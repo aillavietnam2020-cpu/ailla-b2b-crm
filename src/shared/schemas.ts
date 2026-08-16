@@ -151,27 +151,62 @@ export const priceUpsertSchema = z.object({
 });
 export type PriceUpsertInput = z.infer<typeof priceUpsertSchema>;
 
-export const paymentCreateSchema = z.object({
-  customer_id: z.string().trim().min(1, 'Phải chọn khách hàng'),
-  amount: vndAmount.refine((v) => v > 0, 'Số tiền phải lớn hơn 0'),
-  paid_at: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày nhận tiền không hợp lệ')
-    .optional(),
-  method: z.string().trim().max(60).optional().nullable(),
-  external_receipt_no: z.string().trim().max(60).optional().nullable(),
-  note: z.string().trim().max(300).optional().nullable(),
-  accounting_confirmed: z.boolean().optional(),
-  /** Phân bổ ngay vào các đơn; để trống nghĩa là "trả nợ chung", vào hàng chờ phân bổ. */
-  allocations: z
-    .array(
-      z.object({
-        order_id: z.string().trim().min(1),
-        amount: vndAmount.refine((v) => v > 0, 'Số tiền phân bổ phải lớn hơn 0'),
-      }),
-    )
-    .optional(),
-});
+/** Số tiền của khoản thu: dương là thu vào, âm CHỈ dùng cho bút toán đảo (is_adjustment). */
+const paymentAmount = z
+  .number({ invalid_type_error: 'Số tiền phải là số nguyên đơn vị đồng' })
+  .int('Số tiền phải là số nguyên đồng, không có phần lẻ')
+  .refine((v) => v !== 0, 'Số tiền phải khác 0');
+
+export const paymentCreateSchema = z
+  .object({
+    customer_id: z.string().trim().min(1, 'Phải chọn khách hàng'),
+    amount: paymentAmount,
+    paid_at: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày nhận tiền không hợp lệ')
+      .optional(),
+    method: z.string().trim().max(60).optional().nullable(),
+    external_receipt_no: z.string().trim().max(60).optional().nullable(),
+    note: z.string().trim().max(300).optional().nullable(),
+    accounting_confirmed: z.boolean().optional(),
+    /** Bút toán đảo: khoản điều chỉnh giảm để huỷ một khoản thu đã ghi nhận trước đó. */
+    is_adjustment: z.boolean().optional(),
+    adjustment_reason: z.string().trim().max(300).optional().nullable(),
+    /** Phân bổ ngay vào các đơn; để trống nghĩa là "trả nợ chung", vào hàng chờ phân bổ. */
+    allocations: z
+      .array(
+        z.object({
+          order_id: z.string().trim().min(1),
+          amount: paymentAmount,
+        }),
+      )
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    // Số âm chỉ hợp lệ khi đánh dấu rõ là bút toán đảo, kèm lý do (mục 9.2).
+    if (value.amount < 0 && !value.is_adjustment) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['amount'],
+        message: 'Số tiền âm chỉ dùng cho bút toán đảo. Hãy tick "Khoản điều chỉnh giảm".',
+      });
+    }
+    if (value.is_adjustment && !value.adjustment_reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['adjustment_reason'],
+        message: 'Bút toán đảo bắt buộc ghi lý do',
+      });
+    }
+    const wrongSign = (value.allocations ?? []).some((a) => Math.sign(a.amount) !== Math.sign(value.amount));
+    if (wrongSign) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allocations'],
+        message: 'Phân bổ phải cùng dấu với số tiền của phiếu',
+      });
+    }
+  });
 export type PaymentCreateInput = z.infer<typeof paymentCreateSchema>;
 
 export const accountingConfirmSchema = z.object({
@@ -199,7 +234,8 @@ export const paymentAllocateSchema = z.object({
     .array(
       z.object({
         order_id: z.string().trim().min(1),
-        amount: vndAmount.refine((v) => v > 0, 'Số tiền phân bổ phải lớn hơn 0'),
+        // Âm khi phân bổ một bút toán đảo để trừ lại đúng đơn đã ghi nhận.
+        amount: paymentAmount,
       }),
     )
     .min(1, 'Phải chọn ít nhất một đơn để phân bổ'),

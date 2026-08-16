@@ -30,7 +30,9 @@ const DEFAULTS: AppConfig = {
     source_orders: 35,
     source_order_lines: 206,
     managed_orders: 34,
-    payments: 26,
+    // Tài liệu ghi 26 nhưng file thật chỉ có 25 giao dịch: dòng thứ 26 trong sheet THANH_TOAN
+    // chỉ điền mỗi ô "KẾ TOÁN XÁC NHẬN", không có ngày/khách/tiền. Tổng tiền vẫn khớp tuyệt đối.
+    payments: 25,
     payments_total: 180073600,
     opening_debt_total: 1256920982,
     official_debt_total: 1168465995,

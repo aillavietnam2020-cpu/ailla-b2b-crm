@@ -25,6 +25,7 @@ export function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [commitStep, setCommitStep] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
   const batches = useApi<BatchRow[]>('/api/imports');
 
@@ -49,28 +50,52 @@ export function ImportPage() {
     }
   };
 
+  /**
+   * Ghi dữ liệu theo từng chặng: sản phẩm/giá → khách hàng → đơn hàng → thanh toán → chốt.
+   * Mỗi chặng là một request riêng vì Cloudflare giới hạn thời gian xử lý mỗi lần gọi.
+   */
   const runCommit = async () => {
     if (!preview || !file) return;
     setBusy(true);
     setErrorText(null);
+    setCommitStep(null);
     try {
-      const formData = new FormData();
-      formData.append('batch_id', preview.batch_id);
-      formData.append('file', file);
-      const result = await apiFetch<{ status: string; inserted: Record<string, number> }>(
-        '/api/imports/commit',
-        { method: 'POST', formData },
-      );
+      let phase: string | null = null;
+      let status = '';
+      // Tối đa 10 vòng cho 5 chặng - đủ dư để không bao giờ lặp vô hạn.
+      for (let i = 0; i < 10; i += 1) {
+        const formData = new FormData();
+        formData.append('batch_id', preview.batch_id);
+        formData.append('file', file);
+        if (phase) formData.append('phase', phase);
+
+        const result = await apiFetch<{
+          status: string;
+          next_phase: string | null;
+          phase_label?: string;
+        }>('/api/imports/commit', { method: 'POST', formData });
+
+        status = result.data.status;
+        setCommitStep(result.data.phase_label ?? null);
+        if (!result.data.next_phase) break;
+        phase = result.data.next_phase;
+      }
+
       toast.success(
-        result.data.status === 'RECONCILED'
-          ? 'Commit thành công và khớp toàn bộ mốc đối soát.'
-          : 'Đã commit nhưng CHƯA khớp đối soát - xem danh sách lệch.',
+        status === 'RECONCILED'
+          ? 'Ghi dữ liệu xong và khớp toàn bộ mốc đối soát.'
+          : 'Đã ghi dữ liệu nhưng CHƯA khớp đối soát - xem danh sách lệch.',
       );
       setPreview(null);
       setFile(null);
+      setCommitStep(null);
       batches.reload();
     } catch (err) {
-      setErrorText(err instanceof ApiError ? err.message : 'Không commit được.');
+      setErrorText(
+        err instanceof ApiError
+          ? `${err.message} (bấm "Ghi dữ liệu" lần nữa để chạy tiếp từ chặng đang dở)`
+          : 'Không ghi được dữ liệu.',
+      );
     } finally {
       setBusy(false);
     }
@@ -116,7 +141,7 @@ export function ImportPage() {
               {busy ? 'Đang xử lý…' : 'Bước 1: Kiểm tra (preview)'}
             </button>
             <button className="btn primary" onClick={runCommit} disabled={!preview || busy}>
-              Bước 2: Commit batch đã kiểm tra
+              {busy && commitStep ? `Đang ghi: ${commitStep}…` : 'Bước 2: Ghi dữ liệu vào hệ thống'}
             </button>
           </div>
         </Card>

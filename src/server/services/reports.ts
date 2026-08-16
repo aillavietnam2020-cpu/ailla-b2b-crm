@@ -64,7 +64,7 @@ export async function salesReport(
         (SELECT COALESCE(SUM(o.discount_amount + o.bonus_deduction), 0) FROM orders o
            WHERE o.owner_id = u.id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
              AND o.order_date BETWEEN ? AND ?) AS discount_total,
-        (SELECT COALESCE(SUM(p.amount), 0) FROM payments p
+        (SELECT COALESCE(SUM(CASE WHEN p.is_adjustment = 1 THEN -p.amount ELSE p.amount END), 0) FROM payments p
            JOIN customers c ON c.id = p.customer_id
            WHERE c.owner_id = u.id AND p.accounting_status = 'DA_XAC_NHAN'
              AND p.paid_at BETWEEN ? AND ?) AS collected,
@@ -127,7 +127,7 @@ export async function salesReport(
       `SELECT substr(o.order_date, 1, 7) AS month,
               COALESCE(SUM(o.total_amount), 0) AS gross_revenue,
               COUNT(*) AS orders,
-              (SELECT COALESCE(SUM(p.amount), 0) FROM payments p
+              (SELECT COALESCE(SUM(CASE WHEN p.is_adjustment = 1 THEN -p.amount ELSE p.amount END), 0) FROM payments p
                  WHERE substr(p.paid_at, 1, 7) = substr(o.order_date, 1, 7)
                    AND p.accounting_status = 'DA_XAC_NHAN') AS collected
        FROM orders o

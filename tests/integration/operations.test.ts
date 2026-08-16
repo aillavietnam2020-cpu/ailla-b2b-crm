@@ -296,3 +296,94 @@ describe('Báo cáo doanh số và thưởng', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('Bút toán đảo (khoản điều chỉnh giảm)', () => {
+  async function approvedOrder() {
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      idempotencyKey: crypto.randomUUID(),
+      body: { customer_id: 'cus-thao-1', items: [{ product_id: 'prod-full', qty: 5 }] },
+    });
+    await ctx.request(`/api/orders/${created.body.data.id}/submit`, {
+      as: USERS.thao,
+      idempotencyKey: crypto.randomUUID(),
+      body: {},
+    });
+    const approvals = await ctx.request('/api/approvals?status=PENDING', { as: USERS.manager });
+    for (const approval of approvals.body.data) {
+      await ctx.request(`/api/approvals/${approval.id}/decide`, {
+        as: USERS.manager,
+        body: { decision: 'APPROVED' },
+      });
+    }
+    return created.body.data.id as string;
+  }
+
+  it('số tiền âm bị từ chối nếu không đánh dấu là bút toán đảo', async () => {
+    const orderId = await approvedOrder();
+    const res = await ctx.request('/api/payments', {
+      as: USERS.manager,
+      body: {
+        customer_id: 'cus-thao-1',
+        amount: -1000000,
+        allocations: [{ order_id: orderId, amount: -1000000 }],
+      },
+    });
+    // Sai quy tắc dữ liệu đầu vào -> 400 kèm chi tiết từng trường.
+    expect(res.status).toBe(400);
+    expect(res.body.error.fields?.amount).toContain('bút toán đảo');
+  });
+
+  it('bút toán đảo bắt buộc ghi lý do và phải chỉ rõ đơn', async () => {
+    const thieuLyDo = await ctx.request('/api/payments', {
+      as: USERS.manager,
+      body: { customer_id: 'cus-thao-1', amount: -1000000, is_adjustment: true },
+    });
+    expect(thieuLyDo.status).toBe(400);
+    expect(thieuLyDo.body.error.fields?.adjustment_reason).toBeTruthy();
+  });
+
+  it('bút toán đảo trừ đúng số tiền đã ghi nhận của đơn', async () => {
+    const orderId = await approvedOrder();
+    const detail = await ctx.request(`/api/orders/${orderId}`, { as: USERS.thao });
+    const total = detail.body.data.total_amount as number;
+
+    await ctx.request('/api/payments', {
+      as: USERS.manager,
+      body: {
+        customer_id: 'cus-thao-1',
+        amount: total,
+        external_receipt_no: 'PT-100',
+        accounting_confirmed: true,
+        allocations: [{ order_id: orderId, amount: total }],
+      },
+    });
+    const daThu = await ctx.request(`/api/orders/${orderId}`, { as: USERS.thao });
+    expect(daThu.body.data.payment_status).toBe('DA_THU_DU');
+
+    // Kế toán đảo lại toàn bộ khoản thu đó.
+    const dao = await ctx.request('/api/payments', {
+      as: USERS.manager,
+      body: {
+        customer_id: 'cus-thao-1',
+        amount: total,
+        is_adjustment: true,
+        adjustment_reason: 'Huỷ khoản thu ghi nhầm',
+        accounting_confirmed: true,
+        allocations: [{ order_id: orderId, amount: total }],
+      },
+    });
+    expect(dao.status).toBe(200);
+
+    const sauKhiDao = await ctx.request(`/api/orders/${orderId}`, { as: USERS.thao });
+    expect(sauKhiDao.body.data.payment_status).toBe('CHUA_THU');
+    expect(sauKhiDao.body.data.received_amount).toBe(0);
+
+    // Không được biến thành số dư có: đây là huỷ khoản thu, không phải thu thừa.
+    const credit = await ctx.db
+      .prepare('SELECT amount FROM customer_credit_balances WHERE customer_id = ?')
+      .bind('cus-thao-1')
+      .first<{ amount: number }>();
+    expect(credit?.amount ?? 0).toBe(0);
+  });
+});

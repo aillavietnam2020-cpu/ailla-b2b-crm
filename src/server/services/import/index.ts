@@ -12,7 +12,7 @@ import { auditStatement } from '../../lib/audit';
 import { badRequest, notFound } from '../../lib/http';
 import { newId, sha256Hex } from '../../lib/ids';
 import type { AppConfig } from '../../lib/settings';
-import { parseWorkbook, type ParsedWorkbook } from './parser';
+import { parseWorkbook, type ParsedWorkbook, type ParseScope } from './parser';
 
 const TIER_ID_BY_CODE: Record<TierCode, string> = {
   GDKD: 'tier-gdkd',
@@ -198,18 +198,44 @@ export async function previewImport(
   };
 }
 
+/**
+ * Ghi dữ liệu theo từng CHẶNG. File thật có hơn 1.400 bản ghi, ghi hết trong một request
+ * sẽ vượt hạn mức xử lý của Cloudflare Workers, nên mỗi chặng là một request riêng.
+ */
+export const COMMIT_PHASES = ['catalog', 'customers', 'orders', 'payments', 'finalize'] as const;
+export type CommitPhase = (typeof COMMIT_PHASES)[number];
+
+export const COMMIT_PHASE_LABELS: Record<CommitPhase, string> = {
+  catalog: 'Sản phẩm và bảng giá',
+  customers: 'Khách hàng',
+  orders: 'Đơn hàng và dòng hàng',
+  payments: 'Thanh toán và chăm sóc',
+  finalize: 'Đối soát và chốt batch',
+};
+
 export interface CommitOptions {
   batchId: string;
   bytes: ArrayBuffer | Uint8Array;
   force?: boolean;
+  /** Bỏ trống thì chạy chặng còn dở tiếp theo. */
+  phase?: CommitPhase;
+  /**
+   * true = chỉ chạy MỘT chặng rồi trả về (Cloudflare Workers có hạn mức xử lý mỗi request).
+   * false/bỏ trống = chạy lần lượt hết các chặng trong cùng lời gọi (dùng cho test và file nhỏ).
+   */
+  singlePhase?: boolean;
   ctx: { requestId: string; ip: string | null };
 }
 
 export interface CommitResult {
   batch_id: string;
-  status: 'COMMITTED' | 'RECONCILED';
+  status: 'COMMITTED' | 'RECONCILED' | 'IN_PROGRESS';
   inserted: Record<string, number>;
   reconciliation: ReconciliationResult;
+  /** Chặng vừa chạy xong và chặng kế tiếp cần gọi (null = đã xong hết). */
+  phase?: CommitPhase;
+  next_phase?: CommitPhase | null;
+  phase_label?: string;
 }
 
 export async function commitImport(
@@ -221,7 +247,14 @@ export async function commitImport(
   const batch = await db
     .prepare('SELECT * FROM import_batches WHERE id = ?')
     .bind(options.batchId)
-    .first<{ id: string; checksum: string; type: string; status: string; file_name: string }>();
+    .first<{
+      id: string;
+      checksum: string;
+      type: string;
+      status: string;
+      file_name: string;
+      progress_json: string | null;
+    }>();
   if (!batch) throw notFound('Không tìm thấy batch import');
   if (batch.status !== 'PREVIEW') {
     throw badRequest('BATCH_NOT_PREVIEW', 'Batch này đã được commit hoặc đã bị huỷ.');
@@ -276,11 +309,15 @@ export async function commitImport(
     };
   }
 
-  const parsed = parseWorkbook(bytes);
-  const totals = computeTotals(parsed);
-  const reconciliation = reconcile(totals, config.reconciliationBaseline);
-  const now = nowIso();
-  const today = vnDate();
+  // Gọi không chỉ định chặng và không bật singlePhase: chạy tuần tự hết các chặng.
+  if (!options.phase && !options.singlePhase) {
+    let last: CommitResult | null = null;
+    for (const p of COMMIT_PHASES) {
+      last = await commitImport(db, config, auth, { ...options, phase: p });
+    }
+    return last as CommitResult;
+  }
+
   const inserted: Record<string, number> = {
     product_groups: 0,
     products: 0,
@@ -300,6 +337,74 @@ export async function commitImport(
     }
   };
 
+  // ---- Chia commit thành từng chặng ---------------------------------------
+  // Mỗi request chỉ chạy MỘT chặng rồi ghi lại tiến độ, tránh vượt hạn mức xử lý.
+  const donePhases: CommitPhase[] = batch.progress_json
+    ? (JSON.parse(batch.progress_json) as CommitPhase[])
+    : [];
+  const phase: CommitPhase =
+    options.phase ?? (COMMIT_PHASES.find((p) => !donePhases.includes(p)) ?? 'finalize');
+
+  // Mỗi chặng chỉ đọc đúng nhóm dữ liệu của mình để không vượt hạn mức xử lý.
+  const SCOPE_BY_PHASE: Record<CommitPhase, ParseScope[]> = {
+    catalog: ['products'],
+    customers: ['customers'],
+    orders: ['orders'],
+    payments: ['payments', 'activities'],
+    finalize: ['products', 'customers', 'orders', 'payments'],
+  };
+  const parsed = parseWorkbook(bytes, SCOPE_BY_PHASE[phase]);
+  const totals = computeTotals(parsed);
+  const reconciliation = reconcile(totals, config.reconciliationBaseline);
+  const now = nowIso();
+  const today = vnDate();
+
+  const finishPhase = async (current: CommitPhase): Promise<CommitResult> => {
+    const done = [...new Set([...donePhases, current])];
+    await db
+      .prepare('UPDATE import_batches SET progress_json = ? WHERE id = ?')
+      .bind(JSON.stringify(done), batch.id)
+      .run();
+    const next = COMMIT_PHASES.find((p) => !done.includes(p)) ?? null;
+    return {
+      batch_id: batch.id,
+      status: 'IN_PROGRESS',
+      inserted,
+      reconciliation,
+      phase: current,
+      next_phase: next,
+      phase_label: COMMIT_PHASE_LABELS[current],
+    };
+  };
+
+  /** Bảng tra cứu dựng lại từ database, vì mỗi chặng chạy trong một request riêng. */
+  const loadMaps = async () => {
+    const [products, customers, users, orders] = await Promise.all([
+      db.prepare('SELECT id, sku FROM products').all<{ id: string; sku: string }>(),
+      db
+        .prepare('SELECT id, legacy_code FROM customers WHERE legacy_code IS NOT NULL')
+        .all<{ id: string; legacy_code: string }>(),
+      db
+        .prepare('SELECT id, display_name, legacy_name FROM users WHERE deleted_at IS NULL')
+        .all<{ id: string; display_name: string; legacy_name: string | null }>(),
+      db
+        .prepare('SELECT id, legacy_order_code FROM orders WHERE legacy_order_code IS NOT NULL')
+        .all<{ id: string; legacy_order_code: string }>(),
+    ]);
+    const owners = new Map<string, string>();
+    for (const u of users.results ?? []) {
+      if (u.legacy_name) owners.set(u.legacy_name.toLowerCase(), u.id);
+      owners.set(u.display_name.toLowerCase(), u.id);
+    }
+    return {
+      products: new Map((products.results ?? []).map((r) => [r.sku, r.id])),
+      customers: new Map((customers.results ?? []).map((r) => [r.legacy_code, r.id])),
+      owners,
+      orders: new Map((orders.results ?? []).map((r) => [r.legacy_order_code, r.id])),
+    };
+  };
+
+  if (phase === 'catalog') {
   // ---- Nhóm sản phẩm + sản phẩm + giá ---------------------------------------
   const groupNames = [...new Set(parsed.products.map((p) => p.group_name).filter(Boolean))] as string[];
   const groupIdByName = new Map<string, string>();
@@ -367,6 +472,10 @@ export async function commitImport(
   }
   await runChunked(productStatements);
 
+    return finishPhase('catalog');
+  }
+
+  if (phase === 'customers') {
   // ---- Khách hàng -----------------------------------------------------------
   const userRows = await db
     .prepare('SELECT id, display_name, legacy_name FROM users WHERE deleted_at IS NULL')
@@ -428,6 +537,13 @@ export async function commitImport(
   }
   await runChunked(customerStatements);
 
+    return finishPhase('customers');
+  }
+
+  if (phase === 'orders') {
+    const maps = await loadMaps();
+    const customerIdByLegacy = maps.customers;
+    const productIdBySku = maps.products;
   // ---- Đơn hàng nguồn + trạng thái -----------------------------------------
   const statusByCode = new Map(parsed.orderStatuses.map((s) => [s.order_code, s]));
   const linesByOrder = new Map<string, typeof parsed.orderLines>();
@@ -614,6 +730,16 @@ export async function commitImport(
 
   await runChunked(orderStatements);
 
+    await runChunked(errorStatements);
+    return finishPhase('orders');
+  }
+
+  if (phase === 'payments') {
+    const maps = await loadMaps();
+    const customerIdByLegacy = maps.customers;
+    const ownerIdByLegacy = maps.owners;
+    const orderIdByCode = maps.orders;
+    const errorStatements: D1PreparedStatement[] = [];
   // ---- Thanh toán -----------------------------------------------------------
   const paymentStatements: D1PreparedStatement[] = [];
   const existingPayments = await db
@@ -659,9 +785,9 @@ export async function commitImport(
       db
         .prepare(
           `INSERT INTO payments (id, external_receipt_no, source, external_row_key, customer_id, amount,
-             paid_at, method, accounting_status, review_status, is_general_repayment, note, import_batch_id,
-             created_by, created_at, updated_at)
-           VALUES (?, ?, 'IMPORT', ?, ?, ?, ?, ?, 'CHUA_XAC_NHAN', ?, ?, NULL, ?, ?, ?, ?)
+             paid_at, method, accounting_status, review_status, is_general_repayment, is_adjustment,
+             adjustment_reason, note, import_batch_id, created_by, created_at, updated_at)
+           VALUES (?, ?, 'IMPORT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
            ON CONFLICT (source, external_row_key) WHERE external_row_key IS NOT NULL DO NOTHING`,
         )
         .bind(
@@ -669,11 +795,15 @@ export async function commitImport(
           payment.receipt_no,
           payment.external_row_key,
           customerId,
-          payment.amount,
+          Math.abs(payment.amount),
           payment.paid_at ?? today,
           payment.method,
+          // Giữ đúng trạng thái kế toán trong file: khoản đã xác nhận mới trừ nợ chính thức.
+          payment.accounting_confirmed ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN',
           payment.needs_review ? 'NEEDS_REVIEW' : 'OK',
           payment.is_general_repayment ? 1 : 0,
+          payment.is_adjustment ? 1 : 0,
+          payment.is_adjustment ? 'Bút toán đảo nhập từ file Excel' : null,
           options.batchId,
           auth.user.id,
           now,
@@ -689,7 +819,7 @@ export async function commitImport(
             `INSERT INTO payment_allocations_pending (id, payment_id, customer_id, amount, reason, status, created_at)
              VALUES (?, ?, ?, ?, 'Khoản trả nợ chung từ file Excel - chờ phân bổ', 'PENDING', ?)`,
           )
-          .bind(newId(), paymentId, customerId, payment.amount, now),
+          .bind(newId(), paymentId, customerId, Math.abs(payment.amount), now),
       );
     } else if (payment.order_code) {
       const orderId = orderIdByCode.get(payment.order_code);
@@ -700,7 +830,7 @@ export async function commitImport(
               `INSERT INTO payment_allocations (id, payment_id, order_id, amount, allocated_by, created_at)
                VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (payment_id, order_id) DO NOTHING`,
             )
-            .bind(newId(), paymentId, orderId, payment.amount, auth.user.id, now),
+            .bind(newId(), paymentId, orderId, Math.abs(payment.amount), auth.user.id, now),
         );
       }
     }
@@ -740,6 +870,9 @@ export async function commitImport(
   }
   await runChunked(activityStatements);
   await runChunked(errorStatements);
+
+    return finishPhase('payments');
+  }
 
   // ---- Chốt batch -----------------------------------------------------------
   const status: 'COMMITTED' | 'RECONCILED' = reconciliation.ok ? 'RECONCILED' : 'COMMITTED';

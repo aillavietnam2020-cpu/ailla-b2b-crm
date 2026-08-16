@@ -8,6 +8,7 @@ import type { AuthContext } from '../env';
 import { auditStatement } from '../lib/audit';
 import { badRequest, forbidden, notFound, unprocessable } from '../lib/http';
 import { newId } from '../lib/ids';
+import { RECEIVED_BY_ORDER } from '../lib/sql';
 import type { AppConfig } from '../lib/settings';
 import { loadPriceRows } from './pricing';
 import { getCustomerDebt } from './debts';
@@ -473,8 +474,7 @@ export async function listOrders(
        JOIN customers c ON c.id = o.customer_id
        LEFT JOIN users u ON u.id = o.owner_id
        LEFT JOIN (
-         SELECT order_id, SUM(amount) AS received FROM payment_allocations
-         WHERE reversed_at IS NULL GROUP BY order_id
+         ${RECEIVED_BY_ORDER}
        ) a ON a.order_id = o.id
        WHERE ${where.join(' AND ')}
        ORDER BY o.order_date DESC, o.created_at DESC
@@ -503,8 +503,7 @@ export async function getOrderDetail(
        JOIN customers c ON c.id = o.customer_id
        LEFT JOIN users u ON u.id = o.owner_id
        LEFT JOIN (
-         SELECT order_id, SUM(amount) AS received FROM payment_allocations
-         WHERE reversed_at IS NULL GROUP BY order_id
+         ${RECEIVED_BY_ORDER}
        ) a ON a.order_id = o.id
        WHERE o.id = ? AND o.deleted_at IS NULL`,
     )
@@ -667,8 +666,7 @@ export async function cancelOrder(
       `SELECT o.id, o.owner_id, o.approval_status, o.delivery_status, o.accounting_status,
               COALESCE(a.received, 0) AS received
        FROM orders o
-       LEFT JOIN (SELECT order_id, SUM(amount) AS received FROM payment_allocations
-                  WHERE reversed_at IS NULL GROUP BY order_id) a ON a.order_id = o.id
+       LEFT JOIN (${RECEIVED_BY_ORDER}) a ON a.order_id = o.id
        WHERE o.id = ? AND o.deleted_at IS NULL`,
     )
     .bind(orderId)

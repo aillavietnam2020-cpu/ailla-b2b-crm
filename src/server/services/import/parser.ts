@@ -71,6 +71,10 @@ export interface ParsedPayment {
   paid_at: string | null;
   method: string | null;
   is_general_repayment: boolean;
+  /** Kế toán đã xác nhận khoản thu này chưa (cột KẾ TOÁN XÁC NHẬN trong file). */
+  accounting_confirmed: boolean;
+  /** Số tiền âm: bút toán đảo huỷ một khoản thu đã ghi nhận trước đó. */
+  is_adjustment: boolean;
   needs_review: boolean;
   external_row_key: string;
 }
@@ -507,14 +511,24 @@ function parseOrderStatuses(workbook: XLSX.WorkBook, issues: ImportIssue[]): Par
     else if (deliveryRaw.includes('hoan')) delivery = 'HOAN';
     else if (deliveryRaw) delivery = 'CHUA_XUAT';
 
-    const accountingValue = toVndInteger(pick(row, ['gia_tri_ke_toan', 'ke_toan_xac_nhan', 'gia_tri_xac_nhan']));
-    if (accountingValue === null) {
+    // Cột "KẾ TOÁN XÁC NHẬN" ở file thật là chữ ("Đã xác nhận"/"Chưa xác nhận"), một số bản
+    // cũ lại ghi bằng số tiền. Chấp nhận cả hai; ô trống = CHƯA xác nhận (mục 2.1).
+    const accountingRaw = pick(row, ['ke_toan_xac_nhan', 'gia_tri_ke_toan', 'gia_tri_xac_nhan']);
+    const accountingText = normalizeKey(accountingRaw);
+    const accountingValue = toVndInteger(accountingRaw);
+    const accountingConfirmed = accountingText.includes('da_xac_nhan')
+      ? true
+      : accountingText.includes('chua_xac_nhan')
+        ? false
+        : accountingValue !== null && accountingValue > 0;
+
+    if (!accountingConfirmed) {
       issues.push({
         sheet: 'QUAN_LY_DON_HANG',
         row_no: rowNo,
         field: 'accounting',
         code: 'ACCOUNTING_UNCONFIRMED',
-        message: `Đơn ${orderCode} chưa có giá trị xác nhận kế toán - coi là CHƯA xác nhận.`,
+        message: `Đơn ${orderCode} chưa được kế toán xác nhận - vào nhóm "chờ ghi nợ", chưa tính vào công nợ chính thức.`,
         severity: 'WARNING',
       });
     }
@@ -524,7 +538,7 @@ function parseOrderStatuses(workbook: XLSX.WorkBook, issues: ImportIssue[]): Par
       order_code: orderCode,
       delivery_status: delivery,
       payment_status: text(pick(row, ['trang_thai_thanh_toan', 'thanh_toan', 'payment_status'])),
-      accounting_confirmed: accountingValue !== null && accountingValue > 0,
+      accounting_confirmed: accountingConfirmed,
       accounting_value: accountingValue,
       shipping_fee: toVndInteger(pick(row, ['phi_van_chuyen', 'phi_ship', 'ship'])),
       discount_amount: toVndInteger(pick(row, ['chiet_khau', 'giam_gia', 'discount'])),
@@ -586,15 +600,35 @@ function parsePayments(workbook: XLSX.WorkBook, issues: ImportIssue[]): ParsedPa
       });
     }
 
+    // Số tiền âm là bút toán đảo: huỷ một khoản thu đã ghi nhận trước đó của cùng đơn.
+    const isAdjustment = amount < 0;
+    if (isAdjustment) {
+      issues.push({
+        sheet: 'THANH_TOAN',
+        row_no: rowNo,
+        field: 'amount',
+        code: 'PAYMENT_ADJUSTMENT',
+        message: `Dòng ${rowNo}: khoản điều chỉnh giảm ${amount.toLocaleString('vi-VN')}đ${
+          orderCode ? ` cho đơn ${orderCode}` : ''
+        } - nhập vào dạng bút toán đảo, có đánh dấu riêng để kế toán đối chiếu.`,
+        severity: 'WARNING',
+      });
+    }
+
     payments.push({
       row_no: rowNo,
       receipt_no: receipt,
       customer_legacy_code: customerCode ? customerCode.toLowerCase() : null,
       order_code: orderCode,
       amount,
+      is_adjustment: isAdjustment,
       paid_at: normalizeExcelDate(pick(row, ['ngay', 'ngay_thu', 'ngay_thanh_toan', 'paid_at'])),
       method: text(pick(row, ['hinh_thuc', 'phuong_thuc', 'method'])),
       is_general_repayment: isGeneral,
+      // Chỉ khoản kế toán ĐÃ xác nhận mới được trừ vào công nợ chính thức (mục 9.1).
+      accounting_confirmed: normalizeKey(
+        pick(row, ['ke_toan_xac_nhan', 'ke_toan', 'accounting']),
+      ).includes('da_xac_nhan'),
       needs_review: !receipt || isGeneral,
       // Khoá chống nhập trùng khi phiếu thu không có mã (mục 9.2)
       external_row_key: `${sheetName}:${rowNo}:${receipt ?? 'NO_RECEIPT'}:${amount}`,
@@ -666,9 +700,45 @@ function parseActivities(workbook: XLSX.WorkBook): ParsedActivity[] {
   return activities;
 }
 
-export function parseWorkbook(bytes: ArrayBuffer | Uint8Array): ParsedWorkbook {
+/** Nhóm dữ liệu cần đọc. Bỏ trống = đọc hết. */
+export type ParseScope = 'products' | 'customers' | 'orders' | 'payments' | 'activities';
+
+/**
+ * Đọc file Excel. Có thể giới hạn theo nhóm dữ liệu để mỗi chặng commit chỉ mở đúng sheet cần
+ * dùng - file thật có 17 sheet, riêng SO_DON_HANG hơn 3.000 dòng, mở hết mọi lần sẽ vượt hạn
+ * mức xử lý của Cloudflare Workers.
+ */
+export function parseWorkbook(
+  bytes: ArrayBuffer | Uint8Array,
+  scopes?: ParseScope[],
+): ParsedWorkbook {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  const workbook = XLSX.read(data, { type: 'array', cellDates: false });
+  const wants = (scope: ParseScope) => !scopes || scopes.includes(scope);
+
+  // Chỉ giải nén những sheet thực sự cần cho các nhóm được yêu cầu.
+  const neededSheets = new Set<string>();
+  if (wants('products')) neededSheets.add('BANG_GIA');
+  if (wants('customers')) neededSheets.add('KHACH_HANG');
+  if (wants('orders')) {
+    neededSheets.add('SO_DON_HANG');
+    neededSheets.add('TAO_DON_HANG');
+    neededSheets.add('QUAN_LY_DON_HANG');
+  }
+  if (wants('payments')) {
+    neededSheets.add('THANH_TOAN');
+    neededSheets.add('CONG_NO');
+  }
+  if (wants('activities')) {
+    neededSheets.add('NHAT_KY_CSKH');
+    neededSheets.add('CHAM_SOC');
+    neededSheets.add('LICH_HEN');
+  }
+
+  const workbook = XLSX.read(data, {
+    type: 'array',
+    cellDates: false,
+    ...(scopes ? { sheets: [...neededSheets] } : {}),
+  });
   const issues: ImportIssue[] = [];
 
   const canhBao = findSheet(workbook, 'CANH_BAO');
@@ -684,13 +754,13 @@ export function parseWorkbook(bytes: ArrayBuffer | Uint8Array): ParsedWorkbook {
   }
 
   return {
-    products: parseProducts(workbook, issues),
-    customers: parseCustomers(workbook, issues),
-    orderLines: parseOrderLines(workbook, issues),
-    orderStatuses: parseOrderStatuses(workbook, issues),
-    payments: parsePayments(workbook, issues),
-    debts: parseDebts(workbook, issues),
-    activities: parseActivities(workbook),
+    products: wants('products') ? parseProducts(workbook, issues) : [],
+    customers: wants('customers') ? parseCustomers(workbook, issues) : [],
+    orderLines: wants('orders') ? parseOrderLines(workbook, issues) : [],
+    orderStatuses: wants('orders') ? parseOrderStatuses(workbook, issues) : [],
+    payments: wants('payments') ? parsePayments(workbook, issues) : [],
+    debts: wants('payments') ? parseDebts(workbook, issues) : [],
+    activities: wants('activities') ? parseActivities(workbook) : [],
     issues,
     sheetsFound: workbook.SheetNames,
   };

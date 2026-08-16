@@ -4,7 +4,7 @@ import { badRequest, ok } from '../lib/http';
 import { clientIp } from '../lib/audit';
 import { loadConfig } from '../lib/settings';
 import { requirePermission } from '../middleware/rbac';
-import { commitImport, previewImport, rollbackImport } from '../services/import';
+import { COMMIT_PHASES, type CommitPhase, commitImport, previewImport, rollbackImport } from '../services/import';
 
 export const importRoutes = new Hono<AppEnv>();
 
@@ -78,15 +78,18 @@ importRoutes.post('/commit', requirePermission('import.run'), async (c) => {
 
   let batchId: string | null = null;
   let bytes: ArrayBuffer | null = null;
+  let phaseParam: string | null = c.req.query('phase') ?? null;
 
   if (contentType.includes('multipart/form-data')) {
     const form = await c.req.formData();
     batchId = String(form.get('batch_id') ?? '');
+    phaseParam = phaseParam ?? (form.get('phase') ? String(form.get('phase')) : null);
     const file = form.get('file');
     if (file && typeof file !== 'string') bytes = await (file as File).arrayBuffer();
   } else {
     const body = await c.req.json().catch(() => ({}));
     batchId = body.batch_id ?? null;
+    phaseParam = phaseParam ?? body.phase ?? null;
   }
 
   if (!batchId) throw badRequest('BATCH_REQUIRED', 'Thiếu batch_id của bước preview.');
@@ -104,9 +107,17 @@ importRoutes.post('/commit', requirePermission('import.run'), async (c) => {
     bytes = await object.arrayBuffer();
   }
 
+  // Ghi theo từng chặng: mỗi request một chặng để không vượt hạn mức xử lý của Workers.
+  // Client gọi lại với next_phase cho tới khi next_phase = null.
+  const phase = COMMIT_PHASES.includes(phaseParam as CommitPhase)
+    ? (phaseParam as CommitPhase)
+    : undefined;
+
   const result = await commitImport(c.env.DB, config, auth, {
     batchId,
     bytes,
+    phase,
+    singlePhase: true,
     ctx: { requestId: c.get('requestId'), ip: clientIp(c.req.raw.headers) },
   });
   return ok(c, result);

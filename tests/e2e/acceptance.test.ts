@@ -21,6 +21,28 @@ function workbookForm(bytes: Uint8Array, extra?: Record<string, string>): FormDa
   return form;
 }
 
+/**
+ * Commit chạy theo từng chặng (mỗi request một chặng) để không vượt hạn mức xử lý của
+ * Cloudflare Workers. Hàm này lặp đúng như màn hình Import trong ứng dụng.
+ */
+async function commitAllPhases(bytes: Uint8Array, batchId: string) {
+  let phase: string | null = null;
+  let last: Awaited<ReturnType<typeof ctx.request>> | null = null;
+  for (let i = 0; i < 10; i += 1) {
+    const extra: Record<string, string> = { batch_id: batchId };
+    if (phase) extra.phase = phase;
+    last = await ctx.request('/api/imports/commit', {
+      as: USERS.manager,
+      formData: workbookForm(bytes, extra),
+    });
+    if (last.status !== 200) break;
+    const next = last.body.data?.next_phase ?? null;
+    if (!next) break;
+    phase = next;
+  }
+  return last!;
+}
+
 describe('AC-01 · Đăng nhập đúng vai trò', () => {
   it('nhân viên gọi API khu quản trị thì bị chặn ở backend', async () => {
     await seedBusinessData(ctx.db);
@@ -80,10 +102,7 @@ describe('AC-04 · Import khách hàng (commit)', () => {
       as: USERS.manager,
       formData: workbookForm(bytes),
     });
-    const commit = await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: preview.body.data.batch_id }),
-    });
+    const commit = await commitAllPhases(bytes, preview.body.data.batch_id);
     expect(commit.status).toBe(200);
 
     const total = await ctx.db.prepare('SELECT COUNT(*) AS n FROM customers').first<{ n: number }>();
@@ -129,10 +148,7 @@ describe('AC-05 · Import đơn hàng', () => {
     expect(preview.body.data.totals.source_order_lines).toBe(206);
     expect(preview.body.data.totals.managed_orders).toBe(34);
 
-    await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: preview.body.data.batch_id }),
-    });
+    await commitAllPhases(bytes, preview.body.data.batch_id);
 
     const orders = await ctx.db.prepare('SELECT COUNT(*) AS n FROM orders').first<{ n: number }>();
     expect(orders?.n).toBe(35);
@@ -161,10 +177,7 @@ describe('AC-06 · Đối soát công nợ', () => {
     expect(lines.find((l) => l.key === 'official_debt_total')?.actual).toBe(1_168_465_995);
     expect(lines.find((l) => l.key === 'projected_debt_total')?.actual).toBe(1_397_046_765);
 
-    const commit = await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: preview.body.data.batch_id }),
-    });
+    const commit = await commitAllPhases(bytes, preview.body.data.batch_id);
     expect(commit.body.data.status).toBe('RECONCILED');
   });
 
@@ -176,10 +189,7 @@ describe('AC-06 · Đối soát công nợ', () => {
     });
     expect(preview.body.data.reconciliation.ok).toBe(false);
 
-    const commit = await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: preview.body.data.batch_id }),
-    });
+    const commit = await commitAllPhases(bytes, preview.body.data.batch_id);
     expect(commit.body.data.status).toBe('COMMITTED');
 
     const alert = await ctx.db
@@ -317,10 +327,7 @@ describe('AC-11 · Payment trả nợ chung', () => {
       as: USERS.manager,
       formData: workbookForm(bytes),
     });
-    await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: preview.body.data.batch_id }),
-    });
+    await commitAllPhases(bytes, preview.body.data.batch_id);
 
     const payments = await ctx.db.prepare('SELECT COUNT(*) AS n FROM payments').first<{ n: number }>();
     expect(payments?.n).toBe(26);
@@ -415,18 +422,12 @@ describe('AC-13 · Idempotency', () => {
       as: USERS.manager,
       formData: workbookForm(bytes),
     });
-    await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: p1.body.data.batch_id }),
-    });
+    await commitAllPhases(bytes, p1.body.data.batch_id);
     const p2 = await ctx.request('/api/imports/preview', {
       as: USERS.manager,
       formData: workbookForm(bytes),
     });
-    const secondCommit = await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: p2.body.data.batch_id }),
-    });
+    const secondCommit = await commitAllPhases(bytes, p2.body.data.batch_id);
     expect(secondCommit.status).toBe(200);
 
     const payments = await ctx.db.prepare('SELECT COUNT(*) AS n FROM payments').first<{ n: number }>();
@@ -444,10 +445,7 @@ describe('Rollback batch import', () => {
       formData: workbookForm(bytes),
     });
     const batchId = preview.body.data.batch_id;
-    await ctx.request('/api/imports/commit', {
-      as: USERS.manager,
-      formData: workbookForm(bytes, { batch_id: batchId }),
-    });
+    await commitAllPhases(bytes, batchId);
 
     const res = await ctx.request(`/api/imports/${batchId}/rollback`, {
       as: USERS.manager,

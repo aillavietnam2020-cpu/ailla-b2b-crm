@@ -45,9 +45,13 @@ LEFT JOIN (
   GROUP BY customer_id
 ) o ON o.customer_id = c.id
 LEFT JOIN (
+  -- Bút toán đảo (is_adjustment = 1) mang dấu âm: nó TRỪ lại khoản thu đã ghi nhận trước đó.
   SELECT p.customer_id,
-    SUM(CASE WHEN p.accounting_status = 'DA_XAC_NHAN' THEN COALESCE(a.allocated, 0) ELSE 0 END) AS confirmed_payments,
-    SUM(p.amount - CASE WHEN p.accounting_status = 'DA_XAC_NHAN' THEN COALESCE(a.allocated, 0) ELSE 0 END) AS pending_cash
+    SUM(CASE WHEN p.accounting_status = 'DA_XAC_NHAN'
+             THEN COALESCE(a.allocated, 0) * CASE WHEN p.is_adjustment = 1 THEN -1 ELSE 1 END
+             ELSE 0 END) AS confirmed_payments,
+    SUM((p.amount - CASE WHEN p.accounting_status = 'DA_XAC_NHAN' THEN COALESCE(a.allocated, 0) ELSE 0 END)
+        * CASE WHEN p.is_adjustment = 1 THEN -1 ELSE 1 END) AS pending_cash
   FROM payments p
   LEFT JOIN (
     SELECT payment_id, SUM(amount) AS allocated

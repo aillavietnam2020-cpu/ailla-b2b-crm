@@ -5,6 +5,7 @@ import type { AuthContext } from '../env';
 import { auditStatement } from '../lib/audit';
 import { badRequest, notFound, unprocessable } from '../lib/http';
 import { newId } from '../lib/ids';
+import { ALLOCATED_BY_PAYMENT, RECEIVED_BY_ORDER } from '../lib/sql';
 
 export interface PaymentRow {
   id: string;
@@ -76,28 +77,46 @@ export async function recordPayment(
   const paymentId = newId();
   const now = nowIso();
   const paidAt = input.paid_at ?? vnDate();
-  const isGeneral = !input.allocations || input.allocations.length === 0;
+  const isAdjustment = Boolean(input.is_adjustment) || input.amount < 0;
+  // Database chỉ lưu số DƯƠNG; ý nghĩa trừ đi nằm ở cờ is_adjustment (mục 9.2).
+  const amount = Math.abs(input.amount);
+  const allocations = (input.allocations ?? []).map((a) => ({
+    order_id: a.order_id,
+    amount: Math.abs(a.amount),
+  }));
+  // Bút toán đảo luôn phải chỉ rõ đơn cần trừ lại, không được để dạng "trả nợ chung".
+  const isGeneral = !isAdjustment && allocations.length === 0;
   const accountingStatus = input.accounting_confirmed ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN';
   const reviewStatus = input.external_receipt_no ? 'OK' : 'NEEDS_REVIEW';
+
+  if (isAdjustment && allocations.length === 0) {
+    throw unprocessable(
+      'ADJUSTMENT_NEEDS_ORDER',
+      'Bút toán đảo phải chọn đúng đơn hàng cần trừ lại số tiền đã ghi nhận.',
+      { allocations: 'Chọn đơn cần điều chỉnh' },
+    );
+  }
 
   const statements: D1PreparedStatement[] = [
     db
       .prepare(
         `INSERT INTO payments (id, external_receipt_no, source, external_row_key, customer_id, amount,
-           paid_at, method, accounting_status, review_status, is_general_repayment, note,
-           created_by, created_at, updated_at)
-         VALUES (?, ?, 'MANUAL', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           paid_at, method, accounting_status, review_status, is_general_repayment, is_adjustment,
+           adjustment_reason, note, created_by, created_at, updated_at)
+         VALUES (?, ?, 'MANUAL', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         paymentId,
         input.external_receipt_no ?? null,
         customer.id,
-        input.amount,
+        amount,
         paidAt,
         input.method ?? null,
         accountingStatus,
         reviewStatus,
         isGeneral ? 1 : 0,
+        isAdjustment ? 1 : 0,
+        isAdjustment ? (input.adjustment_reason ?? 'Bút toán đảo') : null,
         input.note ?? null,
         auth.user.id,
         now,
@@ -116,7 +135,7 @@ export async function recordPayment(
           newId(),
           paymentId,
           customer.id,
-          input.amount,
+          amount,
           'Khoản trả nợ chung - chờ phân bổ vào từng đơn',
           now,
         ),
@@ -131,7 +150,8 @@ export async function recordPayment(
       entityId: paymentId,
       after: {
         customer: customer.name,
-        amount: input.amount,
+        amount,
+        is_adjustment: isAdjustment,
         paid_at: paidAt,
         accounting_status: accountingStatus,
         general: isGeneral,
@@ -143,8 +163,8 @@ export async function recordPayment(
 
   await db.batch(statements);
 
-  if (!isGeneral && input.allocations) {
-    await allocatePayment(db, auth, paymentId, input.allocations, ctx);
+  if (!isGeneral && allocations.length > 0) {
+    await allocatePayment(db, auth, paymentId, allocations, ctx);
   }
 
   return { id: paymentId, pending_allocation: isGeneral };
@@ -165,18 +185,26 @@ export async function allocatePayment(
 ): Promise<{ allocated: number; credit_balance: number }> {
   const payment = await db
     .prepare(
-      `SELECT p.id, p.customer_id, p.amount, p.accounting_status,
+      `SELECT p.id, p.customer_id, p.amount, p.accounting_status, p.is_adjustment,
               COALESCE(a.allocated, 0) AS allocated
        FROM payments p
-       LEFT JOIN (SELECT payment_id, SUM(amount) AS allocated FROM payment_allocations
-                  WHERE reversed_at IS NULL GROUP BY payment_id) a ON a.payment_id = p.id
+       LEFT JOIN (${ALLOCATED_BY_PAYMENT}) a ON a.payment_id = p.id
        WHERE p.id = ?`,
     )
     .bind(paymentId)
-    .first<{ id: string; customer_id: string; amount: number; accounting_status: string; allocated: number }>();
+    .first<{
+      id: string;
+      customer_id: string;
+      amount: number;
+      accounting_status: string;
+      is_adjustment: number;
+      allocated: number;
+    }>();
   if (!payment) throw notFound('Không tìm thấy phiếu thu');
 
-  const requested = allocations.reduce((acc, a) => acc + a.amount, 0);
+  // Số tiền trong database luôn dương; bút toán đảo mang ý nghĩa trừ đi.
+  const isAdjustment = payment.is_adjustment === 1;
+  const requested = allocations.reduce((acc, a) => acc + Math.abs(a.amount), 0);
   if (payment.allocated + requested > payment.amount) {
     throw unprocessable(
       'ALLOCATION_EXCEEDS_PAYMENT',
@@ -189,8 +217,7 @@ export async function allocatePayment(
     .prepare(
       `SELECT o.id, o.customer_id, o.total_amount, o.cod_amount, COALESCE(a.received, 0) AS received
        FROM orders o
-       LEFT JOIN (SELECT order_id, SUM(amount) AS received FROM payment_allocations
-                  WHERE reversed_at IS NULL GROUP BY order_id) a ON a.order_id = o.id
+       LEFT JOIN (${RECEIVED_BY_ORDER}) a ON a.order_id = o.id
        WHERE o.id IN (${orderIds.map(() => '?').join(',')}) AND o.deleted_at IS NULL`,
     )
     .bind(...orderIds)
@@ -213,8 +240,11 @@ export async function allocatePayment(
 
     const receivedBefore = order.received + order.cod_amount;
     const remaining = order.total_amount - receivedBefore;
-    const applied = Math.min(allocation.amount, Math.max(0, remaining));
-    excess += allocation.amount - applied;
+    const wanted = Math.abs(allocation.amount);
+    // Bút toán đảo trừ đúng số đã ghi nhận; phiếu thu thường thì phần vượt quá công nợ của đơn
+    // được giữ lại thành số dư có của khách chứ không để đơn âm.
+    const applied = isAdjustment ? wanted : Math.min(wanted, Math.max(0, remaining));
+    excess += wanted - applied;
 
     if (applied > 0) {
       statements.push(
@@ -227,12 +257,19 @@ export async function allocatePayment(
           .bind(newId(), paymentId, allocation.order_id, applied, auth.user.id, now),
         db
           .prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?')
-          .bind(derivePaymentStatus(order.total_amount, receivedBefore + applied), now, allocation.order_id),
+          .bind(
+            derivePaymentStatus(
+              order.total_amount,
+              receivedBefore + (isAdjustment ? -applied : applied),
+            ),
+            now,
+            allocation.order_id,
+          ),
       );
     }
   }
 
-  if (excess > 0) {
+  if (excess > 0 && !isAdjustment) {
     // Thu thừa lưu riêng thành credit balance, KHÔNG dùng số âm (mục 9.2).
     statements.push(
       db
