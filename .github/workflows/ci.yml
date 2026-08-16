@@ -1,0 +1,47 @@
+name: CI
+
+# Chạy trước mọi lần deploy: lint, typecheck, test, build (mục 15.1).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # node:sqlite dùng trong test tích hợp cần Node >= 22
+          node-version: '22'
+          cache: npm
+
+      - name: Cài dependency
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (unit + integration + e2e API)
+        run: npm test
+
+      - name: Build SPA
+        run: npm run build
+
+      - name: Kiểm tra không commit file dữ liệu thật
+        run: |
+          if git ls-files | grep -E '\.(xlsx|xls)$' | grep -v '^tests/fixtures/'; then
+            echo "Phát hiện file Excel trong repo - không được commit dữ liệu production."
+            exit 1
+          fi
+          if git ls-files | grep -E '^\.dev\.vars$|^\.env$'; then
+            echo "Phát hiện file secrets trong repo."
+            exit 1
+          fi

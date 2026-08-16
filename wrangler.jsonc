@@ -1,0 +1,111 @@
+{
+  // Cấu hình Cloudflare Worker cho AILLA B2B CRM.
+  // KHÔNG đặt secret trong file này (dùng `wrangler secret put` hoặc Dashboard > Settings > Variables).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ailla-b2b-crm",
+  "main": "src/server/index.ts",
+  "compatibility_date": "2024-12-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    // Chỉ dùng ở local: khi ENVIRONMENT=development, Worker chấp nhận email giả lập
+    // qua header X-Dev-Email để lập trình viên thử vai trò mà không cần Cloudflare Access.
+    "DEV_AUTH_ENABLED": "true",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "APP_TIMEZONE": "Asia/Ho_Chi_Minh"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ailla_crm_dev",
+      "database_id": "REPLACE_WITH_DEV_D1_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "ailla-crm-files-dev"
+    }
+  ],
+  "triggers": {
+    // Chạy mỗi giờ: sinh cảnh báo quá hạn / tái nhập / công nợ.
+    "crons": ["0 * * * *"]
+  },
+  "env": {
+    // BẢN DEMO CÔNG KHAI: dùng để xem thử giao diện từ xa, đăng nhập không cần mật khẩu.
+    // Database riêng, chỉ chứa dữ liệu mẫu đã ẩn danh. TUYỆT ĐỐI không import dữ liệu khách thật.
+    "demo": {
+      "name": "ailla-b2b-crm-demo",
+      "vars": {
+        "ENVIRONMENT": "demo",
+        "DEV_AUTH_ENABLED": "true",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": "",
+        "APP_TIMEZONE": "Asia/Ho_Chi_Minh"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ailla_crm_demo",
+          "database_id": "e3c9b807-e6ec-41af-b9fd-7d3c1e6439f9",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    "staging": {
+      "name": "ailla-b2b-crm-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "DEV_AUTH_ENABLED": "false",
+        "ACCESS_TEAM_DOMAIN": "REPLACE.cloudflareaccess.com",
+        "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",
+        "APP_TIMEZONE": "Asia/Ho_Chi_Minh"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ailla_crm_staging",
+          "database_id": "REPLACE_WITH_STAGING_D1_ID",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "ailla-crm-files-staging" }],
+      "triggers": { "crons": ["0 * * * *"] }
+    },
+    "production": {
+      "name": "ailla-b2b-crm",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "DEV_AUTH_ENABLED": "false",
+        "ACCESS_TEAM_DOMAIN": "REPLACE.cloudflareaccess.com",
+        "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",
+        "APP_TIMEZONE": "Asia/Ho_Chi_Minh"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ailla_crm_prod",
+          "database_id": "5a9c1852-0693-4b22-a922-c30a3095dff0",
+          "migrations_dir": "migrations"
+        }
+      ],
+      // R2 chưa được bật trên tài khoản (Dashboard > R2 > Enable). Khi bật xong thì tạo bucket
+      // `ailla-crm-files-prod` rồi bỏ dấu chú thích dòng dưới để lưu file import vào R2.
+      // "r2_buckets": [{ "binding": "FILES", "bucket_name": "ailla-crm-files-prod" }],
+      "triggers": { "crons": ["0 * * * *"] }
+      // Khi ailla.vn đã được thêm vào Cloudflare, bỏ chú thích dòng dưới để dùng crm.ailla.vn
+      // (đây cũng là điều kiện bắt buộc để bật Cloudflare Access bảo vệ hệ thống).
+      // ,"routes": [{ "pattern": "crm.ailla.vn", "custom_domain": true }]
+    }
+  }
+}

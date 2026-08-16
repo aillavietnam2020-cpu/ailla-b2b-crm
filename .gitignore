@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.wrangler/
+.vite/
+coverage/
+.dev-data/
+
+# Secrets & biến môi trường - TUYỆT ĐỐI không commit
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+
+# Dữ liệu production - không commit file Excel khách hàng thật
+data/
+*.xlsx
+*.xls
+!tests/fixtures/*.xlsx
+
+# Hệ điều hành / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
