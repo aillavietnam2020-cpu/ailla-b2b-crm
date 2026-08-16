@@ -423,10 +423,11 @@ describe('AC-13 · Idempotency', () => {
       as: USERS.manager,
       formData: workbookForm(bytes),
     });
-    await ctx.request('/api/imports/commit', {
+    const secondCommit = await ctx.request('/api/imports/commit', {
       as: USERS.manager,
       formData: workbookForm(bytes, { batch_id: p2.body.data.batch_id }),
     });
+    expect(secondCommit.status).toBe(200);
 
     const payments = await ctx.db.prepare('SELECT COUNT(*) AS n FROM payments').first<{ n: number }>();
     expect(payments?.n).toBe(26); // external_row_key chống trùng

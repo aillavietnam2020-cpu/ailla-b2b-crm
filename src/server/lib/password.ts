@@ -4,7 +4,8 @@
  * Định dạng lưu: pbkdf2$<iterations>$<salt_base64>$<hash_base64>
  */
 
-const ITERATIONS = 210_000;
+// Mức tối đa được Web Crypto của Cloudflare Workers hỗ trợ.
+const ITERATIONS = 100_000;
 const KEY_LENGTH_BITS = 256;
 
 function toBase64(bytes: Uint8Array): string {

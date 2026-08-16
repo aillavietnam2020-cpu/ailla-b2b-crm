@@ -12,8 +12,11 @@
 import { execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
-const ITERATIONS = 210_000;
+// Phải trùng giới hạn Web Crypto trên Cloudflare Workers.
+const ITERATIONS = 100_000;
 
 const DATABASES = {
   production: 'ailla_crm_prod',
@@ -108,7 +111,14 @@ async function main() {
   if (env !== 'dev') args.splice(4, 0, '--env', env);
 
   try {
-    const output = execFileSync('npx', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    // Gọi thẳng CLI JavaScript của Wrangler để giữ nguyên từng đối số SQL trên
+    // Windows; đi qua npx.cmd/cmd.exe sẽ tách câu SQL tại dấu cách.
+    const scriptDir = dirname(fileURLToPath(import.meta.url));
+    const wranglerCli = resolve(scriptDir, '../node_modules/wrangler/bin/wrangler.js');
+    const output = execFileSync(process.execPath, [wranglerCli, ...args.slice(1)], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     const changed = /"rows_written":\s*(\d+)/.exec(output);
     if (changed && Number(changed[1]) === 0) {
       console.error(`\nKhông tìm thấy tài khoản ${email} trong database ${database}.`);

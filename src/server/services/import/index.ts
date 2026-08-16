@@ -221,7 +221,7 @@ export async function commitImport(
   const batch = await db
     .prepare('SELECT * FROM import_batches WHERE id = ?')
     .bind(options.batchId)
-    .first<{ id: string; checksum: string; status: string; file_name: string }>();
+    .first<{ id: string; checksum: string; type: string; status: string; file_name: string }>();
   if (!batch) throw notFound('Không tìm thấy batch import');
   if (batch.status !== 'PREVIEW') {
     throw badRequest('BATCH_NOT_PREVIEW', 'Batch này đã được commit hoặc đã bị huỷ.');
@@ -234,6 +234,46 @@ export async function commitImport(
       'CHECKSUM_MISMATCH',
       'File commit khác với file đã preview. Hãy preview lại để tránh ghi nhầm dữ liệu.',
     );
+  }
+
+  // Cùng một nội dung đã được chốt trước đó: trả kết quả cũ như một no-op thành
+  // công. Batch preview mới được đóng lại để không tích tụ bản ghi treo và cũng
+  // không vi phạm unique index (checksum, type) khi chuyển sang COMMITTED.
+  const previousCommit = await db
+    .prepare(
+      `SELECT id, status, reconciliation_json FROM import_batches
+       WHERE checksum = ? AND type = ? AND status IN ('COMMITTED', 'RECONCILED')
+       ORDER BY committed_at DESC LIMIT 1`,
+    )
+    .bind(batch.checksum, batch.type)
+    .first<{
+      id: string;
+      status: 'COMMITTED' | 'RECONCILED';
+      reconciliation_json: string | null;
+    }>();
+  if (previousCommit) {
+    await db
+      .prepare("UPDATE import_batches SET status = 'ROLLED_BACK', rolled_back_at = ? WHERE id = ?")
+      .bind(nowIso(), options.batchId)
+      .run();
+    return {
+      batch_id: previousCommit.id,
+      status: previousCommit.status,
+      inserted: {
+        product_groups: 0,
+        products: 0,
+        product_prices: 0,
+        customers: 0,
+        orders: 0,
+        order_items: 0,
+        payments: 0,
+        activities: 0,
+        pending_allocations: 0,
+      },
+      reconciliation: previousCommit.reconciliation_json
+        ? (JSON.parse(previousCommit.reconciliation_json) as ReconciliationResult)
+        : { ok: false, lines: [] },
+    };
   }
 
   const parsed = parseWorkbook(bytes);
@@ -402,6 +442,18 @@ export async function commitImport(
   const orderIdByCode = new Map<string, string>();
   const errorStatements: D1PreparedStatement[] = [];
 
+  // Import lại cùng workbook phải là thao tác an toàn. Giữ đơn đã nhập trước đó
+  // và chỉ dùng mã cũ để đối chiếu trạng thái, thay vì đụng UNIQUE(order_no).
+  const existingOrders = await db
+    .prepare(
+      `SELECT id, legacy_order_code FROM orders
+       WHERE legacy_order_code IS NOT NULL AND deleted_at IS NULL`,
+    )
+    .all<{ id: string; legacy_order_code: string }>();
+  const existingOrderIdByCode = new Map(
+    (existingOrders.results ?? []).map((row) => [row.legacy_order_code, row.id]),
+  );
+
   for (const [orderCode, lines] of linesByOrder) {
     const first = lines[0];
 
@@ -424,6 +476,12 @@ export async function commitImport(
             ),
         );
       }
+      continue;
+    }
+
+    const existingOrderId = existingOrderIdByCode.get(orderCode);
+    if (existingOrderId) {
+      orderIdByCode.set(orderCode, existingOrderId);
       continue;
     }
 
@@ -558,7 +616,21 @@ export async function commitImport(
 
   // ---- Thanh toán -----------------------------------------------------------
   const paymentStatements: D1PreparedStatement[] = [];
+  const existingPayments = await db
+    .prepare(
+      `SELECT external_row_key FROM payments
+       WHERE source = 'IMPORT' AND external_row_key IS NOT NULL`,
+    )
+    .all<{ external_row_key: string }>();
+  const existingPaymentKeys = new Set(
+    (existingPayments.results ?? []).map((row) => row.external_row_key),
+  );
   for (const payment of parsed.payments) {
+    // Nếu file đã được import trước đó thì bỏ cả payment lẫn allocation đi kèm.
+    // Chỉ dựa vào ON CONFLICT ở câu INSERT payment sẽ khiến allocation sau đó
+    // tham chiếu tới một payment_id mới không tồn tại và vi phạm khoá ngoại.
+    if (payment.external_row_key && existingPaymentKeys.has(payment.external_row_key)) continue;
+
     const customerId = payment.customer_legacy_code
       ? customerIdByLegacy.get(payment.customer_legacy_code)
       : undefined;

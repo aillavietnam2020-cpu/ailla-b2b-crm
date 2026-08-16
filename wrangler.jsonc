@@ -4,7 +4,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ailla-b2b-crm",
   "main": "src/server/index.ts",
-  "compatibility_date": "2024-12-18",
+  "compatibility_date": "2026-08-16",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist/client",
@@ -99,6 +99,7 @@
           "migrations_dir": "migrations"
         }
       ],
+      "r2_buckets": [],
       // R2 chưa được bật trên tài khoản (Dashboard > R2 > Enable). Khi bật xong thì tạo bucket
       // `ailla-crm-files-prod` rồi bỏ dấu chú thích dòng dưới để lưu file import vào R2.
       // "r2_buckets": [{ "binding": "FILES", "bucket_name": "ailla-crm-files-prod" }],

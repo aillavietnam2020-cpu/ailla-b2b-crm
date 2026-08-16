@@ -10,8 +10,10 @@ describe('Tương thích băm mật khẩu giữa script và Worker', () => {
   it('chuỗi băm do script tạo được Worker chấp nhận', async () => {
     const password = 'ailla2026';
     const salt = randomBytes(16);
-    const hash = pbkdf2Sync(password.normalize('NFKC'), salt, 210_000, 32, 'sha256');
-    const stored = `pbkdf2$210000$${salt.toString('base64')}$${hash.toString('base64')}`;
+    const hash = pbkdf2Sync(password.normalize('NFKC'), salt, 100_000, 32, 'sha256');
+    // Dùng Buffer.from để giữ tương thích kiểu dữ liệu khi dự án đồng thời nạp
+    // Cloudflare Workers types và Node types.
+    const stored = `pbkdf2$100000$${Buffer.from(salt).toString('base64')}$${Buffer.from(hash).toString('base64')}`;
 
     expect(await verifyPassword(password, stored)).toBe(true);
     expect(await verifyPassword('mat-khau-khac', stored)).toBe(false);
