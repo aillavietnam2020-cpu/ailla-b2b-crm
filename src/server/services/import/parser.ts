@@ -124,7 +124,9 @@ export function normalizeKey(value: unknown): string {
 const SHEET_ALIASES: Record<string, string[]> = {
   BANG_GIA: ['bang_gia', 'bang_gia_8_cap', 'gia', 'price', 'bang_gia_san_pham'],
   KHACH_HANG: ['khach_hang', 'customer', 'danh_sach_khach_hang'],
-  TAO_DON_HANG: ['tao_don_hang', 'don_hang_nguon', 'chi_tiet_don_hang', 'order_items'],
+  // File thật đặt tên sheet dòng hàng là SO_DON_HANG; sheet TAO_DON là màn hình nhập tay nên
+  // KHÔNG import (nó chỉ là biểu mẫu một đơn đang soạn dở).
+  TAO_DON_HANG: ['so_don_hang', 'so_don', 'tao_don_hang', 'don_hang_nguon', 'chi_tiet_don_hang', 'order_items'],
   QUAN_LY_DON_HANG: ['quan_ly_don_hang', 'quanly_don', 'order_status', 'theo_doi_don_hang'],
   THANH_TOAN: ['thanh_toan', 'payment', 'phieu_thu'],
   CONG_NO: ['cong_no', 'debt', 'du_no'],
@@ -148,10 +150,40 @@ function findSheet(workbook: XLSX.WorkBook, logical: string): string | null {
 
 type Row = Record<string, unknown>;
 
+/**
+ * File thật của công ty có 1-2 dòng tiêu đề trang trí phía trên (tên bảng in hoa, dòng ghi chú
+ * màu), dòng tiêu đề cột thật nằm ở dòng 3. Hàm này dò trong 10 dòng đầu và chọn dòng có nhiều
+ * ô chữ nhất - đó chính là dòng tiêu đề cột.
+ */
+function findHeaderRow(sheet: XLSX.WorkSheet): number {
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: null,
+    raw: true,
+    blankrows: true,
+  });
+  let headerIdx = 0;
+  let best = -1;
+  for (let i = 0; i < Math.min(10, matrix.length); i += 1) {
+    const labels = (matrix[i] ?? []).filter(
+      (cell) => typeof cell === 'string' && cell.trim().length > 1 && !cell.startsWith('#REF'),
+    ).length;
+    if (labels > best) {
+      best = labels;
+      headerIdx = i;
+    }
+  }
+  return headerIdx;
+}
+
 function sheetRows(workbook: XLSX.WorkBook, sheetName: string): Row[] {
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) return [];
-  return XLSX.utils.sheet_to_json<Row>(sheet, { defval: null, raw: true });
+  return XLSX.utils.sheet_to_json<Row>(sheet, {
+    defval: null,
+    raw: true,
+    range: findHeaderRow(sheet),
+  });
 }
 
 function pick(row: Row, aliases: string[]): unknown {
