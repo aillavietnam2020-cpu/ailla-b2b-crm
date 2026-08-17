@@ -122,14 +122,28 @@ export interface ParsedWorkbook {
 const COMBINING_MARKS = new RegExp('[\\u0300-\\u036f]', 'g');
 
 /** Bỏ dấu tiếng Việt + chuẩn hoá để so khớp tên sheet/cột không phụ thuộc cách gõ. */
+/**
+ * Nho ket qua da chuan hoa. Moi dong don goi ham nay hang chuc lan tren cung mot bo ten cot;
+ * file that co 206 dong x 21 cot nen khong nho se ton hang tram nghin lan chuan hoa Unicode
+ * va lam Cloudflare cat request giua chung (loi 1102).
+ */
+const normalizeCache = new Map<string, string>();
+
 export function normalizeKey(value: unknown): string {
-  return String(value ?? '')
+  const raw = String(value ?? '');
+  const cached = normalizeCache.get(raw);
+  if (cached !== undefined) return cached;
+
+  const result = raw
     .normalize('NFD')
     .replace(COMBINING_MARKS, '')
     .replace(/đ/gi, 'd')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
+
+  if (normalizeCache.size < 5000) normalizeCache.set(raw, result);
+  return result;
 }
 
 const SHEET_ALIASES: Record<string, string[]> = {

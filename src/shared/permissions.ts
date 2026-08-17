@@ -92,40 +92,15 @@ const MANAGER: Permission[] = [
  * CEO: toàn công ty, ưu tiên chỉ đọc vận hành.
  * Không có order.create / activity.create / customer.create (mục 4: "Không nhập liệu vận hành").
  */
-const CEO: Permission[] = [
-  'customer.read.own',
-  'customer.read.team',
-  'customer.read.all',
-  'customer.reassign',
-  // Chủ doanh nghiệp vẫn trực tiếp gọi khách lớn và chốt trạng thái giao hàng, nên cần
-  // các quyền nhập liệu này; mọi thao tác đều vào nhật ký như người khác.
-  'customer.update',
-  'customer.tier.change',
-  'activity.create',
-  'activity.read.team',
-  'task.manage.team',
-  'order.delivery.update',
-  'price.read',
-  'price.approve',
-  'order.approve.normal',
-  'order.approve.exception',
-  'debt.read.own',
-  'debt.read.team',
-  'debt.read.all',
-  'import.read',
-  'export.all',
-  'audit.read.own',
-  'audit.read.team',
-  'audit.read.all',
-  'dashboard.manager',
-  'dashboard.ceo',
-  'settings.manage',
-  'user.manage',
-  'user.manage.all',
-  'product.manage',
-  'order.payment.record',
-  'order.accounting.confirm',
-];
+/**
+ * CEO là chủ doanh nghiệp: có TOÀN BỘ quyền trong hệ thống, không chặn gì cả.
+ * Mọi thao tác vẫn được ghi nhật ký như những người khác.
+ */
+/**
+ * CEO la chu doanh nghiep: co TOAN BO quyen trong he thong.
+ * Moi thao tac van duoc ghi nhat ky nhu nhung nguoi khac.
+ */
+const CEO: Permission[] = [...PERMISSIONS];
 
 export const ROLE_PERMISSIONS: Record<Role, ReadonlyArray<Permission>> = {
   EMPLOYEE: EMPLOYEE,

@@ -59,6 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [devEmail, tick]);
 
+  // Phien het han o bat ky man hinh nao -> quay ve man hinh dang nhap.
+  useEffect(() => {
+    const onUnauthorized = () => setMe(null);
+    window.addEventListener('ailla:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('ailla:unauthorized', onUnauthorized);
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     await api.post('/api/auth/login', { email, password });
     setDevEmail(null);

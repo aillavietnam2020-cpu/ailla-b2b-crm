@@ -62,6 +62,11 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   const payload = text ? JSON.parse(text) : {};
 
   if (!response.ok) {
+    // Phien dang nhap het han: bao cho ca ung dung biet de quay ve man hinh dang nhap,
+    // thay vi de tung o hien "Chua dang nhap".
+    if (response.status === 401 && !path.startsWith('/api/auth/')) {
+      window.dispatchEvent(new CustomEvent('ailla:unauthorized'));
+    }
     const err = payload as ApiErrorBody;
     throw new ApiError(
       response.status,

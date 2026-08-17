@@ -214,9 +214,14 @@ describe('Đơn hàng', () => {
     expect(res.status).toBe(403);
   });
 
-  it('CEO không tạo đơn (không nhập liệu vận hành)', async () => {
+  it('CEO có toàn quyền nên tạo được đơn, và thao tác vẫn vào nhật ký', async () => {
     const res = await ctx.request('/api/orders', { as: USERS.ceo, body: orderBody });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+
+    const audit = await ctx.db
+      .prepare(`SELECT actor_id FROM audit_logs WHERE action = 'ORDER_CREATED' ORDER BY created_at DESC LIMIT 1`)
+      .first<{ actor_id: string }>();
+    expect(audit?.actor_id).toBe('user-ceo');
   });
 });
 

@@ -139,7 +139,15 @@ export async function previewImport(
   auth: AuthContext,
   options: PreviewOptions,
 ): Promise<ImportPreviewResult> {
-  const parsed = parseWorkbook(options.bytes);
+  // Chi mo nhung sheet thuc su dung: file that co 17 sheet, trong do nhieu sheet la bao cao
+  // va bieu mau in an - mo het se vuot han muc xu ly cua Cloudflare Workers.
+  const parsed = parseWorkbook(options.bytes, [
+    'products',
+    'customers',
+    'orders',
+    'payments',
+    'activities',
+  ]);
   const totals = computeTotals(parsed);
   const reconciliation = reconcile(totals, config.reconciliationBaseline);
   const bytes = options.bytes instanceof Uint8Array ? options.bytes : new Uint8Array(options.bytes);
@@ -373,6 +381,18 @@ export async function commitImport(
   const now = nowIso();
   const today = vnDate();
 
+  // Khong cho chot batch khi con chang chua chay xong - de tranh tinh trang da ghi thanh toan
+  // nhung chua ghi don hang.
+  if (phase === 'finalize') {
+    const missing = COMMIT_PHASES.filter((p) => p !== 'finalize' && !donePhases.includes(p));
+    if (missing.length > 0) {
+      throw badRequest(
+        'PHASES_INCOMPLETE',
+        `Chưa ghi xong các phần: ${missing.map((p) => COMMIT_PHASE_LABELS[p]).join(', ')}. Bấm "Ghi dữ liệu" lại để chạy tiếp.`,
+      );
+    }
+  }
+
   const finishPhase = async (current: CommitPhase): Promise<CommitResult> => {
     const done = [...new Set([...donePhases, current])];
     await db
@@ -411,7 +431,9 @@ export async function commitImport(
       owners.set(u.display_name.toLowerCase(), u.id);
     }
     return {
-      products: new Map((products.results ?? []).map((r) => [r.sku, r.id])),
+      // Khop ma hang KHONG phan biet hoa/thuong: file that co 'TOILET1l' o bang gia
+      // nhung dong don ghi 'Toilet1l', truoc day bi coi la ma la va bo dong.
+      products: new Map((products.results ?? []).map((r) => [r.sku.trim().toLowerCase(), r.id])),
       customers: new Map((customers.results ?? []).map((r) => [r.legacy_code, r.id])),
       owners,
       orders: new Map((orders.results ?? []).map((r) => [r.legacy_order_code, r.id])),
@@ -440,14 +462,16 @@ export async function commitImport(
   await runChunked(groupStatements);
 
   const existingProducts = await db.prepare('SELECT id, sku FROM products').all<{ id: string; sku: string }>();
-  const productIdBySku = new Map((existingProducts.results ?? []).map((p) => [p.sku, p.id]));
+  const productIdBySku = new Map(
+    (existingProducts.results ?? []).map((p) => [p.sku.trim().toLowerCase(), p.id]),
+  );
 
   const productStatements: D1PreparedStatement[] = [];
   for (const product of parsed.products) {
-    let productId = productIdBySku.get(product.sku);
+    let productId = productIdBySku.get(product.sku.trim().toLowerCase());
     if (!productId) {
       productId = newId();
-      productIdBySku.set(product.sku, productId);
+      productIdBySku.set(product.sku.trim().toLowerCase(), productId);
       inserted.products += 1;
       productStatements.push(
         db
@@ -645,7 +669,8 @@ export async function commitImport(
     let subtotal = 0;
     const itemStatements: D1PreparedStatement[] = [];
     for (const line of lines) {
-      const productId = line.sku ? productIdBySku.get(line.sku) : undefined;
+      // Mã hàng khớp không phân biệt hoa/thường và khoảng trắng thừa.
+      const productId = line.sku ? productIdBySku.get(line.sku.trim().toLowerCase()) : undefined;
       if (!productId || !line.qty) {
         errorStatements.push(
           db
