@@ -814,3 +814,61 @@ table.data.wide {
 .content { min-width: 0; max-width: 100%; }
 .grid-2 > * { min-width: 0; }
 .card { min-width: 0; }
+
+/* Màn tạo đơn: khách hàng + tổng tiền trên cùng một khung rộng ------------- */
+.order-head {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .order-head { grid-template-columns: 1fr; }
+}
+.order-facts {
+  background: var(--bg-soft, #f7f8fb);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 14px;
+  min-width: 0;
+}
+.order-facts .stat-row { padding: 9px 0; }
+.product-suggest {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 0 16px 14px;
+  overflow: hidden;
+}
+.suggest-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.suggest-row:last-child { border-bottom: 0; }
+.suggest-row:hover:not(:disabled) { background: #fdf2f7; }
+.suggest-row:disabled { cursor: not-allowed; opacity: 0.6; }
+.pack-size { display: inline-flex; align-items: center; margin-left: 6px; }
+.pack-size input { width: 58px; text-align: right; }
+
+/* Thanh cuộn ngang phải NHÌN THẤY được: mặc định của Chrome quá mảnh và tự ẩn. */
+.table-wrap {
+  scrollbar-width: auto;
+  scrollbar-color: #b6bdcb #eef1f6;
+  overscroll-behavior-x: contain;
+}
+.table-wrap::-webkit-scrollbar { height: 14px; }
+.table-wrap::-webkit-scrollbar-track { background: #eef1f6; border-radius: 999px; }
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #b6bdcb;
+  border: 3px solid #eef1f6;
+  border-radius: 999px;
+}
+.table-wrap::-webkit-scrollbar-thumb:hover { background: #98a1b2; }

@@ -1,50 +1,57 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import type { CustomerListItem, ProductItem } from '@shared/types';
-import { vnDate } from '@shared/datetime';
+import type { CustomerListItem, PriceTier, ProductItem } from '@shared/types';
 import { formatVnd } from '@shared/money';
+import { vnDate } from '@shared/datetime';
 import { ApiError, api, newIdempotencyKey } from '../../lib/api';
 import { useApi, useDebounced } from '../../lib/hooks';
-import { Card, Field, StateBlock, useToast } from '../../components/ui';
+import { Card, ErrorBox, StateBlock, useToast } from '../../components/ui';
 
 interface Line {
   product_id: string;
   sku: string;
   name: string;
+  /** Đơn vị lẻ của sản phẩm, ví dụ "Chai", "Can". */
+  unit: string;
+  /** Số lượng lẻ trong một thùng; 1 nghĩa là không bán theo thùng. */
+  pack_size: number;
+  /** Khách lấy lẻ hay lấy nguyên thùng. */
+  pack_mode: 'LE' | 'THUNG';
+  /** Số lượng theo đơn vị đang chọn (lẻ hoặc thùng). */
   qty: number;
-  applied_price: number | null;
-  /** Hàng tặng khuyến mại: không tính tiền, không cần duyệt giá. */
-  is_gift?: boolean;
-}
-
-interface PreviewLine {
-  product_id: string;
-  sku: string;
-  qty: number;
+  /** Giá một đơn vị lẻ theo cấp của khách; null = cấp này chưa có giá. */
   base_price: number | null;
-  applied_price: number;
-  line_total: number;
-  price_override: boolean;
-  diff_percent: number;
-  required_role?: 'MANAGER' | 'CEO';
+  /** Giá sửa tay cho một đơn vị lẻ; để trống là dùng giá chuẩn. */
+  applied_price: number | null;
+  is_gift: boolean;
 }
 
-interface PreviewResult {
-  lines: PreviewLine[];
-  totals: {
-    subtotal: number;
-    totalAmount: number;
-    remainingAmount: number;
-  };
-  approvals: Array<{ rule: string; requiredRole: string; reason: string }>;
+/** Số lượng lẻ thực tế của một dòng (thùng × quy đổi). */
+function unitQty(line: Line): number {
+  return line.pack_mode === 'THUNG' ? line.qty * Math.max(1, line.pack_size) : line.qty;
 }
 
-/** Tạo đơn: giá tự động theo cấp khách, chặn giá NULL, giá sửa tay phải duyệt. */
+function linePrice(line: Line): number {
+  if (line.is_gift) return 0;
+  return line.applied_price ?? line.base_price ?? 0;
+}
+
+function lineTotal(line: Line): number {
+  return unitQty(line) * linePrice(line);
+}
+
+/** Đọc số quy đổi từ cột "Quy cách" của sản phẩm: "12 chai/thùng" -> 12. */
+function parsePackSize(value: string | null): number {
+  if (!value) return 1;
+  const match = String(value).match(/\d+/);
+  const parsed = match ? Number(match[0]) : 1;
+  return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
+}
+
 export function NewOrderPage() {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
   const toast = useToast();
-  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey());
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
 
   const [customerId, setCustomerId] = useState(params.get('customer_id') ?? '');
   const [productQuery, setProductQuery] = useState('');
@@ -52,79 +59,91 @@ export function NewOrderPage() {
   const [fees, setFees] = useState({ discount_amount: 0, bonus_deduction: 0, shipping_fee: 0, cod_amount: 0 });
   const [promotion, setPromotion] = useState({ code: '', note: '' });
   const [note, setNote] = useState('');
-  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey());
 
-  const debouncedProductQuery = useDebounced(productQuery);
+  const debouncedQuery = useDebounced(productQuery);
   const customers = useApi<CustomerListItem[]>('/api/customers?page_size=200');
-  const products = useApi<ProductItem[]>(
-    debouncedProductQuery ? `/api/products?q=${encodeURIComponent(debouncedProductQuery)}&limit=25` : null,
+  const tiers = useApi<PriceTier[]>('/api/tiers');
+  const catalog = useApi<{ products: ProductItem[] }>(
+    `/api/prices?limit=400${debouncedQuery ? `&q=${encodeURIComponent(debouncedQuery)}` : ''}`,
   );
 
-  const customer = useMemo(
-    () => (customers.data ?? []).find((c) => c.id === customerId) ?? null,
-    [customers.data, customerId],
+  const customer = (customers.data ?? []).find((c) => c.id === customerId) ?? null;
+  const tierCode = useMemo(
+    () => (tiers.data ?? []).find((t) => t.id === customer?.tier_id)?.code ?? null,
+    [tiers.data, customer?.tier_id],
   );
+
+  /** Giá của một sản phẩm theo đúng cấp bậc của khách đang chọn. */
+  const priceForTier = (product: ProductItem): number | null =>
+    tierCode ? (product.prices[tierCode] ?? null) : null;
+
+  const subtotal = lines.reduce((acc, line) => acc + lineTotal(line), 0);
+  const totalAmount = subtotal - fees.discount_amount - fees.bonus_deduction + fees.shipping_fee;
+  const remaining = totalAmount - fees.cod_amount;
+  const blockedLines = lines.filter((l) => !l.is_gift && l.base_price === null);
 
   const addLine = (product: ProductItem) => {
-    if (lines.some((l) => l.product_id === product.id)) return;
-    setLines([...lines, { product_id: product.id, sku: product.sku, name: product.name, qty: 1, applied_price: null }]);
-    setProductQuery('');
-    setPreview(null);
+    if (lines.some((l) => l.product_id === product.id)) {
+      toast.error(`${product.sku} đã có trong đơn`);
+      return;
+    }
+    setLines([
+      ...lines,
+      {
+        product_id: product.id,
+        sku: product.sku,
+        name: product.name,
+        unit: product.unit ?? 'Cái',
+        pack_size: parsePackSize(product.pack_size),
+        pack_mode: 'LE',
+        qty: 1,
+        base_price: priceForTier(product),
+        applied_price: null,
+        is_gift: false,
+      },
+    ]);
   };
 
   const updateLine = (index: number, patch: Partial<Line>) => {
     setLines(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
-    setPreview(null);
-  };
-
-  const buildPayload = () => ({
-    customer_id: customerId,
-    order_date: vnDate(),
-    items: lines.map((line) => ({
-      product_id: line.product_id,
-      qty: line.qty,
-      applied_price: line.is_gift ? undefined : (line.applied_price ?? undefined),
-      is_gift: line.is_gift ?? false,
-    })),
-    ...fees,
-    promotion_code: promotion.code || null,
-    promotion_note: promotion.note || null,
-    note: note || null,
-  });
-
-  const runPreview = async () => {
-    setFormError(null);
-    setFieldErrors({});
-    try {
-      const result = await api.post<PreviewResult>('/api/orders/preview', buildPayload());
-      setPreview(result.data);
-    } catch (err) {
-      setPreview(null);
-      if (err instanceof ApiError) {
-        setFormError(err.message);
-        setFieldErrors(err.fields ?? {});
-      } else setFormError('Không tính được đơn hàng.');
-    }
   };
 
   const save = async () => {
-    if (saving) return;
     setSaving(true);
     setFormError(null);
     setFieldErrors({});
     try {
-      const result = await api.post<{ id: string; order_no: string }>('/api/orders', buildPayload(), idempotencyKey);
-      toast.success(`Đã tạo đơn ${result.data.order_no} ở trạng thái Nháp`);
-      setIdempotencyKey(newIdempotencyKey());
+      const result = await api.post<{ id: string }>(
+        '/api/orders',
+        {
+          customer_id: customerId,
+          order_date: vnDate(),
+          items: lines.map((line) => ({
+            product_id: line.product_id,
+            // Gửi lên số lượng LẺ; hệ thống chỉ lưu đơn vị lẻ để tính tiền và tồn nhất quán.
+            qty: unitQty(line),
+            applied_price: line.is_gift ? undefined : (line.applied_price ?? undefined),
+            is_gift: line.is_gift,
+          })),
+          ...fees,
+          promotion_code: promotion.code || null,
+          promotion_note: promotion.note || null,
+          note: note || null,
+        },
+        idempotencyKey,
+      );
+      toast.success('Đã tạo đơn. Kiểm tra lại rồi gửi duyệt.');
       navigate(`/sales/orders/${result.data.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
         setFormError(err.message);
         setFieldErrors(err.fields ?? {});
-      } else setFormError('Không lưu được đơn hàng.');
+        setIdempotencyKey(newIdempotencyKey());
+      } else setFormError('Không tạo được đơn hàng');
     } finally {
       setSaving(false);
     }
@@ -135,276 +154,317 @@ export function NewOrderPage() {
       <div className="page-head">
         <div>
           <h2>Tạo đơn hàng</h2>
-          <p>Giá lấy tự động theo cấp của khách. Mã thiếu giá sẽ bị chặn, giá sửa tay sẽ phải gửi duyệt.</p>
+          <p>
+            Giá tự nhảy theo cấp bậc của khách. Mã chưa có giá ở cấp đó sẽ bị chặn; giá sửa tay phải
+            gửi duyệt.
+          </p>
         </div>
       </div>
 
-      {formError && <div className="alert-box" style={{ marginBottom: 16 }}>{formError}</div>}
+      <ErrorBox message={formError} />
 
-      <div className="grid-2">
-        <div className="stack">
-          <Card title="1. Chọn khách hàng">
-            <Field label="Khách hàng *" error={fieldErrors.customer_id}>
-              <select
-                value={customerId}
-                onChange={(e) => {
-                  setCustomerId(e.target.value);
-                  setPreview(null);
-                }}
-              >
-                <option value="">— Chọn khách —</option>
-                {(customers.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.tier_name ? `· ${c.tier_name}` : '· CHƯA MAP CẤP GIÁ'}
-                  </option>
-                ))}
-              </select>
-            </Field>
+      {/* Khối 1: khách hàng và tổng tiền nằm cùng một khung cho dễ đối chiếu */}
+      <Card title="Khách hàng và tổng tiền">
+        <div className="order-head">
+          <div className="field">
+            <label>Khách hàng *</label>
+            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+              <option value="">— Chọn khách hàng —</option>
+              {(customers.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.tier_name ?? 'chưa có cấp'}
+                </option>
+              ))}
+            </select>
             {customer && !customer.tier_id && (
-              <div className="alert-box" style={{ marginTop: 12 }}>
-                Khách này đang ở cấp "{customer.legacy_tier_label ?? 'Khác'}" chưa map sang 8 cấp giá. Quản lý phải
-                map cấp trước khi tạo đơn.
-              </div>
+              <span className="error">
+                Khách chưa được map cấp giá nên chưa tạo đơn được. Quản lý cần chọn cấp bậc trước.
+              </span>
             )}
-            {customer && (
-              <div style={{ marginTop: 12 }}>
-                <div className="stat-row">
-                  <span className="muted">Công nợ chính thức</span>
-                  <strong>{formatVnd(customer.official_debt)}</strong>
-                </div>
-                <div className="stat-row">
-                  <span className="muted">Công nợ dự kiến</span>
-                  <strong>{formatVnd(customer.projected_debt)}</strong>
-                </div>
-                <div className="stat-row">
-                  <span className="muted">Hạn mức</span>
-                  <strong>{formatVnd(customer.credit_limit)}</strong>
-                </div>
-              </div>
-            )}
-          </Card>
+          </div>
 
-          <Card title="2. Thêm sản phẩm">
-            <Field label="Tìm mã SKU hoặc tên sản phẩm">
-              <input
-                value={productQuery}
-                onChange={(e) => setProductQuery(e.target.value)}
-                placeholder="VD: TOILET500, nước giặt…"
-              />
-            </Field>
-            <StateBlock
-              loading={products.loading}
-              error={products.error}
-              empty={Boolean(debouncedProductQuery) && (products.data ?? []).length === 0}
-              emptyText="Không tìm thấy sản phẩm."
-            >
-              <div className="timeline" style={{ marginTop: 10 }}>
-                {(products.data ?? []).slice(0, 8).map((product) => (
-                  <div className="event" key={product.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div>
-                      <p>
-                        <strong>{product.sku}</strong> — {product.name}
-                      </p>
-                      {product.missing_tiers.length > 0 && (
-                        <small style={{ color: 'var(--orange)' }}>
-                          Thiếu giá ở: {product.missing_tiers.join(', ')}
-                        </small>
-                      )}
-                    </div>
-                    <button className="btn sm" onClick={() => addLine(product)}>
-                      Thêm
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </StateBlock>
-          </Card>
-        </div>
-
-        <div className="stack">
-          <Card title="3. Dòng đơn hàng" bodyClass="">
-            {lines.length === 0 ? (
-              <div className="empty">Chưa có dòng nào.</div>
-            ) : (
-              <div className="table-wrap">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>Sản phẩm</th>
-                      <th className="right">SL</th>
-                      <th className="right">Giá áp dụng</th>
-                      <th className="right">Hàng tặng</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map((line, index) => (
-                      <tr key={line.product_id}>
-                        <td>
-                          <strong>{line.sku}</strong>
-                          <div className="muted">{line.name}</div>
-                          {fieldErrors[`items.${index}.applied_price`] && (
-                            <div className="error" style={{ color: 'var(--red)', fontSize: 12 }}>
-                              {fieldErrors[`items.${index}.applied_price`]}
-                            </div>
-                          )}
-                        </td>
-                        <td className="right">
-                          <input
-                            type="number"
-                            min={1}
-                            value={line.qty}
-                            onChange={(e) => updateLine(index, { qty: Number(e.target.value) || 1 })}
-                            style={{ width: 78, textAlign: 'right' }}
-                          />
-                        </td>
-                        <td className="right">
-                          {line.is_gift ? (
-                            <span className="badge green">Tặng · 0đ</span>
-                          ) : (
-                            <input
-                              type="number"
-                              min={0}
-                              step={1000}
-                              placeholder="Giá chuẩn"
-                              value={line.applied_price ?? ''}
-                              onChange={(e) =>
-                                updateLine(index, {
-                                  applied_price: e.target.value === '' ? null : Number(e.target.value),
-                                })
-                              }
-                              style={{ width: 130, textAlign: 'right' }}
-                            />
-                          )}
-                        </td>
-                        <td className="right">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(line.is_gift)}
-                            title="Đánh dấu dòng này là hàng tặng khuyến mại"
-                            onChange={(e) =>
-                              updateLine(index, {
-                                is_gift: e.target.checked,
-                                applied_price: e.target.checked ? null : line.applied_price,
-                              })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <button
-                            className="btn sm danger"
-                            onClick={() => {
-                              setLines(lines.filter((_, i) => i !== index));
-                              setPreview(null);
-                            }}
-                          >
-                            Xoá
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-
-          <Card title="4. Khuyến mại, phí và chiết khấu">
-            <div className="form-grid">
-              <Field
-                label="Mã chương trình khuyến mại"
-                hint="Ví dụ: KM-T8-MUA10TANG1. Dùng để lọc và tổng kết chương trình sau này."
-              >
-                <input
-                  value={promotion.code}
-                  onChange={(e) => setPromotion({ ...promotion, code: e.target.value })}
-                  placeholder="Bỏ trống nếu đơn không theo chương trình"
-                />
-              </Field>
-              <Field label="Nội dung khuyến mại">
-                <input
-                  value={promotion.note}
-                  onChange={(e) => setPromotion({ ...promotion, note: e.target.value })}
-                  placeholder="Mua 10 tặng 1, giảm 5% đơn từ 20 triệu…"
-                />
-              </Field>
-              <Field label="Chiết khấu (đ)">
-                <input
-                  type="number"
-                  min={0}
-                  value={fees.discount_amount}
-                  onChange={(e) => setFees({ ...fees, discount_amount: Number(e.target.value) || 0 })}
-                />
-              </Field>
-              <Field label="Trừ thưởng tháng (đ)">
-                <input
-                  type="number"
-                  min={0}
-                  value={fees.bonus_deduction}
-                  onChange={(e) => setFees({ ...fees, bonus_deduction: Number(e.target.value) || 0 })}
-                />
-              </Field>
-              <Field label="Phí vận chuyển (đ)">
-                <input
-                  type="number"
-                  min={0}
-                  value={fees.shipping_fee}
-                  onChange={(e) => setFees({ ...fees, shipping_fee: Number(e.target.value) || 0 })}
-                />
-              </Field>
-              <Field label="COD/đặt cọc (đ)">
-                <input
-                  type="number"
-                  min={0}
-                  value={fees.cod_amount}
-                  onChange={(e) => setFees({ ...fees, cod_amount: Number(e.target.value) || 0 })}
-                />
-              </Field>
-              <Field label="Ghi chú" full>
-                <textarea value={note} onChange={(e) => setNote(e.target.value)} />
-              </Field>
+          <div className="order-facts">
+            <div className="stat-row">
+              <span className="muted">Cấp bậc áp giá</span>
+              <strong>{customer?.tier_name ?? '—'}</strong>
             </div>
-          </Card>
+            <div className="stat-row">
+              <span className="muted">Công nợ chính thức</span>
+              <strong>{formatVnd(customer?.official_debt ?? 0)}</strong>
+            </div>
+            <div className="stat-row">
+              <span className="muted">Hạn mức</span>
+              <strong>{formatVnd(customer?.credit_limit ?? 0)}</strong>
+            </div>
+          </div>
 
-          {preview && (
-            <Card title="5. Kiểm tra trước khi lưu">
-              <div className="stat-row">
-                <span className="muted">Tiền hàng</span>
-                <strong>{formatVnd(preview.totals.subtotal)}</strong>
-              </div>
-              <div className="stat-row">
-                <span className="muted">Tổng phải thu</span>
-                <strong>{formatVnd(preview.totals.totalAmount)}</strong>
-              </div>
-              {preview.approvals.length > 0 && (
-                <div className="alert-box warn" style={{ marginTop: 12 }}>
-                  Đơn này sẽ cần duyệt:
-                  <ul style={{ margin: '8px 0 0 18px' }}>
-                    {preview.approvals.map((approval, index) => (
-                      <li key={index}>
-                        {approval.reason} ({approval.requiredRole === 'CEO' ? 'CEO duyệt' : 'Quản lý duyệt'})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </Card>
-          )}
-
-          <div className="actions">
-            <button className="btn" onClick={runPreview} disabled={!customerId || lines.length === 0}>
-              Kiểm tra giá & hạn mức
-            </button>
-            <button
-              className="btn primary"
-              onClick={save}
-              disabled={saving || !customerId || lines.length === 0}
-            >
-              {saving ? 'Đang lưu…' : 'Lưu đơn nháp'}
-            </button>
+          <div className="order-facts">
+            <div className="stat-row">
+              <span className="muted">Tiền hàng</span>
+              <strong>{formatVnd(subtotal)}</strong>
+            </div>
+            <div className="stat-row">
+              <span className="muted">Tổng phải thu</span>
+              <strong style={{ fontSize: 18 }}>{formatVnd(totalAmount)}</strong>
+            </div>
+            <div className="stat-row">
+              <span className="muted">Còn phải thu sau COD</span>
+              <strong>{formatVnd(remaining)}</strong>
+            </div>
           </div>
         </div>
-      </div>
+      </Card>
+
+      <div style={{ height: 16 }} />
+
+      {/* Khối 2: dòng hàng chiếm hết chiều ngang, không phải kéo qua lại */}
+      <Card
+        title={`Dòng đơn hàng (${lines.length})`}
+        bodyClass=""
+        action={
+          <div className="search" style={{ minWidth: 320 }}>
+            <input
+              value={productQuery}
+              onChange={(e) => setProductQuery(e.target.value)}
+              placeholder="Gõ mã SKU hoặc tên sản phẩm để thêm…"
+              disabled={!customerId}
+            />
+          </div>
+        }
+      >
+        {productQuery && (
+          <div className="product-suggest">
+            <StateBlock
+              loading={catalog.loading}
+              error={catalog.error}
+              empty={(catalog.data?.products ?? []).length === 0}
+              emptyText="Không tìm thấy sản phẩm."
+            >
+              {(catalog.data?.products ?? []).slice(0, 8).map((product) => {
+                const price = priceForTier(product);
+                return (
+                  <button
+                    type="button"
+                    key={product.id}
+                    className="suggest-row"
+                    onClick={() => addLine(product)}
+                    disabled={!customerId}
+                  >
+                    <span>
+                      <strong>{product.sku}</strong> · {product.name}
+                      <small className="muted">
+                        {' '}
+                        {product.unit ?? ''} {product.pack_size ? `· ${product.pack_size}` : ''}
+                      </small>
+                    </span>
+                    <span className={price === null ? 'error' : ''}>
+                      {price === null ? 'Chưa có giá ở cấp này' : formatVnd(price)}
+                    </span>
+                  </button>
+                );
+              })}
+            </StateBlock>
+          </div>
+        )}
+
+        {lines.length === 0 ? (
+          <div className="empty">
+            {customerId ? 'Chưa có dòng nào. Gõ mã sản phẩm ở ô trên để thêm.' : 'Chọn khách hàng trước.'}
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>Đơn vị</th>
+                  <th className="right">Số lượng</th>
+                  <th className="right">Quy ra lẻ</th>
+                  <th className="right">Đơn giá lẻ</th>
+                  <th className="right">Thành tiền</th>
+                  <th className="right">Hàng tặng</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line, index) => (
+                  <tr key={line.product_id}>
+                    <td>
+                      <strong>{line.sku}</strong>
+                      <div className="muted">{line.name}</div>
+                      {fieldErrors[`items.${index}.applied_price`] && (
+                        <div className="error">{fieldErrors[`items.${index}.applied_price`]}</div>
+                      )}
+                      {!line.is_gift && line.base_price === null && (
+                        <div className="error">Cấp giá của khách chưa có giá cho mã này</div>
+                      )}
+                    </td>
+                    <td className="nowrap">
+                      <select
+                        value={line.pack_mode}
+                        onChange={(e) =>
+                          updateLine(index, {
+                            pack_mode: e.target.value as 'LE' | 'THUNG',
+                            // Sản phẩm chưa khai quy cách thì tạm lấy 12, sửa ngay ở ô bên cạnh.
+                            pack_size:
+                              e.target.value === 'THUNG' && line.pack_size < 2 ? 12 : line.pack_size,
+                          })
+                        }
+                      >
+                        <option value="LE">{line.unit} (lẻ)</option>
+                        <option value="THUNG">Thùng</option>
+                      </select>
+                      {line.pack_mode === 'THUNG' && (
+                        <span className="pack-size">
+                          <input
+                            type="number"
+                            min={2}
+                            value={line.pack_size}
+                            title={`Một thùng có mấy ${line.unit.toLowerCase()}`}
+                            onChange={(e) =>
+                              updateLine(index, { pack_size: Math.max(2, Number(e.target.value) || 2) })
+                            }
+                          />
+                          <small className="muted"> {line.unit.toLowerCase()}/thùng</small>
+                        </span>
+                      )}
+                    </td>
+                    <td className="right">
+                      <input
+                        type="number"
+                        min={1}
+                        value={line.qty}
+                        onChange={(e) => updateLine(index, { qty: Number(e.target.value) || 1 })}
+                        style={{ width: 84, textAlign: 'right' }}
+                      />
+                    </td>
+                    <td className="right nowrap">
+                      {unitQty(line)} {line.unit.toLowerCase()}
+                    </td>
+                    <td className="right">
+                      {line.is_gift ? (
+                        <span className="badge green">Tặng · 0đ</span>
+                      ) : (
+                        <input
+                          type="number"
+                          min={0}
+                          step={1000}
+                          placeholder={line.base_price !== null ? String(line.base_price) : 'chưa có giá'}
+                          value={line.applied_price ?? ''}
+                          onChange={(e) =>
+                            updateLine(index, {
+                              applied_price: e.target.value === '' ? null : Number(e.target.value),
+                            })
+                          }
+                          style={{ width: 130, textAlign: 'right' }}
+                        />
+                      )}
+                    </td>
+                    <td className="right nowrap">
+                      <strong>{formatVnd(lineTotal(line))}</strong>
+                    </td>
+                    <td className="right">
+                      <input
+                        type="checkbox"
+                        checked={line.is_gift}
+                        title="Hàng tặng khuyến mại, không tính tiền"
+                        onChange={(e) => updateLine(index, { is_gift: e.target.checked })}
+                      />
+                    </td>
+                    <td>
+                      <button
+                        className="btn sm danger"
+                        onClick={() => setLines(lines.filter((_, i) => i !== index))}
+                      >
+                        Xoá
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <div style={{ height: 16 }} />
+
+      <Card title="Khuyến mại, phí và chiết khấu">
+        <div className="form-grid">
+          <div className="field">
+            <label>Mã chương trình khuyến mại</label>
+            <input
+              value={promotion.code}
+              onChange={(e) => setPromotion({ ...promotion, code: e.target.value })}
+              placeholder="KM-T8-MUA10TANG1"
+            />
+          </div>
+          <div className="field">
+            <label>Nội dung khuyến mại</label>
+            <input
+              value={promotion.note}
+              onChange={(e) => setPromotion({ ...promotion, note: e.target.value })}
+              placeholder="Mua 10 tặng 1, giảm 5% đơn từ 20 triệu…"
+            />
+          </div>
+          <div className="field">
+            <label>Chiết khấu (đ)</label>
+            <input
+              type="number"
+              min={0}
+              value={fees.discount_amount}
+              onChange={(e) => setFees({ ...fees, discount_amount: Number(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="field">
+            <label>Trừ thưởng tháng (đ)</label>
+            <input
+              type="number"
+              min={0}
+              value={fees.bonus_deduction}
+              onChange={(e) => setFees({ ...fees, bonus_deduction: Number(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="field">
+            <label>Phí vận chuyển (đ)</label>
+            <input
+              type="number"
+              min={0}
+              value={fees.shipping_fee}
+              onChange={(e) => setFees({ ...fees, shipping_fee: Number(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="field">
+            <label>COD / đặt cọc (đ)</label>
+            <input
+              type="number"
+              min={0}
+              value={fees.cod_amount}
+              onChange={(e) => setFees({ ...fees, cod_amount: Number(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="field full">
+            <label>Ghi chú đơn</label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="modal-foot" style={{ paddingRight: 0 }}>
+          <button
+            className="btn primary"
+            disabled={saving || !customerId || lines.length === 0 || blockedLines.length > 0}
+            onClick={save}
+          >
+            {saving ? 'Đang lưu…' : `Lưu đơn · ${formatVnd(totalAmount)}`}
+          </button>
+        </div>
+        {blockedLines.length > 0 && (
+          <div className="alert-box" style={{ marginTop: 10 }}>
+            Còn {blockedLines.length} dòng chưa có giá ở cấp của khách. Bỏ dòng đó ra hoặc bổ sung giá
+            trong Bảng giá trước khi lưu.
+          </div>
+        )}
+      </Card>
     </>
   );
 }
