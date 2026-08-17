@@ -6,7 +6,12 @@ import { parseInput } from '../lib/validate';
 import { paymentAllocateSchema, paymentCreateSchema } from '@shared/schemas';
 import { customerScopeClause, requirePermission } from '../middleware/rbac';
 import { listDebts, totalDebts } from '../services/debts';
-import { allocatePayment, listPayments, recordPayment } from '../services/payments';
+import {
+  allocatePayment,
+  listPayments,
+  recordPayment,
+  setPaymentAccountingStatus,
+} from '../services/payments';
 
 export const financeRoutes = new Hono<AppEnv>();
 
@@ -42,6 +47,21 @@ financeRoutes.post('/payments', requirePermission('order.payment.record'), async
     ip: clientIp(c.req.raw.headers),
   });
   return ok(c, result);
+});
+
+/** Kế toán xác nhận khoản tiền sale đã tích là "tiền về". */
+financeRoutes.post('/payments/:id/confirm', requirePermission('order.accounting.confirm'), async (c) => {
+  const auth = c.get('auth');
+  const body = (await c.req.json().catch(() => ({}))) as { confirmed?: boolean; note?: string };
+  await setPaymentAccountingStatus(
+    c.env.DB,
+    auth,
+    c.req.param('id'),
+    body.confirmed !== false,
+    body.note ?? null,
+    { requestId: c.get('requestId'), ip: clientIp(c.req.raw.headers) },
+  );
+  return ok(c, { ok: true });
 });
 
 financeRoutes.post('/payments/:id/allocate', requirePermission('payment.allocate'), async (c) => {

@@ -51,6 +51,8 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 const EMPLOYEE: Permission[] = [
   'customer.read.own',
+  // Sale tích "tiền về"; khoản này CHƯA vào công nợ chính thức cho tới khi kế toán xác nhận.
+  'order.payment.record',
   'customer.create',
   'customer.update',
   'activity.create',
@@ -125,6 +127,29 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlyArray<Permission>> = {
 
 export function can(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
+}
+
+/**
+ * Gói quyền của KẾ TOÁN. Đây không phải vai trò gốc mà là quyền cộng thêm cho một tài khoản,
+ * vì công ty dùng MISA/Excel cho sổ sách, CRM chỉ cần chỗ xác nhận tiền và theo dõi công nợ.
+ */
+export const ACCOUNTANT_PERMISSIONS: Permission[] = [
+  'order.accounting.confirm',
+  'payment.allocate',
+  'order.payment.record',
+  'debt.read.team',
+  'debt.read.all',
+  'export.team',
+  'audit.read.team',
+];
+
+/** Quyền cuối cùng của một người = quyền theo vai trò + quyền cấp thêm. */
+export function effectivePermissions(role: Role, extra: string[] = []): Permission[] {
+  const set = new Set<Permission>(ROLE_PERMISSIONS[role]);
+  for (const item of extra) {
+    if ((PERMISSIONS as readonly string[]).includes(item)) set.add(item as Permission);
+  }
+  return [...set];
 }
 
 export type DataScope = 'OWN' | 'TEAM' | 'ALL';

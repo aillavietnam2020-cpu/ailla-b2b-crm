@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { AppEnv, AuthUser, Env } from '../env';
-import { customerScope } from '@shared/permissions';
+import { customerScope, effectivePermissions } from '@shared/permissions';
 import { forbidden, unauthorized } from '../lib/http';
 import { readSessionCookie, resolveSession } from '../lib/session';
 
@@ -48,6 +48,15 @@ export async function resolveEmail(env: Env, headers: Headers): Promise<string> 
   throw unauthorized('Chưa đăng nhập');
 }
 
+/** Quyền cấp thêm cho riêng tài khoản (gói Kế toán chẳng hạn). */
+export async function loadExtraPermissions(db: D1Database, userId: string): Promise<string[]> {
+  const rows = await db
+    .prepare('SELECT permission FROM user_permissions WHERE user_id = ?')
+    .bind(userId)
+    .all<{ permission: string }>();
+  return (rows.results ?? []).map((r) => r.permission);
+}
+
 export async function loadUserByEmail(db: D1Database, email: string): Promise<AuthUser> {
   const user = await db
     .prepare(
@@ -72,16 +81,19 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
     const session = await resolveSession(c.env.DB, token);
     if (session) {
       if (session.status !== 'ACTIVE') throw forbidden('Tài khoản đang bị khoá.');
+      const extra = await loadExtraPermissions(c.env.DB, session.id);
+      const role = session.role as AuthUser['role'];
       c.set('auth', {
         user: {
           id: session.id,
           email: session.email,
           display_name: session.display_name,
-          role: session.role as AuthUser['role'],
+          role,
           status: session.status,
           must_change_password: session.must_change_password,
         },
-        scope: customerScope(session.role as AuthUser['role']),
+        scope: customerScope(role),
+        permissions: effectivePermissions(role, extra),
       });
       await next();
       return;
@@ -90,7 +102,12 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   const email = await resolveEmail(c.env, c.req.raw.headers);
   const user = await loadUserByEmail(c.env.DB, email);
-  c.set('auth', { user, scope: customerScope(user.role) });
+  const extra = await loadExtraPermissions(c.env.DB, user.id);
+  c.set('auth', {
+    user,
+    scope: customerScope(user.role),
+    permissions: effectivePermissions(user.role, extra),
+  });
   await next();
 };
 
@@ -103,16 +120,18 @@ export const optionalAuthMiddleware: MiddlewareHandler<AppEnv> = async (c, next)
   if (token) {
     const session = await resolveSession(c.env.DB, token);
     if (session && session.status === 'ACTIVE') {
+      const role = session.role as AuthUser['role'];
       c.set('auth', {
         user: {
           id: session.id,
           email: session.email,
           display_name: session.display_name,
-          role: session.role as AuthUser['role'],
+          role,
           status: session.status,
           must_change_password: session.must_change_password,
         },
-        scope: customerScope(session.role as AuthUser['role']),
+        scope: customerScope(role),
+        permissions: effectivePermissions(role, await loadExtraPermissions(c.env.DB, session.id)),
       });
     }
   }

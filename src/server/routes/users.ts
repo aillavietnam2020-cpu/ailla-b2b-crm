@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { nowIso } from '@shared/datetime';
 import { ROLES } from '@shared/enums';
+import { ACCOUNTANT_PERMISSIONS } from '@shared/permissions';
 import { zodFieldErrors } from '@shared/schemas';
 import type { AppEnv } from '../env';
 import { auditStatement } from '../lib/audit';
@@ -47,7 +48,9 @@ userRoutes.get('/', requirePermission('user.manage'), async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT id, email, display_name, role, status, legacy_name, phone, last_login_at,
             password_updated_at, must_change_password,
-            CASE WHEN password_hash IS NULL THEN 0 ELSE 1 END AS has_password
+            CASE WHEN password_hash IS NULL THEN 0 ELSE 1 END AS has_password,
+            (SELECT COUNT(*) FROM user_permissions up
+              WHERE up.user_id = users.id AND up.permission = 'order.accounting.confirm') AS is_accountant
      FROM users WHERE deleted_at IS NULL ORDER BY role, display_name COLLATE NOCASE`,
   ).all();
   return c.json({ data: rows.results ?? [], request_id: c.get('requestId') });
@@ -105,6 +108,55 @@ userRoutes.post('/', requirePermission('user.manage'), async (c) => {
   ]);
 
   return c.json({ data: { id }, request_id: c.get('requestId') }, 201);
+});
+
+/**
+ * Bật/tắt gói quyền KẾ TOÁN cho một tài khoản.
+ * Kế toán: xác nhận tiền về, phân bổ khoản thu, xem công nợ toàn công ty.
+ * Không sửa đơn, không tạo khách - sổ sách chính thức vẫn nằm ở MISA.
+ */
+userRoutes.post('/:id/accountant', requirePermission('user.manage'), async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as { enabled?: boolean };
+  const enabled = body.enabled !== false;
+
+  const target = await c.env.DB.prepare(
+    'SELECT id, email, display_name FROM users WHERE id = ? AND deleted_at IS NULL',
+  )
+    .bind(id)
+    .first<{ id: string; email: string; display_name: string }>();
+  if (!target) throw notFound('Không tìm thấy tài khoản');
+
+  const now = nowIso();
+  const statements = enabled
+    ? ACCOUNTANT_PERMISSIONS.map((permission) =>
+        c.env.DB.prepare(
+          `INSERT INTO user_permissions (user_id, permission, granted_by, created_at)
+           VALUES (?, ?, ?, ?) ON CONFLICT (user_id, permission) DO NOTHING`,
+        ).bind(id, permission, auth.user.id, now),
+      )
+    : [
+        c.env.DB.prepare(
+          `DELETE FROM user_permissions WHERE user_id = ? AND permission IN (${ACCOUNTANT_PERMISSIONS.map(
+            () => '?',
+          ).join(',')})`,
+        ).bind(id, ...ACCOUNTANT_PERMISSIONS),
+      ];
+
+  statements.push(
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'USER_UPDATED',
+      entityType: 'USER',
+      entityId: id,
+      after: { accountant: enabled, email: target.email },
+      requestId: c.get('requestId'),
+      ip: c.req.header('CF-Connecting-IP') ?? null,
+    }),
+  );
+  await c.env.DB.batch(statements);
+  return c.json({ data: { ok: true, accountant: enabled }, request_id: c.get('requestId') });
 });
 
 userRoutes.patch('/:id', requirePermission('user.manage'), async (c) => {

@@ -25,6 +25,8 @@ export interface AuthUser {
 export interface AuthContext {
   user: AuthUser;
   scope: DataScope;
+  /** Quyền theo vai trò + quyền cấp thêm cho riêng tài khoản (ví dụ gói Kế toán). */
+  permissions: string[];
 }
 
 export interface AppVariables {

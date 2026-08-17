@@ -86,7 +86,10 @@ export async function recordPayment(
   }));
   // Bút toán đảo luôn phải chỉ rõ đơn cần trừ lại, không được để dạng "trả nợ chung".
   const isGeneral = !isAdjustment && allocations.length === 0;
-  const accountingStatus = input.accounting_confirmed ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN';
+  // Sale chỉ được TÍCH "tiền về"; khoản này nằm ở nhóm "chờ tiền về" cho tới khi kế toán
+  // xác nhận. Chỉ tài khoản có quyền kế toán mới xác nhận ngay lúc ghi nhận.
+  const canConfirm = auth.permissions.includes('order.accounting.confirm');
+  const accountingStatus = input.accounting_confirmed && canConfirm ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN';
   const reviewStatus = input.external_receipt_no ? 'OK' : 'NEEDS_REVIEW';
 
   if (isAdjustment && allocations.length === 0) {
@@ -168,6 +171,47 @@ export async function recordPayment(
   }
 
   return { id: paymentId, pending_allocation: isGeneral };
+}
+
+/** Kế toán xác nhận (hoặc bỏ xác nhận) một khoản tiền đã ghi nhận. */
+export async function setPaymentAccountingStatus(
+  db: D1Database,
+  auth: AuthContext,
+  paymentId: string,
+  confirmed: boolean,
+  note: string | null,
+  ctx: { requestId: string; ip: string | null },
+): Promise<void> {
+  const payment = await db
+    .prepare(
+      `SELECT p.id, p.amount, p.accounting_status, c.name AS customer_name
+       FROM payments p JOIN customers c ON c.id = p.customer_id WHERE p.id = ?`,
+    )
+    .bind(paymentId)
+    .first<{ id: string; amount: number; accounting_status: string; customer_name: string }>();
+  if (!payment) throw notFound('Không tìm thấy khoản tiền này');
+
+  const now = nowIso();
+  await db.batch([
+    db
+      .prepare('UPDATE payments SET accounting_status = ?, updated_at = ? WHERE id = ?')
+      .bind(confirmed ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN', now, paymentId),
+    auditStatement(db, {
+      actorId: auth.user.id,
+      action: 'ACCOUNTING_CONFIRMED',
+      entityType: 'PAYMENT',
+      entityId: paymentId,
+      before: { accounting_status: payment.accounting_status },
+      after: {
+        accounting_status: confirmed ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN',
+        customer: payment.customer_name,
+        amount: payment.amount,
+      },
+      reason: note,
+      requestId: ctx.requestId,
+      ip: ctx.ip,
+    }),
+  ]);
 }
 
 /**

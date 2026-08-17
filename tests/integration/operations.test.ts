@@ -255,12 +255,61 @@ describe('Khuyến mại và vận hành đơn hàng', () => {
     expect(credit?.amount).toBe(100000);
   });
 
-  it('nhân viên không được tự ghi nhận tiền về', async () => {
+  it('sale tích được tiền về nhưng khoản đó CHƯA vào công nợ chính thức', async () => {
     const res = await ctx.request('/api/payments', {
+      as: USERS.thao,
+      body: {
+        customer_id: 'cus-thao-1',
+        amount: 100000,
+        // Sale có tick "kế toán đã xác nhận" thì hệ thống vẫn bỏ qua.
+        accounting_confirmed: true,
+      },
+    });
+    expect(res.status).toBe(200);
+
+    const payment = await ctx.db
+      .prepare('SELECT accounting_status FROM payments WHERE id = ?')
+      .bind(res.body.data.id)
+      .first<{ accounting_status: string }>();
+    expect(payment?.accounting_status).toBe('CHUA_XAC_NHAN');
+  });
+
+  it('kế toán xác nhận thì khoản tiền mới được tính vào công nợ chính thức', async () => {
+    const ghiNhan = await ctx.request('/api/payments', {
       as: USERS.thao,
       body: { customer_id: 'cus-thao-1', amount: 100000 },
     });
-    expect(res.status).toBe(403);
+    const paymentId = ghiNhan.body.data.id;
+
+    // Nhân viên thường không xác nhận được.
+    const saleTuXacNhan = await ctx.request(`/api/payments/${paymentId}/confirm`, {
+      as: USERS.thao,
+      body: { confirmed: true },
+    });
+    expect(saleTuXacNhan.status).toBe(403);
+
+    // Cấp gói quyền kế toán cho Huyền rồi xác nhận.
+    const huyen = await ctx.db
+      .prepare('SELECT id FROM users WHERE email = ?')
+      .bind(USERS.huyen)
+      .first<{ id: string }>();
+    const capQuyen = await ctx.request(`/api/admin/users/${huyen!.id}/accountant`, {
+      as: USERS.ceo,
+      body: { enabled: true },
+    });
+    expect(capQuyen.status).toBe(200);
+
+    const xacNhan = await ctx.request(`/api/payments/${paymentId}/confirm`, {
+      as: USERS.huyen,
+      body: { confirmed: true },
+    });
+    expect(xacNhan.status).toBe(200);
+
+    const payment = await ctx.db
+      .prepare('SELECT accounting_status FROM payments WHERE id = ?')
+      .bind(paymentId)
+      .first<{ accounting_status: string }>();
+    expect(payment?.accounting_status).toBe('DA_XAC_NHAN');
   });
 });
 
