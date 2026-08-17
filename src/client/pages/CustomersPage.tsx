@@ -141,6 +141,8 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                   <th>Cấp giá</th>
                   <th>Giai đoạn</th>
                   {mode === 'admin' && <th>Sale phụ trách</th>}
+                  <th className="right">Doanh số tháng này</th>
+                  <th>Nhập gần nhất</th>
                   <th className="right">Công nợ chính thức</th>
                   <th className="right">Dự kiến</th>
                   <th>Chăm sóc tiếp</th>

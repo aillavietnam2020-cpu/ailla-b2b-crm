@@ -48,6 +48,16 @@ export async function resolveEmail(env: Env, headers: Headers): Promise<string> 
   throw unauthorized('Chưa đăng nhập');
 }
 
+/**
+ * Phạm vi dữ liệu: theo vai trò, nhưng ai được cấp quyền xem công nợ toàn công ty
+ * (ví dụ kế toán) thì phải nhìn được mọi khách, không chỉ khách của mình.
+ */
+function scopeFor(role: AuthUser['role'], permissions: string[]) {
+  if (permissions.includes('debt.read.all') || permissions.includes('customer.read.all')) return 'ALL';
+  if (permissions.includes('debt.read.team') || permissions.includes('customer.read.team')) return 'TEAM';
+  return customerScope(role);
+}
+
 /** Quyền cấp thêm cho riêng tài khoản (gói Kế toán chẳng hạn). */
 export async function loadExtraPermissions(db: D1Database, userId: string): Promise<string[]> {
   const rows = await db
@@ -92,7 +102,7 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
           status: session.status,
           must_change_password: session.must_change_password,
         },
-        scope: customerScope(role),
+        scope: scopeFor(role, effectivePermissions(role, extra)),
         permissions: effectivePermissions(role, extra),
       });
       await next();
@@ -105,7 +115,7 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const extra = await loadExtraPermissions(c.env.DB, user.id);
   c.set('auth', {
     user,
-    scope: customerScope(user.role),
+    scope: scopeFor(user.role, effectivePermissions(user.role, extra)),
     permissions: effectivePermissions(user.role, extra),
   });
   await next();

@@ -3,7 +3,6 @@ import type { AppEnv } from '../env';
 import { nowIso } from '@shared/datetime';
 import { auditStatement } from '../lib/audit';
 import { badRequest, ok } from '../lib/http';
-import { ROLE_PERMISSIONS } from '@shared/permissions';
 import { listAlerts, syncAlerts } from '../services/alerts';
 import { loadConfig } from '../lib/settings';
 import { requirePermission } from '../middleware/rbac';
@@ -15,7 +14,9 @@ coreRoutes.get('/me', (c) => {
   return ok(c, {
     user: auth.user,
     scope: auth.scope,
-    permissions: [...ROLE_PERMISSIONS[auth.user.role]],
+    // Quyền theo vai trò CỘNG quyền cấp thêm (gói Kế toán), nếu không giao diện sẽ ẩn
+    // mất các nút mà backend thực tế cho phép.
+    permissions: auth.permissions,
     environment: c.env.ENVIRONMENT,
   });
 });

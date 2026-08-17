@@ -798,11 +798,19 @@ table.data.wide {
   .bar-value { text-align: left; }
 }
 
-/* Bảng rộng: luôn cuộn ngang được thay vì bị cắt mất cột cuối */
+/* Bảng rộng: luôn cuộn ngang được thay vì bị cắt mất cột cuối.
+   Lưu ý: KHÔNG đặt overflow:hidden cho .card, nếu không thanh cuộn của bảng bị nuốt mất. */
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  width: 100%;
   max-width: 100%;
 }
-.table-wrap table.wide { min-width: 1100px; }
-.card { overflow: hidden; }
+.table-wrap table { min-width: 720px; }
+.table-wrap table.wide { min-width: 1180px; }
+/* Vùng nội dung không được ép co lại, nếu không bảng sẽ tràn ra ngoài màn hình. */
+.app { min-width: 0; }
+.main { min-width: 0; overflow-x: hidden; }
+.content { min-width: 0; max-width: 100%; }
+.grid-2 > * { min-width: 0; }
+.card { min-width: 0; }
