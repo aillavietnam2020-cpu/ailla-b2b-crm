@@ -313,36 +313,28 @@ describe('Khuyến mại và vận hành đơn hàng', () => {
   });
 });
 
-describe('Báo cáo doanh số và thưởng', () => {
+describe('Dashboard kinh doanh', () => {
   it('nhân viên chỉ xem được số của chính mình', async () => {
     const res = await ctx.request('/api/dashboards/sales?period=2026-08&user_id=user-huyen', {
       as: USERS.thao,
     });
     expect(res.status).toBe(200);
-    const ids = res.body.data.rows.map((r: { user_id: string }) => r.user_id);
+    const ids = res.body.data.by_sale.map((r: { user_id: string }) => r.user_id);
     expect(ids).toEqual(['user-thao']);
   });
 
-  it('CEO đổi được tỷ lệ thưởng và báo cáo tính lại theo tỷ lệ mới', async () => {
-    const updated = await ctx.request('/api/settings', {
-      as: USERS.ceo,
-      method: 'PATCH',
-      body: { 'commission.percent': 2, 'commission.basis': 'REVENUE' },
-    });
-    expect(updated.status).toBe(200);
-
-    const report = await ctx.request('/api/dashboards/sales?period=2026-08', { as: USERS.ceo });
-    expect(report.body.data.commission_percent).toBe(2);
-    expect(report.body.data.basis).toBe('REVENUE');
-  });
-
-  it('quản lý không đổi được tỷ lệ thưởng', async () => {
-    const res = await ctx.request('/api/settings', {
-      as: USERS.manager,
-      method: 'PATCH',
-      body: { 'commission.percent': 10 },
-    });
-    expect(res.status).toBe(403);
+  it('trả đủ 4 khối theo sheet DASHBOARD_SALE', async () => {
+    const res = await ctx.request('/api/dashboards/sales?period=2026-08', { as: USERS.ceo });
+    expect(res.status).toBe(200);
+    const d = res.body.data;
+    expect(d.overview).toBeTruthy();
+    expect(Array.isArray(d.by_sale)).toBe(true);
+    expect(Array.isArray(d.by_product_group)).toBe(true);
+    expect(Array.isArray(d.funnel)).toBe(true);
+    // Tổng quan phải có đủ các chỉ số công ty đang theo dõi.
+    for (const key of ['revenue', 'orders', 'aov', 'close_rate', 'repeat_rate']) {
+      expect(d.overview).toHaveProperty(key);
+    }
   });
 });
 

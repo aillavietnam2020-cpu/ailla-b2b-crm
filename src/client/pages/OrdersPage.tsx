@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ApprovalItem, OrderDetail, OrderListItem } from '@shared/types';
 import { formatVnDate, formatVnDateTime, vnDate } from '@shared/datetime';
@@ -84,6 +84,7 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
                   <th className="right">Tổng phải thu</th>
                   <th className="right">Còn phải thu</th>
                   <th>Trạng thái</th>
+                  <th>Việc cần làm</th>
                 </tr>
               </thead>
               <tbody>
@@ -106,6 +107,9 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
                         payment={order.payment_status}
                         accounting={order.accounting_status}
                       />
+                    </td>
+                    <td>
+                      <QuickActions order={order} onDone={() => orders.reload()} />
                     </td>
                   </tr>
                 ))}
@@ -477,6 +481,122 @@ export function OrderDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
             setShowPayment(false);
             toast.success('Đã ghi nhận tiền về');
             order.reload();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Thao tác nhanh ngay trên danh sách, đúng luồng thật của công ty:
+ *   Quản lý tích "đã xuất kho" → "đã giao"
+ *   Sale tích "tiền về" (ghi nhận, chưa vào công nợ chính thức)
+ *   Kế toán bấm "xác nhận" thì đơn mới ghi nợ chính thức.
+ * Nút nào không thuộc quyền của người đang đăng nhập thì không hiện.
+ */
+function QuickActions({ order, onDone }: { order: OrderListItem; onDone: () => void }) {
+  const { can } = useAuth();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+
+  const run = async (label: string, action: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await action();
+      toast.success(label);
+      onDone();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Không thực hiện được');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const buttons: React.ReactNode[] = [];
+
+  if (order.approval_status === 'APPROVED' && can('order.delivery.update')) {
+    if (order.delivery_status === 'CHUA_XUAT') {
+      buttons.push(
+        <button
+          key="xuat"
+          className="btn sm"
+          disabled={busy}
+          onClick={() =>
+            run('Đã đánh dấu xuất kho', () =>
+              api.post(`/api/orders/${order.id}/delivery`, { delivery_status: 'DA_XUAT_KHO' }),
+            )
+          }
+        >
+          Đã xuất kho
+        </button>,
+      );
+    } else if (order.delivery_status === 'DA_XUAT_KHO') {
+      buttons.push(
+        <button
+          key="giao"
+          className="btn sm"
+          disabled={busy}
+          onClick={() =>
+            run('Đã đánh dấu giao hàng', () =>
+              api.post(`/api/orders/${order.id}/delivery`, { delivery_status: 'DA_GIAO' }),
+            )
+          }
+        >
+          Đã giao
+        </button>,
+      );
+    }
+  }
+
+  if (
+    order.approval_status === 'APPROVED' &&
+    order.payment_status !== 'DA_THU_DU' &&
+    can('order.payment.record')
+  ) {
+    buttons.push(
+      <button key="tien" className="btn sm primary" disabled={busy} onClick={() => setShowPayment(true)}>
+        Tiền về
+      </button>,
+    );
+  }
+
+  if (
+    order.approval_status === 'APPROVED' &&
+    order.accounting_status === 'CHUA_XAC_NHAN' &&
+    (order.delivery_status === 'DA_XUAT_KHO' || order.delivery_status === 'DA_GIAO') &&
+    can('order.accounting.confirm')
+  ) {
+    buttons.push(
+      <button
+        key="kt"
+        className="btn sm dark"
+        disabled={busy}
+        onClick={() =>
+          run('Kế toán đã xác nhận', () =>
+            api.post(`/api/orders/${order.id}/accounting`, { accounting_status: 'DA_XAC_NHAN' }),
+          )
+        }
+      >
+        KT xác nhận
+      </button>,
+    );
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {buttons.length > 0 ? buttons : <span className="muted">—</span>}
+      </div>
+      {showPayment && (
+        <RecordPaymentModal
+          order={{ ...order, items: [], approvals: [] } as unknown as OrderDetail}
+          onClose={() => setShowPayment(false)}
+          onDone={() => {
+            setShowPayment(false);
+            toast.success('Đã ghi nhận tiền về, chờ kế toán xác nhận');
+            onDone();
           }}
         />
       )}

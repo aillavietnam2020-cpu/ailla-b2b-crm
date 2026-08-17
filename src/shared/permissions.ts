@@ -97,6 +97,14 @@ const CEO: Permission[] = [
   'customer.read.team',
   'customer.read.all',
   'customer.reassign',
+  // Chủ doanh nghiệp vẫn trực tiếp gọi khách lớn và chốt trạng thái giao hàng, nên cần
+  // các quyền nhập liệu này; mọi thao tác đều vào nhật ký như người khác.
+  'customer.update',
+  'customer.tier.change',
+  'activity.create',
+  'activity.read.team',
+  'task.manage.team',
+  'order.delivery.update',
   'price.read',
   'price.approve',
   'order.approve.normal',

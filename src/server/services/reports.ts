@@ -1,151 +1,263 @@
 import { vnDate } from '@shared/datetime';
 import type { AppConfig } from '../lib/settings';
 
-export interface SalesRow {
-  user_id: string | null;
-  display_name: string;
+/**
+ * Dashboard kinh doanh, dựng theo đúng sheet DASHBOARD_SALE trong file CRM của công ty:
+ *   A. Tổng quan công ty trong kỳ
+ *   B. KPI hiệu suất từng sale
+ *   C. Nhóm sản phẩm bán chạy
+ *   D. Phễu khách hàng
+ *
+ * "Doanh thu trong kỳ" theo định nghĩa của file: tiền hàng đã trừ chiết khấu, KHÔNG tính
+ * phí vận chuyển. Chỉ tính đơn đã duyệt.
+ */
+
+export interface SalesOverview {
+  revenue: number;
   orders: number;
-  gross_revenue: number; // tổng phải thu của đơn đã duyệt
-  gift_value: number; // giá trị hàng tặng theo giá chuẩn
-  discount_total: number; // chiết khấu + trừ thưởng
-  collected: number; // tiền đã thu (kế toán xác nhận)
-  new_customers: number;
-  commission: number; // thưởng ước tính
+  aov: number;
+  customers_with_orders: number;
+  new_first_order_customers: number;
+  new_contacted_customers: number;
+  close_rate: number;
+  repeat_rate: number;
+  official_debt: number;
+  over_limit_customers: number;
+  overdue_reorder_customers: number;
 }
 
-export interface SalesReport {
+export interface SalesKpiRow {
+  user_id: string | null;
+  display_name: string;
+  revenue: number;
+  revenue_new_customers: number;
+  revenue_old_customers: number;
+  orders: number;
+  aov: number;
+  new_customers: number;
+  collected: number;
+}
+
+export interface ProductGroupRow {
+  group_name: string;
+  revenue: number;
+  quantity: number;
+  order_lines: number;
+  share: number;
+  revenue_total: number;
+}
+
+export interface FunnelRow {
+  stage: string;
+  customers: number;
+  share: number;
+  revenue_total: number;
+}
+
+export interface SalesDashboard {
   period: string;
   from: string;
   to: string;
-  basis: 'REVENUE' | 'COLLECTED';
-  commission_percent: number;
-  rows: SalesRow[];
-  totals: Omit<SalesRow, 'user_id' | 'display_name'>;
-  by_month: Array<{ month: string; gross_revenue: number; collected: number; orders: number }>;
+  overview: SalesOverview;
+  by_sale: SalesKpiRow[];
+  by_product_group: ProductGroupRow[];
+  funnel: FunnelRow[];
 }
 
 function periodRange(period: string): { from: string; to: string } {
-  // period: 'YYYY-MM' cho báo cáo tháng, 'YYYY' cho báo cáo năm.
   if (/^\d{4}$/.test(period)) return { from: `${period}-01-01`, to: `${period}-12-31` };
   const [y, m] = period.split('-').map(Number);
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
   return { from: `${period}-01`, to: `${period}-${String(lastDay).padStart(2, '0')}` };
 }
 
-/**
- * Doanh số và thưởng theo nhân viên.
- * Thưởng = tỷ lệ % (cấu hình được) nhân với căn cứ tính:
- *   - COLLECTED: tiền thực thu đã được kế toán xác nhận (mặc định, an toàn cho dòng tiền).
- *   - REVENUE:   tổng phải thu của đơn đã duyệt.
- * Đây là số ƯỚC TÍNH để theo dõi; con số chi trả cuối cùng do công ty chốt.
- */
-export async function salesReport(
+/** Doanh thu = tiền hàng - chiết khấu - trừ thưởng, KHÔNG cộng phí vận chuyển. */
+const REVENUE_EXPR = '(o.subtotal - o.discount_amount - o.bonus_deduction)';
+
+export async function salesDashboard(
   db: D1Database,
-  config: AppConfig,
+  _config: AppConfig,
   options: { period?: string; ownerId?: string | null },
-): Promise<SalesReport> {
+): Promise<SalesDashboard> {
   const period = options.period ?? vnDate().slice(0, 7);
   const { from, to } = periodRange(period);
   const ownerFilter = options.ownerId ? 'AND o.owner_id = ?' : '';
   const ownerParams = options.ownerId ? [options.ownerId] : [];
 
-  const rows = await db
+  /* ---------------- A. Tổng quan ---------------- */
+  const overviewRow = await db
     .prepare(
-      `SELECT u.id AS user_id, u.display_name,
-        (SELECT COUNT(*) FROM orders o WHERE o.owner_id = u.id AND o.deleted_at IS NULL
-           AND o.approval_status = 'APPROVED' AND o.order_date BETWEEN ? AND ?) AS orders,
-        (SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.owner_id = u.id
-           AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
-           AND o.order_date BETWEEN ? AND ?) AS gross_revenue,
-        (SELECT COALESCE(SUM(oi.qty * COALESCE(oi.base_price, 0)), 0)
-           FROM order_items oi JOIN orders o ON o.id = oi.order_id
-           WHERE o.owner_id = u.id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
-             AND oi.is_gift = 1 AND o.order_date BETWEEN ? AND ?) AS gift_value,
-        (SELECT COALESCE(SUM(o.discount_amount + o.bonus_deduction), 0) FROM orders o
-           WHERE o.owner_id = u.id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
-             AND o.order_date BETWEEN ? AND ?) AS discount_total,
-        (SELECT COALESCE(SUM(CASE WHEN p.is_adjustment = 1 THEN -p.amount ELSE p.amount END), 0) FROM payments p
-           JOIN customers c ON c.id = p.customer_id
-           WHERE c.owner_id = u.id AND p.accounting_status = 'DA_XAC_NHAN'
-             AND p.paid_at BETWEEN ? AND ?) AS collected,
-        (SELECT COUNT(*) FROM customers c WHERE c.owner_id = u.id AND c.deleted_at IS NULL
-           AND substr(c.created_at, 1, 10) BETWEEN ? AND ?) AS new_customers
-       FROM users u
-       WHERE u.deleted_at IS NULL AND u.role = 'EMPLOYEE'
-         ${options.ownerId ? 'AND u.id = ?' : ''}
-       ORDER BY gross_revenue DESC`,
-    )
-    .bind(
-      from,
-      to,
-      from,
-      to,
-      from,
-      to,
-      from,
-      to,
-      from,
-      to,
-      from,
-      to,
-      ...(options.ownerId ? [options.ownerId] : []),
-    )
-    .all<Omit<SalesRow, 'commission'>>();
-
-  const percent = config.commissionPercent;
-  const basis = config.commissionBasis;
-  const list: SalesRow[] = (rows.results ?? []).map((r) => ({
-    ...r,
-    commission: Math.round(((basis === 'COLLECTED' ? r.collected : r.gross_revenue) * percent) / 100),
-  }));
-
-  const totals = list.reduce(
-    (acc, r) => ({
-      orders: acc.orders + r.orders,
-      gross_revenue: acc.gross_revenue + r.gross_revenue,
-      gift_value: acc.gift_value + r.gift_value,
-      discount_total: acc.discount_total + r.discount_total,
-      collected: acc.collected + r.collected,
-      new_customers: acc.new_customers + r.new_customers,
-      commission: acc.commission + r.commission,
-    }),
-    {
-      orders: 0,
-      gross_revenue: 0,
-      gift_value: 0,
-      discount_total: 0,
-      collected: 0,
-      new_customers: 0,
-      commission: 0,
-    },
-  );
-
-  // Biểu đồ 12 tháng gần nhất để nhìn xu hướng.
-  const year = period.slice(0, 4);
-  const byMonth = await db
-    .prepare(
-      `SELECT substr(o.order_date, 1, 7) AS month,
-              COALESCE(SUM(o.total_amount), 0) AS gross_revenue,
-              COUNT(*) AS orders,
-              (SELECT COALESCE(SUM(CASE WHEN p.is_adjustment = 1 THEN -p.amount ELSE p.amount END), 0) FROM payments p
-                 WHERE substr(p.paid_at, 1, 7) = substr(o.order_date, 1, 7)
-                   AND p.accounting_status = 'DA_XAC_NHAN') AS collected
+      `SELECT
+        COALESCE(SUM(${REVENUE_EXPR}), 0) AS revenue,
+        COUNT(*) AS orders,
+        COUNT(DISTINCT o.customer_id) AS customers_with_orders
        FROM orders o
        WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
-         AND substr(o.order_date, 1, 4) = ? ${ownerFilter}
-       GROUP BY month ORDER BY month`,
+         AND o.order_date BETWEEN ? AND ? ${ownerFilter}`,
     )
-    .bind(year, ...ownerParams)
-    .all<{ month: string; gross_revenue: number; collected: number; orders: number }>();
+    .bind(from, to, ...ownerParams)
+    .first<{ revenue: number; orders: number; customers_with_orders: number }>();
+
+  // Khách chốt đơn ĐẦU TIÊN trong kỳ: đơn sớm nhất của khách rơi vào kỳ này.
+  const firstOrderRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM (
+         SELECT o.customer_id, MIN(o.order_date) AS first_date
+         FROM orders o
+         WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED' ${ownerFilter}
+         GROUP BY o.customer_id
+       ) t WHERE t.first_date BETWEEN ? AND ?`,
+    )
+    .bind(...ownerParams, from, to)
+    .first<{ n: number }>();
+
+  const contactedRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM customers c
+       WHERE c.deleted_at IS NULL AND c.first_contact_date BETWEEN ? AND ?
+         ${options.ownerId ? 'AND c.owner_id = ?' : ''}`,
+    )
+    .bind(from, to, ...ownerParams)
+    .first<{ n: number }>();
+
+  // Khách cũ tái đơn: đã từng mua TRƯỚC kỳ và có đơn trong kỳ.
+  const repeatRow = await db
+    .prepare(
+      `SELECT
+        (SELECT COUNT(DISTINCT o.customer_id) FROM orders o
+          WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
+            AND o.order_date BETWEEN ? AND ? ${ownerFilter}
+            AND o.customer_id IN (
+              SELECT customer_id FROM orders WHERE deleted_at IS NULL
+                AND approval_status = 'APPROVED' AND order_date < ?)) AS repeated,
+        (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE deleted_at IS NULL
+           AND approval_status = 'APPROVED' AND order_date < ?) AS bought_before`,
+    )
+    .bind(from, to, ...ownerParams, from, from)
+    .first<{ repeated: number; bought_before: number }>();
+
+  const today = vnDate();
+  const riskRow = await db
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM customers c
+          WHERE c.deleted_at IS NULL AND c.stage <> 'LOST' AND c.last_order_date IS NOT NULL
+            AND julianday(?) - julianday(c.last_order_date) >
+                COALESCE(c.reorder_cycle_days, 30)) AS overdue_reorder`,
+    )
+    .bind(today)
+    .first<{ overdue_reorder: number }>();
+
+  /* ---------------- B. KPI từng sale ---------------- */
+  const bySale = await db
+    .prepare(
+      `SELECT u.id AS user_id, u.display_name,
+        COALESCE(SUM(${REVENUE_EXPR}), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN first_order.first_date BETWEEN ? AND ?
+                          THEN ${REVENUE_EXPR} ELSE 0 END), 0) AS revenue_new_customers,
+        COALESCE(SUM(CASE WHEN first_order.first_date < ?
+                          THEN ${REVENUE_EXPR} ELSE 0 END), 0) AS revenue_old_customers,
+        COUNT(o.id) AS orders,
+        (SELECT COUNT(*) FROM customers c WHERE c.owner_id = u.id AND c.deleted_at IS NULL
+           AND c.first_contact_date BETWEEN ? AND ?) AS new_customers,
+        (SELECT COALESCE(SUM(CASE WHEN p.is_adjustment = 1 THEN -p.amount ELSE p.amount END), 0)
+           FROM payments p JOIN customers c2 ON c2.id = p.customer_id
+           WHERE c2.owner_id = u.id AND p.accounting_status = 'DA_XAC_NHAN'
+             AND p.paid_at BETWEEN ? AND ?) AS collected
+       FROM users u
+       LEFT JOIN orders o ON o.owner_id = u.id AND o.deleted_at IS NULL
+            AND o.approval_status = 'APPROVED' AND o.order_date BETWEEN ? AND ?
+       LEFT JOIN (
+         SELECT customer_id, MIN(order_date) AS first_date FROM orders
+         WHERE deleted_at IS NULL AND approval_status = 'APPROVED' GROUP BY customer_id
+       ) first_order ON first_order.customer_id = o.customer_id
+       WHERE u.deleted_at IS NULL AND u.role = 'EMPLOYEE'
+         ${options.ownerId ? 'AND u.id = ?' : ''}
+       GROUP BY u.id, u.display_name
+       ORDER BY revenue DESC`,
+    )
+    .bind(from, to, from, from, to, from, to, from, to, ...ownerParams)
+    .all<Omit<SalesKpiRow, 'aov'>>();
+
+  /* ---------------- C. Nhóm sản phẩm ---------------- */
+  const groups = await db
+    .prepare(
+      `SELECT COALESCE(g.name, 'Chưa phân nhóm') AS group_name,
+        COALESCE(SUM(CASE WHEN o.order_date BETWEEN ? AND ? THEN i.line_total ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN o.order_date BETWEEN ? AND ? THEN i.qty ELSE 0 END), 0) AS quantity,
+        COALESCE(SUM(CASE WHEN o.order_date BETWEEN ? AND ? THEN 1 ELSE 0 END), 0) AS order_lines,
+        COALESCE(SUM(i.line_total), 0) AS revenue_total
+       FROM order_items i
+       JOIN orders o ON o.id = i.order_id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
+       JOIN products p ON p.id = i.product_id
+       LEFT JOIN product_groups g ON g.id = p.group_id
+       ${options.ownerId ? 'WHERE o.owner_id = ?' : ''}
+       GROUP BY group_name
+       ORDER BY revenue_total DESC`,
+    )
+    .bind(from, to, from, to, from, to, ...ownerParams)
+    .all<Omit<ProductGroupRow, 'share'>>();
+
+  /* ---------------- D. Phễu khách hàng ---------------- */
+  const funnel = await db
+    .prepare(
+      `SELECT c.stage,
+              COUNT(*) AS customers,
+              COALESCE((SELECT SUM(o.subtotal) FROM orders o
+                        WHERE o.customer_id = c.id AND o.deleted_at IS NULL
+                          AND o.approval_status = 'APPROVED'), 0) AS revenue_total
+       FROM customers c
+       WHERE c.deleted_at IS NULL ${options.ownerId ? 'AND c.owner_id = ?' : ''}
+       GROUP BY c.stage`,
+    )
+    .bind(...ownerParams)
+    .all<{ stage: string; customers: number; revenue_total: number }>();
+
+  const debts = await db
+    .prepare(
+      `SELECT COALESCE(SUM(c.opening_debt), 0) AS opening FROM customers c WHERE c.deleted_at IS NULL`,
+    )
+    .first<{ opening: number }>();
+
+  const revenue = overviewRow?.revenue ?? 0;
+  const orders = overviewRow?.orders ?? 0;
+  const contacted = contactedRow?.n ?? 0;
+  const firstOrders = firstOrderRow?.n ?? 0;
+  const groupRows = groups.results ?? [];
+  const groupTotal = groupRows.reduce((acc, g) => acc + g.revenue, 0);
+  const funnelRows = funnel.results ?? [];
+  const funnelTotal = funnelRows.reduce((acc, f) => acc + f.customers, 0);
 
   return {
     period,
     from,
     to,
-    basis,
-    commission_percent: percent,
-    rows: list,
-    totals,
-    by_month: byMonth.results ?? [],
+    overview: {
+      revenue,
+      orders,
+      aov: orders ? Math.round(revenue / orders) : 0,
+      customers_with_orders: overviewRow?.customers_with_orders ?? 0,
+      new_first_order_customers: firstOrders,
+      new_contacted_customers: contacted,
+      close_rate: contacted ? Math.round((firstOrders / contacted) * 100) : 0,
+      repeat_rate: repeatRow?.bought_before
+        ? Math.round((repeatRow.repeated / repeatRow.bought_before) * 100)
+        : 0,
+      official_debt: debts?.opening ?? 0,
+      over_limit_customers: 0,
+      overdue_reorder_customers: riskRow?.overdue_reorder ?? 0,
+    },
+    by_sale: (bySale.results ?? []).map((r) => ({
+      ...r,
+      aov: r.orders ? Math.round(r.revenue / r.orders) : 0,
+    })),
+    by_product_group: groupRows.map((g) => ({
+      ...g,
+      share: groupTotal ? Math.round((g.revenue / groupTotal) * 1000) / 10 : 0,
+    })),
+    funnel: funnelRows.map((f) => ({
+      ...f,
+      share: funnelTotal ? Math.round((f.customers / funnelTotal) * 1000) / 10 : 0,
+    })),
   };
 }

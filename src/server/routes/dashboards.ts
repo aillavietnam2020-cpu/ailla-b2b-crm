@@ -4,7 +4,7 @@ import { ok } from '../lib/http';
 import { requirePermission } from '../middleware/rbac';
 import { loadConfig } from '../lib/settings';
 import { ceoDashboard, managerDashboard, salesPerformance } from '../services/dashboards';
-import { salesReport } from '../services/reports';
+import { salesDashboard } from '../services/reports';
 
 export const dashboardRoutes = new Hono<AppEnv>();
 
@@ -25,7 +25,10 @@ dashboardRoutes.get('/sales', async (c) => {
   const config = await loadConfig(c.env.DB);
   const requested = c.req.query('user_id');
   const ownerId = auth.user.role === 'EMPLOYEE' ? auth.user.id : (requested ?? null);
-  return ok(c, await salesReport(c.env.DB, config, { period: c.req.query('period') ?? undefined, ownerId }));
+  return ok(
+    c,
+    await salesDashboard(c.env.DB, config, { period: c.req.query('period') ?? undefined, ownerId }),
+  );
 });
 
 /** Kết quả cá nhân. Nhân viên chỉ xem được của chính mình. */

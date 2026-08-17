@@ -1,260 +1,218 @@
 import { useState } from 'react';
 import { formatCompactVnd, formatVnd } from '@shared/money';
 import { vnDate } from '@shared/datetime';
+import { STAGE_LABELS, type CustomerStage } from '@shared/enums';
 import { useApi } from '../../lib/hooks';
-import { useAuth } from '../../components/AuthProvider';
-import { Card, ErrorBox, Kpi, PageHead, StateBlock } from '../../components/ui';
-import { ApiError, api } from '../../lib/api';
+import { Card, Kpi, PageHead, StateBlock } from '../../components/ui';
 
-interface SalesRow {
-  user_id: string | null;
-  display_name: string;
-  orders: number;
-  gross_revenue: number;
-  gift_value: number;
-  discount_total: number;
-  collected: number;
-  new_customers: number;
-  commission: number;
-}
-
-interface SalesReport {
+interface SalesDashboardData {
   period: string;
-  from: string;
-  to: string;
-  basis: 'REVENUE' | 'COLLECTED';
-  commission_percent: number;
-  rows: SalesRow[];
-  totals: Omit<SalesRow, 'user_id' | 'display_name'>;
-  by_month: Array<{ month: string; gross_revenue: number; collected: number; orders: number }>;
+  overview: {
+    revenue: number;
+    orders: number;
+    aov: number;
+    customers_with_orders: number;
+    new_first_order_customers: number;
+    new_contacted_customers: number;
+    close_rate: number;
+    repeat_rate: number;
+    overdue_reorder_customers: number;
+  };
+  by_sale: Array<{
+    user_id: string | null;
+    display_name: string;
+    revenue: number;
+    revenue_new_customers: number;
+    revenue_old_customers: number;
+    orders: number;
+    aov: number;
+    new_customers: number;
+    collected: number;
+  }>;
+  by_product_group: Array<{
+    group_name: string;
+    revenue: number;
+    quantity: number;
+    order_lines: number;
+    share: number;
+    revenue_total: number;
+  }>;
+  funnel: Array<{ stage: string; customers: number; share: number; revenue_total: number }>;
 }
 
-const MONTH_NAMES = [
-  'Tháng 1',
-  'Tháng 2',
-  'Tháng 3',
-  'Tháng 4',
-  'Tháng 5',
-  'Tháng 6',
-  'Tháng 7',
-  'Tháng 8',
-  'Tháng 9',
-  'Tháng 10',
-  'Tháng 11',
-  'Tháng 12',
-];
-
-/** Doanh số theo tháng/năm và thưởng ước tính cho từng nhân viên Sale. */
+/**
+ * Dashboard kinh doanh dựng theo sheet DASHBOARD_SALE của công ty:
+ * A tổng quan kỳ · B KPI từng sale · C nhóm sản phẩm bán chạy · D phễu khách hàng.
+ */
 export function ReportsPage() {
-  const { can } = useAuth();
-  const today = vnDate();
-  const [period, setPeriod] = useState(today.slice(0, 7));
-  const [savingPercent, setSavingPercent] = useState(false);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  const report = useApi<SalesReport>(`/api/dashboards/sales?period=${period}&_=${reloadKey}`);
+  const [period, setPeriod] = useState(vnDate().slice(0, 7));
+  const report = useApi<SalesDashboardData>(`/api/dashboards/sales?period=${period}`);
   const data = report.data;
-  const isYear = /^\d{4}$/.test(period);
-  const canEditSettings = can('settings.manage');
 
-  async function saveCommission(percent: number, basis: 'REVENUE' | 'COLLECTED') {
-    setSavingPercent(true);
-    setSettingsError(null);
-    try {
-      await api.patch('/api/settings', { 'commission.percent': percent, 'commission.basis': basis });
-      setReloadKey((k) => k + 1);
-    } catch (err) {
-      setSettingsError(err instanceof ApiError ? err.message : 'Không lưu được thiết lập');
-    } finally {
-      setSavingPercent(false);
-    }
-  }
-
-  const maxRevenue = Math.max(1, ...(data?.by_month ?? []).map((m) => m.gross_revenue));
+  const maxGroupRevenue = Math.max(1, ...(data?.by_product_group ?? []).map((g) => g.revenue_total));
 
   return (
     <>
       <PageHead
-        title="Doanh số và thưởng"
-        subtitle="Doanh số đơn đã duyệt, tiền thực thu và thưởng ước tính theo từng nhân viên."
+        title="Dashboard kinh doanh"
+        subtitle="Doanh thu đã trừ chiết khấu, không tính phí vận chuyển; chỉ tính đơn đã duyệt."
         actions={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="month"
-              value={isYear ? `${period}-01` : period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="select"
-            />
-            <button className="btn" onClick={() => setPeriod(period.slice(0, 4))}>
-              Cả năm {period.slice(0, 4)}
-            </button>
-          </div>
+          <input
+            type="month"
+            className="select"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+          />
         }
       />
-
-      <ErrorBox message={settingsError} />
 
       <StateBlock loading={report.loading} error={report.error}>
         {data && (
           <>
+            {/* A. TỔNG QUAN CÔNG TY TRONG KỲ */}
             <div className="kpi-grid">
+              <Kpi label="Doanh thu trong kỳ" value={formatCompactVnd(data.overview.revenue)} hint="Đã trừ chiết khấu" />
+              <Kpi label="Số đơn trong kỳ" value={data.overview.orders} hint="Đơn đã duyệt" />
+              <Kpi label="Giá trị đơn trung bình" value={formatCompactVnd(data.overview.aov)} hint="Doanh thu / số đơn" />
               <Kpi
-                label={isYear ? `Doanh số năm ${period}` : `Doanh số ${MONTH_NAMES[Number(period.slice(5, 7)) - 1]}`}
-                value={formatCompactVnd(data.totals.gross_revenue)}
-                hint={`${data.totals.orders} đơn đã duyệt`}
+                label="Khách phát sinh đơn"
+                value={data.overview.customers_with_orders}
+                hint={`${data.overview.new_first_order_customers} khách chốt đơn đầu tiên`}
               />
               <Kpi
-                label="Tiền đã thu"
-                value={formatCompactVnd(data.totals.collected)}
-                hint="Kế toán đã xác nhận"
+                label="Tỷ lệ chốt trong kỳ"
+                value={`${data.overview.close_rate}%`}
+                hint={`${data.overview.new_contacted_customers} khách mới tiếp cận`}
               />
               <Kpi
-                label="Chiết khấu + trừ thưởng"
-                value={formatCompactVnd(data.totals.discount_total)}
-                hint="Giảm trực tiếp trên đơn"
+                label="Tỷ lệ khách cũ tái đơn"
+                value={`${data.overview.repeat_rate}%`}
+                hint="Khách đã mua trước kỳ, có đơn trong kỳ"
               />
               <Kpi
-                label="Giá trị hàng tặng"
-                value={formatCompactVnd(data.totals.gift_value)}
-                hint="Tính theo giá chuẩn của cấp khách"
-              />
-              <Kpi
-                label="Thưởng ước tính"
-                value={formatCompactVnd(data.totals.commission)}
-                hint={`${data.commission_percent}% ${data.basis === 'COLLECTED' ? 'tiền đã thu' : 'doanh số'}`}
+                label="Khách quá hạn tái mua"
+                value={data.overview.overdue_reorder_customers}
+                hint="Quá chu kỳ riêng của từng khách"
+                tone={data.overview.overdue_reorder_customers > 0 ? 'warn' : undefined}
               />
             </div>
 
-            <div className="grid-2" style={{ marginTop: 18 }}>
-              <Card title="Kết quả từng nhân viên" bodyClass="">
+            <div style={{ height: 18 }} />
+
+            {/* B. KPI HIỆU SUẤT TỪNG SALE */}
+            <Card title="Hiệu suất từng sale trong kỳ" bodyClass="">
+              <div className="table-wrap">
+                <table className="data wide">
+                  <thead>
+                    <tr>
+                      <th>Nhân viên</th>
+                      <th className="right">Doanh thu</th>
+                      <th className="right">DT khách mới</th>
+                      <th className="right">DT khách cũ</th>
+                      <th className="right">Số đơn</th>
+                      <th className="right">AOV</th>
+                      <th className="right">Khách mới tiếp cận</th>
+                      <th className="right">Tiền đã thu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.by_sale.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="empty">
+                          Kỳ này chưa có số liệu.
+                        </td>
+                      </tr>
+                    ) : (
+                      data.by_sale.map((row) => (
+                        <tr key={row.user_id ?? row.display_name}>
+                          <td>
+                            <strong>{row.display_name}</strong>
+                          </td>
+                          <td className="right nowrap">{formatVnd(row.revenue)}</td>
+                          <td className="right nowrap">{formatVnd(row.revenue_new_customers)}</td>
+                          <td className="right nowrap">{formatVnd(row.revenue_old_customers)}</td>
+                          <td className="right">{row.orders}</td>
+                          <td className="right nowrap">{formatVnd(row.aov)}</td>
+                          <td className="right">{row.new_customers}</td>
+                          <td className="right nowrap">{formatVnd(row.collected)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <div style={{ height: 18 }} />
+
+            <div className="grid-2">
+              {/* C. NHÓM SẢN PHẨM BÁN CHẠY */}
+              <Card title="Nhóm sản phẩm bán chạy" bodyClass="">
                 <div className="table-wrap">
                   <table className="data">
                     <thead>
                       <tr>
-                        <th>Nhân viên</th>
-                        <th className="right">Đơn</th>
-                        <th className="right">Doanh số</th>
-                        <th className="right">Đã thu</th>
-                        <th className="right">Khách mới</th>
-                        <th className="right">Thưởng ước tính</th>
+                        <th>Nhóm sản phẩm</th>
+                        <th className="right">Doanh thu kỳ</th>
+                        <th className="right">Sản lượng</th>
+                        <th className="right">Tỷ trọng</th>
+                        <th className="right">Luỹ kế</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.rows.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="empty">
-                            Kỳ này chưa có số liệu.
+                      {data.by_product_group.map((group) => (
+                        <tr key={group.group_name}>
+                          <td>
+                            <strong>{group.group_name}</strong>
+                            <div className="progress" style={{ background: '#eaecf0', marginTop: 4 }}>
+                              <i
+                                style={{
+                                  width: `${Math.max(2, (group.revenue_total / maxGroupRevenue) * 100)}%`,
+                                  background: 'var(--pink)',
+                                }}
+                              />
+                            </div>
                           </td>
+                          <td className="right nowrap">{formatVnd(group.revenue)}</td>
+                          <td className="right">{group.quantity}</td>
+                          <td className="right">{group.share}%</td>
+                          <td className="right nowrap">{formatCompactVnd(group.revenue_total)}</td>
                         </tr>
-                      ) : (
-                        data.rows.map((row) => (
-                          <tr key={row.user_id ?? row.display_name}>
-                            <td>
-                              <strong>{row.display_name}</strong>
-                            </td>
-                            <td className="right">{row.orders}</td>
-                            <td className="right nowrap">{formatVnd(row.gross_revenue)}</td>
-                            <td className="right nowrap">{formatVnd(row.collected)}</td>
-                            <td className="right">{row.new_customers}</td>
-                            <td className="right nowrap">
-                              <strong>{formatVnd(row.commission)}</strong>
-                            </td>
-                          </tr>
-                        ))
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </Card>
 
-              <div style={{ display: 'grid', gap: 18, alignContent: 'start' }}>
-                <Card title={`Doanh số 12 tháng năm ${period.slice(0, 4)}`}>
-                  {data.by_month.length === 0 ? (
-                    <div className="empty">Chưa có đơn nào trong năm này.</div>
-                  ) : (
-                    <div style={{ display: 'grid', gap: 10 }}>
-                      {data.by_month.map((m) => (
-                        <div key={m.month}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                            <span>{MONTH_NAMES[Number(m.month.slice(5, 7)) - 1]}</span>
-                            <strong>{formatCompactVnd(m.gross_revenue)}</strong>
-                          </div>
-                          <div className="progress" style={{ background: '#eaecf0' }}>
-                            <i
-                              style={{
-                                width: `${Math.max(3, (m.gross_revenue / maxRevenue) * 100)}%`,
-                                background: 'var(--pink)',
-                              }}
-                            />
-                          </div>
-                        </div>
+              {/* D. PHỄU KHÁCH HÀNG */}
+              <Card title="Phễu khách hàng" bodyClass="">
+                <div className="table-wrap">
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>Giai đoạn</th>
+                        <th className="right">Số khách</th>
+                        <th className="right">Tỷ trọng</th>
+                        <th className="right">Doanh số luỹ kế</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.funnel.map((row) => (
+                        <tr key={row.stage}>
+                          <td>{STAGE_LABELS[row.stage as CustomerStage] ?? row.stage}</td>
+                          <td className="right">{row.customers}</td>
+                          <td className="right">{row.share}%</td>
+                          <td className="right nowrap">{formatCompactVnd(row.revenue_total)}</td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
-                </Card>
-
-                <Card title="Cách tính thưởng">
-                  <p className="muted">
-                    Thưởng ước tính = tỷ lệ % × căn cứ tính. Đây là con số theo dõi nội bộ, không thay
-                    cho bảng lương chính thức.
-                  </p>
-                  {canEditSettings ? (
-                    <CommissionSetting
-                      percent={data.commission_percent}
-                      basis={data.basis}
-                      busy={savingPercent}
-                      onSave={saveCommission}
-                    />
-                  ) : (
-                    <p>
-                      Đang áp dụng: <strong>{data.commission_percent}%</strong> trên{' '}
-                      {data.basis === 'COLLECTED' ? 'tiền đã thu' : 'doanh số đơn đã duyệt'}. Chỉ CEO
-                      được đổi tỷ lệ này.
-                    </p>
-                  )}
-                </Card>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </div>
           </>
         )}
       </StateBlock>
     </>
-  );
-}
-
-function CommissionSetting({
-  percent,
-  basis,
-  busy,
-  onSave,
-}: {
-  percent: number;
-  basis: 'REVENUE' | 'COLLECTED';
-  busy: boolean;
-  onSave: (percent: number, basis: 'REVENUE' | 'COLLECTED') => void;
-}) {
-  const [value, setValue] = useState(String(percent));
-  const [mode, setMode] = useState(basis);
-
-  return (
-    <div className="form-grid" style={{ marginTop: 10 }}>
-      <div className="field">
-        <label>Tỷ lệ thưởng (%)</label>
-        <input type="number" min={0} step={0.1} value={value} onChange={(e) => setValue(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Tính trên</label>
-        <select value={mode} onChange={(e) => setMode(e.target.value as 'REVENUE' | 'COLLECTED')}>
-          <option value="COLLECTED">Tiền đã thu (an toàn dòng tiền)</option>
-          <option value="REVENUE">Doanh số đơn đã duyệt</option>
-        </select>
-      </div>
-      <div className="field full">
-        <button className="btn primary" disabled={busy} onClick={() => onSave(Number(value), mode)}>
-          {busy ? 'Đang lưu…' : 'Lưu cách tính thưởng'}
-        </button>
-      </div>
-    </div>
   );
 }

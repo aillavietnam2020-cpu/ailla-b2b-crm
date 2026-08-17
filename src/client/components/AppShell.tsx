@@ -19,16 +19,21 @@ const SALES_NAV: NavItem[] = [
   { to: '/sales/performance', label: 'Kết quả cá nhân', short: 'Kết quả', mobile: true },
 ];
 
+/** Việc hằng ngày. */
 const ADMIN_NAV: NavItem[] = [
   { to: '/admin', label: 'Điều hành đội ngũ', short: 'Điều hành', mobile: true },
   { to: '/admin/ceo', label: 'Bàn điều hành CEO', short: 'CEO' },
+  { to: '/admin/reports', label: 'Dashboard kinh doanh', short: 'Dashboard', mobile: true },
   { to: '/admin/customers', label: 'Khách hàng', short: 'Khách hàng', mobile: true },
   { to: '/admin/orders', label: 'Đơn hàng & duyệt', short: 'Đơn hàng', mobile: true },
-  { to: '/admin/prices', label: 'Bảng giá 8 cấp', short: 'Bảng giá' },
   { to: '/admin/debts', label: 'Công nợ', short: 'Công nợ' },
-  { to: '/admin/reports', label: 'Doanh số & thưởng', short: 'Doanh số', mobile: true },
-  { to: '/admin/users', label: 'Người dùng', short: 'Tài khoản' },
-  { to: '/admin/imports', label: 'Import & chất lượng', short: 'Import' },
+];
+
+/** Thiết lập: ít khi đụng tới, tách riêng cho khỏi rối màn hình làm việc hằng ngày. */
+const ADMIN_SETUP_NAV: NavItem[] = [
+  { to: '/admin/prices', label: 'Sản phẩm & bảng giá', short: 'Bảng giá' },
+  { to: '/admin/users', label: 'Người dùng & phân quyền', short: 'Tài khoản' },
+  { to: '/admin/imports', label: 'Import dữ liệu', short: 'Import' },
   { to: '/admin/audit', label: 'Nhật ký hệ thống', short: 'Audit' },
 ];
 
@@ -44,9 +49,9 @@ const TITLES: Record<string, string> = {
   '/admin/ceo': 'Bàn điều hành CEO',
   '/admin/customers': 'Khách hàng B2B',
   '/admin/orders': 'Đơn hàng & duyệt ngoại lệ',
-  '/admin/prices': 'Bảng giá 8 cấp',
+  '/admin/prices': 'Sản phẩm và bảng giá 8 cấp',
   '/admin/debts': 'Công nợ toàn công ty',
-  '/admin/reports': 'Doanh số và thưởng',
+  '/admin/reports': 'Dashboard kinh doanh',
   '/admin/users': 'Người dùng và phân quyền',
   '/admin/imports': 'Import & chất lượng dữ liệu',
   '/admin/audit': 'Nhật ký hệ thống',
@@ -68,7 +73,6 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
   const visibleNav = nav.filter((item) => {
     if (item.to === '/admin/ceo') return me?.user.role === 'CEO';
     if (item.to === '/admin/imports') return me?.user.role === 'MANAGER' || me?.user.role === 'CEO';
-    if (item.to === '/admin/users') return me?.permissions.includes('user.manage');
     return true;
   });
   const title = TITLES[location.pathname] ?? 'AILLA B2B CRM';
@@ -91,6 +95,22 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
             </NavLink>
           ))}
         </nav>
+        {space === 'admin' && (
+          <>
+            <div className="nav-label">Thiết lập</div>
+            <nav className="nav">
+              {ADMIN_SETUP_NAV.filter((item) => {
+                if (item.to === '/admin/users') return me?.permissions.includes('user.manage');
+                if (item.to === '/admin/imports') return me?.permissions.includes('import.read');
+                return true;
+              }).map((item) => (
+                <NavLink key={item.to} to={item.to}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          </>
+        )}
         {me?.user.role !== 'EMPLOYEE' && (
           <>
             <div className="nav-label">Chuyển không gian</div>
