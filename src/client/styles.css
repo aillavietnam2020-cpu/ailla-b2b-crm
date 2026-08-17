@@ -886,3 +886,21 @@ table.data.wide {
   border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover { background: #98a1b2; }
+
+/* Bảng dài: biến thành khung cao cố định, để thanh kéo ngang luôn nằm trong tầm
+   nhìn thay vì tụt xuống tận đáy bảng 30 dòng. Tiêu đề cột dính lại khi cuộn. */
+.table-wrap {
+  max-height: calc(100vh - 230px);
+  min-height: 160px;
+  overflow: auto;
+}
+.table-wrap table.data thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+/* Trong hộp thoại thì không giới hạn chiều cao, hộp thoại tự cuộn. */
+.modal-body .table-wrap {
+  max-height: none;
+  min-height: 0;
+}
