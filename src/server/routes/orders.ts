@@ -151,13 +151,18 @@ approvalRoutes.get('/', requirePermission('order.approve.normal', 'order.approve
 approvalRoutes.post('/:id/decide', requirePermission('order.approve.normal', 'order.approve.exception'), async (c) => {
   const auth = c.get('auth');
   const input = parseInput(approvalDecisionSchema, await c.req.json().catch(() => ({})));
+  const config = await loadConfig(c.env.DB);
   const result = await decideApproval(
     c.env.DB,
     auth,
     c.req.param('id'),
     input.decision,
     input.note ?? null,
-    { requestId: c.get('requestId'), ip: clientIp(c.req.raw.headers) },
+    {
+      requestId: c.get('requestId'),
+      ip: clientIp(c.req.raw.headers),
+      allowSelfApproval: config.allowSelfApproval,
+    },
   );
   return ok(c, result);
 });

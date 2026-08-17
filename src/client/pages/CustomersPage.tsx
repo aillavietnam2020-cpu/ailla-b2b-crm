@@ -175,7 +175,27 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                         <StageBadge stage={customer.stage} />
                       </td>
                       {mode === 'admin' && <td>{customer.owner_name ?? 'Chưa phân công'}</td>}
-                      <td className="right nowrap">{formatVnd(customer.official_debt)}</td>
+                      <td className="right nowrap">
+                      <strong>{formatVnd(customer.revenue_month ?? 0)}</strong>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {customer.orders_total ?? 0} đơn luỹ kế
+                      </div>
+                    </td>
+                    <td className="nowrap">
+                      {customer.last_order_date ? (
+                        <>
+                          {formatVnDate(customer.last_order_date)}
+                          <div className={customer.reorder_due ? 'error' : 'muted'} style={{ fontSize: 12 }}>
+                            {customer.reorder_due
+                              ? `Quá hạn ${customer.days_since_order} ngày`
+                              : `${customer.days_since_order ?? 0}/${customer.reorder_cycle_days ?? 30} ngày`}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="muted">Chưa mua</span>
+                      )}
+                    </td>
+                    <td className="right nowrap">{formatVnd(customer.official_debt)}</td>
                       <td className="right nowrap">{formatVnd(customer.projected_debt)}</td>
                       <td className={overdue ? 'nowrap' : 'nowrap'} style={overdue ? { color: 'var(--red)', fontWeight: 700 } : undefined}>
                         {formatVnDate(customer.next_follow_up_at)}

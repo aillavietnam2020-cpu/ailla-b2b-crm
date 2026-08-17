@@ -53,7 +53,7 @@ export async function decideApproval(
   approvalId: string,
   decision: 'APPROVED' | 'REJECTED',
   note: string | null,
-  ctx: { requestId: string; ip: string | null },
+  ctx: { requestId: string; ip: string | null; allowSelfApproval?: boolean },
 ): Promise<{ approval_status: string; order_status?: string }> {
   const approval = await db
     .prepare('SELECT * FROM approvals WHERE id = ?')
@@ -70,8 +70,13 @@ export async function decideApproval(
         : 'Bạn không có quyền duyệt yêu cầu này.',
     );
   }
-  if (approval.requester_id === auth.user.id && auth.user.role !== 'CEO') {
-    throw forbidden('Không được tự duyệt yêu cầu do chính mình gửi.');
+  // Công ty nhỏ: một người vừa bán hàng vừa là quản lý. Nếu cấu hình không cho tự duyệt thì
+  // vẫn chặn, còn mặc định là cho phép và ghi rõ "tự duyệt" vào nhật ký.
+  const selfApproval = approval.requester_id === auth.user.id;
+  if (selfApproval && auth.user.role !== 'CEO' && ctx.allowSelfApproval === false) {
+    throw forbidden(
+      'Cấu hình hiện tại không cho tự duyệt yêu cầu do chính mình gửi. Nhờ người khác duyệt.',
+    );
   }
 
   const now = nowIso();
@@ -113,7 +118,7 @@ export async function decideApproval(
           entityId: order.id,
           before: { approval_status: order.approval_status },
           after: { approval_status: 'REJECTED' },
-          reason: note,
+          reason: selfApproval ? `${note ?? ''} (tự duyệt)`.trim() : note,
           requestId: ctx.requestId,
           ip: ctx.ip,
         }),
@@ -156,7 +161,7 @@ export async function decideApproval(
             entityId: order.id,
             before: { approval_status: order.approval_status },
             after: { approval_status: 'APPROVED', customer_stage: nextStage },
-            reason: note,
+            reason: selfApproval ? `${note ?? ''} (tự duyệt)`.trim() : note,
             requestId: ctx.requestId,
             ip: ctx.ip,
           }),

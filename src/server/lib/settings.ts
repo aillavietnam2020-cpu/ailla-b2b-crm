@@ -15,6 +15,11 @@ export interface AppConfig {
   commissionPercent: number;
   /** Căn cứ tính thưởng: doanh số đơn đã duyệt hay tiền đã thu thực tế. */
   commissionBasis: 'REVENUE' | 'COLLECTED';
+  /**
+   * Cho phép người gửi yêu cầu tự duyệt. Công ty nhỏ, Thảo vừa là sale vừa là quản lý nên
+   * mặc định BẬT; mọi lần tự duyệt đều được ghi rõ trong nhật ký để CEO soát lại.
+   */
+  allowSelfApproval: boolean;
 }
 
 const DEFAULTS: AppConfig = {
@@ -45,6 +50,7 @@ const DEFAULTS: AppConfig = {
   authLockMinutes: 15,
   commissionPercent: 1,
   commissionBasis: 'COLLECTED',
+  allowSelfApproval: true,
 };
 
 function parseJson<T>(raw: string | null | undefined, fallback: T): T {
@@ -96,6 +102,7 @@ export async function loadConfig(db: D1Database): Promise<AppConfig> {
     authLockMinutes: parseJson(map.get('auth.lock_minutes'), DEFAULTS.authLockMinutes),
     commissionPercent: parseJson(map.get('commission.percent'), DEFAULTS.commissionPercent),
     commissionBasis: parseJson(map.get('commission.basis'), DEFAULTS.commissionBasis),
+    allowSelfApproval: parseJson(map.get('approval.allow_self_approve'), DEFAULTS.allowSelfApproval),
   };
 }
 

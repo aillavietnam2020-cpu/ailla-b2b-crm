@@ -14,10 +14,23 @@ import { RECEIVED_BY_ORDER } from '../lib/sql';
 import type { AppConfig } from '../lib/settings';
 import { getCustomerDebt } from './debts';
 
+/**
+ * Danh sách khách kèm các chỉ số theo dõi tái mua - đúng các cột trong sheet KHACH_HANG:
+ * doanh số kỳ, ngày đặt gần nhất, số ngày chưa đặt lại, ngưỡng tái mua áp dụng.
+ */
 const LIST_SQL = `
 SELECT c.id, c.legacy_code, c.name, c.phone_text, c.province, c.tier_id, t.name AS tier_name,
        c.legacy_tier_label, c.owner_id, u.display_name AS owner_name, c.stage, c.source,
-       c.next_follow_up_at, c.last_order_date, c.data_quality, c.credit_limit, t.debt_limit
+       c.next_follow_up_at, c.last_order_date, c.data_quality, c.credit_limit, t.debt_limit,
+       COALESCE(c.reorder_cycle_days, 30) AS reorder_cycle_days,
+       CAST(julianday('now', '+7 hours') - julianday(c.last_order_date) AS INTEGER) AS days_since_order,
+       (SELECT COALESCE(SUM(o.subtotal - o.discount_amount - o.bonus_deduction), 0)
+          FROM orders o
+         WHERE o.customer_id = c.id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
+           AND substr(o.order_date, 1, 7) = strftime('%Y-%m', 'now', '+7 hours')) AS revenue_month,
+       (SELECT COUNT(*) FROM orders o
+         WHERE o.customer_id = c.id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED')
+         AS orders_total
 FROM customers c
 LEFT JOIN users u ON u.id = c.owner_id
 LEFT JOIN price_tiers t ON t.id = c.tier_id
@@ -132,6 +145,10 @@ export async function listCustomers(
   let enriched = items.map((row, index) => ({
     ...row,
     credit_limit: row.credit_limit ?? row.debt_limit ?? 0,
+    // Quá ngưỡng tái mua riêng của khách thì bật cảnh báo để sale gọi lại.
+    reorder_due:
+      row.last_order_date != null &&
+      (row.days_since_order ?? 0) > (row.reorder_cycle_days ?? 30),
     official_debt: debtRows[index].official_debt,
     projected_debt: debtRows[index].projected_debt,
     revenue_total: debtRows[index].posted_charges,

@@ -73,6 +73,13 @@ export interface CustomerListItem {
   official_debt: number;
   projected_debt: number;
   credit_limit: number;
+  /** Doanh số tháng này của khách (đơn đã duyệt, đã trừ chiết khấu). */
+  revenue_month?: number;
+  orders_total?: number;
+  /** Số ngày kể từ lần đặt gần nhất và ngưỡng tái mua áp dụng cho khách này. */
+  days_since_order?: number | null;
+  reorder_cycle_days?: number | null;
+  reorder_due?: boolean;
 }
 
 export interface CustomerDetail extends CustomerListItem {
