@@ -5,7 +5,15 @@ import { formatVnDate, formatVnDateTime, vnDate } from '@shared/datetime';
 import { formatVnd } from '@shared/money';
 import { ApiError, api } from '../lib/api';
 import { useApi } from '../lib/hooks';
-import { Card, ErrorBox, Modal, OrderStatusBadges, StateBlock, useToast } from '../components/ui';
+import {
+  Card,
+  ErrorBox,
+  Modal,
+  OrderStageBadge,
+  OrderStatusBadges,
+  StateBlock,
+  useToast,
+} from '../components/ui';
 import { useAuth } from '../components/AuthProvider';
 
 export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
@@ -83,8 +91,8 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
                   <th>Ngày</th>
                   <th className="right">Tổng phải thu</th>
                   <th className="right">Còn phải thu</th>
-                  <th>Trạng thái</th>
-                  <th>Việc cần làm</th>
+                  <th>Trạng thái hiện tại</th>
+                  <th>Cập nhật trạng thái</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,12 +109,7 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
                     <td className="right nowrap">{formatVnd(order.total_amount)}</td>
                     <td className="right nowrap">{formatVnd(order.remaining_amount)}</td>
                     <td>
-                      <OrderStatusBadges
-                        approval={order.approval_status}
-                        delivery={order.delivery_status}
-                        payment={order.payment_status}
-                        accounting={order.accounting_status}
-                      />
+                      <OrderStageBadge {...order} />
                     </td>
                     <td>
                       <QuickActions order={order} onDone={() => orders.reload()} />
@@ -515,6 +518,25 @@ function QuickActions({ order, onDone }: { order: OrderListItem; onDone: () => v
   };
 
   const buttons: React.ReactNode[] = [];
+
+  // Đơn còn nháp thì việc cần làm đầu tiên là gửi duyệt, làm ngay tại danh sách.
+  if (
+    (order.approval_status === 'DRAFT' || order.approval_status === 'REJECTED') &&
+    can('order.submit')
+  ) {
+    buttons.push(
+      <button
+        key="gui"
+        className="btn sm primary"
+        disabled={busy}
+        onClick={() =>
+          run('Đã gửi duyệt', () => api.post(`/api/orders/${order.id}/submit`, {}, crypto.randomUUID()))
+        }
+      >
+        Gửi duyệt
+      </button>,
+    );
+  }
 
   if (order.approval_status === 'APPROVED' && can('order.delivery.update')) {
     if (order.delivery_status === 'CHUA_XUAT') {

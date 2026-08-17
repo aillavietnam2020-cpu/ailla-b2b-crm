@@ -92,6 +92,39 @@ export function OrderStatusBadges({
   );
 }
 
+/**
+ * Một đơn chỉ hiện ĐÚNG MỘT nhãn: bước xa nhất mà đơn đã đi tới trong luồng
+ * tạo đơn → duyệt → xuất kho → giao → thu tiền → kế toán xác nhận.
+ * Danh sách đơn không nên trải cả dải nhãn, nhìn rất rối.
+ */
+export function orderStage(order: {
+  approval_status: keyof typeof ORDER_STATUS_LABELS.approval;
+  delivery_status: keyof typeof ORDER_STATUS_LABELS.delivery;
+  payment_status: keyof typeof ORDER_STATUS_LABELS.payment;
+  accounting_status: keyof typeof ORDER_STATUS_LABELS.accounting;
+}): { label: string; tone: string } {
+  if (order.approval_status === 'CANCELLED') return { label: 'Đã huỷ', tone: 'red' };
+  if (order.approval_status === 'REJECTED') return { label: 'Bị từ chối', tone: 'red' };
+  if (order.approval_status === 'DRAFT') return { label: 'Nháp, chưa gửi duyệt', tone: 'orange' };
+  if (order.approval_status === 'PENDING_APPROVAL') return { label: 'Chờ duyệt', tone: 'orange' };
+  if (order.delivery_status === 'HOAN') return { label: 'Hàng hoàn về', tone: 'red' };
+
+  // Đã duyệt: chạy tiếp theo đúng luồng vận hành của công ty.
+  if (order.accounting_status === 'DA_XAC_NHAN') return { label: 'Hoàn tất', tone: 'green' };
+  if (order.payment_status === 'DA_THU_DU' || order.payment_status === 'THU_THUA') {
+    return { label: 'Chờ kế toán xác nhận', tone: 'purple' };
+  }
+  if (order.payment_status === 'THU_MOT_PHAN') return { label: 'Thu một phần', tone: 'orange' };
+  if (order.delivery_status === 'DA_GIAO') return { label: 'Đã giao, chờ tiền', tone: 'blue' };
+  if (order.delivery_status === 'DA_XUAT_KHO') return { label: 'Đã xuất kho', tone: 'blue' };
+  return { label: 'Chờ xuất kho', tone: 'orange' };
+}
+
+export function OrderStageBadge(props: Parameters<typeof orderStage>[0]) {
+  const stage = orderStage(props);
+  return <span className={`badge ${stage.tone} nowrap`}>{stage.label}</span>;
+}
+
 /* ------------------------------------------------------------------ Khối chung */
 export function Card({
   title,

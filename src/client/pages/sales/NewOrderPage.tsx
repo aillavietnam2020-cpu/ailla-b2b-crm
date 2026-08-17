@@ -26,18 +26,43 @@ interface Line {
   is_gift: boolean;
 }
 
-/** Số lượng lẻ thực tế của một dòng (thùng × quy đổi). */
-function unitQty(line: Line): number {
-  return line.pack_mode === 'THUNG' ? line.qty * Math.max(1, line.pack_size) : line.qty;
+/** 1 nếu khách lấy lẻ, bằng số chai trong thùng nếu khách lấy nguyên thùng. */
+function factorOf(line: Line): number {
+  return line.pack_mode === 'THUNG' ? Math.max(1, line.pack_size) : 1;
 }
 
+/** Số chai thực tế của dòng — chỉ dùng để đối chiếu và tính thưởng. */
+function unitQty(line: Line): number {
+  return line.qty * factorOf(line);
+}
+
+/** Giá theo cấp bậc của khách, quy về đúng đơn vị đang bán (chai hay thùng). */
+function tierPriceFor(line: Line): number | null {
+  return line.base_price === null ? null : line.base_price * factorOf(line);
+}
+
+/** Giá thực tính cho một đơn vị đang bán: giá sale sửa tay, nếu không thì giá cấp bậc. */
 function linePrice(line: Line): number {
   if (line.is_gift) return 0;
-  return line.applied_price ?? line.base_price ?? 0;
+  return line.applied_price ?? tierPriceFor(line) ?? 0;
 }
 
 function lineTotal(line: Line): number {
-  return unitQty(line) * linePrice(line);
+  return line.qty * linePrice(line);
+}
+
+/**
+ * Đơn vị bán lẻ để hiển thị. File Excel có mã ghi ĐVT là "Thùng", nhưng đơn vị
+ * nhỏ nhất khách lấy vẫn là chai, nên không được hiện "Thùng (lẻ)".
+ */
+function retailUnit(unit: string | null): string {
+  const raw = (unit ?? '').trim();
+  if (!raw) return 'Chai';
+  const key = raw.toLowerCase();
+  if (key.includes('thùng') || key.includes('thung') || key.includes('kiện') || key.includes('kien')) {
+    return 'Chai';
+  }
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 /** Đọc số quy đổi từ cột "Quy cách" của sản phẩm: "12 chai/thùng" -> 12. */
@@ -97,7 +122,7 @@ export function NewOrderPage() {
         product_id: product.id,
         sku: product.sku,
         name: product.name,
-        unit: product.unit ?? 'Cái',
+        unit: retailUnit(product.unit),
         pack_size: parsePackSize(product.pack_size),
         pack_mode: 'LE',
         qty: 1,
@@ -124,9 +149,13 @@ export function NewOrderPage() {
           order_date: vnDate(),
           items: lines.map((line) => ({
             product_id: line.product_id,
-            // Gửi lên số lượng LẺ; hệ thống chỉ lưu đơn vị lẻ để tính tiền và tồn nhất quán.
+            // Hệ thống lưu theo đơn vị nhỏ nhất (chai) để doanh số và thưởng tính
+            // nhất quán, nên đơn lấy thùng được quy đổi cả số lượng lẫn đơn giá.
             qty: unitQty(line),
-            applied_price: line.is_gift ? undefined : (line.applied_price ?? undefined),
+            applied_price:
+              line.is_gift || line.applied_price === null
+                ? undefined
+                : Math.round(line.applied_price / factorOf(line)),
             is_gift: line.is_gift,
           })),
           ...fees,
@@ -279,8 +308,8 @@ export function NewOrderPage() {
                   <th>Sản phẩm</th>
                   <th>Đơn vị</th>
                   <th className="right">Số lượng</th>
-                  <th className="right">Quy ra lẻ</th>
-                  <th className="right">Đơn giá lẻ</th>
+                  <th className="right">Quy ra chai (tính thưởng)</th>
+                  <th className="right">Đơn giá theo cấp bậc</th>
                   <th className="right">Thành tiền</th>
                   <th className="right">Hàng tặng</th>
                   <th></th>
@@ -308,6 +337,8 @@ export function NewOrderPage() {
                             // Sản phẩm chưa khai quy cách thì tạm lấy 12, sửa ngay ở ô bên cạnh.
                             pack_size:
                               e.target.value === 'THUNG' && line.pack_size < 2 ? 12 : line.pack_size,
+                            // Đổi đơn vị thì giá sửa tay cũ không còn đúng nữa.
+                            applied_price: null,
                           })
                         }
                       >
@@ -349,7 +380,9 @@ export function NewOrderPage() {
                           type="number"
                           min={0}
                           step={1000}
-                          placeholder={line.base_price !== null ? String(line.base_price) : 'chưa có giá'}
+                          placeholder={
+                            tierPriceFor(line) !== null ? String(tierPriceFor(line)) : 'chưa có giá'
+                          }
                           value={line.applied_price ?? ''}
                           onChange={(e) =>
                             updateLine(index, {
@@ -389,7 +422,11 @@ export function NewOrderPage() {
 
       <div style={{ height: 16 }} />
 
-      <Card title="Khuyến mại, phí và chiết khấu">
+      <Card title="Chương trình khuyến mại, chiết khấu và phí">
+        <p className="muted" style={{ margin: '0 0 12px' }}>
+          Tặng quà: thêm sản phẩm vào bảng trên rồi tích ô <strong>Hàng tặng</strong>, dòng đó về 0đ.
+          Giảm giá tiền: điền vào ô <strong>Chiết khấu</strong> bên dưới.
+        </p>
         <div className="form-grid">
           <div className="field">
             <label>Mã chương trình khuyến mại</label>

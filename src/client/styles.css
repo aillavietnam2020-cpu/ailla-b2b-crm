@@ -872,3 +872,17 @@ table.data.wide {
   border-radius: 999px;
 }
 .table-wrap::-webkit-scrollbar-thumb:hover { background: #98a1b2; }
+
+/* Mọi vùng cuộn trong phần mềm đều phải có thanh kéo nhìn thấy được, không chỉ bảng. */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: #b6bdcb #eef1f6;
+}
+*::-webkit-scrollbar { width: 14px; height: 14px; }
+*::-webkit-scrollbar-track { background: #eef1f6; }
+*::-webkit-scrollbar-thumb {
+  background: #b6bdcb;
+  border: 3px solid #eef1f6;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: #98a1b2; }
