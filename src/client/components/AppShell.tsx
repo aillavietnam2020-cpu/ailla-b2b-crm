@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
+import { installTableScrolling } from '../lib/dragScroll';
 import { initialsOf } from './ui';
 
 interface NavItem {
@@ -76,6 +77,9 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
     return true;
   });
   const title = TITLES[location.pathname] ?? 'AILLA B2B CRM';
+
+  // Kéo chuột và lăn chuột để xem bảng rộng, gắn một lần cho mọi trang.
+  React.useEffect(() => installTableScrolling(), []);
 
   return (
     <div className="app">

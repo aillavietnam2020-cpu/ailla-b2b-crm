@@ -904,3 +904,28 @@ table.data.wide {
   max-height: none;
   min-height: 0;
 }
+
+/* Kéo bảng bằng chuột như kéo bản đồ, khỏi phải mò thanh kéo ở đáy. */
+.table-wrap.is-pannable { cursor: grab; }
+.table-wrap.is-panning { cursor: grabbing; }
+.table-wrap.is-pannable input,
+.table-wrap.is-pannable select,
+.table-wrap.is-pannable button,
+.table-wrap.is-pannable a { cursor: auto; }
+.table-wrap.is-pannable button,
+.table-wrap.is-pannable a { cursor: pointer; }
+
+/* Cột đầu (mã SKU, mã đơn, tên khách) dính lại khi kéo ngang để không lạc dòng. */
+.table-wrap table.data.wide th:first-child,
+.table-wrap table.data.wide td:first-child {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 1;
+  box-shadow: 1px 0 0 var(--line);
+}
+.table-wrap table.data.wide thead th:first-child {
+  background: #f8fafc;
+  z-index: 3;
+}
+.table-wrap table.data.wide tr:hover td:first-child { background: #fffafd; }
