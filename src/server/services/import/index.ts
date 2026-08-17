@@ -33,6 +33,7 @@ export interface ImportTotals {
   managed_orders: number;
   payments: number;
   payments_total: number;
+  managed_orders_total: number;
   opening_debt_total: number;
   official_debt_total: number;
   projected_debt_total: number;
@@ -52,6 +53,11 @@ export function computeTotals(parsed: ParsedWorkbook): ImportTotals {
     managed_orders: parsed.orderStatuses.length,
     payments: parsed.payments.length,
     payments_total: parsed.payments.reduce((acc, p) => acc + p.amount, 0),
+    // Tổng phải thu của các đơn ở sheet quản lý: chốt để không lọt lỗi đọc nhầm cột giá.
+    managed_orders_total: parsed.orderStatuses.reduce(
+      (acc, o) => acc + (o.total_due ?? 0),
+      0,
+    ),
     opening_debt_total: parsed.debts.reduce((acc, d) => acc + (d.opening_debt ?? 0), 0),
     official_debt_total: parsed.debts.reduce((acc, d) => acc + (d.official_debt ?? 0), 0),
     projected_debt_total: parsed.debts.reduce((acc, d) => acc + (d.projected_debt ?? 0), 0),
@@ -68,6 +74,7 @@ const RECON_LABELS: Record<string, string> = {
   managed_orders: 'Số đơn ở sheet quản lý',
   payments: 'Số giao dịch thanh toán',
   payments_total: 'Tổng tiền thanh toán',
+  managed_orders_total: 'Tổng phải thu của các đơn',
   opening_debt_total: 'Dư nợ cũ',
   official_debt_total: 'Công nợ chính thức',
   projected_debt_total: 'Công nợ dự kiến',
@@ -254,6 +261,7 @@ export async function commitImport(
       status: string;
       file_name: string;
       progress_json: string | null;
+      totals_json: string | null;
     }>();
   if (!batch) throw notFound('Không tìm thấy batch import');
   if (batch.status !== 'PREVIEW') {
@@ -351,10 +359,16 @@ export async function commitImport(
     customers: ['customers'],
     orders: ['orders'],
     payments: ['payments', 'activities'],
-    finalize: ['products', 'customers', 'orders', 'payments'],
+    // Chặng chốt chỉ cần các con số tổng, lấy lại từ kết quả preview đã lưu trong batch
+    // thay vì đọc lại toàn bộ file (đọc lại sẽ vượt hạn mức xử lý).
+    finalize: [],
   };
   const parsed = parseWorkbook(bytes, SCOPE_BY_PHASE[phase]);
-  const totals = computeTotals(parsed);
+  // Chặng chốt dùng lại tổng đã tính ở bước preview (đã lưu trong batch).
+  const totals =
+    phase === 'finalize' && batch.totals_json
+      ? (JSON.parse(batch.totals_json) as ImportTotals)
+      : computeTotals(parsed);
   const reconciliation = reconcile(totals, config.reconciliationBaseline);
   const now = nowIso();
   const today = vnDate();
@@ -650,8 +664,10 @@ export async function commitImport(
         );
         continue;
       }
+      // Đơn lịch sử: giữ nguyên đơn giá và thành tiền ghi trong file, không tính lại theo
+      // bảng giá hiện hành - nếu không, đơn cũ sẽ đổi số mỗi lần bảng giá thay đổi.
       const price = line.unit_price ?? 0;
-      const lineTotal = price * line.qty;
+      const lineTotal = line.line_total ?? price * line.qty;
       subtotal += lineTotal;
       inserted.order_items += 1;
       itemStatements.push(
@@ -661,7 +677,16 @@ export async function commitImport(
                price_override, tier_id_snapshot, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)`,
           )
-          .bind(newId(), orderId, productId, line.qty, price, price, lineTotal, now),
+          .bind(
+            newId(),
+            orderId,
+            productId,
+            line.qty,
+            line.base_price ?? price,
+            price,
+            lineTotal,
+            now,
+          ),
       );
     }
 

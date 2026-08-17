@@ -65,7 +65,8 @@ export async function ceoDashboard(db: D1Database): Promise<CeoDashboard> {
       `SELECT
         (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE deleted_at IS NULL
            AND approval_status = 'APPROVED' AND substr(order_date, 1, 7) = ?) AS revenue_month,
-        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE substr(paid_at, 1, 7) = ?
+        (SELECT COALESCE(SUM(CASE WHEN is_adjustment = 1 THEN -amount ELSE amount END), 0)
+           FROM payments WHERE substr(paid_at, 1, 7) = ?
            AND accounting_status = 'DA_XAC_NHAN') AS collected_month,
         (SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL) AS customers_total,
         (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE approval_status = 'APPROVED'

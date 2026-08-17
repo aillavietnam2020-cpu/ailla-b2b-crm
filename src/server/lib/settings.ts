@@ -34,6 +34,8 @@ const DEFAULTS: AppConfig = {
     // chỉ điền mỗi ô "KẾ TOÁN XÁC NHẬN", không có ngày/khách/tiền. Tổng tiền vẫn khớp tuyệt đối.
     payments: 25,
     payments_total: 180073600,
+    // Tổng phải thu của 34 đơn ở sheet QUAN_LY_DON_HANG, chốt theo file ngày 16/08/2026.
+    managed_orders_total: 320199383,
     opening_debt_total: 1256920982,
     official_debt_total: 1168465995,
     projected_debt_total: 1397046765,

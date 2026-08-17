@@ -45,7 +45,12 @@ export interface ParsedOrderLine {
   customer_legacy_code: string | null;
   sku: string | null;
   qty: number | null;
+  /** Đơn giá thực bán ghi trong file (cột "Đơn giá áp dụng"). */
   unit_price: number | null;
+  /** Đơn giá theo bảng giá tại thời điểm đó (cột "Đơn giá theo bảng"). */
+  base_price: number | null;
+  /** Thành tiền ghi trong file; ưu tiên dùng số này cho đơn lịch sử. */
+  line_total: number | null;
   order_date: string | null;
 }
 
@@ -56,6 +61,8 @@ export interface ParsedOrderStatus {
   payment_status: string | null;
   accounting_confirmed: boolean | null;
   accounting_value: number | null;
+  /** Cột "TỔNG PHẢI THU" trong sheet quản lý đơn - dùng để đối soát tiền của từng đơn. */
+  total_due: number | null;
   shipping_fee: number | null;
   discount_amount: number | null;
   bonus_deduction: number | null;
@@ -190,14 +197,33 @@ function sheetRows(workbook: XLSX.WorkBook, sheetName: string): Row[] {
   });
 }
 
+const isEmptyCell = (value: unknown) =>
+  value === null || value === undefined || String(value).trim() === '';
+
+/**
+ * Lấy giá trị của cột theo danh sách tên có thể có, xét theo thứ tự ưu tiên:
+ *   1. trùng khít tên cột            (ví dụ alias 'don_gia_ap_dung')
+ *   2. tên cột bắt đầu bằng alias
+ *   3. tên cột có chứa alias
+ * Ở bước 2 và 3 chỉ nhận ô CÓ dữ liệu, để một cột trống như "Sửa giá (nếu có)" không
+ * chiếm chỗ của cột thật là "Đơn giá áp dụng".
+ */
 function pick(row: Row, aliases: string[]): unknown {
-  for (const key of Object.keys(row)) {
-    const norm = normalizeKey(key);
-    if (aliases.includes(norm)) return row[key];
+  const keys = Object.keys(row);
+  for (const alias of aliases) {
+    for (const key of keys) {
+      if (normalizeKey(key) === alias) return row[key];
+    }
   }
-  for (const key of Object.keys(row)) {
-    const norm = normalizeKey(key);
-    if (aliases.some((alias) => norm.includes(alias))) return row[key];
+  for (const alias of aliases) {
+    for (const key of keys) {
+      if (normalizeKey(key).startsWith(alias) && !isEmptyCell(row[key])) return row[key];
+    }
+  }
+  for (const alias of aliases) {
+    for (const key of keys) {
+      if (normalizeKey(key).includes(alias) && !isEmptyCell(row[key])) return row[key];
+    }
   }
   return null;
 }
@@ -474,7 +500,14 @@ function parseOrderLines(workbook: XLSX.WorkBook, issues: ImportIssue[]): Parsed
       customer_legacy_code: customerCode ? customerCode.toLowerCase() : null,
       sku,
       qty,
-      unit_price: toVndInteger(pick(row, ['don_gia', 'gia', 'unit_price', 'gia_ban'])),
+      // File thật có 3 cột giá: "Sửa giá (nếu có)", "Đơn giá theo bảng", "Đơn giá áp dụng".
+      // Giá thực bán của đơn cũ là "Đơn giá áp dụng".
+      unit_price: toVndInteger(
+        pick(row, ['don_gia_ap_dung', 'don_gia_theo_bang', 'don_gia', 'unit_price', 'gia_ban']),
+      ),
+      base_price: toVndInteger(pick(row, ['don_gia_theo_bang', 'don_gia_bang', 'gia_theo_bang'])),
+      // Giữ nguyên thành tiền của file để số liệu lịch sử khớp tuyệt đối với sổ cũ.
+      line_total: toVndInteger(pick(row, ['thanh_tien', 'tong_tien_dong', 'line_total'])),
       order_date: normalizeExcelDate(pick(row, ['ngay', 'ngay_dat', 'ngay_don', 'order_date'])),
     });
   });
@@ -540,6 +573,7 @@ function parseOrderStatuses(workbook: XLSX.WorkBook, issues: ImportIssue[]): Par
       payment_status: text(pick(row, ['trang_thai_thanh_toan', 'thanh_toan', 'payment_status'])),
       accounting_confirmed: accountingConfirmed,
       accounting_value: accountingValue,
+      total_due: toVndInteger(pick(row, ['tong_phai_thu', 'tong_tien_phai_thu', 'thanh_toan_phai_thu'])),
       shipping_fee: toVndInteger(pick(row, ['phi_van_chuyen', 'phi_ship', 'ship'])),
       discount_amount: toVndInteger(pick(row, ['chiet_khau', 'giam_gia', 'discount'])),
       bonus_deduction: toVndInteger(pick(row, ['tru_thuong', 'thuong_thang', 'tru_thuong_thang'])),

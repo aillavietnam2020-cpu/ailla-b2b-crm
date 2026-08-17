@@ -8,24 +8,37 @@ import { auditStatement } from '../lib/audit';
 import { notFound } from '../lib/http';
 import { newId } from '../lib/ids';
 
+/**
+ * D1 chỉ cho tối đa 100 tham số mỗi câu truy vấn, trong khi bảng giá có tới 134 sản phẩm.
+ * Chia nhỏ danh sách để không vỡ truy vấn (trước đây mở bảng giá đầy đủ bị lỗi 500).
+ */
+const SQL_PARAM_LIMIT = 90;
+
 export async function loadPriceRows(
   db: D1Database,
   productIds: string[],
   tierId?: string | null,
 ): Promise<PriceRow[]> {
   if (productIds.length === 0) return [];
-  const placeholders = productIds.map(() => '?').join(',');
-  const tierClause = tierId ? ' AND tier_id = ?' : '';
-  const params: unknown[] = tierId ? [...productIds, tierId] : [...productIds];
-  const rows = await db
-    .prepare(
-      `SELECT product_id, tier_id, amount, valid_from, valid_to, status
-       FROM product_prices
-       WHERE product_id IN (${placeholders})${tierClause} AND status <> 'DRAFT'`,
-    )
-    .bind(...params)
-    .all<PriceRow>();
-  return rows.results ?? [];
+  const chunkSize = tierId ? SQL_PARAM_LIMIT - 1 : SQL_PARAM_LIMIT;
+  const results: PriceRow[] = [];
+
+  for (let i = 0; i < productIds.length; i += chunkSize) {
+    const chunk = productIds.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => '?').join(',');
+    const tierClause = tierId ? ' AND tier_id = ?' : '';
+    const params: unknown[] = tierId ? [...chunk, tierId] : [...chunk];
+    const rows = await db
+      .prepare(
+        `SELECT product_id, tier_id, amount, valid_from, valid_to, status
+         FROM product_prices
+         WHERE product_id IN (${placeholders})${tierClause} AND status <> 'DRAFT'`,
+      )
+      .bind(...params)
+      .all<PriceRow>();
+    results.push(...(rows.results ?? []));
+  }
+  return results;
 }
 
 export async function getBasePrice(
@@ -221,11 +234,27 @@ export async function listPriceTable(
     products.map((p) => p.id),
   );
 
+  // Gom giá theo cặp (sản phẩm, cấp) TRƯỚC khi dò, thay vì quét lại toàn bộ danh sách giá
+  // cho từng ô. Với 134 sản phẩm x 8 cấp, cách cũ tốn hàng triệu phép so sánh và làm
+  // Cloudflare cắt request (lỗi 500 khi mở bảng giá).
+  const rowsByKey = new Map<string, PriceRow[]>();
+  for (const row of priceRows) {
+    const key = `${row.product_id}|${row.tier_id}`;
+    const list = rowsByKey.get(key);
+    if (list) list.push(row);
+    else rowsByKey.set(key, [row]);
+  }
+
   const items: ProductItem[] = products.map((p) => {
     const prices: Record<string, number | null> = {};
     const missing: string[] = [];
     for (const tier of tiers) {
-      const resolved = resolveEffectivePrice(priceRows, p.id, tier.id, onDate);
+      const resolved = resolveEffectivePrice(
+        rowsByKey.get(`${p.id}|${tier.id}`) ?? [],
+        p.id,
+        tier.id,
+        onDate,
+      );
       prices[tier.code] = resolved.amount;
       if (resolved.amount === null || resolved.amount === undefined) missing.push(tier.name);
     }
