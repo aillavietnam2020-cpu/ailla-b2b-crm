@@ -42,15 +42,18 @@ describe('Hồ sơ khách hàng', () => {
     expect(actions).toContain('CUSTOMER_TIER_CHANGED');
   });
 
-  it('không cho nhảy giai đoạn sai vòng đời', async () => {
-    const res = await ctx.request('/api/customers/cus-thao-1', {
-      as: USERS.manager,
-      method: 'PATCH',
-      body: { stage: 'REGULAR' },
-    });
-    expect(res.status).toBe(422);
-    expect(res.body.error.code).toBe('INVALID_STAGE_TRANSITION');
-  });
+  it('sale sửa được giai đoạn về đúng thực tế của khách cũ', () => 
+    ctx
+      .request('/api/customers/cus-thao-1', {
+        as: USERS.manager,
+        method: 'PATCH',
+        body: { stage: 'REGULAR' },
+      })
+      .then((res) => {
+        // Khách nhập từ file cũ đang là 'Mới tiếp cận' dù đã mua nhiều năm, phải sửa được ngay.
+        expect(res.status).toBe(200);
+        expect(res.body.data.stage).toBe('REGULAR');
+      }));
 
   it('chuyển sang Mất khách bắt buộc ghi lý do', async () => {
     const missing = await ctx.request('/api/customers/cus-thao-1', {

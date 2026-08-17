@@ -165,7 +165,8 @@ export async function getCustomer(
   const extra = await db
     .prepare(
       `SELECT address, potential, interested_products, reorder_cycle_days, first_contact_date,
-              opening_debt, data_quality_note, lost_reason, created_at, updated_at
+              opening_debt, data_quality_note, lost_reason, birthday, zalo, email, note,
+              tax_code, contact_person, created_at, updated_at
        FROM customers WHERE id = ?`,
     )
     .bind(customerId)
@@ -380,6 +381,12 @@ export async function updateCustomer(
     'credit_limit',
     'lost_reason',
     'data_quality',
+    'birthday',
+    'zalo',
+    'email',
+    'note',
+    'tax_code',
+    'contact_person',
   ];
 
   const fields: string[] = [];

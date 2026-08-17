@@ -46,6 +46,12 @@ export function CustomerEditModal({
     next_follow_up_at: customer.next_follow_up_at ?? '',
     credit_limit: customer.credit_limit ? String(customer.credit_limit) : '',
     lost_reason: customer.lost_reason ?? '',
+    birthday: customer.birthday ?? '',
+    zalo: customer.zalo ?? '',
+    email: customer.email ?? '',
+    contact_person: customer.contact_person ?? '',
+    tax_code: customer.tax_code ?? '',
+    note: customer.note ?? '',
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +80,12 @@ export function CustomerEditModal({
         next_follow_up_at: form.next_follow_up_at || null,
         credit_limit: form.credit_limit ? Number(form.credit_limit) : null,
         lost_reason: form.lost_reason.trim() || null,
+        birthday: form.birthday || null,
+        zalo: form.zalo.trim() || null,
+        email: form.email.trim() || null,
+        contact_person: form.contact_person.trim() || null,
+        tax_code: form.tax_code.trim() || null,
+        note: form.note.trim() || null,
       });
       onSaved();
     } catch (err) {
@@ -105,6 +117,41 @@ export function CustomerEditModal({
                 inputMode="tel"
               />
               {fields.phone_text && <span className="error">{fields.phone_text}</span>}
+            </div>
+            <div className="field">
+              <label>Ngày sinh</label>
+              <input
+                type="date"
+                value={form.birthday}
+                onChange={(e) => setForm({ ...form, birthday: e.target.value })}
+              />
+              <span className="muted" style={{ fontSize: 12 }}>
+                Dùng để nhắc chúc mừng sinh nhật khách.
+              </span>
+            </div>
+            <div className="field">
+              <label>Zalo / Facebook</label>
+              <input value={form.zalo} onChange={(e) => setForm({ ...form, zalo: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label>Người liên hệ</label>
+              <input
+                value={form.contact_person}
+                onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
+                placeholder="Tên người trực tiếp đặt hàng"
+              />
+            </div>
+            <div className="field">
+              <label>Mã số thuế</label>
+              <input value={form.tax_code} onChange={(e) => setForm({ ...form, tax_code: e.target.value })} />
             </div>
             <div className="field">
               <label>Tỉnh/thành</label>
@@ -197,6 +244,14 @@ export function CustomerEditModal({
             <div className="field full">
               <label>Tiềm năng / ghi chú</label>
               <input value={form.potential} onChange={(e) => setForm({ ...form, potential: e.target.value })} />
+            </div>
+            <div className="field full">
+              <label>Ghi chú / đặc điểm khách</label>
+              <textarea
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder="Thói quen đặt hàng, người quyết định, lưu ý khi giao hàng…"
+              />
             </div>
             <div className="field full">
               <label>Sản phẩm quan tâm</label>

@@ -33,6 +33,16 @@ export const customerCreateSchema = z.object({
     .nullable(),
   note: z.string().trim().max(1000).optional().nullable(),
   owner_id: z.string().trim().min(1).optional().nullable(),
+  birthday: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày sinh không hợp lệ')
+    .optional()
+    .nullable(),
+  zalo: z.string().trim().max(120).optional().nullable(),
+  email: z.string().trim().max(160).optional().nullable(),
+  tax_code: z.string().trim().max(40).optional().nullable(),
+  contact_person: z.string().trim().max(120).optional().nullable(),
+  credit_limit: z.number().int().min(0).optional().nullable(),
 });
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 

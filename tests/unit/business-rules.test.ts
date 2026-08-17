@@ -197,9 +197,14 @@ describe('Công nợ ba khái niệm (mục 9.1)', () => {
 });
 
 describe('Vòng đời khách hàng (mục 7.1)', () => {
-  it('chỉ cho phép chuyển giai đoạn hợp lệ', () => {
-    expect(canTransition('NEW', 'CONSULTING')).toBe(true);
-    expect(canTransition('NEW', 'REGULAR')).toBe(false);
+  it('cho phép chuyển sang bất kỳ giai đoạn nào, trừ mở lại khách đã mất', () => {
+    // Thực tế khách không đi một chiều: đang mua đều vẫn quay lại đàm phán cho đơn mới.
+    expect(canTransition('REGULAR', 'NEGOTIATING')).toBe(true);
+    expect(canTransition('NEW', 'REGULAR')).toBe(true);
+    expect(canTransition('DORMANT', 'REGULAR')).toBe(true);
+    // Mở lại khách đã mất vẫn phải do Quản lý.
+    expect(requiresManagerToReopen('LOST', 'REGULAR')).toBe(true);
+    expect(requiresManagerToReopen('NEW', 'CONSULTING')).toBe(false);
   });
 
   it('mở lại khách đã mất phải do Quản lý', () => {

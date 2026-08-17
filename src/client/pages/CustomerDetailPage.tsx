@@ -254,6 +254,9 @@ export function CustomerDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
           customerId={c.id}
           customerName={c.name}
           currentStage={c.stage}
+          tierName={c.tier_name ?? c.legacy_tier_label ?? null}
+          phone={c.phone_text}
+          officialDebt={debt.official_debt}
           onClose={() => setShowActivity(false)}
           onSaved={customer.reload}
         />

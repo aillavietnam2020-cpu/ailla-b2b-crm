@@ -1,15 +1,20 @@
 /** Vòng đời khách hàng (mục 7.1) và điều kiện ra/vào từng giai đoạn. */
-import type { CustomerStage } from './enums';
+import { CUSTOMER_STAGES, type CustomerStage } from './enums';
 
+/**
+ * Thuc te khach hang khong di theo mot chieu: co khach dang mua deu bong quay lai giai doan
+ * dam phan cho don moi, co khach ngu dong roi mua lai. Vi vay cho phep chuyen sang BAT KY
+ * giai doan nao, tru mot rang buoc duy nhat: mo lai khach da mat phai do Quan ly.
+ */
 export const STAGE_FLOW: Record<CustomerStage, CustomerStage[]> = {
-  NEW: ['CONSULTING', 'LOST'],
-  CONSULTING: ['QUOTED', 'LOST'],
-  QUOTED: ['NEGOTIATING', 'LOST'],
-  NEGOTIATING: ['FIRST_ORDER', 'LOST'],
-  FIRST_ORDER: ['REGULAR', 'DORMANT', 'LOST'],
-  REGULAR: ['DORMANT', 'LOST'],
-  DORMANT: ['REGULAR', 'FIRST_ORDER', 'LOST'],
-  LOST: [],
+  NEW: [...CUSTOMER_STAGES],
+  CONSULTING: [...CUSTOMER_STAGES],
+  QUOTED: [...CUSTOMER_STAGES],
+  NEGOTIATING: [...CUSTOMER_STAGES],
+  FIRST_ORDER: [...CUSTOMER_STAGES],
+  REGULAR: [...CUSTOMER_STAGES],
+  DORMANT: [...CUSTOMER_STAGES],
+  LOST: [...CUSTOMER_STAGES],
 };
 
 export const STAGE_REQUIREMENTS: Record<CustomerStage, string> = {

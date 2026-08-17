@@ -10,12 +10,25 @@ interface Props {
   customerId: string;
   customerName: string;
   currentStage: CustomerStage;
+  /** Cấp bậc đại lý và công nợ hiện tại, để sale nhìn thấy ngay khi gọi khách. */
+  tierName?: string | null;
+  phone?: string | null;
+  officialDebt?: number | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
 /** Ghi nhận chăm sóc. Giữ nguyên dữ liệu đã nhập khi API báo lỗi (mục 6.1). */
-export function ActivityModal({ customerId, customerName, currentStage, onClose, onSaved }: Props) {
+export function ActivityModal({
+  customerId,
+  customerName,
+  currentStage,
+  tierName,
+  phone,
+  officialDebt,
+  onClose,
+  onSaved,
+}: Props) {
   const toast = useToast();
   const [idempotencyKey] = useState(newIdempotencyKey());
   const [saving, setSaving] = useState(false);
@@ -32,7 +45,9 @@ export function ActivityModal({ customerId, customerName, currentStage, onClose,
   });
 
   const closing = (CLOSING_RESULTS as readonly string[]).includes(form.result);
-  const stageOptions = [currentStage, ...STAGE_FLOW[currentStage]];
+  // Cho chọn mọi giai đoạn: khách nhập từ file cũ đang là "Mới tiếp cận" dù đã mua nhiều năm,
+  // sale phải sửa được về đúng thực tế.
+  const stageOptions = [...new Set([currentStage, ...STAGE_FLOW[currentStage]])];
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -71,7 +86,9 @@ export function ActivityModal({ customerId, customerName, currentStage, onClose,
 
   return (
     <Modal
-      title={`Ghi nhận chăm sóc · ${customerName}`}
+      title={`Ghi nhận chăm sóc · ${customerName}${tierName ? ` · ${tierName}` : ''}${
+        phone ? ` · ${phone}` : ''
+      }${officialDebt ? ` · nợ ${officialDebt.toLocaleString('vi-VN')}đ` : ''}`}
       onClose={onClose}
       footer={
         <>

@@ -76,6 +76,13 @@ export interface CustomerListItem {
 }
 
 export interface CustomerDetail extends CustomerListItem {
+  /** Thông tin cơ bản bổ sung ngoài file Excel gốc. */
+  birthday?: string | null;
+  zalo?: string | null;
+  email?: string | null;
+  note?: string | null;
+  tax_code?: string | null;
+  contact_person?: string | null;
   address: string | null;
   potential: string | null;
   interested_products: string | null;
