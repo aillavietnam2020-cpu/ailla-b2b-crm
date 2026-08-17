@@ -53,3 +53,18 @@ npx wrangler deploy --env production    # cập nhật bản thật
 npx wrangler d1 execute ailla_crm_prod --remote --env production --command "SELECT COUNT(*) FROM customers;"
 npx wrangler rollback --env production  # quay lại bản deploy trước
 ```
+
+## Cách tính công nợ chính thức (CEO chốt ngày 17/8/2026)
+
+Đặc tả mục 9.1 ban đầu chỉ trừ công nợ phần tiền đã phân bổ vào từng đơn. Thực tế
+công ty đang làm trên Excel: kế toán xác nhận khoản thu là trừ thẳng công nợ, kể cả
+khoản khách "trả nợ chung" chưa gán vào đơn nào. CEO chốt làm theo Excel.
+
+- `confirmed_payments` = toàn bộ tiền kế toán ĐÃ xác nhận (bút toán đảo mang dấu âm).
+- `pending_cash` = tiền sale đã báo về nhưng kế toán CHƯA xác nhận.
+- Công nợ chính thức = nợ đầu kỳ + đơn đã ghi nhận − tiền kế toán đã xác nhận.
+
+Đối chiếu với file Excel sau khi đổi (17/8/2026):
+1.256.920.982 + 91.618.613 − 180.073.600 = **1.168.465.995đ**, khớp đúng mốc
+`official_debt_total` của file gốc. Phần phân bổ theo đơn vẫn giữ nguyên để biết
+từng đơn đã thu bao nhiêu.

@@ -20,8 +20,10 @@ interface DebtRow {
  * Tổng hợp công nợ theo khách. Ba khái niệm được tính riêng đúng mục 9.1:
  *  - posted_charges: đơn đã duyệt + đã xuất/giao + kế toán ĐÃ xác nhận
  *  - pending_charges: đơn đã duyệt + đã xuất/giao nhưng kế toán CHƯA xác nhận
- *  - confirmed_payments: phần đã phân bổ của payment kế toán ĐÃ xác nhận
- *  - pending_cash: payment chưa xác nhận + phần chưa phân bổ của payment đã xác nhận
+ *  - confirmed_payments: TOÀN BỘ tiền kế toán ĐÃ xác nhận, kể cả khoản khách trả
+ *    nợ chung chưa gán vào đơn nào — chốt theo cách công ty đang làm trên Excel:
+ *    kế toán xác nhận là trừ thẳng công nợ, không chờ phân bổ từng đơn.
+ *  - pending_cash: tiền sale đã báo về nhưng kế toán CHƯA xác nhận
  */
 const BASE_SQL = `
 SELECT c.id, c.name, c.owner_id, u.display_name AS owner_name,
@@ -48,15 +50,11 @@ LEFT JOIN (
   -- Bút toán đảo (is_adjustment = 1) mang dấu âm: nó TRỪ lại khoản thu đã ghi nhận trước đó.
   SELECT p.customer_id,
     SUM(CASE WHEN p.accounting_status = 'DA_XAC_NHAN'
-             THEN COALESCE(a.allocated, 0) * CASE WHEN p.is_adjustment = 1 THEN -1 ELSE 1 END
+             THEN p.amount * CASE WHEN p.is_adjustment = 1 THEN -1 ELSE 1 END
              ELSE 0 END) AS confirmed_payments,
-    SUM((p.amount - CASE WHEN p.accounting_status = 'DA_XAC_NHAN' THEN COALESCE(a.allocated, 0) ELSE 0 END)
-        * CASE WHEN p.is_adjustment = 1 THEN -1 ELSE 1 END) AS pending_cash
+    SUM(CASE WHEN p.accounting_status = 'DA_XAC_NHAN' THEN 0
+             ELSE p.amount * CASE WHEN p.is_adjustment = 1 THEN -1 ELSE 1 END END) AS pending_cash
   FROM payments p
-  LEFT JOIN (
-    SELECT payment_id, SUM(amount) AS allocated
-    FROM payment_allocations WHERE reversed_at IS NULL GROUP BY payment_id
-  ) a ON a.payment_id = p.id
   GROUP BY p.customer_id
 ) p ON p.customer_id = c.id
 LEFT JOIN customer_credit_balances cb ON cb.customer_id = c.id
