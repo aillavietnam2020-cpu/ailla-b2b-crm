@@ -318,3 +318,7 @@ tr.chg-row td{background:#fff7fb}.t-pink{color:#c2185b}.aibox{border:1.5px solid
 .svsync{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:10px;background:#40c057;flex:none}.svsync.busy{background:#fab005}.svsync.err{background:#fa5252}
 .srcgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.srcbox{text-align:left;border:1px solid #e9ecef;border-radius:14px;padding:16px;background:#fff;cursor:pointer;font:inherit}.srcbox:hover{border-color:#adb5bd}.srcbox .l{font-weight:700;font-size:14px}.srcbox .v{font-size:26px;font-weight:800;margin:6px 0 2px}.srcbox .p{font-weight:600;font-size:13px}.srcbox .h{font-size:12.5px;color:#868e96;margin-top:6px}.srcbox.t-pnk{border-top:4px solid #e7357b}.srcbox.t-grn{border-top:4px solid #2f9e44}
 .note.internal{background:#f8f9fa;border-color:#dee2e6;color:#495057;font-size:13px}
+/* Thanh lọc việc gọn 2 dòng: dòng 1 thời gian + phạm vi xem, dòng 2 ô tìm và các ô chọn */
+.cvf{padding:8px 10px;gap:6px}.cvrow{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}.cvf .chips b{font-size:11px}.cvf .chip{padding:4px 10px;font-size:13px}
+.cvf .frow{flex-wrap:nowrap;gap:6px;overflow-x:auto}.cvf .frow input,.cvf .frow select{flex:1 1 130px;min-width:110px;max-width:200px;padding:5px 8px;font-size:13px}
+@media (max-width:700px){.cvf .frow{flex-wrap:wrap}}

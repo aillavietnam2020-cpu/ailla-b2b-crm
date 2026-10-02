@@ -61,8 +61,8 @@ function cvFilter(L){
     if(CVF.tg==="today"&&x.han!==today)return false;if(CVF.tg==="week"&&(x.han<W.tu||x.han>W.den))return false;if(CVF.tg==="lweek"&&(x.han<LW.tu||x.han>LW.den))return false;
     return true});
 }
-function cvFilterBar(opts={}){const d=D();return `<div class="cvf"><div class="chips"><b>Thời gian</b>${[["all","Cả tháng"],["today","Hôm nay"],["week","Tuần này"],["lweek","Tuần trước"]].map(([k,t])=>`<button class="chip${CVF.tg===k?" on":""}" data-tg="${k}">${t}</button>`).join("")}</div>
-  <div class="chips"><b>Xem</b>${cvScopeOpts().map(([k,t])=>`<button class="chip${CVF.scope===k?" on":""}" data-sc="${k}">${t}</button>`).join("")}</div>
+function cvFilterBar(opts={}){const d=D();return `<div class="cvf"><div class="cvrow"><div class="chips"><b>Thời gian</b>${[["all","Cả tháng"],["today","Hôm nay"],["week","Tuần này"],["lweek","Tuần trước"]].map(([k,t])=>`<button class="chip${CVF.tg===k?" on":""}" data-tg="${k}">${t}</button>`).join("")}</div>
+  <div class="chips"><b>Xem</b>${cvScopeOpts().map(([k,t])=>`<button class="chip${CVF.scope===k?" on":""}" data-sc="${k}">${t}</button>`).join("")}</div></div>
   <div class="frow"><input id="cv-q" placeholder="Tìm việc, mã thẻ, người…" value="${esc(CVF.q)}"><select id="cv-team">${opt([["","Mọi team"]].concat(Object.entries(TEAMS)),CVF.team)}</select><select id="cv-ng">${opt([["","Mọi người"]].concat(d.users.filter(u=>u.active&&u.role!=="admin").map(u=>[u.id,u.name])),CVF.nguoi)}</select><select id="cv-da">${opt([["","Mọi dự án"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),CVF.da)}</select>${opts.noSt?"":`<select id="cv-st">${opt([["","Mọi trạng thái"],["late","Quá hạn"]].concat(CV_ST.map(s=>[s[0],s[1]])),CVF.st)}</select>`}<select id="cv-uu">${opt([["","Mọi mức ưu tiên"]].concat(UU),CVF.uu)}</select></div></div>`}
 function bindCvFilter(m){
   m.querySelectorAll("[data-tg]").forEach(b=>b.onclick=()=>{CVF.tg=b.dataset.tg;renderMain()});m.querySelectorAll("[data-sc]").forEach(b=>b.onclick=()=>{CVF.scope=b.dataset.sc;renderMain()});
