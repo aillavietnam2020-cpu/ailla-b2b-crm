@@ -55,7 +55,7 @@ function ensureShape(d){
   crmSeed(d);
   gvSeed(d);cvSeed(d);hrShape(d);aiShape(d);dcShape(d);botShape(d);if(d.mode==="live")d.settings.today=realDay();if(!d.kenhPT)d.kenhPT={};if(!d.strategyExtra)d.strategyExtra=[];
   const pbOf={u_chi:"BDH",u_digital:"ADS"},nsOf={u_quynh:"NV012"};
-  d.users.forEach(u=>{if(u.phongBan===undefined||u.phongBan==="MKT"||u.phongBan==="DIG"||u.phongBan==="BGD")u.phongBan=pbOf[u.id]||(u.role==="content"||u.role==="lead"?"CM":"");if(u.maNS===undefined)u.maNS=nsOf[u.id]||"";if(u.role==="admin")u.perms=ALL_PERMS.slice()});
+  d.users.forEach(u=>{if(u.role==="digital"&&!u.phongBan)u.phongBan="ADS";if(u.phongBan===undefined||u.phongBan==="MKT"||u.phongBan==="DIG"||u.phongBan==="BGD")u.phongBan=pbOf[u.id]||(u.role==="content"||u.role==="lead"?"CM":u.role==="digital"?"ADS":"");if(u.maNS===undefined)u.maNS=nsOf[u.id]||"";if(u.role==="admin")u.perms=ALL_PERMS.slice()});
   return d;
 }
 

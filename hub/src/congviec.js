@@ -6,7 +6,9 @@ const TEAMS={content:"Content & Media",digital:"Digital – Ads",koc:"KOC",chung
 const CV_ST=[["cg","Chưa giao","gry"],["todo","Cần làm","gry"],["doing","Đang làm","blu"],["review","Chờ duyệt","amb"],["done","Hoàn thành","grn"]];
 const cvStN=k=>(CV_ST.find(s=>s[0]===k)||[k,k])[1];
 const UU=["Cao","Trung bình","Thấp"];
-const teamOf=u=>!u?"":u.role==="digital"?"digital":["content","lead"].includes(u.role)?"content":u.role==="truongphong"?"mkt":"all";
+// Team của một người: Content/Digital theo vai trò; các phòng khác (Sale, Sản xuất, Kế toán...) theo phòng ban.
+const MKT_PB=["CM","ADS","KOC","BDH",""];
+const teamOf=u=>!u?"":u.role==="digital"?"digital":["content","lead"].includes(u.role)?"content":u.role==="truongphong"?(MKT_PB.includes(u.phongBan||"")?"mkt":u.phongBan):u.role==="nhanvien"&&u.phongBan?u.phongBan:"all";
 function cvSeed(d){
   if(d.projects)return;const t=d.settings.today;
   d.projects=[
@@ -53,7 +55,7 @@ function cvFilter(L){
   if(!CVF.scope)CVF.scope=ME.role==="admin"?"all":ME.role==="lead"?"team":"mine";
   return L.filter(x=>{
     if(CVF.scope==="mine"&&x.nguoi!==me&&!x.phoi.includes(me))return false;
-    if(CVF.scope==="team"&&t!=="all"&&x.team!==t&&!(t==="content"&&x.src==="order"))return false;
+    if(CVF.scope==="team"&&t!=="all"&&x.team!==t&&!(t==="content"&&x.src==="order")&&!(t==="mkt"&&["content","digital","koc"].includes(x.team)))return false;
     if(CVF.team&&x.team!==CVF.team)return false;if(CVF.nguoi&&x.nguoi!==CVF.nguoi&&!x.phoi.includes(CVF.nguoi))return false;if(CVF.da&&x.da!==CVF.da)return false;if(CVF.st&&(CVF.st==="late"?!x.late:x.st!==CVF.st))return false;if(CVF.uu&&x.uu!==CVF.uu)return false;
     if(CVF.q&&!(x.ten+" "+x.mo+" "+x.id+" "+userName(x.nguoi)).toLowerCase().includes(CVF.q.toLowerCase()))return false;
     if(CVF.tg==="today"&&x.han!==today)return false;if(CVF.tg==="week"&&(x.han<W.tu||x.han>W.den))return false;if(CVF.tg==="lweek"&&(x.han<LW.tu||x.han>LW.den))return false;
@@ -81,7 +83,7 @@ function openTask(id){
   const d=D(),t=id?d.tasks.find(x=>x.id===id):null,ed=can(ME,"viec.giao")||!t||t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),gv=can(ME,"viec.giao")||!t;
   const users=d.users.filter(u=>u.active&&u.role!=="admin"||u.id===ME.id);
   openDrawerHTML(`<h2>${t?"Nhiệm vụ":"Tạo nhiệm vụ"}</h2><form class="frm" id="tkf2"><label class="field">Tên việc<input id="t-ten" required value="${esc(t?t.ten:"")}" ${gv?"":"disabled"}></label><label class="field">Mô tả<textarea id="t-mo" rows="2" ${gv?"":"disabled"}>${esc(t?t.moTa:"")}</textarea></label>
-   <div class="row4"><label class="field">Team<select id="t-team" ${gv?"":"disabled"}>${opt(Object.entries(TEAMS),t?t.team:(teamOf(ME)==="digital"?"digital":"content"))}</select></label><label class="field">Dự án<select id="t-da" ${gv?"":"disabled"}>${opt([["","—"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),t?t.da:CVF.da)}</select></label></div>
+   <div class="row4"><label class="field">Team<select id="t-team" ${gv?"":"disabled"}>${opt(Object.entries(TEAMS),t?t.team:(TEAMS[teamOf(ME)]?teamOf(ME):"content"))}</select></label><label class="field">Dự án<select id="t-da" ${gv?"":"disabled"}>${opt([["","—"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),t?t.da:CVF.da)}</select></label></div>
    <div class="row4"><label class="field">Người làm<select id="t-ng" ${gv?"":"disabled"}>${opt([["","— chưa giao"]].concat(users.map(u=>[u.id,u.name+" · "+(TEAMS[teamOf(u)]||"Quản lý")])),t?t.nguoi:(gv?"":ME.id))}</select></label><label class="field">Hạn<select id="t-han" ${gv?"":"disabled"}>${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),t?t.han:Math.min(MONTH.ndays,d.settings.today+2))}</select></label><label class="field">Ưu tiên<select id="t-uu" ${gv?"":"disabled"}>${opt(UU,t?t.uu:"Trung bình")}</select></label><label class="field">Trạng thái<select id="t-st" ${ed?"":"disabled"}>${opt(CV_ST.filter(s=>s[0]!=="cg").map(s=>[s[0],s[1]]),t?t.st:"todo")}</select></label></div>
    <div class="field">Người phối hợp<div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="t-phoi" value="${u.id}" ${t&&(t.phoi||[]).includes(u.id)?"checked":""} ${gv?"":"disabled"}> ${esc(u.name)}</label>`).join("")}</div></div>
    <div class="field">Việc nhỏ cần tích<div id="t-ck">${(t?t.checklist:[]).map((c,i)=>`<label class="ck"><input type="checkbox" data-ck="${i}" ${c.x?"checked":""} ${ed?"":"disabled"}> ${esc(c.t)}</label>`).join("")}</div>${gv?`<input id="t-ckn" placeholder="Thêm việc nhỏ, Enter để thêm">`:""}</div>

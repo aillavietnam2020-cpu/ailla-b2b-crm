@@ -21,7 +21,7 @@ if (!DATA || !out) {
 const ITEMS = [
   ['t9file', 't9file.json', 0], // báo cáo video TikTok tuần, trợ lý AI của team dùng
   ['t9', null, 0], // kế hoạch + doanh thu tháng 9 theo SKU, lead dùng ở Kế hoạch › Bước 1
-  ['kd', 'kinhdoanh.json', 1], // doanh thu các kênh
+  ['kd', 'kinhdoanh.json', 0], // doanh thu các kênh (Sale, Kế toán, Marketing cần xem số kênh mình)
   ['skucost', 'skucost.json', 1], // giá vốn SKU
   ['nhansu0', 'nhansu0.json', 1], // danh sách nhân sự ban đầu (không có lương)
 ];

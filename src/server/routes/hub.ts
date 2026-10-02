@@ -99,7 +99,9 @@ hubRoutes.get('/blob/:key', async (c) => {
     .bind(key)
     .first<{ data: string; admin_only: number }>();
   if (!row) return ok(c, null);
-  if (row.admin_only && !isHubAdmin(c.get('auth').user.role)) throw forbidden();
+  // Số liệu riêng tư (giá vốn, danh sách nhân sự): CEO và kế toán (xem được công nợ toàn công ty).
+  const auth = c.get('auth');
+  if (row.admin_only && !isHubAdmin(auth.user.role) && !auth.permissions.includes('debt.read.all')) throw forbidden();
   return ok(c, JSON.parse(await unpack(row.data)));
 });
 

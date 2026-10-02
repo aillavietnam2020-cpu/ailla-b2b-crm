@@ -112,7 +112,7 @@ function pHieuQua(m){
    2. CV CẦN XỬ LÝ
    ===================================================================== */
 function cvList(u){
-  const d=D(),C=d.cards,td=d.settings.today,mine=c=>APP_MODE==="admin"||c.nguoi===u.id;
+  const d=D(),C=d.cards,td=d.settings.today,mine=c=>["admin","lead"].includes(u.role)||c.nguoi===u.id;
   const L=[];const add=(key,t,lvl,items,act)=>{if(items.length)L.push({key,t,lvl,items,act})};
   if(can(u,"viec.duyet")){add("dkb","Kịch bản chờ duyệt","blu",C.filter(c=>c.step==="dkb"),"card");add("dvd","Video chờ duyệt + CEO check","blu",C.filter(c=>c.step==="dvd"),"card")}
   if(can(u,"viec.giao"))add("cg","Thẻ 7 ngày tới chưa giao","red",C.filter(c=>c.step==="cg"&&c.day<=td+7),"assign");
@@ -121,7 +121,7 @@ function cvList(u){
   add("id","Đã đăng nhưng thiếu ID / link bài","red",C.filter(c=>c.step==="xong"&&mine(c)&&(chOf(c.kenh).needId?!c.tiktokId:!c.linkDang)),"card");
   add("sap","Đăng trong 2 ngày tới, chưa có kịch bản","amb",C.filter(c=>c.step==="kb"&&c.day<=td+2&&c.day>=td&&mine(c)),"card");
   if(can(u,"win.sua"))add("win","Video win chưa có kế hoạch nhân bản","pnk",winners().filter(w=>!d.winPlans.some(p=>p.src===w.key)).slice(0,10),"win");
-  if(can(u,"order.xem"))add("order","Order sắp tới hạn / trễ","amb",d.orders.filter(o=>o.trangThai!=="Xong"&&o.han<=td+2&&(APP_MODE==="admin"||o.giao===u.id||o.nguoiOrder===u.id)),"order");
+  if(can(u,"order.xem"))add("order","Order sắp tới hạn / trễ","amb",d.orders.filter(o=>o.trangThai!=="Xong"&&o.han<=td+2&&(["admin","lead"].includes(u.role)||o.giao===u.id||o.nguoiOrder===u.id)),"order");
   if(can(u,"research.duyet"))add("rs","Research chờ kiểm / duyệt","blu",d.research.filter(r=>["Chờ kiểm tra","Đã kiểm"].includes(r.status)),"research");
   if(u.role!=="admin"&&can(u,"research.sua"))add("q","Câu hỏi research được giao","blu",d.questions.filter(q=>q.to===u.id&&q.status!=="Xong"),"research");
   const lastTT=d.imports.find(i=>i.loai==="TikTok"),lastAds=d.imports.find(i=>i.loai==="Ads Facebook"),needW=weekOf(td)-1;
@@ -254,7 +254,7 @@ ${({nc:`Tìm khách đang tìm gì quanh vấn đề "${p.pain}": từ khóa, c�
 Nguyên tắc: chỉ ghi điều quan sát được; mỗi phát hiện có link; không tự tạo số liệu; không lấy 1 video hay 1 comment làm xu hướng; thiếu bằng chứng ghi "chưa đủ dữ liệu".
 Kết quả: bảng | Phát hiện | Bằng chứng | Link | Chỉ số / trích dẫn | Gợi ý cho video TikTok |; cuối cùng chọn 3 phát hiện đáng dùng nhất.`;
 function pResearch(m){
-  const d=D(),R=d.research,I=d.insights,tab=SUB.research||(APP_MODE==="user"?"q":"rs");
+  const d=D(),R=d.research,I=d.insights,tab=SUB.research||(!["admin","lead"].includes(ME.role)?"q":"rs");
   const tabs=[["rs","Bản ghi research"],["ins","Insight & cơ hội"],["q","Câu hỏi"],["pb","Phân bổ"]];
   const nhanhCo=new Set(R.filter(r=>r.status!=="Loại").map(r=>r.nhanh)).size;
   m.innerHTML=H("Kho research")+`<div class="grid kpis">${kpi("Bản ghi",R.length,R.filter(r=>r.status==="Loại").length+" đã loại")}${kpi("Đã duyệt",R.filter(r=>r.status==="Đã duyệt").length,"trên "+R.length,"var(--green)")}${kpi("Insight",I.length,I.filter(i=>i.quyetDinh==="Làm ngay").length+" làm ngay")}${kpi("Độ phủ nhánh",nhanhCo+"/5","nhánh có dữ liệu")}${kpi("Tin cậy cao",R.filter(r=>r.tin==="Cao").length)}</div>
@@ -277,7 +277,7 @@ function pResearch(m){
     b.querySelectorAll("[data-mkt]").forEach(btn=>btn.onclick=()=>{const i=I.find(x=>x.ma===btn.dataset.mkt);const ma="T10-"+i.sku+"-"+String(d.tuyen.length+1).padStart(2,"0");DB.mutate(ME.name,"tạo tuyến từ "+i.ma,dt=>{dt.tuyen.push({ma,kenh:sk(i.sku).kenh,sku:i.sku,tuyen:"Pain/Insight",vaiTro:i.coHoi||"Test",kh:4,nguoi:(dt.pillars.find(p=>p.sku===i.sku)||{}).nguoi||"u_may",kiemChung:"Có bằng chứng",maInsight:i.ma,ghiChu:i.insight});dt.insights.find(x=>x.ma===i.ma).maTuyen=ma});toast("Đã tạo tuyến "+ma+" (4 video). Vào Lịch content › Pillar & tuyến để chỉnh và phát hành");renderMain()});
     if($("#if"))$("#if").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"thêm insight",dt=>dt.insights.push({ma:"INS-"+String(dt.insights.length+1).padStart(2,"0"),ngay:new Date().toLocaleDateString("vi-VN").slice(0,5),sku:$("#i-sku").value,persona:$("#i-pe").value,van:$("#i-v").value,insight:$("#i-in").value,maRs:$("#i-rs").value,bangChung:"",coHoi:$("#i-ch").value,goc:$("#i-g").value,chungMinh:"",format:$("#i-f").value,uuTien:$("#i-u").value,tin:"Trung bình",quyetDinh:"Để sau",deXuat:ME.id,duyet:"",maTuyen:""}));renderMain()};
   }
-  if(tab==="q"){const Q=APP_MODE==="user"&&!can(ME,"research.duyet")?d.questions.filter(q=>q.to===ME.id):d.questions;
+  if(tab==="q"){const Q=!["admin","lead"].includes(ME.role)&&!can(ME,"research.duyet")?d.questions.filter(q=>q.to===ME.id):d.questions;
     b.innerHTML=`<section class="card">${tbl(["Mã","Sản phẩm","Câu hỏi","Người làm","Bản ghi","Trạng thái",""],Q.map(q=>`<tr><td class="mono">${q.id}</td><td>${swatch(q.sku)}${sk(q.sku).n}</td><td class="wide">${esc(q.q)}</td><td>${esc(userName(q.to))}</td><td class="n">${R.filter(r=>r.q===q.id).length}</td><td>${pill(q.status,q.status==="Xong"?"grn":q.status==="Đang làm"?"blu":"gry")}</td><td>${q.to===ME.id&&q.status!=="Xong"?`<button class="btn sm" data-qdone="${q.id}">Báo xong</button>`:""}</td></tr>`))}<p class="hint">Làm research: chọn tab "Bản ghi research", chọn câu hỏi, chép câu lệnh AI, rồi ghi từng phát hiện kèm link.</p></section>`;
     b.querySelectorAll("[data-qdone]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"báo xong câu hỏi "+x.dataset.qdone,dt=>dt.questions.find(q=>q.id===x.dataset.qdone).status="Xong");renderMain()});
   }

@@ -97,8 +97,11 @@ const ROLE_PRESET={
  lead:ALL_PERMS.filter(p=>!["nhansu.quanly","caidat.quanly","kehoach.duyet","sanpham.quanly","thietlap.quanly","gia.xem_von","chiphi.xem","chiphi.nhap","pl.xem","luong.quanly"].includes(p)),
  content:["cv.xem","kehoach.xem","research.xem","research.sua","lich.xem","lich.sua_cua_minh","win.xem","order.xem","kho.xem"],
  digital:["cv.xem","research.xem","lich.xem","win.xem","order.xem","order.tao","order.sua","baocao.ads"],
+ // Phòng ban khác (Sale, Sản xuất, Kế toán, HCNS...): thấy phân hệ của phòng mình + giao việc.
+ truongphong:["cv.xem","viec.giao","viec.duyet","tongquan.xem"],
+ nhanvien:["cv.xem"],
 };
-const ROLES={admin:"Quản trị (CEO)",lead:"Trưởng nhóm",content:"Nhân viên content",digital:"Team Digital"};
+const ROLES={admin:"Quản trị (CEO)",lead:"Trưởng nhóm",content:"Nhân viên content",digital:"Team Digital",truongphong:"Trưởng phòng",nhanvien:"Nhân viên"};
 
 /* ---------- Tiện ích ---------- */
 let _rs=20261015;const rnd=()=>{_rs|=0;_rs=_rs+0x6D2B79F5|0;let t=Math.imul(_rs^_rs>>>15,1|_rs);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
