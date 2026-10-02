@@ -1,15 +1,15 @@
 /* =====================================================================
    BÁO CÁO ADS THEO NGÀY (Marketing › Quảng cáo › Chi theo ngày)
    Lấy thẳng file "BÁO CÁO DIGITAL MKT 2026 FINAL" của team Digital: VPS đọc 3 tab
-   Ads Việt Anh / Thảo / Duẩn 5 phút một lần và đẩy lên máy chủ (blob ads_live).
+   Ads Việt Anh / Thảo / Duẩn mỗi sáng 8h và đẩy lên máy chủ (blob ads_live).
    Mỗi tab: các khối sản phẩm (SYS_ID, ví dụ RUOI_CD, MUOI_MESS) × chỉ số × ngày 1–31.
    ===================================================================== */
 const ADL={raw:null,at:0,busy:false,who:"",day:"",open:""};
 async function adlLoad(force){
-  if(typeof svApi!=="function"||ADL.busy||(!force&&Date.now()-ADL.at<55000))return;ADL.busy=true;
+  if(typeof svApi!=="function"||ADL.busy||(!force&&Date.now()-ADL.at<1800000))return;ADL.busy=true;
   try{const r=await svApi("/api/hub/blob/ads_live");const ch=JSON.stringify(r)!==JSON.stringify(ADL.raw);ADL.raw=r;ADL.at=Date.now();if(ch&&PAGE==="fb_ads"&&!svTyping())renderMain()}catch(e){}finally{ADL.busy=false}
 }
-setInterval(()=>{if(ME&&PAGE==="fb_ads"&&!document.hidden)adlLoad()},60000);
+
 
 const adlNum=v=>{const n=parseFloat(String(v==null?"":v).replace(/[^\d.,-]/g,"").replace(/,/g,""));return Number.isFinite(n)?n:0};
 /* Một tab → các khối sản phẩm. */
@@ -56,10 +56,10 @@ function pAdsDay(m){
   const dayLbl=ADL.day==="all"?`cả tháng ${mo}/${yr} (1–${last})`:`ngày ${ADL.day}/${mo}/${yr}`;
   const row=g=>{const s=g.s;return `<tr class="clk${ADL.open===g.id?" on":""}" data-adlo="${esc(g.id)}"><td><b>${esc(g.name)}</b><small>${esc(g.id)} · ${g.fun}</small></td><td>${g.who.map(esc).join(", ")||"—"}</td><td class="n">${money(s.spend)}</td><td class="n">${nf(s.data)}</td><td class="n">${s.data?money(s.giaData):"—"}</td><td class="n">${nf(s.orders)}</td><td class="n">${money(s.rev)}</td><td class="n">${s.orders?money(s.cpo):"—"}</td><td class="n">${s.rev?adlPct(s.pct):"—"}</td><td class="n">${s.data?adlPct(s.chot):"—"}</td><td class="n"><b>${adlR(s.roas)}</b></td></tr>${ADL.open===g.id?`<tr class="sub"><td colspan="11">${adlDaily(g.L,last)}</td></tr>`:""}`};
   const people=D_.who.map(w=>{const s=adlStats(B.filter(b=>b.who===w),days);return `<tr><td><b>${esc(w)}</b></td><td class="n">${money(s.spend)}</td><td class="n">${nf(s.data)}</td><td class="n">${nf(s.orders)}</td><td class="n">${money(s.rev)}</td><td class="n">${s.orders?money(s.cpo):"—"}</td><td class="n">${s.rev?adlPct(s.pct):"—"}</td><td class="n"><b>${adlR(s.roas)}</b></td></tr>`}).join("");
-  m.innerHTML=H("Báo cáo Ads theo ngày",`Theo file BÁO CÁO DIGITAL của team · tự cập nhật 5 phút/lần · lần cuối ${atS}`)+`
+  m.innerHTML=H("Báo cáo Ads theo ngày",`Theo file BÁO CÁO DIGITAL của team · cập nhật mỗi sáng 8h · lần cuối ${atS}`)+`
   <div class="filters"><select id="adl-w">${opt([["","Tất cả người chạy"]].concat(D_.who.map(w=>[w,w])),ADL.who)}</select>
   <select id="adl-d">${opt([["all","Cả tháng "+mo]].concat(Array.from({length:last},(_,i)=>[String(last-i),`Ngày ${last-i}/${mo}`+(i===0?" (mới nhất)":"")])),ADL.day)}</select>
-  <span class="hint">Chi phí Ads tự kéo từ Meta; đơn và doanh số do Sale nhập vào file, nhập xong vài phút là hiện ở đây.</span></div>
+  <span class="hint">Số liệu lấy từ file báo cáo Digital lúc 8h sáng mỗi ngày (chi Ads kéo từ Meta, đơn và doanh số Sale nhập).</span></div>
   <div class="grid kpis">${kpi("Chi Ads",money(S.spend),dayLbl)}${kpi("Data / tin nhắn",nf(S.data),S.data?"giá data "+money(S.giaData):"")}${kpi("Đơn chốt",nf(S.orders),S.data?"tỷ lệ chốt "+adlPct(S.chot):"")}${kpi("Doanh số",money(S.rev),S.orders?"TB đơn "+money(S.tbDon):"")}${kpi("ROAS",adlR(S.roas),"doanh số / chi ads")}${kpi("% CPQC / doanh số",S.rev?adlPct(S.pct):"—","chi phí gồm thuế")}${kpi("Chi / đơn",S.orders?money(S.cpo):"—","")}</div>
   <section class="card flush"><div class="card-h pad"><h2>Theo sản phẩm · ${dayLbl}</h2><span class="hint">bấm một dòng để xem từng ngày như file báo cáo</span></div>
   <div class="tbl"><table><thead><tr><th>Sản phẩm</th><th>Người chạy</th><th class="n">Chi Ads</th><th class="n">Data</th><th class="n">Giá data</th><th class="n">Đơn</th><th class="n">Doanh số</th><th class="n">Chi/đơn</th><th class="n">% CP/DS</th><th class="n">Tỷ lệ chốt</th><th class="n">ROAS</th></tr></thead><tbody>${P.map(row).join("")||`<tr><td colspan="11" class="empty">Không có số liệu ${dayLbl}.</td></tr>`}</tbody></table></div></section>

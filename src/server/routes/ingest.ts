@@ -6,7 +6,7 @@ import { badRequest, ok, unauthorized } from '../lib/http';
 
 /**
  * Nhận số liệu từ VPS (không qua đăng nhập, xác thực bằng khoá riêng INGEST_KEY).
- *  - /ads-live: file "BÁO CÁO DIGITAL MKT 2026 FINAL" (3 tab Ads Việt Anh / Thảo / Duẩn), VPS đọc 5 phút một lần.
+ *  - /ads-live: file "BÁO CÁO DIGITAL MKT 2026 FINAL" (3 tab Ads Việt Anh / Thảo / Duẩn), VPS đọc mỗi sáng 8h.
  */
 export const ingestRoutes = new Hono<AppEnv>();
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Đọc file BÁO CÁO DIGITAL MKT 2026 FINAL (3 tab Ads Việt Anh / Thảo / Duẩn) rồi đẩy lên Trang quản trị Ailla.
-Chạy bằng cron 5 phút/lần. Không dùng AI, không tốn token. Khoá đẩy lên web: /root/.config/ailla/ingest.key."""
+Chạy bằng cron mỗi sáng 8h (0 8 * * *). Không dùng AI, không tốn token. Khoá đẩy lên web: /root/.config/ailla/ingest.key."""
 import json, subprocess, sys, urllib.request
 
 SHEET = "1LEMLE7GQ1ZeC03mHq0AW7ggacmXYd8gnSubU3v0KxLY"
