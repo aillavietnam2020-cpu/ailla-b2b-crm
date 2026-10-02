@@ -2,7 +2,7 @@
    BÁO CÁO KINH DOANH (toàn công ty + từng kênh) · DIGITAL ADS FB · SALE B2C FACEBOOK · KẾ TOÁN
    Nguồn: BÁO CÁO DIGITAL MKT 2026 FINAL (Ads FB) + AILLA_Pancake_v5 (đơn Facebook). Chỉ nhúng số tổng hợp.
    ===================================================================== */
-const KDX=(typeof KD!=="undefined"&&KD)?KD:{adsPeople:[],adsProd:[],adsTran:[],adsMonths:[],adsChiDay:[],fbHist:[],fbDash:{},fbSale:[],fbNhom:[]};
+let KDX=(typeof KD!=="undefined"&&KD)?KD:{adsPeople:[],adsProd:[],adsTran:[],adsMonths:[],adsChiDay:[],fbHist:[],fbDash:{},fbSale:[],fbNhom:[]};
 const tr=v=>v?money(v):"—";
 const pc=(a,b)=>b?(a/b*100).toFixed(1)+"%":"—";
 const cleanN=s=>String(s||"").replace(/\\n/g," ").replace(/\s+/g," ").trim();
@@ -45,7 +45,7 @@ function pBcFb(m){
 /* ---------- Bảng lãi lỗ kênh dùng chung ---------- */
 const plTbl=(L,dt)=>tbl(["Chỉ tiêu","Số tiền","% doanh thu","Ghi chú"],L.map(r=>{const big=/^[A-ZÀ-Ỹ =]/.test(r[0])&&r[0]===r[0].toUpperCase();return `<tr class="${big?"tot":""}"><td>${esc(r[0])}</td><td class="n">${typeof r[1]==="number"?nf(Math.round(r[1])):esc(r[1])}</td><td class="n">${typeof r[2]==="number"?(r[2]*100).toFixed(1)+"%":""}</td><td class="hint">${esc(r[3]||"")}</td></tr>`}));
 const kvTbl=(L,h=["Chỉ số","Giá trị","Ghi chú"])=>tbl(h,L.map(r=>`<tr><td>${esc(r[0])}</td><td class="n">${typeof r[1]==="number"?(Math.abs(r[1])<10&&r[1]%1?(Math.abs(r[1])<1?(r[1]*100).toFixed(1)+"%":r[1].toFixed(2)):nf(Math.round(r[1]))):esc(r[1]??"")}</td><td class="hint">${esc(r.slice(2).filter(x=>typeof x==="string").join(" · "))}${r.slice(2).find(x=>typeof x==="number")!=null?" "+((r.slice(2).find(x=>typeof x==="number"))*100).toFixed(1)+"%":""}</td></tr>`));
-const TT=KDX.tts||null,SP=KDX.spe||null;
+let TT=KDX.tts||null,SP=KDX.spe||null;
 const plv=(P,re)=>((P||[]).find(r=>re.test(r[0]))||[])[1]||0;
 
 function pBcTikTok(m){

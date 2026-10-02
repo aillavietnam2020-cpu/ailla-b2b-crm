@@ -2,7 +2,7 @@
    CHỌN THỜI GIAN dùng chung: ngày, tuần, tháng, quý, năm, khoảng tùy chọn
    ===================================================================== */
 const FB_ADS_TAX=0.1;
-const DAYD=(KDX&&KDX.day)||{tts:{},spe:{},fb:{},ads:{}};
+let DAYD=(KDX&&KDX.day)||{tts:{},spe:{},fb:{},ads:{}};
 const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const pdate=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};

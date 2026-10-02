@@ -67,7 +67,7 @@ DB.load=async function(){
   const blob=k=>svApi("/api/hub/blob/"+k).catch(()=>null);
   const [t9,t9b,kd,sc,ns]=await Promise.all([blob("t9file"),blob("t9"),isCeo()?blob("kd"):null,isCeo()?blob("skucost"):null,isCeo()?blob("nhansu0"):null]);
   if(SV.perms.includes("dashboard.ceo"))svApi("/api/dashboards/ceo").then(c=>{CRM_BASE.noChinhThuc=c.official_debt||0;CRM_BASE.noDuKien=c.projected_debt||0;if(ME&&PAGE==="exec")renderMain()}).catch(()=>{});
-  if(t9)window.T9FILE=t9;if(t9b){T9_BASE=t9b.base||{};T9RAW=t9b.raw||T9RAW}if(kd)KD=kd;if(sc)SKUCOST=sc;if(ns)NHANSU0=ns;
+  if(t9)window.T9FILE=t9;if(t9b){T9_BASE=t9b.base||{};T9RAW=t9b.raw||T9RAW}if(kd){KD=kd;KDX=kd;DAYD=kd.day||DAYD;TT=kd.tts||null;SP=kd.spe||null}if(sc)SKUCOST=sc;if(ns)NHANSU0=ns;
   const st=await svApi("/api/hub/state");
   if(!st.data){
     if(!isCeo()){this.data=null;return}
