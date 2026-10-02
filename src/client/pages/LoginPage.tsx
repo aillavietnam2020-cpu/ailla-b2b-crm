@@ -34,6 +34,12 @@ export function LoginPage({ error }: { error: string | null }) {
     setBusy(true);
     setFormError(null);
     try {
+      // Vừa đăng nhập thì vào trang chủ Ailla Hub, kể cả khi mở từ link CRM cũ.
+      try {
+        sessionStorage.setItem('ailla_just_logged_in', '1');
+      } catch {
+        /* trình duyệt chặn lưu tạm: bỏ qua */
+      }
       await login(email.trim(), password);
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Không đăng nhập được, thử lại giúp tôi.');

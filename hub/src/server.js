@@ -82,6 +82,8 @@ DB.load=async function(){
   if(!u){const f=foldName(SV.me.display_name);u=this.data.users.find(x=>x.active&&!x.crm&&x.name&&(foldName(x.name)===f||f.endsWith(" "+foldName(x.name))))}
   if(u&&u.crm!==SV.me.id){const id=u.id;this.mutate("Hệ thống","gắn tài khoản đăng nhập "+SV.me.display_name+" → "+u.name,d=>{d.users.find(x=>x.id===id).crm=SV.me.id})}
   ME=u?this.data.users.find(x=>x.id===u.id):null;
+  // Mỗi lần mở Hub đều bắt đầu ở trang chủ (Tổng quan điều hành), không mở lại trang lần trước.
+  MOD="";PAGE="";try{localStorage.removeItem(SKEY+"_m");localStorage.removeItem(SKEY+"_p")}catch(e){}
   APP_MODE=ME&&["admin","lead"].includes(ME.role)?"admin":"user";
   setInterval(svPoll,15000);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)svPoll()});

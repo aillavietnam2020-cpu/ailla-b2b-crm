@@ -38,9 +38,17 @@ export function App() {
   const next = new URLSearchParams(location.search).get('next');
   const hasHub = me.permissions.includes('hub.access');
   const hubOnly = !me.permissions.includes('price.read') && hasHub;
+  let justLoggedIn = false;
+  try {
+    justLoggedIn = sessionStorage.getItem('ailla_just_logged_in') === '1';
+    sessionStorage.removeItem('ailla_just_logged_in');
+  } catch {
+    /* trình duyệt chặn lưu tạm: bỏ qua */
+  }
   const goHub =
     hasHub &&
-    ((next && /^\/hub\/[\w\-./?=&#]*$/.test(next)) ||
+    (justLoggedIn ||
+      (next && /^\/hub\/[\w\-./?=&#]*$/.test(next)) ||
       location.pathname === '/' ||
       (hubOnly && !location.pathname.endsWith('/account')));
   if (goHub) {
