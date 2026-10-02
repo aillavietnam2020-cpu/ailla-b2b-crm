@@ -48,22 +48,23 @@ function pAdsDay(m){
   const {B,last,mo,yr}=D_;
   if(!ADL.day)ADL.day=String(last||1);
   const days=ADL.day==="all"?Array.from({length:last},(_,i)=>i+1):[+ADL.day];
-  const scope=B.filter(b=>!ADL.who||b.who===ADL.who),S=adlStats(scope,days);
+  const S=adlStats(B.filter(b=>!ADL.who||b.who===ADL.who),days);
   const at=new Date(D_.at),atS=at.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})+" "+at.toLocaleDateString("vi-VN");
-  // gộp theo sản phẩm (cùng mã SYS_ID) qua các người chạy
-  const G={};scope.forEach(b=>{(G[b.id]=G[b.id]||{id:b.id,name:b.name,fun:b.fun,L:[]}).L.push(b)});
-  const P=Object.values(G).map(g=>Object.assign(g,{s:adlStats(g.L,days),mon:adlStats(g.L,Array.from({length:last},(_,i)=>i+1)),who:[...new Set(g.L.filter(b=>days.some(d=>(b.m.spend[d-1]||0)>0)).map(b=>b.who))]})).filter(g=>g.s.spend||g.s.orders||g.s.rev).sort((a,b)=>b.s.spend-a.s.spend);
-  const dayLbl=ADL.day==="all"?`cả tháng ${mo}/${yr} (1–${last})`:`ngày ${ADL.day}/${mo}/${yr}`;
-  const row=g=>{const s=g.s;return `<tr class="clk${ADL.open===g.id?" on":""}" data-adlo="${esc(g.id)}"><td><b>${esc(g.name)}</b><small>${esc(g.id)} · ${g.fun}</small></td><td>${g.who.map(esc).join(", ")||"—"}</td><td class="n">${money(s.spend)}</td><td class="n">${nf(s.data)}</td><td class="n">${s.data?money(s.giaData):"—"}</td><td class="n">${nf(s.orders)}</td><td class="n">${money(s.rev)}</td><td class="n">${s.orders?money(s.cpo):"—"}</td><td class="n">${s.rev?adlPct(s.pct):"—"}</td><td class="n">${s.data?adlPct(s.chot):"—"}</td><td class="n"><b>${adlR(s.roas)}</b></td></tr>${ADL.open===g.id?`<tr class="sub"><td colspan="11">${adlDaily(g.L,last)}</td></tr>`:""}`};
-  const people=D_.who.map(w=>{const s=adlStats(B.filter(b=>b.who===w),days);return `<tr><td><b>${esc(w)}</b></td><td class="n">${money(s.spend)}</td><td class="n">${nf(s.data)}</td><td class="n">${nf(s.orders)}</td><td class="n">${money(s.rev)}</td><td class="n">${s.orders?money(s.cpo):"—"}</td><td class="n">${s.rev?adlPct(s.pct):"—"}</td><td class="n"><b>${adlR(s.roas)}</b></td></tr>`}).join("");
+  // Tách theo người chạy: mỗi người một bảng, ai chạy mã nào thì có mã đó (mã có số trong tháng).
+  const MON=Array.from({length:last},(_,i)=>i+1),dayLbl=ADL.day==="all"?`cả tháng ${mo}/${yr} (1–${last})`:`ngày ${ADL.day}/${mo}/${yr}`;
+  const cells=s=>`<td class="n">${s.spend?money(s.spend):"—"}</td><td class="n">${s.data?nf(s.data):"—"}</td><td class="n">${s.data?money(s.giaData):"—"}</td><td class="n">${s.orders?nf(s.orders):"—"}</td><td class="n">${s.rev?money(s.rev):"—"}</td><td class="n">${s.orders?money(s.cpo):"—"}</td><td class="n">${s.rev?adlPct(s.pct):"—"}</td><td class="n">${s.data?adlPct(s.chot):"—"}</td><td class="n"><b>${s.spend&&s.rev?adlR(s.roas):"—"}</b></td>`;
+  const HEAD=`<thead><tr><th>Mã · sản phẩm</th><th class="n">Chi Ads</th><th class="n">Data</th><th class="n">Giá data</th><th class="n">Đơn</th><th class="n">Doanh số</th><th class="n">Chi/đơn</th><th class="n">% CP/DS</th><th class="n">Tỷ lệ chốt</th><th class="n">ROAS</th></tr></thead>`;
+  const section=w=>{const L=B.filter(b=>b.who===w).map(b=>({b,key:w+"|"+b.id,s:adlStats([b],days),mon:adlStats([b],MON)})).filter(x=>x.mon.spend||x.mon.orders||x.mon.rev).sort((a,c)=>c.s.spend-a.s.spend||c.mon.spend-a.mon.spend),T=adlStats(L.map(x=>x.b),days);
+    return `<section class="card flush"><div class="card-h pad"><h2>${esc(w)}</h2><span class="hint">${L.length} mã đang chạy trong tháng · ${dayLbl}</span></div><div class="tbl"><table>${HEAD}<tbody>${L.map(x=>`<tr class="clk${ADL.open===x.key?" on":""}${x.s.spend||x.s.orders?"":" dim"}" data-adlo="${esc(x.key)}"><td><b class="mono">${esc(x.b.id)}</b><small>${esc(x.b.name)} · ${x.b.fun}</small></td>${cells(x.s)}</tr>${ADL.open===x.key?`<tr class="sub"><td colspan="10">${adlDaily([x.b],last)}</td></tr>`:""}`).join("")||`<tr><td colspan="10" class="empty">Chưa có mã nào có số trong tháng.</td></tr>`}<tr class="tot"><td><b>Tổng ${esc(w)}</b></td>${cells(T)}</tr></tbody></table></div></section>`};
+  const people=D_.who.map(w=>{const s=adlStats(B.filter(b=>b.who===w),days);return `<tr><td><b>${esc(w)}</b></td>${cells(s)}</tr>`}).join("");
   m.innerHTML=H("Báo cáo Ads theo ngày",`Theo file BÁO CÁO DIGITAL của team · cập nhật mỗi sáng 8h · lần cuối ${atS}`)+`
   <div class="filters"><select id="adl-w">${opt([["","Tất cả người chạy"]].concat(D_.who.map(w=>[w,w])),ADL.who)}</select>
   <select id="adl-d">${opt([["all","Cả tháng "+mo]].concat(Array.from({length:last},(_,i)=>[String(last-i),`Ngày ${last-i}/${mo}`+(i===0?" (mới nhất)":"")])),ADL.day)}</select>
-  <span class="hint">Số liệu lấy từ file báo cáo Digital lúc 8h sáng mỗi ngày (chi Ads kéo từ Meta, đơn và doanh số Sale nhập).</span></div>
+  <span class="hint">Số liệu lấy từ file báo cáo Digital lúc 8h sáng mỗi ngày. Thêm mã mới: thêm khối mã đó vào tab Ads của người chạy trong file, hôm sau web tự hiện.</span></div>
   <div class="grid kpis">${kpi("Chi Ads",money(S.spend),dayLbl)}${kpi("Data / tin nhắn",nf(S.data),S.data?"giá data "+money(S.giaData):"")}${kpi("Đơn chốt",nf(S.orders),S.data?"tỷ lệ chốt "+adlPct(S.chot):"")}${kpi("Doanh số",money(S.rev),S.orders?"TB đơn "+money(S.tbDon):"")}${kpi("ROAS",adlR(S.roas),"doanh số / chi ads")}${kpi("% CPQC / doanh số",S.rev?adlPct(S.pct):"—","chi phí gồm thuế")}${kpi("Chi / đơn",S.orders?money(S.cpo):"—","")}</div>
-  <section class="card flush"><div class="card-h pad"><h2>Theo sản phẩm · ${dayLbl}</h2><span class="hint">bấm một dòng để xem từng ngày như file báo cáo</span></div>
-  <div class="tbl"><table><thead><tr><th>Sản phẩm</th><th>Người chạy</th><th class="n">Chi Ads</th><th class="n">Data</th><th class="n">Giá data</th><th class="n">Đơn</th><th class="n">Doanh số</th><th class="n">Chi/đơn</th><th class="n">% CP/DS</th><th class="n">Tỷ lệ chốt</th><th class="n">ROAS</th></tr></thead><tbody>${P.map(row).join("")||`<tr><td colspan="11" class="empty">Không có số liệu ${dayLbl}.</td></tr>`}</tbody></table></div></section>
-  <section class="card"><div class="card-h"><h2>Theo người chạy · ${dayLbl}</h2></div>${tbl(["Người chạy","Chi Ads","Data","Đơn","Doanh số","Chi/đơn","% CP/DS","ROAS"],[people])}</section>`;
+  ${ADL.who?"":`<section class="card flush"><div class="card-h pad"><h2>So sánh người chạy · ${dayLbl}</h2></div><div class="tbl"><table><thead><tr><th>Người chạy</th>${HEAD.replace(/^.*?<th>Mã · sản phẩm<\/th>/,"").replace("</tr></thead>","")}</tr></thead><tbody>${people}</tbody></table></div></section>`}
+  <p class="hint">Bấm một mã để xem từng ngày như trong file báo cáo.</p>
+  ${D_.who.filter(w=>!ADL.who||w===ADL.who).map(section).join("")}`;
   $("#adl-w").onchange=e=>{ADL.who=e.target.value;renderMain()};
   $("#adl-d").onchange=e=>{ADL.day=e.target.value;renderMain()};
   m.querySelectorAll("[data-adlo]").forEach(r=>r.onclick=()=>{ADL.open=ADL.open===r.dataset.adlo?"":r.dataset.adlo;renderMain()});
