@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { nowIso } from '@shared/datetime';
 import type { AppEnv } from '../env';
+import { pack, unpack } from '../lib/pack';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
 import type { AuthContext } from '../env';
@@ -16,7 +17,7 @@ export const hubRoutes = new Hono<AppEnv>();
 const STATE_ID = 'main';
 const MAX_JSON = 8 * 1024 * 1024; // 8 MB JSON gốc (nén xong còn khoảng 1/8)
 const SECURE_ID = 'secure';
-const BLOB_KEYS = ['t9file', 't9', 'kd', 'kd_ads', 'kd_sale', 'skucost', 'nhansu0'] as const;
+const BLOB_KEYS = ['t9file', 't9', 'kd', 'kd_ads', 'kd_sale', 'skucost', 'nhansu0', 'ads_live'] as const;
 /**
  * Phần dữ liệu tài chính (giá vốn SKU, chi phí tháng, mục tiêu doanh số) tách sang bản ghi riêng:
  * chỉ CEO và kế toán (quyền xem công nợ toàn công ty) đọc/ghi được; người khác không nhận về,
@@ -32,22 +33,6 @@ function splitSecure(data: Record<string, unknown>) {
     delete data[k];
   }
   return secure;
-}
-
-async function pack(json: string): Promise<string> {
-  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
-  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-
-async function unpack(b64: string): Promise<string> {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return new Response(stream).text();
 }
 
 const isHubAdmin = (role: string) => role === 'CEO';
@@ -178,7 +163,7 @@ hubRoutes.get('/blob/:key', async (c) => {
   // Số liệu riêng tư (doanh thu đầy đủ, giá vốn, danh sách nhân sự): chỉ CEO và kế toán.
   const auth = c.get('auth');
   if (row.admin_only && !canSecret(auth)) throw forbidden();
-  await auditStatement(c.env.DB, {
+  if (key !== 'ads_live') await auditStatement(c.env.DB, {
     actorId: auth.user.id,
     action: 'HUB_READ',
     entityType: 'HUB_BLOB',

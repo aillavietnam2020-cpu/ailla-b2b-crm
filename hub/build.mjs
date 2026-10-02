@@ -16,7 +16,7 @@ const OUT = path.resolve(ROOT, '..', 'src', 'server', 'hub', 'hub.html');
 
 const JS_ORDER = [
   'core.js', 'app.js', 'phanbo.js', 'setup.js', 'giaoviec.js', 'kinhdoanh.js', 'exec.js', 'period.js',
-  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'winhub.js', 'bots.js', 'claude.js', 'ai.js', 'server.js',
+  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'winhub.js', 'adsday.js', 'bots.js', 'claude.js', 'ai.js', 'server.js',
 ];
 
 const read = (f) => readFileSync(path.join(SRC, f), 'utf8');

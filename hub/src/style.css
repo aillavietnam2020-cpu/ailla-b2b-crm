@@ -359,3 +359,4 @@ tr.chg-row td{background:#fff7fb}.t-pink{color:#c2185b}.aibox{border:1.5px solid
 .sxtabs .cnt{background:#e7357b;color:#fff;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:4px}
 @media (max-width:760px){.aibtn span{display:none}}
 .settabs{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px}.settabs button{border:1px solid var(--line);background:#fff;font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;cursor:pointer;color:#495057}.settabs button.on{background:#1f2937;color:#fff;border-color:#1f2937}
+tr.clk{cursor:pointer}tr.clk:hover td{background:#fdf6f9}tr.clk.on td{background:#fdf0f5}tr.sub>td{background:#fafafa;padding:8px}.adl-days{overflow-x:auto}.adl-days table{font-size:12.5px}.adl-days th,.adl-days td{white-space:nowrap;padding:5px 8px}

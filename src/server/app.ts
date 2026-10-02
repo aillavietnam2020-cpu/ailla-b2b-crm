@@ -6,6 +6,7 @@ import { authMiddleware, optionalAuthMiddleware } from './middleware/auth';
 import { auth } from './routes/auth';
 import { userRoutes } from './routes/users';
 import { backupRoutes } from './routes/backup';
+import { ingestRoutes } from './routes/ingest';
 import { coreRoutes } from './routes/core';
 import { customerRoutes, taskRoutes } from './routes/customers';
 import { catalogRoutes } from './routes/catalog';
@@ -63,6 +64,7 @@ export function createApp() {
   // Worker dựng video (máy văn phòng) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/worker', workerRoutes);
   app.route('/api/backup', backupRoutes);
+  app.route('/api/ingest', ingestRoutes);
 
   // Mọi endpoint /api còn lại đều phải qua xác thực + RBAC ở backend.
   app.use('/api/*', authMiddleware);

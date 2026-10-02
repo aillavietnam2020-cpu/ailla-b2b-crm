@@ -70,14 +70,14 @@ const PAGE_SETS=[
   {n:"Tổng quan",ids:["hieuqua","baocao"],labels:["Hiệu quả tháng","Nhập số liệu"]},
   {n:"Kế hoạch tháng",ids:["kehoach","dieuchinh","research"],labels:["Kế hoạch","Điều chỉnh","Research & insight"]},
   {n:"Lịch đăng",ids:["lich","phanbo"],labels:["Lịch content","Phân bổ video kho"]},
-  {n:"Quảng cáo",ids:["adshieuqua","adssp","fb_ads","order"],labels:["Hiệu quả Ads","Theo sản phẩm","Chi theo ngày","Order video"]}];
+  {n:"Quảng cáo",ids:["adshieuqua","adssp","fb_ads","order"],labels:["Hiệu quả Ads","Theo sản phẩm","Báo cáo theo ngày","Order video"]}];
 const setOf=id=>PAGE_SETS.find(x=>x.ids.includes(id));
 /* Gộp các trang cùng nhóm thành một dòng: giữ trang đầu tiên được xem, đổi tên thành tên nhóm, ẩn các trang còn lại. */
 function collapseSets(items){const seen=new Set();return items.filter(i=>{const st=setOf(i[0]);if(!st)return true;if(seen.has(st))return false;seen.add(st);return true}).map(i=>{const st=setOf(i[0]);return st?[i[0],st.n,i[2],i[3],st]:i})}
 const ADM_ITEM=(k,n)=>{const i=MENU_ADMIN.flatMap(g=>g[1]).find(x=>x[0]===k);return i?[i[0],n||i[1],i[2],i[3]]:null};
 const MKT_G=()=>[["",[ADM_ITEM("hieuqua"),ADM_ITEM("baocao"),ADM_ITEM("kehoach"),MI("dieuchinh","Điều chỉnh kế hoạch",u=>can(u,"kehoach.xem"),()=>(D().adjusts||[]).filter(a=>a.st==="pending").length||""),ADM_ITEM("research"),
    ADM_ITEM("lich"),(i=>i&&[i[0],i[1],i[2]])(ADM_ITEM("phanbo")),ADM_ITEM("win","Video win"),ADM_ITEM("kho","Kho video"),
-   MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("fb_ads","Chi Ads theo ngày",tq),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||""),
+   MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("fb_ads","Báo cáo Ads theo ngày",tq),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||""),
    MI("bc_koc","KOC / Affiliate",tq)].filter(Boolean)]];
 /* Menu: 8 mục lớn. "hide" = không hiện ở thanh bên (Trợ lý AI ở nút trên cùng, mục Của tôi ở chỗ bấm vào tên).
    "tabs" = các trang con hiện thành thanh tab trong trang, thanh bên chỉ còn một dòng. */

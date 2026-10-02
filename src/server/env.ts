@@ -23,6 +23,8 @@ export interface Env {
   CF_ACCESS_TOKEN?: string;
   /** Khoá cho máy văn phòng tải bản sao lưu mỗi đêm (/api/backup). */
   BACKUP_KEY?: string;
+  /** Khoá VPS đẩy số liệu (file báo cáo Digital) lên /api/ingest. */
+  INGEST_KEY?: string;
 }
 
 export interface AuthUser {
