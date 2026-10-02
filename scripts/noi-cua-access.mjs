@@ -78,7 +78,13 @@ function putSecret(name, value) {
 // Lấy mã từ bộ nhớ copy (chị bấm nút Copy trên Cloudflare là đủ, không cần dán vào cửa sổ đen).
 function fromClipboard() {
   const r = spawnSync('powershell', ['-NoProfile', '-Command', 'Get-Clipboard -Raw'], { encoding: 'utf8' });
-  return String(r.stdout || '').replace(/[^A-Za-z0-9_-]/g, '');
+  const raw = String(r.stdout || '');
+  // Copy nhầm cả dòng lệnh thử (curl ... Bearer <mã>) thì lấy đúng phần sau "Bearer".
+  const bearer = /Bearer\s+([A-Za-z0-9_-]{30,})/.exec(raw);
+  if (bearer) return bearer[1];
+  // Còn lại: lấy đoạn liền dài nhất trông giống mã khoá.
+  const runs = raw.match(/[A-Za-z0-9_-]{30,}/g) || [];
+  return runs.sort((x, y) => y.length - x.length)[0] || '';
 }
 let token = fromClipboard();
 if (token.length >= 30) {
