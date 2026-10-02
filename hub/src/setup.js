@@ -62,18 +62,30 @@ function ensureShape(d){
 /* ---------- Phân hệ ---------- */
 const MI=(k,t,p,c)=>[k,t,p||(()=>true),c];
 const tq=u=>can(u,"tongquan.xem");
-const MKT_G=()=>{const all=MENU_ADMIN.filter(g=>g[0]!=="Hệ thống").flatMap(g=>g[1]),pick=(k,n)=>{const i=all.find(x=>x[0]===k);return i?(n?[i[0],n,i[2],i[3]]:i):null},P=(...a)=>a.filter(Boolean);return [
-   ["Kế hoạch",P(pick("hieuqua"),pick("kehoach","Kế hoạch tháng"),MI("dieuchinh","Điều chỉnh kế hoạch",u=>can(u,"kehoach.xem"),()=>(D().adjusts||[]).filter(a=>a.st==="pending").length||""),pick("baocao","Nhập số liệu"))],
-   ["Nội dung",P(pick("cv","Cần xử lý"),pick("lich"),pick("congviec"),pick("phanbo"),pick("giaoviec","Lịch quay"))],
-   ["Video",P(pick("win","Video win"),pick("research"),pick("kho","Kho video"))],
-   ["Quảng cáo & KOC",[MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("fb_ads","Chi Ads theo ngày",tq),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||""),MI("bc_koc","KOC / Affiliate",tq)]]]};
+/* Nhóm trang: một dòng ở thanh bên (hoặc một tab), bấm vào có hàng nút chuyển giữa các trang trong nhóm.
+   Dòng ở thanh bên lấy tên nhóm và trỏ tới trang đầu tiên người đó được xem. */
+const PAGE_SETS=[
+  {n:"Bảng tiến độ",ids:["cv_kb","congviec"],labels:["Tất cả việc","Theo bước video"]},
+  {n:"Lịch",ids:["cv_lich","giaoviec"],labels:["Lịch việc","Lịch quay"]},
+  {n:"Tổng quan",ids:["hieuqua","baocao"],labels:["Hiệu quả tháng","Nhập số liệu"]},
+  {n:"Kế hoạch tháng",ids:["kehoach","dieuchinh","research"],labels:["Kế hoạch","Điều chỉnh","Research & insight"]},
+  {n:"Lịch đăng",ids:["lich","phanbo"],labels:["Lịch content","Phân bổ video kho"]},
+  {n:"Quảng cáo",ids:["adshieuqua","adssp","fb_ads","order"],labels:["Hiệu quả Ads","Theo sản phẩm","Chi theo ngày","Order video"]}];
+const setOf=id=>PAGE_SETS.find(x=>x.ids.includes(id));
+/* Gộp các trang cùng nhóm thành một dòng: giữ trang đầu tiên được xem, đổi tên thành tên nhóm, ẩn các trang còn lại. */
+function collapseSets(items){const seen=new Set();return items.filter(i=>{const st=setOf(i[0]);if(!st)return true;if(seen.has(st))return false;seen.add(st);return true}).map(i=>{const st=setOf(i[0]);return st?[i[0],st.n,i[2],i[3],st]:i})}
+const ADM_ITEM=(k,n)=>{const i=MENU_ADMIN.flatMap(g=>g[1]).find(x=>x[0]===k);return i?[i[0],n||i[1],i[2],i[3]]:null};
+const MKT_G=()=>[["",[ADM_ITEM("hieuqua"),ADM_ITEM("baocao"),ADM_ITEM("kehoach"),MI("dieuchinh","Điều chỉnh kế hoạch",u=>can(u,"kehoach.xem"),()=>(D().adjusts||[]).filter(a=>a.st==="pending").length||""),ADM_ITEM("research"),
+   ADM_ITEM("lich"),(i=>i&&[i[0],i[1],i[2]])(ADM_ITEM("phanbo")),ADM_ITEM("win","Video win"),ADM_ITEM("kho","Kho video"),
+   MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("fb_ads","Chi Ads theo ngày",tq),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||""),
+   MI("bc_koc","KOC / Affiliate",tq)].filter(Boolean)]];
 /* Menu: 8 mục lớn. "hide" = không hiện ở thanh bên (Trợ lý AI ở nút trên cùng, mục Của tôi ở chỗ bấm vào tên).
    "tabs" = các trang con hiện thành thanh tab trong trang, thanh bên chỉ còn một dòng. */
 const MODULES=[
  {k:"exec",zone:"",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
- {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_tq","Tổng quan"),MI("cv_nv","Task",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),MI("cv_kb","Bảng tiến độ"),MI("cv_lich","Lịch"),MI("cv_mt","Mục tiêu"),MI("cv_da","Dự án")]]]},
+ {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_tq","Tổng quan"),MI("cv_nv","Task",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),ADM_ITEM("cv","Cần duyệt"),MI("cv_kb","Bảng tiến độ"),ADM_ITEM("congviec"),MI("cv_lich","Lịch"),ADM_ITEM("giaoviec"),MI("cv_mt","Mục tiêu"),MI("cv_da","Dự án")].filter(Boolean)]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
- {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("matkhau","Đổi mật khẩu")]]]},
+ {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("matkhau","Đổi mật khẩu")]]]},
  {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Bán hàng B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
    ["Báo cáo kênh",[MI("bc_tong","Tổng quan kênh",tq),MI("bc_tiktok","TikTok Shop",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq)]],
    ["Facebook",[MI("fb_sale","Sale B2C",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
@@ -98,7 +110,10 @@ let MOD="";
 const modGroups=mo=>mo.groups().map(([g,items])=>[g,items.filter(i=>i[2](ME))]).filter(g=>g[1].length);
 const visibleMods=()=>MODULES.filter(mo=>modGroups(mo).length);
 /* Thanh tab trong trang cho phân hệ dạng tab (Sản xuất có thanh riêng). */
-function modTabs(m){if(APP_MODE!=="admin")return;const mo=curMod();if(!mo||!mo.tabs||mo.k==="sx")return;const its=modGroups(mo).flatMap(g=>g[1]);if(its.length<2)return;const nav=document.createElement("nav");nav.className="sxtabs";nav.innerHTML=its.map(([id,t,,cnt])=>{const n=cnt?cnt():"";return `<button class="${id===PAGE?"on":""}" data-mt="${id}">${t}${n!==""&&n!==0?` <b class="cnt">${n}</b>`:""}</button>`}).join("");const ph=m.querySelector(".ph");if(ph)ph.after(nav);else m.prepend(nav);nav.querySelectorAll("[data-mt]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.mt;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)})}
+function modTabs(m){if(APP_MODE!=="admin")return;const mo=curMod();if(!mo)return;const all=modGroups(mo).flatMap(g=>g[1]),ph=m.querySelector(".ph"),put=el=>{const t=m.querySelector(":scope > nav.sxtabs");if(t)t.after(el);else if(ph)ph.after(el);else m.prepend(el)};
+  if(mo.tabs&&mo.k!=="sx"){const its=collapseSets(all);if(its.length>1){const nav=document.createElement("nav");nav.className="sxtabs";nav.innerHTML=its.map(([id,t,,cnt,st])=>{const n=cnt?cnt():"",on=id===PAGE||(st&&st.ids.includes(PAGE));return `<button class="${on?"on":""}" data-mt="${id}">${t}${n!==""&&n!==0?` <b class="cnt">${n}</b>`:""}</button>`}).join("");put(nav)}}
+  const st=setOf(PAGE);if(st){const ok=st.ids.filter(id=>all.some(i=>i[0]===id));if(ok.length>1){const nav=document.createElement("nav");nav.className="settabs";nav.innerHTML=ok.map(id=>`<button class="${id===PAGE?"on":""}" data-mt="${id}">${st.labels[st.ids.indexOf(id)]}</button>`).join("");put(nav)}}
+  m.querySelectorAll("[data-mt]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.mt;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)})}
 
 /* ---------- P&L (khung) ---------- */
 function pPL(m){

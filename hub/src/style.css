@@ -358,3 +358,4 @@ tr.chg-row td{background:#fff7fb}.t-pink{color:#c2185b}.aibox{border:1.5px solid
 .aibtn{display:flex;align-items:center;gap:6px;border:1px solid #f3c1d5;background:#fff5f9;color:#c2185b;border-radius:999px;padding:7px 12px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap}.aibtn svg{width:16px;height:16px}.aibtn:hover{background:#fde4ee}
 .sxtabs .cnt{background:#e7357b;color:#fff;border-radius:999px;font-size:11px;padding:1px 6px;margin-left:4px}
 @media (max-width:760px){.aibtn span{display:none}}
+.settabs{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px}.settabs button{border:1px solid var(--line);background:#fff;font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;cursor:pointer;color:#495057}.settabs button.on{background:#1f2937;color:#fff;border-color:#1f2937}
