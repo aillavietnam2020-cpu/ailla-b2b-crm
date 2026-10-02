@@ -106,9 +106,10 @@
       // `ailla-crm-files-prod` rồi bỏ dấu chú thích dòng dưới để lưu file import vào R2.
       // "r2_buckets": [{ "binding": "FILES", "bucket_name": "ailla-crm-files-prod" }],
       "triggers": { "crons": ["0 * * * *"] }
-      // Khi ailla.vn đã được thêm vào Cloudflare, bỏ chú thích dòng dưới để dùng crm.ailla.vn
-      // (đây cũng là điều kiện bắt buộc để bật Cloudflare Access bảo vệ hệ thống).
-      // ,"routes": [{ "pattern": "crm.ailla.vn", "custom_domain": true }]
+      // Ailla Hub chạy ở qt.ailla.vn (ailla.vn đã ở Cloudflare từ 02/10/2026). Địa chỉ workers.dev vẫn dùng được.
+      ,"routes": [{ "pattern": "qt.ailla.vn", "custom_domain": true }],
+      // Giữ địa chỉ cũ ailla-b2b-crm.aillavietnam2020.workers.dev cho người đã lưu link.
+      "workers_dev": true
     }
   }
 }

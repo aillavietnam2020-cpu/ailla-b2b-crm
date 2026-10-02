@@ -33,12 +33,19 @@ export function App() {
   // Tài khoản vừa được cấp mật khẩu: bắt đổi trước khi vào hệ thống.
   if (mustChangePassword) return <ChangePasswordPage forced />;
 
-  // Đăng nhập từ khu Marketing (/hub/) thì quay lại đúng chỗ; tài khoản "chỉ Marketing" luôn về /hub/.
+  // Ailla Hub (/hub/) là cửa vào chung: ai có quyền thì đăng nhập xong vào thẳng Hub, CRM B2B là một
+  // phân hệ bên trong. Tài khoản "chỉ Marketing" chỉ được ở lại CRM để đổi mật khẩu.
   const next = new URLSearchParams(location.search).get('next');
-  const hubOnly = !me.permissions.includes('price.read') && me.permissions.includes('hub.access');
-  if (hubOnly || (next && /^\/hub\/[\w\-./?=&#]*$/.test(next) && me.permissions.includes('hub.access'))) {
+  const hasHub = me.permissions.includes('hub.access');
+  const hubOnly = !me.permissions.includes('price.read') && hasHub;
+  const goHub =
+    hasHub &&
+    ((next && /^\/hub\/[\w\-./?=&#]*$/.test(next)) ||
+      location.pathname === '/' ||
+      (hubOnly && !location.pathname.endsWith('/account')));
+  if (goHub) {
     window.location.replace(next && next.startsWith('/hub/') ? next : '/hub/');
-    return <div className="loading" style={{ paddingTop: 80 }}>Đang mở khu Marketing…</div>;
+    return <div className="loading" style={{ paddingTop: 80 }}>Đang mở Ailla Hub…</div>;
   }
 
   const isAdminSpace = me.user.role === 'MANAGER' || me.user.role === 'CEO';

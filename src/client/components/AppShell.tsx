@@ -117,9 +117,9 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
         )}
         {me?.permissions.includes('hub.access') && (
           <>
-            <div className="nav-label">Khu khác</div>
+            <div className="nav-label">Ailla Hub</div>
             <nav className="nav">
-              <a href="/hub/">Marketing & công việc</a>
+              <a href="/hub/">← Về Ailla Hub</a>
             </nav>
           </>
         )}

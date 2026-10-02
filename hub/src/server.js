@@ -96,7 +96,7 @@ DB.reset=async function(){toast("Bản trên máy chủ không xoá về dữ li
 function renderLogin(){
   const msg=!DB.data?"Khu Marketing chưa được khởi tạo. Nhờ chị Hoa (CEO) mở trang này một lần để tạo dữ liệu ban đầu."
     :`Tài khoản <b>${esc(SV.me?SV.me.display_name:"")}</b> chưa được gắn với nhân sự nào trong khu Marketing. Nhờ chị Hoa vào <b>Quản trị hệ thống › Tài khoản & phân quyền</b> để gắn.`;
-  $("#app").innerHTML=`<div class="loginwrap"><div class="login"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>Ailla Hub</h1><p>${msg}</p><div class="acts"><a class="btn" href="/">Về CRM B2B</a><button class="btn" id="svout">Đăng xuất</button></div></div></div>`;
+  $("#app").innerHTML=`<div class="loginwrap"><div class="login"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>Ailla Hub</h1><p>${msg}</p><div class="acts">${SV.perms.includes("price.read")?`<a class="btn" href="/admin">Mở CRM B2B</a>`:""}<button class="btn" id="svout">Đăng xuất</button></div></div></div>`;
   $("#svout").onclick=svLogout;
 }
 async function svLogout(){try{await fetch("/api/auth/logout",{method:"POST",credentials:"same-origin"})}catch(e){}location.href="/"}
@@ -106,7 +106,7 @@ async function svLogout(){try{await fetch("/api/auth/logout",{method:"POST",cred
 for(const k of ["exec","b2c","b2b","sx","fin","hr"]){const i=MODULES.findIndex(m=>m.k===k);if(i>=0)MODULES.splice(i,1)}
 MODULES.splice(1,0,{k:"b2blink",zone:"Kinh doanh",ic:"box",n:"Kinh doanh B2B (CRM)",sub:"",groups:()=>[["",[MI("crmgo","Mở CRM B2B",()=>SV.perms.includes("price.read"))]]]});
 {const i=MENU_USER.findIndex(g=>g[0]==="Nhân sự của tôi");if(i>=0)MENU_USER.splice(i,1)}
-PAGES.crmgo=m=>{m.innerHTML=H("Đang mở CRM B2B…");location.href="/"};
+PAGES.crmgo=m=>{m.innerHTML=H("Đang mở CRM B2B…");location.href=SV.me&&SV.me.role!=="EMPLOYEE"?(SV.me.role==="CEO"?"/admin/ceo":"/admin"):"/sales"};
 PAGES.matkhau=m=>{const p=SV.me&&SV.me.role!=="EMPLOYEE"?"/admin/account":"/sales/account";m.innerHTML=H("Đổi mật khẩu","Dùng chung mật khẩu với CRM")+`<section class="card narrow"><p>Mật khẩu đăng nhập dùng chung cho CRM và khu Marketing.</p><div class="acts"><a class="btn pri" href="${p}">Đổi mật khẩu</a></div></section>`};
 
 const _pCaiDat=pCaiDat;
