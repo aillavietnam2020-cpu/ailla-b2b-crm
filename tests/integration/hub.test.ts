@@ -192,3 +192,44 @@ describe('Hàng việc gửi Worker dựng video', () => {
     expect(list.body.data[0]).toMatchObject({ id, status: 'review', worker_job: 'WIN-002', result: { variants: [{ id: 'V1' }] } });
   });
 });
+
+describe('Cửa qt.ailla.vn tự cập nhật theo tài khoản', () => {
+  it('thêm tài khoản thì gửi đủ email đang hoạt động; khoá thì rút ra; chưa cấu hình thì bỏ qua', async () => {
+    const off = await ctx.request('/api/admin/users/access-sync', { as: USERS.ceo });
+    expect(off.body.data.configured).toBe(false);
+
+    Object.assign(ctx.env, { CF_ACCOUNT_ID: 'acc', ACCESS_APP_ID: 'app', ACCESS_POLICY_ID: 'pol', CF_ACCESS_TOKEN: 'tok' });
+    const calls: { url: string; emails: string[] }[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      calls.push({ url, emails: body.include.map((x: { email: { email: string } }) => x.email.email) });
+      return new Response('{"success":true}', { status: 200 });
+    }) as typeof fetch;
+    try {
+      const created = await ctx.request('/api/admin/users', {
+        as: USERS.ceo,
+        body: { email: 'Moi@Ailla.vn', display_name: 'Nhân sự mới', role: 'EMPLOYEE', password: 'abc12345' },
+      });
+      expect(created.status).toBe(201);
+      expect(created.body.data.access.ok).toBe(true);
+      expect(calls[0].url).toBe('https://api.cloudflare.com/client/v4/accounts/acc/access/apps/app/policies/pol');
+      expect(calls[0].emails).toContain('moi@ailla.vn');
+      expect(calls[0].emails).toContain(USERS.ceo.toLowerCase());
+
+      const lock = await ctx.request(`/api/admin/users/${created.body.data.id}`, {
+        as: USERS.ceo,
+        method: 'PATCH',
+        body: { status: 'DISABLED' },
+      });
+      expect(lock.body.data.access.ok).toBe(true);
+      expect(calls[1].emails).not.toContain('moi@ailla.vn');
+
+      // Nhân viên không tự đồng bộ được.
+      const staff = await ctx.request('/api/admin/users/access-sync', { as: USERS.thao, method: 'POST' });
+      expect(staff.status).toBe(403);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+});

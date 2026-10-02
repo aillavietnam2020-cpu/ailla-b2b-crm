@@ -16,6 +16,11 @@ export interface Env {
   AI_MODEL?: string;
   /** Khoá riêng cho Worker dựng video (máy văn phòng) gọi /api/worker/*. Đặt bằng `wrangler secret put`. */
   WORKER_KEY?: string;
+  /** Tự cập nhật danh sách email được vào qt.ailla.vn (Cloudflare Access). CF_ACCESS_TOKEN là secret. */
+  CF_ACCOUNT_ID?: string;
+  ACCESS_APP_ID?: string;
+  ACCESS_POLICY_ID?: string;
+  CF_ACCESS_TOKEN?: string;
 }
 
 export interface AuthUser {

@@ -5,6 +5,7 @@ import { ROLES } from '@shared/enums';
 import { ACCOUNTANT_PERMISSIONS, HUB_ONLY } from '@shared/permissions';
 import { zodFieldErrors } from '@shared/schemas';
 import type { AppEnv } from '../env';
+import { syncAccessEmails } from '../lib/access-sync';
 import { auditStatement } from '../lib/audit';
 import { badRequest, forbidden, notFound, unprocessable } from '../lib/http';
 import { newId } from '../lib/ids';
@@ -111,7 +112,9 @@ userRoutes.post('/', requirePermission('user.manage'), async (c) => {
     }),
   ]);
 
-  return c.json({ data: { id }, request_id: c.get('requestId') }, 201);
+  // Mở cửa qt.ailla.vn cho email mới (Cloudflare Access).
+  const access = await syncAccessEmails(c.env).catch(() => ({ ok: false, error: 'lỗi mạng' }));
+  return c.json({ data: { id, access }, request_id: c.get('requestId') }, 201);
 });
 
 /**
@@ -134,12 +137,16 @@ userRoutes.post('/:id/accountant', requirePermission('user.manage'), async (c) =
 
   const now = nowIso();
   const statements = enabled
-    ? ACCOUNTANT_PERMISSIONS.map((permission) =>
-        c.env.DB.prepare(
-          `INSERT INTO user_permissions (user_id, permission, granted_by, created_at)
-           VALUES (?, ?, ?, ?) ON CONFLICT (user_id, permission) DO NOTHING`,
-        ).bind(id, permission, auth.user.id, now),
-      )
+    ? [
+        ...ACCOUNTANT_PERMISSIONS.map((permission) =>
+          c.env.DB.prepare(
+            `INSERT INTO user_permissions (user_id, permission, granted_by, created_at)
+             VALUES (?, ?, ?, ?) ON CONFLICT (user_id, permission) DO NOTHING`,
+          ).bind(id, permission, auth.user.id, now),
+        ),
+        // Kế toán cần vào CRM B2B (xác nhận tiền về): bỏ dấu "Chỉ Marketing" nếu có, không thì quyền kế toán vô tác dụng.
+        c.env.DB.prepare('DELETE FROM user_permissions WHERE user_id = ? AND permission = ?').bind(id, HUB_ONLY),
+      ]
     : [
         c.env.DB.prepare(
           `DELETE FROM user_permissions WHERE user_id = ? AND permission IN (${ACCOUNTANT_PERMISSIONS.map(
@@ -261,8 +268,13 @@ userRoutes.patch('/:id', requirePermission('user.manage'), async (c) => {
 
   // Khoá tài khoản thì đá mọi phiên đang đăng nhập ra ngay.
   if (parsed.data.status === 'DISABLED') await revokeAllSessions(c.env.DB, id);
+  // Khoá / mở lại tài khoản thì rút / thêm email ở cửa qt.ailla.vn.
+  const access =
+    parsed.data.status && parsed.data.status !== target.status
+      ? await syncAccessEmails(c.env).catch(() => ({ ok: false, error: 'lỗi mạng' }))
+      : undefined;
 
-  return c.json({ data: { ok: true }, request_id: c.get('requestId') });
+  return c.json({ data: { ok: true, access }, request_id: c.get('requestId') });
 });
 
 /** Đặt lại mật khẩu cho nhân sự. Người được cấp phải đổi lại ở lần đăng nhập kế tiếp. */
@@ -304,4 +316,14 @@ userRoutes.post('/:id/set-password', requirePermission('user.manage'), async (c)
   await revokeAllSessions(c.env.DB, id);
 
   return c.json({ data: { ok: true }, request_id: c.get('requestId') });
+});
+
+/** Tình trạng cửa qt.ailla.vn và đồng bộ lại bằng tay. */
+userRoutes.get('/access-sync', requirePermission('user.manage'), async (c) => {
+  const configured = Boolean(c.env.CF_ACCESS_TOKEN && c.env.CF_ACCOUNT_ID && c.env.ACCESS_POLICY_ID);
+  return c.json({ data: { configured }, request_id: c.get('requestId') });
+});
+userRoutes.post('/access-sync', requirePermission('user.manage'), async (c) => {
+  const access = await syncAccessEmails(c.env).catch(() => ({ ok: false, error: 'lỗi mạng' }));
+  return c.json({ data: access, request_id: c.get('requestId') });
 });
