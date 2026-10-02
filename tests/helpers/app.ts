@@ -22,6 +22,8 @@ export interface TestResponseBody {
 export interface TestContext {
   db: TestD1;
   env: Env;
+  /** Gọi thẳng ứng dụng khi cần header riêng (ví dụ khoá Worker). */
+  app: ReturnType<typeof createApp>;
   request: (
     path: string,
     options?: {
@@ -100,7 +102,7 @@ export function createTestContext(): TestContext {
     };
   };
 
-  return { db, env, request };
+  return { db, env, app, request };
 }
 
 /** Bộ dữ liệu tối thiểu: 1 sản phẩm đủ giá, 1 sản phẩm thiếu giá bán lẻ, 3 khách. */

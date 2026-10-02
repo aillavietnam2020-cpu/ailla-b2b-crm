@@ -71,8 +71,8 @@ function svNotify(a,b){if(!ME||!a.kiem)return;const neu=k=>(b[k]||[]).filter(x=>
   if(can(ME,"sx.kiemke"))neu("kiem").forEach(id=>{const x=s.batches.find(y=>y.id===id);if(x)msg.push(`Xưởng vừa báo xong ${sxP(x.sp).ten}: ${nf(x.baoSL)} · chờ kiểm kê`)});
   if(can(ME,"sx.xuong"))neu("req").forEach(id=>{const x=s.requests.find(y=>y.id===id);if(x)msg.push(`Nhu cầu mới: ${sxP(x.sp).ten}${x.sl?" · "+nf(x.sl):""}${x.uu==="Gấp"?" · GẤP":""}`)});
   neu("task").forEach(id=>{const t=D().tasks.find(y=>y.id===id);if(t)msg.push("Việc mới giao cho bạn: "+t.ten)});
-  if(!msg.length)return;toast(msg.join(" · "));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Ailla Hub",{body:msg.join(" · ")})}catch(e){}
-  document.title="("+msg.length+") Ailla Hub";setTimeout(()=>{document.title="Ailla Hub"},15000)}
+  if(!msg.length)return;toast(msg.join(" · "));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join(" · ")})}catch(e){}
+  document.title="("+msg.length+") Trang quản trị Ailla";setTimeout(()=>{document.title="Trang quản trị Ailla"},15000)}
 DB.load=async function(){
   const me=await svApi("/api/me");SV.me=me.user;SV.perms=me.permissions||[];
   const blob=k=>svApi("/api/hub/blob/"+k).catch(()=>null);
@@ -120,7 +120,7 @@ DB.reset=async function(){toast("Bản trên máy chủ không xoá về dữ li
 function renderLogin(){
   const msg=!DB.data?"Khu Marketing chưa được khởi tạo. Nhờ chị Hoa (CEO) mở trang này một lần để tạo dữ liệu ban đầu."
     :`Tài khoản <b>${esc(SV.me?SV.me.display_name:"")}</b> chưa được gắn với nhân sự nào trong khu Marketing. Nhờ chị Hoa vào <b>Quản trị hệ thống › Tài khoản & phân quyền</b> để gắn.`;
-  $("#app").innerHTML=`<div class="loginwrap"><div class="login"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>Ailla Hub</h1><p>${msg}</p><div class="acts">${SV.perms.includes("price.read")?`<a class="btn" href="/admin">Mở CRM B2B</a>`:""}<button class="btn" id="svout">Đăng xuất</button></div></div></div>`;
+  $("#app").innerHTML=`<div class="loginwrap"><div class="login"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>Trang quản trị Ailla</h1><p>${msg}</p><div class="acts">${SV.perms.includes("price.read")?`<a class="btn" href="/admin">Mở CRM B2B</a>`:""}<button class="btn" id="svout">Đăng xuất</button></div></div></div>`;
   $("#svout").onclick=svLogout;
 }
 async function svLogout(){try{await fetch("/api/auth/logout",{method:"POST",credentials:"same-origin"})}catch(e){}location.href="/"}

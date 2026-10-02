@@ -13,6 +13,7 @@ import { financeRoutes } from './routes/finance';
 import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
+import { hubWorkerRoutes, workerRoutes } from './routes/worker';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -58,6 +59,9 @@ export function createApp() {
   app.use('/api/auth/*', optionalAuthMiddleware);
   app.route('/api/auth', auth);
 
+  // Worker dựng video (máy văn phòng) tự gọi bằng khoá riêng, không có phiên đăng nhập.
+  app.route('/api/worker', workerRoutes);
+
   // Mọi endpoint /api còn lại đều phải qua xác thực + RBAC ở backend.
   app.use('/api/*', authMiddleware);
 
@@ -71,6 +75,7 @@ export function createApp() {
   app.route('/api', financeRoutes);
   app.route('/api/imports', importRoutes);
   app.route('/api/dashboards', dashboardRoutes);
+  app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub', hubRoutes);
 
   app.notFound((c) =>

@@ -150,3 +150,45 @@ describe('Kho Sản xuất trừ tồn theo đơn B2B', () => {
     expect(res.body.data[0].applied_price).toBeUndefined();
   });
 });
+
+describe('Hàng việc gửi Worker dựng video', () => {
+  it('trang quản trị tạo việc, Worker lấy bằng khoá riêng và gửi kết quả lên', async () => {
+    ctx.env.WORKER_KEY = 'khoa-thu-worker-1234567890';
+    const create = await ctx.request('/api/hub/worker-tasks', {
+      as: USERS.ceo,
+      body: { kind: 'win_analyze', ref: 'VW-1', payload: { link: 'https://www.tiktok.com/@a/video/1', sku: 'tinh-dau-giat-say', variants: 5 } },
+    });
+    expect(create.status).toBe(200);
+    const id = create.body.data.id;
+
+    // Không có khoá hoặc sai khoá: bị chặn.
+    expect((await ctx.request('/api/worker/pull', { body: {} })).status).toBe(401);
+
+    const pull = async () => {
+      const res = await ctx.app.fetch(
+        new Request('http://localhost/api/worker/pull', { method: 'POST', headers: { 'X-Worker-Key': 'khoa-thu-worker-1234567890' } }),
+        ctx.env,
+        { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext,
+      );
+      return { status: res.status, body: (await res.json()) as { data: Array<{ id: string; payload: { sku: string } }> } };
+    };
+    const first = await pull();
+    expect(first.status).toBe(200);
+    expect(first.body.data.map((t) => t.id)).toEqual([id]);
+    expect(first.body.data[0].payload.sku).toBe('tinh-dau-giat-say');
+    expect((await pull()).body.data).toEqual([]); // đã nhận thì không trả lại lần nữa
+
+    const push = await ctx.app.fetch(
+      new Request('http://localhost/api/worker/push', {
+        method: 'POST',
+        headers: { 'X-Worker-Key': 'khoa-thu-worker-1234567890', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'review', worker_job: 'WIN-002', result: { variants: [{ id: 'V1' }] } }),
+      }),
+      ctx.env,
+      { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext,
+    );
+    expect(push.status).toBe(200);
+    const list = await ctx.request('/api/hub/worker-tasks', { as: USERS.ceo });
+    expect(list.body.data[0]).toMatchObject({ id, status: 'review', worker_job: 'WIN-002', result: { variants: [{ id: 'V1' }] } });
+  });
+});

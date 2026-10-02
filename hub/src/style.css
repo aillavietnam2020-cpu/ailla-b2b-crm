@@ -350,3 +350,7 @@ tr.chg-row td{background:#fff7fb}.t-pink{color:#c2185b}.aibox{border:1.5px solid
 @media print{#sxprint .lbl{font-size:3.2mm}#sxprint .lbl-r{width:34%}#sxprint .lbl-r svg{width:100%;height:auto}#sxprint .lbl-sp{font-size:4mm}#sxprint .lbl-big,#sxprint .lbl-sl{font-size:4.6mm}#sxprint .lbl-l img{height:8mm}}
 .parow{align-items:flex-end;gap:8px}.parow .btn{margin-bottom:6px}
 .cm-in.wide{max-width:1150px;width:94vw}
+/* ===== Video win · Hypit ===== */
+.tabs .cnt{background:#e7357b;color:#fff;border-radius:99px;padding:0 6px;font-size:11px;margin-left:4px}
+.hycard h3{font-size:15px;margin:14px 0 6px}.hyblue{background:#f5f8ff;border:1px solid #e1e8ff;border-radius:12px;padding:10px 14px;margin:8px 0}.hyblue ul{margin:6px 0 0 18px}
+.hyvars{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}.hyvar{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff}.hyvar.done{background:#f3fbf5}.hyvh{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px}.hyvar textarea{font-size:13px}

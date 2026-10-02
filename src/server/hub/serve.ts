@@ -36,7 +36,7 @@ export async function serveHub(request: Request, env: Env, html: string): Promis
   );
   if (!permissions.includes('hub.access')) {
     return new Response(
-      '<!doctype html><meta charset="utf-8"><title>Ailla Hub</title><p style="font-family:sans-serif;padding:40px">Tài khoản chưa được cấp quyền vào khu Marketing. Nhờ CEO bật ở CRM › Người dùng & phân quyền. <a href="/">Về CRM</a></p>',
+      '<!doctype html><meta charset="utf-8"><title>Trang quản trị Ailla</title><p style="font-family:sans-serif;padding:40px">Tài khoản chưa được cấp quyền vào khu Marketing. Nhờ CEO bật ở CRM › Người dùng & phân quyền. <a href="/">Về CRM</a></p>',
       { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
     );
   }

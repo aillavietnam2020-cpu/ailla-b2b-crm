@@ -14,6 +14,8 @@ export interface Env {
   AI_BASE_URL?: string;
   AI_API_KEY?: string;
   AI_MODEL?: string;
+  /** Khoá riêng cho Worker dựng video (máy văn phòng) gọi /api/worker/*. Đặt bằng `wrangler secret put`. */
+  WORKER_KEY?: string;
 }
 
 export interface AuthUser {

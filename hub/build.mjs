@@ -16,7 +16,7 @@ const OUT = path.resolve(ROOT, '..', 'src', 'server', 'hub', 'hub.html');
 
 const JS_ORDER = [
   'core.js', 'app.js', 'phanbo.js', 'setup.js', 'giaoviec.js', 'kinhdoanh.js', 'exec.js', 'period.js',
-  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'bots.js', 'claude.js', 'ai.js', 'server.js',
+  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'winhub.js', 'bots.js', 'claude.js', 'ai.js', 'server.js',
 ];
 
 const read = (f) => readFileSync(path.join(SRC, f), 'utf8');
@@ -37,7 +37,7 @@ const xlsx = '<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xl
 
 const html = `<!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ailla Hub</title>
+<title>Trang quản trị Ailla</title>
 <link rel="icon" href="data:image/png;base64,${logo}">
 ${fonts}
 ${xlsx}

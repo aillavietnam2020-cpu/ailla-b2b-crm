@@ -51,7 +51,7 @@ export function LoginPage({ error }: { error: string | null }) {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={submit}>
-        <h1>Ailla Hub</h1>
+        <h1>Trang quản trị Ailla</h1>
         <p className="muted">Hệ thống điều hành AILLA: Marketing, công việc, CRM B2B. Đăng nhập bằng tài khoản công ty cấp.</p>
 
         {(formError || error) && (
