@@ -10,7 +10,7 @@ import { requirePermission } from '../middleware/rbac';
  *  - /api/hub/worker-tasks : trang quản trị tạo việc và xem tiến độ (cần đăng nhập + quyền khu quản trị).
  *  - /api/worker/pull, /api/worker/push : Worker tự gọi, xác thực bằng khoá riêng WORKER_KEY (secret của Worker web).
  */
-const KINDS = ['win_analyze', 'win_approve', 'win_fix'] as const;
+const KINDS = ['win_analyze', 'win_approve', 'win_fix', 'win_child_ok', 'win_child_fix'] as const;
 const STATUSES = ['queued', 'taken', 'running', 'review', 'building', 'done', 'error'] as const;
 
 type TaskRow = {
@@ -56,6 +56,34 @@ hubWorkerRoutes.post('/', async (c) => {
     .bind(id, body.kind, body.ref ?? null, payload, c.get('auth').user.id, now, now)
     .run();
   return ok(c, { id });
+});
+
+/**
+ * Xem bản nháp video: phát thẳng từ máy dựng ở văn phòng qua đường kết nối riêng (máy dựng tự báo địa chỉ),
+ * không chép file đi đâu. Người xem phải đăng nhập và có quyền khu quản trị.
+ */
+hubWorkerRoutes.get('/preview/:job', async (c) => {
+  const job = c.req.param('job');
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(job)) throw badRequest('BAD_JOB', 'Mã video không hợp lệ');
+  const row = await c.env.DB.prepare("SELECT v FROM app_kv WHERE k = 'worker_preview_url'").first<{ v: string }>();
+  if (!row || !c.env.WORKER_KEY) throw notFound('Máy dựng chưa bật đường xem bản nháp');
+  const headers: Record<string, string> = { 'X-Worker-Key': c.env.WORKER_KEY };
+  const range = c.req.header('Range');
+  if (range) headers.Range = range;
+  let res: Response;
+  try {
+    res = await fetch(`${row.v}/preview/${job}`, { headers });
+  } catch {
+    throw notFound('Không kết nối được máy dựng (máy văn phòng có đang bật không?)');
+  }
+  if (!res.ok && res.status !== 206) throw notFound(res.status === 404 ? 'Chưa có bản nháp cho video này' : 'Máy dựng chưa trả được video');
+  const out = new Headers();
+  for (const h of ['Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges']) {
+    const v = res.headers.get(h);
+    if (v) out.set(h, v);
+  }
+  out.set('Cache-Control', 'private, no-store');
+  return new Response(res.body, { status: res.status, headers: out });
 });
 
 /* ---------- Worker gọi ---------- */
@@ -116,6 +144,20 @@ workerRoutes.post('/push', async (c) => {
       nowIso(),
       body.id,
     )
+    .run();
+  return ok(c, { ok: true });
+});
+
+/** Máy dựng báo địa chỉ đường xem bản nháp (đổi mỗi lần máy dựng khởi động lại). */
+workerRoutes.post('/preview-url', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { url?: string };
+  const url = String(body.url ?? '').replace(/\/$/, '');
+  if (!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) throw badRequest('BAD_URL', 'Địa chỉ không hợp lệ');
+  await c.env.DB.prepare(
+    `INSERT INTO app_kv (k, v, updated_at) VALUES ('worker_preview_url', ?, ?)
+     ON CONFLICT (k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at`,
+  )
+    .bind(url, nowIso())
     .run();
   return ok(c, { ok: true });
 });
