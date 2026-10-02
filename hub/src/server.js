@@ -69,7 +69,7 @@ DB.load=async function(){
   SV.acct=acct;
   // CEO + kế toán nhận đủ số kinh doanh; người khác chỉ nhận số Ads (team Digital) và chỉ số bán hàng (Sale).
   const [t9,t9b,kdFull,kdAds,kdSale,sc,ns]=await Promise.all([blob("t9file"),blob("t9"),acct?blob("kd"):null,acct?null:blob("kd_ads"),acct?null:blob("kd_sale"),acct?blob("skucost"):null,isCeo()?blob("nhansu0"):null]);
-  const kd=kdFull||(kdAds||kdSale?{...KDX,...(kdAds||{}),...(kdSale||{}),day:{tts:{},spe:{},fb:{},ads:(kdAds&&kdAds.day&&kdAds.day.ads)||{}}}:null);
+  const kd=kdFull||(kdAds||kdSale?{...KDX,...(kdAds||{}),...(kdSale||{}),day:{tts:{},spe:{},fb:(kdSale&&kdSale.day&&kdSale.day.fb)||{},ads:(kdAds&&kdAds.day&&kdAds.day.ads)||{}}}:null);
   if(SV.perms.includes("dashboard.ceo"))svApi("/api/dashboards/ceo").then(c=>{CRM_BASE.noChinhThuc=c.official_debt||0;CRM_BASE.noDuKien=c.projected_debt||0;if(ME&&PAGE==="exec")renderMain()}).catch(()=>{});
   if(t9)window.T9FILE=t9;if(t9b){T9_BASE=t9b.base||{};T9RAW=t9b.raw||T9RAW}if(kd){KD=kd;KDX=kd;DAYD=kd.day||DAYD;TT=kd.tts||null;SP=kd.spe||null}if(sc)SKUCOST=sc;if(ns)NHANSU0=ns;
   const st=await svApi("/api/hub/state");

@@ -23,7 +23,7 @@ const ITEMS = [
   ['t9', null, 0], // kế hoạch + doanh thu tháng 9 theo SKU, lead dùng ở Kế hoạch › Bước 1
   ['kd', 'kinhdoanh.json', 1], // doanh thu, lãi lỗ các kênh: chỉ CEO + kế toán
   ['kd_ads', 'kd_ads', 0], // số Ads Facebook cho team Digital (chi, đơn, doanh số Ads từng người)
-  ['kd_sale', 'kd_sale', 0], // chỉ số bán hàng cho Sale B2C (đơn, chốt, hủy, hoàn), đã bỏ doanh thu
+  ['kd_sale', 'kd_sale', 0], // số bán hàng cho Sale B2C (doanh thu, đơn, chốt, hủy, hoàn), không có giá vốn/lãi
   ['skucost', 'skucost.json', 1], // giá vốn SKU
   ['nhansu0', 'nhansu0.json', 1], // danh sách nhân sự ban đầu (không có lương)
 ];
@@ -63,12 +63,10 @@ function kdPart(kind) {
     const { adsPeople, adsProd, adsTran, adsMonths, adsChiDay } = kd;
     return { adsPeople, adsProd, adsTran, adsMonths, adsChiDay, day: { ads: kd.day?.ads ?? {} } };
   }
-  const money = /doanh thu|aov|giá trị|tiền/i;
-  const strip = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !money.test(k)));
-  return {
-    fbSale: (kd.fbSale ?? []).map(({ dt, ...s }) => s),
-    fbHist: (kd.fbHist ?? []).map(strip),
-  };
+  // Sale cần doanh thu để làm việc (doanh thu chốt, doanh thu từng bạn, giá trị đơn) nhưng KHÔNG thấy
+  // giá vốn / lãi: bỏ cột giá vốn (vị trí 7) trong số Facebook theo ngày.
+  const fbDay = Object.fromEntries(Object.entries(kd.day?.fb ?? {}).map(([d, r]) => [d, r.map((v, i) => (i === 7 ? 0 : v))]));
+  return { fbSale: kd.fbSale ?? [], fbHist: kd.fbHist ?? [], day: { fb: fbDay } };
 }
 
 const now = new Date().toISOString();
