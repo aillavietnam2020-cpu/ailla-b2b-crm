@@ -66,11 +66,12 @@ async function svPoll(){
 }
 
 /* Báo ngay việc mới đến tay mình (xưởng báo xong → kế toán; nhu cầu mới → xưởng; lô đã kiểm → người in tem). */
-function svWatch(){const s=D()&&D().sx;if(!s)return {};return {kiem:s.batches.filter(b=>b.st==="CHO_KIEM").map(b=>b.id),req:s.requests.filter(r=>r.st==="CAN_LAM").map(r=>r.id),tem:s.batches.filter(b=>b.st==="DA_KIEM"||b.st==="TEM_SAN").map(b=>b.id),task:(D().tasks||[]).filter(t=>t.nguoi===(ME&&ME.id)&&t.st!=="done").map(t=>t.id)}}
+function svWatch(){const s=D()&&D().sx;if(!s)return {};return {kiem:s.batches.filter(b=>b.st==="CHO_KIEM").map(b=>b.id),req:s.requests.filter(r=>r.st==="CAN_LAM").map(r=>r.id),tem:s.batches.filter(b=>b.st==="DA_KIEM"||b.st==="TEM_SAN").map(b=>b.id),task:(D().tasks||[]).filter(t=>t.nguoi===(ME&&ME.id)&&t.st!=="done").map(t=>t.id),duyet:(D().tasks||[]).filter(t=>t.duyet===(ME&&ME.id)&&t.st==="review").map(t=>t.id+":"+(t.trinh||[]).join(","))}}
 function svNotify(a,b){if(!ME||!a.kiem)return;const neu=k=>(b[k]||[]).filter(x=>!(a[k]||[]).includes(x)),s=D().sx,msg=[];
   if(can(ME,"sx.kiemke"))neu("kiem").forEach(id=>{const x=s.batches.find(y=>y.id===id);if(x)msg.push(`Xưởng vừa báo xong ${sxP(x.sp).ten}: ${nf(x.baoSL)} · chờ kiểm kê`)});
   if(can(ME,"sx.xuong"))neu("req").forEach(id=>{const x=s.requests.find(y=>y.id===id);if(x)msg.push(`Nhu cầu mới: ${sxP(x.sp).ten}${x.sl?" · "+nf(x.sl):""}${x.uu==="Gấp"?" · GẤP":""}`)});
   neu("task").forEach(id=>{const t=D().tasks.find(y=>y.id===id);if(t)msg.push("Việc mới giao cho bạn: "+t.ten)});
+  neu("duyet").forEach(k=>{const t=D().tasks.find(y=>y.id===k.split(":")[0]);if(t)msg.push("Có video trình bạn duyệt: "+t.ten)});
   if(!msg.length)return;toast(msg.join(" · "));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join(" · ")})}catch(e){}
   document.title="("+msg.length+") Trang quản trị Ailla";setTimeout(()=>{document.title="Trang quản trị Ailla"},15000)}
 DB.load=async function(){
@@ -110,8 +111,12 @@ DB.load=async function(){
   addEventListener("beforeunload",e=>{if(SV.pending.length){e.preventDefault();e.returnValue=""}});
 };
 DB.save=function(){SV.pending.push(()=>{});svSchedule()};
+/* Sản lượng KH của pillar = tổng số lượng các tuyến cùng sản phẩm, cùng kênh (kênh ngoài TikTok chính: cộng mọi tuyến
+   của kênh). Sửa tuyến hay điều chỉnh kế hoạch là pillar tự đổi theo, không lệch nhau. */
+function pillarTuyen(d,p){return (d.tuyen||[]).filter(t=>t.kenh===p.kenh&&(p.kenh!=="TikTok chính"||t.sku===p.sku))}
+function syncPillars(d){(d.pillars||[]).forEach(p=>{const T=pillarTuyen(d,p);if(T.length)p.kh=T.reduce((a,t)=>a+(+t.kh||0),0)})}
 DB.mutate=function(who,msg,fn){
-  const act=d=>{fn(d);d.activity.unshift({t:nowHM(),d:today(),who,msg});d.activity=d.activity.slice(0,400);d.updatedAt=Date.now()};
+  const act=d=>{fn(d);syncPillars(d);d.activity.unshift({t:nowHM(),d:today(),who,msg});d.activity=d.activity.slice(0,400);d.updatedAt=Date.now()};
   act(this.data);SV.pending.push(act);svSchedule();
 };
 DB.reset=async function(){toast("Bản trên máy chủ không xoá về dữ liệu mẫu được.")};
