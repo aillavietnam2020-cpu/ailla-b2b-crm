@@ -70,6 +70,7 @@ const MKT_G=()=>{const all=MENU_ADMIN.filter(g=>g[0]!=="Hệ thống").flatMap(g
    ["Đo lường",pick(["baocao"])]]};
 const MODULES=[
  {k:"exec",zone:"",ic:"home",n:"Tổng quan điều hành",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
+ {k:"cv",zone:"",ic:"task",n:"Giao việc & mục tiêu",sub:"",groups:()=>[["Công việc",[MI("cv_tq","Tổng quan công việc"),MI("cv_mt","Mục tiêu"),MI("cv_nv","Nhiệm vụ",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),MI("cv_kb","Tiến độ"),MI("cv_lich","Lịch"),MI("cv_da","Dự án")]]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
  {k:"b2c",zone:"Kinh doanh",ic:"bag",n:"Kinh doanh B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
    ["Báo cáo kênh",[MI("bc_tong","Tổng quan kinh doanh",tq),MI("bc_tiktok","TikTok Shop",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq)]],
@@ -79,7 +80,6 @@ const MODULES=[
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
  {k:"sx",zone:"Kinh doanh",ic:"fac",n:"Sản xuất",sub:"",groups:()=>[["",[MI("sx","Sản xuất & kho")]]]},
  {k:"mkt",zone:"Quản trị",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC",groups:MKT_G},
- {k:"cv",zone:"Quản trị",ic:"task",n:"Công việc & dự án",sub:"",groups:()=>[["Công việc",[MI("cv_tq","Tổng quan công việc"),MI("cv_nv","Nhiệm vụ",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),MI("cv_kb","Tiến độ"),MI("cv_lich","Lịch"),MI("cv_da","Dự án")]]]},
  {k:"fin",zone:"Quản trị",ic:"fin",n:"Tài chính & P&L",sub:"",groups:()=>[["Tài chính",[MI("pl","Báo cáo P&L",u=>can(u,"pl.xem")),MI("chiphi","Chi phí theo tháng",u=>can(u,"chiphi.xem")),MI("doisoat","Đối soát tiền về",u=>can(u,"chiphi.xem")),MI("sku","Giá vốn SKU",u=>can(u,"gia.xem_von"))]]]},
  {k:"hr",zone:"Quản trị",ic:"ppl",n:"Nhân sự",sub:"",groups:()=>[
    ["Tổng quan",[MI("hr_tq","Tổng quan nhân sự",u=>can(u,"nhansu.quanly"))]],
