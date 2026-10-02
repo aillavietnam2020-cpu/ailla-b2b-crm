@@ -21,6 +21,8 @@ export interface Env {
   ACCESS_APP_ID?: string;
   ACCESS_POLICY_ID?: string;
   CF_ACCESS_TOKEN?: string;
+  /** Khoá cho máy văn phòng tải bản sao lưu mỗi đêm (/api/backup). */
+  BACKUP_KEY?: string;
 }
 
 export interface AuthUser {
