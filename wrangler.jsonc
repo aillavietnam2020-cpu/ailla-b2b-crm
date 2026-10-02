@@ -11,7 +11,10 @@
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // Trình duyệt mở /hub/ phải qua Worker (kiểm tra đăng nhập rồi trả trang Ailla Hub),
+    // nếu không Cloudflare tự trả index.html của CRM cho mọi đường dẫn lạ.
+    "run_worker_first": ["/hub", "/hub/*", "/api/*"]
   },
   "observability": {
     "enabled": true

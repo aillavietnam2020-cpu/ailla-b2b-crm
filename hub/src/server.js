@@ -21,6 +21,8 @@ const foldName=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(
 
 /* ---------- Các hàm trước đây nằm trong crm.js (CRM giả lập) ---------- */
 function crmSeed(){}
+// Số công nợ B2B lấy thẳng từ CRM thật (Bàn điều hành CEO), không còn số chép tay.
+var CRM_BASE={noChinhThuc:0,noDuKien:0};
 function crmModal(title,html,wide){let ov=$("#crmm");if(!ov){ov=document.createElement("div");ov.id="crmm";ov.className="cmodal";document.body.appendChild(ov)}ov.innerHTML=`<div class="cm-in${wide?" wide":""}" role="dialog" aria-modal="true"><div class="cm-h"><h3>${title}</h3><button class="x" id="cm-x" aria-label="Đóng">✕</button></div><div class="cm-b">${html}</div></div>`;ov.hidden=false;$("#cm-x").onclick=closeCM}
 function closeCM(){const ov=$("#crmm");if(ov)ov.hidden=true}
 function openDrawerHTML(h){const dr=$("#drawer");$("#drawerIn").innerHTML=`<button class="x" id="dx" aria-label="Đóng">✕</button>`+h;dr.hidden=false;$("#dx").onclick=closeDrawer}
@@ -64,6 +66,7 @@ DB.load=async function(){
   const me=await svApi("/api/me");SV.me=me.user;SV.perms=me.permissions||[];
   const blob=k=>svApi("/api/hub/blob/"+k).catch(()=>null);
   const [t9,t9b,kd,sc,ns]=await Promise.all([blob("t9file"),blob("t9"),isCeo()?blob("kd"):null,isCeo()?blob("skucost"):null,isCeo()?blob("nhansu0"):null]);
+  if(SV.perms.includes("dashboard.ceo"))svApi("/api/dashboards/ceo").then(c=>{CRM_BASE.noChinhThuc=c.official_debt||0;CRM_BASE.noDuKien=c.projected_debt||0;if(ME&&PAGE==="exec")renderMain()}).catch(()=>{});
   if(t9)window.T9FILE=t9;if(t9b){T9_BASE=t9b.base||{};T9RAW=t9b.raw||T9RAW}if(kd)KD=kd;if(sc)SKUCOST=sc;if(ns)NHANSU0=ns;
   const st=await svApi("/api/hub/state");
   if(!st.data){
@@ -101,11 +104,13 @@ function renderLogin(){
 }
 async function svLogout(){try{await fetch("/api/auth/logout",{method:"POST",credentials:"same-origin"})}catch(e){}location.href="/"}
 
-// Bản đầu chỉ đưa Marketing, Công việc, Trợ lý AI và Quản trị hệ thống lên máy chủ.
-// Các phân hệ còn lại (điều hành, B2C, sản xuất, tài chính, nhân sự) làm ở đợt sau.
-for(const k of ["exec","b2c","b2b","sx","fin","hr"]){const i=MODULES.findIndex(m=>m.k===k);if(i>=0)MODULES.splice(i,1)}
-MODULES.splice(1,0,{k:"b2blink",zone:"Kinh doanh",ic:"box",n:"Kinh doanh B2B (CRM)",sub:"",groups:()=>[["",[MI("crmgo","Mở CRM B2B",()=>SV.perms.includes("price.read"))]]]});
-{const i=MENU_USER.findIndex(g=>g[0]==="Nhân sự của tôi");if(i>=0)MENU_USER.splice(i,1)}
+// CRM B2B thật là phân hệ riêng (/admin, /sales), thay cho bản CRM giả lập trong khung.
+// Lương, phiếu lương và file HR MASTER KHÔNG đưa lên đây: dữ liệu Hub là một bản chung,
+// ai có tài khoản Hub cũng tải được, nên số lương phải ở chỗ phân quyền riêng (làm sau).
+{const i=MODULES.findIndex(m=>m.k==="b2b");if(i>=0)MODULES.splice(i,1)}
+{const hr=MODULES.find(m=>m.k==="hr");if(hr){const g0=hr.groups;hr.groups=()=>g0().filter(([g])=>g!=="Lương"&&g!=="Dữ liệu")}}
+{const i=MENU_USER.findIndex(g=>g[0]==="Nhân sự của tôi");if(i>=0)MENU_USER[i]=[MENU_USER[i][0],MENU_USER[i][1].filter(it=>it[0]!=="hr_plme")]}
+MODULES.splice(MODULES.findIndex(m=>m.zone==="Kinh doanh"),0,{k:"b2blink",zone:"Kinh doanh",ic:"box",n:"Kinh doanh B2B (CRM)",sub:"",groups:()=>[["",[MI("crmgo","Mở CRM B2B",()=>SV.perms.includes("price.read"))]]]});
 PAGES.crmgo=m=>{m.innerHTML=H("Đang mở CRM B2B…");location.href=SV.me&&SV.me.role!=="EMPLOYEE"?(SV.me.role==="CEO"?"/admin/ceo":"/admin"):"/sales"};
 PAGES.matkhau=m=>{const p=SV.me&&SV.me.role!=="EMPLOYEE"?"/admin/account":"/sales/account";m.innerHTML=H("Đổi mật khẩu","Dùng chung mật khẩu với CRM")+`<section class="card narrow"><p>Mật khẩu đăng nhập dùng chung cho CRM và khu Marketing.</p><div class="acts"><a class="btn pri" href="${p}">Đổi mật khẩu</a></div></section>`};
 

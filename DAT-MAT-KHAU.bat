@@ -1,6 +1,8 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
+rem Dung tai khoan Cloudflare da dang nhap; token trong bien moi truong thieu quyen D1.
+set CLOUDFLARE_API_TOKEN=
 echo ============================================================
 echo   DAT MAT KHAU DANG NHAP CRM (ban that tren Cloudflare)
 echo ------------------------------------------------------------
