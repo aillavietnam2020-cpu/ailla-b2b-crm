@@ -33,6 +33,14 @@ export function App() {
   // Tài khoản vừa được cấp mật khẩu: bắt đổi trước khi vào hệ thống.
   if (mustChangePassword) return <ChangePasswordPage forced />;
 
+  // Đăng nhập từ khu Marketing (/hub/) thì quay lại đúng chỗ; tài khoản "chỉ Marketing" luôn về /hub/.
+  const next = new URLSearchParams(location.search).get('next');
+  const hubOnly = !me.permissions.includes('price.read') && me.permissions.includes('hub.access');
+  if (hubOnly || (next && /^\/hub\/[\w\-./?=&#]*$/.test(next) && me.permissions.includes('hub.access'))) {
+    window.location.replace(next && next.startsWith('/hub/') ? next : '/hub/');
+    return <div className="loading" style={{ paddingTop: 80 }}>Đang mở khu Marketing…</div>;
+  }
+
   const isAdminSpace = me.user.role === 'MANAGER' || me.user.role === 'CEO';
   const homePath = isAdminSpace ? (me.user.role === 'CEO' ? '/admin/ceo' : '/admin') : '/sales';
 

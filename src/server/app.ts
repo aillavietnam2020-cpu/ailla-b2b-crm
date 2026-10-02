@@ -12,6 +12,7 @@ import { approvalRoutes, orderRoutes } from './routes/orders';
 import { financeRoutes } from './routes/finance';
 import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
+import { hubRoutes } from './routes/hub';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -68,6 +69,7 @@ export function createApp() {
   app.route('/api', financeRoutes);
   app.route('/api/imports', importRoutes);
   app.route('/api/dashboards', dashboardRoutes);
+  app.route('/api/hub', hubRoutes);
 
   app.notFound((c) =>
     c.json(

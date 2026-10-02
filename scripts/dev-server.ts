@@ -9,15 +9,18 @@
  * KHÔNG dùng cho staging/production - production luôn chạy trên Cloudflare Workers + D1.
  */
 import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/server/app';
 import type { Env } from '../src/server/env';
 import { createSqliteD1 } from './lib/sqlite-d1';
+import { serveHub } from '../src/server/hub/serve';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DATA_DIR = path.join(ROOT, '.dev-data');
+// DEV_DATA_DIR: đặt database thử ở thư mục khác (ví dụ thư mục tạm, không đồng bộ lên Drive).
+const DATA_DIR = process.env.DEV_DATA_DIR ?? path.join(ROOT, '.dev-data');
 const DB_FILE = path.join(DATA_DIR, 'crm.sqlite');
 const PORT = Number(process.env.PORT ?? 8787);
 const fresh = process.argv.includes('--fresh');
@@ -54,7 +57,11 @@ const server = createServer(async (req, res) => {
   });
 
   try {
-    const response = await app.fetch(request, env, {
+    // Khu Marketing: đọc lại file mỗi lần để sửa hub/src rồi chạy `node hub/build.mjs` là thấy ngay.
+    const pathname = new URL(url).pathname;
+    const response = pathname === '/hub' || pathname.startsWith('/hub/')
+      ? await serveHub(request, env, readFileSync(path.join(ROOT, 'src/server/hub/hub.html'), 'utf8'))
+      : await app.fetch(request, env, {
       waitUntil: () => {},
       passThroughOnException: () => {},
     } as unknown as ExecutionContext);

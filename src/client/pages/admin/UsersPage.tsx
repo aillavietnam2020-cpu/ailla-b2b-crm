@@ -16,6 +16,8 @@ interface UserRow {
   password_updated_at: string | null;
   must_change_password: number;
   has_password: number;
+  is_marketing?: number;
+  is_hub_only?: number;
 }
 
 const ROLE_LABELS: Record<UserRow['role'], string> = {
@@ -52,6 +54,22 @@ export function UsersPage() {
   }
 
   useEffect(load, []);
+
+  async function setMarketing(user: UserRow, mode: string) {
+    try {
+      await api.post(`/api/admin/users/${user.id}/marketing`, { mode });
+      setNotice(
+        mode === 'off'
+          ? `${user.display_name}: không vào khu Marketing`
+          : mode === 'only'
+            ? `${user.display_name}: chỉ vào khu Marketing (không thấy dữ liệu B2B)`
+            : `${user.display_name}: vào thêm khu Marketing`,
+      );
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không đổi được quyền Marketing');
+    }
+  }
 
   async function toggleStatus(user: UserRow) {
     const next = user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
@@ -102,6 +120,7 @@ export function UsersPage() {
                   <th>Người dùng</th>
                   <th>Vai trò</th>
                   <th>Tên trong file Excel</th>
+                  <th>Khu Marketing</th>
                   <th>Lần đăng nhập gần nhất</th>
                   <th>Trạng thái</th>
                   <th>Thao tác</th>
@@ -116,6 +135,21 @@ export function UsersPage() {
                     </td>
                     <td>{ROLE_LABELS[user.role]}</td>
                     <td>{user.legacy_name ?? <span className="muted">—</span>}</td>
+                    <td>
+                      {user.role === 'CEO' ? (
+                        <span className="muted">Toàn quyền</span>
+                      ) : (
+                        <select
+                          value={user.is_hub_only ? 'only' : user.is_marketing ? 'with_b2b' : 'off'}
+                          disabled={!isCeo && user.role !== 'EMPLOYEE'}
+                          onChange={(e) => void setMarketing(user, e.target.value)}
+                        >
+                          <option value="off">Không vào</option>
+                          <option value="with_b2b">Vào thêm (giữ B2B)</option>
+                          <option value="only">Chỉ Marketing</option>
+                        </select>
+                      )}
+                    </td>
                     <td>
                       {user.last_login_at ? (
                         formatVnDateTime(user.last_login_at)

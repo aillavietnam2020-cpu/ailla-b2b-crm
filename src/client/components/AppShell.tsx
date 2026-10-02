@@ -115,6 +115,14 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
             </nav>
           </>
         )}
+        {me?.permissions.includes('hub.access') && (
+          <>
+            <div className="nav-label">Khu khác</div>
+            <nav className="nav">
+              <a href="/hub/">Marketing & công việc</a>
+            </nav>
+          </>
+        )}
         {me?.user.role !== 'EMPLOYEE' && (
           <>
             <div className="nav-label">Chuyển không gian</div>

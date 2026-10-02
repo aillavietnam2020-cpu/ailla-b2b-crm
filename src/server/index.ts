@@ -2,6 +2,8 @@ import type { Env } from './env';
 import { createApp } from './app';
 import { loadConfig } from './lib/settings';
 import { syncAlerts } from './services/alerts';
+import { serveHub } from './hub/serve';
+import HUB_HTML from './hub/hub.html';
 
 const app = createApp();
 
@@ -11,6 +13,11 @@ export default {
 
     if (url.pathname.startsWith('/api')) {
       return app.fetch(request, env, ctx);
+    }
+
+    // Khu Marketing: trang tĩnh nhưng chỉ trả về sau khi kiểm tra đăng nhập.
+    if (url.pathname === '/hub' || url.pathname.startsWith('/hub/')) {
+      return serveHub(request, env, HUB_HTML);
     }
 
     // SPA React: mọi đường dẫn khác trả về static assets (không phải nguồn dữ liệu).

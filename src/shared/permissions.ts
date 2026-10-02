@@ -45,6 +45,8 @@ export const PERMISSIONS = [
   'user.manage.all',
   'product.manage',
   'order.payment.record',
+  // Khu Marketing & công việc (trang /hub/): vào được thì đọc/ghi kế hoạch, giao việc, trợ lý AI.
+  'hub.access',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -126,8 +128,17 @@ export const ACCOUNTANT_PERMISSIONS: Permission[] = [
   'audit.read.team',
 ];
 
+/**
+ * Gói quyền MARKETING: nhân sự Content/Digital chỉ làm ở khu Marketing (/hub/), không đụng dữ liệu B2B.
+ * HUB_ONLY là dấu đánh riêng (không nằm trong PERMISSIONS nên CEO không bao giờ bị dính):
+ * tài khoản có dấu này chỉ còn đúng quyền vào khu Marketing.
+ */
+export const MARKETING_PERMISSIONS: Permission[] = ['hub.access'];
+export const HUB_ONLY = 'hub.only';
+
 /** Quyền cuối cùng của một người = quyền theo vai trò + quyền cấp thêm. */
 export function effectivePermissions(role: Role, extra: string[] = []): Permission[] {
+  if (role !== 'CEO' && extra.includes(HUB_ONLY)) return [...MARKETING_PERMISSIONS];
   const set = new Set<Permission>(ROLE_PERMISSIONS[role]);
   for (const item of extra) {
     if ((PERMISSIONS as readonly string[]).includes(item)) set.add(item as Permission);

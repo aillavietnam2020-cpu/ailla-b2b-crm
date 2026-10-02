@@ -6,6 +6,8 @@
   "main": "src/server/index.ts",
   "compatibility_date": "2026-08-16",
   "compatibility_flags": ["nodejs_compat"],
+  // Trang khu Marketing (src/server/hub/hub.html, dựng bằng hub/build.mjs) được nhúng vào Worker dạng chữ.
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",

@@ -10,6 +10,10 @@ export interface Env {
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
   APP_TIMEZONE?: string;
+  /** Trợ lý AI khu Marketing: 9router trên VPS. AI_API_KEY đặt bằng `wrangler secret put`. */
+  AI_BASE_URL?: string;
+  AI_API_KEY?: string;
+  AI_MODEL?: string;
 }
 
 export interface AuthUser {

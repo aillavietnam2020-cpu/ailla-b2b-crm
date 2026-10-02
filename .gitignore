@@ -24,3 +24,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.log
+.pending-password.sql
+
+# Trang khu Marketing dựng ra từ hub/src (node hub/build.mjs)
+src/server/hub/hub.html

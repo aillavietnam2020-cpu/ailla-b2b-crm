@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { nowIso } from '@shared/datetime';
 import { ROLES } from '@shared/enums';
-import { ACCOUNTANT_PERMISSIONS } from '@shared/permissions';
+import { ACCOUNTANT_PERMISSIONS, HUB_ONLY } from '@shared/permissions';
 import { zodFieldErrors } from '@shared/schemas';
 import type { AppEnv } from '../env';
 import { auditStatement } from '../lib/audit';
@@ -50,7 +50,11 @@ userRoutes.get('/', requirePermission('user.manage'), async (c) => {
             password_updated_at, must_change_password,
             CASE WHEN password_hash IS NULL THEN 0 ELSE 1 END AS has_password,
             (SELECT COUNT(*) FROM user_permissions up
-              WHERE up.user_id = users.id AND up.permission = 'order.accounting.confirm') AS is_accountant
+              WHERE up.user_id = users.id AND up.permission = 'order.accounting.confirm') AS is_accountant,
+            (SELECT COUNT(*) FROM user_permissions up
+              WHERE up.user_id = users.id AND up.permission = 'hub.access') AS is_marketing,
+            (SELECT COUNT(*) FROM user_permissions up
+              WHERE up.user_id = users.id AND up.permission = 'hub.only') AS is_hub_only
      FROM users WHERE deleted_at IS NULL ORDER BY role, display_name COLLATE NOCASE`,
   ).all();
   return c.json({ data: rows.results ?? [], request_id: c.get('requestId') });
@@ -157,6 +161,52 @@ userRoutes.post('/:id/accountant', requirePermission('user.manage'), async (c) =
   );
   await c.env.DB.batch(statements);
   return c.json({ data: { ok: true, accountant: enabled }, request_id: c.get('requestId') });
+});
+
+/**
+ * Khu Marketing: 'off' = không vào; 'with_b2b' = vào thêm khu Marketing, vẫn giữ quyền B2B;
+ * 'only' = nhân sự Content/Digital, CHỈ vào khu Marketing, mọi dữ liệu B2B bị chặn ở backend.
+ */
+userRoutes.post('/:id/marketing', requirePermission('user.manage'), async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as { mode?: string };
+  const mode = body.mode === 'only' || body.mode === 'with_b2b' ? body.mode : 'off';
+
+  const target = await c.env.DB.prepare(
+    'SELECT id, email, role FROM users WHERE id = ? AND deleted_at IS NULL',
+  )
+    .bind(id)
+    .first<{ id: string; email: string; role: string }>();
+  if (!target) throw notFound('Không tìm thấy tài khoản');
+  assertCanTouchRole(auth.user.role, target.role);
+
+  const now = nowIso();
+  const grant = (permission: string) =>
+    c.env.DB.prepare(
+      `INSERT INTO user_permissions (user_id, permission, granted_by, created_at)
+       VALUES (?, ?, ?, ?) ON CONFLICT (user_id, permission) DO NOTHING`,
+    ).bind(id, permission, auth.user.id, now);
+  const statements = [
+    c.env.DB.prepare(
+      "DELETE FROM user_permissions WHERE user_id = ? AND permission IN ('hub.access', ?)",
+    ).bind(id, HUB_ONLY),
+  ];
+  if (mode !== 'off') statements.push(grant('hub.access'));
+  if (mode === 'only') statements.push(grant(HUB_ONLY));
+  statements.push(
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'USER_UPDATED',
+      entityType: 'USER',
+      entityId: id,
+      after: { marketing: mode, email: target.email },
+      requestId: c.get('requestId'),
+      ip: c.req.header('CF-Connecting-IP') ?? null,
+    }),
+  );
+  await c.env.DB.batch(statements);
+  return c.json({ data: { ok: true, marketing: mode }, request_id: c.get('requestId') });
 });
 
 userRoutes.patch('/:id', requirePermission('user.manage'), async (c) => {

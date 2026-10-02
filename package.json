@@ -12,7 +12,7 @@
     "dev:worker": "wrangler dev",
     "dev:node": "tsx scripts/dev-server.ts",
     "dev:node:fresh": "tsx scripts/dev-server.ts --fresh",
-    "build": "tsc -b tsconfig.build.json && vite build",
+    "build": "node hub/build.mjs && tsc -b tsconfig.build.json && vite build",
     "preview": "wrangler dev --local",
     "typecheck": "tsc -b tsconfig.build.json --force",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
