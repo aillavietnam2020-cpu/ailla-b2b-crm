@@ -88,7 +88,7 @@ DB.load=async function(){
   ME=u?this.data.users.find(x=>x.id===u.id):null;
   // Mỗi lần mở Hub đều bắt đầu ở trang chủ (Tổng quan điều hành), không mở lại trang lần trước.
   // CEO vào Tổng quan điều hành; nhân viên vào Tổng quan công việc (việc của mình, việc được giao).
-  MOD=ME&&ME.role!=="admin"?"cv":"";PAGE=ME&&ME.role!=="admin"?"cv_tq":"";try{localStorage.removeItem(SKEY+"_m");localStorage.removeItem(SKEY+"_p")}catch(e){}
+  MOD=ME&&ME.role!=="admin"?"cv":"";PAGE=ME&&ME.role!=="admin"?"cv_tq":"";if(/^#lo=/.test(location.hash)){MOD="sx";PAGE="sx_lo"}try{localStorage.removeItem(SKEY+"_m");localStorage.removeItem(SKEY+"_p")}catch(e){}
   // Mọi người dùng chung khung phân hệ; mỗi người chỉ thấy phân hệ của phòng mình (xem svAllowedMods).
   APP_MODE="admin";
   for(const p of this.data.departments||[])if(!MKT_PB.includes(p.k)&&!TEAMS[p.k])TEAMS[p.k]=p.n;
@@ -127,7 +127,9 @@ const DEPT_MODS={SX:["sx"],KV:["sx"],HCNS:["hr"]};
 function svAllowedMods(){
   if(!ME||ME.role==="admin")return null;
   const p=(D().departments||[]).find(x=>x.k===ME.phongBan),m=(p&&p.phanHe&&p.phanHe.length?p.phanHe:DEPT_MODS[ME.phongBan])||[];
-  const s=new Set(["cv",...m]);if(s.has("mkt"))s.add("aiq");if(s.has("b2b")||s.has("b2c"))s.add("b2blink");return s;
+  const s=new Set(["cv",...m]);if(s.has("mkt"))s.add("aiq");
+  // Ai được cấp một quyền Sản xuất (Thảo điều phối, kế toán kho, kỹ thuật...) thì thấy phân hệ Sản xuất.
+  if(["sx.dieuphoi","sx.xuong","sx.kiemke","sx.kythuat"].some(k=>can(ME,k))||ME.phongBan==="KT")s.add("sx");if(s.has("b2b")||s.has("b2c"))s.add("b2blink");return s;
 }
 // Phòng được dùng phân hệ nào thì người trong phòng xem được các trang của phân hệ đó (B2C, Sản xuất,
 // Tài chính, Nhân sự, Tổng quan); Marketing và Quản trị hệ thống vẫn theo quyền chi tiết từng người.

@@ -16,7 +16,7 @@ const OUT = path.resolve(ROOT, '..', 'src', 'server', 'hub', 'hub.html');
 
 const JS_ORDER = [
   'core.js', 'app.js', 'phanbo.js', 'setup.js', 'giaoviec.js', 'kinhdoanh.js', 'exec.js', 'period.js',
-  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'bots.js', 'claude.js', 'ai.js', 'server.js',
+  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'bots.js', 'claude.js', 'ai.js', 'server.js',
 ];
 
 const read = (f) => readFileSync(path.join(SRC, f), 'utf8');
@@ -33,7 +33,7 @@ const header = [
 
 const fonts =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">';
-const xlsx = '<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>';
+const xlsx = '<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>';
 
 const html = `<!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

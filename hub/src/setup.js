@@ -78,7 +78,7 @@ const MODULES=[
  {k:"b2b",zone:"Kinh doanh",ic:"box",n:"Kinh doanh B2B",sub:"Đại lý · NPP · CRM",groups:()=>[
    ["Bán hàng",[MI("b2b_today","Việc hôm nay"),MI("b2b_kh","Khách hàng"),MI("b2b_don","Đơn hàng & duyệt",null,()=>(D().b2b?D().b2b.orders.flatMap(o=>o.approvals||[]).filter(a=>a.status==="PENDING").length:"")||""),MI("b2b_gia","Bảng giá 8 cấp"),MI("b2b_cn","Công nợ"),MI("b2b_perf","Kết quả cá nhân")]],
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
- {k:"sx",zone:"Kinh doanh",ic:"fac",n:"Sản xuất",sub:"",groups:()=>[["",[MI("sx","Sản xuất & kho")]]]},
+ {k:"sx",zone:"Kinh doanh",ic:"fac",n:"Sản xuất",sub:"",tabs:true,groups:()=>[["",SX_TABS.map(([k,t])=>MI(k,t))]]},
  {k:"mkt",zone:"Quản trị",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC",groups:MKT_G},
  {k:"fin",zone:"Quản trị",ic:"fin",n:"Tài chính & P&L",sub:"",groups:()=>[["Tài chính",[MI("pl","Báo cáo P&L",u=>can(u,"pl.xem")),MI("chiphi","Chi phí theo tháng",u=>can(u,"chiphi.xem")),MI("doisoat","Đối soát tiền về",u=>can(u,"chiphi.xem")),MI("sku","Giá vốn SKU",u=>can(u,"gia.xem_von"))]]]},
  {k:"hr",zone:"Quản trị",ic:"ppl",n:"Nhân sự",sub:"",groups:()=>[

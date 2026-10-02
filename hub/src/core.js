@@ -89,6 +89,7 @@ const PERMS=[
  ["Báo cáo",[["baocao.tiktok","Nhập báo cáo TikTok"],["baocao.ads","Nhập báo cáo Ads Facebook"]]],
  ["Nhân sự & lương",[["nhansu.duyet","Duyệt nghỉ phép, OT, tạm ứng, KPI"],["luong.quanly","Xem và làm bảng lương, phiếu lương"]]],
  ["Thiết lập & Tài chính",[["thietlap.quanly","Sửa dữ liệu gốc: phòng ban, kênh bán, danh mục chi phí, SKU"],["gia.xem_von","Xem giá vốn SKU"],["chiphi.xem","Xem chi phí theo tháng"],["chiphi.nhap","Nhập chi phí"],["pl.xem","Xem báo cáo P&L"]]],
+ ["Sản xuất",[["sx.dieuphoi","Tạo nhu cầu sản xuất, đề nghị mua hàng (điều phối)"],["sx.xuong","Bắt đầu việc, báo hoàn thành (tổ trưởng xưởng)"],["sx.kiemke","Kiểm kê, tạo lô, in tem, nhập kho (kế toán kho)"],["sx.kythuat","Báo nguyên vật liệu thực tế (kỹ thuật)"]]],
  ["Hệ thống",[["sanpham.quanly","Quản lý danh mục sản phẩm"],["nhansu.quanly","Quản lý nhân sự, mật khẩu, phân quyền"],["quychuan.sua","Sửa quy chuẩn"],["caidat.quanly","Cài đặt, sao lưu, xóa dữ liệu"]]],
 ];
 const ALL_PERMS=PERMS.flatMap(g=>g[1].map(p=>p[0]));
@@ -98,7 +99,7 @@ const ROLE_PRESET={
  content:["cv.xem","kehoach.xem","research.xem","research.sua","lich.xem","lich.sua_cua_minh","win.xem","order.xem","kho.xem"],
  digital:["cv.xem","research.xem","lich.xem","win.xem","order.xem","order.tao","order.sua","baocao.ads"],
  // Phòng ban khác (Sale, Sản xuất, Kế toán, HCNS...): thấy phân hệ của phòng mình + giao việc.
- truongphong:["cv.xem","viec.giao","viec.duyet","tongquan.xem"],
+ truongphong:["cv.xem","viec.giao","viec.duyet","tongquan.xem","sx.xuong"],
  nhanvien:["cv.xem"],
 };
 const ROLES={admin:"Quản trị (CEO)",lead:"Trưởng nhóm",content:"Nhân viên content",digital:"Team Digital",truongphong:"Trưởng phòng",nhanvien:"Nhân viên"};
