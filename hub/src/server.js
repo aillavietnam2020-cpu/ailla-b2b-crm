@@ -49,19 +49,30 @@ async function svFlush(){
 }
 function svRefreshMe(){if(!ME)return;const u=D().users.find(x=>x.id===ME.id);if(u)ME=u}
 const svTyping=()=>{const a=document.activeElement;return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.id!=="qs"};
+// Đang thao tác thì 5 giây hỏi một lần; để máy không đụng tới quá 2 phút thì 30 giây (đỡ tốn lượt gọi máy chủ).
+let svActive=Date.now(),svLastPoll=0;["mousemove","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,()=>{svActive=Date.now()},{passive:true}));
 async function svPoll(){
   try{
     if(SV.busy||SV.pending.length||document.hidden)return;
+    if(Date.now()-svActive>120000&&Date.now()-svLastPoll<30000)return;svLastPoll=Date.now();
     const v=await svApi("/api/hub/state/version");
     if(v.version>SV.version){
       if(svTyping()){SV.deferRemote=true;return}
       const st=await svApi("/api/hub/state");
       if(SV.pending.length)return;
-      DB.data=ensureShape(st.data);SV.version=st.version;SV.deferRemote=false;onRemoteChange();
+      const before=svWatch();DB.data=ensureShape(st.data);SV.version=st.version;SV.deferRemote=false;onRemoteChange();svNotify(before,svWatch());
     }
   }catch(e){}
 }
 
+/* Báo ngay việc mới đến tay mình (xưởng báo xong → kế toán; nhu cầu mới → xưởng; lô đã kiểm → người in tem). */
+function svWatch(){const s=D()&&D().sx;if(!s)return {};return {kiem:s.batches.filter(b=>b.st==="CHO_KIEM").map(b=>b.id),req:s.requests.filter(r=>r.st==="CAN_LAM").map(r=>r.id),tem:s.batches.filter(b=>b.st==="DA_KIEM"||b.st==="TEM_SAN").map(b=>b.id),task:(D().tasks||[]).filter(t=>t.nguoi===(ME&&ME.id)&&t.st!=="done").map(t=>t.id)}}
+function svNotify(a,b){if(!ME||!a.kiem)return;const neu=k=>(b[k]||[]).filter(x=>!(a[k]||[]).includes(x)),s=D().sx,msg=[];
+  if(can(ME,"sx.kiemke"))neu("kiem").forEach(id=>{const x=s.batches.find(y=>y.id===id);if(x)msg.push(`Xưởng vừa báo xong ${sxP(x.sp).ten}: ${nf(x.baoSL)} · chờ kiểm kê`)});
+  if(can(ME,"sx.xuong"))neu("req").forEach(id=>{const x=s.requests.find(y=>y.id===id);if(x)msg.push(`Nhu cầu mới: ${sxP(x.sp).ten}${x.sl?" · "+nf(x.sl):""}${x.uu==="Gấp"?" · GẤP":""}`)});
+  neu("task").forEach(id=>{const t=D().tasks.find(y=>y.id===id);if(t)msg.push("Việc mới giao cho bạn: "+t.ten)});
+  if(!msg.length)return;toast(msg.join(" · "));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Ailla Hub",{body:msg.join(" · ")})}catch(e){}
+  document.title="("+msg.length+") Ailla Hub";setTimeout(()=>{document.title="Ailla Hub"},15000)}
 DB.load=async function(){
   const me=await svApi("/api/me");SV.me=me.user;SV.perms=me.permissions||[];
   const blob=k=>svApi("/api/hub/blob/"+k).catch(()=>null);
@@ -92,7 +103,8 @@ DB.load=async function(){
   // Mọi người dùng chung khung phân hệ; mỗi người chỉ thấy phân hệ của phòng mình (xem svAllowedMods).
   APP_MODE="admin";
   for(const p of this.data.departments||[])if(!MKT_PB.includes(p.k)&&!TEAMS[p.k])TEAMS[p.k]=p.n;
-  setInterval(svPoll,15000);
+  // Vận hành thời gian thực: 5 giây hỏi máy chủ một lần (chỉ khi đang mở trang), có thay đổi mới tải về.
+  setInterval(svPoll,5000);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)svPoll()});
   document.addEventListener("focusout",()=>{if(SV.deferRemote)setTimeout(svPoll,300)});
   addEventListener("beforeunload",e=>{if(SV.pending.length){e.preventDefault();e.returnValue=""}});
