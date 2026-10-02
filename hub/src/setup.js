@@ -62,42 +62,43 @@ function ensureShape(d){
 /* ---------- Phân hệ ---------- */
 const MI=(k,t,p,c)=>[k,t,p||(()=>true),c];
 const tq=u=>can(u,"tongquan.xem");
-const MKT_G=()=>{const all=MENU_ADMIN.filter(g=>g[0]!=="Hệ thống").flatMap(g=>g[1]),pick=ks=>ks.map(k=>all.find(i=>i[0]===k)).filter(Boolean);return [
-   ["Điều phối chung",pick(["hieuqua","cv","kehoach"]).concat([MI("dieuchinh","Điều chỉnh kế hoạch",u=>can(u,"kehoach.xem"),()=>(D().adjusts||[]).filter(a=>a.st==="pending").length||""),MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"))],pick(["giaoviec"]))],
-   ["Team Content & Media",pick(["lich","phanbo","congviec","win","kho","research"])],
-   ["Team Digital – Ads Facebook",[MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||"")]],
-   ["Team KOC / Affiliate",[MI("bc_koc","KOC / Affiliate",tq)]],
-   ["Đo lường",pick(["baocao"])]]};
+const MKT_G=()=>{const all=MENU_ADMIN.filter(g=>g[0]!=="Hệ thống").flatMap(g=>g[1]),pick=(k,n)=>{const i=all.find(x=>x[0]===k);return i?(n?[i[0],n,i[2],i[3]]:i):null},P=(...a)=>a.filter(Boolean);return [
+   ["Kế hoạch",P(pick("hieuqua"),pick("kehoach","Kế hoạch tháng"),MI("dieuchinh","Điều chỉnh kế hoạch",u=>can(u,"kehoach.xem"),()=>(D().adjusts||[]).filter(a=>a.st==="pending").length||""),pick("baocao","Nhập số liệu"))],
+   ["Nội dung",P(pick("cv","Cần xử lý"),pick("lich"),pick("congviec"),pick("phanbo"),pick("giaoviec","Lịch quay"))],
+   ["Video",P(pick("win","Video win"),pick("research"),pick("kho","Kho video"))],
+   ["Quảng cáo & KOC",[MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("fb_ads","Chi Ads theo ngày",tq),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||""),MI("bc_koc","KOC / Affiliate",tq)]]]};
+/* Menu: 8 mục lớn. "hide" = không hiện ở thanh bên (Trợ lý AI ở nút trên cùng, mục Của tôi ở chỗ bấm vào tên).
+   "tabs" = các trang con hiện thành thanh tab trong trang, thanh bên chỉ còn một dòng. */
 const MODULES=[
- {k:"exec",zone:"",ic:"home",n:"Tổng quan điều hành",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
- {k:"cv",zone:"",ic:"task",n:"Giao việc & mục tiêu",sub:"",groups:()=>[["Công việc",[MI("cv_tq","Tổng quan công việc"),MI("cv_mt","Mục tiêu"),MI("cv_nv","Nhiệm vụ",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),MI("cv_kb","Tiến độ"),MI("cv_lich","Lịch"),MI("cv_da","Dự án")]]]},
- {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
- {k:"b2c",zone:"Kinh doanh",ic:"bag",n:"Kinh doanh B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
-   ["Báo cáo kênh",[MI("bc_tong","Tổng quan kinh doanh",tq),MI("bc_tiktok","TikTok Shop",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq)]],
-   ["Hoạt động Facebook",[MI("fb_ads","Quảng cáo",tq),MI("fb_sale","Hoạt động Sale B2C",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
- {k:"b2b",zone:"Kinh doanh",ic:"box",n:"Kinh doanh B2B",sub:"Đại lý · NPP · CRM",groups:()=>[
+ {k:"exec",zone:"",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
+ {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_tq","Tổng quan"),MI("cv_nv","Task",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),MI("cv_kb","Bảng tiến độ"),MI("cv_lich","Lịch"),MI("cv_mt","Mục tiêu"),MI("cv_da","Dự án")]]]},
+ {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
+ {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("matkhau","Đổi mật khẩu")]]]},
+ {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Bán hàng B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
+   ["Báo cáo kênh",[MI("bc_tong","Tổng quan kênh",tq),MI("bc_tiktok","TikTok Shop",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq)]],
+   ["Facebook",[MI("fb_sale","Sale B2C",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
+ {k:"b2b",zone:"Bán hàng",ic:"box",n:"Kinh doanh B2B",sub:"Đại lý · NPP · CRM",groups:()=>[
    ["Bán hàng",[MI("b2b_today","Việc hôm nay"),MI("b2b_kh","Khách hàng"),MI("b2b_don","Đơn hàng & duyệt",null,()=>(D().b2b?D().b2b.orders.flatMap(o=>o.approvals||[]).filter(a=>a.status==="PENDING").length:"")||""),MI("b2b_gia","Bảng giá 8 cấp"),MI("b2b_cn","Công nợ"),MI("b2b_perf","Kết quả cá nhân")]],
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
- {k:"sx",zone:"Kinh doanh",ic:"fac",n:"Sản xuất",sub:"",tabs:true,groups:()=>[["",SX_TABS.map(([k,t])=>MI(k,t))]]},
- {k:"mkt",zone:"Quản trị",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC",groups:MKT_G},
- {k:"fin",zone:"Quản trị",ic:"fin",n:"Tài chính & P&L",sub:"",groups:()=>[["Tài chính",[MI("pl","Báo cáo P&L",u=>can(u,"pl.xem")),MI("chiphi","Chi phí theo tháng",u=>can(u,"chiphi.xem")),MI("doisoat","Đối soát tiền về",u=>can(u,"chiphi.xem")),MI("sku","Giá vốn SKU",u=>can(u,"gia.xem_von"))]]]},
+ {k:"mkt",zone:"Vận hành",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC",groups:MKT_G},
+ {k:"sx",zone:"Vận hành",ic:"fac",n:"Sản xuất & kho",sub:"",tabs:true,groups:()=>[["",SX_TABS.map(([k,t])=>MI(k,t))]]},
+ {k:"fin",zone:"Quản trị",ic:"fin",n:"Tài chính",sub:"",groups:()=>[["",[MI("pl","Báo cáo P&L",u=>can(u,"pl.xem")),MI("chiphi","Chi phí theo tháng",u=>can(u,"chiphi.xem")),MI("doisoat","Đối soát tiền về",u=>can(u,"chiphi.xem")),MI("sku","Giá vốn SKU",u=>can(u,"gia.xem_von"))]]]},
  {k:"hr",zone:"Quản trị",ic:"ppl",n:"Nhân sự",sub:"",groups:()=>[
-   ["Tổng quan",[MI("hr_tq","Tổng quan nhân sự",u=>can(u,"nhansu.quanly"))]],
-   ["Hồ sơ",[MI("hoso","Danh sách nhân sự",u=>can(u,"nhansu.quanly")),MI("hr_hd","Hợp đồng & thử việc",u=>can(u,"nhansu.quanly")),MI("phongban","Phòng ban",u=>can(u,"thietlap.quanly"))]],
-   ["Chấm công & nghỉ",[MI("hr_cc","Chấm công",u=>can(u,"nhansu.quanly")),MI("hr_nghi","Nghỉ phép, OT, tạm ứng",u=>can(u,"nhansu.quanly")||can(u,"nhansu.duyet"),()=>(D().hr?D().hr.don.filter(x=>x.tt==="cho").length+D().hr.tu.filter(x=>x.tt==="cho").length:"")||"")]],
-   ["Hiệu suất",[MI("hr_kpi","KPI",u=>can(u,"nhansu.quanly")||can(u,"nhansu.duyet")),MI("hr_xb","Xét bậc & đánh giá",u=>can(u,"nhansu.quanly"))]],
+   ["Hồ sơ",[MI("hr_tq","Tổng quan nhân sự",u=>can(u,"nhansu.quanly")),MI("hoso","Hồ sơ nhân sự",u=>can(u,"nhansu.quanly")),MI("hr_hd","Hợp đồng & thử việc",u=>can(u,"nhansu.quanly"))]],
+   ["Chấm công & hiệu suất",[MI("hr_cc","Chấm công",u=>can(u,"nhansu.quanly")),MI("hr_nghi","Đơn từ: nghỉ, OT, tạm ứng",u=>can(u,"nhansu.quanly")||can(u,"nhansu.duyet"),()=>(D().hr?D().hr.don.filter(x=>x.tt==="cho").length+D().hr.tu.filter(x=>x.tt==="cho").length:"")||""),MI("hr_kpi","KPI",u=>can(u,"nhansu.quanly")||can(u,"nhansu.duyet")),MI("hr_xb","Xét bậc & đánh giá",u=>can(u,"nhansu.quanly"))]],
    ["Lương",[MI("hr_bl","Bảng lương",u=>can(u,"luong.quanly")),MI("hr_pl","Phiếu lương",u=>can(u,"luong.quanly")),MI("hr_cdl","Cài đặt lương",u=>can(u,"luong.quanly"))]],
-   ["Phát triển",[MI("hr_td","Tuyển dụng & đào tạo",u=>can(u,"nhansu.quanly"))]],
+   ["Tuyển dụng",[MI("hr_td","Tuyển dụng & đào tạo",u=>can(u,"nhansu.quanly"))]],
    ["Dữ liệu",[MI("hr_nap","Nạp file HR MASTER",u=>can(u,"nhansu.quanly"))]]]},
- {k:"setup",zone:"Hệ thống",ic:"gear",n:"Quản trị hệ thống",sub:"",groups:()=>[
-   ["Tổ chức & quyền",[MI("nhansu","Tài khoản & phân quyền",u=>can(u,"nhansu.quanly")),MI("phongban","Phòng ban",u=>can(u,"thietlap.quanly"))]],
-   ["Sản phẩm & giá",[MI("sanpham","Danh mục sản phẩm",u=>can(u,"sanpham.quanly")),MI("sku","SKU & giá vốn",u=>can(u,"gia.xem_von")),MI("kenhban","Kênh bán & phí",u=>can(u,"thietlap.quanly"))]],
-   ["Chi phí",[MI("chiphidm","Danh mục chi phí",u=>can(u,"thietlap.quanly"))]],
-   ["Hệ thống",[MI("bots","Bot AI phòng ban",u=>can(u,"caidat.quanly")),MI("quychuan","Quy chuẩn"),MI("caidat","Cài đặt & sao lưu",u=>can(u,"caidat.quanly")),MI("matkhau","Đổi mật khẩu")]]]},
+ {k:"setup",zone:"Quản trị",ic:"gear",n:"Cài đặt",sub:"",groups:()=>[
+   ["Tổ chức",[MI("nhansu","Tài khoản & phân quyền",u=>can(u,"nhansu.quanly")),MI("phongban","Phòng ban",u=>can(u,"thietlap.quanly"))]],
+   ["Danh mục",[MI("sanpham","Sản phẩm",u=>can(u,"sanpham.quanly")),MI("kenhban","Kênh bán & phí",u=>can(u,"thietlap.quanly")),MI("chiphidm","Danh mục chi phí",u=>can(u,"thietlap.quanly"))]],
+   ["Hệ thống",[MI("bots","Bot AI phòng ban",u=>can(u,"caidat.quanly")),MI("quychuan","Quy chuẩn"),MI("caidat","Sao lưu dữ liệu",u=>can(u,"caidat.quanly"))]]]},
 ];
 let MOD="";
 const modGroups=mo=>mo.groups().map(([g,items])=>[g,items.filter(i=>i[2](ME))]).filter(g=>g[1].length);
 const visibleMods=()=>MODULES.filter(mo=>modGroups(mo).length);
+/* Thanh tab trong trang cho phân hệ dạng tab (Sản xuất có thanh riêng). */
+function modTabs(m){if(APP_MODE!=="admin")return;const mo=curMod();if(!mo||!mo.tabs||mo.k==="sx")return;const its=modGroups(mo).flatMap(g=>g[1]);if(its.length<2)return;const nav=document.createElement("nav");nav.className="sxtabs";nav.innerHTML=its.map(([id,t,,cnt])=>{const n=cnt?cnt():"";return `<button class="${id===PAGE?"on":""}" data-mt="${id}">${t}${n!==""&&n!==0?` <b class="cnt">${n}</b>`:""}</button>`}).join("");const ph=m.querySelector(".ph");if(ph)ph.after(nav);else m.prepend(nav);nav.querySelectorAll("[data-mt]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.mt;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)})}
 
 /* ---------- P&L (khung) ---------- */
 function pPL(m){
@@ -111,7 +112,7 @@ function pHR(m){m.innerHTML=H("Nhân sự","Làm sau Digital và P&L")+`<section
 function pCRM(m){m.innerHTML=H("Sale B2B — CRM","Đang chạy riêng, sẽ gộp vào khung chung")+`<section class="card"><p>CRM B2B (khách sỉ, đại lý, đơn hàng, công nợ, bảng giá 8 cấp) đang chạy ở địa chỉ riêng. Khi dựng bản thật, CRM trở thành phân hệ này: dùng chung đăng nhập, nhân sự, phòng ban và danh mục sản phẩm.</p><div class="acts"><a class="btn pri" href="https://ailla-b2b-crm-demo.aillavietnam2020.workers.dev/sales/performance" target="_blank" rel="noopener">Mở CRM B2B (bản demo)</a></div></section>`}
 
 /* ---------- Thiết lập: phòng ban ---------- */
-const PHANHE_N={exec:"Tổng quan",b2c:"KD B2C",b2b:"KD B2B",sx:"Sản xuất",mkt:"Marketing",fin:"Tài chính",hr:"Nhân sự",setup:"Hệ thống"};
+const PHANHE_N={exec:"Tổng quan",b2c:"Bán hàng B2C",b2b:"KD B2B",sx:"Sản xuất & kho",mkt:"Marketing",fin:"Tài chính",hr:"Nhân sự",setup:"Cài đặt"};
 function pPhongBan(m){
   const d=D(),ed=can(ME,"thietlap.quanly"),st=d.staff.filter(x=>x.tt!=="Đã nghỉ"),uOpts=[["","—"]].concat(d.users.filter(u=>u.active).map(u=>[u.id,u.name+" (tài khoản)"]));
   const byK=KHOI.map(kh=>[kh,st.filter(x=>x.khoi===kh).length]);

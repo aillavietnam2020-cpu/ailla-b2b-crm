@@ -121,7 +121,7 @@ function pCvTong(m){
 /* ---------- 2. Nhiệm vụ ---------- */
 function pCvNv(m){
   const L=cvFilter(cvItems()).sort((a,b)=>(b.late-a.late)||(a.st==="done")-(b.st==="done")||a.han-b.han);
-  m.innerHTML=H("Nhiệm vụ",`${L.length} việc`)+`<div class="filters"><span class="sp"></span><button class="btn sm${CVF.view==="grid"?" pri":""}" data-vw="grid">Thẻ</button><button class="btn sm${CVF.view==="list"?" pri":""}" data-vw="list">Danh sách</button><button class="btn" id="cv-xl">⬇ Excel</button>${newTaskBtn()}</div>${cvFilterBar()}
+  m.innerHTML=H("Task",`${L.length} việc`)+`<div class="filters"><span class="sp"></span><button class="btn sm${CVF.view==="grid"?" pri":""}" data-vw="grid">Thẻ</button><button class="btn sm${CVF.view==="list"?" pri":""}" data-vw="list">Danh sách</button><button class="btn" id="cv-xl">⬇ Excel</button>${newTaskBtn()}</div>${cvFilterBar()}
   ${CVF.view==="grid"?`<div class="cvgrid">${L.slice(0,120).map(cvCard).join("")||`<p class="empty">Không có việc.</p>`}</div>${L.length>120?`<p class="hint">Đang hiện 120/${L.length} việc, lọc thêm để xem hết.</p>`:""}`:`<section class="card">${tbl(["Việc","Loại","Dự án","Người làm","Hạn","Ưu tiên","Trạng thái"],L.map(x=>`<tr class="clk" data-cv="${x.id}" data-src="${x.src}"><td><b>${esc(x.ten)}</b><small>${esc(x.mo)}</small></td><td>${esc(x.loai)}</td><td>${esc(prjN(x.da))}</td><td>${esc(userName(x.nguoi)||"—")}</td><td>${x.late?`<span class="t-red">${dd(x.han)} · trễ ${x.lateD}n</span>`:dd(x.han)}</td><td>${x.uu}</td><td>${pill(cvStN(x.st),(CV_ST.find(s=>s[0]===x.st)||[])[2])}</td></tr>`))}</section>`}`;
   bindCvFilter(m);bindCvCards(m);bindNew();m.querySelectorAll("[data-vw]").forEach(b=>b.onclick=()=>{CVF.view=b.dataset.vw;renderMain()});
   $("#cv-xl").onclick=()=>{if(typeof XLSX==="undefined"){toast("Cần mạng để xuất Excel");return}const ws=XLSX.utils.aoa_to_sheet([["Mã","Việc","Mô tả","Loại","Team","Dự án","Người làm","Hạn","Ưu tiên","Trạng thái","Quá hạn (ngày)"]].concat(L.map(x=>[x.id,x.ten,x.mo,x.loai,TEAMS[x.team]||x.team,prjN(x.da),userName(x.nguoi),dd(x.han)+"/"+MONTH.year,x.uu,cvStN(x.st),x.lateD||""])));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Nhiem vu");XLSX.writeFile(wb,`Nhiem-vu-T${MONTH.mon}.xlsx`)};
@@ -129,7 +129,7 @@ function pCvNv(m){
 /* ---------- 3. Tiến độ (bảng cột) ---------- */
 function pCvKb(m){
   const L=cvFilter(cvItems());
-  m.innerHTML=H("Tiến độ","Kéo thẻ việc sang cột khác để đổi trạng thái · thẻ video đi theo các bước riêng (bấm để mở)")+`<div class="filters"><span class="sp"></span>${newTaskBtn()}</div>${cvFilterBar({noSt:true})}
+  m.innerHTML=H("Bảng tiến độ","Kéo thẻ việc sang cột khác để đổi trạng thái · thẻ video đi theo các bước riêng (bấm để mở)")+`<div class="filters"><span class="sp"></span>${newTaskBtn()}</div>${cvFilterBar({noSt:true})}
   <div class="kbx">${CV_ST.map(([k,t,c])=>{const I=L.filter(x=>x.st===k).sort((a,b)=>(b.late-a.late)||a.han-b.han);return `<div class="kcol" data-drop="${k}"><div class="kh"><i class="dot d-${c}"></i><b>${t}</b><span>${I.length}</span></div>${I.slice(0,40).map(x=>cvCard(x).replace('class="cvc','draggable="'+(x.src==="task")+'" class="cvc')).join("")}${I.length>40?`<p class="hint">+${I.length-40} việc nữa</p>`:""}</div>`}).join("")}</div>`;
   bindCvFilter(m);bindCvCards(m);bindNew();
   m.querySelectorAll('.cvc[draggable="true"]').forEach(c=>c.ondragstart=e=>e.dataTransfer.setData("text",c.dataset.cv));

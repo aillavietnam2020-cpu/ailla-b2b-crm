@@ -119,7 +119,7 @@ DB.reset=async function(){toast("Bản trên máy chủ không xoá về dữ li
 /* ---------- Khung giao diện ---------- */
 function renderLogin(){
   const msg=!DB.data?"Khu Marketing chưa được khởi tạo. Nhờ chị Hoa (CEO) mở trang này một lần để tạo dữ liệu ban đầu."
-    :`Tài khoản <b>${esc(SV.me?SV.me.display_name:"")}</b> chưa được gắn với nhân sự nào trong khu Marketing. Nhờ chị Hoa vào <b>Quản trị hệ thống › Tài khoản & phân quyền</b> để gắn.`;
+    :`Tài khoản <b>${esc(SV.me?SV.me.display_name:"")}</b> chưa được gắn với nhân sự nào trong khu Marketing. Nhờ chị Hoa vào <b>Cài đặt › Tài khoản & phân quyền</b> để gắn.`;
   $("#app").innerHTML=`<div class="loginwrap"><div class="login"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>Trang quản trị Ailla</h1><p>${msg}</p><div class="acts">${SV.perms.includes("price.read")?`<a class="btn" href="/admin">Mở CRM B2B</a>`:""}<button class="btn" id="svout">Đăng xuất</button></div></div></div>`;
   $("#svout").onclick=svLogout;
 }
@@ -131,15 +131,15 @@ async function svLogout(){try{await fetch("/api/auth/logout",{method:"POST",cred
 {const i=MODULES.findIndex(m=>m.k==="b2b");if(i>=0)MODULES.splice(i,1)}
 {const hr=MODULES.find(m=>m.k==="hr");if(hr){const g0=hr.groups;hr.groups=()=>g0().filter(([g])=>g!=="Lương"&&g!=="Dữ liệu")}}
 {const i=MENU_USER.findIndex(g=>g[0]==="Nhân sự của tôi");if(i>=0)MENU_USER[i]=[MENU_USER[i][0],MENU_USER[i][1].filter(it=>it[0]!=="hr_plme")]}
-MODULES.splice(MODULES.findIndex(m=>m.zone==="Kinh doanh"),0,{k:"b2blink",zone:"Kinh doanh",ic:"box",n:"Kinh doanh B2B (CRM)",sub:"",groups:()=>[["",[MI("crmgo","Mở CRM B2B",()=>SV.perms.includes("price.read"))]]]});
+MODULES.splice(MODULES.findIndex(m=>m.k==="mkt"),0,{k:"b2blink",zone:"Bán hàng",ic:"box",n:"Bán hàng B2B (CRM)",sub:"",groups:()=>[["",[MI("crmgo","Mở CRM B2B",()=>SV.perms.includes("price.read"))]]]});
 /* ---------- Mỗi phòng ban chỉ thấy phân hệ của mình ----------
-   Phân hệ lấy từ Quản trị hệ thống › Phòng ban (cột "Dùng phân hệ"); ai cũng có Công việc & dự án
+   Phân hệ lấy từ Cài đặt › Phòng ban (cột "Dùng phân hệ"); ai cũng có Công việc & dự án
    (giao việc, nhiệm vụ). CEO (vai trò Quản trị) thấy tất cả. */
 const DEPT_MODS={SX:["sx"],KV:["sx"],HCNS:["hr"]};
 function svAllowedMods(){
   if(!ME||ME.role==="admin")return null;
   const p=(D().departments||[]).find(x=>x.k===ME.phongBan),m=(p&&p.phanHe&&p.phanHe.length?p.phanHe:DEPT_MODS[ME.phongBan])||[];
-  const s=new Set(["cv",...m]);if(s.has("mkt"))s.add("aiq");
+  const s=new Set(["cv","me",...m]);if(s.has("mkt"))s.add("aiq");
   // Ai được cấp một quyền Sản xuất (Thảo điều phối, kế toán kho, kỹ thuật...) thì thấy phân hệ Sản xuất.
   if(["sx.dieuphoi","sx.xuong","sx.kiemke","sx.kythuat"].some(k=>can(ME,k))||ME.phongBan==="KT")s.add("sx");if(s.has("b2b")||s.has("b2c"))s.add("b2blink");return s;
 }
@@ -154,7 +154,6 @@ MODULES.forEach(mo=>{const g=mo.groups;mo.groups=()=>{const a=svAllowedMods();if
 /* Dòng ghi chú trên các trang số tài chính: đây là số quản trị nội bộ, sổ sách chính thức ở MISA. */
 const INTERNAL_PAGES=["exec","bc_tong","bc_tiktok","bc_shopee","bc_fb","pl","chiphi","doisoat","sku","adshieuqua","fb_ads","adssp"];
 INTERNAL_PAGES.forEach(k=>{const f=PAGES[k];if(f)PAGES[k]=m=>{f(m);m.insertAdjacentHTML("afterbegin",`<div class="note internal">🔒 Số liệu <b>quản trị nội bộ</b> để điều hành (ước tính, phân bổ, so mục tiêu), không phải báo cáo tài chính. Sổ sách chính thức do Kế toán quản lý trên MISA.</div>`)}});
-{const cv=MODULES.find(m=>m.k==="cv");if(cv){const g=cv.groups;cv.groups=()=>{const G=g();return G.length?G.concat([["Của tôi",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("matkhau","Đổi mật khẩu")]]]):G}}}
 {const mk=MODULES.find(m=>m.k==="mkt");if(mk){const g=mk.groups;mk.groups=()=>{const G=g();return G.length?[["Của tôi",[MI("viectoi","Việc của tôi",u=>u.role==="content",()=>myTodo().length||""),MI("ketquatoi","Kết quả của tôi",u=>u.role==="content")]]].concat(G):G}}}
 PAGES.crmgo=m=>{m.innerHTML=H("Đang mở CRM B2B…");location.href=SV.me&&SV.me.role!=="EMPLOYEE"?(SV.me.role==="CEO"?"/admin/ceo":"/admin"):"/sales"};
 PAGES.matkhau=m=>{const p=SV.me&&SV.me.role!=="EMPLOYEE"?"/admin/account":"/sales/account";m.innerHTML=H("Đổi mật khẩu","Dùng chung mật khẩu với CRM")+`<section class="card narrow"><p>Mật khẩu đăng nhập dùng chung cho CRM và khu Marketing.</p><div class="acts"><a class="btn pri" href="${p}">Đổi mật khẩu</a></div></section>`};
@@ -181,7 +180,7 @@ function pNhanSuSV(m){
   const b2bCell=u=>{const a=acc(u.crm);if(!a)return "—";if(a.role!=="EMPLOYEE"||u.id===ME.id||a.is_accountant)return "Có";return crm?`<label class="sw-t"><input type="checkbox" data-b2b="${a.id}" ${a.is_hub_only?"":"checked"}> ${a.is_hub_only?"Không":"Có"}</label>`:(a.is_hub_only?"Không":"Có")};
   const ktCell=u=>{const a=acc(u.crm);if(!a)return "—";if(a.role==="CEO")return "Có";return crm?`<label class="sw-t"><input type="checkbox" data-kt="${a.id}" ${a.is_accountant?"checked":""}> ${a.is_accountant?"Có":"Không"}</label>`:(a.is_accountant?"Có":"Không")};
   const gate=SV_ACCESS&&SV_ACCESS.configured;
-  m.innerHTML=H("Tài khoản & phân quyền","Thêm, khoá nhân sự và cấp quyền ở một chỗ")+`<div class="note">Mỗi người chỉ thấy phân hệ của <b>phòng ban</b> mình (đặt ở Quản trị hệ thống › Phòng ban) và mục Giao việc & mục tiêu. <b>Trưởng phòng</b> giao được việc cho người trong phòng. <b>Kế toán</b> mới xem được giá vốn, P&L, chi phí và doanh thu tổng. Bỏ tick <b>Đang làm</b> là khoá luôn tài khoản đăng nhập.</div>
+  m.innerHTML=H("Tài khoản & phân quyền","Thêm, khoá nhân sự và cấp quyền ở một chỗ")+`<div class="note">Mỗi người chỉ thấy phân hệ của <b>phòng ban</b> mình (đặt ở Cài đặt › Phòng ban) và mục Task giao việc. <b>Trưởng phòng</b> giao được việc cho người trong phòng. <b>Kế toán</b> mới xem được giá vốn, P&L, chi phí và doanh thu tổng. Bỏ tick <b>Đang làm</b> là khoá luôn tài khoản đăng nhập.</div>
   ${crm?`<section class="card"><div class="card-h"><h2>Cửa vào qt.ailla.vn</h2>${gate?pill("Tự cập nhật","grn"):pill("Chưa nối tự động","amb")}</div><p class="hint">${gate?"Thêm nhân sự là email được mở cửa ngay; khoá tài khoản là email bị rút ra.":"Hiện chỉ email của chị vào được qt.ailla.vn. Khi nối xong, thêm nhân sự ở đây là tự mở cửa cho họ."}</p>${gate?`<div class="acts"><button class="btn sm" id="acsync">Đồng bộ lại ngay</button></div>`:""}</section>`:""}
   <section class="card">${tbl(["Họ tên","Phòng ban","Vai trò","Tài khoản đăng nhập","Vào CRM B2B","Kế toán","Đang làm",""],U.map(u=>`<tr><td><b>${esc(u.name)}</b><small>${esc(u.title||"")}</small></td><td>${ed&&u.id!==ME.id?`<select data-upb="${u.id}">${opt([["","—"]].concat(D().departments.map(p=>[p.k,p.n])),u.phongBan||"")}</select>`:esc((D().departments.find(p=>p.k===u.phongBan)||{n:"—"}).n)}</td><td>${u.id===ME.id||!ed?ROLES[u.role]:`<select data-ur="${u.id}">${opt(Object.entries(ROLES),u.role)}</select>`}</td><td>${accCell(u)}</td><td>${b2bCell(u)}</td><td>${ktCell(u)}</td><td>${u.id===ME.id||!ed?(u.active?"Có":"Đã khóa"):`<label class="sw-t"><input type="checkbox" data-ua="${u.id}" ${u.active?"checked":""}> ${u.active?"Có":"Đã khóa"}</label>`}</td><td class="nowrap">${ed?`<button class="btn sm" data-pp="${u.id}">Phân quyền</button>`:""}${crm&&acc(u.crm)&&u.id!==ME.id?` <button class="btn sm" data-pw="${u.crm}">Cấp lại mật khẩu</button>`:""}</td></tr>`))}</section>
   ${ed?`<section class="card"><div class="card-h"><h2>Thêm nhân sự</h2></div><p class="hint">Điền một lần: web tự tạo tài khoản đăng nhập, gắn phòng ban, quyền theo vai trò${gate?" và mở cửa qt.ailla.vn":""}. Lần đầu đăng nhập, nhân sự phải đổi sang mật khẩu của riêng họ.</p><form class="frm" id="uf"><div class="row4"><label class="field">Họ tên<input id="u-n" required></label><label class="field">Chức danh<input id="u-t"></label><label class="field">Phòng ban<select id="u-pb">${opt(D().departments.map(p=>[p.k,p.n]),"")}</select></label><label class="field">Vai trò<select id="u-r">${opt(Object.entries(ROLES).filter(([k])=>k!=="admin"),"nhanvien")}</select></label></div>

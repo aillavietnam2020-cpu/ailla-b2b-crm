@@ -75,8 +75,17 @@ function putSecret(name, value) {
   if (r.status !== 0) throw new Error(`Không cất được ${name}: ${(r.stderr || r.stdout || '').slice(-300)}`);
 }
 
-const token = await askHidden('Dán mã khoá Cloudflare (bấm chuột phải) rồi bấm Enter — mỗi ký tự hiện một dấu *: ');
-console.log(`(đã nhận ${token.length} ký tự)`);
+// Lấy mã từ bộ nhớ copy (chị bấm nút Copy trên Cloudflare là đủ, không cần dán vào cửa sổ đen).
+function fromClipboard() {
+  const r = spawnSync('powershell', ['-NoProfile', '-Command', 'Get-Clipboard -Raw'], { encoding: 'utf8' });
+  return String(r.stdout || '').replace(/[^A-Za-z0-9_-]/g, '');
+}
+let token = fromClipboard();
+if (token.length >= 30) {
+  console.log(`Đã lấy mã khoá từ bộ nhớ copy (${token.length} ký tự).`);
+} else {
+  token = await askHidden('Chưa thấy mã trong bộ nhớ copy. Dán mã (bấm chuột phải) rồi Enter: ');
+}
 if (!token) {
   console.log('Chưa dán mã khoá.');
   process.exitCode = 1;
@@ -103,8 +112,9 @@ try {
   putSecret('ACCESS_POLICY_ID', policy.id);
   if (!isReusable) putSecret('ACCESS_APP_ID', app.id);
   putSecret('CF_ACCESS_TOKEN', token);
+  spawnSync('powershell', ['-NoProfile', '-Command', 'Set-Clipboard -Value " "']);
   console.log('');
-  console.log('XONG. Vào qt.ailla.vn › Quản trị hệ thống › Tài khoản & phân quyền:');
+  console.log('XONG. Vào qt.ailla.vn › Cài đặt › Tài khoản & phân quyền:');
   console.log('ô "Cửa vào qt.ailla.vn" sẽ hiện "Tự cập nhật".');
 } catch (e) {
   console.log('');
