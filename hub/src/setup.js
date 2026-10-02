@@ -72,8 +72,8 @@ const MODULES=[
  {k:"exec",zone:"",ic:"home",n:"Tổng quan điều hành",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
  {k:"b2c",zone:"Kinh doanh",ic:"bag",n:"Kinh doanh B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
-   ["Báo cáo kênh",[MI("bc_tong","Tổng quan kinh doanh",tq),MI("bc_tiktok","TikTok Shop",tq),MI("bc_shopee","Shopee",tq)]],
-   ["Facebook",[MI("bc_fb","Tổng quan Facebook",tq),MI("fb_ads","Quảng cáo",tq),MI("fb_sale","Hoạt động Sale B2C",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
+   ["Báo cáo kênh",[MI("bc_tong","Tổng quan kinh doanh",tq),MI("bc_tiktok","TikTok Shop",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq)]],
+   ["Hoạt động Facebook",[MI("fb_ads","Quảng cáo",tq),MI("fb_sale","Hoạt động Sale B2C",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
  {k:"b2b",zone:"Kinh doanh",ic:"box",n:"Kinh doanh B2B",sub:"Đại lý · NPP · CRM",groups:()=>[
    ["Bán hàng",[MI("b2b_today","Việc hôm nay"),MI("b2b_kh","Khách hàng"),MI("b2b_don","Đơn hàng & duyệt",null,()=>(D().b2b?D().b2b.orders.flatMap(o=>o.approvals||[]).filter(a=>a.status==="PENDING").length:"")||""),MI("b2b_gia","Bảng giá 8 cấp"),MI("b2b_cn","Công nợ"),MI("b2b_perf","Kết quả cá nhân")]],
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
