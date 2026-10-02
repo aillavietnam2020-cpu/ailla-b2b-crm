@@ -88,6 +88,10 @@
       "name": "ailla-b2b-crm",
       "vars": {
         "ENVIRONMENT": "production",
+        // Trợ lý AI khu Marketing: 9router trên VPS qua đường hầm Cloudflare (chỉ mở /v1/).
+        // Khoá đặt bằng: npx wrangler secret put AI_API_KEY --env production
+        "AI_BASE_URL": "https://ai.ailla.vn",
+        "AI_MODEL": "Combo_Content",
         "DEV_AUTH_ENABLED": "false",
         "ACCESS_TEAM_DOMAIN": "REPLACE.cloudflareaccess.com",
         "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",
