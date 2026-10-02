@@ -12,6 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
+process.noDeprecation = true;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ACCOUNT_ID = 'be5d086a049ed8399aaa562543e9d174';
 const DOMAIN = 'qt.ailla.vn';
@@ -62,10 +63,22 @@ async function cf(token, path) {
   return j.result;
 }
 
+/** Máy chưa đăng nhập Cloudflare (hoặc phiên cũ hết hạn) thì mở trang đăng nhập để chị bấm Allow. */
+function ensureLogin() {
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (k.toUpperCase() === 'CLOUDFLARE_API_TOKEN') delete env[k];
+  const who = spawnSync('npx wrangler whoami', { cwd: ROOT, env, shell: true, encoding: 'utf8' });
+  if (who.status === 0 && /logged in/i.test(who.stdout || '') && !/not logged in/i.test(who.stdout || '')) return;
+  console.log('');
+  console.log('Cần đăng nhập Cloudflare một lần: trình duyệt sẽ mở, chị bấm nút "Allow" rồi quay lại đây.');
+  const r = spawnSync('npx wrangler login', { cwd: ROOT, env, shell: true, stdio: 'inherit' });
+  if (r.status !== 0) throw new Error('Chưa đăng nhập được Cloudflare');
+}
+
 function putSecret(name, value) {
   const env = { ...process.env };
   delete env.CLOUDFLARE_API_TOKEN; // dùng tài khoản Cloudflare đã đăng nhập trên máy
-  const r = spawnSync('npx', ['wrangler', 'secret', 'put', name, '--env', 'production'], {
+  const r = spawnSync(`npx wrangler secret put ${name} --env production`, {
     cwd: ROOT,
     input: value,
     env,
@@ -113,6 +126,7 @@ try {
   const isReusable = Array.isArray(reusable) && reusable.some((p) => p.id === policy.id);
 
   console.log(`Tìm thấy cửa: "${app.name}", chính sách "${policy.name}".`);
+  ensureLogin();
   console.log('Đang cất vào máy chủ (mất khoảng 30 giây)...');
   putSecret('CF_ACCOUNT_ID', ACCOUNT_ID);
   putSecret('ACCESS_POLICY_ID', policy.id);
@@ -125,7 +139,7 @@ try {
 } catch (e) {
   console.log('');
   console.log('CHƯA ĐƯỢC: ' + e.message);
-  console.log('Kiểm tra lại: mã khoá copy đủ chưa (thường dài khoảng 40 ký tự), có quyền "Access: Apps and Policies - Edit" chưa.');
+  if (/Authentication|token|quyền|permission/i.test(e.message)) console.log('Kiểm tra lại: mã khoá copy đủ chưa (thường dài khoảng 40-55 ký tự), có quyền "Access: Apps and Policies - Edit" chưa.');
   process.exitCode = 1;
 }
 }
