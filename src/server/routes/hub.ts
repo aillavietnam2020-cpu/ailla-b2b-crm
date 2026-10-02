@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { nowIso } from '@shared/datetime';
 import type { AppEnv } from '../env';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
+import { auditStatement } from '../lib/audit';
+import type { AuthContext } from '../env';
 import { requirePermission } from '../middleware/rbac';
 
 /**
@@ -13,7 +15,24 @@ export const hubRoutes = new Hono<AppEnv>();
 
 const STATE_ID = 'main';
 const MAX_JSON = 8 * 1024 * 1024; // 8 MB JSON gốc (nén xong còn khoảng 1/8)
-const BLOB_KEYS = ['t9file', 't9', 'kd', 'skucost', 'nhansu0'] as const;
+const SECURE_ID = 'secure';
+const BLOB_KEYS = ['t9file', 't9', 'kd', 'kd_ads', 'kd_sale', 'skucost', 'nhansu0'] as const;
+/**
+ * Phần dữ liệu tài chính (giá vốn SKU, chi phí tháng, mục tiêu doanh số) tách sang bản ghi riêng:
+ * chỉ CEO và kế toán (quyền xem công nợ toàn công ty) đọc/ghi được; người khác không nhận về,
+ * gửi lên cũng bị bỏ qua.
+ */
+const SECURE_KEYS = ['skus', 'costs', 'targets'] as const;
+const canSecret = (auth: AuthContext) => auth.user.role === 'CEO' || auth.permissions.includes('debt.read.all');
+
+function splitSecure(data: Record<string, unknown>) {
+  const secure: Record<string, unknown> = {};
+  for (const k of SECURE_KEYS) {
+    if (k in data) secure[k] = data[k];
+    delete data[k];
+  }
+  return secure;
+}
 
 async function pack(json: string): Promise<string> {
   const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -48,7 +67,24 @@ hubRoutes.get('/state', async (c) => {
     .bind(STATE_ID)
     .first<{ version: number; data: string; updated_at: string }>();
   if (!row) return ok(c, { version: 0, data: null, updated_at: null });
-  return ok(c, { version: row.version, data: JSON.parse(await unpack(row.data)), updated_at: row.updated_at });
+  const auth = c.get('auth');
+  const data = JSON.parse(await unpack(row.data)) as Record<string, unknown>;
+  // Bản cũ có thể còn lẫn số tài chính: luôn gạt ra trước. Chưa có ngăn riêng thì CEO/kế toán nhận lại
+  // đúng số cũ đó, lần ghi kế tiếp sẽ tự chuyển sang ngăn riêng.
+  const legacy = splitSecure(data);
+  if (canSecret(auth)) {
+    const sec = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(SECURE_ID).first<{ data: string }>();
+    Object.assign(data, sec ? JSON.parse(await unpack(sec.data)) : legacy);
+  }
+  await auditStatement(c.env.DB, {
+    actorId: auth.user.id,
+    action: 'HUB_READ',
+    entityType: 'HUB',
+    entityId: canSecret(auth) ? 'state+finance' : 'state',
+    ip: c.req.header('CF-Connecting-IP') ?? null,
+    requestId: c.get('requestId'),
+  }).run();
+  return ok(c, { version: row.version, data, updated_at: row.updated_at });
 });
 
 hubRoutes.put('/state', async (c) => {
@@ -65,8 +101,20 @@ hubRoutes.put('/state', async (c) => {
   if (!Number.isInteger(base) || base < 0 || !body.data || typeof body.data !== 'object') {
     throw badRequest('BAD_STATE', 'Thiếu số phiên bản hoặc dữ liệu');
   }
-  const packed = await pack(JSON.stringify(body.data));
+  const data = body.data as Record<string, unknown>;
+  const secure = splitSecure(data);
+  const packed = await pack(JSON.stringify(data));
   const now = nowIso();
+  const saveSecure = async () => {
+    if (!canSecret(auth) || Object.keys(secure).length === 0) return;
+    await c.env.DB.prepare(
+      `INSERT INTO hub_state (id, version, data, updated_at, updated_by) VALUES (?, 1, ?, ?, ?)
+       ON CONFLICT (id) DO UPDATE SET version = hub_state.version + 1, data = excluded.data,
+         updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    )
+      .bind(SECURE_ID, await pack(JSON.stringify(secure)), now, auth.user.id)
+      .run();
+  };
 
   // Bản đầu tiên chỉ CEO được khởi tạo (tránh nhân viên vô tình tạo kho rỗng).
   if (base === 0) {
@@ -78,6 +126,7 @@ hubRoutes.put('/state', async (c) => {
       .bind(STATE_ID, packed, now, auth.user.id)
       .run();
     if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Đã có người khởi tạo trước');
+    await saveSecure();
     return ok(c, { version: 1, updated_at: now });
   }
 
@@ -88,6 +137,7 @@ hubRoutes.put('/state', async (c) => {
     .bind(packed, now, auth.user.id, STATE_ID, base)
     .run();
   if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Có người vừa sửa trước, đang tải bản mới');
+  await saveSecure();
   return ok(c, { version: base + 1, updated_at: now });
 });
 
@@ -99,9 +149,17 @@ hubRoutes.get('/blob/:key', async (c) => {
     .bind(key)
     .first<{ data: string; admin_only: number }>();
   if (!row) return ok(c, null);
-  // Số liệu riêng tư (giá vốn, danh sách nhân sự): CEO và kế toán (xem được công nợ toàn công ty).
+  // Số liệu riêng tư (doanh thu đầy đủ, giá vốn, danh sách nhân sự): chỉ CEO và kế toán.
   const auth = c.get('auth');
-  if (row.admin_only && !isHubAdmin(auth.user.role) && !auth.permissions.includes('debt.read.all')) throw forbidden();
+  if (row.admin_only && !canSecret(auth)) throw forbidden();
+  await auditStatement(c.env.DB, {
+    actorId: auth.user.id,
+    action: 'HUB_READ',
+    entityType: 'HUB_BLOB',
+    entityId: key,
+    ip: c.req.header('CF-Connecting-IP') ?? null,
+    requestId: c.get('requestId'),
+  }).run();
   return ok(c, JSON.parse(await unpack(row.data)));
 });
 

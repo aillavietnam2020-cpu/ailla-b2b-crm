@@ -66,7 +66,10 @@ DB.load=async function(){
   const me=await svApi("/api/me");SV.me=me.user;SV.perms=me.permissions||[];
   const blob=k=>svApi("/api/hub/blob/"+k).catch(()=>null);
   const acct=isCeo()||SV.perms.includes("debt.read.all");
-  const [t9,t9b,kd,sc,ns]=await Promise.all([blob("t9file"),blob("t9"),blob("kd"),acct?blob("skucost"):null,isCeo()?blob("nhansu0"):null]);
+  SV.acct=acct;
+  // CEO + kế toán nhận đủ số kinh doanh; người khác chỉ nhận số Ads (team Digital) và chỉ số bán hàng (Sale).
+  const [t9,t9b,kdFull,kdAds,kdSale,sc,ns]=await Promise.all([blob("t9file"),blob("t9"),acct?blob("kd"):null,acct?null:blob("kd_ads"),acct?null:blob("kd_sale"),acct?blob("skucost"):null,isCeo()?blob("nhansu0"):null]);
+  const kd=kdFull||(kdAds||kdSale?{...KDX,...(kdAds||{}),...(kdSale||{}),day:{tts:{},spe:{},fb:{},ads:(kdAds&&kdAds.day&&kdAds.day.ads)||{}}}:null);
   if(SV.perms.includes("dashboard.ceo"))svApi("/api/dashboards/ceo").then(c=>{CRM_BASE.noChinhThuc=c.official_debt||0;CRM_BASE.noDuKien=c.projected_debt||0;if(ME&&PAGE==="exec")renderMain()}).catch(()=>{});
   if(t9)window.T9FILE=t9;if(t9b){T9_BASE=t9b.base||{};T9RAW=t9b.raw||T9RAW}if(kd){KD=kd;KDX=kd;DAYD=kd.day||DAYD;TT=kd.tts||null;SP=kd.spe||null}if(sc)SKUCOST=sc;if(ns)NHANSU0=ns;
   const st=await svApi("/api/hub/state");
@@ -129,7 +132,14 @@ function svAllowedMods(){
 // Phòng được dùng phân hệ nào thì người trong phòng xem được các trang của phân hệ đó (B2C, Sản xuất,
 // Tài chính, Nhân sự, Tổng quan); Marketing và Quản trị hệ thống vẫn theo quyền chi tiết từng người.
 const DEPT_OPEN=["exec","b2c","sx","fin","hr"];
-MODULES.forEach(mo=>{const g=mo.groups;mo.groups=()=>{const a=svAllowedMods();if(a&&!a.has(mo.k))return [];const G=g();return a&&DEPT_OPEN.includes(mo.k)?G.map(([n,its])=>[n,its.map(i=>[i[0],i[1],()=>true,i[3]])]):G}});
+// Số tài chính (doanh thu tổng, giá vốn, P&L, chi phí): chỉ CEO và kế toán. Người khác ở phòng Sale chỉ thấy
+// trang chỉ số bán hàng; Tổng quan điều hành và Tài chính ẩn hẳn.
+const SECRET_MODS=["exec","fin"],SALE_PAGES=["fb_sale","fb_cskh"];
+MODULES.forEach(mo=>{const g=mo.groups;mo.groups=()=>{const a=svAllowedMods();if(a&&!a.has(mo.k))return [];if(!SV.acct&&SECRET_MODS.includes(mo.k))return [];let G=g();if(a&&DEPT_OPEN.includes(mo.k))G=G.map(([n,its])=>[n,its.map(i=>[i[0],i[1],()=>true,i[3]])]);if(!SV.acct&&mo.k==="b2c")G=G.map(([n,its])=>[n,its.filter(i=>SALE_PAGES.includes(i[0]))]).filter(x=>x[1].length);return G}});
+{const st=MODULES.find(m=>m.k==="setup");if(st){const g=st.groups;st.groups=()=>g().map(([n,its])=>[n,its.filter(i=>SV.acct||!["sku","kenhban","chiphidm"].includes(i[0]))]).filter(x=>x[1].length)}}
+/* Dòng ghi chú trên các trang số tài chính: đây là số quản trị nội bộ, sổ sách chính thức ở MISA. */
+const INTERNAL_PAGES=["exec","bc_tong","bc_tiktok","bc_shopee","bc_fb","pl","chiphi","doisoat","sku","adshieuqua","fb_ads","adssp"];
+INTERNAL_PAGES.forEach(k=>{const f=PAGES[k];if(f)PAGES[k]=m=>{f(m);m.insertAdjacentHTML("afterbegin",`<div class="note internal">🔒 Số liệu <b>quản trị nội bộ</b> để điều hành (ước tính, phân bổ, so mục tiêu), không phải báo cáo tài chính. Sổ sách chính thức do Kế toán quản lý trên MISA.</div>`)}});
 {const cv=MODULES.find(m=>m.k==="cv");if(cv){const g=cv.groups;cv.groups=()=>{const G=g();return G.length?G.concat([["Của tôi",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("matkhau","Đổi mật khẩu")]]]):G}}}
 {const mk=MODULES.find(m=>m.k==="mkt");if(mk){const g=mk.groups;mk.groups=()=>{const G=g();return G.length?[["Của tôi",[MI("viectoi","Việc của tôi",u=>u.role==="content",()=>myTodo().length||""),MI("ketquatoi","Kết quả của tôi",u=>u.role==="content")]]].concat(G):G}}}
 PAGES.crmgo=m=>{m.innerHTML=H("Đang mở CRM B2B…");location.href=SV.me&&SV.me.role!=="EMPLOYEE"?(SV.me.role==="CEO"?"/admin/ceo":"/admin"):"/sales"};

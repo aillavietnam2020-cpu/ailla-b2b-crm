@@ -21,7 +21,9 @@ if (!DATA || !out) {
 const ITEMS = [
   ['t9file', 't9file.json', 0], // báo cáo video TikTok tuần, trợ lý AI của team dùng
   ['t9', null, 0], // kế hoạch + doanh thu tháng 9 theo SKU, lead dùng ở Kế hoạch › Bước 1
-  ['kd', 'kinhdoanh.json', 0], // doanh thu các kênh (Sale, Kế toán, Marketing cần xem số kênh mình)
+  ['kd', 'kinhdoanh.json', 1], // doanh thu, lãi lỗ các kênh: chỉ CEO + kế toán
+  ['kd_ads', 'kd_ads', 0], // số Ads Facebook cho team Digital (chi, đơn, doanh số Ads từng người)
+  ['kd_sale', 'kd_sale', 0], // chỉ số bán hàng cho Sale B2C (đơn, chốt, hủy, hoàn), đã bỏ doanh thu
   ['skucost', 'skucost.json', 1], // giá vốn SKU
   ['nhansu0', 'nhansu0.json', 1], // danh sách nhân sự ban đầu (không có lương)
 ];
@@ -53,10 +55,26 @@ function t9Blob() {
   return { base, raw: { cards: t9?.cards ?? [], kho: t9?.kho ?? [] } };
 }
 
+// Phần cắt ra từ kinhdoanh.json cho từng nhóm, không kèm doanh thu tổng, giá vốn, lãi lỗ.
+function kdPart(kind) {
+  const kd = readJson('kinhdoanh.json');
+  if (!kd) return null;
+  if (kind === 'kd_ads') {
+    const { adsPeople, adsProd, adsTran, adsMonths, adsChiDay } = kd;
+    return { adsPeople, adsProd, adsTran, adsMonths, adsChiDay, day: { ads: kd.day?.ads ?? {} } };
+  }
+  const money = /doanh thu|aov|giá trị|tiền/i;
+  const strip = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !money.test(k)));
+  return {
+    fbSale: (kd.fbSale ?? []).map(({ dt, ...s }) => s),
+    fbHist: (kd.fbHist ?? []).map(strip),
+  };
+}
+
 const now = new Date().toISOString();
 const lines = [];
 for (const [key, file, adminOnly] of ITEMS) {
-  const value = file ? readJson(file) : t9Blob();
+  const value = file?.startsWith('kd_') ? kdPart(file) : file ? readJson(file) : t9Blob();
   if (!value) {
     console.warn(`[hub] bỏ qua ${key} (không có số liệu)`);
     continue;

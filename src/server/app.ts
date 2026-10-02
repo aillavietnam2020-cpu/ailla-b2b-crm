@@ -25,6 +25,8 @@ export function createApp() {
     const requestId = c.req.header('CF-Ray') ?? crypto.randomUUID();
     c.set('requestId', requestId);
     c.header('X-Request-Id', requestId);
+    // Hệ thống nội bộ: không cho công cụ tìm kiếm lưu hay hiển thị.
+    c.header('X-Robots-Tag', 'noindex, nofollow, noarchive');
     await next();
   });
 

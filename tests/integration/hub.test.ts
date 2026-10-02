@@ -91,3 +91,28 @@ describe('Khu Marketing (/api/hub)', () => {
     expect(res.body.error.code).toBe('AI_NOT_CONFIGURED');
   });
 });
+
+describe('Số tài chính trong khu Marketing', () => {
+  it('giá vốn, chi phí, mục tiêu doanh số chỉ CEO và kế toán thấy; nhân viên gửi lên cũng bị bỏ qua', async () => {
+    await ctx.request('/api/admin/users/user-thao/marketing', { as: USERS.ceo, body: { mode: 'with_b2b' } });
+    await ctx.request('/api/hub/state', {
+      as: USERS.ceo,
+      method: 'PUT',
+      body: { version: 0, data: { cards: [], skus: [{ ma: 'A', giaVon: 1000 }], costs: [{ tien: 5 }] } },
+    });
+    const staff = await ctx.request('/api/hub/state', { as: USERS.thao });
+    expect(staff.body.data.data.cards).toEqual([]);
+    expect(staff.body.data.data.skus).toBeUndefined();
+    expect(staff.body.data.data.costs).toBeUndefined();
+
+    // Nhân viên ghi đè bằng bản không có (hoặc có giả) số tài chính: số thật của CEO vẫn còn.
+    await ctx.request('/api/hub/state', {
+      as: USERS.thao,
+      method: 'PUT',
+      body: { version: 1, data: { cards: [{ id: 'C1' }], skus: [] } },
+    });
+    const ceo = await ctx.request('/api/hub/state', { as: USERS.ceo });
+    expect(ceo.body.data.data.cards).toEqual([{ id: 'C1' }]);
+    expect(ceo.body.data.data.skus).toEqual([{ ma: 'A', giaVon: 1000 }]);
+  });
+});

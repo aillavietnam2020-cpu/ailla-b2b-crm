@@ -48,6 +48,7 @@ export async function serveHub(request: Request, env: Env, html: string): Promis
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'X-Content-Type-Options': 'nosniff',
+      'X-Robots-Tag': 'noindex, nofollow, noarchive',
     },
   });
 }

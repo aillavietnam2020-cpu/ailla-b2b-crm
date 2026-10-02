@@ -10,7 +10,7 @@ echo   Mat khau go o day KHONG hien len man hinh va khong gui
 echo   di dau ngoai database cua cong ty.
 echo ============================================================
 echo.
-set /p EMAIL="Email tai khoan (vi du aillavietnam2020@gmail.com): "
+set /p EMAIL="Email tai khoan (vi du sephoaailla@gmail.com): "
 echo.
 node scripts/set-password.mjs --env production --email %EMAIL%
 echo.
