@@ -141,6 +141,32 @@ hubRoutes.put('/state', async (c) => {
   return ok(c, { version: base + 1, updated_at: now });
 });
 
+/**
+ * Kho Sản xuất trừ tồn theo đơn B2B ngay lúc đơn được bấm "Đã xuất kho" trên CRM (cùng máy chủ, không qua Sheet).
+ * Chỉ trả số lượng theo mã hàng, không kèm giá hay tên khách.
+ */
+hubRoutes.get('/b2b-out', async (c) => {
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(c.req.query('from') ?? '') ? (c.req.query('from') as string) : '2000-01-01';
+  const rows = await c.env.DB.prepare(
+    `SELECT o.order_no, o.delivery_status, o.delivered_at, p.sku, p.name, p.unit, oi.qty
+     FROM orders o JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id
+     WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
+       AND o.delivery_status IN ('DA_XUAT_KHO', 'DA_GIAO') AND o.delivered_at >= ?
+     ORDER BY o.delivered_at DESC LIMIT 5000`,
+  )
+    .bind(from)
+    .all();
+  return ok(c, rows.results ?? []);
+});
+
+/** Danh mục mã hàng CRM để kế toán quy đổi sang mã sản xuất (1 thùng = bao nhiêu sản phẩm). */
+hubRoutes.get('/b2b-products', async (c) => {
+  const rows = await c.env.DB.prepare(
+    'SELECT sku, name, unit FROM products WHERE deleted_at IS NULL AND active = 1 ORDER BY sku',
+  ).all();
+  return ok(c, rows.results ?? []);
+});
+
 /** Dữ liệu báo cáo nạp sẵn (TikTok tuần, kinh doanh các kênh, giá vốn). */
 hubRoutes.get('/blob/:key', async (c) => {
   const key = c.req.param('key');

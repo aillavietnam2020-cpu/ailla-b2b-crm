@@ -22,7 +22,7 @@ const SX_GIACONG=/azzen|metis|camila|della|mesy/i;
 function sxPrefix(ten){const w=String(ten).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/gi,"d").toUpperCase().split(/[^A-Z0-9]+/).filter(x=>x&&!/^(AILLA|NUOC|SX|ML|KG|G|LIT|L)$/.test(x)&&!/^\d/.test(x));return (w.slice(0,2).map(x=>x[0]).join("")||"SP")}
 function sxShape(d){
   if(!d.sx)d.sx={products:[],people:[],requests:[],batches:[],norms:[],usage:[],purchases:[],moves:[],log:[],cfg:{labelW:100,labelH:70,nvlTol:5,boxDefault:50},demo:false,seeded:false};
-  const s=d.sx;
+  const s=d.sx;if(!s.maps)s.maps=[];if(!s.cfg.b2bFrom)s.cfg.b2bFrom=sxToday();
   if(!s.products.length&&(d.skus||[]).length)s.products=d.skus.map(k=>({ma:k.ma,ten:k.ten,dvt:"sp",loai:SX_GIACONG.test(k.ten)?"Gia công":"Tự sản xuất",prefix:sxPrefix(k.ten),thung:0,toiThieu:0,active:true}));
   if(!s.people.length&&(d.staff||[]).length)s.people=d.staff.filter(x=>x.khoi==="Sản xuất & Kho"&&x.tt!=="Đã nghỉ").map(x=>({ten:x.ten.split(" ").pop(),hoTen:x.ten,viTri:x.viTri}));
   if(!s.seeded&&s.products.length){s.seeded=true;sxSeedDemo(s)}
@@ -54,6 +54,31 @@ function sxReqCode(s){const t=sxToday().replace(/-/g,""),base="YC-"+t+"-";let n=
 const sxLog=(s,act)=>{s.log.unshift({at:sxNow(),by:ME.name,act});s.log=s.log.slice(0,300)};
 const sxMut=(msg,fn)=>DB.mutate(ME.name,"Sản xuất · "+msg,d=>{sxShape(d);fn(d.sx);sxLog(d.sx,msg)});
 
+/* ---------- B2B: trừ tồn theo đơn CRM đã xuất kho (cùng máy chủ, gần như tức thì) ---------- */
+const SXB2B={rows:[],prods:[],at:0,busy:false};
+async function sxB2BRefresh(force){
+  if(typeof svApi!=="function"||SXB2B.busy||(!force&&Date.now()-SXB2B.at<15000))return;SXB2B.busy=true;
+  try{const from=(SX()&&SX().cfg.b2bFrom)||sxToday();const [rows,prods]=await Promise.all([svApi("/api/hub/b2b-out?from="+from),SXB2B.prods.length?SXB2B.prods:svApi("/api/hub/b2b-products").catch(()=>[])]);
+    const changed=JSON.stringify(rows)!==JSON.stringify(SXB2B.rows)||!SXB2B.at;SXB2B.rows=rows||[];SXB2B.prods=prods||[];SXB2B.at=Date.now();
+    if(changed&&/^sx/.test(PAGE)&&!svTyping())renderMain()}catch(e){}finally{SXB2B.busy=false}
+}
+// Đang mở trang Sản xuất thì 15 giây tải lại đơn B2B một lần (đơn CRM không làm đổi dữ liệu Hub nên phải hỏi riêng).
+setInterval(()=>{if(ME&&/^sx/.test(PAGE)&&!document.hidden)sxB2BRefresh()},15000);
+const sxMap=ma=>(SX().maps||[]).find(m=>m.nguon==="B2B"&&m.ma===ma);
+function sxB2BOut(){const s=SX();if(!s)return [];return SXB2B.rows.filter(r=>String(r.delivered_at||"").slice(0,10)>=s.cfg.b2bFrom).map(r=>{const m=sxMap(r.sku);return m&&m.sp?{sp:m.sp,sl:r.qty*(m.heSo||1),r}:null}).filter(Boolean)}
+const sxB2BUnmapped=()=>[...new Set(SXB2B.rows.filter(r=>String(r.delivered_at||"").slice(0,10)>=SX().cfg.b2bFrom&&!(sxMap(r.sku)||{}).sp).map(r=>r.sku))];
+/* Gợi ý quy đổi theo tên: mã lẻ (-C, -G…) = 1 sản phẩm; mã thùng = số sản phẩm/thùng (kế toán điền). */
+const sxFold=t=>String(t).normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/gi,"d").toLowerCase().replace(/[^a-z0-9.]+/g," ").trim();
+function sxGuess(name,sku){
+  // 1) Mã CRM (bỏ đuôi lẻ -C/-G) trùng mã sản xuất thì lấy luôn.
+  const base=String(sku||"").replace(/-(c|g)$/i,"").toLowerCase(),ex=SX().products.find(p=>p.ma.toLowerCase()===base);if(ex)return ex;
+  // 2) So tên, dung tích (800ml, 3.6kg, 300g…) phải trùng nhau.
+  const norm=t=>sxFold(t).replace(/(\d),(\d)/g,"$1.$2"),size=t=>(norm(t).match(/\d+(\.\d+)?(?= ?(ml|l|lit|kg|g|gam)\b)/g)||[]).map(Number),sz=size(name);
+  // Chỉ gợi ý khi MỌI chữ quan trọng của tên CRM (bỏ màu trong ngoặc) đều có trong tên sản xuất và cùng dung tích; không chắc thì để kế toán tự chọn.
+  const w=norm(String(name).replace(/\(.*?\)/g," ")).split(" ").filter(x=>x.length>1&&!/^\d/.test(x)&&!["ailla","aill","huong","nuoc","nature","xa","ml","kg","lit","gam","chuyen","dung"].includes(x));if(!w.length)return null;const hits=[];
+  SX().products.forEach(p=>{if(SX_GIACONG.test(p.ten)&&!SX_GIACONG.test(name))return;const ps=size(p.ten);if(sz.length&&!(ps.length&&sz.some(v=>ps.includes(v))))return;const pw=" "+norm(p.ten)+" ";if(w.every(x=>pw.includes(" "+x+" ")))hits.push(p)});
+  return hits.length===1?hits[0]:null}
+
 /* ---------- Khung trang: thanh tab giống mẫu ---------- */
 function sxFrame(m,key,title,sub,body,actions=""){
   sxShape(D());
@@ -69,7 +94,9 @@ const sxNames=b=>(b.nguoi||[]).join(", ")||"—";
 function sxStock(){
   const s=SX(),by={};const g=k=>by[k]=by[k]||{sp:k,san:0,thung:0,khay:0,cho:0,loi:0,choNhap:0,dangLam:0,canLam:0};
   s.batches.filter(b=>b.st!=="HUY").forEach(b=>{const o=g(b.sp);if(b.st==="CHO_KIEM"){o.choNhap+=b.baoSL||0;return}o.cho+=b.cho||0;o.loi+=b.loi||0;const ok=b.containers.filter(c=>c.st==="OK");if(b.st==="SAN_SANG")ok.forEach(c=>{o.san+=c.sl;if(c.loai==="Thùng")o.thung+=c.sl;else o.khay+=c.sl});else o.choNhap+=b.dat||0});
-  s.moves.forEach(mv=>{const o=g(mv.sp);if(mv.loai==="Xuất / điều chỉnh")o.san-=mv.sl});
+  s.moves.forEach(mv=>{const o=g(mv.sp);if(mv.loai==="Xuất / điều chỉnh")o.san-=mv.sl;if(mv.loai==="Tồn đầu kỳ / điều chỉnh tăng")o.san+=mv.sl});
+  // Đơn B2B đã xuất kho trên CRM (từ ngày bắt đầu trừ) → trừ ngay theo bảng quy đổi mã.
+  sxB2BOut().forEach(x=>{const o=g(x.sp);o.xuatB2B=(o.xuatB2B||0)+x.sl;o.san-=x.sl});
   s.requests.filter(r=>r.st==="CAN_LAM"||r.st==="DANG_LAM").forEach(r=>{const o=g(r.sp);if(r.st==="DANG_LAM")o.dangLam++;else o.canLam++});
   return Object.values(by).sort((a,b)=>a.san-b.san);
 }
@@ -81,6 +108,7 @@ function sxAlerts(){
   s.batches.filter(b=>b.st==="TEM_SAN").forEach(b=>A.push(["blu","task",`Lô ${b.ma} đã tạo ${b.containers.filter(c=>c.st==="OK").length} tem, chưa in`,sxP(b.sp).ten,"sx_lo","In tem"]));
   s.batches.filter(b=>["DA_KIEM","TEM_SAN","DA_IN","SAN_SANG"].includes(b.st)&&s.norms.some(n=>n.sp===b.sp)&&!s.usage.some(u=>u.lot===b.id)).forEach(b=>A.push(["amb","alert",`Kỹ thuật chưa báo nguyên vật liệu lô ${b.ma}`,sxP(b.sp).ten,"sx_nvl","Nhắc"]));
   s.purchases.filter(p=>p.st==="Đã đặt"&&p.ngayVe&&p.ngayVe<today).forEach(p=>A.push(["red","cart",`${p.ten} về chậm`,`dự kiến ${sxDd(p.ngayVe)}${p.ncc?" · "+p.ncc:""}`,"sx_mh","Xem"]));
+  {const um=sxB2BUnmapped();if(um.length)A.push(["amb","box",`${um.length} mã hàng B2B chưa quy đổi`,`đơn đã xuất kho nhưng chưa trừ tồn: ${um.slice(0,4).join(", ")}${um.length>4?"…":""}`,"sx_kho","Quy đổi"])}
   sxStock().filter(o=>{const p=sxP(o.sp);return p.toiThieu&&o.san<p.toiThieu}).forEach(o=>A.push(["red","box",`${sxP(o.sp).ten} dưới mức tối thiểu`,`sẵn sàng ${nf(o.san)} / tối thiểu ${nf(sxP(o.sp).toiThieu)}`,"sx_kho","Xem kho"]));
   return A;
 }
@@ -310,14 +338,26 @@ function pSxMh(m){
 function pSxKho(m){
   sxShape(D());const s=SX(),st=sxStock(),ed=sxCan("sx.kiemke");
   const conts=s.batches.filter(b=>b.st==="SAN_SANG").flatMap(b=>b.containers.filter(c=>c.st==="OK").map(c=>({b,c})));
-  sxFrame(m,"sx_kho","Kho thành phẩm","Tồn theo sản phẩm, lô, thùng/khay và vị trí · tách hàng sẵn sàng bán, chờ xử lý, lỗi",`
+  const seen=[...new Set(SXB2B.rows.map(r=>r.sku))],showAll=SXF.mapAll,mapList=(showAll?SXB2B.prods:SXB2B.prods.filter(p=>seen.includes(p.sku)||sxMap(p.sku)));
+  const outBy={};SXB2B.rows.filter(r=>String(r.delivered_at||"").slice(0,10)>=s.cfg.b2bFrom).forEach(r=>outBy[r.sku]=(outBy[r.sku]||0)+r.qty);
+  const b2bSec=`<section class="card"><div class="card-h"><h2>Đơn B2B trừ tồn ngay khi bấm "Đã xuất kho" trên CRM</h2><span class="hint">${SXB2B.rows.length} dòng hàng đã xuất · cập nhật ${SXB2B.at?new Date(SXB2B.at).toLocaleTimeString("vi-VN"):"—"}</span></div>
+   <div class="filters"><label class="inl">Bắt đầu trừ từ ngày ${ed?`<input type="date" id="b2b-from" value="${s.cfg.b2bFrom}">`:sxDd(s.cfg.b2bFrom)}</label><span class="hint">Đơn xuất trước ngày này coi như đã nằm trong số tồn lúc bắt đầu. Hôm bắt đầu, kế toán ghi phiếu <b>Tồn đầu kỳ</b> cho từng mã ở cuối trang.</span><label class="ck sm"><input type="checkbox" id="map-all" ${showAll?"checked":""}> Hiện đủ ${SXB2B.prods.length} mã CRM</label></div>
+   ${mapList.length?tbl(["Mã CRM","Tên trên CRM","Đơn vị","Đã xuất từ ngày bắt đầu","Quy đổi sang mã sản xuất","1 đơn vị CRM = ? sản phẩm","Trạng thái"],mapList.map(p=>{const mp=sxMap(p.sku),g=!mp&&sxGuess(p.name,p.sku),le=/-(c|g)$/i.test(p.sku)||!/thùng/i.test(p.unit||"");return `<tr><td class="mono">${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${esc(p.unit||"")}</td><td class="n">${outBy[p.sku]?nf(outBy[p.sku]):"—"}</td><td>${ed?`<select data-mp="${esc(p.sku)}">${opt([["","— chưa quy đổi"]].concat(SX().products.map(x=>[x.ma,x.ten])),mp?mp.sp:"")}</select>${g?` <button class="lnk" data-mg="${esc(p.sku)}" data-sp="${esc(g.ma)}" data-hs="${le?1:(g.thung||"")}">gợi ý: ${esc(g.ten)}</button>`:""}`:esc(mp?sxP(mp.sp).ten:"—")}</td><td class="n">${ed?`<input class="num" data-mh="${esc(p.sku)}" value="${mp?mp.heSo:""}" placeholder="${le?1:"SL/thùng"}" style="width:80px">`:mp?mp.heSo:"—"}</td><td>${mp&&mp.sp?pill("Đang trừ tồn","grn"):outBy[p.sku]?pill("Chưa trừ","red"):pill("Chưa quy đổi","gry")}</td></tr>`})):`<p class="empty">Chưa có đơn B2B nào xuất kho từ ngày bắt đầu. Tích "Hiện đủ mã CRM" để quy đổi trước.</p>`}</section>`;
+  sxFrame(m,"sx_kho","Kho thành phẩm","Tồn theo sản phẩm, lô, thùng/khay và vị trí · tách hàng sẵn sàng bán, chờ xử lý, lỗi · đơn B2B trừ ngay khi xuất kho",`
   <div class="note">Số trên khay là <b>số lượng bàn giao ban đầu</b>. Khi chưa nối hệ thống đơn bán ra, web chưa trừ tự động: kế toán ghi xuất/điều chỉnh khi kiểm kê lại. Không suy tồn từ số đơn đi trong ngày vì đơn dùng cả hàng cũ lẫn hàng mới.</div>
-  <section class="card flush">${tbl(["Sản phẩm","Sẵn sàng bán","· trong thùng","· trên khay (bàn giao)","Chờ nhập kho","Chờ xử lý","Lỗi","Mức tối thiểu"],st.map(o=>{const p=sxP(o.sp);return `<tr><td><b>${esc(p.ten)}</b></td><td class="n"><b>${nf(o.san)}</b></td><td class="n">${nf(o.thung)}</td><td class="n">${nf(o.khay)}</td><td class="n">${nf(o.choNhap)}</td><td class="n warn">${nf(o.cho)}</td><td class="n bad">${nf(o.loi)}</td><td class="n">${ed?`<input class="num" data-tt="${esc(o.sp)}" value="${p.toiThieu||""}" placeholder="—" style="width:80px">`:p.toiThieu?nf(p.toiThieu):"—"}${p.toiThieu&&o.san<p.toiThieu?" "+pill("thiếu","red"):""}</td></tr>`}))}</section>
+  <section class="card flush">${tbl(["Sản phẩm","Sẵn sàng bán","· nhập trong thùng","· bàn giao trên khay","Đã xuất B2B","Chờ nhập kho","Chờ xử lý","Lỗi","Mức tối thiểu"],st.map(o=>{const p=sxP(o.sp);return `<tr><td><b>${esc(p.ten)}</b></td><td class="n"><b class="${o.san<0?"bad":""}">${nf(o.san)}</b>${o.san<0?`<small class="bad">thiếu tồn đầu kỳ</small>`:""}</td><td class="n">${nf(o.thung)}</td><td class="n">${nf(o.khay)}</td><td class="n">${o.xuatB2B?"−"+nf(o.xuatB2B):"—"}</td><td class="n">${nf(o.choNhap)}</td><td class="n warn">${nf(o.cho)}</td><td class="n bad">${nf(o.loi)}</td><td class="n">${ed?`<input class="num" data-tt="${esc(o.sp)}" value="${p.toiThieu||""}" placeholder="—" style="width:80px">`:p.toiThieu?nf(p.toiThieu):"—"}${p.toiThieu&&o.san<p.toiThieu?" "+pill("thiếu","red"):""}</td></tr>`}))}</section>
+  ${b2bSec}
   ${sxCard("Theo lô, thùng / khay và vị trí","",tbl(["Lô","Sản phẩm","Vật chứa","Số lượng","Vị trí"],conts.map(({b,c})=>`<tr class="clk" data-sxb="${b.id}"><td class="mono">${esc(b.ma)}</td><td>${esc(sxP(b.sp).ten)}</td><td>${c.loai} · ${c.c}</td><td class="n">${nf(c.sl)}${c.loai!=="Thùng"?" <small>bàn giao ban đầu</small>":""}</td><td>${esc(c.viTri||"—")}</td></tr>`)))}
-  ${sxCard("Lịch sử nhập, bàn giao, xuất, điều chỉnh","",tbl(["Lúc","Người","Loại","Sản phẩm","Lô / vật chứa","SL","Đến / lý do"],s.moves.slice().reverse().slice(0,60).map(v=>`<tr><td>${esc(v.at)}</td><td>${esc(v.by)}</td><td>${esc(v.loai)}</td><td>${esc(sxP(v.sp).ten)}</td><td class="mono">${esc(v.lot||"")} ${esc(v.c||"")}</td><td class="n">${nf(v.sl)}</td><td>${esc(v.den||v.lyDo||"")}</td></tr>`))+(ed?`<form class="frm row7" id="xkf"><label class="field">Sản phẩm<select id="xk-sp" required>${sxProdOpts("")}</select></label><label class="field">Số lượng<input id="xk-sl" type="number" min="1" required></label><label class="field grow">Lý do (xuất, kiểm kê lại, hỏng…)<input id="xk-ly" required></label><button class="btn">Ghi xuất / điều chỉnh</button></form>`:""))}`);
+  ${sxCard("Lịch sử nhập, bàn giao, xuất, điều chỉnh","",tbl(["Lúc","Người","Loại","Sản phẩm","Lô / vật chứa","SL","Đến / lý do"],s.moves.slice().reverse().slice(0,60).map(v=>`<tr><td>${esc(v.at)}</td><td>${esc(v.by)}</td><td>${esc(v.loai)}</td><td>${esc(sxP(v.sp).ten)}</td><td class="mono">${esc(v.lot||"")} ${esc(v.c||"")}</td><td class="n">${nf(v.sl)}</td><td>${esc(v.den||v.lyDo||"")}</td></tr>`))+(ed?`<form class="frm row7" id="xkf"><label class="field">Loại<select id="xk-lo">${opt(["Tồn đầu kỳ / điều chỉnh tăng","Xuất / điều chỉnh"],"Xuất / điều chỉnh")}</select></label><label class="field">Sản phẩm<select id="xk-sp" required>${sxProdOpts("")}</select></label><label class="field">Số lượng<input id="xk-sl" type="number" min="1" required></label><label class="field grow">Lý do (tồn đầu kỳ khi bắt đầu dùng, kiểm kê lại, hỏng…)<input id="xk-ly" required></label><button class="btn">Ghi phiếu</button></form>`:""))}`);
   sxBindCommon(m);
+  const setMap=(ma,f,v)=>sxMut(`quy đổi mã B2B ${ma}`,s2=>{let mp=s2.maps.find(y=>y.nguon==="B2B"&&y.ma===ma);if(!mp){mp={nguon:"B2B",ma,sp:"",heSo:1};s2.maps.push(mp)}mp[f]=v});
+  m.querySelectorAll("[data-mp]").forEach(x=>x.onchange=()=>{setMap(x.dataset.mp,"sp",x.value);toast("Đã lưu quy đổi");renderMain()});
+  m.querySelectorAll("[data-mh]").forEach(x=>x.onchange=()=>{setMap(x.dataset.mh,"heSo",+x.value||1);toast("Đã lưu");renderMain()});
+  m.querySelectorAll("[data-mg]").forEach(b=>b.onclick=()=>{const ma=b.dataset.mg;sxMut(`quy đổi mã B2B ${ma} theo gợi ý`,s2=>{let mp=s2.maps.find(y=>y.nguon==="B2B"&&y.ma===ma);if(!mp){mp={nguon:"B2B",ma,sp:"",heSo:1};s2.maps.push(mp)}mp.sp=b.dataset.sp;mp.heSo=+b.dataset.hs||1});toast(+b.dataset.hs?"Đã quy đổi":"Đã chọn sản phẩm, điền số sản phẩm mỗi thùng");renderMain()});
+  if($("#b2b-from"))$("#b2b-from").onchange=e=>{sxMut("đặt ngày bắt đầu trừ tồn B2B "+e.target.value,s2=>s2.cfg.b2bFrom=e.target.value);sxB2BRefresh(true);renderMain()};
+  if($("#map-all"))$("#map-all").onchange=e=>{SXF.mapAll=e.target.checked;renderMain()};
   m.querySelectorAll("[data-tt]").forEach(x=>x.onchange=()=>{sxMut(`đặt mức tối thiểu ${sxP(x.dataset.tt).ten}: ${x.value||0}`,s2=>{const p=s2.products.find(y=>y.ma===x.dataset.tt);if(p)p.toiThieu=+x.value||0});toast("Đã lưu");renderMain()});
-  if($("#xkf"))$("#xkf").onsubmit=e=>{e.preventDefault();sxMut("xuất / điều chỉnh "+sxP($("#xk-sp").value).ten,s2=>s2.moves.push({at:sxNow(),by:ME.name,sp:$("#xk-sp").value,sl:+$("#xk-sl").value,loai:"Xuất / điều chỉnh",lyDo:$("#xk-ly").value.trim()}));renderMain()};
+  if($("#xkf"))$("#xkf").onsubmit=e=>{e.preventDefault();const lo=$("#xk-lo").value;sxMut(lo.toLowerCase()+" "+sxP($("#xk-sp").value).ten,s2=>s2.moves.push({at:sxNow(),by:ME.name,sp:$("#xk-sp").value,sl:+$("#xk-sl").value,loai:lo,lyDo:$("#xk-ly").value.trim()}));renderMain()};
 }
 
 /* ---------- 8. BÁO CÁO ---------- */
@@ -340,5 +380,5 @@ function pSxBc(m){
 }
 
 /* Lần đầu mở: tạo dữ liệu Sản xuất trên máy chủ (danh mục từ SKU, nhân sự xưởng từ hồ sơ, dữ liệu mẫu). */
-function sxInit(f){return m=>{const d=D();if(!d.sx||(!d.sx.seeded&&(d.skus||[]).length))DB.mutate("Hệ thống","Sản xuất · khởi tạo dữ liệu",dt=>sxShape(dt));else sxShape(d);f(m)}}
+function sxInit(f){return m=>{sxB2BRefresh();const d=D();if(!d.sx||(!d.sx.seeded&&(d.skus||[]).length))DB.mutate("Hệ thống","Sản xuất · khởi tạo dữ liệu",dt=>sxShape(dt));else sxShape(d);f(m)}}
 Object.assign(PAGES,{sx:sxInit(pSxTq),sx_tq:sxInit(pSxTq),sx_nc:sxInit(pSxNc),sx_td:sxInit(pSxTd),sx_lo:sxInit(pSxLo),sx_nvl:sxInit(pSxNvl),sx_mh:sxInit(pSxMh),sx_kho:sxInit(pSxKho),sx_bc:sxInit(pSxBc)});
