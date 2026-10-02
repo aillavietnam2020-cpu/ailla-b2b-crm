@@ -39,7 +39,11 @@ function askHidden(question) {
           if (value.length) value = value.slice(0, -1);
           continue;
         }
-        value += c;
+        // Chỉ nhận ký tự của mã khoá (chữ, số, - _): bỏ ký tự lạ lọt vào khi dán trong cửa sổ đen.
+        if (/[A-Za-z0-9_-]/.test(c)) {
+          value += c;
+          process.stdout.write('*');
+        }
       }
     };
     stdin.on('data', onData);
@@ -71,11 +75,12 @@ function putSecret(name, value) {
   if (r.status !== 0) throw new Error(`Không cất được ${name}: ${(r.stderr || r.stdout || '').slice(-300)}`);
 }
 
-const token = await askHidden('Dán mã khoá Cloudflare rồi bấm Enter (không hiện chữ là bình thường): ');
+const token = await askHidden('Dán mã khoá Cloudflare (bấm chuột phải) rồi bấm Enter — mỗi ký tự hiện một dấu *: ');
+console.log(`(đã nhận ${token.length} ký tự)`);
 if (!token) {
   console.log('Chưa dán mã khoá.');
-  process.exit(1);
-}
+  process.exitCode = 1;
+} else {
 
 try {
   const apps = await cf(token, '/apps');
@@ -104,6 +109,7 @@ try {
 } catch (e) {
   console.log('');
   console.log('CHƯA ĐƯỢC: ' + e.message);
-  console.log('Kiểm tra lại mã khoá có quyền "Access: Apps and Policies - Edit" chưa.');
-  process.exit(1);
+  console.log('Kiểm tra lại: mã khoá copy đủ chưa (thường dài khoảng 40 ký tự), có quyền "Access: Apps and Policies - Edit" chưa.');
+  process.exitCode = 1;
+}
 }
