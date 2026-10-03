@@ -64,7 +64,7 @@ function render(){
 function renderMain(){if(!ME)return;const m=$("#main");if(!m){render();return}m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m)}
 function bindCommon(m){
   m.querySelectorAll("[data-card]").forEach(e=>e.addEventListener("click",ev=>{if(ev.target.closest("select,input,button:not([data-card]),a"))return;openCard(e.dataset.card)}));
-  m.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.go;if(APP_MODE==="admin"&&!modGroups(curMod()).some(g=>g[1].some(i=>i[0]===PAGE)))MOD="";if(b.dataset.sub)SUB[PAGE]=b.dataset.sub;render();scrollTo(0,0)});
+  m.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.go;if(b.dataset.step7)STEP=7;if(APP_MODE==="admin"&&!modGroups(curMod()).some(g=>g[1].some(i=>i[0]===PAGE)))MOD="";if(b.dataset.sub)SUB[PAGE]=b.dataset.sub;render();scrollTo(0,0)});
   m.querySelectorAll("[data-sub]").forEach(b=>{if(b.dataset.go)return;b.onclick=()=>{SUB[PAGE]=b.dataset.sub;renderMain()}});
   m.querySelectorAll("select[data-step]").forEach(s=>s.onchange=()=>{const id=s.dataset.step,v=s.value;if(v==="__back"){openCard(id,{back:true});renderMain();return}const err=moveCard(ME,id,v);if(err){toast(err);openCard(id,{err})}renderMain()});
   m.querySelectorAll("select[data-assign]").forEach(s=>s.onchange=()=>{if(!s.value)return;assignCard(ME,s.dataset.assign,s.value);toast(s.dataset.assign+" → "+userName(s.value));renderMain()});

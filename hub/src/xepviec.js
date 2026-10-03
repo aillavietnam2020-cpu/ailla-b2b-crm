@@ -176,11 +176,11 @@ function pMktTq(m){
   const cap=Math.max(8,...team.map(u=>xvOpen(u.id).length));
   const pipe=CHANNELS.map(ch=>{const I=WC.filter(c=>c.kenh===ch.k);return `<tr><td><b>${esc(ch.short)}</b></td>${DP_STEPS.map(s=>{const L=I.filter(c=>c.step===s||(s==="edit"&&c.step==="worker")),late=L.filter(isLate).length;return `<td class="n"><button type="button" class="xcell${!L.length?" z":late?" jam":["dkb","dvd","dceo"].includes(s)?" w":s==="xong"?" ok":""}" data-xpipe="${esc(ch.k)}|${s}">${L.length}${late?` · trễ ${late}`:""}</button></td>`}).join("")}</tr>`}).join("");
   m.innerHTML=H("Tổng quan Content",`${xvLbl(W)} · hôm nay ${dayLbl(today)} · đổi kỳ xem ở ô chọn thời gian trên cùng`)+`
-  <div class="lwtool"><span class="sp"></span>${xvGive()?`<button class="btn" id="mq-hot">🔥 Đẩy sản phẩm đang lên xu hướng</button><button class="btn" data-go="xepviec">Xếp việc tuần</button>`:""}<button class="btn" data-go="lich">Calendar</button></div>
+  <div class="lwtool"><span class="sp"></span>${xvGive()?`<button class="btn" id="mq-hot">🔥 Đẩy sản phẩm đang lên xu hướng</button><button class="btn" data-go="kehoach" data-step7="1">6. Làm hằng ngày</button>`:""}<button class="btn" data-go="lich">Calendar</button></div>
   <div class="xchs">${CHANNELS.map(chCard).join("")}</div>
   <div class="xr2">
    <section class="card"><div class="card-h"><h2>Việc đang chờ duyệt</h2><span class="hint">xử lý xong là hết số</span><span class="sp"></span>${Q.length?`<button class="btn pri" id="mq-rv">Duyệt lần lượt (${Q.length}) →</button>`:""}</div>
-    <div class="xq">${[["Kịch bản chờ duyệt",qn("dkb")],["Video chờ Oanh duyệt",qn("dvd")]].concat(ME.role==="admin"?[["Video chờ chị duyệt",qn("dceo")]]:[]).map(([t,n])=>`<div class="xqi${n?" hot":""}"><b class="numeric">${n}</b><span>${t}</span></div>`).join("")}<div class="xqi${unas.length?" hot":""} clk" data-go="xepviec"><b class="numeric">${unas.length}</b><span>Video trong kỳ chưa giao</span></div></div>
+    <div class="xq">${[["Kịch bản chờ duyệt",qn("dkb")],["Video chờ Oanh duyệt",qn("dvd")]].concat(ME.role==="admin"?[["Video chờ chị duyệt",qn("dceo")]]:[]).map(([t,n])=>`<div class="xqi${n?" hot":""}"><b class="numeric">${n}</b><span>${t}</span></div>`).join("")}<div class="xqi${unas.length?" hot":""} clk" data-go="kehoach" data-step7="1"><b class="numeric">${unas.length}</b><span>Video trong kỳ chưa giao</span></div></div>
     <div class="xkhoq clk" data-xkho="1"><b class="numeric">${free.length}</b><span><b>Video tồn còn dùng được</b> <small>${xvGroupBy(free,k=>k.sku).sort((a,b)=>b[1].length-a[1].length).slice(0,4).map(([k,L])=>esc(sk(k).n)+" "+L.length).join(" · ")||"kho trống"} · trong kỳ đã xếp ${WC.filter(c=>c.khoMa).length}</small></span><span class="btn sm">Xếp vào lịch →</span></div></section>
    <section class="card"><div class="card-h"><h2>Cần chú ý</h2><span class="hint">web tự phát hiện</span></div>
     <ul class="xatt">${att.map(([t,h])=>`<li><i class="xdot x-${t}"></i><span>${h}</span></li>`).join("")||`<li><i class="xdot x-grn"></i><span>Mọi thứ đang đúng nhịp.</span></li>`}</ul></section>
@@ -193,7 +193,7 @@ function pMktTq(m){
   xvBindWeek(m);
   if($("#mq-rv"))$("#mq-rv").onclick=openReview;
   if($("#mq-hot"))$("#mq-hot").onclick=()=>openHot();
-  m.querySelectorAll("[data-xkho]").forEach(x=>x.onclick=()=>{XV.tab="kho";PAGE="xepviec";renderMain();scrollTo(0,0)});
+  m.querySelectorAll("[data-xkho]").forEach(x=>x.onclick=()=>{XV.tab="kho";PAGE="kehoach";STEP=7;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-xch]").forEach(x=>x.onclick=()=>{LW.kenh=x.dataset.xch;LW.w=W.w||1;PAGE="lich";SUB.lich="week";renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-xpipe]").forEach(x=>x.onclick=()=>{const [k,s]=x.dataset.xpipe.split("|");Object.assign(DP,{kenh:k,step:s,tuyen:"",nguoi:"",sku:"",loai:"",view:"buoc"});DP.sel.clear();PAGE="dieuphoi";renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-xpc]").forEach(x=>x.onclick=()=>{const [u,ci]=x.dataset.xpc.split("|");const L=cellCards({id:u},+ci);
