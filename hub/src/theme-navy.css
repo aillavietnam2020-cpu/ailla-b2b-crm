@@ -628,3 +628,4 @@ table.pttab td{vertical-align:middle}
 .ksb.open .ksh{background:#f2f3ff}
 .ksb .tbl{border:0;border-radius:0}
 table.kstab td{vertical-align:middle}
+.wksum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.wktab td{vertical-align:middle}.wkact{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:260px}

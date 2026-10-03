@@ -139,7 +139,7 @@ function pXepViec2(m){
   m.innerHTML=H("Xếp việc tuần",`${xvLbl(W)} · làm lần lượt từ ① đến ⑤, bước nào có số là còn việc`)+`<div class="lwtool"><div class="seg xvtabs">${tabs.map(([k,t,n])=>`<button data-xvt="${k}" class="${XV.tab===k?"on":""}">${t}${n?` <span class="xbadge">${n}</span>`:""}</button>`).join("")}</div></div><div id="xvb"></div>`;
   m.querySelectorAll("[data-xvt]").forEach(b=>b.onclick=()=>{XV.tab=b.dataset.xvt;XV.sel.clear();renderMain()});
   const b=$("#xvb"),o={d,W,days,WC,team,give,slots,free,kbPool,qPool:[],ePool,post:WC.filter(c=>c.step==="dang")};
-  ({tuan:xvTuan,kho:xvKho2,quay:xvQuay2,wk:xvWorker,kb:xvKB,edit:xvEdit,dang:xvDang2})[XV.tab](b,o);
+  ({tuan:xvTuan,kho:xvKho2,quay:xvQuay2,wk:xvWorker2,kb:xvKB,edit:xvEdit,dang:xvDang2})[XV.tab](b,o);
   wpWorkList(b,XV.tab);
   /* nối với ① Kế hoạch tuần: dải "cần làm" + chọn sẵn sản phẩm đang làm */
   const ST={kho:["ton","reup"],quay:["oneshot","kichban"],wk:["worker"]}[XV.tab];
@@ -291,7 +291,7 @@ openCard=function(id,o={}){const c=D().cards.find(x=>x.id===id);if(c&&!o.full&&(
 /* ---------- Ngày bắt đầu / hạn xong của việc được giao, trễ hạn phải có lý do và Oanh duyệt ---------- */
 /* hạn mặc định: viết hook / kịch bản xong trước buổi quay gần nhất 1 ngày; việc khác 2 ngày */
 function defHan(d,WW,t){const td=d.settings.today;if(["oneshot","kichban"].includes(t)){const s=(d.shoots||[]).filter(x=>x.trangThai!=="Đã quay"&&x.day>td).sort((a,b)=>a.day-b.day)[0];if(s)return Math.max(td,s.day-1)}return Math.min(MONTH.ndays,td+2)}
-const hanTag=c=>xvGive()?`<select class="hansel${isLate(c)?" late":""}" data-sethan="${c.id}" title="Hạn xong">${opt([["","Chưa có hạn"]].concat(Array.from({length:MONTH.ndays},(_,i)=>[i+1,"hạn "+dd(i+1)])),c.han||"")}</select>`:(c.han?`<span class="xms ${isLate(c)?"t-red":""}">${c.batDau?dd(c.batDau)+" → ":""}hạn ${dd(c.han)}${isLate(c)?" · trễ":""}</span>`:"");
+const hanTag=c=>xvGive()?`${c.batDau?`<span class="xms">giao ${dd(c.batDau)}</span>`:""}<select class="hansel${isLate(c)?" late":""}" data-sethan="${c.id}" title="Hạn xong">${opt([["","Chưa có hạn"]].concat(Array.from({length:MONTH.ndays},(_,i)=>[i+1,"hạn "+dd(i+1)])),c.han||"")}</select>`:(c.han?`<span class="xms ${isLate(c)?"t-red":""}">${c.batDau?dd(c.batDau)+" → ":""}hạn ${dd(c.han)}${isLate(c)?" · trễ":""}</span>`:"");
 document.addEventListener("change",e=>{const x=e.target;if(!x.matches||!x.matches("select[data-sethan]"))return;const id=x.dataset.sethan,v=+x.value||0;DB.mutate(ME.name,"đặt hạn "+id+" → "+(v?dd(v):"không"),dt=>{const c=dt.cards.find(y=>y.id===id);if(c){c.han=v;if(v&&!c.batDau)c.batDau=dt.settings.today}});toast(v?"Đã đặt hạn "+dd(v):"Đã bỏ hạn");renderMain()});
 const _mvTre=moveCard;
 moveCard=function(u,id,to,inp={}){const c=D().cards.find(x=>x.id===id);inp=Object.assign({},inp);let lt=inp.lyDoTre;delete inp.lyDoTre;
@@ -338,4 +338,30 @@ function xvKho2(b,o){
     toast(`Đã chọn ${ma}`+(left?`, còn ${left} video cần chọn`:", đã chọn đủ"));renderMain()});
   b.querySelectorAll("[data-ksun]").forEach(x=>x.onclick=()=>{const id=x.dataset.ksun;DB.mutate(ME.name,"bỏ chọn video tồn "+id,dt=>{const c=dt.cards.find(y=>y.id===id);if(!c)return;const k=dt.kho.find(y=>y.ma===c.khoMa);if(k){k.maDang="";k.trangThai="Chưa dùng"}c.khoMa="";c.step="kb";c.loai="";c.nguon="Footage cũ";c.nguoi=c.giao||c.nguoi;c.day=0;c.linkVideo=""});toast("Đã trả video về kho");renderMain()});
   b.querySelectorAll("[data-setday]").forEach(x=>x.onchange=()=>{if(!x.value)return;DB.mutate(ME.name,"xếp ngày đăng "+x.dataset.setday+" → "+dd(+x.value),dt=>{const c=dt.cards.find(y=>y.id===x.dataset.setday);if(c)c.day=+x.value});toast("Đã xếp ngày đăng "+dd(+x.value));renderMain()});
+}
+
+
+/* ---------- Video không quay (Worker): bảng tiến độ thay cho khung tạo video ----------
+   Việc được tạo khi giao ở ① Kế hoạch tuần. Worker chưa nối với thẻ nên người phụ trách tự chạy Worker rồi dán link.
+   Chưa làm → Đang làm → Đã gửi duyệt → Xong (được duyệt) */
+const wkSt=c=>{if(["dang","xong"].includes(c.step))return "xong";if(["dkb","dvd","dceo"].includes(c.step))return "duyet";if(c.step==="worker"&&c.wkBat)return "lam";if(c.step==="kb"&&String(c.noiDung||"").trim())return "lam";return "chua"};
+const WK_G=[["chua","Chưa làm"],["lam","Đang làm"],["duyet","Đã gửi duyệt"],["xong","Xong (được duyệt)"]];
+function xvWorker2(b,o){
+  const {d,W,give}=o,L=d.cards.filter(c=>loaiOf(c)==="worker"&&(xvIn(c,W)||(!c.day&&!c.qday))).sort((a,c)=>(a.han||99)-(c.han||99));
+  const mine=c=>give||c.nguoi===ME.id||c.giao===ME.id;
+  const lnk=v=>/^https?:/.test(v)?v:"https://"+v;
+  const row=c=>{const st=wkSt(c),t=d.tuyen.find(x=>x.ma===c.maTuyen),late=isLate(c);
+    const act=!mine(c)?"":st==="chua"&&c.step==="worker"?`<button class="btn sm" data-wkgo="${c.id}">Bắt đầu chạy Worker</button>`
+      :st==="chua"&&c.step==="kb"?`<button class="btn sm" data-card="${c.id}">Viết kịch bản</button>`
+      :c.step==="worker"?`<input class="hkin" data-wkl="${c.id}" placeholder="Dán link video Worker dựng xong…" value="${esc(c.linkFinal||"")}">${late?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm pri" data-wksend="${c.id}">Gửi Oanh duyệt</button>`
+      :c.step==="kb"?`<button class="btn sm" data-card="${c.id}">Mở kịch bản</button>`:"";
+    return `<tr><td>${swatch(c.sku)}<b>${esc(sk(c.sku).n)}</b><small>${esc(t?t.tuyen:c.tuyen||"")} · ${c.wkMode==="B"?"nhân sự viết kịch bản":"Worker viết kịch bản + voice"}</small></td>
+     <td>${esc(userName(c.giao||c.nguoi)||"—")}</td><td class="nowrap">${c.batDau?dd(c.batDau):"—"}</td><td>${hanTag(c)||"—"}</td>
+     <td>${pill((WK_G.find(g=>g[0]===st)||[])[1],{chua:"gry",lam:"blu",duyet:"amb",xong:"grn"}[st])}${c.step==="dceo"?`<small>chờ chị duyệt</small>`:c.step==="dvd"?`<small>chờ Oanh duyệt</small>`:c.step==="dkb"?`<small>kịch bản chờ Oanh duyệt</small>`:""}</td>
+     <td>${c.linkFinal?`<a href="${esc(lnk(c.linkFinal))}" target="_blank" rel="noopener">▶ Xem video</a>`:`<span class="hint">chưa có</span>`}</td><td class="wkact">${act}</td></tr>`};
+  b.innerHTML=`<section class="card"><div class="card-h"><h2>Video không quay (Worker)</h2><span class="hint">${L.length} video · giao ở ① Kế hoạch tuần · Worker chưa tự nhận việc từ đây: người phụ trách chạy Worker, xong dán link video rồi gửi Oanh duyệt</span></div>
+   <div class="wksum">${WK_G.map(([k,t])=>`<span class="xqi${L.filter(c=>wkSt(c)===k).length&&k!=="xong"?" hot":""}"><b class="numeric">${L.filter(c=>wkSt(c)===k).length}</b><span>${t}</span></span>`).join("")}</div></section>
+  ${WK_G.map(([k,t])=>{const G=L.filter(c=>wkSt(c)===k);return G.length?`<section class="card flush"><div class="card-h pad"><h2>${t}</h2><span class="hint">${G.length}</span></div><div class="tbl"><table class="wktab"><thead><tr><th>Sản phẩm · tuyến</th><th>Phụ trách</th><th>Ngày giao</th><th>Hạn</th><th>Tiến độ</th><th>Link video</th><th></th></tr></thead><tbody>${G.map(row).join("")}</tbody></table></div></section>`:""}).join("")||`<section class="card"><p class="empty">Chưa có video Worker nào trong kỳ. Giao ở ① Kế hoạch tuần › Không quay · Worker.</p></section>`}`;
+  b.querySelectorAll("[data-wkgo]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"bắt đầu chạy Worker "+x.dataset.wkgo,dt=>{const c=dt.cards.find(y=>y.id===x.dataset.wkgo);if(c)c.wkBat=dt.settings.today});toast("Đã chuyển sang Đang làm");renderMain()});
+  b.querySelectorAll("[data-wksend]").forEach(x=>x.onclick=()=>{const id=x.dataset.wksend,l=b.querySelector(`[data-wkl="${id}"]`).value.trim(),tr=b.querySelector(`[data-tre="${id}"]`);if(!l){toast("Dán link video Worker dựng xong trước");return}const e=moveCard(ME,id,"dvd",{linkFinal:l,lyDoTre:tr?tr.value.trim():undefined});toast(e||"Đã gửi Oanh duyệt");renderMain()});
 }
