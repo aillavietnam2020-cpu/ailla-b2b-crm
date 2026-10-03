@@ -30,22 +30,44 @@ function autoSlot(dt,ids){
   return n}
 /* Ngày đăng do người giữ kênh tự xếp (không tự xếp hộ) */
 
-/* ---------- ① Kế hoạch tuần ---------- */
+/* ---------- ① Kế hoạch tuần: mỗi sản phẩm × kênh chia theo loại video, các bước sau bám theo số này ---------- */
+const MIX=[["ton","Dùng video tồn","kho","đăng lại video cũ trong kho"],["oneshot","One shot","quay","quay, chỉ cần hook"],["kichban","Review / voice off","quay","quay, có kịch bản"],["worker","Không quay · Worker","wk","cảnh cũ + Worker dựng"],["reup","Reup","kho","video cũ đổi hook / edit lại"],["nhanban","Nhân bản win","win","Hypit nhân bản video win"]];
+const mixOf=c=>{const L=loaiOf(c);if(c.khoMa)return L==="kho"?"ton":"reup";if(L==="worker")return "worker";if(L==="nhanban")return "nhanban";if(L==="reup")return "reup";if(L==="kho")return "ton";return c.oneShot||c.phatSinh?"oneshot":"kichban"};
+const wpMix=e=>e&&e.mix?e.mix:{};
+const wpTot=e=>{const m=wpMix(e);const s=Object.values(m).reduce((a,b)=>a+(+b||0),0);return s||(+((e||{}).sl)||0)};
+function wpWeekNo(d,W,days){return days.length<=7?weekOf(W.tu):weekOf(d.settings.today)||1}
+let WP_OPEN=new Set();
 function xvTuan(b,o){
-  const {d,W,days,give}=o,today=d.settings.today,w=days.length<=7?weekOf(W.tu):weekOf(today)||1,WW=WEEKS.find(x=>x.w===w)||WEEKS[0],wp=wpOf(d,w),pairs=ptPairs(),free=xvKhoFree();
+  const {d,W,days,give}=o,today=d.settings.today,w=wpWeekNo(d,W,days),WW=WEEKS.find(x=>x.w===w)||WEEKS[0],wp=wpOf(d,w),pairs=ptPairs(),free=xvKhoFree();
   const inW=c=>{const x=cDay(c);return x>=WW.tu&&x<=WW.den};
-  const rows=CHANNELS.map(ch=>{const P=pairs.filter(x=>x.kenh===ch.k);if(!P.length)return "";
-    const cap=sum(xvDays(WW),x=>nhipOf(ch.k,x)),tot=sum(P,x=>+(wp[wpKey(x.sku,x.kenh)]||{}).sl||0);
-    return `<tr class="grp"><td colspan="8"><b>${esc(ch.short)}</b> <span class="hint">· tuần này kế hoạch <b>${tot}</b> video · nhịp đăng cả tuần chứa được <b>${cap}</b> video ${tot>cap?pill("vượt nhịp đăng "+(tot-cap),"amb"):tot&&tot<cap?pill("còn "+(cap-tot)+" ô đăng trống","gry"):""}</span></td></tr>`+
-    P.map(x=>{const k=wpKey(x.sku,x.kenh),e=wp[k]||{},C=d.cards.filter(c=>c.sku===x.sku&&c.kenh===x.kenh),made=C.length,left=Math.max(0,(x.sl||0)-made),kho=free.filter(q=>q.sku===x.sku).length,lam=C.filter(inW).length,prev=d.cards.filter(c=>c.sku===x.sku&&c.kenh===x.kenh&&(()=>{const pw=WEEKS.find(y=>y.w===w-1);const z=cDay(c);return pw&&z>=pw.tu&&z<=pw.den})()),don=sum(prev,c=>c.don||0);
-      return `<tr><td>${swatch(x.sku)}<b>${esc(sk(x.sku).n)}</b>${pill(x.huong,x.huong==="Đẩy mạnh"?"pnk":"gry")}</td><td class="n">${x.sl||"—"}</td><td class="n">${made}${left?`<small>còn ${left}</small>`:""}</td><td class="n">${kho||"—"}</td><td class="n">${prev.length?`${prev.length} video<small>${don} đơn</small>`:"—"}</td>
-       <td>${give?`<input type="number" min="0" class="num" data-wpsl="${esc(k)}" value="${e.sl||""}" placeholder="0">`:(e.sl||"—")}</td>
-       <td>${give?`<select data-wpuu="${esc(k)}">${opt(WP_UU,e.uu||"thuong")}</select>`:esc((WP_UU.find(u=>u[0]===e.uu)||WP_UU[2])[1])}</td>
-       <td class="n">${e.sl?`<b class="${lam>=e.sl?"t-grn":""}">${lam}/${e.sl}</b>`:lam||"—"}</td></tr>`}).join("")}).join("");
-  b.innerHTML=`<section class="card flush"><div class="card-h pad"><h2>Kế hoạch tuần ${w} · ${dd(WW.tu)}–${dd(Math.min(WW.den,MONTH.ndays))}</h2><span class="hint">tuần này làm bao nhiêu video mỗi sản phẩm, cái nào làm trước · ${days.length>7?"đang xem cả tháng nên hiện tuần hiện tại, muốn đặt tuần khác thì chọn tuần ở ô thời gian trên cùng":""}</span></div>
-   <div class="tbl"><table class="wptab"><thead><tr><th>Sản phẩm</th><th class="n">KPI tháng</th><th class="n">Đã làm</th><th class="n">Video tồn</th><th class="n">Tuần trước</th><th>Tuần này làm</th><th>Ưu tiên</th><th class="n">Đã lên hook / quay</th></tr></thead><tbody>${rows||`<tr><td colspan="8" class="empty">Chưa có sản phẩm nào trong kế hoạch tháng (Kế hoạch tháng › bước 5).</td></tr>`}</tbody></table></div>
-   <p class="hint pad">Sản phẩm còn nhiều video cũ thì để "Làm sau" và dùng video tồn ở bước ②. Sản phẩm đang ra số tốt hoặc cần cho dịp sale thì để "Làm trước" / "Đẩy cho sale": khi xếp lịch đăng, các video này được xếp trước. Số "Tuần này làm" cũng quyết định sản phẩm được đăng dày hay cách ngày.</p></section>`;
-  b.querySelectorAll("[data-wpsl],[data-wpuu]").forEach(x=>x.onchange=()=>{const k=x.dataset.wpsl||x.dataset.wpuu;DB.mutate(ME.name,"kế hoạch tuần "+w,dt=>{dt.weekPlan=dt.weekPlan||{};dt.weekPlan[w]=dt.weekPlan[w]||{};const e=dt.weekPlan[w][k]=dt.weekPlan[w][k]||{};if(x.dataset.wpsl)e.sl=Math.max(0,+x.value||0);else e.uu=x.value});toast("Đã lưu");renderMain()});
+  const pw=WEEKS.find(y=>y.w===w-1);
+  const block=x=>{const k=wpKey(x.sku,x.kenh),e=wp[k]||{},m=wpMix(e),C=d.cards.filter(c=>c.sku===x.sku&&c.kenh===x.kenh),CW=C.filter(inW),tot=wpTot(e),kho=free.filter(q=>q.sku===x.sku).length,prev=pw?C.filter(c=>{const z=cDay(c);return z>=pw.tu&&z<=pw.den}):[],op=WP_OPEN.has(k);
+    const p=tot?Math.min(100,Math.round(CW.length/tot*100)):0;
+    return `<div class="wpb${op?" open":""}"><div class="wph" data-wpo="${esc(k)}"><i class="ptar">${op?"▾":"▸"}</i>${swatch(x.sku)}<b>${esc(sk(x.sku).n)}</b>${pill(x.huong,x.huong==="Đẩy mạnh"?"pnk":"gry")}
+      <span class="wpt">tuần này <b>${tot||0}</b> video · đã làm <b>${CW.length}</b></span><span class="xlbar wpbar"><i style="width:${p}%;background:${p>=100?"#2f9e44":"#4b54d1"}"></i></span>
+      <span class="sp"></span>${give?`<select data-wpuu="${esc(k)}">${opt(WP_UU,e.uu||"thuong")}</select>`:pill((WP_UU.find(u=>u[0]===e.uu)||WP_UU[2])[1])}</div>
+     ${op?`<div class="wpi"><span>KPI tháng <b>${x.sl||"—"}</b></span><span>đã làm cả tháng <b>${C.length}</b>${x.sl&&x.sl>C.length?` · còn ${x.sl-C.length}`:""}</span><span>video tồn trong kho <b>${kho}</b></span><span>tuần trước <b>${prev.length}</b> video · ${sum(prev,c=>c.don||0)} đơn</span></div>
+     <div class="wpm">${MIX.map(([t,lb,tab,hint])=>{const n=+m[t]||0,dn=CW.filter(c=>mixOf(c)===t).length;return `<div class="wpc${n&&dn>=n?" ok":""}"><div class="wpcl"><b>${lb}</b><small>${hint}</small></div>
+       ${give?`<input type="number" min="0" class="num" data-wpm="${esc(k)}|${t}" value="${n||""}" placeholder="0">`:`<b>${n||"—"}</b>`}<span class="wpcd">đã làm <b>${dn}</b>${n?`/${n}`:""}</span>
+       ${n&&dn<n?`<button class="btn sm" data-wpgo="${esc(k)}|${t}">Làm →</button>`:""}</div>`}).join("")}</div>`:`<div class="ptmini">${MIX.filter(([t])=>+m[t]).map(([t,lb])=>`${lb} ${CW.filter(c=>mixOf(c)===t).length}/${m[t]}`).join(" · ")||(e.sl?`${e.sl} video, chưa chia loại`:"chưa đặt")} · <span class="lnk">bấm để chia theo loại</span></div>`}</div>`};
+  const chs=CHANNELS.map(ch=>{const P=pairs.filter(x=>x.kenh===ch.k);if(!P.length)return "";const cap=sum(xvDays(WW),x=>nhipOf(ch.k,x)),tot=sum(P,x=>wpTot(wp[wpKey(x.sku,x.kenh)]));
+    return `<div class="wpch"><div class="ptsum"><b>${esc(ch.short)}</b> · tuần này kế hoạch <b>${tot}</b> video · nhịp đăng cả tuần chứa được <b>${cap}</b> ${tot>cap?pill("vượt nhịp đăng "+(tot-cap),"amb"):tot&&tot<cap?pill("còn "+(cap-tot)+" ô đăng trống","gry"):""}</div>${P.map(block).join("")}</div>`}).join("");
+  b.innerHTML=`<section class="card"><div class="card-h"><h2>Kế hoạch tuần ${w} · ${dd(WW.tu)}–${dd(Math.min(WW.den,MONTH.ndays))}</h2><span class="hint">mở từng sản phẩm, chia số video tuần này theo loại · bấm "Làm →" để sang đúng bước, chọn sẵn sản phẩm${days.length>7?" · đang xem cả tháng nên hiện tuần hiện tại":""}</span></div>
+   ${chs||`<p class="empty">Chưa có sản phẩm nào trong kế hoạch tháng (Kế hoạch tháng › bước 5).</p>`}
+   <p class="hint">Ưu tiên: "Làm trước" / "Đẩy cho sale" cho sản phẩm đang ra số hoặc cần cho dịp sale; "Làm sau" cho sản phẩm còn nhiều video cũ. Người giữ kênh nhìn ưu tiên này khi tự xếp ngày đăng.</p></section>`;
+  b.querySelectorAll("[data-wpo]").forEach(h=>h.onclick=e=>{if(e.target.closest("input,select,button"))return;const k=h.dataset.wpo;WP_OPEN.has(k)?WP_OPEN.delete(k):WP_OPEN.add(k);renderMain()});
+  b.querySelectorAll("[data-wpuu]").forEach(x=>x.onchange=()=>{const k=x.dataset.wpuu;DB.mutate(ME.name,"ưu tiên tuần "+w,dt=>{dt.weekPlan=dt.weekPlan||{};dt.weekPlan[w]=dt.weekPlan[w]||{};(dt.weekPlan[w][k]=dt.weekPlan[w][k]||{}).uu=x.value});toast("Đã lưu")});
+  b.querySelectorAll("[data-wpm]").forEach(x=>x.onchange=()=>{const [sku,kenh,t]=x.dataset.wpm.split("|"),k=wpKey(sku,kenh);DB.mutate(ME.name,"kế hoạch tuần "+w+" "+sk(sku).n,dt=>{dt.weekPlan=dt.weekPlan||{};dt.weekPlan[w]=dt.weekPlan[w]||{};const e=dt.weekPlan[w][k]=dt.weekPlan[w][k]||{};e.mix=e.mix||{};e.mix[t]=Math.max(0,+x.value||0);e.sl=Object.values(e.mix).reduce((a,b)=>a+(+b||0),0)});toast("Đã lưu");renderMain()});
+  b.querySelectorAll("[data-wpgo]").forEach(x=>x.onclick=()=>wpGo(...x.dataset.wpgo.split("|")));
+}
+/* Sang đúng bước, chọn sẵn sản phẩm × kênh và loại video */
+function wpGo(sku,kenh,t){const mx=MIX.find(x=>x[0]===t);XV.sku=sku;XV.kenh=kenh;XV.mix=t;if(mx[2]==="win"){MOD="mkt";PAGE="win";render();scrollTo(0,0);return}XV.tab=mx[2];XV.sel.clear();renderMain();scrollTo(0,0)}
+/* Dải "Tuần này cần làm" ở các bước: lấy từ kế hoạch tuần */
+function wpStrip(d,W,days,types){
+  const w=wpWeekNo(d,W,days),WW=WEEKS.find(x=>x.w===w)||WEEKS[0],wp=wpOf(d,w),inW=c=>{const x=cDay(c);return x>=WW.tu&&x<=WW.den};
+  const items=ptPairs().map(x=>{const m=wpMix(wp[wpKey(x.sku,x.kenh)]),parts=types.filter(t=>+m[t]).map(t=>{const n=+m[t],dn=d.cards.filter(c=>c.sku===x.sku&&c.kenh===x.kenh&&inW(c)&&mixOf(c)===t).length;return {t,n,dn}});return {x,parts}}).filter(i=>i.parts.length);
+  if(!items.length)return `<div class="wpstrip"><span class="hint">Tuần ${w} chưa chia số video cho bước này. Đặt ở ① Kế hoạch tuần.</span></div>`;
+  return `<div class="wpstrip"><b>Tuần ${w} cần làm:</b>${items.map(({x,parts})=>{const on=XV.sku===x.sku&&XV.kenh===x.kenh;return `<button type="button" class="wpq${on?" on":""}" data-wpq="${esc(x.sku)}|${esc(x.kenh)}|${parts[0].t}">${swatch(x.sku)}${esc(sk(x.sku).n)} · ${esc(chOf(x.kenh).short)}: ${parts.map(p=>`${(MIX.find(z=>z[0]===p.t)||[])[1]} <b class="${p.dn>=p.n?"t-grn":""}">${p.dn}/${p.n}</b>`).join(" · ")}</button>`}).join("")}${XV.sku?`<button type="button" class="chipx" data-wpq="">Bỏ chọn ${esc(sk(XV.sku).n)} ✕</button>`:""}</div>`;
 }
 
 /* ---------- ③ Buổi quay & hook ---------- */
@@ -114,6 +136,15 @@ function pXepViec2(m){
   m.querySelectorAll("[data-xvt]").forEach(b=>b.onclick=()=>{XV.tab=b.dataset.xvt;XV.sel.clear();renderMain()});
   const b=$("#xvb"),o={d,W,days,WC,team,give,slots,free,kbPool,qPool:[],ePool,post:WC.filter(c=>c.step==="dang")};
   ({tuan:xvTuan,kho:xvKho,quay:xvQuay2,wk:xvWorker,kb:xvKB,edit:xvEdit,dang:xvDang2})[XV.tab](b,o);
+  /* nối với ① Kế hoạch tuần: dải "cần làm" + chọn sẵn sản phẩm đang làm */
+  const ST={kho:["ton","reup"],quay:["oneshot","kichban"],wk:["worker"]}[XV.tab];
+  if(ST){b.insertAdjacentHTML("afterbegin",wpStrip(d,W,days,ST));
+    b.querySelectorAll("[data-wpq]").forEach(x=>x.onclick=()=>{const v=x.dataset.wpq;if(!v){XV.sku="";XV.kenh="";XV.mix=""}else{const [s2,k2,t2]=v.split("|");XV.sku=s2;XV.kenh=k2;XV.mix=t2}renderMain()});
+    if(XV.sku){const tu=d.tuyen.find(t=>t.sku===XV.sku&&(!XV.kenh||t.kenh===XV.kenh));
+      if(XV.tab==="quay"){b.querySelectorAll(".hkadd .ht").forEach(s2=>{if(tu)s2.value=tu.ma});b.querySelectorAll(".hkadd .hl").forEach(s2=>s2.value=XV.mix==="kichban"?"0":"1")}
+      if(XV.tab==="wk"&&tu&&$("#wk-t"))$("#wk-t").value=tu.ma;
+      if(XV.tab==="kho"){const v=$("#xa-v");if(v){const o2=[...v.options].find(op=>(xvKhoFree().find(q=>q.ma===op.value)||{}).sku===XV.sku);if(o2)v.value=o2.value}if($("#xa-k")&&XV.kenh)$("#xa-k").value=XV.kenh;if($("#xa-m"))$("#xa-m").value=XV.mix==="reup"?"hook":"nguyen"}
+      if(!tu&&["quay","wk"].includes(XV.tab))b.insertAdjacentHTML("afterbegin",`<div class="note">${esc(sk(XV.sku).n)} ở ${esc(chOf(XV.kenh||"").short)} chưa có tuyến nào. Lập tuyến ở Kế hoạch tháng › bước 5 trước.</div>`)}}
   b.querySelectorAll("[data-xsel]").forEach(x=>{x.onclick=e=>e.stopPropagation();x.onchange=()=>{x.checked?XV.sel.add(x.dataset.xsel):XV.sel.delete(x.dataset.xsel);renderMain()}});
   bindCommon(b);
 }
