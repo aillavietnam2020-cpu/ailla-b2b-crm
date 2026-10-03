@@ -538,3 +538,8 @@ table.pttab td{vertical-align:middle}
 .ptadd input,.ptadd select{width:auto;min-width:150px;height:38px}.ptadd .nn{width:80px;min-width:0}
 .t-vio{color:#7048e8}
 @media (max-width:900px){.pti{grid-template-columns:1fr}}
+
+.gyed{display:grid;grid-template-columns:1fr 1fr;gap:14px;border:1px dashed #c9cdf0;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#f8f8ff}
+.gyed>p{grid-column:1/-1;margin:0}
+.gyg{display:grid;gap:8px;align-content:start}
+@media (max-width:900px){.gyed{grid-template-columns:1fr}}
