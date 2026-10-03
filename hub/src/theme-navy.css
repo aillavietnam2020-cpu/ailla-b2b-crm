@@ -548,3 +548,9 @@ table.pttab td{vertical-align:middle}
 .ptkpi input{width:80px;height:34px;text-align:right}
 .ptsum{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px;border-radius:12px;background:#f2f3ff;font-size:14.5px}
 .pttab td input{width:100%}
+
+.ptb .pth{cursor:pointer;margin-bottom:0;user-select:none}
+.ptb.open .pth{margin-bottom:10px}
+.ptar{font-style:normal;color:var(--nv-active);width:16px;display:inline-block}
+.ptmini{margin:6px 0 0 24px;font-size:13px;color:var(--muted)}
+.ptb{padding:12px 16px}
