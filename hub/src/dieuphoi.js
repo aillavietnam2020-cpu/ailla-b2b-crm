@@ -82,3 +82,17 @@ function tuyenBox(c){
 }
 /* Bấm "Xem cả tuyến" / một tuyến ở bất kỳ đâu → Điều phối, lọc đúng tuyến đó */
 document.addEventListener("click",e=>{const b=e.target.closest("[data-gotuyen]");if(!b)return;e.preventDefault();e.stopPropagation();if(typeof closeDrawer==="function")closeDrawer();DP.tuyen=b.dataset.gotuyen;DP.view="buoc";DP.step="";DP.sel.clear();MOD="mkt";PAGE="dieuphoi";render();scrollTo(0,0)},true);
+
+/* Thanh kéo ngang nổi: bảng rộng mà đáy bảng còn ở dưới màn hình thì hiện một thanh kéo ngang dính sát đáy màn hình */
+(function(){
+  const bar=document.createElement("div");bar.id="hscroll";bar.innerHTML="<div></div>";document.body.appendChild(bar);
+  let cur=null,lock=false,queued=false;
+  const pick=()=>{queued=false;const vh=innerHeight;let best=null;
+    document.querySelectorAll(".tbl").forEach(t=>{if(best||t.scrollWidth<=t.clientWidth+2)return;const r=t.getBoundingClientRect();if(r.top<vh-60&&r.bottom>vh-4)best=t});
+    cur=best;if(!cur){bar.style.display="none";return}
+    const r=cur.getBoundingClientRect();bar.style.display="block";bar.style.left=r.left+"px";bar.style.width=cur.clientWidth+"px";bar.firstChild.style.width=cur.scrollWidth+"px";if(!lock)bar.scrollLeft=cur.scrollLeft};
+  const later=()=>{if(!queued){queued=true;setTimeout(pick,60)}};
+  bar.addEventListener("scroll",()=>{if(cur){lock=true;cur.scrollLeft=bar.scrollLeft;setTimeout(()=>lock=false,30)}});
+  document.addEventListener("scroll",e=>{if(e.target===bar)return;if(e.target===cur&&!lock)bar.scrollLeft=cur.scrollLeft;later()},true);
+  addEventListener("resize",later);addEventListener("load",later);later();new MutationObserver(later).observe(document.body,{childList:true,subtree:true});
+})();

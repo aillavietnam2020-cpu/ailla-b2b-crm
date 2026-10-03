@@ -316,8 +316,7 @@ td{height:40px}
 
 
 /* ---------- bảng dài: khung cao vừa màn hình để thanh kéo ngang luôn nhìn thấy ---------- */
-.tbl{max-height:calc(100vh - 170px);overflow:auto}
-.tbl thead th{position:sticky;top:0;z-index:2}
+.tbl{overflow-x:auto}
 .tbl::-webkit-scrollbar{height:12px;width:10px}
 .tbl::-webkit-scrollbar-thumb{background:#98a2b3;border-radius:8px;border:2px solid #fff}
 .tbl::-webkit-scrollbar-track{background:#f1f3f6}
@@ -346,3 +345,10 @@ table.dptab2{table-layout:fixed;width:100%}
 .tyh .lnk{margin-left:auto}
 .tybox dl{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;margin:8px 0 0;font-size:14px}
 .tybox dt{color:var(--muted)}.tybox dd{margin:0}
+
+/* thanh kéo ngang nổi ở đáy màn hình cho bảng rộng */
+#hscroll{position:fixed;bottom:0;height:18px;overflow-x:auto;overflow-y:hidden;z-index:60;display:none;background:rgba(241,243,246,.96);border-top:1px solid var(--line);border-radius:6px 6px 0 0}
+#hscroll>div{height:1px}
+#hscroll::-webkit-scrollbar{height:14px}
+#hscroll::-webkit-scrollbar-thumb{background:#7d8899;border-radius:8px;border:3px solid #f1f3f6}
+#hscroll::-webkit-scrollbar-track{background:transparent}
