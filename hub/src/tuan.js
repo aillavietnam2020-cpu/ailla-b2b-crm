@@ -28,9 +28,7 @@ function autoSlot(dt,ids){
     for(let x=st;x<=MONTH.ndays&&!pick;x++)if(on(c.kenh,x).length<nhipOf(c.kenh,x))pick=x;
     if(pick){c.day=pick;n++}});
   return n}
-/* Video vừa quay xong / vừa duyệt mà chưa có ngày đăng thì tự xếp ngay */
-const _moveCardTuan=moveCard;
-moveCard=function(u,id,to,inp){const e=_moveCardTuan(u,id,to,inp||{});if(!e){const c=D().cards.find(x=>x.id===id);if(c&&!c.day&&["dvd","dceo","dang"].includes(c.step))DB.mutate(u.name,"xếp ngày đăng "+id,dt=>autoSlot(dt,[id]))}return e};
+/* Ngày đăng do người giữ kênh tự xếp (không tự xếp hộ) */
 
 /* ---------- ① Kế hoạch tuần ---------- */
 function xvTuan(b,o){
@@ -93,14 +91,14 @@ function xvDang2(b,o){
   b.innerHTML=`<section class="card"><div class="card-h"><h2>Nhịp đăng từng kênh</h2><span class="hint">số video mỗi ngày theo giai đoạn · ví dụ trước sale 10/10 đăng dày, sau đó giảm · ngày không thuộc giai đoạn nào thì dùng số mặc định</span></div>
    <div class="nhg">${CHANNELS.map(ch=>`<div class="nhk"><b>${esc(ch.short)}</b><small>mặc định ${slotsOf()[ch.k]||0}/ngày</small>${(N[ch.k]||[]).map((r,i)=>`<div class="nhr">${dd(r.tu)} → ${dd(r.den)}: <b>${r.sl}</b>/ngày${give?` <button class="lnk danger" data-nhx="${esc(ch.k)}|${i}">✕</button>`:""}</div>`).join("")}
     ${give?`<div class="nhadd" data-nhk="${esc(ch.k)}"><select class="a">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dd(i+1)]),today)}</select>→<select class="z">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dd(i+1)]),Math.min(MONTH.ndays,today+5))}</select><input type="number" min="0" class="n num" placeholder="video/ngày"><button class="btn sm" data-nhadd="${esc(ch.k)}">+ Giai đoạn</button></div>`:""}</div>`).join("")}</div></section>
-  <section class="card"><div class="card-h"><h2>Video chưa có ngày đăng</h2>${give?`<button class="btn sm" id="hot-open">🔥 Đẩy sản phẩm đang lên xu hướng</button>`:""}<span class="hint">${un.length} video đã quay xong trở đi</span><span class="sp"></span>${give&&un.length?`<button class="btn pri" id="as-go">Xếp lịch tự động (${un.length})</button>`:""}</div>
-   <div class="xlist">${un.slice(0,40).map(c=>xvMini(c,`<span class="xms">${esc(chOf(c.kenh).short)} · ${esc(stepName(c.step))}</span>`)).join("")||`<p class="hint">Không có. Video duyệt xong cũng tự được xếp ngày.</p>`}</div>
-   <p class="hint">Cách xếp: theo nhịp đăng của kênh, video "Làm trước" / "Đẩy cho sale" xếp trước. Sản phẩm làm nhiều video trong tuần được đăng mỗi ngày (có ngày 2–3 video), sản phẩm làm ít thì đăng cách ngày. Kéo đổi ngày ở Calendar nếu cần.</p></section>
+  <section class="card"><div class="card-h"><h2>Video chưa có ngày đăng</h2><span class="hint">người giữ kênh tự xếp</span>${give?`<button class="btn sm" id="hot-open">🔥 Đẩy sản phẩm đang lên xu hướng</button>`:""}<span class="hint">${un.length} video đã quay xong trở đi</span><span class="sp"></span></div>
+   <div class="xlist">${un.slice(0,60).map(c=>{const may=give||chanOwner(c.kenh)===ME.id;return `<div class="xmini">${swatch(c.sku)}<span class="xmt clk" data-card="${c.id}">${esc(c.hookText||c.yTuong||c.tuyen||c.id)}</span><span class="xms">${esc(chOf(c.kenh).short)} · ${esc(stepName(c.step))} · giữ kênh: ${esc(userName(chanOwner(c.kenh))||"chưa đặt")}</span>${may?`<select data-setday="${c.id}">${opt([["","Chọn ngày đăng"]].concat(Array.from({length:MONTH.ndays-today+1},(_,i)=>today+i).map(x=>[x,dayLbl(x)+" · "+d.cards.filter(y=>y.kenh===c.kenh&&y.day===x).length+"/"+nhipOf(c.kenh,x)])),"")}</select>`:""}</div>`}).join("")||`<p class="hint">Không có video nào đang chờ xếp ngày.</p>`}</div>
+   <p class="hint">Người giữ kênh tự chọn ngày đăng cho từng video. Số cạnh mỗi ngày là đã xếp / nhịp đăng của kênh, để cân: sản phẩm đẩy chính đăng dày hơn, sản phẩm ít video thì đăng cách ngày, video "Làm trước" / "Đẩy cho sale" xếp sớm. Đổi ngày sau này ở thẻ video hoặc Calendar.</p></section>
   <section class="card flush"><div class="card-h pad"><h2>7 ngày tới</h2><span class="hint">đã xếp / nhịp đăng</span></div><div class="tbl"><table><thead><tr><th>Kênh</th>${D7.map(x=>`<th class="n">${dayLbl(x)}</th>`).join("")}</tr></thead><tbody>${CHANNELS.map(ch=>`<tr><td><b>${esc(ch.short)}</b><small>giữ kênh: ${esc(userName(chanOwner(ch.k))||"chưa đặt")}</small></td>${D7.map(x=>{const L=d.cards.filter(c=>c.kenh===ch.k&&c.day===x),cap=nhipOf(ch.k,x);return `<td class="n"><b class="${L.length>cap?"t-red":L.length===cap&&cap?"t-grn":""}">${L.length}</b>/${cap}<small>${esc(xvGroupBy(L,c=>c.sku).map(([k,l])=>sk(k).n.split(" ")[0]+" "+l.length).join(", "))}</small></td>`}).join("")}</tr>`).join("")}</tbody></table></div></section>`;
   b.querySelectorAll("[data-nhadd]").forEach(x=>x.onclick=()=>{const k=x.dataset.nhadd,f=x.closest(".nhadd"),a=+f.querySelector(".a").value,z=+f.querySelector(".z").value,n=+f.querySelector(".n").value;if(!n&&n!==0||f.querySelector(".n").value===""){toast("Gõ số video/ngày");return}DB.mutate(ME.name,"nhịp đăng "+k,dt=>{dt.settings.nhip=dt.settings.nhip||{};dt.settings.nhip[k]=(dt.settings.nhip[k]||[]).concat({tu:Math.min(a,z),den:Math.max(a,z),sl:n}).sort((p,q)=>p.tu-q.tu)});renderMain()});
   b.querySelectorAll("[data-nhx]").forEach(x=>x.onclick=()=>{const [k,i]=x.dataset.nhx.split("|");DB.mutate(ME.name,"bỏ giai đoạn nhịp đăng",dt=>dt.settings.nhip[k].splice(+i,1));renderMain()});
   if($("#hot-open"))$("#hot-open").onclick=()=>openHot();
-  if($("#as-go"))$("#as-go").onclick=()=>{let n=0;DB.mutate(ME.name,"xếp lịch đăng tự động",dt=>{n=autoSlot(dt)});toast(n?`Đã xếp ngày đăng cho ${n} video`:"Không còn ô trống theo nhịp đăng, tăng nhịp hoặc thêm giai đoạn");renderMain()};
+  b.querySelectorAll("[data-setday]").forEach(x=>x.onchange=()=>{if(!x.value)return;DB.mutate(ME.name,"xếp ngày đăng "+x.dataset.setday+" → "+dd(+x.value),dt=>{const c=dt.cards.find(y=>y.id===x.dataset.setday);if(c)c.day=+x.value});toast("Đã xếp ngày đăng "+dd(+x.value));renderMain()});
 }
 
 /* ---------- Trang Xếp việc tuần (thay bản cũ) ---------- */
@@ -132,22 +130,20 @@ function openHot(sku0,kenh0){
    <form class="frm" id="hotf"><label class="field">Sản phẩm · kênh<select id="hot-p">${opt(pairs.map(x=>[x.sku+"|"+x.kenh,sk(x.sku).n+" · "+chOf(x.kenh).short]),(sku0&&kenh0)?sku0+"|"+kenh0:"")}</select></label>
    <label class="field">Đăng mỗi ngày bao nhiêu video sản phẩm này<input id="hot-n" type="number" min="1" value="3"></label>
    <label class="field">Trong bao nhiêu ngày tới<input id="hot-d" type="number" min="1" value="5"></label></form><div id="hot-info"></div>
-   <div class="acts"><button class="btn pri" id="hot-go">Đẩy lên ngay</button></div>`;
+   <div class="acts"><button class="btn pri" id="hot-go">Giao việc đẩy sản phẩm</button></div>`;
   $("#drawer").hidden=false;$("#dx").onclick=closeDrawer;
   const info=()=>{const [sku,kenh]=$("#hot-p").value.split("|"),need=(+$("#hot-n").value||0)*(+$("#hot-d").value||0),ready=d.cards.filter(c=>c.sku===sku&&c.kenh===kenh&&["edit","worker","dvd","dceo","dang"].includes(c.step)&&(!c.day||c.day>=today)).length,kho=xvKhoFree().filter(k=>k.sku===sku).length,thieu=Math.max(0,need-ready-kho);
     $("#hot-info").innerHTML=`<dl class="kv"><dt>Cần đăng</dt><dd><b>${need}</b> video trong ${$("#hot-d").value} ngày tới</dd><dt>Đã có sẵn</dt><dd><b>${ready}</b> video đang edit / chờ duyệt / chờ đăng</dd><dt>Video tồn</dt><dd><b>${kho}</b> video trong kho (xếp ở Xếp việc tuần › ② Video tồn)</dd><dt>Còn thiếu</dt><dd>${thieu?`<b class="t-red">${thieu}</b> video → cộng vào kế hoạch tuần (làm trước) và giao việc quay gấp`:`<b class="t-grn">đủ</b>`}</dd></dl>
-     <p class="hint">Bấm "Đẩy lên ngay": lịch đăng ${esc(chOf(kenh).short)} từ hôm nay được xếp lại, video sản phẩm này lên trước; người giữ kênh (${esc(userName(chanOwner(kenh))||"chưa đặt")}) nhận việc "điều chỉnh lịch"${thieu?"; Oanh nhận việc lên hook quay gấp":""}.</p>`;return {sku,kenh,need,ready,kho,thieu}};
+     <p class="hint">Bấm "Đẩy lên ngay": người giữ kênh ${esc(chOf(kenh).short)} (${esc(userName(chanOwner(kenh))||"chưa đặt")}) nhận việc tự xếp lại lịch đăng, đưa sản phẩm này lên trước${thieu?"; Oanh nhận việc lên hook quay gấp":""}.</p>`;return {sku,kenh,need,ready,kho,thieu}};
   ["#hot-p","#hot-n","#hot-d"].forEach(s=>$(s).oninput=$(s).onchange=info);info();
   $("#hot-go").onclick=()=>{const r=info(),per=+$("#hot-n").value||1,nd=+$("#hot-d").value||1,w=weekOf(today)||1,lead=(d.users.find(u=>u.role==="lead"&&u.active)||{}).id||ME.id,own=chanOwner(r.kenh);
     DB.mutate(ME.name,`đẩy gấp ${sk(r.sku).n} ở ${r.kenh}`,dt=>{
       dt.weekPlan=dt.weekPlan||{};dt.weekPlan[w]=dt.weekPlan[w]||{};const e=dt.weekPlan[w][wpKey(r.sku,r.kenh)]=dt.weekPlan[w][wpKey(r.sku,r.kenh)]||{};e.uu="sale";e.sl=Math.max(+e.sl||0,per*7);if(r.thieu)e.sl=(+e.sl||0)+0;
       dt.hot=(dt.hot||[]).filter(h=>!(h.sku===r.sku&&h.kenh===r.kenh)).concat({sku:r.sku,kenh:r.kenh,tu:today,den:Math.min(MONTH.ndays,today+nd-1),sl:per,at:new Date().toLocaleString("vi-VN"),by:ME.name});
-      dt.cards.filter(c=>c.kenh===r.kenh&&c.day>=today&&["edit","worker","dvd","dceo","dang"].includes(c.step)).forEach(c=>c.day=0);
-      autoSlot(dt);
       const t=(ten,nguoi,mo)=>dt.tasks.push({id:uid("tk"),ten,loai:"Điều chỉnh do xu hướng",nguoi,han:Math.min(MONTH.ndays,today+1),moTa:mo,team:"content",da:"",phoi:[],uu:"Cao",st:"todo",checklist:[],tao:ME.id,kq:""});
-      if(own)t(`Điều chỉnh lịch ${chOf(r.kenh).short}: đẩy ${sk(r.sku).n} lên`,own,`${sk(r.sku).n} đang lên xu hướng. Lịch đăng ${r.kenh} đã xếp lại từ ${dd(today)}: mỗi ngày ${per} video trong ${nd} ngày. Kiểm tra Calendar và đăng đúng lịch mới.`);
+      if(own)t(`Điều chỉnh lịch ${chOf(r.kenh).short}: đẩy ${sk(r.sku).n} lên`,own,`${sk(r.sku).n} đang lên xu hướng. Tự xếp lại lịch đăng ${r.kenh} từ ${dd(today)}: mỗi ngày ${per} video ${sk(r.sku).n} trong ${nd} ngày, đưa video sản phẩm này lên trước (dùng cả video tồn nếu có). Xếp ở Xếp việc tuần › ⑤ Lịch đăng hoặc Calendar.`);
       if(r.thieu)t(`Quay gấp ${r.thieu} video ${sk(r.sku).n}`,lead,`Thiếu ${r.thieu} video ${sk(r.sku).n} cho ${r.kenh} để đẩy xu hướng. Lên danh sách hook ở Xếp việc tuần › ③ Buổi quay & hook (đã cộng vào kế hoạch tuần, ưu tiên làm trước).`)});
-    closeDrawer();toast(`Đã xếp lại lịch ${chOf(r.kenh).short}${r.thieu?`, giao việc quay gấp ${r.thieu} video`:""}`);renderMain()};
+    closeDrawer();toast(`Đã giao việc điều chỉnh lịch cho người giữ kênh${r.thieu?`, giao việc quay gấp ${r.thieu} video`:""}`);renderMain()};
 }
 /* Hệ số ưu tiên cho sản phẩm đang đẩy gấp trong khoảng ngày */
 const _perWeek0=perWeek;
@@ -166,13 +162,13 @@ function xvWorker(b,o){
   b.innerHTML=`<section class="card"><div class="card-h"><h2>Video không quay</h2><span class="hint">dùng cảnh cũ trong kho cảnh, Worker dựng và tạo voice · không cần buổi quay</span></div>
    ${give?`<form class="frm row7" id="wk-add"><label class="field">Tuyến (sản phẩm · kênh)<select id="wk-t">${tOpts}</select></label><label class="field">Số video<input id="wk-n" type="number" min="1" value="3"></label>
     <label class="field">Cách làm<select id="wk-m">${opt([["A","Worker viết kịch bản + voice"],["B","Nhân sự viết kịch bản, Worker dựng + voice"]],"A")}</select></label>
-    <label class="field">Người viết kịch bản (cách B)<select id="wk-p">${opt([["","—"]].concat(team.map(u=>[u.id,u.name])),"")}</select></label>
+    <label class="field">Người phụ trách triển khai<select id="wk-p">${opt([["","—"]].concat(team.map(u=>[u.id,u.name])),"")}</select></label>
     <label class="field">Ghi chú cho Worker (cảnh dùng, giọng…)<input id="wk-g" placeholder="vd: cảnh ngâm áo kho tháng 9, giọng nữ miền Bắc"></label><button class="btn pri">+ Tạo video</button></form>`:""}
-   <p class="hint">Cách A: thẻ đi thẳng tới Worker, dựng xong Oanh duyệt video rồi chị duyệt. Cách B: người viết kịch bản nộp, Oanh duyệt kịch bản, sau đó Worker dựng và tạo voice.</p></section>
-  <section class="card"><div class="card-h"><h2>Trong kỳ</h2><span class="hint">${L.length} video</span></div>${G.map(([t,f])=>{const I=L.filter(f);return I.length?`<div class="xgrp">${t} · ${I.length}</div><div class="xlist">${I.map(c=>xvMini(c,`<span class="xms">${esc(sk(c.sku).n.split(" ")[0])} · ${c.wkMode==="B"?"NS viết":"Worker viết"}</span>`)).join("")}</div>`:""}).join("")||`<p class="empty">Chưa có video nào.</p>`}</section>`;
+   <p class="hint">Mỗi video đều giao cho một người phụ trách triển khai. Cách A: người phụ trách chọn cảnh trong kho cảnh, cho Worker viết kịch bản + voice và dựng, kiểm tra rồi gửi Oanh duyệt video, sau đó chị duyệt. Cách B: người phụ trách viết kịch bản, Oanh duyệt kịch bản, Worker dựng + tạo voice, người phụ trách kiểm tra rồi gửi duyệt video.</p></section>
+  <section class="card"><div class="card-h"><h2>Trong kỳ</h2><span class="hint">${L.length} video</span></div>${G.map(([t,f])=>{const I=L.filter(f);return I.length?`<div class="xgrp">${t} · ${I.length}</div><div class="xlist">${I.map(c=>xvMini(c,`<span class="xms">${esc(sk(c.sku).n.split(" ")[0])} · ${c.wkMode==="B"?"NS viết":"Worker viết"} · ${esc(userName(c.nguoi)||"chưa giao")}</span>`)).join("")}</div>`:""}).join("")||`<p class="empty">Chưa có video nào.</p>`}</section>`;
   if($("#wk-add"))$("#wk-add").onsubmit=e=>{e.preventDefault();const t=d.tuyen.find(y=>y.ma===$("#wk-t").value),n=Math.max(1,+$("#wk-n").value||1),mo=$("#wk-m").value,p=$("#wk-p").value,g=$("#wk-g").value;
-    if(!t){toast("Chưa có tuyến nào, lập tuyến ở Kế hoạch tháng › bước 5");return}if(mo==="B"&&!p){toast("Chọn người viết kịch bản");return}
-    const ids=[];DB.mutate(ME.name,`tạo ${n} video không quay (Worker) ${sk(t.sku).n}`,dt=>{for(let i=0;i<n;i++){const c=newCard(dt,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,day:0,qday:Math.max(today,W.tu),nguon:"Kho cảnh + Worker",loai:"worker",wkMode:mo,dangVideo:"Giọng đọc (Adam/AI)",nguoiDung:"Worker",ghiChuWorker:g,step:mo==="A"?"worker":"kb",nguoi:mo==="A"?"":p,nguoiKB:mo==="A"?"":p});dt.cards.push(c);ids.push(c.id)}});
+    if(!t){toast("Chưa có tuyến nào, lập tuyến ở Kế hoạch tháng › bước 5");return}if(!p){toast("Chọn người phụ trách triển khai");$("#wk-p").focus();return}
+    const ids=[];DB.mutate(ME.name,`tạo ${n} video không quay (Worker) ${sk(t.sku).n}`,dt=>{for(let i=0;i<n;i++){const c=newCard(dt,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,day:0,qday:Math.max(today,W.tu),nguon:"Kho cảnh + Worker",loai:"worker",wkMode:mo,dangVideo:"Giọng đọc (Adam/AI)",nguoiDung:"Worker",ghiChuWorker:g,step:mo==="A"?"worker":"kb",nguoi:p,nguoiKB:mo==="B"?p:"",nguoiEdit:p});dt.cards.push(c);ids.push(c.id)}});
     if(mo==="A"&&typeof simulateWorker==="function")ids.forEach(simulateWorker);
-    toast(`Đã tạo ${n} video`+(mo==="A"?", Worker đang dựng":", "+userName(p)+" viết kịch bản"));renderMain()};
+    toast(`Đã tạo ${n} video, giao ${userName(p)}`+(mo==="A"?" theo dõi Worker dựng":" viết kịch bản"));renderMain()};
 }

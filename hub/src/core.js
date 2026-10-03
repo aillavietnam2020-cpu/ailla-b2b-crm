@@ -216,7 +216,8 @@ function removePlanChannel(u,k,kenh){const p=D().products.find(x=>x.k===k);if(!p
 function removePlanProduct(u,k){const d=D();if(d.cards.some(c=>c.sku===k&&c.nguon!=="Footage cũ")||d.tuyen.some(t=>t.sku===k))return "Sản phẩm đã có tuyến hoặc thẻ việc trong tháng, xóa tuyến/thẻ trước.";DB.mutate(u.name,`bỏ ${sk(k).n} khỏi kế hoạch tháng`,dd2=>{dd2.products=dd2.products.filter(p=>p.k!==k);delete dd2.goals[k]});return ""}
 function sendBack(u,id,note){DB.mutate(u.name,`trả lại ${id}: ${note||"cần sửa"}`,d=>{const x=d.cards.find(y=>y.id===id);if(["dvd","dceo"].includes(x.step)){x.step="edit";if(x.nguoiEdit)x.nguoi=x.nguoiEdit}else{x.step="kb";if(x.nguoiKB)x.nguoi=x.nguoiKB}x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa"})})}
 function assignCard(u,id,to){DB.mutate(u.name,`giao ${id} cho ${userName(to)}`,d=>{const x=d.cards.find(y=>y.id===id);x.nguoi=to;if(x.step==="cg"){const L=loaiOf(x);x.step=L==="moi"?"kb":L==="kho"?"dang":"edit"}if(x.step==="edit")x.nguoiEdit=to})}
-function simulateWorker(id){setTimeout(()=>{const c=D().cards.find(x=>x.id===id);if(!c||c.step!=="worker")return;DB.mutate("Worker",`dựng xong ${id}, chờ duyệt`,d=>{const x=d.cards.find(y=>y.id===id);x.step="dvd";x.linkFinal="drive.google.com/…/Ailla-VIDEO-FINAL/"+id+".mp4"});if(typeof render==="function")render();toast("Worker dựng xong "+id)},6000)}
+function simulateWorker(id){if(D().mode==="live")return; // web thật: người phụ trách dán link video Worker dựng rồi bấm gửi duyệt
+  setTimeout(()=>{const c=D().cards.find(x=>x.id===id);if(!c||c.step!=="worker")return;DB.mutate("Worker",`dựng xong ${id}, chờ duyệt`,d=>{const x=d.cards.find(y=>y.id===id);x.step="dvd";x.linkFinal="drive.google.com/…/Ailla-VIDEO-FINAL/"+id+".mp4"});if(typeof render==="function")render();toast("Worker dựng xong "+id)},6000)}
 
 /* ---------- Sinh thẻ từ TUYẾN (Phát hành) ---------- */
 const HOOK={
