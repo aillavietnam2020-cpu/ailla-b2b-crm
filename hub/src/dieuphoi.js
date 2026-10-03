@@ -75,7 +75,7 @@ function dpTuyenHtml(d){
 /* Khung "Thuộc tuyến" trong cửa sổ thẻ video: pillar, tuyến, insight để viết kịch bản đúng hướng */
 function tuyenBox(c){
   const d=D(),t=d.tuyen.find(x=>x.ma===c.maTuyen);if(!t)return "";
-  const p=(d.pillars||[]).find(x=>x.kenh===t.kenh&&(x.kenh!=="TikTok chính"||x.sku===t.sku))||(d.pillars||[]).find(x=>x.sku===t.sku);
+  const p=(d.pillars||[]).find(x=>x.kenh===t.kenh&&x.sku===t.sku)||(d.pillars||[]).find(x=>x.sku===t.sku);
   const ins=t.maInsight&&(d.insights||[]).find(x=>x.ma===t.maInsight);const I=d.cards.filter(x=>x.maTuyen===t.ma);
   return `<div class="tybox"><div class="tyh"><b>Thuộc tuyến: ${esc(t.tuyen)}</b> <span class="mono hint">${esc(t.ma)}</span><button type="button" class="lnk" data-gotuyen="${esc(t.ma)}">Xem cả tuyến (${I.length} thẻ) →</button></div>
    <dl>${p?`<dt>Pillar</dt><dd>${esc(p.vaiTro||"")}${p.idea?` · big idea: <b>${esc(p.idea)}</b>`:""}</dd>`:""}<dt>Vai trò tuyến</dt><dd>${esc(t.vaiTro||"—")} · kế hoạch ${t.kh} video</dd>${ins?`<dt>Insight</dt><dd>${esc(ins.insight||"")}${ins.persona?` · <span class="hint">${esc(ins.persona)}</span>`:""}</dd>`:""}${t.ghiChu?`<dt>Ghi chú</dt><dd>${esc(t.ghiChu)}</dd>`:""}</dl></div>`;

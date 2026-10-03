@@ -113,7 +113,7 @@ DB.load=async function(){
 DB.save=function(){SV.pending.push(()=>{});svSchedule()};
 /* Sản lượng KH của pillar = tổng số lượng các tuyến cùng sản phẩm, cùng kênh (kênh ngoài TikTok chính: cộng mọi tuyến
    của kênh). Sửa tuyến hay điều chỉnh kế hoạch là pillar tự đổi theo, không lệch nhau. */
-function pillarTuyen(d,p){return (d.tuyen||[]).filter(t=>t.kenh===p.kenh&&(p.kenh!=="TikTok chính"||t.sku===p.sku))}
+function pillarTuyen(d,p){return (d.tuyen||[]).filter(t=>t.kenh===p.kenh&&t.sku===p.sku)}
 function syncPillars(d){(d.pillars||[]).forEach(p=>{const T=pillarTuyen(d,p);if(T.length)p.kh=T.reduce((a,t)=>a+(+t.kh||0),0)})}
 DB.mutate=function(who,msg,fn){
   const act=d=>{fn(d);syncPillars(d);d.activity.unshift({t:nowHM(),d:today(),who,msg});d.activity=d.activity.slice(0,400);d.updatedAt=Date.now()};
