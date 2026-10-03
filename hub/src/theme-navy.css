@@ -616,3 +616,4 @@ table.pttab td{vertical-align:middle}
 .wpas{display:grid;gap:5px}
 .wpas small{color:var(--muted);font-size:12px}
 .wpu{display:flex;align-items:center;gap:6px;font-size:13px}.wpu span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wpu input{width:60px;height:30px;padding:2px 6px}
+.kfrm{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kfrm .full{grid-column:1/-1}.kinfo{grid-column:1/-1;padding:10px 12px;border-radius:10px;background:#f4f5ff}

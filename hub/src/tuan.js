@@ -251,3 +251,38 @@ function wpWorkList(b,tab){
      ${TN.length?`<section class="card"><div class="card-h"><h2>Video tồn cần chọn</h2><span class="hint">${TN.length} ô · người được giao chọn video ở bảng "Ô lịch dành cho video tồn" bên dưới</span></div><div class="xlist">${TN.map(c=>xvMini(c,`<span class="xms">${esc(chOf(c.kenh).short)} · ${esc(userName(c.nguoi)||"—")}</span>`)).join("")}</div></section>`:""}`);
     b.querySelectorAll("[data-rpsend]").forEach(x=>x.onclick=()=>{const id=x.dataset.rpsend,l=b.querySelector(`[data-rpin="${id}"]`).value.trim();const e=moveCard(ME,id,"worker",{linkVideo:l});toast(e||"Đã gửi Worker dựng");renderMain()})}
 }
+
+/* ---------- Thẻ "dùng video tồn": cửa sổ gọn ----------
+   chọn video trong kho → xem tuyến → chọn kênh → chọn ngày đăng; đã xếp rồi thì chỉ còn đăng và dán ID / link */
+function openKhoCard(c){
+  const d=D(),today=d.settings.today,k=c.khoMa&&(d.kho||[]).find(x=>x.ma===c.khoMa),ed=xvGive()||c.nguoi===ME.id||chanOwner(c.kenh)===ME.id,fb=!chOf(c.kenh).needId;
+  const free=xvKhoFree().filter(x=>x.sku===c.sku),others=xvKhoFree().filter(x=>x.sku!==c.sku);
+  const T=d.tuyen.filter(t=>t.sku===c.sku);
+  const dayOpts=kenh=>[["","Chọn ngày đăng"]].concat(Array.from({length:MONTH.ndays-today+1},(_,i)=>today+i).map(x=>[x,dayLbl(x)+" · đã xếp "+d.cards.filter(y=>y.kenh===kenh&&y.day===x&&y.id!==c.id).length+"/"+nhipOf(kenh,x)]));
+  OPENED=c.id;
+  $("#drawerIn").innerHTML=`<div class="dh"><div><span class="mono">${c.id}</span> ${pill(k?(c.step==="xong"?"Đã đăng":"Chờ đăng"):"Chưa chọn video","gry")}</div><button class="btn sm" id="dx">Đóng</button></div>
+   <h2 class="dtitle">${k?"Video tồn "+esc(k.ma):"Chọn video tồn để đăng"}</h2>
+   <p class="hint">${swatch(c.sku)}${esc(sk(c.sku).n)} · người làm: ${esc(userName(c.giao||c.nguoi)||"—")}</p>
+   <div class="frm kfrm">
+    ${k?`<div class="kinfo"><b>${esc(k.ma)}</b> · ${esc(k.tuyen||k.skuText||"")}${k.link?` · <a href="${esc(/^https?:/.test(k.link)?k.link:"https://"+k.link)}" target="_blank" rel="noopener">Xem video</a>`:""}</div>`
+      :`<label class="field full">Video tồn trong kho<select id="kc-v" ${ed?"":"disabled"}>${opt([["","— chọn video —"]].concat(free.map(x=>[x.ma,x.ma+" · "+(x.tuyen||x.skuText||"")])).concat(others.length?[["__sep","── sản phẩm khác ──"]].concat(others.map(x=>[x.ma,sk(x.sku).n+" · "+x.ma+" · "+(x.tuyen||"")])):[]),"")}</select><small>${free.length?free.length+" video "+esc(sk(c.sku).n)+" còn dùng được":`<span class="t-amb">Kho không còn video ${esc(sk(c.sku).n)}</span>`}</small></label>`}
+    <label class="field">Tuyến<select id="kc-t" ${ed?"":"disabled"}>${opt([["","—"]].concat(T.map(t=>[t.ma,t.tuyen+" · "+chOf(t.kenh).short])),c.maTuyen||"")}</select></label>
+    <label class="field">Kênh<select id="kc-k" ${ed?"":"disabled"}>${opt(CHANNELS.map(x=>[x.k,x.short]),c.kenh)}</select></label>
+    <label class="field">Ngày đăng<select id="kc-d" ${ed?"":"disabled"}>${opt(dayOpts(c.kenh),c.day||"")}</select></label>
+    ${k?`<label class="field">${fb?"Link bài đã đăng":"ID video TikTok (19 số)"}<input id="kc-id" value="${esc(fb?c.linkDang||"":c.tiktokId||"")}" ${ed?"":"disabled"}></label>`:""}
+   </div>
+   <div class="acts">${ed?(k?`<button class="btn pri" id="kc-save">Lưu</button>${c.step!=="xong"?`<button class="btn" id="kc-post">Đã đăng</button>`:""}`:`<button class="btn pri" id="kc-save">Đưa vào lịch đăng</button>`):""}<button class="lnk" id="kc-full">Mở thẻ đầy đủ</button>${xvGive()&&!k?`<button class="lnk danger" id="kc-del">Xóa ô này</button>`:""}</div>`;
+  $("#drawer").hidden=false;$("#dx").onclick=closeDrawer;
+  if($("#kc-k"))$("#kc-k").onchange=()=>{$("#kc-d").innerHTML=opt(dayOpts($("#kc-k").value),$("#kc-d").value)};
+  if($("#kc-v"))$("#kc-v").onchange=()=>{const v=(d.kho||[]).find(x=>x.ma===$("#kc-v").value);if(!v)return;const m=T.find(t=>(v.tuyen||"").toLowerCase().includes((t.tuyen||"").toLowerCase().split(" ")[0]));if(m&&$("#kc-t"))$("#kc-t").value=m.ma};
+  $("#kc-full").onclick=()=>_openCardKho(c.id,{full:true});
+  if($("#kc-del"))$("#kc-del").onclick=()=>{DB.mutate(ME.name,"xóa ô video tồn "+c.id,dt=>{dt.cards=dt.cards.filter(y=>y.id!==c.id)});closeDrawer();renderMain()};
+  if($("#kc-save"))$("#kc-save").onclick=()=>{const kenh=$("#kc-k").value,day=+$("#kc-d").value||0,tu=$("#kc-t").value;
+    if(!k){const ma=$("#kc-v").value;if(!ma||ma==="__sep"){toast("Chọn video tồn");return}allocKho(ma,kenh,day,"nguyen",chanOwner(kenh)||c.nguoi,c.id)}
+    DB.mutate(ME.name,"xếp video tồn "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(!x)return;x.kenh=kenh;x.day=day;if(tu){x.maTuyen=tu;const t=dt.tuyen.find(y=>y.ma===tu);if(t)x.tuyen=t.tuyen}if(!k){x.step="dang";x.loai="kho";x.ceo="PASS";x.nguoi=((dt.kenhPT||{})[kenh]||{}).chinh||x.nguoi}
+      if(k&&$("#kc-id")){const v=$("#kc-id").value.trim();if(fb)x.linkDang=v;else x.tiktokId=v}});
+    toast(k?"Đã lưu":"Đã đưa vào lịch"+(day?" ngày "+dd(day):", người giữ kênh chọn ngày đăng"));renderMain();openKhoCard(D().cards.find(y=>y.id===c.id))};
+  if($("#kc-post"))$("#kc-post").onclick=()=>{const v=$("#kc-id").value.trim();const e=moveCard(ME,c.id,"xong",fb?{linkDang:v}:{tiktokId:v});if(e){toast(e);return}toast("Đã đăng");closeDrawer();renderMain()};
+}
+const _openCardKho=openCard;
+openCard=function(id,o={}){const c=D().cards.find(x=>x.id===id);if(c&&!o.full&&(c.mix==="ton"||(c.khoMa&&loaiOf(c)==="kho")))return openKhoCard(c);return _openCardKho(id,o)};

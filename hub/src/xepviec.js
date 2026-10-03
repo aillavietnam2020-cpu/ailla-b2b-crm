@@ -55,7 +55,7 @@ function xvKho(b,o){
    <div class="xkho">${bySku.map(([k,L])=>`<span class="pchip">${swatch(k)}${esc(sk(k).n)} <b>${L.length}</b></span>`).join("")||`<span class="hint">Kho đang trống. Thêm video tồn ở Kho video.</span>`}</div></section>
   <section class="card flush"><div class="card-h pad"><h2>Ô lịch dành cho video tồn <span class="hint">${slots.length} ô chưa có video</span></h2>${give&&slots.length?`<button class="btn pri sm" id="xk-auto">Lấp tự động</button>`:""}</div>
    <div class="tbl"><table><thead><tr><th>Ngày lên kênh</th><th>Kênh</th><th>Sản phẩm · tuyến</th><th>Video tồn</th><th>Cách dùng</th><th>Người edit</th><th></th></tr></thead><tbody>
-   ${slots.map(c=>{const k=sug(c),L=free.filter(x=>x.sku===c.sku);return `<tr><td><b>${dayLbl(c.day)}</b></td><td>${esc(chOf(c.kenh).short)}<small>giữ kênh: ${esc(userName(chanOwner(c.kenh))||"chưa đặt")}</small></td><td>${swatch(c.sku)}${esc(xvTuyenName(c))}</td>
+   ${slots.map(c=>{const k=sug(c),L=free.filter(x=>x.sku===c.sku);return `<tr><td><b>${c.day?dayLbl(c.day):`<span class="hint">chưa xếp ngày</span>`}</b></td><td>${esc(chOf(c.kenh).short)}<small>giữ kênh: ${esc(userName(chanOwner(c.kenh))||"chưa đặt")}</small></td><td>${swatch(c.sku)}${esc(xvTuyenName(c))}</td>
     <td>${L.length?`<select data-xkv="${c.id}">${opt(L.map(x=>[x.ma,x.ma+" · "+(x.tuyen||x.skuText||"")]),k?k.ma:"")}</select>${xvKhoLink(k||L[0],c.id)}`:`<span class="t-amb">Kho hết video ${esc(sk(c.sku).n)}</span>`}</td>
     <td>${L.length?`<select data-xkm="${c.id}">${opt([["nguyen","Đăng nguyên bản (không cần duyệt)"],["hook","Đổi hook / edit lại (cần duyệt)"]],defMode(c))}</select>`:""}</td>
     <td>${L.length?`<select data-xke="${c.id}">${opt([["","—"]].concat(team.map(u=>[u.id,u.name])),"")}</select>`:""}</td>
