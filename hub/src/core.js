@@ -234,7 +234,7 @@ function newCard(d,o){
   const ix=_seq++;const id="TT-"+String(_seq).padStart(4,"0");
   const sku=o.sku,kenh=o.kenh;const tu=d.tuyen.find(t=>t.ma===o.maTuyen);
   const tac=(d.tactics.find(t=>t.sku.includes(sku))||{k:"DT"}).k;
-  const hk=d.mode==="live"||d.plan&&d.plan.published?"":HOOK[sku]?HOOK[sku][ix%HOOK[sku].length]:""; // ý tưởng mẫu chỉ dùng cho số liệu demo cũ, kế hoạch thật để trống cho người viết
+  const hk=""; // thẻ mới để trống ý tưởng cho người viết kịch bản (không điền ý tưởng mẫu)
   return Object.assign({id,thang:MONTH.key,day:1,sku,kenh,ct:tac,maTuyen:"",tuyen:tu?tu.tuyen:"",mucTieu:tu?tu.vaiTro:"",nguon:"Quay mới",uuTien:"Trung bình",dangVideo:chOf(kenh).needId?"One shot":"Bài ảnh",
     yTuong:hk,noiDung:"",canhQuay:"",hookText:"",daoCu:"",caption:"",nguoi:"",goiy:tu?tu.nguoi:"",host:"",nguoiDung:chOf(kenh).needId?"Worker":"",ngayQuay:"",linkVideo:"",linkFinal:"",ceo:"CẦN KIỂM TRA",ngayDang:"",linkDang:"",tiktokId:"",
     briefHinh:"",linkAnh:"",ketQua:"",order:"",winSrc:"",view:0,giuChan:0,click:0,don:0,gmv:0,step:"cg",gopy:[],history:[],files:[],createdAt:Date.now()},o,{id});
