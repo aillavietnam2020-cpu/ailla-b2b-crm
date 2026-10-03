@@ -558,3 +558,10 @@ table.pttab td{vertical-align:middle}
 .gyhd,.gyft{grid-column:1/-1;display:flex;align-items:center;gap:10px}
 .gyhd b{font-size:15px}.gyhd .btn{margin-left:auto}
 .gyft{justify-content:center}
+
+.gymod{position:fixed;inset:0;background:rgba(20,24,60,.35);display:grid;place-items:center;z-index:100;padding:16px}
+.gybox{background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(20,24,60,.25);padding:18px 20px;width:min(560px,100%);max-height:80vh;overflow:auto;display:grid;gap:12px}
+.gybox .gyhd{display:flex;align-items:center}.gybox .gyhd .btn{margin-left:auto}
+.gybox #gy-in{flex:1;min-width:0}
+.ptadd select,.pttab select{min-width:150px}
+.pttab td:first-child select,.pttab td:nth-child(2) select{min-width:190px}
