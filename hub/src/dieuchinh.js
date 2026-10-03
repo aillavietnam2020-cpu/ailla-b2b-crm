@@ -21,7 +21,7 @@ function applyAdjust(dt,adj){
 const fmtCh=ch=>ch.f==="huong"?`${sk(ch.k).n}: hướng ${ch.old} → <b>${ch.nw}</b>`:ch.f==="gmv"?`${sk(ch.k).n}: mục tiêu ${tr(ch.old)} → <b>${tr(ch.nw)}</b>`:`${sk(ch.k).n}: số video ${ch.old} → <b>${ch.nw}</b>${ch.thucTe!=null&&-ch.thucTe<ch.old-ch.nw?` (chỉ bớt được ${-ch.thucTe} thẻ chưa giao)`:""}`;
 function pDieuChinh(m){
   const d=dcShape(D()),B=d.planBase,ed=can(ME,"kehoach.duyet"),sug=can(ME,"kehoach.sua");
-  if(!B){m.innerHTML=H("Điều chỉnh kế hoạch")+`<section class="card waitf"><h2>Chưa chốt kế hoạch gốc</h2><p>Kế hoạch gốc được chốt khi phát hành kế hoạch ở Kế hoạch › Bước 6. Từ lúc đó mọi thay đổi trong tháng đều đi qua trang này.</p></section>`;return}
+  if(!B){m.innerHTML=H("Điều chỉnh kế hoạch")+`<section class="card waitf"><h2>Chưa chốt kế hoạch gốc</h2><p>Kế hoạch gốc được chốt khi phát hành kế hoạch ở Kế hoạch › Bước 5. Từ lúc đó mọi thay đổi trong tháng đều đi qua trang này.</p></section>`;return}
   const rows=d.products.map(p=>{const b=B.items.find(x=>x.k===p.k)||{huong:"(chưa có)",gmv:0,kh:0},cur={huong:p.huong,gmv:(d.goals[p.k]||{}).gmv||0,kh:khOf(d,p.k)};return {p,b,cur}});
   const pend=d.adjusts.filter(a=>a.st==="pending");
   m.innerHTML=H("Điều chỉnh kế hoạch",`Kế hoạch gốc chốt ${esc(B.at)} · ${d.adjusts.filter(a=>a.st==="applied").length} lần điều chỉnh`)+`<div class="note">Kế hoạch gốc giữ nguyên để cuối tháng đối chiếu. Khi số tuần cho thấy cần đổi (sản phẩm đang lên, sản phẩm chậm), tạo <b>phiếu điều chỉnh</b> có lý do. Oanh hoặc trợ lý AI đề xuất, chị duyệt. Duyệt xong thẻ việc tự thêm hoặc bớt, và ghi vào Quyết định tuần.</div>

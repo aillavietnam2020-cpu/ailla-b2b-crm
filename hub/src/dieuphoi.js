@@ -1,5 +1,5 @@
 /* =====================================================================
-   ĐIỀU PHỐI SẢN XUẤT VIDEO (Marketing · bước 7 Làm hằng ngày)
+   ĐIỀU PHỐI SẢN XUẤT VIDEO (Marketing · bước 6 Làm hằng ngày)
    Một bảng cho Oanh: thẻ đang ở bước nào, ai giữ, trễ gì; giao hàng loạt
    (viết kịch bản, edit), xếp thẻ vào buổi quay tuần, quay xong chuyển cả loạt
    sang edit; theo dõi từng kênh đủ bao nhiêu video quay mới / reup / kho / nhân bản.
@@ -70,7 +70,7 @@ function dpTuyenHtml(d){
     const bar=DP_GRP.map(([k,,f])=>{const n=I.filter(c=>f(c.step)).length;return n?`<i class="lw-${k}" style="width:${n/kh*100}%" title="${n}"></i>`:""}).join("");
     const done=I.filter(c=>c.step==="xong").length,wait=I.filter(c=>["dkb","dvd","dceo"].includes(c.step)).length;
     return `<tr class="clk" data-gotuyen="${esc(t.ma)}"><td><div class="dpt">${swatch(t.sku)}<div class="dptc"><div><b>${esc(t.tuyen)}</b> <span class="hint mono">${esc(t.ma)}</span></div><div><small>${esc(sk(t.sku).n)} · ${esc(chOf(t.kenh).short)} · ${esc(t.vaiTro||"")}</small></div></div></div></td><td>${esc(userName(t.nguoi)||"—")}</td><td><span class="dpbar">${bar}</span><small class="numeric">${I.length}/${t.kh} thẻ</small></td><td class="n numeric">${done}/${t.kh}</td><td class="n">${wait?`<b class="t-amb">${wait}</b>`:"—"}</td><td class="n">${late?`<b class="t-red">${late}</b>`:"—"}</td></tr>`}).join("");
-  return `<div class="tbl"><table class="dptab2"><thead><tr><th>Tuyến · sản phẩm · kênh</th><th>Phụ trách</th><th>Tiến độ thẻ</th><th class="n">Đã đăng</th><th class="n">Chờ duyệt</th><th class="n">Trễ</th></tr></thead><tbody>${rows||`<tr><td colspan="6" class="empty">Chưa có tuyến. Lập pillar và tuyến ở Kế hoạch tháng › bước 6 rồi bấm Phát hành.</td></tr>`}</tbody></table></div><p class="hint pad">Bấm một tuyến để xem các thẻ video của tuyến đó. Màu thanh: xám chưa giao · xanh đang làm · vàng chờ duyệt · navy chờ đăng · xanh lá đã đăng.</p>`;
+  return `<div class="tbl"><table class="dptab2"><thead><tr><th>Tuyến · sản phẩm · kênh</th><th>Phụ trách</th><th>Tiến độ thẻ</th><th class="n">Đã đăng</th><th class="n">Chờ duyệt</th><th class="n">Trễ</th></tr></thead><tbody>${rows||`<tr><td colspan="6" class="empty">Chưa có tuyến. Lập pillar và tuyến ở Kế hoạch tháng › bước 5 rồi bấm Phát hành.</td></tr>`}</tbody></table></div><p class="hint pad">Bấm một tuyến để xem các thẻ video của tuyến đó. Màu thanh: xám chưa giao · xanh đang làm · vàng chờ duyệt · navy chờ đăng · xanh lá đã đăng.</p>`;
 }
 /* Khung "Thuộc tuyến" trong cửa sổ thẻ video: pillar, tuyến, insight để viết kịch bản đúng hướng */
 function tuyenBox(c){
