@@ -319,3 +319,12 @@ th{text-transform:none;letter-spacing:0;font-size:13px}
 .ppb{height:40px;background:var(--bg-surface)!important;border:1px solid var(--border-subtle)!important;color:var(--text-primary)!important;border-radius:10px!important}.ppb:hover{border-color:var(--border-strong)!important}.ppm{background:var(--bg-surface-raised)!important;border:1px solid var(--border-strong)!important;box-shadow:0 12px 32px rgba(0,0,0,.35)!important}.ppm button{color:var(--text-primary)}.ppm button.on{background:var(--info-soft);color:var(--text-primary)}
 @media (max-width:900px){.ppb span{max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pp{min-width:0}}
 @media (max-width:900px){.topbar>.sp{display:none}.pp{flex:1 1 auto;min-width:0}.ppb{width:100%;min-width:0}.ppb span{max-width:none;flex:1;min-width:0}}
+/* menu điện thoại: nút đóng + lớp tối phía sau, bấm ra ngoài là đóng */
+.sidex{display:none}
+@media (max-width:900px){
+  .sidex{display:grid;place-items:center;position:absolute;top:12px;right:12px;width:40px;height:40px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary);font-size:18px;cursor:pointer;z-index:2}
+  .sidex:hover{background:var(--bg-surface-hover)}
+  .side{width:min(280px,82vw)}
+  .menu-open .side{box-shadow:0 0 40px rgba(0,0,0,.55)}
+  .menu-open .mainwrap::before{content:"";position:fixed;inset:0;background:rgba(3,10,20,.6);z-index:25}
+}
