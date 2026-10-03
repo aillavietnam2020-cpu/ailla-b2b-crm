@@ -439,3 +439,24 @@ table.dptab2{table-layout:fixed;width:100%}
 .rvkb dl.kv{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin:0}
 .rvkb dt{color:var(--muted)}.rvkb dd{margin:0}
 .rvvid{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+
+/* ---------- Giao diện thoáng (chị tham khảo Bitrix24): nền sáng, ít viền, hàng cao, chữ tiêu đề cột thường ---------- */
+:root{--canvas:#f3f5f9;--line:#e9ecf1}
+body{font-size:15.5px}
+.ph{margin:4px 0 20px;gap:16px}
+.ph h1{font-size:30px;font-weight:700;letter-spacing:-.02em}
+.ph-sub{color:#7a8496}
+.card{border-color:#ebeef3;border-radius:16px;box-shadow:0 1px 2px rgba(16,24,40,.04);padding:20px 24px;margin-bottom:18px}
+.card-h{margin-bottom:14px}
+.tbl{border-color:#eef0f4;border-radius:14px}
+:where(.tbl:not(.edit):not(.sheet)) th{background:#fff;text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:#7a8496;padding:14px 16px;border-bottom:1px solid #eef0f4}
+:where(.tbl:not(.edit):not(.sheet)) td{padding:15px 16px;height:56px;vertical-align:middle;border-bottom:1px solid #f0f2f6}
+:where(.tbl:not(.edit):not(.sheet)) tbody tr:hover td{background:#f7faff}
+.filters{gap:10px;margin-bottom:18px}
+.filters select,.filters input,.lwtool select{height:40px;border-radius:10px;border-color:#e3e7ee;background:#fff}
+.btn{border-radius:10px;padding:9px 16px;border-color:#e3e7ee}
+.btn.sm{padding:5px 11px}
+.seg{border-radius:10px;border-color:#e3e7ee}
+.seg button{padding:8px 14px}
+.lwtool{gap:10px;margin-bottom:18px}
+.kpi{border-color:#ebeef3}
