@@ -316,7 +316,7 @@ function xvKho2(b,o){
   const {d,W,give}=o,today=d.settings.today,free=xvKhoFree(),bySku=xvGroupBy(free,k=>k.sku).sort((a,c)=>c[1].length-a[1].length);
   const slots=d.cards.filter(c=>c.mix==="ton"&&!c.khoMa&&["kb","cg"].includes(c.step));
   const pairs=xvGroupBy(slots,c=>c.sku+"|"+c.kenh);
-  const chosen=d.cards.filter(c=>c.khoMa&&loaiOf(c)==="kho"&&c.step!=="xong"&&(xvIn(c,W)||!c.day)).sort((a,c)=>(a.day||99)-(c.day||99));
+  const chosen=d.cards.filter(c=>c.khoMa&&loaiOf(c)==="kho"&&(c.step!=="xong"||xvIn(c,W))).sort((a,c)=>(a.step==="xong")-(c.step==="xong")||(a.day||99)-(c.day||99)); // video tồn đã chọn: hiện hết video chưa đăng, ngày nào cũng hiện
   const may=c=>give||c.giao===ME.id||c.nguoi===ME.id;
   const block=([key,S])=>{const [sku,kenh]=key.split("|"),V=free.filter(k=>k.sku===sku),op=KS_OPEN.has(key),who=[...new Set(S.map(c=>userName(c.giao||c.nguoi)).filter(Boolean))].join(", ");
     return `<div class="ksb${op?" open":""}"><div class="ksh" data-kso="${esc(key)}"><i class="ptar">${op?"▾":"▸"}</i>${swatch(sku)}<b>${esc(sk(sku).n)}</b><span class="hint">${esc(chOf(kenh).short)} · cần chọn <b>${S.length}</b> video · giao ${esc(who||"—")} · kho có ${V.length} video</span></div>
@@ -325,11 +325,11 @@ function xvKho2(b,o){
    <div class="xkho">${bySku.map(([k,L])=>`<span class="pchip">${swatch(k)}${esc(sk(k).n)} <b>${L.length}</b></span>`).join("")||`<span class="hint">Kho đang trống.</span>`}</div></section>
   <section class="card"><div class="card-h"><h2>Chọn video tồn</h2><span class="hint">${slots.length?`${slots.length} video cần chọn · bấm từng sản phẩm để mở danh sách video trong kho, xem rồi bấm Chọn`:"không còn video nào cần chọn"}</span></div>
    ${pairs.map(block).join("")||`<p class="hint">Giao "Dùng video tồn" ở ① Kế hoạch tuần thì sản phẩm sẽ hiện ở đây.</p>`}</section>
-  <section class="card flush"><div class="card-h pad"><h2>Lịch đăng video tồn</h2><span class="hint">${chosen.length} video đã chọn · người đăng tự chọn ngày đăng</span></div>
+  <section class="card flush"><div class="card-h pad"><h2>Lịch đăng video tồn</h2><span class="hint">${chosen.filter(c=>c.step!=="xong").length} video chờ đăng · người đăng tự chọn ngày đăng · video đã có ngày vẫn ở đây đến khi đăng xong</span></div>
    <div class="tbl"><table><thead><tr><th>Video</th><th>Sản phẩm · tuyến</th><th>Kênh</th><th>Người edit</th><th>Người đăng</th><th>Ngày đăng</th><th></th></tr></thead><tbody>
    ${chosen.map(c=>{const k=(d.kho||[]).find(x=>x.ma===c.khoMa)||{},own=chanOwner(c.kenh),canDay=give||own===ME.id;return `<tr><td><span class="mono clk" data-card="${c.id}">${esc(c.khoMa)}</span>${k.link?` · <a href="${esc(khoLink(k))}" target="_blank" rel="noopener">xem</a>`:""}</td><td>${swatch(c.sku)}${esc(sk(c.sku).n)}<small>${esc(k.tuyen||c.tuyen||"")}</small></td><td>${esc(chOf(c.kenh).short)}</td><td>${esc(c.nguoiEditTen||khoEditor(k)||"—")}</td><td>${esc(userName(own)||"chưa đặt")}</td>
      <td>${canDay?`<select data-setday="${c.id}">${opt([["","Chọn ngày"]].concat(Array.from({length:MONTH.ndays-today+1},(_,i)=>today+i).map(x=>[x,dayLbl(x)+" · "+d.cards.filter(y=>y.kenh===c.kenh&&y.day===x&&y.id!==c.id).length+"/"+nhipOf(c.kenh,x)])),c.day||"")}</select>`:(c.day?dayLbl(c.day):"chưa xếp")}</td>
-     <td>${may(c)&&c.mix==="ton"?`<button class="lnk danger" data-ksun="${c.id}" title="Trả video về kho, chọn lại">Bỏ chọn</button>`:""}</td></tr>`}).join("")||`<tr><td colspan="7" class="empty">Chưa chọn video nào.</td></tr>`}</tbody></table></div></section>`;
+     <td>${c.step==="xong"?pill("Đã đăng","grn"):""}${may(c)&&c.mix==="ton"&&c.step!=="xong"?`<button class="lnk danger" data-ksun="${c.id}" title="Trả video về kho, chọn lại">Bỏ chọn</button>`:""}</td></tr>`}).join("")||`<tr><td colspan="7" class="empty">Chưa chọn video nào.</td></tr>`}</tbody></table></div></section>`;
   b.querySelectorAll("[data-kso]").forEach(h=>h.onclick=()=>{const k=h.dataset.kso;KS_OPEN.has(k)?KS_OPEN.delete(k):KS_OPEN.add(k);renderMain()});
   b.querySelectorAll("[data-kspick]").forEach(x=>x.onclick=()=>{const [sku,kenh,ma]=x.dataset.kspick.split("|"),slot=D().cards.find(c=>c.mix==="ton"&&!c.khoMa&&["kb","cg"].includes(c.step)&&c.sku===sku&&c.kenh===kenh&&may(c));if(!slot){toast("Không còn ô cần chọn");return}
     const k=(D().kho||[]).find(y=>y.ma===ma),own=chanOwner(kenh);allocKho(ma,kenh,0,"nguyen",own||slot.nguoi,slot.id);
