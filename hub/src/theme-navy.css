@@ -612,3 +612,7 @@ table.pttab td{vertical-align:middle}
 .wpas{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.wpas select{width:auto;min-width:0;flex:1}.wpas input{width:64px}
 .hkin{flex:1;min-width:160px;height:34px}
 .wpas select{flex:1 1 100%;min-width:0}.wpas input{flex:0 0 70px}.wpas .btn{flex:1}
+
+.wpas{display:grid;gap:5px}
+.wpas small{color:var(--muted);font-size:12px}
+.wpu{display:flex;align-items:center;gap:6px;font-size:13px}.wpu span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wpu input{width:60px;height:30px;padding:2px 6px}
