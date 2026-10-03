@@ -43,6 +43,7 @@ ${fonts}
 ${xlsx}
 <style>
 ${read('style.css')}
+${read('theme-navy.css')}
 </style></head><body>
 <div id="app"><div class="loginwrap"><div class="login"><p>Đang tải…</p></div></div></div>
 <div class="drawer" id="drawer" hidden><div class="in" id="drawerIn" role="dialog" aria-modal="true" aria-label="Chi tiết"></div></div>
