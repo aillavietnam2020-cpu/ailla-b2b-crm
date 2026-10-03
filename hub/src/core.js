@@ -150,7 +150,8 @@ const userBy=id=>D().users.find(u=>u.id===id);
 const userName=id=>(userBy(id)||{name:""}).name;
 const workers=()=>D().users.filter(u=>u.active&&(u.role==="content"||u.role==="lead"));
 const can=(u,p)=>!!u&&(u.perms||[]).includes(p);
-const isLate=c=>!["xong","cg"].includes(c.step)&&c.day&&c.day<D().settings.today;
+const WORK_STEPS=["kb","worker","edit"];
+const isLate=c=>{const t=D().settings.today;if(c.han&&WORK_STEPS.includes(c.step))return c.han<t;return !["xong","cg"].includes(c.step)&&c.day&&c.day<t}; // c.han = hạn xong việc được giao
 
 /* ---------- File đính kèm (IndexedDB) ---------- */
 const FILES={

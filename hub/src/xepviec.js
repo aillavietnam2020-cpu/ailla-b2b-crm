@@ -73,7 +73,7 @@ function xvKho(b,o){
 }
 
 /* ② Kịch bản: thẻ quay mới của tuần chưa có người → giao người viết */
-function xvAssign(ids,to,kind){DB.mutate(ME.name,`giao ${kind} ${ids.length} thẻ cho ${userName(to)}`,dt=>ids.forEach(id=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;x.nguoi=to;if(kind==="kịch bản"){x.nguoiKB=to;if(x.step==="cg")x.step="kb"}else{x.nguoiEdit=to;if(x.step==="cg")x.step="edit"}}))}
+function xvAssign(ids,to,kind){DB.mutate(ME.name,`giao ${kind} ${ids.length} thẻ cho ${userName(to)}`,dt=>ids.forEach(id=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;x.nguoi=to;x.batDau=dt.settings.today;x.han=Math.min(MONTH.ndays,dt.settings.today+2);x.tre=null;if(kind==="kịch bản"){x.nguoiKB=to;if(x.step==="cg")x.step="kb"}else{x.nguoiEdit=to;if(x.step==="cg")x.step="edit"}}))}
 function xvAuto(ids,people,kind){const load=new Map(people.map(u=>[u.id,xvOpen(u.id).length]));const plan=new Map();ids.forEach(id=>{const u=[...load.entries()].sort((a,b)=>a[1]-b[1])[0];if(!u)return;load.set(u[0],u[1]+1);if(!plan.has(u[0]))plan.set(u[0],[]);plan.get(u[0]).push(id)});plan.forEach((L,u)=>xvAssign(L,u,kind));return plan}
 function xvKB(b,o){
   const {d,W,days,team,give,kbPool}=o,inKB=d.cards.filter(c=>["kb","dkb"].includes(c.step)&&xvIn(c,W));const cap=Math.max(8,...team.map(u=>xvOpen(u.id).length));
