@@ -291,7 +291,8 @@ openCard=function(id,o={}){const c=D().cards.find(x=>x.id===id);if(c&&!o.full&&(
 /* ---------- Ngày bắt đầu / hạn xong của việc được giao, trễ hạn phải có lý do và Oanh duyệt ---------- */
 /* hạn mặc định: viết hook / kịch bản xong trước buổi quay gần nhất 1 ngày; việc khác 2 ngày */
 function defHan(d,WW,t){const td=d.settings.today;if(["oneshot","kichban"].includes(t)){const s=(d.shoots||[]).filter(x=>x.trangThai!=="Đã quay"&&x.day>td).sort((a,b)=>a.day-b.day)[0];if(s)return Math.max(td,s.day-1)}return Math.min(MONTH.ndays,td+2)}
-const hanTag=c=>c.han?`<span class="xms ${isLate(c)?"t-red":""}">${c.batDau?dd(c.batDau)+" → ":""}hạn ${dd(c.han)}${isLate(c)?" · trễ":""}</span>`:"";
+const hanTag=c=>xvGive()?`<select class="hansel${isLate(c)?" late":""}" data-sethan="${c.id}" title="Hạn xong">${opt([["","Chưa có hạn"]].concat(Array.from({length:MONTH.ndays},(_,i)=>[i+1,"hạn "+dd(i+1)])),c.han||"")}</select>`:(c.han?`<span class="xms ${isLate(c)?"t-red":""}">${c.batDau?dd(c.batDau)+" → ":""}hạn ${dd(c.han)}${isLate(c)?" · trễ":""}</span>`:"");
+document.addEventListener("change",e=>{const x=e.target;if(!x.matches||!x.matches("select[data-sethan]"))return;const id=x.dataset.sethan,v=+x.value||0;DB.mutate(ME.name,"đặt hạn "+id+" → "+(v?dd(v):"không"),dt=>{const c=dt.cards.find(y=>y.id===id);if(c){c.han=v;if(v&&!c.batDau)c.batDau=dt.settings.today}});toast(v?"Đã đặt hạn "+dd(v):"Đã bỏ hạn");renderMain()});
 const _mvTre=moveCard;
 moveCard=function(u,id,to,inp={}){const c=D().cards.find(x=>x.id===id);inp=Object.assign({},inp);let lt=inp.lyDoTre;delete inp.lyDoTre;
   const late=c&&c.han&&WORK_STEPS.includes(c.step)&&c.han<D().settings.today&&to!==c.step;
