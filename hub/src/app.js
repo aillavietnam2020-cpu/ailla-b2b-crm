@@ -7,7 +7,8 @@ const H=(t,s)=>`<div class="ph"><h1>${t}</h1>${s?`<div class="ph-sub">${s}</div>
 const pill=(t,c="gry")=>`<span class="pill p-${c}">${esc(t)}</span>`;
 const KPI_TONE=[[/quá hạn|trễ|hủy|hoàn|cảnh báo|lỗ|vượt|không đạt|mất/i,"red","alert"],[/chờ|chưa/i,"amb","clock"],[/doanh thu|doanh số|gmv|thu nhập|thực lĩnh|giá trị/i,"pnk","money"],[/lãi|lợi nhuận|biên/i,"grn","trend"],[/chi |chi$|phí|ads|quảng cáo|giá vốn|bhxh|thuế|quỹ lương|nợ/i,"org","wallet"],[/đơn|sản lượng|món/i,"blu","cart"],[/tỷ lệ|roas|%|đúng hạn|hệ số|điểm/i,"teal","pct"],[/người|nhân sự|khách|nhân viên|kol|koc|tuyển/i,"vio","users"],[/video|bài|thẻ|việc|nhiệm vụ|kịch bản/i,"navy","task"],[/hoàn thành|xong|đã|đạt/i,"grn","check"]];
 const kpiTone=l=>{const s=String(l).replace(/<[^>]+>/g,"");for(const [re,c,i] of KPI_TONE)if(re.test(s))return [c,i];return ["navy","chart"]};
-const kpi=(l,v,h,col)=>{const [c,i]=kpiTone(l);return `<div class="kpi t-${c}"><div class="ki">${typeof ico==="function"?ico(i):""}</div><div class="kb"><div class="l">${l}</div><div class="v"${col?` style="color:${col}"`:""}>${v}</div>${h?`<div class="h">${h}</div>`:""}</div></div>`};
+const kpiZero=v=>{const t=String(v==null?"":v).replace(/<[^>]*>/g,"").trim();return !t||t==="—"||t==="-"||/^0([.,]0+)?(%|đ|tr| tỷ)?$/.test(t)};
+const kpi=(l,v,h,col)=>{const [c,i]=kpiTone(l);return `<div class="kpi t-${c}${kpiZero(v)?" mut":""}"><div class="ki">${typeof ico==="function"?ico(i):""}</div><div class="kb"><div class="l">${l}</div><div class="v"${col?` style="color:${col}"`:""}>${v}</div>${h?`<div class="h">${h}</div>`:""}</div></div>`};
 const opt=(arr,v)=>arr.map(o=>{const [val,lab]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${String(val)===String(v)?" selected":""}>${esc(lab)}</option>`}).join("");
 const skOpts=()=>prods().map(p=>[p.k,p.n]);
 const userOpts=(blank)=>(blank?[["",blank]]:[]).concat(workers().map(u=>[u.id,u.name]));
