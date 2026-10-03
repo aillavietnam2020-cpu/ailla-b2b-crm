@@ -313,3 +313,36 @@ td{height:40px}
 .lwsumline b{color:var(--ink);font-size:15px}
 .lwsumline span.z{opacity:.55}
 .lwsumline .lwd{width:10px;height:10px}
+
+
+/* ---------- bảng dài: khung cao vừa màn hình để thanh kéo ngang luôn nhìn thấy ---------- */
+.tbl{max-height:calc(100vh - 170px);overflow:auto}
+.tbl thead th{position:sticky;top:0;z-index:2}
+.tbl::-webkit-scrollbar{height:12px;width:10px}
+.tbl::-webkit-scrollbar-thumb{background:#98a2b3;border-radius:8px;border:2px solid #fff}
+.tbl::-webkit-scrollbar-track{background:#f1f3f6}
+/* Điều phối: bảng vừa khung, không cần kéo ngang */
+table.dptab{table-layout:fixed;width:100%}
+.dptab th.c0{width:34px}
+.dptab th:nth-child(3),.dptab td:nth-child(3){width:108px}
+.dptab th:nth-child(4),.dptab td:nth-child(4){width:70px}
+.dptab th:nth-child(5),.dptab td:nth-child(5){width:108px}
+.dptab th:nth-child(6),.dptab td:nth-child(6){width:72px}
+.dptab th:nth-child(7),.dptab td:nth-child(7){width:84px}
+.dptab th:nth-child(8),.dptab td:nth-child(8){width:132px}
+.dptab td{overflow:hidden;text-overflow:ellipsis}
+.dptab td:nth-child(5){white-space:nowrap}
+table.dptab2{table-layout:fixed;width:100%}
+.dptab2 th:nth-child(2),.dptab2 td:nth-child(2){width:96px}
+.dptab2 th:nth-child(3),.dptab2 td:nth-child(3){width:200px}
+.dptab2 th:nth-child(4),.dptab2 td:nth-child(4),.dptab2 th:nth-child(5),.dptab2 td:nth-child(5),.dptab2 th:nth-child(6),.dptab2 td:nth-child(6){width:72px}
+.dpbar{display:inline-flex;width:120px;height:8px;border-radius:99px;background:#eef1f6;overflow:hidden;vertical-align:middle;margin-right:6px}
+.dpbar i{display:block;height:100%}
+.dpbar .lw-new{background:#ced4da}.dpbar .lw-doing{background:#2f6fde}.dpbar .lw-wait{background:#f59f00}.dpbar .lw-post{background:var(--nv-active)}.dpbar .lw-done{background:#2f9e44}
+.chipx{border:1px solid var(--nv-bar);background:#eef4ff;color:var(--nv-active);border-radius:999px;padding:6px 12px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+/* khung "Thuộc tuyến" trong thẻ video */
+.tybox{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 12px;background:#f8fafc;box-shadow:inset 3px 0 0 var(--nv-bar)}
+.tyh{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.tyh .lnk{margin-left:auto}
+.tybox dl{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;margin:8px 0 0;font-size:14px}
+.tybox dt{color:var(--muted)}.tybox dd{margin:0}
