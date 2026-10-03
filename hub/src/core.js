@@ -234,7 +234,7 @@ function newCard(d,o){
   const ix=_seq++;const id="TT-"+String(_seq).padStart(4,"0");
   const sku=o.sku,kenh=o.kenh;const tu=d.tuyen.find(t=>t.ma===o.maTuyen);
   const tac=(d.tactics.find(t=>t.sku.includes(sku))||{k:"DT"}).k;
-  const hk=HOOK[sku]?HOOK[sku][ix%HOOK[sku].length]:"";
+  const hk=d.mode==="live"||d.plan&&d.plan.published?"":HOOK[sku]?HOOK[sku][ix%HOOK[sku].length]:""; // ý tưởng mẫu chỉ dùng cho số liệu demo cũ, kế hoạch thật để trống cho người viết
   return Object.assign({id,thang:MONTH.key,day:1,sku,kenh,ct:tac,maTuyen:"",tuyen:tu?tu.tuyen:"",mucTieu:tu?tu.vaiTro:"",nguon:"Quay mới",uuTien:"Trung bình",dangVideo:chOf(kenh).needId?"One shot":"Bài ảnh",
     yTuong:hk,noiDung:"",canhQuay:"",hookText:"",daoCu:"",caption:"",nguoi:"",goiy:tu?tu.nguoi:"",host:"",nguoiDung:chOf(kenh).needId?"Worker":"",ngayQuay:"",linkVideo:"",linkFinal:"",ceo:"CẦN KIỂM TRA",ngayDang:"",linkDang:"",tiktokId:"",
     briefHinh:"",linkAnh:"",ketQua:"",order:"",winSrc:"",view:0,giuChan:0,click:0,don:0,gmv:0,step:"cg",gopy:[],history:[],files:[],createdAt:Date.now()},o,{id});
@@ -242,7 +242,7 @@ function newCard(d,o){
 function publishPlan(d){
   let added=0;const st0=Math.max(1,Math.min(MONTH.ndays,(d.settings&&d.settings.today)||1)); // phát hành giữa tháng: rải từ hôm nay
   d.tuyen.forEach(t=>{const have=d.cards.filter(c=>c.maTuyen===t.ma).length;
-    for(let i=have;i<t.kh;i++){d.cards.push(newCard(d,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,day:Math.min(MONTH.ndays,st0+Math.floor(i*(MONTH.ndays-st0+1)/Math.max(1,t.kh))+(t.ma.length%3)),nguon:["Đổi hook video tồn","Edit footage có sẵn","Đăng lại video kho","Reup video mới"].includes(t.tuyen)?"Footage cũ":t.tuyen==="Nhân bản winner"?"Nhân bản winner":"Quay mới",dangVideo:t.dangVideo||undefined}));added++}});
+    for(let i=have;i<t.kh;i++){d.cards.push(newCard(d,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,day:Math.min(MONTH.ndays,st0+Math.floor(i*(MONTH.ndays-st0+1)/Math.max(1,t.kh))+(t.ma.length%3)),nguon:/video kho|video tồn|footage|reup/i.test(t.tuyen||"")?"Footage cũ":t.tuyen==="Nhân bản winner"?"Nhân bản winner":"Quay mới",dangVideo:t.dangVideo||undefined}));added++}});
   d.plan.published={at:today(),cards:d.cards.length};
   return added;
 }
