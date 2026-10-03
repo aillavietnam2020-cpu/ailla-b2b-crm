@@ -78,7 +78,7 @@ function tuyenBox(c){
   const p=(d.pillars||[]).find(x=>x.kenh===t.kenh&&(x.kenh!=="TikTok chính"||x.sku===t.sku))||(d.pillars||[]).find(x=>x.sku===t.sku);
   const ins=t.maInsight&&(d.insights||[]).find(x=>x.ma===t.maInsight);const I=d.cards.filter(x=>x.maTuyen===t.ma);
   return `<div class="tybox"><div class="tyh"><b>Thuộc tuyến: ${esc(t.tuyen)}</b> <span class="mono hint">${esc(t.ma)}</span><button type="button" class="lnk" data-gotuyen="${esc(t.ma)}">Xem cả tuyến (${I.length} thẻ) →</button></div>
-   <dl>${p?`<dt>Pillar</dt><dd>${esc(p.vaiTro||"")}${p.idea?` · big idea: <b>${esc(p.idea)}</b>`:""}</dd>`:""}<dt>Vai trò tuyến</dt><dd>${esc(t.vaiTro||"—")} · kế hoạch ${t.kh} video · phụ trách ${esc(userName(t.nguoi)||"—")}</dd>${ins?`<dt>Insight</dt><dd>${esc(ins.insight||"")}${ins.persona?` · <span class="hint">${esc(ins.persona)}</span>`:""}</dd>`:""}${t.ghiChu?`<dt>Ghi chú</dt><dd>${esc(t.ghiChu)}</dd>`:""}</dl></div>`;
+   <dl>${p?`<dt>Pillar</dt><dd>${esc(p.vaiTro||"")}${p.idea?` · big idea: <b>${esc(p.idea)}</b>`:""}</dd>`:""}<dt>Vai trò tuyến</dt><dd>${esc(t.vaiTro||"—")} · kế hoạch ${t.kh} video</dd>${ins?`<dt>Insight</dt><dd>${esc(ins.insight||"")}${ins.persona?` · <span class="hint">${esc(ins.persona)}</span>`:""}</dd>`:""}${t.ghiChu?`<dt>Ghi chú</dt><dd>${esc(t.ghiChu)}</dd>`:""}</dl></div>`;
 }
 /* Bấm "Xem cả tuyến" / một tuyến ở bất kỳ đâu → Điều phối, lọc đúng tuyến đó */
 document.addEventListener("click",e=>{const b=e.target.closest("[data-gotuyen]");if(!b)return;e.preventDefault();e.stopPropagation();if(typeof closeDrawer==="function")closeDrawer();DP.tuyen=b.dataset.gotuyen;DP.view="buoc";DP.step="";DP.sel.clear();MOD="mkt";PAGE="dieuphoi";render();scrollTo(0,0)},true);

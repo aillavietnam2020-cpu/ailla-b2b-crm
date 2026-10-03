@@ -21,11 +21,11 @@ function lichTuan(b,C){
 /* Trang Lịch content: Tuần (mặc định) · Tháng · Pillar & tuyến. Bỏ các bảng từng kênh kéo ngang như Sheet. */
 const _pLichOld=pLich;
 pLich=function(m){
-  const tab=SUB.lich&&["week","cal","pillar"].includes(SUB.lich)?SUB.lich:"week";SUB.lich=tab;
+  const tab=SUB.lich&&["week","cal"].includes(SUB.lich)?SUB.lich:"week";SUB.lich=tab;
   const bindTabs=()=>m.querySelectorAll("[data-lwv]").forEach(b=>b.onclick=()=>{SUB.lich=b.dataset.lwv;renderMain()});
-  if(tab!=="week"){_pLichOld(m);const t=m.querySelector(".tabs");if(t)t.outerHTML=`<div class="lwtool">${lwTabs(tab)}</div>`;bindTabs();return}
+  if(tab!=="week"){_pLichOld(m);const h1=m.querySelector(".ph h1");if(h1)h1.textContent="Calendar";const t=m.querySelector(".tabs");if(t)t.outerHTML=`<div class="lwtool">${lwTabs(tab)}</div>`;bindTabs();return}
   const d=D();if(!LW.w)LW.w=weekOf(d.settings.today)||1;const W=WEEKS.find(w=>w.w===LW.w)||WEEKS[0];
-  m.innerHTML=H("Lịch content")+`<div class="lwtool">
+  m.innerHTML=H("Calendar","Video nào lên kênh nào, ngày nào · bấm một video để mở thẻ")+`<div class="lwtool">
    <div class="seg"><button data-lww="-1" ${LW.w<=1?"disabled":""} aria-label="Tuần trước">‹</button><button class="on">Tuần ${W.w} · ${dd(W.tu)}–${dd(Math.min(W.den,MONTH.ndays))}</button><button data-lww="1" ${LW.w>=WEEKS.length?"disabled":""} aria-label="Tuần sau">›</button></div>
    ${lwTabs(tab)}
    <div class="seg">${[["","Tất cả"]].concat(CHANNELS.map(c=>[c.k,c.short])).map(([k,t])=>`<button class="${LW.kenh===k?"on":""}" data-lwk="${esc(k)}">${esc(t)}</button>`).join("")}</div>
@@ -39,5 +39,5 @@ pLich=function(m){
   const C=d.cards.filter(c=>(!LF.sku||c.sku===LF.sku)&&(!LF.nguoi||c.nguoi===LF.nguoi));
   lichTuan($("#lb"),C);
 };
-const lwTabs=tab=>`<div class="seg">${[["week","Tuần"],["cal","Tháng"],["pillar","Pillar & tuyến"]].map(([k,t])=>`<button data-lwv="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`;
+const lwTabs=tab=>`<div class="seg">${[["week","Tuần"],["cal","Tháng"]].map(([k,t])=>`<button data-lwv="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`;
 PAGES.lich=pLich;

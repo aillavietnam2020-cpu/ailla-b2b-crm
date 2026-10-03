@@ -55,7 +55,7 @@ const chOf=k=>CHANNELS.find(c=>c.k===k)||CHANNELS[0];
 const LISTS={
   duyet:["Chưa duyệt","Cần sửa","Đã duyệt"],ceo:["CẦN KIỂM TRA","PASS","KHÔNG DÙNG"],dang:["Chưa đăng","Đã lên lịch","Đã đăng"],
   nguon:["Quay mới","Footage cũ","Nhân bản winner","Order Digital","Đăng lại"],fbFormat:["Bài ảnh","Carousel","Video/Reel"],uutien:["Cao","Trung bình","Thấp"],
-  tuyen:["Pain/Insight","How-to","Trước/sau","Demo/Proof","Review/Proof","Chọn mùi/Lifestyle","Sale/20.10","Nhân bản winner","Đổi hook video tồn","Thương hiệu"],
+  tuyen:["Pain/Insight","How-to","Trước/sau","Demo/Proof","Review/Proof","Chọn mùi/Lifestyle","Sale/20.10","Nhân bản winner","Đăng lại video kho","Đổi hook video tồn","Thương hiệu"],
   dangVideo:["One shot","Giọng đọc (Adam/AI)","Chèn chữ","Ảnh cuộn","Bài ảnh","Carousel","Video/Reel"],
   nhanh:{nc:"Nhu cầu tìm kiếm",kh:"Tiếng nói khách hàng",dt:"Nội dung đối thủ",ads:"Quảng cáo & Offer",nb:"Dữ liệu nội bộ"},
   tinCay:["Cao","Trung bình","Thấp"],rsStatus:["Mới","Chờ kiểm tra","Đã kiểm","Đã duyệt","Loại"],quyetDinh:["Làm ngay","Test","Để sau","Bỏ"],
@@ -232,9 +232,9 @@ function newCard(d,o){
     briefHinh:"",linkAnh:"",ketQua:"",order:"",winSrc:"",view:0,giuChan:0,click:0,don:0,gmv:0,step:"cg",gopy:[],history:[],files:[],createdAt:Date.now()},o,{id});
 }
 function publishPlan(d){
-  let added=0;
+  let added=0;const st0=Math.max(1,Math.min(MONTH.ndays,(d.settings&&d.settings.today)||1)); // phát hành giữa tháng: rải từ hôm nay
   d.tuyen.forEach(t=>{const have=d.cards.filter(c=>c.maTuyen===t.ma).length;
-    for(let i=have;i<t.kh;i++){d.cards.push(newCard(d,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,day:Math.min(MONTH.ndays,Math.floor(i*MONTH.ndays/Math.max(1,t.kh))+1+(t.ma.length%3)),nguon:["Đổi hook video tồn","Edit footage có sẵn","Đăng lại video kho","Reup video mới"].includes(t.tuyen)?"Footage cũ":t.tuyen==="Nhân bản winner"?"Nhân bản winner":"Quay mới",dangVideo:t.dangVideo||undefined}));added++}});
+    for(let i=have;i<t.kh;i++){d.cards.push(newCard(d,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,day:Math.min(MONTH.ndays,st0+Math.floor(i*(MONTH.ndays-st0+1)/Math.max(1,t.kh))+(t.ma.length%3)),nguon:["Đổi hook video tồn","Edit footage có sẵn","Đăng lại video kho","Reup video mới"].includes(t.tuyen)?"Footage cũ":t.tuyen==="Nhân bản winner"?"Nhân bản winner":"Quay mới",dangVideo:t.dangVideo||undefined}));added++}});
   d.plan.published={at:today(),cards:d.cards.length};
   return added;
 }
