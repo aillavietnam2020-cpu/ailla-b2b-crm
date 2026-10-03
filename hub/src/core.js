@@ -63,14 +63,21 @@ const LISTS={
 /* ---------- Trạng thái thẻ (luồng) ---------- */
 const STEPS=[
  {id:"cg",t:"Chưa giao",who:"Oanh giao"},
- {id:"kb",t:"Lên kịch bản",who:"Người được giao"},
- {id:"dkb",t:"Chờ duyệt kịch bản",who:"Oanh / chị"},
- {id:"quay",t:"Đi quay",who:"Dán link Drive"},
+ {id:"kb",t:"Viết kịch bản",who:"Người được giao"},
+ {id:"dkb",t:"Oanh duyệt kịch bản",who:"Oanh"},
+ {id:"quay",t:"Chờ quay",who:"Theo buổi quay tuần"},
+ {id:"edit",t:"Đang edit",who:"Người edit · dán link"},
  {id:"worker",t:"Worker đang dựng",who:"Máy tự làm",auto:true},
- {id:"dvd",t:"Chờ duyệt video",who:"Oanh / chị · CEO check"},
- {id:"dang",t:"Chờ đăng",who:"Gắn giỏ, đăng, dán ID"},
+ {id:"dvd",t:"Oanh duyệt video",who:"Oanh"},
+ {id:"dceo",t:"Chị duyệt video",who:"Chị Hoa"},
+ {id:"dang",t:"Chờ đăng",who:"Người giữ kênh · dán ID / link"},
  {id:"xong",t:"Đã đăng",who:"Số về theo báo cáo tuần"},
 ];
+/* Loại video: quay mới (đủ bước) · reup có sửa (edit → duyệt) · lấy từ kho đăng lại (đăng thẳng) · nhân bản win */
+const LOAI_V={moi:"Quay mới",reup:"Reup có sửa",kho:"Video có sẵn trong kho",nhanban:"Nhân bản win"};
+function loaiOf(c){if(c.loai)return c.loai;if(c.nguon==="Nhân bản winner")return "nhanban";if(c.nguon==="Đăng lại")return "kho";if(c.nguon==="Footage cũ")return c.khoMa&&!/hook/i.test(c.tuyen||"")&&c.step==="dang"?"kho":"reup";return "moi"}
+/* Người giữ kênh (đăng bài): Phụ trách chính của kênh ở Kế hoạch tháng */
+const chanOwner=k=>((D().kenhPT||{})[k]||{}).chinh||"";
 const stepName=id=>(STEPS.find(s=>s.id===id)||{t:id}).t;
 const stepIdx=id=>STEPS.findIndex(s=>s.id===id);
 /* Cột trạng thái kiểu sheet (suy ra từ bước) */
@@ -156,22 +163,23 @@ const MAX_FILE=10*1024*1024;
 
 /* ---------- Luồng thẻ ---------- */
 function nextAct(c){
-  const fb=!chOf(c.kenh).needId,ton=c.nguon==="Footage cũ";
-  return ({kb:ton?["Viết hook mới xong, gửi Worker","worker"]:["Gửi kịch bản để duyệt","dkb"],dkb:["Duyệt kịch bản","quay"],quay:fb?["Làm xong, gửi duyệt","dvd"]:["Quay xong, gửi Worker dựng","worker"],dvd:["Duyệt video","dang"],dang:fb?["Đã đăng Fanpage","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
+  const fb=!chOf(c.kenh).needId,L=loaiOf(c);
+  return ({kb:L==="moi"?["Gửi Oanh duyệt kịch bản","dkb"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi Oanh duyệt","dvd"],worker:["Dựng xong, gửi Oanh duyệt","dvd"],dvd:["Oanh duyệt, gửi chị","dceo"],dceo:["Chị duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
 }
 function canEditCard(u,c){if(!u)return false;if(can(u,"lich.sua_tat_ca"))return true;return can(u,"lich.sua_cua_minh")&&c.nguoi===u.id}
 function canMove(u,c,to){
   if(c.step==="cg")return can(u,"viec.giao");
   if(["dkb","dvd"].includes(c.step))return can(u,"viec.duyet");
+  if(c.step==="dceo")return u.role==="admin";
+  if(c.step==="dang"&&chanOwner(c.kenh)===u.id)return true;
+  if(c.step==="quay"&&can(u,"viec.giao"))return true;
   return canEditCard(u,c);
 }
 function checkMove(c,to,inp){
   const v=k=>(inp[k]!==undefined?inp[k]:c[k])||"";
   if(c.step==="cg"&&!c.nguoi)return "Thẻ chưa giao người làm.";
   if(to==="dkb"&&!String(v("hookText")).trim()&&!String(v("noiDung")).trim())return "Viết ít nhất Hook text hoặc Nội dung chi tiết trước khi gửi duyệt.";
-  if(to==="worker"&&c.nguon!=="Footage cũ"&&!String(v("linkVideo")).trim())return "Dán Link video vừa quay (Google Drive).";
-  if(to==="worker"&&c.nguon==="Footage cũ"&&!String(v("hookText")).trim())return "Viết Hook text mới cho video tồn.";
-  if(to==="dang"&&chOf(c.kenh).needId&&v("ceo")!=="PASS")return "CEO check phải là PASS trước khi duyệt đăng (đúng sản phẩm, đúng claim).";
+  if(to==="dvd"&&!String(v("linkFinal")).trim()&&!String(v("linkVideo")).trim())return "Dán link video đã edit (Google Drive) trước khi gửi duyệt.";
   if(to==="xong"&&chOf(c.kenh).needId){const id=String(v("tiktokId")).trim();if(!/^\d{19}$/.test(id))return "ID video TikTok phải đủ 19 chữ số (dãy số sau /video/ trong link).";if(D().cards.some(x=>x.id!==c.id&&x.tiktokId===id))return "ID này đã gắn cho thẻ khác.";}
   if(to==="xong"&&!chOf(c.kenh).needId&&!String(v("linkDang")).trim())return "Dán Link bài đã đăng.";
   return "";
@@ -180,7 +188,7 @@ function moveCard(u,id,to,inp={}){
   const c=D().cards.find(x=>x.id===id);if(!c)return "Không tìm thấy thẻ.";
   if(!canMove(u,c,to))return "Bạn không có quyền chuyển thẻ này.";
   const err=checkMove(c,to,inp);if(err)return err;
-  DB.mutate(u.name,`chuyển ${c.id} sang "${stepName(to)}"`,d=>{const x=d.cards.find(y=>y.id===id);Object.entries(inp).forEach(([k,v])=>{if(v!==undefined)x[k]=v});x.step=to;if(to==="xong"&&!x.ngayDang)x.ngayDang=d.settings.today;if(to==="xong"&&x.tiktokId&&!x.linkDang&&!chOf(x.kenh).acc.startsWith("("))x.linkDang="https://www.tiktok.com/@"+chOf(x.kenh).acc+"/video/"+x.tiktokId;x.history=(x.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,to})});
+  DB.mutate(u.name,`chuyển ${c.id} sang "${stepName(to)}"`,d=>{const x=d.cards.find(y=>y.id===id);Object.entries(inp).forEach(([k,v])=>{if(v!==undefined)x[k]=v});x.step=to;if(to==="kb"||to==="dkb")x.nguoiKB=x.nguoiKB||x.nguoi;if(to==="edit"&&x.nguoiEdit)x.nguoi=x.nguoiEdit;if(to==="edit")x.nguoiEdit=x.nguoi;if(to==="dang"){x.ceo="PASS";const o=((d.kenhPT||{})[x.kenh]||{}).chinh;if(o)x.nguoi=o}if(to==="xong"&&!x.ngayDang)x.ngayDang=d.settings.today;if(to==="xong"&&x.tiktokId&&!x.linkDang&&!chOf(x.kenh).acc.startsWith("("))x.linkDang="https://www.tiktok.com/@"+chOf(x.kenh).acc+"/video/"+x.tiktokId;x.history=(x.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,to})});
   if(to==="worker")simulateWorker(id);
   return "";
 }
@@ -198,8 +206,8 @@ function repostCard(u,id,kenh,day,nguoi){
 function addPlanProduct(u,k,huong,kenh,gmvTr){const c=D().catalog.find(x=>x.k===k);if(!c)return "Không có sản phẩm này trong danh mục.";if(D().products.some(p=>p.k===k))return "Sản phẩm đã có trong kế hoạch tháng.";
   DB.mutate(u.name,`thêm ${c.n} vào kế hoạch tháng ${MONTH.mon}`,d=>{d.products.push({k:c.k,n:c.n,c:c.c,gia:c.gia,mo:c.mo,pain:c.pain,claim:c.claim,huong,kenh});d.goals[k]={m9:(typeof T9_BASE!=="undefined"&&T9_BASE[k])||0,gmv:(+gmvTr||0)*1e6}});return ""}
 function removePlanProduct(u,k){const d=D();if(d.cards.some(c=>c.sku===k&&c.nguon!=="Footage cũ")||d.tuyen.some(t=>t.sku===k))return "Sản phẩm đã có tuyến hoặc thẻ việc trong tháng, xóa tuyến/thẻ trước.";DB.mutate(u.name,`bỏ ${sk(k).n} khỏi kế hoạch tháng`,dd2=>{dd2.products=dd2.products.filter(p=>p.k!==k);delete dd2.goals[k]});return ""}
-function sendBack(u,id,note){DB.mutate(u.name,`trả lại ${id}: ${note||"cần sửa"}`,d=>{const x=d.cards.find(y=>y.id===id);x.step=x.step==="dvd"?(x.nguon==="Footage cũ"?"kb":"quay"):"kb";x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa"})})}
-function assignCard(u,id,to){DB.mutate(u.name,`giao ${id} cho ${userName(to)}`,d=>{const x=d.cards.find(y=>y.id===id);x.nguoi=to;if(x.step==="cg")x.step="kb"})}
+function sendBack(u,id,note){DB.mutate(u.name,`trả lại ${id}: ${note||"cần sửa"}`,d=>{const x=d.cards.find(y=>y.id===id);if(["dvd","dceo"].includes(x.step)){x.step="edit";if(x.nguoiEdit)x.nguoi=x.nguoiEdit}else{x.step="kb";if(x.nguoiKB)x.nguoi=x.nguoiKB}x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa"})})}
+function assignCard(u,id,to){DB.mutate(u.name,`giao ${id} cho ${userName(to)}`,d=>{const x=d.cards.find(y=>y.id===id);x.nguoi=to;if(x.step==="cg"){const L=loaiOf(x);x.step=L==="moi"?"kb":L==="kho"?"dang":"edit"}if(x.step==="edit")x.nguoiEdit=to})}
 function simulateWorker(id){setTimeout(()=>{const c=D().cards.find(x=>x.id===id);if(!c||c.step!=="worker")return;DB.mutate("Worker",`dựng xong ${id}, chờ duyệt`,d=>{const x=d.cards.find(y=>y.id===id);x.step="dvd";x.linkFinal="drive.google.com/…/Ailla-VIDEO-FINAL/"+id+".mp4"});if(typeof render==="function")render();toast("Worker dựng xong "+id)},6000)}
 
 /* ---------- Sinh thẻ từ TUYẾN (Phát hành) ---------- */

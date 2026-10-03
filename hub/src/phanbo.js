@@ -13,9 +13,9 @@ function phIn(kenh,from,to,day){return D().cards.filter(c=>c.kenh===kenh&&isPH(c
 function freeDay(kenh,sku,from,to,skip){const S=slotsOf();for(let x=from;x<=to;x++){const cs=cellCards(x,kenh).filter(c=>c.id!==skip);if(cs.length<(S[kenh]||0)&&!cs.some(c=>c.sku===sku))return x}for(let x=from;x<=to;x++){if(cellCards(x,kenh).filter(c=>c.id!==skip).length<(S[kenh]||0))return x}return 0}
 function allocKho(ma,kenh,day,mode,nguoi,phId){let cid;DB.mutate(ME.name,`xếp video cũ ${ma} vào ${kenh} ngày ${day}`,d=>{const k=d.kho.find(x=>x.ma===ma);if(!k||k.maDang)return;
   const ph=phId?d.cards.find(x=>x.id===phId):null;
-  if(ph){Object.assign(ph,{khoMa:k.ma,sku:k.sku,linkVideo:k.link,yTuong:"Video cũ "+k.ma+(k.tuyen?" · "+k.tuyen:""),nguoi:ph.nguoi||nguoi,goiy:ph.goiy||nguoi,step:ph.step==="cg"||ph.step==="kb"?(mode==="hook"?"kb":"dvd"):ph.step});cid=ph.id}else{
-  const c=newCard(d,{sku:k.sku,kenh,day,nguon:"Footage cũ",tuyen:"Đổi hook video tồn",yTuong:"Video cũ "+k.ma+(k.tuyen?" · "+k.tuyen:""),linkVideo:k.link,nguoi,goiy:nguoi,step:mode==="hook"?"kb":"dvd",ceo:"CẦN KIỂM TRA",khoMa:k.ma});
-  d.cards.push(c);cid=c.id}Object.assign(k,{kenhDeXuat:kenh,lyDo:k.lyDo||"Phân bổ lịch đăng",canSua:mode==="hook"?"Đổi hook, chèn chữ mới":"Đăng nguyên, chờ duyệt claim",trangThai:"Đã lên lịch",maDang:cid})});return cid}
+  if(ph){Object.assign(ph,{khoMa:k.ma,sku:k.sku,linkVideo:k.link,yTuong:"Video cũ "+k.ma+(k.tuyen?" · "+k.tuyen:""),nguoi:ph.nguoi||nguoi,goiy:ph.goiy||nguoi,step:ph.step==="cg"||ph.step==="kb"?(mode==="hook"?"edit":"dang"):ph.step,loai:mode==="hook"?"reup":"kho"});cid=ph.id}else{
+  const c=newCard(d,{sku:k.sku,kenh,day,nguon:"Footage cũ",tuyen:"Đổi hook video tồn",yTuong:"Video cũ "+k.ma+(k.tuyen?" · "+k.tuyen:""),linkVideo:k.link,nguoi,goiy:nguoi,step:mode==="hook"?"edit":"dang",loai:mode==="hook"?"reup":"kho",ceo:mode==="hook"?"CẦN KIỂM TRA":"PASS",khoMa:k.ma});
+  d.cards.push(c);cid=c.id}Object.assign(k,{kenhDeXuat:kenh,lyDo:k.lyDo||"Phân bổ lịch đăng",canSua:mode==="hook"?"Đổi hook, chèn chữ mới":"Đăng nguyên",trangThai:"Đã lên lịch",maDang:cid})});return cid}
 function moveSlot(id,kenh,day){DB.mutate(ME.name,`đổi lịch ${id} → ${kenh} ngày ${day}`,d=>{const c=d.cards.find(x=>x.id===id);c.kenh=kenh;c.day=day})}
 function pPhanBo(m){
   const d=D(),td=d.settings.today,S=slotsOf(),ed=canPB();

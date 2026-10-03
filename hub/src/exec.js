@@ -16,7 +16,7 @@ function execAlerts(){
 }
 function execApprovals(){
   const d=D(),L=[];const st=d.plan.steps||{};Object.entries(st).filter(([n,v])=>v&&v.s==="review").forEach(([n])=>L.push([`Kế hoạch tháng ${MONTH.mon} · bước ${n}`,"Marketing · Oanh gửi","kehoach"]));
-  const kb=d.cards.filter(c=>c.step==="dkb").length,vd=d.cards.filter(c=>c.step==="dvd").length;if(kb)L.push([`${kb} kịch bản chờ duyệt`,"Marketing · Content","cv"]);if(vd)L.push([`${vd} video chờ duyệt (CEO check)`,"Marketing · Content","cv"]);
+  const kb=d.cards.filter(c=>c.step==="dkb").length,vd=d.cards.filter(c=>c.step==="dvd").length;if(kb)L.push([`${kb} kịch bản chờ duyệt`,"Marketing · Content","cv"]);if(vd)L.push([`${vd} video chờ Oanh duyệt`,"Marketing · Content","cv"]);const vc=d.cards.filter(c=>c.step==="dceo").length;if(vc)L.push([`${vc} video chờ chị duyệt`,"Marketing · Oanh đã duyệt","cv"]);
   const dcp=(d.adjusts||[]).filter(a=>a.st==="pending").length;if(dcp)L.push([`${dcp} phiếu điều chỉnh kế hoạch chờ duyệt`,"Marketing · Oanh / trợ lý AI đề xuất","dieuchinh"]);
   const rs=d.research.filter(r=>r.status==="Chờ kiểm tra").length;if(rs)L.push([`${rs} research chờ kiểm tra`,"Marketing","research"]);
   if(d.b2b){const p=d.b2b.orders.filter(o=>o.approval==="PENDING_APPROVAL");if(p.length)L.push([`${p.length} đơn B2B chờ duyệt · ${tr(sum(p,ordTot))}`,"Kinh doanh B2B","b2b_don"])}

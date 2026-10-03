@@ -39,7 +39,7 @@ function cvSeed(d){
   d.tasks=(d.tasks||[]).map(x=>({id:x.id,ten:x.ten,team:"content",da:/Fanpage/.test(x.ten)?"DA-03":"DA-01",nguoi:x.nguoi,phoi:[],han:x.han,uu:"Trung bình",st:x.xong?"done":"todo",loai:x.loai,moTa:x.ghiChu||"",checklist:[],tao:"u_oanh",kq:""})).concat(add);
 }
 /* ---------- gộp mọi việc thành một danh sách ---------- */
-function cardStatus(c){return c.step==="cg"||!c.nguoi?"cg":c.step==="kb"?"todo":["dkb","dvd"].includes(c.step)?"review":c.step==="xong"?"done":"doing"}
+function cardStatus(c){return c.step==="cg"||!c.nguoi?"cg":c.step==="kb"?"todo":["dkb","dvd","dceo"].includes(c.step)?"review":c.step==="xong"?"done":"doing"}
 function cardProject(c){const d=D();for(const p of d.projects||[]){const L=p.loc||{};if(L.orders)continue;if(L.tuyen&&!L.tuyen.includes(c.tuyen))continue;if(L.kenh&&!L.kenh.includes(c.kenh))continue;if(L.tuyenNot&&L.tuyenNot.includes(c.tuyen))continue;if(L.toiNgay&&c.day>L.toiNgay)continue;if(L.tuNgay&&c.day<L.tuNgay)continue;return p.id}return c.order?"DA-06":""}
 function cvItems(){
   const d=D(),today=d.settings.today,out=[];
