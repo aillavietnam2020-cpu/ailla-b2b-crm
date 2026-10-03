@@ -76,24 +76,25 @@ function wpStrip(d,W,days,types){
 
 /* ---------- ③ Buổi quay & hook ---------- */
 function xvQuay2(b,o){
-  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>s.day>=W.tu&&s.day<=W.den).sort((a,c)=>a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
+  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>(s.day>=W.tu&&s.day<=W.den)||(s.day>=d.settings.today&&s.trangThai!=="Đã quay")).sort((a,c)=>a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
   const qDef=team.find(u=>/quỳnh/i.test(u.name)),w=weekOf(W.tu)||1,wp=wpOf(d,w);
   const tOpts=()=>{const g=xvGroupBy(d.tuyen.slice(),t=>sk(t.sku).n+" · "+chOf(t.kenh).short);return g.map(([n,L])=>`<optgroup label="${esc(n)}">${L.map(t=>`<option value="${esc(t.ma)}">${esc(t.tuyen)}${t.vaiTro?" · "+esc(t.vaiTro):""}</option>`).join("")}</optgroup>`).join("")};
   const wait=d.cards.filter(c=>c.step==="quay"&&!c.buoiQuay);
   const sess=s=>{const I=d.cards.filter(c=>c.buoiQuay===s.id),chua=I.filter(c=>c.step==="dkb"),kb=I.filter(c=>c.step==="kb"),ok=I.filter(c=>c.step==="quay"),done=I.filter(c=>!["dkb","kb","quay","cg"].includes(c.step)),ps=I.filter(c=>c.phatSinh).length;
     const bySku=xvGroupBy(I,c=>c.sku+"|"+c.kenh);
-    return `<section class="card xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} ${esc(s.gio||"")}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${pill(s.trangThai||"Đã lên lịch",s.trangThai==="Đã quay"?"grn":"blu")}</div>
+    return `<section class="card xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${pill(s.trangThai||"Đã lên lịch",s.trangThai==="Đã quay"?"grn":"blu")}</div>
      <div class="xsum">${I.length} hook · ${chua.length?`<b class="t-amb">${chua.length} chờ Oanh duyệt</b> · `:""}${kb.length?`${kb.length} đang viết kịch bản · `:""}${ok.length} sẵn sàng quay · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}</div>
      ${bySku.map(([k,L])=>{const [sku,kenh]=k.split("|"),e=wp[k]||{};return `<div class="hkg"><div class="hkh">${swatch(sku)}<b>${esc(sk(sku).n)}</b> <span class="hint">${esc(chOf(kenh).short)} · ${L.length} hook${e.sl?` · kế hoạch tuần ${e.sl}`:""}</span></div>
       ${L.map(c=>{const t=d.tuyen.find(x=>x.ma===c.maTuyen);return `<div class="hkr">${c.step==="quay"&&give?`<input type="checkbox" data-hkq="${c.id}" ${c.daQuay?"checked":""} title="Đã quay">`:`<span class="hkst">${c.step==="dkb"?"⏳":["kb"].includes(c.step)?"✍":c.step==="quay"?"○":"✓"}</span>`}<span class="hkt clk" data-card="${c.id}">${esc(c.hookText||"(chưa có hook)")}</span><small>${esc(t?t.tuyen:"")}${c.oneShot?" · one shot":" · có kịch bản"}${c.phatSinh?" · phát sinh":""}</small>${give&&["dkb","kb","quay"].includes(c.step)&&!c.daQuay?`<button class="lnk danger" data-hkx="${c.id}" title="Bỏ hook">✕</button>`:""}</div>`}).join("")}</div>`}).join("")||`<p class="hint">Chưa có hook nào. Thêm ở dưới: mỗi dòng một hook = một video.</p>`}
      ${give&&s.trangThai!=="Đã quay"?`<div class="hkadd" data-hka="${s.id}"><select class="ht">${tOpts()}</select><select class="hl">${opt([["1","One shot: chỉ cần hook, Oanh duyệt cả danh sách"],["0","Review, voice off…: viết kịch bản, duyệt từng cái"]],"1")}</select><textarea class="hh" rows="2" placeholder="Gõ hook, mỗi dòng một hook"></textarea><button class="btn sm pri" data-hkadd="${s.id}">+ Thêm hook</button></div>`:""}
+     <label class="field full">Ghi chú buổi quay<textarea rows="2" data-sqnote="${s.id}" ${give?"":"disabled"} placeholder="Đạo cụ, người mẫu, địa điểm, lưu ý…">${esc(s.ghiChu||"")}</textarea></label>
      <label class="field full">Cảnh trám / review cần quay (đủ dùng cho các video trong tuần)<textarea rows="2" data-tram="${s.id}" ${give?"":"disabled"} placeholder="Ví dụ: cảnh trám ngâm áo, cận bột tan, review cầm sản phẩm — đủ cho 12 video bột tẩy tuần này">${esc(s.tram||"")}</textarea></label>
      <div class="acts">${dv&&chua.length?`<button class="btn pri" data-hkok="${s.id}">✓ Duyệt danh sách hook (${chua.length})</button>`:""}
       ${give&&ok.length?`<button class="btn" data-hkdone="${s.id}">Chốt buổi quay: ${ok.filter(c=>c.daQuay).length} đã quay → sang Edit</button>`:""}
       ${give&&s.trangThai==="Đã quay"||give&&ok.length?`<span class="hkps"><select data-pst="${s.id}">${tOpts()}</select><input data-psh="${s.id}" placeholder="Hook phát sinh"><button class="btn sm" data-psadd="${s.id}">+ Hook phát sinh</button></span>`:""}</div></section>`};
   b.innerHTML=`${wait.length?`<div class="note">${wait.length} hook đã duyệt từ buổi trước chưa quay. ${give?`<button class="btn sm" id="hk-move">Chuyển vào buổi quay gần nhất</button>`:""}</div>`:""}
    ${sh.map(sess).join("")||`<section class="card"><p class="empty">Kỳ này chưa có buổi quay. Thêm buổi quay ở dưới.</p></section>`}
-   ${give?`<section class="card"><div class="card-h"><h2>Thêm buổi quay</h2></div><form class="frm row7" id="xq-add"><label class="field">Ngày<select id="xs-d">${opt(days.map(x=>[x,dayLbl(x)]),Math.max(d.settings.today,W.tu)<=W.den?Math.max(d.settings.today,W.tu):W.tu)}</select></label><label class="field">Giờ<input id="xs-g" value="8:30"></label><label class="field">Địa điểm<input id="xs-p" value="Văn phòng Ailla"></label><label class="field">Người quay<select id="xs-n">${opt(team.map(u=>[u.id,u.name]),qDef?qDef.id:"")}</select></label><button class="btn pri">+ Thêm buổi quay</button></form></section>`:""}`;
+   ${give?`<section class="card"><div class="card-h"><h2>Thêm buổi quay</h2></div><form class="frm row7" id="xq-add"><label class="field">Ngày<select id="xs-d">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),Math.max(d.settings.today,W.tu))}</select></label><label class="field">Buổi<select id="xs-b">${opt(["Sáng","Chiều","Cả ngày"],"Sáng")}</select></label><label class="field">Giờ (nếu cần)<input id="xs-g" placeholder="vd 8:30"></label><label class="field">Địa điểm<input id="xs-p" value="Văn phòng Ailla"></label><label class="field">Người quay<select id="xs-n">${opt(team.map(u=>[u.id,u.name]),qDef?qDef.id:"")}</select></label><label class="field">Ghi chú<input id="xs-gc" placeholder="Đạo cụ, lưu ý…"></label><button class="btn pri">+ Thêm buổi quay</button></form></section>`:""}`;
   const S=id=>(D().shoots||[]).find(x=>x.id===id);
   b.querySelectorAll("[data-hkadd]").forEach(x=>x.onclick=()=>{const s=S(x.dataset.hkadd),f=x.closest(".hkadd"),t=d.tuyen.find(y=>y.ma===f.querySelector(".ht").value),one=f.querySelector(".hl").value==="1",L=f.querySelector(".hh").value.split("\n").map(v=>v.trim()).filter(Boolean);
     if(!t){toast("Chưa có tuyến nào, lập tuyến ở Kế hoạch tháng › bước 5");return}if(!L.length){toast("Gõ ít nhất một hook");f.querySelector(".hh").focus();return}
@@ -105,9 +106,10 @@ function xvQuay2(b,o){
   b.querySelectorAll("[data-hkdone]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkdone;let a=0,r=0;DB.mutate(ME.name,"chốt buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===id);if(s)s.trangThai="Đã quay";dt.cards.forEach(c=>{if(c.buoiQuay!==id||c.step!=="quay")return;if(c.daQuay){c.step="edit";c.nguoi="";c.nguoiEdit="";a++}else{c.buoiQuay="";r++}})});toast(`${a} video sang Edit${r?`, ${r} hook chưa quay chuyển sang buổi sau`:""}`);XV.tab="edit";renderMain()});
   b.querySelectorAll("[data-psadd]").forEach(x=>x.onclick=()=>{const id=x.dataset.psadd,s=S(id),t=d.tuyen.find(y=>y.ma===b.querySelector(`[data-pst="${id}"]`).value),h=b.querySelector(`[data-psh="${id}"]`).value.trim();if(!t||!h){toast("Chọn tuyến và gõ hook phát sinh");return}
     DB.mutate(ME.name,"hook phát sinh buổi quay "+dd(s.day),dt=>dt.cards.push(newCard(dt,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,hookText:h,day:0,qday:s.day,buoiQuay:id,nguon:"Quay mới",loai:"moi",oneShot:true,phatSinh:true,dangVideo:t.dangVideo||"One shot",step:"edit",nguoi:"",nguoiEdit:""})));toast("Đã ghi hook phát sinh, giao người edit ở ④");renderMain()});
+  b.querySelectorAll("[data-sqnote]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"ghi chú buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===x.dataset.sqnote);if(s)s.ghiChu=x.value}));
   b.querySelectorAll("[data-tram]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"ghi cảnh trám buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===x.dataset.tram);if(s)s.tram=x.value}));
   if($("#hk-move"))$("#hk-move").onclick=()=>{const nx=(D().shoots||[]).filter(s=>s.trangThai!=="Đã quay"&&s.day>=D().settings.today).sort((a,c)=>a.day-c.day)[0];if(!nx){toast("Chưa có buổi quay sắp tới, thêm buổi quay trước");return}DB.mutate(ME.name,"chuyển hook chưa quay sang buổi "+dd(nx.day),dt=>dt.cards.forEach(c=>{if(c.step==="quay"&&!c.buoiQuay){c.buoiQuay=nx.id;c.qday=nx.day}}));renderMain()};
-  if($("#xq-add"))$("#xq-add").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"lên lịch quay",dt=>{dt.shoots=dt.shoots||[];dt.shoots.push({id:uid("sq"),day:+$("#xs-d").value,gio:$("#xs-g").value,diaDiem:$("#xs-p").value,nguoi:[$("#xs-n").value].filter(Boolean),ghiChu:"",tram:"",trangThai:"Đã lên lịch"})});toast("Đã thêm buổi quay");renderMain()};
+  if($("#xq-add"))$("#xq-add").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"lên lịch quay",dt=>{dt.shoots=dt.shoots||[];dt.shoots.push({id:uid("sq"),day:+$("#xs-d").value,buoi:$("#xs-b").value,gio:$("#xs-g").value,diaDiem:$("#xs-p").value,nguoi:[$("#xs-n").value].filter(Boolean),ghiChu:$("#xs-gc").value,tram:"",trangThai:"Đã lên lịch"})});toast("Đã thêm buổi quay");renderMain()};
 }
 
 /* ---------- ⑤ Lịch đăng: nhịp đăng + tự xếp ---------- */
@@ -247,7 +249,7 @@ function wpWorkList(b,tab){
   if(tab==="kho"){const R=d.cards.filter(c=>c.mix==="reup"&&c.step==="kb"),TN=[];
     if(!R.length&&!TN.length)return;
     b.insertAdjacentHTML("afterbegin",`${R.length?`<section class="card"><div class="card-h"><h2>Video reup cần link</h2><span class="hint">${R.length} video · người được giao dán link video gốc (Google Drive) rồi gửi Worker dựng</span></div>
-     <div class="xlist">${R.map(c=>`<div class="xmini">${swatch(c.sku)}<span class="xms">${esc(sk(c.sku).n.split(" ").slice(0,2).join(" "))} · ${esc(chOf(c.kenh).short)} · ${esc(userName(c.nguoi)||"—")}</span>${hanTag(c)}${mine(c)?`<input class="hkin" data-rpin="${c.id}" placeholder="Dán link video gốc (Drive)…" value="${esc(c.linkVideo||"")}">${isLate(c)?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm" data-rpsend="${c.id}">Gửi Worker</button>`:`<span class="xmt">chưa có link</span>`}</div>`).join("")}</div></section>`:""}
+     <div class="xlist">${R.map(c=>`<div class="xmini">${swatch(c.sku)}<span class="xms">${esc(sk(c.sku).n.split(" ").slice(0,2).join(" "))} · ${esc(chOf(c.kenh).short)} · ${esc(userName(c.nguoi)||"—")}</span>${hanTag(c)}${mine(c)?`<input class="hkin" data-rpin="${c.id}" placeholder="Dán link video gốc (Drive)…" value="${esc(c.linkVideo||"")}">${isLate(c)?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm" data-rpsend="${c.id}">Đã có link, gửi duyệt sau</button><button class="btn sm pri" data-wsend="${c.id}">Gửi Worker dựng</button>`:`<span class="xmt">chưa có link</span>`}</div>`).join("")}</div></section>`:""}
      ${TN.length?`<section class="card"><div class="card-h"><h2>Video tồn cần chọn</h2><span class="hint">${TN.length} ô · người được giao chọn video ở bảng "Ô lịch dành cho video tồn" bên dưới</span></div><div class="xlist">${TN.map(c=>xvMini(c,`<span class="xms">${esc(chOf(c.kenh).short)} · ${esc(userName(c.nguoi)||"—")}</span>`)).join("")}</div></section>`:""}`);
     b.querySelectorAll("[data-rpsend]").forEach(x=>x.onclick=()=>{const id=x.dataset.rpsend,l=b.querySelector(`[data-rpin="${id}"]`).value.trim();const tr=b.querySelector(`[data-tre="${id}"]`),e=moveCard(ME,id,"worker",{linkVideo:l,lyDoTre:tr?tr.value.trim():undefined});toast(e||"Đã gửi Worker dựng");renderMain()})}
 }
@@ -344,24 +346,102 @@ function xvKho2(b,o){
 /* ---------- Video không quay (Worker): bảng tiến độ thay cho khung tạo video ----------
    Việc được tạo khi giao ở ① Kế hoạch tuần. Worker chưa nối với thẻ nên người phụ trách tự chạy Worker rồi dán link.
    Chưa làm → Đang làm → Đã gửi duyệt → Xong (được duyệt) */
-const wkSt=c=>{if(["dang","xong"].includes(c.step))return "xong";if(["dkb","dvd","dceo"].includes(c.step))return "duyet";if(c.step==="worker"&&c.wkBat)return "lam";if(c.step==="kb"&&String(c.noiDung||"").trim())return "lam";return "chua"};
+const wkSt=c=>{if(["dang","xong"].includes(c.step))return "xong";if(["dkb","dvd","dceo"].includes(c.step))return "duyet";if(c.step==="worker"&&(c.wkBat||c.wt))return "lam";if(c.step==="kb"&&String(c.noiDung||"").trim())return "lam";return "chua"};
 const WK_G=[["chua","Chưa làm"],["lam","Đang làm"],["duyet","Đã gửi duyệt"],["xong","Xong (được duyệt)"]];
 function xvWorker2(b,o){
   const {d,W,give}=o,L=d.cards.filter(c=>loaiOf(c)==="worker"&&(xvIn(c,W)||(!c.day&&!c.qday))).sort((a,c)=>(a.han||99)-(c.han||99));
   const mine=c=>give||c.nguoi===ME.id||c.giao===ME.id;
   const lnk=v=>/^https?:/.test(v)?v:"https://"+v;
   const row=c=>{const st=wkSt(c),t=d.tuyen.find(x=>x.ma===c.maTuyen),late=isLate(c);
-    const act=!mine(c)?"":st==="chua"&&c.step==="worker"?`<button class="btn sm" data-wkgo="${c.id}">Bắt đầu chạy Worker</button>`
+    const dv=can(ME,"viec.duyet")||ME.role==="admin";const act=c.wt&&c.wStage==="script"&&c.wStatus==="review"?(dv?`<div class="wkscr">${esc(c.wScript||"(Worker chưa gửi nội dung kịch bản)")}</div><button class="btn sm pri" data-wkscok="${c.id}">Duyệt kịch bản</button><button class="btn sm" data-wkscfix="${c.id}">Sửa kịch bản</button>`:`<span class="hint">kịch bản Worker viết chờ Oanh duyệt</span>`):!mine(c)?"":c.wt?"":st==="chua"&&c.step==="worker"?`<button class="btn sm pri" data-wsend="${c.id}">Gửi Worker dựng</button><button class="lnk" data-wkgo="${c.id}">Tự chạy Worker, dán link sau</button>`
       :st==="chua"&&c.step==="kb"?`<button class="btn sm" data-card="${c.id}">Viết kịch bản</button>`
-      :c.step==="worker"?`<input class="hkin" data-wkl="${c.id}" placeholder="Dán link video Worker dựng xong…" value="${esc(c.linkFinal||"")}">${late?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm pri" data-wksend="${c.id}">Gửi Oanh duyệt</button>`
+      :c.step==="worker"&&!c.wt?`<input class="hkin" data-wkl="${c.id}" placeholder="Dán link video Worker dựng xong…" value="${esc(c.linkFinal||"")}">${late?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm pri" data-wksend="${c.id}">Gửi Oanh duyệt</button>`
       :c.step==="kb"?`<button class="btn sm" data-card="${c.id}">Mở kịch bản</button>`:"";
     return `<tr><td>${swatch(c.sku)}<b>${esc(sk(c.sku).n)}</b><small>${esc(t?t.tuyen:c.tuyen||"")} · ${c.wkMode==="B"?"nhân sự viết kịch bản":"Worker viết kịch bản + voice"}</small></td>
      <td>${esc(userName(c.giao||c.nguoi)||"—")}</td><td class="nowrap">${c.batDau?dd(c.batDau):"—"}</td><td>${hanTag(c)||"—"}</td>
      <td>${pill((WK_G.find(g=>g[0]===st)||[])[1],{chua:"gry",lam:"blu",duyet:"amb",xong:"grn"}[st])}${c.step==="dceo"?`<small>chờ chị duyệt</small>`:c.step==="dvd"?`<small>chờ Oanh duyệt</small>`:c.step==="dkb"?`<small>kịch bản chờ Oanh duyệt</small>`:""}</td>
-     <td>${c.linkFinal?`<a href="${esc(lnk(c.linkFinal))}" target="_blank" rel="noopener">▶ Xem video</a>`:`<span class="hint">chưa có</span>`}</td><td class="wkact">${act}</td></tr>`};
+     <td>${wkLine(c)||(c.linkFinal?`<a href="${esc(c.linkFinal.startsWith("/")?c.linkFinal:lnk(c.linkFinal))}" target="_blank" rel="noopener">▶ Xem video</a>`:`<span class="hint">chưa có</span>`)}</td><td class="wkact">${act}</td></tr>`};
   b.innerHTML=`<section class="card"><div class="card-h"><h2>Video không quay (Worker)</h2><span class="hint">${L.length} video · giao ở ① Kế hoạch tuần · Worker chưa tự nhận việc từ đây: người phụ trách chạy Worker, xong dán link video rồi gửi Oanh duyệt</span></div>
    <div class="wksum">${WK_G.map(([k,t])=>`<span class="xqi${L.filter(c=>wkSt(c)===k).length&&k!=="xong"?" hot":""}"><b class="numeric">${L.filter(c=>wkSt(c)===k).length}</b><span>${t}</span></span>`).join("")}</div></section>
   ${WK_G.map(([k,t])=>{const G=L.filter(c=>wkSt(c)===k);return G.length?`<section class="card flush"><div class="card-h pad"><h2>${t}</h2><span class="hint">${G.length}</span></div><div class="tbl"><table class="wktab"><thead><tr><th>Sản phẩm · tuyến</th><th>Phụ trách</th><th>Ngày giao</th><th>Hạn</th><th>Tiến độ</th><th>Link video</th><th></th></tr></thead><tbody>${G.map(row).join("")}</tbody></table></div></section>`:""}).join("")||`<section class="card"><p class="empty">Chưa có video Worker nào trong kỳ. Giao ở ① Kế hoạch tuần › Không quay · Worker.</p></section>`}`;
+  b.querySelectorAll("[data-wkscok]").forEach(x=>x.onclick=async()=>{const c=D().cards.find(y=>y.id===x.dataset.wkscok);const er=await wkTask("card_script_ok",c);toast(er||"Đã duyệt kịch bản, Worker tạo giọng và ghép cảnh");DB.mutate(ME.name,"duyệt kịch bản Worker "+c.id,dt=>{const y=dt.cards.find(z=>z.id===c.id);if(y){y.wStage="";y.wStatus="running";y.wDetail="Kịch bản đã duyệt, Worker đang tạo giọng + ghép cảnh";y.wFixAt=new Date().toISOString()}});renderMain()});
+  b.querySelectorAll("[data-wkscfix]").forEach(x=>x.onclick=async()=>{const n=prompt("Cần sửa kịch bản thế nào?");if(!n||!n.trim())return;const c=D().cards.find(y=>y.id===x.dataset.wkscfix);const er=await wkTask("card_script_fix",c,{note:n.trim()});toast(er||"Đã gửi góp ý, Worker viết lại kịch bản");DB.mutate(ME.name,"sửa kịch bản Worker "+c.id,dt=>{const y=dt.cards.find(z=>z.id===c.id);if(y){y.wStage="";y.wStatus="running";y.wDetail="Worker đang viết lại kịch bản theo góp ý";y.wFixAt=new Date().toISOString()}});renderMain()});
   b.querySelectorAll("[data-wkgo]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"bắt đầu chạy Worker "+x.dataset.wkgo,dt=>{const c=dt.cards.find(y=>y.id===x.dataset.wkgo);if(c)c.wkBat=dt.settings.today});toast("Đã chuyển sang Đang làm");renderMain()});
   b.querySelectorAll("[data-wksend]").forEach(x=>x.onclick=()=>{const id=x.dataset.wksend,l=b.querySelector(`[data-wkl="${id}"]`).value.trim(),tr=b.querySelector(`[data-tre="${id}"]`);if(!l){toast("Dán link video Worker dựng xong trước");return}const e=moveCard(ME,id,"dvd",{linkFinal:l,lyDoTre:tr?tr.value.trim():undefined});toast(e||"Đã gửi Oanh duyệt");renderMain()});
 }
+
+
+/* ---------- Nối Worker (máy dựng ở văn phòng) cho thẻ video ----------
+   One shot / review sau khi quay (④ Edit): chọn người edit hoặc Gửi Worker (giữ tiếng quay, hoặc giọng AI đọc kịch bản)
+   Reup: Gửi Worker đổi hook, chèn chữ hoặc sửa / đổi thương hiệu · Không quay: giọng đọc từ kho cảnh (Worker viết hoặc kịch bản có sẵn)
+   Worker có bản nháp → thẻ sang Oanh duyệt video (xem bản nháp ngay trên web) → chị duyệt → Worker lưu Drive, link về thẻ.
+   Góp ý sửa ở web → Worker dựng lại. Worker tự hỏi web 15 giây/lần nên máy văn phòng phải bật. */
+const W_SKU={BT:"tay-van-nang",TD:"tinh-dau-giat-say",XM:"xit-muoi",XR:"xit-ruoi",SAP:"sap-thom"};
+const W_PACK={BT:[["hu-450g","Hũ 450g"],["chai-250g","Chai 250g"]]};
+const W_CH={"TikTok chính":"tiktok_main","TikTok Via 1":"tiktok_via_1","TikTok Via 2":"tiktok_via_2","Fanpage chính":"facebook_page"};
+const W_VOICE=[["adam","Adam"],["anh-thu","Anh Thư"],["an-nhien","An Nhiên"],["cam-hong","Cẩm Hồng"],["tham","Thắm"],["ngan","Ngân"],["my","My"]];
+const wkKind=c=>{const L=loaiOf(c);if(L==="worker")return "voice";if(c.mix==="reup"||L==="reup")return "reup";if(["edit","quay"].includes(c.step)&&L==="moi")return c.oneShot?"oneshot":"review";return ""};
+const wkCan=c=>!!wkKind(c)&&!c.wt&&["edit","kb","worker"].includes(c.step)&&(xvGive()||c.nguoi===ME.id||c.giao===ME.id);
+function openWorkerSend(id){
+  const c=D().cards.find(x=>x.id===id);if(!c)return;const k=wkKind(c),t=D().tuyen.find(x=>x.ma===c.maTuyen),pl=t&&(D().pillars||[]).find(p=>p.sku===c.sku&&p.kenh===c.kenh);
+  const modes=k==="oneshot"?[["oneshot","Dựng one shot (cắt vấp, tăng tốc, chỉnh màu, cảnh trám, hook, chữ)"]]
+    :k==="review"?[["oneshot","Giữ tiếng trong video quay, Worker cắt và chèn chữ"],["voice","Giọng AI đọc kịch bản, ghép cảnh vừa quay"]]
+    :k==="reup"?[["text","Đổi hook, chèn chữ (giữ nguyên hình và tiếng)"],["rebrand","Sửa / đổi thương hiệu (cắt đoạn có tên thương hiệu cũ)"]]
+    :[["voice","Giọng đọc từ kho cảnh"]];
+  const needScript=k==="voice"&&c.wkMode==="B";
+  $("#drawerIn").innerHTML=`<div class="dh"><h2>Gửi Worker dựng</h2><button class="btn sm" id="dx">Đóng</button></div>
+   <p class="hint"><span class="mono">${c.id}</span> · ${esc(sk(c.sku).n)} · ${esc(chOf(c.kenh).short)}${t?" · tuyến "+esc(t.tuyen):""}</p>
+   ${W_SKU[c.sku]?"":`<div class="warn">Worker chưa có sản phẩm ${esc(sk(c.sku).n)} trong kho cảnh. ${k==="reup"?"Chỉ dùng được kiểu đổi hook, chèn chữ.":"Chưa gửi được, giao người edit."}</div>`}
+   <div class="frm kfrm">
+    <label class="field full">Worker làm<select id="ws-m">${opt(modes,modes[0][0])}</select></label>
+    <label class="field full" id="ws-lk">Link Google Drive <small id="ws-lkh"></small><input id="ws-l" value="${esc(c.linkVideo||"")}" placeholder="Dán link video (hoặc thư mục) trên Drive"></label>
+    ${W_PACK[c.sku]?`<label class="field">Bao bì<select id="ws-p">${opt(W_PACK[c.sku],W_PACK[c.sku][0][0])}</select></label>`:""}
+    <label class="field" id="ws-vw">Giọng đọc<select id="ws-v">${opt(W_VOICE,"adam")}</select></label>
+    <label class="field full">Hook (0–3 giây đầu)<input id="ws-h" value="${esc(c.hookText||"")}" placeholder="Để trống thì Worker tự chọn"></label>
+    <label class="field full" id="ws-sw">Kịch bản${needScript?" (bắt buộc)":" (có thì Worker đọc đúng kịch bản, trống thì Worker tự viết)"}<textarea id="ws-s" rows="5">${esc(c.noiDung||"")}</textarea></label>
+    <label class="field full" id="ws-bw">Tên thương hiệu cũ cần bỏ (cách nhau dấu phẩy)<input id="ws-bn"><span><input type="checkbox" id="ws-own" style="width:auto"> Video thuộc Ailla / được phép dùng lại</span></label>
+    <label class="field full">Ghi chú cho Worker<input id="ws-n" placeholder="vd: nhịp nhanh, nhấn mạnh an toàn cho bé"></label>
+   </div><div class="acts"><button class="btn pri" id="ws-go">Gửi Worker</button></div>`;
+  $("#drawer").hidden=false;$("#dx").onclick=closeDrawer;
+  const sync=()=>{const m=$("#ws-m").value;$("#ws-vw").hidden=m!=="voice";$("#ws-sw").hidden=m!=="voice";$("#ws-bw").hidden=m!=="rebrand";$("#ws-lkh").textContent=m==="voice"?"(thư mục cảnh, để trống thì Worker lấy trong kho cảnh)":"(video gốc / video vừa quay)"};$("#ws-m").onchange=sync;sync();
+  $("#ws-go").onclick=async()=>{const m=$("#ws-m").value,link=$("#ws-l").value.trim(),script=$("#ws-s").value.trim();
+    if(m!=="text"&&!W_SKU[c.sku]){toast("Worker chưa có sản phẩm này");return}
+    if(m!=="voice"&&!/drive\.google\.com/.test(link)){toast("Dán link video trên Google Drive");$("#ws-l").focus();return}
+    if(m==="voice"&&link&&!/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//.test(link)){toast("Giọng đọc: link phải là THƯ MỤC cảnh trên Drive (hoặc để trống)");return}
+    if(needScript&&!script){toast("Cách làm này cần kịch bản nhân sự viết");return}
+    const brief=[t&&("Tuyến: "+t.tuyen),t&&t.vaiTro&&("Vai trò: "+t.vaiTro),pl&&pl.idea&&("Big idea: "+pl.idea),c.yTuong&&!/^(Viết|Chọn|Tìm)/.test(c.yTuong)&&("Ý tưởng: "+c.yTuong)].filter(Boolean).join("\n");
+    const order={mode:m,sku:W_SKU[c.sku]||"",packaging:($("#ws-p")||{}).value||"",link,hook:$("#ws-h").value.trim(),note:$("#ws-n").value.trim(),
+      video_type:k==="reup"?"reup":"new_shoot",publish_channel:W_CH[c.kenh]||"other"};
+    if(m==="voice"){order.voice=$("#ws-v").value;order.script=script;order.brief=brief||("Video "+sk(c.sku).n);}
+    if(m==="rebrand"){order.ban_names=$("#ws-bn").value;order.owned=$("#ws-own").checked}
+    try{const r=await svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind:"card_build",ref:c.id,payload:{order,card:c.id,by:ME.name}})});
+      DB.mutate(ME.name,"gửi Worker dựng "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(!x)return;x.wt=r.id;x.wMode=m;x.wStatus="queued";x.wDetail="Chờ máy văn phòng nhận việc";x.wDone=false;x.step="worker";x.nguoiDung="Worker";if(link&&!x.linkVideo)x.linkVideo=link;if(order.hook)x.hookText=x.hookText||order.hook;if(script)x.noiDung=script;if(!x.han)x.han=Math.min(MONTH.ndays,dt.settings.today+1)});
+      closeDrawer();toast("Đã gửi Worker. Máy văn phòng nhận việc trong khoảng 15 giây");renderMain()}catch(e){toast("Chưa gửi được: "+e.message)}};
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-wsend]");if(!b)return;e.preventDefault();e.stopPropagation();openWorkerSend(b.dataset.wsend)},true);
+/* gửi lệnh duyệt / sửa sang Worker */
+async function wkTask(kind,c,extra){try{await svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind,ref:c.wt,payload:Object.assign({worker_job:c.wJob,by:ME.name,video_type:loaiOf(c)==="reup"?"reup":"new_shoot",channel:W_CH[c.kenh]||"other"},extra||{})})});return ""}catch(e){return e.message}}
+/* Chị duyệt xong (sang Chờ đăng) → Worker lưu thành phẩm lên Drive */
+const _mvWk=moveCard;
+moveCard=function(u,id,to,inp){const c=D().cards.find(x=>x.id===id),from=c&&c.step;const e=_mvWk(u,id,to,inp);
+  if(!e&&c&&c.wJob&&!c.wDone&&from==="dceo"&&to==="dang"){wkTask("card_ok",c).then(er=>{if(er)toast("Chưa báo được Worker lưu Drive: "+er)});DB.mutate(u.name,"Worker lưu Drive "+id,dt=>{const x=dt.cards.find(y=>y.id===id);if(x){x.wDetail="Đã duyệt, Worker đang lưu thành phẩm lên Drive"}})}
+  return e};
+/* Góp ý sửa video Worker dựng → Worker dựng lại */
+const _sbWk=sendBack;
+sendBack=function(u,id,note){const c=D().cards.find(x=>x.id===id);if(c&&c.wJob&&["dvd","dceo"].includes(c.step)){wkTask("card_fix",c,{note:note||"Cần sửa"}).then(er=>{if(er)toast("Chưa gửi được góp ý cho Worker: "+er)});
+  DB.mutate(u.name,`góp ý Worker sửa ${id}: ${note||""}`,dt=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;x.step="worker";x.wStatus="running";x.wDetail="Worker đang dựng lại theo góp ý";x.wFixAt=new Date().toISOString();x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa"})});return}
+  return _sbWk(u,id,note)};
+/* Đồng bộ tiến độ Worker về thẻ (mở trang là cập nhật, tối đa 20 giây/lần) */
+let WT_AT=0,WT_BUSY=false;
+async function wtSync(){if(WT_BUSY||Date.now()-WT_AT<20000||!DB.data)return;const C=D().cards.filter(c=>c.wt&&!c.wDone);if(!C.length)return;WT_BUSY=true;WT_AT=Date.now();
+  try{const L=await svApi("/api/hub/worker-tasks?kind=card"),by={};(L||[]).forEach(t=>by[t.id]=t);const ch=[];
+    C.forEach(c=>{const t=by[c.wt];if(!t)return;const r=t.result||{},u={wStatus:t.status,wProg:t.progress||0,wDetail:t.detail||"",wJob:t.worker_job||c.wJob||"",wStage:r.stage||"",wScript:r.script||""};
+      const fresh=!c.wFixAt||String(t.updated_at||"")>c.wFixAt;if(!fresh){u.wStatus="running";u.wDetail=c.wDetail;u.wStage=""}
+      if(fresh&&t.status==="review"&&r.stage==="video"&&c.step==="worker"){u.step="dvd";u.linkFinal="/api/hub/worker-tasks/preview/"+u.wJob}
+      if(t.status==="done"&&r.drive_url){u.linkFinal=r.drive_url;u.wDone=true}
+      if(Object.keys(u).some(k=>String(c[k]??"")!==String(u[k]??"")))ch.push([c.id,u])});
+    if(ch.length){DB.mutate("Worker","cập nhật tiến độ Worker",dt=>ch.forEach(([id,u])=>{const x=dt.cards.find(y=>y.id===id);if(x)Object.assign(x,u)}));if(!(typeof svTyping==="function"&&svTyping()))renderMain()}}
+  catch(e){}finally{WT_BUSY=false}}
+setInterval(()=>{if(typeof ME!=="undefined"&&ME&&typeof PAGE!=="undefined"&&["kehoach","mkt_tq","xepviec","dieuphoi","lich"].includes(PAGE))wtSync()},20000);
+/* dòng tiến độ Worker trên thẻ / danh sách */
+const wkLine=c=>!c.wt?"":`<span class="wkln ${c.wStatus==="error"?"t-red":""}">🤖 ${c.wDone?"Đã lưu Drive":esc(c.wDetail||"Đã gửi Worker")}${c.wStatus==="running"&&c.wProg?` · ${c.wProg}%`:""}${c.wJob&&!c.wDone&&["dvd","dceo"].includes(c.step)?` · <a href="/api/hub/worker-tasks/preview/${esc(c.wJob)}" target="_blank" rel="noopener">▶ bản nháp</a>`:""}${c.wDone&&c.linkFinal?` · <a href="${esc(c.linkFinal)}" target="_blank" rel="noopener">▶ thành phẩm</a>`:""}</span>`;

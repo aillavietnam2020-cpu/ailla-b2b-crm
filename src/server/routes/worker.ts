@@ -10,7 +10,11 @@ import { requirePermission } from '../middleware/rbac';
  *  - /api/hub/worker-tasks : trang quản trị tạo việc và xem tiến độ (cần đăng nhập + quyền khu quản trị).
  *  - /api/worker/pull, /api/worker/push : Worker tự gọi, xác thực bằng khoá riêng WORKER_KEY (secret của Worker web).
  */
-const KINDS = ['win_analyze', 'win_approve', 'win_fix', 'win_child_ok', 'win_child_fix'] as const;
+const KINDS = [
+  'win_analyze', 'win_approve', 'win_fix', 'win_child_ok', 'win_child_fix',
+  // Thẻ video ở Marketing: dựng one shot / chèn chữ / sửa video có sẵn / giọng đọc; duyệt, góp ý sửa, duyệt kịch bản
+  'card_build', 'card_ok', 'card_fix', 'card_script_ok', 'card_script_fix',
+] as const;
 const STATUSES = ['queued', 'taken', 'running', 'review', 'building', 'done', 'error'] as const;
 
 type TaskRow = {
@@ -38,7 +42,13 @@ export const hubWorkerRoutes = new Hono<AppEnv>();
 hubWorkerRoutes.use('*', requirePermission('hub.access'));
 
 hubWorkerRoutes.get('/', async (c) => {
-  const rows = await c.env.DB.prepare('SELECT * FROM worker_tasks ORDER BY created_at DESC LIMIT 200').all<TaskRow>();
+  // ?kind=card: việc của thẻ video Marketing; mặc định: việc video win (Hypit) như cũ.
+  const card = c.req.query('kind') === 'card';
+  const rows = await c.env.DB.prepare(
+    card
+      ? "SELECT * FROM worker_tasks WHERE kind LIKE 'card%' ORDER BY created_at DESC LIMIT 500"
+      : "SELECT * FROM worker_tasks WHERE kind NOT LIKE 'card%' ORDER BY created_at DESC LIMIT 200",
+  ).all<TaskRow>();
   return ok(c, (rows.results ?? []).map(view));
 });
 
