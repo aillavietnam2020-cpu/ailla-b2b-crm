@@ -231,7 +231,7 @@ const HOOK={
 };
 let _seq=100;
 function newCard(d,o){
-  const ix=_seq++;const id="TT-"+String(_seq).padStart(4,"0");
+  const mx=Math.max(_seq,...(d.cards||[]).map(c=>+String(c.id||"").replace(/\D/g,"")||0));_seq=mx+1;const ix=_seq;const id="TT-"+String(_seq).padStart(4,"0"); // không trùng mã thẻ đã có (kể cả sau khi tải lại trang)
   const sku=o.sku,kenh=o.kenh;const tu=d.tuyen.find(t=>t.ma===o.maTuyen);
   const tac=(d.tactics.find(t=>t.sku.includes(sku))||{k:"DT"}).k;
   const hk=""; // thẻ mới để trống ý tưởng cho người viết kịch bản (không điền ý tưởng mẫu)
@@ -240,6 +240,8 @@ function newCard(d,o){
     briefHinh:"",linkAnh:"",ketQua:"",order:"",winSrc:"",view:0,giuChan:0,click:0,don:0,gmv:0,step:"cg",gopy:[],history:[],files:[],createdAt:Date.now()},o,{id});
 }
 function publishPlan(d){
+  /* Kế hoạch tháng là quỹ video, không sinh thẻ rải ngày nữa: video được tạo khi lên danh sách hook ở buổi quay */
+  if(!d.plan.legacyPublish){d.plan.published={at:today(),cards:d.cards.length};return 0}
   let added=0;const st0=Math.max(1,Math.min(MONTH.ndays,(d.settings&&d.settings.today)||1)); // phát hành giữa tháng: rải từ hôm nay
   d.tuyen.forEach(t=>{const have=d.cards.filter(c=>c.maTuyen===t.ma).length;
     for(let i=have;i<t.kh;i++){d.cards.push(newCard(d,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,day:Math.min(MONTH.ndays,st0+Math.floor(i*(MONTH.ndays-st0+1)/Math.max(1,t.kh))+(t.ma.length%3)),nguon:/video kho|video tồn|footage|reup/i.test(t.tuyen||"")?"Footage cũ":t.tuyen==="Nhân bản winner"?"Nhân bản winner":"Quay mới",dangVideo:t.dangVideo||undefined}));added++}});

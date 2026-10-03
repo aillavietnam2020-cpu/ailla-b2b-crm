@@ -565,3 +565,24 @@ table.pttab td{vertical-align:middle}
 .gybox #gy-in{flex:1;min-width:0}
 .ptadd select,.pttab select{min-width:150px}
 .pttab td:first-child select,.pttab td:nth-child(2) select{min-width:190px}
+
+/* Kế hoạch tuần · buổi quay & hook · nhịp đăng */
+.wptab tr.grp td{background:#f4f5ff;font-size:14px}
+.wptab input.num{width:80px}.wptab select{min-width:170px}
+.xses2 .xsum{font-size:13.5px;color:var(--muted);margin-bottom:10px}
+.hkg{border:1px solid #eceef5;border-radius:12px;padding:8px 12px;margin-bottom:8px;background:#fcfcff}
+.hkh{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.hkr{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px dashed #eceef5}
+.hkr:first-of-type{border-top:0}
+.hkr input{width:auto;margin:0}
+.hkst{width:18px;text-align:center}
+.hkt{flex:1;min-width:0;font-size:14px}
+.hkr small{color:var(--muted);font-size:12px;white-space:nowrap}
+.hkadd{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,1fr) 2fr auto;gap:8px;align-items:start;margin:10px 0}
+.hkadd textarea{min-height:40px}
+.hkps{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}.hkps input{width:220px}
+.nhg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.nhk{border:1px solid #eceef5;border-radius:12px;padding:10px 12px;display:grid;gap:6px;background:#fcfcff}
+.nhk small{color:var(--muted)}
+.nhadd{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.nhadd select{width:auto;min-width:0}.nhadd input{width:90px}
+@media (max-width:1000px){.hkadd{grid-template-columns:1fr}}

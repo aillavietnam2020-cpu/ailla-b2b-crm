@@ -11,7 +11,7 @@ const xvRange=()=>{const mf=MONTH.key+"-01",mt=MONTH.key+"-"+String(MONTH.ndays)
 const xvWeek=()=>{const r=xvRange();if(r)return {w:weekOf(r.tu),tu:r.tu,den:r.den,out:false};const t=D().settings.today,W=WEEKS.find(w=>t>=w.tu&&t<=w.den)||WEEKS[0];return Object.assign({},W,{out:true})};
 const xvLbl=W=>W.out?`tuần này ${dd(W.tu)}–${dd(Math.min(W.den,MONTH.ndays))} <span class="t-amb">(kỳ chọn ở trên nằm ngoài tháng ${MONTH.mon}, chọn "Tháng này" hoặc tuần cần xem)</span>`:(W.tu===1&&W.den===MONTH.ndays?`cả tháng ${MONTH.mon}`:`${dd(W.tu)} – ${dd(W.den)}`);
 const xvDays=W=>{const a=[];for(let x=W.tu;x<=Math.min(W.den,MONTH.ndays);x++)a.push(x);return a};
-const xvIn=(c,W)=>c.day>=W.tu&&c.day<=W.den;
+const xvIn=(c,W)=>{const x=c.day||c.qday||0;return x>=W.tu&&x<=W.den};
 const xvOpen=uid2=>D().cards.filter(c=>c.nguoi===uid2&&!["xong","cg"].includes(c.step));
 const xvGive=()=>can(ME,"viec.giao")||ME.role==="admin";
 const xvKhoFree=()=>(D().kho||[]).filter(k=>khoOk(k)&&!k.maDang);
@@ -45,6 +45,7 @@ function pXepViec(m){
 function xvAlloc(ma,ph,mode,editor){const d=D(),c=ph?d.cards.find(x=>x.id===ph):null;
   const id=allocKho(ma,c?c.kenh:XV.addK,c?c.day:XV.addD,mode,mode==="hook"?editor:chanOwner(c?c.kenh:XV.addK),ph||undefined);
   if(id)DB.mutate(ME.name,"xếp video tồn "+ma,dt=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;if(mode==="hook"){x.nguoi=editor||x.nguoi;x.nguoiEdit=x.nguoi;x.ceo="CẦN KIỂM TRA"}else{x.nguoi=((dt.kenhPT||{})[x.kenh]||{}).chinh||x.nguoi;x.ceo="PASS";x.step="dang";x.loai="kho"}});
+  if(id&&!D().cards.find(c=>c.id===id).day)DB.mutate(ME.name,"xếp ngày đăng video tồn",dt=>autoSlot(dt,[id]));
   return id}
 function xvKho(b,o){
   const {d,W,days,team,give,slots,free}=o,used=o.WC.filter(c=>c.khoMa),bySku=xvGroupBy(free,k=>k.sku).sort((a,b2)=>b2[1].length-a[1].length);
@@ -61,7 +62,7 @@ function xvKho(b,o){
     <td>${give?(L.length?`<button class="btn sm pri" data-xkok="${c.id}">Nhận</button>`:`<button class="btn sm" data-xknew="${c.id}">Chuyển thành quay mới</button>`):""}</td></tr>`}).join("")||`<tr><td colspan="7" class="empty">Kỳ này không có ô nào dành cho video tồn. Muốn có ô cố định, ở Kế hoạch tháng › bước 5 thêm tuyến "Đăng lại video kho" hoặc "Đổi hook video tồn" rồi bấm Phát hành. Hoặc thêm thẳng ở dưới.</td></tr>`}</tbody></table></div>
    <p class="hint pad">Đăng nguyên bản: thẻ đi thẳng tới người giữ kênh, đăng xong dán link. Đổi hook / edit lại: thẻ sang người edit, Oanh duyệt rồi chị duyệt mới lên kênh. Kho hết video thì bấm "Chuyển thành quay mới", thẻ sang bước ② Kịch bản.</p></section>
   ${give?`<section class="card"><div class="card-h"><h2>Thêm video tồn vào lịch</h2><span class="hint">không cần có ô trong kế hoạch</span></div>
-   <form class="frm row7" id="xk-add"><label class="field">Video tồn<select id="xa-v">${opt(free.map(x=>[x.ma,x.ma+" · "+sk(x.sku).n+(x.tuyen?" · "+x.tuyen:"")]),"")}</select></label><label class="field">Kênh<select id="xa-k">${opt(CHANNELS.map(c=>[c.k,c.short]),"TikTok Via 2")}</select></label><label class="field">Ngày lên kênh<select id="xa-d">${opt(days.map(x=>[x,dayLbl(x)]),Math.max(d.settings.today,W.tu)<=W.den?Math.max(d.settings.today,W.tu):W.tu)}</select></label><label class="field">Cách dùng<select id="xa-m">${opt([["nguyen","Đăng nguyên bản"],["hook","Đổi hook / edit lại"]],"nguyen")}</select></label><label class="field">Người edit<select id="xa-e">${opt([["","—"]].concat(team.map(u=>[u.id,u.name])),"")}</select></label><button class="btn pri" ${free.length?"":"disabled"}>Thêm vào lịch</button></form></section>`:""}
+   <form class="frm row7" id="xk-add"><label class="field">Video tồn<select id="xa-v">${opt(free.map(x=>[x.ma,x.ma+" · "+sk(x.sku).n+(x.tuyen?" · "+x.tuyen:"")]),"")}</select></label><label class="field">Kênh<select id="xa-k">${opt(CHANNELS.map(c=>[c.k,c.short]),"TikTok Via 2")}</select></label><label class="field">Ngày lên kênh<select id="xa-d">${opt([[0,"Tự xếp theo nhịp đăng"]].concat(days.map(x=>[x,dayLbl(x)])),0||Math.max(d.settings.today,W.tu)<=W.den?Math.max(d.settings.today,W.tu):W.tu)}</select></label><label class="field">Cách dùng<select id="xa-m">${opt([["nguyen","Đăng nguyên bản"],["hook","Đổi hook / edit lại"]],"nguyen")}</select></label><label class="field">Người edit<select id="xa-e">${opt([["","—"]].concat(team.map(u=>[u.id,u.name])),"")}</select></label><button class="btn pri" ${free.length?"":"disabled"}>Thêm vào lịch</button></form></section>`:""}
   ${used.length?`<section class="card"><div class="card-h"><h2>Video tồn đã xếp trong kỳ</h2><span class="hint">${used.length}</span></div><div class="xlist">${used.map(c=>xvMini(c,`<span class="xms">${esc(chOf(c.kenh).short)} · ${esc(stepName(c.step))}</span>`)).join("")}</div></section>`:""}`;
   const val=(a,id)=>{const e=b.querySelector(`[${a}="${id}"]`);return e?e.value:""};
   b.querySelectorAll("[data-xkok]").forEach(x=>x.onclick=()=>{const id=x.dataset.xkok,mode=val("data-xkm",id),ed=val("data-xke",id);if(mode==="hook"&&!ed){toast("Chọn người edit cho video đổi hook");return}xvAlloc(val("data-xkv",id),id,mode,ed);toast("Đã xếp video tồn vào lịch");renderMain()});
@@ -176,7 +177,7 @@ function pMktTq(m){
   const cap=Math.max(8,...team.map(u=>xvOpen(u.id).length));
   const pipe=CHANNELS.map(ch=>{const I=WC.filter(c=>c.kenh===ch.k);return `<tr><td><b>${esc(ch.short)}</b></td>${DP_STEPS.map(s=>{const L=I.filter(c=>c.step===s||(s==="edit"&&c.step==="worker")),late=L.filter(isLate).length;return `<td class="n"><button type="button" class="xcell${!L.length?" z":late?" jam":["dkb","dvd","dceo"].includes(s)?" w":s==="xong"?" ok":""}" data-xpipe="${esc(ch.k)}|${s}">${L.length}${late?` · trễ ${late}`:""}</button></td>`}).join("")}</tr>`}).join("");
   m.innerHTML=H("Tổng quan Content",`${xvLbl(W)} · hôm nay ${dayLbl(today)} · đổi kỳ xem ở ô chọn thời gian trên cùng`)+`
-  <div class="lwtool"><span class="sp"></span>${xvGive()?`<button class="btn" data-go="xepviec">Xếp việc tuần</button>`:""}<button class="btn" data-go="lich">Calendar</button></div>
+  <div class="lwtool"><span class="sp"></span>${xvGive()?`<button class="btn" id="mq-hot">🔥 Đẩy sản phẩm đang lên xu hướng</button><button class="btn" data-go="xepviec">Xếp việc tuần</button>`:""}<button class="btn" data-go="lich">Calendar</button></div>
   <div class="xchs">${CHANNELS.map(chCard).join("")}</div>
   <div class="xr2">
    <section class="card"><div class="card-h"><h2>Việc đang chờ duyệt</h2><span class="hint">xử lý xong là hết số</span><span class="sp"></span>${Q.length?`<button class="btn pri" id="mq-rv">Duyệt lần lượt (${Q.length}) →</button>`:""}</div>
@@ -192,6 +193,7 @@ function pMktTq(m){
    <div class="tbl"><table class="xpipe"><thead><tr><th>Kênh</th>${DP_STEPS.map(s=>`<th class="n">${esc(stepName(s))}</th>`).join("")}</tr></thead><tbody>${pipe}</tbody></table></div></section>`;
   xvBindWeek(m);
   if($("#mq-rv"))$("#mq-rv").onclick=openReview;
+  if($("#mq-hot"))$("#mq-hot").onclick=()=>openHot();
   m.querySelectorAll("[data-xkho]").forEach(x=>x.onclick=()=>{XV.tab="kho";PAGE="xepviec";renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-xch]").forEach(x=>x.onclick=()=>{LW.kenh=x.dataset.xch;LW.w=W.w||1;PAGE="lich";SUB.lich="week";renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-xpipe]").forEach(x=>x.onclick=()=>{const [k,s]=x.dataset.xpipe.split("|");Object.assign(DP,{kenh:k,step:s,tuyen:"",nguoi:"",sku:"",loai:"",view:"buoc"});DP.sel.clear();PAGE="dieuphoi";renderMain();scrollTo(0,0)});
