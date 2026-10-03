@@ -202,9 +202,15 @@ function repostCard(u,id,kenh,day,nguoi){
     d.cards.push(n);nid=n.id});
   return nid;
 }
-/* Sản phẩm của kế hoạch tháng (chọn từ danh mục) */
-function addPlanProduct(u,k,huong,kenh,gmvTr){const c=D().catalog.find(x=>x.k===k);if(!c)return "Không có sản phẩm này trong danh mục.";if(D().products.some(p=>p.k===k))return "Sản phẩm đã có trong kế hoạch tháng.";
-  DB.mutate(u.name,`thêm ${c.n} vào kế hoạch tháng ${MONTH.mon}`,d=>{d.products.push({k:c.k,n:c.n,c:c.c,gia:c.gia,mo:c.mo,pain:c.pain,claim:c.claim,huong,kenh});d.goals[k]={m9:(typeof T9_BASE!=="undefined"&&T9_BASE[k])||0,gmv:(+gmvTr||0)*1e6}});return ""}
+/* Sản phẩm của kế hoạch tháng (chọn từ danh mục). Một sản phẩm đẩy được nhiều kênh: p.kenhs=[{kenh,huong,gmv}], p.kenh/p.huong = kênh đầu tiên */
+const pKenhs=p=>p.kenhs&&p.kenhs.length?p.kenhs:[{kenh:p.kenh||"TikTok chính",huong:p.huong||"Test",gmv:0}];
+function addPlanProduct(u,k,huong,kenh,gmvTr){const c=D().catalog.find(x=>x.k===k);if(!c)return "Không có sản phẩm này trong danh mục.";
+  const ex=D().products.find(p=>p.k===k);if(ex){if(pKenhs(ex).some(x=>x.kenh===kenh))return c.n+" đã có ở kênh "+chOf(kenh).short+".";
+    DB.mutate(u.name,`thêm ${c.n} vào kênh ${kenh}`,d=>{const p=d.products.find(x=>x.k===k);p.kenhs=pKenhs(p).concat({kenh,huong,gmv:(+gmvTr||0)*1e6});d.goals[k]=d.goals[k]||{m9:0,gmv:0};d.goals[k].gmv+=(+gmvTr||0)*1e6});return ""}
+  DB.mutate(u.name,`thêm ${c.n} vào kế hoạch tháng ${MONTH.mon}`,d=>{d.products.push({k:c.k,n:c.n,c:c.c,gia:c.gia,mo:c.mo,pain:c.pain,claim:c.claim,huong,kenh,kenhs:[{kenh,huong,gmv:(+gmvTr||0)*1e6}]});d.goals[k]={m9:(typeof T9_BASE!=="undefined"&&T9_BASE[k])||0,gmv:(+gmvTr||0)*1e6}});return ""}
+function removePlanChannel(u,k,kenh){const p=D().products.find(x=>x.k===k);if(!p)return "";const L=pKenhs(p);if(L.length<=1)return removePlanProduct(u,k);
+  if(D().tuyen.some(t=>t.sku===k&&t.kenh===kenh))return "Sản phẩm đã có tuyến ở kênh này, xóa tuyến trước.";
+  DB.mutate(u.name,`bỏ ${sk(k).n} khỏi kênh ${kenh}`,d=>{const x=d.products.find(y=>y.k===k),e=pKenhs(x).find(y=>y.kenh===kenh);x.kenhs=pKenhs(x).filter(y=>y.kenh!==kenh);x.kenh=x.kenhs[0].kenh;x.huong=x.kenhs[0].huong;if(e&&d.goals[k])d.goals[k].gmv=Math.max(0,d.goals[k].gmv-(e.gmv||0))});return ""}
 function removePlanProduct(u,k){const d=D();if(d.cards.some(c=>c.sku===k&&c.nguon!=="Footage cũ")||d.tuyen.some(t=>t.sku===k))return "Sản phẩm đã có tuyến hoặc thẻ việc trong tháng, xóa tuyến/thẻ trước.";DB.mutate(u.name,`bỏ ${sk(k).n} khỏi kế hoạch tháng`,dd2=>{dd2.products=dd2.products.filter(p=>p.k!==k);delete dd2.goals[k]});return ""}
 function sendBack(u,id,note){DB.mutate(u.name,`trả lại ${id}: ${note||"cần sửa"}`,d=>{const x=d.cards.find(y=>y.id===id);if(["dvd","dceo"].includes(x.step)){x.step="edit";if(x.nguoiEdit)x.nguoi=x.nguoiEdit}else{x.step="kb";if(x.nguoiKB)x.nguoi=x.nguoiKB}x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa"})})}
 function assignCard(u,id,to){DB.mutate(u.name,`giao ${id} cho ${userName(to)}`,d=>{const x=d.cards.find(y=>y.id===id);x.nguoi=to;if(x.step==="cg"){const L=loaiOf(x);x.step=L==="moi"?"kb":L==="kho"?"dang":"edit"}if(x.step==="edit")x.nguoiEdit=to})}

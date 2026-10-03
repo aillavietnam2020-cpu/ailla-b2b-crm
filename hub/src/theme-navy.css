@@ -507,3 +507,20 @@ body{background:radial-gradient(900px 520px at 88% 6%,rgba(122,156,255,.38) 0%,t
 .btn.pri{background:linear-gradient(135deg,#4b54d1,#6a55dc);border-color:#4b54d1}
 .btn.pri:hover{background:#3d45b3;border-color:#3d45b3}
 @media (max-width:860px){.side{background:linear-gradient(180deg,#d6deff,#e2d6ff)}}
+
+/* ① Sản phẩm trong kế hoạch: xếp theo kênh */
+.pkch{display:grid;gap:10px}
+.pkrow{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:start;padding:10px 0;border-top:1px solid #f0f2f6}
+.pkrow:first-child{border-top:0;padding-top:0}
+.pkn b{display:block;font-size:15px}.pkn small{color:var(--muted);font-size:12.5px}
+
+.pkrow{display:block;padding:0;border:1px solid #eceef5;border-radius:12px;overflow:hidden}
+.pkrow:first-child{padding-top:0}
+.pkh{display:flex;align-items:center;gap:12px;width:100%;border:0;background:#fafbff;padding:12px 16px;font:inherit;text-align:left;cursor:pointer}
+.pkh:hover{background:#f2f3ff}
+.pkh b{font-size:15.5px;min-width:90px}
+.pkh small{color:var(--muted);font-size:13px;white-space:nowrap}
+.pkh .pkl{flex:1;min-width:0;color:#7a8096;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pkh i{font-style:normal;color:var(--nv-active)}
+.pkrow.open .pkh{background:#eef0ff}
+.pkrow.open .chips2{padding:12px 16px}
