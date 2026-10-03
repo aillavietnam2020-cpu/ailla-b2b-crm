@@ -44,7 +44,7 @@ const CATALOG_EXTRA=[
 const NHOM_OF={BT:"Giặt — xả",TD:"Giặt — xả",TL:"Giặt — xả",NG:"Giặt — xả",AR:"Khác",XM:"Kiểm soát côn trùng — AiBio",SAP:"Chăm sóc không gian"};
 const NHOMS=["Giặt — xả","Vệ sinh nhà cửa","Kiểm soát côn trùng — AiBio","Chăm sóc không gian","Chăm sóc cá nhân","Bếp","Khác"];
 function catalog0(){const pk=PRODUCTS0.map(p=>p.k);return PRODUCTS0.map(p=>({k:p.k,n:p.n,nhom:NHOM_OF[p.k]||"Khác",c:p.c,gia:p.gia,mo:p.mo,pain:p.pain,claim:p.claim,kenh:p.kenh,active:true})).concat(CATALOG_EXTRA.filter(p=>!pk.includes(p.k)).map(p=>({...p,kenh:"TikTok chính",active:true})))}
-const OTHER_PRODUCTS=[{k:"LS",n:"Lau sàn",c:"#7a8399"},{k:"XR",n:"Xịt ruồi AiBio",c:"#7a8399"},{k:"KHAC",n:"Khác",c:"#7a8399"}];
+const OTHER_PRODUCTS=[{k:"TH",n:"Thương hiệu Ailla",c:"#e7357b"},{k:"LS",n:"Lau sàn",c:"#7a8399"},{k:"XR",n:"Xịt ruồi AiBio",c:"#7a8399"},{k:"KHAC",n:"Khác",c:"#7a8399"}];
 const CHANNELS=[
  {k:"TikTok chính",short:"TT chính",needId:true,acc:"aillavietnamstore",tab:"TIKTOK"},
  {k:"TikTok Via 1",short:"Via 1",needId:true,acc:"(Via 1 — 2 video/ngày: edit footage có sẵn + đăng lại video kho)",tab:"TIKTOK_VIA 1"},
@@ -55,7 +55,7 @@ const chOf=k=>CHANNELS.find(c=>c.k===k)||CHANNELS[0];
 const LISTS={
   duyet:["Chưa duyệt","Cần sửa","Đã duyệt"],ceo:["CẦN KIỂM TRA","PASS","KHÔNG DÙNG"],dang:["Chưa đăng","Đã lên lịch","Đã đăng"],
   nguon:["Quay mới","Footage cũ","Nhân bản winner","Order Digital","Đăng lại"],fbFormat:["Bài ảnh","Carousel","Video/Reel"],uutien:["Cao","Trung bình","Thấp"],
-  tuyen:["Pain/Insight","How-to","Trước/sau","Demo/Proof","Review/Proof","Chọn mùi/Lifestyle","Sale/20.10","Nhân bản winner","Đăng lại video kho","Đổi hook video tồn","Thương hiệu"],
+  tuyen:["Pain/Insight","How-to","Trước/sau","Demo/Proof","Review/Proof","Chọn mùi/Lifestyle","Sale/20.10","Nhân bản winner","Đăng lại video kho","Đổi hook video tồn","Thương hiệu","Câu chuyện thương hiệu","Mẹo hay gia đình","Khách hàng nói về Ailla"],
   dangVideo:["One shot","Giọng đọc (Adam/AI)","Chèn chữ","Ảnh cuộn","Bài ảnh","Carousel","Video/Reel"],
   nhanh:{nc:"Nhu cầu tìm kiếm",kh:"Tiếng nói khách hàng",dt:"Nội dung đối thủ",ads:"Quảng cáo & Offer",nb:"Dữ liệu nội bộ"},
   tinCay:["Cao","Trung bình","Thấp"],rsStatus:["Mới","Chờ kiểm tra","Đã kiểm","Đã duyệt","Loại"],quyetDinh:["Làm ngay","Test","Để sau","Bỏ"],
@@ -204,7 +204,9 @@ function repostCard(u,id,kenh,day,nguoi){
 }
 /* Sản phẩm của kế hoạch tháng (chọn từ danh mục). Một sản phẩm đẩy được nhiều kênh: p.kenhs=[{kenh,huong,gmv}], p.kenh/p.huong = kênh đầu tiên */
 const pKenhs=p=>p.kenhs&&p.kenhs.length?p.kenhs:[{kenh:p.kenh||"TikTok chính",huong:p.huong||"Test",gmv:0}];
-function addPlanProduct(u,k,huong,kenh,gmvTr){const c=D().catalog.find(x=>x.k===k);if(!c)return "Không có sản phẩm này trong danh mục.";
+/* "TH" = nội dung thương hiệu (branding), không gắn sản phẩm, không tính doanh thu */
+const TH_ITEM={k:"TH",n:"Thương hiệu Ailla",c:"#e7357b",gia:0,mo:"Nội dung xây thương hiệu: câu chuyện Ailla, mẹo gia đình, khách hàng nói về Ailla",pain:"",claim:""};
+function addPlanProduct(u,k,huong,kenh,gmvTr){if(k==="TH")gmvTr=0;const c=k==="TH"?TH_ITEM:D().catalog.find(x=>x.k===k);if(!c)return "Không có sản phẩm này trong danh mục.";
   const ex=D().products.find(p=>p.k===k);if(ex){if(pKenhs(ex).some(x=>x.kenh===kenh))return c.n+" đã có ở kênh "+chOf(kenh).short+".";
     DB.mutate(u.name,`thêm ${c.n} vào kênh ${kenh}`,d=>{const p=d.products.find(x=>x.k===k);p.kenhs=pKenhs(p).concat({kenh,huong,gmv:(+gmvTr||0)*1e6});d.goals[k]=d.goals[k]||{m9:0,gmv:0};d.goals[k].gmv+=(+gmvTr||0)*1e6});return ""}
   DB.mutate(u.name,`thêm ${c.n} vào kế hoạch tháng ${MONTH.mon}`,d=>{d.products.push({k:c.k,n:c.n,c:c.c,gia:c.gia,mo:c.mo,pain:c.pain,claim:c.claim,huong,kenh,kenhs:[{kenh,huong,gmv:(+gmvTr||0)*1e6}]});d.goals[k]={m9:(typeof T9_BASE!=="undefined"&&T9_BASE[k])||0,gmv:(+gmvTr||0)*1e6}});return ""}
