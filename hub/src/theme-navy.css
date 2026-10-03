@@ -543,3 +543,8 @@ table.pttab td{vertical-align:middle}
 .gyed>p{grid-column:1/-1;margin:0}
 .gyg{display:grid;gap:8px;align-content:start}
 @media (max-width:900px){.gyed{grid-template-columns:1fr}}
+
+.ptkpi{display:inline-flex;align-items:center;gap:6px;margin-left:10px;font-size:14px;color:var(--muted)}
+.ptkpi input{width:80px;height:34px;text-align:right}
+.ptsum{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px;border-radius:12px;background:#f2f3ff;font-size:14.5px}
+.pttab td input{width:100%}
