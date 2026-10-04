@@ -144,8 +144,8 @@ function calMonth(b,C,r){
   const cells=[];for(let i=0;i<dow(r.tu);i++)cells.push(0);for(let x=r.tu;x<=r.den;x++)cells.push(x);while(cells.length%7)cells.push(0);
   b.innerHTML=`<div class="lwsumline">${sumL.map(([l,v,k])=>`<span class="${v?"":"z"}">${k?`<i class="lwd lw-${k}"></i>`:""}${l} <b class="numeric">${v}</b></span>`).join("")}</div>
   <section class="card flush"><div class="calm">${["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7","CN"].map(x=>`<div class="calh">${x}</div>`).join("")}
-   ${cells.map(x=>{if(!x)return `<div class="calc out"></div>`;const L=I.filter(c=>c.day===x),cap=sum(chs,k=>nhipOf(k,x));return `<div class="calc${x===today?" now":""}${x<today?" past":""}"><div class="caln"><b>${dd(x)}</b><span class="${L.length<cap&&x>=today?"t-red":""}">${L.length}/${cap}</span></div>${L.slice(0,6).map(lwChip).join("")}${L.length>6?`<button class="lnk" data-calday="${x}">+${L.length-6} video nữa</button>`:""}</div>`}).join("")}
-  </div></section><p class="hint">Số ở góc mỗi ngày: đã xếp / nhịp đăng (đỏ là còn thiếu). Bấm "+ video nữa" để xem riêng ngày đó.</p>`;
+   ${cells.map(x=>{if(!x)return `<div class="calc out"></div>`;const L=I.filter(c=>c.day===x),cap=sum(chs,k=>nhipOf(k,x));return `<div class="calc${x===today?" now":""}${x<today?" past":""}"><div class="caln"><b>${dd(x)}</b><span class="${L.length<cap&&x>=today?"t-red":""}">${L.length}/${cap}</span></div>${L.slice(0,6).map(lwChip).join("")}${L.length>6?`<button class="lnk" data-calday="${x}">+${L.length-6} video nữa</button>`:""}${LW.kenh?slotEmpty(LW.kenh,x,L.length):""}</div>`}).join("")}
+  </div></section><p class="hint">Số ở góc mỗi ngày: đã xếp / nhịp đăng (đỏ là còn thiếu). Bấm "+ video nữa" để xem riêng ngày đó. Chọn một kênh ở trên để hiện ô trống, bấm ô trống để chọn video.</p>`;
   b.querySelectorAll("[data-calday]").forEach(x=>x.onclick=()=>{const v=+x.dataset.calday,s=MONTH.key+"-"+String(v).padStart(2,"0");setPeriod({k:"d",from:s,to:s,label:"Ngày"})});
 }
 pLich=function(m){
@@ -179,3 +179,24 @@ xvTuan=function(b,o){_xvTuanWin(b,o);
   b.querySelectorAll('[data-wpgo$="|nhanban"]').forEach(x=>{const sku=x.dataset.wpgo.split("|")[0],W=winners().filter(w=>w.sku===sku&&w.don>0).slice(0,3);
     x.insertAdjacentHTML("beforebegin",W.length?`<div class="wpwin">🏆 Video win ${esc(sk(sku).n)}: ${W.map(w=>`${esc((w.ten||"").slice(0,40))}${(w.ten||"").length>40?"…":""} <b>${nf(w.don)} đơn</b>`).join(" · ")}</div>`:`<div class="wpwin hint">Chưa có video win của ${esc(sk(sku).n)} (cần nhập báo cáo TikTok).</div>`)});
 };
+
+/* ---------- Calendar: ô trống theo nhịp đăng, bấm để chọn video (đã duyệt hoặc video tồn trong kho) ---------- */
+const slotMay=k=>can(ME,"viec.giao")||can(ME,"kho.gan")||chanOwner(k)===ME.id;
+function slotEmpty(k,x,n){const t=D().settings.today;if(x<t||!slotMay(k))return "";const e=Math.max(0,nhipOf(k,x)-n);return Array.from({length:Math.min(e,8)},()=>`<button type="button" class="lwslot" data-slot="${esc(k)}|${x}" title="Ô trống: bấm để chọn video">＋ ô trống</button>`).join("")+(e>8?`<small class="hint">+${e-8} ô</small>`:"")}
+let SLOTF={sku:"",tab:"new"};
+function openSlot(k,x){
+  const d=D(),ready=d.cards.filter(c=>c.step==="dang"&&!c.day).sort((a,b)=>(a.kenh===k?0:1)-(b.kenh===k?0:1)),kho=xvKhoFree();
+  const skus=[...new Set((SLOTF.tab==="new"?ready:kho).map(c=>c.sku))];
+  const L=(SLOTF.tab==="new"?ready:kho).filter(v=>!SLOTF.sku||v.sku===SLOTF.sku).slice(0,80);
+  openDrawerHTML(`<h2>Chọn video cho ${esc(chOf(k).short)} · ${dayLbl(x)}</h2><p class="hint">Ngày này đã xếp ${d.cards.filter(c=>c.kenh===k&&c.day===x).length}/${nhipOf(k,x)} video</p>
+   <div class="seg"><button class="${SLOTF.tab==="new"?"on":""}" data-stab="new">Video đã duyệt chờ đăng (${ready.length})</button><button class="${SLOTF.tab==="kho"?"on":""}" data-stab="kho">Video tồn trong kho (${kho.length})</button></div>
+   <div class="filters"><select id="sl-s">${opt([["","Mọi sản phẩm"]].concat(skus.map(s2=>[s2,sk(s2).n])),SLOTF.sku)}</select></div>
+   <div class="slotl">${L.map(v=>SLOTF.tab==="new"?`<div class="slotr">${swatch(v.sku)}<span><b>${esc(v.hookText||v.yTuong||v.id)}</b><small>${esc(sk(v.sku).n)} · ${esc(chOf(v.kenh).short)}${v.kenh!==k?" (sẽ chuyển sang "+esc(chOf(k).short)+")":""}${v.linkFinal||v.linkVideo?` · <a href="${esc(kdLink(v.linkFinal||v.linkVideo))}" target="_blank" rel="noopener">xem</a>`:""}</small></span><button class="btn sm pri" data-pickc="${v.id}">Chọn</button></div>`
+     :`<div class="slotr">${swatch(v.sku)}<span><b>${esc((v.tuyen||"")+(v.ten?(v.tuyen?" · ":"")+v.ten:"")||v.ma)}</b><small>${esc(v.ma)} · ${esc(sk(v.sku).n)}${v.nguoi?" · edit: "+esc(v.nguoi):""} · <a href="${esc(v.link)}" target="_blank" rel="noopener">xem</a></small></span><button class="btn sm pri" data-pickk="${esc(v.ma)}" data-mode="nguyen">Đăng nguyên</button><button class="btn sm" data-pickk="${esc(v.ma)}" data-mode="hook" title="Tạo việc edit đổi hook, chèn chữ">Đổi hook</button></div>`).join("")||`<p class="empty">${SLOTF.tab==="new"?"Chưa có video nào đã duyệt mà chưa có ngày đăng.":"Kho không còn video tồn dùng được."}</p>`}</div>`);
+  const di=$("#drawerIn");
+  di.querySelectorAll("[data-stab]").forEach(b=>b.onclick=()=>{SLOTF.tab=b.dataset.stab;SLOTF.sku="";openSlot(k,x)});
+  $("#sl-s").onchange=e=>{SLOTF.sku=e.target.value;openSlot(k,x)};
+  di.querySelectorAll("[data-pickc]").forEach(b=>b.onclick=()=>{const id=b.dataset.pickc;DB.mutate(ME.name,`xếp ${id} vào ${k} ngày ${dd(x)}`,dt=>{const c=dt.cards.find(y=>y.id===id);if(c){c.day=x;c.kenh=k}});toast("Đã xếp vào "+chOf(k).short+" "+dd(x));closeDrawer();renderMain()});
+  di.querySelectorAll("[data-pickk]").forEach(b=>b.onclick=()=>{const cid=allocKho(b.dataset.pickk,k,x,b.dataset.mode==="hook"?"hook":"nguyen",chanOwner(k)||ME.id);toast(cid?(b.dataset.mode==="hook"?"Đã tạo việc đổi hook "+cid:"Đã xếp video tồn vào "+dd(x)):"Video này đã được dùng");closeDrawer();renderMain()});
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-slot]");if(!b)return;e.preventDefault();e.stopPropagation();const [k,x]=b.dataset.slot.split("|");SLOTF.sku="";openSlot(k,+x)},true);
