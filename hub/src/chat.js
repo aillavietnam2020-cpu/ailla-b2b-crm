@@ -66,6 +66,7 @@ function bellBadge(){const b=document.querySelector(".bell");if(!b)return;const 
 /* Bấm một thông báo: đánh dấu đã đọc, mở đúng chỗ (thẻ video, phòng chat, trang) */
 function ntGo(n){if(!n)return;if(n.id)DB.mutate(ME.name,"đọc thông báo",dt=>{const x=(dt.notifs||[]).find(y=>y.id===n.id);if(x)x.read=true});bellBadge();
   if(n.ref&&D().cards.some(c=>c.id===n.ref))openCard(n.ref);else if(n.ref&&n.ref.startsWith("room:"))openChat(n.ref.slice(5));
+  else if(n.ref&&n.ref.startsWith("task:")&&typeof openTask==="function")openTask(n.ref.slice(5));
   else if(n.ref&&n.ref.startsWith("page:")){PAGE=n.ref.slice(5);if(APP_MODE==="admin"&&typeof modGroups==="function"&&!modGroups(curMod()).some(g=>g[1].some(i=>i[0]===PAGE)))MOD="";render()}}
 /* Thông báo bật lên ở góc dưới màn hình (tự ẩn sau 12 giây, bấm vào để mở) */
 function ntPop(n){let w=$("#ntpop");if(!w){w=document.createElement("div");w.id="ntpop";w.className="ntpop";document.body.appendChild(w)}

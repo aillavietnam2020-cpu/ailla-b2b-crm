@@ -72,7 +72,7 @@ function execTodo(){
   const L=(typeof cvItems==="function"?cvItems():[]).filter(x=>x.st!=="done");
   return {all:L,doing:L.filter(x=>x.st==="doing").length,late:L.filter(x=>x.late).length,top:L.slice().sort((a,b)=>(b.late-a.late)||(a.han-b.han)).slice(0,5).map(x=>({...x,lq:x.src==="card"?"Marketing":x.src==="order"?"Marketing · Digital":(dep(x.nguoi)||TEAMS[x.team]||"Chung"),hanTxt:x.han===today?"Hôm nay":x.han<today?`Trễ ${today-x.han} ngày`:`${String(x.han).padStart(2,"0")}/${String(MONTH.mon).padStart(2,"0")}`}))};
 }
-const EX_ST={late:["Quá hạn","red"],doing:["Đang làm","blu"],review:["Chờ duyệt","amb"],todo:["Cần làm","gry"],cg:["Chưa giao","gry"]};
+const EX_ST={late:["Quá hạn","red"],doing:["Đang làm","blu"],nhan:["Đã nhận việc","blu"],review:["Chờ duyệt","amb"],todo:["Cần làm","gry"],cg:["Chưa giao","gry"]};
 function execStock(){
   if(typeof SX!=="function"||!SX()||typeof sxStock!=="function")return null;
   const s=SX(),td=sxToday(),inT=["Nhập kho","Bàn giao khu đóng đơn","Tồn đầu kỳ / điều chỉnh tăng"],nhap={},xuat={};
