@@ -7,7 +7,8 @@
    - Calendar: theo kỳ chọn (tuần này, tháng này, hoặc từ ngày đến ngày).
    ===================================================================== */
 const KD_PIPE=["kb","dkb","quay","worker","edit","dvd","dceo"];
-let KDV={k:"",s:"",t:""};
+let KDV={k:"",s:"",t:"",q:""};
+const kdFold=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/gi,"d").toLowerCase();
 const kdLink=u=>u?(/^https?:/.test(u)?u:"https://"+u):"";
 const kdSP=c=>c.linkSP||((D().settings.linkSP||{})[c.sku])||"";
 const kdSX=c=>c.ngaySX||0;
@@ -45,7 +46,9 @@ xvDang2=function(b,o){
   const a=Math.max(1,W.tu),z=W.den;
   let L=d.cards.filter(c=>c.step==="dang"||(c.step==="xong"&&(c.ngayDang||c.day)>=a&&(c.ngayDang||c.day)<=z));
   const tot={cho:L.filter(c=>c.step==="dang"&&!c.day).length,lich:L.filter(c=>c.step==="dang"&&c.day).length,da:L.filter(c=>c.step==="xong").length};
-  L=L.filter(c=>(!KDV.k||c.kenh===KDV.k)&&(!KDV.s||c.sku===KDV.s)&&(!KDV.t||kdST(c)[0]===KDV.t)).sort((p,q)=>(p.step==="xong")-(q.step==="xong")||(p.day||99)-(q.day||99)||(kdSX(q)-kdSX(p)));
+  const L0=L.filter(c=>!KDV.k||c.kenh===KDV.k),qf=kdFold(KDV.q||""),hit=c=>!qf||kdFold([sk(c.sku).n,c.hookText,c.yTuong,c.tuyen,c.id,c.spTT].join(" ")).includes(qf);
+  const bySku=xvGroupBy(L0,c=>c.sku).map(([k,A])=>({k,n:A.length,cho:A.filter(c=>c.step==="dang"&&!c.day).length,lich:A.filter(c=>c.step==="dang"&&c.day).length,da:A.filter(c=>c.step==="xong").length})).sort((a,b)=>b.n-a.n);
+  L=L.filter(c=>hit(c)&&(!KDV.k||c.kenh===KDV.k)&&(!KDV.s||c.sku===KDV.s)&&(!KDV.t||kdST(c)[0]===KDV.t)).sort((p,q)=>(p.step==="xong")-(q.step==="xong")||(p.day||99)-(q.day||99)||(kdSX(q)-kdSX(p)));
   const mayK=c=>give||chanOwner(c.kenh)===ME.id;
   const dayOpts=c=>[["","Chọn ngày"]].concat(Array.from({length:MONTH.ndays-today+1},(_,i)=>today+i).map(x=>[x,dayLbl(x)+" · "+d.cards.filter(y=>y.kenh===c.kenh&&y.day===x).length+"/"+nhipOf(c.kenh,x)]));
   const win=d.settings.winnerOrders||100;
@@ -61,7 +64,8 @@ xvDang2=function(b,o){
      <td class="n">${c.view?nf(c.view):"—"}</td><td class="n">${c.view?ctr.toFixed(1)+"%":"—"}</td><td class="n">${c.gmv?money(c.gmv):"—"}</td><td class="n">${c.don?`<b class="${c.don>=win?"t-grn":""}">${nf(c.don)}</b>${c.don>=win?" 🏆":""}`:"—"}</td></tr>`};
   const kho=`<section class="card flush"><div class="card-h pad"><h2>Kho video đăng được</h2><span class="hint">chỉ video Oanh và chị đã duyệt · ${tot.cho} chờ xếp ngày · ${tot.lich} đã lên lịch · ${tot.da} đã đăng trong kỳ</span>${give?`<span class="sp"></span><button class="btn sm" id="hot-open">🔥 Đẩy sản phẩm đang lên xu hướng</button>`:""}</div>
    <div class="filters pad"><div class="seg">${[["","Tất cả kênh"]].concat(CHANNELS.map(c=>[c.k,c.short])).map(([k,t])=>`<button class="${KDV.k===k?"on":""}" data-kdk="${esc(k)}">${esc(t)}</button>`).join("")}</div>
-    <select id="kd-s">${opt([["","Mọi sản phẩm"]].concat(skOpts()),KDV.s)}</select><select id="kd-t">${opt([["","Mọi trạng thái"],"Chờ xếp ngày","Đã lên lịch","Quá ngày, chưa đăng","Đã đăng"],KDV.t)}</select></div>
+    <input id="kd-q" class="kdq" placeholder="🔍 Tìm sản phẩm, hook, mã video… (Enter)" value="${esc(KDV.q||"")}"><select id="kd-s">${opt([["","Mọi sản phẩm"]].concat(skOpts()),KDV.s)}</select><select id="kd-t">${opt([["","Mọi trạng thái"],"Chờ xếp ngày","Đã lên lịch","Quá ngày, chưa đăng","Đã đăng"],KDV.t)}</select></div>
+   ${bySku.length?`<div class="kdsku pad">${bySku.map(x=>`<button type="button" class="kdsk${KDV.s===x.k?" on":""}" data-kdsku="${esc(x.k)}" title="Bấm để lọc ${esc(sk(x.k).n)}">${swatch(x.k)}<b>${esc(sk(x.k).n)}</b><span class="kdn">${x.n}</span><small>${x.cho?`<i class="t-amb">${x.cho} chờ xếp</i>`:""}${x.lich?`<i>${x.lich} lịch</i>`:""}${x.da?`<i class="t-grn">${x.da} đã đăng</i>`:""}</small></button>`).join("")}${KDV.s||KDV.q?`<button type="button" class="lnk" data-kdsku="">Bỏ lọc ✕</button>`:""}</div>`:""}
    ${L.length?`<div class="tbl"><table class="kdt"><thead><tr><th>Video</th><th>Link video</th><th>SKU</th><th class="n">Ngày sản xuất</th><th>Trạng thái</th><th>Ngày đăng dự kiến</th><th>Ngày đăng thực tế</th><th>SP gắn giỏ</th><th class="n">View</th><th class="n">CTR</th><th class="n">GMV</th><th class="n">Đơn/tháng</th></tr></thead><tbody>${L.slice(0,200).map(row).join("")}</tbody></table></div>`:`<p class="empty pad">Chưa có video nào được duyệt xong. Video edit xong → Oanh duyệt → chị duyệt thì mới vào kho này.</p>`}
    <p class="hint pad">Người giữ kênh tự chọn ngày đăng (số cạnh ngày là đã xếp / nhịp đăng). Đăng xong dán link vào ô "Ngày đăng thực tế" và bấm Đã đăng. Sản phẩm gắn giỏ, view, CTR, GMV, đơn tự nhảy khi nhập báo cáo TikTok (Đo lường › Nhập báo cáo, file Video Performance List), không phải điền tay. CTR = lượt nhấp sản phẩm / view. 🏆 = từ ${win} đơn trở lên (video win).</p></section>`;
   const t7=`<section class="card flush"><div class="card-h pad"><h2>7 ngày tới</h2><span class="hint">đã xếp / nhịp đăng</span></div><div class="tbl"><table><thead><tr><th>Kênh</th>${D7.map(x=>`<th class="n">${dayLbl(x)}</th>`).join("")}</tr></thead><tbody>${CHANNELS.map(ch=>`<tr><td><b>${esc(ch.short)}</b></td>${D7.map(x=>{const I=d.cards.filter(c=>c.kenh===ch.k&&c.day===x),cap=nhipOf(ch.k,x);return `<td class="n"><b class="${I.length<cap?"t-red":I.length===cap&&cap?"t-grn":""}">${I.length}</b>/${cap}<small>${esc(xvGroupBy(I,c=>c.sku).map(([k,l])=>sk(k).n.split(" ")[0]+" "+l.length).join(", "))}</small></td>`}).join("")}</tr>`).join("")}</tbody></table></div></section>`;
@@ -70,7 +74,9 @@ xvDang2=function(b,o){
   b.querySelectorAll("[data-nhx]").forEach(x=>x.onclick=()=>{const [k,i]=x.dataset.nhx.split("|");DB.mutate(ME.name,"bỏ giai đoạn nhịp đăng",dt=>dt.settings.nhip[k].splice(+i,1));renderMain()});
   if($("#hot-open"))$("#hot-open").onclick=()=>openHot();
   b.querySelectorAll("[data-kdk]").forEach(x=>x.onclick=()=>{KDV.k=x.dataset.kdk;renderMain()});
-  $("#kd-s").onchange=e=>{KDV.s=e.target.value;renderMain()};$("#kd-t").onchange=e=>{KDV.t=e.target.value;renderMain()};
+  $("#kd-s").onchange=e=>{KDV.s=e.target.value;renderMain()};
+  b.querySelectorAll("[data-kdsku]").forEach(x=>x.onclick=()=>{const v=x.dataset.kdsku;if(!v){KDV.s="";KDV.q=""}else KDV.s=KDV.s===v?"":v;renderMain()});
+  $("#kd-q").onkeydown=e=>{if(e.key==="Enter"){KDV.q=e.target.value.trim();renderMain();setTimeout(()=>{const q=$("#kd-q");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}},30)}};$("#kd-q").onchange=e=>{if(KDV.q!==e.target.value.trim()){KDV.q=e.target.value.trim();renderMain()}};$("#kd-t").onchange=e=>{KDV.t=e.target.value;renderMain()};
   b.querySelectorAll("[data-kdday]").forEach(x=>x.onchange=()=>{const v=+x.value||0;DB.mutate(ME.name,"xếp ngày đăng "+x.dataset.kdday+" → "+(v?dd(v):"bỏ ngày"),dt=>{const c=dt.cards.find(y=>y.id===x.dataset.kdday);if(c)c.day=v});toast(v?"Đã xếp ngày đăng "+dd(v):"Đã bỏ ngày đăng");renderMain()});
   b.querySelectorAll("[data-kdp]").forEach(x=>x.onclick=()=>{const id=x.dataset.kdp,c=d.cards.find(y=>y.id===id),l=b.querySelector(`[data-kdl="${id}"]`).value.trim();if(!l){toast("Dán link bài đã đăng trước");return}
     const inp={linkDang:l,ngayDang:today};if(chOf(c.kenh).needId){const m2=l.match(/\d{19}/);if(!m2){toast("Link TikTok phải có dãy 19 số sau /video/");return}inp.tiktokId=m2[0]}
