@@ -168,6 +168,8 @@ PAGES.lich=pLich;
 /* ---------- Video win & nhân bản ngay trong Làm hằng ngày (nối với ① Kế hoạch tuần: loại "Nhân bản win") ---------- */
 function xvWin(b,o){
   PAGES.win(b);const ph=b.querySelector(".ph");if(ph)ph.remove();
+  /* tab con (Video win shop / nghiên cứu / Hypit) nằm trong trang Kế hoạch: đổi SUB.win chứ không phải SUB của trang Kế hoạch */
+  b.addEventListener("click",e=>{const t=e.target.closest("[data-sub]");if(!t||!b.contains(t))return;e.stopPropagation();e.preventDefault();SUB.win=t.dataset.sub;renderMain()},true);
   const d=o.d,W=winners().filter(w=>!XV.sku||w.sku===XV.sku).slice(0,5);
   if(XV.sku&&W.length)b.insertAdjacentHTML("afterbegin",`<div class="note">Video win của <b>${esc(sk(XV.sku).n)}</b>: ${W.map(w=>`${esc((w.ten||"").slice(0,50))} (${nf(w.don)} đơn)`).join(" · ")}. Bấm <b>Phân tích Hypit</b> ở video muốn nhân bản trong bảng dưới.</div>`);
 }
