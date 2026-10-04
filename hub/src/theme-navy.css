@@ -717,3 +717,9 @@ td.wvid a{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;w
 .tkst{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.tkb{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
 .tkb.on{background:#5b5bd6;border-color:#5b5bd6;color:#fff;font-weight:600}.tkb.tk-grn.on{background:#2f9e44;border-color:#2f9e44}.tkb.tk-amb.on{background:#e8890c;border-color:#e8890c}.tkb:disabled{opacity:.6;cursor:default}
 .tklate{border:1px solid #f1a7a7;background:#fff5f5;border-radius:10px;padding:8px 10px;margin:6px 0}.tklate>b{color:#c92a2a}
+/* Task giao việc: bảng việc rộng, khung Cần chú ý hẹp */
+.xrow2.cvq{grid-template-columns:minmax(0,1fr) 270px}
+.xrow2.cvq .xatt .card-h h2{font-size:15px}.xrow2.cvq .xatt{font-size:13px}
+.xrow2.cvq td:first-child{white-space:normal}
+@media(max-width:1100px){.xrow2.cvq{grid-template-columns:1fr}}
+.xrow2.cvq .xatt *{white-space:normal!important;overflow-wrap:anywhere;min-width:0}
