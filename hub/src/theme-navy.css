@@ -712,3 +712,4 @@ body:has(#chp) .ntpop{right:auto;left:18px}
 .wrank td,.wrank th{white-space:nowrap}
 .wclip{max-width:200px;overflow:hidden}.wrank td,.wrank th{padding-left:8px;padding-right:8px}.wclip>*{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 td.wvid a{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none}
+.wrank td:last-child .btn{font-size:11.5px;padding:3px 8px}.wrank td:first-child{padding-right:2px}
