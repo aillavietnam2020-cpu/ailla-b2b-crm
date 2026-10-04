@@ -744,3 +744,4 @@ td.wvid a{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;w
 .kdq{min-width:240px;flex:1 1 240px;max-width:360px}
 .kdsku{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 10px}.kdsk{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 10px;cursor:pointer;font-size:13px}
 .kdsk:hover{border-color:#5b5bd6}.kdsk.on{border-color:#5b5bd6;background:#f1f0ff}.kdsk .kdn{font-weight:700;background:#eef0ff;color:#3d3fa8;border-radius:6px;padding:0 6px}.kdsk small{display:flex;gap:6px;color:var(--muted)}.kdsk small i{font-style:normal}
+.kplist{display:flex;flex-direction:column;gap:6px;padding:0 16px 12px}.kplist .slotr select{max-width:150px;font-size:12.5px;padding:4px 6px}
