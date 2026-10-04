@@ -445,7 +445,7 @@ async function wtSync(){if(WT_BUSY||Date.now()-WT_AT<20000||!DB.data)return;cons
       if(fresh&&t.status==="review"&&r.stage==="video"&&c.step==="worker"){u.linkFinal="/api/hub/worker-tasks/preview/"+u.wJob} // bản nháp: người phụ trách xem, bấm Duyệt thì mới sang Oanh
       if(t.status==="done"&&r.drive_url){u.linkFinal=r.drive_url;u.wDone=true}
       if(Object.keys(u).some(k=>String(c[k]??"")!==String(u[k]??"")))ch.push([c.id,u])});
-    if(ch.length){DB.mutate("Worker","cập nhật tiến độ Worker",dt=>ch.forEach(([id,u])=>{const x=dt.cards.find(y=>y.id===id);if(x)Object.assign(x,u)}));if(!(typeof svTyping==="function"&&svTyping()))renderMain()}}
+    if(ch.length){DB.mutate("Worker","cập nhật tiến độ Worker",dt=>ch.forEach(([id,u])=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;const was=x.wStatus==="review"&&x.wStage;Object.assign(x,u);if(!was&&x.wStatus==="review"&&x.wStage&&typeof notifyU==="function")notifyU(dt,[x.nguoi||x.giao],(x.wStage==="script"?"Worker viết xong kịch bản, chờ Oanh duyệt: ":"Worker dựng xong bản nháp, vào xem và bấm Duyệt, gửi Oanh: ")+cardLbl(x),x.id)}));if(!(typeof svTyping==="function"&&svTyping()))renderMain()}}
   catch(e){}finally{WT_BUSY=false}}
 setInterval(()=>{if(typeof ME!=="undefined"&&ME&&typeof PAGE!=="undefined"&&["kehoach","mkt_tq","xepviec","dieuphoi","lich"].includes(PAGE))wtSync()},20000);
 /* dòng tiến độ Worker trên thẻ / danh sách */
