@@ -138,6 +138,7 @@ function bindCalBar(m){const t=D().settings.today,W=WEEKS.find(w=>t>=w.tu&&t<=w.
   m.querySelectorAll("[data-calp]").forEach(x=>x.onclick=()=>setPeriod(x.dataset.calp==="wk"?mk(W.tu,Math.min(W.den,MONTH.ndays),"Tuần này"):mk(1,MONTH.ndays,"Tháng "+MONTH.mon)));
   const ch=()=>{let a=+$("#cal-a").value,z=+$("#cal-z").value;if(a>z)[a,z]=[z,a];setPeriod(mk(a,z,a===z?"Ngày":"Tùy chọn"))};$("#cal-a").onchange=ch;$("#cal-z").onchange=ch}
 function calMonth(b,C,r){
+  if(LW.kenh===""&&!LW._auto){LW._auto=1;const mine=CHANNELS.find(ch=>chanOwner(ch.k)===ME.id);if(mine){LW.kenh=mine.k;renderMain();return}}
   const d=D(),today=d.settings.today,chs=CHANNELS.filter(ch=>!LW.kenh||ch.k===LW.kenh).map(c=>c.k),I=C.filter(c=>c.day>=r.tu&&c.day<=r.den&&chs.includes(c.kenh));
   const cnt=k=>I.filter(c=>LW_ST(c)[0]===k).length;
   const sumL=[["Kế hoạch",I.length,""],["Chưa giao",cnt("new"),"new"],["Đang làm",cnt("doing"),"doing"],["Chờ duyệt",cnt("wait"),"wait"],["Chờ đăng",cnt("post"),"post"],["Đã đăng",cnt("done"),"done"],["Trễ",cnt("late"),"late"]];
@@ -145,7 +146,7 @@ function calMonth(b,C,r){
   b.innerHTML=`<div class="lwsumline">${sumL.map(([l,v,k])=>`<span class="${v?"":"z"}">${k?`<i class="lwd lw-${k}"></i>`:""}${l} <b class="numeric">${v}</b></span>`).join("")}</div>
   <section class="card flush"><div class="calm">${["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7","CN"].map(x=>`<div class="calh">${x}</div>`).join("")}
    ${cells.map(x=>{if(!x)return `<div class="calc out"></div>`;const L=I.filter(c=>c.day===x),cap=sum(chs,k=>nhipOf(k,x));return `<div class="calc${x===today?" now":""}${x<today?" past":""}"><div class="caln"><b>${dd(x)}</b><span class="${L.length<cap&&x>=today?"t-red":""}">${L.length}/${cap}</span></div>${L.slice(0,6).map(lwChip).join("")}${L.length>6?`<button class="lnk" data-calday="${x}">+${L.length-6} video nữa</button>`:""}${LW.kenh?slotEmpty(LW.kenh,x,L.length):""}</div>`}).join("")}
-  </div></section><p class="hint">Số ở góc mỗi ngày: đã xếp / nhịp đăng (đỏ là còn thiếu). Bấm "+ video nữa" để xem riêng ngày đó. Chọn một kênh ở trên để hiện ô trống, bấm ô trống để chọn video.</p>`;
+  </div></section><p class="hint">Số ở góc mỗi ngày: đã xếp / nhịp đăng (đỏ là còn thiếu). Bấm "+ video nữa" để xem riêng ngày đó. Chọn một kênh ở trên để hiện ô trống, bấm ô trống để chọn video (tích nhiều video là xếp được cả tháng một lần).</p>`;
   b.querySelectorAll("[data-calday]").forEach(x=>x.onclick=()=>{const v=+x.dataset.calday,s=MONTH.key+"-"+String(v).padStart(2,"0");setPeriod({k:"d",from:s,to:s,label:"Ngày"})});
 }
 pLich=function(m){
@@ -184,16 +185,27 @@ xvTuan=function(b,o){_xvTuanWin(b,o);
 const slotMay=k=>can(ME,"viec.giao")||can(ME,"kho.gan")||chanOwner(k)===ME.id;
 function slotEmpty(k,x,n){const t=D().settings.today;if(x<t||!slotMay(k))return "";const e=Math.max(0,nhipOf(k,x)-n);return Array.from({length:Math.min(e,8)},()=>`<button type="button" class="lwslot" data-slot="${esc(k)}|${x}" title="Ô trống: bấm để chọn video">＋ ô trống</button>`).join("")+(e>8?`<small class="hint">+${e-8} ô</small>`:"")}
 let SLOTF={sku:"",tab:"new"};
+/* các ô trống của kênh từ ngày x đến hết tháng (mỗi phần tử là một ngày, lặp theo số ô trống) */
+function slotFree(k,x){const d=D(),out=[];for(let y=Math.max(x,d.settings.today);y<=MONTH.ndays;y++){const e=Math.max(0,nhipOf(k,y)-d.cards.filter(c=>c.kenh===k&&c.day===y).length);for(let i=0;i<e;i++)out.push(y)}return out}
 function openSlot(k,x){
   const d=D(),ready=d.cards.filter(c=>c.step==="dang"&&!c.day).sort((a,b)=>(a.kenh===k?0:1)-(b.kenh===k?0:1)),kho=xvKhoFree();
   const skus=[...new Set((SLOTF.tab==="new"?ready:kho).map(c=>c.sku))];
   const L=(SLOTF.tab==="new"?ready:kho).filter(v=>!SLOTF.sku||v.sku===SLOTF.sku).slice(0,80);
   openDrawerHTML(`<h2>Chọn video cho ${esc(chOf(k).short)} · ${dayLbl(x)}</h2><p class="hint">Ngày này đã xếp ${d.cards.filter(c=>c.kenh===k&&c.day===x).length}/${nhipOf(k,x)} video</p>
    <div class="seg"><button class="${SLOTF.tab==="new"?"on":""}" data-stab="new">Video đã duyệt chờ đăng (${ready.length})</button><button class="${SLOTF.tab==="kho"?"on":""}" data-stab="kho">Video tồn trong kho (${kho.length})</button></div>
-   <div class="filters"><select id="sl-s">${opt([["","Mọi sản phẩm"]].concat(skus.map(s2=>[s2,sk(s2).n])),SLOTF.sku)}</select></div>
-   <div class="slotl">${L.map(v=>SLOTF.tab==="new"?`<div class="slotr">${swatch(v.sku)}<span><b>${esc(v.hookText||v.yTuong||v.id)}</b><small>${esc(sk(v.sku).n)} · ${esc(chOf(v.kenh).short)}${v.kenh!==k?" (sẽ chuyển sang "+esc(chOf(k).short)+")":""}${v.linkFinal||v.linkVideo?` · <a href="${esc(kdLink(v.linkFinal||v.linkVideo))}" target="_blank" rel="noopener">xem</a>`:""}</small></span><button class="btn sm pri" data-pickc="${v.id}">Chọn</button></div>`
-     :`<div class="slotr">${swatch(v.sku)}<span><b>${esc((v.tuyen||"")+(v.ten?(v.tuyen?" · ":"")+v.ten:"")||v.ma)}</b><small>${esc(v.ma)} · ${esc(sk(v.sku).n)}${v.nguoi?" · edit: "+esc(v.nguoi):""} · <a href="${esc(v.link)}" target="_blank" rel="noopener">xem</a></small></span><button class="btn sm pri" data-pickk="${esc(v.ma)}" data-mode="nguyen">Đăng nguyên</button><button class="btn sm" data-pickk="${esc(v.ma)}" data-mode="hook" title="Tạo việc edit đổi hook, chèn chữ">Đổi hook</button></div>`).join("")||`<p class="empty">${SLOTF.tab==="new"?"Chưa có video nào đã duyệt mà chưa có ngày đăng.":"Kho không còn video tồn dùng được."}</p>`}</div>`);
+   <div class="filters"><select id="sl-s">${opt([["","Mọi sản phẩm"]].concat(skus.map(s2=>[s2,sk(s2).n])),SLOTF.sku)}</select><label class="ck sm"><input type="checkbox" id="sl-all"> Chọn hết danh sách</label></div>
+   <div class="slotbulk"><b>Xếp nhiều video một lần:</b> tích các video rồi bấm, web rải lần lượt vào các ô trống của ${esc(chOf(k).short)} từ ${dd(x)} đến hết tháng (đúng nhịp đăng từng ngày).${SLOTF.tab==="kho"?` <select id="sl-mode">${opt([["nguyen","Đăng nguyên"],["hook","Đổi hook (tạo việc edit)"]],"nguyen")}</select>`:""} <button class="btn sm pri" id="sl-bulk">Xếp các video đã tích</button> <span class="hint" id="sl-cnt">0 video · còn ${slotFree(k,x).length} ô trống</span></div>
+   <div class="slotl">${L.map(v=>SLOTF.tab==="new"?`<div class="slotr"><input type="checkbox" data-selc="${v.id}">${swatch(v.sku)}<span><b>${esc(v.hookText||v.yTuong||v.id)}</b><small>${esc(sk(v.sku).n)} · ${esc(chOf(v.kenh).short)}${v.kenh!==k?" (sẽ chuyển sang "+esc(chOf(k).short)+")":""}${v.linkFinal||v.linkVideo?` · <a href="${esc(kdLink(v.linkFinal||v.linkVideo))}" target="_blank" rel="noopener">xem</a>`:""}</small></span><button class="btn sm pri" data-pickc="${v.id}">Chọn</button></div>`
+     :`<div class="slotr"><input type="checkbox" data-selk="${esc(v.ma)}">${swatch(v.sku)}<span><b>${esc((v.tuyen||"")+(v.ten?(v.tuyen?" · ":"")+v.ten:"")||v.ma)}</b><small>${esc(v.ma)} · ${esc(sk(v.sku).n)}${v.nguoi?" · edit: "+esc(v.nguoi):""} · <a href="${esc(v.link)}" target="_blank" rel="noopener">xem</a></small></span><button class="btn sm pri" data-pickk="${esc(v.ma)}" data-mode="nguyen">Đăng nguyên</button><button class="btn sm" data-pickk="${esc(v.ma)}" data-mode="hook" title="Tạo việc edit đổi hook, chèn chữ">Đổi hook</button></div>`).join("")||`<p class="empty">${SLOTF.tab==="new"?"Chưa có video nào đã duyệt mà chưa có ngày đăng.":"Kho không còn video tồn dùng được."}</p>`}</div>`);
   const di=$("#drawerIn");
+  const cnt=()=>{const n=di.querySelectorAll("[data-selc]:checked,[data-selk]:checked").length;$("#sl-cnt").textContent=`${n} video · còn ${slotFree(k,x).length} ô trống`};
+  di.querySelectorAll("[data-selc],[data-selk]").forEach(c=>c.onchange=cnt);
+  $("#sl-all").onchange=e=>{di.querySelectorAll("[data-selc],[data-selk]").forEach(c=>c.checked=e.target.checked);cnt()};
+  $("#sl-bulk").onclick=()=>{const C=[...di.querySelectorAll("[data-selc]:checked")].map(c=>c.dataset.selc),K=[...di.querySelectorAll("[data-selk]:checked")].map(c=>c.dataset.selk),free=slotFree(k,x);
+    if(!C.length&&!K.length){toast("Tích ít nhất một video");return}const n=Math.min(free.length,C.length+K.length);if(!n){toast("Không còn ô trống từ ngày này đến hết tháng");return}
+    let i=0;if(C.length)DB.mutate(ME.name,`xếp ${Math.min(C.length,n)} video vào ${k}`,dt=>{C.forEach(id=>{if(i>=n)return;const c=dt.cards.find(y=>y.id===id);if(c){c.day=free[i++];c.kenh=k}})});
+    const mode=$("#sl-mode")?$("#sl-mode").value:"nguyen";K.forEach(ma=>{if(i>=n)return;if(allocKho(ma,k,free[i],mode,chanOwner(k)||ME.id))i++});
+    toast(`Đã xếp ${i} video vào ${chOf(k).short} (${dd(free[0])} → ${dd(free[i-1]||free[0])})${C.length+K.length>i?` · ${C.length+K.length-i} video chưa xếp vì hết ô`:""}`);closeDrawer();renderMain()};
   di.querySelectorAll("[data-stab]").forEach(b=>b.onclick=()=>{SLOTF.tab=b.dataset.stab;SLOTF.sku="";openSlot(k,x)});
   $("#sl-s").onchange=e=>{SLOTF.sku=e.target.value;openSlot(k,x)};
   di.querySelectorAll("[data-pickc]").forEach(b=>b.onclick=()=>{const id=b.dataset.pickc;DB.mutate(ME.name,`xếp ${id} vào ${k} ngày ${dd(x)}`,dt=>{const c=dt.cards.find(y=>y.id===id);if(c){c.day=x;c.kenh=k}});toast("Đã xếp vào "+chOf(k).short+" "+dd(x));closeDrawer();renderMain()});
