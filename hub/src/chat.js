@@ -39,8 +39,8 @@ moveCard=function(u,id,to,inp){const c=D().cards.find(x=>x.id===id),from=c&&c.st
 const _sbNt=sendBack;
 sendBack=function(u,id,note){const c=D().cards.find(x=>x.id===id);const r=_sbNt(u,id,note);if(c)DB.mutate(u.name,"thông báo trả về "+id,dt=>notifyU(dt,[c.nguoiEdit,c.nguoiKB,c.nguoi,c.giao],`${u.name} trả về sửa: ${note||"cần sửa"} · ${cardLbl(c)}`,id));return r};
 const _wpaNt=wpAssign;
-wpAssign=function(sku,kenh,t,u,n,w,bd,hn){const before=new Set(D().cards.map(c=>c.id)),r=_wpaNt(sku,kenh,t,u,n,w,bd,hn);const nw=D().cards.filter(c=>!before.has(c.id));const lb=(MIX.find(z=>z[0]===t)||[])[1]||"";
-  DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[u],`${ME.name} giao bạn ${n} video ${lb} · ${sk(sku).n} · ${chOf(kenh).short}${hn?" · hạn "+dd(hn):""}`,nw[0]?nw[0].id:""));return r};
+wpAssign=function(sku,kenh,t,u,n,w,bd,hn,note){const before=new Set(D().cards.map(c=>c.id)),r=_wpaNt(sku,kenh,t,u,n,w,bd,hn,note);const nw=D().cards.filter(c=>!before.has(c.id));const lb=(MIX.find(z=>z[0]===t)||[])[1]||"";
+  DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[u],`${ME.name} giao bạn ${n} video ${lb} · ${sk(sku).n} · ${chOf(kenh).short}${hn?" · hạn "+dd(hn):""}${note&&note.trim()?" · Note: "+note.trim():""}`,nw[0]?nw[0].id:""));return r};
 const _xvaNt=xvAssign;
 xvAssign=function(ids,to,kind){_xvaNt(ids,to,kind);DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[to],`${ME.name} giao bạn ${ids.length} việc ${kind}`,ids[0]))};
 

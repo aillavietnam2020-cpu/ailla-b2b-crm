@@ -176,11 +176,13 @@ function xvWin(b,o){
   const d=o.d,W=winners().filter(w=>!XV.sku||w.sku===XV.sku).slice(0,5);
   if(XV.sku&&W.length)b.insertAdjacentHTML("afterbegin",`<div class="note">Video win của <b>${esc(sk(XV.sku).n)}</b>: ${W.map(w=>`${esc((w.ten||"").slice(0,50))} (${nf(w.don)} đơn)`).join(" · ")}. Bấm <b>Phân tích Hypit</b> ở video muốn nhân bản trong bảng dưới.</div>`);
 }
+/* Video win của một sản phẩm: shop mình (có đơn) trước, rồi KOC / đối thủ đã lưu */
+const winAll=sku=>winners().filter(w=>w.sku===sku&&w.don>0).map(w=>({ten:w.ten,so:nf(w.don)+" đơn"})).concat((D().winResearch||[]).filter(r=>r.sp===sku).map(r=>({ten:(r.kocId?"KOC · ":"Đối thủ · ")+(r.ten||r.link||""),so:r.soLieu||""})));
 /* ① Kế hoạch tuần: ô "Nhân bản win" hiện luôn video win của sản phẩm đó để Oanh biết nhân bản cái nào */
 const _xvTuanWin=xvTuan;
 xvTuan=function(b,o){_xvTuanWin(b,o);
-  b.querySelectorAll('[data-wpgo$="|nhanban"]').forEach(x=>{const cell=x.closest(".wpc"),inp=cell&&cell.querySelector("[data-wpm]"),num=inp?+inp.value||0:+((cell&&cell.querySelector(".wpcl+b")||{}).textContent)||0,giao=+((cell&&cell.querySelector(".wpcd b")||{}).textContent)||0;if(!num&&!giao)return;const sku=x.dataset.wpgo.split("|")[0],W=winners().filter(w=>w.sku===sku&&w.don>0).slice(0,3);
-    x.insertAdjacentHTML("beforebegin",W.length?`<div class="wpwin">🏆 Video win ${esc(sk(sku).n)}: ${W.map(w=>`${esc((w.ten||"").slice(0,40))}${(w.ten||"").length>40?"…":""} <b>${nf(w.don)} đơn</b>`).join(" · ")}</div>`:`<div class="wpwin hint">Chưa có video win của ${esc(sk(sku).n)} (cần nhập báo cáo TikTok).</div>`)});
+  b.querySelectorAll('[data-wpgo$="|nhanban"]').forEach(x=>{const cell=x.closest(".wpc"),inp=cell&&cell.querySelector("[data-wpm]"),num=inp?+inp.value||0:+((cell&&cell.querySelector(".wpcl+b")||{}).textContent)||0,giao=+((cell&&cell.querySelector(".wpcd b")||{}).textContent)||0;if(!num&&!giao)return;const sku=x.dataset.wpgo.split("|")[0],W=winAll(sku).slice(0,3);
+    x.insertAdjacentHTML("beforebegin",W.length?`<div class="wpwin">🏆 Video win ${esc(sk(sku).n)}: ${W.map(w=>`${esc((w.ten||"").slice(0,40))}${(w.ten||"").length>40?"…":""} <b>${esc(w.so)}</b>`).join(" · ")}</div>`:`<div class="wpwin hint">Chưa có video win của ${esc(sk(sku).n)}. Người nhận việc tìm video win của <b>đối thủ / KOC</b> trước (lưu ở Video win › Video win đối thủ), rồi mới nhân bản. Việc giao sẽ có sẵn bước này.</div>`)});
 };
 
 /* ---------- Calendar: ô trống theo nhịp đăng, bấm để chọn video (đã duyệt hoặc video tồn trong kho) ---------- */
