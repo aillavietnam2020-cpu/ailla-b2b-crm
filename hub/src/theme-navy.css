@@ -745,3 +745,12 @@ td.wvid a{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;w
 .kdsku{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 10px}.kdsk{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 10px;cursor:pointer;font-size:13px}
 .kdsk:hover{border-color:#5b5bd6}.kdsk.on{border-color:#5b5bd6;background:#f1f0ff}.kdsk .kdn{font-weight:700;background:#eef0ff;color:#3d3fa8;border-radius:6px;padding:0 6px}.kdsk small{display:flex;gap:6px;color:var(--muted)}.kdsk small i{font-style:normal}
 .kplist{display:flex;flex-direction:column;gap:6px;padding:0 16px 12px}.kplist .slotr select{max-width:150px;font-size:12.5px;padding:4px 6px}
+/* Kế hoạch tháng: dải 7 bước + khung "Bước …" gọn lại */
+.steps{gap:8px!important;margin-bottom:10px!important}
+.steps .stp{padding:8px 10px!important;min-height:0!important;border-radius:10px!important;gap:2px!important}
+.steps .stp b{font-size:13.5px!important;line-height:1.25!important}
+.steps .stp small,.steps .stp span:not(:first-child){font-size:11px!important;line-height:1.3!important}
+.steps .stp>i,.steps .stp .n,.steps .stp em{width:20px!important;height:20px!important;font-size:11px!important}
+.card.step-head{padding:10px 16px!important;margin-bottom:10px!important}.card.step-head h2{font-size:16px!important}.card.step-head .hint,.card.step-head p{font-size:12.5px!important;margin:2px 0 0!important}
+.steps{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important}.steps .stp{width:auto!important;max-width:none!important}
+@media(max-width:900px){.steps{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
