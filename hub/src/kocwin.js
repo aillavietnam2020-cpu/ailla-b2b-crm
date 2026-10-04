@@ -18,10 +18,12 @@ function kocImport(u,res,quiet){
   if(!all.length){if(!quiet)toast("File này không có video KOC nào (toàn video của tài khoản shop)");return {n:0,moi:0}}
   const S=D().settings,pot=S.potential||30,old=new Map((D().kocVideos||[]).map(v=>[v.id,v]));
   const moi=recs.filter(r=>r.don>=pot&&(!old.has(r.id)||(old.get(r.id).don||0)<pot)&&!(old.get(r.id)||{}).st);
+  const mR=String(res.range||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/),RG={f:mR?mR[1]:"",t:mR?mR[2]:""};
   DB.mutate(u.name,`video KOC từ báo cáo "${res.name}": ${all.length} video`,dt=>{
     dt.kocVideos=dt.kocVideos||[];
     recs.forEach(r=>{const acc=String(r.acc).replace(/^@/,""),v=dt.kocVideos.find(x=>x.id===r.id),o={acc,ten:String(r.ten||"").slice(0,140),sp:String(r.sp||"").replace(/\(\d{10,}\)/g,"").slice(0,90),sku:guessSku(r.sp)||guessSku(r.ten)||"KHAC",tm:String(r.tm||"").slice(0,10),view:r.view,click:r.click,don:r.don,gmv:r.gmv,xh:r.xh,ky:res.range||res.name,at:dt.settings.today};
-      if(v)Object.assign(v,o);else dt.kocVideos.push(Object.assign({id:r.id,st:""},o))});
+      const h={f:RG.f,t:RG.t,d:r.don,g:r.gmv,v:r.view,c:r.click};
+      if(v){Object.assign(v,o);v.hist=(v.hist||[]).filter(x=>!(x.f===h.f&&x.t===h.t));if(h.f)v.hist.push(h)}else dt.kocVideos.push(Object.assign({id:r.id,st:"",hist:h.f?[h]:[]},o))});
     dt.kocVideos.sort((a,b)=>(b.don||0)-(a.don||0)||(b.gmv||0)-(a.gmv||0));
     if(dt.kocVideos.length>KOC_KEEP)dt.kocVideos=dt.kocVideos.filter((v,i)=>i<KOC_KEEP||v.st);
     dt.kocImports=(dt.kocImports||[]).concat({at:new Date().toLocaleString("vi-VN"),by:u.name,file:res.name,range:res.range,n:all.length,koc:new Set(all.map(r=>r.acc)).size,don:sum(all,r=>r.don),gmv:sum(all,r=>r.gmv)}).slice(-20);
@@ -35,23 +37,37 @@ function kocImport(u,res,quiet){
 const _applyTikTokKoc=applyTikTok;
 applyTikTok=function(u,res,kenh){const cl=_applyTikTokKoc(u,res,kenh);kocImport(u,res,true);return cl};
 
-let KOCF={lv:"pot",sku:""};
+let KOCF=(()=>{const t=new Date(),y=t.getFullYear(),m=t.getMonth(),z=n=>String(n).padStart(2,"0");return {st:"pot",sku:"",top:10,k:"mo",f:`${y}-${z(m+1)}-01`,t:`${y}-${z(m+1)}-${z(new Date(y,m+1,0).getDate())}`}})();
+/* Số của một video trong khoảng ngày chọn: cộng các lần nhập báo cáo nằm trọn trong khoảng (bỏ báo cáo chồng ngày) */
+const kocHist=v=>{if(v.hist&&v.hist.length)return v.hist;const m=String(v.ky||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);return m?[{f:m[1],t:m[2],d:v.don,g:v.gmv,v:v.view,c:v.click}]:[]};
+function kocIn(v,f,t){const H=kocHist(v).filter(h=>h.f>=f&&h.t<=t).sort((a,b)=>(b.t>b.f?1:0)-(a.t>a.f?1:0)||b.t.localeCompare(a.t)),pick=[];
+  H.sort((a,b)=>(Date.parse(b.t)-Date.parse(b.f))-(Date.parse(a.t)-Date.parse(a.f))).forEach(h=>{if(!pick.some(p=>!(h.t<p.f||h.f>p.t)))pick.push(h)});
+  return pick.length?{don:sum(pick,h=>h.d||0),gmv:sum(pick,h=>h.g||0),view:sum(pick,h=>h.v||0),click:sum(pick,h=>h.c||0),ky:pick.length}:null}
+const KOC_ST=[["pot","Chờ check"],["win","Đã duyệt vào kho win"],["bo","Bỏ qua"],["all","Tất cả"]];
 function kocSection(){
-  const d=D(),S=d.settings,all=d.kocVideos||[],can=kocCan(),pot=S.potential||30;
-  const L=all.filter(v=>(KOCF.lv==="all"||(KOCF.lv==="pot"?v.don>=pot&&!v.st:KOCF.lv==="win"?v.st==="win":v.st==="bo"))&&(!KOCF.sku||v.sku===KOCF.sku));
-  const cho=all.filter(v=>v.don>=pot&&!v.st).length;
-  return `<section class="card flush" id="kocv"><div class="card-h pad"><h2>🏆 Video KOC ra số</h2><span class="hint">tự tách từ báo cáo TikTok (video không phải tài khoản shop) · ${all.length} video · <b class="${cho?"t-amb":""}">${cho} chờ check</b> · tiềm năng từ ${pot} đơn, win từ ${S.winnerOrders||100} đơn</span></div>
-   <div class="filters pad"><div class="seg">${[["pot",`Chờ check (${cho})`],["win","Đã vào kho win"],["bo","Đã bỏ qua"],["all","Tất cả"]].map(([k,t])=>`<button class="${KOCF.lv===k?"on":""}" data-kocf="${k}">${t}</button>`).join("")}</div><select id="koc-s">${opt([["","Mọi sản phẩm"]].concat(skOpts()),KOCF.sku)}</select>
-    ${ME.role==="admin"?`<button class="lnk" id="koc-own" title="Video của các tài khoản này không tính là KOC">Tài khoản của shop: ${esc(ownAccs().join(", "))} · sửa</button>`:""}</div>
-   <div class="kocup pad"><div><b>Tải báo cáo video KOC</b><small>TikTok Shop › Phân tích › Video › chọn video của <b>nhà sáng tạo liên kết (KOC)</b> › Xuất file "Video Performance List" rồi kéo vào đây. File video của shop vẫn nhập ở Đo lường › Nhập báo cáo.${(d.kocImports||[]).length?` · Lần nhập gần nhất: ${esc(d.kocImports[d.kocImports.length-1].range||d.kocImports[d.kocImports.length-1].file)} (${nf(d.kocImports[d.kocImports.length-1].n)} video, ${nf(d.kocImports[d.kocImports.length-1].koc)} KOC) lúc ${esc(d.kocImports[d.kocImports.length-1].at)}`:""}</small></div>${dropZone("koc")}</div>
-   ${L.length?`<div class="tbl"><table><thead><tr><th>Video</th><th>KOC</th><th>Sản phẩm</th><th>Ngày đăng</th><th class="n">View</th><th class="n">CTR</th><th class="n">Đơn</th><th class="n">GMV</th><th>Mức</th><th></th></tr></thead><tbody>${L.slice(0,150).map(v=>{const lv=kocLvl(v);return `<tr><td class="wide"><a href="${esc(kocLink(v))}" target="_blank" rel="noopener">${esc((v.ten||"(không tên)").slice(0,80))}</a><small>${esc(v.ky||"")}</small></td><td>@${esc(v.acc)}</td><td>${swatch(v.sku)}${esc(sk(v.sku).n)}</td><td>${esc(v.tm||"")}</td><td class="n">${nf(v.view||0)}</td><td class="n">${v.view?((v.click||0)/v.view*100).toFixed(1)+"%":"—"}</td><td class="n"><b>${nf(v.don||0)}</b></td><td class="n">${money(v.gmv||0)}</td><td>${pill(lv[0],lv[1])}</td>
-     <td>${v.st==="win"?`${pill("Đã vào kho win","grn")}${v.by?`<small>${esc(v.by)}</small>`:""}`:v.st==="bo"?`${pill("Bỏ qua","gry")}${can?` <button class="lnk" data-kocu="${v.id}">hoàn tác</button>`:""}`:can?`<button class="btn sm pri" data-kocw="${v.id}">✓ Đưa vào kho video win</button> <button class="lnk" data-kocb="${v.id}">Bỏ qua</button>`:`<span class="hint">chờ Oanh check</span>`}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có video nào ở mục này.":"Chưa có video KOC. Nhập báo cáo video TikTok (Đo lường › Nhập báo cáo, file Video Performance List), video của KOC tự hiện ở đây."}</p>`}
-   <p class="hint pad">Đưa vào kho video win: video vào Video win (nguồn KOC) để Hypit phân tích vì sao bán được rồi nhân bản. Mỗi lần nhập báo cáo, số view, đơn, GMV của video KOC tự cập nhật.</p></section>`;
+  const d=D(),S=d.settings,all=d.kocVideos||[],can=kocCan(),pot=S.potential||30,F=KOCF;
+  const R=all.map(v=>{const x=kocIn(v,F.f,F.t);return x?Object.assign({},v,x):null}).filter(Boolean);
+  const stOk=v=>F.st==="all"||(F.st==="pot"?v.don>=pot&&!v.st:v.st===F.st);
+  const L=R.filter(v=>stOk(v)&&(!F.sku||v.sku===F.sku)).sort((a,b)=>b.don-a.don||b.gmv-a.gmv).slice(0,Math.max(1,+F.top||10));
+  const cho=all.filter(v=>v.don>=pot&&!v.st).length,last=(d.kocImports||[]).slice(-1)[0];
+  return `<section class="card flush" id="kocv"><div class="card-h pad"><h2>🏆 TOP KOC</h2><span class="hint">${cho?`<b class="t-amb">${cho} video chờ check</b> · `:""}tiềm năng từ ${pot} đơn, win từ ${S.winnerOrders||100} đơn</span><span class="sp"></span>
+    <button class="btn sm" id="koc-up" title="${last?esc("Lần nhập gần nhất: "+(last.range||last.file)+" · "+nf(last.n)+" video, "+nf(last.koc)+" KOC · "+last.at):"Chưa nhập báo cáo KOC"}">⬆ Tải báo cáo KOC</button><input type="file" id="koc-fi" accept=".xlsx,.xls,.csv" hidden></div>
+   <div class="filters pad kocflt"><label>Top<select id="koc-top">${opt([5,10,20,50,100].map(n=>[n,"Top "+n]).concat([5,10,20,50,100].includes(+F.top)?[]:[[F.top,"Top "+F.top]]).concat([["__","Số khác…"]]),F.top)}</select></label>
+    <label>Thời gian<select id="koc-k">${opt([["mo","Tháng này"],["lmo","Tháng trước"],["c","Tùy chọn ngày"]],F.k)}</select></label>${F.k==="c"?`<label>Từ<input type="date" id="koc-f" value="${F.f}"></label><label>Đến<input type="date" id="koc-t" value="${F.t}"></label>`:""}
+    <label>Trạng thái<select id="koc-st">${opt(KOC_ST,F.st)}</select></label><label>Sản phẩm<select id="koc-s">${opt([["","Mọi sản phẩm"]].concat(skOpts()),F.sku)}</select></label>
+    ${ME.role==="admin"?`<button class="lnk" id="koc-own" title="Video của các tài khoản này không tính là KOC">Tài khoản shop · sửa</button>`:""}</div>
+   ${L.length?`<div class="tbl"><table class="koct"><thead><tr><th class="n">#</th><th>Video</th><th>KOC</th><th>Sản phẩm</th><th>Ngày đăng</th><th class="n">View</th><th class="n">CTR</th><th class="n">Đơn</th><th class="n">GMV</th><th>Mức</th><th></th></tr></thead><tbody>${L.map((v,i)=>{const lv=kocLvl(v);return `<tr><td class="n">${i+1}</td><td class="kocvid"><a href="${esc(kocLink(v))}" target="_blank" rel="noopener" title="${esc(v.ten||"")}">▶ ${esc(v.ten||"Xem video")}</a></td><td>@${esc(v.acc)}</td><td>${swatch(v.sku)}${esc(sk(v.sku).n)}</td><td>${esc((v.tm||"").replace(/\//g,"-").split("-").reverse().join("/"))}</td><td class="n">${nf(v.view||0)}</td><td class="n">${v.view?((v.click||0)/v.view*100).toFixed(1)+"%":"—"}</td><td class="n"><b>${nf(v.don||0)}</b></td><td class="n">${money(v.gmv||0)}</td><td>${pill(lv[0],lv[1])}</td>
+     <td class="nowrap">${v.st==="win"?`${pill("Đã vào kho win","grn")}`:v.st==="bo"?`${pill("Bỏ qua","gry")}${can?` <button class="lnk" data-kocu="${v.id}">hoàn tác</button>`:""}`:can?`<button class="btn sm pri" data-kocw="${v.id}">✓ Vào kho win</button> <button class="lnk" data-kocb="${v.id}">Bỏ qua</button>`:`<span class="hint">chờ Oanh check</span>`}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có video nào khớp bộ lọc (thử chọn Tất cả hoặc đổi thời gian).":"Chưa có video KOC. Bấm ⬆ Tải báo cáo KOC ở góc trên."}</p>`}
+   <p class="hint pad">Số view, đơn, GMV tính theo các báo cáo KOC đã tải nằm trong khoảng thời gian chọn. "Vào kho win": video vào Video win (nguồn KOC) để Hypit phân tích rồi nhân bản.</p></section>`;
 }
 function kocBind(m){
-  if($("#dz-koc"))bindDrop("koc",async f=>{const rows=await readXlsx(f);const res=parseTikTok(rows,f.name);if(res.err){toast(res.err);return}KOCF.lv="pot";kocImport(ME,res,false);renderMain()});
-  m.querySelectorAll("[data-kocf]").forEach(x=>x.onclick=()=>{KOCF.lv=x.dataset.kocf;renderMain()});
-  if($("#koc-s"))$("#koc-s").onchange=e=>{KOCF.sku=e.target.value;renderMain()};
+  const fi=$("#koc-fi");if(fi){$("#koc-up").onclick=()=>fi.click();fi.onchange=async()=>{const f=fi.files[0];if(!f)return;const rows=await readXlsx(f);const res=parseTikTok(rows,f.name);if(res.err){toast(res.err);return}
+    const mR=String(res.range||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);if(mR&&(mR[1]<KOCF.f||mR[2]>KOCF.t)){KOCF.k="c";KOCF.f=mR[1];KOCF.t=mR[2]}KOCF.st="pot";kocImport(ME,res,false);renderMain()}}
+  const mo=off=>{const t=new Date(),y=t.getFullYear(),mm=t.getMonth()+off,a=new Date(y,mm,1),b=new Date(y,mm+1,0),z=n=>String(n).padStart(2,"0");return [`${a.getFullYear()}-${z(a.getMonth()+1)}-01`,`${b.getFullYear()}-${z(b.getMonth()+1)}-${z(b.getDate())}`]};
+  $("#koc-top").onchange=e=>{let v=e.target.value;if(v==="__"){v=prompt("Hiện top bao nhiêu video?","15");if(!v||!(+v>0)){renderMain();return}}KOCF.top=Math.round(+v);renderMain()};
+  $("#koc-k").onchange=e=>{KOCF.k=e.target.value;if(KOCF.k!=="c")[KOCF.f,KOCF.t]=mo(KOCF.k==="mo"?0:-1);renderMain()};
+  if($("#koc-f")){const ch=()=>{let f=$("#koc-f").value,t=$("#koc-t").value;if(!f||!t)return;if(f>t)[f,t]=[t,f];KOCF.f=f;KOCF.t=t;renderMain()};$("#koc-f").onchange=ch;$("#koc-t").onchange=ch}
+  $("#koc-st").onchange=e=>{KOCF.st=e.target.value;renderMain()};$("#koc-s").onchange=e=>{KOCF.sku=e.target.value;renderMain()};
   if($("#koc-own"))$("#koc-own").onclick=()=>{const v=prompt("Tên tài khoản TikTok của shop (cách nhau dấu phẩy). Video của các tài khoản này không tính là KOC:",ownAccs().join(", "));if(v===null)return;DB.mutate(ME.name,"tài khoản shop TikTok",dt=>{dt.settings.ownAccs=v.split(",").map(s=>s.trim().replace(/^@/,"")).filter(Boolean)});renderMain()};
   m.querySelectorAll("[data-kocw]").forEach(x=>x.onclick=()=>{const v=(D().kocVideos||[]).find(y=>y.id===x.dataset.kocw);if(!v)return;
     DB.mutate(ME.name,"đưa video KOC @"+v.acc+" vào kho video win",dt=>{const y=dt.kocVideos.find(q=>q.id===v.id);if(y){y.st="win";y.by=ME.name}dt.winResearch=dt.winResearch||[];if(!dt.winResearch.some(r=>r.kocId===v.id)){const t=new Date();
