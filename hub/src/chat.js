@@ -8,6 +8,12 @@
    Dữ liệu nằm trong dữ liệu chung của web (5 giây đồng bộ một lần): d.notifs, d.chat, d.chatRead.
    ===================================================================== */
 const CH_ROOMS=[["chung","Chung"],["content","Content & Media"],["digital","Digital"]];
+/* Nhắn riêng: phòng "dm:<id>~<id>" (2 mã người xếp theo thứ tự) */
+const dmKey=u=>"dm:"+[ME.id,u].sort().join("~");
+const dmOther=k=>k.startsWith("dm:")?k.slice(3).split("~").find(x=>x!==ME.id):"";
+const chPeople=()=>ME&&DB.data?D().users.filter(u=>u.active&&u.id!==ME.id&&u.name):[];
+const chRooms=()=>CH_ROOMS.concat(chPeople().map(u=>[dmKey(u.id),u.name]));
+const roomName=k=>k.startsWith("dm:")?"nhắn riêng với "+(userName(dmOther(k))||""):"nhóm "+((CH_ROOMS.find(r=>r[0]===k)||[])[1]||k);
 const CH_KEEP=300,NT_KEEP=600;
 const nowISO=()=>new Date().toISOString();
 const agoTxt=t=>{const s=(Date.now()-new Date(t).getTime())/1000;return s<60?"vừa xong":s<3600?Math.floor(s/60)+" phút trước":s<86400?Math.floor(s/3600)+" giờ trước":new Date(t).toLocaleDateString("vi-VN").slice(0,5)};
@@ -51,19 +57,27 @@ function openNotifs(){
     if($("#nt-exec"))$("#nt-exec").onclick=()=>{p.remove();MOD="exec";PAGE="exec";render()};
     if($("#nt-perm"))$("#nt-perm").onclick=()=>Notification.requestPermission().then(()=>draw());
     if($("#nt-all"))$("#nt-all").onclick=()=>{DB.mutate(ME.name,"đọc thông báo",dt=>(dt.notifs||[]).forEach(n=>{if(n.to===ME.id)n.read=true}));draw();bellBadge()};
-    p.querySelectorAll("[data-nt]").forEach(b=>b.onclick=()=>{const n=myNotifs().find(x=>x.id===b.dataset.nt);DB.mutate(ME.name,"đọc thông báo",dt=>{const x=(dt.notifs||[]).find(y=>y.id===n.id);if(x)x.read=true});p.remove();bellBadge();
-      if(n.ref&&D().cards.some(c=>c.id===n.ref))openCard(n.ref);else if(n.ref&&n.ref.startsWith("room:"))openChat(n.ref.slice(5))})};
+    p.querySelectorAll("[data-nt]").forEach(b=>b.onclick=()=>{const n=myNotifs().find(x=>x.id===b.dataset.nt);p.remove();ntGo(n)})};
   draw();
 }
 function bellBadge(){const b=document.querySelector(".bell");if(!b)return;const al=APP_MODE==="admin"&&typeof execAlerts==="function"?execAlerts().length:0,n=myUnread()+al;let s=b.querySelector("b");if(n){if(!s){s=document.createElement("b");b.appendChild(s)}s.textContent=n}else if(s)s.remove();
   const c=$("#chatbtn");if(c){const u=chUnreadAll();let t=c.querySelector("b");if(u){if(!t){t=document.createElement("b");c.appendChild(t)}t.textContent=u}else if(t)t.remove()}}
+
+/* Bấm một thông báo: đánh dấu đã đọc, mở đúng chỗ (thẻ video, phòng chat, trang) */
+function ntGo(n){if(!n)return;if(n.id)DB.mutate(ME.name,"đọc thông báo",dt=>{const x=(dt.notifs||[]).find(y=>y.id===n.id);if(x)x.read=true});bellBadge();
+  if(n.ref&&D().cards.some(c=>c.id===n.ref))openCard(n.ref);else if(n.ref&&n.ref.startsWith("room:"))openChat(n.ref.slice(5));
+  else if(n.ref&&n.ref.startsWith("page:")){PAGE=n.ref.slice(5);if(APP_MODE==="admin"&&typeof modGroups==="function"&&!modGroups(curMod()).some(g=>g[1].some(i=>i[0]===PAGE)))MOD="";render()}}
+/* Thông báo bật lên ở góc dưới màn hình (tự ẩn sau 12 giây, bấm vào để mở) */
+function ntPop(n){let w=$("#ntpop");if(!w){w=document.createElement("div");w.id="ntpop";w.className="ntpop";document.body.appendChild(w)}
+  const e=document.createElement("div");e.className="ntpc";e.innerHTML=`<button class="ntpx" aria-label="Đóng">✕</button><b>🔔 Thông báo</b><span>${esc(n.text)}</span><small>bấm để mở</small>`;
+  e.onclick=ev=>{e.remove();if(ev.target.closest(".ntpx"))return;ntGo(n)};w.appendChild(e);while(w.children.length>4)w.firstChild.remove();setTimeout(()=>e.remove(),12000)}
 
 /* ---------- Chat chung ---------- */
 let CH_ROOM="chung";
 const chMsgs=k=>((D()&&D().chat||{})[k]||[]);
 const chReadAt=k=>(((D()&&D().chatRead||{})[ME&&ME.id]||{})[k])||"";
 const chUnread=k=>chMsgs(k).filter(m=>m.by!==(ME&&ME.id)&&m.t>chReadAt(k)).length;
-const chUnreadAll=()=>ME?CH_ROOMS.reduce((a,[k])=>a+chUnread(k),0):0;
+const chUnreadAll=()=>ME?chRooms().reduce((a,[k])=>a+chUnread(k),0):0;
 const mentions=text=>D().users.filter(u=>u.active&&u.name&&new RegExp("@"+u.name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![\\p{L}\\d])","iu").test(text)).map(u=>u.id);
 const linkify=t=>esc(t).replace(/https?:\/\/[^\s<]+/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m.length>48?m.slice(0,48)+"…":m}</a>`).replace(/@([\p{L}\d ]{1,20}?)(?=[\s,.!?:]|$)/gu,(m,n)=>D().users.some(u=>u.name&&u.name.toLowerCase()===n.toLowerCase())?`<b class="chm">${m}</b>`:m);
 function openChat(room){
@@ -71,17 +85,19 @@ function openChat(room){
   const draw=()=>{const M=chMsgs(CH_ROOM).slice(-120);
     p.innerHTML=`<div class="chph"><b>Trao đổi nội bộ</b><button class="lnk" id="ch-x">Đóng</button></div>
      <div class="seg chtabs">${CH_ROOMS.map(([k,n])=>`<button class="${k===CH_ROOM?"on":""}" data-chr="${k}">${n}${k!==CH_ROOM&&chUnread(k)?` <span class="xbadge">${chUnread(k)}</span>`:""}</button>`).join("")}</div>
+     <div class="chdm"><small>Nhắn riêng:</small>${chPeople().map(u=>{const k=dmKey(u.id),n=chUnread(k);return `<button type="button" class="chdmb${k===CH_ROOM?" on":""}" data-chr="${k}" title="Nhắn riêng với ${esc(u.name)}"><i>${esc((u.name.split(" ").pop()||"?")[0])}</i>${esc(u.name)}${k!==CH_ROOM&&n?` <span class="xbadge">${n}</span>`:""}</button>`}).join("")}</div>
+     ${CH_ROOM.startsWith("dm:")?`<div class="chdmh">Nhắn riêng với <b>${esc(userName(dmOther(CH_ROOM)))}</b> · chỉ hiện cho hai người</div>`:""}
      <div class="chl" id="chl">${M.map(m=>`<div class="chmsg${m.by===ME.id?" me":""}"><div class="chw"><b>${esc(userName(m.by)||m.who||"")}</b><small>${agoTxt(m.t)}</small></div><div class="chtx">${linkify(m.text)}</div></div>`).join("")||`<p class="hint" style="padding:16px">Chưa có tin nhắn. Gõ @tên để gọi người, người đó sẽ nhận thông báo.</p>`}</div>
-     <form class="chf" id="chf"><textarea id="ch-in" rows="2" placeholder="Nhắn cho nhóm… gõ @Oanh để gọi tên · Enter để gửi, Shift+Enter xuống dòng"></textarea><button class="btn pri">Gửi</button></form>
-     <div class="chwho">${D().users.filter(u=>u.active&&u.id!==ME.id&&u.name).slice(0,14).map(u=>`<button type="button" class="chip" data-at="${esc(u.name)}">@${esc(u.name)}</button>`).join("")}</div>`;
+     <form class="chf" id="chf"><textarea id="ch-in" rows="2" placeholder="${CH_ROOM.startsWith("dm:")?"Nhắn riêng cho "+esc(userName(dmOther(CH_ROOM)))+"… Enter để gửi":"Nhắn cho nhóm… gõ @Oanh để gọi tên · Enter để gửi, Shift+Enter xuống dòng"}"></textarea><button class="btn pri">Gửi</button></form>
+     ${CH_ROOM.startsWith("dm:")?"":`<div class="chwho">${D().users.filter(u=>u.active&&u.id!==ME.id&&u.name).slice(0,14).map(u=>`<button type="button" class="chip" data-at="${esc(u.name)}">@${esc(u.name)}</button>`).join("")}</div>`}`;
     const l=$("#chl");l.scrollTop=l.scrollHeight;
     $("#ch-x").onclick=()=>p.remove();
     p.querySelectorAll("[data-chr]").forEach(b=>b.onclick=()=>{CH_ROOM=b.dataset.chr;markRead();draw()});
     p.querySelectorAll("[data-at]").forEach(b=>b.onclick=()=>{const i=$("#ch-in");i.value+=(i.value&&!/\s$/.test(i.value)?" ":"")+"@"+b.dataset.at+" ";i.focus()});
-    const send=()=>{const v=$("#ch-in").value.trim();if(!v)return;const room=CH_ROOM,rn=(CH_ROOMS.find(r=>r[0]===room)||[])[1];
-      DB.mutate(ME.name,"nhắn nhóm "+rn,dt=>{dt.chat=dt.chat||{};const L=dt.chat[room]=dt.chat[room]||[];L.push({id:uid("cm"),by:ME.id,who:ME.name,t:nowISO(),text:v});if(L.length>CH_KEEP)dt.chat[room]=L.slice(-CH_KEEP);
+    const send=()=>{const v=$("#ch-in").value.trim();if(!v)return;const room=CH_ROOM,rn=(CH_ROOMS.find(r=>r[0]===room)||[])[1],dm=dmOther(room);
+      DB.mutate(ME.name,dm?"nhắn riêng":"nhắn nhóm "+rn,dt=>{dt.chat=dt.chat||{};const L=dt.chat[room]=dt.chat[room]||[];L.push({id:uid("cm"),by:ME.id,who:ME.name,t:nowISO(),text:v});if(L.length>CH_KEEP)dt.chat[room]=L.slice(-CH_KEEP);
         dt.chatRead=dt.chatRead||{};(dt.chatRead[ME.id]=dt.chatRead[ME.id]||{})[room]=nowISO();
-        notifyU(dt,mentions(v),`${ME.name} gọi bạn trong nhóm ${rn}: ${v.slice(0,120)}`,"room:"+room)});draw();bellBadge()};
+        if(dm)notifyU(dt,[dm],`💬 ${ME.name} nhắn riêng: ${v.slice(0,120)}`,"room:"+room);else notifyU(dt,mentions(v),`${ME.name} gọi bạn trong nhóm ${rn}: ${v.slice(0,120)}`,"room:"+room)});draw();bellBadge()};
     $("#chf").onsubmit=e=>{e.preventDefault();send()};
     $("#ch-in").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}};
     $("#ch-in").focus()};
@@ -101,12 +117,12 @@ openCard=function(id,o){_ocChat(id,o);const c=D().cards.find(x=>x.id===id),di=$(
 
 /* ---------- Có tin mới (từ máy chủ) → báo trên màn hình + thông báo trình duyệt ---------- */
 const _swNt=svWatch;
-svWatch=function(){const r=_swNt();if(ME&&D()){r.nt=myNotifs().filter(n=>!n.read).map(n=>n.id);r.ch=CH_ROOMS.map(([k])=>k+":"+chMsgs(k).length)}return r};
+svWatch=function(){const r=_swNt();if(ME&&D()){r.nt=myNotifs().filter(n=>!n.read).map(n=>n.id);r.ch=chRooms().map(([k])=>k+":"+chMsgs(k).length)}return r};
 const _snNt=svNotify;
 svNotify=function(a,b){_snNt(a,b);if(!ME||!b||!b.nt)return;const neu=(b.nt||[]).filter(x=>!(a.nt||[]).includes(x)),L=myNotifs().filter(n=>neu.includes(n.id));
-  const chNew=CH_ROOMS.filter(([k])=>chUnread(k)&&!(a.ch||[]).includes(k+":"+chMsgs(k).length)).map(([k,n])=>n);
-  const msg=L.map(n=>n.text).concat(chNew.length?["Tin nhắn mới trong nhóm "+chNew.join(", ")]:[]);
-  if(msg.length){toast(msg[0]+(msg.length>1?` (+${msg.length-1})`:""));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join("\n")})}catch(e){}}
+  const chNew=CH_ROOMS.filter(([k])=>chUnread(k)&&!(a.ch||[]).includes(k+":"+chMsgs(k).length));
+  const msg=L.map(n=>n.text).concat(chNew.length?["Tin nhắn mới trong nhóm "+chNew.map(r=>r[1]).join(", ")]:[]);
+  if(msg.length){L.forEach(n=>ntPop(n));chNew.forEach(([k,nm])=>{const m=chMsgs(k).slice(-1)[0];if(m&&!L.some(n=>n.ref==="room:"+k))ntPop({id:"",text:`💬 ${userName(m.by)||m.who} (nhóm ${nm}): ${String(m.text).slice(0,120)}`,ref:"room:"+k,at:m.t})});try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join("\n")})}catch(e){}}
   bellBadge();const p=$("#chp");if(p&&p._draw&&!(document.activeElement&&document.activeElement.id==="ch-in"&&document.activeElement.value))p._draw()};
 
 /* ---------- Giữ trang khi F5 (chỉ trong tab đang mở) ---------- */
@@ -117,3 +133,8 @@ const _renderView=render;
 render=function(){_renderView();saveView();if(ME){bellBadge();const b=document.querySelector(".bell");if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();openNotifs()};const c=$("#chatbtn");if(c)c.onclick=()=>{$("#chp")?$("#chp").remove():openChat()}}};
 const _renderMainView=renderMain;
 renderMain=function(){_renderMainView();saveView()};
+
+/* Mở web mà còn thông báo chưa đọc: bật lên một lần ở góc dưới */
+let NT_FIRST=false;
+setInterval(()=>{if(NT_FIRST||!ME||!DB.data)return;NT_FIRST=true;const L=myNotifs().filter(n=>!n.read);if(!L.length)return;
+  if(L.length===1)ntPop(L[0]);else ntPop({id:"",text:`Bạn có ${L.length} thông báo chưa đọc. Mới nhất: ${L[0].text}`,ref:""})},1500);

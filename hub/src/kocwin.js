@@ -84,11 +84,3 @@ const _xvWinKoc=xvWin;
 xvWin=function(b,o){_xvWinKoc(b,o);const pot=D().settings.potential||30,n=(D().kocVideos||[]).filter(v=>v.don>=pot&&!v.st).length;
   if(n)b.insertAdjacentHTML("afterbegin",`<div class="note">🏆 Có <b>${n} video KOC ra số</b> chờ check. <button class="btn sm" data-go="bc_koc">Xem video KOC →</button></div>`);bindCommon(b)};
 
-/* Bấm thông báo dạng "page:…" thì mở đúng trang */
-const _openNotifsKoc=openNotifs;
-openNotifs=function(){_openNotifsKoc();const p=$("#ntp");if(!p)return;
-  p.addEventListener("click",e=>{const b=e.target.closest("[data-nt]");if(!b)return;const n=(D().notifs||[]).find(x=>x.id===b.dataset.nt);if(n&&n.ref&&n.ref.startsWith("page:")){PAGE=n.ref.slice(5);if(APP_MODE==="admin"&&!modGroups(curMod()).some(g=>g[1].some(i=>i[0]===PAGE)))MOD="";render()}},true)};
-
-/* Nhập báo cáo › TikTok: nhắc chỗ tải file KOC */
-const _pBaoCaoKoc=PAGES.baocao;
-PAGES.baocao=function(m){_pBaoCaoKoc(m);const c=m.querySelector("#dz-tt");if(c)c.insertAdjacentHTML("afterend",`<p class="hint">File video của <b>KOC / affiliate</b> là báo cáo riêng: tải ở <button class="lnk" data-go="bc_koc">Marketing › KOC / Affiliate</button>. Ở đây chỉ nhập file video của shop (aillavietnamstore, aillavnstore2…).</p>`);bindCommon(m)};
