@@ -438,6 +438,7 @@ async function wtSync(){if(WT_BUSY||Date.now()-WT_AT<20000||!DB.data)return;cons
   try{const L=await svApi("/api/hub/worker-tasks?kind=card"),by={};(L||[]).forEach(t=>by[t.id]=t);const ch=[];
     C.forEach(c=>{const t=by[c.wt];if(!t)return;const r=t.result||{},u={wStatus:t.status,wProg:t.progress||0,wDetail:t.detail||"",wJob:t.worker_job||c.wJob||"",wStage:r.stage||"",wScript:r.script||""};
       const fresh=!c.wFixAt||String(t.updated_at||"")>c.wFixAt;if(!fresh){u.wStatus="running";u.wDetail=c.wDetail;u.wStage=""}
+      if(fresh&&t.status==="running"&&["dvd","dceo"].includes(c.step)){u.step="worker";u.linkFinal=""} // dựng lại từ Telegram / trang Worker: về Đang làm
       if(fresh&&t.status==="review"&&r.stage==="video"&&c.step==="worker"){u.step="dvd";u.linkFinal="/api/hub/worker-tasks/preview/"+u.wJob}
       if(t.status==="done"&&r.drive_url){u.linkFinal=r.drive_url;u.wDone=true}
       if(Object.keys(u).some(k=>String(c[k]??"")!==String(u[k]??"")))ch.push([c.id,u])});
