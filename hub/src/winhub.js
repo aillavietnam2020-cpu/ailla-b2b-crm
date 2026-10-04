@@ -40,22 +40,31 @@ pWin=function(m){
   hyRefresh();if(SUB.win==="plan")SUB.win="rank";const tab=SUB.win||"rank";
   if(tab==="rank"||tab==="plan"){_pWinOld(m);hyTabs(m,tab);if(tab==="rank")hyDecorateRank(m);hyBind(m);return}
   _pWinOld(m);hyTabs(m,tab);const b=$("#wb");
-  if(tab==="research")b.innerHTML=hyResearchHtml();else b.innerHTML=hyHypitHtml();
+  if(tab==="research")b.innerHTML=hyResearchHtml();else if(tab==="koc")b.innerHTML=hyKocHtml();else b.innerHTML=hyHypitHtml();
   hyBind(m);
 };
 PAGES.win=pWin;
-function hyTabs(m,tab){const t=m.querySelector(".tabs");if(!t)return;const n=hyAnalyses().filter(x=>x.status==="review").length;t.outerHTML=`<div class="tabs">${[["rank","Video win shop TikTok"],["research","Video win nghiên cứu"],["hypit",`Hypit phân tích & dựng${n?` <b class="cnt">${n}</b>`:""}`]] .map(([k,x])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${x}</button>`).join("")}</div>`;m.querySelectorAll(".tabs [data-sub]").forEach(b=>b.onclick=()=>{SUB.win=b.dataset.sub;renderMain()})}
+function hyTabs(m,tab){const t=m.querySelector(".tabs");if(!t)return;const n=hyAnalyses().filter(x=>x.status==="review").length;t.outerHTML=`<div class="tabs">${[["rank","Video win inhouse"],["koc",`Video win KOC${(D().winResearch||[]).some(r=>r.kocId)?` <b class="cnt">${(D().winResearch||[]).filter(r=>r.kocId).length}</b>`:""}`],["research","Video win đối thủ"],["hypit",`Hypit phân tích & dựng${n?` <b class="cnt">${n}</b>`:""}`]] .map(([k,x])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${x}</button>`).join("")}</div>`;m.querySelectorAll(".tabs [data-sub]").forEach(b=>b.onclick=()=>{SUB.win=b.dataset.sub;renderMain()})}
 /* Bảng xếp hạng có sẵn: thêm nút Phân tích Hypit cạnh nút Lên kế hoạch. */
-function hyDecorateRank(m){m.querySelectorAll("[data-mkplan]").forEach(x=>{x.insertAdjacentHTML("afterend",hyBtn("TT-"+x.dataset.mkplan));x.remove()})}
+function hyDecorateRank(m){const tb=m.querySelector("#wb table");if(tb)tb.classList.add("wrank");if(tb){const H=[...tb.querySelectorAll("thead th")].map(x=>x.textContent.trim()),ci=n=>H.indexOf(n),rows=[...tb.querySelectorAll("tbody tr")];
+  const iN=ci("Nguồn");if(iN>=0)rows.forEach(r=>{const c=r.cells[iN];if(!c)return;const t=c.textContent,mm=t.match(/(\d{4})\/(\d{2})\/(\d{2})/);if(mm){c.title=t;c.textContent=(/cũ/i.test(t)?"Cũ · ":"")+mm[3]+"/"+mm[2]+"/"+mm[1].slice(2)}});
+  const iP=ci("Người làm");if(iP>=0&&rows.every(r=>!(r.cells[iP]&&r.cells[iP].textContent.trim())))[tb.querySelector("thead tr")].concat(rows).forEach(r=>{const c=r.cells[iP];if(c)c.remove()});}if(tb)tb.querySelectorAll("td.wide").forEach(td=>{const t=td.firstChild&&td.firstChild.nodeType===3?td.firstChild.textContent:"",sm=td.querySelector("small");td.innerHTML=`<div class="wclip"><span title="${esc(t)}">${esc(t)}</span>${sm?`<small title="${esc(sm.textContent)}">${esc(sm.textContent)}</small>`:""}</div>`});m.querySelectorAll("[data-mkplan]").forEach(x=>{x.insertAdjacentHTML("afterend",hyBtn("TT-"+x.dataset.mkplan));x.remove()})}
 
-/* ---------- Video win nghiên cứu (nhân sự nhập) ---------- */
+/* ---------- Video win KOC (Oanh / chị duyệt từ TOP KOC ở trang KOC / Affiliate) ---------- */
+function hyKocHtml(){
+  const L=(D().winResearch||[]).filter(r=>r.kocId).slice().reverse(),pot=D().settings.potential||30,cho=(D().kocVideos||[]).filter(v=>v.don>=pot&&!v.st).length;
+  return `<section class="card"><div class="card-h"><h2>Video win KOC</h2><span class="hint">${L.length} video đã duyệt vào kho win${cho?` · <b class="t-amb">${cho} video KOC ra số chờ check</b>`:""}</span><span class="sp"></span><button class="btn sm" data-go="bc_koc">Chọn thêm từ TOP KOC →</button></div>
+   ${L.length?tbl(["Ngày duyệt","Video","KOC","Sản phẩm","Số liệu","Người duyệt",""],L.map(r=>`<tr><td>${esc(r.at)}</td><td class="wide wvid"><a href="${esc(r.link)}" target="_blank" rel="noopener" title="${esc(r.ten||r.link)}">▶ ${esc(r.ten||r.link)}</a></td><td>${esc((r.nguon||"").replace(/^KOC\s*/,""))}</td><td>${r.sp?swatch(r.sp)+esc(sk(r.sp).n):"—"}</td><td>${esc(r.soLieu||"")}</td><td>${esc(r.byName||"")}</td><td>${hyBtn(r.id)}</td></tr>`)):`<p class="empty">Chưa có video KOC nào trong kho win. Vào trang KOC / Affiliate, ở bảng TOP KOC bấm "✓ Vào kho win" cho video ra số tốt.</p>`}</section>`;
+}
+
+/* ---------- Video win đối thủ (nhân sự nhập) ---------- */
 function hyResearchHtml(){
-  const L=(D().winResearch||[]).slice().reverse();
-  return `<section class="card"><div class="card-h"><h2>Thêm video win nghiên cứu</h2><span class="hint">video đối thủ / ngoài ngành đang bán tốt · ghi lại để Hypit học cách làm, không sao chép</span></div>
+  const L=(D().winResearch||[]).filter(r=>!r.kocId).slice().reverse();
+  return `<section class="card"><div class="card-h"><h2>Thêm video win đối thủ</h2><span class="hint">video đối thủ / ngoài ngành đang bán tốt · ghi lại để Hypit học cách làm, không sao chép</span></div>
   <form class="frm" id="wrf"><div class="row4"><label class="field grow">Link video<input id="wr-l" required placeholder="https://www.tiktok.com/@…/video/…"></label><label class="field grow">Tên / nội dung chính<input id="wr-t" placeholder="VD: Mẹ bỉm thử tẩy lồng máy giặt"></label></div>
   <div class="row4"><label class="field">Nguồn<input id="wr-n" placeholder="Shop đối thủ, KOC…"></label><label class="field">Sản phẩm của mình để làm theo<select id="wr-s">${opt([["","— chọn"]].concat(prods().map(p=>[p.k,p.n])),"")}</select></label><label class="field">Số liệu thấy được<input id="wr-v" placeholder="VD: 2,1tr view · 5k đã bán"></label></div>
   <label class="field">Vì sao thấy video này win<textarea id="wr-y" rows="2" placeholder="Hook 3 giây đầu, cách demo trước/sau…"></textarea></label><button class="btn pri">Lưu video win</button></form></section>
-  <section class="card"><div class="card-h"><h2>Danh sách video win nghiên cứu</h2><span class="hint">${L.length} video</span></div>${tbl(["Ngày","Người nhập","Video","Nguồn","Sản phẩm","Số liệu","Vì sao win",""],L.map(r=>`<tr><td>${esc(r.at)}</td><td><b>${esc(r.byName)}</b></td><td class="wide"><a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.ten||r.link)}</a></td><td>${esc(r.nguon||"")}</td><td>${r.sp?esc(sk(r.sp).n):"—"}</td><td>${esc(r.soLieu||"")}</td><td>${esc(r.lyDo||"")}</td><td>${hyBtn(r.id)}${r.by===ME.id||ME.role==="admin"?` <button class="btn sm danger" data-wrx="${r.id}">Xóa</button>`:""}</td></tr>`))}</section>`;
+  <section class="card"><div class="card-h"><h2>Danh sách video win đối thủ</h2><span class="hint">${L.length} video</span></div>${tbl(["Ngày","Người nhập","Video","Nguồn","Sản phẩm","Số liệu","Vì sao win",""],L.map(r=>`<tr><td>${esc(r.at)}</td><td><b>${esc(r.byName)}</b></td><td class="wide wvid"><a href="${esc(r.link)}" target="_blank" rel="noopener" title="${esc(r.ten||r.link)}">▶ ${esc(r.ten||r.link)}</a></td><td>${esc(r.nguon||"")}</td><td>${r.sp?esc(sk(r.sp).n):"—"}</td><td>${esc(r.soLieu||"")}</td><td>${esc(r.lyDo||"")}</td><td>${hyBtn(r.id)}${r.by===ME.id||ME.role==="admin"?` <button class="btn sm danger" data-wrx="${r.id}">Xóa</button>`:""}</td></tr>`))}</section>`;
 }
 
 /* ---------- Hypit phân tích & dựng ---------- */
