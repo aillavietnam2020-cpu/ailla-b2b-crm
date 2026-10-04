@@ -684,3 +684,4 @@ table.kstab td{vertical-align:middle}
 .kdt td,.kdt th{white-space:nowrap}.kdt td.wide{white-space:normal}.kdpost input{min-width:150px;width:150px}
 .kcsum{display:block;white-space:pre-line;color:var(--muted);font-size:12px;margin-top:2px}
 .kcadd label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:2px}
+.wpwin{flex-basis:100%;font-size:12.5px;background:#fff8e6;border-radius:8px;padding:4px 8px}.kdsp{max-width:220px;overflow:hidden;text-overflow:ellipsis}

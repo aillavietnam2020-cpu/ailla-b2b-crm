@@ -289,7 +289,7 @@ function classifyTikTok(res,cards){
 function applyTikTok(u,res,kenh){
   const cl=classifyTikTok(res,D().cards);const wk=weekOf(res.den||D().settings.cutoff);
   DB.mutate(u.name,`nhập báo cáo TikTok "${res.name}" (${kenh}): ${cl.match.length} video khớp`,d=>{
-    cl.match.forEach(([r])=>{const c=d.cards.find(x=>x.tiktokId===r.id);Object.assign(c,{view:r.view,click:r.click,don:r.don,gmv:r.gmv,giuChan:r.xh})});
+    cl.match.forEach(([r])=>{const c=d.cards.find(x=>x.tiktokId===r.id);Object.assign(c,{view:r.view,click:r.click,don:r.don,gmv:r.gmv,giuChan:r.xh,spTT:r.sp})});
     const ow=d.weekly.find(x=>x.w===wk)||(d.weekly.push({w:wk,cu:0,tutao:0,ads:0,adsDon:0,adsGmv:0}),d.weekly[d.weekly.length-1]);ow.cu=cl.sum.old.gmv;ow.tutao=cl.sum.auto.gmv;
     cl.old.sort((a,b)=>b.gmv-a.gmv).slice(0,10).forEach(r=>{const w=d.oldWins.find(x=>x.id===r.id);if(w)Object.assign(w,{don:r.don,gmv:r.gmv,view:r.view});else d.oldWins.push({id:r.id,ten:r.ten,tm:r.tm,sku:guessSku(r.sp)||guessSku(r.ten)||"KHAC",view:r.view,don:r.don,gmv:r.gmv,kenh})});
     if(!d.ttWeeks)d.ttWeeks=[];d.ttWeeks.push({key:uid("tw"),label:res.range||res.name,tu:"",den:"",recs:res.recs.map(r=>[r.id,guessSku(r.sp)||guessSku(r.ten)||"KHAC",r.gmv,r.don,r.view,r.tm,/[#@]/.test(r.ten)?1:0,r.ten.slice(0,80),r.acc||""])});d.ttWeeks=d.ttWeeks.slice(-8);

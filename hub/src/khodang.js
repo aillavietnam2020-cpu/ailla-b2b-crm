@@ -57,13 +57,13 @@ xvDang2=function(b,o){
      <td>${pill(s[0],s[1])}</td>
      <td>${c.step==="dang"&&m?`<select data-kdday="${c.id}">${opt(dayOpts(c),c.day||"")}</select>`:(c.day?dayLbl(c.day):"—")}</td>
      <td>${c.step==="xong"?`${dd(c.ngayDang)}${c.linkDang?` · <a href="${esc(kdLink(c.linkDang))}" target="_blank" rel="noopener">bài đăng</a>`:""}`:m?`<span class="kdpost"><input data-kdl="${c.id}" placeholder="${chOf(c.kenh).needId?"Dán link TikTok đã đăng":"Dán link bài đã đăng"}"><button class="btn sm pri" data-kdp="${c.id}">Đã đăng</button></span>`:"—"}</td>
-     <td>${sp?`<a href="${esc(kdLink(sp))}" target="_blank" rel="noopener">mở</a> `:""}${m?`<button class="lnk" data-kdsp="${c.id}" title="Dán link sản phẩm (giỏ hàng)">${sp?"sửa":"+ dán"}</button>`:""}</td>
+     <td class="kdsp">${c.spTT?`<span title="${esc(c.spTT)}">${esc(c.spTT.slice(0,40))}${c.spTT.length>40?"…":""}</span>`:`<span class="hint">—</span>`}</td>
      <td class="n">${c.view?nf(c.view):"—"}</td><td class="n">${c.view?ctr.toFixed(1)+"%":"—"}</td><td class="n">${c.gmv?money(c.gmv):"—"}</td><td class="n">${c.don?`<b class="${c.don>=win?"t-grn":""}">${nf(c.don)}</b>${c.don>=win?" 🏆":""}`:"—"}</td></tr>`};
   const kho=`<section class="card flush"><div class="card-h pad"><h2>Kho video đăng được</h2><span class="hint">chỉ video Oanh và chị đã duyệt · ${tot.cho} chờ xếp ngày · ${tot.lich} đã lên lịch · ${tot.da} đã đăng trong kỳ</span>${give?`<span class="sp"></span><button class="btn sm" id="hot-open">🔥 Đẩy sản phẩm đang lên xu hướng</button>`:""}</div>
    <div class="filters pad"><div class="seg">${[["","Tất cả kênh"]].concat(CHANNELS.map(c=>[c.k,c.short])).map(([k,t])=>`<button class="${KDV.k===k?"on":""}" data-kdk="${esc(k)}">${esc(t)}</button>`).join("")}</div>
     <select id="kd-s">${opt([["","Mọi sản phẩm"]].concat(skOpts()),KDV.s)}</select><select id="kd-t">${opt([["","Mọi trạng thái"],"Chờ xếp ngày","Đã lên lịch","Quá ngày, chưa đăng","Đã đăng"],KDV.t)}</select></div>
-   ${L.length?`<div class="tbl"><table class="kdt"><thead><tr><th>Video</th><th>Link video</th><th>SKU</th><th class="n">Ngày sản xuất</th><th>Trạng thái</th><th>Ngày đăng dự kiến</th><th>Ngày đăng thực tế</th><th>Link SP</th><th class="n">View</th><th class="n">CTR</th><th class="n">GMV</th><th class="n">Đơn/tháng</th></tr></thead><tbody>${L.slice(0,200).map(row).join("")}</tbody></table></div>`:`<p class="empty pad">Chưa có video nào được duyệt xong. Video edit xong → Oanh duyệt → chị duyệt thì mới vào kho này.</p>`}
-   <p class="hint pad">Người giữ kênh tự chọn ngày đăng (số cạnh ngày là đã xếp / nhịp đăng). Đăng xong dán link vào ô "Ngày đăng thực tế" và bấm Đã đăng. View, CTR, GMV, đơn tự cập nhật khi nhập báo cáo TikTok (Video Performance List). CTR = lượt nhấp sản phẩm / view. 🏆 = từ ${win} đơn trở lên (video win).</p></section>`;
+   ${L.length?`<div class="tbl"><table class="kdt"><thead><tr><th>Video</th><th>Link video</th><th>SKU</th><th class="n">Ngày sản xuất</th><th>Trạng thái</th><th>Ngày đăng dự kiến</th><th>Ngày đăng thực tế</th><th>SP gắn giỏ</th><th class="n">View</th><th class="n">CTR</th><th class="n">GMV</th><th class="n">Đơn/tháng</th></tr></thead><tbody>${L.slice(0,200).map(row).join("")}</tbody></table></div>`:`<p class="empty pad">Chưa có video nào được duyệt xong. Video edit xong → Oanh duyệt → chị duyệt thì mới vào kho này.</p>`}
+   <p class="hint pad">Người giữ kênh tự chọn ngày đăng (số cạnh ngày là đã xếp / nhịp đăng). Đăng xong dán link vào ô "Ngày đăng thực tế" và bấm Đã đăng. Sản phẩm gắn giỏ, view, CTR, GMV, đơn tự nhảy khi nhập báo cáo TikTok (Đo lường › Nhập báo cáo, file Video Performance List), không phải điền tay. CTR = lượt nhấp sản phẩm / view. 🏆 = từ ${win} đơn trở lên (video win).</p></section>`;
   const t7=`<section class="card flush"><div class="card-h pad"><h2>7 ngày tới</h2><span class="hint">đã xếp / nhịp đăng</span></div><div class="tbl"><table><thead><tr><th>Kênh</th>${D7.map(x=>`<th class="n">${dayLbl(x)}</th>`).join("")}</tr></thead><tbody>${CHANNELS.map(ch=>`<tr><td><b>${esc(ch.short)}</b></td>${D7.map(x=>{const I=d.cards.filter(c=>c.kenh===ch.k&&c.day===x),cap=nhipOf(ch.k,x);return `<td class="n"><b class="${I.length<cap?"t-red":I.length===cap&&cap?"t-grn":""}">${I.length}</b>/${cap}<small>${esc(xvGroupBy(I,c=>c.sku).map(([k,l])=>sk(k).n.split(" ")[0]+" "+l.length).join(", "))}</small></td>`}).join("")}</tr>`).join("")}</tbody></table></div></section>`;
   b.innerHTML=nhCard+kho+t7;
   b.querySelectorAll("[data-nhadd]").forEach(x=>x.onclick=()=>{const k=x.dataset.nhadd,f=x.closest(".nhadd"),a2=+f.querySelector(".a").value,z2=+f.querySelector(".z").value,ni=f.querySelector(".n");if(ni.value===""){toast("Gõ số video mỗi ngày");return}const n=+ni.value;DB.mutate(ME.name,"nhịp đăng "+k,dt=>{dt.settings.nhip=dt.settings.nhip||{};dt.settings.nhip[k]=(dt.settings.nhip[k]||[]).concat({tu:Math.min(a2,z2),den:Math.max(a2,z2),sl:n}).sort((p,q)=>p.tu-q.tu)});renderMain()});
@@ -75,8 +75,6 @@ xvDang2=function(b,o){
   b.querySelectorAll("[data-kdp]").forEach(x=>x.onclick=()=>{const id=x.dataset.kdp,c=d.cards.find(y=>y.id===id),l=b.querySelector(`[data-kdl="${id}"]`).value.trim();if(!l){toast("Dán link bài đã đăng trước");return}
     const inp={linkDang:l,ngayDang:today};if(chOf(c.kenh).needId){const m2=l.match(/\d{19}/);if(!m2){toast("Link TikTok phải có dãy 19 số sau /video/");return}inp.tiktokId=m2[0]}
     const e=moveCard(ME,id,"xong",inp);if(e){toast(e);return}toast("Đã ghi là đã đăng");renderMain()});
-  b.querySelectorAll("[data-kdsp]").forEach(x=>x.onclick=()=>{const id=x.dataset.kdsp,c=d.cards.find(y=>y.id===id),v=prompt("Link sản phẩm (giỏ hàng) cho video này:",kdSP(c));if(v===null)return;const l=v.trim();
-    DB.mutate(ME.name,"link sản phẩm "+id,dt=>{const y=dt.cards.find(q=>q.id===id);if(y)y.linkSP=l;dt.settings.linkSP=dt.settings.linkSP||{};if(l&&!dt.settings.linkSP[y.sku])dt.settings.linkSP[y.sku]=l});renderMain()});
   bindCommon(b);
 };
 
@@ -166,3 +164,16 @@ pLich=function(m){
   else calMonth($("#lb"),C,r);
 };
 PAGES.lich=pLich;
+
+/* ---------- Video win & nhân bản ngay trong Làm hằng ngày (nối với ① Kế hoạch tuần: loại "Nhân bản win") ---------- */
+function xvWin(b,o){
+  PAGES.win(b);const ph=b.querySelector(".ph");if(ph)ph.remove();
+  const d=o.d,W=winners().filter(w=>!XV.sku||w.sku===XV.sku).slice(0,5);
+  if(XV.sku&&W.length)b.insertAdjacentHTML("afterbegin",`<div class="note">Video win của <b>${esc(sk(XV.sku).n)}</b>: ${W.map(w=>`${esc((w.ten||"").slice(0,50))} (${nf(w.don)} đơn)`).join(" · ")}. Bấm <b>Phân tích Hypit</b> ở video muốn nhân bản trong bảng dưới.</div>`);
+}
+/* ① Kế hoạch tuần: ô "Nhân bản win" hiện luôn video win của sản phẩm đó để Oanh biết nhân bản cái nào */
+const _xvTuanWin=xvTuan;
+xvTuan=function(b,o){_xvTuanWin(b,o);
+  b.querySelectorAll('[data-wpgo$="|nhanban"]').forEach(x=>{const sku=x.dataset.wpgo.split("|")[0],W=winners().filter(w=>w.sku===sku&&w.don>0).slice(0,3);
+    x.insertAdjacentHTML("beforebegin",W.length?`<div class="wpwin">🏆 Video win ${esc(sk(sku).n)}: ${W.map(w=>`${esc((w.ten||"").slice(0,40))}${(w.ten||"").length>40?"…":""} <b>${nf(w.don)} đơn</b>`).join(" · ")}</div>`:`<div class="wpwin hint">Chưa có video win của ${esc(sk(sku).n)} (cần nhập báo cáo TikTok).</div>`)});
+};
