@@ -134,14 +134,14 @@ function pXepViec2(m){
   const d=D(),W=xvWeek(),days=xvDays(W),WC=d.cards.filter(c=>xvIn(c,W)),team=xvTeam(),give=xvGive(),free=xvKhoFree();
   const slots=WC.filter(isPH);
   const kbPool=d.cards.filter(c=>["moi","worker"].includes(loaiOf(c))&&!isPH(c)&&(c.step==="cg"||(c.step==="kb"&&!c.nguoi)));
-  const ePool=d.cards.filter(c=>(c.step==="edit"&&!c.nguoiEdit)||(c.step==="cg"&&["reup","nhanban"].includes(loaiOf(c))&&!isPH(c))).sort((a,b)=>cDay(a)-cDay(b));
+  const ePool=d.cards.filter(c=>c.step==="edit"&&!c.nguoiEdit&&!c.wt);
   const hkWait=d.cards.filter(c=>c.buoiQuay&&c.step==="dkb").length,un=d.cards.filter(c=>!c.day&&["edit","worker","dvd","dceo","dang"].includes(c.step)).length;
   const tabs=[["tuan","① Kế hoạch tuần",0],["kho","② Video tồn",slots.length],["quay","③ Buổi quay & hook",hkWait],["wk","Video Worker",d.cards.filter(c=>loaiOf(c)==="worker"&&["kb","dkb"].includes(c.step)).length],["kb","Kịch bản (nếu có)",kbPool.length],["edit","④ Edit",ePool.length],["dang","⑤ Lịch đăng",un]];
   if(!tabs.some(t=>t[0]===XV.tab))XV.tab="tuan";
   m.innerHTML=H("Xếp việc tuần",`${xvLbl(W)} · làm lần lượt từ ① đến ⑤, bước nào có số là còn việc`)+`<div class="lwtool"><div class="seg xvtabs">${tabs.map(([k,t,n])=>`<button data-xvt="${k}" class="${XV.tab===k?"on":""}">${t}${n?` <span class="xbadge">${n}</span>`:""}</button>`).join("")}</div></div><div id="xvb"></div>`;
   m.querySelectorAll("[data-xvt]").forEach(b=>b.onclick=()=>{XV.tab=b.dataset.xvt;XV.sel.clear();renderMain()});
   const b=$("#xvb"),o={d,W,days,WC,team,give,slots,free,kbPool,qPool:[],ePool,post:WC.filter(c=>c.step==="dang")};
-  ({tuan:xvTuan,kho:xvKho2,quay:xvQuay2,wk:xvWorker2,kb:xvKB,edit:xvEdit,dang:xvDang2})[XV.tab](b,o);
+  ({tuan:xvTuan,kho:xvKho2,quay:xvQuay2,wk:xvWorker2,kb:xvKB,edit:xvEdit2,dang:xvDang2})[XV.tab](b,o);
   wpWorkList(b,XV.tab);
   /* nối với ① Kế hoạch tuần: dải "cần làm" + chọn sẵn sản phẩm đang làm */
   const ST={kho:["ton","reup"],quay:["oneshot","kichban"],wk:["worker"]}[XV.tab];
@@ -464,3 +464,36 @@ async function wkRedo(id,btn){
     if(t.status==="error"){toast("Worker không làm lại được: "+(t.detail||"không rõ lý do"));renderMain();return}
     if(t.status==="done"){DB.mutate(ME.name,"Worker làm lại "+c.wJob,dt=>{const y=dt.cards.find(z=>z.id===id);if(!y)return;y.step="worker";y.wStatus="running";y.wStage="";y.linkFinal="";y.wDetail=t.detail||"Worker đang làm lại từ đầu";y.wFixAt=new Date().toISOString()});toast(t.detail||"Worker đang làm lại");WT_AT=0;renderMain();return}}
   toast("Máy văn phòng chưa nhận việc làm lại. Kiểm tra máy có bật không, việc vẫn nằm chờ và sẽ chạy khi máy bật.");renderMain()}
+
+
+/* ---------- ④ Edit (làm lại): Oanh giao theo SỐ LƯỢNG, ai edit xong video nào thì dán link video đó và gửi duyệt ----------
+   Video quay xong nằm chung một chỗ; Oanh điền mỗi người bao nhiêu video rồi bấm Giao (chia lần lượt theo ngày quay).
+   Người edit: mỗi video có ô dán link + Gửi duyệt (Oanh → chị). Oanh tự edit thì gửi thẳng chị duyệt. */
+const isApprover=u=>!!u&&u.role==="lead"&&(u.perms||[]).includes("viec.duyet");
+const _mvEdit=moveCard;
+moveCard=function(u,id,to,inp){const c=D().cards.find(x=>x.id===id),from=c&&c.step,e=_mvEdit(u,id,to,inp);
+  if(!e&&from==="edit"&&to==="dvd"&&isApprover(u)){const e2=moveCard(u,id,"dceo",{});if(!e2)toast("Video Oanh tự edit: đã gửi thẳng chị duyệt")}return e};
+function xvEdit2(b,o){
+  const {d,W,team,give}=o,today=d.settings.today;
+  const pool=d.cards.filter(c=>c.step==="edit"&&!c.nguoiEdit&&!c.wt).sort((a,c)=>(a.qday||a.day||99)-(c.qday||c.day||99));
+  const ed=d.cards.filter(c=>c.nguoiEdit&&!c.wt&&["edit","dvd","dceo"].includes(c.step));
+  const doneW=u=>d.cards.filter(c=>c.nguoiEdit===u&&["dang","xong"].includes(c.step)&&xvIn(c,W)).length;
+  const may=c=>give||c.nguoiEdit===ME.id;
+  const prodG=xvGroupBy(pool,c=>c.sku);
+  const row=c=>{const t=d.tuyen.find(x=>x.ma===c.maTuyen),late=isLate(c);return `<div class="edr${late?" late":""}">${swatch(c.sku)}<span class="xmt clk" data-card="${c.id}"><b>${esc(c.hookText||c.yTuong||c.id)}</b><small>${esc(sk(c.sku).n)}${t?" · "+esc(t.tuyen):""} · ${esc(chOf(c.kenh).short)}${c.oneShot?" · one shot":""}</small></span>${hanTag(c)}
+    ${c.step==="edit"?(may(c)?`<input class="hkin" data-edl="${c.id}" placeholder="Dán link video đã edit (Drive)…" value="${esc(c.linkFinal||"")}">${late?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm pri" data-edsend="${c.id}">Gửi duyệt</button>${typeof wkCan==="function"&&wkCan(c)?`<button class="btn sm" data-wsend="${c.id}">Gửi Worker</button>`:""}`:`<span class="hint">đang edit</span>`)
+     :`${pill(c.step==="dvd"?"chờ Oanh duyệt":"chờ chị duyệt","amb")}${c.linkFinal?`<a href="${esc(/^https?:/.test(c.linkFinal)?c.linkFinal:"https://"+c.linkFinal)}" target="_blank" rel="noopener">xem</a>`:""}`}
+    ${give&&c.step==="edit"?`<select class="edmv" data-edmv="${c.id}" title="Chuyển cho người khác">${opt([["","Chuyển…"]].concat(team.filter(u=>u.id!==c.nguoiEdit).map(u=>[u.id,u.name])).concat([["__pool","Trả về chưa giao"]]),"")}</select>`:""}</div>`};
+  b.innerHTML=`<section class="card"><div class="card-h"><h2>Video đã quay, chờ chia edit</h2><span class="hint">${pool.length} video${prodG.length?" · "+prodG.map(([k,L])=>esc(sk(k).n)+" "+L.length).join(" · "):""}</span></div>
+   ${give&&pool.length?`<div class="edas"><span class="hint">Giao theo số lượng (lấy lần lượt video quay trước):</span><label>Sản phẩm<select id="ed-sku">${opt([["","Tất cả"]].concat(prodG.map(([k,L])=>[k,sk(k).n+" ("+L.length+")"])),"")}</select></label>${team.map(u=>`<label class="wpu"><span>${esc(u.name)}</span><input type="number" min="0" class="num" data-edn="${u.id}" placeholder="0"></label>`).join("")}<label>Hạn xong<select id="ed-han">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dd(i+1)]),Math.min(MONTH.ndays,today+2))}</select></label><button class="btn pri" id="ed-go">Giao</button></div>`:pool.length?"":`<p class="hint">Không còn video nào chờ chia edit. Video quay xong (③ Buổi quay › Chốt buổi quay) sẽ vào đây.</p>`}</section>
+  <div class="edcols">${team.map(u=>{const L=ed.filter(c=>c.nguoiEdit===u.id),e1=L.filter(c=>c.step==="edit"),wait=L.filter(c=>c.step!=="edit"),late=e1.filter(isLate).length;
+    return `<section class="card edcol"><div class="card-h"><h2>${esc(u.name)}</h2><span class="hint">đang edit <b>${e1.length}</b>${late?` · <b class="t-red">${late} trễ</b>`:""} · chờ duyệt <b>${wait.length}</b> · đã duyệt tuần này <b>${doneW(u.id)}</b>${isApprover(u)?" · gửi thẳng chị duyệt":""}</span></div>
+     ${L.length?`<div class="edl">${e1.map(row).join("")}${wait.map(row).join("")}</div>`:`<p class="hint">Chưa có video edit.</p>`}</section>`}).join("")}</div>`;
+  if($("#ed-go"))$("#ed-go").onclick=()=>{const sku=$("#ed-sku").value,han=+$("#ed-han").value,ask=[...b.querySelectorAll("[data-edn]")].map(i=>[i.dataset.edn,Math.max(0,+i.value||0)]).filter(z=>z[1]);if(!ask.length){toast("Điền số video cho ít nhất một người");return}
+    const P=pool.filter(c=>!sku||c.sku===sku).map(c=>c.id),need=ask.reduce((a,z)=>a+z[1],0);if(need>P.length){toast(`Chỉ còn ${P.length} video chờ chia edit${sku?" của sản phẩm này":""}`);return}
+    let i=0;const plan=ask.map(([u,n])=>[u,P.slice(i,i+=n)]);
+    DB.mutate(ME.name,"chia edit: "+plan.map(([u,L])=>userName(u)+" "+L.length).join(", "),dt=>{plan.forEach(([u,L])=>L.forEach(id=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;x.nguoiEdit=u;x.nguoi=u;x.batDau=dt.settings.today;x.han=han;x.tre=null}));if(typeof notifyU==="function")plan.forEach(([u,L])=>notifyU(dt,[u],`${ME.name} giao bạn edit ${L.length} video, hạn ${dd(han)}`,L[0]))});
+    toast("Đã giao: "+plan.map(([u,L])=>userName(u)+" "+L.length).join(", "));renderMain()};
+  b.querySelectorAll("[data-edsend]").forEach(x=>x.onclick=()=>{const id=x.dataset.edsend,l=b.querySelector(`[data-edl="${id}"]`).value.trim(),tr=b.querySelector(`[data-tre="${id}"]`);if(!l){toast("Dán link video đã edit trước");return}const e=moveCard(ME,id,"dvd",{linkFinal:l,lyDoTre:tr?tr.value.trim():undefined});if(e){toast(e);return}toast("Đã gửi duyệt");renderMain()});
+  b.querySelectorAll("[data-edmv]").forEach(x=>x.onchange=()=>{const v=x.value,id=x.dataset.edmv;if(!v)return;DB.mutate(ME.name,v==="__pool"?"trả video về chưa giao edit "+id:"chuyển edit "+id+" cho "+userName(v),dt=>{const c=dt.cards.find(y=>y.id===id);if(!c)return;if(v==="__pool"){c.nguoiEdit="";c.nguoi="";c.han=0}else{c.nguoiEdit=v;c.nguoi=v;if(typeof notifyU==="function")notifyU(dt,[v],`${ME.name} chuyển cho bạn edit: ${c.hookText||c.id}`,id)}});renderMain()});
+}

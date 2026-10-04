@@ -652,3 +652,12 @@ table.kstab td{vertical-align:middle}
 .chf{display:flex;gap:8px;align-items:flex-end;margin-top:8px}.chf textarea{flex:1;min-height:42px}
 .chwho{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.chwho .chip{border:1px solid var(--line);background:#fff;cursor:pointer}
 .cthr{margin-top:14px}
+
+.edas{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.edas label{display:grid;gap:3px;font-size:12.5px;color:var(--muted)}.edas select{width:auto;height:34px}.edas .wpu{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink)}.edas .wpu input{width:64px;height:34px}
+.edcols{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}
+.edl{display:grid;gap:6px}
+.edr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid #eceef5;border-radius:10px;padding:7px 10px;background:#fcfcff}
+.edr.late{border-color:#f3b6cb;background:#fff7fa}
+.edr .xmt{flex:1 1 200px;min-width:0}.edr .xmt b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.edr .xmt small{color:var(--muted);font-size:12px}
+.edr .hkin{flex:1 1 220px}.edmv{width:auto;height:30px;font-size:12.5px}
+@media (max-width:900px){.edcols{grid-template-columns:1fr}}
