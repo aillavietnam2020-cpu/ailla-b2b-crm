@@ -100,7 +100,7 @@ DB.load=async function(){
   ME=u?this.data.users.find(x=>x.id===u.id):null;
   // Mỗi lần mở Hub đều bắt đầu ở trang chủ (Tổng quan điều hành), không mở lại trang lần trước.
   // CEO vào Tổng quan điều hành; nhân viên vào Tổng quan công việc (việc của mình, việc được giao).
-  MOD=ME&&ME.role!=="admin"?"cv":"";PAGE=ME&&ME.role!=="admin"?"cv_tq":"";if(/^#lo=/.test(location.hash)){MOD="sx";PAGE="sx_lo"}try{localStorage.removeItem(SKEY+"_m");localStorage.removeItem(SKEY+"_p")}catch(e){}
+  MOD=ME&&ME.role!=="admin"?"cv":"";PAGE=ME&&ME.role!=="admin"?"cv_tq":"";if(/^#lo=/.test(location.hash)){MOD="sx";PAGE="sx_lo"}try{localStorage.removeItem(SKEY+"_m");localStorage.removeItem(SKEY+"_p")}catch(e){}if(typeof restoreView==="function")restoreView(); // F5: tab đang mở giữ nguyên trang đang làm
   // Mọi người dùng chung khung phân hệ; mỗi người chỉ thấy phân hệ của phòng mình (xem svAllowedMods).
   APP_MODE="admin";
   for(const p of this.data.departments||[])if(!MKT_PB.includes(p.k)&&!TEAMS[p.k])TEAMS[p.k]=p.n;
