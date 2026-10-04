@@ -135,8 +135,8 @@ function pXepViec2(m){
   const slots=WC.filter(isPH);
   const kbPool=d.cards.filter(c=>["moi","worker"].includes(loaiOf(c))&&!isPH(c)&&(c.step==="cg"||(c.step==="kb"&&!c.nguoi)));
   const ePool=d.cards.filter(c=>c.step==="edit"&&!c.nguoiEdit&&!c.wt);
-  const hkWait=d.cards.filter(c=>c.buoiQuay&&c.step==="dkb").length,un=d.cards.filter(c=>!c.day&&["edit","worker","dvd","dceo","dang"].includes(c.step)).length;
-  const tabs=[["tuan","① Kế hoạch tuần",0],["kho","② Video tồn",slots.length],["quay","③ Buổi quay & hook",hkWait],["wk","Video Worker",d.cards.filter(c=>loaiOf(c)==="worker"&&["kb","dkb"].includes(c.step)).length],["kb","Kịch bản (nếu có)",kbPool.length],["edit","④ Edit",ePool.length],["dang","⑤ Lịch đăng",un]];
+  const hkWait=d.cards.filter(c=>c.buoiQuay&&c.step==="dkb").length,un=d.cards.filter(c=>!c.day&&c.step==="dang").length;
+  const tabs=[["tuan","① Kế hoạch tuần",0],["kho","② Video tồn",slots.length],["quay","③ Buổi quay & hook",hkWait],["wk","Video Worker",d.cards.filter(c=>loaiOf(c)==="worker"&&["kb","dkb"].includes(c.step)).length],["kb","Kịch bản (nếu có)",kbPool.length],["edit","④ Edit",ePool.length],["dang","⑤ Kho video & lịch đăng",un]];
   if(!tabs.some(t=>t[0]===XV.tab))XV.tab="tuan";
   m.innerHTML=H("Xếp việc tuần",`${xvLbl(W)} · làm lần lượt từ ① đến ⑤, bước nào có số là còn việc`)+`<div class="lwtool"><div class="seg xvtabs">${tabs.map(([k,t,n])=>`<button data-xvt="${k}" class="${XV.tab===k?"on":""}">${t}${n?` <span class="xbadge">${n}</span>`:""}</button>`).join("")}</div></div><div id="xvb"></div>`;
   m.querySelectorAll("[data-xvt]").forEach(b=>b.onclick=()=>{XV.tab=b.dataset.xvt;XV.sel.clear();renderMain()});

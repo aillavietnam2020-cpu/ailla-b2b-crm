@@ -661,3 +661,24 @@ table.kstab td{vertical-align:middle}
 .edr .xmt{flex:1 1 200px;min-width:0}.edr .xmt b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.edr .xmt small{color:var(--muted);font-size:12px}
 .edr .hkin{flex:1 1 220px}.edmv{width:auto;height:30px;font-size:12.5px}
 @media (max-width:900px){.edcols{grid-template-columns:1fr}}
+/* kho video đăng được · đủ video chưa · kho cảnh · calendar tháng */
+.kdu{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.kduk{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:8px}
+.kduk.bad{border-color:#f1a7a7;background:#fff7f7}.kduk.mid{border-color:#f3cf8a;background:#fffbf2}.kduk.ok{border-color:#b7e3c4}
+.kduh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.kduh small{color:var(--muted)}
+.kdun{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}.kdun span{background:rgba(0,0,0,.03);border-radius:8px;padding:6px 2px}.kdun small{display:block;font-size:11px;color:var(--muted)}.kdun b{font-size:18px}
+.kdumsg{font-size:13px}.kduk.bad .kdumsg{color:#c92a2a;font-weight:600}
+.kdug{font-size:12.5px;display:flex;flex-direction:column;gap:2px}.kdug small{color:var(--muted)}
+.nhadd summary{cursor:pointer;font-size:13px;color:var(--accent,#5b5bd6)}.nhaddf{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;font-size:13px}.nhaddf .num{width:64px}
+.kdt td small{display:block;color:var(--muted)}.kdt td.wide{min-width:220px}.kdpost{display:flex;gap:4px}.kdpost input{min-width:160px}
+.filters.pad,.empty.pad,.hint.pad{padding-left:16px;padding-right:16px}
+.kcb{display:flex;flex-direction:column;gap:6px;margin:8px 0}.kcr{font-size:13px;background:#f4f6ff;border-radius:8px;padding:6px 10px}
+.kcadd{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:8px}.kcadd .kl{flex:1 1 280px}.kcadd .kn{width:80px}.kcadd .kg{flex:1 1 200px}.kcadd .hint{flex-basis:100%}
+.calr{display:flex;align-items:center;gap:6px;font-size:13px}
+.calm{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.calh{padding:8px;font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line)}
+.calc{min-height:110px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.calc.out{background:rgba(0,0,0,.02)}.calc.past{opacity:.75}.calc.now{background:#f3f1ff}
+.caln{display:flex;justify-content:space-between;font-size:12px}
+@media(max-width:760px){.calm{grid-template-columns:1fr}.calh,.calc.out{display:none}.calc{min-height:0}}
+.kdt td,.kdt th{white-space:nowrap}.kdt td.wide{white-space:normal}.kdpost input{min-width:150px;width:150px}
