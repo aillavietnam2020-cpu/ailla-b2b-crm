@@ -37,13 +37,13 @@ function kocImport(u,res,quiet){
 const _applyTikTokKoc=applyTikTok;
 applyTikTok=function(u,res,kenh){const cl=_applyTikTokKoc(u,res,kenh);kocImport(u,res,true);return cl};
 
-let KOCF=(()=>{const t=new Date(),y=t.getFullYear(),m=t.getMonth(),z=n=>String(n).padStart(2,"0");return {st:"pot",sku:"",top:10,k:"mo",f:`${y}-${z(m+1)}-01`,t:`${y}-${z(m+1)}-${z(new Date(y,m+1,0).getDate())}`}})();
+let KOCF=(()=>{const t=new Date(),y=t.getFullYear(),m=t.getMonth(),z=n=>String(n).padStart(2,"0");return {st:"all",sku:"",top:10,k:"mo",f:`${y}-${z(m+1)}-01`,t:`${y}-${z(m+1)}-${z(new Date(y,m+1,0).getDate())}`}})();
 /* Số của một video trong khoảng ngày chọn: cộng các lần nhập báo cáo nằm trọn trong khoảng (bỏ báo cáo chồng ngày) */
 const kocHist=v=>{if(v.hist&&v.hist.length)return v.hist;const m=String(v.ky||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);return m?[{f:m[1],t:m[2],d:v.don,g:v.gmv,v:v.view,c:v.click}]:[]};
 function kocIn(v,f,t){const H=kocHist(v).filter(h=>h.f>=f&&h.t<=t).sort((a,b)=>(b.t>b.f?1:0)-(a.t>a.f?1:0)||b.t.localeCompare(a.t)),pick=[];
   H.sort((a,b)=>(Date.parse(b.t)-Date.parse(b.f))-(Date.parse(a.t)-Date.parse(a.f))).forEach(h=>{if(!pick.some(p=>!(h.t<p.f||h.f>p.t)))pick.push(h)});
   return pick.length?{don:sum(pick,h=>h.d||0),gmv:sum(pick,h=>h.g||0),view:sum(pick,h=>h.v||0),click:sum(pick,h=>h.c||0),ky:pick.length}:null}
-const KOC_ST=[["pot","Chờ check"],["win","Đã duyệt vào kho win"],["bo","Bỏ qua"],["all","Tất cả"]];
+const KOC_ST=[["all","Tất cả"],["pot","Chờ check (từ ngưỡng tiềm năng)"],["win","Đã duyệt vào kho win"],["bo","Bỏ qua"]];
 const kocUpBtn=()=>{const last=(D().kocImports||[]).slice(-1)[0];return `<button class="btn sm" id="koc-up" title="${last?esc("Lần nhập gần nhất: "+(last.range||last.file)+" · "+nf(last.n)+" video, "+nf(last.koc)+" KOC · "+last.at):"Chưa nhập báo cáo KOC"}">⬆ Tải báo cáo KOC</button><input type="file" id="koc-fi" accept=".xlsx,.xls,.csv" hidden>`};
 function kocSection(){
   const d=D(),S=d.settings,all=d.kocVideos||[],can=kocCan(),pot=S.potential||30,F=KOCF;
@@ -57,11 +57,12 @@ function kocSection(){
     ${ME.role==="admin"?`<button class="lnk" id="koc-own" title="Video của các tài khoản này không tính là KOC">Tài khoản shop · sửa</button>`:""}</div>
    ${L.length?`<div class="tbl"><table class="koct"><thead><tr><th class="n">#</th><th>Video</th><th>KOC</th><th>Sản phẩm</th><th>Ngày đăng</th><th class="n">View</th><th class="n">CTR</th><th class="n">Đơn</th><th class="n">GMV</th><th>Mức</th><th></th></tr></thead><tbody>${L.map((v,i)=>{const lv=kocLvl(v);return `<tr><td class="n">${i+1}</td><td class="kocvid"><a href="${esc(kocLink(v))}" target="_blank" rel="noopener" title="${esc(v.ten||"")}">▶ ${esc(v.ten||"Xem video")}</a></td><td>@${esc(v.acc)}</td><td>${swatch(v.sku)}${esc(sk(v.sku).n)}</td><td>${esc((v.tm||"").replace(/\//g,"-").split("-").reverse().join("/"))}</td><td class="n">${nf(v.view||0)}</td><td class="n">${v.view?((v.click||0)/v.view*100).toFixed(1)+"%":"—"}</td><td class="n"><b>${nf(v.don||0)}</b></td><td class="n">${money(v.gmv||0)}</td><td>${pill(lv[0],lv[1])}</td>
      <td class="nowrap">${v.st==="win"?`${pill("Đã vào kho win","grn")}`:v.st==="bo"?`${pill("Bỏ qua","gry")}${can?` <button class="lnk" data-kocu="${v.id}">hoàn tác</button>`:""}`:can?`<button class="btn sm pri" data-kocw="${v.id}">✓ Vào kho win</button> <button class="lnk" data-kocb="${v.id}">Bỏ qua</button>`:`<span class="hint">chờ Oanh check</span>`}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có video nào khớp bộ lọc (thử chọn Tất cả hoặc đổi thời gian).":"Chưa có video KOC. Bấm ⬆ Tải báo cáo KOC ở góc trên."}</p>`}
+   ${L.length&&L.length<(+F.top||10)?`<p class="hint pad">Chỉ có ${L.length} video khớp bộ lọc ${F.st!=="all"?`"${esc((KOC_ST.find(x=>x[0]===F.st)||[])[1])}"`:""} trong kỳ này${F.st!=="all"?` · chọn Trạng thái "Tất cả" để xem đủ top ${F.top}`:""}.</p>`:""}
    <p class="hint pad">Số view, đơn, GMV tính theo các báo cáo KOC đã tải nằm trong khoảng thời gian chọn. "Vào kho win": video vào Video win (nguồn KOC) để Hypit phân tích rồi nhân bản.</p></section>`;
 }
 function kocBind(m){
   const fi=$("#koc-fi");if(fi){$("#koc-up").onclick=()=>fi.click();fi.onchange=async()=>{const f=fi.files[0];if(!f)return;const rows=await readXlsx(f);const res=parseTikTok(rows,f.name);if(res.err){toast(res.err);return}
-    const mR=String(res.range||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);if(mR&&(mR[1]<KOCF.f||mR[2]>KOCF.t)){KOCF.k="c";KOCF.f=mR[1];KOCF.t=mR[2]}KOCF.st="pot";kocImport(ME,res,false);renderMain()}}
+    const mR=String(res.range||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);if(mR&&(mR[1]<KOCF.f||mR[2]>KOCF.t)){KOCF.k="c";KOCF.f=mR[1];KOCF.t=mR[2]}kocImport(ME,res,false);renderMain()}}
   const mo=off=>{const t=new Date(),y=t.getFullYear(),mm=t.getMonth()+off,a=new Date(y,mm,1),b=new Date(y,mm+1,0),z=n=>String(n).padStart(2,"0");return [`${a.getFullYear()}-${z(a.getMonth()+1)}-01`,`${b.getFullYear()}-${z(b.getMonth()+1)}-${z(b.getDate())}`]};
   $("#koc-top").onchange=e=>{let v=e.target.value;if(v==="__"){v=prompt("Hiện top bao nhiêu video?","15");if(!v||!(+v>0)){renderMain();return}}KOCF.top=Math.round(+v);renderMain()};
   $("#koc-k").onchange=e=>{KOCF.k=e.target.value;if(KOCF.k!=="c")[KOCF.f,KOCF.t]=mo(KOCF.k==="mo"?0:-1);renderMain()};
