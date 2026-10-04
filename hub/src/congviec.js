@@ -75,6 +75,11 @@ function cvCard(x){const ed=x.src==="task"&&(can(ME,"viec.giao")||x.nguoi===ME.i
   <b class="cvt${x.st==="done"?" strike":""}">${esc(x.ten)}</b><div class="cvm">${esc(x.mo)}</div>
   <div class="cvtags">${x.da?`<span>📁 ${esc(prjN(x.da))}</span>`:""}<span>👥 ${TEAMS[x.team]||x.team}</span>${x.ck&&x.ck.length?`<span>☑ ${x.ck.filter(c=>c.x).length}/${x.ck.length}</span>`:""}</div>
   <div class="cvf2"><span class="who">${avatar(x.nguoi)}${esc(userName(x.nguoi)||"Chưa giao")}${x.phoi.length?`<small> +${x.phoi.map(userName).filter(Boolean).join(", ")}</small>`:""}</span><span class="${x.late?"t-red":x.st==="done"?"t-grn":"hint"}">${x.late?`⚠ Quá hạn ${x.lateD} ngày`:x.st==="done"?"✓ Xong":"Hạn "+dd(x.han)}</span></div></div>`}
+/* Thẻ gọn cho bảng Kanban: cột đã là trạng thái nên không lặp nhãn trạng thái */
+function kbCard(x){const uu=x.uu==="Cao"?"cao":x.uu==="Thấp"?"thap":"tb",who=userName(x.nguoi)||"Chưa giao",meta=[x.loai,x.mo].filter(Boolean).join(" · ");
+  return `<div class="kbc${x.late?" late":x.st==="done"?" done":""}" data-cv="${x.id}" data-src="${x.src}" draggable="${x.src==="task"}" title="${esc(x.ten)}">
+   <div class="kbt${x.st==="done"?" strike":""}">${esc(x.ten)}</div>${meta?`<div class="kbm">${esc(meta)}</div>`:""}
+   <div class="kbf"><span class="kbwho">${avatar(x.nguoi)}<span>${esc(who.split(" ").slice(-2).join(" "))}${x.phoi.length?` <small>+${x.phoi.length}</small>`:""}</span></span><i class="kbuu u-${uu}" title="Ưu tiên ${esc(x.uu)}">${esc(x.uu==="Trung bình"?"TB":x.uu)}</i><span class="kbd ${x.late?"t-red":x.st==="done"?"t-grn":""}">${x.late?`Trễ ${x.lateD}n`:x.st==="done"?"✓ Xong":x.han?dd(x.han):"—"}</span></div></div>`}
 function bindCvCards(m){
   m.querySelectorAll("[data-cvst]").forEach(s=>{s.onclick=e=>e.stopPropagation();s.onchange=()=>{{const t0=D().tasks.find(x=>x.id===s.dataset.cvst);if(t0&&s.value==="done"&&t0.han&&t0.han<D().settings.today&&t0.st!=="done"&&!tkMgr(t0)){toast("Việc đã trễ hạn: ghi lý do gửi quản lý");s.value=t0.st;openTask(t0.id);return}}DB.mutate(ME.name,"đổi trạng thái việc",dt=>{const t=dt.tasks.find(x=>x.id===s.dataset.cvst);t.st=s.value});toast("Đã cập nhật");renderMain()}});
   m.querySelectorAll("[data-cv]").forEach(e=>e.onclick=ev=>{if(ev.target.closest("select,button,input"))return;const src=e.dataset.src,id=e.dataset.cv;if(src==="card")openCard(id);else if(src==="order"){PAGE="order";MOD="";render()}else openTask(id)});
@@ -150,9 +155,9 @@ function pCvNv(m){
 function pCvKb(m){
   const L=cvFilter(cvItems());
   m.innerHTML=H("Bảng tiến độ","Kéo thẻ việc sang cột khác để đổi trạng thái · thẻ video đi theo các bước riêng (bấm để mở)")+`<div class="filters"><span class="sp"></span>${newTaskBtn()}</div>${cvFilterBar({noSt:true})}
-  <div class="kbx">${CV_ST.map(([k,t,c])=>{const I=L.filter(x=>x.st===k).sort((a,b)=>(b.late-a.late)||a.han-b.han);return `<div class="kcol" data-drop="${k}"><div class="kh"><i class="dot d-${c}"></i><b>${t}</b><span>${I.length}</span></div>${I.slice(0,40).map(x=>cvCard(x).replace('class="cvc','draggable="'+(x.src==="task")+'" class="cvc')).join("")}${I.length>40?`<p class="hint">+${I.length-40} việc nữa</p>`:""}</div>`}).join("")}</div>`;
+  <div class="kbx">${CV_ST.map(([k,t,c])=>{const I=L.filter(x=>x.st===k).sort((a,b)=>(b.late-a.late)||a.han-b.han);return `<div class="kcol" data-drop="${k}"><div class="kh"><i class="dot d-${c}"></i><b>${t}</b><span>${I.length}</span></div>${I.slice(0,40).map(kbCard).join("")}${I.length>40?`<p class="hint">+${I.length-40} việc nữa</p>`:""}</div>`}).join("")}</div>`;
   bindCvFilter(m);bindCvCards(m);bindNew();
-  m.querySelectorAll('.cvc[draggable="true"]').forEach(c=>c.ondragstart=e=>e.dataTransfer.setData("text",c.dataset.cv));
+  m.querySelectorAll('.cvc[draggable="true"],.kbc[draggable="true"]').forEach(c=>c.ondragstart=e=>e.dataTransfer.setData("text",c.dataset.cv));
   m.querySelectorAll("[data-drop]").forEach(col=>{col.ondragover=e=>{e.preventDefault();col.classList.add("ov")};col.ondragleave=()=>col.classList.remove("ov");col.ondrop=e=>{e.preventDefault();col.classList.remove("ov");const id=e.dataTransfer.getData("text"),to=col.dataset.drop;if(to==="cg"){toast("Việc đã giao không chuyển về Chưa giao");return}const t=D().tasks.find(x=>x.id===id);if(!t)return;if(!(can(ME,"viec.giao")||t.nguoi===ME.id||(t.phoi||[]).includes(ME.id))){toast("Bạn không phụ trách việc này");return}if(to==="done"&&t.han&&t.han<D().settings.today&&t.st!=="done"&&!tkMgr(t)){toast("Việc đã trễ hạn: mở việc, ghi lý do gửi quản lý");openTask(t.id);return}DB.mutate(ME.name,`chuyển "${t.ten}" → ${cvStN(to)}`,dt=>dt.tasks.find(x=>x.id===id).st=to);renderMain()}});
 }
 /* ---------- 4. Lịch tháng ---------- */

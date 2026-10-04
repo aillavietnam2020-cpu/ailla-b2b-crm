@@ -732,3 +732,12 @@ td.wvid a{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;w
 .kbx{grid-template-columns:repeat(6,minmax(170px,1fr))!important}
 .kcol .cvh{flex-wrap:wrap;min-width:0}.kcol .cvh .hint{flex-basis:100%;order:9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
 .kcol>*{min-width:0}
+/* Thẻ Kanban gọn */
+.kbc{background:#fff;border:1px solid var(--line);border-left:3px solid #5b5bd6;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:0}
+.kbc:hover{box-shadow:0 4px 14px rgba(40,40,90,.08)}.kbc.late{border-left-color:#e03131}.kbc.done{border-left-color:#2f9e44;opacity:.75}
+.kbt{font-weight:600;font-size:13.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.kbt.strike{text-decoration:line-through;color:var(--muted)}
+.kbm{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kbf{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:2px;min-width:0}
+.kbwho{display:flex;align-items:center;gap:5px;flex:1;min-width:0}.kbwho>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kbwho .av,.kbwho [class*=avatar]{width:20px;height:20px;font-size:10px;flex:none}
+.kbuu{font-style:normal;font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 5px;flex:none}.u-cao{background:#ffe3e3;color:#c92a2a}.u-tb{background:#fff3db;color:#b76e00}.u-thap{background:#eef0f4;color:#667085}
+.kbd{flex:none;font-weight:600;color:#475467}.kbd.t-red{color:#c92a2a}.kbd.t-grn{color:#2f9e44}
