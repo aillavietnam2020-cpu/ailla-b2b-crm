@@ -70,10 +70,10 @@ function xvTuan(b,o){
   b.querySelectorAll("[data-wpa]").forEach(x=>x.onclick=()=>{const v=x.dataset.wpa,[sku,kenh,t,wx]=v.split("|"),box=x.closest(".wpas"),L=[...box.querySelectorAll("[data-wpu]")].map(i=>[i.dataset.wpu,Math.max(0,+i.value||0)]).filter(z=>z[1]);if(!L.length){toast("Điền số video cho ít nhất một người");return}const bd=+box.querySelector("[data-wpbd]").value,hn=+box.querySelector("[data-wphan]").value;if(hn<bd){toast("Hạn xong phải sau ngày bắt đầu");return}{const left=+((box.querySelector("small")||{}).textContent||"").replace(/\D+/g," ").trim().split(" ")[0]||0,ask=L.reduce((a2,z)=>a2+z[1],0);if(left&&ask>left){toast(`Chỉ còn ${left} video chưa giao theo kế hoạch, đang giao ${ask}. Sửa lại số cho từng người.`);return}}const out=L.map(([u,n])=>{wpAssign(sku,kenh,t,u,n,wx,bd,hn);return userName(u)+" "+n});toast("Đã giao: "+out.join(", "));renderMain()});
   b.querySelectorAll("[data-wpe]").forEach(x=>x.onclick=()=>{WP_EDIT.add(x.dataset.wpe);renderMain()});
   b.querySelectorAll("[data-wpec]").forEach(x=>x.onclick=()=>{WP_EDIT.delete(x.dataset.wpec);renderMain()});
-  b.querySelectorAll("[data-wpebox] input").forEach(i=>i.oninput=()=>{const bt=i.closest(".wpe").querySelector("[data-wpes]");delete bt.dataset.ok;bt.textContent="Lưu";i.closest(".wpe").querySelector(".wpeprev").textContent=""});
+  b.querySelectorAll("[data-wpebox] input,[data-wpebox] select").forEach(i=>i.oninput=i.onchange=()=>{const bt=i.closest(".wpe").querySelector("[data-wpes]");delete bt.dataset.ok;bt.textContent="Lưu";i.closest(".wpe").querySelector(".wpeprev").textContent=""});
   b.querySelectorAll("[data-wpes]").forEach(x=>x.onclick=()=>{const id=x.dataset.wpes,box=x.closest(".wpe"),tg={};let bad="";
     box.querySelectorAll("[data-wpeu]").forEach(i=>{const v=Math.max(0,Math.floor(+i.value||0));if(v<(+i.min||0))bad=`${userName(i.dataset.wpeu)||"Người này"} đã xong ${i.min} việc, không bớt dưới ${i.min} được`;tg[i.dataset.wpeu]=v});
-    if(bad){toast(bad);return}const P=wpEditCalc(D(),id,tg),txt=wpEditText(P);if(!txt.length){WP_EDIT.delete(id);renderMain();return}
+    if(bad){toast(bad);return}const hs={};box.querySelectorAll("[data-wpeh]").forEach(i=>{if(i.value&&i.value!==i.dataset.orig&&(tg[i.dataset.wpeh]||0)>0)hs[i.dataset.wpeh]=+i.value});const P=wpEditCalc(D(),id,tg,hs),txt=wpEditText(P);if(!txt.length){WP_EDIT.delete(id);renderMain();return}
     if(!x.dataset.ok){box.querySelector(".wpeprev").innerHTML="Sẽ: "+txt.map(esc).join(" · ");x.dataset.ok=1;x.textContent="Đồng ý, lưu";return}
     wpEditApply(id,P);WP_EDIT.delete(id);toast("Đã sửa: "+txt.join(", "));renderMain()});
 }
@@ -237,14 +237,14 @@ function wpEditCells(dt,id){const [sku,kenh,t,w2]=id.split("|"),WW=w2==="M"?{tu:
   if(t==="nhanban")return {sku,kenh,t,w2,TK:(dt.tasks||[]).filter(x=>x.mix==="nhanban"&&x.sku===sku&&x.kenh===kenh&&String(x.wk)===String(w2))};
   return {sku,kenh,t,w2,G:dt.cards.filter(c=>c.sku===sku&&c.kenh===kenh&&mixOf(c)===t&&cDay(c)>=WW.tu&&cDay(c)<=WW.den)}}
 function wpEditBox(id,n,G,TK,team){
-  const cnt={},lock={};G.forEach(c=>{const u=wpOwn(c);cnt[u]=(cnt[u]||0)+1;if(c.step==="xong")lock[u]=(lock[u]||0)+1});
-  TK.forEach(x=>{cnt[x.nguoi]=(cnt[x.nguoi]||0)+(x.sl||1);if(x.st==="done")lock[x.nguoi]=(lock[x.nguoi]||0)+(x.sl||1)});
+  const cnt={},lock={},han={};G.forEach(c=>{const u=wpOwn(c);cnt[u]=(cnt[u]||0)+1;if(c.step==="xong")lock[u]=(lock[u]||0)+1;else if(+c.han)han[u]=Math.max(han[u]||0,+c.han)});
+  TK.forEach(x=>{cnt[x.nguoi]=(cnt[x.nguoi]||0)+(x.sl||1);if(x.st==="done")lock[x.nguoi]=(lock[x.nguoi]||0)+(x.sl||1);else if(+x.han)han[x.nguoi]=Math.max(han[x.nguoi]||0,+x.han)});const dOpts=Array.from({length:MONTH.ndays},(_,i)=>[i+1,dd(i+1)]);
   const ids=[...new Set([...Object.keys(cnt),...team.map(u=>u.id)])];
-  return `<div class="wpas wpe" data-wpebox="${esc(id)}"><small>Sửa số việc từng người (kế hoạch ${n}). Bớt người này, thêm người kia là <b>chuyển việc</b>, phần đã làm giữ nguyên. Bớt mà không ai nhận thì <b>bỏ việc thừa</b>: bỏ việc chưa làm trước, video tồn đã chọn trả lại kho. Việc đã đăng không bớt được.</small>
-    ${ids.map(u=>`<label class="wpu"><span>${esc(userName(u)||"chưa có người")}${lock[u]?` <small>(${lock[u]} đã xong)</small>`:""}</span><input type="number" min="${lock[u]||0}" class="num" data-wpeu="${esc(u)}" value="${cnt[u]||0}"></label>`).join("")}
+  return `<div class="wpas wpe" data-wpebox="${esc(id)}"><small>Sửa số việc từng người (kế hoạch ${n}). Bớt người này, thêm người kia là <b>chuyển việc</b>, phần đã làm giữ nguyên. Bớt mà không ai nhận thì <b>bỏ việc thừa</b>: bỏ việc chưa làm trước, video tồn đã chọn trả lại kho. Việc đã đăng không bớt được. Ô <b>hạn</b> đổi hạn xong cho mọi việc chưa xong của người đó.</small>
+    ${ids.map(u=>`<label class="wpu"><span>${esc(userName(u)||"chưa có người")}${lock[u]?` <small>(${lock[u]} đã xong)</small>`:""}</span><input type="number" min="${lock[u]||0}" class="num" data-wpeu="${esc(u)}" value="${cnt[u]||0}"><select data-wpeh="${esc(u)}" data-orig="${han[u]||""}" title="Hạn xong việc của người này">${opt([["","hạn —"]].concat(dOpts.map(([v,l])=>[v,"hạn "+l])),han[u]||"")}</select></label>`).join("")}
     <div class="wpeprev hint"></div><button class="btn sm pri" data-wpes="${esc(id)}">Lưu</button><button class="btn sm ghost" data-wpec="${esc(id)}">Thôi</button></div>`}
 /* Tính trước sẽ làm gì: chuyển việc nào, bỏ việc nào, giao thêm bao nhiêu */
-function wpEditCalc(dt,id,tg){const X=wpEditCells(dt,id),P={moves:[],dels:[],adds:[],tk:[],started:0};
+function wpEditCalc(dt,id,tg,hs){const X=wpEditCells(dt,id),P={moves:[],dels:[],adds:[],tk:[],started:0,hans:Object.entries(hs||{})};
   if(X.t==="nhanban"){const have={};X.TK.forEach(x=>{have[x.nguoi]=(have[x.nguoi]||0)+(x.sl||1)});
     Object.keys({...have,...tg}).forEach(u=>{const h=have[u]||0,g=tg[u]??h;if(g!==h)P.tk.push([u,g-h])});return P}
   const by={};X.G.forEach(c=>{(by[wpOwn(c)]=by[wpOwn(c)]||[]).push(c)});const pool=[];
@@ -256,7 +256,7 @@ function wpEditText(P){const nm=u=>userName(u)||"chưa có người",o=[];
   const mv=xvGroupBy(P.moves,m=>m[1]+">"+m[2]);mv.forEach(([k,L])=>{const [f,t]=k.split(">");o.push(`chuyển ${L.length} việc từ ${nm(f)} sang ${nm(t)}`)});
   if(P.dels.length)o.push(`bỏ ${P.dels.length} việc thừa${P.started?` (trong đó ${P.started} việc đã bắt đầu làm)`:""}`);
   P.adds.forEach(([u,n])=>o.push(`giao thêm ${nm(u)} ${n} việc`));
-  P.tk.forEach(([u,n])=>o.push(n>0?`giao thêm ${nm(u)} ${n} video nhân bản`:`bớt ${nm(u)} ${-n} video nhân bản`));return o}
+  P.hans.forEach(([u,h])=>o.push(`đổi hạn ${nm(u)} sang ${dd(h)}`));P.tk.forEach(([u,n])=>o.push(n>0?`giao thêm ${nm(u)} ${n} video nhân bản`:`bớt ${nm(u)} ${-n} video nhân bản`));return o}
 function wpEditApply(id,P){const [sku,kenh,t,w2]=id.split("|");
   DB.mutate(ME.name,"sửa giao việc "+sk(sku).n+" "+kenh,dt=>{
     P.moves.forEach(([cid,f,u])=>{const c=dt.cards.find(x=>x.id===cid);if(!c)return;c.giao=u;["nguoi","nguoiKB","nguoiEdit","goiy"].forEach(k=>{if(c[k]===f)c[k]=u})});
@@ -265,8 +265,9 @@ function wpEditApply(id,P){const [sku,kenh,t,w2]=id.split("|");
     if(t==="nhanban"){const X=wpEditCells(dt,id),ref=X.TK[0]||{};P.tk.forEach(([u,n])=>{let left=n;
       if(left<0){X.TK.filter(x=>x.nguoi===u&&x.st!=="done").reverse().forEach(x=>{if(!left)return;const r=Math.min(x.sl||1,-left);x.sl=(x.sl||1)-r;left+=r});dt.tasks=dt.tasks.filter(x=>!(x.mix==="nhanban"&&x.sl<=0))}
       else{const o=X.TK.find(x=>x.nguoi===u&&x.st!=="done");if(o){o.sl=(o.sl||1)+left;left=0}else dt.tasks.push({...ref,id:uid("tk"),nguoi:u,sl:left,st:"todo",kq:"",checklist:[],tao:ME.id})}});
-      dt.tasks.filter(x=>x.mix==="nhanban"&&x.sku===sku&&x.kenh===kenh).forEach(x=>{x.ten=(x.ten||"").replace(/Nhân bản \d+/,"Nhân bản "+x.sl);x.moTa=(x.moTa||"").replace(/nhân bản \d+/,"nhân bản "+x.sl)})}});
-  if(t!=="nhanban")P.adds.forEach(([u,n])=>wpAssign(sku,kenh,t,u,n,w2==="M"?"M":+w2))}
+      dt.tasks.filter(x=>x.mix==="nhanban"&&x.sku===sku&&x.kenh===kenh).forEach(x=>{x.ten=(x.ten||"").replace(/Nhân bản \d+/,"Nhân bản "+x.sl);x.moTa=(x.moTa||"").replace(/nhân bản \d+/,"nhân bản "+x.sl)})}
+    if(P.hans.length){const X=wpEditCells(dt,id);P.hans.forEach(([u,h])=>{(X.G||[]).forEach(c=>{if(wpOwn(c)===u&&c.step!=="xong")c.han=h});(X.TK||[]).forEach(x=>{if(x.nguoi===u&&x.st!=="done")x.han=h})})}});
+  if(t!=="nhanban")P.adds.forEach(([u,n])=>{const h=(P.hans.find(z=>z[0]===u)||[])[1];wpAssign(sku,kenh,t,u,n,w2==="M"?"M":+w2,undefined,h)})}
 function wpAssign(sku,kenh,t,u,n,w,bd,hn){
   const d=D(),WW=w==="M"?{w:"M",tu:1,den:MONTH.ndays}:WEEKS.find(x=>x.w===w)||WEEKS[0],qd=Math.min(MONTH.ndays,Math.max(d.settings.today,WW.tu)),T=d.tuyen.filter(x=>x.sku===sku&&x.kenh===kenh);
   const one=T.length===1?T[0].ma:"",pickT=re=>(T.find(x=>re.test(x.tuyen||""))||T.find(x=>!/kho|tồn|reup|nhân bản/i.test(x.tuyen||""))||T[0]||{}).ma||"";
