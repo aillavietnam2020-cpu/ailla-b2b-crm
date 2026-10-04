@@ -14,6 +14,8 @@ const KINDS = [
   'win_analyze', 'win_approve', 'win_fix', 'win_child_ok', 'win_child_fix',
   // Thẻ video ở Marketing: dựng one shot / chèn chữ / sửa video có sẵn / giọng đọc; duyệt, góp ý sửa, duyệt kịch bản
   'card_build', 'card_ok', 'card_fix', 'card_redo', 'card_script_ok', 'card_script_fix', 'card_notify',
+  // Buổi quay xong: quét thư mục cảnh vào kho cảnh của Worker (như lệnh /quet trên Telegram)
+  'card_scan',
 ] as const;
 const STATUSES = ['queued', 'taken', 'running', 'review', 'building', 'done', 'error'] as const;
 

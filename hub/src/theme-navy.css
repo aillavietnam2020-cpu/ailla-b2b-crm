@@ -682,3 +682,4 @@ table.kstab td{vertical-align:middle}
 .caln{display:flex;justify-content:space-between;font-size:12px}
 @media(max-width:760px){.calm{grid-template-columns:1fr}.calh,.calc.out{display:none}.calc{min-height:0}}
 .kdt td,.kdt th{white-space:nowrap}.kdt td.wide{white-space:normal}.kdpost input{min-width:150px;width:150px}
+.kcsum{display:block;white-space:pre-line;color:var(--muted);font-size:12px;margin-top:2px}
