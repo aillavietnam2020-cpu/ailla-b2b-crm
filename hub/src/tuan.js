@@ -414,7 +414,7 @@ function openWorkerSend(id){
       video_type:k==="reup"?"reup":"new_shoot",publish_channel:W_CH[c.kenh]||"other"};
     if(m==="voice"){order.voice=$("#ws-v").value;order.script=script;order.brief=brief||("Video "+sk(c.sku).n);}
     if(m==="rebrand"){order.ban_names=$("#ws-bn").value;order.owned=$("#ws-own").checked}
-    try{const r=await svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind:"card_build",ref:c.id,payload:{order,card:c.id,by:ME.name,owner:userName(chanOwner(c.kenh))||"",label:`${sk(c.sku).n}${t?" · "+t.tuyen:""} · ${c.id}`}})});
+    try{const r=await svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind:"card_build",ref:c.id,payload:{order,card:c.id,by:ME.name,tg:ME.role==="admin"?"chi":ME.name,owner:userName(chanOwner(c.kenh))||"",label:`${sk(c.sku).n}${t?" · "+t.tuyen:""} · ${c.id}`}})});
       DB.mutate(ME.name,"gửi Worker dựng "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(!x)return;x.wt=r.id;x.wMode=m;x.wStatus="queued";x.wDetail="Chờ máy văn phòng nhận việc";x.wDone=false;x.step="worker";x.nguoiDung="Worker";if(link&&!x.linkVideo)x.linkVideo=link;if(order.hook)x.hookText=x.hookText||order.hook;if(script)x.noiDung=script;if(!x.han)x.han=Math.min(MONTH.ndays,dt.settings.today+1)});
       closeDrawer();toast("Đã gửi Worker. Máy văn phòng nhận việc trong khoảng 15 giây");renderMain()}catch(e){toast("Chưa gửi được: "+e.message)}};
 }
