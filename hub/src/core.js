@@ -190,7 +190,7 @@ function moveCard(u,id,to,inp={}){
   const c=D().cards.find(x=>x.id===id);if(!c)return "Không tìm thấy thẻ.";
   if(!canMove(u,c,to))return "Bạn không có quyền chuyển thẻ này.";
   const err=checkMove(c,to,inp);if(err)return err;
-  DB.mutate(u.name,`chuyển ${c.id} sang "${stepName(to)}"`,d=>{const x=d.cards.find(y=>y.id===id);Object.entries(inp).forEach(([k,v])=>{if(v!==undefined)x[k]=v});x.step=to;if(to==="kb"||to==="dkb")x.nguoiKB=x.nguoiKB||x.nguoi;if(to==="edit"&&x.nguoiEdit)x.nguoi=x.nguoiEdit;if(to==="edit")x.nguoiEdit=x.nguoi;if(to==="dang"){x.ceo="PASS";const o=((d.kenhPT||{})[x.kenh]||{}).chinh;if(o)x.nguoi=o}if(to==="xong"&&!x.ngayDang)x.ngayDang=d.settings.today;if(to==="xong"&&x.tiktokId&&!x.linkDang&&!chOf(x.kenh).acc.startsWith("("))x.linkDang="https://www.tiktok.com/@"+chOf(x.kenh).acc+"/video/"+x.tiktokId;x.history=(x.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,to})});
+  DB.mutate(u.name,`chuyển ${c.id} sang "${stepName(to)}"`,d=>{const x=d.cards.find(y=>y.id===id);Object.entries(inp).forEach(([k,v])=>{if(v!==undefined)x[k]=v});if(inp.maTuyen!==undefined){const t=d.tuyen.find(y=>y.ma===x.maTuyen);if(t)x.tuyen=t.tuyen}x.step=to;if(to==="kb"||to==="dkb")x.nguoiKB=x.nguoiKB||x.nguoi;if(to==="edit"&&x.nguoiEdit)x.nguoi=x.nguoiEdit;if(to==="edit")x.nguoiEdit=x.nguoi;if(to==="dang"){x.ceo="PASS";const o=((d.kenhPT||{})[x.kenh]||{}).chinh;if(o)x.nguoi=o}if(to==="xong"&&!x.ngayDang)x.ngayDang=d.settings.today;if(to==="xong"&&x.tiktokId&&!x.linkDang&&!chOf(x.kenh).acc.startsWith("("))x.linkDang="https://www.tiktok.com/@"+chOf(x.kenh).acc+"/video/"+x.tiktokId;x.history=(x.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,to})});
   if(to==="worker")simulateWorker(id);
   return "";
 }
