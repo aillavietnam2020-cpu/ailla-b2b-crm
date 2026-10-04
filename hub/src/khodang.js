@@ -179,7 +179,7 @@ function xvWin(b,o){
 /* ① Kế hoạch tuần: ô "Nhân bản win" hiện luôn video win của sản phẩm đó để Oanh biết nhân bản cái nào */
 const _xvTuanWin=xvTuan;
 xvTuan=function(b,o){_xvTuanWin(b,o);
-  b.querySelectorAll('[data-wpgo$="|nhanban"]').forEach(x=>{const sku=x.dataset.wpgo.split("|")[0],W=winners().filter(w=>w.sku===sku&&w.don>0).slice(0,3);
+  b.querySelectorAll('[data-wpgo$="|nhanban"]').forEach(x=>{const cell=x.closest(".wpc"),inp=cell&&cell.querySelector("[data-wpm]"),num=inp?+inp.value||0:+((cell&&cell.querySelector(".wpcl+b")||{}).textContent)||0,giao=+((cell&&cell.querySelector(".wpcd b")||{}).textContent)||0;if(!num&&!giao)return;const sku=x.dataset.wpgo.split("|")[0],W=winners().filter(w=>w.sku===sku&&w.don>0).slice(0,3);
     x.insertAdjacentHTML("beforebegin",W.length?`<div class="wpwin">🏆 Video win ${esc(sk(sku).n)}: ${W.map(w=>`${esc((w.ten||"").slice(0,40))}${(w.ten||"").length>40?"…":""} <b>${nf(w.don)} đơn</b>`).join(" · ")}</div>`:`<div class="wpwin hint">Chưa có video win của ${esc(sk(sku).n)} (cần nhập báo cáo TikTok).</div>`)});
 };
 
