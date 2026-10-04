@@ -44,14 +44,14 @@ function kocIn(v,f,t){const H=kocHist(v).filter(h=>h.f>=f&&h.t<=t).sort((a,b)=>(
   H.sort((a,b)=>(Date.parse(b.t)-Date.parse(b.f))-(Date.parse(a.t)-Date.parse(a.f))).forEach(h=>{if(!pick.some(p=>!(h.t<p.f||h.f>p.t)))pick.push(h)});
   return pick.length?{don:sum(pick,h=>h.d||0),gmv:sum(pick,h=>h.g||0),view:sum(pick,h=>h.v||0),click:sum(pick,h=>h.c||0),ky:pick.length}:null}
 const KOC_ST=[["pot","Chờ check"],["win","Đã duyệt vào kho win"],["bo","Bỏ qua"],["all","Tất cả"]];
+const kocUpBtn=()=>{const last=(D().kocImports||[]).slice(-1)[0];return `<button class="btn sm" id="koc-up" title="${last?esc("Lần nhập gần nhất: "+(last.range||last.file)+" · "+nf(last.n)+" video, "+nf(last.koc)+" KOC · "+last.at):"Chưa nhập báo cáo KOC"}">⬆ Tải báo cáo KOC</button><input type="file" id="koc-fi" accept=".xlsx,.xls,.csv" hidden>`};
 function kocSection(){
   const d=D(),S=d.settings,all=d.kocVideos||[],can=kocCan(),pot=S.potential||30,F=KOCF;
   const R=all.map(v=>{const x=kocIn(v,F.f,F.t);return x?Object.assign({},v,x):null}).filter(Boolean);
   const stOk=v=>F.st==="all"||(F.st==="pot"?v.don>=pot&&!v.st:v.st===F.st);
   const L=R.filter(v=>stOk(v)&&(!F.sku||v.sku===F.sku)).sort((a,b)=>b.don-a.don||b.gmv-a.gmv).slice(0,Math.max(1,+F.top||10));
   const cho=all.filter(v=>v.don>=pot&&!v.st).length,last=(d.kocImports||[]).slice(-1)[0];
-  return `<section class="card flush" id="kocv"><div class="card-h pad"><h2>🏆 TOP KOC</h2><span class="hint">${cho?`<b class="t-amb">${cho} video chờ check</b> · `:""}tiềm năng từ ${pot} đơn, win từ ${S.winnerOrders||100} đơn</span><span class="sp"></span>
-    <button class="btn sm" id="koc-up" title="${last?esc("Lần nhập gần nhất: "+(last.range||last.file)+" · "+nf(last.n)+" video, "+nf(last.koc)+" KOC · "+last.at):"Chưa nhập báo cáo KOC"}">⬆ Tải báo cáo KOC</button><input type="file" id="koc-fi" accept=".xlsx,.xls,.csv" hidden></div>
+  return `<section class="card flush" id="kocv"><div class="card-h pad"><h2>🏆 TOP KOC</h2><span class="hint">${cho?`<b class="t-amb">${cho} video chờ check</b> · `:""}tiềm năng từ ${pot} đơn, win từ ${S.winnerOrders||100} đơn</span></div>
    <div class="filters pad kocflt"><label>Top<select id="koc-top">${opt([5,10,20,50,100].map(n=>[n,"Top "+n]).concat([5,10,20,50,100].includes(+F.top)?[]:[[F.top,"Top "+F.top]]).concat([["__","Số khác…"]]),F.top)}</select></label>
     <label>Thời gian<select id="koc-k">${opt([["mo","Tháng này"],["lmo","Tháng trước"],["c","Tùy chọn ngày"]],F.k)}</select></label>${F.k==="c"?`<label>Từ<input type="date" id="koc-f" value="${F.f}"></label><label>Đến<input type="date" id="koc-t" value="${F.t}"></label>`:""}
     <label>Trạng thái<select id="koc-st">${opt(KOC_ST,F.st)}</select></label><label>Sản phẩm<select id="koc-s">${opt([["","Mọi sản phẩm"]].concat(skOpts()),F.sku)}</select></label>
@@ -77,7 +77,9 @@ function kocBind(m){
   m.querySelectorAll("[data-kocu]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"hoàn tác bỏ qua video KOC",dt=>{const y=(dt.kocVideos||[]).find(q=>q.id===x.dataset.kocu);if(y)y.st=""});renderMain()});
 }
 const _pBcKocV=PAGES.bc_koc;
-PAGES.bc_koc=function(m){_pBcKocV(m);const h=m.querySelector(".ph");const html=kocSection();if(h)h.insertAdjacentHTML("afterend",html);else m.insertAdjacentHTML("afterbegin",html);kocBind(m)};
+PAGES.bc_koc=function(m){_pBcKocV(m);const h=m.querySelector(".ph"),k=m.querySelector(".grid.kpis"),html=kocSection();
+  if(k)k.insertAdjacentHTML("afterend",html);else if(h)h.insertAdjacentHTML("afterend",html);else m.insertAdjacentHTML("afterbegin",html);
+  if(h){h.classList.add("phkoc");h.insertAdjacentHTML("beforeend",`<span class="phact">${kocUpBtn()}</span>`)}else m.querySelector("#kocv .card-h").insertAdjacentHTML("beforeend",kocUpBtn());kocBind(m)};
 
 /* Bước Video win & nhân bản: nhắc video KOC chờ check */
 const _xvWinKoc=xvWin;
