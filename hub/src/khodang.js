@@ -21,8 +21,10 @@ function kdDu(d,W){
   const today=d.settings.today,a=Math.max(today,W.tu),z=Math.max(a,W.den),n=z-a+1;
   return CHANNELS.map(ch=>{let can=0;for(let x=a;x<=z;x++)can+=nhipOf(ch.k,x);
     const ready=d.cards.filter(c=>c.kenh===ch.k&&c.step==="dang"&&(!c.day||c.day>=a)).length,
-      doing=d.cards.filter(c=>c.kenh===ch.k&&KD_PIPE.includes(c.step)).length,thieu=Math.max(0,can-ready-doing);
-    return {ch,a,z,n,can,ready,doing,thieu,thieuNgay:Math.max(0,can-ready)}});
+      DL=d.cards.filter(c=>c.kenh===ch.k&&KD_PIPE.includes(c.step)),doing=DL.length,thieu=Math.max(0,can-ready),
+      KD_ST={kb:"đang viết kịch bản",dkb:"chờ duyệt kịch bản",quay:"chờ quay",worker:"Worker đang dựng",edit:"đang edit",dvd:"chờ Oanh duyệt",dceo:"chờ chị duyệt"},
+      tach=Object.keys(KD_ST).map(k=>[KD_ST[k],DL.filter(c=>c.step===k).length]).filter(x=>x[1]).map(x=>x[1]+" "+x[0]).join(", ");
+    return {ch,a,z,n,can,ready,doing,thieu,tach,conThieu:Math.max(0,thieu-doing)}});
 }
 
 xvDang2=function(b,o){
@@ -31,10 +33,11 @@ xvDang2=function(b,o){
   const D7=[];for(let x=Math.max(today,W.tu);x<=Math.min(MONTH.ndays,Math.max(today,W.tu)+6);x++)D7.push(x);
   /* ---- 1. nhịp đăng + đủ video chưa ---- */
   const nhCard=`<section class="card"><div class="card-h"><h2>Nhịp đăng & đủ video chưa</h2><span class="hint">nhịp = số video <b>đăng mỗi ngày</b> trên kênh · tính từ hôm nay ${dd(today)} đến ${dd(R[0].z)} (theo kỳ chọn ở trên)</span></div>
-   <div class="kdu">${R.map(r=>{const gd=(N[r.ch.k]||[]);return `<div class="kduk${r.thieu?" bad":r.thieuNgay?" mid":" ok"}">
+   <div class="kdu">${R.map(r=>{const gd=(N[r.ch.k]||[]);return `<div class="kduk${r.thieu?" bad":" ok"}">
      <div class="kduh"><b>${esc(r.ch.short)}</b><small>giữ kênh: ${esc(userName(chanOwner(r.ch.k))||"chưa đặt")}</small></div>
-     <div class="kdun"><span><small>Cần đăng</small><b>${r.can}</b></span><span><small>Đã có sẵn</small><b>${r.ready}</b></span><span><small>Đang làm</small><b>${r.doing}</b></span><span><small>Thiếu</small><b class="${r.thieu?"t-red":"t-grn"}">${r.thieu}</b></span></div>
-     <div class="kdumsg">${r.thieu?`⚠ Thiếu ${r.thieu} video: cần lên thêm lịch sản xuất (buổi quay, Worker, reup) cho kênh này.`:r.thieuNgay?`Đủ nếu ${r.thieuNgay} video đang làm xong kịp và được duyệt.`:"✓ Đủ video sẵn để đăng."}</div>
+     <div class="kdun"><span><small>Cần đăng</small><b>${r.can}</b></span><span><small>Đã duyệt, sẵn đăng</small><b>${r.ready}</b></span><span><small>Đang làm (chưa duyệt)</small><b>${r.doing}</b></span><span><small>Thiếu</small><b class="${r.thieu?"t-red":"t-grn"}">${r.thieu}</b></span></div>
+     <div class="kdumsg">${!r.thieu?"✓ Đủ video đã duyệt để đăng.":r.conThieu?`⚠ Thiếu ${r.thieu} video đã duyệt. Kể cả ${r.doing} video đang làm xong hết vẫn còn thiếu ${r.conThieu}: cần lên thêm lịch sản xuất (buổi quay, Worker, reup).`:`⚠ Thiếu ${r.thieu} video đã duyệt. Có ${r.doing} video đang làm: phải làm xong và duyệt kịp trước ngày đăng mới đủ.`}</div>
+     ${r.doing?`<small class="hint">Đang làm gồm: ${esc(r.tach)}</small>`:""}
      <div class="kdug"><small>Mặc định ${slotsOf()[r.ch.k]||0} video/ngày</small>${gd.map((g,i)=>`<div class="nhr">${dd(g.tu)} → ${dd(g.den)}: <b>${g.sl}</b> video/ngày × ${g.den-g.tu+1} ngày = <b>${g.sl*(g.den-g.tu+1)}</b> video${give?` <button class="lnk danger" data-nhx="${esc(r.ch.k)}|${i}" title="Bỏ giai đoạn">✕</button>`:""}</div>`).join("")}</div>
      ${give?`<details class="nhadd" data-nhk="${esc(r.ch.k)}"><summary>+ Thêm giai đoạn đăng dày / thưa</summary><div class="nhaddf">Từ <select class="a">${opt(days,today)}</select> đến <select class="z">${opt(days,Math.min(MONTH.ndays,today+5))}</select> mỗi ngày <input type="number" min="0" class="n num" placeholder="số"> video <button class="btn sm" data-nhadd="${esc(r.ch.k)}">Lưu</button></div><small class="hint">Ví dụ trước sale 10/10 đăng 6 video/ngày, sau đó về 3.</small></details>`:""}
    </div>`}).join("")}</div></section>`;
