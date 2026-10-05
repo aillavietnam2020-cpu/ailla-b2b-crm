@@ -121,12 +121,7 @@ openWorkerSend=function(id){const r=_owsKC(id),c=D().cards.find(x=>x.id===id),in
   return r};
 
 /* ---------- ④ Edit: nói rõ chỗ dán link khi chưa có video ---------- */
-const _xvEditKD=xvEdit2;
-xvEdit2=function(b,o){_xvEditKD(b,o);
-  b.querySelectorAll(".edcol p.hint").forEach(p=>{if(p.textContent.startsWith("Chưa có video edit"))p.innerHTML="Chưa có video edit. Khi Oanh giao, mỗi video hiện ở đây kèm <b>ô dán link</b> và nút <b>Gửi duyệt</b> → Oanh duyệt → chị duyệt → vào <b>⑤ Kho video đăng được</b>."});
-  const pe=b.querySelector(".card p.hint");if(pe&&pe.textContent.startsWith("Không còn video"))pe.insertAdjacentHTML("afterend",`<p><button class="btn sm" id="ed-kc">📁 Dán link thư mục cảnh quay (③ Buổi quay)</button></p>`);if($("#ed-kc"))$("#ed-kc").onclick=()=>{XV.tab="quay";renderMain();const k=$("#kc-free");if(k)k.scrollIntoView({block:"center"})};
-  const h=b.querySelector(".card .card-h .hint");if(h&&/^0 video/.test(h.textContent))h.textContent="0 video (đếm số video đã quay chờ edit, không phải số cảnh)";
-};
+
 
 /* ---------- Calendar theo kỳ chọn: tuần, tháng hay từ ngày đến ngày ---------- */
 function calRange(){const r=xvRange();if(r)return r;const t=D().settings.today,W=WEEKS.find(w=>t>=w.tu&&t<=w.den)||WEEKS[0];return {tu:W.tu,den:Math.min(W.den,MONTH.ndays),out:true}}
