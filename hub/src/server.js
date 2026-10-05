@@ -151,7 +151,7 @@ const CRM_EMB=[
  ["cr_s_gia","Bảng giá 8 cấp","/sales/prices",()=>crmRole()==="EMPLOYEE"],
  ["cr_s_cn","Công nợ khách của tôi","/sales/debts",()=>crmRole()==="EMPLOYEE"],
  ["cr_s_kq","Kết quả cá nhân","/sales/performance",()=>crmRole()==="EMPLOYEE"]];
-const CRM_GROUPS=()=>{const L=CRM_EMB.filter(x=>x[3]()).map(([k,t])=>MI(k,t,()=>SV.perms.includes("price.read")));return crmRole()==="EMPLOYEE"?[["",L]]:[["Điều hành",L.slice(0,4)],["Thiết lập",L.slice(4)]].filter(g=>g[1].length)};
+const CRM_GROUPS=()=>{const L=CRM_EMB.filter(x=>x[3]()&&x[0]!=="cr_gia").map(([k,t])=>MI(k,t,()=>SV.perms.includes("price.read")));return crmRole()==="EMPLOYEE"?[["",L]]:[["Điều hành",L.slice(0,4)],["Thiết lập",L.slice(4)]].filter(g=>g[1].length)};
 MODULES.splice(MODULES.findIndex(m=>m.k==="mkt"),0,{k:"b2blink",zone:"Bán hàng",ic:"box",n:"Bán hàng B2B (CRM)",sub:"Đại lý · NPP",groups:CRM_GROUPS});
 CRM_EMB.forEach(([k,t,p])=>{PAGES[k]=m=>{m.innerHTML=H(t,"Khách sỉ, đại lý, đơn hàng, công nợ")+'<div class="crmembed"><iframe id="crmfr" src="'+p+'" title="'+esc(t)+'"></iframe></div>'}});
 window.addEventListener("message",e=>{if(e.origin!==location.origin||!e.data||e.data.type!=="crm-title"||!$("#crmfr"))return;const h=$("#main .ph h1");if(h&&e.data.title&&e.data.title!=="AILLA B2B CRM")h.textContent=e.data.title});
@@ -174,6 +174,8 @@ const DEPT_OPEN=["exec","b2c","sx","fin","hr"];
 const SECRET_MODS=["exec","fin"],SALE_PAGES=["fb_sale","fb_cskh"];
 MODULES.forEach(mo=>{const g=mo.groups;mo.groups=()=>{const a=svAllowedMods();if(a&&!a.has(mo.k))return [];if(!SV.acct&&SECRET_MODS.includes(mo.k))return [];let G=g();if(a&&DEPT_OPEN.includes(mo.k))G=G.map(([n,its])=>[n,its.map(i=>[i[0],i[1],()=>true,i[3]])]);if(!SV.acct&&mo.k==="b2c")G=G.map(([n,its])=>[n,its.filter(i=>SALE_PAGES.includes(i[0]))]).filter(x=>x[1].length);return G}});
 {const st=MODULES.find(m=>m.k==="setup");if(st){const g=st.groups;st.groups=()=>g().map(([n,its])=>[n,its.filter(i=>SV.acct||!["sku","kenhban","chiphidm"].includes(i[0]))]).filter(x=>x[1].length)}}
+/* Sản phẩm & bảng giá 8 cấp của CRM B2B là chỗ thiết lập, ít đụng tới: đặt ở Cài đặt › Danh mục, cạnh mục Sản phẩm. */
+{const st=MODULES.find(m=>m.k==="setup");if(st){const g=st.groups;st.groups=()=>{const G=g();const ok=crmRole()!=="EMPLOYEE"&&SV.perms.includes("price.read");if(!ok)return G;const it=MI("cr_gia","Bảng giá B2B (CRM)",()=>true);const i=G.findIndex(x=>x[0]==="Danh mục");if(i>=0){const L=G[i][1].slice(),j=L.findIndex(x=>x[0]==="sanpham");L.splice(j>=0?j+1:L.length,0,it);return G.map((x,k)=>k===i?[x[0],L]:x)}return [["Danh mục",[it]]].concat(G)}}}
 /* Dòng ghi chú trên các trang số tài chính: đây là số quản trị nội bộ, sổ sách chính thức ở MISA. */
 const INTERNAL_PAGES=["bc_tong","bc_tiktok","bc_shopee","bc_fb","pl","chiphi","doisoat","sku","adshieuqua","fb_ads","adssp"];
 INTERNAL_PAGES.forEach(k=>{const f=PAGES[k];if(f)PAGES[k]=m=>{f(m);m.insertAdjacentHTML("afterbegin",`<div class="note internal">🔒 Số liệu <b>quản trị nội bộ</b> để điều hành (ước tính, phân bổ, so mục tiêu), không phải báo cáo tài chính. Sổ sách chính thức do Kế toán quản lý trên MISA.</div>`)}});
