@@ -807,3 +807,5 @@ td.wide .hkin{width:min(520px,100%);margin-right:8px}
 .sqform{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end;padding:12px 0;border-bottom:1px solid #eef0f6;margin-bottom:6px}
 .sqform .btn{justify-self:start}.chk label{white-space:nowrap}
 .vmform{border-bottom:0}
+
+button.pchip{cursor:pointer;font:inherit}.pchip.on{background:var(--nv-active,#1a3554);color:#fff;border-color:transparent}.pchip.on b{color:#fff}

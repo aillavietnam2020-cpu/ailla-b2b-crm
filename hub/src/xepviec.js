@@ -178,7 +178,7 @@ function pMktTq(m){
   const cap=Math.max(8,...team.map(u=>xvOpen(u.id).length));
   const pipe=CHANNELS.map(ch=>{const I=WC.filter(c=>c.kenh===ch.k);return `<tr><td><b>${esc(ch.short)}</b></td>${DP_STEPS.map(s=>{const L=I.filter(c=>c.step===s||(s==="edit"&&c.step==="worker")),late=L.filter(isLate).length;return `<td class="n"><button type="button" class="xcell${!L.length?" z":late?" jam":["dkb","dvd","dceo"].includes(s)?" w":s==="xong"?" ok":""}" data-xpipe="${esc(ch.k)}|${s}">${L.length}${late?` · trễ ${late}`:""}</button></td>`}).join("")}</tr>`}).join("");
   m.innerHTML=H("Tổng quan Content",`${xvLbl(W)} · hôm nay ${dayLbl(today)} · đổi kỳ xem ở ô chọn thời gian trên cùng`)+`
-  <div class="lwtool"><span class="sp"></span>${xvGive()?`<button class="btn" id="mq-hot">🔥 Đẩy sản phẩm đang lên xu hướng</button><button class="btn" data-go="kehoach" data-step7="1">6. Làm hằng ngày</button>`:""}<button class="btn" data-go="lich">Calendar</button></div>
+  <div class="lwtool"><span class="sp"></span>${xvGive()?`<button class="btn" id="mq-hot">🔥 Đẩy sản phẩm đang lên xu hướng</button><button class="btn" data-go="kehoach" data-step7="1">6. Làm hằng ngày</button>`:""}<button class="btn" data-xcal="1">Calendar</button></div>
   <div class="xchs">${CHANNELS.map(chCard).join("")}</div>
   <div class="xr2">
    <section class="card"><div class="card-h"><h2>Việc đang chờ duyệt</h2><span class="hint">xử lý xong là hết số</span><span class="sp"></span>${Q.length?`<button class="btn pri" id="mq-rv">Duyệt lần lượt (${Q.length}) →</button>`:""}</div>
@@ -195,8 +195,9 @@ function pMktTq(m){
   xvBindWeek(m);
   if($("#mq-rv"))$("#mq-rv").onclick=openReview;
   if($("#mq-hot"))$("#mq-hot").onclick=()=>openHot();
-  m.querySelectorAll("[data-xkho]").forEach(x=>x.onclick=()=>{XV.tab="kho";PAGE="kehoach";STEP=7;renderMain();scrollTo(0,0)});
-  m.querySelectorAll("[data-xch]").forEach(x=>x.onclick=()=>{LW.kenh=x.dataset.xch;LW.w=W.w||1;PAGE="lich";SUB.lich="week";renderMain();scrollTo(0,0)});
+  m.querySelectorAll("[data-xkho]").forEach(x=>x.onclick=()=>{XV.tab="kho";XV.ks="ton";XV.khoSku="";PAGE="kehoach";STEP=7;render();scrollTo(0,0)});
+  m.querySelectorAll("[data-xcal]").forEach(x=>x.onclick=()=>{XV.tab="kho";XV.ks="cal";PAGE="kehoach";STEP=7;render();scrollTo(0,0)});
+  m.querySelectorAll("[data-xch]").forEach(x=>x.onclick=()=>{LW.kenh=x.dataset.xch;LW.w=W.w||1;SUB.lich="week";XV.tab="kho";XV.ks="cal";PAGE="kehoach";STEP=7;render();scrollTo(0,0)});
   m.querySelectorAll("[data-xpipe]").forEach(x=>x.onclick=()=>{const [k,s]=x.dataset.xpipe.split("|");Object.assign(DP,{kenh:k,step:s,tuyen:"",nguoi:"",sku:"",loai:"",view:"buoc"});DP.sel.clear();PAGE="dieuphoi";renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-xpc]").forEach(x=>x.onclick=()=>{const [u,ci]=x.dataset.xpc.split("|");const L=cellCards({id:u},+ci);
     $("#drawerIn").innerHTML=`<div class="dh"><h2>${esc(userName(u))} · ${esc(COLS[+ci].l)}</h2><button class="btn sm" id="dx">Đóng</button></div><p class="hint">Các video lên kênh trong khoảng này mà ${esc(userName(u))} đang giữ. Bấm để mở thẻ.</p><div class="xlist">${L.map(c=>xvMini(c,`<span class="xms">${esc(chOf(c.kenh).short)} · ${esc(stepName(c.step))}</span>`)).join("")}</div>`;
