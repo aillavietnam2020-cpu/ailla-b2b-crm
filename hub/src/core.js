@@ -166,7 +166,7 @@ const MAX_FILE=10*1024*1024;
 /* ---------- Luồng thẻ ---------- */
 function nextAct(c){
   const fb=!chOf(c.kenh).needId,L=loaiOf(c);
-  return ({kb:L==="moi"?["Gửi Oanh duyệt kịch bản","dkb"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi Oanh duyệt","dvd"],worker:["Dựng xong, gửi Oanh duyệt","dvd"],dvd:["Oanh duyệt, gửi chị","dceo"],dceo:["Chị duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
+  return ({kb:L==="moi"?["Chốt hook / kịch bản, sang quay","quay"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi Oanh duyệt","dvd"],worker:["Dựng xong, gửi Oanh duyệt","dvd"],dvd:["Oanh duyệt, gửi chị","dceo"],dceo:["Chị duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
 }
 function canEditCard(u,c){if(!u)return false;if(can(u,"lich.sua_tat_ca"))return true;return can(u,"lich.sua_cua_minh")&&c.nguoi===u.id}
 function canMove(u,c,to){
@@ -180,7 +180,7 @@ function canMove(u,c,to){
 function checkMove(c,to,inp){
   const v=k=>(inp[k]!==undefined?inp[k]:c[k])||"";
   if(c.step==="cg"&&!c.nguoi)return "Thẻ chưa giao người làm.";
-  if(to==="dkb"&&!String(v("hookText")).trim()&&!String(v("noiDung")).trim())return "Viết ít nhất Hook text hoặc Nội dung chi tiết trước khi gửi duyệt.";
+  if((to==="dkb"||(c.step==="kb"&&to==="quay"))&&!String(v("hookText")).trim()&&!String(v("noiDung")).trim())return "Viết ít nhất Hook text hoặc Nội dung chi tiết trước khi chốt.";
   if(to==="dvd"&&!String(v("linkFinal")).trim()&&!String(v("linkVideo")).trim())return "Dán link video đã edit (Google Drive) trước khi gửi duyệt.";
   if(to==="xong"&&chOf(c.kenh).needId){const id=String(v("tiktokId")).trim();if(!/^\d{19}$/.test(id))return "ID video TikTok phải đủ 19 chữ số (dãy số sau /video/ trong link).";if(D().cards.some(x=>x.id!==c.id&&x.tiktokId===id))return "ID này đã gắn cho thẻ khác.";}
   if(to==="xong"&&!chOf(c.kenh).needId&&!String(v("linkDang")).trim())return "Dán Link bài đã đăng.";
