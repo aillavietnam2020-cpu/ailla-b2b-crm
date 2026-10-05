@@ -788,3 +788,6 @@ td.wide .hkin{width:min(520px,100%);margin-right:8px}
 .hkg2>b{font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap}
 .hkexp select,.hkfile select,td select[data-hksq]{height:auto;min-height:36px;padding:6px 30px 6px 10px;line-height:1.35;font-size:14px;width:auto;max-width:240px;text-overflow:ellipsis}
 .hkexp .btn,.hkfile .btn{min-height:36px}
+
+.hkaddbar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin:6px 0}.hkaddbar .hkin{flex:1 1 360px;min-width:200px}.hkaddbar select{height:auto;min-height:36px;padding:6px 30px 6px 10px;width:auto;max-width:240px}
+.wktab td small{display:block;color:var(--muted)}

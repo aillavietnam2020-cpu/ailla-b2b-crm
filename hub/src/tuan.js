@@ -218,7 +218,7 @@ function sqBind(b,d){
 /* Xuất hook / kịch bản lên Google Drive (qua máy Worker ở văn phòng): chọn Excel hoặc Word, nhận link, gắn vào buổi quay */
 const HK_COLS=["STT","Sản phẩm","Kênh","Tuyến","Loại","Nhân sự","Hook","Kịch bản / nội dung","Cảnh quay","Đạo cụ / bối cảnh","Trạng thái","Buổi quay","Hạn nộp"];
 function hkRows(d,sku,kenh,onlyMine){
-  return hkAll(d).filter(c=>c.sku===sku&&c.kenh===kenh&&hkSt(c)!=="dq"&&(!onlyMine||c.nguoi===ME.id||c.giao===ME.id)).sort((a,c)=>(a.han||99)-(c.han||99)||(a.qday||99)-(c.qday||99)||String(a.id).localeCompare(String(c.id)))
+  return hkAll(d).filter(c=>c.sku===sku&&c.kenh===kenh&&hkSt(c)!=="dq"&&(c.step!=="kb"||c.hookText||c.noiDung)&&(!onlyMine||c.nguoi===ME.id||c.giao===ME.id)).sort((a,c)=>(a.han||99)-(c.han||99)||(a.qday||99)-(c.qday||99)||String(a.id).localeCompare(String(c.id)))
     .map((c,i)=>{const tu=d.tuyen.find(x=>x.ma===c.maTuyen),sh=(d.shoots||[]).find(s=>s.id===c.buoiQuay);return [i+1,sk(c.sku).n,chOf(c.kenh).short,tu?tu.tuyen:"",hkIsHook(c)?"Hook":"Kịch bản",userName(c.nguoi||c.giao)||"",c.hookText||"",c.noiDung||c.yTuong||"",c.canhQuay||"",c.daoCu||"",HK_LB[hkSt(c)][0],sh?dd(sh.day)+(sh.buoi?" "+sh.buoi:""):"",c.han?dd(c.han):""]})
 }
 async function hkExportDrive(sku,kenh,fmt,btn){
@@ -242,31 +242,57 @@ function hkFilesHtml(d){
   return `<section class="card"><div class="card-h"><h2>File hook & kịch bản đã xuất lên Drive</h2><span class="hint">mở file trên Drive rồi in đem đi quay</span></div>${FL.map(f=>`<div class="hkfile"><a href="${esc(f.link)}" target="_blank" rel="noopener">▶ ${esc(f.name)}</a><small>${esc(f.by)} · ${f.n} dòng</small><a class="btn sm" href="${esc(f.link)}" target="_blank" rel="noopener">Mở để in</a><button class="btn sm" data-hkfc="${f.id}">Chép link</button></div>`).join("")}</section>`
 }
 /* Bảng hook / kịch bản: bấm kênh, thấy từng sản phẩm cần bao nhiêu, nhân sự tự viết theo số thứ tự */
+const HK_AUTO=new Set();let HK_FOCUS="";
+/* Viết hook / kịch bản: viết bao nhiêu thêm bấy nhiêu. Viết xong tự sang "Chờ Oanh duyệt", ưu tiên điền vào ô kế hoạch còn trống, hết ô thì tự thêm. */
+function hkAddItem(sku,kenh,type,hook,script,tuyenMa){
+  const h=(hook||"").trim(),sc=(script||"").trim();
+  if(type==="hook"&&!h){toast("Gõ hook trước");return false}
+  if(type==="kb"&&!sc&&!h){toast("Viết kịch bản trước");return false}
+  const d=D(),tus=d.tuyen.filter(x=>x.sku===sku&&x.kenh===kenh);
+  if(tus.length&&!tuyenMa){toast("Chọn tuyến nội dung cho video này trước");return false}
+  DB.mutate(ME.name,"viết "+(type==="hook"?"hook ":"kịch bản ")+sk(sku).n,dt=>{
+    const mx=type==="hook"?"oneshot":"kichban",empty=x=>x.sku===sku&&x.kenh===kenh&&mixOf(x)===mx&&x.step==="kb"&&!x.hookText&&!x.noiDung&&x.nguon!=="Footage cũ";
+    let c=dt.cards.find(x=>empty(x)&&(x.nguoi===ME.id||x.giao===ME.id))||dt.cards.find(x=>empty(x)&&!x.nguoi&&!x.giao);
+    if(!c){c=newCard(dt,{sku,kenh,day:0,qday:0,nguon:"Quay mới",loai:"moi",oneShot:type==="hook",mix:mx,dangVideo:type==="hook"?"One shot":undefined,phatSinh:true,step:"kb"});dt.cards.push(c)}
+    c.hookText=h;if(sc)c.noiDung=sc;c.nguoi=ME.id;c.nguoiKB=ME.id;if(!c.giao)c.giao=ME.id;
+    if(tuyenMa&&!c.maTuyen){c.maTuyen=tuyenMa;const tu=dt.tuyen.find(y=>y.ma===tuyenMa);if(tu)c.tuyen=tu.tuyen}
+    c.step="dkb";notifyU(dt,approvers(),`${ME.name} gửi ${type==="hook"?"hook":"kịch bản"} chờ duyệt: ${sk(sku).n} (${c.id})`,c.id)});
+  return true
+}
 function xvHookList(b,o){
   const d=o.d,dv=can(ME,"viec.duyet")||ME.role==="admin",all=hkAll(d),chs=CHANNELS.filter(ch=>all.some(c=>c.kenh===ch.k));
   if(!HK_K||!chs.some(c=>c.k===HK_K))HK_K=(chs[0]||{}).k||"";
   const tabs=chs.length?`<div class="seg ptk">${chs.map(ch=>`<button data-hkk="${esc(ch.k)}" class="${ch.k===HK_K?"on":""}">${esc(ch.short)} <span class="xbadge">${all.filter(c=>c.kenh===ch.k&&["cv","cd"].includes(hkSt(c))).length}</span></button>`).join("")}</div>`:"";
   const K=all.filter(c=>c.kenh===HK_K),bySku=xvGroupBy(K,c=>c.sku);
-  if(![...HK_OPEN].some(k=>k.endsWith("|"+HK_K))&&bySku[0])HK_OPEN.add(bySku[0][0]+"|"+HK_K); // mở sẵn sản phẩm đầu tiên để thấy ngay chỗ viết
-  const blk=([sku,G])=>{const key=sku+"|"+HK_K,op=HK_OPEN.has(key),H=G.filter(hkIsHook),S=G.filter(c=>!hkIsHook(c));
-    const rows=G.filter(c=>hkSt(c)!=="dq").sort((a,c)=>(a.han||99)-(c.han||99)||(a.qday||99)-(c.qday||99)||String(a.id).localeCompare(String(c.id))).map((c,i)=>{
-      const st=hkSt(c),sh=(d.shoots||[]).find(s=>s.id===c.buoiQuay),mine=hkMine(c),isH=hkIsHook(c);
-      const cell=c.step==="kb"&&mine?`<input class="hkin" data-hkv="${c.id}" value="${esc(c.hookText||"")}" placeholder="${isH?"Gõ hook…":"Gõ hook mở đầu…"}">${isH?"":`<button class="btn sm" data-card="${c.id}">${c.noiDung?"Sửa kịch bản":"Viết kịch bản"}</button>`}`:`${esc(c.hookText||"")}${c.noiDung?` <small class="t-grn">đã có kịch bản</small>`:""}${c.step==="kb"&&!c.hookText&&!c.noiDung?`<span class="hint">chưa viết</span>`:""}`;
-      const act=c.step==="kb"&&mine?`<button class="btn sm pri" data-hkgs="${c.id}">Gửi duyệt</button>`:c.step==="dkb"?(dv?`<button class="btn sm pri" data-hkdy="${c.id}">Duyệt</button><button class="btn sm" data-hktl="${c.id}">Trả lại</button>`:`<span class="hint">chờ Oanh</span>`):"";
-      return `<tr><td class="n">${i+1}</td><td>${isH?"Hook":"Kịch bản"}</td><td>${esc(userName(c.nguoi||c.giao)||"chưa giao")}</td><td class="wide">${cell}</td><td>${pill(HK_LB[st][0],HK_LB[st][1])}</td><td>${mine?`<select data-hksq="${c.id}">${opt([["","—"]].concat(hkOpenShoots(d).map(s2=>[s2.id,dd(s2.day)+(s2.buoi?" "+s2.buoi:"")])),c.buoiQuay||"")}</select>`:(sh?dd(sh.day)+(sh.buoi?" "+esc(sh.buoi):""):"—")}</td><td>${c.han?dd(c.han):"—"}</td><td class="nowrap">${act}</td></tr>`}).join("");
+  if(!HK_AUTO.has(HK_K)&&bySku[0]){HK_AUTO.add(HK_K);HK_OPEN.add(bySku[0][0]+"|"+HK_K)} // mở sẵn sản phẩm đầu tiên một lần, sau đó bấm để gập / mở tùy ý
+  const blk=([sku,G])=>{const key=sku+"|"+HK_K,op=HK_OPEN.has(key),H=G.filter(hkIsHook),S=G.filter(c=>!hkIsHook(c)),tus=d.tuyen.filter(x=>x.sku===sku&&x.kenh===HK_K);
+    const written=G.filter(c=>hkSt(c)!=="dq"&&(c.step!=="kb"||c.hookText||c.noiDung)).sort((a,c)=>(a.han||99)-(c.han||99)||(a.qday||99)-(c.qday||99)||String(a.id).localeCompare(String(c.id)));
+    const rows=written.map((c,i)=>{
+      const st=hkSt(c),sh=(d.shoots||[]).find(s=>s.id===c.buoiQuay),mine=hkMine(c),isH=hkIsHook(c),tu=d.tuyen.find(x=>x.ma===c.maTuyen);
+      const cell=mine&&["kb","dkb"].includes(c.step)?`<input class="hkin" data-hkv="${c.id}" value="${esc(c.hookText||"")}" placeholder="${isH?"Hook…":"Hook mở đầu…"}">${isH?"":`<button class="btn sm" data-card="${c.id}">${c.noiDung?"Sửa kịch bản":"Viết kịch bản"}</button>`}`:`${esc(c.hookText||"")}${c.noiDung?` <small class="t-grn">đã có kịch bản</small>`:""}`;
+      const pl=c.step==="kb"?pill("Cần sửa","red"):pill(HK_LB[st][0],HK_LB[st][1]);
+      const act=c.step==="dkb"&&dv?`<button class="btn sm pri" data-hkdy="${c.id}">Duyệt</button><button class="btn sm" data-hktl="${c.id}">Trả lại</button>`:"";
+      return `<tr><td class="n">${i+1}</td><td>${isH?"Hook":"Kịch bản"}${tu?`<small>${esc(tu.tuyen)}</small>`:""}</td><td>${esc(userName(c.nguoi||c.giao)||"chưa giao")}</td><td class="wide">${cell}</td><td>${pl}</td><td>${mine||dv?`<select data-hksq="${c.id}">${opt([["","—"]].concat(hkOpenShoots(d).map(s2=>[s2.id,dd(s2.day)+(s2.buoi?" "+s2.buoi:"")])),c.buoiQuay||"")}</select>`:(sh?dd(sh.day)+(sh.buoi?" "+esc(sh.buoi):""):"—")}</td><td>${c.han?dd(c.han):"—"}</td><td class="nowrap">${act}</td></tr>`}).join("");
+    const add=`<div class="hkaddbar"><select data-hkat>${opt([["","— tuyến nội dung"]].concat(tus.map(t=>[t.ma,t.tuyen])),"")}</select><input class="hkin" data-hkah="${esc(key)}" placeholder="Viết hook rồi nhấn Enter (viết bao nhiêu thêm bấy nhiêu)…"><button class="btn sm pri" data-hkaddh="${esc(key)}">+ Thêm hook</button></div>
+     <div class="hkaddbar"><textarea class="hkin" data-hkas="${esc(key)}" rows="2" placeholder="Viết kịch bản (Review, voice off)…"></textarea><button class="btn sm pri" data-hkaddk="${esc(key)}">+ Thêm kịch bản</button></div>`;
     return `<div class="wpb${op?" open":""}"><div class="wph" data-hko="${esc(key)}"><i class="ptar">${op?"▾":"▸"}</i>${swatch(sku)}<b>${esc(sk(sku).n)}</b><span class="hkc">${hkSum(H,"Hook")}</span><span class="hkc">${hkSum(S,"Kịch bản")}</span></div>
-     ${op?`<div class="hkexp"><div class="hkg2"><b>Xuất để in</b><select data-hkfmt><option value="xlsx">Excel (.xlsx)</option><option value="doc">Word (.doc)</option></select><button class="btn sm pri" data-hkexp="${esc(key)}">⬆ Xuất lên Drive</button></div><div class="hkg2"><b>Xếp vào buổi quay</b><select data-hkbs>${opt([["","Chọn buổi quay…"]].concat(hkOpenShoots(d).map(s2=>[s2.id,dd(s2.day)+(s2.buoi?" "+s2.buoi:"")])),"")}</select><button class="btn sm" data-hkbulk="${esc(key)}">Xếp các dòng đã duyệt</button></div><span class="hint">file lưu vào Google Drive của công ty, mở ra để in đem đi quay${xvGive()?"":" · chỉ gồm hook / kịch bản của bạn"}</span></div><div class="tbl"><table class="wktab"><thead><tr><th>#</th><th>Loại</th><th>Nhân sự</th><th>Nội dung</th><th>Trạng thái</th><th>Buổi quay</th><th>Hạn nộp</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="8" class="empty">Không còn hook / kịch bản nào chờ làm.</td></tr>`}</tbody></table></div>`:""}</div>`};
-  b.innerHTML=`<section class="card"><div class="card-h"><h2>Hook & kịch bản theo kênh</h2><span class="hint">bấm kênh, bấm sản phẩm để xem bảng · nhân sự tự viết, bấm Gửi duyệt, Oanh duyệt xong thì sẵn sàng quay</span></div>${tabs}${bySku.map(blk).join("")||`<p class="empty">Chưa có hook / kịch bản nào. Giao ở ① Kế hoạch › One shot, Review.</p>`}</section>${hkFilesHtml(d)}`;
+     ${op?`<div class="hkexp"><div class="hkg2"><b>Xuất để in</b><select data-hkfmt><option value="xlsx">Excel (.xlsx)</option><option value="doc">Word (.doc)</option></select><button class="btn sm pri" data-hkexp="${esc(key)}">⬆ Xuất lên Drive</button></div><div class="hkg2"><b>Xếp vào buổi quay</b><select data-hkbs>${opt([["","Chọn buổi quay…"]].concat(hkOpenShoots(d).map(s2=>[s2.id,dd(s2.day)+(s2.buoi?" "+s2.buoi:"")])),"")}</select><button class="btn sm" data-hkbulk="${esc(key)}">Xếp các dòng đã duyệt</button></div><span class="hint">file lưu vào Google Drive của công ty, mở ra để in đem đi quay${xvGive()?"":" · chỉ gồm hook / kịch bản của bạn"}</span></div>
+     ${add}<div class="tbl"><table class="wktab"><thead><tr><th>#</th><th>Loại</th><th>Nhân sự</th><th>Nội dung</th><th>Trạng thái</th><th>Buổi quay</th><th>Hạn nộp</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="8" class="empty">Chưa có hook / kịch bản nào được viết. Viết ở ô phía trên, viết xong tự gửi Oanh duyệt.</td></tr>`}</tbody></table></div>`:""}</div>`};
+  b.innerHTML=`<section class="card"><div class="card-h"><h2>Hook & kịch bản theo kênh</h2><span class="hint">bấm kênh, bấm sản phẩm để gập / mở · viết bao nhiêu thêm bấy nhiêu, viết xong tự chuyển Chờ Oanh duyệt · Oanh duyệt xong thì sẵn sàng quay</span></div>${tabs}${bySku.map(blk).join("")||`<p class="empty">Chưa có sản phẩm nào có hook / kịch bản. Giao ở ① Kế hoạch › One shot, Review.</p>`}</section>${hkFilesHtml(d)}`;
+  if(HK_FOCUS){const i=b.querySelector(`[data-hkah="${HK_FOCUS}"]`);if(i)i.focus();HK_FOCUS=""}
   b.querySelectorAll("[data-hkk]").forEach(x=>x.onclick=()=>{HK_K=x.dataset.hkk;renderMain()});
+  b.querySelectorAll("[data-hko]").forEach(h=>h.onclick=e=>{if(e.target.closest("input,button,select"))return;const k=h.dataset.hko;HK_OPEN.has(k)?HK_OPEN.delete(k):HK_OPEN.add(k);renderMain()});
+  const addH=key=>{const [sku,kenh]=key.split("|"),w=b.querySelector(`[data-hkah="${key}"]`).closest(".wpb"),ok=hkAddItem(sku,kenh,"hook",w.querySelector(`[data-hkah="${key}"]`).value,"",w.querySelector("[data-hkat]").value);if(ok){HK_FOCUS=key;toast("Đã thêm hook, chờ Oanh duyệt");renderMain()}};
+  b.querySelectorAll("[data-hkaddh]").forEach(x=>x.onclick=()=>addH(x.dataset.hkaddh));
+  b.querySelectorAll("[data-hkah]").forEach(i=>i.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addH(i.dataset.hkah)}});
+  b.querySelectorAll("[data-hkaddk]").forEach(x=>x.onclick=()=>{const key=x.dataset.hkaddk,[sku,kenh]=key.split("|"),w=x.closest(".wpb"),ok=hkAddItem(sku,kenh,"kb","",w.querySelector(`[data-hkas="${key}"]`).value,w.querySelector("[data-hkat]").value);if(ok){toast("Đã thêm kịch bản, chờ Oanh duyệt");renderMain()}});
+  b.querySelectorAll("[data-hkv]").forEach(i=>i.onchange=()=>{const id=i.dataset.hkv,v=i.value.trim();if(!v)return;DB.mutate(ME.name,"sửa hook "+id,dt=>{const c=dt.cards.find(y=>y.id===id);if(!c)return;c.hookText=v;if(c.step==="kb"){c.step="dkb";notifyU(dt,approvers(),`${ME.name} gửi lại hook chờ duyệt: ${sk(c.sku).n} (${c.id})`,c.id)}});toast("Đã lưu");renderMain()});
   b.querySelectorAll("[data-hksq]").forEach(x=>x.onchange=()=>{hkSetShoot([x.dataset.hksq],x.value);toast(x.value?"Đã xếp vào buổi quay":"Đã bỏ khỏi buổi quay");renderMain()});
   b.querySelectorAll("[data-hkbulk]").forEach(x=>x.onclick=()=>{const [sku,kenh]=x.dataset.hkbulk.split("|"),sid=x.closest(".hkexp").querySelector("[data-hkbs]").value;if(!sid){toast("Chọn buổi quay trước");return}
     const ids=hkAll(D()).filter(c=>c.sku===sku&&c.kenh===kenh&&hkSt(c)==="dd"&&!c.buoiQuay&&hkMine(c)).map(c=>c.id);if(!ids.length){toast("Không có dòng đã duyệt nào chưa xếp buổi quay");return}
     hkSetShoot(ids,sid);toast("Đã xếp "+ids.length+" dòng vào buổi quay");renderMain()});
   b.querySelectorAll("[data-hkexp]").forEach(x=>x.onclick=()=>{const [sku,kenh]=x.dataset.hkexp.split("|"),f=x.closest(".hkexp").querySelector("[data-hkfmt]").value;hkExportDrive(sku,kenh,f,x)});
-  b.querySelectorAll("[data-hkfa]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkfa,sid=b.querySelector(`[data-hkfs="${id}"]`).value,f=(D().hkFiles||[]).find(y=>y.id===id);if(!sid){toast("Chọn buổi quay trước");return}if(!f)return;DB.mutate(ME.name,"gắn link hook kịch bản vào buổi quay",dt=>{const s=(dt.shoots||[]).find(y=>y.id===sid);if(s)s.linkHook=f.link});toast("Đã gắn link vào buổi quay");renderMain()});
   b.querySelectorAll("[data-hkfc]").forEach(x=>x.onclick=()=>{const f=(D().hkFiles||[]).find(y=>y.id===x.dataset.hkfc);if(!f)return;try{navigator.clipboard.writeText(f.link);toast("Đã chép link")}catch(e){toast(f.link)}});
-  b.querySelectorAll("[data-hko]").forEach(h=>h.onclick=e=>{if(e.target.closest("input,button,select"))return;const k=h.dataset.hko;HK_OPEN.has(k)?HK_OPEN.delete(k):HK_OPEN.add(k);renderMain()});
-  b.querySelectorAll("[data-hkgs]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkgs,i=b.querySelector(`[data-hkv="${id}"]`),v=i?i.value.trim():undefined,e=moveCard(ME,id,"dkb",v!==undefined?{hookText:v}:{});toast(e||"Đã gửi Oanh duyệt");renderMain()});
   b.querySelectorAll("[data-hkdy]").forEach(x=>x.onclick=()=>{const e=moveCard(ME,x.dataset.hkdy,"quay");toast(e||"Đã duyệt");renderMain()});
   b.querySelectorAll("[data-hktl]").forEach(x=>x.onclick=()=>{const n=prompt("Cần sửa gì? (ghi ngắn cho nhân sự)");if(n===null)return;sendBack(ME,x.dataset.hktl,n.trim()||"cần sửa");toast("Đã trả lại nhân sự");renderMain()});
 }
