@@ -761,3 +761,13 @@ td.wvid a{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;w
 /* CRM B2B nằm trong khung */
 .crmembed{height:calc(100vh - 175px);min-height:520px}
 .crmembed iframe{width:100%;height:100%;border:0;background:transparent;display:block}
+
+/* Chỉ tiêu buổi quay, bảng hook / kịch bản */
+.shtar{border:1px dashed #cdd5e6;background:#f8faff;border-radius:12px;padding:10px 12px;margin:8px 0}
+.shth{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin-bottom:6px}.shth small{color:var(--muted)}
+.shrow{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:5px 0;border-top:1px solid #eef0f6}.shrow:first-of-type{border-top:0}
+.shp{display:inline-flex;align-items:center;gap:6px;font-size:13.5px}.shp .num{width:64px;height:30px;padding:2px 6px}
+.shadd{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}.shadd select{width:auto;height:32px}
+.hkmybox .hkmy{padding:7px 10px;border-radius:10px;background:#f3f6ff;margin:4px 0}.hkmybox .hkmy.late{background:#fff1f0}
+.wph .hkc{font-size:13px;color:var(--muted);margin-left:12px}
+td.wide .hkin{width:min(520px,100%);margin-right:8px}
