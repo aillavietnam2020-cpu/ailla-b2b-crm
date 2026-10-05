@@ -799,3 +799,5 @@ td.wide .hkin{width:min(520px,100%);margin-right:8px}
 .sqedit>summary::-webkit-details-marker{display:none}
 .sqedit[open]>.frm{position:absolute;right:0;top:calc(100% + 6px);z-index:30;width:min(560px,86vw);background:#fff;border:1px solid #d9dfee;border-radius:14px;padding:14px;box-shadow:0 12px 32px rgba(16,24,40,.18)}
 .sqsk{display:block;margin-top:4px;color:var(--muted);font-size:13px}.sqwarn{color:#b54708;background:#fff6e8;border-radius:10px;padding:6px 10px;margin:6px 0}
+
+.gopyln{margin-top:6px;padding:6px 10px;border-radius:10px;background:#fff1f0;color:#b42318;font-size:13.5px;line-height:1.4}.gopyln small{color:#a15c57}
