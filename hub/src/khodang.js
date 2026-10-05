@@ -97,22 +97,7 @@ function kcBlock(d,s,give){
    ${may?`<div class="kcadd"><span class="hint">Tải cảnh quay buổi này lên <b>một thư mục Drive</b>, dán link thư mục rồi bấm Lưu: Worker tự quét, AI gán sản phẩm, loại cảnh, dùng được hay loại (như gửi /quet cho bot Telegram).</span><input class="kl" placeholder="Link thư mục Drive (…/drive/folders/…)"><input class="kg" placeholder="Ghi chú (vd cảnh trám ngâm áo, cận bột tan)"><button class="btn sm pri" data-kcsave="${s.id}" data-skus="${esc(skus.join(","))}">Lưu vào kho cảnh</button></div>`:""}</div>`;
 }
 const _xvQuayKC=xvQuay2;
-xvQuay2=function(b,o){
-  _xvQuayKC(b,o);const d=o.d;kcSync();
-  b.querySelectorAll("[data-sqnote]").forEach(t=>{const s=(d.shoots||[]).find(y=>y.id===t.dataset.sqnote);if(s)t.closest("label").insertAdjacentHTML("beforebegin",kcBlock(d,s,o.give))});
-  const KC=(d.khoCanh||[]).slice().sort((p,q)=>q.at-p.at||q.day-p.day);
-  if(KC.length)b.insertAdjacentHTML("beforeend",`<section class="card"><div class="card-h"><h2>📁 Kho cảnh</h2><span class="hint">${KC.length} thư mục · ${sum(KC,k=>k.n||0)} cảnh dùng được · Worker dùng cho video không quay và cảnh trám · xem chi tiết từng cảnh ở trang Worker › Kho cảnh</span></div>
-   <div class="tbl"><table><thead><tr><th>Ngày quay</th><th>Sản phẩm</th><th>Worker</th><th>Ghi chú</th><th>Người gửi</th><th></th></tr></thead><tbody>${KC.map(k=>`<tr><td>${k.day?dayLbl(k.day):"—"}</td><td>${k.skus.map(x=>swatch(x)+esc(sk(x).n)).join(", ")||"—"}</td><td class="wide">${kcSt(k)||"—"}</td><td>${esc(k.ghiChu||"")}</td><td>${esc(k.by)}</td><td><a href="${esc(kdLink(k.link))}" target="_blank" rel="noopener">mở thư mục</a></td></tr>`).join("")}</tbody></table></div></section>`);
-  b.querySelectorAll("[data-kcsave]").forEach(x=>x.onclick=async()=>{const f=x.closest(".kcadd"),l=f.querySelector(".kl").value.trim();if(!KC_FOLDER.test(l)){toast("Cần link THƯ MỤC Drive dạng …/drive/folders/…");return}
-    if((d.khoCanh||[]).some(k=>k.link===l&&k.wStatus!=="error")){toast("Thư mục này đã lưu vào kho cảnh rồi");return}
-    x.disabled=true;const s=(d.shoots||[]).find(y=>y.id===x.dataset.kcsave)||{id:"",day:+(f.querySelector(".kd")||{}).value||d.settings.today},g=f.querySelector(".kg").value.trim(),ks=f.querySelector(".ks"),skus=ks?(ks.value?[ks.value]:[]):x.dataset.skus?x.dataset.skus.split(","):[];
-    const mx=(D().khoCanh||[]).reduce((m,k)=>Math.max(m,+String(k.id).replace(/\D/g,"")||0),0),k={id:"KC-"+String(mx+1).padStart(3,"0"),shoot:s.id,day:s.day,skus,link:l,n:0,ghiChu:g,by:ME.name,at:D().settings.today};
-    const wt=await kcSend(k,ME.name);if(!wt){x.disabled=false;return}
-    DB.mutate(ME.name,"lưu kho cảnh buổi quay "+dd(s.day),dt=>{dt.khoCanh=dt.khoCanh||[];dt.khoCanh.push(Object.assign(k,{wt,wStatus:"running",wDetail:"Đã gửi Worker, chờ quét"}))});toast("Đã gửi Worker quét vào kho cảnh");renderMain()});
-  b.querySelectorAll("[data-kcre]").forEach(x=>x.onclick=async()=>{const k=(d.khoCanh||[]).find(y=>y.id===x.dataset.kcre);if(!k)return;x.disabled=true;const wt=await kcSend(k,ME.name);if(!wt){x.disabled=false;return}
-    DB.mutate(ME.name,"gửi quét lại kho cảnh "+k.id,dt=>{const y=dt.khoCanh.find(q=>q.id===k.id);if(y)Object.assign(y,{wt,wStatus:"running",wDetail:"Đã gửi lại Worker"})});renderMain()});
-  b.querySelectorAll("[data-kcx]").forEach(x=>x.onclick=()=>{if(!confirm("Bỏ dòng này khỏi danh sách? (File trên Drive và cảnh đã vào kho Worker vẫn còn)"))return;DB.mutate(ME.name,"bỏ kho cảnh "+x.dataset.kcx,dt=>{dt.khoCanh=(dt.khoCanh||[]).filter(k=>k.id!==x.dataset.kcx)});renderMain()});
-};
+xvQuay2=function(b,o){_xvQuayKC(b,o)};
 /* Gửi Worker kiểu giọng đọc: chọn nhanh thư mục trong kho cảnh */
 const _owsKC=openWorkerSend;
 openWorkerSend=function(id){const r=_owsKC(id),c=D().cards.find(x=>x.id===id),inp=$("#ws-l");

@@ -62,7 +62,7 @@ function xvTuan(b,o){
   const avail=CHANNELS.filter(ch=>pairs.some(x=>x.kenh===ch.k));if(!WP_K||!avail.some(c=>c.k===WP_K))WP_K=(avail[0]||{}).k||"";
   const tabs=avail.length?`<div class="seg ptk">${avail.map(ch=>`<button data-wpk="${esc(ch.k)}" class="${ch.k===WP_K?"on":""}">${esc(ch.short)} <span class="xbadge">${pairs.filter(x=>x.kenh===ch.k).length}</span></button>`).join("")}</div>`:"";
   const chs=CHANNELS.map(ch=>{const P=pairs.filter(x=>x.kenh===ch.k);if(!P.length||ch.k!==WP_K)return "";const M=isM(ch.k),cap=sum(xvDays(M?WM:WW),x=>nhipOf(ch.k,x)),tot=sum(P,x=>wpPlan(x,M,(M?wpM:wp)[wpKey(x.sku,x.kenh)]));
-    const cl=false;return `<div class="wpch"><div class="ptsum"><b>${esc(ch.short)}</b>${(()=>{const pt=(d.kenhPT||{})[ch.k]||{};return give?`<span class="wppt" title="Người giữ kênh (đăng video) và người hỗ trợ"><label>Phụ trách <select data-ptk="${esc(ch.k)}|chinh">${opt([["","— chưa chọn"]].concat(team.map(u=>[u.id,u.name])),pt.chinh||"")}</select></label><label>Hỗ trợ <select data-ptk="${esc(ch.k)}|phu">${opt([["","—"]].concat(team.map(u=>[u.id,u.name])),pt.phu||"")}</select></label></span>`:`<span class="wppt">Phụ trách <b>${esc(userName(pt.chinh)||"chưa chọn")}</b>${pt.phu?` · hỗ trợ <b>${esc(userName(pt.phu))}</b>`:""}</span>`})()}${give?`<span class="seg sm wpsc"><button class="${M?"":"on"}" data-wpsc="${esc(ch.k)}|tuan">Theo tuần</button><button class="${M?"on":""}" data-wpsc="${esc(ch.k)}|thang">Cả tháng</button></span>`:` · ${M?"lên kế hoạch cả tháng":"theo tuần"}`} · kế hoạch <b>${tot}</b> video · <span title="Số ô đăng = số video mỗi ngày (cài ở ⑤ Kho video & lịch đăng › Nhịp đăng từng kênh) × số ngày. Kế hoạch nhiều hơn số ô đăng thì phần dư không có ngày để đăng, cần tăng nhịp đăng hoặc giảm kế hoạch.">lịch đăng có <b>${cap}</b> ô (${M?"cả tháng":"tuần này"}, khoảng ${Math.round(cap/Math.max(1,xvDays(M?WM:WW).length)*10)/10} video/ngày)</span>${M?"":` <small class="hint">(tuần ${dd(WW.tu)}–${dd(Math.min(WW.den,MONTH.ndays))})</small>`} ${tot>cap?pill("dư "+(tot-cap)+" video không có ô đăng","amb"):tot&&tot<cap?pill("còn "+(cap-tot)+" ô đăng trống","gry"):""}</div>${cl?`<p class="hint wpchn">${P.length} sản phẩm · bấm tên kênh để mở</p>`:P.map(block).join("")}</div>`}).join("");
+    const cl=false;return `<div class="wpch"><div class="ptsum"><b>${esc(ch.short)}</b>${(()=>{const pt=(d.kenhPT||{})[ch.k]||{};return give?`<span class="wppt" title="Người giữ kênh (đăng video) và người hỗ trợ"><label>Phụ trách <select data-ptk="${esc(ch.k)}|chinh">${opt([["","— chưa chọn"]].concat(team.map(u=>[u.id,u.name])),pt.chinh||"")}</select></label><label>Hỗ trợ <select data-ptk="${esc(ch.k)}|phu">${opt([["","—"]].concat(team.map(u=>[u.id,u.name])),pt.phu||"")}</select></label></span>`:`<span class="wppt">Phụ trách <b>${esc(userName(pt.chinh)||"chưa chọn")}</b>${pt.phu?` · hỗ trợ <b>${esc(userName(pt.phu))}</b>`:""}</span>`})()}${give?`<span class="seg sm wpsc"><button class="${M?"":"on"}" data-wpsc="${esc(ch.k)}|tuan">Theo tuần</button><button class="${M?"on":""}" data-wpsc="${esc(ch.k)}|thang">Cả tháng</button></span>`:` · ${M?"lên kế hoạch cả tháng":"theo tuần"}`} · kế hoạch <b>${tot}</b> video · <span title="Số ô đăng = số video mỗi ngày (cài ở ⑤ Kho video & lịch đăng › Nhịp đăng từng kênh) × số ngày. Kế hoạch nhiều hơn số ô đăng thì phần dư không có ngày để đăng, cần tăng nhịp đăng hoặc giảm kế hoạch.">lịch đăng có <b>${cap}</b> ô (${M?"cả tháng":"tuần này"}, khoảng ${Math.round(cap/Math.max(1,xvDays(M?WM:WW).length)*10)/10} video/ngày)</span>${M?"":` <small class="hint">(tuần ${dd(WW.tu)}–${dd(Math.min(WW.den,MONTH.ndays))})</small>`} ${tot>cap?pill("dư "+(tot-cap)+" video không có ô đăng","amb"):tot&&tot<cap?pill("còn "+(cap-tot)+" ô đăng trống","gry"):""}</div>${cl?`<p class="hint wpchn">${P.length} sản phẩm · bấm tên kênh để mở</p>`:pbHtml(d,ch,P,give)+P.map(block).join("")}</div>`}).join("");
   b.innerHTML=`<section class="card"><div class="card-h"><h2>Kế hoạch</h2><span class="hint">mở từng sản phẩm, chia số video theo loại rồi giao người ngay trong từng ô · bấm tên kênh để chọn kênh, mỗi kênh chọn lên kế hoạch theo tuần hay cả tháng${days.length>7?" · đang xem cả tháng nên hiện tuần hiện tại":""}</span></div>
    ${tabs}${chs||`<p class="empty">Chưa có sản phẩm nào trong kế hoạch tháng (Kế hoạch tháng › bước 5).</p>`}
    <p class="hint">Ưu tiên P1 → P4: P1 cao nhất. Người giữ kênh nhìn mức ưu tiên này khi tự xếp ngày đăng, sản phẩm P1 lên trước.</p></section>`;
@@ -74,6 +74,9 @@ function xvTuan(b,o){
   b.querySelectorAll("[data-wpm]").forEach(x=>x.onchange=()=>{const [sku,kenh,t,wx]=x.dataset.wpm.split("|"),k=wpKey(sku,kenh);DB.mutate(ME.name,"kế hoạch "+(wx==="M"?"cả tháng":"tuần "+wx)+" "+sk(sku).n,dt=>{dt.weekPlan=dt.weekPlan||{};dt.weekPlan[wx]=dt.weekPlan[wx]||{};const e=dt.weekPlan[wx][k]=dt.weekPlan[wx][k]||{};e.mix=e.mix||{};e.mix[t]=Math.max(0,+x.value||0);e.sl=Object.values(e.mix).reduce((a,b)=>a+(+b||0),0)});toast("Đã lưu");renderMain()});
   b.querySelectorAll("[data-wpgo]").forEach(x=>x.onclick=()=>{const [s2,k2,t2]=x.dataset.wpgo.split("|");wpGo(s2,k2,t2)});
   b.querySelectorAll("[data-wpa]").forEach(x=>x.onclick=()=>{const v=x.dataset.wpa,[sku,kenh,t,wx]=v.split("|"),box=x.closest(".wpas"),L=[...box.querySelectorAll("[data-wpu]")].map(i=>[i.dataset.wpu,Math.max(0,+i.value||0)]).filter(z=>z[1]);if(!L.length){toast("Điền số video cho ít nhất một người");return}const bd=+box.querySelector("[data-wpbd]").value,hn=+box.querySelector("[data-wphan]").value;if(hn<bd){toast("Hạn xong phải sau ngày bắt đầu");return}{const left=+((box.querySelector("small")||{}).textContent||"").replace(/\D+/g," ").trim().split(" ")[0]||0,ask=L.reduce((a2,z)=>a2+z[1],0);if(left&&ask>left){toast(`Chỉ còn ${left} video chưa giao theo kế hoạch, đang giao ${ask}. Sửa lại số cho từng người.`);return}}const note=(box.querySelector("[data-wpnote]")||{}).value||"",out=L.map(([u,n])=>{wpAssign(sku,kenh,t,u,n,wx,bd,hn,note);return userName(u)+" "+n});toast("Đã giao: "+out.join(", "));renderMain()});
+  b.querySelectorAll("[data-pbtog]").forEach(h=>h.onclick=e=>{if(e.target.closest("input,button,select"))return;const k=h.dataset.pbtog;PB_OPEN.has(k)?PB_OPEN.delete(k):PB_OPEN.add(k);renderMain()});
+  b.querySelectorAll("[data-pbi]").forEach(i=>i.onchange=()=>{const [kenh,w,sku]=i.dataset.pbi.split("|"),kpi=+i.dataset.kpi||0;DB.mutate(ME.name,"phân bổ tuần "+w+" "+sk(sku).n,dt=>{dt.phanBo=dt.phanBo||{};const o2=dt.phanBo[kenh]=dt.phanBo[kenh]||{};const arr=(Array.isArray(o2[sku])&&o2[sku].length===5?o2[sku]:pbDef(kpi)).slice();arr[+w-1]=Math.max(0,Math.floor(+i.value||0));o2[sku]=arr});renderMain()});
+  b.querySelectorAll("[data-pbreset]").forEach(x=>x.onclick=()=>{const [kenh,sku]=x.dataset.pbreset.split("|");DB.mutate(ME.name,"chia lại phân bổ tuần theo ngày",dt=>{if(dt.phanBo&&dt.phanBo[kenh])delete dt.phanBo[kenh][sku]});renderMain()});
   b.querySelectorAll("[data-ptk]").forEach(x=>{x.onclick=e=>e.stopPropagation();x.onchange=()=>{const [k,f]=x.dataset.ptk.split("|");DB.mutate(ME.name,"đổi phụ trách kênh "+k,dt=>{dt.kenhPT=dt.kenhPT||{};dt.kenhPT[k]=dt.kenhPT[k]||{chinh:"",phu:""};dt.kenhPT[k][f]=x.value});toast("Đã lưu")}});
   b.querySelectorAll("[data-wpe]").forEach(x=>x.onclick=()=>{WP_EDIT.add(x.dataset.wpe);renderMain()});
   b.querySelectorAll("[data-wpec]").forEach(x=>x.onclick=()=>{WP_EDIT.delete(x.dataset.wpec);renderMain()});
@@ -180,6 +183,31 @@ function xvVideoMade(b,o){
   xvEdit2(b.querySelector("#vm-e"),o);
 }
 /* ---------- ④ Kho video & Calendar: video tồn tháng trước, video sản xuất trong tháng, rồi đẩy sang Calendar ---------- */
+/* ---------- Phân bổ video theo tuần (chốt ở ① Kế hoạch, ⑤ Calendar đọc để cảnh báo thiếu) ---------- */
+const PB_OPEN=new Set();
+const PB_W=()=>WEEKS.map(x=>({w:x.w,tu:x.tu,den:Math.min(x.den,MONTH.ndays)}));
+/* chia mặc định theo số ngày của từng tuần, tổng luôn đúng KPI tháng */
+function pbDef(k){const W5=PB_W(),dys=W5.map(x=>x.den-x.tu+1),tot=dys.reduce((a,b)=>a+b,0),raw=dys.map(n=>k*n/tot),base=raw.map(Math.floor);let rest=k-base.reduce((a,b)=>a+b,0);raw.map((r,i)=>[r-Math.floor(r),i]).sort((a,b)=>b[0]-a[0]).forEach(([,i])=>{if(rest>0){base[i]++;rest--}});return base}
+const pbArr=(d,kenh,sku,k)=>{const e=((d.phanBo||{})[kenh]||{})[sku];return Array.isArray(e)&&e.length===5?e.map(n=>+n||0):pbDef(+k||0)};
+function pbHtml(d,ch,P,give){
+  if(!P.length)return "";
+  const kenh=ch.k,W5=PB_W(),A=P.map(x=>({x,a:pbArr(d,kenh,x.sku,x.sl)})),tot=sum(P,x=>+x.sl||0),open=PB_OPEN.has(kenh);
+  const bad=A.filter(({x,a})=>a.reduce((s,n)=>s+n,0)!==(+x.sl||0));
+  const wk=W5.map((w,i)=>{const items=A.filter(({a})=>a[i]>0),wt=A.reduce((s,{a})=>s+a[i],0),key=kenh+"|"+w.w,wo=PB_OPEN.has(key);
+    return `<div class="pbw"><div class="pbwh clk" data-pbtog="${esc(key)}"><i class="ptar">${wo?"▾":"▸"}</i><b>Tuần ${w.w}</b> · ngày ${dd(w.tu)}–${dd(w.den)}: <b>${wt} video</b><span class="hint">${items.map(({x,a})=>a[i]+" "+esc(sk(x.sku).n)).join(" · ")}</span></div>
+     ${wo?`<div class="pbl">${A.map(({x,a})=>`<div class="pbp">${swatch(x.sku)}<b>${esc(sk(x.sku).n)}</b>${give?`<input type="number" min="0" class="num" data-pbi="${esc(kenh)}|${w.w}|${x.sku}" data-kpi="${+x.sl||0}" value="${a[i]}">`:`<b>${a[i]}</b>`} video<small>(cả tháng ${+x.sl||0})</small></div>`).join("")}</div>`:""}</div>`}).join("");
+  return `<section class="pbbox"><div class="pbh clk" data-pbtog="${esc(kenh)}"><i class="ptar">${open?"▾":"▸"}</i><b>Phân bổ theo tuần</b> · tổng video trong tháng: <b>${tot}</b>${bad.length?` ${pill("lệch KPI "+bad.length+" sản phẩm","amb")}`:""}</div>
+   ${open?`${wk}${bad.length?`<p class="t-amb pbn">${bad.map(({x,a})=>`${esc(sk(x.sku).n)}: các tuần cộng ${a.reduce((s,n)=>s+n,0)}, KPI tháng ${+x.sl||0}${give?` <button class="lnk" data-pbreset="${esc(kenh)}|${x.sku}">chia lại theo ngày</button>`:""}`).join(" · ")}</p>`:`<p class="hint pbn">Các tuần cộng đúng KPI tháng. Mặc định chia theo số ngày của từng tuần, sửa số từng tuần ở trên.</p>`}`:""}</section>`
+}
+/* Calendar đọc phân bổ tuần: đã xếp lịch / kế hoạch tuần, cảnh báo thiếu */
+function calWeekPlan(o){
+  const d=o.d,today=d.settings.today,pairs=ptPairs(),W5=PB_W();
+  const rows=CHANNELS.map(ch=>{const P=pairs.filter(x=>x.kenh===ch.k);if(!P.length)return "";
+    const cells=W5.map((w,i)=>{const plan=sum(P,x=>pbArr(d,ch.k,x.sku,x.sl)[i]),used=d.cards.filter(c=>c.kenh===ch.k&&c.day>=w.tu&&c.day<=w.den).length,th=Math.max(0,plan-used),st=today>=w.tu;
+      return `<td class="n ${th?(st?"pbbad":"pbwarn"):"pbok"}"><b>${used}</b>/${plan}${th?`<small>thiếu ${th}</small>`:""}</td>`}).join("");
+    return `<tr><td><b>${esc(ch.short)}</b></td>${cells}</tr>`}).join("");
+  return `<section class="card flush"><div class="card-h pad"><h2>Kế hoạch phân bổ theo tuần</h2><span class="hint">đã xếp lịch / kế hoạch tuần (chốt ở ① Kế hoạch) · ô đỏ là tuần đã bắt đầu mà còn thiếu</span></div><div class="tbl"><table><thead><tr><th>Kênh</th>${W5.map(w=>`<th class="n">Tuần ${w.w}<small>${dd(w.tu)}–${dd(w.den)}</small></th>`).join("")}</tr></thead><tbody>${rows||`<tr><td colspan="6" class="empty">Chưa có kế hoạch kênh.</td></tr>`}</tbody></table></div></section>`
+}
 /* ---------- ④ Kho video: tổng quan số lượng, video đợi duyệt, video cần phân bổ (tồn tháng trước + sản xuất trong tháng) · ⑤ Calendar tách riêng ---------- */
 const KV_PIPE=["kb","dkb","quay","edit","worker","dvd","dceo"];
 function khoSummary(o){
@@ -220,7 +248,8 @@ function xvVideoCan(b,o){
 }
 /* ⑤ Calendar: nhịp đăng, video chờ xếp ngày, lịch cả tháng */
 function xvCalendar(b,o){
-  b.innerHTML='<div id="cl-d"></div><div id="cl-c"></div>';
+  b.innerHTML='<div id="cl-w"></div><div id="cl-d"></div><div id="cl-c"></div>';
+  b.querySelector("#cl-w").innerHTML=calWeekPlan(o);
   xvDang2(b.querySelector("#cl-d"),o);
   const c=b.querySelector("#cl-c");PAGES.lich(c);const ph=c.querySelector(".ph");if(ph)ph.remove()
 }
