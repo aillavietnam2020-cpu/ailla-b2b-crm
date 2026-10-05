@@ -81,6 +81,21 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
   // Kéo chuột và lăn chuột để xem bảng rộng, gắn một lần cho mọi trang.
   React.useEffect(() => installTableScrolling(), []);
 
+  // Trong khung Trang quản trị: chỉ hiện nội dung, báo tên trang lên để khung hiển thị đúng tiêu đề.
+  const embedded = window.self !== window.top;
+  React.useEffect(() => {
+    if (embedded) window.parent.postMessage({ type: 'crm-title', title }, window.location.origin);
+  }, [embedded, title]);
+  if (embedded) {
+    return (
+      <div className="app">
+        <main className="main">
+          <div className={TITLES[location.pathname] ? 'content has-title' : 'content'}>{children}</div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <aside className="sidebar">

@@ -929,3 +929,81 @@ table.data.wide {
   z-index: 3;
 }
 .table-wrap table.data.wide tr:hover td:first-child { background: #fffafd; }
+
+/* Đồng bộ giao diện với Trang quản trị (hub) ------------------------------- */
+:root {
+  --canvas: #f3f5f9;
+  --r: 16px;
+}
+body {
+  font-family: 'Be Vietnam Pro', Inter, 'Segoe UI', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  background: linear-gradient(135deg, #e9efff 0%, #f3efff 38%, #eaf6ff 72%, #f1f5ff 100%) fixed;
+}
+.card {
+  border-color: #ebeef3;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+.card-head {
+  padding: 18px 22px;
+  border-bottom-color: #eef0f4;
+}
+.card-body {
+  padding: 18px 22px;
+}
+.btn {
+  border-radius: 10px;
+  border-color: #e3e7ee;
+  font-weight: 600;
+}
+.topbar {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(8px);
+}
+table.data th {
+  background: #fff;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #7a8496;
+  border-bottom: 1px solid #eef0f4;
+}
+table.data td {
+  border-bottom: 1px solid #f0f2f6;
+}
+table.data tr:hover td {
+  background: #f7faff;
+}
+input,
+select,
+textarea {
+  border-radius: 10px;
+}
+.kpi {
+  border-color: #ebeef3;
+  border-radius: 16px;
+}
+
+/* Khi nằm trong khung Trang quản trị -------------------------------------- */
+html.embedded body {
+  background: transparent;
+}
+html.embedded .sidebar,
+html.embedded .topbar,
+html.embedded .mobile-nav {
+  display: none !important;
+}
+html.embedded .app {
+  display: block;
+  min-height: 0;
+}
+html.embedded .content {
+  padding: 0 0 32px;
+  max-width: none;
+}
+html.embedded .has-title .page-head h2 {
+  display: none;
+}

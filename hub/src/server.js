@@ -136,7 +136,27 @@ async function svLogout(){try{await fetch("/api/auth/logout",{method:"POST",cred
 {const i=MODULES.findIndex(m=>m.k==="b2b");if(i>=0)MODULES.splice(i,1)}
 {const hr=MODULES.find(m=>m.k==="hr");if(hr){const g0=hr.groups;hr.groups=()=>g0().filter(([g])=>g!=="Lương"&&g!=="Dữ liệu")}}
 {const i=MENU_USER.findIndex(g=>g[0]==="Nhân sự của tôi");if(i>=0)MENU_USER[i]=[MENU_USER[i][0],MENU_USER[i][1].filter(it=>it[0]!=="hr_plme")]}
-MODULES.splice(MODULES.findIndex(m=>m.k==="mkt"),0,{k:"b2blink",zone:"Bán hàng",ic:"box",n:"Bán hàng B2B (CRM)",sub:"",groups:()=>[["",[MI("crmgo","Mở CRM B2B",()=>SV.perms.includes("price.read"))]]]});
+/* CRM B2B nằm ngay trong khung này (không mở tab mới): mỗi mục menu là một trang CRM hiện trong khung, CRM tự ẩn menu và nút đăng xuất của nó. */
+const crmRole=()=>(SV.me&&SV.me.role)||"";
+const CRM_EMB=[
+ ["cr_dh","Điều hành đội ngũ","/admin",()=>crmRole()!=="EMPLOYEE"],
+ ["cr_ceo","Bàn điều hành CEO","/admin/ceo",()=>crmRole()==="CEO"],
+ ["cr_rp","Dashboard kinh doanh","/admin/reports",()=>crmRole()!=="EMPLOYEE"],
+ ["cr_kh","Khách hàng","/admin/customers",()=>crmRole()!=="EMPLOYEE"],
+ ["cr_dn","Đơn hàng & duyệt","/admin/orders",()=>crmRole()!=="EMPLOYEE"],
+ ["cr_cn","Công nợ","/admin/debts",()=>crmRole()!=="EMPLOYEE"],
+ ["cr_gia","Sản phẩm & bảng giá","/admin/prices",()=>crmRole()!=="EMPLOYEE"],
+ ["cr_im","Import dữ liệu","/admin/imports",()=>crmRole()!=="EMPLOYEE"&&SV.perms.includes("import.read")],
+ ["cr_s_hn","Việc hôm nay","/sales",()=>crmRole()==="EMPLOYEE"],
+ ["cr_s_kh","Khách hàng của tôi","/sales/customers",()=>crmRole()==="EMPLOYEE"],
+ ["cr_s_dn","Đơn hàng","/sales/orders",()=>crmRole()==="EMPLOYEE"],
+ ["cr_s_gia","Bảng giá 8 cấp","/sales/prices",()=>crmRole()==="EMPLOYEE"],
+ ["cr_s_cn","Công nợ khách của tôi","/sales/debts",()=>crmRole()==="EMPLOYEE"],
+ ["cr_s_kq","Kết quả cá nhân","/sales/performance",()=>crmRole()==="EMPLOYEE"]];
+const CRM_GROUPS=()=>{const L=CRM_EMB.filter(x=>x[3]()).map(([k,t])=>MI(k,t,()=>SV.perms.includes("price.read")));return crmRole()==="EMPLOYEE"?[["",L]]:[["Điều hành",L.slice(0,6)],["Thiết lập",L.slice(6)]].filter(g=>g[1].length)};
+MODULES.splice(MODULES.findIndex(m=>m.k==="mkt"),0,{k:"b2blink",zone:"Bán hàng",ic:"box",n:"Bán hàng B2B (CRM)",sub:"Đại lý · NPP",groups:CRM_GROUPS});
+CRM_EMB.forEach(([k,t,p])=>{PAGES[k]=m=>{m.innerHTML=H(t,"Khách sỉ, đại lý, đơn hàng, công nợ")+'<div class="crmembed"><iframe id="crmfr" src="'+p+'" title="'+esc(t)+'"></iframe></div>'}});
+window.addEventListener("message",e=>{if(e.origin!==location.origin||!e.data||e.data.type!=="crm-title"||!$("#crmfr"))return;const h=$("#main .ph h1");if(h&&e.data.title&&e.data.title!=="AILLA B2B CRM")h.textContent=e.data.title});
 /* ---------- Mỗi phòng ban chỉ thấy phân hệ của mình ----------
    Phân hệ lấy từ Cài đặt › Phòng ban (cột "Dùng phân hệ"); ai cũng có Công việc & dự án
    (giao việc, nhiệm vụ). CEO (vai trò Quản trị) thấy tất cả. */
@@ -159,7 +179,7 @@ MODULES.forEach(mo=>{const g=mo.groups;mo.groups=()=>{const a=svAllowedMods();if
 /* Dòng ghi chú trên các trang số tài chính: đây là số quản trị nội bộ, sổ sách chính thức ở MISA. */
 const INTERNAL_PAGES=["bc_tong","bc_tiktok","bc_shopee","bc_fb","pl","chiphi","doisoat","sku","adshieuqua","fb_ads","adssp"];
 INTERNAL_PAGES.forEach(k=>{const f=PAGES[k];if(f)PAGES[k]=m=>{f(m);m.insertAdjacentHTML("afterbegin",`<div class="note internal">🔒 Số liệu <b>quản trị nội bộ</b> để điều hành (ước tính, phân bổ, so mục tiêu), không phải báo cáo tài chính. Sổ sách chính thức do Kế toán quản lý trên MISA.</div>`)}});
-PAGES.crmgo=m=>{m.innerHTML=H("Đang mở CRM B2B…");location.href=SV.me&&SV.me.role!=="EMPLOYEE"?(SV.me.role==="CEO"?"/admin/ceo":"/admin"):"/sales"};
+PAGES.crmgo=m=>{const k=SV.me&&SV.me.role==="EMPLOYEE"?"cr_s_hn":SV.me&&SV.me.role==="CEO"?"cr_ceo":"cr_dh";PAGES[k](m)};
 PAGES.matkhau=m=>{const p=SV.me&&SV.me.role!=="EMPLOYEE"?"/admin/account":"/sales/account";m.innerHTML=H("Đổi mật khẩu","Dùng chung mật khẩu với CRM")+`<section class="card narrow"><p>Mật khẩu đăng nhập dùng chung cho CRM và khu Marketing.</p><div class="acts"><a class="btn pri" href="${p}">Đổi mật khẩu</a></div></section>`};
 
 const _pCaiDat=pCaiDat;
