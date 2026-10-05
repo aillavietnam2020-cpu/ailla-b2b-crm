@@ -247,6 +247,7 @@ function xvHookList(b,o){
   if(!HK_K||!chs.some(c=>c.k===HK_K))HK_K=(chs[0]||{}).k||"";
   const tabs=chs.length?`<div class="seg ptk">${chs.map(ch=>`<button data-hkk="${esc(ch.k)}" class="${ch.k===HK_K?"on":""}">${esc(ch.short)} <span class="xbadge">${all.filter(c=>c.kenh===ch.k&&["cv","cd"].includes(hkSt(c))).length}</span></button>`).join("")}</div>`:"";
   const K=all.filter(c=>c.kenh===HK_K),bySku=xvGroupBy(K,c=>c.sku);
+  if(![...HK_OPEN].some(k=>k.endsWith("|"+HK_K))&&bySku[0])HK_OPEN.add(bySku[0][0]+"|"+HK_K); // mở sẵn sản phẩm đầu tiên để thấy ngay chỗ viết
   const blk=([sku,G])=>{const key=sku+"|"+HK_K,op=HK_OPEN.has(key),H=G.filter(hkIsHook),S=G.filter(c=>!hkIsHook(c));
     const rows=G.filter(c=>hkSt(c)!=="dq").sort((a,c)=>(a.han||99)-(c.han||99)||(a.qday||99)-(c.qday||99)||String(a.id).localeCompare(String(c.id))).map((c,i)=>{
       const st=hkSt(c),sh=(d.shoots||[]).find(s=>s.id===c.buoiQuay),mine=hkMine(c),isH=hkIsHook(c);
@@ -271,7 +272,7 @@ function xvHookList(b,o){
 }
 /* ---------- ② Hook & kịch bản, quay, edit ---------- */
 function xvHook(b,o){
-  b.innerHTML='<div id="xh-q"></div><div id="xh-l"></div><div id="xh-e"></div><div id="xh-k"></div>';
+  b.innerHTML='<div id="xh-l"></div><div id="xh-q"></div><div id="xh-e"></div><div id="xh-k"></div>';
   xvQuay2(b.querySelector("#xh-q"),o);
   xvHookList(b.querySelector("#xh-l"),o);
   xvEdit2(b.querySelector("#xh-e"),o);
