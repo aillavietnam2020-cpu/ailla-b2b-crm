@@ -180,15 +180,49 @@ function xvVideoMade(b,o){
   xvEdit2(b.querySelector("#vm-e"),o);
 }
 /* ---------- ④ Kho video & Calendar: video tồn tháng trước, video sản xuất trong tháng, rồi đẩy sang Calendar ---------- */
+/* ---------- ④ Kho video: tổng quan số lượng, video đợi duyệt, video cần phân bổ (tồn tháng trước + sản xuất trong tháng) · ⑤ Calendar tách riêng ---------- */
+const KV_PIPE=["kb","dkb","quay","edit","worker","dvd","dceo"];
+function khoSummary(o){
+  const d=o.d,pairs=ptPairs();
+  const rows=CHANNELS.map(ch=>{const P=pairs.filter(x=>x.kenh===ch.k);if(!P.length)return "";
+    const need=sum(P,x=>x.sl),C=d.cards.filter(c=>c.kenh===ch.k&&c.nguon!=="Order Digital");
+    const ready=C.filter(c=>["dang","xong"].includes(c.step)).length,wip=C.filter(c=>KV_PIPE.includes(c.step)&&(c.step!=="kb"||c.hookText||c.noiDung)).length,thieu=Math.max(0,need-ready),own=userName(chanOwner(ch.k));
+    return `<div class="khoc${thieu?" bad":""}"><div class="khoh"><b>${esc(ch.short)}</b><small>${own?"giữ kênh: "+esc(own):""}</small></div><div class="khon"><div><span>Tổng video tháng</span><b>${need}</b></div><div><span>Đã duyệt, sẵn đăng</span><b>${ready}</b></div><div><span>Đang làm</span><b>${wip}</b></div><div><span>Thiếu</span><b class="${thieu?"t-red":"t-grn"}">${thieu}</b></div></div>${thieu?`<p class="t-red">⚠ Thiếu ${thieu} video đã duyệt.${wip>=thieu?` Có ${wip} video đang làm, duyệt kịp thì đủ.`:` Kể cả ${wip} video đang làm xong hết vẫn còn thiếu ${thieu-wip}: cần thêm lịch sản xuất.`}</p>`:`<p class="t-grn">Đủ video cho cả tháng.</p>`}</div>`}).join("");
+  return `<section class="card"><div class="card-h"><h2>Tổng quan kho video</h2><span class="hint">cả tháng · theo kế hoạch từng kênh · kho tồn còn ${xvKhoFree().length} video dùng được</span></div><div class="khos">${rows||`<p class="hint">Chưa có kế hoạch kênh nào.</p>`}</div></section>`
+}
 function xvKhoAll(b,o){
-  XV.ks=XV.ks||"ton";
-  const TB=[["ton","Video tồn tháng trước"],["new","Video sản xuất trong tháng"],["cal","Calendar"]];
-  b.innerHTML=`<div class="seg ptk">${TB.map(([k,t])=>`<button data-xks="${k}" class="${XV.ks===k?"on":""}">${t}</button>`).join("")}</div><div id="xk-b"></div>`;
+  if(XV.ks==="new")XV.ks="wait";else if(!["wait","can"].includes(XV.ks))XV.ks="can";
+  const pend=o.d.cards.filter(c=>["edit","dvd","dceo"].includes(c.step)&&!c.wt).length;
+  const TB=[["wait","① Video đợi duyệt"+(pend?` (${pend})`:"")],["can","② Video cần phân bổ"]];
+  b.innerHTML=`${khoSummary(o)}<div class="seg ptk">${TB.map(([k,t])=>`<button data-xks="${k}" class="${XV.ks===k?"on":""}">${t}</button>`).join("")}</div><div id="xk-b"></div>`;
   b.querySelectorAll("[data-xks]").forEach(x=>x.onclick=()=>{XV.ks=x.dataset.xks;renderMain()});
   const c=b.querySelector("#xk-b");
-  if(XV.ks==="ton")xvKho2(c,o);
-  else if(XV.ks==="new"){c.innerHTML='<div id="xk-m"></div><div id="xk-d"></div>';xvVideoMade(c.querySelector("#xk-m"),o);xvDang2(c.querySelector("#xk-d"),o)}
-  else{PAGES.lich(c);const ph=c.querySelector(".ph");if(ph)ph.remove()}
+  if(XV.ks==="wait")xvVideoMade(c,o);else xvVideoCan(c,o)
+}
+/* Video cần phân bổ: tồn tháng trước + sản xuất trong tháng, lọc theo sản phẩm */
+function xvVideoCan(b,o){
+  const d=o.d;XV.kind=XV.kind||"all";
+  const sx=d.cards.filter(c=>["dang","xong"].includes(c.step)&&loaiOf(c)!=="kho"&&c.mix!=="ton"),free=xvKhoFree(),cnt={};
+  free.forEach(k=>{cnt[k.sku]=(cnt[k.sku]||0)+1});sx.forEach(c=>{cnt[c.sku]=(cnt[c.sku]||0)+1});
+  const KD=[["all","Tất cả"],["ton","Video tồn tháng trước ("+free.length+")"],["sx","Video sản xuất trong tháng ("+sx.length+")"]];
+  b.innerHTML=`<section class="card"><div class="seg">${KD.map(([k,t])=>`<button data-xkind="${k}" class="${XV.kind===k?"on":""}">${t}</button>`).join("")}</div>
+   <div class="xkho"><button class="pchip${XV.khoSku?"":" on"}" data-khosku="">Mọi sản phẩm</button>${Object.entries(cnt).sort((a,c)=>c[1]-a[1]).map(([k,n])=>`<button class="pchip${XV.khoSku===k?" on":""}" data-khosku="${esc(k)}">${swatch(k)}${esc(sk(k).n)} <b>${n}</b></button>`).join("")}</div></section><div id="vc-t"></div><div id="vc-s"></div>`;
+  b.querySelectorAll("[data-xkind]").forEach(x=>x.onclick=()=>{XV.kind=x.dataset.xkind;renderMain()});
+  b.querySelectorAll("[data-khosku]").forEach(x=>x.onclick=()=>{XV.khoSku=x.dataset.khosku;renderMain()});
+  if(XV.kind!=="sx")xvKho2(b.querySelector("#vc-t"),o);
+  if(XV.kind!=="ton"){
+    const L=sx.filter(c=>!XV.khoSku||c.sku===XV.khoSku).sort((a,c)=>(a.day||99)-(c.day||99));
+    const link=c=>c.linkFinal||c.linkVideo||"";
+    b.querySelector("#vc-s").innerHTML=`<section class="card flush"><div class="card-h pad"><h2>Video sản xuất trong tháng</h2><span class="hint">${L.length} video đã duyệt · xếp ngày đăng ở ⑤ Calendar · tháng không dùng hết thì chuyển sang kho tồn</span><span class="sp"></span><button class="btn sm" data-gocal="1">Sang ⑤ Calendar →</button></div>
+     <div class="tbl"><table><thead><tr><th>Video</th><th>Sản phẩm · tuyến</th><th>Kênh</th><th>Người làm</th><th>Link</th><th>Trạng thái</th></tr></thead><tbody>${L.map(c=>`<tr><td><span class="clk" data-card="${c.id}"><b>${esc(c.hookText||c.yTuong||c.id)}</b></span></td><td>${swatch(c.sku)}${esc(sk(c.sku).n)}<small>${esc(c.tuyen||"")}</small></td><td>${esc(chOf(c.kenh).short)}</td><td>${esc(userName(c.nguoiEdit||c.nguoi)||"—")}</td><td>${link(c)?`<a href="${esc(/^https?:/.test(link(c))||link(c).startsWith("/")?link(c):"https://"+link(c))}" target="_blank" rel="noopener">▶ Xem video</a>`:"—"}</td><td>${c.step==="xong"?pill("Đã đăng","grn"):c.day?pill("Đăng "+dd(c.day),"blu"):pill("Chờ xếp lịch","amb")}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">Chưa có video sản xuất trong tháng nào được duyệt.</td></tr>`}</tbody></table></div></section>`;
+    b.querySelectorAll("[data-gocal]").forEach(x=>x.onclick=()=>{XV.tab="cal";renderMain();scrollTo(0,0)})
+  }
+}
+/* ⑤ Calendar: nhịp đăng, video chờ xếp ngày, lịch cả tháng */
+function xvCalendar(b,o){
+  b.innerHTML='<div id="cl-d"></div><div id="cl-c"></div>';
+  xvDang2(b.querySelector("#cl-d"),o);
+  const c=b.querySelector("#cl-c");PAGES.lich(c);const ph=c.querySelector(".ph");if(ph)ph.remove()
 }
 /* ---------- ② Hook & kịch bản theo kênh · chỉ tiêu từng buổi quay · Oanh duyệt ---------- */
 const SQ_TOG=new Map();
@@ -333,18 +367,18 @@ function pXepViec2(m){
   const kbPool=d.cards.filter(c=>["moi","worker"].includes(loaiOf(c))&&!isPH(c)&&(c.step==="cg"||(c.step==="kb"&&!c.nguoi)));
   const ePool=d.cards.filter(c=>c.step==="edit"&&!c.nguoiEdit&&!c.wt);
   const hkWait=d.cards.filter(c=>c.buoiQuay&&c.step==="dkb").length,un=d.cards.filter(c=>!c.day&&c.step==="dang").length;
-  if(["kb","win","edit"].includes(XV.tab))XV.tab="quay";if(XV.tab==="dang"){XV.tab="kho";XV.ks="new"}
+  if(["kb","win","edit"].includes(XV.tab))XV.tab="quay";if(XV.tab==="dang"){XV.tab="kho";XV.ks="wait"}if(XV.tab==="kho"&&XV.ks==="cal")XV.tab="cal";
   const nHook=hkAll(d).filter(c=>["cv","cd"].includes(hkSt(c))).length;
   const nOrder=d.cards.filter(c=>(loaiOf(c)==="worker"&&["kb","dkb"].includes(c.step))||(c.mix==="reup"&&c.step==="kb")).length;
-  const tabs=[["tuan","① Kế hoạch",0],["quay","② Hook & kịch bản, lịch quay",nHook+hkWait],["wk","③ Order Worker",nOrder],["kho","④ Kho video & Calendar",slots.length+un]];
+  const tabs=[["tuan","① Kế hoạch",0],["quay","② Hook & kịch bản, lịch quay",nHook+hkWait],["wk","③ Order Worker",nOrder],["kho","④ Kho video",slots.length+d.cards.filter(c=>["edit","dvd","dceo"].includes(c.step)&&!c.wt).length],["cal","⑤ Calendar",un]];
   if(!tabs.some(t=>t[0]===XV.tab))XV.tab="tuan";
   m.innerHTML=H("Xếp việc tuần",`${xvLbl(W)} · làm lần lượt từ ① đến ⑤, bước nào có số là còn việc`)+`<div class="lwtool"><div class="seg xvtabs">${tabs.map(([k,t,n])=>`<button data-xvt="${k}" class="${XV.tab===k?"on":""}">${t}${n?` <span class="xbadge">${n}</span>`:""}</button>`).join("")}</div></div><div id="xvb"></div>`;
   m.querySelectorAll("[data-xvt]").forEach(b=>b.onclick=()=>{XV.tab=b.dataset.xvt;XV.sel.clear();renderMain()});
   const b=$("#xvb"),o={d,W,days,WC,team,give,slots,free,kbPool,qPool:[],ePool,post:WC.filter(c=>c.step==="dang")};
-  ({tuan:xvTuan,kho:xvKhoAll,quay:xvHook,wk:xvWorker2})[XV.tab](b,o);
+  ({tuan:xvTuan,kho:xvKhoAll,cal:xvCalendar,quay:xvHook,wk:xvWorker2})[XV.tab](b,o);
   wpWorkList(b,XV.tab);
   /* nối với ① Kế hoạch tuần: dải "cần làm" + chọn sẵn sản phẩm đang làm */
-  const ST=(XV.tab==="kho"&&(XV.ks||"ton")!=="ton")?null:({kho:["ton"]})[XV.tab];
+  const ST=null;
   if(ST){const ks=XV.tab==="kho"&&b.querySelector("#khosum");if(ks)ks.insertAdjacentHTML("afterend",wpStrip(d,W,days,ST));else b.insertAdjacentHTML("afterbegin",wpStrip(d,W,days,ST));
     b.querySelectorAll("[data-wpq]").forEach(x=>x.onclick=()=>{const v=x.dataset.wpq;if(!v){XV.sku="";XV.kenh="";XV.mix=""}else{const [s2,k2,t2]=v.split("|");XV.sku=s2;XV.kenh=k2;XV.mix=t2;if(XV.tab==="kho"){const kk=s2+"|"+k2;KS_OPEN.has(kk)?KS_OPEN.delete(kk):KS_OPEN.add(kk)}}renderMain()});
     if(XV.sku){const tu=d.tuyen.find(t=>t.sku===XV.sku&&(!XV.kenh||t.kenh===XV.kenh));
@@ -578,8 +612,8 @@ function xvKho2(b,o){
   const kOpts=sku=>{const p=d.products.find(x=>x.k===sku),L=p?pKenhs(p).map(e=>e.kenh):CHANNELS.map(c=>c.k);return L.filter(k=>give||chanOwner(k)===ME.id)};
   const browse=`<section class="card flush"><div class="card-h pad"><h2>Chọn video từ kho</h2><span class="hint">${FV.length} video${FV.length>shown.length?` (hiện ${shown.length} video đầu, bấm sản phẩm ở trên để lọc)`:""} · chọn kênh rồi bấm Chọn, video sang "Lịch đăng video tồn" bên dưới</span></div>
    <div class="tbl"><table class="kstab"><thead><tr><th>Mã</th><th>Sản phẩm</th><th>Tuyến / nội dung</th><th>Người edit</th><th>Video</th><th>Chọn cho kênh</th></tr></thead><tbody>${shown.map(k=>{const ko=kOpts(k.sku);return `<tr><td class="mono">${esc(k.ma)}</td><td>${swatch(k.sku)}${esc(sk(k.sku).n)}</td><td>${esc((k.tuyen||"")+(k.ten?(k.tuyen?" · ":"")+k.ten:"")||k.skuText||"")}</td><td>${esc(khoEditor(k)||"—")}</td><td>${k.link?`<a href="${esc(khoLink(k))}" target="_blank" rel="noopener">▶ Xem video</a>`:`<span class="hint">chưa có link</span>`}</td><td>${ko.length?`<select data-kbk="${esc(k.ma)}">${opt(ko.map(x=>[x,chOf(x).short]),ko[0])}</select><button class="btn sm pri" data-kbpick="${esc(k.ma)}|${esc(k.sku)}">Chọn</button>`:`<span class="hint">người phụ trách kênh chọn</span>`}</td></tr>`}).join("")||`<tr><td colspan="6" class="empty">Không có video nào.</td></tr>`}</tbody></table></div></section>`;
-  b.innerHTML=`<section class="card" id="khosum"><div class="card-h"><h2>Kho video tồn tháng trước</h2><span class="hint">${free.length} video còn dùng được · bấm sản phẩm để lọc</span></div>
-   <div class="xkho"><button class="pchip${XV.khoSku?"":" on"}" data-khosku="">Tất cả <b>${free.length}</b></button>${bySku.map(([k,L])=>`<button class="pchip${XV.khoSku===k?" on":""}" data-khosku="${esc(k)}">${swatch(k)}${esc(sk(k).n)} <b>${L.length}</b></button>`).join("")||`<span class="hint">Kho đang trống.</span>`}</div></section>
+  b.innerHTML=`<section class="card" id="khosum"><div class="card-h"><h2>Kho video tồn tháng trước</h2><span class="hint">${free.length} video còn dùng được · chưa dùng hết trong tháng thì chuyển sang tháng sau</span></div>
+   </section>
    ${browse}
   <section class="card"><div class="card-h"><h2>Chọn video tồn</h2><span class="hint">${slots.length?`${slots.length} video cần chọn · bấm từng sản phẩm để mở danh sách video trong kho, xem rồi bấm Chọn`:"không còn video nào cần chọn"}</span></div>
    ${pairs.map(block).join("")||`<p class="hint">Giao "Dùng video tồn" ở ① Kế hoạch thì sản phẩm sẽ hiện ở đây.</p>`}</section>
