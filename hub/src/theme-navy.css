@@ -801,3 +801,9 @@ td.wide .hkin{width:min(520px,100%);margin-right:8px}
 .sqsk{display:block;margin-top:4px;color:var(--muted);font-size:13px}.sqwarn{color:#b54708;background:#fff6e8;border-radius:10px;padding:6px 10px;margin:6px 0}
 
 .gopyln{margin-top:6px;padding:6px 10px;border-radius:10px;background:#fff1f0;color:#b42318;font-size:13.5px;line-height:1.4}.gopyln small{color:#a15c57}
+
+/* Lịch quay: một khối chung */
+.lichquay .sqitem{border:1px solid #e9ecf1;border-radius:14px;padding:12px 16px;margin:10px 0;background:#fff}
+.sqform{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end;padding:12px 0;border-bottom:1px solid #eef0f6;margin-bottom:6px}
+.sqform .btn{justify-self:start}.chk label{white-space:nowrap}
+.vmform{border-bottom:0}

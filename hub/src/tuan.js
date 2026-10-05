@@ -102,7 +102,7 @@ function xvQuay2(b,o){
   const wait=d.cards.filter(c=>c.step==="quay"&&!c.buoiQuay);
   const sess=s=>{const I=d.cards.filter(c=>c.buoiQuay===s.id),chua=I.filter(c=>c.step==="dkb"),kb=I.filter(c=>c.step==="kb"),ok=I.filter(c=>c.step==="quay"),done=I.filter(c=>!["dkb","kb","quay","cg"].includes(c.step)),ps=I.filter(c=>c.phatSinh).length;
     const bySku=xvGroupBy(I,c=>c.sku+"|"+c.kenh);
-    return `<section class="card xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${pill(SQ_LB[SQ_ST(s)][0],SQ_LB[SQ_ST(s)][1])}</div>
+    return `<div class="sqitem xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${pill(SQ_LB[SQ_ST(s)][0],SQ_LB[SQ_ST(s)][1])}</div>
      ${sqBox(s,give,dv)}<div class="xsum">${I.length} hook / kịch bản xếp vào buổi quay · <b class="${ok.length?"t-grn":""}">${ok.length} đã duyệt, sẵn sàng quay</b>${chua.length?` · <b class="t-amb">${chua.length} chờ Oanh duyệt</b>`:""}${kb.length?` · <b class="t-red">${kb.length} cần sửa</b>`:""} · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}${bySku.length?`<span class="sqsk">${bySku.map(([k,L])=>`${swatch(k.split("|")[0])} ${esc(sk(k.split("|")[0]).n)} (${esc(chOf(k.split("|")[1]).short)}): ${L.length}`).join(" · ")}</span>`:""}</div>
      ${SQ_ST(s)!=="xong"&&SQ_ST(s)!=="huy"&&I.length&&(chua.length||kb.length)&&s.day-D().settings.today<=1?`<p class="sqwarn">⚠ Sắp tới buổi quay mà còn ${chua.length+kb.length} hook / kịch bản chưa được duyệt.</p>`:""}
      ${(()=>{const H=I.filter(c=>mixOf(c)==="oneshot"),K=I.filter(c=>mixOf(c)==="kichban");return [H.length?"":"Chưa có hook nào: <button class=\"lnk\" data-gohk=\"hook\">Viết hook →</button>",K.length?"":"Chưa có kịch bản nào: <button class=\"lnk\" data-gohk=\"kb\">Viết kịch bản →</button>"].filter(Boolean).map(x=>`<p class="hint">${x} (ở bảng Hook & kịch bản theo kênh bên dưới, duyệt xong chọn buổi quay này)</p>`).join("")})()}
@@ -110,11 +110,14 @@ function xvQuay2(b,o){
      <label class="field full">Ghi chú buổi quay<textarea rows="2" data-sqnote="${s.id}" ${give?"":"disabled"} placeholder="Đạo cụ, người mẫu, địa điểm, lưu ý…">${esc(s.ghiChu||"")}</textarea></label>
      <label class="field full">Cảnh trám / review cần quay (đủ dùng cho các video trong tuần)<textarea rows="2" data-tram="${s.id}" ${give?"":"disabled"} placeholder="Ví dụ: cảnh trám ngâm áo, cận bột tan, review cầm sản phẩm — đủ cho 12 video bột tẩy tuần này">${esc(s.tram||"")}</textarea></label>
      <div class="acts">${dv&&chua.length?`<button class="btn pri" data-hkok="${s.id}">✓ Duyệt danh sách hook (${chua.length})</button>`:""}
-      ${give&&ok.length?`<button class="btn" data-hkdone="${s.id}">Chốt buổi quay: ${ok.length} hook / kịch bản → Gửi video</button>`:""}
-      ${give&&s.trangThai==="Đã quay"||give&&ok.length?`<span class="hkps"><select data-pst="${s.id}">${tOpts()}</select><input data-psh="${s.id}" placeholder="Hook phát sinh"><button class="btn sm" data-psadd="${s.id}">+ Hook phát sinh</button></span>`:""}</div></section>`};
-  b.innerHTML=`${wait.length?`<div class="note">${wait.length} hook đã duyệt từ buổi trước chưa quay. ${give?`<button class="btn sm" id="hk-move">Chuyển vào buổi quay gần nhất</button>`:""}</div>`:""}
-   ${sh.map(sess).join("")||`<section class="card"><p class="empty">Kỳ này chưa có buổi quay. Thêm buổi quay ở dưới.</p></section>`}
-   ${give?`<section class="card"><div class="card-h"><h2>Thêm buổi quay</h2></div><form class="frm row7" id="xq-add"><label class="field">Ngày<select id="xs-d">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),Math.max(d.settings.today,W.tu))}</select></label><label class="field">Buổi<select id="xs-b">${opt(["Sáng","Chiều","Cả ngày"],"Sáng")}</select></label><label class="field">Giờ (nếu cần)<input id="xs-g" placeholder="vd 8:30"></label><label class="field">Địa điểm<input id="xs-p" value="Văn phòng Ailla"></label><div class="field"><span>Người quay (tích nhiều người)</span><div class="chk" id="xs-ns">${team.map(u=>`<label><input type="checkbox" name="xs-n" value="${u.id}" ${qDef&&qDef.id===u.id?"checked":""}> ${esc(u.name)}</label>`).join("")}</div></div><label class="field">Ghi chú<input id="xs-gc" placeholder="Đạo cụ, lưu ý…"></label><button class="btn pri">+ Thêm buổi quay</button></form></section>`:""}`;
+      ${give&&ok.length?`<button class="btn" data-hkdone="${s.id}">Chốt buổi quay: ${ok.length} hook / kịch bản → Kho video</button>`:""}
+      ${give&&s.trangThai==="Đã quay"||give&&ok.length?`<span class="hkps"><select data-pst="${s.id}">${tOpts()}</select><input data-psh="${s.id}" placeholder="Hook phát sinh"><button class="btn sm" data-psadd="${s.id}">+ Hook phát sinh</button></span>`:""}</div></div>`};
+  const showAdd=give&&(SQ_ADD===null?!sh.length:SQ_ADD);
+  b.innerHTML=`<div class="card-h"><h2>Lịch quay</h2><span class="hint">các buổi quay đã lên lịch · gập / mở từng buổi · mục tiêu do lead tự viết</span><span class="sp"></span>${give?`<button class="btn sm pri" id="sq-addtog">${showAdd?"Đóng form":"+ Thêm buổi quay"}</button>`:""}</div>
+   ${showAdd?`<form class="sqform" id="xq-add"><label class="field">Ngày<select id="xs-d">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),Math.max(d.settings.today,W.tu))}</select></label><label class="field">Buổi<select id="xs-b">${opt(["Sáng","Chiều","Cả ngày"],"Sáng")}</select></label><label class="field">Giờ (nếu cần)<input id="xs-g" placeholder="vd 8:30"></label><label class="field">Địa điểm<input id="xs-p" value="Văn phòng Ailla"></label><div class="field"><span>Người quay (tích nhiều người)</span><div class="chk" id="xs-ns">${team.map(u=>`<label><input type="checkbox" name="xs-n" value="${u.id}" ${qDef&&qDef.id===u.id?"checked":""}> ${esc(u.name)}</label>`).join("")}</div></div><label class="field">Ghi chú<input id="xs-gc" placeholder="Đạo cụ, lưu ý…"></label><button class="btn pri">+ Thêm buổi quay</button></form>`:""}
+   ${wait.length?`<div class="note">${wait.length} hook đã duyệt từ buổi trước chưa quay. ${give?`<button class="btn sm" id="hk-move">Chuyển vào buổi quay gần nhất</button>`:""}</div>`:""}
+   ${sh.map(sess).join("")||`<p class="empty">Chưa có buổi quay nào. Bấm "+ Thêm buổi quay".</p>`}`;
+  if($("#sq-addtog"))$("#sq-addtog").onclick=()=>{SQ_ADD=!showAdd;renderMain()};
   const S=id=>(D().shoots||[]).find(x=>x.id===id);
   b.querySelectorAll("[data-hkadd]").forEach(x=>x.onclick=()=>{const s=S(x.dataset.hkadd),f=x.closest(".hkadd"),t=d.tuyen.find(y=>y.ma===f.querySelector(".ht").value),one=f.querySelector(".hl").value==="1",L=f.querySelector(".hh").value.split("\n").map(v=>v.trim()).filter(Boolean);
     if(!t){toast("Chưa có tuyến nào, lập tuyến ở Kế hoạch tháng › bước 5");return}if(!L.length){toast("Gõ ít nhất một hook");f.querySelector(".hh").focus();return}
@@ -132,13 +135,13 @@ function xvQuay2(b,o){
   b.querySelectorAll("[data-hkx]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"bỏ hook "+x.dataset.hkx,dt=>{dt.cards=dt.cards.filter(c=>c.id!==x.dataset.hkx)});renderMain()});
   b.querySelectorAll("[data-hkok]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkok;let n=0;DB.mutate(ME.name,"duyệt danh sách hook buổi quay",dt=>dt.cards.forEach(c=>{if(c.buoiQuay===id&&c.step==="dkb"){c.step="quay";n++}}));toast(`Đã duyệt ${n} hook, sẵn sàng quay`);renderMain()});
   b.querySelectorAll("[data-hkq]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"đánh dấu đã quay "+x.dataset.hkq,dt=>{const c=dt.cards.find(y=>y.id===x.dataset.hkq);if(c)c.daQuay=x.checked}));
-  b.querySelectorAll("[data-hkdone]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkdone;const nq=(D().cards||[]).filter(c=>c.buoiQuay===id&&c.step==="quay").length;if(!confirm("Chốt buổi quay: "+nq+" hook / kịch bản sẽ chuyển sang 'Gửi video đã làm xong'. Hook nào chưa quay thì bỏ khỏi buổi quay ở bảng hook trước. Chốt luôn?"))return;let a=0,r=0;DB.mutate(ME.name,"chốt buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===id);if(s)s.trangThai="Đã quay";dt.cards.forEach(c=>{if(c.buoiQuay!==id||c.step!=="quay")return;if(true){c.daQuay=true;const o=c.nguoiKB||c.nguoi||c.giao||"";c.step="edit";c.nguoi=o;c.nguoiEdit=o;a++}else{c.buoiQuay="";r++}})});toast(`${a} video chuyển sang "Gửi video đã làm xong"${r?`, ${r} hook chưa quay chuyển sang buổi sau`:""}`);XV.tab="edit";renderMain()});
+  b.querySelectorAll("[data-hkdone]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkdone;const nq=(D().cards||[]).filter(c=>c.buoiQuay===id&&c.step==="quay").length;if(!confirm("Chốt buổi quay: "+nq+" hook / kịch bản sẽ chuyển sang ④ Kho video › Video sản xuất trong tháng. Hook nào chưa quay thì bỏ khỏi buổi quay ở bảng hook trước. Chốt luôn?"))return;let a=0,r=0;DB.mutate(ME.name,"chốt buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===id);if(s)s.trangThai="Đã quay";dt.cards.forEach(c=>{if(c.buoiQuay!==id||c.step!=="quay")return;if(true){c.daQuay=true;const o=c.nguoiKB||c.nguoi||c.giao||"";c.step="edit";c.nguoi=o;c.nguoiEdit=o;a++}else{c.buoiQuay="";r++}})});toast(`${a} video chuyển sang ④ Kho video › Video sản xuất trong tháng${r?`, ${r} hook chưa quay chuyển sang buổi sau`:""}`);XV.tab="kho";XV.ks="new";renderMain()});
   b.querySelectorAll("[data-psadd]").forEach(x=>x.onclick=()=>{const id=x.dataset.psadd,s=S(id),t=d.tuyen.find(y=>y.ma===b.querySelector(`[data-pst="${id}"]`).value),h=b.querySelector(`[data-psh="${id}"]`).value.trim();if(!t||!h){toast("Chọn tuyến và gõ hook phát sinh");return}
     DB.mutate(ME.name,"hook phát sinh buổi quay "+dd(s.day),dt=>dt.cards.push(newCard(dt,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,hookText:h,day:0,qday:s.day,buoiQuay:id,nguon:"Quay mới",loai:"moi",oneShot:true,phatSinh:true,dangVideo:t.dangVideo||"One shot",step:"edit",nguoi:"",nguoiEdit:""})));toast("Đã ghi hook phát sinh, giao người edit ở ④");renderMain()});
   b.querySelectorAll("[data-sqnote]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"ghi chú buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===x.dataset.sqnote);if(s)s.ghiChu=x.value}));
   b.querySelectorAll("[data-tram]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"ghi cảnh trám buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===x.dataset.tram);if(s)s.tram=x.value}));
   if($("#hk-move"))$("#hk-move").onclick=()=>{const nx=(D().shoots||[]).filter(s=>!["Đã quay","Đã hủy"].includes(s.trangThai)&&s.day>=D().settings.today).sort((a,c)=>a.day-c.day)[0];if(!nx){toast("Chưa có buổi quay sắp tới, thêm buổi quay trước");return}DB.mutate(ME.name,"chuyển hook chưa quay sang buổi "+dd(nx.day),dt=>dt.cards.forEach(c=>{if(c.step==="quay"&&!c.buoiQuay){c.buoiQuay=nx.id;c.qday=nx.day}}));renderMain()};
-  if($("#xq-add"))$("#xq-add").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"lên lịch quay",dt=>{dt.shoots=dt.shoots||[];dt.shoots.push({id:uid("sq"),day:+$("#xs-d").value,buoi:$("#xs-b").value,gio:$("#xs-g").value,diaDiem:$("#xs-p").value,nguoi:[...document.querySelectorAll('#xs-ns input:checked')].map(i=>i.value),ghiChu:$("#xs-gc").value,tram:"",trangThai:"Đã lên lịch"})});toast("Đã thêm buổi quay");renderMain()};
+  if($("#xq-add"))$("#xq-add").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"lên lịch quay",dt=>{dt.shoots=dt.shoots||[];dt.shoots.push({id:uid("sq"),day:+$("#xs-d").value,buoi:$("#xs-b").value,gio:$("#xs-g").value,diaDiem:$("#xs-p").value,nguoi:[...document.querySelectorAll('#xs-ns input:checked')].map(i=>i.value),ghiChu:$("#xs-gc").value,tram:"",trangThai:"Đã lên lịch"})});toast("Đã thêm buổi quay");SQ_ADD=false;renderMain()};
 }
 
 /* ---------- ⑤ Lịch đăng: nhịp đăng + tự xếp ---------- */
@@ -158,6 +161,24 @@ function xvDang2(b,o){
   b.querySelectorAll("[data-setday]").forEach(x=>x.onchange=()=>{if(!x.value)return;DB.mutate(ME.name,"xếp ngày đăng "+x.dataset.setday+" → "+dd(+x.value),dt=>{const c=dt.cards.find(y=>y.id===x.dataset.setday);if(c)c.day=+x.value});toast("Đã xếp ngày đăng "+dd(+x.value));renderMain()});
 }
 
+/* ---------- ④ Kho video › Video sản xuất trong tháng: thêm video tự edit, gửi và duyệt video đã làm xong ---------- */
+function xvVideoMade(b,o){
+  const SK=prods();
+  b.innerHTML=`<section class="card"><div class="card-h"><h2>Thêm video tự edit</h2><span class="hint">video Worker dựng xong thì tự vào kho · video tự edit thì thêm ở đây: dán link, chọn sản phẩm và kênh rồi gửi duyệt</span></div>
+   <div class="sqform vmform"><label class="field">Sản phẩm<select id="vm-s">${opt(SK.map(p=>[p.k,p.n]),"")}</select></label><label class="field">Kênh<select id="vm-k">${opt(CHANNELS.map(c=>[c.k,c.short]),CHANNELS[0].k)}</select></label><label class="field">Tuyến nội dung<select id="vm-t"></select></label><label class="field">Hook / tên video<input id="vm-h" placeholder="Ví dụ: Áo trắng ố cổ"></label><label class="field">Link video (Drive)<input id="vm-l" placeholder="https://drive.google.com/…"></label><button class="btn pri" id="vm-go">+ Thêm vào kho, gửi duyệt</button></div></section><div id="vm-e"></div>`;
+  const fillT=()=>{const s=b.querySelector("#vm-s").value,k=b.querySelector("#vm-k").value,L=D().tuyen.filter(t=>t.sku===s&&t.kenh===k);b.querySelector("#vm-t").innerHTML=opt([["","— tuyến nội dung"]].concat(L.map(t=>[t.ma,t.tuyen])),"")};
+  b.querySelector("#vm-s").onchange=fillT;b.querySelector("#vm-k").onchange=fillT;fillT();
+  b.querySelector("#vm-go").onclick=()=>{
+    const sku=b.querySelector("#vm-s").value,kenh=b.querySelector("#vm-k").value,tu=b.querySelector("#vm-t").value,h=b.querySelector("#vm-h").value.trim(),l=b.querySelector("#vm-l").value.trim();
+    if(!/^https?:\/\//i.test(l)){toast("Dán link video (bắt đầu bằng https://) trước");return}
+    if(D().tuyen.some(t=>t.sku===sku&&t.kenh===kenh)&&!tu){toast("Chọn tuyến nội dung cho video này");return}
+    const ap=isApprover(ME);
+    DB.mutate(ME.name,"thêm video tự edit vào kho",dt=>{const c=newCard(dt,{sku,kenh,day:0,qday:0,nguon:"Quay mới",loai:"moi",mix:"tuedit",hookText:h,yTuong:h,maTuyen:tu,step:ap?"dceo":"dvd",nguoi:ME.id,nguoiEdit:ME.id,nguoiKB:ME.id,giao:ME.id,linkFinal:l,phatSinh:true});
+      if(tu){const tt=dt.tuyen.find(y=>y.ma===tu);if(tt)c.tuyen=tt.tuyen}dt.cards.push(c);
+      notifyU(dt,ap?admins():approvers(),`${ME.name} thêm video chờ duyệt: ${sk(sku).n}${h?" · "+h:""}`,c.id)});
+    toast(ap?"Đã thêm, chờ chị duyệt":"Đã thêm, chờ Oanh duyệt");renderMain()};
+  xvEdit2(b.querySelector("#vm-e"),o);
+}
 /* ---------- ④ Kho video & Calendar: video tồn tháng trước, video sản xuất trong tháng, rồi đẩy sang Calendar ---------- */
 function xvKhoAll(b,o){
   XV.ks=XV.ks||"ton";
@@ -166,11 +187,12 @@ function xvKhoAll(b,o){
   b.querySelectorAll("[data-xks]").forEach(x=>x.onclick=()=>{XV.ks=x.dataset.xks;renderMain()});
   const c=b.querySelector("#xk-b");
   if(XV.ks==="ton")xvKho2(c,o);
-  else if(XV.ks==="new")xvDang2(c,o);
+  else if(XV.ks==="new"){c.innerHTML='<div id="xk-m"></div><div id="xk-d"></div>';xvVideoMade(c.querySelector("#xk-m"),o);xvDang2(c.querySelector("#xk-d"),o)}
   else{PAGES.lich(c);const ph=c.querySelector(".ph");if(ph)ph.remove()}
 }
 /* ---------- ② Hook & kịch bản theo kênh · chỉ tiêu từng buổi quay · Oanh duyệt ---------- */
 const SQ_TOG=new Map();
+let SQ_ADD=null;
 let HK_K="";const HK_OPEN=new Set();
 const hkOpenShoots=d=>(d.shoots||[]).filter(s=>!["Đã quay","Đã hủy"].includes(s.trangThai)).sort((a,c)=>a.day-c.day);
 const hkIsHook=c=>mixOf(c)==="oneshot";
@@ -298,10 +320,9 @@ function xvHookList(b,o){
 }
 /* ---------- ② Hook & kịch bản, quay, edit ---------- */
 function xvHook(b,o){
-  b.innerHTML='<div id="xh-l"></div><div id="xh-q"></div><div id="xh-e"></div><div id="xh-k"></div>';
-  xvQuay2(b.querySelector("#xh-q"),o);
+  b.innerHTML='<div id="xh-l"></div><section class="card lichquay" id="xh-q"></section><div id="xh-k"></div>';
   xvHookList(b.querySelector("#xh-l"),o);
-  xvEdit2(b.querySelector("#xh-e"),o);
+  xvQuay2(b.querySelector("#xh-q"),o);
   if(o.kbPool.length){const k=b.querySelector("#xh-k");k.innerHTML='<details class="card"><summary><b>Video quay mới chưa có người viết ('+o.kbPool.length+')</b></summary><div id="xh-kb"></div></details>';xvKB(k.querySelector("#xh-kb"),o)}
 }
 /* ---------- Trang Xếp việc tuần (thay bản cũ) ---------- */
@@ -314,7 +335,7 @@ function pXepViec2(m){
   if(["kb","win","edit"].includes(XV.tab))XV.tab="quay";if(XV.tab==="dang"){XV.tab="kho";XV.ks="new"}
   const nHook=hkAll(d).filter(c=>["cv","cd"].includes(hkSt(c))).length;
   const nOrder=d.cards.filter(c=>(loaiOf(c)==="worker"&&["kb","dkb"].includes(c.step))||(c.mix==="reup"&&c.step==="kb")).length;
-  const tabs=[["tuan","① Kế hoạch",0],["quay","② Hook & kịch bản, quay, edit",nHook+hkWait+ePool.length],["wk","③ Order Worker",nOrder],["kho","④ Kho video & Calendar",slots.length+un]];
+  const tabs=[["tuan","① Kế hoạch",0],["quay","② Hook & kịch bản, lịch quay",nHook+hkWait],["wk","③ Order Worker",nOrder],["kho","④ Kho video & Calendar",slots.length+un]];
   if(!tabs.some(t=>t[0]===XV.tab))XV.tab="tuan";
   m.innerHTML=H("Xếp việc tuần",`${xvLbl(W)} · làm lần lượt từ ① đến ⑤, bước nào có số là còn việc`)+`<div class="lwtool"><div class="seg xvtabs">${tabs.map(([k,t,n])=>`<button data-xvt="${k}" class="${XV.tab===k?"on":""}">${t}${n?` <span class="xbadge">${n}</span>`:""}</button>`).join("")}</div></div><div id="xvb"></div>`;
   m.querySelectorAll("[data-xvt]").forEach(b=>b.onclick=()=>{XV.tab=b.dataset.xvt;XV.sel.clear();renderMain()});
@@ -709,10 +730,10 @@ function xvEdit2(b,o){
   const prodG=xvGroupBy(pool,c=>c.sku);
   const row=c=>{const t=d.tuyen.find(x=>x.ma===c.maTuyen),late=isLate(c);return `<div class="edr${late?" late":""}">${swatch(c.sku)}<span class="xmt clk" data-card="${c.id}"><b>${esc(c.hookText||c.yTuong||c.id)}</b><small>${esc(sk(c.sku).n)}${t?" · "+esc(t.tuyen):""} · ${esc(chOf(c.kenh).short)}${c.oneShot?" · one shot":""}</small></span>${hanTag(c)}
     ${c.step==="edit"?(may(c)?`<input class="hkin" data-edl="${c.id}" placeholder="Dán link video đã edit (Drive)…" value="${esc(c.linkFinal||"")}">${late?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm pri" data-edsend="${c.id}">Gửi duyệt</button>${typeof wkCan==="function"&&wkCan(c)?`<button class="btn sm" data-wsend="${c.id}">Gửi Worker</button>`:""}`:`<span class="hint">đang edit</span>`)
-     :`${pill(c.step==="dvd"?"chờ Oanh duyệt":"chờ chị duyệt","amb")}${c.linkFinal?`<a href="${esc(/^https?:/.test(c.linkFinal)?c.linkFinal:"https://"+c.linkFinal)}" target="_blank" rel="noopener">xem</a>`:""}`}
+     :`${pill(c.step==="dvd"?"chờ Oanh duyệt":"chờ chị duyệt","amb")}${(c.step==="dvd"&&can(ME,"viec.duyet")||c.step==="dceo"&&ME.role==="admin")?`<button class="btn sm pri" data-eddy="${c.id}">Duyệt</button><button class="btn sm" data-edtl="${c.id}">Trả lại</button>`:""}${c.linkFinal?`<a href="${esc(/^https?:/.test(c.linkFinal)?c.linkFinal:"https://"+c.linkFinal)}" target="_blank" rel="noopener">xem</a>`:""}`}
     ${give&&c.step==="edit"?`<select class="edmv" data-edmv="${c.id}" title="Chuyển cho người khác">${opt([["","Chuyển…"]].concat(team.filter(u=>u.id!==c.nguoiEdit).map(u=>[u.id,u.name])).concat([["__pool","Trả về chưa giao"]]),"")}</select>`:""}</div>`};
-  b.innerHTML=`<section class="card"><div class="card-h"><h2>Gửi video đã làm xong</h2><span class="hint">quay xong, tự order Worker qua Telegram (Review, One shot) hoặc tự edit · dán link video vào đây rồi bấm Gửi duyệt · Oanh duyệt, chị duyệt, rồi vào ④ Kho video & Calendar</span></div>${pool.length&&give?`<p class="hint"><b>${pool.length}</b> video quay xong chưa có người phụ trách.</p><button class="btn pri" id="ed-auto">Giao về người viết hook</button>`:""}</section>
-  <div class="edcols">${ed.length?"":"<p class=\"hint\">Chưa có video nào cần gửi.</p>"}${team.filter(u=>ed.some(c=>c.nguoiEdit===u.id)).map(u=>{const L=ed.filter(c=>c.nguoiEdit===u.id),e1=L.filter(c=>c.step==="edit"),wait=L.filter(c=>c.step!=="edit"),late=e1.filter(isLate).length;
+  b.innerHTML=`<section class="card"><div class="card-h"><h2>Video đã quay, chờ gửi và duyệt</h2><span class="hint">quay xong, tự order Worker qua Telegram (Review, One shot) hoặc tự edit · dán link video đã edit rồi bấm Gửi duyệt · Oanh duyệt, chị duyệt, video vào danh sách chờ đăng bên dưới</span></div>${pool.length&&give?`<p class="hint"><b>${pool.length}</b> video quay xong chưa có người phụ trách.</p><button class="btn pri" id="ed-auto">Giao về người viết hook</button>`:""}</section>
+  <div class="edcols">${ed.length?"":"<p class=\"hint\">Chưa có video nào cần gửi.</p>"}${team.concat(D().users.filter(u=>!team.some(t2=>t2.id===u.id)&&ed.some(c=>c.nguoiEdit===u.id))).filter(u=>ed.some(c=>c.nguoiEdit===u.id)).map(u=>{const L=ed.filter(c=>c.nguoiEdit===u.id),e1=L.filter(c=>c.step==="edit"),wait=L.filter(c=>c.step!=="edit"),late=e1.filter(isLate).length;
     return `<section class="card edcol"><div class="card-h"><h2>${esc(u.name)}</h2><span class="hint">đang edit <b>${e1.length}</b>${late?` · <b class="t-red">${late} trễ</b>`:""} · chờ duyệt <b>${wait.length}</b> · đã duyệt tuần này <b>${doneW(u.id)}</b>${isApprover(u)?" · gửi thẳng chị duyệt":""}</span></div>
      ${L.length?`<div class="edl">${e1.map(row).join("")}${wait.map(row).join("")}</div>`:`<p class="hint">Chưa có video edit.</p>`}</section>`}).join("")}</div>`;
   if($("#ed-auto"))$("#ed-auto").onclick=()=>{let n=0;DB.mutate(ME.name,"giao video quay xong về người viết hook",dt=>dt.cards.forEach(x=>{if(x.step==="edit"&&!x.nguoiEdit&&!x.wt){const o=x.nguoiKB||x.nguoi||x.giao;if(o){x.nguoiEdit=o;x.nguoi=o;n++}}}));toast("Đã giao "+n+" video về người viết hook");renderMain()};
@@ -721,6 +742,8 @@ function xvEdit2(b,o){
     let i=0;const plan=ask.map(([u,n])=>[u,P.slice(i,i+=n)]);
     DB.mutate(ME.name,"chia edit: "+plan.map(([u,L])=>userName(u)+" "+L.length).join(", "),dt=>{plan.forEach(([u,L])=>L.forEach(id=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;x.nguoiEdit=u;x.nguoi=u;x.batDau=dt.settings.today;x.han=han;x.tre=null}));if(typeof notifyU==="function")plan.forEach(([u,L])=>notifyU(dt,[u],`${ME.name} giao bạn edit ${L.length} video, hạn ${dd(han)}`,L[0]))});
     toast("Đã giao: "+plan.map(([u,L])=>userName(u)+" "+L.length).join(", "));renderMain()};
+  b.querySelectorAll("[data-eddy]").forEach(x=>x.onclick=()=>{const c=D().cards.find(y=>y.id===x.dataset.eddy),nx=c&&nextAct(c);if(!nx)return;const e=moveCard(ME,c.id,nx[1]);toast(e||"Đã duyệt");renderMain()});
+  b.querySelectorAll("[data-edtl]").forEach(x=>x.onclick=()=>{const n=prompt("Cần sửa gì? (ghi ngắn cho người làm)");if(n===null)return;sendBack(ME,x.dataset.edtl,n.trim()||"cần sửa");toast("Đã trả lại");renderMain()});
   b.querySelectorAll("[data-edsend]").forEach(x=>x.onclick=()=>{const id=x.dataset.edsend,l=b.querySelector(`[data-edl="${id}"]`).value.trim(),tr=b.querySelector(`[data-tre="${id}"]`);if(!l){toast("Dán link video đã edit trước");return}const e=moveCard(ME,id,"dvd",{linkFinal:l,lyDoTre:tr?tr.value.trim():undefined});if(e){toast(e);return}toast("Đã gửi duyệt");renderMain()});
   b.querySelectorAll("[data-edmv]").forEach(x=>x.onchange=()=>{const v=x.value,id=x.dataset.edmv;if(!v)return;DB.mutate(ME.name,v==="__pool"?"trả video về chưa giao edit "+id:"chuyển edit "+id+" cho "+userName(v),dt=>{const c=dt.cards.find(y=>y.id===id);if(!c)return;if(v==="__pool"){c.nguoiEdit="";c.nguoi="";c.han=0}else{c.nguoiEdit=v;c.nguoi=v;if(typeof notifyU==="function")notifyU(dt,[v],`${ME.name} chuyển cho bạn edit: ${c.hookText||c.id}`,id)}});renderMain()});
 }
