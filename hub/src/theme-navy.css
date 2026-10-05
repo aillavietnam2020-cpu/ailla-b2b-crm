@@ -48,7 +48,7 @@
 .kic .ic{width:18px;height:18px}
 .k-money,.k-cart,.k-task{color:#2f6fde;background:#eef4ff}.k-wallet{color:#b54708;background:#fff4e5}.k-trend{color:#087a55;background:#e8f8f0}.k-alert{color:#c92a2a;background:#fff1f0}
 .kl{grid-area:l;font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kv{grid-area:v;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.2;margin-top:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kv:not(dl){grid-area:v;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.2;margin-top:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .kchg{grid-area:h;font-size:13px;color:var(--muted);font-weight:500}
 .kchg.up{color:#087a55}.kchg.dn{color:#c92a2a}
 /* hai khu chính + hai bảng */
