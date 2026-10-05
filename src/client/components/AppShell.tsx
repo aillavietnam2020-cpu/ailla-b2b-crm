@@ -97,11 +97,13 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
   return (
     <div className="app">
       <aside className="sidebar">
+        <div className="brand-logo">
+          <img src="/ailla-logo.png" alt="Ailla" />
+        </div>
         <div className="brand">
-          <div className="brand-mark">A</div>
           <div>
-            <strong>AILLA</strong>
-            <small>{space === 'admin' ? 'Quản trị B2B' : 'Bàn làm việc Sale'}</small>
+            <strong>Trang quản trị</strong>
+            <small>{space === 'admin' ? 'Quản trị B2B · AILLA Việt Nam' : 'Bàn làm việc Sale · AILLA Việt Nam'}</small>
           </div>
         </div>
         <div className="nav-label">{space === 'admin' ? 'Điều hành' : 'Công việc'}</div>
