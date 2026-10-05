@@ -1007,3 +1007,24 @@ html.embedded .content {
 html.embedded .has-title .page-head h2 {
   display: none;
 }
+
+/* Thanh tab của Dashboard kinh doanh chung */
+.dash-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dash-tabs button {
+  border: 1px solid #e3e7ee;
+  background: #fff;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #475467;
+}
+.dash-tabs button.on {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}

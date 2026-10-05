@@ -9,12 +9,10 @@ import { OrderDetailPage, OrdersPage } from './pages/OrdersPage';
 import { TodayPage } from './pages/sales/TodayPage';
 import { NewOrderPage } from './pages/sales/NewOrderPage';
 import { PerformancePage } from './pages/sales/PerformancePage';
-import { ManagerDashboardPage } from './pages/admin/ManagerDashboardPage';
-import { CeoDashboardPage } from './pages/admin/CeoDashboardPage';
 import { ImportPage } from './pages/admin/ImportPage';
 import { AuditPage } from './pages/admin/AuditPage';
 import { UsersPage } from './pages/admin/UsersPage';
-import { ReportsPage } from './pages/admin/ReportsPage';
+import { DashboardPage } from './pages/admin/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 
@@ -87,15 +85,15 @@ export function App() {
         <Route path="/sales/debts" element={<DebtsPage mode="sales" />} />
         <Route path="/sales/performance" element={<PerformancePage />} />
 
-        <Route path="/admin" element={<ManagerDashboardPage />} />
-        <Route path="/admin/ceo" element={<CeoDashboardPage />} />
+        <Route path="/admin" element={<DashboardPage initial="doingu" />} />
+        <Route path="/admin/ceo" element={<DashboardPage initial="ceo" />} />
         <Route path="/admin/customers" element={<CustomersPage mode="admin" />} />
         <Route path="/admin/customers/:id" element={<CustomerDetailPage mode="admin" />} />
         <Route path="/admin/orders" element={<OrdersPage mode="admin" />} />
         <Route path="/admin/orders/:id" element={<OrderDetailPage mode="admin" />} />
         <Route path="/admin/prices" element={<PricesPage />} />
         <Route path="/admin/debts" element={<DebtsPage mode="admin" />} />
-        <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/reports" element={<DashboardPage initial="tong" />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/imports" element={<ImportPage />} />
         <Route path="/admin/audit" element={<AuditPage />} />

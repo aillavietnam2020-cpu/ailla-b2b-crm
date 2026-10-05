@@ -22,8 +22,6 @@ const SALES_NAV: NavItem[] = [
 
 /** Việc hằng ngày. */
 const ADMIN_NAV: NavItem[] = [
-  { to: '/admin', label: 'Điều hành đội ngũ', short: 'Điều hành', mobile: true },
-  { to: '/admin/ceo', label: 'Bàn điều hành CEO', short: 'CEO' },
   { to: '/admin/reports', label: 'Dashboard kinh doanh', short: 'Dashboard', mobile: true },
   { to: '/admin/customers', label: 'Khách hàng', short: 'Khách hàng', mobile: true },
   { to: '/admin/orders', label: 'Đơn hàng & duyệt', short: 'Đơn hàng', mobile: true },
@@ -46,8 +44,8 @@ const TITLES: Record<string, string> = {
   '/sales/prices': 'Bảng giá 8 cấp',
   '/sales/debts': 'Công nợ khách của tôi',
   '/sales/performance': 'Kết quả cá nhân',
-  '/admin': 'Điều hành đội ngũ',
-  '/admin/ceo': 'Bàn điều hành CEO',
+  '/admin': 'Dashboard kinh doanh',
+  '/admin/ceo': 'Dashboard kinh doanh',
   '/admin/customers': 'Khách hàng B2B',
   '/admin/orders': 'Đơn hàng & duyệt ngoại lệ',
   '/admin/prices': 'Sản phẩm và bảng giá 8 cấp',

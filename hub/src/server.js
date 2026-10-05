@@ -139,8 +139,6 @@ async function svLogout(){try{await fetch("/api/auth/logout",{method:"POST",cred
 /* CRM B2B nằm ngay trong khung này (không mở tab mới): mỗi mục menu là một trang CRM hiện trong khung, CRM tự ẩn menu và nút đăng xuất của nó. */
 const crmRole=()=>(SV.me&&SV.me.role)||"";
 const CRM_EMB=[
- ["cr_dh","Điều hành đội ngũ","/admin",()=>crmRole()!=="EMPLOYEE"],
- ["cr_ceo","Bàn điều hành CEO","/admin/ceo",()=>crmRole()==="CEO"],
  ["cr_rp","Dashboard kinh doanh","/admin/reports",()=>crmRole()!=="EMPLOYEE"],
  ["cr_kh","Khách hàng","/admin/customers",()=>crmRole()!=="EMPLOYEE"],
  ["cr_dn","Đơn hàng & duyệt","/admin/orders",()=>crmRole()!=="EMPLOYEE"],
@@ -153,7 +151,7 @@ const CRM_EMB=[
  ["cr_s_gia","Bảng giá 8 cấp","/sales/prices",()=>crmRole()==="EMPLOYEE"],
  ["cr_s_cn","Công nợ khách của tôi","/sales/debts",()=>crmRole()==="EMPLOYEE"],
  ["cr_s_kq","Kết quả cá nhân","/sales/performance",()=>crmRole()==="EMPLOYEE"]];
-const CRM_GROUPS=()=>{const L=CRM_EMB.filter(x=>x[3]()).map(([k,t])=>MI(k,t,()=>SV.perms.includes("price.read")));return crmRole()==="EMPLOYEE"?[["",L]]:[["Điều hành",L.slice(0,6)],["Thiết lập",L.slice(6)]].filter(g=>g[1].length)};
+const CRM_GROUPS=()=>{const L=CRM_EMB.filter(x=>x[3]()).map(([k,t])=>MI(k,t,()=>SV.perms.includes("price.read")));return crmRole()==="EMPLOYEE"?[["",L]]:[["Điều hành",L.slice(0,4)],["Thiết lập",L.slice(4)]].filter(g=>g[1].length)};
 MODULES.splice(MODULES.findIndex(m=>m.k==="mkt"),0,{k:"b2blink",zone:"Bán hàng",ic:"box",n:"Bán hàng B2B (CRM)",sub:"Đại lý · NPP",groups:CRM_GROUPS});
 CRM_EMB.forEach(([k,t,p])=>{PAGES[k]=m=>{m.innerHTML=H(t,"Khách sỉ, đại lý, đơn hàng, công nợ")+'<div class="crmembed"><iframe id="crmfr" src="'+p+'" title="'+esc(t)+'"></iframe></div>'}});
 window.addEventListener("message",e=>{if(e.origin!==location.origin||!e.data||e.data.type!=="crm-title"||!$("#crmfr"))return;const h=$("#main .ph h1");if(h&&e.data.title&&e.data.title!=="AILLA B2B CRM")h.textContent=e.data.title});
@@ -179,7 +177,7 @@ MODULES.forEach(mo=>{const g=mo.groups;mo.groups=()=>{const a=svAllowedMods();if
 /* Dòng ghi chú trên các trang số tài chính: đây là số quản trị nội bộ, sổ sách chính thức ở MISA. */
 const INTERNAL_PAGES=["bc_tong","bc_tiktok","bc_shopee","bc_fb","pl","chiphi","doisoat","sku","adshieuqua","fb_ads","adssp"];
 INTERNAL_PAGES.forEach(k=>{const f=PAGES[k];if(f)PAGES[k]=m=>{f(m);m.insertAdjacentHTML("afterbegin",`<div class="note internal">🔒 Số liệu <b>quản trị nội bộ</b> để điều hành (ước tính, phân bổ, so mục tiêu), không phải báo cáo tài chính. Sổ sách chính thức do Kế toán quản lý trên MISA.</div>`)}});
-PAGES.crmgo=m=>{const k=SV.me&&SV.me.role==="EMPLOYEE"?"cr_s_hn":SV.me&&SV.me.role==="CEO"?"cr_ceo":"cr_dh";PAGES[k](m)};
+PAGES.crmgo=m=>{const k=SV.me&&SV.me.role==="EMPLOYEE"?"cr_s_hn":"cr_rp";PAGES[k](m)};
 PAGES.matkhau=m=>{const p=SV.me&&SV.me.role!=="EMPLOYEE"?"/admin/account":"/sales/account";m.innerHTML=H("Đổi mật khẩu","Dùng chung mật khẩu với CRM")+`<section class="card narrow"><p>Mật khẩu đăng nhập dùng chung cho CRM và khu Marketing.</p><div class="acts"><a class="btn pri" href="${p}">Đổi mật khẩu</a></div></section>`};
 
 const _pCaiDat=pCaiDat;
