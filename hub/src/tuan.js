@@ -32,7 +32,7 @@ function autoSlot(dt,ids){
 /* Ngày đăng do người giữ kênh tự xếp (không tự xếp hộ) */
 
 /* ---------- ① Kế hoạch tuần: mỗi sản phẩm × kênh chia theo loại video, các bước sau bám theo số này ---------- */
-const MIX=[["ton","Dùng video tồn","kho","đăng lại video cũ trong kho"],["oneshot","One shot","quay","quay, chỉ cần hook"],["kichban","Review / voice off","quay","quay, có kịch bản"],["worker","Không quay · Worker","wk","cảnh cũ + Worker dựng"],["reup","Reup","kho","video cũ đổi hook / edit lại"],["nhanban","Nhân bản win","win","Hypit nhân bản video win"]];
+const MIX=[["ton","Dùng video tồn","kho","đăng lại video cũ trong kho"],["oneshot","One shot","quay","quay, chỉ cần hook"],["kichban","Review / voice off","quay","quay, có kịch bản"],["worker","Không quay · Worker","wk","cảnh cũ + Worker dựng"],["reup","Reup","wk","video cũ đổi hook / edit lại"],["nhanban","Nhân bản win","win","Hypit nhân bản video win"]];
 const VID_STEPS=["dvd","dceo","dang","xong"];
 const mixOf=c=>{if(c.mix)return c.mix;const L=loaiOf(c);if(c.khoMa)return L==="kho"?"ton":"reup";if(L==="worker")return "worker";if(L==="nhanban")return "nhanban";if(L==="reup")return "reup";if(L==="kho")return "ton";return c.oneShot||c.phatSinh?"oneshot":"kichban"};
 const wpMix=e=>e&&e.mix?e.mix:{};
@@ -306,7 +306,7 @@ function wpWorkList(b,tab){
      <p class="hint">Hook đã duyệt hiện ở trên cùng ("hook đã duyệt chưa quay"), bấm chuyển vào buổi quay.</p></section>`);
     b.querySelectorAll("[data-hksend]").forEach(x=>x.onclick=()=>{const id=x.dataset.hksend,h=b.querySelector(`[data-hkin="${id}"]`).value.trim();if(!h){toast("Gõ hook trước");return}const tr=b.querySelector(`[data-tre="${id}"]`),e=moveCard(ME,id,"dkb",{hookText:h,lyDoTre:tr?tr.value.trim():undefined});toast(e||"Đã gửi Oanh duyệt hook");renderMain()});
     if($("#hk-okall"))$("#hk-okall").onclick=()=>{let n=0;A.forEach(c=>{if(!moveCard(ME,c.id,"quay"))n++});toast(`Đã duyệt ${n} hook, xếp vào buổi quay ở dưới`);renderMain()}}
-  if(tab==="kho"){const R=d.cards.filter(c=>c.mix==="reup"&&c.step==="kb"),TN=[];
+  if(tab==="wk"){const R=d.cards.filter(c=>c.mix==="reup"&&c.step==="kb"),TN=[];
     if(!R.length&&!TN.length)return;
     b.insertAdjacentHTML("afterbegin",`${R.length?`<section class="card"><div class="card-h"><h2>Video reup cần link</h2><span class="hint">${R.length} video · người được giao dán link video gốc (Google Drive) rồi gửi Worker dựng</span></div>
      <div class="xlist">${R.map(c=>`<div class="xmini">${swatch(c.sku)}<span class="xms">${esc(sk(c.sku).n.split(" ").slice(0,2).join(" "))} · ${esc(chOf(c.kenh).short)} · ${esc(userName(c.nguoi)||"—")}</span>${hanTag(c)}${mine(c)?`<input class="hkin" data-rpin="${c.id}" placeholder="Dán link video gốc (Drive)…" value="${esc(c.linkVideo||"")}">${isLate(c)?`<input class="hkin tre" data-tre="${c.id}" placeholder="Trễ hạn: lý do trễ…">`:""}<button class="btn sm" data-rpsend="${c.id}">Đã có link, gửi duyệt sau</button><button class="btn sm pri" data-wsend="${c.id}">Gửi Worker dựng</button>`:`<span class="xmt">chưa có link</span>`}</div>`).join("")}</div></section>`:""}
