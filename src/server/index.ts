@@ -4,6 +4,7 @@ import { loadConfig } from './lib/settings';
 import { syncAlerts } from './services/alerts';
 import { serveHub } from './hub/serve';
 import HUB_HTML from './hub/hub.html';
+import { shootReminders } from './services/shootReminders';
 
 const app = createApp();
 
@@ -34,6 +35,12 @@ export default {
         const config = await loadConfig(env.DB);
         const result = await syncAlerts(env.DB, config);
         console.info('[cron] alerts', JSON.stringify(result));
+        // Nhắc buổi quay của khu Marketing (chỉ chạy lúc 8 giờ sáng giờ Việt Nam).
+        try {
+          console.info('[cron] nhac buoi quay', JSON.stringify(await shootReminders(env.DB)));
+        } catch (error) {
+          console.error('[cron] nhac buoi quay loi', error);
+        }
       })(),
     );
   },

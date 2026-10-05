@@ -42,7 +42,7 @@ function wpWeekNo(d,W,days){return days.length<=7?weekOf(W.tu):weekOf(d.settings
 let WP_OPEN=new Set();
 const WP_EDIT=new Set();
 const WPCH_CLOSED=new Set();
-let OW_K="";
+let OW_K="";const OW_OPEN=new Set(),OW_AUTO=new Set();
 let WP_K="";
 function xvTuan(b,o){
   const {d,W,days,give,team}=o,today=d.settings.today,w=wpWeekNo(d,W,days),WW=WEEKS.find(x=>x.w===w)||WEEKS[0],wp=wpOf(d,w),pairs=ptPairs(),free=xvKhoFree();
@@ -608,9 +608,12 @@ function xvWorker2(b,o){
   if(!OW_K||!OWC.some(c=>c.k===OW_K))OW_K=(OWC[0]||{}).k||"";
   const LK=L.filter(c=>c.kenh===OW_K),ORD=WK_G.map(g=>g[0]);
   const owTabs=OWC.length?`<div class="seg ptk">${OWC.map(ch=>`<button data-owk="${esc(ch.k)}" class="${ch.k===OW_K?"on":""}">${esc(ch.short)} <span class="xbadge">${L.filter(c=>c.kenh===ch.k&&wkSt(c)!=="xong").length}</span></button>`).join("")}</div>`:"";
+  const OWG=xvGroupBy(LK,c=>c.sku);
+  if(!OW_AUTO.has(OW_K)&&OWG[0]){OW_AUTO.add(OW_K);OW_OPEN.add(OWG[0][0]+"|"+OW_K)} // mở sẵn sản phẩm đầu tiên một lần, sau đó bấm tên sản phẩm để gập / mở
   b.innerHTML=`${owTabs}<section class="card"><div class="card-h"><h2>Order Worker${OW_K?" · "+esc(chOf(OW_K).short):""}</h2><span class="hint">${LK.length} video · chọn kênh ở trên, trong kênh chia theo sản phẩm · Worker dựng xong thì người phụ trách xem bản nháp, bấm "Duyệt, gửi Oanh" hoặc "Góp ý sửa"</span></div>
    <div class="wksum">${WK_G.map(([k,t])=>`<span class="xqi${LK.filter(c=>wkSt(c)===k).length&&k!=="xong"?" hot":""}"><b class="numeric">${LK.filter(c=>wkSt(c)===k).length}</b><span>${t}</span></span>`).join("")}</div></section>
-  ${xvGroupBy(LK,c=>c.sku).map(([sku,G])=>{G.sort((a,c)=>ORD.indexOf(wkSt(a))-ORD.indexOf(wkSt(c))||(a.han||99)-(c.han||99));return `<section class="card flush"><div class="card-h pad">${swatch(sku)}<h2>${esc(sk(sku).n)}</h2><span class="hint">${G.length} video · ${WK_G.filter(g=>G.some(c=>wkSt(c)===g[0])).map(g=>G.filter(c=>wkSt(c)===g[0]).length+" "+g[1].toLowerCase()).join(" · ")}</span></div><div class="tbl"><table class="wktab"><thead><tr><th>Tuyến · cách làm</th><th>Phụ trách</th><th>Ngày giao</th><th>Hạn</th><th>Tiến độ</th><th>Link video</th><th></th></tr></thead><tbody>${G.map(row).join("")}</tbody></table></div></section>`}).join("")||`<section class="card"><p class="empty">Kênh này chưa có video Worker trong kỳ. Giao ở ① Kế hoạch › Không quay · Worker.</p></section>`}`;
+  ${OWG.map(([sku,G])=>{const owk=sku+"|"+OW_K,owop=OW_OPEN.has(owk);G.sort((a,c)=>ORD.indexOf(wkSt(a))-ORD.indexOf(wkSt(c))||(a.han||99)-(c.han||99));return `<section class="card flush"><div class="card-h pad clk" data-owo="${esc(owk)}"><i class="ptar">${owop?"▾":"▸"}</i>${swatch(sku)}<h2>${esc(sk(sku).n)}</h2><span class="hint">${G.length} video · ${WK_G.filter(g=>G.some(c=>wkSt(c)===g[0])).map(g=>G.filter(c=>wkSt(c)===g[0]).length+" "+g[1].toLowerCase()).join(" · ")}</span></div>${owop?`<div class="tbl"><table class="wktab"><thead><tr><th>Tuyến · cách làm</th><th>Phụ trách</th><th>Ngày giao</th><th>Hạn</th><th>Tiến độ</th><th>Link video</th><th></th></tr></thead><tbody>${G.map(row).join("")}</tbody></table></div>`:""}</section>`}).join("")||`<section class="card"><p class="empty">Kênh này chưa có video Worker trong kỳ. Giao ở ① Kế hoạch › Không quay · Worker.</p></section>`}`;
+  b.querySelectorAll("[data-owo]").forEach(h=>h.onclick=e=>{if(e.target.closest("button,a,input,select"))return;const k=h.dataset.owo;OW_OPEN.has(k)?OW_OPEN.delete(k):OW_OPEN.add(k);renderMain()});
   b.querySelectorAll("[data-owk]").forEach(x=>x.onclick=()=>{OW_K=x.dataset.owk;renderMain()});
 
   b.querySelectorAll("[data-wkself]").forEach(x=>x.onclick=()=>{const c=D().cards.find(y=>y.id===x.dataset.wkself);const e=moveCard(ME,c.id,"dvd",{linkFinal:"/api/hub/worker-tasks/preview/"+c.wJob});toast(e||"Đã gửi Oanh duyệt");renderMain()});
