@@ -791,3 +791,11 @@ td.wide .hkin{width:min(520px,100%);margin-right:8px}
 
 .hkaddbar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin:6px 0}.hkaddbar .hkin{flex:1 1 360px;min-width:200px}.hkaddbar select{height:auto;min-height:36px;padding:6px 30px 6px 10px;width:auto;max-width:240px}
 .wktab td small{display:block;color:var(--muted)}
+
+/* nút Sửa lịch ở góc phải, cạnh mục tiêu */
+.sqtop{display:flex;gap:12px;align-items:flex-start}.sqtop>label{flex:1;min-width:0}
+.sqedit{position:relative;flex:none;border:0;padding:0;margin-top:22px}
+.sqedit>summary{list-style:none;cursor:pointer;padding:7px 14px;border:1px solid #cdd5e6;border-radius:999px;background:#fff;font-weight:600;font-size:13.5px;white-space:nowrap;color:var(--nv-active,#1a3554)}
+.sqedit>summary::-webkit-details-marker{display:none}
+.sqedit[open]>.frm{position:absolute;right:0;top:calc(100% + 6px);z-index:30;width:min(560px,86vw);background:#fff;border:1px solid #d9dfee;border-radius:14px;padding:14px;box-shadow:0 12px 32px rgba(16,24,40,.18)}
+.sqsk{display:block;margin-top:4px;color:var(--muted);font-size:13px}.sqwarn{color:#b54708;background:#fff6e8;border-radius:10px;padding:6px 10px;margin:6px 0}
