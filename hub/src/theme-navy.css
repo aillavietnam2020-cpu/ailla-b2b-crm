@@ -781,3 +781,10 @@ td.wide .hkin{width:min(520px,100%);margin-right:8px}
 
 .chk{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.chk label{display:inline-flex;gap:5px;align-items:center;font-size:14px;color:var(--ink)}
 .sqedit{border:1px dashed #cdd5e6;border-radius:10px;padding:6px 10px}.sqedit summary{cursor:pointer;font-weight:600}.sqedit .frm{margin-top:8px}
+
+/* thanh xuất file / xếp buổi quay: ô chọn đủ cao, không cắt chữ */
+.hkexp{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;margin:10px 0}
+.hkg2{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #e3e7ee;border-radius:12px;background:#f8faff}
+.hkg2>b{font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap}
+.hkexp select,.hkfile select,td select[data-hksq]{height:auto;min-height:36px;padding:6px 30px 6px 10px;line-height:1.35;font-size:14px;width:auto;max-width:240px;text-overflow:ellipsis}
+.hkexp .btn,.hkfile .btn{min-height:36px}
