@@ -75,7 +75,7 @@ const setOf=id=>PAGE_SETS.find(x=>x.ids.includes(id));
 function collapseSets(items){const seen=new Set();return items.filter(i=>{const st=setOf(i[0]);if(!st)return true;if(seen.has(st))return false;seen.add(st);return true}).map(i=>{const st=setOf(i[0]);return st?[i[0],st.n,i[2],i[3],st]:i})}
 const ADM_ITEM=(k,n)=>{const i=MENU_ADMIN.flatMap(g=>g[1]).find(x=>x[0]===k);return i?[i[0],n||i[1],i[2],i[3]]:null};
 const MKT_G=()=>[["",[MI("mkt_tq","Tổng quan",u=>u.role!=="digital",()=>{try{return rvQueue().length||""}catch(e){return ""}}),ADM_ITEM("kehoach"),ADM_ITEM("research"),
-   MI("dieuphoi","Tất cả thẻ video",u=>u.role!=="digital"),ADM_ITEM("lich","Calendar"),ADM_ITEM("win","Video win"),ADM_ITEM("kho","Kho video"),ADM_ITEM("hieuqua"),ADM_ITEM("baocao"),
+   MI("dieuphoi","Tất cả thẻ video",u=>u.role!=="digital"),ADM_ITEM("win","Video win"),ADM_ITEM("hieuqua"),ADM_ITEM("baocao"),
    MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("fb_ads","Báo cáo Ads theo ngày",tq),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||""),
    MI("bc_koc","KOC / Affiliate",tq)].filter(Boolean)]];
 /* Menu: 8 mục lớn. "hide" = không hiện ở thanh bên (Trợ lý AI ở nút trên cùng, mục Của tôi ở chỗ bấm vào tên).
