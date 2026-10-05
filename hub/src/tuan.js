@@ -96,23 +96,23 @@ function wpStrip(d,W,days,types){
 
 /* ---------- ③ Buổi quay & hook ---------- */
 function xvQuay2(b,o){
-  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>(s.day>=W.tu&&s.day<=W.den)||(s.day>=d.settings.today&&s.trangThai!=="Đã quay")).sort((a,c)=>a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
+  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>(s.day>=W.tu&&s.day<=W.den)||!["Đã quay","Đã hủy"].includes(s.trangThai)).sort((a,c)=>a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
   const qDef=team.find(u=>/quỳnh/i.test(u.name)),w=weekOf(W.tu)||1,wp=wpOf(d,w);
   const tOpts=()=>{const g=xvGroupBy(d.tuyen.slice(),t=>sk(t.sku).n+" · "+chOf(t.kenh).short);return g.map(([n,L])=>`<optgroup label="${esc(n)}">${L.map(t=>`<option value="${esc(t.ma)}">${esc(t.tuyen)}${t.vaiTro?" · "+esc(t.vaiTro):""}</option>`).join("")}</optgroup>`).join("")};
   const wait=d.cards.filter(c=>c.step==="quay"&&!c.buoiQuay);
   const sess=s=>{const I=d.cards.filter(c=>c.buoiQuay===s.id),chua=I.filter(c=>c.step==="dkb"),kb=I.filter(c=>c.step==="kb"),ok=I.filter(c=>c.step==="quay"),done=I.filter(c=>!["dkb","kb","quay","cg"].includes(c.step)),ps=I.filter(c=>c.phatSinh).length;
     const bySku=xvGroupBy(I,c=>c.sku+"|"+c.kenh);
-    return `<section class="card xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span><button class="btn sm" data-hkword="${s.id}" title="Xuất phiếu hook và kịch bản của buổi quay này ra file Word để in">⬇ Xuất Word (in)</button>${pill(s.trangThai||"Đã lên lịch",s.trangThai==="Đã quay"?"grn":"blu")}</div>
-     ${shootTargetBox(s,d,give)}<div class="xsum">${I.length} hook · ${chua.length?`<b class="t-amb">${chua.length} chờ Oanh duyệt</b> · `:""}${kb.length?`${kb.length} đang viết kịch bản · `:""}${ok.length} sẵn sàng quay · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}</div>
+    return `<section class="card xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${pill(SQ_LB[SQ_ST(s)][0],SQ_LB[SQ_ST(s)][1])}</div>
+     ${sqBox(s,give,dv)}<div class="xsum">${I.length} hook · ${chua.length?`<b class="t-amb">${chua.length} chờ Oanh duyệt</b> · `:""}${kb.length?`${kb.length} đang viết kịch bản · `:""}${ok.length} sẵn sàng quay · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}</div>
      ${bySku.map(([k,L])=>{const [sku,kenh]=k.split("|"),e=wp[k]||{};return `<div class="hkg"><div class="hkh">${swatch(sku)}<b>${esc(sk(sku).n)}</b> <span class="hint">${esc(chOf(kenh).short)} · ${L.length} hook${e.sl?` · kế hoạch tuần ${e.sl}`:""}</span></div>
       ${L.map(c=>{const t=d.tuyen.find(x=>x.ma===c.maTuyen);return `<div class="hkr">${c.step==="quay"&&give?`<input type="checkbox" data-hkq="${c.id}" ${c.daQuay?"checked":""} title="Đã quay">`:`<span class="hkst">${c.step==="dkb"?"⏳":["kb"].includes(c.step)?"✍":c.step==="quay"?"○":"✓"}</span>`}<span class="hkt clk" data-card="${c.id}">${esc(c.hookText||"(chưa có hook)")}</span><small>${esc(t?t.tuyen:"")}${c.oneShot?" · one shot":" · có kịch bản"}${c.phatSinh?" · phát sinh":""}</small>${give&&["dkb","kb","quay"].includes(c.step)&&!c.daQuay?`<button class="lnk danger" data-hkx="${c.id}" title="Bỏ hook">✕</button>`:""}</div>`}).join("")}</div>`}).join("")||`<p class="hint">Chưa có hook nào. Thêm ở dưới: mỗi dòng một hook = một video.</p>`}
-     ${give&&s.trangThai!=="Đã quay"?`<div class="hkadd" data-hka="${s.id}"><select class="ht">${tOpts()}</select><select class="hl">${opt([["1","One shot: viết hook rồi quay"],["0","Review, voice off…: viết kịch bản rồi quay"]],"1")}</select><textarea class="hh" rows="2" placeholder="Gõ hook, mỗi dòng một hook"></textarea><button class="btn sm pri" data-hkadd="${s.id}">+ Thêm hook</button></div>`:""}
+     ${give&&!["Đã quay","Đã hủy"].includes(s.trangThai)?`<div class="hkadd" data-hka="${s.id}"><select class="ht">${tOpts()}</select><select class="hl">${opt([["1","One shot: viết hook rồi quay"],["0","Review, voice off…: viết kịch bản rồi quay"]],"1")}</select><textarea class="hh" rows="2" placeholder="Gõ hook, mỗi dòng một hook"></textarea><button class="btn sm pri" data-hkadd="${s.id}">+ Thêm hook</button></div>`:""}
      <label class="field full">Ghi chú buổi quay<textarea rows="2" data-sqnote="${s.id}" ${give?"":"disabled"} placeholder="Đạo cụ, người mẫu, địa điểm, lưu ý…">${esc(s.ghiChu||"")}</textarea></label>
      <label class="field full">Cảnh trám / review cần quay (đủ dùng cho các video trong tuần)<textarea rows="2" data-tram="${s.id}" ${give?"":"disabled"} placeholder="Ví dụ: cảnh trám ngâm áo, cận bột tan, review cầm sản phẩm — đủ cho 12 video bột tẩy tuần này">${esc(s.tram||"")}</textarea></label>
      <div class="acts">${dv&&chua.length?`<button class="btn pri" data-hkok="${s.id}">✓ Duyệt danh sách hook (${chua.length})</button>`:""}
       ${give&&ok.length?`<button class="btn" data-hkdone="${s.id}">Chốt buổi quay: ${ok.filter(c=>c.daQuay).length} đã quay → sang Edit</button>`:""}
       ${give&&s.trangThai==="Đã quay"||give&&ok.length?`<span class="hkps"><select data-pst="${s.id}">${tOpts()}</select><input data-psh="${s.id}" placeholder="Hook phát sinh"><button class="btn sm" data-psadd="${s.id}">+ Hook phát sinh</button></span>`:""}</div></section>`};
-  b.innerHTML=`<div class="acts"><button class="btn" id="hk-wordall" title="Hook và kịch bản chưa quay, xếp theo buổi quay, xuất ra file Word để in">⬇ Xuất Word: tất cả hook & kịch bản chưa quay</button></div>${wait.length?`<div class="note">${wait.length} hook đã duyệt từ buổi trước chưa quay. ${give?`<button class="btn sm" id="hk-move">Chuyển vào buổi quay gần nhất</button>`:""}</div>`:""}
+  b.innerHTML=`${wait.length?`<div class="note">${wait.length} hook đã duyệt từ buổi trước chưa quay. ${give?`<button class="btn sm" id="hk-move">Chuyển vào buổi quay gần nhất</button>`:""}</div>`:""}
    ${sh.map(sess).join("")||`<section class="card"><p class="empty">Kỳ này chưa có buổi quay. Thêm buổi quay ở dưới.</p></section>`}
    ${give?`<section class="card"><div class="card-h"><h2>Thêm buổi quay</h2></div><form class="frm row7" id="xq-add"><label class="field">Ngày<select id="xs-d">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),Math.max(d.settings.today,W.tu))}</select></label><label class="field">Buổi<select id="xs-b">${opt(["Sáng","Chiều","Cả ngày"],"Sáng")}</select></label><label class="field">Giờ (nếu cần)<input id="xs-g" placeholder="vd 8:30"></label><label class="field">Địa điểm<input id="xs-p" value="Văn phòng Ailla"></label><label class="field">Người quay<select id="xs-n">${opt(team.map(u=>[u.id,u.name]),qDef?qDef.id:"")}</select></label><label class="field">Ghi chú<input id="xs-gc" placeholder="Đạo cụ, lưu ý…"></label><button class="btn pri">+ Thêm buổi quay</button></form></section>`:""}`;
   const S=id=>(D().shoots||[]).find(x=>x.id===id);
@@ -120,9 +120,7 @@ function xvQuay2(b,o){
     if(!t){toast("Chưa có tuyến nào, lập tuyến ở Kế hoạch tháng › bước 5");return}if(!L.length){toast("Gõ ít nhất một hook");f.querySelector(".hh").focus();return}
     DB.mutate(ME.name,`thêm ${L.length} hook buổi quay ${dd(s.day)}`,dt=>L.forEach(h=>{const by=s.nguoi[0]||"";dt.cards.push(newCard(dt,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,hookText:h,day:0,qday:s.day,buoiQuay:s.id,nguon:"Quay mới",loai:"moi",oneShot:one,dangVideo:t.dangVideo||(one?"One shot":undefined),step:one?"dkb":"kb",nguoi:by,nguoiKB:by}))}));
     toast(`Đã thêm ${L.length} hook`+(one?", chờ Oanh duyệt":", người được giao viết kịch bản rồi gửi Oanh duyệt"));renderMain()});
-  b.querySelectorAll("[data-hkword]").forEach(x=>x.onclick=()=>hkExportWord(x.dataset.hkword));
-  shootTargetBind(b,d);
-  if(b.querySelector("#hk-wordall"))b.querySelector("#hk-wordall").onclick=()=>hkExportWord("");
+  sqBind(b,d);
   b.querySelectorAll("[data-hkx]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"bỏ hook "+x.dataset.hkx,dt=>{dt.cards=dt.cards.filter(c=>c.id!==x.dataset.hkx)});renderMain()});
   b.querySelectorAll("[data-hkok]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkok;let n=0;DB.mutate(ME.name,"duyệt danh sách hook buổi quay",dt=>dt.cards.forEach(c=>{if(c.buoiQuay===id&&c.step==="dkb"){c.step="quay";n++}}));toast(`Đã duyệt ${n} hook, sẵn sàng quay`);renderMain()});
   b.querySelectorAll("[data-hkq]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"đánh dấu đã quay "+x.dataset.hkq,dt=>{const c=dt.cards.find(y=>y.id===x.dataset.hkq);if(c)c.daQuay=x.checked}));
@@ -131,7 +129,7 @@ function xvQuay2(b,o){
     DB.mutate(ME.name,"hook phát sinh buổi quay "+dd(s.day),dt=>dt.cards.push(newCard(dt,{sku:t.sku,kenh:t.kenh,maTuyen:t.ma,hookText:h,day:0,qday:s.day,buoiQuay:id,nguon:"Quay mới",loai:"moi",oneShot:true,phatSinh:true,dangVideo:t.dangVideo||"One shot",step:"edit",nguoi:"",nguoiEdit:""})));toast("Đã ghi hook phát sinh, giao người edit ở ④");renderMain()});
   b.querySelectorAll("[data-sqnote]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"ghi chú buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===x.dataset.sqnote);if(s)s.ghiChu=x.value}));
   b.querySelectorAll("[data-tram]").forEach(x=>x.onchange=()=>DB.mutate(ME.name,"ghi cảnh trám buổi quay",dt=>{const s=dt.shoots.find(y=>y.id===x.dataset.tram);if(s)s.tram=x.value}));
-  if($("#hk-move"))$("#hk-move").onclick=()=>{const nx=(D().shoots||[]).filter(s=>s.trangThai!=="Đã quay"&&s.day>=D().settings.today).sort((a,c)=>a.day-c.day)[0];if(!nx){toast("Chưa có buổi quay sắp tới, thêm buổi quay trước");return}DB.mutate(ME.name,"chuyển hook chưa quay sang buổi "+dd(nx.day),dt=>dt.cards.forEach(c=>{if(c.step==="quay"&&!c.buoiQuay){c.buoiQuay=nx.id;c.qday=nx.day}}));renderMain()};
+  if($("#hk-move"))$("#hk-move").onclick=()=>{const nx=(D().shoots||[]).filter(s=>!["Đã quay","Đã hủy"].includes(s.trangThai)&&s.day>=D().settings.today).sort((a,c)=>a.day-c.day)[0];if(!nx){toast("Chưa có buổi quay sắp tới, thêm buổi quay trước");return}DB.mutate(ME.name,"chuyển hook chưa quay sang buổi "+dd(nx.day),dt=>dt.cards.forEach(c=>{if(c.step==="quay"&&!c.buoiQuay){c.buoiQuay=nx.id;c.qday=nx.day}}));renderMain()};
   if($("#xq-add"))$("#xq-add").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"lên lịch quay",dt=>{dt.shoots=dt.shoots||[];dt.shoots.push({id:uid("sq"),day:+$("#xs-d").value,buoi:$("#xs-b").value,gio:$("#xs-g").value,diaDiem:$("#xs-p").value,nguoi:[$("#xs-n").value].filter(Boolean),ghiChu:$("#xs-gc").value,tram:"",trangThai:"Đã lên lịch"})});toast("Đã thêm buổi quay");renderMain()};
 }
 
@@ -152,19 +150,6 @@ function xvDang2(b,o){
   b.querySelectorAll("[data-setday]").forEach(x=>x.onchange=()=>{if(!x.value)return;DB.mutate(ME.name,"xếp ngày đăng "+x.dataset.setday+" → "+dd(+x.value),dt=>{const c=dt.cards.find(y=>y.id===x.dataset.setday);if(c)c.day=+x.value});toast("Đã xếp ngày đăng "+dd(+x.value));renderMain()});
 }
 
-/* Xuất phiếu hook / kịch bản ra file Word (.doc) để in đem đi quay. id rỗng = mọi hook, kịch bản chưa quay, nhóm theo buổi quay */
-function hkExportWord(shootId){
-  const d=D(),LB={oneshot:"One shot (hook)",kichban:"Review / voice off (kịch bản)",nhanban:"Nhân bản win",worker:"Worker",ton:"Video tồn",reup:"Reup"};
-  const keep=c=>!["ton","reup","worker"].includes(mixOf(c))&&(c.hookText||c.noiDung||c.canhQuay||c.yTuong);
-  const sets=(shootId?(d.shoots||[]).filter(s=>s.id===shootId):(d.shoots||[]).filter(s=>s.trangThai!=="Đã quay")).map(s=>[s,d.cards.filter(c=>c.buoiQuay===s.id&&keep(c)&&(shootId||c.step!=="xong"&&!c.daQuay))]);
-  if(!shootId){const free=d.cards.filter(c=>!c.buoiQuay&&["kb","dkb","quay"].includes(c.step)&&keep(c));if(free.length)sets.push([null,free])}
-  const n=sets.reduce((a,x)=>a+x[1].length,0);if(!n){toast("Chưa có hook hoặc kịch bản nào để xuất");return}
-  const e=x=>esc(String(x==null?"":x)).replace(/\n/g,"<br>");
-  const row=(c,i)=>{const t=d.tuyen.find(y=>y.ma===c.maTuyen);return `<tr><td class="c">${i+1}</td><td><b>${e(sk(c.sku).n)}</b><br>${e(chOf(c.kenh).short)}<br><i>${e(t?t.tuyen:"")}</i></td><td>${e(LB[mixOf(c)]||mixOf(c))}</td><td>${e(c.hookText)}</td><td>${e(c.noiDung||c.yTuong)}</td><td>${e([c.canhQuay,c.daoCu].filter(Boolean).join(" · "))}</td><td>${e(userName(c.nguoiKB||c.nguoi)||"")}</td><td class="c">☐</td></tr>`};
-  const body=sets.map(([s,L])=>`<h2>${s?"Buổi quay "+e(dayLbl(s.day))+" · "+e(s.buoi||"")+(s.gio?" "+e(s.gio):""):"Chưa xếp buổi quay"}</h2>${s?`<p>Địa điểm: ${e(s.diaDiem||"")} · Người quay: ${e((s.nguoi||[]).map(userName).join(", ")||"")}${s.ghiChu?" · Ghi chú: "+e(s.ghiChu):""}</p>${s.tram?"<p>Cảnh trám cần quay: "+e(s.tram)+"</p>":""}`:""}<table><tr><th>STT</th><th>Sản phẩm · Kênh · Tuyến</th><th>Loại</th><th>Hook</th><th>Kịch bản / nội dung</th><th>Cảnh quay · Đạo cụ</th><th>Người viết</th><th>Đã quay</th></tr>${L.map(row).join("")}</table>`).join("");
-  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Phiếu hook & kịch bản</title><style>@page{size:A4 landscape;margin:1.2cm}body{font-family:Arial,sans-serif;font-size:11pt}h1{font-size:16pt}h2{font-size:13pt;margin-top:18pt;color:#14213d}table{border-collapse:collapse;width:100%;margin-top:6pt}th,td{border:1px solid #666;padding:4pt 6pt;vertical-align:top}th{background:#e8ecf4}.c{text-align:center}</style></head><body><h1>PHIẾU HOOK & KỊCH BẢN · AILLA</h1><p>Xuất ngày '+new Date().toLocaleDateString("vi-VN")+' · '+n+' video</p>'+body+'</body></html>';
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+html],{type:"application/msword"}));a.download="Phieu-hook-kich-ban-"+new Date().toISOString().slice(0,10)+".doc";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);toast("Đã xuất file Word ("+n+" video)")
-}
 /* ---------- ④ Kho video & Calendar: video tồn tháng trước, video sản xuất trong tháng, rồi đẩy sang Calendar ---------- */
 function xvKhoAll(b,o){
   XV.ks=XV.ks||"ton";
@@ -185,50 +170,53 @@ const hkAll=d=>d.cards.filter(c=>["oneshot","kichban"].includes(mixOf(c))&&c.ngu
 const hkCount=L=>{const n={cv:0,cd:0,dd:0,dq:0};L.forEach(c=>n[hkSt(c)]++);return n};
 const hkSum=(L,lb)=>{const n=hkCount(L);return `<b>${lb} ${L.length}</b>: chưa viết ${n.cv} · chờ duyệt ${n.cd} · đã duyệt ${n.dd} · đã quay ${n.dq}`};
 function hkMine(c){return xvGive()||c.nguoi===ME.id||c.giao===ME.id}
-/* Gắn hook / kịch bản từ quỹ video của tháng vào buổi quay theo chỉ tiêu, hạn nộp = trước ngày quay 1 ngày, báo từng người */
-function shootApply(id,targets){
-  const warn=[];
-  DB.mutate(ME.name,"chỉ tiêu buổi quay",dt=>{
-    const s=(dt.shoots||[]).find(x=>x.id===id);if(!s)return;
-    if(targets)s.targets=targets;const han=Math.max(1,s.day-1),notes={};
-    (s.targets||[]).forEach(tg=>[["hook","oneshot"],["kb","kichban"]].forEach(([f,mx])=>{
-      const want=Math.max(0,+tg[f]||0),have=dt.cards.filter(c=>c.buoiQuay===id&&c.sku===tg.sku&&mixOf(c)===mx&&["kb","dkb","quay"].includes(c.step)),need=want-have.length;
-      if(need>0){
-        const pool=dt.cards.filter(c=>!c.buoiQuay&&c.sku===tg.sku&&mixOf(c)===mx&&c.step==="kb"&&c.nguon!=="Footage cũ").sort((a,b)=>(a.han||99)-(b.han||99)||String(a.id).localeCompare(String(b.id)));
-        pool.slice(0,need).forEach(c=>{c.buoiQuay=id;c.qday=s.day;c.han=han;if(c.nguoi){const n=notes[c.nguoi]=notes[c.nguoi]||{hook:0,kb:0};n[f]++}});
-        if(pool.length<need)warn.push(`${sk(tg.sku).n}: quỹ video chỉ còn ${pool.length}/${need} ${f==="hook"?"hook":"kịch bản"}, tăng số ở ① Kế hoạch`)
-      }else if(need<0)have.filter(c=>c.step==="kb"&&!c.hookText&&!c.noiDung).slice(0,-need).forEach(c=>{c.buoiQuay="";c.han=0})
-    }));
-    dt.cards.filter(c=>c.buoiQuay===id&&["kb","dkb"].includes(c.step)).forEach(c=>{c.han=han});
-    Object.entries(notes).forEach(([u,n])=>notifyU(dt,[u],`Buổi quay ${dd(s.day)}${s.buoi?" "+s.buoi:""}: bạn cần nộp ${n.hook} hook, ${n.kb} kịch bản trước ngày ${dd(han)}`,""))
-  });
-  return warn
+/* Buổi quay: mục tiêu lead tự viết, link file hook & kịch bản trên Drive, trạng thái, trễ hạn */
+const SQ_ST=s=>{const x=s.trangThai;if(x==="Đã quay")return "xong";if(x==="Đã hủy")return "huy";if(s.day<D().settings.today)return "tre";return x==="Đang quay"?"dang":"chua"};
+const SQ_LB={chua:["Chưa làm","gry"],dang:["Đang làm","blu"],tre:["Trễ hạn","red"],xong:["Đã quay","grn"],huy:["Đã hủy","gry"]};
+function sqBox(s,give,dv){
+  const st=SQ_ST(s),may=give||(s.nguoi||[]).includes(ME.id),lnk=v=>/^https?:/.test(v)?v:"https://"+v,today=D().settings.today;
+  const days=Array.from({length:MONTH.ndays-today+1},(_,i)=>today+i);
+  const tre=st==="tre"?`<div class="sqtre"><b class="t-red">Buổi quay trễ so với lịch (${dd(s.day)})</b>${s.treLyDo?` · Lý do: ${esc(s.treLyDo)} <small>(${esc(s.treBy||"")})</small>`:may?`<div class="xrow"><input class="hkin" data-sqtre="${s.id}" placeholder="Điền lý do trễ…"><button class="btn sm pri" data-sqtres="${s.id}">Gửi lý do</button></div>`:" · chưa có lý do"}${dv?`<div class="xrow"><label>Dời sang ngày<select data-sqnew="${s.id}">${opt(days.map(x=>[x,dayLbl(x)]),today)}</select></label><button class="btn sm" data-sqmove="${s.id}">Dời lịch quay</button><button class="btn sm danger" data-sqcancel="${s.id}">Hủy buổi quay</button></div>`:""}</div>`:"";
+  const act=st==="chua"&&may?`<button class="btn sm" data-sqstart="${s.id}">Bắt đầu quay</button>`:"";
+  return `<div class="sqbox"><label class="field full">Mục tiêu buổi quay (lead tự viết)<textarea rows="2" data-sqmt="${s.id}" ${dv||give?"":"disabled"} placeholder="Ví dụ: 5/10 quay 50 video tinh dầu · 6/10 quay thêm cảnh trám tinh dầu và 20 video bột tẩy">${esc(s.mucTieu||"")}</textarea></label>
+   <label class="field full">Link file hook & kịch bản (Drive)<div class="xrow"><input data-sqlink="${s.id}" value="${esc(s.linkHook||"")}" placeholder="Xuất file lên Drive ở bảng hook bên dưới, rồi dán link vào đây" ${may||dv?"":"disabled"}>${s.linkHook?`<a class="btn sm" href="${esc(lnk(s.linkHook))}" target="_blank" rel="noopener">▶ Mở file</a>`:""}</div></label>${act}${tre}</div>`}
+function sqBind(b,d){
+  const mut=(id,msg,fn)=>DB.mutate(ME.name,msg,dt=>{const s=(dt.shoots||[]).find(y=>y.id===id);if(s)fn(s,dt)});
+  b.querySelectorAll("[data-sqmt]").forEach(x=>x.onchange=()=>mut(x.dataset.sqmt,"mục tiêu buổi quay",s=>{s.mucTieu=x.value}));
+  b.querySelectorAll("[data-sqlink]").forEach(x=>x.onchange=()=>{mut(x.dataset.sqlink,"link hook kịch bản buổi quay",s=>{s.linkHook=x.value.trim()});renderMain()});
+  b.querySelectorAll("[data-sqstart]").forEach(x=>x.onclick=()=>{mut(x.dataset.sqstart,"bắt đầu quay",s=>{s.trangThai="Đang quay"});renderMain()});
+  b.querySelectorAll("[data-sqtres]").forEach(x=>x.onclick=()=>{const id=x.dataset.sqtres,v=(b.querySelector(`[data-sqtre="${id}"]`).value||"").trim();if(!v){toast("Điền lý do trễ trước");return}
+    mut(id,"lý do trễ buổi quay",(s,dt)=>{s.treLyDo=v;s.treBy=ME.name;notifyU(dt,approvers(),`Buổi quay ${dd(s.day)} trễ: ${v} (${ME.name}). Oanh dời lịch hoặc hủy.`,"")});toast("Đã gửi lý do cho Oanh");renderMain()});
+  b.querySelectorAll("[data-sqmove]").forEach(x=>x.onclick=()=>{const id=x.dataset.sqmove,nd=+b.querySelector(`[data-sqnew="${id}"]`).value;
+    mut(id,"dời lịch quay",(s,dt)=>{s.lichSu=(s.lichSu||[]).concat({tu:s.day,lyDo:s.treLyDo||"",by:ME.name});s.day=nd;s.trangThai="Đã lên lịch";s.treLyDo="";dt.cards.filter(c=>c.buoiQuay===id).forEach(c=>{c.qday=nd});notifyU(dt,s.nguoi,`Buổi quay được dời sang ${dd(nd)}`,"")});toast("Đã dời lịch quay");renderMain()});
+  b.querySelectorAll("[data-sqcancel]").forEach(x=>x.onclick=()=>{const id=x.dataset.sqcancel;if(!confirm("Hủy buổi quay này? Hook và kịch bản đang gắn sẽ trả về chưa xếp buổi."))return;
+    mut(id,"hủy buổi quay",(s,dt)=>{s.trangThai="Đã hủy";dt.cards.filter(c=>c.buoiQuay===id&&["kb","dkb","quay"].includes(c.step)).forEach(c=>{c.buoiQuay=""});notifyU(dt,s.nguoi,`Buổi quay ${dd(s.day)} đã hủy`,"")});toast("Đã hủy buổi quay");renderMain()});
 }
-/* Khung chỉ tiêu trong từng buổi quay */
-function shootTargetBox(s,d,give){
-  const T=s.targets||[],han=Math.max(1,s.day-1);
-  const row=(tg,i)=>{const L=m=>d.cards.filter(c=>c.buoiQuay===s.id&&c.sku===tg.sku&&mixOf(c)===m),H=L("oneshot"),K=L("kichban"),wr=A=>A.filter(c=>c.hookText||c.noiDung).length,ap=A=>A.filter(c=>["dd","dq"].includes(hkSt(c))).length;
-    const part=(lb,A,want,f)=>{const th=Math.max(0,(+want||0)-ap(A));return `<span class="shp">${lb}: ${give?`<input type="number" min="0" class="num" data-shtv="${i}|${f}" value="${+want||0}">`:`<b>${+want||0}</b>`} · đã viết <b>${wr(A)}</b> · đã duyệt <b>${ap(A)}</b>${th?` · <b class="t-red">thiếu ${th}</b>`:(+want?` · <b class="t-grn">đủ</b>`:"")}</span>`};
-    return `<div class="shrow">${swatch(tg.sku)}<b>${esc(sk(tg.sku).n)}</b>${part("Hook",H,tg.hook,"hook")}${part("Kịch bản",K,tg.kb,"kb")}${give?`<button class="lnk danger" data-shtx="${i}" title="Bỏ chỉ tiêu này">✕</button>`:""}</div>`};
-  return `<div class="shtar" data-shtbox="${s.id}"><div class="shth"><b>Chỉ tiêu buổi quay</b><small>lead ghi tổng theo sản phẩm · nhân sự nộp trước ngày <b>${dd(han)}</b> (trước ngày quay 1 ngày)</small></div>
-   ${T.length?T.map(row).join(""):`<p class="hint">Chưa ghi chỉ tiêu. Ví dụ buổi 5/10 quay 50 video tinh dầu: thêm Tinh dầu, 50 hook.</p>`}
-   ${give&&s.trangThai!=="Đã quay"?`<div class="shadd"><select data-shts>${opt([["","+ Thêm sản phẩm…"]].concat(prods().filter(p=>!T.some(t=>t.sku===p.k)).map(p=>[p.k,p.n])),"")}</select><button class="btn sm pri" data-shtsave="${s.id}">Lưu chỉ tiêu và gắn hook / kịch bản vào buổi quay</button></div>`:""}</div>`}
-function shootTargetBind(b,d){
-  const S0=id=>(D().shoots||[]).find(x=>x.id===id);
-  b.querySelectorAll("[data-shtsave]").forEach(x=>x.onclick=()=>{const id=x.dataset.shtsave,box=b.querySelector(`[data-shtbox="${id}"]`),s=S0(id);if(!s)return;
-    const T=(s.targets||[]).map(t=>({...t}));box.querySelectorAll("[data-shtv]").forEach(i=>{const [k,f]=i.dataset.shtv.split("|");if(T[+k])T[+k][f]=Math.max(0,+i.value||0)});
-    const add=box.querySelector("[data-shts]");if(add&&add.value)T.push({sku:add.value,hook:0,kb:0});
-    const warn=shootApply(id,T);toast(warn.length?warn.join(" · "):"Đã gắn hook / kịch bản vào buổi quay và báo nhân sự");renderMain()});
-  b.querySelectorAll("[data-shtx]").forEach(x=>x.onclick=()=>{const box=x.closest("[data-shtbox]"),id=box.dataset.shtbox;DB.mutate(ME.name,"bỏ chỉ tiêu buổi quay",dt=>{const s=(dt.shoots||[]).find(y=>y.id===id);if(!s)return;const t=(s.targets||[])[+x.dataset.shtx];if(!t)return;s.targets.splice(+x.dataset.shtx,1);dt.cards.filter(c=>c.buoiQuay===id&&c.sku===t.sku&&c.step==="kb"&&!c.hookText&&!c.noiDung).forEach(c=>{c.buoiQuay="";c.han=0})});renderMain()});
+/* Xuất hook / kịch bản lên Google Drive (qua máy Worker ở văn phòng): chọn Excel hoặc Word, nhận link, gắn vào buổi quay */
+const HK_COLS=["STT","Sản phẩm","Kênh","Tuyến","Loại","Nhân sự","Hook","Kịch bản / nội dung","Cảnh quay","Đạo cụ / bối cảnh","Trạng thái","Buổi quay","Hạn nộp"];
+function hkRows(d,sku,kenh,onlyMine){
+  return hkAll(d).filter(c=>c.sku===sku&&c.kenh===kenh&&hkSt(c)!=="dq"&&(!onlyMine||c.nguoi===ME.id||c.giao===ME.id)).sort((a,c)=>(a.han||99)-(c.han||99)||(a.qday||99)-(c.qday||99)||String(a.id).localeCompare(String(c.id)))
+    .map((c,i)=>{const tu=d.tuyen.find(x=>x.ma===c.maTuyen),sh=(d.shoots||[]).find(s=>s.id===c.buoiQuay);return [i+1,sk(c.sku).n,chOf(c.kenh).short,tu?tu.tuyen:"",hkIsHook(c)?"Hook":"Kịch bản",userName(c.nguoi||c.giao)||"",c.hookText||"",c.noiDung||c.yTuong||"",c.canhQuay||"",c.daoCu||"",HK_LB[hkSt(c)][0],sh?dd(sh.day)+(sh.buoi?" "+sh.buoi:""):"",c.han?dd(c.han):""]})
 }
-/* Nhân sự thấy ngay mình còn nợ bao nhiêu trước các buổi quay sắp tới */
-function hkMyBox(d){
-  const today=d.settings.today,L=[];
-  (d.shoots||[]).filter(s=>s.trangThai!=="Đã quay"&&s.day>=today).sort((a,c)=>a.day-c.day).forEach(s=>{
-    const mine=d.cards.filter(c=>c.buoiQuay===s.id&&c.nguoi===ME.id&&["oneshot","kichban"].includes(mixOf(c))),todo=mine.filter(c=>c.step==="kb"),wait=mine.filter(c=>c.step==="dkb");
-    if(!todo.length&&!wait.length)return;const h=todo.filter(hkIsHook).length,k=todo.length-h;
-    L.push(`<div class="hkmy${s.day-today<=1&&todo.length?" late":""}"><b>Buổi quay ${dd(s.day)}${s.buoi?" "+esc(s.buoi):""}</b>: ${todo.length?`còn <b>${h}</b> hook, <b>${k}</b> kịch bản cần nộp trước ngày <b>${dd(Math.max(1,s.day-1))}</b>`:"bạn đã nộp đủ"}${wait.length?` · ${wait.length} đang chờ Oanh duyệt`:""}</div>`)});
-  return L.length?`<section class="card hkmybox"><div class="card-h"><h2>Của tôi: cần nộp trước buổi quay</h2></div>${L.join("")}</section>`:""
+async function hkExportDrive(sku,kenh,fmt,btn){
+  const d=D(),onlyMine=!xvGive(),rows=hkRows(d,sku,kenh,onlyMine);
+  if(!rows.length){toast("Chưa có hook / kịch bản nào để xuất");return}
+  const idle="⬆ Xuất lên Drive";btn.disabled=true;btn.textContent="Đang gửi cho Worker…";
+  const day=new Date().toISOString().slice(0,10),name=sk(sku).n+" - "+chOf(kenh).short+" - "+(onlyMine?ME.name+" - ":"")+day;
+  let tid;try{tid=(await svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind:"card_export",ref:"HK-"+Date.now(),payload:{format:fmt,title:"Hook và kịch bản · "+name,filename:name,folder:"Tháng "+MONTH.mon+" · "+sk(sku).n,columns:HK_COLS,rows,by:ME.name}})})).id}catch(e){toast("Chưa gửi được: "+((e&&e.message)||e));btn.disabled=false;btn.textContent=idle;return}
+  for(let i=0;i<50;i++){
+    await new Promise(r=>setTimeout(r,4000));let tk;try{tk=((await svApi("/api/hub/worker-tasks?kind=card"))||[]).find(x=>x.id===tid)}catch(e){continue}
+    if(tk&&tk.status==="done"&&tk.result&&tk.result.link){DB.mutate(ME.name,"xuất hook lên Drive",dt=>{dt.hkFiles=dt.hkFiles||[];dt.hkFiles.unshift({id:tid,name:tk.result.name,link:tk.result.link,by:ME.name,at:Date.now(),sku,kenh,n:rows.length})});toast("Đã lưu lên Drive, gắn link vào buổi quay ở mục File đã xuất");renderMain();return}
+    if(tk&&tk.status==="error"){toast("Không xuất được: "+(tk.detail||"lỗi"));break}
+    if(btn.isConnected&&tk&&tk.detail)btn.textContent=tk.detail
+  }
+  if(btn.isConnected){btn.disabled=false;btn.textContent=idle}
+  toast("Chưa có link sau vài phút. Kiểm tra máy Worker ở văn phòng có đang bật không.")
+}
+function hkFilesHtml(d){
+  const FL=(d.hkFiles||[]).slice(0,8);if(!FL.length)return "";
+  const up=(d.shoots||[]).filter(s=>!["Đã quay","Đã hủy"].includes(s.trangThai)).sort((a,c)=>a.day-c.day);
+  return `<section class="card"><div class="card-h"><h2>File hook & kịch bản đã xuất lên Drive</h2><span class="hint">gắn link vào buổi quay để cả team thấy</span></div>${FL.map(f=>`<div class="hkfile"><a href="${esc(f.link)}" target="_blank" rel="noopener">▶ ${esc(f.name)}</a><small>${esc(f.by)} · ${f.n} dòng</small><select data-hkfs="${f.id}">${opt([["","Gắn link vào buổi quay…"]].concat(up.map(s=>[s.id,dayLbl(s.day)+(s.buoi?" "+s.buoi:"")+(s.linkHook?" (đã có link)":"")])),"")}</select><button class="btn sm" data-hkfa="${f.id}">Gắn link</button><button class="btn sm" data-hkfc="${f.id}">Chép link</button></div>`).join("")}</section>`
 }
 /* Bảng hook / kịch bản: bấm kênh, thấy từng sản phẩm cần bao nhiêu, nhân sự tự viết theo số thứ tự */
 function xvHookList(b,o){
@@ -243,9 +231,12 @@ function xvHookList(b,o){
       const act=c.step==="kb"&&mine?`<button class="btn sm pri" data-hkgs="${c.id}">Gửi duyệt</button>`:c.step==="dkb"?(dv?`<button class="btn sm pri" data-hkdy="${c.id}">Duyệt</button><button class="btn sm" data-hktl="${c.id}">Trả lại</button>`:`<span class="hint">chờ Oanh</span>`):"";
       return `<tr><td class="n">${i+1}</td><td>${isH?"Hook":"Kịch bản"}</td><td>${esc(userName(c.nguoi||c.giao)||"chưa giao")}</td><td class="wide">${cell}</td><td>${pill(HK_LB[st][0],HK_LB[st][1])}</td><td>${sh?dd(sh.day)+(sh.buoi?" "+esc(sh.buoi):""):"—"}</td><td>${c.han?dd(c.han):"—"}</td><td class="nowrap">${act}</td></tr>`}).join("");
     return `<div class="wpb${op?" open":""}"><div class="wph" data-hko="${esc(key)}"><i class="ptar">${op?"▾":"▸"}</i>${swatch(sku)}<b>${esc(sk(sku).n)}</b><span class="hkc">${hkSum(H,"Hook")}</span><span class="hkc">${hkSum(S,"Kịch bản")}</span></div>
-     ${op?`<div class="tbl"><table class="wktab"><thead><tr><th>#</th><th>Loại</th><th>Nhân sự</th><th>Nội dung</th><th>Trạng thái</th><th>Buổi quay</th><th>Hạn nộp</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="8" class="empty">Không còn hook / kịch bản nào chờ làm.</td></tr>`}</tbody></table></div>`:""}</div>`};
-  b.innerHTML=`<section class="card"><div class="card-h"><h2>Hook & kịch bản theo kênh</h2><span class="hint">bấm kênh, bấm sản phẩm để xem bảng · nhân sự tự viết, bấm Gửi duyệt, Oanh duyệt xong thì sẵn sàng quay</span></div>${tabs}${bySku.map(blk).join("")||`<p class="empty">Chưa có hook / kịch bản nào. Giao ở ① Kế hoạch › One shot, Review.</p>`}</section>`;
+     ${op?`<div class="hkexp"><select data-hkfmt><option value="xlsx">Excel (.xlsx)</option><option value="doc">Word (.doc)</option></select><button class="btn sm pri" data-hkexp="${esc(key)}">⬆ Xuất lên Drive</button><span class="hint">file lưu vào Google Drive của công ty, bạn nhận link rồi gắn vào buổi quay${xvGive()?"":" · chỉ gồm hook / kịch bản của bạn"}</span></div><div class="tbl"><table class="wktab"><thead><tr><th>#</th><th>Loại</th><th>Nhân sự</th><th>Nội dung</th><th>Trạng thái</th><th>Buổi quay</th><th>Hạn nộp</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="8" class="empty">Không còn hook / kịch bản nào chờ làm.</td></tr>`}</tbody></table></div>`:""}</div>`};
+  b.innerHTML=`<section class="card"><div class="card-h"><h2>Hook & kịch bản theo kênh</h2><span class="hint">bấm kênh, bấm sản phẩm để xem bảng · nhân sự tự viết, bấm Gửi duyệt, Oanh duyệt xong thì sẵn sàng quay</span></div>${tabs}${bySku.map(blk).join("")||`<p class="empty">Chưa có hook / kịch bản nào. Giao ở ① Kế hoạch › One shot, Review.</p>`}</section>${hkFilesHtml(d)}`;
   b.querySelectorAll("[data-hkk]").forEach(x=>x.onclick=()=>{HK_K=x.dataset.hkk;renderMain()});
+  b.querySelectorAll("[data-hkexp]").forEach(x=>x.onclick=()=>{const [sku,kenh]=x.dataset.hkexp.split("|"),f=x.closest(".hkexp").querySelector("[data-hkfmt]").value;hkExportDrive(sku,kenh,f,x)});
+  b.querySelectorAll("[data-hkfa]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkfa,sid=b.querySelector(`[data-hkfs="${id}"]`).value,f=(D().hkFiles||[]).find(y=>y.id===id);if(!sid){toast("Chọn buổi quay trước");return}if(!f)return;DB.mutate(ME.name,"gắn link hook kịch bản vào buổi quay",dt=>{const s=(dt.shoots||[]).find(y=>y.id===sid);if(s)s.linkHook=f.link});toast("Đã gắn link vào buổi quay");renderMain()});
+  b.querySelectorAll("[data-hkfc]").forEach(x=>x.onclick=()=>{const f=(D().hkFiles||[]).find(y=>y.id===x.dataset.hkfc);if(!f)return;try{navigator.clipboard.writeText(f.link);toast("Đã chép link")}catch(e){toast(f.link)}});
   b.querySelectorAll("[data-hko]").forEach(h=>h.onclick=e=>{if(e.target.closest("input,button,select"))return;const k=h.dataset.hko;HK_OPEN.has(k)?HK_OPEN.delete(k):HK_OPEN.add(k);renderMain()});
   b.querySelectorAll("[data-hkgs]").forEach(x=>x.onclick=()=>{const id=x.dataset.hkgs,i=b.querySelector(`[data-hkv="${id}"]`),v=i?i.value.trim():undefined,e=moveCard(ME,id,"dkb",v!==undefined?{hookText:v}:{});toast(e||"Đã gửi Oanh duyệt");renderMain()});
   b.querySelectorAll("[data-hkdy]").forEach(x=>x.onclick=()=>{const e=moveCard(ME,x.dataset.hkdy,"quay");toast(e||"Đã duyệt");renderMain()});
@@ -253,8 +244,7 @@ function xvHookList(b,o){
 }
 /* ---------- ② Hook & kịch bản, quay, edit ---------- */
 function xvHook(b,o){
-  b.innerHTML='<div id="xh-m"></div><div id="xh-q"></div><div id="xh-l"></div><section class="card" id="xh-esec"><div class="card-h"><h2>Edit</h2><span class="hint">video đã quay xong: giao người edit theo số lượng, người edit dán link rồi gửi duyệt</span></div><div id="xh-e"></div></section><div id="xh-k"></div>';
-  b.querySelector("#xh-m").innerHTML=hkMyBox(o.d);
+  b.innerHTML='<div id="xh-q"></div><div id="xh-l"></div><section class="card" id="xh-esec"><div class="card-h"><h2>Edit</h2><span class="hint">video đã quay xong: giao người edit theo số lượng, người edit dán link rồi gửi duyệt</span></div><div id="xh-e"></div></section><div id="xh-k"></div>';
   xvQuay2(b.querySelector("#xh-q"),o);
   xvHookList(b.querySelector("#xh-l"),o);
   xvEdit2(b.querySelector("#xh-e"),o);
@@ -278,7 +268,7 @@ function pXepViec2(m){
   ({tuan:xvTuan,kho:xvKhoAll,quay:xvHook,wk:xvWorker2})[XV.tab](b,o);
   wpWorkList(b,XV.tab);
   /* nối với ① Kế hoạch tuần: dải "cần làm" + chọn sẵn sản phẩm đang làm */
-  const ST=(XV.tab==="kho"&&(XV.ks||"ton")!=="ton")?null:({kho:["ton"],quay:["oneshot","kichban"],wk:["worker","reup"]})[XV.tab];
+  const ST=(XV.tab==="kho"&&(XV.ks||"ton")!=="ton")?null:({kho:["ton"]})[XV.tab];
   if(ST){const ks=XV.tab==="kho"&&b.querySelector("#khosum");if(ks)ks.insertAdjacentHTML("afterend",wpStrip(d,W,days,ST));else b.insertAdjacentHTML("afterbegin",wpStrip(d,W,days,ST));
     b.querySelectorAll("[data-wpq]").forEach(x=>x.onclick=()=>{const v=x.dataset.wpq;if(!v){XV.sku="";XV.kenh="";XV.mix=""}else{const [s2,k2,t2]=v.split("|");XV.sku=s2;XV.kenh=k2;XV.mix=t2;if(XV.tab==="kho"){const kk=s2+"|"+k2;KS_OPEN.has(kk)?KS_OPEN.delete(kk):KS_OPEN.add(kk)}}renderMain()});
     if(XV.sku){const tu=d.tuyen.find(t=>t.sku===XV.sku&&(!XV.kenh||t.kenh===XV.kenh));
@@ -469,7 +459,7 @@ openCard=function(id,o={}){const c=D().cards.find(x=>x.id===id);if(c&&!o.full&&(
 
 /* ---------- Ngày bắt đầu / hạn xong của việc được giao, trễ hạn phải có lý do và Oanh duyệt ---------- */
 /* hạn mặc định: viết hook / kịch bản xong trước buổi quay gần nhất 1 ngày; việc khác 2 ngày */
-function defHan(d,WW,t){const td=d.settings.today;if(["oneshot","kichban"].includes(t)){const s=(d.shoots||[]).filter(x=>x.trangThai!=="Đã quay"&&x.day>td).sort((a,b)=>a.day-b.day)[0];if(s)return Math.max(td,s.day-1)}return WW&&WW.w==="M"?MONTH.ndays:Math.min(MONTH.ndays,td+2)}
+function defHan(d,WW,t){const td=d.settings.today;if(["oneshot","kichban"].includes(t)){const s=(d.shoots||[]).filter(x=>!["Đã quay","Đã hủy"].includes(x.trangThai)&&x.day>td).sort((a,b)=>a.day-b.day)[0];if(s)return Math.max(td,s.day-1)}return WW&&WW.w==="M"?MONTH.ndays:Math.min(MONTH.ndays,td+2)}
 const hanTag=c=>xvGive()?`${c.batDau?`<span class="xms">giao ${dd(c.batDau)}</span>`:""}<select class="hansel${isLate(c)?" late":""}" data-sethan="${c.id}" title="Hạn xong">${opt([["","Chưa có hạn"]].concat(Array.from({length:MONTH.ndays},(_,i)=>[i+1,"hạn "+dd(i+1)])),c.han||"")}</select>`:(c.han?`<span class="xms ${isLate(c)?"t-red":""}">${c.batDau?dd(c.batDau)+" → ":""}hạn ${dd(c.han)}${isLate(c)?" · trễ":""}</span>`:"");
 document.addEventListener("change",e=>{const x=e.target;if(!x.matches||!x.matches("select[data-sethan]"))return;const id=x.dataset.sethan,v=+x.value||0;DB.mutate(ME.name,"đặt hạn "+id+" → "+(v?dd(v):"không"),dt=>{const c=dt.cards.find(y=>y.id===id);if(c){c.han=v;if(v&&!c.batDau)c.batDau=dt.settings.today}});toast(v?"Đã đặt hạn "+dd(v):"Đã bỏ hạn");renderMain()});
 const _mvTre=moveCard;

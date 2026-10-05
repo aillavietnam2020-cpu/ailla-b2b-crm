@@ -99,8 +99,6 @@ function kcBlock(d,s,give){
 const _xvQuayKC=xvQuay2;
 xvQuay2=function(b,o){
   _xvQuayKC(b,o);const d=o.d;kcSync();
-  b.insertAdjacentHTML("afterbegin",`<section class="card" id="kc-free"><div class="card-h"><h2>📁 Lưu cảnh quay vào kho cảnh</h2><span class="hint">quay xong tải cảnh lên một thư mục Drive, dán link ở đây · không cần tạo buổi quay trước · Worker tự quét như gửi /quet cho bot Telegram</span></div>
-   <div class="kcadd"><label>Ngày quay<select class="kd">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),d.settings.today)}</select></label><label>Sản phẩm<select class="ks">${opt([["","Máy tự nhận từ hình"]].concat(skOpts().filter(x=>W_SKU[Array.isArray(x)?x[0]:x])),"")}</select></label><input class="kl" placeholder="Link thư mục Drive (…/drive/folders/…)"><input class="kg" placeholder="Ghi chú (vd cảnh trám ngâm áo, cận bột tan)"><button class="btn sm pri" data-kcsave="">Lưu vào kho cảnh</button></div></section>`);
   b.querySelectorAll("[data-sqnote]").forEach(t=>{const s=(d.shoots||[]).find(y=>y.id===t.dataset.sqnote);if(s)t.closest("label").insertAdjacentHTML("beforebegin",kcBlock(d,s,o.give))});
   const KC=(d.khoCanh||[]).slice().sort((p,q)=>q.at-p.at||q.day-p.day);
   if(KC.length)b.insertAdjacentHTML("beforeend",`<section class="card"><div class="card-h"><h2>📁 Kho cảnh</h2><span class="hint">${KC.length} thư mục · ${sum(KC,k=>k.n||0)} cảnh dùng được · Worker dùng cho video không quay và cảnh trám · xem chi tiết từng cảnh ở trang Worker › Kho cảnh</span></div>

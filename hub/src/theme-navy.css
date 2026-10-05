@@ -771,3 +771,8 @@ td.wvid a{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;w
 .hkmybox .hkmy{padding:7px 10px;border-radius:10px;background:#f3f6ff;margin:4px 0}.hkmybox .hkmy.late{background:#fff1f0}
 .wph .hkc{font-size:13px;color:var(--muted);margin-left:12px}
 td.wide .hkin{width:min(520px,100%);margin-right:8px}
+
+.sqbox{margin:8px 0;display:grid;gap:8px}.sqtre{border:1px solid #f1b8b4;background:#fff5f4;border-radius:10px;padding:8px 10px;display:grid;gap:6px}
+
+.hkexp{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}.hkexp select{width:auto;height:32px}
+.hkfile{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:7px 0;border-top:1px solid #eef0f6}.hkfile:first-of-type{border-top:0}.hkfile select{width:auto;height:32px}
