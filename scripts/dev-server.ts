@@ -40,6 +40,8 @@ const env = {
   ENVIRONMENT: 'development',
   DEV_AUTH_ENABLED: 'true',
   APP_TIMEZONE: 'Asia/Ho_Chi_Minh',
+  AI_BASE_URL: process.env.AI_BASE_URL,
+  AI_API_KEY: process.env.AI_API_KEY,
 } as Env;
 
 const app = createApp();

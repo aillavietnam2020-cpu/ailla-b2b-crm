@@ -144,7 +144,7 @@ export function CustomerDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
                     {c.orders.map((order) => (
                       <tr key={order.id}>
                         <td>
-                          <Link to={`/${mode}/orders/${order.id}`} style={{ color: 'var(--pink)', fontWeight: 700 }}>
+                          <Link to={`/${mode}/orders/${order.id}`} className="rowlink">
                             {order.order_no}
                           </Link>
                         </td>

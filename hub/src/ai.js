@@ -3,7 +3,7 @@
    Web chạy bộ luật phân tích số liệu; nhận định gửi BOT CỦA PHÒNG BAN (OpenClaw, combo AI ở 9router) — xem bots.js.
    ===================================================================== */
 const AI_SRC_T9="t9file";
-function aiShape(d){if(!d.ai)d.ai={state:{},log:[],src:"",tg:{bat:false,gio:"08:00",nhan:"Chị Hoa, Oanh"}};if(!d.ttWeeks)d.ttWeeks=[];return d}
+function aiShape(d){if(!d.ai)d.ai={state:{},log:[],src:"",tg:{bat:false,gio:"08:00",nhan:"Chị Hoa, Lead Content & Media"}};if(!d.ttWeeks)d.ttWeeks=[];return d}
 function aiWeeks(){const d=D(),L=(d.ttWeeks||[]).slice();if(typeof T9FILE!=="undefined")L.unshift({key:AI_SRC_T9,label:"Tuần 24–30/9 (file thật)",tu:"2026-09-24",den:"2026-09-30",recs:T9FILE.recs.map(r=>[r[0],guessSku(r[3])||guessSku(r[2])||"KHAC",r[7],r[6],r[4],String(r[1]).slice(0,10),/[#@]/.test(String(r[2]))?1:0,String(r[2]).slice(0,80),r[8]||""])});return L}
 const ttUrl=v=>`https://www.tiktok.com/@${v[8]||"aillavietnamstore"}/video/${v[0]}`;
 const vidRef=v=>v?{id:v[0],url:ttUrl(v),ten:v[7]||v[0]}:null;
@@ -49,7 +49,7 @@ function pAI(m){
    <section class="card"><div class="card-h"><h2>Hỏi AI về số liệu</h2></div><textarea id="ai-q" rows="3" placeholder="VD: Vì sao tinh dầu tăng mạnh tuần này? Nên giảm sản phẩm nào để dồn video?"></textarea><div class="acts"><button class="btn pri" id="ai-ask">Hỏi AI</button></div><div id="ai-q-out" class="clout">${AIOUT.hoi||""}</div><p class="hint">Câu hỏi được gửi kèm số liệu tuần đang chọn. Sau này chuyển sang bot phòng ban (xem Cài đặt › Bot AI phòng ban).</p></section>
    <section class="card"><div class="card-h"><h2>Đã áp dụng</h2></div>${(D().ai.log||[]).slice(0,8).map(l=>`<div class="event"><p><strong>${esc(l.title)}</strong></p><small>${esc(l.by)} · ${esc(l.at)}${l.dc?" · phiếu "+esc(l.dc):""}</small></div>`).join("")||`<p class="empty">Chưa áp dụng đề xuất nào.</p>`}</section></div></div>`;
   $("#ai-src").onchange=e=>{AISRC=e.target.value;renderMain()};
-  m.querySelectorAll("[data-ai-ok]").forEach(b=>b.onclick=()=>{const ins=R.I[+b.dataset.aiOk];if(!confirm(`Áp dụng: ${ins.actTxt}`))return;let n=0;DB.mutate(ME.name,"áp dụng đề xuất AI: "+ins.title,dt=>{aiShape(dt);n=aiApply(dt,ins)});toast(can(ME,"kehoach.duyet")?"Đã tạo và áp dụng phiếu điều chỉnh. Xem ở Điều chỉnh kế hoạch":"Đã gửi phiếu điều chỉnh chờ chị duyệt");renderMain()});
+  m.querySelectorAll("[data-ai-ok]").forEach(b=>b.onclick=()=>{const ins=R.I[+b.dataset.aiOk];if(!confirm(`Áp dụng: ${ins.actTxt}`))return;let n=0;DB.mutate(ME.name,"áp dụng đề xuất AI: "+ins.title,dt=>{aiShape(dt);n=aiApply(dt,ins)});toast(can(ME,"kehoach.duyet")?"Đã tạo và áp dụng phiếu điều chỉnh. Xem ở Điều chỉnh kế hoạch":"Đã gửi phiếu điều chỉnh chờ CEO duyệt");renderMain()});
   m.querySelectorAll("[data-ai-no]").forEach(b=>b.onclick=()=>{const ins=R.I[+b.dataset.aiNo];DB.mutate(ME.name,"bỏ qua đề xuất AI: "+ins.title,dt=>{aiShape(dt);dt.ai.state[ins.key]="ignored"});renderMain()});
   const cp=t=>{try{navigator.clipboard.writeText(t);toast("Đã sao chép")}catch(e){toast("Không sao chép được")}};
   m.querySelectorAll("[data-cpid]").forEach(b=>b.onclick=()=>cp(b.dataset.cpid));

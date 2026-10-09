@@ -693,6 +693,28 @@ export async function commitImport(
       // bảng giá hiện hành - nếu không, đơn cũ sẽ đổi số mỗi lần bảng giá thay đổi.
       const price = line.unit_price ?? 0;
       const lineTotal = line.line_total ?? price * line.qty;
+      if (line.qty < 0) {
+        // Dòng số lượng ÂM trong sổ đơn = hàng trả lại / giảm trừ. order_items chỉ nhận số lượng dương,
+        // nên không tạo dòng hàng, nhưng VẪN cộng thành tiền âm vào tiền hàng của đơn để tổng phải thu
+        // và công nợ khớp với Google Sheet. Ghi cảnh báo để kế toán biết đơn nào có hàng trả.
+        subtotal += lineTotal;
+        errorStatements.push(
+          db
+            .prepare(
+              `INSERT INTO import_errors (id, batch_id, sheet, row_no, field, code, message, severity, raw_json, created_at)
+               VALUES (?, ?, 'SO_DON_HANG', ?, 'qty', 'RETURN_LINE_NETTED', ?, 'WARNING', ?, ?)`,
+            )
+            .bind(
+              newId(),
+              options.batchId,
+              line.row_no,
+              `Dòng ${line.row_no}: số lượng âm (${line.qty}) của mã "${line.sku ?? ''}" ở đơn ${orderCode} là hàng trả lại. Đã trừ ${Math.abs(lineTotal)} đ vào tiền hàng của đơn, không tạo dòng hàng.`,
+              JSON.stringify(line),
+              now,
+            ),
+        );
+        continue;
+      }
       subtotal += lineTotal;
       inserted.order_items += 1;
       itemStatements.push(

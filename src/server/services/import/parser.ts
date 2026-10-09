@@ -588,7 +588,9 @@ function parseOrderStatuses(workbook: XLSX.WorkBook, issues: ImportIssue[]): Par
       accounting_confirmed: accountingConfirmed,
       accounting_value: accountingValue,
       total_due: toVndInteger(pick(row, ['tong_phai_thu', 'tong_tien_phai_thu', 'thanh_toan_phai_thu'])),
-      shipping_fee: toVndInteger(pick(row, ['phi_van_chuyen', 'phi_ship', 'ship'])),
+      // Sheet có HAI cột ship: "Phí ship thực tế (cty trả đơn vị vận chuyển)" là chi phí của công ty, KHÔNG thu của khách;
+      // chỉ "Phí ship thu khách" mới cộng vào tổng phải thu. Lấy nhầm cột đầu làm công nợ cao hơn Sheet.
+      shipping_fee: toVndInteger(pick(row, ['phi_ship_thu_khach', 'ship_thu_khach', 'phi_van_chuyen_thu_khach'])),
       discount_amount: toVndInteger(pick(row, ['chiet_khau', 'giam_gia', 'discount'])),
       bonus_deduction: toVndInteger(pick(row, ['tru_thuong', 'thuong_thang', 'tru_thuong_thang'])),
       cod_amount: toVndInteger(pick(row, ['cod', 'dat_coc', 'tien_coc'])),

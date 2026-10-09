@@ -1083,3 +1083,97 @@ html.embedded .has-title .page-head h2 {
 .sidebar-foot strong {
   color: #1f2550;
 }
+
+/* Danh sách khách hàng: dòng thấp, khung cao gần hết màn hình để xem được nhiều khách cùng lúc */
+.table-wrap.tall { max-height: calc(100vh - 150px); }
+table.data.compact th { padding: 8px 10px; font-size: 12.5px; }
+table.data.compact td { padding: 5px 10px; font-size: 13.5px; line-height: 1.3; vertical-align: middle; }
+table.data.compact .cust-phone { margin-left: 8px; font-size: 12.5px; white-space: nowrap; }
+table.data.compact .cust-sub { margin-left: 6px; font-size: 12px; white-space: nowrap; }
+table.data.compact .badge { padding: 1px 7px; font-size: 11.5px; margin-left: 6px; }
+table.data.compact .btn.sm { padding: 3px 9px; font-size: 12.5px; }
+table.data.compact td { white-space: nowrap; }
+
+/* =====================================================================
+   GIAO DIỆN GỌN cho toàn bộ CRM B2B (chị Hoa 07/10/2026): chữ đầu trang nhỏ lại, dòng bảng thấp,
+   nút nhỏ, ô số liệu gọn — một màn hình xem được nhiều thông tin hơn. Đặt cuối file để đè các kiểu cũ.
+   ===================================================================== */
+body { font-size: 13.5px; line-height: 1.4; }
+.topbar { height: 48px; padding: 0 18px; }
+.topbar h1 { font-size: 15.5px; }
+.avatar { width: 28px; height: 28px; font-size: 13px; }
+.content { padding: 12px 16px 28px; }
+.page-head { gap: 10px; margin-bottom: 10px; align-items: center; }
+.page-head h2 { font-size: 18px; margin: 0 0 1px; }
+.page-head p { font-size: 12.5px; }
+.stack { gap: 10px; }
+
+/* Nút, ô nhập */
+.btn { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+.btn.sm { padding: 3px 9px; font-size: 12px; }
+.select, .search input, .field input, .field select, .field textarea, input, select, textarea { font-size: 13px; }
+.select { padding: 6px 10px; border-radius: 8px; }
+.search { min-width: 180px; }
+.search input { padding: 6px 10px; border-radius: 8px; }
+.field input, .field select, .field textarea { padding: 6px 10px; }
+.field label { font-size: 12.5px; }
+.actions { gap: 6px; }
+
+/* Khung */
+.card { border-radius: 12px; }
+.card-head { padding: 9px 14px; gap: 10px; }
+.card-head h3 { font-size: 14px; }
+.card-body { padding: 10px 14px; }
+.toolbar { padding: 8px 12px; gap: 8px; }
+
+/* Bảng: dòng thấp, tiêu đề cột gọn */
+table.data th { padding: 7px 10px; font-size: 12.5px; }
+table.data td { padding: 4px 10px; font-size: 13px; line-height: 1.25; }
+table.data td .muted { font-size: 12px; }
+.table-wrap { max-height: calc(100vh - 150px); }
+.badge { padding: 1px 8px; font-size: 11.5px; }
+
+/* Ô số liệu (Dashboard, Công nợ, Bàn điều hành) */
+.kpis, .stat-grid { gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.kpi, .stat-card { padding: 9px 12px; border-radius: 10px; }
+.kpi .label, .stat-card-label { font-size: 12px; }
+.kpi .value, .stat-card-value { font-size: 18px; margin: 2px 0 1px; }
+.kpi .hint, .stat-card-hint, .stat-card-trend { font-size: 11.5px; }
+.stat-row { padding: 5px 0; }
+
+/* Chỉnh lần 2 (07/10): chữ to hơn một chút, nút thao tác không xuống dòng, khung rỗng gọn, bảng dài hơn */
+body { font-size: 14.5px; }
+.page-head h2 { font-size: 20px; }
+.page-head p { font-size: 13px; }
+.topbar h1 { font-size: 16px; }
+.btn { font-size: 13.5px; }
+.btn.sm { font-size: 12.5px; }
+.select, .search input, .field input, .field select, .field textarea, input, select, textarea { font-size: 14px; }
+table.data th { font-size: 13px; }
+table.data td { font-size: 14px; }
+table.data td .muted { font-size: 12.5px; }
+table.data.compact td { font-size: 14px; }
+table.data.compact .cust-phone { font-size: 13px; }
+table.data.compact .cust-sub { font-size: 12.5px; }
+table.data.compact .actions, table.data .actions { flex-wrap: nowrap; }
+table.data.compact .btn.sm { font-size: 12.5px; }
+.kpi .label, .stat-card-label { font-size: 12.5px; }
+.kpi .value, .stat-card-value { font-size: 19px; }
+.empty { padding: 8px 14px; font-size: 13.5px; }
+.loading { padding: 10px 14px; }
+.table-wrap.tall { max-height: calc(100vh - 118px); }
+
+/* Chỉnh lần 3 (07/10): đồng bộ chữ và màu với các phần khác của trang (khu Marketing, Sản xuất, Tài chính):
+   cùng font Be Vietnam Pro, cùng màu chữ, tiêu đề cột in hoa nhỏ màu xám đậm, link trong bảng cùng màu chữ thường. */
+:root { --ink: #111827; --muted: #5b6475; }
+body { font-family: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.5; color: var(--ink); }
+.page-head h2 { font-size: 22px; letter-spacing: -0.01em; }
+.page-head p, .muted, table.data td .muted { color: var(--muted); }
+table.data th { background: #f8fafc; text-transform: uppercase; letter-spacing: 0.04em; font-size: 12px; font-weight: 700; color: #475467; border-bottom: 1px solid var(--line); }
+table.data td { font-size: 14px; color: var(--ink); }
+.rowlink { color: var(--ink); font-weight: 600; text-decoration: none; }
+.rowlink:hover { color: var(--blue); text-decoration: underline; }
+.btn { font-size: 14px; }
+.btn.sm { font-size: 13px; }
+.kpi .label, .stat-card-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.kpi .value, .stat-card-value { color: var(--ink); }

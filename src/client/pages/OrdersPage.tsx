@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ApprovalItem, OrderDetail, OrderListItem } from '@shared/types';
 import { formatVnDate, formatVnDateTime, vnDate } from '@shared/datetime';
-import { formatVnd } from '@shared/money';
+import { formatVnd, formatVndNumber } from '@shared/money';
 import { ApiError, api } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import {
@@ -89,8 +89,8 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
                   <th>Khách hàng</th>
                   {mode === 'admin' && <th>Sale</th>}
                   <th>Ngày</th>
-                  <th className="right">Tổng phải thu</th>
-                  <th className="right">Còn phải thu</th>
+                  <th className="right">Tổng phải thu (đ)</th>
+                  <th className="right">Còn phải thu (đ)</th>
                   <th>Trạng thái hiện tại</th>
                   <th>Cập nhật trạng thái</th>
                 </tr>
@@ -99,15 +99,15 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
                 {(orders.data ?? []).map((order) => (
                   <tr key={order.id}>
                     <td>
-                      <Link to={`/${mode}/orders/${order.id}`} style={{ color: 'var(--pink)', fontWeight: 700 }}>
+                      <Link to={`/${mode}/orders/${order.id}`} className="rowlink">
                         {order.order_no}
                       </Link>
                     </td>
                     <td>{order.customer_name}</td>
                     {mode === 'admin' && <td>{order.owner_name ?? '—'}</td>}
                     <td className="nowrap">{formatVnDate(order.order_date)}</td>
-                    <td className="right nowrap">{formatVnd(order.total_amount)}</td>
-                    <td className="right nowrap">{formatVnd(order.remaining_amount)}</td>
+                    <td className="right nowrap">{formatVndNumber(order.total_amount)}</td>
+                    <td className="right nowrap">{formatVndNumber(order.remaining_amount)}</td>
                     <td>
                       <OrderStageBadge {...order} />
                     </td>

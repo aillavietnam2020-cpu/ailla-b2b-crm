@@ -69,15 +69,26 @@ const PAGE_SETS=[
   {n:"Lịch",ids:["cv_lich","giaoviec"],labels:["Lịch việc","Lịch quay"]},
   {n:"Hiệu quả",ids:["hieuqua","baocao"],labels:["Hiệu quả tháng","Nhập số liệu"]},
   {n:"Kế hoạch tháng",ids:["kehoach","research","dieuphoi"],labels:["Kế hoạch","Research & insight","Tất cả thẻ video"]},
-  {n:"Quảng cáo",ids:["adshieuqua","adssp","fb_ads","order"],labels:["Hiệu quả Ads","Theo sản phẩm","Báo cáo theo ngày","Order video"]}];
+  {n:"Quảng cáo",ids:["adshieuqua","adssp","fb_ads"],labels:["Hiệu quả Ads","Theo sản phẩm","Báo cáo theo ngày"]}];
 const setOf=id=>PAGE_SETS.find(x=>x.ids.includes(id));
 /* Gộp các trang cùng nhóm thành một dòng: giữ trang đầu tiên được xem, đổi tên thành tên nhóm, ẩn các trang còn lại. */
 function collapseSets(items){const seen=new Set();return items.filter(i=>{const st=setOf(i[0]);if(!st)return true;if(seen.has(st))return false;seen.add(st);return true}).map(i=>{const st=setOf(i[0]);return st?[i[0],st.n,i[2],i[3],st]:i})}
 const ADM_ITEM=(k,n)=>{const i=MENU_ADMIN.flatMap(g=>g[1]).find(x=>x[0]===k);return i?[i[0],n||i[1],i[2],i[3]]:null};
-const MKT_G=()=>[["",[MI("mkt_tq","Tổng quan",u=>u.role!=="digital",()=>{try{return rvQueue().length||""}catch(e){return ""}}),ADM_ITEM("kehoach"),ADM_ITEM("research"),
-   MI("dieuphoi","Tất cả thẻ video",u=>u.role!=="digital"),ADM_ITEM("win","Video win"),ADM_ITEM("hieuqua"),ADM_ITEM("baocao"),
-   MI("adshieuqua","Hiệu quả Ads",u=>can(u,"baocao.ads")||tq(u)),MI("adssp","Ads theo sản phẩm",u=>can(u,"baocao.ads")||tq(u)),MI("fb_ads","Báo cáo Ads theo ngày",tq),MI("order","Order video",u=>can(u,"order.xem"),()=>D().orders.filter(o=>o.trangThai!=="Xong").length||""),
-   MI("bc_koc","KOC / Affiliate",tq)].filter(Boolean)]];
+/* Nhóm theo team: mỗi người thuộc một team (content, koc, live, ads), chỉ thấy khu của team mình. Chưa đặt thì suy ra từ vai trò. */
+const userTeam=u=>{if(!u)return "";if(u.team)return u.team;if(u.role==="admin")return "all";if(u.role==="digital")return "ads";if(u.role==="content"||u.role==="lead")return "content";return ""};
+const dgOk=u=>u.role==="digital"||u.role==="admin"||userTeam(u)==="ads"||tq(u);
+const ordCnt=()=>{try{return D().orders.filter(o=>o.trangThai!=="Xong").length||""}catch(e){return ""}};
+/* Marketing gồm 4 khu: Content & Media, Booking KOC, Livestream, Digital Marketing. Mỗi người chỉ thấy khu của team mình (chưa đặt team thì thấy hết). */
+const tm=(t,p)=>u=>{const T=userTeam(u);return (!T||T==="all"||T===t)&&(!p||p(u))};
+const MKT_G=()=>[
+ ["Content & Media",[MI("mkt_tq","Tổng quan",tm("content",u=>u.role!=="digital"),()=>{try{return rvQueue().length||""}catch(e){return ""}}),ADM_ITEM("kehoach"),ADM_ITEM("research"),
+   MI("dieuphoi","Tất cả thẻ video",tm("content",u=>u.role!=="digital")),ADM_ITEM("win","Video win"),ADM_ITEM("hieuqua"),MI("nhaplieu","Nhập báo cáo",tm("content",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead")),
+   MI("order_c","Order từ Ads",tm("content",u=>can(u,"order.xem")||u.role==="content"||u.role==="lead"||u.role==="admin"),ordCnt),MI("hoc_kb","Học từ kịch bản",tm("content",()=>true))].filter(Boolean).map(i=>[i[0],i[1],(u=>{const T=userTeam(u);return (!T||T==="all"||T==="content")&&i[2](u)}),i[3]])],
+ ["Booking KOC",[MI("bc_koc","KOC / Affiliate",u=>{const T=userTeam(u);return (!T||T==="all"||T==="koc")&&(tq(u)||u.role==="admin"||T==="koc")})]],
+ ["Livestream",[MI("live","Livestream (đang xây)",()=>true)]],
+ ["Digital Marketing",[MI("dg_tq","Tổng quan Digital",tm("ads",dgOk)),MI("dg_lib","Thư viện video ads",tm("ads",dgOk)),
+   MI("adshieuqua","Hiệu quả Ads",tm("ads",u=>can(u,"baocao.ads")||dgOk(u))),MI("adssp","Ads theo sản phẩm",tm("ads",u=>can(u,"baocao.ads")||dgOk(u))),MI("fb_ads","Báo cáo Ads theo ngày",tm("ads",dgOk)),
+   MI("order","Order cho Content",tm("ads",u=>dgOk(u)||can(u,"order.xem")),ordCnt),MI("nhaplieu","Nhập báo cáo Ads",u=>userTeam(u)==="ads"&&(can(u,"baocao.ads")||u.role==="digital"))].filter(Boolean)]];
 /* Menu: 8 mục lớn. "hide" = không hiện ở thanh bên (Trợ lý AI ở nút trên cùng, mục Của tôi ở chỗ bấm vào tên).
    "tabs" = các trang con hiện thành thanh tab trong trang, thanh bên chỉ còn một dòng. */
 const MODULES=[
@@ -91,8 +102,8 @@ const MODULES=[
  {k:"b2b",zone:"Bán hàng",ic:"box",n:"Kinh doanh B2B",sub:"Đại lý · NPP · CRM",groups:()=>[
    ["Bán hàng",[MI("b2b_today","Việc hôm nay"),MI("b2b_kh","Khách hàng"),MI("b2b_don","Đơn hàng & duyệt",null,()=>(D().b2b?D().b2b.orders.flatMap(o=>o.approvals||[]).filter(a=>a.status==="PENDING").length:"")||""),MI("b2b_gia","Bảng giá 8 cấp"),MI("b2b_cn","Công nợ"),MI("b2b_perf","Kết quả cá nhân")]],
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
- {k:"mkt",zone:"Vận hành",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC",groups:MKT_G},
- {k:"sx",zone:"Vận hành",ic:"fac",n:"Sản xuất & kho",sub:"",tabs:true,groups:()=>[["",SX_TABS.map(([k,t])=>MI(k,t))]]},
+ {k:"mkt",zone:"Vận hành",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC · Live",groups:MKT_G},
+ {k:"sx",zone:"Vận hành",ic:"fac",n:"Sản xuất & kho",sub:"",tabs:true,groups:()=>[["",SX_TABS.concat(KHO_SUB.filter(([k])=>k!=="kho_ton")).map(([k,t])=>MI(k,t))]]},
  {k:"fin",zone:"Quản trị",ic:"fin",n:"Tài chính",sub:"",groups:()=>[["",[MI("pl","Báo cáo P&L",u=>can(u,"pl.xem")),MI("chiphi","Chi phí theo tháng",u=>can(u,"chiphi.xem")),MI("doisoat","Đối soát tiền về",u=>can(u,"chiphi.xem")),MI("sku","Giá vốn SKU",u=>can(u,"gia.xem_von"))]]]},
  {k:"hr",zone:"Quản trị",ic:"ppl",n:"Nhân sự",sub:"",groups:()=>[
    ["Hồ sơ",[MI("hr_tq","Tổng quan nhân sự",u=>can(u,"nhansu.quanly")),MI("hoso","Hồ sơ nhân sự",u=>can(u,"nhansu.quanly")),MI("hr_hd","Hợp đồng & thử việc",u=>can(u,"nhansu.quanly"))]],

@@ -46,7 +46,7 @@ const TITLES: Record<string, string> = {
   '/sales/performance': 'Kết quả cá nhân',
   '/admin': 'Dashboard kinh doanh',
   '/admin/ceo': 'Dashboard kinh doanh',
-  '/admin/customers': 'Khách hàng B2B',
+  '/admin/customers': 'Danh sách khách hàng',
   '/admin/orders': 'Đơn hàng & duyệt ngoại lệ',
   '/admin/prices': 'Sản phẩm và bảng giá 8 cấp',
   '/admin/debts': 'Công nợ toàn công ty',

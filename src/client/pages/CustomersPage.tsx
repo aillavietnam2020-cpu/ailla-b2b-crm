@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import type { CustomerListItem, PriceTier, UserSummary } from '@shared/types';
 import { CUSTOMER_STAGES, STAGE_LABELS } from '@shared/enums';
 import { formatVnDate, vnDate } from '@shared/datetime';
-import { formatVnd } from '@shared/money';
+import { formatVndNumber } from '@shared/money';
 import { formatPhone } from '@shared/phone';
 import { ApiError, api, newIdempotencyKey } from '../lib/api';
 import { useApi, useDebounced } from '../lib/hooks';
@@ -46,12 +46,8 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
     <>
       <div className="page-head">
         <div>
-          <h2>{mode === 'admin' ? 'Khách hàng B2B' : 'Khách hàng của tôi'}</h2>
-          <p>
-            {mode === 'admin'
-              ? 'Toàn đội Sale. Chuyển owner bắt buộc ghi lý do và được lưu vào nhật ký.'
-              : 'Chỉ hiển thị khách được phân công cho bạn (giới hạn ở backend).'}
-          </p>
+          <h2>{mode === 'admin' ? 'Danh sách khách hàng' : 'Khách hàng của tôi'}</h2>
+          {mode !== 'admin' && <p>Chỉ hiển thị khách được phân công cho bạn (giới hạn ở backend).</p>}
         </div>
         {can('customer.create') && (
           <button className="btn primary" onClick={() => setShowCreate(true)}>
@@ -132,8 +128,8 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
           empty={(customers.data ?? []).length === 0}
           emptyText="Không tìm thấy khách hàng phù hợp."
         >
-          <div className="table-wrap">
-            <table className="data wide">
+          <div className="table-wrap tall">
+            <table className="data wide compact">
               <thead>
                 <tr>
                   <th>Khách hàng</th>
@@ -141,10 +137,10 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                   <th>Cấp giá</th>
                   <th>Giai đoạn</th>
                   {mode === 'admin' && <th>Sale phụ trách</th>}
-                  <th className="right">Doanh số tháng này</th>
+                  <th className="right">Doanh số tháng này (đ)</th>
                   <th>Nhập gần nhất</th>
-                  <th className="right">Công nợ chính thức</th>
-                  <th className="right">Dự kiến</th>
+                  <th className="right">Công nợ chính thức (đ)</th>
+                  <th className="right">Dự kiến (đ)</th>
                   <th>Chăm sóc tiếp</th>
                   <th></th>
                 </tr>
@@ -158,13 +154,15 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                       <td>
                         <Link
                           to={`/${mode}/customers/${customer.id}`}
-                          style={{ fontWeight: 700, color: 'var(--pink)' }}
+                          className="rowlink"
                         >
                           {customer.name}
                         </Link>
-                        <div className="muted">{formatPhone(customer.phone_text)}</div>
+                        <span className="muted cust-phone">{formatPhone(customer.phone_text)}</span>
                         {customer.data_quality === 'NEEDS_REVIEW' && (
-                          <span className="badge orange">Cần kiểm tra dữ liệu</span>
+                          <span className="badge orange" title="Cần kiểm tra dữ liệu">
+                            Kiểm tra
+                          </span>
                         )}
                       </td>
                       <td>{customer.province ?? '—'}</td>
@@ -178,27 +176,27 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                       </td>
                       {mode === 'admin' && <td>{customer.owner_name ?? 'Chưa phân công'}</td>}
                       <td className="right nowrap">
-                      <strong>{formatVnd(customer.revenue_month ?? 0)}</strong>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {customer.orders_total ?? 0} đơn luỹ kế
-                      </div>
+                      <strong>{formatVndNumber(customer.revenue_month ?? 0)}</strong>
+                      <span className="muted cust-sub" title="Số đơn luỹ kế">
+                        {customer.orders_total ?? 0} đơn
+                      </span>
                     </td>
                     <td className="nowrap">
                       {customer.last_order_date ? (
                         <>
                           {formatVnDate(customer.last_order_date)}
-                          <div className={customer.reorder_due ? 'error' : 'muted'} style={{ fontSize: 12 }}>
+                          <span className={`cust-sub ${customer.reorder_due ? 'error' : 'muted'}`}>
                             {customer.reorder_due
                               ? `Quá hạn ${customer.days_since_order} ngày`
                               : `${customer.days_since_order ?? 0}/${customer.reorder_cycle_days ?? 30} ngày`}
-                          </div>
+                          </span>
                         </>
                       ) : (
                         <span className="muted">Chưa mua</span>
                       )}
                     </td>
-                    <td className="right nowrap">{formatVnd(customer.official_debt)}</td>
-                      <td className="right nowrap">{formatVnd(customer.projected_debt)}</td>
+                    <td className="right nowrap">{formatVndNumber(customer.official_debt)}</td>
+                      <td className="right nowrap">{formatVndNumber(customer.projected_debt)}</td>
                       <td className={overdue ? 'nowrap' : 'nowrap'} style={overdue ? { color: 'var(--red)', fontWeight: 700 } : undefined}>
                         {formatVnDate(customer.next_follow_up_at)}
                       </td>

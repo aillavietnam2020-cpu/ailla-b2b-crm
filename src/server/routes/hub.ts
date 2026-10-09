@@ -6,6 +6,7 @@ import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
 import type { AuthContext } from '../env';
 import { requirePermission } from '../middleware/rbac';
+import { canHr, hrFromUsers } from '../lib/hrAccess';
 
 /**
  * Khu Marketing & công việc (trang tĩnh /hub/).
@@ -35,6 +36,25 @@ function splitSecure(data: Record<string, unknown>) {
   return secure;
 }
 
+/**
+ * Dữ liệu nhân sự (d.hr: hồ sơ, lương, CCCD, ngân hàng, hợp đồng, chấm công, bảng lương...) cất ở bản ghi 'hr'.
+ * Chỉ người được phép (lib/hrAccess) nhận về và ghi được. Đơn từ, KPI tự đánh giá, tuyển dụng, đào tạo
+ * vẫn ở bản chung vì nhân viên tự gửi.
+ */
+const HR_ID = 'hr';
+const HR_PUBLIC = ['don', 'kpi', 'td', 'dt'];
+function splitHr(data: Record<string, unknown>) {
+  const hr = data.hr as Record<string, unknown> | undefined;
+  if (!hr || typeof hr !== 'object') return {};
+  const sec: Record<string, unknown> = {};
+  const pub: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(hr)) (HR_PUBLIC.includes(k) ? pub : sec)[k] = v;
+  data.hr = pub;
+  return sec;
+}
+const hrHasData = (h: Record<string, unknown>) =>
+  !!h.loaded || ['ns', 'cc', 'payroll', 'phep'].some((k) => h[k] && Object.keys(h[k] as object).length > 0);
+
 const isHubAdmin = (role: string) => role === 'CEO';
 
 hubRoutes.use('*', requirePermission('hub.access'));
@@ -61,6 +81,20 @@ hubRoutes.get('/state', async (c) => {
     const sec = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(SECURE_ID).first<{ data: string }>();
     Object.assign(data, sec ? JSON.parse(await unpack(sec.data)) : legacy);
   }
+  // Nhân sự: bản cũ còn nằm trong bản chung thì chuyển sang ngăn riêng ngay lần đọc đầu tiên.
+  const hrOk = hrFromUsers(auth, data.users as never);
+  const hrLegacy = splitHr(data);
+  let hrRow = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(HR_ID).first<{ data: string }>();
+  if (!hrRow && hrHasData(hrLegacy)) {
+    const packed = await pack(JSON.stringify(hrLegacy));
+    await c.env.DB.prepare(
+      `INSERT INTO hub_state (id, version, data, updated_at, updated_by) VALUES (?, 1, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+    )
+      .bind(HR_ID, packed, nowIso(), auth.user.id)
+      .run();
+    hrRow = { data: packed };
+  }
+  if (hrOk && hrRow) data.hr = Object.assign(data.hr as object, JSON.parse(await unpack(hrRow.data)));
   await auditStatement(c.env.DB, {
     actorId: auth.user.id,
     action: 'HUB_READ',
@@ -69,14 +103,14 @@ hubRoutes.get('/state', async (c) => {
     ip: c.req.header('CF-Connecting-IP') ?? null,
     requestId: c.get('requestId'),
   }).run();
-  return ok(c, { version: row.version, data, updated_at: row.updated_at });
+  return ok(c, { version: row.version, data, updated_at: row.updated_at, hr_ok: hrOk });
 });
 
 hubRoutes.put('/state', async (c) => {
   const auth = c.get('auth');
   const raw = await c.req.text();
   if (raw.length > MAX_JSON) throw badRequest('TOO_LARGE', 'Dữ liệu quá lớn');
-  let body: { version?: unknown; data?: unknown };
+  let body: { version?: unknown; data?: unknown; hr?: unknown };
   try {
     body = JSON.parse(raw);
   } catch {
@@ -88,6 +122,7 @@ hubRoutes.put('/state', async (c) => {
   }
   const data = body.data as Record<string, unknown>;
   const secure = splitSecure(data);
+  const hrSec = splitHr(data);
   const packed = await pack(JSON.stringify(data));
   const now = nowIso();
   const saveSecure = async () => {
@@ -98,6 +133,26 @@ hubRoutes.put('/state', async (c) => {
          updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
     )
       .bind(SECURE_ID, await pack(JSON.stringify(secure)), now, auth.user.id)
+      .run();
+  };
+  const saveHr = async () => {
+    // Trang cũ còn mở từ trước khi tách ngăn: lần ghi đầu tiên cất luôn phần nhân sự (chưa có ngăn mới cất).
+    if (hrHasData(hrSec)) {
+      await c.env.DB.prepare(
+        `INSERT INTO hub_state (id, version, data, updated_at, updated_by) VALUES (?, 1, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+      )
+        .bind(HR_ID, await pack(JSON.stringify(hrSec)), now, auth.user.id)
+        .run();
+    }
+    // Trình duyệt chỉ gửi phần nhân sự khi đã nhận được nó (hr_ok); không có quyền thì bỏ qua.
+    if (!(body as { hr?: unknown }).hr || Object.keys(hrSec).length === 0) return;
+    if (!(await canHr(c.env.DB, auth))) return;
+    await c.env.DB.prepare(
+      `INSERT INTO hub_state (id, version, data, updated_at, updated_by) VALUES (?, 1, ?, ?, ?)
+       ON CONFLICT (id) DO UPDATE SET version = hub_state.version + 1, data = excluded.data,
+         updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    )
+      .bind(HR_ID, await pack(JSON.stringify(hrSec)), now, auth.user.id)
       .run();
   };
 
@@ -112,6 +167,7 @@ hubRoutes.put('/state', async (c) => {
       .run();
     if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Đã có người khởi tạo trước');
     await saveSecure();
+    await saveHr();
     return ok(c, { version: 1, updated_at: now });
   }
 
@@ -123,6 +179,7 @@ hubRoutes.put('/state', async (c) => {
     .run();
   if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Có người vừa sửa trước, đang tải bản mới');
   await saveSecure();
+  await saveHr();
   return ok(c, { version: base + 1, updated_at: now });
 });
 
@@ -243,4 +300,136 @@ hubRoutes.post('/ai', async (c) => {
     text = data.choices[0]?.message.content ?? '';
   }
   return ok(c, { text: text.trim(), model: used });
+});
+
+/**
+ * Hỏi AI trong web: nhân sự hỏi bằng lời thường, trình duyệt gửi kèm bản tóm tắt số liệu đã tính sẵn
+ * (không gửi nguyên dữ liệu), máy chủ chặn theo số câu mỗi ngày rồi hỏi 9router.
+ * Mỗi ngày: nhân viên 10 câu, trưởng nhóm / trưởng phòng 20 câu, CEO 50 câu (giờ Việt Nam).
+ */
+const ASK_LIMIT_DEFAULT = 10;
+const ASK_LIMITS: Record<string, number> = { admin: 50, lead: 20, truongphong: 20 };
+const ASK_SYSTEM = [
+  'Bạn là trợ lý của Ailla Việt Nam, trả lời nhân sự trong công ty về công việc của họ dựa trên phần DỮ LIỆU được gửi kèm.',
+  'Quy tắc:',
+  '- Trả lời bằng tiếng Việt, ngắn gọn, đi thẳng vào câu hỏi trước, sau đó tối đa 3 gạch đầu dòng nếu cần.',
+  '- Chỉ dùng số trong DỮ LIỆU. Số nào DỮ LIỆU đã tính sẵn thì dùng nguyên văn, không tự tính lại. Chỉ được cộng trừ đơn giản khi cần tổng.',
+  '- Không có trong DỮ LIỆU thì nói rõ "web chưa có số này", tuyệt đối không bịa hay đoán số.',
+  '- Nói rõ tên sản phẩm, tên kênh, đơn vị (video, đơn, view) và khoảng thời gian của số bạn nêu.',
+  '- Giải thích bằng lời đời thường, không dùng thuật ngữ kỹ thuật. Không dùng bảng markdown.',
+  '- "Còn cần làm" = kế hoạch tháng trừ video dùng tồn trừ video đã có hoặc đang làm. "Hiệu quả" là view, đơn, GMV của video đã đăng.',
+].join('\n');
+
+const vnDay = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+
+async function askWho(c: { get: (k: 'auth') => AuthContext; env: AppEnv['Bindings'] }) {
+  const auth = c.get('auth');
+  let role = auth.user.role === 'CEO' ? 'admin' : 'nhanvien';
+  const row = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(STATE_ID).first<{ data: string }>();
+  if (row) {
+    try {
+      const d = JSON.parse(await unpack(row.data)) as { users?: Array<{ crm?: string; role?: string; active?: boolean }> };
+      const u = d.users?.find((x) => x.crm === auth.user.id && x.active !== false);
+      if (u?.role) role = u.role;
+    } catch {
+      /* giữ vai trò mặc định */
+    }
+  }
+  return { id: auth.user.id, limit: ASK_LIMITS[role] ?? ASK_LIMIT_DEFAULT };
+}
+
+type AskUsage = { date: string; counts: Record<string, number> };
+async function askUsageRead(db: D1Database): Promise<AskUsage> {
+  const row = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind('ai_usage').first<{ data: string }>();
+  let u: AskUsage = { date: vnDay(), counts: {} };
+  if (row) {
+    try {
+      const p = JSON.parse(row.data) as AskUsage;
+      if (p.date === vnDay() && p.counts) u = p;
+    } catch {
+      /* bắt đầu lại */
+    }
+  }
+  return u;
+}
+async function askUsageWrite(db: D1Database, u: AskUsage, userId: string) {
+  await db
+    .prepare(
+      `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES ('ai_usage', ?, 1, ?, ?)
+       ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    )
+    .bind(JSON.stringify(u), nowIso(), userId)
+    .run();
+}
+
+hubRoutes.get('/ask/quota', async (c) => {
+  const who = await askWho(c);
+  const u = await askUsageRead(c.env.DB);
+  const used = u.counts[who.id] ?? 0;
+  return ok(c, { limit: who.limit, used, left: Math.max(0, who.limit - used) });
+});
+
+hubRoutes.post('/ask', async (c) => {
+  const { AI_BASE_URL, AI_API_KEY, AI_MODEL } = c.env;
+  if (!AI_BASE_URL || !AI_API_KEY) {
+    throw badRequest('AI_NOT_CONFIGURED', 'Máy chủ chưa được nối với AI. Báo quản trị để cài đặt.');
+  }
+  const body = (await c.req.json().catch(() => ({}))) as { question?: string; pack?: string };
+  const question = String(body.question ?? '').trim().slice(0, 600);
+  const dataPack = String(body.pack ?? '').slice(0, 16000);
+  if (!question) throw badRequest('EMPTY', 'Chưa có câu hỏi');
+
+  const who = await askWho(c);
+  const usage = await askUsageRead(c.env.DB);
+  const used = usage.counts[who.id] ?? 0;
+  if (used >= who.limit) {
+    throw badRequest('ASK_LIMIT', `Hôm nay bạn đã hỏi đủ ${who.limit} câu. Sáng mai sẽ hỏi tiếp được.`);
+  }
+  usage.counts[who.id] = used + 1;
+  await askUsageWrite(c.env.DB, usage, who.id);
+
+  const refund = async () => {
+    const u = await askUsageRead(c.env.DB);
+    u.counts[who.id] = Math.max(0, (u.counts[who.id] ?? 1) - 1);
+    await askUsageWrite(c.env.DB, u, who.id);
+  };
+
+  try {
+    const res = await fetch(`${AI_BASE_URL.replace(/\/$/, '')}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${AI_API_KEY}` },
+      body: JSON.stringify({
+        model: AI_MODEL || 'Combo_Content',
+        stream: false,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: ASK_SYSTEM },
+          { role: 'user', content: `DỮ LIỆU:\n${dataPack}\n\nCÂU HỎI: ${question}` },
+        ],
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    const raw = await res.text();
+    if (!res.ok) {
+      console.error('[hub/ask] 9router', res.status, raw.slice(0, 300));
+      throw badRequest('AI_FAILED', `AI báo lỗi ${res.status}. Thử lại sau ít phút, câu hỏi này không bị tính.`);
+    }
+    let text = '';
+    if (raw.trimStart().startsWith('data:')) {
+      for (const line of raw.split(/\r?\n/)) {
+        const payload = line.slice(5).trim();
+        if (!line.startsWith('data:') || !payload || payload === '[DONE]') continue;
+        const chunk = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string } }> };
+        for (const ch of chunk.choices ?? []) text += ch.delta?.content ?? '';
+      }
+    } else {
+      const data = JSON.parse(raw) as { choices: Array<{ message: { content: string } }> };
+      text = data.choices[0]?.message.content ?? '';
+    }
+    if (!text.trim()) throw badRequest('AI_EMPTY', 'AI chưa trả lời được, thử lại, câu hỏi này không bị tính.');
+    return ok(c, { text: text.trim(), limit: who.limit, left: Math.max(0, who.limit - (used + 1)) });
+  } catch (e) {
+    await refund();
+    throw e;
+  }
 });

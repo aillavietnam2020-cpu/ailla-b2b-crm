@@ -7,7 +7,8 @@ const HR_THANG0={L1a:[5650000,6215000,5933000,5650000,5650000,5368000,5368000,53
 const HR_CS0={ma:"CS-2026-HRM",hieuLuc:"2026-01-01",cong:26,gio:8,ot:1.5,otCN:2,anTrua:780000,xang:500000,dt:300000,cc:500000,docHai:500000,muonMax:2,bhxh:0.105,tranBH:36000000,gtBan:11000000,gtNPT:4400000,bieu:"7",phepNam:12,xetBacThang:3,nguongBac:70,kpiQD:[[95,1],[85,.75],[70,.5],[0,0]],note:"Theo DM_HeThong file HR MASTER — nhiều số đang là GIẢ ĐỊNH DEMO, CEO/HCNS/Kế toán cần chốt"};
 const TAX={"7":[[5e6,.05],[10e6,.1],[18e6,.15],[32e6,.2],[52e6,.25],[80e6,.3],[1e15,.35]],"5":[[10e6,.05],[30e6,.1],[60e6,.2],[100e6,.3],[1e15,.35]]};
 const hrNow=()=>{const t=new Date();return {iso:iso(t),thang:iso(t).slice(0,7)}};
-function hrShape(d){if(!d.hr)d.hr={loaded:false,ns:{},phep:{},kpi:[],dg:[],xb:[],td:[],dt:[],tu:[],cc:{},thuong:{},don:[],payroll:{},cs:[JSON.parse(JSON.stringify(HR_CS0))],thangLuong:JSON.parse(JSON.stringify(HR_THANG0)),file:""};const nsOf={u_quynh:"NV012",u_va:"NV015",u_thao:"NV025",u_duan:"NV024",u_dat:"NV014",u_huyen:"NV021"};d.users.forEach(u=>{if(!u.maNS&&nsOf[u.id])u.maNS=nsOf[u.id]});return d}
+function hrShape(d){const z={loaded:false,ns:{},phep:{},kpi:[],dg:[],xb:[],td:[],dt:[],tu:[],cc:{},thuong:{},don:[],payroll:{},cs:[JSON.parse(JSON.stringify(HR_CS0))],thangLuong:JSON.parse(JSON.stringify(HR_THANG0)),file:""};d.hr=d.hr||{};for(const k in z)if(d.hr[k]==null)d.hr[k]=z[k]; // phần riêng (lương, hồ sơ) chỉ người được phép nhận về: thiếu thì điền rỗng
+const nsOf={u_quynh:"NV012",u_va:"NV015",u_thao:"NV025",u_duan:"NV024",u_dat:"NV014",u_huyen:"NV021"};d.users.forEach(u=>{if(!u.maNS&&nsOf[u.id])u.maNS=nsOf[u.id]});return d}
 const HRD=()=>D().hr;
 const csOf=thang=>{const L=HRD().cs.filter(c=>c.hieuLuc.slice(0,7)<=thang).sort((a,b)=>a.hieuLuc<b.hieuLuc?1:-1);return L[0]||HRD().cs[0]};
 const staffBy=ma=>D().staff.find(x=>x.ma===ma)||{ma,ten:ma,pb:"",khoi:""};

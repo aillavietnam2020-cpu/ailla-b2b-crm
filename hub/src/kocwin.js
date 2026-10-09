@@ -1,8 +1,8 @@
 /* =====================================================================
    VIDEO KOC RA SỐ (từ báo cáo TikTok Video Performance List)
    - Nhập báo cáo: video không phải của tài khoản shop = video KOC → lưu vào d.kocVideos (cập nhật số mỗi lần nhập).
-   - Video KOC có đơn từ ngưỡng "tiềm năng" trở lên → báo Oanh + chị: check, cái nào ok đưa vào kho video win.
-   - Trang KOC / Affiliate: bảng video KOC ra số; Oanh / chị bấm "Đưa vào kho video win" → vào Video win
+   - Video KOC có đơn từ ngưỡng "tiềm năng" trở lên → báo Lead Content & Media + chị: check, cái nào ok đưa vào kho video win.
+   - Trang KOC / Affiliate: bảng video KOC ra số; Lead Content & Media / chị bấm "Đưa vào kho video win" → vào Video win
      (nguồn KOC) để Hypit phân tích và nhân bản.
    ===================================================================== */
 const KOC_KEEP=400;
@@ -31,7 +31,7 @@ function kocImport(u,res,quiet){
       notifyU(dt,approvers().concat(admins()),`🏆 Báo cáo TikTok có ${moi.length} video KOC ra số${win?` (${win} video win)`:""}: check video win KOC, cái nào ok đưa vào kho video win để phân tích và nhân bản`,"page:bc_koc")}
   });
   if(moi.length){const ap=typeof hyApprover==="function"&&hyApprover();svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind:"card_notify",ref:"koc",payload:{to:["chi"].concat(ap?[ap.name]:[]),text:`🏆 Báo cáo video KOC ${res.range||""}: ${moi.length} video KOC ra số (nhiều nhất ${nf(Math.max(...moi.map(r=>r.don)))} đơn). Check video win KOC ở Marketing › KOC / Affiliate, cái nào ok đưa vào kho video win để phân tích và nhân bản.`}})}).catch(()=>{})}
-  toast(`Đã nhập ${all.length} video KOC${moi.length?` · ${moi.length} video ra số mới, đã báo Oanh và chị`:""}`);
+  toast(`Đã nhập ${all.length} video KOC${moi.length?` · ${moi.length} video ra số mới, đã báo Lead Content & Media và chị`:""}`);
   return {n:all.length,moi:moi.length};
 }
 const _applyTikTokKoc=applyTikTok;
@@ -44,7 +44,7 @@ function kocIn(v,f,t){const H=kocHist(v).filter(h=>h.f>=f&&h.t<=t).sort((a,b)=>(
   H.sort((a,b)=>(Date.parse(b.t)-Date.parse(b.f))-(Date.parse(a.t)-Date.parse(a.f))).forEach(h=>{if(!pick.some(p=>!(h.t<p.f||h.f>p.t)))pick.push(h)});
   return pick.length?{don:sum(pick,h=>h.d||0),gmv:sum(pick,h=>h.g||0),view:sum(pick,h=>h.v||0),click:sum(pick,h=>h.c||0),ky:pick.length}:null}
 const KOC_ST=[["all","Tất cả"],["pot","Chờ check (từ ngưỡng tiềm năng)"],["win","Đã duyệt vào kho win"],["bo","Bỏ qua"]];
-const kocUpBtn=()=>{const last=(D().kocImports||[]).slice(-1)[0];return `<button class="btn sm" id="koc-up" title="${last?esc("Lần nhập gần nhất: "+(last.range||last.file)+" · "+nf(last.n)+" video, "+nf(last.koc)+" KOC · "+last.at):"Chưa nhập báo cáo KOC"}">⬆ Tải báo cáo KOC</button><input type="file" id="koc-fi" accept=".xlsx,.xls,.csv" hidden>`};
+const kocUpBtn=()=>""; // tải báo cáo KOC làm ở menu Nhập báo cáo
 function kocSection(){
   const d=D(),S=d.settings,all=d.kocVideos||[],can=kocCan(),pot=S.potential||30,F=KOCF;
   const R=all.map(v=>{const x=kocIn(v,F.f,F.t);return x?Object.assign({},v,x):null}).filter(Boolean);
@@ -56,7 +56,7 @@ function kocSection(){
     <label>Trạng thái<select id="koc-st">${opt(KOC_ST,F.st)}</select></label><label>Sản phẩm<select id="koc-s">${opt([["","Mọi sản phẩm"]].concat(skOpts()),F.sku)}</select></label>
     ${ME.role==="admin"?`<button class="lnk" id="koc-own" title="Video của các tài khoản này không tính là KOC">Tài khoản shop · sửa</button>`:""}</div>
    ${L.length?`<div class="tbl"><table class="koct"><thead><tr><th class="n">#</th><th>Video</th><th>KOC</th><th>Sản phẩm</th><th>Ngày đăng</th><th class="n">View</th><th class="n">CTR</th><th class="n">Đơn</th><th class="n">GMV</th><th>Mức</th><th></th></tr></thead><tbody>${L.map((v,i)=>{const lv=kocLvl(v);return `<tr><td class="n">${i+1}</td><td class="kocvid"><a href="${esc(kocLink(v))}" target="_blank" rel="noopener" title="${esc(v.ten||"")}">▶ ${esc(v.ten||"Xem video")}</a></td><td>@${esc(v.acc)}</td><td>${swatch(v.sku)}${esc(sk(v.sku).n)}</td><td>${esc((v.tm||"").replace(/\//g,"-").split("-").reverse().join("/"))}</td><td class="n">${nf(v.view||0)}</td><td class="n">${v.view?((v.click||0)/v.view*100).toFixed(1)+"%":"—"}</td><td class="n"><b>${nf(v.don||0)}</b></td><td class="n">${money(v.gmv||0)}</td><td>${pill(lv[0],lv[1])}</td>
-     <td class="nowrap">${v.st==="win"?`${pill("Đã vào kho win","grn")}`:v.st==="bo"?`${pill("Bỏ qua","gry")}${can?` <button class="lnk" data-kocu="${v.id}">hoàn tác</button>`:""}`:can?`<button class="btn sm pri" data-kocw="${v.id}">✓ Vào kho win</button> <button class="lnk" data-kocb="${v.id}">Bỏ qua</button>`:`<span class="hint">chờ Oanh check</span>`}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có video nào khớp bộ lọc (thử chọn Tất cả hoặc đổi thời gian).":"Chưa có video KOC. Bấm ⬆ Tải báo cáo KOC ở góc trên."}</p>`}
+     <td class="nowrap">${v.st==="win"?`${pill("Đã vào kho win","grn")}`:v.st==="bo"?`${pill("Bỏ qua","gry")}${can?` <button class="lnk" data-kocu="${v.id}">hoàn tác</button>`:""}`:can?`<button class="btn sm pri" data-kocw="${v.id}">✓ Vào kho win</button> <button class="lnk" data-kocb="${v.id}">Bỏ qua</button>`:`<span class="hint">chờ Lead Content & Media check</span>`}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có video nào khớp bộ lọc (thử chọn Tất cả hoặc đổi thời gian).":"Chưa có video KOC. Bấm ⬆ Tải báo cáo KOC ở góc trên."}</p>`}
    ${L.length&&L.length<(+F.top||10)?`<p class="hint pad">Chỉ có ${L.length} video khớp bộ lọc ${F.st!=="all"?`"${esc((KOC_ST.find(x=>x[0]===F.st)||[])[1])}"`:""} trong kỳ này${F.st!=="all"?` · chọn Trạng thái "Tất cả" để xem đủ top ${F.top}`:""}.</p>`:""}
    <p class="hint pad">Số view, đơn, GMV tính theo các báo cáo KOC đã tải nằm trong khoảng thời gian chọn. "Vào kho win": video vào Video win (nguồn KOC) để Hypit phân tích rồi nhân bản.</p></section>`;
 }
@@ -71,7 +71,7 @@ function kocBind(m){
   if($("#koc-own"))$("#koc-own").onclick=()=>{const v=prompt("Tên tài khoản TikTok của shop (cách nhau dấu phẩy). Video của các tài khoản này không tính là KOC:",ownAccs().join(", "));if(v===null)return;DB.mutate(ME.name,"tài khoản shop TikTok",dt=>{dt.settings.ownAccs=v.split(",").map(s=>s.trim().replace(/^@/,"")).filter(Boolean)});renderMain()};
   m.querySelectorAll("[data-kocw]").forEach(x=>x.onclick=()=>{const v=(D().kocVideos||[]).find(y=>y.id===x.dataset.kocw);if(!v)return;
     DB.mutate(ME.name,"đưa video KOC @"+v.acc+" vào kho video win",dt=>{const y=dt.kocVideos.find(q=>q.id===v.id);if(y){y.st="win";y.by=ME.name}dt.winResearch=dt.winResearch||[];if(!dt.winResearch.some(r=>r.kocId===v.id)){const t=new Date();
-      dt.winResearch.push({id:"VW-"+Date.now().toString(36).toUpperCase(),kocId:v.id,link:kocLink(v),ten:v.ten||"Video KOC @"+v.acc,nguon:"KOC @"+v.acc,sp:v.sku,soLieu:`${nf(v.view||0)} view · ${nf(v.don||0)} đơn · ${money(v.gmv||0)} (${v.ky||""})`,lyDo:"Video KOC ra số, Oanh check ok",by:ME.id,byName:ME.name,at:`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`})}});
+      dt.winResearch.push({id:"VW-"+Date.now().toString(36).toUpperCase(),kocId:v.id,link:kocLink(v),ten:v.ten||"Video KOC @"+v.acc,nguon:"KOC @"+v.acc,sp:v.sku,soLieu:`${nf(v.view||0)} view · ${nf(v.don||0)} đơn · ${money(v.gmv||0)} (${v.ky||""})`,lyDo:"Video KOC ra số, Lead Content & Media check ok",by:ME.id,byName:ME.name,at:`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`})}});
     toast("Đã đưa vào kho video win · vào Video win › Video win nghiên cứu bấm Phân tích Hypit");renderMain()});
   m.querySelectorAll("[data-kocb]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"bỏ qua video KOC",dt=>{const y=(dt.kocVideos||[]).find(q=>q.id===x.dataset.kocb);if(y){y.st="bo";y.by=ME.name}});renderMain()});
   m.querySelectorAll("[data-kocu]").forEach(x=>x.onclick=()=>{DB.mutate(ME.name,"hoàn tác bỏ qua video KOC",dt=>{const y=(dt.kocVideos||[]).find(q=>q.id===x.dataset.kocu);if(y)y.st=""});renderMain()});

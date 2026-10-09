@@ -62,14 +62,14 @@ const LISTS={
 };
 /* ---------- Trạng thái thẻ (luồng) ---------- */
 const STEPS=[
- {id:"cg",t:"Chưa giao",who:"Oanh giao"},
+ {id:"cg",t:"Chưa giao",who:"Lead Content & Media giao"},
  {id:"kb",t:"Viết kịch bản",who:"Người được giao"},
- {id:"dkb",t:"Oanh duyệt kịch bản",who:"Oanh"},
+ {id:"dkb",t:"Người duyệt kịch bản",who:"Oanh"},
  {id:"quay",t:"Chờ quay",who:"Theo buổi quay tuần"},
  {id:"edit",t:"Đang edit",who:"Người edit · dán link"},
  {id:"worker",t:"Worker đang dựng",who:"Máy tự làm",auto:true},
- {id:"dvd",t:"Oanh duyệt video",who:"Oanh"},
- {id:"dceo",t:"Chị duyệt video",who:"Chị Hoa"},
+ {id:"dvd",t:"Người duyệt video",who:"Oanh"},
+ {id:"dceo",t:"CEO duyệt video",who:"Chị Hoa"},
  {id:"dang",t:"Chờ đăng",who:"Người giữ kênh · dán ID / link"},
  {id:"xong",t:"Đã đăng",who:"Số về theo báo cáo tuần"},
 ];
@@ -166,7 +166,7 @@ const MAX_FILE=10*1024*1024;
 /* ---------- Luồng thẻ ---------- */
 function nextAct(c){
   const fb=!chOf(c.kenh).needId,L=loaiOf(c);
-  return ({kb:L==="moi"?["Gửi Oanh duyệt kịch bản","dkb"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi Oanh duyệt","dvd"],worker:["Dựng xong, gửi Oanh duyệt","dvd"],dvd:["Oanh duyệt, gửi chị","dceo"],dceo:["Chị duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
+  return ({kb:L==="moi"?["Gửi duyệt kịch bản","dkb"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi duyệt","dvd"],worker:["Dựng xong, gửi duyệt","dvd"],dvd:["người duyệt, gửi CEO","dceo"],dceo:["CEO duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
 }
 function canEditCard(u,c){if(!u)return false;if(can(u,"lich.sua_tat_ca"))return true;return can(u,"lich.sua_cua_minh")&&c.nguoi===u.id}
 function canMove(u,c,to){
@@ -286,16 +286,30 @@ function classifyTikTok(res,cards){
   const S=a=>({n:a.length,don:sum(a,x=>x.don),gmv:sum(a,x=>x.gmv)});
   out.sum={match:S(out.match.map(x=>x[0])),stray:S(out.stray),auto:S(out.auto),old:S(out.old),all:S(res.recs)};return out;
 }
+/* Mỗi video lưu số theo từng khoảng ngày của báo cáo (hist). Tổng = ghép các khoảng KHÔNG chồng nhau, khoảng dài chọn trước.
+   Báo cáo 3/10 rồi 3–8/10: dùng 3–8/10. Báo cáo 3/10 rồi 4–8/10: cộng. Chồng một phần: lấy khoảng dài hơn và báo cảnh báo. */
+function tkPick(H){const pick=[];(H||[]).slice().sort((a,b)=>(Date.parse(b.t)-Date.parse(b.f))-(Date.parse(a.t)-Date.parse(a.f))||String(b.t).localeCompare(String(a.t))).forEach(h=>{if(!pick.some(p=>!(h.t<p.f||h.f>p.t)))pick.push(h)});return {d:pick.reduce((a,h)=>a+(+h.d||0),0),g:pick.reduce((a,h)=>a+(+h.g||0),0),v:pick.reduce((a,h)=>a+(+h.v||0),0),c:pick.reduce((a,h)=>a+(+h.c||0),0),n:pick.length}}
+const tkRange=s=>{const m=String(s||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);return m?{f:m[1],t:m[2]}:null};
+function tkRangeNote(nw,imports){const N=tkRange(nw);if(!N)return null;const L=(imports||[]).filter(i=>i.loai==="TikTok").map(i=>tkRange(i.range)).filter(Boolean);let contain=0,same=0,part=0,adj=0;
+  L.forEach(o=>{if(o.f===N.f&&o.t===N.t)same++;else if(N.f<=o.f&&N.t>=o.t)contain++;else if(N.t<o.f||N.f>o.t)adj++;else part++});
+  if(part)return {warn:true,txt:"Khoảng ngày "+N.f+" đến "+N.t+" CHỒNG MỘT PHẦN với báo cáo đã nhập trước đó. Web lấy khoảng dài hơn cho từng video nên có thể thiếu hoặc lệch số. Nên xuất lại báo cáo từ ngày 1 của tháng đến hôm nay."};
+  if(same)return {warn:false,txt:"Báo cáo cùng khoảng ngày đã nhập trước đó, web thay số mới, không cộng."};
+  if(contain)return {warn:false,txt:"Khoảng ngày mới chứa báo cáo cũ, web dùng số mới, không cộng lặp."};
+  if(adj&&L.length)return {warn:false,txt:"Khoảng ngày nối tiếp báo cáo trước, web cộng vào số cũ."};
+  return null}
 function applyTikTok(u,res,kenh){
-  const cl=classifyTikTok(res,D().cards);const wk=weekOf(res.den||D().settings.cutoff);
+  const cl=classifyTikTok(res,D().cards);const wk=weekOf(res.den||D().settings.cutoff),rn=tkRangeNote(res.range,D().imports);
   DB.mutate(u.name,`nhập báo cáo TikTok "${res.name}" (${kenh}): ${cl.match.length} video khớp`,d=>{
-    cl.match.forEach(([r])=>{const c=d.cards.find(x=>x.tiktokId===r.id);Object.assign(c,{view:r.view,click:r.click,don:r.don,gmv:r.gmv,giuChan:r.xh,spTT:r.sp})});
+    /* video TikTok tháng này chưa có thẻ: giữ lại để gợi ý khớp với video chờ đăng */
+    const un=cl.stray.concat(cl.auto).map(r=>({id:r.id,ten:String(r.ten||"").slice(0,140),sp:r.sp,view:r.view,click:r.click,don:r.don,gmv:r.gmv,xh:r.xh,tm:r.tm,kenh})),ids=new Set(un.map(r=>r.id));
+    d.ttChua=un.concat((d.ttChua||[]).filter(r=>!ids.has(r.id)&&!d.cards.some(c=>c.tiktokId===r.id))).slice(0,200);
+    const RG=tkRange(res.range);cl.match.forEach(([r])=>{const c=d.cards.find(x=>x.tiktokId===r.id);if(RG){if(!c.hist&&(c.don||c.view)){const li=(d.imports||[]).find(i=>i.loai==="TikTok"),lr=li&&tkRange(li.range);if(lr)c.hist=[{f:lr.f,t:lr.t,d:c.don||0,g:c.gmv||0,v:c.view||0,c:c.click||0}]}c.hist=(c.hist||[]).filter(x=>!(x.f===RG.f&&x.t===RG.t));c.hist.push({f:RG.f,t:RG.t,d:r.don,g:r.gmv,v:r.view,c:r.click});const k=tkPick(c.hist);Object.assign(c,{view:k.v,click:k.c,don:k.d,gmv:k.g,giuChan:r.xh,spTT:r.sp})}else Object.assign(c,{view:r.view,click:r.click,don:r.don,gmv:r.gmv,giuChan:r.xh,spTT:r.sp})});
     const ow=d.weekly.find(x=>x.w===wk)||(d.weekly.push({w:wk,cu:0,tutao:0,ads:0,adsDon:0,adsGmv:0}),d.weekly[d.weekly.length-1]);ow.cu=cl.sum.old.gmv;ow.tutao=cl.sum.auto.gmv;
     cl.old.sort((a,b)=>b.gmv-a.gmv).slice(0,10).forEach(r=>{const w=d.oldWins.find(x=>x.id===r.id);if(w)Object.assign(w,{don:r.don,gmv:r.gmv,view:r.view});else d.oldWins.push({id:r.id,ten:r.ten,tm:r.tm,sku:guessSku(r.sp)||guessSku(r.ten)||"KHAC",view:r.view,don:r.don,gmv:r.gmv,kenh})});
     if(!d.ttWeeks)d.ttWeeks=[];d.ttWeeks.push({key:uid("tw"),label:res.range||res.name,tu:"",den:"",recs:res.recs.map(r=>[r.id,guessSku(r.sp)||guessSku(r.ten)||"KHAC",r.gmv,r.don,r.view,r.tm,/[#@]/.test(r.ten)?1:0,r.ten.slice(0,80),r.acc||""])});d.ttWeeks=d.ttWeeks.slice(-8);
     d.imports.unshift({id:uid("i"),loai:"TikTok",kenh,at:new Date().toLocaleString("vi-VN"),by:u.name,file:res.name,range:res.range,tuan:wk,sum:cl.sum,stray:cl.stray.slice(0,40)});
     if(res.den&&res.thang===MONTH.mon)d.settings.cutoff=Math.max(d.settings.cutoff,res.den);
-  });return cl;
+  });if(rn){if(rn.warn)alert(rn.txt);else setTimeout(()=>toast(rn.txt),700)}return cl;
 }
 /* ---------- Báo cáo Ads Facebook (Meta Ads Manager) ----------
    Đọc linh hoạt cột tiếng Việt / tiếng Anh. Tên chiến dịch theo quy ước NGƯỜI-MÃSP-CD/MESS-…
@@ -328,7 +342,7 @@ function seedData(){
   const mkUser=(id,username,name,role,title)=>({id,username,name,role,title,active:true,pw:"",perms:ROLE_PRESET[role].slice()});
   const d={version:APP_VERSION,month:MONTH.key,
     settings:{today:15,cutoff:11,workDays:26,winnerOrders:100,winnerBonus:200000,potential:30,adsBudget:[6e6,10e6,14e6,12e6,8e6]},
-    users:[mkUser("u_chi","chihoa","Chị Hoa","admin","CEO"),mkUser("u_oanh","oanh","Oanh","lead","Lead Content & Media"),mkUser("u_quynh","quynh","Quỳnh","content","Content"),mkUser("u_may","may","May","content","Content + Research"),mkUser("u_trinh","trinh","Trinh","content","Content"),mkUser("u_hoa","hoa","Hòa","content","Content"),mkUser("u_digital","digital","Digital (tài khoản chung)","digital","Team Digital"),mkUser("u_va","vietanh","Việt Anh","digital","Ads Facebook"),mkUser("u_thao","thao","Ngọc Thảo","digital","Ads Facebook"),mkUser("u_duan","duan","Duẩn","digital","Ads Facebook"),mkUser("u_dat","dat","Đình Đạt","digital","Ads Facebook"),mkUser("u_huyen","huyen","Bích Huyền","digital","Ads TikTok")],
+    users:[mkUser("u_chi","chihoa","Chị Hoa","admin","CEO"),mkUser("u_oanh","oanh","Oanh","lead","Oanh"),mkUser("u_quynh","quynh","Quỳnh","content","Content"),mkUser("u_may","may","May","content","Content + Research"),mkUser("u_trinh","trinh","Trinh","content","Content"),mkUser("u_hoa","hoa","Hòa","content","Content"),mkUser("u_digital","digital","Digital (tài khoản chung)","digital","Team Digital"),mkUser("u_va","vietanh","Việt Anh","digital","Ads Facebook"),mkUser("u_thao","thao","Ngọc Thảo","digital","Ads Facebook"),mkUser("u_duan","duan","Duẩn","digital","Ads Facebook"),mkUser("u_dat","dat","Đình Đạt","digital","Ads Facebook"),mkUser("u_huyen","huyen","Bích Huyền","digital","Ads TikTok")],
     products:JSON.parse(JSON.stringify(PRODUCTS0)),catalog:catalog0(),
     plan:{notes1:{nhanDinh:"Tốt: tinh dầu giữ doanh thu nhờ video đăng 30/05.\nChưa tốt: video tháng 9 gần như không ra đơn; bột tẩy chỉ 8 video; thiếu ngày, thiếu ID nên không đo được.",vanDe:"1. Giảm phụ thuộc 1 video cũ: nhân bản + tìm video win mới (tinh dầu đang tốt, làm 50).\n2. Đẩy Bột tẩy vạn năng lên 50 video mới.\n3. Via: 2 video/ngày (30 edit footage có sẵn + 30 đăng lại video kho); Via phụ reup 1 video/ngày.\n4. Fanpage chính 28 bài, agent tạo ảnh và đăng tự động.\n5. Sale đôi 10/10 và 20/10 trên TikTok + Fanpage.\n6. Bắt buộc nhập đủ ngày, link, ID.",nguonLuc:"Worker dựng tự động (giảm công dựng).\n2 tài khoản Via mới.\n193 video cũ đã duyệt trong kho."},steps:{1:{s:"done",by:"Oanh",at:"25/09"},2:{s:"done",by:"Chị Hoa",at:"26/09"},3:{s:"done",by:"Oanh",at:"26/09"},4:{s:"review",by:"May",at:"28/09",note:"Còn thiếu research Nước giặt AiBio, Arila"},5:{s:"done",by:"Chị Hoa",at:"29/09"},6:{s:"done",by:"Oanh",at:"30/09"}},published:null},
     goals:{},kpiTargets:{},questions:[],research:[],insights:[],strategy:{},tactics:[],pillars:[],tuyen:[],

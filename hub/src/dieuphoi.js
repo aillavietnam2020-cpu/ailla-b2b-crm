@@ -1,10 +1,10 @@
 /* =====================================================================
    ĐIỀU PHỐI SẢN XUẤT VIDEO (Marketing · bước 6 Làm hằng ngày)
-   Một bảng cho Oanh: thẻ đang ở bước nào, ai giữ, trễ gì; giao hàng loạt
+   Một bảng cho Lead Content & Media: thẻ đang ở bước nào, ai giữ, trễ gì; giao hàng loạt
    (viết kịch bản, edit), xếp thẻ vào buổi quay tuần, quay xong chuyển cả loạt
    sang edit; theo dõi từng kênh đủ bao nhiêu video quay mới / reup / kho / nhân bản.
-   Luồng: quay mới = kịch bản → Oanh duyệt → quay → edit → Oanh duyệt → chị duyệt → đăng
-          reup có sửa = edit → Oanh duyệt → chị duyệt → đăng · video có sẵn trong kho = đăng thẳng
+   Luồng: quay mới = kịch bản → người duyệt → quay → edit → người duyệt → CEO duyệt → đăng
+          reup có sửa = edit → người duyệt → CEO duyệt → đăng · video có sẵn trong kho = đăng thẳng
    ===================================================================== */
 let DP={step:"",kenh:"",loai:"",nguoi:"",sku:"",tuyen:"",view:"buoc",sel:new Set()};
 const DP_STEPS=["cg","kb","dkb","quay","edit","dvd","dceo","dang","xong"];

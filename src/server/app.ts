@@ -16,6 +16,8 @@ import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
 import { hubWorkerRoutes, workerRoutes } from './routes/worker';
+import { khoRoutes } from './routes/kho';
+import { hrRoutes } from './routes/hr';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -80,6 +82,8 @@ export function createApp() {
   app.route('/api/imports', importRoutes);
   app.route('/api/dashboards', dashboardRoutes);
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
+  app.route('/api/hub/kho', khoRoutes);
+  app.route('/api/hub/hr', hrRoutes);
   app.route('/api/hub', hubRoutes);
 
   app.notFound((c) =>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DebtSummary } from '@shared/types';
-import { formatVnd } from '@shared/money';
+import { formatVnd, formatVndNumber } from '@shared/money';
 import { useApi } from '../lib/hooks';
 import { Card, Kpi, StateBlock } from '../components/ui';
 
@@ -67,14 +67,14 @@ export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
                 <tr>
                   <th>Khách hàng</th>
                   {mode === 'admin' && <th>Sale</th>}
-                  <th className="right">Dư nợ cũ</th>
-                  <th className="right">Đã ghi nợ</th>
-                  <th className="right">Đã thanh toán</th>
-                  <th className="right">Chính thức</th>
-                  <th className="right">Chờ ghi nợ</th>
-                  <th className="right">Chờ tiền về</th>
-                  <th className="right">Dự kiến</th>
-                  <th className="right">Hạn mức</th>
+                  <th className="right">Dư nợ cũ (đ)</th>
+                  <th className="right">Đã ghi nợ (đ)</th>
+                  <th className="right">Đã thanh toán (đ)</th>
+                  <th className="right">Chính thức (đ)</th>
+                  <th className="right">Chờ ghi nợ (đ)</th>
+                  <th className="right">Chờ tiền về (đ)</th>
+                  <th className="right">Dự kiến (đ)</th>
+                  <th className="right">Hạn mức (đ)</th>
                 </tr>
               </thead>
               <tbody>
@@ -83,7 +83,7 @@ export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
                     <td>
                       <Link
                         to={`/${mode}/customers/${debt.customer_id}`}
-                        style={{ color: 'var(--pink)', fontWeight: 700 }}
+                        className="rowlink"
                       >
                         {debt.customer_name}
                       </Link>
@@ -93,16 +93,16 @@ export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
                       )}
                     </td>
                     {mode === 'admin' && <td>{debt.owner_name ?? '—'}</td>}
-                    <td className="right nowrap">{formatVnd(debt.opening_debt)}</td>
-                    <td className="right nowrap">{formatVnd(debt.posted_charges)}</td>
-                    <td className="right nowrap">{formatVnd(debt.confirmed_payments)}</td>
+                    <td className="right nowrap">{formatVndNumber(debt.opening_debt)}</td>
+                    <td className="right nowrap">{formatVndNumber(debt.posted_charges)}</td>
+                    <td className="right nowrap">{formatVndNumber(debt.confirmed_payments)}</td>
                     <td className="right nowrap">
-                      <strong>{formatVnd(debt.official_debt)}</strong>
+                      <strong>{formatVndNumber(debt.official_debt)}</strong>
                     </td>
-                    <td className="right nowrap">{formatVnd(debt.pending_charges)}</td>
-                    <td className="right nowrap">{formatVnd(debt.pending_cash)}</td>
-                    <td className="right nowrap">{formatVnd(debt.projected_debt)}</td>
-                    <td className="right nowrap muted">{formatVnd(debt.limit)}</td>
+                    <td className="right nowrap">{formatVndNumber(debt.pending_charges)}</td>
+                    <td className="right nowrap">{formatVndNumber(debt.pending_cash)}</td>
+                    <td className="right nowrap">{formatVndNumber(debt.projected_debt)}</td>
+                    <td className="right nowrap muted">{formatVndNumber(debt.limit)}</td>
                   </tr>
                 ))}
               </tbody>

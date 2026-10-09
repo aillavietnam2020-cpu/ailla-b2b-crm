@@ -105,8 +105,10 @@ export function createSqliteD1(options: CreateOptions = {}): SqliteD1 {
   const db = new DatabaseSync(options.file ?? ':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
 
+  // File đã có dữ liệu (mở lại dev server) thì không chạy lại migration; muốn làm mới dùng --fresh.
+  const existing = db.prepare("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
   const migrationsDir = path.join(ROOT, 'migrations');
-  for (const file of readdirSync(migrationsDir).filter((n) => n.endsWith('.sql')).sort()) {
+  for (const file of existing ? [] : readdirSync(migrationsDir).filter((n) => n.endsWith('.sql')).sort()) {
     db.exec(readFileSync(path.join(migrationsDir, file), 'utf8'));
   }
   for (const extra of options.extraSqlFiles ?? []) {

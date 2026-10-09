@@ -9,8 +9,8 @@
  *   node scripts/set-password.mjs --env production --email ten@congty.com
  *   node scripts/set-password.mjs --env demo --email thao@ailla.vn
  */
+import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -39,22 +39,35 @@ function parseArgs() {
 /** Đọc mật khẩu mà không hiện ký tự lên màn hình. */
 function askHidden(question) {
   return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    const onData = (char) => {
-      const c = char.toString();
-      if (c === '\n' || c === '\r' || c === '') {
-        process.stdin.removeListener('data', onData);
-      } else {
-        process.stdout.write('[2K[200D' + question + '*'.repeat(rl.line.length));
+    const stdin = process.stdin;
+    let value = '';
+    process.stdout.write(question);
+    if (stdin.isTTY) stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    const onData = (chunk) => {
+      for (const c of chunk) {
+        if (c === '\r' || c === '\n') {
+          stdin.removeListener('data', onData);
+          if (stdin.isTTY) stdin.setRawMode(false);
+          stdin.pause();
+          process.stdout.write('\n');
+          resolve(value);
+          return;
+        }
+        if (c === '') process.exit(1);
+        if (c === '\b' || c === '') {
+          if (value.length) {
+            value = value.slice(0, -1);
+            process.stdout.write('\b \b');
+          }
+        } else {
+          value += c;
+          process.stdout.write('*');
+        }
       }
     };
-    process.stdout.write(question);
-    process.stdin.on('data', onData);
-    rl.question('', (value) => {
-      rl.close();
-      process.stdout.write('\n');
-      resolve(value);
-    });
+    stdin.on('data', onData);
   });
 }
 
@@ -106,6 +119,13 @@ async function main() {
     `UPDATE users SET password_hash = '${hash}', password_updated_at = '${now}', ` +
     `must_change_password = ${mustChange ? 1 : 0}, failed_login_count = 0, locked_until = NULL, ` +
     `updated_at = '${now}' WHERE lower(email) = lower('${email.replace(/'/g, "''")}');`;
+
+  if (process.argv.includes('--save-sql')) {
+    // Chỉ lưu câu lệnh (mật khẩu đã mã hoá) ra file để chạy lên Cloudflare sau.
+    writeFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../.pending-password.sql'), sql);
+    console.info('\n✅ Đã lưu xong. Báo lại để đẩy lên hệ thống.');
+    return;
+  }
 
   const args = ['wrangler', 'd1', 'execute', database, '--remote', '--command', sql];
   if (env !== 'dev') args.splice(4, 0, '--env', env);

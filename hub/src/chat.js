@@ -1,6 +1,6 @@
 /* =====================================================================
    TRAO ĐỔI NỘI BỘ + THÔNG BÁO TỪNG NGƯỜI + GIỮ TRANG KHI F5
-   - Chat chung: khung bên phải mở từ thanh trên cùng (💬), có nhóm Chung / Content & Media / Digital, gọi tên @Oanh.
+   - Chat chung: khung bên phải mở từ thanh trên cùng (💬), có nhóm Chung / Content & Media / Digital, gọi tên @Lead Content & Media.
    - Trao đổi trong từng thẻ video: ở cuối cửa sổ thẻ, báo cho người làm thẻ và người được gọi tên.
    - Chuông 🔔: thông báo của riêng mình (việc mới giao, video chờ duyệt, bị trả về sửa, Worker xong bản nháp…),
      bấm vào mở đúng thẻ. Máy đang mở web thì hiện thông báo của trình duyệt khi có tin mới.
@@ -22,16 +22,17 @@ const agoTxt=t=>{const s=(Date.now()-new Date(t).getTime())/1000;return s<60?"v�
 function notifyU(dt,ids,text,ref){const me=ME&&ME.id;dt.notifs=dt.notifs||[];[...new Set([].concat(ids).filter(Boolean))].forEach(to=>{if(to===me)return;dt.notifs.push({id:uid("nt"),to,text,at:nowISO(),ref:ref||"",by:me||"",read:false})});if(dt.notifs.length>NT_KEEP)dt.notifs=dt.notifs.slice(-NT_KEEP)}
 const myNotifs=()=>(D()&&D().notifs||[]).filter(n=>ME&&n.to===ME.id).slice().reverse();
 const myUnread=()=>myNotifs().filter(n=>!n.read).length;
-const approvers=()=>D().users.filter(u=>u.active&&(u.perms||[]).includes("viec.duyet")&&u.role==="lead").map(u=>u.id);
+const approvers=()=>{const r=D().users.filter(u=>u.active&&(u.perms||[]).includes("viec.duyet")&&u.role==="lead").map(u=>u.id);return r.length?r:D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id)};
 const admins=()=>D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id);
 const cardLbl=c=>{const t=D().tuyen.find(x=>x.ma===c.maTuyen);return `${sk(c.sku).n}${t?" · "+t.tuyen:""} (${c.id})`};
 /* Sự kiện của thẻ video → báo đúng người */
 const _mvNt=moveCard;
 moveCard=function(u,id,to,inp){const c=D().cards.find(x=>x.id===id),from=c&&c.step,e=_mvNt(u,id,to,inp);
   if(!e&&c&&from!==to){const L=cardLbl(c),who=u.name;DB.mutate(who,"thông báo "+id,dt=>{const x=dt.cards.find(y=>y.id===id)||c;
+    if(to==="dkb"||to==="dvd"){x.duyet="Chưa duyệt";x.ceo="CẦN KIỂM TRA"}else if(to==="dceo"){x.ceo="CẦN KIỂM TRA"}
     if(to==="dkb")notifyU(dt,approvers(),`${who} gửi ${x.oneShot?"hook":"kịch bản"} chờ duyệt: ${L}`,id);
     else if(to==="dvd"&&!(typeof isApprover==="function"&&isApprover(u)))notifyU(dt,approvers(),`Video mới ${who} vừa làm xong, cần duyệt: ${L}`,id);
-    else if(to==="dceo")notifyU(dt,admins(),`Video chờ chị duyệt: ${L} (${who} đã duyệt)`,id);
+    else if(to==="dceo")notifyU(dt,admins(),`Video chờ CEO duyệt: ${L} (${who} đã duyệt)`,id);
     else if(to==="dang"){const o=((dt.kenhPT||{})[x.kenh]||{}).chinh;notifyU(dt,[o],`Video đã duyệt xong, chờ bạn đăng: ${L}`,id)}
     else if(from==="dkb"&&to==="quay")notifyU(dt,[x.nguoiKB||x.nguoi],`${x.oneShot?"Hook":"Kịch bản"} đã được duyệt: ${L}`,id);
     if(x.tre&&x.tre.st==="cho"&&x.tre.by===who)notifyU(dt,approvers(),`${who} nộp trễ hạn (${x.tre.buoc}): ${x.tre.lyDo} · ${L}`,id)})}
@@ -39,7 +40,7 @@ moveCard=function(u,id,to,inp){const c=D().cards.find(x=>x.id===id),from=c&&c.st
 const _sbNt=sendBack;
 sendBack=function(u,id,note){const c=D().cards.find(x=>x.id===id);const r=_sbNt(u,id,note);if(c)DB.mutate(u.name,"thông báo trả về "+id,dt=>notifyU(dt,[c.nguoiEdit,c.nguoiKB,c.nguoi,c.giao],`${u.name} trả về sửa: ${note||"cần sửa"} · ${cardLbl(c)}`,id));return r};
 const _wpaNt=wpAssign;
-wpAssign=function(sku,kenh,t,u,n,w,bd,hn,note){if(t==="ton"){const ow=chanOwner(kenh);if(ow)u=ow}const before=new Set(D().cards.map(c=>c.id)),r=_wpaNt(sku,kenh,t,u,n,w,bd,hn,note);const nw=D().cards.filter(c=>!before.has(c.id));const lb=(MIX.find(z=>z[0]===t)||[])[1]||"";
+wpAssign=function(sku,kenh,t,u,n,w,bd,hn,note){if(t==="ton"){const ow=chanOwner(kenh);if(ow&&pvAvailUid(ow,hn||defHan(D(),null,t)))u=ow}const before=new Set(D().cards.map(c=>c.id)),r=_wpaNt(sku,kenh,t,u,n,w,bd,hn,note);const nw=D().cards.filter(c=>!before.has(c.id));const lb=(MIX.find(z=>z[0]===t)||[])[1]||"";
   DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[u],`${ME.name} giao bạn ${n} video ${lb} · ${sk(sku).n} · ${chOf(kenh).short}${hn?" · hạn "+dd(hn):""}${note&&note.trim()?" · Note: "+note.trim():""}`,nw[0]?nw[0].id:""));return r};
 const _xvaNt=xvAssign;
 xvAssign=function(ids,to,kind){_xvaNt(ids,to,kind);DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[to],`${ME.name} giao bạn ${ids.length} việc ${kind}`,ids[0]))};
@@ -89,7 +90,7 @@ function openChat(room){
      <div class="chdm"><small>Nhắn riêng:</small>${chPeople().map(u=>{const k=dmKey(u.id),n=chUnread(k);return `<button type="button" class="chdmb${k===CH_ROOM?" on":""}" data-chr="${k}" title="Nhắn riêng với ${esc(u.name)}"><i>${esc((u.name.split(" ").pop()||"?")[0])}</i>${esc(u.name)}${k!==CH_ROOM&&n?` <span class="xbadge">${n}</span>`:""}</button>`}).join("")}</div>
      ${CH_ROOM.startsWith("dm:")?`<div class="chdmh">Nhắn riêng với <b>${esc(userName(dmOther(CH_ROOM)))}</b> · chỉ hiện cho hai người</div>`:""}
      <div class="chl" id="chl">${M.map(m=>`<div class="chmsg${m.by===ME.id?" me":""}"><div class="chw"><b>${esc(userName(m.by)||m.who||"")}</b><small>${agoTxt(m.t)}</small></div><div class="chtx">${linkify(m.text)}</div></div>`).join("")||`<p class="hint" style="padding:16px">Chưa có tin nhắn. Gõ @tên để gọi người, người đó sẽ nhận thông báo.</p>`}</div>
-     <form class="chf" id="chf"><textarea id="ch-in" rows="2" placeholder="${CH_ROOM.startsWith("dm:")?"Nhắn riêng cho "+esc(userName(dmOther(CH_ROOM)))+"… Enter để gửi":"Nhắn cho nhóm… gõ @Oanh để gọi tên · Enter để gửi, Shift+Enter xuống dòng"}"></textarea><button class="btn pri">Gửi</button></form>
+     <form class="chf" id="chf"><textarea id="ch-in" rows="2" placeholder="${CH_ROOM.startsWith("dm:")?"Nhắn riêng cho "+esc(userName(dmOther(CH_ROOM)))+"… Enter để gửi":"Nhắn cho nhóm… gõ @Lead Content & Media để gọi tên · Enter để gửi, Shift+Enter xuống dòng"}"></textarea><button class="btn pri">Gửi</button></form>
      ${CH_ROOM.startsWith("dm:")?"":`<div class="chwho">${D().users.filter(u=>u.active&&u.id!==ME.id&&u.name).slice(0,14).map(u=>`<button type="button" class="chip" data-at="${esc(u.name)}">@${esc(u.name)}</button>`).join("")}</div>`}`;
     const l=$("#chl");l.scrollTop=l.scrollHeight;
     $("#ch-x").onclick=()=>p.remove();
@@ -128,12 +129,22 @@ svNotify=function(a,b){_snNt(a,b);if(!ME||!b||!b.nt)return;const neu=(b.nt||[]).
 
 /* ---------- Giữ trang khi F5 (chỉ trong tab đang mở) ---------- */
 const VIEW_KEY="ailla_view";
-function saveView(){if(!ME)return;try{sessionStorage.setItem(VIEW_KEY,JSON.stringify({u:ME.id,MOD,PAGE,STEP:typeof STEP!=="undefined"?STEP:1,SUB:typeof SUB!=="undefined"?SUB:{},xv:typeof XV!=="undefined"?XV.tab:"",ptk:typeof PT_K!=="undefined"?PT_K:""}))}catch(e){}}
-function restoreView(){try{const v=JSON.parse(sessionStorage.getItem(VIEW_KEY)||"null");if(!v||!ME||v.u!==ME.id||!v.PAGE||!PAGES[v.PAGE])return;MOD=v.MOD||"";PAGE=v.PAGE;if(v.STEP)STEP=v.STEP;if(v.SUB&&typeof SUB!=="undefined")Object.assign(SUB,v.SUB);if(v.xv&&typeof XV!=="undefined")XV.tab=v.xv;if(v.ptk&&typeof PT_K!=="undefined")PT_K=v.ptk}catch(e){}}
+/* những biến chọn tab con / bộ lọc cần nhớ để tải lại trang vẫn về đúng chỗ */
+const VW_GET=()=>{const g=f=>{try{return f()}catch(e){return undefined}};return {xv:g(()=>XV.tab),xks:g(()=>XV.ks),xst:g(()=>XV.khoSt),xkk:g(()=>XV.ktK),xksu:g(()=>XV.khoSku),xdk:g(()=>XV.dnK),xds:g(()=>XV.dnS),wpk:g(()=>WP_K),bvk:g(()=>BV.k),bvs:g(()=>BV.sku),bvt:g(()=>BV.t),tqk:g(()=>TQ_K),ptk:g(()=>PT_K),dg:g(()=>DG)}};
+function saveView(){if(!ME)return;try{sessionStorage.setItem(VIEW_KEY,JSON.stringify(Object.assign({u:ME.id,MOD,PAGE,STEP:typeof STEP!=="undefined"?STEP:1,SUB:typeof SUB!=="undefined"?SUB:{}},VW_GET())))}catch(e){}}
+let _scrY=null;
+function restoreView(){try{const v=JSON.parse(sessionStorage.getItem(VIEW_KEY)||"null");if(!v||!ME||v.u!==ME.id||!v.PAGE||!PAGES[v.PAGE])return;MOD=v.MOD||"";PAGE=v.PAGE;if(v.STEP)STEP=v.STEP;if(v.SUB&&typeof SUB!=="undefined")Object.assign(SUB,v.SUB);
+  const S=(c,x)=>{try{if(x!==undefined&&x!==null)c(x)}catch(e){}};
+  S(x=>XV.tab=x,v.xv);S(x=>XV.ks=x,v.xks);S(x=>XV.khoSt=x,v.xst);S(x=>XV.ktK=x,v.xkk);S(x=>XV.khoSku=x,v.xksu);S(x=>XV.dnK=x,v.xdk);S(x=>XV.dnS=x,v.xds);S(x=>WP_K=x,v.wpk);S(x=>BV.k=x,v.bvk);S(x=>BV.sku=x,v.bvs);S(x=>BV.t=x,v.bvt);S(x=>TQ_K=x,v.tqk);S(x=>PT_K=x,v.ptk);S(x=>Object.assign(DG,x),v.dg);
+  const sy=+sessionStorage.getItem(VIEW_KEY+"_y");if(sy>0)_scrY={y:sy,t:Date.now()}}catch(e){}}
+/* nhớ vị trí cuộn; trong vài giây đầu sau khi mở lại thì chưa ghi đè để còn trả về đúng chỗ */
+window.addEventListener("scroll",()=>{if(!ME||(_scrY&&Date.now()-_scrY.t<4500))return;try{sessionStorage.setItem(VIEW_KEY+"_y",String(Math.round(window.scrollY)))}catch(e){}},{passive:true});
+["wheel","touchstart","keydown","mousedown"].forEach(ev=>window.addEventListener(ev,()=>{_scrY=null},{passive:true,capture:true}));
+const _backScr=()=>{if(_scrY&&Date.now()-_scrY.t<4500){window.scrollTo(0,_scrY.y);setTimeout(()=>{if(_scrY)window.scrollTo(0,_scrY.y)},400)}};
 const _renderView=render;
-render=function(){_renderView();saveView();if(ME){bellBadge();const b=document.querySelector(".bell");if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();openNotifs()};const c=$("#chatbtn");if(c)c.onclick=()=>{$("#chp")?$("#chp").remove():openChat()}}};
+render=function(){_renderView();saveView();_backScr();if(ME){bellBadge();const b=document.querySelector(".bell");if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();openNotifs()};const c=$("#chatbtn");if(c)c.onclick=()=>{$("#chp")?$("#chp").remove():openChat()}}};
 const _renderMainView=renderMain;
-renderMain=function(){_renderMainView();saveView()};
+renderMain=function(){_renderMainView();saveView();_backScr()};
 
 /* Mở web mà còn thông báo chưa đọc: bật lên một lần ở góc dưới */
 let NT_FIRST=false;

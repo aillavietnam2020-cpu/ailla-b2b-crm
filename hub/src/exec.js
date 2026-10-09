@@ -15,9 +15,9 @@ function execAlerts(){
   return A;
 }
 function execApprovals(){
-  const d=D(),L=[];const st=d.plan.steps||{};Object.entries(st).filter(([n,v])=>v&&v.s==="review").forEach(([n])=>L.push([`Kế hoạch tháng ${MONTH.mon} · bước ${n}`,"Marketing · Oanh gửi","kehoach"]));
-  const kb=d.cards.filter(c=>c.step==="dkb").length,vd=d.cards.filter(c=>c.step==="dvd").length;if(kb)L.push([`${kb} kịch bản chờ duyệt`,"Marketing · Content","cv"]);if(vd)L.push([`${vd} video chờ Oanh duyệt`,"Marketing · Content","cv"]);const vc=d.cards.filter(c=>c.step==="dceo").length;if(vc)L.push([`${vc} video chờ chị duyệt`,"Marketing · Oanh đã duyệt","cv"]);
-  const dcp=(d.adjusts||[]).filter(a=>a.st==="pending").length;if(dcp)L.push([`${dcp} phiếu điều chỉnh kế hoạch chờ duyệt`,"Marketing · Oanh / trợ lý AI đề xuất","dieuchinh"]);
+  const d=D(),L=[];const st=d.plan.steps||{};Object.entries(st).filter(([n,v])=>v&&v.s==="review").forEach(([n])=>L.push([`Kế hoạch tháng ${MONTH.mon} · bước ${n}`,"Marketing · Lead Content & Media gửi","kehoach"]));
+  const kb=d.cards.filter(c=>c.step==="dkb").length,vd=d.cards.filter(c=>c.step==="dvd").length;if(kb)L.push([`${kb} kịch bản chờ duyệt`,"Marketing · Content","cv"]);if(vd)L.push([`${vd} video chờ duyệt`,"Marketing · Content","cv"]);const vc=d.cards.filter(c=>c.step==="dceo").length;if(vc)L.push([`${vc} video chờ CEO duyệt`,"Marketing · Lead Content & Media đã duyệt","cv"]);
+  const dcp=(d.adjusts||[]).filter(a=>a.st==="pending").length;if(dcp)L.push([`${dcp} phiếu điều chỉnh kế hoạch chờ duyệt`,"Marketing · Lead Content & Media / trợ lý AI đề xuất","dieuchinh"]);
   const rs=d.research.filter(r=>r.status==="Chờ kiểm tra").length;if(rs)L.push([`${rs} research chờ kiểm tra`,"Marketing","research"]);
   if(d.b2b){const p=d.b2b.orders.filter(o=>o.approval==="PENDING_APPROVAL");if(p.length)L.push([`${p.length} đơn B2B chờ duyệt · ${tr(sum(p,ordTot))}`,"Kinh doanh B2B","b2b_don"])}
   return L;
@@ -69,7 +69,7 @@ function bindLineChart(m,series,keys,fmt,lbl){
 }
 function execTodo(){
   const d=D(),today=d.settings.today,dep=id=>{const u=d.users.find(x=>x.id===id);return u?((d.departments||[]).find(p=>p.k===u.phongBan)||{}).n:""};
-  const L=(typeof cvItems==="function"?cvItems():[]).filter(x=>x.st!=="done");
+  const L=(typeof cvItems==="function"?cvGroup(cvItems()):[]).filter(x=>x.st!=="done");
   return {all:L,doing:L.filter(x=>x.st==="doing").length,late:L.filter(x=>x.late).length,top:L.slice().sort((a,b)=>(b.late-a.late)||(a.han-b.han)).slice(0,5).map(x=>({...x,lq:x.src==="card"?"Marketing":x.src==="order"?"Marketing · Digital":(dep(x.nguoi)||TEAMS[x.team]||"Chung"),hanTxt:x.han===today?"Hôm nay":x.han<today?`Trễ ${today-x.han} ngày`:`${String(x.han).padStart(2,"0")}/${String(MONTH.mon).padStart(2,"0")}`}))};
 }
 const EX_ST={late:["Quá hạn","red"],doing:["Đang làm","blu"],nhan:["Đã nhận việc","blu"],review:["Chờ duyệt","amb"],todo:["Cần làm","gry"],cg:["Chưa giao","gry"]};
@@ -105,7 +105,7 @@ function pExec(m){
     <div class="tabs xtabs" role="tablist">${[["all","Tất cả"],["fb","Facebook"],["tts","TikTok Shop"],["spe","Shopee"],["b2b","B2B / Đại lý"]].map(([k2,t])=>`<button role="tab" aria-selected="${EXCH.tab===k2}" class="${EXCH.tab===k2?"on":""}" data-xt="${k2}">${t}</button>`).join("")}</div>
     ${EXCH.tab==="b2b"?`<p class="empty xempty">Doanh số B2B chưa đưa vào biểu đồ: đơn đại lý đang nằm trong CRM B2B. <button class="lnk" data-go="b2b_today">Mở CRM B2B →</button></p>`:hasData?lineChart(ser,ksD,tr,lbl):`<p class="empty xempty">Kỳ đã chọn chưa có số doanh thu. Thử chọn tháng 7, 8 hoặc 9/2026 ở ô chọn kỳ phía trên.</p>`}</section>
    <section class="card xtodo"><div class="card-h"><h2>Việc cần xử lý</h2><button class="lnk" data-go="cv_nv">Xem tất cả →</button></div>
-    ${TD.top.length?`<div class="tbl"><table><thead><tr><th>Nội dung công việc</th><th>Hạn</th><th>Trạng thái</th></tr></thead><tbody>${TD.top.map(x=>{const s=x.late?EX_ST.late:(EX_ST[x.st]||[x.st,"gry"]);return `<tr><td><div class="xtn">${exDot(s[1])}<div class="xtc"><span>${esc(x.ten||"")}</span><small>${esc(x.lq)}</small></div></div></td><td class="${x.late?"t-red":""} xst">${x.hanTxt}</td><td class="xst">${pill(s[0],s[1])}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty">Không có việc đang mở.</p>`}</section>
+    ${TD.top.length?`<div class="tbl"><table><thead><tr><th>Nội dung công việc</th><th>Hạn</th><th>Trạng thái</th></tr></thead><tbody>${TD.top.map(x=>{const s=x.late?EX_ST.late:(EX_ST[x.st]||[x.st,"gry"]);return `<tr><td><div class="xtn">${exDot(s[1])}<div class="xtc"><span>${esc(x.ten||"")}</span><small>${esc(x.sub||x.lq)}</small></div></div></td><td class="${x.late?"t-red":""} xst">${x.hanTxt}</td><td class="xst">${pill(s[0],s[1])}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty">Không có việc đang mở.</p>`}</section>
   </div>
   <div class="xbot">
    <section class="card"><div class="card-h"><h2>Hiệu quả theo kênh</h2><span class="hint">lợi nhuận chưa trừ lương, kho, chi phí chung</span></div>
@@ -119,7 +119,7 @@ function pExec(m){
    <section class="card"><div class="card-h"><h2>% Đạt mục tiêu</h2><button class="lnk" id="tg-ed">Sửa mục tiêu</button></div><p class="hint">Mục tiêu tháng quy theo ${days} ngày đã chọn</p>
     <div class="gl">${goals.map(([n,v,t])=>{const tg=t*k,p=tg?v/tg*100:0;return `<div class="gi"><div class="gt"><b>${n}</b><span class="numeric">${t?`${tr(v)} / ${tr(tg)}`:"chưa đặt mục tiêu"}</span></div>${t?`<div class="gb"><i style="width:${Math.min(100,p)}%;background:${p>=100?"#2f9e44":p>=80?"#f59f00":"#e03131"}"></i></div><b class="gp numeric ${p>=100?"t-grn":p<80?"t-red":""}">${Math.round(p)}%</b>`:""}</div>`}).join("")}</div></section>
    <section class="card"><div class="card-h"><h2>Cảnh báo điều hành</h2>${pill(al.length,"red")}</div><div class="xal">${al.map(a=>`<button class="xa ${a[0]}" data-go="${a[3]}"><b>${esc(a[1])}</b><span>${esc(a[2])} ${typeof botChip==="function"?botChip(PAGE_PB[a[3]]||"BDH"):""}</span></button>`).join("")||`<p class="empty">Không có cảnh báo.</p>`}</div></section>
-   <section class="card"><div class="card-h"><h2>Việc chờ chị duyệt</h2>${pill(ap.length,"amb")}</div><div class="xap">${ap.map(a=>`<div><div><b>${esc(a[0])}</b><span>${esc(a[1])}</span></div><button class="btn sm pri" data-go="${a[2]}">Xem & duyệt</button></div>`).join("")||`<p class="empty">Không có việc chờ duyệt.</p>`}</div></section>
+   <section class="card"><div class="card-h"><h2>Việc chờ CEO duyệt</h2>${pill(ap.length,"amb")}</div><div class="xap">${ap.map(a=>`<div><div><b>${esc(a[0])}</b><span>${esc(a[1])}</span></div><button class="btn sm pri" data-go="${a[2]}">Xem & duyệt</button></div>`).join("")||`<p class="empty">Không có việc chờ duyệt.</p>`}</div></section>
   </div>`;
   m.querySelectorAll("[data-xt]").forEach(b=>b.onclick=()=>{EXCH.tab=b.dataset.xt;renderMain()});
   if(m.querySelector(".lcsvg"))bindLineChart(m,ser,ksD,tr,lbl);

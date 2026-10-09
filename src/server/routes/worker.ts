@@ -13,7 +13,7 @@ import { requirePermission } from '../middleware/rbac';
 const KINDS = [
   'win_analyze', 'win_approve', 'win_fix', 'win_child_ok', 'win_child_fix',
   // Thẻ video ở Marketing: dựng one shot / chèn chữ / sửa video có sẵn / giọng đọc; duyệt, góp ý sửa, duyệt kịch bản
-  'card_build', 'card_ok', 'card_fix', 'card_redo', 'card_script_ok', 'card_script_fix', 'card_notify',
+  'card_build', 'card_ok', 'card_fix', 'card_redo', 'card_script_ok', 'card_script_fix', 'card_script_edit', 'card_notify',
   // Buổi quay xong: quét thư mục cảnh vào kho cảnh của Worker (như lệnh /quet trên Telegram)
   'card_scan',
   // Xuất hook / kịch bản ra Excel hoặc Word, Worker lưu vào Google Drive của công ty và trả link

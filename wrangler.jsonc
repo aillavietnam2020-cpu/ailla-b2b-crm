@@ -80,12 +80,10 @@
         {
           "binding": "DB",
           "database_name": "ailla_crm_staging",
-          "database_id": "REPLACE_WITH_STAGING_D1_ID",
+          "database_id": "f3956115-5fba-4110-9fa5-13cd8466bb0a",
           "migrations_dir": "migrations"
         }
-      ],
-      "r2_buckets": [{ "binding": "FILES", "bucket_name": "ailla-crm-files-staging" }],
-      "triggers": { "crons": ["0 * * * *"] }
+      ]
     },
     "production": {
       "name": "ailla-b2b-crm",
@@ -94,7 +92,7 @@
         // Trợ lý AI khu Marketing: 9router trên VPS qua đường hầm Cloudflare (chỉ mở /v1/).
         // Khoá đặt bằng: npx wrangler secret put AI_API_KEY --env production
         "AI_BASE_URL": "https://ai.ailla.vn",
-        "AI_MODEL": "Combo_Content",
+        "AI_MODEL": "web",
         "DEV_AUTH_ENABLED": "false",
         "ACCESS_TEAM_DOMAIN": "REPLACE.cloudflareaccess.com",
         "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",

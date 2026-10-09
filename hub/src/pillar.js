@@ -34,16 +34,16 @@ document.addEventListener("change",e=>{const s=e.target;if(s.matches&&s.matches(
 const GOIY_DEF={tuyen:TUYEN_GOIY,vaitro:VAITRO_GOIY,tuyenTH:TUYEN_TH,vaitroTH:VAITRO_TH,dd:LISTS.dangVideo.filter(x=>!["Bài ảnh","Carousel"].includes(x)),ddFB:LISTS.fbFormat};
 const goiy=k=>{const g=(D().settings||{}).goiy;return g&&Array.isArray(g[k])?g[k]:GOIY_DEF[k]};
 function goiyAdd(dt,k,v){v=(v||"").trim();if(!v)return false;dt.settings.goiy=dt.settings.goiy||{};const L=Array.isArray(dt.settings.goiy[k])?dt.settings.goiy[k]:GOIY_DEF[k].slice();if(L.some(x=>x.toLowerCase()===v.toLowerCase()))return false;dt.settings.goiy[k]=L.concat(v);return true}
-const ptPairs=()=>{const o=[];prods().forEach(p=>pKenhs(p).forEach(e=>o.push({sku:p.k,kenh:e.kenh,huong:e.huong,sl:+e.sl||0})));return o};
+const ptPairs=()=>{const o=[];prods().forEach(p=>pKenhs(p).forEach(e=>o.push({sku:p.k,kenh:e.kenh,huong:e.huong,sl:+e.sl||0,ton:+e.ton||0})));return o};
 /* So tổng số video các tuyến với KPI số video của sản phẩm ở kênh */
 const ptVs=(kpi,kh)=>!kpi?pill("Chưa đặt KPI","gry"):kh===kpi?pill("Đủ KPI","grn"):kh<kpi?pill("Còn thiếu "+(kpi-kh)+" video","amb"):pill("Vượt "+(kh-kpi)+" video","vio");
 const ptPil=(d,sku,kenh)=>(d.pillars||[]).find(x=>x.sku===sku&&x.kenh===kenh);
 function ptEnsure(dt,sku,kenh){let p=ptPil(dt,sku,kenh);if(!p){p={ma:"PIL-"+MONTH.key.slice(2).replace("-","")+"-"+String(dt.pillars.length+1).padStart(2,"0"),sku,kenh,vaiTro:"",mucTieu:"",kh:0,dinhDang:"",idea:"",nguoi:"",ghiChu:""};dt.pillars.push(p)}return p}
 const ptFmt=kenh=>chOf(kenh).needId?LISTS.dangVideo.filter(x=>!["Bài ảnh","Carousel"].includes(x)):LISTS.fbFormat;
-function ptHtml(d,ed){
+function ptHtml(d,ed,only){
   const pairs=ptPairs(),chs=CHANNELS.filter(ch=>pairs.some(x=>x.kenh===ch.k));
-  if(!PT_K||!chs.some(c=>c.k===PT_K))PT_K=(chs[0]||{}).k||"";
-  const P=pairs.filter(x=>x.kenh===PT_K);
+  if(!PT_K||!chs.some(c=>c.k===PT_K))PT_K=(chs[0]||{}).k||"";if(only)PT_K=only;
+  const P=pairs.filter(x=>x.kenh===PT_K&&(typeof knShown!=="function"||knShown(d,x)));
   const block=x=>{const pl=ptPil(d,x.sku,x.kenh)||{},T=d.tuyen.map((t,i)=>[t,i]).filter(([t])=>t.kenh===x.kenh&&t.sku===x.sku),key=x.sku+"|"+x.kenh;
     const C=d.cards.filter(c=>c.kenh===x.kenh&&c.sku===x.sku),kh=sum(T,([t])=>t.kh),xong=C.filter(c=>c.step==="xong").length;
     const rows=T.map(([t,i])=>{const cs=C.filter(c=>c.maTuyen===t.ma),dn=cs.filter(c=>c.step==="xong").length,ps=cs.filter(c=>c.phatSinh).length,diff=cs.length-t.kh;
@@ -56,17 +56,19 @@ function ptHtml(d,ed){
        
        <td class="nowrap">${ed?`<button class="btn sm" data-tps="${i}" title="Ghi thêm 1 video ngoài kế hoạch cho tuyến này">+ Phát sinh</button> ${cs.length?"":`<button class="lnk danger" data-tdel2="${i}">Xóa</button>`}`:""}</td></tr>`}).join("");
     const op=PT_OPEN.has(key);return `<div class="ptb${op?" open":""}"><div class="pth" data-ptopen="${esc(key)}"><i class="ptar">${op?"▾":"▸"}</i>${swatch(x.sku)}<b>${esc(sk(x.sku).n)}</b>${x.sku==="TH"?pill("Branding","vio"):""}${pill(x.huong,x.huong==="Đẩy mạnh"?"pnk":x.huong==="Test"||x.huong==="Đẩy nhẹ"?"amb":"gry")}<span class="ptkpi">KPI ${ed?`<input type="number" min="0" class="num" data-pkpi="${esc(key)}" value="${x.sl||""}" placeholder="—">`:`<b>${x.sl||"—"}</b>`} video · <b>${T.length}</b> tuyến</span><span class="sp"></span><span class="hint">đã giao <b>${C.length}</b> video · đã đăng <b>${xong}</b></span></div>
-     ${op?`<div class="ptbody"><div class="pti"><label>Big idea${ed?`<input data-pi="${esc(key)}" data-f="idea" value="${esc(pl.idea||"")}" placeholder="${x.sku==="TH"?"Ý lớn xuyên suốt, ví dụ: Ailla, Sạch & Lành cho cả nhà":"Ý lớn xuyên suốt pillar, ví dụ: bí quyết tiệm giặt về tận nhà"}">`:`<b>${esc(pl.idea||"—")}</b>`}</label><label>Ghi chú${ed?`<input data-pi="${esc(key)}" data-f="ghiChu" value="${esc(pl.ghiChu||"")}">`:`<span>${esc(pl.ghiChu||"")}</span>`}</label></div>
+     ${ed?`<div class="ptnrow"><textarea class="ptnote" rows="1" data-pi="${esc(key)}" data-f="ghiChu" placeholder="Ghi chú cho sản phẩm này… (Enter để xuống dòng)">${esc(pl.ghiChu||"")}</textarea></div>`:(pl.ghiChu?`<div class="ptnrow"><span class="ptnote ro">${esc(pl.ghiChu)}</span></div>`:"")}
+     ${op?`<div class="ptbody"><div class="pti"><label>Big idea${ed?`<input data-pi="${esc(key)}" data-f="idea" value="${esc(pl.idea||"")}" placeholder="${x.sku==="TH"?"Ý lớn xuyên suốt, ví dụ: Ailla, Sạch & Lành cho cả nhà":"Ý lớn xuyên suốt pillar, ví dụ: bí quyết tiệm giặt về tận nhà"}">`:`<b>${esc(pl.idea||"—")}</b>`}</label></div>
      <div class="tbl"><table class="pttab"><thead><tr><th>Tuyến nội dung</th><th>Vai trò</th><th>Định dạng</th><th class="n">Thẻ</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="5" class="empty">Chưa có tuyến. Thêm ở dòng dưới.</td></tr>`}</tbody></table></div>
      ${ed?`<div class="ptadd" data-nf="${esc(key)}">${gsel(x.sku==="TH"?"tuyenTH":"tuyen",`class="nt"`,"",x.sku==="TH"?"Chọn tuyến thương hiệu":"Chọn tuyến nội dung")}${gsel(x.sku==="TH"?"vaitroTH":"vaitro",`class="nv"`,"","Vai trò")}${gsel(chOf(x.kenh).needId?"dd":"ddFB",`class="nd"`,"","Định dạng")}<button class="btn sm pri" data-tnew="${esc(key)}">+ Thêm tuyến</button></div>`:""}</div>`:`<div class="ptmini">${T.map(([t])=>esc(t.tuyen)).join(" · ")||"Chưa có tuyến"} · <span class="lnk">bấm để mở</span></div>`}</div>`};
-  return `<section class="card" id="ptsec"><div class="card-h"><h2>② Pillar & tuyến</h2><span class="hint">mỗi sản phẩm ở mỗi kênh (chọn ở ①) là một pillar · trong pillar ghi đủ các tuyến: nội dung gì, vai trò gì, định dạng nào (không cần số video từng tuyến, người viết kịch bản chọn tuyến cho từng video)</span></div>
+  return `<section class="card" id="ptsec"><div class="card-h"><h2>Pillar & tuyến</h2><span class="hint">mỗi sản phẩm là một pillar: ghi tuyến nội dung, vai trò, định dạng</span></div>
    
-   ${chs.length?`<div class="seg ptk">${chs.map(ch=>`<button data-ptk="${esc(ch.k)}" class="${ch.k===PT_K?"on":""}">${esc(ch.short)} <span class="xbadge">${pairs.filter(x=>x.kenh===ch.k).length}</span></button>`).join("")}</div>`:""}
-   ${P.length?(()=>{const K=sum(P,x=>x.sl);return `<div class="ptsum"><b>${esc(chOf(PT_K).short)}</b> · KPI cả kênh <b>${K||"—"}</b> video · <b>${d.tuyen.filter(t=>t.kenh===PT_K).length}</b> tuyến</div>`})():""}${P.map(block).join("")||`<p class="empty">Chưa có sản phẩm nào ở ①. Thêm sản phẩm vào kênh trước, pillar sẽ tự hiện ở đây.</p>`}
+   ${chs.length&&!only?`<div class="seg ptk">${chs.map(ch=>`<button data-ptk="${esc(ch.k)}" class="${ch.k===PT_K?"on":""}">${esc(ch.short)} <span class="xbadge">${pairs.filter(x=>x.kenh===ch.k).length}</span></button>`).join("")}</div>`:""}
+   ${P.length?(()=>{const K=sum(P,x=>x.sl);return `<div class="ptsum"><b>${esc(chOf(PT_K).short)}</b> · KPI cả kênh <b>${K||"—"}</b> video · <b>${d.tuyen.filter(t=>t.kenh===PT_K).length}</b> tuyến</div>`})():""}${P.map(block).join("")||`<p class="empty">Chưa chọn sản phẩm cho kênh này ở bảng mục tiêu phía trên.</p>`}
    <datalist id="dl-tuyen">${goiy("tuyen").map(x=>`<option value="${esc(x)}">`).join("")}</datalist><datalist id="dl-vaitro">${goiy("vaitro").map(x=>`<option value="${esc(x)}">`).join("")}</datalist><datalist id="dl-dd">${goiy("dd").map(x=>`<option value="${esc(x)}">`).join("")}</datalist><datalist id="dl-ddfb">${goiy("ddFB").map(x=>`<option value="${esc(x)}">`).join("")}</datalist><datalist id="dl-tuyen-th">${goiy("tuyenTH").map(x=>`<option value="${esc(x)}">`).join("")}</datalist><datalist id="dl-vaitro-th">${goiy("vaitroTH").map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
-   ${ed?`<div class="acts"><span class="hint">Kế hoạch tháng là quỹ video: KPI số video, không gắn ngày. Số video từng tuyến không cần đặt trước: người viết hook / kịch bản chọn tuyến cho từng video. Video được tạo khi lên danh sách hook ở Kế hoạch tháng › 6. Làm hằng ngày › ③ Buổi quay & hook, mỗi hook ghi vào một tuyến. Hook phát sinh khi quay hiện là "phát sinh" ở đúng tuyến.</span></div>`:""}</section>`;
+   </section>`;
 }
 function ptBind(b){
+  const fit=x=>{x.style.height="auto";x.style.height=Math.max(36,x.scrollHeight+2)+"px"};b.querySelectorAll("textarea.ptnote").forEach(x=>{fit(x);x.addEventListener("input",()=>fit(x))});
   b.querySelectorAll("[data-ptopen]").forEach(h=>h.onclick=e=>{if(e.target.closest("input,select,button,a,textarea"))return;const k=h.dataset.ptopen;PT_OPEN.has(k)?PT_OPEN.delete(k):PT_OPEN.add(k);renderMain()});
   b.querySelectorAll("[data-ptk]").forEach(x=>x.onclick=()=>{PT_K=x.dataset.ptk;renderMain()});
   b.querySelectorAll("[data-pi]").forEach(x=>x.onchange=()=>{const [sku,kenh]=x.dataset.pi.split("|");DB.mutate(ME.name,"sửa pillar "+sk(sku).n,dt=>{ptEnsure(dt,sku,kenh)[x.dataset.f]=x.value});toast("Đã lưu")});

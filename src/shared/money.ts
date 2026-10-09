@@ -46,3 +46,9 @@ export function percentDiff(base: number, applied: number): number {
 export function sum(values: Array<number | null | undefined>): number {
   return values.reduce<number>((acc, v) => acc + (v ?? 0), 0);
 }
+
+/** Số tiền chỉ có số, dùng trong bảng khi đơn vị (đ) đã ghi ở tiêu đề cột: 26.292.960 */
+export function formatVndNumber(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '—';
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount);
+}

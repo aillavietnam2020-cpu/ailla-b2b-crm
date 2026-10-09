@@ -16,7 +16,7 @@ const OUT = path.resolve(ROOT, '..', 'src', 'server', 'hub', 'hub.html');
 
 const JS_ORDER = [
   'core.js', 'app.js', 'phanbo.js', 'setup.js', 'giaoviec.js', 'kinhdoanh.js', 'exec.js', 'period.js',
-  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'winhub.js', 'adsday.js', 'dieuphoi.js', 'xepviec.js', 'pillar.js', 'tuan.js', 'dashv2.js', 'lichtuan.js', 'bots.js', 'claude.js', 'ai.js', 'server.js', 'chat.js', 'khodang.js', 'kocwin.js',
+  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'kho.js', 'kho2.js', 'kho3.js', 'kho4.js', 'winhub.js', 'adsday.js', 'dieuphoi.js', 'xepviec.js', 'pillar.js', 'tuan.js', 'dashv2.js', 'lichtuan.js', 'bots.js', 'claude.js', 'ai.js', 'server.js', 'chat.js', 'khodang.js', 'kocwin.js', 'trolyai.js', 'giaonhanh.js', 'dauviec.js', 'loaivideo.js', 'bangvideo.js', 'fanpage.js', 'nhapthang.js', 'digital.js', 'hockb.js', 'pagethuonghieu.js', 'nhansu2.js',
 ];
 
 const read = (f) => readFileSync(path.join(SRC, f), 'utf8');
@@ -29,6 +29,7 @@ const header = [
   `const LOGO="${logo}";`,
   `const QUYCHUAN=${esc(read('quychuan.json').trim())};`,
   'var KD=null,SKUCOST=[],NHANSU0=[],T9_BASE={},T9RAW={cards:[],kho:[]};',
+  `const BUILD_ID="${Date.now()}";`,
 ].join('\n');
 
 const fonts =
