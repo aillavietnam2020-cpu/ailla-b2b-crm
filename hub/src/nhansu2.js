@@ -28,7 +28,7 @@ function nvNhacHD(){
 async function nvLoadFiles(ma,force){
   if(!force&&NVFILES.ma===ma)return;NVFILES={ma,L:[],busy:true};
   try{NVFILES.L=await svApi("/api/hub/hr/files?ma="+encodeURIComponent(ma))||[]}catch(e){NVFILES.L=[]}
-  NVFILES.busy=false;if(PAGE==="hr_nv"&&NVF.sel===ma)renderMain();
+  NVFILES.busy=false;if(["hr_nv","hr_tq","hr"].includes(PAGE)&&NVF.sel===ma)renderMain();
 }
 function nvList(){const d=D();return d.staff.filter(x=>(NVF.tt==="all"||(NVF.tt==="dang"?x.tt!=="Đã nghỉ":x.tt===NVF.tt))&&(!NVF.pb||x.pb===NVF.pb)&&(!NVF.q||foldName(x.ma+" "+x.ten+" "+(x.viTri||"")+" "+(hsOf(x.ma).cccd||"")+" "+(hsOf(x.ma).mst||"")+" "+(hsOf(x.ma).sdt||"")).includes(foldName(NVF.q))))}
 function pHrNV(m){
