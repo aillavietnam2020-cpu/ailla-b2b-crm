@@ -57,3 +57,11 @@ let NVCC="";
     ${tbl(["Ngày","Thứ","Vào","Ra","Công","Giờ làm","Trễ (phút)","Sớm (phút)","OT (giờ)","Ký hiệu","Ghi chú"],L.map(r=>`<tr${r[11]?' class="warn"':""}><td>${vndate(r[0])}</td><td>${esc(r[1])}</td><td class="mono">${esc(r[2])}</td><td class="mono">${esc(r[3])}</td><td class="n">${r[4]}</td><td class="n">${Math.round(r[5]*10)/10}</td><td class="n">${r[6]||""}</td><td class="n">${r[7]||""}</td><td class="n">${r[8]||""}</td><td>${esc(r[9])}</td><td>${esc([r[11],r[12]].filter(Boolean).join(" · "))}</td></tr>`))}`:`<p class="hint">Chưa có dữ liệu máy chấm công của người này. Nạp file HR MASTER (tab CCDuLieu) ở Nhân sự › Nạp file HR MASTER.</p>`;
   return s.replace(/<div class="nv-body">[\s\S]*<\/div><\/div><\/section>$/,`<div class="nv-body">${body}</div></div></section>`)}}
 {const _b=nvBind;nvBind=function(ma,ed){_b(ma,ed);if($("#nvcc-k"))$("#nvcc-k").onchange=e=>{NVCC=e.target.value;renderMain()}}}
+/* Tổng quan nhân sự = trang một màn (ô số + danh sách + hồ sơ), giống mẫu chị chọn. Mục "Nhân viên" gộp vào đây. */
+{const _p=pHrNV;pHrNV=function(m){_p(m);if(!hrOk())return;const h=HRD(),w=m.querySelector(".nv-w");if(!w)return;
+  const cho=(h.don||[]).filter(x=>x.tt==="cho").length+(h.tu||[]).filter(x=>x.tt==="cho").length,kc=(h.kpi||[]).filter(k=>k.st==="cho").length,tv=D().staff.filter(x=>x.tt==="Thử việc"&&((nvNs(x.ma).hd||{}).hetTV)&&daysTo(nvNs(x.ma).hd.hetTV)<=15).length,loi=(h.ccLoi||[]).length;
+  const add=[["amb",cho,"đơn nghỉ / OT / tạm ứng chờ duyệt","hr_nghi"],["amb",kc,"phiếu KPI chờ duyệt","hr_kpi"],["amb",tv,"người sắp hết thử việc (≤ 15 ngày)","hr_hd"],["amb",loi,"dòng chấm công chưa gắn mã NV","hr_nap"]].filter(a=>a[1]);
+  w.insertAdjacentHTML("beforeend",add.map(a=>`<div class="nv-wr nv-go" data-go="${a[3]}"><i class="dot d-${a[0]}"></i><b>${a[1]}</b> ${a[2]}</div>`).join(""));
+  const t=m.querySelector(".ph h1");if(t)t.textContent="Tổng quan nhân sự"}}
+PAGES.hr_tq=pHrNV;PAGES.hr=pHrNV;PAGES.hr_nv=pHrNV;
+{const hr=MODULES.find(m=>m.k==="hr");if(hr){const g0=hr.groups;hr.groups=()=>g0().map(([g,its])=>[g,its.filter(i=>i[0]!=="hr_nv")])}}

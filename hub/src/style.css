@@ -402,3 +402,5 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 @media (max-width:1750px){.nv-3{grid-template-columns:150px 1fr 1fr}.nv-3>.nv-box:last-child{grid-column:1/-1}}
 @media (max-width:1100px){.nv-3,.nv-2{grid-template-columns:1fr}.nv-3>.nv-box:last-child{grid-column:auto}}
 .nv-list td:nth-child(3){white-space:normal;min-width:150px}.nv-list td:nth-child(9){white-space:normal;max-width:170px}
+.nv-list{max-height:300px}.nv-go{cursor:pointer}.nv-go:hover{text-decoration:underline}
+.nv-top .card{padding-top:14px;padding-bottom:12px}.card.nv-t{min-height:104px}
