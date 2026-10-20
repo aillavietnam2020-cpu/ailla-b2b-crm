@@ -78,27 +78,44 @@ def pos_link_names(cfg):
     return names
 
 
-def pos_split(cfg, d, dim):
+def pos_source_names(cfg):
+    names = {}
+    for x in pos_get(cfg, "/shops/{shop}/order_source", {}).get("data", []):
+        for k in (x.get("id"), x.get("custom_id")):
+            if k is not None and x.get("name"):
+                names[str(k)] = x["name"].strip()
+    return names
+
+
+def pos_split(cfg, d, dims):
     since, until = day_bounds(d)
     payload = pos_get(cfg, "/shops/{shop}/analytics/sale", {
         "since": since, "until": until, "success_status": "1", "success_record": "updated_at",
-        "returned_record": "success_record", "select_fields[]": POS_FIELDS, "split_by[]": [dim]})
+        "returned_record": "success_record", "select_fields[]": POS_FIELDS, "split_by[]": dims})
     out = []
     for row in payload.get("data", []):
         res = row.get("result", {})
-        out.append((row.get(dim), {"orders": num(res.get("total_order_count")), "revenue": num(res.get("net_revenue")),
+        out.append((row, {"orders": num(res.get("total_order_count")), "revenue": num(res.get("net_revenue")),
                     "delivered": num(res.get("delivered_count")), "delivered_rev": num(res.get("delivered_revenue")),
                     "returned_rev": num(res.get("returned_revenue")), "canceled": num(res.get("canceled_order_count"))}))
     return out
 
 
-def pos_day(cfg, d, link_names):
+def pos_day(cfg, d, link_names, src_names):
     camps = []
-    for v, m_ in pos_split(cfg, d, "Order.p_utm_campaign"):
-        camps.append(dict(m_, campaign_id=str(v) if v else ""))
+    try:
+        for row, m_ in pos_split(cfg, d, ["Order.p_utm_campaign", "Order.source"]):
+            v = row.get("Order.p_utm_campaign")
+            sid = row.get("Order.source", row.get("order_sources"))
+            camps.append(dict(m_, campaign_id=str(v) if v else "", source=src_names.get(str(sid), "mã " + str(sid))))
+    except Exception:
+        camps = []
+        for row, m_ in pos_split(cfg, d, ["Order.p_utm_campaign"]):
+            v = row.get("Order.p_utm_campaign")
+            camps.append(dict(m_, campaign_id=str(v) if v else "", source=""))
     links = {}
-    for v, m_ in pos_split(cfg, d, "Order.link"):
-        k = link_key(v)
+    for row, m_ in pos_split(cfg, d, ["Order.link"]):
+        k = link_key(row.get("Order.link"))
         t = links.setdefault(k, {"link": k, "name": link_names.get(k, ""), "orders": 0, "revenue": 0, "delivered": 0,
                                  "delivered_rev": 0, "returned_rev": 0, "canceled": 0})
         for f in ("orders", "revenue", "delivered", "delivered_rev", "returned_rev", "canceled"):
@@ -139,9 +156,10 @@ def main():
             errors.append(f"FB {acc}: {type(e).__name__} {str(e)[:120]}")
     cfg = env_file(POS_ENV)
     link_names = pos_link_names(cfg)
+    src_names = pos_source_names(cfg)
     for d in days:
         try:
-            out[str(d)]["pos"], out[str(d)]["link"] = pos_day(cfg, d, link_names)
+            out[str(d)]["pos"], out[str(d)]["link"] = pos_day(cfg, d, link_names, src_names)
         except Exception as e:
             errors.append(f"Pancake {d}: {type(e).__name__} {str(e)[:120]}")
         time.sleep(0.3)

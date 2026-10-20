@@ -120,14 +120,14 @@ const adfPeriod=(D,per)=>{
   return D.keys.filter(k=>k===per);
 };
 function adfAgg(D,days){
-  const C={};let unmatched=0,unOrders=0;
+  const C={},US={};let unmatched=0,unOrders=0;
   const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);return {name:nm.name||"",account:nm.account||"",owner:p.owner,prod:p.prod,typ:p.typ}})()));
   days.forEach(k=>{const d=D.days[k];if(!d)return;
     (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;x.msgs+=c.messages||0});
-    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0}});
+    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=p.orders||0;u.rev+=p.revenue||0}});
   });
   const links={};days.forEach(k=>((D.days[k]||{}).link||[]).forEach(l=>{const key=l.name||"(trang chưa có tên)";const t=links[key]||(links[key]={name:key,orders:0,rev:0});t.orders+=l.orders||0;t.rev+=l.revenue||0}));
-  return {C:Object.values(C),unmatched,unOrders,links:Object.values(links).sort((a,b)=>b.rev-a.rev)};
+  return {C:Object.values(C),unmatched,unOrders,unSrc:Object.values(US).sort((a,b)=>b.rev-a.rev),links:Object.values(links).sort((a,b)=>b.rev-a.rev)};
 }
 const adfSum=L=>{const s=L.reduce((a,x)=>({spend:a.spend+x.spend,msgs:a.msgs+x.msgs,orders:a.orders+x.orders,rev:a.rev+x.rev}),{spend:0,msgs:0,orders:0,rev:0});
   return Object.assign(s,{giaMsg:s.msgs?s.spend/s.msgs:0,cpo:s.orders?s.spend/s.orders:0,pct:s.rev?s.spend*1.1/s.rev:0,roas:s.spend?s.rev/s.spend:0})};
@@ -157,7 +157,7 @@ function adfDaily(D,keys,ids){
   return `<div class="tbl adl-days"><table><thead><tr><th>Chỉ số</th><th class="n">Tổng</th>${keys.map(k=>`<th class="n">${+k.slice(8)}/${+k.slice(5,7)}</th>`).join("")}</tr></thead><tbody>${R.map(([n,f])=>`<tr><td><b>${n}</b></td><td class="n"><b>${f(tot)}</b></td>${per.map(s=>`<td class="n">${f(s)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 function pAdsFb(m){
-  const D=adfData(),{C,unmatched,unOrders,links}=adfAgg(D,adfPeriod(D,ADF.per)),days=adfPeriod(D,ADF.per);
+  const D=adfData(),{C,unmatched,unOrders,unSrc,links}=adfAgg(D,adfPeriod(D,ADF.per)),days=adfPeriod(D,ADF.per);
   const L=C.filter(x=>x.spend||x.rev),owners=["Việt Anh","Thảo","Duẩn","Chưa rõ người"].filter(w=>L.some(x=>x.owner===w)&&(!ADF.who||ADF.who===w));
   const T=adfSum(ADF.who?L.filter(x=>x.owner===ADF.who):L),at=new Date(D.at),atS=at.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})+" "+at.toLocaleDateString("vi-VN");
   const lbl=days.length?(days.length===1?"ngày "+days[0].slice(8)+"/"+days[0].slice(5,7):`${days[0].slice(8)}/${days[0].slice(5,7)} – ${days[days.length-1].slice(8)}/${days[days.length-1].slice(5,7)}`):"";
@@ -176,6 +176,7 @@ function pAdsFb(m){
   ${ADF.per==="m0"||ADF.per==="m1"?part:""}<div class="grid kpis">${kpi("Chi Ads",money(T.spend),lbl)}${kpi("Tin nhắn",nf(T.msgs),T.msgs?"giá "+money(T.giaMsg):"")}${kpi("Đơn (Pancake)",nf(T.orders),"gắn được vào chiến dịch")}${kpi("Doanh số (Pancake)",money(T.rev),T.orders?"TB đơn "+money(T.rev/T.orders):"")}${kpi("ROAS",adlR(T.roas),"doanh số / chi ads")}${kpi("% CP / doanh số",T.rev?adlPct(T.pct):"—","chi phí gồm thuế 10%")}${ADF.who?"":kpi("Doanh số chưa gắn chiến dịch",money(unmatched),nf(unOrders)+" đơn · khách tự vào, tin nhắn, chăm sóc")}</div>
   <p class="hint">Bấm một dòng để xem từng chiến dịch. Chiến dịch tin nhắn chưa có doanh số vì đơn chốt qua inbox không mang mã chiến dịch (nằm ở dòng "chưa gắn chiến dịch").</p>
   ${owners.map(section).join("")||`<section class="card"><p class="empty">Chưa có số liệu trong kỳ này.</p></section>`}
+  ${ADF.who||!unSrc.length?"":`<section class="card flush"><div class="card-h pad"><h2>Doanh số chưa gắn chiến dịch, theo nguồn đơn</h2><span class="hint">${lbl} · đơn không mang mã chiến dịch Facebook, ví dụ khách nhắn tin rồi chốt, khách tự vào, chăm sóc</span></div><div class="tbl"><table><thead><tr><th>Nguồn đơn</th><th class="n">Đơn</th><th class="n">Doanh số</th></tr></thead><tbody>${unSrc.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${nf(x.orders)}</td><td class="n">${money(x.rev)}</td></tr>`).join("")}</tbody></table></div></section>`}
   <section class="card flush"><div class="card-h pad"><h2>Doanh số theo trang bán hàng (Pancake)</h2><span class="hint">đúng tên "Nguồn đơn" trên Pancake · ${lbl}</span></div><div class="tbl"><table><thead><tr><th>Nguồn đơn</th><th class="n">Đơn</th><th class="n">Doanh số</th></tr></thead><tbody>${links.filter(x=>!ADF.who||x.name.toLowerCase().includes(ADF.who.toLowerCase())).map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${nf(x.orders)}</td><td class="n">${money(x.rev)}</td></tr>`).join("")||`<tr><td colspan="3" class="empty">Chưa có.</td></tr>`}</tbody></table></div></section>`;
   $("#adf-w").onchange=e=>{ADF.who=e.target.value;renderMain()};
   $("#adf-p").onchange=e=>{ADF.per=e.target.value;renderMain()};
