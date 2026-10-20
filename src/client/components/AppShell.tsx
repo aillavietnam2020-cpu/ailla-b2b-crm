@@ -2,6 +2,8 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 import { installTableScrolling } from '../lib/dragScroll';
+import { installMobileTables } from '../lib/mobileTables';
+import { installRowMenus } from '../lib/rowMenus';
 import { initialsOf } from './ui';
 
 interface NavItem {
@@ -17,6 +19,9 @@ const SALES_NAV: NavItem[] = [
   { to: '/sales/orders', label: 'Đơn hàng', short: 'Đơn hàng', mobile: true },
   { to: '/sales/prices', label: 'Bảng giá 8 cấp', short: 'Bảng giá' },
   { to: '/sales/debts', label: 'Công nợ khách của tôi', short: 'Công nợ' },
+  { to: '/sales/bills', label: 'Kho bill giao dịch', short: 'Bill' },
+  { to: '/sales/returns', label: 'Hàng trả lại', short: 'Trả hàng' },
+  { to: '/sales/shipping-vouchers', label: 'Phiếu chi vận chuyển', short: 'Chi VC' },
   { to: '/sales/performance', label: 'Kết quả cá nhân', short: 'Kết quả', mobile: true },
 ];
 
@@ -26,15 +31,55 @@ const ADMIN_NAV: NavItem[] = [
   { to: '/admin/customers', label: 'Khách hàng', short: 'Khách hàng', mobile: true },
   { to: '/admin/orders', label: 'Đơn hàng & duyệt', short: 'Đơn hàng', mobile: true },
   { to: '/admin/debts', label: 'Công nợ', short: 'Công nợ' },
+  { to: '/admin/bills', label: 'Kho bill giao dịch', short: 'Bill' },
+  { to: '/admin/returns', label: 'Hàng trả lại', short: 'Trả hàng' },
+  { to: '/admin/bonus', label: 'Thưởng & xếp hạng NPP', short: 'Thưởng' },
+  { to: '/admin/shipping-vouchers', label: 'Phiếu chi vận chuyển', short: 'Chi VC' },
 ];
 
 /** Thiết lập: ít khi đụng tới, tách riêng cho khỏi rối màn hình làm việc hằng ngày. */
 const ADMIN_SETUP_NAV: NavItem[] = [
   { to: '/admin/prices', label: 'Sản phẩm & bảng giá', short: 'Bảng giá' },
+  { to: '/admin/price-adjustments', label: 'Giá điều chỉnh / khuyến mại', short: 'Giá điều chỉnh' },
+  { to: '/admin/customer-prices', label: 'Bảng giá khách gia công', short: 'Giá gia công' },
   { to: '/admin/users', label: 'Người dùng & phân quyền', short: 'Tài khoản' },
   { to: '/admin/imports', label: 'Import dữ liệu', short: 'Import' },
   { to: '/admin/audit', label: 'Nhật ký hệ thống', short: 'Audit' },
 ];
+
+/**
+ * Trang quản trị (quantri.*) chỉ có MỘT menu: menu 8 mục trong /hub/. Mở thẳng một đường dẫn CRM (từ thông báo, từ liên kết cũ...)
+ * thì chuyển vào đúng trang trong khung đó; trang nào chưa có chỗ trong menu thì hiện nội dung kèm nút quay lại, không dựng menu thứ hai.
+ */
+const PATH_TO_HUB_PAGE: Record<string, string> = {
+  '/admin': 'exec',
+  '/admin/reports': 'exec',
+  '/admin/ceo': 'exec',
+  '/admin/orders': 'cr_dn',
+  '/admin/customers': 'cr_kh',
+  '/admin/debts': 'cr_cn',
+  '/admin/prices': 'cr_gia',
+  '/admin/price-adjustments': 'cr_dc',
+  '/admin/customer-prices': 'cr_giagc',
+  '/admin/bonus': 'cr_thuong',
+  '/admin/bonus-policy': 'cr_thuong',
+  '/admin/users': 'nhansu',
+  '/admin/imports': 'cr_import',
+  '/admin/audit': 'cr_audit',
+  '/admin/bills': 'cr_bill',
+  '/admin/receiving-accounts': 'cr_rcv',
+  '/admin/shipping-vouchers': 'cr_vc',
+};
+/** Trang chi tiết (đơn, khách): mở lại đúng trang đó trong khung của mục tương ứng. */
+const DETAIL_PREFIX = ['/admin/orders/', '/admin/customers/'];
+const isQuantriHost = () => window.location.hostname.startsWith('quantri.');
+/** Đích trong /hub/ cho một đường dẫn CRM, hoặc null nếu chưa có chỗ trong menu. */
+function hubHashFor(pathname: string, search: string): string | null {
+  const key = PATH_TO_HUB_PAGE[pathname];
+  if (key) return `go=${key}`;
+  if (DETAIL_PREFIX.some((x) => pathname.startsWith(x))) return `crm=${encodeURIComponent(pathname + search)}`;
+  return null;
+}
 
 const TITLES: Record<string, string> = {
   '/sales': 'Việc hôm nay',
@@ -43,13 +88,23 @@ const TITLES: Record<string, string> = {
   '/sales/orders/new': 'Tạo đơn hàng',
   '/sales/prices': 'Bảng giá 8 cấp',
   '/sales/debts': 'Công nợ khách của tôi',
+  '/sales/bills': 'Kho bill giao dịch',
+  '/sales/returns': 'Hàng trả lại',
+  '/sales/shipping-vouchers': 'Phiếu chi vận chuyển',
   '/sales/performance': 'Kết quả cá nhân',
   '/admin': 'Dashboard kinh doanh',
   '/admin/ceo': 'Dashboard kinh doanh',
   '/admin/customers': 'Danh sách khách hàng',
   '/admin/orders': 'Đơn hàng & duyệt ngoại lệ',
   '/admin/prices': 'Sản phẩm và bảng giá 8 cấp',
+  '/admin/customer-prices': 'Bảng giá riêng từng khách',
   '/admin/debts': 'Công nợ toàn công ty',
+  '/admin/bills': 'Kho bill giao dịch',
+  '/admin/returns': 'Hàng trả lại',
+  '/admin/price-adjustments': 'Giá điều chỉnh / khuyến mại',
+  '/admin/bonus': 'Thưởng & xếp hạng NPP',
+  '/admin/bonus-policy': 'Cơ chế thưởng NPP',
+  '/admin/shipping-vouchers': 'Phiếu chi vận chuyển',
   '/admin/reports': 'Dashboard kinh doanh',
   '/admin/users': 'Người dùng và phân quyền',
   '/admin/imports': 'Import & chất lượng dữ liệu',
@@ -72,18 +127,44 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
   const visibleNav = nav.filter((item) => {
     if (item.to === '/admin/ceo') return me?.user.role === 'CEO';
     if (item.to === '/admin/imports') return me?.user.role === 'MANAGER' || me?.user.role === 'CEO';
+    // Sổ phiếu chi vận chuyển: điều phối, kế toán, CEO. Sale thường không thấy.
+    if (item.to === '/sales/shipping-vouchers')
+      return Boolean(
+        me?.permissions.includes('order.accounting.confirm') || me?.permissions.includes('order.approve.normal'),
+      );
     return true;
   });
   const title = TITLES[location.pathname] ?? 'AILLA B2B CRM';
 
   // Kéo chuột và lăn chuột để xem bảng rộng, gắn một lần cho mọi trang.
   React.useEffect(() => installTableScrolling(), []);
+  // Điện thoại: dòng bảng hiện thành thẻ (xem lib/mobileTables.ts).
+  React.useEffect(() => installMobileTables(), []);
+  // Cột thao tác của bảng: nút phụ (Xóa, Khoá...) gom vào nút ⋯.
+  React.useEffect(() => installRowMenus(), []);
 
   // Trong khung Trang quản trị: chỉ hiện nội dung, báo tên trang lên để khung hiển thị đúng tiêu đề.
   const embedded = window.self !== window.top;
+  const onQuantri = !embedded && isQuantriHost();
+  const hubHash = onQuantri ? hubHashFor(location.pathname, location.search) : null;
   React.useEffect(() => {
-    if (embedded) window.parent.postMessage({ type: 'crm-title', title }, window.location.origin);
-  }, [embedded, title]);
+    if (hubHash) window.location.replace(`/hub/#${hubHash}`);
+  }, [hubHash]);
+  if (hubHash) return null;
+  if (onQuantri) {
+    return (
+      <div className="app">
+        <main className="main">
+          <div className="content" style={{ paddingTop: 14 }}>
+            <p style={{ margin: '0 0 12px' }}>
+              <a href="/hub/">← Về Trang quản trị</a>
+            </p>
+            {children}
+          </div>
+        </main>
+      </div>
+    );
+  }
   if (embedded) {
     return (
       <div className="app">
@@ -106,14 +187,16 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
             <small>{space === 'admin' ? 'Quản trị B2B · AILLA Việt Nam' : 'Bàn làm việc Sale · AILLA Việt Nam'}</small>
           </div>
         </div>
-        <div className="nav-label">{space === 'admin' ? 'Điều hành' : 'Công việc'}</div>
-        <nav className="nav">
-          {visibleNav.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/sales' || item.to === '/admin'}>
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+          <>
+            <div className="nav-label">{space === 'admin' ? 'Điều hành' : 'Công việc'}</div>
+            <nav className="nav">
+              {visibleNav.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.to === '/sales' || item.to === '/admin'}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          </>
         {space === 'admin' && (
           <>
             <div className="nav-label">Thiết lập</div>

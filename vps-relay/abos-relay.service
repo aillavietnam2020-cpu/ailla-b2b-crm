@@ -1,0 +1,14 @@
+[Unit]
+Description=ABOS relay - nhắn agent từ web
+After=network-online.target openclaw-gateway.service
+
+[Service]
+EnvironmentFile=/root/.config/abos-relay.env
+Environment=XDG_RUNTIME_DIR=/run/user/0
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/root/.local/bin:/root/.npm-global/bin
+ExecStart=/usr/bin/python3 /usr/local/lib/abos-relay/abos-relay.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

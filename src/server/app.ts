@@ -3,6 +3,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import type { AppEnv } from './env';
 import { AppError } from './lib/http';
 import { authMiddleware, optionalAuthMiddleware } from './middleware/auth';
+import { adminHostGate, adminOnlyEndpoint } from './middleware/adminHost';
 import { auth } from './routes/auth';
 import { userRoutes } from './routes/users';
 import { backupRoutes } from './routes/backup';
@@ -10,12 +11,25 @@ import { ingestRoutes } from './routes/ingest';
 import { coreRoutes } from './routes/core';
 import { customerRoutes, taskRoutes } from './routes/customers';
 import { catalogRoutes } from './routes/catalog';
+import { customerPriceRoutes } from './routes/customerPrices';
+import { billRoutes } from './routes/bills';
+import { returnRoutes } from './routes/returns';
+import { bonusRoutes } from './routes/bonus';
+import { priceAdjustmentRoutes } from './routes/priceAdjustments';
+import { workRoutes } from './routes/work';
+import { staffPurchaseRoutes } from './routes/staffPurchases';
+import { shippingVoucherRoutes } from './routes/shippingVouchers';
+import { agentRoutes } from './routes/agent';
+import { agentAdminRoutes } from './routes/agents';
+import { agentChatRoutes, agentRelayRoutes } from './routes/agentChat';
+import { proposalRoutes } from './routes/proposals';
+import { receivingAccountRoutes } from './routes/receivingAccounts';
 import { approvalRoutes, orderRoutes } from './routes/orders';
 import { financeRoutes } from './routes/finance';
 import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
-import { hubWorkerRoutes, workerRoutes } from './routes/worker';
+import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
 import { khoRoutes } from './routes/kho';
 import { hrRoutes } from './routes/hr';
 
@@ -65,17 +79,38 @@ export function createApp() {
 
   // Worker dựng video (máy văn phòng) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/worker', workerRoutes);
+  // Cầu nối trên VPS (nhắn agent trên web) tự gọi bằng khoá riêng, không có phiên đăng nhập.
+  app.route('/api/agent-relay', agentRelayRoutes);
+  // Agent Fanpage (OpenClaw trên VPS) tự gọi bằng khoá riêng FP_KEY.
+  app.route('/api/fp', fpAgentRoutes);
   app.route('/api/backup', backupRoutes);
   app.route('/api/ingest', ingestRoutes);
 
   // Mọi endpoint /api còn lại đều phải qua xác thực + RBAC ở backend.
   app.use('/api/*', authMiddleware);
+  // Trên địa chỉ quản trị chỉ CEO và kế toán; thao tác phân quyền chỉ làm ở địa chỉ quản trị.
+  app.use('/api/*', adminHostGate);
+  app.use('/api/admin/*', adminOnlyEndpoint);
 
   app.route('/api', coreRoutes);
   app.route('/api/admin/users', userRoutes);
+  app.route('/api/admin/agents', agentAdminRoutes);
   app.route('/api/customers', customerRoutes);
   app.route('/api/tasks', taskRoutes);
   app.route('/api', catalogRoutes);
+  app.route('/api/customer-prices', customerPriceRoutes);
+  app.route('/api/bills', billRoutes);
+  app.route('/api/returns', returnRoutes);
+  app.route('/api/bonus', bonusRoutes);
+  app.route('/api/price-adjustments', priceAdjustmentRoutes);
+  app.route('/api/shipping-vouchers', shippingVoucherRoutes);
+  app.route('/api/work', workRoutes);
+  app.route('/api/staff-purchases', staffPurchaseRoutes);
+  app.route('/api/agent', agentRoutes);
+  // Nhắn agent trên web: chạy được cả ở trang vận hành, vẫn chỉ CEO.
+  app.route('/api/agent-chat', agentChatRoutes);
+  app.route('/api/proposals', proposalRoutes);
+  app.route('/api/receiving-accounts', receivingAccountRoutes);
   app.route('/api/orders', orderRoutes);
   app.route('/api/approvals', approvalRoutes);
   app.route('/api', financeRoutes);

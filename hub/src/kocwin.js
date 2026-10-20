@@ -65,8 +65,7 @@ function kocBind(m){
     const mR=String(res.range||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);if(mR&&(mR[1]<KOCF.f||mR[2]>KOCF.t)){KOCF.k="c";KOCF.f=mR[1];KOCF.t=mR[2]}kocImport(ME,res,false);renderMain()}}
   const mo=off=>{const t=new Date(),y=t.getFullYear(),mm=t.getMonth()+off,a=new Date(y,mm,1),b=new Date(y,mm+1,0),z=n=>String(n).padStart(2,"0");return [`${a.getFullYear()}-${z(a.getMonth()+1)}-01`,`${b.getFullYear()}-${z(b.getMonth()+1)}-${z(b.getDate())}`]};
   $("#koc-top").onchange=e=>{let v=e.target.value;if(v==="__"){v=prompt("Hiện top bao nhiêu video?","15");if(!v||!(+v>0)){renderMain();return}}KOCF.top=Math.round(+v);renderMain()};
-  $("#koc-k").onchange=e=>{KOCF.k=e.target.value;if(KOCF.k!=="c")[KOCF.f,KOCF.t]=mo(KOCF.k==="mo"?0:-1);renderMain()};
-  if($("#koc-f")){const ch=()=>{let f=$("#koc-f").value,t=$("#koc-t").value;if(!f||!t)return;if(f>t)[f,t]=[t,f];KOCF.f=f;KOCF.t=t;renderMain()};$("#koc-f").onchange=ch;$("#koc-t").onchange=ch}
+  $("#koc-rg").onclick=ev=>{ev.stopPropagation();drpOpen($("#koc-rg"),{from:KOCF.f,to:KOCF.t,preset:""},KHO_PRESETS.map(([k,t])=>[k,t,()=>khoPresetRange(k)]),r=>{KOCF.k="c";KOCF.f=r.from;KOCF.t=r.to;renderMain()})};
   $("#koc-st").onchange=e=>{KOCF.st=e.target.value;renderMain()};$("#koc-s").onchange=e=>{KOCF.sku=e.target.value;renderMain()};
   if($("#koc-own"))$("#koc-own").onclick=()=>{const v=prompt("Tên tài khoản TikTok của shop (cách nhau dấu phẩy). Video của các tài khoản này không tính là KOC:",ownAccs().join(", "));if(v===null)return;DB.mutate(ME.name,"tài khoản shop TikTok",dt=>{dt.settings.ownAccs=v.split(",").map(s=>s.trim().replace(/^@/,"")).filter(Boolean)});renderMain()};
   m.querySelectorAll("[data-kocw]").forEach(x=>x.onclick=()=>{const v=(D().kocVideos||[]).find(y=>y.id===x.dataset.kocw);if(!v)return;
@@ -78,7 +77,7 @@ function kocBind(m){
 }
 
 /* Chọn thời gian cho cả trang KOC (dải số + TOP KOC) */
-const kocTimeCtl=()=>{const F=KOCF;return `<span class="kocper"><label>Thời gian<select id="koc-k">${opt([["mo","Tháng này"],["lmo","Tháng trước"],["c","Tùy chọn ngày"]],F.k)}</select></label>${F.k==="c"?`<label>Từ<input type="date" id="koc-f" value="${F.f}"></label><label>Đến<input type="date" id="koc-t" value="${F.t}"></label>`:""}</span>`};
+const kocTimeCtl=()=>{const F=KOCF;return `<span class="kocper"><button type="button" class="btn rcbtn" id="koc-rg">📅 ${esc(kocVnd(F.f))} – ${esc(kocVnd(F.t))} ▾</button></span>`};
 const kocVnd=s=>s?s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4):"";
 function kocKpis(){
   const d=D(),S=d.settings,F=KOCF,R=(d.kocVideos||[]).map(v=>{const x=kocIn(v,F.f,F.t);return x?Object.assign({},v,x):null}).filter(Boolean);

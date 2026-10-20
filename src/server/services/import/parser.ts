@@ -340,7 +340,13 @@ function parseProducts(workbook: XLSX.WorkBook, issues: ImportIssue[]): ParsedPr
       sku,
       name: name ?? sku,
       unit: text(pick(row, ['dvt', 'don_vi', 'don_vi_tinh', 'unit'])),
-      pack_size: text(pick(row, ['quy_cach', 'dong_goi', 'pack_size'])),
+      // Cột "Quy đổi" của Sheet: mã thùng ghi số can/chai trong thùng (10, 28...), mã lẻ ghi 1 -> chỉ giữ khi > 1.
+      pack_size: (() => {
+        const explicit = text(pick(row, ['quy_cach', 'dong_goi', 'pack_size']));
+        if (explicit) return explicit;
+        const conv = Number(pick(row, ['quy_doi']));
+        return Number.isFinite(conv) && conv > 1 ? `${Math.round(conv)} can/chai` : null;
+      })(),
       group_name: text(pick(row, ['nhom', 'nhom_sp', 'nhom_san_pham', 'group'])),
       prices,
       missing_tiers: missing,
@@ -447,8 +453,7 @@ function parseCustomers(workbook: XLSX.WorkBook, issues: ImportIssue[]): ParsedC
     }
 
     // Các trường CRM (nguồn, giai đoạn, tiềm năng, chu kỳ) trong file cũ đang trống hoàn toàn.
-    const source = text(pick(row, ['nguon', 'nguon_khach', 'source']));
-    if (!source) reviewNotes.push('Chưa có nguồn khách');
+    // (không cảnh báo khi thiếu nguồn khách: Sheet cũ không có cột này)
 
     customers.push({
       row_no: rowNo,
@@ -751,7 +756,7 @@ function parseActivities(workbook: XLSX.WorkBook): ParsedActivity[] {
 }
 
 /** Nhóm dữ liệu cần đọc. Bỏ trống = đọc hết. */
-export type ParseScope = 'products' | 'customers' | 'orders' | 'payments' | 'activities';
+export type ParseScope = 'products' | 'customers' | 'orders' | 'payments' | 'activities' | 'debts';
 
 /**
  * Đọc file Excel. Có thể giới hạn theo nhóm dữ liệu để mỗi chặng commit chỉ mở đúng sheet cần
@@ -778,16 +783,32 @@ export function parseWorkbook(
     neededSheets.add('THANH_TOAN');
     neededSheets.add('CONG_NO');
   }
+  // Chỉ cần số dư nợ cũ từng khách (chặng khách hàng): mở sheet CONG_NO, không mở sổ thu tiền.
+  if (wants('debts')) neededSheets.add('CONG_NO');
   if (wants('activities')) {
     neededSheets.add('NHAT_KY_CSKH');
     neededSheets.add('CHAM_SOC');
     neededSheets.add('LICH_HEN');
   }
 
+  // Không giới hạn nhóm (bước kiểm tra file): vẫn chỉ giải nén các sheet dùng tới. File xuất từ Google Sheet có
+  // nhiều tab thừa và hàng nghìn dòng công thức trống, mở hết sẽ vượt hạn mức xử lý của Workers.
+  let sheetsToRead: string[] | undefined = scopes ? [...neededSheets] : undefined;
+  if (!scopes) {
+    const names = XLSX.read(data, { type: 'array', bookSheets: true }).SheetNames;
+    const probe = { SheetNames: names } as XLSX.WorkBook;
+    const found = new Set<string>();
+    for (const logical of ['BANG_GIA', 'KHACH_HANG', 'TAO_DON_HANG', 'QUAN_LY_DON_HANG', 'THANH_TOAN', 'CONG_NO', 'CHAM_SOC', 'LICH_HEN']) {
+      const hit = findSheet(probe, logical);
+      if (hit) found.add(hit);
+    }
+    for (const name of names) if (name === 'NHAT_KY_CSKH') found.add(name);
+    sheetsToRead = found.size > 0 ? [...found] : undefined;
+  }
   const workbook = XLSX.read(data, {
     type: 'array',
     cellDates: false,
-    ...(scopes ? { sheets: [...neededSheets] } : {}),
+    ...(sheetsToRead ? { sheets: sheetsToRead } : {}),
   });
   const issues: ImportIssue[] = [];
 
@@ -809,7 +830,7 @@ export function parseWorkbook(
     orderLines: wants('orders') ? parseOrderLines(workbook, issues) : [],
     orderStatuses: wants('orders') ? parseOrderStatuses(workbook, issues) : [],
     payments: wants('payments') ? parsePayments(workbook, issues) : [],
-    debts: wants('payments') ? parseDebts(workbook, issues) : [],
+    debts: wants('payments') || wants('debts') ? parseDebts(workbook, issues) : [],
     activities: wants('activities') ? parseActivities(workbook) : [],
     issues,
     sheetsFound: workbook.SheetNames,

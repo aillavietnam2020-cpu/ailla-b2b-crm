@@ -2,11 +2,12 @@ import { Hono } from 'hono';
 import { nowIso } from '@shared/datetime';
 import type { AppEnv } from '../env';
 import { pack, unpack } from '../lib/pack';
-import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
+import { AppError, badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
 import type { AuthContext } from '../env';
 import { requirePermission } from '../middleware/rbac';
-import { canHr, hrFromUsers } from '../lib/hrAccess';
+import { canHr, hrGrantFromUsers, saveHrGrant } from '../lib/hrAccess';
+import { neutralizeTags, protectUsers, type GuardUser } from '../lib/stateGuard';
 
 /**
  * Khu Marketing & công việc (trang tĩnh /hub/).
@@ -55,6 +56,14 @@ function splitHr(data: Record<string, unknown>) {
 const hrHasData = (h: Record<string, unknown>) =>
   !!h.loaded || ['ns', 'cc', 'payroll', 'phep'].some((k) => h[k] && Object.keys(h[k] as object).length > 0);
 
+/**
+ * Dữ liệu SẢN XUẤT (d.sx: phiếu sản xuất, lô, tem, định mức, mua hàng, nhật ký) có ngăn riêng, số phiên bản riêng.
+ * Trước đây nằm chung bản chung với Marketing nên sửa một phiếu sản xuất là ghi lại cả khối Marketing và
+ * hai bên hay đụng nhau (409). Giờ tách hẳn: Marketing và Sản xuất ghi độc lập, không còn lẫn nhau.
+ * Lần đọc đầu tiên máy chủ tự chép d.sx cũ trong bản chung sang ngăn riêng.
+ */
+const SX_ID = 'sx';
+
 const isHubAdmin = (role: string) => role === 'CEO';
 
 hubRoutes.use('*', requirePermission('hub.access'));
@@ -64,7 +73,10 @@ hubRoutes.get('/state/version', async (c) => {
   const row = await c.env.DB.prepare('SELECT version, updated_at FROM hub_state WHERE id = ?')
     .bind(STATE_ID)
     .first<{ version: number; updated_at: string }>();
-  return ok(c, { version: row?.version ?? 0, updated_at: row?.updated_at ?? null });
+  const sx = await c.env.DB.prepare('SELECT version FROM hub_state WHERE id = ?')
+    .bind(SX_ID)
+    .first<{ version: number }>();
+  return ok(c, { version: row?.version ?? 0, updated_at: row?.updated_at ?? null, sx_version: sx?.version ?? 0 });
 });
 
 hubRoutes.get('/state', async (c) => {
@@ -74,6 +86,9 @@ hubRoutes.get('/state', async (c) => {
   if (!row) return ok(c, { version: 0, data: null, updated_at: null });
   const auth = c.get('auth');
   const data = JSON.parse(await unpack(row.data)) as Record<string, unknown>;
+  // Sản xuất đã có ngăn riêng thì không trả kèm trong bản chung (trang mới tải riêng qua /sx).
+  const sxRow = await c.env.DB.prepare('SELECT 1 AS x FROM hub_state WHERE id = ?').bind(SX_ID).first();
+  if (sxRow) delete data.sx;
   // Bản cũ có thể còn lẫn số tài chính: luôn gạt ra trước. Chưa có ngăn riêng thì CEO/kế toán nhận lại
   // đúng số cũ đó, lần ghi kế tiếp sẽ tự chuyển sang ngăn riêng.
   const legacy = splitSecure(data);
@@ -82,7 +97,7 @@ hubRoutes.get('/state', async (c) => {
     Object.assign(data, sec ? JSON.parse(await unpack(sec.data)) : legacy);
   }
   // Nhân sự: bản cũ còn nằm trong bản chung thì chuyển sang ngăn riêng ngay lần đọc đầu tiên.
-  const hrOk = hrFromUsers(auth, data.users as never);
+  const hrOk = await canHr(c.env.DB, auth);
   const hrLegacy = splitHr(data);
   let hrRow = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(HR_ID).first<{ data: string }>();
   if (!hrRow && hrHasData(hrLegacy)) {
@@ -121,8 +136,35 @@ hubRoutes.put('/state', async (c) => {
     throw badRequest('BAD_STATE', 'Thiếu số phiên bản hoặc dữ liệu');
   }
   const data = body.data as Record<string, unknown>;
+  const isCeo = isHubAdmin(auth.user.role);
+  // Trang cũ còn mở từ trước khi tách Sản xuất: nó sẽ ghi đè phiếu sản xuất bằng bản cũ, nên bắt tải lại trang.
+  if ('sx' in data) {
+    const sxRow = await c.env.DB.prepare('SELECT 1 AS x FROM hub_state WHERE id = ?').bind(SX_ID).first();
+    if (sxRow) {
+      throw new AppError(
+        426,
+        'CLIENT_OUTDATED',
+        'Trang này là bản cũ (Sản xuất đã tách riêng). Bấm F5 để tải lại trang rồi làm tiếp.',
+      );
+    }
+  }
+  // Bản chung ai trong khu Marketing cũng ghi được: người không phải CEO không được đổi quyền / vai trò / tên,
+  // không được thêm bớt tài khoản (người làm nhân sự đã được CEO duyệt thì sửa được trừ tài khoản quản trị).
+  if (!isCeo && Array.isArray(data.users)) {
+    const cur = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(STATE_ID).first<{ data: string }>();
+    if (cur) {
+      const existing = (JSON.parse(await unpack(cur.data)) as { users?: unknown }).users;
+      if (Array.isArray(existing)) {
+        data.users = protectUsers(data.users as GuardUser[], existing as GuardUser[], auth.user.id, await canHr(c.env.DB, auth));
+      }
+    }
+  }
   const secure = splitSecure(data);
   const hrSec = splitHr(data);
+  // Không cho mở thẻ HTML trong dữ liệu: chặn chèn mã chạy trên màn hình người khác.
+  neutralizeTags(data);
+  neutralizeTags(secure);
+  neutralizeTags(hrSec);
   const packed = await pack(JSON.stringify(data));
   const now = nowIso();
   const saveSecure = async () => {
@@ -168,6 +210,7 @@ hubRoutes.put('/state', async (c) => {
     if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Đã có người khởi tạo trước');
     await saveSecure();
     await saveHr();
+    if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
     return ok(c, { version: 1, updated_at: now });
   }
 
@@ -180,6 +223,73 @@ hubRoutes.put('/state', async (c) => {
   if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Có người vừa sửa trước, đang tải bản mới');
   await saveSecure();
   await saveHr();
+  if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
+  return ok(c, { version: base + 1, updated_at: now });
+});
+
+/** Dữ liệu Sản xuất (ngăn riêng). Lần đọc đầu tiên chép d.sx từ bản chung sang. */
+hubRoutes.get('/sx', async (c) => {
+  let row = await c.env.DB.prepare('SELECT version, data, updated_at FROM hub_state WHERE id = ?')
+    .bind(SX_ID)
+    .first<{ version: number; data: string; updated_at: string }>();
+  if (!row) {
+    const main = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?')
+      .bind(STATE_ID)
+      .first<{ data: string }>();
+    const legacy = main ? (JSON.parse(await unpack(main.data)) as { sx?: unknown }).sx : undefined;
+    if (!legacy || typeof legacy !== 'object') return ok(c, { version: 0, data: null, updated_at: null });
+    const packed = await pack(JSON.stringify(legacy));
+    const now = nowIso();
+    await c.env.DB.prepare(
+      `INSERT INTO hub_state (id, version, data, updated_at, updated_by) VALUES (?, 1, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+    )
+      .bind(SX_ID, packed, now, c.get('auth').user.id)
+      .run();
+    row = await c.env.DB.prepare('SELECT version, data, updated_at FROM hub_state WHERE id = ?')
+      .bind(SX_ID)
+      .first<{ version: number; data: string; updated_at: string }>();
+    if (!row) return ok(c, { version: 0, data: null, updated_at: null });
+  }
+  return ok(c, {
+    version: row.version,
+    data: JSON.parse(await unpack(row.data)),
+    updated_at: row.updated_at,
+  });
+});
+
+hubRoutes.put('/sx', async (c) => {
+  const auth = c.get('auth');
+  const raw = await c.req.text();
+  if (raw.length > MAX_JSON) throw badRequest('TOO_LARGE', 'Dữ liệu quá lớn');
+  let body: { version?: unknown; data?: unknown };
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw badRequest('BAD_JSON', 'Dữ liệu gửi lên không đúng định dạng');
+  }
+  const base = Number(body.version);
+  if (!Number.isInteger(base) || base < 0 || !body.data || typeof body.data !== 'object' || Array.isArray(body.data)) {
+    throw badRequest('BAD_STATE', 'Thiếu số phiên bản hoặc dữ liệu');
+  }
+  neutralizeTags(body.data);
+  const packed = await pack(JSON.stringify(body.data));
+  const now = nowIso();
+  if (base === 0) {
+    const res = await c.env.DB.prepare(
+      `INSERT INTO hub_state (id, version, data, updated_at, updated_by) VALUES (?, 1, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+    )
+      .bind(SX_ID, packed, now, auth.user.id)
+      .run();
+    if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Đã có người khởi tạo trước, đang tải bản mới');
+    return ok(c, { version: 1, updated_at: now });
+  }
+  const res = await c.env.DB.prepare(
+    `UPDATE hub_state SET version = version + 1, data = ?, updated_at = ?, updated_by = ?
+     WHERE id = ? AND version = ?`,
+  )
+    .bind(packed, now, auth.user.id, SX_ID, base)
+    .run();
+  if (!res.meta.changes) throw conflict('VERSION_CONFLICT', 'Có người vừa sửa trước, đang tải bản mới');
   return ok(c, { version: base + 1, updated_at: now });
 });
 
@@ -262,7 +372,7 @@ hubRoutes.post('/ai', async (c) => {
   const system = String(body.system ?? '').slice(0, 20000);
   const user = String(body.user ?? '').slice(0, 60000);
   if (!user) throw badRequest('EMPTY', 'Chưa có nội dung để hỏi');
-  const model = (body.model && /^[\w.\-]{1,80}$/.test(body.model) ? body.model : AI_MODEL) || 'Combo_Content';
+  const model = (body.model && /^[\w.-]{1,80}$/.test(body.model) ? body.model : AI_MODEL) || 'Combo_Content';
 
   const res = await fetch(`${AI_BASE_URL.replace(/\/$/, '')}/v1/chat/completions`, {
     method: 'POST',

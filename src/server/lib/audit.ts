@@ -12,6 +12,14 @@ export interface AuditInput {
   reason?: string | null;
   ip?: string | null;
   requestId?: string | null;
+  /** Ai thực hiện: người, hệ thống tự động (cron) hay AI agent. Mặc định là người. */
+  actorType?: 'USER' | 'SYSTEM' | 'AGENT';
+  /** Kết quả thao tác; mặc định thành công. */
+  result?: 'OK' | 'FAILED' | 'DENIED';
+  /** Nguồn kích hoạt, ví dụ proposal:<id>, event:<id>, cron. */
+  source?: string | null;
+  /** Người đã phê duyệt thao tác (nếu có bước duyệt). */
+  approvedBy?: string | null;
 }
 
 /**
@@ -20,8 +28,9 @@ export interface AuditInput {
 export function auditStatement(db: D1Database, input: AuditInput): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, before_json, after_json, reason, ip, request_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, before_json, after_json, reason, ip, request_id,
+         created_at, actor_type, result, source, approved_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       newId(),
@@ -35,6 +44,10 @@ export function auditStatement(db: D1Database, input: AuditInput): D1PreparedSta
       input.ip ?? null,
       input.requestId ?? null,
       nowIso(),
+      input.actorType ?? 'USER',
+      input.result ?? 'OK',
+      input.source ?? null,
+      input.approvedBy ?? null,
     );
 }
 

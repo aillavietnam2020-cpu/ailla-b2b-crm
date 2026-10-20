@@ -6,10 +6,11 @@ import { STAGE_FLOW } from '@shared/stages';
 import { useApi } from '../lib/hooks';
 import { ApiError, api } from '../lib/api';
 import { useAuth } from './AuthProvider';
-import { ErrorBox, Modal } from './ui';
+import { ErrorBox, Modal, useToast } from './ui';
 
 interface TierOption {
   id: string;
+  code: string;
   name: string;
   rank: number;
   debt_limit: number;
@@ -29,6 +30,7 @@ export function CustomerEditModal({
   onSaved: () => void;
 }) {
   const { can } = useAuth();
+  const toast = useToast();
   const tiers = useApi<TierOption[]>('/api/tiers');
   const canChangeTier = can('customer.tier.change');
 
@@ -38,6 +40,7 @@ export function CustomerEditModal({
     province: customer.province ?? '',
     address: customer.address ?? '',
     tier_id: customer.tier_id ?? '',
+    price_mode: (customer.price_mode ?? 'TIER') as 'TIER' | 'CUSTOM',
     source: customer.source ?? '',
     stage: customer.stage as CustomerStage,
     potential: customer.potential ?? '',
@@ -51,6 +54,7 @@ export function CustomerEditModal({
     email: customer.email ?? '',
     contact_person: customer.contact_person ?? '',
     tax_code: customer.tax_code ?? '',
+    staff_code: customer.staff_code ?? '',
     note: customer.note ?? '',
   });
   const [busy, setBusy] = useState(false);
@@ -72,6 +76,7 @@ export function CustomerEditModal({
         province: form.province.trim() || null,
         address: form.address.trim() || null,
         tier_id: canChangeTier ? form.tier_id || null : undefined,
+        price_mode: canChangeTier ? form.price_mode : undefined,
         source: form.source.trim() || null,
         stage: form.stage,
         potential: form.potential.trim() || null,
@@ -85,8 +90,14 @@ export function CustomerEditModal({
         email: form.email.trim() || null,
         contact_person: form.contact_person.trim() || null,
         tax_code: form.tax_code.trim() || null,
+        staff_code: form.staff_code.trim() || null,
         note: form.note.trim() || null,
       });
+      // Sale không tự đổi cấp ở hồ sơ: chọn cấp khác thì gửi xin Quản lý / CEO duyệt.
+      if (!canChangeTier && form.tier_id && form.tier_id !== (customer.tier_id ?? '')) {
+        await api.post(`/api/customers/${customer.id}/tier-request`, { tier_id: form.tier_id, reason: 'Gửi từ hồ sơ khách.' });
+        toast.success('Đã gửi xin Quản lý duyệt đổi cấp. Duyệt xong cấp mới được đổi.');
+      }
       onSaved();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -153,6 +164,12 @@ export function CustomerEditModal({
               <label>Mã số thuế</label>
               <input value={form.tax_code} onChange={(e) => setForm({ ...form, tax_code: e.target.value })} />
             </div>
+            {(tiers.data ?? []).find((t) => t.id === form.tier_id)?.code === 'NHAN_VIEN' && (
+              <div className="field">
+                <label>Mã nhân sự (để trừ lương cuối tháng)</label>
+                <input value={form.staff_code} onChange={(e) => setForm({ ...form, staff_code: e.target.value })} placeholder="Mã NS trong bảng nhân sự" />
+              </div>
+            )}
             <div className="field">
               <label>Tỉnh/thành</label>
               <input value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} />
@@ -160,6 +177,23 @@ export function CustomerEditModal({
             <div className="field">
               <label>Địa chỉ</label>
               <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
+
+            <div className="field">
+              <label>Cách tính giá</label>
+              <select
+                value={form.price_mode}
+                onChange={(e) => setForm({ ...form, price_mode: e.target.value as 'TIER' | 'CUSTOM' })}
+                disabled={!can('customer.update')}
+              >
+                <option value="TIER">Theo cấp giá 8 bậc (đại lý, NPP…)</option>
+                <option value="CUSTOM">Bảng giá riêng của khách (gia công hoặc NPP có giá riêng)</option>
+              </select>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {form.price_mode === 'CUSTOM'
+                  ? 'Khách chỉ mua được các mã đã có trong bảng giá riêng. Nhập bảng giá ở Quản trị › Bảng giá khách gia công.'
+                  : 'Giá lấy theo cấp giá bên dưới.'}
+              </span>
             </div>
 
             <div className="field">

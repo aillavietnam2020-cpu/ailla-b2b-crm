@@ -9,7 +9,7 @@ import type { Env } from '../env';
 export async function syncAccessEmails(env: Env): Promise<{ ok: boolean; count?: number; error?: string }> {
   if (!env.CF_ACCESS_TOKEN || !env.CF_ACCOUNT_ID || !env.ACCESS_POLICY_ID) return { ok: false, error: 'chưa cấu hình' };
   const rows = await env.DB.prepare(
-    "SELECT DISTINCT lower(email) AS email FROM users WHERE status = 'ACTIVE' AND deleted_at IS NULL ORDER BY 1",
+    "SELECT DISTINCT lower(email) AS email FROM users WHERE status = 'ACTIVE' AND deleted_at IS NULL AND kind = 'HUMAN' ORDER BY 1",
   ).all<{ email: string }>();
   const emails = (rows.results ?? []).map((r) => r.email).filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
   if (!emails.length) return { ok: false, error: 'không có email' }; // không bao giờ để danh sách rỗng (khoá cả CEO)

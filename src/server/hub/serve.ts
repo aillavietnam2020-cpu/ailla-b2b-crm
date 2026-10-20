@@ -2,6 +2,7 @@ import type { Env } from '../env';
 import { effectivePermissions } from '@shared/permissions';
 import { loadExtraPermissions } from '../middleware/auth';
 import { readSessionCookie, resolveSession } from '../lib/session';
+import { isAdminHost } from '../lib/host';
 
 /** Trang có script/style nội tuyến nên cần chính sách riêng, chặt nhất có thể. */
 const CSP = [
@@ -30,6 +31,7 @@ export async function serveHub(request: Request, env: Env, html: string): Promis
   if (!session || session.status !== 'ACTIVE') {
     return Response.redirect(new URL('/?next=/hub/', url).toString(), 302);
   }
+  if (session.must_change_password === 1) return Response.redirect(new URL('/', url).toString(), 302);
   const permissions = effectivePermissions(
     session.role as 'EMPLOYEE' | 'MANAGER' | 'CEO',
     await loadExtraPermissions(env.DB, session.id),
@@ -40,7 +42,21 @@ export async function serveHub(request: Request, env: Env, html: string): Promis
       { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
     );
   }
-  return new Response(html, {
+  const adminMode = isAdminHost(env, request);
+  if (adminMode && !(session.role === 'CEO' || permissions.includes('debt.read.all'))) {
+    return new Response(
+      '<!doctype html><meta charset="utf-8"><title>Trang quản trị Ailla</title><p style="font-family:sans-serif;padding:40px">Trang quản trị chỉ dành cho chủ doanh nghiệp và kế toán.</p>',
+      { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    );
+  }
+  const opsUrl = env.OPS_HOST ? 'https://' + env.OPS_HOST + '/hub/' : '';
+  const adminUrl = env.ADMIN_HOST ? 'https://' + env.ADMIN_HOST + '/hub/' : '';
+  const siteTitle = !env.ADMIN_HOST ? "Trang quản trị Ailla" : adminMode ? "Ailla Quản trị" : "Ailla Vận hành";
+  const page = html.split("Trang quản trị Ailla").join(siteTitle).replace(
+    'let HOST_MODE="ops";let OPS_URL="";let ADMIN_URL="";',
+    'let HOST_MODE=' + JSON.stringify(adminMode ? 'admin' : 'ops') + ';let OPS_URL=' + JSON.stringify(opsUrl) + ';let ADMIN_URL=' + JSON.stringify(adminUrl) + ';',
+  );
+  return new Response(page, {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',

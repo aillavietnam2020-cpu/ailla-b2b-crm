@@ -1,9 +1,11 @@
 import type { MiddlewareHandler } from 'hono';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import type { AppEnv, AuthUser, Env } from '../env';
+import type { AppEnv, AuthContext, AuthUser, Env } from '../env';
 import { customerScope, effectivePermissions } from '@shared/permissions';
 import { forbidden, unauthorized } from '../lib/http';
 import { readSessionCookie, resolveSession } from '../lib/session';
+import { AGENT_PERMISSIONS, AGENT_SCOPE_PERMISSIONS } from '@shared/agent';
+import { AGENT_TOKEN_PREFIX, hashAgentToken } from '../lib/agentToken';
 
 type Jwks = ReturnType<typeof createRemoteJWKSet>;
 const jwksCache = new Map<string, Jwks>();
@@ -71,7 +73,7 @@ export async function loadUserByEmail(db: D1Database, email: string): Promise<Au
   const user = await db
     .prepare(
       `SELECT id, email, display_name, role, status, must_change_password FROM users
-       WHERE lower(email) = lower(?) AND deleted_at IS NULL`,
+       WHERE lower(email) = lower(?) AND deleted_at IS NULL AND kind = 'HUMAN'`,
     )
     .bind(email)
     .first<AuthUser & { must_change_password: number }>();
@@ -85,12 +87,78 @@ export async function loadUserByEmail(db: D1Database, email: string): Promise<Au
   return user;
 }
 
+/** Tài khoản đang bị bắt đổi mật khẩu chỉ gọi được /api/me (và /api/auth/*) cho tới khi đổi xong. */
+function assertPasswordChanged(c: { req: { url: string } }, user: { must_change_password?: number }): void {
+  if (user.must_change_password !== 1) return;
+  const path = new URL(c.req.url).pathname;
+  if (path === '/api/me') return;
+  throw forbidden('Bạn cần đổi mật khẩu trước khi dùng. Vào vanhanh.ailla.vn, đổi mật khẩu rồi mở lại trang này.');
+}
+
+/**
+ * AI agent vào bằng khóa riêng (Authorization: Bearer agt_...). Quyền của agent CHỈ là các quyền cấp riêng cho
+ * nó (agent.read, agent.propose), không bao giờ theo vai trò; và chỉ được gọi /api/agent/*.
+ */
+async function resolveAgentAuth(
+  c: { env: Env; req: { header: (n: string) => string | undefined; url: string } },
+): Promise<AuthContext | null> {
+  const header = c.req.header('Authorization') ?? '';
+  if (!header.startsWith('Bearer ' + AGENT_TOKEN_PREFIX)) return null;
+  const hash = await hashAgentToken(header.slice('Bearer '.length).trim());
+  const row = await c.env.DB.prepare(
+    `SELECT a.id, a.status AS agent_status, a.last_used_at, u.email, u.display_name, u.status AS user_status
+     FROM agents a JOIN users u ON u.id = a.id
+     WHERE a.token_hash = ? AND u.deleted_at IS NULL`,
+  )
+    .bind(hash)
+    .first<{
+      id: string;
+      agent_status: string;
+      last_used_at: string | null;
+      email: string;
+      display_name: string;
+      user_status: string;
+    }>();
+  if (!row || row.agent_status !== 'ACTIVE' || row.user_status !== 'ACTIVE') {
+    throw unauthorized('Khóa agent không đúng hoặc đã bị khóa');
+  }
+  const path = new URL(c.req.url).pathname;
+  if (!path.startsWith('/api/agent/')) throw forbidden('Agent chỉ được dùng các đường dẫn /api/agent/*');
+  const now = new Date();
+  // Chỉ ghi lần dùng cuối khi đã cũ hơn 5 phút để mỗi lần gọi không tốn một lượt ghi.
+  if (!row.last_used_at || now.getTime() - new Date(row.last_used_at).getTime() > 300_000) {
+    await c.env.DB.prepare('UPDATE agents SET last_used_at = ? WHERE id = ?').bind(now.toISOString(), row.id).run();
+  }
+  const extra = await loadExtraPermissions(c.env.DB, row.id);
+  return {
+    user: {
+      id: row.id,
+      email: row.email,
+      display_name: row.display_name,
+      role: 'EMPLOYEE',
+      status: 'ACTIVE',
+    },
+    scope: 'ALL',
+    permissions: extra.filter(
+      (p) => (AGENT_PERMISSIONS as readonly string[]).includes(p) || AGENT_SCOPE_PERMISSIONS.includes(p),
+    ),
+    actorType: 'AGENT',
+  };
+}
+
 export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const agentAuth = await resolveAgentAuth(c);
+  if (agentAuth) {
+    c.set('auth', agentAuth);
+    await next();
+    return;
+  }
   const token = readSessionCookie(c.req.raw.headers);
   if (token) {
     const session = await resolveSession(c.env.DB, token);
     if (session) {
       if (session.status !== 'ACTIVE') throw forbidden('Tài khoản đang bị khoá.');
+      assertPasswordChanged(c, session);
       const extra = await loadExtraPermissions(c.env.DB, session.id);
       const role = session.role as AuthUser['role'];
       c.set('auth', {
@@ -112,6 +180,7 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   const email = await resolveEmail(c.env, c.req.raw.headers);
   const user = await loadUserByEmail(c.env.DB, email);
+  assertPasswordChanged(c, user);
   const extra = await loadExtraPermissions(c.env.DB, user.id);
   c.set('auth', {
     user,

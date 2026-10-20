@@ -15,6 +15,8 @@ hrRoutes.use('*', async (c, next) => {
 });
 
 const MAX_FILE = 1_500_000;
+// Chỉ ảnh và PDF được mở ngay trong trình duyệt; mọi loại khác (kể cả HTML) bị ép tải về để không chạy mã.
+const INLINE_OK = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
 const KINDS = ['anh', 'cccd', 'hd', 'qd', 'khac'];
 
 hrRoutes.get('/files', async (c) => {
@@ -58,8 +60,9 @@ hrRoutes.get('/files/:id', async (c) => {
     d instanceof Uint8Array ? d : d instanceof ArrayBuffer ? new Uint8Array(d) : Array.isArray(d) ? Uint8Array.from(d as number[]) : Uint8Array.from(Object.values(d as object) as number[]);
   return new Response(bytes as unknown as BodyInit, {
     headers: {
-      'Content-Type': row.mime,
-      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(row.name)}`,
+      'Content-Type': INLINE_OK.includes(row.mime) ? row.mime : 'application/octet-stream',
+      'Content-Disposition': `${INLINE_OK.includes(row.mime) ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(row.name)}`,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
       'Cache-Control': 'private, max-age=300',
       'X-Content-Type-Options': 'nosniff',
     },

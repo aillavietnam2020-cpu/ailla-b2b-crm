@@ -19,15 +19,21 @@ interface AuditRow {
 
 export function AuditPage() {
   const [entityType, setEntityType] = useState('');
-  const logs = useApi<AuditRow[]>(`/api/audit${entityType ? `?entity_type=${entityType}` : ''}`);
+  const [showReads, setShowReads] = useState(false);
+  const qs = [entityType ? `entity_type=${entityType}` : '', showReads ? 'include_reads=1' : ''].filter(Boolean).join('&');
+  const logs = useApi<AuditRow[]>(`/api/audit${qs ? `?${qs}` : ''}`);
 
   return (
     <>
       <div className="page-head">
         <div>
           <h2>Nhật ký hệ thống</h2>
-          <p>Mọi thay đổi owner, cấp giá, đơn hàng, duyệt, thanh toán và import đều được ghi lại kèm before/after.</p>
+          <p>Ai đã sửa, thêm, xóa, duyệt gì và lúc nào (giá, đơn hàng, thanh toán, nhập dữ liệu...). Các dòng chỉ mở xem được ẩn cho gọn.</p>
         </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <input type="checkbox" checked={showReads} onChange={(e) => setShowReads(e.target.checked)} />
+          Hiện cả dòng đọc dữ liệu
+        </label>
         <select className="select" value={entityType} onChange={(e) => setEntityType(e.target.value)}>
           <option value="">Tất cả đối tượng</option>
           <option value="CUSTOMER">Khách hàng</option>

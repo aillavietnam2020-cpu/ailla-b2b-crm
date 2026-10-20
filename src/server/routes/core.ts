@@ -6,6 +6,7 @@ import { badRequest, ok } from '../lib/http';
 import { listAlerts, syncAlerts } from '../services/alerts';
 import { loadConfig } from '../lib/settings';
 import { requirePermission } from '../middleware/rbac';
+import { adminOnlyEndpoint } from '../middleware/adminHost';
 
 export const coreRoutes = new Hono<AppEnv>();
 
@@ -29,16 +30,49 @@ coreRoutes.get('/users', async (c) => {
   }
   const rows = await c.env.DB.prepare(
     `SELECT id, display_name, role, legacy_name FROM users
-     WHERE status = 'ACTIVE' AND deleted_at IS NULL ORDER BY role, display_name`,
+     WHERE status = 'ACTIVE' AND deleted_at IS NULL AND kind = 'HUMAN' ORDER BY role, display_name`,
   ).all();
   return ok(c, rows.results ?? []);
 });
 
 coreRoutes.get('/tiers', async (c) => {
   const rows = await c.env.DB.prepare(
-    'SELECT id, code, name, rank, debt_limit FROM price_tiers ORDER BY rank',
+    `SELECT t.id, t.code, t.name, t.rank, t.debt_limit, COALESCE(r.min_order_amount, 0) AS min_order_amount
+     FROM price_tiers t LEFT JOIN tier_upgrade_rules r ON r.tier_id = t.id ORDER BY t.rank`,
   ).all();
   return ok(c, rows.results ?? []);
+});
+
+/** Điều kiện lên cấp: tiền hàng tối thiểu của một đơn để sale tự đưa khách lên cấp này (0 = chưa đặt, sale phải xin duyệt). */
+coreRoutes.put('/tiers/:id/upgrade-rule', adminOnlyEndpoint, requirePermission('customer.tier.change'), async (c) => {
+  const auth = c.get('auth');
+  const body = (await c.req.json().catch(() => null)) as { min_order_amount?: unknown } | null;
+  const amount = Math.round(Number(body?.min_order_amount ?? NaN));
+  if (!Number.isFinite(amount) || amount < 0 || amount > 100_000_000_000) {
+    throw badRequest('BAD_AMOUNT', 'Số tiền không hợp lệ (từ 0 trở lên, tính bằng đồng).');
+  }
+  const tier = await c.env.DB.prepare('SELECT id, name FROM price_tiers WHERE id = ?').bind(c.req.param('id')).first<{ id: string; name: string }>();
+  if (!tier) throw badRequest('NO_TIER', 'Không tìm thấy cấp giá.');
+  const before = await c.env.DB.prepare('SELECT min_order_amount FROM tier_upgrade_rules WHERE tier_id = ?').bind(tier.id).first<{ min_order_amount: number }>();
+  await c.env.DB.batch([
+    c.env.DB
+      .prepare(
+        `INSERT INTO tier_upgrade_rules (tier_id, min_order_amount, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT (tier_id) DO UPDATE SET min_order_amount = excluded.min_order_amount, updated_at = excluded.updated_at`,
+      )
+      .bind(tier.id, amount, nowIso()),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'TIER_RULE_CHANGED',
+      entityType: 'PRICE_TIER',
+      entityId: tier.id,
+      before: { min_order_amount: before?.min_order_amount ?? 0 },
+      after: { min_order_amount: amount, tier: tier.name },
+      requestId: c.get('requestId'),
+      ip: null,
+    }),
+  ]);
+  return ok(c, { tier_id: tier.id, min_order_amount: amount });
 });
 
 coreRoutes.get('/alerts', async (c) => {
@@ -61,7 +95,7 @@ coreRoutes.get('/settings', requirePermission('dashboard.manager'), async (c) =>
   return ok(c, { items: rows.results ?? [], config: await loadConfig(c.env.DB) });
 });
 
-coreRoutes.patch('/settings', requirePermission('settings.manage'), async (c) => {
+coreRoutes.patch('/settings', adminOnlyEndpoint, requirePermission('settings.manage'), async (c) => {
   const auth = c.get('auth');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const entries = Object.entries(body);
@@ -100,6 +134,10 @@ coreRoutes.get('/audit', requirePermission('audit.read.own'), async (c) => {
   if (auth.user.role === 'EMPLOYEE') {
     where.push('a.actor_id = ?');
     params.push(auth.user.id);
+  }
+  // Mặc định ẩn các dòng "đọc dữ liệu" (mỗi lần mở web là một dòng), chỉ hiện việc sửa / thêm / xóa / duyệt.
+  if (c.req.query('include_reads') !== '1') {
+    where.push("a.action NOT LIKE '%_READ'");
   }
   if (entityType) {
     where.push('a.entity_type = ?');

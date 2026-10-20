@@ -10,6 +10,7 @@ import {
 import { ALERT_LABELS, type AlertCode } from '@shared/enums';
 import type { AlertItem } from '@shared/types';
 import { newId } from '../lib/ids';
+import { eventStatement } from '../lib/events';
 import type { AppConfig } from '../lib/settings';
 import { listDebts } from './debts';
 
@@ -81,7 +82,7 @@ export async function evaluateAllAlerts(db: D1Database, config: AppConfig): Prom
     .prepare(
       `SELECT p.id AS product_id, p.sku, GROUP_CONCAT(t.name, ', ') AS tier_names
        FROM products p
-       JOIN price_tiers t ON 1 = 1
+       JOIN price_tiers t ON t.code NOT IN ('KHAC', 'NHAN_VIEN')
        LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.tier_id = t.id
             AND pp.amount IS NOT NULL AND pp.status <> 'DRAFT'
             AND (pp.valid_to IS NULL OR pp.valid_to >= date('now'))
@@ -105,6 +106,7 @@ export async function evaluateAllAlerts(db: D1Database, config: AppConfig): Prom
 export async function syncAlerts(db: D1Database, config: AppConfig): Promise<{ opened: number; resolved: number }> {
   const candidates = await evaluateAllAlerts(db, config);
   const now = nowIso();
+  const today = vnDate();
   const keyOf = (c: { code: string; entityType: string; entityId: string }) =>
     `${c.code}|${c.entityType}|${c.entityId}`;
 
@@ -122,6 +124,14 @@ export async function syncAlerts(db: D1Database, config: AppConfig): Promise<{ o
     if (existingMap.has(keyOf(candidate))) continue;
     opened += 1;
     statements.push(
+      eventStatement(db, {
+        type: 'ALERT_OPENED',
+        entityType: String(candidate.entityType).toUpperCase(),
+        entityId: candidate.entityId,
+        actorType: 'SYSTEM',
+        dedupeKey: `ALERT:${candidate.code}:${candidate.entityType}:${candidate.entityId}:${today}`,
+        payload: { code: candidate.code, severity: candidate.severity, message: candidate.message },
+      }),
       db
         .prepare(
           `INSERT INTO alerts (id, code, entity_type, entity_id, owner_id, severity, message, data_json, status, created_at)

@@ -12,6 +12,7 @@ export const PERMISSIONS = [
   'customer.create',
   'customer.update',
   'customer.reassign',
+  'customer.delete',
   'customer.tier.change',
   'activity.create',
   'activity.read.team',
@@ -45,6 +46,12 @@ export const PERMISSIONS = [
   'user.manage.all',
   'product.manage',
   'order.payment.record',
+  // Kế toán kho: thấy mọi đơn, kiểm tồn, báo đủ/thiếu hàng, ghi số thực xuất.
+  'order.kho.process',
+  'sx.kiemke',
+  // Quyền riêng của AI agent (xem shared/agent.ts): chỉ đọc qua /api/agent và ghi đề xuất.
+  'agent.read',
+  'agent.propose',
   // Khu Marketing & công việc (trang /hub/): vào được thì đọc/ghi kế hoạch, giao việc, trợ lý AI.
   'hub.access',
 ] as const;
@@ -129,6 +136,12 @@ export const ACCOUNTANT_PERMISSIONS: Permission[] = [
 ];
 
 /**
+ * Gói quyền KHO (kế toán kho): thấy mọi đơn B2B trong luồng kho, kiểm tồn, báo đủ/thiếu, ghi số thực xuất khi xuất hàng.
+ * Cấp thêm cho một tài khoản như gói Kế toán; không cho sửa đơn, không xem công nợ.
+ */
+export const WAREHOUSE_PERMISSIONS: Permission[] = ['order.kho.process', 'sx.kiemke'];
+
+/**
  * Gói quyền MARKETING: nhân sự Content/Digital chỉ làm ở khu Marketing (/hub/), không đụng dữ liệu B2B.
  * HUB_ONLY là dấu đánh riêng (không nằm trong PERMISSIONS nên CEO không bao giờ bị dính):
  * tài khoản có dấu này chỉ còn đúng quyền vào khu Marketing.
@@ -138,7 +151,10 @@ export const HUB_ONLY = 'hub.only';
 
 /** Quyền cuối cùng của một người = quyền theo vai trò + quyền cấp thêm. */
 export function effectivePermissions(role: Role, extra: string[] = []): Permission[] {
-  if (role !== 'CEO' && extra.includes(HUB_ONLY)) return [...MARKETING_PERMISSIONS];
+  // Dấu "chỉ Marketing" chỉ thu quyền khi người đó KHÔNG được cấp quyền kho; ai có quyền kho (kế toán kho) thì giữ nguyên quyền kho
+  // dù còn dấu này, để không bị mất quyền vì thao tác chọn lẫn.
+  const isWarehouse = extra.some((p) => (WAREHOUSE_PERMISSIONS as string[]).includes(p));
+  if (role !== 'CEO' && extra.includes(HUB_ONLY) && !isWarehouse) return [...MARKETING_PERMISSIONS];
   const set = new Set<Permission>(ROLE_PERMISSIONS[role]);
   for (const item of extra) {
     if ((PERMISSIONS as readonly string[]).includes(item)) set.add(item as Permission);

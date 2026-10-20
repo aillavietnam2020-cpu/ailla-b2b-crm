@@ -9,6 +9,7 @@ import { ApiError, api, newIdempotencyKey } from '../lib/api';
 import { useApi, useDebounced } from '../lib/hooks';
 import { Card, Field, Modal, StageBadge, StateBlock, useToast } from '../components/ui';
 import { useAuth } from '../components/AuthProvider';
+import { hubPeriodParam } from '../lib/hubPeriod';
 
 export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
   const { me, can } = useAuth();
@@ -22,6 +23,8 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
   const [showCreate, setShowCreate] = useState(params.get('new') === '1');
   const [reassignTarget, setReassignTarget] = useState<CustomerListItem | null>(null);
   const debouncedQ = useDebounced(q);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const canDelete = can('customer.delete');
 
   const query = new URLSearchParams({ page: '1', page_size: '100' });
   if (debouncedQ) query.set('q', debouncedQ);
@@ -29,6 +32,8 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
   if (owner) query.set('owner_id', owner);
   if (quality) query.set('data_quality', quality);
   if (sort) query.set('sort', sort);
+  // Doanh số theo tháng đang chọn ở thanh thời gian trên cùng của Trang quản trị.
+  query.set('month', hubPeriodParam());
 
   const customers = useApi<CustomerListItem[]>(`/api/customers?${query.toString()}`);
   const users = useApi<UserSummary[]>('/api/users');
@@ -42,18 +47,64 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
     }
   };
 
+  const togglePick = (id: string, on: boolean) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const allShown = (customers.data ?? []).map((x) => x.id);
+  const allPicked = allShown.length > 0 && allShown.every((x) => picked.has(x));
+  const deletePicked = async () => {
+    const ids = [...picked];
+    if (!ids.length) return;
+    if (
+      !window.confirm(
+        `Xóa ${ids.length} khách đã chọn?\n\nChỉ xóa được khách chưa có đơn hàng, phiếu thu, trả hàng hay dư nợ cũ. Khách đã phát sinh sẽ được giữ lại để còn lịch sử công nợ.`,
+      )
+    )
+      return;
+    try {
+      const res = await api.post<{
+        done: Array<{ id: string; name: string }>;
+        blocked: Array<{ id: string; name: string; reasons: string[] }>;
+      }>('/api/customers/bulk-delete', { ids });
+      const r = res.data;
+      setPicked(new Set());
+      customers.reload();
+      toast.success(`Đã xóa ${r.done.length} khách`);
+      if (r.blocked.length) {
+        window.alert(
+          `${r.blocked.length} khách chưa xóa được vì đã phát sinh:\n\n` +
+            r.blocked
+              .slice(0, 12)
+              .map((b) => `• ${b.name}: ${b.reasons.join('; ')}`)
+              .join('\n') +
+            (r.blocked.length > 12 ? `\n… và ${r.blocked.length - 12} khách nữa` : ''),
+        );
+      }
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Chưa xóa được');
+    }
+  };
+
   return (
     <>
       <div className="page-head">
         <div>
           <h2>{mode === 'admin' ? 'Danh sách khách hàng' : 'Khách hàng của tôi'}</h2>
-          {mode !== 'admin' && <p>Chỉ hiển thị khách được phân công cho bạn (giới hạn ở backend).</p>}
+          {mode !== 'admin' && (
+            <p>Chỉ hiển thị khách được phân công cho bạn (giới hạn ở backend).</p>
+          )}
         </div>
-        {can('customer.create') && (
-          <button className="btn primary" onClick={() => setShowCreate(true)}>
-            Thêm khách hàng
-          </button>
-        )}
+        <div className="actions">
+          {can('customer.create') && (
+            <button className="btn primary" onClick={() => setShowCreate(true)}>
+              Thêm khách hàng
+            </button>
+          )}
+        </div>
       </div>
 
       <Card bodyClass="">
@@ -91,26 +142,32 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
             <option value="NEEDS_REVIEW">Cần kiểm tra dữ liệu</option>
             <option value="OK">Dữ liệu đủ</option>
           </select>
-          <select
-            className="select"
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            title="Sắp xếp danh sách"
-          >
-            <option value="follow_up">Sắp theo: lịch chăm sóc</option>
-            <option value="name">Tên A → Z</option>
-            <option value="name_desc">Tên Z → A</option>
-            <option value="newest">Mới thêm trước</option>
-            <option value="last_order">Đơn gần nhất</option>
-            <option value="debt">Công nợ cao nhất</option>
-            <option value="revenue">Doanh số cao nhất</option>
-            <option value="province">Tỉnh/thành</option>
-            <option value="tier">Cấp giá</option>
-            <option value="stage">Giai đoạn</option>
-            {mode === 'admin' && <option value="owner">Nhân viên phụ trách</option>}
-          </select>
+          <label className="muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Sắp xếp
+            <select
+              className="select"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              title="Sắp xếp danh sách"
+            >
+              <option value="follow_up">Theo lịch chăm sóc</option>
+              <option value="name">Theo tên A → Z</option>
+              <option value="name_desc">Theo tên Z → A</option>
+              <option value="newest">Mới thêm trước</option>
+              <option value="last_order">Đơn gần nhất trước</option>
+              <option value="debt">Công nợ cao nhất</option>
+              <option value="revenue_month">Doanh số tháng cao → thấp</option>
+              <option value="revenue_month_asc">Doanh số tháng thấp → cao</option>
+              <option value="revenue">Doanh số cộng dồn cao nhất</option>
+              <option value="province">Theo tỉnh / thành</option>
+              <option value="tier">Theo cấp giá</option>
+              <option value="stage">Theo giai đoạn</option>
+              {mode === 'admin' && <option value="owner">Theo sale phụ trách</option>}
+            </select>
+          </label>
           <button
             className="btn"
+            title="Bỏ hết bộ lọc (tìm kiếm, giai đoạn, sale, chất lượng dữ liệu) để thấy lại toàn bộ khách. Không đổi cách sắp xếp."
             onClick={() => {
               setQ('');
               setStage('');
@@ -118,7 +175,7 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
               setQuality('');
             }}
           >
-            Đặt lại
+            Xóa bộ lọc
           </button>
         </div>
 
@@ -128,19 +185,76 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
           empty={(customers.data ?? []).length === 0}
           emptyText="Không tìm thấy khách hàng phù hợp."
         >
+          {canDelete && (
+            <div
+              style={{
+                minHeight: 46,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flexWrap: 'wrap',
+                padding: '6px 16px',
+                background: picked.size ? '#f4f3ff' : '#fbfbfd',
+                borderTop: '1px solid #e3e6ec',
+                fontSize: 13.5,
+              }}
+            >
+              {picked.size ? (
+                <>
+                  <b>Đã chọn {picked.size} khách</b>
+                  <button className="btn sm" style={{ color: '#b42318' }} onClick={() => void deletePicked()}>
+                    Xóa
+                  </button>
+                  <button className="btn sm" onClick={() => setPicked(new Set())}>
+                    Bỏ chọn
+                  </button>
+                </>
+              ) : (
+                <span className="muted">Tick ô ở đầu dòng để chọn nhiều khách rồi xóa một lần.</span>
+              )}
+            </div>
+          )}
           <div className="table-wrap tall">
             <table className="data wide compact">
               <thead>
                 <tr>
+                  {canDelete && (
+                    <th style={{ width: 34 }}>
+                      <input
+                        type="checkbox"
+                        title="Chọn cả danh sách đang hiện"
+                        checked={allPicked}
+                        onChange={(e) =>
+                          setPicked(e.target.checked ? new Set(allShown) : new Set())
+                        }
+                      />
+                    </th>
+                  )}
                   <th>Khách hàng</th>
                   <th>Khu vực</th>
                   <th>Cấp giá</th>
                   <th>Giai đoạn</th>
-                  {mode === 'admin' && <th>Sale phụ trách</th>}
-                  <th className="right">Doanh số tháng này (đ)</th>
+                  {mode === 'admin' && <th>Sale</th>}
+                  <th
+                    className="right"
+                    title="Doanh số tháng này theo giá nhập (giá cấp của khách)"
+                  >
+                    Doanh số tháng (đ)
+                  </th>
+                  <th
+                    className="right"
+                    title="Doanh số tháng này quy theo giá niêm yết bán lẻ, dùng tính thưởng"
+                  >
+                    Doanh số lẻ (đ)
+                  </th>
                   <th>Nhập gần nhất</th>
                   <th className="right">Công nợ chính thức (đ)</th>
-                  <th className="right">Dự kiến (đ)</th>
+                  <th
+                    className="right"
+                    title="Công nợ chính thức + đơn đã duyệt, đã xuất nhưng kế toán chưa xác nhận − tiền sale đã báo về chưa xác nhận. Đơn nháp không tính."
+                  >
+                    Dự kiến (đ)
+                  </th>
                   <th>Chăm sóc tiếp</th>
                   <th></th>
                 </tr>
@@ -151,53 +265,82 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                     customer.next_follow_up_at !== null && customer.next_follow_up_at < vnDate();
                   return (
                     <tr key={customer.id}>
+                      {canDelete && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={picked.has(customer.id)}
+                            onChange={(e) => togglePick(customer.id, e.target.checked)}
+                          />
+                        </td>
+                      )}
                       <td>
-                        <Link
-                          to={`/${mode}/customers/${customer.id}`}
-                          className="rowlink"
-                        >
+                        <Link to={`/${mode}/customers/${customer.id}`} className="rowlink">
                           {customer.name}
                         </Link>
                         <span className="muted cust-phone">{formatPhone(customer.phone_text)}</span>
                         {customer.data_quality === 'NEEDS_REVIEW' && (
-                          <span className="badge orange" title="Cần kiểm tra dữ liệu">
-                            Kiểm tra
-                          </span>
+                          <div
+                            className="cust-review"
+                            title={customer.data_quality_note ?? 'Cần kiểm tra dữ liệu'}
+                          >
+                            ● {customer.data_quality_note ?? 'Cần kiểm tra dữ liệu'}
+                          </div>
                         )}
                       </td>
                       <td>{customer.province ?? '—'}</td>
                       <td>
                         {customer.tier_name ?? (
-                          <span className="badge red">{customer.legacy_tier_label ?? 'Chưa map cấp'}</span>
+                          <span className="badge red">
+                            {customer.legacy_tier_label ?? 'Chưa map cấp'}
+                          </span>
                         )}
                       </td>
                       <td>
                         <StageBadge stage={customer.stage} />
                       </td>
-                      {mode === 'admin' && <td>{customer.owner_name ?? 'Chưa phân công'}</td>}
+                      {mode === 'admin' && <td>{customer.owner_short ?? '_'}</td>}
                       <td className="right nowrap">
-                      <strong>{formatVndNumber(customer.revenue_month ?? 0)}</strong>
-                      <span className="muted cust-sub" title="Số đơn luỹ kế">
-                        {customer.orders_total ?? 0} đơn
-                      </span>
-                    </td>
-                    <td className="nowrap">
-                      {customer.last_order_date ? (
-                        <>
-                          {formatVnDate(customer.last_order_date)}
-                          <span className={`cust-sub ${customer.reorder_due ? 'error' : 'muted'}`}>
-                            {customer.reorder_due
-                              ? `Quá hạn ${customer.days_since_order} ngày`
-                              : `${customer.days_since_order ?? 0}/${customer.reorder_cycle_days ?? 30} ngày`}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="muted">Chưa mua</span>
-                      )}
-                    </td>
-                    <td className="right nowrap">{formatVndNumber(customer.official_debt)}</td>
-                      <td className="right nowrap">{formatVndNumber(customer.projected_debt)}</td>
-                      <td className={overdue ? 'nowrap' : 'nowrap'} style={overdue ? { color: 'var(--red)', fontWeight: 700 } : undefined}>
+                        {customer.revenue_month ? (
+                          <strong>{formatVndNumber(customer.revenue_month)}</strong>
+                        ) : (
+                          '_'
+                        )}
+                      </td>
+                      <td className="right nowrap">
+                        {customer.retail_month ? (
+                          <strong>{formatVndNumber(customer.retail_month)}</strong>
+                        ) : (
+                          '_'
+                        )}
+                      </td>
+                      <td className="nowrap">
+                        {customer.last_order_date ? (
+                          <>
+                            {formatVnDate(customer.last_order_date)}
+                            <span
+                              className={`cust-sub ${customer.reorder_due ? 'error' : 'muted'}`}
+                              style={{ display: 'block', marginLeft: 0, fontSize: 11 }}
+                            >
+                              {customer.reorder_due
+                                ? `Quá hạn ${customer.days_since_order} ngày`
+                                : `${customer.days_since_order ?? 0}/${customer.reorder_cycle_days ?? 30} ngày`}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="muted">Chưa mua</span>
+                        )}
+                      </td>
+                      <td className="right nowrap">
+                        {customer.official_debt ? formatVndNumber(customer.official_debt) : '_'}
+                      </td>
+                      <td className="right nowrap">
+                        {customer.projected_debt ? formatVndNumber(customer.projected_debt) : '_'}
+                      </td>
+                      <td
+                        className={overdue ? 'nowrap' : 'nowrap'}
+                        style={overdue ? { color: 'var(--red)', fontWeight: 700 } : undefined}
+                      >
                         {formatVnDate(customer.next_follow_up_at)}
                       </td>
                       <td>
@@ -324,7 +467,11 @@ function CreateCustomerModal({
     >
       <form id="create-customer" onSubmit={submit}>
         <div className="modal-body">
-          {formError && <div className="alert-box" style={{ marginBottom: 14 }}>{formError}</div>}
+          {formError && (
+            <div className="alert-box" style={{ marginBottom: 14 }}>
+              {formError}
+            </div>
+          )}
           <div className="form-grid">
             <Field label="Tên khách hàng / chủ cửa hàng *" error={fields.name}>
               <input
@@ -333,7 +480,11 @@ function CreateCustomerModal({
                 aria-invalid={Boolean(fields.name)}
               />
             </Field>
-            <Field label="Số điện thoại" error={fields.phone_text} hint="Lưu dạng chữ, giữ số 0 đầu">
+            <Field
+              label="Số điện thoại"
+              error={fields.phone_text}
+              hint="Lưu dạng chữ, giữ số 0 đầu"
+            >
               <input
                 value={form.phone_text}
                 onChange={(e) => setForm({ ...form, phone_text: e.target.value })}
@@ -342,13 +493,26 @@ function CreateCustomerModal({
               />
             </Field>
             <Field label="Tỉnh/thành" error={fields.province}>
-              <input value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} />
+              <input
+                value={form.province}
+                onChange={(e) => setForm({ ...form, province: e.target.value })}
+              />
             </Field>
             <Field label="Địa chỉ" error={fields.address}>
-              <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <input
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+              />
             </Field>
-            <Field label="Cấp giá" error={fields.tier_id} hint="Chưa chọn cấp thì chưa tạo được đơn">
-              <select value={form.tier_id} onChange={(e) => setForm({ ...form, tier_id: e.target.value })}>
+            <Field
+              label="Cấp giá"
+              error={fields.tier_id}
+              hint="Chưa chọn cấp thì chưa tạo được đơn"
+            >
+              <select
+                value={form.tier_id}
+                onChange={(e) => setForm({ ...form, tier_id: e.target.value })}
+              >
                 <option value="">Chưa xác định</option>
                 {tiers.map((tier) => (
                   <option key={tier.id} value={tier.id}>
@@ -358,15 +522,23 @@ function CreateCustomerModal({
               </select>
             </Field>
             <Field label="Nguồn khách" error={fields.source}>
-              <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
-                {['Facebook Ads', 'TikTok', 'Website', 'Giới thiệu', 'Hội chợ/Sự kiện', 'Khác'].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
+              <select
+                value={form.source}
+                onChange={(e) => setForm({ ...form, source: e.target.value })}
+              >
+                {['Facebook Ads', 'TikTok', 'Website', 'Giới thiệu', 'Hội chợ/Sự kiện', 'Khác'].map(
+                  (s) => (
+                    <option key={s}>{s}</option>
+                  ),
+                )}
               </select>
             </Field>
             {canChooseOwner && (
               <Field label="Sale phụ trách" error={fields.owner_id}>
-                <select value={form.owner_id} onChange={(e) => setForm({ ...form, owner_id: e.target.value })}>
+                <select
+                  value={form.owner_id}
+                  onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
+                >
                   <option value="">Giao cho tôi</option>
                   {users.map((user) => (
                     <option key={user.id} value={user.id}>
@@ -450,7 +622,11 @@ function ReassignModal({
     >
       <form id="reassign-form" onSubmit={submit}>
         <div className="modal-body">
-          {formError && <div className="alert-box" style={{ marginBottom: 14 }}>{formError}</div>}
+          {formError && (
+            <div className="alert-box" style={{ marginBottom: 14 }}>
+              {formError}
+            </div>
+          )}
           <div className="form-grid">
             <Field label="Người nhận *" error={fields.owner_id}>
               <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
@@ -462,7 +638,12 @@ function ReassignModal({
                 ))}
               </select>
             </Field>
-            <Field label="Lý do chuyển *" error={fields.reason} full hint="Lý do được ghi vào nhật ký hệ thống">
+            <Field
+              label="Lý do chuyển *"
+              error={fields.reason}
+              full
+              hint="Lý do được ghi vào nhật ký hệ thống"
+            >
               <textarea value={reason} onChange={(e) => setReason(e.target.value)} />
             </Field>
           </div>

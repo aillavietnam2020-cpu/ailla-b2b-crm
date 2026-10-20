@@ -8,11 +8,14 @@ import type { ActivityCreateInput, CustomerCreateInput } from '@shared/schemas';
 import type { ActivityItem, CustomerDetail, CustomerListItem, TaskItem } from '@shared/types';
 import type { AuthContext } from '../env';
 import { auditStatement } from '../lib/audit';
+import { eventStatement } from '../lib/events';
 import { badRequest, forbidden, notFound, unprocessable } from '../lib/http';
 import { newId } from '../lib/ids';
 import { RECEIVED_BY_ORDER } from '../lib/sql';
 import type { AppConfig } from '../lib/settings';
 import { getCustomerDebt } from './debts';
+import { monthRetailByCustomer } from './bonus';
+import { spanOf } from '../lib/span';
 
 /**
  * Danh sách khách kèm các chỉ số theo dõi tái mua - đúng các cột trong sheet KHACH_HANG:
@@ -20,10 +23,10 @@ import { getCustomerDebt } from './debts';
  */
 const LIST_SQL = `
 SELECT c.id, c.legacy_code, c.name, c.phone_text, c.province, c.tier_id, t.name AS tier_name,
-       c.legacy_tier_label, c.owner_id, u.display_name AS owner_name, c.stage, c.source,
-       c.next_follow_up_at, c.last_order_date, c.data_quality, c.credit_limit, t.debt_limit,
+       c.price_mode, c.legacy_tier_label, c.owner_id, u.display_name AS owner_name, u.legacy_name AS owner_legacy, c.stage, c.source,
+       c.next_follow_up_at, (SELECT MAX(lo.order_date) FROM orders lo WHERE lo.customer_id = c.id AND lo.deleted_at IS NULL AND lo.approval_status = 'APPROVED') AS last_order_date, c.data_quality, c.data_quality_note, c.credit_limit, t.debt_limit,
        COALESCE(c.reorder_cycle_days, 30) AS reorder_cycle_days,
-       CAST(julianday('now', '+7 hours') - julianday(c.last_order_date) AS INTEGER) AS days_since_order,
+       CAST(julianday('now', '+7 hours') - julianday((SELECT MAX(lo.order_date) FROM orders lo WHERE lo.customer_id = c.id AND lo.deleted_at IS NULL AND lo.approval_status = 'APPROVED')) AS INTEGER) AS days_since_order,
        (SELECT COALESCE(SUM(o.subtotal - o.discount_amount - o.bonus_deduction), 0)
           FROM orders o
          WHERE o.customer_id = c.id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
@@ -44,9 +47,17 @@ export interface CustomerFilters {
   due?: 'today' | 'overdue' | 'upcoming';
   dataQuality?: 'OK' | 'NEEDS_REVIEW';
   sort?: string;
+  /** Tháng tính doanh số (YYYY-MM); bỏ trống là tháng hiện tại. */
+  month?: string;
   page: number;
   pageSize: number;
 }
+
+/** LIST_SQL tính doanh số theo tháng hiện tại; thay bằng khoảng ngày (từ, đến) để xem đúng kỳ chọn. */
+const LIST_SQL_BY_MONTH = LIST_SQL.replace(
+  "substr(o.order_date, 1, 7) = strftime('%Y-%m', 'now', '+7 hours')",
+  'substr(o.order_date, 1, 10) BETWEEN ? AND ?',
+);
 
 /** Các kiểu sắp xếp cho phép. Không ghép chuỗi từ client vào SQL để tránh SQL injection. */
 const SORT_OPTIONS: Record<string, string> = {
@@ -55,7 +66,7 @@ const SORT_OPTIONS: Record<string, string> = {
   name_desc: 'c.name COLLATE NOCASE DESC',
   newest: 'c.created_at DESC',
   oldest: 'c.created_at',
-  last_order: `CASE WHEN c.last_order_date IS NULL THEN 1 ELSE 0 END, c.last_order_date DESC`,
+  last_order: `CASE WHEN last_order_date IS NULL THEN 1 ELSE 0 END, last_order_date DESC`,
   province: `c.province COLLATE NOCASE, c.name COLLATE NOCASE`,
   tier: 't.rank, c.name COLLATE NOCASE',
   stage: 'c.stage, c.name COLLATE NOCASE',
@@ -77,6 +88,17 @@ export const CUSTOMER_SORT_LABELS: Record<string, string> = {
   revenue: 'Doanh số cao nhất',
 };
 
+/** Tên sale rút gọn để hiện trong bảng: tên gọi trong Sheet (Thảo, Huyền) nếu có, không thì từ cuối của họ tên. */
+export function shortOwner(
+  displayName: string | null,
+  legacy: string | null | undefined,
+): string | null {
+  if (legacy && legacy.trim()) return legacy.trim();
+  if (!displayName) return null;
+  const parts = displayName.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? displayName;
+}
+
 export async function listCustomers(
   db: D1Database,
   scopeSql: string,
@@ -88,7 +110,9 @@ export async function listCustomers(
   const today = vnDate();
 
   if (filters.q) {
-    where.push('(c.name LIKE ? OR c.phone_text LIKE ? OR c.province LIKE ? OR c.legacy_code LIKE ?)');
+    where.push(
+      '(c.name LIKE ? OR c.phone_text LIKE ? OR c.province LIKE ? OR c.legacy_code LIKE ?)',
+    );
     const like = `%${filters.q}%`;
     params.push(like, like, like, like);
   }
@@ -126,29 +150,35 @@ export async function listCustomers(
     .first<{ n: number }>();
 
   const offset = (filters.page - 1) * filters.pageSize;
+  const span = spanOf(filters.month);
   // "debt"/"revenue" phải sắp xếp sau khi tính xong, nên tạm lấy theo tên rồi sắp lại ở dưới.
   const sortKey = filters.sort ?? 'follow_up';
-  const sortByComputed = sortKey === 'debt' || sortKey === 'revenue';
+  const sortByComputed = ['debt', 'revenue', 'revenue_month', 'revenue_month_asc'].includes(
+    sortKey,
+  );
   const orderBy = SORT_OPTIONS[sortByComputed ? 'follow_up' : sortKey] ?? SORT_OPTIONS.follow_up;
 
   const rows = await db
-    .prepare(
-      `${LIST_SQL} AND ${clause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
-    )
-    .bind(...params, sortByComputed ? 500 : filters.pageSize, sortByComputed ? 0 : offset)
+    .prepare(`${LIST_SQL_BY_MONTH} AND ${clause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
+    .bind(span.from, span.to, ...params, sortByComputed ? 500 : filters.pageSize, sortByComputed ? 0 : offset)
     .all<CustomerListItem & { debt_limit: number | null }>();
 
   const items = rows.results ?? [];
   // Công nợ tính riêng theo từng khách để không nhân bản dòng khi JOIN.
   const debtRows = await Promise.all(items.map((i) => getCustomerDebt(db, i.id)));
 
+  const retailByCustomer = await monthRetailByCustomer(db, span.to.slice(0, 7), {
+    from: span.from,
+    to: span.to,
+  });
   let enriched = items.map((row, index) => ({
     ...row,
+    owner_short: shortOwner(row.owner_name, (row as { owner_legacy?: string | null }).owner_legacy),
+    retail_month: retailByCustomer.get(row.id) ?? 0,
     credit_limit: row.credit_limit ?? row.debt_limit ?? 0,
     // Quá ngưỡng tái mua riêng của khách thì bật cảnh báo để sale gọi lại.
     reorder_due:
-      row.last_order_date != null &&
-      (row.days_since_order ?? 0) > (row.reorder_cycle_days ?? 30),
+      row.last_order_date != null && (row.days_since_order ?? 0) > (row.reorder_cycle_days ?? 30),
     official_debt: debtRows[index].official_debt,
     projected_debt: debtRows[index].projected_debt,
     revenue_total: debtRows[index].posted_charges,
@@ -159,7 +189,11 @@ export async function listCustomers(
       .sort((a, b) =>
         sortKey === 'debt'
           ? b.official_debt - a.official_debt
-          : (b.revenue_total ?? 0) - (a.revenue_total ?? 0),
+          : sortKey === 'revenue_month'
+            ? (b.revenue_month ?? 0) - (a.revenue_month ?? 0)
+            : sortKey === 'revenue_month_asc'
+              ? (a.revenue_month ?? 0) - (b.revenue_month ?? 0)
+              : (b.revenue_total ?? 0) - (a.revenue_total ?? 0),
       )
       .slice(offset, offset + filters.pageSize);
   }
@@ -171,19 +205,22 @@ export async function getCustomer(
   db: D1Database,
   auth: AuthContext,
   customerId: string,
+  monthParam?: string,
 ): Promise<CustomerDetail> {
+  const span = spanOf(monthParam);
   const row = await db
-    .prepare(`${LIST_SQL} AND c.id = ?`)
-    .bind(customerId)
+    .prepare(`${LIST_SQL_BY_MONTH} AND c.id = ?`)
+    .bind(span.from, span.to, customerId)
     .first<Record<string, unknown>>();
   if (!row) throw notFound('Không tìm thấy khách hàng');
-  if (auth.scope === 'OWN' && row.owner_id !== auth.user.id) throw notFound('Không tìm thấy khách hàng');
+  if (auth.scope === 'OWN' && row.owner_id !== auth.user.id)
+    throw notFound('Không tìm thấy khách hàng');
 
   const extra = await db
     .prepare(
       `SELECT address, potential, interested_products, reorder_cycle_days, first_contact_date,
               opening_debt, data_quality_note, lost_reason, birthday, zalo, email, note,
-              tax_code, contact_person, created_at, updated_at
+              tax_code, staff_code, contact_person, created_at, updated_at
        FROM customers WHERE id = ?`,
     )
     .bind(customerId)
@@ -226,15 +263,23 @@ export async function getCustomer(
   const debt = await getCustomerDebt(db, customerId);
   const today = vnDate();
 
+  const retail = (
+    await monthRetailByCustomer(db, span.to.slice(0, 7), { from: span.from, to: span.to })
+  ).get(customerId) ?? 0;
   return {
     ...(row as unknown as CustomerListItem),
     ...(extra as unknown as Record<string, never>),
+    retail_month: retail,
+    owner_short: shortOwner(row.owner_name as string | null, row.owner_legacy as string | null),
     credit_limit: (row.credit_limit as number) ?? (row.debt_limit as number) ?? 0,
     official_debt: debt.official_debt,
     projected_debt: debt.projected_debt,
     debt,
     activities: activities.results ?? [],
-    tasks: (tasks.results ?? []).map((t) => ({ ...t, overdue: t.status === 'OPEN' && t.due_at < today })),
+    tasks: (tasks.results ?? []).map((t) => ({
+      ...t,
+      overdue: t.status === 'OPEN' && t.due_at < today,
+    })),
     orders: (orders.results ?? []).map((o) => ({
       ...o,
       remaining_amount: o.total_amount - (o.cod_amount ?? 0) - (o.received_amount ?? 0),
@@ -295,7 +340,7 @@ export async function createCustomer(
         vnDate(),
         nextFollowUp,
         phone.needsReview ? 'NEEDS_REVIEW' : 'OK',
-        phone.needsReview ? phone.note ?? null : null,
+        phone.needsReview ? (phone.note ?? null) : null,
         auth.user.id,
         now,
         now,
@@ -326,6 +371,14 @@ export async function createCustomer(
       requestId: ctx.requestId,
       ip: ctx.ip,
     }),
+    eventStatement(db, {
+      type: 'CUSTOMER_CREATED',
+      entityType: 'CUSTOMER',
+      entityId: id,
+      actorId: auth.user.id,
+      actorType: auth.actorType ?? 'USER',
+      payload: { name: input.name, owner_id: ownerId },
+    }),
   ];
 
   await db.batch(statements);
@@ -346,7 +399,7 @@ export async function updateCustomer(
 ): Promise<void> {
   const before = await db
     .prepare(
-      `SELECT id, name, phone_text, province, address, tier_id, owner_id, source, stage, potential,
+      `SELECT id, name, phone_text, province, address, tier_id, price_mode, owner_id, source, stage, potential,
               interested_products, reorder_cycle_days, next_follow_up_at, credit_limit, data_quality,
               lost_reason
        FROM customers WHERE id = ? AND deleted_at IS NULL`,
@@ -354,19 +407,34 @@ export async function updateCustomer(
     .bind(customerId)
     .first<Record<string, unknown>>();
   if (!before) throw notFound('Không tìm thấy khách hàng');
-  if (auth.scope === 'OWN' && before.owner_id !== auth.user.id) throw notFound('Không tìm thấy khách hàng');
+  if (auth.scope === 'OWN' && before.owner_id !== auth.user.id)
+    throw notFound('Không tìm thấy khách hàng');
 
   const changingTier = input.tier_id !== undefined && input.tier_id !== before.tier_id;
+  // Ở hồ sơ khách chỉ Quản lý / CEO đổi cấp giá. Sale chỉ lên cấp được ngay trên đơn khi đơn đạt điều kiện.
   if (changingTier && !can(auth.user.role, 'customer.tier.change')) {
-    throw forbidden('Chỉ Quản lý hoặc CEO được đổi cấp giá của khách hàng.');
+    throw forbidden('Chỉ Quản lý hoặc CEO được đổi cấp giá của khách hàng. Sale lên cấp cho khách ngay khi lập đơn đạt cấp mới.');
+  }
+  if (
+    input.price_mode !== undefined &&
+    input.price_mode !== before.price_mode &&
+    !can(auth.user.role, 'customer.tier.change')
+  ) {
+    throw forbidden('Chỉ Quản lý hoặc CEO được đổi cách tính giá của khách hàng.');
   }
   if (input.owner_id !== undefined && input.owner_id !== before.owner_id) {
-    throw badRequest('USE_REASSIGN', 'Đổi người phụ trách phải dùng chức năng Chuyển sale (bắt buộc ghi lý do).');
+    throw badRequest(
+      'USE_REASSIGN',
+      'Đổi người phụ trách phải dùng chức năng Chuyển sale (bắt buộc ghi lý do).',
+    );
   }
 
   const stage = input.stage as CustomerStage | undefined;
   if (stage && stage !== before.stage) {
-    if (requiresManagerToReopen(before.stage as CustomerStage, stage) && auth.user.role === 'EMPLOYEE') {
+    if (
+      requiresManagerToReopen(before.stage as CustomerStage, stage) &&
+      auth.user.role === 'EMPLOYEE'
+    ) {
       throw forbidden('Chỉ Quản lý được mở lại khách đã mất.');
     }
     if (!canTransition(before.stage as CustomerStage, stage)) {
@@ -389,6 +457,7 @@ export async function updateCustomer(
     'province',
     'address',
     'tier_id',
+    'price_mode',
     'source',
     'stage',
     'potential',
@@ -403,6 +472,7 @@ export async function updateCustomer(
     'email',
     'note',
     'tax_code',
+    'staff_code',
     'contact_person',
   ];
 
@@ -460,7 +530,8 @@ export async function reassignCustomer(
     .prepare(`SELECT id, display_name FROM users WHERE id = ? AND status = 'ACTIVE'`)
     .bind(newOwnerId)
     .first<{ id: string; display_name: string }>();
-  if (!owner) throw badRequest('OWNER_NOT_FOUND', 'Nhân viên nhận khách không tồn tại hoặc đã bị khoá');
+  if (!owner)
+    throw badRequest('OWNER_NOT_FOUND', 'Nhân viên nhận khách không tồn tại hoặc đã bị khoá');
 
   const now = nowIso();
   await db.batch([
@@ -468,7 +539,9 @@ export async function reassignCustomer(
       .prepare('UPDATE customers SET owner_id = ?, updated_at = ? WHERE id = ?')
       .bind(newOwnerId, now, customerId),
     db
-      .prepare(`UPDATE tasks SET assignee_id = ?, updated_at = ? WHERE customer_id = ? AND status = 'OPEN'`)
+      .prepare(
+        `UPDATE tasks SET assignee_id = ?, updated_at = ? WHERE customer_id = ? AND status = 'OPEN'`,
+      )
       .bind(newOwnerId, now, customerId),
     auditStatement(db, {
       actorId: auth.user.id,
@@ -501,7 +574,8 @@ export async function addActivity(
     .bind(customerId)
     .first<{ id: string; name: string; owner_id: string | null; stage: CustomerStage }>();
   if (!customer) throw notFound('Không tìm thấy khách hàng');
-  if (auth.scope === 'OWN' && customer.owner_id !== auth.user.id) throw notFound('Không tìm thấy khách hàng');
+  if (auth.scope === 'OWN' && customer.owner_id !== auth.user.id)
+    throw notFound('Không tìm thấy khách hàng');
 
   const closing = (CLOSING_RESULTS as readonly string[]).includes(input.result);
   let nextStage: CustomerStage = customer.stage;
@@ -522,9 +596,13 @@ export async function addActivity(
   }
 
   if (isOpenStage(nextStage) && !input.next_date) {
-    throw unprocessable('NEXT_FOLLOW_UP_REQUIRED', 'Khách chưa đóng bắt buộc phải có lịch chăm sóc tiếp.', {
-      next_date: 'Bắt buộc chọn ngày chăm sóc tiếp',
-    });
+    throw unprocessable(
+      'NEXT_FOLLOW_UP_REQUIRED',
+      'Khách chưa đóng bắt buộc phải có lịch chăm sóc tiếp.',
+      {
+        next_date: 'Bắt buộc chọn ngày chăm sóc tiếp',
+      },
+    );
   }
 
   const now = nowIso();

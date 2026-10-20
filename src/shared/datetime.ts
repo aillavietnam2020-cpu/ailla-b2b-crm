@@ -4,6 +4,11 @@
 
 export const VN_OFFSET_MINUTES = 7 * 60;
 
+/** Ngày xuất kho do người dùng chọn → mốc giữa trưa giờ Việt Nam của ngày đó (05:00 UTC): ngày UTC và ngày VN đều ra đúng ngày chọn. */
+export function shipDayToIso(day: string): string {
+  return `${day}T05:00:00.000Z`;
+}
+
 export function nowIso(): string {
   return new Date().toISOString();
 }

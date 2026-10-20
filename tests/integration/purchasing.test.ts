@@ -1,0 +1,218 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createTestContext, seedUsers, USERS, type TestContext } from '../helpers/app';
+
+let ctx: TestContext;
+const NOW = '2026-10-19T01:00:00.000Z';
+const KT = 'kythuat2@ailla.vn';
+const BASE = '/api/hub/kho/mh';
+
+async function grant(userId: string, perm: string) {
+  await ctx.db.prepare('INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(userId, perm, 'user-ceo', NOW).run();
+}
+
+async function setup() {
+  const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC Hóa chất A' } });
+  const supplierId = sup.body.data.id as string;
+  const po = await ctx.request(`${BASE}/orders`, {
+    as: USERS.ceo,
+    body: { supplier_id: supplierId, order_date: '2026-10-05', lines: [{ item: 'NVL1', qty: 100 }] },
+  });
+  return { supplierId, poId: po.body.data.id as string, poNo: po.body.data.no as string };
+}
+
+beforeEach(async () => {
+  ctx = createTestContext();
+  await seedUsers(ctx.db);
+  await ctx.db
+    .prepare("INSERT INTO users (id, email, display_name, role, status, created_at, updated_at) VALUES ('user-kt2', ?, 'Kỹ thuật (test)', 'EMPLOYEE', 'ACTIVE', ?, ?)")
+    .bind(KT, NOW, NOW)
+    .run();
+  await grant('user-kt2', 'hub.access');
+  await grant('user-kt2', 'sx.kiemke');
+  await ctx.db.prepare("INSERT INTO kho_items (code, name, unit, cls, grp, min_stock, active, created_at) VALUES ('NVL1', 'Nguyên liệu 1', 'kg', 'NVL', '', 0, 1, ?)").bind(NOW).run();
+});
+
+describe('Mua hàng: phiếu mua → nhận hàng → giá, hóa đơn, phiếu chi, công nợ', () => {
+  it('lập phiếu mua; đặt khác giao: nhận làm hai lần, trạng thái đổi theo số thực nhận', async () => {
+    const { poId, poNo } = await setup();
+    expect(poNo).toMatch(/^PM2610-001$/);
+    const r1 = await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 60 }] } });
+    expect(r1.status).toBe(200);
+    let list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(list.body.data[0].status).toBe('DANG_GIAO');
+    expect(list.body.data[0].lines[0].received).toBe(60);
+    const r2 = await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-09', lines: [{ item: 'NVL1', qty: 45 }] } });
+    expect(r2.status).toBe(200);
+    list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(list.body.data[0].status).toBe('DU');
+    const stock = await ctx.db.prepare('SELECT SUM(qty) AS q FROM kho_ledger WHERE item = ?').bind('NVL1').first<{ q: number }>();
+    expect(stock?.q).toBe(105);
+  });
+
+  it('kỹ thuật không thấy giá và không gọi được hóa đơn, phiếu chi, công nợ', async () => {
+    const { poId } = await setup();
+    await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 10 }] } });
+    const list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(JSON.stringify(list.body)).not.toContain('unit_price');
+    expect((await ctx.request(`${BASE}/invoices`, { as: KT })).status).toBe(403);
+    expect((await ctx.request(`${BASE}/payments`, { as: KT })).status).toBe(403);
+    expect((await ctx.request(`${BASE}/debts`, { as: KT })).status).toBe(403);
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: KT });
+    expect(JSON.stringify(sup.body)).not.toContain('opening_debt');
+  });
+
+  it('giá lúc giao + phí vận chuyển trên hóa đơn thành giá vốn nhập; hủy hóa đơn thì về giá lúc giao', async () => {
+    const { supplierId, poId } = await setup();
+    const rc = await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 60 }] } });
+    const orders = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const rl = orders.body.data[0].receipts[0].lines[0];
+    const receiptId = orders.body.data[0].receipts[0].id as string;
+    expect(rc.status).toBe(200);
+    const setP = await ctx.request(`${BASE}/receipt-lines/${rl.id}/price`, { as: USERS.ceo, method: 'PUT', body: { unit_price: 1000 } });
+    expect(setP.status).toBe(200);
+    const price = async () => (await ctx.db.prepare('SELECT price FROM kho_moves WHERE item = ?').bind('NVL1').first<{ price: number | null }>())?.price;
+    expect(await price()).toBe(1000);
+
+    const inv = await ctx.request(`${BASE}/invoices`, {
+      as: USERS.ceo,
+      body: { supplier_id: supplierId, invoice_no: 'HD001', invoice_date: '2026-10-08', receipt_ids: [receiptId], vat_amount: 4800, freight: 6000 },
+    });
+    expect(inv.status).toBe(200);
+    expect(inv.body.data.total).toBe(60000 + 4800 + 6000);
+    expect(await price()).toBe(1100); // 1000 + 6000/60, VAT không tính vào giá vốn
+    const cancel = await ctx.request(`${BASE}/invoices/${inv.body.data.id}/cancel`, { as: USERS.ceo, body: {} });
+    expect(cancel.status).toBe(200);
+    expect(await price()).toBe(1000);
+  });
+
+  it('công nợ nhà cung cấp có đầu kỳ: đầu kỳ + hóa đơn − đã chi', async () => {
+    const { supplierId, poId } = await setup();
+    await ctx.request(`${BASE}/suppliers/${supplierId}/opening`, { as: USERS.ceo, method: 'PUT', body: { opening_debt: 500000, opening_date: '2026-09-30' } });
+    await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 10 }] } });
+    const orders = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    await ctx.request(`${BASE}/receipt-lines/${orders.body.data[0].receipts[0].lines[0].id}/price`, { as: USERS.ceo, method: 'PUT', body: { unit_price: 2000 } });
+    const inv = await ctx.request(`${BASE}/invoices`, {
+      as: USERS.ceo,
+      body: { supplier_id: supplierId, invoice_date: '2026-10-08', receipt_ids: [orders.body.data[0].receipts[0].id] },
+    });
+    expect(inv.body.data.total).toBe(20000);
+    const pay = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, invoice_id: inv.body.data.id, pay_date: '2026-10-10', amount: 120000, account: 'Vietcombank' } });
+    expect(pay.status).toBe(200);
+    const debts = await ctx.request(`${BASE}/debts`, { as: USERS.ceo });
+    const row = debts.body.data.find((d: { id: string }) => d.id === supplierId);
+    expect(row.balance).toBe(500000 + 20000 - 120000);
+    const ledger = await ctx.request(`${BASE}/suppliers/${supplierId}/ledger`, { as: USERS.ceo });
+    expect(ledger.body.data.entries.at(-1).balance).toBe(400000);
+  });
+
+  it('giá nguyên vật liệu tháng là bình quân gia quyền có tồn đầu', async () => {
+    const { supplierId, poId } = await setup();
+    // tồn đầu 100 kg giá 1000 (phiếu tồn đầu)
+    await ctx.db.prepare("INSERT INTO kho_docs (no, type, doc_date, partner, ref_no, note, extra, status, created_at) VALUES ('TD2609-001', 'TD', '2026-09-30', '', '', '', '{}', 'OK', ?)").bind(NOW).run();
+    const td = await ctx.db.prepare("SELECT id FROM kho_docs WHERE no = 'TD2609-001'").first<{ id: number }>();
+    await ctx.db.prepare("INSERT INTO kho_moves (doc_id, item, qty, price, role, note) VALUES (?, 'NVL1', 100, 1000, 'IN', '')").bind(td?.id).run();
+    await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 100 }] } });
+    const orders = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    await ctx.request(`${BASE}/receipt-lines/${orders.body.data[0].receipts[0].lines[0].id}/price`, { as: USERS.ceo, method: 'PUT', body: { unit_price: 1200 } });
+    expect(supplierId).toBeTruthy();
+    const r = await ctx.request(`${BASE}/material-prices?month=2026-10`, { as: USERS.ceo });
+    const row = r.body.data.rows.find((x: { item: string }) => x.item === 'NVL1');
+    expect(row.open_qty).toBe(100);
+    expect(row.open_price).toBe(1000);
+    expect(row.in_price).toBe(1200);
+    expect(row.avg_price).toBe(1100); // (100×1000 + 100×1200) / 200
+  });
+});
+
+describe('Mua hàng: ngày giao dự kiến, giá đặt, cọc', () => {
+  it('phiếu mua có ngày giao dự kiến và giá đặt; kho không thấy giá, quản lý thấy', async () => {
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC B' } });
+    const po = await ctx.request(`${BASE}/orders`, {
+      as: USERS.ceo,
+      body: { supplier_id: sup.body.data.id, order_date: '2026-10-05', expected_date: '2026-10-12', lines: [{ item: 'NVL1', qty: 50, unit_price: 1500 }] },
+    });
+    expect(po.status).toBe(200);
+    const kt = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(kt.body.data[0].expected_date).toBe('2026-10-12');
+    expect(JSON.stringify(kt.body)).not.toContain('unit_price');
+    const boss = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    expect(boss.body.data[0].lines[0].unit_price).toBe(1500);
+  });
+
+  it('ngày giao dự kiến sai định dạng bị từ chối', async () => {
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC C' } });
+    const r = await ctx.request(`${BASE}/orders`, { as: USERS.ceo, body: { supplier_id: sup.body.data.id, order_date: '2026-10-05', expected_date: '12/10', lines: [{ item: 'NVL1', qty: 5 }] } });
+    expect(r.status).toBe(400);
+  });
+
+  it('cọc trước khi đặt hàng gắn vào phiếu mua và trừ vào công nợ; trả một phần, không cần hết đơn', async () => {
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC D' } });
+    const supplierId = sup.body.data.id as string;
+    const po = await ctx.request(`${BASE}/orders`, { as: USERS.ceo, body: { supplier_id: supplierId, order_date: '2026-10-05', lines: [{ item: 'NVL1', qty: 10 }] } });
+    const dep = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, po_id: po.body.data.id, kind: 'COC', pay_date: '2026-10-05', amount: 300000, account: 'Tiền mặt' } });
+    expect(dep.status).toBe(200);
+    let debts = await ctx.request(`${BASE}/debts`, { as: USERS.ceo });
+    expect(debts.body.data.find((d: { id: string }) => d.id === supplierId).balance).toBe(-300000);
+    const ledger = await ctx.request(`${BASE}/suppliers/${supplierId}/ledger`, { as: USERS.ceo });
+    expect(ledger.body.data.entries[0].kind).toBe('Đã cọc');
+    const pays = await ctx.request(`${BASE}/payments`, { as: USERS.ceo });
+    expect(pays.body.data[0].po_no).toMatch(/^PM/);
+    // phiếu mua của nhà cung cấp khác thì không gắn được
+    const other = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC E' } });
+    const bad = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: other.body.data.id, po_id: po.body.data.id, pay_date: '2026-10-06', amount: 1000 } });
+    expect(bad.status).toBe(400);
+    debts = await ctx.request(`${BASE}/debts`, { as: USERS.ceo });
+    expect(debts.body.data.find((d: { id: string }) => d.id === supplierId).balance).toBe(-300000);
+  });
+});
+
+describe('Chứng từ nhà cung cấp: nhập giá + hóa đơn trong một lần, kèm ảnh', () => {
+  it('ghi chứng từ nhập giá từng dòng ngay trong form, đính kèm ảnh và tải lại được', async () => {
+    const { supplierId, poId } = await setup();
+    await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 40 }] } });
+    const orders = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const rc = orders.body.data[0].receipts[0];
+    const inv = await ctx.request(`${BASE}/invoices`, {
+      as: USERS.ceo,
+      body: { supplier_id: supplierId, invoice_no: 'HD-77', doc_type: 'HD', invoice_date: '2026-10-08', receipt_ids: [rc.id], prices: { [rc.lines[0].id]: 2500 }, vat_amount: 8000, handling: 4000 },
+    });
+    expect(inv.status).toBe(200);
+    expect(inv.body.data.total).toBe(100000 + 8000 + 4000);
+    const price = (await ctx.db.prepare('SELECT price FROM kho_moves WHERE item = ?').bind('NVL1').first<{ price: number | null }>())?.price;
+    expect(price).toBe(2600); // 2500 + bốc vác 4000 / 40
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const up = await ctx.request(`${BASE}/invoices/${inv.body.data.id}/files`, { as: USERS.ceo, body: { name: 'bill.png', mime: 'image/png', data: png } });
+    expect(up.status).toBe(200);
+    const list = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo });
+    expect(list.body.data[0].file_count).toBe(1);
+    expect(list.body.data[0].doc_type).toBe('HD');
+    const bad = await ctx.request(`${BASE}/invoices/${inv.body.data.id}/files`, { as: USERS.ceo, body: { name: 'x.exe', mime: 'application/x-msdownload', data: png } });
+    expect(bad.status).toBe(400);
+    expect((await ctx.request(`${BASE}/invoices/${inv.body.data.id}/files`, { as: KT })).status).toBe(403);
+  });
+
+  it('thiếu giá một dòng thì chưa ghi được chứng từ', async () => {
+    const { supplierId, poId } = await setup();
+    await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 5 }] } });
+    const orders = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const rc = orders.body.data[0].receipts[0];
+    const r = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo, body: { supplier_id: supplierId, invoice_date: '2026-10-08', receipt_ids: [rc.id] } });
+    expect(r.status).toBe(400);
+  });
+});
+
+describe('Chứng từ nhập tay theo từng dòng hàng', () => {
+  it('ghi chứng từ không gắn lần nhận hàng, nhập nhiều dòng hàng có giá; tiền hàng tự cộng', async () => {
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC F' } });
+    const r = await ctx.request(`${BASE}/invoices`, {
+      as: USERS.ceo,
+      body: { supplier_id: sup.body.data.id, doc_type: 'PG', invoice_date: '2026-10-08', manual_lines: [{ item: 'NVL1', qty: 10, unit_price: 1000 }, { item: 'NVL1', qty: 5, unit_price: 2000 }], freight: 500 },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.data.total).toBe(10000 + 10000 + 500);
+    const lines = await ctx.request(`${BASE}/invoices/${r.body.data.id}/lines`, { as: USERS.ceo });
+    expect(lines.body.data).toHaveLength(2);
+    const bad = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo, body: { supplier_id: sup.body.data.id, invoice_date: '2026-10-08', manual_lines: [{ item: 'NVL1', qty: 10 }] } });
+    expect(bad.status).toBe(400);
+  });
+});

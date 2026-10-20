@@ -1,0 +1,444 @@
+/* =====================================================================
+   Mua hàng nguyên vật liệu.
+   Bên vận hành (không có giá): Thảo lập phiếu mua, kho báo thực nhận từng lần giao (tự sinh phiếu nhập kho).
+   Trang quản trị: nhập giá lúc giao, hóa đơn (VAT, vận chuyển, bốc vác), phiếu chi, công nợ nhà cung cấp (có đầu kỳ),
+   giá nguyên vật liệu từng tháng (bình quân gia quyền, có tồn đầu).
+   ===================================================================== */
+const MH={orders:null,sup:null,busy:false,err:"",at:0,view:"open",debts:null,inv:null,pay:null,prices:null,pmonth:"",onlyNoPrice:true};
+const MH_ST={DAT:["Đã đặt","amb"],DANG_GIAO:["Đang giao","blu"],DU:["Đủ hàng","grn"],HUY:["Đã hủy","gry"]};
+const mhPerm=n=>typeof SV!=="undefined"&&SV.perms&&SV.perms.includes(n);
+const mhManage=()=>!!ME&&(ME.role==="admin"||mhPerm("order.approve.normal")||mhPerm("order.accounting.confirm"));
+const mhReceive=()=>mhManage()||mhPerm("sx.kiemke")||mhPerm("order.kho.process");
+const mhToday=()=>{const t=new Date(),p=n=>String(n).padStart(2,"0");return t.getFullYear()+"-"+p(t.getMonth()+1)+"-"+p(t.getDate())};
+const mhN=n=>nf(Math.round(n*1000)/1000);
+const mhName=c=>((typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(c))||{}).name||c;
+
+async function mhLoad(force){
+  if(MH.busy||(!force&&MH.orders&&Date.now()-MH.at<15000))return;
+  MH.busy=true;
+  try{
+    if(typeof khoLoad==="function")await khoLoad();
+    const [o,s]=await Promise.all([kApi("/mh/orders"),kApi("/mh/suppliers")]);
+    MH.orders=o;MH.sup=s;MH.err="";MH.at=Date.now()}
+  catch(e){MH.err=e.message||"Không tải được phiếu mua hàng"}
+  MH.busy=false;
+  if(/^mh_|^sx_mh$|^exec$/.test(PAGE))renderMain();
+}
+const mhReload=async()=>{MH.at=0;MH.debts=MH.inv=MH.pay=MH.prices=null;await mhLoad(true)};
+const mhSupOpts=(sel)=>opt([["","— Chọn nhà cung cấp —"]].concat((MH.sup||[]).filter(s=>s.active).map(s=>[s.id,s.name])),sel||"");
+
+/* ---------- Thêm nhà cung cấp (dùng chung) ---------- */
+function mhNewSupplier(done,opt){
+  opt=opt||{};const withDebt=!!opt.debt&&mhManage();
+  openDrawerHTML(`<h2>Thêm nhà cung cấp</h2><form class="frm" id="mhs"><label class="field">Tên nhà cung cấp<input id="mhs-n" required maxlength="120"></label><label class="field">Điện thoại<input id="mhs-p" maxlength="40"></label>
+   ${withDebt?`<h3>Công nợ đầu kỳ</h3><p class="hint">Số tiền mình đang nợ nhà cung cấp này tại ngày bắt đầu dùng web. Chưa nợ thì để 0.</p><div class="row4"><label class="field">Đang nợ (đ)<input id="mhs-a" type="number" value="0"></label><label class="field">Tính đến ngày<input id="mhs-d" type="date" value="${mhToday()}"></label></div>`:""}
+   <div id="mhs-e"></div><button class="btn pri">Lưu</button></form>`);
+  $("#mhs-n").focus();
+  $("#mhs").onsubmit=async e=>{e.preventDefault();try{const body={name:$("#mhs-n").value,phone:$("#mhs-p").value};if(withDebt){body.opening_debt=+$("#mhs-a").value||0;body.opening_date=$("#mhs-d").value}
+    const r=await kApi("/mh/suppliers",{method:"POST",body:JSON.stringify(body)});closeDrawer();toast("Đã thêm nhà cung cấp");await mhReload();if(done)done(r.id)}catch(err){$("#mhs-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
+}
+/* ---------- Bên vận hành: phiếu mua + nhận hàng (không giá) ---------- */
+function mhSummary(po,k){return po.lines.map(l=>esc(mhName(l.item))+" × "+mhN(k==="got"?l.received:l.qty)).join(", ")}
+/* Phiếu mua quá ngày giao dự kiến mà chưa đủ hàng: số ngày trễ (0 = không trễ). */
+function mhLateDays(p){
+  if(!(p.status==="DAT"||p.status==="DANG_GIAO")||!p.expected_date)return 0;
+  const t=mhToday();if(p.expected_date>=t)return 0;
+  return Math.round((new Date(t)-new Date(p.expected_date))/864e5)}
+/* Nguyên vật liệu dưới mức tối thiểu (hoặc âm kho) cần mua. Mức tối thiểu đặt ở Kho vật tư. */
+function mhNeedBuy(){
+  const A=(typeof KHO!=="undefined"&&KHO.alerts)||{low:[],negative:[]},ok=c=>["NVL","CCDC","HH"].includes(((KHO.items&&KHO.items.get(c))||{}).cls);
+  return [...(A.negative||[]),...(A.low||[])].filter(r=>ok(r.code)).map(r=>({code:r.code,name:r.name,unit:r.unit,qty:+r.qty,min:+r.min_stock||0,need:Math.max(0,Math.round(((+r.min_stock||0)-(+r.qty))*1000)/1000)}))}
+/* Tiến trình của một phiếu mua hàng: đặt → hẹn giao → nhận hàng (xác nhận bên vận hành) → chứng từ → thanh toán.
+   Hai bước tiền (chứng từ, thanh toán) chỉ hiện ở trang quản trị cho CEO, quản lý, kế toán. */
+const mhDM=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"";
+function mhPoMoney(p){
+  const rv=r=>r.lines.reduce((t,l)=>t+(l.unit_price!=null?l.qty*l.unit_price:0),0),allR=(MH.orders||[]).flatMap(o=>o.receipts),inv=[];let invTotal=0,invPaid=0;
+  (MH.inv||[]).filter(v=>v.status==="OK").forEach(v=>{const ids=v.receipt_ids||[],mine=p.receipts.filter(r=>ids.includes(r.id));if(!mine.length)return;
+    const all=allR.filter(r=>ids.includes(r.id)),A=all.reduce((t,r)=>t+rv(r),0),B=mine.reduce((t,r)=>t+rv(r),0),k=A>0?B/A:mine.length/Math.max(1,all.length);
+    inv.push({...v,share:k});invTotal+=v.total*k;invPaid+=v.paid*k});
+  const invIds=new Set(inv.map(v=>v.id)),pays=(MH.pay||[]).filter(x=>x.status==="OK"&&(x.po_id===p.id&&!x.invoice_id||x.invoice_id&&invIds.has(x.invoice_id))),direct=pays.filter(x=>!x.invoice_id);
+  const paid=invPaid+direct.reduce((t,x)=>t+(+x.amount||0),0);
+  return {inv,pays,invTotal:Math.round(invTotal),paid:Math.round(paid),deposit:direct.filter(x=>x.kind==="COC").reduce((t,x)=>t+(+x.amount||0),0)}}
+function mhSteps(p){
+  const late=mhLateDays(p),got=p.status==="DU"||p.status==="DANG_GIAO",st=[];
+  if(p.status==="HUY")return `<span class="mhs n">Đã hủy</span>`;
+  st.push(["d","Đặt hàng "+mhDM(p.order_date)]);
+  st.push(p.expected_date?(got?["d","Hẹn giao "+mhDM(p.expected_date)]:late?["l","Trễ "+late+" ngày (hẹn "+mhDM(p.expected_date)+")"]:["c","Hẹn giao "+mhDM(p.expected_date)]):["n","Chưa hẹn ngày giao"]);
+  st.push(p.status==="DU"?["d","Đủ hàng"]:p.status==="DANG_GIAO"?["c","Đã nhận một phần"]:["n","Chưa nhận hàng"]);
+  if(IS_ADMIN_HOST()&&mhManage()){
+    const M=mhPoMoney(p);
+    st.push(M.invTotal>0?["d","Chứng từ "+nf(Math.round(M.invTotal))]:got?["c","Chờ chứng từ"]:["n","Chưa có chứng từ"]);
+    st.push(M.invTotal>0?(M.paid>=M.invTotal?["d","Đã trả đủ"]:M.paid>0?["c","Đã trả "+nf(Math.round(M.paid))+"/"+nf(Math.round(M.invTotal))]:["c","Chưa trả"]):M.deposit>0?["c","Đã cọc "+nf(Math.round(M.deposit))]:["n","Chưa trả"])}
+  return `<div class="mhsteps">${st.map(([c,t],i)=>`<span class="mhs ${c}">${esc(t)}</span>`).join("")}</div>`}
+const mhValue=p=>p.lines.some(l=>l.unit_price!=null)?p.lines.reduce((t,l)=>t+(l.unit_price!=null?l.qty*l.unit_price:0),0):null;
+/* Khung đơn giản cho trang quản trị (bên vận hành dùng khung Sản xuất & kho sxFrame). */
+function mhFrame(m,key,title,sub,body,actions){m.innerHTML=H(MH.admin?"Phiếu mua hàng":title,sub)+(actions?`<div class="filters"><span class="sp"></span>${actions}</div>`:"")+body}
+function pMuaHang(m){
+  mhLoad();if(IS_ADMIN_HOST()&&mhManage()){mhLoadInv();mhLoadPay()}
+  const ed=mhManage(),rc=mhReceive(),O=MH.orders||[],shown=O.filter(p=>MH.view==="all"?true:p.status==="DAT"||p.status==="DANG_GIAO"),need=ed&&MH.orders?mhNeedBuy():[];
+  const needCard=!ed||!MH.orders||!need.length?"":`<section class="card flush"><div class="card-h pad"><h2>Cần mua</h2><span class="hint">${need.length} nguyên vật liệu dưới mức tối thiểu</span><button class="btn sm pri" id="mh-buyall">Lập phiếu mua cho tất cả</button></div>${tbl(["Mã","Tên","Tồn hiện tại","Mức tối thiểu","Nên mua thêm",""],need.map(r=>`<tr><td class="mono">${esc(r.code)}</td><td>${esc(r.name)}</td><td class="n">${r.qty<0?`<b style="color:#b42318">${mhN(r.qty)}</b>`:mhN(r.qty)} ${esc(r.unit||"")}</td><td class="n">${r.min?mhN(r.min):"—"}</td><td class="n"><b>${mhN(r.need)}</b></td><td><button class="btn sm" data-mhb="${esc(r.code)}">Lập phiếu mua</button></td></tr>`))}</section>`;
+  const body=MH.err?`<div class="note red">${esc(MH.err)}</div>`:!MH.orders?`<p class="hint pad">Đang tải…</p>`:needCard+
+  `<div class="filters"><select id="mh-v">${opt([["open","Phiếu đang mở"],["all","Tất cả phiếu"]],MH.view)}</select><span class="hint">${shown.length} phiếu</span>${MH.admin&&ed?`<span class="sp"></span><button class="btn pri" id="mh-new">+ Lập phiếu mua hàng</button>`:""}</div>
+   <section class="card flush">${tbl(["Số phiếu","Nhà cung cấp","Hàng đặt","Tiến trình"].concat(ed?["Giá trị đặt"]:[]).concat([""]),shown.map(p=>{const open=p.status==="DAT"||p.status==="DANG_GIAO",val=ed?mhValue(p):null;return `<tr class="clk" data-mhd="${p.id}"><td class="mono"><b>${esc(p.no)}</b><div class="hint">đặt ${esc(kDd(p.order_date))}</div></td><td>${esc(p.supplier_name)}</td><td>${mhSummary(p,"qty")}</td><td>${mhSteps(p)}</td>${ed?`<td class="n">${val==null?"—":nf(Math.round(val))}</td>`:""}<td class="nowrap">${rc&&open?`<button class="btn sm pri" data-mhr="${p.id}">Nhận hàng</button> `:""}${ed&&open&&!p.receipts.some(r=>r.status==="OK")?`<button class="btn sm" data-mhe="${p.id}">Sửa</button> <button class="btn sm danger" data-mhx="${p.id}">Hủy phiếu</button>`:""}</td></tr>`}))}</section>`;
+  (MH.admin?mhFrame:sxFrame)(m,"sx_mh","Mua hàng","Mua nguyên vật liệu: Thảo lập phiếu mua hàng, kho ghi số thực nhận khi hàng về",`<details class="mhguide"><summary>Cách dùng</summary><div class="note">① Hàng xuống dưới mức tồn tối thiểu (đặt ở Kho vật tư, cột "Tồn tối thiểu") thì mục <b>Cần mua</b> báo cho Thảo. ② Thảo bấm <b>+ Lập phiếu mua hàng</b>: nhà cung cấp, ngày đặt, <b>ngày giao dự kiến</b>, hàng, số lượng, giá đặt. Quá ngày giao mà chưa đủ hàng thì báo <b>Trễ</b> và nhảy cảnh báo ở Tổng quan. ③ Hàng về, kho bấm <b>Nhận hàng</b> và ghi số <b>thực nhận</b>; kho tăng ngay. ④ Kế toán ghi giá lúc giao, chứng từ, phiếu chi và công nợ ở Trang quản trị. Giá chỉ Thảo, kế toán và CEO thấy.</div></details>`+body,ed&&!MH.admin?`<button class="btn pri" id="mh-new">+ Lập phiếu mua hàng</button>`:"");
+  if(MH.err||!MH.orders)return;
+  $("#mh-v").onchange=e=>{MH.view=e.target.value;renderMain()};
+  if($("#mh-new"))$("#mh-new").onclick=()=>mhForm(null);
+  if($("#mh-buyall"))$("#mh-buyall").onclick=()=>mhForm(null,{L:need.map(r=>({item:r.code,qty:r.need||"",note:"",price:""}))});
+  m.querySelectorAll("[data-mhb]").forEach(b=>b.onclick=()=>{const r=need.find(x=>x.code===b.dataset.mhb);if(r)mhForm(null,{L:[{item:r.code,qty:r.need||"",note:"",price:""}]})});
+  m.querySelectorAll("[data-mhr]").forEach(b=>b.onclick=e=>{e.stopPropagation();mhReceiveForm(b.dataset.mhr)});
+  m.querySelectorAll("[data-mhe]").forEach(b=>b.onclick=e=>{e.stopPropagation();mhForm(b.dataset.mhe)});
+  m.querySelectorAll("[data-mhx]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const p=O.find(x=>x.id===b.dataset.mhx);if(!p||!confirm("Hủy phiếu mua "+p.no+"?"))return;
+    try{await kApi("/mh/orders/"+p.id+"/cancel",{method:"POST",body:"{}"});toast("Đã hủy phiếu "+p.no);await mhReload()}catch(err){toast(err.message)}});
+  m.querySelectorAll("[data-mhd]").forEach(r=>r.onclick=()=>mhDetail(r.dataset.mhd));
+}
+function mhDetail(id){
+  const p=(MH.orders||[]).find(x=>x.id===id);if(!p)return;const st=MH_ST[p.status]||["",""],money=p.receipts.some(r=>r.lines.some(l=>"unit_price" in l));
+  openDrawerHTML(`<h2>${esc(p.no)} · ${esc(p.supplier_name)}</h2><p class="hint">Ngày đặt ${esc(kDd(p.order_date))}${p.expected_date?" · giao dự kiến "+esc(kDd(p.expected_date)):""} · ${pill(st[0],st[1])}${mhLateDays(p)?" "+pill("Trễ "+mhLateDays(p)+" ngày","red"):""}${p.note?" · "+esc(p.note):""}</p>
+   <h3>Tiến trình</h3>${mhSteps(p)}${(IS_ADMIN_HOST()&&mhManage())?(()=>{const M=mhPoMoney(p);return M.inv.length||M.pays.length?`<h3>Chứng từ và thanh toán</h3>${tbl(["Ngày","Nội dung","Số tiền"],[...M.inv.map(v=>`<tr><td>${esc(mhD(v.invoice_date))}</td><td>${v.doc_type==="PG"?"Phiếu giao / bill":"Hóa đơn"} ${esc(v.invoice_no||"")}</td><td class="n">${nf(v.total)}</td></tr>`),...M.inv.filter(v=>v.paid>0).map(v=>`<tr><td></td><td>Đã chi cho ${esc(v.invoice_no||"chứng từ")}</td><td class="n">−${nf(v.paid)}</td></tr>`),...M.pays.map(x=>`<tr><td>${esc(mhD(x.pay_date))}</td><td>${x.kind==="COC"?"Tiền cọc":"Đã chi"}</td><td class="n">−${nf(x.amount)}</td></tr>`)])}`:""})():""}
+   <h3>Hàng đặt</h3>${tbl(["Mã","Tên","Đặt","Đã nhận","Còn thiếu"].concat(p.lines.some(l=>l.unit_price!=null)?["Giá đặt (đ)"]:[]),p.lines.map(l=>`<tr><td class="mono">${esc(l.item)}</td><td>${esc(l.name)}</td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td class="n">${mhN(l.received)}</td><td class="n">${l.qty-l.received>1e-9?`<b style="color:#b42318">${mhN(l.qty-l.received)}</b>`:"—"}</td>${p.lines.some(x=>x.unit_price!=null)?`<td class="n">${l.unit_price!=null?nf(l.unit_price):"—"}</td>`:""}</tr>`))}
+   <h3>Các lần nhận hàng</h3>${p.receipts.length?tbl(["Ngày nhận","Hàng nhận","Ghi chú","Trạng thái",""],p.receipts.map(r=>`<tr><td>${esc(kDd(r.receipt_date))}</td><td>${r.lines.map(l=>esc(l.name)+" × "+mhN(l.qty)+(money&&l.unit_price!=null?" @ "+nf(l.unit_price):"")).join("<br>")}</td><td>${esc(r.note||"")}</td><td>${r.status==="OK"?pill("Đã nhập kho","grn"):pill("Đã hủy","gry")}</td><td>${mhManage()&&r.status==="OK"?`<button class="btn sm danger" data-mhcr="${r.id}">Hủy lần nhận</button>`:""}</td></tr>`)):`<p class="hint">Chưa có lần nhận nào.</p>`}`);
+  document.querySelectorAll("[data-mhcr]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy lần nhận hàng này? Phiếu nhập kho tương ứng cũng bị hủy."))return;
+    try{await kApi("/mh/receipts/"+b.dataset.mhcr+"/cancel",{method:"POST",body:JSON.stringify({reason:"Hủy lần nhận hàng"})});closeDrawer();toast("Đã hủy lần nhận hàng");await mhReload()}catch(err){toast(err.message)}});
+}
+/* Form lập / sửa phiếu mua */
+function mhForm(id,draft){
+  const p=id?(MH.orders||[]).find(x=>x.id===id):null;
+  const L=draft&&draft.L?draft.L:p?p.lines.map(l=>({item:l.item,qty:l.qty,note:l.note||"",price:l.unit_price==null?"":l.unit_price})):[{item:"",qty:"",note:"",price:""}];
+  openDrawerHTML(`<h2>${p?"Sửa phiếu mua "+esc(p.no):"Lập phiếu mua hàng"}</h2><form class="frm" id="mhf"><div class="row4"><label class="field grow">Nhà cung cấp<select id="mhf-s">${mhSupOpts(draft&&draft.sup?draft.sup:p?p.supplier_id:"")}</select></label><button type="button" class="btn sm" id="mhf-ns" style="align-self:end">+ Nhà cung cấp mới</button></div>
+   <div class="row4"><label class="field">Ngày đặt hàng<input id="mhf-d" type="date" value="${esc(draft&&draft.date?draft.date:p?p.order_date:mhToday())}" required></label><label class="field">Ngày giao dự kiến<input id="mhf-e" type="date" value="${esc(draft&&draft.exp!=null?draft.exp:p?(p.expected_date||""):"")}"></label></div>
+   <div class="tbl edit"><table><thead><tr><th>Mã hàng</th><th>Tên</th><th>Số lượng đặt</th><th>Giá đặt (đ)</th><th>Ghi chú</th><th></th></tr></thead><tbody id="mhf-b"></tbody></table></div>
+   <div class="row7"><button type="button" class="btn" id="mhf-add">+ Thêm dòng</button><span id="mhf-tot" class="hint"></span></div>
+   <label class="field">Ghi chú phiếu<input id="mhf-n" value="${esc(draft&&draft.note!=null?draft.note:p?p.note:"")}"></label><div id="mhf-e2"></div><button class="btn pri">${p?"Lưu phiếu":"Lập phiếu"}</button></form>`);
+  const tot=()=>{const v=L.reduce((t,l)=>t+(+l.qty||0)*(+l.price||0),0);$("#mhf-tot").textContent=v?"Giá trị đặt: "+nf(Math.round(v))+" đ":""};
+  const draw=()=>{$("#mhf-b").innerHTML=L.map((l,i)=>`<tr><td><input class="mh-i" data-i="${i}" value="${esc(l.item)}" placeholder="Gõ mã hoặc tên" autocomplete="off"></td><td class="mh-nm">${esc(l.item?mhName(l.item):"")}</td><td><input class="mh-q n" data-i="${i}" type="number" min="0" step="any" value="${l.qty}"></td><td><input class="mh-p n" data-i="${i}" type="number" min="0" step="any" value="${l.price==null?"":l.price}" placeholder="Giá"></td><td><input class="mh-o" data-i="${i}" value="${esc(l.note)}"></td><td><button type="button" class="lnk" data-rm="${i}">✕</button></td></tr>`).join("");
+    document.querySelectorAll(".mh-i").forEach(x=>khoPick(x,["NVL","CCDC","HH"],it=>{const i=+x.dataset.i;L[i].item=it.code;x.value=it.code;x.closest("tr").querySelector(".mh-nm").textContent=it.name}));
+    document.querySelectorAll(".mh-q").forEach(x=>x.oninput=()=>{L[+x.dataset.i].qty=x.value;tot()});document.querySelectorAll(".mh-p").forEach(x=>x.oninput=()=>{L[+x.dataset.i].price=x.value;tot()});
+    document.querySelectorAll(".mh-o").forEach(x=>x.oninput=()=>L[+x.dataset.i].note=x.value);
+    document.querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{L.splice(+x.dataset.rm,1);if(!L.length)L.push({item:"",qty:"",note:"",price:""});draw()});tot()};
+  draw();
+  $("#mhf-add").onclick=()=>{L.push({item:"",qty:"",note:"",price:""});draw()};
+  $("#mhf-ns").onclick=()=>{const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value};mhNewSupplier(sid=>mhForm(id,{...keep,sup:sid}))};
+  $("#mhf").onsubmit=async e=>{e.preventDefault();const body={supplier_id:$("#mhf-s").value,order_date:$("#mhf-d").value,expected_date:$("#mhf-e").value||null,note:$("#mhf-n").value,lines:L.filter(l=>l.item).map(l=>({item:l.item,qty:+l.qty,note:l.note,unit_price:l.price===""||l.price==null?null:+l.price}))};
+    try{const r=await kApi(p?"/mh/orders/"+p.id:"/mh/orders",{method:p?"PUT":"POST",body:JSON.stringify(body)});closeDrawer();toast(p?"Đã lưu phiếu":"Đã lập phiếu "+r.no);await mhReload()}catch(err){$("#mhf-e2").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
+}
+/* Form kho báo thực nhận */
+function mhReceiveForm(id){
+  const p=(MH.orders||[]).find(x=>x.id===id);if(!p)return;
+  const L=p.lines.map(l=>({po_line_id:l.id,item:l.item,name:l.name,unit:l.unit,qty:l.qty,received:l.received,now:Math.max(0,Math.round((l.qty-l.received)*1e6)/1e6)})),X=[];
+  openDrawerHTML(`<h2>Nhận hàng · ${esc(p.no)}</h2><p class="hint">${esc(p.supplier_name)} · ghi số THỰC NHẬN của lần giao này (có thể khác số đặt). Hệ thống tự lập phiếu nhập kho.</p><form class="frm" id="mhr"><label class="field">Ngày nhận<input id="mhr-d" type="date" value="${mhToday()}" required></label>
+   <div class="tbl edit"><table><thead><tr><th>Hàng</th><th>Đặt</th><th>Đã nhận</th><th>Nhận lần này</th></tr></thead><tbody>${L.map((l,i)=>`<tr><td><b>${esc(l.name)}</b><br><small class="mono">${esc(l.item)}</small></td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td class="n">${mhN(l.received)}</td><td><input class="mhr-q n" data-i="${i}" type="number" min="0" step="any" value="${l.now}"></td></tr>`).join("")}</tbody></table></div>
+   <h3>Hàng giao thêm ngoài phiếu đặt</h3><div class="tbl edit"><table><tbody id="mhr-x"></tbody></table></div><div class="row7"><button type="button" class="btn sm" id="mhr-add">+ Thêm hàng giao thêm</button></div>
+   <label class="field">Ghi chú (ví dụ: giao thiếu, hàng lỗi)<input id="mhr-n"></label><div id="mhr-e"></div><button class="btn pri">Ghi nhận hàng về kho</button></form>`);
+  document.querySelectorAll(".mhr-q").forEach(x=>x.oninput=()=>L[+x.dataset.i].now=x.value);
+  const drawX=()=>{$("#mhr-x").innerHTML=X.map((l,i)=>`<tr><td><input class="mhx-i" data-i="${i}" value="${esc(l.item)}" placeholder="Gõ mã hoặc tên" autocomplete="off"></td><td class="mh-nm">${esc(l.item?mhName(l.item):"")}</td><td><input class="mhx-q n" data-i="${i}" type="number" min="0" step="any" value="${l.qty}" placeholder="Số lượng"></td><td><button type="button" class="lnk" data-xr="${i}">✕</button></td></tr>`).join("");
+    document.querySelectorAll(".mhx-i").forEach(x=>khoPick(x,["NVL","CCDC","HH"],it=>{const i=+x.dataset.i;X[i].item=it.code;x.value=it.code;x.closest("tr").querySelector(".mh-nm").textContent=it.name}));
+    document.querySelectorAll(".mhx-q").forEach(x=>x.oninput=()=>X[+x.dataset.i].qty=x.value);
+    document.querySelectorAll("[data-xr]").forEach(x=>x.onclick=()=>{X.splice(+x.dataset.xr,1);drawX()})};
+  $("#mhr-add").onclick=()=>{X.push({item:"",qty:""});drawX()};
+  $("#mhr").onsubmit=async e=>{e.preventDefault();
+    const lines=L.filter(l=>+l.now>0).map(l=>({po_line_id:l.po_line_id,item:l.item,qty:+l.now})).concat(X.filter(x=>x.item&&+x.qty>0).map(x=>({item:x.item,qty:+x.qty})));
+    if(!lines.length){$("#mhr-e").innerHTML=`<div class="note red">Chưa có dòng nào có số lượng nhận.</div>`;return}
+    try{const r=await kApi("/mh/orders/"+p.id+"/receipts",{method:"POST",body:JSON.stringify({receipt_date:$("#mhr-d").value,note:$("#mhr-n").value,lines})});closeDrawer();toast("Đã nhập kho, phiếu "+r.kho_doc_no);await mhReload();if(typeof khoLoad==="function")khoLoad(true)}catch(err){$("#mhr-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
+}
+/* Tab "Đặt ngoài" giữ trang cũ (hàng AILLA đặt bên ngoài thay vì tự sản xuất) */
+{const i=SX_TABS.findIndex(t=>t[0]==="sx_mh");if(i>=0)SX_TABS[i][1]="Mua hàng"}
+{const old=PAGES.sx_mh;PAGES.sx_dn=function(m){old.apply(this,arguments);m.querySelectorAll(".sxtabs button").forEach(b=>b.classList.toggle("on",b.dataset.sxt==="sx_dn"))}}
+PAGES.sx_mh=sxInit(pMuaHang);
+
+/* =====================================================================
+   Trang quản trị: Mua hàng & công nợ (có giá)
+   ===================================================================== */
+const mhD=v=>v?kDd(v):"";
+/* Hướng dẫn ngắn ở đầu mỗi trang: trang này làm gì, ai làm, khi nào. */
+const MH_GUIDE={
+  mh_po:"<b>Phiếu mua hàng</b> do Thảo lập khi đặt hàng nhà cung cấp: ngày đặt, ngày giao dự kiến, hàng, số lượng, giá đặt. Trang này theo dõi từng phiếu: đã đặt, đang giao, đủ hàng, trễ bao nhiêu ngày.",
+  mh_cho:"<b>Làm khi nào:</b> kho đã ghi hàng về (bên vận hành) mà chưa có chứng từ giá. Khi nhà cung cấp gửi <b>phiếu giao hàng, bill hoặc hóa đơn đỏ</b> thì bấm <b>Ghi chứng từ</b>: nhập giá từng dòng, VAT, vận chuyển, bốc vác và <b>đính kèm ảnh hoặc PDF</b>. Ghi xong hàng biến mất khỏi danh sách này và công nợ nhà cung cấp tăng đúng số tiền.",
+  mh_hd:"<b>Chứng từ</b> là phiếu giao hàng, bill hoặc hóa đơn đỏ nhà cung cấp gửi. <b>Khi nào ghi:</b> hàng đã về kho (kho đã ghi nhận) và nhà cung cấp gửi chứng từ. Bấm <b>Ghi chứng từ</b> ở khối đầu trang (hoặc nút <b>+ Ghi chứng từ nhà cung cấp</b>): nhập giá từng dòng, VAT, vận chuyển, bốc vác, đính kèm ảnh hoặc PDF. Ghi xong, hàng biến mất khỏi khối chờ và công nợ nhà cung cấp tăng đúng số tiền. Bấm vào một chứng từ đã ghi để xem hoặc thêm ảnh; ghi nhầm thì Hủy chứng từ rồi ghi lại.",
+  mh_chi:"<b>Khi nào ghi:</b> Thảo báo đã thanh toán hoặc đã cọc cho nhà cung cấp thì kế toán bấm <b>+ Ghi phiếu chi</b>: nhà cung cấp, số tiền, ngày, tài khoản. Trả một phần, trả khi chưa có hóa đơn, hay trả trước (cọc) đều được; công nợ nhà cung cấp tự trừ.",
+  mh_no:"<b>Kết quả.</b> Mình còn nợ từng nhà cung cấp bao nhiêu = công nợ đầu kỳ + chứng từ − tiền đã chi (gồm cả cọc). <b>Lần đầu:</b> bấm <b>+ Thêm nhà cung cấp</b> và nhập số nợ cũ ngay trong form đó. Về sau sửa số nợ đầu kỳ bằng nút <b>Đặt đầu kỳ</b> ở dòng nhà cung cấp.",
+  mh_gianvl:"<b>Kết quả.</b> Giá trung bình của từng nguyên vật liệu trong tháng (có tính cả hàng còn tồn đầu tháng). Số này dùng để tính giá thành sản phẩm."};
+const mhGuide=k=>`<details class="mhguide"><summary>Cách dùng</summary><div class="note">${MH_GUIDE[k]}</div></details>`;
+function mhNeedAdmin(m,title,sub){
+  if(!mhManage()){m.innerHTML=H(title,sub)+`<section class="card"><p>Chỉ CEO, quản lý và kế toán xem được phần này.</p></section>`;return true}
+  return false;
+}
+/* --- Chờ ghi chứng từ: hàng đã về kho nhưng chưa có phiếu giao / hóa đơn của nhà cung cấp --- */
+async function mhLoadInv(){if(MH.inv)return;try{MH.inv=await kApi("/mh/invoices")}catch(e){MH.inv=[];toast(e.message)}if(/^mh_/.test(PAGE))renderMain()}
+const MH_DOC={HD:"Hóa đơn VAT (hóa đơn đỏ)",PG:"Phiếu giao hàng / bill"};
+function mhPendingReceipts(){
+  const used=new Set((MH.inv||[]).filter(v=>v.status==="OK").flatMap(v=>v.receipt_ids||[])),out=[];
+  (MH.orders||[]).filter(p=>p.status!=="HUY").forEach(p=>p.receipts.filter(r=>r.status==="OK"&&!used.has(r.id)).forEach(r=>out.push({p,r})));return out}
+function pMhCho(m){
+  mhLoad();mhLoadInv();const T="Chờ ghi chứng từ",S="Hàng đã về kho, chưa có phiếu giao hoặc hóa đơn của nhà cung cấp";
+  if(mhNeedAdmin(m,T,S))return;
+  if(MH.err||!MH.orders||!MH.inv){m.innerHTML=H(T,S)+(MH.err?`<div class="note red">${esc(MH.err)}</div>`:`<p class="hint pad">Đang tải…</p>`);return}
+  const L=mhPendingReceipts();
+  m.innerHTML=H(T,S)+mhGuide("mh_cho")+`<div class="filters"><span class="hint">${L.length?L.length+" lần nhận hàng đang chờ chứng từ":""}</span><span class="sp"></span><button class="btn pri" id="mhw-new">+ Ghi chứng từ nhà cung cấp</button></div>
+  ${L.length?`<section class="card flush">${tbl(["Ngày nhận","Phiếu mua","Nhà cung cấp","Hàng đã nhận","Giá đặt dự kiến",""],L.map(({p,r})=>{const plan=r.lines.reduce((t,l)=>{const pl=p.lines.find(x=>x.id===l.po_line_id);return t+(pl&&pl.unit_price!=null?l.qty*pl.unit_price:NaN)},0);return `<tr><td>${esc(mhD(r.receipt_date))}</td><td class="mono">${esc(p.no)}</td><td>${esc(p.supplier_name)}</td><td>${r.lines.map(l=>esc(l.name)+" × "+mhN(l.qty)).join("<br>")}</td><td class="n">${isNaN(plan)?"—":nf(Math.round(plan))}</td><td><button class="btn sm pri" data-wr="${r.id}" data-ws="${p.supplier_id}">Ghi chứng từ</button></td></tr>`}))}</section>`:`<section class="card"><p class="pad">Không có hàng nào đang chờ chứng từ. Khi kho ghi nhận hàng về (ở bên vận hành), hàng hiện ở đây để kế toán ghi phiếu giao, bill hoặc hóa đơn của nhà cung cấp. Có chứng từ mà chưa thấy hàng về thì bấm <b>+ Ghi chứng từ nhà cung cấp</b> và nhập tiền hàng tay.</p></section>`}`;
+  $("#mhw-new").onclick=()=>mhDocForm();
+  m.querySelectorAll("[data-wr]").forEach(b=>b.onclick=()=>mhDocForm({sup:b.dataset.ws,rids:[b.dataset.wr]}));
+}
+/* --- Chứng từ nhà cung cấp đã ghi --- */
+/* Khối "hàng đã về kho, chờ ghi chứng từ": nằm ngay đầu trang Chứng từ nhà cung cấp. */
+function mhPendingCard(){
+  const L=mhPendingReceipts();
+  return `<section class="card flush"><div class="card-h pad"><h2>Hàng đã về kho, chưa có chứng từ</h2><span class="hint">${L.length?L.length+" lần nhận hàng đang chờ":"không có hàng nào đang chờ"}</span></div>${L.length?tbl(["Ngày nhận","Phiếu mua","Nhà cung cấp","Hàng đã nhận","Giá đặt dự kiến",""],L.map(({p,r})=>{const plan=r.lines.reduce((t,l)=>{const pl=p.lines.find(x=>x.id===l.po_line_id);return t+(pl&&pl.unit_price!=null?l.qty*pl.unit_price:NaN)},0);return `<tr><td>${esc(mhD(r.receipt_date))}</td><td class="mono">${esc(p.no)}</td><td>${esc(p.supplier_name)}</td><td>${r.lines.map(l=>esc(l.name)+" × "+mhN(l.qty)).join("<br>")}</td><td class="n">${isNaN(plan)?"—":nf(Math.round(plan))}</td><td><button class="btn sm pri" data-wr="${r.id}" data-ws="${p.supplier_id}">Ghi chứng từ</button></td></tr>`})):`<p class="hint pad">Khi kho ghi nhận hàng về (bên vận hành), hàng hiện ở đây để kế toán ghi chứng từ. Có chứng từ mà chưa thấy hàng về thì bấm <b>+ Ghi chứng từ nhà cung cấp</b> và nhập tiền hàng tay.</p>`}</section>`}
+function pMhHd(m){
+  mhLoad();mhLoadInv();const T="Chứng từ nhà cung cấp",S="Phiếu giao hàng, bill, hóa đơn đỏ của nhà cung cấp";
+  if(mhNeedAdmin(m,T,S))return;
+  if(!MH.inv||!MH.orders){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
+  m.innerHTML=H(T,S)+mhGuide("mh_hd")+mhPendingCard()+`<div class="filters"><span class="hint">Chứng từ đã ghi</span><span class="sp"></span><button class="btn pri" id="mhh-new">+ Ghi chứng từ nhà cung cấp</button></div>
+  <section class="card flush">${tbl(["Ngày","Loại","Số chứng từ","Nhà cung cấp","Tiền hàng","VAT","Vận chuyển","Bốc vác + khác","Tổng phải trả","Đã chi","Còn lại","Ảnh / PDF","Trạng thái",""],MH.inv.map(v=>`<tr class="clk ${v.status==="OK"?"":"mut"}" data-hv="${v.id}"><td>${esc(mhD(v.invoice_date))}</td><td>${v.doc_type==="PG"?"Phiếu giao / bill":"Hóa đơn VAT"}</td><td>${esc(v.invoice_no||"—")}</td><td>${esc(v.supplier_name)}</td><td class="n">${nf(v.goods_amount)}</td><td class="n">${nf(v.vat_amount)}${v.vat_in_cost?" <small>(vào giá vốn)</small>":""}</td><td class="n">${nf(v.freight)}</td><td class="n">${nf(v.handling+v.other)}</td><td class="n"><b>${nf(v.total)}</b></td><td class="n">${nf(v.paid)}</td><td class="n">${v.status==="OK"?nf(v.total-v.paid):"—"}</td><td>${v.file_count?pill(v.file_count+" file","blu"):"<span class=\"hint\">chưa có</span>"}</td><td>${v.status==="OK"?pill(v.paid>=v.total?"Đã chi đủ":v.paid>0?"Chi một phần":"Chưa chi",v.paid>=v.total?"grn":v.paid>0?"blu":"amb"):pill("Đã hủy","gry")}</td><td>${v.status==="OK"?`<button class="btn sm danger" data-hx="${v.id}">Hủy chứng từ</button>`:""}</td></tr>`))}</section>`;
+  $("#mhh-new").onclick=()=>mhDocForm();
+  m.querySelectorAll("[data-wr]").forEach(b=>b.onclick=()=>mhDocForm({sup:b.dataset.ws,rids:[b.dataset.wr]}));
+  m.querySelectorAll("[data-hv]").forEach(r=>r.onclick=()=>mhDocDetail(r.dataset.hv));
+  m.querySelectorAll("[data-hx]").forEach(b=>b.onclick=async e=>{e.stopPropagation();if(!confirm("Hủy chứng từ này? Giá vốn nhập quay về giá chưa cộng phí."))return;
+    try{await kApi("/mh/invoices/"+b.dataset.hx+"/cancel",{method:"POST",body:"{}"});toast("Đã hủy chứng từ");await mhReload();await mhLoadInv()}catch(err){toast(err.message)}});
+}
+/* Nén ảnh bill về tối đa 1600 điểm (vẫn đọc rõ chữ); PDF giữ nguyên nhưng không quá ~900 KB. */
+function mhPrepFile(file){
+  return new Promise((res,rej)=>{
+    if(file.type==="application/pdf"){if(file.size>900000){rej(new Error(file.name+": PDF quá lớn (tối đa khoảng 900 KB)"));return}
+      const fr=new FileReader();fr.onload=()=>res({name:file.name,mime:"application/pdf",data:String(fr.result).split(",")[1]});fr.onerror=()=>rej(new Error("Không đọc được "+file.name));fr.readAsDataURL(file);return}
+    if(!file.type.startsWith("image/")){rej(new Error(file.name+": chỉ nhận ảnh hoặc PDF"));return}
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{const k=Math.min(1,1600/Math.max(img.width,img.height)),cv=document.createElement("canvas");cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,cv.width,cv.height);cx.drawImage(img,0,0,cv.width,cv.height);URL.revokeObjectURL(url);
+      let q=.8,d=cv.toDataURL("image/jpeg",q);while(d.length>1300000&&q>.4){q-=.1;d=cv.toDataURL("image/jpeg",q)}
+      res({name:file.name.replace(/\.[^.]+$/,"")+".jpg",mime:"image/jpeg",data:d.split(",")[1]})};
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("Không đọc được ảnh "+file.name))};img.src=url})}
+async function mhUploadFiles(invId,files){
+  let okn=0;
+  for(const f of files){try{const x=await mhPrepFile(f);await kApi("/mh/invoices/"+invId+"/files",{method:"POST",body:JSON.stringify(x)});okn++}catch(e){toast(e.message)}}
+  return okn}
+const mhFileUrl=(inv,f)=>"/api/hub/kho/mh/invoices/"+inv+"/files/"+f;
+/* Xem chi tiết một chứng từ: số tiền, hàng, ảnh / PDF đính kèm (thêm, xóa được). */
+async function mhDocDetail(id){
+  const v=(MH.inv||[]).find(x=>x.id===id);if(!v)return;
+  let files=[];try{files=await kApi("/mh/invoices/"+id+"/files")}catch(e){toast(e.message)}
+  let ml=[];try{ml=await kApi("/mh/invoices/"+id+"/lines")}catch(e){}
+  const rcs=[];(MH.orders||[]).forEach(p=>p.receipts.forEach(r=>{if((v.receipt_ids||[]).includes(r.id))rcs.push({p,r})}));
+  openDrawerHTML(`<h2>${v.doc_type==="PG"?"Phiếu giao / bill":"Hóa đơn"} ${esc(v.invoice_no||"")} · ${esc(v.supplier_name)}</h2><p class="hint">Ngày ${esc(mhD(v.invoice_date))} · tiền hàng ${nf(v.goods_amount)} + VAT ${nf(v.vat_amount)} + vận chuyển ${nf(v.freight)} + bốc vác ${nf(v.handling)} + khác ${nf(v.other)} = <b>${nf(v.total)}</b>${v.note?" · "+esc(v.note):""}</p>
+   ${rcs.length?`<h3>Hàng thuộc chứng từ</h3>${tbl(["Ngày nhận","Phiếu mua","Hàng","Số nhận","Giá lúc giao","Thành tiền"],rcs.flatMap(({p,r})=>r.lines.map(l=>`<tr><td>${esc(mhD(r.receipt_date))}</td><td class="mono">${esc(p.no)}</td><td>${esc(l.name)}</td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td class="n">${l.unit_price!=null?nf(l.unit_price):"—"}</td><td class="n">${l.unit_price!=null?nf(Math.round(l.qty*l.unit_price)):"—"}</td></tr>`)))}`:(ml.length?"":`<p class="hint">Chứng từ chỉ có tổng tiền hàng, không có dòng hàng.</p>`)}${ml.length?`<h3>Dòng hàng nhập trên chứng từ</h3>${tbl(["Hàng","Số lượng","Đơn giá","Thành tiền"],ml.map(l=>`<tr><td>${esc(l.name)}<br><small class="mono">${esc(l.item)}</small></td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td class="n">${nf(l.unit_price)}</td><td class="n">${nf(Math.round(l.qty*l.unit_price))}</td></tr>`))}`:""}
+   <h3>Ảnh / PDF đính kèm</h3><div class="mhfiles">${files.length?files.map(f=>f.mime==="application/pdf"?`<div class="mhfile"><a href="${mhFileUrl(id,f.id)}" target="_blank" rel="noopener">📄 ${esc(f.name||"hóa đơn.pdf")}</a><button type="button" class="lnk" data-fd="${f.id}">Xóa</button></div>`:`<div class="mhfile"><a href="${mhFileUrl(id,f.id)}" target="_blank" rel="noopener"><img src="${mhFileUrl(id,f.id)}" alt="${esc(f.name)}"></a><button type="button" class="lnk" data-fd="${f.id}">Xóa</button></div>`).join(""):`<p class="hint">Chưa có ảnh hoặc PDF nào.</p>`}</div>
+   <label class="field">Thêm ảnh bill, hóa đơn đỏ (ảnh hoặc PDF)<input type="file" id="mhd-f" multiple accept="image/*,application/pdf"></label><button class="btn" id="mhd-up">Tải lên</button>`);
+  document.querySelectorAll("[data-fd]").forEach(b=>b.onclick=async()=>{if(!confirm("Xóa file này?"))return;try{await kApi("/mh/invoices/"+id+"/files/"+b.dataset.fd,{method:"DELETE"});MH.inv=null;await mhLoadInv();mhDocDetail(id)}catch(e){toast(e.message)}});
+  $("#mhd-up").onclick=async()=>{const fs=[...$("#mhd-f").files];if(!fs.length)return;$("#mhd-up").disabled=true;const n=await mhUploadFiles(id,fs);if(n)toast("Đã tải lên "+n+" file");MH.inv=null;await mhLoadInv();mhDocDetail(id)};
+}
+/* Form ghi chứng từ: chọn nhà cung cấp → hàng kho đã nhận (nhập giá từng dòng) + thêm dòng hàng khác → chi phí → đính kèm ảnh / PDF. */
+function mhDocForm(pre){
+  pre=pre||{};
+  const pend=mhPendingReceipts(),M=[{item:"",qty:"",price:""}];
+  openDrawerHTML(`<h2>Ghi chứng từ nhà cung cấp</h2><form class="frm mhdoc" id="mhi">
+   <div class="row4"><label class="field grow">Nhà cung cấp<select id="mhi-s">${mhSupOpts(pre.sup||"")}</select></label><label class="field">Loại chứng từ<select id="mhi-t"><option value="PG">${MH_DOC.PG}</option><option value="HD">${MH_DOC.HD}</option></select></label></div>
+   <div class="row4"><label class="field grow">Số chứng từ<input id="mhi-no" placeholder="Số phiếu giao hoặc số hóa đơn"></label><label class="field">Ngày chứng từ<input id="mhi-d" type="date" value="${mhToday()}" required></label></div>
+   <h3 class="mhstep"><span>1</span>Hàng và giá</h3>
+   <div id="mhi-r"></div>
+   <div id="mhi-mwrap"><div class="hint" id="mhi-mh"></div><div class="tbl edit"><table class="mhlines"><thead><tr><th>Mã hàng</th><th class="n">Số lượng</th><th class="n">Đơn giá (đ)</th><th class="n">Thành tiền</th><th></th></tr></thead><tbody id="mhi-m"></tbody></table></div><button type="button" class="btn sm" id="mhi-add">+ Thêm dòng hàng</button></div>
+   <h3 class="mhstep"><span>2</span>Chi phí trên chứng từ</h3>
+   <div class="row4"><label class="field">VAT (đ)<input id="mhi-vat" type="number" min="0" value="0"></label><label class="field">Vận chuyển (đ)<input id="mhi-fr" type="number" min="0" value="0"></label><label class="field">Bốc vác (đ)<input id="mhi-hd" type="number" min="0" value="0"></label><label class="field">Khác (đ)<input id="mhi-ot" type="number" min="0" value="0"></label></div>
+   <label class="chk"><input type="checkbox" id="mhi-vc"> Tính VAT vào giá vốn (khi VAT không được khấu trừ)</label>
+   <div id="mhi-sum" class="note mhtot"></div>
+   <h3 class="mhstep"><span>3</span>Ảnh bill, hóa đơn đỏ</h3>
+   <input type="file" id="mhi-f" multiple accept="image/*,application/pdf"><div id="mhi-fl" class="hint"></div>
+   <label class="field">Ghi chú<input id="mhi-n"></label><div id="mhi-e"></div><button class="btn pri">Ghi chứng từ</button></form>`);
+  const sel=()=>[...document.querySelectorAll(".mhi-c:checked")].map(x=>x.value);
+  const manualSum=()=>M.reduce((t,l)=>t+(+l.qty||0)*(+l.price||0),0);
+  const rcSum=()=>{let g=0;document.querySelectorAll(".mhi-c:checked").forEach(c=>{document.querySelectorAll('.mhi-pr[data-r="'+c.value+'"]').forEach(i=>{g+=(+i.dataset.q)*(+i.value||0)})});return g};
+  const sum=()=>{const g=n=>+($(n).value)||0,goods=rcSum()+manualSum(),tot=goods+g("#mhi-vat")+g("#mhi-fr")+g("#mhi-hd")+g("#mhi-ot");
+    $("#mhi-sum").innerHTML=`Tiền hàng <b>${nf(Math.round(goods))}</b> + VAT ${nf(g("#mhi-vat"))} + vận chuyển ${nf(g("#mhi-fr"))} + bốc vác ${nf(g("#mhi-hd"))} + khác ${nf(g("#mhi-ot"))} = <b>Tổng phải trả ${nf(Math.round(tot))}</b>`;
+    document.querySelectorAll(".mhi-lt").forEach(td=>{const i=+td.dataset.i;td.textContent=(+M[i].qty&&+M[i].price)?nf(Math.round(M[i].qty*M[i].price)):"—"});
+    document.querySelectorAll(".mhi-rt").forEach(td=>{const i=document.querySelector('.mhi-pr[data-l="'+td.dataset.l+'"]');td.textContent=i&&+i.value?nf(Math.round(+i.dataset.q*+i.value)):"—"})};
+  const drawM=()=>{$("#mhi-m").innerHTML=M.map((l,i)=>`<tr><td><input class="mhm-i" data-i="${i}" value="${esc(l.item)}" placeholder="Gõ mã hoặc tên hàng" autocomplete="off">${l.item?`<small class="mh-nm">${esc(mhName(l.item))}</small>`:""}</td><td><input class="mhm-q n" data-i="${i}" type="number" min="0" step="any" value="${l.qty}"></td><td><input class="mhm-p n" data-i="${i}" type="number" min="0" step="any" value="${l.price}"></td><td class="n mhi-lt" data-i="${i}">—</td><td><button type="button" class="lnk" data-mx="${i}">✕</button></td></tr>`).join("");
+    document.querySelectorAll(".mhm-i").forEach(x=>khoPick(x,["NVL","CCDC","HH"],it=>{const i=+x.dataset.i;M[i].item=it.code;x.value=it.code;let sm=x.parentNode.querySelector("small");if(!sm){sm=document.createElement("small");sm.className="mh-nm";x.parentNode.appendChild(sm)}sm.textContent=it.name}));
+    document.querySelectorAll(".mhm-q").forEach(x=>x.oninput=()=>{M[+x.dataset.i].qty=x.value;sum()});document.querySelectorAll(".mhm-p").forEach(x=>x.oninput=()=>{M[+x.dataset.i].price=x.value;sum()});
+    document.querySelectorAll("[data-mx]").forEach(x=>x.onclick=()=>{M.splice(+x.dataset.mx,1);if(!M.length)M.push({item:"",qty:"",price:""});drawM()});sum()};
+  const drawR=()=>{const sid=$("#mhi-s").value,L=pend.filter(x=>x.p.supplier_id===sid);
+    $("#mhi-r").innerHTML=L.length?`<p class="hint">Hàng kho đã nhận của nhà cung cấp này, chưa có chứng từ. Tick lần nhận thuộc chứng từ và <b>điền đơn giá từng dòng</b>:</p>`+L.map(({p,r})=>`<div class="mhrc"><label class="chk"><input type="checkbox" class="mhi-c" value="${r.id}" ${(pre.rids||L.map(x=>x.r.id)).includes(r.id)?"checked":""}> <b>${esc(mhD(r.receipt_date))}</b> · phiếu mua hàng ${esc(p.no)}</label><table class="mhlines"><thead><tr><th>Hàng</th><th class="n">Số nhận</th><th class="n">Đơn giá (đ)</th><th class="n">Thành tiền</th></tr></thead><tbody>${r.lines.map(l=>{const pl=p.lines.find(x=>x.id===l.po_line_id),def=l.unit_price!=null?l.unit_price:(pl&&pl.unit_price!=null?pl.unit_price:"");return `<tr><td>${esc(l.name)}</td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td><input class="mhi-pr n" data-r="${r.id}" data-l="${l.id}" data-q="${l.qty}" type="number" min="0" step="any" value="${def}" placeholder="Giá"></td><td class="n mhi-rt" data-l="${l.id}">—</td></tr>`}).join("")}</tbody></table></div>`).join(""):"";
+    $("#mhi-mh").textContent=L.length?"Hàng khác trên chứng từ (không nằm trong lần nhận hàng ở trên), nếu có:":"Nhập từng dòng hàng ghi trên chứng từ: mã hàng, số lượng, đơn giá.";
+    document.querySelectorAll(".mhi-c").forEach(x=>x.onchange=sum);document.querySelectorAll(".mhi-pr").forEach(x=>x.oninput=sum);sum()};
+  $("#mhi-s").onchange=drawR;["#mhi-vat","#mhi-fr","#mhi-hd","#mhi-ot"].forEach(i=>$(i).oninput=sum);
+  $("#mhi-add").onclick=()=>{M.push({item:"",qty:"",price:""});drawM();const r=document.querySelectorAll(".mhm-i");if(r.length)r[r.length-1].focus()};
+  $("#mhi-f").onchange=()=>{$("#mhi-fl").textContent=[...$("#mhi-f").files].map(f=>f.name).join(", ")};
+  drawR();drawM();
+  $("#mhi").onsubmit=async e=>{e.preventDefault();const g=n=>+($(n).value)||0,ids=sel(),prices={};
+    ids.forEach(rid=>document.querySelectorAll('.mhi-pr[data-r="'+rid+'"]').forEach(i=>{prices[i.dataset.l]=i.value===""?null:+i.value}));
+    const ml=M.filter(l=>l.item||+l.qty||+l.price);
+    if(ml.some(l=>!l.item||!(+l.qty>0)||l.price===""||!(+l.price>=0))){$("#mhi-e").innerHTML=`<div class="note red">Mỗi dòng hàng nhập thêm cần đủ mã hàng, số lượng và đơn giá (hoặc xóa dòng trống).</div>`;return}
+    const btn=e.submitter||document.querySelector("#mhi button.pri");if(btn)btn.disabled=true;
+    try{const r=await kApi("/mh/invoices",{method:"POST",body:JSON.stringify({supplier_id:$("#mhi-s").value,doc_type:$("#mhi-t").value,invoice_no:$("#mhi-no").value,invoice_date:$("#mhi-d").value,receipt_ids:ids,prices,manual_lines:ml.map(l=>({item:l.item,qty:+l.qty,unit_price:+l.price})),vat_amount:g("#mhi-vat"),freight:g("#mhi-fr"),handling:g("#mhi-hd"),other:g("#mhi-ot"),vat_in_cost:$("#mhi-vc").checked,note:$("#mhi-n").value})});
+      const fs=[...$("#mhi-f").files];let up=0;if(fs.length)up=await mhUploadFiles(r.id,fs);
+      closeDrawer();toast("Đã ghi chứng từ"+(up?", đính kèm "+up+" file":""));await mhReload();await mhLoadInv()}
+    catch(err){$("#mhi-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
+}
+/* --- Phiếu chi --- */
+async function mhLoadPay(){if(MH.pay)return;try{MH.pay=await kApi("/mh/payments")}catch(e){MH.pay=[];toast(e.message)}if(/^mh_/.test(PAGE))renderMain()}
+function pMhChi(m){
+  mhLoad();mhLoadPay();mhLoadInv();const T="Phiếu chi thanh toán",S="Thảo báo đã thanh toán, kế toán ghi phiếu chi";
+  if(mhNeedAdmin(m,T,S))return;
+  if(!MH.pay||!MH.sup){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
+  m.innerHTML=H(T,S)+mhGuide("mh_chi")+`<div class="filters"><span class="sp"></span><button class="btn pri" id="mhc-new">+ Ghi phiếu chi</button></div>
+  <section class="card flush">${tbl(["Ngày chi","Loại","Nhà cung cấp","Hóa đơn / phiếu mua","Số tiền","Tài khoản / hình thức","Ghi chú","Trạng thái",""],MH.pay.map(p=>`<tr class="${p.status==="OK"?"":"mut"}"><td>${esc(mhD(p.pay_date))}</td><td>${p.kind==="COC"?pill("Cọc","amb"):"Trả tiền"}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.invoice_no||p.po_no||"—")}</td><td class="n"><b>${nf(p.amount)}</b></td><td>${esc(p.account||"")}</td><td>${esc(p.note||"")}</td><td>${p.status==="OK"?pill("Đã ghi","grn"):pill("Đã hủy","gry")}</td><td>${p.status==="OK"?`<button class="btn sm danger" data-px="${p.id}">Hủy phiếu chi</button>`:""}</td></tr>`))}</section>`;
+  $("#mhc-new").onclick=()=>mhPayForm();
+  m.querySelectorAll("[data-px]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy phiếu chi này? Công nợ nhà cung cấp tăng lại đúng số tiền."))return;
+    try{await kApi("/mh/payments/"+b.dataset.px+"/cancel",{method:"POST",body:"{}"});toast("Đã hủy phiếu chi");MH.pay=null;MH.inv=null;MH.debts=null;await mhLoadPay();await mhLoadInv()}catch(err){toast(err.message)}});
+}
+function mhPayForm(supId,poId){
+  openDrawerHTML(`<h2>Ghi phiếu chi thanh toán</h2><form class="frm" id="mhp"><div class="row4"><label class="field grow">Nhà cung cấp<select id="mhp-s">${mhSupOpts(supId||"")}</select></label><label class="field">Loại<select id="mhp-k"><option value="CHI">Trả tiền (thanh toán)</option><option value="COC">Cọc / trả trước khi đặt hàng</option></select></label></div>
+   <div class="row4"><label class="field">Ngày chi<input id="mhp-d" type="date" value="${mhToday()}" required></label><label class="field">Số tiền (đ)<input id="mhp-a" type="number" min="1" required></label></div>
+   <label class="field">Gắn vào hóa đơn (không bắt buộc)<select id="mhp-i"><option value="">— Không gắn, trừ vào công nợ chung —</option></select></label>
+   <label class="field">Gắn vào phiếu mua (dùng cho tiền cọc)<select id="mhp-o"><option value="">— Không gắn —</option></select></label><label class="field">Tài khoản / hình thức chi<input id="mhp-ac" placeholder="Ví dụ: Vietcombank, tiền mặt"></label><label class="field">Ghi chú<input id="mhp-n"></label><div id="mhp-e"></div><button class="btn pri">Ghi phiếu chi</button></form>`);
+  const fill=()=>{const sid=$("#mhp-s").value;$("#mhp-i").innerHTML=`<option value="">— Không gắn, trừ vào công nợ chung —</option>`+(MH.inv||[]).filter(v=>v.status==="OK"&&v.supplier_id===sid&&v.total>v.paid).map(v=>`<option value="${v.id}">${esc(mhD(v.invoice_date))} · ${esc(v.invoice_no||"không số")} · còn ${nf(v.total-v.paid)}</option>`).join("");
+    $("#mhp-o").innerHTML=`<option value="">— Không gắn —</option>`+(MH.orders||[]).filter(p=>p.supplier_id===sid&&p.status!=="HUY").map(p=>`<option value="${p.id}">${esc(p.no)} · ${esc(mhD(p.order_date))}${p.status==="DU"?" · đã đủ hàng":""}</option>`).join("")};
+  $("#mhp-s").onchange=fill;fill();
+  if(poId){const p=(MH.orders||[]).find(x=>x.id===poId);$("#mhp-o").value=poId;if(p){const open=mhPoMoney(p).inv.filter(v=>v.total>v.paid);if(open.length===1){$("#mhp-i").value=open[0].id;$("#mhp-a").value=open[0].total-open[0].paid}else if(!open.length)$("#mhp-k").value="COC"}}
+  $("#mhp").onsubmit=async e=>{e.preventDefault();
+    try{await kApi("/mh/payments",{method:"POST",body:JSON.stringify({supplier_id:$("#mhp-s").value,kind:$("#mhp-k").value,po_id:$("#mhp-o").value||null,invoice_id:$("#mhp-i").value||null,pay_date:$("#mhp-d").value,amount:+$("#mhp-a").value,account:$("#mhp-ac").value,note:$("#mhp-n").value})});closeDrawer();toast("Đã ghi phiếu chi");MH.pay=null;MH.inv=null;MH.debts=null;if(PAGE==="mh_chi"){mhLoadPay();mhLoadInv()}else renderMain()}catch(err){$("#mhp-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
+}
+/* --- Công nợ nhà cung cấp --- */
+async function mhLoadDebt(){if(MH.debts)return;try{MH.debts=await kApi("/mh/debts")}catch(e){MH.debts=[];toast(e.message)}if(PAGE==="mh_no")renderMain()}
+function pMhNo(m){
+  mhLoad();mhLoadDebt();const T="Công nợ nhà cung cấp",S="Đầu kỳ + hóa đơn − đã chi";
+  if(mhNeedAdmin(m,T,S))return;
+  if(!MH.debts){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
+  const D0=MH.debts,tot=k=>sum(D0,x=>x[k]);
+  m.innerHTML=H(T,S)+mhGuide("mh_no")+`<div class="grid kpis">${kpi("Tổng còn nợ nhà cung cấp",tr(tot("balance")),D0.filter(x=>x.balance>0).length+" nhà cung cấp còn nợ")}${kpi("Công nợ đầu kỳ",tr(tot("opening_debt")),"")}${kpi("Hóa đơn phát sinh",tr(tot("invoiced")),"")}${kpi("Đã chi",tr(tot("paid")),"")}</div>
+  <div class="filters"><span class="sp"></span><button class="btn" id="mhn-ct">+ Ghi chứng từ</button><button class="btn" id="mhn-pc">+ Ghi phiếu chi</button><button class="btn pri" id="mhn-ns">+ Thêm nhà cung cấp (kèm công nợ đầu kỳ)</button></div>
+  <section class="card flush">${tbl(["Nhà cung cấp","Công nợ đầu kỳ","Ngày chốt","Hóa đơn phát sinh","Đã chi","Còn nợ",""],D0.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="n">${nf(d.opening_debt)}</td><td>${esc(mhD(d.opening_date)||"chưa đặt")}</td><td class="n">${nf(d.invoiced)}</td><td class="n">${nf(d.paid)}</td><td class="n"><b style="${d.balance>0?"color:#b42318":""}">${nf(d.balance)}</b></td><td class="nowrap"><button class="btn sm" data-ld="${d.id}">Sổ chi tiết</button> <button class="btn sm" data-od="${d.id}">Đặt đầu kỳ</button> <button class="btn sm" data-pd="${d.id}">Ghi chi</button></td></tr>`).concat(D0.length?[`<tr class="tot"><td><b>Tổng</b></td><td class="n">${nf(tot("opening_debt"))}</td><td></td><td class="n">${nf(tot("invoiced"))}</td><td class="n">${nf(tot("paid"))}</td><td class="n"><b>${nf(tot("balance"))}</b></td><td></td></tr>`]:[]))}
+   <p class="hint pad">Chưa có nhà cung cấp nào thì bấm <b>+ Thêm nhà cung cấp</b>: nhập tên và số đang nợ tại ngày bắt đầu dùng web. Nhà cung cấp đã có thì bấm <b>Đặt đầu kỳ</b> ở cuối dòng để sửa. Chứng từ và phiếu chi từ sau ngày chốt mới được cộng trừ vào.</p></section>`;
+  $("#mhn-ct").onclick=()=>{mhLoadInv();mhDocForm()};$("#mhn-pc").onclick=()=>{mhLoadInv();mhPayForm()};
+  $("#mhn-ns").onclick=()=>mhNewSupplier(()=>{MH.debts=null;mhLoadDebt()},{debt:true});
+  m.querySelectorAll("[data-pd]").forEach(b=>b.onclick=()=>{mhLoadInv();mhPayForm(b.dataset.pd)});
+  m.querySelectorAll("[data-od]").forEach(b=>b.onclick=()=>{const d=D0.find(x=>x.id===b.dataset.od);if(!d)return;
+    openDrawerHTML(`<h2>Công nợ đầu kỳ · ${esc(d.name)}</h2><form class="frm" id="mho"><label class="field">Số tiền đang nợ nhà cung cấp tại ngày chốt (đ)<input id="mho-a" type="number" value="${d.opening_debt}" required></label><label class="field">Ngày chốt<input id="mho-d" type="date" value="${d.opening_date||mhToday()}" required></label><div id="mho-e"></div><button class="btn pri">Lưu</button></form>`);
+    $("#mho").onsubmit=async e=>{e.preventDefault();try{await kApi("/mh/suppliers/"+d.id+"/opening",{method:"PUT",body:JSON.stringify({opening_debt:+$("#mho-a").value,opening_date:$("#mho-d").value})});closeDrawer();toast("Đã lưu công nợ đầu kỳ");MH.debts=null;await mhLoadDebt()}catch(err){$("#mho-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}}});
+  m.querySelectorAll("[data-ld]").forEach(b=>b.onclick=async()=>{try{const r=await kApi("/mh/suppliers/"+b.dataset.ld+"/ledger"),s=r.supplier;
+    openDrawerHTML(`<h2>Sổ công nợ · ${esc(s.name)}</h2><p class="hint">Đầu kỳ ${nf(s.opening_debt)} ${s.opening_date?"(chốt "+esc(mhD(s.opening_date))+")":""}</p>${r.entries.length?tbl(["Ngày","Nội dung","Số / hình thức","Phát sinh","Còn nợ"],r.entries.map(e=>`<tr><td>${esc(mhD(e.date))}</td><td>${esc(e.kind)}</td><td>${esc(e.ref||"")}</td><td class="n">${e.delta<0?`−${nf(-e.delta)}`:"+"+nf(e.delta)}</td><td class="n"><b>${nf(e.balance)}</b></td></tr>`)):`<p class="hint">Chưa có phát sinh sau ngày chốt.</p>`}`)}catch(err){toast(err.message)}});
+}
+/* --- Giá nguyên vật liệu theo tháng --- */
+async function mhLoadPrices(){const mo=MH.pmonth||MONTH.key;if(MH.prices&&MH.prices.month===mo)return;try{MH.prices=await kApi("/mh/material-prices?month="+mo)}catch(e){MH.prices={month:mo,rows:[]};toast(e.message)}if(PAGE==="mh_gianvl")renderMain()}
+function pMhGiaNvl(m){
+  mhLoadPrices();const T="Giá nguyên vật liệu theo tháng",S="Bình quân gia quyền, có tính tồn đầu tháng";mhLoad();
+  if(mhNeedAdmin(m,T,S))return;
+  const mo=MH.pmonth||MONTH.key;
+  m.innerHTML=H(T,S)+mhGuide("mh_gianvl")+`<div class="filters"><label class="field" style="margin:0">Tháng <input type="month" id="mhv-m" value="${mo}"></label><span class="hint">Giá nhập đã gồm phí vận chuyển, bốc vác (và VAT nếu hóa đơn chọn tính vào giá vốn)</span></div>
+  <section class="card flush">${!MH.prices||MH.prices.month!==mo?`<p class="hint pad">Đang tải…</p>`:MH.prices.rows.length?tbl(["Nguyên vật liệu","Tồn đầu tháng","Giá tồn đầu (đ)","Nhập trong tháng","Giá nhập tháng (đ)","Giá bình quân cuối tháng (đ)","Giá nhập gần nhất (đ)"],MH.prices.rows.map(r=>`<tr><td><b>${esc(r.name)}</b><br><small class="mono">${esc(r.item)}</small></td><td class="n">${mhN(r.open_qty)} ${esc(r.unit)}</td><td class="n">${r.open_qty?nf(Math.round(r.open_price)):"—"}</td><td class="n">${r.in_qty?mhN(r.in_qty)+" "+esc(r.unit):"—"}</td><td class="n">${r.in_qty?nf(Math.round(r.in_price)):"—"}</td><td class="n"><b>${nf(Math.round(r.avg_price))}</b></td><td class="n">${nf(Math.round(r.last_price))}</td></tr>`)):`<p class="hint pad">Tháng này chưa có nguyên vật liệu nào có giá nhập.</p>`}</section>`;
+  $("#mhv-m").onchange=e=>{MH.pmonth=e.target.value;MH.prices=null;renderMain()};
+}
+/* Trạng thái gộp của một phiếu mua (trang quản trị). */
+function mhStage(p,M){
+  if(p.status==="HUY")return ["huy","Đã hủy","gry"];
+  if(p.status!=="DU")return ["hang",mhLateDays(p)?"Trễ hàng":"Chờ hàng",mhLateDays(p)?"red":"amb"];
+  if(mhPendingReceipts().some(x=>x.p.id===p.id)||!M.invTotal)return ["ct","Chờ chứng từ","blu"];
+  if(M.paid<M.invTotal-1)return ["no","Còn nợ","red"];
+  return ["xong","Xong","grn"]}
+/* Khoảng thời gian lọc theo ngày đặt: [từ, đến (không gồm)] */
+function mhPeriod(){const t=mhToday(),y=+t.slice(0,4),mo=+t.slice(5,7),f=(Y,M)=>{while(M<1){M+=12;Y--}return Y+"-"+String(M).padStart(2,"0")+"-01"};
+  return {m0:[f(y,mo),null],m1:[f(y,mo-1),f(y,mo)],m3:[f(y,mo-2),null],y:[y+"-01-01",null]}[MH.per]||[null,null]}
+function pMhDon(m){
+  mhLoad();mhLoadInv();mhLoadPay();const T="Đơn mua hàng",S="Mỗi phiếu một dòng: đặt hàng → nhận hàng → chứng từ → trả tiền";
+  if(mhNeedAdmin(m,T,S))return;
+  if(MH.err){m.innerHTML=H(T,S)+`<div class="note red">${esc(MH.err)}</div>`;return}
+  if(!MH.orders||!MH.inv||!MH.pay){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
+  const [from,to]=mhPeriod(),q=(MH.q||"").trim().toLowerCase(),need=mhNeedBuy();
+  const rows=MH.orders.map(p=>{const M=mhPoMoney(p);return {p,M,st:mhStage(p,M),val:M.invTotal||mhValue(p)||0}})
+    .filter(x=>(!from||x.p.order_date>=from)&&(!to||x.p.order_date<to)&&(!MH.sid||x.p.supplier_id===MH.sid)&&(!q||(x.p.no+" "+x.p.supplier_name+" "+x.p.lines.map(l=>l.item+" "+l.name).join(" ")).toLowerCase().includes(q)));
+  const live=rows.filter(x=>x.st[0]!=="huy"),cnt=k=>rows.filter(x=>x.st[0]===k).length,F=MH.st||"";
+  const shown=rows.filter(x=>F?x.st[0]===F:x.st[0]!=="huy");
+  const tot=k=>live.reduce((t,x)=>t+x[k],0),owe=live.reduce((t,x)=>t+(x.M.invTotal?Math.max(0,x.M.invTotal-x.M.paid):0),0),paid=live.reduce((t,x)=>t+x.M.paid,0);
+  const chips=[["","Tất cả",live.length],["hang","Chờ hàng",cnt("hang")],["ct","Chờ chứng từ",cnt("ct")],["no","Còn nợ",cnt("no")],["xong","Xong",cnt("xong")],["huy","Đã hủy",cnt("huy")]];
+  const items=p=>{const L=p.lines.map(l=>esc(l.name||mhName(l.item))+" × "+mhN(l.qty));return L.slice(0,2).join("<br>")+(L.length>2?`<div class="hint">+${L.length-2} mặt hàng khác</div>`:"")};
+  const recv=p=>{const late=mhLateDays(p);return p.status==="HUY"?"—":p.status==="DU"?`<span class="ok">Đủ hàng</span>`:(p.status==="DANG_GIAO"?"Đã nhận một phần<br>":"")+(late?`<b style="color:#b42318">Trễ ${late} ngày</b>`:p.expected_date?`<span class="hint">hẹn ${esc(mhDM(p.expected_date))}</span>`:`<span class="hint">chưa hẹn ngày</span>`)};
+  const act=x=>{const p=x.p,o=p.status==="DAT"||p.status==="DANG_GIAO";return o?`<button class="btn sm pri" data-mhr="${p.id}">Nhận hàng</button>`:x.st[0]==="ct"?`<button class="btn sm pri" data-mhw="${p.id}">Ghi chứng từ</button>`:x.st[0]==="no"?`<button class="btn sm pri" data-mhp="${p.id}">Ghi chi</button>`:""};
+  m.innerHTML=H(T,S)+(need.length?`<div class="note mhneed">⚠ <b>${need.length} nguyên vật liệu</b> dưới mức tồn tối thiểu: ${need.slice(0,4).map(r=>esc(r.name)).join(", ")}${need.length>4?"…":""} <button class="btn sm" id="mh-buyall">Lập phiếu mua cho các mã này</button></div>`:"")+
+  `<div class="grid kpis">${kpi("Số phiếu mua",nf(live.length),cnt("hang")?cnt("hang")+" phiếu đang chờ hàng":"")}${kpi("Tiền hàng",nf(Math.round(tot("val"))),"theo chứng từ, chưa có thì theo giá đặt")}${kpi("Đã trả",nf(paid),"")}${kpi("Còn nợ",nf(owe),cnt("ct")?cnt("ct")+" phiếu chưa có chứng từ":"")}</div>
+  <div class="filters"><select id="mh-per">${opt([["all","Tất cả thời gian"],["m0","Tháng này"],["m1","Tháng trước"],["m3","3 tháng gần đây"],["y","Năm nay"]],MH.per||"all")}</select><select id="mh-sid">${opt([["","Tất cả nhà cung cấp"]].concat((MH.sup||[]).map(x=>[x.id,x.name])),MH.sid||"")}</select><input id="mh-q" class="mhq" placeholder="Tìm số phiếu, hàng…" value="${esc(MH.q||"")}"><span class="sp"></span><button class="btn pri" id="mh-new">+ Lập phiếu mua hàng</button></div>
+  <div class="ttchips mhchips">${chips.map(([k,t,n])=>`<button class="ttchip${F===k?" on":""}" data-mhst="${k}">${t} <b>${n}</b></button>`).join("")}</div>
+  <section class="card flush">${tbl(["Số phiếu","Nhà cung cấp","Hàng đặt","Nhận hàng","Số tiền","Đã trả","Còn nợ","Trạng thái",""],shown.map(x=>{const p=x.p,M=x.M;return `<tr class="clk" data-mhd="${p.id}"><td class="mono"><b>${esc(p.no)}</b><div class="hint">${esc(kDd(p.order_date))}</div></td><td>${esc(p.supplier_name)}</td><td>${items(p)}</td><td>${recv(p)}</td><td class="n">${M.invTotal?nf(M.invTotal):x.val?`${nf(Math.round(x.val))}<div class="hint">theo giá đặt</div>`:"—"}</td><td class="n">${M.paid?nf(M.paid)+(M.deposit&&!M.invTotal?`<div class="hint">tiền cọc</div>`:""):"—"}</td><td class="n">${M.invTotal&&M.invTotal-M.paid>1?`<b style="color:#b42318">${nf(M.invTotal-M.paid)}</b>`:"—"}</td><td>${pill(x.st[1],x.st[2])}</td><td class="nowrap">${act(x)}</td></tr>`}))}</section>`;
+  $("#mh-per").onchange=e=>{MH.per=e.target.value;renderMain()};$("#mh-sid").onchange=e=>{MH.sid=e.target.value;renderMain()};
+  $("#mh-q").onchange=e=>{MH.q=e.target.value;renderMain()};
+  m.querySelectorAll("[data-mhst]").forEach(b=>b.onclick=()=>{MH.st=b.dataset.mhst;renderMain()});
+  $("#mh-new").onclick=()=>mhForm(null);
+  if($("#mh-buyall"))$("#mh-buyall").onclick=()=>mhForm(null,{L:need.map(r=>({item:r.code,qty:r.need||"",note:"",price:""}))});
+  m.querySelectorAll("[data-mhr]").forEach(b=>b.onclick=e=>{e.stopPropagation();mhReceiveForm(b.dataset.mhr)});
+  m.querySelectorAll("[data-mhw]").forEach(b=>b.onclick=e=>{e.stopPropagation();mhPoDoc(b.dataset.mhw)});
+  m.querySelectorAll("[data-mhp]").forEach(b=>b.onclick=e=>{e.stopPropagation();const p=MH.orders.find(x=>x.id===b.dataset.mhp);if(p)mhPayForm(p.supplier_id,p.id)});
+  m.querySelectorAll("[data-mhd]").forEach(r=>r.onclick=()=>mhPoDrawer(r.dataset.mhd));
+}
+/* Ghi chứng từ cho đúng phiếu mua này (tick sẵn các lần nhận hàng chưa có chứng từ). */
+function mhPoDoc(id){const p=(MH.orders||[]).find(x=>x.id===id);if(!p)return;mhDocForm({sup:p.supplier_id,rids:mhPendingReceipts().filter(x=>x.p.id===id).map(x=>x.r.id)})}
+/* Cửa sổ phụ của một phiếu mua: toàn bộ từ đặt hàng tới trả tiền, cập nhật ngay tại đây. */
+function mhPoDrawer(id){
+  const p=(MH.orders||[]).find(x=>x.id===id);if(!p)return;const M=mhPoMoney(p),st=mhStage(p,M),o=p.status==="DAT"||p.status==="DANG_GIAO",pend=mhPendingReceipts().filter(x=>x.p.id===id),hasRc=p.receipts.some(r=>r.status==="OK");
+  const val=mhValue(p);
+  openDrawerHTML(`<h2>${esc(p.no)} · ${esc(p.supplier_name)} ${pill(st[1],st[2])}</h2><p class="hint">Đặt ${esc(kDd(p.order_date))}${p.expected_date?" · giao dự kiến "+esc(kDd(p.expected_date)):""}${p.note?" · "+esc(p.note):""}</p>
+   <div class="mhacts">${o?`<button class="btn pri" data-a="rc">Nhận hàng</button>`:""}${p.status!=="HUY"?`<button class="btn${!o&&pend.length?" pri":""}" data-a="ct">Ghi chứng từ</button><button class="btn${st[0]==="no"?" pri":""}" data-a="chi">Ghi chi / cọc</button>`:""}${o&&!hasRc?`<button class="btn" data-a="sua">Sửa phiếu</button><button class="btn danger" data-a="huy">Hủy phiếu</button>`:""}</div>
+   ${mhSteps(p)}
+   <div class="mhsum"><div><span>Giá trị đặt</span><b>${val!=null?nf(Math.round(val)):"—"}</b></div><div><span>Theo chứng từ</span><b>${M.invTotal?nf(M.invTotal):"—"}</b></div><div><span>Đã trả</span><b>${nf(M.paid)}</b></div><div><span>Còn nợ</span><b style="${M.invTotal-M.paid>1?"color:#b42318":""}">${M.invTotal?nf(Math.max(0,M.invTotal-M.paid)):"—"}</b></div></div>
+   <h3>Hàng đặt</h3>${tbl(["Hàng","Đặt","Đã nhận","Còn thiếu","Giá đặt (đ)"],p.lines.map(l=>`<tr><td>${esc(l.name)}<br><small class="mono">${esc(l.item)}</small></td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td class="n">${mhN(l.received)}</td><td class="n">${l.qty-l.received>1e-9?`<b style="color:#b42318">${mhN(l.qty-l.received)}</b>`:"—"}</td><td class="n">${l.unit_price!=null?nf(l.unit_price):"—"}</td></tr>`))}
+   <h3>Các lần nhận hàng</h3>${p.receipts.length?tbl(["Ngày nhận","Hàng nhận","Ghi chú","Trạng thái",""],p.receipts.map(r=>`<tr class="${r.status==="OK"?"":"mut"}"><td>${esc(kDd(r.receipt_date))}</td><td>${r.lines.map(l=>esc(l.name)+" × "+mhN(l.qty)+(l.unit_price!=null?" @ "+nf(l.unit_price):"")).join("<br>")}</td><td>${esc(r.note||"")}</td><td>${r.status!=="OK"?pill("Đã hủy","gry"):pend.some(x=>x.r.id===r.id)?pill("Chờ chứng từ","blu"):pill("Đã có chứng từ","grn")}</td><td>${r.status==="OK"?`<button class="btn sm danger" data-mhcr="${r.id}">Hủy lần nhận</button>`:""}</td></tr>`)):`<p class="hint">Chưa nhận hàng lần nào.</p>`}
+   <h3>Chứng từ</h3>${M.inv.length?tbl(["Ngày","Chứng từ","Tổng","Đã chi","Ảnh / PDF",""],M.inv.map(v=>`<tr class="clk" data-hv="${v.id}"><td>${esc(mhD(v.invoice_date))}</td><td>${v.doc_type==="PG"?"Phiếu giao / bill":"Hóa đơn VAT"} ${esc(v.invoice_no||"")}${v.share<.999?`<div class="hint">chung với phiếu khác, phần phiếu này ≈ ${nf(Math.round(v.total*v.share))}</div>`:""}</td><td class="n">${nf(v.total)}</td><td class="n">${nf(v.paid)}</td><td>${v.file_count?pill(v.file_count+" file","blu"):`<span class="hint">chưa có</span>`}</td><td><button class="btn sm danger" data-hx="${v.id}">Hủy chứng từ</button></td></tr>`)):`<p class="hint">Chưa có chứng từ.${pend.length?" Hàng đã về, bấm <b>Ghi chứng từ</b> khi nhà cung cấp gửi bill hoặc hóa đơn.":""}</p>`}
+   <h3>Thanh toán</h3>${M.pays.length?tbl(["Ngày chi","Loại","Số tiền","Tài khoản","Ghi chú",""],M.pays.map(x=>`<tr><td>${esc(mhD(x.pay_date))}</td><td>${x.kind==="COC"?pill("Cọc","amb"):"Trả tiền"}${x.invoice_no?`<div class="hint">cho chứng từ ${esc(x.invoice_no)}</div>`:""}</td><td class="n"><b>${nf(x.amount)}</b></td><td>${esc(x.account||"")}</td><td>${esc(x.note||"")}</td><td><button class="btn sm danger" data-px="${x.id}">Hủy phiếu chi</button></td></tr>`)):`<p class="hint">Chưa trả tiền.</p>`}`);
+  const D=document.querySelector("#dx")||document,done=async(msg)=>{closeDrawer();if(msg)toast(msg);await mhReload()};
+  document.querySelectorAll(".mhacts [data-a]").forEach(b=>b.onclick=async()=>{const a=b.dataset.a;
+    if(a==="rc")mhReceiveForm(id);else if(a==="ct")mhPoDoc(id);else if(a==="chi")mhPayForm(p.supplier_id,id);else if(a==="sua")mhForm(id);
+    else if(a==="huy"){if(!confirm("Hủy phiếu mua "+p.no+"?"))return;try{await kApi("/mh/orders/"+id+"/cancel",{method:"POST",body:"{}"});await done("Đã hủy phiếu "+p.no)}catch(e){toast(e.message)}}});
+  document.querySelectorAll("[data-mhcr]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy lần nhận hàng này? Phiếu nhập kho tương ứng cũng bị hủy."))return;
+    try{await kApi("/mh/receipts/"+b.dataset.mhcr+"/cancel",{method:"POST",body:JSON.stringify({reason:"Hủy lần nhận hàng"})});await done("Đã hủy lần nhận hàng")}catch(e){toast(e.message)}});
+  document.querySelectorAll("[data-hv]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;mhDocDetail(r.dataset.hv)});
+  document.querySelectorAll("[data-hx]").forEach(b=>b.onclick=async e=>{e.stopPropagation();if(!confirm("Hủy chứng từ này? Công nợ nhà cung cấp giảm lại đúng số tiền."))return;
+    try{await kApi("/mh/invoices/"+b.dataset.hx+"/cancel",{method:"POST",body:"{}"});await done("Đã hủy chứng từ")}catch(err){toast(err.message)}});
+  document.querySelectorAll("[data-px]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy phiếu chi này? Công nợ nhà cung cấp tăng lại đúng số tiền."))return;
+    try{await kApi("/mh/payments/"+b.dataset.px+"/cancel",{method:"POST",body:"{}"});await done("Đã hủy phiếu chi")}catch(err){toast(err.message)}});
+}
+PAGES.mh_po=pMhDon;
+Object.assign(PAGES,{mh_cho:pMhHd,mh_gia:pMhHd,mh_hd:pMhHd,mh_chi:pMhChi,mh_no:pMhNo,mh_gianvl:pMhGiaNvl});
+
+/* =====================================================================
+   Kho hàng (trang quản trị): Tồn kho & giá trị = số lượng tồn × giá bình quân (bình quân gia quyền, có tính xuất dùng).
+   Số lượng tồn vẫn do kho làm bên vận hành; ở đây chỉ thêm phần giá trị.
+   ===================================================================== */
+const KG={q:"",cls:"",prices:null,busy:false,err:""};
+async function kgLoad(){
+  if(KG.busy||KG.prices)return;KG.busy=true;
+  try{if(typeof khoLoad==="function")await khoLoad();const r=await kApi("/mh/material-prices?month="+MONTH.key);KG.prices=new Map(r.rows.map(x=>[x.item,x]));KG.err=""}catch(e){KG.err=e.message||"Không tải được giá"}
+  KG.busy=false;if(PAGE==="kho_gtri")renderMain();
+}
+function pKhoGiaTri(m){
+  kgLoad();const T="Tồn kho & giá trị",S="Số lượng tồn nhân giá bình quân nguyên vật liệu";
+  if(mhNeedAdmin(m,T,S))return;
+  if(KG.err){m.innerHTML=H(T,S)+`<div class="note red">${esc(KG.err)}</div>`;return}
+  if(!KG.prices||typeof KHO==="undefined"||!KHO.items||!KHO.stock){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
+  const fold=t=>String(t||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/gi,"d").toLowerCase(),needle=fold(KG.q.trim());
+  const rows=[...KHO.items.values()].filter(i=>i.active).map(i=>{const q=+KHO.stock.get(i.code)||0,p=KG.prices.get(i.code),pr=p&&p.avg_price>0?p.avg_price:null;return {i,q,pr,v:pr!=null?q*pr:null}}).filter(r=>r.q!==0)
+    .filter(r=>(!KG.cls||r.i.cls===KG.cls)&&(!needle||needle.split(/\s+/).every(w=>fold(r.i.code+" "+r.i.name).includes(w)))).sort((a,b)=>(b.v||0)-(a.v||0));
+  const tot=sum(rows,r=>r.v||0),noPrice=rows.filter(r=>r.pr==null&&r.q>0);
+  const byCls={};rows.forEach(r=>{const k=(typeof KHO_CLS!=="undefined"&&KHO_CLS[r.i.cls])||r.i.cls;byCls[k]=(byCls[k]||0)+(r.v||0)});
+  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Tổng giá trị tồn kho",tr(tot),rows.length+" mã đang có tồn")}${Object.entries(byCls).filter(([,v])=>v>0).slice(0,4).map(([k,v])=>kpi(k,tr(v),"")).join("")}${noPrice.length?kpi("Chưa có giá",nf(noPrice.length)+" mã","chưa tính được giá trị","var(--orange)"):""}</div>
+  <div class="filters"><select id="kg-c">${opt([["","Mọi loại hàng"]].concat(Object.entries(typeof KHO_CLS!=="undefined"?KHO_CLS:{})),KG.cls)}</select><input id="kg-q" placeholder="Tìm mã, tên…" value="${esc(KG.q)}" style="max-width:260px"><span class="hint">${rows.length} mã</span></div>
+  <section class="card flush">${tbl(["Mã","Tên","Loại","Tồn","Giá bình quân (đ)","Giá trị tồn (đ)"],rows.slice(0,400).map(r=>`<tr><td class="mono">${esc(r.i.code)}</td><td>${esc(r.i.name)}</td><td>${esc((typeof KHO_CLS!=="undefined"&&KHO_CLS[r.i.cls])||r.i.cls)}</td><td class="n">${r.q<0?`<b style="color:#b42318">${mhN(r.q)}</b>`:mhN(r.q)} ${esc(r.i.unit||"")}</td><td class="n">${r.pr!=null?nf(Math.round(r.pr)):`<span class="hint">chưa có giá</span>`}</td><td class="n">${r.v!=null?nf(Math.round(r.v)):"—"}</td></tr>`).concat(rows.length?[`<tr class="tot"><td colspan="5"><b>Tổng</b></td><td class="n"><b>${nf(Math.round(tot))}</b></td></tr>`]:[]))}
+   <p class="hint pad">Giá bình quân lấy từ các phiếu nhập có giá (Mua hàng) và tồn đầu kỳ, có trừ phần đã xuất dùng. Thành phẩm chưa có giá nhập nên chưa tính giá trị; sẽ tính khi có giá thành sản phẩm theo tháng.</p></section>`;
+  $("#kg-c").onchange=e=>{KG.cls=e.target.value;renderMain()};
+  $("#kg-q").oninput=()=>{KG.q=$("#kg-q").value;const p=$("#kg-q").selectionStart;renderMain();const q=$("#kg-q");q.focus();q.setSelectionRange(p,p)};
+}
+PAGES.kho_gtri=pKhoGiaTri;
+
+
+/* =====================================================================
+   Cảnh báo mua hàng cho người phụ trách mua (Thảo), kế toán, CEO: hiện ở "Cảnh báo vận hành" của Tổng quan.
+   - Nguyên vật liệu dưới mức tồn tối thiểu (Thảo thấy luôn, không cần kho báo).
+   - Phiếu mua quá ngày giao dự kiến mà chưa đủ hàng.
+   ===================================================================== */
+{const _ea=execAlerts;execAlerts=function(){
+  const A=_ea();
+  try{
+    if(!mhManage())return A;
+    const page=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"?"mh_hd":"sx_mh";
+    const need=mhNeedBuy();
+    if(need.length)A.push(["amb",`${need.length} nguyên vật liệu dưới mức tồn tối thiểu`,need.slice(0,3).map(r=>r.name).join(", ")+(need.length>3?"…":"")+" · cần đặt thêm",page]);
+    (MH.orders||[]).filter(p=>mhLateDays(p)>0).slice(0,5).forEach(p=>A.push(["red",`${p.no} trễ ${mhLateDays(p)} ngày giao`,`${p.supplier_name} · dự kiến ${kDd(p.expected_date)}`,page]));
+  }catch(e){}
+  return A;
+}}
+/* Trang Tổng quan: nạp dữ liệu mua hàng và kho cho người có quyền, xong tự vẽ lại để cảnh báo hiện ra. */
+{const _ex=PAGES.exec;if(_ex)PAGES.exec=function(m){if(mhManage()){mhLoad()}return _ex.apply(this,arguments)}}

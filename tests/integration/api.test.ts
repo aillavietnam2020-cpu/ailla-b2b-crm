@@ -131,9 +131,9 @@ describe('Khách hàng và chăm sóc', () => {
 });
 
 describe('Bảng giá', () => {
-  it('trả đủ 8 cấp và đánh dấu cấp thiếu giá', async () => {
+  it('trả đủ 8 cấp (cộng cấp Nhân viên) và đánh dấu cấp thiếu giá', async () => {
     const res = await ctx.request('/api/prices', { as: USERS.thao });
-    expect(res.body.data.tiers.length).toBe(8);
+    expect(res.body.data.tiers.length).toBe(9);
     const missing = res.body.data.products.find((p: { sku: string }) => p.sku === 'TEST-MISSING');
     expect(missing.prices.BAN_LE).toBeNull();
     expect(missing.missing_tiers.length).toBeGreaterThan(0);

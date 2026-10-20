@@ -3,6 +3,7 @@ import { nowIso } from '@shared/datetime';
 import type { AppEnv } from '../env';
 import { pack } from '../lib/pack';
 import { badRequest, ok, unauthorized } from '../lib/http';
+import { CHANNELS, saveChannelDays, type Channel, type ChannelDay } from '../services/channelOut';
 
 /**
  * Nhận số liệu từ VPS (không qua đăng nhập, xác thực bằng khoá riêng INGEST_KEY).
@@ -49,4 +50,24 @@ ingestRoutes.post('/ads-fb', async (c) => {
     .bind(await pack(JSON.stringify(data)), data.at)
     .run();
   return ok(c, { ok: true, at: data.at });
+});
+
+/**
+ * Số hàng lẻ bán qua sàn mỗi ngày (tab "Hàng lẻ theo ngày" của Sheet kế toán kho TikTok / Shopee).
+ * Body: { channel: 'TIKTOK' | 'SHOPEE', days: [{ day: 'YYYY-MM-DD', orders?, lines: [{ label, qty }] }] }
+ */
+ingestRoutes.post('/channel-out', async (c) => {
+  const raw = await c.req.text();
+  if (raw.length > 2_000_000) throw badRequest('TOO_LARGE', 'Dữ liệu quá lớn');
+  const body = JSON.parse(raw) as { channel?: string; days?: ChannelDay[] };
+  if (!body.channel || !(CHANNELS as readonly string[]).includes(body.channel)) {
+    throw badRequest('BAD_CHANNEL', 'Kênh không đúng');
+  }
+  if (!Array.isArray(body.days) || body.days.length === 0 || body.days.length > 120) {
+    throw badRequest('BAD_DATA', 'Thiếu danh sách ngày');
+  }
+  for (const d of body.days) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d.day))) throw badRequest('BAD_DATE', 'Ngày không đúng');
+  }
+  return ok(c, await saveChannelDays(c.env.DB, body.channel as Channel, body.days, 'INGEST'));
 });

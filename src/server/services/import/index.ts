@@ -364,7 +364,8 @@ export async function commitImport(
   // Mỗi chặng chỉ đọc đúng nhóm dữ liệu của mình để không vượt hạn mức xử lý.
   const SCOPE_BY_PHASE: Record<CommitPhase, ParseScope[]> = {
     catalog: ['products'],
-    customers: ['customers'],
+    // Dư nợ cũ lấy từ sheet CONG_NO (nguồn chuẩn); ô dư nợ ở KHACH_HANG có thể trống với khách có số âm.
+    customers: ['customers', 'debts'],
     orders: ['orders'],
     payments: ['payments', 'activities'],
     // Chặng chốt chỉ cần các con số tổng, lấy lại từ kết quả preview đã lưu trong batch
@@ -466,9 +467,23 @@ export async function commitImport(
     (existingProducts.results ?? []).map((p) => [p.sku.trim().toLowerCase(), p.id]),
   );
 
+  // Giá đang áp dụng của sản phẩm đã có: nhập lại file thì CHỈ ghi giá khi Sheet có giá và khác giá hiện tại.
+  // Ô giá trống trong Sheet không được xóa giá đang có trên web.
+  const currentPrice = new Map<string, number | null>();
+  const priceRows = await db
+    .prepare(
+      `SELECT product_id, tier_id, amount FROM product_prices
+       WHERE status = 'ACTIVE' AND valid_from <= ? AND (valid_to IS NULL OR valid_to >= ?)
+       ORDER BY valid_from ASC`,
+    )
+    .bind(today, today)
+    .all<{ product_id: string; tier_id: string; amount: number | null }>();
+  for (const r of priceRows.results ?? []) currentPrice.set(`${r.product_id}|${r.tier_id}`, r.amount);
+
   const productStatements: D1PreparedStatement[] = [];
   for (const product of parsed.products) {
     let productId = productIdBySku.get(product.sku.trim().toLowerCase());
+    const isExisting = Boolean(productId);
     if (!productId) {
       productId = newId();
       productIdBySku.set(product.sku.trim().toLowerCase(), productId);
@@ -494,6 +509,10 @@ export async function commitImport(
 
     for (const code of TIER_ORDER) {
       const amount = product.prices[code];
+      if (isExisting) {
+        const now0 = currentPrice.get(`${productId}|${TIER_ID_BY_CODE[code]}`);
+        if (amount === null || amount === undefined || amount === now0) continue;
+      }
       // Giá NULL vẫn tạo dòng để hiển thị "Chưa có" và chặn bán, nhưng amount giữ NULL.
       inserted.product_prices += 1;
       productStatements.push(
@@ -533,7 +552,48 @@ export async function commitImport(
   const customerStatements: D1PreparedStatement[] = [];
 
   for (const customer of parsed.customers) {
-    if (customerIdByLegacy.has(customer.legacy_code)) continue;
+    const knownId = customerIdByLegacy.get(customer.legacy_code);
+    if (knownId) {
+      // Khách đã có: Sheet là số liệu chuẩn, kéo tên, liên hệ, cấp bậc, sale phụ trách, dư nợ cũ về đúng Sheet.
+      const debtRow0 = debtByCustomer.get(customer.legacy_code);
+      const opening0 = debtRow0?.opening_debt ?? customer.opening_debt ?? 0;
+      const owner0 = customer.owner_legacy_name
+        ? (ownerIdByLegacy.get(customer.owner_legacy_name.toLowerCase()) ?? null)
+        : null;
+      customerStatements.push(
+        db
+          .prepare(
+            `UPDATE customers SET name = ?, phone_text = ?, phone_normalized = ?, province = ?, address = ?,
+               tier_id = COALESCE(?, tier_id), legacy_tier_label = COALESCE(?, legacy_tier_label),
+               owner_id = COALESCE(?, owner_id), opening_debt = ?, updated_at = ?
+             WHERE id = ? AND (name <> ? OR COALESCE(phone_text, '') <> ? OR COALESCE(province, '') <> ?
+               OR COALESCE(address, '') <> ? OR opening_debt <> ?
+               OR COALESCE(tier_id, '') <> COALESCE(?, COALESCE(tier_id, ''))
+               OR COALESCE(owner_id, '') <> COALESCE(?, COALESCE(owner_id, '')))`,
+          )
+          .bind(
+            customer.name,
+            customer.phone_text,
+            customer.phone_normalized,
+            customer.province,
+            customer.address,
+            customer.tier_code ? TIER_ID_BY_CODE[customer.tier_code] : null,
+            customer.tier_label,
+            owner0,
+            opening0,
+            now,
+            knownId,
+            customer.name,
+            customer.phone_text ?? '',
+            customer.province ?? '',
+            customer.address ?? '',
+            opening0,
+            customer.tier_code ? TIER_ID_BY_CODE[customer.tier_code] : null,
+            owner0,
+          ),
+      );
+      continue;
+    }
     const id = newId();
     customerIdByLegacy.set(customer.legacy_code, id);
     inserted.customers += 1;
@@ -608,6 +668,72 @@ export async function commitImport(
     (existingOrders.results ?? []).map((row) => [row.legacy_order_code, row.id]),
   );
 
+  // Dữ liệu hiện có của các đơn nhập từ Sheet, để so với Sheet.
+  const syncable = new Map<
+    string,
+    {
+      subtotal: number;
+      discount_amount: number;
+      bonus_deduction: number;
+      shipping_fee: number;
+      total_amount: number;
+      cod_amount: number;
+      delivery_status: string;
+      accounting_status: string;
+    }
+  >();
+  const syncRows = await db
+    .prepare(
+      `SELECT id, subtotal, discount_amount, bonus_deduction, shipping_fee, total_amount, cod_amount,
+              delivery_status, accounting_status
+       FROM orders WHERE legacy_order_code IS NOT NULL AND deleted_at IS NULL`,
+    )
+    .all<{
+      id: string;
+      subtotal: number;
+      discount_amount: number;
+      bonus_deduction: number;
+      shipping_fee: number;
+      total_amount: number;
+      cod_amount: number;
+      delivery_status: string;
+      accounting_status: string;
+    }>();
+  for (const r of syncRows.results ?? []) syncable.set(r.id, r);
+  const itemsByOrder = new Map<string, string[]>();
+  const itemRows = await db
+    .prepare(
+      `SELECT oi.order_id, oi.product_id, oi.qty, oi.applied_price FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id WHERE o.legacy_order_code IS NOT NULL`,
+    )
+    .all<{ order_id: string; product_id: string; qty: number; applied_price: number }>();
+  for (const r of itemRows.results ?? []) {
+    const list = itemsByOrder.get(r.order_id) ?? [];
+    list.push(`${r.product_id}:${r.qty}:${r.applied_price}`);
+    itemsByOrder.set(r.order_id, list);
+  }
+
+  // Khách xuất hiện trong đơn nhưng không có ở danh sách khách (vd. "khách lẻ"): tự tạo hồ sơ để đơn không bị treo.
+  const autoCustomerStatements: D1PreparedStatement[] = [];
+  for (const lines of linesByOrder.values()) {
+    const code = lines[0].customer_legacy_code;
+    if (!code || customerIdByLegacy.has(code)) continue;
+    const id = newId();
+    customerIdByLegacy.set(code, id);
+    inserted.customers += 1;
+    const nm = code.charAt(0).toUpperCase() + code.slice(1);
+    autoCustomerStatements.push(
+      db
+        .prepare(
+          `INSERT INTO customers (id, legacy_code, name, stage, opening_debt, opening_debt_batch, data_quality,
+             data_quality_note, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, 'NEW', 0, ?, 'NEEDS_REVIEW', ?, ?, ?, ?)`,
+        )
+        .bind(id, code, nm, options.batchId, 'Tự tạo khi nhập vì đơn dùng tên khách này nhưng chưa có hồ sơ', auth.user.id, now, now),
+    );
+  }
+  await runChunked(autoCustomerStatements);
+
   for (const [orderCode, lines] of linesByOrder) {
     const first = lines[0];
 
@@ -636,6 +762,85 @@ export async function commitImport(
     const existingOrderId = existingOrderIdByCode.get(orderCode);
     if (existingOrderId) {
       orderIdByCode.set(orderCode, existingOrderId);
+      // Sheet là số liệu chuẩn: đơn nhập từ Sheet lệch thì kéo số tiền, dòng hàng, trạng thái giao/kế toán về đúng Sheet.
+      // Đơn không có dòng trạng thái ở sheet quản lý thì giữ nguyên.
+      const cur = syncable.get(existingOrderId);
+      const st = statusByCode.get(orderCode);
+      if (cur && st) {
+        let sub = 0;
+        const sig: string[] = [];
+        const newItems: { product_id: string; qty: number; price: number; base: number; total: number }[] = [];
+        let ok = true;
+        for (const line of lines) {
+          // Dòng nhập mã hàng nhưng để số lượng 0: bỏ qua, đơn vẫn đồng bộ bình thường.
+          if (!line.qty) continue;
+          const pid = line.sku ? productIdBySku.get(line.sku.trim().toLowerCase()) : undefined;
+          if (!pid) { ok = false; break; }
+          const price = line.unit_price ?? 0;
+          const lt = line.line_total ?? price * line.qty;
+          sub += lt;
+          if (line.qty > 0) {
+            sig.push(`${pid}:${line.qty}:${price}`);
+            newItems.push({ product_id: pid, qty: line.qty, price, base: line.base_price ?? price, total: lt });
+          }
+        }
+        if (ok) {
+          const sh = st.shipping_fee ?? 0;
+          const di = st.discount_amount ?? 0;
+          const bo = st.bonus_deduction ?? 0;
+          const cd = st.cod_amount ?? 0;
+          const tt = sub - di - bo + sh;
+          const oldSig = (itemsByOrder.get(existingOrderId) ?? []).sort().join('|');
+          const itemsChanged = oldSig !== [...sig].sort().join('|');
+          const newDelivery = st.delivery_status ?? cur.delivery_status;
+          const newAcc = st.accounting_confirmed ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN';
+          const moneyChanged =
+            cur.subtotal !== sub || cur.discount_amount !== di || cur.bonus_deduction !== bo ||
+            cur.shipping_fee !== sh || cur.total_amount !== tt || cur.cod_amount !== cd ||
+            cur.delivery_status !== newDelivery || cur.accounting_status !== newAcc;
+          if (itemsChanged || moneyChanged) {
+            orderStatements.push(
+              db
+                .prepare(
+                  `UPDATE orders SET subtotal = ?, discount_amount = ?, bonus_deduction = ?, shipping_fee = ?,
+                     total_amount = ?, cod_amount = ?, delivery_status = ?, accounting_status = ?,
+                     accounting_confirmed_at = CASE WHEN ? = 'DA_XAC_NHAN' THEN COALESCE(accounting_confirmed_at, ?) ELSE NULL END,
+                     updated_at = ? WHERE id = ?`,
+                )
+                .bind(sub, di, bo, sh, tt, cd, newDelivery, newAcc, newAcc, now, now, existingOrderId),
+            );
+            if (itemsChanged) {
+              orderStatements.push(db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(existingOrderId));
+              for (const it of newItems) {
+                orderStatements.push(
+                  db
+                    .prepare(
+                      `INSERT INTO order_items (id, order_id, product_id, qty, base_price, applied_price, line_total,
+                         price_override, tier_id_snapshot, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)`,
+                    )
+                    .bind(newId(), existingOrderId, it.product_id, it.qty, it.base, it.price, it.total, now),
+                );
+              }
+            }
+            inserted.orders_updated = (inserted.orders_updated ?? 0) + 1;
+            errorStatements.push(
+              db
+                .prepare(
+                  `INSERT INTO import_errors (id, batch_id, sheet, row_no, field, code, message, severity, created_at)
+                   VALUES (?, ?, 'SO_DON_HANG', ?, 'total', 'ORDER_SYNCED_FROM_SHEET', ?, 'WARNING', ?)`,
+                )
+                .bind(
+                  newId(),
+                  options.batchId,
+                  first.row_no,
+                  `Đơn ${orderCode} cập nhật theo Sheet: tổng ${cur.total_amount} → ${tt}${itemsChanged ? ' (đổi cả dòng hàng)' : ''}.`,
+                  now,
+                ),
+            );
+          }
+        }
+      }
       continue;
     }
 
@@ -802,6 +1007,33 @@ export async function commitImport(
 
   await runChunked(orderStatements);
 
+  // Dọn đơn không có trong Sheet (đơn thử/demo tạo trên web, đơn đã bị xoá khỏi Sheet): ẩn mềm bằng deleted_at,
+  // khôi phục được. Chỉ chạy khi file có đủ đơn thật để tránh ẩn nhầm toàn bộ vì file rỗng.
+  const sheetCodes = [...linesByOrder.keys()].filter((k) => k !== 'CHUA_KHAI_BAO');
+  if (sheetCodes.length >= 10) {
+    const keep = new Set(sheetCodes);
+    const all = await db
+      .prepare('SELECT id, order_no, legacy_order_code FROM orders WHERE deleted_at IS NULL')
+      .all<{ id: string; order_no: string; legacy_order_code: string | null }>();
+    const stale = (all.results ?? []).filter((o) => !o.legacy_order_code || !keep.has(o.legacy_order_code));
+    const cleanup: D1PreparedStatement[] = [];
+    for (const o of stale) {
+      cleanup.push(
+        db
+          .prepare("UPDATE orders SET deleted_at = ?, kho_status = 'KHONG', updated_at = ? WHERE id = ?")
+          .bind(now, now, o.id),
+        db
+          .prepare(
+            `INSERT INTO import_errors (id, batch_id, sheet, row_no, field, code, message, severity, created_at)
+             VALUES (?, ?, 'SO_DON_HANG', NULL, 'order_code', 'ORDER_HIDDEN_NOT_IN_SHEET', ?, 'WARNING', ?)`,
+          )
+          .bind(newId(), options.batchId, `Đơn ${o.order_no} không có trong Sheet nên đã được ẩn khỏi danh sách.`, now),
+      );
+      inserted.orders_hidden = (inserted.orders_hidden ?? 0) + 1;
+    }
+    await runChunked(cleanup);
+  }
+
     await runChunked(errorStatements);
     return finishPhase('orders');
   }
@@ -816,13 +1048,42 @@ export async function commitImport(
   const paymentStatements: D1PreparedStatement[] = [];
   const existingPayments = await db
     .prepare(
-      `SELECT external_row_key FROM payments
+      `SELECT id, external_row_key, accounting_status, paid_at, method FROM payments
        WHERE source = 'IMPORT' AND external_row_key IS NOT NULL`,
     )
-    .all<{ external_row_key: string }>();
+    .all<{ id: string; external_row_key: string; accounting_status: string; paid_at: string; method: string | null }>();
   const existingPaymentKeys = new Set(
     (existingPayments.results ?? []).map((row) => row.external_row_key),
   );
+  const existingPaymentByKey = new Map((existingPayments.results ?? []).map((row) => [row.external_row_key, row]));
+  // Phiếu đã có: kéo ngày thu, hình thức, trạng thái kế toán về đúng Sheet.
+  for (const payment of parsed.payments) {
+    const cur = payment.external_row_key ? existingPaymentByKey.get(payment.external_row_key) : undefined;
+    if (!cur) continue;
+    const accNew = payment.accounting_confirmed ? 'DA_XAC_NHAN' : 'CHUA_XAC_NHAN';
+    const paidNew = payment.paid_at ?? cur.paid_at;
+    if (cur.accounting_status !== accNew || cur.paid_at !== paidNew || (cur.method ?? null) !== (payment.method ?? null)) {
+      paymentStatements.push(
+        db
+          .prepare('UPDATE payments SET accounting_status = ?, paid_at = ?, method = ?, updated_at = ? WHERE id = ?')
+          .bind(accNew, paidNew, payment.method ?? null, now, cur.id),
+      );
+      inserted.payments_updated = (inserted.payments_updated ?? 0) + 1;
+    }
+  }
+  // Phiếu nhập từ Sheet mà Sheet không còn dòng đó (đã sửa/xoá): gỡ bỏ để tổng tiền khớp Sheet.
+  if (parsed.payments.length >= 10) {
+    const sheetKeys = new Set(parsed.payments.map((p) => p.external_row_key).filter(Boolean) as string[]);
+    for (const row of existingPayments.results ?? []) {
+      if (sheetKeys.has(row.external_row_key)) continue;
+      paymentStatements.push(
+        db.prepare('DELETE FROM payment_allocations WHERE payment_id = ?').bind(row.id),
+        db.prepare('DELETE FROM payment_allocations_pending WHERE payment_id = ?').bind(row.id),
+        db.prepare('DELETE FROM payments WHERE id = ?').bind(row.id),
+      );
+      inserted.payments_removed = (inserted.payments_removed ?? 0) + 1;
+    }
+  }
   for (const payment of parsed.payments) {
     // Nếu file đã được import trước đó thì bỏ cả payment lẫn allocation đi kèm.
     // Chỉ dựa vào ON CONFLICT ở câu INSERT payment sẽ khiến allocation sau đó
@@ -911,11 +1172,18 @@ export async function commitImport(
 
   // ---- Nhật ký chăm sóc (giữ dòng hợp lệ, không tạo dòng rỗng) --------------
   const activityStatements: D1PreparedStatement[] = [];
+  const haveActs = await db
+    .prepare('SELECT customer_id, content, created_at FROM customer_activities')
+    .all<{ customer_id: string; content: string; created_at: string }>();
+  const actKeys = new Set((haveActs.results ?? []).map((a) => `${a.customer_id}|${a.created_at.slice(0, 10)}|${a.content}`));
   for (const activity of parsed.activities) {
     const customerId = activity.customer_legacy_code
       ? customerIdByLegacy.get(activity.customer_legacy_code)
       : undefined;
     if (!customerId || !activity.content) continue;
+    const actKey = `${customerId}|${activity.created_at ?? today}|${activity.content}`;
+    if (actKeys.has(actKey)) continue;
+    actKeys.add(actKey);
     const userId = activity.owner_legacy_name
       ? (ownerIdByLegacy.get(activity.owner_legacy_name.toLowerCase()) ?? auth.user.id)
       : auth.user.id;
