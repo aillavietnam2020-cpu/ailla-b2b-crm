@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""abos - cầu nối agent OpenClaw với web ABOS. Chỉ đọc + gửi đề xuất.
+Khoá lấy từ biến môi trường ABOS_AGENT_KEY (dạng agt_...). Địa chỉ web: ABOS_URL (mặc định https://vanhanh.ailla.vn).
+"""
+import json, os, sys, urllib.request, urllib.parse, urllib.error
+
+URL = os.environ.get("ABOS_URL", "https://vanhanh.ailla.vn").rstrip("/")
+KEY = os.environ.get("ABOS_AGENT_KEY", "")
+
+
+def call(path, params=None, body=None):
+    if not KEY.startswith("agt_"):
+        sys.exit("Thiếu khoá: biến ABOS_AGENT_KEY chưa được đặt cho agent này.")
+    q = ("?" + urllib.parse.urlencode({k: v for k, v in (params or {}).items() if v not in (None, "")})) if params else ""
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(URL + "/api/agent" + path + q, data=data, method="POST" if body is not None else "GET")
+    req.add_header("Authorization", "Bearer " + KEY)
+    req.add_header("User-Agent", "abos-agent/1")
+    if data:
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            out = json.load(r)
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.load(e).get("error", {}).get("message", "")
+        except Exception:
+            msg = ""
+        sys.exit(f"Web trả lỗi {e.code}: {msg}")
+    except Exception as e:
+        sys.exit(f"Không nối được web: {e}")
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def opts(argv):
+    o, i = {}, 0
+    while i < len(argv):
+        if argv[i].startswith("--") and i + 1 < len(argv):
+            o[argv[i][2:]] = argv[i + 1]
+            i += 2
+        else:
+            i += 1
+    return o
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit("Dùng: abos me|orders|order|customer|shortages|kho-alerts|kho-stock|events|propose")
+    cmd, rest = sys.argv[1], sys.argv[2:]
+    o = opts(rest)
+    if cmd == "me":
+        call("/me")
+    elif cmd == "orders":
+        call("/orders", {"flow": o.get("flow"), "kho_status": o.get("kho-status"),
+                         "stuck_hours": o.get("stuck-hours"), "customer_id": o.get("customer")})
+    elif cmd == "order" and rest:
+        call("/orders/" + urllib.parse.quote(rest[0], safe=""))
+    elif cmd == "customer" and rest:
+        call("/customers/" + urllib.parse.quote(rest[0], safe=""))
+    elif cmd == "shortages":
+        call("/shortages")
+    elif cmd == "kho-alerts":
+        call("/kho/alerts")
+    elif cmd == "kho-stock":
+        call("/kho/stock", {"cls": o.get("cls")})
+    elif cmd == "events":
+        call("/events", {"after": o.get("after"), "types": o.get("types"), "limit": o.get("limit")})
+    elif cmd == "propose":
+        need = ["kind", "route", "entity-type", "entity-id", "title", "dedupe"]
+        miss = [k for k in need if not o.get(k)]
+        if miss:
+            sys.exit("Thiếu: " + ", ".join("--" + k for k in miss))
+        call("/proposals", body={"kind": o["kind"], "route_to": o["route"], "entity_type": o["entity-type"],
+                                 "entity_id": o["entity-id"], "title": o["title"], "body": o.get("body"),
+                                 "dedupe_key": o["dedupe"]})
+    else:
+        sys.exit("Lệnh không có. Chạy abos không tham số để xem danh sách.")
+
+
+main()
