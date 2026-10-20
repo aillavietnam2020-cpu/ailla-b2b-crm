@@ -16,7 +16,7 @@ KEY_FILE = Path("/root/.config/ailla/ingest.key")
 VN = timezone(timedelta(hours=7))
 ACCOUNTS = ["2438831049860777", "1721213761771236", "1056409566271847", "1498215448711810",
             "1340771911416054", "1979044982736581", "1354614543145294"]
-DAYS_BACK = 35
+DAYS_BACK = 75
 POS_FIELDS = ["net_revenue", "total_order_count", "delivered_count", "delivered_revenue",
               "returned_revenue", "returned_order_count", "canceled_order_count"]
 MSG_KEYS = ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.total_messaging_connection"]
