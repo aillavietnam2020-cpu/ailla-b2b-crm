@@ -84,7 +84,7 @@ function adlDaily(L,last){
 const ADF={raw:null,at:0,busy:false,who:"",per:"m0",open:""};
 async function adfLoad(force){
   if(typeof svApi!=="function"||ADF.busy||(!force&&Date.now()-ADF.at<1800000))return;ADF.busy=true;
-  try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&PAGE==="fb_ads"&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
+  try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq")&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
 }
 const ADF_ACC={"2438831049860777":"Việt Anh","1721213761771236":"Việt Anh","1340771911416054":"Thảo","187878951968758":"Thảo","1354614543145294":"Thảo"};
 const ADF_PROD={TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
@@ -131,6 +131,29 @@ function adfAgg(D,days){
 }
 const adfSum=L=>{const s=L.reduce((a,x)=>({spend:a.spend+x.spend,msgs:a.msgs+x.msgs,orders:a.orders+x.orders,rev:a.rev+x.rev}),{spend:0,msgs:0,orders:0,rev:0});
   return Object.assign(s,{giaMsg:s.msgs?s.spend/s.msgs:0,cpo:s.orders?s.spend/s.orders:0,pct:s.rev?s.spend*1.1/s.rev:0,roas:s.spend?s.rev/s.spend:0})};
+/* Tổng quan Digital: số tự động theo kỳ chị chọn ở thanh trên (PERIOD). Trả về null nếu chưa có số tự động. */
+function adfOverview(){
+  adfLoad();if(!(ADF.raw&&ADF.raw.days))return null;const D=adfData();if(!D.keys.length)return null;
+  const days=D.keys.filter(k=>k>=PERIOD.from&&k<=PERIOD.to);
+  if(!days.length)return `<div class="note">Chưa có số quảng cáo tự động trong kỳ ${esc(pLabel())}. Số có từ ${vnd(D.keys[0])} đến ${vnd(D.last)}: chọn "Tháng này" hoặc "7 ngày qua" ở thanh trên.</div>`;
+  const {C,unmatched,unOrders}=adfAgg(D,days),L=C.filter(x=>x.spend||x.rev),T=adfSum(L);
+  const row=(name,sub,s)=>`<tr><td><b>${esc(name)}</b>${sub?`<small>${sub}</small>`:""}</td><td class="n">${s.rev?money(s.rev):"—"}</td><td class="n">${s.spend?money(s.spend):"—"}</td><td class="n">${s.rev?adlPct(s.pct):"—"}</td><td class="n">${s.orders?nf(s.orders):"—"}</td><td class="n">${s.orders?money(s.cpo):"—"}</td><td class="n"><b>${s.spend&&s.rev?adlR(s.roas):"—"}</b></td></tr>`;
+  const HEAD=`<thead><tr><th>{h}</th><th class="n">Doanh số</th><th class="n">Chi Ads</th><th class="n">% CP/DS</th><th class="n">Đơn</th><th class="n">Chi/đơn</th><th class="n">ROAS</th></tr></thead>`;
+  const ppl=["Việt Anh","Thảo","Duẩn","Chưa rõ người"].map(w=>[w,L.filter(x=>x.owner===w)]).filter(x=>x[1].length).map(([w,a])=>[w,adfSum(a),a.length]).sort((a,b)=>b[1].rev-a[1].rev);
+  const pr={};L.forEach(x=>{const k=x.prod||"?";(pr[k]||(pr[k]=[])).push(x)});
+  const prods=Object.entries(pr).map(([k,a])=>[ADF_PROD[k]||"Chưa rõ sản phẩm",adfSum(a),a.length]).sort((a,b)=>b[1].rev-a[1].rev);
+  const at=new Date(D.at);
+  return `<div class="grid kpis">${kpi("Chi Ads",money(T.spend),esc(pLabel()))}${kpi("Doanh số mang về",money(T.rev),"Pancake, gắn vào chiến dịch")}${kpi("ROAS",adlR(T.roas),"doanh số / chi ads")}${kpi("Đơn chốt",nf(T.orders),T.orders?"chi / đơn "+money(T.cpo):"")}${kpi("Chi Ads / doanh số",T.rev?adlPct(T.pct):"—","gồm thuế 10% · mục tiêu ≤ 35%")}${kpi("Doanh số chưa gắn chiến dịch",money(unmatched),nf(unOrders)+" đơn")}</div>
+  <div class="note">Tự lấy từ Facebook và Pancake mỗi sáng 8h (lần cuối ${at.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})} ${at.toLocaleDateString("vi-VN")}). Số có tới ngày ${vnd(D.last)}. Xem từng ngày như file Excel ở <a href="#" data-go="fb_ads">Báo cáo theo ngày</a>.</div>
+  <section class="card flush"><div class="card-h pad"><h2>Top nhân sự</h2><span class="hint">xếp theo doanh số mang về</span></div><div class="tbl"><table>${HEAD.replace("{h}","Nhân sự")}<tbody>${ppl.map(([w,s,n])=>row(w,n+" chiến dịch",s)).join("")}</tbody></table></div></section>
+  <section class="card flush"><div class="card-h pad"><h2>Top sản phẩm</h2><span class="hint">xếp theo doanh số mang về</span></div><div class="tbl"><table>${HEAD.replace("{h}","Sản phẩm")}<tbody>${prods.map(([n,s,c])=>row(n,c+" chiến dịch",s)).join("")}</tbody></table></div></section>`;
+}
+/* Bảng từng ngày như file Excel: mỗi chỉ số một hàng, mỗi ngày một cột, có cột Tổng. */
+function adfDaily(D,keys,ids){
+  const pick=k=>adfSum(adfAgg(D,k).C.filter(c=>ids.has(c.id))),per=keys.map(k=>pick([k])),tot=pick(keys);
+  const R=[["Chi Ads",s=>s.spend?nf(Math.round(s.spend)):""],["Tin nhắn",s=>s.msgs?nf(s.msgs):""],["Giá tin nhắn",s=>s.msgs?nf(Math.round(s.giaMsg)):""],["Đơn",s=>s.orders?nf(s.orders):""],["Doanh số",s=>s.rev?nf(Math.round(s.rev)):""],["Chi/đơn",s=>s.orders?nf(Math.round(s.cpo)):""],["% CP/DS",s=>s.rev?adlPct(s.pct):""],["ROAS",s=>s.spend&&s.rev?adlR(s.roas):""]];
+  return `<div class="tbl adl-days"><table><thead><tr><th>Chỉ số</th><th class="n">Tổng</th>${keys.map(k=>`<th class="n">${+k.slice(8)}/${+k.slice(5,7)}</th>`).join("")}</tr></thead><tbody>${R.map(([n,f])=>`<tr><td><b>${n}</b></td><td class="n"><b>${f(tot)}</b></td>${per.map(s=>`<td class="n">${f(s)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
 function pAdsFb(m){
   const D=adfData(),{C,unmatched,unOrders,links}=adfAgg(D,adfPeriod(D,ADF.per)),days=adfPeriod(D,ADF.per);
   const L=C.filter(x=>x.spend||x.rev),owners=["Việt Anh","Thảo","Duẩn","Chưa rõ người"].filter(w=>L.some(x=>x.owner===w)&&(!ADF.who||ADF.who===w));
@@ -140,7 +163,8 @@ function pAdsFb(m){
   const HEAD=`<thead><tr><th>Mã · sản phẩm</th><th class="n">Chi Ads</th><th class="n">Tin nhắn</th><th class="n">Giá tin nhắn</th><th class="n">Đơn</th><th class="n">Doanh số</th><th class="n">Chi/đơn</th><th class="n">% CP/DS</th><th class="n">ROAS</th></tr></thead>`;
   const section=w=>{const mine=L.filter(x=>x.owner===w),G={};mine.forEach(x=>{const k=(x.prod||"?")+"|"+x.typ;(G[k]||(G[k]=[])).push(x)});
     const rows=Object.entries(G).map(([k,a])=>({k:w+"|"+k,prod:a[0].prod,typ:a[0].typ,list:a,s:adfSum(a)})).sort((a,b)=>b.s.spend-a.s.spend);
-    return `<section class="card flush"><div class="card-h pad"><h2>${esc(w)}</h2><span class="hint">${mine.length} chiến dịch · ${lbl}</span></div><div class="tbl"><table>${HEAD}<tbody>${rows.map(r=>`<tr class="clk${ADF.open===r.k?" on":""}" data-adfo="${esc(r.k)}"><td><b>${esc(ADF_PROD[r.prod]||"Chưa rõ sản phẩm")}</b><small>${r.typ} · ${r.list.length} chiến dịch</small></td>${cells(r.s)}</tr>${ADF.open===r.k?`<tr class="sub"><td colspan="9"><div class="tbl"><table><tbody>${r.list.slice().sort((a,b)=>b.spend-a.spend).map(c=>`<tr><td><span class="mono">${esc(c.name||c.id)}</span></td>${cells(adfSum([c]))}</tr>`).join("")}</tbody></table></div></td></tr>`:""}`).join("")}<tr class="tot"><td><b>Tổng ${esc(w)}</b></td>${cells(adfSum(mine))}</tr></tbody></table></div></section>`};
+    const ids=l=>new Set(l.map(c=>c.id)),allKey=w+"|ALL";
+    return `<section class="card flush"><div class="card-h pad"><h2>${esc(w)}</h2><span class="hint">${mine.length} chiến dịch · ${lbl} · bấm một dòng để xem từng ngày</span></div><div class="tbl"><table>${HEAD}<tbody>${rows.map(r=>`<tr class="clk${ADF.open===r.k?" on":""}" data-adfo="${esc(r.k)}"><td><b>${esc(ADF_PROD[r.prod]||"Chưa rõ sản phẩm")}</b><small>${r.typ} · ${r.list.length} chiến dịch</small></td>${cells(r.s)}</tr>${ADF.open===r.k?`<tr class="sub"><td colspan="9">${adfDaily(D,days,ids(r.list))}<div class="tbl"><table><tbody>${r.list.slice().sort((a,b)=>b.spend-a.spend).map(c=>`<tr><td><span class="mono">${esc(c.name||c.id)}</span></td>${cells(adfSum([c]))}</tr>`).join("")}</tbody></table></div></td></tr>`:""}`).join("")}<tr class="tot clk${ADF.open===allKey?" on":""}" data-adfo="${esc(allKey)}"><td><b>Tổng ${esc(w)}</b><small>bấm để xem từng ngày</small></td>${cells(adfSum(mine))}</tr>${ADF.open===allKey?`<tr class="sub"><td colspan="9">${adfDaily(D,days,ids(mine))}</td></tr>`:""}</tbody></table></div></section>`};
   const perOpt=[["m0","Tháng "+D.last.slice(5,7)+" (từ đầu tháng)"],["d7","7 ngày gần nhất"]].concat(D.keys.some(k=>k.slice(0,7)!==D.last.slice(0,7))?[["m1","Tháng trước (phần đã có)"]]:[]).concat(D.keys.filter(k=>k<=D.last).slice(-14).reverse().map(k=>[k,"Ngày "+k.slice(8)+"/"+k.slice(5,7)]));
   m.innerHTML=H("Báo cáo Ads theo ngày",`Tự lấy từ Facebook (chi phí, tin nhắn) và Pancake (đơn, doanh số) mỗi sáng · lần cuối ${atS}`)+`
   <div class="filters"><select id="adf-w">${opt([["","Tất cả người chạy"]].concat(["Việt Anh","Thảo","Duẩn"].map(w=>[w,w])),ADF.who)}</select>

@@ -10,7 +10,8 @@ import { requirePermission } from '../middleware/rbac';
 import { zodFieldErrors } from '@shared/schemas';
 import { getOrderDetail } from '../services/orders';
 import { flowSummary, khoCheck } from '../services/orderFlow';
-import { getCustomerDebt } from '../services/debts';
+import { getCustomerDebt, listDebts, totalDebts } from '../services/debts';
+import { listPayments } from '../services/payments';
 import { createProposal } from '../services/proposals';
 import { khoAlerts } from './kho';
 import { unpack } from '../lib/pack';
@@ -146,6 +147,45 @@ agentRoutes.get('/customers/:id', requirePermission('agent.read'), async (c) => 
       .all(),
   ]);
   return ok(c, { customer, debt, orders: orders.results ?? [], open_tasks: tasks.results ?? [] });
+});
+
+/* ---------- CRM B2B: khách, công nợ toàn công ty, tiền thu (phạm vi debts) ---------- */
+
+/** Tìm khách theo tên hoặc mã. ?q=tên&limit=30 */
+agentRoutes.get('/customers', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'debts');
+  const q = (c.req.query('q') ?? '').trim();
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 30)) || 30), 100);
+  const like = `%${q.replace(/[%_]/g, '')}%`;
+  const rows = await c.env.DB.prepare(
+    `SELECT c.id, c.name, u.display_name AS owner_name, c.stage, c.tier_id, c.credit_limit, c.last_order_date, c.reorder_cycle_days
+     FROM customers c LEFT JOIN users u ON u.id = c.owner_id
+     WHERE c.deleted_at IS NULL AND (? = '' OR c.name LIKE ? OR c.id = ?)
+     ORDER BY c.name COLLATE NOCASE LIMIT ?`,
+  )
+    .bind(q, like, q, limit)
+    .all();
+  return ok(c, rows.results ?? []);
+});
+
+/** Công nợ toàn công ty: ?loc=vuot (vượt hạn mức) | co-no (đang nợ). Kèm tổng. */
+agentRoutes.get('/debts', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'debts');
+  const loc = c.req.query('loc');
+  const list = await listDebts(c.env.DB, '1=1', [], { onlyExceeded: loc === 'vuot', onlyWithDebt: loc === 'co-no' });
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 50)) || 50), 200);
+  return ok(c, list.slice(0, limit), { totals: totalDebts(list), total_rows: list.length });
+});
+
+/** Phiếu thu tiền khách. ?pending=1 (chưa kế toán xác nhận) &customer_id=...&limit=... */
+agentRoutes.get('/payments', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'debts');
+  const items = await listPayments(c.env.DB, '1=1', [], {
+    customerId: c.req.query('customer_id') ?? undefined,
+    pendingOnly: c.req.query('pending') === '1',
+    limit: Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 50)) || 50), 200),
+  });
+  return ok(c, items);
 });
 
 /** Mã đang thiếu của các đơn chờ kho / giữ chờ hàng, gom theo mã (cho đề xuất sản xuất). */
