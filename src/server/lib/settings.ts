@@ -20,6 +20,11 @@ export interface AppConfig {
    * mặc định BẬT; mọi lần tự duyệt đều được ghi rõ trong nhật ký để CEO soát lại.
    */
   allowSelfApproval: boolean;
+  /**
+   * Giá thỏa thuận lệch bảng giá có phải qua duyệt không. Nhiều khách mua giá thỏa thuận, sale tự điền giá được:
+   * mặc định TẮT (không bắt duyệt), dòng vẫn được đánh dấu giá thỏa thuận kèm % lệch để đối soát.
+   */
+  priceNeedsApproval: boolean;
 }
 
 const DEFAULTS: AppConfig = {
@@ -51,6 +56,7 @@ const DEFAULTS: AppConfig = {
   commissionPercent: 1,
   commissionBasis: 'COLLECTED',
   allowSelfApproval: true,
+  priceNeedsApproval: false,
 };
 
 function parseJson<T>(raw: string | null | undefined, fallback: T): T {
@@ -102,7 +108,14 @@ export async function loadConfig(db: D1Database): Promise<AppConfig> {
     authLockMinutes: parseJson(map.get('auth.lock_minutes'), DEFAULTS.authLockMinutes),
     commissionPercent: parseJson(map.get('commission.percent'), DEFAULTS.commissionPercent),
     commissionBasis: parseJson(map.get('commission.basis'), DEFAULTS.commissionBasis),
-    allowSelfApproval: parseJson(map.get('approval.allow_self_approve'), DEFAULTS.allowSelfApproval),
+    allowSelfApproval: parseJson(
+      map.get('approval.allow_self_approve'),
+      DEFAULTS.allowSelfApproval,
+    ),
+    priceNeedsApproval: parseJson(
+      map.get('approval.price_override_required'),
+      DEFAULTS.priceNeedsApproval,
+    ),
   };
 }
 

@@ -1,3 +1,4 @@
+import { hubPeriodParam } from '../../lib/hubPeriod';
 import type { CeoDashboard } from '@shared/types';
 import { formatVnd } from '@shared/money';
 import { useApi } from '../../lib/hooks';
@@ -5,7 +6,9 @@ import { Card, Kpi, StateBlock } from '../../components/ui';
 import { ApprovalTable } from '../OrdersPage';
 
 export function CeoDashboardPage() {
-  const dashboard = useApi<CeoDashboard>('/api/dashboards/ceo');
+  const dashboard = useApi<CeoDashboard>(
+    `/api/dashboards/ceo?month=${hubPeriodParam()}`,
+  );
   const data = dashboard.data;
   const quality = data?.data_quality;
 
@@ -19,9 +22,21 @@ export function CeoDashboardPage() {
       </div>
 
       <div className="kpis">
-        <Kpi label="Doanh số tháng" value={formatVnd(data?.revenue_month ?? 0)} hint="Đơn đã duyệt" />
-        <Kpi label="Thu tiền trong tháng" value={formatVnd(data?.collected_month ?? 0)} hint="Kế toán đã xác nhận" />
-        <Kpi label="Công nợ chính thức" value={formatVnd(data?.official_debt ?? 0)} hint="Dùng cho báo cáo" />
+        <Kpi
+          label="Doanh số tháng"
+          value={formatVnd(data?.revenue_month ?? 0)}
+          hint="Đơn đã duyệt"
+        />
+        <Kpi
+          label="Thu tiền trong tháng"
+          value={formatVnd(data?.collected_month ?? 0)}
+          hint="Kế toán đã xác nhận"
+        />
+        <Kpi
+          label="Công nợ chính thức"
+          value={formatVnd(data?.official_debt ?? 0)}
+          hint="Dùng cho báo cáo"
+        />
         <Kpi
           label="Công nợ dự kiến"
           value={formatVnd(data?.projected_debt ?? 0)}
@@ -79,7 +94,9 @@ export function CeoDashboardPage() {
             <span className="muted">Lần import gần nhất</span>
             <strong>
               {quality?.last_import_status ?? 'Chưa import'}{' '}
-              {quality?.last_import_reconciled === false && <span className="badge red">Lệch đối soát</span>}
+              {quality?.last_import_reconciled === false && (
+                <span className="badge red">Lệch đối soát</span>
+              )}
             </strong>
           </div>
         </Card>

@@ -20,6 +20,13 @@ export function normalizePhone(raw: unknown): PhoneNormalizeResult {
     return { text: null, normalized: null, restoredLeadingZero: false, needsReview: true, note: 'Thiếu số điện thoại' };
   }
 
+  // Khách có nhiều số ("0949… - 0944…", "0949…/0944…"): hợp lệ nếu từng số đều đúng; dò trùng theo số đầu.
+  if (typeof raw === 'string') {
+    const parts = raw.split(/s*[-–/,;|]s*|s{2,}/).map((p) => p.replace(/D/g, '')).filter(Boolean);
+    if (parts.length > 1 && parts.every((p) => /^0d{9}$/.test(p))) {
+      return { text: raw.trim(), normalized: parts[0]!, restoredLeadingZero: false, needsReview: false };
+    }
+  }
   const wasNumber = typeof raw === 'number';
   const rawText = wasNumber ? String(Math.trunc(raw as number)) : String(raw).trim();
   let digits = rawText.replace(/\D/g, '');

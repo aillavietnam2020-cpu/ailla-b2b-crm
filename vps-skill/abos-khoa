@@ -1,0 +1,18 @@
+#!/bin/bash
+# Chị chạy trong Termius: abos-khoa <mã agent>   (ví dụ: abos-khoa main)
+# Dán khoá agent (dạng agt_...) lấy ở web: Điều hành agent / Agent AI. Khoá không hiện trên màn hình.
+set -e
+A="$1"
+if [ -z "$A" ]; then echo "Cách dùng: abos-khoa <mã agent>, ví dụ: abos-khoa main"; exit 1; fi
+case "$A" in *[!a-zA-Z0-9-]*) echo "Mã agent không hợp lệ"; exit 1;; esac
+echo "Bấm Ctrl+V để dán khoá của agent $A (sẽ KHÔNG thấy chữ hiện ra, bình thường), rồi Enter."
+read -r -s -p "Khoá: " K
+echo
+K=$(echo "$K" | tr -d '[:space:]')
+echo "Đã nhận ${#K} ký tự."
+case "$K" in agt_*) ;; *) echo "Không đúng khoá agent (phải bắt đầu bằng agt_). Thoát."; exit 1;; esac
+umask 077
+mkdir -p /root/.config/abos
+printf '%s' "$K" > "/root/.config/abos/$A.key"
+chmod 600 "/root/.config/abos/$A.key"
+echo "Đã lưu khoá cho agent $A."

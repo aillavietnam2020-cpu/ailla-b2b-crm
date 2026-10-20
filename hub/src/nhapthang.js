@@ -107,4 +107,4 @@ function ntImportFile(f){
 }
 /* file "Hệ thống quản trị content" (có sheet Video Đã Đăng) đưa nhầm vào ô báo cáo TikTok: tự chuyển sang nhập hiệu quả thực tế */
 function ntIsContentFile(f){return new Promise(res=>{if(typeof XLSX==="undefined"){res(false);return}const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:"array",bookSheets:true});res(wb.SheetNames.some(n=>/da dang/.test(ntFold(n))&&/video/.test(ntFold(n))))}catch(e){res(false)}};r.onerror=()=>res(false);r.readAsArrayBuffer(f)})}
-
+PAGES.nhaplieu_ads=PAGES.nhaplieu;

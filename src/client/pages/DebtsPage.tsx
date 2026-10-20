@@ -4,6 +4,7 @@ import type { DebtSummary } from '@shared/types';
 import { formatVnd, formatVndNumber } from '@shared/money';
 import { useApi } from '../lib/hooks';
 import { Card, Kpi, StateBlock } from '../components/ui';
+import { CollectPaymentButton } from '../components/CollectPayment';
 
 interface Totals {
   opening_debt: number;
@@ -16,8 +17,12 @@ interface Totals {
 
 export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
   const [filter, setFilter] = useState('');
+  const [q, setQ] = useState('');
+  // 13/10 chị: lọc nhanh theo tên khách (gõ không dấu cũng tìm được)
+  const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
   const debts = useApi<DebtSummary[]>(`/api/debts${filter ? `?filter=${filter}` : ''}`);
   const totals = debts.meta?.totals as Totals | undefined;
+  const rows = (debts.data ?? []).filter((d) => !q.trim() || fold(d.customer_name ?? '').includes(fold(q.trim())));
 
   return (
     <>
@@ -30,6 +35,16 @@ export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
           </p>
         </div>
         <div className="actions">
+          <div className="search">
+            <input
+              type="search"
+              placeholder="Tìm tên khách hàng…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              style={{ minWidth: 220 }}
+            />
+          </div>
+          <CollectPaymentButton onDone={() => debts.reload()} />
           <select className="select" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="">Tất cả khách</option>
             <option value="has_debt">Chỉ khách còn nợ</option>
@@ -58,8 +73,8 @@ export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
         <StateBlock
           loading={debts.loading}
           error={debts.error}
-          empty={(debts.data ?? []).length === 0}
-          emptyText="Không có dữ liệu công nợ."
+          empty={rows.length === 0}
+          emptyText={q.trim() ? `Không có khách nào tên chứa "${q.trim()}".` : 'Không có dữ liệu công nợ.'}
         >
           <div className="table-wrap">
             <table className="data wide">
@@ -78,7 +93,7 @@ export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
                 </tr>
               </thead>
               <tbody>
-                {(debts.data ?? []).map((debt) => (
+                {rows.map((debt) => (
                   <tr key={debt.customer_id}>
                     <td>
                       <Link

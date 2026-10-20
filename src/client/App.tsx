@@ -4,7 +4,13 @@ import { useAuth } from './components/AuthProvider';
 import { CustomersPage } from './pages/CustomersPage';
 import { CustomerDetailPage } from './pages/CustomerDetailPage';
 import { PricesPage } from './pages/PricesPage';
+import { CustomerPricesPage } from './pages/admin/CustomerPricesPage';
 import { DebtsPage } from './pages/DebtsPage';
+import { BillsPage, ReceivingAccountsPage } from './pages/BillsPage';
+import { ReturnsPage } from './pages/ReturnsPage';
+import { PriceAdjustmentsPage } from './pages/PriceAdjustmentsPage';
+import { BonusHubPage } from './pages/BonusPages';
+import { ShippingVouchersPage } from './pages/ShippingVouchersPage';
 import { OrderDetailPage, OrdersPage } from './pages/OrdersPage';
 import { TodayPage } from './pages/sales/TodayPage';
 import { NewOrderPage } from './pages/sales/NewOrderPage';
@@ -15,6 +21,8 @@ import { UsersPage } from './pages/admin/UsersPage';
 import { DashboardPage } from './pages/admin/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
+import { PrintOrderPage } from './pages/PrintOrderPage';
+import { PrintStatementPage } from './pages/PrintStatementPage';
 
 /**
  * Hai không gian giao diện dùng chung một backend:
@@ -55,6 +63,16 @@ export function App() {
     return <div className="loading" style={{ paddingTop: 80 }}>Đang mở Trang quản trị…</div>;
   }
 
+  // Trang in phiếu: mở ở tab riêng, không có khung menu.
+  if (location.pathname.startsWith('/print/orders/') || location.pathname.startsWith('/print/statement/')) {
+    return (
+      <Routes>
+        <Route path="/print/orders/:id" element={<PrintOrderPage />} />
+        <Route path="/print/statement/:id" element={<PrintStatementPage />} />
+      </Routes>
+    );
+  }
+
   const isAdminSpace = me.user.role === 'MANAGER' || me.user.role === 'CEO';
   const homePath = isAdminSpace ? (me.user.role === 'CEO' ? '/admin/ceo' : '/admin') : '/sales';
 
@@ -79,10 +97,14 @@ export function App() {
         <Route path="/sales/customers" element={<CustomersPage mode="sales" />} />
         <Route path="/sales/customers/:id" element={<CustomerDetailPage mode="sales" />} />
         <Route path="/sales/orders" element={<OrdersPage mode="sales" />} />
-        <Route path="/sales/orders/new" element={<NewOrderPage />} />
+        <Route path="/sales/orders/new" element={<NewOrderPage mode="sales" />} />
         <Route path="/sales/orders/:id" element={<OrderDetailPage mode="sales" />} />
+        <Route path="/sales/orders/:id/edit" element={<NewOrderPage mode="sales" />} />
         <Route path="/sales/prices" element={<PricesPage />} />
         <Route path="/sales/debts" element={<DebtsPage mode="sales" />} />
+        <Route path="/sales/bills" element={<BillsPage />} />
+        <Route path="/sales/returns" element={<ReturnsPage />} />
+        <Route path="/sales/shipping-vouchers" element={<ShippingVouchersPage />} />
         <Route path="/sales/performance" element={<PerformancePage />} />
 
         <Route path="/admin" element={<DashboardPage initial="doingu" />} />
@@ -91,8 +113,17 @@ export function App() {
         <Route path="/admin/customers/:id" element={<CustomerDetailPage mode="admin" />} />
         <Route path="/admin/orders" element={<OrdersPage mode="admin" />} />
         <Route path="/admin/orders/:id" element={<OrderDetailPage mode="admin" />} />
+        <Route path="/admin/orders/:id/edit" element={<NewOrderPage mode="admin" />} />
+        <Route path="/admin/customer-prices" element={<CustomerPricesPage />} />
         <Route path="/admin/prices" element={<PricesPage />} />
+        <Route path="/admin/receiving-accounts" element={<ReceivingAccountsPage />} />
         <Route path="/admin/debts" element={<DebtsPage mode="admin" />} />
+        <Route path="/admin/bills" element={<BillsPage />} />
+        <Route path="/admin/returns" element={<ReturnsPage />} />
+        <Route path="/admin/price-adjustments" element={<PriceAdjustmentsPage />} />
+        <Route path="/admin/bonus" element={<BonusHubPage />} />
+        <Route path="/admin/bonus-policy" element={<BonusHubPage initial="policy" />} />
+        <Route path="/admin/shipping-vouchers" element={<ShippingVouchersPage />} />
         <Route path="/admin/reports" element={<DashboardPage initial="tong" />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/imports" element={<ImportPage />} />

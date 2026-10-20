@@ -67,10 +67,29 @@ const tq=u=>can(u,"tongquan.xem");
 const PAGE_SETS=[
   {n:"Bảng tiến độ",ids:["cv_kb","congviec"],labels:["Tất cả việc","Theo bước video"]},
   {n:"Lịch",ids:["cv_lich","giaoviec"],labels:["Lịch việc","Lịch quay"]},
-  {n:"Hiệu quả",ids:["hieuqua","baocao"],labels:["Hiệu quả tháng","Nhập số liệu"]},
-  {n:"Kế hoạch tháng",ids:["kehoach","research","dieuphoi"],labels:["Kế hoạch","Research & insight","Tất cả thẻ video"]},
-  {n:"Quảng cáo",ids:["adshieuqua","adssp","fb_ads"],labels:["Hiệu quả Ads","Theo sản phẩm","Báo cáo theo ngày"]}];
-const setOf=id=>PAGE_SETS.find(x=>x.ids.includes(id));
+  {n:"Dự án và mục tiêu",ids:["cv_da","cv_mt"],labels:["Dự án","Mục tiêu"]},
+  /* Marketing: mục cha bấm vào sổ ra các trang con ngay ở thanh bên (kiểu Pancake), trong trang không có hàng tab */
+  /* Marketing: 5 team ngang hàng; team nhiều trang thì bấm vào sổ ra các trang con ngay thanh bên (mỗi lần chỉ mở một team) */
+  {n:"Content",ids:["mkt_tq","kehoach","research","dieuphoi","lich","kho_luutru","win","order_c","nhaplieu"],labels:["Tổng quan","Kế hoạch tháng","Research","Điều phối sản xuất","Calendar","Kho lưu trữ video","Video win","Order từ Ads","Nhập báo cáo"],acc:true,noBar:true,hide:["lich","research"]},
+  {n:"Digital Marketing",ids:["dg_tq","fb_ads","dg_lib","order","nhaplieu_ads"],labels:["Tổng quan","Báo cáo theo ngày","Thư viện video ads","Order cho Content","Nhập báo cáo Ads"],acc:true,noBar:true},
+  {n:"Facebook",ids:["bc_fb","fb_sale"],labels:["Doanh thu Facebook","Hoạt động team Sale"],noBar:true},
+  /* Kho vật tư gồm nhiều trang con; mục "Kho vật tư" trên thanh bên mở trang Tồn kho, các tab con nằm trong trang. */
+  {n:"Sản xuất",ids:["sx_nc","kho_pc","sx_td","sx_lo"],labels:[],noBar:true},
+  /* Trang quản trị: mỗi mục lớn một chức năng; mục nào có nhiều trang liên quan thì gom thành một dòng có tab bên trong. */
+  {adm:true,n:"Báo cáo kết quả kinh doanh",ids:["bc_tong","pl"],labels:["Theo kênh","Lãi lỗ (P&L)"]},
+  {adm:true,n:"Doanh thu",ids:["bc_tiktok","bc_shopee","bc_fb","cskh_cu","bc_b2b","bc_gc"],labels:["TikTok Shop","Shopee","Facebook Ads","CSKH cũ","B2B / Đại lý","Gia công"]},
+  {adm:true,n:"Chi phí",ids:["chiphi","chiphidm","cr_vc"],labels:["Chi phí theo tháng","Danh mục & phân bổ chi phí","Phiếu chi vận chuyển"]},
+  {adm:true,n:"Tiền về & đối soát",ids:["doisoat","cr_bill","cr_rcv"],labels:["Đối soát tiền về","Kho bill giao dịch","Tài khoản nhận tiền"]},
+  {adm:true,n:"Mua hàng",ids:["mh_po","mh_no","mh_gianvl"],labels:["Đơn mua hàng","Công nợ nhà cung cấp","Giá nguyên vật liệu theo tháng"]},
+  {adm:true,n:"Bảng giá",ids:["cr_gia","cr_dc"],labels:["Bảng giá 8 cấp","Giá điều chỉnh / khuyến mại"]},
+  {adm:true,n:"Tài khoản & phòng ban",ids:["nhansu","phongban"],labels:["Tài khoản & phân quyền","Phòng ban & phân hệ"]},
+  {adm:true,n:"Dữ liệu",ids:["cr_import","caidat"],labels:["Nhập dữ liệu CRM","Sao lưu dữ liệu"]},
+  {adm:true,n:"Trợ lý AI",ids:["bots","agentchat","agents"],labels:["Bot AI phòng ban","Điều hành agent","Agent AI"]},
+  {n:"Kho vật tư",ids:["kho_ton","kho_nhap","kho_nhap_tp","kho_xuat_b2b","kho_xuat","kho_online","kho_hoan","kho_nxt","kho_cl","kho_dm","kho_boc","kho_vo","kho_map"],labels:[],noBar:true}];
+/* Trang quản trị đặt "Định mức & giá thành" và "Vỏ can, chai & thùng" thành hai dòng riêng, không gộp vào "Kho vật tư". */
+const setOf=id=>{const adm=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
+  if(adm){const a=PAGE_SETS.find(x=>x.adm&&x.ids.includes(id));if(a)return a;if(/^kho_/.test(id))return undefined}
+  return PAGE_SETS.find(x=>!x.adm&&x.ids.includes(id))};
 /* Gộp các trang cùng nhóm thành một dòng: giữ trang đầu tiên được xem, đổi tên thành tên nhóm, ẩn các trang còn lại. */
 function collapseSets(items){const seen=new Set();return items.filter(i=>{const st=setOf(i[0]);if(!st)return true;if(seen.has(st))return false;seen.add(st);return true}).map(i=>{const st=setOf(i[0]);return st?[i[0],st.n,i[2],i[3],st]:i})}
 const ADM_ITEM=(k,n)=>{const i=MENU_ADMIN.flatMap(g=>g[1]).find(x=>x[0]===k);return i?[i[0],n||i[1],i[2],i[3]]:null};
@@ -80,30 +99,33 @@ const dgOk=u=>u.role==="digital"||u.role==="admin"||userTeam(u)==="ads"||tq(u);
 const ordCnt=()=>{try{return D().orders.filter(o=>o.trangThai!=="Xong").length||""}catch(e){return ""}};
 /* Marketing gồm 4 khu: Content & Media, Booking KOC, Livestream, Digital Marketing. Mỗi người chỉ thấy khu của team mình (chưa đặt team thì thấy hết). */
 const tm=(t,p)=>u=>{const T=userTeam(u);return (!T||T==="all"||T===t)&&(!p||p(u))};
+const CT=i=>[i[0],i[1],(u=>{const T=userTeam(u);return (!T||T==="all"||T==="content")&&i[2](u)}),i[3]];
 const MKT_G=()=>[
- ["Content & Media",[MI("mkt_tq","Tổng quan",tm("content",u=>u.role!=="digital"),()=>{try{return rvQueue().length||""}catch(e){return ""}}),ADM_ITEM("kehoach"),ADM_ITEM("research"),
-   MI("dieuphoi","Tất cả thẻ video",tm("content",u=>u.role!=="digital")),ADM_ITEM("win","Video win"),ADM_ITEM("hieuqua"),MI("nhaplieu","Nhập báo cáo",tm("content",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead")),
-   MI("order_c","Order từ Ads",tm("content",u=>can(u,"order.xem")||u.role==="content"||u.role==="lead"||u.role==="admin"),ordCnt),MI("hoc_kb","Học từ kịch bản",tm("content",()=>true))].filter(Boolean).map(i=>[i[0],i[1],(u=>{const T=userTeam(u);return (!T||T==="all"||T==="content")&&i[2](u)}),i[3]])],
- ["Booking KOC",[MI("bc_koc","KOC / Affiliate",u=>{const T=userTeam(u);return (!T||T==="all"||T==="koc")&&(tq(u)||u.role==="admin"||T==="koc")})]],
- ["Livestream",[MI("live","Livestream (đang xây)",()=>true)]],
- ["Digital Marketing",[MI("dg_tq","Tổng quan Digital",tm("ads",dgOk)),MI("dg_lib","Thư viện video ads",tm("ads",dgOk)),
-   MI("adshieuqua","Hiệu quả Ads",tm("ads",u=>can(u,"baocao.ads")||dgOk(u))),MI("adssp","Ads theo sản phẩm",tm("ads",u=>can(u,"baocao.ads")||dgOk(u))),MI("fb_ads","Báo cáo Ads theo ngày",tm("ads",dgOk)),
-   MI("order","Order cho Content",tm("ads",u=>dgOk(u)||can(u,"order.xem")),ordCnt),MI("nhaplieu","Nhập báo cáo Ads",u=>userTeam(u)==="ads"&&(can(u,"baocao.ads")||u.role==="digital"))].filter(Boolean)]];
+ ["",[MI("mkt_tq","Tổng quan",tm("content",u=>u.role!=="digital"),()=>{try{return rvQueue().length||""}catch(e){return ""}}),
+   ADM_ITEM("kehoach"),ADM_ITEM("research"),ADM_ITEM("lich","Calendar"),MI("dieuphoi","Điều phối sản xuất",tm("content",u=>u.role==="admin"||u.role==="lead"||can(u,"viec.giao"))),
+   MI("kho_luutru","Kho lưu trữ video",tm("content",u=>u.role==="admin"||u.role==="lead"||u.role==="content"||u.role==="digital")),ADM_ITEM("win","Video win"),
+   MI("order_c","Order từ Ads",tm("content",u=>can(u,"order.xem")||u.role==="content"||u.role==="lead"||u.role==="admin"),ordCnt),
+   MI("nhaplieu","Nhập báo cáo",tm("content",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead"))].filter(Boolean).map(CT)],
+ ["",[MI("xuongvideo","Sản xuất video",tm("content"))]],
+ ["",[MI("bc_koc","Booking KOC",u=>{const T=userTeam(u);return (!T||T==="all"||T==="koc")&&(tq(u)||u.role==="admin"||T==="koc")})]],
+ ["",[MI("live","Livestream",tm("live"))]],
+ ["",[MI("dg_tq","Tổng quan Digital",tm("ads",dgOk)),MI("dg_lib","Thư viện video ads",tm("ads",dgOk)),
+   MI("fb_ads","Báo cáo Ads theo ngày",tm("ads",dgOk)),
+   MI("order","Order cho Content",tm("ads",u=>dgOk(u)||can(u,"order.xem")),ordCnt),MI("nhaplieu_ads","Nhập báo cáo Ads",u=>userTeam(u)==="ads"&&(can(u,"baocao.ads")||u.role==="digital"))].filter(Boolean)]];
 /* Menu: 8 mục lớn. "hide" = không hiện ở thanh bên (Trợ lý AI ở nút trên cùng, mục Của tôi ở chỗ bấm vào tên).
    "tabs" = các trang con hiện thành thanh tab trong trang, thanh bên chỉ còn một dòng. */
 const MODULES=[
  {k:"exec",zone:"",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
- {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_tq","Tổng quan"),MI("cv_nv","Task",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),ADM_ITEM("cv","Cần duyệt"),MI("cv_kb","Bảng tiến độ"),ADM_ITEM("congviec"),MI("cv_lich","Lịch"),ADM_ITEM("giaoviec"),MI("cv_mt","Mục tiêu"),MI("cv_da","Dự án")].filter(Boolean)]]},
+ {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_tc","Toàn cảnh"),MI("cv_nv","Theo dõi",null,()=>cvFilter(cvItems()).filter(x=>x.late).length||""),ADM_ITEM("cv","Cần xử lý"),MI("cv_kb","Bảng tiến độ"),ADM_ITEM("congviec"),MI("cv_lich","Lịch"),ADM_ITEM("giaoviec"),MI("cv_da","Dự án"),MI("cv_mt","Mục tiêu")].filter(Boolean)]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
  {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("matkhau","Đổi mật khẩu")]]]},
- {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Bán hàng B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
-   ["Báo cáo kênh",[MI("bc_tong","Tổng quan kênh",tq),MI("bc_tiktok","TikTok Shop",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq)]],
-   ["Facebook",[MI("fb_sale","Sale B2C",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
+ {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Kinh doanh B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
+   ["",[MI("bc_tong","Kết quả kinh doanh",tq),MI("bc_tiktok","TikTok",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq),MI("fb_sale","Hoạt động team Sale",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
  {k:"b2b",zone:"Bán hàng",ic:"box",n:"Kinh doanh B2B",sub:"Đại lý · NPP · CRM",groups:()=>[
    ["Bán hàng",[MI("b2b_today","Việc hôm nay"),MI("b2b_kh","Khách hàng"),MI("b2b_don","Đơn hàng & duyệt",null,()=>(D().b2b?D().b2b.orders.flatMap(o=>o.approvals||[]).filter(a=>a.status==="PENDING").length:"")||""),MI("b2b_gia","Bảng giá 8 cấp"),MI("b2b_cn","Công nợ"),MI("b2b_perf","Kết quả cá nhân")]],
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
  {k:"mkt",zone:"Vận hành",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC · Live",groups:MKT_G},
- {k:"sx",zone:"Vận hành",ic:"fac",n:"Sản xuất & kho",sub:"",tabs:true,groups:()=>[["",SX_TABS.concat(KHO_SUB.filter(([k])=>k!=="kho_ton")).map(([k,t])=>MI(k,t))]]},
+ {k:"sx",zone:"Vận hành",ic:"fac",n:"Sản xuất & kho",sub:"",groups:()=>[["",SX_TABS.concat(KHO_SUB.filter(([k])=>k!=="kho_ton")).map(([k,t])=>MI(k,t))]]},
  {k:"fin",zone:"Quản trị",ic:"fin",n:"Tài chính",sub:"",groups:()=>[["",[MI("pl","Báo cáo P&L",u=>can(u,"pl.xem")),MI("chiphi","Chi phí theo tháng",u=>can(u,"chiphi.xem")),MI("doisoat","Đối soát tiền về",u=>can(u,"chiphi.xem")),MI("sku","Giá vốn SKU",u=>can(u,"gia.xem_von"))]]]},
  {k:"hr",zone:"Quản trị",ic:"ppl",n:"Nhân sự",sub:"",groups:()=>[
    ["Hồ sơ",[MI("hr_tq","Tổng quan nhân sự",u=>can(u,"nhansu.quanly")),MI("hoso","Hồ sơ nhân sự",u=>can(u,"nhansu.quanly")),MI("hr_hd","Hợp đồng & thử việc",u=>can(u,"nhansu.quanly"))]],
@@ -117,13 +139,34 @@ const MODULES=[
    ["Hệ thống",[MI("bots","Bot AI phòng ban",u=>can(u,"caidat.quanly")),MI("quychuan","Quy chuẩn"),MI("caidat","Sao lưu dữ liệu",u=>can(u,"caidat.quanly"))]]]},
 ];
 let MOD="";
-const modGroups=mo=>mo.groups().map(([g,items])=>[g,items.filter(i=>i[2](ME))]).filter(g=>g[1].length);
+/* Hai địa chỉ: quản trị (chỉ Cài đặt + Tài chính) và vận hành (mọi thứ còn lại; Cài đặt chỉ còn Quy chuẩn). Chưa cấu hình địa chỉ quản trị thì giữ như cũ. */
+const modGroups=mo=>{
+  const G=mo.groups().map(([g,items])=>[g,items.filter(i=>i[2](ME))]).filter(g=>g[1].length);
+  if(HOST_MODE==="admin")return mo.adm?G:[];
+  if(mo.adm)return [];
+  if(HOST_MODE==="ops"&&ADMIN_URL){
+    if(mo.k==="fin")return [];
+    if(mo.k==="setup")return G.map(([g,its])=>[g,its.filter(i=>i[0]==="quychuan")]).filter(g=>g[1].length);
+    return G.map(([g,its])=>[g,its.filter(i=>!OPS_HIDE.includes(i[0]))]).filter(g=>g[1].length);
+  }
+  return G};
 const visibleMods=()=>MODULES.filter(mo=>modGroups(mo).length);
 /* Thanh tab trong trang cho phân hệ dạng tab (Sản xuất có thanh riêng). */
-function modTabs(m){if(APP_MODE!=="admin")return;const mo=curMod();if(!mo)return;const all=modGroups(mo).flatMap(g=>g[1]),ph=m.querySelector(".ph"),put=el=>{const t=m.querySelector(":scope > nav.sxtabs");if(t)t.after(el);else if(ph)ph.after(el);else m.prepend(el)};
-  if(mo.tabs&&mo.k!=="sx"){const its=collapseSets(all);if(its.length>1){const nav=document.createElement("nav");nav.className="sxtabs";nav.innerHTML=its.map(([id,t,,cnt,st])=>{const n=cnt?cnt():"",on=id===PAGE||(st&&st.ids.includes(PAGE));return `<button class="${on?"on":""}" data-mt="${id}">${t}${n!==""&&n!==0?` <b class="cnt">${n}</b>`:""}</button>`}).join("");put(nav)}}
-  const st=setOf(PAGE);if(st){const ok=st.ids.filter(id=>all.some(i=>i[0]===id));if(ok.length>1){const nav=document.createElement("nav");nav.className="settabs";nav.innerHTML=ok.map(id=>`<button class="${id===PAGE?"on":""}" data-mt="${id}">${st.labels[st.ids.indexOf(id)]}</button>`).join("");put(nav)}}
-  m.querySelectorAll("[data-mt]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.mt;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)})}
+function modTabs(m){if(APP_MODE!=="admin")return;const mo=curMod();if(!mo)return;{/* Ô chọn kỳ ở thanh trên chỉ hiện ở trang có dùng nó; trang không dùng thì ẩn cho gọn. */
+    const pp=document.querySelector(".topbar .pp");
+    if(pp){const SX_PERIOD=["kho_nxt","kho_cl","kho_nhap","kho_nhap_tp","kho_pc","kho_xuat","kho_xuat_b2b","kho_hoan"];pp.style.display=mo.k==="sx"&&!SX_PERIOD.includes(PAGE)?"none":""}}const slot=document.getElementById("tbslot");if(slot)slot.innerHTML="";if(slot&&m.querySelector(".crmembed")){const p0=m.querySelector(".ph");if(p0)slot.appendChild(p0)}if(slot){const sxn=m.querySelector(":scope > nav.sxtabs");if(sxn){if(mo.k==="sx")sxn.remove();else slot.appendChild(sxn)}}if(slot&&mo.k==="sx"){const hd=m.querySelector(":scope > .sxhead"),tt=hd&&hd.firstElementChild;
+    if(tt){tt.classList.add("tbtitle","nosub");slot.appendChild(tt);const act=hd.querySelector(".sxact");if(!act||!act.children.length)hd.remove()}}const all=modGroups(mo).flatMap(g=>g[1]),ph=m.querySelector(".ph"),put=el=>{const t=m.querySelector(":scope > nav.sxtabs");if(t)t.after(el);else if(ph)ph.after(el);else m.prepend(el)};
+  if(mo.tabs&&mo.k!=="sx"){const its=collapseSets(all);if(its.length>1){const nav=document.createElement("nav");nav.className="sxtabs";nav.innerHTML=its.map(([id,t,,cnt,st])=>{const n=cnt?cnt():"",on=id===PAGE||(st&&st.ids.includes(PAGE));return `<button class="${on?"on":""}" data-mt="${id}">${t}${n!==""&&n!==0?` <b class="cnt">${n}</b>`:""}</button>`}).join("");if(slot)slot.appendChild(nav);else put(nav)}}
+  const st=setOf(PAGE);if(st&&!st.noBar){const ok=st.ids.filter(id=>all.some(i=>i[0]===id));if(ok.length>1){const nav=document.createElement("nav");nav.className="settabs";nav.innerHTML=ok.map(id=>`<button class="${id===PAGE?"on":""}" data-mt="${id}">${st.labels[st.ids.indexOf(id)]}</button>`).join("");put(nav)}}
+  if(HOST_MODE!=="admin"&&(PAGE==="bc_fb"||PAGE==="fb_sale")){
+    const mk=MODULES.find(x=>x.k==="mkt"),dgOkU=mk&&modGroups(mk).some(g=>g[1].some(i=>i[0]==="dg_tq")),bar=document.createElement("div");
+    bar.style.cssText="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:8px 0";
+    bar.innerHTML=`<button type="button" class="btn sm${PAGE==="bc_fb"?" pri":""}" data-mt="bc_fb">Doanh thu Facebook</button><button type="button" class="btn sm${PAGE==="fb_sale"?" pri":""}" data-mt="fb_sale">Hoạt động team Sale</button>${dgOkU?`<button type="button" class="btn sm" data-fbdg="1">Hoạt động team Digital</button>`:""}`;
+    put(bar);const g=bar.querySelector("[data-fbdg]");
+    if(g)g.onclick=()=>{MOD="mkt";PAGE="dg_tq";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}
+  }
+  if(slot&&!slot.children.length){const hd=m.querySelector(".ph,.xhead");if(hd)slot.appendChild(hd)}
+  const goMt=b=>b.onclick=()=>{PAGE=b.dataset.mt;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)};m.querySelectorAll("[data-mt]").forEach(goMt);document.querySelectorAll("#tbslot [data-mt]").forEach(goMt)}
 
 /* ---------- P&L (khung) ---------- */
 function pPL(m){

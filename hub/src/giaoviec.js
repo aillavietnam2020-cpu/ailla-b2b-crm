@@ -2,7 +2,7 @@
    GIAO VIỆC & LỊCH QUAY — tuần này ai viết kịch bản nào, hôm nào đi quay, ở đâu
    ===================================================================== */
 const THU=["T2","T3","T4","T5","T6","T7","CN"];
-const wd=day=>(MONTH.first+day-1)%7;
+const wd=day=>(((MONTH.first+day-1)%7)+7)%7;
 const dayLbl=day=>`${THU[wd(day)]} ${dd(day)}`;
 const DIADIEM=["Văn phòng Ailla","Nhà máy Thanh Oai","Nhà máy Cự Khê","Nhà nhân viên / ngoại cảnh","Studio thuê"];
 const TASK_LOAI=["Chuẩn bị đạo cụ, mẫu","Research","Viết caption","Thiết kế ảnh","Livestream","Khác"];
@@ -33,8 +33,8 @@ function gvTuan(B,{d,days,pend,shoots,tasks,byNg}){
     const sh=shoots.filter(s=>s.day===day),kb=pend.filter(c=>c.hanKB===day),post=d.cards.filter(c=>c.day===day&&c.step!=="xong"&&byNg(c.nguoi)),tk=tasks.filter(t=>t.han===day);
     const byCh={};post.forEach(c=>byCh[chOf(c.kenh).short]=(byCh[chOf(c.kenh).short]||0)+1);
     return `<div class="wkd${day===d.settings.today?" today":""}"><div class="wkh">${dayLbl(day)}${wd(day)===6?" · nghỉ":""}</div>
-     ${sh.map(s=>`<div class="ev ev-q" data-shoot="${s.id}"><b>🎬 Đi quay ${s.gio||""}</b><span>${esc(s.diaDiem)}</span><span>${s.nguoi.map(userName).join(", ")||"chưa có người"}</span><span>${d.cards.filter(c=>c.buoiQuay===s.id).length} video · ${esc(s.trangThai)}</span></div>`).join("")}
-     ${kb.map(c=>`<div class="ev ev-k${mine(c.nguoi)}" data-card="${c.id}"><b>✍️ Hạn kịch bản</b><span>${c.id} · ${sk(c.sku).n}</span><span>${esc(userName(c.nguoi)||"chưa giao")}</span></div>`).join("")}
+     ${sh.map(s=>`<div class="ev ev-q" data-shoot="${s.id}"><b>🎬 Đi quay ${s.gio||""}</b><span>${esc(s.diaDiem)}</span><span>${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span>${d.cards.filter(c=>c.buoiQuay===s.id).length} video · ${esc(s.trangThai)}</span></div>`).join("")}
+     ${kb.map(c=>`<div class="ev ev-k${mine(c.nguoi)}" data-card="${c.id}"><b>✍️ Hạn kịch bản</b><span>${c.id} · ${esc(sk(c.sku).n)}</span><span>${esc(userName(c.nguoi)||"chưa giao")}</span></div>`).join("")}
      ${tk.map(t=>`<div class="ev ev-t${t.st==="done"?" done":""}${mine(t.nguoi)}"><b>${t.st==="done"?"✅":"📌"} ${esc(t.ten)}</b><span>${esc(userName(t.nguoi))}</span></div>`).join("")}
      ${post.length?`<div class="ev ev-p"><b>📤 Lịch đăng</b><span>${Object.entries(byCh).map(([k,n])=>k+" "+n).join(" · ")}</span></div>`:""}
      ${!sh.length&&!kb.length&&!tk.length&&!post.length?`<div class="ev-empty">—</div>`:""}</div>`}).join("")}</div></div>
@@ -54,7 +54,7 @@ function gvKichBan(B,{d,ed,W,inW,pend}){
   $("#gk-p").onchange=e=>{GVK.pham=e.target.value;renderMain()};
   B.querySelectorAll("[data-oc]").forEach(b=>b.onclick=()=>openCard(b.dataset.oc));
   const set=(id,f,v,msg)=>DB.mutate(ME.name,msg,dt=>{const c=dt.cards.find(x=>x.id===id);c[f]=v;if(f==="nguoi"&&v&&c.step==="cg")c.step="kb"});
-  B.querySelectorAll("[data-gn]").forEach(s=>s.onchange=()=>{set(s.dataset.gn,"nguoi",s.value,`giao ${s.dataset.gn} cho ${userName(s.value)}`);toast("Đã giao");renderMain()});
+  B.querySelectorAll("[data-gn]").forEach(s=>s.onchange=()=>{set(s.dataset.gn,"nguoi",s.value,`giao ${s.dataset.gn} cho ${esc(userName(s.value))}`);toast("Đã giao");renderMain()});
   B.querySelectorAll("[data-gh]").forEach(s=>s.onchange=()=>{set(s.dataset.gh,"hanKB",+s.value||0,`đặt hạn kịch bản ${s.dataset.gh}`);toast("Đã lưu")});
   B.querySelectorAll("[data-gq]").forEach(s=>s.onchange=()=>{set(s.dataset.gq,"buoiQuay",s.value,`xếp ${s.dataset.gq} vào buổi quay`);toast("Đã lưu")});
   B.querySelectorAll("[data-gs]").forEach(x=>x.onchange=()=>{x.checked?GVK.sel.add(x.dataset.gs):GVK.sel.delete(x.dataset.gs)});
@@ -66,9 +66,9 @@ function gvQuay(B,{d,ed,W,inW,pendAll:pend,shoots:L}){
   const crew=d.users.filter(u=>u.active&&["content","lead"].includes(u.role));
   B.innerHTML=`${L.map(s=>{const cs=d.cards.filter(c=>c.buoiQuay===s.id),free=pend.filter(c=>!c.buoiQuay&&c.nguoi&&["kb","dkb","quay"].includes(c.step));return `<section class="card"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} ${esc(s.gio||"")} · ${esc(s.diaDiem)}</h2>${pill(s.trangThai,s.trangThai==="Đã quay"?"grn":s.trangThai==="Hoãn"?"red":"blu")}</div>
    ${ed?`<div class="frm row7"><label class="field">Ngày<select data-sq="${s.id}" data-f="day">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),s.day)}</select></label><label class="field">Giờ<input data-sq="${s.id}" data-f="gio" value="${esc(s.gio)}" placeholder="8:30"></label><label class="field">Địa điểm<input data-sq="${s.id}" data-f="diaDiem" value="${esc(s.diaDiem)}" list="dl-dd"></label><label class="field">Trạng thái<select data-sq="${s.id}" data-f="trangThai">${opt(["Đã lên lịch","Đã quay","Hoãn"],s.trangThai)}</select></label><label class="field grow">Chuẩn bị / ghi chú<input data-sq="${s.id}" data-f="ghiChu" value="${esc(s.ghiChu)}" placeholder="Mẫu, đạo cụ, người diễn…"></label></div>
-   <div class="phc"><b>Người đi quay:</b> ${crew.map(u=>`<label class="ck sm"><input type="checkbox" data-sn="${s.id}" value="${u.id}" ${s.nguoi.includes(u.id)?"checked":""}> ${esc(u.name)}</label>`).join("")}</div>`:`<p>Người đi quay: <b>${s.nguoi.map(userName).join(", ")||"—"}</b>${s.ghiChu?` · ${esc(s.ghiChu)}`:""}</p>`}
+   <div class="phc"><b>Người đi quay:</b> ${crew.map(u=>`<label class="ck sm"><input type="checkbox" data-sn="${s.id}" value="${u.id}" ${s.nguoi.includes(u.id)?"checked":""}> ${esc(u.name)}</label>`).join("")}</div>`:`<p>Người đi quay: <b>${esc(s.nguoi.map(userName).join(", ")||"—")}</b>${s.ghiChu?` · ${esc(s.ghiChu)}`:""}</p>`}
    <h3>Quay ${cs.length} video</h3>${tbl(["Thẻ","Sản phẩm · ý tưởng","Người làm kịch bản","Kịch bản","Ngày đăng",""],cs.map(c=>`<tr><td class="mono"><button class="lnk" data-oc="${c.id}">${c.id}</button></td><td>${swatch(c.sku)}${esc(sk(c.sku).n)}<small>${esc(c.hookText||c.yTuong||"")}</small></td><td>${esc(userName(c.nguoi))}</td><td>${stepPill(c)}</td><td>${dayLbl(c.day)}</td><td>${ed?`<button class="btn sm" data-sx="${c.id}">Bỏ ra</button>`:""}</td></tr>`))}
-   ${ed&&free.length?`<div class="frm row7"><label class="field grow">Thêm video vào buổi này<select id="sa-${s.id}">${opt(free.map(c=>[c.id,`${c.id} · ${sk(c.sku).n} · ${userName(c.nguoi)} · đăng ${dd(c.day)}`]),"")}</select></label><button class="btn" data-sa="${s.id}">Thêm</button></div>`:""}
+   ${ed&&free.length?`<div class="frm row7"><label class="field grow">Thêm video vào buổi này<select id="sa-${s.id}">${opt(free.map(c=>[c.id,`${c.id} · ${esc(sk(c.sku).n)} · ${esc(userName(c.nguoi))} · đăng ${dd(c.day)}`]),"")}</select></label><button class="btn" data-sa="${s.id}">Thêm</button></div>`:""}
    ${ed?`<div class="acts"><button class="btn sm danger" data-sd="${s.id}">Xóa buổi quay</button></div>`:""}</section>`}).join("")||`<section class="card"><p class="empty">Tuần ${W.w} chưa có buổi quay nào.</p></section>`}
   ${ed?`<section class="card"><div class="card-h"><h2>Lên lịch buổi quay mới</h2></div><form class="frm" id="sqf"><div class="row4"><label class="field">Ngày<select id="sq-d">${opt(Array.from({length:W.den-W.tu+1},(_,i)=>[W.tu+i,dayLbl(W.tu+i)]),W.tu)}</select></label><label class="field">Giờ<input id="sq-g" value="8:30"></label><label class="field grow">Địa điểm<input id="sq-dd" list="dl-dd" value="Văn phòng Ailla" required></label></div>
    <div class="phc"><b>Người đi quay:</b> ${crew.map(u=>`<label class="ck sm"><input type="checkbox" name="sq-n" value="${u.id}"> ${esc(u.name)}</label>`).join("")}</div><label class="field">Chuẩn bị / ghi chú<input id="sq-gc" placeholder="Mẫu, đạo cụ, người diễn…"></label><button class="btn pri">Thêm buổi quay</button></form></section>`:""}

@@ -86,6 +86,8 @@ export const api = {
   post: <T>(path: string, body?: unknown, idempotencyKey?: string) =>
     apiFetch<T>(path, { method: 'POST', body, idempotencyKey }),
   patch: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PATCH', body }),
+  put: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PUT', body }),
+  delete: <T>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, formData: FormData) => apiFetch<T>(path, { method: 'POST', formData }),
 };
 

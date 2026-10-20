@@ -14,6 +14,8 @@ const KINDS = [
   'win_analyze', 'win_approve', 'win_fix', 'win_child_ok', 'win_child_fix',
   // Thẻ video ở Marketing: dựng one shot / chèn chữ / sửa video có sẵn / giọng đọc; duyệt, góp ý sửa, duyệt kịch bản
   'card_build', 'card_ok', 'card_fix', 'card_redo', 'card_script_ok', 'card_script_fix', 'card_script_edit', 'card_notify',
+  // Công xưởng SX video: nhân sự tự đặt order bằng tay, tách hẳn khỏi luồng thẻ video
+  'xuong_build', 'xuong_ok', 'xuong_fix', 'xuong_redo', 'xuong_script_ok', 'xuong_script_fix', 'xuong_script_edit',
   // Buổi quay xong: quét thư mục cảnh vào kho cảnh của Worker (như lệnh /quet trên Telegram)
   'card_scan',
   // Xuất hook / kịch bản ra Excel hoặc Word, Worker lưu vào Google Drive của công ty và trả link
@@ -47,11 +49,18 @@ hubWorkerRoutes.use('*', requirePermission('hub.access'));
 
 hubWorkerRoutes.get('/', async (c) => {
   // ?kind=card: việc của thẻ video Marketing; mặc định: việc video win (Hypit) như cũ.
+  // ?kind=xuong: order của trang Công xưởng SX video.
   const card = c.req.query('kind') === 'card';
+  const xuong = c.req.query('kind') === 'xuong';
+  const fp = c.req.query('kind') === 'fp';
   const rows = await c.env.DB.prepare(
-    card
+    fp
+      ? "SELECT * FROM worker_tasks WHERE substr(kind,1,3) = 'fp_' ORDER BY created_at DESC LIMIT 500"
+      : xuong
+      ? "SELECT * FROM worker_tasks WHERE kind LIKE 'xuong%' ORDER BY created_at DESC LIMIT 500"
+      : card
       ? "SELECT * FROM worker_tasks WHERE kind LIKE 'card%' ORDER BY created_at DESC LIMIT 500"
-      : "SELECT * FROM worker_tasks WHERE kind NOT LIKE 'card%' ORDER BY created_at DESC LIMIT 200",
+      : "SELECT * FROM worker_tasks WHERE kind NOT LIKE 'card%' AND kind NOT LIKE 'xuong%' AND substr(kind,1,3) <> 'fp_' ORDER BY created_at DESC LIMIT 200",
   ).all<TaskRow>();
   return ok(c, (rows.results ?? []).map(view));
 });
@@ -117,7 +126,7 @@ workerRoutes.use('*', async (c, next) => {
 /** Lấy việc mới; đánh dấu đã nhận để không ai lấy trùng. */
 workerRoutes.post('/pull', async (c) => {
   const rows = await c.env.DB.prepare(
-    "SELECT * FROM worker_tasks WHERE status = 'queued' ORDER BY created_at LIMIT 10",
+    "SELECT * FROM worker_tasks WHERE status = 'queued' AND substr(kind,1,3) <> 'fp_' ORDER BY created_at LIMIT 10",
   ).all<TaskRow>();
   const list = rows.results ?? [];
   const now = nowIso();
@@ -173,5 +182,42 @@ workerRoutes.post('/preview-url', async (c) => {
   )
     .bind(url, nowIso())
     .run();
+  return ok(c, { ok: true });
+});
+
+/* ---------- Agent Fanpage (OpenClaw trên VPS) gọi: khoá riêng FP_KEY, chỉ thấy việc fp_* ---------- */
+export const fpAgentRoutes = new Hono<AppEnv>();
+fpAgentRoutes.use('*', async (c, next) => {
+  const key = c.req.header('X-Fp-Key') ?? '';
+  const expected = c.env.FP_KEY ?? '';
+  if (!expected || key.length !== expected.length) throw unauthorized('Sai khoá');
+  let diff = 0;
+  for (let i = 0; i < key.length; i++) diff |= key.charCodeAt(i) ^ expected.charCodeAt(i);
+  if (diff !== 0) throw unauthorized('Sai khoá');
+  await next();
+});
+fpAgentRoutes.post('/pull', async (c) => {
+  const rows = await c.env.DB.prepare(
+    "SELECT * FROM worker_tasks WHERE status = 'queued' AND substr(kind,1,3) = 'fp_' ORDER BY created_at LIMIT 5",
+  ).all<TaskRow>();
+  const list = rows.results ?? [];
+  const now = nowIso();
+  for (const r of list) {
+    await c.env.DB.prepare("UPDATE worker_tasks SET status = 'taken', updated_at = ? WHERE id = ? AND status = 'queued'").bind(now, r.id).run();
+  }
+  return ok(c, list.map(view));
+});
+fpAgentRoutes.post('/push', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { id?: string; status?: string; progress?: number; detail?: string; result?: unknown };
+  if (!body.id) throw badRequest('NO_ID', 'Thiếu mã việc');
+  if (body.status && !(STATUSES as readonly string[]).includes(body.status)) throw badRequest('BAD_STATUS', 'Trạng thái lạ');
+  const row = await c.env.DB.prepare("SELECT id FROM worker_tasks WHERE id = ? AND substr(kind,1,3) = 'fp_'").bind(body.id).first();
+  if (!row) throw notFound('Không có việc này');
+  const result = body.result === undefined ? null : JSON.stringify(body.result);
+  if (result && result.length > 900_000) throw badRequest('TOO_LARGE', 'Kết quả quá lớn');
+  await c.env.DB.prepare(
+    `UPDATE worker_tasks SET status = COALESCE(?, status), progress = COALESCE(?, progress), detail = COALESCE(?, detail),
+       result = COALESCE(?, result), updated_at = ? WHERE id = ?`,
+  ).bind(body.status ?? null, Number.isFinite(body.progress) ? Math.round(Number(body.progress)) : null, body.detail ? String(body.detail).slice(0, 1000) : null, result, nowIso(), body.id).run();
   return ok(c, { ok: true });
 });

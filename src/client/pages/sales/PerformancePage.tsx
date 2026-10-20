@@ -1,3 +1,4 @@
+import { hubPeriodParam } from '../../lib/hubPeriod';
 import type { SalesPerformance } from '@shared/types';
 import { STAGE_LABELS } from '@shared/enums';
 import { formatVnd } from '@shared/money';
@@ -5,7 +6,9 @@ import { useApi } from '../../lib/hooks';
 import { Card, Kpi } from '../../components/ui';
 
 export function PerformancePage() {
-  const perf = useApi<SalesPerformance>('/api/dashboards/me');
+  const perf = useApi<SalesPerformance>(
+    `/api/dashboards/me?month=${hubPeriodParam()}`,
+  );
   const data = perf.data;
   const maxStage = Math.max(1, ...(data?.by_stage ?? []).map((s) => s.count));
 
@@ -14,7 +17,10 @@ export function PerformancePage() {
       <div className="page-head">
         <div>
           <h2>Kết quả cá nhân</h2>
-          <p>Đánh giá dựa trên hành động chăm sóc và kết quả bán hàng thực tế trong phạm vi khách của bạn.</p>
+          <p>
+            Đánh giá dựa trên hành động chăm sóc và kết quả bán hàng thực tế trong phạm vi khách của
+            bạn.
+          </p>
         </div>
       </div>
 
@@ -25,8 +31,16 @@ export function PerformancePage() {
           value={data ? `${data.order_rate}%` : '—'}
           hint={data ? `${data.customers_with_orders} khách đã nhập hàng` : ''}
         />
-        <Kpi label="Doanh số tháng" value={formatVnd(data?.revenue_month ?? 0)} hint="Đơn đã duyệt" />
-        <Kpi label="Doanh số luỹ kế" value={formatVnd(data?.revenue_total ?? 0)} hint="Toàn bộ đơn đã duyệt" />
+        <Kpi
+          label="Doanh số tháng"
+          value={formatVnd(data?.revenue_month ?? 0)}
+          hint="Đơn đã duyệt"
+        />
+        <Kpi
+          label="Doanh số luỹ kế"
+          value={formatVnd(data?.revenue_total ?? 0)}
+          hint="Toàn bộ đơn đã duyệt"
+        />
       </div>
 
       <div className="grid-2">
@@ -61,8 +75,8 @@ export function PerformancePage() {
             </strong>
           </div>
           <p className="muted" style={{ marginTop: 14 }}>
-            Không để lịch quá hạn: mỗi khách còn mở đều phải có ngày chăm sóc tiếp. Ưu tiên nhóm đã đủ điều kiện và
-            có cửa hàng để tăng tỷ lệ đơn nhập đầu.
+            Không để lịch quá hạn: mỗi khách còn mở đều phải có ngày chăm sóc tiếp. Ưu tiên nhóm đã
+            đủ điều kiện và có cửa hàng để tăng tỷ lệ đơn nhập đầu.
           </p>
         </Card>
       </div>

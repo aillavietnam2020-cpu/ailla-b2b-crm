@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { hubPeriodLabel, hubPeriodParam } from '../../lib/hubPeriod';
 import { formatCompactVnd, formatVnd } from '@shared/money';
-import { vnDate } from '@shared/datetime';
 import { STAGE_LABELS, type CustomerStage } from '@shared/enums';
 import { useApi } from '../../lib/hooks';
 import { Card, PageHead, StateBlock } from '../../components/ui';
@@ -46,7 +45,8 @@ interface SalesDashboardData {
  * A tổng quan kỳ · B KPI từng sale · C nhóm sản phẩm bán chạy · D phễu khách hàng.
  */
 export function ReportsPage() {
-  const [period, setPeriod] = useState(vnDate().slice(0, 7));
+  // Tháng theo bộ chọn thời gian trên cùng của Trang quản trị (không còn ô chọn tháng riêng).
+  const period = hubPeriodParam();
   const report = useApi<SalesDashboardData>(`/api/dashboards/sales?period=${period}`);
   const data = report.data;
 
@@ -55,14 +55,6 @@ export function ReportsPage() {
       <PageHead
         title="Dashboard kinh doanh"
         subtitle="Doanh thu đã trừ chiết khấu, không tính phí vận chuyển; chỉ tính đơn đã duyệt."
-        actions={
-          <input
-            type="month"
-            className="select"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-          />
-        }
       />
 
       <StateBlock loading={report.loading} error={report.error}>
@@ -138,14 +130,23 @@ export function ReportsPage() {
                 )}
               </Card>
 
-              <Card title="Cơ cấu doanh thu theo nhóm sản phẩm">
-                <DonutChart
-                  centerLabel="doanh thu luỹ kế"
-                  format={formatCompactVnd}
-                  slices={data.by_product_group
-                    .slice(0, 8)
-                    .map((g) => ({ label: g.group_name, value: g.revenue_total }))}
-                />
+              <Card title={`Cơ cấu doanh thu ${hubPeriodLabel()} theo nhóm sản phẩm`}>
+                {data.by_product_group.every((g) => !g.revenue) ? (
+                  <div className="empty">Kỳ này chưa có doanh thu.</div>
+                ) : (
+                  <DonutChart
+                    centerLabel="doanh thu trong kỳ"
+                    format={formatCompactVnd}
+                    slices={data.by_product_group
+                      .filter((g) => g.revenue > 0)
+                      .sort((x, y) => y.revenue - x.revenue)
+                      .slice(0, 8)
+                      .map((g) => ({
+                        label: `${g.group_name} · ${formatCompactVnd(g.revenue)}`,
+                        value: g.revenue,
+                      }))}
+                  />
+                )}
               </Card>
             </div>
 

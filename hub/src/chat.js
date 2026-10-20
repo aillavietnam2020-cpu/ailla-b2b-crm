@@ -24,7 +24,7 @@ const myNotifs=()=>(D()&&D().notifs||[]).filter(n=>ME&&n.to===ME.id).slice().rev
 const myUnread=()=>myNotifs().filter(n=>!n.read).length;
 const approvers=()=>{const r=D().users.filter(u=>u.active&&(u.perms||[]).includes("viec.duyet")&&u.role==="lead").map(u=>u.id);return r.length?r:D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id)};
 const admins=()=>D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id);
-const cardLbl=c=>{const t=D().tuyen.find(x=>x.ma===c.maTuyen);return `${sk(c.sku).n}${t?" · "+t.tuyen:""} (${c.id})`};
+const cardLbl=c=>{const t=D().tuyen.find(x=>x.ma===c.maTuyen);return `${esc(sk(c.sku).n)}${t?" · "+t.tuyen:""} (${c.id})`};
 /* Sự kiện của thẻ video → báo đúng người */
 const _mvNt=moveCard;
 moveCard=function(u,id,to,inp){const c=D().cards.find(x=>x.id===id),from=c&&c.step,e=_mvNt(u,id,to,inp);
@@ -41,7 +41,7 @@ const _sbNt=sendBack;
 sendBack=function(u,id,note){const c=D().cards.find(x=>x.id===id);const r=_sbNt(u,id,note);if(c)DB.mutate(u.name,"thông báo trả về "+id,dt=>notifyU(dt,[c.nguoiEdit,c.nguoiKB,c.nguoi,c.giao],`${u.name} trả về sửa: ${note||"cần sửa"} · ${cardLbl(c)}`,id));return r};
 const _wpaNt=wpAssign;
 wpAssign=function(sku,kenh,t,u,n,w,bd,hn,note){if(t==="ton"){const ow=chanOwner(kenh);if(ow&&pvAvailUid(ow,hn||defHan(D(),null,t)))u=ow}const before=new Set(D().cards.map(c=>c.id)),r=_wpaNt(sku,kenh,t,u,n,w,bd,hn,note);const nw=D().cards.filter(c=>!before.has(c.id));const lb=(MIX.find(z=>z[0]===t)||[])[1]||"";
-  DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[u],`${ME.name} giao bạn ${n} video ${lb} · ${sk(sku).n} · ${chOf(kenh).short}${hn?" · hạn "+dd(hn):""}${note&&note.trim()?" · Note: "+note.trim():""}`,nw[0]?nw[0].id:""));return r};
+  DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[u],`${ME.name} giao bạn ${n} video ${lb} · ${esc(sk(sku).n)} · ${chOf(kenh).short}${hn?" · hạn "+dd(hn):""}${note&&note.trim()?" · Note: "+note.trim():""}`,nw[0]?nw[0].id:""));return r};
 const _xvaNt=xvAssign;
 xvAssign=function(ids,to,kind){_xvaNt(ids,to,kind);DB.mutate(ME.name,"thông báo giao việc",dt=>notifyU(dt,[to],`${ME.name} giao bạn ${ids.length} việc ${kind}`,ids[0]))};
 

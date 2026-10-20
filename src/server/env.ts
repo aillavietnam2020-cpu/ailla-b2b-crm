@@ -16,6 +16,10 @@ export interface Env {
   AI_MODEL?: string;
   /** Khoá riêng cho Worker dựng video (máy văn phòng) gọi /api/worker/*. Đặt bằng `wrangler secret put`. */
   WORKER_KEY?: string;
+  /** Khoá riêng cho cầu nối trên VPS (nhắn agent ngay trên web) gọi /api/agent-relay. Đặt bằng `wrangler secret put`. */
+  AGENT_RELAY_KEY?: string;
+  /** Khoá riêng cho agent Fanpage (OpenClaw trên VPS) gọi /api/fp/*, chỉ thấy việc fp_*. */
+  FP_KEY?: string;
   /** Tự cập nhật danh sách email được vào qt.ailla.vn (Cloudflare Access). CF_ACCESS_TOKEN là secret. */
   CF_ACCOUNT_ID?: string;
   ACCESS_APP_ID?: string;
@@ -25,6 +29,9 @@ export interface Env {
   BACKUP_KEY?: string;
   /** Khoá VPS đẩy số liệu (file báo cáo Digital) lên /api/ingest. */
   INGEST_KEY?: string;
+  /** Địa chỉ trang vận hành (qt.ailla.vn) và trang quản trị (quantri.ailla.vn). Trống thì không tách. */
+  OPS_HOST?: string;
+  ADMIN_HOST?: string;
 }
 
 export interface AuthUser {
@@ -42,6 +49,8 @@ export interface AuthContext {
   scope: DataScope;
   /** Quyền theo vai trò + quyền cấp thêm cho riêng tài khoản (ví dụ gói Kế toán). */
   permissions: string[];
+  /** USER = người dùng; AGENT = AI agent vào bằng khóa riêng. */
+  actorType?: 'USER' | 'AGENT';
 }
 
 export interface AppVariables {

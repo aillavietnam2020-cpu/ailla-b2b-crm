@@ -19,6 +19,8 @@ const depOfName=n=>{const d=D(),u=d.users.find(x=>x.name===n);return u?depOfUser
 function itemDept(x){return x.src==="card"?"Marketing":x.src==="order"?"Marketing · Digital":(depOfUser(x.nguoi)||TEAMS[x.team]||"Chung")}
 
 /* ---------- việc chị cần xử lý: chỉ ngoại lệ ---------- */
+/* Chỉ CEO (tài khoản vai trò CEO) thấy toàn bộ; người khác chỉ thấy việc của mình */
+const execFull=()=>{try{return typeof SV!=="undefined"&&SV&&SV.me?SV.me.role==="CEO":ME.role==="admin"}catch(e){return ME.role==="admin"}};
 function execAttention(){
   const d=D(),today=d.settings.today,out=[],I=typeof cvItems==="function"?cvGroup(cvItems()):[];
   (XB.ap||[]).slice(0,4).forEach(a=>out.push({w:9,t:`Duyệt đơn B2B ${a.entity_label||""}${a.customer_name?" · "+a.customer_name:""}`,dep:"Kinh doanh B2B",who:a.requester_name||"",han:"Chờ duyệt",st:["Chờ duyệt","amb"],btn:"Duyệt",href:a.entity_id?"/admin/orders/"+a.entity_id:"/admin/orders"}));
@@ -30,7 +32,9 @@ function execAttention(){
   if(typeof SX==="function"&&SX()){const ck=SX().batches.filter(b=>b.st==="CHO_KIEM").length;if(ck)out.push({w:6,t:`${ck} lô chờ kế toán kiểm`,dep:"Sản xuất & kho",who:"Kế toán",han:"Hôm nay",st:["Chờ kiểm","amb"],btn:"Xem",go:"sx_lo"})}
   execAlerts().filter(a=>a[0]==="red"&&!/thẻ video trễ/.test(a[1])).forEach(a=>out.push({w:7,t:a[1],dep:a[2].split(" · ")[0],who:"",han:"—",st:["Cảnh báo","red"],btn:"Xem",go:a[3]}));
   I.filter(x=>!x.late&&x.st!=="done"&&x.han>=today&&x.han<=today+1&&x.uu==="Cao").slice(0,2).forEach(x=>out.push({w:5,t:x.ten,dep:itemDept(x),who:userName(x.nguoi)||"Chưa giao",han:x.han===today?"Hôm nay":"Ngày mai",st:["Sắp đến hạn","blu"],btn:"Xem",open:x}));
-  return out.sort((a,b)=>b.w-a.w);
+  /* Người không phải CEO chỉ thấy việc của chính mình, không thấy duyệt, cảnh báo, đề xuất AI của các phòng khác */
+  const mine=out.filter(a=>execFull()||(a.open&&(a.open.nguoi===ME.id||(a.open.phoi||[]).includes(ME.id))));
+  return mine.sort((a,b)=>b.w-a.w);
 }
 
 /* =========================== TỔNG QUAN CÔNG TY =========================== */
@@ -78,8 +82,8 @@ function pExec(m){
    <section class="card flush"><div class="card-h pad"><h2>Hiệu quả kinh doanh theo kênh</h2><span class="hint">lãi đóng góp chưa trừ lương, kho, chi phí chung · <button class="lnk" id="tg-ed">Sửa mục tiêu</button></span></div>
     <div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Doanh thu</th><th class="n">Đơn</th><th class="n">Chi phí</th><th class="n">Lãi</th><th class="n">% MT</th><th class="n">Kỳ trước</th><th>Xu hướng</th></tr></thead><tbody>${CH.map(chRow).join("")}${b2bRow}
     <tr class="tot"><td>Tổng B2C</td><td class="n">${tr(N.tong)}</td><td class="n">${oTot?nf(oTot):"—"}</td><td class="n">${tr(cTot)}</td><td class="n">${lr.length?tr(lTot):"—"}</td><td class="n">${tg?Math.round(N.tong/tg*100)+"%":"—"}</td><td class="n">${ok?xChg(N.tong,P.tong):"—"}</td><td></td></tr></tbody></table></div></section>
-   <section class="card flush xatt"><div class="card-h pad"><h2>Việc cần chị xử lý <span class="hint">${AT.length}</span></h2><button class="lnk" data-go="cv_nv">Tất cả việc →</button></div>
-    ${AT.length?`<div class="xattl">${AT.slice(0,6).map((a,i)=>`<div class="xai"><i class="sdot s-${a.st[1]}"></i><div class="xat"><b>${esc(a.t)}</b><small>${esc(a.dep||"")}${a.who?" · "+esc(a.who):""} · <span class="${a.late?"t-red":""}">${esc(a.han)}</span></small></div>${pill(a.st[0],a.st[1])}<button class="btn sm${a.btn==="Duyệt"?" pri":""}" data-xai="${i}">${a.btn}</button></div>`).join("")}</div>`:`<p class="empty pad">Không có việc nào cần chị xử lý.</p>`}</section>
+   <section class="card flush xatt"><div class="card-h pad"><h2>${execFull()?"Việc cần chị xử lý":"Việc của tôi cần xử lý"} <span class="hint">${AT.length}</span></h2><button class="lnk" data-go="cv_nv">Tất cả việc →</button></div>
+    ${AT.length?`<div class="xattl">${AT.slice(0,6).map((a,i)=>`<div class="xai"><i class="sdot s-${a.st[1]}"></i><div class="xat"><b>${esc(a.t)}</b><small>${esc(a.dep||"")}${a.who?" · "+esc(a.who):""} · <span class="${a.late?"t-red":""}">${esc(a.han)}</span></small></div>${pill(a.st[0],a.st[1])}<button class="btn sm${a.btn==="Duyệt"?" pri":""}" data-xai="${i}">${a.btn}</button></div>`).join("")}</div>`:`<p class="empty pad">${execFull()?"Không có việc nào cần chị xử lý.":"Bạn không có việc nào cần xử lý."}</p>`}</section>
   </div>
   <div class="xrow3">${blocks.join("")}</div>
   <section class="card flush" id="xal"><div class="card-h pad"><h2>Hoạt động mới nhất</h2><span class="hint">${AL.length?`${AL.length} cảnh báo vận hành ở danh sách bên trên`:""}</span></div>

@@ -1,0 +1,108 @@
+/* ===== Giao diện điện thoại (≤ 760px) — nạp CUỐI CÙNG, chỉ chỉnh cho màn nhỏ, không đụng bản máy tính ===== */
+@media (max-width:760px){
+  html{-webkit-text-size-adjust:100%}
+  body{overflow-x:hidden}
+  html,body{max-width:100%}
+  .mainwrap,.mainwrap>main{min-width:0;max-width:100vw;overflow-x:clip}
+  .crmembed{max-width:100%;overflow:hidden}
+  .crmembed iframe{max-width:100%}
+  /* ô nhập 16px để điện thoại không tự phóng to khi chạm vào */
+  input,select,textarea{font-size:16px!important}
+  button,.btn,.mi,.top{touch-action:manipulation}
+
+  /* ---- thanh trên: 1 hàng gọn, ô chọn kỳ xuống hàng dưới ---- */
+  .topbar{flex-wrap:wrap;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px}
+  .hamb{width:42px;height:42px;border-radius:12px;flex:none}
+  .topbar .srch{flex:0 0 42px;width:42px;height:42px;padding:0;justify-content:center;border-radius:12px;overflow:hidden}
+  .topbar .srch input{position:absolute;inset:0;width:100%;padding:0 12px 0 40px;opacity:0}
+  .topbar .srch:focus-within{position:absolute;left:12px;right:12px;top:calc(8px + env(safe-area-inset-top));width:auto;height:42px;z-index:60;background:#fff;box-shadow:0 8px 24px rgba(16,24,40,.18);overflow:visible}
+  .topbar .srch:focus-within input{opacity:1}
+  .topbar .sp{flex:1}
+  .topbar .pp{order:9;flex:1 1 100%}
+  .topbar .ppb{width:100%;justify-content:space-between}
+  .topbar .svsync{display:none}
+  .chatbtn,.bell{width:42px;height:42px}
+  .uchip i{width:38px;height:38px}
+  .umenu{top:60px;right:8px}
+
+  /* nút trợ lý AI nổi: không che nội dung, nằm góc phải dưới */
+  .topbar .aibtn{display:none}
+  .menu-open .ntpop,.menu-open #aibtn{display:none!important}
+  .aibtn{right:12px;bottom:calc(14px + env(safe-area-inset-bottom));padding:12px 14px}
+  .xk,.kcell,.kpi{min-width:0;overflow:hidden}.xk *,.kcell *,.kpi *{overflow-wrap:anywhere}
+
+  main{padding:12px 12px calc(84px + env(safe-area-inset-bottom))}
+  .ph{flex-wrap:wrap;gap:8px}
+  .ph h1{font-size:20px;line-height:1.25}
+  .card{border-radius:14px}
+  .card,.cardp{padding-left:14px;padding-right:14px}
+
+  /* lưới nhiều cột → 1–2 cột */
+  .xkpis,.kpis,.kstrip,.xkstrip,.fk7,.prodrow,.sxcols,.trs,.flow5,.scs,.plrow,.nv-top{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .xrow3,.xrow2,.xmain,.xbot,.xgrid,.xgrid3,.cols2,.cols3,.cols4,.eb2,.eb3,.crm2,.order-head,.dpmain,.aigrid,.sxgrid2,.sxgrid3,.sxlot,.nv-3,.nv-2,.pb,.cvgrid,.prjgrid,.prjs,.xv2,.xr2,.edcols,.gyed,.pti,.hkadd,.calm{grid-template-columns:minmax(0,1fr)!important}
+  .dpstrip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .dps{border-left:0!important;border-top:1px solid var(--line)}
+  .xkstrip .xk{border-left:0!important}
+
+  /* thanh lọc/công cụ: cho xuống dòng, ô to bấm được */
+  .xfbar,.dpbulk,.inlrow,.row,.frow,.tools,.bar{flex-wrap:wrap}
+  .srchin,.dpbulk select{min-width:0;width:100%}
+  select,input:not([type=checkbox]):not([type=radio]),textarea{min-height:42px}
+  .btn,button.sm,.chip{min-height:38px}
+
+  /* thanh tab ngang: vuốt được, không xuống dòng */
+  .kstab,.dptab,.dgtab,.nv-tabs,.tabs,.stabs{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .settabs,.modtabs{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;margin-left:-12px;margin-right:-12px;padding:2px 12px}.settabs button,.modtabs button,.sxtabs button{flex:none;white-space:nowrap;min-height:40px}
+  .ph p{font-size:13.5px;line-height:1.45}
+  /* thông báo nổi: gọn, nằm trên nút Hỏi AI, không che trang */
+  .ntpop{left:10px!important;right:10px!important;top:auto!important;bottom:calc(72px + env(safe-area-inset-bottom))!important;width:auto!important;max-width:none!important}
+  .ntpc{padding:8px 30px 8px 12px;font-size:13.5px}
+  .kstab>*,.dptab>*,.dgtab>*,.nv-tabs>*,.tabs>*,.stabs>*{flex:none}
+
+  /* bảng rộng: cuộn ngang trong khung, không làm vỡ cả trang */
+  .tbl,.tbl.sheet,.tbl.edit,.pbt,.tblwrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;max-height:none}
+  .card>table,.card>div>table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl td,.tbl th{padding:10px 10px}
+
+  /* khung chi tiết trượt bên phải → tràn toàn màn hình */
+  .drawer .in{width:100vw!important;max-width:100vw!important;border-radius:0}
+  .toast{left:12px!important;right:12px!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;max-width:none}
+  .ppm{position:fixed;left:8px!important;right:8px!important;top:auto;bottom:8px;max-height:80vh;overflow:auto;border-radius:16px}
+  #hm-link{right:auto!important;left:12px!important;bottom:calc(14px + env(safe-area-inset-bottom))!important;min-height:44px;display:inline-flex;align-items:center}
+  .crmembed{height:calc(100vh - 150px);min-height:480px}
+  .umenu,.qsr{max-width:calc(100vw - 16px)}
+
+  /* thanh điều hướng dưới đáy kiểu ứng dụng */
+  #mobtab{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  #mobtab button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;color:#667085;font:inherit;font-size:11px;font-weight:600;min-height:48px;padding:0}
+  #mobtab button.on{color:#e7357b}
+  #mobtab button.big svg{width:42px;height:42px;padding:10px;border-radius:50%;background:#e7357b;color:#fff;margin-top:-18px;box-shadow:0 4px 12px rgba(231,53,123,.35)}
+  #mobtab button.big span{margin-top:-2px}
+  .has-mobtab main{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+  .has-mobtab .hamb{display:none}
+  .has-mobtab .aibtn,.has-mobtab #hm-link{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+  .has-mobtab .ntpop{bottom:calc(132px + env(safe-area-inset-bottom))!important}
+  .has-mobtab .crmembed{height:calc(100vh - 215px)}
+  .menu-open #mobtab{display:none}
+
+  /* ---- kiểu ứng dụng: bo tròn nhiều, đầu trang mềm, nút "+" nổi giữa thanh đáy ---- */
+  .topbar{background:linear-gradient(180deg,#cfe0ff 0%,rgba(232,239,255,.92) 100%)!important;border-bottom:0;padding-bottom:12px}
+  .topbar .hamb,.topbar .srch,.chatbtn,.bell{border-radius:999px;border-color:transparent;background:rgba(255,255,255,.9)}
+  .topbar .uchip i{box-shadow:0 0 0 3px rgba(255,255,255,.9)}
+  .topbar .ppb{border-radius:999px;border-color:transparent;background:rgba(255,255,255,.9)}
+  .card,.cardp,.xk,.kpi{border-radius:22px}
+  .btn,button.btn{border-radius:14px}
+  input:not([type=checkbox]):not([type=radio]),select,textarea{border-radius:14px}
+  .tbl{border-radius:18px}
+  #mobtab{border-radius:26px 26px 0 0;box-shadow:0 -6px 24px rgba(16,24,40,.08);border-top:0;padding-top:8px}
+  #mobtab button.big{flex:0 0 66px;position:relative}
+  #mobtab button.big svg{position:absolute;left:50%;top:-30px;transform:translateX(-50%);width:56px;height:56px;margin:0;padding:15px;border:4px solid #fff;background:#3b6df0;box-shadow:0 8px 18px rgba(59,109,240,.4)}
+  #mobtab button.big span{display:none}
+  #mobtab button.on{color:#3b6df0}
+  /* hàng nút tròn thao tác nhanh */
+  #moqa{display:flex;justify-content:space-around;gap:4px;background:#fff;border-radius:24px;padding:14px 4px 10px;margin:0 0 14px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+  #moqa button{flex:1;min-width:0;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:6px;font:inherit;font-size:11.5px;font-weight:600;color:#344054;padding:0}
+  #moqa button i{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#e8efff;color:#3b6df0}
+  #moqa button span{text-align:center;line-height:1.2}
+  .xk .xkh,.xk h3,.xk .t{white-space:normal}
+}

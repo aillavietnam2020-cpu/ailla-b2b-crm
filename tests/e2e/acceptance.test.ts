@@ -464,3 +464,96 @@ describe('Rollback batch import', () => {
     expect(batch?.status).toBe('ROLLED_BACK');
   });
 });
+
+describe('AC-13 · Nhập lại để đồng bộ đơn cũ theo Sheet', () => {
+  it('đơn lệch trên web được kéo về đúng Sheet (kể cả đơn đã sửa); đơn thử không có trong Sheet bị ẩn', async () => {
+    const first = buildWorkbookBytes();
+    const p1 = await ctx.request('/api/imports/preview', { as: USERS.manager, formData: workbookForm(first) });
+    await commitAllPhases(first, p1.body.data.batch_id);
+
+    const rows = await ctx.db
+      .prepare('SELECT id, total_amount FROM orders WHERE legacy_order_code IS NOT NULL ORDER BY order_no LIMIT 2')
+      .all<{ id: string; total_amount: number }>();
+    const [drifted, edited] = rows.results ?? [];
+    await ctx.db.prepare('UPDATE orders SET total_amount = total_amount + 777, subtotal = subtotal + 777 WHERE id = ?').bind(drifted.id).run();
+    await ctx.db.prepare('UPDATE orders SET total_amount = total_amount + 555, subtotal = subtotal + 555 WHERE id = ?').bind(edited.id).run();
+    await ctx.db
+      .prepare(
+        `INSERT INTO order_revisions (id, order_id, revision_no, reason, before_json, after_json, created_at)
+         VALUES ('rev-test-1', ?, 1, 'sửa tay', '{}', '{}', '2026-10-01T00:00:00Z')`,
+      )
+      .bind(edited.id)
+      .run();
+
+    // File khác nội dung (khác checksum) nhưng cùng đơn: ép chạy lại bước đơn hàng.
+    const second = buildWorkbookBytes({ breakReconciliation: true });
+    const p2 = await ctx.request('/api/imports/preview', { as: USERS.manager, formData: workbookForm(second) });
+    await commitAllPhases(second, p2.body.data.batch_id);
+
+    const after = await ctx.db
+      .prepare('SELECT id, total_amount FROM orders WHERE id IN (?, ?)')
+      .bind(drifted.id, edited.id)
+      .all<{ id: string; total_amount: number }>();
+    const byId = new Map((after.results ?? []).map((r) => [r.id, r.total_amount]));
+    expect(byId.get(drifted.id)).toBe(drifted.total_amount); // kéo về đúng Sheet
+    expect(byId.get(edited.id)).toBe(edited.total_amount); // Sheet là chuẩn: đơn đã sửa trên web cũng kéo về Sheet
+
+    const orders = await ctx.db.prepare('SELECT COUNT(*) AS n FROM orders').first<{ n: number }>();
+    expect(orders?.n).toBe(35); // không nhân đôi đơn
+  });
+});
+
+describe('AC-14 · Dọn dữ liệu web theo Sheet', () => {
+  it('đơn tạo thử trên web không có trong Sheet bị ẩn; nhập lại không nhân đôi nhật ký chăm sóc', async () => {
+    const bytes = buildWorkbookBytes();
+    const p1 = await ctx.request('/api/imports/preview', { as: USERS.manager, formData: workbookForm(bytes) });
+    await commitAllPhases(bytes, p1.body.data.batch_id);
+    const cust = await ctx.db.prepare('SELECT id FROM customers LIMIT 1').first<{ id: string }>();
+    await ctx.db
+      .prepare(
+        `INSERT INTO orders (id, order_no, customer_id, order_date, subtotal, total_amount, approval_status,
+           delivery_status, payment_status, accounting_status, created_at, updated_at)
+         VALUES ('demo-1', 'DH-DEMO-1', ?, '2026-10-01', 100, 100, 'DRAFT', 'CHUA_XUAT', 'CHUA_THU',
+           'CHUA_XAC_NHAN', '2026-10-01T00:00:00Z', '2026-10-01T00:00:00Z')`,
+      )
+      .bind(cust!.id)
+      .run();
+    const acts1 = await ctx.db.prepare('SELECT COUNT(*) AS n FROM customer_activities').first<{ n: number }>();
+
+    const second = buildWorkbookBytes({ breakReconciliation: true });
+    const p2 = await ctx.request('/api/imports/preview', { as: USERS.manager, formData: workbookForm(second) });
+    await commitAllPhases(second, p2.body.data.batch_id);
+
+    const demo = await ctx.db.prepare("SELECT deleted_at FROM orders WHERE id = 'demo-1'").first<{ deleted_at: string | null }>();
+    expect(demo?.deleted_at).not.toBeNull();
+    const live = await ctx.db.prepare('SELECT COUNT(*) AS n FROM orders WHERE deleted_at IS NULL').first<{ n: number }>();
+    expect(live?.n).toBe(35);
+    const acts2 = await ctx.db.prepare('SELECT COUNT(*) AS n FROM customer_activities').first<{ n: number }>();
+    expect(acts2?.n).toBe(acts1?.n);
+  });
+});
+
+describe('Tìm kiếm đơn hàng', () => {
+  it('tìm theo tên khách, mã sản phẩm hoặc nhiều từ cùng lúc', async () => {
+    await seedBusinessData(ctx.db);
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', items: [{ product_id: 'prod-full', qty: 2 }] },
+    });
+    expect(created.status).toBe(201);
+    const no = created.body.data.order_no as string;
+    const all = await ctx.request('/api/orders', { as: USERS.thao });
+    const cust = all.body.data.find((o: { order_no: string }) => o.order_no === no).customer_name as string;
+
+    const byNo = await ctx.request(`/api/orders?q=${encodeURIComponent(no)}`, { as: USERS.thao });
+    expect(byNo.body.data.map((o: { order_no: string }) => o.order_no)).toContain(no);
+    const byCust = await ctx.request(`/api/orders?q=${encodeURIComponent(cust.split(' ')[0])}`, { as: USERS.thao });
+    expect(byCust.body.data.map((o: { order_no: string }) => o.order_no)).toContain(no);
+    const bySku = await ctx.request('/api/orders?q=TEST-FULL', { as: USERS.thao });
+    expect(bySku.body.data.map((o: { order_no: string }) => o.order_no)).toContain(no);
+    const none = await ctx.request('/api/orders?q=khong-co-don-nay-xyz', { as: USERS.thao });
+    expect(none.body.data).toHaveLength(0);
+    const both = await ctx.request(`/api/orders?q=${encodeURIComponent(`${no} TEST-FULL`)}`, { as: USERS.thao });
+    expect(both.body.data.map((o: { order_no: string }) => o.order_no)).toContain(no);
+  });
+});

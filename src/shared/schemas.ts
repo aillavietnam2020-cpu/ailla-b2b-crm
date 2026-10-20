@@ -41,8 +41,12 @@ export const customerCreateSchema = z.object({
   zalo: z.string().trim().max(120).optional().nullable(),
   email: z.string().trim().max(160).optional().nullable(),
   tax_code: z.string().trim().max(40).optional().nullable(),
+  /** Khách là nhân viên mua hàng công ty: mã nhân sự (Mã NS trong HR MASTER) để trừ lương cuối tháng. */
+  staff_code: z.string().trim().max(20).optional().nullable(),
   contact_person: z.string().trim().max(120).optional().nullable(),
   credit_limit: z.number().int().min(0).optional().nullable(),
+  /** TIER = giá theo cấp 8 bậc; CUSTOM = bảng giá riêng của khách (khách gia công). */
+  price_mode: z.enum(['TIER', 'CUSTOM']).optional(),
 });
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 
@@ -124,8 +128,91 @@ export const orderCreateSchema = z.object({
   /** Chương trình khuyến mại áp dụng cho đơn (mã nội bộ do công ty đặt). */
   promotion_code: z.string().trim().max(60).optional().nullable(),
   promotion_note: z.string().trim().max(300).optional().nullable(),
+  /** Khách NPP lên cấp: sale đổi cấp giá ngay trên đơn, đơn tính giá theo cấp mới và hồ sơ khách tự cập nhật theo. */
+  customer_tier_id: z.string().trim().min(1).optional().nullable(),
 });
 export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
+
+/**
+ * Sửa đơn đã tạo. Khách và ngày đơn giữ nguyên; muốn đổi khách thì huỷ đơn và tạo đơn mới.
+ * Đơn đã gửi duyệt/xuất kho thì bắt buộc ghi lý do (kiểm ở backend theo trạng thái đơn).
+ */
+export const orderUpdateSchema = orderCreateSchema.omit({ customer_id: true, order_date: true }).extend({
+  reason: z.string().trim().max(300).optional().nullable(),
+});
+export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày hiệu lực không hợp lệ');
+
+const flowDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày không hợp lệ');
+const flowNote = z.string().trim().max(500).optional().nullable();
+
+export const flowNoteSchema = z.object({ note: flowNote });
+export const flowToKhoSchema = z.object({ need_date: flowDate.optional().nullable(), note: flowNote });
+export const flowHoldSchema = z.object({ hold_until: flowDate, note: flowNote });
+export const flowApproveSchema = z.object({ ship_date: flowDate.optional().nullable(), note: flowNote });
+export const flowKhoReportSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        product_id: z.string().trim().min(1),
+        status: z.enum(['DU', 'THIEU']),
+        ok_qty: z.number().int().min(0).optional().nullable(),
+        eta_date: flowDate.optional().nullable(),
+        note: z.string().trim().max(300).optional().nullable(),
+      }),
+    )
+    .min(1, 'Chưa có dòng nào'),
+  note: flowNote,
+});
+export const flowShipSchema = z.object({
+  lines: z
+    .array(z.object({ product_id: z.string().trim().min(1), shipped_qty: z.number().int().min(0) }))
+    .optional(),
+  note: flowNote,
+  ship_day: flowDate.optional().nullable(),
+  shipped_by_name: z.string().trim().max(80).optional().nullable(),
+});
+
+export const flowCorrectShippedSchema = z.object({
+  lines: z
+    .array(z.object({ product_id: z.string().trim().min(1), shipped_qty: z.number().int().min(0) }))
+    .min(1, 'Chưa có mã nào để sửa'),
+  reason: z.string().trim().min(5, 'Ghi lý do sửa (tối thiểu 5 ký tự)').max(400),
+});
+
+export const customerPriceSetSchema = z.object({
+  product_id: z.string().trim().min(1, 'Thiếu sản phẩm'),
+  /** null = bỏ mã này khỏi bảng giá riêng của khách. */
+  amount: vndAmount.nullable(),
+  valid_from: isoDate.optional(),
+});
+export type CustomerPriceSetInput = z.infer<typeof customerPriceSetSchema>;
+
+export const customerPriceImportSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        sku: z.string().trim().min(1).max(60),
+        amount: vndAmount,
+        name: z.string().trim().max(200).optional().nullable(),
+        /** ĐVT trong file (Thùng/Can/Chai), chỉ dùng khi tạo sản phẩm mới. */
+        unit: z.string().trim().max(40).optional().nullable(),
+        /** Số đơn vị lẻ trong một thùng (cột Quy cách), chỉ dùng khi tạo sản phẩm mới. */
+        pack_qty: z.number().int().min(1).max(10000).optional().nullable(),
+      }),
+    )
+    .min(1, 'File không có dòng giá nào')
+    .max(2000, 'Tối đa 2000 dòng mỗi lần tải lên'),
+  valid_from: isoDate.optional(),
+  /** Tạo luôn sản phẩm cho các mã chưa có trong danh mục. */
+  create_missing: z.boolean().optional(),
+  /** Mã nào có trong bảng giá cũ mà không có trong file thì bỏ khỏi bảng giá. */
+  replace_all: z.boolean().optional(),
+  /** Chỉ xem trước, không ghi gì. */
+  dry_run: z.boolean().optional(),
+});
+export type CustomerPriceImportInput = z.infer<typeof customerPriceImportSchema>;
 
 export const productGroupSchema = z.object({
   code: z.string().trim().min(1, 'Nhập mã nhóm').max(40),
@@ -182,6 +269,16 @@ export const paymentCreateSchema = z
     /** Bút toán đảo: khoản điều chỉnh giảm để huỷ một khoản thu đã ghi nhận trước đó. */
     is_adjustment: z.boolean().optional(),
     adjustment_reason: z.string().trim().max(300).optional().nullable(),
+    /** Mục đích khoản tiền: thanh toán đơn, trả công nợ cũ, hay khách đặt cọc / ứng trước. */
+    purpose: z.enum(['ORDER', 'DEBT', 'DEPOSIT']).optional(),
+    /** Giải trình khi số tiền lệch phần còn phải thu, hoặc khi là trả nợ cũ / đặt cọc. */
+    explanation: z.string().trim().max(500).optional().nullable(),
+    /** Tài khoản nhận tiền (trong danh sách hợp lệ của công ty) khi chuyển khoản. */
+    receiving_account_id: z.string().trim().max(60).optional().nullable(),
+    /** Tiền mặt: ai nhận tiền. */
+    receiver_name: z.string().trim().max(120).optional().nullable(),
+    /** Số tham chiếu giao dịch ngân hàng trên bill; duy nhất, một bill không ghi hai lần. */
+    bank_ref: z.string().trim().max(80).optional().nullable(),
     /** Phân bổ ngay vào các đơn; để trống nghĩa là "trả nợ chung", vào hàng chờ phân bổ. */
     allocations: z
       .array(
@@ -254,6 +351,15 @@ export const paymentAllocateSchema = z.object({
 export const deliveryUpdateSchema = z.object({
   delivery_status: z.enum(['CHUA_XUAT', 'DA_XUAT_KHO', 'DA_GIAO', 'HOAN']),
   note: z.string().trim().max(300).optional().nullable(),
+  ship_day: flowDate.optional().nullable(),
+  shipped_by_name: z.string().trim().max(80).optional().nullable(),
+});
+
+/** Sửa ngày xuất kho / người xuất kho của đơn đã xuất. */
+export const shipInfoSchema = z.object({
+  ship_day: flowDate,
+  shipped_by_name: z.string().trim().min(2, 'Ghi tên người xuất kho').max(80),
+  note: z.string().trim().max(300).optional().nullable(),
 });
 
 export const taskCompleteSchema = z.object({
@@ -271,6 +377,8 @@ export const listQuerySchema = z.object({
   sort: z
     .enum([
       'follow_up',
+      'revenue_month',
+      'revenue_month_asc',
       'name',
       'name_desc',
       'newest',

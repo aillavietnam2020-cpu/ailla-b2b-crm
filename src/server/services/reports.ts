@@ -65,6 +65,8 @@ export interface SalesDashboard {
 }
 
 function periodRange(period: string): { from: string; to: string } {
+  const r = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(period);
+  if (r) return { from: r[1], to: r[2] };
   if (/^\d{4}$/.test(period)) return { from: `${period}-01-01`, to: `${period}-12-31` };
   const [y, m] = period.split('-').map(Number);
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -171,7 +173,9 @@ export async function salesDashboard(
          SELECT customer_id, MIN(order_date) AS first_date FROM orders
          WHERE deleted_at IS NULL AND approval_status = 'APPROVED' GROUP BY customer_id
        ) first_order ON first_order.customer_id = o.customer_id
-       WHERE u.deleted_at IS NULL AND u.role = 'EMPLOYEE'
+       WHERE u.deleted_at IS NULL AND u.role = 'EMPLOYEE' AND u.kind = 'HUMAN'
+         -- Kế toán (có quyền xác nhận tiền) không phải sale: không đưa vào bảng doanh thu theo nhân viên.
+         AND NOT EXISTS (SELECT 1 FROM user_permissions up WHERE up.user_id = u.id AND up.permission = 'order.accounting.confirm')
          ${options.ownerId ? 'AND u.id = ?' : ''}
        GROUP BY u.id, u.display_name
        ORDER BY revenue DESC`,

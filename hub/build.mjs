@@ -15,8 +15,8 @@ const SRC = path.join(ROOT, 'src');
 const OUT = path.resolve(ROOT, '..', 'src', 'server', 'hub', 'hub.html');
 
 const JS_ORDER = [
-  'core.js', 'app.js', 'phanbo.js', 'setup.js', 'giaoviec.js', 'kinhdoanh.js', 'exec.js', 'period.js',
-  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'kho.js', 'kho2.js', 'kho3.js', 'kho4.js', 'winhub.js', 'adsday.js', 'dieuphoi.js', 'xepviec.js', 'pillar.js', 'tuan.js', 'dashv2.js', 'lichtuan.js', 'bots.js', 'claude.js', 'ai.js', 'server.js', 'chat.js', 'khodang.js', 'kocwin.js', 'trolyai.js', 'giaonhanh.js', 'dauviec.js', 'loaivideo.js', 'bangvideo.js', 'fanpage.js', 'nhapthang.js', 'digital.js', 'hockb.js', 'pagethuonghieu.js', 'nhansu2.js', 'nhansu3.js', 'nhansu4.js', 'tenhien.js',
+  'core.js', 'drp.js', 'app.js', 'phanbo.js', 'setup.js', 'giaoviec.js', 'kinhdoanh.js', 'exec.js', 'period.js',
+  'congviec.js', 'hr.js', 'importx.js', 'dieuchinh.js', 'sanxuat.js', 'kho.js', 'kho2.js', 'kho3.js', 'kho4.js', 'khoxuat.js', 'sxsteps.js', 'sanphamsku.js', 'khohoan.js', 'winhub.js', 'adsday.js', 'dieuphoi.js', 'xepviec.js', 'pillar.js', 'tuan.js', 'dashv2.js', 'lichtuan.js', 'bots.js', 'claude.js', 'ai.js', 'server.js', 'chat.js', 'khodang.js', 'kocwin.js', 'trolyai.js', 'giaonhanh.js', 'kehoachthang.js', 'tongquancontent.js', 'dauviec.js', 'loaivideo.js', 'bangvideo.js', 'fanpage.js', 'fpai.js', 'nhapthang.js', 'digital.js', 'hockb.js', 'pagethuonghieu.js', 'nhansu2.js', 'nhansu3.js', 'nhansu4.js', 'tenhien.js', 'lichluoi.js', 'xuongvideo.js', 'hostmode.js', 'admmenu.js', 'opsview.js', 'b2bpl.js', 'gc.js', 'muahang.js', 'rowmenu.js', 'thangmoi.js', 'trungtam.js', 'ttmenu.js', 'vieccuatoi.js', 'dieuhanhagent.js', 'mobile.js',
 ];
 
 const read = (f) => readFileSync(path.join(SRC, f), 'utf8');
@@ -25,6 +25,7 @@ const esc = (s) => s.replace(/<\//g, '<\\/');
 const logo = read('logo.b64').trim();
 const header = [
   'const SERVER=true;',
+  'let HOST_MODE="ops";let OPS_URL="";let ADMIN_URL="";',
   'let APP_MODE="admin";',
   `const LOGO="${logo}";`,
   `const QUYCHUAN=${esc(read('quychuan.json').trim())};`,
@@ -37,7 +38,7 @@ const fonts =
 const xlsx = '<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>';
 
 const html = `<!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0f1b3d"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Ailla"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Trang quản trị Ailla</title>
 <link rel="icon" href="data:image/png;base64,${logo}">
 ${fonts}
@@ -45,6 +46,8 @@ ${xlsx}
 <style>
 ${read('style.css')}
 ${read('theme-navy.css')}
+${read('theme-sang.css')}
+${read('mobile.css')}
 </style></head><body>
 <div id="app"><div class="loginwrap"><div class="login"><p>Đang tải…</p></div></div></div>
 <div class="drawer" id="drawer" hidden><div class="in" id="drawerIn" role="dialog" aria-modal="true" aria-label="Chi tiết"></div></div>

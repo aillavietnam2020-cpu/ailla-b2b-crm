@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import type { ProductItem } from '@shared/types';
-import { TIER_LABELS, TIER_ORDER } from '@shared/enums';
+import type { PriceTier, ProductItem } from '@shared/types';
+import { TIER_LABELS, TIER_ORDER, type TierCode } from '@shared/enums';
+
+/** Các cột giá: 8 cấp + cấp Nhân viên (giá nội bộ do quản lý điền). */
+const PRICE_COLS: string[] = [...TIER_ORDER, 'NHAN_VIEN'];
+const colLabel = (code: string) => (code === 'NHAN_VIEN' ? 'Nhân viên' : TIER_LABELS[code as TierCode]);
 import { formatVnd } from '@shared/money';
 import { vnDate } from '@shared/datetime';
 import { useApi, useDebounced } from '../lib/hooks';
@@ -31,11 +35,15 @@ export function PricesPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const debouncedQ = useDebounced(q);
 
-  const canEditPrice = can('price.propose');
-  const canApprovePrice = can('price.approve');
-  const canManageProduct = can('product.manage');
+  // Trên web vận hành (vanhanh) chỉ XEM bảng giá; sửa giá, thêm / xóa sản phẩm chỉ ở trang quản trị.
+  const host = window.location.hostname;
+  const onAdminSite = host.startsWith('quantri.') || host === 'localhost' || host === '127.0.0.1';
+  const canEditPrice = can('price.propose') && onAdminSite;
+  const canApprovePrice = can('price.approve') && onAdminSite;
+  const canManageProduct = can('product.manage') && onAdminSite;
 
-  const query = new URLSearchParams({ limit: '500', _: String(reloadKey) });
+  // Sản phẩm gia công chỉ nằm trong bảng giá riêng của từng khách nên không hiện ở bảng 8 cấp.
+  const query = new URLSearchParams({ limit: '500', scope: 'TIER', _: String(reloadKey) });
   if (debouncedQ) query.set('q', debouncedQ);
   if (onlyMissing) query.set('missing_price', '1');
   const prices = useApi<{ products: ProductItem[]; tiers: TierRow[]; date: string }>(
@@ -94,6 +102,8 @@ export function PricesPage() {
           </label>
         </div>
 
+        <TierRulesCard canEdit={can('customer.tier.change') && onAdminSite} />
+
         <StateBlock
           loading={prices.loading}
           error={prices.error}
@@ -107,9 +117,9 @@ export function PricesPage() {
                   <th>Mã SKU</th>
                   <th>Tên sản phẩm</th>
                   <th>Nhóm</th>
-                  {TIER_ORDER.map((code) => (
+                  {PRICE_COLS.map((code) => (
                     <th key={code} className="right">
-                      {TIER_LABELS[code]}
+                      {colLabel(code)}
                     </th>
                   ))}
                 </tr>
@@ -122,8 +132,10 @@ export function PricesPage() {
                     </td>
                     <td>{product.name}</td>
                     <td className="muted">{product.group_name ?? '—'}</td>
-                    {TIER_ORDER.map((code) => {
+                    {PRICE_COLS.map((code) => {
                       const amount = product.prices[code];
+                      const eff = product.eff_prices?.[code];
+                      const adj = (product.adjusted ?? []).find((x) => x.tier === code);
                       const tier = tierByCode.get(code);
                       const content =
                         amount === null || amount === undefined ? (
@@ -143,6 +155,13 @@ export function PricesPage() {
                             </button>
                           ) : (
                             content
+                          )}
+                          {adj && eff !== null && eff !== undefined && eff !== amount && (
+                            <div>
+                              <small className="badge orange" title={`Đang điều chỉnh: ${adj.label}`}>
+                                đang áp {formatVnd(eff)}
+                              </small>
+                            </div>
                           )}
                         </td>
                       );
@@ -172,6 +191,8 @@ export function PricesPage() {
 
       {adding && (
         <NewProductModal
+          tiers={tiers}
+          immediate={canApprovePrice}
           onClose={() => setAdding(false)}
           onDone={() => {
             setAdding(false);
@@ -243,7 +264,7 @@ function PriceEditModal({
               <input
                 type="number"
                 min={0}
-                step={1000}
+                step={1}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Để trống = xoá giá cấp này"
@@ -282,8 +303,20 @@ function PriceEditModal({
   );
 }
 
-function NewProductModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ sku: '', name: '', unit: '', pack_size: '' });
+function NewProductModal({
+  tiers,
+  immediate,
+  onClose,
+  onDone,
+}: {
+  tiers: TierRow[];
+  immediate: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const groups = useApi<Array<{ id: string; name: string }>>('/api/product-groups');
+  const [form, setForm] = useState({ sku: '', name: '', unit: '', pack_size: '', group_id: '' });
+  const [prices, setPrices] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -294,12 +327,24 @@ function NewProductModal({ onClose, onDone }: { onClose: () => void; onDone: () 
     setError(null);
     setFields({});
     try {
-      await api.post('/api/products', {
+      const created = await api.post<{ id: string }>('/api/products', {
         sku: form.sku.trim(),
         name: form.name.trim(),
         unit: form.unit || null,
         pack_size: form.pack_size || null,
+        group_id: form.group_id || null,
       });
+      // Giá các cấp điền luôn lúc tạo: cấp nào để trống thì chưa có giá (bị chặn bán).
+      const filled = tiers.filter((t) => (prices[t.id] ?? '').trim() !== '');
+      for (const t of filled) {
+        await api.post('/api/prices', {
+          product_id: created.data.id,
+          tier_id: t.id,
+          amount: Math.round(Number(prices[t.id])),
+          valid_from: vnDate(),
+          reason: 'Giá khi tạo sản phẩm mới',
+        });
+      }
       onDone();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -343,6 +388,36 @@ function NewProductModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                 placeholder="500ml, 5L, 12 chai/thùng…"
               />
             </div>
+            <div className="field">
+              <label>Nhóm sản phẩm</label>
+              <select value={form.group_id} onChange={(e) => setForm({ ...form, group_id: e.target.value })}>
+                <option value="">— chưa có nhóm —</option>
+                {(groups.data ?? []).map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <h4 style={{ margin: '16px 0 4px' }}>Giá các cấp (đồng)</h4>
+          <p className="muted" style={{ margin: '0 0 8px', fontSize: 12.5 }}>
+            {immediate ? 'Điền được cấp nào lưu luôn cấp đó, có hiệu lực từ hôm nay.' : 'Giá điền ở đây sẽ gửi CEO duyệt.'} Cấp để trống = chưa có
+            giá, bị chặn bán cho tới khi đặt giá.
+          </p>
+          <div className="form-grid">
+            {tiers.map((t) => (
+              <div className="field" key={t.id}>
+                <label>{t.name}</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={prices[t.id] ?? ''}
+                  onChange={(e) => setPrices({ ...prices, [t.id]: e.target.value })}
+                />
+              </div>
+            ))}
           </div>
         </div>
         <div className="modal-foot">
@@ -355,5 +430,92 @@ function NewProductModal({ onClose, onDone }: { onClose: () => void; onDone: () 
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * Điều kiện lên cấp giá: tiền hàng tối thiểu của MỘT đơn để sale tự đưa khách lên cấp đó ngay khi lập đơn.
+ * Đơn chưa đạt (hoặc cấp để trống / 0) thì sale vẫn lập đơn nháp và gửi xin Quản lý duyệt đổi cấp.
+ */
+function TierRulesCard({ canEdit }: { canEdit: boolean }) {
+  const toast = useToast();
+  const [key, setKey] = useState(0);
+  const tiers = useApi<PriceTier[]>(`/api/tiers?_=${key}`);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const list = (tiers.data ?? []).filter((t) => t.code !== 'KHAC' && t.code !== 'NHAN_VIEN');
+  async function save(t: PriceTier) {
+    const raw = (draft[t.id] ?? '').replace(/[^\d]/g, '');
+    if (draft[t.id] === undefined) return;
+    try {
+      await api.put(`/api/tiers/${t.id}/upgrade-rule`, { min_order_amount: raw === '' ? 0 : Number(raw) });
+      toast.success(`Đã lưu điều kiện lên cấp ${t.name}`);
+      setDraft((d) => {
+        const n = { ...d };
+        delete n[t.id];
+        return n;
+      });
+      setKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Chưa lưu được');
+    }
+  }
+  if (list.length === 0) return null;
+  return (
+    <Card title="Điều kiện lên cấp giá (sale tự đưa khách lên cấp ngay trên đơn)" bodyClass="">
+      <p className="muted" style={{ margin: '8px 14px' }}>
+        Điền <b>tiền hàng tối thiểu của một đơn</b> để được lên cấp đó. Đơn đạt thì cấp của khách đổi luôn khi lưu đơn. Đơn chưa đạt hoặc
+        cấp để trống (0) thì sale vẫn lập đơn nháp giá cấp mới, gửi khách được, và gửi xin Quản lý duyệt đổi cấp. Chị, chị Thảo và quản lý
+        đổi cấp ở đâu cũng không bị ràng buộc.
+      </p>
+      <div className="table-wrap">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Cấp giá</th>
+              <th className="right">Đơn từ (đồng, tiền hàng)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((t) => {
+              const cur = t.min_order_amount ?? 0;
+              const val = draft[t.id] ?? (cur ? String(cur) : '');
+              return (
+                <tr key={t.id}>
+                  <td>
+                    <strong>{t.name}</strong>
+                  </td>
+                  <td className="right">
+                    {canEdit ? (
+                      <input
+                        inputMode="numeric"
+                        style={{ width: 180, textAlign: 'right' }}
+                        placeholder="0 (chưa đặt)"
+                        value={val === '' ? '' : Number(val.replace(/[^\d]/g, '') || 0).toLocaleString('vi-VN')}
+                        onChange={(e) => setDraft((d) => ({ ...d, [t.id]: e.target.value.replace(/[^\d]/g, '') }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void save(t);
+                        }}
+                      />
+                    ) : cur ? (
+                      formatVnd(cur)
+                    ) : (
+                      <span className="muted">chưa đặt</span>
+                    )}
+                  </td>
+                  <td>
+                    {canEdit && draft[t.id] !== undefined && (
+                      <button className="btn sm primary" onClick={() => void save(t)}>
+                        Lưu
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }

@@ -2,9 +2,15 @@ import type { Env } from './env';
 import { createApp } from './app';
 import { loadConfig } from './lib/settings';
 import { syncAlerts } from './services/alerts';
+import { emitTimeEvents } from './services/timeEvents';
 import { serveHub } from './hub/serve';
 import HUB_HTML from './hub/hub.html';
 import { shootReminders } from './services/shootReminders';
+import { taskReminders } from './services/taskReminders';
+import { syncAllChannels } from './services/poscake';
+import { syncReturns } from './services/returnScan';
+import { isAdminHost } from './lib/host';
+import { readSessionCookie, resolveSession } from './lib/session';
 
 const app = createApp();
 
@@ -21,6 +27,13 @@ export default {
       return serveHub(request, env, HUB_HTML);
     }
 
+    // Địa chỉ quản trị: đã đăng nhập thì mở gốc là vào luôn trang quản trị (không hiện giao diện CRM B2B).
+    if (url.pathname === '/' && !url.searchParams.has('next') && isAdminHost(env, request)) {
+      const token = readSessionCookie(request.headers);
+      const session = token ? await resolveSession(env.DB, token) : null;
+      if (session && session.status === 'ACTIVE') return Response.redirect(new URL('/hub/', url).toString(), 302);
+    }
+
     // SPA React: mọi đường dẫn khác trả về static assets (không phải nguồn dữ liệu).
     if (env.ASSETS) {
       return env.ASSETS.fetch(request);
@@ -35,11 +48,35 @@ export default {
         const config = await loadConfig(env.DB);
         const result = await syncAlerts(env.DB, config);
         console.info('[cron] alerts', JSON.stringify(result));
+        // Sự kiện theo thời gian (đơn kẹt, quá lịch xuất, tồn dưới mức) cho agent đọc sau này.
+        try {
+          console.info('[cron] events', JSON.stringify(await emitTimeEvents(env.DB)));
+        } catch (error) {
+          console.error('[cron] events loi', error);
+        }
+        // Kéo đơn bán qua sàn (TikTok Shop, Shopee) từ Poscake: 7 giờ sáng giờ Việt Nam, hôm qua và hôm kia.
+        try {
+          const hourVn = (new Date().getUTCHours() + 7) % 24;
+          if (hourVn === 7) {
+            const day = (back: number) => new Date(Date.now() + 7 * 3_600_000 - back * 86_400_000).toISOString().slice(0, 10);
+            console.info('[cron] poscake', JSON.stringify(await syncAllChannels(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
+            // Đơn hoàn (TikTok, Shopee, Facebook): hôm nay, hôm qua, hôm kia.
+            console.info('[cron] don hoan', JSON.stringify(await syncReturns(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
+          }
+        } catch (error) {
+          console.error('[cron] poscake loi', error);
+        }
         // Nhắc buổi quay của khu Marketing (chỉ chạy lúc 8 giờ sáng giờ Việt Nam).
         try {
           console.info('[cron] nhac buoi quay', JSON.stringify(await shootReminders(env.DB)));
         } catch (error) {
           console.error('[cron] nhac buoi quay loi', error);
+        }
+        // Nhắc việc Task giao việc: việc trễ, đến hạn, chờ duyệt + tóm tắt cho chị (8 giờ sáng giờ Việt Nam).
+        try {
+          console.info('[cron] nhac task', JSON.stringify(await taskReminders(env.DB)));
+        } catch (error) {
+          console.error('[cron] nhac task loi', error);
         }
       })(),
     );

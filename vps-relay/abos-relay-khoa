@@ -1,0 +1,24 @@
+#!/bin/bash
+# Chị chạy lệnh này trong Termius để dán khoá cầu nối. Khoá không hiện trên màn hình (cố ý, để bảo mật), không đi qua Claude.
+set -e
+F=/root/.config/abos-relay.env
+mkdir -p /root/.config
+echo "Bấm Ctrl+V để dán khoá (sẽ KHÔNG thấy chữ nào hiện ra, đó là bình thường), rồi bấm Enter."
+read -r -s -p "Khoá: " K
+echo
+K=$(echo "$K" | tr -d '[:space:]')
+echo "Đã nhận ${#K} ký tự."
+case "$K" in
+  rly_*) ;;
+  *) echo "Không đúng khoá cầu nối (phải bắt đầu bằng rly_ và dài 68 ký tự). Chị chạy lại file TAO-KHOA-CAU-NOI.bat rồi dán lại."; exit 1;;
+esac
+umask 077
+cat > "$F" <<EOF
+ABOS_URL=https://ailla-b2b-crm.aillavietnam2020.workers.dev
+ABOS_RELAY_KEY=$K
+ABOS_SESSION=agent:{id}:main
+EOF
+chmod 600 "$F"
+export XDG_RUNTIME_DIR=/run/user/0
+systemctl --user enable abos-relay.service >/dev/null 2>&1 || true
+systemctl --user restart abos-relay.service && echo "Đã lưu khoá và bật cầu nối. Chị nên copy một chữ bất kỳ để xoá khoá khỏi bộ nhớ tạm." || echo "Đã lưu khoá nhưng chưa bật được cầu nối, báo Claude."

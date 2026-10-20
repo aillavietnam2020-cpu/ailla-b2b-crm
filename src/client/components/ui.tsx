@@ -102,6 +102,8 @@ export function orderStage(order: {
   delivery_status: keyof typeof ORDER_STATUS_LABELS.delivery;
   payment_status: keyof typeof ORDER_STATUS_LABELS.payment;
   accounting_status: keyof typeof ORDER_STATUS_LABELS.accounting;
+  /** Còn phải thu của đơn; có thì phân biệt "Đã thu đủ" với "Đã ghi nợ" (kế toán đã chốt nhưng còn nợ). */
+  remaining_amount?: number;
 }): { label: string; tone: string } {
   if (order.approval_status === 'CANCELLED') return { label: 'Đã huỷ', tone: 'red' };
   if (order.approval_status === 'REJECTED') return { label: 'Bị từ chối', tone: 'red' };
@@ -110,7 +112,13 @@ export function orderStage(order: {
   if (order.delivery_status === 'HOAN') return { label: 'Hàng hoàn về', tone: 'red' };
 
   // Đã duyệt: chạy tiếp theo đúng luồng vận hành của công ty.
-  if (order.accounting_status === 'DA_XAC_NHAN') return { label: 'Hoàn tất', tone: 'green' };
+  // Kế toán đã chốt ghi nợ. Chỉ "Đã thu đủ" khi không còn phải thu; còn phải thu thì là "Đã ghi nợ".
+  if (order.accounting_status === 'DA_XAC_NHAN') {
+    if (order.remaining_amount !== undefined && order.remaining_amount > 0) {
+      return { label: 'Đã ghi nợ', tone: 'blue' };
+    }
+    return { label: 'Đã thu đủ', tone: 'green' };
+  }
   if (order.payment_status === 'DA_THU_DU' || order.payment_status === 'THU_THUA') {
     return { label: 'Chờ kế toán xác nhận', tone: 'purple' };
   }

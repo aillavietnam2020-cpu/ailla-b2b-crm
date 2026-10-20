@@ -14,28 +14,29 @@ function khoShowPrint(html){
 }
 function khoPrintWin(){let buf="";return {document:{write:h=>{buf+=h},close:()=>khoShowPrint(buf)},focus(){},print(){}}}
 function khoPsxNeeds(r){
-  const misa=typeof khoMisaOf==="function"?khoMisaOf(r.sp):r.sp,B=(misa&&KHO.bom.get(misa))||[];
-  const sl=+r.sl||0,perUnit=!sl;
-  const nm=c=>KHO.items.get(c)||{name:c,unit:"",cls:""};
-  // 1) vật tư đóng gói + bán thành phẩm cho thành phẩm
-  const pack=B.map(b=>({code:b.item,name:nm(b.item).name,unit:nm(b.item).unit,cls:nm(b.item).cls,kind:b.kind,dm:b.qty,need:sl?Math.round(b.qty*sl*1000)/1000:null}));
-  // 2) nguyên liệu pha chế cho từng bán thành phẩm
+  const misa=typeof khoMisaOf==="function"?khoMisaOf(r.sp):r.sp,sl=+r.sl||0,perUnit=!sl,hid=!!KHO.bomHidden;
+  const nm=c=>KHO.items.get(c)||{name:c,unit:"",cls:""},rd=n=>Math.round(n*1000)/1000;
+  /* Người không xem được bảng định mức chỉ nhận lượng cần cho đúng số lượng của phiếu (đã hỏi máy chủ trước khi in), không có cột định mức / 1 sp. */
+  const B=hid?((misa&&sl&&KHO.exp.get(misa+"|"+sl))||[]).map(x=>({item:x.item,qty:null,need:x.need,kind:x.kind})):((misa&&KHO.bom.get(misa))||[]);
+  const pack=B.map(b=>({code:b.item,name:nm(b.item).name,unit:nm(b.item).unit,cls:nm(b.item).cls,kind:b.kind,dm:b.qty,need:hid?rd(b.need):(sl?rd(b.qty*sl):null)}));
   const mix=[];
   pack.filter(p=>p.cls==="BTP").forEach(bt=>{
-    (KHO.bom.get(bt.code)||[]).forEach(b=>mix.push({btp:bt.code,btpName:bt.name,code:b.item,name:nm(b.item).name,unit:nm(b.item).unit,dm:b.qty,need:bt.need!=null?Math.round(b.qty*bt.need*1000)/1000:null}));
+    const sub=hid?((bt.need>0&&KHO.exp.get(bt.code+"|"+bt.need))||[]).map(x=>({item:x.item,qty:null,need:x.need})):(KHO.bom.get(bt.code)||[]);
+    sub.forEach(b=>mix.push({btp:bt.code,btpName:bt.name,code:b.item,name:nm(b.item).name,unit:nm(b.item).unit,dm:b.qty,need:hid?rd(b.need):(bt.need!=null?rd(b.qty*bt.need):null)}));
   });
-  return {misa,pack,mix,perUnit};
+  return {misa,pack,mix,perUnit,hid};
 }
-function khoPrintPsx(id){
+async function khoPrintPsx(id){
   const r=(SX().requests||[]).find(x=>x.id===id);if(!r)return;
   if(!KHO.cat){toast("Đang tải danh mục kho, thử lại sau vài giây");khoLoad();return}
-  const {misa,pack,mix,perUnit}=khoPsxNeeds(r),p=sxP(r.sp),fmt=n=>n==null?"—":knum(n);
+  if(KHO.bomHidden){try{const m0=typeof khoMisaOf==="function"?khoMisaOf(r.sp):r.sp,sl0=+r.sl||0;if(m0&&sl0>0){const [[,,rows]]=await khoExpand([[m0,sl0]]);const bts=rows.filter(x=>((KHO.items.get(x.item)||{}).cls==="BTP")&&x.need>0).map(x=>[x.item,Math.round(x.need*1000)/1000]);if(bts.length)await khoExpand(bts)}}catch(e){toast(e.message);return}}
+  const {misa,pack,mix,perUnit,hid}=khoPsxNeeds(r),p=sxP(r.sp),fmt=n=>n==null?"—":knum(n);
   const meta=[["Số phiếu",r.id],["Ngày tạo phiếu",kDd(r.taoLuc)],["Sản phẩm",p.ten+(misa?" ("+misa+")":"")],["Số lượng yêu cầu",r.sl?knum(r.sl)+" "+(p.dvt&&p.dvt!=="sp"?p.dvt:""):"Chưa chốt"],
     ["Lý do sản xuất",r.nguon||"—"],["Ưu tiên",r.uu||"—"],["Hạn cần hàng",r.han?kDd(r.han):"—"],["Người tạo phiếu",r.tao||"—"]];
   const th=a=>"<tr>"+a.map(c=>"<th>"+c+"</th>").join("")+"</tr>";
   const t1=pack.length?"<h3>1. Vật tư theo định mức"+(perUnit?" (cho 1 đơn vị sản phẩm)":"")+"</h3><table><thead>"+th(["STT","Mã","Tên vật tư","ĐVT","Định mức / 1 sp",perUnit?"Cần dùng":"Tổng cần dùng","Loại"])+"</thead><tbody>"+
     pack.map((x,i)=>"<tr><td class=\"c\">"+(i+1)+"</td><td>"+esc(x.code)+"</td><td>"+esc(x.name)+"</td><td>"+esc(x.unit)+"</td><td class=\"n\">"+fmt(x.dm)+"</td><td class=\"n\"><b>"+fmt(perUnit?x.dm:x.need)+"</b></td><td>"+esc(x.kind||"")+"</td></tr>").join("")+"</tbody></table>":
-    "<div class=\"note\">Sản phẩm này chưa có định mức trong danh mục kho"+(misa?"":" (chưa nối mã MISA)")+", nên chưa liệt kê được vật tư.</div>";
+    (hid&&perUnit&&misa?"<div class=\"note\">Phiếu chưa chốt số lượng nên chưa tính được vật tư cần dùng.</div>":"<div class=\"note\">Sản phẩm này chưa có định mức trong danh mục kho"+(misa?"":" (chưa nối mã MISA)")+", nên chưa liệt kê được vật tư.</div>");
   const t2=mix.length?"<h3>2. Nguyên liệu pha chế bán thành phẩm"+(perUnit?" (cho 1 lít)":"")+"</h3><table><thead>"+th(["STT","Mã","Tên nguyên liệu","ĐVT","Định mức / 1 lít","Cần dùng","Bán thành phẩm","Thực tế ghi tay"])+"</thead><tbody>"+
     mix.map((x,i)=>"<tr><td class=\"c\">"+(i+1)+"</td><td>"+esc(x.code)+"</td><td>"+esc(x.name)+"</td><td>"+esc(x.unit)+"</td><td class=\"n\">"+fmt(x.dm)+"</td><td class=\"n\"><b>"+fmt(perUnit?x.dm:x.need)+"</b></td><td>"+esc(x.btp)+"</td><td class=\"fill\"></td></tr>").join("")+"</tbody></table>":"";
   const w=khoPrintWin();

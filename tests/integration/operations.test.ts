@@ -10,7 +10,7 @@ beforeEach(async () => {
 });
 
 describe('Hồ sơ khách hàng', () => {
-  it('nhân viên sửa được thông tin khách của mình nhưng không đổi được cấp giá', async () => {
+  it('nhân viên sửa được thông tin khách của mình nhưng không đổi được cấp giá ở hồ sơ', async () => {
     const ok = await ctx.request('/api/customers/cus-thao-1', {
       as: USERS.thao,
       method: 'PATCH',
@@ -217,7 +217,7 @@ describe('Khuyến mại và vận hành đơn hàng', () => {
     expect(confirmed.status).toBe(200);
   });
 
-  it('ghi nhận tiền về trừ đúng công nợ và tiền thừa thành số dư có', async () => {
+  it('ghi nhận tiền về trừ đúng công nợ; tiền thừa (không có nợ cũ) thành số dư có', async () => {
     const created = await createOrderWithGift();
     const orderId = created.body.data.id;
     await ctx.request(`/api/orders/${orderId}/submit`, {
@@ -242,6 +242,7 @@ describe('Khuyến mại và vận hành đơn hàng', () => {
         amount: total + 100000,
         method: 'Chuyển khoản',
         external_receipt_no: 'PT-001',
+        explanation: 'Khách chuyển dư, giữ làm số dư có',
         accounting_confirmed: true,
         allocations: [{ order_id: orderId, amount: total + 100000 }],
       },

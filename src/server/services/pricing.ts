@@ -7,6 +7,7 @@ import type { AuthContext } from '../env';
 import { auditStatement } from '../lib/audit';
 import { notFound } from '../lib/http';
 import { newId } from '../lib/ids';
+import { adjustedPrice, loadAdjustments } from './priceAdjust';
 
 /**
  * D1 chỉ cho tối đa 100 tham số mỗi câu truy vấn, trong khi bảng giá có tới 134 sản phẩm.
@@ -76,7 +77,8 @@ export async function setPrice(
 
   const validFrom = input.valid_from ?? vnDate();
   const now = nowIso();
-  const approved = can(auth.user.role, 'price.approve');
+  // Quyền duyệt giá tính theo quyền thực của người dùng (gồm cả quyền được cấp thêm), không chỉ theo vai trò.
+  const approved = auth.permissions.includes('price.approve') || can(auth.user.role, 'price.approve');
   const status: 'ACTIVE' | 'DRAFT' = approved ? 'ACTIVE' : 'DRAFT';
 
   const current = await db
@@ -193,42 +195,73 @@ interface ProductRow {
   group_id: string | null;
   group_name: string | null;
   active: number;
+  price_scope: string | null;
 }
 
 /** Bảng giá 8 cấp theo ngày hiệu lực; giá NULL trả về null để giao diện hiện "Chưa có". */
 export async function listPriceTable(
   db: D1Database,
   onDate: string,
-  options?: { q?: string; groupId?: string; onlyMissing?: boolean; limit?: number },
-): Promise<{ tiers: Array<{ id: string; code: string; name: string; rank: number }>; products: ProductItem[] }> {
+  options?: {
+    q?: string;
+    groupId?: string;
+    onlyMissing?: boolean;
+    limit?: number;
+    /** TIER = chỉ sản phẩm trong bảng giá 8 cấp; CUSTOM = chỉ sản phẩm gia công; bỏ trống = tất cả. */
+    scope?: 'TIER' | 'CUSTOM';
+  },
+): Promise<{
+  tiers: Array<{ id: string; code: string; name: string; rank: number }>;
+  products: ProductItem[];
+}> {
   const tierRows = await db
-    .prepare('SELECT id, code, name, rank FROM price_tiers ORDER BY rank')
+    .prepare("SELECT id, code, name, rank FROM price_tiers WHERE code <> 'KHAC' ORDER BY rank")
     .all<{ id: string; code: string; name: string; rank: number }>();
   const tiers = tierRows.results ?? [];
 
-  const where: string[] = ['p.deleted_at IS NULL'];
+  const where: string[] = ['p.deleted_at IS NULL', "(g.code IS NULL OR g.code <> 'VAT_TU_BAN')"];
   const params: unknown[] = [];
+  // Tìm theo từng chữ trên mã, tên và nhóm ("xịt muỗi aibio" vẫn ra "Muỗi 300ml" nhóm Côn trùng AiBio):
+  // khớp ít nhất một chữ, xếp sản phẩm khớp nhiều chữ lên trước.
+  let rank = '';
+  const rankParams: unknown[] = [];
   if (options?.q) {
-    where.push('(p.sku LIKE ? OR p.name LIKE ?)');
-    params.push(`%${options.q}%`, `%${options.q}%`);
+    const words = options.q
+      .trim()
+      .split(/s+/)
+      .filter((w) => w.length >= 2)
+      .slice(0, 6);
+    const hay = "(p.sku || ' ' || p.name || ' ' || COALESCE(g.name, ''))";
+    if (words.length) {
+      where.push(`(${words.map(() => `${hay} LIKE ?`).join(' OR ')})`);
+      params.push(...words.map((w) => `%${w}%`));
+      rank = `(${words.map(() => `(${hay} LIKE ?)`).join(' + ')}) DESC, `;
+      rankParams.push(...words.map((w) => `%${w}%`));
+    }
   }
   if (options?.groupId) {
     where.push('p.group_id = ?');
     params.push(options.groupId);
   }
+  if (options?.scope) {
+    where.push("COALESCE(p.price_scope, 'TIER') = ?");
+    params.push(options.scope);
+  }
 
   const productRows = await db
     .prepare(
-      `SELECT p.id, p.sku, p.name, p.unit, p.pack_size, p.group_id, g.name AS group_name, p.active
+      `SELECT p.id, p.sku, p.name, p.unit, p.pack_size, p.group_id, g.name AS group_name, p.active,
+              p.price_scope
        FROM products p LEFT JOIN product_groups g ON g.id = p.group_id
        WHERE ${where.join(' AND ')}
-       ORDER BY p.sku
+       ORDER BY ${rank}p.sku
        LIMIT ?`,
     )
-    .bind(...params, options?.limit ?? 500)
+    .bind(...params, ...rankParams, options?.limit ?? 500)
     .all<ProductRow>();
 
   const products = productRows.results ?? [];
+  const adjustments = await loadAdjustments(db, onDate);
   const priceRows = await loadPriceRows(
     db,
     products.map((p) => p.id),
@@ -247,6 +280,8 @@ export async function listPriceTable(
 
   const items: ProductItem[] = products.map((p) => {
     const prices: Record<string, number | null> = {};
+    const effPrices: Record<string, number | null> = {};
+    const adjusted: Array<{ tier: string; label: string; kind: string; value: number }> = [];
     const missing: string[] = [];
     for (const tier of tiers) {
       const resolved = resolveEffectivePrice(
@@ -256,7 +291,27 @@ export async function listPriceTable(
         onDate,
       );
       prices[tier.code] = resolved.amount;
-      if (resolved.amount === null || resolved.amount === undefined) missing.push(tier.name);
+      const adj =
+        p.price_scope === 'CUSTOM'
+          ? { amount: resolved.amount, adjustment: null }
+          : adjustedPrice(adjustments, p.id, p.group_id, tier.id, resolved.amount);
+      effPrices[tier.code] = adj.amount;
+      if (adj.adjustment) {
+        adjusted.push({
+          tier: tier.code,
+          label: adj.adjustment.label,
+          kind: adj.adjustment.kind,
+          value: adj.adjustment.value,
+        });
+      }
+      // Sản phẩm gia công chỉ bán theo bảng giá riêng của khách nên không bị báo thiếu giá 8 cấp.
+      if (
+        p.price_scope !== 'CUSTOM' &&
+        tier.code !== 'NHAN_VIEN' &&
+        (resolved.amount === null || resolved.amount === undefined)
+      ) {
+        missing.push(tier.name);
+      }
     }
     return {
       id: p.id,
@@ -267,7 +322,10 @@ export async function listPriceTable(
       group_id: p.group_id,
       group_name: p.group_name,
       active: p.active,
+      price_scope: p.price_scope === 'CUSTOM' ? 'CUSTOM' : 'TIER',
       prices,
+      eff_prices: effPrices,
+      adjusted,
       missing_tiers: missing,
     };
   });

@@ -105,12 +105,34 @@ function dgFb(key){
 PAGES.dg_lib=pDgLib;
 /* tổng quan Digital (demo) */
 function pDgTq(m){
+  /* Tổng quan Digital: gộp đủ số liệu chính của Hiệu quả Ads + Ads theo sản phẩm + creative; không lặp lại ở trang khác */
   const d=D(),all=dgRows(),ads=dgAds(),O=d.orders||[],td=d.settings.today;
   const per=u=>all.filter(r=>r.st&&r.st[u.id]);
-  m.innerHTML=H("Tổng quan Digital","Bản demo · số liệu chi phí, đơn theo creative sẽ gắn khi nối báo cáo Ads (API Facebook)")+
-   `<div class="grid kpis">${kpi("Video trong thư viện",all.length)}${kpi("Scale",all.filter(r=>r.tt==="Scale").length,"","var(--green)")}${kpi("Win TikTok",all.filter(r=>dgTin(r.don)==="win").length)}${kpi("Order đang chờ Content",O.filter(o=>o.trangThai!=="Xong").length,"",O.some(o=>o.trangThai!=="Xong"&&o.han<td)?"var(--red)":"")}</div>
+  const grab=fn=>{const t=document.createElement("div");try{fn(t)}catch(e){console.warn("tổng quan Digital: bỏ một khối",e);return null}const ph=t.querySelector(".ph");if(ph)ph.remove();return t};
+  const hq=grab(pAdsHieuQua),sp=grab(pAdsSP);
+  const pick=(t,sel)=>t?[...t.querySelectorAll(sel)]:[];
+  /* các khối lấy từ Hiệu quả Ads */
+  const hqKpi=pick(hq,":scope > .grid.kpis")[0],hqSec=pick(hq,":scope > section.card"),hqNote=pick(hq,":scope > .note,:scope > .srcnote,:scope > p.hint");
+  const secBy=(arr,re)=>arr.find(s=>re.test((s.querySelector(".card-h h2")||{}).textContent||""));
+  const rank=secBy(hqSec,/xếp hạng/i),theoThang=secBy(hqSec,/theo tháng/i),daNhap=secBy(hqSec,/đã nhập/i);
+  /* các khối lấy từ Ads theo sản phẩm */
+  const spSec=pick(sp,":scope > section.card"),spNote=pick(sp,":scope > .note")[0];
+  const prodTbl=spSec.find(s=>!s.querySelector(".card-h")),tran=secBy(spSec,/trần/i);
+  if(prodTbl){prodTbl.insertAdjacentHTML("afterbegin",`<div class="card-h"><h2>Top sản phẩm</h2><span class="hint">xếp theo doanh số mang về</span></div>`)}
+  if(rank){const h=rank.querySelector(".card-h h2");if(h)h.textContent="Top nhân sự"}
+  const creative=`<div class="grid kpis">${kpi("Video trong thư viện",all.length)}${kpi("Scale",all.filter(r=>r.tt==="Scale").length,"","var(--green)")}${kpi("Win TikTok",all.filter(r=>dgTin(r.don)==="win").length)}${kpi("Order đang chờ Content",O.filter(o=>o.trangThai!=="Xong").length,"",O.some(o=>o.trangThai!=="Xong"&&o.han<td)?"var(--red)":"")}</div>
    <section class="card flush"><div class="card-h pad"><h2>Creative của từng người</h2><span class="hint">chọn trạng thái của người đó ở Thư viện video quảng cáo là tính cho người đó</span></div><div class="tbl"><table class="kstab"><thead><tr><th>Người</th><th class="n">Creative đang dùng</th><th class="n">Scale</th><th class="n">Đang test</th><th class="n">Đã dừng</th></tr></thead><tbody>${ads.map(u=>{const p=per(u);return `<tr><td><b>${esc(u.name)}</b></td><td class="n">${p.length}</td><td class="n">${p.filter(r=>r.st[u.id]==="Scale").length}</td><td class="n">${p.filter(r=>r.st[u.id]==="Đang test").length}</td><td class="n">${p.filter(r=>r.st[u.id]==="Đã dừng").length}</td></tr>`}).join("")||'<tr><td colspan="5" class="empty">Chưa có nhân sự Ads.</td></tr>'}</tbody></table></div></section>
    <div class="acts" style="padding:0 4px"><button class="btn pri" data-go="dg_lib">Mở Thư viện video quảng cáo</button><button class="btn" data-go="order">Order cho Content</button></div>`;
+  m.innerHTML=H("Tổng quan Digital","Quảng cáo Facebook và creative: số tổng, top nhân sự, top sản phẩm, trần chi phí")+`<div id="dgq"></div>`;
+  const box=m.querySelector("#dgq");
+  if(hqKpi)box.appendChild(hqKpi);
+  if(spNote)box.appendChild(spNote);
+  if(rank)box.appendChild(rank);
+  if(prodTbl)box.appendChild(prodTbl);
+  box.insertAdjacentHTML("beforeend",creative);
+  [theoThang,daNhap,tran].forEach(s=>{if(s)box.appendChild(s)});
+  hqNote.forEach(n=>box.appendChild(n));
+  if(!hq&&!sp)box.insertAdjacentHTML("afterbegin",`<div class="note">Chưa có báo cáo Ads để tổng hợp. Nhập báo cáo ở mục Nhập báo cáo Ads.</div>`);
   bindCommon(m)
 }
 PAGES.dg_tq=pDgTq;

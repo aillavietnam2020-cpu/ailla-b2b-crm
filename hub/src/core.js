@@ -120,9 +120,11 @@ const money=n=>!n?"0":Math.abs(n)>=1e9?(n/1e9).toLocaleString("vi-VN",{maximumFr
 const nf=n=>Math.round(n||0).toLocaleString("vi-VN");
 const pct=(a,b)=>b?Math.round(a/b*100):0;
 const sum=(a,f)=>a.reduce((x,c)=>x+(+f(c)||0),0);
-const dow=d=>(d-1+MONTH.first)%7;
-const dd=d=>d?(d<10?"0":"")+d+"/"+String(MONTH.mon).padStart(2,"0"):"—";
-const weekOf=d=>!d?0:d<=4?1:d<=11?2:d<=18?3:d<=25?4:5;
+const dow=d=>(((d-1+MONTH.first)%7)+7)%7;
+/* ngày <= 0 là ngày của tháng trước (việc dở sang tháng mới vẫn giữ hạn cũ) */
+const tmDateLbl=d=>{const t=new Date(MONTH.year,MONTH.mon-1,d);return String(t.getDate()).padStart(2,"0")+"/"+String(t.getMonth()+1).padStart(2,"0")};
+const dd=d=>d?(d>0?(d<10?"0":"")+d+"/"+String(MONTH.mon).padStart(2,"0"):tmDateLbl(d)):"—";
+const weekOf=d=>{if(!d||d<1)return 0;for(const w of WEEKS)if(d<=w.den)return w.w;return WEEKS.length?WEEKS[WEEKS.length-1].w:5};
 const WEEKS=[{w:1,tu:1,den:4},{w:2,tu:5,den:11},{w:3,tu:12,den:18},{w:4,tu:19,den:25},{w:5,tu:26,den:31}];
 const nowHM=()=>new Date().toTimeString().slice(0,5);
 const today=()=>new Date().toLocaleDateString("vi-VN");
@@ -214,10 +216,10 @@ function addPlanProduct(u,k,huong,kenh,gmvTr){if(k==="TH")gmvTr=0;const c=k==="T
   DB.mutate(u.name,`thêm ${c.n} vào kế hoạch tháng ${MONTH.mon}`,d=>{d.products.push({k:c.k,n:c.n,c:c.c,gia:c.gia,mo:c.mo,pain:c.pain,claim:c.claim,huong,kenh,kenhs:[{kenh,huong,gmv:(+gmvTr||0)*1e6}]});d.goals[k]={m9:(typeof T9_BASE!=="undefined"&&T9_BASE[k])||0,gmv:(+gmvTr||0)*1e6}});return ""}
 function removePlanChannel(u,k,kenh){const p=D().products.find(x=>x.k===k);if(!p)return "";const L=pKenhs(p);if(L.length<=1)return removePlanProduct(u,k);
   if(D().tuyen.some(t=>t.sku===k&&t.kenh===kenh))return "Sản phẩm đã có tuyến ở kênh này, xóa tuyến trước.";
-  DB.mutate(u.name,`bỏ ${sk(k).n} khỏi kênh ${kenh}`,d=>{const x=d.products.find(y=>y.k===k),e=pKenhs(x).find(y=>y.kenh===kenh);x.kenhs=pKenhs(x).filter(y=>y.kenh!==kenh);x.kenh=x.kenhs[0].kenh;x.huong=x.kenhs[0].huong;if(e&&d.goals[k])d.goals[k].gmv=Math.max(0,d.goals[k].gmv-(e.gmv||0))});return ""}
-function removePlanProduct(u,k){const d=D();if(d.cards.some(c=>c.sku===k&&c.nguon!=="Footage cũ")||d.tuyen.some(t=>t.sku===k))return "Sản phẩm đã có tuyến hoặc thẻ việc trong tháng, xóa tuyến/thẻ trước.";DB.mutate(u.name,`bỏ ${sk(k).n} khỏi kế hoạch tháng`,dd2=>{dd2.products=dd2.products.filter(p=>p.k!==k);delete dd2.goals[k]});return ""}
+  DB.mutate(u.name,`bỏ ${esc(sk(k).n)} khỏi kênh ${kenh}`,d=>{const x=d.products.find(y=>y.k===k),e=pKenhs(x).find(y=>y.kenh===kenh);x.kenhs=pKenhs(x).filter(y=>y.kenh!==kenh);x.kenh=x.kenhs[0].kenh;x.huong=x.kenhs[0].huong;if(e&&d.goals[k])d.goals[k].gmv=Math.max(0,d.goals[k].gmv-(e.gmv||0))});return ""}
+function removePlanProduct(u,k){const d=D();if(d.cards.some(c=>c.sku===k&&c.nguon!=="Footage cũ")||d.tuyen.some(t=>t.sku===k))return "Sản phẩm đã có tuyến hoặc thẻ việc trong tháng, xóa tuyến/thẻ trước.";DB.mutate(u.name,`bỏ ${esc(sk(k).n)} khỏi kế hoạch tháng`,dd2=>{dd2.products=dd2.products.filter(p=>p.k!==k);delete dd2.goals[k]});return ""}
 function sendBack(u,id,note){DB.mutate(u.name,`trả lại ${id}: ${note||"cần sửa"}`,d=>{const x=d.cards.find(y=>y.id===id);if(["dvd","dceo"].includes(x.step)){x.step="edit";if(x.nguoiEdit)x.nguoi=x.nguoiEdit}else{x.step="kb";if(x.nguoiKB)x.nguoi=x.nguoiKB}x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa"})})}
-function assignCard(u,id,to){DB.mutate(u.name,`giao ${id} cho ${userName(to)}`,d=>{const x=d.cards.find(y=>y.id===id);x.nguoi=to;if(x.step==="cg"){const L=loaiOf(x);x.step=L==="moi"?"kb":L==="kho"?"dang":"edit"}if(x.step==="edit")x.nguoiEdit=to})}
+function assignCard(u,id,to){DB.mutate(u.name,`giao ${id} cho ${esc(userName(to))}`,d=>{const x=d.cards.find(y=>y.id===id);x.nguoi=to;if(x.step==="cg"){const L=loaiOf(x);x.step=L==="moi"?"kb":L==="kho"?"dang":"edit"}if(x.step==="edit")x.nguoiEdit=to})}
 function simulateWorker(id){if(D().mode==="live")return; // web thật: người phụ trách dán link video Worker dựng rồi bấm gửi duyệt
   setTimeout(()=>{const c=D().cards.find(x=>x.id===id);if(!c||c.step!=="worker")return;DB.mutate("Worker",`dựng xong ${id}, chờ duyệt`,d=>{const x=d.cards.find(y=>y.id===id);x.step="dvd";x.linkFinal="drive.google.com/…/Ailla-VIDEO-FINAL/"+id+".mp4"});if(typeof render==="function")render();toast("Worker dựng xong "+id)},6000)}
 

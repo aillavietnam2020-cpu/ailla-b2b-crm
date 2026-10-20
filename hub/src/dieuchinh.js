@@ -18,7 +18,7 @@ function applyAdjust(dt,adj){
   adj.st="applied";adj.duyet=ME.name;adj.duyetLuc=new Date().toLocaleString("vi-VN");dt.adjusts.unshift(adj);
   const w=weekOf(dt.settings.today)||1;dt.weekNotes[w]=dt.weekNotes[w]||{};dt.weekNotes[w].qd=((dt.weekNotes[w].qd||"")+(dt.weekNotes[w].qd?"\n":"")+`[Điều chỉnh ${adj.id}] ${adj.lyDo}`).trim();
 }
-const fmtCh=ch=>ch.f==="huong"?`${sk(ch.k).n}: hướng ${ch.old} → <b>${ch.nw}</b>`:ch.f==="gmv"?`${sk(ch.k).n}: mục tiêu ${tr(ch.old)} → <b>${tr(ch.nw)}</b>`:`${sk(ch.k).n}: số video ${ch.old} → <b>${ch.nw}</b>${ch.thucTe!=null&&-ch.thucTe<ch.old-ch.nw?` (chỉ bớt được ${-ch.thucTe} thẻ chưa giao)`:""}`;
+const fmtCh=ch=>ch.f==="huong"?`${esc(sk(ch.k).n)}: hướng ${ch.old} → <b>${ch.nw}</b>`:ch.f==="gmv"?`${esc(sk(ch.k).n)}: mục tiêu ${tr(ch.old)} → <b>${tr(ch.nw)}</b>`:`${esc(sk(ch.k).n)}: số video ${ch.old} → <b>${ch.nw}</b>${ch.thucTe!=null&&-ch.thucTe<ch.old-ch.nw?` (chỉ bớt được ${-ch.thucTe} thẻ chưa giao)`:""}`;
 function pDieuChinh(m){
   const d=dcShape(D()),B=d.planBase,ed=can(ME,"kehoach.duyet"),sug=can(ME,"kehoach.sua");
   if(!B){m.innerHTML=H("Điều chỉnh kế hoạch")+`<section class="card waitf"><h2>Chưa chốt kế hoạch gốc</h2><p>Kế hoạch gốc được chốt khi phát hành kế hoạch ở Kế hoạch › Bước 5. Từ lúc đó mọi thay đổi trong tháng đều đi qua trang này.</p></section>`;return}

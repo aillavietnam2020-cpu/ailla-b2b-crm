@@ -1,17 +1,17 @@
 import { vnDate } from '@shared/datetime';
+import { spanOf } from '../lib/span';
 import type { CeoDashboard, ManagerDashboard, SalesPerformance } from '@shared/types';
 import type { CustomerStage } from '@shared/enums';
 import { listDebts, totalDebts } from './debts';
 import { listAlerts } from './alerts';
 import { listApprovals } from './approvals';
 
-function monthPrefix(today = vnDate()): string {
-  return today.slice(0, 7);
-}
-
-export async function managerDashboard(db: D1Database): Promise<ManagerDashboard> {
+export async function managerDashboard(
+  db: D1Database,
+  monthParam?: string | null,
+): Promise<ManagerDashboard> {
   const today = vnDate();
-  const month = monthPrefix(today);
+  const { from, to } = spanOf(monthParam);
 
   const reps = await db
     .prepare(
@@ -21,16 +21,16 @@ export async function managerDashboard(db: D1Database): Promise<ManagerDashboard
         (SELECT COUNT(*) FROM tasks t WHERE t.assignee_id = u.id AND t.status = 'OPEN' AND t.due_at < ?) AS overdue_tasks,
         (SELECT COUNT(*) FROM customer_activities a WHERE a.user_id = u.id AND a.created_at >= ?) AS activities_30d,
         (SELECT COUNT(*) FROM orders o WHERE o.owner_id = u.id AND o.deleted_at IS NULL
-            AND o.approval_status = 'APPROVED' AND substr(o.order_date, 1, 7) = ?) AS orders_month,
+            AND o.approval_status = 'APPROVED' AND substr(o.order_date, 1, 10) BETWEEN ? AND ?) AS orders_month,
         (SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.owner_id = u.id AND o.deleted_at IS NULL
-            AND o.approval_status = 'APPROVED' AND substr(o.order_date, 1, 7) = ?) AS revenue_month,
+            AND o.approval_status = 'APPROVED' AND substr(o.order_date, 1, 10) BETWEEN ? AND ?) AS revenue_month,
         (SELECT COUNT(DISTINCT o.customer_id) FROM orders o WHERE o.owner_id = u.id
             AND o.approval_status = 'APPROVED' AND o.deleted_at IS NULL) AS customers_with_orders
        FROM users u
-       WHERE u.role = 'EMPLOYEE' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL
+       WHERE u.role = 'EMPLOYEE' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.kind = 'HUMAN'
        ORDER BY revenue_month DESC`,
     )
-    .bind(today, new Date(Date.now() - 30 * 86_400_000).toISOString(), month, month)
+    .bind(today, new Date(Date.now() - 30 * 86_400_000).toISOString(), from, to, from, to)
     .all<ManagerDashboard['reps'][number]>();
 
   const counts = await db
@@ -57,22 +57,25 @@ export async function managerDashboard(db: D1Database): Promise<ManagerDashboard
   };
 }
 
-export async function ceoDashboard(db: D1Database): Promise<CeoDashboard> {
-  const month = monthPrefix();
+export async function ceoDashboard(
+  db: D1Database,
+  monthParam?: string | null,
+): Promise<CeoDashboard> {
+  const { from, to } = spanOf(monthParam);
 
   const money = await db
     .prepare(
       `SELECT
         (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE deleted_at IS NULL
-           AND approval_status = 'APPROVED' AND substr(order_date, 1, 7) = ?) AS revenue_month,
+           AND approval_status = 'APPROVED' AND substr(order_date, 1, 10) BETWEEN ? AND ?) AS revenue_month,
         (SELECT COALESCE(SUM(CASE WHEN is_adjustment = 1 THEN -amount ELSE amount END), 0)
-           FROM payments WHERE substr(paid_at, 1, 7) = ?
+           FROM payments WHERE substr(paid_at, 1, 10) BETWEEN ? AND ?
            AND accounting_status = 'DA_XAC_NHAN') AS collected_month,
         (SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL) AS customers_total,
         (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE approval_status = 'APPROVED'
            AND deleted_at IS NULL) AS customers_with_orders`,
     )
-    .bind(month, month)
+    .bind(from, to, from, to)
     .first<{
       revenue_month: number;
       collected_month: number;
@@ -87,7 +90,7 @@ export async function ceoDashboard(db: D1Database): Promise<CeoDashboard> {
       `SELECT
         (SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL AND data_quality = 'NEEDS_REVIEW') AS customers_needs_review,
         (SELECT COUNT(DISTINCT p.id) FROM products p
-           JOIN price_tiers t ON 1 = 1
+           JOIN price_tiers t ON t.code NOT IN ('KHAC', 'NHAN_VIEN')
            LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.tier_id = t.id AND pp.amount IS NOT NULL
            WHERE p.deleted_at IS NULL AND pp.id IS NULL) AS products_missing_price,
         (SELECT COUNT(*) FROM orders WHERE deleted_at IS NULL AND data_quality = 'NEEDS_REVIEW') AS orders_needs_review,
@@ -121,7 +124,9 @@ export async function ceoDashboard(db: D1Database): Promise<CeoDashboard> {
     pending_cash: debts.pending_cash,
     customers_total: customersTotal,
     customers_with_orders: money?.customers_with_orders ?? 0,
-    order_rate: customersTotal ? Math.round(((money?.customers_with_orders ?? 0) / customersTotal) * 100) : 0,
+    order_rate: customersTotal
+      ? Math.round(((money?.customers_with_orders ?? 0) / customersTotal) * 100)
+      : 0,
     data_quality: {
       customers_needs_review: quality?.customers_needs_review ?? 0,
       products_missing_price: quality?.products_missing_price ?? 0,
@@ -135,9 +140,13 @@ export async function ceoDashboard(db: D1Database): Promise<CeoDashboard> {
   };
 }
 
-export async function salesPerformance(db: D1Database, userId: string): Promise<SalesPerformance> {
+export async function salesPerformance(
+  db: D1Database,
+  userId: string,
+  monthParam?: string | null,
+): Promise<SalesPerformance> {
   const today = vnDate();
-  const month = monthPrefix(today);
+  const { from, to } = spanOf(monthParam);
 
   const row = await db
     .prepare(
@@ -146,14 +155,14 @@ export async function salesPerformance(db: D1Database, userId: string): Promise<
         (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE owner_id = ? AND approval_status = 'APPROVED'
            AND deleted_at IS NULL) AS customers_with_orders,
         (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE owner_id = ? AND approval_status = 'APPROVED'
-           AND deleted_at IS NULL AND substr(order_date, 1, 7) = ?) AS revenue_month,
+           AND deleted_at IS NULL AND substr(order_date, 1, 10) BETWEEN ? AND ?) AS revenue_month,
         (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE owner_id = ? AND approval_status = 'APPROVED'
            AND deleted_at IS NULL) AS revenue_total,
-        (SELECT COUNT(*) FROM customer_activities WHERE user_id = ? AND substr(created_at, 1, 7) = ?) AS activities_month,
+        (SELECT COUNT(*) FROM customer_activities WHERE user_id = ? AND substr(created_at, 1, 10) BETWEEN ? AND ?) AS activities_month,
         (SELECT COUNT(*) FROM tasks WHERE assignee_id = ? AND status = 'OPEN') AS open_tasks,
         (SELECT COUNT(*) FROM tasks WHERE assignee_id = ? AND status = 'OPEN' AND due_at < ?) AS overdue_tasks`,
     )
-    .bind(userId, userId, userId, month, userId, userId, month, userId, userId, today)
+    .bind(userId, userId, userId, from, to, userId, userId, from, to, userId, userId, today)
     .first<Omit<SalesPerformance, 'order_rate' | 'by_stage'>>();
 
   const stages = await db

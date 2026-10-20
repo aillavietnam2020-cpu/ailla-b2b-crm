@@ -1,3 +1,4 @@
+import { hubPeriodParam } from '../../lib/hubPeriod';
 import { Link } from 'react-router-dom';
 import type { ManagerDashboard } from '@shared/types';
 import { formatVnd } from '@shared/money';
@@ -7,13 +8,17 @@ import { Card, Kpi, StateBlock, useToast } from '../../components/ui';
 
 export function ManagerDashboardPage() {
   const toast = useToast();
-  const dashboard = useApi<ManagerDashboard>('/api/dashboards/manager');
+  const dashboard = useApi<ManagerDashboard>(
+    `/api/dashboards/manager?month=${hubPeriodParam()}`,
+  );
   const data = dashboard.data;
 
   const refreshAlerts = async () => {
     try {
       const result = await api.post<{ opened: number; resolved: number }>('/api/alerts/refresh');
-      toast.success(`Đã cập nhật cảnh báo: mở mới ${result.data.opened}, đóng ${result.data.resolved}`);
+      toast.success(
+        `Đã cập nhật cảnh báo: mở mới ${result.data.opened}, đóng ${result.data.resolved}`,
+      );
       dashboard.reload();
     } catch {
       toast.error('Không chạy được rule cảnh báo');
@@ -93,7 +98,10 @@ export function ManagerDashboardPage() {
                       </td>
                       <td className="right">{rep.customers}</td>
                       <td className="right">{rep.open_tasks}</td>
-                      <td className="right" style={{ color: rep.overdue_tasks ? 'var(--red)' : undefined }}>
+                      <td
+                        className="right"
+                        style={{ color: rep.overdue_tasks ? 'var(--red)' : undefined }}
+                      >
                         {rep.overdue_tasks}
                       </td>
                       <td className="right">{rep.activities_30d}</td>
