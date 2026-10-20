@@ -34,3 +34,19 @@ ingestRoutes.post('/ads-live', async (c) => {
     .run();
   return ok(c, { ok: true, at: data.at });
 });
+
+/** Số liệu ngày: chi phí/tin nhắn từ Facebook + đơn/doanh số từ Pancake (theo Nguồn đơn). VPS đẩy mỗi sáng. */
+ingestRoutes.post('/ads-fb', async (c) => {
+  const raw = await c.req.text();
+  if (raw.length > 6_000_000) throw badRequest('TOO_LARGE', 'Dữ liệu quá lớn');
+  const body = JSON.parse(raw) as { days?: Record<string, unknown> };
+  if (!body.days || typeof body.days !== 'object') throw badRequest('BAD_DATA', 'Thiếu dữ liệu các ngày');
+  const data = { at: nowIso(), days: body.days };
+  await c.env.DB.prepare(
+    `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES ('ads_fb', ?, 0, ?, NULL)
+     ON CONFLICT (key) DO UPDATE SET data = excluded.data, admin_only = 0, updated_at = excluded.updated_at, updated_by = NULL`,
+  )
+    .bind(await pack(JSON.stringify(data)), data.at)
+    .run();
+  return ok(c, { ok: true, at: data.at });
+});

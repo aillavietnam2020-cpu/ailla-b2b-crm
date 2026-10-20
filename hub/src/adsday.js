@@ -42,7 +42,7 @@ function adlStats(B,days){
 const adlPct=v=>(v*100).toFixed(1).replace(".",",")+"%";
 const adlR=v=>v?v.toFixed(2).replace(".",","):"—";
 
-function pAdsDay(m){
+function pAdsDaySheet(m){
   adlLoad();const D_=adlData();
   if(!D_){m.innerHTML=H("Báo cáo Ads theo ngày","Lấy từ file BÁO CÁO DIGITAL MKT 2026 FINAL")+`<section class="card"><p class="empty">${ADL.at?"Chưa có số liệu từ file báo cáo Digital.":"Đang tải số liệu…"}</p></section>`;return}
   const {B,last,mo,yr}=D_;
@@ -75,5 +75,90 @@ function adlDaily(L,last){
   const R=[["Chi Ads",s=>s.spend?nf(Math.round(s.spend)):""],["Data",s=>s.data?nf(s.data):""],["Giá data",s=>s.data?nf(Math.round(s.giaData)):""],["Đơn chốt",s=>s.orders?nf(s.orders):""],["Doanh số",s=>s.rev?nf(Math.round(s.rev)):""],["Chi/đơn",s=>s.orders?nf(Math.round(s.cpo)):""],["% CP/DS",s=>s.rev?adlPct(s.pct):""],["Tỷ lệ chốt",s=>s.data?adlPct(s.chot):""],["ROAS",s=>s.spend&&s.rev?adlR(s.roas):""]];
   const mon=adlStats(L,D);
   return `<div class="tbl adl-days"><table><thead><tr><th>Chỉ số</th><th class="n">Tổng</th>${D.map(d=>`<th class="n">${d}</th>`).join("")}</tr></thead><tbody>${R.map(([n,f])=>`<tr><td><b>${n}</b></td><td class="n"><b>${f(mon)}</b></td>${st.map(s=>`<td class="n">${f(s)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+/* =====================================================================
+   SỐ LIỆU TỰ ĐỘNG: chi phí + tin nhắn từ Facebook, đơn + doanh số từ Pancake.
+   VPS (ads-fb.py) đẩy mỗi sáng vào blob ads_fb: days[ngày] = {fb:[chiến dịch], pos:[doanh số theo mã chiến dịch], link:[theo trang bán hàng]}.
+   Doanh số Pancake ghép vào chiến dịch theo mã chiến dịch trên đơn (utm_campaign); người, sản phẩm, loại đọc từ tên chiến dịch.
+   ===================================================================== */
+const ADF={raw:null,at:0,busy:false,who:"",per:"m0",open:""};
+async function adfLoad(force){
+  if(typeof svApi!=="function"||ADF.busy||(!force&&Date.now()-ADF.at<1800000))return;ADF.busy=true;
+  try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&PAGE==="fb_ads"&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
+}
+const ADF_ACC={"2438831049860777":"Việt Anh","1721213761771236":"Việt Anh","1340771911416054":"Thảo","187878951968758":"Thảo","1354614543145294":"Thảo"};
+const ADF_PROD={TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
+/* Đọc tên chiến dịch: VA-TLAi-CD-… | DUAN-TD-CD-… | TĐ - TLAi - 23.9 - … | MESS - … (không ghi người: lấy theo tài khoản). */
+function adfParse(name,account){
+  const raw=String(name||""),n=raw.toUpperCase().replace(/Đ/g,"D"),tk=n.split(/[^A-Z0-9]+/).filter(Boolean);
+  let owner="",rest=tk;
+  if(tk[0]==="VA"||tk[0]==="VIETANH"){owner="Việt Anh";rest=tk.slice(1)}
+  else if(tk[0]==="DUAN"||tk[0]==="DUAN1"){owner="Duẩn";rest=tk.slice(1)}
+  else if(tk[0]==="TD"&&/^T[ĐD]\s*-\s/i.test(raw)){owner="Thảo";rest=tk.slice(1)}
+  else if(tk[0]==="THAO"){owner="Thảo";rest=tk.slice(1)}
+  else if(tk.includes("DUAN"))owner="Duẩn";
+  if(!owner)owner=ADF_ACC[account]||"Chưa rõ người";
+  const has=f=>rest.some(f);let prod="";
+  if(has(t=>t==="TLAI"))prod="TLAI";else if(has(t=>t.includes("AIBIO")))prod="AIBIO";else if(has(t=>t==="TLG"||t.startsWith("TLG")))prod="TLG";
+  else if(has(t=>t==="TD"||t==="TINHDAU"))prod="TINHDAU";else if(has(t=>t==="LS"||t==="LAUSAN"))prod="LS";
+  else if(has(t=>t==="XM"||t==="MUOI"))prod="MUOI";else if(has(t=>t==="XR"||t==="RUOI"))prod="RUOI";
+  const typ=tk.includes("MESS")||/(^|[^A-Z])MESS([^A-Z]|$)/.test(n)?"Tin nhắn":"Chuyển đổi";
+  return {owner,prod,typ};
+}
+function adfData(){
+  const r=ADF.raw;if(!r||!r.days)return null;
+  const keys=Object.keys(r.days).sort(),names={};
+  keys.forEach(k=>(r.days[k].fb||[]).forEach(c=>{names[c.campaign_id]={name:c.campaign,account:c.account}}));
+  const last=keys.filter(k=>(r.days[k].fb||[]).length||(r.days[k].pos||[]).length).pop()||keys[keys.length-1];
+  return {days:r.days,keys,names,last,at:r.at};
+}
+const adfPeriod=(D,per)=>{
+  const mo=D.last.slice(0,7);
+  if(per==="m0")return D.keys.filter(k=>k.slice(0,7)===mo);
+  if(per==="m1"){const t=new Date(+mo.slice(0,4),+mo.slice(5,7)-2,1),p=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0");return D.keys.filter(k=>k.slice(0,7)===p)}
+  if(per==="d7")return D.keys.filter(k=>k<=D.last).slice(-7);
+  return D.keys.filter(k=>k===per);
+};
+function adfAgg(D,days){
+  const C={};let unmatched=0,unOrders=0;
+  const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);return {name:nm.name||"",account:nm.account||"",owner:p.owner,prod:p.prod,typ:p.typ}})()));
+  days.forEach(k=>{const d=D.days[k];if(!d)return;
+    (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;x.msgs+=c.messages||0});
+    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0}});
+  });
+  const links={};days.forEach(k=>((D.days[k]||{}).link||[]).forEach(l=>{const key=l.name||"(trang chưa có tên)";const t=links[key]||(links[key]={name:key,orders:0,rev:0});t.orders+=l.orders||0;t.rev+=l.revenue||0}));
+  return {C:Object.values(C),unmatched,unOrders,links:Object.values(links).sort((a,b)=>b.rev-a.rev)};
+}
+const adfSum=L=>{const s=L.reduce((a,x)=>({spend:a.spend+x.spend,msgs:a.msgs+x.msgs,orders:a.orders+x.orders,rev:a.rev+x.rev}),{spend:0,msgs:0,orders:0,rev:0});
+  return Object.assign(s,{giaMsg:s.msgs?s.spend/s.msgs:0,cpo:s.orders?s.spend/s.orders:0,pct:s.rev?s.spend*1.1/s.rev:0,roas:s.spend?s.rev/s.spend:0})};
+function pAdsFb(m){
+  const D=adfData(),{C,unmatched,unOrders,links}=adfAgg(D,adfPeriod(D,ADF.per)),days=adfPeriod(D,ADF.per);
+  const L=C.filter(x=>x.spend||x.rev),owners=["Việt Anh","Thảo","Duẩn","Chưa rõ người"].filter(w=>L.some(x=>x.owner===w)&&(!ADF.who||ADF.who===w));
+  const T=adfSum(ADF.who?L.filter(x=>x.owner===ADF.who):L),at=new Date(D.at),atS=at.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})+" "+at.toLocaleDateString("vi-VN");
+  const lbl=days.length?(days.length===1?"ngày "+days[0].slice(8)+"/"+days[0].slice(5,7):`${days[0].slice(8)}/${days[0].slice(5,7)} – ${days[days.length-1].slice(8)}/${days[days.length-1].slice(5,7)}`):"";
+  const cells=s=>`<td class="n">${s.spend?money(s.spend):"—"}</td><td class="n">${s.msgs?nf(s.msgs):"—"}</td><td class="n">${s.msgs?money(s.giaMsg):"—"}</td><td class="n">${s.orders?nf(s.orders):"—"}</td><td class="n">${s.rev?money(s.rev):"—"}</td><td class="n">${s.orders?money(s.cpo):"—"}</td><td class="n">${s.rev?adlPct(s.pct):"—"}</td><td class="n"><b>${s.spend&&s.rev?adlR(s.roas):"—"}</b></td>`;
+  const HEAD=`<thead><tr><th>Mã · sản phẩm</th><th class="n">Chi Ads</th><th class="n">Tin nhắn</th><th class="n">Giá tin nhắn</th><th class="n">Đơn</th><th class="n">Doanh số</th><th class="n">Chi/đơn</th><th class="n">% CP/DS</th><th class="n">ROAS</th></tr></thead>`;
+  const section=w=>{const mine=L.filter(x=>x.owner===w),G={};mine.forEach(x=>{const k=(x.prod||"?")+"|"+x.typ;(G[k]||(G[k]=[])).push(x)});
+    const rows=Object.entries(G).map(([k,a])=>({k:w+"|"+k,prod:a[0].prod,typ:a[0].typ,list:a,s:adfSum(a)})).sort((a,b)=>b.s.spend-a.s.spend);
+    return `<section class="card flush"><div class="card-h pad"><h2>${esc(w)}</h2><span class="hint">${mine.length} chiến dịch · ${lbl}</span></div><div class="tbl"><table>${HEAD}<tbody>${rows.map(r=>`<tr class="clk${ADF.open===r.k?" on":""}" data-adfo="${esc(r.k)}"><td><b>${esc(ADF_PROD[r.prod]||"Chưa rõ sản phẩm")}</b><small>${r.typ} · ${r.list.length} chiến dịch</small></td>${cells(r.s)}</tr>${ADF.open===r.k?`<tr class="sub"><td colspan="9"><div class="tbl"><table><tbody>${r.list.slice().sort((a,b)=>b.spend-a.spend).map(c=>`<tr><td><span class="mono">${esc(c.name||c.id)}</span></td>${cells(adfSum([c]))}</tr>`).join("")}</tbody></table></div></td></tr>`:""}`).join("")}<tr class="tot"><td><b>Tổng ${esc(w)}</b></td>${cells(adfSum(mine))}</tr></tbody></table></div></section>`};
+  const perOpt=[["m0","Tháng "+D.last.slice(5,7)+" (từ đầu tháng)"],["d7","7 ngày gần nhất"]].concat(D.keys.some(k=>k.slice(0,7)!==D.last.slice(0,7))?[["m1","Tháng trước (phần đã có)"]]:[]).concat(D.keys.filter(k=>k<=D.last).slice(-14).reverse().map(k=>[k,"Ngày "+k.slice(8)+"/"+k.slice(5,7)]));
+  m.innerHTML=H("Báo cáo Ads theo ngày",`Tự lấy từ Facebook (chi phí, tin nhắn) và Pancake (đơn, doanh số) mỗi sáng · lần cuối ${atS}`)+`
+  <div class="filters"><select id="adf-w">${opt([["","Tất cả người chạy"]].concat(["Việt Anh","Thảo","Duẩn"].map(w=>[w,w])),ADF.who)}</select>
+  <select id="adf-p">${opt(perOpt,ADF.per)}</select>
+  <span class="hint">Doanh số lấy từ Pancake, ghép vào chiến dịch theo mã chiến dịch trên đơn. Người, sản phẩm, loại đọc từ tên chiến dịch (VA, DUAN, TĐ…).</span></div>
+  <div class="grid kpis">${kpi("Chi Ads",money(T.spend),lbl)}${kpi("Tin nhắn",nf(T.msgs),T.msgs?"giá "+money(T.giaMsg):"")}${kpi("Đơn (Pancake)",nf(T.orders),"gắn được vào chiến dịch")}${kpi("Doanh số (Pancake)",money(T.rev),T.orders?"TB đơn "+money(T.rev/T.orders):"")}${kpi("ROAS",adlR(T.roas),"doanh số / chi ads")}${kpi("% CP / doanh số",T.rev?adlPct(T.pct):"—","chi phí gồm thuế 10%")}${ADF.who?"":kpi("Doanh số chưa gắn chiến dịch",money(unmatched),nf(unOrders)+" đơn · khách tự vào, tin nhắn, chăm sóc")}</div>
+  <p class="hint">Bấm một dòng để xem từng chiến dịch. Chiến dịch tin nhắn chưa có doanh số vì đơn chốt qua inbox không mang mã chiến dịch (nằm ở dòng "chưa gắn chiến dịch").</p>
+  ${owners.map(section).join("")||`<section class="card"><p class="empty">Chưa có số liệu trong kỳ này.</p></section>`}
+  <section class="card flush"><div class="card-h pad"><h2>Doanh số theo trang bán hàng (Pancake)</h2><span class="hint">đúng tên "Nguồn đơn" trên Pancake · ${lbl}</span></div><div class="tbl"><table><thead><tr><th>Nguồn đơn</th><th class="n">Đơn</th><th class="n">Doanh số</th></tr></thead><tbody>${links.filter(x=>!ADF.who||x.name.toLowerCase().includes(ADF.who.toLowerCase())).map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${nf(x.orders)}</td><td class="n">${money(x.rev)}</td></tr>`).join("")||`<tr><td colspan="3" class="empty">Chưa có.</td></tr>`}</tbody></table></div></section>`;
+  $("#adf-w").onchange=e=>{ADF.who=e.target.value;renderMain()};
+  $("#adf-p").onchange=e=>{ADF.per=e.target.value;renderMain()};
+  m.querySelectorAll("[data-adfo]").forEach(r=>r.onclick=()=>{ADF.open=ADF.open===r.dataset.adfo?"":r.dataset.adfo;renderMain()});
+}
+/* Có số liệu tự động thì dùng; chưa có thì dùng bản đọc từ file báo cáo Digital. */
+function pAdsDay(m){
+  adfLoad();
+  if(ADF.raw&&ADF.raw.days&&adfData().keys.length)return pAdsFb(m);
+  if(!ADF.at){m.innerHTML=H("Báo cáo Ads theo ngày","Đang tải…")+`<section class="card"><p class="empty">Đang tải số liệu…</p></section>`;return}
+  return pAdsDaySheet(m);
 }
 PAGES.fb_ads=pAdsDay;
