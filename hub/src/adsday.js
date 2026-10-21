@@ -139,6 +139,9 @@ function adfAgg(D,days){
   days.forEach(k=>{const mk=(D.days[k]||{}).mk;if(adfPageDay(D.days[k])||!Array.isArray(mk))return;mk.forEach(r=>{const who=adfWho(r.marketer),id="__mk_"+who,x=C[id]||(C[id]={id,name:"Đơn chốt qua inbox, Pancake gắn Marketer ("+who+")",account:"",owner:who,prod:"INBOX",typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=r.orders||0;x.rev+=r.revenue||0})});
   if(SH)days.forEach(k=>{if(adfPageDay(D.days[k])||Array.isArray((D.days[k]||{}).mk))return;if(k.slice(0,7)!==SH.mo)return;const di=+k.slice(8)-1;SH.rows.forEach(r=>{const o=r.orders[di]||0,v=r.rev[di]||0;if(!o&&!v)return;const id="__sheet_"+r.who+"_"+r.prod;const x=C[id]||(C[id]={id,name:"Doanh số tin nhắn theo báo cáo Sheet ("+(ADF_PROD[r.prod]||"chưa rõ sản phẩm")+")",account:"",owner:r.who,prod:r.prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=o;x.rev+=v})});
   const links={};days.forEach(k=>((D.days[k]||{}).link||[]).forEach(l=>{const key=l.name||"(trang chưa có tên)";const t=links[key]||(links[key]={name:key,orders:0,rev:0});t.orders+=l.orders||0;t.rev+=l.revenue||0}));
+  /* Người chỉ chạy tin nhắn cho đúng một sản phẩm thì doanh số tin nhắn (theo page) tính vào sản phẩm đó. */
+  const MP={};Object.values(C).forEach(x=>{if(x.typ==="Tin nhắn"&&x.prod&&x.prod!=="INBOX"&&x.spend>0)(MP[x.owner]=MP[x.owner]||new Set()).add(x.prod)});
+  Object.values(C).forEach(x=>{if(x.prod==="INBOX"&&MP[x.owner]&&MP[x.owner].size===1)x.prod=[...MP[x.owner]][0]});
   return {C:Object.values(C),unmatched,unOrders,unSrc:Object.values(US).sort((a,b)=>b.rev-a.rev),links:Object.values(links).sort((a,b)=>b.rev-a.rev)};
 }
 const adfSum=L=>{const s=L.reduce((a,x)=>({spend:a.spend+x.spend,msgs:a.msgs+x.msgs,orders:a.orders+x.orders,rev:a.rev+x.rev}),{spend:0,msgs:0,orders:0,rev:0});
