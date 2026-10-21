@@ -120,7 +120,7 @@ def pos_day(cfg, d, link_names, src_names, user_names):
         for row, m_ in pos_split(cfg, d, ["Order.p_utm_campaign", "Order.source"]):
             v = row.get("Order.p_utm_campaign")
             sid = row.get("Order.source", row.get("order_sources"))
-            camps.append(dict(m_, campaign_id=str(v) if v else "", source=src_names.get(str(sid), "mã " + str(sid))))
+            camps.append(dict(m_, campaign_id=str(v) if v else "", source=src_names.get(str(sid), "mã " + str(sid)), page=str(row.get("account") or row.get("page_id") or "")))
     except Exception:
         camps = []
         for row, m_ in pos_split(cfg, d, ["Order.p_utm_campaign"]):
@@ -133,16 +133,7 @@ def pos_day(cfg, d, link_names, src_names, user_names):
                                  "delivered_rev": 0, "returned_rev": 0, "canceled": 0})
         for f in ("orders", "revenue", "delivered", "delivered_rev", "returned_rev", "canceled"):
             t[f] += m_[f]
-    mk = []
-    try:
-        for row, m_ in pos_split(cfg, d, ["Order.source", "User.id"], {"user_type": "marketer"}):
-            sid = str(row.get("Order.source", row.get("order_sources")))
-            uid = row.get("User.id")
-            if src_names.get(sid, "") != "Facebook" or not uid:
-                continue
-            mk.append({"marketer": user_names.get(str(uid), str(uid)[:8]), "orders": m_["orders"], "revenue": m_["revenue"]})
-    except BaseException:
-        mk = None
+    mk = None
     return camps, list(links.values()), mk
 
 
