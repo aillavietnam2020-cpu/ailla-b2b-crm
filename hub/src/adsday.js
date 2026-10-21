@@ -132,7 +132,7 @@ function adfAgg(D,days){
   const C={},US={};let unmatched=0,unOrders=0;
   const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);return {name:nm.name||"",account:nm.account||"",owner:p.owner,prod:p.prod,typ:p.typ}})()));
   days.forEach(k=>{const d=D.days[k];if(!d)return;
-    (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;x.msgs+=c.messages||0});
+    (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;/* Data: quảng cáo tin nhắn = số tin nhắn; quảng cáo chuyển đổi = số khách để lại thông tin (đăng ký hoàn tất) */x.msgs+=x.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0))});
     (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=p.orders||0;u.rev+=p.revenue||0}});
   });
   const SH=adfSheetMess();

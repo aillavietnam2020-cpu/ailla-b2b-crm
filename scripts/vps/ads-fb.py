@@ -21,6 +21,7 @@ DAYS_BACK = 75
 POS_FIELDS = ["net_revenue", "total_order_count", "delivered_count", "delivered_revenue",
               "returned_revenue", "returned_order_count", "canceled_order_count"]
 MSG_KEYS = ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.total_messaging_connection"]
+LEAD_KEYS = ["omni_complete_registration", "complete_registration", "offsite_conversion.fb_pixel_complete_registration"]
 BUY_KEYS = ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase", "onsite_web_purchase"]
 
 
@@ -161,7 +162,7 @@ def fb_rows(fb, account, since, until):
         out.append({"day": r.get("date_start"), "account": account, "campaign_id": r.get("campaign_id"),
                     "campaign": r.get("campaign_name"), "spend": num(r.get("spend")),
                     "impressions": num(r.get("impressions")), "clicks": num(r.get("clicks")),
-                    "messages": action_value(r, MSG_KEYS), "purchase": action_value(r, BUY_KEYS)})
+                    "messages": action_value(r, MSG_KEYS), "leads": action_value(r, LEAD_KEYS), "purchase": action_value(r, BUY_KEYS)})
     return out
 
 
