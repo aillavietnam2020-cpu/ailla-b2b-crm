@@ -87,11 +87,11 @@ def pos_source_names(cfg):
     return names
 
 
-def pos_split(cfg, d, dims):
+def pos_split(cfg, d, dims, extra=None):
     since, until = day_bounds(d)
     payload = pos_get(cfg, "/shops/{shop}/analytics/sale", {
         "since": since, "until": until, "success_status": "1", "success_record": "updated_at",
-        "returned_record": "success_record", "select_fields[]": POS_FIELDS, "split_by[]": dims})
+        "returned_record": "success_record", "select_fields[]": POS_FIELDS, "split_by[]": dims, **(extra or {})})
     out = []
     for row in payload.get("data", []):
         res = row.get("result", {})
@@ -101,7 +101,20 @@ def pos_split(cfg, d, dims):
     return out
 
 
-def pos_day(cfg, d, link_names, src_names):
+def pos_user_names(cfg):
+    names = {}
+    try:
+        for u in pos_get(cfg, "/shops/{shop}/users", {}).get("data", []):
+            nm = u.get("name") or (u.get("user") or {}).get("name") or ""
+            for v in list(u.values()) + list((u.get("user") or {}).values()):
+                if isinstance(v, str) and len(v) == 36:
+                    names[v] = nm
+    except BaseException:
+        pass
+    return names
+
+
+def pos_day(cfg, d, link_names, src_names, user_names):
     camps = []
     try:
         for row, m_ in pos_split(cfg, d, ["Order.p_utm_campaign", "Order.source"]):
@@ -120,7 +133,17 @@ def pos_day(cfg, d, link_names, src_names):
                                  "delivered_rev": 0, "returned_rev": 0, "canceled": 0})
         for f in ("orders", "revenue", "delivered", "delivered_rev", "returned_rev", "canceled"):
             t[f] += m_[f]
-    return camps, list(links.values())
+    mk = []
+    try:
+        for row, m_ in pos_split(cfg, d, ["Order.source", "User.id"], {"user_type": "marketer"}):
+            sid = str(row.get("Order.source", row.get("order_sources")))
+            uid = row.get("User.id")
+            if src_names.get(sid, "") != "Facebook" or not uid:
+                continue
+            mk.append({"marketer": user_names.get(str(uid), str(uid)[:8]), "orders": m_["orders"], "revenue": m_["revenue"]})
+    except BaseException:
+        mk = None
+    return camps, list(links.values()), mk
 
 
 def fb_rows(fb, account, since, until):
@@ -210,9 +233,12 @@ def main():
     cfg = env_file(POS_ENV)
     link_names = pos_link_names(cfg)
     src_names = pos_source_names(cfg)
+    user_names = pos_user_names(cfg)
     for d in days:
         try:
-            out[str(d)]["pos"], out[str(d)]["link"] = pos_day(cfg, d, link_names, src_names)
+            out[str(d)]["pos"], out[str(d)]["link"], mk_ = pos_day(cfg, d, link_names, src_names, user_names)
+            if mk_ is not None:
+                out[str(d)]["mk"] = mk_
         except Exception as e:
             errors.append(f"Pancake {d}: {type(e).__name__} {str(e)[:120]}")
         time.sleep(0.3)
