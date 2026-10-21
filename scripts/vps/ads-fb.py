@@ -16,6 +16,7 @@ KEY_FILE = Path("/root/.config/ailla/ingest.key")
 VN = timezone(timedelta(hours=7))
 ACCOUNTS = ["2438831049860777", "1721213761771236", "1056409566271847", "1498215448711810",
             "1340771911416054", "1979044982736581", "1354614543145294"]
+ACCOUNTS_OPT = ["187878951968758"]  # Thảo Đỉnh: có quyền thì lấy, chưa có quyền thì bỏ qua, không chặn việc gửi
 DAYS_BACK = 75
 POS_FIELDS = ["net_revenue", "total_order_count", "delivered_count", "delivered_revenue",
               "returned_revenue", "returned_order_count", "canceled_order_count"]
@@ -214,7 +215,7 @@ def main():
     out = {str(d): {"fb": [], "pos": [], "link": []} for d in days}
     errors = []
     fb = importlib.machinery.SourceFileLoader("fbads", "/usr/local/bin/fb-ads").load_module()
-    for acc in ACCOUNTS:
+    for acc in ACCOUNTS + ACCOUNTS_OPT:
         # chia từng đoạn 10 ngày, nghỉ giữa các lần gọi; Facebook báo "quá nhiều lệnh" thì chờ rồi thử lại
         for i in range(0, len(days), 10):
             chunk = days[i:i + 10]
@@ -229,7 +230,7 @@ def main():
                     if attempt < 3 and ("nhiều" in msg or "too many" in msg.lower() or "limit" in msg.lower()):
                         time.sleep(90)
                         continue
-                    errors.append(f"FB {acc}: {msg}")
+                    errors.append(("FBopt " if acc in ACCOUNTS_OPT else "FB ") + f"{acc}: {msg}")
                     break
             time.sleep(2)
     bills = billing(fb, errors)
