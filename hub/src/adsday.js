@@ -7,7 +7,7 @@
 const ADL={raw:null,at:0,busy:false,who:"",day:"",open:""};
 async function adlLoad(force){
   if(typeof svApi!=="function"||ADL.busy||(!force&&Date.now()-ADL.at<1800000))return;ADL.busy=true;
-  try{const r=await svApi("/api/hub/blob/ads_live");const ch=JSON.stringify(r)!==JSON.stringify(ADL.raw);ADL.raw=r;ADL.at=Date.now();if(ch&&PAGE==="fb_ads"&&!svTyping())renderMain()}catch(e){}finally{ADL.busy=false}
+  try{const r=await svApi("/api/hub/blob/ads_live");const ch=JSON.stringify(r)!==JSON.stringify(ADL.raw);ADL.raw=r;ADL.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp")&&!svTyping())renderMain()}catch(e){}finally{ADL.busy=false}
 }
 
 
@@ -87,8 +87,7 @@ async function adfLoad(force){
   try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp")&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
 }
 const ADF_ACC={"2438831049860777":"Việt Anh","1721213761771236":"Việt Anh","1340771911416054":"Thảo","187878951968758":"Thảo","1354614543145294":"Thảo"};
-const ADF_INBOX_OWNER="Việt Anh";
-const ADF_PROD={INBOX:"Đơn chốt qua inbox (chưa chia sản phẩm)",TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
+const ADF_PROD={TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
 /* Đọc tên chiến dịch: VA-TLAi-CD-… | DUAN-TD-CD-… | TĐ - TLAi - 23.9 - … | MESS - … (không ghi người: lấy theo tài khoản). */
 function adfParse(name,account){
   const raw=String(name||""),n=raw.toUpperCase().replace(/Đ/g,"D"),tk=n.split(/[^A-Z0-9]+/).filter(Boolean);
@@ -120,13 +119,21 @@ const adfPeriod=(D,per)=>{
   if(per==="d7")return D.keys.filter(k=>k<=D.last).slice(-7);
   return D.keys.filter(k=>k===per);
 };
+/* Doanh số, đơn của quảng cáo TIN NHẮN: lấy theo số sale nhập trong file BÁO CÁO DIGITAL (web đọc lại mỗi sáng). Tin nhắn chốt qua inbox không mang mã chiến dịch nên Pancake không tách được. */
+const adfSheetProd=id=>{id=String(id||"").toUpperCase();return id.startsWith("RUOI")?"RUOI":id.startsWith("MUOI")?"MUOI":id.startsWith("AIBIO")?"AIBIO":id.startsWith("TLG")?"TLG":/^(TD|TINH)/.test(id)?"TINHDAU":/^(LS|LAU)/.test(id)?"LS":""};
+function adfSheetMess(){
+  if(typeof adlLoad!=="function")return null;adlLoad();const S=adlData();if(!S)return null;
+  return {mo:S.yr+"-"+String(S.mo).padStart(2,"0"),rows:S.B.filter(b=>b.fun==="Tin nhắn"&&b.m).map(b=>({who:b.who,prod:adfSheetProd(b.id),orders:b.m.orders||[],rev:b.m.rev||[]}))};
+}
 function adfAgg(D,days){
   const C={},US={};let unmatched=0,unOrders=0;
   const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);return {name:nm.name||"",account:nm.account||"",owner:p.owner,prod:p.prod,typ:p.typ}})()));
   days.forEach(k=>{const d=D.days[k];if(!d)return;
     (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;x.msgs+=c.messages||0});
-    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else if(p.source==="Facebook"){const ik="__inbox",x=C[ik]||(C[ik]={id:ik,name:"Đơn chốt qua inbox Facebook (chưa gắn chiến dịch)",account:"",owner:ADF_INBOX_OWNER,prod:"INBOX",typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=p.orders||0;u.rev+=p.revenue||0}});
+    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=p.orders||0;u.rev+=p.revenue||0}});
   });
+  const SH=adfSheetMess();
+  if(SH)days.forEach(k=>{if(k.slice(0,7)!==SH.mo)return;const di=+k.slice(8)-1;SH.rows.forEach(r=>{const o=r.orders[di]||0,v=r.rev[di]||0;if(!o&&!v)return;const id="__sheet_"+r.who+"_"+r.prod;const x=C[id]||(C[id]={id,name:"Doanh số tin nhắn theo báo cáo Sheet ("+(ADF_PROD[r.prod]||"chưa rõ sản phẩm")+")",account:"",owner:r.who,prod:r.prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=o;x.rev+=v})});
   const links={};days.forEach(k=>((D.days[k]||{}).link||[]).forEach(l=>{const key=l.name||"(trang chưa có tên)";const t=links[key]||(links[key]={name:key,orders:0,rev:0});t.orders+=l.orders||0;t.rev+=l.revenue||0}));
   return {C:Object.values(C),unmatched,unOrders,unSrc:Object.values(US).sort((a,b)=>b.rev-a.rev),links:Object.values(links).sort((a,b)=>b.rev-a.rev)};
 }
