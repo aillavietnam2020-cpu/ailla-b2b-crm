@@ -121,8 +121,8 @@ const adfPeriod=(D,per)=>{
 };
 /* Doanh số, đơn của quảng cáo TIN NHẮN: lấy theo số sale nhập trong file BÁO CÁO DIGITAL (web đọc lại mỗi sáng). Tin nhắn chốt qua inbox không mang mã chiến dịch nên Pancake không tách được. */
 const adfSheetProd=id=>{id=String(id||"").toUpperCase();return id.startsWith("RUOI")?"RUOI":id.startsWith("MUOI")?"MUOI":id.startsWith("AIBIO")?"AIBIO":id.startsWith("TLG")?"TLG":/^(TD|TINH)/.test(id)?"TINHDAU":/^(LS|LAU)/.test(id)?"LS":""};
-const ADF_PAGE_OWNER={"105017945992971":"Việt Anh","61585541043585":"Việt Anh","100089661122548":"Thảo","61592606507215":"Duẩn","61566319940808":"Duẩn","61577468900810":"Duẩn"};
-const adfPageDay=d=>!!d&&(d.pos||[]).some(p=>p.page);
+const ADF_MESS={"Việt Anh":{pages:["105017945992971","61585541043585"],prods:["TLG"]}};
+const ADF_MESS_PROD={TLG:"TLG"};
 const adfWho=n=>{n=String(n||"").toLowerCase();return /vi[eệ]t anh/.test(n)?"Việt Anh":/th[aả]o/.test(n)?"Thảo":/du[aẩ]n/.test(n)?"Duẩn":"Chưa rõ người"};
 function adfSheetMess(){
   if(typeof adlLoad!=="function")return null;adlLoad();const S=adlData();if(!S)return null;
@@ -133,11 +133,14 @@ function adfAgg(D,days){
   const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);return {name:nm.name||"",account:nm.account||"",owner:p.owner,prod:p.prod,typ:p.typ}})()));
   days.forEach(k=>{const d=D.days[k];if(!d)return;
     (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;x.msgs+=c.messages||0});
-    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else if(p.source==="Facebook"&&ADF_PAGE_OWNER[p.page]){const who=ADF_PAGE_OWNER[p.page],id="__pg_"+who,x=C[id]||(C[id]={id,name:"Đơn chốt qua tin nhắn page của "+who+" (theo page)",account:"",owner:who,prod:"INBOX",typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=p.orders||0;u.rev+=p.revenue||0}});
+    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=p.orders||0;u.rev+=p.revenue||0}});
   });
   const SH=adfSheetMess();
-  days.forEach(k=>{const mk=(D.days[k]||{}).mk;if(adfPageDay(D.days[k])||!Array.isArray(mk))return;mk.forEach(r=>{const who=adfWho(r.marketer),id="__mk_"+who,x=C[id]||(C[id]={id,name:"Đơn chốt qua inbox, Pancake gắn Marketer ("+who+")",account:"",owner:who,prod:"INBOX",typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=r.orders||0;x.rev+=r.revenue||0})});
-  if(SH)days.forEach(k=>{if(adfPageDay(D.days[k])||Array.isArray((D.days[k]||{}).mk))return;if(k.slice(0,7)!==SH.mo)return;const di=+k.slice(8)-1;SH.rows.forEach(r=>{const o=r.orders[di]||0,v=r.rev[di]||0;if(!o&&!v)return;const id="__sheet_"+r.who+"_"+r.prod;const x=C[id]||(C[id]={id,name:"Doanh số tin nhắn theo báo cáo Sheet ("+(ADF_PROD[r.prod]||"chưa rõ sản phẩm")+")",account:"",owner:r.who,prod:r.prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=o;x.rev+=v})});
+  /* Doanh số tin nhắn: đơn nguồn Facebook, đúng page của người chạy, đúng sản phẩm chạy quảng cáo tin nhắn (quy ước chị Hoa 21/10). */
+  let attRev=0,attOrd=0;
+  days.forEach(k=>{const rows=(D.days[k]||{}).fbp;if(!Array.isArray(rows))return;rows.forEach(r=>{Object.entries(ADF_MESS).forEach(([who,cf])=>{if(!cf.pages.includes(r.page)||!cf.prods.includes(String(r.code).toUpperCase()))return;const prod=ADF_MESS_PROD[String(r.code).toUpperCase()]||String(r.code).toUpperCase(),id="__mess_"+who+"_"+prod,x=C[id]||(C[id]={id,name:"Doanh số tin nhắn của "+who+" (Pancake: đơn từ page của "+who+", sản phẩm "+(r.name||r.code)+")",account:"",owner:who,prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=r.orders||0;x.rev+=r.revenue||0;attRev+=r.revenue||0;attOrd+=r.orders||0})})});
+  if(attRev||attOrd){unmatched=Math.max(0,unmatched-attRev);unOrders=Math.max(0,unOrders-attOrd);if(US.Facebook){US.Facebook.rev=Math.max(0,US.Facebook.rev-attRev);US.Facebook.orders=Math.max(0,US.Facebook.orders-attOrd);if(!US.Facebook.rev&&!US.Facebook.orders)delete US.Facebook}}
+  if(SH)days.forEach(k=>{if(Array.isArray((D.days[k]||{}).fbp))return;if(k.slice(0,7)!==SH.mo)return;const di=+k.slice(8)-1;SH.rows.forEach(r=>{const o=r.orders[di]||0,v=r.rev[di]||0;if(!o&&!v)return;const id="__sheet_"+r.who+"_"+r.prod;const x=C[id]||(C[id]={id,name:"Doanh số tin nhắn theo báo cáo Sheet ("+(ADF_PROD[r.prod]||"chưa rõ sản phẩm")+")",account:"",owner:r.who,prod:r.prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=o;x.rev+=v})});
   const links={};days.forEach(k=>((D.days[k]||{}).link||[]).forEach(l=>{const key=l.name||"(trang chưa có tên)";const t=links[key]||(links[key]={name:key,orders:0,rev:0});t.orders+=l.orders||0;t.rev+=l.revenue||0}));
   /* Người chỉ chạy tin nhắn cho đúng một sản phẩm thì doanh số tin nhắn (theo page) tính vào sản phẩm đó. */
   const MP={};Object.values(C).forEach(x=>{if(x.typ==="Tin nhắn"&&x.prod&&x.prod!=="INBOX"&&x.spend>0)(MP[x.owner]=MP[x.owner]||new Set()).add(x.prod)});

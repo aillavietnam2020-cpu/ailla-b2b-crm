@@ -133,8 +133,20 @@ def pos_day(cfg, d, link_names, src_names, user_names):
                                  "delivered_rev": 0, "returned_rev": 0, "canceled": 0})
         for f in ("orders", "revenue", "delivered", "delivered_rev", "returned_rev", "canceled"):
             t[f] += m_[f]
-    mk = None
-    return camps, list(links.values()), mk
+    fbp = []
+    try:
+        for row, m_ in pos_split(cfg, d, ["Order.source", "Variation.product_id"]):
+            sid = str(row.get("Order.source", row.get("order_sources")))
+            if src_names.get(sid, "") != "Facebook":
+                continue
+            pr = row.get("product") or {}
+            cid = str(pr.get("custom_id") or "") if isinstance(pr, dict) else ""
+            fbp.append({"page": str(row.get("account") or row.get("page_id") or ""), "code": cid,
+                        "name": (pr.get("name") if isinstance(pr, dict) else "") or "",
+                        "orders": m_["orders"], "revenue": m_["revenue"]})
+    except BaseException:
+        fbp = None
+    return camps, list(links.values()), fbp
 
 
 def fb_rows(fb, account, since, until):
@@ -227,9 +239,9 @@ def main():
     user_names = pos_user_names(cfg)
     for d in days:
         try:
-            out[str(d)]["pos"], out[str(d)]["link"], mk_ = pos_day(cfg, d, link_names, src_names, user_names)
-            if mk_ is not None:
-                out[str(d)]["mk"] = mk_
+            out[str(d)]["pos"], out[str(d)]["link"], fbp_ = pos_day(cfg, d, link_names, src_names, user_names)
+            if fbp_ is not None:
+                out[str(d)]["fbp"] = fbp_
         except Exception as e:
             errors.append(f"Pancake {d}: {type(e).__name__} {str(e)[:120]}")
         time.sleep(0.3)
