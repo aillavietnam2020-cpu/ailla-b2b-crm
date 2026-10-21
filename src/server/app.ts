@@ -22,6 +22,7 @@ import { shippingVoucherRoutes } from './routes/shippingVouchers';
 import { agentRoutes } from './routes/agent';
 import { agentAdminRoutes } from './routes/agents';
 import { agentChatRoutes, agentRelayRoutes } from './routes/agentChat';
+import { agentTrainRoutes, agentTrainRelayRoutes } from './routes/agentTrain';
 import { proposalRoutes } from './routes/proposals';
 import { receivingAccountRoutes } from './routes/receivingAccounts';
 import { approvalRoutes, orderRoutes } from './routes/orders';
@@ -81,6 +82,7 @@ export function createApp() {
   app.route('/api/worker', workerRoutes);
   // Cầu nối trên VPS (nhắn agent trên web) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/agent-relay', agentRelayRoutes);
+  app.route('/api/agent-train-relay', agentTrainRelayRoutes);
   // Agent Fanpage (OpenClaw trên VPS) tự gọi bằng khoá riêng FP_KEY.
   app.route('/api/fp', fpAgentRoutes);
   app.route('/api/backup', backupRoutes);
@@ -109,6 +111,7 @@ export function createApp() {
   app.route('/api/agent', agentRoutes);
   // Nhắn agent trên web: chạy được cả ở trang vận hành, vẫn chỉ CEO.
   app.route('/api/agent-chat', agentChatRoutes);
+  app.route('/api/agent-train', agentTrainRoutes);
   app.route('/api/proposals', proposalRoutes);
   app.route('/api/receiving-accounts', receivingAccountRoutes);
   app.route('/api/orders', orderRoutes);
