@@ -138,6 +138,49 @@ def fb_rows(fb, account, since, until):
     return out
 
 
+BILL_FILE = Path("/opt/ailla/giaodich.json")
+
+
+def billing(fb, errors):
+    """Lịch sử trừ tiền / nạp tiền từ nhật ký tài khoản quảng cáo. Facebook chỉ giữ khoảng 7 ngày nên dồn vào file trên máy."""
+    try:
+        keep = json.loads(BILL_FILE.read_text(encoding="utf-8")) if BILL_FILE.exists() else {}
+    except Exception:
+        keep = {}
+    for acc in ACCOUNTS:
+        try:
+            rows = fb.all_pages(f"act_{acc}/activities", {"limit": 200, "fields": "event_type,event_time,extra_data,translated_event_type,object_name"})
+        except BaseException as e:
+            errors.append(f"GD {acc}: {str(e)[:100]}")
+            continue
+        for x in rows:
+            t = x.get("event_type")
+            if t not in ("ad_account_billing_charge", "funding_event_successful"):
+                continue
+            try:
+                ex = json.loads(x.get("extra_data") or "{}")
+            except Exception:
+                ex = {}
+            charge = t == "ad_account_billing_charge"
+            amount = num(ex.get("new_value") if charge else ex.get("amount"))
+            tx = str(ex.get("transaction_id") or "")
+            key = f"{acc}|{t}|{tx or x.get('event_time')}|{int(amount)}"
+            keep[key] = {"account": acc, "name": x.get("object_name") if charge else "", "kind": "tru" if charge else "nap",
+                         "time": x.get("event_time"), "amount": amount, "currency": ex.get("currency", "VND"), "tx": tx}
+        time.sleep(1)
+    names = {}
+    for v in keep.values():
+        if v["name"]:
+            names[v["account"]] = v["name"]
+    for v in keep.values():
+        v["name"] = names.get(v["account"], v["account"])
+    try:
+        BILL_FILE.write_text(json.dumps(keep, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        errors.append("GD lưu file: " + str(e)[:80])
+    return sorted(keep.values(), key=lambda v: v["time"] or "", reverse=True)
+
+
 def main():
     dry = "--dry" in sys.argv
     today = datetime.now(VN).date()
@@ -146,14 +189,24 @@ def main():
     errors = []
     fb = importlib.machinery.SourceFileLoader("fbads", "/usr/local/bin/fb-ads").load_module()
     for acc in ACCOUNTS:
-        try:
-            for r in fb_rows(fb, acc, str(days[0]), str(days[-1])):
-                if r["day"] in out:
-                    out[r["day"]]["fb"].append({k: v for k, v in r.items() if k != "day"})
-        except SystemExit as e:
-            errors.append(f"FB {acc}: {str(e)[:120]}")
-        except Exception as e:
-            errors.append(f"FB {acc}: {type(e).__name__} {str(e)[:120]}")
+        # chia từng đoạn 10 ngày, nghỉ giữa các lần gọi; Facebook báo "quá nhiều lệnh" thì chờ rồi thử lại
+        for i in range(0, len(days), 10):
+            chunk = days[i:i + 10]
+            for attempt in range(4):
+                try:
+                    for r in fb_rows(fb, acc, str(chunk[0]), str(chunk[-1])):
+                        if r["day"] in out:
+                            out[r["day"]]["fb"].append({k: v for k, v in r.items() if k != "day"})
+                    break
+                except BaseException as e:
+                    msg = str(e)[:140]
+                    if attempt < 3 and ("nhiều" in msg or "too many" in msg.lower() or "limit" in msg.lower()):
+                        time.sleep(90)
+                        continue
+                    errors.append(f"FB {acc}: {msg}")
+                    break
+            time.sleep(2)
+    bills = billing(fb, errors)
     cfg = env_file(POS_ENV)
     link_names = pos_link_names(cfg)
     src_names = pos_source_names(cfg)
@@ -194,7 +247,10 @@ def main():
             print(f"  {k[:55]} | {int(v):,}")
         print("LỖI:", errors or "không")
         return
-    body = json.dumps({"days": out}, ensure_ascii=False).encode()
+    if any(e.startswith("FB ") for e in errors):
+        print("KHÔNG GỬI vì Facebook còn lỗi, giữ số cũ trên web. Lỗi:", errors)
+        sys.exit(2)
+    body = json.dumps({"days": out, "billing": bills}, ensure_ascii=False).encode()
     req = urllib.request.Request(WEB, data=body, method="POST", headers={
         "Content-Type": "application/json", "X-Ingest-Key": KEY_FILE.read_text().strip(), "User-Agent": "ailla-ads-fb/1.0"})
     with urllib.request.urlopen(req, timeout=90) as r:

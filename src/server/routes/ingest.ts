@@ -40,9 +40,9 @@ ingestRoutes.post('/ads-live', async (c) => {
 ingestRoutes.post('/ads-fb', async (c) => {
   const raw = await c.req.text();
   if (raw.length > 12_000_000) throw badRequest('TOO_LARGE', 'Dữ liệu quá lớn');
-  const body = JSON.parse(raw) as { days?: Record<string, unknown> };
+  const body = JSON.parse(raw) as { days?: Record<string, unknown>; billing?: unknown[] };
   if (!body.days || typeof body.days !== 'object') throw badRequest('BAD_DATA', 'Thiếu dữ liệu các ngày');
-  const data = { at: nowIso(), days: body.days };
+  const data = { at: nowIso(), days: body.days, billing: Array.isArray(body.billing) ? body.billing.slice(0, 5000) : [] };
   await c.env.DB.prepare(
     `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES ('ads_fb', ?, 0, ?, NULL)
      ON CONFLICT (key) DO UPDATE SET data = excluded.data, admin_only = 0, updated_at = excluded.updated_at, updated_by = NULL`,
