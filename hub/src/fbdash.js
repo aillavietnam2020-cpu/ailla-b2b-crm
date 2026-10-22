@@ -9,19 +9,20 @@
    Trước 01/10: báo cáo Digital (Kho lưu trữ), cộng 10% thuế. Tháng 7, 8 theo ngày; tháng 9 lấy tổng tháng rồi chia theo nhịp chi từng ngày của BM. */
 const FBD_QC_API_FROM="2026-10-01",FBD_TAX_BM=1.04;
 /* Hệ số thuế: tháng 10 theo tiền thật Facebook đã trừ (371,8 triệu đã trừ / 357,3 triệu chi tiêu, 01–21/10); trước đó 1,10 theo báo cáo Digital. */
-/* Tháng 10: tiền thật Facebook trừ (tổng giao dịch "Đã thanh toán" trong Lập hóa đơn và thanh toán của BM, lưu ở bmPaid) chia cho chi tiêu BM cùng các ngày; ngày sau mốc dùng cùng hệ số. */
-let FBD_BMF={key:"",v:FBD_TAX_BM};
-function fbdBmFactor(){
-  const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,b=F&&F.bmPaid&&F.bmPaid["2026-10"];if(!b)return FBD_TAX_BM;
-  const key=(F.at||"")+"|"+((typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.at)||"");if(FBD_BMF.key===key)return FBD_BMF.v;
-  const R=(typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days)||{},raw=sum(Object.keys(R).filter(k=>k.slice(0,7)==="2026-10"&&k<=b.through),fbdApiDay);
-  const v=raw>0?Math.max(1,Math.min(1.15,b.total/raw)):FBD_TAX_BM;FBD_BMF={key,v};return v;
-}
-const fbdTax=k=>k>=FBD_QC_API_FROM?fbdBmFactor():1+FB_ADS_TAX;
+const fbdTax=k=>1+FB_ADS_TAX;
 const fbdApiDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];return d?sum(d.fb||[],c=>c.spend):0};
 function fbdQcRaw(k){
   const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null;
-  if(k>=FBD_QC_API_FROM){const v=fbdApiDay(k);if(v)return v;return sum(Object.keys(DAYD.ads||{}),w=>((DAYD.ads[w]||{})[k]||[0])[0])}
+  if(k>=FBD_QC_API_FROM){
+    const m=k.slice(0,7),dg=F&&F.qcDig&&F.qcDig[m];
+    if(dg){
+      if(dg.days[k]!=null)return dg.days[k];
+      /* ngày Digital chưa có số: lấy số BM nhân tỷ lệ Digital/BM của các ngày đã có */
+      const ks=Object.keys(dg.days),a=sum(ks,x=>dg.days[x]),b=sum(ks,fbdApiDay),v=fbdApiDay(k);
+      if(v&&b>0)return v*a/b;
+    }
+    const v=fbdApiDay(k);if(v)return v;return sum(Object.keys(DAYD.ads||{}),w=>((DAYD.ads[w]||{})[k]||[0])[0]);
+  }
   if(F&&F.qc&&F.qc[k]!=null)return F.qc[k];
   const m=k.slice(0,7);
   if(F&&F.qcMon&&F.qcMon[m]!=null){
@@ -190,4 +191,12 @@ function fbdDonut(items,total,mid){
   const r=44,C2=2*Math.PI*r;let off=0;
   const seg=items.filter(x=>x.v>0).map(x=>{const d=x.v/total*C2,o=`<circle cx="60" cy="60" r="${r}" fill="none" stroke="${x.c}" stroke-width="16" stroke-dasharray="${d.toFixed(2)} ${(C2-d).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 60 60)"><title>${x.n}: ${money(x.v)}</title></circle>`;off+=d;return o}).join("");
   return `<svg class="fbd-donut" viewBox="0 0 120 120"><circle cx="60" cy="60" r="${r}" fill="none" stroke="#eef0f5" stroke-width="16"/>${seg}<text x="60" y="56" text-anchor="middle" font-size="9" fill="#7a8397">Tổng chi phí</text><text x="60" y="72" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">${mid}</text></svg>`;
+}
+
+/* Đối chiếu chi phí quảng cáo tháng 10: báo cáo Digital hàng ngày x 1,1 và tổng giao dịch BM (bmPaid) cùng đến một ngày. Hết tháng dùng tổng giao dịch BM cả tháng, không nhân 1,1. */
+function fbdRecon(){
+  const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,b=F&&F.bmPaid&&F.bmPaid["2026-10"],dg=F&&F.qcDig&&F.qcDig["2026-10"];
+  if(!b||!dg)return "";
+  const dig=sum(Object.keys(dg.days).filter(k=>k<=b.through),k=>dg.days[k])*(1+FB_ADS_TAX),bm=b.total,df=bm?(dig-bm)/bm*100:0,ok=Math.abs(df)<=2;
+  return `<div class="fbd-recon ${ok?"ok":"bad"}"><b>Đối chiếu chi phí quảng cáo tháng 10 đến ${fbdVN(b.through)}:</b> báo cáo Digital × 1,1 = ${money(dig)} · giao dịch BM đã trừ = ${money(bm)} · chênh ${df.toLocaleString("vi-VN",{maximumFractionDigits:1})}% (${ok?"khớp":"lệch, cần kiểm tra"}). Hết tháng em thay bằng tổng giao dịch BM cả tháng (không nhân 1,1).</div>`;
 }

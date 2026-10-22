@@ -667,3 +667,4 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 .fbd-bl .v{text-align:right}.fbd-bl .v b{font-size:14px}
 @media (max-width:1300px){.fbd-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.fbd-strip .c{border-bottom:1px solid var(--line)}}
 @media (max-width:760px){.fbd-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.fbd-bl{grid-template-columns:1fr 1fr}.fbd-bl .bar{grid-column:1/-1;order:3}}
+.fbd-recon{margin-top:10px;font-size:12.5px;line-height:1.45;border-radius:8px;padding:8px 12px;border:1px solid var(--line)}.fbd-recon.ok{background:var(--green-soft);border-color:#c3e6d2}.fbd-recon.bad{background:var(--red-soft);border-color:#f3c9c9}
