@@ -84,7 +84,29 @@ function adlDaily(L,last){
 const ADF={raw:null,at:0,busy:false,who:"",per:"m0",open:""};
 async function adfLoad(force){
   if(typeof svApi!=="function"||ADF.busy||(!force&&Date.now()-ADF.at<1800000))return;ADF.busy=true;
-  try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp")&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
+  try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp"||PAGE==="bc_fb"||PAGE==="fb_sale")&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
+}
+/* Trang Facebook (Doanh thu, Hoạt động team Sale): Sheet Pancake chỉ có đến 29/9, nên ngày nào Sheet không có thì dựng từ số tự động (ads_fb).
+   Đơn tạo = đơn; hủy = đơn hủy; chốt = đơn − hủy; Pancake chỉ trả doanh số hoàn nên số đơn hoàn là ước lượng (250 nghìn/đơn hoàn, hiệu chỉnh theo 8/8–29/9);
+   giá vốn ước tính 15,6% doanh thu giao xong. Đối chiếu 8/8–29/9 với Sheet: đơn lệch 0,2%, doanh thu chốt lệch 0,4%. Chi phí QC theo chiến dịch Facebook, gộp theo người chạy. */
+const ADF_RET_AVG=250000,ADF_GV=0.156;
+function adfMergeDays(){
+  const R=ADF.raw;if(!(R&&R.days)||typeof DAYD==="undefined"||!DAYD)return;
+  DAYD.fb=DAYD.fb||{};DAYD.ads=DAYD.ads||{};
+  if(ADF.mgFor!==DAYD){ADF.mgFor=DAYD;ADF.mgAt="";ADF.mgFb=new Set();ADF.mgAds=[]}
+  const sig=R.at+"|"+((typeof FBS!=="undefined"&&FBS.raw)?FBS.raw.at:"");if(ADF.mgAt===sig)return;ADF.mgAt=sig;
+  ADF.mgFb.forEach(k=>delete DAYD.fb[k]);ADF.mgFb.clear();ADF.mgEst=new Set();ADF.mgAds.forEach(([o,k])=>{if(DAYD.ads[o])delete DAYD.ads[o][k]});ADF.mgAds=[];
+  const sheetAds=new Set();Object.values(DAYD.ads).forEach(o=>Object.keys(o).forEach(k=>sheetAds.add(k)));
+  const names={};Object.values(R.days).forEach(d=>(d.fb||[]).forEach(c=>{names[c.campaign_id]={name:c.campaign,account:c.account}}));
+  Object.keys(R.days).sort().forEach(k=>{const d=R.days[k],pos=d.pos||[];
+    if(pos.length&&!DAYD.fb[k]){let o=0,can=0,del=0,rev=0,dr=0,rt=0;pos.forEach(p=>{o+=p.orders||0;can+=p.canceled||0;del+=p.delivered||0;rev+=p.revenue||0;dr+=p.delivered_rev||0;rt+=p.returned_rev||0});
+      const fs=(typeof FBS!=="undefined"&&FBS.raw&&FBS.raw.days||{})[k],hoan=fs?Math.min(del,sum(fs,r=>r.hoan)):Math.min(del,Math.round(rt/ADF_RET_AVG)),dtG=Math.max(0,dr-rt);if(!fs)ADF.mgEst=(ADF.mgEst||new Set()).add(k);
+      DAYD.fb[k]=[o,Math.max(0,o-can),can,hoan,Math.max(0,del-hoan),dtG,rev,Math.round(dtG*ADF_GV),0,0];ADF.mgFb.add(k)}
+    if(!sheetAds.has(k)&&(d.fb||[]).length){const by={};
+      (d.fb||[]).forEach(c=>{const p=adfParse(c.campaign,c.account),a=by[p.owner]||(by[p.owner]=[0,0,0,0]);a[0]+=c.spend||0;a[1]+=p.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0))});
+      pos.forEach(p=>{const n=names[p.campaign_id];if(!n)return;const w=adfParse(n.name,n.account).owner,a=by[w]||(by[w]=[0,0,0,0]);a[2]+=p.orders||0;a[3]+=p.revenue||0});
+      Object.entries(by).forEach(([w,a])=>{(DAYD.ads[w]=DAYD.ads[w]||{})[k]=a;ADF.mgAds.push([w,k])})}
+  });
 }
 const ADF_ACC={"2438831049860777":"Việt Anh","1721213761771236":"Việt Anh","1340771911416054":"Thảo","187878951968758":"Thảo","1354614543145294":"Thảo"};
 const ADF_PROD={INBOX:"Đơn chốt qua inbox (chưa chia sản phẩm)",TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
@@ -133,7 +155,7 @@ function adfAgg(D,days){
   const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);return {name:nm.name||"",account:nm.account||"",owner:p.owner,prod:p.prod,typ:p.typ}})()));
   days.forEach(k=>{const d=D.days[k];if(!d)return;
     (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;/* Data: quảng cáo tin nhắn = số tin nhắn; quảng cáo chuyển đổi = số khách để lại thông tin (đăng ký hoàn tất) */x.msgs+=x.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0))});
-    (d.pos||[]).forEach(p=>{const od=(p.orders||0)-(p.canceled||0);/* đơn chốt = trừ đơn hủy, giống Pancake */if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=od;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=od;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=od;u.rev+=p.revenue||0}});
+    (d.pos||[]).forEach(p=>{const od=(p.orders||0)-(p.canceled||0);/* don chot = tru don huy, giong Pancake */if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=od;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=od;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=od;u.rev+=p.revenue||0}});
   });
   const SH=adfSheetMess();
   /* Doanh số tin nhắn: đơn nguồn Facebook, đúng page của người chạy, đúng sản phẩm chạy quảng cáo tin nhắn (quy ước chị Hoa 21/10). */
