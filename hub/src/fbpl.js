@@ -5,7 +5,7 @@
    Tab 3 Sản phẩm: lãi gộp từng sản phẩm, theo nhóm hàng.
    Dùng các hàm trong fbdash.js; nạp sau fbdash.js.
    ===================================================================== */
-const FBD={tab:"pl"};
+const FBD={tab:"pl"},FBD_RET_FC=0.08;/* tỷ lệ hoàn dự kiến 8%: chị Hoa thường dùng */
 function fbdShiftMonth(k){const d=pdate(k),t=new Date(d.getFullYear(),d.getMonth()-1,1),last=new Date(d.getFullYear(),d.getMonth(),0).getDate();t.setDate(Math.min(d.getDate(),last));return iso(t)}
 const fbdVN=k=>k.slice(8)+"/"+k.slice(5,7);
 const fbdCostTot=(C,hasQc)=>C.gv+C.ship+C.shipRet+(hasQc?C.qcT:0);
@@ -63,9 +63,8 @@ function pFbPL(m){
   /* Dự kiến khi các đơn đang giao có kết quả: chỉ hiện với kỳ còn đơn mới (14 ngày cuối của số liệu). Tháng đã đóng, tiền về hết thì số thật là số chuẩn. */
   const dataLast=Object.keys(DAYD.fb||{}).sort().pop()||lastK,matureEnd=iso(addD(pdate(dataLast),-14)),young=days.some(k=>k>matureEnd);
   let fcCard="";
-  if(young&&A.giao&&A.chot){const md=Object.keys(DAYD.fb||{}).filter(k=>k<=matureEnd&&k>=iso(addD(pdate(matureEnd),-30))),mg=sum(md,k=>DAYD.fb[k][4]),mc=sum(md,k=>DAYD.fb[k][1]),rS=mc?mg/mc:0;
-    if(rS>0){const f=Math.max(1,A.chot*rS/A.giao),dtF=C.dt*f,costF=(C.gv+C.ship+C.shipRet)*f+(A.hasQc?C.qcT:0),profF=dtF-costF;
-      fcCard=`<section class="fbd-card fbd-wide"><h3>Dự kiến khi các đơn đang giao có kết quả</h3><div class="fbd-fc">${[["Doanh thu dự kiến",money(dtF),"số thật "+money(C.dt)],["Tổng chi phí dự kiến",money(costF),"số thật "+money(tot)],["Lợi nhuận dự kiến",money(profF),"chưa trừ chi phí vận hành"],["Biên lợi nhuận dự kiến",fbdPct(profF,dtF),"số thật "+fbdPct(prof,C.dt)]].map(([l,v,s2])=>`<div><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`).join("")}</div><p class="fbd-note">Cách tính: các đơn đã chốt nhưng chưa giao xong sẽ giao thành công theo tỷ lệ thường lệ ${fbdPct(mg,mc,0)} (đơn chốt thành đơn giao thành công, tính trên ${md.length} ngày đã chốt kết quả, trước ${fbdVN(matureEnd)}). Giá vốn và vận chuyển tăng theo số đơn giao; chi phí quảng cáo giữ nguyên. Chỉ là ước tính, số chuẩn là số thật khi tiền đã về hết (khoảng 10 ngày sau khi hết tháng).</p></section>`}}
+  if(young&&C.fRev>0){const RET=FBD_RET_FC,add=C.fRev*(1-RET),dtF=C.dt+add,rate=C.dt?C.ship/C.dt:0,shipRetF=C.dt?C.shipRet*dtF/C.dt:0,costF=C.gv+C.fGv*(1-RET)+C.ship+rate*add+shipRetF+(A.hasQc?C.qcT:0),profF=dtF-costF;
+    fcCard=`<section class="fbd-card fbd-wide"><h3>Dự kiến khi các đơn đang giao có kết quả</h3><div class="fbd-fc">${[["Doanh thu dự kiến",money(dtF),"số thật "+money(C.dt)],["Tổng chi phí dự kiến",money(costF),"số thật "+money(tot)],["Lợi nhuận dự kiến",money(profF),"chưa trừ chi phí vận hành"],["Biên lợi nhuận dự kiến",fbdPct(profF,dtF),"số thật "+fbdPct(prof,C.dt)]].map(([l,v,s2])=>`<div><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`).join("")}</div><p class="fbd-note">Cách tính: doanh thu dự kiến = đơn đã giao thành công ${money(C.dt)} + (đơn đang vận chuyển và chưa giao ${money(C.fRev)}, ${nf(C.fN)} đơn) × (1 − ${Math.round(RET*100)}% hoàn dự kiến) = ${money(dtF)}. Giá vốn và phí vận chuyển của các đơn này tính theo giá vốn thật từng đơn và tỷ lệ phí hiện tại; chi phí quảng cáo giữ nguyên. Chỉ là ước tính; số chuẩn là số thật khi tiền đã về hết (khoảng 10 ngày sau khi hết tháng).</p></section>`}
   const cmp=`<section class="fbd-card fbd-wide"><h3>So sánh cùng kỳ tháng trước và mục tiêu tháng</h3><div class="fbd-cmpgrid"><div>${tbl(["Chỉ tiêu","Kỳ này","Cùng kỳ tháng trước","Chênh"],[cmpRows])}<p class="fbd-note">Kỳ này ${fbdVN(days[0])}–${fbdVN(days[days.length-1])}${Cp.n?`, tháng trước ${fbdVN(pdays[0])}–${fbdVN(pdays[pdays.length-1])} (${Cp.n} ngày có số)`:", chưa có số tháng trước để so"}. Mũi tên xanh là tốt: chi phí giảm, doanh thu và lợi nhuận tăng.</p></div>${goal}</div></section>`;
   const adv=fbdAdvice({C,Cp,A,prof,days}).map(([lv,t,a])=>`<div class="fbd-adv ${lv}"><b>${t}</b><span>${a}</span></div>`).join("");
   const advCard=`<section class="fbd-card"><h3>Cảnh báo và đề xuất</h3><div class="fbd-advs">${adv}</div></section>`;

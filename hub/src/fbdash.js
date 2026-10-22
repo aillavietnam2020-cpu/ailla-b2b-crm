@@ -4,6 +4,8 @@
    Trang quản trị (HOST_MODE === "admin"): hiện đủ giá vốn, phí hoàn, lãi gộp, lãi đóng góp kênh.
    Số lấy theo kỳ chọn ở thanh trên: Sheet Pancake đến 29/9, từ 30/9 dựng từ số tự động (adfMergeDays trong adsday.js).
    ===================================================================== */
+/* Chi phí QC trước ngày này lấy từ Kho lưu trữ của file Digital: số Facebook API chỉ đủ từ tháng 9 (tháng 8 API thiếu khoảng 38% so với file Digital). */
+const FBD_QC_API_FROM="2026-09-01";
 const FBD_SHIP=0.096,FBD_SHIP_RET=29900,FBD_TARGET=18.5;
 const fbdFull=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
 const fbdRange=(a,b)=>{const o=[];for(let d=pdate(a);iso(d)<=b&&o.length<800;d=addD(d,1))o.push(iso(d));return o};
@@ -16,7 +18,7 @@ function fbdAgg(days){
 }
 const fbdSeries=(days,f)=>days.map(k=>f(k));
 const fbdDay=k=>{const r=(DAYD.fb||{})[k];return r?r[6]||0:0};
-const fbdQc=k=>{let s=0;for(const o in DAYD.ads||{}){const x=DAYD.ads[o][k];if(x)s+=+x[0]||0}if(!s&&typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.qc)s=FBC.raw.qc[k]||0;return s*(1+FB_ADS_TAX)};
+const fbdQc=k=>{let s=0;for(const o in DAYD.ads||{}){const x=DAYD.ads[o][k];if(x)s+=+x[0]||0}const bq=(typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.qc)?FBC.raw.qc[k]:null;if(k<FBD_QC_API_FROM&&bq!=null)s=bq;else if(!s&&bq!=null)s=bq;return s*(1+FB_ADS_TAX)};
 function fbdSpark(v,w,h,col){
   const mx=Math.max(1,...v),n=v.length;if(n<2)return "";
   const pts=v.map((y,i)=>[i/(n-1)*w,h-2-y/mx*(h-6)]);
@@ -140,8 +142,8 @@ async function fbcLoad(force){
   try{const r=await svApi("/api/hub/blob/fb_cost_days");const ch=(r&&r.at)!==(FBC.raw&&FBC.raw.at);FBC.raw=r;if(r)FBC.at=Date.now();if(ch&&(PAGE==="bc_fb")&&!svTyping())renderMain()}catch(e){}finally{FBC.busy=false}
 }
 function fbdCost(days){
-  const R=FBC.raw&&FBC.raw.days,o={n:0,dt:0,gv:0,ship:0,shipRet:0,qc:0,qcT:0,last:"",gop:0};if(!R)return o;
-  days.forEach(k=>{const d=R[k];if(!d)return;o.n++;o.dt+=d.g[1];o.gv+=d.g[2];o.ship+=d.g[3];o.shipRet+=2*d.h[1];o.qc+=(sum(Object.keys(DAYD.ads||{}),w=>((DAYD.ads[w]||{})[k]||[0])[0])||((FBC.raw.qc||{})[k]||0));o.last=k});
+  const R=FBC.raw&&FBC.raw.days,o={n:0,dt:0,gv:0,ship:0,shipRet:0,qc:0,qcT:0,last:"",gop:0,fN:0,fRev:0,fGv:0};if(!R)return o;
+  days.forEach(k=>{const d=R[k];if(!d)return;o.n++;o.dt+=d.g[1];o.gv+=d.g[2];o.ship+=d.g[3];o.shipRet+=2*d.h[1];const bq=(FBC.raw.qc||{})[k],aq=sum(Object.keys(DAYD.ads||{}),w=>((DAYD.ads[w]||{})[k]||[0])[0]);o.qc+=(k<FBD_QC_API_FROM&&bq!=null)?bq:(aq||bq||0);if(d.f){o.fN+=d.f[0];o.fRev+=d.f[1];o.fGv+=d.f[2]};o.last=k});
   o.qcT=o.qc*(1+FB_ADS_TAX);o.gop=o.dt-o.gv-o.ship-o.shipRet;return o;
 }
 
