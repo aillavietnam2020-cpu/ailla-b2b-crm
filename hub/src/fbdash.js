@@ -9,7 +9,9 @@
    Trước 01/10: báo cáo Digital (Kho lưu trữ), cộng 10% thuế. Tháng 7, 8 theo ngày; tháng 9 lấy tổng tháng rồi chia theo nhịp chi từng ngày của BM. */
 const FBD_QC_API_FROM="2026-10-01",FBD_TAX_BM=1.04;
 /* Hệ số thuế: tháng 10 theo tiền thật Facebook đã trừ (371,8 triệu đã trừ / 357,3 triệu chi tiêu, 01–21/10); trước đó 1,10 theo báo cáo Digital. */
-const fbdTax=k=>1+FB_ADS_TAX;
+/* Tháng đã chốt (bmPaid[tháng].final): chi phí quảng cáo lấy đúng tổng giao dịch BM cả tháng, đã gồm thuế nên không nhân 1,1. */
+const fbdFinal=k=>{const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,b=F&&F.bmPaid&&F.bmPaid[k.slice(0,7)];return b&&b.final?b:null};
+const fbdTax=k=>fbdFinal(k)?1:1+FB_ADS_TAX;
 /* Số Digital hàng ngày có sẵn trên web: chi tiêu Facebook của các chiến dịch thuộc 3 người chạy ads (cùng số trang Hiệu quả Ads của vận hành đang hiện). Chiến dịch chưa rõ người không nằm trong số này. */
 const FBD_DIG_OWNERS=["Việt Anh","Thảo","Duẩn"];
 const fbdDigDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];if(!d||typeof adfParse!=="function")return 0;return sum(d.fb||[],c=>FBD_DIG_OWNERS.includes(adfParse(c.campaign,c.account).owner)?c.spend:0)};
@@ -17,6 +19,9 @@ const fbdApiDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF
 function fbdQcRaw(k){
   const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null;
   /* Giống trang "Giao dịch thanh toán Facebook" của vận hành: tháng 10 lấy số Facebook (cả chiến dịch chưa rõ người), tháng 9 lấy báo cáo Digital, nhân 1,1 để ra tiền Facebook trừ. */
+  const fin=fbdFinal(k);
+  if(fin){const m=k.slice(0,7),ks=Object.keys((typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days)||{}).filter(x=>x.slice(0,7)===m),tot=sum(ks,fbdApiDay);
+    if(tot>0)return fin.total*fbdApiDay(k)/tot;return fin.total/new Date(+m.slice(0,4),+m.slice(5,7),0).getDate()}
   const dsum=sum(Object.keys(DAYD.ads||{}),x=>((DAYD.ads[x]||{})[k]||[0])[0]);
   if(k>=FBD_QC_API_FROM){const w=fbdApiDay(k);return w||dsum}
   if(k.slice(0,7)==="2026-09"&&dsum)return dsum;
@@ -191,10 +196,10 @@ function fbdDonut(items,total,mid){
 }
 
 /* Đối chiếu chi phí quảng cáo tháng 10: báo cáo Digital hàng ngày x 1,1 và tổng giao dịch BM (bmPaid) cùng đến một ngày. Hết tháng dùng tổng giao dịch BM cả tháng, không nhân 1,1. */
-function fbdRecon(){
-  const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,b=F&&F.bmPaid&&F.bmPaid["2026-10"];
-  if(!b)return "";
-  const ks=Object.keys((typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days)||{}).filter(k=>k.slice(0,7)==="2026-10"&&k<=b.through);
-  const est=sum(ks,fbdApiDay)*(1+FB_ADS_TAX),bm=b.total,df=bm?(est-bm)/bm*100:0,ok=Math.abs(df)<=3;
-  return `<div class="fbd-recon ${ok?"ok":"bad"}"><b>Đối chiếu chi phí quảng cáo tháng 10 đến ${fbdVN(b.through)}:</b> số Facebook hàng ngày trên web × 1,1 = ${money(est)} · giao dịch BM đã trừ = ${money(bm)} · chênh ${df.toLocaleString("vi-VN",{maximumFractionDigits:1})}% (${ok?"khớp":"lệch"}). ${ok?"":"Facebook trừ tiền theo ngưỡng nên số đã trừ chưa theo kịp chi tiêu. "}Hết tháng em thay bằng tổng giao dịch BM cả tháng (không nhân 1,1).</div>`;
+function fbdRecon(periodDays){
+  const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,B=F&&F.bmPaid;if(!B)return "";
+  const months=[...new Set((periodDays||[]).map(k=>k.slice(0,7)))].filter(m=>B[m]);
+  return months.map(m=>{const b=B[m],ks=Object.keys((typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days)||{}).filter(k=>k.slice(0,7)===m&&k<=b.through);
+    const est=sum(ks,fbdApiDay)*(1+FB_ADS_TAX),bm=b.total,df=bm?(est-bm)/bm*100:0,ok=Math.abs(df)<=3,mm=m.slice(5)+"/"+m.slice(0,4);
+    return `<div class="fbd-recon ${ok?"ok":"bad"}"><b>Đối chiếu chi phí quảng cáo tháng ${mm}${b.final?" (đã chốt)":" đến "+fbdVN(b.through)}:</b> số Facebook hàng ngày trên web × 1,1 = ${money(est)} · giao dịch BM đã trừ = ${money(bm)} · chênh ${df.toLocaleString("vi-VN",{maximumFractionDigits:1})}% (${ok?"khớp":"lệch"}). ${b.final?"Tháng đã chốt: lãi lỗ dùng đúng tổng giao dịch BM, không nhân 1,1.":(ok?"":"Facebook trừ tiền theo ngưỡng nên số đã trừ chưa theo kịp chi tiêu. ")+"Hết tháng em thay bằng tổng giao dịch BM cả tháng (không nhân 1,1)."}</div>`}).join("");
 }
