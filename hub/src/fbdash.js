@@ -99,7 +99,7 @@ function pFbdash(m){
 PAGES.bc_fb=pFbdash;
 
 /* ---- Số bán hàng theo người xử lý đơn (blob fb_sale_days, máy chủ tự kéo từ Pancake mỗi sáng) ---- */
-const FBS={raw:null,at:0,busy:false};
+const FBS={raw:null,at:0,busy:false},FBS_KPI=["Mai Hương","Huyền Phạm"];/* người tính KPI: chị Hoa chốt 22/10/2026 */
 async function fbsLoad(force){
   if(typeof svApi!=="function"||FBS.busy||(!force&&Date.now()-FBS.at<1800000))return;FBS.busy=true;
   try{const r=await svApi("/api/hub/blob/fb_sale_days");const ch=(r&&r.at)!==(FBS.raw&&FBS.raw.at);FBS.raw=r;if(r)FBS.at=Date.now();if(ch&&(PAGE==="bc_fb"||PAGE==="fb_sale")&&!svTyping())renderMain()}catch(e){}finally{FBS.busy=false}
@@ -117,7 +117,11 @@ function fbsTbl(){
   const T=P.list.reduce((a,x)=>({tao:a.tao+x.tao,huy:a.huy+x.huy,hoan:a.hoan+x.hoan,giao:a.giao+x.giao,dt:a.dt+x.dt}),{tao:0,huy:0,hoan:0,giao:0,dt:0});
   const row=(x,i)=>{const chot=x.tao-x.huy,w=[];if(x.tao>=20&&x.huy/x.tao>.2)w.push(pill("hủy cao","red"));if(x.n==="(chưa gán)")w.push(pill("chưa gán người","amb"));
     return `<tr${i<0?' class="tot"':""}><td>${i<0?"":i+1}</td><td><b>${esc(x.n)}</b></td><td class="n">${tr(x.dt)}</td><td class="n">${nf(x.tao)}</td><td class="n">${nf(chot)}</td><td class="n">${nf(x.giao)}</td><td class="n">${nf(x.huy)}</td><td class="n">${nf(x.hoan)}</td><td class="n">${fbdPct(chot,x.tao)}</td><td class="n">${fbdPct(x.huy,x.tao)}</td><td>${w.join(" ")||"—"}</td></tr>`};
-  return tbl(["Hạng","Người xử lý đơn","Doanh thu","Đơn tạo","Chốt","Giao TC","Hủy","Hoàn","Tỷ lệ chốt","Tỷ lệ hủy","Cảnh báo"],P.list.map((x,i)=>row(x,i)).concat([row(Object.assign({},T,{n:"Tổng"}),-1)]))+`<p class="fbd-note">Số theo ngày tạo đơn, người xử lý là người bán hàng gắn trên đơn Pancake. Đơn hoàn tính theo ngày hoàn nên có thể nằm khác ngày với đơn gốc.</p>`;
+  const fold=t=>String(t).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/g,"d").toLowerCase().trim(),isK=x=>FBS_KPI.some(n=>fold(n)===fold(x.n));
+  const K=P.list.filter(isK),S=P.list.filter(x=>!isK(x)),sumL=(L,n)=>Object.assign(L.reduce((a,x)=>({tao:a.tao+x.tao,huy:a.huy+x.huy,hoan:a.hoan+x.hoan,giao:a.giao+x.giao,dt:a.dt+x.dt}),{tao:0,huy:0,hoan:0,giao:0,dt:0}),{n});
+  const head=t=>`<tr class="fbd-grp"><td colspan="11">${t}</td></tr>`;
+  const rows=[head("Người tính KPI")].concat(K.map((x,i)=>row(x,i)),K.length?[row(sumL(K,"Cộng nhóm tính KPI"),-1)]:[],[head("Hỗ trợ, đơn tự động, chưa gán người (không tính KPI)")],S.map((x,i)=>row(x,K.length+i)),[row(Object.assign({},T,{n:"Tổng"}),-1)]);
+  return tbl(["Hạng","Người xử lý đơn","Doanh thu","Đơn tạo","Chốt","Giao TC","Hủy","Hoàn","Tỷ lệ chốt","Tỷ lệ hủy","Cảnh báo"],rows)+`<p class="fbd-note">Số theo ngày tạo đơn, người xử lý là người bán hàng gắn trên đơn Pancake. Chỉ ${FBS_KPI.join(" và ")} tính KPI (Huyền Phạm đã đi làm lại, Dũng Hoàng đã nghỉ). Đơn hoàn tính theo ngày hoàn nên có thể nằm khác ngày với đơn gốc.</p>`;
 }
 
 /* ---- Giá vốn, phí vận chuyển thật theo ngày (blob fb_cost_days, lấy từ Sheet Pancake: giá vốn và phí ship từng đơn) ---- */
