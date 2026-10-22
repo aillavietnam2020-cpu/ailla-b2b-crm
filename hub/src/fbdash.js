@@ -97,7 +97,7 @@ PAGES.bc_fb=pFbdash;
 const FBS={raw:null,at:0,busy:false};
 async function fbsLoad(force){
   if(typeof svApi!=="function"||FBS.busy||(!force&&Date.now()-FBS.at<1800000))return;FBS.busy=true;
-  try{const r=await svApi("/api/hub/blob/fb_sale_days");const ch=(r&&r.at)!==(FBS.raw&&FBS.raw.at);FBS.raw=r;FBS.at=Date.now();if(ch&&(PAGE==="bc_fb"||PAGE==="fb_sale")&&!svTyping())renderMain()}catch(e){}finally{FBS.busy=false}
+  try{const r=await svApi("/api/hub/blob/fb_sale_days");const ch=(r&&r.at)!==(FBS.raw&&FBS.raw.at);FBS.raw=r;if(r)FBS.at=Date.now();if(ch&&(PAGE==="bc_fb"||PAGE==="fb_sale")&&!svTyping())renderMain()}catch(e){}finally{FBS.busy=false}
 }
 function fbsPeople(days){
   const R=FBS.raw;if(!R||!R.days)return null;const m={};let n=0;
@@ -119,7 +119,7 @@ function fbsTbl(){
 const FBC={raw:null,at:0,busy:false};
 async function fbcLoad(force){
   if(typeof svApi!=="function"||FBC.busy||(!force&&Date.now()-FBC.at<1800000))return;FBC.busy=true;
-  try{const r=await svApi("/api/hub/blob/fb_cost_days");const ch=(r&&r.at)!==(FBC.raw&&FBC.raw.at);FBC.raw=r;FBC.at=Date.now();if(ch&&(PAGE==="bc_fb")&&!svTyping())renderMain()}catch(e){}finally{FBC.busy=false}
+  try{const r=await svApi("/api/hub/blob/fb_cost_days");const ch=(r&&r.at)!==(FBC.raw&&FBC.raw.at);FBC.raw=r;if(r)FBC.at=Date.now();if(ch&&(PAGE==="bc_fb")&&!svTyping())renderMain()}catch(e){}finally{FBC.busy=false}
 }
 function fbdCost(days){
   const R=FBC.raw&&FBC.raw.days,o={n:0,dt:0,gv:0,ship:0,shipRet:0,qc:0,qcT:0,last:"",gop:0};if(!R)return o;
