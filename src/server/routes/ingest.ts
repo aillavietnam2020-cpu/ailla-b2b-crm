@@ -40,13 +40,14 @@ ingestRoutes.post('/ads-live', async (c) => {
 ingestRoutes.post('/ads-fb', async (c) => {
   const raw = await c.req.text();
   if (raw.length > 12_000_000) throw badRequest('TOO_LARGE', 'Dữ liệu quá lớn');
-  const body = JSON.parse(raw) as { days?: Record<string, unknown>; billing?: unknown[]; camp_page?: Record<string, string> };
+  const body = JSON.parse(raw) as { days?: Record<string, unknown>; billing?: unknown[]; camp_page?: Record<string, string>; acc_info?: unknown[] };
   if (!body.days || typeof body.days !== 'object') throw badRequest('BAD_DATA', 'Thiếu dữ liệu các ngày');
   const data = {
     at: nowIso(),
     days: body.days,
     billing: Array.isArray(body.billing) ? body.billing.slice(0, 5000) : [],
     camp_page: body.camp_page && typeof body.camp_page === 'object' ? body.camp_page : {},
+    acc_info: Array.isArray(body.acc_info) ? body.acc_info.slice(0, 50) : [],
   };
   await c.env.DB.prepare(
     `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES ('ads_fb', ?, 0, ?, NULL)

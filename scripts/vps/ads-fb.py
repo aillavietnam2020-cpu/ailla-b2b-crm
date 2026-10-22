@@ -230,6 +230,20 @@ def camp_pages(fb, ids_by_acc, errors):
     return out
 
 
+def acc_info(fb, errors):
+    """Tổng đã chi từ trước tới nay và dư nợ hiện tại của từng tài khoản quảng cáo, cho kế toán đối soát."""
+    out = []
+    for acc in ACCOUNTS + ACCOUNTS_OPT:
+        try:
+            r = fb.call("GET", f"act_{acc}", {"fields": "name,currency,amount_spent,balance,account_status"})
+            out.append({"account": acc, "name": r.get("name"), "currency": r.get("currency"), "amount_spent": num(r.get("amount_spent")),
+                        "balance": num(r.get("balance")), "status": r.get("account_status")})
+        except BaseException as e:
+            errors.append(f"INFO {acc}: {str(e)[:70]}")
+        time.sleep(0.5)
+    return out
+
+
 def main():
     dry = "--dry" in sys.argv
     today = datetime.now(VN).date()
@@ -262,6 +276,7 @@ def main():
                 mess_ids.setdefault(r["account"], set()).add(r["campaign_id"])
     camp_page = camp_pages(fb, mess_ids, errors)
     bills = billing(fb, errors)
+    info = acc_info(fb, errors)
     cfg = env_file(POS_ENV)
     link_names = pos_link_names(cfg)
     src_names = pos_source_names(cfg)
@@ -308,7 +323,7 @@ def main():
     if any(e.startswith("FB ") for e in errors):
         print("KHÔNG GỬI vì Facebook còn lỗi, giữ số cũ trên web. Lỗi:", errors)
         sys.exit(2)
-    body = json.dumps({"days": out, "billing": bills, "camp_page": camp_page}, ensure_ascii=False).encode()
+    body = json.dumps({"days": out, "billing": bills, "camp_page": camp_page, "acc_info": info}, ensure_ascii=False).encode()
     req = urllib.request.Request(WEB, data=body, method="POST", headers={
         "Content-Type": "application/json", "X-Ingest-Key": KEY_FILE.read_text().strip(), "User-Agent": "ailla-ads-fb/1.0"})
     with urllib.request.urlopen(req, timeout=90) as r:

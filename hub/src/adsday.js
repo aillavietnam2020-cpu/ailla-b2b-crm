@@ -7,7 +7,7 @@
 const ADL={raw:null,at:0,busy:false,who:"",day:"",open:""};
 async function adlLoad(force){
   if(typeof svApi!=="function"||ADL.busy||(!force&&Date.now()-ADL.at<1800000))return;ADL.busy=true;
-  try{const r=await svApi("/api/hub/blob/ads_live");const ch=JSON.stringify(r)!==JSON.stringify(ADL.raw);ADL.raw=r;ADL.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp")&&!svTyping())renderMain()}catch(e){}finally{ADL.busy=false}
+  try{const r=await svApi("/api/hub/blob/ads_live");const ch=JSON.stringify(r)!==JSON.stringify(ADL.raw);ADL.raw=r;ADL.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="fb_gd"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp")&&!svTyping())renderMain()}catch(e){}finally{ADL.busy=false}
 }
 
 
@@ -297,3 +297,50 @@ PAGES.adssp=function(m){
   if(tran)m.appendChild(tran);
 };
 PAGES.fb_ads=pAdsDay;
+/* =====================================================================
+   GIAO DỊCH THANH TOÁN FACEBOOK (Digital Marketing › Giao dịch thanh toán)
+   Từng lần Facebook trừ tiền / nạp tiền của tài khoản quảng cáo trong BM, cho kế toán đối soát.
+   Nguồn: nhật ký tài khoản quảng cáo; Facebook chỉ giữ khoảng 7 ngày nên máy chủ ghi dồn lại mỗi sáng 8h.
+   ===================================================================== */
+const ADG={acc:"",kind:""};
+function adgCsv(L){
+  const NL=String.fromCharCode(10),q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const txt=String.fromCharCode(65279)+["Giờ (VN)","Tài khoản","Mã tài khoản","Loại","Số tiền","Tiền tệ","Mã giao dịch"].map(q).join(",")+NL+L.map(b=>[adfDtm(b.time),b.name,b.account,b.kind==="tru"?"Trừ tiền":"Nạp tiền",b.amount,b.currency,b.tx].map(q).join(",")).join(NL);
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download="giao-dich-facebook-"+PERIOD.from+"-"+PERIOD.to+".csv";document.body.appendChild(a);a.click();a.remove();
+}
+function pFbGd(m){
+  adfLoad();const R=ADF.raw;
+  if(!R){m.innerHTML=H("Giao dịch thanh toán Facebook","Đang tải…")+`<section class="card"><p class="empty">Đang tải số liệu…</p></section>`;return}
+  const bills=R.billing||[],info=R.acc_info||[],D=adfData(),days=D?D.keys.filter(k=>k>=PERIOD.from&&k<=PERIOD.to):[];
+  const inP=bills.filter(b=>{const d=adfDt(b.time);return d>=PERIOD.from&&d<=PERIOD.to});
+  const names={};bills.forEach(b=>{if(b.name)names[b.account]=b.name});info.forEach(i=>{if(i.name)names[i.account]=i.name});
+  const accIds=[...new Set(bills.map(b=>b.account).concat(info.map(i=>i.account)))];
+  const L=inP.filter(b=>(!ADG.acc||b.account===ADG.acc)&&(!ADG.kind||b.kind===ADG.kind));
+  const spend={};days.forEach(k=>((D.days[k]||{}).fb||[]).forEach(c=>{spend[c.account]=(spend[c.account]||0)+(c.spend||0)}));
+  const tru=inP.filter(b=>b.kind==="tru"),nap=inP.filter(b=>b.kind==="nap"),sm=a=>a.reduce((x,b)=>x+(b.amount||0),0);
+  const first=bills.length?adfDt(bills[bills.length-1].time):"";
+  const rows=accIds.map(a=>{const t=inP.filter(b=>b.account===a&&b.kind==="tru"),n=inP.filter(b=>b.account===a&&b.kind==="nap"),i=info.find(x=>x.account===a)||{};return {a,name:names[a]||a,nTru:t.length,tru:sm(t),nNap:n.length,nap:sm(n),sp:spend[a]||0,spent:i.amount_spent,bal:i.balance}}).filter(r=>r.nTru||r.nNap||r.sp).sort((x,y)=>y.tru-x.tru);
+  const T=rows.reduce((o,r)=>({tru:o.tru+r.tru,nap:o.nap+r.nap,sp:o.sp+r.sp,spent:o.spent+(r.spent||0),bal:o.bal+(r.bal||0)}),{tru:0,nap:0,sp:0,spent:0,bal:0});
+  const at=new Date(R.at);
+  m.innerHTML=ADF_CSS+H("Giao dịch thanh toán Facebook","Lấy từ Business Manager · lần cuối "+at.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})+" "+at.toLocaleDateString("vi-VN"))+`
+  <div class="filters"><select id="adg-a">${opt([["","Tất cả tài khoản"]].concat(accIds.map(a=>[a,names[a]||a])),ADG.acc)}</select>
+  <select id="adg-k">${opt([["","Trừ tiền và nạp tiền"],["tru","Chỉ trừ tiền"],["nap","Chỉ nạp tiền"]],ADG.kind)}</select>
+  <span class="hint">Chọn kỳ ở thanh thời gian phía trên. Facebook chỉ giữ nhật ký khoảng 7 ngày, máy chủ ghi lại từ ${first?vnd(first):"—"}; khoản cũ hơn tải tay file giao dịch từ Facebook.</span>
+  <button class="btn" id="adg-csv" style="margin-left:auto">Tải Excel (CSV)</button></div>
+  <div class="grid kpis">${kpi("Tiền Facebook đã trừ",nf(T.tru)+"đ",tru.length+" lần · "+esc(pLabel()))}${kpi("Tiền đã nạp",nf(T.nap)+"đ",nap.length+" lần")}${kpi("Chi phí quảng cáo cùng kỳ",nf(Math.round(T.sp))+"đ","theo báo cáo chiến dịch")}${kpi("Dư nợ hiện tại",nf(T.bal)+"đ","Facebook chưa trừ")}${kpi("Tổng đã chi từ trước tới nay",nf(T.spent)+"đ","cộng các tài khoản")}</div>
+  <section class="card flush"><div class="card-h pad"><h2>Theo từng tài khoản quảng cáo</h2><span class="hint">${esc(pLabel())}</span></div><div class="tbl"><table><thead><tr><th>Tài khoản</th><th class="n">Số lần trừ</th><th class="n">Tiền bị trừ</th><th class="n">Số lần nạp</th><th class="n">Tiền nạp</th><th class="n">Chi phí quảng cáo cùng kỳ</th><th class="n">Dư nợ hiện tại</th><th class="n">Tổng đã chi từ trước</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.name)}</b><small class="mono">${esc(r.a)}</small></td><td class="n">${nf(r.nTru)}</td><td class="n">${nf(r.tru)}</td><td class="n">${nf(r.nNap)}</td><td class="n">${nf(r.nap)}</td><td class="n">${nf(Math.round(r.sp))}</td><td class="n">${r.bal==null?"—":nf(r.bal)}</td><td class="n">${r.spent==null?"—":nf(r.spent)}</td></tr>`).join("")||`<tr><td colspan="8" class="empty">Chưa có giao dịch trong kỳ này.</td></tr>`}<tr class="tot"><td><b>Tổng</b></td><td class="n"></td><td class="n">${nf(T.tru)}</td><td class="n"></td><td class="n">${nf(T.nap)}</td><td class="n">${nf(Math.round(T.sp))}</td><td class="n">${nf(T.bal)}</td><td class="n">${nf(T.spent)}</td></tr></tbody></table></div></section>
+  <section class="card flush"><div class="card-h pad"><h2>Từng lần trừ tiền, nạp tiền</h2><span class="hint">${L.length} giao dịch${L.length>400?" · hiện 400 dòng đầu, tải Excel để lấy đủ":""}</span></div><div class="tbl"><table><thead><tr><th>Giờ (VN)</th><th>Tài khoản</th><th>Loại</th><th class="n">Số tiền (đ)</th><th>Mã giao dịch</th></tr></thead><tbody>${L.slice(0,400).map(b=>`<tr><td>${adfDtm(b.time)}</td><td>${esc(b.name||b.account)}</td><td>${b.kind==="tru"?"Trừ tiền":"Nạp tiền"}</td><td class="n">${nf(b.amount)}</td><td class="mono">${esc(b.tx||"")}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">Chưa có giao dịch nào trong kỳ và bộ lọc này.</td></tr>`}</tbody></table></div></section>
+  ${srcNote("Nhật ký tài khoản quảng cáo của Facebook (Marketing API), máy chủ ghi lại mỗi sáng 8h. Dư nợ và tổng đã chi lấy trực tiếp từ từng tài khoản.")}`;
+  $("#adg-a").onchange=e=>{ADG.acc=e.target.value;renderMain()};
+  $("#adg-k").onchange=e=>{ADG.kind=e.target.value;renderMain()};
+  $("#adg-csv").onclick=()=>adgCsv(L);
+}
+PAGES.fb_gd=pFbGd;
+/* Thêm tab "Giao dịch thanh toán" vào nhóm Digital Marketing (không sửa file menu chung). */
+(function(){try{
+  const st=PAGE_SETS.find(x=>x.n==="Digital Marketing");
+  if(st&&!st.ids.includes("fb_gd")){const i=st.ids.indexOf("fb_ads")+1;st.ids.splice(i,0,"fb_gd");st.labels.splice(i,0,"Giao dịch thanh toán")}
+  const mk=MODULES.find(x=>x.k==="mkt");
+  if(mk&&!mk._gd){mk._gd=1;const g0=mk.groups;mk.groups=function(){const r=g0.apply(this,arguments);r.forEach(gr=>{const arr=gr[1],j=arr.findIndex(it=>it&&it[0]==="fb_ads");if(j>=0&&!arr.some(it=>it&&it[0]==="fb_gd"))arr.splice(j+1,0,MI("fb_gd","Giao dịch thanh toán",tm("ads",dgOk)))});return r}}
+}catch(e){console.warn("menu giao dịch",e)}})();
+
