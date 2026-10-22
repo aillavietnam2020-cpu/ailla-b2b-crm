@@ -209,6 +209,27 @@ def billing(fb, errors):
     return sorted(keep.values(), key=lambda v: v["time"] or "", reverse=True)
 
 
+def camp_pages(fb, ids_by_acc, errors):
+    """Page mà từng chiến dịch tin nhắn cũ (tên không ghi người) đang chạy trên đó, để gán cho người phụ trách page."""
+    out = {}
+    for acc, ids in ids_by_acc.items():
+        ids = sorted(ids)
+        for i in range(0, len(ids), 40):
+            chunk = ids[i:i + 40]
+            try:
+                rows = fb.all_pages(f"act_{acc}/adsets", {"limit": 200, "fields": "campaign_id,promoted_object",
+                                                        "filtering": json.dumps([{"field": "campaign.id", "operator": "IN", "value": chunk}])})
+            except BaseException as e:
+                errors.append(f"PG {acc}: {str(e)[:80]}")
+                continue
+            for r in rows:
+                pg = (r.get("promoted_object") or {}).get("page_id")
+                if pg and r.get("campaign_id") not in out:
+                    out[r["campaign_id"]] = str(pg)
+            time.sleep(1.5)
+    return out
+
+
 def main():
     dry = "--dry" in sys.argv
     today = datetime.now(VN).date()
@@ -234,6 +255,12 @@ def main():
                     errors.append(("FBopt " if acc in ACCOUNTS_OPT else "FB ") + f"{acc}: {msg}")
                     break
             time.sleep(2)
+    mess_ids = {}
+    for v in out.values():
+        for r in v["fb"]:
+            if str(r.get("campaign", "")).upper().startswith("MESS"):
+                mess_ids.setdefault(r["account"], set()).add(r["campaign_id"])
+    camp_page = camp_pages(fb, mess_ids, errors)
     bills = billing(fb, errors)
     cfg = env_file(POS_ENV)
     link_names = pos_link_names(cfg)
@@ -281,7 +308,7 @@ def main():
     if any(e.startswith("FB ") for e in errors):
         print("KHÔNG GỬI vì Facebook còn lỗi, giữ số cũ trên web. Lỗi:", errors)
         sys.exit(2)
-    body = json.dumps({"days": out, "billing": bills}, ensure_ascii=False).encode()
+    body = json.dumps({"days": out, "billing": bills, "camp_page": camp_page}, ensure_ascii=False).encode()
     req = urllib.request.Request(WEB, data=body, method="POST", headers={
         "Content-Type": "application/json", "X-Ingest-Key": KEY_FILE.read_text().strip(), "User-Agent": "ailla-ads-fb/1.0"})
     with urllib.request.urlopen(req, timeout=90) as r:
