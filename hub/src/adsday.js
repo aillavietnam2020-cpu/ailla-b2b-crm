@@ -320,6 +320,15 @@ function adgMonths(D,bills){
   out.forEach(r=>{r.tot=r.p.reduce((a,b)=>a+b,0)+r.other;r.est=Math.round(r.tot*1.1);const bm=bills.filter(b=>b.kind==="tru"&&adfDt(b.time).slice(0,7)===r.m);r.real=bm.length?bm.reduce((a,b)=>a+vatAmt(b),0):null});
   return out;
 }
+/* Báo cáo cuối tháng cho kế toán: (1) chi phí quảng cáo theo người, VAT 10%, so với giao dịch thực tế trong BM; (2) chi phí theo sản phẩm (từ Facebook) để tính lãi lỗ. */
+function adgMonthCsv(D,bills){
+  const NL=String.fromCharCode(10),q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"',line=a=>a.map(q).join(",");
+  const rows=[line(["BÁO CÁO CHI PHÍ QUẢNG CÁO FACEBOOK THEO THÁNG"]),line(["Tháng","Nguồn chi phí","Việt Anh","Thảo","Duẩn","Chưa rõ người","Tổng chi phí quảng cáo","VAT 10%","Tiền Facebook trừ ước tính (gồm VAT)","Giao dịch thực tế trong BM (gồm VAT)","Chênh lệch (thực tế trừ ước tính)"])];
+  adgMonths(D,bills).forEach(r=>{const vat=Math.round(r.tot*0.1);rows.push(line([r.m,r.src,...r.p.map(Math.round),Math.round(r.other),Math.round(r.tot),vat,r.est,r.real==null?"":r.real,r.real==null?"":r.real-r.est]))});
+  rows.push("",line(["CHI PHÍ QUẢNG CÁO THEO SẢN PHẨM (theo Facebook)"]),line(["Tháng","Sản phẩm","Chi phí quảng cáo","VAT 10%","Gồm VAT","Doanh số Pancake gắn chiến dịch","Đơn"]));
+  [...new Set(D.keys.map(k=>k.slice(0,7)))].sort().forEach(m=>{const ks=D.keys.filter(k=>k.slice(0,7)===m);if(!ks.length||ks[0].slice(8)!=="01")return;const by={};adfAgg(D,ks).C.forEach(x=>{if(!x.spend&&!x.rev)return;const n=ADF_PROD[x.prod]||"Chưa rõ sản phẩm",t=by[n]||(by[n]={sp:0,ds:0,don:0});t.sp+=x.spend;t.ds+=x.rev;t.don+=x.orders});Object.entries(by).sort((a,b)=>b[1].sp-a[1].sp).forEach(([n,t])=>rows.push(line([m,n,Math.round(t.sp),Math.round(t.sp*0.1),Math.round(t.sp*1.1),Math.round(t.ds),t.don])))});
+  const txt=String.fromCharCode(65279)+rows.join(NL),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download="bao-cao-thang-quang-cao-facebook.csv";document.body.appendChild(a);a.click();a.remove();
+}
 function pFbGd(m){
   adfLoad();const R=ADF.raw;
   if(!R){m.innerHTML=H("Giao dịch thanh toán Facebook","Đang tải…")+`<section class="card"><p class="empty">Đang tải số liệu…</p></section>`;return}
@@ -338,7 +347,7 @@ function pFbGd(m){
   <div class="filters"><select id="adg-a">${opt([["","Tất cả tài khoản"]].concat(accIds.map(a=>[a,names[a]||a])),ADG.acc)}</select>
   <select id="adg-k">${opt([["","Trừ tiền và nạp tiền"],["tru","Chỉ trừ tiền"],["nap","Chỉ nạp tiền"]],ADG.kind)}</select>
   <span class="hint">Chọn kỳ ở thanh thời gian phía trên. Facebook chỉ giữ nhật ký khoảng 7 ngày, máy chủ ghi lại từ ${first?vnd(first):"—"}; khoản cũ hơn tải tay file giao dịch từ Facebook.</span>
-  <button class="btn" id="adg-csv" style="margin-left:auto">Tải Excel (CSV)</button></div>
+  <button class="btn" id="adg-mcsv" style="margin-left:auto">Tải báo cáo tháng (Excel)</button><button class="btn" id="adg-csv">Tải giao dịch (Excel)</button></div>
   <div class="grid kpis">${kpi("Tiền Facebook đã trừ (gồm VAT 10%)",nf(T.tru)+"đ",tru.length+" lần · "+esc(pLabel()))}${kpi("Tiền đã nạp",nf(T.nap)+"đ",nap.length+" lần")}${kpi("Chi phí quảng cáo cùng giai đoạn",nf(Math.round(T.sp))+"đ",first?"từ "+vnd(first)+", theo báo cáo chiến dịch":"theo báo cáo chiến dịch")}${kpi("Dư nợ hiện tại",info.length?nf(T.bal)+"đ":"—","Facebook chưa trừ")}${kpi("Tổng đã chi từ trước tới nay",info.length?nf(T.spent)+"đ":"—","cộng các tài khoản")}</div>
   <section class="card flush"><div class="card-h pad"><h2>Theo tháng</h2><span class="hint">tiền Facebook trừ ước tính = chi phí quảng cáo × 1,1 (VAT 10%); có giao dịch BM thì hiện thêm số thực tế</span></div><div class="tbl"><table><thead><tr><th>Tháng</th><th class="n">Việt Anh</th><th class="n">Thảo</th><th class="n">Duẩn</th><th class="n">Chưa rõ người</th><th class="n">Tổng chi phí quảng cáo</th><th class="n">Tiền Facebook trừ ước tính (× 1,1)</th><th class="n">Giao dịch thực tế trong BM (gồm VAT)</th></tr></thead><tbody>${adgMonths(D,bills).map(r=>`<tr><td><b>${r.m.slice(5)}/${r.m.slice(0,4)}</b><small>nguồn: ${r.src}</small></td>${r.p.map(v=>`<td class="n">${v?nf(Math.round(v)):"—"}</td>`).join("")}<td class="n">${r.other?nf(Math.round(r.other)):"—"}</td><td class="n">${nf(Math.round(r.tot))}</td><td class="n"><b>${nf(r.est)}</b></td><td class="n">${r.real==null?"chưa có (máy ghi từ "+(first?vnd(first):"—")+")":nf(r.real)}</td></tr>`).join("")||`<tr><td colspan="8" class="empty">Chưa có số.</td></tr>`}</tbody></table></div></section>
   <section class="card flush"><div class="card-h pad"><h2>Theo từng tài khoản quảng cáo</h2><span class="hint">${esc(pLabel())}</span></div><div class="tbl"><table><thead><tr><th>Tài khoản</th><th class="n">Số lần trừ</th><th class="n">Tiền bị trừ (gồm VAT)</th><th class="n">Số lần nạp</th><th class="n">Tiền nạp</th><th class="n">Chi phí quảng cáo cùng giai đoạn</th><th class="n">Dư nợ hiện tại</th><th class="n">Tổng đã chi từ trước</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.name)}</b><small class="mono">${esc(r.a)}</small></td><td class="n">${nf(r.nTru)}</td><td class="n">${nf(r.tru)}</td><td class="n">${nf(r.nNap)}</td><td class="n">${nf(r.nap)}</td><td class="n">${nf(Math.round(r.sp))}</td><td class="n">${r.bal==null?"—":nf(r.bal)}</td><td class="n">${r.spent==null?"—":nf(r.spent)}</td></tr>`).join("")||`<tr><td colspan="8" class="empty">Chưa có giao dịch trong kỳ này.</td></tr>`}<tr class="tot"><td><b>Tổng</b></td><td class="n"></td><td class="n">${nf(T.tru)}</td><td class="n"></td><td class="n">${nf(T.nap)}</td><td class="n">${nf(Math.round(T.sp))}</td><td class="n">${nf(T.bal)}</td><td class="n">${nf(T.spent)}</td></tr></tbody></table></div></section>
@@ -347,6 +356,7 @@ function pFbGd(m){
   $("#adg-a").onchange=e=>{ADG.acc=e.target.value;renderMain()};
   $("#adg-k").onchange=e=>{ADG.kind=e.target.value;renderMain()};
   $("#adg-csv").onclick=()=>adgCsv(L);
+  $("#adg-mcsv").onclick=()=>adgMonthCsv(D,bills);
 }
 PAGES.fb_gd=pFbGd;
 /* Thêm tab "Giao dịch thanh toán" vào nhóm Digital Marketing (không sửa file menu chung). */
