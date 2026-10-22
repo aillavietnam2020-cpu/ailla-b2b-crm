@@ -6,7 +6,9 @@ import { auditStatement } from '../lib/audit';
 import { requirePermission } from '../middleware/rbac';
 import { adminOnlyEndpoint } from '../middleware/adminHost';
 import { khoReturnRoutes } from './khoReturns';
-import { purchasingRoutes } from './purchasing';
+import { purchasingRoutes, poStatus, autoPoForReceipt } from './purchasing';
+import { newId } from '../lib/ids';
+import { probeSaleSplit, syncFbSaleDays } from '../services/fbSales';
 import {
   POSCAKE_CHANNELS,
   SOURCE_CHANNELS,
@@ -1266,6 +1268,15 @@ khoRoutes.post('/docs', async (c) => {
     }
   }
 
+  // Phiếu nhập nguyên vật liệu có thể gắn với một phiếu mua (đặt hàng ở trang quản trị): hàng về thì phiếu mua tự nhảy trạng thái.
+  const poId = type === 'PN' && b.po_id ? String(b.po_id) : '';
+  let poRow: { id: string; no: string; status: string } | null = null;
+  if (poId) {
+    poRow = await c.env.DB.prepare('SELECT id, no, status FROM po_orders WHERE id = ?').bind(poId).first<{ id: string; no: string; status: string }>();
+    if (!poRow) throw badRequest('BAD_PO', 'Không tìm thấy phiếu mua đã chọn');
+    if (poRow.status === 'HUY') throw badRequest('PO_CANCELLED', `Phiếu mua ${poRow.no} đã hủy`);
+  }
+
   // Số phiếu: ký hiệu + năm tháng + số thứ tự, ví dụ PC2610-001. Trùng (hai người ghi cùng lúc) thì thử lại.
   const ym = date.slice(2, 4) + date.slice(5, 7);
   const now = nowIso();
@@ -1314,6 +1325,43 @@ khoRoutes.post('/docs', async (c) => {
       ip: ip(c),
     }),
   ]);
+  // Nhập nguyên vật liệu không có phiếu đặt nhưng có ghi nhà cung cấp (ví dụ vỏ can): tự tạo phiếu mua để Thảo nhập giá, kế toán theo dõi công nợ.
+  if (!poRow && type === 'PN' && String(b.partner ?? '').trim().length >= 2 && moves.length) {
+    const agg = new Map<string, { item: string; qty: number; price: number | null }>();
+    for (const m of moves) {
+      const x = agg.get(m.item);
+      if (x) x.qty += m.qty;
+      else agg.set(m.item, { item: m.item, qty: m.qty, price: m.price ?? null });
+    }
+    poRow = await autoPoForReceipt(c, String(b.partner), date, [...agg.values()], String(b.note ?? '').trim());
+  }
+  if (poRow) {
+    // Gắn phiếu nhập kho này vào phiếu mua: mỗi dòng hàng khớp dòng đặt cùng mã (ưu tiên dòng còn thiếu).
+    const poLines = (
+      await c.env.DB.prepare(
+        `SELECT l.id, l.item, l.qty - COALESCE((SELECT SUM(rl.qty) FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id
+                                                  WHERE rl.po_line_id = l.id AND r.status = 'OK'), 0) AS remain
+         FROM po_lines l WHERE l.po_id = ? ORDER BY l.sort`,
+      )
+        .bind(poRow.id)
+        .all<{ id: string; item: string; remain: number }>()
+    ).results;
+    const mv = (await c.env.DB.prepare('SELECT id, item, qty, price FROM kho_moves WHERE doc_id = ? ORDER BY id').bind(docId).all<{ id: number; item: string; qty: number; price: number | null }>()).results;
+    const rid = newId();
+    await c.env.DB.prepare('INSERT INTO po_receipts (id, po_id, receipt_date, kho_doc_id, note, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(rid, poRow.id, date, docId, String(b.note ?? '').trim(), 'OK', auth.user.id, now)
+      .run();
+    for (const m of mv) {
+      const cand = poLines.filter((l) => l.item === m.item);
+      const pl = cand.find((l) => l.remain > 1e-9) ?? cand[0] ?? null;
+      if (pl) pl.remain -= m.qty;
+      await c.env.DB.prepare('INSERT INTO po_receipt_lines (id, receipt_id, po_line_id, item, qty, unit_price, kho_move_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(newId(), rid, pl?.id ?? null, m.item, m.qty, m.price, m.id)
+        .run();
+    }
+    await poStatus(c.env.DB, poRow.id);
+    warnings.push(`Đã ghi nhận hàng về cho phiếu mua ${poRow.no}.`);
+  }
   return ok(c, { id: docId, no, warnings });
 });
 
@@ -1327,10 +1375,19 @@ khoRoutes.post('/docs/:id/cancel', async (c) => {
   if (!doc) throw notFound('Không tìm thấy phiếu');
   if (doc.status !== 'OK') throw conflict('ALREADY', 'Phiếu này đã hủy rồi');
   if (doc.type === 'TD' && !isCeo(auth)) throw forbidden('Chỉ CEO hủy phiếu tồn đầu kỳ');
+  // Phiếu nhập đã gắn phiếu mua: hủy thì phiếu mua trả về chưa nhận (trừ khi đã vào hóa đơn nhà cung cấp).
+  const linked = doc.type === 'PN'
+    ? (await c.env.DB.prepare("SELECT id, po_id FROM po_receipts WHERE kho_doc_id = ? AND status = 'OK'").bind(id).all<{ id: string; po_id: string }>()).results
+    : [];
+  for (const r of linked) {
+    const inv = await c.env.DB.prepare("SELECT invoice_no FROM po_invoices WHERE status = 'OK' AND receipt_ids LIKE ?").bind(`%"${r.id}"%`).first<{ invoice_no: string }>();
+    if (inv) throw badRequest('INVOICED', `Phiếu nhập này đã nằm trong chứng từ nhà cung cấp ${inv.invoice_no || '(chưa có số)'}. Hủy chứng từ trước.`);
+  }
   await c.env.DB.batch([
     c.env.DB.prepare(
       "UPDATE kho_docs SET status = 'HUY', cancelled_by = ?, cancelled_at = ?, cancel_reason = ? WHERE id = ? AND status = 'OK'",
     ).bind(auth.user.id, nowIso(), reason, id),
+    ...linked.map((r) => c.env.DB.prepare("UPDATE po_receipts SET status = 'HUY' WHERE id = ?").bind(r.id)),
     auditStatement(c.env.DB, {
       actorId: auth.user.id,
       action: 'KHO_DOC_CANCELLED',
@@ -1341,6 +1398,7 @@ khoRoutes.post('/docs/:id/cancel', async (c) => {
       ip: ip(c),
     }),
   ]);
+  for (const po of new Set(linked.map((r) => r.po_id))) await poStatus(c.env.DB, po);
   return ok(c, { id, no: doc.no });
 });
 
@@ -2550,4 +2608,25 @@ khoRoutes.get('/online/probe', async (c) => {
   const day = c.req.query('day');
   if (!isSrcChannel(channel) || !isDate(day)) throw badRequest('BAD_PARAMS', 'Cần kênh và ngày');
   return ok(c, await probeChannelDay(c.env.DB, c.env.INGEST_KEY, channel, day, httpFetch));
+});
+
+/** Chẩn đoán (CEO): Pancake chia số bán hàng Facebook theo người xử lý đơn bằng loại người nào. */
+khoRoutes.get('/online/probe-sale', async (c) => {
+  const auth = c.get('auth');
+  if (!isCeo(auth)) throw forbidden('Chỉ CEO chẩn đoán nguồn Pancake');
+  const day = c.req.query('day');
+  if (!isDate(day)) throw badRequest('BAD_PARAMS', 'Cần ngày');
+  return ok(c, await probeSaleSplit(c.env.DB, c.env.INGEST_KEY, day, httpFetch));
+});
+
+/** Chạy bù số bán hàng Facebook theo người (CEO): từ ngày đến ngày, tối đa 25 ngày mỗi lần. */
+khoRoutes.post('/online/sale-sync', async (c) => {
+  const auth = c.get('auth');
+  if (!isCeo(auth)) throw forbidden('Chỉ CEO chạy bù số Pancake');
+  const b = (await c.req.json().catch(() => ({}))) as { from?: string; to?: string };
+  if (!isDate(b.from) || !isDate(b.to) || b.to < b.from) throw badRequest('BAD_PARAMS', 'Cần từ ngày và đến ngày');
+  const days: string[] = [];
+  for (let t = Date.parse(`${b.from}T00:00:00Z`); t <= Date.parse(`${b.to}T00:00:00Z`) && days.length < 26; t += 86_400_000) days.push(new Date(t).toISOString().slice(0, 10));
+  if (days.length > 25) throw badRequest('TOO_MANY', 'Tối đa 25 ngày mỗi lần');
+  return ok(c, await syncFbSaleDays(c.env.DB, c.env.INGEST_KEY, days, httpFetch));
 });
