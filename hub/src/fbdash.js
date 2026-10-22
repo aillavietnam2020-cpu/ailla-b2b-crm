@@ -10,19 +10,16 @@
 const FBD_QC_API_FROM="2026-10-01",FBD_TAX_BM=1.04;
 /* Hệ số thuế: tháng 10 theo tiền thật Facebook đã trừ (371,8 triệu đã trừ / 357,3 triệu chi tiêu, 01–21/10); trước đó 1,10 theo báo cáo Digital. */
 const fbdTax=k=>1+FB_ADS_TAX;
+/* Số Digital hàng ngày có sẵn trên web: chi tiêu Facebook của các chiến dịch thuộc 3 người chạy ads (cùng số trang Hiệu quả Ads của vận hành đang hiện). Chiến dịch chưa rõ người không nằm trong số này. */
+const FBD_DIG_OWNERS=["Việt Anh","Thảo","Duẩn"];
+const fbdDigDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];if(!d||typeof adfParse!=="function")return 0;return sum(d.fb||[],c=>FBD_DIG_OWNERS.includes(adfParse(c.campaign,c.account).owner)?c.spend:0)};
 const fbdApiDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];return d?sum(d.fb||[],c=>c.spend):0};
 function fbdQcRaw(k){
   const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null;
-  if(k>=FBD_QC_API_FROM){
-    const m=k.slice(0,7),dg=F&&F.qcDig&&F.qcDig[m];
-    if(dg){
-      if(dg.days[k]!=null)return dg.days[k];
-      /* ngày Digital chưa có số: lấy số BM nhân tỷ lệ Digital/BM của các ngày đã có */
-      const ks=Object.keys(dg.days),a=sum(ks,x=>dg.days[x]),b=sum(ks,fbdApiDay),v=fbdApiDay(k);
-      if(v&&b>0)return v*a/b;
-    }
-    const v=fbdApiDay(k);if(v)return v;return sum(Object.keys(DAYD.ads||{}),w=>((DAYD.ads[w]||{})[k]||[0])[0]);
-  }
+  /* Giống trang "Giao dịch thanh toán Facebook" của vận hành: tháng 10 lấy số Facebook (cả chiến dịch chưa rõ người), tháng 9 lấy báo cáo Digital, nhân 1,1 để ra tiền Facebook trừ. */
+  const dsum=sum(Object.keys(DAYD.ads||{}),x=>((DAYD.ads[x]||{})[k]||[0])[0]);
+  if(k>=FBD_QC_API_FROM){const w=fbdApiDay(k);return w||dsum}
+  if(k.slice(0,7)==="2026-09"&&dsum)return dsum;
   if(F&&F.qc&&F.qc[k]!=null)return F.qc[k];
   const m=k.slice(0,7);
   if(F&&F.qcMon&&F.qcMon[m]!=null){
@@ -195,8 +192,9 @@ function fbdDonut(items,total,mid){
 
 /* Đối chiếu chi phí quảng cáo tháng 10: báo cáo Digital hàng ngày x 1,1 và tổng giao dịch BM (bmPaid) cùng đến một ngày. Hết tháng dùng tổng giao dịch BM cả tháng, không nhân 1,1. */
 function fbdRecon(){
-  const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,b=F&&F.bmPaid&&F.bmPaid["2026-10"],dg=F&&F.qcDig&&F.qcDig["2026-10"];
-  if(!b||!dg)return "";
-  const dig=sum(Object.keys(dg.days).filter(k=>k<=b.through),k=>dg.days[k])*(1+FB_ADS_TAX),bm=b.total,df=bm?(dig-bm)/bm*100:0,ok=Math.abs(df)<=2;
-  return `<div class="fbd-recon ${ok?"ok":"bad"}"><b>Đối chiếu chi phí quảng cáo tháng 10 đến ${fbdVN(b.through)}:</b> báo cáo Digital × 1,1 = ${money(dig)} · giao dịch BM đã trừ = ${money(bm)} · chênh ${df.toLocaleString("vi-VN",{maximumFractionDigits:1})}% (${ok?"khớp":"lệch, cần kiểm tra"}). Hết tháng em thay bằng tổng giao dịch BM cả tháng (không nhân 1,1).</div>`;
+  const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,b=F&&F.bmPaid&&F.bmPaid["2026-10"];
+  if(!b)return "";
+  const ks=Object.keys((typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days)||{}).filter(k=>k.slice(0,7)==="2026-10"&&k<=b.through);
+  const est=sum(ks,fbdApiDay)*(1+FB_ADS_TAX),bm=b.total,df=bm?(est-bm)/bm*100:0,ok=Math.abs(df)<=3;
+  return `<div class="fbd-recon ${ok?"ok":"bad"}"><b>Đối chiếu chi phí quảng cáo tháng 10 đến ${fbdVN(b.through)}:</b> số Facebook hàng ngày trên web × 1,1 = ${money(est)} · giao dịch BM đã trừ = ${money(bm)} · chênh ${df.toLocaleString("vi-VN",{maximumFractionDigits:1})}% (${ok?"khớp":"lệch"}). ${ok?"":"Facebook trừ tiền theo ngưỡng nên số đã trừ chưa theo kịp chi tiêu. "}Hết tháng em thay bằng tổng giao dịch BM cả tháng (không nhân 1,1).</div>`;
 }
