@@ -9,7 +9,15 @@
    Trước 01/10: báo cáo Digital (Kho lưu trữ), cộng 10% thuế. Tháng 7, 8 theo ngày; tháng 9 lấy tổng tháng rồi chia theo nhịp chi từng ngày của BM. */
 const FBD_QC_API_FROM="2026-10-01",FBD_TAX_BM=1.04;
 /* Hệ số thuế: tháng 10 theo tiền thật Facebook đã trừ (371,8 triệu đã trừ / 357,3 triệu chi tiêu, 01–21/10); trước đó 1,10 theo báo cáo Digital. */
-const fbdTax=k=>k>=FBD_QC_API_FROM?FBD_TAX_BM:1+FB_ADS_TAX;
+/* Tháng 10: tiền thật Facebook trừ (tổng giao dịch "Đã thanh toán" trong Lập hóa đơn và thanh toán của BM, lưu ở bmPaid) chia cho chi tiêu BM cùng các ngày; ngày sau mốc dùng cùng hệ số. */
+let FBD_BMF={key:"",v:FBD_TAX_BM};
+function fbdBmFactor(){
+  const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null,b=F&&F.bmPaid&&F.bmPaid["2026-10"];if(!b)return FBD_TAX_BM;
+  const key=(F.at||"")+"|"+((typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.at)||"");if(FBD_BMF.key===key)return FBD_BMF.v;
+  const R=(typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days)||{},raw=sum(Object.keys(R).filter(k=>k.slice(0,7)==="2026-10"&&k<=b.through),fbdApiDay);
+  const v=raw>0?Math.max(1,Math.min(1.15,b.total/raw)):FBD_TAX_BM;FBD_BMF={key,v};return v;
+}
+const fbdTax=k=>k>=FBD_QC_API_FROM?fbdBmFactor():1+FB_ADS_TAX;
 const fbdApiDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];return d?sum(d.fb||[],c=>c.spend):0};
 function fbdQcRaw(k){
   const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null;
