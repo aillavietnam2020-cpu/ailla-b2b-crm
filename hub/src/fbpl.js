@@ -60,7 +60,7 @@ function pFbPL(m){
   const bar=(v,c)=>`<div class="fbd-rb big"><i style="width:${Math.max(0,Math.min(100,v)).toFixed(1)}%;background:${c}"></i></div>`;
   const goal=`<div class="fbd-goal"><div class="l">Mục tiêu doanh số Facebook tháng ${mo}/${y}</div>${tg?`<div class="v">${money(A.dtChot)} <small>/ ${money(tg)}</small></div>${bar(pctT,pctT>=100?"#087a55":"#e7357b")}<div class="s">đạt ${fbdPct(A.dtChot,tg)} mục tiêu (doanh thu đơn chốt)${fc?`; theo đà hiện tại cuối tháng khoảng <b>${money(fc)}</b> (${fbdPct(fc,tg,0)} mục tiêu)`:""}</div>`:`<div class="s">Chưa đặt mục tiêu doanh số Facebook. Chị đặt ở trang Tổng quan, mục "Mục tiêu doanh số theo tháng", em sẽ so sánh tại đây.</div>`}<div class="l" style="margin-top:12px">Biên lợi nhuận so với mục tiêu ${FBD_TARGET.toLocaleString("vi-VN")}%</div>${bar(margin/FBD_TARGET*100,margin>=FBD_TARGET?"#087a55":"#f59f00")}<div class="s">hiện ${fbdPct(prof,C.dt)} (chưa trừ chi phí vận hành)</div></div>`;
   /* Dự kiến khi các đơn đang giao có kết quả: chỉ hiện với kỳ còn đơn mới (14 ngày cuối của số liệu). Tháng đã đóng, tiền về hết thì số thật là số chuẩn. */
-  const matureEnd=iso(addD(pdate(lastK),-14)),young=days.some(k=>k>matureEnd);
+  const dataLast=Object.keys(DAYD.fb||{}).sort().pop()||lastK,matureEnd=iso(addD(pdate(dataLast),-14)),young=days.some(k=>k>matureEnd);
   let fcCard="";
   if(young&&A.giao&&A.chot){const md=Object.keys(DAYD.fb||{}).filter(k=>k<=matureEnd&&k>=iso(addD(pdate(matureEnd),-30))),mg=sum(md,k=>DAYD.fb[k][4]),mc=sum(md,k=>DAYD.fb[k][1]),rS=mc?mg/mc:0;
     if(rS>0){const f=Math.max(1,A.chot*rS/A.giao),dtF=C.dt*f,costF=(C.gv+C.ship+C.shipRet)*f+(A.hasQc?C.qcT:0),profF=dtF-costF;
