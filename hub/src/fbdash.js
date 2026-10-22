@@ -6,6 +6,14 @@
    ===================================================================== */
 /* Chi phí QC trước ngày này lấy từ Kho lưu trữ của file Digital: số Facebook API chỉ đủ từ tháng 9 (tháng 8 API thiếu khoảng 38% so với file Digital). */
 const FBD_QC_API_FROM="2026-09-01";
+/* Chi phí quảng cáo một ngày (chưa thuế): từ 01/09 lấy đúng số Facebook BM kéo mỗi sáng (ads_fb); trước đó lấy Kho lưu trữ của file Digital; không có thì dùng số báo cáo cũ. */
+function fbdQcRaw(k){
+  if(k>=FBD_QC_API_FROM&&typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k]){const f=ADF.raw.days[k].fb||[];if(f.length)return sum(f,c=>c.spend)}
+  const bq=(typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.qc)?FBC.raw.qc[k]:null;
+  if(k<FBD_QC_API_FROM&&bq!=null)return bq;
+  const aq=sum(Object.keys(DAYD.ads||{}),w=>((DAYD.ads[w]||{})[k]||[0])[0]);
+  return aq||bq||0;
+}
 const FBD_SHIP=0.096,FBD_SHIP_RET=29900,FBD_TARGET=18.5;
 const fbdFull=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
 const fbdRange=(a,b)=>{const o=[];for(let d=pdate(a);iso(d)<=b&&o.length<800;d=addD(d,1))o.push(iso(d));return o};
@@ -13,12 +21,12 @@ const fbdPct=(a,b,dg=1)=>b?(a/b*100).toLocaleString("vi-VN",{maximumFractionDigi
 function fbdAgg(days){
   const a={tao:0,chot:0,huy:0,hoan:0,giao:0,dtGiao:0,dtChot:0,gv:0,qc:0,n:0,hasQc:false};
   days.forEach(k=>{const r=(DAYD.fb||{})[k];if(r){a.n++;a.tao+=r[0]||0;a.chot+=r[1]||0;a.huy+=r[2]||0;a.hoan+=r[3]||0;a.giao+=r[4]||0;a.dtGiao+=r[5]||0;a.dtChot+=r[6]||0;a.gv+=r[7]||0}
-    for(const o in DAYD.ads||{}){const x=DAYD.ads[o][k];if(x){a.qc+=+x[0]||0;a.hasQc=true}}});
+    {const q=fbdQcRaw(k);if(q){a.qc+=q;a.hasQc=true}}});
   a.qcT=a.qc*(1+FB_ADS_TAX);return a;
 }
 const fbdSeries=(days,f)=>days.map(k=>f(k));
 const fbdDay=k=>{const r=(DAYD.fb||{})[k];return r?r[6]||0:0};
-const fbdQc=k=>{let s=0;for(const o in DAYD.ads||{}){const x=DAYD.ads[o][k];if(x)s+=+x[0]||0}const bq=(typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.qc)?FBC.raw.qc[k]:null;if(k<FBD_QC_API_FROM&&bq!=null)s=bq;else if(!s&&bq!=null)s=bq;return s*(1+FB_ADS_TAX)};
+const fbdQc=k=>fbdQcRaw(k)*(1+FB_ADS_TAX);
 function fbdSpark(v,w,h,col){
   const mx=Math.max(1,...v),n=v.length;if(n<2)return "";
   const pts=v.map((y,i)=>[i/(n-1)*w,h-2-y/mx*(h-6)]);
@@ -143,7 +151,7 @@ async function fbcLoad(force){
 }
 function fbdCost(days){
   const R=FBC.raw&&FBC.raw.days,o={n:0,dt:0,gv:0,ship:0,shipRet:0,qc:0,qcT:0,last:"",gop:0,fN:0,fRev:0,fGv:0};if(!R)return o;
-  days.forEach(k=>{const d=R[k];if(!d)return;o.n++;o.dt+=d.g[1];o.gv+=d.g[2];o.ship+=d.g[3];o.shipRet+=2*d.h[1];const bq=(FBC.raw.qc||{})[k],aq=sum(Object.keys(DAYD.ads||{}),w=>((DAYD.ads[w]||{})[k]||[0])[0]);o.qc+=(k<FBD_QC_API_FROM&&bq!=null)?bq:(aq||bq||0);if(d.f){o.fN+=d.f[0];o.fRev+=d.f[1];o.fGv+=d.f[2]};o.last=k});
+  days.forEach(k=>{const d=R[k];if(!d)return;o.n++;o.dt+=d.g[1];o.gv+=d.g[2];o.ship+=d.g[3];o.shipRet+=2*d.h[1];o.qc+=fbdQcRaw(k);if(d.f){o.fN+=d.f[0];o.fRev+=d.f[1];o.fGv+=d.f[2]};o.last=k});
   o.qcT=o.qc*(1+FB_ADS_TAX);o.gop=o.dt-o.gv-o.ship-o.shipRet;return o;
 }
 
