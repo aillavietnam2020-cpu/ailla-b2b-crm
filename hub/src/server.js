@@ -81,7 +81,7 @@ function svNotify(a,b){if(!ME||!a.kiem)return;const neu=k=>(b[k]||[]).filter(x=>
   if(!msg.length)return;toast(msg.join(" · "));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join(" · ")})}catch(e){}
   document.title="("+msg.length+") Trang quản trị Ailla";setTimeout(()=>{document.title="Trang quản trị Ailla"},15000)}
 DB.load=async function(){
-  const me=await svApi("/api/me");SV.me=me.user;SV.perms=me.permissions||[];
+  const me=await svApi("/api/me");SV.me=me.user;SV.perms=me.permissions||[];SV.agentChat=me.agent_chat||[];
   const blob=k=>svApi("/api/hub/blob/"+k).catch(()=>null);
   const acct=isCeo()||SV.perms.includes("debt.read.all");
   SV.acct=acct;

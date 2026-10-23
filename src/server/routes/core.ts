@@ -7,12 +7,15 @@ import { listAlerts, syncAlerts } from '../services/alerts';
 import { loadConfig } from '../lib/settings';
 import { requirePermission } from '../middleware/rbac';
 import { adminOnlyEndpoint } from '../middleware/adminHost';
+import { allowedAgents } from './agentChat';
 
 export const coreRoutes = new Hono<AppEnv>();
 
-coreRoutes.get('/me', (c) => {
+coreRoutes.get('/me', async (c) => {
   const auth = c.get('auth');
   return ok(c, {
+    // Agent mà người này được nhắn trên trang Điều hành agent (rỗng thì không hiện mục đó).
+    agent_chat: await allowedAgents(c.env.DB, auth.user),
     user: auth.user,
     scope: auth.scope,
     // Quyền theo vai trò CỘNG quyền cấp thêm (gói Kế toán), nếu không giao diện sẽ ẩn
