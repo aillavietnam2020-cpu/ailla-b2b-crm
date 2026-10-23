@@ -150,4 +150,29 @@ describe('Phiếu hàng trả lại', () => {
     expect((await ctx.request(`/api/returns/${mine.id}`, { as: USERS.huyen })).status).toBe(404);
     expect((await ctx.request('/api/returns', { as: USERS.thao })).body.data).toHaveLength(1);
   });
+  it('hàng lỗi không thu về: không qua kho, không đổi tồn, kế toán xác nhận thẳng thì giảm công nợ', async () => {
+    const before = await getCustomerDebt(ctx.db as unknown as D1Database, 'cus-thao-1');
+    const stockBefore = await stock();
+    const short = await ctx.request('/api/returns', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', reason: 'lỗi', no_collect: true, items: [{ product_id: 'prod-full', qty: 2, unit_price: 100000 }] },
+    });
+    expect(short.status).toBe(400);
+    const created = await ctx.request('/api/returns', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', reason: 'Hàng móp vỡ, khách không gửi trả, bù cho khách', no_collect: true, items: [{ product_id: 'prod-full', qty: 2, unit_price: 100000 }] },
+    });
+    expect(created.status).toBe(200);
+    const r = created.body.data;
+    expect(r.status).toBe('DA_NHAN_KHO');
+    expect(r.no_collect).toBe(1);
+    expect(r.credit_amount).toBe(200000);
+    expect(await stock()).toBe(stockBefore);
+    const done = await ctx.request(`/api/returns/${r.id}/confirm`, { as: USERS.manager, body: { resolution: 'TRU_CONG_NO' } });
+    expect(done.status).toBe(200);
+    expect(done.body.data.status).toBe('DA_GIAM_NO');
+    const after = await getCustomerDebt(ctx.db as unknown as D1Database, 'cus-thao-1');
+    expect(after.official_debt).toBe(before.official_debt - 200000);
+    expect(await stock()).toBe(stockBefore);
+  });
 });

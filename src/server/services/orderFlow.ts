@@ -920,7 +920,7 @@ async function buildShippedAdjustment(
 ): Promise<{ statements: D1PreparedStatement[]; changes: Array<{ sku: string; name: string; ordered: number; shipped: number }> }> {
   const rows = await db
     .prepare(
-      `SELECT oi.id, p.sku, p.name, oi.qty, oi.applied_price, oi.line_total, oi.is_gift, okl.shipped_qty AS shipped
+      `SELECT oi.id, p.sku, p.name, oi.qty, oi.applied_price, oi.line_total, oi.is_gift, oi.gift_qty, okl.shipped_qty AS shipped
        FROM order_items oi
        JOIN products p ON p.id = oi.product_id
        LEFT JOIN order_kho_lines okl ON okl.order_id = oi.order_id AND okl.product_id = oi.product_id
@@ -935,6 +935,7 @@ async function buildShippedAdjustment(
       applied_price: number;
       line_total: number;
       is_gift: number;
+      gift_qty: number;
       shipped: number | null;
     }>();
   const items = rows.results ?? [];
@@ -994,7 +995,7 @@ async function buildShippedAdjustment(
       stmts.push(db.prepare('DELETE FROM order_items WHERE id = ?').bind(r.id));
       continue;
     }
-    const lineTotal = r.is_gift ? 0 : Math.round(r.shipped * r.applied_price);
+    const lineTotal = r.is_gift ? 0 : Math.round(Math.max(0, r.shipped - (r.gift_qty ?? 0)) * r.applied_price);
     stmts.push(
       db.prepare('UPDATE order_items SET qty = ?, line_total = ? WHERE id = ?').bind(r.shipped, lineTotal, r.id),
     );

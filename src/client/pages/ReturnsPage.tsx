@@ -101,7 +101,7 @@ export function ReturnsPage() {
                       {formatVnd(r.status === 'CHO_KHO' || r.status === 'HUY' ? r.claimed_amount : r.credit_amount)}
                     </td>
                     <td>
-                      <span className={`badge ${STATUS_TONE[r.status]} nowrap`}>{RETURN_STATUS_LABELS[r.status]}</span>
+                      <span className={`badge ${STATUS_TONE[r.status]} nowrap`}>{r.no_collect && r.status === 'DA_NHAN_KHO' ? 'Không thu về, chờ kế toán' : RETURN_STATUS_LABELS[r.status]}</span>
                     </td>
                     <td>{r.created_by_name ?? '—'}</td>
                   </tr>
@@ -161,6 +161,7 @@ function CreateReturnModal({ onClose, onDone }: { onClose: () => void; onDone: (
   const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
   const [reason, setReason] = useState('');
+  const [noCollect, setNoCollect] = useState(false);
   const [note, setNote] = useState('');
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [query, setQuery] = useState('');
@@ -225,6 +226,7 @@ function CreateReturnModal({ onClose, onDone }: { onClose: () => void; onDone: (
     setError(null);
     if (!customerId) return setError('Chọn khách hàng.');
     if (reason.trim().length < 2) return setError('Ghi lý do trả hàng.');
+    if (noCollect && reason.trim().length < 10) return setError('Hàng lỗi không thu về: ghi rõ lý do (hàng gì lỗi, vì sao không gửi trả về).');
     if (chosen.length === 0) return setError('Nhập số lượng trả cho ít nhất một mặt hàng.');
     for (const l of chosen) {
       if (l.max_qty !== null && Number(l.qty) > l.max_qty) {
@@ -237,6 +239,7 @@ function CreateReturnModal({ onClose, onDone }: { onClose: () => void; onDone: (
         customer_id: customerId,
         order_id: orderId || null,
         reason: reason.trim(),
+        no_collect: noCollect,
         note: note.trim() || null,
         items: chosen.map((l) => ({
           product_id: l.product_id,
@@ -245,7 +248,7 @@ function CreateReturnModal({ onClose, onDone }: { onClose: () => void; onDone: (
           unit_price: Math.round(Number(l.unit_price || 0)),
         })),
       });
-      toast.success(`Đã tạo phiếu ${res.data.return_no}. Chờ kho nhận hàng.`);
+      toast.success(noCollect ? `Đã tạo phiếu ${res.data.return_no}. Hàng không thu về, chờ kế toán xác nhận bù cho khách.` : `Đã tạo phiếu ${res.data.return_no}. Chờ kho nhận hàng.`);
       onDone(res.data.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không tạo được phiếu');
@@ -300,6 +303,12 @@ function CreateReturnModal({ onClose, onDone }: { onClose: () => void; onDone: (
         </Field>
         <Field label="Ghi chú thêm" full>
           <input value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+        <Field label="Hàng lỗi, khách không gửi trả về (công ty bù cho khách)" full>
+          <label className="mo-check">
+            <input type="checkbox" checked={noCollect} onChange={(e) => setNoCollect(e.target.checked)} />
+            Không thu hàng về kho: bỏ qua bước kho nhận, kế toán xác nhận bù thẳng (trừ công nợ hoặc hoàn tiền)
+          </label>
         </Field>
       </div>
 
@@ -458,7 +467,7 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
           <div>
             <ErrorBox message={error} />
             <p>
-              <span className={`badge ${STATUS_TONE[r.status]}`}>{RETURN_STATUS_LABELS[r.status]}</span>{' '}
+              <span className={`badge ${STATUS_TONE[r.status]}`}>{r.no_collect && r.status === 'DA_NHAN_KHO' ? 'Không thu về, chờ kế toán' : RETURN_STATUS_LABELS[r.status]}</span>{' '}
               <strong>{r.customer_name}</strong>
               {r.order_no && <> · đơn gốc {r.order_no}</>} · ngày {formatVnDate(r.return_date)}
             </p>
@@ -568,7 +577,7 @@ function ReturnModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
               {r.status !== 'CHO_KHO' && r.status !== 'HUY' && (
                 <>
                   {' '}
-                  · Giảm công nợ theo số kho nhận: <strong>{formatVnd(r.credit_amount)}</strong>
+                  · {r.no_collect ? 'Bù cho khách (hàng không thu về):' : 'Giảm công nợ theo số kho nhận:'} <strong>{formatVnd(r.credit_amount)}</strong>
                 </>
               )}
               {r.resolution && <> · {RETURN_RESOLUTION_LABELS[r.resolution]}</>}

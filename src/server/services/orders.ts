@@ -57,6 +57,40 @@ export interface PreparedLine {
   promotion_note?: string | null;
 }
 
+/**
+ * Cùng một sản phẩm vừa có dòng bán vừa có dòng tặng: lưu thành MỘT dòng (qty = tổng, gift_qty = phần tặng, tiền chỉ tính phần bán),
+ * để kho chỉ thấy một mã với tổng số lượng cần xuất.
+ */
+export function mergeLinesForStorage(lines: PreparedLine[]): Array<PreparedLine & { gift_qty: number }> {
+  const out: Array<PreparedLine & { gift_qty: number }> = [];
+  for (const l of lines) {
+    const mate = out.find((o) => o.product_id === l.product_id && Boolean(o.is_gift) !== Boolean(l.is_gift) && o.gift_qty === (o.is_gift ? o.qty : 0));
+    if (!mate) {
+      out.push({ ...l, gift_qty: l.is_gift ? l.qty : 0 });
+      continue;
+    }
+    const sale = mate.is_gift ? l : mate;
+    const gift = mate.is_gift ? mate : l;
+    out[out.indexOf(mate)] = { ...sale, qty: sale.qty + gift.qty, gift_qty: gift.qty, is_gift: false, promotion_note: gift.promotion_note ?? sale.promotion_note ?? null };
+  }
+  return out;
+}
+
+/** Ngược lại khi đọc đơn: dòng có gift_qty tách lại thành dòng bán + dòng tặng để hiện và sửa như cũ. */
+export function splitGiftRows<T extends { qty: number; applied_price: number; line_total: number; is_gift?: unknown; gift_qty?: number | null; id?: string }>(rows: T[]): T[] {
+  const out: T[] = [];
+  for (const r of rows) {
+    const g = Number(r.gift_qty ?? 0);
+    if (!g || g >= r.qty || r.is_gift) {
+      out.push(r);
+      continue;
+    }
+    out.push({ ...r, qty: r.qty - g, gift_qty: 0 });
+    out.push({ ...r, id: r.id ? `${r.id}-tang` : r.id, qty: g, applied_price: 0, line_total: 0, is_gift: (typeof r.is_gift === 'boolean' ? true : 1) as never, gift_qty: 0 });
+  }
+  return out;
+}
+
 export interface PreparedOrder {
   customer: CustomerRow;
   /** Sale đổi cấp giá của khách khi lập / sửa đơn: lưu cùng lúc với đơn. */
@@ -417,13 +451,13 @@ export async function createOrder(
       ),
   ];
 
-  for (const line of prepared.lines) {
+  for (const line of mergeLinesForStorage(prepared.lines)) {
     statements.push(
       db
         .prepare(
           `INSERT INTO order_items (id, order_id, product_id, qty, base_price, applied_price, line_total,
-             price_override, price_override_reason, tier_id_snapshot, is_gift, promotion_note, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             price_override, price_override_reason, tier_id_snapshot, is_gift, promotion_note, created_at, gift_qty)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           newId(),
@@ -439,6 +473,7 @@ export async function createOrder(
           line.is_gift ? 1 : 0,
           line.promotion_note ?? null,
           now,
+          line.gift_qty,
         ),
     );
   }
@@ -819,7 +854,7 @@ export async function getOrderDetail(
     .prepare(
       `SELECT oi.id, oi.product_id, p.sku, p.name AS product_name, oi.qty, oi.base_price,
               oi.applied_price, oi.line_total, oi.price_override, oi.price_override_reason,
-              oi.is_gift, oi.promotion_note, p.unit, p.pack_size
+              oi.is_gift, oi.gift_qty, oi.promotion_note, p.unit, p.pack_size
        FROM order_items oi JOIN products p ON p.id = oi.product_id
        WHERE oi.order_id = ? ORDER BY oi.created_at`,
     )
@@ -889,7 +924,7 @@ export async function getOrderDetail(
     revisions,
     remaining_amount:
       (order.total_amount ?? 0) - (order.cod_amount ?? 0) - (order.received_amount ?? 0),
-    items: (itemRows.results ?? []).map((i) => ({
+    items: splitGiftRows(itemRows.results ?? []).map((i) => ({
       ...i,
       price_override: Boolean(i.price_override),
       is_gift: Boolean((i as unknown as { is_gift: number }).is_gift),
@@ -1232,7 +1267,7 @@ export async function updateOrder(
   const oldItemRows = await db
     .prepare(
       `SELECT oi.product_id, p.sku, p.name, oi.qty, oi.applied_price, oi.line_total,
-              oi.price_override, oi.is_gift
+              oi.price_override, oi.is_gift, oi.gift_qty
        FROM order_items oi JOIN products p ON p.id = oi.product_id
        WHERE oi.order_id = ? ORDER BY oi.created_at`,
     )
@@ -1246,8 +1281,9 @@ export async function updateOrder(
       line_total: number;
       price_override: number;
       is_gift: number;
+      gift_qty: number;
     }>();
-  const oldItems = oldItemRows.results ?? [];
+  const oldItems = splitGiftRows(oldItemRows.results ?? []);
 
   const before: OrderRevisionSnapshot = {
     items: oldItems.map((i) => ({
@@ -1430,13 +1466,13 @@ export async function updateOrder(
     db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(orderId),
   ];
 
-  for (const line of prepared.lines) {
+  for (const line of mergeLinesForStorage(prepared.lines)) {
     statements.push(
       db
         .prepare(
           `INSERT INTO order_items (id, order_id, product_id, qty, base_price, applied_price, line_total,
-             price_override, price_override_reason, tier_id_snapshot, is_gift, promotion_note, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             price_override, price_override_reason, tier_id_snapshot, is_gift, promotion_note, created_at, gift_qty)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           newId(),
@@ -1452,6 +1488,7 @@ export async function updateOrder(
           line.is_gift ? 1 : 0,
           line.promotion_note ?? null,
           now,
+          line.gift_qty,
         ),
     );
   }

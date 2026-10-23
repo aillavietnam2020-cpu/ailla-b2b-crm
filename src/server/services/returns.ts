@@ -62,6 +62,7 @@ interface ReturnRow {
   claimed_amount: number;
   credit_amount: number;
   resolution: ReturnListItem['resolution'];
+  no_collect: number;
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;
@@ -76,7 +77,7 @@ interface ReturnRow {
 const SELECT_RETURN = `
   SELECT r.id, r.return_no, r.customer_id, c.name AS customer_name, c.owner_id AS owner_id,
          r.order_id, o.order_no AS order_no, r.status, r.return_date, r.reason, r.note,
-         r.claimed_amount, r.credit_amount, r.resolution, r.created_by,
+         r.claimed_amount, r.credit_amount, r.resolution, r.no_collect, r.created_by,
          cu.display_name AS created_by_name, r.created_at,
          ku.display_name AS kho_by_name, r.kho_at, r.kho_note,
          au.display_name AS acct_by_name, r.acct_at, r.acct_note
@@ -100,6 +101,7 @@ function toListItem(r: ReturnRow): ReturnListItem {
     reason: r.reason,
     claimed_amount: r.claimed_amount,
     credit_amount: r.credit_amount,
+    no_collect: r.no_collect,
     resolution: r.resolution,
     created_by_name: r.created_by_name,
     created_at: r.created_at,
@@ -271,6 +273,10 @@ export async function createReturn(
   const tierPrice = input.items.some((it) => it.unit_price === undefined && !bought.has(it.product_id))
     ? await customerPrices(db, input.customer_id, input.items.map((it) => it.product_id), date)
     : new Map<string, number>();
+  const noCollect = input.no_collect === true;
+  if (noCollect && input.reason.trim().length < 10) {
+    throw badRequest('REASON_TOO_SHORT', 'Hàng lỗi không thu về: ghi rõ lý do (hàng gì lỗi, vì sao không gửi trả) để kế toán đối chiếu.');
+  }
   let claimed = 0;
   const lineStatements: D1PreparedStatement[] = [];
   for (const it of input.items) {
@@ -280,10 +286,10 @@ export async function createReturn(
     lineStatements.push(
       db
         .prepare(
-          `INSERT INTO order_return_lines (id, return_id, product_id, qty, unit_price, deduction, line_note)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO order_return_lines (id, return_id, product_id, qty, unit_price, deduction, line_note, received_qty, condition)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(newId(), id, it.product_id, it.qty, price, deduction, it.line_note ?? null),
+        .bind(newId(), id, it.product_id, it.qty, price, deduction, it.line_note ?? null, noCollect ? it.qty : null, noCollect ? 'HONG' : null),
     );
   }
 
@@ -291,12 +297,28 @@ export async function createReturn(
     db
       .prepare(
         `INSERT INTO order_returns (id, return_no, customer_id, order_id, status, return_date, reason, note,
-           claimed_amount, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'CHO_KHO', ?, ?, ?, ?, ?, ?, ?)`,
+           claimed_amount, created_by, created_at, updated_at, no_collect, credit_amount, kho_note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, returnNo, input.customer_id, input.order_id ?? null, date, input.reason, input.note ?? null, claimed, auth.user.id, now, now),
+      .bind(
+        id,
+        returnNo,
+        input.customer_id,
+        input.order_id ?? null,
+        noCollect ? 'DA_NHAN_KHO' : 'CHO_KHO',
+        date,
+        input.reason,
+        input.note ?? null,
+        claimed,
+        auth.user.id,
+        now,
+        now,
+        noCollect ? 1 : 0,
+        noCollect ? claimed : 0,
+        noCollect ? 'Hàng lỗi, không thu về (không qua kho), bù cho khách' : null,
+      ),
     ...lineStatements,
-    logStmt(db, id, auth, 'TAO_PHIEU', input.reason, now),
+    logStmt(db, id, auth, noCollect ? 'TAO_PHIEU_KHONG_THU_VE' : 'TAO_PHIEU', input.reason, now),
     returnEvent(db, auth, 'RETURN_CREATED', id, { return_no: returnNo, customer_id: input.customer_id, claimed_amount: claimed }),
     auditStatement(db, {
       actorId: auth.user.id,

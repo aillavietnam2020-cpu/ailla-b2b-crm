@@ -325,10 +325,14 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
     existing.data.approval_status !== 'REJECTED';
 
   const addLine = (product: Suggest, supply = false) => {
-    if (lines.some((l) => l.product_id === product.id)) {
+    const same = lines.filter((l) => l.product_id === product.id);
+    // Cùng sản phẩm được có hai dòng: một dòng bán, một dòng tặng.
+    const addAsGift = same.length === 1 && !same[0].is_gift;
+    if (same.length > 0 && !addAsGift) {
       toast.error(`${product.sku} đã có trong đơn`);
       return;
     }
+    if (addAsGift) toast.success(`${product.sku} đã có dòng bán, thêm dòng TẶNG kèm`);
     setLines([
       ...lines,
       {
@@ -341,7 +345,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
         qty: 1,
         base_price: product.price,
         applied_price: null,
-        is_gift: false,
+        is_gift: addAsGift,
         carton_sku: isCartonUnit(product.unit),
         supply,
       },
@@ -646,7 +650,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                 const open = openLine === line.product_id;
                 const missing = lineNeedsPrice(line);
                 return (
-                  <div key={line.product_id} className={'mo-line' + (missing ? ' bad' : '')}>
+                  <div key={line.product_id + (line.is_gift ? "-tang" : "")} className={'mo-line' + (missing ? ' bad' : '')}>
                     <div className="mo-line-main">
                       <button
                         type="button"
@@ -815,7 +819,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                 </thead>
                 <tbody>
                   {lines.map((line, index) => (
-                    <tr key={line.product_id}>
+                    <tr key={line.product_id + (line.is_gift ? "-tang" : "")}>
                       <td>
                         <strong>{line.sku}</strong>
                         <div className="muted">{line.name}</div>

@@ -34,6 +34,8 @@ export const returnCreateSchema = z.object({
   return_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày trả không hợp lệ').optional(),
   reason: z.string().trim().min(2, 'Ghi lý do trả hàng').max(500),
   note: z.string().trim().max(1000).nullable().optional(),
+  /** Hàng lỗi khách không gửi trả về, công ty bù cho khách: không qua kho, kế toán xác nhận thẳng. */
+  no_collect: z.boolean().optional(),
   items: z
     .array(
       z.object({
@@ -106,6 +108,8 @@ export interface ReturnListItem {
   claimed_amount: number;
   credit_amount: number;
   resolution: ReturnResolution | null;
+  /** 1 = hàng lỗi không thu về (không qua kho). */
+  no_collect?: number;
   created_by_name: string | null;
   created_at: string;
 }

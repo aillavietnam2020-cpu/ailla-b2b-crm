@@ -117,7 +117,7 @@ export async function bonusReport(
     (
       await db
         .prepare(
-          `SELECT o.customer_id, substr(o.order_date, 1, 7) AS ym, o.order_date, oi.product_id, oi.qty, oi.line_total
+          `SELECT o.customer_id, substr(o.order_date, 1, 7) AS ym, o.order_date, oi.product_id, (oi.qty - oi.gift_qty) AS qty, oi.line_total
            FROM order_items oi
            JOIN orders o ON o.id = oi.order_id
            JOIN products p ON p.id = oi.product_id
@@ -307,7 +307,7 @@ export async function monthRetailByCustomer(
     (
       await db
         .prepare(
-          `SELECT o.customer_id, o.order_date, oi.product_id, oi.qty
+          `SELECT o.customer_id, o.order_date, oi.product_id, (oi.qty - oi.gift_qty) AS qty
          FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
          WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED' AND o.delivery_status <> 'HOAN'
            AND o.order_date >= ? AND o.order_date <= ? AND oi.is_gift = 0 AND oi.applied_price > 0 AND p.bonus_excluded = 0`,
