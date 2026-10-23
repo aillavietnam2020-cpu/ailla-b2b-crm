@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""hoi-agent - cho một agent (ví dụ Thảo) HỎI một agent khác và nhận câu trả lời.
+
+Dùng:  hoi-agent --as main <mã agent cần hỏi> "<câu hỏi>"
+Chỉ hỏi được các agent có trong danh sách cho phép (/root/.config/abos/ask-allow.json), ví dụ:
+  {"main": ["ke-toan-truong-ailla"]}
+Câu hỏi chạy trong một phiên riêng của agent được hỏi, không lẫn vào cuộc trò chuyện của chị Hoa với agent đó.
+"""
+import json, os, sqlite3, subprocess, sys, tempfile, time
+
+ALLOW = "/root/.config/abos/ask-allow.json"
+NAMES = {"main": "Thảo (AILLA Center)"}
+
+
+def die(msg):
+    print(msg)
+    sys.exit(1)
+
+
+def main():
+    a = sys.argv[1:]
+    if len(a) < 4 or a[0] != "--as":
+        die('Dùng: hoi-agent --as <mã của bạn> <mã agent cần hỏi> "<câu hỏi>"')
+    me, target, question = a[1], a[2], " ".join(a[3:]).strip()
+    try:
+        allow = json.load(open(ALLOW, encoding="utf-8"))
+    except Exception:
+        allow = {}
+    if target not in allow.get(me, []):
+        die(f"Bạn chưa được phép hỏi agent {target}. Chị Hoa chưa cho phép; hãy báo lại chị Hoa.")
+    if not question:
+        die("Thiếu câu hỏi.")
+    framed = (f"[Câu hỏi nội bộ từ {NAMES.get(me, me)}, hỏi thay chị Hoa (CEO). Hãy trả lời ngắn gọn, đúng sự thật, "
+              "dựa trên dữ liệu bạn đọc được (nếu cần số liệu thì dùng công cụ đọc web như bình thường). "
+              "Không làm việc nào khác ngoài trả lời câu hỏi. Nếu không đủ dữ liệu thì nói rõ là không biết.]\n\n" + question)
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        f.write(framed)
+        path = f.name
+    start_ms = int(time.time() * 1000) - 2000
+    key = f"agent:{target}:ask-{me}"
+    env = dict(os.environ, XDG_RUNTIME_DIR=os.environ.get("XDG_RUNTIME_DIR", "/run/user/0"))
+    try:
+        p = subprocess.run(["openclaw", "agent", "--agent", target, "--session-key", key, "--message-file", path,
+                            "--json", "--timeout", "300"], capture_output=True, text=True, timeout=360, env=env)
+    finally:
+        os.unlink(path)
+    if p.returncode != 0:
+        die("Agent được hỏi chưa trả lời được: " + (p.stderr or p.stdout).strip()[-300:])
+    reply = ""
+    try:
+        data = json.loads(p.stdout)
+        parts = []
+        for pl in (data.get("result") or {}).get("payloads", []):
+            t = pl.get("text") if isinstance(pl, dict) else None
+            if t and t.strip():
+                parts.append(t.strip())
+        reply = "\n\n".join(parts)
+    except ValueError:
+        pass
+    if not reply:
+        # Việc dài: lấy tin trả lời cuối trong nhật ký phiên.
+        try:
+            db = sqlite3.connect(f"file:/root/.openclaw/agents/{target}/agent/openclaw-agent.sqlite?mode=ro", uri=True, timeout=5)
+            r = db.execute("select current_session_id from session_nodes where session_key=?", (key,)).fetchone()
+            sid = r[0] if r else None
+            end = time.time() + 180
+            while sid and time.time() < end and not reply:
+                for _, ej in db.execute("select seq, event_json from transcript_events where session_id=? and created_at>? order by seq", (sid, start_ms)):
+                    m = (json.loads(ej).get("message") or {})
+                    if m.get("role") == "assistant":
+                        t = "\n".join(c.get("text", "") for c in (m.get("content") or []) if isinstance(c, dict) and c.get("type") == "text").strip()
+                        if t:
+                            reply = t
+                if not reply:
+                    time.sleep(5)
+            db.close()
+        except Exception as e:
+            die(f"Chưa đọc được câu trả lời: {e}")
+    print(reply or "(Agent được hỏi chưa trả lời bằng chữ.)")
+
+
+main()
