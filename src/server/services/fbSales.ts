@@ -157,3 +157,20 @@ export async function syncFbSaleDays(
     .run();
   return out;
 }
+
+/** Chẩn đoán (CEO): thử thêm tham số cho analytics/sale để biết Pancake có tính theo ngày tạo đơn không. */
+export async function probeSaleExtra(db: D1Database, secret: string | undefined, day: string, extra: Record<string, string>, fetchFn: FetchFn) {
+  const { shop, key } = await openFacebook(db, secret);
+  const res = await fetchFn(saleUrl(shop, key, day, ['User.id'], { user_type: 'sale', ...extra }));
+  const text = await res.text();
+  let rows: unknown[] = [];
+  try {
+    rows = (JSON.parse(text) as { data?: unknown[] }).data ?? [];
+  } catch {
+    /* không phải JSON */
+  }
+  return { day, extra, status: res.status, rows: rows.length, data: rows.map((r) => {
+    const x = ((r as Record<string, unknown>).result ?? {}) as Record<string, unknown>;
+    return { u: String((r as Record<string, unknown>)['User.id'] ?? ''), total: x.total_order_count, order_count: x.order_count, canceled: x.canceled_order_count, returned: x.returned_order_count, delivered: x.delivered_count, net: x.net_revenue, delivered_rev: x.delivered_revenue, returned_rev: x.returned_revenue };
+  }), error: res.ok ? undefined : text.slice(0, 200) };
+}
