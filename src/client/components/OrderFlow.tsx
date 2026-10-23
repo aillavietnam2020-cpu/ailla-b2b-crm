@@ -212,7 +212,18 @@ export function OrderFlowPanel({
         )}
 
         {/* Bước 3: kho kiểm tồn */}
-        {status === 'CHO_KIEM_KHO' && isKho && (
+        {status === 'CHO_KIEM_KHO' && isKho && me?.user.role === 'CEO' && (
+          /* Chủ doanh nghiệp có đủ quyền kho nhưng việc nhập kết quả kiểm tồn là của Kế toán kho: gấp lại cho gọn, cần thì bấm mở */
+          <details style={{ marginTop: 6 }}>
+            <summary style={{ cursor: 'pointer' }}>Nhập kết quả kiểm tồn thay Kế toán kho (mở ra khi cần)</summary>
+            <KhoCheckForm
+              order={order}
+              busy={busy}
+              onSubmit={(b) => run('kho-report', b, 'Đã báo kết quả kiểm kho')}
+            />
+          </details>
+        )}
+        {status === 'CHO_KIEM_KHO' && isKho && me?.user.role !== 'CEO' && (
           <KhoCheckForm
             order={order}
             busy={busy}
@@ -838,39 +849,42 @@ function KhoCheckForm({
                       <span className="muted">—</span>
                     )}
                   </td>
-                  <td style={{ minWidth: 230 }}>
-                    <select
-                      value={d.status}
-                      onChange={(e) =>
-                        set(l.product_id, { status: e.target.value as 'DU' | 'THIEU' })
-                      }
-                    >
-                      <option value="DU">Đủ hàng</option>
-                      <option value="THIEU">Thiếu hàng</option>
-                    </select>
-                    {d.status === 'THIEU' && (
-                      <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={l.qty - 1}
-                          value={d.ok_qty}
-                          onChange={(e) => set(l.product_id, { ok_qty: e.target.value })}
-                          placeholder={`Giao được (trên ${l.qty})`}
-                        />
-                        <input
-                          type="date"
-                          value={d.eta_date}
-                          onChange={(e) => set(l.product_id, { eta_date: e.target.value })}
-                          title="Ngày dự kiến có hàng / lịch sản xuất"
-                        />
-                        <input
-                          value={d.note}
-                          onChange={(e) => set(l.product_id, { note: e.target.value })}
-                          placeholder="Ghi chú (sản xuất xong ngày…)"
-                        />
-                      </div>
-                    )}
+                  <td className="kho-res">
+                    <div className="kho-res-grid">
+                      <select
+                        value={d.status}
+                        onChange={(e) =>
+                          set(l.product_id, { status: e.target.value as 'DU' | 'THIEU' })
+                        }
+                      >
+                        <option value="DU">Đủ hàng</option>
+                        <option value="THIEU">Thiếu hàng</option>
+                      </select>
+                      {d.status === 'THIEU' && (
+                        <>
+                          <input
+                            type="number"
+                            min={0}
+                            max={l.qty - 1}
+                            value={d.ok_qty}
+                            onChange={(e) => set(l.product_id, { ok_qty: e.target.value })}
+                            placeholder={`Giao được / ${l.qty}`}
+                            title={`Số giao được (trên ${l.qty})`}
+                          />
+                          <input
+                            type="date"
+                            value={d.eta_date}
+                            onChange={(e) => set(l.product_id, { eta_date: e.target.value })}
+                            title="Ngày dự kiến có hàng / lịch sản xuất"
+                          />
+                          <input
+                            value={d.note}
+                            onChange={(e) => set(l.product_id, { note: e.target.value })}
+                            placeholder="Ghi chú"
+                          />
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

@@ -2025,3 +2025,22 @@ table.data.wide input[type="checkbox"] { width: 14px; height: 14px; accent-color
 .stagechip.mine b { background: #f79009; color: #fff; }
 .stagechip.mine.on { background: #fff4d6; border-color: #dc6803; }
 .btn.todo { min-width: 112px; justify-content: center; white-space: nowrap; }
+
+/* Bảng kho kiểm tồn: cột Kết quả gọn, 2 ô một hàng, ô nhập cùng kiểu */
+.kho-res { min-width: 300px; }
+.kho-res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.kho-res-grid select,
+.kho-res-grid input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid #d5dbe6;
+  border-radius: 8px;
+  background: #fff;
+}
+.kho-res-grid select:focus,
+.kho-res-grid input:focus { outline: 2px solid #c7d2fe; border-color: #6366f1; }
