@@ -241,6 +241,67 @@ export async function autoAllocatePayment(
 }
 
 /**
+ * Bill đã gắn đơn này nhưng khoản tiền ghi lúc đơn chưa duyệt nên chưa trừ vào đơn (hoặc trừ thiếu):
+ * đơn đã duyệt thì trừ đúng khoản đó vào đơn. Phần tiền thừa lúc đó đã tính vào số dư có của khách thì trả lại cho khớp.
+ */
+export async function applyNamedPaymentsToOrder(
+  db: D1Database,
+  auth: AuthContext,
+  orderId: string,
+  ctx: { requestId: string; ip: string | null },
+): Promise<number> {
+  const o = await db
+    .prepare(
+      `SELECT o.id, o.customer_id, o.total_amount - COALESCE(o.cod_amount, 0) - COALESCE(a.received, 0) AS remaining
+       FROM orders o LEFT JOIN (${RECEIVED_BY_ORDER}) a ON a.order_id = o.id
+       WHERE o.id = ? AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED' AND o.delivery_status <> 'HOAN'`,
+    )
+    .bind(orderId)
+    .first<{ id: string; customer_id: string; remaining: number }>();
+  if (!o || o.remaining <= 0) return 0;
+  const rows = await db
+    .prepare(
+      `SELECT DISTINCT p.id, p.amount - COALESCE(a.allocated, 0) AS free
+       FROM bills b JOIN payments p ON p.id = b.payment_id
+       LEFT JOIN (${ALLOCATED_BY_PAYMENT}) a ON a.payment_id = p.id
+       WHERE b.order_id = ? AND b.deleted_at IS NULL AND p.customer_id = ? AND p.is_adjustment = 0 AND p.purpose <> 'DEPOSIT'
+         AND p.amount > COALESCE(a.allocated, 0)
+       ORDER BY p.paid_at ASC, p.created_at ASC`,
+    )
+    .bind(orderId, o.customer_id)
+    .all<{ id: string; free: number }>();
+  let left = o.remaining;
+  let applied = 0;
+  for (const r of rows.results ?? []) {
+    if (left <= 0) break;
+    const take = Math.min(left, r.free);
+    if (take <= 0) continue;
+    await allocatePayment(db, auth, r.id, [{ order_id: orderId, amount: take }], ctx);
+    const st = await db
+      .prepare(`SELECT after_json FROM audit_logs WHERE entity_type = 'PAYMENT' AND entity_id = ? AND action = ? ORDER BY created_at DESC LIMIT 1`)
+      .bind(r.id, LEFTOVER_SETTLED_ACTION)
+      .first<{ after_json: string | null }>()
+      .catch(() => null);
+    let credited = 0;
+    try {
+      credited = Number(JSON.parse(st?.after_json ?? '{}').to_credit ?? 0) || 0;
+    } catch {
+      credited = 0;
+    }
+    const back = Math.min(take, credited);
+    if (back > 0) {
+      await db
+        .prepare('UPDATE customer_credit_balances SET amount = MAX(0, amount - ?), updated_at = ? WHERE customer_id = ?')
+        .bind(back, nowIso(), o.customer_id)
+        .run();
+    }
+    left -= take;
+    applied += take;
+  }
+  return applied;
+}
+
+/**
  * Khách đặt cọc THẬT: tiền cọc nằm ở khách; khi đơn đã đi (xuất kho) thì trừ cọc còn dư vào đơn đó (cọc cũ trừ trước),
  * đơn nào cũng vậy. Tổng công nợ của khách không đổi (cọc vốn đã trừ nợ), chỉ là đơn hiện đúng đã thu bao nhiêu.
  * Trả về số tiền cọc đã trừ vào đơn.
@@ -260,6 +321,9 @@ export async function applyDepositsToOrder(
     .bind(orderId)
     .first<{ id: string; customer_id: string; remaining: number }>();
   if (!o || o.remaining <= 0) return 0;
+  const named = await applyNamedPaymentsToOrder(db, auth, orderId, ctx);
+  if (named >= o.remaining) return named;
+  o.remaining -= named;
   const deps = await db
     .prepare(
       `SELECT p.id, p.amount - COALESCE(a.allocated, 0) AS free
@@ -279,7 +343,7 @@ export async function applyDepositsToOrder(
     left -= take;
     applied += take;
   }
-  return applied;
+  return applied + named;
 }
 
 /**

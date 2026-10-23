@@ -609,4 +609,29 @@ describe('Gợi ý đơn cho khoản tiền chưa gắn + xác nhận một lầ
     const noWhy = await ctx.request(`/api/payments/${id}/void`, { as: USERS.manager, body: { reason: '' } });
     expect(noWhy.status).toBe(400);
   });
+  it('bill đã gắn đơn nhưng khoản tiền ghi lúc đơn chưa duyệt (chưa trừ đơn, đã thành số dư có): đơn duyệt xong thì tự trừ đúng đơn và trả lại số dư có', async () => {
+    const orderId = await approvedOrder();
+    const r = await pay(USERS.thao, { customer_id: 'cus-thao-1', amount: 1_000_000, method: 'Chuyển khoản' });
+    expect(r.status).toBe(200);
+    const pid = r.body.data.id as string;
+    // Giả lập: lúc ghi đơn chưa duyệt nên không trừ đơn, phần tiền bị tính thành số dư có.
+    await ctx.db.prepare('DELETE FROM payment_allocations WHERE payment_id = ?').bind(pid).run();
+    await ctx.db.prepare("UPDATE orders SET payment_status = 'CHUA_THU'").run();
+    await ctx.db.prepare('DELETE FROM customer_credit_balances').run();
+    await ctx.db.prepare("INSERT INTO customer_credit_balances (id, customer_id, amount, updated_at) VALUES ('cb-x', 'cus-thao-1', 1000000, '2026-01-01')").run();
+    await ctx.db.prepare("DELETE FROM audit_logs WHERE action = 'PAYMENT_LEFTOVER_SETTLED'").run();
+    await ctx.db
+      .prepare("INSERT INTO audit_logs (id, action, entity_type, entity_id, after_json, created_at) VALUES ('al-x', 'PAYMENT_LEFTOVER_SETTLED', 'PAYMENT', ?, ?, '2026-01-01')")
+      .bind(pid, JSON.stringify({ to_old_debt: 0, to_credit: 1_000_000 }))
+      .run();
+    await ctx.db
+      .prepare("INSERT INTO bills (id, customer_id, order_id, payment_id, amount, name, mime, size, data, created_at) VALUES ('bill-x', 'cus-thao-1', ?, ?, 1000000, 'b.png', 'image/png', 1, x'00', '2026-01-01')")
+      .bind(orderId, pid)
+      .run();
+    const ok = await ctx.request(`/api/orders/${orderId}/apply-deposit`, { as: USERS.manager, body: {} });
+    expect(ok.status).toBe(200);
+    const rows = await ctx.db.prepare('SELECT order_id, amount FROM payment_allocations WHERE payment_id = ?').bind(pid).all<{ order_id: string; amount: number }>();
+    expect(rows.results?.map((x) => x.order_id)).toEqual([orderId]);
+    expect(await creditOf()).toBe(0);
+  });
 });
