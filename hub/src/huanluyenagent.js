@@ -90,7 +90,7 @@ var HT_CSS=`<style id="ht-css">
 #ht .hdrawer .dh{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
 #ht .hdrawer .db{padding:16px 18px;overflow-y:auto;flex:1}
 #ht .hdrawer .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
-@media(max-width:900px){#ht .shell{grid-template-columns:1fr}#ht .hside{position:static;display:flex;flex-wrap:wrap;gap:2px}#ht .hside .sec{width:100%}#ht .hside button{width:auto}#ht .two,#ht .split{grid-template-columns:1fr}}
+@container ht (max-width:900px){#ht .shell{grid-template-columns:1fr}#ht .hside{position:static;display:flex;flex-wrap:wrap;gap:2px}#ht .hside .sec{width:100%}#ht .hside button{width:auto}#ht .two,#ht .split{grid-template-columns:1fr}}
 
 #ht .inbox{display:grid;grid-template-columns:290px minmax(0,1fr) 310px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);min-height:560px;box-shadow:var(--shadow)}
 #ht .inbox>div{min-width:0}
@@ -123,7 +123,16 @@ var HT_CSS=`<style id="ht-css">
 #ht .rp h4{margin:14px 0 6px;font-size:13px}
 #ht .rpt h4:first-child{margin-top:0}
 #ht .pvx{background:var(--gray-soft);border-radius:10px;padding:8px 10px;font-size:13px}
-@media(max-width:1100px){#ht .inbox{grid-template-columns:1fr}#ht .cl,#ht .rp{border:0;max-height:none}}
+/* Màn Hội thoại co theo bề rộng khung trang (không theo màn hình), vì menu bên trái của web đã chiếm chỗ */
+@container ht (max-width:1300px){#ht .inbox{grid-template-columns:280px minmax(0,1fr)}#ht .inbox .rp{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line);max-height:none}}
+@container ht (max-width:780px){#ht .inbox{grid-template-columns:1fr}#ht .cl{max-height:300px;border-right:0;border-bottom:1px solid var(--line)}}
+
+#ht .hwrap{container:ht/inline-size}
+#ht .chd{flex-wrap:wrap}
+#ht .chd>div{min-width:0}
+#ht .rp,#ht .rpt{overflow-wrap:anywhere}
+#ht .achip{white-space:normal;text-align:left}
+#ht .thr{min-height:180px}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -193,9 +202,9 @@ function draw(){
   var cvOld=document.getElementById("cvw"),sl=cvOld?cvOld.scrollLeft:0,stp=cvOld?cvOld.scrollTop:0;
   var focusId=document.activeElement&&document.activeElement.id==="simin"?"simin":(document.activeElement&&(document.activeElement.id==="q"||document.activeElement.id==="cvq")?document.activeElement.id:"");
   var keepV=focusId?document.activeElement.value:null,keepPos=focusId&&document.activeElement.selectionStart;
-  root.innerHTML=topbar()+'<div id="ht-issues">'+(ST.view==="bot"?issuesBar():"")+"</div>"+
+  root.innerHTML='<div class="hwrap">'+topbar()+'<div id="ht-issues">'+(ST.view==="bot"?issuesBar():"")+"</div>"+
     (ST.ctl.kill?'<div class="alert bad">ĐANG TẮT KHẨN: mọi agent ngừng trả lời ở tất cả Page. Bấm "Gỡ tắt khẩn" để bật lại.</div>':"")+
-    (ST.view==="home"?home():botView())+(ST.drawer?drawerHtml():"");
+    (ST.view==="home"?home():botView())+"</div>"+(ST.drawer?drawerHtml():"");
   if(keepV!==null){var el=document.getElementById(focusId);if(el){el.value=keepV;el.focus();try{el.setSelectionRange(keepPos,keepPos)}catch(e){}}}
   var ch=document.getElementById("chat");if(ch)ch.scrollTop=ch.scrollHeight;
   var thr=document.getElementById("thr");if(thr)thr.scrollTop=thr.scrollHeight;
