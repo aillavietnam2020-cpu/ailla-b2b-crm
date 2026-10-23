@@ -74,6 +74,43 @@ const fbdGrid=groups=>`<section class="fbd-pn">${groups.map(([n,L])=>`<div class
 /* Dải chỉ số chính kiểu Pancake: một hàng số lớn, có thể kèm biểu đồ ngay dưới trong cùng một khung */
 const fbdTop=(cells,extra)=>`<section class="fbd-pn"><div class="fbd-gr big">${cells.map(fbdTile).join("")}</div>${extra||""}</section>`;
 const fbdN2=v=>v?v.toLocaleString("vi-VN",{maximumFractionDigits:2}):"—";
+/* ---- Kiểu Pancake: hàng chỉ số chọn được + biểu đồ đường so kỳ trước, bảng dày có mức tăng giảm xếp dưới số ---- */
+const FBM={};
+const fbdFmt=(t,v)=>t==="m"?money(v):t==="p"?(v*100).toLocaleString("vi-VN",{maximumFractionDigits:1})+"%":t==="x"?fbdN2(v):t==="d"?nf(Math.round(v))+"đ":nf(Math.round(v));
+/* Mỗi chỉ số: {l nhãn, t kiểu số (m tiền, n đếm, p tỷ lệ, x hai số lẻ, d đồng), n(k) tử số theo ngày, d(k) mẫu số nếu là tỷ số, rev=true nếu tăng là xấu} */
+function fbdMetVal(df,ks){const n=sum(ks,k=>+df.n(k)||0);if(!df.d)return n;const d=sum(ks,k=>+df.d(k)||0);return d?n/d:0}
+function fbdMetDay(df,k){const n=+df.n(k)||0;if(!df.d)return n;const d=+df.d(k)||0;return d?n/d:0}
+function fbdLine(cur,prev,labels,t){
+  const W=900,Hh=200,pl=52,pr=14,pt=12,pb=26,iw=W-pl-pr,ih=Hh-pt-pb,mx0=Math.max(1e-9,...cur,...prev),p10=Math.pow(10,Math.floor(Math.log10(mx0))),mx=Math.ceil(mx0/p10*2)/2*p10||mx0,n=cur.length;
+  if(!cur.some(v=>v>0)&&!prev.some(v=>v>0))return '<p class="empty">Kỳ này chưa có số theo ngày.</p>';
+  const x=i=>pl+(n>1?i/(n-1):.5)*iw,y=v=>pt+ih-v/mx*ih,pts=a=>a.map((v,i)=>x(i).toFixed(1)+","+y(v).toFixed(1)).join(" ");
+  const grid=[0,.25,.5,.75,1].map(g=>'<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y(mx*g)+'" y2="'+y(mx*g)+'" stroke="#e9ecf3"/><text x="'+(pl-6)+'" y="'+(y(mx*g)+4)+'" text-anchor="end" font-size="10" fill="#7a8397">'+fbdFmt(t,mx*g)+'</text>').join("");
+  const step=Math.max(1,Math.ceil(n/14)),lbl=labels.map((l,i)=>i%step===0?'<text x="'+x(i).toFixed(1)+'" y="'+(Hh-8)+'" text-anchor="middle" font-size="10" fill="#7a8397">'+l+'</text>':"").join("");
+  const dots=cur.map((v,i)=>'<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="3" fill="#2457c5" opacity="0"><title>'+labels[i]+": "+fbdFmt(t,v)+(prev[i]!=null?" · kỳ trước "+fbdFmt(t,prev[i]):"")+'</title></circle>').join("");
+  const hit=cur.map((v,i)=>'<rect x="'+(x(i)-iw/n/2).toFixed(1)+'" y="'+pt+'" width="'+(iw/n).toFixed(1)+'" height="'+ih+'" fill="transparent"><title>'+labels[i]+": "+fbdFmt(t,v)+(prev[i]!=null?" · kỳ trước "+fbdFmt(t,prev[i]):"")+'</title></rect>').join("");
+  return '<svg class="pc-chart" viewBox="0 0 '+W+" "+Hh+'">'+grid+'<polygon points="'+x(0)+","+(pt+ih)+" "+pts(cur)+" "+x(n-1)+","+(pt+ih)+'" fill="#2457c5" opacity=".08"/><polyline points="'+pts(prev)+'" fill="none" stroke="#9aa3b5" stroke-width="1.6" stroke-dasharray="4 4"/><polyline points="'+pts(cur)+'" fill="none" stroke="#2457c5" stroke-width="2.2" stroke-linejoin="round"/>'+lbl+hit+"</svg>";
+}
+function fbdMetPanel(id,defs,days,pdays,title){
+  const sel=Math.min(FBM[id]||0,defs.length-1),df=defs[sel],labels=days.map(k=>k.slice(8)+"/"+k.slice(5,7));
+  const cells=defs.map((d,i)=>{const c=fbdMetVal(d,days),p=fbdMetVal(d,pdays),bad=d.warn&&d.warn(c);return '<button type="button" class="pc-m'+(i===sel?" on":"")+(bad?" bad":"")+'" data-fbm="'+id+":"+i+'"><span class="l">'+d.l+'</span><b>'+fbdFmt(d.t,c)+'</b><span class="s">'+(p?fbdDelta(c,p,d.rev):"&nbsp;")+"</span></button>"}).join("");
+  const cur=days.map(k=>fbdMetDay(df,k)),prev=pdays.map(k=>fbdMetDay(df,k));
+  return '<section class="pc-card"><div class="pc-h"><b>'+title+'</b><span>'+esc(pLabel())+" · so với "+(pdays.length?fbdVN2(pdays[0])+"–"+fbdVN2(pdays[pdays.length-1]):"kỳ trước")+'</span></div><div class="pc-ms">'+cells+'</div><div class="pc-cw">'+fbdLine(cur,prev,labels,df.t)+'<div class="pc-leg"><i></i>'+df.l+' kỳ này<i class="p"></i>kỳ trước</div></div></section>';
+}
+const fbdVN2=k=>k.slice(8)+"/"+k.slice(5,7);
+function fbdBindMet(m){m.querySelectorAll("[data-fbm]").forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.fbm.split(":");FBM[id]=+i;renderMain()})}
+/* Ô bảng: số ở trên, mức tăng giảm ngay dưới */
+const fbdTd=(v,c,p,rev)=>'<td class="n"><div class="pv">'+v+'</div><div class="pd">'+(p?fbdDelta(c,p,rev):"&nbsp;")+"</div></td>";
+function fbdSrcTable(days,pdays){
+  const S=fbdSources(days),Sp=fbdSources(pdays),pm={};Sp.forEach(x=>pm[x.n]=x);if(!S.length)return "";
+  const tot=sum(S,x=>x.rev);
+  return '<section class="pc-card"><div class="pc-h"><b>Nguồn đơn</b><span>doanh thu theo nơi tạo đơn trên Pancake</span></div><div class="pc-tw"><table class="pc-t"><thead><tr><th>Nguồn đơn</th><th class="n">Doanh thu</th><th class="n">Tỷ trọng</th><th class="n">Đơn tạo</th><th class="n">Tỷ lệ hủy</th></tr></thead><tbody>'+S.map(x=>{const q=pm[x.n]||{};return '<tr><td><i class="pc-dot" style="background:'+x.c+'"></i>'+esc(x.n)+"</td>"+fbdTd(money(x.rev),x.rev,q.rev)+'<td class="n"><div class="pv">'+fbdPct(x.rev,tot)+'</div><div class="pd">&nbsp;</div></td>'+fbdTd(nf(x.o),x.o,q.o)+fbdTd(fbdPct(x.can,x.o),x.o?x.can/x.o:0,q.o?q.can/q.o:0,true)+"</tr>"}).join("")+"</tbody></table></div></section>";
+}
+function fbdPeopleTable(days,pdays){
+  const P=fbsPeople(days),Pp=fbsPeople(pdays);if(!P)return "";
+  const pm={};(Pp?Pp.list:[]).forEach(x=>pm[x.n]=x);
+  return '<section class="pc-card"><div class="pc-h"><b>Nhân viên</b><span>đơn đã xác nhận, trừ hoàn và hủy</span></div><div class="pc-tw"><table class="pc-t"><thead><tr><th>Nhân viên</th><th class="n">Doanh thu</th><th class="n">Đơn tạo</th><th class="n">Đơn chốt</th><th class="n">Tỷ lệ hủy</th></tr></thead><tbody>'+P.list.slice(0,10).map(x=>{const q=pm[x.n]||{},ch=x.tao-x.huy,qc=(q.tao||0)-(q.huy||0);return "<tr><td>"+esc(x.n)+"</td>"+fbdTd(money(x.dt),x.dt,q.dt)+fbdTd(nf(x.tao),x.tao,q.tao)+fbdTd(nf(ch),ch,qc)+fbdTd(x.tao?fbdPct(x.huy,x.tao):"—",x.tao?x.huy/x.tao:0,q.tao?q.huy/q.tao:0,true)+"</tr>"}).join("")+"</tbody></table></div></section>";
+}
+
 /* Biểu đồ cột doanh thu + đường chi phí QC. Kỳ dài hơn 92 ngày thì gộp theo tháng. */
 function fbdChart(days,dtFn=fbdDay,qcFn=fbdQc,l1="Doanh thu chốt",l2="Chi phí QC sau thuế"){
   const byM=days.length>92,groups=[];
@@ -155,9 +192,10 @@ function pFbdash(m,forceOps){
   const nhom=N.length?`<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm · tháng 9</h3>${tbl(full?["Nhóm hàng","Số đơn","Số lượng","Doanh thu","Giá vốn","Biên gộp"]:["Nhóm hàng","Số đơn","Số lượng","Doanh thu"],N.map(x=>`<tr><td><b>${esc(x.n)}</b></td><td class="n">${nf(x.don)}</td><td class="n">${nf(x.sl)}</td><td class="n">${tr(x.dt)}</td>${full?`<td class="n">${tr(x.gv)}</td><td class="n">${x.dt?pill(Math.round((x.dt-x.gv)/x.dt*100)+"%",(x.dt-x.gv)/x.dt>.6?"grn":"amb"):"—"}</td>`:""}</tr>`))}</section>`:"";
   const pl=full&&Dd.dt?`<section class="fbd-card fbd-wide"><h3>Lãi đóng góp kênh · kỳ ${esc(Dd.ky||"")} (Sheet Pancake)</h3>${tbl(["Khoản","Số tiền","% doanh thu"],[["Doanh thu ghi nhận",Dd.dt],["− Giá vốn hàng bán",Dd.gv],["− Phí vận chuyển",Dd.vc],["− Ship đơn hoàn (2 chiều)",Dd.hoan],["= Lãi gộp",Dd.laigop]].map(([l,v])=>`<tr class="${l.startsWith("=")?"tot":""}"><td>${l}</td><td class="n">${nf(v)}</td><td class="n">${Dd.dt?Math.abs(v/Dd.dt*100).toFixed(1)+"%":"—"}</td></tr>`))}</section>`:"";
   const heroUse=(full&&heroA)?heroA:hero;
-  m.innerHTML=head+`<div class="fbd-meta"><span class="pill p-blu">${esc(pLabel())}</span><span>${A.n}/${len} ngày có số${len<all.length?" (kỳ chọn còn "+(all.length-len)+" ngày chưa tới)":""}</span>${upd?`<span>số tự động cập nhật ${upd}</span>`:""}</div>${full?heroUse+alerts:fbdTop([["Doanh thu chốt",money(A.dtChot),fbdDelta(A.dtChot,P.dtChot),P.dtChot?"so "+len+" ngày trước":""],["Đơn chốt",nf(A.chot),fbdDelta(A.chot,P.chot),"trên "+nf(A.tao)+" đơn tạo"],["Giá trị TB / đơn",aov?nf(Math.round(aov))+"đ":"—",fbdDelta(aov,aovP)],["Chi phí QC sau thuế",A.hasQc?money(A.qcT):"—",A.hasQc?fbdPct(A.qcT,A.dtChot)+" doanh thu chốt":"chưa có số QC"],["ROAS sau thuế",fbdN2(roas),"","chưa thuế "+fbdN2(roasPre0)+" · hòa vốn 1,8",A.hasQc&&roas&&roas<1.8?"bad":""],["CPO",A.hasQc&&A.chot?nf(Math.round(cpo))+"đ":"—","","chi phí / đơn chốt"]],`<div class="fbd-chw">${fbdChart(days)}</div>`)+alerts+grid}<div class="fbd-grid">${full?costCard+wf+chartA:funnel+srcCard+wf}${full?fbdProdCard(days):""}${nhom}${pl}</div>
+  m.innerHTML=head+`<div class="fbd-meta"><span class="pill p-blu">${esc(pLabel())}</span><span>${A.n}/${len} ngày có số${len<all.length?" (kỳ chọn còn "+(all.length-len)+" ngày chưa tới)":""}</span>${upd?`<span>số tự động cập nhật ${upd}</span>`:""}</div>${full?heroUse+alerts:fbdMetPanel("ops",[{l:"Doanh thu chốt",t:"m",n:fbdDay},{l:"Đơn chốt",t:"n",n:k=>((DAYD.fb||{})[k]||[])[1]},{l:"Đơn tạo",t:"n",n:k=>((DAYD.fb||{})[k]||[])[0]},{l:"Đơn hủy",t:"n",rev:true,n:k=>((DAYD.fb||{})[k]||[])[2]},{l:"Tỷ lệ hủy",t:"p",rev:true,warn:v=>v>.2,n:k=>((DAYD.fb||{})[k]||[])[2],d:k=>((DAYD.fb||{})[k]||[])[0]},{l:"Giá trị TB / đơn",t:"d",n:fbdDay,d:k=>((DAYD.fb||{})[k]||[])[1]},{l:"Chi phí QC sau thuế",t:"m",rev:true,n:fbdQc},{l:"ROAS sau thuế",t:"x",warn:v=>v&&v<1.8,n:fbdDay,d:fbdQc},{l:"CPO",t:"d",rev:true,n:fbdQc,d:k=>((DAYD.fb||{})[k]||[])[1]},{l:"Đơn hoàn",t:"n",rev:true,n:k=>((DAYD.fb||{})[k]||[])[3]}],days,fbdRange(pf,pt),"Tổng quan Facebook")+alerts+'<div class="pc-2">'+fbdSrcTable(days,fbdRange(pf,pt))+fbdPeopleTable(days,fbdRange(pf,pt))+"</div>"}<div class="fbd-grid">${full?costCard+wf+chartA:wf}${full?fbdProdCard(days):""}${nhom}${pl}</div>
   ${full?"":`<details class="fbd-card fbd-wide fbd-det"><summary>Phễu đơn hàng theo tháng (báo cáo Pancake)</summary>${fbFunnel()}</details>`}
   ${srcNote("Pancake POS (đơn, doanh thu, theo ngày tạo đơn) và Facebook Ads (chi phí). Sheet Pancake đến 29/9, từ 30/9 lấy tự động mỗi sáng.")}`;
+  if(typeof m.querySelectorAll==="function")fbdBindMet(m);
 }
 PAGES.bc_fb=m=>pFbdash(m);
 
