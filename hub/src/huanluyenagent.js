@@ -557,7 +557,7 @@ function drawerHtml(){
     title="Thêm Page";
     body='<label class="f"><span>Tên Page</span><input type="text" id="d_name" placeholder="VD: Ailla Việt Nam Store"></label><label class="f"><span>Link Page hoặc dãy số (id) của Page</span><input type="text" id="d_fb" placeholder="Dán link, hoặc gõ dãy số VD: 105017945992971"></label><p class="hint">Dán link có chứa dãy số, ví dụ: botcake.io/105017945992971/home, hoặc facebook.com/profile.php?id=105017945992971. Link chỉ có tên (facebook.com/Aillavietnamstore) thì chưa đủ. Dãy số xem ở địa chỉ trang Botcake của Page, hoặc ở Facebook: Giới thiệu, Minh bạch của Trang.</p>';
   }
-  return '<div class="veil" data-act="closedrawer"><div class="hdrawer" role="dialog" aria-label="'+esc(title)+'"><div class="dh"><b>'+title+'</b><button class="btn sm ghost" data-act="closedrawer" aria-label="Đóng">✕</button></div><div class="db">'+body+'</div><div class="df"><button class="btn" data-act="closedrawer">Hủy</button><button class="btn pri" data-act="savedrawer">'+ok+"</button></div></div></div>";
+  return '<div class="veil" data-act="closedrawer"><div class="hdrawer" role="dialog" aria-label="'+esc(title)+'"><div class="dh"><b>'+title+'</b><button class="btn sm ghost" data-act="closedrawer" aria-label="Đóng">✕</button></div><div class="db"><div id="d_err" class="alert bad" hidden></div>'+body+'</div><div class="df"><button class="btn" data-act="closedrawer">Hủy</button><button class="btn pri" data-act="savedrawer">'+ok+"</button></div></div></div>";
 }
 function val(id){var e=document.getElementById(id);return e?e.value.trim():""}
 
@@ -651,18 +651,20 @@ async function runSim(body,said){
   ST.simlog.unshift({time:nowHM(),said:said,flow:r.result.flow||"-",res:q[0],cls:q[1],text:r.log.join("\n")});
   draw();
 }
+/* Lỗi hiện ngay trong ngăn kéo (thông báo chung của web nằm dưới lớp phủ nên chị không thấy). */
+function derr(m){var e=document.getElementById("d_err");if(ST.drawer&&e){e.textContent=m;e.hidden=false}else toast(m)}
 async function saveDrawer(){
   var d=ST.drawer,b=ST.doc;
   try{
-    if(d.type==="bot"){var nm0=val("d_name");if(!nm0){toast("Cần có tên bot");return}await api("/bots",{method:"POST",body:JSON.stringify({name:nm0,from:val("d_from")||undefined})});ST.drawer=null;await loadHome();toast("Đã tạo bot");return}
+    if(d.type==="bot"){var nm0=val("d_name");if(!nm0){derr("Cần có tên bot");return}await api("/bots",{method:"POST",body:JSON.stringify({name:nm0,from:val("d_from")||undefined})});ST.drawer=null;await loadHome();derr("Đã tạo bot");return}
     if(d.type==="tag"){var tn=val("d_tname");if(!tn){toast("Cần có tên thẻ");return}var body0=JSON.stringify({name:tn,kind:val("d_tkind"),color:val("d_tcolor")});if(d.id)await api("/tags/"+d.id,{method:"PATCH",body:body0});else await api("/tags",{method:"POST",body:body0});ST.tags=await api("/tags");ST.drawer=null;draw();toast("Đã lưu thẻ");return}
-    if(d.type==="page"){await api("/pages",{method:"POST",body:JSON.stringify({name:val("d_name"),fb_page_id:val("d_fb")})});ST.drawer=null;await loadHome();toast("Đã thêm Page");return}
+    if(d.type==="page"){await api("/pages",{method:"POST",body:JSON.stringify({name:val("d_name"),fb_page_id:val("d_fb")})});ST.drawer=null;await loadHome();derr("Đã thêm Page");return}
     if(d.type==="msg"){
-      var code=val("d_code"),text=val("d_text");if(!code||!text){toast("Cần có mã câu và nội dung");return}
+      var code=val("d_code"),text=val("d_text");if(!code||!text){derr("Cần có mã câu và nội dung");return}
       var o={code:code,grp:val("d_grp"),text:text,claim:val("d_claim"),img:val("d_img")};
       if(d.id){var m=mk(b.lib,d.id);for(var k in o)m[k]=o[k]}else{o.id=rid("m");b.lib.push(o)}
     }else if(d.type==="flow"){
-      var nm=val("d_name");if(!nm){toast("Cần có tên luồng");return}
+      var nm=val("d_name");if(!nm){derr("Cần có tên luồng");return}
       var fl={id:rid("f"),code:val("d_code")||"LUONG-"+(b.flows.length+1),name:nm,keys:val("d_keys"),entry:false,win:"in",allow:[],nodes:[{id:rid("n"),t:"msg",x:30,y:40,ref:(b.lib[0]||{}).id||"",btns:[],next:""}]};
       b.flows.push(fl);ST.sel=fl.id;ST.node=fl.nodes[0].id;
     }else if(d.type==="node"){
@@ -672,28 +674,28 @@ async function saveDrawer(){
       ff.nodes.push(nn);ST.node=nn.id;
     }else if(d.type==="product"){
       var pn=val("d_name"),pid=val("d_id").toLowerCase().replace(/[^a-z0-9_]/g,"");
-      if(!pn||!pid){toast("Cần có tên và mã ngắn (chữ thường, số)");return}
-      if(mk(b.products,pid)){toast("Mã ngắn này đã có");return}
+      if(!pn||!pid){derr("Cần có tên và mã ngắn (chữ thường, số)");return}
+      if(mk(b.products,pid)){derr("Mã ngắn này đã có");return}
       b.products.push({id:pid,name:pn});
     }else if(d.type==="offer"){
-      var pr=val("d_price");if(!pr){toast("Cần có giá");return}
+      var pr=val("d_price");if(!pr){derr("Cần có giá");return}
       b.offers.push({id:rid("o"),prod:d.id,name:val("d_name")||"Mua riêng",lv:val("d_lv"),price:pr,from:val("d_from")||""});
     }else if(d.type==="group"){
-      var gg=val("d_g").toUpperCase().replace(/\s+/g,"");if(!gg){toast("Cần có mã nhóm");return}
-      if(b.media.some(function(x){return x.g===gg})){toast("Nhóm này đã có");return}
+      var gg=val("d_g").toUpperCase().replace(/\s+/g,"");if(!gg){derr("Cần có mã nhóm");return}
+      if(b.media.some(function(x){return x.g===gg})){derr("Nhóm này đã có");return}
       b.media.push({g:gg,d:val("d_d"),urls:[]});
     }else if(d.type==="urls"){
       var g=b.media.filter(function(x){return x.g===d.id})[0],ls=val("d_urls").split(/\n+/).map(function(x){return x.trim()}).filter(Boolean);
-      if(!ls.length){toast("Chưa có đường dẫn nào");return}
-      if(ls.some(function(x){return !/^https:\/\//i.test(x)})){toast("Mỗi đường dẫn phải bắt đầu bằng https://");return}
+      if(!ls.length){derr("Chưa có đường dẫn nào");return}
+      if(ls.some(function(x){return !/^https:\/\//i.test(x)})){derr("Mỗi đường dẫn phải bắt đầu bằng https://");return}
       g.urls=g.urls.concat(ls);
     }else if(d.type==="banned"){
-      var bt=val("d_text");if(!bt){toast("Cần có nội dung");return}b.banned.push(bt);
+      var bt=val("d_text");if(!bt){derr("Cần có nội dung");return}b.banned.push(bt);
     }else if(d.type==="list"){
-      var tx=val("d_text");if(!tx){toast("Cần có nội dung");return}b[d.id].push({id:rid("r"),text:tx,on:true});
+      var tx=val("d_text");if(!tx){derr("Cần có nội dung");return}b[d.id].push({id:rid("r"),text:tx,on:true});
     }
     ST.drawer=null;touch();draw();
-  }catch(e){toast(e.message)}
+  }catch(e){derr(e.message)}
 }
 document.addEventListener("change",function(e){
   if(!alive())return;
