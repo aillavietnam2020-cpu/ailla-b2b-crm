@@ -213,7 +213,7 @@ async function fbsLoad(force){
 }
 function fbsPeople(days){
   const R=FBS.raw;if(!R||!R.days)return null;const m={};let n=0;
-  days.forEach(k=>{const rows=R.days[k];if(!rows)return;n++;rows.forEach(r=>{const nm=r.u?(((R.names||{})[r.u]||"Người "+r.u.slice(0,6)).replace(/^API_CONNECTION$/,"Đơn tự động từ trang bán hàng (API)").replace(/^Thảo Đĩnh$/,"Thảo Đĩnh (Thảo ads)")):"(chưa gán)",t=m[nm]||(m[nm]={u:r.u,tao:0,huy:0,hoan:0,giao:0,dt:0});t.tao+=r.tao;t.huy+=r.huy;t.hoan+=r.hoan;t.giao+=r.giao;t.dt+=r.dt-(r.hoanDt||0)})});
+  days.forEach(k=>{const rows=R.days[k];if(!rows)return;n++;rows.forEach(r=>{const nm=r.u?(((R.names||{})[r.u]||"Người "+r.u.slice(0,6)).replace(/^API_CONNECTION$/,"Việt Nam (AILLA Việt Nam, chị xác nhận)").replace(/^Thảo Đĩnh$/,"Thảo Đĩnh (Thảo ads)")):"(chưa gán)",t=m[nm]||(m[nm]={u:r.u,tao:0,huy:0,hoan:0,giao:0,dt:0});t.tao+=r.tao;t.huy+=r.huy;t.hoan+=r.hoan;t.giao+=r.giao;t.dt+=r.dt-(r.hoanDt||0)})});
   if(!n)return null;
   return {n,list:Object.entries(m).map(([n,x])=>Object.assign(x,{n})).sort((a,b)=>b.tao-a.tao)};
 }
@@ -227,7 +227,7 @@ function fbsTbl(){
   const fold=t=>String(t).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/g,"d").toLowerCase().trim(),isK=x=>FBS_KPI.some(n=>fold(n)===fold(x.n));
   const K=P.list.filter(isK),S=P.list.filter(x=>!isK(x)),sumL=(L,n)=>Object.assign(L.reduce((a,x)=>({tao:a.tao+x.tao,huy:a.huy+x.huy,hoan:a.hoan+x.hoan,giao:a.giao+x.giao,dt:a.dt+x.dt}),{tao:0,huy:0,hoan:0,giao:0,dt:0}),{n});
   const head=t=>`<tr class="fbd-grp"><td colspan="11">${t}</td></tr>`;
-  const rows=[head("Người tính KPI")].concat(K.map((x,i)=>row(x,i)),K.length?[row(sumL(K,"Cộng nhóm tính KPI"),-1)]:[],[head("Hỗ trợ, đơn tự động, chưa gán người (không tính KPI)")],S.map((x,i)=>row(x,K.length+i)),[row(Object.assign({},T,{n:"Tổng"}),-1)]);
+  const rows=[head("Người tính KPI")].concat(K.map((x,i)=>row(x,i)),K.length?[row(sumL(K,"Cộng nhóm tính KPI"),-1)]:[],[head("Chị và người xác nhận hộ, chưa gán người (không tính KPI)")],S.map((x,i)=>row(x,K.length+i)),[row(Object.assign({},T,{n:"Tổng"}),-1)]);
   return tbl(["Hạng","Người xử lý đơn","Doanh thu","Đơn tạo","Chốt","Giao TC","Hủy","Hoàn","Tỷ lệ chốt","Tỷ lệ hủy","Cảnh báo"],rows)+`<p class="fbd-note">Doanh thu = đơn đã xác nhận, đã trừ đơn hoàn và đơn hủy, xếp theo ngày tạo đơn. Người xử lý là người bán hàng gắn trên đơn Pancake. Người tính KPI: ${FBS_KPI.join(", ")} (Huyền Phạm đã đi làm lại, Dũng Hoàng đã nghỉ). Đơn hoàn tính theo ngày hoàn nên có thể nằm khác ngày với đơn gốc.</p>`;
 }
 
