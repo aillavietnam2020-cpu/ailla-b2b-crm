@@ -39,7 +39,7 @@ export interface SoatResult {
 }
 
 const LIMIT = 200; // đọc tối đa 200 dòng mỗi mục
-const SHOW = 15; // hiện 15 dòng đầu
+const SHOW = 100; // hiện tối đa 100 dòng đầu mỗi mục
 export const OVERDUE_DAYS = 3; // đồng bộ với luật hàng hoàn: quá 3 ngày chưa về / chưa nhập kho thì báo
 const CLAIM_OPEN_DAYS = 7;
 
@@ -127,9 +127,13 @@ export const CHECK_DEFS: CheckDef[] = [
     group: 'KHO',
     severity: 'DO',
     title: 'Tồn kho âm theo sổ kho',
-    hint: 'Sổ kho cho ra số tồn nhỏ hơn 0: xuất nhiều hơn nhập. Thường do thiếu phiếu nhập, nhập sai mã, hoặc chưa nhập tồn đầu kỳ (nếu chưa nhập số kiểm kê đầu kỳ thì âm là bình thường, nhập xong sẽ hết).',
-    columns: [['item', 'Mã'], ['name', 'Tên'], ['balance', 'Tồn theo sổ']],
-    sql: `SELECT l.item, i.name, ROUND(SUM(l.qty), 2) AS balance
+    hint: 'Bấm vào một dòng để xem sổ chi tiết của mã đó (nhập, xuất theo từng loại phiếu và các dòng gần nhất) rồi biết âm từ đâu. Sổ kho cho ra số tồn nhỏ hơn 0: xuất nhiều hơn nhập. Thường do thiếu phiếu nhập, nhập sai mã, hoặc chưa nhập tồn đầu kỳ (nếu chưa nhập số kiểm kê đầu kỳ thì âm là bình thường, nhập xong sẽ hết).',
+    columns: [['item', 'Mã'], ['name', 'Tên'], ['in_qty', 'Tổng nhập'], ['out_qty', 'Tổng xuất'], ['balance', 'Tồn theo sổ'], ['last_out', 'Xuất gần nhất']],
+    sql: `SELECT l.item, i.name,
+                 ROUND(SUM(CASE WHEN l.qty > 0 THEN l.qty ELSE 0 END), 2) AS in_qty,
+                 ROUND(SUM(CASE WHEN l.qty < 0 THEN -l.qty ELSE 0 END), 2) AS out_qty,
+                 ROUND(SUM(l.qty), 2) AS balance,
+                 MAX(CASE WHEN l.qty < 0 THEN l.doc_date END) AS last_out
           FROM kho_ledger l JOIN kho_items i ON i.code = l.item
           GROUP BY l.item HAVING SUM(l.qty) < -0.0001
           ORDER BY balance LIMIT ${LIMIT}`,

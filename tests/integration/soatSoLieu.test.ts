@@ -112,3 +112,28 @@ describe('Máy soát số liệu', () => {
     expect(t3?.rows[0]).toMatchObject({ amount: 100000, allocated: 150000, over: 50000 });
   });
 });
+
+describe('Sổ chi tiết một mã hàng (biết tồn âm từ đâu)', () => {
+  it('cho tổng theo loại phiếu và tồn cộng dồn; sale không xem được', async () => {
+    await ctx.db.prepare("INSERT INTO kho_items (code, name, unit, cls, created_at) VALUES ('SP9', 'Sản phẩm thử', 'Chai', 'TP', ?)").bind(NOW).run();
+    await ctx.db.prepare("INSERT INTO kho_docs (no, type, doc_date, status, created_at) VALUES ('PN2610-005', 'PN', '2026-10-10', 'OK', ?)").bind(NOW).run();
+    await ctx.db.prepare("INSERT INTO kho_docs (no, type, doc_date, status, created_at) VALUES ('XK2610-005', 'XK', '2026-10-12', 'OK', ?)").bind(NOW).run();
+    const pn = await ctx.db.prepare("SELECT id FROM kho_docs WHERE no = 'PN2610-005'").first<{ id: number }>();
+    const xk = await ctx.db.prepare("SELECT id FROM kho_docs WHERE no = 'XK2610-005'").first<{ id: number }>();
+    await ctx.db.prepare("INSERT INTO kho_moves (doc_id, item, qty, role) VALUES (?, 'SP9', 10, 'IN')").bind(pn?.id).run();
+    await ctx.db.prepare("INSERT INTO kho_moves (doc_id, item, qty, role) VALUES (?, 'SP9', -25, 'OUT')").bind(xk?.id).run();
+    const r = await ctx.request('/api/hub/soat/item/SP9', { as: USERS.ceo });
+    expect(r.status).toBe(200);
+    expect(r.body.data.balance).toBe(-15);
+    expect(r.body.data.by_type).toEqual([
+      { type: 'XK', lines: 1, qty: -25 },
+      { type: 'PN', lines: 1, qty: 10 },
+    ]);
+    expect(r.body.data.recent[0]).toMatchObject({ doc_no: 'XK2610-005', balance: -15 });
+    expect((await ctx.request('/api/hub/soat/item/SP9', { as: USERS.thao })).status).toBe(403);
+    expect((await ctx.request('/api/hub/soat/item/KHONGCO', { as: USERS.ceo })).status).toBe(404);
+    // K1 giờ có cả tổng nhập / xuất
+    const d = (await ctx.request('/api/hub/soat', { as: USERS.ceo })).body.data;
+    expect(d.findings.find((f: { code: string }) => f.code === 'K1').rows[0]).toMatchObject({ item: 'SP9', in_qty: 10, out_qty: 25, balance: -15 });
+  });
+});
