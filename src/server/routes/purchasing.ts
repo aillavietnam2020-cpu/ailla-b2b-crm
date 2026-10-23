@@ -131,7 +131,7 @@ const optDate = (v: unknown): string | null => {
   return v;
 };
 
-async function poStatus(db: D1Database, poId: string) {
+export async function poStatus(db: D1Database, poId: string) {
   const lines = (await db.prepare('SELECT id, qty FROM po_lines WHERE po_id = ?').bind(poId).all<{ id: string; qty: number }>()).results;
   const got = new Map(
     (
@@ -155,8 +155,9 @@ purchasingRoutes.get('/orders', async (c) => {
   const onlyOpen = c.req.query('open') === '1';
   const orders = (
     await c.env.DB.prepare(
-      `SELECT o.id, o.no, o.order_date, o.expected_date, o.supplier_id, s.name AS supplier_name, o.note, o.status, o.created_at
-       FROM po_orders o JOIN suppliers s ON s.id = o.supplier_id
+      `SELECT o.id, o.no, o.order_date, o.expected_date, o.supplier_id, s.name AS supplier_name, s.phone AS supplier_phone, o.note, o.status, o.created_at, o.updated_at, o.source,
+              u.display_name AS created_by_name
+       FROM po_orders o JOIN suppliers s ON s.id = o.supplier_id LEFT JOIN users u ON u.id = o.created_by
        ${onlyOpen ? "WHERE o.status IN ('DAT', 'DANG_GIAO')" : ''}
        ORDER BY o.order_date DESC, o.no DESC LIMIT 300`,
     ).all<Record<string, unknown>>()
@@ -291,13 +292,18 @@ purchasingRoutes.post('/orders/:id/cancel', async (c) => {
 purchasingRoutes.post('/orders/:id/receipts', async (c) => {
   const auth = c.get('auth');
   if (!canReceive(auth)) throw forbidden('Bạn chưa có quyền ghi nhận hàng về kho');
-  const id = c.req.param('id');
+  const b = (await c.req.json().catch(() => ({}))) as { receipt_date?: unknown; note?: unknown; lines?: unknown };
+  return ok(c, await receive(c, c.req.param('id'), b));
+});
+
+/** Ghi một lần nhận hàng cho phiếu mua: lập phiếu nhập kho PN, cộng tồn, gắn dòng nhận vào dòng đặt. */
+async function receive(c: Context<AppEnv>, id: string, b: { receipt_date?: unknown; note?: unknown; lines?: unknown }) {
+  const auth = c.get('auth');
   const po = await c.env.DB.prepare(
     `SELECT o.id, o.no, o.status, s.name AS supplier FROM po_orders o JOIN suppliers s ON s.id = o.supplier_id WHERE o.id = ?`,
   ).bind(id).first<{ id: string; no: string; status: string; supplier: string }>();
   if (!po) throw notFound('Không tìm thấy phiếu mua');
   if (po.status === 'HUY') throw badRequest('CANCELLED', 'Phiếu mua này đã hủy');
-  const b = (await c.req.json().catch(() => ({}))) as { receipt_date?: unknown; note?: unknown; lines?: unknown };
   if (!isDate(b.receipt_date)) throw badRequest('BAD_DATE', 'Chọn ngày nhận hàng');
   const lines = (await checkLines(c.env.DB, b.lines)) as Array<{ item: string; qty: number; note: string; po_line_id?: string | null }>;
   const poLines = new Map((await c.env.DB.prepare('SELECT id, item FROM po_lines WHERE po_id = ?').bind(id).all<{ id: string; item: string }>()).results.map((l) => [l.id, l.item]));
@@ -339,7 +345,79 @@ purchasingRoutes.post('/orders/:id/receipts', async (c) => {
   }
   await poStatus(c.env.DB, id);
   await auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_RECEIVED', entityType: 'PO', entityId: po.no, after: { receipt: rid, kho_doc: docNo, lines: lines.length }, requestId: c.get('requestId'), ip: ipOf(c) }).run();
-  return ok(c, { id: rid, kho_doc_no: docNo });
+  return { id: rid, kho_doc_no: docNo };
+}
+
+/** Hàng về không có phiếu đặt (ví dụ vỏ can): kho ghi phiếu nhập kho như thường, web tự tạo một phiếu mua (source = KHO)
+ *  để Thảo nhập giá sau và kế toán theo dõi công nợ. Nhà cung cấp chưa có thì tự thêm theo tên kho gõ (không có công nợ đầu kỳ).
+ *  Trả về phiếu mua để phiếu nhập kho gắn vào như khi chọn phiếu mua có sẵn. */
+export async function autoPoForReceipt(
+  c: Context<AppEnv>,
+  supplierName: string,
+  date: string,
+  lines: Array<{ item: string; qty: number; price: number | null }>,
+  note: string,
+): Promise<{ id: string; no: string; status: string }> {
+  const auth = c.get('auth');
+  const now = nowIso();
+  const name = supplierName.trim();
+  const had = await c.env.DB.prepare('SELECT id FROM suppliers WHERE name = ?').bind(name).first<{ id: string }>();
+  const supId = had?.id ?? newId();
+  if (!had)
+    await c.env.DB.batch([
+      c.env.DB.prepare("INSERT INTO suppliers (id, name, phone, note, opening_debt, opening_date, active, created_at, updated_at) VALUES (?, ?, '', ?, 0, NULL, 1, ?, ?)").bind(supId, name, 'Kho thêm khi nhận hàng', now, now),
+      auditStatement(c.env.DB, { actorId: auth.user.id, action: 'SUPPLIER_CREATED', entityType: 'SUPPLIER', entityId: supId, after: { name, by: 'kho' }, requestId: c.get('requestId'), ip: ipOf(c) }),
+    ]);
+  const id = newId();
+  const gen = await nextNo(c.env.DB, 'po_orders', 'PM', date);
+  let no = '';
+  for (let a = 0; a < 4 && !no; a++) {
+    const cand = gen.make(gen.base + a);
+    try {
+      await c.env.DB.prepare("INSERT INTO po_orders (id, no, order_date, expected_date, supplier_id, note, status, created_by, created_at, updated_at, source) VALUES (?, ?, ?, NULL, ?, ?, 'DAT', ?, ?, ?, 'KHO')")
+        .bind(id, cand, date, supId, ('Tự tạo khi kho nhận hàng. ' + note).trim(), auth.user.id, now, now)
+        .run();
+      no = cand;
+    } catch (e) {
+      if (!String(e).includes('UNIQUE')) throw e;
+    }
+  }
+  if (!no) throw conflict('NO_CLASH', 'Không cấp được số phiếu mua, thử lại');
+  await c.env.DB.batch([
+    ...lines.map((l, i) => c.env.DB.prepare('INSERT INTO po_lines (id, po_id, item, qty, note, sort, unit_price) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(newId(), id, l.item, l.qty, '', i, l.price)),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_CREATED', entityType: 'PO', entityId: no, after: { lines: lines.length, source: 'KHO' }, requestId: c.get('requestId'), ip: ipOf(c) }),
+  ]);
+  return { id, no, status: 'DAT' };
+}
+
+/** Thảo / kế toán nhập giá cho phiếu mua sau khi hàng đã về (dùng cho phiếu tự tạo khi nhận hàng, hoặc phiếu đặt chưa có giá).
+ *  Giá đi vào dòng đặt và các dòng nhận hàng chưa có giá (giá vốn nhập kho tính lại). */
+purchasingRoutes.put('/orders/:id/prices', async (c) => {
+  const auth = c.get('auth');
+  needManage(auth);
+  const id = c.req.param('id');
+  const po = await c.env.DB.prepare('SELECT no, status FROM po_orders WHERE id = ?').bind(id).first<{ no: string; status: string }>();
+  if (!po) throw notFound('Không tìm thấy phiếu mua');
+  if (po.status === 'HUY') throw badRequest('CANCELLED', 'Phiếu mua này đã hủy');
+  const b = (await c.req.json().catch(() => ({}))) as { prices?: Record<string, unknown> };
+  const lines = (await c.env.DB.prepare('SELECT id FROM po_lines WHERE po_id = ?').bind(id).all<{ id: string }>()).results.map((l) => l.id);
+  const set: Array<[string, number]> = [];
+  for (const [lid, v] of Object.entries(b.prices ?? {})) {
+    if (!lines.includes(lid)) throw badRequest('BAD_LINE', 'Dòng hàng không thuộc phiếu này');
+    const n = Number(v);
+    if (v === '' || v == null || !Number.isFinite(n) || n < 0) throw badRequest('BAD_PRICE', 'Giá phải là số từ 0 trở lên');
+    set.push([lid, n]);
+  }
+  if (!set.length) throw badRequest('NO_PRICE', 'Chưa nhập giá dòng nào');
+  await c.env.DB.batch([
+    ...set.map(([lid, n]) => c.env.DB.prepare('UPDATE po_lines SET unit_price = ? WHERE id = ?').bind(n, lid)),
+    ...set.map(([lid, n]) => c.env.DB.prepare('UPDATE po_receipt_lines SET unit_price = ? WHERE po_line_id = ? AND unit_price IS NULL').bind(n, lid)),
+    c.env.DB.prepare('UPDATE po_orders SET updated_at = ? WHERE id = ?').bind(nowIso(), id),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_PRICE_SET', entityType: 'PO', entityId: po.no, after: { lines: set.length }, requestId: c.get('requestId'), ip: ipOf(c) }),
+  ]);
+  const rids = (await c.env.DB.prepare("SELECT id FROM po_receipts WHERE po_id = ? AND status = 'OK'").bind(id).all<{ id: string }>()).results.map((r) => r.id);
+  await reprice(c.env.DB, rids);
+  return ok(c, { id, lines: set.length });
 });
 
 purchasingRoutes.post('/receipts/:id/cancel', async (c) => {
