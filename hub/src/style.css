@@ -722,3 +722,7 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 /* Hai khối trái phải cao bằng nhau, bảng giãn đầy khối */
 .pc-2{align-items:stretch}.pc-2>.pc-card{display:flex;flex-direction:column;margin:0;height:100%;box-sizing:border-box}.pc-2>.pc-card>.pc-tw{flex:1}.pc-2>.pc-card .pc-t{height:100%}
 .pc-2+.pc-card,.pc-2+.fbd-note{margin-top:10px}.pc-2 .pc-t td{vertical-align:middle}
+
+/* Cảnh báo theo người (trang Team Sale) */
+.pc-wl{padding:4px 14px 8px}.pc-wl>div{display:grid;grid-template-columns:10px 150px 1fr;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid #eef0f5;font-size:12.5px}.pc-wl>div:last-child{border-bottom:0}
+.pc-wl i{width:8px;height:8px;border-radius:50%;background:#adb5bd;display:inline-block}.pc-wl i.red{background:#d92d20}.pc-wl i.amb{background:#f59f00}.pc-wl i.grn{background:#087a55}.pc-wl span{color:var(--muted)}

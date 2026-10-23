@@ -219,7 +219,7 @@ async function fbsLoad(force){
 }
 function fbsPeople(days){
   const R=FBS.raw;if(!R||!R.days)return null;const m={};let n=0;
-  days.forEach(k=>{const rows=R.days[k];if(!rows)return;n++;rows.forEach(r=>{const nm=r.u?(((R.names||{})[r.u]||"Người "+r.u.slice(0,6)).replace(/^API_CONNECTION$/,"Việt Nam (AILLA Việt Nam, chị xác nhận)").replace(/^Thảo Đĩnh$/,"Thảo Đĩnh (Thảo ads)")):"(chưa gán)",t=m[nm]||(m[nm]={u:r.u,tao:0,huy:0,hoan:0,giao:0,dt:0});t.tao+=r.tao;t.huy+=r.huy;t.hoan+=r.hoan;t.giao+=r.giao;t.dt+=r.dt-(r.hoanDt||0)})});
+  days.forEach(k=>{const rows=R.days[k];if(!rows)return;n++;rows.forEach(r=>{const nm=r.u?(((R.names||{})[r.u]||"Người "+r.u.slice(0,6)).replace(/^API_CONNECTION$/,"Việt Nam (AILLA Việt Nam, chị xác nhận)").replace(/^Thảo Đĩnh$/,"Thảo Đĩnh (Thảo ads)")):"(chưa gán)",t=m[nm]||(m[nm]={u:r.u,tao:0,huy:0,hoan:0,giao:0,dt:0,hd:0});t.hd+=r.hoanDt||0;t.tao+=r.tao;t.huy+=r.huy;t.hoan+=r.hoan;t.giao+=r.giao;t.dt+=r.dt-(r.hoanDt||0)})});
   if(!n)return null;
   return {n,list:Object.entries(m).map(([n,x])=>Object.assign(x,{n})).sort((a,b)=>b.tao-a.tao)};
 }
