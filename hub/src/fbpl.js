@@ -128,7 +128,7 @@ function fbdSaleView(){
   const len=days.length,pf=iso(addD(pdate(PERIOD.from),-len)),pt=iso(addD(pdate(PERIOD.from),-1)),pall=fbdRange(pf,pt),havePrev=pall.filter(k=>R[k]).length>=len*.8,pdays=havePrev?pall:[];
   const rows=k=>R[k]||[],S=(k,f)=>sum(rows(k),f),tao=k=>S(k,r=>r.tao),huy=k=>S(k,r=>r.huy),chot=k=>tao(k)-huy(k),dt=k=>S(k,r=>r.dt-(r.hoanDt||0));
   const defs=[{l:"Doanh thu",t:"m",n:dt},{l:"Đơn tạo",t:"n",n:tao},{l:"Đơn chốt",t:"n",n:chot},{l:"Đơn giao thành công",t:"n",n:k=>S(k,r=>r.giao)},{l:"Đơn hủy",t:"n",rev:true,n:huy},{l:"Đơn hoàn",t:"n",rev:true,n:k=>S(k,r=>r.hoan)},{l:"Tỷ lệ chốt",t:"p",n:chot,d:tao},{l:"Tỷ lệ hủy",t:"p",rev:true,warn:v=>v>.2,n:huy,d:tao},{l:"Giá trị TB / đơn chốt",t:"d",n:dt,d:chot}];
-  const panel=fbdMetPanel("sale",defs,days,pdays,"Bán hàng theo người xử lý đơn");
+  const panel=fbdMetPanel("sale",defs,days,pdays,"Bán hàng theo người xử lý đơn","",true);
   const P=fbsPeople(days),Pp=havePrev?fbsPeople(pdays):null,pm={};(Pp?Pp.list:[]).forEach(x=>pm[x.n]=x);
   const fold=t=>String(t).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/g,"d").toLowerCase().trim(),isK=x=>FBS_KPI.some(n=>fold(n)===fold(x.n));
   const add=(L,n)=>Object.assign(L.reduce((a,x)=>({tao:a.tao+x.tao,huy:a.huy+x.huy,hoan:a.hoan+x.hoan,giao:a.giao+x.giao,dt:a.dt+x.dt}),{tao:0,huy:0,hoan:0,giao:0,dt:0}),{n});

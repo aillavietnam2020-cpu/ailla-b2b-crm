@@ -90,10 +90,11 @@ function fbdLine(cur,prev,labels,t){
   const hit=cur.map((v,i)=>'<rect x="'+(x(i)-iw/n/2).toFixed(1)+'" y="'+pt+'" width="'+(iw/n).toFixed(1)+'" height="'+ih+'" fill="transparent"><title>'+labels[i]+": "+fbdFmt(t,v)+(prev[i]!=null?" · kỳ trước "+fbdFmt(t,prev[i]):"")+'</title></rect>').join("");
   return '<svg class="pc-chart" viewBox="0 0 '+W+" "+Hh+'">'+grid+'<polygon points="'+x(0)+","+(pt+ih)+" "+pts(cur)+" "+x(n-1)+","+(pt+ih)+'" fill="#2457c5" opacity=".08"/><polyline points="'+pts(prev)+'" fill="none" stroke="#9aa3b5" stroke-width="1.6" stroke-dasharray="4 4"/><polyline points="'+pts(cur)+'" fill="none" stroke="#2457c5" stroke-width="2.2" stroke-linejoin="round"/>'+lbl+hit+"</svg>";
 }
-function fbdMetPanel(id,defs,days,pdays,title,side){
+function fbdMetPanel(id,defs,days,pdays,title,side,nochart){
   const sel=Math.min(FBM[id]||0,defs.length-1),df=defs[sel],labels=days.map(k=>k.slice(8)+"/"+k.slice(5,7));
-  const cells=defs.map((d,i)=>{const c=fbdMetVal(d,days),p=fbdMetVal(d,pdays),bad=d.warn&&d.warn(c);return '<button type="button" class="pc-m'+(i===sel?" on":"")+(bad?" bad":"")+'" data-fbm="'+id+":"+i+'"><span class="l">'+d.l+'</span><b>'+fbdFmt(d.t,c)+'</b><span class="s">'+(p?fbdDelta(c,p,d.rev):"&nbsp;")+"</span></button>"}).join("");
+  const cells=defs.map((d,i)=>{const c=fbdMetVal(d,days),p=fbdMetVal(d,pdays),bad=d.warn&&d.warn(c);return '<button type="button" class="pc-m'+(i===sel&&!nochart?" on":"")+(bad?" bad":"")+'"'+(nochart?' style="cursor:default"':' data-fbm="'+id+":"+i+'"')+'><span class="l">'+d.l+'</span><b>'+fbdFmt(d.t,c)+'</b><span class="s">'+(p?fbdDelta(c,p,d.rev):"&nbsp;")+"</span></button>"}).join("");
   const cur=days.map(k=>fbdMetDay(df,k)),prev=pdays.map(k=>fbdMetDay(df,k));
+  if(nochart)return '<section class="pc-card pc-strip"><div class="pc-ms">'+cells+"</div></section>";
   return '<section class="pc-card pc-strip"><div class="pc-ms">'+cells+'</div></section><div class="pc-row'+(side?"":" one")+'"><section class="pc-card"><div class="pc-h"><b>'+df.l+" theo ngày</b><span>"+esc(pLabel())+" · so với "+(pdays.length?fbdVN2(pdays[0])+"–"+fbdVN2(pdays[pdays.length-1]):"kỳ trước")+'</span></div><div class="pc-cw">'+fbdLine(cur,prev,labels,df.t)+'<div class="pc-leg"><i></i>kỳ này<i class="p"></i>kỳ trước</div></div></section>'+(side||"")+"</div>";
 }
 function fbdToday(days){
