@@ -85,11 +85,11 @@ var HT_CSS=`<style id="ht-css">
 #ht .nd .dots{padding:4px 10px 8px;text-align:right;font-size:12px;color:var(--muted);display:flex;justify-content:flex-end;gap:12px}
 #ht .dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--pink);margin-left:5px;cursor:crosshair;vertical-align:middle;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--pink)}
 #ht .media-note{margin:8px 0 0}
-#ht .veil{position:fixed;inset:0;background:rgba(10,14,22,.45);z-index:200;display:flex;justify-content:flex-end}
+#ht .veil{position:fixed;inset:0;background:rgba(10,14,22,.45);z-index:950;display:flex;justify-content:flex-end}
 #ht .hdrawer{width:min(460px,100%);height:100%;background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column}
 #ht .hdrawer .dh{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
 #ht .hdrawer .db{padding:16px 18px;overflow-y:auto;flex:1}
-#ht .hdrawer .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+#ht .hdrawer .df{padding:12px 18px 84px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 @container ht (max-width:900px){#ht .shell{grid-template-columns:1fr}#ht .hside{position:static;display:flex;flex-wrap:wrap;gap:2px}#ht .hside .sec{width:100%}#ht .hside button{width:auto}#ht .two,#ht .split{grid-template-columns:1fr}}
 
 #ht .inbox{display:grid;grid-template-columns:290px minmax(0,1fr) 310px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);min-height:560px;box-shadow:var(--shadow)}
