@@ -91,6 +91,39 @@ var HT_CSS=`<style id="ht-css">
 #ht .hdrawer .db{padding:16px 18px;overflow-y:auto;flex:1}
 #ht .hdrawer .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 @media(max-width:900px){#ht .shell{grid-template-columns:1fr}#ht .hside{position:static;display:flex;flex-wrap:wrap;gap:2px}#ht .hside .sec{width:100%}#ht .hside button{width:auto}#ht .two,#ht .split{grid-template-columns:1fr}}
+
+#ht .inbox{display:grid;grid-template-columns:290px minmax(0,1fr) 310px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);min-height:560px;box-shadow:var(--shadow)}
+#ht .inbox>div{min-width:0}
+#ht .cl{border-right:1px solid var(--line);overflow-y:auto;max-height:680px}
+#ht .cft{padding:10px;border-bottom:1px solid var(--line);display:grid;gap:6px;position:sticky;top:0;background:var(--surface);z-index:1}
+#ht .ci{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+#ht .ci:hover{background:var(--gray-soft)}#ht .ci.on{background:var(--violet-soft)}
+#ht .ci b{font-size:14px}
+#ht .cl2{display:flex;justify-content:space-between;gap:8px;align-items:center}
+#ht .cl2 .hint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#ht .un{background:var(--pink);color:#fff;border-radius:99px;font-size:11px;font-weight:700;padding:0 7px;flex:none}
+#ht .tg{display:inline-block;font-size:11px;font-weight:700;padding:0 7px;border-radius:5px;margin:3px 4px 0 0;color:#fff}
+#ht .cm2{display:flex;flex-direction:column;min-width:0;background:var(--canvas)}
+#ht .chd{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;justify-content:space-between;gap:8px;align-items:center}
+#ht .thr{flex:1;overflow-y:auto;max-height:520px;padding:14px;display:flex;flex-direction:column;gap:8px}
+#ht .tm{max-width:78%;padding:8px 12px;border-radius:12px;border:2px solid transparent;white-space:pre-wrap;word-break:break-word}
+#ht .tm .src{display:block;font-size:11px;font-weight:700;margin-bottom:2px;opacity:.8}
+#ht .tm.k{align-self:flex-start;background:var(--surface);border-color:var(--line)}
+#ht .tm.a{align-self:flex-end;background:var(--navy);color:#fff;cursor:pointer}
+#ht .tm.s2{align-self:flex-end;background:var(--blue-soft);color:var(--blue)}
+#ht .tm.sys{align-self:center;background:var(--red-soft);color:var(--red);font-weight:600;cursor:pointer;text-align:center}
+#ht .tm.pk{border-color:var(--pink)}
+#ht .tm.wr{box-shadow:0 0 0 2px var(--red)}
+#ht .tagbar{display:flex;flex-wrap:wrap;border-top:1px solid var(--line)}
+#ht .tagbar button{flex:1;min-width:84px;border:0;color:#fff;font-size:11px;font-weight:700;padding:7px 4px;cursor:pointer;opacity:.5;letter-spacing:.02em}
+#ht .tagbar button.on{opacity:1;box-shadow:inset 0 -3px 0 rgba(255,255,255,.7)}
+#ht .comp{padding:12px 14px;background:var(--surface);border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+#ht .emp{margin:auto;color:var(--muted)}
+#ht .rp{border-left:1px solid var(--line);overflow-y:auto;max-height:680px;padding:12px}
+#ht .rp h4{margin:14px 0 6px;font-size:13px}
+#ht .rpt h4:first-child{margin-top:0}
+#ht .pvx{background:var(--gray-soft);border-radius:10px;padding:8px 10px;font-size:13px}
+@media(max-width:1100px){#ht .inbox{grid-template-columns:1fr}#ht .cl,#ht .rp{border:0;max-height:none}}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -100,7 +133,7 @@ function fm(s){try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",min
 function nowHM(){var d=new Date();return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}
 
 var ST={view:"home",hsub:"bp",bots:[],pages:[],ctl:{kill:false,testers:"",silent_minutes:30,hours_from:"",hours_to:""},hlog:[],runs:[],
-  botId:"",name:"",doc:null,issues:[],versions:[],dirty:false,save:"saved",tab:"tt",sel:"",node:"",conn:null,drawer:null,toast:"",sec:"kb",
+  botId:"",name:"",doc:null,issues:[],versions:[],dirty:false,save:"saved",tab:"tt",sel:"",node:"",conn:null,drawer:null,toast:"",sec:"kb",tags:[],convs:null,cv:null,cvId:0,cvMsg:0,cvTag:0,cvQ:"",cvPage:"",
   xh:"",phone:false,chat:[],cur:null,simlog:[],root:null,pvTok:0,q:"",busy:false};
 
 /* ---------- Tự lưu nháp ---------- */
@@ -137,7 +170,7 @@ async function loadHome(){
 }
 async function loadBot(id,keepTab){
   var r=await api("/bots/"+id);
-  ST.botId=id;ST.name=r.name;ST.doc=r.draft;ST.issues=r.issues;ST.versions=r.versions;ST.dirty=r.dirty;ST.save="saved";
+  ST.botId=id;try{ST.tags=await api("/tags");ST.pages=await api("/pages")}catch(e){}ST.name=r.name;ST.doc=r.draft;ST.issues=r.issues;ST.versions=r.versions;ST.dirty=r.dirty;ST.save="saved";
   if(!keepTab){ST.tab="tc";ST.sec="kb";ST.chat=[];ST.cur=null;ST.simlog=[]}
   if(!mk(ST.doc.flows,ST.sel))ST.sel=(ST.doc.flows[0]||{}).id||"";
   var f=mk(ST.doc.flows,ST.sel);if(!f||!mk(f.nodes,ST.node))ST.node=f&&f.nodes[0]?f.nodes[0].id:"";
@@ -158,13 +191,14 @@ function modePill(m){return m==="tester"?'<span class="pill p-amb">Chỉ thử t
 function draw(){
   var root=ST.root;if(!root||!root.isConnected)return;
   var cvOld=document.getElementById("cvw"),sl=cvOld?cvOld.scrollLeft:0,stp=cvOld?cvOld.scrollTop:0;
-  var focusId=document.activeElement&&document.activeElement.id==="simin"?"simin":(document.activeElement&&document.activeElement.id==="q"?"q":"");
+  var focusId=document.activeElement&&document.activeElement.id==="simin"?"simin":(document.activeElement&&(document.activeElement.id==="q"||document.activeElement.id==="cvq")?document.activeElement.id:"");
   var keepV=focusId?document.activeElement.value:null,keepPos=focusId&&document.activeElement.selectionStart;
   root.innerHTML=topbar()+'<div id="ht-issues">'+(ST.view==="bot"?issuesBar():"")+"</div>"+
     (ST.ctl.kill?'<div class="alert bad">ĐANG TẮT KHẨN: mọi agent ngừng trả lời ở tất cả Page. Bấm "Gỡ tắt khẩn" để bật lại.</div>':"")+
     (ST.view==="home"?home():botView())+(ST.drawer?drawerHtml():"");
   if(keepV!==null){var el=document.getElementById(focusId);if(el){el.value=keepV;el.focus();try{el.setSelectionRange(keepPos,keepPos)}catch(e){}}}
   var ch=document.getElementById("chat");if(ch)ch.scrollTop=ch.scrollHeight;
+  var thr=document.getElementById("thr");if(thr)thr.scrollTop=thr.scrollHeight;
   var cvNew=document.getElementById("cvw");if(cvNew){cvNew.scrollLeft=sl;cvNew.scrollTop=stp}
   drawEdges();
   if(ST.view==="bot"&&ST.tab==="tc"&&!ST.drawer)loadPreview();
@@ -227,21 +261,78 @@ function homeLog(){
 }
 /* Cách đặt tab học từ Pancake (thanh tab trên: Hội thoại, Thống kê, Cài đặt; trong Cài đặt có menu trái), Botcake (Cơ bản / Nâng cao), Preny (Thiết lập nhanh / Cài đặt nâng cao). Mục "Sắp có" chưa làm. */
 var NAV=[
-  {k:"hl",n:"Hội thoại",soon:1,items:[["hl","Hội thoại"],["dx","Đề xuất"]]},
+  {k:"hl",n:"Hội thoại",items:[["hl","Hội thoại"],["dx","Đề xuất",1]]},
   {k:"kb",n:"Kịch bản",items:[["tc","Luồng kịch bản"],["cm","Câu mẫu"],["sp","Sản phẩm &amp; giá"],["md","Ảnh / video"],["bd","Bám đuổi"]]},
   {k:"tk",n:"Thống kê",soon:1,items:[["tk","Thống kê luồng"]]},
   {k:"kt",n:"Thử &amp; xuất bản",items:[["ms","Mô phỏng"],["pb","Phiên bản"]]},
-  {k:"cd",n:"Cài đặt",items:[["tt","Cài đặt chung"],["qt","Quy tắc &amp; chuyển người"],["th","Thẻ hội thoại",1]]}
+  {k:"cd",n:"Cài đặt",items:[["tt","Cài đặt chung"],["qt","Quy tắc &amp; chuyển người"],["th","Thẻ hội thoại"]]}
 ];
 function secOf(t){for(var i=0;i<NAV.length;i++)for(var j=0;j<NAV[i].items.length;j++)if(NAV[i].items[j][0]===t)return NAV[i].k;return "kb"}
 function badge(t){var b=D();return t==="tc"?b.flows.length:t==="cm"?b.lib.length:t==="sp"?b.offers.length:t==="md"?b.media.reduce(function(a,x){return a+x.urls.length},0):t==="bd"?b.follow.length:""}
 function soonPage(title,sub,bullets,ask){
   return '<div class="hph"><div><h1>'+title+'</h1><div class="hint">'+sub+'</div></div><span class="pill p-gry">Sắp có</span></div><div class="card"><b>Sẽ có gì</b><ul style="margin:8px 0 0;padding-left:20px">'+bullets.map(function(x){return "<li>"+x+"</li>"}).join("")+"</ul>"+(ask?'<p class="hint" style="margin:10px 0 0">'+ask+"</p>":"")+"</div>";
 }
-function hl(){return soonPage("Hội thoại","Xem tin nhắn khách như hộp thư Pancake, nhưng cho việc huấn luyện.",["Danh sách khách có bộ lọc theo thẻ, tìm kiếm.","Khung chat có nhãn nguồn từng tin: Khách, Agent, Nhân viên, Botcake.","Mỗi tin của agent ghi luồng, phiên bản và lý do chọn; có nút \"Agent trả lời sai\" và \"Tạo câu mẫu từ tin này\".","Thanh thẻ giai đoạn bấm một lần (CÂU HỎI, CHƯA BÁO GIÁ, ĐÃ BÁO GIÁ, THIẾU THÔNG TIN, ĐÃ MUA HÀNG, HOÀN THÀNH, HỎI GIÁ SỈ) và thẻ sản phẩm, đồng bộ tên với Pancake.","Bảng bên phải: ghi chú, đơn hàng, Thẻ / Thẻ KH."],"Cần chị quyết nguồn tin nhắn (công cụ VPS hay Pancake) và cách che thông tin khách trước khi làm.")}
+var TCOL={gray:"#667085",blue:"var(--blue)",grn:"var(--green)",amb:"var(--orange)",red:"var(--red)",pnk:"var(--pink)",vio:"var(--violet)"};
+var TCOLN={gray:"Xám",blue:"Xanh dương",grn:"Xanh lá",amb:"Cam",red:"Đỏ",pnk:"Hồng",vio:"Tím"};
+function tagById(id){for(var i=0;i<ST.tags.length;i++)if(ST.tags[i].id===id)return ST.tags[i];return null}
+function tagChip(id){var t=tagById(id);return t?'<span class="tg" style="background:'+TCOL[t.color]+'">'+esc(t.name)+"</span>":""}
+function fmT(s){try{var d=new Date(s);return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}catch(e){return ""}}
+var WHO={customer:"Khách",agent:"Agent",sale:"Nhân viên",system:"Agent dừng"};
+async function loadConvs(keepDetail){
+  try{
+    var qs=[];if(ST.cvTag)qs.push("tag="+ST.cvTag);if(ST.cvQ)qs.push("q="+encodeURIComponent(ST.cvQ));
+    ST.convs=await api("/convs"+(qs.length?"?"+qs.join("&"):""));
+    if(ST.cvId&&keepDetail!==false)await loadConv(ST.cvId,true);
+    else if(!ST.cvId&&ST.convs.length)await loadConv(ST.convs[0].id,true);
+  }catch(e){toast("Chưa tải được hội thoại: "+e.message)}
+  draw();
+}
+async function loadConv(id,quiet){
+  try{
+    ST.cv=await api("/convs/"+id);ST.cvId=id;
+    var r=ST.convs.filter(function(x){return x.id===id})[0];
+    if(r&&r.unread){r.unread=0;api("/convs/"+id+"/read",{method:"POST",body:"{}"}).catch(function(){})}
+    if(ST.cvMsg&&!ST.cv.messages.some(function(m){return m.id===ST.cvMsg}))ST.cvMsg=0;
+  }catch(e){ST.cv=null;ST.cvId=0;if(!quiet)toast(e.message)}
+  if(!quiet)draw();
+}
+function hl(){
+  var pages=ST.pages.filter(function(p){return p.bot_id===ST.botId});
+  var showPages=ST.cvPage==="all"||!pages.length?null:pages.map(function(p){return p.fb_page_id});
+  var list=(ST.convs||[]).filter(function(c){return !showPages||showPages.indexOf(c.fb_page_id)>=0});
+  var stage=ST.tags.filter(function(t){return t.kind==="stage"}),prod=ST.tags.filter(function(t){return t.kind==="product"});
+  var opts='<option value="">Lọc theo thẻ</option>'+ST.tags.map(function(t){return '<option value="'+t.id+'"'+(ST.cvTag===t.id?" selected":"")+">"+esc(t.name)+"</option>"}).join("");
+  var popts=pages.length?'<option value="">Page của bot này</option><option value="all"'+(ST.cvPage==="all"?" selected":"")+">Tất cả Page</option>":"";
+  var lhtml=list.map(function(c){
+    var sel=ST.cvId===c.id;
+    return '<div class="ci'+(sel?" on":"")+'" data-act="cv" data-id="'+c.id+'"><div class="row between"><b>'+esc(c.name||"Khách "+c.id)+'</b><span class="hint" style="flex:none">'+fm(c.last_at)+'</span></div><div class="cl2"><span class="hint">'+(c.last_who==="agent"?"Agent: ":c.last_who==="sale"?"NV: ":c.last_who==="system"?"Agent dừng: ":"")+esc(c.last_text)+"</span>"+(c.unread?'<span class="un">'+c.unread+"</span>":"")+"</div><div>"+c.tag_ids.map(tagChip).join("")+"</div></div>"}).join("")||'<div class="ci hint">Chưa có hội thoại nào'+(ST.cvTag||ST.cvQ?" khớp bộ lọc":". Khi công cụ trên VPS đẩy tin lên, hội thoại sẽ hiện ở đây")+".</div>";
+  var cv=ST.cv,mid="",right="";
+  if(cv){
+    var sel=ST.cvMsg?cv.messages.filter(function(m){return m.id===ST.cvMsg})[0]:null;
+    mid='<div class="chd"><div><b>'+esc(cv.name||"Khách "+cv.id)+'</b><div class="hint">'+esc(cv.page_name||cv.fb_page_id)+(cv.bot_name?" · bot "+esc(cv.bot_name):"")+'</div></div><button class="btn sm danger" data-act="cvdel" data-id="'+cv.id+'">Xóa khỏi web</button></div>'+
+     '<div class="thr" id="thr">'+cv.messages.map(function(m){
+       var cls=m.who==="customer"?"k":m.who==="agent"?"a":m.who==="sale"?"s2":"sys";
+       var src=m.who==="agent"?"Agent"+(m.flow?" · "+esc(m.flow):"")+(m.version?" · bản "+m.version:""):(WHO[m.who]||m.who)+(m.who==="system"&&m.flow?" · "+esc(m.flow):"");
+       var click=m.who==="agent"||m.who==="system";
+       return '<div class="tm '+cls+(ST.cvMsg===m.id?" pk":"")+(m.wrong?" wr":"")+'"'+(click?' data-act="msgsel" data-id="'+m.id+'"':"")+'><span class="src">'+src+" · "+fmT(m.at)+(m.wrong?" · đã đánh dấu sai":"")+"</span>"+esc(m.text)+"</div>"}).join("")+"</div>"+
+     '<div class="tagbar">'+stage.map(function(t){var on=cv.tag_ids.indexOf(t.id)>=0;return '<button class="'+(on?"on":"")+'" style="background:'+TCOL[t.color]+'" data-act="cvtag" data-id="'+t.id+'" title="'+(on?"Bỏ thẻ":"Gắn thẻ")+'">'+esc(t.name)+"</button>"}).join("")+"</div>"+
+     '<div class="comp">Chỉ xem. Trả lời khách ở Pancake. Tin ở đây đã che số điện thoại, email, link.</div>';
+    right='<div class="rpt"><h4>Thông tin</h4><div class="hint">Khách: <b style="color:var(--ink)">'+esc(cv.name||"(chưa có tên)")+"</b></div><div class=\"hint\">Page: "+esc(cv.page_name||cv.fb_page_id)+'</div><div class="hint">Bot: '+(cv.bot_name?esc(cv.bot_name):"chưa gắn")+'</div><div class="hint">Tin gần nhất: '+fm(cv.last_at)+"</div>"+
+     '<h4>Ghi chú</h4><textarea data-act="cvnote" placeholder="Ghi chú về khách này…" style="min-height:70px">'+esc(cv.note||"")+"</textarea>"+
+     '<h4>Thẻ giai đoạn</h4><div>'+(stage.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có thẻ giai đoạn.</span>')+'</div><h4>Thẻ sản phẩm</h4><div>'+(prod.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có thẻ sản phẩm. Thêm ở Cài đặt, Thẻ hội thoại.</span>')+"</div>"+
+     (sel?'<h4>Vì sao agent làm vậy</h4><div class="pvx">'+esc(sel.why||"Chưa có lý do (công cụ VPS chưa gửi kèm).")+'</div><h4>Agent đã lấy gì</h4><div class="log">'+esc(sel.got||"Chưa có dữ liệu.")+'</div><div class="row" style="margin-top:8px"><button class="btn sm'+(sel.wrong?" danger":"")+'" data-act="wrongmsg" data-id="'+sel.id+'">'+(sel.wrong?"Bỏ đánh dấu sai":"Agent trả lời sai")+'</button>'+(sel.who==="agent"?'<button class="btn sm pri" data-act="mkphrase" data-id="'+sel.id+'">Tạo câu mẫu từ tin này</button>':"")+"</div>":'<h4>Chi tiết tin</h4><p class="hint">Bấm vào một tin của agent (khung xanh đậm hoặc đỏ) để xem vì sao agent chọn luồng đó và đã lấy dữ liệu gì.</p>')+"</div>";
+  }else{mid='<div class="emp">Chọn một hội thoại ở bên trái</div>';right='<div class="rpt hint">Chưa chọn hội thoại.</div>'}
+  return '<div class="hph"><div><h1>Hội thoại</h1><div class="hint">Xem tin khách và agent trả lời như hộp thư Pancake, để huấn luyện. Chỉ chị xem. Tin do công cụ trên VPS đẩy lên, đã che số điện thoại; tự xóa sau 90 ngày.</div></div></div>'+
+   '<div class="inbox"><div class="cl"><div class="cft"><input type="text" id="cvq" placeholder="Tìm khách…" value="'+esc(ST.cvQ||"")+'"><select data-act="cvfilter">'+opts+"</select>"+(popts?'<select data-act="cvpage">'+popts+"</select>":"")+"</div>"+lhtml+'</div><div class="cm2">'+mid+'</div><div class="rp">'+right+"</div></div>";
+}
 function dx(){return soonPage("Đề xuất","Hệ thống đọc hội thoại rồi đề xuất cải tiến, chị duyệt mới thành bản nháp.",["Khách hỏi lặp lại mà chưa có luồng: đề xuất luồng mới.","Câu nhân viên hay gửi mà khách hay chốt: đề xuất thành câu mẫu.","Nút ít người bấm, luồng ít người đi tiếp: đề xuất sửa.","Agent bị chặn nhiều vì thiếu giá: nhắc chị nhập giá."],"Chỉ đề xuất. Vẫn phải xuất bản mới tới agent.")}
 function tk(){return soonPage("Thống kê luồng","Giống thống kê của Botcake: mỗi luồng gửi bao nhiêu lần, hiệu quả ra sao.",["Đã gửi, khách nhắn tiếp, bấm nút, chuyển chị, bị chặn theo từng luồng.","Cảnh báo luồng ít người đi tiếp để chị sửa.","Số liệu lấy từ nhật ký agent (đã có bảng ghi, chờ công cụ VPS nối vào)."])}
-function th(){return soonPage("Thẻ hội thoại","Quản lý thẻ như Pancake: tên thẻ, màu, luật tự gắn.",["Thẻ giai đoạn và thẻ sản phẩm (Tẩy lồng, Tẩy mốc gioăng).","Luật tự gắn thẻ theo luồng đã gửi (ví dụ gửi TL-02 thì thêm ĐÃ BÁO GIÁ).","Thẻ sản phẩm quyết định agent nạp gói sản phẩm nào."],"Giai đoạn đầu chỉ gắn thẻ trong web, chưa đụng thẻ trên Pancake.")}
+function th(){
+  var rows=ST.tags.map(function(t){return "<tr><td>"+tagChip(t.id)+"</td><td>"+(t.kind==="product"?"Sản phẩm":"Giai đoạn")+"</td><td>"+TCOLN[t.color]+'</td><td><div class="row"><button class="btn sm" data-act="edittag" data-id="'+t.id+'">Sửa</button><button class="btn sm" data-act="deltag" data-id="'+t.id+'">Xóa</button></div></td></tr>'}).join("");
+  return '<div class="hph"><div><h1>Thẻ hội thoại</h1><div class="hint">Thẻ giai đoạn hiện thanh màu dưới khung chat (bấm một lần để gắn). Thẻ sản phẩm cho biết khách đang hỏi gì. Luồng có thể tự gắn thẻ khi gửi (xem ô "Thẻ tự gắn" ở Luồng kịch bản). Thẻ ở đây chỉ nằm trong web, chưa đồng bộ sang Pancake.</div></div></div>'+
+   '<div class="tbar"><span class="sp"></span><button class="btn pri" data-act="addtag">Thêm thẻ</button></div>'+
+   '<div class="tbl"><table><thead><tr><th>Thẻ</th><th>Loại</th><th>Màu</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="4" class="hint">Chưa có thẻ nào.</td></tr>')+"</tbody></table></div>";
+}
 function botView(){
   var cur=mkSec(ST.sec);
   var top='<div class="tabs">'+NAV.map(function(s){return '<button data-act="sec" data-id="'+s.k+'" class="'+(ST.sec===s.k?"on":"")+'">'+s.n+(s.soon?'<span>Sắp có</span>':"")+"</button>"}).join("")+"</div>";
@@ -343,7 +434,7 @@ function tc(){
      '<div class="grid" style="margin-top:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"><label class="f"><span>Mã luồng</span><input type="text" data-flow="code" value="'+esc(f.code)+'"></label><label class="f"><span>Tên luồng</span><input type="text" data-flow="name" value="'+esc(f.name)+'"></label>'+
      '<label class="f"><span>Gửi tin</span><select data-flow="win"><option value="in"'+(f.win==="in"?" selected":"")+'>Trong khoảng 24 giờ</option><option value="out"'+(f.win==="out"?" selected":"")+">Ngoài khoảng 24 giờ</option></select></label></div>"+
      '<label class="f"><span>Gợi ý để agent chọn luồng này (từ khóa khách hay nói, cách nhau dấu phẩy)</span><input type="text" data-flow="keys" value="'+esc(f.keys)+'"></label>'+
-     '<div class="row" style="margin-bottom:8px"><button class="achip'+(f.entry?" on":"")+'" data-act="entry">Agent được chọn luồng này từ đầu hội thoại</button></div>'+
+     '<div class="row" style="margin-bottom:8px"><button class="achip'+(f.entry?" on":"")+'" data-act="entry">Agent được chọn luồng này từ đầu hội thoại</button></div>'+'<div class="hint" style="margin-bottom:6px">Thẻ tự gắn cho khách khi gửi luồng này:</div><div class="row" style="margin-bottom:8px">'+(ST.tags.map(function(t){return '<button class="achip'+((f.tags||[]).indexOf(t.name)>=0?" on":"")+'" data-act="ftag" data-id="'+esc(t.name)+'">'+esc(t.name)+"</button>"}).join("")||'<span class="hint">(chưa có thẻ, thêm ở Cài đặt, Thẻ hội thoại)</span>')+"</div>"+
      '<div class="hint" style="margin-bottom:6px">Sau khi gửi luồng này, nếu khách nhắn tiếp thì agent chỉ được chọn một trong các luồng:</div><div class="row">'+(b.flows.filter(function(x){return x.id!==f.id}).map(function(x){return '<button class="achip'+(f.allow.indexOf(x.id)>=0?" on":"")+'" data-act="allow" data-id="'+x.id+'">'+esc(x.code)+"</button>"}).join("")||'<span class="hint">(chưa có luồng khác)</span>')+"</div></div>"+
      '<div class="card"><div class="cvbar"><b style="margin-right:6px">Sơ đồ</b><button class="btn sm pri" data-act="addnode">+ Thêm ô</button><span class="hint">Kéo tiêu đề ô để di chuyển. Bấm chấm tròn rồi bấm ô đích để nối.</span>'+(ST.conn?'<span class="pill p-amb">Đang nối: bấm vào ô muốn nối tới</span><button class="btn sm" data-act="cancelconn">Hủy</button>':"")+"</div>"+
      '<div class="cvw" id="cvw"><div class="cv" id="cv" style="width:'+W+"px;height:"+Hh+'px"><svg id="edges" class="edges"></svg>'+f.nodes.map(function(x,i){return nodeHtml(x,i)}).join("")+"</div></div>"+
@@ -418,7 +509,7 @@ function varChips(){return [["xh","Xưng hô (anh/chị/mình)"],["ten_page","T�
 function drawerHtml(){
   var d=ST.drawer,b=ST.doc,body="",title="",ok="Lưu";
   if(d.type==="msg"){
-    var m=d.id?mk(b.lib,d.id):{code:"",grp:"",text:"",claim:"",img:""};
+    var m=d.id?mk(b.lib,d.id):{code:"",grp:"",text:d.prefill||"",claim:"",img:""};
     title=d.id?"Sửa câu mẫu":"Thêm câu mẫu";
     var imgs='<option value="">(không kèm ảnh)</option>'+b.media.map(function(g){return '<option value="'+esc(g.g)+'"'+(m.img===g.g?" selected":"")+">"+esc(g.g)+"</option>"}).join("");
     body='<label class="f"><span>Mã câu</span><input type="text" id="d_code" value="'+esc(m.code)+'" placeholder="VD: GIA_LONG_02"></label><label class="f"><span>Nhóm</span><input type="text" id="d_grp" value="'+esc(m.grp)+'" placeholder="VD: Báo giá, Mở đầu, Bám đuổi"></label>'+
@@ -449,6 +540,10 @@ function drawerHtml(){
     title=d.from?"Nhân bản bot":"Tạo bot mới";ok=d.from?"Nhân bản":"Tạo bot";
     body='<label class="f"><span>Tên bot</span><input type="text" id="d_name" placeholder="VD: Bot tẩy lồng và tẩy mốc gioăng"></label>'+
      '<label class="f"><span>Bắt đầu từ</span><select id="d_from"><option value="">Bot trống</option>'+ST.bots.map(function(k){return '<option value="'+k.id+'"'+(d.from===k.id?" selected":"")+">Nhân bản: "+esc(k.name)+"</option>"}).join("")+"</select></label>";
+  }else if(d.type==="tag"){
+    var tg=d.id?tagById(d.id):{name:"",color:"gray",kind:"stage"};
+    title=d.id?"Sửa thẻ":"Thêm thẻ";
+    body='<label class="f"><span>Tên thẻ</span><input type="text" id="d_tname" value="'+esc(tg.name)+'" placeholder="VD: ĐÃ BÁO GIÁ"></label><label class="f"><span>Loại</span><select id="d_tkind"><option value="stage"'+(tg.kind==="stage"?" selected":"")+'>Giai đoạn (hiện trên thanh dưới khung chat)</option><option value="product"'+(tg.kind==="product"?" selected":"")+'>Sản phẩm</option></select></label><label class="f"><span>Màu</span><select id="d_tcolor">'+Object.keys(TCOL).map(function(k){return '<option value="'+k+'"'+(tg.color===k?" selected":"")+">"+TCOLN[k]+"</option>"}).join("")+"</select></label>";
   }else if(d.type==="page"){
     title="Thêm Page";
     body='<label class="f"><span>Tên Page</span><input type="text" id="d_name" placeholder="VD: Ailla Việt Nam Store"></label><label class="f"><span>Id Page Facebook (chỉ gồm số)</span><input type="text" id="d_fb" placeholder="VD: 105017945992971"></label>';
@@ -488,11 +583,21 @@ document.addEventListener("click",function(e){
     catch(err){try{var r2=await api("/bots/"+ST.botId);ST.issues=r2.issues}catch(x){}toast(err.message);draw()}
     finally{ST.busy=false;updTop()}});return}
   if(a==="rollback"){guard(async function(){if(!confirm("Quay lại bản "+id+"? Nội dung bản đó sẽ thành bản mới nhất và được xuất bản ngay."))return;await flush();var r=await api("/bots/"+ST.botId+"/rollback",{method:"POST",body:JSON.stringify({version:+id})});await loadBot(ST.botId,true);toast("Đã quay lại, thành bản "+r.version)});return}
-  if(a==="tab"){guard(async function(){await flush();ST.tab=id;ST.sec=secOf(id);draw()});return}
-  if(a==="sec"){guard(async function(){await flush();var s=mkSec(id);ST.sec=id;ST.tab=s.items[0][0];draw()});return}
+  if(a==="tab"){guard(async function(){await flush();ST.tab=id;ST.sec=secOf(id);draw();if(id==="hl")loadConvs()});return}
+  if(a==="sec"){guard(async function(){await flush();var s=mkSec(id);ST.sec=id;ST.tab=s.items[0][0];draw();if(ST.tab==="hl")loadConvs()});return}
   if(a==="savedrawer"){saveDrawer();return}
   if(!b)return;
   if(a==="selflow"){ST.sel=id;var f0=mk(b.flows,id);ST.node=f0&&f0.nodes[0]?f0.nodes[0].id:"";ST.conn=null;draw();return}
+  if(a==="ftag"){var ff0=curFlow();ff0.tags=ff0.tags||[];var ix0=ff0.tags.indexOf(id);if(ix0>=0)ff0.tags.splice(ix0,1);else ff0.tags.push(id);touch();draw();return}
+  if(a==="cv"){loadConv(+id);return}
+  if(a==="msgsel"){ST.cvMsg=ST.cvMsg===+id?0:+id;draw();return}
+  if(a==="cvtag"){guard(async function(){var ids=ST.cv.tag_ids.slice(),i1=ids.indexOf(+id);if(i1>=0)ids.splice(i1,1);else ids.push(+id);var r=await api("/convs/"+ST.cvId+"/tags",{method:"PUT",body:JSON.stringify({tag_ids:ids})});ST.cv.tag_ids=r.tag_ids;var row=ST.convs.filter(function(x){return x.id===ST.cvId})[0];if(row)row.tag_ids=r.tag_ids;draw()});return}
+  if(a==="wrongmsg"){guard(async function(){var m=ST.cv.messages.filter(function(x){return x.id===+id})[0];var wrong=!m.wrong,note="";if(wrong){note=prompt("Sai ở đâu? (không bắt buộc)")||""}await api("/msgs/"+id+"/wrong",{method:"POST",body:JSON.stringify({wrong:wrong,note:note})});m.wrong=wrong?1:0;m.wrong_note=note;toast(wrong?"Đã đánh dấu sai":"Đã bỏ đánh dấu");draw()});return}
+  if(a==="mkphrase"){var mm=ST.cv.messages.filter(function(x){return x.id===+id})[0];if(!mm)return;ST.tab="cm";ST.sec="kb";ST.drawer={type:"msg",prefill:mm.text};draw();return}
+  if(a==="cvdel"){guard(async function(){if(!confirm("Xóa hội thoại này khỏi web? (Không ảnh hưởng tin trên Facebook hay Pancake)"))return;await api("/convs/"+id,{method:"DELETE"});ST.cvId=0;ST.cv=null;await loadConvs(false)});return}
+  if(a==="addtag"){ST.drawer={type:"tag"};draw();return}
+  if(a==="edittag"){ST.drawer={type:"tag",id:+id};draw();return}
+  if(a==="deltag"){guard(async function(){if(!confirm("Xóa thẻ này? Thẻ sẽ bị gỡ khỏi mọi hội thoại."))return;await api("/tags/"+id,{method:"DELETE"});ST.tags=await api("/tags");draw()});return}
   if(a==="addflow"){ST.drawer={type:"flow"};draw();return}
   if(a==="delflow"){if(!confirm("Xóa luồng này?"))return;b.flows=b.flows.filter(function(x){return x.id!==id});b.flows.forEach(function(x){x.allow=x.allow.filter(function(y){return y!==id});x.nodes.forEach(function(n){(n.btns||[]).forEach(function(bt){if(bt.to===id)bt.to=""});if(n.to===id)n.to=""})});ST.sel=(b.flows[0]||{}).id||"";ST.node="";ST.cur=null;touch();draw();return}
   if(a==="addnode"){ST.drawer={type:"node"};draw();return}
@@ -541,6 +646,7 @@ async function saveDrawer(){
   var d=ST.drawer,b=ST.doc;
   try{
     if(d.type==="bot"){var nm0=val("d_name");if(!nm0){toast("Cần có tên bot");return}await api("/bots",{method:"POST",body:JSON.stringify({name:nm0,from:val("d_from")||undefined})});ST.drawer=null;await loadHome();toast("Đã tạo bot");return}
+    if(d.type==="tag"){var tn=val("d_tname");if(!tn){toast("Cần có tên thẻ");return}var body0=JSON.stringify({name:tn,kind:val("d_tkind"),color:val("d_tcolor")});if(d.id)await api("/tags/"+d.id,{method:"PATCH",body:body0});else await api("/tags",{method:"POST",body:body0});ST.tags=await api("/tags");ST.drawer=null;draw();toast("Đã lưu thẻ");return}
     if(d.type==="page"){await api("/pages",{method:"POST",body:JSON.stringify({name:val("d_name"),fb_page_id:val("d_fb")})});ST.drawer=null;await loadHome();toast("Đã thêm Page");return}
     if(d.type==="msg"){
       var code=val("d_code"),text=val("d_text");if(!code||!text){toast("Cần có mã câu và nội dung");return}
@@ -592,6 +698,9 @@ document.addEventListener("change",function(e){
   if(fl&&b){var f=curFlow();if(f){f[fl]=t.value;touch();if(t.tagName==="SELECT"||fl==="code"||fl==="name")draw()}return}
   var fo=t.getAttribute("data-follow");
   if(fo&&b){var pp=fo.split(":"),it=mk(b.follow,pp[1]);if(it){it[pp[0]]=t.value;touch()}return}
+  if(a==="cvnote"){guard(async function(){await api("/convs/"+ST.cvId,{method:"PUT",body:JSON.stringify({note:t.value})});if(ST.cv)ST.cv.note=t.value;toast("Đã lưu ghi chú")});return}
+  if(a==="cvfilter"){ST.cvTag=+t.value||0;ST.cvId=0;ST.cv=null;loadConvs();return}
+  if(a==="cvpage"){ST.cvPage=t.value;ST.cvId=0;ST.cv=null;loadConvs();return}
   if(a==="botname"){ST.name=t.value.trim()||ST.name;touch();return}
   if(a==="pickbot"){if(t.value)openBot(t.value);else goHome();return}
   if(a==="pagebot"){guard(async function(){try{await api("/pages/"+t.getAttribute("data-id"),{method:"PATCH",body:JSON.stringify({bot_id:t.value||null})})}finally{await loadHome()}});return}
@@ -599,7 +708,16 @@ document.addEventListener("change",function(e){
   if(a==="setxh"){ST.xh=t.value;draw();return}
   if(a==="setphone"){ST.phone=t.checked;draw();return}
 });
-document.addEventListener("input",function(e){if(alive()&&e.target.id==="q"){ST.q=e.target.value;draw()}});
+document.addEventListener("input",function(e){
+  if(!alive())return;
+  if(e.target.id==="q"){ST.q=e.target.value;draw()}
+  if(e.target.id==="cvq"){ST.cvQ=e.target.value;clearTimeout(ST.cvT);ST.cvT=setTimeout(function(){ST.cvId=0;ST.cv=null;loadConvs()},350)}
+});
+setInterval(function(){
+  if(!alive()||ST.view!=="bot"||ST.tab!=="hl"||ST.drawer)return;
+  var ae=document.activeElement;if(ae&&ST.root.contains(ae)&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"))return;
+  loadConvs();
+},15000);
 document.addEventListener("keydown",function(e){
   if(!alive())return;
   if(e.key==="Enter"&&e.target.id==="simin"){e.preventDefault();var bt=document.querySelector('#ht [data-act="send"]');if(bt)bt.click()}

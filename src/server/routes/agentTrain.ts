@@ -286,6 +286,161 @@ agentTrainRoutes.delete('/pages/:id', async (c) => {
   return ok(c, { ok: true });
 });
 
+/* --- Thẻ hội thoại (giống thẻ của Pancake) --- */
+const TAG_COLORS = ['gray', 'blue', 'grn', 'amb', 'red', 'pnk', 'vio'];
+type TagRow = { id: number; name: string; color: string; kind: string; sort: number };
+
+agentTrainRoutes.get('/tags', async (c) => {
+  const rows = await c.env.DB.prepare('SELECT id, name, color, kind, sort FROM agent_train_tags ORDER BY kind DESC, sort, id').all<TagRow>();
+  return ok(c, rows.results ?? []);
+});
+
+agentTrainRoutes.post('/tags', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { name?: string; color?: string; kind?: string };
+  const name = text(b.name, 40);
+  if (!name) throw badRequest('NO_NAME', 'Chưa gõ tên thẻ');
+  const color = TAG_COLORS.includes(String(b.color)) ? String(b.color) : 'gray';
+  const kind = b.kind === 'product' ? 'product' : 'stage';
+  const dup = await c.env.DB.prepare('SELECT id FROM agent_train_tags WHERE name = ?').bind(name).first();
+  if (dup) throw conflict('TAG_EXISTS', 'Đã có thẻ tên này.');
+  const mx = await c.env.DB.prepare('SELECT MAX(sort) AS m FROM agent_train_tags').first<{ m: number | null }>();
+  const res = await c.env.DB.prepare('INSERT INTO agent_train_tags (name, color, kind, sort, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(name, color, kind, (mx?.m ?? 0) + 1, nowIso())
+    .run();
+  await logEvent(c, 'tag.add', res.meta.last_row_id, name);
+  return ok(c, { id: res.meta.last_row_id });
+});
+
+agentTrainRoutes.patch('/tags/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  const old = await c.env.DB.prepare('SELECT id, name, color, kind FROM agent_train_tags WHERE id = ?').bind(id).first<TagRow>();
+  if (!old) throw notFound('Không có thẻ này');
+  const b = (await c.req.json().catch(() => ({}))) as { name?: string; color?: string; kind?: string };
+  const name = b.name === undefined ? old.name : text(b.name, 40);
+  if (!name) throw badRequest('NO_NAME', 'Chưa gõ tên thẻ');
+  const dup = await c.env.DB.prepare('SELECT id FROM agent_train_tags WHERE name = ? AND id != ?').bind(name, id).first();
+  if (dup) throw conflict('TAG_EXISTS', 'Đã có thẻ tên này.');
+  const color = b.color !== undefined && TAG_COLORS.includes(b.color) ? b.color : old.color;
+  const kind = b.kind === undefined ? old.kind : b.kind === 'product' ? 'product' : 'stage';
+  await c.env.DB.prepare('UPDATE agent_train_tags SET name = ?, color = ?, kind = ? WHERE id = ?').bind(name, color, kind, id).run();
+  await logEvent(c, 'tag.update', id, name);
+  return ok(c, { ok: true });
+});
+
+agentTrainRoutes.delete('/tags/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM agent_train_conv_tags WHERE tag_id = ?').bind(id),
+    c.env.DB.prepare('DELETE FROM agent_train_tags WHERE id = ?').bind(id),
+  ]);
+  await logEvent(c, 'tag.delete', id);
+  return ok(c, { ok: true });
+});
+
+/* --- Hội thoại (tin nhắn do công cụ VPS đẩy lên, chỉ chị xem) --- */
+agentTrainRoutes.get('/convs', async (c) => {
+  const tag = Number(c.req.query('tag') ?? 0) || 0;
+  const q = text(c.req.query('q'), 80).toLowerCase();
+  const where: string[] = [];
+  const args: unknown[] = [];
+  if (tag) {
+    where.push('v.id IN (SELECT conv_id FROM agent_train_conv_tags WHERE tag_id = ?)');
+    args.push(tag);
+  }
+  if (q) {
+    where.push('(LOWER(v.name) LIKE ? OR LOWER(v.last_text) LIKE ?)');
+    args.push(`%${q}%`, `%${q}%`);
+  }
+  const rows = await c.env.DB.prepare(
+    `SELECT v.id, v.fb_page_id, v.name, v.unread, v.last_at, v.last_text, v.last_who, p.name AS page_name
+     FROM agent_train_convs v LEFT JOIN agent_train_pages p ON p.fb_page_id = v.fb_page_id
+     ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY v.last_at DESC LIMIT 100`,
+  )
+    .bind(...args)
+    .all<{ id: number }>();
+  const list = rows.results ?? [];
+  const tagRows = list.length
+    ? await c.env.DB.prepare(`SELECT conv_id, tag_id FROM agent_train_conv_tags WHERE conv_id IN (${list.map(() => '?').join(',')})`)
+        .bind(...list.map((x) => x.id))
+        .all<{ conv_id: number; tag_id: number }>()
+    : { results: [] as { conv_id: number; tag_id: number }[] };
+  const by = new Map<number, number[]>();
+  for (const t of tagRows.results ?? []) by.set(t.conv_id, [...(by.get(t.conv_id) ?? []), t.tag_id]);
+  return ok(c, list.map((x) => ({ ...x, tag_ids: by.get(x.id) ?? [] })));
+});
+
+agentTrainRoutes.get('/convs/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  const conv = await c.env.DB.prepare(
+    `SELECT v.id, v.fb_page_id, v.name, v.note, v.unread, v.created_at, v.last_at, p.name AS page_name, p.bot_id
+     FROM agent_train_convs v LEFT JOIN agent_train_pages p ON p.fb_page_id = v.fb_page_id WHERE v.id = ?`,
+  )
+    .bind(id)
+    .first<{ id: number; bot_id: string | null }>();
+  if (!conv) throw notFound('Không có hội thoại này');
+  const msgs = await c.env.DB.prepare(
+    `SELECT * FROM (SELECT id, at, who, text, flow, version, why, got, wrong, wrong_note FROM agent_train_msgs WHERE conv_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id`,
+  )
+    .bind(id)
+    .all();
+  const tags = await c.env.DB.prepare('SELECT tag_id FROM agent_train_conv_tags WHERE conv_id = ?').bind(id).all<{ tag_id: number }>();
+  const bot = conv.bot_id ? await c.env.DB.prepare('SELECT name FROM agent_train_bots WHERE id = ?').bind(conv.bot_id).first<{ name: string }>() : null;
+  return ok(c, { ...conv, bot_name: bot?.name ?? null, messages: msgs.results ?? [], tag_ids: (tags.results ?? []).map((t) => t.tag_id) });
+});
+
+/** Đổi bộ thẻ của khách (thay cả bộ). */
+agentTrainRoutes.put('/convs/:id/tags', async (c) => {
+  const id = Number(c.req.param('id'));
+  const b = (await c.req.json().catch(() => ({}))) as { tag_ids?: number[] };
+  const exists = await c.env.DB.prepare('SELECT id FROM agent_train_convs WHERE id = ?').bind(id).first();
+  if (!exists) throw notFound('Không có hội thoại này');
+  const ids = [...new Set((b.tag_ids ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 30);
+  const valid = ids.length
+    ? ((await c.env.DB.prepare(`SELECT id FROM agent_train_tags WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all<{ id: number }>()).results ?? []).map((x) => x.id)
+    : [];
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM agent_train_conv_tags WHERE conv_id = ?').bind(id),
+    ...valid.map((t) => c.env.DB.prepare('INSERT INTO agent_train_conv_tags (conv_id, tag_id) VALUES (?, ?)').bind(id, t)),
+  ]);
+  return ok(c, { tag_ids: valid });
+});
+
+agentTrainRoutes.put('/convs/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  const b = (await c.req.json().catch(() => ({}))) as { note?: string };
+  const res = await c.env.DB.prepare('UPDATE agent_train_convs SET note = ? WHERE id = ?').bind(text(b.note, 1000), id).run();
+  if (!res.meta.changes) throw notFound('Không có hội thoại này');
+  return ok(c, { ok: true });
+});
+
+/** Đánh dấu đã xem trong web. Không gửi gì cho Facebook nên khách không thấy "đã xem". */
+agentTrainRoutes.post('/convs/:id/read', async (c) => {
+  await c.env.DB.prepare('UPDATE agent_train_convs SET unread = 0 WHERE id = ?').bind(Number(c.req.param('id'))).run();
+  return ok(c, { ok: true });
+});
+
+agentTrainRoutes.delete('/convs/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM agent_train_msgs WHERE conv_id = ?').bind(id),
+    c.env.DB.prepare('DELETE FROM agent_train_conv_tags WHERE conv_id = ?').bind(id),
+    c.env.DB.prepare('DELETE FROM agent_train_convs WHERE id = ?').bind(id),
+  ]);
+  await logEvent(c, 'conv.delete', id);
+  return ok(c, { ok: true });
+});
+
+/** Chị đánh dấu một tin của agent là sai (để sau này thành đề xuất sửa). */
+agentTrainRoutes.post('/msgs/:id/wrong', async (c) => {
+  const id = Number(c.req.param('id'));
+  const b = (await c.req.json().catch(() => ({}))) as { wrong?: boolean; note?: string };
+  const res = await c.env.DB.prepare(`UPDATE agent_train_msgs SET wrong = ?, wrong_note = ? WHERE id = ? AND who IN ('agent', 'system')`)
+    .bind(b.wrong === false ? 0 : 1, text(b.note, 300), id)
+    .run();
+  if (!res.meta.changes) throw notFound('Không có tin này');
+  return ok(c, { ok: true });
+});
+
 /* --- Nhật ký --- */
 agentTrainRoutes.get('/log', async (c) => {
   const rows = await c.env.DB.prepare(
@@ -384,4 +539,96 @@ agentTrainRelayRoutes.post('/run', async (c) => {
     .bind(nowIso(), text(b.page, 40), b.bot_id ? text(b.bot_id, 60) : null, Number.isFinite(Number(b.version)) ? Number(b.version) : null, text(b.flow, 60), String(b.result), text(b.note, 300), maskPersonal(text(b.customer, 600)))
     .run();
   return ok(c, { ok: true });
+});
+
+const RETENTION_DAYS = 90;
+type InMsg = { ext_id?: string; who?: string; text?: string; at?: string; flow?: string; version?: number; why?: string; got?: string };
+
+/**
+ * Công cụ trên VPS đẩy tin nhắn của một khách lên web (khách nhắn, agent trả lời, nhân viên nhắn tay, agent dừng).
+ * Nội dung được che số điện thoại, email, link NGAY Ở ĐÂY trước khi lưu. Tin trùng (cùng ext_id) bị bỏ qua.
+ * Khi agent gửi một luồng có khai báo thẻ tự gắn, thẻ đó được gắn cho khách. Tin cũ hơn 90 ngày tự xóa.
+ */
+agentTrainRelayRoutes.post('/messages', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { page?: string; psid?: string; name?: string; messages?: InMsg[] };
+  const page = text(b.page, 40);
+  const psid = text(b.psid, 64);
+  if (!/^\d{5,30}$/.test(page) || !psid) throw badRequest('BAD_CONV', 'Cần id Page (số) và mã khách.');
+  const list = (b.messages ?? []).slice(0, 30);
+  if (!list.length) throw badRequest('EMPTY', 'Không có tin nào.');
+  const WHO = ['customer', 'agent', 'sale', 'system'];
+  const now = nowIso();
+  const name = text(b.name, 120);
+  let conv = await c.env.DB.prepare('SELECT id FROM agent_train_convs WHERE fb_page_id = ? AND psid = ?').bind(page, psid).first<{ id: number }>();
+  if (!conv) {
+    const r = await c.env.DB.prepare(`INSERT INTO agent_train_convs (fb_page_id, psid, name, last_at, created_at) VALUES (?, ?, ?, ?, ?)`)
+      .bind(page, psid, name, '', now)
+      .run();
+    conv = { id: Number(r.meta.last_row_id) };
+  } else if (name) {
+    await c.env.DB.prepare('UPDATE agent_train_convs SET name = ? WHERE id = ?').bind(name, conv.id).run();
+  }
+  // Luồng của bản đang dùng, để gắn thẻ tự động theo mã luồng.
+  const bot = await c.env.DB.prepare(
+    `SELECT v.data FROM agent_train_pages p JOIN agent_train_versions v ON v.bot_id = p.bot_id AND v.is_current = 1 WHERE p.fb_page_id = ?`,
+  )
+    .bind(page)
+    .first<{ data: string }>();
+  const doc = bot ? parseDoc(bot.data) : null;
+  const tagRows = (await c.env.DB.prepare('SELECT id, name FROM agent_train_tags').all<{ id: number; name: string }>()).results ?? [];
+  let added = 0;
+  let unread = 0;
+  let lastAt = '';
+  let lastText = '';
+  let lastWho = '';
+  const autoTags = new Set<number>();
+  for (const m of list) {
+    const who = WHO.includes(String(m.who)) ? String(m.who) : '';
+    const body = maskPersonal(text(m.text, 4000));
+    if (!who || !body) continue;
+    const at = m.at && !Number.isNaN(Date.parse(m.at)) ? new Date(m.at).toISOString() : now;
+    const r = await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO agent_train_msgs (conv_id, ext_id, at, who, text, flow, version, why, got) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(conv.id, text(m.ext_id, 80), at, who, body, text(m.flow, 60), Number.isFinite(Number(m.version)) ? Number(m.version) : null, text(m.why, 600), text(m.got, 800))
+      .run();
+    if (!r.meta.changes) continue;
+    added++;
+    if (!lastAt || at >= lastAt) {
+      lastAt = at;
+      lastText = body.slice(0, 200);
+      lastWho = who;
+    }
+    if (who === 'customer') unread++;
+    if ((who === 'agent' || who === 'system') && m.flow && doc) {
+      const code = text(m.flow, 60).split(' ')[0];
+      const f = doc.flows.find((x) => x.code === code);
+      for (const tn of f?.tags ?? []) {
+        const t = tagRows.find((x) => x.name === tn);
+        if (t) autoTags.add(t.id);
+      }
+    }
+  }
+  if (added) {
+    await c.env.DB.prepare(
+      `UPDATE agent_train_convs SET unread = unread + ?,
+         last_text = CASE WHEN last_at <= ? THEN ? ELSE last_text END,
+         last_who = CASE WHEN last_at <= ? THEN ? ELSE last_who END,
+         last_at = CASE WHEN last_at <= ? THEN ? ELSE last_at END
+       WHERE id = ?`,
+    )
+      .bind(unread, lastAt, lastText, lastAt, lastWho, lastAt, lastAt, conv.id)
+      .run();
+  }
+  for (const t of autoTags) {
+    await c.env.DB.prepare('INSERT OR IGNORE INTO agent_train_conv_tags (conv_id, tag_id) VALUES (?, ?)').bind(conv.id, t).run();
+  }
+  // Giữ tin tối đa 90 ngày; hội thoại không còn tin nào thì xóa luôn.
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 86_400_000).toISOString();
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM agent_train_msgs WHERE at < ?').bind(cutoff),
+    c.env.DB.prepare(`DELETE FROM agent_train_conv_tags WHERE conv_id IN (SELECT id FROM agent_train_convs WHERE last_at != '' AND last_at < ?)`).bind(cutoff),
+    c.env.DB.prepare(`DELETE FROM agent_train_convs WHERE last_at != '' AND last_at < ?`).bind(cutoff),
+  ]);
+  return ok(c, { added, conv_id: conv.id, auto_tags: autoTags.size });
 });

@@ -339,3 +339,98 @@ describe('Nút tắt khẩn, giờ trả lời và gói cho agent', () => {
     expect((await relay('GET', '/pack?page=1', undefined, 'sai')).status).toBe(401);
   });
 });
+
+describe('Hội thoại và thẻ', () => {
+  const PAGE = '105017945992971';
+  const push = (psid: string, messages: unknown[], name = 'Khách A') => relay('POST', '/messages', { page: PAGE, psid, name, messages });
+  const convs = async (qs = '') => (await ceo('/convs' + qs)).body.data as any[];
+
+  it('chỉ CEO xem được hội thoại và thẻ', async () => {
+    expect((await ctx.request('/api/agent-train/convs', { as: USERS.thao } as any)).status).toBe(403);
+    expect((await ctx.request('/api/agent-train/tags', { as: USERS.thao } as any)).status).toBe(403);
+  });
+
+  it('có sẵn các thẻ giai đoạn của Pancake; thêm, sửa, xóa thẻ; không trùng tên', async () => {
+    const tags = (await ceo('/tags')).body.data;
+    expect(tags.map((t: any) => t.name)).toEqual(expect.arrayContaining(['ĐÃ BÁO GIÁ', 'HỎI GIÁ SỈ', 'ĐÃ MUA HÀNG']));
+    const add = await ceo('/tags', { name: 'Tẩy lồng', color: 'amb', kind: 'product' });
+    expect(add.status).toBe(200);
+    expect((await ceo('/tags', { name: 'Tẩy lồng' })).status).toBe(409);
+    expect((await ceo(`/tags/${add.body.data.id}`, { name: 'Tẩy lồng máy giặt', color: 'blue' }, 'PATCH')).status).toBe(200);
+    expect((await ceo(`/tags/${add.body.data.id}`, undefined, 'DELETE')).status).toBe(200);
+    expect((await ceo('/tags')).body.data.some((t: any) => t.name.startsWith('Tẩy lồng'))).toBe(false);
+  });
+
+  it('cầu nối sai khoá, thiếu Page hoặc không có tin thì bị từ chối', async () => {
+    expect((await relay('POST', '/messages', { page: PAGE, psid: 'p1', messages: [{ who: 'customer', text: 'x' }] }, 'sai')).status).toBe(401);
+    expect((await relay('POST', '/messages', { page: 'abc', psid: 'p1', messages: [{ who: 'customer', text: 'x' }] })).status).toBe(400);
+    expect((await push('p1', [])).status).toBe(400);
+  });
+
+  it('tin VPS đẩy lên được che số điện thoại, không ghi trùng, đếm chưa xem, sắp theo mới nhất', async () => {
+    const r = await push('psid-1', [
+      { ext_id: 'm1', who: 'customer', text: 'Gọi em số 0912 345 678 nhé', at: '2026-10-23T01:00:00.000Z' },
+      { ext_id: 'm2', who: 'agent', text: 'Dạ chị ơi', flow: 'TL-01', version: 1, at: '2026-10-23T01:00:05.000Z' },
+    ]);
+    expect(r.body.data.added).toBe(2);
+    // gửi lại cùng ext_id thì không nhân đôi
+    expect((await push('psid-1', [{ ext_id: 'm1', who: 'customer', text: 'Gọi em số 0912 345 678 nhé' }])).body.data.added).toBe(0);
+    await push('psid-2', [{ ext_id: 'n1', who: 'customer', text: 'Giá bao nhiêu', at: '2026-10-23T02:00:00.000Z' }], 'Khách B');
+    const list = await convs();
+    expect(list.map((x) => x.name)).toEqual(['Khách B', 'Khách A']);
+    expect(list[1]).toMatchObject({ unread: 1, last_who: 'agent' });
+    const detail = (await ceo(`/convs/${list[1].id}`)).body.data;
+    expect(detail.messages).toHaveLength(2);
+    expect(JSON.stringify(detail.messages)).not.toMatch(/0912/);
+    expect(detail.messages[0].text).toContain('[sđt]');
+    // đã xem trong web
+    await ceo(`/convs/${list[1].id}/read`, {});
+    expect((await convs()).find((x) => x.name === 'Khách A').unread).toBe(0);
+  });
+
+  it('luồng có khai báo thẻ thì thẻ tự gắn khi agent gửi luồng đó', async () => {
+    const tags = (await ceo('/tags')).body.data as any[];
+    const baoGia = tags.find((t) => t.name === 'ĐÃ BÁO GIÁ');
+    const doc = sampleDoc();
+    doc.flows[1].tags = ['ĐÃ BÁO GIÁ'];
+    const bot = await newBot('Bot tag', doc);
+    await ceo(`/bots/${bot}/publish`, {});
+    const pg = await ceo('/pages', { name: 'Ailla', fb_page_id: PAGE });
+    await ceo(`/pages/${pg.body.data.id}`, { bot_id: bot, mode: 'tester' }, 'PATCH');
+    const r = await push('psid-3', [{ ext_id: 'a1', who: 'agent', text: 'Dạ giá…', flow: 'TL-02 Báo giá', version: 1 }]);
+    expect(r.body.data.auto_tags).toBe(1);
+    const list = await convs();
+    expect(list[0].tag_ids).toEqual([baoGia.id]);
+    expect((await convs('?tag=' + baoGia.id))).toHaveLength(1);
+    expect((await convs('?tag=999999'))).toHaveLength(0);
+  });
+
+  it('chị đổi thẻ, ghi chú, đánh dấu agent sai; tìm kiếm; xóa hội thoại', async () => {
+    await push('psid-4', [
+      { ext_id: 'k1', who: 'customer', text: 'tẩy lồng có hỏng máy không' },
+      { ext_id: 'k2', who: 'system', text: 'Ngoài kịch bản, agent dừng', why: 'Không có luồng khớp' },
+      { ext_id: 'k3', who: 'sale', text: 'Dạ không ạ' },
+    ], 'Khách D');
+    const id = (await convs())[0].id;
+    const tags = (await ceo('/tags')).body.data as any[];
+    const put = await ceo(`/convs/${id}/tags`, { tag_ids: [tags[0].id, tags[1].id, 999999] }, 'PUT');
+    expect(put.body.data.tag_ids).toEqual([tags[0].id, tags[1].id]);
+    expect((await ceo(`/convs/${id}`, { note: 'Khách hay hỏi' }, 'PUT')).status).toBe(200);
+    const d = (await ceo(`/convs/${id}`)).body.data;
+    expect(d.note).toBe('Khách hay hỏi');
+    const sysMsg = d.messages.find((m: any) => m.who === 'system');
+    const cust = d.messages.find((m: any) => m.who === 'customer');
+    expect((await ceo(`/msgs/${sysMsg.id}/wrong`, { note: 'nên có luồng an toàn cho máy' })).status).toBe(200);
+    expect((await ceo(`/msgs/${cust.id}/wrong`, {})).status).toBe(404);
+    expect((await ceo(`/convs/${id}`)).body.data.messages.find((m: any) => m.id === sysMsg.id)).toMatchObject({ wrong: 1, wrong_note: 'nên có luồng an toàn cho máy' });
+    expect(await convs('?q=khach d')).toHaveLength(0);
+    expect(await convs('?q=Khách D')).toHaveLength(1);
+    expect((await ceo(`/convs/${id}`, undefined, 'DELETE')).status).toBe(200);
+    expect((await ceo(`/convs/${id}`)).status).toBe(404);
+  });
+
+  it('tin cũ hơn 90 ngày tự bị xóa', async () => {
+    await push('psid-old', [{ ext_id: 'o1', who: 'customer', text: 'tin rất cũ', at: '2026-01-01T00:00:00.000Z' }], 'Khách cũ');
+    expect((await convs()).some((x) => x.name === 'Khách cũ')).toBe(false);
+  });
+});

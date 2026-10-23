@@ -35,6 +35,8 @@ export interface Flow {
   entry: boolean;
   win: 'in' | 'out';
   allow: string[];
+  /** Tên thẻ hội thoại tự gắn cho khách khi luồng này đã được gửi (vd ĐÃ BÁO GIÁ). */
+  tags?: string[];
   nodes: FlowNode[];
 }
 export interface Phrase {
@@ -133,6 +135,7 @@ export function normalizeDoc(input: unknown): BotDoc {
       entry: !!f.entry,
       win: f.win === 'out' ? 'out' : 'in',
       allow: ids(f.allow),
+      tags: Array.isArray(f.tags) ? f.tags.map((x) => s(x, 60)).filter(Boolean).slice(0, 10) : [],
       nodes: arr(f.nodes).slice(0, 80).map((x): FlowNode => {
         const t: NodeType = (['msg', 'img', 'cond', 'jump', 'handoff'] as const).find((k) => k === x.t) ?? 'msg';
         const node: FlowNode = { id: s(x.id, 60), t, x: Math.max(0, n(x.x)), y: Math.max(0, n(x.y)) };

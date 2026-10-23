@@ -70,6 +70,48 @@ def log(event: str, **kw) -> None:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+ABOS_ENV = Path("/root/.config/abos-relay.env")   # cùng file khoá của abos-relay (chị đã dán, không nằm trong kho mã)
+WEB_CTX: dict = {"flow": "", "why": "", "got": ""}  # luồng/mã câu mẫu đang gửi, để ghi kèm vào tin agent
+WEB_SENT: set = set()                               # tin đã đẩy lên web trong lần chạy này (máy chủ cũng tự bỏ tin trùng)
+WEB_NAMES: dict = {}                                # psid -> tên khách (lấy từ Graph)
+
+
+def abos_conf() -> tuple[str, str]:
+    url, key = os.environ.get("ABOS_URL", ""), os.environ.get("ABOS_RELAY_KEY", "")
+    try:
+        for line in ABOS_ENV.read_text().splitlines():
+            k, _, v = line.partition("=")
+            if k.strip() == "ABOS_URL" and not url:
+                url = v.strip().strip('"')
+            elif k.strip() == "ABOS_RELAY_KEY" and not key:
+                key = v.strip().strip('"')
+    except OSError:
+        pass
+    return (url or "https://vanhanh.ailla.vn").rstrip("/"), key
+
+
+def web_log(psid: str, who: str, text: str, ext_id: str = "", at: str | None = None, **extra) -> None:
+    """Day 1 tin len man Hoi thoai tren web ABOS (may chu tu che so dien thoai, email, link). KHONG BAO GIO lam hong viec tra loi:
+    loi mang hay thieu khoa thi chi ghi log. Chi gui cho cac psid nam trong danh sach tester."""
+    if not text or not psid or (ext_id and ext_id in WEB_SENT):
+        return
+    try:
+        url, key = abos_conf()
+        if not key:
+            return
+        body = {"page": PAGE_ID, "psid": psid, "name": WEB_NAMES.get(psid, ""),
+                "messages": [{"ext_id": ext_id, "who": who, "text": text[:4000], "at": at, **extra}]}
+        req = urllib.request.Request(url + "/api/agent-train-relay/messages", data=json.dumps(body).encode(), method="POST",
+                                     headers={"Content-Type": "application/json", "X-Relay-Key": key})
+        urllib.request.urlopen(req, timeout=8).read()
+        if ext_id:
+            WEB_SENT.add(ext_id)
+            if len(WEB_SENT) > 2000:
+                WEB_SENT.clear()
+    except Exception as e:  # noqa: BLE001
+        log("web_log_failed", why=str(e)[:120])
+
+
 def token() -> str:
     pages = json.loads(PAGES_CFG.read_text())["pages"]
     p = next((x for x in pages if x.get("id") == PAGE_ID), None)
@@ -131,6 +173,7 @@ def send_text(psid: str, text: str, human_delay: bool = True) -> dict:
         headers={"Content-Type": "application/json"})
     mine_add(r.get("message_id", ""))
     log("send_text", to_hash=psid[-4:], chars=len(text))
+    web_log(psid, "agent", text, ext_id=r.get("message_id", ""), **WEB_CTX)
     return r
 
 
@@ -159,6 +202,7 @@ def send_media(psid: str, code: str) -> dict:
     r = graph("POST", "me/messages", body=body, headers={"Content-Type": ctype})
     mine_add(r.get("message_id", ""))
     log("send_media", to_hash=psid[-4:], code=code, kind=kind, bytes=len(data))
+    web_log(psid, "agent", f"[Gửi {'video' if kind == 'video' else 'ảnh'}: {code}]", ext_id=r.get("message_id", ""), **WEB_CTX)
     return r
 
 
@@ -330,6 +374,8 @@ def deliver(psid: str, reply: str, asked: str = "") -> None:
     dirs = DIRECTIVE.findall(reply or "")
     if not dirs:
         log("no_directive", raw_chars=len(reply or ""))
+        web_log(psid, "system", "Agent không chọn được câu mẫu nào, đã dừng và báo chị Hoa.", flow="-",
+                why="Không có mã câu mẫu hợp lệ cho tin này", got="Không gửi gì cho khách")
         note_to_tester(psid, "Agent không chọn được câu mẫu nào cho tin này, đã dừng và không gửi gì cho khách. Tin khách: " + asked[:200])
         return
     block_mode = c.get("format") == "block"
@@ -354,6 +400,8 @@ def deliver(psid: str, reply: str, asked: str = "") -> None:
             set_xung(psid, "anh" if "anh" in val.lower() else "chị")
         elif kind == "HOI_CHI":
             log("ask_boss", why=val[:200])
+            web_log(psid, "system", "Agent dừng và hỏi chị Hoa: " + val[:300], flow="-",
+                    why="Câu chưa có trong kịch bản V5", got="Không gửi gì cho khách")
             note_to_tester(psid, "Câu này chưa có trong kịch bản, agent dừng và hỏi chị Hoa: " + val[:600])
         elif kind == "MA":
             fields = [x.strip() for x in val.split("|")]
@@ -368,6 +416,8 @@ def deliver(psid: str, reply: str, asked: str = "") -> None:
                 continue
             msgs = kichban.render(cat, code, fields[1:], get_xung(psid))
             log("script_code", code=code)
+            WEB_CTX.update(flow=code, why=f"Agent chọn mã câu mẫu {code} trong kịch bản V5 theo tin khách",
+                           got=f"Câu mẫu {code} từ kịch bản V5 (nguyên văn, chương trình điền biến)")
             if block_mode:
                 parts.extend(msgs)
                 continue
@@ -384,6 +434,7 @@ def deliver(psid: str, reply: str, asked: str = "") -> None:
             send_text(psid, piece)
             time.sleep(1.2)
     log("delivered", mode="block" if block_mode else "sale")
+    WEB_CTX.update(flow="", why="", got="")
 
 
 def compose(psid: str, reply: str) -> str:
@@ -517,9 +568,11 @@ def run() -> None:
                 data = graph("GET", f"{PAGE_ID}/conversations", {
                     "fields": "participants,updated_time,messages.limit(14){id,message,from,created_time,attachments}", "limit": 15})
                 for conv in data.get("data", []):
-                    psid = next((p["id"] for p in conv["participants"]["data"] if p["id"] != PAGE_ID), None)
+                    part = next((p for p in conv["participants"]["data"] if p["id"] != PAGE_ID), None)
+                    psid = part["id"] if part else None
                     if psid not in c["testers"]:
                         continue
+                    WEB_NAMES[psid] = (part or {}).get("name", "")
                     ordered = list(reversed((conv.get("messages") or {}).get("data", [])))
                     pending = []   # tin khach moi chua xu ly
                     last_inbound_age = 1e9
@@ -534,10 +587,12 @@ def run() -> None:
                             if not mine_has(m["id"]):
                                 s["pause"][psid] = time.time() + c["pause_minutes_after_human"] * 60
                                 log("human_takeover", to_hash=psid[-4:])
+                                web_log(psid, "sale", (m.get("message") or "[ảnh/tệp]"), ext_id=m["id"], at=m.get("created_time"))
                             continue
                         age = (datetime.now(timezone.utc) - datetime.fromisoformat(m["created_time"].replace("+0000", "+00:00"))).total_seconds()
                         last_inbound_age = min(last_inbound_age, age)
                         pending.append((idx, m, age))
+                        web_log(psid, "customer", (m.get("message") or "").strip() or "[khách gửi ảnh/tệp]", ext_id=m["id"], at=m.get("created_time"))
                     if not pending and c.get("followup", True):
                         maybe_followup(psid, ordered, s, c)
                     if not pending:
