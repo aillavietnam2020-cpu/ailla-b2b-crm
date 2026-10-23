@@ -123,7 +123,7 @@ Ví dụ tháng 9 (kỳ đã đóng, số thật): doanh thu 1,21 tỷ; giá v�
 ## 10. Bảng xếp hạng team Sale
 
 **Tính KPI**: Mai Hương, Huyền Phạm, Linh Ha.
-**Không tính sale** (hiện riêng để đủ tổng): chị Hoa, chị Thảo quản lý ("Nguyễn Thanh Thảo"), Thảo Đĩnh (Thảo ads, được xác nhận đơn nhưng không tính doanh thu như sale), tài khoản "Việt Nam" (đơn tự động từ trang bán hàng, máy chủ gọi API_CONNECTION), đơn chưa gán người.
+**Không tính sale** (hiện riêng để đủ tổng): chị Hoa, chị Thảo quản lý ("Nguyễn Thanh Thảo"), Thảo Đĩnh (Thảo ads, được xác nhận đơn nhưng không tính doanh thu như sale), tài khoản "Việt Nam" (AILLA Việt Nam, chị Hoa xác nhận những đơn sale chưa kịp xác nhận; trong số Pancake lấy qua máy chủ tài khoản này tên API_CONNECTION). Đã đối chiếu Sheet ngày 23/10: tháng 10 Sheet ghi tài khoản "Việt Nam" 1.098 đơn, toàn bộ là đơn Webcake đã gửi, đã nhận hoặc hoàn, khớp với 1.115 đơn của API_CONNECTION bên Pancake. Đơn chưa gán người cũng nằm nhóm này.
 
 Doanh thu mỗi người theo **cách của Sale** ở mục 4: đơn đã xác nhận, bỏ đơn hoàn, bỏ đơn hủy, xếp theo **ngày tạo đơn**, để cùng cách đếm đơn của Sheet. Máy chủ kéo từ Pancake theo ngày tạo đơn (tham số success_record = inserted_at), rồi trừ doanh thu đơn hoàn. Cảnh báo "hủy cao" khi tỷ lệ hủy của người đó trên 20%.
 
