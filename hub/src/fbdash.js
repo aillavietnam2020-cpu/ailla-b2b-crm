@@ -107,7 +107,7 @@ function fbdSrcTable(days,pdays){
 }
 function fbdPeopleTable(days,pdays){
   const P=fbsPeople(days),Pp=fbsPeople(pdays);if(!P)return "";
-  const pm={};(Pp?Pp.list:[]).forEach(x=>pm[x.n]=x);
+  const pm={};(Pp&&Pp.n>=days.length*.8?Pp.list:[]).forEach(x=>pm[x.n]=x);/* kỳ trước chưa đủ số theo người thì không so, tránh phần trăm vô lý */
   return '<section class="pc-card"><div class="pc-h"><b>Nhân viên</b><span>đơn đã xác nhận, trừ hoàn và hủy</span></div><div class="pc-tw"><table class="pc-t"><thead><tr><th>Nhân viên</th><th class="n">Doanh thu</th><th class="n">Đơn tạo</th><th class="n">Đơn chốt</th><th class="n">Tỷ lệ hủy</th></tr></thead><tbody>'+P.list.slice(0,10).map(x=>{const q=pm[x.n]||{},ch=x.tao-x.huy,qc=(q.tao||0)-(q.huy||0);return "<tr><td>"+esc(x.n)+"</td>"+fbdTd(money(x.dt),x.dt,q.dt)+fbdTd(nf(x.tao),x.tao,q.tao)+fbdTd(nf(ch),ch,qc)+fbdTd(x.tao?fbdPct(x.huy,x.tao):"—",x.tao?x.huy/x.tao:0,q.tao?q.huy/q.tao:0,true)+"</tr>"}).join("")+"</tbody></table></div></section>";
 }
 
