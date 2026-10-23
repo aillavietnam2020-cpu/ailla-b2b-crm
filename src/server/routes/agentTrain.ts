@@ -80,6 +80,15 @@ agentTrainRoutes.get('/bots', async (c) => {
   const vers = await c.env.DB.prepare(`SELECT bot_id, version FROM agent_train_versions WHERE is_current = 1`).all<{ bot_id: string; version: number }>();
   const pages = await c.env.DB.prepare(`SELECT id, name, bot_id, mode FROM agent_train_pages`).all<{ id: number; name: string; bot_id: string | null; mode: string }>();
   const cur = new Map((vers.results ?? []).map((v) => [v.bot_id, v.version]));
+  // Số lượt agent chạy 7 ngày qua theo kết quả (từ nhật ký agent), để hiện cạnh từng bot như thống kê của Webcake.
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const runRows = await c.env.DB.prepare(
+    `SELECT bot_id, result, COUNT(*) AS n FROM agent_train_runs WHERE at >= ? AND bot_id IS NOT NULL GROUP BY bot_id, result`,
+  )
+    .bind(since)
+    .all<{ bot_id: string; result: string; n: number }>();
+  const runs = new Map<string, Record<string, number>>();
+  for (const r of runRows.results ?? []) runs.set(r.bot_id, { ...(runs.get(r.bot_id) ?? {}), [r.result]: r.n });
   return ok(
     c,
     (bots.results ?? []).map((b) => {
@@ -91,6 +100,7 @@ agentTrainRoutes.get('/bots', async (c) => {
         updated_at: b.updated_at,
         current_version: cur.get(b.id) ?? null,
         counts: { flows: d.flows.length, lib: d.lib.length, offers: d.offers.length },
+        runs: { sent: 0, handoff: 0, blocked: 0, out_of_script: 0, ...(runs.get(b.id) ?? {}) },
         pages: (pages.results ?? []).filter((p) => p.bot_id === b.id),
       };
     }),

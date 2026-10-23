@@ -331,6 +331,8 @@ describe('Nút tắt khẩn, giờ trả lời và gói cho agent', () => {
     const runs = (await ceo('/runs')).body.data;
     expect(runs[0]).toMatchObject({ flow: 'TL-02', result: 'sent', version: 1 });
     expect(runs[0].customer).not.toContain('0912345678');
+    const list = (await ceo('/bots')).body.data;
+    expect(list[0].runs).toMatchObject({ sent: 1, handoff: 0 });
   });
 
   it('cầu nối sai khoá bị từ chối', async () => {
