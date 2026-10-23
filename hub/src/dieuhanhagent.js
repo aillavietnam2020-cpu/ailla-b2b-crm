@@ -83,6 +83,7 @@ const AC_CSS=`<style id="ac-css">
 .ac-send{border-top:1px solid var(--line);padding:8px 12px;display:flex;flex-direction:column;gap:6px}.ac-bar{display:flex;align-items:flex-end;gap:8px}.ac-bar .btn{height:38px;padding:0 16px}.ac-bar .ac-clip{height:38px;width:38px;padding:0;flex:none}.ac-opt{position:relative;flex:none}.ac-optp{position:absolute;right:0;bottom:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 8px 24px rgba(20,30,60,.16);display:flex;flex-direction:column;gap:8px;white-space:nowrap;font-size:13px;z-index:5}.ac-optp[hidden]{display:none}
 .ac-pend{display:flex;gap:8px;flex-wrap:wrap}
 .ac-pend .pi{position:relative}.ac-doc{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:12px;max-width:260px}.ac-doc b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}.ac-doc .px{position:static;width:18px;height:18px;line-height:18px}.ac-doc.err{border-color:#dc2626;color:#dc2626}.ac-dl{display:inline-block;margin-top:8px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;font-size:12px;text-decoration:none;color:inherit;background:var(--surface)}
+.ac-clip.rec{background:#fee2e2;border-color:#dc2626;color:#b91c1c;animation:acrec 1s infinite}@keyframes acrec{50%{opacity:.55}}
 .ac-pend img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .ac-pend .px{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#111827;color:#fff;cursor:pointer;font-size:12px;line-height:20px;padding:0}
 .ac-clip{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;cursor:pointer;font-size:16px}
@@ -206,6 +207,24 @@ async function acOpenDoc(id,name){
   }catch(e){body.innerHTML='<p class="note red">'+esc(e.message||"Không mở được file")+"</p>"}
 }
 const AC_VIEW_CSS='.acv{position:fixed;top:64px;right:12px;bottom:12px;width:var(--acvw,460px);max-width:92vw;min-width:300px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(20,30,60,.22);z-index:60;display:flex;flex-direction:column}.acv[hidden]{display:none}.acv.big{width:80vw}.acv-grip{position:absolute;left:-6px;top:0;bottom:0;width:12px;cursor:ew-resize;touch-action:none}.acv-grip:hover{background:linear-gradient(90deg,transparent,rgba(99,102,241,.25),transparent)}.acv-h{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line)}.acv-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.acv-b{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:32px;height:30px;cursor:pointer;font-size:14px;text-decoration:none;color:inherit;display:grid;place-items:center;padding:0}.acv-body{flex:1;overflow:auto;padding:14px 16px;font-size:14px;line-height:1.55}.acv-md h2,.acv-md h3,.acv-md h4,.acv-md h5{margin:14px 0 6px;line-height:1.3}.acv-md h2{font-size:18px}.acv-md h3{font-size:16px}.acv-md h4,.acv-md h5{font-size:14.5px}.acv-md p{margin:6px 0}.acv-md ul,.acv-md ol{margin:6px 0;padding-left:20px}.acv-md blockquote{margin:8px 0;padding:4px 10px;border-left:3px solid var(--pink,#e11d74);background:rgba(0,0,0,.04);color:var(--muted)}.acv-md hr{border:0;border-top:1px solid var(--line);margin:12px 0}.acv-md code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px;font-size:12.5px}.acv-pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.04);padding:10px 12px;border-radius:10px;font:12.5px/1.5 ui-monospace,Consolas,monospace;margin:8px 0}.acv-tw{overflow:auto;margin:8px 0}.acv-t2{border-collapse:collapse;font-size:13px;min-width:100%}.acv-t2 th,.acv-t2 td{border:1px solid var(--line);padding:5px 9px;text-align:left;vertical-align:top}.acv-t2 th{background:rgba(0,0,0,.05);position:sticky;top:0}.acv-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.acv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}.acv-tabs button.on{background:var(--pink-soft,#fde7ef);border-color:var(--pink,#e11d74)}.ac-dl{font:inherit;cursor:pointer}';
+/* Ghi âm: nói tiếng Việt, chữ hiện dần vào ô gõ (dùng nhận dạng giọng nói có sẵn của Chrome/Edge, không gửi file âm thanh lên máy chủ AILLA) */
+let AC_REC=null;
+function acMicInit(){
+  const b=$("#ac-mic"),ta=$("#ac-text");if(!b||!ta)return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){b.title="Trình duyệt này chưa hỗ trợ ghi âm thành chữ. Dùng Chrome hoặc Edge nhé";b.onclick=()=>toast("Trình duyệt này chưa hỗ trợ ghi âm. Chị dùng Chrome hoặc Edge nhé");b.style.opacity=".5";return}
+  const stop=()=>{if(AC_REC){try{AC_REC.stop()}catch(e){}}};
+  b.onclick=()=>{
+    if(AC_REC){stop();return}
+    const r=new SR();r.lang="vi-VN";r.continuous=true;r.interimResults=true;
+    const base=ta.value&&!/\s$/.test(ta.value)?ta.value+" ":ta.value;let fin="";
+    r.onresult=e=>{let it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else it+=t}
+      ta.value=base+fin+it;if(ta._grow)ta._grow()};
+    r.onerror=e=>{const m={"not-allowed":"Chưa cho phép micro. Chị bấm biểu tượng ổ khóa cạnh địa chỉ web, chọn cho phép Micro","no-speech":"Không nghe thấy tiếng nói","audio-capture":"Không tìm thấy micro","network":"Mất mạng khi nhận giọng nói"}[e.error];if(m)toast(m)};
+    r.onend=()=>{AC_REC=null;b.classList.remove("rec");b.textContent="🎤";if(ta.value.trim())ta.focus()};
+    try{r.start();AC_REC=r;b.classList.add("rec");b.textContent="⏹"}catch(e){toast("Chưa bật được micro: "+e.message)}
+  };
+}
 const acHour=s=>{try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch(e){return ""}};
 const acAgo=s=>{if(!s)return "chưa có";const d=(Date.now()-Date.parse(s))/1000;return d<90?"vừa xong":d<3600?Math.round(d/60)+" phút trước":d<86400?Math.round(d/3600)+" giờ trước":Math.round(d/86400)+" ngày trước"};
 const acA=id=>(AC.agents||[]).find(x=>x.id===id);
@@ -243,7 +262,7 @@ function acChat(){
     </div>
     <div class="ac-msgs" id="ac-msgs"></div>
     <div class="ac-send" id="ac-send"><div id="ac-quote"></div><div class="ac-pend" id="ac-pend"></div>
-    <div class="ac-bar"><button class="ac-clip" id="ac-clip" title="Đính kèm ảnh, Excel, PDF, Word, video (tối đa 25 MB mỗi file)">📎</button><textarea id="ac-text" rows="1" placeholder="Nhắn cho ${esc(a.name)}…  (/stop dừng việc đang làm · /new phiên mới)"></textarea><span class="ac-opt"><button class="ac-clip" id="ac-more" title="Tùy chọn gửi">⋯</button><div class="ac-optp" id="ac-optp" hidden>${AC.cur==="lead-sale-ailla"?'<label title="Tin chị gõ được xử lý như khách nhắn vào page: agent chỉ chọn câu mẫu kịch bản Pancake V5, không tự viết"><input type="checkbox" id="ac-kh"> Thử như khách (kịch bản V5)</label>':""}${AC.isCeo?'<label><input type="checkbox" id="ac-tg"> Gửi cả bản trả lời sang Telegram</label>':""}</div></span><button class="btn pri" id="ac-go">Gửi</button></div><input type="file" id="ac-file" accept="image/*,.xlsx,.xls,.csv,.pdf,.docx,.doc,.pptx,.txt,.md,.json,.mp4,.mov,.webm,.mp3,.wav,.m4a" multiple hidden></div></div>
+    <div class="ac-bar"><button class="ac-clip" id="ac-clip" title="Đính kèm ảnh, Excel, PDF, Word, video (tối đa 25 MB mỗi file)">📎</button><button class="ac-clip" id="ac-mic" type="button" title="Bấm để nói, bấm lần nữa để dừng (chữ hiện vào ô gõ)">🎤</button><textarea id="ac-text" rows="1" placeholder="Nhắn cho ${esc(a.name)}…  (/stop dừng việc đang làm · /new phiên mới)"></textarea><span class="ac-opt"><button class="ac-clip" id="ac-more" title="Tùy chọn gửi">⋯</button><div class="ac-optp" id="ac-optp" hidden>${AC.cur==="lead-sale-ailla"?'<label title="Tin chị gõ được xử lý như khách nhắn vào page: agent chỉ chọn câu mẫu kịch bản Pancake V5, không tự viết"><input type="checkbox" id="ac-kh"> Thử như khách (kịch bản V5)</label>':""}${AC.isCeo?'<label><input type="checkbox" id="ac-tg"> Gửi cả bản trả lời sang Telegram</label>':""}</div></span><button class="btn pri" id="ac-go">Gửi</button></div><input type="file" id="ac-file" accept="image/*,.xlsx,.xls,.csv,.pdf,.docx,.doc,.pptx,.txt,.md,.json,.mp4,.mov,.webm,.mp3,.wav,.m4a" multiple hidden></div></div>
    <div class="ac-right" id="ac-right"></div></div>`;
   R.querySelectorAll("[data-ac]").forEach(b=>b.onclick=()=>acPick(b.dataset.ac));
   {const sc=$("#ac-strip"),on=sc&&sc.querySelector(".ac-sc.on");if(on&&sc)sc.scrollLeft=Math.max(0,on.offsetLeft-sc.offsetLeft-120);const nx=$("#ac-next");if(nx&&sc)nx.onclick=()=>{sc.scrollLeft+=330}}
@@ -257,6 +276,7 @@ function acChat(){
   $("#ac-text").ondragover=e=>e.preventDefault();
   $("#ac-text").ondrop=e=>{const fs=[...(e.dataTransfer&&e.dataTransfer.files||[])];if(fs.length){e.preventDefault();acAddFiles(fs)}};
   $("#ac-clip").onclick=()=>$("#ac-file").click();
+  acMicInit();
   $("#ac-more").onclick=e=>{e.stopPropagation();$("#ac-optp").hidden=!$("#ac-optp").hidden};
   document.addEventListener("click",e=>{const o=$("#ac-optp");if(o&&!o.hidden&&!e.target.closest(".ac-opt"))o.hidden=true});
   {const ta=$("#ac-text"),grow=()=>{ta.style.height="auto";ta.style.height=Math.min(130,ta.scrollHeight)+"px"};ta.addEventListener("input",grow);ta._grow=grow}

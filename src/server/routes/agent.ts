@@ -178,6 +178,43 @@ agentRoutes.get('/customers', requirePermission('agent.read'), async (c) => {
   return ok(c, rows.results ?? []);
 });
 
+/**
+ * Doanh số đơn B2B theo khách và khoảng ngày (mọi đơn chưa hủy, kể cả đã kế toán xác nhận), có tổng theo tháng.
+ * ?customer=<tên hoặc mã khách> &from=YYYY-MM-DD &to=YYYY-MM-DD. Cần quyền Đơn hàng (có tiền).
+ */
+agentRoutes.get('/sales', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'orders');
+  const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  if (!isDay(from) || !isDay(to)) throw badRequest('BAD_RANGE', 'Cần from và to dạng YYYY-MM-DD');
+  const q = (c.req.query('customer') ?? '').trim().replace(/[%_]/g, '').slice(0, 80);
+  const like = `%${q}%`;
+  const rows = await c.env.DB.prepare(
+    `SELECT o.order_no, o.order_date, c.id AS customer_id, c.name AS customer_name, o.total_amount, o.approval_status, o.delivery_status,
+            o.payment_status, o.accounting_status
+     FROM orders o JOIN customers c ON c.id = o.customer_id
+     WHERE o.deleted_at IS NULL AND o.approval_status <> 'CANCELLED' AND o.order_date >= ?1 AND o.order_date <= ?2
+       AND (?3 = '' OR c.name LIKE ?4 OR c.id = ?3)
+     ORDER BY o.order_date, o.order_no LIMIT 1000`,
+  )
+    .bind(from, to, q, like)
+    .all<{ order_date: string; total_amount: number; customer_name: string; customer_id: string }>();
+  const list = rows.results ?? [];
+  const byMonth: Record<string, { orders: number; total: number }> = {};
+  const byCustomer: Record<string, { orders: number; total: number }> = {};
+  let total = 0;
+  for (const r of list) {
+    const m = String(r.order_date).slice(0, 7);
+    (byMonth[m] ??= { orders: 0, total: 0 }).orders++;
+    byMonth[m].total += r.total_amount ?? 0;
+    (byCustomer[r.customer_name] ??= { orders: 0, total: 0 }).orders++;
+    byCustomer[r.customer_name].total += r.total_amount ?? 0;
+    total += r.total_amount ?? 0;
+  }
+  return ok(c, { from, to, orders: list.length, total, by_month: byMonth, by_customer: byCustomer, list }, { truncated: list.length >= 1000 });
+});
+
 /** Tra sản phẩm theo tên hoặc mã (để lên đơn không phải đoán mã). ?q=chữ &tier=<mã cấp giá> (có thì kèm đơn giá hiện hành của cấp đó). */
 agentRoutes.get('/products', requirePermission('agent.read'), async (c) => {
   needScope(c, 'orders');
