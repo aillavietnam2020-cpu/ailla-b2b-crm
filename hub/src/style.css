@@ -671,7 +671,7 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 .fbd-sel{font-size:13px;padding:3px 8px;border-radius:8px;width:auto;margin-left:6px}.fbd-card td input{width:100%;min-width:90px}.fbd-card .acts{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
 /* Lưới chỉ số gọn kiểu Pancake (trang Facebook): nhóm nhỏ, ô nhỏ, nhiều số trên một màn hình */
 .fbd-gs{margin-bottom:8px}.fbd-gs h4{margin:0 0 5px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-.fbd-gr{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.fbd-gr{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px}
 .fbd-gt{background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px 11px;min-width:0;box-shadow:0 1px 2px rgba(16,24,40,.04)}
 .fbd-gt .l{font-size:11.5px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fbd-gt .v{font-size:17px;font-weight:800;margin:2px 0 1px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
