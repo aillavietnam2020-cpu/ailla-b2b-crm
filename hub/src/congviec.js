@@ -2,7 +2,7 @@
    CÔNG VIỆC & DỰ ÁN — một chỗ cho mọi việc (thẻ video, order Digital, việc chung)
    Phạm vi xem: Của tôi · Cả team · Tất cả (theo vai trò). Ưu tiên Content & Digital.
    ===================================================================== */
-const TEAMS={content:"Content",digital:"Digital – Ads",koc:"KOC",chung:"Chung"};
+const TEAMS={content:"Content",digital:"Digital – Ads",koc:"KOC",ketoan:"Kế toán",kho:"Kho",sx:"Sản xuất",hcns:"Hành chính nhân sự",sale:"Sale",chung:"Chung"};
 const CV_ST=[["cg","Chưa giao","gry"],["todo","Cần làm","gry"],["nhan","Đã nhận việc","blu"],["doing","Đang làm","blu"],["review","Chờ duyệt","amb"],["done","Hoàn thành","grn"]];
 const cvStN=k=>(CV_ST.find(s=>s[0]===k)||[k,k])[1];
 const UU=["Cao","Trung bình","Thấp"];
@@ -113,8 +113,10 @@ const tkMgr=t=>!!ME&&ME.id!==t.nguoi&&(ME.role==="admin"||t.tao===ME.id||tkMgrId
 /* Quy tắc đóng việc: việc do người khác giao thì người làm chỉ bấm "Chờ duyệt", người giao (hoặc quản lý) duyệt mới Hoàn thành. Việc tự tạo cho mình thì tự đóng. */
 const tkGiver=()=>!!ME&&(ME.role==="admin"||can(ME,"viec.giao"));
 /* đổi trạng thái một việc + báo chuông đúng người: gửi duyệt → người giao/quản lý · duyệt xong, trả lại → người làm */
+/* nhật ký từng việc: ai làm gì lúc nào (giữ 60 dòng gần nhất) */
+function tkLog(x,txt){x.log=x.log||[];x.log.push({at:new Date().toLocaleString("vi-VN"),by:(typeof ME!=="undefined"&&ME)?ME.name:"Hệ thống",txt});if(x.log.length>60)x.log=x.log.slice(-60)}
 function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
-  DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});
+  DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});
     if(old===k||typeof notifyU!=="function")return;
     if(k==="review")notifyU(dt,[x.tao,...tkMgrIds(x)],`${ME.name} gửi duyệt việc "${x.ten}"`,ref);
     else if(k==="done"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} đã duyệt xong việc "${x.ten}"`,ref);
@@ -127,7 +129,7 @@ function openTask(id){
   const users=d.users.filter(u=>u.active&&u.role!=="admin"||u.id===ME.id);
   openDrawerHTML(`<h2>${t?"Chi tiết việc":"Giao việc"}</h2>${t&&t.tao?`<p class="hint">Người giao: ${esc(userName(t.tao)||"—")}</p>`:""}${!t&&!giver?`<p class="hint">Bạn tạo việc cho chính mình. Muốn giao cho người khác, nhờ quản lý giao.</p>`:""}<form class="frm" id="tkf2"><label class="field">Tên việc<input id="t-ten" required value="${esc(t?t.ten:"")}" ${gv?"":"disabled"}></label><label class="field">Mô tả<textarea id="t-mo" rows="2" ${gv?"":"disabled"}>${esc(t?t.moTa:"")}</textarea></label>
    <div class="row4"><label class="field">Team<select id="t-team" ${gv?"":"disabled"}>${opt(Object.entries(TEAMS),t?t.team:(TEAMS[teamOf(ME)]?teamOf(ME):"content"))}</select></label><label class="field">Dự án<select id="t-da" ${gv?"":"disabled"}>${opt([["","—"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),t?t.da:CVF.da)}</select></label></div>
-   <div class="row4"><label class="field">Người làm<select id="t-ng" ${gv&&giver?"":"disabled"}>${opt([["","— chưa giao"]].concat(users.map(u=>[u.id,u.name+" · "+(TEAMS[teamOf(u)]||"Quản lý")])),t?t.nguoi:(giver?"":ME.id))}</select></label><label class="field">Hạn<select id="t-han" ${gv?"":"disabled"}>${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),t?t.han:Math.min(MONTH.ndays,d.settings.today+2))}</select></label><label class="field">Ưu tiên<select id="t-uu" ${gv?"":"disabled"}>${opt(UU,t?t.uu:"Trung bình")}</select></label></div>
+   <div class="row4"><label class="field">Người làm<select id="t-ng" ${gv&&giver?"":"disabled"}>${opt([["","— chưa giao"]].concat(users.map(u=>[u.id,u.name+" · "+(TEAMS[teamOf(u)]||"Quản lý")])),t?t.nguoi:(giver?"":ME.id))}</select></label><label class="field">Hạn<select id="t-han" ${gv?"":"disabled"}>${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),t?t.han:Math.min(MONTH.ndays,d.settings.today+2))}</select></label><label class="field">Bắt đầu<select id="t-bd" ${gv?"":"disabled"}>${opt([[0,"như hạn"]].concat(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)])),t?(t.bd||0):0)}</select></label><label class="field">Ưu tiên<select id="t-uu" ${gv?"":"disabled"}>${opt(UU,t?t.uu:"Trung bình")}</select></label></div>
    <div class="field" id="t-cdw">Công đoạn <small class="hint">(một việc có nhiều người, mỗi người một phần)</small><div id="t-cd"></div>${gv&&giver?`<div class="acts"><button type="button" class="btn sm" id="t-cdadd">＋ Công đoạn</button><button type="button" class="btn sm" id="t-cddu">＋ Bước duyệt</button><label class="ck sm"><input type="checkbox" id="t-seq" ${t&&t.tuanTu===false?"":"checked"}> Làm lần lượt</label></div>`:""}</div>
    <div class="field" id="t-stw">Trạng thái <small class="hint">bấm để đổi${t&&ed?", tự lưu ngay":""}</small><div class="tkst">${CV_ST.filter(s=>s[0]!=="cg").map(([k,n,c])=>`<button type="button" class="tkb tk-${c}${(t?t.st:"todo")===k?" on":""}" data-tkst="${k}" ${ed?"":"disabled"}>${(t?t.st:"todo")===k?"✓ ":""}${n}</button>`).join("")}</div><input type="hidden" id="t-st" value="${t?t.st:"todo"}">${t&&t.stAt?`<small class="hint">Đổi lần cuối: ${esc(t.stAt)} bởi ${esc(t.stBy||"")}</small>`:""}</div>
    ${t&&t.st==="review"&&!(t.cd&&t.cd.length)?(tkMgr(t)?`<div class="tklate ok"><b>Việc đang chờ bạn duyệt</b><div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt hoàn thành</button></div></div>`:`<p class="hint">Đã gửi duyệt, đang chờ ${esc(tkMgrNames(t))} xem.</p>`):""}
@@ -135,8 +137,9 @@ function openTask(id){
      ${cho?`<p>📨 <b>${esc(R.by)}</b> đã gửi lý do lúc ${esc(R.at)}: <i>${esc(R.lyDo)}</i><br><span class="hint">Chờ quản lý (${esc(tkMgrNames(t))}) gia hạn hoặc duyệt hoàn thành.</span></p>
        ${mg?`<div class="tkmg"><label>Gia hạn đến<select id="t-gh">${opt(Array.from({length:MONTH.ndays-d.settings.today+1},(_,i)=>d.settings.today+i).map(x=>[x,dayLbl(x)]),R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:Math.min(MONTH.ndays,d.settings.today+2))}</select></label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button><button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button></div>`:""}`
      :`${ed&&!mg?`<label class="field">${lt?"Lý do trễ":"Xin gia hạn"}<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu, cần thêm bao lâu">${esc(R.lyDo||"")}</textarea></label><label class="field">Xin dời hạn đến<select id="t-hm">${opt(Array.from({length:Math.max(1,MONTH.ndays-Math.max(t.han,d.settings.today)+1)},(_,i)=>Math.max(t.han,d.settings.today)+i).map(x=>[x,dayLbl(x)]),Math.min(MONTH.ndays,Math.max(t.han,d.settings.today)+1))}</select></label><button type="button" class="btn sm pri" id="t-trego">Gửi quản lý</button>`:mg?`<p class="hint">Người làm chưa gửi lý do trễ.</p><div class="tkmg"><label>Gia hạn đến<select id="t-gh">${opt(Array.from({length:MONTH.ndays-d.settings.today+1},(_,i)=>d.settings.today+i).map(x=>[x,dayLbl(x)]),R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:Math.min(MONTH.ndays,d.settings.today+2))}</select></label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button><button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button></div>`:""}`}</div>`})():""}
-   <div class="field">Người cùng làm / hỗ trợ <small class="hint">(một việc có thể nhiều người)</small><div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="t-phoi" value="${u.id}" ${t&&(t.phoi||[]).includes(u.id)?"checked":""} ${gv?"":"disabled"}> ${esc(u.name)}</label>`).join("")}</div></div>
+   <div class="field" id="t-phw">Người cùng làm / hỗ trợ <small class="hint">(một việc có thể nhiều người)</small><div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="t-phoi" value="${u.id}" ${t&&(t.phoi||[]).includes(u.id)?"checked":""} ${gv?"":"disabled"}> ${esc(u.name)}</label>`).join("")}</div></div>
    <div class="field">Việc nhỏ cần tích<div id="t-ck">${(t?t.checklist:[]).map((c,i)=>`<label class="ck"><input type="checkbox" data-ck="${i}" ${c.x?"checked":""} ${ed?"":"disabled"}> ${esc(c.t)}</label>`).join("")}</div>${gv?`<input id="t-ckn" placeholder="Thêm việc nhỏ, Enter để thêm">`:""}</div>
+   ${t?`<details class="field tklog"><summary>Nhật ký <small class="hint">(${(t.log||[]).length} dòng)</small></summary>${(t.log||[]).length?(t.log||[]).slice().reverse().slice(0,40).map(l=>`<div class="tkl"><span>${esc(l.at)}</span> <b>${esc(l.by)}</b> ${esc(l.txt)}</div>`).join(""):`<p class="hint">Chưa có dòng nào. Từ nay mọi thay đổi của việc này được ghi lại.</p>`}</details>`:""}
    <label class="field">Link / tài liệu đính kèm <small class="hint">(không bắt buộc)</small><input id="t-dk" value="${esc(t?t.dk||"":"")}" placeholder="Link Drive, brief…" ${gv?"":"disabled"}></label>
    <label class="field">Link kết quả <small class="hint">(không bắt buộc · việc có sản phẩm thì dán link Drive, bài đăng…)</small><input id="t-kq" value="${esc(t?t.kq:"")}" ${ed?"":"disabled"}></label>
    ${ed?`<div class="acts"><button class="btn pri">${t?"Lưu":"Giao việc"}</button>${t&&gv?`<button type="button" class="btn danger" id="t-del">Xóa</button>`:""}</div>`:""}</form>`);
@@ -147,9 +150,9 @@ function openTask(id){
   const hanOpts=h=>opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),h);
   const userOpts2=n=>opt([["","— chọn người"]].concat(users.map(u=>[u.id,u.name])),n);
   const rcd=()=>{const w=$("#t-cd");if(!w)return;const seqOn=!$("#t-seq")||$("#t-seq").checked,act=tkActive({cd,tuanTu:seqOn?undefined:false}),edit=gv&&giver;
-    $("#t-cdw").style.display=(cd.length||edit)?"":"none";$("#t-stw").style.display=cd.length?"none":"";
+    $("#t-cdw").style.display=(cd.length||edit)?"":"none";$("#t-stw").style.display=cd.length?"none":"";{const ph=$("#t-phw");if(ph)ph.style.display=cd.length?"none":"";[["#t-ng",gv&&giver],["#t-han",gv],["#t-bd",gv]].forEach(([q,okk])=>{const e=$(q);if(e)e.disabled=cd.length>0||!okk})}
     w.innerHTML=cd.map((s,i)=>{const on=act.includes(s),can=!!t&&on&&(s.nguoi===ME.id||(s.loai==="duyet"?ME.role==="admin":(giver||tkMgr(t))));
-      return `<div class="tcd2${on?" on":""}${s.st==="xong"?" dn":""}" data-i="${i}"><span class="tcdn">${i+1}</span>${edit&&s.st!=="xong"?`<input data-f="ten" value="${esc(s.ten)}" placeholder="Tên công đoạn">`:`<b>${esc(s.ten)}</b>`}${edit&&s.st!=="xong"?`<select data-f="nguoi">${userOpts2(s.nguoi)}</select><select data-f="han">${hanOpts(s.han)}</select>`:`<span>${esc(userName(s.nguoi)||"—")}</span><span>${s.han?dd(s.han):""}</span>`}<span class="tcds">${s.st==="xong"?"✓ Xong":on?(s.st==="lam"?"Đang làm":"Đến lượt"):"Chờ"}</span>${can?`<button type="button" class="btn sm pri" data-cdx="${s.id}">${s.loai==="duyet"?"Duyệt xong":"Xong"}</button>${s.loai==="duyet"?`<button type="button" class="btn sm" data-cdt="${s.id}">Trả lại</button>`:(s.st!=="lam"?`<button type="button" class="btn sm" data-cdl="${s.id}">Đang làm</button>`:"")}`:""}${edit&&s.st!=="xong"?`<button type="button" class="btn sm danger" data-cdr="${i}" title="Bỏ công đoạn">✕</button>`:""}</div>`}).join("");
+      return `<div class="tcd2${on?" on":""}${s.st==="xong"?" fin":""}" data-i="${i}"><span class="tcdn">${i+1}</span>${edit&&s.st!=="xong"?`<input data-f="ten" value="${esc(s.ten)}" placeholder="Tên công đoạn">`:`<b>${esc(s.ten)}</b>`}${edit&&s.st!=="xong"?`<select data-f="nguoi">${userOpts2(s.nguoi)}</select><select data-f="han">${hanOpts(s.han)}</select>`:`<span>${esc(userName(s.nguoi)||"—")}</span><span>${s.han?dd(s.han):""}</span>`}<span class="tcds">${s.st==="xong"?"✓ Xong":on?(s.st==="lam"?"Đang làm":"Đến lượt"):"Chờ"}</span>${can?`<button type="button" class="btn sm pri" data-cdx="${s.id}">${s.loai==="duyet"?"Duyệt xong":"Xong"}</button>${s.loai==="duyet"?`<button type="button" class="btn sm" data-cdt="${s.id}">Trả lại</button>`:(s.st!=="lam"?`<button type="button" class="btn sm" data-cdl="${s.id}">Đang làm</button>`:"")}`:""}${edit&&s.st!=="xong"?`<button type="button" class="btn sm danger" data-cdr="${i}" title="Bỏ công đoạn">✕</button>`:""}</div>`}).join("");
     w.querySelectorAll("[data-f]").forEach(e=>e.onchange=e.oninput=()=>{const i=+e.closest("[data-i]").dataset.i,f=e.dataset.f;cd[i][f]=f==="han"?+e.value:e.value;if(f!=="ten")rcd()});
     w.querySelectorAll("[data-cdr]").forEach(b=>b.onclick=()=>{cd.splice(+b.dataset.cdr,1);rcd()});
     const go=(sel,act,ask)=>w.querySelectorAll(sel).forEach(b=>b.onclick=()=>{let note="";if(ask){note=(prompt("Cần sửa gì? (người làm sẽ nhận được)")||"").trim();if(!note){toast("Ghi cần sửa gì để người làm biết");return}}tkCdAct(t.id,b.dataset[sel.slice(6,-1)],act,note);toast(act==="xong"?"Đã xong công đoạn":act==="lam"?"Đã bấm Đang làm":"Đã trả lại");openTask(t.id);renderMain()});
@@ -165,20 +168,21 @@ function openTask(id){
     if(t&&ed){stSave(k,k==="done"&&t.treReq&&t.treReq.st==="cho"?{treReq:Object.assign({},t.treReq,{st:"ok",xl:ME.name})}:null);openTask(t.id)}});
   const now=()=>new Date().toLocaleString("vi-VN");
   if($("#t-trego"))$("#t-trego").onclick=()=>{const v=$("#t-tre").value.trim();if(!v){toast("Ghi lý do trễ");return}
-    DB.mutate(ME.name,`lý do trễ "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;const hm=+($("#t-hm")||{}).value||0,lt=x.han<dt.settings.today;x.treReq={lyDo:v,at:now(),by:ME.name,st:"cho",hanMoi:hm};x.tre={lyDo:v,at:now(),by:ME.name};if(typeof notifyU==="function")notifyU(dt,[x.tao,...tkMgrIds(x)],`${lt?"⚠ "+ME.name+" báo trễ":ME.name+" xin gia hạn"} việc "${x.ten}"${hm?" đến "+dd(hm):""}: ${v.slice(0,100)}`,"task:"+x.id)});toast("Đã gửi quản lý");openTask(t.id)};
+    DB.mutate(ME.name,`lý do trễ "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;const hm=+($("#t-hm")||{}).value||0,lt=x.han<dt.settings.today;tkLog(x,(lt?"Báo trễ":"Xin gia hạn")+": "+v.slice(0,120)+(hm?" · xin đến "+dd(hm):""));x.treReq={lyDo:v,at:now(),by:ME.name,st:"cho",hanMoi:hm};x.tre={lyDo:v,at:now(),by:ME.name};if(typeof notifyU==="function")notifyU(dt,[x.tao,...tkMgrIds(x)],`${lt?"⚠ "+ME.name+" báo trễ":ME.name+" xin gia hạn"} việc "${x.ten}"${hm?" đến "+dd(hm):""}: ${v.slice(0,100)}`,"task:"+x.id)});toast("Đã gửi quản lý");openTask(t.id)};
   if($("#t-duyet"))$("#t-duyet").onclick=()=>{tkSetSt(t.id,"done");toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
   if($("#t-tlok"))$("#t-tlok").onclick=()=>{const n=$("#t-tl").value.trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}tkSetSt(t.id,"doing",{tlNote:n},n);toast("Đã trả lại cho "+(userName(t.nguoi)||"người làm"));closeDrawer();renderMain()};
-  if($("#t-ghok"))$("#t-ghok").onclick=()=>{const h=+$("#t-gh").value;DB.mutate(ME.name,`gia hạn "${t.ten}" đến ${dd(h)}`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.hanCu=x.hanCu||x.han;x.han=h;x.treReq=Object.assign({},x.treReq||{},{st:"giahan",xl:ME.name,xlAt:now(),hanMoi:h});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} gia hạn việc "${x.ten}" đến ${dayLbl(h)}`,"task:"+x.id)});toast("Đã gia hạn đến "+dd(h));openTask(t.id);renderMain()};
-  if($("#t-dok"))$("#t-dok").onclick=()=>{DB.mutate(ME.name,`duyệt hoàn thành "${t.ten}" (trễ hạn)`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.st="done";x.stAt=now();x.stBy=ME.name;x.treReq=Object.assign({},x.treReq||{},{st:"ok",xl:ME.name,xlAt:now()});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} duyệt hoàn thành việc "${x.ten}"`,"task:"+x.id)});toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
+  if($("#t-ghok"))$("#t-ghok").onclick=()=>{const h=+$("#t-gh").value;DB.mutate(ME.name,`gia hạn "${t.ten}" đến ${dd(h)}`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.hanCu=x.hanCu||x.han;tkLog(x,"Gia hạn đến "+dd(h));x.han=h;x.treReq=Object.assign({},x.treReq||{},{st:"giahan",xl:ME.name,xlAt:now(),hanMoi:h});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} gia hạn việc "${x.ten}" đến ${dayLbl(h)}`,"task:"+x.id)});toast("Đã gia hạn đến "+dd(h));openTask(t.id);renderMain()};
+  if($("#t-dok"))$("#t-dok").onclick=()=>{DB.mutate(ME.name,`duyệt hoàn thành "${t.ten}" (trễ hạn)`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;tkLog(x,"Duyệt hoàn thành");x.st="done";x.stAt=now();x.stBy=ME.name;x.treReq=Object.assign({},x.treReq||{},{st:"ok",xl:ME.name,xlAt:now()});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} duyệt hoàn thành việc "${x.ten}"`,"task:"+x.id)});toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
   $("#tkf2").onsubmit=e=>{e.preventDefault();$("#tkf2").querySelectorAll("[data-ck]").forEach(x=>{if(ck[+x.dataset.ck])ck[+x.dataset.ck].x=x.checked});
-    const v={ten:$("#t-ten").value,moTa:$("#t-mo").value,team:$("#t-team").value,da:$("#t-da").value,nguoi:$("#t-ng").value,han:+$("#t-han").value,uu:$("#t-uu").value,st:$("#t-st").value,phoi:[...document.querySelectorAll("[name=t-phoi]:checked")].map(x=>x.value),checklist:ck,kq:$("#t-kq").value,dk:$("#t-dk")?$("#t-dk").value.trim():""};const trv=$("#t-tre")&&$("#t-tre").value.trim();if(trv&&(!t.tre||t.tre.lyDo!==trv))v.tre={lyDo:trv,at:new Date().toLocaleString("vi-VN"),by:ME.name};
+    const v={ten:$("#t-ten").value,moTa:$("#t-mo").value,team:$("#t-team").value,da:$("#t-da").value,nguoi:$("#t-ng").value,han:+$("#t-han").value,uu:$("#t-uu").value,bd:+($("#t-bd")||{}).value||0,st:$("#t-st").value,phoi:[...document.querySelectorAll("[name=t-phoi]:checked")].map(x=>x.value),checklist:ck,kq:$("#t-kq").value,dk:$("#t-dk")?$("#t-dk").value.trim():""};const trv=$("#t-tre")&&$("#t-tre").value.trim();if(trv&&(!t.tre||t.tre.lyDo!==trv))v.tre={lyDo:trv,at:new Date().toLocaleString("vi-VN"),by:ME.name};
     v.cd=cd.map(s=>Object.assign({},s));v.tuanTu=!$("#t-seq")||$("#t-seq").checked;
     if(v.cd.some(s=>!s.nguoi||!String(s.ten).trim())){toast("Mỗi công đoạn cần có tên và người làm");return}
     if(!giver)v.nguoi=t?t.nguoi:ME.id;
     if(!t&&v.st==="done"&&v.nguoi!==ME.id)v.st="todo";
-    const nid=uid("cv"),oldNg=t?t.nguoi:"",oldPhoi=t?(t.phoi||[]):[];
+    const nid=uid("cv"),oldNg=t?t.nguoi:"",oldPhoi=t?(t.phoi||[]):[],oldHan=t?t.han:0;
     DB.mutate(ME.name,(t?"cập nhật việc: ":"giao việc: ")+v.ten+(v.nguoi?" → "+userName(v.nguoi):""),dt=>{let x;if(t){x=dt.tasks.find(y=>y.id===t.id);Object.assign(x,gv?v:{st:v.st,checklist:v.checklist,kq:v.kq,...(v.tre?{tre:v.tre}:{})})}else{x={id:nid,...v,loai:"Việc",tao:ME.id};dt.tasks.push(x)}
       if(x.cd&&x.cd.length){tkSync(x);v.nguoi=x.nguoi;v.han=x.han;v.phoi=x.phoi}
+      tkLog(x,t?("Sửa việc"+(oldNg!==x.nguoi?" · người làm: "+(userName(oldNg)||"—")+" → "+(userName(x.nguoi)||"—"):"")+(oldHan&&oldHan!==x.han?" · hạn: "+dd(oldHan)+" → "+dd(x.han):"")):("Giao việc"+(x.nguoi?" cho "+userName(x.nguoi):"")+(x.han?" · hạn "+dd(x.han):"")));
       if(typeof notifyU==="function"&&gv){const ds=v.han?` · hạn ${dd(v.han)}`:"";const nw=[];if(v.nguoi&&v.nguoi!==oldNg)nw.push(v.nguoi);v.phoi.filter(p=>!oldPhoi.includes(p)).forEach(p=>nw.push(p));if(nw.length)notifyU(dt,nw,`${ME.name} giao bạn việc "${v.ten}"${ds}`,"task:"+x.id);else if(t&&t.han!==v.han&&v.nguoi)notifyU(dt,[v.nguoi],`${ME.name} đổi hạn việc "${v.ten}" thành ${dd(v.han)}`,"task:"+x.id)}});toast(t?"Đã lưu":"Đã giao");closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
 }
@@ -230,13 +234,72 @@ function pCvLich(m){
   bindCvFilter(m);bindCvCards(m);bindNew();m.querySelectorAll("[data-vday]").forEach(b=>b.onclick=()=>{XV.tab="kho";XV.ks="cal";PAGE="kehoach";STEP=7;MOD="";render()});
 }
 /* ---------- 5. Dự án ---------- */
+/* ---------- 5. Dự án: thẻ dự án, thêm nhanh, tiến độ tự tính từ các việc trong dự án ---------- */
+const CVP={q:"",st:"",ow:"",uu:""};
+function prjStats(p){
+  const d=D(),td=d.settings.today,L=cvItems().filter(x=>x.da===p.id&&!CV_TEST.includes(x.nguoi)),done=L.filter(x=>x.st==="done").length,late=L.filter(x=>x.late).length,doing=L.filter(x=>x.st==="doing"||x.st==="nhan").length;
+  const pc2=L.length?Math.round(done/L.length*100):0,bd=p.batDau||1,span=Math.max(1,p.han-bd),exp=Math.max(0,Math.min(100,Math.round((td-bd)/span*100)));
+  let st="Đúng tiến độ",tone="grn";
+  if(!L.length){st="Chưa có việc";tone="gry"}else if(done===L.length){st="Hoàn thành";tone="grn"}else if(late){st="Có việc trễ";tone="red"}else if(p.han<td){st="Quá hạn dự án";tone="red"}else if(pc2<exp-10){st="Chậm";tone="amb"}
+  return {L,done,late,doing,pc2,exp,st,tone};
+}
 function pCvDa(m){
-  const d=D(),I=cvItems(),ed=can(ME,"viec.giao");
-  m.innerHTML=H("Dự án",`${(d.projects||[]).length} dự án tháng ${MONTH.mon}`)+`<div class="prjgrid">${(d.projects||[]).map(p=>{const L=I.filter(x=>x.da===p.id),ok=L.filter(x=>x.st==="done").length,late=L.filter(x=>x.late).length,pc2=L.length?Math.round(ok/L.length*100):0,exp=Math.min(100,Math.round(d.settings.today/p.han*100));return `<section class="card prjc"><div class="card-h"><h2>${esc(p.ten)}${p.loai?` <span class="tag prjl">${esc(p.loai)}</span>`:""}</h2>${pill(late?"Có việc trễ":pc2>=exp-10?"Đúng tiến độ":"Chậm",late?"red":pc2>=exp-10?"grn":"amb")}</div><p class="hint">${esc(p.moTa)}</p><div class="kv2"><span>Team <b>${TEAMS[p.team]}</b></span><span>Phụ trách <b>${esc(userName(p.owner))}</b></span><span>${p.bd?"Thời gian":"Hạn"} <b>${p.bd?dd(p.bd)+" → ":""}${dd(p.han)}</b></span></div><div class="progress big"><i style="width:${pc2}%"></i><em style="left:${exp}%"></em></div><div class="kv2"><span><b>${pc2}%</b> xong (${ok}/${L.length})</span><span>đáng lẽ ~${exp}%</span>${late?`<span class="t-red"><b>${late}</b> quá hạn</span>`:""}</div><div class="acts"><button class="btn sm" data-pjk="${p.id}">Xem tiến độ</button><button class="btn sm" data-pjn="${p.id}">Danh sách việc</button></div></section>`}).join("")}</div>
-  ${ed?`<section class="card"><div class="card-h"><h2>Thêm dự án / chiến dịch</h2></div><form class="frm row7" id="pjf"><label class="field grow">Tên dự án<input id="pj-t" required placeholder="VD: Sale 11/11"></label><label class="field">Team<select id="pj-team">${opt(Object.entries(TEAMS),"content")}</select></label><label class="field">Phụ trách<select id="pj-o">${opt(d.users.filter(u=>u.active).map(u=>[u.id,u.name]),ME.id)}</select></label><label class="field">Loại<select id="pj-l">${opt(["Sản phẩm mới","Khuyến mãi","Thử nghiệm","Khác"],"Sản phẩm mới")}</select></label><label class="field">Bắt đầu<select id="pj-b">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),Math.max(1,d.settings.today))}</select></label><label class="field">Hạn<select id="pj-h">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]),MONTH.ndays)}</select></label><button class="btn pri">Thêm</button></form></section>`:""}`;
-  m.querySelectorAll("[data-pjk]").forEach(b=>b.onclick=()=>{CVF.da=b.dataset.pjk;CVF.scope=["admin","lead"].includes(ME.role)?"all":CVF.scope;PAGE="cv_kb";render()});
-  m.querySelectorAll("[data-pjn]").forEach(b=>b.onclick=()=>{CVF.da=b.dataset.pjn;CVF.scope=["admin","lead"].includes(ME.role)?"all":CVF.scope;PAGE="cv_nv";render()});
-  if($("#pjf"))$("#pjf").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"thêm dự án "+$("#pj-t").value,dt=>dt.projects.push({id:"DA-"+String(dt.projects.length+1).padStart(2,"0"),ten:$("#pj-t").value,team:$("#pj-team").value,owner:$("#pj-o").value,han:+$("#pj-h").value,bd:+$("#pj-b").value,loai:$("#pj-l").value,moTa:"",loc:{none:true,kenh:["__"]}}));renderMain()};
+  const d=D(),td=d.settings.today,ed=tkGiver(),P=d.projects||[],S={};P.forEach(p=>S[p.id]=prjStats(p));
+  const L=P.filter(p=>(!CVP.q||(p.ten+" "+p.id+" "+userName(p.owner)).toLowerCase().includes(CVP.q.toLowerCase()))&&(!CVP.st||S[p.id].st===CVP.st)&&(!CVP.ow||p.owner===CVP.ow)&&(!CVP.uu||(p.uu||"Trung bình")===CVP.uu));
+  const owners=[...new Set(P.map(p=>p.owner).filter(Boolean))],sts=[...new Set(Object.values(S).map(s=>s.st))];
+  const card=p=>{const s=S[p.id],mem=[...new Set([p.owner,...(p.tv||[]),...s.L.map(x=>x.nguoi)].filter(x=>x&&!CV_TEST.includes(x)))],uu=p.uu||"Trung bình";
+    return `<section class="pj"><div class="pjh"><span class="pjic">▣</span><div class="pjt"><b>${esc(p.ten)}</b><small>${esc(p.id)} · ${esc(TEAMS[p.team]||p.team||"")}</small></div>${pill(s.st,s.tone)}</div>
+    ${p.moTa?`<p class="pjd">${esc(cvShort(p.moTa,110))}</p>`:""}
+    <div class="pjm"><div><small>Phụ trách</small><span>${avatar(p.owner)}${esc(userName(p.owner)||"—")}</span></div><div><small>Hạn</small><span>${dd(p.han)} <i class="${p.han<td&&s.pc2<100?"t-red":""}">${p.han>=td?"còn "+(p.han-td)+" ngày":"trễ "+(td-p.han)+" ngày"}</i></span></div><div><small>Ưu tiên</small>${pill(uu.toUpperCase(),uu==="Cao"?"red":uu==="Thấp"?"gry":"amb")}</div></div>
+    <div class="progress big"><i style="width:${s.pc2}%"></i><em style="left:${s.exp}%"></em></div>
+    <div class="pjn"><b>${s.pc2}%</b> · ${s.done}/${s.L.length} việc xong${s.doing?` · ${s.doing} đang làm`:""}${s.late?` · <b class="t-red">${s.late} trễ</b>`:""}</div>
+    <div class="pjf"><span class="pjav">${mem.slice(0,4).map(avatar).join("")}${mem.length>4?`<small>+${mem.length-4}</small>`:""}</span><span class="sp"></span><button type="button" class="btn sm" data-pjv="${p.id}">Xem việc</button><button type="button" class="btn sm" data-pjg="${p.id}">Gantt</button>${ed?`<button type="button" class="btn sm" data-pje="${p.id}">Sửa</button>`:""}</div></section>`};
+  m.innerHTML=`<div class="cvbar"><input id="pj-q" placeholder="Tìm dự án, người phụ trách…" value="${esc(CVP.q)}"><select id="pj-st">${opt([["","Mọi trạng thái"]].concat(sts),CVP.st)}</select><select id="pj-ow">${opt([["","Mọi người phụ trách"]].concat(owners.map(o=>[o,userName(o)])),CVP.ow)}</select><select id="pj-uu">${opt([["","Mọi mức ưu tiên"]].concat(UU),CVP.uu)}</select>${ed?`<button class="btn pri" type="button" id="pj-new">＋ Thêm dự án</button>`:""}</div>
+  ${ed?`<form class="pjq" id="pj-quick"><b>Thêm nhanh</b><input id="pjq-t" placeholder="Tên dự án, chiến dịch" required><select id="pjq-o">${opt(d.users.filter(u=>u.active).map(u=>[u.id,u.name]),ME.id)}</select><select id="pjq-h">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,"Hạn "+dayLbl(i+1)]),MONTH.ndays)}</select><button class="btn sm pri">Thêm</button></form>`:""}
+  ${P.length?`<div class="pjgrid">${L.map(card).join("")||'<p class="empty">Không có dự án nào khớp bộ lọc.</p>'}</div>`:`<section class="card"><p class="empty pad">Chưa có dự án nào. ${ed?"Gõ tên vào ô Thêm nhanh ở trên rồi bấm Thêm.":"Quản lý sẽ tạo dự án."}</p></section>`}`;
+  [["pj-q","q"],["pj-st","st"],["pj-ow","ow"],["pj-uu","uu"]].forEach(([id,k])=>{const e=$("#"+id);if(e)e.onchange=()=>{CVP[k]=e.value;renderMain()}});
+  if($("#pj-new"))$("#pj-new").onclick=()=>openProject(null);
+  if($("#pj-quick"))$("#pj-quick").onsubmit=e=>{e.preventDefault();const ten=$("#pjq-t").value.trim();if(!ten)return;prjSave(null,{ten,owner:$("#pjq-o").value,han:+$("#pjq-h").value,team:teamOf(ME)&&TEAMS[teamOf(ME)]?teamOf(ME):"content"});toast("Đã thêm dự án");renderMain()};
+  const goView=(id,view)=>{CVF.da=id;CVV.view=view;CVV.scope="team";cvWhoSet("all");CVF.st="";MOD="cv";PAGE="cv_v";render()};
+  m.querySelectorAll("[data-pjv]").forEach(b=>b.onclick=()=>goView(b.dataset.pjv,"list"));
+  m.querySelectorAll("[data-pjg]").forEach(b=>b.onclick=()=>goView(b.dataset.pjg,"gantt"));
+  m.querySelectorAll("[data-pje]").forEach(b=>b.onclick=()=>openProject(b.dataset.pje));
+}
+function prjSave(id,v){
+  DB.mutate(ME.name,(id?"sửa dự án ":"thêm dự án ")+v.ten,dt=>{dt.projects=dt.projects||[];
+    if(id){const p=dt.projects.find(x=>x.id===id);if(!p)return;Object.assign(p,v)}
+    else{const n=dt.projects.reduce((z,p)=>Math.max(z,+String(p.id).replace(/\D/g,"")||0),0)+1;
+      dt.projects.push(Object.assign({id:"DA-"+String(n).padStart(2,"0"),moTa:"",uu:"Trung bình",tv:[],batDau:0,loc:{none:true,kenh:["__"]}},v));
+      if(typeof notifyU==="function")notifyU(dt,[v.owner,...(v.tv||[])],`${ME.name} thêm bạn vào dự án "${v.ten}"`,"page:cv_da")}});
+}
+function openProject(id){
+  const d=D(),p=id?(d.projects||[]).find(x=>x.id===id):null,users=d.users.filter(u=>u.active&&u.role!=="admin"||u.id===ME.id),days=Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]);
+  openDrawerHTML(`<h2>${p?"Sửa dự án":"Thêm dự án"}</h2><form class="frm" id="pjf2"><label class="field">Tên dự án<input id="pf-t" required value="${esc(p?p.ten:"")}"></label><label class="field">Mô tả<textarea id="pf-m" rows="2">${esc(p?p.moTa||"":"")}</textarea></label>
+   <div class="row4"><label class="field">Team<select id="pf-team">${opt(Object.entries(TEAMS),p?p.team:"content")}</select></label><label class="field">Phụ trách<select id="pf-o">${opt(users.map(u=>[u.id,u.name]),p?p.owner:ME.id)}</select></label></div>
+   <div class="row4"><label class="field">Bắt đầu<select id="pf-b">${opt([[0,"—"]].concat(days),p?p.batDau||0:0)}</select></label><label class="field">Hạn<select id="pf-h">${opt(days,p?p.han:MONTH.ndays)}</select></label><label class="field">Ưu tiên<select id="pf-u">${opt(UU,p?p.uu||"Trung bình":"Trung bình")}</select></label></div>
+   <div class="field">Thành viên<div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="pf-tv" value="${u.id}" ${p&&(p.tv||[]).includes(u.id)?"checked":""}> ${esc(u.name)}</label>`).join("")}</div></div>
+   <div class="acts"><button class="btn pri">${p?"Lưu":"Thêm dự án"}</button>${p&&ME.role==="admin"?`<button type="button" class="btn danger" id="pf-del">Xóa</button>`:""}</div></form>`);
+  $("#pjf2").onsubmit=e=>{e.preventDefault();prjSave(id,{ten:$("#pf-t").value.trim(),moTa:$("#pf-m").value,team:$("#pf-team").value,owner:$("#pf-o").value,batDau:+$("#pf-b").value||0,han:+$("#pf-h").value,uu:$("#pf-u").value,tv:[...document.querySelectorAll("[name=pf-tv]:checked")].map(x=>x.value)});toast(id?"Đã lưu":"Đã thêm dự án");closeDrawer();renderMain()};
+  if($("#pf-del"))$("#pf-del").onclick=()=>{if(!confirm("Xóa dự án này? Các việc trong dự án vẫn còn, chỉ bỏ gắn dự án."))return;DB.mutate(ME.name,"xóa dự án "+p.ten,dt=>{dt.projects=(dt.projects||[]).filter(x=>x.id!==id);(dt.tasks||[]).forEach(t=>{if(t.da===id)t.da=""})});closeDrawer();renderMain()};
+}
+/* ---------- Gantt: dự án và việc theo trục thời gian của tháng; việc nhiều công đoạn hiện từng đoạn theo từng người ---------- */
+function pCvGantt(m){
+  const d=D(),td=d.settings.today,N=MONTH.ndays,cl=v=>Math.max(1,Math.min(N,v||1));
+  const tasks=cvFilter(cvItems().filter(x=>x.src==="task")).map(x=>d.tasks.find(t=>t.id===x.id)).filter(t=>t&&t.han);
+  const segs=t=>{const c=t.cd&&t.cd.length?t.cd:null;
+    if(c)return c.map((s,i)=>{const b=cl(s.han||t.han),a=Math.min(b,cl(i?(c[i-1].han||s.han):(t.bd||(b-2))));return {a,b,cls:s.st==="xong"?"dn":(s.han&&s.han<td)?"lt":s.st==="lam"?"dg":"",tip:`${s.ten} · ${userName(s.nguoi)||"—"} · hạn ${dd(s.han)}`,lb:(userName(s.nguoi)||"").split(" ").slice(-1)[0]}});
+    const b=cl(t.han),a=Math.min(b,cl(t.bd||(b-2)));return [{a,b,cls:t.st==="done"?"dn":t.han<td?"lt":(t.st==="doing"||t.st==="nhan")?"dg":t.st==="review"?"rv":"",tip:`${t.ten} · ${userName(t.nguoi)||"—"} · hạn ${dd(t.han)}`,lb:(userName(t.nguoi)||"").split(" ").slice(-1)[0]}]};
+  const grid=`<div class="gth"><div class="gtl"></div><div class="gtt gtdays">${Array.from({length:N},(_,i)=>{const dy=i+1;return `<span class="${dy===td?"now":wd(dy)>=5?"we":""}"><b>${dy}</b>${THU[wd(dy)]}</span>`}).join("")}</div></div>`;
+  const bars=t=>segs(t).map(s=>`<i class="gtb ${s.cls}" style="left:${(s.a-1)/N*100}%;width:${(s.b-s.a+1)/N*100}%" title="${esc(s.tip)}" data-gt="${esc(t.id)}">${esc(s.lb)}</i>`).join("");
+  const today=`<b class="gtn" style="left:${(td-.5)/N*100}%"></b>`;
+  const row=t=>`<div class="gtr"><div class="gtl" title="${esc(t.ten)}"><b>${esc(cvShort(t.ten,30))}</b><small>${esc(userName(t.nguoi)||"Chưa giao")}${t.cd&&t.cd.length?` · ${t.cd.filter(s=>s.st==="xong").length}/${t.cd.length} công đoạn`:""}</small></div><div class="gtt">${today}${bars(t)}</div></div>`;
+  const P=(d.projects||[]).filter(p=>!CVF.da||p.id===CVF.da),inP=id=>tasks.filter(t=>t.da===id),none=tasks.filter(t=>!t.da||!(d.projects||[]).some(p=>p.id===t.da));
+  const proj=p=>{const A=Math.min(cl(p.han),cl(p.batDau||1));return `<div class="gtr gtp"><div class="gtl" data-gp="${esc(p.id)}"><b>▣ ${esc(cvShort(p.ten,28))}</b><small>${esc(userName(p.owner)||"")}</small></div><div class="gtt">${today}<i class="gtb pj" style="left:${(A-1)/N*100}%;width:${(cl(p.han)-A+1)/N*100}%" title="${esc(p.ten)} · hạn ${dd(p.han)}"></i></div></div>${inP(p.id).slice(0,40).map(row).join("")}`};
+  const body=P.map(proj).join("")+(CVF.da?"":(none.length?`<div class="gtr gtp"><div class="gtl"><b>Việc ngoài dự án</b></div><div class="gtt"></div></div>${none.slice(0,60).map(row).join("")}`:""));
+  m.innerHTML=cvFilterBar({noSt:true})+`<section class="card flush gtw">${body?grid+body:`<p class="empty pad">Chưa có việc nào có hạn trong bộ lọc này. Bấm Giao việc, chọn hạn là việc hiện lên đây.</p>`}</section><p class="hint tcnote">Thanh xanh lá: xong · xanh dương: đang làm · đỏ: trễ · vàng: chờ duyệt · xám: chưa bắt đầu. Việc nhiều công đoạn hiện từng đoạn, mỗi đoạn một người. Bấm thanh để mở việc.</p>`;
+  bindCvFilter(m);
+  m.querySelectorAll("[data-gt]").forEach(b=>b.onclick=()=>openTask(b.dataset.gt));
+  m.querySelectorAll("[data-gp]").forEach(b=>b.onclick=()=>openProject(b.dataset.gp));
 }
 /* ---------- MỤC TIÊU: giao mục tiêu theo tháng cho từng người / team ----------
    Team Ads: mục tiêu doanh số từng bạn chạy Ads, kết quả tự lấy từ báo cáo Digital.
@@ -494,7 +557,7 @@ const CV_TEST=["u_8ngyde8","u_x4ozsoe"];
 const cvTestToChi=x=>CV_TEST.includes(x.nguoi)?Object.assign({},x,{nguoi:"u_chi"}):x;
 const CVO={data:null,at:0,busy:false,err:"",ppl:false};
 /* Người phụ trách từng phòng (chị chốt 20/10); sửa ở đây khi đổi người */
-const CV_PHUTRACH={content:["u_chi"],digital:["u_chi"],ketoan:["u_noijyi4","u_t42e38h"],kho:["u_qc4yd2f"],sale:["u_2twwuby"]};
+const CV_PHUTRACH={content:["u_chi"],digital:["u_chi"],ketoan:["u_noijyi4","u_t42e38h"],kho:["u_qc4yd2f"],sale:["u_2twwuby"],sx:["u_t42e38h","u_chi"],hcns:["u_t42e38h"]};
 async function cvoLoad(force){
   if(CVO.busy||typeof ME==="undefined"||!ME)return;
   if(!force&&CVO.at&&Date.now()-CVO.at<60000)return;
@@ -515,13 +578,30 @@ function pCvTcCeo(m){
   const pct=I.length?Math.round(doneN/I.length*100):0;
   const tile=(k,l,v,sub,tone)=>`<button type="button" class="tctile${tone&&v?" "+tone:""}" data-kp="${k}"><span>${l}</span><b>${v}</b>${sub?`<small>${sub}</small>`:""}</button>`;
   const T={};I.forEach(x=>{const k=x.team||"chung",t=T[k]=T[k]||{k,n:0,done:0,doing:0,rv:0,late:0,by:{}};t.n++;if(x.st==="done")t.done++;else{if(x.st==="doing"||x.st==="nhan")t.doing++;if(x.st==="review")t.rv++;if(x.late){t.late++;t.by[x.nguoi||""]=(t.by[x.nguoi||""]||0)+1}}});
-  const teams=Object.values(T).sort((x,y)=>y.late-x.late||y.n-x.n);
+  const OT=["ketoan","kho","sx","hcns","sale"],teams=Object.values(T).filter(t=>!OT.includes(t.k)).sort((x,y)=>y.late-x.late||y.n-x.n);
   const bar=t=>{const w=v=>t.n?(v/t.n*100).toFixed(1):0,todo=Math.max(0,t.n-t.done-t.doing-t.rv-t.late);return `<div class="tcstack" title="Xong ${t.done} · Đang làm ${t.doing} · Chờ duyệt ${t.rv} · Trễ ${t.late}"><i style="width:${w(t.done)}%;background:#639922"></i><i style="width:${w(t.doing)}%;background:#378ADD"></i><i style="width:${w(t.rv)}%;background:#EF9F27"></i><i style="width:${w(t.late)}%;background:#E24B4A"></i><i style="width:${w(todo)}%;background:#d9dde8"></i></div>`};
   const topBy=t=>{const e=Object.entries(t.by).sort((x,y)=>y[1]-x[1])[0];return e?(userName(e[0])||"Chưa giao")+" ("+e[1]+")":"—"};
   const deptRows=teams.map(t=>`<tr class="clk" data-dt="${esc(t.k)}"><td><b>${esc(cvTeamName(t.k))}</b><small>${esc(((CV_PHUTRACH[t.k]||[]).map(userName).filter(Boolean).join(", "))||"")}</small></td><td>${t.n}</td><td class="g">${t.done}</td><td class="b">${t.doing}</td><td class="a">${t.rv}</td><td>${t.late?`<span class="tcn r">${t.late}</span>`:'<span class="tcz">0</span>'}</td><td>${bar(t)}</td><td class="tcw">${esc(topBy(t))}</td></tr>`).join("");
   const maxAge=g=>its.filter(x=>x.group===g).reduce((z,x)=>Math.max(z,x.age_days),0),cnt=g=>its.filter(x=>x.group===g).reduce((z,x)=>z+x.count,0);
-  const bl=(ten,n,age,a,r,go)=>{const tone=!n||age<a?"success":age>=r?"danger":"warning";return `<button type="button" class="tcbl ${tone}" data-bl="${go}"><span>${ten}</span><b>${O?n:"…"}</b><small>${n&&age?"tồn lâu nhất "+age+" ngày":n?"":"không tồn"}</small></button>`};
+  const ck=k=>(its.find(x=>x.key===k)||{count:0}).count;
+  const ageOf=s=>{s=String(s||"");let m=s.match(/(\d{4})-(\d{2})-(\d{2})/),dt=m?new Date(+m[1],+m[2]-1,+m[3]):null;if(!dt){m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)dt=new Date(+m[3],+m[2]-1,+m[1])}if(!dt)return 0;const n=new Date();return Math.max(0,Math.round((new Date(n.getFullYear(),n.getMonth(),n.getDate())-dt)/864e5))};
+  const sxd=(typeof SX==="function"&&SX())?SX():null,sxCan=sxd?sxd.requests.filter(r=>r.st==="CAN_LAM"):[],sxDang=sxd?sxd.requests.filter(r=>r.st==="DANG_LAM"):[],sxKiem=sxd?sxd.batches.filter(b=>b.st==="CHO_KIEM"):[];
+  const sxAge=Math.max(0,...sxCan.map(r=>ageOf(r.taoLuc)),...sxKiem.map(b=>ageOf(b.ngay)));
+  const hrd=(d.hr&&d.hr.don)?d.hr.don.filter(x=>x.tt==="cho"):[],hrt=(d.hr&&d.hr.tu)?d.hr.tu.filter(x=>x.tt==="cho"):[],hrAge=Math.max(0,...hrd.map(x=>ageOf(x.gui)));
+  const tkTxt=k=>{const t=T[k];return t&&t.n-t.done>0?`${t.n-t.done} việc giao tay${t.late?` (${t.late} trễ)`:""}`:""};
   const saleN=O?O.sale.count+O.cskh.count:0,saleAge=O?Math.max(O.sale.age_days,O.cskh.age_days):0;
+  const pt=k=>(CV_PHUTRACH[k]||[]).map(userName).filter(Boolean).join(", ")||"—";
+  const jn=a=>a.filter(Boolean).join(" · ")||"Không có việc tồn";
+  const kt=its.filter(x=>x.group==="Kế toán");
+  const others=[
+    {ten:"Kế toán",pt:pt("ketoan"),chi:O?jn([ck("pay_confirm")?ck("pay_confirm")+" bill chờ xác nhận":"",ck("order_confirm")?ck("order_confirm")+" đơn chờ ghi nợ":"",ck("return_confirm")?ck("return_confirm")+" hàng trả chờ xác nhận":"",ck("pay_unallocated")?ck("pay_unallocated")+" khoản tiền chưa chia":"",tkTxt("ketoan")]):"Đang tải…",age:maxAge("Kế toán"),a:3,r:7,go:()=>{MOD="b2b";PAGE="b2b_cn";render()}},
+    {ten:"Kho",pt:pt("kho"),chi:O?jn([ck("ship")?ck("ship")+" đơn chờ xuất kho":"",tkTxt("kho")]):"Đang tải…",age:maxAge("Kho"),a:1,r:3,go:()=>{MOD="sx";PAGE="kho_xuat_b2b";render()}},
+    {ten:"Sản xuất",pt:pt("sx"),chi:sxd?jn([sxCan.length?sxCan.length+" lệnh cần làm":"",sxDang.length?sxDang.length+" đang làm":"",sxKiem.length?sxKiem.length+" lô chờ kiểm":"",tkTxt("sx")]):"Chưa nạp dữ liệu sản xuất",age:sxAge,a:2,r:5,go:()=>{MOD="sx";PAGE="sx_nc";render()}},
+    {ten:"Hành chính nhân sự",pt:pt("hcns"),chi:d.hr?jn([hrd.length?hrd.length+" đơn nghỉ, OT chờ duyệt":"",hrt.length?hrt.length+" tạm ứng chờ duyệt":"",tkTxt("hcns")]):"Chưa nạp dữ liệu nhân sự",age:hrAge,a:2,r:5,go:()=>{MOD="hr";PAGE="hr_nghi";render()}},
+    {ten:"Sale, chăm sóc khách",pt:pt("sale"),chi:O?jn([O.sale.count?O.sale.count+" đơn chưa gửi duyệt hoặc bị từ chối":"",O.cskh.count?O.cskh.count+" việc chăm sóc đến hạn":"",tkTxt("sale")]):"Đang tải…",age:saleAge,a:2,r:5,go:()=>{MOD="b2b";PAGE="b2b_don";render()}}
+  ];
+  const stOf=r=>{const none=r.chi==="Không có việc tồn"||/^(Đang tải|Chưa nạp)/.test(r.chi);if(none||r.age<r.a)return ["Ổn","success"];return r.age>=r.r?["Cần để ý","danger"]:["Chậm","warning"]};
+  const otherRows=others.map((r,i)=>{const s=stOf(r);return `<tr class="clk" data-od="${i}"><td><b>${esc(r.ten)}</b></td><td>${esc(r.pt)}</td><td>${esc(r.chi)}</td><td>${r.age>0?`<span class="${r.age>=r.r?"t-red":""}">${r.age} ngày</span>`:"—"}</td><td><span class="tcst ${s[1]}">${s[0]}</span></td></tr>`}).join("");
   const worst=late.slice().sort((x,y)=>(y.lateD||0)-(x.lateD||0)).slice(0,6);
   const pplRows=ppl.slice(0,8).map(p=>`<div class="tcp2" data-pp="${esc(p.id)}"><span class="tcpn">${avatar(p.id)}<b>${esc(userName(p.id))}</b></span><span class="tcpb"><i style="width:${Math.max(8,Math.round(p.n/ppl[0].n*100))}%"></i></span><span class="tcpv">${p.n} trễ · lâu nhất ${p.max} ngày</span><button type="button" class="btn sm" data-nudge="${esc(p.id)}">Nhắc</button></div>`).join("");
   const worstRows=worst.map(x=>`<div class="tcr" data-w="${esc(x.id)}" data-ws="${x.src}"><span class="t-red">Trễ ${x.lateD} ngày</span> · ${esc(cvShort(x.ten,48))} · ${esc((userName(x.nguoi)||"Chưa giao").split(" ").slice(-1)[0])}</div>`).join("");
@@ -532,8 +612,8 @@ function pCvTcCeo(m){
   ${mineN?`<div class="tcmine"><b>${mineN} việc đang chờ chị</b> (đến lượt chị làm, cần chị duyệt, cần giao hoặc đốc) <button class="lnk" id="cvo-mine">Mở Việc của tôi →</button></div>`:""}
   <div class="tcmain"><section class="card tcbox"><h3>Theo phòng ban <small class="hint">xanh: xong · xanh dương: đang làm · vàng: chờ duyệt · đỏ: trễ · xám: chưa làm</small></h3><table class="tcp tcdept2"><thead><tr><th>Phòng</th><th>Tổng</th><th>Xong</th><th>Làm</th><th>Duyệt</th><th>Trễ</th><th>Tiến độ</th><th>Trễ nhiều nhất</th></tr></thead><tbody>${deptRows||'<tr><td colspan="8" class="empty">Chưa có dữ liệu.</td></tr>'}</tbody></table></section>
   <section class="card tcbox"><h3>Ai đang trễ <small class="hint">${ppl.length} người</small></h3>${pplRows||'<p class="empty">Không ai đang trễ.</p>'}</section></div>
-  <div class="tcmain"><section class="card tcbox"><h3>Trễ lâu nhất <small class="hint">bấm để mở xử lý</small></h3>${worstRows||'<p class="empty">Không có việc trễ.</p>'}</section>
-  <section class="card tcbox"><h3>Tồn đọng kế toán, kho, bán hàng</h3><div class="tcbls">${bl("Kế toán",cnt("Kế toán"),maxAge("Kế toán"),3,7,"ketoan")}${bl("Kho",cnt("Kho"),maxAge("Kho"),1,3,"kho")}${bl("Bán hàng, CSKH",saleN,saleAge,2,5,"sale")}</div></section></div>`;
+  <div class="tcmain"><section class="card tcbox"><h3>Các phòng khác <small class="hint">bấm vào dòng để mở chi tiết</small></h3><table class="tcp tcdept"><thead><tr><th>Phòng</th><th>Phụ trách</th><th>Chỉ số chính</th><th>Tồn lâu nhất</th><th>Tình trạng</th></tr></thead><tbody>${otherRows}</tbody></table></section>
+  <section class="card tcbox"><h3>Trễ lâu nhất <small class="hint">bấm để mở xử lý</small></h3>${worstRows||'<p class="empty">Không có việc trễ.</p>'}</section></div>`;
   bindNew();
   $("#cvo-ppl").onclick=()=>{CVO.ppl=true;renderMain()};
   $("#cvo-re").onclick=()=>{cvoLoad(true);toast("Đang tải lại…")};
@@ -544,6 +624,7 @@ function pCvTcCeo(m){
   m.querySelectorAll("[data-pp]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;goList("p:"+r.dataset.pp,"late")});
   m.querySelectorAll("[data-nudge]").forEach(b=>b.onclick=e=>{e.stopPropagation();const id=b.dataset.nudge,p=lateBy[id];if(!p)return;DB.mutate(ME.name,"nhắc việc trễ "+userName(id),dt=>{if(typeof notifyU==="function")notifyU(dt,[id],`${ME.name} nhắc: bạn đang có ${p.n} việc trễ hạn, lâu nhất ${p.max} ngày`,"page:cv_v")});toast("Đã nhắc "+userName(id))});
   m.querySelectorAll("[data-w]").forEach(r=>r.onclick=()=>{const id=r.dataset.w,s=r.dataset.ws;if(s==="card")openCard(id);else if(s==="order"){PAGE="order";MOD="";render()}else openTask(id)});
+  m.querySelectorAll("[data-od]").forEach(r=>r.onclick=()=>others[+r.dataset.od].go());
   m.querySelectorAll("[data-bl]").forEach(b=>b.onclick=()=>{const k=b.dataset.bl;if(k==="ketoan"){MOD="b2b";PAGE="b2b_cn"}else if(k==="kho"){MOD="sx";PAGE="kho_xuat_b2b"}else{MOD="b2b";PAGE="b2b_don"}render()});
 }
 /* "Theo người": bản Toàn cảnh cũ (ai đang ôm bao nhiêu việc) */
@@ -582,6 +663,7 @@ function tkCdAct(id,sid,act,note){
   DB.mutate(ME.name,`công đoạn "${t0.ten}": ${act}`,dt=>{
     const x=dt.tasks.find(y=>y.id===id);if(!x||!x.cd)return;const s=x.cd.find(z=>z.id===sid);if(!s)return;
     const before=tkActive(x).map(z=>z.id),nowS=new Date().toLocaleString("vi-VN"),ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
+    tkLog(x,`${act==="xong"?"Xong":act==="lam"?"Bắt đầu":"Trả lại"} công đoạn "${s.ten}"${note?": "+note:""}`);
     if(act==="lam"){s.st="lam";s.at=nowS;s.by=ME.name}
     else if(act==="xong"){s.st="xong";s.at=nowS;s.by=ME.name}
     else if(act==="tra"){const i=x.cd.indexOf(s);let j=i-1;while(j>=0&&x.cd[j].loai==="duyet")j--;
@@ -643,13 +725,14 @@ function pCvV(m){
   const view=(k,l)=>`<button type="button" class="cvview${CVV.view===k?" on":""}" data-vv="${k}">${l}</button>`;
   const tq=CVV.view==="tq",listMine=CVV.view==="list"&&CVV.scope==="mine";
   const mgr=cvMgrView();
-  m.innerHTML=`<div class="cvvbar">${tq?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}${mgr?view("tq","Tổng quan"):""}${CVV.view==="board"?`<button type="button" class="cvview" data-vgo="congviec">Theo bước video</button>`:""}${CVV.view==="cal"?`<button type="button" class="cvview" data-vgo="giaoviec">Lịch quay</button>`:""}${listMine?`<button class="btn sm" id="wk-re" type="button">Tải lại</button>${newTaskBtn()}`:""}</div><div id="cvv-body"></div>`;
+  m.innerHTML=`<div class="cvvbar">${tq?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}${view("gantt","Gantt")}${mgr?view("tq","Tổng quan"):""}${CVV.view==="board"?`<button type="button" class="cvview" data-vgo="congviec">Theo bước video</button>`:""}${CVV.view==="cal"?`<button type="button" class="cvview" data-vgo="giaoviec">Lịch quay</button>`:""}${listMine?`<button class="btn sm" id="wk-re" type="button">Tải lại</button>${newTaskBtn()}`:""}</div><div id="cvv-body"></div>`;
   const body=m.querySelector("#cvv-body");
   CVF.tao=(CVV.scope==="giao"&&!tq)?ME.id:"";
   try{
     if(tq)pCvTc(body);
     else if(CVV.view==="board")pCvKb(body);
     else if(CVV.view==="cal")pCvLich(body);
+    else if(CVV.view==="gantt")pCvGantt(body);
     else if(listMine)wkEmbed(body);
     else cvNvRaw(body);
   }catch(e){console.error("Trang Việc lỗi",e);body.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chị chụp dòng này gửi em: ${esc(String(e&&e.message||e))}</div>`}

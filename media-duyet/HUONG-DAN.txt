@@ -1,0 +1,7 @@
+Thả file ảnh/video để agent trực page gửi vào đây. Đặt tên theo mã trong kịch bản, ví dụ:
+MEDIA-TONG-01.mp4 (video tổng hợp công dụng)
+MEDIA-PACK-01.jpg (ảnh lọ 250g hiện hành)
+FB-QA-01-1.jpg, FB-BEP-01-1.jpg, FB-GIADUNG-01-1.jpg (feedback)
+HDSD-TONG-01.jpg, HDSD-TONG-02.jpg
+MEDIA-COMBO-01.jpg, MEDIA-COMBO-02.jpg, MEDIA-COMBO-03.jpg
+Chưa có thì bỏ qua, thiếu mã nào agent bỏ mã đó. File ở đây chỉ để em xem lại, chưa gửi cho khách.

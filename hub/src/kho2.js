@@ -229,13 +229,13 @@ const KHO_CH={TIKTOK:"TikTok Shop",SHOPEE:"Shopee",FACEBOOK:"Facebook"};
 async function khoLoadOnline(){
   KHO.on=Object.assign(KHO.on||{},{busy:true});
   try{Object.assign(KHO.on,await kApi("/online"));KHO.src=await kApi("/online/source")}catch(e){toast(e.message);KHO.on.runs=KHO.on.runs||[];KHO.on.unmapped=KHO.on.unmapped||[];KHO.src=KHO.src||[]}
-  KHO.on.busy=false;if(PAGE==="kho_online")renderMain();
+  KHO.on.busy=false;if(PAGE==="kho_online"||PAGE==="kho_qd")renderMain();
 }
 async function khoLoadChannel(ch){
   KHO.chd=KHO.chd||{};KHO.chd[ch]={busy:true};
   try{const rg=khoRange(KHO.onForm||{});const rq="&from="+rg.from+"&to="+rg.to;const [combos,map,recon]=await Promise.all([kApi("/online/combos?channel="+ch),kApi("/online/map?channel="+ch),kApi("/online/sheet?channel="+ch+rq)]);KHO.chd[ch]={combos,map,recon}}
   catch(e){toast(e.message);KHO.chd[ch]={combos:[],map:[],recon:null}}
-  if(PAGE==="kho_online")renderMain();
+  if(PAGE==="kho_online"||PAGE==="kho_qd")renderMain();
 }
 /* Đọc tab "Hàng lẻ theo ngày": dán từ Sheet (cột cách nhau bằng tab) hoặc mảng dòng từ file Excel. */
 function khoParseOnline(A){
@@ -618,7 +618,10 @@ function pKhoOnline(m){
     m.querySelectorAll(".cb-q").forEach(x=>x.onchange=()=>{const P=draftOf(+x.dataset.i);P[+x.dataset.j].qty=+String(x.value).replace(",",".")||1});
     m.querySelectorAll(".cb-add").forEach(a=>a.onclick=e=>{e.preventDefault();draftOf(+a.dataset.i).push({code:"",name:"",qty:1});renderMain()});
     m.querySelectorAll(".cb-d").forEach(b=>b.onclick=()=>{draftOf(+b.dataset.i).splice(+b.dataset.j,1);renderMain()});
-    m.querySelectorAll(".cb-s").forEach(b=>b.onclick=async()=>{const i=+b.dataset.i,c=combos[i],P=draftOf(i).filter(p=>p.code);
+    m.querySelectorAll(".cb-s").forEach(b=>b.onclick=async()=>{const i=+b.dataset.i,c=combos[i];
+      /* Lấy món đã chọn ngay trên dòng (không phụ thuộc bản nháp: danh sách có thể vừa tải lại làm lệch thứ tự). */
+      const row=b.closest("tr"),fromRow=row?[...row.querySelectorAll(".cb-i")].map(inp=>{const code=(inp.dataset.code||String(inp.value).split(" - ")[0]).trim(),it=code&&KHO.items&&KHO.items.get(code),q=row.querySelector('.cb-q[data-j="'+inp.dataset.j+'"]');return it?{code:it.code,name:it.name,qty:q?(+String(q.value).replace(",",".")||1):1}:null}):[];
+      const P=fromRow.some(Boolean)?fromRow.filter(Boolean):draftOf(i).filter(p=>p.code);
       if(!P.length){toast("Chọn sản phẩm lẻ trong danh sách gợi ý");return}
       if(P.length<draftOf(i).length&&!confirm("Còn dòng chưa chọn sản phẩm, vẫn lưu "+P.length+" món?"))return;
       try{await kApi("/online/map/set",{method:"POST",body:JSON.stringify({channel:tab,sku:c.sku,variant:c.variant||"",from_day:($("#cb-from")&&$("#cb-from").value)||"",parts:P.map(p=>({item_label:p.code+" - "+(p.name||""),qty:p.qty}))})});
@@ -1138,4 +1141,5 @@ function khoVoucherOpen(i){
    <div class="acts" style="margin-top:12px"><button class="btn pri" id="vch-pr">In phiếu</button></div>`);
   $("#vch-pr").onclick=()=>{const w=window.open("","_blank");if(!w)return;
     w.document.write(`<html><head><meta charset="utf-8"><title>${V.no}</title><style>body{font:14px Arial;margin:28px}h1{font-size:20px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #444;padding:6px 8px;text-align:left}th.n,td.n{text-align:right}.sg{display:flex;justify-content:space-between;margin-top:46px;text-align:center}.sg div{width:30%}</style></head><body><h1>PHIẾU XUẤT KHO BÁN LẺ ${CHN.toUpperCase()}</h1><div>Số phiếu: <b>${V.no}</b> · Ngày xuất: <b>${kDd(V.day)}</b> · Số đơn: ${V.orders}</div><table><thead><tr><th>Mã</th><th>Sản phẩm</th><th class="n">Số lượng</th></tr></thead><tbody>${rows}<tr><td colspan="2"><b>Tổng</b></td><td class="n"><b>${knum(tot)}</b></td></tr></tbody></table><div class="sg"><div>Người lập<br><br><br></div><div>Thủ kho<br><br><br></div><div>Kế toán<br><br><br></div></div><script>onload=()=>print()<\/script></body></html>`);w.document.close()}}
-{const _o=PAGES.kho_online;PAGES.kho_online=m=>{_o(m);m.querySelectorAll("tr[data-vch]").forEach(r=>r.onclick=e=>{if(e.target.closest("button")&&e.target.dataset.vch===undefined)return;khoVoucherOpen(+r.dataset.vch)})}}
+/* Bấm dòng hoặc nút "Xem phiếu" để mở phiếu xuất. Gắn cho cả trang vận hành (kho_online) và trang quản trị (kho_qd). */
+for(const k of ["kho_online","kho_qd"]){const _o=PAGES[k];if(_o)PAGES[k]=m=>{_o(m);m.querySelectorAll("tr[data-vch]").forEach(r=>r.onclick=e=>{if(e.target.closest("button")&&e.target.dataset.vch===undefined)return;khoVoucherOpen(+r.dataset.vch)})}}
