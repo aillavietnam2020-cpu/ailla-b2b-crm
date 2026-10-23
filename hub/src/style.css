@@ -677,3 +677,13 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 .fbd-gt .v{font-size:17px;font-weight:800;margin:2px 0 1px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 .fbd-gt .s{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;font-size:11px;color:var(--muted);line-height:1.3;min-height:14px}
 .fbd-gt.bad{border-color:#f3b8b3;background:#fff7f6}.fbd-gt.bad .v{color:#b42318}.fbd-gt.ok .v{color:#087a55}
+
+/* Kiểu Pancake: một khung, số chạy ngang, ngăn bằng đường mảnh, không đóng hộp từng ô */
+.fbd-pn{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 3px rgba(16,24,40,.05);margin-bottom:10px;overflow:hidden}
+.fbd-pn .fbd-gs{display:grid;grid-template-columns:104px minmax(0,1fr);align-items:stretch;margin:0;border-top:1px solid var(--line)}.fbd-pn .fbd-gs:first-child{border-top:0}
+.fbd-pn .fbd-gs h4{margin:0;padding:8px 10px;background:#f6f7fb;border-right:1px solid var(--line);font-size:11px;letter-spacing:.02em;display:flex;align-items:center}
+.fbd-pn .fbd-gr{gap:0}.fbd-pn .fbd-gt{border:0;border-left:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;padding:6px 12px}.fbd-pn .fbd-gr>.fbd-gt:first-child{border-left:0}
+.fbd-pn .fbd-gt.bad{background:transparent;border-color:var(--line)}.fbd-pn .fbd-gt .v{font-size:15px}
+.fbd-pn .fbd-gr.big .fbd-gt{padding:10px 14px}.fbd-pn .fbd-gr.big .fbd-gt .v{font-size:21px}.fbd-pn .fbd-gr.big .fbd-gt .l{font-size:12px}
+.fbd-chw{border-top:1px solid var(--line);padding:6px 10px 4px}
+@media (max-width:760px){.fbd-pn .fbd-gs{grid-template-columns:1fr}.fbd-pn .fbd-gs h4{border-right:0;border-bottom:1px solid var(--line)}}
