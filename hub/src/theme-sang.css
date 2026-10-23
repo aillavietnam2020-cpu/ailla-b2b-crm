@@ -357,3 +357,25 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 /* Đồng bộ mã B2B: ngày bắt đầu trừ kho gọn một dòng */
 .card.kmfrom{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px}
 .card.kmfrom input[type=date]{width:auto;flex:none;padding:5px 8px}
+
+/* Đơn mua hàng: tên hàng dòng phụ gọn một dòng; bảng đơn hàng trong cửa sổ phụ như đơn đặt hàng */
+.mhnames{max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mhorder tfoot td{background:#f8f9fc;font-size:13px;padding:7px 10px;border-top:1px solid #eceef4}
+.mhorder tfoot td:first-child{text-align:right;color:#4b5565}
+.mhorder tr.mhdue td{background:#eef0ff;color:#2d3a8c;font-size:14px}
+
+/* Đơn mua hàng kiểu đơn B2B: một dòng gọn; trang chi tiết */
+.mhrow td{white-space:nowrap}
+.mhrow td.mhsup{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.mhno{color:#2f3fb8;font-weight:700;cursor:pointer}
+.mhtodo{display:inline-block;padding:2px 10px;border-radius:999px;background:#eef0ff;color:#4b54d1;font-size:12px;font-weight:600}
+.mhtodo.red{background:#fde7e7;color:#b42318}
+.mhpage{max-width:1100px}
+.mhback{display:inline-block;margin:0 0 10px;color:#4b54d1;font-weight:600}
+#mh-detail{background:#fff;border-radius:14px;padding:18px 22px;box-shadow:0 1px 3px rgba(20,30,60,.06)}
+.mhh{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.mhinfo{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:0 0 12px}
+.mhinfo>div{background:#f6f7fb;border-radius:10px;padding:8px 12px}
+.mhinfo span{display:block;font-size:12px;color:#7a8199}.mhinfo b{display:block;font-size:14px}.mhinfo small{display:block;font-size:12px;color:#7a8199}
+@media(max-width:800px){.mhinfo{grid-template-columns:repeat(2,1fr)}}
+#mh-detail h3{margin:16px 0 8px}

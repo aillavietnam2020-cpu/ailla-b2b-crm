@@ -6,6 +6,8 @@ function load() {
   const src = readFileSync('hub/src/congviec.js', 'utf8');
   const a = src.indexOf('function tkActive(x)');
   const b = src.indexOf('/* Việc của tôi (mọi người)');
+  const l = src.indexOf('function tkLog(x,txt)');
+  const lEnd = src.indexOf('function tkSetSt(');
   const data: { tasks: any[]; settings: { today: number } } = { tasks: [], settings: { today: 20 } };
   const notes: Array<[string, string]> = [];
   const ME = { id: 'u_chi', name: 'Chị Hoa', role: 'admin' };
@@ -15,7 +17,7 @@ function load() {
     'ME',
     'notifyU',
     'dd',
-    `${src.slice(a, b)}\nreturn {tkActive,tkSync,tkCdAct};`,
+    `${src.slice(l, lEnd)}\n${src.slice(a, b)}\nreturn {tkActive,tkSync,tkCdAct};`,
   );
   const api = fn(
     () => data,
