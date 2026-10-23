@@ -49,7 +49,7 @@ export class SqliteStatement {
     }
     async run() {
         const info = this.db.prepare(this.sql).run(...normalize(this.params));
-        return { success: true, meta: { changes: Number(info.changes ?? 0) } };
+        return { success: true, meta: { changes: Number(info.changes ?? 0), last_row_id: Number(info.lastInsertRowid ?? 0) } };
     }
     async raw() {
         const result = await this.all();

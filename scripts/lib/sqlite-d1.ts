@@ -52,9 +52,9 @@ export class SqliteStatement {
     return { results: this.db.prepare(this.sql).all(...normalize(this.params)) as T[], success: true };
   }
 
-  async run(): Promise<{ success: boolean; meta: { changes: number } }> {
+  async run(): Promise<{ success: boolean; meta: { changes: number; last_row_id: number } }> {
     const info = this.db.prepare(this.sql).run(...normalize(this.params));
-    return { success: true, meta: { changes: Number(info.changes ?? 0) } };
+    return { success: true, meta: { changes: Number(info.changes ?? 0), last_row_id: Number(info.lastInsertRowid ?? 0) } };
   }
 
   async raw<T = unknown[]>(): Promise<T[]> {
