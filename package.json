@@ -32,6 +32,7 @@
     "import:commit": "tsx scripts/import/cli.ts commit",
     "deploy": "npm run build && wrangler deploy",
     "deploy:staging": "npm run build && wrangler deploy --env staging",
+    "predeploy:prod": "node scripts/check-deploy.mjs",
     "deploy:prod": "npm run build && wrangler deploy --env production",
     "cf-typegen": "wrangler types"
   },
