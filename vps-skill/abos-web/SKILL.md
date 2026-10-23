@@ -31,6 +31,7 @@ Dùng khi chị Hoa hoặc nhân sự hỏi số liệu thật trên web (đơn,
 | `abos kho-doc <id>` | Chi tiết một phiếu kho: từng dòng mã, số lượng |
 | `abos kho-lots [--st CHO_KIEM\|DA_KIEM\|TEM_SAN\|DA_IN\|SAN_SANG\|HUY] [--q chữ] [--limit N]` | Lô kiểm kê đóng gói và tem: đạt/lỗi/chờ, số tem đã tạo và đã in, vật chứa |
 | `abos kho-online [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--channel TIKTOK\|SHOPEE\|FACEBOOK] [--limit N]` | Xuất B2C qua sàn (Kho vật tư → Xuất B2C): từng ngày × kênh có số đơn, sản phẩm lẻ bán, chưa có mã vật tư; tổng 7 ngày gần nhất theo kênh; top sản phẩm 14 ngày |
+| `abos sales --customer tên_hoặc_mã --from YYYY-MM-DD --to YYYY-MM-DD` | DOANH SỐ đơn B2B của một khách (hoặc mọi khách nếu bỏ --customer) trong khoảng ngày: tổng, tổng theo tháng, theo khách, danh sách đơn (mọi đơn chưa hủy, kể cả đã kế toán xác nhận). Dùng cho câu hỏi "doanh số/tổng đơn của X từ ngày … đến …" thay vì tự lục từng đơn (cần quyền Đơn hàng) |
 | `abos products --q chữ [--tier <mã cấp giá>] [--limit N]` | Tra sản phẩm theo tên hoặc mã SKU (id, mã, tên, đơn vị, quy cách), kèm đơn giá hiện hành của cấp giá nếu có `--tier`. Dùng để lên đơn đúng mã, không đoán từ đơn cũ (cần quyền Đơn hàng) |
 | `abos pha-che [--limit N]` | Phiếu pha chế gần đây: nguyên liệu dùng, lệch định mức (cần quyền Kho) |
 | `abos mkt-cards [--step kb] [--kenh K]` | Thẻ video của team Content: bước, người làm (cần quyền Marketing Content) |

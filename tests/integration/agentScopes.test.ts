@@ -210,6 +210,17 @@ describe('Phạm vi đọc của agent theo vai', () => {
     expect(await status(none.token, '/api/agent/products')).toBe(403);
   });
 
+  it('doanh số theo khách và khoảng ngày: có tổng theo tháng; agent không có phạm vi đơn thì không xem được', async () => {
+    const a = await makeAgent('Kế toán doanh số', ['orders']);
+    const r = await agentCall(a.token, '/api/agent/sales?from=2020-01-01&to=2030-12-31');
+    expect(r.status).toBe(200);
+    expect(r.body.data).toMatchObject({ from: '2020-01-01', orders: expect.any(Number), total: expect.any(Number) });
+    expect(typeof r.body.data.by_month).toBe('object');
+    expect(await status(a.token, '/api/agent/sales?from=abc&to=2030-12-31')).toBe(400);
+    const none = await makeAgent('Kho thôi', ['kho']);
+    expect(await status(none.token, '/api/agent/sales?from=2020-01-01&to=2030-12-31')).toBe(403);
+  });
+
   it('Marketing: Content thấy thẻ video, Digital thấy order Digital, không chéo team', async () => {
     const data = {
       users: [{ id: 'u1', name: 'Quỳnh' }],

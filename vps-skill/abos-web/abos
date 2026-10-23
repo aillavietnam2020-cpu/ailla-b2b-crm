@@ -97,7 +97,7 @@ def main():
             DLG = args[1]
         args = args[2:]
     if not args:
-        sys.exit("Dùng: abos --as <mã agent> me|orders|order|customers|customer|debts|payments|shortages|kho-alerts|kho-stock|kho-nxt|kho-docs|kho-doc|kho-lots|kho-online|products|act|read|pha-che|mkt-cards|mkt-orders|mkt-ads|xuong|events|propose")
+        sys.exit("Dùng: abos --as <mã agent> me|orders|order|customers|customer|debts|payments|shortages|kho-alerts|kho-stock|kho-nxt|kho-docs|kho-doc|kho-lots|kho-online|products|sales|act|read|pha-che|mkt-cards|mkt-orders|mkt-ads|xuong|events|propose")
     cmd, rest = args[0], args[1:]
     if cmd == "read":
         # Trợ lý toàn diện (AILLA Center): ĐỌC mọi trang web như chủ doanh nghiệp, chỉ GET, không ghi gì
@@ -167,6 +167,8 @@ def main():
         call("/kho/lots", {"st": o.get("st"), "q": o.get("q"), "limit": o.get("limit")})
     elif cmd == "kho-online":
         call("/kho/online", {"from": o.get("from"), "to": o.get("to"), "channel": o.get("channel"), "limit": o.get("limit")})
+    elif cmd == "sales":
+        call("/sales", {"customer": o.get("customer"), "from": o.get("from"), "to": o.get("to")})
     elif cmd == "products":
         call("/products", {"q": o.get("q"), "tier": o.get("tier"), "limit": o.get("limit")})
     elif cmd == "kho-nxt":
