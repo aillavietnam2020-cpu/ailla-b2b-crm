@@ -131,7 +131,7 @@ function khoForm(type,pre,clsO){
   const T=KHO_TYPES[type],price=KHO.cat.can_price;
   const isPC=type==="PC",isKS=type==="KS",isOut=type==="XB",isTL=type==="TL",isPN=type==="PN"||type==="TD";
   const head=`<div class="row7"><label class="field">Ngày<input type="date" id="kf-d" value="${kToday()}" required></label>
-   ${type==="PN"?`<label class="field grow">Nhà cung cấp<input id="kf-p" placeholder="Tên nhà cung cấp"></label>`:""}
+   ${type==="PN"?`<label class="field grow">Thuộc phiếu mua<select id="kf-po"><option value="">Đang tải phiếu mua…</option></select></label><label class="field grow">Nhà cung cấp<input id="kf-p" placeholder="Tên nhà cung cấp"></label>`:""}
    ${isOut?`<label class="field">Loại<select id="kf-k"><option value="XB">Xuất bán: NPP, đại lý, gia công, bán nguyên liệu (XB)</option><option value="XK">Xuất khác: hàng mẫu, hủy hỏng (XK)</option></select></label><label class="field grow">Khách hàng / nơi nhận<input id="kf-p" required></label><label class="field">Mã đơn của sale<input id="kf-r"></label>`:""}
    ${isPC?`<label class="field grow">Bán thành phẩm<input id="kf-btp" placeholder="Gõ tên BTP rồi chọn" autocomplete="off" required></label><label class="field">Số lít thực tế<input id="kf-lit" type="number" step="any" min="0" required></label><label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label><label class="field">Số lít theo phiếu<input id="kf-rq" type="number" step="any" min="0"></label>`:""}
    ${isKS?`<label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label>`:""}</div>`;
@@ -176,6 +176,14 @@ function khoForm(type,pre,clsO){
     $("#kf-add").onclick=()=>{const tr=addLine({});tr.dataset.std=0}}
   else{$("#kf-add").onclick=()=>addLine({});if(isOut)$("#kf-box").onclick=()=>addLine({cls:["NVL","HH","CCDC"]});addLine({})}
   if($("#kf-psx"))$("#kf-psx").onchange=()=>{if($("#kf-psx").value)khoFillFromPsx(type,$("#kf-psx").value,addLine)};
+  if(type==="PN"&&$("#kf-po")){
+    /* Hàng về theo một phiếu mua (Thảo lập ở trang quản trị): chọn phiếu thì điền sẵn nhà cung cấp và số còn thiếu; lưu xong phiếu mua tự nhảy "đã nhập kho" */
+    (async()=>{try{await mhLoad(true)}catch(e){}
+      const sel=$("#kf-po");if(!sel)return;const O=(typeof MH!=="undefined"&&MH.orders||[]).filter(p=>p.status==="DAT"||p.status==="DANG_GIAO");
+      sel.innerHTML='<option value="">Không có phiếu đặt: web tự tạo phiếu mua theo nhà cung cấp, Thảo nhập giá sau</option>'+O.map(p=>`<option value="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name)} · ${esc(p.lines.slice(0,2).map(l=>l.name||l.item).join(", "))}</option>`).join("")})();
+    $("#kf-po").onchange=()=>{const p=(MH.orders||[]).find(x=>x.id===$("#kf-po").value);if(!p)return;
+      $("#kf-p").value=p.supplier_name;body.innerHTML="";const rest=p.lines.filter(l=>l.qty-l.received>1e-9);
+      (rest.length?rest:p.lines).forEach(l=>addLine({item:l.item,qty:rest.length?Math.round((l.qty-l.received)*1e6)/1e6:l.qty}));refresh()}}
   if(pre)pre(addLine);
   $("#kf-print").onclick=()=>{
     const L=lines().filter(l=>l.item),dt=$("#kf-d").value,tp=isOut?$("#kf-k").value:type;
@@ -185,6 +193,7 @@ function khoForm(type,pre,clsO){
   $("#kf").onsubmit=async e=>{e.preventDefault();const ok=$("#kf-ok");ok.disabled=true;$("#kf-msg").textContent="Đang ghi…";
     try{const L=lines().filter(l=>l.item);const body={type:isOut?$("#kf-k").value:type,date:$("#kf-d").value,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",note:$("#kf-n").value,
       lines:L.map(l=>({item:l.item,qty:l.qty===""?undefined:+l.qty,ref_qty:l.ref_qty===""?undefined:+l.ref_qty,verdict:l.verdict||undefined,price:l.price===""?undefined:+l.price,std_qty:l.std_qty}))};
+      if($("#kf-po")&&$("#kf-po").value)body.po_id=$("#kf-po").value;
       if(isPC){body.btp=$("#kf-btp").dataset.code;body.liters=+$("#kf-lit").value;body.ref_qty=$("#kf-rq").value===""?undefined:+$("#kf-rq").value}
       if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");
       const r=await kApi("/docs",{method:"POST",body:JSON.stringify(body)});closeDrawer();KHO.at=0;KHO.list={};KHO.nxt=null;KHO.cl=null;KHO.mp=null;await khoLoad(true);renderMain();toast("Đã ghi phiếu "+r.no);khoOpenDoc(r.id,r.warnings)}

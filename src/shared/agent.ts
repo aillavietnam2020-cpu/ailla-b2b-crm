@@ -3,8 +3,8 @@
  * Agent chỉ vào bằng /api/agent/*, có quyền riêng (không dùng quyền admin), và phần lớn việc chỉ được ĐỀ XUẤT.
  */
 
-/** Quyền riêng của agent. Chỉ hai quyền này; agent không nhận quyền theo vai trò. */
-export const AGENT_PERMISSIONS = ['agent.read', 'agent.propose'] as const;
+/** Quyền riêng của agent ('agent.act' = được ghi thay người, chỉ khi có giấy ủy quyền của người ra lệnh). Chỉ các quyền này; agent không nhận quyền theo vai trò. */
+export const AGENT_PERMISSIONS = ['agent.read', 'agent.propose', 'agent.act'] as const;
 
 /**
  * Phạm vi đọc của từng agent (cấp riêng, theo vai). Lưu trong user_permissions dạng 'agent.scope.<tên>'.

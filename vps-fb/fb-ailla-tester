@@ -1,0 +1,628 @@
+#!/usr/bin/env python3
+"""Thu tu van tren page Ailla Viet Nam Store - CHI TRA LOI TAI KHOAN THU (tester), khong dung cho khach that.
+
+Lenh:
+  fb-ailla-tester status                 xem che do, danh sach tester, media duoc duyet
+  fb-ailla-tester find MA                tim cuoc tro chuyen co tin chua MA, in ra id nguoi nhan (chi id)
+  fb-ailla-tester add-tester PSID        them tester
+  fb-ailla-tester send-text PSID "noi dung"
+  fb-ailla-tester send-media PSID MA_MEDIA
+  fb-ailla-tester run                    vong lap: doc tin moi cua tester, hoi agent Lead Sale, tra loi
+  fb-ailla-tester off | on               cong tac tat/bat (mode off | tester). Khong co che do live.
+
+An toan: khoa cung page 105017945992971; chi gui cho PSID trong danh sach tester; chi gui media co trong
+manifest da duyet; ton trong cua so 24h; dung neu nhan vien page tra loi tay; ghi nhat ky; khong in token.
+"""
+from __future__ import annotations
+
+import json
+import mimetypes
+import re
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+PAGE_ID = "105017945992971"
+GRAPH = "https://graph.facebook.com/v26.0"
+CFG = Path("/root/.config/openclaw/fb-ailla-tester.json")
+PAGES_CFG = Path("/root/.config/openclaw/facebook-pages.json")
+LOG = Path("/root/fb-ailla-tester/log.jsonl")
+STATE = Path("/root/fb-ailla-tester/state.json")
+AGENT = "lead-sale-ailla"
+WINDOW_SECONDS = 23 * 3600
+DEFAULT = {"page_id": PAGE_ID, "mode": "off", "testers": [], "media_manifest": "/root/fb-ailla-tester/media-approved.json",
+           "poll_seconds": 8, "pause_minutes_after_human": 120}
+
+
+def cfg() -> dict:
+    try:
+        c = {**DEFAULT, **json.loads(CFG.read_text())}
+    except FileNotFoundError:
+        c = dict(DEFAULT)
+    if c["page_id"] != PAGE_ID:
+        raise SystemExit("Cau hinh sai page")
+    if c["mode"] not in ("off", "tester"):
+        raise SystemExit("Che do chi duoc la off hoac tester")
+    return c
+
+
+def save_cfg(c: dict) -> None:
+    CFG.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CFG.with_suffix(".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(c, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, CFG)
+
+
+def log(event: str, **kw) -> None:
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    row = {"t": datetime.now(timezone.utc).isoformat(timespec="seconds"), "event": event, **kw}
+    with open(LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def token() -> str:
+    pages = json.loads(PAGES_CFG.read_text())["pages"]
+    p = next((x for x in pages if x.get("id") == PAGE_ID), None)
+    if not p or not p.get("token"):
+        raise SystemExit("Khong co token page")
+    return p["token"]
+
+
+def graph(method: str, path: str, params: dict | None = None, body: bytes | None = None, headers: dict | None = None) -> dict:
+    q = dict(params or {})
+    q["access_token"] = token()
+    url = f"{GRAPH}/{path}?" + urllib.parse.urlencode(q)
+    req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.load(e).get("error", {})
+        except Exception:
+            err = {}
+        raise RuntimeError(f"Facebook {e.code}: {err.get('message', '')[:300]} (code {err.get('code')}/{err.get('error_subcode')})")
+
+
+def multipart(fields: dict, filename: str, data: bytes, mime: str) -> tuple[bytes, str]:
+    b = uuid.uuid4().hex
+    out = b""
+    for k, v in fields.items():
+        out += f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+    out += (f'--{b}\r\nContent-Disposition: form-data; name="filedata"; filename="{filename}"\r\n'
+            f'Content-Type: {mime}\r\n\r\n').encode() + data + f"\r\n--{b}--\r\n".encode()
+    return out, f"multipart/form-data; boundary={b}"
+
+
+def need_tester(psid: str) -> None:
+    c = cfg()
+    if c["mode"] != "tester":
+        raise SystemExit("Che do dang tat (off)")
+    if psid not in c["testers"]:
+        raise SystemExit("Nguoi nhan khong nam trong danh sach tester - tu choi gui")
+
+
+def typing(psid: str, on: bool = True) -> None:
+    try:
+        graph("POST", "me/messages", body=json.dumps({
+            "recipient": {"id": psid}, "sender_action": "typing_on" if on else "typing_off"}).encode(),
+            headers={"Content-Type": "application/json"})
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def send_text(psid: str, text: str, human_delay: bool = True) -> dict:
+    need_tester(psid)
+    if human_delay:
+        typing(psid)
+        time.sleep(min(6.0, 1.0 + len(text) / 70.0))
+    r = graph("POST", "me/messages", body=json.dumps({
+        "recipient": {"id": psid}, "messaging_type": "RESPONSE", "message": {"text": text[:1900]}}).encode(),
+        headers={"Content-Type": "application/json"})
+    mine_add(r.get("message_id", ""))
+    log("send_text", to_hash=psid[-4:], chars=len(text))
+    return r
+
+
+def media_manifest() -> dict:
+    c = cfg()
+    try:
+        return json.loads(Path(c["media_manifest"]).read_text())
+    except FileNotFoundError:
+        return {}
+
+
+def send_media(psid: str, code: str) -> dict:
+    need_tester(psid)
+    m = media_manifest().get(code)
+    if not m or m.get("status") != "APPROVED-TEST":
+        raise SystemExit(f"Media {code} chua duoc duyet")
+    path = Path(m["path"])
+    data = path.read_bytes()
+    mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    kind = "video" if mime.startswith("video") else "image" if mime.startswith("image") else None
+    if not kind or len(data) > 24 * 1024 * 1024:
+        raise SystemExit("Loai hoac dung luong media khong hop le")
+    body, ctype = multipart({
+        "recipient": json.dumps({"id": psid}), "messaging_type": "RESPONSE",
+        "message": json.dumps({"attachment": {"type": kind, "payload": {"is_reusable": False}}})}, path.name, data, mime)
+    r = graph("POST", "me/messages", body=body, headers={"Content-Type": ctype})
+    mine_add(r.get("message_id", ""))
+    log("send_media", to_hash=psid[-4:], code=code, kind=kind, bytes=len(data))
+    return r
+
+
+def find(code: str) -> None:
+    data = graph("GET", f"{PAGE_ID}/conversations", {
+        "fields": "participants,messages.limit(5){message,from,created_time}", "limit": 25})
+    for conv in data.get("data", []):
+        for msg in (conv.get("messages") or {}).get("data", []):
+            if code in (msg.get("message") or ""):
+                for p in conv["participants"]["data"]:
+                    if p["id"] != PAGE_ID:
+                        print(json.dumps({"psid": p["id"], "found_at": msg.get("created_time")}))
+                        return
+    print(json.dumps({"psid": None}))
+
+
+MINE = Path("/root/fb-ailla-tester/mine.json")
+
+
+def mine_add(mid: str) -> None:
+    try:
+        v = json.loads(MINE.read_text())
+    except (FileNotFoundError, ValueError):
+        v = []
+    v.append(mid)
+    MINE.write_text(json.dumps(v[-300:]))
+
+
+def mine_has(mid: str) -> bool:
+    try:
+        return mid in json.loads(MINE.read_text())
+    except (FileNotFoundError, ValueError):
+        return False
+
+
+def state() -> dict:
+    try:
+        return json.loads(STATE.read_text())
+    except (FileNotFoundError, ValueError):
+        return {"seen": {}, "pause": {}}
+
+
+def save_state(s: dict) -> None:
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(json.dumps(s))
+
+
+XUNG_FILE = Path("/root/fb-ailla-tester/xung.json")
+SYSTEM_NOTE = re.compile(r"(?i)^(đã (đặt|gán|thêm|chuyển|cập nhật|xóa|bỏ)|.*giai đoạn của khách hàng tiềm năng)")
+MEDIA_INTRO = {"/BT_FEEDBACK": ["FB-QA-01", "FB-BEP-01", "FB-GIADUNG-01", "FB-TRA-01"]}
+DIRECTIVE = re.compile(r"\[(MA|XUNG|HOI_CHI|MEDIA)\s*:\s*([^\]]*)\]")
+
+
+def get_xung(psid: str) -> str:
+    try:
+        return json.loads(XUNG_FILE.read_text()).get(psid, "chị")
+    except (FileNotFoundError, ValueError):
+        return "chị"
+
+
+def set_xung(psid: str, v: str) -> None:
+    try:
+        d = json.loads(XUNG_FILE.read_text())
+    except (FileNotFoundError, ValueError):
+        d = {}
+    d[psid] = v
+    XUNG_FILE.write_text(json.dumps(d, ensure_ascii=False))
+
+
+def kb():
+    import sys as _s
+    if "/usr/local/lib" not in _s.path:
+        _s.path.insert(0, "/usr/local/lib")
+    import kichban
+    return kichban, kichban.parse()
+
+
+RULES = """Bạn là agent Lead Sale đang trực chat page Ailla Việt Nam Store. [CHẾ ĐỘ THỬ: người nhắn là tài khoản thử của chị Hoa, không phải khách thật.]
+
+QUY TẮC TUYỆT ĐỐI:
+0. PHẠM VI HIỆN HÀNH (chị Hoa đã hủy V5): CHỈ tư vấn TẨY LỒNG MÁY GIẶT AILLA; chỉ gợi ý Tẩy mốc gioăng khi khách có cả cặn lồng và mốc gioăng. Mọi sản phẩm khác (kể cả bột tẩy vạn năng, nên KHÔNG dùng mã /BT_*, V5 chỉ để tham khảo), tẩy lồng Aibio dạng gói, và giá/quà/ảnh không có mã trong danh mục: ghi [HOI_CHI:...], không trả lời khách.
+1. Bạn KHÔNG ĐƯỢC tự viết câu nào gửi cho khách. Chữ nào bạn viết ngoài các thẻ bên dưới sẽ bị hệ thống BỎ, khách không thấy.
+2. Bạn chỉ được CHỌN mã câu mẫu từ kịch bản Pancake V5 của chị Hoa (danh mục bên dưới), hệ thống sẽ gửi đúng nguyên văn.
+3. Làm đúng luồng V5 nhưng TỪNG BƯỚC THEO NHỊP KHÁCH, không dồn nhiều bước một lượt: (a) Lần đầu khách nhắn: gửi cụm mở đầu /BT_GT1, /BT_GT2, /BT_FEEDBACK, /BT_HOI_NHU_CAU. (b) Khi khách nói vết bẩn/vật liệu: gửi MỘT mã tư vấn /BT_TV_* đúng nhóm, rồi báo giá /BT_GIA (kèm /BT_CAMKET). Chỉ vậy, DỪNG, chờ khách phản hồi. (c) /BT_CHOT chỉ gửi khi khách đã xem giá mà còn lưỡng lự hoặc hỏi nên chọn combo nào. (d) /BT_XINDON chỉ khi khách nói rõ muốn lấy combo; /BT_XACNHAN chỉ khi khách đã gửi đủ tên, SĐT, địa chỉ. (e) Khách hỏi từ chối/thắc mắc: chọn đúng MỘT mã /BT_TC_* hoặc FAQ_* trả lời đúng ý. (f) Khách hỏi cách dùng: /BT_GUI_HDSD kèm đúng một thẻ [MEDIA:HDSD-...]. Mã đã gửi rồi vẫn được gửi LẠI nếu khách hỏi lại đúng nội dung đó (ví dụ hỏi lại giá thì gửi lại /BT_GIA). Không bao giờ dùng [HOI_CHI] cho câu mà kịch bản có mã trả lời.
+3g. XÁC ĐỊNH SẢN PHẨM khách đang nói tới từ LỊCH SỬ HỘI THOẠI THẬT (đọc kỹ các tin PAGE đã gửi và KHÁCH đã nói). Mã /BT_* chỉ dùng khi khách đang nói về BỘT TẨY VẠN NĂNG; mã /TL_* khi nói về tẩy lồng máy giặt hoặc tẩy mốc gioăng. Nếu khách chỉ hỏi chung (ví dụ chỉ nhắn: giá, tư vấn) mà lịch sử chưa xác định sản phẩm: gửi /CHUNG_HOI_SANPHAM, tuyệt đối không đoán sản phẩm và không báo giá. Nếu lịch sử cho thấy đang nói tẩy lồng/tẩy gioăng mà khách hỏi giá thì KHÔNG dùng /BT_GIA mà dùng mã báo giá /TL_GIA_* theo mục 4b.\n4. Kịch bản V5 (mã /BT_*) CHỈ dành cho sản phẩm BỘT TẨY VẠN NĂNG AILLA; tẩy lồng dùng mã /TL_*. Khách hỏi sản phẩm khác ngoài bột tẩy vạn năng và tẩy lồng/tẩy gioăng (ví dụ bình xịt, nước giặt...) hoặc câu không có trong kịch bản, hoặc cần giá/chính sách/ưu đãi ngoài kịch bản: KHÔNG trả lời khách, chỉ ghi thẻ [HOI_CHI:...] để hỏi chị Hoa.
+4b. Sản phẩm TẨY LỒNG và TẨY MỐC GIOĂNG: chỉ được dùng các mã /TL_* trong danh mục. GIÁ/COMBO/QUÀ chỉ được báo bằng các mã báo giá đã duyệt theo "BẢNG GIÁ SP FACEBOOK" của chị Hoa, không tự nêu số nào: khách hỏi giá (hoặc hỏi combo, quà, ưu đãi) về tẩy lồng Ailla / tẩy mốc gioăng cao su / combo tẩy lồng + tẩy gioăng => [MA:/TL_GIA_COMBO] (gửi 4 combo, rồi DỪNG chờ khách chọn). Khách mới chỉ nhắn muốn tư vấn / quan tâm tẩy lồng thì làm theo luồng: lần đầu /TL_HOI_QUANTAM, khách xác nhận thì /TL_HOI_MAY, sau khi khách trả lời tình trạng máy thì tư vấn rồi báo giá; khách chỉ hỏi riêng tẩy mốc gioăng cao su (không nhắc tẩy lồng) => [MA:/TL_GIA_TAYMOC]; khách nói rõ tẩy lồng Aibio / bột tẩy lồng dạng gói => [MA:/TL_GIA_AIBIO]. Khách hỏi combo/quà/giá khác (bảng giá cũ, giá sàn Shopee, so sánh) mà không có mã: ghi [HOI_CHI:...].
+5. Không biết thì hỏi chị, không đoán, không sáng tạo, không dùng câu trong mục "CÂU KHÔNG ĐƯỢC DÙNG".
+
+CÁCH TRẢ LỜI (chỉ các thẻ này, mỗi thẻ một dòng, theo thứ tự gửi):
+[XUNG:anh] hoặc [XUNG:chị]  — chọn cách gọi khách (nếu chưa rõ thì chị)
+[MA:/BT_GT1]  — gửi câu mẫu. Mã có chỗ trống "…" thì điền theo thứ tự: [MA:/BT_TC_KHONGSACH|vết mực]
+[MEDIA:HDSD-QA-01]  — chỉ dùng ở /BT_GUI_HDSD để chọn đúng 1 ảnh HDSD
+[HOI_CHI:câu khách hỏi nguyên văn | lý do chưa có kịch bản]
+
+DANH MỤC MÃ CÂU MẪU:
+"""
+
+
+def ask_agent(psid: str, text: str, history: str | None = None) -> str:
+    kichban, cat = kb()
+    script = (kichban.SCRIPT.read_text(encoding="utf-8"))
+    framed = (RULES + kichban.catalog_for_agent(cat)
+              + "\n\n===== KỊCH BẢN V5 ĐẦY ĐỦ (để bạn hiểu luồng, bạn không được chép lại nội dung) =====\n" + script
+              + ("\n\n===== LỊCH SỬ HỘI THOẠI THẬT TRÊN PAGE (cũ → mới; KHÁCH = khách nhắn, PAGE = tin page đã gửi) =====\n" + (history or "(chưa có tin nào trước đó)") if history is not None else "")
+              + "\n\n===== TIN KHÁCH VỪA NHẮN =====\n" + text
+              + "\n\nChỉ trả về các thẻ [..], không viết gì khác.")
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        f.write(framed)
+        path = f.name
+    try:
+        p = subprocess.run(["openclaw", "agent", "--agent", AGENT, "--session-key", f"agent:{AGENT}:fb-kb-{psid[-6:]}" + (f"-{int(time.time())}" if history is not None else ""),
+                            "--message-file", path, "--json", "--timeout", "180"],
+                           capture_output=True, text=True, timeout=240,
+                           env={**os.environ, "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", "/run/user/0")})
+    finally:
+        os.unlink(path)
+    if p.returncode != 0:
+        raise RuntimeError((p.stderr or p.stdout)[-300:])
+    out = []
+    for x in ((json.loads(p.stdout).get("result") or {}).get("payloads") or []):
+        if isinstance(x, dict) and x.get("text"):
+            out.append(x["text"])
+    return "\n".join(out).strip()
+
+
+def note_to_tester(psid: str, text: str) -> None:
+    """Thong bao NOI BO cho chi Hoa (Telegram, bot Lead Sale). Khong bao gio gui vao cuoc chat voi khach."""
+    msg = "[Page Ailla Việt Nam Store - chế độ thử] " + text
+    try:
+        subprocess.run(["openclaw", "message", "send", "--channel", "telegram", "--account", "lead-sale-ailla",
+                        "--target", "8959489474", "-m", msg], capture_output=True, text=True, timeout=60,
+                       env={**os.environ, "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", "/run/user/0")})
+        log("boss_notified", chars=len(msg))
+    except Exception as e:  # noqa: BLE001
+        log("boss_notify_failed", why=str(e)[:120])
+
+
+EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200d\u2022\u25CF\u25AA\u25AB]")
+
+
+def one_block(parts: list[str]) -> str:
+    """Gop tat ca cau mau cua luot nay thanh 1 doan dai: khong icon, khong xuong dong, khong dau in dam."""
+    t = " ".join(parts).replace("**", "")
+    t = EMOJI.sub("", t)
+    t = re.sub(r"\s*\n\s*", " ", t)
+    return re.sub(r" {2,}", " ", t).strip()
+
+
+def chunks(text: str, limit: int = 1800) -> list[str]:
+    out = []
+    while len(text) > limit:
+        cut = max(text.rfind(". ", 0, limit), text.rfind("? ", 0, limit), text.rfind("! ", 0, limit))
+        cut = cut + 1 if cut > 300 else limit
+        out.append(text[:cut].strip())
+        text = text[cut:].strip()
+    if text:
+        out.append(text)
+    return out
+
+
+def sale_text(t: str) -> str:
+    """Giu nguyen cach trinh bay cua sale (icon, xuong dong). Chi bo dau ** cua markdown vi Messenger khong hien in dam."""
+    return t.replace("**", "").strip()
+
+
+def deliver(psid: str, reply: str, asked: str = "") -> None:
+    kichban, cat = kb()
+    c = cfg()
+    dirs = DIRECTIVE.findall(reply or "")
+    if not dirs:
+        log("no_directive", raw_chars=len(reply or ""))
+        note_to_tester(psid, "Agent không chọn được câu mẫu nào cho tin này, đã dừng và không gửi gì cho khách. Tin khách: " + asked[:200])
+        return
+    block_mode = c.get("format") == "block"
+    parts: list[str] = []
+
+    def out(text: str) -> None:
+        for piece in chunks(sale_text(text), 1900):
+            send_text(psid, piece)
+            time.sleep(1.2)
+
+    def media_for(code: str) -> None:
+        if not c.get("send_media"):
+            return
+        try:
+            send_media(psid, code)
+        except (SystemExit, RuntimeError):
+            log("media_missing", code=code)
+
+    for kind, val in dirs:
+        val = val.strip()
+        if kind == "XUNG":
+            set_xung(psid, "anh" if "anh" in val.lower() else "chị")
+        elif kind == "HOI_CHI":
+            log("ask_boss", why=val[:200])
+            note_to_tester(psid, "Câu này chưa có trong kịch bản, agent dừng và hỏi chị Hoa: " + val[:600])
+        elif kind == "MA":
+            fields = [x.strip() for x in val.split("|")]
+            code = fields[0]
+            if code not in cat:
+                log("unknown_code", code=code[:40])
+                continue
+            if code in MEDIA_INTRO and not any(
+                    media_manifest().get(m, {}).get("status") in ("APPROVED-TEST", "APPROVED-LIVE") for m in MEDIA_INTRO[code]):
+                # Cau mau chi de gioi thieu anh/video ("em gui chi xem feedback...") ma chua co file duoc duyet: bo qua, khong hua suong
+                log("skip_media_intro", code=code)
+                continue
+            msgs = kichban.render(cat, code, fields[1:], get_xung(psid))
+            log("script_code", code=code)
+            if block_mode:
+                parts.extend(msgs)
+                continue
+            for m in msgs:
+                out(m)
+            for mcode in cat[code]["media"]:
+                if not mcode.startswith("NOTE:"):
+                    media_for(mcode)
+        elif kind == "MEDIA":
+            if not block_mode:
+                media_for(val)
+    if block_mode and parts:
+        for piece in chunks(one_block(parts)):
+            send_text(psid, piece)
+            time.sleep(1.2)
+    log("delivered", mode="block" if block_mode else "sale")
+
+
+def compose(psid: str, reply: str) -> str:
+    """Dung cho khung chat web: doi cac the agent chon thanh van ban (nguyen van tu kich ban), khong gui di dau."""
+    kichban, cat = kb()
+    dirs = DIRECTIVE.findall(reply or "")
+    if not dirs:
+        return "(Agent không chọn được câu mẫu nào cho tin này, em dừng và hỏi chị.)"
+    xung = get_xung(psid)
+    out = []
+    for kind, val in dirs:
+        val = val.strip()
+        if kind == "XUNG":
+            xung = "anh" if "anh" in val.lower() else "chị"
+            set_xung(psid, xung)
+        elif kind == "HOI_CHI":
+            out.append("(Chưa có trong kịch bản, em dừng và hỏi chị Hoa: " + val[:600] + ")")
+        elif kind == "MA":
+            parts = [x.strip() for x in val.split("|")]
+            if parts[0] not in cat:
+                continue
+            out.extend(kichban.render(cat, parts[0], parts[1:], xung))
+            for mc in cat[parts[0]]["media"]:
+                if not mc.startswith("NOTE:"):
+                    out.append("(Kịch bản gửi kèm: " + mc + ")")
+        elif kind == "MEDIA":
+            out.append("(Kịch bản chọn gửi: " + val + ")")
+    return "\n\n".join(out)
+
+
+CONV = Path("/root/fb-ailla-tester/conversations.json")
+
+
+def conv_load() -> dict:
+    try:
+        return json.loads(CONV.read_text())
+    except (FileNotFoundError, ValueError):
+        return {}
+
+
+def conv_note(psid: str, codes: list[str], inbound_ts: float | None = None) -> None:
+    d = conv_load()
+    c = d.setdefault(psid, {"product": None, "sent": [], "turns": 0})
+    for code in codes:
+        c["sent"].append(code)
+        if code.startswith("/BT_"):
+            c["product"] = "bột tẩy vạn năng"
+        elif code.startswith("/TL_"):
+            c["product"] = "tẩy lồng máy giặt / tẩy mốc gioăng"
+    c["sent"] = c["sent"][-40:]
+    c["turns"] = c.get("turns", 0) + 1
+    c["last_reply_at"] = time.time()
+    CONV.write_text(json.dumps(d, ensure_ascii=False))
+
+
+def conv_summary(psid: str) -> str:
+    c = conv_load().get(psid)
+    if not c:
+        return "(khách mới, chưa gửi mã nào)"
+    return f"sản phẩm đang tư vấn: {c.get('product') or 'chưa rõ'}; các mã đã gửi (cũ→mới): {', '.join(c['sent'][-15:]) or 'chưa có'}; số lượt đã trả lời: {c.get('turns', 0)}"
+
+
+def alert(msg: str) -> None:
+    try:
+        subprocess.run(["openclaw", "message", "send", "--channel", "telegram", "--account", "lead-sale-ailla",
+                        "--target", "8959489474", "-m", "[Agent trực page - CẢNH BÁO] " + msg], capture_output=True,
+                       text=True, timeout=60, env={**os.environ, "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", "/run/user/0")})
+    except Exception:  # noqa: BLE001
+        pass
+
+
+FU_GENERIC = ["/CHUNG_BAM_1", "/CHUNG_BAM_2"]
+
+
+def followup_codes(psid: str) -> list[str]:
+    """Bám đuổi theo V5 mục VII (bột tẩy vạn năng, tối đa 2 lượt rồi dừng); sản phẩm khác dùng 2 câu chăm sóc chung của Pancake."""
+    conv = conv_load().get(psid) or {}
+    sent = conv.get("sent", [])
+    prod = conv.get("product") or ""
+    if "/BT_XACNHAN" in sent:
+        return []
+    if prod.startswith("bột tẩy"):
+        return ["/BT_BAM_DAGIA1", "/BT_BAM_DAGIA2", "/BT_BAM_DUNG2"] if "/BT_GIA" in sent else ["/BT_BAM_CHUATV1", "/BT_BAM_CHUATV2", "/BT_BAM_DUNG1"]
+    return FU_GENERIC
+
+
+def maybe_followup(psid: str, ordered: list, s: dict, c: dict) -> None:
+    """Khách im lặng sau tin của bot: nhắc theo lịch (mặc định 10 phút, rồi 30, rồi 60), trong cửa sổ 24 giờ, dừng khi nhân viên nhắn tay hoặc khách trả lời."""
+    try:
+        if not ordered:
+            return
+        last = ordered[-1]
+        if (last.get("from") or {}).get("id") != PAGE_ID or not mine_has(last["id"]):
+            return
+        if s["pause"].get(psid, 0) > time.time():
+            return
+        cust = [m for m in ordered if (m.get("from") or {}).get("id") != PAGE_ID]
+        if not cust:
+            return
+        now = datetime.now(timezone.utc)
+        t_of = lambda m: datetime.fromisoformat(m["created_time"].replace("+0000", "+00:00"))
+        if (now - t_of(cust[-1])).total_seconds() > WINDOW_SECONDS:
+            return
+        anchor = cust[-1]["id"]
+        fu = s.setdefault("fu", {})
+        st = fu.get(psid) or {}
+        n = st.get("n", 0) if st.get("anchor") == anchor else 0
+        codes = followup_codes(psid)
+        if n >= len(codes):
+            return
+        mins = c.get("followup_minutes", [10, 30, 60])
+        if (now - t_of(last)).total_seconds() < mins[min(n, len(mins) - 1)] * 60:
+            return
+        fu[psid] = {"anchor": anchor, "n": n + 1}
+        save_state(s)
+        log("followup", to_hash=psid[-4:], n=n + 1, code=codes[n])
+        deliver(psid, f"[XUNG:{get_xung(psid)}]\n[MA:{codes[n]}]", "")
+    except Exception as e:  # noqa: BLE001
+        log("followup_error", why=str(e)[:150])
+
+
+def run() -> None:
+    errors = 0
+    last_ok = time.time()
+    alerted = False
+    while True:
+        c = cfg()
+        if c["mode"] == "tester" and c["testers"]:
+            s = state()
+            try:
+                data = graph("GET", f"{PAGE_ID}/conversations", {
+                    "fields": "participants,updated_time,messages.limit(14){id,message,from,created_time,attachments}", "limit": 15})
+                for conv in data.get("data", []):
+                    psid = next((p["id"] for p in conv["participants"]["data"] if p["id"] != PAGE_ID), None)
+                    if psid not in c["testers"]:
+                        continue
+                    ordered = list(reversed((conv.get("messages") or {}).get("data", [])))
+                    pending = []   # tin khach moi chua xu ly
+                    last_inbound_age = 1e9
+                    for idx, m in enumerate(ordered):
+                        if m["id"] in s["seen"].get(psid, []):
+                            continue
+                        is_page = (m.get("from") or {}).get("id") == PAGE_ID
+                        if is_page:
+                            s["seen"].setdefault(psid, []).append(m["id"])
+                            if SYSTEM_NOTE.search(m.get("message") or "") or not (m.get("message") or m.get("attachments")):
+                                continue
+                            if not mine_has(m["id"]):
+                                s["pause"][psid] = time.time() + c["pause_minutes_after_human"] * 60
+                                log("human_takeover", to_hash=psid[-4:])
+                            continue
+                        age = (datetime.now(timezone.utc) - datetime.fromisoformat(m["created_time"].replace("+0000", "+00:00"))).total_seconds()
+                        last_inbound_age = min(last_inbound_age, age)
+                        pending.append((idx, m, age))
+                    if not pending and c.get("followup", True):
+                        maybe_followup(psid, ordered, s, c)
+                    if not pending:
+                        continue
+                    # Gom cac tin khach nhan lien nhau: cho khach go xong (debounce) roi tra loi 1 lan
+                    if last_inbound_age < c.get("debounce_seconds", 6):
+                        continue
+                    for _, m, _ in pending:
+                        s["seen"].setdefault(psid, []).append(m["id"])
+                    s["seen"][psid] = s["seen"][psid][-80:]
+                    fresh = [(i, m, a) for i, m, a in pending if a <= 600 and a <= WINDOW_SECONDS]
+                    if not fresh or s["pause"].get(psid, 0) > time.time():
+                        save_state(s)
+                        continue
+                    texts = []
+                    for _, m, _ in fresh:
+                        t = (m.get("message") or "").strip()
+                        if (m.get("attachments") or {}).get("data"):
+                            t += " [khách gửi kèm ảnh/video - agent chưa xem được nội dung]"
+                        if t.strip():
+                            texts.append(t.strip())
+                    if not texts:
+                        save_state(s)
+                        continue
+                    text = "\n".join(texts)
+                    first_idx = fresh[0][0]
+                    hist_lines = []
+                    for hm in ordered[max(0, first_idx - 12):first_idx]:
+                        who = "PAGE" if (hm.get("from") or {}).get("id") == PAGE_ID else "KHÁCH"
+                        body = (hm.get("message") or "").strip()
+                        if not body and (hm.get("attachments") or {}).get("data"):
+                            body = "(gửi ảnh/video)"
+                        if body:
+                            hist_lines.append(f"{who}: {body[:500]}")
+                    save_state(s)
+                    log("inbound", from_hash=psid[-4:], chars=len(text), merged=len(texts))
+                    hist = "\n".join(hist_lines) + ("\n" if hist_lines else "") + "[TRẠNG THÁI HỆ THỐNG] " + conv_summary(psid)
+                    reply = ask_agent(psid, text, hist)
+                    deliver(psid, reply, text)
+                    conv_note(psid, [x.strip() for x in re.findall(r"\[MA:(/[A-Z_0-9]+)", reply or "")])
+                errors = 0
+                last_ok = time.time()
+                alerted = False
+            except Exception as e:  # noqa: BLE001
+                errors += 1
+                log("error", why=str(e)[:200], streak=errors)
+                if errors >= 5 and not alerted:
+                    alerted = True
+                    alert(f"Dịch vụ trả lời page lỗi liên tiếp {errors} lần: {str(e)[:150]}")
+            save_state(s)
+        time.sleep(int(c["poll_seconds"]))
+
+
+def main() -> None:
+    a = sys.argv[1:]
+    if not a:
+        print(__doc__)
+        return
+    cmd = a[0]
+    if cmd == "status":
+        c = cfg()
+        print(json.dumps({"mode": c["mode"], "testers": len(c["testers"]),
+                          "media_approved": [k for k, v in media_manifest().items() if v.get("status") == "APPROVED-TEST"]}, ensure_ascii=False))
+    elif cmd == "find":
+        find(a[1])
+    elif cmd == "add-tester":
+        c = cfg()
+        if a[1] not in c["testers"]:
+            c["testers"].append(a[1])
+        save_cfg(c)
+        print("da them tester")
+    elif cmd in ("on", "off"):
+        c = cfg()
+        c["mode"] = "tester" if cmd == "on" else "off"
+        save_cfg(c)
+        print("mode =", c["mode"])
+    elif cmd == "send-text":
+        print(json.dumps(send_text(a[1], a[2])))
+    elif cmd == "send-media":
+        print(json.dumps(send_media(a[1], a[2])))
+    elif cmd == "run":
+        run()
+    else:
+        print(__doc__)
+
+
+if __name__ == "__main__":
+    main()

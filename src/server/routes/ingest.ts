@@ -36,6 +36,28 @@ ingestRoutes.post('/ads-live', async (c) => {
   return ok(c, { ok: true, at: data.at });
 });
 
+/** Số liệu ngày: chi phí/tin nhắn từ Facebook + đơn/doanh số từ Pancake (theo Nguồn đơn). VPS đẩy mỗi sáng. */
+ingestRoutes.post('/ads-fb', async (c) => {
+  const raw = await c.req.text();
+  if (raw.length > 12_000_000) throw badRequest('TOO_LARGE', 'Dữ liệu quá lớn');
+  const body = JSON.parse(raw) as { days?: Record<string, unknown>; billing?: unknown[]; camp_page?: Record<string, string>; acc_info?: unknown[] };
+  if (!body.days || typeof body.days !== 'object') throw badRequest('BAD_DATA', 'Thiếu dữ liệu các ngày');
+  const data = {
+    at: nowIso(),
+    days: body.days,
+    billing: Array.isArray(body.billing) ? body.billing.slice(0, 5000) : [],
+    camp_page: body.camp_page && typeof body.camp_page === 'object' ? body.camp_page : {},
+    acc_info: Array.isArray(body.acc_info) ? body.acc_info.slice(0, 50) : [],
+  };
+  await c.env.DB.prepare(
+    `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES ('ads_fb', ?, 0, ?, NULL)
+     ON CONFLICT (key) DO UPDATE SET data = excluded.data, admin_only = 0, updated_at = excluded.updated_at, updated_by = NULL`,
+  )
+    .bind(await pack(JSON.stringify(data)), data.at)
+    .run();
+  return ok(c, { ok: true, at: data.at });
+});
+
 /**
  * Số hàng lẻ bán qua sàn mỗi ngày (tab "Hàng lẻ theo ngày" của Sheet kế toán kho TikTok / Shopee).
  * Body: { channel: 'TIKTOK' | 'SHOPEE', days: [{ day: 'YYYY-MM-DD', orders?, lines: [{ label, qty }] }] }

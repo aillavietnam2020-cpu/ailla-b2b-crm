@@ -10,7 +10,8 @@ import { requirePermission } from '../middleware/rbac';
 import { zodFieldErrors } from '@shared/schemas';
 import { getOrderDetail } from '../services/orders';
 import { flowSummary, khoCheck } from '../services/orderFlow';
-import { getCustomerDebt } from '../services/debts';
+import { getCustomerDebt, listDebts, totalDebts } from '../services/debts';
+import { listPayments } from '../services/payments';
 import { createProposal } from '../services/proposals';
 import { khoAlerts } from './kho';
 import { unpack } from '../lib/pack';
@@ -93,12 +94,22 @@ agentRoutes.get('/orders', requirePermission('agent.read'), async (c) => {
   )
     .bind(...params, Math.min(Number(c.req.query('limit') ?? LIMIT), LIMIT))
     .all<Record<string, unknown>>();
+  const fullOrders = hasScope(c, 'orders');
   return ok(
     c,
-    (rows.results ?? []).map((r) => ({
-      ...r,
-      waiting_for: r.flow_on ? KHO_WAITING[(r.kho_status as KhoStatus) ?? 'KHONG'] : null,
-    })),
+    (rows.results ?? []).map((r) => {
+      const row: Record<string, unknown> = {
+        ...r,
+        waiting_for: r.flow_on ? KHO_WAITING[(r.kho_status as KhoStatus) ?? 'KHONG'] : null,
+      };
+      // Vai kho (Kế toán kho, trợ lý của Chúc) chỉ làm vận hành: không thấy số tiền, thanh toán, trạng thái kế toán.
+      if (!fullOrders) {
+        delete row.total_amount;
+        delete row.payment_status;
+        delete row.accounting_status;
+      }
+      return row;
+    }),
   );
 });
 
@@ -148,6 +159,66 @@ agentRoutes.get('/customers/:id', requirePermission('agent.read'), async (c) => 
   return ok(c, { customer, debt, orders: orders.results ?? [], open_tasks: tasks.results ?? [] });
 });
 
+/* ---------- CRM B2B: khách, công nợ toàn công ty, tiền thu (phạm vi debts) ---------- */
+
+/** Tìm khách theo tên hoặc mã. ?q=tên&limit=30 */
+agentRoutes.get('/customers', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'debts');
+  const q = (c.req.query('q') ?? '').trim();
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 30)) || 30), 100);
+  const like = `%${q.replace(/[%_]/g, '')}%`;
+  const rows = await c.env.DB.prepare(
+    `SELECT c.id, c.name, u.display_name AS owner_name, c.stage, c.tier_id, c.credit_limit, c.last_order_date, c.reorder_cycle_days
+     FROM customers c LEFT JOIN users u ON u.id = c.owner_id
+     WHERE c.deleted_at IS NULL AND (? = '' OR c.name LIKE ? OR c.id = ?)
+     ORDER BY c.name COLLATE NOCASE LIMIT ?`,
+  )
+    .bind(q, like, q, limit)
+    .all();
+  return ok(c, rows.results ?? []);
+});
+
+/** Tra sản phẩm theo tên hoặc mã (để lên đơn không phải đoán mã). ?q=chữ &tier=<mã cấp giá> (có thì kèm đơn giá hiện hành của cấp đó). */
+agentRoutes.get('/products', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'orders');
+  const q = (c.req.query('q') ?? '').trim().replace(/[%_]/g, '').slice(0, 60);
+  const tier = (c.req.query('tier') ?? '').trim();
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 30)) || 30), 100);
+  const like = `%${q}%`;
+  const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  const rows = await c.env.DB.prepare(
+    `SELECT p.id, p.sku, p.name, p.unit, p.pack_size, g.name AS group_name,
+       (SELECT pp.amount FROM product_prices pp WHERE pp.product_id = p.id AND pp.tier_id = ?1 AND pp.status IN ('ACTIVE', 'LOCKED')
+          AND pp.valid_from <= ?2 AND (pp.valid_to IS NULL OR pp.valid_to >= ?2) ORDER BY pp.valid_from DESC, pp.version DESC LIMIT 1) AS price
+     FROM products p LEFT JOIN product_groups g ON g.id = p.group_id
+     WHERE p.deleted_at IS NULL AND p.active = 1 AND (?3 = '' OR p.name LIKE ?4 OR p.sku LIKE ?4)
+     ORDER BY p.name COLLATE NOCASE LIMIT ?5`,
+  )
+    .bind(tier || null, today, q, like, limit)
+    .all();
+  return ok(c, rows.results ?? []);
+});
+
+/** Công nợ toàn công ty: ?loc=vuot (vượt hạn mức) | co-no (đang nợ). Kèm tổng. */
+agentRoutes.get('/debts', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'debts');
+  const loc = c.req.query('loc');
+  const list = await listDebts(c.env.DB, '1=1', [], { onlyExceeded: loc === 'vuot', onlyWithDebt: loc === 'co-no' });
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 50)) || 50), 200);
+  return ok(c, list.slice(0, limit), { totals: totalDebts(list), total_rows: list.length });
+});
+
+/** Phiếu thu tiền khách. ?pending=1 (chưa kế toán xác nhận) &customer_id=...&limit=... */
+agentRoutes.get('/payments', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'debts');
+  const items = await listPayments(c.env.DB, '1=1', [], {
+    customerId: c.req.query('customer_id') ?? undefined,
+    pendingOnly: c.req.query('pending') === '1',
+    limit: Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 50)) || 50), 200),
+  });
+  return ok(c, items);
+});
+
 /** Mã đang thiếu của các đơn chờ kho / giữ chờ hàng, gom theo mã (cho đề xuất sản xuất). */
 agentRoutes.get('/shortages', requirePermission('agent.read'), async (c) => {
   needScope(c, 'orders', 'orders_kho', 'kho');
@@ -161,19 +232,258 @@ agentRoutes.get('/kho/alerts', requirePermission('agent.read'), async (c) => {
   return ok(c, await khoAlerts(c.env.DB));
 });
 
-/** Tồn hiện tại theo mã kho (có thể lọc theo lớp NVL/BTP/TP). */
+/** Tồn hiện tại theo mã kho. Lọc: cls (NVL = Kho vật tư, TP, BTP, HH, COMBO, CCDC), q (tên hoặc mã), neg=1 (chỉ tồn âm), nonzero=1 (chỉ tồn khác 0), limit (mặc định 200). */
 agentRoutes.get('/kho/stock', requirePermission('agent.read'), async (c) => {
   needScope(c, 'kho');
-  const cls = c.req.query('cls');
+  const cls = c.req.query('cls') || null;
+  const q = (c.req.query('q') ?? '').trim().slice(0, 60);
+  const neg = c.req.query('neg') === '1';
+  const nonzero = c.req.query('nonzero') === '1';
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 200)) || 200), 2000);
+  const where = ['i.active = 1', '(? IS NULL OR i.cls = ?)'];
+  const params: unknown[] = [cls, cls];
+  if (q) {
+    where.push('(i.name LIKE ? OR i.code LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`);
+  }
+  if (neg) where.push('COALESCE(s.qty, 0) < 0');
+  if (nonzero) where.push('ABS(COALESCE(s.qty, 0)) > 0.0000005');
   const rows = await c.env.DB.prepare(
     `SELECT i.code, i.name, i.unit, i.cls, i.min_stock, ROUND(COALESCE(s.qty, 0), 6) AS qty
      FROM kho_items i LEFT JOIN (SELECT item, SUM(qty) AS qty FROM kho_ledger GROUP BY item) s ON s.item = i.code
-     WHERE i.active = 1 AND (? IS NULL OR i.cls = ?)
-     ORDER BY i.code LIMIT 2000`,
+     WHERE ${where.join(' AND ')}
+     ORDER BY ${neg ? 'COALESCE(s.qty, 0) ASC, ' : ''}i.code LIMIT 2000`,
   )
-    .bind(cls ?? null, cls ?? null)
-    .all();
+    .bind(...params)
+    .all<Record<string, unknown>>();
+  const all = rows.results ?? [];
+  return ok(c, all.slice(0, limit), { total: all.length, shown: Math.min(all.length, limit) });
+});
+
+/** Nhập – xuất – tồn trong kỳ (giống trang Kho vật tư → Nhập – xuất – tồn). Lọc cls, q; chỉ mã có phát sinh hoặc còn tồn. */
+agentRoutes.get('/kho/nxt', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (!isDay(from) || !isDay(to)) throw badRequest('BAD_RANGE', 'Cần from và to dạng YYYY-MM-DD');
+  const cls = c.req.query('cls') || null;
+  const q = (c.req.query('q') ?? '').trim().slice(0, 60);
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 200)) || 200), 1000);
+  const rows = await c.env.DB.prepare(
+    `SELECT l.item AS code, COALESCE(i.name, l.item) AS name, i.unit AS unit, i.cls AS cls,
+       ROUND(SUM(CASE WHEN l.doc_date < ?1 THEN l.qty ELSE 0 END), 6) AS opening,
+       ROUND(SUM(CASE WHEN l.doc_date >= ?1 AND l.doc_date <= ?2 AND l.qty > 0 THEN l.qty ELSE 0 END), 6) AS qty_in,
+       ROUND(SUM(CASE WHEN l.doc_date >= ?1 AND l.doc_date <= ?2 AND l.qty < 0 THEN -l.qty ELSE 0 END), 6) AS qty_out,
+       ROUND(SUM(CASE WHEN l.doc_date <= ?2 THEN l.qty ELSE 0 END), 6) AS closing
+     FROM kho_ledger l LEFT JOIN kho_items i ON i.code = l.item
+     WHERE (?3 IS NULL OR i.cls = ?3) AND (?4 = '' OR i.name LIKE ?5 OR l.item LIKE ?5)
+     GROUP BY l.item
+     HAVING ABS(opening) > 0.0000005 OR qty_in > 0.0000005 OR qty_out > 0.0000005 OR ABS(closing) > 0.0000005
+     ORDER BY l.item`,
+  )
+    .bind(from, to, cls, q, `%${q}%`)
+    .all<Record<string, unknown>>();
+  const all = rows.results ?? [];
+  return ok(c, all.slice(0, limit), { total: all.length, shown: Math.min(all.length, limit), from, to });
+});
+
+/** Phiếu kho gần đây: KS kiểm kê · XB xuất B2B · XK xuất khác · PN nhập · PC pha chế · TL, TD. Chỉ đọc, không có đơn giá. */
+const KHO_DOC_TYPES = ['PN', 'PC', 'KS', 'XB', 'XK', 'TL', 'TD'];
+agentRoutes.get('/kho/docs', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const type = c.req.query('type');
+  if (type && !KHO_DOC_TYPES.includes(type)) throw badRequest('BAD_TYPE', 'Loại phiếu không đúng');
+  const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  const q = (c.req.query('q') ?? '').trim().slice(0, 60);
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 50)) || 50), 200);
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (type) {
+    where.push('d.type = ?');
+    params.push(type);
+  }
+  if (isDay(from)) {
+    where.push('d.doc_date >= ?');
+    params.push(from);
+  }
+  if (isDay(to)) {
+    where.push('d.doc_date <= ?');
+    params.push(to);
+  }
+  if (q) {
+    where.push('(d.no LIKE ? OR d.partner LIKE ? OR d.ref_no LIKE ? OR d.note LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  const rows = await c.env.DB.prepare(
+    `SELECT d.id, d.no, d.type, d.doc_date, d.partner, d.ref_no, d.ref_qty, d.note, d.status,
+       (SELECT COUNT(*) FROM kho_moves m WHERE m.doc_id = d.id) AS n_lines
+     FROM kho_docs d ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+     ORDER BY d.doc_date DESC, d.id DESC LIMIT ?`,
+  )
+    .bind(...params, limit)
+    .all<Record<string, unknown>>();
   return ok(c, rows.results ?? []);
+});
+
+agentRoutes.get('/kho/docs/:id', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) throw badRequest('BAD_ID', 'Mã phiếu không đúng');
+  const doc = await c.env.DB.prepare(
+    'SELECT id, no, type, doc_date, partner, ref_no, ref_qty, note, status FROM kho_docs WHERE id = ?',
+  )
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!doc) throw notFound('Không có phiếu này');
+  const lines = await c.env.DB.prepare(
+    `SELECT m.item AS code, COALESCE(i.name, m.item) AS name, i.unit AS unit, i.cls AS cls, m.qty, m.role, m.note
+     FROM kho_moves m LEFT JOIN kho_items i ON i.code = m.item WHERE m.doc_id = ? ORDER BY m.id`,
+  )
+    .bind(id)
+    .all<Record<string, unknown>>();
+  return ok(c, { ...doc, lines: lines.results ?? [] });
+});
+
+/**
+ * Xuất B2C qua sàn (TikTok / Shopee / Facebook), giống trang Kho vật tư → Xuất B2C: từng ngày × kênh có số đơn,
+ * sản phẩm lẻ bán (đã có mã + chưa có mã), tổng 7 ngày gần nhất và sản phẩm bán nhiều nhất. Không có tiền.
+ */
+agentRoutes.get('/kho/online', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  const channel = (c.req.query('channel') ?? '').toUpperCase();
+  if (channel && !['TIKTOK', 'SHOPEE', 'FACEBOOK'].includes(channel)) throw badRequest('BAD_CHANNEL', 'Kênh phải là TIKTOK, SHOPEE hoặc FACEBOOK');
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 60)) || 60), 400);
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (channel) {
+    where.push('r.channel = ?');
+    params.push(channel);
+  }
+  if (isDay(from)) {
+    where.push('r.day >= ?');
+    params.push(from);
+  }
+  if (isDay(to)) {
+    where.push('r.day <= ?');
+    params.push(to);
+  }
+  const db = c.env.DB;
+  const days = await db
+    .prepare(
+      `SELECT r.channel, r.day, r.orders,
+         COALESCE((SELECT SUM(qty) FROM channel_out o WHERE o.channel = r.channel AND o.day = r.day), 0) AS qty_co_ma,
+         COALESCE((SELECT SUM(qty) FROM channel_unmapped u WHERE u.channel = r.channel AND u.day = r.day), 0) AS qty_chua_co_ma
+       FROM channel_runs r ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+       ORDER BY r.day DESC, r.channel LIMIT ?`,
+    )
+    .bind(...params, limit)
+    .all<{ channel: string; day: string; orders: number; qty_co_ma: number; qty_chua_co_ma: number }>();
+  const rows = (days.results ?? []).map((r) => ({
+    day: r.day,
+    channel: r.channel,
+    orders: r.orders,
+    san_pham: r.qty_co_ma + r.qty_chua_co_ma,
+    chua_co_ma_vat_tu: r.qty_chua_co_ma,
+  }));
+  // 7 ngày gần nhất có dữ liệu (như các ô tổng trên trang), tính trên toàn bộ kênh dù có lọc ngày hay không
+  const recent = await db.prepare('SELECT DISTINCT day FROM channel_runs ORDER BY day DESC LIMIT 7').all<{ day: string }>();
+  const rd = (recent.results ?? []).map((r) => r.day);
+  const sum7: Record<string, { orders: number; san_pham: number; chua_co_ma_vat_tu: number }> = {};
+  if (rd.length) {
+    const ph = rd.map(() => '?').join(',');
+    const s = await db
+      .prepare(
+        `SELECT r.channel, SUM(r.orders) AS orders,
+           SUM(COALESCE((SELECT SUM(qty) FROM channel_out o WHERE o.channel = r.channel AND o.day = r.day), 0)
+             + COALESCE((SELECT SUM(qty) FROM channel_unmapped u WHERE u.channel = r.channel AND u.day = r.day), 0)) AS san_pham,
+           SUM(COALESCE((SELECT SUM(qty) FROM channel_unmapped u WHERE u.channel = r.channel AND u.day = r.day), 0)) AS chua
+         FROM channel_runs r WHERE r.day IN (${ph}) GROUP BY r.channel`,
+      )
+      .bind(...rd)
+      .all<{ channel: string; orders: number; san_pham: number; chua: number }>();
+    for (const r of s.results ?? []) sum7[r.channel] = { orders: r.orders, san_pham: r.san_pham, chua_co_ma_vat_tu: r.chua };
+  }
+  const top = await db
+    .prepare(
+      `SELECT o.channel, o.item AS code, i.name, i.unit, ROUND(SUM(o.qty), 0) AS qty
+       FROM channel_out o LEFT JOIN kho_items i ON i.code = o.item
+       WHERE o.day >= date('now', '+7 hours', '-13 days')
+       GROUP BY o.channel, o.item ORDER BY qty DESC LIMIT 30`,
+    )
+    .all<Record<string, unknown>>();
+  const total = (k: 'orders' | 'san_pham' | 'chua_co_ma_vat_tu') => Object.values(sum7).reduce((a, v) => a + (v[k] ?? 0), 0);
+  return ok(c, {
+    tong_7_ngay_gan_nhat: {
+      cac_ngay: rd,
+      theo_kenh: sum7,
+      san_pham_le_ban: total('san_pham'),
+      chua_co_ma_vat_tu: total('chua_co_ma_vat_tu'),
+    },
+    theo_ngay: rows,
+    top_14_ngay_co_ma: top.results ?? [],
+  });
+});
+
+/** Lô kiểm kê đóng gói và tem (module Sản xuất): trạng thái, số đạt/lỗi/chờ, số tem đã tạo và đã in. Chỉ đọc. */
+const LOT_STATUS: Record<string, string> = {
+  CHO_KIEM: 'Chờ kiểm kê',
+  DA_KIEM: 'Đã kiểm, chờ phân bổ',
+  TEM_SAN: 'Đã tạo tem, chờ in',
+  DA_IN: 'Đã in tem',
+  SAN_SANG: 'Đã nhập kho / bàn giao',
+  HUY: 'Đã hủy',
+};
+agentRoutes.get('/kho/lots', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const st = c.req.query('st');
+  if (st && !LOT_STATUS[st]) throw badRequest('BAD_STATUS', 'Trạng thái lô không đúng');
+  const q = (c.req.query('q') ?? '').trim().toLowerCase().slice(0, 60);
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 30)) || 30), 200);
+  const row = await c.env.DB.prepare("SELECT data FROM hub_state WHERE id = 'sx'").first<{ data: string }>();
+  if (!row) return ok(c, [], { total: 0, shown: 0, by_status: {} });
+  type Cont = { c?: string; loai?: string; sl?: number; viTri?: string; st?: string; in?: unknown[] };
+  type Batch = {
+    id?: string; ma?: string; sp?: string; ngay?: string; baoSL?: number; tong?: number; dat?: number; loi?: number;
+    cho?: number; ghiChu?: string; lechLyDo?: string; kiemBy?: string; kiemLuc?: string; st?: string; containers?: Cont[];
+  };
+  const sx = JSON.parse(await unpack(row.data)) as { batches?: Batch[]; products?: { ma: string; ten: string }[] };
+  const names = new Map((sx.products ?? []).map((p) => [p.ma, p.ten]));
+  const all = (sx.batches ?? []).filter((b) => b.ma);
+  const byStatus: Record<string, number> = {};
+  for (const b of all) byStatus[b.st ?? '?'] = (byStatus[b.st ?? '?'] ?? 0) + 1;
+  const picked = all
+    .filter((b) => (!st || b.st === st) && (!q || `${b.ma} ${b.sp} ${names.get(b.sp ?? '') ?? ''}`.toLowerCase().includes(q)))
+    .sort((a, b) => String(b.ngay ?? '').localeCompare(String(a.ngay ?? '')));
+  const items = picked.slice(0, limit).map((b) => {
+    const conts = (b.containers ?? []).filter((x) => x.st === 'OK');
+    return {
+      ma: b.ma,
+      sp: b.sp,
+      ten: names.get(b.sp ?? '') ?? null,
+      ngay: b.ngay,
+      st: b.st,
+      trang_thai: LOT_STATUS[b.st ?? ''] ?? b.st,
+      xuong_bao: b.baoSL,
+      tong_kiem: b.tong,
+      dat: b.dat,
+      loi: b.loi,
+      cho: b.cho,
+      ghi_chu: b.ghiChu || null,
+      ly_do_lech: b.lechLyDo || null,
+      nguoi_kiem: b.kiemBy || null,
+      kiem_luc: b.kiemLuc || null,
+      tem_da_tao: conts.length,
+      tem_da_in: conts.filter((x) => (x.in ?? []).length > 0).length,
+      vat_chua: conts.slice(0, 30).map((x) => ({ ma: x.c, loai: x.loai, sl: x.sl, vi_tri: x.viTri, da_in: (x.in ?? []).length })),
+    };
+  });
+  return ok(c, items, { total: picked.length, shown: items.length, by_status: byStatus });
 });
 
 /** Dòng sự kiện theo con trỏ id: agent nhớ id lớn nhất đã xử lý rồi hỏi tiếp từ đó. */

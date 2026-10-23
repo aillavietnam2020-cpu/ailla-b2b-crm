@@ -9,6 +9,7 @@ import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
 import { syncAllChannels } from './services/poscake';
 import { syncReturns } from './services/returnScan';
+import { syncFbSaleDays } from './services/fbSales';
 import { isAdminHost } from './lib/host';
 import { readSessionCookie, resolveSession } from './lib/session';
 
@@ -62,6 +63,8 @@ export default {
             console.info('[cron] poscake', JSON.stringify(await syncAllChannels(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
             // Đơn hoàn (TikTok, Shopee, Facebook): hôm nay, hôm qua, hôm kia.
             console.info('[cron] don hoan', JSON.stringify(await syncReturns(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
+            // Số bán hàng Facebook theo người xử lý đơn (Pancake analytics): 8 ngày gần nhất, vì đơn hoàn và đơn giao về chậm.
+            console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6, 7].map(day), (u) => fetch(u))));
           }
         } catch (error) {
           console.error('[cron] poscake loi', error);

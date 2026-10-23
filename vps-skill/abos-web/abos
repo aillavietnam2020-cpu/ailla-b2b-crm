@@ -7,6 +7,7 @@ import json, os, sys, urllib.request, urllib.parse, urllib.error
 URL = os.environ.get("ABOS_URL", "https://ailla-b2b-crm.aillavietnam2020.workers.dev").rstrip("/")
 KEY = os.environ.get("ABOS_AGENT_KEY", "")
 AS = ""
+DLG = os.environ.get("ABOS_DLG", "")
 
 
 def load_key():
@@ -46,6 +47,35 @@ def call(path, params=None, body=None):
     print(json.dumps(out, ensure_ascii=False))
 
 
+def act(method, path, body):
+    """Ghi dữ liệu thay người: chỉ chạy được khi có giấy ủy quyền (--dlg) do web cấp lúc chị Thảo vừa nhắn. Web tự từ chối nếu sai."""
+    load_key()
+    if not KEY.startswith("agt_"):
+        sys.exit("Agent này chưa có khoá đọc web. Báo chị Hoa dán khoá bằng lệnh abos-khoa.")
+    dlg = DLG if DLG.startswith("dlg_") else "tg"  # không có giấy trong tin web thì thử giấy theo tin Telegram; web tự từ chối nếu không có người được chỉ định vừa nhắn
+    method = method.upper()
+    if method not in ("GET", "POST", "PUT") or not path.startswith("/api/"):
+        sys.exit("Dùng: abos --as ID --dlg GIẤY act GET|POST|PUT /api/... ['{json}']")
+    data = body.encode("utf-8") if body else None
+    req = urllib.request.Request(URL + path, data=data, method=method)
+    req.add_header("Authorization", "Bearer " + KEY)
+    req.add_header("X-Delegation", dlg)
+    req.add_header("User-Agent", "abos-agent/1")
+    if data:
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            print(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.load(e).get("error", {}).get("message", "")
+        except Exception:
+            msg = ""
+        sys.exit(f"Web trả lỗi {e.code}: {msg}")
+    except Exception as e:
+        sys.exit(f"Không nối được web: {e}")
+
+
 def opts(argv):
     o, i = {}, 0
     while i < len(argv):
@@ -59,12 +89,20 @@ def opts(argv):
 
 def main():
     args = sys.argv[1:]
-    global AS
-    if len(args) >= 2 and args[0] == "--as":
-        AS, args = args[1], args[2:]
+    global AS, DLG
+    while len(args) >= 2 and args[0] in ("--as", "--dlg"):
+        if args[0] == "--as":
+            AS = args[1]
+        else:
+            DLG = args[1]
+        args = args[2:]
     if not args:
-        sys.exit("Dùng: abos --as <mã agent> me|orders|order|customer|shortages|kho-alerts|kho-stock|pha-che|mkt-cards|mkt-orders|mkt-ads|xuong|events|propose")
+        sys.exit("Dùng: abos --as <mã agent> me|orders|order|customers|customer|debts|payments|shortages|kho-alerts|kho-stock|kho-nxt|kho-docs|kho-doc|kho-lots|kho-online|products|act|pha-che|mkt-cards|mkt-orders|mkt-ads|xuong|events|propose")
     cmd, rest = args[0], args[1:]
+    if cmd == "act":
+        if len(rest) < 2:
+            sys.exit("Dùng: abos --as ID --dlg GIẤY act GET|POST|PUT /api/... ['{json}']")
+        return act(rest[0], rest[1], rest[2] if len(rest) > 2 else "")
     o = opts(rest)
     if cmd == "me":
         call("/me")
@@ -75,6 +113,12 @@ def main():
         call("/orders/" + urllib.parse.quote(rest[0], safe=""))
     elif cmd == "customer" and rest:
         call("/customers/" + urllib.parse.quote(rest[0], safe=""))
+    elif cmd == "customers":
+        call("/customers", {"q": o.get("q"), "limit": o.get("limit")})
+    elif cmd == "debts":
+        call("/debts", {"loc": o.get("loc"), "limit": o.get("limit")})
+    elif cmd == "payments":
+        call("/payments", {"pending": o.get("pending"), "customer_id": o.get("customer"), "limit": o.get("limit")})
     elif cmd == "pha-che":
         call("/kho/pha-che", {"limit": o.get("limit")})
     elif cmd == "mkt-cards":
@@ -90,7 +134,21 @@ def main():
     elif cmd == "kho-alerts":
         call("/kho/alerts")
     elif cmd == "kho-stock":
-        call("/kho/stock", {"cls": o.get("cls")})
+        call("/kho/stock", {"cls": o.get("cls"), "q": o.get("q"), "neg": o.get("neg"),
+                            "nonzero": o.get("nonzero"), "limit": o.get("limit")})
+    elif cmd == "kho-docs":
+        call("/kho/docs", {"type": o.get("type"), "from": o.get("from"), "to": o.get("to"), "q": o.get("q"), "limit": o.get("limit")})
+    elif cmd == "kho-doc" and rest:
+        call("/kho/docs/" + urllib.parse.quote(rest[0], safe=""))
+    elif cmd == "kho-lots":
+        call("/kho/lots", {"st": o.get("st"), "q": o.get("q"), "limit": o.get("limit")})
+    elif cmd == "kho-online":
+        call("/kho/online", {"from": o.get("from"), "to": o.get("to"), "channel": o.get("channel"), "limit": o.get("limit")})
+    elif cmd == "products":
+        call("/products", {"q": o.get("q"), "tier": o.get("tier"), "limit": o.get("limit")})
+    elif cmd == "kho-nxt":
+        call("/kho/nxt", {"from": o.get("from"), "to": o.get("to"), "cls": o.get("cls"),
+                          "q": o.get("q"), "limit": o.get("limit")})
     elif cmd == "events":
         call("/events", {"after": o.get("after"), "types": o.get("types"), "limit": o.get("limit")})
     elif cmd == "propose":

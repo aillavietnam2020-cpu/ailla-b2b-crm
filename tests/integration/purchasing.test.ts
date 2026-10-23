@@ -216,3 +216,59 @@ describe('Chứng từ nhập tay theo từng dòng hàng', () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe('Phiếu nhập kho của kho gắn với phiếu mua', () => {
+  it('Chúc lập phiếu nhập chọn phiếu mua: phiếu mua nhảy trạng thái; hủy phiếu nhập thì trả về chưa nhận', async () => {
+    const { poId } = await setup();
+    const pn = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-08', partner: 'NCC Hóa chất A', po_id: poId, lines: [{ item: 'NVL1', qty: 60 }] } });
+    expect(pn.status).toBe(200);
+    let list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(list.body.data[0].status).toBe('DANG_GIAO');
+    expect(list.body.data[0].lines[0].received).toBe(60);
+    expect(list.body.data[0].receipts[0].kho_doc_id).toBe(pn.body.data.id);
+    const pn2 = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-09', po_id: poId, lines: [{ item: 'NVL1', qty: 40 }] } });
+    list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(list.body.data[0].status).toBe('DU');
+    const bad = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-09', po_id: 'khong-co', lines: [{ item: 'NVL1', qty: 1 }] } });
+    expect(bad.status).toBe(400);
+    const cancel = await ctx.request(`/api/hub/kho/docs/${pn2.body.data.id}/cancel`, { as: USERS.ceo, body: { reason: 'nhập nhầm' } });
+    expect(cancel.status).toBe(200);
+    list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(list.body.data[0].status).toBe('DANG_GIAO');
+    expect(list.body.data[0].lines[0].received).toBe(60);
+  });
+
+  it('phiếu nhập không chọn phiếu mua vẫn ghi bình thường (có tên nhà cung cấp thì tự gắn vào phiếu mua tự tạo)', async () => {
+    const pn = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-08', partner: 'Mua lẻ', lines: [{ item: 'NVL1', qty: 5 }] } });
+    expect(pn.status).toBe(200);
+    expect(await ctx.db.prepare("SELECT COUNT(*) AS n FROM po_receipts r JOIN po_orders o ON o.id = r.po_id WHERE o.source = 'KHO'").first<{ n: number }>()).toEqual({ n: 1 });
+  });
+});
+
+describe('Hàng về không có phiếu đặt (vỏ can): kho ghi phiếu nhập, web tự tạo phiếu mua, Thảo nhập giá sau', () => {
+  it('phiếu nhập NVL không chọn phiếu mua, có tên NCC mới: tự tạo NCC + phiếu mua đủ hàng chưa có giá; nhập giá sau thì giá vốn tính lại', async () => {
+    const d = await ctx.request('/api/hub/kho/docs', { as: USERS.ceo, body: { type: 'PN', date: '2026-10-21', partner: 'Vỏ can Minh Phát', note: '', lines: [{ item: 'NVL1', qty: 500 }] } });
+    expect(d.status).toBe(200);
+    const list = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const po = list.body.data.find((o: { source: string }) => o.source === 'KHO');
+    expect(po.supplier_name).toBe('Vỏ can Minh Phát');
+    expect(po.status).toBe('DU');
+    expect(po.lines[0].unit_price).toBeNull();
+    expect(po.receipts).toHaveLength(1);
+    expect((await ctx.request(`${BASE}/orders/${po.id}/prices`, { method: 'PUT', as: KT, body: { prices: { [po.lines[0].id]: 3000 } } })).status).toBe(403);
+    const p = await ctx.request(`${BASE}/orders/${po.id}/prices`, { method: 'PUT', as: USERS.ceo, body: { prices: { [po.lines[0].id]: 3000 } } });
+    expect(p.status).toBe(200);
+    const mv = await ctx.db.prepare('SELECT price FROM kho_moves WHERE doc_id = ?').bind(d.body.data.id).first<{ price: number }>();
+    expect(mv?.price).toBe(3000);
+    const after = (await ctx.request(`${BASE}/orders`, { as: USERS.ceo })).body.data.find((o: { id: string }) => o.id === po.id);
+    expect(after.lines[0].unit_price).toBe(3000);
+    expect(after.receipts[0].lines[0].unit_price).toBe(3000);
+  });
+
+  it('phiếu nhập không ghi nhà cung cấp thì không tạo phiếu mua', async () => {
+    const d = await ctx.request('/api/hub/kho/docs', { as: USERS.ceo, body: { type: 'PN', date: '2026-10-21', partner: '', lines: [{ item: 'NVL1', qty: 5 }] } });
+    expect(d.status).toBe(200);
+    const list = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    expect(list.body.data.filter((o: { source: string }) => o.source === 'KHO')).toHaveLength(0);
+  });
+});

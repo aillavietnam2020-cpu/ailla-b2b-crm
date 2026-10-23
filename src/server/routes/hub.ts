@@ -19,7 +19,7 @@ export const hubRoutes = new Hono<AppEnv>();
 const STATE_ID = 'main';
 const MAX_JSON = 8 * 1024 * 1024; // 8 MB JSON gốc (nén xong còn khoảng 1/8)
 const SECURE_ID = 'secure';
-const BLOB_KEYS = ['t9file', 't9', 'kd', 'kd_ads', 'kd_sale', 'skucost', 'nhansu0', 'ads_live'] as const;
+const BLOB_KEYS = ['t9file', 't9', 'kd', 'kd_ads', 'kd_sale', 'skucost', 'nhansu0', 'ads_live', 'ads_fb', 'fb_sale_days', 'fb_cost_days'] as const;
 /**
  * Phần dữ liệu tài chính (giá vốn SKU, chi phí tháng, mục tiêu doanh số) tách sang bản ghi riêng:
  * chỉ CEO và kế toán (quyền xem công nợ toàn công ty) đọc/ghi được; người khác không nhận về,
@@ -330,7 +330,7 @@ hubRoutes.get('/blob/:key', async (c) => {
   // Số liệu riêng tư (doanh thu đầy đủ, giá vốn, danh sách nhân sự): chỉ CEO và kế toán.
   const auth = c.get('auth');
   if (row.admin_only && !canSecret(auth)) throw forbidden();
-  if (key !== 'ads_live') await auditStatement(c.env.DB, {
+  if (key !== 'ads_live' && key !== 'ads_fb' && key !== 'fb_sale_days') await auditStatement(c.env.DB, {
     actorId: auth.user.id,
     action: 'HUB_READ',
     entityType: 'HUB_BLOB',

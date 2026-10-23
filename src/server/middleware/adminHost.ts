@@ -16,6 +16,8 @@ export const adminHostGate: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 /** Thao tác quản trị (phân quyền, sản phẩm, giá, thiết lập): chỉ gọi được từ địa chỉ quản trị khi đã cấu hình. */
 export const adminOnlyEndpoint: MiddlewareHandler<AppEnv> = async (c, next) => {
+  // Agent ghi thay người bằng giấy ủy quyền gọi từ máy chủ, không qua địa chỉ quản trị; quyền vẫn chỉ bằng quyền của người ra lệnh.
+  if (c.get('auth')?.delegation) return next();
   if (c.env.ADMIN_HOST && !isAdminHost(c.env, c.req.raw)) {
     throw forbidden(`Thao tác này chỉ làm ở trang quản trị (${c.env.ADMIN_HOST}).`);
   }
