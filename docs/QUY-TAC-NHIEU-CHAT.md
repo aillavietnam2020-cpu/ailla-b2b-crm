@@ -63,3 +63,7 @@ Khi sửa một file ở cột "file chung dễ vướng": sửa ít nhất có 
 ## 7. Cách báo chị Hoa
 
 Chị Hoa không rành kỹ thuật: báo bằng lời đời thường, nói thứ nhìn thấy trên màn hình, nói rõ đã làm gì và còn việc gì chị cần quyết. Không dán khóa, mật khẩu hay mã bí mật vào chat.
+
+## 8. Báo chị Hoa ngắn gọn, và được tự động (23/10)
+
+Xem phần đầu `CLAUDE.md`. Tóm tắt: báo tối đa 4 dòng đời thường, nói chị thấy gì, đã lên web chưa, chị có phải làm gì không (mặc định "Chị không cần làm gì"). Chat được tự ghép `main` và tự đưa web lên khi đủ 5 điều kiện (merge origin/main, tsc + vitest qua, chốt chặn cho qua, không xóa/sửa đè dữ liệu thật, đúng phạm vi chị nhờ). Thứ tự: ghi main trước rồi deploy ngay sau, để chat khác thấy main mới và không đè nhau.
