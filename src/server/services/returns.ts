@@ -220,7 +220,9 @@ export async function createReturn(
   }
 
   // Đơn gốc (nếu có) phải của đúng khách; lấy giá bán và số lượng đã mua để chặn trả quá.
-  const bought = new Map<string, { qty: number; price: number }>();
+  const bought = new Map<string, { qty: number; price: number; gift: number }>();
+  // Số hàng tặng trong đơn gốc, và số đã trả trước đó của từng mã: hàng tặng trả lại không được hoàn tiền.
+  const returnedBefore = new Map<string, number>();
   if (input.order_id) {
     const order = await db
       .prepare('SELECT id FROM orders WHERE id = ? AND customer_id = ? AND deleted_at IS NULL')
@@ -228,10 +230,14 @@ export async function createReturn(
       .first<{ id: string }>();
     if (!order) throw badRequest('ORDER_NOT_OF_CUSTOMER', 'Đơn gốc không thuộc khách này.');
     const oi = await db
-      .prepare('SELECT product_id, SUM(qty) AS qty, MAX(applied_price) AS price FROM order_items WHERE order_id = ? GROUP BY product_id')
+      .prepare(
+        `SELECT product_id, SUM(qty) AS qty, MAX(applied_price) AS price,
+                SUM(CASE WHEN is_gift = 1 THEN qty ELSE gift_qty END) AS gift
+         FROM order_items WHERE order_id = ? GROUP BY product_id`,
+      )
       .bind(input.order_id)
-      .all<{ product_id: string; qty: number; price: number }>();
-    for (const r of oi.results ?? []) bought.set(r.product_id, { qty: r.qty, price: r.price });
+      .all<{ product_id: string; qty: number; price: number; gift: number }>();
+    for (const r of oi.results ?? []) bought.set(r.product_id, { qty: r.qty, price: r.price, gift: r.gift ?? 0 });
     const already = await db
       .prepare(
         `SELECT l.product_id, SUM(l.qty) AS qty FROM order_return_lines l
@@ -241,6 +247,7 @@ export async function createReturn(
       .bind(input.order_id)
       .all<{ product_id: string; qty: number }>();
     const returned = new Map((already.results ?? []).map((r) => [r.product_id, r.qty]));
+    for (const [k, v] of returned) returnedBefore.set(k, v);
     for (const it of input.items) {
       const b = bought.get(it.product_id);
       if (!b) throw badRequest('ITEM_NOT_IN_ORDER', 'Có mặt hàng không nằm trong đơn gốc đã chọn.');
@@ -279,7 +286,24 @@ export async function createReturn(
   }
   let claimed = 0;
   const lineStatements: D1PreparedStatement[] = [];
+  // Mã có hàng tặng trong đơn gốc: trả phần hàng bán trước (tính tiền), phần vượt quá là hàng tặng (đơn giá 0, không hoàn tiền).
+  const used = new Map<string, number>();
+  const expanded: typeof input.items = [];
   for (const it of input.items) {
+    const b = bought.get(it.product_id);
+    if (!b || b.gift <= 0) {
+      expanded.push(it);
+      continue;
+    }
+    const paidCap = Math.max(0, b.qty - b.gift);
+    const soFar = (returnedBefore.get(it.product_id) ?? 0) + (used.get(it.product_id) ?? 0);
+    const paidQty = Math.min(it.qty, Math.max(0, paidCap - soFar));
+    const giftQty = it.qty - paidQty;
+    used.set(it.product_id, (used.get(it.product_id) ?? 0) + it.qty);
+    if (paidQty > 0) expanded.push({ ...it, qty: paidQty });
+    if (giftQty > 0) expanded.push({ ...it, qty: giftQty, unit_price: 0, deduction: 0, line_note: it.line_note ?? 'Hàng tặng, không hoàn tiền' });
+  }
+  for (const it of expanded) {
     const price = it.unit_price ?? bought.get(it.product_id)?.price ?? tierPrice.get(it.product_id) ?? 0;
     const deduction = it.deduction ?? 0;
     claimed += Math.max(0, Math.round(price * it.qty) - deduction);

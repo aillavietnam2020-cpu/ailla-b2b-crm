@@ -175,4 +175,21 @@ describe('Phiếu hàng trả lại', () => {
     expect(after.official_debt).toBe(before.official_debt - 200000);
     expect(await stock()).toBe(stockBefore);
   });
+  it('trả hàng của đơn có hàng tặng: phần hàng bán hoàn tiền, phần hàng tặng trả lại không hoàn tiền', async () => {
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', order_date: '2026-08-16', items: [{ product_id: 'prod-full', qty: 10 }, { product_id: 'prod-full', qty: 2, is_gift: true }] },
+    });
+    expect(created.status).toBe(201);
+    const orderId = created.body.data.id as string;
+    const price = (await ctx.db.prepare('SELECT applied_price FROM order_items WHERE order_id = ?').bind(orderId).first<{ applied_price: number }>())!.applied_price;
+    const r = await ctx.request('/api/returns', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', order_id: orderId, reason: 'Khách trả cả hàng bán lẫn hàng tặng', items: [{ product_id: 'prod-full', qty: 12 }] },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.data.claimed_amount).toBe(price * 10);
+    const qtys = (r.body.data.items as Array<{ qty: number; unit_price: number }>).map((l) => [l.qty, l.unit_price]);
+    expect(qtys).toEqual([[10, price], [2, 0]]);
+  });
 });
