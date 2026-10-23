@@ -6,6 +6,8 @@ import { forbidden, unauthorized } from '../lib/http';
 import { readSessionCookie, resolveSession } from '../lib/session';
 import { AGENT_PERMISSIONS, AGENT_SCOPE_PERMISSIONS } from '@shared/agent';
 import { AGENT_TOKEN_PREFIX, hashAgentToken } from '../lib/agentToken';
+import { delegatedPathAllowed, loadDelegation } from '../lib/delegation';
+import { auditStatement } from '../lib/audit';
 
 type Jwks = ReturnType<typeof createRemoteJWKSet>;
 const jwksCache = new Map<string, Jwks>();
@@ -100,7 +102,7 @@ function assertPasswordChanged(c: { req: { url: string } }, user: { must_change_
  * nó (agent.read, agent.propose), không bao giờ theo vai trò; và chỉ được gọi /api/agent/*.
  */
 async function resolveAgentAuth(
-  c: { env: Env; req: { header: (n: string) => string | undefined; url: string } },
+  c: { env: Env; req: { header: (n: string) => string | undefined; url: string; method: string } },
 ): Promise<AuthContext | null> {
   const header = c.req.header('Authorization') ?? '';
   if (!header.startsWith('Bearer ' + AGENT_TOKEN_PREFIX)) return null;
@@ -123,6 +125,8 @@ async function resolveAgentAuth(
     throw unauthorized('Khóa agent không đúng hoặc đã bị khóa');
   }
   const path = new URL(c.req.url).pathname;
+  const dlg = c.req.header('X-Delegation');
+  if (dlg) return resolveDelegated(c, row, dlg, path);
   if (!path.startsWith('/api/agent/')) throw forbidden('Agent chỉ được dùng các đường dẫn /api/agent/*');
   const now = new Date();
   // Chỉ ghi lần dùng cuối khi đã cũ hơn 5 phút để mỗi lần gọi không tốn một lượt ghi.
@@ -146,11 +150,64 @@ async function resolveAgentAuth(
   };
 }
 
+/**
+ * Agent ghi dữ liệu thay người: cần quyền 'agent.act' + giấy ủy quyền (X-Delegation) sinh ra khi CHÍNH người được chỉ định
+ * vừa ra lệnh cho agent này qua web. Từ đó yêu cầu chạy với đúng quyền của người đó, chỉ trong danh sách đường dẫn cho phép,
+ * không xóa cứng, tối đa vài chục lần ghi mỗi giấy; mọi lần ghi đều có dòng nhật ký riêng.
+ */
+async function resolveDelegated(
+  c: { env: Env; req: { method: string } },
+  agent: { id: string; email: string; display_name: string },
+  token: string,
+  path: string,
+): Promise<AuthContext> {
+  const method = c.req.method.toUpperCase();
+  const own = await loadExtraPermissions(c.env.DB, agent.id);
+  if (!own.includes('agent.act')) throw forbidden('Agent này chưa được cấp quyền ghi dữ liệu');
+  const d = await loadDelegation(c.env.DB, token, agent.id);
+  if (!d) throw forbidden('Không có lệnh của người được chỉ định (hoặc đã hết hạn). Chỉ ghi được khi người đó vừa nhắn agent trên web Điều hành agent.');
+  if (!delegatedPathAllowed(method, path)) throw forbidden('Agent chưa được phép thao tác này');
+  if (method !== 'GET') {
+    const r = await c.env.DB.prepare('UPDATE agent_delegations SET uses = uses + 1 WHERE token_hash = ? AND uses < max_uses AND expires_at > ?')
+      .bind(d.token_hash, new Date().toISOString())
+      .run();
+    if (!r.meta.changes) throw forbidden('Lệnh này đã dùng hết số lần ghi cho phép; nhờ người ra lệnh nhắn lại');
+  }
+  const u = await c.env.DB
+    .prepare("SELECT id, email, display_name, role, status FROM users WHERE id = ? AND deleted_at IS NULL AND kind = 'HUMAN'")
+    .bind(d.user_id)
+    .first<AuthUser>();
+  if (!u || u.status !== 'ACTIVE') throw forbidden('Người ra lệnh không còn hoạt động');
+  const extra = await loadExtraPermissions(c.env.DB, u.id);
+  const permissions = effectivePermissions(u.role as AuthUser['role'], extra);
+  return {
+    user: { id: u.id, email: u.email, display_name: u.display_name, role: u.role as AuthUser['role'], status: u.status },
+    scope: scopeFor(u.role as AuthUser['role'], permissions),
+    permissions,
+    actorType: 'AGENT',
+    delegation: { agentId: agent.id, agentName: agent.display_name },
+  };
+}
+
 export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const agentAuth = await resolveAgentAuth(c);
   if (agentAuth) {
     c.set('auth', agentAuth);
     await next();
+    if (agentAuth.delegation && c.req.method !== 'GET') {
+      // Nhật ký riêng: agent nào, thay ai, làm gì, kết quả ra sao.
+      await auditStatement(c.env.DB, {
+        actorId: agentAuth.delegation.agentId,
+        actorType: 'AGENT',
+        action: 'AGENT_ACT',
+        entityType: 'AGENT',
+        entityId: new URL(c.req.url).pathname,
+        after: { method: c.req.method, status: c.res.status, on_behalf_of: agentAuth.user.display_name },
+        result: c.res.status < 400 ? 'OK' : 'FAILED',
+        requestId: c.get('requestId'),
+        ip: c.req.header('CF-Connecting-IP') ?? null,
+      }).run();
+    }
     return;
   }
   const token = readSessionCookie(c.req.raw.headers);

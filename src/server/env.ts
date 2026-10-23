@@ -51,6 +51,8 @@ export interface AuthContext {
   permissions: string[];
   /** USER = người dùng; AGENT = AI agent vào bằng khóa riêng. */
   actorType?: 'USER' | 'AGENT';
+  /** Agent đang ghi thay người bằng giấy ủy quyền: user là người ra lệnh, quyền cũng chỉ bằng quyền của người đó. */
+  delegation?: { agentId: string; agentName: string };
 }
 
 export interface AppVariables {
