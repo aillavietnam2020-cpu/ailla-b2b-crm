@@ -20,6 +20,8 @@ Viết ngày 23/10/2026 sau lần ghép các nhánh (main = 8927e71). Chị Hoa 
 
 - Chat nào làm xong việc thì báo chị Hoa và chat điều phối; KHÔNG tự ghi vào `main` và KHÔNG tự đưa lên web khi việc của mình chưa qua kiểm tra.
 - Ghép vào `main` làm trong một worktree sạch riêng từ `origin/main`, ghép từng nhánh, chạy toàn bộ kiểm tra, rồi mới đưa lên web, sau đó mới ghi `main`. Chỗ trùng thì xử lý từng chỗ, giữ cả hai phần, không lấy nguyên một bản.
+- BẮT BUỘC trước khi đưa lên web: so thư mục chung `G:\CODE\CRMilla-b2b-crm` (file sửa dở và file mới chưa theo dõi) với bản vừa ghép, từng file bằng `git hash-object`. File nào có trong thư mục chung mà không có trong bản ghép thì tìm chủ chat trước (tra bằng nội dung file, ngày sửa, lịch sử các chat). Lý do: ngày 23/10 bản ghép đã đưa lên web làm mất tạm thời Task giao việc (Tổng quan 7 phòng), trang Quy đổi mã các sàn và màu giao diện sáng, vì các phần đó đã chạy trên web từ trước nhưng chưa bao giờ được lưu vào git. Đã vá cùng ngày (main 6d03dbc).
+- Mỗi lần đưa một phần lên web từ thư mục chung (trước đây hay làm), phải lưu (commit) đúng phần đó vào nhánh của chat ngay sau đó, không để "đang chạy trên web mà chưa lưu".
 - Đưa lên web = `npm run deploy:prod`; cập nhật dữ liệu = `npm run db:migrate:prod` (chạy từ worktree đã ghép). Cần chị Hoa đồng ý trong chat. Máy có thể chặn; khi bị chặn thì dừng, báo chị, không vòng qua.
 
 ## 4. Số file cập nhật dữ liệu (migration) theo khối
