@@ -31,15 +31,15 @@ async function withFiles<T extends { id: number }>(db: D1Database, msgs: T[]) {
   const by = new Map<number, Array<{ id: number; name: string }>>();
   for (const f of rows.results ?? []) (by.get(f.chat_id) ?? by.set(f.chat_id, []).get(f.chat_id)!).push({ id: f.id, name: f.name });
   const dr = await db
-    .prepare(`SELECT id, chat_id, name, size, nparts FROM agent_chat_docs WHERE chat_id IN (${ids.map(() => '?').join(',')}) ORDER BY id`)
+    .prepare(`SELECT id, chat_id, name, size, nparts, (preview IS NOT NULL) AS has_preview FROM agent_chat_docs WHERE chat_id IN (${ids.map(() => '?').join(',')}) ORDER BY id`)
     .bind(...ids)
     .all<DocInfo & { chat_id: number }>();
   const dby = new Map<number, DocInfo[]>();
-  for (const d of dr.results ?? []) (dby.get(d.chat_id) ?? dby.set(d.chat_id, []).get(d.chat_id)!).push({ id: d.id, name: d.name, size: d.size, nparts: d.nparts });
+  for (const d of dr.results ?? []) (dby.get(d.chat_id) ?? dby.set(d.chat_id, []).get(d.chat_id)!).push({ id: d.id, name: d.name, size: d.size, nparts: d.nparts, has_preview: d.has_preview });
   return msgs.map((m) => ({ ...m, files: by.get(m.id) ?? [], docs: dby.get(m.id) ?? [] }));
 }
 
-type DocInfo = { id: number; name: string; size: number; nparts: number };
+type DocInfo = { id: number; name: string; size: number; nparts: number; has_preview?: number };
 const DOC_EXT = ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc', 'pptx', 'txt', 'md', 'json', 'mp4', 'mov', 'webm', 'mp3', 'wav', 'm4a'];
 const DOC_MAX = 25 * 1024 * 1024; // 25 MB mỗi file
 const DOC_PART = 900_000; // byte gốc mỗi mảnh (base64 ~1,2 MB, dưới giới hạn 2 MB của D1)
@@ -233,6 +233,15 @@ agentChatRoutes.get('/doc/:id', async (c) => {
   });
 });
 
+/** Bản xem trước (Excel, Word đã đọc sẵn) của file trong cuộc trò chuyện của chính người đang đăng nhập. */
+agentChatRoutes.get('/doc/:id/preview', async (c) => {
+  const d = await c.env.DB.prepare('SELECT preview FROM agent_chat_docs WHERE id = ? AND owner_id = ? AND chat_id IS NOT NULL')
+    .bind(Number(c.req.param('id')), c.get('auth').user.id)
+    .first<{ preview: string | null }>();
+  if (!d) throw notFound('Không có file này');
+  return ok(c, { preview: d.preview });
+});
+
 agentChatRoutes.post('/', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     agent?: string;
@@ -399,6 +408,40 @@ agentRelayRoutes.get('/file/:id', async (c) => {
   return ok(c, { name: row.name, mime: row.mime, b64: row.data });
 });
 
+/** Cầu nối đưa file agent tạo ra (md, xlsx, docx, pdf...) lên web: khai báo file, kèm bản xem trước nếu có. */
+agentRelayRoutes.post('/doc-start', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { name?: string; size?: number; owner_id?: string | null; preview?: string | null };
+  const name = String(b.name ?? '').replace(/[\\/\u0000-\u001f]/g, '_').slice(0, 120);
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  const size = Math.floor(Number(b.size));
+  if (!name || !DOC_EXT.includes(ext)) throw badRequest('BAD_TYPE', 'Loại file này chưa nhận');
+  if (!Number.isFinite(size) || size <= 0 || size > DOC_MAX) throw badRequest('BAD_SIZE', 'Dung lượng file không hợp lệ (tối đa 25 MB)');
+  const owner =
+    (b.owner_id ? String(b.owner_id) : '') ||
+    (await c.env.DB.prepare(`SELECT id FROM users WHERE role = 'CEO' AND kind = 'HUMAN' ORDER BY created_at LIMIT 1`).first<{ id: string }>())?.id ||
+    '';
+  if (!owner) throw badRequest('NO_OWNER', 'Chưa có người nhận file');
+  const preview = typeof b.preview === 'string' && b.preview ? b.preview.slice(0, 400_000) : null;
+  const nparts = Math.ceil(size / DOC_PART);
+  await c.env.DB.prepare('INSERT INTO agent_chat_docs (owner_id, name, size, nparts, created_at, preview) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(owner, name, size, nparts, nowIso(), preview)
+    .run();
+  const row = await c.env.DB.prepare('SELECT MAX(id) AS id FROM agent_chat_docs WHERE owner_id = ?').bind(owner).first<{ id: number }>();
+  return ok(c, { id: row!.id, nparts, part_bytes: DOC_PART });
+});
+
+agentRelayRoutes.post('/doc-part', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { id?: number; seq?: number; b64?: string };
+  const id = Number(b.id);
+  const seq = Number(b.seq);
+  const d = await c.env.DB.prepare('SELECT nparts FROM agent_chat_docs WHERE id = ? AND chat_id IS NULL').bind(id).first<{ nparts: number }>();
+  if (!d) throw notFound('Không có file này');
+  if (!Number.isInteger(seq) || seq < 0 || seq >= d.nparts) throw badRequest('BAD_SEQ', 'Số mảnh không đúng');
+  if (typeof b.b64 !== 'string' || !b.b64 || b.b64.length > 1_400_000 || !/^[A-Za-z0-9+/=]+$/.test(b.b64)) throw badRequest('BAD_PART', 'Mảnh file không đúng');
+  await c.env.DB.prepare('INSERT OR REPLACE INTO agent_chat_doc_parts (doc_id, seq, data) VALUES (?, ?, ?)').bind(id, seq, b.b64).run();
+  return ok(c, { ok: true });
+});
+
 /** Cầu nối tải từng mảnh file chị đính kèm. */
 agentRelayRoutes.get('/doc/:id/:seq', async (c) => {
   const row = await c.env.DB.prepare(
@@ -444,6 +487,7 @@ agentRelayRoutes.post('/push', async (c) => {
     reply?: string;
     error?: string;
     files?: Array<{ name?: string; mime?: string; b64?: string }>;
+    docs?: number[];
   };
   const id = Number(b.id);
   if (!Number.isInteger(id)) throw badRequest('NO_ID', 'Thiếu mã tin');
@@ -471,6 +515,9 @@ agentRelayRoutes.post('/push', async (c) => {
       .bind(replyId, String(f.name ?? 'anh').slice(0, 120), f.mime, f.b64, now)
       .run();
   }
+  for (const did of (b.docs ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 4)) {
+    await c.env.DB.prepare('UPDATE agent_chat_docs SET chat_id = ? WHERE id = ? AND chat_id IS NULL AND owner_id IS ?').bind(replyId, did, row.owner_id).run();
+  }
   await c.env.DB.prepare(`UPDATE agent_chat SET status = ?, updated_at = ? WHERE id = ?`).bind(failed ? 'error' : 'done', now, id).run();
   return ok(c, { ok: true, files: files.length });
 });
@@ -488,6 +535,7 @@ agentRelayRoutes.post('/sync', async (c) => {
       ext_id?: string;
       ts?: number;
       files?: Array<{ name?: string; mime?: string; b64?: string }>;
+      docs?: number[];
     }>;
   };
   const items = (b.items ?? []).slice(0, 100);
@@ -513,6 +561,9 @@ agentRelayRoutes.post('/sync', async (c) => {
       await c.env.DB.prepare(`INSERT INTO agent_chat_files (chat_id, name, mime, data, created_at) VALUES (?, ?, ?, ?, ?)`)
         .bind(row?.id ?? 0, String(f.name ?? 'anh').slice(0, 120), f.mime, f.b64, at)
         .run();
+    }
+    for (const did of (it.docs ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 4)) {
+      await c.env.DB.prepare('UPDATE agent_chat_docs SET chat_id = ? WHERE id = ? AND chat_id IS NULL').bind(row?.id ?? 0, did).run();
     }
   }
   return ok(c, { added });
