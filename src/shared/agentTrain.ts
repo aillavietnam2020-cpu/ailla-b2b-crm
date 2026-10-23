@@ -45,3 +45,31 @@ export function checkReply(reply: string, approvedPriceText: string[], bannedPhr
   }
   return flags;
 }
+
+/**
+ * Lấy id Page (dãy số) từ cái chị dán vào: gõ thẳng dãy số, hoặc link có chứa dãy số
+ * (botcake.io/<số>/..., facebook.com/profile.php?id=<số>, facebook.com/<tên>-<số>, facebook.com/pages/<tên>/<số>, m.me/<số>).
+ * Link chỉ có tên Page (facebook.com/Aillavietnamstore) không có dãy số nên trả null: Facebook không cho đổi tên ra số nếu không có quyền.
+ */
+export function parseFbPageId(input: string): string | null {
+  const raw = input.trim();
+  if (/^\d{5,30}$/.test(raw)) return raw;
+  if (!raw) return null;
+  let url: URL;
+  try {
+    url = new URL(/^[a-z]+:\/\//i.test(raw) ? raw : `https://${raw}`);
+  } catch {
+    return null;
+  }
+  for (const k of ['id', 'page_id', 'asset_id', 'fbid']) {
+    const v = url.searchParams.get(k);
+    if (v && /^\d{5,30}$/.test(v)) return v;
+  }
+  const segs = url.pathname.split('/').filter(Boolean).map((x) => decodeURIComponent(x));
+  for (const seg of segs) if (/^\d{9,30}$/.test(seg)) return seg;
+  for (const seg of segs) {
+    const m = seg.match(/-(\d{9,30})$/);
+    if (m) return m[1];
+  }
+  return null;
+}

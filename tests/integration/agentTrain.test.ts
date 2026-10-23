@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { checkReply, extractPrices, maskPersonal } from '@shared/agentTrain';
+import { checkReply, extractPrices, maskPersonal, parseFbPageId } from '@shared/agentTrain';
 import { emptyDoc, normalizeDoc, simulate, validateDoc, type BotDoc, type SimState } from '@shared/agentFlow';
 import { createTestContext, seedBusinessData, seedUsers, USERS, type TestContext } from '../helpers/app';
 
@@ -432,5 +432,39 @@ describe('Hội thoại và thẻ', () => {
   it('tin cũ hơn 90 ngày tự bị xóa', async () => {
     await push('psid-old', [{ ext_id: 'o1', who: 'customer', text: 'tin rất cũ', at: '2026-01-01T00:00:00.000Z' }], 'Khách cũ');
     expect((await convs()).some((x) => x.name === 'Khách cũ')).toBe(false);
+  });
+});
+
+describe('Thêm Page bằng link', () => {
+  const ID = '105017945992971';
+  it('lấy được dãy số từ link Botcake, Facebook, Messenger hoặc gõ thẳng số', () => {
+    for (const s of [
+      ID,
+      ` ${ID} `,
+      `https://botcake.io/${ID}/home`,
+      `botcake.io/${ID}/flows/452401008/content`,
+      `https://www.facebook.com/profile.php?id=${ID}`,
+      `https://www.facebook.com/Ailla-Viet-Nam-Store-${ID}`,
+      `https://www.facebook.com/pages/Ailla-Viet-Nam-Store/${ID}`,
+      `https://business.facebook.com/latest/home?asset_id=${ID}`,
+      `https://m.me/${ID}`,
+    ]) {
+      expect(parseFbPageId(s), s).toBe(ID);
+    }
+  });
+  it('link chỉ có tên Page hoặc rác thì không lấy được số', () => {
+    for (const s of ['https://www.facebook.com/Aillavietnamstore', 'https://pancake.vn/Aillavietnamstore', 'm.me/Aillavietnamstore', 'abc', '', '123']) {
+      expect(parseFbPageId(s), s).toBeNull();
+    }
+  });
+  it('API nhận link, báo lỗi dễ hiểu khi link chỉ có tên, không thêm trùng', async () => {
+    const ok1 = await ceo('/pages', { name: 'Ailla Việt Nam Store', fb_page_id: `https://botcake.io/${ID}/home` });
+    expect(ok1.status).toBe(200);
+    expect((await ceo('/pages')).body.data[0].fb_page_id).toBe(ID);
+    const bad = await ceo('/pages', { name: 'X', fb_page_id: 'https://www.facebook.com/Aillavietnamstore' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.message).toContain('dãy số');
+    expect((await ceo('/pages', { name: 'Trùng', fb_page_id: `facebook.com/profile.php?id=${ID}` })).status).toBe(409);
+    expect((await ceo('/pages', { name: '', fb_page_id: ID })).status).toBe(400);
   });
 });

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { nowIso } from '@shared/datetime';
-import { maskPersonal } from '@shared/agentTrain';
+import { maskPersonal, parseFbPageId } from '@shared/agentTrain';
 import { emptyDoc, normalizeDoc, simulate, validateDoc, type BotDoc, type SimState } from '@shared/agentFlow';
 import type { AppEnv } from '../env';
 import { newId } from '../lib/ids';
@@ -242,8 +242,14 @@ agentTrainRoutes.get('/pages', async (c) => {
 agentTrainRoutes.post('/pages', async (c) => {
   const b = (await c.req.json().catch(() => ({}))) as { name?: string; fb_page_id?: string };
   const name = text(b.name, 120);
-  const fb = text(b.fb_page_id, 40);
-  if (!name || !/^\d{5,30}$/.test(fb)) throw badRequest('BAD_PAGE', 'Cần tên Page và id Page Facebook (chỉ gồm số).');
+  if (!name) throw badRequest('BAD_PAGE', 'Chưa gõ tên Page.');
+  const fb = parseFbPageId(text(b.fb_page_id, 600));
+  if (!fb) {
+    throw badRequest(
+      'BAD_PAGE',
+      'Không thấy dãy số của Page trong cái chị dán. Link chỉ có tên Page (facebook.com/tên) thì không đủ. Dán link có số, ví dụ botcake.io/105017945992971/home hoặc facebook.com/profile.php?id=105017945992971, hoặc gõ thẳng dãy số.',
+    );
+  }
   const dup = await c.env.DB.prepare('SELECT id FROM agent_train_pages WHERE fb_page_id = ?').bind(fb).first();
   if (dup) throw conflict('PAGE_EXISTS', 'Page này đã có trong danh sách.');
   const now = nowIso();
