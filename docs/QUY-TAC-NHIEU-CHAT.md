@@ -24,6 +24,7 @@ Viết ngày 23/10/2026 sau lần ghép các nhánh (main = 8927e71). Chị Hoa 
 - Mỗi lần đưa một phần lên web từ thư mục chung (trước đây hay làm), phải lưu (commit) đúng phần đó vào nhánh của chat ngay sau đó, không để "đang chạy trên web mà chưa lưu".
 - KHÔNG đưa web lên từ nhánh riêng của chat mình. Nhánh riêng không có phần của chat khác, nên đưa lên sẽ làm MẤT tính năng đang chạy của họ (đã xảy ra 23/10). Chỉ đưa web lên từ bản đã `git merge origin/main` mới nhất, đã chạy tsc + vitest, và đã được chị Hoa đồng ý; xong thì ghi bản đó vào `main` ngay.
 - Đã có chốt chặn trong máy (từ 23/10): `npm run deploy:prod` tự dừng nếu bản đang làm chưa chứa `origin/main` mới nhất (script `scripts/check-deploy.mjs`). Bị dừng thì làm theo thông báo (`git merge origin/main`, kiểm tra lại), KHÔNG tự đặt `SKIP_DEPLOY_GUARD=1` (chỉ chị Hoa được dùng).
+- Chốt chặn có thêm KHÓA đưa web lên (cùng ngày): mỗi lúc chỉ một chat đưa web lên được; chat khác thấy khóa thì chờ 1–2 phút. Sau khi dựng xong còn kiểm tra lần cuối xem có chat nào vừa ghi main trong lúc dựng không; nếu có thì dừng, phải merge lại. Khóa tự hết hạn sau 10 phút.
 - Đưa lên web = `npm run deploy:prod`; cập nhật dữ liệu = `npm run db:migrate:prod` (chạy từ worktree đã ghép). Cần chị Hoa đồng ý trong chat. Máy có thể chặn; khi bị chặn thì dừng, báo chị, không vòng qua.
 
 ## 4. Số file cập nhật dữ liệu (migration) theo khối
