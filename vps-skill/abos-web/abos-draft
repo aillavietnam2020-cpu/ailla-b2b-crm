@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""abos-draft - vẽ ẢNH NHÁP (phiếu/đơn) để người ra lệnh xem và duyệt trước khi agent ghi vào web.
+
+Dùng: abos-draft <file.json>   (hoặc JSON từ stdin: abos-draft -)
+JSON: {"title": "ĐƠN HÀNG NHÁP", "subtitle": "NPP ...", "meta": [["Nhà phân phối","…"],["Ngày","…"]],
+       "columns": ["Mã","Tên","SL","Đơn giá","Thành tiền"], "rows": [["A1","Tên","10","100.000","1.000.000"]],
+       "totals": [["Tổng tiền hàng","1.000.000"]], "note": "Ghi chú / chỗ cần xác nhận"}
+In ra một dòng MEDIA:<đường dẫn ảnh> để gửi ảnh cho người duyệt (web và Telegram đều hiện được).
+Chỉ vẽ ảnh, không ghi gì vào web.
+"""
+import json, os, sys, time
+
+from PIL import Image, ImageDraw, ImageFont
+
+FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+OUT_DIR = "/root/.openclaw/media/abos-drafts"
+W = 1200
+
+
+def font(size, bold=False):
+    try:
+        return ImageFont.truetype(BOLD if bold else FONT, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def wrap(draw, text, fnt, width):
+    out, line = [], ""
+    for word in str(text).split():
+        t = (line + " " + word).strip()
+        if draw.textlength(t, font=fnt) <= width:
+            line = t
+        else:
+            if line:
+                out.append(line)
+            line = word
+    out.append(line)
+    return out or [""]
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(__doc__)
+    raw = sys.stdin.read() if sys.argv[1] == "-" else open(sys.argv[1], encoding="utf-8").read()
+    d = json.loads(raw)
+    cols = [str(c) for c in d.get("columns", [])]
+    rows = [[str(x) for x in r] for r in d.get("rows", [])]
+    meta = d.get("meta", [])
+    totals = d.get("totals", [])
+    pad = 40
+    inner = W - 2 * pad
+    f_t, f_b, f_s, f_h = font(40, True), font(26), font(22), font(24, True)
+    probe = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+
+    # độ rộng cột: cột đầu và cột "Tên" rộng hơn, số thì hẹp
+    n = max(len(cols), 1)
+    if n == 1:
+        widths = [inner]
+    else:
+        base = []
+        for i, c in enumerate(cols):
+            w = probe.textlength(c, font=f_h)
+            for r in rows:
+                if i < len(r):
+                    w = max(w, min(probe.textlength(r[i], font=f_s), inner * 0.42))
+            base.append(w + 28)
+        scale = inner / sum(base)
+        widths = [w * scale for w in base]
+
+    # tính chiều cao
+    y = pad + 56 + (36 if d.get("subtitle") else 0) + len(meta) * 36 + 24
+    row_h = []
+    for r in rows:
+        h = max(len(wrap(probe, r[i] if i < len(r) else "", f_s, widths[i] - 16)) for i in range(n)) * 30 + 16
+        row_h.append(h)
+    y += 46 + sum(row_h) + 20 + len(totals) * 40 + 30
+    note_lines = wrap(probe, d.get("note", ""), f_s, inner) if d.get("note") else []
+    y += len(note_lines) * 30 + 70
+    img = Image.new("RGB", (W, max(y, 500)), "white")
+    dr = ImageDraw.Draw(img)
+
+    # tiêu đề
+    dr.rectangle([0, 0, W, 16], fill="#7c3aed")
+    yy = pad + 8
+    dr.text((pad, yy), str(d.get("title", "ĐƠN NHÁP")), font=f_t, fill="#111827")
+    dr.text((W - pad - 230, yy + 10), "NHÁP · CHƯA GHI", font=f_h, fill="#b42318")
+    yy += 56
+    if d.get("subtitle"):
+        dr.text((pad, yy), str(d["subtitle"]), font=f_b, fill="#374151")
+        yy += 36
+    for k, v in meta:
+        dr.text((pad, yy), f"{k}:", font=f_s, fill="#6b7280")
+        dr.text((pad + 260, yy), str(v), font=f_b, fill="#111827")
+        yy += 36
+    yy += 16
+    # bảng
+    if cols:
+        dr.rectangle([pad, yy, W - pad, yy + 46], fill="#ede9fe")
+        x = pad
+        for i, c in enumerate(cols):
+            dr.text((x + 8, yy + 10), c, font=f_h, fill="#4c1d95")
+            x += widths[i]
+        yy += 46
+        for ri, r in enumerate(rows):
+            h = row_h[ri]
+            if ri % 2:
+                dr.rectangle([pad, yy, W - pad, yy + h], fill="#f9fafb")
+            x = pad
+            for i in range(n):
+                cell = r[i] if i < len(r) else ""
+                numeric = cell.replace(".", "").replace(",", "").replace("%", "").replace(" ", "").isdigit()
+                lines = wrap(dr, cell, f_s, widths[i] - 16)
+                for li, t in enumerate(lines):
+                    tx = x + widths[i] - 8 - dr.textlength(t, font=f_s) if numeric else x + 8
+                    dr.text((tx, yy + 8 + li * 30), t, font=f_s, fill="#111827")
+                x += widths[i]
+            yy += h
+            dr.line([pad, yy, W - pad, yy], fill="#e5e7eb")
+    yy += 16
+    for k, v in totals:
+        dr.text((W - pad - 520, yy), str(k), font=f_b, fill="#374151")
+        vt = str(v)
+        dr.text((W - pad - dr.textlength(vt, font=f_t), yy - 6), vt, font=f_t, fill="#111827")
+        yy += 40
+    yy += 14
+    for t in note_lines:
+        dr.text((pad, yy), t, font=f_s, fill="#92400e")
+        yy += 30
+    dr.text((pad, img.height - 44), "Ảnh nháp để duyệt. Chỉ khi trả lời ĐỒNG Ý, agent mới ghi vào web.", font=f_s, fill="#6b7280")
+    os.makedirs(OUT_DIR, exist_ok=True)
+    path = f"{OUT_DIR}/nhap-{int(time.time())}.png"
+    img.save(path, optimize=True)
+    # dọn ảnh nháp cũ hơn 7 ngày
+    cut = time.time() - 7 * 86400
+    for nme in os.listdir(OUT_DIR):
+        fp = os.path.join(OUT_DIR, nme)
+        if os.path.isfile(fp) and os.path.getmtime(fp) < cut:
+            os.unlink(fp)
+    print("MEDIA:" + path)
+
+
+if __name__ == "__main__":
+    main()
