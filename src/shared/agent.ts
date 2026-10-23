@@ -4,7 +4,7 @@
  */
 
 /** Quyền riêng của agent ('agent.act' = được ghi thay người, chỉ khi có giấy ủy quyền của người ra lệnh). Chỉ các quyền này; agent không nhận quyền theo vai trò. */
-export const AGENT_PERMISSIONS = ['agent.read', 'agent.propose', 'agent.act'] as const;
+export const AGENT_PERMISSIONS = ['agent.read', 'agent.propose', 'agent.act', 'agent.readall'] as const;
 
 /**
  * Phạm vi đọc của từng agent (cấp riêng, theo vai). Lưu trong user_permissions dạng 'agent.scope.<tên>'.

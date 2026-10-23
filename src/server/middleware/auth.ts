@@ -127,6 +127,7 @@ async function resolveAgentAuth(
   const path = new URL(c.req.url).pathname;
   const dlg = c.req.header('X-Delegation');
   if (dlg) return resolveDelegated(c, row, dlg, path);
+  if (c.req.header('X-Read-All') === '1') return resolveReadAll(c, row, path);
   if (!path.startsWith('/api/agent/')) throw forbidden('Agent chỉ được dùng các đường dẫn /api/agent/*');
   const now = new Date();
   // Chỉ ghi lần dùng cuối khi đã cũ hơn 5 phút để mỗi lần gọi không tốn một lượt ghi.
@@ -155,6 +156,37 @@ async function resolveAgentAuth(
  * vừa ra lệnh cho agent này qua web. Từ đó yêu cầu chạy với đúng quyền của người đó, chỉ trong danh sách đường dẫn cho phép,
  * không xóa cứng, tối đa vài chục lần ghi mỗi giấy; mọi lần ghi đều có dòng nhật ký riêng.
  */
+/** Đường dẫn trợ lý toàn diện KHÔNG được xem: đăng nhập, khóa agent, và nội dung chat của các agent khác. */
+const READALL_DENY = /^\/api\/(auth|admin\/agents|agent-relay|agent-chat|worker|ingest|backup)(\/|$)/;
+
+/**
+ * Trợ lý toàn diện của chị Hoa (quyền 'agent.readall'): ĐỌC mọi trang như chủ doanh nghiệp, tuyệt đối chỉ GET.
+ * Không giấy ủy quyền nào, không ghi gì; muốn ghi vẫn phải qua giấy ủy quyền khi chị ra lệnh.
+ */
+async function resolveReadAll(
+  c: { env: Env; req: { method: string } },
+  agent: { id: string; display_name: string },
+  path: string,
+): Promise<AuthContext> {
+  if (c.req.method.toUpperCase() !== 'GET') throw forbidden('Chế độ đọc toàn bộ chỉ được xem, không ghi');
+  const own = await loadExtraPermissions(c.env.DB, agent.id);
+  if (!own.includes('agent.readall')) throw forbidden('Agent này chưa được cấp quyền đọc toàn bộ web');
+  if (!path.startsWith('/api/') || path.includes('..') || READALL_DENY.test(path)) throw forbidden('Đường dẫn này không nằm trong phần agent được xem');
+  const u = await c.env.DB
+    .prepare("SELECT id, email, display_name, role, status FROM users WHERE role = 'CEO' AND kind = 'HUMAN' AND status = 'ACTIVE' AND deleted_at IS NULL ORDER BY created_at LIMIT 1")
+    .first<AuthUser>();
+  if (!u) throw forbidden('Chưa có tài khoản chủ doanh nghiệp để đọc thay');
+  const extra = await loadExtraPermissions(c.env.DB, u.id);
+  const permissions = effectivePermissions(u.role as AuthUser['role'], extra);
+  return {
+    user: { id: u.id, email: u.email, display_name: u.display_name, role: u.role as AuthUser['role'], status: u.status },
+    scope: scopeFor(u.role as AuthUser['role'], permissions),
+    permissions,
+    actorType: 'AGENT',
+    delegation: { agentId: agent.id, agentName: agent.display_name },
+  };
+}
+
 async function resolveDelegated(
   c: { env: Env; req: { method: string } },
   agent: { id: string; email: string; display_name: string },

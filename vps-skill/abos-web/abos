@@ -97,8 +97,31 @@ def main():
             DLG = args[1]
         args = args[2:]
     if not args:
-        sys.exit("Dùng: abos --as <mã agent> me|orders|order|customers|customer|debts|payments|shortages|kho-alerts|kho-stock|kho-nxt|kho-docs|kho-doc|kho-lots|kho-online|products|act|pha-che|mkt-cards|mkt-orders|mkt-ads|xuong|events|propose")
+        sys.exit("Dùng: abos --as <mã agent> me|orders|order|customers|customer|debts|payments|shortages|kho-alerts|kho-stock|kho-nxt|kho-docs|kho-doc|kho-lots|kho-online|products|act|read|pha-che|mkt-cards|mkt-orders|mkt-ads|xuong|events|propose")
     cmd, rest = args[0], args[1:]
+    if cmd == "read":
+        # Trợ lý toàn diện (AILLA Center): ĐỌC mọi trang web như chủ doanh nghiệp, chỉ GET, không ghi gì
+        if not rest or not rest[0].startswith("/api/"):
+            sys.exit("Dùng: abos --as main read /api/... (chỉ xem)")
+        load_key()
+        if not KEY.startswith("agt_"):
+            sys.exit("Agent này chưa có khoá đọc web.")
+        req = urllib.request.Request(URL + rest[0], method="GET")
+        req.add_header("Authorization", "Bearer " + KEY)
+        req.add_header("X-Read-All", "1")
+        req.add_header("User-Agent", "abos-agent/1")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                print(r.read().decode("utf-8")[:60000])
+        except urllib.error.HTTPError as e:
+            try:
+                msg = json.load(e).get("error", {}).get("message", "")
+            except Exception:
+                msg = ""
+            sys.exit(f"Web trả lỗi {e.code}: {msg}")
+        except Exception as e:
+            sys.exit(f"Không nối được web: {e}")
+        return
     if cmd == "act":
         if len(rest) < 2:
             sys.exit("Dùng: abos --as ID --dlg GIẤY act GET|POST|PUT /api/... ['{json}']")

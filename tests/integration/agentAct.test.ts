@@ -112,3 +112,28 @@ describe('Agent ghi dữ liệu thay người, chỉ khi người được chỉ
     expect((await call(agent.token, 'POST', '/api/hub/kho/mh/suppliers', { name: 'NCC Z' }, dlg)).status).toBe(403);
   });
 });
+
+describe('Trợ lý toàn diện: đọc mọi trang như chủ, tuyệt đối không ghi', () => {
+  async function readAll(token: string, method: string, path: string) {
+    const res = await ctx.app.fetch(
+      new Request(`http://localhost${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'X-Read-All': '1', 'Content-Type': 'application/json' }, body: method === 'GET' ? undefined : '{}' }),
+      ctx.env,
+      { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext,
+    );
+    return res.status;
+  }
+
+  it('chỉ đọc được khi agent có quyền readall; không ghi, không đọc khóa/đăng nhập', async () => {
+    const made = await ctx.request('/api/admin/agents', { as: USERS.ceo, body: { name: 'Trợ lý chị', scopes: [] } });
+    const agent = made.body.data as { id: string; token: string };
+    expect(await readAll(agent.token, 'GET', '/api/customers')).toBe(403); // chưa có quyền
+    await ctx.db.prepare('INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(agent.id, 'agent.readall', await uid(USERS.ceo), '2026-10-23T00:00:00Z').run();
+    expect(await readAll(agent.token, 'GET', '/api/customers')).toBe(200);
+    expect(await readAll(agent.token, 'GET', '/api/admin/users')).toBe(200);
+    expect(await readAll(agent.token, 'POST', '/api/customers')).toBe(403);
+    expect(await readAll(agent.token, 'PUT', '/api/admin/users/x')).toBe(403);
+    expect(await readAll(agent.token, 'GET', '/api/admin/agents')).toBe(403);
+    expect(await readAll(agent.token, 'GET', '/api/auth/me')).toBe(403);
+    expect(await readAll(agent.token, 'GET', '/api/agent-chat/agents')).toBe(403);
+  });
+});
