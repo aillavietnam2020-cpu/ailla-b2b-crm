@@ -43,7 +43,7 @@ function pFbPL(m){
   const all=fbdRange(PERIOD.from,PERIOD.to),lastK=all.filter(k=>(DAYD.fb||{})[k]).pop()||PERIOD.to,days=all.filter(k=>k<=lastK),A=fbdAgg(days),len=days.length;
   const meta=`<div class="fbd-meta"><span class="pill p-blu">${esc(pLabel())}</span><span>${A.n}/${len} ngày có số${len<all.length?" (kỳ chọn còn "+(all.length-len)+" ngày chưa tới)":""}</span></div>`;
   if(FBD.tab==="bh"){const t=document.createElement("div");pFbdash(t,true);const body=t.innerHTML.replace(/^<div class="ph">[\s\S]*?<\/div><\/div>/,"");m.innerHTML=head+tabs+meta+body;bind();return}
-  if(FBD.tab==="sale"){const t=document.createElement("div");PAGES.fb_sale(t);const body=t.innerHTML.replace(/^<div class="ph">[\s\S]*?<\/div><\/div>/,"");m.innerHTML=head+tabs+meta+body;bind();return}
+  if(FBD.tab==="sale"){m.innerHTML=head+tabs+meta+fbdSaleView();bind();return}
   if(FBD.tab==="nc"){fbdRenderNc(m,head,tabs);bind();return}
   const C=fbdCost(days),pdays=days.map(fbdShiftMonth),Cp=fbdCost(pdays);
   if(FBD.tab==="sp"){const N=KDX.fbNhom||[];
@@ -117,3 +117,27 @@ function fbdRenderNc(m,head,tabs){
   m.querySelector("#nc-save").onclick=()=>save(collect(),"nhập chi phí vận hành");
   m.querySelector("#nc-tgs").onclick=()=>{const v=+m.querySelector("#nc-tg").value||0;DB.mutate(ME.name,"đặt mục tiêu doanh số Facebook",dt=>{if(typeof execTargets==="function")execTargets();dt.targets=dt.targets||{};dt.targets.fb=v});renderMain()};
 }
+
+/* ---- Tab / trang Team Sale kiểu Pancake: hàng chỉ số chọn được, biểu đồ theo ngày, bảng xếp hạng dày ---- */
+function fbdSaleView(){
+  adfLoad();fbsLoad();adfMergeDays();
+  const all=fbdRange(PERIOD.from,PERIOD.to),R=FBS.raw&&FBS.raw.days;
+  if(!R)return `<section class="pc-card"><p class="empty">Đang tải số bán hàng theo người từ Pancake…</p></section>`;
+  const lastK=all.filter(k=>R[k]).pop(),days=lastK?all.filter(k=>k<=lastK):[];
+  if(!days.length)return `<section class="pc-card"><p class="empty">Kỳ đã chọn chưa có số bán hàng theo người. Số có từ 30/09/2026.</p></section>`;
+  const len=days.length,pf=iso(addD(pdate(PERIOD.from),-len)),pt=iso(addD(pdate(PERIOD.from),-1)),pall=fbdRange(pf,pt),havePrev=pall.filter(k=>R[k]).length>=len*.8,pdays=havePrev?pall:[];
+  const rows=k=>R[k]||[],S=(k,f)=>sum(rows(k),f),tao=k=>S(k,r=>r.tao),huy=k=>S(k,r=>r.huy),chot=k=>tao(k)-huy(k),dt=k=>S(k,r=>r.dt-(r.hoanDt||0));
+  const defs=[{l:"Doanh thu",t:"m",n:dt},{l:"Đơn tạo",t:"n",n:tao},{l:"Đơn chốt",t:"n",n:chot},{l:"Đơn giao thành công",t:"n",n:k=>S(k,r=>r.giao)},{l:"Đơn hủy",t:"n",rev:true,n:huy},{l:"Đơn hoàn",t:"n",rev:true,n:k=>S(k,r=>r.hoan)},{l:"Tỷ lệ chốt",t:"p",n:chot,d:tao},{l:"Tỷ lệ hủy",t:"p",rev:true,warn:v=>v>.2,n:huy,d:tao},{l:"Giá trị TB / đơn chốt",t:"d",n:dt,d:chot}];
+  const panel=fbdMetPanel("sale",defs,days,pdays,"Bán hàng theo người xử lý đơn");
+  const P=fbsPeople(days),Pp=havePrev?fbsPeople(pdays):null,pm={};(Pp?Pp.list:[]).forEach(x=>pm[x.n]=x);
+  const fold=t=>String(t).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/g,"d").toLowerCase().trim(),isK=x=>FBS_KPI.some(n=>fold(n)===fold(x.n));
+  const add=(L,n)=>Object.assign(L.reduce((a,x)=>({tao:a.tao+x.tao,huy:a.huy+x.huy,hoan:a.hoan+x.hoan,giao:a.giao+x.giao,dt:a.dt+x.dt}),{tao:0,huy:0,hoan:0,giao:0,dt:0}),{n});
+  const row=(x,i,q)=>{const ch=x.tao-x.huy,w=[];if(x.tao>=20&&x.huy/x.tao>.2)w.push(pill("hủy cao","red"));if(x.n==="(chưa gán)")w.push(pill("chưa gán người","amb"));q=q||pm[x.n]||{};const qc=(q.tao||0)-(q.huy||0),tot=i<0;
+    return `<tr${tot?' class="pc-tot"':""}><td>${tot?"":i+1}</td><td><b>${esc(x.n)}</b></td>${fbdTd(money(x.dt),x.dt,q.dt)}${fbdTd(nf(x.tao),x.tao,q.tao)}${fbdTd(nf(ch),ch,qc)}${fbdTd(nf(x.giao),x.giao,q.giao)}${fbdTd(nf(x.huy),x.huy,q.huy,true)}${fbdTd(nf(x.hoan),x.hoan,q.hoan,true)}${fbdTd(fbdPct(ch,x.tao),x.tao?ch/x.tao:0,q.tao?qc/q.tao:0)}${fbdTd(fbdPct(x.huy,x.tao),x.tao?x.huy/x.tao:0,q.tao?q.huy/q.tao:0,true)}<td>${w.join(" ")||"—"}</td></tr>`};
+  const grp=t=>`<tr class="pc-grp"><td colspan="11">${t}</td></tr>`;
+  let table="";
+  if(P){const K=P.list.filter(isK),O=P.list.filter(x=>!isK(x)),T=add(P.list,"Tổng"),Kt=add(K,"Cộng nhóm tính KPI"),Pk=Pp?add(Pp.list.filter(isK),""):{},Pt=Pp?add(Pp.list,""):{};
+    table=`<section class="pc-card"><div class="pc-h"><b>Xếp hạng và cảnh báo người xử lý đơn</b><span>${esc(pLabel())} · ${P.n} ngày có số · lấy tự động từ Pancake</span></div><div class="pc-tw"><table class="pc-t"><thead><tr><th>Hạng</th><th>Người xử lý đơn</th><th class="n">Doanh thu</th><th class="n">Đơn tạo</th><th class="n">Chốt</th><th class="n">Giao TC</th><th class="n">Hủy</th><th class="n">Hoàn</th><th class="n">Tỷ lệ chốt</th><th class="n">Tỷ lệ hủy</th><th>Cảnh báo</th></tr></thead><tbody>${[grp("Người tính KPI")].concat(K.map((x,i)=>row(x,i)),K.length?[row(Kt,-1,Pk)]:[],[grp("Hỗ trợ, đơn tự động, chưa gán người (không tính KPI)")],O.map((x,i)=>row(x,K.length+i)),[row(T,-1,Pt)]).join("")}</tbody></table></div><p class="fbd-note" style="padding:8px 14px 10px">Doanh thu = đơn đã xác nhận, đã trừ đơn hoàn và đơn hủy, xếp theo ngày tạo đơn. Người xử lý là người bán hàng gắn trên đơn Pancake. Người tính KPI: ${FBS_KPI.join(", ")}. Đơn hoàn tính theo ngày hoàn nên có thể nằm khác ngày với đơn gốc.${havePrev?"":" Kỳ trước chưa có số theo người nên chưa so sánh."}</p></section>`}
+  return panel+table;
+}
+PAGES.fb_sale=m=>{m.innerHTML=H("Hoạt động Sale B2C","Facebook · người xử lý đơn trên Pancake (Sale + CSKH)")+fbdSaleView();fbdBindMet(m)};
