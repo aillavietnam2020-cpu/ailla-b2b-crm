@@ -125,7 +125,7 @@ Ví dụ tháng 9 (kỳ đã đóng, số thật): doanh thu 1,21 tỷ; giá v�
 **Tính KPI**: Mai Hương, Huyền Phạm, Linh Ha.
 **Không tính sale** (hiện riêng để đủ tổng): chị Hoa, chị Thảo quản lý ("Nguyễn Thanh Thảo"), Thảo Đĩnh (Thảo ads, được xác nhận đơn nhưng không tính doanh thu như sale), tài khoản "Việt Nam" (đơn tự động từ trang bán hàng, máy chủ gọi API_CONNECTION), đơn chưa gán người.
 
-Doanh thu mỗi người theo **cách của Sale** ở mục 4: đơn đã xác nhận, bỏ đơn hoàn, bỏ đơn hủy, xếp theo **ngày tạo đơn**, để cùng cách đếm đơn của Sheet. Cảnh báo "hủy cao" khi tỷ lệ hủy của người đó trên 20%.
+Doanh thu mỗi người theo **cách của Sale** ở mục 4: đơn đã xác nhận, bỏ đơn hoàn, bỏ đơn hủy, xếp theo **ngày tạo đơn**, để cùng cách đếm đơn của Sheet. Máy chủ kéo từ Pancake theo ngày tạo đơn (tham số success_record = inserted_at), rồi trừ doanh thu đơn hoàn. Cảnh báo "hủy cao" khi tỷ lệ hủy của người đó trên 20%.
 
 ---
 
@@ -144,4 +144,4 @@ Khi hai số khác nhau, xem **số đơn trước** (đếm cùng ngày tạo),
 - Phí vận chuyển và giá vốn nạp từ Sheet bằng tay đến ngày gần nhất. Khi chị nhập chi phí thật trên web thì thay.
 - Chi phí vận hành, mục tiêu doanh số Facebook: chị nhập ở tab "Nhập chi phí".
 - Tháng 8 chưa đối chiếu được chi phí quảng cáo.
-- Doanh thu theo người của Sale đang được chuyển sang cách tính ở mục 10.
+- Doanh thu theo người đã chuyển sang cách của Sale (mục 10) từ 23/10/2026. Người tính KPI chính (Huyền Phạm, Mai Hương) lệch Sheet khoảng 3 đến 4%; các tài khoản Linh Ha, Thảo Đĩnh và đơn tự động còn lệch nhiều hơn vì Sheet và Pancake gán đơn cho người khác nhau.

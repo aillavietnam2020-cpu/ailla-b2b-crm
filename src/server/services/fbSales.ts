@@ -124,7 +124,7 @@ export async function syncFbSaleDays(
   const out: Array<{ day: string; ok: boolean; note: string }> = [];
   for (const day of days) {
     try {
-      const res = await fetchFn(saleUrl(shop, key, day, ['User.id'], { user_type: 'sale' }));
+      const res = await fetchFn(saleUrl(shop, key, day, ['User.id'], { user_type: 'sale', success_record: 'inserted_at' }));
       if (!res.ok) throw new Error(`Pancake trả lỗi ${res.status}`);
       const json = JSON.parse(await res.text()) as { data?: Array<Record<string, unknown>> };
       const rows: SaleRow[] = (json.data ?? []).map((r) => {
