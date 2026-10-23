@@ -8,7 +8,7 @@ import { adminOnlyEndpoint } from '../middleware/adminHost';
 import { khoReturnRoutes } from './khoReturns';
 import { purchasingRoutes, poStatus, autoPoForReceipt } from './purchasing';
 import { newId } from '../lib/ids';
-import { probeSaleSplit, syncFbSaleDays } from '../services/fbSales';
+import { probeSaleSplit, probeSaleExtra, syncFbSaleDays } from '../services/fbSales';
 import {
   POSCAKE_CHANNELS,
   SOURCE_CHANNELS,
@@ -2629,4 +2629,19 @@ khoRoutes.post('/online/sale-sync', async (c) => {
   for (let t = Date.parse(`${b.from}T00:00:00Z`); t <= Date.parse(`${b.to}T00:00:00Z`) && days.length < 26; t += 86_400_000) days.push(new Date(t).toISOString().slice(0, 10));
   if (days.length > 25) throw badRequest('TOO_MANY', 'Tối đa 25 ngày mỗi lần');
   return ok(c, await syncFbSaleDays(c.env.DB, c.env.INGEST_KEY, days, httpFetch));
+});
+
+/** Chẩn đoán (CEO): thử tham số analytics/sale. extra=ten:gia_tri,ten:gia_tri (chỉ cho phép vài tham số an toàn). */
+khoRoutes.get('/online/probe-sale2', async (c) => {
+  const auth = c.get('auth');
+  if (!isCeo(auth)) throw forbidden('Chỉ CEO chẩn đoán nguồn Pancake');
+  const day = c.req.query('day');
+  if (!isDate(day)) throw badRequest('BAD_PARAMS', 'Cần ngày');
+  const allow = new Set(['success_status', 'success_record', 'returned_record', 'date_type', 'record_type', 'order_status']);
+  const extra: Record<string, string> = {};
+  for (const part of (c.req.query('extra') ?? '').split(',')) {
+    const [k, v] = part.split(':');
+    if (k && v && allow.has(k)) extra[k] = v;
+  }
+  return ok(c, await probeSaleExtra(c.env.DB, c.env.INGEST_KEY, day, extra, httpFetch));
 });
