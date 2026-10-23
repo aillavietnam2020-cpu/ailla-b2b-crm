@@ -15,6 +15,7 @@ PAGES.cr_audit=m=>{m.innerHTML=H("Nhật ký","Ai đã sửa gì, lúc nào (gi�
     out.kho_gtri=MI("kho_gtri","Tồn kho & giá trị",()=>mhManage());
     [["mh_po","Đơn mua hàng"],["mh_hd","Chứng từ nhà cung cấp"],["mh_chi","Phiếu chi"],["mh_no","Công nợ nhà cung cấp"],["mh_gianvl","Giá nguyên vật liệu theo tháng"]].forEach(([k,t])=>{out[k]=MI(k,t,()=>mhManage())});
     out.cr_audit=MI("cr_audit","Nhật ký",u=>adm(u)&&crmRole()!=="EMPLOYEE");
+    out.soat_sl=MI("soat_sl","Máy soát số liệu",u=>adm(u)||can(u,"order.accounting.confirm"));
     return out};
   const pick=(P,keys,names)=>keys.map((k,i)=>{const it=P[k];return it?(names&&names[i]?[it[0],names[i],it[2],it[3]]:it):null}).filter(Boolean);
   const mk=(k,ic,n,spec)=>({k,adm:true,zone:"Quản trị",ic,n,sub:"",groups:()=>{const P=pool();return spec.map(([g,keys,names])=>[g,pick(P,keys,names)]).filter(g=>g[1].length)}});
@@ -35,7 +36,7 @@ PAGES.cr_audit=m=>{m.innerHTML=H("Nhật ký","Ai đã sửa gì, lúc nào (gi�
       ["Tài khoản",["nhansu","phongban"],["Tài khoản & phòng ban","Phòng ban & phân hệ"]],
       ["Thiết lập",["kenhban","quychuan"]],
       ["Dữ liệu & AI",["cr_import","caidat","bots","agentchat","agents"],["Dữ liệu","Sao lưu dữ liệu","Trợ lý AI","Điều hành agent","Agent AI"]],
-      ["Theo dõi",["cr_audit"]]]));
+      ["Theo dõi",["soat_sl","cr_audit"],["Máy soát số liệu","Nhật ký"]]]));
 
 }
 

@@ -114,6 +114,98 @@ const acTb=h=>{const L=h.split("\n"),o=[],isR=r=>/^\s*\|.*\|\s*$/.test(r);
     }else{o.push(L[i]);i++}
   }return o.join("\n")};
 const acFmt=t=>acTb(acLink(esc(t)).replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>")).replace(/`([^`\n]+)`/g,"<code>$1</code>").replace(/^(\s*)[-*] /gm,"$1• ").replace(/^#{1,6} +/gm,"");
+/* ---------- Khung xem file bên phải: markdown, Excel, Word, csv, txt, json (kéo cạnh trái để to/nhỏ, ⤢ để mở rộng) ---------- */
+const AC_DOC_CACHE=new Map();
+function acInline(t){
+  return t.replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>")
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*(?!\*)/g,"$1<i>$2</i>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+}
+function acTable(rows,head){
+  if(!rows||!rows.length)return '<p class="hint">Bảng trống.</p>';
+  const w=Math.max(...rows.map(r=>r.length)),pad=r=>{const x=r.slice();while(x.length<w)x.push("");return x};
+  const H=head===false?null:pad(rows[0]),B=(head===false?rows:rows.slice(1)).map(pad);
+  return '<div class="acv-tw"><table class="acv-t2">'+(H?'<thead><tr>'+H.map(c=>"<th>"+esc(c)+"</th>").join("")+"</tr></thead>":"")+"<tbody>"+B.map(r=>"<tr>"+r.map(c=>"<td>"+esc(c)+"</td>").join("")+"</tr>").join("")+"</tbody></table></div>";
+}
+function acCsv(text){
+  const rows=[];let row=[],cur="",q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===","||ch===";"||ch==="\t"){row.push(cur);cur=""}
+    else if(ch==="\n"){row.push(cur);rows.push(row);row=[];cur=""}
+    else if(ch!=="\r")cur+=ch;
+    if(rows.length>=2000)break}
+  if(cur||row.length){row.push(cur);rows.push(row)}
+  return rows;
+}
+function acMd(src){
+  const L=String(src).replace(/\r/g,"").split("\n"),out=[];let i=0;
+  const isRow=l=>/^\s*\|.*\|\s*$/.test(l),isSep=l=>/^\s*\|[\s:|-]+\|\s*$/.test(l);
+  while(i<L.length){
+    let l=L[i];
+    if(/^\s*```/.test(l)){const buf=[];i++;while(i<L.length&&!/^\s*```/.test(L[i])){buf.push(L[i]);i++}i++;out.push('<pre class="acv-pre">'+esc(buf.join("\n"))+"</pre>");continue}
+    if(!l.trim()){i++;continue}
+    if(/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(l)){out.push("<hr>");i++;continue}
+    let m=/^(#{1,6})\s+(.*)$/.exec(l);
+    if(m){const n=Math.min(m[1].length+1,5);out.push("<h"+n+">"+acInline(esc(m[2]))+"</h"+n+">");i++;continue}
+    if(isRow(l)){const rows=[];while(i<L.length&&isRow(L[i])){if(!isSep(L[i]))rows.push(L[i].trim().replace(/^\||\|$/g,"").split("|").map(c=>c.trim()));i++}
+      const w=Math.max(...rows.map(r=>r.length));out.push('<div class="acv-tw"><table class="acv-t2"><thead><tr>'+rows[0].map(c=>"<th>"+acInline(esc(c))+"</th>").join("")+"</tr></thead><tbody>"+rows.slice(1).map(r=>{while(r.length<w)r.push("");return "<tr>"+r.map(c=>"<td>"+acInline(esc(c))+"</td>").join("")+"</tr>"}).join("")+"</tbody></table></div>");continue}
+    if(/^\s*>/.test(l)){const buf=[];while(i<L.length&&/^\s*>/.test(L[i])){buf.push(L[i].replace(/^\s*>\s?/,""));i++}out.push("<blockquote>"+acInline(esc(buf.join("\n"))).replace(/\n/g,"<br>")+"</blockquote>");continue}
+    if(/^\s*([-*+]|\d+[.)])\s+/.test(l)){const items=[];let ord=/^\s*\d/.test(l);
+      while(i<L.length&&/^\s*([-*+]|\d+[.)])\s+/.test(L[i])){const mm=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(L[i]);items.push('<li style="margin-left:'+Math.min(6,Math.floor(mm[1].length/2))*16+'px">'+acInline(esc(mm[3]))+"</li>");i++}
+      out.push((ord?"<ol>":"<ul>")+items.join("")+(ord?"</ol>":"</ul>"));continue}
+    const buf=[];while(i<L.length&&L[i].trim()&&!/^(#{1,6}\s|\s*```|\s*>|\s*\|.*\|\s*$|\s*([-*+]|\d+[.)])\s+)/.test(L[i])){buf.push(L[i]);i++}
+    if(!buf.length){buf.push(L[i]);i++}
+    out.push("<p>"+acInline(esc(buf.join("\n"))).replace(/\n/g,"<br>")+"</p>");
+  }
+  return out.join("");
+}
+function acViewer(){
+  let v=document.getElementById("ac-view");
+  if(v)return v;
+  v=document.createElement("div");v.id="ac-view";v.className="acv";v.hidden=true;
+  let w=0;try{w=+localStorage.getItem("ac_vw")||0}catch(e){}
+  if(w)v.style.setProperty("--acvw",w+"px");
+  v.innerHTML='<div class="acv-grip" title="Kéo để chỉnh độ rộng"></div><div class="acv-h"><b class="acv-title"></b><a class="acv-b" id="acv-dl" title="Tải file về">⬇</a><button class="acv-b" id="acv-max" title="Mở rộng / thu nhỏ">⤢</button><button class="acv-b" id="acv-x" title="Đóng">✕</button></div><div class="acv-body"></div>';
+  const st=document.createElement("style");st.textContent=AC_VIEW_CSS;document.head.appendChild(st);document.body.appendChild(v);
+  v.querySelector("#acv-x").onclick=()=>{v.hidden=true};
+  v.querySelector("#acv-max").onclick=()=>{const big=v.classList.toggle("big");if(!big)return;v.style.removeProperty("--acvw")};
+  const g=v.querySelector(".acv-grip");
+  g.onpointerdown=e=>{e.preventDefault();g.setPointerCapture(e.pointerId);v.classList.remove("big");
+    g.onpointermove=ev=>{const nw=Math.max(300,Math.min(window.innerWidth*.92,window.innerWidth-ev.clientX-12));v.style.setProperty("--acvw",Math.round(nw)+"px")};
+    g.onpointerup=()=>{g.onpointermove=null;g.onpointerup=null;try{localStorage.setItem("ac_vw",parseInt(getComputedStyle(v).width))}catch(e2){}}};
+  setInterval(()=>{if(typeof PAGE!=="undefined"&&PAGE!=="agentchat")v.hidden=true},1500);
+  return v;
+}
+async function acOpenDoc(id,name){
+  const v=acViewer(),body=v.querySelector(".acv-body");
+  v.querySelector(".acv-title").textContent=name;body.innerHTML='<p class="hint">Đang mở…</p>';v.hidden=false;
+  const ext=(name.split(".").pop()||"").toLowerCase();
+  try{
+    let blob=AC_DOC_CACHE.get(id);
+    if(!blob){const r=await fetch("/api/agent-chat/doc/"+id,{credentials:"same-origin"});if(!r.ok)throw new Error("Không tải được file ("+r.status+")");blob=await r.blob();AC_DOC_CACHE.set(id,blob)}
+    const url=URL.createObjectURL(blob),dl=v.querySelector("#acv-dl");dl.href=url;dl.download=name;
+    if(ext==="md"||ext==="markdown")body.innerHTML='<div class="acv-md">'+acMd(await blob.text())+"</div>";
+    else if(ext==="txt"||ext==="log")body.innerHTML='<pre class="acv-pre">'+esc(await blob.text())+"</pre>";
+    else if(ext==="json"){let t=await blob.text();try{t=JSON.stringify(JSON.parse(t),null,2)}catch(e){}body.innerHTML='<pre class="acv-pre">'+esc(t)+"</pre>"}
+    else if(ext==="csv")body.innerHTML=acTable(acCsv(await blob.text()));
+    else if(ext==="xlsx"||ext==="docx"){
+      const p=await svApi("/api/agent-chat/doc/"+id+"/preview");
+      if(!p||!p.preview){body.innerHTML='<p class="hint">File này chưa xem trước được trên web (file chị tải lên, hoặc định dạng không đọc được). Bấm ⬇ để tải về mở bằng Excel/Word.</p>';return}
+      const d=JSON.parse(p.preview);
+      if(d.sheets){
+        const show=k=>{body.querySelector(".acv-sheet").innerHTML=acTable(d.sheets[k].rows)+(d.sheets[k].truncated?'<p class="hint">Chỉ hiện 300 dòng đầu, tải file về để xem đủ.</p>':"");body.querySelectorAll("[data-sh]").forEach(b=>b.classList.toggle("on",+b.dataset.sh===k))};
+        body.innerHTML='<div class="acv-tabs">'+d.sheets.map((s,k)=>'<button data-sh="'+k+'">'+esc(s.name)+"</button>").join("")+'</div><div class="acv-sheet"></div>';
+        body.querySelectorAll("[data-sh]").forEach(b=>b.onclick=()=>show(+b.dataset.sh));show(0);
+      }else body.innerHTML='<div class="acv-md">'+(d.blocks||[]).map(b=>b.t==="tbl"?acTable(b.rows,false):b.h?"<h"+Math.min(b.h+1,5)+">"+esc(b.s)+"</h"+Math.min(b.h+1,5)+">":"<p>"+esc(b.s)+"</p>").join("")+"</div>";
+    }
+    else if(ext==="pdf"){window.open(url,"_blank");body.innerHTML='<p class="hint">Đã mở PDF ở tab mới. Nếu trình duyệt chặn cửa sổ, bấm ⬇ để tải về.</p>'}
+    else body.innerHTML='<p class="hint">Loại file này chưa xem trực tiếp được trên web. Bấm ⬇ để tải về.</p>';
+  }catch(e){body.innerHTML='<p class="note red">'+esc(e.message||"Không mở được file")+"</p>"}
+}
+const AC_VIEW_CSS='.acv{position:fixed;top:64px;right:12px;bottom:12px;width:var(--acvw,460px);max-width:92vw;min-width:300px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(20,30,60,.22);z-index:60;display:flex;flex-direction:column}.acv[hidden]{display:none}.acv.big{width:80vw}.acv-grip{position:absolute;left:-6px;top:0;bottom:0;width:12px;cursor:ew-resize;touch-action:none}.acv-grip:hover{background:linear-gradient(90deg,transparent,rgba(99,102,241,.25),transparent)}.acv-h{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line)}.acv-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.acv-b{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:32px;height:30px;cursor:pointer;font-size:14px;text-decoration:none;color:inherit;display:grid;place-items:center;padding:0}.acv-body{flex:1;overflow:auto;padding:14px 16px;font-size:14px;line-height:1.55}.acv-md h2,.acv-md h3,.acv-md h4,.acv-md h5{margin:14px 0 6px;line-height:1.3}.acv-md h2{font-size:18px}.acv-md h3{font-size:16px}.acv-md h4,.acv-md h5{font-size:14.5px}.acv-md p{margin:6px 0}.acv-md ul,.acv-md ol{margin:6px 0;padding-left:20px}.acv-md blockquote{margin:8px 0;padding:4px 10px;border-left:3px solid var(--pink,#e11d74);background:rgba(0,0,0,.04);color:var(--muted)}.acv-md hr{border:0;border-top:1px solid var(--line);margin:12px 0}.acv-md code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px;font-size:12.5px}.acv-pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.04);padding:10px 12px;border-radius:10px;font:12.5px/1.5 ui-monospace,Consolas,monospace;margin:8px 0}.acv-tw{overflow:auto;margin:8px 0}.acv-t2{border-collapse:collapse;font-size:13px;min-width:100%}.acv-t2 th,.acv-t2 td{border:1px solid var(--line);padding:5px 9px;text-align:left;vertical-align:top}.acv-t2 th{background:rgba(0,0,0,.05);position:sticky;top:0}.acv-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.acv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}.acv-tabs button.on{background:var(--pink-soft,#fde7ef);border-color:var(--pink,#e11d74)}.ac-dl{font:inherit;cursor:pointer}';
 const acHour=s=>{try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch(e){return ""}};
 const acAgo=s=>{if(!s)return "chưa có";const d=(Date.now()-Date.parse(s))/1000;return d<90?"vừa xong":d<3600?Math.round(d/60)+" phút trước":d<86400?Math.round(d/3600)+" giờ trước":Math.round(d/86400)+" ngày trước"};
 const acA=id=>(AC.agents||[]).find(x=>x.id===id);
@@ -205,8 +297,9 @@ function acDrawMsgs(stick){
     const act=m.role==="SYSTEM"?"":`<span class="ac-act"><button data-cp="${i}" title="Bôi đen một đoạn rồi bấm để chỉ copy đoạn đó">Copy</button><button data-rp="${i}" title="Bôi đen một đoạn rồi bấm để chỉ trả lời đoạn đó">Trả lời</button></span>`;
     const st=u?(m.status==="queued"?" · đang chờ":m.status==="taken"?" · agent đang làm…":m.status==="error"?" · lỗi":""):"";
     const who=u?`<span class="ac-me">${esc(((ME&&ME.name)||"H").trim().split(/\s+/).pop().slice(0,1).toUpperCase())}</span>`:m.role==="AGENT"?acAv(a):"";
-    return `<div class="ac-row2 ${u?"u":""}" style="--ac:${esc(a.color||"#64748b")}">${who}<div class="ac-m ${k}"><span class="nm">${u?esc((ME&&ME.name)||"Chị Hoa"):m.role==="AGENT"?esc(a.name):"Hệ thống"}</span>${qhtml}${m.role==="AGENT"?acFmt(m.body):esc(mbody)}${(m.files||[]).length?`<div class="ac-imgs n${Math.min((m.files||[]).length,4)}">${(m.files||[]).map(f=>`<a href="/api/agent-chat/file/${f.id}" target="_blank" rel="noopener"><img class="ac-img" src="/api/agent-chat/file/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>`:""}${(m.docs||[]).map(d=>`<a class="ac-dl" href="/api/agent-chat/doc/${d.id}" download>📄 ${esc(d.name)} · ${d.size>1048576?(d.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(d.size/1024))+" KB"}</a>`).join("")}<small>${acHour(m.created_at)}${st}${u&&m.tg?" · gửi cả Telegram":""}${m.source==="TELEGRAM"?" · từ Telegram":""}</small>${act}</div></div>`}).join(""):`<div class="hint">${AC.tab==="files"?"Chưa có ảnh hay link nào.":"Chưa có tin nào. Gõ bên dưới để nhắn agent."}</div>`;
+    return `<div class="ac-row2 ${u?"u":""}" style="--ac:${esc(a.color||"#64748b")}">${who}<div class="ac-m ${k}"><span class="nm">${u?esc((ME&&ME.name)||"Chị Hoa"):m.role==="AGENT"?esc(a.name):"Hệ thống"}</span>${qhtml}${m.role==="AGENT"?acFmt(m.body):esc(mbody)}${(m.files||[]).length?`<div class="ac-imgs n${Math.min((m.files||[]).length,4)}">${(m.files||[]).map(f=>`<a href="/api/agent-chat/file/${f.id}" target="_blank" rel="noopener"><img class="ac-img" src="/api/agent-chat/file/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>`:""}${(m.docs||[]).map(d=>`<button type="button" class="ac-dl" data-doc="${d.id}" data-dn="${esc(d.name)}" title="Bấm để xem ngay">📄 ${esc(d.name)} · ${d.size>1048576?(d.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(d.size/1024))+" KB"}</button>`).join("")}<small>${acHour(m.created_at)}${st}${u&&m.tg?" · gửi cả Telegram":""}${m.source==="TELEGRAM"?" · từ Telegram":""}</small>${act}</div></div>`}).join(""):`<div class="hint">${AC.tab==="files"?"Chưa có ảnh hay link nào.":"Chưa có tin nào. Gõ bên dưới để nhắn agent."}</div>`;
   box.querySelectorAll("[data-cp],[data-rp]").forEach(b=>b.onmousedown=e=>e.preventDefault()); // bấm nút không làm mất vùng bôi đen
+  box.querySelectorAll("[data-doc]").forEach(b=>b.onclick=()=>acOpenDoc(+b.dataset.doc,b.dataset.dn));
   box.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>acCopy(AC.shown[+b.dataset.cp],b));
   box.querySelectorAll("[data-rp]").forEach(b=>b.onclick=()=>acReply(AC.shown[+b.dataset.rp],b));
   if(stick||near)box.scrollTop=box.scrollHeight;

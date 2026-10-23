@@ -200,7 +200,7 @@ describe('Nhắn agent trên web', () => {
 
     const pulled = await relay('/pull', {});
     expect(pulled.body.data[0].body).toBe('(gửi file)');
-    expect(pulled.body.data[0].docs).toEqual([{ id, name: 'bang gia.xlsx', size: 1_000_000, nparts: 2 }]);
+    expect(pulled.body.data[0].docs).toEqual([{ id, name: 'bang gia.xlsx', size: 1_000_000, nparts: 2, has_preview: 0 }]);
     const part = await ctx.app.fetch(new Request(`http://x/api/agent-relay/doc/${id}/1`, { headers: { 'X-Relay-Key': 'relay-test-key-123' } }), ctx.env);
     expect(((await part.json()) as any).data.b64).toBe(btoa('manh hai'));
 
@@ -222,5 +222,23 @@ describe('Nhắn agent trên web', () => {
     const r = await relay('/reset-taken', {});
     expect(r.body.data.reset).toBe(1);
     expect((await relay('/pull', {})).body.data.map((m: any) => m.body)).toEqual(['ba']);
+  });
+
+  it('agent tạo file (xlsx) → cầu nối đưa lên web kèm bản xem trước → chị xem được, người khác không', async () => {
+    await ctx.request('/api/agent-chat', { as: USERS.ceo, body: { agent: 'main', body: 'làm bảng giúp chị' } });
+    const id = (await relay('/pull', {})).body.data[0].id;
+    const start = await relay('/doc-start', { name: 'bang-gia.xlsx', size: 1000, preview: JSON.stringify({ sheets: [{ name: 'Gia', rows: [['Mã', 'Giá'], ['V5', '149000']], truncated: false }] }) });
+    expect(start.status).toBe(200);
+    const did = start.body.data.id as number;
+    expect(start.body.data.nparts).toBe(1);
+    expect((await relay('/doc-part', { id: did, seq: 0, b64: btoa('x') })).status).toBe(200);
+    expect((await relay('/doc-start', { name: 'virus.exe', size: 10 })).status).toBe(400);
+    await relay('/push', { id, reply: 'Em gửi file', files: [], docs: [did] });
+    const list = await ctx.request('/api/agent-chat?agent=main', { as: USERS.ceo });
+    const doc = list.body.data.find((m: any) => m.role === 'AGENT').docs[0];
+    expect(doc).toMatchObject({ id: did, name: 'bang-gia.xlsx', has_preview: 1 });
+    const prev = await ctx.request(`/api/agent-chat/doc/${did}/preview`, { as: USERS.ceo });
+    expect(JSON.parse(prev.body.data.preview).sheets[0].rows[1]).toEqual(['V5', '149000']);
+    expect((await ctx.request(`/api/agent-chat/doc/${did}/preview`, { as: USERS.thao })).status).toBe(404);
   });
 });

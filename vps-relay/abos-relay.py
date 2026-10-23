@@ -27,6 +27,7 @@ HOA_TG = "8959489474"
 ADS_AGENTS = ("duan-ads-agent", "thaodinh-ads-agent", "viet-anh-ads-agent")
 IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")
 VID_EXT = (".mp4", ".mov", ".webm", ".mkv")
+DOC_EXT = (".md", ".txt", ".csv", ".json", ".xlsx", ".docx", ".pdf", ".pptx")
 
 
 def log(*a):
@@ -151,12 +152,80 @@ def pack_media(text):
             mb = os.path.getsize(path) / 1_048_576
             notes.append(f"(Video {name}, {mb:.1f} MB, đã tạo xong trên máy VPS. Web chưa xem trực tiếp được video; "
                          "tích ô 'Gửi cả bản trả lời sang Telegram' để nhận video trên Telegram.)")
+        elif low.endswith(DOC_EXT) and os.path.getsize(path) <= 25 * 1024 * 1024:
+            files.append({"kind": "doc", "path": path, "name": name})
         else:
             notes.append(f"(File {name} đã tạo trên máy VPS.)")
     clean = MEDIA_RE.sub("", text).strip()
     if notes:
         clean = (clean + "\n\n" + "\n".join(notes)).strip()
     return clean, files
+
+
+def make_preview(path, ext):
+    """Excel, Word đọc sẵn thành bảng/chữ (JSON) để web mở xem ngay; md, txt, csv, json web đọc thẳng từ file nên không cần."""
+    try:
+        if ext == "xlsx":
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            sheets = []
+            for ws in wb.worksheets[:8]:
+                rows, trunc = [], False
+                for r in ws.iter_rows(values_only=True):
+                    if not any(v is not None and str(v).strip() for v in r):
+                        continue
+                    rows.append(["" if v is None else str(v)[:200] for v in list(r)[:40]])
+                    if len(rows) >= 300:
+                        trunc = True
+                        break
+                sheets.append({"name": ws.title, "rows": rows, "truncated": trunc})
+            return json.dumps({"sheets": sheets}, ensure_ascii=False)
+        if ext == "docx":
+            import docx
+            from docx.table import Table
+            from docx.text.paragraph import Paragraph
+            d = docx.Document(path)
+            blocks = []
+            for el in d.element.body.iterchildren():
+                tag = el.tag.rsplit("}", 1)[-1]
+                if tag == "p":
+                    para = Paragraph(el, d)
+                    t = para.text.strip()
+                    if not t:
+                        continue
+                    sty = (para.style.name if para.style is not None else "") or ""
+                    lv = int(sty.split()[-1]) if sty.startswith("Heading") and sty.split()[-1].isdigit() else 0
+                    blocks.append({"t": "p", "s": t[:2000], "h": lv})
+                elif tag == "tbl":
+                    tb = Table(el, d)
+                    blocks.append({"t": "tbl", "rows": [[c.text.strip()[:200] for c in r.cells[:20]] for r in tb.rows[:300]]})
+                if len(blocks) >= 3000:
+                    break
+            return json.dumps({"blocks": blocks}, ensure_ascii=False)
+    except Exception as e:
+        log("không tạo được bản xem trước", os.path.basename(path), e)
+    return None
+
+
+def upload_docs(files, owner_id):
+    """Tách các file tài liệu ra khỏi danh sách ảnh: đưa lên web theo từng mảnh, trả về (ảnh, mã các file đã lên web)."""
+    imgs, ids = [], []
+    for f in files:
+        if f.get("kind") != "doc":
+            imgs.append(f)
+            continue
+        try:
+            path = f["path"]
+            ext = os.path.splitext(path)[1].lower().lstrip(".")
+            data = open(path, "rb").read()
+            r = web("/doc-start", {"name": f["name"], "size": len(data), "owner_id": owner_id, "preview": make_preview(path, ext)})
+            step = int(r["part_bytes"])
+            for i in range(int(r["nparts"])):
+                web("/doc-part", {"id": r["id"], "seq": i, "b64": base64.b64encode(data[i * step:(i + 1) * step]).decode()})
+            ids.append(r["id"])
+        except Exception as e:
+            log("không đưa file lên web được", f.get("name"), e)
+    return imgs, ids
 
 
 UPLOAD_DIR = "/root/.openclaw/media/web-uploads"
@@ -514,8 +583,9 @@ def sync_once(cursor):
                         if is_silent(text):
                             continue
                         clean, files = pack_media(text)
+                        files, docs = upload_docs(files, None)
                         items.append({"agent": agent, "role": "AGENT", "body": clean or "(ảnh)", "ext_id": f"{sid}:{seq}", "ts": ts,
-                                      "files": files})
+                                      "files": files, "docs": docs})
                 newcur[ck] = {"sid": sid, "seq": last, "kind": kind}
         except Exception as e:
             log("đồng bộ lỗi", agent, e)
@@ -608,7 +678,10 @@ def handle(m):
         WINDOWS.setdefault(m["agent"], []).append(win)
     try:
         reply, files = ask_agent(m)
-        web("/push", {"id": m["id"], "reply": reply, "files": files})
+        files, docs = upload_docs(files, m.get("owner_id"))
+        if not reply.strip() and (files or docs):
+            reply = "(Agent gửi file đính kèm.)"
+        web("/push", {"id": m["id"], "reply": reply, "files": files, "docs": docs})
     except Exception as e:  # lỗi của riêng tin này: báo lên web, đi tiếp
         log("lỗi tin", m["id"], e)
         late = ""

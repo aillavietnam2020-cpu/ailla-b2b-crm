@@ -32,6 +32,7 @@ import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
 import { khoRoutes } from './routes/kho';
+import { soatRoutes } from './routes/soatSoLieu';
 import { hrRoutes } from './routes/hr';
 
 /**
@@ -121,6 +122,7 @@ export function createApp() {
   app.route('/api/dashboards', dashboardRoutes);
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/kho', khoRoutes);
+  app.route('/api/hub/soat', soatRoutes);
   app.route('/api/hub/hr', hrRoutes);
   app.route('/api/hub', hubRoutes);
 
