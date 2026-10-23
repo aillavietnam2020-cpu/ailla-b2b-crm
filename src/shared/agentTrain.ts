@@ -1,9 +1,5 @@
 /** Luật kiểm tra dùng chung cho trang Huấn luyện agent (web) và công cụ trên VPS. Không phụ thuộc môi trường. */
 
-export const TRAIN_KINDS = ['SCRIPT', 'PRICE', 'FAQ', 'MEDIA', 'RULE'] as const;
-export type TrainKind = (typeof TRAIN_KINDS)[number];
-export const TRAIN_SETS = ['SALE', 'CSKH', 'BOTH'] as const;
-
 /** Che thông tin cá nhân trước khi lưu hội thoại cũ: số điện thoại, email, đường link, dãy số dài (tài khoản, mã vận đơn). */
 export function maskPersonal(text: string): string {
   return text

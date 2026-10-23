@@ -1,175 +1,651 @@
 /* ---------- Huấn luyện agent ----------
-   Chị dạy agent Sale và CSKH trực page: kịch bản, bảng giá, câu khách hay hỏi, ảnh/video, luật cấm.
-   Agent chỉ đọc bản chị ĐÃ DUYỆT; chỗ nào chị sửa thì tự về "nháp" tới khi chị duyệt lại.
-   Agent học từ hội thoại chỉ ĐỀ XUẤT, chị duyệt hoặc từ chối. Chạy thử: agent trả lời lại câu khách cũ để chị chấm.
-   Nút tắt khẩn và chế độ "chỉ thử với tài khoản của chị" nằm ở tab đầu. Không có chế độ gửi cho khách thật.
-   Chỉ CEO thấy. API: /api/agent-train (src/server/routes/agentTrain.ts). */
-const TR={tab:"ctl",set:"",items:[],sug:[],evals:[],log:[],ov:null,ctl:null,edit:null,q:""};
-const TR_ACT={"item.create":"Thêm mục","item.edit":"Sửa mục","item.approve":"Duyệt mục","item.archive":"Bỏ mục","suggestion.approve":"Duyệt đề xuất","suggestion.reject":"Từ chối đề xuất","control.kill":"BẬT tắt khẩn","control.unkill":"Gỡ tắt khẩn","control.save":"Lưu thiết lập"};
-const TR_KINDS={
-  script:{k:"SCRIPT",n:"Kịch bản",hint:"Câu mẫu đã duyệt theo mã (vd BT_GT1). Agent chỉ được chọn mã, không tự viết lại.",code:"Mã câu mẫu",grp:"Nhóm (vd: bột tẩy vạn năng)",title:"Khi nào dùng",body:"Nguyên văn câu mẫu",extra:"Ghi chú / mã ảnh đi kèm"},
-  price:{k:"PRICE",n:"Bảng giá",hint:"Giá, combo, quà chuẩn. Giá trong câu agent trả lời mà không có ở đây sẽ bị đánh dấu lỗi.",code:"Mã",grp:"Nhóm sản phẩm",title:"Sản phẩm / combo",body:"Giá và quà (vd: 149K; combo 369K tặng...)",extra:"Điều kiện"},
-  faq:{k:"FAQ",n:"Câu khách hỏi",hint:"Câu khách hay hỏi và câu trả lời chuẩn. Chưa có ở đây thì agent dừng và báo chị.",code:"Mã",grp:"Chủ đề",title:"Câu khách hỏi",body:"Câu trả lời chuẩn",extra:"Ghi chú"},
-  media:{k:"MEDIA",n:"Ảnh / video",hint:"Ảnh, video đã duyệt theo nhóm vết bẩn. Dán link ảnh vào ô ghi chú.",code:"Mã ảnh/video",grp:"Nhóm vết bẩn",title:"Tên ảnh / video",body:"Dùng khi nào",extra:"Link ảnh / video"},
-  rule:{k:"RULE",n:"Luật cấm",hint:"Mỗi dòng một câu/cụm từ agent KHÔNG được nói (vd câu về oxygen hoạt tính). Bắt gặp là bị đánh dấu lỗi.",code:"Mã",grp:"Nhóm",title:"Tên luật",body:"Các câu cấm (mỗi dòng một câu)",extra:"Lý do"}};
-const TR_ST={DRAFT:["Nháp","amb"],APPROVED:["Đã duyệt","grn"],ARCHIVED:["Đã bỏ","gry"]};
-const TR_SETS={SALE:"Sale",CSKH:"CSKH",BOTH:"Sale + CSKH"};
-const TR_CSS=`<style id="tr-css">
-.tr-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
-.tr-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;cursor:pointer;font-weight:600;color:var(--ink)}
-.tr-tabs button.on{background:var(--navy);color:#fff;border-color:transparent}
-.tr-tabs .tr-n{background:var(--orange);color:#fff;border-radius:999px;font-size:12px;padding:1px 7px;margin-left:6px}
-.tr-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
-.tr-card h3{margin:0 0 6px;font-size:15px}
-.tr-kill{border:2px solid var(--red);background:var(--red-soft)}
-.tr-kill.live{border-color:var(--line);background:var(--surface)}
-.tr-it{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--surface)}
-.tr-it .t{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;font-weight:600}
-.tr-it .b{white-space:pre-wrap;word-break:break-word;margin:6px 0;line-height:1.5}
-.tr-it .x{color:var(--muted);font-size:12.5px;white-space:pre-wrap;word-break:break-all}
-.tr-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.tr-form{display:grid;gap:8px}
-.tr-form input,.tr-form textarea,.tr-form select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit}
-.tr-form textarea{min-height:90px}
-.tr-flag{color:var(--red);font-size:13px}
-.tr-cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.tr-cmp>div{background:var(--gray-soft);border-radius:10px;padding:8px 10px;white-space:pre-wrap;word-break:break-word}
-.tr-cmp small{display:block;color:var(--muted);font-weight:600;margin-bottom:4px}
-.tr-stars button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 9px;cursor:pointer}
-.tr-stars button.on{background:var(--orange);color:#fff;border-color:transparent}
-@media(max-width:760px){.tr-cmp{grid-template-columns:1fr}}
+   Chị tạo bot bán hàng, soạn kịch bản (câu mẫu, luồng dạng sơ đồ như Botcake, giá, ảnh, bám đuổi, quy tắc), chạy mô phỏng,
+   xuất bản phiên bản, gắn bot vào Page. Agent trên VPS chỉ đọc phiên bản ĐANG DÙNG; nháp tự lưu nhưng agent chưa thấy.
+   Luồng gửi một mạch rồi dừng, không chờ khách. Khách bấm nút thì chạy luồng của nút; khách nhắn chữ thì agent chọn
+   luồng kế trong danh sách được phép; ngoài danh sách thì dừng và báo chị. Không có chế độ gửi cho khách thật.
+   Chỉ CEO thấy. API: /api/agent-train (src/server/routes/agentTrain.ts); bộ chạy luồng dùng chung: src/shared/agentFlow.ts. */
+(function(){
+"use strict";
+var HT_CSS=`<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap"><style id="ht-css">
+#ht{
+  --bg:#f6f7f9; --panel:#fff; --ink:#111827; --muted:#667085; --line:#e4e7ec; --chip:#f0f2f5;
+  --acc:#0b7a62; --acc-ink:#fff; --acc-soft:#dff4ee;
+  --ok:#157a3d; --ok-soft:#e1f5e8; --warn:#a85a0a; --warn-soft:#fdf0db; --bad:#b42318; --bad-soft:#fde7e4; --blue:#1d4fc4; --blue-soft:#e3ebfb;
+  --shadow:0 12px 40px rgba(16,24,40,.18);
+  --font:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+#ht,#ht *{box-sizing:border-box}
+#ht{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:0 24px}
+#ht button,#ht input,#ht select,#ht textarea{font:inherit;color:inherit}
+#ht .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line);margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-1 * max(16px,env(safe-area-inset-right,0px)));padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px))}
+#ht .top .in{max-width:1200px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#ht .hlogo{font-weight:700;font-size:16px;margin-right:6px}
+#ht .hlogo i{font-style:normal;color:var(--acc)}
+#ht .hsp{flex:1}
+#ht .wrap{max-width:1200px;margin:16px auto 0}
+#ht .btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:6px 13px;font-weight:600;cursor:pointer}
+#ht .btn:hover{border-color:var(--muted)}
+#ht .btn.pri{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+#ht .btn.red{background:var(--bad);border-color:var(--bad);color:#fff}
+#ht .btn.sm{padding:3px 9px;font-size:12.5px}
+#ht .btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+#ht .btn:disabled{opacity:.5;cursor:default}
+#ht select,#ht input[type=text],#ht input[type=number],#ht textarea{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:7px 10px;width:100%}
+#ht textarea{min-height:84px;resize:vertical}
+#ht select.inl{width:auto}
+#ht label.f{display:block;margin-bottom:10px}
+#ht label.f>span{display:block;font-weight:600;font-size:12.5px;margin-bottom:4px}
+#ht .hhint{color:var(--muted);font-size:12.5px}
+#ht .hpill{display:inline-block;font-size:12px;font-weight:600;padding:1px 10px;border-radius:99px;white-space:nowrap}
+#ht .ok{background:var(--ok-soft);color:var(--ok)}
+#ht .warn{background:var(--warn-soft);color:var(--warn)}
+#ht .bad{background:var(--bad-soft);color:var(--bad)}
+#ht .blue{background:var(--blue-soft);color:var(--blue)}
+#ht .gray{background:var(--chip);color:var(--muted)}
+#ht .acc{background:var(--acc-soft);color:var(--acc)}
+#ht .alert{padding:9px 14px;border-radius:10px;margin-bottom:12px;font-weight:600}
+#ht .alert.bad{background:var(--bad-soft);color:var(--bad)}
+#ht .shell{display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;align-items:start}
+#ht .hside{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px;position:sticky;top:64px}
+#ht .hside .bn{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:6px}
+#ht .hside .bn b{display:block}
+#ht .hside button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:500}
+#ht .hside button:hover{background:var(--chip)}
+#ht .hside button.on{background:var(--acc-soft);color:var(--acc);font-weight:600}
+#ht .hside .c{background:var(--chip);border-radius:99px;font-size:11.5px;padding:0 7px;color:var(--muted)}
+#ht .main{min-width:0}
+#ht h1{font-size:19px;margin:0}
+#ht .hph{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+#ht .hcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;min-width:0}
+#ht .hcard h3{margin:0 0 8px;font-size:14.5px}
+#ht .hgrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+#ht .hrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#ht .between{justify-content:space-between}
+#ht .tw{overflow-x:auto}
+#ht table{border-collapse:collapse;width:100%;min-width:520px}
+#ht th,#ht td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+#ht th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+#ht td.num,#ht th.num{font-variant-numeric:tabular-nums}
+#ht code{background:var(--chip);border-radius:6px;padding:1px 6px;font-size:12.5px}
+#ht .two{display:grid;grid-template-columns:240px minmax(0,1fr);gap:12px;align-items:start}
+#ht .list button.it{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:11px;padding:9px 12px;margin-bottom:8px;cursor:pointer}
+#ht .list button.it.on{border-color:var(--acc);background:var(--acc-soft)}
+#ht .list button.it small{display:block;color:var(--muted)}
+#ht .step{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;background:var(--panel)}
+#ht .step .n{width:26px;height:26px;border-radius:50%;background:var(--acc);color:var(--acc-ink);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px}
+#ht .step.h .n{background:var(--bad);color:#fff}
+#ht .step.w .n{background:var(--warn);color:#fff}
+#ht .step .t small{display:block;color:var(--muted)}
+#ht .chat{display:flex;flex-direction:column;gap:8px;min-height:260px;max-height:420px;overflow-y:auto;padding:4px}
+#ht .m{max-width:88%;padding:8px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
+#ht .m.k{align-self:flex-start;background:var(--chip)}
+#ht .m.a{align-self:flex-end;background:var(--acc);color:var(--acc-ink)}
+#ht .m.s{align-self:center;background:var(--bad-soft);color:var(--bad);font-weight:600;text-align:center}
+#ht .m.i{align-self:flex-end;background:var(--blue-soft);color:var(--blue)}
+#ht .split{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
+#ht .log{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:var(--chip);border-radius:10px;padding:10px 12px;overflow-x:auto;white-space:pre-wrap}
+#ht .media{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+#ht .im{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:repeating-linear-gradient(45deg,var(--chip),var(--chip) 8px,var(--panel) 8px,var(--panel) 16px);display:flex;align-items:flex-end;padding:5px;font-size:11px;color:var(--muted)}
+#ht .im.x{outline:2px solid var(--bad)}
+#ht .veil{position:fixed;inset:0;background:rgba(10,14,22,.45);z-index:20;display:flex;justify-content:flex-end}
+#ht .hdrawer{width:min(460px,100%);height:100%;background:var(--panel);box-shadow:var(--shadow);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+#ht .hdrawer .dh{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+#ht .hdrawer .db{padding:16px 18px;overflow-y:auto;flex:1}
+#ht .hdrawer .df{padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+#ht .hchips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+#ht .htoast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:10px;z-index:30;font-weight:600}
+#ht .bots{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+#ht .pv{background:var(--chip);border-radius:10px;padding:10px 12px;white-space:pre-wrap}
+#ht .cvw{overflow:auto;height:460px;border:1px solid var(--line);border-radius:12px;background-color:var(--bg);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:18px 18px;position:relative}
+#ht .cv{position:relative;min-width:100%;min-height:100%}
+#ht .edges{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+#ht .edges path{fill:none;stroke:var(--acc);stroke-width:2}
+#ht .nd{position:absolute;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 8px rgba(16,24,40,.08)}
+#ht .nd.sel{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc-soft)}
+#ht .nd .nh{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);font-weight:600;font-size:12.5px;cursor:grab;touch-action:none;user-select:none}
+#ht .nd.cond .nh{color:var(--warn)}
+#ht .nd.handoff .nh{color:var(--bad)}
+#ht .nd.jump .nh{color:var(--blue)}
+#ht .nd.img .nh{color:var(--muted)}
+#ht .nd .nb{padding:8px 10px;font-size:12.5px;word-break:break-word}
+#ht .nd .dots{padding:4px 10px 8px;text-align:right;font-size:12px;color:var(--muted);display:flex;justify-content:flex-end;gap:12px}
+#ht .dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--acc);margin-left:5px;cursor:crosshair;vertical-align:middle;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--acc)}
+#ht .hcvbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+#ht .phone{background:var(--bg);border:6px solid var(--ink);border-radius:26px;padding:12px 10px;max-width:330px;margin:0 auto}
+#ht .phone .chat{min-height:200px;max-height:360px}
+#ht .bchip{display:inline-block;margin:6px 6px 0 0;padding:3px 10px;border:1px solid var(--acc);color:var(--acc);border-radius:99px;font-size:12.5px;font-weight:600;background:var(--panel);cursor:pointer}
+#ht .achip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:2px 11px;font-size:12.5px;cursor:pointer}
+#ht .achip.on{background:var(--acc-soft);border-color:var(--acc);color:var(--acc);font-weight:600}
+#ht :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+@media(max-width:820px){#ht .shell{grid-template-columns:1fr}
+#ht .hside{position:static;display:flex;overflow-x:auto;gap:4px}
+#ht .hside .bn{display:none}
+#ht .hside button{white-space:nowrap;width:auto}
+#ht .two,#ht .split{grid-template-columns:1fr}}
+#ht .ttop{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+#ht .hlogo{font-weight:700;font-size:16px}#ht .hlogo i{font-style:normal;color:var(--acc)}
+#ht .hstabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+#ht .hstabs button{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:6px 14px;cursor:pointer;font-weight:600}
+#ht .hstabs button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+#ht .hside{top:12px}
+#ht .imgs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}#ht .imgs img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+#ht .im{position:relative;overflow:hidden;padding:0}#ht .im img{width:100%;height:100%;object-fit:cover}#ht .im button{position:absolute;right:4px;top:4px}
+#ht .tw{overflow-x:auto}
+#ht .kill{border:2px solid var(--bad);background:var(--bad-soft)}
+#ht{font-family:var(--font);font-size:14px;line-height:1.5;color:var(--ink)}
+#ht .veil{z-index:200}#ht .htoast{z-index:210}
+
 </style>`;
-const trApi=(p,o)=>svApi("/api/agent-train"+p,o);
-const trNote=(t)=>`<div class="note">${t}</div>`;
-async function trLoadOv(){try{TR.ov=await trApi("/overview");TR.ctl=TR.ov.control}catch(e){toast("Chưa tải được: "+e.message)}}
-const trCount=(kind,st)=>((TR.ov&&TR.ov.items)||[]).filter(r=>r.kind===kind&&(!st||r.status===st)).reduce((a,r)=>a+r.n,0);
-function trTabs(){
-  const pend=TR.ov?TR.ov.pending_suggestions:0;
-  const tabs=[["ctl","Điều khiển"],["script","Kịch bản"],["price","Bảng giá"],["faq","Câu khách hỏi"],["media","Ảnh / video"],["rule","Luật cấm"],["sug","Đề xuất"+(pend?`<span class="tr-n">${pend}</span>`:"")],["eval","Chạy thử"],["log","Lịch sử"]];
-  return `<div class="tr-tabs">${tabs.map(t=>`<button data-trt="${t[0]}" class="${TR.tab===t[0]?"on":""}">${t[1]}</button>`).join("")}</div>`;
+var api=function(p,o){return svApi("/api/agent-train"+p,o)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function rid(p){return p+Math.random().toString(36).slice(2,8)}
+function mk(a,id){for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i];return null}
+function fm(s){try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch(e){return s||""}}
+function nowHM(){var d=new Date();return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}
+
+var ST={view:"home",hsub:"bp",bots:[],pages:[],ctl:{kill:false,testers:"",silent_minutes:30,hours_from:"",hours_to:""},hlog:[],runs:[],
+  botId:"",name:"",doc:null,issues:[],versions:[],dirty:false,save:"saved",tab:"tt",sel:"",node:"",conn:null,drawer:null,toast:"",
+  xh:"",phone:false,chat:[],cur:null,simlog:[],root:null,pvTok:0,q:"",busy:false};
+
+/* ---------- Tự lưu nháp ---------- */
+var saveT=null;
+function saveLabel(){
+  if(ST.save==="pending"||ST.save==="saving")return "Đang lưu nháp…";
+  if(ST.save==="error")return "Lưu nháp lỗi";
+  return ST.dirty?"Đã lưu nháp · chưa xuất bản":"Đã xuất bản";
 }
-async function trShow(){
-  const box=$("#tr-body");if(!box)return;
-  $("#tr-tabs").innerHTML=trTabs();
-  $("#tr-tabs").querySelectorAll("[data-trt]").forEach(b=>b.onclick=()=>{TR.tab=b.dataset.trt;TR.edit=null;trShow()});
-  const t=TR.tab;
+function updTop(){
+  var l=document.getElementById("ht-save");if(l)l.textContent=saveLabel();
+  var p=document.getElementById("ht-pub");if(p)p.disabled=!ST.dirty||ST.busy;
+}
+function touch(){ST.dirty=true;ST.save="pending";clearTimeout(saveT);saveT=setTimeout(flush,700);updTop()}
+async function flush(){
+  clearTimeout(saveT);
+  if(ST.save!=="pending"||!ST.botId)return true;
+  ST.save="saving";updTop();
   try{
-    if(t==="ctl"){await trLoadOv();trDrawCtl(box)}
-    else if(TR_KINDS[t]){TR.items=await trApi("/items?kind="+TR_KINDS[t].k);trDrawItems(box,t)}
-    else if(t==="sug"){TR.sug=await trApi("/suggestions");trDrawSug(box)}
-    else if(t==="eval"){TR.evals=await trApi("/evals");trDrawEval(box)}
-    else if(t==="log"){TR.log=await trApi("/log");trDrawLog(box)}
-  }catch(e){box.innerHTML=`<div class="hint">Chưa tải được: ${esc(e.message)}</div>`}
+    var r=await api("/bots/"+ST.botId,{method:"PUT",body:JSON.stringify({name:ST.name,draft:ST.doc})});
+    ST.issues=r.issues;
+    if(ST.save==="saving")ST.save="saved";
+    updTop();updIssues();return true;
+  }catch(e){ST.save="error";updTop();toast("Chưa lưu được nháp: "+e.message);return false}
 }
-/* ---- Điều khiển: nút tắt khẩn + chế độ thử ---- */
-function trDrawCtl(box){
-  const c=TR.ctl||{mode:"off",kill:false,testers:""};
-  const sum=Object.entries(TR_KINDS).map(([k,v])=>`<tr><td>${v.n}</td><td>${trCount(v.k,"APPROVED")}</td><td>${trCount(v.k,"DRAFT")}</td></tr>`).join("");
-  box.innerHTML=`<div class="tr-card tr-kill ${c.kill?"":"live"}"><h3>${c.kill?"⛔ ĐANG TẮT KHẨN: agent không trả lời ai":"Nút tắt khẩn"}</h3>
-  <div class="hint">Bật là agent ngừng ngay: gói kiến thức trả về trống nên không còn câu nào để gửi. Tắt khẩn thắng mọi chế độ khác.</div>
-  <div class="tr-act"><button class="btn ${c.kill?"pri":"danger"}" id="tr-kill">${c.kill?"Gỡ tắt khẩn":"TẮT KHẨN agent"}</button></div></div>
-  <div class="tr-card"><h3>Chế độ</h3>
-  <div class="hint">Hiện chỉ có 2 chế độ: <b>Tắt</b> hoặc <b>Chỉ thử với tài khoản của chị</b>. Gửi cho khách thật chưa có trong trang này — chị duyệt riêng rồi mới mở.</div>
-  <div class="tr-form" style="margin-top:8px"><select id="tr-mode"><option value="off" ${c.mode==="off"?"selected":""}>Tắt (agent chưa trả lời ai)</option><option value="tester" ${c.mode==="tester"?"selected":""}>Chỉ thử với tài khoản của chị</option></select>
-  <input id="tr-testers" placeholder="Tài khoản thử được phép (tên hoặc mã Facebook, cách nhau dấu phẩy)" value="${esc(c.testers||"")}">
-  <label>Nhân viên nhắn tay thì agent im trong (phút) <input id="tr-silent" type="number" min="1" max="1440" value="${c.silent_minutes||30}"></label>
-  <label>Khung giờ agent được trả lời (để trống = cả ngày) <span style="display:flex;gap:8px"><input id="tr-hf" type="time" value="${esc(c.hours_from||"")}"><input id="tr-ht" type="time" value="${esc(c.hours_to||"")}"></span></label>
-  <div class="hint">Câu khách hỏi ngoài kịch bản đã duyệt: agent <b>dừng và báo chị</b>, không dùng kiến thức chung để đoán.</div>
-  <div><button class="btn pri" id="tr-save">Lưu chế độ</button></div></div></div>
-  <div class="tr-card"><h3>Kho kiến thức hiện có</h3><table class="tbl"><thead><tr><th>Mục</th><th>Đã duyệt</th><th>Nháp</th></tr></thead><tbody>${sum}</tbody></table>
-  <div class="hint" style="margin-top:6px">Agent chỉ thấy các mục <b>Đã duyệt</b>. Sửa một mục đã duyệt thì mục đó về Nháp tới khi chị duyệt lại.</div></div>`;
-  $("#tr-kill").onclick=async()=>{
-    if(!c.kill&&!confirm("Tắt khẩn: agent ngừng trả lời ngay. Chắc chắn?"))return;
-    try{TR.ctl=await trApi("/control",{method:"PUT",body:JSON.stringify({kill:!c.kill})});toast(TR.ctl.kill?"Đã tắt khẩn":"Đã gỡ tắt khẩn");trDrawCtl(box)}catch(e){toast("Chưa lưu được: "+e.message)}};
-  $("#tr-save").onclick=async()=>{
-    try{TR.ctl=await trApi("/control",{method:"PUT",body:JSON.stringify({mode:$("#tr-mode").value,testers:$("#tr-testers").value,silent_minutes:+$("#tr-silent").value,hours_from:$("#tr-hf").value,hours_to:$("#tr-ht").value})});toast("Đã lưu");trDrawCtl(box)}catch(e){toast("Chưa lưu được: "+e.message)}};
+function updIssues(){var b=document.getElementById("ht-issues");if(b)b.innerHTML=issuesBar()}
+function toast(t){ST.toast=t;draw();clearTimeout(toast.h);toast.h=setTimeout(function(){ST.toast="";draw()},2600)}
+
+/* ---------- Tải dữ liệu ---------- */
+async function loadHome(){
+  try{
+    var r=await Promise.all([api("/bots"),api("/pages"),api("/control")]);
+    ST.bots=r[0];ST.pages=r[1];ST.ctl=r[2];
+  }catch(e){toast("Chưa tải được: "+e.message)}
+  draw();
 }
-/* ---- Danh sách mục (kịch bản, giá, câu hỏi, ảnh/video, luật cấm) ---- */
-function trForm(t,it){
-  const K=TR_KINDS[t],v=it||{agent_set:TR.set||"SALE",grp:"",code:"",title:"",body:"",extra:""};
-  return `<div class="tr-card"><h3>${it&&it.id?"Sửa mục":"Thêm mục mới"} · ${K.n}</h3><div class="tr-form">
-  <select id="tf-set">${Object.entries(TR_SETS).map(([k,n])=>`<option value="${k}" ${v.agent_set===k?"selected":""}>Cho agent: ${n}</option>`).join("")}</select>
-  <input id="tf-grp" placeholder="${esc(K.grp)}" value="${esc(v.grp)}"><input id="tf-code" placeholder="${esc(K.code)}" value="${esc(v.code)}">
-  <input id="tf-title" placeholder="${esc(K.title)}" value="${esc(v.title)}">
-  <textarea id="tf-body" placeholder="${esc(K.body)}">${esc(v.body)}</textarea>
-  <textarea id="tf-extra" style="min-height:50px" placeholder="${esc(K.extra)}">${esc(v.extra)}</textarea>
-  <div class="tr-act"><button class="btn pri" id="tf-ok">Lưu (thành nháp)</button><button class="btn" id="tf-no">Bỏ</button></div></div></div>`;
+async function loadBot(id,keepTab){
+  var r=await api("/bots/"+id);
+  ST.botId=id;ST.name=r.name;ST.doc=r.draft;ST.issues=r.issues;ST.versions=r.versions;ST.dirty=r.dirty;ST.save="saved";
+  if(!keepTab){ST.tab="tt";ST.chat=[];ST.cur=null;ST.simlog=[]}
+  if(!mk(ST.doc.flows,ST.sel))ST.sel=(ST.doc.flows[0]||{}).id||"";
+  var f=mk(ST.doc.flows,ST.sel);if(!f||!mk(f.nodes,ST.node))ST.node=f&&f.nodes[0]?f.nodes[0].id:"";
+  ST.conn=null;
 }
-function trDrawItems(box,t){
-  const K=TR_KINDS[t],q=TR.q.toLowerCase(),sf=TR.set;
-  const rows=TR.items.filter(i=>(!sf||i.agent_set===sf||i.agent_set==="BOTH")&&(!q||(i.title+i.body+i.code+i.grp).toLowerCase().includes(q)));
-  const nd=rows.filter(i=>i.status==="DRAFT").length;
-  let last="";
-  box.innerHTML=trNote(esc(K.hint))+
-   `<div class="tr-act" style="margin:0 0 10px;align-items:center"><button class="btn pri" id="tr-add">+ Thêm</button>
-    <select id="tr-sf"><option value="">Tất cả agent</option><option value="SALE" ${sf==="SALE"?"selected":""}>Sale</option><option value="CSKH" ${sf==="CSKH"?"selected":""}>CSKH</option></select>
-    <input id="tr-q" placeholder="Tìm…" value="${esc(TR.q)}" style="border:1px solid var(--line);border-radius:10px;padding:7px 10px">
-    ${nd?`<button class="btn" id="tr-all">Duyệt hết ${nd} mục nháp</button>`:""}</div>`+
-   (TR.edit?trForm(t,TR.edit):"")+
-   (rows.length?rows.map(i=>{
-     const g=i.grp!==last?`<h4 style="margin:14px 0 6px">${esc(i.grp||"(chưa có nhóm)")}</h4>`:"";last=i.grp;
-     const st=TR_ST[i.status]||["",""];
-     return g+`<div class="tr-it"><div class="t"><span>${i.code?`<code>${esc(i.code)}</code> `:""}${esc(i.title)}</span><span><span class="pill p-${st[1]}">${st[0]}</span> <span class="pill p-gry">${TR_SETS[i.agent_set]}</span>${i.source==="AGENT"?` <span class="pill p-gry">agent đề xuất</span>`:""}</span></div>
-      ${i.body?`<div class="b">${esc(i.body)}</div>`:""}${i.extra?`<div class="x">${esc(i.extra)}</div>`:""}
-      <div class="tr-act">${i.status!=="APPROVED"?`<button class="btn pri" data-ok="${i.id}">Duyệt</button>`:""}<button class="btn" data-ed="${i.id}">Sửa</button><button class="btn" data-ar="${i.id}">Bỏ</button></div></div>`}).join(""):`<div class="hint">Chưa có mục nào${q||sf?" khớp bộ lọc":""}. Bấm “+ Thêm”.</div>`);
-  $("#tr-add").onclick=()=>{TR.edit={};trDrawItems(box,t)};
-  $("#tr-sf").onchange=e=>{TR.set=e.target.value;trDrawItems(box,t)};
-  $("#tr-q").oninput=e=>{TR.q=e.target.value;clearTimeout(trDrawItems.h);trDrawItems.h=setTimeout(()=>{trDrawItems(box,t);const i=$("#tr-q");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)};
-  if($("#tr-all"))$("#tr-all").onclick=async()=>{if(!confirm(`Duyệt ${nd} mục nháp đang hiện? Agent sẽ dùng nguyên văn các mục này.`))return;
-    try{for(const i of rows.filter(x=>x.status==="DRAFT"))await trApi("/items/"+i.id+"/approve",{method:"POST"});toast("Đã duyệt");trShow()}catch(e){toast(e.message)}};
-  box.querySelectorAll("[data-ok]").forEach(b=>b.onclick=async()=>{try{await trApi("/items/"+b.dataset.ok+"/approve",{method:"POST"});trShow()}catch(e){toast(e.message)}});
-  box.querySelectorAll("[data-ar]").forEach(b=>b.onclick=async()=>{if(!confirm("Bỏ mục này? Agent sẽ không dùng nữa."))return;try{await trApi("/items/"+b.dataset.ar+"/archive",{method:"POST"});trShow()}catch(e){toast(e.message)}});
-  box.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{TR.edit=TR.items.find(x=>x.id==b.dataset.ed);trDrawItems(box,t);scrollTo(0,0)});
-  if(TR.edit){
-    $("#tf-no").onclick=()=>{TR.edit=null;trDrawItems(box,t)};
-    $("#tf-ok").onclick=async()=>{
-      const body={kind:K.k,agent_set:$("#tf-set").value,grp:$("#tf-grp").value,code:$("#tf-code").value,title:$("#tf-title").value,body:$("#tf-body").value,extra:$("#tf-extra").value};
-      try{if(TR.edit.id)await trApi("/items/"+TR.edit.id,{method:"PATCH",body:JSON.stringify(body)});else await trApi("/items",{method:"POST",body:JSON.stringify(body)});
-        TR.edit=null;toast("Đã lưu thành nháp. Bấm Duyệt để agent dùng.");trShow()}catch(e){toast("Chưa lưu được: "+e.message)}};
+async function openBot(id){
+  try{await loadBot(id);ST.view="bot";draw()}catch(e){toast("Chưa mở được bot: "+e.message)}
+}
+async function goHome(){
+  await flush();ST.view="home";ST.botId="";ST.doc=null;await loadHome();
+}
+function D(){return ST.doc}
+function pageOfBot(){return ST.pages.filter(function(p){return p.bot_id===ST.botId})[0]||null}
+function modePill(m){return m==="tester"?'<span class="hpill warn">Chỉ thử tài khoản chị</span>':'<span class="hpill gray">Tắt</span>'}
+
+/* ---------- Vẽ ---------- */
+function draw(){
+  var root=ST.root;if(!root||!root.isConnected)return;
+  var cvOld=document.getElementById("cvw"),sl=cvOld?cvOld.scrollLeft:0,stp=cvOld?cvOld.scrollTop:0;
+  var focusId=document.activeElement&&document.activeElement.id==="simin"?"simin":(document.activeElement&&document.activeElement.id==="q"?"q":"");
+  var keepV=focusId?document.activeElement.value:null,keepPos=focusId&&document.activeElement.selectionStart;
+  root.innerHTML=topbar()+'<div id="ht-issues">'+(ST.view==="bot"?issuesBar():"")+"</div>"+
+    (ST.ctl.kill?'<div class="alert bad">ĐANG TẮT KHẨN: mọi agent ngừng trả lời ở tất cả Page. Bấm "Gỡ tắt khẩn" để bật lại.</div>':"")+
+    (ST.view==="home"?home():botView())+(ST.drawer?drawerHtml():"")+(ST.toast?'<div class="htoast">'+esc(ST.toast)+"</div>":"");
+  if(keepV!==null){var el=document.getElementById(focusId);if(el){el.value=keepV;el.focus();try{el.setSelectionRange(keepPos,keepPos)}catch(e){}}}
+  var ch=document.getElementById("chat");if(ch)ch.scrollTop=ch.scrollHeight;
+  var cvNew=document.getElementById("cvw");if(cvNew){cvNew.scrollLeft=sl;cvNew.scrollTop=stp}
+  drawEdges();
+  if(ST.view==="bot"&&ST.tab==="tc"&&!ST.drawer)loadPreview();
+}
+function topbar(){
+  var opts='<option value="">Tất cả bot và Page</option>'+ST.bots.map(function(b){return '<option value="'+b.id+'"'+(ST.view==="bot"&&ST.botId===b.id?" selected":"")+">"+esc(b.name)+"</option>"}).join("");
+  return '<div class="ttop"><span class="hlogo">Huấn luyện <i>agent</i></span>'+(ST.bots.length?'<select class="hinl" data-act="pickbot" aria-label="Chọn bot">'+opts+"</select>":"")+'<span class="hsp"></span>'+
+   (ST.view==="bot"?'<span class="hhint" id="ht-save">'+saveLabel()+'</span><button class="btn pri" id="ht-pub" data-act="publish"'+(ST.dirty&&!ST.busy?"":" disabled")+">Xuất bản</button>":"")+
+   '<button class="btn '+(ST.ctl.kill?"pri":"red")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button></div>";
+}
+function issuesBar(){
+  var er=ST.issues.filter(function(i){return i.level==="error"}),wr=ST.issues.filter(function(i){return i.level==="warn"});
+  if(!er.length&&!wr.length)return "";
+  return '<div class="alert '+(er.length?"bad":"warn")+'" style="font-weight:500">'+(er.length?'<b>'+er.length+" lỗi cần sửa trước khi xuất bản:</b> "+esc(er[0].msg)+(er.length>1?" (và "+(er.length-1)+" lỗi nữa, xem tab Tổng quan)":""):"<b>"+wr.length+" cảnh báo:</b> "+esc(wr[0].msg)+(wr.length>1?" (xem tab Tổng quan)":""))+"</div>";
+}
+function home(){
+  var subs=[["bp","Bot và Page"],["ctl","Điều khiển chung"],["log","Nhật ký"]];
+  var bar='<div class="hstabs">'+subs.map(function(s){return '<button data-act="hsub" data-id="'+s[0]+'" class="'+(ST.hsub===s[0]?"on":"")+'">'+s[1]+"</button>"}).join("")+"</div>";
+  if(ST.hsub==="ctl")return bar+homeCtl();
+  if(ST.hsub==="log")return bar+homeLog();
+  var bots=ST.bots.map(function(b){
+    return '<div class="hcard"><div class="hrow between"><b>'+esc(b.name)+"</b>"+(b.current_version?'<span class="hpill ok">Bản '+b.current_version+" đang dùng</span>":'<span class="hpill gray">Chưa xuất bản</span>')+"</div>"+
+     '<p class="hhint" style="margin:6px 0">'+b.counts.flows+" luồng · "+b.counts.lib+" câu mẫu · "+b.counts.offers+" mức giá"+(b.dirty?" · có thay đổi chưa xuất bản":"")+"</p>"+
+     '<div class="hhint">Page: '+(b.pages.length?b.pages.map(function(p){return esc(p.name)}).join(", "):"chưa gắn")+"</div>"+
+     '<div class="hrow" style="margin-top:10px"><button class="btn pri sm" data-act="openbot" data-id="'+b.id+'">Mở</button><button class="btn sm" data-act="clonebot" data-id="'+b.id+'">Nhân bản</button><button class="btn sm" data-act="delbot" data-id="'+b.id+'">Xóa</button></div></div>'}).join("");
+  var pages=ST.pages.map(function(p){
+    var opts='<option value="">(chưa gắn bot)</option>'+ST.bots.map(function(b){return '<option value="'+b.id+'"'+(p.bot_id===b.id?" selected":"")+">"+esc(b.name)+"</option>"}).join("");
+    return "<tr><td><b>"+esc(p.name)+'</b><br><span class="hhint">'+esc(p.fb_page_id)+'</span></td><td><select data-act="pagebot" data-id="'+p.id+'">'+opts+'</select></td><td>'+modePill(p.mode)+'</td><td><select class="hinl" data-act="pagemode" data-id="'+p.id+'"><option value="off"'+(p.mode==="off"?" selected":"")+'>Tắt</option><option value="tester"'+(p.mode==="tester"?" selected":"")+'>Chỉ thử tài khoản chị</option></select></td><td><button class="btn sm ghost" data-act="delpage" data-id="'+p.id+'" aria-label="Xóa Page">✕</button></td></tr>'}).join("");
+  return bar+'<div class="hph"><div><h1>Bot và Page</h1><div class="hhint">Mỗi Page gắn với một bot. Nhiều Page dùng chung một bot, hoặc nhân bản bot để chỉnh riêng cho Page khác.</div></div><button class="btn pri" data-act="newbot">+ Tạo bot</button></div>'+
+   (ST.bots.length?'<div class="bots">'+bots+"</div>":'<div class="hcard hhint">Chưa có bot nào. Bấm "+ Tạo bot" để bắt đầu.</div>')+
+   '<div class="hcard" style="margin-top:12px"><div class="hrow between"><h3 style="margin:0">Page Facebook</h3><button class="btn sm pri" data-act="newpage">+ Thêm Page</button></div>'+
+   (ST.pages.length?'<div class="tw"><table><thead><tr><th>Page</th><th>Bot đang dùng</th><th>Trạng thái</th><th>Chế độ</th><th></th></tr></thead><tbody>'+pages+"</tbody></table></div>":'<p class="hhint" style="margin:8px 0 0">Chưa có Page. Thêm Page (tên và id Page Facebook) rồi gắn bot.</p>')+
+   '<p class="hhint" style="margin:8px 0 0">Chỉ bật thử được khi bot đã xuất bản. Chế độ gửi cho khách thật chưa có ở đây: chị duyệt riêng rồi mới mở.</p></div>';
+}
+function homeCtl(){
+  var c=ST.ctl;
+  return '<div class="hph"><div><h1>Điều khiển chung</h1><div class="hhint">Áp dụng cho mọi Page.</div></div></div>'+
+   '<div class="hcard kill"><div class="hrow between"><div><h3 style="margin:0">Nút tắt khẩn</h3><span class="hhint">Bật là agent ngừng ngay ở mọi Page: gói kịch bản trả về trống nên không còn câu nào để gửi.</span></div><button class="btn '+(c.kill?"pri":"red")+'" data-act="kill">'+(c.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button></div></div>"+
+   '<div class="hcard"><h3>Thiết lập</h3><label class="f"><span>Tài khoản thử được phép (tên hoặc mã Facebook, cách nhau dấu phẩy)</span><input type="text" id="c_testers" value="'+esc(c.testers||"")+'"></label>'+
+   '<label class="f"><span>Nhân viên nhắn tay thì agent im trong (phút)</span><input type="number" id="c_silent" min="1" max="1440" value="'+(c.silent_minutes||30)+'"></label>'+
+   '<label class="f"><span>Khung giờ agent được trả lời (để trống = cả ngày)</span><span class="hrow"><input type="time" id="c_hf" style="max-width:150px" value="'+esc(c.hours_from||"")+'"><input type="time" id="c_ht" style="max-width:150px" value="'+esc(c.hours_to||"")+'"></span></label>'+
+   '<div class="hhint" style="margin-bottom:10px">Câu khách hỏi ngoài kịch bản đã xuất bản: agent dừng và báo chị, không dùng kiến thức chung để đoán.</div><button class="btn pri" data-act="savectl">Lưu thiết lập</button></div>';
+}
+var ACT={"bot.create":"Tạo bot","bot.delete":"Xóa bot","bot.publish":"Xuất bản","page.add":"Thêm Page","page.update":"Sửa Page","page.delete":"Xóa Page","control.kill":"BẬT tắt khẩn","control.unkill":"Gỡ tắt khẩn","control.save":"Lưu thiết lập"};
+var RES={sent:["Đã gửi","ok"],handoff:["Chuyển chị","bad"],blocked:["Bị chặn","warn"],out_of_script:["Ngoài kịch bản","bad"],skipped:["Bỏ qua","gray"]};
+function homeLog(){
+  var h=ST.hlog.length?'<div class="tw"><table><thead><tr><th>Lúc</th><th>Ai</th><th>Việc</th><th>Chi tiết</th></tr></thead><tbody>'+ST.hlog.map(function(l){return "<tr><td>"+fm(l.at)+"</td><td>"+esc(l.by_name||"")+"</td><td>"+esc(ACT[l.action]||l.action)+"</td><td>"+esc(l.detail)+"</td></tr>"}).join("")+"</tbody></table></div>":'<span class="hhint">Chưa có thay đổi nào.</span>';
+  var r=ST.runs.length?'<div class="tw"><table><thead><tr><th>Lúc</th><th>Page</th><th>Bản</th><th>Luồng</th><th>Kết quả</th><th>Khách nói (đã che thông tin)</th></tr></thead><tbody>'+ST.runs.map(function(x){var q=RES[x.result]||[x.result,"gray"];return "<tr><td>"+fm(x.at)+"</td><td>"+esc(x.fb_page_id)+"</td><td>"+(x.version||"")+"</td><td>"+esc(x.flow)+'</td><td><span class="hpill '+q[1]+'">'+q[0]+"</span>"+(x.note?'<br><span class="hhint">'+esc(x.note)+"</span>":"")+"</td><td>"+esc(x.customer)+"</td></tr>"}).join("")+"</tbody></table></div>":'<span class="hhint">Chưa có lượt nào. Khi công cụ trên VPS nối vào, mỗi lượt agent trả lời hay dừng sẽ ghi ở đây, kèm phiên bản và luồng đã chọn.</span>';
+  return '<div class="hph"><div><h1>Nhật ký</h1></div></div><div class="hcard"><h3>Agent đã làm gì</h3>'+r+'</div><div class="hcard"><h3>Lịch sử chỉnh sửa</h3>'+h+"</div>";
+}
+var TABS=[["tt","Tổng quan"],["tc","Luồng kịch bản"],["cm","Câu mẫu"],["sp","Sản phẩm &amp; giá"],["md","Ảnh / video"],["bd","Bám đuổi"],["qt","Quy tắc &amp; chuyển người"],["ms","Mô phỏng"],["pb","Phiên bản"]];
+function badge(t){var b=D();return t==="tc"?b.flows.length:t==="cm"?b.lib.length:t==="sp"?b.offers.length:t==="md"?b.media.reduce(function(a,x){return a+x.urls.length},0):""}
+function botView(){
+  var b=D(),pg=pageOfBot();
+  var side='<div class="hside"><div class="bn"><b>'+esc(ST.name)+"</b>"+(pg?modePill(pg.mode):'<span class="hpill gray">Chưa gắn Page</span>')+'<button class="btn sm ghost" data-act="home" style="margin-top:4px">← Tất cả bot</button></div>'+
+   TABS.map(function(t){var c=badge(t[0]);return '<button data-act="tab" data-id="'+t[0]+'" class="'+(ST.tab===t[0]?"on":"")+'"><span>'+t[1]+"</span>"+(c!==""?'<span class="c">'+c+"</span>":"")+"</button>"}).join("")+"</div>";
+  var body={tt:tt,tc:tc,cm:cm,sp:sp,md:md,bd:bd,qt:qt,ms:ms,pb:pb}[ST.tab]();
+  return '<div class="shell">'+side+'<div class="main">'+body+"</div></div>";
+}
+function tt(){
+  var pg=ST.pages.filter(function(p){return p.bot_id===ST.botId}),cur=ST.versions.filter(function(v){return v.is_current})[0];
+  var er=ST.issues.filter(function(i){return i.level==="error"}),wr=ST.issues.filter(function(i){return i.level==="warn"});
+  return '<div class="hph"><div><h1>Tổng quan</h1><div class="hhint">Bot này làm gì và còn thiếu gì.</div></div><label class="f" style="min-width:260px;margin:0"><span>Tên bot</span><input type="text" data-act="botname" value="'+esc(ST.name)+'"></label></div>'+
+   '<div class="hgrid"><div class="hcard"><h3>Phiên bản đang dùng</h3>'+(cur?'<span class="hpill ok">Bản '+cur.version+"</span> <span class=\"hint\">"+fm(cur.published_at)+"</span>":'<span class="hpill gray">Chưa xuất bản</span><p class="hhint" style="margin:6px 0 0">Agent chưa thấy gì cho tới khi chị xuất bản.</p>')+"</div>"+
+   '<div class="hcard"><h3>Page đang dùng bot này</h3>'+(pg.length?pg.map(function(p){return "<div>"+esc(p.name)+" "+modePill(p.mode)+"</div>"}).join(""):'<span class="hhint">Chưa gắn. Vào "Tất cả bot" để gắn.</span>')+"</div></div>"+
+   '<div class="hcard"><h3>Kiểm tra kịch bản</h3>'+(!er.length&&!wr.length?'<span class="hpill ok">Không có lỗi hay cảnh báo</span>':er.map(function(i){return '<div style="padding:3px 0"><span class="hpill bad">Lỗi</span> '+esc(i.msg)+"</div>"}).join("")+wr.map(function(i){return '<div style="padding:3px 0"><span class="hpill warn">Cảnh báo</span> '+esc(i.msg)+"</div>"}).join("")+'<p class="hhint" style="margin:8px 0 0">Còn lỗi thì chưa xuất bản được. Cảnh báo thì vẫn xuất bản được.</p>')+"</div>";
+}
+
+/* ---- Luồng kịch bản (sơ đồ giống Botcake: gửi một mạch, không chờ khách) ---- */
+var NT={msg:"Câu mẫu",img:"Ảnh",cond:"Điều kiện",jump:"Chuyển luồng",handoff:"Chuyển chị Hoa"};
+var CONDS={xh:"Đã biết giới tính khách",phone:"Khách đã để số điện thoại"};
+function flowName(id){var f=mk(D().flows,id);return f?f.code+" "+f.name:"(đã xóa)"}
+function nodeSummary(n){
+  var b=D();
+  if(n.t==="msg"){var m=mk(b.lib,n.ref);return m?"<b>"+esc(m.code)+"</b><br>"+esc(m.text.length>85?m.text.slice(0,85)+"…":m.text):"(chưa chọn câu mẫu)"}
+  if(n.t==="img")return n.ref?"Nhóm ảnh <b>"+esc(n.ref)+"</b>":"(chưa chọn nhóm ảnh)";
+  if(n.t==="cond")return esc(CONDS[n.c]||"")+"?";
+  if(n.t==="jump")return "→ "+esc(n.to?flowName(n.to):"(chưa chọn luồng)");
+  return esc(n.ref||"Cần người thật");
+}
+function nodeHtml(n,idx){
+  var dots=n.t==="cond"?'<div class="dots"><span>Có<i class="dot" data-dot="'+n.id+':yes"></i></span><span>Không<i class="dot" data-dot="'+n.id+':no"></i></span></div>':(n.t==="jump"||n.t==="handoff")?"":'<div class="dots"><span>Tiếp theo<i class="dot" data-dot="'+n.id+':next"></i></span></div>';
+  var bt=(n.btns||[]).filter(function(x){return x.label}).map(function(x){return '<span class="hpill blue" style="margin:4px 4px 0 0;display:inline-block">'+esc(x.label)+(x.to?" → "+esc((mk(D().flows,x.to)||{}).code||"?"):"")+"</span>"}).join("");
+  return '<div class="nd '+n.t+(ST.node===n.id?" sel":"")+'" data-node="'+n.id+'" style="left:'+n.x+"px;top:"+n.y+'px"><div class="nh" data-drag="'+n.id+'"><span>'+NT[n.t]+"</span>"+(idx===0?'<span class="hpill acc">Bắt đầu</span>':"")+'</div><div class="nb">'+nodeSummary(n)+(bt?"<div>"+bt+"</div>":"")+"</div>"+dots+"</div>";
+}
+function drawEdges(){
+  var cv=document.getElementById("cv"),svg=document.getElementById("edges");if(!cv||!svg||!ST.doc)return;
+  var f=mk(D().flows,ST.sel);if(!f)return;
+  var cr=cv.getBoundingClientRect(),p="";
+  function link(key,to){
+    var d=cv.querySelector('[data-dot="'+key+'"]'),t=cv.querySelector('[data-node="'+to+'"]');if(!d||!t)return;
+    var a=d.getBoundingClientRect(),c=t.getBoundingClientRect();
+    var x1=a.left+a.width/2-cr.left,y1=a.top+a.height/2-cr.top,x2=c.left-cr.left,y2=c.top+20-cr.top,dx=Math.max(40,Math.abs(x2-x1)/2);
+    p+='<path d="M'+x1+","+y1+" C"+(x1+dx)+","+y1+" "+(x2-dx)+","+y2+" "+x2+","+y2+'"/><circle cx="'+x2+'" cy="'+y2+'" r="3.5" fill="var(--acc)"/>';
   }
+  f.nodes.forEach(function(n){if(n.next)link(n.id+":next",n.next);if(n.yes)link(n.id+":yes",n.yes);if(n.no)link(n.id+":no",n.no)});
+  svg.innerHTML=p;
 }
-/* ---- Đề xuất của agent ---- */
-function trDrawSug(box){
-  box.innerHTML=trNote("Agent học từ hội thoại rồi <b>đề xuất</b> ở đây. Agent không tự áp dụng: chị duyệt thì mới thành mục đã duyệt; từ chối thì bỏ.")+
-  (TR.sug.length?TR.sug.map(s=>`<div class="tr-it"><div class="t"><span>${esc(s.title)}</span><span><span class="pill p-gry">${(TR_KINDS[Object.keys(TR_KINDS).find(k=>TR_KINDS[k].k===s.kind)]||{n:s.kind}).n}</span> <span class="pill p-gry">${TR_SETS[s.agent_set]}</span></span></div>
-   <textarea class="tr-sb" data-id="${s.id}" style="width:100%;box-sizing:border-box;min-height:80px;margin:6px 0;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit">${esc(s.body)}</textarea>
-   ${s.reason?`<div class="x"><b>Vì sao:</b> ${esc(s.reason)}</div>`:""}${s.evidence?`<div class="x"><b>Hội thoại mẫu (đã che thông tin cá nhân):</b> ${esc(s.evidence)}</div>`:""}
-   <div class="tr-act"><button class="btn pri" data-sa="${s.id}">Duyệt (dùng nội dung ở trên)</button><button class="btn" data-sr="${s.id}">Từ chối</button></div></div>`).join(""):`<div class="hint">Chưa có đề xuất nào đang chờ.</div>`);
-  box.querySelectorAll("[data-sa]").forEach(b=>b.onclick=async()=>{const ta=box.querySelector(`.tr-sb[data-id="${b.dataset.sa}"]`);
-    try{await trApi("/suggestions/"+b.dataset.sa+"/approve",{method:"POST",body:JSON.stringify({body:ta.value})});toast("Đã duyệt, thêm vào kho");trShow()}catch(e){toast(e.message)}});
-  box.querySelectorAll("[data-sr]").forEach(b=>b.onclick=async()=>{const n=prompt("Lý do từ chối (không bắt buộc):")||"";
-    try{await trApi("/suggestions/"+b.dataset.sr+"/reject",{method:"POST",body:JSON.stringify({note:n})});trShow()}catch(e){toast(e.message)}});
+function flowOpts(sel,skip){return '<option value="">(chưa chọn luồng)</option>'+D().flows.filter(function(x){return x.id!==skip}).map(function(x){return '<option value="'+x.id+'"'+(sel===x.id?" selected":"")+">"+esc(x.code+" "+x.name)+"</option>"}).join("")}
+function nodeEditor(f,n){
+  var b=D();
+  if(!n)return '<div class="hcard hhint">Bấm vào tiêu đề một ô trên sơ đồ để sửa nội dung ô đó.</div>';
+  var body="";
+  if(n.t==="msg"){
+    body='<label class="f"><span>Câu mẫu gửi</span><select data-nb="ref"><option value="">(chưa chọn)</option>'+b.lib.map(function(m){return '<option value="'+m.id+'"'+(n.ref===m.id?" selected":"")+">"+esc(m.code+" - "+m.text.slice(0,50))+"</option>"}).join("")+"</select></label>"+
+     '<div class="hhint" style="margin-bottom:6px">Nút bấm dưới tin (khách bấm thì chạy luồng đó)</div>'+
+     (n.btns||[]).map(function(x,i){return '<div class="hrow" style="margin-bottom:6px"><input type="text" style="flex:1;min-width:110px" placeholder="Chữ trên nút" data-nb="btn:'+i+':label" value="'+esc(x.label)+'"><select class="hinl" style="max-width:210px" data-nb="btn:'+i+':to">'+flowOpts(x.to,f.id)+'</select><button class="btn sm ghost" data-act="delbtn" data-id="'+i+'" aria-label="Xóa nút">✕</button></div>'}).join("")+
+     ((n.btns||[]).length<3?'<button class="btn sm" data-act="addbtn">+ Thêm nút</button>':'<span class="hhint">Tối đa 3 nút</span>');
+  }else if(n.t==="img"){
+    body='<label class="f"><span>Nhóm ảnh gửi</span><select data-nb="ref"><option value="">(chưa chọn)</option>'+b.media.map(function(g){return '<option value="'+esc(g.g)+'"'+(n.ref===g.g?" selected":"")+">"+esc(g.g)+" · "+esc(g.d)+"</option>"}).join("")+"</select></label>";
+  }else if(n.t==="cond"){
+    body='<label class="f"><span>Điều kiện (dựa trên dữ liệu khách, không chờ khách trả lời)</span><select data-nb="c">'+Object.keys(CONDS).map(function(k){return '<option value="'+k+'"'+(n.c===k?" selected":"")+">"+CONDS[k]+"</option>"}).join("")+'</select></label><div class="hhint">Nối đường "Có" và "Không" ở hai chấm bên phải ô.</div>';
+  }else if(n.t==="jump"){
+    body='<label class="f"><span>Chạy tiếp luồng</span><select data-nb="to">'+flowOpts(n.to,f.id)+"</select></label>";
+  }else{
+    body='<label class="f"><span>Lý do chuyển chị Hoa</span><input type="text" data-nb="ref" value="'+esc(n.ref||"")+'"></label>';
+  }
+  return '<div class="hcard"><div class="hrow between"><h3 style="margin:0">Sửa ô: '+NT[n.t]+'</h3><div class="hrow"><button class="btn sm" data-act="setstart">Đặt làm ô bắt đầu</button><button class="btn sm" data-act="unlink">Gỡ đường nối</button><button class="btn sm" data-act="delnodesel">Xóa ô</button></div></div><div style="margin-top:10px">'+body+"</div></div>";
 }
-/* ---- Chạy thử / chấm điểm ---- */
-function trDrawEval(box){
-  const E=TR.evals,done=E.filter(e=>e.ceo_score),avg=done.length?(done.reduce((a,e)=>a+e.ceo_score,0)/done.length).toFixed(1):"–";
-  const bad=E.filter(e=>e.flags.length).length;
-  box.innerHTML=trNote("Dán các hội thoại cũ (câu khách + câu sale đã nhắn). Hệ thống tự che số điện thoại, email, link. Agent trả lời lại, chị so với câu sale và chấm 1–5. <b>Chỉ đọc, không gửi cho ai.</b>")+
-  `<div class="tr-card"><h3>Thêm câu để thử</h3><div class="tr-form">
-   <select id="te-set"><option value="SALE">Agent Sale</option><option value="CSKH">Agent CSKH</option></select>
-   <textarea id="te-paste" placeholder="Mỗi câu một khối, cách nhau một dòng trống. Dòng đầu: KHÁCH: ...   Dòng sau: SALE: ..."></textarea>
-   <div><button class="btn pri" id="te-add">Thêm vào hàng chờ</button></div></div></div>
-   <div class="hint" style="margin:0 0 10px">${E.length} câu · đã chấm ${done.length} · điểm trung bình ${avg} · ${bad} câu bị tự đánh dấu lỗi · ${E.filter(e=>e.agent_reply===null).length} đang chờ agent trả lời</div>`+
-  E.map(e=>`<div class="tr-it"><div class="t"><span>${TR_SETS[e.agent_set]} · khách hỏi</span><button class="btn" data-ed="${e.id}">Xoá</button></div>
-   <div class="b">${esc(e.customer_msg)}</div>
-   <div class="tr-cmp"><div><small>Sale đã nhắn</small>${esc(e.sale_reply||"(không có)")}</div><div><small>Agent trả lời lại</small>${e.agent_reply===null?"Đang chờ agent…":esc(e.agent_reply)}</div></div>
-   ${e.flags.map(f=>`<div class="tr-flag">⚠️ ${esc(f.msg)}</div>`).join("")}
-   ${e.agent_reply!==null?`<div class="tr-act tr-stars">Chị chấm: ${[1,2,3,4,5].map(n=>`<button data-sc="${e.id}:${n}" class="${e.ceo_score===n?"on":""}">${n}</button>`).join("")}</div>`:""}</div>`).join("");
-  $("#te-add").onclick=async()=>{
-    const cases=$("#te-paste").value.split(/\n\s*\n/).map(b=>{const k=b.match(/^\s*KH[ÁA]CH\s*:\s*([\s\S]*?)(?:\n\s*SALE\s*:\s*([\s\S]*))?$/i);return k?{customer_msg:k[1],sale_reply:k[2]||""}:{customer_msg:b,sale_reply:""}}).filter(x=>x.customer_msg.trim());
-    if(!cases.length){toast("Chưa có câu nào");return}
-    try{const r=await trApi("/evals",{method:"POST",body:JSON.stringify({agent_set:$("#te-set").value,cases})});toast("Đã thêm "+r.added+" câu");trShow()}catch(e){toast(e.message)}};
-  box.querySelectorAll("[data-ed]").forEach(b=>b.onclick=async()=>{if(!confirm("Xoá câu thử này?"))return;try{await trApi("/evals/"+b.dataset.ed,{method:"DELETE"});trShow()}catch(e){toast(e.message)}});
-  box.querySelectorAll("[data-sc]").forEach(b=>b.onclick=async()=>{const [id,n]=b.dataset.sc.split(":");try{await trApi("/evals/"+id+"/score",{method:"POST",body:JSON.stringify({score:+n})});trShow()}catch(e){toast(e.message)}});
+function chatHtml(arr,live){
+  return arr.map(function(m){
+    var imgs=m.urls&&m.urls.length?'<div class="imgs">'+m.urls.slice(0,4).map(function(u){return '<img src="'+esc(u)+'" alt="">'}).join("")+"</div>":"";
+    var btns=m.btns&&m.btns.length?"<div>"+m.btns.map(function(x){return live?'<span class="bchip" data-act="simbtn" data-id="'+x.to+'" data-label="'+esc(x.label)+'">'+esc(x.label)+"</span>":'<span class="bchip">'+esc(x.label)+"</span>"}).join("")+"</div>":"";
+    return '<div class="m '+m.c+'">'+esc(m.t)+imgs+btns+"</div>"}).join("");
 }
-function trDrawLog(box){
-  const fm=s=>{try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch(e){return s}};
-  box.innerHTML=trNote("Ai sửa, duyệt, tắt khẩn gì và lúc nào, để lần lại khi agent nói sai.")+(TR.log.length?`<table class="tbl"><thead><tr><th>Lúc</th><th>Ai</th><th>Việc</th><th>Chi tiết</th></tr></thead><tbody>${TR.log.map(l=>`<tr><td>${fm(l.at)}</td><td>${esc(l.by_name||"")}</td><td>${esc(TR_ACT[l.action]||l.action)}${l.ref&&l.ref!=="control"?` #${esc(l.ref)}`:""}</td><td>${esc(l.detail)}</td></tr>`).join("")}</tbody></table>`:`<div class="hint">Chưa có thay đổi nào.</div>`);
+function toChat(m){return {c:m.kind==="agent"?"a":m.kind==="image"?"i":"s",t:m.text,btns:m.buttons,urls:m.urls}}
+async function sim(body,state){
+  var pg=pageOfBot();
+  return api("/bots/"+ST.botId+"/simulate",{method:"POST",body:JSON.stringify(Object.assign({draft:ST.doc,state:state||{cur:ST.cur,xh:ST.xh,phone:ST.phone},page:pg?pg.name:""},body))});
 }
-PAGES.huanluyenagent=m=>{
-  m.innerHTML=H("Huấn luyện agent","Dạy agent Sale và CSKH trực page · agent chỉ dùng bản chị đã duyệt")+TR_CSS+`<div id="tr-tabs"></div><div id="tr-body"><div class="hint">Đang tải…</div></div>`;
-  trLoadOv().then(trShow);
+async function loadPreview(){
+  var f=mk(D().flows,ST.sel);if(!f)return;
+  var tok=++ST.pvTok;
+  try{
+    var r=await sim({preview_flow:f.id},{cur:null,xh:ST.xh,phone:ST.phone});
+    var el=document.getElementById("pvchat");
+    if(tok===ST.pvTok&&el)el.innerHTML=chatHtml(r.messages.map(toChat),false);
+  }catch(e){var el2=document.getElementById("pvchat");if(el2)el2.innerHTML='<div class="hhint">Chưa xem thử được: '+esc(e.message)+"</div>"}
+}
+function tc(){
+  var b=D(),f=mk(b.flows,ST.sel)||b.flows[0];if(f)ST.sel=f.id;
+  var list=b.flows.map(function(x){return '<button class="it'+(x.id===ST.sel?" on":"")+'" data-act="selflow" data-id="'+x.id+'"><b>'+esc(x.code)+" · "+esc(x.name)+"</b><small>"+x.nodes.length+" ô"+(x.entry?" · mở được từ đầu":"")+"</small></button>"}).join("");
+  var ed="";
+  if(f){
+    var n=mk(f.nodes,ST.node);
+    var W=720,Hh=320;f.nodes.forEach(function(x){W=Math.max(W,x.x+280);Hh=Math.max(Hh,x.y+190)});
+    ed='<div class="hcard"><div class="hrow between"><h3 style="margin:0">Luồng</h3><button class="btn sm" data-act="delflow" data-id="'+f.id+'">Xóa luồng</button></div>'+
+     '<div class="hgrid" style="margin-top:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"><label class="f"><span>Mã luồng</span><input type="text" data-flow="code" value="'+esc(f.code)+'"></label><label class="f"><span>Tên luồng</span><input type="text" data-flow="name" value="'+esc(f.name)+'"></label>'+
+     '<label class="f"><span>Gửi tin</span><select data-flow="win"><option value="in"'+(f.win==="in"?" selected":"")+'>Trong khoảng 24 giờ</option><option value="out"'+(f.win==="out"?" selected":"")+">Ngoài khoảng 24 giờ</option></select></label></div>"+
+     '<label class="f"><span>Gợi ý để agent chọn luồng này (từ khóa khách hay nói, cách nhau dấu phẩy)</span><input type="text" data-flow="keys" value="'+esc(f.keys)+'"></label>'+
+     '<div class="hrow" style="margin-bottom:8px"><button class="achip'+(f.entry?" on":"")+'" data-act="entry">Agent được chọn luồng này từ đầu hội thoại</button></div>'+
+     '<div class="hhint" style="margin-bottom:6px">Sau khi gửi luồng này, nếu khách nhắn tiếp thì agent chỉ được chọn một trong các luồng:</div><div class="hrow">'+(b.flows.filter(function(x){return x.id!==f.id}).map(function(x){return '<button class="achip'+(f.allow.indexOf(x.id)>=0?" on":"")+'" data-act="allow" data-id="'+x.id+'">'+esc(x.code)+"</button>"}).join("")||'<span class="hhint">(chưa có luồng khác)</span>')+"</div></div>"+
+     '<div class="hcard"><div class="hcvbar"><b style="margin-right:6px">Sơ đồ</b><button class="btn sm pri" data-act="addnode">+ Thêm ô</button><span class="hhint">Kéo tiêu đề ô để di chuyển. Bấm chấm tròn rồi bấm ô đích để nối.</span>'+(ST.conn?'<span class="hpill warn">Đang nối: bấm vào ô muốn nối tới</span><button class="btn sm" data-act="cancelconn">Hủy</button>':"")+"</div>"+
+     '<div class="cvw" id="cvw"><div class="cv" id="cv" style="width:'+W+"px;height:"+Hh+'px"><svg id="edges" class="edges"></svg>'+f.nodes.map(function(x,i){return nodeHtml(x,i)}).join("")+"</div></div>"+
+     '<p class="hhint" style="margin:8px 0 0">Luồng gửi một mạch từ ô bắt đầu rồi dừng, không chờ khách trả lời. Khách nói tiếp thì khách bấm nút, hoặc agent chọn luồng kế trong danh sách được phép ở trên.</p></div>'+
+     '<div class="split">'+nodeEditor(f,n)+'<div class="hcard"><h3>Xem thử luồng</h3><div class="hrow" style="margin-bottom:8px"><label class="hhint"><input type="checkbox" data-act="setphone"'+(ST.phone?" checked":"")+"> khách đã để SĐT</label>"+xhSelect()+'</div><div class="phone"><div class="chat" id="pvchat"><span class="hhint">Đang tải…</span></div></div></div></div>';
+  }else ed='<div class="hcard hhint">Chưa có luồng nào. Bấm "+ Thêm luồng".</div>';
+  return '<div class="hph"><div><h1>Luồng kịch bản</h1><div class="hhint">Mỗi luồng là một sơ đồ các ô gửi liên tiếp, giống Botcake. Chị thêm luồng, thêm ô, nối đường, đặt nút bấm sang luồng khác.</div></div><button class="btn pri" data-act="addflow">+ Thêm luồng</button></div>'+
+   '<div class="two"><div class="list">'+list+"</div><div>"+ed+"</div></div>";
+}
+function xhSelect(){return '<select class="hinl" data-act="setxh"><option value="">chưa rõ giới tính</option><option value="anh"'+(ST.xh==="anh"?" selected":"")+'>anh</option><option value="chị"'+(ST.xh==="chị"?" selected":"")+">chị</option></select>"}
+
+/* ---- Câu mẫu ---- */
+function cm(){
+  var b=D(),q=(ST.q||"").toLowerCase();
+  var rows=b.lib.filter(function(m){return !q||(m.code+m.text+m.grp).toLowerCase().indexOf(q)>=0}).map(function(m){
+    var used=b.flows.filter(function(f){return f.nodes.some(function(n){return n.t==="msg"&&n.ref===m.id})}).length;
+    return "<tr><td><code>"+esc(m.code)+'</code><br><span class="hhint">'+esc(m.grp)+'</span></td><td style="min-width:260px">'+esc(m.text)+(m.claim?'<br><span class="hpill blue">Cam kết: '+esc(m.claim)+"</span>":"")+(m.img?' <span class="hpill gray">Kèm ảnh '+esc(m.img)+"</span>":"")+"</td><td>"+used+' luồng</td><td><div class="hrow"><button class="btn sm" data-act="editmsg" data-id="'+m.id+'">Sửa</button><button class="btn sm" data-act="delmsg" data-id="'+m.id+'">Xóa</button></div></td></tr>'}).join("");
+  return '<div class="hph"><div><h1>Câu mẫu</h1><div class="hhint">Kho câu nguyên văn. Agent chỉ chọn mã câu, không tự viết lại. Biến như {xh}, {gia_...} được điền từ dữ liệu; thiếu dữ liệu thì câu bị chặn.</div></div><div class="hrow"><input type="text" id="q" placeholder="Tìm câu mẫu…" value="'+esc(ST.q||"")+'" style="width:200px"><button class="btn pri" data-act="addmsg">+ Thêm câu mẫu</button></div></div>'+
+   '<div class="hcard"><div class="tw"><table><thead><tr><th>Mã</th><th>Nội dung</th><th>Đang dùng</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="4" class="hhint">Chưa có câu mẫu nào.</td></tr>')+"</tbody></table></div></div>";
+}
+/* ---- Sản phẩm và giá ---- */
+function sp(){
+  var b=D();
+  var cards=b.products.map(function(p){
+    var of=b.offers.filter(function(o){return o.prod===p.id});
+    return '<div class="hcard"><div class="hrow between"><div><h3 style="margin:0">'+esc(p.name)+'</h3><span class="hhint">biến trong câu mẫu: <code>{gia_'+esc(p.id)+"}</code></span></div><div class=\"row\">"+(of.length?'<span class="hpill ok">Có giá</span>':'<span class="hpill warn">Chưa có giá</span>')+'<button class="btn sm" data-act="delprod" data-id="'+p.id+'">Xóa sản phẩm</button></div></div>'+
+     (of.length?'<div class="tw"><table><thead><tr><th>Chương trình</th><th>Mức</th><th class="num">Giá</th><th>Hiệu lực từ</th><th></th></tr></thead><tbody>'+of.map(function(o){return "<tr><td>"+esc(o.name)+"</td><td>"+esc(o.lv)+'</td><td class="num"><b>'+esc(o.price)+"</b></td><td>"+esc(o.from)+'</td><td><button class="btn sm" data-act="deloffer" data-id="'+o.id+'">Xóa</button></td></tr>'}).join("")+"</tbody></table></div>":'<p class="hhint" style="margin:8px 0">Chưa có bảng giá nên agent không báo giá cho sản phẩm này, sẽ dừng và báo chị.</p>')+
+     '<div style="margin-top:8px"><button class="btn sm pri" data-act="addoffer" data-id="'+p.id+'">+ Thêm mức giá</button></div></div>'}).join("");
+  return '<div class="hph"><div><h1>Sản phẩm &amp; giá</h1><div class="hhint">Giá chỉ lấy từ đây. Câu nào có giá khác bảng này đều bị chặn. Quà và combo chi tiết chị nhập khi có.</div></div><button class="btn pri" data-act="addprod">+ Thêm sản phẩm</button></div>'+(cards||'<div class="hcard hhint">Chưa có sản phẩm nào. Bấm "+ Thêm sản phẩm".</div>');
+}
+/* ---- Ảnh / video ---- */
+function md(){
+  var b=D();
+  return '<div class="hph"><div><h1>Ảnh / video</h1><div class="hhint">Nhóm ảnh gắn vào câu mẫu hoặc ô ảnh trong luồng. Dán đường dẫn ảnh (https://...), mỗi dòng một ảnh. Tải ảnh lên trực tiếp sẽ làm ở bước sau.</div></div><button class="btn pri" data-act="addgroup">+ Thêm nhóm ảnh</button></div>'+
+   (b.media.map(function(g){return '<div class="hcard"><div class="hrow between"><h3 style="margin:0">'+esc(g.g)+" · "+esc(g.d)+" ("+g.urls.length+')</h3><div class="hrow"><button class="btn sm" data-act="addurls" data-id="'+esc(g.g)+'">+ Thêm ảnh</button><button class="btn sm" data-act="delgroup" data-id="'+esc(g.g)+'">Xóa nhóm</button></div></div>'+
+     (g.urls.length?'<div class="media" style="margin-top:8px">'+g.urls.map(function(u,i){return '<div class="im"><img src="'+esc(u)+'" alt=""><button class="btn sm" data-act="delurl" data-id="'+esc(g.g)+":"+i+'" aria-label="Xóa ảnh">✕</button></div>'}).join("")+"</div>":'<p class="hhint" style="margin:8px 0 0">Nhóm chưa có ảnh.</p>')+"</div>"}).join("")||'<div class="hcard hhint">Chưa có nhóm ảnh nào.</div>')+
+   '<div class="hcard"><div class="hrow between"><h3 style="margin:0">Câu cấm (agent không được nói)</h3><button class="btn sm pri" data-act="addbanned">+ Thêm</button></div><p class="hhint" style="margin:4px 0 8px">Câu mẫu nào chứa các cụm này sẽ bị chặn. Ví dụ câu về oxygen hoạt tính chị đã yêu cầu bỏ.</p>'+
+   (b.banned.map(function(x,i){return '<div class="hrow between" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>'+esc(x)+'</span><button class="btn sm ghost" data-act="delbanned" data-id="'+i+'" aria-label="Xóa">✕</button></div>'}).join("")||'<span class="hhint">Chưa có.</span>')+"</div>";
+}
+function bd(){
+  var b=D();
+  return '<div class="hph"><div><h1>Bám đuổi</h1><div class="hhint">Tối đa 5 lần. Khách trả lời là hủy lịch cũ và đi tiếp theo ngữ cảnh mới. Công cụ trên VPS sẽ chạy lịch này ở bước sau.</div></div><button class="btn pri" data-act="addfollow"'+(b.follow.length>=5?" disabled":"")+'>+ Thêm lần bám đuổi</button></div>'+
+   '<div class="hcard">'+(b.follow.map(function(f,i){
+     var opts='<option value="">(chưa chọn câu mẫu)</option>'+b.lib.map(function(m){return '<option value="'+m.id+'"'+(f.ref===m.id?" selected":"")+">"+esc(m.code)+"</option>"}).join("");
+     return '<div class="step"><span class="n">'+(i+1)+'</span><div class="t"><input type="text" data-follow="when:'+f.id+'" value="'+esc(f.when)+'"><div style="margin-top:6px"><select data-follow="ref:'+f.id+'">'+opts+'</select></div></div><button class="btn sm ghost" data-act="delfollow" data-id="'+f.id+'" aria-label="Xóa">✕</button></div>'}).join("")||'<span class="hhint">Chưa có lần bám đuổi nào.</span>')+
+   '<p class="hhint" style="margin:6px 0 0">Lần chưa chọn câu mẫu sẽ không gửi. Cần đối chiếu luật 24 giờ của Facebook trước khi mở khách thật.</p></div>';
+}
+function qt(){
+  var b=D();
+  function list(key,arr,title,hint){return '<div class="hcard"><div class="hrow between"><h3 style="margin:0">'+title+'</h3><button class="btn sm pri" data-act="addlist" data-id="'+key+'">+ Thêm</button></div><p class="hhint" style="margin:4px 0 8px">'+hint+"</p>"+arr.map(function(r){return '<div class="hrow between" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>'+esc(r.text)+'</span><span class="hrow"><button class="btn sm" data-act="togglelist" data-id="'+key+":"+r.id+'">'+(r.on?"Đang bật":"Đã tắt")+'</button><button class="btn sm ghost" data-act="dellist" data-id="'+key+":"+r.id+'" aria-label="Xóa">✕</button></span></div>'}).join("")+"</div>"}
+  return '<div class="hph"><div><h1>Quy tắc &amp; chuyển người</h1></div></div>'+list("rules",b.rules,"Quy tắc ứng xử chung","Agent luôn theo các quy tắc này.")+list("handoff",b.handoff,"Khi nào chuyển chị Hoa","Gặp các trường hợp này agent dừng và báo chị, không tự trả lời.");
+}
+/* ---- Mô phỏng ---- */
+function ms(){
+  var chat=chatHtml(ST.chat,true)||'<div class="hhint">Gõ một câu khách rồi Gửi, hoặc bấm nút trong tin của agent. Mô phỏng chạy trên bản nháp đang sửa, không gửi cho ai, không cần bật Page.</div>';
+  var lg=ST.simlog[0];
+  return '<div class="hph"><div><h1>Mô phỏng</h1><div class="hhint">Thử với bản đang sửa (kể cả chưa xuất bản). Agent thật chọn luồng bằng AI; ở đây chọn bằng từ khóa để chị kiểm tra kịch bản.</div></div><div class="hrow"><label class="hhint">Khách xưng</label>'+xhSelect()+'<label class="hhint"><input type="checkbox" data-act="setphone"'+(ST.phone?" checked":"")+'> đã để SĐT</label><button class="btn sm" data-act="clearchat">Làm mới</button></div></div>'+
+   '<div class="split"><div class="hcard"><div class="chat" id="chat">'+chat+'</div><div class="hrow" style="margin-top:10px"><input type="text" id="simin" placeholder="Gõ câu của khách…" style="flex:1;min-width:160px"><button class="btn pri" data-act="send">Gửi</button></div></div>'+
+   '<div class="hcard"><h3>Agent đã lấy gì để trả lời</h3><div class="log">'+(lg?esc(lg.text):"Chưa có lần thử nào.")+"</div></div></div>"+
+   '<div class="hcard"><h3>Nhật ký lần thử</h3>'+(ST.simlog.length?'<div class="tw"><table><thead><tr><th>Giờ</th><th>Khách nói</th><th>Luồng</th><th>Kết quả</th></tr></thead><tbody>'+ST.simlog.map(function(l){return "<tr><td>"+l.time+"</td><td>"+esc(l.said)+"</td><td>"+esc(l.flow)+'</td><td><span class="hpill '+l.cls+'">'+esc(l.res)+"</span></td></tr>"}).join("")+"</tbody></table></div>":'<span class="hhint">Chưa có.</span>')+"</div>";
+}
+function pb(){
+  return '<div class="hph"><div><h1>Phiên bản</h1><div class="hhint">Mỗi lần xuất bản tạo một phiên bản. Agent chỉ dùng bản "Đang dùng". Quay lại bản cũ cũng tạo một bản mới, lịch sử không mất.</div></div></div><div class="hcard">'+
+   (ST.dirty?'<div class="hrow between" style="padding-bottom:10px;border-bottom:1px solid var(--line)"><span><b>Bản nháp</b> <span class="hpill warn">chưa xuất bản</span></span><button class="btn pri sm" data-act="publish">Xuất bản</button></div>':"")+
+   (ST.versions.map(function(v){return '<div class="hrow between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span><b>Bản '+v.version+"</b> "+(v.is_current?'<span class="hpill ok">Đang dùng</span>':'<span class="hpill gray">Đã xuất bản</span>')+' <span class="hhint">'+fm(v.published_at)+" · "+esc(v.by_name||"")+(v.note?" · "+esc(v.note):"")+"</span></span>"+(v.is_current?"":'<button class="btn sm" data-act="rollback" data-id="'+v.version+'">Quay lại bản này</button>')+"</div>"}).join("")||'<span class="hhint">Chưa xuất bản lần nào.</span>')+"</div>";
+}
+/* ---------- Ngăn kéo (form thêm / sửa) ---------- */
+function varChips(){return [["xh","Xưng hô (anh/chị/mình)"],["ten_page","Tên Page"]].concat(D().products.map(function(p){return ["gia_"+p.id,"Giá "+p.name]}))}
+function drawerHtml(){
+  var d=ST.drawer,b=ST.doc,body="",title="",ok="Lưu";
+  if(d.type==="msg"){
+    var m=d.id?mk(b.lib,d.id):{code:"",grp:"",text:"",claim:"",img:""};
+    title=d.id?"Sửa câu mẫu":"Thêm câu mẫu";
+    var imgs='<option value="">(không kèm ảnh)</option>'+b.media.map(function(g){return '<option value="'+esc(g.g)+'"'+(m.img===g.g?" selected":"")+">"+esc(g.g)+"</option>"}).join("");
+    body='<label class="f"><span>Mã câu</span><input type="text" id="d_code" value="'+esc(m.code)+'" placeholder="VD: GIA_LONG_02"></label><label class="f"><span>Nhóm</span><input type="text" id="d_grp" value="'+esc(m.grp)+'" placeholder="VD: Báo giá, Mở đầu, Bám đuổi"></label>'+
+     '<label class="f"><span>Nội dung (khoảng 200 chữ trở xuống)</span><textarea id="d_text">'+esc(m.text)+"</textarea></label>"+
+     '<div class="hhint">Chèn biến:</div><div class="hchips">'+varChips().map(function(v){return '<button class="btn sm" data-act="insvar" data-id="'+v[0]+'" title="'+esc(v[1])+'">{'+v[0]+"}</button>"}).join("")+"</div>"+
+     '<label class="f"><span>Cam kết đi kèm (nếu có, phải nằm trong kịch bản đã duyệt)</span><input type="text" id="d_claim" value="'+esc(m.claim)+'"></label><label class="f"><span>Ảnh đi kèm</span><select id="d_img">'+imgs+"</select></label>";
+  }else if(d.type==="flow"){
+    title="Thêm luồng";ok="Tạo luồng";
+    body='<label class="f"><span>Mã luồng</span><input type="text" id="d_code" placeholder="VD: BT-07"></label><label class="f"><span>Tên luồng</span><input type="text" id="d_name" placeholder="VD: Hỏi về bột tẩy vạn năng"></label><label class="f"><span>Gợi ý để agent chọn luồng (từ khóa)</span><input type="text" id="d_keys" placeholder="VD: bột tẩy, tẩy vạn năng"></label><p class="hhint">Luồng mới có sẵn một ô câu mẫu. Chị thêm ô và nối đường trên sơ đồ.</p>';
+  }else if(d.type==="node"){
+    title="Thêm ô vào sơ đồ";ok="Thêm ô";
+    body='<label class="f"><span>Loại ô</span><select id="d_k"><option value="msg">Câu mẫu</option><option value="img">Ảnh</option><option value="cond">Điều kiện</option><option value="jump">Chuyển luồng</option><option value="handoff">Chuyển chị Hoa</option></select></label><p class="hhint">Chị chọn nội dung ô ở bảng "Sửa ô" bên dưới sơ đồ.</p>';
+  }else if(d.type==="product"){
+    title="Thêm sản phẩm";
+    body='<label class="f"><span>Tên sản phẩm</span><input type="text" id="d_name" placeholder="VD: Tẩy lồng máy giặt AILLA"></label><label class="f"><span>Mã ngắn (chữ thường không dấu, dùng trong biến giá)</span><input type="text" id="d_id" placeholder="VD: long  →  biến {gia_long}"></label>';
+  }else if(d.type==="offer"){
+    title="Thêm mức giá";
+    body='<label class="f"><span>Tên chương trình</span><input type="text" id="d_name" placeholder="VD: Mua riêng"></label><label class="f"><span>Mức</span><input type="text" id="d_lv" placeholder="VD: Mức 1"></label><label class="f"><span>Giá</span><input type="text" id="d_price" placeholder="VD: 145K"></label><label class="f"><span>Hiệu lực từ</span><input type="text" id="d_from" placeholder="VD: 22/10/2026"></label>';
+  }else if(d.type==="group"){
+    title="Thêm nhóm ảnh";
+    body='<label class="f"><span>Mã nhóm (không dấu cách, ví dụ LONG, TEST)</span><input type="text" id="d_g" placeholder="VD: TEST"></label><label class="f"><span>Mô tả</span><input type="text" id="d_d" placeholder="VD: Ảnh test thực tế"></label>';
+  }else if(d.type==="urls"){
+    title="Thêm ảnh vào nhóm "+esc(d.id);ok="Thêm ảnh";
+    body='<label class="f"><span>Đường dẫn ảnh, mỗi dòng một ảnh (bắt đầu bằng https://)</span><textarea id="d_urls" style="min-height:140px"></textarea></label>';
+  }else if(d.type==="list"||d.type==="banned"){
+    title="Thêm dòng";body='<label class="f"><span>Nội dung</span><textarea id="d_text"></textarea></label>';
+  }else if(d.type==="bot"){
+    title=d.from?"Nhân bản bot":"Tạo bot mới";ok=d.from?"Nhân bản":"Tạo bot";
+    body='<label class="f"><span>Tên bot</span><input type="text" id="d_name" placeholder="VD: Bot tẩy lồng và tẩy mốc gioăng"></label>'+
+     '<label class="f"><span>Bắt đầu từ</span><select id="d_from"><option value="">Bot trống</option>'+ST.bots.map(function(k){return '<option value="'+k.id+'"'+(d.from===k.id?" selected":"")+">Nhân bản: "+esc(k.name)+"</option>"}).join("")+"</select></label>";
+  }else if(d.type==="page"){
+    title="Thêm Page";
+    body='<label class="f"><span>Tên Page</span><input type="text" id="d_name" placeholder="VD: Ailla Việt Nam Store"></label><label class="f"><span>Id Page Facebook (chỉ gồm số)</span><input type="text" id="d_fb" placeholder="VD: 105017945992971"></label>';
+  }
+  return '<div class="veil" data-act="closedrawer"><div class="hdrawer" role="dialog" aria-label="'+esc(title)+'"><div class="dh"><b>'+title+'</b><button class="btn sm ghost" data-act="closedrawer" aria-label="Đóng">✕</button></div><div class="db">'+body+'</div><div class="df"><button class="btn" data-act="closedrawer">Hủy</button><button class="btn pri" data-act="savedrawer">'+ok+"</button></div></div></div>";
+}
+function val(id){var e=document.getElementById(id);return e?e.value.trim():""}
+
+/* ---------- Sự kiện ---------- */
+function alive(){return ST.root&&ST.root.isConnected}
+function curFlow(){return ST.doc&&mk(ST.doc.flows,ST.sel)}
+function curNode(){var f=curFlow();return f&&mk(f.nodes,ST.node)}
+async function guard(fn){try{await fn()}catch(e){toast(e.message||"Có lỗi")}}
+document.addEventListener("click",function(e){
+  if(!alive())return;
+  var dt=e.target.closest("[data-dot]");
+  if(dt){var pr=dt.getAttribute("data-dot").split(":");ST.conn={from:pr[0],key:pr[1]};draw();return}
+  var t=e.target.closest("[data-act]");if(!t||!ST.root.contains(t))return;
+  var a=t.getAttribute("data-act"),id=t.getAttribute("data-id"),b=ST.doc;
+  if(a==="closedrawer"){if(t.classList.contains("veil")&&e.target!==t)return;ST.drawer=null;draw();return}
+  if(t.tagName==="SELECT"||t.tagName==="INPUT")return;
+  if(a==="kill"){guard(async function(){if(!ST.ctl.kill&&!confirm("Tắt khẩn: mọi agent ngừng trả lời ngay. Chắc chắn?"))return;ST.ctl=await api("/control",{method:"PUT",body:JSON.stringify({kill:!ST.ctl.kill})});toast(ST.ctl.kill?"Đã tắt khẩn":"Đã gỡ tắt khẩn")});return}
+  if(a==="savectl"){guard(async function(){ST.ctl=await api("/control",{method:"PUT",body:JSON.stringify({testers:val("c_testers"),silent_minutes:+val("c_silent"),hours_from:val("c_hf"),hours_to:val("c_ht")})});toast("Đã lưu thiết lập")});return}
+  if(a==="hsub"){ST.hsub=id;if(id==="log")guard(async function(){var r=await Promise.all([api("/log"),api("/runs")]);ST.hlog=r[0];ST.runs=r[1];draw()});else draw();return}
+  if(a==="home"){goHome();return}
+  if(a==="openbot"){openBot(id);return}
+  if(a==="newbot"){ST.drawer={type:"bot"};draw();return}
+  if(a==="clonebot"){ST.drawer={type:"bot",from:id};draw();return}
+  if(a==="delbot"){guard(async function(){if(!confirm("Xóa bot này cùng mọi phiên bản của nó?"))return;await api("/bots/"+id,{method:"DELETE"});await loadHome();toast("Đã xóa bot")});return}
+  if(a==="newpage"){ST.drawer={type:"page"};draw();return}
+  if(a==="delpage"){guard(async function(){if(!confirm("Bỏ Page này khỏi danh sách?"))return;await api("/pages/"+id,{method:"DELETE"});await loadHome()});return}
+  if(a==="publish"){guard(async function(){
+    if(ST.busy)return;ST.busy=true;updTop();
+    try{if(!(await flush()))return;
+      var r=await api("/bots/"+ST.botId+"/publish",{method:"POST",body:JSON.stringify({})});
+      await loadBot(ST.botId,true);toast("Đã xuất bản bản "+r.version+(r.warnings.length?" (còn "+r.warnings.length+" cảnh báo)":""))}
+    catch(err){try{var r2=await api("/bots/"+ST.botId);ST.issues=r2.issues}catch(x){}toast(err.message);draw()}
+    finally{ST.busy=false;updTop()}});return}
+  if(a==="rollback"){guard(async function(){if(!confirm("Quay lại bản "+id+"? Nội dung bản đó sẽ thành bản mới nhất và được xuất bản ngay."))return;await flush();var r=await api("/bots/"+ST.botId+"/rollback",{method:"POST",body:JSON.stringify({version:+id})});await loadBot(ST.botId,true);toast("Đã quay lại, thành bản "+r.version)});return}
+  if(a==="tab"){guard(async function(){await flush();ST.tab=id;draw()});return}
+  if(a==="savedrawer"){saveDrawer();return}
+  if(!b)return;
+  if(a==="selflow"){ST.sel=id;var f0=mk(b.flows,id);ST.node=f0&&f0.nodes[0]?f0.nodes[0].id:"";ST.conn=null;draw();return}
+  if(a==="addflow"){ST.drawer={type:"flow"};draw();return}
+  if(a==="delflow"){if(!confirm("Xóa luồng này?"))return;b.flows=b.flows.filter(function(x){return x.id!==id});b.flows.forEach(function(x){x.allow=x.allow.filter(function(y){return y!==id});x.nodes.forEach(function(n){(n.btns||[]).forEach(function(bt){if(bt.to===id)bt.to=""});if(n.to===id)n.to=""})});ST.sel=(b.flows[0]||{}).id||"";ST.node="";ST.cur=null;touch();draw();return}
+  if(a==="addnode"){ST.drawer={type:"node"};draw();return}
+  if(a==="entry"){var f1=curFlow();f1.entry=!f1.entry;touch();draw();return}
+  if(a==="allow"){var f2=curFlow(),ix=f2.allow.indexOf(id);if(ix>=0)f2.allow.splice(ix,1);else f2.allow.push(id);touch();draw();return}
+  if(a==="cancelconn"){ST.conn=null;draw();return}
+  if(a==="addbtn"||a==="delbtn"||a==="setstart"||a==="unlink"||a==="delnodesel"){
+    var f3=curFlow(),n3=curNode();if(!n3)return;
+    if(a==="addbtn"){n3.btns=n3.btns||[];if(n3.btns.length<3)n3.btns.push({label:"",to:""})}
+    else if(a==="delbtn")n3.btns.splice(+id,1);
+    else if(a==="setstart"){f3.nodes=[n3].concat(f3.nodes.filter(function(x){return x!==n3}))}
+    else if(a==="unlink"){n3.next="";n3.yes="";n3.no=""}
+    else{f3.nodes=f3.nodes.filter(function(x){return x!==n3});f3.nodes.forEach(function(x){if(x.next===n3.id)x.next="";if(x.yes===n3.id)x.yes="";if(x.no===n3.id)x.no=""});ST.node=""}
+    touch();draw();return}
+  if(a==="simbtn"){guard(async function(){var label=t.getAttribute("data-label");ST.chat.push({c:"k",t:"[Khách bấm nút] "+label});await runSim({flow_id:id},"[bấm nút] "+label)});return}
+  if(a==="send"){var inp=document.getElementById("simin"),tx=inp?inp.value.trim():"";if(tx){inp.value="";ST.chat.push({c:"k",t:tx});guard(function(){return runSim({text:tx},tx)})}return}
+  if(a==="clearchat"){ST.chat=[];ST.cur=null;draw();return}
+  if(a==="addmsg"){ST.drawer={type:"msg"};draw();return}
+  if(a==="editmsg"){ST.drawer={type:"msg",id:id};draw();return}
+  if(a==="delmsg"){b.lib=b.lib.filter(function(x){return x.id!==id});touch();draw();return}
+  if(a==="insvar"){var ta=document.getElementById("d_text");if(ta){var s=ta.selectionStart==null?ta.value.length:ta.selectionStart;ta.value=ta.value.slice(0,s)+"{"+id+"}"+ta.value.slice(ta.selectionEnd==null?s:ta.selectionEnd);ta.focus()}return}
+  if(a==="addprod"){ST.drawer={type:"product"};draw();return}
+  if(a==="delprod"){if(!confirm("Xóa sản phẩm và các mức giá của nó?"))return;b.products=b.products.filter(function(x){return x.id!==id});b.offers=b.offers.filter(function(x){return x.prod!==id});touch();draw();return}
+  if(a==="addoffer"){ST.drawer={type:"offer",id:id};draw();return}
+  if(a==="deloffer"){b.offers=b.offers.filter(function(x){return x.id!==id});touch();draw();return}
+  if(a==="addgroup"){ST.drawer={type:"group"};draw();return}
+  if(a==="delgroup"){if(!confirm("Xóa nhóm ảnh "+id+"?"))return;b.media=b.media.filter(function(x){return x.g!==id});touch();draw();return}
+  if(a==="addurls"){ST.drawer={type:"urls",id:id};draw();return}
+  if(a==="delurl"){var q=id.split(":"),g=b.media.filter(function(x){return x.g===q[0]})[0];if(g){g.urls.splice(+q[1],1);touch();draw()}return}
+  if(a==="addbanned"){ST.drawer={type:"banned"};draw();return}
+  if(a==="delbanned"){b.banned.splice(+id,1);touch();draw();return}
+  if(a==="addfollow"){if(b.follow.length<5){b.follow.push({id:rid("f"),when:"Tiếp theo",ref:""});touch();draw()}return}
+  if(a==="delfollow"){b.follow=b.follow.filter(function(x){return x.id!==id});touch();draw();return}
+  if(a==="addlist"){ST.drawer={type:"list",id:id};draw();return}
+  if(a==="togglelist"||a==="dellist"){var p=id.split(":"),arr=b[p[0]],it=mk(arr,p[1]);if(a==="togglelist")it.on=!it.on;else b[p[0]]=arr.filter(function(x){return x.id!==p[1]});touch();draw();return}
+});
+async function runSim(body,said){
+  var r=await sim(body);
+  r.messages.forEach(function(m){ST.chat.push(toChat(m))});
+  ST.cur=r.state.cur;
+  var q={sent:["Đã gửi (thử)","ok"],handoff:["Chuyển chị: "+r.result.note,"bad"],blocked:["Chặn: "+r.result.note,"warn"],out_of_script:["Ngoài kịch bản: báo chị","bad"],nothing:["-","gray"]}[r.result.kind]||["-","gray"];
+  ST.simlog.unshift({time:nowHM(),said:said,flow:r.result.flow||"-",res:q[0],cls:q[1],text:r.log.join("\n")});
+  draw();
+}
+async function saveDrawer(){
+  var d=ST.drawer,b=ST.doc;
+  try{
+    if(d.type==="bot"){var nm0=val("d_name");if(!nm0){toast("Cần có tên bot");return}await api("/bots",{method:"POST",body:JSON.stringify({name:nm0,from:val("d_from")||undefined})});ST.drawer=null;await loadHome();toast("Đã tạo bot");return}
+    if(d.type==="page"){await api("/pages",{method:"POST",body:JSON.stringify({name:val("d_name"),fb_page_id:val("d_fb")})});ST.drawer=null;await loadHome();toast("Đã thêm Page");return}
+    if(d.type==="msg"){
+      var code=val("d_code"),text=val("d_text");if(!code||!text){toast("Cần có mã câu và nội dung");return}
+      var o={code:code,grp:val("d_grp"),text:text,claim:val("d_claim"),img:val("d_img")};
+      if(d.id){var m=mk(b.lib,d.id);for(var k in o)m[k]=o[k]}else{o.id=rid("m");b.lib.push(o)}
+    }else if(d.type==="flow"){
+      var nm=val("d_name");if(!nm){toast("Cần có tên luồng");return}
+      var fl={id:rid("f"),code:val("d_code")||"LUONG-"+(b.flows.length+1),name:nm,keys:val("d_keys"),entry:false,win:"in",allow:[],nodes:[{id:rid("n"),t:"msg",x:30,y:40,ref:(b.lib[0]||{}).id||"",btns:[],next:""}]};
+      b.flows.push(fl);ST.sel=fl.id;ST.node=fl.nodes[0].id;
+    }else if(d.type==="node"){
+      var ff=curFlow(),kk=val("d_k"),cnt=ff.nodes.length;
+      var nn={id:rid("n"),t:kk,x:30+(cnt%3)*270,y:40+Math.floor(cnt/3)*170};
+      if(kk==="msg"){nn.ref="";nn.btns=[];nn.next=""}else if(kk==="img"){nn.ref="";nn.next=""}else if(kk==="cond"){nn.c="xh";nn.yes="";nn.no=""}else if(kk==="jump"){nn.to=""}else{nn.ref=""}
+      ff.nodes.push(nn);ST.node=nn.id;
+    }else if(d.type==="product"){
+      var pn=val("d_name"),pid=val("d_id").toLowerCase().replace(/[^a-z0-9_]/g,"");
+      if(!pn||!pid){toast("Cần có tên và mã ngắn (chữ thường, số)");return}
+      if(mk(b.products,pid)){toast("Mã ngắn này đã có");return}
+      b.products.push({id:pid,name:pn});
+    }else if(d.type==="offer"){
+      var pr=val("d_price");if(!pr){toast("Cần có giá");return}
+      b.offers.push({id:rid("o"),prod:d.id,name:val("d_name")||"Mua riêng",lv:val("d_lv"),price:pr,from:val("d_from")||""});
+    }else if(d.type==="group"){
+      var gg=val("d_g").toUpperCase().replace(/\s+/g,"");if(!gg){toast("Cần có mã nhóm");return}
+      if(b.media.some(function(x){return x.g===gg})){toast("Nhóm này đã có");return}
+      b.media.push({g:gg,d:val("d_d"),urls:[]});
+    }else if(d.type==="urls"){
+      var g=b.media.filter(function(x){return x.g===d.id})[0],ls=val("d_urls").split(/\n+/).map(function(x){return x.trim()}).filter(Boolean);
+      if(!ls.length){toast("Chưa có đường dẫn nào");return}
+      if(ls.some(function(x){return !/^https:\/\//i.test(x)})){toast("Mỗi đường dẫn phải bắt đầu bằng https://");return}
+      g.urls=g.urls.concat(ls);
+    }else if(d.type==="banned"){
+      var bt=val("d_text");if(!bt){toast("Cần có nội dung");return}b.banned.push(bt);
+    }else if(d.type==="list"){
+      var tx=val("d_text");if(!tx){toast("Cần có nội dung");return}b[d.id].push({id:rid("r"),text:tx,on:true});
+    }
+    ST.drawer=null;touch();draw();
+  }catch(e){toast(e.message)}
+}
+document.addEventListener("change",function(e){
+  if(!alive())return;
+  var t=e.target;if(!ST.root.contains(t))return;
+  var a=t.getAttribute("data-act"),b=ST.doc;
+  var nbv=t.getAttribute("data-nb");
+  if(nbv&&b){var nn=curNode();if(nn){var q=nbv.split(":");
+    if(q[0]==="btn"){var bt=nn.btns[+q[1]];if(bt)bt[q[2]]=t.value}else nn[q[0]]=t.value;
+    touch();if(t.tagName==="SELECT")draw()}return}
+  var fl=t.getAttribute("data-flow");
+  if(fl&&b){var f=curFlow();if(f){f[fl]=t.value;touch();if(t.tagName==="SELECT"||fl==="code"||fl==="name")draw()}return}
+  var fo=t.getAttribute("data-follow");
+  if(fo&&b){var pp=fo.split(":"),it=mk(b.follow,pp[1]);if(it){it[pp[0]]=t.value;touch()}return}
+  if(a==="botname"){ST.name=t.value.trim()||ST.name;touch();return}
+  if(a==="pickbot"){if(t.value)openBot(t.value);else goHome();return}
+  if(a==="pagebot"){guard(async function(){try{await api("/pages/"+t.getAttribute("data-id"),{method:"PATCH",body:JSON.stringify({bot_id:t.value||null})})}finally{await loadHome()}});return}
+  if(a==="pagemode"){guard(async function(){try{await api("/pages/"+t.getAttribute("data-id"),{method:"PATCH",body:JSON.stringify({mode:t.value})})}finally{await loadHome()}});return}
+  if(a==="setxh"){ST.xh=t.value;draw();return}
+  if(a==="setphone"){ST.phone=t.checked;draw();return}
+});
+document.addEventListener("input",function(e){if(alive()&&e.target.id==="q"){ST.q=e.target.value;draw()}});
+document.addEventListener("keydown",function(e){
+  if(!alive())return;
+  if(e.key==="Enter"&&e.target.id==="simin"){e.preventDefault();var bt=document.querySelector('#ht [data-act="send"]');if(bt)bt.click()}
+  if(e.key==="Escape"){if(ST.conn){ST.conn=null;draw()}else if(ST.drawer){ST.drawer=null;draw()}}
+});
+var drag=null;
+document.addEventListener("pointerdown",function(e){
+  if(!alive())return;
+  var h=e.target.closest("[data-drag]");if(!h)return;
+  var f=curFlow(),n=f&&mk(f.nodes,h.getAttribute("data-drag"));if(!n)return;
+  drag={n:n,el:h.parentNode,sx:e.clientX,sy:e.clientY,ox:n.x,oy:n.y,moved:false};e.preventDefault();
+});
+document.addEventListener("pointermove",function(e){
+  if(!drag)return;var dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+  if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;
+  if(drag.moved){drag.n.x=Math.max(0,drag.ox+dx);drag.n.y=Math.max(0,drag.oy+dy);drag.el.style.left=drag.n.x+"px";drag.el.style.top=drag.n.y+"px";drawEdges()}
+});
+document.addEventListener("pointerup",function(){
+  if(!drag)return;var d=drag;drag=null;
+  if(d.moved){touch();return}
+  if(ST.conn){var f=curFlow(),from=f&&mk(f.nodes,ST.conn.from);if(from&&from!==d.n){from[ST.conn.key]=d.n.id;touch()}ST.conn=null;draw();return}
+  ST.node=d.n.id;draw();
+});
+
+/* ---------- Mở trang ---------- */
+PAGES.huanluyenagent=function(m){
+  m.innerHTML='<div id="ht"></div>'+HT_CSS;
+  ST.root=m.querySelector("#ht");
+  ST.view="home";ST.hsub="bp";ST.botId="";ST.doc=null;ST.drawer=null;ST.toast="";
+  draw();
+  loadHome();
 };
+})();
 {const s=MODULES.find(m=>m.k==="setup");if(s){const g0=s.groups;s.groups=()=>{const G=g0();const hs=G.find(g=>g[0]==="Hệ thống");if(hs)hs[1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}
 {const i=MODULES.findIndex(m=>m.k==="agt");const mod=MODULES[i];
  if(mod){const g0=mod.groups;mod.groups=()=>{const G=g0();G[0][1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}
