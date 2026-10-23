@@ -7,7 +7,7 @@
 const ADL={raw:null,at:0,busy:false,who:"",day:"",open:""};
 async function adlLoad(force){
   if(typeof svApi!=="function"||ADL.busy||(!force&&Date.now()-ADL.at<1800000))return;ADL.busy=true;
-  try{const r=await svApi("/api/hub/blob/ads_live");const ch=JSON.stringify(r)!==JSON.stringify(ADL.raw);ADL.raw=r;ADL.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp")&&!svTyping())renderMain()}catch(e){}finally{ADL.busy=false}
+  try{const r=await svApi("/api/hub/blob/ads_live");const ch=JSON.stringify(r)!==JSON.stringify(ADL.raw);ADL.raw=r;ADL.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="fb_gd"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp")&&!svTyping())renderMain()}catch(e){}finally{ADL.busy=false}
 }
 
 
@@ -109,7 +109,7 @@ function adfMergeDays(){
   });
 }
 const ADF_ACC={"2438831049860777":"Việt Anh","1721213761771236":"Việt Anh","1340771911416054":"Thảo","187878951968758":"Thảo","1354614543145294":"Thảo"};
-const ADF_PROD={INBOX:"Đơn chốt qua inbox (chưa chia sản phẩm)",TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
+const ADF_PROD={LANDING:"Đơn trang bán hàng chưa gắn chiến dịch",INBOX:"Đơn chốt qua inbox (chưa chia sản phẩm)",TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
 /* Đọc tên chiến dịch: VA-TLAi-CD-… | DUAN-TD-CD-… | TĐ - TLAi - 23.9 - … | MESS - … (không ghi người: lấy theo tài khoản). */
 function adfParse(name,account){
   const raw=String(name||""),n=raw.toUpperCase().replace(/Đ/g,"D"),tk=n.split(/[^A-Z0-9]+/).filter(Boolean);
@@ -132,7 +132,7 @@ function adfData(){
   const keys=Object.keys(r.days).sort(),names={};
   keys.forEach(k=>(r.days[k].fb||[]).forEach(c=>{names[c.campaign_id]={name:c.campaign,account:c.account}}));
   const last=keys.filter(k=>(r.days[k].fb||[]).length||(r.days[k].pos||[]).length).pop()||keys[keys.length-1];
-  return {days:r.days,keys,names,last,at:r.at};
+  return {days:r.days,keys,names,last,at:r.at,campPage:r.camp_page||{}};
 }
 const adfPeriod=(D,per)=>{
   const mo=D.last.slice(0,7);
@@ -143,6 +143,9 @@ const adfPeriod=(D,per)=>{
 };
 /* Doanh số, đơn của quảng cáo TIN NHẮN: lấy theo số sale nhập trong file BÁO CÁO DIGITAL (web đọc lại mỗi sáng). Tin nhắn chốt qua inbox không mang mã chiến dịch nên Pancake không tách được. */
 const adfSheetProd=id=>{id=String(id||"").toUpperCase();return id.startsWith("RUOI")?"RUOI":id.startsWith("MUOI")?"MUOI":id.startsWith("AIBIO")?"AIBIO":id.startsWith("TLG")?"TLG":/^(TD|TINH)/.test(id)?"TINHDAU":/^(LS|LAU)/.test(id)?"LS":""};
+const ADF_PAGE_OWNER={"105017945992971":"Việt Anh","61585541043585":"Việt Anh","100089661122548":"Thảo","61592606507215":"Duẩn","61566319940808":"Duẩn","61577468900810":"Duẩn"};
+/* Tên nguồn đơn Pancake (ví dụ "Thảo-TLG-Aibio", "Việt Anh-Muỗi", "TLG Aibio Duẩn") -> người chạy */
+const adfLinkWho=n=>{n=String(n||"").toLowerCase();return /vi[eệ]t anh/.test(n)?"Việt Anh":/th[aả]o/.test(n)?"Thảo":/du[aẩ]n/.test(n)?"Duẩn":""};
 const ADF_MESS={"Việt Anh":{pages:["105017945992971","61585541043585"],prods:["TLG"]}};
 const ADF_MESS_PROD={TLG:"TLG"};
 const adfWho=n=>{n=String(n||"").toLowerCase();return /vi[eệ]t anh/.test(n)?"Việt Anh":/th[aả]o/.test(n)?"Thảo":/du[aẩ]n/.test(n)?"Duẩn":"Chưa rõ người"};
@@ -152,10 +155,10 @@ function adfSheetMess(){
 }
 function adfAgg(D,days){
   const C={},US={};let unmatched=0,unOrders=0;
-  const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);return {name:nm.name||"",account:nm.account||"",owner:p.owner,prod:p.prod,typ:p.typ}})()));
+  const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);const pgo=ADF_PAGE_OWNER[(D.campPage||{})[id]];return {name:nm.name||"",account:nm.account||"",owner:p.owner==="Chưa rõ người"&&pgo?pgo:p.owner,prod:p.prod,typ:p.typ}})()));
   days.forEach(k=>{const d=D.days[k];if(!d)return;
     (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;/* Data: quảng cáo tin nhắn = số tin nhắn; quảng cáo chuyển đổi = số khách để lại thông tin (đăng ký hoàn tất) */x.msgs+=x.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0))});
-    (d.pos||[]).forEach(p=>{if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=p.orders||0;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=p.orders||0;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=p.orders||0;u.rev+=p.revenue||0}});
+    (d.pos||[]).forEach(p=>{const od=(p.orders||0)-(p.canceled||0);/* don chot = tru don huy, giong Pancake */if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=od;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=od;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=od;u.rev+=p.revenue||0}});
   });
   const SH=adfSheetMess();
   /* Doanh số tin nhắn: đơn nguồn Facebook, đúng page của người chạy, đúng sản phẩm chạy quảng cáo tin nhắn (quy ước chị Hoa 21/10). */
@@ -163,6 +166,12 @@ function adfAgg(D,days){
   days.forEach(k=>{const rows=(D.days[k]||{}).fbp;if(!Array.isArray(rows))return;rows.forEach(r=>{Object.entries(ADF_MESS).forEach(([who,cf])=>{if(!cf.pages.includes(r.page)||!cf.prods.includes(String(r.code).toUpperCase()))return;const prod=ADF_MESS_PROD[String(r.code).toUpperCase()]||String(r.code).toUpperCase(),id="__mess_"+who+"_"+prod,x=C[id]||(C[id]={id,name:"Doanh số tin nhắn của "+who+" (Pancake: đơn từ page của "+who+", sản phẩm "+(r.name||r.code)+")",account:"",owner:who,prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=r.orders||0;x.rev+=r.revenue||0;attRev+=r.revenue||0;attOrd+=r.orders||0})})});
   if(attRev||attOrd){unmatched=Math.max(0,unmatched-attRev);unOrders=Math.max(0,unOrders-attOrd);if(US.Facebook){US.Facebook.rev=Math.max(0,US.Facebook.rev-attRev);US.Facebook.orders=Math.max(0,US.Facebook.orders-attOrd);if(!US.Facebook.rev&&!US.Facebook.orders)delete US.Facebook}}
   if(SH)days.forEach(k=>{if(Array.isArray((D.days[k]||{}).fbp))return;if(k.slice(0,7)!==SH.mo)return;const di=+k.slice(8)-1;SH.rows.forEach(r=>{const o=r.orders[di]||0,v=r.rev[di]||0;if(!o&&!v)return;const id="__sheet_"+r.who+"_"+r.prod;const x=C[id]||(C[id]={id,name:"Doanh số tin nhắn theo báo cáo Sheet ("+(ADF_PROD[r.prod]||"chưa rõ sản phẩm")+")",account:"",owner:r.who,prod:r.prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=o;x.rev+=v})});
+  /* Đơn từ trang bán hàng không mang mã chiến dịch: Pancake vẫn biết trang đó của ai (tên nguồn đơn). Phần chênh giữa doanh số theo trang và doanh số đã gắn chiến dịch của người đó được tính cho người đó. */
+  const LW={},LO={};days.forEach(k=>((D.days[k]||{}).link||[]).forEach(l=>{const w=adfLinkWho(l.name);if(!w)return;LW[w]=(LW[w]||0)+(l.revenue||0);LO[w]=(LO[w]||0)+Math.max(0,(l.orders||0)-(l.canceled||0))}));
+  const MW={},MO={};Object.values(C).forEach(x=>{if(x.id.startsWith("__")||x.typ==="Tin nhắn")return;MW[x.owner]=(MW[x.owner]||0)+x.rev;MO[x.owner]=(MO[x.owner]||0)+x.orders});
+  let landRev=0,landOrd=0;
+  Object.keys(LW).forEach(w=>{const rv=Math.max(0,LW[w]-(MW[w]||0)),od=Math.max(0,LO[w]-(MO[w]||0));if(!rv&&!od)return;const id="__land_"+w;C[id]={id,name:"Đơn trang bán hàng chưa gắn chiến dịch (theo tên nguồn đơn của "+w+")",account:"",owner:w,prod:"LANDING",typ:"Chuyển đổi",spend:0,msgs:0,orders:od,rev:rv};landRev+=rv;landOrd+=od});
+  if(landRev||landOrd){unmatched=Math.max(0,unmatched-landRev);unOrders=Math.max(0,unOrders-landOrd);const W=US["Webcake Landing"];if(W){W.rev=Math.max(0,W.rev-landRev);W.orders=Math.max(0,W.orders-landOrd);if(!W.rev&&!W.orders)delete US["Webcake Landing"]}}
   const links={};days.forEach(k=>((D.days[k]||{}).link||[]).forEach(l=>{const key=l.name||"(trang chưa có tên)";const t=links[key]||(links[key]={name:key,orders:0,rev:0});t.orders+=l.orders||0;t.rev+=l.revenue||0}));
   /* Người chỉ chạy tin nhắn cho đúng một sản phẩm thì doanh số tin nhắn (theo page) tính vào sản phẩm đó. */
   const MP={};Object.values(C).forEach(x=>{if(x.typ==="Tin nhắn"&&x.prod&&x.prod!=="INBOX"&&x.spend>0)(MP[x.owner]=MP[x.owner]||new Set()).add(x.prod)});
@@ -288,3 +297,73 @@ PAGES.adssp=function(m){
   if(tran)m.appendChild(tran);
 };
 PAGES.fb_ads=pAdsDay;
+/* =====================================================================
+   GIAO DỊCH THANH TOÁN FACEBOOK (Digital Marketing › Giao dịch thanh toán)
+   Từng lần Facebook trừ tiền / nạp tiền của tài khoản quảng cáo trong BM, cho kế toán đối soát.
+   Nguồn: nhật ký tài khoản quảng cáo; Facebook chỉ giữ khoảng 7 ngày nên máy chủ ghi dồn lại mỗi sáng 8h.
+   ===================================================================== */
+const ADG={acc:"",kind:""};
+/* Facebook ghi số tiền trừ trước VAT; BM hiện số gồm VAT 10% (ví dụ 23.502.990 -> 25.853.289). Nạp tiền không có VAT. */
+const vatAmt=b=>b.kind==="tru"?Math.round((b.amount||0)*1.1):(b.amount||0);
+function adgCsv(L){
+  const NL=String.fromCharCode(10),q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const txt=String.fromCharCode(65279)+["Giờ (VN)","Tài khoản","Mã tài khoản","Loại","Số tiền gồm VAT 10%","Số tiền trước VAT","Tiền tệ","Mã giao dịch"].map(q).join(",")+NL+L.map(b=>[adfDtm(b.time),b.name,b.account,b.kind==="tru"?"Trừ tiền":"Nạp tiền",vatAmt(b),b.amount,b.currency,b.tx].map(q).join(",")).join(NL);
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download="giao-dich-facebook-"+PERIOD.from+"-"+PERIOD.to+".csv";document.body.appendChild(a);a.click();a.remove();
+}
+/* Theo tháng: tháng chưa có lịch sử giao dịch thì ước tính = chi phí quảng cáo x 1,1 (VAT 10%). Tháng 9 lấy từ báo cáo Digital, các tháng sau lấy từ Facebook. */
+function adgMonths(D,bills){
+  const P=["Việt Anh","Thảo","Duẩn"],out=[],dig={};
+  Object.entries(DAYD.ads||{}).forEach(([nv,days])=>Object.keys(days).forEach(k=>{const m=k.slice(0,7),w=adfWho(nv),w2=w==="Chưa rõ người"?nv:w,o=dig[m]||(dig[m]={});o[w2]=(o[w2]||0)+(+days[k][0]||0)}));
+  Object.keys(dig).sort().forEach(m=>{const o=dig[m];out.push({m,src:"báo cáo Digital",p:P.map(w=>o[w]||0),other:Object.entries(o).filter(([w])=>!P.includes(w)).reduce((x,[,v])=>x+v,0)})});
+  const last=Object.keys(dig).sort().pop()||"";
+  if(D)[...new Set(D.keys.map(k=>k.slice(0,7)))].filter(m=>m>last).sort().forEach(m=>{const g=adfAgg(D,D.keys.filter(k=>k.slice(0,7)===m)).C.filter(x=>x.spend),by=w=>g.filter(x=>x.owner===w).reduce((a,x)=>a+x.spend,0);out.push({m,src:"Facebook",p:P.map(by),other:by("Chưa rõ người")})});
+  out.forEach(r=>{r.tot=r.p.reduce((a,b)=>a+b,0)+r.other;r.est=Math.round(r.tot*1.1);const bm=bills.filter(b=>b.kind==="tru"&&adfDt(b.time).slice(0,7)===r.m);r.real=bm.length?bm.reduce((a,b)=>a+vatAmt(b),0):null});
+  return out;
+}
+/* Báo cáo cuối tháng cho kế toán: (1) chi phí quảng cáo theo người, VAT 10%, so với giao dịch thực tế trong BM; (2) chi phí theo sản phẩm (từ Facebook) để tính lãi lỗ. */
+function adgMonthCsv(D,bills){
+  const NL=String.fromCharCode(10),q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"',line=a=>a.map(q).join(",");
+  const rows=[line(["BÁO CÁO CHI PHÍ QUẢNG CÁO FACEBOOK THEO THÁNG"]),line(["Tháng","Nguồn chi phí","Việt Anh","Thảo","Duẩn","Chưa rõ người","Tổng chi phí quảng cáo","VAT 10%","Tiền Facebook trừ ước tính (gồm VAT)","Giao dịch thực tế trong BM (gồm VAT)","Chênh lệch (thực tế trừ ước tính)"])];
+  adgMonths(D,bills).forEach(r=>{const vat=Math.round(r.tot*0.1);rows.push(line([r.m,r.src,...r.p.map(Math.round),Math.round(r.other),Math.round(r.tot),vat,r.est,r.real==null?"":r.real,r.real==null?"":r.real-r.est]))});
+  rows.push("",line(["CHI PHÍ QUẢNG CÁO THEO SẢN PHẨM (theo Facebook)"]),line(["Tháng","Sản phẩm","Chi phí quảng cáo","VAT 10%","Gồm VAT","Doanh số Pancake gắn chiến dịch","Đơn"]));
+  [...new Set(D.keys.map(k=>k.slice(0,7)))].sort().forEach(m=>{const ks=D.keys.filter(k=>k.slice(0,7)===m);if(!ks.length||ks[0].slice(8)!=="01")return;const by={};adfAgg(D,ks).C.forEach(x=>{if(!x.spend&&!x.rev)return;const n=ADF_PROD[x.prod]||"Chưa rõ sản phẩm",t=by[n]||(by[n]={sp:0,ds:0,don:0});t.sp+=x.spend;t.ds+=x.rev;t.don+=x.orders});Object.entries(by).sort((a,b)=>b[1].sp-a[1].sp).forEach(([n,t])=>rows.push(line([m,n,Math.round(t.sp),Math.round(t.sp*0.1),Math.round(t.sp*1.1),Math.round(t.ds),t.don])))});
+  const txt=String.fromCharCode(65279)+rows.join(NL),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download="bao-cao-thang-quang-cao-facebook.csv";document.body.appendChild(a);a.click();a.remove();
+}
+function pFbGd(m){
+  adfLoad();const R=ADF.raw;
+  if(!R){m.innerHTML=H("Giao dịch thanh toán Facebook","Đang tải…")+`<section class="card"><p class="empty">Đang tải số liệu…</p></section>`;return}
+  const bills=R.billing||[],info=R.acc_info||[],D=adfData(),days=D?D.keys.filter(k=>k>=PERIOD.from&&k<=PERIOD.to):[];
+  const inP=bills.filter(b=>{const d=adfDt(b.time);return d>=PERIOD.from&&d<=PERIOD.to});
+  const names={};bills.forEach(b=>{if(b.name)names[b.account]=b.name});info.forEach(i=>{if(i.name)names[i.account]=i.name});
+  const accIds=[...new Set(bills.map(b=>b.account).concat(info.map(i=>i.account)))];
+  const L=inP.filter(b=>(!ADG.acc||b.account===ADG.acc)&&(!ADG.kind||b.kind===ADG.kind));
+  const first=bills.length?adfDt(bills[bills.length-1].time):"";
+  const spend={};days.filter(k=>!first||k>=first).forEach(k=>((D.days[k]||{}).fb||[]).forEach(c=>{spend[c.account]=(spend[c.account]||0)+(c.spend||0)}));
+  const tru=inP.filter(b=>b.kind==="tru"),nap=inP.filter(b=>b.kind==="nap"),sm=a=>a.reduce((x,b)=>x+vatAmt(b),0);
+  const rows=accIds.map(a=>{const t=inP.filter(b=>b.account===a&&b.kind==="tru"),n=inP.filter(b=>b.account===a&&b.kind==="nap"),i=info.find(x=>x.account===a)||{};return {a,name:names[a]||a,nTru:t.length,tru:sm(t),nNap:n.length,nap:sm(n),sp:spend[a]||0,spent:i.amount_spent,bal:i.balance}}).filter(r=>r.nTru||r.nNap||r.sp).sort((x,y)=>y.tru-x.tru);
+  const T=rows.reduce((o,r)=>({tru:o.tru+r.tru,nap:o.nap+r.nap,sp:o.sp+r.sp,spent:o.spent+(r.spent||0),bal:o.bal+(r.bal||0)}),{tru:0,nap:0,sp:0,spent:0,bal:0});
+  const at=new Date(R.at);
+  m.innerHTML=ADF_CSS+H("Giao dịch thanh toán Facebook","Lấy từ Business Manager · lần cuối "+at.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})+" "+at.toLocaleDateString("vi-VN"))+`
+  <div class="filters"><select id="adg-a">${opt([["","Tất cả tài khoản"]].concat(accIds.map(a=>[a,names[a]||a])),ADG.acc)}</select>
+  <select id="adg-k">${opt([["","Trừ tiền và nạp tiền"],["tru","Chỉ trừ tiền"],["nap","Chỉ nạp tiền"]],ADG.kind)}</select>
+  <span class="hint">Chọn kỳ ở thanh thời gian phía trên. Facebook chỉ giữ nhật ký khoảng 7 ngày, máy chủ ghi lại từ ${first?vnd(first):"—"}; khoản cũ hơn tải tay file giao dịch từ Facebook.</span>
+  <button class="btn" id="adg-mcsv" style="margin-left:auto">Tải báo cáo tháng (Excel)</button><button class="btn" id="adg-csv">Tải giao dịch (Excel)</button></div>
+  <div class="grid kpis">${kpi("Tiền Facebook đã trừ (gồm VAT 10%)",nf(T.tru)+"đ",tru.length+" lần · "+esc(pLabel()))}${kpi("Tiền đã nạp",nf(T.nap)+"đ",nap.length+" lần")}${kpi("Chi phí quảng cáo cùng giai đoạn",nf(Math.round(T.sp))+"đ",first?"từ "+vnd(first)+", theo báo cáo chiến dịch":"theo báo cáo chiến dịch")}${kpi("Dư nợ hiện tại",info.length?nf(T.bal)+"đ":"—","Facebook chưa trừ")}${kpi("Tổng đã chi từ trước tới nay",info.length?nf(T.spent)+"đ":"—","cộng các tài khoản")}</div>
+  <section class="card flush"><div class="card-h pad"><h2>Theo tháng</h2><span class="hint">tiền Facebook trừ ước tính = chi phí quảng cáo × 1,1 (VAT 10%); có giao dịch BM thì hiện thêm số thực tế</span></div><div class="tbl"><table><thead><tr><th>Tháng</th><th class="n">Việt Anh</th><th class="n">Thảo</th><th class="n">Duẩn</th><th class="n">Chưa rõ người</th><th class="n">Tổng chi phí quảng cáo</th><th class="n">Tiền Facebook trừ ước tính (× 1,1)</th><th class="n">Giao dịch thực tế trong BM (gồm VAT)</th></tr></thead><tbody>${adgMonths(D,bills).map(r=>`<tr><td><b>${r.m.slice(5)}/${r.m.slice(0,4)}</b><small>nguồn: ${r.src}</small></td>${r.p.map(v=>`<td class="n">${v?nf(Math.round(v)):"—"}</td>`).join("")}<td class="n">${r.other?nf(Math.round(r.other)):"—"}</td><td class="n">${nf(Math.round(r.tot))}</td><td class="n"><b>${nf(r.est)}</b></td><td class="n">${r.real==null?"chưa có (máy ghi từ "+(first?vnd(first):"—")+")":nf(r.real)}</td></tr>`).join("")||`<tr><td colspan="8" class="empty">Chưa có số.</td></tr>`}</tbody></table></div></section>
+  <section class="card flush"><div class="card-h pad"><h2>Theo từng tài khoản quảng cáo</h2><span class="hint">${esc(pLabel())}</span></div><div class="tbl"><table><thead><tr><th>Tài khoản</th><th class="n">Số lần trừ</th><th class="n">Tiền bị trừ (gồm VAT)</th><th class="n">Số lần nạp</th><th class="n">Tiền nạp</th><th class="n">Chi phí quảng cáo cùng giai đoạn</th><th class="n">Dư nợ hiện tại</th><th class="n">Tổng đã chi từ trước</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.name)}</b><small class="mono">${esc(r.a)}</small></td><td class="n">${nf(r.nTru)}</td><td class="n">${nf(r.tru)}</td><td class="n">${nf(r.nNap)}</td><td class="n">${nf(r.nap)}</td><td class="n">${nf(Math.round(r.sp))}</td><td class="n">${r.bal==null?"—":nf(r.bal)}</td><td class="n">${r.spent==null?"—":nf(r.spent)}</td></tr>`).join("")||`<tr><td colspan="8" class="empty">Chưa có giao dịch trong kỳ này.</td></tr>`}<tr class="tot"><td><b>Tổng</b></td><td class="n"></td><td class="n">${nf(T.tru)}</td><td class="n"></td><td class="n">${nf(T.nap)}</td><td class="n">${nf(Math.round(T.sp))}</td><td class="n">${nf(T.bal)}</td><td class="n">${nf(T.spent)}</td></tr></tbody></table></div></section>
+  <section class="card flush"><div class="card-h pad"><h2>Từng lần trừ tiền, nạp tiền</h2><span class="hint">${L.length} giao dịch${L.length>400?" · hiện 400 dòng đầu, tải Excel để lấy đủ":""}</span></div><div class="tbl"><table><thead><tr><th>Giờ (VN)</th><th>Tài khoản</th><th>Loại</th><th class="n">Số tiền gồm VAT 10% (đ)</th><th class="n">Trước VAT (đ)</th><th>Mã giao dịch</th></tr></thead><tbody>${L.slice(0,400).map(b=>`<tr><td>${adfDtm(b.time)}</td><td>${esc(b.name||b.account)}</td><td>${b.kind==="tru"?"Trừ tiền":"Nạp tiền"}</td><td class="n"><b>${nf(vatAmt(b))}</b></td><td class="n">${b.kind==="tru"?nf(b.amount):"—"}</td><td class="mono">${esc(b.tx||"")}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">Chưa có giao dịch nào trong kỳ và bộ lọc này.</td></tr>`}</tbody></table></div></section>
+  ${srcNote("Nhật ký tài khoản quảng cáo của Facebook (Marketing API), máy chủ ghi lại mỗi sáng 8h. Dư nợ và tổng đã chi lấy trực tiếp từ từng tài khoản.")}`;
+  $("#adg-a").onchange=e=>{ADG.acc=e.target.value;renderMain()};
+  $("#adg-k").onchange=e=>{ADG.kind=e.target.value;renderMain()};
+  $("#adg-csv").onclick=()=>adgCsv(L);
+  $("#adg-mcsv").onclick=()=>adgMonthCsv(D,bills);
+}
+PAGES.fb_gd=pFbGd;
+/* Thêm tab "Giao dịch thanh toán" vào nhóm Digital Marketing (không sửa file menu chung). */
+(function(){try{
+  const st=PAGE_SETS.find(x=>x.n==="Digital Marketing");
+  if(st&&!st.ids.includes("fb_gd")){const i=st.ids.indexOf("fb_ads")+1;st.ids.splice(i,0,"fb_gd");st.labels.splice(i,0,"Giao dịch thanh toán")}
+  const mk=MODULES.find(x=>x.k==="mkt");
+  if(mk&&!mk._gd){mk._gd=1;const g0=mk.groups;mk.groups=function(){const r=g0.apply(this,arguments);r.forEach(gr=>{const arr=gr[1],j=arr.findIndex(it=>it&&it[0]==="fb_ads");if(j>=0&&!arr.some(it=>it&&it[0]==="fb_gd"))arr.splice(j+1,0,MI("fb_gd","Giao dịch thanh toán",tm("ads",dgOk)))});return r}}
+}catch(e){console.warn("menu giao dịch",e)}})();
+

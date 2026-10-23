@@ -11,43 +11,53 @@ async function wkLoad(force){
   try{
     const before=WK.items?wkCount():null;
     WK.items=await svApi("/api/work/mine");WK.err="";WK.at=Date.now();
-    if(before!==null&&wkCount()!==before&&!/^cv_vt$/.test(PAGE)){const ae=document.activeElement,typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);if(!typing&&!document.querySelector(".modal,.mdl,[role=dialog],#drawer:not([hidden])"))try{render()}catch(x){}}}
+    if(before!==null&&wkCount()!==before&&!/^cv_v$/.test(PAGE)){const ae=document.activeElement,typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);if(!typing&&!document.querySelector(".modal,.mdl,[role=dialog],#drawer:not([hidden])"))try{render()}catch(x){}}}
   catch(e){WK.err=e.message||"Không tải được"}
   WK.busy=false;
-  if(PAGE==="cv_vt")renderMain();
+  if(PAGE==="cv_v"&&CVV.view==="list"&&CVV.scope==="mine")renderMain();
 }
 /* Chị (CEO): việc của kế toán, kho đã có người phụ trách, xem ở "Toàn cảnh". Ở đây chỉ việc chính chị phải quyết hoặc làm. */
 const wkCeo=()=>!!ME&&ME.role==="admin";
-const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho"].includes(x.group)));const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
+const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho"].includes(x.group)));const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Tôi cần giao, đốc","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
 const wkCount=()=>wkMine().reduce((n,x)=>n+x.count,0);
 function wkPage(k){
   const emp=typeof crmRole==="function"&&crmRole()==="EMPLOYEE";
   return {bill:emp?"cr_s_bill":"cr_bill",don:emp?"cr_s_dn":"cr_dn",ret:emp?"cr_s_ret":"cr_ret",xuat:"kho_xuat_b2b",hn:emp?"cr_s_hn":"cr_kh"}[k]||"cr_dn";
 }
 const wkDd=s=>s?String(s).slice(8,10)+"/"+String(s).slice(5,7):"";
-PAGES.cv_vt=m=>{
-  try{wkRender(m)}catch(e){
-    /* Có lỗi thì hiện chữ ngay trên trang (thay vì trắng) để biết sửa chỗ nào. */
-    m.innerHTML=`<div class="sxhead"><div><h1>Việc của tôi</h1></div></div><div class="note red"><b>Trang chưa hiện được.</b> Chị chụp dòng này gửi em: ${esc(String(e&&e.message||e))}<br><small>${esc(String((e&&e.stack||"").split("|").slice(0,3).join(" | ")))}</small></div>`;
-    try{console.error("cv_vt",e)}catch(x){}
-  }
-};
-function wkRender(m){
-  if(!WK.at||typeof _rLast=="undefined"||_rLast!==PAGE)wkLoad(true);
-  /* Mới vào trang này (từ trang khác): cuộn về đầu, kẻo màn hình còn đang cuộn sâu của trang trước làm nội dung nằm khuất phía trên (trông như trắng trang). */
-  if(typeof _rLast==="undefined"||_rLast!==PAGE){const top=()=>{try{window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;for(let e=m;e;e=e.parentElement){if(e.scrollTop)e.scrollTop=0}}catch(x){}};top();requestAnimationFrame(top);setTimeout(top,150)}
-  const items=WK.items?wkMine():[],groups=[...new Set(items.map(x=>x.group))];
-  const tone=a=>a>=3?"red":a>=1?"amb":"gry";
-  const row=x=>`<div class="sxal"><span style="flex:1;min-width:0"><b>${esc(x.title)}</b> <span class="pill p-${tone(x.age_days)}">${x.count} việc</span>${x.amount?` <span class="pill p-gry">${nf(x.amount)} đ</span>`:""}<br><small>${esc(x.detail)}${x.oldest?` · cũ nhất ${wkDd(x.oldest)}${x.age_days>0?`, tồn <b>${x.age_days} ngày</b>`:" (hôm nay)"}`:""}</small></span>${x.key==="pay_unallocated"?`<button class="btn sm pri" data-wkbulk="1" title="Chỉ xem trước, chưa ghi gì">Xem trước</button>`:""}${x.key==="pay_confirm"||x.key==="order_confirm"?`<button class="btn sm pri" data-wkq="${x.key}" title="Xem từng khoản, bấm xác nhận ngay tại đây">Xem và xác nhận</button>`:""}${x.act&&x.cdId?`<button class="btn sm pri" data-wkcd="${x.taskId}|${x.cdId}">Xong</button>`:""}${x.taskId?`<button class="btn sm" data-wktask="${x.taskId}">Mở</button>`:`<button class="btn sm${x.age_days>=2?" pri":""}" data-wkgo="${x.go||wkPage(x.page)}"${x.st!==undefined?` data-wkst="${x.st}"`:""}${x.who?` data-wkwho="${x.who}"`:""}>Mở</button>`}</div>`;
-  m.innerHTML=`<div class="sxhead"><div><h1>Việc của tôi</h1><div class="ph-sub">${wkCeo()?"Phần của chị trong mọi việc: đến lượt chị làm, cần chị duyệt, đang chờ người trước. Việc của kế toán, kho, bán hàng xem ở tab Toàn cảnh.":"Phần của bạn trong mọi việc: đến lượt làm, cần duyệt, đang chờ người trước, cùng việc kế toán, kho, bán hàng theo quyền."}</div></div><div class="sxact"><button class="btn sm" id="wk-re">Tải lại</button></div></div>
-  ${WK.err?`<div class="note red">${esc(WK.err)}</div>`:""}
-  ${!WK.items?`<p class="hint pad">Đang tải…</p>`:items.length?groups.map(g=>`<section class="card ttw"><div class="card-h"><h2>${esc(g)}</h2><span class="hint">${items.filter(x=>x.group===g).reduce((n,x)=>n+x.count,0)} việc</span></div><div class="sxalerts">${items.filter(x=>x.group===g).map(row).join("")}</div></section>`).join(""):`<section class="card"><p class="empty pad">Hôm nay không có việc nào tồn. Cảm ơn chị!</p></section>`}`;
-  const re=m.querySelector("#wk-re");if(re)re.onclick=()=>{wkLoad(true);toast("Đang tải lại…")};
+PAGES.cv_vt=m=>{CVV.view="list";CVV.scope="mine";cvWhoSet("mine");PAGE="cv_v";pCvV(m)};
+/* Phần "Của tôi" trong trang Việc: chia nhóm theo mức gấp (chờ duyệt, quá hạn, hôm nay, tuần này, sau này), việc kế toán, kho... theo quyền */
+const WKO={};
+const WK_FIRST=["Chờ tôi duyệt","Quá hạn","Hôm nay","Tuần này","Sau này","Đang chờ người trước"];
+function wkSec(x){
+  const td=D().settings.today,W=WEEKS.find(w=>td>=w.tu&&td<=w.den)||WEEKS[0],g=x.group;
+  if(g==="Cần tôi duyệt"||g==="Duyệt")return "Chờ tôi duyệt";
+  if(g==="Đang chờ người trước")return g;
+  if(g==="Tôi cần giao, đốc")return "Quá hạn";
+  if(g==="Đến lượt tôi làm"){const h=x.han;return h&&h<td?"Quá hạn":h===td?"Hôm nay":(h&&h<=W.den)?"Tuần này":"Sau này"}
+  return g;
+}
+function wkBodyHtml(){
+  const items=wkMine(),tone=a=>a>=3?"red":a>=1?"amb":"gry",secs={};
+  items.forEach(x=>{(secs[wkSec(x)]=secs[wkSec(x)]||[]).push(x)});
+  const keys=WK_FIRST.filter(k=>secs[k]).concat(Object.keys(secs).filter(k=>!WK_FIRST.includes(k)));
+  const row=x=>`<div class="sxal"><span style="flex:1;min-width:0"><b>${esc(x.title)}</b>${x.chip?` <span class="pill p-gry">${esc(x.chip)}</span>`:""}${x.count>1?` <span class="pill p-${tone(x.age_days)}">${x.count} việc</span>`:""}${x.han!==undefined&&x.age_days>0?` <span class="pill p-red">trễ ${x.age_days} ngày</span>`:""}${x.amount?` <span class="pill p-gry">${nf(x.amount)} đ</span>`:""}<br><small>${esc(x.detail)}${x.oldest?` · cũ nhất ${wkDd(x.oldest)}${x.age_days>0?`, tồn <b>${x.age_days} ngày</b>`:" (hôm nay)"}`:""}</small></span>${x.key==="pay_unallocated"?`<button class="btn sm pri" data-wkbulk="1" title="Chỉ xem trước, chưa ghi gì">Xem trước</button>`:""}${x.key==="pay_confirm"||x.key==="order_confirm"?`<button class="btn sm pri" data-wkq="${x.key}" title="Xem từng khoản, bấm xác nhận ngay tại đây">Xem và xác nhận</button>`:""}${x.act&&x.cdId?`<button class="btn sm pri" data-wkcd="${x.taskId}|${x.cdId}">Xong</button>`:""}${x.taskId?`<button class="btn sm" data-wktask="${x.taskId}">Mở</button>`:`<button class="btn sm${x.age_days>=2?" pri":""}" data-wkgo="${x.go||wkPage(x.page)}"${x.st!==undefined?` data-wkst="${x.st}"`:""}${x.who?` data-wkwho="${x.who}"`:""}${x.mod?` data-wkmod="${x.mod}"`:""}>Mở</button>`}</div>`;
+  return keys.map(k=>{const L=secs[k],n=L.reduce((z,x)=>z+x.count,0),open=(k in WKO)?WKO[k]:!["Tuần này","Sau này","Đang chờ người trước"].includes(k);
+    return `<details class="cvgrp wksec" data-sk="${esc(k)}"${open?" open":""}><summary><b>${esc(k)}</b><span class="cvgc">${n}</span></summary><div class="sxalerts">${L.map(row).join("")}</div></details>`}).join("");
+}
+function wkBind(m){
+  m.querySelectorAll("details.wksec").forEach(g=>g.addEventListener("toggle",()=>{WKO[g.dataset.sk]=g.open}));
   m.querySelectorAll("[data-wkbulk]").forEach(b=>b.onclick=()=>wkPreview());
   m.querySelectorAll("[data-wkq]").forEach(b=>b.onclick=()=>wkQueue(b.dataset.wkq));
   m.querySelectorAll("[data-wktask]").forEach(b=>b.onclick=()=>openTask(b.dataset.wktask));
   m.querySelectorAll("[data-wkcd]").forEach(b=>b.onclick=()=>{const p=b.dataset.wkcd.split("|");tkCdAct(p[0],p[1],"xong");toast("Đã xong công đoạn");renderMain()});
-  m.querySelectorAll("[data-wkgo]").forEach(b=>b.onclick=()=>{if(b.dataset.wkst!==undefined)CVF.st=b.dataset.wkst;if(b.dataset.wkwho)cvWhoSet(b.dataset.wkwho);PAGE=b.dataset.wkgo;renderMain();scrollTo(0,0)});
+  m.querySelectorAll("[data-wkgo]").forEach(b=>b.onclick=()=>{if(b.dataset.wkst!==undefined)CVF.st=b.dataset.wkst;if(b.dataset.wkwho)cvWhoSet(b.dataset.wkwho);if(b.dataset.wkmod)MOD=b.dataset.wkmod;PAGE=b.dataset.wkgo;renderMain();scrollTo(0,0)});
+}
+function wkEmbed(m){
+  if(!WK.at||typeof _rLast=="undefined"||_rLast!==PAGE)wkLoad(true);
+  const body=WK.items?wkBodyHtml():"";
+  m.innerHTML=(WK.err?`<div class="note red">${esc(WK.err)}</div>`:"")+(!WK.items?`<p class="hint pad">Đang tải…</p>`:body||`<section class="card"><p class="empty pad">Hiện không có việc nào đang chờ ${wkCeo()?"chị":"bạn"}. Cảm ơn!</p></section>`);
+  wkBind(m);
 }
 /* Xem từng khoản chờ kế toán xác nhận, bấm xác nhận từng dòng hoặc cả danh sách (kế toán tự đối chiếu bill rồi mới bấm) */
 /* Mỗi khoản tiền hiện ảnh bill (bấm xem lớn) + giờ nhập, người nhập, mã giao dịch, đơn đã gắn: để phân biệt các khoản cùng ngày cùng số tiền */
@@ -106,8 +116,6 @@ async function wkPreview(){
 }
 
 {
-  const cv=MODULES.find(x=>x.k==="cv");
-  if(cv){const g0=cv.groups;cv.groups=()=>{const G=g0();if(G.length){const it=MI("cv_vt","Việc của tôi",()=>true,()=>{try{return wkCount()||""}catch(e){return ""}}),L=G[0][1],i=L.findIndex(x=>x[0]==="cv_tc");if(i>=0&&typeof cvMgrView==="function"&&cvMgrView())L.splice(i+1,0,it);else L.unshift(it)}return G}}
   setInterval(()=>{try{if(ME&&document.visibilityState==="visible")wkLoad(true)}catch(e){}},120000);
   setTimeout(()=>{try{if(ME)wkLoad(true)}catch(e){}},3500);
 }

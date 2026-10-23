@@ -78,6 +78,7 @@ function cvFilter(L){
     if(CVF.scope==="mine"&&x.nguoi!==me&&!x.phoi.includes(me))return false;
     if(ME.role!=="admin"&&!cvSummaryOnly()&&t!=="all"&&x.nguoi!==me&&!x.phoi.includes(me)&&!cvTeamSee(t,x.team)&&!(t==="content"&&x.src==="order"))return false;
     if(CVF.wt){const ux=d.users.find(y=>y.id===x.nguoi);if(!ux||!cvTeamSee(CVF.wt,teamOf(ux)))return false}
+    if(CVF.tao&&x.tao!==CVF.tao)return false;
     if(CVF.team&&x.team!==CVF.team)return false;if(CVF.nguoi&&x.nguoi!==CVF.nguoi&&!x.phoi.includes(CVF.nguoi))return false;if(CVF.da&&x.da!==CVF.da)return false;if(CVF.st&&(CVF.st==="late"?!x.late:CVF.st==="todo"?!["cg","todo","nhan"].includes(x.st):x.st!==CVF.st))return false;if(CVF.uu&&x.uu!==CVF.uu)return false;
     if(CVF.q&&!(x.ten+" "+x.mo+" "+x.id+" "+userName(x.nguoi)).toLowerCase().includes(CVF.q.toLowerCase()))return false;
     if(CVF.tg==="today"&&x.han!==today)return false;if(CVF.tg==="week"&&(x.han<W.tu||x.han>W.den))return false;if(CVF.tg==="lweek"&&(x.han<LW.tu||x.han>LW.den))return false;
@@ -500,50 +501,50 @@ async function cvoLoad(force){
   CVO.busy=true;
   try{CVO.data=await svApi("/api/work/overview");CVO.err="";CVO.at=Date.now()}catch(e){CVO.err=e.message||"Chưa tải được số liệu kế toán, kho, bán hàng"}
   CVO.busy=false;
-  if(PAGE==="cv_tc"&&ME.role==="admin")renderMain();
+  if((PAGE==="cv_tc"||(PAGE==="cv_v"&&CVV.view==="tq"))&&ME.role==="admin")renderMain();
 }
 function pCvTcCeo(m){
   if(CVO.ppl)return pCvTcPpl(m);
   if(!CVO.at||typeof _rLast==="undefined"||_rLast!==PAGE)cvoLoad(true);
   const d=D(),td=d.settings.today,O=CVO.data,its=(O&&O.items)||[];
-  const names=ids=>ids.map(id=>userName(id)).filter(Boolean).join(", ")||"—";
-  const L=cvGroup(cvItems().filter(x=>!CV_TEST.includes(x.nguoi))).map(cvTestToChi),openL=L.filter(x=>x.st!=="done"),lateOf=t=>openL.filter(x=>x.team===t&&x.late);
-  const mgrT=(d.tasks||[]).filter(t=>!CV_TEST.includes(t.nguoi)&&tkMgr(t)),rv=mgrT.filter(t=>t.st==="review").length,gh=mgrT.filter(t=>(t.treReq||{}).st==="cho"&&t.st!=="done").length;
-  const vid=d.cards.filter(c=>!CV_TEST.includes(c.nguoi)&&["dkb","dvd","dceo"].includes(c.step)).length;
-  const ap=its.find(x=>x.key==="approve")||{count:0,age_days:0};
-  const age=a=>a>0?`cũ nhất ${a} ngày`:"";
-  const tile=(k,l,v,sub,tone)=>`<button type="button" class="tctile${tone&&v?" "+tone:""}" data-ct="${k}"><span>${l}</span><b>${v}</b>${sub?`<small>${sub}</small>`:""}</button>`;
-  const maxAge=g=>its.filter(x=>x.group===g).reduce((a,x)=>Math.max(a,x.age_days),0),cnt=(g,k)=>(its.find(x=>x.key===k)||{count:0}).count;
-  const lt=t=>{const a=lateOf(t);return {n:a.length,age:a.reduce((z,x)=>Math.max(z,x.lateD||0),0)}};
-  const warn=cvWarn(),thieu=warn.reduce((n,w)=>n+Math.max(0,w.need-w.have),0);
-  const C=lt("content"),G=lt("digital"),CL=(typeof cvList==="function"?cvList(ME).L:[]),clN=k=>{const x=CL.find(y=>y.key===k);return x?x.items.filter(i=>!CV_TEST.includes(i.nguoi)).length:0};
-  const dueG=openL.filter(x=>x.team==="digital"&&x.han&&x.han<=td),doneAll=L.filter(x=>x.team==="digital"&&x.han&&x.han<=td),okG=doneAll.filter(x=>x.st==="done"||!x.late).length;
-  const kt=its.filter(x=>x.group==="Kế toán"),ktAge=maxAge("Kế toán"),khoN=cnt("Kho","ship"),khoAge=maxAge("Kho");
-  const join=a=>a.filter(Boolean).join(" · ")||"Không có việc tồn";
-  const rows=[
-    {k:"content",ten:"Content, Media",pt:names(CV_PHUTRACH.content),chi:join([C.n?`${C.n} việc trễ`:"",thieu?`mai thiếu ${thieu} video`:"",clN("cg")?`${clN("cg")} thẻ 7 ngày tới chưa giao`:"",clN("id")?`${clN("id")} bài đã đăng thiếu link`:"",clN("bitra")?`${clN("bitra")} video bị trả lại`:""]),age:C.age,a:1,r:3,go:()=>{cvWhoSet("t:content");PAGE="cv_nv";render()}},
-    {k:"digital",ten:"Digital, Ads",pt:names(CV_PHUTRACH.digital),chi:join([G.n?`${G.n} việc trễ`:"",doneAll.length?`đúng hạn ${Math.round(okG/doneAll.length*100)}%`:""]),age:G.age,a:1,r:3,go:()=>{cvWhoSet("t:digital");PAGE="cv_nv";render()}},
-    {k:"ketoan",ten:"Kế toán",pt:names(CV_PHUTRACH.ketoan),chi:O?join([cnt("Kế toán","pay_confirm")?`${cnt("Kế toán","pay_confirm")} bill chờ xác nhận`:"",cnt("Kế toán","order_confirm")?`${cnt("Kế toán","order_confirm")} đơn chờ ghi nợ`:"",cnt("Kế toán","return_confirm")?`${cnt("Kế toán","return_confirm")} hàng trả chờ xác nhận`:"",cnt("Kế toán","pay_unallocated")?`${cnt("Kế toán","pay_unallocated")} khoản tiền chưa chia`:""]):"Đang tải…",age:ktAge,a:3,r:7,go:()=>{MOD="cv";PAGE="cv_vt";render()}},
-    {k:"kho",ten:"Kho",pt:names(CV_PHUTRACH.kho),chi:O?join([khoN?`${khoN} đơn chờ xuất kho`:""]):"Đang tải…",age:khoAge,a:1,r:3,go:()=>{MOD="cv";PAGE="cv_vt";render()}},
-    {k:"sale",ten:"Sale B2B, chăm sóc khách",pt:names(CV_PHUTRACH.sale),chi:O?join([O.sale.count?`${O.sale.count} đơn chưa gửi duyệt hoặc bị từ chối`:"",O.cskh.count?`${O.cskh.count} việc chăm sóc đến hạn`:""]):"Đang tải…",age:Math.max(O?O.sale.age_days:0,O?O.cskh.age_days:0),a:2,r:5,go:()=>{MOD="b2b";PAGE="b2b_don";render()}}
-  ];
-  const st=r=>{const none=r.chi==="Không có việc tồn";if(none||r.age<r.a)return ["Ổn","success"];return r.age>=r.r?["Cần để ý","danger"]:["Chậm","warning"]};
-  CVO._rows=rows;
+  const I=cvItems().filter(x=>!CV_TEST.includes(x.nguoi)).map(cvTestToChi),open=I.filter(x=>x.st!=="done"),late=open.filter(x=>x.late);
+  const doneN=I.length-open.length,doingN=open.filter(x=>x.st==="doing"||x.st==="nhan").length,rvN=open.filter(x=>x.st==="review").length,todoN=open.length-doingN-rvN-late.filter(x=>x.st!=="doing"&&x.st!=="nhan"&&x.st!=="review").length;
+  const lateBy={};late.forEach(x=>{const k=x.nguoi||"";const o=lateBy[k]=lateBy[k]||{id:k,n:0,max:0};o.n++;o.max=Math.max(o.max,x.lateD||0)});
+  const ppl=Object.values(lateBy).filter(p=>p.id).sort((x,y)=>y.n-x.n||y.max-x.max);
+  const due=I.filter(x=>x.han&&x.han<=td),okN=due.filter(x=>x.st==="done"||!x.late).length;
+  const pct=I.length?Math.round(doneN/I.length*100):0;
+  const tile=(k,l,v,sub,tone)=>`<button type="button" class="tctile${tone&&v?" "+tone:""}" data-kp="${k}"><span>${l}</span><b>${v}</b>${sub?`<small>${sub}</small>`:""}</button>`;
+  const T={};I.forEach(x=>{const k=x.team||"chung",t=T[k]=T[k]||{k,n:0,done:0,doing:0,rv:0,late:0,by:{}};t.n++;if(x.st==="done")t.done++;else{if(x.st==="doing"||x.st==="nhan")t.doing++;if(x.st==="review")t.rv++;if(x.late){t.late++;t.by[x.nguoi||""]=(t.by[x.nguoi||""]||0)+1}}});
+  const teams=Object.values(T).sort((x,y)=>y.late-x.late||y.n-x.n);
+  const bar=t=>{const w=v=>t.n?(v/t.n*100).toFixed(1):0,todo=Math.max(0,t.n-t.done-t.doing-t.rv-t.late);return `<div class="tcstack" title="Xong ${t.done} · Đang làm ${t.doing} · Chờ duyệt ${t.rv} · Trễ ${t.late}"><i style="width:${w(t.done)}%;background:#639922"></i><i style="width:${w(t.doing)}%;background:#378ADD"></i><i style="width:${w(t.rv)}%;background:#EF9F27"></i><i style="width:${w(t.late)}%;background:#E24B4A"></i><i style="width:${w(todo)}%;background:#d9dde8"></i></div>`};
+  const topBy=t=>{const e=Object.entries(t.by).sort((x,y)=>y[1]-x[1])[0];return e?(userName(e[0])||"Chưa giao")+" ("+e[1]+")":"—"};
+  const deptRows=teams.map(t=>`<tr class="clk" data-dt="${esc(t.k)}"><td><b>${esc(cvTeamName(t.k))}</b><small>${esc(((CV_PHUTRACH[t.k]||[]).map(userName).filter(Boolean).join(", "))||"")}</small></td><td>${t.n}</td><td class="g">${t.done}</td><td class="b">${t.doing}</td><td class="a">${t.rv}</td><td>${t.late?`<span class="tcn r">${t.late}</span>`:'<span class="tcz">0</span>'}</td><td>${bar(t)}</td><td class="tcw">${esc(topBy(t))}</td></tr>`).join("");
+  const maxAge=g=>its.filter(x=>x.group===g).reduce((z,x)=>Math.max(z,x.age_days),0),cnt=g=>its.filter(x=>x.group===g).reduce((z,x)=>z+x.count,0);
+  const bl=(ten,n,age,a,r,go)=>{const tone=!n||age<a?"success":age>=r?"danger":"warning";return `<button type="button" class="tcbl ${tone}" data-bl="${go}"><span>${ten}</span><b>${O?n:"…"}</b><small>${n&&age?"tồn lâu nhất "+age+" ngày":n?"":"không tồn"}</small></button>`};
+  const saleN=O?O.sale.count+O.cskh.count:0,saleAge=O?Math.max(O.sale.age_days,O.cskh.age_days):0;
+  const worst=late.slice().sort((x,y)=>(y.lateD||0)-(x.lateD||0)).slice(0,6);
+  const pplRows=ppl.slice(0,8).map(p=>`<div class="tcp2" data-pp="${esc(p.id)}"><span class="tcpn">${avatar(p.id)}<b>${esc(userName(p.id))}</b></span><span class="tcpb"><i style="width:${Math.max(8,Math.round(p.n/ppl[0].n*100))}%"></i></span><span class="tcpv">${p.n} trễ · lâu nhất ${p.max} ngày</span><button type="button" class="btn sm" data-nudge="${esc(p.id)}">Nhắc</button></div>`).join("");
+  const worstRows=worst.map(x=>`<div class="tcr" data-w="${esc(x.id)}" data-ws="${x.src}"><span class="t-red">Trễ ${x.lateD} ngày</span> · ${esc(cvShort(x.ten,48))} · ${esc((userName(x.nguoi)||"Chưa giao").split(" ").slice(-1)[0])}</div>`).join("");
+  const mineN=(typeof wkCount==="function"?wkCount():0);
   m.innerHTML=`<div class="cvbar"><button class="btn sm pri" type="button" disabled>Theo phòng ban</button><button class="btn sm" type="button" id="cvo-ppl">Theo người</button><button class="btn sm" type="button" id="cvo-re">Tải lại</button>${newTaskBtn()}</div>
   ${CVO.err?`<div class="note red">${esc(CVO.err)}</div>`:""}
-  <h3 class="tch3">Chờ chị quyết</h3>
-  <div class="tctiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">${tile("ap","Duyệt đơn, giá",O?ap.count:"…",O?age(ap.age_days):"","amb")}${tile("vid","Video, kịch bản chờ duyệt",vid,"","amb")}${tile("rv","Việc giao chờ chị duyệt",rv,"","amb")}${tile("gh","Xin gia hạn",gh,"","")}</div>
-  <h3 class="tch3">Sức khỏe từng phòng ban</h3>
-  <section class="card tcbox"><table class="tcp tcdept"><thead><tr><th>Phòng</th><th>Phụ trách</th><th>Chỉ số chính</th><th>Tồn lâu nhất</th><th>Tình trạng</th></tr></thead><tbody>${rows.map((r,i)=>{const s=st(r);return `<tr class="clk" data-dp="${i}"><td><b>${esc(r.ten)}</b></td><td>${esc(r.pt)}</td><td>${esc(r.chi)}</td><td>${r.age>0?`<span class="${r.age>=r.r?"t-red":""}">${r.age} ngày</span>`:"—"}</td><td><span class="tcst ${s[1]}">${s[0]}</span></td></tr>`}).join("")}</tbody></table></section>
-  <p class="hint tcnote">Bất thường (công nợ quá hạn, tồn kho thấp, quảng cáo vượt giá) xem ở <button class="lnk" id="cvo-ex">Tổng quan công ty →</button></p>`;
+  <div class="tctiles" style="grid-template-columns:repeat(6,minmax(0,1fr))">${tile("all","Tổng việc",I.length,"tháng ${MONTH.mon}".replace("${MONTH.mon}",MONTH.mon))}${tile("done","Hoàn thành",doneN,pct+"% tổng","grn")}${tile("doing","Đang làm",doingN,"")}${tile("review","Chờ duyệt",rvN,"","amb")}${tile("late","Quá hạn",late.length,ppl.length+" người đang trễ","red")}${tile("","Đúng hạn",due.length?Math.round(okN/due.length*100)+"%":"—",`${okN}/${due.length} việc tới hạn`,"grn")}</div>
+  ${mineN?`<div class="tcmine"><b>${mineN} việc đang chờ chị</b> (đến lượt chị làm, cần chị duyệt, cần giao hoặc đốc) <button class="lnk" id="cvo-mine">Mở Việc của tôi →</button></div>`:""}
+  <div class="tcmain"><section class="card tcbox"><h3>Theo phòng ban <small class="hint">xanh: xong · xanh dương: đang làm · vàng: chờ duyệt · đỏ: trễ · xám: chưa làm</small></h3><table class="tcp tcdept2"><thead><tr><th>Phòng</th><th>Tổng</th><th>Xong</th><th>Làm</th><th>Duyệt</th><th>Trễ</th><th>Tiến độ</th><th>Trễ nhiều nhất</th></tr></thead><tbody>${deptRows||'<tr><td colspan="8" class="empty">Chưa có dữ liệu.</td></tr>'}</tbody></table></section>
+  <section class="card tcbox"><h3>Ai đang trễ <small class="hint">${ppl.length} người</small></h3>${pplRows||'<p class="empty">Không ai đang trễ.</p>'}</section></div>
+  <div class="tcmain"><section class="card tcbox"><h3>Trễ lâu nhất <small class="hint">bấm để mở xử lý</small></h3>${worstRows||'<p class="empty">Không có việc trễ.</p>'}</section>
+  <section class="card tcbox"><h3>Tồn đọng kế toán, kho, bán hàng</h3><div class="tcbls">${bl("Kế toán",cnt("Kế toán"),maxAge("Kế toán"),3,7,"ketoan")}${bl("Kho",cnt("Kho"),maxAge("Kho"),1,3,"kho")}${bl("Bán hàng, CSKH",saleN,saleAge,2,5,"sale")}</div></section></div>`;
   bindNew();
   $("#cvo-ppl").onclick=()=>{CVO.ppl=true;renderMain()};
   $("#cvo-re").onclick=()=>{cvoLoad(true);toast("Đang tải lại…")};
-  $("#cvo-ex").onclick=()=>{MOD="";PAGE="exec";render()};
-  m.querySelectorAll("[data-dp]").forEach(r=>r.onclick=()=>rows[+r.dataset.dp].go());
-  m.querySelectorAll("[data-ct]").forEach(b=>b.onclick=()=>{const k=b.dataset.ct;
-    if(k==="ap"){MOD="b2b";PAGE="b2b_don"}else if(k==="vid"){MOD="cv";PAGE="cv"}else{CVF.st="review";if(k==="rv")cvWhoSet("all");PAGE="cv_nv"}
-    render()});
+  const mb=$("#cvo-mine");if(mb)mb.onclick=()=>{CVV.view="list";CVV.scope="mine";cvWhoSet("mine");renderMain()};
+  const goList=(who,st)=>{CVV.view="list";CVV.scope="team";cvWhoSet(who);CVF.st=st||"";CVF.tg="all";renderMain()};
+  m.querySelectorAll("[data-kp]").forEach(b=>b.onclick=()=>{const k=b.dataset.kp;goList("all",k==="all"?"":k)});
+  m.querySelectorAll("[data-dt]").forEach(r=>r.onclick=()=>goList("t:"+r.dataset.dt,""));
+  m.querySelectorAll("[data-pp]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;goList("p:"+r.dataset.pp,"late")});
+  m.querySelectorAll("[data-nudge]").forEach(b=>b.onclick=e=>{e.stopPropagation();const id=b.dataset.nudge,p=lateBy[id];if(!p)return;DB.mutate(ME.name,"nhắc việc trễ "+userName(id),dt=>{if(typeof notifyU==="function")notifyU(dt,[id],`${ME.name} nhắc: bạn đang có ${p.n} việc trễ hạn, lâu nhất ${p.max} ngày`,"page:cv_v")});toast("Đã nhắc "+userName(id))});
+  m.querySelectorAll("[data-w]").forEach(r=>r.onclick=()=>{const id=r.dataset.w,s=r.dataset.ws;if(s==="card")openCard(id);else if(s==="order"){PAGE="order";MOD="";render()}else openTask(id)});
+  m.querySelectorAll("[data-bl]").forEach(b=>b.onclick=()=>{const k=b.dataset.bl;if(k==="ketoan"){MOD="b2b";PAGE="b2b_cn"}else if(k==="kho"){MOD="sx";PAGE="kho_xuat_b2b"}else{MOD="b2b";PAGE="b2b_don"}render()});
 }
 /* "Theo người": bản Toàn cảnh cũ (ai đang ôm bao nhiêu việc) */
 function pCvTcPpl(m){
@@ -603,17 +604,62 @@ function cvMyItems(){
       const act=tkActive(t);
       t.cd.filter(s=>s.nguoi===ME_&&s.st!=="xong").forEach(s=>{
         if(act.includes(s)){
-          if(s.loai==="duyet")add({key:"d_"+s.id,group:G2,title:t.ten,detail:`Chờ bạn duyệt · giao bởi ${who}${s.han?" · hạn "+dd(s.han):""}`,age_days:late(s.han),taskId:t.id});
-          else add({key:"w_"+s.id,group:G1,title:`${t.ten} · ${s.ten}`,detail:`Hạn ${s.han?dd(s.han):"—"} · giao bởi ${who}${s.st==="lam"?" · đang làm":""}`,age_days:late(s.han),taskId:t.id,cdId:s.id,act:"xong"});
+          if(s.loai==="duyet")add({key:"d_"+s.id,group:G2,title:t.ten,chip:"Duyệt",detail:`Chờ bạn duyệt · giao bởi ${who}${s.han?" · hạn "+dd(s.han):""}`,age_days:late(s.han),taskId:t.id});
+          else add({key:"w_"+s.id,group:G1,title:`${t.ten} · ${s.ten}`,detail:`Hạn ${s.han?dd(s.han):"—"} · giao bởi ${who}${s.st==="lam"?" · đang làm":""}`,age_days:late(s.han),han:s.han||0,chip:`${t.cd.filter(z=>z.st==="xong").length}/${t.cd.length} công đoạn`,taskId:t.id,cdId:s.id,act:"xong"});
         }else{const prev=act[0];add({key:"c_"+s.id,group:G3,title:`${t.ten} · ${s.ten}`,detail:prev?`Chờ ${userName(prev.nguoi)||"—"} xong "${prev.ten}"`:"Chờ công đoạn trước",taskId:t.id})}
       });
     }else{
       if(t.st==="review"&&tkMgr(t))add({key:"r_"+t.id,group:G2,title:t.ten,detail:`${userName(t.nguoi)||"—"} đã gửi duyệt`,age_days:late(t.han),taskId:t.id});
-      else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st!=="review")add({key:"t_"+t.id,group:G1,title:t.ten,detail:`Hạn ${t.han?dd(t.han):"—"} · giao bởi ${who}`,age_days:late(t.han),taskId:t.id});
+      else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st!=="review")add({key:"t_"+t.id,group:G1,title:t.ten,detail:`Hạn ${t.han?dd(t.han):"—"} · giao bởi ${who}`,age_days:late(t.han),han:t.han||0,taskId:t.id});
     }
     if((t.treReq||{}).st==="cho"&&tkMgr(t))add({key:"g_"+t.id,group:G2,title:t.ten,detail:`${(t.treReq||{}).by||"Người làm"} xin gia hạn${(t.treReq||{}).hanMoi?" đến "+dd(t.treReq.hanMoi):""}`,taskId:t.id});
   });
+  if(ME.role==="admin"||ME.role==="lead"){
+    const CL=typeof cvList==="function"?cvList(ME).L:[],n=k=>{const g=CL.find(y=>y.key===k);return g?g.items.filter(i=>!CV_TEST.includes(i.nguoi)).length:0},G4="Tôi cần giao, đốc";
+    if(n("cg"))add({key:"k_cg",group:G4,title:`${n("cg")} thẻ video 7 ngày tới chưa giao người`,detail:"Giao người viết kịch bản, quay, edit để kịp đăng",count:n("cg"),mod:"mkt",go:"dieuphoi"});
+    const late=cvGroup(cvItems().filter(x=>!CV_TEST.includes(x.nguoi))).filter(x=>x.late&&x.st!=="done"&&x.nguoi!==ME_);
+    if(late.length)add({key:"k_tre",group:G4,title:`${late.length} việc của team đang trễ hạn`,detail:"Nhắc hoặc dời hạn: "+[...new Set(late.map(x=>userName(x.nguoi)).filter(Boolean))].slice(0,4).join(", "),count:late.length,age_days:late.reduce((z,x)=>Math.max(z,x.lateD||0),0),go:"cv_nv",st:"late",who:"all"});
+    if(n("id"))add({key:"k_id",group:G4,title:`${n("id")} bài đã đăng nhưng thiếu link / ID`,detail:"Nhờ người đăng bổ sung",count:n("id"),go:"cv"});
+  }
   const vid=d.cards.filter(c=>ok(c)&&["dkb","dvd","dceo"].includes(c.step)&&(ME.role==="admin"||can(ME,"viec.duyet"))&&(c.step!=="dceo"||ME.role==="admin")).length;
   if(vid)add({key:"v_vid",group:G2,title:"Video, kịch bản chờ duyệt",detail:"Duyệt xong thì video đi tiếp",count:vid,go:"cv"});
   return L;
 }
+
+/* =====================================================================
+   TRANG "VIỆC" DUY NHẤT (học cách Asana, Base Wework, ClickUp): một nơi, chọn phạm vi và kiểu xem
+   Phạm vi: Của tôi · Tôi giao · Cả team.  Kiểu xem: Danh sách · Bảng · Lịch · Tổng quan.
+   ===================================================================== */
+const CVV={scope:"",view:""};
+const cvNvRaw=m=>{try{pCvNv2(m)}catch(e){console.error("Task mới lỗi, dùng bản cũ",e);pCvNv(m)}};
+function cvvDefault(){const top=ME.role==="admin"||cvSummaryOnly();CVV.view=top?"tq":"list";CVV.scope=top?"team":"mine"}
+function pCvV(m){
+  if(!CVV.view)cvvDefault();
+  PAGE="cv_v";
+  const td=D().settings.today,tasks=D().tasks||[];
+  const nMine=WK&&WK.items?wkCount():"",nGiao=tasks.filter(t=>t.tao===ME.id&&t.nguoi!==ME.id&&t.st!=="done"&&!CV_TEST.includes(t.nguoi)).length;
+  const nTeam=cvGroup(cvItems().filter(x=>!CV_TEST.includes(x.nguoi))).filter(x=>x.st!=="done").length;
+  const chip=(k,l,n)=>`<button type="button" class="cvchip${CVV.scope===k?" on":""}" data-vs="${k}">${l}${n!==""?` <b>${n}</b>`:""}</button>`;
+  const view=(k,l)=>`<button type="button" class="cvview${CVV.view===k?" on":""}" data-vv="${k}">${l}</button>`;
+  const tq=CVV.view==="tq",listMine=CVV.view==="list"&&CVV.scope==="mine";
+  const mgr=cvMgrView();
+  m.innerHTML=`<div class="cvvbar">${tq?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}${mgr?view("tq","Tổng quan"):""}${CVV.view==="board"?`<button type="button" class="cvview" data-vgo="congviec">Theo bước video</button>`:""}${CVV.view==="cal"?`<button type="button" class="cvview" data-vgo="giaoviec">Lịch quay</button>`:""}${listMine?`<button class="btn sm" id="wk-re" type="button">Tải lại</button>${newTaskBtn()}`:""}</div><div id="cvv-body"></div>`;
+  const body=m.querySelector("#cvv-body");
+  CVF.tao=(CVV.scope==="giao"&&!tq)?ME.id:"";
+  try{
+    if(tq)pCvTc(body);
+    else if(CVV.view==="board")pCvKb(body);
+    else if(CVV.view==="cal")pCvLich(body);
+    else if(listMine)wkEmbed(body);
+    else cvNvRaw(body);
+  }catch(e){console.error("Trang Việc lỗi",e);body.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chị chụp dòng này gửi em: ${esc(String(e&&e.message||e))}</div>`}
+  m.querySelectorAll("[data-vs]").forEach(b=>b.onclick=()=>{CVV.scope=b.dataset.vs;cvWhoSet(CVV.scope==="mine"?"mine":"all");CVF.st="";renderMain()});
+  m.querySelectorAll("[data-vv]").forEach(b=>b.onclick=()=>{CVV.view=b.dataset.vv;if(CVV.view==="tq")CVF.tao="";renderMain()});
+  m.querySelectorAll("[data-vgo]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.vgo;render()});
+  const re=m.querySelector("#wk-re");if(re)re.onclick=()=>{wkLoad(true);toast("Đang tải lại…")};
+  if(listMine)bindNew();
+}
+PAGES.cv_v=m=>pCvV(m);
+/* các đường dẫn cũ (cv_nv, cv_kb, cv_lich, cv_tc) đều đưa về trang Việc đúng kiểu xem */
+const cvvLegacy=view=>m=>{CVV.view=view;CVV.scope=CVF.tao?"giao":(CVF.who==="mine"?"mine":"team");PAGE="cv_v";pCvV(m)};
+PAGES.cv_nv=cvvLegacy("list");PAGES.cv_kb=cvvLegacy("board");PAGES.cv_lich=cvvLegacy("cal");PAGES.cv_tc=cvvLegacy("tq");

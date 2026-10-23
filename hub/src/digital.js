@@ -109,7 +109,8 @@ function pDgTq(m){
   const d=D(),all=dgRows(),ads=dgAds(),O=d.orders||[],td=d.settings.today;
   const per=u=>all.filter(r=>r.st&&r.st[u.id]);
   const grab=fn=>{const t=document.createElement("div");try{fn(t)}catch(e){console.warn("tổng quan Digital: bỏ một khối",e);return null}const ph=t.querySelector(".ph");if(ph)ph.remove();return t};
-  const hq=grab(pAdsHieuQua),sp=grab(pAdsSP);
+  const live=typeof adfOverview==="function"?adfOverview():null;
+  const hq=live?null:grab(pAdsHieuQua),sp=live?null:grab(pAdsSP);
   const pick=(t,sel)=>t?[...t.querySelectorAll(sel)]:[];
   /* các khối lấy từ Hiệu quả Ads */
   const hqKpi=pick(hq,":scope > .grid.kpis")[0],hqSec=pick(hq,":scope > section.card"),hqNote=pick(hq,":scope > .note,:scope > .srcnote,:scope > p.hint");
@@ -125,6 +126,7 @@ function pDgTq(m){
    <div class="acts" style="padding:0 4px"><button class="btn pri" data-go="dg_lib">Mở Thư viện video quảng cáo</button><button class="btn" data-go="order">Order cho Content</button></div>`;
   m.innerHTML=H("Tổng quan Digital","Quảng cáo Facebook và creative: số tổng, top nhân sự, top sản phẩm, trần chi phí")+`<div id="dgq"></div>`;
   const box=m.querySelector("#dgq");
+  if(live)box.insertAdjacentHTML("beforeend",live);
   if(hqKpi)box.appendChild(hqKpi);
   if(spNote)box.appendChild(spNote);
   if(rank)box.appendChild(rank);
@@ -132,7 +134,7 @@ function pDgTq(m){
   box.insertAdjacentHTML("beforeend",creative);
   [theoThang,daNhap,tran].forEach(s=>{if(s)box.appendChild(s)});
   hqNote.forEach(n=>box.appendChild(n));
-  if(!hq&&!sp)box.insertAdjacentHTML("afterbegin",`<div class="note">Chưa có báo cáo Ads để tổng hợp. Nhập báo cáo ở mục Nhập báo cáo Ads.</div>`);
+  if(!live&&!hq&&!sp)box.insertAdjacentHTML("afterbegin",`<div class="note">Chưa có báo cáo Ads để tổng hợp. Nhập báo cáo ở mục Nhập báo cáo Ads.</div>`);
   bindCommon(m)
 }
 PAGES.dg_tq=pDgTq;
