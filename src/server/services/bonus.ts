@@ -34,6 +34,8 @@ export interface BonusRow {
   month_gift_value: number;
   month_gift_items: GiftItem[];
   advanced: number;
+  /** Đã chi bằng phiếu chi thưởng (kể cả phiếu đang chờ duyệt). */
+  paid: number;
   payable: number;
   year_retail: number;
   year_level: string;
@@ -167,6 +169,17 @@ export async function bonusReport(
         .all<{ customer_id: string; adv: number }>()
     ).results ?? [];
   const advBy = new Map(advances.map((a) => [a.customer_id, a.adv ?? 0]));
+  const paidRows =
+    (
+      await db
+        .prepare(
+          `SELECT customer_id, SUM(amount) AS paid FROM bonus_cash_vouchers
+           WHERE status IN ('CHO_DUYET', 'DA_CHI') AND month >= ? AND month <= ? GROUP BY customer_id`,
+        )
+        .bind(monthStart.slice(0, 7), monthEnd.slice(0, 7))
+        .all<{ customer_id: string; paid: number }>()
+    ).results ?? [];
+  const paidBy = new Map(paidRows.map((a) => [a.customer_id, a.paid ?? 0]));
 
   const acc = new Map<
     string,
@@ -249,6 +262,7 @@ export async function bonusReport(
     }
     const ly = pickLevel(pol.YEAR, retailY);
     const advanced = advBy.get(c.id) ?? 0;
+    const paid = paidBy.get(c.id) ?? 0;
     rows.push({
       customer_id: c.id,
       customer_name: c.name,
@@ -262,7 +276,8 @@ export async function bonusReport(
       month_gift_value: giftValue,
       month_gift_items: giftItems,
       advanced,
-      payable: cash - advanced,
+      paid,
+      payable: cash - advanced - paid,
       year_retail: retailY,
       year_level: ly?.label ?? 'Chưa đạt mốc',
       year_cash: ly?.cash ?? 0,
