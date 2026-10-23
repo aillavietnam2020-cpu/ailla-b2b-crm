@@ -718,3 +718,7 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 .fbd-adv.red summary:before{background:#d92d20}.fbd-adv.amb summary:before{background:#f59f00}.fbd-adv.grn summary:before{background:#087a55}.fbd-adv.blu summary:before{background:#3b5bdb}
 .fbd-adv>span{display:block;margin:4px 0 0 16px;font-size:12px;line-height:1.45;color:var(--muted);opacity:1}
 .pc-t tr.pc-grp td{background:#f6f7fb;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#475066;padding:6px 12px}.pc-t tr.pc-tot td{background:#f8f9fc;font-weight:700;border-top:1px solid var(--line)}.pc-t tr.pc-tot .pv{font-weight:700}
+
+/* Hai khối trái phải cao bằng nhau, bảng giãn đầy khối */
+.pc-2{align-items:stretch}.pc-2>.pc-card{display:flex;flex-direction:column;margin:0;height:100%;box-sizing:border-box}.pc-2>.pc-card>.pc-tw{flex:1}.pc-2>.pc-card .pc-t{height:100%}
+.pc-2+.pc-card,.pc-2+.fbd-note{margin-top:10px}
