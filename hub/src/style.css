@@ -721,4 +721,4 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 
 /* Hai khối trái phải cao bằng nhau, bảng giãn đầy khối */
 .pc-2{align-items:stretch}.pc-2>.pc-card{display:flex;flex-direction:column;margin:0;height:100%;box-sizing:border-box}.pc-2>.pc-card>.pc-tw{flex:1}.pc-2>.pc-card .pc-t{height:100%}
-.pc-2+.pc-card,.pc-2+.fbd-note{margin-top:10px}
+.pc-2+.pc-card,.pc-2+.fbd-note{margin-top:10px}.pc-2 .pc-t td{vertical-align:middle}
