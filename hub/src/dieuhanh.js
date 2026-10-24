@@ -86,16 +86,20 @@ function dhCalcBaTang(mo){
 async function dhLoadPrevB2b(pr){const key=pr.from+"|"+pr.to;if(DH.b2bPrevKey===key)return;DH.b2bPrevKey=key;DH.b2bPrev=null;try{const r=await svApi("/api/dashboards/b2b-sku?from="+pr.from+"&to="+pr.to);const o={};(r.months||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.revenue||0)});DH.b2bPrev=o}catch(e){DH.b2bPrev={}}if(PAGE==="dh")renderMain()}
 function dhTongQuan(){
   if(typeof b2bLoad==="function")b2bLoad();
-  const pr=prevRange();dhLoadPrevB2b(pr);
-  const C=dhCalcNgay(),P=execNums(pr.from,pr.to),full=(()=>{const ms=[];for(let d=pdate(PERIOD.from.slice(0,7)+"-01");iso(d)<=PERIOD.to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms.every(k=>fullMonth(k,PERIOD.from,PERIOD.to))?ms:null})();
+  const full=(()=>{const ms=[];for(let d=pdate(PERIOD.from.slice(0,7)+"-01");iso(d)<=PERIOD.to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms.every(k=>fullMonth(k,PERIOD.from,PERIOD.to))?ms:null})();
+  /* Chọn trọn tháng thì so với đúng số tháng liền trước; không thì so với số ngày liền trước. */
+  const pr=full?(()=>{const f=pdate(PERIOD.from),a=new Date(f.getFullYear(),f.getMonth()-full.length,1),b=addD(f,-1);return {from:iso(a),to:iso(b)}})():prevRange();dhLoadPrevB2b(pr);
+  const C=dhCalcNgay(),P=execNums(pr.from,pr.to);
   const S=typeof TSB!=="undefined"&&TSB.sum?TSB.sum:{},ttM=full&&full.every(k=>S[k])?full.map(k=>S[k]):null;
   const R=C.rows.map(r=>r.ch==="tts"&&ttM?{...r,dt:ttM.reduce((a,x)=>a+x.dt,0),t2:ttM.reduce((a,x)=>a+x.lai,0),chot:1,co:true}:r);
   const pv={tts:P.tt*((C.cfg.kenh.tts||{}).thuan||1),fb:P.fbDT*((C.cfg.kenh.fb||{}).thuan||1),spe:P.spDT};
-  const le={dt:R.reduce((a,r)=>a+(r.co?r.dt:0),0),lai:R.reduce((a,r)=>a+(r.co?r.t2:0),0),prev:pv.tts+pv.fb+pv.spe};
+  /* Kỳ trước thiếu số của kênh nào đang có số thì không so (so lệch kênh sẽ ra % ảo). */
+  const leOK=R.filter(r=>r.co).every(r=>(P.n[r.ch]||0)>0);
+  const le={dt:R.reduce((a,r)=>a+(r.co?r.dt:0),0),lai:R.reduce((a,r)=>a+(r.co?r.t2:0),0),prev:leOK?pv.tts+pv.fb+pv.spe:0};
   const B=typeof b2bChannel==="function"?b2bChannel("B2B"):null,G=typeof b2bChannel==="function"?b2bChannel("GIA_CONG"):null,bp=DH.b2bPrev||{};
   if(!B&&!DH.b2bWait){DH.b2bWait=1;setTimeout(()=>{DH.b2bWait=0;if(PAGE==="dh")renderMain()},1200)}
   const pp={dt:B&&B.has?B.net:0,lai:B&&B.has?B.gross:0,prev:bp.B2B||0},gc={dt:G&&G.has?G.net:0,lai:G&&G.has?G.gross:0,prev:bp.GIA_CONG||0};
-  const tong=le.dt+pp.dt+gc.dt,lai=le.lai+pp.lai+gc.lai,tongP=le.prev+pp.prev+gc.prev;
+  const tong=le.dt+pp.dt+gc.dt,lai=le.lai+pp.lai+gc.lai,tongP=leOK&&(!pp.dt||pp.prev)?le.prev+pp.prev+gc.prev:0;
   const Gc=dhCalcGia(),T=dhCalcTien(),todo=[];
   if(ttM){const td=(TSB.data&&Object.values(TSB.data).find(x=>x&&x.data&&full.includes(x.data.ky)));const t=td&&td.data&&td.data.todo;if(t&&(t.noMap.length||t.miss.length))todo.push(["red",`TikTok: ${t.noMap.length} mã chưa quy đổi, ${t.miss.length} mã thiếu giá vốn`,"kế toán","bc_tiktok"])}
   R.filter(r=>r.co&&r.dt&&r.ads/r.dt>0.25).forEach(r=>todo.push(["amb",`${r.n}: quảng cáo ${dhPct(r.ads/r.dt)} doanh thu`,"team "+r.n,"dh"]));
@@ -105,7 +109,7 @@ function dhTongQuan(){
   if(Gc.red.length)todo.push(["red",`${Gc.red.length} giá bán / báo giá gia công dưới ngưỡng`,"CEO quyết giá","dh"]);
   if(!T.last)todo.push(["amb","Chưa nhập số dư tiền tuần này","kế toán","dh"]);
   const bars=(rows,col)=>{const mx=Math.max(1,...rows.map(x=>x[1]));return rows.length?`<div class="dhb" style="--dhc:${col}">${rows.map(([n,v])=>`<span>${esc(n)}</span><i style="width:${Math.max(2,v/mx*100)}%"></i><span>${tr(v)}</span>`).join("")}</div>`:""};
-  const chg=(a,b)=>!b?`<span class="kchg">chưa có kỳ trước</span>`:exChg(a,b);
+  const chg=(a,b)=>!b?`<span class="kchg">kỳ trước chưa đủ số</span>`:exChg(a,b);
   const laiTxt=(v,dt,ghi)=>v==null?`<span class="dhm-l">${ghi||"chưa tính được lãi"}</span>`:`<span class="dhm-l">lãi <b class="${v<0?"neg":""}">${tr(v)}</b> · ${dhPct(dt?v/dt:null)}${ghi?" · "+ghi:""}</span>`;
   const leNote=R.filter(r=>!r.co).map(r=>r.n).join(", "),grpTop=g=>g&&g.grp?[...g.grp.values()].sort((a,b)=>b.rev-a.rev).slice(0,3).map(x=>[x.n||"Khác",x.rev]):[];
   const K=[["money","Tổng doanh thu",tr(tong),chg(tong,tongP)],["trend","Lãi đóng góp",tr(lai),`<span class="kchg">${dhPct(tong?lai/tong:null)} doanh thu</span>`],["bag","Bán lẻ",tr(le.dt),chg(le.dt,le.prev)],["box","Phân phối",tr(pp.dt),chg(pp.dt,pp.prev)],["fac","Gia công",tr(gc.dt),chg(gc.dt,gc.prev)],["wallet","Tiền đủ chạy",T.R.ngay==null?"—":nf(T.R.ngay)+" ngày",`<span class="kchg">${T.last?"số dư "+vnd(T.last.ngay):"chưa nhập số dư"}</span>`]];
