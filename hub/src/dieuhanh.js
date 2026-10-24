@@ -163,7 +163,12 @@ PAGES.dh=pDieuHanh;
 
 /* Menu trang quản trị: "Phòng điều hành" đứng ngay sau "Tổng quan công ty". */
 if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
-  const mod={k:"q_dh",adm:true,zone:"Quản trị",ic:"trend",n:"Phòng điều hành",sub:"",groups:()=>[["",[MI("dh","Phòng điều hành",u=>u.role==="admin"||dhOk())]]]};
+  /* Gom về một chỗ: mọi báo cáo kết quả, doanh thu theo kênh nằm dưới Phòng điều hành (chỗ CEO xem, quyết định);
+     "Tài chính" cũ chỉ còn việc của kế toán (chi phí, đối soát, bill, tài khoản nhận tiền) nên đổi tên "Việc kế toán". */
+  const REP=["bc_tong","pl","bc_tiktok","bc_shopee","bc_fb","cskh_cu","bc_b2b","bc_gc"],fin=MODULES.find(x=>x.k==="q_fin"),finG=fin?fin.groups:()=>[];
+  const reports=()=>{const its=finG().flatMap(g=>g[1]);return REP.map(k=>its.find(i=>i[0]===k)).filter(Boolean)};
+  if(fin){fin.n="Việc kế toán";fin.groups=()=>finG().map(([g,its])=>[g,its.filter(i=>!REP.includes(i[0]))]).filter(g=>g[1].length)}
+  const mod={k:"q_dh",adm:true,zone:"Quản trị",ic:"trend",n:"Phòng điều hành",sub:"",groups:()=>[["",[MI("dh","Phòng điều hành",u=>u.role==="admin"||dhOk())].concat(reports())]]};
   const i=MODULES.findIndex(x=>x.k==="q_tq");MODULES.splice(i>=0?i+1:MODULES.length,0,mod);
 }
 /* Cảnh báo điều hành ở Tổng quan công ty: giá nguyên liệu tăng, giá bán dưới ngưỡng, tiền đủ chạy thấp. */
