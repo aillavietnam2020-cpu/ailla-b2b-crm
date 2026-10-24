@@ -41,6 +41,8 @@ const SPC_DEF_COMBOS=[
  ["Nước lau sàn chuyên dụng",SPC_L+"taygioangcaosu","2 can 5KG","",0,359000,"","Link landing trong Sheet trùng với Tẩy mốc gioăng, cần kiểm tra lại"]
 ].map((a,i)=>({id:"d"+(i+1),nhom:a[0],landing:a[1],page:"",nguoi:"Thảo",combo:a[2],qua:a[3],ship:a[4],gia:a[5],tu:"",den:a[6]||"",ghi:a[7]||""}));
 
+/* Danh sách sản phẩm cố định cho trang vận hành (không dùng số giá vốn): mã, tên, nhóm */
+const SPC_SKUS=[["TLG125","Túi tẩy lồng giặt Aibio 125g","Tẩy lồng giặt"],["TLG","Tẩy lồng giặt Ailla 300g","Tẩy lồng giặt"],["TM","Tẩy mốc gioăng cao su 100g","Tẩy chuyên dụng"],["M300","Bình xịt muỗi, kiến, gián 300ml","Kiểm soát côn trùng"],["XM530ML","Xịt đuổi muỗi 530ml","Kiểm soát côn trùng"],["R300","Xịt ruồi 300ml","Kiểm soát côn trùng"],["XR","Xịt đuổi ruồi 530ml","Kiểm soát côn trùng"],["TDST","Tinh dầu sấy luxury (Tím)","Tinh dầu giặt sấy"],["TDSH","Tinh dầu sấy Hygeine (Hồng)","Tinh dầu giặt sấy"],["TDSX","Tinh dầu sấy nắng mai (Xanh)","Tinh dầu giặt sấy"],["TDSXL","Tinh dầu sấy France (Xanh lá)","Tinh dầu giặt sấy"],["TDSD","Tinh dầu giặt sấy Ban Mê","Tinh dầu giặt sấy"],["TD","Tinh dầu giặt sấy 80ml","Tinh dầu giặt sấy"],["BTVN250","Bột tẩy vạn năng 250g",""],["BTVN","Bột tẩy vạn năng Ailla Natural",""],["LSCD5KG","Lau sàn chuyên dụng 5kg",""],["LSCD2KG","Lau sàn chuyên dụng 2kg",""],["LS5CDSC","Lau sàn 5kg chuyên dụng sả chanh",""],["LS1LCDHH","Lau sàn chuyên dụng 1 lít hương hoa hồng",""],["MT","Tẩy mốc trắng quần áo",""],["10CFT","Nước giặt 10kg hương hoa nắng",""],["ND","Nồi điện mini 18cm","Hàng thương mại"],["BD100","Bodymist 100ml",""],["C","Chổi quét sơn",""],["TOILET500","Tẩy toilet 500ml",""]];
 const spcStore=()=>{try{return D().fbCat||null}catch(e){return null}};
 const spcCls=c=>{const s=spcStore();return (s&&s.cls&&s.cls[c])||SPC_DEF_CLS[c]||SPC_OFF};
 const spcCombos=()=>{const s=spcStore();return s&&Array.isArray(s.combos)?s.combos:SPC_DEF_COMBOS};
@@ -50,12 +52,13 @@ const spcSt=c=>{const t=iso(new Date());if(c.tu&&c.tu>t)return ["Sắp chạy","
 const spcShort=u=>String(u||"").replace(/^https?:\/\/(www\.)?/,"");
 
 /* Khung chọn sản phẩm đang chạy / quà tặng và bảng combo, giá */
-function spcEditor(F,days){
-  const ed=spcCanEdit(),rev={};
-  days.forEach(k=>((F.p||{})[k]||[]).forEach(([i,q,dt])=>{rev[i]=(rev[i]||0)+dt*1000}));
-  const sk=Object.entries(F.sk).map(([i,s])=>({i,c:s[0],n:s[1],g:s[2]||"",dt:rev[i]||0,k:spcCls(s[0])})).filter(x=>x.dt>0||x.k!==SPC_OFF).sort((a,b)=>(b.k===SPC_RUN)-(a.k===SPC_RUN)||(b.k===SPC_GIFT)-(a.k===SPC_GIFT)||b.dt-a.dt);
+function spcEditor(F,days,opt){
+  const ed=spcCanEdit(),rev={},noRev=!F||!F.sk;opt=opt||{};
+  if(!noRev)days.forEach(k=>((F.p||{})[k]||[]).forEach(([i,q,dt])=>{rev[i]=(rev[i]||0)+dt*1000}));
+  const base=noRev?SPC_SKUS.map(s=>[s[0],s]):Object.entries(F.sk).map(([i,s])=>[i,s]);
+  const sk=base.map(([i,s])=>({i,c:s[0],n:s[1],g:s[2]||"",dt:rev[i]||0,k:spcCls(s[0])})).filter(x=>noRev||x.dt>0||x.k!==SPC_OFF).sort((a,b)=>(b.k===SPC_RUN)-(a.k===SPC_RUN)||(b.k===SPC_GIFT)-(a.k===SPC_GIFT)||b.dt-a.dt);
   const cnt=k=>sk.filter(x=>x.k===k).length;
-  const skRows=sk.map(x=>`<tr><td class="mono">${esc(x.c)}</td><td><b>${esc(x.n)}</b>${x.g?`<small>${esc(x.g)}</small>`:""}</td><td class="n">${x.dt?tr(x.dt):"—"}</td><td>${ed?`<select class="spc-in" data-spc-cls="${esc(x.c)}">${[SPC_RUN,SPC_GIFT,SPC_OFF].map(v=>`<option value="${v}"${x.k===v?" selected":""}>${SPC_LBL[v]}</option>`).join("")}</select>`:pill(SPC_LBL[x.k],x.k===SPC_RUN?"grn":x.k===SPC_GIFT?"amb":"gry")}</td></tr>`).join("");
+  const skRows=sk.map(x=>`<tr><td class="mono">${esc(x.c)}</td><td><b>${esc(x.n)}</b>${x.g?`<small>${esc(x.g)}</small>`:""}</td>${noRev?"":`<td class="n">${x.dt?tr(x.dt):"—"}</td>`}<td>${ed?`<select class="spc-in" data-spc-cls="${esc(x.c)}">${[SPC_RUN,SPC_GIFT,SPC_OFF].map(v=>`<option value="${v}"${x.k===v?" selected":""}>${SPC_LBL[v]}</option>`).join("")}</select>`:pill(SPC_LBL[x.k],x.k===SPC_RUN?"grn":x.k===SPC_GIFT?"amb":"gry")}</td></tr>`).join("");
   const all=spcCombos(),who=[...new Set(all.map(c=>c.nguoi).filter(Boolean))],lands=[...new Set(all.map(c=>c.landing).filter(Boolean))];
   const list=all.filter(c=>(!SPC.who||c.nguoi===SPC.who)&&(!SPC.land||c.landing===SPC.land)&&(!SPC.st||spcSt(c)[0]===SPC.st));
   const inp=(c,f,w,ph)=>ed?`<input class="spc-in" style="min-width:${w}px" data-spf="${f}" data-spid="${esc(c.id)}" value="${esc(c[f]==null?"":c[f])}"${ph?` placeholder="${ph}"`:""}>`:esc(c[f]==null?"":c[f]);
@@ -64,8 +67,8 @@ function spcEditor(F,days){
   const selOpt=(arr,v,all)=>`<option value="">${all}</option>`+arr.map(x=>`<option value="${esc(x)}"${v===x?" selected":""}>${esc(x)}</option>`).join("");
   return `<style>.spc-in{padding:3px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);width:100%}.spc-box{max-height:330px;overflow:auto}.spc-cb table{min-width:1500px}.spc-cb th,.spc-cb td{padding:4px 6px;vertical-align:middle}.spc-f{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px}</style>
   <section class="fbd-card fbd-wide"><h3>Sản phẩm đang chạy quảng cáo <span class="hint" style="font-weight:400">${cnt(SPC_RUN)} đang chạy · ${cnt(SPC_GIFT)} quà tặng</span></h3>
-  <p class="fbd-note">Chỉ <b>sản phẩm đang chạy</b> được tính vào bảng hiệu quả bên dưới. <b>Quà tặng</b> (nồi điện, body mist, chổi...) tách riêng, không tính vào hiệu quả. Hôm nay chạy sản phẩm nào, chị chọn ở cột bên phải.${ed?"":" Chị cần quyền Digital để sửa."}</p>
-  <div class="tbl spc-box"><table><thead><tr><th>Mã</th><th>Sản phẩm</th><th class="n">Doanh thu kỳ này</th><th>Phân loại</th></tr></thead><tbody>${skRows}</tbody></table></div></section>
+  <p class="fbd-note">${opt.van?"Digital tự điền: chọn sản phẩm nào <b>đang chạy</b> quảng cáo, món nào là <b>quà tặng</b>. Giá vốn không hiện ở trang này. ":""}Chỉ <b>sản phẩm đang chạy</b> được tính vào bảng hiệu quả ở trang quản trị. <b>Quà tặng</b> (nồi điện, body mist, chổi...) tách riêng, không tính vào hiệu quả. Hôm nay chạy sản phẩm nào, chị chọn ở cột bên phải.${ed?"":" Chị cần quyền Digital để sửa."}</p>
+  <div class="tbl spc-box"><table><thead><tr><th>Mã</th><th>Sản phẩm</th>${noRev?"":`<th class="n">Doanh thu kỳ này</th>`}<th>Phân loại</th></tr></thead><tbody>${skRows}</tbody></table></div></section>
   <section class="fbd-card fbd-wide"><h3>Combo và giá bán <span class="hint" style="font-weight:400">${list.length}/${all.length} combo</span></h3>
   <p class="fbd-note">Mỗi dòng là một combo của một landing. Khi chạy giá mới hoặc test giá: bấm <b>Nhân bản</b>, sửa giá, page, người test và ngày áp dụng (từ ngày, đến ngày). Combo hết hạn tự hiện "Đã hết". Bỏ trống page nghĩa là áp dụng cho mọi page.</p>
   <div class="spc-f"><select class="spc-in" style="width:auto" data-spc-fl="who">${selOpt(who,SPC.who,"Tất cả người")}</select><select class="spc-in" style="width:auto;max-width:260px" data-spc-fl="land">${selOpt(lands,SPC.land,"Tất cả landing")}</select><select class="spc-in" style="width:auto" data-spc-fl="st">${selOpt(["Đang áp dụng","Sắp chạy","Đã hết"],SPC.st,"Mọi trạng thái")}</select>${ed?`<button class="btn pri" data-spc-act="add">+ Thêm combo</button>`:""}</div>
@@ -103,3 +106,12 @@ if(!window.__spcBound){window.__spcBound=1;
     if(act==="add")spcEdit("thêm combo mới",c=>{c.combos.unshift({id:"n"+Date.now(),nhom:"",landing:"",page:"",nguoi:ME.name||"",combo:"",qua:"",ship:0,gia:0,tu:iso(new Date()),den:"",ghi:""})});
     else if(act==="dup")spcEdit("nhân bản combo",c=>{const i=c.combos.findIndex(y=>y.id===id);if(i>=0)c.combos.splice(i+1,0,Object.assign({},c.combos[i],{id:"n"+Date.now(),tu:iso(new Date()),den:"",ghi:""}))});
     else if(act==="del"&&confirm("Xóa combo này?"))spcEdit("xóa combo",c=>{c.combos=c.combos.filter(y=>y.id!==id)})})}
+
+/* Trang riêng ở bản vận hành (Marketing › Digital Marketing › Sản phẩm và combo): Digital tự điền, không có giá vốn */
+PAGES.dg_sp=function(m){m.innerHTML=H("Sản phẩm và combo","Sản phẩm nào đang chạy, combo, giá, landing, page và ngày áp dụng · không có giá vốn")+spcEditor(null,[],{van:true})};
+(function(){try{
+  const st=PAGE_SETS.find(x=>x.n==="Digital Marketing");
+  if(st&&!st.ids.includes("dg_sp")){const i=st.ids.indexOf("dg_lib");const at=i>=0?i:st.ids.length;st.ids.splice(at,0,"dg_sp");st.labels.splice(at,0,"Sản phẩm và combo")}
+  const mk=MODULES.find(x=>x.k==="mkt");
+  if(mk&&!mk._sp){mk._sp=1;const g0=mk.groups;mk.groups=function(){const r=g0.apply(this,arguments);r.forEach(gr=>{const arr=gr[1],j=arr.findIndex(it=>it&&it[0]==="dg_lib");if(j>=0&&!arr.some(it=>it&&it[0]==="dg_sp"))arr.splice(j,0,MI("dg_sp","Sản phẩm và combo",tm("ads",dgOk)))});return r}}
+}catch(e){console.warn("menu sản phẩm và combo",e)}})();
