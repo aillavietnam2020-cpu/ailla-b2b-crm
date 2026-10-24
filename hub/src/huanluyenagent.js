@@ -207,6 +207,19 @@ var HT_CSS=`<style id="ht-css">
 #ht .tm.a .src{color:#4a6b3a;opacity:1}
 #ht .tm.a .dimg{background:rgba(255,255,255,.5);color:var(--muted)}
 #ht .tm.sys{background:#fde8e6}
+/* Giống kiểu Zalo chị gửi: nền xám xanh rất nhạt, bong bóng trắng (khách) và xanh nhạt (bên mình), không viền, chữ tối, giờ nhỏ xám */
+#ht .cm2{background:#e9edf2}
+#ht .thr{background:#e9edf2}
+#ht .tm{border:0;box-shadow:0 1px 1px rgba(0,0,0,.06);color:#1d2939}
+#ht .tm.k{background:#fff}
+#ht .tm.a,#ht .tm.s2{background:#e2edff;color:#1d2939}
+#ht .tm.sys{background:#fde8e6;color:#9b2c24;font-weight:500}
+#ht .tm .src{color:#7a8699;font-weight:500;font-size:10.5px;opacity:1}
+#ht .tm.a .src,#ht .tm.s2 .src{color:#6b7f9e}
+#ht .tm.pk{box-shadow:0 0 0 2px #7aa7e8}
+#ht .tm.wr{box-shadow:0 0 0 2px var(--red)}
+#ht .chd,#ht .comp{background:#fff}
+#ht .ocard{background:#fff;border:0}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
