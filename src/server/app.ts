@@ -31,7 +31,9 @@ import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
+import { sttRoutes, sttWorkerRoutes } from './routes/stt';
 import { khoRoutes } from './routes/kho';
+import { tiktokRoutes } from './routes/tiktok';
 import { soatRoutes } from './routes/soatSoLieu';
 import { hrRoutes } from './routes/hr';
 
@@ -81,6 +83,8 @@ export function createApp() {
 
   // Worker dựng video (máy văn phòng) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/worker', workerRoutes);
+  // Máy ở văn phòng nghe ghi âm bằng Whisper, cũng gọi bằng khoá Worker.
+  app.route('/api/stt-worker', sttWorkerRoutes);
   // Cầu nối trên VPS (nhắn agent trên web) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/agent-relay', agentRelayRoutes);
   app.route('/api/agent-train-relay', agentTrainRelayRoutes);
@@ -111,6 +115,7 @@ export function createApp() {
   app.route('/api/staff-purchases', staffPurchaseRoutes);
   app.route('/api/agent', agentRoutes);
   // Nhắn agent trên web: chạy được cả ở trang vận hành, vẫn chỉ CEO.
+  app.route('/api/agent-chat/stt', sttRoutes);
   app.route('/api/agent-chat', agentChatRoutes);
   app.route('/api/agent-train', agentTrainRoutes);
   app.route('/api/proposals', proposalRoutes);
@@ -122,6 +127,7 @@ export function createApp() {
   app.route('/api/dashboards', dashboardRoutes);
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/kho', khoRoutes);
+  app.route('/api/hub/tiktok', tiktokRoutes);
   app.route('/api/hub/soat', soatRoutes);
   app.route('/api/hub/hr', hrRoutes);
   app.route('/api/hub', hubRoutes);

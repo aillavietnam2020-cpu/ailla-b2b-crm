@@ -385,13 +385,13 @@ agentTrainRoutes.get('/convs/:id', async (c) => {
     .first<{ id: number; bot_id: string | null }>();
   if (!conv) throw notFound('Không có hội thoại này');
   const msgs = await c.env.DB.prepare(
-    `SELECT * FROM (SELECT id, at, who, text, flow, version, why, got, wrong, wrong_note FROM agent_train_msgs WHERE conv_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id`,
+    `SELECT * FROM (SELECT id, at, who, text, flow, version, why, got, wrong, wrong_note, images FROM agent_train_msgs WHERE conv_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id`,
   )
     .bind(id)
-    .all();
+    .all<{ images: string }>();
   const tags = await c.env.DB.prepare('SELECT tag_id FROM agent_train_conv_tags WHERE conv_id = ?').bind(id).all<{ tag_id: number }>();
   const bot = conv.bot_id ? await c.env.DB.prepare('SELECT name FROM agent_train_bots WHERE id = ?').bind(conv.bot_id).first<{ name: string }>() : null;
-  return ok(c, { ...conv, bot_name: bot?.name ?? null, messages: msgs.results ?? [], tag_ids: (tags.results ?? []).map((t) => t.tag_id) });
+  return ok(c, { ...conv, bot_name: bot?.name ?? null, messages: (msgs.results ?? []).map((m) => ({ ...m, images: m.images ? (JSON.parse(m.images) as string[]) : [] })), tag_ids: (tags.results ?? []).map((t) => t.tag_id) });
 });
 
 /** Đổi bộ thẻ của khách (thay cả bộ). */
@@ -548,7 +548,7 @@ agentTrainRelayRoutes.post('/run', async (c) => {
 });
 
 const RETENTION_DAYS = 90;
-type InMsg = { ext_id?: string; who?: string; text?: string; at?: string; flow?: string; version?: number; why?: string; got?: string };
+type InMsg = { ext_id?: string; who?: string; text?: string; at?: string; flow?: string; version?: number; why?: string; got?: string; images?: string[] };
 
 /**
  * Công cụ trên VPS đẩy tin nhắn của một khách lên web (khách nhắn, agent trả lời, nhân viên nhắn tay, agent dừng).
@@ -590,13 +590,15 @@ agentTrainRelayRoutes.post('/messages', async (c) => {
   const autoTags = new Set<number>();
   for (const m of list) {
     const who = WHO.includes(String(m.who)) ? String(m.who) : '';
-    const body = maskPersonal(text(m.text, 4000));
+    const body = maskPersonal(text(m.text, 4000)) || (Array.isArray(m.images) && m.images.length ? '[Ảnh]' : '');
     if (!who || !body) continue;
     const at = m.at && !Number.isNaN(Date.parse(m.at)) ? new Date(m.at).toISOString() : now;
+    // Chỉ nhận đường dẫn https (tối đa 10 ảnh mỗi tin).
+    const imgs = Array.isArray(m.images) ? m.images.map((u) => text(u, 600)).filter((u) => /^https:\/\//i.test(u)).slice(0, 10) : [];
     const r = await c.env.DB.prepare(
-      `INSERT OR IGNORE INTO agent_train_msgs (conv_id, ext_id, at, who, text, flow, version, why, got) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO agent_train_msgs (conv_id, ext_id, at, who, text, flow, version, why, got, images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(conv.id, text(m.ext_id, 80), at, who, body, text(m.flow, 60), Number.isFinite(Number(m.version)) ? Number(m.version) : null, text(m.why, 600), text(m.got, 800))
+      .bind(conv.id, text(m.ext_id, 80), at, who, body, text(m.flow, 60), Number.isFinite(Number(m.version)) ? Number(m.version) : null, text(m.why, 600), text(m.got, 800), imgs ? JSON.stringify(imgs) : '')
       .run();
     if (!r.meta.changes) continue;
     added++;

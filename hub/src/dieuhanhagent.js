@@ -207,22 +207,56 @@ async function acOpenDoc(id,name){
   }catch(e){body.innerHTML='<p class="note red">'+esc(e.message||"Không mở được file")+"</p>"}
 }
 const AC_VIEW_CSS='.acv{position:fixed;top:64px;right:12px;bottom:12px;width:var(--acvw,460px);max-width:92vw;min-width:300px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(20,30,60,.22);z-index:60;display:flex;flex-direction:column}.acv[hidden]{display:none}.acv.big{width:80vw}.acv-grip{position:absolute;left:-6px;top:0;bottom:0;width:12px;cursor:ew-resize;touch-action:none}.acv-grip:hover{background:linear-gradient(90deg,transparent,rgba(99,102,241,.25),transparent)}.acv-h{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line)}.acv-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.acv-b{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:32px;height:30px;cursor:pointer;font-size:14px;text-decoration:none;color:inherit;display:grid;place-items:center;padding:0}.acv-body{flex:1;overflow:auto;padding:14px 16px;font-size:14px;line-height:1.55}.acv-md h2,.acv-md h3,.acv-md h4,.acv-md h5{margin:14px 0 6px;line-height:1.3}.acv-md h2{font-size:18px}.acv-md h3{font-size:16px}.acv-md h4,.acv-md h5{font-size:14.5px}.acv-md p{margin:6px 0}.acv-md ul,.acv-md ol{margin:6px 0;padding-left:20px}.acv-md blockquote{margin:8px 0;padding:4px 10px;border-left:3px solid var(--pink,#e11d74);background:rgba(0,0,0,.04);color:var(--muted)}.acv-md hr{border:0;border-top:1px solid var(--line);margin:12px 0}.acv-md code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px;font-size:12.5px}.acv-pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.04);padding:10px 12px;border-radius:10px;font:12.5px/1.5 ui-monospace,Consolas,monospace;margin:8px 0}.acv-tw{overflow:auto;margin:8px 0}.acv-t2{border-collapse:collapse;font-size:13px;min-width:100%}.acv-t2 th,.acv-t2 td{border:1px solid var(--line);padding:5px 9px;text-align:left;vertical-align:top}.acv-t2 th{background:rgba(0,0,0,.05);position:sticky;top:0}.acv-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.acv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}.acv-tabs button.on{background:var(--pink-soft,#fde7ef);border-color:var(--pink,#e11d74)}.ac-dl{font:inherit;cursor:pointer}';
-/* Ghi âm: nói tiếng Việt, chữ hiện dần vào ô gõ (dùng nhận dạng giọng nói có sẵn của Chrome/Edge, không gửi file âm thanh lên máy chủ AILLA) */
-let AC_REC=null;
+/* Ghi âm: máy văn phòng đang bật thì thu âm rồi gửi cho Whisper large-v3 nghe (chữ chuẩn, có dấu câu, hiện sau vài giây).
+   Máy tắt thì dùng nhận giọng có sẵn của Chrome/Edge (chữ hiện dần nhưng kém chính xác hơn). */
+let AC_REC=null,AC_MR=null;
+async function acSttPost(path,body){const r=await fetch(path,{method:body?"POST":"GET",credentials:"same-origin",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error((j.error&&j.error.message)||"Lỗi "+r.status);return j.data}
 function acMicInit(){
   const b=$("#ac-mic"),ta=$("#ac-text");if(!b||!ta)return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){b.title="Trình duyệt này chưa hỗ trợ ghi âm thành chữ. Dùng Chrome hoặc Edge nhé";b.onclick=()=>toast("Trình duyệt này chưa hỗ trợ ghi âm. Chị dùng Chrome hoặc Edge nhé");b.style.opacity=".5";return}
-  const stop=()=>{if(AC_REC){try{AC_REC.stop()}catch(e){}}};
-  b.onclick=()=>{
-    if(AC_REC){stop();return}
+  const ph0=ta.placeholder,say=m=>{ta.placeholder=m||ph0},tick={t:0};
+  const reset=()=>{AC_REC=null;AC_MR=null;clearInterval(tick.t);say();b.disabled=false;b.classList.remove("rec");b.textContent="🎤"};
+  const put=t=>{const base=ta.value&&!/\s$/.test(ta.value)?ta.value+" ":ta.value;ta.value=base+t;if(ta._grow)ta._grow();ta.focus()};
+  const whisper=async()=>{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const mt=["audio/webm;codecs=opus","audio/webm","audio/mp4"].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+    const mr=new MediaRecorder(stream,mt?{mimeType:mt,audioBitsPerSecond:24000}:{audioBitsPerSecond:24000});
+    const chunks=[];mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    const t0=Date.now(),auto=setTimeout(()=>{try{mr.stop()}catch(e){}},230000);
+    mr.onstop=async()=>{
+      clearTimeout(auto);stream.getTracks().forEach(t=>t.stop());
+      AC_MR=null;clearInterval(tick.t);say("⏳ Đang chuyển giọng nói thành chữ… (khoảng vài giây)");b.disabled=true;b.classList.remove("rec");b.textContent="⏳";
+      try{
+        if(Date.now()-t0<700)throw new Error("Ghi âm quá ngắn");
+        const blob=new Blob(chunks,{type:mr.mimeType||mt||"audio/webm"});
+        const b64=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(String(fr.result).split(",")[1]||"");fr.onerror=()=>no(new Error("Không đọc được ghi âm"));fr.readAsDataURL(blob)});
+        const job=await acSttPost("/api/agent-chat/stt",{audio_b64:b64,mime:blob.type});
+        for(let i=0;i<75;i++){await new Promise(r=>setTimeout(r,1200));const r=await acSttPost("/api/agent-chat/stt/"+job.id);
+          if(r.status==="done"){if(r.text)put(r.text);else toast("Không nghe thấy tiếng nói");return}
+          if(r.status==="error")throw new Error(r.error||"Máy nghe gặp lỗi")}
+        throw new Error("Chờ quá lâu, thử lại nhé");
+      }catch(e){toast(e.message||"Không nghe được ghi âm")}finally{reset()}
+    };
+    mr.start();AC_MR=mr;b.classList.add("rec");b.textContent="⏹";
+    const tk=()=>say("🔴 Đang nghe "+Math.round((Date.now()-t0)/1000)+" giây… nói xong bấm ⏹ để chữ hiện ra");tk();tick.t=setInterval(tk,1000);
+  };
+  const browser=()=>{
+    if(!SR){toast("Máy văn phòng đang tắt và trình duyệt này chưa hỗ trợ ghi âm. Chị dùng Chrome hoặc Edge nhé");return}
     const r=new SR();r.lang="vi-VN";r.continuous=true;r.interimResults=true;
     const base=ta.value&&!/\s$/.test(ta.value)?ta.value+" ":ta.value;let fin="";
     r.onresult=e=>{let it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else it+=t}
       ta.value=base+fin+it;if(ta._grow)ta._grow()};
     r.onerror=e=>{const m={"not-allowed":"Chưa cho phép micro. Chị bấm biểu tượng ổ khóa cạnh địa chỉ web, chọn cho phép Micro","no-speech":"Không nghe thấy tiếng nói","audio-capture":"Không tìm thấy micro","network":"Mất mạng khi nhận giọng nói"}[e.error];if(m)toast(m)};
-    r.onend=()=>{AC_REC=null;b.classList.remove("rec");b.textContent="🎤";if(ta.value.trim())ta.focus()};
+    r.onend=()=>{reset();if(ta.value.trim())ta.focus()};
     try{r.start();AC_REC=r;b.classList.add("rec");b.textContent="⏹"}catch(e){toast("Chưa bật được micro: "+e.message)}
+  };
+  b.onclick=async()=>{
+    if(AC_MR){try{AC_MR.stop()}catch(e){}return}
+    if(AC_REC){try{AC_REC.stop()}catch(e){}return}
+    let online=false;
+    try{online=!!(window.MediaRecorder&&navigator.mediaDevices&&(await acSttPost("/api/agent-chat/stt/status")).online)}catch(e){}
+    try{if(online)await whisper();else browser()}
+    catch(e){reset();toast(/Permission|NotAllowed/i.test(e.name+e.message)?"Chưa cho phép micro. Chị bấm biểu tượng ổ khóa cạnh địa chỉ web, chọn cho phép Micro":"Chưa bật được micro: "+(e.message||e))}
   };
 }
 const acHour=s=>{try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch(e){return ""}};
@@ -262,7 +296,7 @@ function acChat(){
     </div>
     <div class="ac-msgs" id="ac-msgs"></div>
     <div class="ac-send" id="ac-send"><div id="ac-quote"></div><div class="ac-pend" id="ac-pend"></div>
-    <div class="ac-bar"><button class="ac-clip" id="ac-clip" title="Đính kèm ảnh, Excel, PDF, Word, video (tối đa 25 MB mỗi file)">📎</button><button class="ac-clip" id="ac-mic" type="button" title="Bấm để nói, bấm lần nữa để dừng (chữ hiện vào ô gõ)">🎤</button><textarea id="ac-text" rows="1" placeholder="Nhắn cho ${esc(a.name)}…  (/stop dừng việc đang làm · /new phiên mới)"></textarea><span class="ac-opt"><button class="ac-clip" id="ac-more" title="Tùy chọn gửi">⋯</button><div class="ac-optp" id="ac-optp" hidden>${AC.cur==="lead-sale-ailla"?'<label title="Tin chị gõ được xử lý như khách nhắn vào page: agent chỉ chọn câu mẫu kịch bản Pancake V5, không tự viết"><input type="checkbox" id="ac-kh"> Thử như khách (kịch bản V5)</label>':""}${AC.isCeo?'<label><input type="checkbox" id="ac-tg"> Gửi cả bản trả lời sang Telegram</label>':""}</div></span><button class="btn pri" id="ac-go">Gửi</button></div><input type="file" id="ac-file" accept="image/*,.xlsx,.xls,.csv,.pdf,.docx,.doc,.pptx,.txt,.md,.json,.mp4,.mov,.webm,.mp3,.wav,.m4a" multiple hidden></div></div>
+    <div class="ac-bar"><button class="ac-clip" id="ac-clip" title="Đính kèm ảnh, Excel, PDF, Word, video (tối đa 25 MB mỗi file)">📎</button><button class="ac-clip" id="ac-mic" type="button" title="Bấm để nói, bấm lần nữa để dừng. Máy văn phòng bật thì chữ chuẩn hơn, hiện sau vài giây">🎤</button><textarea id="ac-text" rows="1" placeholder="Nhắn cho ${esc(a.name)}…  (/stop dừng việc đang làm · /new phiên mới)"></textarea><span class="ac-opt"><button class="ac-clip" id="ac-more" title="Tùy chọn gửi">⋯</button><div class="ac-optp" id="ac-optp" hidden>${AC.cur==="lead-sale-ailla"?'<label title="Tin chị gõ được xử lý như khách nhắn vào page: agent chỉ chọn câu mẫu kịch bản Pancake V5, không tự viết"><input type="checkbox" id="ac-kh"> Thử như khách (kịch bản V5)</label>':""}${AC.isCeo?'<label><input type="checkbox" id="ac-tg"> Gửi cả bản trả lời sang Telegram</label>':""}</div></span><button class="btn pri" id="ac-go">Gửi</button></div><input type="file" id="ac-file" accept="image/*,.xlsx,.xls,.csv,.pdf,.docx,.doc,.pptx,.txt,.md,.json,.mp4,.mov,.webm,.mp3,.wav,.m4a" multiple hidden></div></div>
    <div class="ac-right" id="ac-right"></div></div>`;
   R.querySelectorAll("[data-ac]").forEach(b=>b.onclick=()=>acPick(b.dataset.ac));
   {const sc=$("#ac-strip"),on=sc&&sc.querySelector(".ac-sc.on");if(on&&sc)sc.scrollLeft=Math.max(0,on.offsetLeft-sc.offsetLeft-120);const nx=$("#ac-next");if(nx&&sc)nx.onclick=()=>{sc.scrollLeft+=330}}

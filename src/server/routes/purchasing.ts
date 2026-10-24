@@ -4,6 +4,7 @@ import type { AppEnv, AuthContext } from '../env';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
+import { addPayFile, deletePayFile, getPayFile, listPayFiles, readPayMethod } from '../lib/payFiles';
 
 /**
  * Mua hàng nguyên vật liệu.
@@ -32,7 +33,7 @@ function needManage(a: AuthContext) {
 /* ---------------- Nhà cung cấp ---------------- */
 
 purchasingRoutes.get('/suppliers', async (c) => {
-  const rows = (await c.env.DB.prepare('SELECT id, name, phone, note, active, opening_debt, opening_date FROM suppliers ORDER BY name').all<
+  const rows = (await c.env.DB.prepare('SELECT id, name, phone, note, active, opening_debt, opening_date, bank, bank_account_no, bank_account_name FROM suppliers ORDER BY name').all<
     Record<string, unknown>
   >()).results;
   const money = showMoney(c);
@@ -634,7 +635,8 @@ purchasingRoutes.get('/payments', async (c) => {
   needManage(c.get('auth'));
   const rows = (
     await c.env.DB.prepare(
-      `SELECT p.*, s.name AS supplier_name, v.invoice_no, o.no AS po_no FROM po_payments p JOIN suppliers s ON s.id = p.supplier_id
+      `SELECT p.*, s.name AS supplier_name, v.invoice_no, o.no AS po_no,
+              (SELECT COUNT(*) FROM pay_files f WHERE f.ref_type = 'PO_PAY' AND f.ref_id = p.id) AS file_count FROM po_payments p JOIN suppliers s ON s.id = p.supplier_id
        LEFT JOIN po_invoices v ON v.id = p.invoice_id LEFT JOIN po_orders o ON o.id = p.po_id ORDER BY p.pay_date DESC, p.created_at DESC LIMIT 300`,
     ).all<Record<string, unknown>>()
   ).results;
@@ -654,13 +656,44 @@ purchasingRoutes.post('/payments', async (c) => {
   if (poId && !(await c.env.DB.prepare("SELECT id FROM po_orders WHERE id = ? AND supplier_id = ? AND status <> 'HUY'").bind(poId, String(b.supplier_id)).first())) throw badRequest('BAD_PO', 'Phiếu mua không đúng nhà cung cấp');
   const invId = b.invoice_id ? String(b.invoice_id) : null;
   if (invId && !(await c.env.DB.prepare("SELECT id FROM po_invoices WHERE id = ? AND supplier_id = ? AND status = 'OK'").bind(invId, String(b.supplier_id)).first())) throw badRequest('BAD_INVOICE', 'Hóa đơn không đúng nhà cung cấp');
+  const pm = readPayMethod(b);
+  const account =
+    pm.method === 'CHUYEN_KHOAN'
+      ? `CK từ ${pm.from_account} → ${[pm.to_bank, pm.to_account_no, pm.to_account_name].filter(Boolean).join(' · ')}`
+      : pm.method === 'TIEN_MAT'
+        ? `Tiền mặt${pm.receiver ? ', người nhận ' + pm.receiver : ''}`
+        : String(b.account ?? '').trim();
   const id = newId();
   await c.env.DB.batch([
-    c.env.DB.prepare("INSERT INTO po_payments (id, supplier_id, invoice_id, pay_date, amount, account, note, status, created_by, created_at, kind, po_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?, ?, ?)")
-      .bind(id, String(b.supplier_id), invId, b.pay_date, amount, String(b.account ?? '').trim(), String(b.note ?? '').trim(), auth.user.id, nowIso(), kind, poId),
+    c.env.DB.prepare(
+      "INSERT INTO po_payments (id, supplier_id, invoice_id, pay_date, amount, account, note, status, created_by, created_at, kind, po_id, method, from_account, to_bank, to_account_no, to_account_name, receiver) VALUES (?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).bind(id, String(b.supplier_id), invId, b.pay_date, amount, account, String(b.note ?? '').trim(), auth.user.id, nowIso(), kind, poId, pm.method, pm.from_account, pm.to_bank, pm.to_account_no, pm.to_account_name, pm.receiver),
+    // Nhớ tài khoản ngân hàng của nhà cung cấp để lần sau điền sẵn.
+    ...(pm.method === 'CHUYEN_KHOAN'
+      ? [c.env.DB.prepare('UPDATE suppliers SET bank = ?, bank_account_no = ?, bank_account_name = ? WHERE id = ?').bind(pm.to_bank, pm.to_account_no, pm.to_account_name, String(b.supplier_id))]
+      : []),
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_PAYMENT_CREATED', entityType: 'PO_PAYMENT', entityId: id, after: { amount }, requestId: c.get('requestId'), ip: ipOf(c) }),
   ]);
   return ok(c, { id });
+});
+
+/* Ảnh bill chuyển khoản / ảnh phiếu chi tiền mặt có chữ ký của phiếu chi nhà cung cấp */
+purchasingRoutes.get('/payments/:id/files', async (c) => {
+  needManage(c.get('auth'));
+  return listPayFiles(c, 'PO_PAY', c.req.param('id'));
+});
+purchasingRoutes.post('/payments/:id/files', async (c) => {
+  needManage(c.get('auth'));
+  if (!(await c.env.DB.prepare('SELECT id FROM po_payments WHERE id = ?').bind(c.req.param('id')).first())) throw notFound('Không tìm thấy phiếu chi');
+  return addPayFile(c, 'PO_PAY', c.req.param('id'));
+});
+purchasingRoutes.get('/payments/:id/files/:fid', async (c) => {
+  needManage(c.get('auth'));
+  return getPayFile(c, 'PO_PAY', c.req.param('id'), c.req.param('fid'));
+});
+purchasingRoutes.delete('/payments/:id/files/:fid', async (c) => {
+  needManage(c.get('auth'));
+  return deletePayFile(c, 'PO_PAY', c.req.param('id'), c.req.param('fid'));
 });
 
 purchasingRoutes.post('/payments/:id/cancel', async (c) => {

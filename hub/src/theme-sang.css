@@ -379,3 +379,9 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 .mhinfo span{display:block;font-size:12px;color:#7a8199}.mhinfo b{display:block;font-size:14px}.mhinfo small{display:block;font-size:12px;color:#7a8199}
 @media(max-width:800px){.mhinfo{grid-template-columns:repeat(2,1fr)}}
 #mh-detail h3{margin:16px 0 8px}
+
+/* Phiếu chi: chọn chuyển khoản / tiền mặt */
+.mhpm{display:flex;gap:18px;margin:0 0 8px}
+.mhinfo.mhpay{grid-template-columns:repeat(3,1fr)}
+.mhpm label.chk{display:inline-flex;align-items:center;gap:6px;flex-direction:row;margin:0}
+.mhpm label.chk input{width:auto;margin:0}
