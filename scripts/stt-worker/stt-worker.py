@@ -4,6 +4,7 @@ Lấy việc từ /api/stt-worker/pull, trả kết quả ở /push. Khóa và �
 Dùng chung khóa "gpu" với Worker dựng video để hai bên không tranh card đồ họa."""
 import base64
 import json
+import re
 import os
 import subprocess
 import sys
@@ -84,8 +85,10 @@ def transcribe(audio: bytes, mime: str) -> str:
     with tempfile.TemporaryDirectory() as d:
         src, wav, out = Path(d) / ("src" + ext), Path(d) / "in.wav", Path(d) / "out"
         src.write_bytes(audio)
-        subprocess.run([str(FFMPEG), "-y", "-i", str(src), "-ar", "16000", "-ac", "1", str(wav)], check=True, capture_output=True, timeout=120)
-        args = ["-m", str(MODEL), "-f", str(wav), "-l", "vi", "-nt", "-np", "-otxt", "-of", str(out)]
+        # cắt khoảng lặng đầu và cuối: Whisper hay bịa câu "cảm ơn các bạn đã theo dõi" khi nghe đoạn im lặng
+        trim = "silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse"
+        subprocess.run([str(FFMPEG), "-y", "-i", str(src), "-af", trim, "-ar", "16000", "-ac", "1", str(wav)], check=True, capture_output=True, timeout=120)
+        args = ["-m", str(MODEL), "-f", str(wav), "-l", "vi", "-nt", "-np", "-mc", "0", "-otxt", "-of", str(out)]
         done = False
         if WCLI_GPU.exists() and gpu_lock():
             try:
@@ -98,7 +101,24 @@ def transcribe(audio: bytes, mime: str) -> str:
         if not done:
             subprocess.run([str(WCLI_CPU), *args], check=True, capture_output=True, timeout=600)
         text = out.with_suffix(".txt").read_text(encoding="utf-8", errors="replace")
-    return " ".join(text.split())
+    return clean(" ".join(text.split()))
+
+
+# Câu Whisper hay bịa khi gặp đoạn lặng/nhạc (học từ video YouTube): bỏ nếu nằm ở đầu hoặc cuối
+HALLU = re.compile(
+    r"^(cảm ơn (các bạn|quý vị|bạn) đã|hẹn gặp lại|hãy (subscribe|đăng ký)|đăng ký (kênh|ủng hộ)|để không bỏ lỡ|ghiền mì gõ|lalaschool|"
+    r"phụ đề|subtitles? by)",
+    re.I,
+)
+
+
+def clean(t: str) -> str:
+    parts = [x for x in re.split(r"(?<=[.!?…])\s+", t.strip()) if x]
+    while parts and HALLU.match(parts[-1].lstrip(". ")):
+        parts.pop()
+    while parts and HALLU.match(parts[0].lstrip(". ")):
+        parts.pop(0)
+    return " ".join(parts).strip()
 
 
 def main():
