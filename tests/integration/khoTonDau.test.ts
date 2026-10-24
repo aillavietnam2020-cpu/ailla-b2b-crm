@@ -59,4 +59,18 @@ describe('nạp tồn đầu kỳ (phiếu TD)', () => {
     });
     expect(cancelOk.status).toBe(200);
   });
+  it('Nhập – xuất – tồn: bấm vào một mã thấy từng phiếu (số phiếu, ngày, nhập/xuất) làm đổi tồn của mã đó', async () => {
+    const r = await td([{ item: 'M05', qty: 7 }]);
+    expect(r.status).toBe(200);
+    const d = await ctx.request('/api/hub/kho/nxt/detail?item=M05&from=2026-10-01&to=2026-10-31', { as: USERS.ceo });
+    expect(d.status).toBe(200);
+    expect(d.body.data.opening).toBe(0);
+    expect(d.body.data.rows).toHaveLength(1);
+    expect(d.body.data.rows[0].doc_id).toBe(r.body.data.id);
+    expect(d.body.data.rows[0].doc_no).toBe(r.body.data.no);
+    expect(d.body.data.rows[0].qty).toBe(7);
+    const later = await ctx.request('/api/hub/kho/nxt/detail?item=M05&from=2026-11-01&to=2026-11-30', { as: USERS.ceo });
+    expect(later.body.data.opening).toBe(7);
+    expect(later.body.data.rows).toHaveLength(0);
+  });
 });
