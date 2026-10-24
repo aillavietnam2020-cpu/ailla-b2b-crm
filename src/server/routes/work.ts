@@ -71,6 +71,10 @@ async function collectItems(auth: AuthContext, db: D1Database, today: string, as
 
   // ---- Quản lý duyệt
   if (isCeo || can('order.approve.normal')) {
+    const se = await db
+      .prepare("SELECT COUNT(*) AS n, MIN(requested_at) AS oldest FROM ship_edit_requests WHERE status = 'CHO_DUYET'")
+      .first<{ n: number; oldest: string | null }>();
+    add({ key: 'ship_edit', group: 'Duyệt', title: 'Yêu cầu sửa phiếu xuất kho chờ duyệt', detail: 'Kho gửi kèm lý do, duyệt thì tồn kho và đơn đổi theo', count: se?.n ?? 0, oldest: se?.oldest ?? null, page: 'xuat' });
     const ap = await db
       .prepare(
         `SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM approvals WHERE status = 'PENDING' ${isCeo ? '' : "AND required_role = 'MANAGER'"}`,

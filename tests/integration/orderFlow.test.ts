@@ -435,8 +435,23 @@ describe('Luồng đơn B2B qua kho', () => {
     const again = await reqSed(CHUC, fix);
     expect(again.status).toBe(200);
 
+    // Vừa gửi yêu cầu: người duyệt nhận việc, kho (người gửi) không tự nhận.
+    const openFor = async (userId: string, like: string) =>
+      (await ctx.db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE assignee_id = ? AND status = 'OPEN' AND title LIKE ?").bind(userId, like).first<{ n: number }>())!.n;
+    const mgrId = (await ctx.db.prepare("SELECT id FROM users WHERE email = ?").bind(USERS.manager).first<{ id: string }>())!.id;
+    const chucId = (await ctx.db.prepare("SELECT id FROM users WHERE email = ?").bind(CHUC).first<{ id: string }>())!.id;
+    expect(await openFor(mgrId, 'Duyệt sửa phiếu xuất đơn%')).toBeGreaterThan(0);
+    expect(await openFor(chucId, 'Duyệt sửa phiếu xuất đơn%')).toBe(0);
+    const pend2 = await ctx.request('/api/work/mine', { as: USERS.manager });
+    expect((pend2.body.data as Array<{ key: string; count: number }>).find((x) => x.key === 'ship_edit')?.count).toBe(1);
+
+    const thaoId = (await ctx.db.prepare('SELECT id FROM users WHERE email = ?').bind(USERS.thao).first<{ id: string }>())!.id;
+    await ctx.db.prepare("INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, 'order.accounting.confirm', ?, '2026-10-01T00:00:00Z')").bind(thaoId, mgrId).run();
     const dec = await ctx.request(`/api/orders/ship-edits/${again.body.data.id}/decide`, { as: USERS.manager, body: { decision: 'APPROVED' } });
     expect(dec.status).toBe(200);
+    // Duyệt xong: kho nhận việc báo lại; đơn đã được kế toán xác nhận nên bị mở lại, kế toán/quản lý nhận việc xác nhận lại.
+    expect(await openFor(chucId, 'Yêu cầu sửa phiếu xuất đơn%đã được duyệt%')).toBe(1);
+    expect(await openFor(thaoId, 'Đơn % đã đổi số thực xuất%')).toBe(1);
 
     // Tồn kho trả lại 2 can; đơn tự áp số mới; quay lại bước chốt tiền; kế toán phải xác nhận lại.
     expect(await stockNow()).toBe(12);

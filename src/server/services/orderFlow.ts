@@ -880,6 +880,17 @@ export async function flowCorrectShipped(
         ),
     );
   }
+  if (unlockAcc) {
+    const { accountantIds, taskStatements } = await import('../lib/notifyTasks');
+    tail.push(
+      ...taskStatements(db, await accountantIds(db), {
+        title: `Đơn ${o.order_no} đã đổi số thực xuất (${text}), kế toán xác nhận ghi nợ lại. Lý do: ${reason}`,
+        customerId: o.customer_id,
+        createdBy: auth.user.id,
+        now,
+      }),
+    );
+  }
   await db.batch([...adj.statements, ...tail]);
   const total = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(orderId).first<{ total_amount: number }>();
   return {

@@ -3,6 +3,7 @@ import type { AuthContext } from '../env';
 import { auditStatement } from '../lib/audit';
 import { badRequest, conflict, forbidden, notFound, unprocessable } from '../lib/http';
 import { newId } from '../lib/ids';
+import { approverIds, taskStatements } from '../lib/notifyTasks';
 import { flowCorrectShipped } from './orderFlow';
 
 /**
@@ -106,8 +107,14 @@ export async function requestShipEdit(
     await row('DA_DUYET').run();
     return { id, applied: true };
   }
+  const more = taskStatements(db, await approverIds(db), {
+    title: `Duyệt sửa phiếu xuất đơn ${o.order_no}: ${reason}. Vào Xuất kho › Xuất B2B xem và duyệt.`,
+    createdBy: auth.user.id,
+    now,
+  });
   await db.batch([
     row('CHO_DUYET'),
+    ...more,
     auditStatement(db, {
       actorId: auth.user.id,
       action: 'SHIP_EDIT_REQUESTED',
@@ -143,7 +150,18 @@ export async function decideShipEdit(
     await applyEdit(db, auth, r.order_id, { ship_day: r.ship_day, shipped_by_name: r.shipped_by_name, lines, reason: r.reason }, ctx);
   }
   const now = nowIso();
+  const ord = await db.prepare('SELECT order_no FROM orders WHERE id = ?').bind(r.order_id).first<{ order_no: string }>();
+  const back = taskStatements(db, r.requested_by ? [r.requested_by] : [], {
+    title:
+      decision === 'APPROVED'
+        ? `Yêu cầu sửa phiếu xuất đơn ${ord?.order_no ?? ''} đã được duyệt và sửa xong.`
+        : `Yêu cầu sửa phiếu xuất đơn ${ord?.order_no ?? ''} bị từ chối: ${note}`,
+    createdBy: auth.user.id,
+    now,
+    priority: 'NORMAL',
+  });
   await db.batch([
+    ...back,
     db
       .prepare("UPDATE ship_edit_requests SET status = ?, decided_by = ?, decided_at = ?, decision_note = ? WHERE id = ? AND status = 'CHO_DUYET'")
       .bind(decision === 'APPROVED' ? 'DA_DUYET' : 'TU_CHOI', auth.user.id, now, note, requestId),
