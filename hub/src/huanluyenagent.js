@@ -166,6 +166,40 @@ var HT_CSS=`<style id="ht-css">
 #ht .ordh{display:flex;justify-content:space-between;font-weight:700}
 #ht .steps2{display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
 #ht .steps2 .on{color:var(--orange);font-weight:700}
+
+/* Ảnh trong chat như Pancake; chữ nhỏ gọn, khối chữ mỏng */
+#ht .pgrid{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;max-width:200px}
+#ht .pgrid img,#ht .pth{width:98px;height:98px;object-fit:cover;border-radius:6px;display:block}
+#ht .pth{display:flex;align-items:flex-end;padding:4px;color:#475467;font-size:10.5px;font-weight:700}
+#ht .pcap{font-size:10.5px;opacity:.7;margin-top:2px}
+#ht .inbox{font-size:13px;line-height:1.35}
+#ht .thr{padding:10px 12px;gap:4px}
+#ht .tm{padding:5px 9px;border-radius:9px;max-width:72%;font-size:13px;line-height:1.38;border-width:1.5px}
+#ht .tm .src{font-size:10px;margin-bottom:1px;font-weight:600}
+#ht .ci{padding:6px 8px;gap:8px}
+#ht .ci b{font-size:13px}
+#ht .av{width:32px;height:32px;font-size:13px}
+#ht .tg{font-size:9.5px;padding:0 5px;margin:2px 3px 0 0}
+#ht .cl2 .hint,#ht .chd .hint{font-size:11.5px}
+#ht .chd{padding:4px 10px}
+#ht .comp{padding:6px 10px;font-size:11.5px}
+#ht .rpb{padding:8px 10px;font-size:12.5px}
+#ht .rpb .hint,#ht .rpb .ord{font-size:12px}
+#ht .sect{font-size:12px;margin:10px 0 4px;padding-top:7px}
+#ht .achip{font-size:11px;padding:1px 8px}
+#ht .ocard{font-size:11.5px;padding:5px 8px}
+#ht .cft{padding:6px}
+/* Gọn, phẳng như Pancake: thẻ chữ nhật nhỏ, không viền dày, không bo tròn lớn */
+#ht .inbox .achip{border:0;border-radius:3px;padding:2px 6px;font-size:11px;line-height:1.3;background:var(--gray-soft);color:var(--muted);font-weight:600;margin:0 2px 3px 0;display:inline-block}
+#ht .inbox .achip.on{background:var(--pink);color:#fff}
+#ht .inbox .btn{padding:3px 8px;font-size:12px;border-radius:6px}
+#ht .inbox{box-shadow:none;border-radius:8px}
+#ht .inbox .rtabs button{padding:7px;font-size:12.5px}
+#ht .inbox .rp textarea{font-size:12px;padding:5px 7px;border-radius:6px}
+#ht .inbox .ord{border-radius:6px;padding:6px 8px;gap:2px}
+#ht .inbox .pvx,#ht .inbox .log{font-size:11.5px;padding:6px 8px;border-radius:6px}
+#ht .inbox .tm{border-radius:8px}
+#ht .inbox .cft input{padding:5px 8px;font-size:12px;border-radius:6px}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -237,7 +271,7 @@ function draw(){
   var keepV=focusId?document.activeElement.value:null,keepPos=focusId&&document.activeElement.selectionStart;
   root.innerHTML='<div class="hwrap">'+topbar()+'<div id="ht-issues">'+(ST.view==="bot"?issuesBar():"")+"</div>"+
     (ST.ctl.kill?'<div class="alert bad">ĐANG TẮT KHẨN: mọi agent ngừng trả lời ở tất cả Page. Bấm "Gỡ tắt khẩn" để bật lại.</div>':"")+
-    (ST.view==="home"?home():botView())+"</div>"+(ST.drawer?drawerHtml():"");
+    (ST.view==="inbox"?hl():ST.view==="home"?home():botView())+"</div>"+(ST.drawer?drawerHtml():"");
   if(keepV!==null){var el=document.getElementById(focusId);if(el){el.value=keepV;el.focus();try{el.setSelectionRange(keepPos,keepPos)}catch(e){}}}
   var ch=document.getElementById("chat");if(ch)ch.scrollTop=ch.scrollHeight;
   var thr=document.getElementById("thr");if(thr)thr.scrollTop=thr.scrollHeight;
@@ -246,6 +280,7 @@ function draw(){
   if(ST.view==="bot"&&ST.tab==="tc"&&!ST.drawer)loadPreview();
 }
 function topbar(){
+  if(ST.view==="inbox")return '<div class="hph"><h1>Hội thoại</h1><span class="hint">Tin khách và agent trả lời, như hộp thư Pancake · chỉ chị xem</span><span class="sp"></span><button class="btn '+(ST.ctl.kill?"pri":"danger")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button></div>";
   var kill='<button class="btn '+(ST.ctl.kill?"pri":"danger")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button>";
   if(ST.view!=="bot")return '<div class="hph"><h1>Huấn luyện agent</h1><span class="hint">Dạy agent bán hàng trực Page · agent chỉ dùng bản đã xuất bản</span><span class="sp"></span>'+kill+"</div>";
   var pg=pageOfBot();
@@ -303,7 +338,7 @@ function homeLog(){
 }
 /* Cách đặt tab học từ Pancake (thanh tab trên: Hội thoại, Thống kê, Cài đặt; trong Cài đặt có menu trái), Botcake (Cơ bản / Nâng cao), Preny (Thiết lập nhanh / Cài đặt nâng cao). Mục "Sắp có" chưa làm. */
 var NAV=[
-  {k:"hl",n:"Hội thoại",items:[["hl","Hội thoại"],["dx","Đề xuất",1]]},
+  {k:"hl",n:"Đề xuất",soon:1,items:[["dx","Đề xuất"]]},
   {k:"kb",n:"Kịch bản",items:[["tc","Luồng kịch bản"],["cm","Câu mẫu"],["sp","Sản phẩm &amp; giá"],["md","Ảnh / video"],["bd","Bám đuổi"]]},
   {k:"tk",n:"Thống kê",soon:1,items:[["tk","Thống kê luồng"]]},
   {k:"kt",n:"Thử &amp; xuất bản",items:[["ms","Mô phỏng"],["pb","Phiên bản"]]},
@@ -392,7 +427,8 @@ function demoData(){
 }
 function msgBody(m){
   var s=esc(m.text);
-  if(m.img)s+='<div class="dimg">🖼 '+esc(m.img)+"</div>";
+  if(m.images&&m.images.length)s+='<div class="pgrid">'+m.images.map(function(u){return '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="Ảnh"></a>'}).join("")+"</div>";
+  else if(m.img){var n=(String(m.img).match(/\((\d+) ảnh\)/)||[0,1])[1]|0,h=["#f6d365","#a1c4fd","#84fab0","#fbc2eb","#ffecd2","#c2e9fb"],t="";for(var i=0;i<n;i++)t+='<div class="pth" style="background:linear-gradient(135deg,'+h[i%h.length]+',#fff)"><span>Ảnh '+(i+1)+"/"+n+"</span></div>";s+='<div class="pgrid">'+t+'</div><div class="pcap">'+esc(m.img)+" · ảnh mẫu</div>"}
   if(m.order&&ST.cv&&ST.cv.order){var o=ST.cv.order;s+='<div class="ocard"><b>Xác nhận đơn đặt hàng</b><div>'+esc(o.items)+"</div><div>Đơn "+esc(o.code)+" · "+esc(o.money)+"</div><div>"+esc(o.name)+" · "+esc(o.phone)+"</div><div>"+esc(o.addr)+"</div></div>"}
   return s;
 }
@@ -837,7 +873,7 @@ document.addEventListener("input",function(e){
   if(e.target.id==="cvq"){ST.cvQ=e.target.value;clearTimeout(ST.cvT);ST.cvT=setTimeout(function(){ST.cvId=0;ST.cv=null;loadConvs()},350)}
 });
 setInterval(function(){
-  if(!alive()||ST.view!=="bot"||ST.tab!=="hl"||ST.drawer||ST.demo)return;
+  if(!alive()||(ST.view==="inbox"?false:(ST.view!=="bot"||ST.tab!=="hl"))||ST.drawer||ST.demo)return;
   var ae=document.activeElement;if(ae&&ST.root.contains(ae)&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"))return;
   loadConvs();
 },15000);
@@ -866,6 +902,15 @@ document.addEventListener("pointerup",function(){
 });
 
 /* ---------- Mở trang ---------- */
+/* Hội thoại: một mục riêng trong menu, xem tất cả Page, không cần chọn bot */
+PAGES.hoithoaiagent=function(m){
+  m.innerHTML='<div id="ht"></div>'+HT_CSS;
+  ST.root=m.querySelector("#ht");
+  ST.view="inbox";ST.drawer=null;ST.toast="";ST.cvId=0;ST.cv=null;ST.cvTag=0;ST.cvQ="";ST.cvPage="all";ST.demo=false;ST.demoAll=null;ST.botId="";ST.tab="hl";
+  ST.doc={products:[],lib:[],flows:[],offers:[],media:[],follow:[],rules:[],handoff:[],banned:[]};
+  draw();
+  Promise.all([api("/tags"),api("/pages"),api("/control")]).then(function(r){ST.tags=r[0];ST.pages=r[1];ST.ctl=r[2];return loadConvs()}).catch(function(e){toast("Chưa tải được: "+e.message)});
+};
 PAGES.huanluyenagent=function(m){
   m.innerHTML='<div id="ht"></div>'+HT_CSS;
   ST.root=m.querySelector("#ht");
@@ -876,4 +921,4 @@ PAGES.huanluyenagent=function(m){
 })();
 {const s=MODULES.find(m=>m.k==="setup");if(s){const g0=s.groups;s.groups=()=>{const G=g0();const hs=G.find(g=>g[0]==="Hệ thống");if(hs)hs[1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}
 {const i=MODULES.findIndex(m=>m.k==="agt");const mod=MODULES[i];
- if(mod){const g0=mod.groups;mod.groups=()=>{const G=g0();G[0][1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}
+ if(mod){const g0=mod.groups;mod.groups=()=>{const G=g0();G[0][1].push(MI("hoithoaiagent","Hội thoại",u=>u.role==="admin"));G[0][1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}

@@ -6,6 +6,7 @@ import type { AppEnv, AuthContext } from '../env';
 import { auditStatement, clientIp } from '../lib/audit';
 import { badRequest, conflict, forbidden, notFound, ok, unprocessable } from '../lib/http';
 import { createShippingVoucher } from '../services/shippingVouchers';
+import { addPayFile, deletePayFile, getPayFile, listPayFiles } from '../lib/payFiles';
 
 /**
  * Sổ phiếu chi vận chuyển. Quản lý điều phối (Thảo) hoặc CEO lập, lập xong có hiệu lực luôn (không qua bước duyệt).
@@ -27,6 +28,12 @@ const createSchema = z.object({
   method: z.enum(['TIEN_MAT', 'CHUYEN_KHOAN', 'KHAC']).default('TIEN_MAT'),
   order_refs: z.string().trim().max(600).optional().default(''),
   note: z.string().trim().max(600).optional().default(''),
+  // Chuyển khoản: chi từ tài khoản công ty nào, chuyển đến ngân hàng / số tài khoản / tên chủ tài khoản nào. Tiền mặt: ai nhận.
+  from_account: z.string().trim().max(160).optional().default(''),
+  to_bank: z.string().trim().max(80).optional().default(''),
+  to_account_no: z.string().trim().max(40).optional().default(''),
+  to_account_name: z.string().trim().max(120).optional().default(''),
+  receiver: z.string().trim().max(120).optional().default(''),
 });
 
 shippingVoucherRoutes.get('/', async (c) => {
@@ -51,7 +58,9 @@ shippingVoucherRoutes.get('/', async (c) => {
   }
   const rows = await c.env.DB.prepare(
     `SELECT v.id, v.voucher_no, v.voucher_date, v.carrier, v.destination, v.amount, v.method, v.order_refs, v.note,
-            v.status, v.created_at, v.cancel_reason, u.display_name AS created_by_name
+            v.status, v.created_at, v.cancel_reason, u.display_name AS created_by_name,
+            v.from_account, v.to_bank, v.to_account_no, v.to_account_name, v.receiver,
+            (SELECT COUNT(*) FROM pay_files f WHERE f.ref_type = 'SHIP_VC' AND f.ref_id = v.id) AS file_count
      FROM shipping_vouchers v LEFT JOIN users u ON u.id = v.created_by
      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
      ORDER BY v.voucher_date DESC, v.created_at DESC LIMIT 500`,
@@ -75,6 +84,28 @@ shippingVoucherRoutes.post('/', async (c) => {
     ip: clientIp(c.req.raw.headers),
   });
   return ok(c, r);
+});
+
+/* Ảnh bill chuyển khoản / ảnh phiếu chi tiền mặt có chữ ký. Ai xem được sổ thì xem và đính kèm được (kế toán gắn bill). */
+const needRead = (a: AuthContext) => {
+  if (!canRead(a)) throw forbidden('Chỉ quản lý điều phối, kế toán hoặc CEO xem được phiếu chi vận chuyển');
+};
+shippingVoucherRoutes.get('/:id/files', async (c) => {
+  needRead(c.get('auth'));
+  return listPayFiles(c, 'SHIP_VC', c.req.param('id'));
+});
+shippingVoucherRoutes.post('/:id/files', async (c) => {
+  needRead(c.get('auth'));
+  if (!(await c.env.DB.prepare('SELECT id FROM shipping_vouchers WHERE id = ?').bind(c.req.param('id')).first())) throw notFound('Không tìm thấy phiếu chi');
+  return addPayFile(c, 'SHIP_VC', c.req.param('id'));
+});
+shippingVoucherRoutes.get('/:id/files/:fid', async (c) => {
+  needRead(c.get('auth'));
+  return getPayFile(c, 'SHIP_VC', c.req.param('id'), c.req.param('fid'));
+});
+shippingVoucherRoutes.delete('/:id/files/:fid', async (c) => {
+  needRead(c.get('auth'));
+  return deletePayFile(c, 'SHIP_VC', c.req.param('id'), c.req.param('fid'));
 });
 
 shippingVoucherRoutes.post('/:id/cancel', async (c) => {
