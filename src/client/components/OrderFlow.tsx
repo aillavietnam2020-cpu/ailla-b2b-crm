@@ -491,13 +491,24 @@ export function OrderFlowPanel({
             <CorrectShipped
               order={order}
               busy={busy}
-              onSubmit={(body) =>
-                run(
-                  'correct-shipped',
-                  body,
-                  'Đã sửa số thực xuất. Tồn kho và đơn đã đổi theo, sale được báo kiểm tra lại tiền',
-                )
-              }
+              onSubmit={async (body) => {
+                if (isApprover) {
+                  await run('correct-shipped', body, 'Đã sửa số thực xuất. Tồn kho và đơn đã đổi theo, sale được báo kiểm tra lại tiền');
+                  return;
+                }
+                // Kho gửi yêu cầu kèm lý do, quản lý điều phối duyệt mới sửa thật.
+                setBusy(true);
+                setError(null);
+                try {
+                  await api.post(`/api/orders/${order.id}/ship-edits`, body);
+                  toast.success('Đã gửi yêu cầu sửa phiếu xuất, chờ quản lý điều phối duyệt');
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : 'Không gửi được yêu cầu');
+                } finally {
+                  setBusy(false);
+                }
+              }}
             />
           )}
       </Card>

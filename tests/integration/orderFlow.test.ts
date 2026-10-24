@@ -230,6 +230,18 @@ describe('Luồng đơn B2B qua kho', () => {
     expect(ed.status).toBe(200);
     const sh2 = await ctx.db.prepare('SELECT delivered_at, shipped_by_name FROM orders WHERE id = ?').bind(id).first<{ delivered_at: string; shipped_by_name: string }>();
     expect(sh2!.delivered_at.slice(0, 10)).toBe('2026-08-13');
+    // Kho (Chúc) không tự sửa ngày xuất: gửi yêu cầu có lý do; quản lý tự sửa thì áp ngay.
+    expect((await ctx.request(`/api/orders/${id}/ship-info`, { as: CHUC, body: { ship_day: '2026-08-12', shipped_by_name: 'Kho A' } })).status).toBe(403);
+    const askDay = await ctx.request(`/api/orders/${id}/ship-edits`, { as: CHUC, body: { ship_day: '2026-08-12', reason: 'xuất sớm hơn một ngày' } });
+    expect(askDay.status).toBe(200);
+    expect(askDay.body.data.applied).toBe(false);
+    expect((await ctx.request(`/api/orders/ship-edits/${askDay.body.data.id}/decide`, { as: USERS.manager, body: { decision: 'APPROVED' } })).status).toBe(200);
+    const sh3 = await ctx.db.prepare('SELECT delivered_at FROM orders WHERE id = ?').bind(id).first<{ delivered_at: string }>();
+    expect(sh3!.delivered_at.slice(0, 10)).toBe('2026-08-12');
+    const self = await ctx.request(`/api/orders/${id}/ship-edits`, { as: USERS.manager, body: { ship_day: '2026-08-11', reason: 'sửa lại cho đúng ngày thực' } });
+    expect(self.body.data.applied).toBe(true);
+    const sh4 = await ctx.db.prepare('SELECT delivered_at FROM orders WHERE id = ?').bind(id).first<{ delivered_at: string }>();
+    expect(sh4!.delivered_at.slice(0, 10)).toBe('2026-08-11');
     expect(sh2!.shipped_by_name).toBe('Kho A');
     const q2 = await ctx.request('/api/hub/kho/b2b-pending', { as: CHUC });
     expect(q2.body.data.some((o: { id: string }) => o.id === id)).toBe(false);
@@ -383,7 +395,7 @@ describe('Luồng đơn B2B qua kho', () => {
       (await ctx.db.prepare("SELECT SUM(qty) AS s FROM kho_ledger WHERE item = 'TP-FULL'").first<{ s: number }>())!.s;
 
     // Chưa xuất thì chưa sửa được.
-    const early = await post(id, 'correct-shipped', CHUC, { lines: sku, reason: 'thử sửa sớm' });
+    const early = await post(id, 'correct-shipped', USERS.manager, { lines: sku, reason: 'thử sửa sớm' });
     expect(early.status).toBe(400);
 
     await post(id, 'ship', CHUC, { lines: sku });
@@ -397,17 +409,34 @@ describe('Luồng đơn B2B qua kho', () => {
     expect(before.kho_status).toBe('DA_CHOT_TIEN');
     expect(before.accounting_status).toBe('DA_XAC_NHAN');
 
-    // Chỉ kế toán kho; bắt buộc có lý do; phải có thay đổi thật.
+    // Kho không tự sửa: gửi yêu cầu kèm lý do, quản lý điều phối duyệt mới sửa thật. Sale thường không gửi được.
     const fix = { lines: [{ product_id: 'prod-full', shipped_qty: 8 }], reason: 'Gửi nhầm 2 can sang đơn khác' };
+    const reqSed = (as: string, body: unknown) => ctx.request(`/api/orders/${id}/ship-edits`, { as, body });
     expect((await post(id, 'correct-shipped', USERS.thao, fix)).status).toBe(403);
-    expect((await post(id, 'correct-shipped', CHUC, { ...fix, reason: 'ab' })).status).toBe(400);
-    expect((await post(id, 'correct-shipped', CHUC, { lines: sku, reason: 'không đổi gì cả' })).status).toBe(422);
+    expect((await post(id, 'correct-shipped', CHUC, fix)).status).toBe(403);
+    expect((await reqSed(USERS.thao, fix)).status).toBe(403);
+    expect((await reqSed(CHUC, { ...fix, reason: 'ab' })).status).toBe(422);
+    expect((await reqSed(CHUC, { reason: 'không có gì để sửa' })).status).toBe(400);
 
-    const r = await post(id, 'correct-shipped', CHUC, fix);
-    expect(r.status).toBe(200);
-    expect(r.body.data.accounting_unlocked).toBe(true);
-    expect(r.body.data.money_unlocked).toBe(true);
-    expect(r.body.data.total_amount).toBe(8 * 125000);
+    const asked = await reqSed(CHUC, fix);
+    expect(asked.status).toBe(200);
+    expect(asked.body.data.applied).toBe(false);
+    // Chưa duyệt thì chưa đổi gì; không gửi chồng yêu cầu thứ hai; kho không tự duyệt.
+    expect(await stockNow()).toBe(10);
+    expect((await reqSed(CHUC, fix)).status).toBe(409);
+    expect((await ctx.request(`/api/orders/ship-edits/${asked.body.data.id}/decide`, { as: CHUC, body: { decision: 'APPROVED' } })).status).toBe(403);
+    const pending = await ctx.request('/api/orders/ship-edits', { as: USERS.manager });
+    expect(pending.body.data).toHaveLength(1);
+    expect(pending.body.data[0].reason).toContain('Gửi nhầm 2 can');
+    // Từ chối phải ghi lý do; từ chối xong thì kho gửi lại được.
+    expect((await ctx.request(`/api/orders/ship-edits/${asked.body.data.id}/decide`, { as: USERS.manager, body: { decision: 'REJECTED' } })).status).toBe(422);
+    expect((await ctx.request(`/api/orders/ship-edits/${asked.body.data.id}/decide`, { as: USERS.manager, body: { decision: 'REJECTED', note: 'Kiểm lại phiếu đã' } })).status).toBe(200);
+    expect(await stockNow()).toBe(10);
+    const again = await reqSed(CHUC, fix);
+    expect(again.status).toBe(200);
+
+    const dec = await ctx.request(`/api/orders/ship-edits/${again.body.data.id}/decide`, { as: USERS.manager, body: { decision: 'APPROVED' } });
+    expect(dec.status).toBe(200);
 
     // Tồn kho trả lại 2 can; đơn tự áp số mới; quay lại bước chốt tiền; kế toán phải xác nhận lại.
     expect(await stockNow()).toBe(12);

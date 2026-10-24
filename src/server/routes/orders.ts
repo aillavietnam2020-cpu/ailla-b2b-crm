@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { applyDepositsToOrder } from '../services/payments';
+import { decideShipEdit, isShipApprover, listShipEdits, requestShipEdit } from '../services/shipEdits';
 import type { AppEnv } from '../env';
 import { created, forbidden, notFound, ok, unprocessable } from '../lib/http';
 import { nowIso, shipDayToIso, vnDate } from '@shared/datetime';
@@ -177,6 +178,38 @@ orderRoutes.post('/:id/flow/approve', async (c) => {
   );
 });
 
+/** Sửa phiếu xuất kho (số thực xuất / ngày / người xuất) có lý do: kho gửi yêu cầu, quản lý điều phối hoặc CEO duyệt. */
+orderRoutes.get('/ship-edits', async (c) => {
+  return ok(c, await listShipEdits(c.env.DB, c.get('auth'), c.req.query('status') ?? 'CHO_DUYET'));
+});
+orderRoutes.post('/ship-edits/:rid/decide', async (c) => {
+  const b = (await c.req.json().catch(() => null)) as { decision?: unknown; note?: unknown } | null;
+  const decision = b?.decision === 'REJECTED' ? 'REJECTED' : 'APPROVED';
+  return ok(c, await decideShipEdit(c.env.DB, c.get('auth'), c.req.param('rid'), decision, String(b?.note ?? '').trim() || null, flowCtx(c)));
+});
+orderRoutes.post('/:id/ship-edits', async (c) => {
+  const b = (await c.req.json().catch(() => null)) as {
+    ship_day?: unknown;
+    shipped_by_name?: unknown;
+    lines?: unknown;
+    reason?: unknown;
+  } | null;
+  const lines = Array.isArray(b?.lines)
+    ? (b!.lines as Array<{ product_id?: unknown; shipped_qty?: unknown }>).map((l) => ({ product_id: String(l.product_id ?? ''), shipped_qty: Math.max(0, Math.floor(Number(l.shipped_qty) || 0)) })).filter((l) => l.product_id)
+    : null;
+  const day = typeof b?.ship_day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.ship_day) ? b.ship_day : null;
+  return ok(
+    c,
+    await requestShipEdit(
+      c.env.DB,
+      c.get('auth'),
+      c.req.param('id'),
+      { ship_day: day, shipped_by_name: typeof b?.shipped_by_name === 'string' ? b.shipped_by_name : null, lines, reason: String(b?.reason ?? '') },
+      flowCtx(c),
+    ),
+  );
+});
+
 orderRoutes.post('/:id/flow/ship', async (c) => {
   const input = parseInput(flowShipSchema, await c.req.json().catch(() => ({})));
   return ok(c, await flowShip(c.env.DB, c.get('auth'), c.req.param('id'), input, flowCtx(c)));
@@ -184,6 +217,10 @@ orderRoutes.post('/:id/flow/ship', async (c) => {
 
 /** Kho sửa số thực xuất sau khi đã xuất (kể cả đã chốt tiền): kho + đơn + tiền đổi theo, kế toán xác nhận lại. */
 orderRoutes.post('/:id/flow/correct-shipped', async (c) => {
+  // Kế toán kho không tự sửa số thực xuất: gửi yêu cầu kèm lý do để quản lý điều phối duyệt (POST /:id/ship-edits).
+  if (!isShipApprover(c.get('auth')) && !c.get('auth').permissions.includes('order.accounting.confirm')) {
+    throw forbidden('Sửa số thực xuất cần quản lý điều phối duyệt. Gửi yêu cầu sửa phiếu kèm lý do.');
+  }
   const input = parseInput(flowCorrectShippedSchema, await c.req.json().catch(() => ({})));
   return ok(c, await flowCorrectShipped(c.env.DB, c.get('auth'), c.req.param('id'), input, flowCtx(c)));
 });
@@ -338,8 +375,8 @@ orderRoutes.post('/:id/delivery', async (c) => {
 /** Sửa ngày xuất kho + người xuất kho của đơn ĐÃ xuất (kế toán kho, người duyệt đơn, CEO). Kho tính lại tồn theo ngày mới. */
 orderRoutes.post('/:id/ship-info', async (c) => {
   const auth = c.get('auth');
-  if (!auth.permissions.includes('order.kho.process') && !auth.permissions.includes('order.approve.normal') && auth.user.role !== 'CEO') {
-    throw forbidden('Chỉ kế toán kho, người duyệt đơn hoặc CEO sửa được ngày xuất kho');
+  if (!isShipApprover(auth)) {
+    throw forbidden('Sửa ngày xuất / người xuất cần quản lý điều phối duyệt. Kho gửi yêu cầu sửa phiếu kèm lý do.');
   }
   const input = parseInput(shipInfoSchema, await c.req.json().catch(() => ({})));
   const id = c.req.param('id');
