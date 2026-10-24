@@ -189,6 +189,17 @@ var HT_CSS=`<style id="ht-css">
 #ht .achip{font-size:11px;padding:1px 8px}
 #ht .ocard{font-size:11.5px;padding:5px 8px}
 #ht .cft{padding:6px}
+/* Gọn, phẳng như Pancake: thẻ chữ nhật nhỏ, không viền dày, không bo tròn lớn */
+#ht .inbox .achip{border:0;border-radius:3px;padding:2px 6px;font-size:11px;line-height:1.3;background:var(--gray-soft);color:var(--muted);font-weight:600;margin:0 2px 3px 0;display:inline-block}
+#ht .inbox .achip.on{background:var(--pink);color:#fff}
+#ht .inbox .btn{padding:3px 8px;font-size:12px;border-radius:6px}
+#ht .inbox{box-shadow:none;border-radius:8px}
+#ht .inbox .rtabs button{padding:7px;font-size:12.5px}
+#ht .inbox .rp textarea{font-size:12px;padding:5px 7px;border-radius:6px}
+#ht .inbox .ord{border-radius:6px;padding:6px 8px;gap:2px}
+#ht .inbox .pvx,#ht .inbox .log{font-size:11.5px;padding:6px 8px;border-radius:6px}
+#ht .inbox .tm{border-radius:8px}
+#ht .inbox .cft input{padding:5px 8px;font-size:12px;border-radius:6px}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
