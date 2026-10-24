@@ -56,7 +56,9 @@ function dhCalcTien(){
 function dhAutoRates(cfg){
   const K=JSON.parse(JSON.stringify(cfg.kenh)),src={};
   try{const F=(typeof DAYD!=="undefined"&&DAYD.fb)||{},ks=Object.keys(F).sort(),last=ks[ks.length-1];
-    if(last&&!K.fb.tay){const cut=iso(addD(pdate(last),-14)),from=iso(addD(pdate(cut),-60));let c=0,g=0,n=0;ks.forEach(k=>{if(k>from&&k<=cut){c+=+F[k][6]||0;g+=+F[k][5]||0;n++}});if(c>0&&n>=7){K.fb.thuan=g/c;src.fb=`giao thành công thật ${dhPct(g/c)} (${n} ngày đã giao xong)`}}}catch(e){}
+    if(last&&!K.fb.tay){const cut=iso(addD(pdate(last),-14)),from=iso(addD(pdate(cut),-60));let c=0,g=0,n=0;ks.forEach(k=>{if(k>from&&k<=cut){c+=+F[k][6]||0;g+=+F[k][5]||0;n++}});if(c>0&&n>=7){K.fb.thuan=g/c;src.fb=`giao thành công thật ${dhPct(g/c)} (${n} ngày đã giao xong)`}
+      /* Facebook không có phí sàn nhưng có phí ship, ship đơn hoàn và thuế 1,5% (quy ước báo cáo Facebook). */
+      const Dd=(typeof KDX!=="undefined"&&KDX.fbDash)||{};if(Dd.dt>0){K.fb.phi=(-(+Dd.vc||0)-(+Dd.hoan||0))/Dd.dt+0.015;src.fb=(src.fb?src.fb+"; ":"")+`phí ship + thuế ${dhPct(K.fb.phi)} (kỳ ${Dd.ky||""})`}}}catch(e){}
   try{if(!K.tts.tay&&typeof TSB!=="undefined"&&TSB.months&&TSB.months.length){const L=TSB.months[TSB.months.length-1],s=L.summary;let gmv=0;Object.entries((TSB.all&&TSB.all.days)||{}).forEach(([d,x])=>{if(d.startsWith(L.ky)&&x.km)gmv+=x.km.gmv||0});
     if(s.dt&&gmv){K.tts.thuan=s.dt/gmv;K.tts.gv=s.gv/s.dt;K.tts.phi=-s.phi/s.dt;src.tts=`tỷ lệ tháng ${L.ky.slice(5)}/${L.ky.slice(0,4)} đã lưu`}}}catch(e){}
   ["tts","spe","fb"].forEach(k=>{if(K[k].tay)src[k]="tỷ lệ nhập tay ở Thiết lập";else if(!src[k])src[k]=k==="spe"?"doanh thu Shopee đã trừ hủy/hoàn":"tỷ lệ mặc định (chưa đủ số thật)"});
