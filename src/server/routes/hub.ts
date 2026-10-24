@@ -21,11 +21,11 @@ const MAX_JSON = 8 * 1024 * 1024; // 8 MB JSON gốc (nén xong còn khoảng 1/
 const SECURE_ID = 'secure';
 const BLOB_KEYS = ['t9file', 't9', 'kd', 'kd_ads', 'kd_sale', 'skucost', 'nhansu0', 'ads_live', 'ads_fb', 'fb_sale_days', 'fb_cost_days'] as const;
 /**
- * Phần dữ liệu tài chính (giá vốn SKU, chi phí tháng, mục tiêu doanh số) tách sang bản ghi riêng:
+ * Phần dữ liệu tài chính (giá vốn SKU, chi phí tháng, mục tiêu doanh số, số tiền và thiết lập Phòng điều hành) tách sang bản ghi riêng:
  * chỉ CEO và kế toán (quyền xem công nợ toàn công ty) đọc/ghi được; người khác không nhận về,
  * gửi lên cũng bị bỏ qua.
  */
-const SECURE_KEYS = ['skus', 'costs', 'targets'] as const;
+const SECURE_KEYS = ['skus', 'costs', 'targets', 'fin'] as const;
 const canSecret = (auth: AuthContext) => auth.user.role === 'CEO' || auth.permissions.includes('debt.read.all');
 
 function splitSecure(data: Record<string, unknown>) {
