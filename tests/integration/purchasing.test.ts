@@ -271,4 +271,20 @@ describe('Hàng về không có phiếu đặt (vỏ can): kho ghi phiếu nhậ
     const list = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
     expect(list.body.data.filter((o: { source: string }) => o.source === 'KHO')).toHaveLength(0);
   });
+  it('web vận hành (có tách địa chỉ quản trị): quản lý điều phối và CEO xem được công nợ, giá, chứng từ; kho và sale thì không', async () => {
+    await setup();
+    const mgr = (await ctx.db.prepare('SELECT id FROM users WHERE email = ?').bind(USERS.manager).first<{ id: string }>())!.id;
+    await grant(mgr, 'hub.access');
+    const call = (host: string, path: string, email: string) =>
+      ctx.app.fetch(
+        new Request(`http://${host}${path}`, { method: 'GET', headers: { 'X-Dev-Email': email, 'Content-Type': 'application/json' } }),
+        { ...ctx.env, ADMIN_HOST: 'quantri.test', OPS_HOST: 'qt.test' },
+      );
+    for (const path of ['/api/hub/kho/mh/debts', '/api/hub/kho/mh/invoices', '/api/hub/kho/mh/payments', '/api/hub/kho/mh/material-prices?month=2026-10']) {
+      expect((await call('qt.test', path, USERS.manager)).status).toBe(200);
+      expect((await call('qt.test', path, USERS.ceo)).status).toBe(200);
+      expect((await call('qt.test', path, KT)).status).toBe(403);
+      expect((await call('qt.test', path, USERS.thao)).status).toBe(403);
+    }
+  });
 });

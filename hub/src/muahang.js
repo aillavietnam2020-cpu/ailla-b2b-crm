@@ -65,7 +65,7 @@ function mhSteps(p){
   st.push(["d","Đặt hàng "+mhDM(p.order_date)]);
   st.push(p.expected_date?(got?["d","Hẹn giao "+mhDM(p.expected_date)]:late?["l","Trễ "+late+" ngày (hẹn "+mhDM(p.expected_date)+")"]:["c","Hẹn giao "+mhDM(p.expected_date)]):["n","Chưa hẹn ngày giao"]);
   st.push(p.status==="DU"?["d","Đủ hàng"]:p.status==="DANG_GIAO"?["c","Đã nhận một phần"]:["n","Chưa nhận hàng"]);
-  if(IS_ADMIN_HOST()&&mhManage()){
+  if(mhManage()){
     const M=mhPoMoney(p);
     st.push(M.invTotal>0?["d","Chứng từ "+nf(Math.round(M.invTotal))]:got?["c","Chờ chứng từ"]:["n","Chưa có chứng từ"]);
     st.push(M.invTotal>0?(M.paid>=M.invTotal?["d","Đã trả đủ"]:M.paid>0?["c","Đã trả "+nf(Math.round(M.paid))+"/"+nf(Math.round(M.invTotal))]:["c","Chưa trả"]):M.deposit>0?["c","Đã cọc "+nf(Math.round(M.deposit))]:["n","Chưa trả"])}
@@ -74,7 +74,7 @@ const mhValue=p=>p.lines.some(l=>l.unit_price!=null)?p.lines.reduce((t,l)=>t+(l.
 /* Khung đơn giản cho trang quản trị (bên vận hành dùng khung Sản xuất & kho sxFrame). */
 function mhFrame(m,key,title,sub,body,actions){m.innerHTML=H(MH.admin?"Phiếu mua hàng":title,sub)+(actions?`<div class="filters"><span class="sp"></span>${actions}</div>`:"")+body}
 function pMuaHang(m){
-  mhLoad();if(IS_ADMIN_HOST()&&mhManage()){mhLoadInv();mhLoadPay()}
+  mhLoad();if(mhManage()){mhLoadInv();mhLoadPay()}
   /* Bên vận hành chỉ ghi nhận hàng về (phiếu nhập kho của kho); lập phiếu mua và giá là việc của trang quản trị (Mua hàng → Đơn mua hàng) */
   const ed=false,rc=mhReceive(),O=MH.orders||[],shown=O.filter(p=>MH.view==="all"?true:p.status==="DAT"||p.status==="DANG_GIAO"),need=ed&&MH.orders?mhNeedBuy():[];
   const needCard=!ed||!MH.orders||!need.length?"":`<section class="card flush"><div class="card-h pad"><h2>Cần mua</h2><span class="hint">${need.length} nguyên vật liệu dưới mức tối thiểu</span><button class="btn sm pri" id="mh-buyall">Lập phiếu mua cho tất cả</button></div>${tbl(["Mã","Tên","Tồn hiện tại","Mức tối thiểu","Nên mua thêm",""],need.map(r=>`<tr><td class="mono">${esc(r.code)}</td><td>${esc(r.name)}</td><td class="n">${r.qty<0?`<b style="color:#b42318">${mhN(r.qty)}</b>`:mhN(r.qty)} ${esc(r.unit||"")}</td><td class="n">${r.min?mhN(r.min):"—"}</td><td class="n"><b>${mhN(r.need)}</b></td><td><button class="btn sm" data-mhb="${esc(r.code)}">Lập phiếu mua</button></td></tr>`))}</section>`;
@@ -96,7 +96,7 @@ function pMuaHang(m){
 function mhDetail(id){
   const p=(MH.orders||[]).find(x=>x.id===id);if(!p)return;const st=MH_ST[p.status]||["",""],money=false;
   openDrawerHTML(`<h2>${esc(p.no)} · ${esc(p.supplier_name)}</h2><p class="hint">Ngày đặt ${esc(kDd(p.order_date))}${p.expected_date?" · giao dự kiến "+esc(kDd(p.expected_date)):""} · ${pill(st[0],st[1])}${mhLateDays(p)?" "+pill("Trễ "+mhLateDays(p)+" ngày","red"):""}${p.note?" · "+esc(p.note):""}</p>
-   <h3>Tiến trình</h3>${mhSteps(p)}${(IS_ADMIN_HOST()&&mhManage())?(()=>{const M=mhPoMoney(p);return M.inv.length||M.pays.length?`<h3>Chứng từ và thanh toán</h3>${tbl(["Ngày","Nội dung","Số tiền"],[...M.inv.map(v=>`<tr><td>${esc(mhD(v.invoice_date))}</td><td>${v.doc_type==="PG"?"Phiếu giao / bill":"Hóa đơn"} ${esc(v.invoice_no||"")}</td><td class="n">${nf(v.total)}</td></tr>`),...M.inv.filter(v=>v.paid>0).map(v=>`<tr><td></td><td>Đã chi cho ${esc(v.invoice_no||"chứng từ")}</td><td class="n">−${nf(v.paid)}</td></tr>`),...M.pays.map(x=>`<tr><td>${esc(mhD(x.pay_date))}</td><td>${x.kind==="COC"?"Tiền cọc":"Đã chi"}</td><td class="n">−${nf(x.amount)}</td></tr>`)])}`:""})():""}
+   <h3>Tiến trình</h3>${mhSteps(p)}${(mhManage())?(()=>{const M=mhPoMoney(p);return M.inv.length||M.pays.length?`<h3>Chứng từ và thanh toán</h3>${tbl(["Ngày","Nội dung","Số tiền"],[...M.inv.map(v=>`<tr><td>${esc(mhD(v.invoice_date))}</td><td>${v.doc_type==="PG"?"Phiếu giao / bill":"Hóa đơn"} ${esc(v.invoice_no||"")}</td><td class="n">${nf(v.total)}</td></tr>`),...M.inv.filter(v=>v.paid>0).map(v=>`<tr><td></td><td>Đã chi cho ${esc(v.invoice_no||"chứng từ")}</td><td class="n">−${nf(v.paid)}</td></tr>`),...M.pays.map(x=>`<tr><td>${esc(mhD(x.pay_date))}</td><td>${x.kind==="COC"?"Tiền cọc":"Đã chi"}</td><td class="n">−${nf(x.amount)}</td></tr>`)])}`:""})():""}
    <h3>Hàng đặt</h3>${tbl(["Mã","Tên","Đặt","Đã nhận","Còn thiếu"],p.lines.map(l=>`<tr><td class="mono">${esc(l.item)}</td><td>${esc(l.name)}</td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td class="n">${mhN(l.received)}</td><td class="n">${l.qty-l.received>1e-9?`<b style="color:#b42318">${mhN(l.qty-l.received)}</b>`:"—"}</td></tr>`))}
    <h3>Các lần nhận hàng</h3>${p.receipts.length?tbl(["Ngày nhận","Hàng nhận","Ghi chú","Trạng thái",""],p.receipts.map(r=>`<tr><td>${esc(kDd(r.receipt_date))}</td><td>${r.lines.map(l=>esc(l.name)+" × "+mhN(l.qty)+(money&&l.unit_price!=null?" @ "+nf(l.unit_price):"")).join("<br>")}</td><td>${esc(r.note||"")}</td><td>${r.status==="OK"?pill("Đã nhập kho","grn"):pill("Đã hủy","gry")}</td><td>${mhManage()&&r.status==="OK"?`<button class="btn sm danger" data-mhcr="${r.id}">Hủy lần nhận</button>`:""}</td></tr>`)):`<p class="hint">Chưa có lần nhận nào.</p>`}`);
   document.querySelectorAll("[data-mhcr]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy lần nhận hàng này? Phiếu nhập kho tương ứng cũng bị hủy."))return;
@@ -467,7 +467,7 @@ PAGES.kho_gtri=pKhoGiaTri;
   const A=_ea();
   try{
     if(!mhManage())return A;
-    const page=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"?"mh_hd":"sx_mh";
+    const page="mh_hd";
     const need=mhNeedBuy();
     if(need.length)A.push(["amb",`${need.length} nguyên vật liệu dưới mức tồn tối thiểu`,need.slice(0,3).map(r=>r.name).join(", ")+(need.length>3?"…":"")+" · cần đặt thêm",page]);
     (MH.orders||[]).filter(p=>mhLateDays(p)>0).slice(0,5).forEach(p=>A.push(["red",`${p.no} trễ ${mhLateDays(p)} ngày giao`,`${p.supplier_name} · dự kiến ${kDd(p.expected_date)}`,page]));
@@ -476,3 +476,16 @@ PAGES.kho_gtri=pKhoGiaTri;
 }}
 /* Trang Tổng quan: nạp dữ liệu mua hàng và kho cho người có quyền, xong tự vẽ lại để cảnh báo hiện ra. */
 {const _ex=PAGES.exec;if(_ex)PAGES.exec=function(m){if(mhManage()){mhLoad()}return _ex.apply(this,arguments)}}
+
+
+/* =====================================================================
+   Mua hàng ngay trên web VẬN HÀNH: lập phiếu mua, hàng về, chứng từ nhà cung cấp, phiếu chi, công nợ, giá nguyên vật liệu.
+   Chỉ người có quyền duyệt đơn (Thảo), kế toán và CEO thấy mục này và thấy giá/tiền (máy chủ cũng chỉ trả giá cho đúng nhóm này).
+   Kho và nhân viên khác chỉ ghi nhận hàng về ở tab Mua hàng trong Sản xuất & kho (không giá).
+   ===================================================================== */
+if(typeof MODULES!=="undefined"&&(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin")&&!MODULES.some(x=>x.k==="mhop")){
+  const ok=()=>mhManage(),i=MODULES.findIndex(x=>x.k==="sx");
+  const mo={k:"mhop",zone:"Vận hành",ic:"cart",n:"Mua hàng",sub:"Đặt hàng · hàng về · chứng từ · công nợ",tabs:true,
+    groups:()=>[["",[MI("mh_po","Đơn mua hàng (lập phiếu)",ok),MI("mh_hd","Chứng từ nhà cung cấp",ok),MI("mh_chi","Phiếu chi",ok),MI("mh_no","Công nợ nhà cung cấp",ok),MI("mh_gianvl","Giá nguyên vật liệu theo tháng",ok)]]]};
+  MODULES.splice(i>=0?i+1:MODULES.length,0,mo);
+}

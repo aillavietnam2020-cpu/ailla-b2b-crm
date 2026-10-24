@@ -4,7 +4,6 @@ import type { AppEnv, AuthContext } from '../env';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
-import { adminOnlyEndpoint } from '../middleware/adminHost';
 
 /**
  * Mua hàng nguyên vật liệu.
@@ -83,7 +82,7 @@ purchasingRoutes.put('/suppliers/:id', async (c) => {
 });
 
 /** Công nợ đầu kỳ của nhà cung cấp: chỉ nhập ở trang quản trị. */
-purchasingRoutes.put('/suppliers/:id/opening', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.put('/suppliers/:id/opening', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const id = c.req.param('id');
@@ -471,7 +470,7 @@ async function reprice(db: D1Database, receiptIds: string[]) {
   }
 }
 
-purchasingRoutes.put('/receipt-lines/:id/price', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.put('/receipt-lines/:id/price', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const id = c.req.param('id');
@@ -491,7 +490,7 @@ purchasingRoutes.put('/receipt-lines/:id/price', adminOnlyEndpoint, async (c) =>
   return ok(c, { id });
 });
 
-purchasingRoutes.get('/invoices', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/invoices', async (c) => {
   needManage(c.get('auth'));
   const rows = (
     await c.env.DB.prepare(
@@ -504,7 +503,7 @@ purchasingRoutes.get('/invoices', adminOnlyEndpoint, async (c) => {
   return ok(c, rows.map((r) => ({ ...r, receipt_ids: JSON.parse(String(r.receipt_ids || '[]')) })));
 });
 
-purchasingRoutes.post('/invoices', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.post('/invoices', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -559,7 +558,7 @@ purchasingRoutes.post('/invoices', adminOnlyEndpoint, async (c) => {
   return ok(c, { id, total });
 });
 
-purchasingRoutes.post('/invoices/:id/cancel', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.post('/invoices/:id/cancel', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const id = c.req.param('id');
@@ -575,7 +574,7 @@ purchasingRoutes.post('/invoices/:id/cancel', adminOnlyEndpoint, async (c) => {
   return ok(c, { id });
 });
 
-purchasingRoutes.get('/invoices/:id/lines', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/invoices/:id/lines', async (c) => {
   needManage(c.get('auth'));
   const rows = (
     await c.env.DB.prepare('SELECT l.item, i.name, i.unit, l.qty, l.unit_price FROM po_invoice_lines l JOIN kho_items i ON i.code = l.item WHERE l.invoice_id = ?')
@@ -591,13 +590,13 @@ const FILE_MIME = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 const MAX_FILE_B64 = 1_400_000; // khoảng 1 MB sau khi giải mã
 const MAX_FILES = 12;
 
-purchasingRoutes.get('/invoices/:id/files', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/invoices/:id/files', async (c) => {
   needManage(c.get('auth'));
   const rows = (await c.env.DB.prepare('SELECT id, name, mime, size, created_at FROM po_files WHERE invoice_id = ? ORDER BY created_at').bind(c.req.param('id')).all()).results;
   return ok(c, rows);
 });
 
-purchasingRoutes.post('/invoices/:id/files', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.post('/invoices/:id/files', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const id = c.req.param('id');
@@ -617,7 +616,7 @@ purchasingRoutes.post('/invoices/:id/files', adminOnlyEndpoint, async (c) => {
   return ok(c, { id: fid });
 });
 
-purchasingRoutes.get('/invoices/:id/files/:fid', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/invoices/:id/files/:fid', async (c) => {
   needManage(c.get('auth'));
   const f = await c.env.DB.prepare('SELECT mime, data FROM po_files WHERE id = ? AND invoice_id = ?').bind(c.req.param('fid'), c.req.param('id')).first<{ mime: string; data: string }>();
   if (!f) throw notFound('Không tìm thấy file');
@@ -625,13 +624,13 @@ purchasingRoutes.get('/invoices/:id/files/:fid', adminOnlyEndpoint, async (c) =>
   return new Response(bin, { headers: { 'Content-Type': f.mime, 'Cache-Control': 'private, max-age=3600' } });
 });
 
-purchasingRoutes.delete('/invoices/:id/files/:fid', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.delete('/invoices/:id/files/:fid', async (c) => {
   needManage(c.get('auth'));
   await c.env.DB.prepare('DELETE FROM po_files WHERE id = ? AND invoice_id = ?').bind(c.req.param('fid'), c.req.param('id')).run();
   return ok(c, { id: c.req.param('fid') });
 });
 
-purchasingRoutes.get('/payments', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/payments', async (c) => {
   needManage(c.get('auth'));
   const rows = (
     await c.env.DB.prepare(
@@ -642,7 +641,7 @@ purchasingRoutes.get('/payments', adminOnlyEndpoint, async (c) => {
   return ok(c, rows);
 });
 
-purchasingRoutes.post('/payments', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.post('/payments', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -664,7 +663,7 @@ purchasingRoutes.post('/payments', adminOnlyEndpoint, async (c) => {
   return ok(c, { id });
 });
 
-purchasingRoutes.post('/payments/:id/cancel', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.post('/payments/:id/cancel', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const id = c.req.param('id');
@@ -679,7 +678,7 @@ purchasingRoutes.post('/payments/:id/cancel', adminOnlyEndpoint, async (c) => {
 });
 
 /** Công nợ từng nhà cung cấp = đầu kỳ + hóa đơn (sau ngày chốt đầu kỳ) − đã chi (sau ngày chốt đầu kỳ). */
-purchasingRoutes.get('/debts', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/debts', async (c) => {
   needManage(c.get('auth'));
   const rows = (
     await c.env.DB.prepare(
@@ -692,7 +691,7 @@ purchasingRoutes.get('/debts', adminOnlyEndpoint, async (c) => {
   return ok(c, rows.map((r) => ({ ...r, balance: r.opening_debt + r.invoiced - r.paid })));
 });
 
-purchasingRoutes.get('/suppliers/:id/ledger', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/suppliers/:id/ledger', async (c) => {
   needManage(c.get('auth'));
   const id = c.req.param('id');
   const s = await c.env.DB.prepare('SELECT id, name, opening_debt, opening_date FROM suppliers WHERE id = ?').bind(id).first<{ id: string; name: string; opening_debt: number; opening_date: string | null }>();
@@ -709,7 +708,7 @@ purchasingRoutes.get('/suppliers/:id/ledger', adminOnlyEndpoint, async (c) => {
 
 /* ---------------- Giá nguyên vật liệu theo tháng (bình quân gia quyền, có tồn đầu) ---------------- */
 
-purchasingRoutes.get('/material-prices', adminOnlyEndpoint, async (c) => {
+purchasingRoutes.get('/material-prices', async (c) => {
   needManage(c.get('auth'));
   const month = c.req.query('month') ?? '';
   if (!/^\d{4}-\d{2}$/.test(month)) throw badRequest('BAD_MONTH', 'Chọn tháng (YYYY-MM)');
