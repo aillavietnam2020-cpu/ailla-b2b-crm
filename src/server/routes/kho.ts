@@ -950,6 +950,34 @@ khoRoutes.get('/nxt', async (c) => {
   return ok(c, rows.results);
 });
 
+/**
+ * Từng phiếu làm đổi tồn của một mã trong kỳ (để từ bảng Nhập – xuất – tồn bấm vào xem phiếu, không chỉ thấy số tổng).
+ * Phiếu thật (kho_docs) có doc_id; phiếu xuất bán đơn B2B / trả hàng được ghép với đơn hoặc phiếu trả để mở ra xem.
+ */
+khoRoutes.get('/nxt/detail', async (c) => {
+  const item = (c.req.query('item') ?? '').trim();
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  if (!item) throw badRequest('NO_ITEM', 'Thiếu mã hàng');
+  if (!isDate(from) || !isDate(to)) throw badRequest('BAD_RANGE', 'Cần chọn ngày bắt đầu và kết thúc');
+  const opening = await c.env.DB.prepare('SELECT ROUND(COALESCE(SUM(qty), 0), 6) AS n FROM kho_ledger WHERE item = ? AND doc_date < ?')
+    .bind(item, from)
+    .first<{ n: number }>();
+  const rows = await c.env.DB.prepare(
+    `SELECT l.doc_date, l.doc_id, l.doc_type, l.doc_no, ROUND(SUM(l.qty), 6) AS qty,
+            MAX(o.id) AS order_id, MAX(r.id) AS return_id
+     FROM kho_ledger l
+     LEFT JOIN orders o ON l.doc_id = 0 AND l.doc_type = 'B2B' AND l.doc_no = 'XB-' || o.order_no
+     LEFT JOIN order_returns r ON l.doc_id = 0 AND l.doc_type = 'TRA_HANG' AND l.doc_no = r.return_no
+     WHERE l.item = ? AND l.doc_date >= ? AND l.doc_date <= ?
+     GROUP BY l.doc_date, l.doc_id, l.doc_type, l.doc_no
+     ORDER BY l.doc_date, l.doc_id, l.doc_no`,
+  )
+    .bind(item, from, to)
+    .all<Record<string, unknown>>();
+  return ok(c, { opening: opening?.n ?? 0, rows: rows.results ?? [] });
+});
+
 /** Chênh lệch định mức và thực tế của các mẻ pha chế trong kỳ, theo từng NVL. */
 khoRoutes.get('/variance', async (c) => {
   if (!canEditMap(c.get('auth'))) throw forbidden('Chỉ CEO, quản lý hoặc kế toán xem chênh lệch so với định mức');

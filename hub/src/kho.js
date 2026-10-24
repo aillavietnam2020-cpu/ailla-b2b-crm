@@ -316,11 +316,25 @@ function pKhoTon(m){
 
 /* ---------- Nhập – xuất – tồn ---------- */
 async function khoLoadNxt(){const P=kPer();KHO.nxtKey=P.from+"|"+P.to;KHO.nxt={busy:true,rows:null};try{KHO.nxt.rows=await kApi(`/nxt?from=${P.from}&to=${P.to}`)}catch(e){toast(e.message);KHO.nxt.rows=[]}KHO.nxt.busy=false;if(PAGE==="kho_nxt")renderMain()}
+/* Bấm một mã ở bảng Nhập – xuất – tồn: hiện từng phiếu làm đổi tồn của mã đó trong kỳ, bấm số phiếu để mở phiếu (xem, in). */
+async function khoNxtDetail(code){
+  const P=kPer();let r;try{r=await kApi(`/nxt/detail?item=${encodeURIComponent(code)}&from=${P.from}&to=${P.to}`)}catch(e){toast(e.message);return}
+  const it=KHO.items.get(code)||{name:code,unit:""};let bal=+r.opening||0;
+  const TY={B2B:"Xuất bán đơn B2B",TRA_HANG:"Nhập hàng trả lại",ONLINE:"Xuất bán lẻ online",PN:"Phiếu nhập",XB:"Phiếu xuất bán",XK:"Phiếu xuất khác",PC:"Pha chế",KS:"Kiểm kê",TD:"Tồn đầu kỳ",TL:"Thanh lý"};
+  const rows=r.rows.map(x=>{bal+=+x.qty;const q=+x.qty,tag=KHO_TYPES[x.doc_type]?KHO_TYPES[x.doc_type].name:(TY[x.doc_type]||x.doc_type);
+    const link=x.doc_id>0?`<a href="#" class="lnk" data-dd="${x.doc_id}">${esc(x.doc_no||"phiếu")}</a>`:x.order_id?`<a href="#" class="lnk" data-op="${esc(x.order_id)}">${esc(x.doc_no)}</a>`:`<b>${esc(x.doc_no||"—")}</b>`;
+    return `<tr><td>${kDd(x.doc_date)}</td><td>${link}</td><td>${esc(TY[x.doc_type]||tag)}</td><td class="n">${q>0?knum(q):""}</td><td class="n">${q<0?knum(-q):""}</td><td class="n"><b>${knum(bal)}</b></td></tr>`}).join("");
+  openDrawerHTML(`<h2>${esc(code)} · ${esc(it.name)}</h2><p class="hint">Kỳ ${kPerLabel(P)} · Tồn đầu kỳ <b>${knum(r.opening)}</b> ${esc(it.unit||"")}. Bấm số phiếu để xem và in phiếu.</p>
+   ${r.rows.length?`<div class="tbl"><table><thead><tr><th>Ngày</th><th>Số phiếu</th><th>Loại</th><th class="n">Nhập</th><th class="n">Xuất</th><th class="n">Tồn sau</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="empty">Không có phiếu nào trong kỳ.</p>`}`);
+  document.querySelectorAll("[data-dd]").forEach(a=>a.onclick=e=>{e.preventDefault();khoOpenDoc(+a.dataset.dd)});
+  document.querySelectorAll("[data-op]").forEach(a=>a.onclick=e=>{e.preventDefault();window.open("/print/orders/"+a.dataset.op+"?type=ship","_blank")});
+}
 function pKhoNxt(m){
   const P=kPer();if(!KHO.nxt||KHO.nxtKey!==P.from+"|"+P.to)khoLoadNxt();const R=(KHO.nxt&&KHO.nxt.rows)||null;
   const rows=R?R.filter(r=>r.opening||r.qty_in||r.qty_out||r.closing).map(r=>({...r,it:KHO.items.get(r.code)||{name:r.code,unit:"",cls:""}})).sort((a,b)=>a.code.localeCompare(b.code)):null;
   khoFrame(m,"kho_nxt","Nhập – xuất – tồn","Tồn đầu kỳ + nhập − xuất = tồn cuối kỳ, theo từng mã. Kỳ lấy theo bộ chọn thời gian ở trên cùng.",`<section class="card flush"><div class="card-h pad"><div class="filters"><b>Kỳ: ${kPerLabel(P)}</b></div><button class="btn" id="nx-x">Tải Excel</button></div>
-   ${rows?khoRows(["Mã","Tên","ĐVT","Loại","Tồn đầu","Nhập","Xuất","Tồn cuối"],rows.map(r=>`<tr><td class="mono">${esc(r.code)}</td><td>${esc(r.it.name)}</td><td>${esc(r.it.unit)}</td><td>${esc(KHO_CLS[r.it.cls]||"")}</td><td class="n">${knum(r.opening)}</td><td class="n">${knum(r.qty_in)}</td><td class="n">${knum(r.qty_out)}</td><td class="n"><b>${knum(r.closing)}</b></td></tr>`)):`<p class="hint pad">Đang tải…</p>`}</section>`);
+   ${rows?khoRows(["Mã","Tên","ĐVT","Loại","Tồn đầu","Nhập","Xuất","Tồn cuối"],rows.map(r=>`<tr class="clk" data-nxd="${esc(r.code)}"><td class="mono">${esc(r.code)}</td><td>${esc(r.it.name)}</td><td>${esc(r.it.unit)}</td><td>${esc(KHO_CLS[r.it.cls]||"")}</td><td class="n">${knum(r.opening)}</td><td class="n">${knum(r.qty_in)}</td><td class="n">${knum(r.qty_out)}</td><td class="n"><b>${knum(r.closing)}</b></td></tr>`)):`<p class="hint pad">Đang tải…</p>`}</section>`);
+  m.querySelectorAll("[data-nxd]").forEach(tr=>tr.onclick=()=>khoNxtDetail(tr.dataset.nxd));
   if($("#nx-x"))$("#nx-x").onclick=()=>{if(!rows||typeof XLSX==="undefined"){toast("Chưa có dữ liệu để tải");return}const ws=XLSX.utils.aoa_to_sheet([["Mã","Tên","ĐVT","Loại","Tồn đầu","Nhập","Xuất","Tồn cuối"],...rows.map(r=>[r.code,r.it.name,r.it.unit,KHO_CLS[r.it.cls]||"",r.opening,r.qty_in,r.qty_out,r.closing])]),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"NXT");XLSX.writeFile(wb,`NXT_${P.from}_${P.to}.xlsx`)};
 }
 
