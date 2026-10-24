@@ -20,6 +20,7 @@ Dùng khi chị Hoa hoặc nhân sự hỏi số liệu thật trên web (đơn,
 | `abos orders [--flow 1] [--kho-status X] [--stuck-hours N] [--customer ID]` | Đơn đang trong luồng, đơn kẹt quá N giờ |
 | `abos order <id>` | Chi tiết một đơn |
 | `abos customers [--q tên]` | Tìm khách theo tên hoặc mã (CRM B2B; cần quyền công nợ) |
+| `abos-congno-xlsx` | **Xuất công nợ TOÀN BỘ khách ra Excel 4 sheet trong ~5 giây** (đã tự đối chiếu tổng). Chạy lệnh này, rồi gửi dòng `MEDIA:` nó in ra. KHÔNG tự viết script Excel cho việc này (mất 5 phút) |
 | `abos debts [--loc vuot\|co-no]` | Công nợ toàn công ty, `vuot` = khách vượt hạn mức, kèm tổng (cần quyền công nợ) |
 | `abos payments [--pending 1] [--customer ID]` | Phiếu thu tiền khách, `--pending 1` = chưa kế toán xác nhận (cần quyền công nợ) |
 | `abos customer <id>` | Khách: công nợ, đơn, việc đang mở |

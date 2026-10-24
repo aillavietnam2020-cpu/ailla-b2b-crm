@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+# Xuất công nợ TOÀN BỘ khách ra Excel (4 sheet) trong vài giây. Dùng: abos-congno-xlsx [tên-agent]. In ra đường dẫn file để gửi bằng MEDIA:
+import json
+import os
+import subprocess
+import sys
+import zipfile
+import datetime
+
+SKILL_DIR = "/root/.openclaw/agents/ke-toan-truong-ailla/agent/workshop-skills/office-file-deliverables/scripts"
+sys.path.insert(0, SKILL_DIR)
+from xlsx_writer import Sheet, build, T, H, N, B, NB, WARN, CELL, HILITE
+
+NOW = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))
+NGAY = NOW.strftime("%d/%m/%Y")
+OUT = "/root/.openclaw/media/exports/Cong_no_toan_bo_khach_" + NOW.strftime("%Y-%m-%d") + ".xlsx"
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
+
+raw = subprocess.run(
+    ["abos", "--as", sys.argv[1] if len(sys.argv) > 1 else "ke-toan-truong-ailla", "debts", "--limit", "200"],
+    check=True,
+    capture_output=True,
+    text=True,
+).stdout
+payload = json.loads(raw)
+rows = payload["data"]
+meta = payload["meta"]
+totals = meta["totals"]
+
+def val(r, camel, snake):
+    return r.get(camel, r.get(snake, 0)) or 0
+
+def official(r): return val(r, "officialDebt", "official_debt")
+def projected(r): return val(r, "projectedDebt", "projected_debt")
+def pending_charges(r): return val(r, "pendingCharges", "pending_charges")
+def pending_cash(r): return val(r, "pendingCash", "pending_cash")
+def opening(r): return val(r, "openingDebt", "opening_debt")
+def charges(r): return val(r, "postedCharges", "posted_charges")
+def payments(r): return val(r, "confirmedPayments", "confirmed_payments")
+def credit(r): return val(r, "creditBalance", "credit_balance")
+
+checks = {
+    "opening_debt": sum(opening(r) for r in rows),
+    "official_debt": sum(official(r) for r in rows),
+    "projected_debt": sum(projected(r) for r in rows),
+    "pending_charges": sum(pending_charges(r) for r in rows),
+    "pending_cash": sum(pending_cash(r) for r in rows),
+    "credit_balance": sum(credit(r) for r in rows),
+    "customers_exceeded": sum(1 for r in rows if r.get("projected_exceeded")),
+}
+for key, amount in checks.items():
+    if amount != totals[key]:
+        raise SystemExit(f"Sai lệch tổng {key}: dòng={amount}, meta={totals[key]}")
+if len(rows) != meta["total_rows"]:
+    raise SystemExit(f"Sai lệch số khách: {len(rows)} != {meta['total_rows']}")
+for r in rows:
+    bridge = official(r) + pending_charges(r) - pending_cash(r)
+    if bridge != projected(r):
+        raise SystemExit(f"Sai cầu nối dự kiến: {r['customer_name']}: {bridge} != {projected(r)}")
+
+with_debt = [r for r in rows if projected(r) > 0]
+exceeded = [r for r in rows if r.get("official_exceeded") or r.get("projected_exceeded")]
+pending = [r for r in rows if pending_charges(r) or pending_cash(r)]
+negative = [r for r in rows if official(r) < 0 or projected(r) < 0]
+
+s0 = Sheet("1. TỔNG QUAN")
+for c, w in {1:34, 2:24, 3:22, 4:22}.items(): s0.w(c, w)
+s0.add([("BÁO CÁO CÔNG NỢ TOÀN BỘ KHÁCH", T)])
+s0.add([("Nguồn", B), ("ABOS – sổ công nợ khách hàng", 0)])
+s0.add([("Ngày xuất", B), (NGAY, 0)])
+s0.add([("Phạm vi", B), ("Toàn bộ khách hàng được ABOS trả về", 0)])
+s0.add([("Đơn vị", B), ("Đồng (VND)", 0)])
+s0.add([("Trạng thái số liệu", B), ("Số công nợ vận hành ABOS tại thời điểm xuất; chưa đối chiếu độc lập với sổ kế toán tổng hợp", WARN)])
+s0.add([])
+s0.add([("CHỈ TIÊU", H), ("GIÁ TRỊ", H), ("GHI CHÚ", H)])
+s0.add([("Số khách", CELL), (len(rows), NB), ("Gồm cả khách số dư bằng 0", CELL)])
+s0.add([("Khách có công nợ dự kiến > 0", CELL), (len(with_debt), NB), ("Lọc theo công nợ dự kiến", CELL)])
+s0.add([("Khách vượt hạn mức", CELL), (totals["customers_exceeded"], NB), ("Theo cờ kiểm soát trên ABOS", CELL)])
+s0.add([("Công nợ đầu kỳ", CELL), (totals["opening_debt"], N), ("Tổng toàn bộ khách", CELL)])
+s0.add([("Công nợ chính thức", CELL), (totals["official_debt"], NB), ("Đã ghi nhận trên ABOS", CELL)])
+s0.add([("Đơn chờ ghi nhận", CELL), (totals["pending_charges"], N), ("Khoản tăng công nợ đang chờ", CELL)])
+s0.add([("Tiền chờ xác nhận", CELL), (totals["pending_cash"], N), ("Khoản giảm công nợ đang chờ", CELL)])
+s0.add([("Công nợ dự kiến", CELL), (totals["projected_debt"], NB), ("Chính thức + đơn chờ − tiền chờ", CELL)])
+s0.add([("Số dư có/tiền khách dư", CELL), (totals["credit_balance"], N), ("Trường credit_balance của ABOS", CELL)])
+s0.add([])
+s0.add([("CẦU NỐI", H), ("CÔNG THỨC", H)])
+s0.add([("Công nợ dự kiến", CELL), ("Công nợ chính thức + Đơn chờ ghi nhận − Tiền chờ xác nhận", CELL)])
+s0.add([("Kiểm tra", CELL), ("Đã đối chiếu tổng meta và từng dòng: KHỚP", HILITE)])
+s0.add([])
+s0.add([("CẢNH BÁO", H), ("NỘI DUNG", H)])
+s0.add([("Giới hạn sử dụng", WARN), ("Không dùng riêng file này để hạch toán/chốt công nợ chính thức khi chưa đối chiếu chứng từ, phiếu thu và sổ kế toán.", WARN)])
+s0.add([("Khoản chờ", WARN), (f"Có {len(pending)} khách có đơn hoặc tiền đang chờ xử lý.", WARN)])
+s0.add([("Số dư âm", WARN), (f"Có {len(negative)} khách có công nợ chính thức hoặc dự kiến âm; cần kiểm tra khoản trả thừa/bù trừ.", WARN)])
+s0.add([])
+s0.add([("TOP 10 CÔNG NỢ DỰ KIẾN", H), ("PHỤ TRÁCH", H), ("CÔNG NỢ DỰ KIẾN", H)])
+for r in sorted(rows, key=projected, reverse=True)[:10]:
+    s0.add([(r["customer_name"], CELL), (r.get("owner_name") or "Chưa gán", CELL), (projected(r), N)])
+
+headers = ["STT", "Khách hàng", "Phụ trách", "Đầu kỳ", "Phát sinh nợ", "Đã thu xác nhận", "Công nợ chính thức", "Đơn chờ", "Tiền chờ", "Công nợ dự kiến", "Số dư có", "Hạn mức", "Chênh lệch cầu nối", "Trạng thái"]
+
+def status(r):
+    flags = []
+    if r.get("official_exceeded") or r.get("projected_exceeded"): flags.append("VƯỢT HẠN MỨC")
+    if pending_charges(r) or pending_cash(r): flags.append("CÓ KHOẢN CHỜ")
+    if official(r) < 0 or projected(r) < 0: flags.append("SỐ DƯ ÂM")
+    return " · ".join(flags) or "Bình thường"
+
+def detail_sheet(name, source):
+    s = Sheet(name)
+    widths = [7, 28, 24, 16, 16, 17, 18, 15, 15, 18, 15, 15, 18, 24]
+    for i, w in enumerate(widths, 1): s.w(i, w)
+    s.add([(name, T)])
+    s.add([("Nguồn: ABOS · Ngày xuất: " + NGAY + " · Đơn vị: VND", 0)])
+    s.add([(h, H) for h in headers])
+    for i, r in enumerate(source, 1):
+        diff = projected(r) - official(r) - pending_charges(r) + pending_cash(r)
+        st = status(r)
+        row = [
+            (i, N), (r["customer_name"], CELL), (r.get("owner_name") or "Chưa gán", CELL),
+            (opening(r), N), (charges(r), N), (payments(r), N), (official(r), N),
+            (pending_charges(r), N), (pending_cash(r), N), (projected(r), N),
+            (credit(r), N), (r.get("limit") or 0, N), (diff, N),
+            (st, WARN if st != "Bình thường" else CELL),
+        ]
+        s.add(row)
+    s.add([("TỔNG", H), ("", H), ("", H), (sum(opening(r) for r in source), NB),
+           (sum(charges(r) for r in source), NB), (sum(payments(r) for r in source), NB),
+           (sum(official(r) for r in source), NB), (sum(pending_charges(r) for r in source), NB),
+           (sum(pending_cash(r) for r in source), NB), (sum(projected(r) for r in source), NB),
+           (sum(credit(r) for r in source), NB), (sum((r.get("limit") or 0) for r in source), NB),
+           (0, NB), ("", H)])
+    return s
+
+s1 = detail_sheet("2. TOÀN BỘ KHÁCH", sorted(rows, key=lambda r: r["customer_name"].casefold()))
+s2 = detail_sheet("3. CÒN CÔNG NỢ", sorted(with_debt, key=projected, reverse=True))
+s3 = detail_sheet("4. VƯỢT HẠN MỨC", sorted(exceeded, key=projected, reverse=True))
+
+build(OUT, [s0, s1, s2, s3])
+with zipfile.ZipFile(OUT) as z:
+    bad = z.testzip()
+    if bad is not None:
+        raise SystemExit(f"File XLSX lỗi tại {bad}")
+
+print("MEDIA:" + OUT)
+print(json.dumps({
+    "path": OUT,
+    "size": os.path.getsize(OUT),
+    "rows": len(rows),
+    "with_debt": len(with_debt),
+    "exceeded": len(exceeded),
+    "pending": len(pending),
+    "negative": len(negative),
+    "totals": totals,
+}, ensure_ascii=False))
