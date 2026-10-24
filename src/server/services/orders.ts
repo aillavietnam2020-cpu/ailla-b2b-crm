@@ -856,7 +856,7 @@ export async function getOrderDetail(
               oi.applied_price, oi.line_total, oi.price_override, oi.price_override_reason,
               oi.is_gift, oi.gift_qty, oi.promotion_note, p.unit, p.pack_size
        FROM order_items oi JOIN products p ON p.id = oi.product_id
-       WHERE oi.order_id = ? ORDER BY oi.created_at`,
+       WHERE oi.order_id = ? ORDER BY oi.created_at, oi.rowid`,
     )
     .bind(orderId)
     .all<Omit<OrderLineItem, 'price_override'> & { price_override: number }>();
