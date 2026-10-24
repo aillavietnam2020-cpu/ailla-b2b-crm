@@ -156,6 +156,16 @@ var HT_CSS=`<style id="ht-css">
 @container ht (max-width:720px){#ht .inbox{grid-template-columns:1fr}#ht .inbox .cl{height:300px;min-height:0;border-right:0;border-bottom:1px solid var(--line)}}
 #ht .tagbar{flex-wrap:nowrap}
 #ht .tagbar button{min-width:0;font-size:10px;padding:6px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#ht .demobar{background:var(--orange-soft);color:var(--orange);border-radius:10px;padding:8px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+#ht .demobar.slim{background:none;padding:0;justify-content:flex-end}
+#ht .dimg{margin-top:6px;border:1px dashed var(--line);border-radius:8px;padding:18px 10px;text-align:center;background:var(--gray-soft);color:var(--muted);font-size:12.5px}
+#ht .tm.a .dimg{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4);color:#fff}
+#ht .ocard{margin-top:6px;background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 10px;font-size:12.5px;border:1px solid var(--line)}
+#ht .ord{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:4px;font-size:13px}
+#ht .ordh{display:flex;justify-content:space-between;font-weight:700}
+#ht .steps2{display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+#ht .steps2 .on{color:var(--orange);font-weight:700}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -165,7 +175,7 @@ function fm(s){try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",min
 function nowHM(){var d=new Date();return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}
 
 var ST={view:"home",hsub:"bp",bots:[],pages:[],ctl:{kill:false,testers:"",silent_minutes:30,hours_from:"",hours_to:""},hlog:[],runs:[],
-  botId:"",name:"",doc:null,issues:[],versions:[],dirty:false,save:"saved",tab:"tt",sel:"",node:"",conn:null,drawer:null,toast:"",sec:"kb",rpTab:"info",tags:[],convs:null,cv:null,cvId:0,cvMsg:0,cvTag:0,cvQ:"",cvPage:"",
+  botId:"",name:"",doc:null,issues:[],versions:[],dirty:false,save:"saved",tab:"tt",sel:"",node:"",conn:null,drawer:null,toast:"",sec:"kb",demo:false,demoAll:null,rpTab:"info",tags:[],convs:null,cv:null,cvId:0,cvMsg:0,cvTag:0,cvQ:"",cvPage:"",
   xh:"",phone:false,chat:[],cur:null,simlog:[],root:null,pvTok:0,q:"",busy:false};
 
 /* ---------- Tự lưu nháp ---------- */
@@ -311,6 +321,13 @@ function tagChip(id){var t=tagById(id);return t?'<span class="tg" style="backgro
 function fmT(s){try{var d=new Date(s);return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}catch(e){return ""}}
 var WHO={customer:"Khách",agent:"Agent",sale:"Nhân viên",system:"Agent dừng"};
 async function loadConvs(keepDetail){
+  if(ST.demo){
+    var all=demoData();
+    ST.convs=all.filter(function(c){return (!ST.cvTag||c.tag_ids.indexOf(ST.cvTag)>=0)&&(!ST.cvQ||(c.name+c.last_text).toLowerCase().indexOf(ST.cvQ.toLowerCase())>=0)});
+    ST.demoAll=ST.demoAll||all;
+    if(!ST.cvId&&ST.convs.length)loadConv(ST.convs[0].id,true);
+    draw();return;
+  }
   try{
     var qs=[];if(ST.cvTag)qs.push("tag="+ST.cvTag);if(ST.cvQ)qs.push("q="+encodeURIComponent(ST.cvQ));
     ST.convs=await api("/convs"+(qs.length?"?"+qs.join("&"):""));
@@ -320,6 +337,12 @@ async function loadConvs(keepDetail){
   draw();
 }
 async function loadConv(id,quiet){
+  if(ST.demo){
+    ST.demoAll=ST.demoAll||demoData();
+    var d=ST.demoAll.filter(function(c){return c.id===id})[0];
+    if(d){ST.cv=d;ST.cvId=id;d.unread=0;var r0=ST.convs.filter(function(x){return x.id===id})[0];if(r0)r0.unread=0}
+    if(!quiet)draw();return;
+  }
   try{
     ST.cv=await api("/convs/"+id);ST.cvId=id;
     var r=ST.convs.filter(function(x){return x.id===id})[0];
@@ -327,6 +350,57 @@ async function loadConv(id,quiet){
     if(ST.cvMsg&&!ST.cv.messages.some(function(m){return m.id===ST.cvMsg}))ST.cvMsg=0;
   }catch(e){ST.cv=null;ST.cvId=0;if(!quiet)toast(e.message)}
   if(!quiet)draw();
+}
+function demoData(){
+  var now=Date.now(),iso=function(m){return new Date(now-m*60000).toISOString()};
+  var T=function(n){var t=ST.tags.filter(function(x){return x.name===n})[0];return t?t.id:0};
+  var ids=function(a){return a.map(T).filter(Boolean)};
+  var A=function(m,t,fl,why,got,extra){return Object.assign({id:0,at:iso(m),who:"agent",text:t,flow:fl,version:3,why:why,got:got,wrong:0,wrong_note:""},extra||{})};
+  var K=function(m,t,extra){return Object.assign({id:0,at:iso(m),who:"customer",text:t,flow:"",version:null,why:"",got:"",wrong:0,wrong_note:""},extra||{})};
+  var convs=[
+   {name:"Chị Lan (ví dụ)",tags:["ĐÃ MUA HÀNG","Tẩy lồng"],unread:0,note:"Khách chốt nhanh, nhà có 2 máy.",
+    order:{code:"73595",status:1,items:"Tẩy lồng máy giặt x 2",money:"269.000đ",name:"Chị Lan",phone:"09******22",addr:"Thôn Hoàng Yên, Chư Prông, Gia Lai",ship:"SPX · mã vận đơn SPXVN06*****A",cod:"Thanh toán khi giao hàng (COD)",waiting:false},
+    msgs:[K(190,"shop ơi cho mình hỏi giá tẩy lồng"),
+     A(189,"Dạ em gửi chị xem hình thực tế để mình dễ hình dung sản phẩm trước ạ.","TL-02 Báo giá","Khách hỏi giá, khớp từ khóa của TL-02.","Câu mẫu GIA_01 · ảnh nhóm TEST",{img:"Ảnh test thực tế (6 ảnh)"}),
+     A(189,"Hiện công ty đang có chương trình sale nhiều ưu đãi và quà tặng ạ. Máy nhà chị là lồng đứng hay lồng ngang, gioăng cao su có mốc không để em gửi combo phù hợp nhất nhé?","TL-02 Báo giá","Khách hỏi giá thì dẫn bằng hình rồi hỏi 2 dữ kiện để chọn nhóm combo.","Câu mẫu GIA_02"),
+     K(180,"lồng ngang, gioăng không mốc"),
+     A(179,"Dạ với máy lồng ngang không mốc, em gửi chị bảng giá Tẩy lồng ạ 👉","TL-03 Báo giá Tẩy lồng","Khách trả lời lồng ngang, không mốc: nhánh Tẩy lồng.","Bảng giá Tẩy lồng (4 gói) · ảnh nhóm LONG",{img:"Bảng giá Tẩy lồng (4 ảnh)"}),
+     K(170,"lấy 2 lọ nhé, ship về Gia Lai"),
+     A(169,"Dạ chị cho em xin tên người nhận, số điện thoại và địa chỉ nhận hàng để em ghi nhận đơn cho chị ạ.","TL-05 Chốt","Khách đã chọn gói: xin thông tin nhận hàng ngay, không hỏi xác nhận.","Câu mẫu XIN_TT_01"),
+     K(165,"Chị Lan, 09******22, Thôn Hoàng Yên, Chư Prông, Gia Lai"),
+     A(164,"Dạ em đã ghi nhận đơn của chị, bên em báo kho đi đơn cho chị rồi ạ.","TL-05 Chốt","Đủ tên, số điện thoại, địa chỉ: lập đơn chờ xác nhận.","Đơn 73595 (chờ xác nhận) · câu mẫu DA_NHAN_DON",{order:true})]},
+   {name:"Anh Hùng (ví dụ)",tags:["HỎI GIÁ SỈ"],unread:1,note:"",order:null,
+    msgs:[K(75,"bên em có giá sỉ không, mình lấy 50 hộp"),
+     A(74,"Dạ để em hỏi lại bộ phận kinh doanh về giá sỉ rồi báo anh ngay nhé ạ.","SI-01 Giá sỉ","Khách hỏi giá sỉ: không báo giá, chuyển người thật.","Luồng chuyển chị Hoa, không gửi giá",{who:"system"})]},
+   {name:"Chị Mai (ví dụ)",tags:["ĐÃ BÁO GIÁ","Tẩy lồng"],unread:2,note:"",order:null,
+    msgs:[K(30,"xin chào"),
+     A(29,"Dạ em chào chị ạ 🌸 Nhà mình dùng máy lồng đứng hay lồng ngang vậy ạ?","TL-01 Mở đầu","Khách chào: chạy luồng mở đầu.","Câu mẫu CHAO_01"),
+     K(12,"đắt quá, bên khác bán rẻ hơn"),
+     A(11,"Ngoài kịch bản đã có. Agent dừng và báo chị Hoa, không đoán.","-","Chưa có câu chê đắt được duyệt trong bản này.","Không gửi gì cho khách",{who:"system"}),
+     K(5,"sao không ai trả lời vậy")]},
+   {name:"Anh Nam (ví dụ)",tags:["CÂU HỎI"],unread:0,note:"",order:null,
+    msgs:[K(1500,"tẩy lồng có làm hỏng máy giặt không shop"),
+     A(1499,"Ngoài kịch bản đã có. Agent dừng và báo chị Hoa, không đoán.","-","Không có luồng nào khớp câu về độ an toàn của máy.","Đây là chỗ nên thêm luồng mới",{who:"system"}),
+     {id:0,at:iso(1480),who:"sale",text:"Dạ sản phẩm an toàn cho máy anh nhé, anh dùng đúng hướng dẫn ạ.",flow:"",version:null,why:"",got:"",wrong:0,wrong_note:""}]}
+  ];
+  var n=1000;
+  return convs.map(function(c,i){
+    var last=c.msgs[c.msgs.length-1];
+    c.msgs.forEach(function(m){m.id=n++});
+    return {id:-(i+1),fb_page_id:"demo",name:c.name,page_name:"Ailla Việt Nam Store",bot_name:"Bot mẫu",note:c.note,unread:c.unread,last_at:last.at,last_text:last.text.slice(0,120),last_who:last.who,tag_ids:ids(c.tags),messages:c.msgs,order:c.order};
+  });
+}
+function msgBody(m){
+  var s=esc(m.text);
+  if(m.img)s+='<div class="dimg">🖼 '+esc(m.img)+"</div>";
+  if(m.order&&ST.cv&&ST.cv.order){var o=ST.cv.order;s+='<div class="ocard"><b>Xác nhận đơn đặt hàng</b><div>'+esc(o.items)+"</div><div>Đơn "+esc(o.code)+" · "+esc(o.money)+"</div><div>"+esc(o.name)+" · "+esc(o.phone)+"</div><div>"+esc(o.addr)+"</div></div>"}
+  return s;
+}
+function orderPanel(cv){
+  var o=cv.order;
+  if(!o)return '<div class="sect">Đơn hàng (0)</div><div class="hint">Chưa có đơn. Khi nối Pancake POS, agent lập đơn ở đây ở trạng thái chờ xác nhận.</div>';
+  var steps=["Mới","Chờ chuyển hàng","Đã gửi hàng","Hủy"];
+  return '<div class="sect">Đơn hàng (1)</div><div class="ord"><div class="ordh">'+esc(o.code)+' <span class="pill p-amb">Chờ xác nhận</span></div><div class="steps2">'+steps.map(function(s,i){return '<span class="'+(i===o.status?"on":"")+'">'+s+"</span>"}).join("")+"</div><div>"+esc(o.name)+"</div><div class=\"hint\">"+esc(o.addr)+"</div><div>"+esc(o.phone)+"</div><div><b>"+esc(o.items)+"</b></div><div><b>"+esc(o.money)+"</b> · "+esc(o.cod)+"</div><div class=\"hint\">Vận chuyển: "+esc(o.ship)+"</div></div>";
 }
 function hl(){
   var pages=ST.pages.filter(function(p){return p.bot_id===ST.botId});
@@ -345,7 +419,7 @@ function hl(){
        var cls=m.who==="customer"?"k":m.who==="agent"?"a":m.who==="sale"?"s2":"sys";
        var src=m.who==="agent"?"Agent"+(m.flow?" · "+esc(m.flow):"")+(m.version?" · bản "+m.version:""):(WHO[m.who]||m.who)+(m.who==="system"&&m.flow?" · "+esc(m.flow):"");
        var click=m.who==="agent"||m.who==="system";
-       return '<div class="tm '+cls+(ST.cvMsg===m.id?" pk":"")+(m.wrong?" wr":"")+'"'+(click?' data-act="msgsel" data-id="'+m.id+'"':"")+'><span class="src">'+src+" · "+fmT(m.at)+(m.wrong?" · đã đánh dấu sai":"")+"</span>"+esc(m.text)+"</div>"}).join("")+"</div>"+
+       return '<div class="tm '+cls+(ST.cvMsg===m.id?" pk":"")+(m.wrong?" wr":"")+'"'+(click?' data-act="msgsel" data-id="'+m.id+'"':"")+'><span class="src">'+src+" · "+fmT(m.at)+(m.wrong?" · đã đánh dấu sai":"")+"</span>"+msgBody(m)+"</div>"}).join("")+"</div>"+
      '<div class="tagbar">'+stage.map(function(t){var on=cv.tag_ids.indexOf(t.id)>=0;return '<button class="'+(on?"on":"")+'" style="background:'+TCOL[t.color]+'" data-act="cvtag" data-id="'+t.id+'" title="'+(on?"Bỏ thẻ":"Gắn thẻ")+'">'+esc(t.name)+"</button>"}).join("")+"</div>"+
      '<div class="comp">Chỉ xem. Trả lời khách ở Pancake. Tin ở đây đã che số điện thoại, email, link.</div>';
     var tabs='<div class="rtabs"><button data-act="rptab" data-id="info" class="'+(ST.rpTab==="info"?"on":"")+'">Thông tin</button><button data-act="rptab" data-id="order" class="'+(ST.rpTab==="order"?"on":"")+'">Tạo đơn</button></div>';
@@ -354,13 +428,15 @@ function hl(){
     }else{
       right=tabs+'<div class="rpb"><div class="hint">Khách: <b style="color:var(--ink)">'+esc(cv.name||"(chưa có tên)")+'</b></div><div class="hint">Tin gần nhất: '+fm(cv.last_at)+"</div>"+
        '<textarea data-act="cvnote" placeholder="Nhập ghi chú…" style="min-height:64px;margin:8px 0">'+esc(cv.note||"")+"</textarea>"+
-       '<div class="sect">Đơn hàng (0)</div><div class="hint">Chưa nối Pancake POS.</div>'+
+       orderPanel(cv)+
        '<div class="sect">Thẻ giai đoạn</div><div>'+(stage.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có thẻ giai đoạn.</span>')+'</div><div class="sect">Thẻ sản phẩm</div><div>'+(prod.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có. Thêm ở Cài đặt, Thẻ hội thoại.</span>')+"</div>"+
        (sel?'<div class="sect">Vì sao agent làm vậy</div><div class="pvx">'+esc(sel.why||"Chưa có lý do (công cụ VPS chưa gửi kèm).")+'</div><div class="sect">Agent đã lấy gì</div><div class="log">'+esc(sel.got||"Chưa có dữ liệu.")+'</div><div class="row" style="margin-top:8px"><button class="btn sm'+(sel.wrong?" danger":"")+'" data-act="wrongmsg" data-id="'+sel.id+'">'+(sel.wrong?"Bỏ đánh dấu sai":"Agent trả lời sai")+'</button>'+(sel.who==="agent"?'<button class="btn sm pri" data-act="mkphrase" data-id="'+sel.id+'">Tạo câu mẫu từ tin này</button>':"")+"</div>":'<div class="sect">Chi tiết tin</div><p class="hint">Bấm vào một tin của agent (bong bóng xanh đậm hoặc đỏ) để xem vì sao agent chọn luồng đó và đã lấy gì.</p>')+"</div>";
     }
   }else{mid='<div class="emp">Chọn một hội thoại ở bên trái</div>';right='<div class="rpb hint">Chưa chọn hội thoại.</div>'}
   var pgsel=pages.length>1?'<select data-act="cvpage"><option value="">Page của bot này</option><option value="all"'+(ST.cvPage==="all"?" selected":"")+">Tất cả Page</option></select>":"";
-  return '<div class="inbox"><div class="cl"><div class="cft"><input type="text" id="cvq" placeholder="Tìm kiếm" value="'+esc(ST.cvQ||"")+'">'+pgsel+filt+'</div><div class="clist">'+lhtml+'</div></div><div class="cm2">'+mid+'</div><div class="rp">'+right+"</div></div>";
+  var empty=!ST.demo&&!(ST.convs||[]).length;
+  var bar=ST.demo?'<div class="demobar"><b>BẢN MẪU</b> khách, hội thoại và đơn dưới đây chỉ là ví dụ để chị xem giao diện, không phải dữ liệu thật và không lưu gì. <button class="btn sm" data-act="demooff">Thoát bản mẫu</button></div>':(empty?'<div class="demobar">Chưa có hội thoại thật (chờ nối công cụ VPS). <button class="btn sm pri" data-act="demoon">Xem bản mẫu</button></div>':'<div class="demobar slim"><button class="btn sm" data-act="demoon">Xem bản mẫu</button></div>');
+  return bar+'<div class="inbox"><div class="cl"><div class="cft"><input type="text" id="cvq" placeholder="Tìm kiếm" value="'+esc(ST.cvQ||"")+'">'+pgsel+filt+'</div><div class="clist">'+lhtml+'</div></div><div class="cm2">'+mid+'</div><div class="rp">'+right+"</div></div>";
 }
 function dx(){return soonPage("Đề xuất","Hệ thống đọc hội thoại rồi đề xuất cải tiến, chị duyệt mới thành bản nháp.",["Khách hỏi lặp lại mà chưa có luồng: đề xuất luồng mới.","Câu nhân viên hay gửi mà khách hay chốt: đề xuất thành câu mẫu.","Nút ít người bấm, luồng ít người đi tiếp: đề xuất sửa.","Agent bị chặn nhiều vì thiếu giá: nhắc chị nhập giá."],"Chỉ đề xuất. Vẫn phải xuất bản mới tới agent.")}
 function tk(){return soonPage("Thống kê luồng","Giống thống kê của Botcake: mỗi luồng gửi bao nhiêu lần, hiệu quả ra sao.",["Đã gửi, khách nhắn tiếp, bấm nút, chuyển chị, bị chặn theo từng luồng.","Cảnh báo luồng ít người đi tiếp để chị sửa.","Số liệu lấy từ nhật ký agent (đã có bảng ghi, chờ công cụ VPS nối vào)."])}
@@ -627,6 +703,10 @@ document.addEventListener("click",function(e){
   if(!b)return;
   if(a==="selflow"){ST.sel=id;var f0=mk(b.flows,id);ST.node=f0&&f0.nodes[0]?f0.nodes[0].id:"";ST.conn=null;draw();return}
   if(a==="ftag"){var ff0=curFlow();ff0.tags=ff0.tags||[];var ix0=ff0.tags.indexOf(id);if(ix0>=0)ff0.tags.splice(ix0,1);else ff0.tags.push(id);touch();draw();return}
+  if(a==="demoon"){ST.demo=true;ST.demoAll=null;ST.cvId=0;ST.cv=null;ST.cvTag=0;ST.cvQ="";loadConvs();return}
+  if(a==="demooff"){ST.demo=false;ST.demoAll=null;ST.cvId=0;ST.cv=null;loadConvs();return}
+  if(ST.demo&&(a==="cvdel"||a==="wrongmsg"||a==="mkphrase")){toast("Đây là bản mẫu, không lưu gì.");return}
+  if(ST.demo&&a==="cvtag"){var ix1=ST.cv.tag_ids.indexOf(+id);if(ix1>=0)ST.cv.tag_ids.splice(ix1,1);else ST.cv.tag_ids.push(+id);var rw=ST.convs.filter(function(x){return x.id===ST.cvId})[0];if(rw)rw.tag_ids=ST.cv.tag_ids.slice();draw();return}
   if(a==="cv"){loadConv(+id);return}
   if(a==="cvfilt"){ST.cvTag=ST.cvTag===+id?0:+id;ST.cvId=0;ST.cv=null;loadConvs();return}
   if(a==="rptab"){ST.rpTab=id;draw();return}
@@ -740,6 +820,7 @@ document.addEventListener("change",function(e){
   if(fl&&b){var f=curFlow();if(f){f[fl]=t.value;touch();if(t.tagName==="SELECT"||fl==="code"||fl==="name")draw()}return}
   var fo=t.getAttribute("data-follow");
   if(fo&&b){var pp=fo.split(":"),it=mk(b.follow,pp[1]);if(it){it[pp[0]]=t.value;touch()}return}
+  if(a==="cvnote"&&ST.demo){return}
   if(a==="cvnote"){guard(async function(){await api("/convs/"+ST.cvId,{method:"PUT",body:JSON.stringify({note:t.value})});if(ST.cv)ST.cv.note=t.value;toast("Đã lưu ghi chú")});return}
   if(a==="cvfilter"){ST.cvTag=+t.value||0;ST.cvId=0;ST.cv=null;loadConvs();return}
   if(a==="cvpage"){ST.cvPage=t.value;ST.cvId=0;ST.cv=null;loadConvs();return}
@@ -756,7 +837,7 @@ document.addEventListener("input",function(e){
   if(e.target.id==="cvq"){ST.cvQ=e.target.value;clearTimeout(ST.cvT);ST.cvT=setTimeout(function(){ST.cvId=0;ST.cv=null;loadConvs()},350)}
 });
 setInterval(function(){
-  if(!alive()||ST.view!=="bot"||ST.tab!=="hl"||ST.drawer)return;
+  if(!alive()||ST.view!=="bot"||ST.tab!=="hl"||ST.drawer||ST.demo)return;
   var ae=document.activeElement;if(ae&&ST.root.contains(ae)&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"))return;
   loadConvs();
 },15000);
