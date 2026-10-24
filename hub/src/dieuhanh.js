@@ -72,6 +72,7 @@ function dhCalcBaTang(mo){
 /* ---------- Giao diện ---------- */
 /* ---------- Tổng quan: một màn hình, 3 mảng kinh doanh (Bán lẻ · Phân phối · Gia công) ---------- */
 (()=>{try{if(document.getElementById("dh-css"))return;const st=document.createElement("style");st.id="dh-css";st.textContent=`
+.xkstrip .xk{border-radius:0}
 .dh3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px}
 .dhm{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:6px}
 .dhm:hover{border-color:#c5cee0}
