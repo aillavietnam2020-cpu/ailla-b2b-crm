@@ -1,10 +1,11 @@
 import { hubPeriodRange } from '../lib/hubPeriod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatVnDate, vnDate } from '@shared/datetime';
 import { formatVnd } from '@shared/money';
 import { ApiError, api } from '../lib/api';
 import { useApi, useDebounced } from '../lib/hooks';
 import { Card, Field, Modal, PageHead, StateBlock, useToast } from '../components/ui';
+import { shrinkImage } from '../lib/image';
 
 interface Voucher {
   id: string;
@@ -19,6 +20,104 @@ interface Voucher {
   status: 'OK' | 'HUY';
   cancel_reason: string | null;
   created_by_name: string | null;
+  from_account?: string;
+  to_bank?: string;
+  to_account_no?: string;
+  to_account_name?: string;
+  receiver?: string;
+  file_count?: number;
+}
+
+interface CompanyAccount {
+  id: string;
+  bank: string;
+  account_no: string;
+  account_name: string;
+  active: number | boolean;
+}
+const acctLabel = (a: CompanyAccount) => [a.bank, a.account_no, a.account_name].filter(Boolean).join(' · ');
+
+/** Chi tiết hình thức chi để hiện dưới chữ "Chuyển khoản" / "Tiền mặt". */
+function methodDetail(v: Voucher): string {
+  if (v.method === 'CHUYEN_KHOAN' && (v.from_account || v.to_account_no))
+    return `từ ${v.from_account || '?'} → ${[v.to_bank, v.to_account_no, v.to_account_name].filter(Boolean).join(' · ')}`;
+  if (v.method === 'TIEN_MAT' && v.receiver) return `người nhận: ${v.receiver}`;
+  return '';
+}
+
+/** Đọc file thành base64 (ảnh đã thu nhỏ) để gửi lên máy chủ. */
+async function fileToPayload(f: File) {
+  const small = await shrinkImage(f);
+  const data = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => reject(new Error('Không đọc được ' + f.name));
+    r.readAsDataURL(small);
+  });
+  return { name: small.name, mime: small.type || 'image/jpeg', data };
+}
+
+/** Ảnh bill chuyển khoản / ảnh phiếu chi tiền mặt có chữ ký của một phiếu: xem, thêm, xóa. */
+function FilesModal({ v, onClose, onChanged }: { v: Voucher; onClose: () => void; onChanged: () => void }) {
+  const toast = useToast();
+  const files = useApi<{ id: string; name: string; mime: string }[]>(`/api/shipping-vouchers/${v.id}/files`);
+  const [busy, setBusy] = useState(false);
+  const url = (fid: string) => `/api/shipping-vouchers/${v.id}/files/${fid}`;
+  async function upload(list: FileList | null) {
+    if (!list?.length) return;
+    setBusy(true);
+    let n = 0;
+    for (const f of Array.from(list)) {
+      try {
+        await api.post(`/api/shipping-vouchers/${v.id}/files`, await fileToPayload(f));
+        n += 1;
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : 'Chưa tải được ' + f.name);
+      }
+    }
+    setBusy(false);
+    if (n) toast.success(`Đã tải lên ${n} ảnh`);
+    files.reload();
+    onChanged();
+  }
+  async function remove(fid: string) {
+    if (!window.confirm('Xóa ảnh này?')) return;
+    try {
+      await api.delete(`/api/shipping-vouchers/${v.id}/files/${fid}`);
+      files.reload();
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Chưa xóa được');
+    }
+  }
+  return (
+    <Modal title={`Ảnh bill / phiếu chi · ${v.voucher_no}`} onClose={onClose}>
+      <p className="muted">
+        {METHOD_LABEL[v.method]} {formatVnd(v.amount)} {methodDetail(v) ? '· ' + methodDetail(v) : ''}
+      </p>
+      <StateBlock loading={files.loading} error={files.error} empty={(files.data ?? []).length === 0} emptyText="Chưa có ảnh nào.">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {(files.data ?? []).map((f) => (
+            <div key={f.id} style={{ width: 150 }}>
+              <a href={url(f.id)} target="_blank" rel="noopener noreferrer">
+                {f.mime === 'application/pdf' ? (
+                  <span>📄 {f.name || 'file.pdf'}</span>
+                ) : (
+                  <img src={url(f.id)} alt={f.name} style={{ width: 150, height: 150, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                )}
+              </a>
+              <button className="btn sm" onClick={() => void remove(f.id)}>
+                Xóa
+              </button>
+            </div>
+          ))}
+        </div>
+      </StateBlock>
+      <Field label="Thêm ảnh bill chuyển khoản / phiếu chi tiền mặt có chữ ký" full>
+        <input type="file" multiple accept="image/*,application/pdf" disabled={busy} onChange={(e) => void upload(e.target.files)} />
+      </Field>
+    </Modal>
+  );
 }
 
 const METHOD_LABEL: Record<Voucher['method'], string> = {
@@ -107,6 +206,7 @@ export function ShippingVouchersPage() {
   const [search, setSearch] = useState('');
   const q = useDebounced(search.trim(), 300);
   const [creating, setCreating] = useState(false);
+  const [viewing, setViewing] = useState<Voucher | null>(null);
   const qs = new URLSearchParams({ from, to });
   if (q) qs.set('q', q);
   const list = useApi<Voucher[]>(`/api/shipping-vouchers?${qs.toString()}`);
@@ -201,13 +301,19 @@ export function ShippingVouchersPage() {
                     <td>{v.carrier}</td>
                     <td>{v.destination || <span className="muted">—</span>}</td>
                     <td className="right nowrap">{formatVnd(v.amount)}</td>
-                    <td>{METHOD_LABEL[v.method]}</td>
+                    <td>
+                      {METHOD_LABEL[v.method]}
+                      {methodDetail(v) && <div className="muted" style={{ fontSize: 12 }}>{methodDetail(v)}</div>}
+                    </td>
                     <td>{v.order_refs || <span className="muted">—</span>}</td>
                     <td>{v.status === 'HUY' ? `Đã hủy: ${v.cancel_reason ?? ''}` : v.note}</td>
                     <td>{v.created_by_name ?? '—'}</td>
                     <td className="nowrap">
                       <button className="btn sm" onClick={() => printVoucher(v)}>
                         In
+                      </button>{' '}
+                      <button className="btn sm" onClick={() => setViewing(v)}>
+                        {v.file_count ? `Ảnh (${v.file_count})` : 'Ảnh'}
                       </button>{' '}
                       {canWrite && v.status === 'OK' && (
                         <button className="btn sm danger" onClick={() => void cancel(v)}>
@@ -222,6 +328,7 @@ export function ShippingVouchersPage() {
           </div>
         </StateBlock>
       </Card>
+      {viewing && <FilesModal v={viewing} onClose={() => setViewing(null)} onChanged={() => list.reload()} />}
       {creating && (
         <CreateModal
           onClose={() => setCreating(false)}
@@ -247,13 +354,25 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const accts = useApi<CompanyAccount[]>('/api/receiving-accounts');
+  const active = (accts.data ?? []).filter((a) => a.active);
+  const [fromAcct, setFromAcct] = useState('');
+  const [fromOther, setFromOther] = useState('');
+  const [toBank, setToBank] = useState('');
+  const [toNo, setToNo] = useState('');
+  const [toName, setToName] = useState('');
+  const [receiver, setReceiver] = useState('');
+  const [files, setFiles] = useState<FileList | null>(null);
+  useEffect(() => {
+    if (!fromAcct && active.length) setFromAcct(acctLabel(active[0]));
+  }, [active.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     setBusy(true);
     setError(null);
     setFields({});
     try {
-      const r = await api.post<{ voucher_no: string }>('/api/shipping-vouchers', {
+      const r = await api.post<{ id: string; voucher_no: string }>('/api/shipping-vouchers', {
         voucher_date: date,
         carrier,
         destination,
@@ -261,8 +380,22 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         method,
         order_refs: orders,
         note,
+        ...(method === 'CHUYEN_KHOAN'
+          ? { from_account: fromAcct === '__x' ? fromOther : fromAcct, to_bank: toBank, to_account_no: toNo, to_account_name: toName }
+          : method === 'TIEN_MAT'
+            ? { receiver }
+            : {}),
       });
-      toast.success('Đã lập phiếu ' + r.data.voucher_no);
+      let up = 0;
+      for (const f of Array.from(files ?? [])) {
+        try {
+          await api.post(`/api/shipping-vouchers/${(r.data as { id: string }).id}/files`, await fileToPayload(f));
+          up += 1;
+        } catch (e) {
+          toast.error(e instanceof ApiError ? e.message : 'Chưa tải được ' + f.name);
+        }
+      }
+      toast.success('Đã lập phiếu ' + r.data.voucher_no + (up ? `, kèm ${up} ảnh` : ''));
       onDone();
     } catch (e) {
       if (e instanceof ApiError) {
@@ -317,6 +450,43 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
             <option value="CHUYEN_KHOAN">Chuyển khoản</option>
             <option value="KHAC">Khác</option>
           </select>
+        </Field>
+        {method === 'CHUYEN_KHOAN' && (
+          <>
+            <Field label="Chi từ tài khoản công ty" error={fields.from_account} full>
+              <select value={fromAcct} onChange={(e) => setFromAcct(e.target.value)}>
+                {!active.length && <option value="">— Chưa có tài khoản công ty (thêm ở Cấu hình) —</option>}
+                {active.map((a) => (
+                  <option key={a.id} value={acctLabel(a)}>
+                    {acctLabel(a)}
+                  </option>
+                ))}
+                <option value="__x">Tài khoản khác…</option>
+              </select>
+            </Field>
+            {fromAcct === '__x' && (
+              <Field label="Ghi tài khoản chi" full>
+                <input value={fromOther} onChange={(e) => setFromOther(e.target.value)} placeholder="Ngân hàng · số tài khoản" />
+              </Field>
+            )}
+            <Field label="Ngân hàng nhận">
+              <input value={toBank} onChange={(e) => setToBank(e.target.value)} placeholder="Ví dụ: MB" />
+            </Field>
+            <Field label="Số tài khoản nhận" error={fields.to_account_no}>
+              <input value={toNo} onChange={(e) => setToNo(e.target.value)} />
+            </Field>
+            <Field label="Tên chủ tài khoản nhận" full>
+              <input value={toName} onChange={(e) => setToName(e.target.value)} />
+            </Field>
+          </>
+        )}
+        {method === 'TIEN_MAT' && (
+          <Field label="Người nhận tiền mặt" full>
+            <input value={receiver} onChange={(e) => setReceiver(e.target.value)} placeholder="Họ tên lái xe / người nhận" />
+          </Field>
+        )}
+        <Field label="Ảnh bill chuyển khoản / ảnh phiếu chi tiền mặt có chữ ký" full>
+          <input type="file" multiple accept="image/*,application/pdf" onChange={(e) => setFiles(e.target.files)} />
         </Field>
         <Field
           label="Các đơn xe chở (không bắt buộc)"

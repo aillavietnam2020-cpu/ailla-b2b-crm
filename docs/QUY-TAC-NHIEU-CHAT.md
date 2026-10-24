@@ -37,6 +37,7 @@ File trong `migrations/` chạy theo số thứ tự tên file. Hai chat cùng t
 | Agent | 0080–0089 |
 | Ads / Facebook | 0090–0099 |
 | Marketing | 0100–0109 |
+| Trang quản trị / Mua hàng / Phiếu chi | 0110–0119 |
 | Đơn hàng / Kế toán / Hàng trả (góp ý chị Thảo) | 0110–0119 |
 | Chat khác (điện thoại, nhân sự...) | xin khối mới ở chị Hoa, ghi vào bảng này |
 

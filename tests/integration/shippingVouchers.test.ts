@@ -49,3 +49,21 @@ describe('Sổ phiếu chi vận chuyển', () => {
     expect(list.body.data[0].status).toBe('HUY');
   });
 });
+
+describe('Phiếu chi vận chuyển: chuyển khoản từ tài khoản nào, đến đâu, ảnh bill / phiếu chi tiền mặt', () => {
+  it('chuyển khoản phải có tài khoản đi và số tài khoản nhận; lưu được và đính kèm ảnh', async () => {
+    expect((await ctx.request('/api/shipping-vouchers', { as: USERS.manager, body: body({ method: 'CHUYEN_KHOAN' }) })).status).toBe(422);
+    const a = await ctx.request('/api/shipping-vouchers', {
+      as: USERS.manager,
+      body: body({ method: 'CHUYEN_KHOAN', from_account: 'Techcombank · 1903 · AILLA', to_bank: 'MB', to_account_no: '9999', to_account_name: 'NGUYEN VAN XE' }),
+    });
+    expect(a.status).toBe(200);
+    const up = await ctx.request(`/api/shipping-vouchers/${a.body.data.id}/files`, { as: USERS.manager, body: { name: 'bill.png', mime: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' } });
+    expect(up.status).toBe(200);
+    const list = await ctx.request('/api/shipping-vouchers', { as: USERS.manager });
+    expect(list.body.data[0]).toMatchObject({ from_account: 'Techcombank · 1903 · AILLA', to_bank: 'MB', to_account_no: '9999', file_count: 1 });
+    const t = await ctx.request('/api/shipping-vouchers', { as: USERS.manager, body: body({ method: 'TIEN_MAT', receiver: 'Lái xe Hùng' }) });
+    expect(t.status).toBe(200);
+  });
+});
+

@@ -12,6 +12,11 @@ export interface ShippingVoucherInput {
   method: 'TIEN_MAT' | 'CHUYEN_KHOAN' | 'KHAC';
   order_refs: string;
   note: string;
+  from_account?: string;
+  to_bank?: string;
+  to_account_no?: string;
+  to_account_name?: string;
+  receiver?: string;
 }
 
 /** Lập một phiếu chi vận chuyển, cấp số PCVC + năm tháng + số thứ tự. Dùng chung cho form lập phiếu và nút "khách trả cước hộ". */
@@ -36,10 +41,12 @@ export async function createShippingVoucher(
       await db.batch([
         db
           .prepare(
-            `INSERT INTO shipping_vouchers (id, voucher_no, voucher_date, carrier, destination, amount, method, order_refs, note, status, created_by, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?)`,
+            `INSERT INTO shipping_vouchers (id, voucher_no, voucher_date, carrier, destination, amount, method, order_refs, note, status, created_by, created_at,
+               from_account, to_bank, to_account_no, to_account_name, receiver)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?, ?, ?, ?, ?, ?)`,
           )
-          .bind(id, no, date, d.carrier, d.destination, d.amount, d.method, d.order_refs, d.note, auth.user.id, now),
+          .bind(id, no, date, d.carrier, d.destination, d.amount, d.method, d.order_refs, d.note, auth.user.id, now,
+            d.from_account ?? '', d.to_bank ?? '', d.to_account_no ?? '', d.to_account_name ?? '', d.receiver ?? ''),
         auditStatement(db, {
           actorId: auth.user.id,
           action: 'SHIPPING_VOUCHER_CREATED',

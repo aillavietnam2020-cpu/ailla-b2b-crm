@@ -288,3 +288,33 @@ describe('Hàng về không có phiếu đặt (vỏ can): kho ghi phiếu nhậ
     }
   });
 });
+
+describe('Phiếu chi nhà cung cấp: tiền mặt / chuyển khoản, tài khoản đi và đến, ảnh bill', () => {
+  it('chuyển khoản ghi rõ chi từ tài khoản nào, chuyển đến đâu; nhà cung cấp nhớ tài khoản; đính kèm ảnh bill', async () => {
+    const { supplierId } = await setup();
+    const miss = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, pay_date: '2026-10-10', amount: 500000, method: 'CHUYEN_KHOAN', to_account_no: '0011' } });
+    expect(miss.status).toBe(400);
+    const r = await ctx.request(`${BASE}/payments`, {
+      as: USERS.ceo,
+      body: { supplier_id: supplierId, pay_date: '2026-10-10', amount: 500000, method: 'CHUYEN_KHOAN', from_account: 'Vietcombank · 0451000123 · CTY AILLA', to_bank: 'ACB', to_account_no: '0011', to_account_name: 'CTY HOA CHAT A' },
+    });
+    expect(r.status).toBe(200);
+    const pid = r.body.data.id as string;
+    const up = await ctx.request(`${BASE}/payments/${pid}/files`, { as: USERS.ceo, body: { name: 'bill.png', mime: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' } });
+    expect(up.status).toBe(200);
+    expect((await ctx.request(`${BASE}/payments/${pid}/files`, { as: KT })).status).toBe(403);
+    const list = await ctx.request(`${BASE}/payments`, { as: USERS.ceo });
+    expect(list.body.data[0]).toMatchObject({ method: 'CHUYEN_KHOAN', from_account: 'Vietcombank · 0451000123 · CTY AILLA', to_bank: 'ACB', to_account_no: '0011', file_count: 1 });
+    const sups = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo });
+    expect(sups.body.data.find((x: { id: string }) => x.id === supplierId)).toMatchObject({ bank: 'ACB', bank_account_no: '0011', bank_account_name: 'CTY HOA CHAT A' });
+  });
+
+  it('tiền mặt ghi người nhận, không cần tài khoản', async () => {
+    const { supplierId } = await setup();
+    const r = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, pay_date: '2026-10-10', amount: 200000, method: 'TIEN_MAT', receiver: 'Anh Tuấn giao hàng' } });
+    expect(r.status).toBe(200);
+    const list = await ctx.request(`${BASE}/payments`, { as: USERS.ceo });
+    expect(list.body.data[0]).toMatchObject({ method: 'TIEN_MAT', receiver: 'Anh Tuấn giao hàng', to_account_no: '' });
+  });
+});
+

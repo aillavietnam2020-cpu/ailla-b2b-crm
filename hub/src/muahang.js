@@ -279,22 +279,57 @@ function pMhChi(m){
   if(mhNeedAdmin(m,T,S))return;
   if(!MH.pay||!MH.sup){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
   m.innerHTML=H(T,S)+mhGuide("mh_chi")+`<div class="filters"><span class="sp"></span><button class="btn pri" id="mhc-new">+ Ghi phiếu chi</button></div>
-  <section class="card flush">${tbl(["Ngày chi","Loại","Nhà cung cấp","Hóa đơn / phiếu mua","Số tiền","Tài khoản / hình thức","Ghi chú","Trạng thái",""],MH.pay.map(p=>`<tr class="${p.status==="OK"?"":"mut"}"><td>${esc(mhD(p.pay_date))}</td><td>${p.kind==="COC"?pill("Cọc","amb"):"Trả tiền"}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.invoice_no||p.po_no||"—")}</td><td class="n"><b>${nf(p.amount)}</b></td><td>${esc(p.account||"")}</td><td>${esc(p.note||"")}</td><td>${p.status==="OK"?pill("Đã ghi","grn"):pill("Đã hủy","gry")}</td><td>${p.status==="OK"?`<button class="btn sm danger" data-px="${p.id}">Hủy phiếu chi</button>`:""}</td></tr>`))}</section>`;
+  <section class="card flush">${tbl(["Ngày chi","Loại","Nhà cung cấp","Hóa đơn / phiếu mua","Số tiền","Tài khoản / hình thức","Ghi chú","Trạng thái",""],MH.pay.map(p=>`<tr class="clk ${p.status==="OK"?"":"mut"}" data-pv="${p.id}"><td>${esc(mhD(p.pay_date))}</td><td>${p.kind==="COC"?pill("Cọc","amb"):"Trả tiền"}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.invoice_no||p.po_no||"—")}</td><td class="n"><b>${nf(p.amount)}</b></td><td>${esc(p.account||"")}${p.file_count?" "+pill(p.file_count+" ảnh","blu"):""}</td><td>${esc(p.note||"")}</td><td>${p.status==="OK"?pill("Đã ghi","grn"):pill("Đã hủy","gry")}</td><td>${p.status==="OK"?`<button class="btn sm danger" data-px="${p.id}">Hủy phiếu chi</button>`:""}</td></tr>`))}</section>`;
   $("#mhc-new").onclick=()=>mhPayForm();
+  m.querySelectorAll("[data-pv]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;mhPayDetail(r.dataset.pv)});
   m.querySelectorAll("[data-px]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy phiếu chi này? Công nợ nhà cung cấp tăng lại đúng số tiền."))return;
     try{await kApi("/mh/payments/"+b.dataset.px+"/cancel",{method:"POST",body:"{}"});toast("Đã hủy phiếu chi");MH.pay=null;MH.inv=null;MH.debts=null;await mhLoadPay();await mhLoadInv()}catch(err){toast(err.message)}});
+}
+/* Hình thức chi: chuyển khoản (chi từ tài khoản công ty nào, đến ngân hàng / số tài khoản / tên chủ tài khoản nào) hoặc tiền mặt (ai nhận).
+   Tài khoản công ty lấy từ danh sách tài khoản của công ty (Cấu hình). Dùng chung cho phiếu chi nhà cung cấp. */
+async function mhAccts(){if(MH.accts)return MH.accts;try{MH.accts=(await svApi("/api/receiving-accounts")).filter(a=>a.active)}catch(e){MH.accts=[]}return MH.accts}
+const mhAcctLabel=a=>[a.bank,a.account_no,a.account_name].filter(Boolean).join(" · ");
+function mhPayMethodHtml(k){return `<h3>Hình thức chi</h3><div class="mhpm" id="${k}-mw"><label class="chk"><input type="radio" name="${k}-m" value="CHUYEN_KHOAN" checked> Chuyển khoản</label><label class="chk"><input type="radio" name="${k}-m" value="TIEN_MAT"> Tiền mặt</label></div>
+   <div id="${k}-ck"><label class="field">Chi từ tài khoản công ty<select id="${k}-from"><option value="">Đang tải tài khoản…</option></select></label><label class="field" id="${k}-fxw" hidden>Ghi tài khoản chi<input id="${k}-fx" placeholder="Ngân hàng · số tài khoản"></label>
+    <div class="row4"><label class="field">Ngân hàng nhận<input id="${k}-tb" placeholder="Ví dụ: ACB"></label><label class="field">Số tài khoản nhận<input id="${k}-tn"></label><label class="field grow">Tên chủ tài khoản nhận<input id="${k}-ta"></label></div></div>
+   <div id="${k}-tm" hidden><label class="field">Người nhận tiền mặt<input id="${k}-rc" placeholder="Họ tên người nhận"></label></div>
+   <label class="field">Ảnh bill chuyển khoản / ảnh phiếu chi tiền mặt có chữ ký<input type="file" id="${k}-f" multiple accept="image/*,application/pdf"></label>`}
+function mhPayFillTo(k,sid){const s=(MH.sup||[]).find(x=>x.id===sid);if(!s)return;$("#"+k+"-tb").value=s.bank||"";$("#"+k+"-tn").value=s.bank_account_no||"";$("#"+k+"-ta").value=s.bank_account_name||s.name||""}
+function mhPayMethodBind(k,sid){
+  const sw=()=>{const ck=document.querySelector(`input[name="${k}-m"]:checked`).value==="CHUYEN_KHOAN";$("#"+k+"-ck").hidden=!ck;$("#"+k+"-tm").hidden=ck};
+  document.querySelectorAll(`input[name="${k}-m"]`).forEach(x=>x.onchange=sw);sw();
+  mhAccts().then(A=>{const sel=$("#"+k+"-from");if(!sel)return;sel.innerHTML=(A.length?"":`<option value="">— Chưa có tài khoản công ty nào (thêm ở Cấu hình) —</option>`)+A.map(a=>`<option>${esc(mhAcctLabel(a))}</option>`).join("")+`<option value="__x">Tài khoản khác…</option>`;
+    sel.onchange=()=>{$("#"+k+"-fxw").hidden=sel.value!=="__x"}});
+  if(sid)mhPayFillTo(k,sid)}
+function mhPayMethodRead(k){const m=document.querySelector(`input[name="${k}-m"]:checked`).value,v=id=>($("#"+k+"-"+id).value||"").trim();
+  return m==="TIEN_MAT"?{method:m,receiver:v("rc")}:{method:m,from_account:v("from")==="__x"?v("fx"):v("from"),to_bank:v("tb"),to_account_no:v("tn"),to_account_name:v("ta")}}
+const mhPayFileUrl=(pid,f)=>"/api/hub/kho/mh/payments/"+pid+"/files/"+f;
+/* Xem một phiếu chi: hình thức, tài khoản, ảnh bill (thêm, xóa được). */
+async function mhPayDetail(id){
+  const x=(MH.pay||[]).find(p=>p.id===id);if(!x)return;let files=[];try{files=await kApi("/mh/payments/"+id+"/files")}catch(e){toast(e.message)}
+  const ck=x.method==="CHUYEN_KHOAN",tm=x.method==="TIEN_MAT";
+  openDrawerHTML(`<h2>Phiếu chi ${nf(x.amount)} đ · ${esc(x.supplier_name)}</h2><p class="hint">Ngày ${esc(mhD(x.pay_date))} · ${x.kind==="COC"?"Tiền cọc":"Trả tiền"}${x.invoice_no?" · chứng từ "+esc(x.invoice_no):""}${x.po_no?" · phiếu mua "+esc(x.po_no):""}${x.status!=="OK"?" · "+pill("Đã hủy","gry"):""}</p>
+   <div class="mhinfo mhpay"><div><span>Hình thức</span><b>${ck?"Chuyển khoản":tm?"Tiền mặt":"—"}</b></div>${ck?`<div><span>Chi từ tài khoản</span><b>${esc(x.from_account)}</b></div><div><span>Chuyển đến</span><b>${esc([x.to_bank,x.to_account_no].filter(Boolean).join(" · "))}</b><small>${esc(x.to_account_name||"")}</small></div>`:tm?`<div><span>Người nhận</span><b>${esc(x.receiver||"—")}</b></div>`:`<div><span>Ghi chú cũ</span><b>${esc(x.account||"—")}</b></div>`}</div>
+   ${x.note?`<p>Ghi chú: ${esc(x.note)}</p>`:""}
+   <h3>Ảnh bill / phiếu chi</h3><div class="mhfiles">${files.length?files.map(f=>f.mime==="application/pdf"?`<div class="mhfile"><a href="${mhPayFileUrl(id,f.id)}" target="_blank" rel="noopener">📄 ${esc(f.name||"file.pdf")}</a><button type="button" class="lnk" data-pfd="${f.id}">Xóa</button></div>`:`<div class="mhfile"><a href="${mhPayFileUrl(id,f.id)}" target="_blank" rel="noopener"><img src="${mhPayFileUrl(id,f.id)}" alt="${esc(f.name)}"></a><button type="button" class="lnk" data-pfd="${f.id}">Xóa</button></div>`).join(""):`<p class="hint">Chưa có ảnh nào.</p>`}</div>
+   <label class="field">Thêm ảnh bill chuyển khoản / phiếu chi tiền mặt<input type="file" id="mhpd-f" multiple accept="image/*,application/pdf"></label><button class="btn" id="mhpd-up">Tải lên</button>`);
+  document.querySelectorAll("[data-pfd]").forEach(b=>b.onclick=async()=>{if(!confirm("Xóa ảnh này?"))return;try{await kApi("/mh/payments/"+id+"/files/"+b.dataset.pfd,{method:"DELETE"});MH.pay=null;await mhLoadPay();mhPayDetail(id)}catch(e){toast(e.message)}});
+  $("#mhpd-up").onclick=async()=>{const fs=[...$("#mhpd-f").files];if(!fs.length)return;$("#mhpd-up").disabled=true;let n=0;for(const f of fs){try{const d=await mhPrepFile(f);await kApi("/mh/payments/"+id+"/files",{method:"POST",body:JSON.stringify(d)});n++}catch(e){toast(e.message)}}if(n)toast("Đã tải lên "+n+" ảnh");MH.pay=null;await mhLoadPay();mhPayDetail(id)};
 }
 function mhPayForm(supId,poId){
   openDrawerHTML(`<h2>Ghi phiếu chi thanh toán</h2><form class="frm" id="mhp"><div class="row4"><label class="field grow">Nhà cung cấp<select id="mhp-s">${mhSupOpts(supId||"")}</select></label><label class="field">Loại<select id="mhp-k"><option value="CHI">Trả tiền (thanh toán)</option><option value="COC">Cọc / trả trước khi đặt hàng</option></select></label></div>
    <div class="row4"><label class="field">Ngày chi<input id="mhp-d" type="date" value="${mhToday()}" required></label><label class="field">Số tiền (đ)<input id="mhp-a" type="number" min="1" required></label></div>
    <label class="field">Gắn vào hóa đơn (không bắt buộc)<select id="mhp-i"><option value="">— Không gắn, trừ vào công nợ chung —</option></select></label>
-   <label class="field">Gắn vào phiếu mua (dùng cho tiền cọc)<select id="mhp-o"><option value="">— Không gắn —</option></select></label><label class="field">Tài khoản / hình thức chi<input id="mhp-ac" placeholder="Ví dụ: Vietcombank, tiền mặt"></label><label class="field">Ghi chú<input id="mhp-n"></label><div id="mhp-e"></div><button class="btn pri">Ghi phiếu chi</button></form>`);
+   <label class="field">Gắn vào phiếu mua (dùng cho tiền cọc)<select id="mhp-o"><option value="">— Không gắn —</option></select></label>${mhPayMethodHtml("mhp")}<label class="field">Ghi chú<input id="mhp-n"></label><div id="mhp-e"></div><button class="btn pri">Ghi phiếu chi</button></form>`);
   const fill=()=>{const sid=$("#mhp-s").value;$("#mhp-i").innerHTML=`<option value="">— Không gắn, trừ vào công nợ chung —</option>`+(MH.inv||[]).filter(v=>v.status==="OK"&&v.supplier_id===sid&&v.total>v.paid).map(v=>`<option value="${v.id}">${esc(mhD(v.invoice_date))} · ${esc(v.invoice_no||"không số")} · còn ${nf(v.total-v.paid)}</option>`).join("");
     $("#mhp-o").innerHTML=`<option value="">— Không gắn —</option>`+(MH.orders||[]).filter(p=>p.supplier_id===sid&&p.status!=="HUY").map(p=>`<option value="${p.id}">${esc(p.no)} · ${esc(mhD(p.order_date))}${p.status==="DU"?" · đã đủ hàng":""}</option>`).join("")};
-  $("#mhp-s").onchange=fill;fill();
+  $("#mhp-s").onchange=()=>{fill();mhPayFillTo("mhp",$("#mhp-s").value)};fill();mhPayMethodBind("mhp",$("#mhp-s").value);
   if(poId){const p=(MH.orders||[]).find(x=>x.id===poId);$("#mhp-o").value=poId;if(p){const open=mhPoMoney(p).inv.filter(v=>v.total>v.paid);if(open.length===1){$("#mhp-i").value=open[0].id;$("#mhp-a").value=open[0].total-open[0].paid}else if(!open.length)$("#mhp-k").value="COC"}}
   $("#mhp").onsubmit=async e=>{e.preventDefault();
-    try{await kApi("/mh/payments",{method:"POST",body:JSON.stringify({supplier_id:$("#mhp-s").value,kind:$("#mhp-k").value,po_id:$("#mhp-o").value||null,invoice_id:$("#mhp-i").value||null,pay_date:$("#mhp-d").value,amount:+$("#mhp-a").value,account:$("#mhp-ac").value,note:$("#mhp-n").value})});closeDrawer();toast("Đã ghi phiếu chi");MH.pay=null;MH.inv=null;MH.debts=null;if(PAGE==="mh_chi"){mhLoadPay();mhLoadInv()}else renderMain()}catch(err){$("#mhp-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
+    const btn=e.submitter||document.querySelector("#mhp button.pri");if(btn)btn.disabled=true;
+    try{const r=await kApi("/mh/payments",{method:"POST",body:JSON.stringify(Object.assign({supplier_id:$("#mhp-s").value,kind:$("#mhp-k").value,po_id:$("#mhp-o").value||null,invoice_id:$("#mhp-i").value||null,pay_date:$("#mhp-d").value,amount:+$("#mhp-a").value,note:$("#mhp-n").value},mhPayMethodRead("mhp")))});
+      const fs=[...$("#mhp-f").files];let up=0;for(const f of fs){try{const x=await mhPrepFile(f);await kApi("/mh/payments/"+r.id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
+      closeDrawer();toast("Đã ghi phiếu chi"+(up?", đính kèm "+up+" ảnh":""));MH.pay=null;MH.inv=null;MH.debts=null;if(PAGE==="mh_chi"){mhLoadPay();mhLoadInv()}else renderMain()}catch(err){$("#mhp-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
 }
 /* --- Công nợ nhà cung cấp --- */
 async function mhLoadDebt(){if(MH.debts)return;try{MH.debts=await kApi("/mh/debts")}catch(e){MH.debts=[];toast(e.message)}if(/^mh_(no|po)$/.test(PAGE))renderMain()}
@@ -411,7 +446,7 @@ function mhPoDrawer(id,target){
     <tr class="mhdue"><td colspan="5">Còn phải trả</td><td class="n"><b>${nf(Math.max(0,(M.invTotal||val||0)-M.paid))}</b></td><td></td></tr></tfoot></table></div>
    <h3>Các lần nhận hàng</h3>${p.receipts.length?tbl(["Ngày nhận","Hàng nhận","Ghi chú","Trạng thái",""],p.receipts.map(r=>`<tr class="${r.status==="OK"?"":"mut"}"><td>${esc(kDd(r.receipt_date))}</td><td>${r.lines.map(l=>esc(l.name)+" × "+mhN(l.qty)+(l.unit_price!=null?" @ "+nf(l.unit_price):"")).join("<br>")}</td><td>${esc(r.note||"")}</td><td>${r.status!=="OK"?pill("Đã hủy","gry"):pend.some(x=>x.r.id===r.id)?pill("Chờ chứng từ","blu"):pill("Đã có chứng từ","grn")}</td><td>${r.status==="OK"?`<button class="btn sm danger" data-mhcr="${r.id}">Hủy lần nhận</button>`:""}</td></tr>`)):`<p class="hint">Chưa nhận hàng lần nào.</p>`}
    <h3>Chứng từ</h3>${M.inv.length?tbl(["Ngày","Chứng từ","Tổng","Đã chi","Ảnh / PDF",""],M.inv.map(v=>`<tr class="clk" data-hv="${v.id}"><td>${esc(mhD(v.invoice_date))}</td><td>${v.doc_type==="PG"?"Phiếu giao / bill":"Hóa đơn VAT"} ${esc(v.invoice_no||"")}${v.share<.999?`<div class="hint">chung với phiếu khác, phần phiếu này ≈ ${nf(Math.round(v.total*v.share))}</div>`:""}</td><td class="n">${nf(v.total)}</td><td class="n">${nf(v.paid)}</td><td>${v.file_count?pill(v.file_count+" file","blu"):`<span class="hint">chưa có</span>`}</td><td><button class="btn sm danger" data-hx="${v.id}">Hủy chứng từ</button></td></tr>`)):`<p class="hint">Chưa có chứng từ.${pend.length?" Hàng đã về, bấm <b>Ghi chứng từ</b> khi nhà cung cấp gửi bill hoặc hóa đơn.":""}</p>`}
-   <h3>Lịch sử thanh toán</h3>${M.pays.length?tbl(["Ngày chi","Loại","Số tiền","Tài khoản","Ghi chú",""],M.pays.map(x=>`<tr><td>${esc(mhD(x.pay_date))}</td><td>${x.kind==="COC"?pill("Cọc","amb"):"Trả tiền"}${x.invoice_no?`<div class="hint">cho chứng từ ${esc(x.invoice_no)}</div>`:""}</td><td class="n"><b>${nf(x.amount)}</b></td><td>${esc(x.account||"")}</td><td>${esc(x.note||"")}</td><td><button class="btn sm danger" data-px="${x.id}">Hủy phiếu chi</button></td></tr>`)):`<p class="hint">Chưa trả tiền.</p>`}`);
+   <h3>Lịch sử thanh toán</h3>${M.pays.length?tbl(["Ngày chi","Loại","Số tiền","Tài khoản","Ghi chú",""],M.pays.map(x=>`<tr class="clk" data-pv="${x.id}"><td>${esc(mhD(x.pay_date))}</td><td>${x.kind==="COC"?pill("Cọc","amb"):"Trả tiền"}${x.invoice_no?`<div class="hint">cho chứng từ ${esc(x.invoice_no)}</div>`:""}</td><td class="n"><b>${nf(x.amount)}</b></td><td>${esc(x.account||"")}${x.file_count?" "+pill(x.file_count+" ảnh","blu"):""}</td><td>${esc(x.note||"")}</td><td><button class="btn sm danger" data-px="${x.id}">Hủy phiếu chi</button></td></tr>`)):`<p class="hint">Chưa trả tiền.</p>`}`);
   if(target)target.innerHTML=html;else openDrawerHTML(html);
   const D=document.querySelector("#dx")||document,done=async(msg)=>{closeDrawer();if(msg)toast(msg);await mhReload()};
   document.querySelectorAll(".mhacts [data-a]").forEach(b=>b.onclick=async()=>{const a=b.dataset.a;
@@ -422,8 +457,9 @@ function mhPoDrawer(id,target){
   document.querySelectorAll("[data-hv]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;mhDocDetail(r.dataset.hv)});
   document.querySelectorAll("[data-hx]").forEach(b=>b.onclick=async e=>{e.stopPropagation();if(!confirm("Hủy chứng từ này? Công nợ nhà cung cấp giảm lại đúng số tiền."))return;
     try{await kApi("/mh/invoices/"+b.dataset.hx+"/cancel",{method:"POST",body:"{}"});await done("Đã hủy chứng từ")}catch(err){toast(err.message)}});
-  document.querySelectorAll("[data-px]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy phiếu chi này? Công nợ nhà cung cấp tăng lại đúng số tiền."))return;
+  document.querySelectorAll("[data-px]").forEach(b=>b.onclick=async e=>{e.stopPropagation();if(!confirm("Hủy phiếu chi này? Công nợ nhà cung cấp tăng lại đúng số tiền."))return;
     try{await kApi("/mh/payments/"+b.dataset.px+"/cancel",{method:"POST",body:"{}"});await done("Đã hủy phiếu chi")}catch(err){toast(err.message)}});
+  document.querySelectorAll("#dx [data-pv],#mh-detail [data-pv]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;mhPayDetail(r.dataset.pv)});
 }
 PAGES.mh_po=pMhDon;
 Object.assign(PAGES,{mh_cho:pMhHd,mh_gia:pMhHd,mh_hd:pMhHd,mh_chi:pMhChi,mh_no:pMhNo,mh_gianvl:pMhGiaNvl});
