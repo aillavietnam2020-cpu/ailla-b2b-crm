@@ -88,6 +88,7 @@ export function PrintOrderPage() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
   const type = params.get('type') === 'ship' ? 'ship' : 'order';
+  // Ngày xuất hàng chỉ hiện khi kho ĐÃ xuất (ngày xuất thực tế); chưa xuất thì để trống, không lấy ngày dự kiến hay ngày duyệt.
   const order = useApi<OrderDetail>(`/api/orders/${id}`);
   const customer = useApi<CustomerDetail>(order.data ? `/api/customers/${order.data.customer_id}` : null);
   const banks = useApi<BankAccount[]>(type === 'order' ? '/api/receiving-accounts' : null);
@@ -112,11 +113,27 @@ export function PrintOrderPage() {
   for (const k of o.kho_lines ?? []) if (k.shipped_qty !== null && k.shipped_qty !== undefined) shipped.set(k.product_id, k.shipped_qty);
   const hasShipped = shipped.size > 0;
   const items = o.items;
-  const diff = hasShipped && items.some((it) => shipped.has(it.product_id) && shipped.get(it.product_id) !== it.qty);
+  // Cùng một sản phẩm có thể có dòng bán + dòng tặng: kho chỉ ghi một số thực xuất cho cả hai, so theo tổng số lượng của mã.
+  const orderedOf = new Map<string, number>();
+  const giftOf = new Map<string, number>();
+  for (const it of items) {
+    orderedOf.set(it.product_id, (orderedOf.get(it.product_id) ?? 0) + it.qty);
+    if (it.is_gift) giftOf.set(it.product_id, (giftOf.get(it.product_id) ?? 0) + it.qty);
+  }
+  const diff = hasShipped && [...shipped].some(([pid, q]) => orderedOf.has(pid) && orderedOf.get(pid) !== q);
+  const shippedDay = (() => {
+    const d = o as OrderDetail & { delivered_at?: string | null };
+    return o.delivery_status === 'DA_XUAT_KHO' || o.delivery_status === 'DA_GIAO' ? (d.delivered_at ?? null) : null;
+  })();
 
   // Tiền theo số thực giao khi kho đã ghi số thực xuất; chưa ghi thì theo số đặt.
   const useActual = type === 'order' && hasShipped;
-  const lineQty = (it: (typeof items)[number]) => (useActual ? (shipped.get(it.product_id) ?? it.qty) : it.qty);
+  const lineQty = (it: (typeof items)[number]) => {
+    if (!useActual || !shipped.has(it.product_id)) return it.qty;
+    const total = shipped.get(it.product_id) ?? it.qty;
+    if (it.is_gift) return Math.min(it.qty, total);
+    return Math.max(0, total - (giftOf.get(it.product_id) ?? 0));
+  };
   const lineAmount = (it: (typeof items)[number]) => (it.is_gift ? 0 : Math.round(lineQty(it) * it.applied_price));
   const subtotal = useActual ? items.reduce((s, it) => s + lineAmount(it), 0) : o.subtotal;
   const total = useActual ? subtotal - (o.discount_amount ?? 0) - (o.bonus_deduction ?? 0) + (o.shipping_fee ?? 0) : o.total_amount;
@@ -179,7 +196,13 @@ export function PrintOrderPage() {
               </td>
               <td>
                 {type === 'ship' ? 'Ngày xuất hàng: ' : 'Ngày đặt: '}
-                <strong>{formatVnDate(type === 'ship' ? (o.ship_date ?? o.order_date) : o.order_date)}</strong>
+                <strong>
+                  {type === 'ship'
+                    ? shippedDay
+                      ? formatVnDate(shippedDay)
+                      : '....../....../........'
+                    : formatVnDate(o.order_date)}
+                </strong>
               </td>
             </tr>
             <tr>
@@ -226,7 +249,7 @@ export function PrintOrderPage() {
                   </td>
                   <td className="c">{unitLabel(it.unit, it.pack_size)}</td>
                   <td className="r">{it.qty}</td>
-                  <td className="r">{shipped.has(it.product_id) ? shipped.get(it.product_id) : ''}</td>
+                  <td className="r">{shipped.has(it.product_id) ? (it.is_gift ? Math.min(it.qty, shipped.get(it.product_id) ?? it.qty) : Math.max(0, (shipped.get(it.product_id) ?? 0) - (giftOf.get(it.product_id) ?? 0))) : ''}</td>
                   <td />
                 </tr>
               ))}

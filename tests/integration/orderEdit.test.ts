@@ -303,4 +303,21 @@ describe('Bảng giá riêng khách gia công', () => {
     });
     expect(res.status).toBe(403);
   });
+  it('cùng một sản phẩm vừa bán vừa tặng: lưu một dòng cho kho, tiền chỉ tính phần bán, đọc lại tách thành hai dòng', async () => {
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: { ...baseOrder, shipping_fee: 0, items: [{ product_id: 'prod-full', qty: 10 }, { product_id: 'prod-full', qty: 2, is_gift: true }] },
+    });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    const rows = await ctx.db.prepare('SELECT qty, gift_qty, line_total FROM order_items WHERE order_id = ?').bind(id).all<{ qty: number; gift_qty: number; line_total: number }>();
+    expect(rows.results).toHaveLength(1);
+    expect(rows.results?.[0].qty).toBe(12);
+    expect(rows.results?.[0].gift_qty).toBe(2);
+    const detail = await ctx.request(`/api/orders/${id}`, { as: USERS.thao });
+    const items = detail.body.data.items as Array<{ qty: number; is_gift: boolean; line_total: number }>;
+    expect(items.map((x) => [x.qty, x.is_gift])).toEqual([[10, false], [2, true]]);
+    expect(items[1].line_total).toBe(0);
+    expect(detail.body.data.total_amount).toBe(items[0].line_total);
+  });
 });

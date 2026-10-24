@@ -62,6 +62,7 @@ interface ReturnRow {
   claimed_amount: number;
   credit_amount: number;
   resolution: ReturnListItem['resolution'];
+  no_collect: number;
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;
@@ -76,7 +77,7 @@ interface ReturnRow {
 const SELECT_RETURN = `
   SELECT r.id, r.return_no, r.customer_id, c.name AS customer_name, c.owner_id AS owner_id,
          r.order_id, o.order_no AS order_no, r.status, r.return_date, r.reason, r.note,
-         r.claimed_amount, r.credit_amount, r.resolution, r.created_by,
+         r.claimed_amount, r.credit_amount, r.resolution, r.no_collect, r.created_by,
          cu.display_name AS created_by_name, r.created_at,
          ku.display_name AS kho_by_name, r.kho_at, r.kho_note,
          au.display_name AS acct_by_name, r.acct_at, r.acct_note
@@ -100,6 +101,7 @@ function toListItem(r: ReturnRow): ReturnListItem {
     reason: r.reason,
     claimed_amount: r.claimed_amount,
     credit_amount: r.credit_amount,
+    no_collect: r.no_collect,
     resolution: r.resolution,
     created_by_name: r.created_by_name,
     created_at: r.created_at,
@@ -218,7 +220,9 @@ export async function createReturn(
   }
 
   // Đơn gốc (nếu có) phải của đúng khách; lấy giá bán và số lượng đã mua để chặn trả quá.
-  const bought = new Map<string, { qty: number; price: number }>();
+  const bought = new Map<string, { qty: number; price: number; gift: number }>();
+  // Số hàng tặng trong đơn gốc, và số đã trả trước đó của từng mã: hàng tặng trả lại không được hoàn tiền.
+  const returnedBefore = new Map<string, number>();
   if (input.order_id) {
     const order = await db
       .prepare('SELECT id FROM orders WHERE id = ? AND customer_id = ? AND deleted_at IS NULL')
@@ -226,10 +230,14 @@ export async function createReturn(
       .first<{ id: string }>();
     if (!order) throw badRequest('ORDER_NOT_OF_CUSTOMER', 'Đơn gốc không thuộc khách này.');
     const oi = await db
-      .prepare('SELECT product_id, SUM(qty) AS qty, MAX(applied_price) AS price FROM order_items WHERE order_id = ? GROUP BY product_id')
+      .prepare(
+        `SELECT product_id, SUM(qty) AS qty, MAX(applied_price) AS price,
+                SUM(CASE WHEN is_gift = 1 THEN qty ELSE gift_qty END) AS gift
+         FROM order_items WHERE order_id = ? GROUP BY product_id`,
+      )
       .bind(input.order_id)
-      .all<{ product_id: string; qty: number; price: number }>();
-    for (const r of oi.results ?? []) bought.set(r.product_id, { qty: r.qty, price: r.price });
+      .all<{ product_id: string; qty: number; price: number; gift: number }>();
+    for (const r of oi.results ?? []) bought.set(r.product_id, { qty: r.qty, price: r.price, gift: r.gift ?? 0 });
     const already = await db
       .prepare(
         `SELECT l.product_id, SUM(l.qty) AS qty FROM order_return_lines l
@@ -239,6 +247,7 @@ export async function createReturn(
       .bind(input.order_id)
       .all<{ product_id: string; qty: number }>();
     const returned = new Map((already.results ?? []).map((r) => [r.product_id, r.qty]));
+    for (const [k, v] of returned) returnedBefore.set(k, v);
     for (const it of input.items) {
       const b = bought.get(it.product_id);
       if (!b) throw badRequest('ITEM_NOT_IN_ORDER', 'Có mặt hàng không nằm trong đơn gốc đã chọn.');
@@ -271,19 +280,40 @@ export async function createReturn(
   const tierPrice = input.items.some((it) => it.unit_price === undefined && !bought.has(it.product_id))
     ? await customerPrices(db, input.customer_id, input.items.map((it) => it.product_id), date)
     : new Map<string, number>();
+  const noCollect = input.no_collect === true;
+  if (noCollect && input.reason.trim().length < 10) {
+    throw badRequest('REASON_TOO_SHORT', 'Hàng lỗi không thu về: ghi rõ lý do (hàng gì lỗi, vì sao không gửi trả) để kế toán đối chiếu.');
+  }
   let claimed = 0;
   const lineStatements: D1PreparedStatement[] = [];
+  // Mã có hàng tặng trong đơn gốc: trả phần hàng bán trước (tính tiền), phần vượt quá là hàng tặng (đơn giá 0, không hoàn tiền).
+  const used = new Map<string, number>();
+  const expanded: typeof input.items = [];
   for (const it of input.items) {
+    const b = bought.get(it.product_id);
+    if (!b || b.gift <= 0) {
+      expanded.push(it);
+      continue;
+    }
+    const paidCap = Math.max(0, b.qty - b.gift);
+    const soFar = (returnedBefore.get(it.product_id) ?? 0) + (used.get(it.product_id) ?? 0);
+    const paidQty = Math.min(it.qty, Math.max(0, paidCap - soFar));
+    const giftQty = it.qty - paidQty;
+    used.set(it.product_id, (used.get(it.product_id) ?? 0) + it.qty);
+    if (paidQty > 0) expanded.push({ ...it, qty: paidQty });
+    if (giftQty > 0) expanded.push({ ...it, qty: giftQty, unit_price: 0, deduction: 0, line_note: it.line_note ?? 'Hàng tặng, không hoàn tiền' });
+  }
+  for (const it of expanded) {
     const price = it.unit_price ?? bought.get(it.product_id)?.price ?? tierPrice.get(it.product_id) ?? 0;
     const deduction = it.deduction ?? 0;
     claimed += Math.max(0, Math.round(price * it.qty) - deduction);
     lineStatements.push(
       db
         .prepare(
-          `INSERT INTO order_return_lines (id, return_id, product_id, qty, unit_price, deduction, line_note)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO order_return_lines (id, return_id, product_id, qty, unit_price, deduction, line_note, received_qty, condition)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(newId(), id, it.product_id, it.qty, price, deduction, it.line_note ?? null),
+        .bind(newId(), id, it.product_id, it.qty, price, deduction, it.line_note ?? null, noCollect ? it.qty : null, noCollect ? 'HONG' : null),
     );
   }
 
@@ -291,12 +321,28 @@ export async function createReturn(
     db
       .prepare(
         `INSERT INTO order_returns (id, return_no, customer_id, order_id, status, return_date, reason, note,
-           claimed_amount, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'CHO_KHO', ?, ?, ?, ?, ?, ?, ?)`,
+           claimed_amount, created_by, created_at, updated_at, no_collect, credit_amount, kho_note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, returnNo, input.customer_id, input.order_id ?? null, date, input.reason, input.note ?? null, claimed, auth.user.id, now, now),
+      .bind(
+        id,
+        returnNo,
+        input.customer_id,
+        input.order_id ?? null,
+        noCollect ? 'DA_NHAN_KHO' : 'CHO_KHO',
+        date,
+        input.reason,
+        input.note ?? null,
+        claimed,
+        auth.user.id,
+        now,
+        now,
+        noCollect ? 1 : 0,
+        noCollect ? claimed : 0,
+        noCollect ? 'Hàng lỗi, không thu về (không qua kho), bù cho khách' : null,
+      ),
     ...lineStatements,
-    logStmt(db, id, auth, 'TAO_PHIEU', input.reason, now),
+    logStmt(db, id, auth, noCollect ? 'TAO_PHIEU_KHONG_THU_VE' : 'TAO_PHIEU', input.reason, now),
     returnEvent(db, auth, 'RETURN_CREATED', id, { return_no: returnNo, customer_id: input.customer_id, claimed_amount: claimed }),
     auditStatement(db, {
       actorId: auth.user.id,

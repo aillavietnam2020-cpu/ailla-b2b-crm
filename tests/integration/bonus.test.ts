@@ -61,6 +61,35 @@ describe('Doanh số lẻ và thưởng NPP', () => {
     expect(row.policy).toBe('CHUNG');
   });
 
+  it('phiếu chi thưởng bằng tiền: chi tối đa bằng còn phải chi, người lập không tự duyệt, hủy thì trả lại số còn phải chi', async () => {
+    await order('o1', 1000, { bonus: 300000 }); // thưởng 500.000, đã trừ vào đơn 300.000 → còn phải chi 200.000
+    const payable = async () =>
+      (await ctx.request('/api/bonus/report?month=2026-10', { as: USERS.ceo })).body.data.rows.find(
+        (x: { customer_id: string }) => x.customer_id === 'cus-thao-1',
+      );
+    const body = (amount: number) => ({ customer_id: 'cus-thao-1', month: '2026-10', amount, method: 'CHUYEN_KHOAN', note: 'CK thưởng tháng 10' });
+    expect((await ctx.request('/api/bonus/cash', { as: USERS.thao, body: body(100000) })).status).toBe(403);
+    const over = await ctx.request('/api/bonus/cash', { as: USERS.manager, body: body(250000) });
+    expect(over.status).toBe(400);
+    const made = await ctx.request('/api/bonus/cash', { as: USERS.manager, body: body(150000) });
+    expect(made.status).toBe(200);
+    expect(made.body.data.voucher_no).toMatch(/^PCT\d{4}-001$/);
+    // Phiếu chờ duyệt đã giữ chỗ: còn phải chi giảm ngay, chi thêm quá số còn lại bị chặn.
+    const mid = await payable();
+    expect(mid.paid).toBe(150000);
+    expect(mid.payable).toBe(50000);
+    expect((await ctx.request('/api/bonus/cash', { as: USERS.manager, body: body(100000) })).status).toBe(400);
+    // Người lập không tự duyệt; CEO duyệt được.
+    expect((await ctx.request(`/api/bonus/cash/${made.body.data.id}/approve`, { as: USERS.manager, body: {} })).status).toBe(403);
+    expect((await ctx.request(`/api/bonus/cash/${made.body.data.id}/approve`, { as: USERS.ceo, body: {} })).status).toBe(200);
+    const list = await ctx.request('/api/bonus/cash?month=2026-10', { as: USERS.ceo });
+    expect(list.body.data[0].status).toBe('DA_CHI');
+    // Hủy phải có lý do; hủy xong số còn phải chi trở lại.
+    expect((await ctx.request(`/api/bonus/cash/${made.body.data.id}/cancel`, { as: USERS.ceo, body: {} })).status).toBe(400);
+    expect((await ctx.request(`/api/bonus/cash/${made.body.data.id}/cancel`, { as: USERS.ceo, body: { reason: 'Chi nhầm khách' } })).status).toBe(200);
+    expect((await payable()).payable).toBe(200000);
+  });
+
   it('khách có cơ chế riêng thì dùng riêng; chỉ CEO đặt cơ chế; sale không xem được báo cáo', async () => {
     await order('o1', 1000);
     const put = (as: string) =>

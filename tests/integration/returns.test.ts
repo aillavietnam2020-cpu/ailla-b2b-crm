@@ -150,4 +150,46 @@ describe('Phiếu hàng trả lại', () => {
     expect((await ctx.request(`/api/returns/${mine.id}`, { as: USERS.huyen })).status).toBe(404);
     expect((await ctx.request('/api/returns', { as: USERS.thao })).body.data).toHaveLength(1);
   });
+  it('hàng lỗi không thu về: không qua kho, không đổi tồn, kế toán xác nhận thẳng thì giảm công nợ', async () => {
+    const before = await getCustomerDebt(ctx.db as unknown as D1Database, 'cus-thao-1');
+    const stockBefore = await stock();
+    const short = await ctx.request('/api/returns', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', reason: 'lỗi', no_collect: true, items: [{ product_id: 'prod-full', qty: 2, unit_price: 100000 }] },
+    });
+    expect(short.status).toBe(400);
+    const created = await ctx.request('/api/returns', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', reason: 'Hàng móp vỡ, khách không gửi trả, bù cho khách', no_collect: true, items: [{ product_id: 'prod-full', qty: 2, unit_price: 100000 }] },
+    });
+    expect(created.status).toBe(200);
+    const r = created.body.data;
+    expect(r.status).toBe('DA_NHAN_KHO');
+    expect(r.no_collect).toBe(1);
+    expect(r.credit_amount).toBe(200000);
+    expect(await stock()).toBe(stockBefore);
+    const done = await ctx.request(`/api/returns/${r.id}/confirm`, { as: USERS.manager, body: { resolution: 'TRU_CONG_NO' } });
+    expect(done.status).toBe(200);
+    expect(done.body.data.status).toBe('DA_GIAM_NO');
+    const after = await getCustomerDebt(ctx.db as unknown as D1Database, 'cus-thao-1');
+    expect(after.official_debt).toBe(before.official_debt - 200000);
+    expect(await stock()).toBe(stockBefore);
+  });
+  it('trả hàng của đơn có hàng tặng: phần hàng bán hoàn tiền, phần hàng tặng trả lại không hoàn tiền', async () => {
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', order_date: '2026-08-16', items: [{ product_id: 'prod-full', qty: 10 }, { product_id: 'prod-full', qty: 2, is_gift: true }] },
+    });
+    expect(created.status).toBe(201);
+    const orderId = created.body.data.id as string;
+    const price = (await ctx.db.prepare('SELECT applied_price FROM order_items WHERE order_id = ?').bind(orderId).first<{ applied_price: number }>())!.applied_price;
+    const r = await ctx.request('/api/returns', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', order_id: orderId, reason: 'Khách trả cả hàng bán lẫn hàng tặng', items: [{ product_id: 'prod-full', qty: 12 }] },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.data.claimed_amount).toBe(price * 10);
+    const qtys = (r.body.data.items as Array<{ qty: number; unit_price: number }>).map((l) => [l.qty, l.unit_price]);
+    expect(qtys).toEqual([[10, price], [2, 0]]);
+  });
 });

@@ -35,6 +35,19 @@ interface Policy {
   overrides: Array<{ customer_id: string; customer_name: string; MONTH: Tier[]; YEAR: Tier[] }>;
   can_edit: boolean;
 }
+interface CashVoucher {
+  id: string;
+  voucher_no: string;
+  customer_id: string;
+  customer_name: string;
+  amount: number;
+  method: string;
+  note: string;
+  status: 'CHO_DUYET' | 'DA_CHI' | 'HUY';
+  cancel_reason: string | null;
+  created_by_name: string | null;
+  approved_by_name: string | null;
+}
 interface Row {
   customer_id: string;
   customer_name: string;
@@ -48,6 +61,7 @@ interface Row {
   month_gift_value: number;
   month_gift_items: GiftItem[];
   advanced: number;
+  paid?: number;
   payable: number;
   year_retail: number;
   year_level: string;
@@ -88,6 +102,28 @@ function RankingPanel({ slot }: { slot: HTMLElement | null }) {
   const rep = useApi<{ month: string; rows: Row[] }>(`/api/bonus/report?month=${from}..${to}`);
   const gifts = useApi<GiftVoucher[]>(`/api/bonus/gifts?month=${giftMonth}`);
   const canApprove = (gifts.meta as { can_approve?: boolean } | undefined)?.can_approve === true;
+  const cash = useApi<CashVoucher[]>(`/api/bonus/cash?month=${giftMonth}`);
+  const payCash = async (r: Row) => {
+    const v = window.prompt(`Chi thưởng cho ${r.customer_name}. Số tiền (tối đa ${r.payable.toLocaleString('vi-VN')} đ):`, String(Math.max(0, r.payable)));
+    if (!v) return;
+    const amount = Math.round(Number(v.replace(/[^\d]/g, '')));
+    if (!amount) return;
+    const note = window.prompt('Ghi chú (chuyển khoản / tiền mặt, nội dung chi):', 'Chuyển khoản') ?? '';
+    await act(
+      async () => {
+        await api.post('/api/bonus/cash', {
+          customer_id: r.customer_id,
+          month: giftMonth,
+          amount,
+          method: /mặt/i.test(note) ? 'TIEN_MAT' : 'CHUYEN_KHOAN',
+          note,
+        });
+        cash.reload();
+        rep.reload();
+      },
+      'Đã lập phiếu chi thưởng, chờ duyệt',
+    );
+  };
   const [top, setTop] = useState<10 | 20 | 0>(10);
   const [q, setQ] = useState('');
   const all = [...(rep.data?.rows ?? [])].sort((x, y2) => y2.retail_sales - x.retail_sales);
@@ -303,6 +339,12 @@ function RankingPanel({ slot }: { slot: HTMLElement | null }) {
                       <td className="right nowrap">
                         <b className={r.payable < 0 ? 'error' : ''}>{formatVnd(r.payable)}</b>
                         {r.advanced ? <div className="bn-sub">đã ứng {formatVnd(r.advanced)}</div> : null}
+                        {r.paid ? <div className="bn-sub">đã chi {formatVnd(r.paid)}</div> : null}
+                        {oneMonth && r.payable > 0 && r.month_cash > 0 ? (
+                          <button className="btn sm" onClick={() => void payCash(r)}>
+                            Chi thưởng
+                          </button>
+                        ) : null}
                       </td>
                       <td className="nowrap">
                         <div>{formatVnd(r.year_retail)}</div>
@@ -405,9 +447,79 @@ function RankingPanel({ slot }: { slot: HTMLElement | null }) {
           </Card>
         </>
       )}
+      {oneMonth && (cash.data ?? []).length > 0 && (
+        <>
+          <div style={{ height: 12 }} />
+          <Card title={`Phiếu chi thưởng bằng tiền tháng ${giftMonth}`}>
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Số phiếu</th>
+                    <th>Khách</th>
+                    <th className="right">Số tiền</th>
+                    <th>Ghi chú</th>
+                    <th>Trạng thái</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(cash.data ?? []).map((v) => (
+                    <tr key={v.id} style={v.status === 'HUY' ? { opacity: 0.5 } : undefined}>
+                      <td className="nowrap">
+                        <strong>{v.voucher_no}</strong>
+                      </td>
+                      <td>{v.customer_name}</td>
+                      <td className="right nowrap">{formatVnd(v.amount)}</td>
+                      <td>{v.note}</td>
+                      <td>
+                        {v.status === 'CHO_DUYET' && <span className="badge warn">Chờ duyệt (lập bởi {v.created_by_name})</span>}
+                        {v.status === 'DA_CHI' && <span className="badge ok">Đã chi · duyệt bởi {v.approved_by_name}</span>}
+                        {v.status === 'HUY' && <span className="badge muted">Đã hủy: {v.cancel_reason}</span>}
+                      </td>
+                      <td className="nowrap">
+                        {(cash.meta as { can_approve?: boolean } | undefined)?.can_approve && v.status === 'CHO_DUYET' && (
+                          <button
+                            className="btn sm primary"
+                            onClick={() =>
+                              void act(async () => {
+                                await api.post(`/api/bonus/cash/${v.id}/approve`, {});
+                                cash.reload();
+                                rep.reload();
+                              }, 'Đã duyệt: phiếu chi thưởng ghi là đã chi')
+                            }
+                          >
+                            Duyệt chi
+                          </button>
+                        )}{' '}
+                        {(cash.meta as { can_approve?: boolean } | undefined)?.can_approve && v.status !== 'HUY' && (
+                          <button
+                            className="btn sm danger"
+                            onClick={() => {
+                              const reason = window.prompt('Lý do hủy phiếu (bắt buộc):', '');
+                              if (reason && reason.trim().length >= 3)
+                                void act(async () => {
+                                  await api.post(`/api/bonus/cash/${v.id}/cancel`, { reason: reason.trim() });
+                                  cash.reload();
+                                  rep.reload();
+                                }, 'Đã hủy phiếu chi thưởng');
+                            }}
+                          >
+                            Hủy
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
       <p className="muted" style={{ marginTop: 8 }}>
         "Đã ứng" là khoản thưởng đã trừ thẳng vào đơn trong kỳ. "Còn phải chi" âm nghĩa là đã
-        ứng nhiều hơn thưởng đạt được.
+        ứng nhiều hơn thưởng đạt được. "Đã chi" là thưởng bằng tiền đã lập phiếu chi thưởng.
       </p>
     </div>
   );
