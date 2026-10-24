@@ -9,7 +9,7 @@ export const DELEGATION_PREFIX = 'dlg_';
 export const DELEGATION_TTL_MS = 30 * 60_000;
 export const DELEGATION_MAX_USES = 40;
 
-/** Chỉ các nhóm việc chị Hoa đã đồng ý: mua hàng + phiếu chi nhà cung cấp, kho, đơn B2B, thanh toán và công nợ khách. Không bao giờ xóa cứng. */
+/** Chỉ các nhóm việc chị Hoa đã đồng ý: mua hàng + phiếu chi nhà cung cấp, kho, đơn B2B, thanh toán và công nợ khách, phiếu chi vận chuyển (lái xe). Không bao giờ xóa cứng. */
 const ALLOW: Array<{ methods: string[]; re: RegExp }> = [
   { methods: ['GET', 'POST', 'PUT'], re: /^\/api\/hub\/kho\/mh(\/|$)/ },
   { methods: ['GET', 'POST'], re: /^\/api\/hub\/kho\/docs(\/\d+\/cancel)?$/ },
@@ -19,6 +19,7 @@ const ALLOW: Array<{ methods: string[]; re: RegExp }> = [
   { methods: ['GET', 'POST', 'PUT'], re: /^\/api\/orders(\/|$)/ },
   { methods: ['GET', 'POST'], re: /^\/api\/payments(\/(?!.*\/delete$)[^/]+(\/[a-z-]+)?)?$/ },
   { methods: ['GET'], re: /^\/api\/customers(\/|$)/ },
+  { methods: ['GET', 'POST'], re: /^\/api\/shipping-vouchers(\/[^/]+\/cancel)?$/ },
 ];
 
 export function delegatedPathAllowed(method: string, path: string): boolean {

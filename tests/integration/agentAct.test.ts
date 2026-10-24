@@ -99,6 +99,17 @@ describe('Agent ghi dữ liệu thay người, chỉ khi người được chỉ
     expect((await call(agent.token, 'GET', '/api/hub/kho/mh/orders', undefined, dlg)).status).toBe(200);
   });
 
+  it('lập và hủy được phiếu chi vận chuyển (lái xe) theo lệnh chị Thảo', async () => {
+    const { agent } = await setup();
+    await ctx.request('/api/agent-chat', { as: USERS.manager, body: { agent: CHAT_AGENT, body: 'chi cước' } });
+    const dlg = (await pull())[0].delegation as string;
+    const r = await call(agent.token, 'POST', '/api/shipping-vouchers', { voucher_date: '2026-10-01', carrier: 'Vũ Thanh Tâm', amount: 750000, method: 'CHUYEN_KHOAN' }, dlg);
+    expect(r.status).toBe(200);
+    const id = (r.body as { data: { id: string } }).data.id;
+    expect((await call(agent.token, 'GET', '/api/shipping-vouchers', undefined, dlg)).status).toBe(200);
+    expect((await call(agent.token, 'POST', `/api/shipping-vouchers/${id}/cancel`, { reason: 'nhập nhầm' }, dlg)).status).toBe(200);
+  });
+
   it('agent chưa được cấp quyền ghi thì giấy cũng vô dụng; quyền chỉ bằng quyền của người ra lệnh', async () => {
     const { agent, mgr } = await setup();
     await ctx.db.prepare("DELETE FROM user_permissions WHERE user_id = ? AND permission = 'agent.act'").bind(agent.id).run();
