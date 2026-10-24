@@ -220,6 +220,15 @@ var HT_CSS=`<style id="ht-css">
 #ht .tm.wr{box-shadow:0 0 0 2px var(--red)}
 #ht .chd,#ht .comp{background:#fff}
 #ht .ocard{background:#fff;border:0}
+
+/* Ảnh hiện riêng, không tô khối: lưới 2 cột sát nhau, bo góc nhỏ */
+#ht .timg{display:flex;flex-direction:column;gap:2px;max-width:72%}
+#ht .timg.right{align-self:flex-end;align-items:flex-end}
+#ht .timg.left{align-self:flex-start;align-items:flex-start}
+#ht .tgrid{display:grid;grid-template-columns:repeat(2,minmax(0,150px));gap:2px}
+#ht .tgrid.g1{grid-template-columns:minmax(0,220px)}
+#ht .tgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;display:block}
+#ht .tcap{font-size:10.5px;color:#7a8699}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -446,10 +455,17 @@ function demoData(){
     return {id:-(i+1),fb_page_id:"demo",name:c.name,page_name:"Ailla Việt Nam Store",bot_name:"Bot mẫu",note:c.note,unread:c.unread,last_at:last.at,last_text:last.text.slice(0,120),last_who:last.who,tag_ids:ids(c.tags),messages:c.msgs,order:c.order};
   });
 }
+function imgBlock(m,cls){
+  var side=cls==="k"?"left":"right",html="";
+  if(m.images&&m.images.length)html=m.images.slice(0,4).map(function(u){return '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="Ảnh"></a>'}).join("");
+  else if(m.img){var n=Math.min(4,(String(m.img).match(/\((\d+) ảnh\)/)||[0,1])[1]|0);for(var i=0;i<n;i++)html+='<img src="'+DEMO_IMGS[i%DEMO_IMGS.length]+'" alt="Ảnh mẫu">'}
+  if(!html)return "";
+  return '<div class="timg '+side+'"><div class="tgrid g'+(html.split("<img").length-1)+'">'+html+'</div>'+(m.img?'<span class="tcap">'+esc(m.img)+" · ảnh mẫu</span>":"")+"</div>";
+}
 function msgBody(m){
   var s=esc(m.text);
-  if(m.images&&m.images.length)s+='<div class="pgrid">'+m.images.map(function(u){return '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="Ảnh"></a>'}).join("")+"</div>";
-  else if(m.img){var n=(String(m.img).match(/\((\d+) ảnh\)/)||[0,1])[1]|0,h=["#f6d365","#a1c4fd","#84fab0","#fbc2eb","#ffecd2","#c2e9fb"],t="";for(var i=0;i<n;i++)t+='<img src="'+DEMO_IMGS[i%DEMO_IMGS.length]+'" alt="Ảnh mẫu">';s+='<div class="pgrid">'+t+'</div><div class="pcap">'+esc(m.img)+" · ảnh mẫu</div>"}
+  if(false)s+='<div class="pgrid">'+m.images.map(function(u){return '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="Ảnh"></a>'}).join("")+"</div>";
+  else if(false){var n=(String(m.img).match(/\((\d+) ảnh\)/)||[0,1])[1]|0,h=["#f6d365","#a1c4fd","#84fab0","#fbc2eb","#ffecd2","#c2e9fb"],t="";for(var i=0;i<n;i++)t+='<img src="'+DEMO_IMGS[i%DEMO_IMGS.length]+'" alt="Ảnh mẫu">';s+='<div class="pgrid">'+t+'</div><div class="pcap">'+esc(m.img)+" · ảnh mẫu</div>"}
   if(m.order&&ST.cv&&ST.cv.order){var o=ST.cv.order;s+='<div class="ocard"><b>Xác nhận đơn đặt hàng</b><div>'+esc(o.items)+"</div><div>Đơn "+esc(o.code)+" · "+esc(o.money)+"</div><div>"+esc(o.name)+" · "+esc(o.phone)+"</div><div>"+esc(o.addr)+"</div></div>"}
   return s;
 }
@@ -476,7 +492,7 @@ function hl(){
        var cls=m.who==="customer"?"k":m.who==="agent"?"a":m.who==="sale"?"s2":"sys";
        var src=m.who==="agent"?"Agent"+(m.flow?" · "+esc(m.flow):"")+(m.version?" · bản "+m.version:""):(WHO[m.who]||m.who)+(m.who==="system"&&m.flow?" · "+esc(m.flow):"");
        var click=m.who==="agent"||m.who==="system";
-       return '<div class="tm '+cls+(ST.cvMsg===m.id?" pk":"")+(m.wrong?" wr":"")+'"'+(click?' data-act="msgsel" data-id="'+m.id+'"':"")+'><span class="src">'+src+" · "+fmT(m.at)+(m.wrong?" · đã đánh dấu sai":"")+"</span>"+msgBody(m)+"</div>"}).join("")+"</div>"+
+       return '<div class="tm '+cls+(ST.cvMsg===m.id?" pk":"")+(m.wrong?" wr":"")+'"'+(click?' data-act="msgsel" data-id="'+m.id+'"':"")+'><span class="src">'+src+" · "+fmT(m.at)+(m.wrong?" · đã đánh dấu sai":"")+"</span>"+msgBody(m)+"</div>"+imgBlock(m,cls)}).join("")+"</div>"+
      '<div class="tagbar">'+stage.map(function(t){var on=cv.tag_ids.indexOf(t.id)>=0;return '<button class="'+(on?"on":"")+'" style="background:'+TCOL[t.color]+'" data-act="cvtag" data-id="'+t.id+'" title="'+(on?"Bỏ thẻ":"Gắn thẻ")+'">'+esc(t.name)+"</button>"}).join("")+"</div>"+
      '<div class="comp">Chỉ xem. Trả lời khách ở Pancake. Tin ở đây đã che số điện thoại, email, link.</div>';
     var tabs='<div class="rtabs"><button data-act="rptab" data-id="info" class="'+(ST.rpTab==="info"?"on":"")+'">Thông tin</button><button data-act="rptab" data-id="order" class="'+(ST.rpTab==="order"?"on":"")+'">Tạo đơn</button></div>';
