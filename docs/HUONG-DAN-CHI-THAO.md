@@ -17,7 +17,17 @@ Vào **Thưởng & xếp hạng NPP**, chọn xem **theo Tháng**.
 - Cột **Còn phải chi** = thưởng đạt được − đã trừ thẳng vào đơn − đã chi.
 - Khách còn phải chi sẽ có nút **Chi thưởng**: bấm, nhập số tiền (không vượt số còn phải chi) và ghi chú.
 - Phiếu hiện ở khung **Phiếu chi thưởng bằng tiền tháng ...** ở dưới, trạng thái chờ duyệt. Người lập không tự duyệt. Chị Thảo (quản lý điều phối) hoặc chị Hoa bấm **Duyệt chi** thì thành "đã chi". Hủy phiếu phải ghi lý do.
-- Thưởng trừ thẳng vào đơn: ghi ở ô **Trừ thưởng tháng** khi tạo đơn. Số này tự cộng vào cột "đã ứng".
+
+### 2b. Trừ thưởng thẳng vào đơn (thay cho chi tiền)
+Khi khách đã đạt thưởng bằng tiền mà muốn trừ luôn vào tiền hàng của đơn sau:
+1. Tạo hoặc sửa đơn của khách đó, ở phần tiền kéo xuống ô **Trừ thưởng tháng (đ)**, nhập số tiền thưởng muốn trừ.
+2. Tổng phải thu của đơn **giảm đúng bằng số đó** (tiền hàng − chiết khấu − trừ thưởng + phí vận chuyển). Phiếu in cho khách hiện dòng trừ thưởng.
+3. Khi đơn đã duyệt, số này tự cộng vào cột **"đã ứng"** của khách ở trang **Thưởng & xếp hạng NPP**, và **Còn phải chi** giảm theo. Không cần lập phiếu chi thưởng cho phần đã trừ.
+4. Muốn biết còn phải chi bao nhiêu thì nhìn cột **Còn phải chi** (đã trừ phần ứng và phần đã chi).
+5. Có thể kết hợp: trừ một phần vào đơn, phần còn lại lập **Phiếu chi thưởng** bằng tiền. Số trừ vào đơn và số chi không được vượt quá thưởng đạt được.
+6. Nếu trừ nhầm: sửa đơn (đơn nháp sửa tự do, đơn đã duyệt sửa kèm lý do) để đưa ô này về đúng số. Số **"đã ứng"** âm nghĩa là đã trừ nhiều hơn thưởng đạt được, cần xem lại.
+
+Lưu ý: chỉ tính các đơn đã duyệt trong kỳ của tháng đó. Thưởng của tháng nào thì trừ vào đơn thuộc tháng đó để báo cáo khớp.
 
 ## 3. Tạo đơn: cùng một sản phẩm vừa bán vừa tặng
 Khi tạo đơn, thêm mã đã có dòng bán một lần nữa sẽ ra **dòng tặng kèm** (0 đồng). Kho chỉ thấy một mã với tổng số lượng. Tiền và thưởng chỉ tính phần bán.
