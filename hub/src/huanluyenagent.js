@@ -237,7 +237,7 @@ function draw(){
   var keepV=focusId?document.activeElement.value:null,keepPos=focusId&&document.activeElement.selectionStart;
   root.innerHTML='<div class="hwrap">'+topbar()+'<div id="ht-issues">'+(ST.view==="bot"?issuesBar():"")+"</div>"+
     (ST.ctl.kill?'<div class="alert bad">ĐANG TẮT KHẨN: mọi agent ngừng trả lời ở tất cả Page. Bấm "Gỡ tắt khẩn" để bật lại.</div>':"")+
-    (ST.view==="home"?home():botView())+"</div>"+(ST.drawer?drawerHtml():"");
+    (ST.view==="inbox"?hl():ST.view==="home"?home():botView())+"</div>"+(ST.drawer?drawerHtml():"");
   if(keepV!==null){var el=document.getElementById(focusId);if(el){el.value=keepV;el.focus();try{el.setSelectionRange(keepPos,keepPos)}catch(e){}}}
   var ch=document.getElementById("chat");if(ch)ch.scrollTop=ch.scrollHeight;
   var thr=document.getElementById("thr");if(thr)thr.scrollTop=thr.scrollHeight;
@@ -246,6 +246,7 @@ function draw(){
   if(ST.view==="bot"&&ST.tab==="tc"&&!ST.drawer)loadPreview();
 }
 function topbar(){
+  if(ST.view==="inbox")return '<div class="hph"><h1>Hội thoại</h1><span class="hint">Tin khách và agent trả lời, như hộp thư Pancake · chỉ chị xem</span><span class="sp"></span><button class="btn '+(ST.ctl.kill?"pri":"danger")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button></div>";
   var kill='<button class="btn '+(ST.ctl.kill?"pri":"danger")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button>";
   if(ST.view!=="bot")return '<div class="hph"><h1>Huấn luyện agent</h1><span class="hint">Dạy agent bán hàng trực Page · agent chỉ dùng bản đã xuất bản</span><span class="sp"></span>'+kill+"</div>";
   var pg=pageOfBot();
@@ -303,7 +304,7 @@ function homeLog(){
 }
 /* Cách đặt tab học từ Pancake (thanh tab trên: Hội thoại, Thống kê, Cài đặt; trong Cài đặt có menu trái), Botcake (Cơ bản / Nâng cao), Preny (Thiết lập nhanh / Cài đặt nâng cao). Mục "Sắp có" chưa làm. */
 var NAV=[
-  {k:"hl",n:"Hội thoại",items:[["hl","Hội thoại"],["dx","Đề xuất",1]]},
+  {k:"hl",n:"Đề xuất",soon:1,items:[["dx","Đề xuất"]]},
   {k:"kb",n:"Kịch bản",items:[["tc","Luồng kịch bản"],["cm","Câu mẫu"],["sp","Sản phẩm &amp; giá"],["md","Ảnh / video"],["bd","Bám đuổi"]]},
   {k:"tk",n:"Thống kê",soon:1,items:[["tk","Thống kê luồng"]]},
   {k:"kt",n:"Thử &amp; xuất bản",items:[["ms","Mô phỏng"],["pb","Phiên bản"]]},
@@ -837,7 +838,7 @@ document.addEventListener("input",function(e){
   if(e.target.id==="cvq"){ST.cvQ=e.target.value;clearTimeout(ST.cvT);ST.cvT=setTimeout(function(){ST.cvId=0;ST.cv=null;loadConvs()},350)}
 });
 setInterval(function(){
-  if(!alive()||ST.view!=="bot"||ST.tab!=="hl"||ST.drawer||ST.demo)return;
+  if(!alive()||(ST.view==="inbox"?false:(ST.view!=="bot"||ST.tab!=="hl"))||ST.drawer||ST.demo)return;
   var ae=document.activeElement;if(ae&&ST.root.contains(ae)&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"))return;
   loadConvs();
 },15000);
@@ -866,6 +867,15 @@ document.addEventListener("pointerup",function(){
 });
 
 /* ---------- Mở trang ---------- */
+/* Hội thoại: một mục riêng trong menu, xem tất cả Page, không cần chọn bot */
+PAGES.hoithoaiagent=function(m){
+  m.innerHTML='<div id="ht"></div>'+HT_CSS;
+  ST.root=m.querySelector("#ht");
+  ST.view="inbox";ST.drawer=null;ST.toast="";ST.cvId=0;ST.cv=null;ST.cvTag=0;ST.cvQ="";ST.cvPage="all";ST.demo=false;ST.demoAll=null;ST.botId="";ST.tab="hl";
+  ST.doc={products:[],lib:[],flows:[],offers:[],media:[],follow:[],rules:[],handoff:[],banned:[]};
+  draw();
+  Promise.all([api("/tags"),api("/pages"),api("/control")]).then(function(r){ST.tags=r[0];ST.pages=r[1];ST.ctl=r[2];return loadConvs()}).catch(function(e){toast("Chưa tải được: "+e.message)});
+};
 PAGES.huanluyenagent=function(m){
   m.innerHTML='<div id="ht"></div>'+HT_CSS;
   ST.root=m.querySelector("#ht");
@@ -876,4 +886,4 @@ PAGES.huanluyenagent=function(m){
 })();
 {const s=MODULES.find(m=>m.k==="setup");if(s){const g0=s.groups;s.groups=()=>{const G=g0();const hs=G.find(g=>g[0]==="Hệ thống");if(hs)hs[1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}
 {const i=MODULES.findIndex(m=>m.k==="agt");const mod=MODULES[i];
- if(mod){const g0=mod.groups;mod.groups=()=>{const G=g0();G[0][1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}
+ if(mod){const g0=mod.groups;mod.groups=()=>{const G=g0();G[0][1].push(MI("hoithoaiagent","Hội thoại",u=>u.role==="admin"));G[0][1].push(MI("huanluyenagent","Huấn luyện agent",u=>u.role==="admin"));return G}}}
