@@ -1,4 +1,4 @@
--- Migration 0082: ghi âm trên web Điều hành agent -> máy ở văn phòng nghe bằng Whisper rồi trả chữ.
+-- Migration 0083: ghi âm trên web Điều hành agent -> máy ở văn phòng nghe bằng Whisper rồi trả chữ.
 -- Âm thanh chỉ tồn tại tới khi nghe xong (xóa ngay), chữ giữ 1 ngày rồi dọn.
 CREATE TABLE agent_stt_jobs (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
