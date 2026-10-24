@@ -1785,6 +1785,32 @@ const isPosChannel = (v: unknown): v is Channel => typeof v === 'string' && (POS
 const isSrcChannel = (v: unknown): v is Channel => typeof v === 'string' && (SOURCE_CHANNELS as string[]).includes(v);
 const httpFetch = (url: string) => fetch(url);
 
+/** Bán lẻ B2C theo khoảng ngày: tổng hợp từng ngày/kênh và chi tiết từng dòng phiếu (để lọc theo thời gian và tải báo cáo). */
+khoRoutes.get('/online/range', async (c) => {
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  if (!isDate(from) || !isDate(to)) throw badRequest('BAD_RANGE', 'Cần chọn ngày bắt đầu và kết thúc');
+  if (from > to) throw badRequest('BAD_RANGE', 'Ngày bắt đầu phải trước ngày kết thúc');
+  const span = (Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 864e5;
+  if (span > 370) throw badRequest('TOO_LONG', 'Chọn tối đa 1 năm mỗi lần');
+  const runs = await c.env.DB.prepare(
+    `SELECT r.channel, r.day, r.orders,
+            COALESCE((SELECT SUM(qty) FROM channel_out o WHERE o.channel = r.channel AND o.day = r.day), 0) AS qty,
+            COALESCE((SELECT SUM(qty) FROM channel_unmapped u WHERE u.channel = r.channel AND u.day = r.day), 0) AS unmapped_qty
+     FROM channel_runs r WHERE r.day >= ? AND r.day <= ? ORDER BY r.day DESC, r.channel`,
+  )
+    .bind(from, to)
+    .all<Record<string, unknown>>();
+  const lines = await c.env.DB.prepare(
+    `SELECT o.channel, o.day, o.item AS code, COALESCE(i.name, o.item) AS name, COALESCE(i.unit, '') AS unit, o.qty
+     FROM channel_out o LEFT JOIN kho_items i ON i.code = o.item
+     WHERE o.day >= ? AND o.day <= ? ORDER BY o.day DESC, o.channel, o.item`,
+  )
+    .bind(from, to)
+    .all<Record<string, unknown>>();
+  return ok(c, { from, to, runs: runs.results ?? [], lines: lines.results ?? [] });
+});
+
 /** Phiếu xuất bán lẻ trong một ngày: mỗi kênh một phiếu XL-<kênh>-<ngày>, các dòng là sản phẩm lẻ đã trừ kho (từ bảng channel_out). */
 khoRoutes.get('/online/day', async (c) => {
   const day = c.req.query('day');

@@ -85,4 +85,17 @@ describe('nạp tồn đầu kỳ (phiếu TD)', () => {
     expect(v[2].lines[0].qty).toBe(3);
     expect((await ctx.request('/api/hub/kho/online/day?day=abc', { as: USERS.ceo })).status).toBe(400);
   });
+  it('Xuất B2C: lọc theo khoảng ngày và lấy báo cáo xuất theo ngày (tổng hợp + chi tiết dòng phiếu)', async () => {
+    await ctx.db.prepare("INSERT INTO channel_out (channel, day, item, qty) VALUES ('TIKTOK', '2026-10-20', 'M07', 5), ('TIKTOK', '2026-10-23', 'M07', 12), ('FACEBOOK', '2026-10-23', 'M08', 3)").run();
+    await ctx.db.prepare("INSERT INTO channel_runs (channel, day, orders, lines, received_at, source) VALUES ('TIKTOK', '2026-10-23', 40, 1, '2026-10-24T00:00:00Z', 'POSCAKE')").run();
+    const r = await ctx.request('/api/hub/kho/online/range?from=2026-10-22&to=2026-10-24', { as: USERS.ceo });
+    expect(r.status).toBe(200);
+    expect(r.body.data.lines.map((l: { day: string; channel: string; qty: number }) => [l.day, l.channel, l.qty])).toEqual([
+      ['2026-10-23', 'FACEBOOK', 3],
+      ['2026-10-23', 'TIKTOK', 12],
+    ]);
+    expect(r.body.data.runs).toHaveLength(1);
+    expect(r.body.data.runs[0]).toMatchObject({ channel: 'TIKTOK', day: '2026-10-23', orders: 40, qty: 12 });
+    expect((await ctx.request('/api/hub/kho/online/range?from=2026-10-24&to=2026-10-22', { as: USERS.ceo })).status).toBe(400);
+  });
 });
