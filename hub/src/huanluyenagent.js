@@ -166,6 +166,29 @@ var HT_CSS=`<style id="ht-css">
 #ht .ordh{display:flex;justify-content:space-between;font-weight:700}
 #ht .steps2{display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
 #ht .steps2 .on{color:var(--orange);font-weight:700}
+
+/* Ảnh trong chat như Pancake; chữ nhỏ gọn, khối chữ mỏng */
+#ht .pgrid{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;max-width:200px}
+#ht .pgrid img,#ht .pth{width:98px;height:98px;object-fit:cover;border-radius:6px;display:block}
+#ht .pth{display:flex;align-items:flex-end;padding:4px;color:#475467;font-size:10.5px;font-weight:700}
+#ht .pcap{font-size:10.5px;opacity:.7;margin-top:2px}
+#ht .inbox{font-size:13px;line-height:1.35}
+#ht .thr{padding:10px 12px;gap:4px}
+#ht .tm{padding:5px 9px;border-radius:9px;max-width:72%;font-size:13px;line-height:1.38;border-width:1.5px}
+#ht .tm .src{font-size:10px;margin-bottom:1px;font-weight:600}
+#ht .ci{padding:6px 8px;gap:8px}
+#ht .ci b{font-size:13px}
+#ht .av{width:32px;height:32px;font-size:13px}
+#ht .tg{font-size:9.5px;padding:0 5px;margin:2px 3px 0 0}
+#ht .cl2 .hint,#ht .chd .hint{font-size:11.5px}
+#ht .chd{padding:4px 10px}
+#ht .comp{padding:6px 10px;font-size:11.5px}
+#ht .rpb{padding:8px 10px;font-size:12.5px}
+#ht .rpb .hint,#ht .rpb .ord{font-size:12px}
+#ht .sect{font-size:12px;margin:10px 0 4px;padding-top:7px}
+#ht .achip{font-size:11px;padding:1px 8px}
+#ht .ocard{font-size:11.5px;padding:5px 8px}
+#ht .cft{padding:6px}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -393,7 +416,8 @@ function demoData(){
 }
 function msgBody(m){
   var s=esc(m.text);
-  if(m.img)s+='<div class="dimg">🖼 '+esc(m.img)+"</div>";
+  if(m.images&&m.images.length)s+='<div class="pgrid">'+m.images.map(function(u){return '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="Ảnh"></a>'}).join("")+"</div>";
+  else if(m.img){var n=(String(m.img).match(/\((\d+) ảnh\)/)||[0,1])[1]|0,h=["#f6d365","#a1c4fd","#84fab0","#fbc2eb","#ffecd2","#c2e9fb"],t="";for(var i=0;i<n;i++)t+='<div class="pth" style="background:linear-gradient(135deg,'+h[i%h.length]+',#fff)"><span>Ảnh '+(i+1)+"/"+n+"</span></div>";s+='<div class="pgrid">'+t+'</div><div class="pcap">'+esc(m.img)+" · ảnh mẫu</div>"}
   if(m.order&&ST.cv&&ST.cv.order){var o=ST.cv.order;s+='<div class="ocard"><b>Xác nhận đơn đặt hàng</b><div>'+esc(o.items)+"</div><div>Đơn "+esc(o.code)+" · "+esc(o.money)+"</div><div>"+esc(o.name)+" · "+esc(o.phone)+"</div><div>"+esc(o.addr)+"</div></div>"}
   return s;
 }

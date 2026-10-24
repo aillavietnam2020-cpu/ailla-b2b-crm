@@ -467,4 +467,13 @@ describe('Thêm Page bằng link', () => {
     expect((await ceo('/pages', { name: 'Trùng', fb_page_id: `facebook.com/profile.php?id=${ID}` })).status).toBe(409);
     expect((await ceo('/pages', { name: '', fb_page_id: ID })).status).toBe(400);
   });
+
+  it('tin có ảnh: chỉ nhận đường dẫn https, trả về cho chị xem', async () => {
+    const push = (psid: string, messages: unknown[], name: string) => relay('POST', '/messages', { page: '105017945992971', psid, name, messages });
+    const convs = async () => (await ceo('/convs')).body.data as any[];
+    await push('psid-img', [{ ext_id: 'i1', who: 'agent', text: 'Dạ em gửi bảng giá', images: ['https://example.com/a.jpg', 'http://x.com/b.jpg', 'javascript:alert(1)'] }], 'Khách ảnh');
+    const id = (await convs()).find((x) => x.name === 'Khách ảnh').id;
+    const d = (await ceo(`/convs/${id}`)).body.data;
+    expect(d.messages[0].images).toEqual(['https://example.com/a.jpg']);
+  });
 });
