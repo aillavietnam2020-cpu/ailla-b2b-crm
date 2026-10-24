@@ -73,4 +73,16 @@ describe('nạp tồn đầu kỳ (phiếu TD)', () => {
     expect(later.body.data.opening).toBe(7);
     expect(later.body.data.rows).toHaveLength(0);
   });
+  it('Xuất B2C: bấm một ngày thấy phiếu xuất bán lẻ của từng kênh (XL-<kênh>-<ngày>) với các dòng đã trừ kho', async () => {
+    await ctx.db.prepare("INSERT INTO channel_out (channel, day, item, qty) VALUES ('TIKTOK', '2026-10-23', 'M07', 12)").run();
+    await ctx.db.prepare("INSERT INTO channel_out (channel, day, item, qty) VALUES ('FACEBOOK', '2026-10-23', 'M07', 3)").run();
+    const r = await ctx.request('/api/hub/kho/online/day?day=2026-10-23', { as: USERS.ceo });
+    expect(r.status).toBe(200);
+    const v = r.body.data.vouchers as Array<{ channel: string; no: string; lines: Array<{ code: string; qty: number }> }>;
+    expect(v.map((x) => x.no)).toEqual(['XL-TT-20261023', 'XL-SP-20261023', 'XL-FB-20261023']);
+    expect(v[0].lines[0]).toMatchObject({ code: 'M07', qty: 12 });
+    expect(v[1].lines).toHaveLength(0);
+    expect(v[2].lines[0].qty).toBe(3);
+    expect((await ctx.request('/api/hub/kho/online/day?day=abc', { as: USERS.ceo })).status).toBe(400);
+  });
 });

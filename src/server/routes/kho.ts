@@ -1785,6 +1785,32 @@ const isPosChannel = (v: unknown): v is Channel => typeof v === 'string' && (POS
 const isSrcChannel = (v: unknown): v is Channel => typeof v === 'string' && (SOURCE_CHANNELS as string[]).includes(v);
 const httpFetch = (url: string) => fetch(url);
 
+/** Phiếu xuất bán lẻ trong một ngày: mỗi kênh một phiếu XL-<kênh>-<ngày>, các dòng là sản phẩm lẻ đã trừ kho (từ bảng channel_out). */
+khoRoutes.get('/online/day', async (c) => {
+  const day = c.req.query('day');
+  if (!isDate(day)) throw badRequest('BAD_DATE', 'Ngày không đúng');
+  const rows = await c.env.DB.prepare(
+    `SELECT o.channel, o.item AS code, COALESCE(i.name, o.item) AS name, COALESCE(i.unit, '') AS unit, o.qty
+     FROM channel_out o LEFT JOIN kho_items i ON i.code = o.item
+     WHERE o.day = ? ORDER BY o.channel, o.item`,
+  )
+    .bind(day)
+    .all<{ channel: string; code: string; name: string; unit: string; qty: number }>();
+  const runs = await c.env.DB.prepare('SELECT channel, orders FROM channel_runs WHERE day = ?').bind(day).all<{ channel: string; orders: number | null }>();
+  const orders: Record<string, number | null> = {};
+  for (const r of runs.results ?? []) orders[r.channel] = r.orders;
+  const out = ['TIKTOK', 'SHOPEE', 'FACEBOOK'].map((ch) => {
+    const code = ch === 'TIKTOK' ? 'TT' : ch === 'SHOPEE' ? 'SP' : 'FB';
+    return {
+      channel: ch,
+      no: `XL-${code}-${day.replace(/-/g, '')}`,
+      orders: orders[ch] ?? null,
+      lines: (rows.results ?? []).filter((r) => r.channel === ch),
+    };
+  });
+  return ok(c, { day, vouchers: out });
+});
+
 khoRoutes.get('/online/source', async (c) => {
   const rows = await c.env.DB
     .prepare('SELECT channel, shop_id, shop_names, last_sync_at, last_sync_note, updated_at FROM channel_source')

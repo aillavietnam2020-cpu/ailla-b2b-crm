@@ -303,7 +303,7 @@ function khoOnStats(O){
   const last7=days.slice(0,7),sum=f=>last7.reduce((s,d)=>s+f(d),0);
   const un=sum(d=>CH.reduce((s,c)=>s+(+get(d,c).unmapped_qty||0),0));
   const kpis=`<div class="grid kpis">${CH.map(c=>kpi("Đơn "+SH[c]+" (7 ngày)",knum(sum(d=>+get(d,c).orders||0)))).join("")}${kpi("Sản phẩm lẻ bán (7 ngày)",knum(sum(d=>CH.reduce((s,c)=>s+tot(d,c),0))))}${kpi("Chưa có mã vật tư",knum(un))}</div>`;
-  const matrix=days.length?`<section class="card flush"><div class="card-h pad"><h2>Bán theo ngày</h2><span class="hint">Ngày tính theo giờ "đã gửi hàng".</span></div><div style="overflow:auto">${tbl(["Ngày"].concat(...CH.map(c=>[SH[c]+": đơn",SH[c]+": sản phẩm"]),["Tổng sản phẩm","Chưa có mã"]),days.map(d=>{const u=CH.reduce((s,c)=>s+(+get(d,c).unmapped_qty||0),0);return `<tr><td>${kDd(d)}</td>${CH.map(c=>`<td class="n">${knum(get(d,c).orders||0)}</td><td class="n">${knum(tot(d,c))}</td>`).join("")}<td class="n"><b>${knum(CH.reduce((s,c)=>s+tot(d,c),0))}</b></td><td class="n">${u?"<b>"+knum(u)+"</b>":"0"}</td></tr>`}))}</div></section>`:"";
+  const matrix=days.length?`<section class="card flush"><div class="card-h pad"><h2>Bán theo ngày</h2><span class="hint">Ngày tính theo giờ "đã gửi hàng".</span></div><div style="overflow:auto">${tbl(["Ngày"].concat(...CH.map(c=>[SH[c]+": đơn",SH[c]+": sản phẩm"]),["Tổng sản phẩm","Chưa có mã"]),days.map(d=>{const u=CH.reduce((s,c)=>s+(+get(d,c).unmapped_qty||0),0);return `<tr class="clk" data-dayv="${d}" title="Bấm để xem phiếu xuất trong ngày"><td>${kDd(d)}</td>${CH.map(c=>`<td class="n">${knum(get(d,c).orders||0)}</td><td class="n">${knum(tot(d,c))}</td>`).join("")}<td class="n"><b>${knum(CH.reduce((s,c)=>s+tot(d,c),0))}</b></td><td class="n">${u?"<b>"+knum(u)+"</b>":"0"}</td></tr>`}))}</div></section>`:"";
   const by=new Map();(O.top||[]).forEach(r=>{const x=by.get(r.code)||{code:r.code,name:r.name||r.code,unit:r.unit||"",TIKTOK:0,SHOPEE:0,FACEBOOK:0};x[r.channel]=+r.qty||0;by.set(r.code,x)});
   const T=r=>CH.reduce((s,c)=>s+(r[c]||0),0);
   const top=[...by.values()].sort((a,b)=>T(b)-T(a)).slice(0,15);
@@ -1130,6 +1130,19 @@ function khoTidyOnline(m){
   if(viewNav)viewNav.classList.add("uline")}
 {const _o=PAGES.kho_online;PAGES.kho_online=m=>{_o(m);khoTidyOnline(m)}}
 
+/* Bảng "Bán theo ngày" ở tab Tất cả: bấm một ngày để xem các phiếu xuất bán lẻ của ngày đó (mỗi kênh một phiếu), in được. */
+async function khoDayVouchers(day){
+  let r;try{r=await kApi("/online/day?day="+day)}catch(e){toast(e.message);return}
+  const CHN={TIKTOK:"TikTok",SHOPEE:"Shopee",FACEBOOK:"Facebook"};
+  const blocks=r.vouchers.map(v=>{const tot=v.lines.reduce((s,l)=>s+l.qty,0);
+    return `<section class="card" style="margin-bottom:10px"><div class="card-h"><h2>${v.no}</h2><span class="hint">Xuất bán lẻ ${CHN[v.channel]}${v.orders!=null?" · "+v.orders+" đơn":""}</span></div>
+     ${v.lines.length?`<table class="tbl"><thead><tr><th>Mã</th><th>Sản phẩm</th><th class="n">Số lượng</th></tr></thead><tbody>${v.lines.map(l=>`<tr><td class="mono">${esc(l.code)}</td><td>${esc(l.name)}</td><td class="n">${knum(l.qty)}</td></tr>`).join("")}<tr><td colspan="2"><b>Tổng</b></td><td class="n"><b>${knum(tot)}</b></td></tr></tbody></table><div class="acts" style="margin-top:8px"><button class="btn" data-dvp="${v.channel}">In phiếu</button></div>`:`<p class="hint">Ngày này không có hàng trừ kho ở ${CHN[v.channel]} (không có đơn, hoặc chưa có mã vật tư).</p>`}</section>`}).join("");
+  openDrawerHTML(`<h2>Phiếu xuất bán lẻ ngày ${kDd(day)}</h2><p class="hint">Tự lập từ đơn Poscake, sản phẩm đã tách combo. Mỗi ngày mỗi kênh một phiếu, số phiếu cố định.</p>${blocks}`);
+  document.querySelectorAll("[data-dvp]").forEach(b=>b.onclick=()=>{
+    const v=r.vouchers.find(x=>x.channel===b.dataset.dvp),tot=v.lines.reduce((s,l)=>s+l.qty,0),rows=v.lines.map(l=>`<tr><td>${esc(l.code)}</td><td>${esc(l.name)}</td><td class="n">${knum(l.qty)}</td></tr>`).join("");
+    const w=window.open("","_blank");if(!w)return;
+    w.document.write(`<html><head><meta charset="utf-8"><title>${v.no}</title><style>body{font:14px Arial;margin:28px}h1{font-size:20px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #444;padding:6px 8px;text-align:left}th.n,td.n{text-align:right}.sg{display:flex;justify-content:space-between;margin-top:46px;text-align:center}.sg div{width:30%}</style></head><body><h1>PHIẾU XUẤT KHO BÁN LẺ ${CHN[v.channel].toUpperCase()}</h1><div>Số phiếu: <b>${v.no}</b> · Ngày xuất: <b>${kDd(day)}</b>${v.orders!=null?" · Số đơn: "+v.orders:""}</div><table><thead><tr><th>Mã</th><th>Sản phẩm</th><th class="n">Số lượng</th></tr></thead><tbody>${rows}<tr><td colspan="2"><b>Tổng</b></td><td class="n"><b>${knum(tot)}</b></td></tr></tbody></table><div class="sg"><div>Người lập<br><br><br></div><div>Thủ kho<br><br><br></div><div>Kế toán<br><br><br></div></div><script>onload=()=>print()<\/script></body></html>`);w.document.close()});
+}
 /* Phiếu xuất bán lẻ theo ngày của từng kênh: mỗi ngày mỗi kênh một phiếu, số phiếu cố định XL-<kênh>-<ngày>. */
 function khoVoucherOpen(i){
   const S=KHO.onForm||{},V=S.vch&&S.vch.days[i];if(!V)return;
@@ -1142,4 +1155,4 @@ function khoVoucherOpen(i){
   $("#vch-pr").onclick=()=>{const w=window.open("","_blank");if(!w)return;
     w.document.write(`<html><head><meta charset="utf-8"><title>${V.no}</title><style>body{font:14px Arial;margin:28px}h1{font-size:20px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #444;padding:6px 8px;text-align:left}th.n,td.n{text-align:right}.sg{display:flex;justify-content:space-between;margin-top:46px;text-align:center}.sg div{width:30%}</style></head><body><h1>PHIẾU XUẤT KHO BÁN LẺ ${CHN.toUpperCase()}</h1><div>Số phiếu: <b>${V.no}</b> · Ngày xuất: <b>${kDd(V.day)}</b> · Số đơn: ${V.orders}</div><table><thead><tr><th>Mã</th><th>Sản phẩm</th><th class="n">Số lượng</th></tr></thead><tbody>${rows}<tr><td colspan="2"><b>Tổng</b></td><td class="n"><b>${knum(tot)}</b></td></tr></tbody></table><div class="sg"><div>Người lập<br><br><br></div><div>Thủ kho<br><br><br></div><div>Kế toán<br><br><br></div></div><script>onload=()=>print()<\/script></body></html>`);w.document.close()}}
 /* Bấm dòng hoặc nút "Xem phiếu" để mở phiếu xuất. Gắn cho cả trang vận hành (kho_online) và trang quản trị (kho_qd). */
-for(const k of ["kho_online","kho_qd"]){const _o=PAGES[k];if(_o)PAGES[k]=m=>{_o(m);m.querySelectorAll("tr[data-vch]").forEach(r=>r.onclick=e=>{if(e.target.closest("button")&&e.target.dataset.vch===undefined)return;khoVoucherOpen(+r.dataset.vch)})}}
+for(const k of ["kho_online","kho_qd"]){const _o=PAGES[k];if(_o)PAGES[k]=m=>{_o(m);m.querySelectorAll("tr[data-dayv]").forEach(r=>r.onclick=()=>khoDayVouchers(r.dataset.dayv));m.querySelectorAll("tr[data-vch]").forEach(r=>r.onclick=e=>{if(e.target.closest("button")&&e.target.dataset.vch===undefined)return;khoVoucherOpen(+r.dataset.vch)})}}
