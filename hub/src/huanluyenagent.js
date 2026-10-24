@@ -92,7 +92,7 @@ var HT_CSS=`<style id="ht-css">
 #ht .hdrawer .df{padding:12px 18px 84px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 @container ht (max-width:900px){#ht .shell{grid-template-columns:1fr}#ht .hside{position:static;display:flex;flex-wrap:wrap;gap:2px}#ht .hside .sec{width:100%}#ht .hside button{width:auto}#ht .two,#ht .split{grid-template-columns:1fr}}
 
-#ht .inbox{display:grid;grid-template-columns:290px minmax(0,1fr) 310px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);min-height:560px;box-shadow:var(--shadow)}
+#ht .inbox{display:grid;grid-template-columns:270px minmax(0,1fr) 340px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);height:calc(100vh - 150px);min-height:480px;box-shadow:var(--shadow)}
 #ht .inbox>div{min-width:0}
 #ht .cl{border-right:1px solid var(--line);overflow-y:auto;max-height:680px}
 #ht .cft{padding:10px;border-bottom:1px solid var(--line);display:grid;gap:6px;position:sticky;top:0;background:var(--surface);z-index:1}
@@ -124,8 +124,6 @@ var HT_CSS=`<style id="ht-css">
 #ht .rpt h4:first-child{margin-top:0}
 #ht .pvx{background:var(--gray-soft);border-radius:10px;padding:8px 10px;font-size:13px}
 /* Màn Hội thoại co theo bề rộng khung trang (không theo màn hình), vì menu bên trái của web đã chiếm chỗ */
-@container ht (max-width:1300px){#ht .inbox{grid-template-columns:280px minmax(0,1fr)}#ht .inbox .rp{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line);max-height:none}}
-@container ht (max-width:780px){#ht .inbox{grid-template-columns:1fr}#ht .cl{max-height:300px;border-right:0;border-bottom:1px solid var(--line)}}
 
 #ht .hwrap{container:ht/inline-size}
 #ht .chd{flex-wrap:wrap}
@@ -133,6 +131,31 @@ var HT_CSS=`<style id="ht-css">
 #ht .rp,#ht .rpt{overflow-wrap:anywhere}
 #ht .achip{white-space:normal;text-align:left}
 #ht .thr{min-height:180px}
+
+/* Màn Hội thoại giống bố cục Pancake: cao cả màn hình, cuộn riêng từng cột, thanh thẻ và ô nhập ghim ở đáy */
+#ht .cl{display:flex;flex-direction:column;max-height:none;overflow:hidden}
+#ht .cft{display:flex;flex-direction:column;gap:6px;padding:8px;position:static}
+#ht .clist{flex:1;overflow-y:auto;min-height:0}
+#ht .tgf{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+#ht .sq{width:18px;height:12px;border-radius:3px;cursor:pointer;opacity:.55}
+#ht .sq.on,#ht .sq:hover{opacity:1;box-shadow:0 0 0 2px var(--ink)}
+#ht .ci{display:flex;gap:10px;align-items:flex-start;padding:8px 10px}
+#ht .av{width:38px;height:38px;border-radius:50%;background:var(--violet-soft);color:var(--violet);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+#ht .cib{min-width:0;flex:1}
+#ht .cm2{height:100%;min-height:0}
+#ht .chd{padding:6px 12px;gap:10px;justify-content:flex-start}
+#ht .chd .av{width:32px;height:32px}
+#ht .thr{flex:1;max-height:none;min-height:0}
+#ht .rp{max-height:none;padding:0;display:flex;flex-direction:column;overflow:hidden}
+#ht .rtabs{display:flex;border-bottom:1px solid var(--line)}
+#ht .rtabs button{flex:1;border:0;background:none;padding:10px;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+#ht .rtabs button.on{color:var(--pink);border-bottom-color:var(--pink)}
+#ht .rpb{padding:12px;overflow-y:auto;flex:1;min-height:0}
+#ht .sect{font-weight:700;font-size:13px;margin:14px 0 6px;padding-top:10px;border-top:1px solid var(--line)}
+@container ht (max-width:980px){#ht .inbox{grid-template-columns:240px minmax(0,1fr);height:auto}#ht .inbox .rp{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line);max-height:420px}#ht .inbox .cl,#ht .inbox .cm2{height:calc(100vh - 200px);min-height:420px}}
+@container ht (max-width:720px){#ht .inbox{grid-template-columns:1fr}#ht .inbox .cl{height:300px;min-height:0;border-right:0;border-bottom:1px solid var(--line)}}
+#ht .tagbar{flex-wrap:nowrap}
+#ht .tagbar button{min-width:0;font-size:10px;padding:6px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>`;
 var api=function(p,o){return svApi("/api/agent-train"+p,o)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -142,7 +165,7 @@ function fm(s){try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",min
 function nowHM(){var d=new Date();return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}
 
 var ST={view:"home",hsub:"bp",bots:[],pages:[],ctl:{kill:false,testers:"",silent_minutes:30,hours_from:"",hours_to:""},hlog:[],runs:[],
-  botId:"",name:"",doc:null,issues:[],versions:[],dirty:false,save:"saved",tab:"tt",sel:"",node:"",conn:null,drawer:null,toast:"",sec:"kb",tags:[],convs:null,cv:null,cvId:0,cvMsg:0,cvTag:0,cvQ:"",cvPage:"",
+  botId:"",name:"",doc:null,issues:[],versions:[],dirty:false,save:"saved",tab:"tt",sel:"",node:"",conn:null,drawer:null,toast:"",sec:"kb",rpTab:"info",tags:[],convs:null,cv:null,cvId:0,cvMsg:0,cvTag:0,cvQ:"",cvPage:"",
   xh:"",phone:false,chat:[],cur:null,simlog:[],root:null,pvTok:0,q:"",busy:false};
 
 /* ---------- Tự lưu nháp ---------- */
@@ -310,15 +333,14 @@ function hl(){
   var showPages=ST.cvPage==="all"||!pages.length?null:pages.map(function(p){return p.fb_page_id});
   var list=(ST.convs||[]).filter(function(c){return !showPages||showPages.indexOf(c.fb_page_id)>=0});
   var stage=ST.tags.filter(function(t){return t.kind==="stage"}),prod=ST.tags.filter(function(t){return t.kind==="product"});
-  var opts='<option value="">Lọc theo thẻ</option>'+ST.tags.map(function(t){return '<option value="'+t.id+'"'+(ST.cvTag===t.id?" selected":"")+">"+esc(t.name)+"</option>"}).join("");
-  var popts=pages.length?'<option value="">Page của bot này</option><option value="all"'+(ST.cvPage==="all"?" selected":"")+">Tất cả Page</option>":"";
+  var filt='<div class="tgf">'+ST.tags.map(function(t){return '<span class="sq'+(ST.cvTag===t.id?" on":"")+'" style="background:'+TCOL[t.color]+'" data-act="cvfilt" data-id="'+t.id+'" title="Lọc: '+esc(t.name)+'"></span>'}).join("")+(ST.cvTag?'<span class="hint" style="cursor:pointer" data-act="cvfilt" data-id="0">bỏ lọc</span>':"")+"</div>";
   var lhtml=list.map(function(c){
-    var sel=ST.cvId===c.id;
-    return '<div class="ci'+(sel?" on":"")+'" data-act="cv" data-id="'+c.id+'"><div class="row between"><b>'+esc(c.name||"Khách "+c.id)+'</b><span class="hint" style="flex:none">'+fm(c.last_at)+'</span></div><div class="cl2"><span class="hint">'+(c.last_who==="agent"?"Agent: ":c.last_who==="sale"?"NV: ":c.last_who==="system"?"Agent dừng: ":"")+esc(c.last_text)+"</span>"+(c.unread?'<span class="un">'+c.unread+"</span>":"")+"</div><div>"+c.tag_ids.map(tagChip).join("")+"</div></div>"}).join("")||'<div class="ci hint">Chưa có hội thoại nào'+(ST.cvTag||ST.cvQ?" khớp bộ lọc":". Khi công cụ trên VPS đẩy tin lên, hội thoại sẽ hiện ở đây")+".</div>";
+    var sel=ST.cvId===c.id,ini=(c.name||"K").trim().charAt(0).toUpperCase();
+    return '<div class="ci'+(sel?" on":"")+'" data-act="cv" data-id="'+c.id+'"><span class="av">'+esc(ini)+'</span><div class="cib"><div class="row between" style="flex-wrap:nowrap"><b>'+esc(c.name||"Khách "+c.id)+'</b><span class="hint" style="flex:none">'+fm(c.last_at)+'</span></div><div class="cl2"><span class="hint">'+(c.last_who==="agent"?"Agent: ":c.last_who==="sale"?"NV: ":c.last_who==="system"?"Agent dừng: ":"")+esc(c.last_text)+"</span>"+(c.unread?'<span class="un">'+c.unread+"</span>":"")+"</div><div>"+c.tag_ids.map(tagChip).join("")+"</div></div></div>"}).join("")||'<div class="ci hint">Chưa có hội thoại nào'+(ST.cvTag||ST.cvQ?" khớp bộ lọc":". Khi công cụ trên VPS đẩy tin lên, hội thoại sẽ hiện ở đây")+".</div>";
   var cv=ST.cv,mid="",right="";
   if(cv){
     var sel=ST.cvMsg?cv.messages.filter(function(m){return m.id===ST.cvMsg})[0]:null;
-    mid='<div class="chd"><div><b>'+esc(cv.name||"Khách "+cv.id)+'</b><div class="hint">'+esc(cv.page_name||cv.fb_page_id)+(cv.bot_name?" · bot "+esc(cv.bot_name):"")+'</div></div><button class="btn sm danger" data-act="cvdel" data-id="'+cv.id+'">Xóa khỏi web</button></div>'+
+    mid='<div class="chd"><span class="av">'+esc((cv.name||"K").trim().charAt(0).toUpperCase())+'</span><div style="min-width:0"><b>'+esc(cv.name||"Khách "+cv.id)+'</b><div class="hint">'+esc(cv.page_name||cv.fb_page_id)+(cv.bot_name?" · bot "+esc(cv.bot_name):"")+'</div></div><span class="sp"></span><button class="btn sm danger" data-act="cvdel" data-id="'+cv.id+'">Xóa khỏi web</button></div>'+
      '<div class="thr" id="thr">'+cv.messages.map(function(m){
        var cls=m.who==="customer"?"k":m.who==="agent"?"a":m.who==="sale"?"s2":"sys";
        var src=m.who==="agent"?"Agent"+(m.flow?" · "+esc(m.flow):"")+(m.version?" · bản "+m.version:""):(WHO[m.who]||m.who)+(m.who==="system"&&m.flow?" · "+esc(m.flow):"");
@@ -326,13 +348,19 @@ function hl(){
        return '<div class="tm '+cls+(ST.cvMsg===m.id?" pk":"")+(m.wrong?" wr":"")+'"'+(click?' data-act="msgsel" data-id="'+m.id+'"':"")+'><span class="src">'+src+" · "+fmT(m.at)+(m.wrong?" · đã đánh dấu sai":"")+"</span>"+esc(m.text)+"</div>"}).join("")+"</div>"+
      '<div class="tagbar">'+stage.map(function(t){var on=cv.tag_ids.indexOf(t.id)>=0;return '<button class="'+(on?"on":"")+'" style="background:'+TCOL[t.color]+'" data-act="cvtag" data-id="'+t.id+'" title="'+(on?"Bỏ thẻ":"Gắn thẻ")+'">'+esc(t.name)+"</button>"}).join("")+"</div>"+
      '<div class="comp">Chỉ xem. Trả lời khách ở Pancake. Tin ở đây đã che số điện thoại, email, link.</div>';
-    right='<div class="rpt"><h4>Thông tin</h4><div class="hint">Khách: <b style="color:var(--ink)">'+esc(cv.name||"(chưa có tên)")+"</b></div><div class=\"hint\">Page: "+esc(cv.page_name||cv.fb_page_id)+'</div><div class="hint">Bot: '+(cv.bot_name?esc(cv.bot_name):"chưa gắn")+'</div><div class="hint">Tin gần nhất: '+fm(cv.last_at)+"</div>"+
-     '<h4>Ghi chú</h4><textarea data-act="cvnote" placeholder="Ghi chú về khách này…" style="min-height:70px">'+esc(cv.note||"")+"</textarea>"+
-     '<h4>Thẻ giai đoạn</h4><div>'+(stage.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có thẻ giai đoạn.</span>')+'</div><h4>Thẻ sản phẩm</h4><div>'+(prod.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có thẻ sản phẩm. Thêm ở Cài đặt, Thẻ hội thoại.</span>')+"</div>"+
-     (sel?'<h4>Vì sao agent làm vậy</h4><div class="pvx">'+esc(sel.why||"Chưa có lý do (công cụ VPS chưa gửi kèm).")+'</div><h4>Agent đã lấy gì</h4><div class="log">'+esc(sel.got||"Chưa có dữ liệu.")+'</div><div class="row" style="margin-top:8px"><button class="btn sm'+(sel.wrong?" danger":"")+'" data-act="wrongmsg" data-id="'+sel.id+'">'+(sel.wrong?"Bỏ đánh dấu sai":"Agent trả lời sai")+'</button>'+(sel.who==="agent"?'<button class="btn sm pri" data-act="mkphrase" data-id="'+sel.id+'">Tạo câu mẫu từ tin này</button>':"")+"</div>":'<h4>Chi tiết tin</h4><p class="hint">Bấm vào một tin của agent (khung xanh đậm hoặc đỏ) để xem vì sao agent chọn luồng đó và đã lấy dữ liệu gì.</p>')+"</div>";
-  }else{mid='<div class="emp">Chọn một hội thoại ở bên trái</div>';right='<div class="rpt hint">Chưa chọn hội thoại.</div>'}
-  return '<div class="hph"><div><h1>Hội thoại</h1><div class="hint">Xem tin khách và agent trả lời như hộp thư Pancake, để huấn luyện. Chỉ chị xem. Tin do công cụ trên VPS đẩy lên, đã che số điện thoại; tự xóa sau 90 ngày.</div></div></div>'+
-   '<div class="inbox"><div class="cl"><div class="cft"><input type="text" id="cvq" placeholder="Tìm khách…" value="'+esc(ST.cvQ||"")+'"><select data-act="cvfilter">'+opts+"</select>"+(popts?'<select data-act="cvpage">'+popts+"</select>":"")+"</div>"+lhtml+'</div><div class="cm2">'+mid+'</div><div class="rp">'+right+"</div></div>";
+    var tabs='<div class="rtabs"><button data-act="rptab" data-id="info" class="'+(ST.rpTab==="info"?"on":"")+'">Thông tin</button><button data-act="rptab" data-id="order" class="'+(ST.rpTab==="order"?"on":"")+'">Tạo đơn</button></div>';
+    if(ST.rpTab==="order"){
+      right=tabs+'<div class="rpb"><span class="pill p-gry">Sắp có</span><p class="hint" style="margin:8px 0 0">Khi nối Pancake POS, agent lập đơn ở trạng thái "chờ xác nhận" từ thông tin khách đã gửi (tên, số điện thoại, địa chỉ, combo). Chị hoặc nhân viên duyệt ở Pancake.</p></div>';
+    }else{
+      right=tabs+'<div class="rpb"><div class="hint">Khách: <b style="color:var(--ink)">'+esc(cv.name||"(chưa có tên)")+'</b></div><div class="hint">Tin gần nhất: '+fm(cv.last_at)+"</div>"+
+       '<textarea data-act="cvnote" placeholder="Nhập ghi chú…" style="min-height:64px;margin:8px 0">'+esc(cv.note||"")+"</textarea>"+
+       '<div class="sect">Đơn hàng (0)</div><div class="hint">Chưa nối Pancake POS.</div>'+
+       '<div class="sect">Thẻ giai đoạn</div><div>'+(stage.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có thẻ giai đoạn.</span>')+'</div><div class="sect">Thẻ sản phẩm</div><div>'+(prod.map(function(t){return '<span class="achip'+(cv.tag_ids.indexOf(t.id)>=0?" on":"")+'" data-act="cvtag" data-id="'+t.id+'">'+esc(t.name)+"</span> "}).join("")||'<span class="hint">Chưa có. Thêm ở Cài đặt, Thẻ hội thoại.</span>')+"</div>"+
+       (sel?'<div class="sect">Vì sao agent làm vậy</div><div class="pvx">'+esc(sel.why||"Chưa có lý do (công cụ VPS chưa gửi kèm).")+'</div><div class="sect">Agent đã lấy gì</div><div class="log">'+esc(sel.got||"Chưa có dữ liệu.")+'</div><div class="row" style="margin-top:8px"><button class="btn sm'+(sel.wrong?" danger":"")+'" data-act="wrongmsg" data-id="'+sel.id+'">'+(sel.wrong?"Bỏ đánh dấu sai":"Agent trả lời sai")+'</button>'+(sel.who==="agent"?'<button class="btn sm pri" data-act="mkphrase" data-id="'+sel.id+'">Tạo câu mẫu từ tin này</button>':"")+"</div>":'<div class="sect">Chi tiết tin</div><p class="hint">Bấm vào một tin của agent (bong bóng xanh đậm hoặc đỏ) để xem vì sao agent chọn luồng đó và đã lấy gì.</p>')+"</div>";
+    }
+  }else{mid='<div class="emp">Chọn một hội thoại ở bên trái</div>';right='<div class="rpb hint">Chưa chọn hội thoại.</div>'}
+  var pgsel=pages.length>1?'<select data-act="cvpage"><option value="">Page của bot này</option><option value="all"'+(ST.cvPage==="all"?" selected":"")+">Tất cả Page</option></select>":"";
+  return '<div class="inbox"><div class="cl"><div class="cft"><input type="text" id="cvq" placeholder="Tìm kiếm" value="'+esc(ST.cvQ||"")+'">'+pgsel+filt+'</div><div class="clist">'+lhtml+'</div></div><div class="cm2">'+mid+'</div><div class="rp">'+right+"</div></div>";
 }
 function dx(){return soonPage("Đề xuất","Hệ thống đọc hội thoại rồi đề xuất cải tiến, chị duyệt mới thành bản nháp.",["Khách hỏi lặp lại mà chưa có luồng: đề xuất luồng mới.","Câu nhân viên hay gửi mà khách hay chốt: đề xuất thành câu mẫu.","Nút ít người bấm, luồng ít người đi tiếp: đề xuất sửa.","Agent bị chặn nhiều vì thiếu giá: nhắc chị nhập giá."],"Chỉ đề xuất. Vẫn phải xuất bản mới tới agent.")}
 function tk(){return soonPage("Thống kê luồng","Giống thống kê của Botcake: mỗi luồng gửi bao nhiêu lần, hiệu quả ra sao.",["Đã gửi, khách nhắn tiếp, bấm nút, chuyển chị, bị chặn theo từng luồng.","Cảnh báo luồng ít người đi tiếp để chị sửa.","Số liệu lấy từ nhật ký agent (đã có bảng ghi, chờ công cụ VPS nối vào)."])}
@@ -349,6 +377,7 @@ function botView(){
     if(t[2])return '<button class="soon" data-act="tab" data-id="'+t[0]+'"><span>'+t[1]+'</span><span class="c soonc">Sắp có</span></button>';
     var c=badge(t[0]);return '<button data-act="tab" data-id="'+t[0]+'" class="'+(ST.tab===t[0]?"on":"")+'"><span>'+t[1]+"</span>"+(c!==""?'<span class="c">'+c+"</span>":"")+"</button>"}).join("")+"</div>":"";
   var body={tt:tt,tc:tc,cm:cm,sp:sp,md:md,bd:bd,qt:qt,ms:ms,pb:pb,hl:hl,dx:dx,tk:tk,th:th}[ST.tab]();
+  if(ST.tab==="hl")return top+body;
   return top+(side?'<div class="shell">'+side+'<div class="main">'+body+"</div></div>":'<div class="main">'+body+"</div>");
 }
 function mkSec(k){for(var i=0;i<NAV.length;i++)if(NAV[i].k===k)return NAV[i];return NAV[1]}
@@ -599,6 +628,8 @@ document.addEventListener("click",function(e){
   if(a==="selflow"){ST.sel=id;var f0=mk(b.flows,id);ST.node=f0&&f0.nodes[0]?f0.nodes[0].id:"";ST.conn=null;draw();return}
   if(a==="ftag"){var ff0=curFlow();ff0.tags=ff0.tags||[];var ix0=ff0.tags.indexOf(id);if(ix0>=0)ff0.tags.splice(ix0,1);else ff0.tags.push(id);touch();draw();return}
   if(a==="cv"){loadConv(+id);return}
+  if(a==="cvfilt"){ST.cvTag=ST.cvTag===+id?0:+id;ST.cvId=0;ST.cv=null;loadConvs();return}
+  if(a==="rptab"){ST.rpTab=id;draw();return}
   if(a==="msgsel"){ST.cvMsg=ST.cvMsg===+id?0:+id;draw();return}
   if(a==="cvtag"){guard(async function(){var ids=ST.cv.tag_ids.slice(),i1=ids.indexOf(+id);if(i1>=0)ids.splice(i1,1);else ids.push(+id);var r=await api("/convs/"+ST.cvId+"/tags",{method:"PUT",body:JSON.stringify({tag_ids:ids})});ST.cv.tag_ids=r.tag_ids;var row=ST.convs.filter(function(x){return x.id===ST.cvId})[0];if(row)row.tag_ids=r.tag_ids;draw()});return}
   if(a==="wrongmsg"){guard(async function(){var m=ST.cv.messages.filter(function(x){return x.id===+id})[0];var wrong=!m.wrong,note="";if(wrong){note=prompt("Sai ở đâu? (không bắt buộc)")||""}await api("/msgs/"+id+"/wrong",{method:"POST",body:JSON.stringify({wrong:wrong,note:note})});m.wrong=wrong?1:0;m.wrong_note=note;toast(wrong?"Đã đánh dấu sai":"Đã bỏ đánh dấu");draw()});return}
