@@ -182,6 +182,62 @@ const adfSum=L=>{const s=L.reduce((a,x)=>({spend:a.spend+x.spend,msgs:a.msgs+x.m
   return Object.assign(s,{giaMsg:s.msgs?s.spend/s.msgs:0,cpo:s.orders?s.spend/s.orders:0,pct:s.rev?s.spend*1.1/s.rev:0,roas:s.spend?s.rev/s.spend:0})};
 /* Tổng quan Digital: số tự động theo kỳ chị chọn ở thanh trên (PERIOD). Trả về null nếu chưa có số tự động. */
 const adfPartial=(D,from,to)=>from<D.keys[0]?`<div class="note">Số tự động mới có từ ngày ${vnd(D.keys[0])}, nên kỳ này chưa đủ từ ${vnd(from)}. Phần trước ngày đó chưa có.</div>`:"";
+/* =====================================================================
+   NHẬN ĐỊNH ĐẦU TRANG TỔNG QUAN DIGITAL (học cách báo cáo tuần 3 kênh Facebook trình bày)
+   Tự sinh từ số liệu, không dùng AI: tiến độ so mục tiêu tháng và thời gian đã qua, dự báo cả tháng,
+   chi phí và đơn tuần này so tuần trước, tỷ lệ hủy, cảnh báo khi số chưa đáng tin.
+   ===================================================================== */
+const ADF_TARGET_DEFAULT={"2026-10":{"Việt Anh":870e6,"Thảo":370e6,"Duẩn":210e6}};
+function adfCampOwner(D,id){const nm=D.names[id];if(!nm)return "";const p=adfParse(nm.name,nm.account),pg=ADF_PAGE_OWNER[(D.campPage||{})[id]];return p.owner==="Chưa rõ người"&&pg?pg:p.owner}
+function adfInsights(D){
+  const OW=["Việt Anh","Thảo","Duẩn"],cur=PERIOD.to.slice(0,7),mo=D.keys.some(k=>k.slice(0,7)===cur)&&cur<=D.last.slice(0,7)?cur:D.last.slice(0,7);
+  const N=new Date(+mo.slice(0,4),+mo.slice(5,7),0).getDate(),isLast=mo===D.last.slice(0,7);
+  const keys=D.keys.filter(k=>k.slice(0,7)===mo&&k<=D.last),lastDay=keys.length?+keys[keys.length-1].slice(8):0,done=isLast?lastDay-1:N;
+  if(keys.length<4||done<3)return "";
+  const full=keys.filter(k=>+k.slice(8)<=done),per={};
+  keys.forEach(k=>{const g=adfAgg(D,[k]),o={spend:0,rev:0,ord:0,unm:g.unmatched,unmO:g.unOrders,by:{}};OW.forEach(w=>o.by[w]={spend:0,rev:0,ord:0});g.C.forEach(x=>{o.spend+=x.spend;o.rev+=x.rev;o.ord+=x.orders;const b=o.by[x.owner];if(b){b.spend+=x.spend;b.rev+=x.rev;b.ord+=x.orders}});per[k]=o});
+  const sm=(L,f)=>L.reduce((a,k)=>a+f(per[k]),0),av=(L,f)=>L.length?sm(L,f)/L.length:0,win=full.slice(-7),prev=full.slice(-14,-7),left=Math.max(0,N-done);
+  const timePct=done/N,fmt=v=>money(Math.round(v)),pc1=v=>(v*100).toFixed(0)+"%",day=k=>+k.slice(8)+"/"+(+k.slice(5,7));
+  const rows=OW.concat(["Tổng"]).map(w=>{const tg=w==="Tổng"?OW.reduce((a,x)=>a+adfTarget(x,mo),0):adfTarget(w,mo),f=w==="Tổng"?(p=>p.rev):(p=>p.by[w].rev),rev=sm(keys,f),revFull=sm(full,f),pace=av(win,f),fc=revFull+pace*left,need=left?Math.max(0,tg-rev)/left:0;return {w,tg,rev,pace,fc,need,pct:tg?rev/tg:0,fpct:tg?fc/tg:0}});
+  const T=rows[rows.length-1],items=[];
+  const it=(lv,t,b,todo)=>`<div class="adf-it ${lv}"><b>${t}</b><div>${b}</div>${todo?`<div class="adf-todo"><b>Việc cần làm:</b> ${todo}</div>`:""}</div>`;
+  /* 1) chi phí và đơn tuần này so tuần trước */
+  if(win.length>=5&&prev.length>=5){
+    const s1=av(win,p=>p.spend),s0=av(prev,p=>p.spend),o1=av(win,p=>p.ord),o0=av(prev,p=>p.ord),sc=s0?s1/s0-1:0,oc=o0?o1/o0-1:0,r1=sm(win,p=>p.spend)?sm(win,p=>p.rev)/sm(win,p=>p.spend):0,r0=sm(prev,p=>p.spend)?sm(prev,p=>p.rev)/sm(prev,p=>p.spend):0;
+    const txt=`Mỗi ngày chi <b>${fmt(s1)}</b> (tuần trước ${fmt(s0)}, ${sc>=0?"tăng":"giảm"} ${Math.abs(sc*100).toFixed(0)}%), đơn <b>${Math.round(o1)}</b>/ngày (tuần trước ${Math.round(o0)}, ${oc>=0?"tăng":"giảm"} ${Math.abs(oc*100).toFixed(0)}%), doanh số trên mỗi đồng chi ${r1.toFixed(2).replace(".",",")} (tuần trước ${r0.toFixed(2).replace(".",",")}).`;
+    if(sc<=-0.1&&oc<0&&Math.abs(oc-sc)<=0.08)items.push(it("r","Chi quảng cáo giảm, đơn giảm theo",txt+" Hai số giảm gần bằng nhau nên <b>không phải quảng cáo kém đi, mà là chi ít đi</b>.","Quyết định có nâng ngân sách ngày lại không, hoặc chốt mục tiêu thực tế cho phần còn lại của tháng."));
+    else if(sc>=0.1&&oc<sc-0.1)items.push(it("a","Chi tăng nhưng đơn tăng ít hơn",txt+" Chi tăng nhiều hơn đơn nên hiệu quả đang giảm.","Người chạy rà lại chiến dịch mới tăng ngân sách, tắt chiến dịch chi nhiều mà ít đơn."));
+    else if(sc>=0.1&&oc>=sc-0.1)items.push(it("g","Chi tăng và đơn tăng theo",txt,""));
+    else items.push(it("g","Chi quảng cáo và đơn ổn định so tuần trước",txt,""));
+  }
+  /* 2) từng người so mục tiêu */
+  rows.slice(0,3).forEach(r=>{if(!r.tg)return;const k=r.pace?r.need/r.pace:0;
+    if(r.fpct<0.85)items.push(it(r.fpct<0.6?"r":"a",`${esc(r.w)}: dự báo chỉ đạt ${pc1(r.fpct)} mục tiêu`,`Đã được ${fmt(r.rev)} trên mục tiêu ${fmt(r.tg)} (${pc1(r.pct)}), trong khi đã qua ${pc1(timePct)} thời gian. Nhịp 7 ngày qua ${fmt(r.pace)}/ngày, còn thiếu ${fmt(Math.max(0,r.tg-r.rev))} trong ${left} ngày, cần ${fmt(r.need)}/ngày${k?` (gấp ${k.toFixed(1).replace(".",",")} lần nhịp hiện tại)`:""}.`,`${esc(r.w)} và quản lý chốt lại mục tiêu thực tế cho phần còn lại của tháng.`));
+    else if(r.fpct>=1)items.push(it("g",`${esc(r.w)}: đang đi đúng nhịp, dự báo đạt ${pc1(r.fpct)} mục tiêu`,`Đã được ${fmt(r.rev)} trên mục tiêu ${fmt(r.tg)} (${pc1(r.pct)}). Nhịp 7 ngày qua ${fmt(r.pace)}/ngày, đủ vượt mục tiêu.`,""))});
+  /* 3) tỷ lệ hủy (bỏ 2 ngày cuối vì sale chưa gọi hết đơn mới) */
+  const cx=full.slice(0,Math.max(0,full.length-2)),cw=cx.slice(-7),cp=cx.slice(-14,-7);
+  const cancel=L=>{let o=0,c=0;const by={};L.forEach(k=>((D.days[k]||{}).pos||[]).forEach(p=>{o+=p.orders||0;c+=p.canceled||0;const w=p.campaign_id?adfCampOwner(D,p.campaign_id):"";if(OW.includes(w)){const b=by[w]||(by[w]={o:0,c:0});b.o+=p.orders||0;b.c+=p.canceled||0}}));return {o,c,r:o?c/o:0,by}};
+  if(cw.length>=4){const a=cancel(cw),b=cp.length>=4?cancel(cp):null,bad=OW.filter(w=>a.by[w]&&a.by[w].o>=40&&a.by[w].c/a.by[w].o>0.2).map(w=>`${esc(w)} ${pc1(a.by[w].c/a.by[w].o)}`);
+    const txt=`${day(cw[0])}–${day(cw[cw.length-1])}: hủy <b>${(a.r*100).toFixed(1).replace(".",",")}%</b> (${a.c} hủy / ${a.o} đơn tạo)${b?`, tuần trước ${(b.r*100).toFixed(1).replace(".",",")}%`:""}. Mục tiêu ≤15%. Em bỏ 2 ngày cuối vì sale chưa gọi hết đơn mới nên tỷ lệ hủy ngày gần nhất thấp giả.`;
+    if(a.r>0.15)items.push(it(a.r>0.2?"r":"a","Tỷ lệ hủy đang vượt mục tiêu 15%",txt+(bad.length?" Người chạy có tỷ lệ hủy trên 20%: "+bad.join(", ")+".":""),"Team Sale rà lại khâu xác nhận đơn, nhất là các chiến dịch hủy nhiều."));
+    else items.push(it("g","Tỷ lệ hủy đạt mục tiêu",txt+(bad.length?" Chỉ có "+bad.join(", ")+" vượt 20%.":""),""))}
+  /* 4) số chưa đáng tin */
+  const allSp=sm(keys,p=>p.spend),unm=sm(keys,p=>p.unm),rv=sm(keys,p=>p.rev),unS=allSp?(allSp-sm(keys,p=>p.by["Việt Anh"].spend+p.by["Thảo"].spend+p.by["Duẩn"].spend))/allSp:0;
+  if(rv+unm>0&&unm/(rv+unm)>0.12)items.push(it("a","Một phần doanh số chưa gắn được vào chiến dịch",`Tháng này có <b>${fmt(unm)}</b> (${pc1(unm/(rv+unm))} tổng doanh số Pancake) là đơn khách tự vào, chăm sóc hoặc đơn không mang mã chiến dịch. Em không chia cho người nào nên doanh số từng người và ROAS có thể thấp hơn thực tế.`,"Nhắc sale chọn đúng nguồn đơn và Marketer khi chốt đơn."));
+  if(unS>0.03)items.push(it("a","Có chiến dịch chưa biết của ai",`${pc1(unS)} chi phí tháng này nằm ở dòng "Chưa rõ người" (tên chiến dịch không ghi người, page chưa khai báo).`,"Mọi người đặt tên chiến dịch theo quy ước: VA-, DUAN-, TĐ - đứng đầu."));
+  const gap=[];for(let d=1;d<=lastDay;d++){const k=mo+"-"+String(d).padStart(2,"0");if(!D.days[k]||!(D.days[k].fb||[]).length)gap.push(d)}
+  if(gap.length)items.push(it("a","Có ngày chưa có số quảng cáo",`Thiếu số chi phí các ngày: ${gap.slice(0,8).join(", ")}${gap.length>8?"…":""}.`,"Kiểm tra lệnh kéo số mỗi sáng 8h trên máy chủ."));
+  const age=(Date.now()-new Date(D.at).getTime())/3600000;if(age>36)items.push(it("r","Số liệu đã cũ",`Lần kéo số gần nhất cách đây ${Math.round(age)} giờ.`,"Kiểm tra lệnh kéo số mỗi sáng 8h trên máy chủ."));
+  const order={r:0,a:1,g:2};items.sort((x,y)=>order[(x.match(/adf-it (\w)/)||[])[1]]-order[(y.match(/adf-it (\w)/)||[])[1]]);
+  /* kết luận một dòng */
+  const lv=T.fpct>=1?"g":T.fpct>=0.85?"a":"r",head=T.fpct>=1?`Đang đi đúng nhịp: dự báo cả tháng đạt ${pc1(T.fpct)} mục tiêu`:T.fpct>=0.85?`Còn kịp nhưng phải tăng nhịp: dự báo đạt ${pc1(T.fpct)} mục tiêu`:`Đang chậm so mục tiêu: dự báo chỉ đạt ${pc1(T.fpct)}`;
+  const mon=mo.slice(5)+"/"+mo.slice(0,4);
+  return `<section class="card adf-ins"><div class="card-h"><h2>Nhận định tháng ${mon}</h2><span class="hint">tự tính từ số liệu · số tới ngày ${day(keys[keys.length-1])}${isLast?" (ngày cuối chưa trọn nên chưa tính vào nhịp)":""}</span></div>
+  <div class="adf-it ${lv} adf-head"><b>${head}</b><div>Doanh số Pancake gắn được vào chiến dịch <b>${fmt(T.rev)}</b> trên mục tiêu <b>${fmt(T.tg)}</b> (${pc1(T.pct)}), trong khi đã qua <b>${pc1(timePct)}</b> thời gian (${done}/${N} ngày). Giữ nhịp 7 ngày qua (${fmt(T.pace)}/ngày) thì cả tháng về khoảng <b>${fmt(T.fc)}</b>; để đủ mục tiêu cần <b>${fmt(T.need)}/ngày</b> trong ${left} ngày còn lại.</div></div>
+  <div class="tbl"><table><thead><tr><th>Tiến độ tháng ${mon}</th><th class="n">Doanh số</th><th class="n">Mục tiêu</th><th class="n">% đạt</th><th class="n">Nhịp 7 ngày qua (mỗi ngày)</th><th class="n">Cần mỗi ngày</th><th class="n">Dự báo cả tháng</th><th class="n">% mục tiêu (dự báo)</th></tr></thead><tbody>${rows.map(r=>`<tr${r.w==="Tổng"?' class="tot"':""}><td><b>${esc(r.w)}</b></td><td class="n">${fmt(r.rev)}</td><td class="n">${r.tg?fmt(r.tg):"—"}</td><td class="n">${r.tg?pc1(r.pct):"—"}</td><td class="n">${fmt(r.pace)}</td><td class="n">${r.tg?fmt(r.need):"—"}</td><td class="n">${fmt(r.fc)}</td><td class="n"><b>${r.tg?pc1(r.fpct):"—"}</b></td></tr>`).join("")}</tbody></table></div>
+  <div class="card-h" style="margin-top:12px"><h2>Cảnh báo và việc cần làm</h2><span class="hint">xếp theo mức độ</span></div>${items.join("")||`<p class="empty">Chưa có cảnh báo nào.</p>`}
+  <p class="hint">Mục tiêu doanh số lấy theo bảng giao tháng (Việt Anh, Thảo, Duẩn); sửa ở trang Hiệu quả Ads. Doanh số là phần Pancake gắn được vào chiến dịch của từng người, nên thấp hơn tổng doanh số công ty.</p></section>`;
+}
 function adfOverview(){
   adfLoad();if(!(ADF.raw&&ADF.raw.days))return null;const D=adfData();if(!D.keys.length)return null;
   const days=D.keys.filter(k=>k>=PERIOD.from&&k<=PERIOD.to);
@@ -194,7 +250,8 @@ function adfOverview(){
   const pr={};L.forEach(x=>{const k=x.prod||"?";(pr[k]||(pr[k]=[])).push(x)});
   const prods=Object.entries(pr).map(([k,a])=>[ADF_PROD[k]||"Chưa rõ sản phẩm",adfSum(a),a.length]).sort((a,b)=>b[1].rev-a[1].rev);
   const at=new Date(D.at);
-  return part+`<div class="grid kpis">${kpi("Chi Ads",money(T.spend),esc(pLabel()))}${kpi("Doanh số mang về",money(T.rev),"Pancake, gắn vào chiến dịch")}${kpi("ROAS",adlR(T.roas),"doanh số / chi ads")}${kpi("Đơn chốt",nf(T.orders),T.orders?"chi / đơn "+money(T.cpo):"")}${kpi("Chi Ads / doanh số",T.rev?adlPct(T.pct):"—","gồm thuế 10% · mục tiêu ≤ 35%")}${kpi("Doanh số chưa gắn chiến dịch",money(unmatched),nf(unOrders)+" đơn")}</div>
+  let insHtml="";try{insHtml=adfInsights(D)}catch(e){console.warn("nhận định",e)}
+  return ADF_CSS+insHtml+part+`<div class="grid kpis">${kpi("Chi Ads",money(T.spend),esc(pLabel()))}${kpi("Doanh số mang về",money(T.rev),"Pancake, gắn vào chiến dịch")}${kpi("ROAS",adlR(T.roas),"doanh số / chi ads")}${kpi("Đơn chốt",nf(T.orders),T.orders?"chi / đơn "+money(T.cpo):"")}${kpi("Chi Ads / doanh số",T.rev?adlPct(T.pct):"—","gồm thuế 10% · mục tiêu ≤ 35%")}${kpi("Doanh số chưa gắn chiến dịch",money(unmatched),nf(unOrders)+" đơn")}</div>
   <div class="note">Tự lấy từ Facebook và Pancake mỗi sáng 8h (lần cuối ${at.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})} ${at.toLocaleDateString("vi-VN")}). Số có tới ngày ${vnd(D.last)}. Xem từng ngày như file Excel ở <a href="#" data-go="fb_ads">Báo cáo theo ngày</a>.</div>
   <section class="card flush"><div class="card-h pad"><h2>Top nhân sự</h2><span class="hint">xếp theo doanh số mang về</span></div><div class="tbl"><table>${HEAD.replace("{h}","Nhân sự")}<tbody>${ppl.map(([w,s,n])=>row(w,n+" chiến dịch",s)).join("")}</tbody></table></div></section>
   <section class="card flush"><div class="card-h pad"><h2>Top sản phẩm</h2><span class="hint">xếp theo doanh số mang về</span></div><div class="tbl"><table>${HEAD.replace("{h}","Sản phẩm")}<tbody>${prods.map(([n,s,c])=>row(n,c+" chiến dịch",s)).join("")}</tbody></table></div></section>`;
@@ -232,7 +289,7 @@ function adfDaily(D,keys,ids,dl){
   const mo=keys.length?keys[0].slice(5,7)+"/"+keys[0].slice(0,4):"";
   return `<div class="adf-days"><div class="hint">Từng ngày · tháng ${mo} · tiền tính bằng nghìn đồng</div><table><thead><tr><th>Chỉ số</th><th>Tổng</th>${keys.map(k=>`<th>${+k.slice(8)}</th>`).join("")}</tr></thead><tbody>${R.map(([n,f])=>`<tr><td><b>${n}</b></td><td><b>${f(tot)}</b></td>${per.map(s=>`<td>${f(s)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
-const ADF_CSS=`<style>.adf-days{padding:2px 10px 10px;overflow-x:auto}.adf-days .hint{margin:2px 0 6px;font-size:12px}.adf-days table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:12px}.adf-days th,.adf-days td{padding:4px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}.adf-days th{font-weight:600;color:var(--muted);background:var(--surface)}.adf-days td:first-child,.adf-days th:first-child{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left;min-width:92px}.adf-days td:nth-child(2),.adf-days th:nth-child(2){position:sticky;left:92px;z-index:2;background:var(--surface);min-width:74px;border-right:1px solid var(--line);font-weight:700}.adf-days td:nth-child(n+3){min-width:52px}.adf-camps{padding:0 10px 8px}.adf-camps table{table-layout:fixed;width:100%;font-size:12px}.adf-camps td,.adf-camps th{padding:4px 8px}.adf-camps td:first-child,.adf-camps th:first-child{width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style>`;
+const ADF_CSS=`<style>.adf-days{padding:2px 10px 10px;overflow-x:auto}.adf-days .hint{margin:2px 0 6px;font-size:12px}.adf-days table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:12px}.adf-days th,.adf-days td{padding:4px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}.adf-days th{font-weight:600;color:var(--muted);background:var(--surface)}.adf-days td:first-child,.adf-days th:first-child{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left;min-width:92px}.adf-days td:nth-child(2),.adf-days th:nth-child(2){position:sticky;left:92px;z-index:2;background:var(--surface);min-width:74px;border-right:1px solid var(--line);font-weight:700}.adf-days td:nth-child(n+3){min-width:52px}.adf-camps{padding:0 10px 8px}.adf-camps table{table-layout:fixed;width:100%;font-size:12px}.adf-camps td,.adf-camps th{padding:4px 8px}.adf-camps td:first-child,.adf-camps th:first-child{width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.adf-it{border-left:4px solid var(--line);border-radius:8px;padding:9px 14px;margin:8px 0;background:var(--surface)}.adf-it.r{border-color:var(--red);background:var(--red-soft)}.adf-it.a{border-color:var(--orange);background:var(--orange-soft)}.adf-it.g{border-color:var(--green);background:var(--green-soft)}.adf-it b{font-weight:600}.adf-todo{margin-top:4px}.adf-head{font-size:14px}.adf-ins .card-h h2{margin:0}</style>`;
 function pAdsFb(m){
   const D=adfData(),days=D.keys.filter(k=>k>=PERIOD.from&&k<=PERIOD.to),{C,unmatched,unOrders,unSrc,links}=adfAgg(D,days);
   const L=C.filter(x=>x.spend||x.rev),owners=["Việt Anh","Thảo","Duẩn","Chưa rõ người"].filter(w=>L.some(x=>x.owner===w)&&(!ADF.who||ADF.who===w));
@@ -269,7 +326,7 @@ function pAdsDay(m){
 /* ---- Hiệu quả Ads và Ads theo sản phẩm: dùng số tự động theo kỳ chọn ở thanh trên; chưa có số thì giữ bản cũ ---- */
 const _adsHQ_old=PAGES.adshieuqua,_adsSP_old=PAGES.adssp;
 const adfLive=()=>{adfLoad();return ADF.raw&&ADF.raw.days&&adfData().keys.length?adfData():null};
-const adfTarget=(n,mo)=>{const t=D().adsTargets||{},v=(t[mo]||{})[n];if(v!=null)return v;const pv=Object.keys(t).sort().filter(k=>k<=mo).pop();if(pv&&t[pv][n]!=null)return t[pv][n];const p=(KDX.adsPeople||[]).find(x=>String(x.n).includes(n.split(" ").pop()));return p?p.kpi:0};
+const adfTarget=(n,mo)=>{const t=D().adsTargets||{},v=(t[mo]||{})[n];if(v!=null)return v;const dv=(ADF_TARGET_DEFAULT[mo]||{})[n];if(dv!=null)return dv;const pv=Object.keys(t).sort().filter(k=>k<=mo).pop();if(pv&&t[pv][n]!=null)return t[pv][n];const p=(KDX.adsPeople||[]).find(x=>String(x.n).includes(n.split(" ").pop()));return p?p.kpi:0};
 PAGES.adshieuqua=function(m){
   const D_=adfLive();if(!D_)return _adsHQ_old(m);
   const days=D_.keys.filter(k=>k>=PERIOD.from&&k<=PERIOD.to),{C,unmatched,unOrders}=adfAgg(D_,days),L=C.filter(x=>x.spend||x.rev),T=adfSum(L),mo=PERIOD.to.slice(0,7);
