@@ -214,7 +214,8 @@ async function acSttPost(path,body){const r=await fetch(path,{method:body?"POST"
 function acMicInit(){
   const b=$("#ac-mic"),ta=$("#ac-text");if(!b||!ta)return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const reset=()=>{AC_REC=null;AC_MR=null;b.disabled=false;b.classList.remove("rec");b.textContent="🎤"};
+  const ph0=ta.placeholder,say=m=>{ta.placeholder=m||ph0},tick={t:0};
+  const reset=()=>{AC_REC=null;AC_MR=null;clearInterval(tick.t);say();b.disabled=false;b.classList.remove("rec");b.textContent="🎤"};
   const put=t=>{const base=ta.value&&!/\s$/.test(ta.value)?ta.value+" ":ta.value;ta.value=base+t;if(ta._grow)ta._grow();ta.focus()};
   const whisper=async()=>{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -224,7 +225,7 @@ function acMicInit(){
     const t0=Date.now(),auto=setTimeout(()=>{try{mr.stop()}catch(e){}},230000);
     mr.onstop=async()=>{
       clearTimeout(auto);stream.getTracks().forEach(t=>t.stop());
-      AC_MR=null;b.disabled=true;b.classList.remove("rec");b.textContent="⏳";
+      AC_MR=null;clearInterval(tick.t);say("⏳ Đang chuyển giọng nói thành chữ… (khoảng vài giây)");b.disabled=true;b.classList.remove("rec");b.textContent="⏳";
       try{
         if(Date.now()-t0<700)throw new Error("Ghi âm quá ngắn");
         const blob=new Blob(chunks,{type:mr.mimeType||mt||"audio/webm"});
@@ -237,6 +238,7 @@ function acMicInit(){
       }catch(e){toast(e.message||"Không nghe được ghi âm")}finally{reset()}
     };
     mr.start();AC_MR=mr;b.classList.add("rec");b.textContent="⏹";
+    const tk=()=>say("🔴 Đang nghe "+Math.round((Date.now()-t0)/1000)+" giây… nói xong bấm ⏹ để chữ hiện ra");tk();tick.t=setInterval(tk,1000);
   };
   const browser=()=>{
     if(!SR){toast("Máy văn phòng đang tắt và trình duyệt này chưa hỗ trợ ghi âm. Chị dùng Chrome hoặc Edge nhé");return}
