@@ -70,7 +70,66 @@ function dhCalcBaTang(mo){
 }
 
 /* ---------- Giao diện ---------- */
-const DH_TABS=[["homnay","Hôm nay / Tuần"],["gia","Giá thành & cảnh báo"],["tien","Tiền & cảnh báo"],["batang","Lãi theo kênh 3 tầng"],["thang","Tháng chốt"],["caidat","Thiết lập"]];
+/* ---------- Tổng quan: một màn hình, 3 mảng kinh doanh (Bán lẻ · Phân phối · Gia công) ---------- */
+(()=>{try{if(document.getElementById("dh-css"))return;const st=document.createElement("style");st.id="dh-css";st.textContent=`
+.dh3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px}
+.dhm{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.dhm:hover{border-color:#c5cee0}
+.dhm-h{display:flex;align-items:center;gap:10px}.dhm-h .kic{flex:none}.dhm-h b{font-size:16px}.dhm-h small{display:block;color:var(--muted);font-size:12.5px;font-weight:500}
+.dhm-v{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-top:4px}
+.dhm-l{font-size:13.5px;color:var(--muted)}.dhm-l b{color:#087a55}.dhm-l b.neg{color:#c92a2a}
+.dhb{display:grid;grid-template-columns:110px 1fr 76px;gap:6px 8px;align-items:center;font-size:13px;margin-top:6px}
+.dhb i{display:block;height:8px;border-radius:4px;background:var(--dhc,#2f6fde)}.dhb span:nth-child(3n){text-align:right;font-weight:600}
+.dhm-n{font-size:12.5px;color:#9a5b00;background:#fff6e5;border-radius:8px;padding:6px 9px;margin-top:auto}
+.dhm-ok{font-size:12.5px;color:#087a55;background:#e9f7ef;border-radius:8px;padding:6px 9px;margin-top:auto}
+@media (max-width:1100px){.dh3{grid-template-columns:1fr}}`;document.head.appendChild(st)}catch(e){}})();
+async function dhLoadPrevB2b(pr){const key=pr.from+"|"+pr.to;if(DH.b2bPrevKey===key)return;DH.b2bPrevKey=key;DH.b2bPrev=null;try{const r=await svApi("/api/dashboards/b2b-sku?from="+pr.from+"&to="+pr.to);const o={};(r.months||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.revenue||0)});DH.b2bPrev=o}catch(e){DH.b2bPrev={}}if(PAGE==="dh")renderMain()}
+function dhTongQuan(){
+  if(typeof b2bLoad==="function")b2bLoad();
+  const full=(()=>{const ms=[];for(let d=pdate(PERIOD.from.slice(0,7)+"-01");iso(d)<=PERIOD.to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms.every(k=>fullMonth(k,PERIOD.from,PERIOD.to))?ms:null})();
+  /* Chọn trọn tháng thì so với đúng số tháng liền trước; không thì so với số ngày liền trước. */
+  const pr=full?(()=>{const f=pdate(PERIOD.from),a=new Date(f.getFullYear(),f.getMonth()-full.length,1),b=addD(f,-1);return {from:iso(a),to:iso(b)}})():prevRange();dhLoadPrevB2b(pr);
+  const C=dhCalcNgay(),P=execNums(pr.from,pr.to);
+  const S=typeof TSB!=="undefined"&&TSB.sum?TSB.sum:{},ttM=full&&full.every(k=>S[k])?full.map(k=>S[k]):null;
+  const R=C.rows.map(r=>r.ch==="tts"&&ttM?{...r,dt:ttM.reduce((a,x)=>a+x.dt,0),t2:ttM.reduce((a,x)=>a+x.lai,0),chot:1,co:true}:r);
+  const pv={tts:P.tt*((C.cfg.kenh.tts||{}).thuan||1),fb:P.fbDT*((C.cfg.kenh.fb||{}).thuan||1),spe:P.spDT};
+  /* Kỳ trước thiếu số của kênh nào đang có số thì không so (so lệch kênh sẽ ra % ảo). */
+  const leOK=R.filter(r=>r.co).every(r=>(P.n[r.ch]||0)>0);
+  const le={dt:R.reduce((a,r)=>a+(r.co?r.dt:0),0),lai:R.reduce((a,r)=>a+(r.co?r.t2:0),0),prev:leOK?pv.tts+pv.fb+pv.spe:0};
+  const B=typeof b2bChannel==="function"?b2bChannel("B2B"):null,G=typeof b2bChannel==="function"?b2bChannel("GIA_CONG"):null,bp=DH.b2bPrev||{};
+  if(!B&&!DH.b2bWait){DH.b2bWait=1;setTimeout(()=>{DH.b2bWait=0;if(PAGE==="dh")renderMain()},1200)}
+  const pp={dt:B&&B.has?B.net:0,lai:B&&B.has?B.gross:0,prev:bp.B2B||0},gc={dt:G&&G.has?G.net:0,lai:G&&G.has?G.gross:0,prev:bp.GIA_CONG||0};
+  const tong=le.dt+pp.dt+gc.dt,lai=le.lai+pp.lai+gc.lai,tongP=leOK&&(!pp.dt||pp.prev)?le.prev+pp.prev+gc.prev:0;
+  const Gc=dhCalcGia(),T=dhCalcTien(),todo=[];
+  if(ttM){const td=(TSB.data&&Object.values(TSB.data).find(x=>x&&x.data&&full.includes(x.data.ky)));const t=td&&td.data&&td.data.todo;if(t&&(t.noMap.length||t.miss.length))todo.push(["red",`TikTok: ${t.noMap.length} mã chưa quy đổi, ${t.miss.length} mã thiếu giá vốn`,"kế toán","bc_tiktok"])}
+  R.filter(r=>r.co&&r.dt&&r.ads/r.dt>0.25).forEach(r=>todo.push(["amb",`${r.n}: quảng cáo ${dhPct(r.ads/r.dt)} doanh thu`,"team "+r.n,"dh"]));
+  R.filter(r=>!r.co).forEach(r=>todo.push(["amb",`${r.n}: chưa có số trong kỳ`,r.ch==="spe"?"team Shopee tải file":"tải số liệu","bc_"+(r.ch==="tts"?"tiktok":r.ch==="spe"?"shopee":"fb")]));
+  if(B&&B.has&&B.cover<0.95)todo.push(["amb",`Phân phối: ${dhPct(1-B.cover)} doanh thu chưa có giá vốn`,"kế toán","bc_b2b"]);
+  if(Gc.up.length)todo.push(["red",`${Gc.up.length} nguyên liệu tăng giá`,"kế toán, sản xuất","dh"]);
+  if(Gc.red.length)todo.push(["red",`${Gc.red.length} giá bán / báo giá gia công dưới ngưỡng`,"CEO quyết giá","dh"]);
+  if(!T.last)todo.push(["amb","Chưa nhập số dư tiền tuần này","kế toán","dh"]);
+  const bars=(rows,col)=>{const mx=Math.max(1,...rows.map(x=>x[1]));return rows.length?`<div class="dhb" style="--dhc:${col}">${rows.map(([n,v])=>`<span>${esc(n)}</span><i style="width:${Math.max(2,v/mx*100)}%"></i><span>${tr(v)}</span>`).join("")}</div>`:""};
+  const chg=(a,b)=>!b?`<span class="kchg">kỳ trước chưa đủ số</span>`:exChg(a,b);
+  const laiTxt=(v,dt,ghi)=>v==null?`<span class="dhm-l">${ghi||"chưa tính được lãi"}</span>`:`<span class="dhm-l">lãi <b class="${v<0?"neg":""}">${tr(v)}</b> · ${dhPct(dt?v/dt:null)}${ghi?" · "+ghi:""}</span>`;
+  const leNote=R.filter(r=>!r.co).map(r=>r.n).join(", "),grpTop=g=>g&&g.grp?[...g.grp.values()].sort((a,b)=>b.rev-a.rev).slice(0,3).map(x=>[x.n||"Khác",x.rev]):[];
+  const K=[["money","Tổng doanh thu",tr(tong),chg(tong,tongP)],["trend","Lãi đóng góp",tr(lai),`<span class="kchg">${dhPct(tong?lai/tong:null)} doanh thu</span>`],["bag","Bán lẻ",tr(le.dt),chg(le.dt,le.prev)],["box","Phân phối",tr(pp.dt),chg(pp.dt,pp.prev)],["fac","Gia công",tr(gc.dt),chg(gc.dt,gc.prev)],["wallet","Tiền đủ chạy",T.R.ngay==null?"—":nf(T.R.ngay)+" ngày",`<span class="kchg">${T.last?"số dư "+vnd(T.last.ngay):"chưa nhập số dư"}</span>`]];
+  return `<section class="kstrip" aria-label="Chỉ số chính">${K.map(([ic,l,v,h])=>`<div class="kcell"><span class="kic k-${ic}">${ico(ic)}</span><span class="kl">${l}</span><span class="kv numeric">${v}</span>${h}</div>`).join("")}</section>
+  <div class="dh3">
+   <button type="button" class="dhm" data-go="bc_tiktok"><div class="dhm-h"><span class="kic k-bag">${ico("bag")}</span><div><b>Bán lẻ</b><small>TikTok · Facebook · Shopee</small></div></div><div class="dhm-v numeric">${tr(le.dt)}</div>${chg(le.dt,le.prev)}${laiTxt(le.lai,le.dt,R.some(r=>r.co&&!r.chot)?"tạm tính":"")}
+    ${bars(R.filter(r=>r.co).map(r=>[r.n,r.dt]),"#e7357b")}${leNote?`<div class="dhm-n">Chưa có số: ${esc(leNote)}</div>`:`<div class="dhm-ok">Đủ số các kênh</div>`}</button>
+   <button type="button" class="dhm" data-go="bc_b2b"><div class="dhm-h"><span class="kic k-box">${ico("box")}</span><div><b>Phân phối</b><small>NPP · đại lý (CRM B2B)</small></div></div><div class="dhm-v numeric">${B?tr(pp.dt):"…"}</div>${chg(pp.dt,pp.prev)}${B&&B.has?laiTxt(pp.lai,pp.dt,"sau giá vốn"):laiTxt(null,0,B?"kỳ này chưa có đơn":"đang tải")}
+    ${bars(grpTop(B),"#2f9e44")}${B&&B.has&&B.cover<0.95?`<div class="dhm-n">${dhPct(1-B.cover)} doanh thu chưa có giá vốn (đang ước tính)</div>`:B&&B.has?`<div class="dhm-ok">Đủ giá vốn</div>`:""}</button>
+   <button type="button" class="dhm" data-go="bc_gc"><div class="dhm-h"><span class="kic k-fac">${ico("fac")}</span><div><b>Gia công</b><small>khách đặt sản xuất</small></div></div><div class="dhm-v numeric">${G?tr(gc.dt):"…"}</div>${chg(gc.dt,gc.prev)}${G&&G.has?laiTxt(gc.lai,gc.dt,"sau giá vốn"):laiTxt(null,0,G?"kỳ này chưa có đơn gia công":"đang tải")}
+    ${bars(grpTop(G),"#f59f00")}${Gc.red.filter(x=>x.kind==="kh").length?`<div class="dhm-n">${Gc.red.filter(x=>x.kind==="kh").length} báo giá dưới ngưỡng biên</div>`:`<div class="dhm-ok">Báo giá chưa có cảnh báo</div>`}</button>
+  </div>
+  <div class="xbot">
+   <section class="card"><div class="card-h"><h2>Cần xử lý</h2>${pill(todo.length,todo.length?"red":"grn")}</div>${todo.length?todo.map(t=>`<button type="button" class="xal1 lnk" data-go="${t[3]}" style="width:100%;text-align:left">${exDot(t[0])}<span>${esc(t[1])} <span class="hint">· ${esc(t[2])}</span></span></button>`).join(""):`<p class="empty">Không có việc nào.</p>`}</section>
+   <section class="card"><div class="card-h"><h2>Tiền</h2><button class="lnk" data-sub="tien">Chi tiết →</button></div>
+    ${[["Đang có (ngân hàng, tiền mặt, ví sàn)",T.last?tr(T.R.co):"chưa nhập"],["Khách còn nợ",T.thu==null?"—":tr(T.thu)],["Nợ nhà cung cấp",tr(T.tra)],["Tiền nằm trong hàng tồn",T.ton?tr(T.ton):"—"],["Đủ chạy",T.R.ngay==null?"— ngày":nf(T.R.ngay)+" ngày"]].map(([l,v])=>`<div class="xal1 ok" style="display:flex;justify-content:space-between"><span>${l}</span><b style="color:#14213d">${v}</b></div>`).join("")}</section>
+  </div>
+  <p class="hint">${esc(pLabel())} · so với ${vnd(pr.from)} – ${vnd(pr.to)}. Bán lẻ: doanh thu dự kiến sau hủy/hoàn và lãi tạm tính${ttM?"; TikTok dùng số tháng đã chốt":""}. Phân phối, gia công: đơn đã duyệt trong CRM, lãi sau giá vốn (chưa trừ chi phí chung). Bấm từng mảng để xem chi tiết.</p>`;
+}
+const DH_TABS=[["tongquan","Tổng quan"],["homnay","Lãi tạm tính theo kênh"],["gia","Giá thành & cảnh báo"],["tien","Tiền & cảnh báo"],["batang","Lãi theo kênh 3 tầng"],["thang","Tháng chốt"],["caidat","Thiết lập"]];
 function dhNeed(t,ai){return `<div class="note amb"><b>Chưa có số:</b> ${t}${ai?` <span class="hint">· ${ai}</span>`:""}</div>`}
 function dhTabNgay(){
   const C=dhCalcNgay(),co=C.rows.filter(r=>r.co),T=co.reduce((a,r)=>({dt:a.dt+r.dt,t2:a.t2+r.t2,ads:a.ads+r.ads}),{dt:0,t2:0,ads:0}),ng=C.cfg.nguong;
@@ -137,9 +196,9 @@ function dhTabCaiDat(){
 function pDieuHanh(m){
   if(!dhOk()){m.innerHTML=H("Phòng điều hành","")+`<section class="card"><p>Chỉ CEO và kế toán xem được.</p></section>`;return}
   dhLoad();
-  const tab=SUB.dh||"homnay";
-  let body="";try{body=DH.busy&&!DH.at?`<p class="hint pad">Đang tải…</p>`:tab==="homnay"?dhTabNgay():tab==="gia"?dhTabGia():tab==="tien"?dhTabTien():tab==="batang"?dhTabBaTang():tab==="thang"?dhTabThang():dhTabCaiDat()}catch(e){body=`<div class="note red">Lỗi tính: ${esc(e.message)}</div>`}
-  m.innerHTML=H("Phòng điều hành","Hôm nay đang chạy thế nào · giá thành · tiền · lãi từng kênh")+`<div class="tabs">${DH_TABS.map(([k,t])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`+(DH.err?`<div class="note red">${esc(DH.err)}</div>`:"")+body;
+  const tab=SUB.dh||"tongquan";
+  let body="";try{body=DH.busy&&!DH.at?`<p class="hint pad">Đang tải…</p>`:tab==="tongquan"?dhTongQuan():tab==="homnay"?dhTabNgay():tab==="gia"?dhTabGia():tab==="tien"?dhTabTien():tab==="batang"?dhTabBaTang():tab==="thang"?dhTabThang():dhTabCaiDat()}catch(e){body=`<div class="note red">Lỗi tính: ${esc(e.message)}</div>`}
+  m.innerHTML=H("Phòng điều hành",esc(pLabel()))+`<div class="tabs">${DH_TABS.map(([k,t])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`+(DH.err?`<div class="note red">${esc(DH.err)}</div>`:"")+body;
   dhBind(m,tab);
 }
 function dhBind(m,tab){
