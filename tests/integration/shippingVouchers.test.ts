@@ -51,8 +51,7 @@ describe('Sổ phiếu chi vận chuyển', () => {
 });
 
 describe('Phiếu chi vận chuyển: chuyển khoản từ tài khoản nào, đến đâu, ảnh bill / phiếu chi tiền mặt', () => {
-  it('chuyển khoản phải có tài khoản đi và số tài khoản nhận; lưu được và đính kèm ảnh', async () => {
-    expect((await ctx.request('/api/shipping-vouchers', { as: USERS.manager, body: body({ method: 'CHUYEN_KHOAN' }) })).status).toBe(422);
+  it('chuyển khoản lưu tài khoản đi và đến, đính kèm được ảnh; tiền mặt lưu người nhận', async () => {
     const a = await ctx.request('/api/shipping-vouchers', {
       as: USERS.manager,
       body: body({ method: 'CHUYEN_KHOAN', from_account: 'Techcombank · 1903 · AILLA', to_bank: 'MB', to_account_no: '9999', to_account_name: 'NGUYEN VAN XE' }),

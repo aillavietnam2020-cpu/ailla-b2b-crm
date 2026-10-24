@@ -368,6 +368,10 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   }, [active.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
+    if (method === 'CHUYEN_KHOAN' && (!(fromAcct === '__x' ? fromOther.trim() : fromAcct) || !toNo.trim())) {
+      setError('Chuyển khoản: chọn tài khoản công ty chi tiền và ghi số tài khoản nhận.');
+      return;
+    }
     setBusy(true);
     setError(null);
     setFields({});

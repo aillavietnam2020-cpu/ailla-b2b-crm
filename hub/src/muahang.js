@@ -326,6 +326,7 @@ function mhPayForm(supId,poId){
   $("#mhp-s").onchange=()=>{fill();mhPayFillTo("mhp",$("#mhp-s").value)};fill();mhPayMethodBind("mhp",$("#mhp-s").value);
   if(poId){const p=(MH.orders||[]).find(x=>x.id===poId);$("#mhp-o").value=poId;if(p){const open=mhPoMoney(p).inv.filter(v=>v.total>v.paid);if(open.length===1){$("#mhp-i").value=open[0].id;$("#mhp-a").value=open[0].total-open[0].paid}else if(!open.length)$("#mhp-k").value="COC"}}
   $("#mhp").onsubmit=async e=>{e.preventDefault();
+    const pm=mhPayMethodRead("mhp");if(pm.method==="CHUYEN_KHOAN"&&(!pm.from_account||!pm.to_account_no)){$("#mhp-e").innerHTML=`<div class="note red">Chuyển khoản: chọn tài khoản công ty chi tiền và ghi số tài khoản nhận.</div>`;return}
     const btn=e.submitter||document.querySelector("#mhp button.pri");if(btn)btn.disabled=true;
     try{const r=await kApi("/mh/payments",{method:"POST",body:JSON.stringify(Object.assign({supplier_id:$("#mhp-s").value,kind:$("#mhp-k").value,po_id:$("#mhp-o").value||null,invoice_id:$("#mhp-i").value||null,pay_date:$("#mhp-d").value,amount:+$("#mhp-a").value,note:$("#mhp-n").value},mhPayMethodRead("mhp")))});
       const fs=[...$("#mhp-f").files];let up=0;for(const f of fs){try{const x=await mhPrepFile(f);await kApi("/mh/payments/"+r.id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}

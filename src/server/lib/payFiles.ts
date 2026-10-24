@@ -45,13 +45,12 @@ export async function deletePayFile(c: Context<AppEnv>, type: PayFileRef, id: st
   return ok(c, { id: fid });
 }
 
-/** Hình thức chi đọc từ form: tiền mặt hay chuyển khoản, chi từ tài khoản nào, chuyển đến đâu, ai nhận. */
+/** Hình thức chi đọc từ form: tiền mặt hay chuyển khoản, chi từ tài khoản nào, chuyển đến đâu, ai nhận.
+ *  Máy chủ không bắt buộc tài khoản (agent lập theo lệnh có thể chưa biết); form trên web bắt buộc. */
 export function readPayMethod(b: Record<string, unknown>) {
   const s = (k: string, max = 120) => String(b[k] ?? '').trim().slice(0, max);
   const method = b.method === 'CHUYEN_KHOAN' ? 'CHUYEN_KHOAN' : b.method === 'TIEN_MAT' ? 'TIEN_MAT' : '';
   const d = { method, from_account: s('from_account', 160), to_bank: s('to_bank', 80), to_account_no: s('to_account_no', 40), to_account_name: s('to_account_name'), receiver: s('receiver') };
-  if (method === 'CHUYEN_KHOAN' && !d.from_account) throw badRequest('NO_FROM_ACCOUNT', 'Chọn tài khoản công ty chi tiền');
-  if (method === 'CHUYEN_KHOAN' && !d.to_account_no) throw badRequest('NO_TO_ACCOUNT', 'Ghi số tài khoản nhận tiền');
   if (method === 'TIEN_MAT') Object.assign(d, { to_bank: '', to_account_no: '', to_account_name: '' });
   return d;
 }

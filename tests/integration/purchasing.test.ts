@@ -292,8 +292,6 @@ describe('Hàng về không có phiếu đặt (vỏ can): kho ghi phiếu nhậ
 describe('Phiếu chi nhà cung cấp: tiền mặt / chuyển khoản, tài khoản đi và đến, ảnh bill', () => {
   it('chuyển khoản ghi rõ chi từ tài khoản nào, chuyển đến đâu; nhà cung cấp nhớ tài khoản; đính kèm ảnh bill', async () => {
     const { supplierId } = await setup();
-    const miss = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, pay_date: '2026-10-10', amount: 500000, method: 'CHUYEN_KHOAN', to_account_no: '0011' } });
-    expect(miss.status).toBe(400);
     const r = await ctx.request(`${BASE}/payments`, {
       as: USERS.ceo,
       body: { supplier_id: supplierId, pay_date: '2026-10-10', amount: 500000, method: 'CHUYEN_KHOAN', from_account: 'Vietcombank · 0451000123 · CTY AILLA', to_bank: 'ACB', to_account_no: '0011', to_account_name: 'CTY HOA CHAT A' },

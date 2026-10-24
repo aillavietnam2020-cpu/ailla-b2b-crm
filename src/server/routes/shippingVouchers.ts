@@ -34,9 +34,6 @@ const createSchema = z.object({
   to_account_no: z.string().trim().max(40).optional().default(''),
   to_account_name: z.string().trim().max(120).optional().default(''),
   receiver: z.string().trim().max(120).optional().default(''),
-}).superRefine((d, ctx) => {
-  if (d.method === 'CHUYEN_KHOAN' && !d.from_account) ctx.addIssue({ code: 'custom', path: ['from_account'], message: 'Chọn tài khoản công ty chi tiền' });
-  if (d.method === 'CHUYEN_KHOAN' && !d.to_account_no) ctx.addIssue({ code: 'custom', path: ['to_account_no'], message: 'Ghi số tài khoản nhận tiền' });
 });
 
 shippingVoucherRoutes.get('/', async (c) => {
