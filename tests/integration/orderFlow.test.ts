@@ -746,4 +746,19 @@ describe('Kho ảnh bill', () => {
     const other = await upload(USERS.thao, { customer_id: 'cus-huyen-1' });
     expect(other.status).toBe(404);
   });
+  it('phiếu xuất kho (màn của kho) có thứ tự mã đúng như đơn sale đặt, không xếp lại theo tên', async () => {
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', order_date: '2026-08-16', items: [{ product_id: 'prod-missing', qty: 3 }, { product_id: 'prod-full', qty: 10 }] },
+    });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    await ctx.db.prepare("UPDATE orders SET approval_status = 'APPROVED', flow_on = 1, kho_status = 'CHO_XUAT', approved_at = '2026-08-16T01:00:00Z' WHERE id = ?").bind(id).run();
+    const r = await ctx.request('/api/hub/kho/b2b-pending', { as: CHUC });
+    expect(r.status).toBe(200);
+    const row = (r.body.data as Array<{ id: string; lines: Array<{ sku: string }> }>).find((x) => x.id === id)!;
+    expect(row.lines.map((l) => l.sku)).toEqual(['TEST-MISSING', 'TEST-FULL']);
+    const d = await ctx.request(`/api/orders/${id}`, { as: USERS.thao });
+    expect((d.body.data.items as Array<{ sku: string }>).map((l) => l.sku)).toEqual(['TEST-MISSING', 'TEST-FULL']);
+  });
 });

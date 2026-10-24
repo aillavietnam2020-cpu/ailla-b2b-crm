@@ -2671,7 +2671,7 @@ async function withOrderLines(db: D1Database, orders: Array<Record<string, unkno
       .prepare(
         `SELECT oi.order_id, oi.product_id, p.sku, p.name, p.unit, oi.qty, oi.is_gift
          FROM order_items oi JOIN products p ON p.id = oi.product_id
-         WHERE oi.order_id IN (${part.map(() => '?').join(',')}) ORDER BY oi.order_id, oi.is_gift, p.name`,
+         WHERE oi.order_id IN (${part.map(() => '?').join(',')}) ORDER BY oi.order_id, oi.created_at, oi.rowid`,
       )
       .bind(...part)
       .all<Record<string, unknown> & { order_id: string }>();
