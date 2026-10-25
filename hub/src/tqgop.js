@@ -125,14 +125,15 @@ function plRowsFor(from,to){
   try{return tqKenhRows()}finally{PERIOD=sv;B2BR.key=bk.key;B2BR.data=bk.data}}
 const plKey=r=>({tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"})[r.k];
 /* Một kênh → các dòng P&L. Phí sàn và vận chuyển = phần còn lại để các dòng cộng khớp lãi đóng góp. */
-function plCol(r){if(!r||r.dt==null)return null;const dt=r.dt,gv=r.gv,ads=r.ads||0,lai=r.lai;
+function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,lai:0,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ads=r.ads||0,lai=r.lai;
   const lg=gv==null?null:dt-gv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ads-lai;return {dt,gv,lg,phi,ads,lai,tam:!!r.tam,src:r.src,don:r.don}}
-function plSum(cols){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.some(c=>c[k]==null)?null:ok.reduce((a,c)=>a+(c[k]||0),0);
-  return {dt:s("dt"),gv:s("gv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),lai:ok.filter(c=>c.lai!=null).reduce((a,c)=>a+c.lai,0),laiDu:ok.every(c=>c.lai!=null),tam:ok.some(c=>c.tam)}}
+function plSum(cols,names){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.reduce((a,c)=>a+(c[k]||0),0);
+  const thieuGv=cols.map((c,i)=>c&&c.gv==null?names[i]:null).filter(Boolean);
+  return {dt:s("dt"),gv:s("gv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),lai:s("lai"),thieuGv,tam:ok.some(c=>c.tam)}}
 function mtGet(ym){const t=D().targets,x=t&&t.thang&&t.thang[ym];if(!x)return null;const o={};let tong=0,co=false;PLK.forEach(([k])=>{const v=+x[k]||0;o[k]=v||null;if(v){tong+=v;co=true}});o.tong=co?tong:null;return co?o:null}
 function plChung(ym){try{if(typeof spChungTheoThang!=="function")return null;const v=spChungTheoThang(ym);return v!=null&&isFinite(+v)&&+v>0?+v:null}catch(e){return null}}
 function plMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
-  const cols={};PLK.forEach(([k])=>cols[k]=plCol(by[k]));const tot=plSum(PLK.map(([k])=>cols[k])),chung=plChung(ym);
+  const cols={};PLK.forEach(([k])=>cols[k]=plCol(by[k]));const tot=plSum(PLK.map(([k])=>cols[k]),PLK.map(x=>x[1])),chung=plChung(ym);
   return {ym,R,by,cols,tot,chung,ln:tot&&chung!=null?tot.lai-chung:null,thieu:PLK.filter(([k])=>!cols[k]).map(x=>x[1]),loading:rows.some(r=>r.src==="đang tải…")}}
 const PLS={ym:""};
 function pPLCty(m){
@@ -149,8 +150,9 @@ function pPLCty(m){
   const src=PLK.map(([k,n])=>{const r=A.by[k];return `<li><b>${n}:</b> ${esc(r?r.src||"":"chờ số")}${r&&r.dang?` · đang giao chưa tính ${nf(r.dang)} đơn (${tr(r.dangDt)})`:""}</li>`}).join("");
   const opts=[];for(let i=-12;i<=0;i++){const k=plYmAdd(plYmNow(),i);opts.push(`<option value="${k}" ${k===ym?"selected":""}>Tháng ${vn(k)}</option>`)}
   m.innerHTML=H("Lãi lỗ P&L công ty",`Tháng ${vn(ym)}${A.R.partial?" · đến hôm nay "+A.R.to.slice(8,10)+"/"+A.R.to.slice(5,7):""} · doanh thu thực · số quản trị nội bộ, sổ sách chính thức ở MISA`)+`
-  <div class="acts" style="margin-bottom:10px"><select id="pl-ym">${opts.join("")}</select><button class="btn" id="pl-mt">Đặt kế hoạch tháng</button></div>
+  <div class="acts" style="margin-bottom:10px"><select id="pl-ym" style="width:auto">${opts.join("")}</select><button class="btn" id="pl-mt">Đặt kế hoạch tháng</button></div>
   ${A.thieu.length?`<div class="note amb">Cột CÔNG TY chưa gồm: ${esc(A.thieu.join(", "))} (chờ tải báo cáo). ${A.loading?"Đang tải B2B…":""}</div>`:""}
+  ${A.tot&&A.tot.thieuGv.length?`<div class="note amb">${esc(A.tot.thieuGv.join(", "))} chưa có giá vốn: cột CÔNG TY chỉ cộng giá vốn, lãi của các kênh đã có giá vốn.</div>`:""}
   ${A.tot&&A.tot.tam?`<div class="note">Có phần doanh thu <b>tạm tính</b> (ngày chưa có báo cáo sàn), số sẽ chốt khi tải báo cáo tháng.</div>`:""}
   <section class="card flush"><div class="tbl"><table><thead><tr><th>Chỉ tiêu (đ)</th>${PLK.map(([,n])=>`<th class="n">${n}</th>`).join("")}<th class="n">CÔNG TY</th><th class="n">Tháng trước<br><small>${vn(P.ym)}</small></th><th class="n">Kế hoạch</th></tr></thead><tbody>
    ${body}${bien("Biên lãi gộp","lg")}${bien("Biên đóng góp","lai")}${bien("Biên lợi nhuận quản trị","ln")}</tbody></table></div>
