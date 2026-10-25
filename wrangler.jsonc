@@ -43,8 +43,8 @@
     }
   ],
   "triggers": {
-    // Chạy mỗi giờ: sinh cảnh báo quá hạn / tái nhập / công nợ.
-    "crons": ["0 * * * *"]
+    // Chạy mỗi 15 phút (đăng bài Fanpage); việc theo giờ chỉ chạy ở lần đầu mỗi giờ.
+    "crons": ["*/15 * * * *"]
   },
   "env": {
     // BẢN DEMO CÔNG KHAI: dùng để xem thử giao diện từ xa, đăng nhập không cần mật khẩu.
@@ -113,7 +113,7 @@
       // R2 chưa được bật trên tài khoản (Dashboard > R2 > Enable). Khi bật xong thì tạo bucket
       // `ailla-crm-files-prod` rồi bỏ dấu chú thích dòng dưới để lưu file import vào R2.
       // "r2_buckets": [{ "binding": "FILES", "bucket_name": "ailla-crm-files-prod" }],
-      "triggers": { "crons": ["0 * * * *"] }
+      "triggers": { "crons": ["*/15 * * * *"] }
       // Ailla Hub chạy ở qt.ailla.vn (ailla.vn đã ở Cloudflare từ 02/10/2026). Địa chỉ workers.dev vẫn dùng được.
       // 13/10: trang vận hành đổi sang vanhanh.ailla.vn; qt.ailla.vn giữ lại một thời gian cho người đã lưu link.
       ,"routes": [{ "pattern": "vanhanh.ailla.vn", "custom_domain": true }, { "pattern": "qt.ailla.vn", "custom_domain": true }, { "pattern": "quantri.ailla.vn", "custom_domain": true }],

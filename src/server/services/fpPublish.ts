@@ -19,6 +19,7 @@ export interface FpCard {
   step?: string;
   day?: number;
   thang?: string;
+  pdate?: string; // ngày đăng đầy đủ YYYY-MM-DD (lịch nhiều tháng); không có thì suy từ thang + day
   pageId?: string;
   gio?: string; // "HH:00"
   dangVideo?: string;
@@ -39,17 +40,22 @@ export interface PageRow { page_id: string; name: string; token: string; is_test
 
 export const vnNow = (now: Date) => new Date(now.getTime() + 7 * 3600 * 1000);
 
+/** Ngày đăng của bài: pdate nếu có, không thì tháng của thẻ (mặc định tháng hiện tại) + ngày. */
+export function cardDate(c: FpCard, monthKey: string): string {
+  if (c.pdate) return c.pdate;
+  return +(c.day ?? 0) ? `${c.thang || monthKey}-${String(c.day).padStart(2, '0')}` : '';
+}
+
 /** Bài tới giờ đăng: đã duyệt, có page + giờ, đúng ngày hôm nay (giờ VN), giờ đã qua nhưng chưa quá LATE_HOURS. */
 export function pickDue(cards: FpCard[], now: Date): FpCard[] {
   const vn = vnNow(now);
   const monthKey = `${vn.getUTCFullYear()}-${String(vn.getUTCMonth() + 1).padStart(2, '0')}`;
-  const today = vn.getUTCDate();
+  const todayStr = `${monthKey}-${String(vn.getUTCDate()).padStart(2, '0')}`;
   const minutes = vn.getUTCHours() * 60 + vn.getUTCMinutes();
   return cards
     .filter((c) => {
       if (c.step !== 'dang' || !c.pageId || !c.gio || c.fbPostId || c.fbState) return false;
-      if (+(c.day ?? 0) !== today) return false;
-      if (c.thang && c.thang !== monthKey) return false;
+      if (cardDate(c, monthKey) !== todayStr) return false;
       const m = /^(\d{1,2}):(\d{2})$/.exec(c.gio);
       if (!m) return false;
       const slot = +m[1] * 60 + +m[2];

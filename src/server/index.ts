@@ -43,10 +43,20 @@ export default {
     return new Response('Ứng dụng chưa được build. Chạy `npm run build` trước.', { status: 503 });
   },
 
-  /** Cron mỗi giờ: sinh cảnh báo quá hạn, tái nhập, công nợ, kế toán treo (mục 13.1). */
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  /**
+   * Cron mỗi 15 phút. Mỗi lần: đăng bài Fanpage tới giờ (giờ lẻ phút 9:15, 9:30...).
+   * Phần còn lại (cảnh báo quá hạn, tái nhập, công nợ, kế toán treo - mục 13.1, kéo đơn, nhắc việc) chỉ chạy ở lần đầu mỗi giờ như trước.
+   */
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(
       (async () => {
+        // Đăng bài Fanpage đã duyệt tới giờ (công tắc app_kv fp_publish: off / test / on).
+        try {
+          console.info('[cron] dang fanpage', JSON.stringify(await publishDue(env.DB, env.INGEST_KEY, (u, i) => fetch(u, i))));
+        } catch (error) {
+          console.error('[cron] dang fanpage loi', error);
+        }
+        if (new Date(event.scheduledTime).getUTCMinutes() >= 15) return;
         const config = await loadConfig(env.DB);
         const result = await syncAlerts(env.DB, config);
         console.info('[cron] alerts', JSON.stringify(result));
@@ -75,12 +85,6 @@ export default {
           console.info('[cron] nhac buoi quay', JSON.stringify(await shootReminders(env.DB)));
         } catch (error) {
           console.error('[cron] nhac buoi quay loi', error);
-        }
-        // Đăng bài Fanpage đã duyệt tới giờ (công tắc app_kv fp_publish: off / test / on).
-        try {
-          console.info('[cron] dang fanpage', JSON.stringify(await publishDue(env.DB, env.INGEST_KEY, (u, i) => fetch(u, i))));
-        } catch (error) {
-          console.error('[cron] dang fanpage loi', error);
         }
         // Nhắc việc Task giao việc: việc trễ, đến hạn, chờ duyệt + tóm tắt cho chị (8 giờ sáng giờ Việt Nam).
         try {
