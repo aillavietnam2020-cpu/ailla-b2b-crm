@@ -24,6 +24,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     o.phai_thu=MI("phai_thu","Phải thu khách",u=>can(u,"chiphi.xem")||mg());
     o.nguong=MI("nguong","Ngưỡng cảnh báo & chỉ số",mg);
     o.npp360=MI("npp360","Hồ sơ NPP / đại lý",u=>can(u,"chiphi.xem")||mg());
+    o.quytac=MI("quytac","Quy tắc vận hành & luồng việc",mg);
     o.so_cp=MI("so_cp","Sổ chi phí",u=>can(u,"chiphi.xem")||mg());
     return o};
   const pick=(P,keys,names)=>keys.map((id,i)=>{const it=P[id];return it?[it[0],(names&&names[i])||it[1],it[2],it[3]]:null}).filter(Boolean);
@@ -40,7 +41,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
       return [g("Tài khoản",["nhansu","phongban"],["Tài khoản & phân quyền","Phòng ban"]),
         g("Danh mục",["sanpham","kenhban","chiphidm","cr_rcv","gc_kh","cr_giagc"],["Sản phẩm","Kênh bán & phí","Danh mục chi phí","Tài khoản nhận tiền","Khách gia công","Bảng giá riêng gia công"]),
         g("Dữ liệu & AI",["cr_import","caidat","bots","agentchat","agents","quychuan"],["Dữ liệu","Sao lưu dữ liệu","Trợ lý AI","Điều hành agent","Agent AI","Quy chuẩn"]),
-        g("Theo dõi",["nguong","soat_sl","cr_audit"],["Ngưỡng cảnh báo & chỉ số","Máy soát số liệu","Nhật ký"])].filter(x=>x[1].length)}});
+        g("Theo dõi",["quytac","nguong","soat_sl","cr_audit"],["Quy tắc vận hành & luồng việc","Ngưỡng cảnh báo & chỉ số","Máy soát số liệu","Nhật ký"])].filter(x=>x[1].length)}});
 
   /* ---------- Nút "+ Ghi nhanh" ở đầu thanh bên ---------- */
   const gnGo=p=>{PAGE=p;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};

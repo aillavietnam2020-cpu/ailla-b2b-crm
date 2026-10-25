@@ -48,17 +48,27 @@ function vcItems(){
   L.forEach(x=>{x.over=x.han?Math.max(0,tlDays(x.han,today)):0;x.leo=x.over>=S.leo});
   return L.sort((a,b)=>(b.leo-a.leo)||(b.over-a.over)||a.r-b.r);
 }
+const vcKey=x=>typeof QT_TAGKEY!=="undefined"?QT_TAGKEY[x.tag[0]]:"";
+function vcWho(x){const k=vcKey(x);if(!k||typeof qtRule!=="function")return "";const r=qtRule(k);return `<small class="vcwho">Người làm: <b>${esc(r.lam)}</b> · duyệt: ${esc(r.duyet)}</small>`}
+/* Giao việc: mở form Giao việc có sẵn của Task giao việc, điền sẵn tên việc và mô tả. */
+function vcGive(x){
+  const txt=s=>String(s||"").replace(/<[^>]+>/g,"").replace(/&amp;/g,"&");
+  if(typeof openTask!=="function"){toast("Chưa mở được form giao việc");return}
+  openTask(null);
+  setTimeout(()=>{const a=document.querySelector("#t-ten"),b=document.querySelector("#t-mo");
+    if(a)a.value=txt(x.t);if(b)b.value=txt(x.s)+(x.han?" · hạn "+x.han:"")},60)}
 function vcCard(){
   const L=vcItems(),n=L.length,show=VC.all?L:L.slice(0,6),leo=L.filter(x=>x.leo).length,qh=L.filter(x=>x.over>0).length;
   VC.list=show;
   const han=x=>!x.han?"":x.over>0?`<b class="vcover">quá hạn ${x.over} ngày</b> · hạn ${esc(mhDM(x.han))}`:`hạn ${esc(mhDM(x.han))}`;
   return `<section class="vcbox"><div class="vch"><b>Việc chờ tôi</b><span>${leo?`<span class="vcn">${leo} cần chị Hoa quyết</span> `:""}<span class="vcn${n?"":" ok"}${qh&&!leo?"":""}">${n?n+" việc"+(qh?" · "+qh+" quá hạn":""):"Không có việc nào"}</span></span></div>${
-    n?show.map((x,i)=>`<div class="vcrow${x.leo?" leo":""}"><span class="vctag ${x.tag[1]}">${esc(x.tag[0])}</span><div class="vct"><b>${x.t}</b><small>${x.s}${han(x)?" · "+han(x):""}</small></div>${x.leo?`<span class="vcleo">Cần chị Hoa quyết</span>`:""}<button class="btn sm" data-vc="${i}">Mở</button></div>`).join("")+(n>6?`<button class="vcmore" id="vc-more">${VC.all?"Thu gọn":"Xem thêm "+(n-6)+" việc"}</button>`:""):`<p class="hint" style="margin:8px 0 2px">Chuyển khoản, chứng từ, công nợ nhà cung cấp đều đã xong.</p>`}</section>`}
+    n?show.map((x,i)=>`<div class="vcrow${x.leo?" leo":""}"><span class="vctag ${x.tag[1]}">${esc(x.tag[0])}</span><div class="vct"><b>${x.t}</b><small>${x.s}${han(x)?" · "+han(x):""}</small>${vcWho(x)}</div>${x.leo?`<span class="vcleo">Cần chị Hoa quyết</span>`:""}<button class="btn sm" data-vg="${i}" title="Giao việc này cho một người">Giao việc</button><button class="btn sm" data-vc="${i}">Mở</button></div>`).join("")+(n>6?`<button class="vcmore" id="vc-more">${VC.all?"Thu gọn":"Xem thêm "+(n-6)+" việc"}</button>`:""):`<p class="hint" style="margin:8px 0 2px">Chuyển khoản, chứng từ, công nợ nhà cung cấp đều đã xong.</p>`}</section>`}
 {const _ex=PAGES.exec;PAGES.exec=function(m){_ex.apply(this,arguments);
   try{if(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin"||!mhManage())return;
     if((SUB.exec||"homnay")!=="homnay"||!m.querySelector(".xkstrip"))return;
     vcLoad();vcLoadMore();if(!(MH.orders&&MH.inv&&MH.pay&&MH.sup))return;
     m.querySelector(".xkstrip").insertAdjacentHTML("beforebegin",vcCard());
     m.querySelectorAll("[data-vc]").forEach(b=>b.onclick=()=>VC.list[+b.dataset.vc].go());
+    m.querySelectorAll("[data-vg]").forEach(b=>b.onclick=()=>vcGive(VC.list[+b.dataset.vg]));
     const mo=m.querySelector("#vc-more");if(mo)mo.onclick=()=>{VC.all=!VC.all;renderMain()};
   }catch(e){}}}

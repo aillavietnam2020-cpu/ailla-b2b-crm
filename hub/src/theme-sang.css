@@ -459,3 +459,11 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 .n3h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.n3n{font-size:18px}
 .n3r>*{margin-bottom:12px}
 @media(max-width:900px){.n3w{grid-template-columns:1fr}.n3l{position:static;max-height:none}}
+
+/* Quy tắc vận hành */
+.qtf{display:flex;gap:14px;align-items:center;padding:8px 0;border-top:1px solid #eef0f6}.qtf>b{width:120px;flex:none}
+.qts{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}.qtc{background:#eef0ff;color:#2f3a9a;border-radius:99px;padding:4px 12px;font-size:12.5px}.qta{color:#9aa1b5;font-style:normal}
+.qti{width:100%;min-width:130px;border:1px solid #d9dcea;border-radius:8px;padding:6px 8px;font:inherit}.qti.qtn{width:64px;min-width:0;text-align:right}
+.qtesc{margin-top:12px;background:#fff6f5;border-left:4px solid #d93025;border-radius:8px;padding:10px 14px;font-size:13.5px}
+.vcwho{color:#5a6178}.vcwho b{color:#2f3a9a}
+@media(max-width:700px){.qtf{flex-direction:column;align-items:flex-start}}
