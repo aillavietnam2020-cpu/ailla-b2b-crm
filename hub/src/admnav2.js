@@ -17,13 +17,14 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     const mg=()=>mhManage();
     if(!o.mh_hd)o.mh_hd=MI("mh_hd","Chứng từ nhà cung cấp",mg);
     if(!o.mh_chi)o.mh_chi=MI("mh_chi","Phiếu chi nhà cung cấp",mg);
+    o.muctieu=MI("muctieu","Kế hoạch doanh thu",u=>can(u,"pl.xem")||mg());
     o.so_cp=MI("so_cp","Sổ chi phí",u=>can(u,"chiphi.xem")||mg());
     return o};
   const pick=(P,keys,names)=>keys.map((id,i)=>{const it=P[id];return it?[it[0],(names&&names[i])||it[1],it[2],it[3]]:null}).filter(Boolean);
   const tabMod=(k,ic,n,zone,keys,names)=>({k,adm:true,zone,ic,n,sub:"",tabs:true,groups:()=>[["",pick(pool(),keys,names)]]});
   MODULES.push(
     {k:"q_tq",adm:true,zone:"Điều hành",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",pick(pool(),["exec"],["Tổng quan"])]]},
-    tabMod("q_dt","bag","Doanh thu & KPI","",["bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["TikTok Shop","Shopee","Facebook","B2B / Đại lý","Gia công","CSKH cũ"]),
+    tabMod("q_dt","bag","Doanh thu & KPI","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý","Gia công","CSKH cũ"]),
     tabMod("q_ll","spark","Lãi lỗ & Giá thành","",["pl","bc_tong","kho_boc","kho_cl","sku"],["P&L công ty","So sánh kênh","Định mức & giá thành","Chênh lệch định mức","Giá vốn SKU"]),
     tabMod("q_cp","fin","Chi phí & Tiền","",["so_cp","cr_vc","mh_no","cr_cn","doisoat","cr_bill"],["Sổ chi phí","Phiếu chi vận chuyển","Phải trả nhà cung cấp","Phải thu khách (NPP)","Đối soát tiền về","Kho bill giao dịch"]),
     tabMod("q_dh","box","Đơn hàng","Nghiệp vụ",["cr_dn","gc_don","kho_qd","cr_kh","cr_gia","cr_dc","cr_thuong"],["Đơn B2B & duyệt","Đơn gia công","Đơn sàn & quy đổi mã","Khách & đại lý","Bảng giá","Giá điều chỉnh / khuyến mại","Thưởng & xếp hạng NPP"]),
