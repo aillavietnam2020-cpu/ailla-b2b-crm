@@ -45,7 +45,9 @@ function vcItems(){
   /* khách nợ quá 90 ngày (gồm nợ đầu kỳ) */
   try{const A=PT.d&&PT.d.rows?PT.d.rows.filter(r=>r.b90p+r.old>0):[];
     if(A.length)L.push({r:6,t:A.length+" khách nợ quá 90 ngày",s:"Tổng "+nf(Math.round(A.reduce((t,r)=>t+r.b90p+r.old,0)))+" đ · "+A.slice(0,2).map(r=>r.customer_name).join(", ")+(A.length>2?"…":""),tag:["Đòi nợ","red"],han:"",go:()=>{PAGE="phai_thu";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)}})}catch(e){}
-  L.forEach(x=>{x.over=x.han?Math.max(0,tlDays(x.han,today)):0;x.leo=x.over>=S.leo});
+  /* việc của team (video chờ đăng, chờ duyệt…) lấy từ Task giao việc, gộp chung một hộp cho khỏi có hai danh sách */
+  try{(typeof execAttention==="function"?execAttention():[]).forEach(a=>L.push({r:a.late?3:7,team:true,t:esc(a.t),s:esc([a.dep,a.who,a.han].filter(Boolean).join(" · ")),tag:[a.st[0],["red","amb","blu","grn"].includes(a.st[1])?a.st[1]:"blu"],han:"",btn:a.btn||"Mở",go:()=>vcAtGo(a)}))}catch(e){}
+  L.forEach(x=>{x.over=x.han?Math.max(0,tlDays(x.han,today)):0;if(x.team&&x.r===3)x.over=1;x.leo=x.over>=S.leo});
   return L.sort((a,b)=>(b.leo-a.leo)||(b.over-a.over)||a.r-b.r);
 }
 const vcKey=x=>typeof QT_TAGKEY!=="undefined"?QT_TAGKEY[x.tag[0]]:"";
@@ -57,17 +59,22 @@ function vcGive(x){
   openTask(null);
   setTimeout(()=>{const a=document.querySelector("#t-ten"),b=document.querySelector("#t-mo");
     if(a)a.value=txt(x.t);if(b)b.value=txt(x.s)+(x.han?" · hạn "+x.han:"")},60)}
+function vcAtGo(a){
+  if(a.href){location.href=a.href;return}
+  if(a.open){if(a.open.src==="card")openCard(a.open.id);else if(a.open.src==="order"){PAGE="order";MOD="";render()}else openTask(a.open.id);return}
+  if(a.go){PAGE=a.go;MOD="";render();scrollTo(0,0)}}
 function vcCard(){
   const L=vcItems(),n=L.length,show=VC.all?L:L.slice(0,6),leo=L.filter(x=>x.leo).length,qh=L.filter(x=>x.over>0).length;
   VC.list=show;
   const han=x=>!x.han?"":x.over>0?`<b class="vcover">quá hạn ${x.over} ngày</b> · hạn ${esc(mhDM(x.han))}`:`hạn ${esc(mhDM(x.han))}`;
   return `<section class="vcbox"><div class="vch"><b>Việc chờ tôi</b><span>${leo?`<span class="vcn">${leo} cần chị Hoa quyết</span> `:""}<span class="vcn${n?"":" ok"}${qh&&!leo?"":""}">${n?n+" việc"+(qh?" · "+qh+" quá hạn":""):"Không có việc nào"}</span></span></div>${
-    n?show.map((x,i)=>`<div class="vcrow${x.leo?" leo":""}"><span class="vctag ${x.tag[1]}">${esc(x.tag[0])}</span><div class="vct"><b>${x.t}</b><small>${x.s}${han(x)?" · "+han(x):""}</small>${vcWho(x)}</div>${x.leo?`<span class="vcleo">Cần chị Hoa quyết</span>`:""}<button class="btn sm" data-vg="${i}" title="Giao việc này cho một người">Giao việc</button><button class="btn sm" data-vc="${i}">Mở</button></div>`).join("")+(n>6?`<button class="vcmore" id="vc-more">${VC.all?"Thu gọn":"Xem thêm "+(n-6)+" việc"}</button>`:""):`<p class="hint" style="margin:8px 0 2px">Chuyển khoản, chứng từ, công nợ nhà cung cấp đều đã xong.</p>`}</section>`}
+    n?show.map((x,i)=>`<div class="vcrow${x.leo?" leo":""}"><span class="vctag ${x.tag[1]}">${esc(x.tag[0])}</span><div class="vct"><b>${x.t}</b><small>${x.s}${han(x)?" · "+han(x):""}</small>${x.team?"":vcWho(x)}</div>${x.leo?`<span class="vcleo">Cần chị Hoa quyết</span>`:""}${x.team?"":`<button class="btn sm" data-vg="${i}" title="Giao việc này cho một người">Giao việc</button>`}<button class="btn sm${x.btn==="Duyệt"?" pri":""}" data-vc="${i}">${x.btn||"Mở"}</button></div>`).join("")+(n>6?`<button class="vcmore" id="vc-more">${VC.all?"Thu gọn":"Xem thêm "+(n-6)+" việc"}</button>`:""):`<p class="hint" style="margin:8px 0 2px">Chuyển khoản, chứng từ, công nợ nhà cung cấp đều đã xong.</p>`}</section>`}
 {const _ex=PAGES.exec;PAGES.exec=function(m){_ex.apply(this,arguments);
   try{if(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin"||!mhManage())return;
     if((SUB.exec||"homnay")!=="homnay"||!m.querySelector(".xkstrip"))return;
     vcLoad();vcLoadMore();if(!(MH.orders&&MH.inv&&MH.pay&&MH.sup))return;
     m.querySelector(".xkstrip").insertAdjacentHTML("beforebegin",vcCard());
+    const old=m.querySelector(".xatt");if(old)old.remove();
     m.querySelectorAll("[data-vc]").forEach(b=>b.onclick=()=>VC.list[+b.dataset.vc].go());
     m.querySelectorAll("[data-vg]").forEach(b=>b.onclick=()=>vcGive(VC.list[+b.dataset.vg]));
     const mo=m.querySelector("#vc-more");if(mo)mo.onclick=()=>{VC.all=!VC.all;renderMain()};
