@@ -27,6 +27,8 @@ export interface FpCard {
   noiDung?: string;
   cta?: string;
   linkLanding?: string;
+  firstComment?: string; // bình luận đầu (thường kèm link bán hàng), agent đăng ngay sau bài
+  firstCommentImg?: string;
   mediaUrl?: string;
   fbState?: string; // sending | ok | error
   fbPostId?: string;
@@ -205,7 +207,7 @@ export async function claimDueForAgent(db: D1Database, now: Date = new Date()) {
     });
     if (!claimed) continue;
     const post = buildPost(c);
-    posts.push({ card_id: c.id, page_id: c.pageId, page_name: byId.get(c.pageId ?? '')?.name, kind: post.path, ...post.params });
+    posts.push({ card_id: c.id, page_id: c.pageId, page_name: byId.get(c.pageId ?? '')?.name, kind: post.path, ...post.params, comment: c.firstComment || undefined, comment_image: c.firstCommentImg || undefined });
   }
   return { mode, posts };
 }
@@ -237,4 +239,87 @@ export async function agentDone(db: D1Database, body: { card_id?: string; ok?: b
       .run();
   }
   return found;
+}
+
+/* ---------- Agent tự lên bài vào lịch (luôn vào "Chờ duyệt", không bao giờ tự duyệt) ---------- */
+export const FANPAGE_CHANNEL = 'Fanpage chính';
+export const MAX_DRAFTS = 60;
+
+export interface RawDraft {
+  page_id?: unknown; date?: unknown; time?: unknown; text?: unknown; format?: unknown;
+  media_url?: unknown; link?: unknown; comment?: unknown; comment_image?: unknown; video_card_id?: unknown;
+}
+const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+const httpsUrl = (v: unknown) => {
+  const s = str(v, 1000);
+  return /^https:\/\/[^\s]+$/.test(s) ? s : '';
+};
+
+/** Kiểm tra và chuẩn hóa một bài agent đề xuất. Trả lý do nếu bỏ. */
+export interface Draft { pageId: string; pdate: string; gio: string; noiDung: string; fmt: string; media: string; link: string; comment: string; commentImg: string }
+export function sanitizeDraft(raw: RawDraft, pageIds: Set<string>, now: Date): { ok: true; d: Draft } | { ok: false; reason: string } {
+  const pageId = str(raw.page_id, 30);
+  if (!pageIds.has(pageId)) return { ok: false, reason: 'page chưa khai báo trên web' };
+  const date = str(raw.date, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + 'T00:00:00Z'))) return { ok: false, reason: 'ngày không đúng dạng YYYY-MM-DD' };
+  const vn = vnNow(now);
+  const today = vn.toISOString().slice(0, 10);
+  if (date < today) return { ok: false, reason: 'ngày đã qua' };
+  const maxDate = new Date(vn.getTime() + 180 * 86_400_000).toISOString().slice(0, 10);
+  if (date > maxDate) return { ok: false, reason: 'ngày quá xa (tối đa 180 ngày)' };
+  const m = /^(\d{1,2}):(\d{2})$/.exec(str(raw.time, 5));
+  if (!m || +m[1] > 23 || +m[2] > 59) return { ok: false, reason: 'giờ không đúng dạng HH:MM' };
+  const gio = `${m[1].padStart(2, '0')}:${String(Math.floor(+m[2] / 15) * 15).padStart(2, '0')}`;
+  const noiDung = str(raw.text, 5000);
+  const media = httpsUrl(raw.media_url);
+  if (!noiDung && !media) return { ok: false, reason: 'bài trống' };
+  const fmtIn = str(raw.format, 10);
+  const fmt = fmtIn === 'video' ? 'Video' : 'Ảnh';
+  return { ok: true, d: { pageId, pdate: date, gio, noiDung, fmt, media, link: httpsUrl(raw.link), comment: str(raw.comment, 2000), commentImg: httpsUrl(raw.comment_image) } };
+}
+
+async function draftId(d: { pageId: string; pdate: string; gio: string; noiDung: string }): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(`${d.pageId}|${d.pdate}|${d.gio}|${d.noiDung.slice(0, 60)}`));
+  return 'FPA-' + [...new Uint8Array(buf)].slice(0, 5).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Tạo thẻ bài ở trạng thái Chờ duyệt cho các bài hợp lệ. Cùng bài gửi lại thì bỏ qua (không nhân đôi). */
+export async function createDrafts(db: D1Database, taskId: string, posts: RawDraft[], now: Date = new Date()) {
+  const pages = await db.prepare('SELECT page_id FROM fp_pages WHERE active = 1').all<{ page_id: string }>();
+  const pageIds = new Set((pages.results ?? []).map((p) => p.page_id));
+  const skipped: Array<{ index: number; reason: string }> = [];
+  const good: Array<{ id: string; d: Draft; video: string }> = [];
+  const list = Array.isArray(posts) ? posts.slice(0, MAX_DRAFTS) : [];
+  for (let i = 0; i < list.length; i++) {
+    const r = sanitizeDraft(list[i] ?? {}, pageIds, now);
+    if (!r.ok) { skipped.push({ index: i, reason: r.reason }); continue; }
+    good.push({ id: await draftId(r.d), d: r.d, video: str(list[i].video_card_id, 40) });
+  }
+  if (!good.length) return { created: 0, skipped };
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await readHub(db);
+    if (!cur) return { created: 0, skipped: [{ index: -1, reason: 'chưa có dữ liệu Marketing trên web' }] };
+    const cards = (cur.d.cards = cur.d.cards ?? []);
+    const have = new Set(cards.map((c) => c.id));
+    let created = 0;
+    const stamp = new Date().toLocaleString('vi-VN');
+    for (const g of good) {
+      if (have.has(g.id)) continue;
+      const day = +g.d.pdate.slice(8);
+      cards.push({
+        id: g.id, thang: g.d.pdate.slice(0, 7), day, sku: 'TH', kenh: FANPAGE_CHANNEL, step: 'dvd', nguon: 'Fanpage', loai: 'moi',
+        dangVideo: g.d.fmt, hookText: g.d.noiDung.split('\n')[0].slice(0, 90), noiDung: g.d.noiDung, pageId: g.d.pageId, pdate: g.d.pdate, gio: g.d.gio,
+        mediaUrl: g.d.media, linkLanding: g.d.link, firstComment: g.d.comment, firstCommentImg: g.d.commentImg, videoSrc: g.video, aiViet: Date.now(), fpAgentTask: taskId,
+        gopy: [], history: [{ t: stamp, who: 'Agent Fanpage', to: 'dvd' }], files: [], createdAt: Date.now(),
+      } as unknown as FpCard);
+      created++;
+    }
+    if (!created) return { created: 0, skipped: skipped.concat([{ index: -1, reason: 'các bài này đã có trên lịch rồi' }]) };
+    const res = await db
+      .prepare("UPDATE hub_state SET version = version + 1, data = ?, updated_at = ? WHERE id = 'main' AND version = ?")
+      .bind(await pack(JSON.stringify(cur.d)), new Date().toISOString(), cur.version)
+      .run();
+    if (res.meta.changes) return { created, skipped };
+  }
+  return { created: 0, skipped: skipped.concat([{ index: -1, reason: 'dữ liệu đang được sửa liên tục, thử lại' }]) };
 }

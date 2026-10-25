@@ -4,7 +4,7 @@ import type { AppEnv } from '../env';
 import { badRequest, notFound, ok, unauthorized } from '../lib/http';
 import { newId } from '../lib/ids';
 import { requirePermission } from '../middleware/rbac';
-import { agentDone, claimDueForAgent } from '../services/fpPublish';
+import { agentDone, claimDueForAgent, createDrafts, type RawDraft } from '../services/fpPublish';
 
 /**
  * Hàng việc gửi sang Worker dựng video (máy ở văn phòng).
@@ -21,6 +21,8 @@ const KINDS = [
   'card_scan',
   // Xuất hook / kịch bản ra Excel hoặc Word, Worker lưu vào Google Drive của công ty và trả link
   'card_export',
+  // Fanpage: agent viết nội dung (fp_write) và tự lên lịch bài theo yêu cầu của chị (fp_plan)
+  'fp_write', 'fp_plan',
 ] as const;
 const STATUSES = ['queued', 'taken', 'running', 'review', 'building', 'done', 'error'] as const;
 
@@ -205,6 +207,12 @@ fpAgentRoutes.post('/done', async (c) => {
   if (!body.card_id) throw badRequest('NO_ID', 'Thiếu mã bài');
   if (!(await agentDone(c.env.DB, body))) throw notFound('Không thấy bài');
   return ok(c, { ok: true });
+});
+/** Agent tạo bài vào lịch (luôn vào Chờ duyệt, chị duyệt rồi mới đăng). Gửi lại cùng bài thì bỏ qua, không nhân đôi. */
+fpAgentRoutes.post('/draft', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { task_id?: string; posts?: RawDraft[] };
+  if (!Array.isArray(body.posts) || !body.posts.length) throw badRequest('NO_POSTS', 'Chưa có bài nào');
+  return ok(c, await createDrafts(c.env.DB, String(body.task_id ?? ''), body.posts));
 });
 fpAgentRoutes.post('/pull', async (c) => {
   const rows = await c.env.DB.prepare(
