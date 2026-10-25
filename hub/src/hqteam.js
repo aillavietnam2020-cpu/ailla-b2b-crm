@@ -36,9 +36,12 @@ function pHieuQuaTeam(m){
    const ov=S.reduce((a,s)=>{const o=s.overview||{};a.rev+=+o.revenue||0;a.ord+=+o.orders||0;a.newc+=+o.new_first_order_customers||0;return a},{rev:0,ord:0,newc:0});
    const by={};S.forEach(s=>(s.by_sale||[]).forEach(x=>{const t=by[x.user_id]||(by[x.user_id]={n:x.display_name,rev:0,ord:0,newc:0,col:0});t.rev+=+x.revenue||0;t.ord+=+x.orders||0;t.newc+=+x.new_customers||0;t.col+=+x.collected||0}));
    const P=Object.values(by).filter(x=>x.rev||x.ord).sort((a,b)=>b.rev-a.rev);
+   /* Đơn không có sale phụ trách (thường là đơn nhập từ file cũ) vẫn nằm trong tổng: hiện một dòng để cộng đủ. */
+   const isEmp=SV&&SV.me&&SV.me.role==="EMPLOYEE",rest={rev:ov.rev-P.reduce((a,x)=>a+x.rev,0),ord:ov.ord-P.reduce((a,x)=>a+x.ord,0)};
+   if(!isEmp&&(rest.rev>1000||rest.ord>0))P.push({n:"(đơn chưa gán sale)",rev:rest.rev,ord:rest.ord,newc:0,col:0,chua:1});
    cards.push(hqCard({t:"Phân phối (Sale B2B)",go:"b2b_perf",sub:ms.length>1?"tính theo tháng: "+ms.map(k=>k.slice(5)+"/"+k.slice(0,4)).join(", "):"tính theo tháng "+(ms[0]||"").slice(5),k:[["Doanh số",ov.rev?tr(ov.rev):done?"—":"…",nf(ov.ord)+" đơn đã duyệt"],["Giá trị đơn trung bình",ov.ord?tr(ov.rev/ov.ord):"—",""],["Khách mới",ov.newc?nf(ov.newc):"—","đặt đơn đầu tiên"]],
-    body:P.length?tbl(["#","Sale","Doanh số","Đơn","Khách mới","Đã thu"],P.map((x,i)=>hqRow([i+1,`<b>${esc(x.n)}</b>`,tr(x.rev),nf(x.ord),nf(x.newc),tr(x.col)]))):"",
-    note:SV&&SV.me&&SV.me.role==="EMPLOYEE"?"Bạn chỉ thấy số của chính mình.":""}))}
+    body:P.length?tbl(["#","Sale","Doanh số","Đơn","Khách mới","Đã thu"],P.map((x,i)=>hqRow([x.chua?"":i+1,x.chua?`<span class="t-red">${esc(x.n)}</span>`:`<b>${esc(x.n)}</b>`,tr(x.rev),nf(x.ord),x.chua?"—":nf(x.newc),x.chua?"—":tr(x.col)]))):"",
+    note:isEmp?"Bạn chỉ thấy số của chính mình.":rest.rev>1000?"Đơn chưa gán sale phụ trách: kế toán hoặc quản lý gán sale cho khách trên CRM thì số tự chia về từng người.":""}))}
   /* Shopee */
   {const dt=g("spe",0);cards.push(hqCard({t:"Shopee",go:"bc_shopee",k:[["Doanh thu",dt?tr(dt):"—",dt?nf(g("spe",4))+" đơn":"chưa có số trong kỳ"]],note:dt?"":"Chưa có số Shopee theo ngày trên web."}))}
   m.innerHTML=H("Hiệu quả team",esc(pLabel())+" · doanh số, đơn, tỷ lệ và xếp hạng từng người")+`<p class="hint" style="margin:-4px 0 12px">Chọn kỳ ở ô ngày phía trên. Bấm "Chi tiết" để xem trang riêng của từng team.</p>`+cards.join("");
