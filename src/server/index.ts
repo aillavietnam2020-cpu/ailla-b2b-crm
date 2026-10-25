@@ -7,6 +7,7 @@ import { serveHub } from './hub/serve';
 import HUB_HTML from './hub/hub.html';
 import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
+import { publishDue } from './services/fpPublish';
 import { syncAllChannels } from './services/poscake';
 import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
@@ -74,6 +75,12 @@ export default {
           console.info('[cron] nhac buoi quay', JSON.stringify(await shootReminders(env.DB)));
         } catch (error) {
           console.error('[cron] nhac buoi quay loi', error);
+        }
+        // Đăng bài Fanpage đã duyệt tới giờ (công tắc app_kv fp_publish: off / test / on).
+        try {
+          console.info('[cron] dang fanpage', JSON.stringify(await publishDue(env.DB, env.INGEST_KEY, (u, i) => fetch(u, i))));
+        } catch (error) {
+          console.error('[cron] dang fanpage loi', error);
         }
         // Nhắc việc Task giao việc: việc trễ, đến hạn, chờ duyệt + tóm tắt cho chị (8 giờ sáng giờ Việt Nam).
         try {
