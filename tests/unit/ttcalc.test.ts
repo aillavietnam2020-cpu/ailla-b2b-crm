@@ -84,10 +84,26 @@ describe('TikTok: file đơn và quyết toán', () => {
     expect(T.ttKind({ csv: ORDERS })).toBe('orders');
   });
   it('từ chối file income sai kỳ', () => {
-    expect(T.ttReadIncome(incomeSheets('2026/09/01-2026/09/30'), '2026-09').err).toMatch(/08\/10\/2026/);
+    // Tới trước 08 tháng sau = báo cáo giữa tháng (được nhận, đánh dấu partial); chưa vào tháng thì từ chối.
+    expect(T.ttReadIncome(incomeSheets('2026/09/01-2026/09/30'), '2026-09').partial).toBe(true);
+    expect(T.ttReadIncome(incomeSheets('2026/08/01-2026/08/31'), '2026-09').err).toMatch(/chưa vào tháng/);
+    expect(T.ttReadIncome(incomeSheets(), '2026-09').partial).toBe(false);
     expect(T.ttReadIncome(incomeSheets('2026/09/02-2026/10/08'), '2026-09').err).toMatch(/01\/09\/2026/);
     expect(T.ttCheckIncomeRange({ from: '2026-08-25', to: '2026-10-10' }, '2026-09')).toBe('');
     expect(T.ttReadIncome({ 'Chi tiết đơn hàng': [] }, '2026-09').err).toMatch(/Khoảng thời gian/);
+  });
+  it('báo cáo giữa tháng: số đến ngày đơn mới nhất, quảng cáo cắt đến ngày đó, có số theo ngày để ghép', () => {
+    const orders = T.ttReadOrders(ORDERS, '2026-09');
+    const income = T.ttReadIncome(incomeSheets('2026/09/01-2026/09/20'), '2026-09');
+    const camp = T.ttReadCampaign([...CAMP.slice(0, 3), ['2026-09-30 00:00:00', 999, 1, 1]]);
+    const M = T.ttBuildMonth({ ky: '2026-09', orders, income, camp });
+    expect(M.den).toBe('2026-09-30');
+    expect(M.ads.chi).toBe(100000 + 50001 + 999);
+    const P = T.ttPL(M, () => ({ u: 1000 }), []);
+    const S = T.ttSummary(P);
+    expect(S.den).toBe('2026-09-30');
+    expect(Object.values(S.days).reduce((a: number, d: any) => a + d[0], 0)).toBe(P.dt);
+    expect(P.checks[0][1]).toMatch(/giữa tháng/);
   });
   it('quảng cáo: cắt ngày 1–8 tháng sau, lấy theo kỳ chi tiêu cộng VAT 10%', () => {
     const { income, M } = build();

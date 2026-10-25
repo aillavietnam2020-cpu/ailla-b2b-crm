@@ -94,7 +94,9 @@ async function tsbAdmCompute(){
 async function tsbSavePrev(){
   const V=TSB.prev;if(!V)return;const cur=TSB.data[V.ky];
   if(cur&&cur.locked_at){toast("Tháng này đã khoá sổ");return}
-  if(!confirm(`Lưu báo cáo TikTok ${tsbKyL(V.ky)}?${cur?"\n\nTháng này đã có bản lưu, bản mới sẽ thay bản cũ.":""}`))return;
+  const curS=(TSB.sum||{})[V.ky];
+  if(V.M.den&&curS&&!curS.den){toast("Tháng này đã có báo cáo chốt sổ đầy đủ, không thay bằng bản giữa tháng");return}
+  if(!confirm(`Lưu báo cáo TikTok ${tsbKyL(V.ky)}${V.M.den?" (giữa tháng, số đến "+tsbVn(V.M.den)+")":""}?${curS?"\n\nTháng này đã có bản lưu"+(curS.den?" đến "+tsbVn(curS.den):"")+", bản mới sẽ thay bản cũ.":""}`))return;
   TSB.busy="Đang lưu…";renderMain();
   try{
     const data={ky:V.ky,M:V.M,pl:ttPackPL(V.P),todo:ttTodo(V.P),files:V.files,at:new Date().toISOString(),by:ME.name};
@@ -111,7 +113,7 @@ async function tsbRecalc(){
   TSB.busy="";renderMain();
 }
 async function tsbLock(lock){
-  const ky=TSB.ky;if(!confirm(lock?`Khoá sổ TikTok ${tsbKyL(ky)}? Sau khi khoá không tải lại file tháng này được nữa.`:`Mở khoá sổ ${tsbKyL(ky)}?`))return;
+  const ky=TSB.ky;if(lock&&((TSB.sum||{})[ky]||{}).den){toast("Bản này là báo cáo giữa tháng. Tải báo cáo chốt sổ (income tới ngày 08 tháng sau) rồi mới khoá sổ.");return}if(!confirm(lock?`Khoá sổ TikTok ${tsbKyL(ky)}? Sau khi khoá không tải lại file tháng này được nữa.`:`Mở khoá sổ ${tsbKyL(ky)}?`))return;
   try{await tsbApi("/month/"+ky+"/lock",{method:"POST",body:JSON.stringify({lock})});toast(lock?"Đã khoá sổ":"Đã mở khoá");delete TSB.data[ky];await Promise.all([tsbLoadMonths(true),tsbLoadMonth(ky)])}catch(e){toast(e.message)}
 }
 
@@ -150,12 +152,13 @@ function tsbMonthsView(){
   const mx=Math.max(1,...S.map(x=>x.s.dt)),W=Math.max(300,S.length*110),Hh=170,gw=W/S.length,bw=gw*.3;
   const bars=`<div class="xleg"><span><i style="background:#14213d"></i>Doanh thu</span><span><i style="background:#2f9e44"></i>Lãi đóng góp kênh</span></div><div class="chartx"><svg viewBox="0 0 ${W} ${Hh+26}" style="width:100%;max-width:${W}px">${S.map((x,i)=>{const h1=x.s.dt/mx*(Hh-10),h2=Math.max(0,x.s.lai)/mx*(Hh-10),x0=i*gw+gw*.18;return `<rect x="${x0}" y="${Hh-h1}" width="${bw}" height="${h1}" rx="3" fill="#14213d"><title>${tsbKyL(x.ky)} · doanh thu ${nf(x.s.dt)}</title></rect><rect x="${x0+bw+4}" y="${Hh-h2}" width="${bw}" height="${h2}" rx="3" fill="#2f9e44"><title>${tsbKyL(x.ky)} · lãi ${nf(x.s.lai)}</title></rect><text x="${x0+bw}" y="${Hh+16}" font-size="12" text-anchor="middle" fill="#6b7280">${tsbKyL(x.ky)}</text>`}).join("")}</svg></div>`;
   return `<section class="card"><div class="card-h"><h2>So sánh các tháng</h2><span class="hint">số đã lưu; tháng khoá sổ không đổi khi cập nhật giá vốn</span></div>${bars}
-  ${tbl(["Tháng","Doanh thu","Giá vốn","Phí sàn","Quảng cáo (đã VAT)","Lãi đóng góp kênh","Biên đóng góp","Số đơn","Hủy/hoàn","Trạng thái"],S.map(x=>`<tr class="${x.old?"":"clk"}" ${x.old?"":`data-tsbky="${x.ky}"`}><td><b>${tsbKyL(x.ky)}</b></td><td class="n">${tsbN(x.s.dt)}</td><td class="n">${tsbN(x.s.gv)}</td><td class="n">${tsbN(Math.abs(x.s.phi))}</td><td class="n">${tsbN(x.s.ads)}</td><td class="n">${tsbRed(x.s.lai)}</td><td class="n">${tsbPct(x.s.lai,x.s.dt)}</td><td class="n">${x.s.don?nf(x.s.don):"—"}</td><td class="n">${x.s.hhRate!=null?tsbPct(x.s.hhRate,1):"—"}</td><td>${x.old?pill("file Excel cũ","gry"):pill(x.lock?"Đã khoá sổ":"Bản nháp",x.lock?"grn":"amb")}</td></tr>`))}</section>`;
+  ${tbl(["Tháng","Doanh thu","Giá vốn","Phí sàn","Quảng cáo (đã VAT)","Lãi đóng góp kênh","Biên đóng góp","Số đơn","Hủy/hoàn","Trạng thái"],S.map(x=>`<tr class="${x.old?"":"clk"}" ${x.old?"":`data-tsbky="${x.ky}"`}><td><b>${tsbKyL(x.ky)}</b></td><td class="n">${tsbN(x.s.dt)}</td><td class="n">${tsbN(x.s.gv)}</td><td class="n">${tsbN(Math.abs(x.s.phi))}</td><td class="n">${tsbN(x.s.ads)}</td><td class="n">${tsbRed(x.s.lai)}</td><td class="n">${tsbPct(x.s.lai,x.s.dt)}</td><td class="n">${x.s.don?nf(x.s.don):"—"}</td><td class="n">${x.s.hhRate!=null?tsbPct(x.s.hhRate,1):"—"}</td><td>${x.old?pill("file Excel cũ","gry"):pill(x.lock?"Đã khoá sổ":x.s.den?"Giữa tháng, đến "+tsbVn(x.s.den):"Bản nháp",x.lock?"grn":x.s.den?"blu":"amb")}</td></tr>`))}</section>`;
 }
 function tsbUpAdmCard(){
   const U=TSB.up,st=k=>U[k]?pill("Đã nhận: "+U[k].name,"grn"):pill("Chưa có","gry");
   return `<section class="card"><div class="card-h"><h2>Tải file tháng (kế toán)</h2><span class="hint">đọc ngay trên máy, chỉ gửi lên web số tiền, mã sản phẩm, trạng thái, ngày</span></div>
-   <ol class="lessons"><li><b>OrderSKUList</b>: TikTok Shop › Đơn hàng › Xuất, lọc theo ngày tạo đơn, trọn tháng báo cáo (.csv hoặc .xlsx).</li><li><b>income</b>: Tài chính › Quyết toán › Chi tiết đơn hàng, kỳ <b>từ 01 tháng báo cáo đến ít nhất 08 tháng sau</b>. Sai kỳ web sẽ từ chối.</li><li><b>Campaign overview</b>: Quảng cáo GMV Max › Tổng quan chiến dịch › theo ngày, trọn tháng báo cáo.</li></ol>
+   <ol class="lessons"><li><b>OrderSKUList</b>: TikTok Shop › Đơn hàng › Xuất, lọc theo ngày tạo đơn, từ ngày 01 của tháng (.csv hoặc .xlsx).</li><li><b>income</b>: Tài chính › Quyết toán › Chi tiết đơn hàng, <b>từ ngày 01 của tháng</b>.</li><li><b>Campaign overview</b>: Quảng cáo GMV Max › Tổng quan chiến dịch › theo ngày, từ ngày 01 của tháng.</li></ol>
+   <p class="hint"><b>Tải giữa tháng</b> (mỗi tuần hoặc mỗi ngày) được: xuất 3 file từ ngày 01 đến hôm nay, web tính doanh thu thực, phí sàn, quảng cáo <b>đến ngày đó</b>; đơn chưa quyết toán dùng phí ước tính. Tải lại thì bản mới thay bản cũ. <b>Chốt sổ</b>: income xuất từ 01 tới ít nhất ngày 08 tháng sau, bản này thay hết các bản giữa tháng.</p>
    ${tsbFileInput("tsbadm",true)}
    <div class="chips" style="margin-top:10px"><b>Đơn hàng</b>${st("orders")}<b>Quyết toán</b>${st("income")}<b>Quảng cáo</b>${st("camp")}</div>
    ${U.orders?`<div class="frm row4" style="margin-top:8px"><label class="field">Tháng báo cáo<input type="month" id="tsb-ky" value="${U.ky||""}"></label></div>`:""}
@@ -167,7 +170,7 @@ function tsbAdmPage(m){
   const V=TSB.prev,ky=V?V.ky:TSB.ky;if(!V&&ky)tsbLoadMonth(ky);
   const S=!V&&ky?TSB.data[ky]:null,P=V?V.P:S?S.pl:null,todo=V?ttTodo(V.P):S?(S.data.todo||ttTodo(S.pl)):null;
   const tab=SUB.bc_tiktok||"pl",lock=S&&S.locked_at,chot=ky?"08/"+ttKyNext(ky).slice(5)+"/"+ttKyNext(ky).slice(0,4):"";
-  const chips=(TSB.months||[]).map(x=>`<button class="chip${!V&&x.ky===TSB.ky?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.locked_at?" ✓":""}</button>`).join("");
+  const chips=(TSB.months||[]).map(x=>`<button class="chip${!V&&x.ky===TSB.ky?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.summary&&x.summary.den?" · đến "+tsbVn(x.summary.den).slice(0,5):""}${x.locked_at?" ✓":""}</button>`).join("");
   const tabs=[["pl","Lãi lỗ"],["sp","Sản phẩm & SKU"],["cb","Cảnh báo"],["dl","Chất lượng dữ liệu"],["thang","Các tháng"],["up","Tải file tháng"]];
   let body="";
   if(tab==="up")body=tsbUpAdmCard();
@@ -179,8 +182,8 @@ function tsbAdmPage(m){
   else if(tab==="cb")body=tsbWarn(P);
   else if(tab==="dl")body=tsbChecks(P,todo);
   const kp=P&&tab!=="thang"&&tab!=="up"?`<div class="grid kpis">${kpi("Doanh thu",tr(P.dt),nf(P.don)+" đơn · TB "+tr(P.aov)+"/đơn")}${kpi("Lãi gộp sau phí sàn",tr(P.lg),tsbPct(P.lg,P.dt)+" doanh thu")}${kpi("Phí sàn",tr(-P.phi),tsbPct(-P.phi,P.dt)+" doanh thu")}${kpi("Quảng cáo (đã VAT)",tr(P.ads),tsbPct(P.ads,P.dt)+" doanh thu")}${kpi("Lãi đóng góp kênh",tr(P.lai),tsbPct(P.lai,P.dt)+" doanh thu","var(--green)")}${kpi("Hủy/hoàn",tsbPct(P.hhRate,1),tr(P.hh)+" giá trị")}</div>`:"";
-  const prevBar=V?`<section class="card" style="border:2px solid var(--orange)"><div class="card-h"><h2>Bảng xem trước ${tsbKyL(V.ky)} · chưa lưu</h2><span class="hint">${V.recalc?"tính lại giá vốn theo dữ liệu web hiện tại":esc(Object.values(V.files||{}).join(" · "))}</span></div><p class="hint">Xem kỹ các tab Lãi lỗ, Cảnh báo, Chất lượng dữ liệu. Bấm lưu thì số mới ghi lên web.</p>${P.dtUocGv/P.dt>0.05?`<div class="note red">Còn <b>${tsbPct(P.dtUocGv,P.dt)}</b> doanh thu chưa có giá vốn thật (đang ước tính${P.gvRate?"":", và chưa có mã nào có giá vốn nên đang tính 0"}). Chưa nên dùng số lãi theo sản phẩm để quyết định cắt hay đẩy. Xem tab Chất lượng dữ liệu.</div>`:P.dtUocGv?`<p class="hint">Còn ${tsbPct(P.dtUocGv,P.dt)} doanh thu đang ước tính giá vốn.</p>`:""}<div class="acts"><button class="btn pri" id="tsb-save"${TSB.busy?" disabled":""}>Lưu báo cáo ${tsbKyL(V.ky)}</button><button class="btn" id="tsb-cancel">Bỏ bản xem trước</button></div></section>`:"";
-  const stat=S?`<span class="hint">${lock?`Đã khoá sổ ${new Date(S.locked_at).toLocaleDateString("vi-VN")}`:`Bản nháp · lưu ${new Date(S.updated_at).toLocaleString("vi-VN")} · nên khoá sổ từ ngày ${chot}`}</span>${lock?(isCeo()?`<button class="btn sm" id="tsb-unlock">Mở khoá</button>`:""):`<button class="btn sm" id="tsb-recalc">Tính lại giá vốn</button><button class="btn sm pri" id="tsb-lock">Khoá sổ ${tsbKyL(ky)}</button>`}`:"";
+  const prevBar=V?`<section class="card" style="border:2px solid var(--orange)"><div class="card-h"><h2>Bảng xem trước ${tsbKyL(V.ky)}${V.M.den?" · giữa tháng, số đến "+tsbVn(V.M.den):""} · chưa lưu</h2><span class="hint">${V.recalc?"tính lại giá vốn theo dữ liệu web hiện tại":esc(Object.values(V.files||{}).join(" · "))}</span></div><p class="hint">Xem kỹ các tab Lãi lỗ, Cảnh báo, Chất lượng dữ liệu. Bấm lưu thì số mới ghi lên web.</p>${P.dtUocGv/P.dt>0.05?`<div class="note red">Còn <b>${tsbPct(P.dtUocGv,P.dt)}</b> doanh thu chưa có giá vốn thật (đang ước tính${P.gvRate?"":", và chưa có mã nào có giá vốn nên đang tính 0"}). Chưa nên dùng số lãi theo sản phẩm để quyết định cắt hay đẩy. Xem tab Chất lượng dữ liệu.</div>`:P.dtUocGv?`<p class="hint">Còn ${tsbPct(P.dtUocGv,P.dt)} doanh thu đang ước tính giá vốn.</p>`:""}<div class="acts"><button class="btn pri" id="tsb-save"${TSB.busy?" disabled":""}>Lưu báo cáo ${tsbKyL(V.ky)}</button><button class="btn" id="tsb-cancel">Bỏ bản xem trước</button></div></section>`:"";
+  const stat=S?`<span class="hint">${lock?`Đã khoá sổ ${new Date(S.locked_at).toLocaleDateString("vi-VN")}`:`${S.data&&S.data.M&&S.data.M.den?"Báo cáo giữa tháng, số đến "+tsbVn(S.data.M.den)+" · ":"Bản nháp · "}lưu ${new Date(S.updated_at).toLocaleString("vi-VN")} · chốt sổ từ ngày ${chot}`}</span>${lock?(isCeo()?`<button class="btn sm" id="tsb-unlock">Mở khoá</button>`:""):`<button class="btn sm" id="tsb-recalc">Tính lại giá vốn</button><button class="btn sm pri" id="tsb-lock">Khoá sổ ${tsbKyL(ky)}</button>`}`:"";
   m.innerHTML=H("Kênh TikTok Shop",`Báo cáo quản trị tháng · chốt sổ ngày 8 tháng sau${ky?" · "+tsbKyL(ky):""}`)
    +`<div class="filters"><div class="chips"><b>Tháng</b>${chips||`<span class="hint">chưa có tháng nào</span>`}${V?`<button class="chip on">${tsbKyL(V.ky)} · xem trước</button>`:""}</div>${stat}</div>`
    +prevBar+kp+`<div class="tabs">${tabs.map(([k,t])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`+body
