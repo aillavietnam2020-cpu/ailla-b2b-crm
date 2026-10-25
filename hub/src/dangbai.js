@@ -133,6 +133,18 @@ function fpcBind(m){
   m.querySelectorAll("[data-fpcaddpg]").forEach(b=>b.onclick=async()=>{const pid=$("#fpc-pid").value.trim(),nm=$("#fpc-nm").value.trim();if(!pid||!nm){toast("Cần ghi cả mã page và tên page");return}
     const r=await fpcApi("/pages","POST",{page_id:pid,name:nm,is_test:$("#fpc-test").checked});if(r)toast("Đã thêm page "+r.name)});
   m.querySelectorAll("[data-fpcmode]").forEach(s=>s.onchange=async()=>{const v=s.value;if(v==="on"&&!confirm("Bật đăng cả page thật? Bài đã duyệt tới giờ sẽ được đăng thật."))return renderMain();await fpcApi("/mode","POST",{mode:v});toast("Đã đổi công tắc")});
+  m.querySelectorAll("[data-fpcb]").forEach(i=>i.onchange=()=>{const f=i.dataset.fpcb,v=i.value;DB.mutate(ME.name,"Fanpage: sửa yêu cầu chung của tháng",dt=>{dt.fpBrief=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},dt.fpBrief||{});dt.fpBrief[f]=v});toast("Đã lưu yêu cầu chung")});
+  m.querySelectorAll("[data-fpclt]").forEach(b=>b.onclick=()=>{FPC.ls=b.dataset.fpclt;FPC.pick.clear();renderMain()});
+  m.querySelectorAll("[data-fpclp]").forEach(c=>c.onchange=()=>{c.checked?FPC.pick.add(c.dataset.fpclp):FPC.pick.delete(c.dataset.fpclp);renderMain()});
+  m.querySelectorAll("[data-fpclall]").forEach(c=>c.onchange=()=>{const ids=fpcInRange().filter(r=>fpcStOf(r)==="cho").map(r=>r.id);c.checked?ids.forEach(i=>FPC.pick.add(i)):FPC.pick.clear();renderMain()});
+  m.querySelectorAll("[data-fpclr]").forEach(r=>r.onclick=ev=>{if(ev.target.closest("input"))return;fpcOpen(r.dataset.fpclr)});
+  m.querySelectorAll("[data-fpclok]").forEach(b=>b.onclick=()=>{
+    const ids=[...FPC.pick],cards=D().cards.filter(c=>ids.includes(c.id)),ok=cards.filter(c=>c.pageId&&c.gio&&fpcDate(c)&&(c.noiDung||c.mediaUrl)),bad=cards.length-ok.length;
+    if(!ok.length){toast("Các bài đã chọn còn thiếu page, ngày giờ hoặc nội dung. Mở từng bài để bổ sung");return}
+    if(!confirm("Duyệt "+ok.length+" bài?"+(bad?" ("+bad+" bài thiếu page/giờ/nội dung sẽ bỏ qua.)":"")+" Bài đã duyệt sẽ được agent đăng khi tới giờ, theo công tắc đang bật."))return;
+    const set=new Set(ok.map(c=>c.id));
+    DB.mutate(ME.name,"Fanpage: duyệt "+ok.length+" bài",dt=>{dt.cards.forEach(c=>{if(!set.has(c.id))return;c.step="dang";c.history=(c.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:ME.name,to:"dang"})})});
+    FPC.pick.clear();toast("Đã duyệt "+ok.length+" bài");renderMain()});
   m.querySelectorAll("[data-fpcagt]").forEach(b=>b.onclick=()=>{FPC.at.open=!FPC.at.open;renderMain()});
   const agt=m.querySelector("#fpc-agt");if(agt)agt.oninput=()=>{FPC.at.text=agt.value};
   m.querySelectorAll("[data-fpcagq]").forEach(b=>b.onclick=()=>{FPC.at.text=b.dataset.fpcagq+(FPC.at.text&&!FPC.at.text.startsWith(b.dataset.fpcagq)?". "+FPC.at.text:"");renderMain()});
@@ -153,6 +165,9 @@ const fpcStyle=`<style>
 .fpc-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:20;width:360px;max-width:90vw;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(30,35,80,.18);padding:12px}.fpc-popa{display:flex;justify-content:space-between;margin:8px 2px}
 .fpc-pl{max-height:320px;overflow:auto}.fpc-pr{display:flex;align-items:center;gap:6px;padding:4px 2px;border-radius:8px}.fpc-pr:hover{background:#f3f4fb}.fpc-pr label{flex:1;display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer;font-size:14px;color:var(--ink)}.fpc-pr label span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fpc-tag{font-style:normal;font-size:11px;background:#eef0ff;color:#4b54d1;border-radius:6px;padding:1px 6px}.fpc-pr .lnk{font-size:12px;white-space:nowrap}
 .fpc-body{display:block}
+.fpc-list{margin-top:16px}.fpc-lt{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line)}.fpc-lt button{border:0;background:#f1f2f9;border-radius:99px;padding:5px 14px;cursor:pointer;font-weight:600;color:#4b5167}.fpc-lt button span{font-weight:700;margin-left:4px}.fpc-lt .on{background:#4b54d1;color:#fff}
+.fpc-tb tr[data-fpclr]{cursor:pointer}.fpc-tb tr[data-fpclr]:hover{background:#f6f7fd}.fpc-tc{max-width:340px}.fpc-all{font-size:13px;display:flex;gap:6px;align-items:center}
+.fpc-bd{margin:6px 0;font-size:13px}.fpc-bd summary{cursor:pointer;color:#4b54d1;font-weight:600}.fpc-brief{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}.fpc-brief label{font-size:12px;color:#5b6176;display:flex;flex-direction:column;gap:3px}@media(max-width:800px){.fpc-brief{grid-template-columns:1fr}}
 .fpc-ag{padding:12px 16px;border-bottom:1px solid var(--line);background:#fbfbff}.fpc-agh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}.fpc-agh .hint{flex:1;min-width:200px;margin:0}
 .fpc-ag textarea{width:100%}.fpc-agr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.fpc-agr .sp{flex:1}
 .fpc-chipb{border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 12px;cursor:pointer;font-size:13px}.fpc-chipb:hover{background:#eef0ff}
@@ -195,6 +210,7 @@ function fpcAgentBox(){
   if(!xvGive())return "";
   const A=FPC.at,L=A.tasks.slice(0,4);
   return `<div class="fpc-ag"><div class="fpc-agh"><b>Giao việc cho agent</b><span class="hint">Chị nói như nhờ người: agent tự viết bài, tạo ảnh, chọn video, đặt lịch. Bài hiện trên lịch ở <b>Chờ duyệt</b>, chị duyệt rồi mới đăng.</span><button type="button" class="lnk" data-fpcagt="1">${A.open?"Thu gọn":"Mở"}</button></div>
+   ${A.open?`<details class="fpc-bd"><summary>Yêu cầu chung của tháng (agent đọc cùng mỗi lần giao việc)</summary>${fpcBriefHtml()}</details>`:""}
    ${A.open?`<textarea id="fpc-agt" rows="3" placeholder="VD: Lên lịch tuần này cho page Tẩy Lồng Giặt, mỗi ngày 2 bài (9:00 và 20:00), đẩy bột tẩy vạn năng, có 2 video lấy từ kho, bình luận đầu kèm link bán hàng.">${esc(A.text)}</textarea>
    <div class="fpc-agr">${FPC_QUICK.map(q=>`<button type="button" class="fpc-chipb" data-fpcagq="${esc(q)}">${esc(q)}</button>`).join("")}<span class="sp"></span><span class="hint">Page: ${FPC.sel.size?FPC.sel.size+" page đã chọn ở ô Kênh":"agent tự chọn trong tất cả page (nên chọn ở ô Kênh cho gọn)"}</span><button type="button" class="btn pri" data-fpcago="1" ${A.busy?"disabled":""}>${A.busy?"Đang giao…":"Giao cho agent"}</button></div>`:""}
    ${L.length?`<div class="fpc-agl">${L.map(t=>`<div class="fpc-agi"><span class="fpc-agt">${esc(String((t.payload||{}).yeuCau||"").slice(0,90))}</span>${fpcAtState(t)}<small>${esc(new Date(t.created_at).toLocaleString("vi-VN"))}</small></div>`).join("")}</div>`:""}</div>`}
@@ -216,22 +232,47 @@ function fpcAtPayload(text){
    khoVideo:d.cards.filter(c=>c.kenh!==BV.k&&(c.linkFinal||c.linkVideo)&&["xong","dang"].includes(c.step)).slice(0,80).map(c=>({id:c.id,ten:String(c.hookText||c.chuDe||c.id).slice(0,70),sku:c.sku||"",link:c.linkFinal||c.linkVideo})),
    daCoTrenLich:d.cards.filter(c=>c.kenh===BV.k&&fpcDate(c)&&fpcDate(c)>=from&&fpcDate(c)<=to).slice(0,150).map(c=>({page_id:c.pageId||"",ngay:fpcDate(c),gio:c.gio||"",noiDung:String(c.noiDung||c.hookText||"").slice(0,60)})),
    quyTac:["Chỉ tạo bài bằng POST /api/fp/draft; bài luôn vào Chờ duyệt, KHÔNG tự duyệt.","Giờ đăng theo bước 15 phút, ngày từ hôm nay trở đi.","Không bịa số liệu/claim; chỉ dùng claim trong sanPham.","Không trùng bài đã có trên lịch (daCoTrenLich).","Có thể gắn video từ khoVideo (video_card_id + media_url) và bình luận đầu kèm link."]}}
-const fpcOrig=pFanpageLich;
-pFanpageLich=function(m,chs){
-  fpcOrig(m,chs);
+/* ---------- Danh sách bài (theo ô Kênh + khung đang xem), duyệt nhiều bài một lần ---------- */
+FPC.ls="cho";FPC.pick=new Set();
+const FPC_TABS=[["cho","Chờ duyệt"],["lich","Đã lên lịch"],["xong","Đã đăng"],["loi","Lỗi"],["nhap","Nháp"],["all","Tất cả"]];
+function fpcRange(){return FPC.view==="week"?[fpcWeek(FPC.anchor)[0].ds,fpcWeek(FPC.anchor)[6].ds]:[fpcIso(FPC.y,FPC.m,1),fpcIso(FPC.y,FPC.m,new Date(FPC.y,FPC.m,0).getDate())]}
+function fpcInRange(){const r=fpcRange();return fpcPosts().filter(c=>fpcDate(c)>=r[0]&&fpcDate(c)<=r[1])}
+function fpcList(){
+  const all=fpcInRange(),cnt=k=>k==="all"?all.length:all.filter(c=>fpcStOf(c)===k).length,
+   rows=all.filter(c=>FPC.ls==="all"||fpcStOf(c)===FPC.ls).sort((a,b)=>(fpcDate(a)+(a.gio||"")).localeCompare(fpcDate(b)+(b.gio||""))),
+   boss=fpcBoss(),canPick=r=>boss&&fpcStOf(r)==="cho",pk=rows.filter(canPick),n=pk.filter(r=>FPC.pick.has(r.id)).length,
+   who=FPC.sel.size===1?(fpcPage([...FPC.sel][0])||{name:""}).name:FPC.sel.size?FPC.sel.size+" page":"tất cả page";
+  return `<section class="fpc fpc-list"><div class="fpc-bar"><b>Danh sách bài</b><span class="hint">${esc(who)} · ${FPC.view==="week"?"tuần này":"tháng "+FPC.m+"/"+FPC.y} · ${all.length} bài</span><span class="sp"></span>
+   ${boss&&FPC.ls==="cho"&&pk.length?`<label class="fpc-all"><input type="checkbox" data-fpclall="1" style="width:auto" ${n&&n===pk.length?"checked":""}> Chọn tất cả</label><button type="button" class="btn pri" data-fpclok="1" ${n?"":"disabled"}>Duyệt ${n} bài đã chọn</button>`:""}</div>
+   <div class="fpc-lt">${FPC_TABS.map(([k,t])=>`<button type="button" class="${FPC.ls===k?"on":""}" data-fpclt="${k}">${t} <span>${cnt(k)}</span></button>`).join("")}</div>
+   ${rows.length?`<div class="tbl"><table class="fptab fpc-tb"><thead><tr><th></th><th>Page</th><th>Ngày giờ</th><th>Nội dung</th><th>Bình luận đầu</th><th>Tình trạng</th></tr></thead><tbody>${rows.map(c=>{const p=fpcPage(c.pageId),s=FPC_ST[fpcStOf(c)];
+    return `<tr data-fpclr="${esc(c.id)}"><td>${canPick(c)?`<input type="checkbox" data-fpclp="${esc(c.id)}" style="width:auto" ${FPC.pick.has(c.id)?"checked":""}>`:""}</td>
+     <td>${p?fpcAv(p,22)+" "+esc(p.name):`<span class="hint">chưa chọn page</span>`}</td><td>${fpcDM(fpcDate(c))}${c.gio?" "+esc(c.gio):` <span class="hint">chưa có giờ</span>`}</td>
+     <td class="fpc-tc">${esc((c.noiDung||c.hookText||"").replace(/\s+/g," ").slice(0,90))||'<span class="hint">(trống)</span>'}${c.fbLoi?`<br><small style="color:#b42318">${esc(c.fbLoi.slice(0,80))}</small>`:""}</td>
+     <td>${c.firstComment?"Có"+(c.firstCommentImg?", kèm ảnh":""):"—"}</td><td><span class="pill" style="background:${s[2]};color:${s[1]}">${s[0]}</span></td></tr>`}).join("")}</tbody></table></div>`
+   :`<p class="empty pad">${FPC.ls==="cho"?"Không có bài nào chờ duyệt trong khung này.":"Không có bài nào."}</p>`}</section>`}
+function fpcBriefHtml(){
+  const B=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},D().fpBrief||{});
+  return `<div class="fpc-brief"><label>Mục tiêu tháng<textarea rows="2" data-fpcb="mucTieu" placeholder="VD: tăng tương tác, kéo khách về mua trên TikTok Shop">${esc(B.mucTieu)}</textarea></label>
+   <label>Giọng văn<textarea rows="2" data-fpcb="giong" placeholder="VD: gần gũi như người nhà, hài nhẹ">${esc(B.giong)}</textarea></label>
+   <label>Sản phẩm cần đẩy<textarea rows="2" data-fpcb="spDay" placeholder="VD: Tinh dầu giặt sấy, Bột tẩy vạn năng">${esc(B.spDay)}</textarea></label>
+   <label>Lưu ý (điều cấm, ngày sale, nội dung bắt buộc)<textarea rows="2" data-fpcb="luuY" placeholder="VD: không nhắc đối thủ">${esc(B.luuY)}</textarea></label></div>`}
+function fpcRender(m){
   if(!FPC.st&&!FPC.loading&&!FPC.err)fpcLoad();
   fpcInit();if(!FPC.at.loaded){FPC.at.loaded=1;fpcAtLoad()}
   const box=document.createElement("div");
-  box.innerHTML=`${fpcStyle}<section class="fpc">${fpcBar()}${fpcAgentBox()}<div class="fpc-body"><div class="fpc-cal">${FPC.view==="week"?fpcWeekView():fpcMonth()}</div></div></section>`;
+  box.innerHTML=`${fpcStyle}<section class="fpc">${fpcBar()}${fpcAgentBox()}<div class="fpc-body"><div class="fpc-cal">${FPC.view==="week"?fpcWeekView():fpcMonth()}</div></div></section>${fpcList()}`;
   m.insertBefore(box,m.firstChild);
   fpcBind(m)
-};
+}
+const fpcOrig=pFanpageLich;
+pFanpageLich=function(m,chs){fpcOrig(m,chs);fpcRender(m)};
 
 /* Trang riêng trên menu Marketing › Content: Lịch đăng Fanpage (lịch + yêu cầu tháng + bảng chi tiết) */
 PAGES.lich_fb=function(m){
   const fp=CHANNELS.filter(c=>!c.needId);BV.k=(fp[0]||{}).k||BV.k;
   m.innerHTML=H("Lịch đăng Fanpage","Soạn bài, duyệt, đặt ngày giờ; agent Fanpage đăng bài đã duyệt khi tới giờ");
-  const box=document.createElement("div");m.appendChild(box);pFanpageLich(box,fp)
+  const box=document.createElement("div");m.appendChild(box);fpcRender(box)
 };
 
 document.addEventListener("click",()=>{if(FPC.dd){FPC.dd=false;try{renderMain()}catch(e){}}});
