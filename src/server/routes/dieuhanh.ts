@@ -12,6 +12,21 @@ dieuhanhRoutes.use('*', requirePermission('hub.access'));
 
 const canMoney = (a: AuthContext) => a.user.role === 'CEO' || a.permissions.includes('debt.read.all');
 
+/** Số đơn đã xuất kho theo kênh sàn và ngày (đơn Poscake web tự kéo về mỗi sáng), để tạm tính tháng chưa chốt. */
+dieuhanhRoutes.get('/channel-orders', async (c) => {
+  if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem');
+  const from = c.req.query('from') ?? '';
+  const to = c.req.query('to') ?? '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return ok(c, []);
+  const r = await c.env.DB.prepare(
+    `SELECT channel, day, COUNT(DISTINCT order_id) AS orders FROM channel_order_lines
+     WHERE day BETWEEN ? AND ? GROUP BY channel, day ORDER BY day`,
+  )
+    .bind(from, to)
+    .all();
+  return ok(c, r.results ?? []);
+});
+
 /** Giá bán đang áp dụng: bảng giá theo cấp (mới nhất mỗi sản phẩm × cấp) và giá riêng từng khách (gia công). */
 dieuhanhRoutes.get('/sell-prices', async (c) => {
   if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem giá bán so với giá thành');

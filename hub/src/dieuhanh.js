@@ -249,8 +249,9 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const REP=["bc_tong","pl","bc_tiktok","bc_shopee","bc_fb","cskh_cu","bc_b2b","bc_gc"],fin=MODULES.find(x=>x.k==="q_fin"),finG=fin?fin.groups:()=>[];
   const reports=()=>{const its=finG().flatMap(g=>g[1]);return REP.map(k=>its.find(i=>i[0]===k)).filter(Boolean)};
   if(fin){fin.n="Việc kế toán";fin.groups=()=>finG().map(([g,its])=>[g,its.filter(i=>!REP.includes(i[0]))]).filter(g=>g[1].length)}
-  const mod={k:"q_dh",adm:true,zone:"Quản trị",ic:"trend",n:"Phòng điều hành",sub:"",groups:()=>[["",[MI("dh","Phòng điều hành",u=>u.role==="admin"||dhOk())].concat(reports())]]};
-  const i=MODULES.findIndex(x=>x.k==="q_tq");MODULES.splice(i>=0?i+1:MODULES.length,0,mod);
+  /* 25/10: Phòng điều hành gộp vào Tổng quan công ty (tqgop.js). Một mục duy nhất ở thanh bên; các báo cáo kênh nằm dưới nó. */
+  const tq=MODULES.find(x=>x.k==="q_tq");
+  if(tq){const g0=tq.groups;tq.groups=()=>{const G=g0();return G.length?[[G[0][0],G[0][1].concat(reports())]].concat(G.slice(1)):[["",reports()]]}}
 }
 /* Cảnh báo điều hành ở Tổng quan công ty: giá nguyên liệu tăng, giá bán dưới ngưỡng, số ngày dự trữ tiền mặt thấp. */
 {const _ea=execAlerts;execAlerts=function(){const A=_ea.apply(this,arguments);
