@@ -362,3 +362,76 @@ export async function customerStatement(db: D1Database, customerId: string, asOf
     owed_total: ordersRemaining + Math.max(0, oldLeft) - credit,
   };
 }
+
+export interface AgingRow {
+  customer_id: string;
+  customer_name: string;
+  owner_name: string | null;
+  official_debt: number;
+  /** nợ theo tuổi đơn: 0–30, 31–60, 61–90, trên 90 ngày; old = phần nợ không còn đơn nào đối ứng (dư nợ đầu kỳ cũ) */
+  b30: number;
+  b60: number;
+  b90: number;
+  b90p: number;
+  old: number;
+  oldest_days: number;
+}
+
+export interface DebtAging {
+  as_of: string;
+  rows: AgingRow[];
+  totals: { debt: number; b30: number; b60: number; b90: number; b90p: number; old: number };
+  rev90: number;
+  dso: number | null;
+}
+
+/**
+ * Tuổi nợ phải thu (khách B2B). Tiền khách trả kế toán trừ thẳng vào công nợ chứ không gán từng đơn, nên tuổi nợ tính theo
+ * cách vào trước trả trước: phần nợ còn lại được xếp vào các đơn MỚI nhất, đơn cũ coi như đã trả trước. Tuổi tính từ ngày đơn.
+ * DSO (số ngày thu tiền bình quân) = tổng nợ chính thức ÷ doanh thu đơn đã xác nhận 90 ngày gần nhất × 90.
+ */
+export async function debtAging(db: D1Database, scopeSql: string, scopeParams: unknown[], asOf: string): Promise<DebtAging> {
+  const list = (await listDebts(db, scopeSql, scopeParams, { onlyWithDebt: true })).filter((d) => d.official_debt > 0);
+  const ids = new Set(list.map((d) => d.customer_id));
+  const orders = await db
+    .prepare(
+      `SELECT o.customer_id, o.order_date, o.total_amount FROM orders o JOIN customers c ON c.id = o.customer_id
+       WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED' AND o.accounting_status = 'DA_XAC_NHAN'
+         AND o.delivery_status IN ('DA_XUAT_KHO','DA_GIAO') AND c.deleted_at IS NULL AND ${scopeSql}
+       ORDER BY o.order_date DESC`,
+    )
+    .bind(...scopeParams)
+    .all<{ customer_id: string; order_date: string; total_amount: number }>();
+  const by = new Map<string, Array<{ order_date: string; total_amount: number }>>();
+  const t0 = new Date(`${asOf}T00:00:00Z`).getTime();
+  const since = new Date(t0 - 90 * 864e5).toISOString().slice(0, 10);
+  let rev90 = 0;
+  for (const o of orders.results ?? []) {
+    if (o.order_date >= since && o.order_date <= asOf) rev90 += o.total_amount || 0;
+    if (!ids.has(o.customer_id)) continue;
+    const a = by.get(o.customer_id) ?? [];
+    a.push(o);
+    by.set(o.customer_id, a);
+  }
+  const rows: AgingRow[] = list.map((d) => {
+    const r: AgingRow = { customer_id: d.customer_id, customer_name: d.customer_name, owner_name: d.owner_name ?? null, official_debt: d.official_debt, b30: 0, b60: 0, b90: 0, b90p: 0, old: 0, oldest_days: 0 };
+    let left = d.official_debt;
+    for (const o of by.get(d.customer_id) ?? []) {
+      if (left <= 0) break;
+      const take = Math.min(left, o.total_amount || 0);
+      if (take <= 0) continue;
+      left -= take;
+      const days = Math.max(0, Math.round((t0 - new Date(`${o.order_date}T00:00:00Z`).getTime()) / 864e5));
+      if (days > r.oldest_days) r.oldest_days = days;
+      if (days <= 30) r.b30 += take;
+      else if (days <= 60) r.b60 += take;
+      else if (days <= 90) r.b90 += take;
+      else r.b90p += take;
+    }
+    if (left > 0) r.old = left;
+    return r;
+  });
+  rows.sort((a, b) => b.b90p + b.old - (a.b90p + a.old) || b.official_debt - a.official_debt);
+  const totals = rows.reduce((t, r) => ({ debt: t.debt + r.official_debt, b30: t.b30 + r.b30, b60: t.b60 + r.b60, b90: t.b90 + r.b90, b90p: t.b90p + r.b90p, old: t.old + r.old }), { debt: 0, b30: 0, b60: 0, b90: 0, b90p: 0, old: 0 });
+  return { as_of: asOf, rows, totals, rev90, dso: rev90 > 0 ? Math.round((totals.debt / rev90) * 90) : null };
+}

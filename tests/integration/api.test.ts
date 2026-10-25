@@ -253,6 +253,38 @@ describe('Công nợ', () => {
     expect(debt.projected_debt).toBe(1_400_000);
   });
 
+  it('tuổi nợ xếp phần nợ còn lại vào các đơn mới nhất, kèm DSO', async () => {
+    const ins = (id: string, date: string, amt: number) =>
+      ctx.db
+        .prepare(
+          `INSERT INTO orders (id, order_no, customer_id, owner_id, order_date, subtotal, total_amount,
+             approval_status, delivery_status, payment_status, accounting_status, created_at, updated_at)
+           VALUES (?, ?, 'cus-thao-1', 'user-thao', ?, ?, ?, 'APPROVED', 'DA_GIAO', 'CHUA_THU', 'DA_XAC_NHAN', ?, ?)`,
+        )
+        .bind(id, 'DH-' + id, date, amt, amt, date + 'T00:00:00.000Z', date + 'T00:00:00.000Z')
+        .run();
+    const today = new Date().toISOString().slice(0, 10);
+    await ins('o-cu', '2020-01-01', 500_000);
+    await ins('o-moi', today, 300_000);
+    await ctx.db
+      .prepare(
+        `INSERT INTO payments (id, external_receipt_no, source, external_row_key, customer_id, amount, paid_at,
+           accounting_status, review_status, is_general_repayment, created_at, updated_at)
+         VALUES ('p-a', 'PT-A', 'MANUAL', 'ka', 'cus-thao-1', 200000, ?, 'DA_XAC_NHAN', 'OK', 0, ?, ?)`,
+      )
+      .bind(today, today + 'T00:00:00.000Z', today + 'T00:00:00.000Z')
+      .run();
+    const res = await ctx.request('/api/debts/aging', { as: USERS.manager });
+    expect(res.status).toBe(200);
+    const r = res.body.data.rows.find((x: { customer_id: string }) => x.customer_id === 'cus-thao-1');
+    // nợ 600k = 300k đơn mới (0–30 ngày) + 300k đơn cũ (trên 90 ngày)
+    expect(r.official_debt).toBe(600_000);
+    expect(r.b30).toBe(300_000);
+    expect(r.b90p).toBe(300_000);
+    expect(res.body.data.rev90).toBe(300_000);
+    expect(res.body.data.dso).toBe(Math.round((res.body.data.totals.debt / 300_000) * 90));
+  });
+
   it('thu thừa thành credit balance, không dùng số âm', async () => {
     await ctx.db
       .prepare(

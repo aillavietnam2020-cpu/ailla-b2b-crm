@@ -3,12 +3,13 @@ import { derivePaymentStatus } from '@shared/orders';
 import { RECEIVED_BY_ORDER } from '../lib/sql';
 import type { AppEnv } from '../env';
 import { ok } from '../lib/http';
+import { vnDate } from '@shared/datetime';
 import { auditStatement, clientIp } from '../lib/audit';
 import { badRequest, forbidden, notFound } from '../lib/http';
 import { parseInput } from '../lib/validate';
 import { paymentAllocateSchema, paymentCreateSchema } from '@shared/schemas';
 import { customerScopeClause, requirePermission } from '../middleware/rbac';
-import { listDebts, totalDebts } from '../services/debts';
+import { debtAging, listDebts, totalDebts } from '../services/debts';
 import {
   allocatePayment,
   confirmAndAttachPayment,
@@ -25,6 +26,12 @@ import {
 } from '../services/payments';
 
 export const financeRoutes = new Hono<AppEnv>();
+
+/** Tuổi nợ phải thu + DSO cho trang quản trị (Chi phí & Tiền › Phải thu khách). */
+financeRoutes.get('/debts/aging', requirePermission('debt.read.own'), async (c) => {
+  const scope = customerScopeClause(c.get('auth'));
+  return ok(c, await debtAging(c.env.DB, scope.sql, scope.params, vnDate()));
+});
 
 financeRoutes.get('/debts', requirePermission('debt.read.own'), async (c) => {
   const auth = c.get('auth');
