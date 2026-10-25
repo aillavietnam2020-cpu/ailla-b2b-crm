@@ -1,6 +1,6 @@
 /* =====================================================================
-   THANH BÊN TRANG QUẢN TRỊ: 8 mục theo nhóm chỉ số quản trị (chị Hoa duyệt 25/10/2026).
-   Điều hành: Tổng quan · Doanh thu & KPI · Lãi lỗ & Giá thành · Chi phí & Tiền
+   THANH BÊN TRANG QUẢN TRỊ (chị Hoa duyệt mẫu 26/10/2026).
+   Điều hành: Tổng quan · Báo cáo (tài chính, tồn kho, công nợ, dòng tiền, hiệu quả SXKD) · Doanh thu · Chi phí
    Nghiệp vụ: Đơn hàng · Mua hàng · Sản xuất & Kho
    Hệ thống:  Cấu hình
    Mỗi mục lớn một dòng ở thanh bên, các trang con là tab trong trang. Mỗi trang chỉ nằm MỘT chỗ.
@@ -37,15 +37,17 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const tabMod=(k,ic,n,zone,keys,names)=>({k,adm:true,zone,ic,n,sub:"",groups:()=>[["",pick(pool(),keys,names)]]});
   MODULES.push(
     {k:"q_tq",adm:true,zone:"Điều hành",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",pick(pool(),["exec"],["Tổng quan"])]]},
-    tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý (NPP)","Gia công","CSKH cũ"]),
-    tabMod("q_ll","spark","Lãi lỗ","",["pl","bc_tong","kho_boc","kho_cl","sku","kho_dm"],["P&L công ty","So sánh kênh","Giá thành & định mức","Chênh lệch định mức","Giá vốn SKU","Định mức theo sản phẩm"]),
-    {k:"q_cp",adm:true,zone:"",ic:"fin",n:"Tiền & chi phí",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
-      return [g("Tiền",["tien_lich"],["Tiền & lịch chi"]),
-        g("Thu",["doisoat","phai_thu","cp_thu"],["Đối soát tiền về","Phải thu & tuổi nợ","Sổ thu"]),
-        g("Chi",["so_cp","mh_no"],["Sổ chi phí","Phải trả nhà cung cấp"]),
-        g("Báo cáo & chứng từ",["ngan_sach","cr_bill"],["Ngân sách","Kho bill giao dịch"])].filter(x=>x[1].length)}},
+    /* Điều hành theo câu hỏi của chủ doanh nghiệp (chị Hoa duyệt mẫu 26/10): Tổng quan · Báo cáo · Doanh thu · Chi phí. */
+    {k:"q_bc",adm:true,zone:"",ic:"chart",n:"Báo cáo",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
+      return [g("Báo cáo tài chính",["pl"],["Lãi lỗ công ty (P&L)"]),
+        g("Báo cáo tồn kho",["kho_gtri","kho_nxt"],["Tồn kho & giá trị","Nhập – xuất – tồn"]),
+        g("Báo cáo công nợ",["phai_thu","mh_no"],["Phải thu & tuổi nợ","Phải trả nhà cung cấp"]),
+        g("Báo cáo dòng tiền",["tien_lich"],["Tiền & lịch chi"]),
+        g("Hiệu quả sản xuất kinh doanh",["bc_tong","kho_boc","kho_cl","sku"],["Lãi theo kênh","Giá thành & định mức","Chênh lệch định mức","Giá vốn SKU"])].filter(x=>x[1].length)}},
+    tabMod("q_kb","trend","Doanh thu","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cp_thu","doisoat"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý (NPP)","Gia công","Sổ thu","Đối soát tiền về"]),
+    tabMod("q_cp","wallet","Chi phí","",["so_cp","ngan_sach","cr_bill"],["Sổ chi phí","Ngân sách","Kho bill, chứng từ"]),
     tabMod("q_mh","cart","Mua hàng","Nghiệp vụ",["mh_po","mh_hd","mh_chi","mh_gianvl"],["Đơn mua hàng","Chứng từ nhà cung cấp","Phiếu chi nhà cung cấp","Giá nguyên vật liệu theo tháng"]),
-    tabMod("q_sx","fac","Sản xuất & Kho","",["sx_nc","kho_gtri","kho_nxt","kho_vo","kho_map","kho_qd"],["Phiếu sản xuất & tiến độ","Tồn kho & giá trị","Nhập – xuất – tồn","Vỏ can, chai & thùng","Đồng bộ mã B2B","Đơn sàn & quy đổi mã"]),
+    tabMod("q_sx","fac","Sản xuất & Kho","",["sx_nc","kho_vo","kho_map","kho_qd","kho_dm"],["Phiếu sản xuất & tiến độ","Vỏ can, chai & thùng","Đồng bộ mã B2B","Đơn sàn & quy đổi mã","Định mức theo sản phẩm"]),
     {k:"q_cfg",adm:true,zone:"Hệ thống",ic:"gear",n:"Cấu hình",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
       return [g("Tài khoản",["nhansu","phongban"],["Tài khoản & phân quyền","Phòng ban"]),
         g("Danh mục",["sanpham","kenhban","chiphidm","cr_rcv"],["Sản phẩm","Kênh bán & phí","Danh mục chi phí","Tài khoản nhận tiền"]),
