@@ -158,7 +158,10 @@ export async function publishDue(db: D1Database, secret: string | undefined, fet
   if (mode === 'off') return { skipped: 'đăng tự động đang tắt' };
   const cur = await readHub(db);
   if (!cur) return { skipped: 'chưa có dữ liệu' };
-  const due = pickDue(cur.d.cards ?? [], now);
+  // Page không có mã trên web (agent trên VPS giữ mã) thì để agent tự lấy bài qua /api/fp/due.
+  const own = await db.prepare("SELECT page_id FROM fp_pages WHERE active = 1 AND token <> ''").all<{ page_id: string }>();
+  const ownIds = new Set((own.results ?? []).map((r) => r.page_id));
+  const due = pickDue((cur.d.cards ?? []).filter((c) => ownIds.has(c.pageId ?? '')), now);
   let ok = 0;
   let bad = 0;
   for (const c of due) {
@@ -167,4 +170,65 @@ export async function publishDue(db: D1Database, secret: string | undefined, fet
     else bad++;
   }
   return { due: due.length, ok, bad };
+}
+
+/**
+ * Agent Fanpage trên VPS (giữ mã các page) hỏi: bài nào tới giờ đăng?
+ * Mỗi bài được "nhận" (đánh dấu đang gửi) ngay lúc trả về, nên hỏi lại không bị đăng đôi.
+ * Chế độ test: chỉ trả bài của page thử. Chế độ off: không trả gì.
+ */
+export async function claimDueForAgent(db: D1Database, now: Date = new Date()) {
+  const mode = await getMode(db);
+  if (mode === 'off') return { mode, posts: [] };
+  const cur = await readHub(db);
+  if (!cur) return { mode, posts: [] };
+  const pages = await db.prepare("SELECT page_id, name, is_test FROM fp_pages WHERE active = 1 AND token = ''").all<{ page_id: string; name: string; is_test: number }>();
+  const byId = new Map((pages.results ?? []).map((p) => [p.page_id, p]));
+  const eligible = (cur.d.cards ?? []).filter((c) => {
+    const p = byId.get(c.pageId ?? '');
+    return !!p && (mode === 'on' || !!p.is_test);
+  });
+  const posts: Array<Record<string, unknown>> = [];
+  for (const c of pickDue(eligible, now)) {
+    let claimed = false;
+    await patchCard(db, c.id, (x) => {
+      if (x.step === 'dang' && !x.fbState && !x.fbPostId) {
+        x.fbState = 'sending';
+        claimed = true;
+      }
+    });
+    if (!claimed) continue;
+    const post = buildPost(c);
+    posts.push({ card_id: c.id, page_id: c.pageId, page_name: byId.get(c.pageId ?? '')?.name, kind: post.path, ...post.params });
+  }
+  return { mode, posts };
+}
+
+/** Agent báo kết quả đăng một bài. */
+export async function agentDone(db: D1Database, body: { card_id?: string; ok?: boolean; fb_post_id?: string; error?: string }) {
+  const id = String(body.card_id ?? '');
+  const now = new Date().toISOString();
+  let page = '';
+  const found = await patchCard(db, id, (c, today) => {
+    page = c.pageId ?? '';
+    if (body.ok) {
+      const fb = String(body.fb_post_id ?? '');
+      c.fbState = 'ok';
+      c.fbPostId = fb || 'ok';
+      c.linkDang = fb ? `https://www.facebook.com/${fb}` : (c.linkDang ?? '');
+      c.step = 'xong';
+      c.ngayDang = today;
+      c.history = (c.history ?? []).concat({ t: new Date().toLocaleString('vi-VN'), who: 'Agent Fanpage', to: 'xong' });
+    } else {
+      c.fbState = 'error';
+      c.fbLoi = String(body.error ?? 'Agent báo lỗi').slice(0, 300);
+    }
+  });
+  if (found) {
+    await db
+      .prepare('INSERT INTO fp_publish_log (card_id, page_id, status, fb_post_id, error, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, page, body.ok ? 'ok' : 'error', body.ok ? String(body.fb_post_id ?? '') : null, body.ok ? null : String(body.error ?? '').slice(0, 500), now)
+      .run();
+  }
+  return found;
 }

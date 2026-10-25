@@ -35,15 +35,23 @@ fpPublishRoutes.post('/mode', async (c) => {
 /** Nối page: chị dán mã page + mã truy cập; kiểm tra thật với Facebook rồi mới lưu (mã được mã hóa). */
 fpPublishRoutes.post('/pages', async (c) => {
   onlyCeo(c);
-  const body = (await c.req.json().catch(() => ({}))) as { page_id?: string; token?: string; is_test?: boolean };
+  // Mã truy cập là tùy chọn: bình thường agent trên VPS đã nối page và giữ mã, web chỉ biết page nào để xếp bài.
+  // Nếu có dán mã thì máy chủ web tự đăng (kiểm tra thật với Facebook, mã được mã hóa).
+  const body = (await c.req.json().catch(() => ({}))) as { page_id?: string; name?: string; token?: string; is_test?: boolean };
   const pageId = String(body.page_id ?? '').trim();
   const token = String(body.token ?? '').trim();
+  let name = String(body.name ?? '').trim();
   if (!/^\d{5,25}$/.test(pageId)) throw badRequest('BAD_PAGE', 'Mã page phải là dãy số');
-  if (token.length < 20) throw badRequest('BAD_TOKEN', 'Chưa dán mã truy cập page');
-  const res = await fetch(`${GRAPH}/${pageId}?fields=name&access_token=${encodeURIComponent(token)}`);
-  const j = (await res.json().catch(() => ({}))) as { name?: string; error?: { message?: string } };
-  if (!res.ok || !j.name) throw badRequest('FB_REJECT', `Facebook không nhận mã này: ${j.error?.message ?? res.status}`);
-  const sealed = await sealKey(token, c.env.INGEST_KEY);
+  let sealed = '';
+  if (token) {
+    const res = await fetch(`${GRAPH}/${pageId}?fields=name&access_token=${encodeURIComponent(token)}`);
+    const fb = (await res.json().catch(() => ({}))) as { name?: string; error?: { message?: string } };
+    if (!res.ok || !fb.name) throw badRequest('FB_REJECT', `Facebook không nhận mã này: ${fb.error?.message ?? res.status}`);
+    name = name || fb.name;
+    sealed = await sealKey(token, c.env.INGEST_KEY);
+  }
+  if (!name) throw badRequest('NO_NAME', 'Ghi tên page');
+  const j = { name };
   await c.env.DB.prepare(
     `INSERT INTO fp_pages (page_id, name, token, is_test, active, created_at, created_by) VALUES (?, ?, ?, ?, 1, ?, ?)
      ON CONFLICT (page_id) DO UPDATE SET name = excluded.name, token = excluded.token, is_test = excluded.is_test, active = 1`,
@@ -69,6 +77,8 @@ fpPublishRoutes.post('/post-now', async (c) => {
   const card = (d.cards ?? []).find((x) => x.id === body.card_id);
   if (!card) throw notFound('Không thấy bài');
   if (card.step !== 'dang') throw badRequest('NOT_APPROVED', 'Bài chưa được duyệt');
+  const pg = await c.env.DB.prepare('SELECT token FROM fp_pages WHERE page_id = ? AND active = 1').bind(card.pageId ?? '').first<{ token: string }>();
+  if (pg && !pg.token) return ok(c, { ok: false, detail: 'Page này do agent trên VPS đăng: agent sẽ lấy bài về đăng khi tới giờ đã đặt.' });
   const r = await publishCard(c.env.DB, c.env.INGEST_KEY, card, await getMode(c.env.DB), (u, i) => fetch(u, i));
   return ok(c, r);
 });
