@@ -15,10 +15,13 @@ function pNganSach(m){
   if(!ym){m.innerHTML=H(T,S)+`<div class="note">Ngân sách đặt theo từng tháng. Chị chọn <b>một tháng</b> ở ô thời gian phía trên (ví dụ “Tháng này”) để xem và đặt ngân sách.</div>`;return}
   if(!MH.pay){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
   const d=D(),ed=mhManage()||can(ME,"chiphi.nhap"),B=((d.fin||{}).budgets||{})[ym]||{},A=nsActual();
-  const nhoms=[...new Set([...(d.costCats||[]).map(c=>c.nhom),...Object.keys(A).map(k=>k.split("||")[0]),...Object.keys(B).map(k=>k.split("||")[0])])].filter(Boolean);
+  const nhomsAll=[...new Set([...(d.costCats||[]).map(c=>c.nhom),...Object.keys(A).map(k=>k.split("||")[0]),...Object.keys(B).map(k=>k.split("||")[0])])].filter(Boolean);
   const pbSet=[...new Set([...(d.departments||[]).map(p=>p.n),...Object.keys(A).map(k=>k.split("||")[1]),...Object.keys(B).map(k=>k.split("||")[1])])];
-  const pbs=pbSet.filter(p=>p!==""),hasBlank=pbSet.includes("");if(hasBlank)pbs.push("");
+  const pbs0=pbSet.filter(p=>p!==""),hasBlank=pbSet.includes("");if(hasBlank)pbs0.push("");
+  /* ẩn cột phòng ban chưa có ngân sách và chưa chi gì (trừ khi đang sửa ngân sách) cho bảng gọn */
+  const pbs=NS.edit?pbs0:pbs0.filter(p=>nhomsAll.some(nh=>(+B[nsKey(nh,p)]||0)||(A[nsKey(nh,p)]||0)));
   const lbl=p=>p||"Chưa gắn phòng ban";
+  const nhoms=NS.edit?nhomsAll:nhomsAll.filter(nh=>pbs0.some(p=>(+B[nsKey(nh,p)]||0)||(A[nsKey(nh,p)]||0)));
   const cell=(nh,pb)=>{const k=nsKey(nh,pb),b=+B[k]||0,a=A[k]||0;
     if(NS.edit)return `<td class="n"><input class="nsin" type="number" min="0" step="1000" data-nk="${esc(k)}" value="${b||""}" placeholder="0"><div class="hint">đã chi ${nf(Math.round(a))}</div></td>`;
     if(!b&&!a)return `<td class="n nsz">—</td>`;
