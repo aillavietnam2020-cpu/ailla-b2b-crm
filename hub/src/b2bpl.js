@@ -103,7 +103,7 @@ function pKetQuaKenh(m){
   ${srcNote("TikTok, Shopee: báo cáo quản trị chốt sổ ngày 8 · Facebook: Pancake + Báo cáo Ads · B2B, Gia công: CRM (đơn đã duyệt) · giá vốn SKU.")}`;
   m.querySelectorAll("tr[data-go]").forEach(tr0=>tr0.onclick=()=>{PAGE=tr0.dataset.go;MOD="";render();scrollTo(0,0)});
 }
-{const _tong=PAGES.bc_tong;PAGES.bc_tong=function(m){if(IS_ADMIN_HOST())return pKetQuaKenh(m);return _tong.apply(this,arguments)}}
+{const _tong=PAGES.bc_tong;PAGES.bc_tong=function(m){if(IS_ADMIN_HOST())return typeof tqSoSanhKenh==="function"?tqSoSanhKenh(m):pKetQuaKenh(m);return _tong.apply(this,arguments)}}
 
 /* ---------- Tổng quan công ty: thêm kênh B2B, Gia công và cộng tổng mọi kênh ---------- */
 {const _ex=PAGES.exec;if(_ex)PAGES.exec=function(m){
