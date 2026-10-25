@@ -95,7 +95,7 @@ function khoPick(inp,classes,onPick){
 /* Phiếu sản xuất = "Phiếu sản xuất" Thảo tạo ở tab Phiếu sản xuất (số PSX…). Chọn là tự điền số phiếu, số lượng yêu cầu, sản phẩm. */
 function khoPsxList(type){
   const open=type==="PC"?["CAN_LAM","DANG_LAM"]:["DANG_LAM","CHO_KIEM"];
-  try{return (SX().requests||[]).filter(r=>open.includes(r.st)).sort((a,b)=>String(b.id).localeCompare(a.id))}catch(e){return []}
+  try{return (SX().requests||[]).filter(r=>open.includes(r.st)&&!(type==="PC"&&r.cachLam==="CONG_NHAN")).sort((a,b)=>String(b.id).localeCompare(a.id))}catch(e){return []}
 }
 function khoPsxOpts(type){
   const L=khoPsxList(type);
