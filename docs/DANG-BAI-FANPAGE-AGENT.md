@@ -17,6 +17,27 @@ Viết 25/10/2026. Web ABOS là nơi quản lý (lịch kiểu Postiz ở Market
   Lỗi thì bài hiện "Lỗi" trên lịch, KHÔNG tự đăng lại; chị kiểm tra trên page rồi mở lại.
 - Bài kẹt "đang gửi" (agent chết giữa chừng) cũng không tự đăng lại: kiểm tra page rồi bấm Mở lại.
 
+## Việc "giao cho agent" (fp_plan) và tự lên bài vào lịch
+Chị gõ yêu cầu ở ô **Giao việc cho agent** trên trang Lịch đăng Fanpage. Web tạo một việc loại `fp_plan` (agent lấy bằng `POST /api/fp/pull`, như việc `fp_write`). Trong `payload` có: `yeuCau` (lời chị), `khungXem` (từ ngày nào đến ngày nào), `pages` (page được chọn: `page_id`, `ten`, `laPageThu`), `brief`, `tuyen`, `sanPham`, `khoVideo` (video trong kho: `id`, `ten`, `link`), `daCoTrenLich` (bài đã có, để không trùng), `quyTac`.
+
+Agent làm xong thì tạo bài vào lịch bằng **`POST /api/fp/draft`**:
+```
+{ "task_id": "<id việc>", "posts": [ {
+  "page_id": "...", "date": "2026-10-27", "time": "09:30",
+  "text": "nội dung bài", "format": "text|photo|video",
+  "media_url": "https://... (ảnh hoặc video, tùy chọn)", "video_card_id": "<id video kho, tùy chọn>",
+  "link": "https://... (link trang bán, tùy chọn)",
+  "comment": "bình luận đầu, thường kèm link bán hàng (tùy chọn)",
+  "comment_image": "https://... ảnh trong bình luận (tùy chọn)" } ] }
+```
+- Tối đa 60 bài/lần. Giờ làm tròn xuống bước 15 phút. Ngày phải từ hôm nay đến 180 ngày tới. `page_id` phải là page đã khai báo trên web.
+- Bài luôn vào **Chờ duyệt**. Agent không duyệt được; chị duyệt rồi mới đăng.
+- Gửi lại cùng bài thì web bỏ qua (không nhân đôi). Trả về `{ created, skipped: [{index, reason}] }`: bài nào bị bỏ có lý do, sửa rồi gửi lại.
+- Xong thì báo việc: `POST /api/fp/push` `{ id: <id việc>, status: "done", detail: "tạo 8 bài", result: { created: 8 } }` (lỗi thì `status: "error"`, `detail: lý do`). Trên web chị thấy "Xong: tạo 8 bài" ngay dưới ô giao việc.
+
+## Bình luận đầu
+Bài có `comment` thì `POST /api/fp/due` trả thêm `comment` và `comment_image`. Agent đăng bài, rồi đăng bình luận đầu (kèm ảnh nếu có) dưới bài vừa đăng, rồi mới gọi `/done`. Nếu bình luận lỗi mà bài đã lên thì vẫn báo `ok: true` (bài đã đăng) và nhắn chị rằng bình luận lỗi; tuyệt đối không đăng lại bài.
+
 ## Khai báo page
 Trên lịch, cột Kênh › "+ Thêm page": mã page (dãy số) + tên + đánh dấu page thử. Tên/mã phải khớp page trong `facebook-pages.json` của agent. Làm page thử trước, thử xong mới thêm page thật.
 

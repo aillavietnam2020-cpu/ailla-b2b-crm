@@ -95,3 +95,42 @@ describe('Đăng bài Fanpage qua agent', () => {
     expect(bad.status).toBe(401);
   });
 });
+
+describe('Agent tự lên bài vào lịch (/api/fp/draft)', () => {
+  const tomorrow = () => new Date(Date.now() + 7 * 3600 * 1000 + 86_400_000).toISOString().slice(0, 10);
+  const draft = (posts: unknown[]) => agent('draft', { task_id: 'WT-1', posts });
+  const cards = async () => (await ctx.request('/api/hub/state', { as: USERS.ceo })).body.data.data.cards as J[];
+
+  it('tạo bài ở Chờ duyệt, không tự duyệt, giờ làm tròn 15 phút', async () => {
+    await addPage('100000000001', true);
+    await seedCard('100000000001');
+    const r: J = await (await draft([{ page_id: '100000000001', date: tomorrow(), time: '9:47', text: 'Bài agent viết', format: 'photo', media_url: 'https://x.vn/a.jpg', comment: 'Mua tại https://ailla.vn' }])).json();
+    expect(r.data.created).toBe(1);
+    const c = (await cards()).find((x) => x.id !== 'FP1');
+    expect(c.step).toBe('dvd');
+    expect(c.gio).toBe('09:45');
+    expect(c.pdate).toBe(tomorrow());
+    expect(c.firstComment).toContain('ailla.vn');
+    expect(c.fpAgentTask).toBe('WT-1');
+  });
+
+  it('gửi lại cùng bài thì không nhân đôi; bài sai bị bỏ kèm lý do', async () => {
+    await addPage('100000000001', true);
+    await seedCard('100000000001');
+    const good = { page_id: '100000000001', date: tomorrow(), time: '10:00', text: 'Bài A' };
+    await draft([good]);
+    const r2: J = await (await draft([good, { page_id: '999', date: tomorrow(), time: '10:00', text: 'x' }, { page_id: '100000000001', date: '2020-01-01', time: '10:00', text: 'x' }, { page_id: '100000000001', date: tomorrow(), time: '25:00', text: 'x' }, { page_id: '100000000001', date: tomorrow(), time: '10:00', text: '' }])).json();
+    expect(r2.data.created).toBe(0);
+    expect(r2.data.skipped.length).toBeGreaterThanOrEqual(4);
+    expect((await cards()).filter((x) => x.id !== 'FP1')).toHaveLength(1);
+  });
+
+  it('bài agent tạo muốn đăng phải được duyệt trước: chưa duyệt thì /due không giao', async () => {
+    await addPage('100000000001', true);
+    await seedCard('100000000001');
+    await setMode('test');
+    await draft([{ page_id: '100000000001', date: tomorrow(), time: '10:00', text: 'Bài mai' }]);
+    const posts = (await due()).data.posts as J[];
+    expect(posts.every((p) => p.card_id === 'FP1')).toBe(true);
+  });
+});
