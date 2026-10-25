@@ -34,7 +34,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const tabMod=(k,ic,n,zone,keys,names)=>({k,adm:true,zone,ic,n,sub:"",groups:()=>[["",pick(pool(),keys,names)]]});
   MODULES.push(
     {k:"q_tq",adm:true,zone:"Điều hành",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",pick(pool(),["exec"],["Tổng quan"])]]},
-    tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu","cr_dn"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý (NPP)","Gia công","CSKH cũ","Đơn B2B cần duyệt"]),
+    tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý (NPP)","Gia công","CSKH cũ"]),
     tabMod("q_ll","spark","Lãi lỗ","",["pl","bc_tong","kho_boc","kho_cl","sku","kho_dm"],["P&L công ty","So sánh kênh","Giá thành & định mức","Chênh lệch định mức","Giá vốn SKU","Định mức theo sản phẩm"]),
     tabMod("q_cp","fin","Tiền & chi phí","",["tien_lich","phai_thu","mh_no","so_cp","ngan_sach","chiphi","cr_vc","doisoat","cr_bill"],["Tiền & lịch chi","Phải thu & tuổi nợ","Phải trả nhà cung cấp","Sổ chi phí","Ngân sách","Chi phí theo tháng","Phiếu chi vận chuyển","Đối soát tiền về","Kho bill giao dịch"]),
     tabMod("q_mh","cart","Mua hàng","Nghiệp vụ",["mh_po","mh_hd","mh_chi","mh_gianvl"],["Đơn mua hàng","Chứng từ nhà cung cấp","Phiếu chi nhà cung cấp","Giá nguyên vật liệu theo tháng"]),
