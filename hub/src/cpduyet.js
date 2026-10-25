@@ -199,11 +199,11 @@ function cpBindBaLoai(){
 const CPT_TAB={t:"ds"};
 function cpGoCho(){CPT_TAB.t="cho";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}
 {const _s=PAGES.so_cp;if(_s)PAGES.so_cp=function(m){
-  const strip=`<div class="tabs xtabs" role="tablist">${[["ds","Danh sách khoản chi"],["cho","Chờ phân bổ"+(((D().costsCho||[]).length+(D().thuCho||[]).length)?" ("+((D().costsCho||[]).length+(D().thuCho||[]).length)+")":"")],["bc","Theo kênh & loại"],["luong","Lương"],["th","Theo tháng"]].filter(x=>x[0]!=="luong"||(typeof cpLgCan==="function"&&cpLgCan())).map(([k,t])=>`<button role="tab" aria-selected="${CPT_TAB.t===k}" class="${CPT_TAB.t===k?"on":""}" data-cpt="${k}">${t}</button>`).join("")}</div>`;
+  const strip=`<div class="tabs xtabs" role="tablist">${[["ds","Danh sách khoản chi"],["cho","Chờ phân bổ"+(((D().costsCho||[]).length+(D().thuCho||[]).length)?" ("+((D().costsCho||[]).length+(D().thuCho||[]).length)+")":"")]].map(([k,t])=>`<button role="tab" aria-selected="${CPT_TAB.t===k}" class="${CPT_TAB.t===k?"on":""}" data-cpt="${k}">${t}</button>`).join("")}</div>`;
   const bindTab=()=>m.querySelectorAll("[data-cpt]").forEach(b=>b.onclick=()=>{CPT_TAB.t=b.dataset.cpt;renderMain()});
   if(CPT_TAB.t==="cho"&&PAGES.cp_duyet){m.innerHTML=strip+`<div id="cpt-body"></div>`;PAGES.cp_duyet(m.querySelector("#cpt-body"));bindTab();return}
   if(CPT_TAB.t==="bc"){m.innerHTML=strip+`<div id="cpt-body">${typeof spLoadShip==="function"?"":""}${cpBaLoai()}</div>`;try{spLoadShip()}catch(e){}bindTab();cpBindBaLoai();return}
-  if(CPT_TAB.t==="luong"&&PAGES.cp_luong){m.innerHTML=strip+`<div id="cpt-body"></div>`;PAGES.cp_luong(m.querySelector("#cpt-body"));bindTab();return}
+  if(CPT_TAB.t==="luong"&&PAGES.cp_luong){m.innerHTML=strip+`<p><button type="button" class="lnk" id="cp-back">← Về danh sách khoản chi</button></p>`+`<div id="cpt-body"></div>`;PAGES.cp_luong(m.querySelector("#cpt-body"));bindTab();$("#cp-back").onclick=()=>{CPT_TAB.t="ds";SOCP.lcp="lg";renderMain()};return}
   if(CPT_TAB.t==="th"&&typeof pChiPhi==="function"){m.innerHTML=strip+`<div id="cpt-body"></div>`;pChiPhi(m.querySelector("#cpt-body"));bindTab();return}
   _s.apply(this,arguments);try{m.insertAdjacentHTML("afterbegin",strip);bindTab()}catch(e){}
   try{const n=(D().costsCho||[]).length,k=m.querySelector(".kpis");if(!k)return;
