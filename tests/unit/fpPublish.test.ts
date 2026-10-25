@@ -23,6 +23,14 @@ describe('pickDue: chỉ đăng bài đã duyệt, đúng ngày, tới giờ', (
     expect(pickDue([card({ fbPostId: '1_2' })], NOW)).toHaveLength(0);
     expect(pickDue([card({ fbState: 'error' })], NOW)).toHaveLength(0);
   });
+  it('giờ lẻ phút: 10:15 đã tới, 10:45 chưa tới', () => {
+    expect(pickDue([card({ gio: '10:15' })], NOW)).toHaveLength(1);
+    expect(pickDue([card({ gio: '10:45' })], NOW)).toHaveLength(0);
+  });
+  it('lịch nhiều tháng: dùng ngày đầy đủ pdate', () => {
+    expect(pickDue([card({ pdate: '2026-10-25', day: 3, thang: '2026-09' })], NOW)).toHaveLength(1);
+    expect(pickDue([card({ pdate: '2026-11-25' })], NOW)).toHaveLength(0);
+  });
   it('mỗi lần tối đa 5 bài', () => {
     const many = Array.from({ length: 8 }, (_, i) => card({ id: 'c' + i }));
     expect(pickDue(many, NOW)).toHaveLength(5);
