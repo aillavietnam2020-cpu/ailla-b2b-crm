@@ -66,3 +66,18 @@ describe('Phiếu chi vận chuyển: chuyển khoản từ tài khoản nào, �
   });
 });
 
+describe('Phiếu chi vận chuyển: kế toán lập được (chị Hoa duyệt 25/10/2026)', () => {
+  it('nhân viên có quyền xác nhận kế toán lập và xem được, không cần quyền duyệt đơn', async () => {
+    const NOW = '2026-10-25T01:00:00.000Z';
+    await ctx.db
+      .prepare("INSERT INTO users (id, email, display_name, role, status, created_at, updated_at) VALUES ('user-kt', 'kt@ailla.vn', 'Kế toán', 'EMPLOYEE', 'ACTIVE', ?, ?)")
+      .bind(NOW, NOW)
+      .run();
+    await ctx.db.prepare("INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES ('user-kt', 'order.accounting.confirm', 'user-ceo', ?)").bind(NOW).run();
+    const a = await ctx.request('/api/shipping-vouchers', { as: 'kt@ailla.vn', body: body() });
+    expect(a.status).toBe(200);
+    const list = await ctx.request('/api/shipping-vouchers', { as: 'kt@ailla.vn' });
+    expect(list.status).toBe(200);
+    expect(list.body.meta?.can_write).not.toBe(false);
+  });
+});

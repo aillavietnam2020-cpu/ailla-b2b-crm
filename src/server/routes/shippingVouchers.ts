@@ -10,12 +10,14 @@ import { addPayFile, deletePayFile, getPayFile, listPayFiles } from '../lib/payF
 
 /**
  * Sổ phiếu chi vận chuyển. Quản lý điều phối (Thảo) hoặc CEO lập, lập xong có hiệu lực luôn (không qua bước duyệt).
- * Kế toán xem được (đối chiếu sổ). Không gắn vào đơn, không chia chi phí theo đơn.
+ * Kế toán cũng lập được (chị Hoa duyệt 25/10/2026). Không gắn vào đơn, không chia chi phí theo đơn.
  */
 export const shippingVoucherRoutes = new Hono<AppEnv>();
 
-const canWrite = (a: AuthContext) => a.user.role === 'CEO' || a.permissions.includes('order.approve.normal');
-const canRead = (a: AuthContext) => canWrite(a) || a.permissions.includes('order.accounting.confirm');
+/** Kế toán (có quyền xác nhận kế toán) cũng lập được phiếu chi, chị Hoa duyệt 25/10/2026. */
+const canWrite = (a: AuthContext) =>
+  a.user.role === 'CEO' || a.permissions.includes('order.approve.normal') || a.permissions.includes('order.accounting.confirm');
+const canRead = canWrite;
 
 const createSchema = z.object({
   voucher_date: z
