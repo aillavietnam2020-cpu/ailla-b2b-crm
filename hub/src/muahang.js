@@ -22,7 +22,7 @@ async function mhLoad(force){
     MH.orders=o;MH.sup=s;MH.err="";MH.at=Date.now()}
   catch(e){MH.err=e.message||"Không tải được phiếu mua hàng"}
   MH.busy=false;
-  if(/^mh_|^sx_mh$|^exec$/.test(PAGE))renderMain();
+  if(/^mh_|^sx_mh$|^exec$|^(so_cp|ngan_sach|tien_lich)$/.test(PAGE))renderMain();
 }
 const mhReload=async()=>{MH.at=0;MH.debts=MH.inv=MH.pay=MH.prices=null;await mhLoad(true)};
 const mhSupOpts=(sel)=>opt([["","— Chọn nhà cung cấp —"]].concat((MH.sup||[]).filter(s=>s.active).map(s=>[s.id,s.name])),sel||"");
@@ -167,7 +167,7 @@ function mhNeedAdmin(m,title,sub){
   return false;
 }
 /* --- Chờ ghi chứng từ: hàng đã về kho nhưng chưa có phiếu giao / hóa đơn của nhà cung cấp --- */
-async function mhLoadInv(){if(MH.inv)return;try{MH.inv=await kApi("/mh/invoices")}catch(e){MH.inv=[];toast(e.message)}if(/^mh_/.test(PAGE))renderMain()}
+async function mhLoadInv(){if(MH.inv)return;try{MH.inv=await kApi("/mh/invoices")}catch(e){MH.inv=[];toast(e.message)}if(/^mh_|^(so_cp|ngan_sach|tien_lich)$/.test(PAGE))renderMain()}
 const MH_DOC={HD:"Hóa đơn VAT (hóa đơn đỏ)",PG:"Phiếu giao hàng / bill"};
 function mhPendingReceipts(){
   const used=new Set((MH.inv||[]).filter(v=>v.status==="OK").flatMap(v=>v.receipt_ids||[])),out=[];
@@ -275,7 +275,7 @@ function mhDocForm(pre){
     catch(err){$("#mhi-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
 }
 /* --- Phiếu chi --- */
-async function mhLoadPay(){if(MH.pay)return;try{MH.pay=await kApi("/mh/payments")}catch(e){MH.pay=[];toast(e.message)}if(/^mh_/.test(PAGE))renderMain()}
+async function mhLoadPay(){if(MH.pay)return;try{MH.pay=await kApi("/mh/payments")}catch(e){MH.pay=[];toast(e.message)}if(/^mh_|^(so_cp|ngan_sach|tien_lich)$/.test(PAGE))renderMain()}
 function pMhChi(m){
   mhLoad();mhLoadPay();mhLoadInv();const T="Phiếu chi thanh toán",S="Thảo báo đã thanh toán, kế toán ghi phiếu chi";
   if(mhNeedAdmin(m,T,S))return;
