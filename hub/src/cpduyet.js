@@ -162,38 +162,52 @@ function cpNapTieu(N){
   const rows=[["Facebook / Pancake",C.adsFB||0],["TikTok Shop",C.adsTT||0],["Shopee",C.adsSPE||0]].filter(r=>r[1]||nap[r[0]]);
   if(!rows.length)return "";
   return `<div class="card-h pad"><h2>Tiền nạp quảng cáo so với tiền tiêu thật</h2><span class="hint">lãi lỗ dùng tiền tiêu thật; tiền nạp lấy từ sổ MISA đã duyệt ở Chờ phân bổ</span></div>${tbl(["Kênh","Đã nạp (sổ)","Đã tiêu (báo cáo ads)","Nạp trừ tiêu"],rows.map(([k,t])=>{const n=nap[k]||0;return `<tr><td><b>${esc(k)}</b></td><td class="n">${n?nf(Math.round(n)):"—"}</td><td class="n">${t?nf(Math.round(t)):"—"}</td><td class="n ${n&&t&&n-t<0?"t-red":""}">${n&&t?nf(Math.round(n-t)):"—"}</td></tr>`}))}<p class="hint pad">Nạp trừ tiêu dương nghĩa là còn tiền trong tài khoản ads. Số tiêu của TikTok và Facebook lấy từ báo cáo đã tải lên; chưa tải thì để trống.</p>`}
+/* Báo cáo chi phí theo kênh và theo loại: hàng = loại chi phí, cột = kênh bán + chi chung; dòng cuối chia chi chung cho kênh. */
+const CP_ROWS=["Quảng cáo","Vận chuyển, đóng hàng","Lương & thưởng","Chi phí cố định","Chi phí khác"];
+const cpRowOf=cat=>{if(["ADS-FB","ADS-TT","ADS-SPE","KOC","ADS"].includes(cat))return 0;if(["VC","CUOC-NPP","DG-B2C"].includes(cat))return 1;if(["LUONG","THUONG","HH-VH"].includes(cat))return 2;return cpCat(cat).loai==="Cố định"?3:4};
 function cpBaLoai(){
   const d=D(),inP=c=>c.ngay?spInP(c.ngay):spMonthIn(c.thang),L=(d.costs||[]).filter(inP);
-  const N=execNums(PERIOD.from,PERIOD.to),rev={"TikTok Shop":N.tt||0,"Shopee":N.spDT||0,"Facebook / Pancake":N.fbGiao||0},ym=PERIOD.from.slice(0,7),oneM=PERIOD.to.slice(0,7)===ym,tay=((d.cpDoanhThu||{})[ym])||{};
+  const N=execNums(PERIOD.from,PERIOD.to),C=N.C||{},rev={"TikTok Shop":N.tt||0,"Shopee":N.spDT||0,"Facebook / Pancake":N.fbGiao||0},ym=PERIOD.from.slice(0,7),oneM=PERIOD.to.slice(0,7)===ym,tay=((d.cpDoanhThu||{})[ym])||{};
   if(oneM)["B2B / Đại lý (CRM)","Gia công"].forEach(k=>{if(+tay[k]>0)rev[k]=+tay[k]});
-  const mode=d.cpChia||"dt",kenhs=CP_KENH(),T={};kenhs.forEach(k=>T[k]={A:0});let chung=0,boC=0,tot={A:0,B:0,C:0};
+  const mode=d.cpChia||"dt",kenhs=CP_KENH(),COL=kenhs.concat(["__c"]),M=CP_ROWS.map(()=>{const o={};COL.forEach(k=>o[k]=0);return o});
   const LG=oneM&&typeof cpLuongAuto==="function"?cpLuongAuto():null;
-  L.forEach(c=>{if(LG&&c.cat==="LUONG")return;const lo=cpLoai(c.cat,c.kenh),t=+c.tien||0;tot[lo]+=t;if(c.kenh&&T[c.kenh])T[c.kenh].A+=t;else if(lo==="C")chung+=t;else boC+=t});
-  if(LG){Object.entries(LG.perKenh).forEach(([k,v])=>{if(T[k]){T[k].A+=v;tot.A+=v}});chung+=LG.chung;tot.C+=LG.chung}
-  const rs=Object.values(rev).reduce((a,b)=>a+b,0),act=kenhs.filter(k=>(rev[k]||0)>0||T[k].A);
+  const kOf=re=>kenhs.find(k=>re.test(k)),KFB=kOf(/facebook/i),KTT=kOf(/tiktok/i),KSP=kOf(/shopee/i);
+  const adsAuto=(C.adsFB||0)+(C.adsTT||0)+(C.adsSPE||0);
+  if(KFB)M[0][KFB]+=C.adsFB||0;if(KTT)M[0][KTT]+=C.adsTT||0;if(KSP)M[0][KSP]+=C.adsSPE||0;
+  L.forEach(c=>{if(LG&&c.cat==="LUONG")return;if(adsAuto>0&&String(c.cat).startsWith("ADS"))return;const col=c.kenh&&kenhs.includes(c.kenh)?c.kenh:"__c";M[cpRowOf(c.cat)][col]+=+c.tien||0});
+  (SOCP.ship||[]).filter(v=>v.status==="OK"&&spInP(v.voucher_date)).forEach(v=>{M[1].__c+=+v.amount||0});
+  if(LG){Object.entries(LG.perKenh).forEach(([k,v])=>{if(M[2][k]!=null)M[2][k]+=v});M[2].__c+=LG.chung}
+  const colT=COL.reduce((o,k)=>{o[k]=M.reduce((t,r)=>t+r[k],0);return o},{}),rowT=M.map(r=>COL.reduce((t,k)=>t+r[k],0)),grand=rowT.reduce((a,b)=>a+b,0);
+  const rs=Object.values(rev).reduce((a,b)=>a+b,0),act=kenhs.filter(k=>(rev[k]||0)>0||colT[k]>0),chung=colT.__c;
   const share=k=>mode==="khong"||!chung?0:mode==="deu"?chung/Math.max(1,act.length):rs?chung*(rev[k]||0)/rs:0;
-  const sumK=k=>T[k].A+share(k);
-  if(!L.length)return `<section class="card pad"><b>Ba loại chi phí</b><p class="hint">Chưa có khoản chi đã duyệt trong kỳ này. Khoản nằm ở "Chờ phân bổ" cho tới khi chị Huệ duyệt.</p></section>`;
-  return `<section class="card flush"><div class="card-h pad"><h2>Kênh nào gánh bao nhiêu chi phí</h2><span class="hint">Chi chung chia theo <select id="cp-mode">${opt([["dt","doanh thu thực của kênh"],["deu","chia đều các kênh"],["khong","không chia, để một dòng riêng"]],mode)}</select> · chỉ gồm khoản chi đã duyệt (không gồm quảng cáo, phí sàn, giá vốn đã có trong báo cáo kênh)</span></div>
-  ${tbl(["Kênh","Trực tiếp kênh (A, gồm lương riêng kênh)","Chi chung được chia (C)","Tổng gánh","Doanh thu thực","% doanh thu"],act.map(k=>`<tr><td><b>${esc(k)}</b></td><td class="n">${nf(Math.round(T[k].A))}</td><td class="n">${nf(Math.round(share(k)))}</td><td class="n"><b>${nf(Math.round(sumK(k)))}</b></td><td class="n">${rev[k]?nf(Math.round(rev[k])):"chưa có"}</td><td class="n">${rev[k]?(sumK(k)/rev[k]*100).toFixed(1).replace(".",",")+"%":"—"}</td></tr>`).concat([`<tr class="tot"><td>Chưa gắn kênh (lương, chi phí phòng ban)</td><td class="n">${nf(Math.round(boC))}</td><td class="n">chi chung chưa chia: ${nf(Math.round(mode==="khong"||(mode==="dt"&&!rs)?chung:0))}</td><td class="n"></td><td></td><td></td></tr>`]))}
-  <p class="hint pad">Loại A ${nf(Math.round(tot.A))} · B ${nf(Math.round(tot.B))} · C ${nf(Math.round(tot.C))} đ. TikTok, Shopee, Facebook lấy doanh thu thực từ báo cáo.${LG?` Đã gồm lương từ bảng lương (${LG.st.toLowerCase()}): vào kênh ${nf(Math.round(Object.values(LG.perKenh).reduce((x,y)=>x+y,0)))}, chi chung ${nf(Math.round(LG.chung))}, vào giá thành ${nf(Math.round(LG.gv))} đ (không tính vào kênh).`:""} NPP và Gia công web chưa có số tự động: ${oneM?`nhập doanh thu thực tháng ${ym.slice(5)}/${ym.slice(0,4)} ở hai ô dưới để chia chi chung cho đủ, tới khi web nối được số thật.`:"chọn một tháng để nhập."}</p>
+  const f=v=>v?nf(Math.round(v)):"—",pc=(a,b)=>b?(a/b*100).toFixed(1).replace(".",",")+"%":"—";
+  if(!grand)return `<section class="card pad"><b>Chi phí theo kênh và theo loại</b><p class="hint">Chưa có khoản chi nào trong kỳ này. Khoản chi nằm ở tab "Chờ phân bổ" cho tới khi chị Huệ duyệt.</p></section>`;
+  const head=["Loại chi phí"].concat(act.map(k=>k),["Chi chung / chưa gắn kênh","Tổng"]);
+  const rows=CP_ROWS.map((n,i)=>rowT[i]?`<tr><td><b>${n}</b></td>${act.map(k=>`<td class="n">${f(M[i][k])}</td>`).join("")}<td class="n">${f(M[i].__c)}</td><td class="n"><b>${f(rowT[i])}</b></td></tr>`:"").join("");
+  const tot=`<tr class="tot"><td>Cộng chi phí trực tiếp</td>${act.map(k=>`<td class="n">${f(colT[k])}</td>`).join("")}<td class="n">${f(chung)}</td><td class="n">${f(grand)}</td></tr>`;
+  const sh=`<tr><td>＋ Chi chung chia cho kênh</td>${act.map(k=>`<td class="n">${f(share(k))}</td>`).join("")}<td class="n">${mode==="khong"||(mode==="dt"&&!rs)?f(chung):"—"}</td><td class="n"></td></tr>`;
+  const gan=`<tr class="tot"><td>Tổng mỗi kênh gánh</td>${act.map(k=>`<td class="n"><b>${f(colT[k]+share(k))}</b></td>`).join("")}<td class="n"></td><td class="n"></td></tr><tr><td>Doanh thu thực</td>${act.map(k=>`<td class="n">${rev[k]?nf(Math.round(rev[k])):"chưa có"}</td>`).join("")}<td></td><td></td></tr><tr><td>Chi phí trên doanh thu</td>${act.map(k=>`<td class="n">${pc(colT[k]+share(k),rev[k])}</td>`).join("")}<td></td><td></td></tr>`;
+  return `<section class="card flush"><div class="card-h pad"><h2>Chi phí theo kênh và theo loại</h2><span class="hint">Chi chung chia theo <select id="cp-mode">${opt([["dt","doanh thu thực của kênh"],["deu","chia đều các kênh"],["khong","không chia, để một dòng riêng"]],mode)}</select></span></div>
+  <div class="tbl"><table><thead><tr>${head.map((h,i)=>`<th${i?' class="n"':""}>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows}${tot}${sh}${gan}</tbody></table></div>
+  <p class="hint pad">Đọc theo hàng: mỗi loại chi phí ở từng kênh. Đọc theo cột: mỗi kênh gánh những gì. Quảng cáo lấy tiền tiêu thật từ báo cáo ads của từng kênh. Chưa gồm giá vốn, phí sàn (đã nằm trong báo cáo sàn) và mua nguyên vật liệu. Phiếu chi vận chuyển chưa gắn kênh nằm ở cột chi chung.${LG?` Lương lấy từ bảng lương (${LG.st.toLowerCase()}), phần sản xuất ${nf(Math.round(LG.gv))} đ vào giá thành, không tính ở đây.`:""} Doanh thu NPP và Gia công web chưa có số tự động: ${oneM?`nhập doanh thu thực tháng ${ym.slice(5)}/${ym.slice(0,4)} ở hai ô dưới, tới khi web nối được số thật.`:"chọn một tháng để nhập."}</p>
   ${oneM&&cpCan()?`<div class="filters pad"><label class="field">Doanh thu thực NPP / đại lý (đ)<input id="cp-dt-npp" type="number" min="0" value="${tay["B2B / Đại lý (CRM)"]||""}"></label><label class="field">Doanh thu thực Gia công (đ)<input id="cp-dt-gc" type="number" min="0" value="${tay["Gia công"]||""}"></label><button class="btn" id="cp-dt-save">Lưu doanh thu</button></div>`:""}
   ${cpNapTieu(N)}
 </section>`}
+function cpBindBaLoai(){
+  const sv=$("#cp-dt-save");if(sv)sv.onclick=()=>{const ym=PERIOD.from.slice(0,7),a=+$("#cp-dt-npp").value||0,b=+$("#cp-dt-gc").value||0;DB.mutate(ME.name,"nhập doanh thu NPP và Gia công",dt=>{if(!dt.cpDoanhThu)dt.cpDoanhThu={};dt.cpDoanhThu[ym]={"B2B / Đại lý (CRM)":a,"Gia công":b}});toast("Đã lưu doanh thu tháng "+ym.slice(5));renderMain()};
+  const sel=$("#cp-mode");if(sel)sel.onchange=()=>{DB.mutate(ME.name,"đổi quy tắc chia chi chung",dt=>{dt.cpChia=sel.value});renderMain()}}
 const CPT_TAB={t:"ds"};
 function cpGoCho(){CPT_TAB.t="cho";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}
 {const _s=PAGES.so_cp;if(_s)PAGES.so_cp=function(m){
-  const strip=`<div class="tabs xtabs" role="tablist">${[["ds","Danh sách khoản chi"],["cho","Chờ phân bổ"+(((D().costsCho||[]).length+(D().thuCho||[]).length)?" ("+((D().costsCho||[]).length+(D().thuCho||[]).length)+")":"")],["luong","Lương"],["th","Theo tháng"]].filter(x=>x[0]!=="luong"||(typeof cpLgCan==="function"&&cpLgCan())).map(([k,t])=>`<button role="tab" aria-selected="${CPT_TAB.t===k}" class="${CPT_TAB.t===k?"on":""}" data-cpt="${k}">${t}</button>`).join("")}</div>`;
+  const strip=`<div class="tabs xtabs" role="tablist">${[["ds","Danh sách khoản chi"],["cho","Chờ phân bổ"+(((D().costsCho||[]).length+(D().thuCho||[]).length)?" ("+((D().costsCho||[]).length+(D().thuCho||[]).length)+")":"")],["bc","Theo kênh & loại"],["luong","Lương"],["th","Theo tháng"]].filter(x=>x[0]!=="luong"||(typeof cpLgCan==="function"&&cpLgCan())).map(([k,t])=>`<button role="tab" aria-selected="${CPT_TAB.t===k}" class="${CPT_TAB.t===k?"on":""}" data-cpt="${k}">${t}</button>`).join("")}</div>`;
   const bindTab=()=>m.querySelectorAll("[data-cpt]").forEach(b=>b.onclick=()=>{CPT_TAB.t=b.dataset.cpt;renderMain()});
   if(CPT_TAB.t==="cho"&&PAGES.cp_duyet){m.innerHTML=strip+`<div id="cpt-body"></div>`;PAGES.cp_duyet(m.querySelector("#cpt-body"));bindTab();return}
+  if(CPT_TAB.t==="bc"){m.innerHTML=strip+`<div id="cpt-body">${typeof spLoadShip==="function"?"":""}${cpBaLoai()}</div>`;try{spLoadShip()}catch(e){}bindTab();cpBindBaLoai();return}
   if(CPT_TAB.t==="luong"&&PAGES.cp_luong){m.innerHTML=strip+`<div id="cpt-body"></div>`;PAGES.cp_luong(m.querySelector("#cpt-body"));bindTab();return}
   if(CPT_TAB.t==="th"&&typeof pChiPhi==="function"){m.innerHTML=strip+`<div id="cpt-body"></div>`;pChiPhi(m.querySelector("#cpt-body"));bindTab();return}
   _s.apply(this,arguments);try{m.insertAdjacentHTML("afterbegin",strip);bindTab()}catch(e){}
   try{const n=(D().costsCho||[]).length,k=m.querySelector(".kpis");if(!k)return;
     const bar=`<div class="note ${n?"amb":""}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${n?`<b>${n} khoản chờ chị Huệ phân bổ</b> (chưa tính vào các số bên dưới)`:"Không có khoản nào chờ phân bổ"}</span><button class="btn sm" id="cp-go">Mở Chờ phân bổ</button></div>`;
     k.insertAdjacentHTML("beforebegin",bar);
-    m.insertAdjacentHTML("beforeend",cpBaLoai());
     $("#cp-go").onclick=()=>{CPT_TAB.t="cho";renderMain()};
-    const sv=$("#cp-dt-save");if(sv)sv.onclick=()=>{const ym=PERIOD.from.slice(0,7),a=+$("#cp-dt-npp").value||0,b=+$("#cp-dt-gc").value||0;DB.mutate(ME.name,"nhập doanh thu NPP và Gia công",dt=>{if(!dt.cpDoanhThu)dt.cpDoanhThu={};dt.cpDoanhThu[ym]={"B2B / Đại lý (CRM)":a,"Gia công":b}});toast("Đã lưu doanh thu tháng "+ym.slice(5));renderMain()};
-    const sel=$("#cp-mode");if(sel)sel.onchange=()=>{DB.mutate(ME.name,"đổi quy tắc chia chi chung",dt=>{dt.cpChia=sel.value});renderMain()}
   }catch(e){}}}
