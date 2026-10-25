@@ -11,7 +11,7 @@
    ===================================================================== */
 const TQ={co:{},coBusy:{}};
 /* Số đơn xuất kho Poscake theo kênh trong khoảng ngày (null khi chưa tải xong). */
-function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(PAGE==="exec"||PAGE==="bc_tong")renderMain()})}return null}
+function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(["exec","bc_tong","pl","muctieu"].includes(PAGE))renderMain()})}return null}
 const tqMonths=(from,to)=>{const ms=[];for(let d=pdate(from.slice(0,7)+"-01");iso(d)<=to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms};
 /* Doanh thu thực + lãi đóng góp từng kênh B2C trong khoảng ngày. N = số gốc của execNums (trước khi đổi). */
 function tqRevB2C(N,from,to){
@@ -101,3 +101,129 @@ const TQ_TABS=[["homnay","Hôm nay"],["kenh","Lãi theo kênh"],["gia","Giá th�
 PAGES.dh=m=>{SUB.exec=({tongquan:"kenh",homnay:"kenh",batang:"kenh"})[SUB.dh]||SUB.dh||"kenh";PAGE="exec";render()};
 /* Cảnh báo: quảng cáo kênh vượt 40% doanh thu thực. */
 {const _ea=execAlerts;execAlerts=function(){const A=_ea.apply(this,arguments);try{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"&&dhOk()){const R=(execNums(PERIOD.from,PERIOD.to).rev)||{};[["tts","TikTok Shop"],["fb","Facebook"]].forEach(([k,n])=>{const r=R[k];if(r&&r.dt&&r.ads/r.dt>dhGet().nguong.qcMax)A.unshift(["red",`${n}: quảng cáo ${dhPct(r.ads/r.dt)} doanh thu thực`,"Tổng quan › Lãi theo kênh","exec"])})}}catch(e){}return A}}
+
+/* =====================================================================
+   LÃI LỖ P&L CÔNG TY · SO SÁNH KÊNH · KẾ HOẠCH DOANH THU (trang quản trị, chị Hoa duyệt 25/10/2026).
+   Cùng một định nghĩa với Tổng quan: doanh thu thực, lãi đóng góp kênh (tqKenhRows).
+   Chi phí chung lấy từ Sổ chi phí qua spChungTheoThang(ym) (chat Dựng trang quản trị làm); chưa có thì ghi "chưa có số", không để 0.
+   Kế hoạch doanh thu theo tháng, theo kênh: D().targets.thang["yyyy-mm"] = {tts,spe,fb,b2b,gc} (doanh thu thực, đ).
+   ===================================================================== */
+const PLK=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["b2b","B2B / Đại lý"],["gc","Gia công"]];
+const PLB={},PLBB={};
+const plYmEnd=ym=>ym+"-"+String(ttKyDays(ym)).padStart(2,"0");
+const plYmAdd=(ym,n)=>{const [y,m]=ym.split("-").map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
+const plRange=ym=>{const t=iso(new Date()),e=plYmEnd(ym);return {from:ym+"-01",to:e<t?e:t,partial:e>t}};
+const plYmNow=()=>{const t=iso(new Date()),p=PERIOD&&PERIOD.to?PERIOD.to:t;return (p>t?t:p).slice(0,7)};
+/* Doanh thu B2B, gia công của một khoảng ngày bất kỳ (không đụng kỳ đang chọn). */
+function plB2b(from,to){const k=from+"|"+to;if(B2BR.key===k&&B2BR.data)return B2BR.data;if(PLB[k])return PLB[k];
+  if(!PLBB[k]){PLBB[k]=1;(async()=>{try{if(!B2BR.map){const mp=await kApi("/map").catch(()=>({map:[]}));B2BR.map=new Map((mp.map||[]).map(r=>[String(r.crm_sku).toLowerCase(),r]))}PLB[k]=await svApi("/api/dashboards/b2b-sku?from="+from+"&to="+to)}catch(e){PLB[k]={lines:[],months:[],err:e.message}}PLBB[k]=0;if(["pl","bc_tong","muctieu","exec"].includes(PAGE))renderMain()})()}
+  return null}
+/* Các dòng kênh (như tqKenhRows) cho một khoảng ngày bất kỳ. */
+function plRowsFor(from,to){
+  const sv=PERIOD,bk={key:B2BR.key,data:B2BR.data},data=plB2b(from,to);
+  PERIOD={...sv,from,to};if(data){B2BR.key=from+"|"+to;B2BR.data=data}else B2BR.key="";
+  try{return tqKenhRows()}finally{PERIOD=sv;B2BR.key=bk.key;B2BR.data=bk.data}}
+const plKey=r=>({tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"})[r.k];
+/* Một kênh → các dòng P&L. Phí sàn và vận chuyển = phần còn lại để các dòng cộng khớp lãi đóng góp. */
+function plCol(r){if(!r||r.dt==null)return null;const dt=r.dt,gv=r.gv,ads=r.ads||0,lai=r.lai;
+  const lg=gv==null?null:dt-gv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ads-lai;return {dt,gv,lg,phi,ads,lai,tam:!!r.tam,src:r.src,don:r.don}}
+function plSum(cols){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.some(c=>c[k]==null)?null:ok.reduce((a,c)=>a+(c[k]||0),0);
+  return {dt:s("dt"),gv:s("gv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),lai:ok.filter(c=>c.lai!=null).reduce((a,c)=>a+c.lai,0),laiDu:ok.every(c=>c.lai!=null),tam:ok.some(c=>c.tam)}}
+function mtGet(ym){const t=D().targets,x=t&&t.thang&&t.thang[ym];if(!x)return null;const o={};let tong=0,co=false;PLK.forEach(([k])=>{const v=+x[k]||0;o[k]=v||null;if(v){tong+=v;co=true}});o.tong=co?tong:null;return co?o:null}
+function plChung(ym){try{if(typeof spChungTheoThang!=="function")return null;const v=spChungTheoThang(ym);return v!=null&&isFinite(+v)&&+v>0?+v:null}catch(e){return null}}
+function plMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
+  const cols={};PLK.forEach(([k])=>cols[k]=plCol(by[k]));const tot=plSum(PLK.map(([k])=>cols[k])),chung=plChung(ym);
+  return {ym,R,by,cols,tot,chung,ln:tot&&chung!=null?tot.lai-chung:null,thieu:PLK.filter(([k])=>!cols[k]).map(x=>x[1]),loading:rows.some(r=>r.src==="đang tải…")}}
+const PLS={ym:""};
+function pPLCty(m){
+  if(!dhOk()){m.innerHTML=H("Lãi lỗ P&L","")+`<div class="note">Trang này chỉ dành cho CEO và kế toán.</div>`;return}
+  dhLoad();const ym=PLS.ym||plYmNow(),A=plMonth(ym),P=plMonth(plYmAdd(ym,-1)),KH=mtGet(ym),vn=x=>x.slice(5,7)+"/"+x.slice(0,4);
+  const f=v=>v==null?`<span class="hint">—</span>`:`<span class="${v<0?"t-red":""}">${nf(Math.round(v))}</span>`;
+  const pct=(a,b)=>a==null||!b?"—":dhPct(a/b);
+  const ROWS=[["dt","Doanh thu thực","tot"],["gv","− Giá vốn",""],["lg","= Lãi gộp","tot"],["phi","− Phí sàn và vận chuyển",""],["ads","− Quảng cáo",""],["lai","= Lãi đóng góp kênh","tot"],["chung","− Chi phí chung (lương, kho vận, thuê, agency…)",""],["ln","= Lợi nhuận quản trị","tot big"]];
+  const cell=(c,k)=>{if(!c)return `<td class="n hint">chờ số</td>`;if(k==="chung"||k==="ln")return `<td class="n hint"></td>`;return `<td class="n">${f(c[k])}</td>`};
+  const cty=(X,k)=>{if(!X.tot)return `<td class="n hint">—</td>`;if(k==="chung")return X.chung==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n">${f(X.chung)}</td>`;if(k==="ln")return X.ln==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n"><b>${f(X.ln)}</b></td>`;return `<td class="n"><b>${f(X.tot[k])}</b></td>`};
+  const kh=k=>k==="dt"&&KH?`<td class="n">${f(KH.tong)}<br><small class="hint">đạt ${pct(A.tot&&A.tot.dt,KH.tong)}</small></td>`:`<td class="n hint">${k==="dt"?"chưa đặt":""}</td>`;
+  const body=ROWS.map(([k,l,c])=>`<tr class="${c.includes("tot")?"tot":""}"><td>${c.includes("big")?`<b>${l}</b>`:l}</td>${PLK.map(([kk])=>cell(A.cols[kk],k)).join("")}${cty(A,k)}${cty(P,k)}${kh(k)}</tr>`).join("");
+  const bien=(l,k)=>`<tr><td class="hint">${l}</td>${PLK.map(([kk])=>{const c=A.cols[kk];return `<td class="n hint">${c&&c[k]!=null&&k!=="ln"?pct(c[k],c.dt):""}</td>`}).join("")}<td class="n hint">${A.tot?pct(k==="ln"?A.ln:A.tot[k],A.tot.dt):""}</td><td class="n hint">${P.tot?pct(k==="ln"?P.ln:P.tot[k],P.tot.dt):""}</td><td></td></tr>`;
+  const src=PLK.map(([k,n])=>{const r=A.by[k];return `<li><b>${n}:</b> ${esc(r?r.src||"":"chờ số")}${r&&r.dang?` · đang giao chưa tính ${nf(r.dang)} đơn (${tr(r.dangDt)})`:""}</li>`}).join("");
+  const opts=[];for(let i=-12;i<=0;i++){const k=plYmAdd(plYmNow(),i);opts.push(`<option value="${k}" ${k===ym?"selected":""}>Tháng ${vn(k)}</option>`)}
+  m.innerHTML=H("Lãi lỗ P&L công ty",`Tháng ${vn(ym)}${A.R.partial?" · đến hôm nay "+A.R.to.slice(8,10)+"/"+A.R.to.slice(5,7):""} · doanh thu thực · số quản trị nội bộ, sổ sách chính thức ở MISA`)+`
+  <div class="acts" style="margin-bottom:10px"><select id="pl-ym">${opts.join("")}</select><button class="btn" id="pl-mt">Đặt kế hoạch tháng</button></div>
+  ${A.thieu.length?`<div class="note amb">Cột CÔNG TY chưa gồm: ${esc(A.thieu.join(", "))} (chờ tải báo cáo). ${A.loading?"Đang tải B2B…":""}</div>`:""}
+  ${A.tot&&A.tot.tam?`<div class="note">Có phần doanh thu <b>tạm tính</b> (ngày chưa có báo cáo sàn), số sẽ chốt khi tải báo cáo tháng.</div>`:""}
+  <section class="card flush"><div class="tbl"><table><thead><tr><th>Chỉ tiêu (đ)</th>${PLK.map(([,n])=>`<th class="n">${n}</th>`).join("")}<th class="n">CÔNG TY</th><th class="n">Tháng trước<br><small>${vn(P.ym)}</small></th><th class="n">Kế hoạch</th></tr></thead><tbody>
+   ${body}${bien("Biên lãi gộp","lg")}${bien("Biên đóng góp","lai")}${bien("Biên lợi nhuận quản trị","ln")}</tbody></table></div>
+   <p class="hint pad">Lãi đóng góp kênh = doanh thu thực − giá vốn − phí sàn, vận chuyển, thuế − quảng cáo. Chi phí chung chưa chia cho từng kênh, chỉ trừ ở cột CÔNG TY. ${A.chung==null?"Chi phí chung lấy từ Sổ chi phí: tháng này chưa có số nên chưa ra lợi nhuận quản trị.":""}</p></section>
+  <section class="card"><div class="card-h"><h2>Nguồn số từng kênh</h2></div><ul class="lessons">${src}</ul></section>`;
+  m.querySelector("#pl-ym").onchange=e=>{PLS.ym=e.target.value;renderMain()};
+  m.querySelector("#pl-mt").onclick=()=>{MT.ym=ym;PAGE="muctieu";renderMain();scrollTo(0,0)};
+}
+PAGES.pl=m=>{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")return pPLCty(m);return pPL(m)};
+
+/* ---------- So sánh kênh (trang bc_tong bên quản trị) ---------- */
+function tqHuyHoan(k,from,to){
+  if(k==="fb"){const tao=rSum("fb",0,from,to).v,h=rSum("fb",2,from,to).v+rSum("fb",3,from,to).v;return tao?h/tao:null}
+  if(k==="tts"){const S=(typeof TSB!=="undefined"&&TSB.sum)||{};let a=0,b=0;tqMonths(from,to).forEach(ym=>{const s=S[ym];if(s&&s.hhRate!=null&&s.don){a+=s.hhRate*s.don;b+=s.don}});return b?a/b:null}
+  return null}
+function tqSoSanhKenh(m){
+  if(!dhOk())return pKetQuaKenh(m);
+  dhLoad();if(typeof b2bLoad==="function")b2bLoad();
+  const rows=tqKenhRows(),T=tqTot(rows),ng=dhGet().nguong,ok=rows.filter(r=>r.dt!=null&&r.dt>0);
+  const rk=ok.filter(r=>r.lai!=null).sort((a,b)=>b.lai-a.lai);rk.forEach((r,i)=>r.rank=i+1);
+  const list=[...rk,...rows.filter(r=>!rk.includes(r))];
+  const p=v=>v==null||!isFinite(v)?"—":dhPct(v);
+  const row=r=>{const v=r.dt!=null&&r.dt>0,c=v?plCol(r):null,hh=v?tqHuyHoan(r.k,PERIOD.from,PERIOD.to):null,qc=v?(r.ads||0)/r.dt:null;
+    return `<tr class="clk${v?"":" mut"}" data-go="${r.go}"><td class="n"><b>${r.rank||""}</b></td><td><b>${esc(r.n)}</b><br><small class="hint">${esc(r.src||"")}</small></td>
+    <td class="n">${r.dt==null?`<span class="pill p-gry">chờ tải báo cáo</span>`:r.dt===0?"0 đ":tr(r.dt)}</td><td class="n">${v?p(r.dt/T.dt):"—"}</td>
+    <td class="n">${c&&c.lg!=null?p(c.lg/r.dt):"—"}</td><td class="n">${c?p(c.phi/r.dt):"—"}</td>
+    <td class="n">${v?(qc>ng.qcMax?`<b class="t-red">${p(qc)}</b>`:p(qc)):"—"}</td>
+    <td class="n"><b class="${r.lai<0?"t-red":""}">${r.lai==null?"—":tr(r.lai)}</b></td><td class="n">${v&&r.lai!=null?p(r.lai/r.dt):"—"}</td>
+    <td class="n">${p(hh)}</td></tr>`};
+  const best=rk[0];
+  m.innerHTML=H("So sánh kênh",esc(pLabel())+" · doanh thu thực · xếp hạng theo lãi đóng góp")+`
+  <div class="xkstrip" style="margin-bottom:12px">
+   <div class="xk"><span class="xkh"><span class="xkl">Doanh thu thực</span></span><span class="xkv numeric">${T.dt?tr(T.dt):"—"}</span><span class="xkm">${ok.length} kênh có số${T.tam?" · có phần tạm tính":""}</span></div>
+   <div class="xk"><span class="xkh"><span class="xkl">Lãi đóng góp</span></span><span class="xkv numeric">${T.dt?tr(T.lai):"—"}</span><span class="xkm">${T.dt?p(T.lai/T.dt)+" doanh thu · trước chi phí chung":""}</span></div>
+   <div class="xk"><span class="xkh"><span class="xkl">Kênh lãi nhiều nhất</span></span><span class="xkv">${best?esc(best.n):"—"}</span><span class="xkm">${best?tr(best.lai):""}</span></div>
+   <div class="xk"><span class="xkh"><span class="xkl">Chờ tải báo cáo</span></span><span class="xkv">${T.thieu.length||"Không"}</span><span class="xkm" style="white-space:normal">${esc(T.thieu.join(", "))}</span></div></div>
+  <section class="card flush"><div class="tbl"><table><thead><tr><th class="n">Hạng</th><th>Kênh · nguồn số</th><th class="n">Doanh thu thực</th><th class="n">% trong tổng</th><th class="n">Biên lãi gộp</th><th class="n">Phí sàn, ship, thuế %</th><th class="n">Quảng cáo %</th><th class="n">Lãi đóng góp</th><th class="n">Biên đóng góp</th><th class="n">Hủy/hoàn %</th></tr></thead>
+   <tbody>${list.map(row).join("")}<tr class="tot"><td></td><td><b>Tổng công ty</b></td><td class="n"><b>${tr(T.dt)}</b></td><td class="n">100%</td><td></td><td></td><td></td><td class="n"><b>${tr(T.lai)}</b></td><td class="n">${T.dt?p(T.lai/T.dt):"—"}</td><td></td></tr></tbody></table></div>
+   <p class="hint pad">Các % tính trên doanh thu thực của từng kênh. Quảng cáo trên ${p(ng.qcMax)} báo đỏ (sửa ngưỡng ở Tổng quan › Thiết lập). Hủy/hoàn: TikTok theo báo cáo tháng đã tải, Facebook = (hủy + hoàn) / đơn tạo; B2B, gia công không tính. Bấm từng dòng để xem chi tiết kênh.</p></section>`;
+  m.querySelectorAll("tr[data-go]").forEach(t=>t.onclick=()=>{PAGE=t.dataset.go;MOD="";render();scrollTo(0,0)});
+}
+
+/* ---------- Kế hoạch doanh thu theo kênh và tiến độ ---------- */
+const MT={ym:""};
+function mtProg(ym){const KH=mtGet(ym);if(!KH)return null;const A=plMonth(ym),R=A.R,nd=ttKyDays(ym),qua=R.partial?+R.to.slice(8,10):nd;
+  const L=PLK.map(([k,n])=>{const c=A.cols[k],kh=KH[k],tt=c?c.dt:null;return {k,n,kh,tt,dat:kh&&tt!=null?tt/kh:null,thieu:kh&&tt!=null?Math.max(0,kh-tt):null,ngay:kh&&tt!=null&&nd>qua?Math.max(0,kh-tt)/(nd-qua):null,tam:c&&c.tam}});
+  const tt=A.tot?A.tot.dt:null;return {ym,KH,A,L,nhip:qua/nd,qua,nd,tong:{kh:KH.tong,tt,dat:tt!=null&&KH.tong?tt/KH.tong:null,thieu:tt!=null?Math.max(0,KH.tong-tt):null,ngay:tt!=null&&nd>qua?Math.max(0,KH.tong-tt)/(nd-qua):null}}}
+const mtBar=(dat,nhip)=>{const w=Math.max(0,Math.min(100,(dat||0)*100)),col=dat==null?"#c9ced8":dat>=nhip?"var(--green)":dat>=nhip*0.9?"#e8a23a":"var(--red)";return `<div style="position:relative;height:10px;background:#eef0f5;border-radius:99px;min-width:120px"><i style="display:block;height:100%;width:${w}%;background:${col};border-radius:99px"></i><span title="nhịp cần đạt theo số ngày đã qua" style="position:absolute;top:-3px;left:${Math.min(100,nhip*100)}%;width:2px;height:16px;background:#333"></span></div>`};
+function pMucTieu(m){
+  if(!dhOk()){m.innerHTML=H("Kế hoạch doanh thu","")+`<div class="note">Trang này chỉ dành cho CEO và kế toán.</div>`;return}
+  dhLoad();const ym=MT.ym||plYmNow(),G=mtProg(ym),vn=x=>x.slice(5,7)+"/"+x.slice(0,4),p=v=>v==null?"—":dhPct(v);
+  const ms=[];for(let i=-2;i<=3;i++)ms.push(plYmAdd(ym,i));
+  const T=D().targets||{},th=T.thang||{};
+  const prog=G?`<section class="card flush"><div class="card-h pad"><h2>Tiến độ tháng ${vn(ym)}</h2><span class="hint">đã qua ${G.qua}/${G.nd} ngày · nhịp cần ${p(G.nhip)} · vạch đen là nhịp cần</span></div><div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Kế hoạch</th><th class="n">Đã đạt (doanh thu thực)</th><th class="n">% đạt</th><th style="min-width:160px">Tiến độ</th><th class="n">Còn thiếu</th><th class="n">Cần mỗi ngày còn lại</th></tr></thead><tbody>
+    ${G.L.map(r=>`<tr><td><b>${r.n}</b>${r.tam?` <span class="pill p-blu">tạm tính</span>`:""}</td><td class="n">${r.kh?tr(r.kh):`<span class="hint">chưa đặt</span>`}</td><td class="n">${r.tt==null?`<span class="pill p-gry">chờ số</span>`:tr(r.tt)}</td><td class="n">${p(r.dat)}</td><td>${r.kh?mtBar(r.dat,G.nhip):""}</td><td class="n">${r.thieu==null?"—":tr(r.thieu)}</td><td class="n">${r.ngay==null?"—":tr(r.ngay)}</td></tr>`).join("")}
+    <tr class="tot"><td><b>Cả công ty</b></td><td class="n"><b>${tr(G.tong.kh)}</b></td><td class="n"><b>${G.tong.tt==null?"—":tr(G.tong.tt)}</b></td><td class="n">${p(G.tong.dat)}</td><td>${mtBar(G.tong.dat,G.nhip)}</td><td class="n">${G.tong.thieu==null?"—":tr(G.tong.thieu)}</td><td class="n">${G.tong.ngay==null?"—":tr(G.tong.ngay)}</td></tr></tbody></table></div>
+    ${G.A.thieu.length?`<p class="hint pad">Chưa có số thực: ${esc(G.A.thieu.join(", "))}, nên cả công ty đang thiếu phần này.</p>`:""}</section>`:`<div class="note">Tháng ${vn(ym)} chưa đặt kế hoạch. Nhập ở bảng dưới rồi bấm Lưu.</div>`;
+  const inp=(k2,k)=>{const v=th[k2]&&th[k2][k];return `<input type="text" inputmode="numeric" data-mt-ym="${k2}" data-mt-k="${k}" value="${v?nf(v):""}" style="width:120px;text-align:right">`};
+  m.innerHTML=H("Kế hoạch doanh thu theo kênh","Kế hoạch doanh thu thực từng tháng, từng kênh · dùng cho cột Kế hoạch ở Lãi lỗ P&L và thanh tiến độ ở Tổng quan")+`
+  <div class="acts" style="margin-bottom:10px"><button class="btn" id="mt-prev">‹ Tháng trước</button><b style="padding:6px 10px">Tháng ${vn(ym)}</b><button class="btn" id="mt-next">Tháng sau ›</button></div>${prog}
+  <section class="card flush"><div class="card-h pad"><h2>Nhập kế hoạch (đ, doanh thu thực)</h2><span class="hint">TikTok, Shopee: doanh thu thuần sau hủy hoàn · Facebook: giao thành công · B2B, gia công: đơn đã duyệt</span></div>
+   <div class="tbl"><table><thead><tr><th>Tháng</th>${PLK.map(([,n])=>`<th class="n">${n}</th>`).join("")}<th class="n">Cộng</th></tr></thead><tbody>
+   ${ms.map(k2=>{const KH=mtGet(k2);return `<tr class="${k2===ym?"sel":""}"><td><b>${vn(k2)}</b></td>${PLK.map(([k])=>`<td class="n">${inp(k2,k)}</td>`).join("")}<td class="n"><b>${KH?tr(KH.tong):"—"}</b></td></tr>`}).join("")}</tbody></table></div>
+   <div class="acts pad"><button class="btn pri" id="mt-save">Lưu kế hoạch</button><span class="hint">Để trống nếu kênh đó chưa đặt.</span></div></section>`;
+  m.querySelector("#mt-prev").onclick=()=>{MT.ym=plYmAdd(ym,-1);renderMain()};m.querySelector("#mt-next").onclick=()=>{MT.ym=plYmAdd(ym,1);renderMain()};
+  m.querySelectorAll("[data-mt-k]").forEach(i=>i.onblur=()=>{const v=+String(i.value).replace(/\D/g,"");i.value=v?nf(v):""});
+  m.querySelector("#mt-save").onclick=()=>{const V={};m.querySelectorAll("[data-mt-k]").forEach(i=>{const v=+String(i.value).replace(/\D/g,"")||0;(V[i.dataset.mtYm]=V[i.dataset.mtYm]||{})[i.dataset.mtK]=v});
+    DB.mutate(ME.name,"sửa kế hoạch doanh thu theo kênh",dt=>{if(typeof execTargets==="function")execTargets();dt.targets=dt.targets||{};dt.targets.thang=dt.targets.thang||{};Object.entries(V).forEach(([k2,o])=>{if(Object.values(o).some(Boolean))dt.targets.thang[k2]=o;else delete dt.targets.thang[k2]})});toast("Đã lưu kế hoạch");renderMain()};
+}
+PAGES.muctieu=pMucTieu;
+/* Tổng quan › Hôm nay: thanh tiến độ kế hoạch tháng. */
+function tqTienDoCard(){const ym=plYmNow(),G=mtProg(ym),vn=ym.slice(5,7)+"/"+ym.slice(0,4);
+  if(!G)return `<section class="card"><div class="card-h"><h2>Tiến độ kế hoạch tháng ${vn}</h2><button class="btn sm" data-tq-mt>Đặt kế hoạch</button></div><p class="hint">Chưa đặt kế hoạch doanh thu tháng này.</p></section>`;
+  return `<section class="card"><div class="card-h"><h2>Tiến độ kế hoạch tháng ${vn}</h2><span class="hint">đã qua ${G.qua}/${G.nd} ngày · vạch đen là nhịp cần</span><button class="btn sm" data-tq-mt>Chi tiết</button></div>
+   <div style="display:grid;grid-template-columns:150px 1fr 190px;gap:8px 12px;align-items:center">${[{n:"Cả công ty",...G.tong,b:1}].concat(G.L.filter(r=>r.kh)).map(r=>`<div>${r.b?"<b>":""}${r.n}${r.b?"</b>":""}</div>${mtBar(r.dat,G.nhip)}<div style="text-align:right">${r.tt==null?"chờ số":tr(r.tt)} / ${tr(r.kh)} · <b>${r.dat==null?"—":dhPct(r.dat)}</b></div>`).join("")}</div></section>`}
+{const _ex=PAGES.exec;PAGES.exec=function(m){_ex.apply(this,arguments);try{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"&&dhOk()&&(SUB.exec||"homnay")==="homnay"){const s=m.querySelector(".xkstrip");if(s){s.insertAdjacentHTML("afterend",tqTienDoCard());m.querySelectorAll("[data-tq-mt]").forEach(b=>b.onclick=()=>{MT.ym="";PAGE="muctieu";renderMain();scrollTo(0,0)})}}}catch(e){}}}
