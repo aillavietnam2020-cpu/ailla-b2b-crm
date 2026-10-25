@@ -156,9 +156,16 @@ function pCpDuyet(m){
 }
 PAGES.cp_duyet=pCpDuyet;
 /* ---------- Sổ chi phí: báo chờ phân bổ + bảng ba loại và kênh gánh bao nhiêu ---------- */
+function cpNapTieu(N){
+  const d=D(),inP=c=>c.ngay?spInP(c.ngay):spMonthIn(c.thang),C=N.C||{},nap={};
+  (d.costsDoiChieu||[]).filter(c=>c.cat==="NAP-ADS"&&inP(c)).forEach(c=>{nap[c.kenh||"Chưa rõ kênh"]=(nap[c.kenh||"Chưa rõ kênh"]||0)+(+c.tien||0)});
+  const rows=[["Facebook / Pancake",C.adsFB||0],["TikTok Shop",C.adsTT||0],["Shopee",C.adsSPE||0]].filter(r=>r[1]||nap[r[0]]);
+  if(!rows.length)return "";
+  return `<div class="card-h pad"><h2>Tiền nạp quảng cáo so với tiền tiêu thật</h2><span class="hint">lãi lỗ dùng tiền tiêu thật; tiền nạp lấy từ sổ MISA đã duyệt ở Chờ phân bổ</span></div>${tbl(["Kênh","Đã nạp (sổ)","Đã tiêu (báo cáo ads)","Nạp trừ tiêu"],rows.map(([k,t])=>{const n=nap[k]||0;return `<tr><td><b>${esc(k)}</b></td><td class="n">${n?nf(Math.round(n)):"—"}</td><td class="n">${t?nf(Math.round(t)):"—"}</td><td class="n ${n&&t&&n-t<0?"t-red":""}">${n&&t?nf(Math.round(n-t)):"—"}</td></tr>`}))}<p class="hint pad">Nạp trừ tiêu dương nghĩa là còn tiền trong tài khoản ads. Số tiêu của TikTok và Facebook lấy từ báo cáo đã tải lên; chưa tải thì để trống.</p>`}
 function cpBaLoai(){
   const d=D(),inP=c=>c.ngay?spInP(c.ngay):spMonthIn(c.thang),L=(d.costs||[]).filter(inP);
-  const N=execNums(PERIOD.from,PERIOD.to),rev={"TikTok Shop":N.tt||0,"Shopee":N.spDT||0,"Facebook / Pancake":N.fbGiao||0};
+  const N=execNums(PERIOD.from,PERIOD.to),rev={"TikTok Shop":N.tt||0,"Shopee":N.spDT||0,"Facebook / Pancake":N.fbGiao||0},ym=PERIOD.from.slice(0,7),oneM=PERIOD.to.slice(0,7)===ym,tay=((d.cpDoanhThu||{})[ym])||{};
+  if(oneM)["B2B / Đại lý (CRM)","Gia công"].forEach(k=>{if(+tay[k]>0)rev[k]=+tay[k]});
   const mode=d.cpChia||"dt",kenhs=CP_KENH(),T={};kenhs.forEach(k=>T[k]={A:0});let chung=0,boC=0,tot={A:0,B:0,C:0};
   L.forEach(c=>{const lo=cpLoai(c.cat,c.kenh),t=+c.tien||0;tot[lo]+=t;if(c.kenh&&T[c.kenh])T[c.kenh].A+=t;else if(lo==="C")chung+=t;else boC+=t});
   const rs=Object.values(rev).reduce((a,b)=>a+b,0),act=kenhs.filter(k=>(rev[k]||0)>0||T[k].A);
@@ -167,12 +174,16 @@ function cpBaLoai(){
   if(!L.length)return `<section class="card pad"><b>Ba loại chi phí</b><p class="hint">Chưa có khoản chi đã duyệt trong kỳ này. Khoản nằm ở "Chờ phân bổ" cho tới khi chị Huệ duyệt.</p></section>`;
   return `<section class="card flush"><div class="card-h pad"><h2>Kênh nào gánh bao nhiêu chi phí</h2><span class="hint">Chi chung chia theo <select id="cp-mode">${opt([["dt","doanh thu thực của kênh"],["deu","chia đều các kênh"],["khong","không chia, để một dòng riêng"]],mode)}</select> · chỉ gồm khoản chi đã duyệt (không gồm quảng cáo, phí sàn, giá vốn đã có trong báo cáo kênh)</span></div>
   ${tbl(["Kênh","Trực tiếp kênh (A, gồm lương riêng kênh)","Chi chung được chia (C)","Tổng gánh","Doanh thu thực","% doanh thu"],act.map(k=>`<tr><td><b>${esc(k)}</b></td><td class="n">${nf(Math.round(T[k].A))}</td><td class="n">${nf(Math.round(share(k)))}</td><td class="n"><b>${nf(Math.round(sumK(k)))}</b></td><td class="n">${rev[k]?nf(Math.round(rev[k])):"chưa có"}</td><td class="n">${rev[k]?(sumK(k)/rev[k]*100).toFixed(1).replace(".",",")+"%":"—"}</td></tr>`).concat([`<tr class="tot"><td>Chưa gắn kênh (lương, chi phí phòng ban)</td><td class="n">${nf(Math.round(boC))}</td><td class="n">chi chung chưa chia: ${nf(Math.round(mode==="khong"||(mode==="dt"&&!rs)?chung:0))}</td><td class="n"></td><td></td><td></td></tr>`]))}
-  <p class="hint pad">Loại A ${nf(Math.round(tot.A))} · B ${nf(Math.round(tot.B))} · C ${nf(Math.round(tot.C))} đ. Kênh B2B / Đại lý và Gia công chưa có doanh thu thực trong web nên chưa nhận phần chi chung theo doanh thu.</p></section>`}
+  <p class="hint pad">Loại A ${nf(Math.round(tot.A))} · B ${nf(Math.round(tot.B))} · C ${nf(Math.round(tot.C))} đ. TikTok, Shopee, Facebook lấy doanh thu thực từ báo cáo. NPP và Gia công web chưa có số tự động: ${oneM?`nhập doanh thu thực tháng ${ym.slice(5)}/${ym.slice(0,4)} ở hai ô dưới để chia chi chung cho đủ, tới khi web nối được số thật.`:"chọn một tháng để nhập."}</p>
+  ${oneM&&cpCan()?`<div class="filters pad"><label class="field">Doanh thu thực NPP / đại lý (đ)<input id="cp-dt-npp" type="number" min="0" value="${tay["B2B / Đại lý (CRM)"]||""}"></label><label class="field">Doanh thu thực Gia công (đ)<input id="cp-dt-gc" type="number" min="0" value="${tay["Gia công"]||""}"></label><button class="btn" id="cp-dt-save">Lưu doanh thu</button></div>`:""}
+  ${cpNapTieu(N)}
+</section>`}
 {const _s=PAGES.so_cp;if(_s)PAGES.so_cp=function(m){_s.apply(this,arguments);
   try{const n=(D().costsCho||[]).length,k=m.querySelector(".kpis");if(!k)return;
     const bar=`<div class="note ${n?"amb":""}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${n?`<b>${n} khoản chờ chị Huệ phân bổ</b> (chưa tính vào các số bên dưới)`:"Không có khoản nào chờ phân bổ"}</span><button class="btn sm" id="cp-go">Mở Chờ phân bổ</button></div>`;
     k.insertAdjacentHTML("beforebegin",bar);
     m.insertAdjacentHTML("beforeend",cpBaLoai());
     $("#cp-go").onclick=()=>{PAGE="cp_duyet";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
+    const sv=$("#cp-dt-save");if(sv)sv.onclick=()=>{const ym=PERIOD.from.slice(0,7),a=+$("#cp-dt-npp").value||0,b=+$("#cp-dt-gc").value||0;DB.mutate(ME.name,"nhập doanh thu NPP và Gia công",dt=>{if(!dt.cpDoanhThu)dt.cpDoanhThu={};dt.cpDoanhThu[ym]={"B2B / Đại lý (CRM)":a,"Gia công":b}});toast("Đã lưu doanh thu tháng "+ym.slice(5));renderMain()};
     const sel=$("#cp-mode");if(sel)sel.onchange=()=>{DB.mutate(ME.name,"đổi quy tắc chia chi chung",dt=>{dt.cpChia=sel.value});renderMain()}
   }catch(e){}}}
