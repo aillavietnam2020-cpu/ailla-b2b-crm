@@ -24,11 +24,11 @@ function pHieuQuaTeam(m){
     note:A&&!A.nKm?"Kỳ này team TikTok chưa tải file Key metrics (Marketing › Nhập báo cáo).":""}))}
   /* Facebook: sale. Doanh thu = đơn GIAO THÀNH CÔNG (doanh thu thực, chị Hoa chốt 25/10); doanh thu chốt chỉ là số đo hiệu suất, gọi đúng tên. */
   {const P=typeof fbsPeople==="function"?fbsPeople(days):null,tao=g("fb",0),chot=g("fb",1),huy=g("fb",2),hoan=g("fb",3),giao=g("fb",4);
-   const R=typeof FBS!=="undefined"&&FBS.raw&&FBS.raw.days,gi={};if(R)days.forEach(k=>(R[k]||[]).forEach(r=>{gi[r.u||""]=(gi[r.u||""]||0)+(+r.dtGiao||0)}));
-   const L=P?P.list.filter(x=>x.tao).map(x=>({...x,giao:gi[x.u||""]||0})).sort((a,b)=>b.giao-a.giao):[];
+   /* Số theo từng người của Pancake là doanh thu chốt trừ hoàn (còn gồm đơn đang giao), chưa có giao thành công theo người. */
+   const L=P?P.list.filter(x=>x.tao).sort((a,b)=>b.dt-a.dt):[];
    cards.push(hqCard({t:"Sale Facebook",go:"fb_sale",sub:"Pancake, theo người xử lý đơn",k:[["Doanh thu giao thành công",g("fb",5)?tr(g("fb",5)):"—",nf(giao)+" đơn giao thành công"],["Doanh thu chốt (hiệu suất)",g("fb",6)?tr(g("fb",6)):"—",nf(chot)+" đơn chốt, gồm đơn đang giao"],["Tỷ lệ chốt",tao?hqPct(chot,tao):"—",nf(tao)+" đơn tạo"],["Tỷ lệ hủy",tao?hqPct(huy,tao):"—",nf(huy)+" đơn"],["Tỷ lệ hoàn",giao+hoan?hqPct(hoan,giao+hoan):"—",nf(hoan)+" đơn"]],
-    body:L.length?tbl(["#","Người xử lý đơn","Doanh thu giao thành công","Doanh thu chốt","Đơn tạo","Tỷ lệ chốt","Tỷ lệ hủy","Hoàn"],L.map((x,i)=>hqRow([i+1,`<b>${esc(x.n)}</b>`,tr(x.giao),tr(x.dt),nf(x.tao),hqPct(x.tao-x.huy,x.tao),`<span class="${x.tao>=20&&x.huy/x.tao>.2?"t-red":""}">${hqPct(x.huy,x.tao)}</span>`,nf(x.hoan)]))):"",
-    note:"Xếp hạng theo doanh thu giao thành công (tiền thật). Doanh thu chốt gồm cả đơn còn đang giao, chỉ để đo hiệu suất chốt đơn."}))}
+    body:L.length?tbl(["#","Người xử lý đơn","Doanh thu chốt trừ hoàn","Đơn tạo","Tỷ lệ chốt","Tỷ lệ hủy","Hoàn"],L.map((x,i)=>hqRow([i+1,`<b>${esc(x.n)}</b>`,tr(x.dt),nf(x.tao),hqPct(x.tao-x.huy,x.tao),`<span class="${x.tao>=20&&x.huy/x.tao>.2?"t-red":""}">${hqPct(x.huy,x.tao)}</span>`,nf(x.hoan)]))):"",
+    note:"Bảng từng người là số đo hiệu suất chốt đơn: doanh thu chốt trừ hoàn, còn gồm đơn đang giao, chưa phải doanh thu thực. Doanh thu thực của kênh là ô Doanh thu giao thành công phía trên. Pancake chưa tách giao thành công theo từng người."}))}
   /* Ads Facebook (Digital) */
   {const A=typeof adsSum==="function"?adsSum():{},L=Object.entries(A).filter(([,a])=>a.n),T=L.reduce((s,[,a])=>({chi:s.chi+a.chi,dt:s.dt+a.dt,don:s.don+a.don,data:s.data+a.data}),{chi:0,dt:0,don:0,data:0});
    cards.push(hqCard({t:"Ads Facebook (Digital)",go:"fb_ads",sub:"báo cáo Digital, chi trước thuế",k:[["Chi quảng cáo",T.chi?tr(T.chi):"—",""],["Doanh số ads (đơn chốt)",T.dt?tr(T.dt):"—",nf(T.don)+" đơn chốt · đo hiệu suất"],["ROAS (đơn chốt)",T.chi?(T.dt/T.chi).toFixed(2).replace(".",","):"—","doanh số ads ÷ chi"],["Chi mỗi đơn",T.don?tr(T.chi/T.don):"—",""]],
