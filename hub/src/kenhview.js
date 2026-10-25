@@ -9,8 +9,8 @@ tqTabKenh=function(){
   const rows=tqKenhRows(),T=tqTot(rows),ng=dhGet().nguong,has=rows.filter(r=>r.dt>0);
   const pc=(a,b)=>b?dhPct(a/b):"—";
   const bien=r=>r.dt&&r.lai!=null?r.lai/r.dt:null;
-  const adsAll=rows.reduce((a,r)=>a+(+r.ads||0),0),cpAll=T.cp;
-  const kpis=`<div class="grid kpis">${kpi("Doanh thu thực",T.dt?tr(T.dt):"—",nf(T.don)+" đơn · "+has.length+" kênh có số"+(T.tam?" · có phần tạm tính":""))}${kpi("Lãi đóng góp",tr(T.lai),T.dt?pc(T.lai,T.dt)+" doanh thu · chưa trừ lương, chi phí chung":"",T.lai<0?"var(--red)":"var(--green)")}${kpi("Chi phí trực tiếp",tr(cpAll),T.dt?pc(cpAll,T.dt)+" doanh thu (giá vốn, phí sàn, quảng cáo)":"")}${kpi("Quảng cáo / doanh thu",T.dt?pc(adsAll,T.dt):"—",tr(adsAll)+" · ngưỡng báo "+dhPct(ng.qcMax),T.dt&&adsAll/T.dt>ng.qcMax?"var(--red)":"")}</div>`;
+  const adsAll=rows.reduce((a,r)=>a+(+r.ads||0),0),cpAll=T.cp,retail=rows.filter(r=>r.mang==="Bán lẻ"&&r.dt>0).reduce((a,r)=>a+r.dt,0);
+  const kpis=`<div class="grid kpis">${kpi("Doanh thu thực",T.dt?tr(T.dt):"—",nf(T.don)+" đơn · "+has.length+" kênh có số"+(T.tam?" · có phần tạm tính":""))}${kpi("Lãi đóng góp",tr(T.lai),T.dt?pc(T.lai,T.dt)+" doanh thu · chưa trừ lương, chi phí chung":"",T.lai<0?"var(--red)":"var(--green)")}${kpi("Chi phí trực tiếp",tr(cpAll),T.dt?pc(cpAll,T.dt)+" doanh thu (giá vốn, phí sàn, quảng cáo)":"")}${kpi("Quảng cáo / doanh thu bán lẻ",retail?pc(adsAll,retail):"—",tr(adsAll)+" trên "+tr(retail)+" · ngưỡng báo "+dhPct(ng.qcMax),retail&&adsAll/retail>ng.qcMax?"var(--red)":"")}</div>`;
   const chRev=qtBars(has.slice().sort((a,b)=>b.dt-a.dt).map(r=>({l:r.n.replace(" (NPP, đại lý)",""),v:r.dt,t:tr(r.dt)+" · "+pc(r.dt,T.dt),c:"b"})));
   const withLai=rows.filter(r=>r.dt>0&&r.lai!=null).sort((a,b)=>b.lai-a.lai);
   const chLai=withLai.length?qtBars(withLai.map(r=>{const b=bien(r);return {l:r.n.replace(" (NPP, đại lý)",""),v:Math.max(0,r.lai),t:tr(r.lai)+" · biên "+dhPct(b),c:b<0?"r":b<ng.bienKenh?"y":"g"}}))+`<p class="hint">Xanh: biên đạt mục tiêu ${dhPct(ng.bienKenh)} · vàng: dưới mục tiêu · đỏ: lỗ.</p>`:`<p class="hint">Chưa có kênh nào tính được lãi.</p>`;

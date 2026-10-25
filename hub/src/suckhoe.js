@@ -22,8 +22,8 @@ function skTiles(){
     else add("bc_tong","Lãi đóng góp","—","chưa có số","gry")}catch(e){}
   /* 3 quảng cáo */
   try{if(N&&N.tong){const C=N.C||{},ads=(C.adsFB||0)+(C.adsTT||0)+(C.adsSPE||0),r=ads/N.tong;
-      add("so_cp","Quảng cáo / doanh thu",Math.round(r*100)+"%","ngưỡng báo đỏ "+Math.round(ng.qcMax*100)+"% · "+tr(ads),r>ng.qcMax?"red":r>ng.qcMax*.85?"amb":"grn")}
-    else add("so_cp","Quảng cáo / doanh thu","—","chưa có doanh thu sàn","gry")}catch(e){}
+      add("so_cp","Quảng cáo / doanh thu bán lẻ",Math.round(r*100)+"%","ngưỡng báo đỏ "+Math.round(ng.qcMax*100)+"% · "+tr(ads),r>ng.qcMax?"red":r>ng.qcMax*.85?"amb":"grn")}
+    else add("so_cp","Quảng cáo / doanh thu bán lẻ","—","chưa có doanh thu sàn","gry")}catch(e){}
   /* 4 tiền */
   try{const t=typeof dhCalcTien==="function"?dhCalcTien():null;
     if(t&&t.last&&t.R.ngay!=null)add("tien_lich","Tiền đủ dùng",t.R.ngay+" ngày","tiền "+tr(t.R.co)+" · ngưỡng "+ng.runway+" ngày",t.R.ngay<ng.runway?"red":t.R.ngay<ng.runway*1.3?"amb":"grn");
