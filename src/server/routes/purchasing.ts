@@ -33,19 +33,20 @@ function needManage(a: AuthContext) {
 /* ---------------- Nhà cung cấp ---------------- */
 
 purchasingRoutes.get('/suppliers', async (c) => {
-  const rows = (await c.env.DB.prepare('SELECT id, name, phone, note, active, opening_debt, opening_date, bank, bank_account_no, bank_account_name FROM suppliers ORDER BY name').all<
+  const rows = (await c.env.DB.prepare('SELECT id, name, phone, note, active, opening_debt, opening_date, bank, bank_account_no, bank_account_name, pay_terms, pay_days FROM suppliers ORDER BY name').all<
     Record<string, unknown>
   >()).results;
   const money = showMoney(c);
-  return ok(c, rows.map((r) => (money ? r : { id: r.id, name: r.name, phone: r.phone, note: r.note, active: r.active })));
+  return ok(c, rows.map((r) => (money ? r : { id: r.id, name: r.name, phone: r.phone, note: r.note, active: r.active, pay_terms: r.pay_terms, pay_days: r.pay_days })));
 });
 
 purchasingRoutes.post('/suppliers', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
-  const b = (await c.req.json().catch(() => ({}))) as { name?: unknown; phone?: unknown; note?: unknown; opening_debt?: unknown; opening_date?: unknown };
+  const b = (await c.req.json().catch(() => ({}))) as { name?: unknown; phone?: unknown; note?: unknown; opening_debt?: unknown; opening_date?: unknown; pay_terms?: unknown; pay_days?: unknown };
   const name = String(b.name ?? '').trim();
   if (name.length < 2) throw badRequest('BAD_NAME', 'Nhập tên nhà cung cấp');
+  const terms = payTerms(b.pay_terms);
   if (await c.env.DB.prepare('SELECT id FROM suppliers WHERE name = ?').bind(name).first()) throw badRequest('DUPLICATE', 'Đã có nhà cung cấp tên "' + name + '"');
   // Công nợ đầu kỳ nhập luôn lúc thêm nhà cung cấp (có số nợ thì phải kèm ngày chốt).
   const debt = int(b.opening_debt);
@@ -54,8 +55,8 @@ purchasingRoutes.post('/suppliers', async (c) => {
   const id = newId();
   const now = nowIso();
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO suppliers (id, name, phone, note, opening_debt, opening_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(
-      id, name, String(b.phone ?? '').trim(), String(b.note ?? '').trim(), debt, openDate, now, now,
+    c.env.DB.prepare('INSERT INTO suppliers (id, name, phone, note, opening_debt, opening_date, created_at, updated_at, pay_terms, pay_days) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(
+      id, name, String(b.phone ?? '').trim(), String(b.note ?? '').trim(), debt, openDate, now, now, terms, terms === 'CONG_NO' ? Math.max(0, int(b.pay_days)) : 0,
     ),
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'SUPPLIER_CREATED', entityType: 'SUPPLIER', entityId: id, after: { name }, requestId: c.get('requestId'), ip: ipOf(c) }),
   ]);
@@ -66,7 +67,7 @@ purchasingRoutes.put('/suppliers/:id', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
   const id = c.req.param('id');
-  const b = (await c.req.json().catch(() => ({}))) as { name?: unknown; phone?: unknown; note?: unknown; active?: unknown };
+  const b = (await c.req.json().catch(() => ({}))) as { name?: unknown; phone?: unknown; note?: unknown; active?: unknown; pay_terms?: unknown; pay_days?: unknown; bank?: unknown; bank_account_no?: unknown; bank_account_name?: unknown };
   const cur = await c.env.DB.prepare('SELECT id, name FROM suppliers WHERE id = ?').bind(id).first<{ id: string; name: string }>();
   if (!cur) throw notFound('Không tìm thấy nhà cung cấp');
   const name = b.name === undefined ? cur.name : String(b.name).trim();
@@ -74,10 +75,26 @@ purchasingRoutes.put('/suppliers/:id', async (c) => {
   if (name !== cur.name && (await c.env.DB.prepare('SELECT id FROM suppliers WHERE name = ? AND id <> ?').bind(name, id).first())) {
     throw badRequest('DUPLICATE', 'Đã có nhà cung cấp tên "' + name + '"');
   }
+  const terms = b.pay_terms === undefined ? null : payTerms(b.pay_terms);
+  const opt = (v: unknown) => (v === undefined ? null : String(v).trim().slice(0, 120));
   await c.env.DB.prepare(
-    `UPDATE suppliers SET name = ?, phone = COALESCE(?, phone), note = COALESCE(?, note), active = COALESCE(?, active), updated_at = ? WHERE id = ?`,
+    `UPDATE suppliers SET name = ?, phone = COALESCE(?, phone), note = COALESCE(?, note), active = COALESCE(?, active),
+       pay_terms = COALESCE(?, pay_terms), pay_days = COALESCE(?, pay_days),
+       bank = COALESCE(?, bank), bank_account_no = COALESCE(?, bank_account_no), bank_account_name = COALESCE(?, bank_account_name), updated_at = ? WHERE id = ?`,
   )
-    .bind(name, b.phone === undefined ? null : String(b.phone).trim(), b.note === undefined ? null : String(b.note).trim(), b.active === undefined ? null : b.active ? 1 : 0, nowIso(), id)
+    .bind(
+      name,
+      b.phone === undefined ? null : String(b.phone).trim(),
+      b.note === undefined ? null : String(b.note).trim(),
+      b.active === undefined ? null : b.active ? 1 : 0,
+      terms,
+      terms === null ? null : terms === 'CONG_NO' ? Math.max(0, int(b.pay_days)) : 0,
+      opt(b.bank),
+      opt(b.bank_account_no),
+      opt(b.bank_account_name),
+      nowIso(),
+      id,
+    )
     .run();
   return ok(c, { id });
 });
@@ -125,6 +142,12 @@ async function checkLines(db: D1Database, lines: unknown): Promise<Array<{ item:
   });
 }
 
+/** Điều khoản thanh toán: TRUOC (chuyển khoản trước khi giao), SAU_NHAN (chuyển khoản sau khi nhận hàng), CONG_NO (trả sau N ngày), rỗng = chưa ghi. */
+const payTerms = (v: unknown): string => {
+  const s = String(v ?? '').trim();
+  if (s && !['TRUOC', 'SAU_NHAN', 'CONG_NO'].includes(s)) throw badRequest('BAD_TERMS', 'Điều khoản thanh toán không hợp lệ');
+  return s;
+};
 const optDate = (v: unknown): string | null => {
   if (v === undefined || v === null || v === '') return null;
   if (!isDate(v)) throw badRequest('BAD_DATE', 'Ngày giao dự kiến không hợp lệ');
@@ -675,6 +698,30 @@ purchasingRoutes.post('/payments', async (c) => {
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_PAYMENT_CREATED', entityType: 'PO_PAYMENT', entityId: id, after: { amount }, requestId: c.get('requestId'), ip: ipOf(c) }),
   ]);
   return ok(c, { id });
+});
+
+/* Ảnh bill / phiếu chi của khoản chi nhập tay ở Sổ chi phí (khoản chi lưu ở bảng dữ liệu của trang quản trị, id do trình duyệt cấp). */
+purchasingRoutes.get('/costs/:id/files', async (c) => {
+  needManage(c.get('auth'));
+  return listPayFiles(c, 'COST', c.req.param('id'));
+});
+purchasingRoutes.post('/costs/:id/files', async (c) => {
+  needManage(c.get('auth'));
+  return addPayFile(c, 'COST', c.req.param('id'));
+});
+purchasingRoutes.get('/costs/:id/files/:fid', async (c) => {
+  needManage(c.get('auth'));
+  return getPayFile(c, 'COST', c.req.param('id'), c.req.param('fid'));
+});
+purchasingRoutes.delete('/costs/:id/files/:fid', async (c) => {
+  needManage(c.get('auth'));
+  return deletePayFile(c, 'COST', c.req.param('id'), c.req.param('fid'));
+});
+/* Số ảnh theo khoản chi, để Sổ chi phí hiện "n ảnh" mà không phải hỏi từng khoản. */
+purchasingRoutes.get('/costs/file-counts', async (c) => {
+  needManage(c.get('auth'));
+  const rows = (await c.env.DB.prepare("SELECT ref_id, COUNT(*) AS n FROM pay_files WHERE ref_type = 'COST' GROUP BY ref_id").all<{ ref_id: string; n: number }>()).results;
+  return ok(c, Object.fromEntries(rows.map((r) => [r.ref_id, r.n])));
 });
 
 /* Ảnh bill chuyển khoản / ảnh phiếu chi tiền mặt có chữ ký của phiếu chi nhà cung cấp */

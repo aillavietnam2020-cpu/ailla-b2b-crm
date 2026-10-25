@@ -5,7 +5,7 @@ import { badRequest, notFound, ok } from './http';
 import { newId } from './ids';
 
 /** Ảnh bill chuyển khoản / ảnh phiếu chi tiền mặt có chữ ký, gắn vào một phiếu chi (trả nhà cung cấp hoặc chi vận chuyển). */
-export type PayFileRef = 'PO_PAY' | 'SHIP_VC';
+export type PayFileRef = 'PO_PAY' | 'SHIP_VC' | 'COST';
 
 const FILE_MIME = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 const MAX_FILE_B64 = 1_400_000; // khoảng 1 MB sau khi giải mã

@@ -31,10 +31,12 @@ const mhSupOpts=(sel)=>opt([["","— Chọn nhà cung cấp —"]].concat((MH.su
 function mhNewSupplier(done,opt){
   opt=opt||{};const withDebt=!!opt.debt&&mhManage();
   openDrawerHTML(`<h2>Thêm nhà cung cấp</h2><form class="frm" id="mhs"><label class="field">Tên nhà cung cấp<input id="mhs-n" required maxlength="120"></label><label class="field">Điện thoại<input id="mhs-p" maxlength="40"></label>
+   <label class="field">Điều khoản thanh toán<select id="mhs-t"><option value="">— Chưa ghi —</option><option value="TRUOC">Chuyển khoản trước khi giao</option><option value="SAU_NHAN">Chuyển khoản sau khi nhận hàng</option><option value="CONG_NO">Công nợ (trả sau N ngày)</option></select></label><label class="field" id="mhs-dw" hidden>Số ngày công nợ<input id="mhs-dd" type="number" min="0" value="30"></label>
    ${withDebt?`<h3>Công nợ đầu kỳ</h3><p class="hint">Số tiền mình đang nợ nhà cung cấp này tại ngày bắt đầu dùng web. Chưa nợ thì để 0.</p><div class="row4"><label class="field">Đang nợ (đ)<input id="mhs-a" type="number" value="0"></label><label class="field">Tính đến ngày<input id="mhs-d" type="date" value="${mhToday()}"></label></div>`:""}
    <div id="mhs-e"></div><button class="btn pri">Lưu</button></form>`);
   $("#mhs-n").focus();
-  $("#mhs").onsubmit=async e=>{e.preventDefault();try{const body={name:$("#mhs-n").value,phone:$("#mhs-p").value};if(withDebt){body.opening_debt=+$("#mhs-a").value||0;body.opening_date=$("#mhs-d").value}
+  $("#mhs-t").onchange=()=>{$("#mhs-dw").hidden=$("#mhs-t").value!=="CONG_NO"};
+  $("#mhs").onsubmit=async e=>{e.preventDefault();try{const body={name:$("#mhs-n").value,phone:$("#mhs-p").value,pay_terms:$("#mhs-t").value,pay_days:+$("#mhs-dd").value||0};if(withDebt){body.opening_debt=+$("#mhs-a").value||0;body.opening_date=$("#mhs-d").value}
     const r=await kApi("/mh/suppliers",{method:"POST",body:JSON.stringify(body)});closeDrawer();toast("Đã thêm nhà cung cấp");await mhReload();if(done)done(r.id)}catch(err){$("#mhs-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
 }
 /* ---------- Bên vận hành: phiếu mua + nhận hàng (không giá) ---------- */
@@ -332,6 +334,16 @@ function mhPayForm(supId,poId){
       const fs=[...$("#mhp-f").files];let up=0;for(const f of fs){try{const x=await mhPrepFile(f);await kApi("/mh/payments/"+r.id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
       closeDrawer();toast("Đã ghi phiếu chi"+(up?", đính kèm "+up+" ảnh":""));MH.pay=null;MH.inv=null;MH.debts=null;if(PAGE==="mh_chi"){mhLoadPay();mhLoadInv()}else renderMain()}catch(err){$("#mhp-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
 }
+/* Sửa nhà cung cấp: tên, điện thoại, điều khoản thanh toán, tài khoản ngân hàng nhận tiền (điền sẵn khi ghi phiếu chi). */
+function mhSupEdit(id){
+  const s=(MH.sup||[]).find(x=>x.id===id);if(!s)return;
+  openDrawerHTML(`<h2>Sửa nhà cung cấp</h2><form class="frm" id="mhse"><label class="field">Tên<input id="mhse-n" value="${esc(s.name)}" required maxlength="120"></label><label class="field">Điện thoại<input id="mhse-p" value="${esc(s.phone||"")}" maxlength="40"></label>
+   <label class="field">Điều khoản thanh toán<select id="mhse-t"><option value="">— Chưa ghi —</option><option value="TRUOC">Chuyển khoản trước khi giao</option><option value="SAU_NHAN">Chuyển khoản sau khi nhận hàng</option><option value="CONG_NO">Công nợ (trả sau N ngày)</option></select></label><label class="field" id="mhse-dw" hidden>Số ngày công nợ<input id="mhse-dd" type="number" min="0" value="${+s.pay_days||30}"></label>
+   <h3>Tài khoản ngân hàng nhận tiền</h3><div class="row4"><label class="field">Ngân hàng<input id="mhse-b" value="${esc(s.bank||"")}"></label><label class="field">Số tài khoản<input id="mhse-a" value="${esc(s.bank_account_no||"")}"></label><label class="field grow">Tên chủ tài khoản<input id="mhse-o" value="${esc(s.bank_account_name||"")}"></label></div>
+   <div id="mhse-e"></div><button class="btn pri">Lưu</button></form>`);
+  $("#mhse-t").value=s.pay_terms||"";const sw=()=>{$("#mhse-dw").hidden=$("#mhse-t").value!=="CONG_NO"};sw();$("#mhse-t").onchange=sw;
+  $("#mhse").onsubmit=async e=>{e.preventDefault();try{await kApi("/mh/suppliers/"+id,{method:"PUT",body:JSON.stringify({name:$("#mhse-n").value,phone:$("#mhse-p").value,pay_terms:$("#mhse-t").value,pay_days:+$("#mhse-dd").value||0,bank:$("#mhse-b").value,bank_account_no:$("#mhse-a").value,bank_account_name:$("#mhse-o").value})});closeDrawer();toast("Đã lưu nhà cung cấp");MH.debts=null;await mhReload()}catch(err){$("#mhse-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
+}
 /* --- Công nợ nhà cung cấp --- */
 async function mhLoadDebt(){if(MH.debts)return;try{MH.debts=await kApi("/mh/debts")}catch(e){MH.debts=[];toast(e.message)}if(/^mh_(no|po)$/.test(PAGE))renderMain()}
 function pMhNo(m){
@@ -341,8 +353,9 @@ function pMhNo(m){
   const D0=MH.debts,tot=k=>sum(D0,x=>x[k]);
   m.innerHTML=H(T,S)+mhGuide("mh_no")+`<div class="grid kpis">${kpi("Tổng còn nợ nhà cung cấp",tr(tot("balance")),D0.filter(x=>x.balance>0).length+" nhà cung cấp còn nợ")}${kpi("Công nợ đầu kỳ",tr(tot("opening_debt")),"")}${kpi("Hóa đơn phát sinh",tr(tot("invoiced")),"")}${kpi("Đã chi",tr(tot("paid")),"")}</div>
   <div class="filters"><span class="sp"></span><button class="btn" id="mhn-ct">+ Ghi chứng từ</button><button class="btn" id="mhn-pc">+ Ghi phiếu chi</button><button class="btn pri" id="mhn-ns">+ Thêm nhà cung cấp (kèm công nợ đầu kỳ)</button></div>
-  <section class="card flush">${tbl(["Nhà cung cấp","Công nợ đầu kỳ","Ngày chốt","Hóa đơn phát sinh","Đã chi","Còn nợ",""],D0.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="n">${nf(d.opening_debt)}</td><td>${esc(mhD(d.opening_date)||"chưa đặt")}</td><td class="n">${nf(d.invoiced)}</td><td class="n">${nf(d.paid)}</td><td class="n"><b style="${d.balance>0?"color:#b42318":""}">${nf(d.balance)}</b></td><td class="nowrap"><button class="btn sm" data-ld="${d.id}">Sổ chi tiết</button> <button class="btn sm" data-od="${d.id}">Đặt đầu kỳ</button> <button class="btn sm" data-pd="${d.id}">Ghi chi</button></td></tr>`).concat(D0.length?[`<tr class="tot"><td><b>Tổng</b></td><td class="n">${nf(tot("opening_debt"))}</td><td></td><td class="n">${nf(tot("invoiced"))}</td><td class="n">${nf(tot("paid"))}</td><td class="n"><b>${nf(tot("balance"))}</b></td><td></td></tr>`]:[]))}
+  <section class="card flush">${tbl(["Nhà cung cấp","Công nợ đầu kỳ","Ngày chốt","Hóa đơn phát sinh","Đã chi","Còn nợ",""],D0.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(mhTermTxt((MH.sup||[]).find(s=>s.id===d.id)||{}))}</div></td><td class="n">${nf(d.opening_debt)}</td><td>${esc(mhD(d.opening_date)||"chưa đặt")}</td><td class="n">${nf(d.invoiced)}</td><td class="n">${nf(d.paid)}</td><td class="n"><b style="${d.balance>0?"color:#b42318":""}">${nf(d.balance)}</b></td><td class="nowrap"><button class="btn sm" data-ld="${d.id}">Sổ chi tiết</button> <button class="btn sm" data-od="${d.id}">Đặt đầu kỳ</button> <button class="btn sm" data-se="${d.id}">Sửa</button> <button class="btn sm" data-pd="${d.id}">Ghi chi</button></td></tr>`).concat(D0.length?[`<tr class="tot"><td><b>Tổng</b></td><td class="n">${nf(tot("opening_debt"))}</td><td></td><td class="n">${nf(tot("invoiced"))}</td><td class="n">${nf(tot("paid"))}</td><td class="n"><b>${nf(tot("balance"))}</b></td><td></td></tr>`]:[]))}
    <p class="hint pad">Chưa có nhà cung cấp nào thì bấm <b>+ Thêm nhà cung cấp</b>: nhập tên và số đang nợ tại ngày bắt đầu dùng web. Nhà cung cấp đã có thì bấm <b>Đặt đầu kỳ</b> ở cuối dòng để sửa. Chứng từ và phiếu chi từ sau ngày chốt mới được cộng trừ vào.</p></section>`;
+  m.querySelectorAll("[data-se]").forEach(b=>b.onclick=()=>mhSupEdit(b.dataset.se));
   $("#mhn-ct").onclick=()=>{mhLoadInv();mhDocForm()};$("#mhn-pc").onclick=()=>{mhLoadInv();mhPayForm()};
   $("#mhn-ns").onclick=()=>mhNewSupplier(()=>{MH.debts=null;mhLoadDebt()},{debt:true});
   m.querySelectorAll("[data-pd]").forEach(b=>b.onclick=()=>{mhLoadInv();mhPayForm(b.dataset.pd)});
@@ -365,10 +378,18 @@ function pMhGiaNvl(m){
 /* Trạng thái gộp của một phiếu mua (trang quản trị). */
 /* Phiếu còn dòng chưa có giá (thường là phiếu tự tạo khi kho nhận hàng không có phiếu đặt). */
 const mhNoPrice=p=>p.status!=="HUY"&&p.lines.some(l=>"unit_price" in l&&l.unit_price==null);
+/* Điều khoản thanh toán của nhà cung cấp: chuyển khoản TRƯỚC khi giao, SAU khi nhận hàng, hoặc công nợ N ngày. */
+const mhTermOf=p=>(MH.sup||[]).find(s=>s.id===p.supplier_id)||{};
+function mhTermTxt(s){const t=s.pay_terms;return t==="TRUOC"?"Chuyển khoản trước khi giao":t==="SAU_NHAN"?"Chuyển khoản sau khi nhận hàng":t==="CONG_NO"?"Công nợ "+(s.pay_days||0)+" ngày":"Chưa ghi"}
+function mhDueOf(p){const s=mhTermOf(p);if(s.pay_terms!=="CONG_NO")return "";const rc=p.receipts.filter(r=>r.status==="OK").map(r=>r.receipt_date).sort().pop();if(!rc)return "";const d=pdate(rc);d.setDate(d.getDate()+(+s.pay_days||0));return iso(d)}
 function mhStage(p,M){
   if(p.status==="HUY")return ["huy","Đã hủy","gry"];
+  if(p.status!=="DU"&&mhTermOf(p).pay_terms==="TRUOC"&&!(M.paid>0))return ["tr","Chờ chuyển khoản trước","amb"];
   if(p.status!=="DU")return ["hang",p.status==="DANG_GIAO"?"Đã nhập kho một phần":mhLateDays(p)?"Trễ hàng":"Chờ hàng",mhLateDays(p)?"red":"amb"];
   if(mhNoPrice(p))return ["gia","Chờ nhập giá","amb"];
+  {const T=mhTermOf(p).pay_terms,due=mhDueOf(p),full=M.invTotal>0&&M.paid>=M.invTotal-1;
+   if(T==="CONG_NO"&&!full&&due)return ["no","Công nợ · hạn "+mhDM(due),due<mhToday()?"red":"amb"];
+   if(T==="SAU_NHAN"&&!(M.paid>0))return ["no","Đã nhập kho · chờ chuyển khoản","red"]}
   /* Hàng đã về kho (phiếu nhập của kho gắn với phiếu mua): trạng thái theo tiền thanh toán */
   if(mhPendingReceipts().some(x=>x.p.id===p.id)||!M.invTotal)return ["ct",M.paid>0?"Đã nhập kho · đã trả "+nf(M.paid):"Đã nhập kho · chưa thanh toán","blu"];
   if(M.paid<M.invTotal-1)return ["no",M.paid>0?"Đã nhập kho · trả một phần":"Đã nhập kho · chưa thanh toán","red"];
@@ -388,7 +409,7 @@ function pMhDon(m){
   const live=rows.filter(x=>x.st[0]!=="huy"),cnt=k=>rows.filter(x=>x.st[0]===k).length,F=MH.st||"";
   const shown=rows.filter(x=>F?x.st[0]===F:x.st[0]!=="huy");
   const tot=k=>live.reduce((t,x)=>t+x[k],0),owe=live.reduce((t,x)=>t+Math.max(0,(x.M.invTotal||x.val||0)-x.M.paid),0),paid=live.reduce((t,x)=>t+x.M.paid,0);
-  const chips=[["","Tất cả",live.length],["hang","Chờ hàng",cnt("hang")],["gia","Chờ nhập giá",cnt("gia")],["ct","Đã nhập, chờ chứng từ",cnt("ct")],["no","Đã nhập, chưa trả đủ",cnt("no")],["xong","Đã thanh toán",cnt("xong")],["huy","Đã hủy",cnt("huy")]];
+  const chips=[["","Tất cả",live.length],["hang","Chờ hàng",cnt("hang")],["tr","Chờ CK trước",cnt("tr")],["gia","Chờ nhập giá",cnt("gia")],["ct","Đã nhập, chờ chứng từ",cnt("ct")],["no","Đã nhập, chưa trả đủ",cnt("no")],["xong","Đã thanh toán",cnt("xong")],["huy","Đã hủy",cnt("huy")]];
   const items=p=>{const u=[...new Set(p.lines.map(l=>l.unit||""))],q=p.lines.reduce((t,l)=>t+(+l.qty||0),0);
     return `<b>${p.lines.length} mặt hàng</b>${u.length===1?` · ${mhN(q)} ${esc(u[0])}`:""}<div class="hint mhnames">${p.lines.map(l=>esc(l.name||mhName(l.item))).join(", ")}</div>`};
   const recv=p=>{const late=mhLateDays(p);return p.status==="HUY"?"—":p.status==="DU"?`<span class="ok">Đủ hàng</span>`:(p.status==="DANG_GIAO"?"Đã nhận một phần<br>":"")+(late?`<b style="color:#b42318">Trễ ${late} ngày</b>`:p.expected_date?`<span class="hint">hẹn ${esc(mhDM(p.expected_date))}</span>`:`<span class="hint">chưa hẹn ngày</span>`)};
@@ -398,7 +419,7 @@ function pMhDon(m){
   <div class="filters"><select id="mh-per">${opt([["all","Tất cả thời gian"],["m0","Tháng này"],["m1","Tháng trước"],["m3","3 tháng gần đây"],["y","Năm nay"]],MH.per||"all")}</select><select id="mh-sid">${opt([["","Tất cả nhà cung cấp"]].concat((MH.sup||[]).map(x=>[x.id,x.name])),MH.sid||"")}</select><input id="mh-q" class="mhq" placeholder="Tìm số phiếu, hàng…" value="${esc(MH.q||"")}"><span class="sp"></span><button class="btn pri" id="mh-new">+ Lập phiếu mua hàng</button></div>
   <div class="ttchips mhchips">${chips.map(([k,t,n])=>`<button class="ttchip${F===k?" on":""}" data-mhst="${k}">${t} <b>${n}</b></button>`).join("")}</div>
    <section class="card flush">${tbl(["Mã phiếu","Nhà cung cấp","Người lập","Ngày đặt","Hẹn giao","Tổng tiền","Đã trả","Còn phải trả","Cập nhật","Cần làm","Trạng thái"],shown.map(x=>{const p=x.p,M=x.M,late=mhLateDays(p),tot=M.invTotal||x.val||0,due=Math.max(0,tot-M.paid);
-    const todo=p.status==="HUY"?"":p.status!=="DU"?(late?`<span class="mhtodo red">Trễ ${late} ngày</span>`:`<span class="mhtodo">Chờ nhận hàng</span>`):x.st[0]==="gia"?`<span class="mhtodo red">Nhập giá</span>`:x.st[0]==="ct"?`<span class="mhtodo">Ghi chứng từ</span>`:x.st[0]==="no"?`<span class="mhtodo">Thanh toán</span>`:"";
+    const todo=p.status==="HUY"?"":x.st[0]==="tr"?`<span class="mhtodo red">Chuyển khoản trước</span>`:p.status!=="DU"?(late?`<span class="mhtodo red">Trễ ${late} ngày</span>`:`<span class="mhtodo">Chờ nhận hàng</span>`):x.st[0]==="gia"?`<span class="mhtodo red">Nhập giá</span>`:x.st[0]==="ct"?`<span class="mhtodo">Ghi chứng từ</span>`:x.st[0]==="no"?`<span class="mhtodo">Thanh toán</span>`:"";
     return `<tr class="clk mhrow" data-mhd="${p.id}"><td><a class="mhno">${esc(p.no)}</a>${p.source==="KHO"?`<div class="hint">kho tự tạo</div>`:""}</td><td class="mhsup" title="${esc(p.supplier_name)}">${esc(p.supplier_name)}</td><td>${esc(p.created_by_name||"—")}</td><td>${esc(kDd(p.order_date))}</td><td>${p.expected_date?esc(kDd(p.expected_date)):"—"}</td><td class="n">${tot?nf(Math.round(tot)):"—"}</td><td class="n">${M.paid?nf(M.paid):"0"}</td><td class="n">${due>1?`<b>${nf(Math.round(due))}</b>`:"0"}</td><td>${p.updated_at?(()=>{const d=new Date(p.updated_at),z=n=>String(n).padStart(2,"0");return isNaN(d)?"":z(d.getHours())+":"+z(d.getMinutes())+" "+z(d.getDate())+"/"+z(d.getMonth()+1)+"/"+d.getFullYear()})():""}</td><td>${todo}</td><td>${pill(x.st[1],x.st[2])}</td></tr>`}))}</section>`;
   $("#mh-per").onchange=e=>{MH.per=e.target.value;renderMain()};$("#mh-sid").onchange=e=>{MH.sid=e.target.value;renderMain()};
   $("#mh-q").onchange=e=>{MH.q=e.target.value;renderMain()};
@@ -435,7 +456,7 @@ function mhPoDrawer(id,target){
   const val=mhValue(p);
   const debt=(MH.debts||[]).find(z=>z.id===p.supplier_id);
   const html=(`<h2 class="mhh">Phiếu mua hàng ${esc(p.no)} ${pill(st[1],st[2])}</h2>
-   <div class="mhinfo"><div><span>Nhà cung cấp</span><b>${esc(p.supplier_name)}</b>${p.supplier_phone?`<small>${esc(p.supplier_phone)}</small>`:""}</div><div><span>Ngày đặt</span><b>${esc(kDd(p.order_date))}</b></div><div><span>Hẹn giao</span><b>${p.expected_date?esc(kDd(p.expected_date)):"chưa hẹn"}</b>${mhLateDays(p)?`<small style="color:#b42318">trễ ${mhLateDays(p)} ngày</small>`:""}</div><div><span>Người lập</span><b>${esc(p.created_by_name||"—")}</b></div><div><span>Công nợ NCC hiện tại</span><b>${!debt?"…":debt.balance<0?"NCC đang giữ "+nf(-debt.balance):nf(debt.balance)}</b><small>${debt&&debt.balance<0?"tiền cọc / trả trước, ":""}tất cả đơn của NCC này</small></div></div>
+   <div class="mhinfo"><div><span>Nhà cung cấp</span><b>${esc(p.supplier_name)}</b>${p.supplier_phone?`<small>${esc(p.supplier_phone)}</small>`:""}</div><div><span>Ngày đặt</span><b>${esc(kDd(p.order_date))}</b></div><div><span>Hẹn giao</span><b>${p.expected_date?esc(kDd(p.expected_date)):"chưa hẹn"}</b>${mhLateDays(p)?`<small style="color:#b42318">trễ ${mhLateDays(p)} ngày</small>`:""}</div><div><span>Người lập</span><b>${esc(p.created_by_name||"—")}</b></div><div><span>Điều khoản thanh toán</span><b>${esc(mhTermTxt(mhTermOf(p)))}</b>${mhDueOf(p)?`<small>hạn trả ${esc(kDd(mhDueOf(p)))}</small>`:""}</div><div><span>Công nợ NCC hiện tại</span><b>${!debt?"…":debt.balance<0?"NCC đang giữ "+nf(-debt.balance):nf(debt.balance)}</b><small>${debt&&debt.balance<0?"tiền cọc / trả trước, ":""}tất cả đơn của NCC này</small></div></div>
    ${p.note?`<p class="hint">Ghi chú: ${esc(p.note)}</p>`:""}
    <div class="mhacts">${o?`<button class="btn pri" data-a="rc">Nhận hàng</button>`:""}${p.status!=="HUY"?`<button class="btn${!o&&pend.length?" pri":""}" data-a="ct">Ghi chứng từ</button><button class="btn${st[0]==="no"?" pri":""}" data-a="chi">Ghi chi / cọc</button>`:""}${p.status!=="HUY"&&(mhNoPrice(p)||hasRc)?`<button class="btn${mhNoPrice(p)?" pri":""}" data-a="gia">${mhNoPrice(p)?"Nhập giá":"Sửa giá"}</button>`:""}${o&&!hasRc?`<button class="btn" data-a="sua">Sửa phiếu</button><button class="btn danger" data-a="huy">Hủy phiếu</button>`:""}</div>
    <h3>Tình trạng</h3>${mhSteps(p)}

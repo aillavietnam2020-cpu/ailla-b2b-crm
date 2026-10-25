@@ -385,3 +385,11 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 .mhinfo.mhpay{grid-template-columns:repeat(3,1fr)}
 .mhpm label.chk{display:inline-flex;align-items:center;gap:6px;flex-direction:row;margin:0}
 .mhpm label.chk input{width:auto;margin:0}
+
+/* Nút "+ Ghi nhanh" đầu thanh bên quản trị */
+.gnbox{position:relative;margin:2px 0 10px}
+.gnbtn{width:100%;display:flex;justify-content:space-between;align-items:center;background:#4b54d1;color:#fff;border:0;border-radius:12px;padding:11px 14px;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(75,84,209,.35)}
+.gnpop{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(20,30,60,.25);padding:6px;z-index:60}
+.gnpop button{display:block;width:100%;text-align:left;background:none;border:0;border-radius:9px;padding:9px 10px;font:inherit;cursor:pointer;color:#1d2433}
+.gnpop button:hover{background:#eef0ff}.gnpop button b{display:block;font-size:13.5px}.gnpop button small{color:#7a8199;font-size:11.5px}
+.mhinfo{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
