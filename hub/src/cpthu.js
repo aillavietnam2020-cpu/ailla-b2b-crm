@@ -50,7 +50,7 @@ function pCpThu(m){
   <div class="grid kpis">${kpi("Tổng thu trong kỳ",nf(Math.round(tot)),L.length+" phiếu")}${Object.entries(by).map(([k,v])=>kpi(cptNg(k).split(" (")[0],nf(Math.round(v)),"")).join("")}</div>
   <section class="card flush">${L.length?tbl(["Ngày","Nội dung","Nguồn thu","Tiền về","Số tiền","Ảnh",""],L.map(x=>`<tr><td>${esc(kDd(x.ngay))}</td><td><b>${esc(x.note)}</b><div class="hint">${esc(x.by||"")} · xác nhận: ${esc(x.duyet||"")}</div></td><td>${esc(cptNg(x.nguon).split(" (")[0])}</td><td>${esc(x.acct||"—")}</td><td class="n"><b>${nf(Math.round(x.tien))}</b></td><td>${files[x.id]?pill(files[x.id]+" ảnh","blu"):`<span class="hint">chưa có</span>`} <button class="btn sm" data-tf="${x.id}">Ảnh</button></td><td>${cpCan()?`<button class="btn sm danger" data-td="${x.id}">Xóa</button>`:""}</td></tr>`)):`<p class="empty pad">Chưa có phiếu thu nào trong kỳ này.</p>`}</section>`;
   $("#ct-new").onclick=()=>cptQuick();
-  if($("#ct-cho"))$("#ct-cho").onclick=()=>{PAGE="cp_duyet";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
+  if($("#ct-cho"))$("#ct-cho").onclick=()=>cpGoCho();
   m.querySelectorAll("[data-tf]").forEach(b=>b.onclick=()=>{const x=L.find(y=>y.id===b.dataset.tf);spFiles(x.id,x.note)});
   m.querySelectorAll("[data-td]").forEach(b=>b.onclick=()=>{const x=L.find(y=>y.id===b.dataset.td);if(!confirm("Xóa phiếu thu \""+x.note+"\" ("+nf(Math.round(x.tien))+" đ)?"))return;DB.mutate(ME.name,"xóa phiếu thu",dt=>{dt.thuTay=(dt.thuTay||[]).filter(y=>y.id!==x.id)});renderMain()});
 }

@@ -181,16 +181,19 @@ function cpBaLoai(){
   ${cpNapTieu(N)}
 </section>`}
 const CPT_TAB={t:"ds"};
+function cpGoCho(){CPT_TAB.t="cho";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}
 {const _s=PAGES.so_cp;if(_s)PAGES.so_cp=function(m){
-  const strip=`<div class="tabs xtabs" role="tablist">${[["ds","Danh sách khoản chi"],["th","Theo tháng"]].map(([k,t])=>`<button role="tab" aria-selected="${CPT_TAB.t===k}" class="${CPT_TAB.t===k?"on":""}" data-cpt="${k}">${t}</button>`).join("")}</div>`;
+  const strip=`<div class="tabs xtabs" role="tablist">${[["ds","Danh sách khoản chi"],["cho","Chờ phân bổ"+(((D().costsCho||[]).length+(D().thuCho||[]).length)?" ("+((D().costsCho||[]).length+(D().thuCho||[]).length)+")":"")],["luong","Lương"],["th","Theo tháng"]].filter(x=>x[0]!=="luong"||(typeof cpLgCan==="function"&&cpLgCan())).map(([k,t])=>`<button role="tab" aria-selected="${CPT_TAB.t===k}" class="${CPT_TAB.t===k?"on":""}" data-cpt="${k}">${t}</button>`).join("")}</div>`;
   const bindTab=()=>m.querySelectorAll("[data-cpt]").forEach(b=>b.onclick=()=>{CPT_TAB.t=b.dataset.cpt;renderMain()});
+  if(CPT_TAB.t==="cho"&&PAGES.cp_duyet){m.innerHTML=strip+`<div id="cpt-body"></div>`;PAGES.cp_duyet(m.querySelector("#cpt-body"));bindTab();return}
+  if(CPT_TAB.t==="luong"&&PAGES.cp_luong){m.innerHTML=strip+`<div id="cpt-body"></div>`;PAGES.cp_luong(m.querySelector("#cpt-body"));bindTab();return}
   if(CPT_TAB.t==="th"&&typeof pChiPhi==="function"){m.innerHTML=strip+`<div id="cpt-body"></div>`;pChiPhi(m.querySelector("#cpt-body"));bindTab();return}
   _s.apply(this,arguments);try{m.insertAdjacentHTML("afterbegin",strip);bindTab()}catch(e){}
   try{const n=(D().costsCho||[]).length,k=m.querySelector(".kpis");if(!k)return;
     const bar=`<div class="note ${n?"amb":""}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${n?`<b>${n} khoản chờ chị Huệ phân bổ</b> (chưa tính vào các số bên dưới)`:"Không có khoản nào chờ phân bổ"}</span><button class="btn sm" id="cp-go">Mở Chờ phân bổ</button></div>`;
     k.insertAdjacentHTML("beforebegin",bar);
     m.insertAdjacentHTML("beforeend",cpBaLoai());
-    $("#cp-go").onclick=()=>{PAGE="cp_duyet";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
+    $("#cp-go").onclick=()=>{CPT_TAB.t="cho";renderMain()};
     const sv=$("#cp-dt-save");if(sv)sv.onclick=()=>{const ym=PERIOD.from.slice(0,7),a=+$("#cp-dt-npp").value||0,b=+$("#cp-dt-gc").value||0;DB.mutate(ME.name,"nhập doanh thu NPP và Gia công",dt=>{if(!dt.cpDoanhThu)dt.cpDoanhThu={};dt.cpDoanhThu[ym]={"B2B / Đại lý (CRM)":a,"Gia công":b}});toast("Đã lưu doanh thu tháng "+ym.slice(5));renderMain()};
     const sel=$("#cp-mode");if(sel)sel.onchange=()=>{DB.mutate(ME.name,"đổi quy tắc chia chi chung",dt=>{dt.cpChia=sel.value});renderMain()}
   }catch(e){}}}
