@@ -14,6 +14,7 @@ const vcLastRc=p=>(p.receipts||[]).filter(r=>r.status==="OK").map(r=>r.receipt_d
 function vcLoad(){
   if(VC.busy||VC.tried||(MH.orders&&MH.inv&&MH.pay&&MH.sup))return;VC.busy=true;VC.tried=true;
   Promise.all([mhLoad(),mhLoadInv(),mhLoadPay()]).catch(()=>{}).finally(()=>{VC.busy=false;if(PAGE==="exec")renderMain()})}
+function vcLoadMore(){try{if(typeof ptLoad==="function")ptLoad();if(typeof spLoadFiles==="function")spLoadFiles()}catch(e){}}
 function vcItems(){
   const L=[],S=vcSla(),today=mhToday();
   (MH.orders||[]).forEach(p=>{
@@ -32,6 +33,12 @@ function vcItems(){
     else if(k==="hang"&&st[2]==="red")add("Hỏi hàng trễ · "+who,"Phiếu mua "+no+" · "+st[1],["Trễ hàng","red"],p.expected_date||"",4);
   });
   try{const need=mhNeedBuy();if(need.length)L.push({r:5,t:need.length+" nguyên vật liệu dưới mức tồn tối thiểu",s:need.slice(0,3).map(x=>x.name).join(", ")+(need.length>3?"…":""),tag:["Cần mua","amb"],han:"",go:()=>{PAGE="mh_po";MH.open=null;renderMain();scrollTo(0,0)}})}catch(e){}
+  /* khoản chi nhập tay tháng này chưa có ảnh bill */
+  try{const ym=today.slice(0,7),F=SOCP.files,miss=F?(D().costs||[]).filter(c=>(c.ngay?c.ngay.slice(0,7):c.thang)===ym&&(+c.tien||0)>0&&!F[c.id]):[];
+    if(miss.length)L.push({r:6,t:miss.length+" khoản chi tháng này chưa có ảnh bill",s:"Ghi ảnh chuyển khoản hoặc phiếu chi tiền mặt để sau này đối chiếu",tag:["Thiếu ảnh","blu"],han:"",go:()=>{PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)}})}catch(e){}
+  /* khách nợ quá 90 ngày (gồm nợ đầu kỳ) */
+  try{const A=PT.d&&PT.d.rows?PT.d.rows.filter(r=>r.b90p+r.old>0):[];
+    if(A.length)L.push({r:6,t:A.length+" khách nợ quá 90 ngày",s:"Tổng "+nf(Math.round(A.reduce((t,r)=>t+r.b90p+r.old,0)))+" đ · "+A.slice(0,2).map(r=>r.customer_name).join(", ")+(A.length>2?"…":""),tag:["Đòi nợ","red"],han:"",go:()=>{PAGE="phai_thu";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)}})}catch(e){}
   L.forEach(x=>{x.over=x.han?Math.max(0,tlDays(x.han,today)):0;x.leo=x.over>=S.leo});
   return L.sort((a,b)=>(b.leo-a.leo)||(b.over-a.over)||a.r-b.r);
 }
@@ -44,7 +51,7 @@ function vcCard(){
 {const _ex=PAGES.exec;PAGES.exec=function(m){_ex.apply(this,arguments);
   try{if(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin"||!mhManage())return;
     if((SUB.exec||"homnay")!=="homnay"||!m.querySelector(".xkstrip"))return;
-    vcLoad();if(!(MH.orders&&MH.inv&&MH.pay&&MH.sup))return;
+    vcLoad();vcLoadMore();if(!(MH.orders&&MH.inv&&MH.pay&&MH.sup))return;
     m.querySelector(".xkstrip").insertAdjacentHTML("beforebegin",vcCard());
     m.querySelectorAll("[data-vc]").forEach(b=>b.onclick=()=>VC.list[+b.dataset.vc].go());
     const mo=m.querySelector("#vc-more");if(mo)mo.onclick=()=>{VC.all=!VC.all;renderMain()};

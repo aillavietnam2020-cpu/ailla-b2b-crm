@@ -6,7 +6,7 @@
 const PT={d:null,busy:false,q:"",only:""};
 async function ptLoad(){if(PT.busy||PT.d)return;PT.busy=true;
   try{PT.d=await svApi("/api/debts/aging")}catch(e){PT.d={err:e.message||"Không tải được"}}
-  PT.busy=false;if(PAGE==="phai_thu")renderMain()}
+  PT.busy=false;if(PAGE==="phai_thu"||PAGE==="exec")renderMain()}
 function pPhaiThu(m){
   ptLoad();const T="Phải thu khách",S="Khách đang nợ bao nhiêu, nợ bao lâu, bao nhiêu ngày thu được tiền";
   const D0=PT.d;

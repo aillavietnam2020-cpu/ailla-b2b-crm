@@ -13,7 +13,7 @@ const spHT=x=>x.method==="CHUYEN_KHOAN"||x.method==="CK"?"Chuyển khoản":x.me
 const SOCP_SRC={tay:["Nhập tay","amb"],ncc:["Phiếu chi nhà cung cấp","blu"],vc:["Phiếu chi vận chuyển","blu"],ads:["Tự động từ báo cáo","gry"]};
 async function spLoadShip(){const k=PERIOD.from+"|"+PERIOD.to;if(SOCP.shipKey===k||SOCP.busy)return;SOCP.busy=true;SOCP.shipKey=k;
   try{SOCP.ship=await svApi("/api/shipping-vouchers?from="+PERIOD.from+"&to="+PERIOD.to)}catch(e){SOCP.ship=[]}SOCP.busy=false;if(["so_cp","ngan_sach","tien_lich"].includes(PAGE))renderMain()}
-async function spLoadFiles(){if(SOCP.files)return;try{SOCP.files=await kApi("/mh/costs/file-counts")}catch(e){SOCP.files={}}if(PAGE==="so_cp")renderMain()}
+async function spLoadFiles(){if(SOCP.files)return;try{SOCP.files=await kApi("/mh/costs/file-counts")}catch(e){SOCP.files={}}if(PAGE==="so_cp"||PAGE==="exec")renderMain()}
 function spRows(){
   const d=D(),cat=k=>d.costCats.find(c=>c.k===k)||{n:k,nhom:"Khác"},R=[];
   (d.costs||[]).forEach(c=>{const ngay=c.ngay||"",ok=ngay?spInP(ngay):spMonthIn(c.thang);if(!ok)return;
