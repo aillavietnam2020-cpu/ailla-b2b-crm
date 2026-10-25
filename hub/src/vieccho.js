@@ -33,6 +33,12 @@ function vcItems(){
     else if(k==="hang"&&st[2]==="red")add("Hỏi hàng trễ · "+who,"Phiếu mua "+no+" · "+st[1],["Trễ hàng","red"],p.expected_date||"",4);
   });
   try{const need=mhNeedBuy();if(need.length)L.push({r:5,t:need.length+" nguyên vật liệu dưới mức tồn tối thiểu",s:need.slice(0,3).map(x=>x.name).join(", ")+(need.length>3?"…":""),tag:["Cần mua","amb"],han:"",go:()=>{PAGE="mh_po";MH.open=null;renderMain();scrollTo(0,0)}})}catch(e){}
+  /* phiếu sản xuất: gấp chưa bắt đầu, hoặc quá hạn cần hàng; lô đã báo hoàn thành đang chờ kiểm kê */
+  try{sxShape(D());const s=SX(),goSx=()=>{PAGE="sx_nc";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)};
+    s.requests.filter(r=>(r.st==="CAN_LAM"||r.st==="DANG_LAM")&&((r.han&&r.han<today)||(r.uu==="Gấp"&&r.st==="CAN_LAM"))).slice(0,6).forEach(r=>
+      L.push({r:1,t:esc(sxP(r.sp).ten)+": phiếu sản xuất "+esc(r.id)+(r.st==="CAN_LAM"?" chưa bắt đầu":" đang làm"),s:(r.uu==="Gấp"?"Ưu tiên gấp · ":"")+(r.sl?nf(r.sl)+" cái · ":"")+(sxCach(r)==="CONG_NHAN"?"công nhân tự làm":"cần kỹ thuật pha chế"),tag:["Sản xuất",r.han&&r.han<today?"red":"amb"],han:r.han||"",go:goSx}));
+    const ck=s.batches.filter(b=>b.st==="CHO_KIEM");
+    if(ck.length)L.push({r:2,t:ck.length+" lô đã đóng gói, chờ kiểm kê",s:ck.slice(0,3).map(b=>sxP(b.sp).ten).join(", ")+(ck.length>3?"…":""),tag:["Chờ kiểm kê","blu"],han:"",go:()=>{PAGE="sx_lo";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)}})}catch(e){}
   /* khoản chi nhập tay tháng này chưa có ảnh bill */
   try{const ym=today.slice(0,7),F=SOCP.files,miss=F?(D().costs||[]).filter(c=>(c.ngay?c.ngay.slice(0,7):c.thang)===ym&&(+c.tien||0)>0&&!F[c.id]):[];
     if(miss.length)L.push({r:6,t:miss.length+" khoản chi tháng này chưa có ảnh bill",s:"Ghi ảnh chuyển khoản hoặc phiếu chi tiền mặt để sau này đối chiếu",tag:["Thiếu ảnh","blu"],han:"",go:()=>{PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)}})}catch(e){}

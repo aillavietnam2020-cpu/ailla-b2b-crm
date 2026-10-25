@@ -23,6 +23,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     o.ngan_sach=MI("ngan_sach","Ngân sách chi phí",u=>can(u,"chiphi.xem")||mg());
     o.phai_thu=MI("phai_thu","Phải thu khách",u=>can(u,"chiphi.xem")||mg());
     o.nguong=MI("nguong","Ngưỡng cảnh báo & chỉ số",mg);
+    o.npp360=MI("npp360","Hồ sơ NPP / đại lý",u=>can(u,"chiphi.xem")||mg());
     o.so_cp=MI("so_cp","Sổ chi phí",u=>can(u,"chiphi.xem")||mg());
     return o};
   const pick=(P,keys,names)=>keys.map((id,i)=>{const it=P[id];return it?[it[0],(names&&names[i])||it[1],it[2],it[3]]:null}).filter(Boolean);
@@ -32,9 +33,9 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     tabMod("q_dt","bag","Doanh thu & KPI","",["muctieu","bc_tiktok","bc_shopee","bc_fb","fb_cskh","cr_rp","bc_b2b","gc_tq","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","Facebook · chăm sóc khách","B2B · dashboard kinh doanh","B2B / Đại lý","Gia công · tổng quan","Gia công · lãi lỗ","CSKH cũ"]),
     tabMod("q_ll","spark","Lãi lỗ & Giá thành","",["pl","bc_tong","kho_boc","kho_cl","sku"],["P&L công ty","So sánh kênh","Định mức & giá thành","Chênh lệch định mức","Giá vốn SKU"]),
     tabMod("q_cp","fin","Chi phí & Tiền","",["so_cp","chiphi","ngan_sach","tien_lich","cr_vc","mh_no","phai_thu","cr_cn","gc_cn","doisoat","cr_bill"],["Sổ chi phí","Chi phí theo tháng","Ngân sách","Tiền & lịch chi","Phiếu chi vận chuyển","Phải trả nhà cung cấp","Phải thu & tuổi nợ","Công nợ khách hàng","Công nợ gia công","Đối soát tiền về","Kho bill giao dịch"]),
-    tabMod("q_dh","box","Đơn hàng","Nghiệp vụ",["cr_dn","gc_don","cr_ret","kho_qd","cr_kh","cr_gia","cr_dc","cr_thuong"],["Đơn B2B & duyệt","Đơn gia công","Hàng trả lại","Đơn sàn & quy đổi mã","Khách & đại lý","Bảng giá","Giá điều chỉnh / khuyến mại","Thưởng & xếp hạng NPP"]),
+    tabMod("q_dh","box","Đơn hàng","Nghiệp vụ",["cr_dn","gc_don","cr_ret","kho_qd","cr_kh","npp360","cr_gia","cr_dc","cr_thuong"],["Đơn B2B & duyệt","Đơn gia công","Hàng trả lại","Đơn sàn & quy đổi mã","Khách & đại lý","Hồ sơ NPP / đại lý","Bảng giá","Giá điều chỉnh / khuyến mại","Thưởng & xếp hạng NPP"]),
     tabMod("q_mh","cart","Mua hàng","",["mh_po","mh_hd","mh_chi","mh_gianvl"],["Đơn mua hàng","Chứng từ nhà cung cấp","Phiếu chi nhà cung cấp","Giá nguyên vật liệu theo tháng"]),
-    tabMod("q_sx","fac","Sản xuất & Kho","",["kho_gtri","kho_nxt","kho_vo","kho_map","kho_dm"],["Tồn kho & giá trị","Nhập – xuất – tồn","Vỏ can, chai & thùng","Đồng bộ mã B2B","Định mức theo sản phẩm"]),
+    tabMod("q_sx","fac","Sản xuất & Kho","",["sx_nc","kho_gtri","kho_nxt","kho_vo","kho_map","kho_dm"],["Phiếu sản xuất & tiến độ","Tồn kho & giá trị","Nhập – xuất – tồn","Vỏ can, chai & thùng","Đồng bộ mã B2B","Định mức theo sản phẩm"]),
     {k:"q_cfg",adm:true,zone:"Hệ thống",ic:"gear",n:"Cấu hình",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
       return [g("Tài khoản",["nhansu","phongban"],["Tài khoản & phân quyền","Phòng ban"]),
         g("Danh mục",["sanpham","kenhban","chiphidm","cr_rcv","gc_kh","cr_giagc"],["Sản phẩm","Kênh bán & phí","Danh mục chi phí","Tài khoản nhận tiền","Khách gia công","Bảng giá riêng gia công"]),
