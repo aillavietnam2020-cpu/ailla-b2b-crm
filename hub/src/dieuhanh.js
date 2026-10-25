@@ -50,11 +50,25 @@ function dhCalcTien(){
   return {cfg,last,tra,thu,ton,tonThieu,chiNgay,chiTu:cfg.chiNgay?"nhập tay":chiThang?"chi phí tháng "+pm.slice(5)+" ÷ 30":"",vi,R};
 }
 /* ---------- Lãi tạm tính trong kỳ chọn ---------- */
+/* Tỷ lệ tạm tính lấy từ số thật (trừ khi người dùng tự nhập ở Thiết lập):
+   Facebook: doanh thu giao thành công ÷ doanh thu chốt của các ngày đã đủ 14 ngày (đơn đã giao xong), 60 ngày gần nhất;
+   TikTok: doanh thu thuần ÷ GMV, giá vốn và phí sàn của tháng đã lưu gần nhất. */
+function dhAutoRates(cfg){
+  const K=JSON.parse(JSON.stringify(cfg.kenh)),src={};
+  try{const F=(typeof DAYD!=="undefined"&&DAYD.fb)||{},ks=Object.keys(F).sort(),last=ks[ks.length-1];
+    if(last&&!K.fb.tay){const cut=iso(addD(pdate(last),-14)),from=iso(addD(pdate(cut),-60));let c=0,g=0,n=0;ks.forEach(k=>{if(k>from&&k<=cut){c+=+F[k][6]||0;g+=+F[k][5]||0;n++}});if(c>0&&n>=7){K.fb.thuan=g/c;src.fb=`giao thành công thật ${dhPct(g/c)} (${n} ngày đã giao xong)`}
+      /* Facebook không có phí sàn nhưng có phí ship, ship đơn hoàn và thuế 1,5% (quy ước báo cáo Facebook). */
+      const Dd=(typeof KDX!=="undefined"&&KDX.fbDash)||{};if(Dd.dt>0){K.fb.phi=(-(+Dd.vc||0)-(+Dd.hoan||0))/Dd.dt+0.015;src.fb=(src.fb?src.fb+"; ":"")+`phí ship + thuế ${dhPct(K.fb.phi)} (kỳ ${Dd.ky||""})`}}}catch(e){}
+  try{if(!K.tts.tay&&typeof TSB!=="undefined"&&TSB.months&&TSB.months.length){const L=TSB.months[TSB.months.length-1],s=L.summary;let gmv=0;Object.entries((TSB.all&&TSB.all.days)||{}).forEach(([d,x])=>{if(d.startsWith(L.ky)&&x.km)gmv+=x.km.gmv||0});
+    if(s.dt&&gmv){K.tts.thuan=s.dt/gmv;K.tts.gv=s.gv/s.dt;K.tts.phi=-s.phi/s.dt;src.tts=`tỷ lệ tháng ${L.ky.slice(5)}/${L.ky.slice(0,4)} đã lưu`}}}catch(e){}
+  ["tts","spe","fb"].forEach(k=>{if(K[k].tay)src[k]="tỷ lệ nhập tay ở Thiết lập";else if(!src[k])src[k]=k==="spe"?"doanh thu Shopee đã trừ hủy/hoàn":"tỷ lệ mặc định (chưa đủ số thật)"});
+  return {K,src};
+}
 function dhCalcNgay(){
-  const cfg=dhGet(),n=pDays().length,g=(s,i)=>pSum(s,i).v,A=typeof adsSum==="function"?adsSum():{},fbAds=Object.values(A).reduce((a,x)=>a+(x.chi||0),0)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1));
+  const cfg=dhGet(),AR=dhAutoRates(cfg),n=pDays().length,g=(s,i)=>pSum(s,i).v,A=typeof adsSum==="function"?adsSum():{},fbAds=Object.values(A).reduce((a,x)=>a+(x.chi||0),0)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1));
   const rows=[["tts",{ban:g("tts",0),don:g("tts",1),ads:g("tts",10)},"GMV cả shop (Key metrics)"],["spe",{ban:g("spe",0),don:g("spe",4),ads:0,gv:g("spe",2),phi:-g("spe",1)},"doanh thu Shopee theo ngày"],["fb",{ban:g("fb",6),don:g("fb",1),ads:fbAds,gv:g("fb",7)},"doanh thu chốt Pancake"]]
-   .map(([ch,x,src])=>({ch,n:(DH_CH.find(c=>c[0]===ch)||[])[1],src,co:x.ban>0,...dhTamTinh(x,cfg.kenh[ch]||{thuan:1,gv:0,phi:0},dhLuongKenh(cfg.luong,ch,n)),ban:x.ban}));
-  return {cfg,n,rows};
+   .map(([ch,x,src])=>({ch,n:(DH_CH.find(c=>c[0]===ch)||[])[1],src,tyle:AR.src[ch],co:x.ban>0,...dhTamTinh(x,AR.K[ch]||{thuan:1,gv:0,phi:0},dhLuongKenh(cfg.luong,ch,n)),ban:x.ban}));
+  return {cfg,n,rows,AR};
 }
 /* ---------- Lãi theo kênh 3 tầng (tháng trọn) ---------- */
 function dhCalcBaTang(mo){
@@ -72,6 +86,7 @@ function dhCalcBaTang(mo){
 /* ---------- Giao diện ---------- */
 /* ---------- Tổng quan: một màn hình, 3 mảng kinh doanh (Bán lẻ · Phân phối · Gia công) ---------- */
 (()=>{try{if(document.getElementById("dh-css"))return;const st=document.createElement("style");st.id="dh-css";st.textContent=`
+.xkstrip .xk{border-radius:0}
 .dh3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px}
 .dhm{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:6px}
 .dhm:hover{border-color:#c5cee0}
@@ -98,12 +113,17 @@ function dhTongQuan(){
   const le={dt:R.reduce((a,r)=>a+(r.co?r.dt:0),0),lai:R.reduce((a,r)=>a+(r.co?r.t2:0),0),prev:leOK?pv.tts+pv.fb+pv.spe:0};
   const B=typeof b2bChannel==="function"?b2bChannel("B2B"):null,G=typeof b2bChannel==="function"?b2bChannel("GIA_CONG"):null,bp=DH.b2bPrev||{};
   if(!B&&!DH.b2bWait){DH.b2bWait=1;setTimeout(()=>{DH.b2bWait=0;if(PAGE==="dh")renderMain()},1200)}
-  const pp={dt:B&&B.has?B.net:0,lai:B&&B.has?B.gross:0,prev:bp.B2B||0},gc={dt:G&&G.has?G.net:0,lai:G&&G.has?G.gross:0,prev:bp.GIA_CONG||0};
+  /* Dòng xuất giá 0đ mà giá vốn lớn (trên 5 triệu) gần như chắc là nhập sai số lượng hoặc đơn vị (thùng/chai):
+     tạm loại khỏi lãi để số không bị méo, và đưa vào "Cần xử lý" để kế toán kiểm đơn. */
+  const susp=ch=>{if(typeof B2BR==="undefined"||!B2BR.data)return [];return B2BR.data.lines.filter(l=>l.channel===ch&&!(+l.revenue>0)).map(l=>{const u=b2bUnitCost(l.sku,l.month);return {...l,cost:u==null?0:u*(+l.qty||0)}}).filter(l=>l.cost>5e6)};
+  const sB=susp("B2B"),sG=susp("GIA_CONG"),sum0=a=>a.reduce((x,l)=>x+l.cost,0);
+  const pp={dt:B&&B.has?B.net:0,lai:B&&B.has?B.gross+sum0(sB):0,prev:bp.B2B||0},gc={dt:G&&G.has?G.net:0,lai:G&&G.has?G.gross+sum0(sG):0,prev:bp.GIA_CONG||0};
   const tong=le.dt+pp.dt+gc.dt,lai=le.lai+pp.lai+gc.lai,tongP=leOK&&(!pp.dt||pp.prev)?le.prev+pp.prev+gc.prev:0;
   const Gc=dhCalcGia(),T=dhCalcTien(),todo=[];
   if(ttM){const td=(TSB.data&&Object.values(TSB.data).find(x=>x&&x.data&&full.includes(x.data.ky)));const t=td&&td.data&&td.data.todo;if(t&&(t.noMap.length||t.miss.length))todo.push(["red",`TikTok: ${t.noMap.length} mã chưa quy đổi, ${t.miss.length} mã thiếu giá vốn`,"kế toán","bc_tiktok"])}
   R.filter(r=>r.co&&r.dt&&r.ads/r.dt>0.25).forEach(r=>todo.push(["amb",`${r.n}: quảng cáo ${dhPct(r.ads/r.dt)} doanh thu`,"team "+r.n,"dh"]));
   R.filter(r=>!r.co).forEach(r=>todo.push(["amb",`${r.n}: chưa có số trong kỳ`,r.ch==="spe"?"team Shopee tải file":"tải số liệu","bc_"+(r.ch==="tts"?"tiktok":r.ch==="spe"?"shopee":"fb")]));
+  sB.concat(sG).forEach(l=>todo.unshift(["red",`${l.channel==="GIA_CONG"?"Gia công":"Phân phối"}: ${l.name} (${l.sku}) xuất ${nf(l.qty)} giá 0đ, giá vốn ${tr(l.cost)} — nghi nhập sai, đã tạm loại khỏi lãi`,"kế toán kiểm đơn",l.channel==="GIA_CONG"?"bc_gc":"bc_b2b"]));
   if(B&&B.has&&B.cover<0.95)todo.push(["amb",`Phân phối: ${dhPct(1-B.cover)} doanh thu chưa có giá vốn`,"kế toán","bc_b2b"]);
   if(Gc.up.length)todo.push(["red",`${Gc.up.length} nguyên liệu tăng giá`,"kế toán, sản xuất","dh"]);
   if(Gc.red.length)todo.push(["red",`${Gc.red.length} giá bán / báo giá gia công dưới ngưỡng`,"CEO quyết giá","dh"]);
@@ -113,12 +133,12 @@ function dhTongQuan(){
   const laiTxt=(v,dt,ghi)=>v==null?`<span class="dhm-l">${ghi||"chưa tính được lãi"}</span>`:`<span class="dhm-l">lãi <b class="${v<0?"neg":""}">${tr(v)}</b> · ${dhPct(dt?v/dt:null)}${ghi?" · "+ghi:""}</span>`;
   const leNote=R.filter(r=>!r.co).map(r=>r.n).join(", "),grpTop=g=>g&&g.grp?[...g.grp.values()].sort((a,b)=>b.rev-a.rev).slice(0,3).map(x=>[x.n||"Khác",x.rev]):[];
   const K=[["money","Tổng doanh thu",tr(tong),chg(tong,tongP)],["trend","Lãi đóng góp",tr(lai),`<span class="kchg">${dhPct(tong?lai/tong:null)} doanh thu</span>`],["bag","Bán lẻ",tr(le.dt),chg(le.dt,le.prev)],["box","Phân phối",tr(pp.dt),chg(pp.dt,pp.prev)],["fac","Gia công",tr(gc.dt),chg(gc.dt,gc.prev)],["wallet","Tiền đủ chạy",T.R.ngay==null?"—":nf(T.R.ngay)+" ngày",`<span class="kchg">${T.last?"số dư "+vnd(T.last.ngay):"chưa nhập số dư"}</span>`]];
-  return `<section class="kstrip" aria-label="Chỉ số chính">${K.map(([ic,l,v,h])=>`<div class="kcell"><span class="kic k-${ic}">${ico(ic)}</span><span class="kl">${l}</span><span class="kv numeric">${v}</span>${h}</div>`).join("")}</section>
+  return `<section class="xkstrip" aria-label="Chỉ số chính">${K.map(([ic,l,v,h])=>`<div class="xk ro${v==="—"?" mut":""}"><span class="xkh"><span class="kic k-${ic}">${ico(ic)}</span><span class="xkl">${l}</span></span><span class="xkv numeric">${v==="—"?"Chưa có số":v}</span><span class="xkm">${h}</span></div>`).join("")}</section>
   <div class="dh3">
    <button type="button" class="dhm" data-go="bc_tiktok"><div class="dhm-h"><span class="kic k-bag">${ico("bag")}</span><div><b>Bán lẻ</b><small>TikTok · Facebook · Shopee</small></div></div><div class="dhm-v numeric">${tr(le.dt)}</div>${chg(le.dt,le.prev)}${laiTxt(le.lai,le.dt,R.some(r=>r.co&&!r.chot)?"tạm tính":"")}
-    ${bars(R.filter(r=>r.co).map(r=>[r.n,r.dt]),"#e7357b")}${leNote?`<div class="dhm-n">Chưa có số: ${esc(leNote)}</div>`:`<div class="dhm-ok">Đủ số các kênh</div>`}</button>
+    ${bars(R.filter(r=>r.co).map(r=>[r.n,r.dt]),"#e7357b")}<div class="hint" style="font-size:12px;line-height:1.45">${R.filter(r=>r.co).map(r=>esc(r.n+": "+(r.chot?"số tháng đã lưu":r.tyle))).join("<br>")}</div>${leNote?`<div class="dhm-n">Chưa có số: ${esc(leNote)}</div>`:`<div class="dhm-ok">Đủ số các kênh</div>`}</button>
    <button type="button" class="dhm" data-go="bc_b2b"><div class="dhm-h"><span class="kic k-box">${ico("box")}</span><div><b>Phân phối</b><small>NPP · đại lý (CRM B2B)</small></div></div><div class="dhm-v numeric">${B?tr(pp.dt):"…"}</div>${chg(pp.dt,pp.prev)}${B&&B.has?laiTxt(pp.lai,pp.dt,"sau giá vốn"):laiTxt(null,0,B?"kỳ này chưa có đơn":"đang tải")}
-    ${bars(grpTop(B),"#2f9e44")}${B&&B.has&&B.cover<0.95?`<div class="dhm-n">${dhPct(1-B.cover)} doanh thu chưa có giá vốn (đang ước tính)</div>`:B&&B.has?`<div class="dhm-ok">Đủ giá vốn</div>`:""}</button>
+    ${bars(grpTop(B),"#2f9e44")}${sB.length?`<div class="dhm-n" style="background:#fdecea;color:#b42318">Đã tạm loại ${tr(sum0(sB))} giá vốn của ${sB.length} dòng giá 0đ nghi nhập sai</div>`:""}${B&&B.has&&B.cover<0.95?`<div class="dhm-n">${dhPct(1-B.cover)} doanh thu chưa có giá vốn (đang ước tính)</div>`:B&&B.has?`<div class="dhm-ok">Đủ giá vốn</div>`:""}</button>
    <button type="button" class="dhm" data-go="bc_gc"><div class="dhm-h"><span class="kic k-fac">${ico("fac")}</span><div><b>Gia công</b><small>khách đặt sản xuất</small></div></div><div class="dhm-v numeric">${G?tr(gc.dt):"…"}</div>${chg(gc.dt,gc.prev)}${G&&G.has?laiTxt(gc.lai,gc.dt,"sau giá vốn"):laiTxt(null,0,G?"kỳ này chưa có đơn gia công":"đang tải")}
     ${bars(grpTop(G),"#f59f00")}${Gc.red.filter(x=>x.kind==="kh").length?`<div class="dhm-n">${Gc.red.filter(x=>x.kind==="kh").length} báo giá dưới ngưỡng biên</div>`:`<div class="dhm-ok">Báo giá chưa có cảnh báo</div>`}</button>
   </div>
@@ -175,7 +195,7 @@ function dhTabThang(){
   return `<section class="card"><div class="card-h"><h2>Báo cáo tháng đã chốt theo kênh</h2></div><p class="hint">Số chốt sau ngày 8 tháng sau (đã biết đơn giao xong, hoàn, phí sàn thật). Mở từng kênh để xem chi tiết.</p><div class="acts">${[["bc_tiktok","TikTok Shop"],["bc_shopee","Shopee"],["bc_fb","Facebook"],["bc_b2b","B2B / Đại lý"],["bc_gc","Gia công"],["pl","Lãi lỗ (P&L)"]].map(([k,t])=>`<button class="btn" data-go="${k}">${t} →</button>`).join("")}</div></section>${typeof tsbMonthsView==="function"?tsbMonthsView():""}`;
 }
 function dhTabCaiDat(){
-  const c=dhGet(),ng=c.nguong,K=c.kenh,chs=[["tts","TikTok"],["spe","Shopee"],["fb","Facebook"],["b2b","B2B / NPP"],["gc","Gia công"]];
+  const c=dhGet(),AR=dhAutoRates(c),ng=c.nguong,K=c.kenh,chs=[["tts","TikTok"],["spe","Shopee"],["fb","Facebook"],["b2b","B2B / NPP"],["gc","Gia công"]];
   const L=c.luong.length?c.luong:[{team:"",tien:0,pt:{}}];
   return `<form class="frm" id="dh-cf">
   <section class="card"><div class="card-h"><h2>Ngưỡng cảnh báo</h2></div><div class="row4">
@@ -185,9 +205,9 @@ function dhTabCaiDat(){
    <label class="field">Biên đóng góp kênh mục tiêu (%)<input type="number" step="0.1" id="dh-n4" value="${ng.bienKenh*100}"></label>
    <label class="field">Tiền đủ chạy tối thiểu (ngày)<input type="number" id="dh-n5" value="${ng.runway}"></label>
    <label class="field">Chi trung bình mỗi ngày (đ, để trống = lấy chi phí tháng trước ÷ 30)<input type="number" id="dh-cn" value="${c.chiNgay||""}"></label></div></section>
-  <section class="card"><div class="card-h"><h2>Tỷ lệ tạm tính theo kênh</h2>${typeof TSB!=="undefined"&&TSB.months&&TSB.months.length?`<button type="button" class="btn sm" id="dh-fromtt">Lấy tỷ lệ TikTok từ tháng đã lưu</button>`:""}</div>
-   ${tbl(["Kênh","Còn lại sau hủy/hoàn (%)","Giá vốn / doanh thu (%)","Phí sàn / doanh thu (%)","Đóng gói mỗi đơn (đ)"],["tts","spe","fb"].map(k=>`<tr><td><b>${(DH_CH.find(x=>x[0]===k)||[])[1]}</b></td>${["thuan","gv","phi"].map(f=>`<td><input type="number" step="0.1" class="dh-k" data-k="${k}" data-f="${f}" value="${+(K[k][f]*100).toFixed(2)}"></td>`).join("")}<td><input type="number" class="dh-k" data-k="${k}" data-f="dongGoi" value="${K[k].dongGoi||0}"></td></tr>`))}
-   <p class="hint">TikTok: doanh số theo ngày là GMV cả shop, nên "còn lại" = doanh thu thuần ÷ GMV của tháng đã chốt. Shopee, Facebook dùng giá vốn, phí sàn thật khi có.</p></section>
+  <section class="card"><div class="card-h"><h2>Tỷ lệ tạm tính theo kênh</h2></div>
+   ${tbl(["Kênh","Tự lấy từ số thật","Còn lại sau hủy/hoàn (%)","Giá vốn / doanh thu (%)","Phí sàn / doanh thu (%)","Đóng gói mỗi đơn (đ)","Đang dùng"],["tts","spe","fb"].map(k=>{const auto=!K[k].tay,V=auto?AR.K[k]:K[k];return `<tr><td><b>${(DH_CH.find(x=>x[0]===k)||[])[1]}</b></td><td><input type="checkbox" class="dh-auto" data-k="${k}"${auto?" checked":""}></td>${["thuan","gv","phi"].map(f=>`<td><input type="number" step="0.1" class="dh-k" data-k="${k}" data-f="${f}" value="${+(V[f]*100).toFixed(2)}"${auto?" disabled":""}></td>`).join("")}<td><input type="number" class="dh-k" data-k="${k}" data-f="dongGoi" value="${K[k].dongGoi||0}"></td><td class="hint">${esc(AR.src[k])}</td></tr>`}))}
+   <p class="hint">Mặc định web tự lấy tỷ lệ từ số thật: Facebook theo tỷ lệ giao thành công của các ngày đã giao xong; TikTok theo tháng đã lưu (doanh thu thuần ÷ GMV, giá vốn, phí sàn). Bỏ tick để tự nhập.</p></section>
   <section class="card"><div class="card-h"><h2>Lương team theo kênh</h2></div><p class="hint">Lương tháng của từng team và phần trăm công sức cho từng kênh. Người làm cho nhiều kênh thì chia %; kế toán, kho, văn phòng để ở chi phí dùng chung (không nhập ở đây).</p>
    <div class="tbl edit"><table><thead><tr><th>Team</th><th>Lương tháng (đ)</th>${chs.map(x=>`<th>% ${x[1]}</th>`).join("")}<th></th></tr></thead><tbody>${L.map((t,i)=>`<tr><td><input class="dh-l" data-i="${i}" data-f="team" value="${esc(t.team||"")}" placeholder="VD: Content & Media"></td><td><input type="number" class="dh-l" data-i="${i}" data-f="tien" value="${t.tien||""}"></td>${chs.map(x=>`<td><input type="number" class="dh-l" data-i="${i}" data-f="pt.${x[0]}" value="${(t.pt||{})[x[0]]||""}" style="width:70px"></td>`).join("")}<td><button type="button" class="lnk" data-dhlx="${i}">✕</button></td></tr>`).join("")}</tbody></table></div>
    <button type="button" class="btn sm" id="dh-ladd">+ Thêm team</button></section>
@@ -210,12 +230,14 @@ function dhBind(m,tab){
   m.querySelectorAll(".dh-l").forEach(x=>x.oninput=()=>{const t=DH.form.luong[+x.dataset.i]||(DH.form.luong[+x.dataset.i]={pt:{}}),f=x.dataset.f;if(f.startsWith("pt."))(t.pt=t.pt||{})[f.slice(3)]=+x.value||0;else t[f]=f==="tien"?(+x.value||0):x.value});
   const add=m.querySelector("#dh-ladd");if(add)add.onclick=()=>{const L=DH.form.luong.filter(t=>t.team||t.tien).concat([{team:"",tien:0,pt:{}}]);DH.form=null;dhSave("thêm team lương",c=>{c.luong=L})};
   m.querySelectorAll("[data-dhlx]").forEach(b=>b.onclick=()=>{const L=DH.form.luong.filter((t,i)=>i!==+b.dataset.dhlx&&(t.team||t.tien));DH.form=null;dhSave("xóa team lương",c=>{c.luong=L})});
+  m.querySelectorAll(".dh-auto").forEach(x=>x.onchange=()=>m.querySelectorAll(`.dh-k[data-k="${x.dataset.k}"]:not([data-f="dongGoi"])`).forEach(i=>i.disabled=x.checked));
   const ft=m.querySelector("#dh-fromtt");if(ft)ft.onclick=()=>{const L=TSB.months[TSB.months.length-1],s=L.summary;let gmv=0;Object.entries((TSB.all&&TSB.all.days)||{}).forEach(([d,x])=>{if(d.startsWith(L.ky)&&x.km)gmv+=x.km.gmv||0});
     if(!s.dt){toast("Tháng đã lưu chưa có doanh thu");return}
     dhSave("lấy tỷ lệ TikTok tháng "+L.ky,c=>{c.kenh.tts.gv=s.gv/s.dt;c.kenh.tts.phi=-s.phi/s.dt;if(gmv)c.kenh.tts.thuan=s.dt/gmv})};
   const f=m.querySelector("#dh-cf");if(f)f.onsubmit=e=>{e.preventDefault();const g=id=>+(m.querySelector(id).value),L=DH.form.luong.filter(t=>t.team||t.tien);DH.form=null;
     dhSave("sửa thiết lập Phòng điều hành",c=>{c.nguong={nvlTang:g("#dh-n1")/100,bienTier:g("#dh-n2")/100,bienGC:g("#dh-n3")/100,bienKenh:g("#dh-n4")/100,runway:g("#dh-n5")||30};c.chiNgay=+m.querySelector("#dh-cn").value||0;
-      m.querySelectorAll(".dh-k").forEach(x=>{const k=x.dataset.k,fl=x.dataset.f;c.kenh[k][fl]=fl==="dongGoi"?(+x.value||0):(+x.value||0)/100});
+      m.querySelectorAll(".dh-k").forEach(x=>{const k=x.dataset.k,fl=x.dataset.f;if(!x.disabled||fl==="dongGoi")c.kenh[k][fl]=fl==="dongGoi"?(+x.value||0):(+x.value||0)/100});
+      m.querySelectorAll(".dh-auto").forEach(x=>{c.kenh[x.dataset.k].tay=!x.checked});
       c.luong=L})};
 }
 PAGES.dh=pDieuHanh;
