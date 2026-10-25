@@ -104,13 +104,13 @@ function cpParseMisa(txt){
 function cpPaste(){
   openDrawerHTML(`<h2>Dán từ sổ MISA</h2><p class="hint">Mở file sổ (ví dụ Sổ chi phí 642), bôi chọn các dòng chi (cột Ngày … Diễn giải … Nợ), sao chép rồi dán vào ô dưới. Dòng trùng ngày + số tiền + diễn giải đã có sẽ được bỏ qua. Ảnh bill bổ sung sau.</p>
   <textarea id="cpp-t" rows="9" class="mhq" style="width:100%" placeholder="02/09/2026 BN3594 02/09/2026 Mua VPS 1 tháng 1121 183150 0"></textarea>
-  <div id="cpp-r" class="hint"></div><button class="btn" id="cpp-c">Xem trước</button> <button class="btn pri" id="cpp-ok" hidden>Gửi chị Huệ phân bổ</button>`);
+  <div id="cpp-r" class="hint"></div><button class="btn" id="cpp-c">Xem trước</button> <button class="btn pri" id="cpp-ok" hidden>Đưa vào Chờ phân bổ</button>`);
   let rows=[];
   $("#cpp-c").onclick=()=>{rows=cpParseMisa($("#cpp-t").value);const d=D(),have=new Set([...(d.costs||[]),...(d.costsCho||[]),...(d.costsDoiChieu||[])].map(x=>[x.ngay||x.thang,x.tien,x.note||""].join("|")));
     rows=rows.filter(r=>!have.has([r.ngay,r.tien,r.note].join("|")));
     $("#cpp-r").innerHTML=rows.length?`<b>${rows.length} dòng</b> sẽ gửi, tổng ${nf(Math.round(rows.reduce((t,r)=>t+r.tien,0)))} đ. Web đoán chắc: ${rows.filter(r=>cpDeXuat(r.note).chac).length} dòng.`:"Không tìm thấy dòng nào mới (cần có ngày dd/mm/yyyy, diễn giải, số tiền).";$("#cpp-ok").hidden=!rows.length};
   $("#cpp-ok").onclick=()=>{if(!rows.length)return;DB.mutate(ME.name,"dán chi phí từ sổ MISA",dt=>{cpEnsureCats(dt);if(!dt.costsCho)dt.costsCho=[];rows.forEach(r=>dt.costsCho.push({id:uid("cp"),ngay:r.ngay,thang:r.ngay.slice(0,7),tien:r.tien,note:r.note,by:ME.name,at:Date.now(),method:"CHUYEN_KHOAN",de:cpDeXuat(r.note)}))});
-    closeDrawer();toast("Đã gửi "+rows.length+" khoản cho chị Huệ");renderMain()}}
+    closeDrawer();toast("Đã đưa "+rows.length+" khoản vào Chờ phân bổ");renderMain()}}
 /* ---------- Chị Huệ duyệt và phân bổ ---------- */
 const CP_ST={sel:{}};
 function cpApprove(ids){
@@ -135,7 +135,7 @@ function pCpDuyet(m){
   const tong=L.reduce((t,x)=>t+x.tien,0),files=SOCP.files||{};spLoadFiles();
   const doi=(d.costsDoiChieu||[]);
   m.innerHTML=H("Chờ phân bổ","Chị Thảo ghi, web đề xuất, chị Huệ duyệt · "+L.length+" khoản · "+nf(Math.round(tong))+" đ")+
-  `<div class="filters"><button class="btn pri" id="cp-new">＋ Ghi chi phí</button><button class="btn" id="cp-paste">Dán từ sổ MISA</button><span class="sp"></span>${can2&&chac.length?`<button class="btn pri" id="cp-all">Duyệt ${chac.length} dòng web đoán chắc</button>`:""}</div>
+  `<div class="filters"><button class="btn pri" id="cp-new">＋ Ghi chi phí</button>${can2?`<button class="btn" id="cp-paste">Dán từ sổ MISA</button>`:""}<span class="sp"></span>${can2&&chac.length?`<button class="btn pri" id="cp-all">Duyệt ${chac.length} dòng web đoán chắc</button>`:""}</div>
   ${can2?"":`<div class="note amb">Chị Huệ (kế toán) hoặc chị Hoa duyệt. Em chỉ xem được trạng thái.</div>`}
   <section class="card flush">${L.length?tbl(["Ngày","Diễn giải","Số tiền","Khoản chi","Kênh","Phòng ban","Loại","Ảnh",""],L.map(x=>{const v=val(x),lo=cpLoai(v.cat,v.kenh),bo=CP_BO[v.cat],de=x.de||{};
     return `<tr data-id="${x.id}"><td>${esc(kDd(x.ngay))}</td><td><b>${esc(x.note)}</b><div class="hint">${esc(x.by||"")} · ${de.chac?esc(de.ly):`<span class="t-red">${esc(de.ly||"chưa rõ")}</span>`}</div></td><td class="n"><b>${nf(Math.round(x.tien))}</b></td>
@@ -146,7 +146,7 @@ function pCpDuyet(m){
     <td>${files[x.id]?pill(files[x.id]+" ảnh","blu"):`<span class="hint">chưa có</span>`} <button class="btn sm" data-fi="${x.id}">Ảnh</button></td>
     <td class="nowrap">${can2?`<button class="btn sm pri" data-ok="${x.id}">Duyệt</button> <button class="btn sm danger" data-del="${x.id}">Xóa</button>`:""}</td></tr>`})):`<p class="empty pad">Không có khoản nào chờ. Chị Thảo ghi bằng nút "＋ Ghi chi phí" hoặc dán từ sổ MISA.</p>`}</section>
   <p class="hint">Loại <b>A</b> đi thẳng vào kênh · <b>B</b> của phòng ban (chọn kênh nếu là lương riêng một kênh) · <b>C</b> chi chung công ty, chia cho kênh theo quy tắc ở Sổ chi phí. Nạp quảng cáo, phí sàn đã có trong báo cáo sàn và chuyển nhầm chỉ để đối chiếu, không cộng vào chi phí. ${doi.length?`Đã đối chiếu: ${doi.length} khoản, ${nf(Math.round(doi.reduce((t,x)=>t+x.tien,0)))} đ.`:""}</p>`;
-  $("#cp-new").onclick=()=>cpQuick();$("#cp-paste").onclick=()=>cpPaste();
+  $("#cp-new").onclick=()=>cpQuick();if($("#cp-paste"))$("#cp-paste").onclick=()=>cpPaste();
   if($("#cp-all"))$("#cp-all").onclick=()=>{if(confirm("Duyệt "+chac.length+" dòng theo đề xuất của web?"))cpApprove(chac.map(x=>x.id))};
   m.querySelectorAll("tr[data-id]").forEach(tr=>{const id=tr.dataset.id;tr.querySelectorAll("select[data-f]").forEach(s=>s.onchange=()=>{const r=CP_ST.sel[id]||(CP_ST.sel[id]={});r[s.dataset.f]=s.value;
     if(s.dataset.f==="cat"){const p=(D().costCats||[]).find(c=>c.k===s.value)||CP_CATS_NEW.find(c=>c.k===s.value);if(p&&!r.pb&&p.pb)r.pb=p.pb}renderMain()})});
