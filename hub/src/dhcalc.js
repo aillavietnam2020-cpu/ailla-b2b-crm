@@ -2,7 +2,7 @@
    PHÒNG ĐIỀU HÀNH: hàm tính thuần (không đụng giao diện), chị Hoa duyệt 24/10/2026.
    - Giá thành quản trị = theo giá nhập nguyên liệu MỚI NHẤT (để báo giá, quyết định bán);
      giá thành kế toán = theo giá BÌNH QUÂN (lên sổ). Giá nguyên liệu tăng quá ngưỡng thì báo, kéo theo giá bán / báo giá lỗ.
-   - Tiền đủ chạy bao nhiêu ngày, lãi tạm tính hằng ngày, lãi theo kênh 3 tầng (chia lương, đóng gói, chi phí chung).
+   - Số ngày dự trữ tiền mặt, lãi tạm tính hằng ngày, lãi theo kênh 3 tầng (chia lương, đóng gói, chi phí chung).
    ===================================================================== */
 const DH_CH=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["b2b","B2B / NPP"],["gc","Gia công"]];
 const DH_CFG0=()=>({
@@ -48,7 +48,7 @@ function dhSellCheck(lines,map,costOf,ng){
     return {...l,code:mp.misa_code,cost,bien,thr,min:Math.ceil(cost/(1-thr)/100)*100,red:bien<thr,lo:l.price<cost}})
    .sort((a,b)=>(a.why?1:0)-(b.why?1:0)||(a.bien??9)-(b.bien??9));
 }
-/* ---------- Tiền đủ chạy bao lâu ----------
+/* ---------- Số ngày dự trữ tiền mặt ----------
    tien: số đang có (ngân hàng + tiền mặt), vi: tiền trên ví sàn, thu: khách nợ trong hạn, tra: phải trả sắp tới hạn, chiNgay: chi trung bình mỗi ngày. */
 function dhRunway({tien,vi,thu,tra,chiNgay}){
   const co=(+tien||0)+(+vi||0),ngay=chiNgay>0?Math.floor(co/chiNgay):null,ngay2=chiNgay>0?Math.floor((co+(+thu||0)-(+tra||0))/chiNgay):null;

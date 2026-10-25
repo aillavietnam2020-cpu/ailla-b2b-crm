@@ -132,7 +132,7 @@ function dhTongQuan(){
   const chg=(a,b)=>!b?`<span class="kchg">kỳ trước chưa đủ số</span>`:exChg(a,b);
   const laiTxt=(v,dt,ghi)=>v==null?`<span class="dhm-l">${ghi||"chưa tính được lãi"}</span>`:`<span class="dhm-l">lãi <b class="${v<0?"neg":""}">${tr(v)}</b> · ${dhPct(dt?v/dt:null)}${ghi?" · "+ghi:""}</span>`;
   const leNote=R.filter(r=>!r.co).map(r=>r.n).join(", "),grpTop=g=>g&&g.grp?[...g.grp.values()].sort((a,b)=>b.rev-a.rev).slice(0,3).map(x=>[x.n||"Khác",x.rev]):[];
-  const K=[["money","Tổng doanh thu",tr(tong),chg(tong,tongP)],["trend","Lãi đóng góp",tr(lai),`<span class="kchg">${dhPct(tong?lai/tong:null)} doanh thu</span>`],["bag","Bán lẻ",tr(le.dt),chg(le.dt,le.prev)],["box","Phân phối",tr(pp.dt),chg(pp.dt,pp.prev)],["fac","Gia công",tr(gc.dt),chg(gc.dt,gc.prev)],["wallet","Tiền đủ chạy",T.R.ngay==null?"—":nf(T.R.ngay)+" ngày",`<span class="kchg">${T.last?"số dư "+vnd(T.last.ngay):"chưa nhập số dư"}</span>`]];
+  const K=[["money","Tổng doanh thu",tr(tong),chg(tong,tongP)],["trend","Lãi đóng góp",tr(lai),`<span class="kchg">${dhPct(tong?lai/tong:null)} doanh thu</span>`],["bag","Bán lẻ",tr(le.dt),chg(le.dt,le.prev)],["box","Phân phối",tr(pp.dt),chg(pp.dt,pp.prev)],["fac","Gia công",tr(gc.dt),chg(gc.dt,gc.prev)],["wallet","Số ngày dự trữ tiền mặt",T.R.ngay==null?"—":nf(T.R.ngay)+" ngày",`<span class="kchg">${T.last?"số dư "+vnd(T.last.ngay):"chưa nhập số dư"}</span>`]];
   return `<section class="xkstrip" aria-label="Chỉ số chính">${K.map(([ic,l,v,h])=>`<div class="xk ro${v==="—"?" mut":""}"><span class="xkh"><span class="kic k-${ic}">${ico(ic)}</span><span class="xkl">${l}</span></span><span class="xkv numeric">${v==="—"?"Chưa có số":v}</span><span class="xkm">${h}</span></div>`).join("")}</section>
   <div class="dh3">
    <button type="button" class="dhm" data-go="bc_tiktok"><div class="dhm-h"><span class="kic k-bag">${ico("bag")}</span><div><b>Bán lẻ</b><small>TikTok · Facebook · Shopee</small></div></div><div class="dhm-v numeric">${tr(le.dt)}</div>${chg(le.dt,le.prev)}${laiTxt(le.lai,le.dt,R.some(r=>r.co&&!r.chot)?"tạm tính":"")}
@@ -145,7 +145,7 @@ function dhTongQuan(){
   <div class="xbot">
    <section class="card"><div class="card-h"><h2>Cần xử lý</h2>${pill(todo.length,todo.length?"red":"grn")}</div>${todo.length?todo.map(t=>`<button type="button" class="xal1 lnk" data-go="${t[3]}" style="width:100%;text-align:left">${exDot(t[0])}<span>${esc(t[1])} <span class="hint">· ${esc(t[2])}</span></span></button>`).join(""):`<p class="empty">Không có việc nào.</p>`}</section>
    <section class="card"><div class="card-h"><h2>Tiền</h2><button class="lnk" data-sub="tien">Chi tiết →</button></div>
-    ${[["Đang có (ngân hàng, tiền mặt, ví sàn)",T.last?tr(T.R.co):"chưa nhập"],["Khách còn nợ",T.thu==null?"—":tr(T.thu)],["Nợ nhà cung cấp",tr(T.tra)],["Tiền nằm trong hàng tồn",T.ton?tr(T.ton):"—"],["Đủ chạy",T.R.ngay==null?"— ngày":nf(T.R.ngay)+" ngày"]].map(([l,v])=>`<div class="xal1 ok" style="display:flex;justify-content:space-between"><span>${l}</span><b style="color:#14213d">${v}</b></div>`).join("")}</section>
+    ${[["Đang có (ngân hàng, tiền mặt, ví sàn)",T.last?tr(T.R.co):"chưa nhập"],["Khách còn nợ",T.thu==null?"—":tr(T.thu)],["Nợ nhà cung cấp",tr(T.tra)],["Tiền nằm trong hàng tồn",T.ton?tr(T.ton):"—"],["Số ngày dự trữ tiền mặt",T.R.ngay==null?"— ngày":nf(T.R.ngay)+" ngày"]].map(([l,v])=>`<div class="xal1 ok" style="display:flex;justify-content:space-between"><span>${l}</span><b style="color:#14213d">${v}</b></div>`).join("")}</section>
   </div>
   <p class="hint">${esc(pLabel())} · so với ${vnd(pr.from)} – ${vnd(pr.to)}. Bán lẻ: doanh thu dự kiến sau hủy/hoàn và lãi tạm tính${ttM?"; TikTok dùng số tháng đã chốt":""}. Phân phối, gia công: đơn đã duyệt trong CRM, lãi sau giá vốn (chưa trừ chi phí chung). Bấm từng mảng để xem chi tiết.</p>`;
 }
@@ -174,8 +174,8 @@ function dhTabGia(){
 function dhTabTien(){
   const T=dhCalcTien(),ng=T.cfg.nguong,R=T.R,l=T.last;
   const den=R.ngay==null?pill("Chưa tính được","gry"):R.ngay<ng.runway?pill("Dưới "+ng.runway+" ngày","red"):pill("Ổn","grn");
-  return `<div class="grid kpis">${kpi("Tiền đang có",l?tr(R.co):"—",l?"ngân hàng, tiền mặt, ví sàn · ngày "+vnd(l.ngay):"chưa nhập số dư")}${kpi("Đủ chạy",R.ngay==null?"—":nf(R.ngay)+" ngày",R.ngay2!=null?"tính cả nợ phải thu, phải trả: "+nf(R.ngay2)+" ngày":"",R.ngay!=null&&R.ngay<ng.runway?"var(--red)":"")}${kpi("Khách còn nợ",T.thu==null?"—":tr(T.thu),"công nợ chính thức (CRM)")}${kpi("Nợ nhà cung cấp",tr(T.tra),(DH.debts||[]).filter(r=>r.balance>0).length+" nhà cung cấp")}${kpi("Tiền nằm trong hàng tồn",T.ton?tr(T.ton):"—",T.tonThieu?T.tonThieu+" mã tồn chưa có giá":"theo giá bình quân")}</div>
-  <section class="card"><div class="card-h"><h2>Tiền đủ chạy bao lâu</h2>${den}</div>
+  return `<div class="grid kpis">${kpi("Tiền đang có",l?tr(R.co):"—",l?"ngân hàng, tiền mặt, ví sàn · ngày "+vnd(l.ngay):"chưa nhập số dư")}${kpi("Số ngày dự trữ tiền mặt",R.ngay==null?"—":nf(R.ngay)+" ngày",R.ngay2!=null?"tính cả nợ phải thu, phải trả: "+nf(R.ngay2)+" ngày":"",R.ngay!=null&&R.ngay<ng.runway?"var(--red)":"")}${kpi("Khách còn nợ",T.thu==null?"—":tr(T.thu),"công nợ chính thức (CRM)")}${kpi("Nợ nhà cung cấp",tr(T.tra),(DH.debts||[]).filter(r=>r.balance>0).length+" nhà cung cấp")}${kpi("Tiền nằm trong hàng tồn",T.ton?tr(T.ton):"—",T.tonThieu?T.tonThieu+" mã tồn chưa có giá":"theo giá bình quân")}</div>
+  <section class="card"><div class="card-h"><h2>Số ngày dự trữ tiền mặt</h2>${den}</div>
    ${tbl(["Khoản","Số tiền","Lấy từ"],[["Ngân hàng + tiền mặt",l?l.tien:null,l?"kế toán nhập ngày "+vnd(l.ngay):"chưa nhập"],["Ví TikTok Shop chưa rút",l?l.viTT:null,"kế toán nhập"],["Ví Shopee chưa rút",l?l.viSPE:null,"kế toán nhập"],["Khách còn nợ (sắp về)",T.thu,"CRM B2B"],["Nợ nhà cung cấp (sắp trả)",-T.tra,"Mua hàng › Công nợ nhà cung cấp"],["Chi trung bình mỗi ngày",T.chiNgay||null,T.chiTu||"chưa có: nhập ở Thiết lập hoặc Chi phí theo tháng"]].map(r=>`<tr><td>${r[0]}</td><td class="n">${r[1]==null?"—":dhN(r[1])}</td><td class="hint">${esc(r[2])}</td></tr>`))}
    ${R.ngay==null?dhNeed("cần số dư tiền và chi trung bình mỗi ngày để tính.","Kế toán nhập số dư hằng tuần ở ô dưới; chi mỗi ngày nhập ở Thiết lập."):""}</section>
   <section class="card"><div class="card-h"><h2>Nhập số dư tiền (hằng tuần)</h2></div><form class="frm" id="dh-tf"><div class="row4"><label class="field">Ngày<input type="date" id="dh-t-d" value="${iso(new Date())}" required></label><label class="field">Ngân hàng + tiền mặt (đ)<input type="number" id="dh-t-t" min="0" required></label><label class="field">Ví TikTok Shop (đ)<input type="number" id="dh-t-v1" min="0"></label><label class="field">Ví Shopee (đ)<input type="number" id="dh-t-v2" min="0"></label></div><label class="field">Ghi chú<input id="dh-t-n"></label><button class="btn pri">Lưu số dư</button></form>
@@ -203,7 +203,7 @@ function dhTabCaiDat(){
    <label class="field">Biên tối thiểu bảng giá cấp (%)<input type="number" step="0.1" id="dh-n2" value="${ng.bienTier*100}"></label>
    <label class="field">Biên tối thiểu báo giá gia công (%)<input type="number" step="0.1" id="dh-n3" value="${ng.bienGC*100}"></label>
    <label class="field">Biên đóng góp kênh mục tiêu (%)<input type="number" step="0.1" id="dh-n4" value="${ng.bienKenh*100}"></label>
-   <label class="field">Tiền đủ chạy tối thiểu (ngày)<input type="number" id="dh-n5" value="${ng.runway}"></label>
+   <label class="field">Số ngày dự trữ tiền mặt tối thiểu<input type="number" id="dh-n5" value="${ng.runway}"></label>
    <label class="field">Chi trung bình mỗi ngày (đ, để trống = lấy chi phí tháng trước ÷ 30)<input type="number" id="dh-cn" value="${c.chiNgay||""}"></label></div></section>
   <section class="card"><div class="card-h"><h2>Tỷ lệ tạm tính theo kênh</h2></div>
    ${tbl(["Kênh","Tự lấy từ số thật","Còn lại sau hủy/hoàn (%)","Giá vốn / doanh thu (%)","Phí sàn / doanh thu (%)","Đóng gói mỗi đơn (đ)","Đang dùng"],["tts","spe","fb"].map(k=>{const auto=!K[k].tay,V=auto?AR.K[k]:K[k];return `<tr><td><b>${(DH_CH.find(x=>x[0]===k)||[])[1]}</b></td><td><input type="checkbox" class="dh-auto" data-k="${k}"${auto?" checked":""}></td>${["thuan","gv","phi"].map(f=>`<td><input type="number" step="0.1" class="dh-k" data-k="${k}" data-f="${f}" value="${+(V[f]*100).toFixed(2)}"${auto?" disabled":""}></td>`).join("")}<td><input type="number" class="dh-k" data-k="${k}" data-f="dongGoi" value="${K[k].dongGoi||0}"></td><td class="hint">${esc(AR.src[k])}</td></tr>`}))}
@@ -252,11 +252,11 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const mod={k:"q_dh",adm:true,zone:"Quản trị",ic:"trend",n:"Phòng điều hành",sub:"",groups:()=>[["",[MI("dh","Phòng điều hành",u=>u.role==="admin"||dhOk())].concat(reports())]]};
   const i=MODULES.findIndex(x=>x.k==="q_tq");MODULES.splice(i>=0?i+1:MODULES.length,0,mod);
 }
-/* Cảnh báo điều hành ở Tổng quan công ty: giá nguyên liệu tăng, giá bán dưới ngưỡng, tiền đủ chạy thấp. */
+/* Cảnh báo điều hành ở Tổng quan công ty: giá nguyên liệu tăng, giá bán dưới ngưỡng, số ngày dự trữ tiền mặt thấp. */
 {const _ea=execAlerts;execAlerts=function(){const A=_ea.apply(this,arguments);
   try{if(dhOk()&&typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){dhLoad();if(DH.at){const G=dhCalcGia(),T=dhCalcTien(),out=[];
     if(G.up.length)out.push(["red",`${G.up.length} nguyên liệu tăng giá từ ${dhPct(G.cfg.nguong.nvlTang)}`,"Phòng điều hành › Giá thành & cảnh báo","dh"]);
     if(G.red.length)out.push(["red",`${G.red.length} giá bán / báo giá gia công dưới ngưỡng biên`,"Phòng điều hành › Giá thành & cảnh báo","dh"]);
-    if(T.R.ngay!=null&&T.R.ngay<T.cfg.nguong.runway)out.push(["red",`Tiền chỉ đủ chạy ${T.R.ngay} ngày`,"Phòng điều hành › Tiền & cảnh báo","dh"]);
+    if(T.R.ngay!=null&&T.R.ngay<T.cfg.nguong.runway)out.push(["red",`Số ngày dự trữ tiền mặt chỉ còn ${T.R.ngay} ngày`,"Phòng điều hành › Tiền & cảnh báo","dh"]);
     return out.concat(A)}}}catch(e){}
   return A}}
