@@ -1,0 +1,69 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { readFileSync } from 'node:fs';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createTestContext, seedUsers, USERS, type TestContext } from '../helpers/app';
+
+/** Agent Kế toán trưởng nạp báo cáo TikTok hằng tuần (chị Hoa duyệt 25/10/2026). */
+let ctx: TestContext;
+
+beforeEach(async () => {
+  ctx = createTestContext();
+  await seedUsers(ctx.db);
+});
+
+async function agentCall(token: string, path: string, method = 'GET', body?: unknown) {
+  const res = await ctx.app.fetch(
+    new Request(`http://localhost${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+    ctx.env,
+    { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext,
+  );
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+async function makeAgent(name: string, scopes: string[]) {
+  const res = await ctx.request('/api/admin/agents', { as: USERS.ceo, body: { name, scopes } });
+  expect(res.status).toBe(201);
+  return res.body.data as { id: string; token: string };
+}
+const month = (ky: string, den: string | null, dt = 100) => ({ data: { ky, M: { den } }, summary: { ky, den, dt, don: 1 }, files: { orders: 'a.xlsx' } });
+
+describe('Agent nạp báo cáo TikTok', () => {
+  it('agent không có phạm vi Báo cáo sàn thì không đọc, không ghi được', async () => {
+    const a = await makeAgent('Kế toán thử', ['orders', 'debts']);
+    expect((await agentCall(a.token, '/api/agent/tiktok/months')).status).toBe(403);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-10', 'PUT', month('2026-10', '2026-10-21'))).status).toBe(403);
+  });
+
+  it('bản giữa tháng ghi được, bản mới hơn thay bản cũ, có nhật ký người làm là agent', async () => {
+    const a = await makeAgent('Kế toán trưởng thử', ['baocao_san']);
+    expect((await agentCall(a.token, '/api/agent/tiktok/inputs?ky=2026-10')).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-10', 'PUT', month('2026-10', '2026-10-14'))).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-10', 'PUT', month('2026-10', '2026-10-21', 200))).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-10', 'PUT', month('2026-10', '2026-10-07'))).status).toBe(409);
+    const ms = await agentCall(a.token, '/api/agent/tiktok/months');
+    expect(ms.body.data[0]).toMatchObject({ ky: '2026-10', den: '2026-10-21', dt: 200, locked: false });
+    const log = await ctx.db.prepare("SELECT actor_type, source FROM audit_logs WHERE action = 'TTS_MONTH_SAVE'").all<any>();
+    expect(log.results).toHaveLength(2);
+    expect(log.results[0]).toMatchObject({ actor_type: 'AGENT', source: 'agent-tiktok' });
+    const days = await agentCall(a.token, '/api/agent/tiktok/days', 'PUT', { src: 'ads', days: { '2026-10-01': { chi: 1000 }, x: {} } });
+    expect(days.body.data).toMatchObject({ n: 1 });
+  });
+
+  it('không thay bản chốt sổ đầy đủ, không ghi tháng đã khoá sổ, không có đường khoá sổ', async () => {
+    const a = await makeAgent('Kế toán trưởng thử', ['baocao_san']);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-09', 'PUT', month('2026-09', null))).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-09', 'PUT', month('2026-09', '2026-09-20'))).status).toBe(409);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-09/lock', 'POST', { lock: true })).status).toBe(404);
+    await ctx.db.prepare("UPDATE tts_month SET locked_at = '2026-10-08T00:00:00Z' WHERE ky = '2026-09'").run();
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-09', 'PUT', month('2026-09', null))).status).toBe(409);
+    expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-11', 'PUT', month('2026-11', '2026-10-30'))).status).toBe(400);
+  });
+
+  it('công cụ của agent dùng đúng công thức của trang Tải file tháng', () => {
+    expect(readFileSync('vps-skill/nap-bao-cao-tiktok/ttcalc.js', 'utf8')).toBe(readFileSync('hub/src/ttcalc.js', 'utf8'));
+  });
+});

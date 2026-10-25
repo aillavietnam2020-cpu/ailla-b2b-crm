@@ -20,6 +20,7 @@ import { workRoutes } from './routes/work';
 import { staffPurchaseRoutes } from './routes/staffPurchases';
 import { shippingVoucherRoutes } from './routes/shippingVouchers';
 import { agentRoutes } from './routes/agent';
+import { agentTiktokRoutes } from './routes/agentTiktok';
 import { agentAdminRoutes } from './routes/agents';
 import { agentChatRoutes, agentRelayRoutes } from './routes/agentChat';
 import { agentTrainRoutes, agentTrainRelayRoutes } from './routes/agentTrain';
@@ -115,6 +116,7 @@ export function createApp() {
   app.route('/api/shipping-vouchers', shippingVoucherRoutes);
   app.route('/api/work', workRoutes);
   app.route('/api/staff-purchases', staffPurchaseRoutes);
+  app.route('/api/agent/tiktok', agentTiktokRoutes);
   app.route('/api/agent', agentRoutes);
   // Nhắn agent trên web: chạy được cả ở trang vận hành, vẫn chỉ CEO.
   app.route('/api/agent-chat/stt', sttRoutes);
