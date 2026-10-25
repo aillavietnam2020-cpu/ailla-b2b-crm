@@ -6,7 +6,7 @@
    ===================================================================== */
 const DH_CH=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["b2b","B2B / NPP"],["gc","Gia công"]];
 const DH_CFG0=()=>({
-  nguong:{nvlTang:0.05,bienTier:0.25,bienGC:0.15,runway:30,bienKenh:0.185},
+  nguong:{nvlTang:0.05,bienTier:0.25,bienGC:0.15,runway:30,bienKenh:0.185,qcMax:0.38},
   kenh:{tts:{thuan:0.9,gv:0.19,phi:0.3,dongGoi:0},spe:{thuan:0.9,gv:0.2,phi:0.25,dongGoi:0},fb:{thuan:0.85,gv:0.2,phi:0,dongGoi:0}},
   luong:[],chiNgay:0,tien:[]});
 /* Gộp thiết lập đã lưu với mặc định (thiếu khoá nào thì lấy mặc định). */

@@ -121,7 +121,7 @@ function dhTongQuan(){
   const tong=le.dt+pp.dt+gc.dt,lai=le.lai+pp.lai+gc.lai,tongP=leOK&&(!pp.dt||pp.prev)?le.prev+pp.prev+gc.prev:0;
   const Gc=dhCalcGia(),T=dhCalcTien(),todo=[];
   if(ttM){const td=(TSB.data&&Object.values(TSB.data).find(x=>x&&x.data&&full.includes(x.data.ky)));const t=td&&td.data&&td.data.todo;if(t&&(t.noMap.length||t.miss.length))todo.push(["red",`TikTok: ${t.noMap.length} mã chưa quy đổi, ${t.miss.length} mã thiếu giá vốn`,"kế toán","bc_tiktok"])}
-  R.filter(r=>r.co&&r.dt&&r.ads/r.dt>0.25).forEach(r=>todo.push(["amb",`${r.n}: quảng cáo ${dhPct(r.ads/r.dt)} doanh thu`,"team "+r.n,"dh"]));
+  R.filter(r=>r.co&&r.dt&&r.ads/r.dt>dhGet().nguong.qcMax).forEach(r=>todo.push(["amb",`${r.n}: quảng cáo ${dhPct(r.ads/r.dt)} doanh thu`,"team "+r.n,"dh"]));
   R.filter(r=>!r.co).forEach(r=>todo.push(["amb",`${r.n}: chưa có số trong kỳ`,r.ch==="spe"?"team Shopee tải file":"tải số liệu","bc_"+(r.ch==="tts"?"tiktok":r.ch==="spe"?"shopee":"fb")]));
   sB.concat(sG).forEach(l=>todo.unshift(["red",`${l.channel==="GIA_CONG"?"Gia công":"Phân phối"}: ${l.name} (${l.sku}) xuất ${nf(l.qty)} giá 0đ, giá vốn ${tr(l.cost)} — nghi nhập sai, đã tạm loại khỏi lãi`,"kế toán kiểm đơn",l.channel==="GIA_CONG"?"bc_gc":"bc_b2b"]));
   if(B&&B.has&&B.cover<0.95)todo.push(["amb",`Phân phối: ${dhPct(1-B.cover)} doanh thu chưa có giá vốn`,"kế toán","bc_b2b"]);
@@ -203,6 +203,7 @@ function dhTabCaiDat(){
    <label class="field">Biên tối thiểu bảng giá cấp (%)<input type="number" step="0.1" id="dh-n2" value="${ng.bienTier*100}"></label>
    <label class="field">Biên tối thiểu báo giá gia công (%)<input type="number" step="0.1" id="dh-n3" value="${ng.bienGC*100}"></label>
    <label class="field">Biên đóng góp kênh mục tiêu (%)<input type="number" step="0.1" id="dh-n4" value="${ng.bienKenh*100}"></label>
+   <label class="field">Quảng cáo tối đa trên doanh thu thực (%), vượt thì báo đỏ<input type="number" step="0.1" id="dh-n6" value="${+(ng.qcMax*100).toFixed(2)}"></label>
    <label class="field">Số ngày dự trữ tiền mặt tối thiểu<input type="number" id="dh-n5" value="${ng.runway}"></label>
    <label class="field">Chi trung bình mỗi ngày (đ, để trống = lấy chi phí tháng trước ÷ 30)<input type="number" id="dh-cn" value="${c.chiNgay||""}"></label></div></section>
   <section class="card"><div class="card-h"><h2>Tỷ lệ tạm tính theo kênh</h2></div>
@@ -235,7 +236,7 @@ function dhBind(m,tab){
     if(!s.dt){toast("Tháng đã lưu chưa có doanh thu");return}
     dhSave("lấy tỷ lệ TikTok tháng "+L.ky,c=>{c.kenh.tts.gv=s.gv/s.dt;c.kenh.tts.phi=-s.phi/s.dt;if(gmv)c.kenh.tts.thuan=s.dt/gmv})};
   const f=m.querySelector("#dh-cf");if(f)f.onsubmit=e=>{e.preventDefault();const g=id=>+(m.querySelector(id).value),L=DH.form.luong.filter(t=>t.team||t.tien);DH.form=null;
-    dhSave("sửa thiết lập Phòng điều hành",c=>{c.nguong={nvlTang:g("#dh-n1")/100,bienTier:g("#dh-n2")/100,bienGC:g("#dh-n3")/100,bienKenh:g("#dh-n4")/100,runway:g("#dh-n5")||30};c.chiNgay=+m.querySelector("#dh-cn").value||0;
+    dhSave("sửa thiết lập Phòng điều hành",c=>{c.nguong={nvlTang:g("#dh-n1")/100,bienTier:g("#dh-n2")/100,bienGC:g("#dh-n3")/100,bienKenh:g("#dh-n4")/100,runway:g("#dh-n5")||30,qcMax:(g("#dh-n6")||38)/100};c.chiNgay=+m.querySelector("#dh-cn").value||0;
       m.querySelectorAll(".dh-k").forEach(x=>{const k=x.dataset.k,fl=x.dataset.f;if(!x.disabled||fl==="dongGoi")c.kenh[k][fl]=fl==="dongGoi"?(+x.value||0):(+x.value||0)/100});
       m.querySelectorAll(".dh-auto").forEach(x=>{c.kenh[x.dataset.k].tay=!x.checked});
       c.luong=L})};
