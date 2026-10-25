@@ -306,7 +306,7 @@ function fchDraw(keep){
   el.querySelector("[data-fchgo]").onclick=()=>{FPC.ls="cho";FPC.pick.clear();const c=D().cards.filter(x=>x.kenh===BV.k&&fpcStOf(x)==="cho"&&fpcDate(x)).sort((a,b)=>fpcDate(a).localeCompare(fpcDate(b)))[0];
     if(c&&(fpcDate(c)<fpcRange()[0]||fpcDate(c)>fpcRange()[1])){FPC.view="month";FPC.y=+fpcDate(c).slice(0,4);FPC.m=+fpcDate(c).slice(5,7)}
     fchToggle(false);renderMain();setTimeout(()=>{const l=document.querySelector(".fpc-list");if(l)l.scrollIntoView({behavior:"smooth",block:"start"})},150)};
-  el.querySelectorAll("[data-fchq]").forEach(b=>b.onclick=()=>{FCH.text=b.dataset.fchq;fchDraw();const t2=document.getElementById("fch-t");if(t2)t2.focus()});
+  el.querySelectorAll("[data-fchq]").forEach(b=>b.onclick=()=>{const t2=document.getElementById("fch-t");FCH.text=b.dataset.fchq;if(t2){t2.value=FCH.text;t2.focus();t2.setSelectionRange(t2.value.length,t2.value.length)}});
   el.querySelector("[data-fchsend]").onclick=()=>fchSend()}
 async function fchPoll(first){
   if(!FCH.agent||FCH.busy)return;FCH.busy=true;
