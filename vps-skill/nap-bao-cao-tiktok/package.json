@@ -1,0 +1,6 @@
+{
+  "name": "nap-bao-cao-tiktok",
+  "private": true,
+  "type": "module",
+  "dependencies": { "xlsx": "0.18.5" }
+}

@@ -13,7 +13,7 @@ export const AGENT_PERMISSIONS = ['agent.read', 'agent.propose', 'agent.act', 'a
  *  xuong = Công xưởng SX video
  */
 export const AGENT_SCOPE_PREFIX = 'agent.scope.';
-export const AGENT_SCOPES = ['orders', 'orders_kho', 'debts', 'kho', 'mkt_content', 'mkt_digital', 'xuong'] as const;
+export const AGENT_SCOPES = ['orders', 'orders_kho', 'debts', 'kho', 'mkt_content', 'mkt_digital', 'xuong', 'baocao_san'] as const;
 export type AgentScope = (typeof AGENT_SCOPES)[number];
 export const AGENT_SCOPE_LABELS: Record<AgentScope, string> = {
   orders: 'Đơn hàng',
@@ -23,6 +23,7 @@ export const AGENT_SCOPE_LABELS: Record<AgentScope, string> = {
   mkt_content: 'Marketing: team Content',
   mkt_digital: 'Marketing: team Digital',
   xuong: 'Công xưởng SX video',
+  baocao_san: 'Nạp báo cáo sàn TikTok (số tháng, quảng cáo theo ngày)',
 };
 export const AGENT_SCOPE_PERMISSIONS: string[] = AGENT_SCOPES.map((s) => AGENT_SCOPE_PREFIX + s);
 
