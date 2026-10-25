@@ -316,3 +316,30 @@ describe('Phiếu chi nhà cung cấp: tiền mặt / chuyển khoản, tài kho
   });
 });
 
+describe('Điều khoản thanh toán nhà cung cấp và ảnh khoản chi', () => {
+  it('ghi được điều khoản trước / sau nhận / công nợ N ngày, sửa được, giá trị lạ bị từ chối', async () => {
+    const a = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC chuyển khoản trước', pay_terms: 'TRUOC' } });
+    expect(a.status).toBe(200);
+    const b = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC công nợ 30 ngày', pay_terms: 'CONG_NO', pay_days: 30 } });
+    expect(b.status).toBe(200);
+    expect((await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC sai', pay_terms: 'LUNG_TUNG' } })).status).toBe(400);
+    const put = await ctx.request(`${BASE}/suppliers/${a.body.data.id}`, { method: 'PUT', as: USERS.ceo, body: { pay_terms: 'SAU_NHAN', bank: 'ACB', bank_account_no: '123', bank_account_name: 'CTY A' } });
+    expect(put.status).toBe(200);
+    const list = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo });
+    const x = list.body.data.find((s: { id: string }) => s.id === a.body.data.id);
+    expect(x).toMatchObject({ pay_terms: 'SAU_NHAN', pay_days: 0, bank: 'ACB', bank_account_no: '123' });
+    expect(list.body.data.find((s: { id: string }) => s.id === b.body.data.id)).toMatchObject({ pay_terms: 'CONG_NO', pay_days: 30 });
+    const kho = await ctx.request(`${BASE}/suppliers`, { as: KT });
+    expect(kho.body.data[0]).toHaveProperty('pay_terms');
+    expect(kho.body.data[0]).not.toHaveProperty('opening_debt');
+  });
+
+  it('đính kèm ảnh cho khoản chi nhập tay; đếm ảnh; kho không đụng được', async () => {
+    const up = await ctx.request(`${BASE}/costs/cp-abc123/files`, { as: USERS.ceo, body: { name: 'bill.png', mime: 'image/png', data: 'iVBORw0KGgo=' } });
+    expect(up.status).toBe(200);
+    const cnt = await ctx.request(`${BASE}/costs/file-counts`, { as: USERS.ceo });
+    expect(cnt.body.data['cp-abc123']).toBe(1);
+    expect((await ctx.request(`${BASE}/costs/cp-abc123/files`, { as: KT })).status).toBe(403);
+  });
+});
+
