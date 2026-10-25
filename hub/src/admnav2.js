@@ -30,14 +30,11 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const pick=(P,keys,names)=>keys.map((id,i)=>{const it=P[id];return it?[it[0],(names&&names[i])||it[1],it[2],it[3]]:null}).filter(Boolean);
   /* Gom theo KÊNH BÁN: một kênh = một mục, bên trong có kết quả, khách, đơn, công nợ, bảng giá (không tách B2B, đại lý, NPP thành nhiều chỗ). */
   PAGE_SETS.push(
-    {adm:true,n:"B2B / Đại lý (NPP)",ids:["bc_b2b","npp360","cr_kh","cr_dn","cr_cn","cr_ret","cr_thuong","cr_gia","cr_dc","cr_rp"],labels:["Kết quả kinh doanh","Hồ sơ khách","Danh sách khách","Đơn hàng & duyệt","Công nợ","Hàng trả lại","Thưởng & xếp hạng","Bảng giá","Giá điều chỉnh","Dashboard CRM"]},
-    {adm:true,n:"Gia công",ids:["gc_tq","bc_gc","gc_don","gc_kh","gc_cn","cr_giagc"],labels:["Tổng quan","Lãi lỗ","Đơn gia công","Khách gia công","Công nợ","Bảng giá riêng"]},
-    {adm:true,n:"Facebook",ids:["bc_fb","fb_cskh"],labels:["Doanh thu & lãi lỗ","Chăm sóc khách"]},
     {adm:true,n:"Giá thành & định mức",ids:["kho_boc","kho_cl","sku","kho_dm"],labels:["Định mức & giá thành","Chênh lệch định mức","Giá vốn SKU","Định mức theo sản phẩm"]});
   const tabMod=(k,ic,n,zone,keys,names)=>({k,adm:true,zone,ic,n,sub:"",groups:()=>[["",pick(pool(),keys,names)]]});
   MODULES.push(
     {k:"q_tq",adm:true,zone:"Điều hành",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",pick(pool(),["exec"],["Tổng quan"])]]},
-    tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","fb_cskh","bc_b2b","npp360","cr_kh","cr_dn","cr_cn","cr_ret","cr_thuong","cr_gia","cr_dc","cr_rp","gc_tq","bc_gc","gc_don","gc_kh","gc_cn","cr_giagc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","Facebook · chăm sóc khách","B2B / Đại lý (NPP)","Hồ sơ khách","Danh sách khách","Đơn hàng & duyệt","Công nợ","Hàng trả lại","Thưởng & xếp hạng","Bảng giá","Giá điều chỉnh","Dashboard CRM","Gia công","Lãi lỗ gia công","Đơn gia công","Khách gia công","Công nợ gia công","Bảng giá riêng","CSKH cũ"]),
+    tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu","cr_dn"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý (NPP)","Gia công","CSKH cũ","Đơn B2B cần duyệt"]),
     tabMod("q_ll","spark","Lãi lỗ","",["pl","bc_tong","kho_boc","kho_cl","sku","kho_dm"],["P&L công ty","So sánh kênh","Giá thành & định mức","Chênh lệch định mức","Giá vốn SKU","Định mức theo sản phẩm"]),
     tabMod("q_cp","fin","Tiền & chi phí","",["tien_lich","phai_thu","mh_no","so_cp","ngan_sach","chiphi","cr_vc","doisoat","cr_bill"],["Tiền & lịch chi","Phải thu & tuổi nợ","Phải trả nhà cung cấp","Sổ chi phí","Ngân sách","Chi phí theo tháng","Phiếu chi vận chuyển","Đối soát tiền về","Kho bill giao dịch"]),
     tabMod("q_mh","cart","Mua hàng","Nghiệp vụ",["mh_po","mh_hd","mh_chi","mh_gianvl"],["Đơn mua hàng","Chứng từ nhà cung cấp","Phiếu chi nhà cung cấp","Giá nguyên vật liệu theo tháng"]),
@@ -45,6 +42,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     {k:"q_cfg",adm:true,zone:"Hệ thống",ic:"gear",n:"Cấu hình",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
       return [g("Tài khoản",["nhansu","phongban"],["Tài khoản & phân quyền","Phòng ban"]),
         g("Danh mục",["sanpham","kenhban","chiphidm","cr_rcv"],["Sản phẩm","Kênh bán & phí","Danh mục chi phí","Tài khoản nhận tiền"]),
+        g("Chính sách bán hàng",["cr_gia","cr_dc","cr_thuong","cr_giagc"],["Bảng giá","Giá điều chỉnh / khuyến mại","Cơ chế thưởng & xếp hạng NPP","Bảng giá riêng gia công"]),
         g("Dữ liệu & AI",["cr_import","caidat","bots","agentchat","agents","quychuan"],["Dữ liệu","Sao lưu dữ liệu","Trợ lý AI","Điều hành agent","Agent AI","Quy chuẩn"]),
         g("Theo dõi",["quytac","nguong","soat_sl","cr_audit"],["Quy tắc vận hành & luồng việc","Ngưỡng cảnh báo & chỉ số","Máy soát số liệu","Nhật ký"])].filter(x=>x[1].length)}});
 
