@@ -187,7 +187,7 @@ PAGES.cr_import=m=>{m.innerHTML=H("Nhập dữ liệu CRM B2B","Tải file Sheet
 /* Agent AI: tài khoản + khóa riêng cho agent (chỉ CEO). Agent chỉ đọc và ghi ĐỀ XUẤT qua /api/agent, không tự đổi dữ liệu. */
 let SV_AGENTS=null,SV_AGENT_TOKEN=null;
 /* Phạm vi đọc của agent theo vai (khớp AGENT_SCOPES ở máy chủ). Chị tích/bỏ tích rồi bấm Lưu. */
-const AG_SCOPES=[["orders","Đơn hàng"],["orders_kho","Đơn chờ kho"],["debts","Khách và công nợ"],["kho","Kho, hóa chất, pha chế"],["mkt_content","Marketing: Content"],["mkt_digital","Marketing: Digital"],["xuong","Công xưởng SX video"]];
+const AG_SCOPES=[["orders","Đơn hàng"],["orders_kho","Đơn chờ kho"],["debts","Khách và công nợ"],["kho","Kho, hóa chất, pha chế"],["mkt_content","Marketing: Content"],["mkt_digital","Marketing: Digital"],["xuong","Công xưởng SX video"],["baocao_san","Nạp báo cáo sàn TikTok"]];
 function svLoadAgents(){return svApi("/api/admin/agents").then(r=>{SV_AGENTS=r||[];if(PAGE==="agents")renderMain()}).catch(()=>{SV_AGENTS=SV_AGENTS||[]})}
 PAGES.agents=m=>{
   if(SV_AGENTS===null){m.innerHTML=H("Agent AI","Đang tải…");svLoadAgents();return}
