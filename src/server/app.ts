@@ -31,6 +31,7 @@ import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
+import { fpPublishRoutes } from './routes/fpPublish';
 import { sttRoutes, sttWorkerRoutes } from './routes/stt';
 import { khoRoutes } from './routes/kho';
 import { tiktokRoutes } from './routes/tiktok';
@@ -127,6 +128,7 @@ export function createApp() {
   app.route('/api/imports', importRoutes);
   app.route('/api/dashboards', dashboardRoutes);
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
+  app.route('/api/hub/fp-publish', fpPublishRoutes);
   app.route('/api/hub/kho', khoRoutes);
   app.route('/api/hub/tiktok', tiktokRoutes);
   app.route('/api/hub/dieuhanh', dieuhanhRoutes);
