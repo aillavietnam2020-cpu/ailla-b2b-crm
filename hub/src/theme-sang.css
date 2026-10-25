@@ -483,3 +483,9 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 .sk-gry{border-left-color:#c9cedd}
 @media(max-width:1200px){.skg{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:640px){.skg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Tổng quan › Lãi theo kênh gọn */
+.kvt td.kvn{min-width:150px}.kvchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.kvchips .pill{font-size:10.5px;padding:1px 8px}
+.kvb{font-weight:700}.kvb.kg{color:#1a7f37}.kvb.ka{color:#9a6700}.kvb.kr{color:#b42318}
+.kvsrc{padding:10px 16px 14px;border-top:1px solid #eef0f6}.kvsrc summary{cursor:pointer;color:#4b54d1;font-weight:600;font-size:13px}
+.kvsrc ul{margin:8px 0 6px 18px;padding:0;font-size:12.5px;color:#4a5168;line-height:1.5}
