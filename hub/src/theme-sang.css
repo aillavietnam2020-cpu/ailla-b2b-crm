@@ -404,3 +404,8 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 .vctag.red{background:#fdecea;color:#b42318}.vctag.amb{background:#fff4dc;color:#9a6700}.vctag.blu{background:#e6efff;color:#1d4ed8}
 .vcmore{background:none;border:0;color:#4b54d1;font:inherit;font-weight:600;cursor:pointer;padding:8px 0 0}
 @media(max-width:640px){.vctag{width:auto;padding:3px 8px}.vct small{white-space:normal}}
+
+/* Tiền & lịch chi */
+.tlh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.tlw{border-top:1px solid #eef0f6;padding:8px 0}.tlwh{display:flex;align-items:baseline;gap:10px}.tlwh small{color:#7a8199;flex:1}.tlsum{font-weight:700}.tlsum.z{color:#9aa1b5;font-weight:400}
+.tlr{display:flex;justify-content:space-between;padding:3px 0 3px 12px;font-size:13px;color:#3b4258}.tlr small{color:#7a8199}
