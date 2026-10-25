@@ -2,7 +2,7 @@
    NGÂN SÁCH CHI PHÍ THEO THÁNG (trang quản trị › Chi phí & Tiền).
    Mỗi tháng đặt ngân sách theo NHÓM chi phí × PHÒNG BAN. "Đã chi" lấy từ Sổ chi phí (nhập tay, phiếu chi nhà cung cấp, vận chuyển, quảng cáo tự cộng).
    Hiện đủ ô: ngân sách, đã chi, còn lại. Quá 85% ngân sách báo vàng, quá 100% báo đỏ.
-   Lưu ở dữ liệu trang quản trị: D().budgets["yyyy-mm"]["nhóm||phòng ban"] = số tiền. Chị Hoa, Thảo, Huệ sửa thẳng.
+   Lưu ở ngăn tài chính riêng (chỉ CEO và kế toán đọc được): D().fin.budgets["yyyy-mm"]["nhóm||phòng ban"] = số tiền. Chị Hoa, Thảo, Huệ sửa thẳng.
    ===================================================================== */
 const NS={edit:false};
 const nsYm=()=>{const a=PERIOD.from.slice(0,7),b=PERIOD.to.slice(0,7);return a===b?a:""};
@@ -14,7 +14,7 @@ function pNganSach(m){
   const ym=nsYm();
   if(!ym){m.innerHTML=H(T,S)+`<div class="note">Ngân sách đặt theo từng tháng. Chị chọn <b>một tháng</b> ở ô thời gian phía trên (ví dụ “Tháng này”) để xem và đặt ngân sách.</div>`;return}
   if(!MH.pay){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
-  const d=D(),ed=mhManage()||can(ME,"chiphi.nhap"),B=(d.budgets||{})[ym]||{},A=nsActual();
+  const d=D(),ed=mhManage()||can(ME,"chiphi.nhap"),B=((d.fin||{}).budgets||{})[ym]||{},A=nsActual();
   const nhoms=[...new Set([...(d.costCats||[]).map(c=>c.nhom),...Object.keys(A).map(k=>k.split("||")[0]),...Object.keys(B).map(k=>k.split("||")[0])])].filter(Boolean);
   const pbSet=[...new Set([...(d.departments||[]).map(p=>p.n),...Object.keys(A).map(k=>k.split("||")[1]),...Object.keys(B).map(k=>k.split("||")[1])])];
   const pbs=pbSet.filter(p=>p!==""),hasBlank=pbSet.includes("");if(hasBlank)pbs.push("");
@@ -35,10 +35,10 @@ function pNganSach(m){
   const on=(id,f)=>{const b=m.querySelector(id);if(b)b.onclick=f};
   on("#ns-edit",()=>{NS.edit=true;renderMain()});on("#ns-cancel",()=>{NS.edit=false;renderMain()});
   on("#ns-save",()=>{const v={};m.querySelectorAll("[data-nk]").forEach(i=>{const n=Math.round(+i.value||0);if(n>0)v[i.dataset.nk]=n});
-    DB.mutate(ME.name,"đặt ngân sách chi phí "+ym,dt=>{dt.budgets=dt.budgets||{};dt.budgets[ym]=v});NS.edit=false;toast("Đã lưu ngân sách");renderMain()});
-  on("#ns-copy",()=>{const a=new Date(ym+"-01T00:00:00");a.setMonth(a.getMonth()-1);const pm=a.getFullYear()+"-"+String(a.getMonth()+1).padStart(2,"0"),src=(D().budgets||{})[pm];
+    DB.mutate(ME.name,"đặt ngân sách chi phí "+ym,dt=>{dt.fin=dt.fin||{};dt.fin.budgets=dt.fin.budgets||{};dt.fin.budgets[ym]=v});NS.edit=false;toast("Đã lưu ngân sách");renderMain()});
+  on("#ns-copy",()=>{const a=new Date(ym+"-01T00:00:00");a.setMonth(a.getMonth()-1);const pm=a.getFullYear()+"-"+String(a.getMonth()+1).padStart(2,"0"),src=((D().fin||{}).budgets||{})[pm];
     if(!src||!Object.keys(src).length){toast("Tháng "+pm.slice(5)+"/"+pm.slice(0,4)+" chưa đặt ngân sách");return}
     if(Object.keys(B).length&&!confirm("Tháng này đã có ngân sách. Chép từ tháng trước sẽ thay thế. Tiếp tục?"))return;
-    DB.mutate(ME.name,"chép ngân sách từ "+pm,dt=>{dt.budgets=dt.budgets||{};dt.budgets[ym]={...(dt.budgets[pm]||{})}});toast("Đã chép ngân sách từ tháng trước");renderMain()});
+    DB.mutate(ME.name,"chép ngân sách từ "+pm,dt=>{dt.fin=dt.fin||{};dt.fin.budgets=dt.fin.budgets||{};dt.fin.budgets[ym]={...(dt.fin.budgets[pm]||{})}});toast("Đã chép ngân sách từ tháng trước");renderMain()});
 }
 PAGES.ngan_sach=pNganSach;

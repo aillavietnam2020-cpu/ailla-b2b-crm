@@ -5,8 +5,8 @@
    3) Lịch chi 4 tuần tới: tiền còn phải trả nhà cung cấp, xếp theo hạn trả (công nợ N ngày; chuyển khoản sau nhận hàng = trả ngay; chuyển khoản trước theo ngày hẹn giao).
    ===================================================================== */
 const TL={busy:false,tried:false};
-const tlAccts=()=>{const a=(MH.accts||[]).map(x=>({k:x.id,n:mhAcctLabel(x)||x.bank||"Tài khoản"}));a.push({k:"TIEN_MAT",n:"Tiền mặt tại công ty"});return a};
-function tlLatest(){const o={};(D().balances||[]).forEach(b=>{const c=o[b.acct];if(!c||b.ngay>c.ngay||(b.ngay===c.ngay&&String(b.id)>String(c.id)))o[b.acct]=b});return o}
+const tlAccts=()=>{const a=(MH.accts||[]).map(x=>({k:x.id,n:mhAcctLabel(x)||x.bank||"Tài khoản"}));a.push({k:"TIEN_MAT",n:"Tiền mặt tại công ty"},{k:"VI_TT",n:"Ví TikTok Shop (chưa rút)"},{k:"VI_SPE",n:"Ví Shopee (chưa rút)"});return a};
+function tlLatest(){const o={};((D().fin||{}).balances||[]).forEach(b=>{const c=o[b.acct];if(!c||b.ngay>c.ngay||(b.ngay===c.ngay&&String(b.id)>String(c.id)))o[b.acct]=b});return o}
 const tlDays=(a,b)=>Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/864e5);
 function tlSchedule(){
   const today=mhToday(),W=[0,1,2,3].map(()=>({sum:0,rows:[]})),late={sum:0,rows:[]},unk={sum:0,rows:[]};
@@ -53,6 +53,10 @@ function tlForm(ac,L){
    <div id="tlf-e"></div><button class="btn pri">Lưu số dư</button></form>`);
   $("#tlf").onsubmit=e=>{e.preventDefault();const ngay=$("#tlf-d").value,vals=[...document.querySelectorAll("[data-tla]")].filter(i=>i.value!=="").map(i=>({acct:i.dataset.tla,tien:Math.round(+i.value)}));
     if(!vals.length){$("#tlf-e").innerHTML=`<div class="note red">Nhập ít nhất một tài khoản</div>`;return}
-    DB.mutate(ME.name,"cập nhật số dư",dt=>{dt.balances=dt.balances||[];vals.forEach(v=>dt.balances.push({id:uid("sd"),ngay,acct:v.acct,tien:v.tien,by:ME.name}))});
+    DB.mutate(ME.name,"cập nhật số dư",dt=>{dt.fin=dt.fin||{};dt.fin.balances=dt.fin.balances||[];vals.forEach(v=>dt.fin.balances.push({id:uid("sd"),ngay,acct:v.acct,tien:v.tien,by:ME.name}));
+      /* đồng bộ sang Tổng quan › Tiền & cảnh báo (một nguồn số dư): ngân hàng + tiền mặt, ví TikTok, ví Shopee */
+      if(typeof dhCfg==="function"){const c=dhCfg(dt.fin.dh),last={};dt.fin.balances.forEach(b=>{const x=last[b.acct];if(!x||b.ngay>=x.ngay)last[b.acct]=b});
+        const bank=Object.entries(last).filter(([k])=>k!=="VI_TT"&&k!=="VI_SPE").reduce((t,[,b])=>t+(+b.tien||0),0);
+        c.tien=c.tien.filter(x=>!(x.ngay===ngay&&x.src==="tl"));c.tien.push({id:uid("t"),ngay,tien:bank,viTT:last.VI_TT?+last.VI_TT.tien:0,viSPE:last.VI_SPE?+last.VI_SPE.tien:0,note:"từ Chi phí & Tiền › Tiền & lịch chi",by:ME.name,src:"tl"});dt.fin.dh=c}});
     closeDrawer();toast("Đã lưu số dư");renderMain()}}
 PAGES.tien_lich=pTienLich;
