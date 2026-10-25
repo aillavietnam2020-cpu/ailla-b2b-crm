@@ -424,3 +424,8 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 /* Từ điển chỉ số */
 .ngh{margin:14px 0 6px;font-size:13px;color:#4b54d1;text-transform:uppercase;letter-spacing:.04em}
 .ngt td{vertical-align:top;font-size:13px}.ngt td:nth-child(2){min-width:260px}
+
+/* Hạn xử lý trong Việc chờ tôi */
+.vcover{color:#b42318}.vcrow.leo{background:#fff6f5;margin:0 -14px;padding:8px 14px}
+.vcleo{flex:none;background:#b42318;color:#fff;border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:700}
+@media(max-width:640px){.vcleo{display:none}}

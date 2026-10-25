@@ -28,18 +28,26 @@ const NG_DICT=[
 const ngCfg=()=>typeof dhCfg==="function"?dhCfg((D().fin||{}).dh):null;
 function pNguong(m){
   const T="Ngưỡng cảnh báo & từ điển chỉ số",S="Mức nào thì hệ thống báo, và mỗi chỉ số trên web nghĩa là gì";
-  const c=ngCfg(),ed=mhManage();
+  const c=ngCfg(),ed=mhManage(),SL=typeof vcSla==="function"?vcSla():{ct:3,gia:2,tr:2,sau:3,leo:2};
   const q=kfold(NG.q||"").trim(),L=NG_DICT.filter(r=>!q||kfold(r.join(" ")).includes(q));
   const nhoms=[...new Set(L.map(r=>r[0]))];
   const f=(id,t,v,h,st)=>`<label class="field">${t}<input type="number" step="${st||1}" min="0" id="${id}" value="${v}" ${ed?"":"disabled"}><small class="hint">${h}</small></label>`;
   m.innerHTML=H(T,S)+(c&&ed?`<div class="card pad"><div class="tlh"><b>Ngưỡng cảnh báo</b></div>
    <form class="frm" id="ng-f"><div class="row4">${f("ng-qc","Quảng cáo tối đa trên doanh thu thực (%)",+(c.nguong.qcMax*100).toFixed(1),"Vượt mức này thì báo đỏ, mặc định 38%","0.1")}${f("ng-rw","Số ngày dự trữ tiền mặt tối thiểu",c.nguong.runway,"Dưới số ngày này thì báo đỏ")}${f("ng-nv","Giá nguyên liệu tăng từ (%)",+(c.nguong.nvlTang*100).toFixed(1),"Tăng bằng hoặc hơn mức này so với tháng trước thì báo","0.1")}</div>
    <div class="row4">${f("ng-bt","Biên tối thiểu bảng giá cấp (%)",+(c.nguong.bienTier*100).toFixed(1),"Giá bán thấp hơn mức này thì báo","0.1")}${f("ng-bg","Biên tối thiểu báo giá gia công (%)",+(c.nguong.bienGC*100).toFixed(1),"Báo giá gia công thấp hơn thì báo","0.1")}${f("ng-bk","Biên đóng góp kênh mục tiêu (%)",+(c.nguong.bienKenh*100).toFixed(1),"Kênh thấp hơn mức này thì báo","0.1")}</div>
-   <button class="btn pri">Lưu ngưỡng</button></form><p class="hint">Cùng nguồn với Tổng quan › Thiết lập: sửa ở đâu cũng được, hai nơi luôn giống nhau. Ngân sách báo vàng từ 85% và đỏ từ 100% là cố định.</p></div>`
+   <button class="btn pri">Lưu ngưỡng</button></form><p class="hint">Cùng nguồn với Tổng quan › Thiết lập: sửa ở đâu cũng được, hai nơi luôn giống nhau. Ngân sách báo vàng từ 85% và đỏ từ 100% là cố định.</p></div>
+   <div class="card pad"><div class="tlh"><b>Hạn xử lý việc chờ</b></div>
+   <form class="frm" id="ng-sla"><div class="row4">${f("sl-ct","Ghi chứng từ nhà cung cấp: trong (ngày)",SL.ct,"Tính từ ngày hàng nhập kho")}${f("sl-gia","Nhập giá cho phiếu mua: trong (ngày)",SL.gia,"Tính từ ngày hàng nhập kho")}${f("sl-tr","Chuyển khoản trước: trong (ngày)",SL.tr,"Tính từ ngày lập phiếu mua")}</div>
+   <div class="row4">${f("sl-sau","Trả nhà cung cấp sau khi nhận hàng: trong (ngày)",SL.sau,"Tính từ ngày hàng nhập kho")}${f("sl-leo","Quá hạn bao nhiêu ngày thì ghi “Cần chị Hoa quyết”",SL.leo,"Hộp Việc chờ tôi đẩy việc đó lên đầu")}</div>
+   <button class="btn pri">Lưu hạn xử lý</button></form><p class="hint">Chưa tự gửi tin nhắn cho ai: quá hạn chỉ hiện đỏ trong hộp Việc chờ tôi ở Tổng quan.</p></div>`
    :`<div class="note">${ed?"Chưa tải được thiết lập ngưỡng.":"Chỉ chị Hoa, chị Thảo, chị Huệ đổi được ngưỡng."}</div>`)+
   `<div class="card pad"><div class="tlh"><b>Từ điển chỉ số</b><input id="ng-q" class="mhq" placeholder="Tìm chỉ số…" value="${esc(NG.q||"")}"></div>
    ${nhoms.length?nhoms.map(n=>`<h3 class="ngh">${esc(n)}</h3><div class="nsw"><table class="tbl ngt"><thead><tr><th>Chỉ số</th><th>Nghĩa là gì, tính thế nào</th><th>Xem ở đâu</th><th>Ai cập nhật</th><th>Khi nào báo</th></tr></thead><tbody>${L.filter(r=>r[0]===n).map(r=>`<tr><td><b>${esc(r[1])}</b></td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${esc(r[5])}</td></tr>`).join("")}</tbody></table></div>`).join(""):`<p class="empty">Không có chỉ số nào khớp.</p>`}</div>`;
   const qi=m.querySelector("#ng-q");qi.oninput=()=>{NG.q=qi.value;const p=qi.selectionStart;renderMain();const n=document.querySelector("#ng-q");if(n){n.focus();n.setSelectionRange(p,p)}};
+  const fs=m.querySelector("#ng-sla");
+  if(fs)fs.onsubmit=e=>{e.preventDefault();const g=id=>Math.max(0,Math.round(+m.querySelector(id).value||0));
+    DB.mutate(ME.name,"sửa hạn xử lý việc chờ",dt=>{dt.fin=dt.fin||{};dt.fin.sla={ct:g("#sl-ct"),gia:g("#sl-gia"),tr:g("#sl-tr"),sau:g("#sl-sau"),leo:g("#sl-leo")}});
+    toast("Đã lưu hạn xử lý");renderMain()};
   const fm=m.querySelector("#ng-f");
   if(fm)fm.onsubmit=e=>{e.preventDefault();const g=id=>+m.querySelector(id).value;
     DB.mutate(ME.name,"sửa ngưỡng cảnh báo",dt=>{dt.fin=dt.fin||{};const cc=dhCfg(dt.fin.dh);

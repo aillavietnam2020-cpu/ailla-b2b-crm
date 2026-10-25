@@ -1,35 +1,46 @@
 /* =====================================================================
    HỘP "VIỆC CHỜ TÔI" Ở ĐẦU TỔNG QUAN (trang quản trị).
    Gom việc đang chờ chị Hoa / chị Thảo / chị Huệ xử lý, mỗi việc một dòng, bấm "Mở" là tới đúng chỗ.
-   Hiện chưa gom: mua hàng (chờ chuyển khoản trước, công nợ, chờ chứng từ, chờ nhập giá, trễ hàng), nguyên vật liệu dưới mức tối thiểu.
-   Chỉ hiện cho người quản lý (mhManage). Không ghi dữ liệu gì.
+   Mỗi việc có HẠN XỬ LÝ (số ngày cho phép chỉnh ở Cấu hình › Ngưỡng cảnh báo). Quá hạn thì báo đỏ ghi "quá N ngày";
+   quá hạn từ số ngày leo thang trở lên thì đánh dấu "Cần chị Hoa quyết" lên đầu hộp.
+   Hiện gom: mua hàng (chờ chuyển khoản trước, công nợ, chờ chứng từ, chờ nhập giá, trễ hàng), nguyên vật liệu dưới mức tối thiểu.
+   Chỉ hiện cho người quản lý (mhManage). Không ghi dữ liệu gì, không gửi tin đi đâu.
    ===================================================================== */
-const VC={busy:false,all:false};
+const VC={busy:false,all:false,tried:false};
+const VC_SLA0={ct:3,gia:2,tr:2,sau:3,leo:2};
+const vcSla=()=>({...VC_SLA0,...(((D().fin||{}).sla)||{})});
+const vcAdd=(d,n)=>{const x=new Date(d+"T00:00:00");x.setDate(x.getDate()+n);return iso(x)};
+const vcLastRc=p=>(p.receipts||[]).filter(r=>r.status==="OK").map(r=>r.receipt_date).sort().pop()||"";
 function vcLoad(){
   if(VC.busy||VC.tried||(MH.orders&&MH.inv&&MH.pay&&MH.sup))return;VC.busy=true;VC.tried=true;
   Promise.all([mhLoad(),mhLoadInv(),mhLoadPay()]).catch(()=>{}).finally(()=>{VC.busy=false;if(PAGE==="exec")renderMain()})}
 function vcItems(){
-  const L=[];
+  const L=[],S=vcSla(),today=mhToday();
   (MH.orders||[]).forEach(p=>{
     if(p.status==="HUY")return;
     let M,st;try{M=mhPoMoney(p);st=mhStage(p,M)}catch(e){return}
-    const k=st[0],who=esc(p.supplier_name||""),no=esc(p.no||"");
+    const k=st[0],who=esc(p.supplier_name||""),no=esc(p.no||""),rc=vcLastRc(p);
     const go=()=>{PAGE="mh_po";MH.open=p.id;MH.st="";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)};
-    if(k==="tr")L.push({r:1,t:"Chuyển khoản trước cho "+who,s:"Phiếu mua "+no+" · nhà cung cấp yêu cầu trả trước khi giao",tag:["Chờ CK trước","amb"],go});
-    else if(k==="no"&&st[2]==="red")L.push({r:0,t:"Trả tiền cho "+who,s:"Phiếu mua "+no+" · "+st[1],tag:[st[1].startsWith("Công nợ")?"Quá hạn":"Chưa trả","red"],go});
-    else if(k==="no")L.push({r:3,t:"Công nợ sắp đến hạn · "+who,s:"Phiếu mua "+no+" · "+st[1],tag:["Công nợ","amb"],go});
-    else if(k==="ct")L.push({r:2,t:"Ghi chứng từ của "+who,s:"Phiếu mua "+no+" · hàng đã nhập kho, chưa có chứng từ",tag:["Chờ chứng từ","blu"],go});
-    else if(k==="gia")L.push({r:2,t:"Nhập giá cho phiếu "+no,s:who+" · hàng đã về, chưa có giá",tag:["Chờ nhập giá","amb"],go});
-    else if(k==="hang"&&st[2]==="red")L.push({r:4,t:"Hỏi hàng trễ · "+who,s:"Phiếu mua "+no+" · "+st[1],tag:["Trễ hàng","red"],go});
+    const add=(t,s,tag,han,r)=>L.push({r,t,s,tag,han,go});
+    if(k==="tr")add("Chuyển khoản trước cho "+who,"Phiếu mua "+no+" · nhà cung cấp yêu cầu trả trước khi giao",["Chờ CK trước","amb"],vcAdd(p.order_date||today,S.tr),1);
+    else if(k==="no"&&st[2]==="red"){
+      const T=mhTermOf(p).pay_terms,due=T==="CONG_NO"?mhDueOf(p):(rc?vcAdd(rc,S.sau):"");
+      add("Trả tiền cho "+who,"Phiếu mua "+no+" · "+st[1],[st[1].startsWith("Công nợ")?"Quá hạn":"Chưa trả","red"],due,0)}
+    else if(k==="no")add("Công nợ sắp đến hạn · "+who,"Phiếu mua "+no+" · "+st[1],["Công nợ","amb"],mhDueOf(p),3);
+    else if(k==="ct")add("Ghi chứng từ của "+who,"Phiếu mua "+no+" · hàng đã nhập kho, chưa có chứng từ",["Chờ chứng từ","blu"],rc?vcAdd(rc,S.ct):"",2);
+    else if(k==="gia")add("Nhập giá cho phiếu "+no,who+" · hàng đã về, chưa có giá",["Chờ nhập giá","amb"],rc?vcAdd(rc,S.gia):"",2);
+    else if(k==="hang"&&st[2]==="red")add("Hỏi hàng trễ · "+who,"Phiếu mua "+no+" · "+st[1],["Trễ hàng","red"],p.expected_date||"",4);
   });
-  try{const need=mhNeedBuy();if(need.length)L.push({r:5,t:need.length+" nguyên vật liệu dưới mức tồn tối thiểu",s:need.slice(0,3).map(x=>x.name).join(", ")+(need.length>3?"…":""),tag:["Cần mua","amb"],go:()=>{PAGE="mh_po";MH.open=null;renderMain();scrollTo(0,0)}})}catch(e){}
-  return L.sort((a,b)=>a.r-b.r);
+  try{const need=mhNeedBuy();if(need.length)L.push({r:5,t:need.length+" nguyên vật liệu dưới mức tồn tối thiểu",s:need.slice(0,3).map(x=>x.name).join(", ")+(need.length>3?"…":""),tag:["Cần mua","amb"],han:"",go:()=>{PAGE="mh_po";MH.open=null;renderMain();scrollTo(0,0)}})}catch(e){}
+  L.forEach(x=>{x.over=x.han?Math.max(0,tlDays(x.han,today)):0;x.leo=x.over>=S.leo});
+  return L.sort((a,b)=>(b.leo-a.leo)||(b.over-a.over)||a.r-b.r);
 }
 function vcCard(){
-  const L=vcItems(),n=L.length,show=VC.all?L:L.slice(0,6);
+  const L=vcItems(),n=L.length,show=VC.all?L:L.slice(0,6),leo=L.filter(x=>x.leo).length,qh=L.filter(x=>x.over>0).length;
   VC.list=show;
-  return `<section class="vcbox"><div class="vch"><b>Việc chờ tôi</b><span class="vcn${n?"":" ok"}">${n?n+" việc":"Không có việc nào"}</span></div>${
-    n?show.map((x,i)=>`<div class="vcrow"><span class="vctag ${x.tag[1]}">${esc(x.tag[0])}</span><div class="vct"><b>${x.t}</b><small>${x.s}</small></div><button class="btn sm" data-vc="${i}">Mở</button></div>`).join("")+(n>6?`<button class="vcmore" id="vc-more">${VC.all?"Thu gọn":"Xem thêm "+(n-6)+" việc"}</button>`:""):`<p class="hint" style="margin:8px 0 2px">Chuyển khoản, chứng từ, công nợ nhà cung cấp đều đã xong.</p>`}</section>`}
+  const han=x=>!x.han?"":x.over>0?`<b class="vcover">quá hạn ${x.over} ngày</b> · hạn ${esc(mhDM(x.han))}`:`hạn ${esc(mhDM(x.han))}`;
+  return `<section class="vcbox"><div class="vch"><b>Việc chờ tôi</b><span>${leo?`<span class="vcn">${leo} cần chị Hoa quyết</span> `:""}<span class="vcn${n?"":" ok"}${qh&&!leo?"":""}">${n?n+" việc"+(qh?" · "+qh+" quá hạn":""):"Không có việc nào"}</span></span></div>${
+    n?show.map((x,i)=>`<div class="vcrow${x.leo?" leo":""}"><span class="vctag ${x.tag[1]}">${esc(x.tag[0])}</span><div class="vct"><b>${x.t}</b><small>${x.s}${han(x)?" · "+han(x):""}</small></div>${x.leo?`<span class="vcleo">Cần chị Hoa quyết</span>`:""}<button class="btn sm" data-vc="${i}">Mở</button></div>`).join("")+(n>6?`<button class="vcmore" id="vc-more">${VC.all?"Thu gọn":"Xem thêm "+(n-6)+" việc"}</button>`:""):`<p class="hint" style="margin:8px 0 2px">Chuyển khoản, chứng từ, công nợ nhà cung cấp đều đã xong.</p>`}</section>`}
 {const _ex=PAGES.exec;PAGES.exec=function(m){_ex.apply(this,arguments);
   try{if(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin"||!mhManage())return;
     if((SUB.exec||"homnay")!=="homnay"||!m.querySelector(".xkstrip"))return;
