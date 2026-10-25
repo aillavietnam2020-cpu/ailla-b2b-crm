@@ -59,6 +59,7 @@ function fpcBar(){
    <button type="button" class="fpc-nav" data-fpcnav="-1">‹</button><b class="fpc-lb">${label}</b><button type="button" class="fpc-nav" data-fpcnav="1">›</button><button type="button" class="fpc-nav" data-fpcnav="0">Hôm nay</button>
    ${fpcPicker()}<span class="sp"></span>
    ${st?`<select data-fpcmode="1" ${ceo?"":"disabled"} class="fpc-mode m-${mode}">${opt([["off","Đăng tự động: Tắt"],["test","Đăng tự động: chỉ page thử"],["on","Đăng tự động: Bật"]],mode)}</select><button type="button" class="fpc-stop" data-fpcstop="1" ${ceo?"":"disabled"}>DỪNG KHẨN</button>`:`<span class="hint">${esc(FPC.err||"Đang tải…")}</span>`}
+   <button type="button" class="btn" data-fchopen="1" title="Mở cửa sổ chat với agent Lead Content: nhờ lên lịch, viết bài, chọn video">Chat với agent${fchBadge()}</button>
    <button type="button" class="btn pri" data-fpcnew="${mv&&!(FPC.y+"-"+fpcPad(FPC.m)===fpcToday().slice(0,7))?fpcIso(FPC.y,FPC.m,1):fpcToday()}">+ Tạo bài</button></div>`}
 function fpcPreview(e){
   const p=fpcPage(e.pageId),media=e.media&&e.fmt==="Ảnh"?`<img src="${esc(e.media)}" alt="" onerror="this.style.display='none'">`:e.media&&e.fmt==="Video"?`<div class="fpc-vid">▶ Video</div>`:"";
@@ -133,6 +134,7 @@ function fpcBind(m){
   m.querySelectorAll("[data-fpcaddpg]").forEach(b=>b.onclick=async()=>{const pid=$("#fpc-pid").value.trim(),nm=$("#fpc-nm").value.trim();if(!pid||!nm){toast("Cần ghi cả mã page và tên page");return}
     const r=await fpcApi("/pages","POST",{page_id:pid,name:nm,is_test:$("#fpc-test").checked});if(r)toast("Đã thêm page "+r.name)});
   m.querySelectorAll("[data-fpcmode]").forEach(s=>s.onchange=async()=>{const v=s.value;if(v==="on"&&!confirm("Bật đăng cả page thật? Bài đã duyệt tới giờ sẽ được đăng thật."))return renderMain();await fpcApi("/mode","POST",{mode:v});toast("Đã đổi công tắc")});
+  m.querySelectorAll("[data-fchopen]").forEach(b=>b.onclick=()=>fchToggle(true));
   m.querySelectorAll("[data-fpcb]").forEach(i=>i.onchange=()=>{const f=i.dataset.fpcb,v=i.value;DB.mutate(ME.name,"Fanpage: sửa yêu cầu chung của tháng",dt=>{dt.fpBrief=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},dt.fpBrief||{});dt.fpBrief[f]=v});toast("Đã lưu yêu cầu chung")});
   m.querySelectorAll("[data-fpclt]").forEach(b=>b.onclick=()=>{FPC.ls=b.dataset.fpclt;FPC.pick.clear();renderMain()});
   m.querySelectorAll("[data-fpclp]").forEach(c=>c.onchange=()=>{c.checked?FPC.pick.add(c.dataset.fpclp):FPC.pick.delete(c.dataset.fpclp);renderMain()});
@@ -221,7 +223,6 @@ async function fpcAtLoad(){
     FPC.at.tasks=mine;if(fin&&typeof svPoll==="function"){await svPoll()}
     if(!same||fin){const ae=document.activeElement;if(!(ae&&ae.id==="fpc-agt"))renderMain()}
   }catch(e){}}
-setInterval(()=>{try{if(typeof PAGE!=="undefined"&&PAGE==="lich_fb"&&document&&!document.hidden)fpcAtLoad()}catch(e){}},8000);
 function fpcAtPayload(text){
   const d=D(),pages=fpcPages(),chosen=FPC.sel.size?pages.filter(p=>FPC.sel.has(p.page_id)):pages;
   const from=FPC.view==="week"?fpcWeek(FPC.anchor)[0].ds:fpcIso(FPC.y,FPC.m,1),to=FPC.view==="week"?fpcWeek(FPC.anchor)[6].ds:fpcIso(FPC.y,FPC.m,new Date(FPC.y,FPC.m,0).getDate());
@@ -257,11 +258,85 @@ function fpcBriefHtml(){
    <label>Giọng văn<textarea rows="2" data-fpcb="giong" placeholder="VD: gần gũi như người nhà, hài nhẹ">${esc(B.giong)}</textarea></label>
    <label>Sản phẩm cần đẩy<textarea rows="2" data-fpcb="spDay" placeholder="VD: Tinh dầu giặt sấy, Bột tẩy vạn năng">${esc(B.spDay)}</textarea></label>
    <label>Lưu ý (điều cấm, ngày sale, nội dung bắt buộc)<textarea rows="2" data-fpcb="luuY" placeholder="VD: không nhắc đối thủ">${esc(B.luuY)}</textarea></label></div>`}
+/* ---------- Cửa sổ chat với agent Lead Content (dùng chính cuộc trò chuyện ở Điều hành agent) ----------
+   Chị nhờ trong chat, agent làm xong thì bài hiện ở lịch + Danh sách bài (Chờ duyệt) để chị duyệt. */
+const FCH={open:false,agent:"",name:"Lead Content",color:"#4b54d1",msgs:[],last:0,busy:false,ready:false,err:"",text:"",timer:0,sending:false};
+const FCH_MARK="[Ngữ cảnh lịch Fanpage ABOS";
+const FCH_QUICK=["Lên lịch tuần này cho page đang chọn","Lên lịch tuần sau, mỗi ngày 2 bài","Viết lại các bài đang chờ duyệt cho hay hơn","Đề xuất tuyến nội dung cho tháng sau"];
+function fchCtx(){
+  const r=fpcRange(),pg=FPC.sel.size?fpcPages().filter(p=>FPC.sel.has(p.page_id)).map(p=>p.name+" ("+p.page_id+")").join("; "):"chưa chọn (nếu chị không nói rõ page thì hỏi lại, đừng đoán)";
+  return FCH_MARK+" - chỉ để em hiểu, đừng nhắc lại cho chị] Khung đang xem: "+r[0]+" đến "+r[1]+". Page đang chọn: "+pg+". "+fchBrief()+"Quy tắc: tạo/sửa bài lên lịch bằng POST /api/fp/draft (bài vào Chờ duyệt, KHÔNG tự duyệt, KHÔNG đăng); viết bài bằng skill viết bài và kiến thức sản phẩm AILLA của em, không viết chung chung; giờ đăng theo bước 15 phút; xong thì trả lời ngắn ở đây: đã tạo bao nhiêu bài, cho page nào, ngày nào, và nhắc chị vào mục Chờ duyệt trên lịch để duyệt.]"}
+function fchBrief(){const B=D().fpBrief||{},t=[["Mục tiêu tháng",B.mucTieu],["Giọng văn",B.giong],["Sản phẩm cần đẩy",B.spDay],["Lưu ý",B.luuY]].filter(x=>x[1]&&String(x[1]).trim()).map(x=>x[0]+": "+String(x[1]).trim()).join("; ");return t?"Yêu cầu chung của tháng: "+t+". ":""}
+const fchShow=b=>{const i=String(b||"").indexOf("\n\n"+FCH_MARK);return i>=0?b.slice(0,i):String(b||"")};
+function fchPending(){try{return D().cards.filter(c=>c.kenh===BV.k&&fpcStOf(c)==="cho").length}catch(e){return 0}}
+function fchBadge(){const n=fchPending();return n?` <span class="fch-n">${n}</span>`:""}
+async function fchInit(){
+  if(FCH.ready)return;FCH.ready=true;
+  try{const r=await svApi("/api/agent-chat/agents"),a=(r.agents||[]).find(x=>/lead content/i.test(x.name||"")||/lead-content/.test(x.id||""));
+    if(!a)FCH.err="Chưa thấy agent Lead Content, hoặc chị chưa được cấp quyền nhắn agent (Điều hành agent › Hội thoại).";else{FCH.agent=a.id;FCH.name=a.name||FCH.name;FCH.color=a.color||FCH.color}}
+  catch(e){FCH.err=e.message||String(e)}
+}
+function fchEl(){
+  let el=document.getElementById("fch");
+  if(!el){el=document.createElement("aside");el.id="fch";el.hidden=true;document.body.appendChild(el);
+    const st=document.createElement("style");st.textContent=`#fch{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:9999;background:#fff;border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(30,35,80,.16);display:flex;flex-direction:column}#fch[hidden]{display:none}
+.fch-h{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}.fch-h b{flex:1}.fch-x{border:0;background:#f1f2f9;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px}
+.fch-go{margin:8px 14px 0;border:1px solid #c9ccf5;background:#eef0ff;color:#3b43b5;border-radius:10px;padding:7px 12px;cursor:pointer;font-weight:600;text-align:left}
+.fch-ms{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:#fafbff}.fch-m{max-width:88%;padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.5;word-break:break-word;white-space:pre-wrap}
+.fch-m.u{align-self:flex-end;background:#4b54d1;color:#fff;border-bottom-right-radius:4px}.fch-m.a{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}.fch-m small{display:block;opacity:.7;font-size:11px;margin-top:2px}
+.fch-q{display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px 0}.fch-q button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 10px;cursor:pointer;font-size:12px}
+.fch-f{display:flex;gap:8px;padding:10px 14px 14px}.fch-f textarea{flex:1;resize:none}.fch-n{display:inline-block;background:#e7357b;color:#fff;border-radius:99px;padding:0 7px;font-size:12px;margin-left:4px}.fch-e{padding:14px;color:#b42318}`;
+    document.head.appendChild(st)}
+  return el}
+function fchDraw(keep){
+  const el=fchEl(),ta=el.querySelector("#fch-t"),had=ta&&document.activeElement===ta,val=ta?ta.value:FCH.text;
+  const L=[...FCH.msgs].sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at))||a.id-b.id).filter(m=>m.role!=="SYSTEM");
+  const n=fchPending();
+  el.innerHTML=`<div class="fch-h"><span class="fpc-av" style="width:34px;height:34px;background:${esc(FCH.color)}">${esc((FCH.name||"A").charAt(0))}</span><b>${esc(FCH.name)}<br><small style="font-weight:400;color:#5b6176">Nhờ lên lịch, viết bài, chọn video. Bài hiện ở lịch để chị duyệt.</small></b><button type="button" class="fch-x" data-fchx="1" aria-label="Đóng">✕</button></div>
+   <button type="button" class="fch-go" data-fchgo="1">Xem bài chờ duyệt${n?" ("+n+")":""} trên lịch →</button>
+   <details class="fpc-bd" style="margin:6px 14px 0"><summary>Yêu cầu chung của tháng (agent đọc cùng mỗi lần nhờ)</summary>${fpcBriefHtml()}</details>
+   ${FCH.err?`<div class="fch-e">${esc(FCH.err)}</div>`:`<div class="fch-ms" id="fch-ms">${L.length?L.map(m=>{const u=m.role==="USER",b=u?fchShow(String(m.body||"").replace(/^\[KHÁCH\] /,"")):String(m.body||""),st=u?(m.status==="queued"?"đang chờ agent":m.status==="taken"?"agent đang làm…":m.status==="error"?"lỗi":""):"";
+      return `<div class="fch-m ${u?"u":"a"}">${u?esc(b):(typeof acFmt==="function"?acFmt(b):esc(b))}${st?`<small>${st}</small>`:""}</div>`}).join(""):`<div class="hint">Chưa có tin nào. Chị nhắn như nhờ người: "Lên lịch tuần này cho page Tẩy Lồng, mỗi ngày 2 bài".</div>`}</div>
+   <div class="fch-q">${FCH_QUICK.map(q=>`<button type="button" data-fchq="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+   <div class="fch-f"><textarea id="fch-t" rows="2" placeholder="Nhắn agent… (Enter để gửi, Shift+Enter xuống dòng)">${esc(val)}</textarea><button type="button" class="btn pri" data-fchsend="1" ${FCH.sending?"disabled":""}>Gửi</button></div>`}`;
+  const ms=el.querySelector("#fch-ms");if(ms&&(keep||true))ms.scrollTop=ms.scrollHeight;
+  const t=el.querySelector("#fch-t");if(t){t.oninput=()=>{FCH.text=t.value};t.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();fchSend()}};if(had)t.focus()}
+  el.querySelectorAll("[data-fpcb]").forEach(i=>i.onchange=()=>{const f=i.dataset.fpcb,v=i.value;DB.mutate(ME.name,"Fanpage: sửa yêu cầu chung của tháng",dt=>{dt.fpBrief=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},dt.fpBrief||{});dt.fpBrief[f]=v});toast("Đã lưu yêu cầu chung")});
+  el.querySelector("[data-fchx]").onclick=()=>fchToggle(false);
+  el.querySelector("[data-fchgo]").onclick=()=>{FPC.ls="cho";FPC.pick.clear();const c=D().cards.filter(x=>x.kenh===BV.k&&fpcStOf(x)==="cho"&&fpcDate(x)).sort((a,b)=>fpcDate(a).localeCompare(fpcDate(b)))[0];
+    if(c&&(fpcDate(c)<fpcRange()[0]||fpcDate(c)>fpcRange()[1])){FPC.view="month";FPC.y=+fpcDate(c).slice(0,4);FPC.m=+fpcDate(c).slice(5,7)}
+    fchToggle(false);renderMain();setTimeout(()=>{const l=document.querySelector(".fpc-list");if(l)l.scrollIntoView({behavior:"smooth",block:"start"})},150)};
+  el.querySelectorAll("[data-fchq]").forEach(b=>b.onclick=()=>{FCH.text=b.dataset.fchq;fchDraw();const t2=document.getElementById("fch-t");if(t2)t2.focus()});
+  el.querySelector("[data-fchsend]").onclick=()=>fchSend()}
+async function fchPoll(first){
+  if(!FCH.agent||FCH.busy)return;FCH.busy=true;
+  try{const r=await svApi("/api/agent-chat?agent="+encodeURIComponent(FCH.agent)+(first?"":"&after="+FCH.last));
+    const newAgent=!first&&r.some(x=>x.role==="AGENT");
+    if(first)FCH.msgs=r;else FCH.msgs=FCH.msgs.concat(r);
+    if(r.length)FCH.last=Math.max(FCH.last,r[r.length-1].id);
+    const st=await svApi("/api/agent-chat/status?agent="+encodeURIComponent(FCH.agent)),mp=new Map(st.map(x=>[x.id,x.status]));
+    FCH.msgs.forEach(x=>{if(x.role==="USER"&&mp.has(x.id))x.status=mp.get(x.id)});
+    const sig=FCH.msgs.map(m=>m.id+":"+m.status).join(",");
+    if(first||r.length||sig!==FCH.sig){FCH.sig=sig;fchDraw()}
+    if(newAgent&&typeof svPoll==="function"){await svPoll();try{renderMain()}catch(e){}}
+  }catch(e){}finally{FCH.busy=false}
+}
+async function fchSend(){
+  const t=(FCH.text||"").trim();if(!t||!FCH.agent||FCH.sending)return;
+  FCH.sending=true;const tb=document.getElementById("fch-t");if(tb)tb.value="";fchDraw();
+  try{await svApi("/api/agent-chat",{method:"POST",body:JSON.stringify({agent:FCH.agent,body:t+"\n\n"+fchCtx(),tg:false,files:[],docs:[]})});FCH.text="";FCH.sending=false;await fchPoll(false);fchDraw()}
+  catch(e){FCH.sending=false;toast("Chưa gửi được: "+(e&&e.message||e));fchDraw()}
+}
+async function fchToggle(on){
+  FCH.open=on;const el=fchEl();el.hidden=!on;
+  if(on){await fchInit();fchDraw();await fchPoll(true);clearInterval(FCH.timer);FCH.timer=setInterval(()=>{if(FCH.open&&!document.hidden)fchPoll(false)},4000)}
+  else clearInterval(FCH.timer)}
+function fchSync(){const el=document.getElementById("fch");if(el&&PAGE!=="lich_fb"){el.hidden=true;FCH.open=false;clearInterval(FCH.timer)}}
 function fpcRender(m){
   if(!FPC.st&&!FPC.loading&&!FPC.err)fpcLoad();
-  fpcInit();if(!FPC.at.loaded){FPC.at.loaded=1;fpcAtLoad()}
+  fpcInit();fchSync();
   const box=document.createElement("div");
-  box.innerHTML=`${fpcStyle}<section class="fpc">${fpcBar()}${fpcAgentBox()}<div class="fpc-body"><div class="fpc-cal">${FPC.view==="week"?fpcWeekView():fpcMonth()}</div></div></section>${fpcList()}`;
+  box.innerHTML=`${fpcStyle}<section class="fpc">${fpcBar()}<div class="fpc-body"><div class="fpc-cal">${FPC.view==="week"?fpcWeekView():fpcMonth()}</div></div></section>${fpcList()}`;
   m.insertBefore(box,m.firstChild);
   fpcBind(m)
 }
