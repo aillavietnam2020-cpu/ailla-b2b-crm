@@ -71,7 +71,7 @@ const PAGE_SETS=[
   {n:"Dự án và mục tiêu",ids:["cv_da","cv_mt"],labels:["Dự án","Mục tiêu"]},
   /* Marketing: mục cha bấm vào sổ ra các trang con ngay ở thanh bên (kiểu Pancake), trong trang không có hàng tab */
   /* Marketing: 5 team ngang hàng; team nhiều trang thì bấm vào sổ ra các trang con ngay thanh bên (mỗi lần chỉ mở một team) */
-  {n:"Content",ids:["mkt_tq","kehoach","research","dieuphoi","lich","kho_luutru","win","order_c","nhaplieu"],labels:["Tổng quan","Kế hoạch tháng","Research","Điều phối sản xuất","Calendar","Kho lưu trữ video","Video win","Order từ Ads","Nhập báo cáo"],acc:true,noBar:true,hide:["lich","research"]},
+  {n:"Content",ids:["mkt_tq","kehoach","research","dieuphoi","lich_fb","lich","kho_luutru","win","order_c","nhaplieu"],labels:["Tổng quan","Kế hoạch tháng","Research","Điều phối sản xuất","Lịch đăng Fanpage","Calendar","Kho lưu trữ video","Video win","Order từ Ads","Nhập báo cáo"],acc:true,noBar:true,hide:["lich","research"]},
   {n:"Digital Marketing",ids:["dg_tq","fb_ads","dg_lib","order","nhaplieu_ads"],labels:["Tổng quan","Báo cáo theo ngày","Thư viện video ads","Order cho Content","Nhập báo cáo Ads"],acc:true,noBar:true},
   {n:"Facebook",ids:["bc_fb","fb_sale"],labels:["Doanh thu Facebook","Hoạt động team Sale"],noBar:true},
   /* Kho vật tư gồm nhiều trang con; mục "Kho vật tư" trên thanh bên mở trang Tồn kho, các tab con nằm trong trang. */
@@ -104,6 +104,7 @@ const CT=i=>[i[0],i[1],(u=>{const T=userTeam(u);return (!T||T==="all"||T==="cont
 const MKT_G=()=>[
  ["",[MI("mkt_tq","Tổng quan",tm("content",u=>u.role!=="digital"),()=>{try{return rvQueue().length||""}catch(e){return ""}}),
    ADM_ITEM("kehoach"),ADM_ITEM("research"),ADM_ITEM("lich","Calendar"),MI("dieuphoi","Điều phối sản xuất",tm("content",u=>u.role==="admin"||u.role==="lead"||can(u,"viec.giao"))),
+   MI("lich_fb","Lịch đăng Fanpage",tm("content",u=>u.role==="admin"||u.role==="lead"||u.role==="content")),
    MI("kho_luutru","Kho lưu trữ video",tm("content",u=>u.role==="admin"||u.role==="lead"||u.role==="content"||u.role==="digital")),ADM_ITEM("win","Video win"),
    MI("order_c","Order từ Ads",tm("content",u=>can(u,"order.xem")||u.role==="content"||u.role==="lead"||u.role==="admin"),ordCnt),
    MI("nhaplieu","Nhập báo cáo",tm("content",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead"))].filter(Boolean).map(CT)],

@@ -166,3 +166,10 @@ pFanpageLich=function(m,chs){
   m.insertBefore(box,m.firstChild);
   fpcBind(m)
 };
+
+/* Trang riêng trên menu Marketing › Content: Lịch đăng Fanpage (lịch + yêu cầu tháng + bảng chi tiết) */
+PAGES.lich_fb=function(m){
+  const fp=CHANNELS.filter(c=>!c.needId);BV.k=(fp[0]||{}).k||BV.k;
+  m.innerHTML=H("Lịch đăng Fanpage","Soạn bài, duyệt, đặt ngày giờ; agent Fanpage đăng bài đã duyệt khi tới giờ");
+  const box=document.createElement("div");m.appendChild(box);pFanpageLich(box,fp)
+};
