@@ -47,6 +47,7 @@ function pCpLuong(m){
   const perK=A.perKenh;
   m.innerHTML=H("Lương theo phòng ban và kênh","Kỳ "+ym.slice(5)+"/"+ym.slice(0,4)+" · bảng lương "+S.st.toLowerCase())+
   `<div class="filters"><label class="chk"><input type="checkbox" id="lg-auto"${on?" checked":""}${ed?"":" disabled"}> Tính lương từ bảng lương vào bảng "Kênh nào gánh bao nhiêu chi phí"</label><span class="sp"></span><button class="btn" data-go="hr_bl">Mở Bảng lương</button></div>
+  ${ed&&!Object.keys(d.cpLuongChia||{}).length&&!Object.keys(d.cpLuongPhong||{}).length?`<div class="note amb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>Chưa đặt cách chia nào. Gợi ý theo ảnh chị Huệ: Khanh → TikTok · Nguyệt → Shopee · Ads/Digital và Sale B2C → Facebook · Content & Media → 47% TikTok, 47% Facebook, 6% Shopee · Sản xuất → vào giá thành. Kho, quản lý, Kế toán, HCNS để chi chung.</span><button class="btn pri" id="lg-goiy">Áp gợi ý này</button></div>`:""}
   ${S.chot?"":`<div class="note amb">Bảng lương tháng này chưa chốt, số đang tạm tính (có thể đổi khi chốt công, KPI, thưởng).</div>`}
   <div class="grid kpis">${kpi("Tổng thu nhập",nf(Math.round(A.tong)),A.n+" người")}${kpi("Vào chi phí các kênh",nf(Math.round(Object.values(perK).reduce((a,b)=>a+b,0))),"trực tiếp từng kênh")}${kpi("Chi chung công ty",nf(Math.round(A.chung)),"chia theo quy tắc ở Sổ chi phí")}${kpi("Vào giá thành",nf(Math.round(A.gv)),"lương sản xuất")}</div>
   <section class="card flush"><div class="card-h pad"><h2>Mặc định theo phòng ban</h2><span class="hint">áp cho người chưa được đặt riêng</span></div>
@@ -57,6 +58,12 @@ function pCpLuong(m){
     return `<tr><td class="mono">${esc(r.ma)}</td><td><b>${esc(r.ten)}</b></td><td>${esc(pbN(r.pb))}</td><td class="n">${nf(Math.round(r.tong))}</td><td>${ed?`<select data-ma="${esc(r.ma)}"><option value="*">Theo phòng ban</option>${opt(presets,own?cur(own):"*")}</select>`:esc(cpLgTxt(p))}</td><td>${esc(cpLgTxt(p))}${own?"":` <span class="hint">(theo phòng ban)</span>`}</td></tr>`}))}</section>
   <section class="card pad"><b>Lương theo kênh</b>${tbl(["Kênh","Lương tính vào kênh"],kenhs.filter(k=>perK[k]).map(k=>`<tr><td>${esc(k)}</td><td class="n"><b>${nf(Math.round(perK[k]))}</b></td></tr>`).concat([`<tr class="tot"><td>Chi chung công ty (chưa gắn kênh)</td><td class="n">${nf(Math.round(A.chung))}</td></tr>`]))}
   <p class="hint">Số này đã nằm trong bảng "Kênh nào gánh bao nhiêu chi phí" ở Sổ chi phí. Lương nhập tay trong sổ (khoản chi "Lương cứng") không cộng thêm khi đang bật ô trên. Thưởng, hoa hồng nhập ở sổ vẫn cộng bình thường.${(()=>{const sx=(d.costs||[]).filter(c=>c.cat==="LUONG"&&(c.ngay?c.ngay.slice(0,7):c.thang)===ym).reduce((t,c)=>t+(+c.tien||0),0);return sx?` Lương đã duyệt trong sổ tháng này: ${nf(Math.round(sx))} đ, bảng lương: ${nf(Math.round(A.tong))} đ.`:""})()}</p></section>`;
+  if($("#lg-goiy"))$("#lg-goiy").onclick=()=>{const K=CP_KENH(),TT=K.find(k=>/tiktok/i.test(k)),SP=K.find(k=>/shopee/i.test(k)),FB=K.find(k=>/facebook/i.test(k));
+    if(!TT||!SP||!FB){toast("Thiếu kênh TikTok, Shopee hoặc Facebook trong Kênh bán & phí");return}
+    const find=re=>(d.staff||[]).find(x=>re.test(x.ten||""));const kh=find(/khanh/i),ng=find(/nguyệt/i),own={};
+    if(kh)own[kh.ma]={k:{[TT]:100}};if(ng)own[ng.ma]={k:{[SP]:100}};
+    if(!confirm("Áp gợi ý chia lương? Khanh → TikTok, Nguyệt → Shopee, Ads/Digital + Sale B2C → Facebook, Content & Media → 47/47/6, Sản xuất → giá thành."))return;
+    save(dt=>{dt.cpLuongChia=Object.assign(dt.cpLuongChia||{},own);dt.cpLuongPhong=Object.assign(dt.cpLuongPhong||{},{ADS:{k:{[FB]:100}},B2C:{k:{[FB]:100}},CM:{k:{[TT]:47,[FB]:47,[SP]:6}},SX:{gv:1}})},"áp gợi ý chia lương theo phòng ban và kênh")};
   const save=(fn,msg)=>{DB.mutate(ME.name,msg,dt=>{fn(dt)});renderMain()};
   m.querySelectorAll("#lg-auto").forEach(c=>c.onchange=()=>save(dt=>{dt.cpLuongAuto=c.checked},"đổi cách tính lương vào chi phí kênh"));
   const apply=(sel,get,set,clear)=>{const v=sel.value;if(v==="split"){cpLgSplit(get(),set);return}

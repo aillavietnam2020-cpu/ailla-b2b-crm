@@ -180,7 +180,12 @@ function cpBaLoai(){
   ${oneM&&cpCan()?`<div class="filters pad"><label class="field">Doanh thu thực NPP / đại lý (đ)<input id="cp-dt-npp" type="number" min="0" value="${tay["B2B / Đại lý (CRM)"]||""}"></label><label class="field">Doanh thu thực Gia công (đ)<input id="cp-dt-gc" type="number" min="0" value="${tay["Gia công"]||""}"></label><button class="btn" id="cp-dt-save">Lưu doanh thu</button></div>`:""}
   ${cpNapTieu(N)}
 </section>`}
-{const _s=PAGES.so_cp;if(_s)PAGES.so_cp=function(m){_s.apply(this,arguments);
+const CPT_TAB={t:"ds"};
+{const _s=PAGES.so_cp;if(_s)PAGES.so_cp=function(m){
+  const strip=`<div class="tabs xtabs" role="tablist">${[["ds","Danh sách khoản chi"],["th","Theo tháng"]].map(([k,t])=>`<button role="tab" aria-selected="${CPT_TAB.t===k}" class="${CPT_TAB.t===k?"on":""}" data-cpt="${k}">${t}</button>`).join("")}</div>`;
+  const bindTab=()=>m.querySelectorAll("[data-cpt]").forEach(b=>b.onclick=()=>{CPT_TAB.t=b.dataset.cpt;renderMain()});
+  if(CPT_TAB.t==="th"&&typeof pChiPhi==="function"){m.innerHTML=strip+`<div id="cpt-body"></div>`;pChiPhi(m.querySelector("#cpt-body"));bindTab();return}
+  _s.apply(this,arguments);try{m.insertAdjacentHTML("afterbegin",strip);bindTab()}catch(e){}
   try{const n=(D().costsCho||[]).length,k=m.querySelector(".kpis");if(!k)return;
     const bar=`<div class="note ${n?"amb":""}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${n?`<b>${n} khoản chờ chị Huệ phân bổ</b> (chưa tính vào các số bên dưới)`:"Không có khoản nào chờ phân bổ"}</span><button class="btn sm" id="cp-go">Mở Chờ phân bổ</button></div>`;
     k.insertAdjacentHTML("beforebegin",bar);

@@ -27,6 +27,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     o.quytac=MI("quytac","Quy tắc vận hành & luồng việc",mg);
     o.cp_duyet=MI("cp_duyet","Chờ phân bổ",u=>can(u,"chiphi.xem")||can(u,"chiphi.nhap")||mg());
     o.cp_luong=MI("cp_luong","Lương theo phòng ban & kênh",u=>u.role==="admin"||can(u,"luong.quanly"));
+    o.cp_thu=MI("cp_thu","Sổ thu",u=>can(u,"chiphi.xem")||can(u,"chiphi.nhap")||mg());
     o.so_cp=MI("so_cp","Sổ chi phí",u=>can(u,"chiphi.xem")||mg());
     return o};
   const pick=(P,keys,names)=>keys.map((id,i)=>{const it=P[id];return it?[it[0],(names&&names[i])||it[1],it[2],it[3]]:null}).filter(Boolean);
@@ -38,7 +39,11 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     {k:"q_tq",adm:true,zone:"Điều hành",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",pick(pool(),["exec"],["Tổng quan"])]]},
     tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý (NPP)","Gia công","CSKH cũ"]),
     tabMod("q_ll","spark","Lãi lỗ","",["pl","bc_tong","kho_boc","kho_cl","sku","kho_dm"],["P&L công ty","So sánh kênh","Giá thành & định mức","Chênh lệch định mức","Giá vốn SKU","Định mức theo sản phẩm"]),
-    tabMod("q_cp","fin","Tiền & chi phí","",["tien_lich","cp_duyet","cp_luong","phai_thu","mh_no","so_cp","ngan_sach","chiphi","cr_vc","doisoat","cr_bill"],["Tiền & lịch chi","Chờ phân bổ","Lương theo phòng ban & kênh","Phải thu & tuổi nợ","Phải trả nhà cung cấp","Sổ chi phí","Ngân sách","Chi phí theo tháng","Phiếu chi vận chuyển","Đối soát tiền về","Kho bill giao dịch"]),
+    {k:"q_cp",adm:true,zone:"",ic:"fin",n:"Tiền & chi phí",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
+      return [g("Tiền",["tien_lich"],["Tiền & lịch chi"]),
+        g("Thu",["doisoat","phai_thu","cp_thu"],["Đối soát tiền về","Phải thu & tuổi nợ","Sổ thu"]),
+        g("Chi",["cp_duyet","so_cp","cr_vc","mh_no","cp_luong"],["Chờ phân bổ","Sổ chi phí","Phiếu chi vận chuyển","Phải trả nhà cung cấp","Lương theo phòng ban & kênh"]),
+        g("Báo cáo & chứng từ",["ngan_sach","cr_bill"],["Ngân sách","Kho bill giao dịch"])].filter(x=>x[1].length)}},
     tabMod("q_mh","cart","Mua hàng","Nghiệp vụ",["mh_po","mh_hd","mh_chi","mh_gianvl"],["Đơn mua hàng","Chứng từ nhà cung cấp","Phiếu chi nhà cung cấp","Giá nguyên vật liệu theo tháng"]),
     tabMod("q_sx","fac","Sản xuất & Kho","",["sx_nc","kho_gtri","kho_nxt","kho_vo","kho_map","kho_qd"],["Phiếu sản xuất & tiến độ","Tồn kho & giá trị","Nhập – xuất – tồn","Vỏ can, chai & thùng","Đồng bộ mã B2B","Đơn sàn & quy đổi mã"]),
     {k:"q_cfg",adm:true,zone:"Hệ thống",ic:"gear",n:"Cấu hình",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
@@ -52,7 +57,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const gnGo=p=>{PAGE=p;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
   const gnReady=async()=>{try{await mhLoad()}catch(e){}for(let i=0;i<40&&!MH.sup;i++)await new Promise(r=>setTimeout(r,150))};
   const gnItems=()=>{const mg=mhManage(),ed=mg||can(ME,"chiphi.nhap");return [
-    ["Ghi chi phí","Thuê, lương, agency, tiếp khách… kèm ảnh bill",ed,()=>spForm()],
+    ["Ghi phiếu thu / phiếu chi","Chọn thu hoặc chi, kèm ảnh bill",ed,()=>spForm()],
     ["Phiếu chi nhà cung cấp","Trả tiền hoặc cọc cho nhà cung cấp",mg,async()=>{await gnReady();mhLoadInv();mhLoadPay();mhPayForm()}],
     ["Phiếu chi vận chuyển","Cước xe, đơn vị vận chuyển",mg,()=>gnGo("cr_vc")],
     ["Lập đơn mua hàng","Nguyên vật liệu, vỏ, bao bì",mg,async()=>{await gnReady();mhForm(null)}],
