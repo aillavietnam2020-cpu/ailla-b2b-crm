@@ -185,9 +185,9 @@ function tqSoSanhKenh(m){
   const best=rk[0];
   m.innerHTML=H("So sánh kênh",esc(pLabel())+" · doanh thu thực · xếp hạng theo lãi đóng góp")+`
   <div class="xkstrip" style="margin-bottom:12px">
-   <div class="xk"><span class="xkh"><span class="xkl">Doanh thu thực</span></span><span class="xkv numeric">${T.dt?tr(T.dt):"—"}</span><span class="xkm">${ok.length} kênh có số${T.tam?" · có phần tạm tính":""}</span></div>
-   <div class="xk"><span class="xkh"><span class="xkl">Lãi đóng góp</span></span><span class="xkv numeric">${T.dt?tr(T.lai):"—"}</span><span class="xkm">${T.dt?p(T.lai/T.dt)+" doanh thu · trước chi phí chung":""}</span></div>
-   <div class="xk"><span class="xkh"><span class="xkl">Kênh lãi nhiều nhất</span></span><span class="xkv">${best?esc(best.n):"—"}</span><span class="xkm">${best?tr(best.lai):""}</span></div>
+   <div class="xk"><span class="xkh"><span class="xkl">Doanh thu thực</span></span><span class="xkv numeric">${T.dt?tr(T.dt):"—"}</span><span class="xkm" style="white-space:normal">${ok.length} kênh có số${T.tam?" · có phần tạm tính":""}</span></div>
+   <div class="xk"><span class="xkh"><span class="xkl">Lãi đóng góp</span></span><span class="xkv numeric">${T.dt?tr(T.lai):"—"}</span><span class="xkm" style="white-space:normal">${T.dt?p(T.lai/T.dt)+" doanh thu · trước chi phí chung":""}</span></div>
+   <div class="xk"><span class="xkh"><span class="xkl">Kênh lãi nhiều nhất</span></span><span class="xkv">${best?esc(best.n):"—"}</span><span class="xkm" style="white-space:normal">${best?tr(best.lai):""}</span></div>
    <div class="xk"><span class="xkh"><span class="xkl">Chờ tải báo cáo</span></span><span class="xkv">${T.thieu.length||"Không"}</span><span class="xkm" style="white-space:normal">${esc(T.thieu.join(", "))}</span></div></div>
   <section class="card flush"><div class="tbl"><table><thead><tr><th class="n">Hạng</th><th>Kênh · nguồn số</th><th class="n">Doanh thu thực</th><th class="n">% trong tổng</th><th class="n">Biên lãi gộp</th><th class="n">Phí sàn, ship, thuế %</th><th class="n">Quảng cáo %</th><th class="n">Lãi đóng góp</th><th class="n">Biên đóng góp</th><th class="n">Hủy/hoàn %</th></tr></thead>
    <tbody>${list.map(row).join("")}<tr class="tot"><td></td><td><b>Tổng công ty</b></td><td class="n"><b>${tr(T.dt)}</b></td><td class="n">100%</td><td></td><td></td><td></td><td class="n"><b>${tr(T.lai)}</b></td><td class="n">${T.dt?p(T.lai/T.dt):"—"}</td><td></td></tr></tbody></table></div>
