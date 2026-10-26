@@ -13,7 +13,7 @@ Do chat điều phối trưởng giữ. Một việc một chủ; chat chỉ nh�
 | # | Việc | Vùng file | Chủ | Trạng thái |
 |---|---|---|---|---|
 | 1 | Chạy Máy soát số liệu (12 mục tiền, kho, hàng hoàn) trên số thật + đối chiếu `select name from d1_migrations` với thư mục migrations (0047 và 0061 có 2 file trùng số, đã chạy cả hai) | `src/server/services/dataChecks.ts` (chỉ đọc) | chờ chị Hoa cho phép đọc DB | chưa làm |
-| 2 | So doanh thu thực giữa báo cáo Facebook, TikTok, Phòng điều hành, Sheet; ghi chỗ lệch | đọc trang quantri/vanhanh | chat "Tiếp tục quản trị 26/10" | giao |
+| 2 | So doanh thu thực giữa báo cáo Facebook, TikTok, Phòng điều hành, Sheet; ghi chỗ lệch | đọc trang quantri/vanhanh | chat "Tiếp tục quản trị 26/10" | XONG 26/10 (kết quả ở mục E); còn bc_fb tháng 10 chưa đọc |
 | 3 | Rà bảo mật theo ghi chú 11/10 (mục 4,3,6,7–11 còn lại) | `src/server/*` auth, hub | chưa giao (việc lớn, giao sau khi xong 1–2) | chờ |
 | 4 | Đưa phần "sửa phiếu chi trực tiếp" (3750295) vào main rồi lên web | `hub/src/muahang.js`, `purchasing.ts` | chat nhánh `ghep-23-10-thao-kho` | chờ chủ chat báo xong |
 | 5 | Đọc từng trang chính trên web thật tìm lỗi hiển thị | web thật | điều phối trưởng, khi chị Hoa đăng nhập sẵn trình duyệt | chưa làm |
@@ -36,3 +36,17 @@ Do chat điều phối trưởng giữ. Một việc một chủ; chat chỉ nh�
 ## D. Khối số migration (thực tế trong main)
 
 0054–0062 Agent cũ; 0080–0083 Agent; 0100 Marketing; 0110–0112 đơn/ship; 0120–0121 phiếu chi/mua hàng; 0130 TikTok. Khối 0070–0079 (Kho), 0090–0099 (Ads) chưa có file nào trong main. Số kế tiếp: Quản trị/chi phí xin khối 0140–0149 (ghi tại đây).
+
+## E. Đối soát doanh thu T9/T10 (26/10, chat Tiếp tục quản trị; chỉ đọc)
+
+Web = trang Lãi lỗ P&L (plMonth); "Huệ" = bảng báo cáo các sàn T9 chị Huệ gửi.
+
+| # | Kỳ · Kênh | Web | Nơi khác | Lệch | Nghi do | Việc tiếp |
+|---|---|---|---|---|---|---|
+| E1 | T9 TikTok | 1.392,1tr (doanh thu thuần, file chốt sổ) | Huệ 1.098,2tr; GMV vanhanh 1.538,0tr | +293,9tr so Huệ | Hai định nghĩa doanh thu | CHỊ HOA chốt dùng định nghĩa nào (nguyên tắc 25/10: doanh thu thực); chat TikTok sửa theo |
+| E2 | T9 Facebook | 996,6tr (giao thành công, Pancake) | Huệ 1.084,3tr; bộ đếm vanhanh 960,5tr | −87,6tr so Huệ; +36,1tr so vanhanh | Ngày tạo đơn vs ngày giao; quantri và vanhanh dùng nguồn/ngày khác nhau | Chat Facebook/Ads: thống nhất MỘT hàm tính cho cả hai trang |
+| E3 | T9 Shopee | chưa có | Huệ 244,8tr | thiếu | Chưa tải báo cáo Shopee T9 | Chị Huệ/Thảo tải; T10 cũng chưa có |
+| E4 | T9 B2B/NPP | 768,4tr | Huệ 780,1tr | −11,7tr | Ngày duyệt vs ngày hóa đơn | Chat CRM/Kho xem đơn chưa duyệt |
+| E5 | T9 Gia công | 0 | Huệ 142,3tr | −142,3tr | Đơn gia công không có trong CRM hoặc gắn loại khác | Chat CRM/Kho tra |
+| E6 | T10 TikTok/FB (đến 26/10) | 941,1tr tạm tính / 650,0tr | bộ đếm ngày vanhanh tháng 10 = 0 | không so được | Bộ đếm chưa có ngày T10 | Chat Facebook/Ads kiểm bộ đếm execNums |
+| E7 | Sheet phân bổ T09 | — | ô doanh thu thực trống, dòng chia chung #ERROR | — | Chị Huệ chưa nhập | Chị Huệ |
