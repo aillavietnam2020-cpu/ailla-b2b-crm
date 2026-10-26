@@ -531,7 +531,7 @@ PAGES.kho_gtri=pKhoGiaTri;
   const A=_ea();
   try{
     if(!mhManage())return A;
-    const page="mh_hd";
+    const page="mh_po";
     const need=mhNeedBuy();
     if(need.length)A.push(["amb",`${need.length} nguyên vật liệu dưới mức tồn tối thiểu`,need.slice(0,3).map(r=>r.name).join(", ")+(need.length>3?"…":"")+" · cần đặt thêm",page]);
     (MH.orders||[]).filter(p=>mhLateDays(p)>0).slice(0,5).forEach(p=>A.push(["red",`${p.no} trễ ${mhLateDays(p)} ngày giao`,`${p.supplier_name} · dự kiến ${kDd(p.expected_date)}`,page]));
@@ -550,6 +550,9 @@ PAGES.kho_gtri=pKhoGiaTri;
 if(typeof MODULES!=="undefined"&&(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin")&&!MODULES.some(x=>x.k==="mhop")){
   const ok=()=>mhManage(),i=MODULES.findIndex(x=>x.k==="sx");
   const mo={k:"mhop",zone:"Vận hành",ic:"cart",n:"Mua hàng",sub:"Đặt hàng · hàng về · chứng từ · công nợ",tabs:true,
-    groups:()=>[["",[MI("mh_po","Đơn mua hàng (lập phiếu)",ok),MI("mh_hd","Chứng từ nhà cung cấp",ok),MI("mh_chi","Phiếu chi",ok),MI("mh_no","Công nợ nhà cung cấp",ok),MI("mh_gianvl","Giá nguyên vật liệu theo tháng",ok)]]]};
+    groups:()=>[["",[MI("mh_po","Mua hàng",ok),MI("mh_no","Công nợ nhà cung cấp",ok),MI("mh_gianvl","Giá nguyên vật liệu",ok)]]]};
   MODULES.splice(i>=0?i+1:MODULES.length,0,mo);
 }
+
+/* Chứng từ, phiếu nhập kho, thanh toán đều nằm trong từng phiếu mua (bấm vào phiếu): không còn tab riêng. Link cũ vào hai trang này chuyển về Mua hàng. */
+for(const k of ["mh_hd","mh_chi"]){const _o=PAGES[k];PAGES[k]=function(m){if(mhManage()){PAGE="mh_po";renderMain();return}return _o.apply(this,arguments)}}

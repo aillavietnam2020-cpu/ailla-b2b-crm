@@ -42,9 +42,9 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     {k:"q_cp",adm:true,zone:"",ic:"fin",n:"Tiền & chi phí",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
       return [g("Tiền",["tien_lich"],["Tiền & lịch chi"]),
         g("Thu",["doisoat","phai_thu","cp_thu"],["Đối soát tiền về","Phải thu & tuổi nợ","Sổ thu"]),
-        g("Chi",["so_cp","mh_no"],["Sổ chi phí","Phải trả nhà cung cấp"]),
+        g("Chi",["so_cp"],["Sổ chi phí"]),
         g("Báo cáo & chứng từ",["ngan_sach","cr_bill"],["Ngân sách","Kho bill giao dịch"])].filter(x=>x[1].length)}},
-    tabMod("q_mh","cart","Mua hàng","Nghiệp vụ",["mh_po","mh_hd","mh_chi","mh_gianvl"],["Đơn mua hàng","Chứng từ nhà cung cấp","Phiếu chi nhà cung cấp","Giá nguyên vật liệu theo tháng"]),
+    tabMod("q_mh","cart","Mua hàng","Nghiệp vụ",["mh_po","mh_no","mh_gianvl"],["Mua hàng","Công nợ nhà cung cấp","Giá nguyên vật liệu"]),
     tabMod("q_sx","fac","Sản xuất & Kho","",["sx_nc","kho_gtri","kho_nxt","kho_vo","kho_map","kho_qd"],["Phiếu sản xuất & tiến độ","Tồn kho & giá trị","Nhập – xuất – tồn","Vỏ can, chai & thùng","Đồng bộ mã B2B","Đơn sàn & quy đổi mã"]),
     {k:"q_cfg",adm:true,zone:"Hệ thống",ic:"gear",n:"Cấu hình",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
       return [g("Tài khoản",["nhansu","phongban"],["Tài khoản & phân quyền","Phòng ban"]),
