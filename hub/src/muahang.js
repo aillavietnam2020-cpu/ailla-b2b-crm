@@ -73,6 +73,8 @@ function mhSteps(p){
     st.push(owe>0&&M.paid>=owe?["d","③ Đã trả đủ "+nf(Math.round(M.paid))]:M.paid>0?["c","③ Đã trả "+nf(Math.round(M.paid))+(owe?"/"+nf(Math.round(owe)):"")]:["n","③ Chưa trả tiền"]);
     st.push(M.invTotal>0?["d","④ Hóa đơn "+nf(Math.round(M.invTotal))]:["n","④ Hóa đơn: chưa có (không bắt buộc)"])}
   return `<div class="mhsteps">${st.map(([c,t])=>`<span class="mhs ${c}">${esc(t)}</span>`).join("")}</div>`}
+const mhValue=p=>p.lines.some(l=>l.unit_price!=null)?p.lines.reduce((t,l)=>t+(l.unit_price!=null?l.qty*l.unit_price:0),0):null;
+/* Khung đơn giản cho trang quản trị (bên vận hành dùng khung Sản xuất & kho sxFrame). */
 function mhFrame(m,key,title,sub,body,actions){m.innerHTML=H(MH.admin?"Phiếu mua hàng":title,sub)+(actions?`<div class="filters"><span class="sp"></span>${actions}</div>`:"")+body}
 function pMuaHang(m){
   mhLoad();if(mhManage()){mhLoadInv();mhLoadPay()}
