@@ -341,5 +341,33 @@ describe('Điều khoản thanh toán nhà cung cấp và ảnh khoản chi', ()
     expect(cnt.body.data['cp-abc123']).toBe(1);
     expect((await ctx.request(`${BASE}/costs/cp-abc123/files`, { as: KT })).status).toBe(403);
   });
+  it('công nợ cộng ngay theo giá phiếu mua (chưa cần chứng từ); phiếu chi trừ vào luôn; có chứng từ thì chứng từ thay cho giá phiếu mua', async () => {
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC cộng ngay' } });
+    const supplierId = sup.body.data.id as string;
+    const po = await ctx.request(`${BASE}/orders`, {
+      as: USERS.ceo,
+      body: { supplier_id: supplierId, order_date: '2026-10-05', lines: [{ item: 'NVL1', qty: 100, unit_price: 2000 }] },
+    });
+    expect(po.status).toBe(200);
+    const poId = po.body.data.id as string;
+    const debt = async () =>
+      ((await ctx.request(`${BASE}/debts`, { as: USERS.ceo })).body.data as Array<{ id: string; invoiced: number; po_pending: number; paid: number; balance: number }>).find((d) => d.id === supplierId)!;
+    // Chưa nhận hàng, chưa chứng từ: công nợ đã có 200.000 theo giá phiếu mua.
+    expect(await debt()).toMatchObject({ invoiced: 0, po_pending: 200000, paid: 0, balance: 200000 });
+    // Thảo chi một phần (không cần chứng từ): trừ ngay.
+    const pay = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, po_id: poId, kind: 'COC', pay_date: '2026-10-06', amount: 50000, account: 'Vietcombank' } });
+    expect(pay.status).toBe(200);
+    expect(await debt()).toMatchObject({ po_pending: 200000, paid: 50000, balance: 150000 });
+    const led = await ctx.request(`${BASE}/suppliers/${supplierId}/ledger`, { as: USERS.ceo });
+    expect((led.body.data.entries as Array<{ kind: string }>).some((e) => e.kind.startsWith('Phiếu mua'))).toBe(true);
+    // Nhận hàng, ghi chứng từ theo giá thật 2.100: chứng từ thay cho giá phiếu mua, không cộng hai lần.
+    await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 100 }] } });
+    const orders = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const mine = (orders.body.data as Array<{ id: string; receipts: Array<{ id: string; lines: Array<{ id: string }> }> }>).find((o) => o.id === poId)!;
+    await ctx.request(`${BASE}/receipt-lines/${mine.receipts[0].lines[0].id}/price`, { as: USERS.ceo, method: 'PUT', body: { unit_price: 2100 } });
+    const inv = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo, body: { supplier_id: supplierId, invoice_date: '2026-10-08', receipt_ids: [mine.receipts[0].id] } });
+    expect(inv.body.data.total).toBe(210000);
+    expect(await debt()).toMatchObject({ invoiced: 210000, po_pending: 0, paid: 50000, balance: 160000 });
+  });
 });
 

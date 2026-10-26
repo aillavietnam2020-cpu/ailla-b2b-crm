@@ -758,17 +758,27 @@ purchasingRoutes.post('/payments/:id/cancel', async (c) => {
 });
 
 /** Công nợ từng nhà cung cấp = đầu kỳ + hóa đơn (sau ngày chốt đầu kỳ) − đã chi (sau ngày chốt đầu kỳ). */
+/** Phiếu mua chưa có chứng từ nào (hóa đơn, phiếu giao) gắn vào lần nhận hàng của nó: giá trị theo giá đặt, tính vào công nợ ngay. */
+const PO_PENDING_SQL = `SELECT po.supplier_id, po.id, po.no, po.order_date, SUM(l.qty * l.unit_price) AS value
+  FROM po_orders po JOIN po_lines l ON l.po_id = po.id
+  WHERE po.status <> 'HUY' AND l.unit_price IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM po_invoices v, json_each(v.receipt_ids) j JOIN po_receipts r ON r.id = j.value
+                    WHERE r.po_id = po.id AND v.status = 'OK' AND r.status = 'OK')
+  GROUP BY po.id`;
+
 purchasingRoutes.get('/debts', async (c) => {
   needManage(c.get('auth'));
   const rows = (
     await c.env.DB.prepare(
       `SELECT s.id, s.name, s.opening_debt, s.opening_date,
               COALESCE((SELECT SUM(v.total) FROM po_invoices v WHERE v.supplier_id = s.id AND v.status = 'OK' AND (s.opening_date IS NULL OR v.invoice_date > s.opening_date)), 0) AS invoiced,
-              COALESCE((SELECT SUM(p.amount) FROM po_payments p WHERE p.supplier_id = s.id AND p.status = 'OK' AND (s.opening_date IS NULL OR p.pay_date > s.opening_date)), 0) AS paid
+              COALESCE((SELECT SUM(p.amount) FROM po_payments p WHERE p.supplier_id = s.id AND p.status = 'OK' AND (s.opening_date IS NULL OR p.pay_date > s.opening_date)), 0) AS paid,
+              COALESCE((SELECT SUM(x.value) FROM (${PO_PENDING_SQL}) x WHERE x.supplier_id = s.id AND (s.opening_date IS NULL OR x.order_date > s.opening_date)), 0) AS po_pending
        FROM suppliers s WHERE s.active = 1 ORDER BY s.name`,
-    ).all<{ id: string; name: string; opening_debt: number; opening_date: string | null; invoiced: number; paid: number }>()
+    ).all<{ id: string; name: string; opening_debt: number; opening_date: string | null; invoiced: number; paid: number; po_pending: number }>()
   ).results;
-  return ok(c, rows.map((r) => ({ ...r, balance: r.opening_debt + r.invoiced - r.paid })));
+  // Công nợ cộng ngay theo giá trên phiếu mua (chưa cần chứng từ); phiếu nào đã có chứng từ thì chứng từ thay cho giá phiếu mua.
+  return ok(c, rows.map((r) => ({ ...r, po_pending: Math.round(r.po_pending), balance: r.opening_debt + r.invoiced + Math.round(r.po_pending) - r.paid })));
 });
 
 purchasingRoutes.get('/suppliers/:id/ledger', async (c) => {
@@ -778,8 +788,12 @@ purchasingRoutes.get('/suppliers/:id/ledger', async (c) => {
   if (!s) throw notFound('Không tìm thấy nhà cung cấp');
   const inv = (await c.env.DB.prepare("SELECT invoice_date AS d, invoice_no AS ref, total AS amount FROM po_invoices WHERE supplier_id = ? AND status = 'OK'").bind(id).all<{ d: string; ref: string; amount: number }>()).results;
   const pay = (await c.env.DB.prepare("SELECT pay_date AS d, account AS ref, amount, kind FROM po_payments WHERE supplier_id = ? AND status = 'OK'").bind(id).all<{ d: string; ref: string; amount: number; kind: string }>()).results;
+  const pend = (
+    await c.env.DB.prepare(`SELECT x.order_date AS d, x.no AS ref, ROUND(x.value) AS amount FROM (${PO_PENDING_SQL}) x WHERE x.supplier_id = ?`).bind(id).all<{ d: string; ref: string; amount: number }>()
+  ).results;
   const entries = [
     ...inv.filter((x) => !s.opening_date || x.d > s.opening_date).map((x) => ({ date: x.d, kind: 'Hóa đơn', ref: x.ref, delta: x.amount })),
+    ...pend.filter((x) => !s.opening_date || x.d > s.opening_date).map((x) => ({ date: x.d, kind: 'Phiếu mua (chưa có chứng từ, tính theo giá đặt)', ref: x.ref, delta: x.amount })),
     ...pay.filter((x) => !s.opening_date || x.d > s.opening_date).map((x) => ({ date: x.d, kind: x.kind === 'COC' ? 'Đã cọc' : 'Đã chi', ref: x.ref, delta: -x.amount })),
   ].sort((a, b) => a.date.localeCompare(b.date));
   let run = s.opening_debt;
