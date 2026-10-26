@@ -59,7 +59,7 @@ function mhPoMoney(p){
   (MH.inv||[]).filter(v=>v.status==="OK").forEach(v=>{const ids=v.receipt_ids||[],mine=p.receipts.filter(r=>ids.includes(r.id));if(!mine.length)return;
     const all=allR.filter(r=>ids.includes(r.id)),A=all.reduce((t,r)=>t+rv(r),0),B=mine.reduce((t,r)=>t+rv(r),0),k=A>0?B/A:mine.length/Math.max(1,all.length);
     inv.push({...v,share:k});invTotal+=v.total*k;invPaid+=v.paid*k});
-  const invIds=new Set(inv.map(v=>v.id)),pays=(MH.pay||[]).filter(x=>x.status==="OK"&&(x.po_id===p.id&&!x.invoice_id||x.invoice_id&&invIds.has(x.invoice_id))),direct=pays.filter(x=>!x.invoice_id);
+  const invIds=new Set(inv.map(v=>v.id)),inInv=x=>!!x.invoice_id&&invIds.has(x.invoice_id),pays=(MH.pay||[]).filter(x=>x.status==="OK"&&(x.po_id===p.id||inInv(x))),direct=pays.filter(x=>!inInv(x));
   const paid=invPaid+direct.reduce((t,x)=>t+(+x.amount||0),0);
   return {inv,pays,invTotal:Math.round(invTotal),paid:Math.round(paid),deposit:direct.filter(x=>x.kind==="COC").reduce((t,x)=>t+(+x.amount||0),0)}}
 function mhSteps(p){
@@ -325,6 +325,16 @@ async function mhPayDetail(id){
   document.querySelectorAll("[data-pfd]").forEach(b=>b.onclick=async()=>{if(!confirm("Xóa ảnh này?"))return;try{await kApi("/mh/payments/"+id+"/files/"+b.dataset.pfd,{method:"DELETE"});MH.pay=null;await mhLoadPay();mhPayDetail(id)}catch(e){toast(e.message)}});
   $("#mhpd-up").onclick=async()=>{const fs=[...$("#mhpd-f").files];if(!fs.length)return;$("#mhpd-up").disabled=true;let n=0;for(const f of fs){try{const d=await mhPrepFile(f);await kApi("/mh/payments/"+id+"/files",{method:"POST",body:JSON.stringify(d)});n++}catch(e){toast(e.message)}}if(n)toast("Đã tải lên "+n+" ảnh");MH.pay=null;await mhLoadPay();mhPayDetail(id)};
 }
+/* Tất cả phiếu chi của một nhà cung cấp (kể cả phiếu không gắn được vào phiếu mua nào): xem, sửa, hủy. */
+async function mhSupPays(sid){
+  await mhLoadPay();await mhLoadInv();
+  const S=(MH.sup||[]).find(x=>x.id===sid)||{name:""},L=(MH.pay||[]).filter(x=>x.supplier_id===sid);
+  openDrawerHTML(`<h2>Phiếu chi · ${esc(S.name)}</h2><p class="hint">Phiếu đã hủy không tính vào công nợ. Ghi nhầm thì bấm Sửa, hoặc Hủy rồi ghi lại.</p>
+   ${L.length?tbl(["Ngày chi","Loại","Số tiền","Gắn với","Ghi chú","Trạng thái",""],L.map(x=>`<tr class="${x.status==="OK"?"":"mut"}"><td>${esc(mhD(x.pay_date))}</td><td>${x.kind==="COC"?pill("Cọc","amb"):"Trả tiền"}</td><td class="n"><b>${nf(x.amount)}</b></td><td>${esc([x.po_no,x.invoice_no].filter(Boolean).join(" · ")||"—")}</td><td>${esc(x.note||"")}</td><td>${x.status==="OK"?pill("Đang tính","grn"):pill("Đã hủy","gry")}</td><td class="nowrap">${x.status==="OK"?`<button class="btn sm" data-spe="${x.id}">Sửa</button> <button class="btn sm danger" data-spx="${x.id}">Hủy</button>`:""}</td></tr>`)):`<p class="hint">Chưa có phiếu chi nào.</p>`}`);
+  document.querySelectorAll("[data-spe]").forEach(b=>b.onclick=()=>mhPayEdit(b.dataset.spe));
+  document.querySelectorAll("[data-spx]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy phiếu chi này? Công nợ nhà cung cấp tăng lại đúng số tiền."))return;
+    try{await kApi("/mh/payments/"+b.dataset.spx+"/cancel",{method:"POST",body:"{}"});toast("Đã hủy phiếu chi");await mhReload();await mhLoadPay();mhSupPays(sid)}catch(err){toast(err.message)}});
+}
 /* Sửa phiếu chi: ngày, số tiền, loại (cọc / trả tiền), ghi chú, phiếu mua gắn kèm. Không phải hủy rồi ghi lại, nên không bị tính hai lần. */
 function mhPayEdit(id){
   const x=(MH.pay||[]).find(p=>p.id===id);if(!x)return;
@@ -370,9 +380,10 @@ function pMhNo(m){
   const D0=MH.debts,tot=k=>sum(D0,x=>x[k]);
   m.innerHTML=H(T,S)+mhGuide("mh_no")+`<div class="grid kpis">${kpi("Tổng còn nợ nhà cung cấp",tr(tot("balance")),D0.filter(x=>x.balance>0).length+" nhà cung cấp còn nợ")}${kpi("Công nợ đầu kỳ",tr(tot("opening_debt")),"")}${kpi("Hóa đơn phát sinh",tr(tot("invoiced")),"")}${kpi("Phiếu mua chưa có chứng từ",tr(tot("po_pending")),"tính theo giá đặt")}${kpi("Đã chi",tr(tot("paid")),"")}</div>
   <div class="filters"><span class="sp"></span><button class="btn" id="mhn-ct">+ Ghi chứng từ</button><button class="btn" id="mhn-pc">+ Ghi phiếu chi</button><button class="btn pri" id="mhn-ns">+ Thêm nhà cung cấp (kèm công nợ đầu kỳ)</button></div>
-  <section class="card flush">${tbl(["Nhà cung cấp","Công nợ đầu kỳ","Ngày chốt","Hóa đơn phát sinh","Phiếu mua chưa có chứng từ","Đã chi","Còn nợ",""],D0.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(mhTermTxt((MH.sup||[]).find(s=>s.id===d.id)||{}))}</div></td><td class="n">${nf(d.opening_debt)}</td><td>${esc(mhD(d.opening_date)||"chưa đặt")}</td><td class="n">${nf(d.invoiced)}</td><td class="n">${nf(d.po_pending||0)}</td><td class="n">${nf(d.paid)}</td><td class="n"><b style="${d.balance>0?"color:#b42318":""}">${nf(d.balance)}</b></td><td class="nowrap"><button class="btn sm" data-ld="${d.id}">Sổ chi tiết</button> <button class="btn sm" data-od="${d.id}">Đặt đầu kỳ</button> <button class="btn sm" data-se="${d.id}">Sửa</button> <button class="btn sm" data-pd="${d.id}">Ghi chi</button></td></tr>`).concat(D0.length?[`<tr class="tot"><td><b>Tổng</b></td><td class="n">${nf(tot("opening_debt"))}</td><td></td><td class="n">${nf(tot("invoiced"))}</td><td class="n">${nf(tot("paid"))}</td><td class="n"><b>${nf(tot("balance"))}</b></td><td></td></tr>`]:[]))}
+  <section class="card flush">${tbl(["Nhà cung cấp","Công nợ đầu kỳ","Ngày chốt","Hóa đơn phát sinh","Phiếu mua chưa có chứng từ","Đã chi","Còn nợ",""],D0.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(mhTermTxt((MH.sup||[]).find(s=>s.id===d.id)||{}))}</div></td><td class="n">${nf(d.opening_debt)}</td><td>${esc(mhD(d.opening_date)||"chưa đặt")}</td><td class="n">${nf(d.invoiced)}</td><td class="n">${nf(d.po_pending||0)}</td><td class="n">${nf(d.paid)}</td><td class="n"><b style="${d.balance>0?"color:#b42318":""}">${nf(d.balance)}</b></td><td class="nowrap"><button class="btn sm" data-pl="${d.id}">Phiếu chi</button> <button class="btn sm" data-ld="${d.id}">Sổ chi tiết</button> <button class="btn sm" data-od="${d.id}">Đặt đầu kỳ</button> <button class="btn sm" data-se="${d.id}">Sửa</button> <button class="btn sm" data-pd="${d.id}">Ghi chi</button></td></tr>`).concat(D0.length?[`<tr class="tot"><td><b>Tổng</b></td><td class="n">${nf(tot("opening_debt"))}</td><td></td><td class="n">${nf(tot("invoiced"))}</td><td class="n">${nf(tot("paid"))}</td><td class="n"><b>${nf(tot("balance"))}</b></td><td></td></tr>`]:[]))}
    <p class="hint pad">Chưa có nhà cung cấp nào thì bấm <b>+ Thêm nhà cung cấp</b>: nhập tên và số đang nợ tại ngày bắt đầu dùng web. Nhà cung cấp đã có thì bấm <b>Đặt đầu kỳ</b> ở cuối dòng để sửa. Chứng từ và phiếu chi từ sau ngày chốt mới được cộng trừ vào.</p></section>`;
   m.querySelectorAll("[data-se]").forEach(b=>b.onclick=()=>mhSupEdit(b.dataset.se));
+  m.querySelectorAll("[data-pl]").forEach(b=>b.onclick=()=>mhSupPays(b.dataset.pl));
   $("#mhn-ct").onclick=()=>{mhLoadInv();mhDocForm()};$("#mhn-pc").onclick=()=>{mhLoadInv();mhPayForm()};
   $("#mhn-ns").onclick=()=>mhNewSupplier(()=>{MH.debts=null;mhLoadDebt()},{debt:true});
   m.querySelectorAll("[data-pd]").forEach(b=>b.onclick=()=>{mhLoadInv();mhPayForm(b.dataset.pd)});
