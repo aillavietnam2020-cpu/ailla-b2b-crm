@@ -145,7 +145,7 @@ describe('Agent báo đã đăng (kể cả đăng tay theo lệnh trong chat)',
     expect(id).toMatch(/^FPA-/);
     const d = await agent('done', {
       card_id: id, ok: true, fb_post_id: '123_456', post_url: 'https://www.facebook.com/123_456', text: 'Nội dung đã đăng thật',
-      media_url: 'https://x.vn/a.jpg', comments: [{ text: 'Mua tại ailla.vn', image: 'https://x.vn/c.jpg' }, { text: '', image: '' }],
+      media_url: 'https://x.vn/a.jpg', posted_at: '2026-10-26T04:45:00Z', comments: [{ text: 'Mua tại ailla.vn', image: 'https://x.vn/c.jpg' }, { text: '', image: '' }],
     });
     expect(d.status).toBe(200);
     const c = (await ctx.request('/api/hub/state', { as: USERS.ceo })).body.data.data.cards.find((x: J) => x.id === id);
@@ -154,5 +154,6 @@ describe('Agent báo đã đăng (kể cả đăng tay theo lệnh trong chat)',
     expect(c.noiDung).toBe('Nội dung đã đăng thật');
     expect(c.mediaUrl).toBe('https://x.vn/a.jpg');
     expect(c.cmDaDang).toHaveLength(1);
+    expect(c.dangLuc).toBe('2026-10-26T04:45:00.000Z');
   });
 });

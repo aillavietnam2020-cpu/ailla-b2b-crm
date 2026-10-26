@@ -34,6 +34,7 @@ export interface FpCard {
   fbPostId?: string;
   fbLoi?: string;
   linkDang?: string;
+  dangLuc?: string; // giờ đăng thật (ISO), khác giờ hẹn pdate + gio
   cmDaDang?: Array<{ text: string; image: string }>; // bình luận agent đã đăng dưới bài
   ngayDang?: number;
   history?: unknown[];
@@ -151,7 +152,7 @@ export async function publishCard(
     const fbId = j.post_id ?? j.id ?? '';
     const link = fbId ? `https://www.facebook.com/${fbId}` : '';
     await patchCard(db, card.id, (c, today) => {
-      c.fbState = 'ok'; c.fbPostId = fbId || 'ok'; c.linkDang = link; c.step = 'xong'; c.ngayDang = today;
+      c.fbState = 'ok'; c.fbPostId = fbId || 'ok'; c.linkDang = link; c.step = 'xong'; c.ngayDang = today; c.dangLuc = new Date().toISOString();
       c.history = (c.history ?? []).concat({ t: new Date().toLocaleString('vi-VN'), who: 'Đăng tự động', to: 'xong' });
     });
     await log('ok', page.page_id, fbId, null);
@@ -215,7 +216,7 @@ export async function claimDueForAgent(db: D1Database, now: Date = new Date()) {
 
 export interface DoneBody {
   card_id?: string; ok?: boolean; fb_post_id?: string; error?: string;
-  post_url?: string; text?: string; media_url?: string; comments?: Array<{ text?: string; image?: string }>;
+  post_url?: string; posted_at?: string; text?: string; media_url?: string; comments?: Array<{ text?: string; image?: string }>;
 }
 
 /**
@@ -229,6 +230,8 @@ export async function agentDone(db: D1Database, body: DoneBody) {
   const url = httpsUrl(body.post_url);
   const text = str(body.text, 5000);
   const media = httpsUrl(body.media_url);
+  const pa = Date.parse(str(body.posted_at, 40));
+  const postedAt = Number.isFinite(pa) && pa <= Date.now() + 60_000 ? new Date(pa).toISOString() : now;
   const cms = (Array.isArray(body.comments) ? body.comments : []).slice(0, 10)
     .map((c) => ({ text: str(c?.text, 2000), image: httpsUrl(c?.image) })).filter((c) => c.text || c.image);
   const found = await patchCard(db, id, (c, today) => {
@@ -238,6 +241,7 @@ export async function agentDone(db: D1Database, body: DoneBody) {
       c.fbState = 'ok';
       c.fbPostId = fb || 'ok';
       c.fbLoi = undefined;
+      c.dangLuc = postedAt;
       c.linkDang = url || (fb ? `https://www.facebook.com/${fb}` : (c.linkDang ?? ''));
       if (text) c.noiDung = text;
       if (media) c.mediaUrl = media;

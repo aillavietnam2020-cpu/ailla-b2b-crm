@@ -99,7 +99,7 @@ function fpcOpen(id,date,gio){
 function fpcSave(to){
   const e=FPC.ed,k=BV.k;
   if(to==="posted"){const u=(prompt("Dán link bài đã đăng trên Facebook (để trống nếu chưa có):")||"").trim();if(u&&!/^https:\/\//.test(u)){e.err="Link phải bắt đầu bằng https://";return fpcModal()}
-    DB.mutate(ME.name,"Fanpage: đánh dấu đã đăng "+e.id,dt=>{const c=dt.cards.find(x=>x.id===e.id);if(!c)return;c.noiDung=e.text||c.noiDung;c.step="xong";c.fbState="ok";c.fbPostId=c.fbPostId||"tay";if(u)c.linkDang=u;c.ngayDang=dt.settings.today;c.history=(c.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:ME.name,to:"xong"})});
+    DB.mutate(ME.name,"Fanpage: đánh dấu đã đăng "+e.id,dt=>{const c=dt.cards.find(x=>x.id===e.id);if(!c)return;c.noiDung=e.text||c.noiDung;c.step="xong";c.fbState="ok";c.fbPostId=c.fbPostId||"tay";c.dangLuc=new Date().toISOString();if(u)c.linkDang=u;c.ngayDang=dt.settings.today;c.history=(c.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:ME.name,to:"xong"})});
     closeCM();FPC.ed=null;toast("Đã đánh dấu đã đăng");renderMain();return}
   if(to==="del"){if(!confirm("Xóa bài này khỏi lịch?"))return;DB.mutate(ME.name,"Fanpage: xóa bài "+e.id,dt=>{dt.cards=dt.cards.filter(c=>c.id!==e.id)});closeCM();FPC.ed=null;renderMain();return}
   if(!e.text.trim()&&!e.media){e.err="Bài chưa có nội dung";return fpcModal()}
@@ -243,6 +243,12 @@ FPC.ls="cho";FPC.lsUser=false;FPC.pick=new Set();
 const FPC_TABS=[["cho","Chờ duyệt"],["lich","Đã lên lịch"],["xong","Đã đăng"],["loi","Lỗi"],["nhap","Nháp"],["all","Tất cả"]];
 function fpcRange(){return FPC.view==="week"?[fpcWeek(FPC.anchor)[0].ds,fpcWeek(FPC.anchor)[6].ds]:[fpcIso(FPC.y,FPC.m,1),fpcIso(FPC.y,FPC.m,new Date(FPC.y,FPC.m,0).getDate())]}
 function fpcInRange(){const r=fpcRange();return fpcPosts().filter(c=>fpcDate(c)>=r[0]&&fpcDate(c)<=r[1])}
+/* Bài đã đăng: hiện giờ đăng thật (kèm giờ hẹn nếu khác); chưa đăng: giờ hẹn */
+function fpcVn(iso){try{const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Ho_Chi_Minh",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date(iso)).reduce((o,x)=>(o[x.type]=x.value,o),{});return p.day+"/"+p.month+" "+p.hour+":"+p.minute}catch(e){return ""}}
+function fpcWhen(c){
+  const plan=fpcDM(fpcDate(c))+(c.gio?" "+c.gio:"");
+  if(fpcStOf(c)==="xong"){const real=c.dangLuc?fpcVn(c.dangLuc):"";return real?`<b>${real}</b><br><small class="hint">đăng thật · hẹn ${esc(plan)}</small>`:`${esc(plan)}<br><small class="hint">giờ hẹn, chưa ghi giờ đăng thật</small>`}
+  return c.gio?esc(plan):`${esc(plan)} <span class="hint">chưa có giờ</span>`}
 function fpcList(){
   const all=fpcInRange(),cnt=k=>k==="all"?all.length:all.filter(c=>fpcStOf(c)===k).length;
   if(!FPC.lsUser)FPC.ls=cnt("cho")>0?"cho":"all";
@@ -254,7 +260,7 @@ function fpcList(){
    <div class="fpc-lt">${FPC_TABS.map(([k,t])=>`<button type="button" class="${FPC.ls===k?"on":""}" data-fpclt="${k}">${t} <span>${cnt(k)}</span></button>`).join("")}</div>
    ${rows.length?`<div class="tbl"><table class="fptab fpc-tb"><thead><tr><th></th><th>Page</th><th>Ngày giờ</th><th>Nội dung</th><th>Bình luận đầu</th><th>Link bài đăng</th><th>Tình trạng</th></tr></thead><tbody>${rows.map(c=>{const p=fpcPage(c.pageId),s=FPC_ST[fpcStOf(c)];
     return `<tr data-fpclr="${esc(c.id)}"><td>${canPick(c)?`<input type="checkbox" data-fpclp="${esc(c.id)}" style="width:auto" ${FPC.pick.has(c.id)?"checked":""}>`:""}</td>
-     <td>${p?fpcAv(p,22)+" "+esc(p.name):`<span class="hint">chưa chọn page</span>`}</td><td>${fpcDM(fpcDate(c))}${c.gio?" "+esc(c.gio):` <span class="hint">chưa có giờ</span>`}</td>
+     <td>${p?fpcAv(p,22)+" "+esc(p.name):`<span class="hint">chưa chọn page</span>`}</td><td>${fpcWhen(c)}</td>
      <td class="fpc-tc">${esc((c.noiDung||c.hookText||"").replace(/\s+/g," ").slice(0,90))||'<span class="hint">(trống)</span>'}${c.fbLoi?`<br><small style="color:#b42318">${esc(c.fbLoi.slice(0,80))}</small>`:""}</td>
      <td>${(c.cmDaDang||[]).length?"Đã đăng "+c.cmDaDang.length:c.firstComment?"Có"+(c.firstCommentImg?", kèm ảnh":""):"—"}</td><td>${c.linkDang?`<a href="${esc(c.linkDang)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Xem bài</a>`:"—"}</td><td><span class="pill" style="background:${s[2]};color:${s[1]}">${s[0]}</span></td></tr>`}).join("")}</tbody></table></div>`
    :`<p class="empty pad">${FPC.ls==="cho"?"Không có bài nào chờ duyệt trong khung này.":"Không có bài nào."}${all.length?` Có ${all.length} bài ở thẻ khác, bấm "Tất cả" để xem.`:""}</p>`}</section>`}
