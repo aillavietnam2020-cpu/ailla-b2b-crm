@@ -134,3 +134,25 @@ describe('Agent tự lên bài vào lịch (/api/fp/draft)', () => {
     expect(posts.every((p) => p.card_id === 'FP1')).toBe(true);
   });
 });
+
+describe('Agent báo đã đăng (kể cả đăng tay theo lệnh trong chat)', () => {
+  it('draft trả mã bài; /done ghi link bài, nội dung, ảnh và bình luận đã đăng', async () => {
+    await addPage('100000000001', true);
+    await seedCard('100000000001');
+    const tomorrow = new Date(Date.now() + 7 * 3600 * 1000 + 86_400_000).toISOString().slice(0, 10);
+    const r: J = await (await agent('draft', { task_id: 'WT-2', posts: [{ page_id: '100000000001', date: tomorrow, time: '09:00', text: 'Nháp ban đầu' }] })).json();
+    const id = r.data.ids[0].id as string;
+    expect(id).toMatch(/^FPA-/);
+    const d = await agent('done', {
+      card_id: id, ok: true, fb_post_id: '123_456', post_url: 'https://www.facebook.com/123_456', text: 'Nội dung đã đăng thật',
+      media_url: 'https://x.vn/a.jpg', comments: [{ text: 'Mua tại ailla.vn', image: 'https://x.vn/c.jpg' }, { text: '', image: '' }],
+    });
+    expect(d.status).toBe(200);
+    const c = (await ctx.request('/api/hub/state', { as: USERS.ceo })).body.data.data.cards.find((x: J) => x.id === id);
+    expect(c.step).toBe('xong');
+    expect(c.linkDang).toBe('https://www.facebook.com/123_456');
+    expect(c.noiDung).toBe('Nội dung đã đăng thật');
+    expect(c.mediaUrl).toBe('https://x.vn/a.jpg');
+    expect(c.cmDaDang).toHaveLength(1);
+  });
+});

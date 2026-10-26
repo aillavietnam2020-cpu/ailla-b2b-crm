@@ -4,7 +4,7 @@ import type { AppEnv } from '../env';
 import { badRequest, notFound, ok, unauthorized } from '../lib/http';
 import { newId } from '../lib/ids';
 import { requirePermission } from '../middleware/rbac';
-import { agentDone, claimDueForAgent, createDrafts, type RawDraft } from '../services/fpPublish';
+import { agentDone, claimDueForAgent, createDrafts, type DoneBody, type RawDraft } from '../services/fpPublish';
 
 /**
  * Hàng việc gửi sang Worker dựng video (máy ở văn phòng).
@@ -203,7 +203,7 @@ fpAgentRoutes.use('*', async (c, next) => {
 fpAgentRoutes.post('/due', async (c) => ok(c, await claimDueForAgent(c.env.DB)));
 /** Agent báo đã đăng xong (ok + fb_post_id) hoặc lỗi (error). */
 fpAgentRoutes.post('/done', async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { card_id?: string; ok?: boolean; fb_post_id?: string; error?: string };
+  const body = (await c.req.json().catch(() => ({}))) as DoneBody;
   if (!body.card_id) throw badRequest('NO_ID', 'Thiếu mã bài');
   if (!(await agentDone(c.env.DB, body))) throw notFound('Không thấy bài');
   return ok(c, { ok: true });

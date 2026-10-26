@@ -34,6 +34,7 @@ export interface FpCard {
   fbPostId?: string;
   fbLoi?: string;
   linkDang?: string;
+  cmDaDang?: Array<{ text: string; image: string }>; // bình luận agent đã đăng dưới bài
   ngayDang?: number;
   history?: unknown[];
 }
@@ -212,30 +213,47 @@ export async function claimDueForAgent(db: D1Database, now: Date = new Date()) {
   return { mode, posts };
 }
 
-/** Agent báo kết quả đăng một bài. */
-export async function agentDone(db: D1Database, body: { card_id?: string; ok?: boolean; fb_post_id?: string; error?: string }) {
+export interface DoneBody {
+  card_id?: string; ok?: boolean; fb_post_id?: string; error?: string;
+  post_url?: string; text?: string; media_url?: string; comments?: Array<{ text?: string; image?: string }>;
+}
+
+/**
+ * Agent báo kết quả đăng một bài, cũng dùng khi chị nhắn agent "đăng đi" trong chat (đăng tay ngoài luồng /due):
+ * ghi lại link bài, nội dung và ảnh/video thực tế đã đăng, và các bình luận đã đăng, để lịch khớp với Facebook.
+ */
+export async function agentDone(db: D1Database, body: DoneBody) {
   const id = String(body.card_id ?? '');
   const now = new Date().toISOString();
   let page = '';
+  const url = httpsUrl(body.post_url);
+  const text = str(body.text, 5000);
+  const media = httpsUrl(body.media_url);
+  const cms = (Array.isArray(body.comments) ? body.comments : []).slice(0, 10)
+    .map((c) => ({ text: str(c?.text, 2000), image: httpsUrl(c?.image) })).filter((c) => c.text || c.image);
   const found = await patchCard(db, id, (c, today) => {
     page = c.pageId ?? '';
     if (body.ok) {
-      const fb = String(body.fb_post_id ?? '');
+      const fb = str(body.fb_post_id, 80);
       c.fbState = 'ok';
       c.fbPostId = fb || 'ok';
-      c.linkDang = fb ? `https://www.facebook.com/${fb}` : (c.linkDang ?? '');
+      c.fbLoi = undefined;
+      c.linkDang = url || (fb ? `https://www.facebook.com/${fb}` : (c.linkDang ?? ''));
+      if (text) c.noiDung = text;
+      if (media) c.mediaUrl = media;
+      if (cms.length) c.cmDaDang = cms;
       c.step = 'xong';
       c.ngayDang = today;
       c.history = (c.history ?? []).concat({ t: new Date().toLocaleString('vi-VN'), who: 'Agent Fanpage', to: 'xong' });
     } else {
       c.fbState = 'error';
-      c.fbLoi = String(body.error ?? 'Agent báo lỗi').slice(0, 300);
+      c.fbLoi = str(body.error, 300) || 'Agent báo lỗi';
     }
   });
   if (found) {
     await db
       .prepare('INSERT INTO fp_publish_log (card_id, page_id, status, fb_post_id, error, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, page, body.ok ? 'ok' : 'error', body.ok ? String(body.fb_post_id ?? '') : null, body.ok ? null : String(body.error ?? '').slice(0, 500), now)
+      .bind(id, page, body.ok ? 'ok' : 'error', body.ok ? str(body.fb_post_id, 80) || url : null, body.ok ? null : str(body.error, 500), now)
       .run();
   }
   return found;
@@ -288,17 +306,17 @@ export async function createDrafts(db: D1Database, taskId: string, posts: RawDra
   const pages = await db.prepare('SELECT page_id FROM fp_pages WHERE active = 1').all<{ page_id: string }>();
   const pageIds = new Set((pages.results ?? []).map((p) => p.page_id));
   const skipped: Array<{ index: number; reason: string }> = [];
-  const good: Array<{ id: string; d: Draft; video: string }> = [];
+  const good: Array<{ id: string; d: Draft; video: string; index: number }> = [];
   const list = Array.isArray(posts) ? posts.slice(0, MAX_DRAFTS) : [];
   for (let i = 0; i < list.length; i++) {
     const r = sanitizeDraft(list[i] ?? {}, pageIds, now);
     if (!r.ok) { skipped.push({ index: i, reason: r.reason }); continue; }
-    good.push({ id: await draftId(r.d), d: r.d, video: str(list[i].video_card_id, 40) });
+    good.push({ id: await draftId(r.d), d: r.d, video: str(list[i].video_card_id, 40), index: i });
   }
-  if (!good.length) return { created: 0, skipped };
+  if (!good.length) return { created: 0, skipped, ids: [] as Array<{ index: number; id: string }> };
   for (let attempt = 0; attempt < 4; attempt++) {
     const cur = await readHub(db);
-    if (!cur) return { created: 0, skipped: [{ index: -1, reason: 'chưa có dữ liệu Marketing trên web' }] };
+    if (!cur) return { created: 0, skipped: [{ index: -1, reason: 'chưa có dữ liệu Marketing trên web' }], ids: [] as Array<{ index: number; id: string }> };
     const cards = (cur.d.cards = cur.d.cards ?? []);
     const have = new Set(cards.map((c) => c.id));
     let created = 0;
@@ -314,12 +332,13 @@ export async function createDrafts(db: D1Database, taskId: string, posts: RawDra
       } as unknown as FpCard);
       created++;
     }
-    if (!created) return { created: 0, skipped: skipped.concat([{ index: -1, reason: 'các bài này đã có trên lịch rồi' }]) };
+    const ids = good.map((g) => ({ index: g.index, id: g.id }));
+    if (!created) return { created: 0, skipped: skipped.concat([{ index: -1, reason: 'các bài này đã có trên lịch rồi' }]), ids };
     const res = await db
       .prepare("UPDATE hub_state SET version = version + 1, data = ?, updated_at = ? WHERE id = 'main' AND version = ?")
       .bind(await pack(JSON.stringify(cur.d)), new Date().toISOString(), cur.version)
       .run();
-    if (res.meta.changes) return { created, skipped };
+    if (res.meta.changes) return { created, skipped, ids };
   }
-  return { created: 0, skipped: skipped.concat([{ index: -1, reason: 'dữ liệu đang được sửa liên tục, thử lại' }]) };
+  return { created: 0, skipped: skipped.concat([{ index: -1, reason: 'dữ liệu đang được sửa liên tục, thử lại' }]), ids: [] as Array<{ index: number; id: string }> };
 }
