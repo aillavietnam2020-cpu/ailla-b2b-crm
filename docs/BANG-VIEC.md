@@ -63,6 +63,6 @@ E2 tra lại 26/10 (đọc code): GIẢ THUYẾT CŨ "hai trang hai nguồn" SAI
 ## G. Chuẩn hóa web: thứ tự chị Hoa chốt 26/10
 
 1. Bước 0: bảng phân vùng hai web (docs/PHAN-VUNG-HAI-WEB.html, trang xem: https://claude.ai/artifact/9was5HbzuzabTGjKtfeuwY) — CHỊ ĐÃ DUYỆT 26/10 (bản 5: Kênh phân phối, Kênh OEM, giữ CSKH cũ).
-2. Sắp xếp lại menu hai web theo bảng — GIAO chat "Sắp xếp lại menu hai web ABOS" (local_4ea79cf9, nhánh claude/sap-xep-menu), đang làm. Chat khác không sửa setup.js/admnav2.js/admmenu.js trong lúc này.
+2. Sắp xếp lại menu hai web theo bảng — GIAO chat "Sắp xếp lại menu hai web ABOS" (local_4ea79cf9, nhánh claude/sap-xep-menu): XONG 26/10, main c08af27, đã lên web (điều phối kiểm menu thật hai web khớp). Còn treo: Kho bill + Phiếu chi vận chuyển bản cho sale có quyền kế toán vẫn ở vận hành (chờ chị chốt); 3 trang Đồng bộ mã/Quy đổi mã/Chênh lệch định mức vẫn ở quản trị (vận hành đang che); Sổ chi phí đặt ở Ngân sách & chi phí; Marketing giữ 5 khu; mục Của tôi không thấy trên thanh bên vận hành (tài khoản CEO) — cần kiểm. Chat khác không sửa setup.js/admnav2.js/admmenu.js trong lúc này.
 3. Từng mảng: Doanh thu → Kho → Tiền & công nợ → Mua hàng → Task: định nghĩa chỉ số, nạp số thật, trang xem số nguồn để đối chiếu.
 4. Giao diện mới áp dần theo mảng.
