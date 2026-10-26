@@ -140,7 +140,7 @@ function fpcBind(m){
   m.querySelectorAll("[data-fpcmode]").forEach(s=>s.onchange=async()=>{const v=s.value;if(v==="on"&&!confirm("Bật đăng cả page thật? Bài đã duyệt tới giờ sẽ được đăng thật."))return renderMain();await fpcApi("/mode","POST",{mode:v});toast("Đã đổi công tắc")});
   m.querySelectorAll("[data-fchopen]").forEach(b=>b.onclick=()=>fchToggle(true));
   m.querySelectorAll("[data-fpcb]").forEach(i=>i.onchange=()=>{const f=i.dataset.fpcb,v=i.value;DB.mutate(ME.name,"Fanpage: sửa yêu cầu chung của tháng",dt=>{dt.fpBrief=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},dt.fpBrief||{});dt.fpBrief[f]=v});toast("Đã lưu yêu cầu chung")});
-  m.querySelectorAll("[data-fpclt]").forEach(b=>b.onclick=()=>{FPC.ls=b.dataset.fpclt;FPC.pick.clear();renderMain()});
+  m.querySelectorAll("[data-fpclt]").forEach(b=>b.onclick=()=>{FPC.ls=b.dataset.fpclt;FPC.lsUser=true;FPC.pick.clear();renderMain()});
   m.querySelectorAll("[data-fpclp]").forEach(c=>c.onchange=()=>{c.checked?FPC.pick.add(c.dataset.fpclp):FPC.pick.delete(c.dataset.fpclp);renderMain()});
   m.querySelectorAll("[data-fpclall]").forEach(c=>c.onchange=()=>{const ids=fpcInRange().filter(r=>fpcStOf(r)==="cho").map(r=>r.id);c.checked?ids.forEach(i=>FPC.pick.add(i)):FPC.pick.clear();renderMain()});
   m.querySelectorAll("[data-fpclr]").forEach(r=>r.onclick=ev=>{if(ev.target.closest("input"))return;fpcOpen(r.dataset.fpclr)});
@@ -239,13 +239,14 @@ function fpcAtPayload(text){
    daCoTrenLich:d.cards.filter(c=>c.kenh===BV.k&&fpcDate(c)&&fpcDate(c)>=from&&fpcDate(c)<=to).slice(0,150).map(c=>({page_id:c.pageId||"",ngay:fpcDate(c),gio:c.gio||"",noiDung:String(c.noiDung||c.hookText||"").slice(0,60)})),
    quyTac:["Chỉ tạo bài bằng POST /api/fp/draft; bài luôn vào Chờ duyệt, KHÔNG tự duyệt.","Giờ đăng theo bước 15 phút, ngày từ hôm nay trở đi.","Không bịa số liệu/claim; chỉ dùng claim trong sanPham.","Không trùng bài đã có trên lịch (daCoTrenLich).","Có thể gắn video từ khoVideo (video_card_id + media_url) và bình luận đầu kèm link."]}}
 /* ---------- Danh sách bài (theo ô Kênh + khung đang xem), duyệt nhiều bài một lần ---------- */
-FPC.ls="cho";FPC.pick=new Set();
+FPC.ls="cho";FPC.lsUser=false;FPC.pick=new Set();
 const FPC_TABS=[["cho","Chờ duyệt"],["lich","Đã lên lịch"],["xong","Đã đăng"],["loi","Lỗi"],["nhap","Nháp"],["all","Tất cả"]];
 function fpcRange(){return FPC.view==="week"?[fpcWeek(FPC.anchor)[0].ds,fpcWeek(FPC.anchor)[6].ds]:[fpcIso(FPC.y,FPC.m,1),fpcIso(FPC.y,FPC.m,new Date(FPC.y,FPC.m,0).getDate())]}
 function fpcInRange(){const r=fpcRange();return fpcPosts().filter(c=>fpcDate(c)>=r[0]&&fpcDate(c)<=r[1])}
 function fpcList(){
-  const all=fpcInRange(),cnt=k=>k==="all"?all.length:all.filter(c=>fpcStOf(c)===k).length,
-   rows=all.filter(c=>FPC.ls==="all"||fpcStOf(c)===FPC.ls).sort((a,b)=>(fpcDate(a)+(a.gio||"")).localeCompare(fpcDate(b)+(b.gio||""))),
+  const all=fpcInRange(),cnt=k=>k==="all"?all.length:all.filter(c=>fpcStOf(c)===k).length;
+  if(!FPC.lsUser)FPC.ls=cnt("cho")>0?"cho":"all";
+  const    rows=all.filter(c=>FPC.ls==="all"||fpcStOf(c)===FPC.ls).sort((a,b)=>(fpcDate(a)+(a.gio||"")).localeCompare(fpcDate(b)+(b.gio||""))),
    boss=fpcBoss(),canPick=r=>boss&&fpcStOf(r)==="cho",pk=rows.filter(canPick),n=pk.filter(r=>FPC.pick.has(r.id)).length,
    who=FPC.sel.size===1?(fpcPage([...FPC.sel][0])||{name:""}).name:FPC.sel.size?FPC.sel.size+" page":"tất cả page";
   return `<section class="fpc fpc-list"><div class="fpc-bar"><b>Danh sách bài</b><span class="hint">${esc(who)} · ${FPC.view==="week"?"tuần này":"tháng "+FPC.m+"/"+FPC.y} · ${all.length} bài</span><span class="sp"></span>
@@ -256,7 +257,7 @@ function fpcList(){
      <td>${p?fpcAv(p,22)+" "+esc(p.name):`<span class="hint">chưa chọn page</span>`}</td><td>${fpcDM(fpcDate(c))}${c.gio?" "+esc(c.gio):` <span class="hint">chưa có giờ</span>`}</td>
      <td class="fpc-tc">${esc((c.noiDung||c.hookText||"").replace(/\s+/g," ").slice(0,90))||'<span class="hint">(trống)</span>'}${c.fbLoi?`<br><small style="color:#b42318">${esc(c.fbLoi.slice(0,80))}</small>`:""}</td>
      <td>${(c.cmDaDang||[]).length?"Đã đăng "+c.cmDaDang.length:c.firstComment?"Có"+(c.firstCommentImg?", kèm ảnh":""):"—"}</td><td>${c.linkDang?`<a href="${esc(c.linkDang)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Xem bài</a>`:"—"}</td><td><span class="pill" style="background:${s[2]};color:${s[1]}">${s[0]}</span></td></tr>`}).join("")}</tbody></table></div>`
-   :`<p class="empty pad">${FPC.ls==="cho"?"Không có bài nào chờ duyệt trong khung này.":"Không có bài nào."}</p>`}</section>`}
+   :`<p class="empty pad">${FPC.ls==="cho"?"Không có bài nào chờ duyệt trong khung này.":"Không có bài nào."}${all.length?` Có ${all.length} bài ở thẻ khác, bấm "Tất cả" để xem.`:""}</p>`}</section>`}
 function fpcBriefHtml(){
   const B=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},D().fpBrief||{});
   return `<div class="fpc-brief"><label>Mục tiêu tháng<textarea rows="2" data-fpcb="mucTieu" placeholder="VD: tăng tương tác, kéo khách về mua trên TikTok Shop">${esc(B.mucTieu)}</textarea></label>
@@ -308,7 +309,7 @@ function fchDraw(keep){
   const t=el.querySelector("#fch-t");if(t){t.oninput=()=>{FCH.text=t.value};t.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();fchSend()}};if(had)t.focus()}
   el.querySelectorAll("[data-fpcb]").forEach(i=>i.onchange=()=>{const f=i.dataset.fpcb,v=i.value;DB.mutate(ME.name,"Fanpage: sửa yêu cầu chung của tháng",dt=>{dt.fpBrief=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},dt.fpBrief||{});dt.fpBrief[f]=v});toast("Đã lưu yêu cầu chung")});
   el.querySelector("[data-fchx]").onclick=()=>fchToggle(false);
-  el.querySelector("[data-fchgo]").onclick=()=>{FPC.ls="cho";FPC.pick.clear();const c=D().cards.filter(x=>x.kenh===BV.k&&fpcStOf(x)==="cho"&&fpcDate(x)).sort((a,b)=>fpcDate(a).localeCompare(fpcDate(b)))[0];
+  el.querySelector("[data-fchgo]").onclick=()=>{FPC.ls="cho";FPC.lsUser=true;FPC.pick.clear();const c=D().cards.filter(x=>x.kenh===BV.k&&fpcStOf(x)==="cho"&&fpcDate(x)).sort((a,b)=>fpcDate(a).localeCompare(fpcDate(b)))[0];
     if(c&&(fpcDate(c)<fpcRange()[0]||fpcDate(c)>fpcRange()[1])){FPC.view="month";FPC.y=+fpcDate(c).slice(0,4);FPC.m=+fpcDate(c).slice(5,7)}
     fchToggle(false);renderMain();setTimeout(()=>{const l=document.querySelector(".fpc-list");if(l)l.scrollIntoView({behavior:"smooth",block:"start"})},150)};
   el.querySelectorAll("[data-fchq]").forEach(b=>b.onclick=()=>{const t2=document.getElementById("fch-t");FCH.text=b.dataset.fchq;if(t2){t2.value=FCH.text;t2.focus();t2.setSelectionRange(t2.value.length,t2.value.length)}});
