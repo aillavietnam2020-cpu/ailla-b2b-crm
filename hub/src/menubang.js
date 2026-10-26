@@ -59,7 +59,7 @@
     const S={
       exec:[["",[["exec","Tổng quan vận hành"]]]],
       kd:[["B2C",[["bc_tiktok","TikTok Shop"],"bc_shopee","bc_fb","fb_sale","fb_cskh"]],
-        ["Kênh phân phối",[["cr_rp","Dashboard kênh phân phối"],"cr_kh","cr_dn","cr_cn","cr_ret",["cr_gia","Bảng giá"],["cr_im","Nhập dữ liệu CRM"],
+        ["Kênh phân phối",[["cr_rp","Dashboard kênh phân phối"],"cr_kh","cr_dn","cr_cn","cr_ret",["cr_gia","Bảng giá"],"cr_bill","cr_vc",["cr_im","Nhập dữ liệu CRM"],
           "cr_s_hn","cr_s_kh","cr_s_dn",["cr_s_gia","Bảng giá"],"cr_s_cn","cr_s_ret","cr_s_kq","cr_s_bill","cr_s_vc"]],
         ["Kênh OEM",[["gc_tq","Tổng quan Kênh OEM"],["gc_kh","Khách hàng OEM"],["gc_don","Đơn OEM"],["gc_sx","Sản xuất OEM"],["gc_cn","Công nợ OEM"]]]],
       sx:[["",["sx_tq"]],
@@ -70,8 +70,10 @@
         ["Danh mục",["kho_dm","kho_vo","kho_map","kho_qd"]]],
       cv:[["",["cv_v","cv_da","cv_mt","hq","quychuan","quytac"]]],
       agt:[["",["agentchat","hoithoaiagent","huanluyenagent",["ai","Trợ lý AI"],["bots","Bot phòng ban"]]]]};
-    /* Chuyển sang web quản trị (kế toán, chính sách): đã có sẵn ở đó. */
-    const DROP=["bc_tong","cr_bill","cr_vc","cr_thuong","mh_no","mh_gianvl"];
+    /* Chuyển sang web quản trị (kế toán, chính sách): đã có sẵn ở đó.
+       Kho bill, Phiếu chi vận chuyển ở CẢ hai web (chị Hoa chốt 26/10): sale nhập bill, chị Thảo lập phiếu chi bên vận hành;
+       kế toán xác nhận, xem ở quản trị › Thu chi. Web quản trị chỉ mở cho CEO và tài khoản có quyền kế toán (serve.ts). */
+    const DROP=["bc_tong","cr_thuong","mh_no","mh_gianvl"];
     USED=Object.values(S).flatMap(ids);
     const mkt=keep("mkt"),hr=keep("hr"),aiq=keep("aiq"),me=keep("me");
     if(mkt)mkt.zone="";if(hr)hr.zone="";
