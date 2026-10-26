@@ -168,7 +168,20 @@ function scViec(all){
   return L}
 function scViecHtml(all,title){const L=scViec(all);if(!L.length)return "";const mark="①②③④⑤⑥⑦⑧";
   return `<section class="card pad"><h2>${title}</h2>${L.map(([t,v,f],i)=>`<div class="scviec${i%2?"":" od"}"><span>${mark[i]||i+1}</span><span>${esc(t)}</span>${f.g?`<button class="btn sm" data-go-g="${esc(f.g)}">Xem dòng</button>`:"<span></span>"}</div>`).join("")}</section>`}
+/* Các khoản chi đã nhập ở mục riêng từ trước (trả tiền nhà cung cấp ở Mua hàng, Phiếu chi vận chuyển): hiện ở Nhật ký chi để sổ đủ mọi khoản tiền chi ra.
+   Chỉ để xem và đối chiếu: không cộng vào phân bổ chi phí (tiền mua hàng đi vào giá vốn; cước vận chuyển đã có ở nhật ký nếu nạp từ MISA). */
+function scExt(){
+  const inP=d=>d>=PERIOD.from&&d<=PERIOD.to,R=[];
+  (MH.pay||[]).filter(x=>x.status==="OK"&&inP(x.pay_date)).forEach(x=>R.push({id:"n"+x.id,d:x.pay_date,ct:"Mua hàng",dg:(x.kind==="COC"?"Cọc nhà cung cấp · ":"Trả nhà cung cấp · ")+x.supplier_name,sub:[x.po_no?"phiếu mua "+x.po_no:"",x.invoice_no?"chứng từ "+x.invoice_no:"",x.account||""].filter(Boolean).join(" · "),t:+x.amount||0,nguon:"Mua hàng (giá vốn)"}));
+  (SOCP.ship||[]).filter(v=>v.status==="OK"&&inP(v.voucher_date)).forEach(v=>R.push({id:"v"+v.id,d:v.voucher_date,ct:v.voucher_no||"",dg:"Cước vận chuyển · "+v.carrier,sub:[v.destination,v.order_refs].filter(Boolean).join(" · "),t:+v.amount||0,nguon:"Phiếu chi vận chuyển"}));
+  return R.sort((a,b)=>String(a.d).localeCompare(String(b.d)))}
+function scExtHtml(){
+  const R=scExt();if(!MH.pay&&!SOCP.ship)return `<p class="hint pad">Đang tải các khoản chi ở Mua hàng và Vận chuyển…</p>`;
+  return `<section class="card flush"><div class="sch pad"><h2>Chi từ Mua hàng và Phiếu chi vận chuyển</h2><span class="hint">đã nhập ở mục riêng, hiện ở đây để sổ đủ mọi khoản chi · không cộng vào phân bổ chi phí ở trên</span></div>
+  ${R.length?`<div class="tbl"><table><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nguồn</th></tr></thead><tbody>${R.map(x=>`<tr><td>${scDd(x.d)}</td><td class="mono">${esc(x.ct)}</td><td>${esc(x.dg)}${x.sub?`<div class="hint">${esc(x.sub)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td><span class="scp p-ok">${esc(x.nguon)}</span></td></tr>`).join("")}
+  <tr class="tot"><td colspan="3">Cộng ${R.length} khoản</td><td class="n">${scNf(R.reduce((t,x)=>t+x.t,0))}</td><td></td></tr></tbody></table></div>`:`<p class="empty pad">Chưa có khoản chi nào ở Mua hàng hoặc Vận chuyển trong kỳ này.</p>`}</section>`}
 function scNK(){
+  try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
   const q=kfold(SC.q||""),cho=scCho().filter(scInP),all=scRows().concat(cho),R=all.filter(x=>(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!q||kfold(x.dg+" "+x.ct).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||String(a.ct).localeCompare(String(b.ct)));
   const ed=scCanDuyet(),gs=scDM().map(x=>x.g);
   return `<section class="card flush"><div class="sch pad"><h2>Nhật ký chi</h2><span class="hint">mỗi khoản một dòng · chọn "Bổ vào" để phân bổ · bấm dòng để xem phiếu</span><span class="sp"></span>
@@ -178,7 +191,7 @@ function scNK(){
    <input id="scf-fq" placeholder="Tìm diễn giải, số chứng từ…" value="${esc(SC.q||"")}"></div>
   ${R.length?`<div class="tbl"><table><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>TK</th><th>Loại</th><th>Bổ vào (kênh / nơi chịu)</th><th>Tình trạng</th></tr></thead><tbody>
   ${R.map(x=>{const d=scG(x.g),isCho=x.st==="Chờ duyệt";return `<tr class="clk" data-id="${x.id}"${isCho?' data-cho="1"':""}><td>${scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg)}${x.gc?`<div class="hint">${esc(x.gc)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(d.n)}</td><td>${esc(d.tk)}</td><td>${scLoP(d.lo)}</td><td>${ed&&!isCho?`<select class="scbv${x.k0&&x.k0!==x.k?" doi":""}" data-bv="${x.id}" aria-label="Bổ khoản chi vào">${SC_COLS.map(k=>`<option${x.k===k?" selected":""}>${k}</option>`).join("")}</select>${x.k0&&x.k0!==x.k?`<div class="hint">đã đổi từ ${esc(x.k0)}</div>`:""}`:esc(x.k)}</td><td>${scStP(x.st)}</td></tr>`}).join("")}
-  <tr class="tot"><td colspan="3">Cộng ${R.length} khoản${R.length<all.length?" (đang lọc)":""}</td><td class="n">${scNf(scS(R))}</td><td colspan="5"></td></tr></tbody></table></div>`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
+  <tr class="tot"><td colspan="3">Cộng ${R.length} khoản${R.length<all.length?" (đang lọc)":""}</td><td class="n">${scNf(scS(R))}</td><td colspan="5"></td></tr></tbody></table></div>`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`+scExtHtml()}
 function scPB(){
   const rows=scRows();if(!rows.length)return scEmpty();
   const gs=[...new Set(rows.map(x=>x.g))].sort(),M={};gs.forEach(g=>{M[g]={};SC_COLS.forEach(c=>M[g][c]=0)});rows.forEach(x=>{const c=SC_COLS.includes(x.k)?x.k:"Chờ xác định";M[x.g][c]+=x.t});
