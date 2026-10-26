@@ -89,20 +89,28 @@ function scForm(){
   <form class="frm" id="scf"><div class="row4"><label class="field">Số phiếu<input id="scf-so" value="${scSoPhieu(today)}" readonly></label><label class="field">Ngày chi<input type="date" id="scf-d" value="${today}" required></label></div>
    <div class="row4"><label class="field">Người đề nghị<input id="scf-dn" placeholder="Họ tên" required></label><label class="field">Bộ phận<select id="scf-bp">${opt(bps.map(x=>[x,x]),"")}</select></label></div>
    <div class="row4"><label class="field">Người nhận tiền<input id="scf-nn" placeholder="Tên người / đơn vị nhận"></label><label class="field">Hình thức<select id="scf-ht">${opt([["Chuyển khoản","Chuyển khoản"],["Tiền mặt","Tiền mặt"]],"Chuyển khoản")}</select></label></div>
+   <div id="scf-ck" class="row4"><label class="field">Chi từ tài khoản công ty<select id="scf-from"><option value="">Đang tải…</option></select></label><label class="field">Chuyển đến (ngân hàng · số tài khoản)<input id="scf-to" placeholder="Ví dụ: MB · 0929927999"></label></div>
+   <label class="field" id="scf-fxw" hidden>Tài khoản chi khác<input id="scf-fx" placeholder="Ngân hàng · số tài khoản · tên chủ tài khoản"></label>
    <label class="field">Nội dung chi (ghi rõ chi cho việc gì)<input id="scf-dg" required placeholder="Ví dụ: Cước xe giao hàng NPP Hải Dương"></label>
    <div class="row4"><label class="field">Nhóm chi phí<select id="scf-g">${opt(dm.map(x=>[x.g,x.g+" · "+x.n]),"")}</select></label><label class="field">Bổ vào (kênh / nơi chịu)<select id="scf-k">${opt(SC_COLS.slice(0,8).map(x=>[x,x]),"Chung")}</select></label></div>
    <div class="row4"><label class="field">Số tiền (đ)<input type="number" id="scf-t" min="1" required></label><label class="field">Chứng từ kèm (hóa đơn, ảnh chuyển khoản)<input type="file" id="scf-f" multiple accept="image/*,application/pdf"></label></div>
    <label class="field">Ghi chú<input id="scf-gc"></label><div id="scf-e"></div>
    <button class="btn pri">${scCanDuyet()?"Ghi vào sổ":"Gửi chị Huệ duyệt"}</button></form>
   <div class="note"><b>Quy ước:</b> không có phiếu thì không chi · nội dung không ghi chung chung "Chi phí" · phải chọn nơi chịu · đính kèm hóa đơn hoặc ảnh chuyển khoản. Trả tiền nhà cung cấp hàng, nguyên vật liệu: ghi ở Mua hàng (đi vào giá vốn).</div>`);
+  /* Tiền đi từ tài khoản nào: chọn trong danh sách tài khoản công ty (Cấu hình) hoặc ghi tài khoản khác; chỉ hiện khi chuyển khoản. */
+  const ckSw=()=>{const ck=$("#scf-ht").value==="Chuyển khoản";$("#scf-ck").hidden=!ck;if(!ck)$("#scf-fxw").hidden=true;else $("#scf-fxw").hidden=$("#scf-from").value!=="__x"};
+  mhAccts().then(A=>{const sel=$("#scf-from");if(!sel)return;sel.innerHTML=`<option value="">— Chọn tài khoản chi tiền —</option>`+A.map(a=>`<option>${esc(mhAcctLabel(a))}</option>`).join("")+`<option value="__x">Tài khoản khác…</option>`;sel.onchange=ckSw;ckSw()});
+  $("#scf-ht").onchange=ckSw;ckSw();
   const sug=()=>{const v=$("#scf-dg").value;if(v.length<3)return;const de=scDeXuat(v);$("#scf-g").value=de.g;if(SC_COLS.slice(0,8).includes(de.k))$("#scf-k").value=de.k};
   $("#scf-dg").onchange=sug;$("#scf-d").onchange=e=>{$("#scf-so").value=scSoPhieu(e.target.value)};
   $("#scf-thu").onclick=()=>{if(typeof cptQuick==="function")cptQuick()};
   $("#scf").onsubmit=async e=>{e.preventDefault();const t=+$("#scf-t").value,dg=$("#scf-dg").value.trim();
     if(!(t>0)||!dg){$("#scf-e").innerHTML=`<div class="note red">Nhập nội dung chi và số tiền.</div>`;return}
     if(/^chi ph[ií]$/i.test(dg)){$("#scf-e").innerHTML=`<div class="note red">Ghi rõ chi cho việc gì, không ghi mỗi chữ "Chi phí".</div>`;return}
+    const ckOn=$("#scf-ht").value==="Chuyển khoản",fromAcc=ckOn?($("#scf-from").value==="__x"?$("#scf-fx").value.trim():$("#scf-from").value):"";
+    if(ckOn&&!fromAcc){$("#scf-e").innerHTML=`<div class="note red">Chuyển khoản: chọn tài khoản công ty chi tiền (hoặc ghi tài khoản khác).</div>`;return}
     const btn=e.submitter;if(btn)btn.disabled=true;
-    const ngay=$("#scf-d").value,row={id:uid("pc"),d:ngay,ct:scSoPhieu(ngay),lct:"Phiếu chi",dg,tk:$("#scf-ht").value==="Tiền mặt"?"1111":"1121",t,g:$("#scf-g").value,k:$("#scf-k").value,gc:$("#scf-gc").value.trim(),dn:$("#scf-dn").value.trim(),bp:$("#scf-bp").value,nn:$("#scf-nn").value.trim(),ht:$("#scf-ht").value,src:"phieu",by:ME.name,at:Date.now()};
+    const ngay=$("#scf-d").value,row={id:uid("pc"),tkc:fromAcc,tkn:ckOn?$("#scf-to").value.trim():"",d:ngay,ct:scSoPhieu(ngay),lct:"Phiếu chi",dg,tk:$("#scf-ht").value==="Tiền mặt"?"1111":"1121",t,g:$("#scf-g").value,k:$("#scf-k").value,gc:$("#scf-gc").value.trim(),dn:$("#scf-dn").value.trim(),bp:$("#scf-bp").value,nn:$("#scf-nn").value.trim(),ht:$("#scf-ht").value,src:"phieu",by:ME.name,at:Date.now()};
     if(scCanDuyet())DB.mutate(ME.name,"ghi phiếu chi "+row.ct,dt=>{dt.fin=dt.fin||{};(dt.fin.nkc=dt.fin.nkc||[]).push({...row,st:"Ổn",duyet:ME.name});(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(dg)]={g:row.g,k:row.k,st:"Ổn"}});
     else DB.mutate(ME.name,"ghi phiếu chi chờ duyệt "+row.ct,dt=>{(dt.pcCho=dt.pcCho||[]).push({...row,st:"Chờ duyệt"})});
     let up=0;for(const f of [...$("#scf-f").files]){try{const x=await mhPrepFile(f);await kApi("/mh/costs/"+row.id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
@@ -120,7 +128,7 @@ function scPhieu(x,cho){
    <tr><td class="hint">TK đề xuất / đối ứng</td><td>${esc(scG(x.g).tk)} / ${esc(x.tk||"—")}</td></tr><tr><td class="hint">Loại</td><td>${scLoP(scG(x.g).lo)}</td></tr>
    <tr><td class="hint">Tình trạng</td><td>${ed?`<select id="scp-st">${opt([["Ổn","Ổn"],["Cần rà","Cần rà"]],x.st)}</select>`:scStP(x.st)}</td></tr>
    <tr><td class="hint">Ghi chú rà soát</td><td>${ed?`<input id="scp-gc" value="${esc(x.gc||"")}" style="width:100%">`:esc(x.gc||"—")}</td></tr>
-   <tr><td class="hint">Người đề nghị · bộ phận</td><td>${esc([x.dn,x.bp].filter(Boolean).join(" · ")||"—")}</td></tr><tr><td class="hint">Người nhận · hình thức</td><td>${esc([x.nn,x.ht].filter(Boolean).join(" · ")||"—")}</td></tr>
+   <tr><td class="hint">Người đề nghị · bộ phận</td><td>${esc([x.dn,x.bp].filter(Boolean).join(" · ")||"—")}</td></tr><tr><td class="hint">Người nhận · hình thức</td><td>${esc([x.nn,x.ht].filter(Boolean).join(" · ")||"—")}</td></tr>${x.tkc||x.tkn?`<tr><td class="hint">Tiền đi từ tài khoản</td><td>${esc(x.tkc||"—")}${x.tkn?`<br><small class="hint">Chuyển đến: ${esc(x.tkn)}</small>`:""}</td></tr>`:""}
    <tr><td class="hint">Chứng từ</td><td>${nf?nf+" ảnh":"chưa có"} <button type="button" class="btn sm" id="scp-f">Xem / thêm ảnh</button></td></tr></tbody></table></div>
    <p class="acts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${ed?`<button class="btn pri" id="scp-luu">Lưu</button><button class="btn danger" id="scp-xoa">Xóa dòng</button>`:""}${cho&&scCanDuyet()?`<button class="btn pri" id="scp-ok">Duyệt vào sổ</button><button class="btn danger" id="scp-tl">Trả lại</button>`:""}</p><div id="scp-cf"></div>`);
   $("#scp-f").onclick=()=>spFiles(x.id,x.dg);

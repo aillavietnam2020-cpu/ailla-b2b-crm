@@ -535,6 +535,8 @@ purchasingRoutes.post('/invoices', async (c) => {
   const sup = await c.env.DB.prepare('SELECT id FROM suppliers WHERE id = ?').bind(String(b.supplier_id ?? '')).first();
   if (!sup) throw badRequest('BAD_SUPPLIER', 'Chọn nhà cung cấp');
   const receiptIds = [...new Set((Array.isArray(b.receipt_ids) ? b.receipt_ids : []).map((x) => String(x)))].filter(Boolean);
+  // Hóa đơn / phiếu giao luôn gắn vào lần nhận hàng của một phiếu mua (không còn chứng từ lơ lửng).
+  if (!receiptIds.length) throw badRequest('NEED_RECEIPT', 'Hóa đơn phải gắn vào lần nhận hàng của một phiếu mua. Nhận hàng vào kho trước, rồi ghi hóa đơn ngay trong phiếu mua đó.');
   let goods = int(b.goods_amount);
   if (receiptIds.length) {
     const ph = receiptIds.map(() => '?').join(',');
@@ -676,6 +678,8 @@ purchasingRoutes.post('/payments', async (c) => {
   if (!(await c.env.DB.prepare('SELECT id FROM suppliers WHERE id = ?').bind(String(b.supplier_id ?? '')).first())) throw badRequest('BAD_SUPPLIER', 'Chọn nhà cung cấp');
   const kind = b.kind === 'COC' ? 'COC' : 'CHI';
   const poId = b.po_id ? String(b.po_id) : null;
+  // Phiếu chi phải gắn vào một phiếu mua (hoặc một hóa đơn); chỉ khi ghi rõ "trả nợ chung" mới được không gắn.
+  if (!poId && !b.invoice_id && b.general !== true) throw badRequest('NEED_PO', 'Phiếu chi phải gắn vào một phiếu mua. Ghi chi ngay trong phiếu mua đó, hoặc chọn "trả nợ chung" nếu là khoản trả nợ cũ.');
   if (poId && !(await c.env.DB.prepare("SELECT id FROM po_orders WHERE id = ? AND supplier_id = ? AND status <> 'HUY'").bind(poId, String(b.supplier_id)).first())) throw badRequest('BAD_PO', 'Phiếu mua không đúng nhà cung cấp');
   const invId = b.invoice_id ? String(b.invoice_id) : null;
   if (invId && !(await c.env.DB.prepare("SELECT id FROM po_invoices WHERE id = ? AND supplier_id = ? AND status = 'OK'").bind(invId, String(b.supplier_id)).first())) throw badRequest('BAD_INVOICE', 'Hóa đơn không đúng nhà cung cấp');
