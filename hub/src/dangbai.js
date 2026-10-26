@@ -140,6 +140,7 @@ function fpcBind(m){
   m.querySelectorAll("[data-fpcmode]").forEach(s=>s.onchange=async()=>{const v=s.value;if(v==="on"&&!confirm("Bật đăng cả page thật? Bài đã duyệt tới giờ sẽ được đăng thật."))return renderMain();await fpcApi("/mode","POST",{mode:v});toast("Đã đổi công tắc")});
   m.querySelectorAll("[data-fchopen]").forEach(b=>b.onclick=()=>fchToggle(true));
   m.querySelectorAll("[data-fpcb]").forEach(i=>i.onchange=()=>{const f=i.dataset.fpcb,v=i.value;DB.mutate(ME.name,"Fanpage: sửa yêu cầu chung của tháng",dt=>{dt.fpBrief=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},dt.fpBrief||{});dt.fpBrief[f]=v});toast("Đã lưu yêu cầu chung")});
+  m.querySelectorAll("[data-fpclpg]").forEach(x=>x.onchange=()=>{FPC.sel.clear();if(x.value)FPC.sel.add(x.value);FPC.pick.clear();renderMain()});
   m.querySelectorAll("[data-fpclt]").forEach(b=>b.onclick=()=>{FPC.ls=b.dataset.fpclt;FPC.lsUser=true;FPC.pick.clear();renderMain()});
   m.querySelectorAll("[data-fpclp]").forEach(c=>c.onchange=()=>{c.checked?FPC.pick.add(c.dataset.fpclp):FPC.pick.delete(c.dataset.fpclp);renderMain()});
   m.querySelectorAll("[data-fpclall]").forEach(c=>c.onchange=()=>{const ids=fpcInRange().filter(r=>fpcStOf(r)==="cho").map(r=>r.id);c.checked?ids.forEach(i=>FPC.pick.add(i)):FPC.pick.clear();renderMain()});
@@ -171,6 +172,7 @@ const fpcStyle=`<style>
 .fpc-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:20;width:360px;max-width:90vw;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(30,35,80,.18);padding:12px}.fpc-popa{display:flex;justify-content:space-between;margin:8px 2px}
 .fpc-pl{max-height:320px;overflow:auto}.fpc-pr{display:flex;align-items:center;gap:6px;padding:4px 2px;border-radius:8px}.fpc-pr:hover{background:#f3f4fb}.fpc-pr label{flex:1;display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer;font-size:14px;color:var(--ink)}.fpc-pr label span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fpc-tag{font-style:normal;font-size:11px;background:#eef0ff;color:#4b54d1;border-radius:6px;padding:1px 6px}.fpc-pr .lnk{font-size:12px;white-space:nowrap}
 .fpc-body{display:block}
+.fpc-pf{width:auto;max-width:260px;font-weight:600}
 .fpc-done{background:#e8f8f0;border:1px solid #bfe6d2;border-radius:10px;padding:8px 12px;font-size:13px}.fpc-cmd{margin-top:4px;padding-left:8px;border-left:3px solid #bfe6d2}
 .fpc-list{margin-top:16px}.fpc-lt{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line)}.fpc-lt button{border:0;background:#f1f2f9;border-radius:99px;padding:5px 14px;cursor:pointer;font-weight:600;color:#4b5167}.fpc-lt button span{font-weight:700;margin-left:4px}.fpc-lt .on{background:#4b54d1;color:#fff}
 .fpc-tb tr[data-fpclr]{cursor:pointer}.fpc-tb tr[data-fpclr]:hover{background:#f6f7fd}.fpc-tc{max-width:340px}.fpc-all{font-size:13px;display:flex;gap:6px;align-items:center}
@@ -245,6 +247,8 @@ function fpcRange(){return FPC.view==="week"?[fpcWeek(FPC.anchor)[0].ds,fpcWeek(
 function fpcInRange(){const r=fpcRange();return fpcPosts().filter(c=>fpcDate(c)>=r[0]&&fpcDate(c)<=r[1])}
 /* Bài đã đăng: hiện giờ đăng thật (kèm giờ hẹn nếu khác); chưa đăng: giờ hẹn */
 function fpcVn(iso){try{const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Ho_Chi_Minh",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date(iso)).reduce((o,x)=>(o[x.type]=x.value,o),{});return p.day+"/"+p.month+" "+p.hour+":"+p.minute}catch(e){return ""}}
+function fpcWk(ds){if(!ds)return"";const t=fpcDt(ds),mon=fpcDt(fpcAdd(ds,-((t.getDay()+6)%7))),sun=fpcAdd(fpcDs(mon),6),th=new Date(mon);th.setDate(mon.getDate()+3);
+  const y0=new Date(th.getFullYear(),0,4),n=1+Math.round(((th-y0)/86400000-3+((y0.getDay()+6)%7))/7);return {n,label:fpcDM(fpcDs(mon))+"–"+fpcDM(sun)}}
 function fpcWhen(c){
   const plan=fpcDM(fpcDate(c))+(c.gio?" "+c.gio:"");
   if(fpcStOf(c)==="xong"){const real=c.dangLuc?fpcVn(c.dangLuc):"";return real?`<b>${real}</b><br><small class="hint">đăng thật · hẹn ${esc(plan)}</small>`:`${esc(plan)}<br><small class="hint">giờ hẹn, chưa ghi giờ đăng thật</small>`}
@@ -255,13 +259,13 @@ function fpcList(){
   const    rows=all.filter(c=>FPC.ls==="all"||fpcStOf(c)===FPC.ls).sort((a,b)=>(fpcDate(a)+(a.gio||"")).localeCompare(fpcDate(b)+(b.gio||""))),
    boss=fpcBoss(),canPick=r=>boss&&fpcStOf(r)==="cho",pk=rows.filter(canPick),n=pk.filter(r=>FPC.pick.has(r.id)).length,
    who=FPC.sel.size===1?(fpcPage([...FPC.sel][0])||{name:""}).name:FPC.sel.size?FPC.sel.size+" page":"tất cả page";
-  return `<section class="fpc fpc-list"><div class="fpc-bar"><b>Danh sách bài</b><span class="hint">${esc(who)} · ${FPC.view==="week"?"tuần này":"tháng "+FPC.m+"/"+FPC.y} · ${all.length} bài</span><span class="sp"></span>
+  return `<section class="fpc fpc-list"><div class="fpc-bar"><b>Danh sách bài</b><select class="fpc-pf" data-fpclpg="1" title="Lọc theo page">${opt([["","Tất cả page"]].concat(fpcPages().map(q=>[q.page_id,q.name])),FPC.sel.size===1?[...FPC.sel][0]:"")}</select><span class="hint">${FPC.view==="week"?"tuần đang xem":"tháng "+FPC.m+"/"+FPC.y} · ${all.length} bài</span><span class="sp"></span>
    ${boss&&FPC.ls==="cho"&&pk.length?`<label class="fpc-all"><input type="checkbox" data-fpclall="1" style="width:auto" ${n&&n===pk.length?"checked":""}> Chọn tất cả</label><button type="button" class="btn pri" data-fpclok="1" ${n?"":"disabled"}>Duyệt ${n} bài đã chọn</button>`:""}</div>
    <div class="fpc-lt">${FPC_TABS.map(([k,t])=>`<button type="button" class="${FPC.ls===k?"on":""}" data-fpclt="${k}">${t} <span>${cnt(k)}</span></button>`).join("")}</div>
-   ${rows.length?`<div class="tbl"><table class="fptab fpc-tb"><thead><tr><th></th><th>Page</th><th>Ngày giờ</th><th>Nội dung</th><th>Bình luận đầu</th><th>Link bài đăng</th><th>Tình trạng</th></tr></thead><tbody>${rows.map(c=>{const p=fpcPage(c.pageId),s=FPC_ST[fpcStOf(c)];
+   ${rows.length?`<div class="tbl"><table class="fptab fpc-tb"><thead><tr><th></th><th>Tuần</th><th>Ngày giờ</th><th>Nội dung</th><th>Bình luận đầu</th><th>Link bài đăng</th><th>Tình trạng</th></tr></thead><tbody>${rows.map(c=>{const p=fpcPage(c.pageId),s=FPC_ST[fpcStOf(c)];
     return `<tr data-fpclr="${esc(c.id)}"><td>${canPick(c)?`<input type="checkbox" data-fpclp="${esc(c.id)}" style="width:auto" ${FPC.pick.has(c.id)?"checked":""}>`:""}</td>
-     <td>${p?fpcAv(p,22)+" "+esc(p.name):`<span class="hint">chưa chọn page</span>`}</td><td>${fpcWhen(c)}</td>
-     <td class="fpc-tc">${esc((c.noiDung||c.hookText||"").replace(/\s+/g," ").slice(0,90))||'<span class="hint">(trống)</span>'}${c.fbLoi?`<br><small style="color:#b42318">${esc(c.fbLoi.slice(0,80))}</small>`:""}</td>
+     <td>${(w=>w?`<b>Tuần ${w.n}</b><br><small class="hint">${w.label}</small>`:"")(fpcWk(fpcDate(c)))}</td><td>${fpcWhen(c)}</td>
+     <td class="fpc-tc">${esc((c.noiDung||c.hookText||"").replace(/\s+/g," ").slice(0,90))||'<span class="hint">(trống)</span>'}<br><small class="hint">${p?esc(p.name):"chưa chọn page"}</small>${c.fbLoi?`<br><small style="color:#b42318">${esc(c.fbLoi.slice(0,80))}</small>`:""}</td>
      <td>${(c.cmDaDang||[]).length?"Đã đăng "+c.cmDaDang.length:c.firstComment?"Có"+(c.firstCommentImg?", kèm ảnh":""):"—"}</td><td>${c.linkDang?`<a href="${esc(c.linkDang)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Xem bài</a>`:"—"}</td><td><span class="pill" style="background:${s[2]};color:${s[1]}">${s[0]}</span></td></tr>`}).join("")}</tbody></table></div>`
    :`<p class="empty pad">${FPC.ls==="cho"?"Không có bài nào chờ duyệt trong khung này.":"Không có bài nào."}${all.length?` Có ${all.length} bài ở thẻ khác, bấm "Tất cả" để xem.`:""}</p>`}</section>`}
 function fpcBriefHtml(){
