@@ -24,7 +24,8 @@ async function mhLoad(force){
   MH.busy=false;
   if(/^mh_|^sx_mh$|^exec$|^(so_cp|ngan_sach|tien_lich)$/.test(PAGE))renderMain();
 }
-const mhReload=async()=>{MH.at=0;MH.debts=MH.inv=MH.pay=MH.prices=null;await mhLoad(true)};
+/* Sau khi hủy / sửa / ghi: xóa số cũ, chờ lần tải đang chạy xong (nếu có), tải lại rồi VẼ LẠI ngay, để công nợ hiện đúng số mới (trước đây gặp lần tải đang chạy thì bỏ qua, màn hình giữ số cũ). */
+const mhReload=async()=>{MH.at=0;MH.debts=MH.inv=MH.pay=MH.prices=null;for(let i=0;i<50&&MH.busy;i++)await new Promise(r=>setTimeout(r,100));await mhLoad(true);if(/^mh_|^sx_mh$/.test(PAGE))renderMain()};
 const mhSupOpts=(sel)=>opt([["","— Chọn nhà cung cấp —"]].concat((MH.sup||[]).filter(s=>s.active).map(s=>[s.id,s.name])),sel||"");
 
 /* ---------- Thêm nhà cung cấp (dùng chung) ---------- */

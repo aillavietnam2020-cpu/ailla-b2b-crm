@@ -388,5 +388,18 @@ describe('Điều khoản thanh toán nhà cung cấp và ảnh khoản chi', ()
     await ctx.request(`${BASE}/payments/${payId}/cancel`, { as: USERS.ceo, body: {} });
     expect((await ctx.request(`${BASE}/payments/${payId}`, { as: USERS.ceo, method: 'PUT', body: { amount: 1000 } })).status).toBe(400);
   });
+  it('hủy phiếu chi thì công nợ tăng lại đúng số, phiếu mới ghi thay thế chỉ tính một lần', async () => {
+    const { supplierId, poId } = await setup();
+    const debt = async () =>
+      ((await ctx.request(`${BASE}/debts`, { as: USERS.ceo })).body.data as Array<{ id: string; paid: number; balance: number }>).find((d) => d.id === supplierId)!;
+    const mk = (amount: number) => ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, po_id: poId, kind: 'COC', pay_date: '2026-10-06', amount, account: 'VCB' } });
+    const a = await mk(50000);
+    const before = (await debt()).balance;
+    expect((await debt()).paid).toBe(50000);
+    expect((await ctx.request(`${BASE}/payments/${a.body.data.id}/cancel`, { as: USERS.ceo, body: {} })).status).toBe(200);
+    expect(await debt()).toMatchObject({ paid: 0, balance: before + 50000 });
+    await mk(70000);
+    expect((await debt()).paid).toBe(70000);
+  });
 });
 
