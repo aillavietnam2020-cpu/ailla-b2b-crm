@@ -659,21 +659,41 @@ khoRoutes.post('/items', async (c) => {
   if (!['NVL', 'BTP', 'TP', 'HH', 'CCDC', 'COMBO'].includes(cls)) throw badRequest('BAD_CLS', 'Lớp kho không đúng');
   const dup = await c.env.DB.prepare('SELECT 1 FROM kho_items WHERE code = ?').bind(code).first();
   if (dup) throw conflict('DUP_CODE', 'Mã này đã có trong danh mục');
+  // Đồ gia dụng / quà tặng khách: tạo luôn SẢN PHẨM cùng mã (để thêm làm hàng tặng trên đơn) và nối với mã kho (1 = 1), tồn kho trừ theo đơn.
+  const withProduct = b?.with_product === true;
+  const now = nowIso();
+  const extra: D1PreparedStatement[] = [];
+  let productId: string | null = null;
+  if (withProduct) {
+    const sk = await c.env.DB.prepare('SELECT 1 FROM products WHERE sku = ?').bind(code).first();
+    if (sk) throw conflict('DUP_SKU', 'Đã có sản phẩm trùng mã này trong danh mục sản phẩm. Đặt mã khác.');
+    productId = newId();
+    const gid = (await c.env.DB.prepare("SELECT id FROM product_groups WHERE code = 'QUA_TANG'").first<{ id: string }>())?.id ?? newId();
+    extra.push(
+      c.env.DB.prepare("INSERT OR IGNORE INTO product_groups (id, code, name, created_at, updated_at) VALUES (?, 'QUA_TANG', 'Quà tặng và gia dụng', ?, ?)").bind(gid, now, now),
+      c.env.DB.prepare(
+        `INSERT INTO products (id, sku, name, unit, group_id, active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, (SELECT id FROM product_groups WHERE code = 'QUA_TANG'), 1, ?, ?)`,
+      ).bind(productId, code, name, String(b?.unit ?? ''), now, now),
+      c.env.DB.prepare("INSERT INTO kho_map (crm_sku, misa_code, factor, note) VALUES (?, ?, 1, 'Quà tặng / gia dụng, tạo cùng lúc với mã kho')").bind(code, code),
+    );
+  }
   await c.env.DB.batch([
     c.env.DB.prepare(
       'INSERT INTO kho_items (code, name, unit, cls, grp, min_stock, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
-    ).bind(code, name, String(b?.unit ?? ''), cls, String(b?.grp ?? ''), Math.max(0, num(b?.min_stock) || 0), nowIso()),
+    ).bind(code, name, String(b?.unit ?? ''), cls, String(b?.grp ?? ''), Math.max(0, num(b?.min_stock) || 0), now),
+    ...extra,
     auditStatement(c.env.DB, {
       actorId: auth.user.id,
       action: 'KHO_ITEM_ADDED',
       entityType: 'KHO_ITEM',
       entityId: code,
-      after: { code, name, cls },
+      after: { code, name, cls, product_id: productId },
       requestId: c.get('requestId'),
       ip: ip(c),
     }),
   ]);
-  return ok(c, { code });
+  return ok(c, { code, product_id: productId });
 });
 
 /**

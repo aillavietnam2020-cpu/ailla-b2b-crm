@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext, seedUsers, USERS, type TestContext } from '../helpers/app';
+import { createTestContext, seedBusinessData, seedUsers, USERS, type TestContext } from '../helpers/app';
 
 let ctx: TestContext;
 const NOW = '2026-10-14T01:00:00.000Z';
@@ -97,5 +97,28 @@ describe('nạp tồn đầu kỳ (phiếu TD)', () => {
     expect(r.body.data.runs).toHaveLength(1);
     expect(r.body.data.runs[0]).toMatchObject({ channel: 'TIKTOK', day: '2026-10-23', orders: 40, qty: 12 });
     expect((await ctx.request('/api/hub/kho/online/range?from=2026-10-24&to=2026-10-22', { as: USERS.ceo })).status).toBe(400);
+  });
+  it('thêm mã hàng quà tặng kèm sản phẩm cùng mã: có sản phẩm, nối mã kho 1-1, thêm làm hàng tặng trên đơn được', async () => {
+    const r = await ctx.request('/api/hub/kho/items', { as: USERS.ceo, body: { code: 'QUA-NOIKIM', name: 'Nồi kim loại quà tặng', unit: 'Cái', cls: 'HH', with_product: true } });
+    expect(r.status).toBe(200);
+    const pid = r.body.data.product_id as string;
+    expect(pid).toBeTruthy();
+    const prod = await ctx.db.prepare("SELECT sku, name, group_id FROM products WHERE id = ?").bind(pid).first<{ sku: string; name: string; group_id: string }>();
+    expect(prod).toMatchObject({ sku: 'QUA-NOIKIM', name: 'Nồi kim loại quà tặng' });
+    const grp = await ctx.db.prepare("SELECT code FROM product_groups WHERE id = ?").bind(prod!.group_id).first<{ code: string }>();
+    expect(grp?.code).toBe('QUA_TANG');
+    const map = await ctx.db.prepare("SELECT misa_code, factor FROM kho_map WHERE crm_sku = 'QUA-NOIKIM'").first<{ misa_code: string; factor: number }>();
+    expect(map).toMatchObject({ misa_code: 'QUA-NOIKIM', factor: 1 });
+    // Thêm làm hàng tặng trên đơn: sản phẩm chưa có giá vẫn tặng được (tiền 0).
+    await seedBusinessData(ctx.db);
+    const ord = await ctx.request('/api/orders', { as: USERS.thao, body: { customer_id: 'cus-thao-1', order_date: '2026-10-20', items: [{ product_id: 'prod-full', qty: 5 }, { product_id: pid, qty: 2, is_gift: true }] } });
+    expect(ord.status).toBe(201);
+    // Trùng mã sản phẩm thì báo rõ, không tạo dở dang.
+    const dup = await ctx.request('/api/hub/kho/items', { as: USERS.ceo, body: { code: 'QUA-NOIKIM2', name: 'x', unit: 'Cái', cls: 'HH', with_product: true } });
+    expect(dup.status).toBe(200);
+    // Không tích "tạo sản phẩm" thì chỉ có mã kho.
+    const only = await ctx.request('/api/hub/kho/items', { as: USERS.ceo, body: { code: 'CHI-KHO', name: 'Chỉ kho', unit: 'Cái', cls: 'HH' } });
+    expect(only.body.data.product_id).toBeNull();
+    expect(await ctx.db.prepare("SELECT 1 AS x FROM products WHERE sku = 'CHI-KHO'").first()).toBeNull();
   });
 });

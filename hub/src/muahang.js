@@ -123,7 +123,7 @@ function mhForm(id,draft){
   $("#mhf-add").onclick=()=>{L.push({item:"",qty:"",note:"",price:""});draw()};
   if($("#mhf-newitem"))$("#mhf-newitem").onclick=()=>{
     const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value};
-    khoNewItem({cls:"HH",hint:"Đồ gia dụng, quà tặng khách hoặc hàng chưa có trong danh mục. Đặt mã ngắn, không dấu, không trùng (ví dụ QUA-NOIKIM, GD-CHOIBAT). Thêm xong mã tự điền vào dòng đang trống của phiếu mua.",
+    khoNewItem({cls:"HH",askProduct:true,hint:"Đồ gia dụng, quà tặng khách hoặc hàng chưa có trong danh mục. Đặt mã ngắn, không dấu, không trùng (ví dụ QUA-NOIKIM, GD-CHOIBAT). Thêm xong mã tự điền vào dòng đang trống của phiếu mua.",
       onDone:async code=>{const e=keep.L.find(l=>!l.item);if(e)e.item=code;else keep.L.push({item:code,qty:"",note:"",price:""});mhForm(id,keep)}})};
   $("#mhf-ns").onclick=()=>{const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value};mhNewSupplier(sid=>mhForm(id,{...keep,sup:sid}))};
   $("#mhf").onsubmit=async e=>{e.preventDefault();const body={supplier_id:$("#mhf-s").value,order_date:$("#mhf-d").value,expected_date:$("#mhf-e").value||null,note:$("#mhf-n").value,lines:L.filter(l=>l.item).map(l=>({item:l.item,qty:+l.qty,note:l.note,unit_price:l.price===""||l.price==null?null:+l.price}))};
