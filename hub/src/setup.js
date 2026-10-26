@@ -127,7 +127,7 @@ const MODULES=[
    ["Bán hàng",[MI("b2b_today","Việc hôm nay"),MI("b2b_kh","Khách hàng"),MI("b2b_don","Đơn hàng & duyệt",null,()=>(D().b2b?D().b2b.orders.flatMap(o=>o.approvals||[]).filter(a=>a.status==="PENDING").length:"")||""),MI("b2b_gia","Bảng giá 8 cấp"),MI("b2b_cn","Công nợ"),MI("b2b_perf","Kết quả cá nhân")]],
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
  {k:"mkt",zone:"Vận hành",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC · Live",groups:MKT_G},
- {k:"sx",zone:"Vận hành",ic:"fac",n:"Sản xuất & kho",sub:"",groups:()=>[["",SX_TABS.concat(KHO_SUB.filter(([k])=>k!=="kho_ton")).map(([k,t])=>MI(k,t))]]},
+ {k:"sx",zone:"Vận hành",ic:"fac",n:"Sản xuất & kho",sub:"",groups:()=>[["",SX_TABS.concat(KHO_SUB.filter(([k])=>k!=="kho_ton")).map(([k,t])=>MI(k,t,k==="sx_mh"?(()=>!(typeof mhManage==="function"&&mhManage())):null))]]},
  {k:"fin",zone:"Quản trị",ic:"fin",n:"Tài chính",sub:"",groups:()=>[["",[MI("pl","Báo cáo P&L",u=>can(u,"pl.xem")),MI("chiphi","Chi phí theo tháng",u=>can(u,"chiphi.xem")),MI("doisoat","Đối soát tiền về",u=>can(u,"chiphi.xem")),MI("sku","Giá vốn SKU",u=>can(u,"gia.xem_von"))]]]},
  {k:"hr",zone:"Quản trị",ic:"ppl",n:"Nhân sự",sub:"",groups:()=>[
    ["Hồ sơ",[MI("hr_tq","Tổng quan nhân sự",u=>can(u,"nhansu.quanly")),MI("hoso","Hồ sơ nhân sự",u=>can(u,"nhansu.quanly")),MI("hr_hd","Hợp đồng & thử việc",u=>can(u,"nhansu.quanly"))]],

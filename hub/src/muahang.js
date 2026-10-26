@@ -152,6 +152,8 @@ function mhReceiveForm(id){
 {const i=SX_TABS.findIndex(t=>t[0]==="sx_mh");if(i>=0)SX_TABS[i][1]="Mua hàng"}
 {const old=PAGES.sx_mh;PAGES.sx_dn=function(m){old.apply(this,arguments);m.querySelectorAll(".sxtabs button").forEach(b=>b.classList.toggle("on",b.dataset.sxt==="sx_dn"))}}
 PAGES.sx_mh=sxInit(pMuaHang);
+/* Người có quyền mua hàng (Thảo, kế toán, CEO) dùng mục "Mua hàng" riêng ở thanh bên: tab Mua hàng trong Sản xuất & kho chỉ còn cho kho ghi nhận hàng về. Link cũ vào tab này thì chuyển sang mục mới. */
+{const _sx=PAGES.sx_mh;PAGES.sx_mh=function(m){if(mhManage()){PAGE="mh_po";renderMain();return}return _sx.apply(this,arguments)}}
 
 /* =====================================================================
    Trang quản trị: Mua hàng & công nợ (có giá)
