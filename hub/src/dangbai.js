@@ -69,6 +69,7 @@ function fpcPreview(e){
 function fpcModal(){
   const e=FPC.ed;if(!e)return;const pages=fpcPages(),ro=e.st==="xong",boss=fpcBoss();
   crmModal(e.id?"Sửa bài":"Tạo bài mới",`<div class="fpc-md"><div class="fpc-mf">
+    ${e.st==="xong"?`<div class="fpc-done"><b>Bài đã đăng</b>${e.linkDang?` · <a href="${esc(e.linkDang)}" target="_blank" rel="noopener">Xem bài trên Facebook</a>`:` · <span class="hint">chưa có link bài</span>`}${(e.cm||[]).length?`<div class="hint" style="margin-top:4px">Bình luận đã đăng (${e.cm.length}):</div>`+e.cm.map(x=>`<div class="fpc-cmd">${esc(x.text||"")}${x.image?` <a href="${esc(x.image)}" target="_blank" rel="noopener">ảnh</a>`:""}</div>`).join(""):""}</div>`:""}
     <div class="fpc-lab">Đăng lên page</div><select id="fpc-pgsel" ${ro?"disabled":""}>${opt([["","— chọn page —"]].concat(pages.map(p=>[p.page_id,p.name+(p.is_test?" (page thử)":"")])),e.pageId)}</select>
     <div class="fpc-lab">Nội dung</div><textarea id="fpc-tx" rows="8" placeholder="Viết nội dung bài…" ${ro?"disabled":""}>${esc(e.text)}</textarea>
     <div class="fpc-row"><label>Dạng bài<select id="fpc-fmt" ${ro?"disabled":""}>${opt([["","Chỉ chữ"],["Ảnh","Ảnh"],["Video","Video"]],e.fmt)}</select></label>
@@ -83,7 +84,7 @@ function fpcModal(){
     ${e.err?`<p class="fpc-err">${esc(e.err)}</p>`:""}
    </div><div class="fpc-mp"><div class="fpc-lab">Xem trước</div><div id="fpc-pv">${fpcPreview(e)}</div></div></div>
    <div class="fpc-mfoot"><span class="pill" style="background:${FPC_ST[e.st][2]};color:${FPC_ST[e.st][1]}">${FPC_ST[e.st][0]}</span><span class="sp"></span>
-    ${e.id&&!ro?`<button type="button" class="lnk danger" data-fpcdo="del">Xóa</button>`:""}${ro?"":`<button type="button" class="btn" data-fpcdo="nhap">Lưu nháp</button><button type="button" class="btn" data-fpcdo="cho">Gửi duyệt</button><button type="button" class="btn pri" data-fpcdo="lich" ${boss?"":"disabled title=\"Chỉ người duyệt\""}>Duyệt &amp; lên lịch</button>`}</div>`,true);
+    ${e.id&&!ro?`<button type="button" class="lnk danger" data-fpcdo="del">Xóa</button>`:""}${e.id&&!ro&&boss?`<button type="button" class="lnk" data-fpcdo="posted" title="Bài đã được đăng lên Facebook ngoài lịch (ví dụ nhờ agent đăng trong chat): dán link để lịch khớp">Đánh dấu đã đăng</button>`:""}${ro?"":`<button type="button" class="btn" data-fpcdo="nhap">Lưu nháp</button><button type="button" class="btn" data-fpcdo="cho">Gửi duyệt</button><button type="button" class="btn pri" data-fpcdo="lich" ${boss?"":"disabled title=\"Chỉ người duyệt\""}>Duyệt &amp; lên lịch</button>`}</div>`,true);
   const sync=()=>{const g=id=>document.getElementById(id);e.text=g("fpc-tx").value;e.fmt=g("fpc-fmt").value;e.media=fpcDirect(g("fpc-md").value);e.link=g("fpc-lk").value.trim();e.comment=g("fpc-cm").value;e.commentImg=fpcDirect(g("fpc-ci").value);e.date=g("fpc-dy").value;e.gio=g("fpc-gio").value?g("fpc-gio").value+":"+g("fpc-ph").value:"";g("fpc-pv").innerHTML=fpcPreview(e)};
   ["fpc-tx","fpc-md","fpc-lk","fpc-cm","fpc-ci","fpc-dy","fpc-gio","fpc-ph"].forEach(i=>{const el=document.getElementById(i);if(el)el.oninput=el.onchange=sync});
   const fm=document.getElementById("fpc-fmt");if(fm)fm.onchange=()=>{sync();fpcModal()};
@@ -92,11 +93,14 @@ function fpcModal(){
   document.querySelectorAll("[data-fpcdo]").forEach(b=>b.onclick=()=>{sync();fpcSave(b.dataset.fpcdo)})}
 function fpcOpen(id,date,gio){
   const c=id?D().cards.find(x=>x.id===id):null;
-  FPC.ed=c?{id:c.id,st:fpcStOf(c),pageId:c.pageId||"",text:c.noiDung||c.hookText||"",fmt:c.mediaUrl?(/video/i.test(c.dangVideo||"")?"Video":"Ảnh"):"",media:c.mediaUrl||"",link:c.linkLanding||"",comment:c.firstComment||"",commentImg:c.firstCommentImg||"",date:fpcDate(c)||fpcToday(),gio:c.gio||"",err:c.fbLoi||""}
-   :{id:"",st:"nhap",pageId:FPC.sel.size===1?[...FPC.sel][0]:"",text:"",fmt:"",media:"",link:"",comment:"",commentImg:"",date:date||fpcToday(),gio:gio?fpcPad(gio)+":00":"",err:""};
+  FPC.ed=c?{id:c.id,st:fpcStOf(c),pageId:c.pageId||"",text:c.noiDung||c.hookText||"",fmt:c.mediaUrl?(/video/i.test(c.dangVideo||"")?"Video":"Ảnh"):"",media:c.mediaUrl||"",link:c.linkLanding||"",comment:c.firstComment||"",commentImg:c.firstCommentImg||"",linkDang:c.linkDang||"",cm:c.cmDaDang||[],date:fpcDate(c)||fpcToday(),gio:c.gio||"",err:c.fbLoi||""}
+   :{id:"",st:"nhap",pageId:FPC.sel.size===1?[...FPC.sel][0]:"",text:"",fmt:"",media:"",link:"",comment:"",commentImg:"",linkDang:"",cm:[],date:date||fpcToday(),gio:gio?fpcPad(gio)+":00":"",err:""};
   fpcModal()}
 function fpcSave(to){
   const e=FPC.ed,k=BV.k;
+  if(to==="posted"){const u=(prompt("Dán link bài đã đăng trên Facebook (để trống nếu chưa có):")||"").trim();if(u&&!/^https:\/\//.test(u)){e.err="Link phải bắt đầu bằng https://";return fpcModal()}
+    DB.mutate(ME.name,"Fanpage: đánh dấu đã đăng "+e.id,dt=>{const c=dt.cards.find(x=>x.id===e.id);if(!c)return;c.noiDung=e.text||c.noiDung;c.step="xong";c.fbState="ok";c.fbPostId=c.fbPostId||"tay";if(u)c.linkDang=u;c.ngayDang=dt.settings.today;c.history=(c.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:ME.name,to:"xong"})});
+    closeCM();FPC.ed=null;toast("Đã đánh dấu đã đăng");renderMain();return}
   if(to==="del"){if(!confirm("Xóa bài này khỏi lịch?"))return;DB.mutate(ME.name,"Fanpage: xóa bài "+e.id,dt=>{dt.cards=dt.cards.filter(c=>c.id!==e.id)});closeCM();FPC.ed=null;renderMain();return}
   if(!e.text.trim()&&!e.media){e.err="Bài chưa có nội dung";return fpcModal()}
   if(to==="lich"){if(!fpcBoss()){e.err="Chỉ người duyệt mới được duyệt";return fpcModal()}
@@ -167,6 +171,7 @@ const fpcStyle=`<style>
 .fpc-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:20;width:360px;max-width:90vw;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(30,35,80,.18);padding:12px}.fpc-popa{display:flex;justify-content:space-between;margin:8px 2px}
 .fpc-pl{max-height:320px;overflow:auto}.fpc-pr{display:flex;align-items:center;gap:6px;padding:4px 2px;border-radius:8px}.fpc-pr:hover{background:#f3f4fb}.fpc-pr label{flex:1;display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer;font-size:14px;color:var(--ink)}.fpc-pr label span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fpc-tag{font-style:normal;font-size:11px;background:#eef0ff;color:#4b54d1;border-radius:6px;padding:1px 6px}.fpc-pr .lnk{font-size:12px;white-space:nowrap}
 .fpc-body{display:block}
+.fpc-done{background:#e8f8f0;border:1px solid #bfe6d2;border-radius:10px;padding:8px 12px;font-size:13px}.fpc-cmd{margin-top:4px;padding-left:8px;border-left:3px solid #bfe6d2}
 .fpc-list{margin-top:16px}.fpc-lt{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line)}.fpc-lt button{border:0;background:#f1f2f9;border-radius:99px;padding:5px 14px;cursor:pointer;font-weight:600;color:#4b5167}.fpc-lt button span{font-weight:700;margin-left:4px}.fpc-lt .on{background:#4b54d1;color:#fff}
 .fpc-tb tr[data-fpclr]{cursor:pointer}.fpc-tb tr[data-fpclr]:hover{background:#f6f7fd}.fpc-tc{max-width:340px}.fpc-all{font-size:13px;display:flex;gap:6px;align-items:center}
 .fpc-bd{margin:6px 0;font-size:13px}.fpc-bd summary{cursor:pointer;color:#4b54d1;font-weight:600}.fpc-brief{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}.fpc-brief label{font-size:12px;color:#5b6176;display:flex;flex-direction:column;gap:3px}@media(max-width:800px){.fpc-brief{grid-template-columns:1fr}}
@@ -246,11 +251,11 @@ function fpcList(){
   return `<section class="fpc fpc-list"><div class="fpc-bar"><b>Danh sách bài</b><span class="hint">${esc(who)} · ${FPC.view==="week"?"tuần này":"tháng "+FPC.m+"/"+FPC.y} · ${all.length} bài</span><span class="sp"></span>
    ${boss&&FPC.ls==="cho"&&pk.length?`<label class="fpc-all"><input type="checkbox" data-fpclall="1" style="width:auto" ${n&&n===pk.length?"checked":""}> Chọn tất cả</label><button type="button" class="btn pri" data-fpclok="1" ${n?"":"disabled"}>Duyệt ${n} bài đã chọn</button>`:""}</div>
    <div class="fpc-lt">${FPC_TABS.map(([k,t])=>`<button type="button" class="${FPC.ls===k?"on":""}" data-fpclt="${k}">${t} <span>${cnt(k)}</span></button>`).join("")}</div>
-   ${rows.length?`<div class="tbl"><table class="fptab fpc-tb"><thead><tr><th></th><th>Page</th><th>Ngày giờ</th><th>Nội dung</th><th>Bình luận đầu</th><th>Tình trạng</th></tr></thead><tbody>${rows.map(c=>{const p=fpcPage(c.pageId),s=FPC_ST[fpcStOf(c)];
+   ${rows.length?`<div class="tbl"><table class="fptab fpc-tb"><thead><tr><th></th><th>Page</th><th>Ngày giờ</th><th>Nội dung</th><th>Bình luận đầu</th><th>Link bài đăng</th><th>Tình trạng</th></tr></thead><tbody>${rows.map(c=>{const p=fpcPage(c.pageId),s=FPC_ST[fpcStOf(c)];
     return `<tr data-fpclr="${esc(c.id)}"><td>${canPick(c)?`<input type="checkbox" data-fpclp="${esc(c.id)}" style="width:auto" ${FPC.pick.has(c.id)?"checked":""}>`:""}</td>
      <td>${p?fpcAv(p,22)+" "+esc(p.name):`<span class="hint">chưa chọn page</span>`}</td><td>${fpcDM(fpcDate(c))}${c.gio?" "+esc(c.gio):` <span class="hint">chưa có giờ</span>`}</td>
      <td class="fpc-tc">${esc((c.noiDung||c.hookText||"").replace(/\s+/g," ").slice(0,90))||'<span class="hint">(trống)</span>'}${c.fbLoi?`<br><small style="color:#b42318">${esc(c.fbLoi.slice(0,80))}</small>`:""}</td>
-     <td>${c.firstComment?"Có"+(c.firstCommentImg?", kèm ảnh":""):"—"}</td><td><span class="pill" style="background:${s[2]};color:${s[1]}">${s[0]}</span></td></tr>`}).join("")}</tbody></table></div>`
+     <td>${(c.cmDaDang||[]).length?"Đã đăng "+c.cmDaDang.length:c.firstComment?"Có"+(c.firstCommentImg?", kèm ảnh":""):"—"}</td><td>${c.linkDang?`<a href="${esc(c.linkDang)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Xem bài</a>`:"—"}</td><td><span class="pill" style="background:${s[2]};color:${s[1]}">${s[0]}</span></td></tr>`}).join("")}</tbody></table></div>`
    :`<p class="empty pad">${FPC.ls==="cho"?"Không có bài nào chờ duyệt trong khung này.":"Không có bài nào."}</p>`}</section>`}
 function fpcBriefHtml(){
   const B=Object.assign({mucTieu:"",giong:"",spDay:"",luuY:""},D().fpBrief||{});
