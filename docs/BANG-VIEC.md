@@ -52,3 +52,10 @@ Web = trang Lãi lỗ P&L (plMonth); "Huệ" = bảng báo cáo các sàn T9 ch�
 | E7 | Sheet phân bổ T09 | — | ô doanh thu thực trống, dòng chia chung #ERROR | — | Chị Huệ chưa nhập | Chị Huệ |
 
 E2 tra lại 26/10 (đọc code): GIẢ THUYẾT CŨ "hai trang hai nguồn" SAI. Trang quản trị (tqgop.js tqRevB2C) và trang vận hành (exec.js execNums) đều cộng cùng một cột: DAYD.fb[ngày][5] = doanh thu giao thành công theo NGÀY TẠO ĐƠN (Sheet Pancake; ngày thiếu thì Pancake API: doanh thu đã giao trừ hoàn ước tính, adsday.js). Vậy 996,6tr vs 960,5tr phải do khác kỳ/khác thời điểm tải (đơn đang giao cập nhật dần), chưa tái hiện được vì chưa đọc số thật. Lệch với chị Huệ (1.084tr) nhiều khả năng do khác cách tính: web theo ngày tạo đơn, chị Huệ nhiều khả năng theo ngày giao/tiền về. CẦN CHỊ HOA CHỐT: Facebook tính theo ngày tạo đơn hay ngày giao thành công.
+
+## F. Quy tắc kỳ doanh thu (chị Hoa chốt 26/10)
+
+- Đơn xác nhận tháng nào tính doanh thu tháng đó (vẫn là doanh thu thực: giao thành công, trừ hoàn/hủy).
+- Chốt số tháng trước vào NGÀY 10 THÁNG SAU. Trước ngày 10: trang quản trị phải ghi rõ "doanh thu dự kiến / chưa chốt" (số thật đến lúc đó + đơn đang giao × (1 − hoàn dự kiến); fbpl.js đã có thẻ dự kiến cho Facebook).
+- Chị Huệ chốt báo cáo cùng thời điểm (ngày 10). Vì vậy lệch Facebook T9 (E2) có thể chỉ do đọc ở hai thời điểm; sau ngày 10 phải so lại.
+- Việc F1 (chat Facebook/Ads, khi mở lại): mọi trang doanh thu hiện nhãn "chưa chốt – dự kiến" cho tháng chưa qua ngày 10, "đã chốt" sau đó, và số đã chốt không đổi nữa. Việc F2 (TikTok, Shopee, B2B): áp cùng quy tắc.
