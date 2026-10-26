@@ -62,7 +62,7 @@ E2 tra lại 26/10 (đọc code): GIẢ THUYẾT CŨ "hai trang hai nguồn" SAI
 
 ## G. Chuẩn hóa web: thứ tự chị Hoa chốt 26/10
 
-1. Bước 0: bảng phân vùng hai web (docs/PHAN-VUNG-HAI-WEB.html, trang xem: https://claude.ai/artifact/9was5HbzuzabTGjKtfeuwY) — CHỜ CHỊ DUYỆT 5 câu.
-2. Sắp xếp lại menu hai web theo bảng (chỉ đổi chỗ, đổi tên; giao một chat làm trọn, file chung: hub/src/setup.js MODULES, hub/src/admnav2.js).
+1. Bước 0: bảng phân vùng hai web (docs/PHAN-VUNG-HAI-WEB.html, trang xem: https://claude.ai/artifact/9was5HbzuzabTGjKtfeuwY) — CHỊ ĐÃ DUYỆT 26/10 (bản 5: Kênh phân phối, Kênh OEM, giữ CSKH cũ).
+2. Sắp xếp lại menu hai web theo bảng — GIAO chat "Sắp xếp lại menu hai web ABOS" (local_4ea79cf9, nhánh claude/sap-xep-menu), đang làm. Chat khác không sửa setup.js/admnav2.js/admmenu.js trong lúc này.
 3. Từng mảng: Doanh thu → Kho → Tiền & công nợ → Mua hàng → Task: định nghĩa chỉ số, nạp số thật, trang xem số nguồn để đối chiếu.
 4. Giao diện mới áp dần theo mảng.
