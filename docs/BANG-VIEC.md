@@ -59,3 +59,10 @@ E2 tra lại 26/10 (đọc code): GIẢ THUYẾT CŨ "hai trang hai nguồn" SAI
 - Chốt số tháng trước vào NGÀY 10 THÁNG SAU. Trước ngày 10: trang quản trị phải ghi rõ "doanh thu dự kiến / chưa chốt" (số thật đến lúc đó + đơn đang giao × (1 − hoàn dự kiến); fbpl.js đã có thẻ dự kiến cho Facebook).
 - Chị Huệ chốt báo cáo cùng thời điểm (ngày 10). Vì vậy lệch Facebook T9 (E2) có thể chỉ do đọc ở hai thời điểm; sau ngày 10 phải so lại.
 - Việc F1 (chat Facebook/Ads, khi mở lại): mọi trang doanh thu hiện nhãn "chưa chốt – dự kiến" cho tháng chưa qua ngày 10, "đã chốt" sau đó, và số đã chốt không đổi nữa. Việc F2 (TikTok, Shopee, B2B): áp cùng quy tắc.
+
+## G. Chuẩn hóa web: thứ tự chị Hoa chốt 26/10
+
+1. Bước 0: bảng phân vùng hai web (docs/PHAN-VUNG-HAI-WEB.html, trang xem: https://claude.ai/artifact/9was5HbzuzabTGjKtfeuwY) — CHỜ CHỊ DUYỆT 5 câu.
+2. Sắp xếp lại menu hai web theo bảng (chỉ đổi chỗ, đổi tên; giao một chat làm trọn, file chung: hub/src/setup.js MODULES, hub/src/admnav2.js).
+3. Từng mảng: Doanh thu → Kho → Tiền & công nợ → Mua hàng → Task: định nghĩa chỉ số, nạp số thật, trang xem số nguồn để đối chiếu.
+4. Giao diện mới áp dần theo mảng.
