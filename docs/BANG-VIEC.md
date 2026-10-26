@@ -22,7 +22,7 @@ Do chat điều phối trưởng giữ. Một việc một chủ; chat chỉ nh�
 
 | Nhánh / thư mục | Nội dung | Chủ nghi là | Cần |
 |---|---|---|---|
-| `viec-do-trong-thu-muc-chung-23-10` (9f5ba69) | `hub/src/congviec.js`, `kho2.js`, `theme-sang.css`, `congDoan.test.ts`, media-duyet/HUONG-DAN.txt, vps-skill/dieu-hanh-agent, hoi-agent | chat "crm và kho web part 4" (worktree strange-poincare đang sửa dở đúng kho2.js, theme-sang.css, congDoan.test.ts) | xác nhận rồi tự ghép; thư mục chung còn 2 thư mục vps-skill chưa theo dõi — bản trong nhánh này là bản lưu |
+| `viec-do-trong-thu-muc-chung-23-10` (9f5ba69) | Đã đối chiếu 26/10: phần kho2.js (kho_qd, phiếu xuất), theme-sang.css (đơn mua hàng), congDoan.test.ts (tkLog) ĐÃ nằm trong main; 3 file dở trong worktree strange-poincare là bản cũ trùng. Còn chưa đối chiếu: congviec.js, media-duyet/HUONG-DAN.txt, vps-skill/dieu-hanh-agent, vps-skill/hoi-agent | không chat nào nhận (chat kho part 4 đã từ chối) | điều phối trưởng đối chiếu nốt 4 file còn lại; sau đó dọn |
 | `sharp-noether-648089` (c34cb8e) | skill abos-web + kế hoạch nối agent; thư mục làm việc báo 366 file đổi (nhiều khả năng chỉ đổi kiểu xuống dòng) | chat "Nối web ABOS với agent" | kiểm tra 366 file có thật sự đổi nội dung không; ghép c34cb8e nếu cần |
 | `ke-toan-bill-gan-don-moi` (31976a6) | một commit "Cập nhật theo main mới", không file | không ai | xóa nhánh được (cần chị Hoa đồng ý) |
 | `fb-next-2310` | docs/PROMPT-DEMO-GIAO-DIEN-FACEBOOK.md chưa lưu | chat Facebook | tự commit |
