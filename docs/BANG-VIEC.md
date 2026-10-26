@@ -43,10 +43,12 @@ Web = trang Lãi lỗ P&L (plMonth); "Huệ" = bảng báo cáo các sàn T9 ch�
 
 | # | Kỳ · Kênh | Web | Nơi khác | Lệch | Nghi do | Việc tiếp |
 |---|---|---|---|---|---|---|
-| E1 | T9 TikTok | 1.392,1tr (doanh thu thuần, file chốt sổ) | Huệ 1.098,2tr; GMV vanhanh 1.538,0tr | +293,9tr so Huệ | Hai định nghĩa doanh thu | CHỊ HOA chốt dùng định nghĩa nào (nguyên tắc 25/10: doanh thu thực); chat TikTok sửa theo |
+| E1 | T9 TikTok (CHỊ HOA CHỐT 26/10: giữ số web; số chị Huệ chỉ tính báo cáo tải 1/10, đơn chưa giao xong nên không dùng) | 1.392,1tr (doanh thu thuần, file chốt sổ) | Huệ 1.098,2tr; GMV vanhanh 1.538,0tr | +293,9tr so Huệ | Hai định nghĩa doanh thu | CHỊ HOA chốt dùng định nghĩa nào (nguyên tắc 25/10: doanh thu thực); chat TikTok sửa theo |
 | E2 | T9 Facebook | 996,6tr (giao thành công, Pancake) | Huệ 1.084,3tr; bộ đếm vanhanh 960,5tr | −87,6tr so Huệ; +36,1tr so vanhanh | Ngày tạo đơn vs ngày giao; quantri và vanhanh dùng nguồn/ngày khác nhau | Chat Facebook/Ads: thống nhất MỘT hàm tính cho cả hai trang |
 | E3 | T9 Shopee | chưa có | Huệ 244,8tr | thiếu | Chưa tải báo cáo Shopee T9 | Chị Huệ/Thảo tải; T10 cũng chưa có |
 | E4 | T9 B2B/NPP | 768,4tr | Huệ 780,1tr | −11,7tr | Ngày duyệt vs ngày hóa đơn | Chat CRM/Kho xem đơn chưa duyệt |
-| E5 | T9 Gia công | 0 | Huệ 142,3tr | −142,3tr | Đơn gia công không có trong CRM hoặc gắn loại khác | Chat CRM/Kho tra |
+| E5 | T9 Gia công (CHỊ HOA: web 0 vì chị Huệ chưa đưa dữ liệu lên, không phải lỗi web; số đúng là của chị Huệ khi nhập) | 0 | Huệ 142,3tr | −142,3tr | Đơn gia công không có trong CRM hoặc gắn loại khác | Chat CRM/Kho tra |
 | E6 | T10 TikTok/FB (đến 26/10) | 941,1tr tạm tính / 650,0tr | bộ đếm ngày vanhanh tháng 10 = 0 | không so được | Bộ đếm chưa có ngày T10 | Chat Facebook/Ads kiểm bộ đếm execNums |
 | E7 | Sheet phân bổ T09 | — | ô doanh thu thực trống, dòng chia chung #ERROR | — | Chị Huệ chưa nhập | Chị Huệ |
+
+Nghi do E2 (Facebook T9, từ đọc code, chưa kiểm số): trang quản trị cộng doanh thu giao thành công theo TỪNG ĐƠN trong Sheet Pancake (fbdash.js, C.dt), còn trang vận hành (exec.js execNums) cộng cột "giao thành công" của dòng TỔNG THEO NGÀY (rSum fb cột 5). Hai nguồn khác nhau nên lệch 36tr. Cách xử: dùng MỘT nguồn (theo đơn) cho cả hai trang. Giao chat Facebook/Ads khi mở lại.
