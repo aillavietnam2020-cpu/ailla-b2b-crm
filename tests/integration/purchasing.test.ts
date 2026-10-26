@@ -369,5 +369,37 @@ describe('Điều khoản thanh toán nhà cung cấp và ảnh khoản chi', ()
     expect(inv.body.data.total).toBe(210000);
     expect(await debt()).toMatchObject({ invoiced: 210000, po_pending: 0, paid: 50000, balance: 160000 });
   });
+  it('sửa phiếu chi trực tiếp (số tiền, ngày, loại) thì công nợ tính lại, không bị tính hai lần; phiếu đã hủy không sửa được; kho không sửa', async () => {
+    const { supplierId, poId } = await setup();
+    const pay = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, po_id: poId, kind: 'COC', pay_date: '2026-10-06', amount: 50000, account: 'Vietcombank' } });
+    const payId = pay.body.data.id as string;
+    const bal = async () =>
+      ((await ctx.request(`${BASE}/debts`, { as: USERS.ceo })).body.data as Array<{ id: string; paid: number; balance: number }>).find((d) => d.id === supplierId)!;
+    expect((await bal()).paid).toBe(50000);
+    expect((await ctx.request(`${BASE}/payments/${payId}`, { as: KT, method: 'PUT', body: { amount: 10 } })).status).toBe(403);
+    expect((await ctx.request(`${BASE}/payments/${payId}`, { as: USERS.ceo, method: 'PUT', body: { amount: 0 } })).status).toBe(400);
+    const ed = await ctx.request(`${BASE}/payments/${payId}`, { as: USERS.ceo, method: 'PUT', body: { amount: 80000, pay_date: '2026-10-07', kind: 'CHI', note: 'Sửa lại số tiền' } });
+    expect(ed.status).toBe(200);
+    expect(await bal()).toMatchObject({ paid: 80000 });
+    const row = await ctx.db.prepare('SELECT pay_date, amount, kind, note FROM po_payments WHERE id = ?').bind(payId).first<{ pay_date: string; amount: number; kind: string; note: string }>();
+    expect(row).toMatchObject({ pay_date: '2026-10-07', amount: 80000, kind: 'CHI', note: 'Sửa lại số tiền' });
+    const log = await ctx.db.prepare("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'PO_PAYMENT_EDITED' AND entity_id = ?").bind(payId).first<{ n: number }>();
+    expect(log!.n).toBe(1);
+    await ctx.request(`${BASE}/payments/${payId}/cancel`, { as: USERS.ceo, body: {} });
+    expect((await ctx.request(`${BASE}/payments/${payId}`, { as: USERS.ceo, method: 'PUT', body: { amount: 1000 } })).status).toBe(400);
+  });
+  it('hủy phiếu chi thì công nợ tăng lại đúng số, phiếu mới ghi thay thế chỉ tính một lần', async () => {
+    const { supplierId, poId } = await setup();
+    const debt = async () =>
+      ((await ctx.request(`${BASE}/debts`, { as: USERS.ceo })).body.data as Array<{ id: string; paid: number; balance: number }>).find((d) => d.id === supplierId)!;
+    const mk = (amount: number) => ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, po_id: poId, kind: 'COC', pay_date: '2026-10-06', amount, account: 'VCB' } });
+    const a = await mk(50000);
+    const before = (await debt()).balance;
+    expect((await debt()).paid).toBe(50000);
+    expect((await ctx.request(`${BASE}/payments/${a.body.data.id}/cancel`, { as: USERS.ceo, body: {} })).status).toBe(200);
+    expect(await debt()).toMatchObject({ paid: 0, balance: before + 50000 });
+    await mk(70000);
+    expect((await debt()).paid).toBe(70000);
+  });
 });
 

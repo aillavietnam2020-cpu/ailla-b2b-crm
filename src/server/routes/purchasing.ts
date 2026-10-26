@@ -743,6 +743,42 @@ purchasingRoutes.delete('/payments/:id/files/:fid', async (c) => {
   return deletePayFile(c, 'PO_PAY', c.req.param('id'), c.req.param('fid'));
 });
 
+/** Sửa phiếu chi (ngày, số tiền, loại, ghi chú, phiếu mua gắn kèm): sửa trực tiếp, không phải hủy rồi làm lại; ghi nhật ký số cũ và số mới. */
+purchasingRoutes.put('/payments/:id', async (c) => {
+  const auth = c.get('auth');
+  needManage(auth);
+  const id = c.req.param('id');
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const cur = await c.env.DB
+    .prepare('SELECT id, supplier_id, pay_date, amount, kind, note, po_id, invoice_id, status FROM po_payments WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; supplier_id: string; pay_date: string; amount: number; kind: string; note: string; po_id: string | null; invoice_id: string | null; status: string }>();
+  if (!cur) throw notFound('Không tìm thấy phiếu chi');
+  if (cur.status !== 'OK') throw badRequest('CANCELLED', 'Phiếu chi này đã hủy, không sửa được');
+  const payDate = b.pay_date === undefined ? cur.pay_date : b.pay_date;
+  if (!isDate(payDate)) throw badRequest('BAD_DATE', 'Chọn ngày chi');
+  const amount = b.amount === undefined ? cur.amount : int(b.amount);
+  if (amount <= 0) throw badRequest('BAD_AMOUNT', 'Nhập số tiền đã chi');
+  const kind = b.kind === undefined ? cur.kind : b.kind === 'COC' ? 'COC' : 'CHI';
+  const note = b.note === undefined ? cur.note : String(b.note ?? '').trim();
+  const poId = b.po_id === undefined ? cur.po_id : b.po_id ? String(b.po_id) : null;
+  if (poId && !(await c.env.DB.prepare("SELECT id FROM po_orders WHERE id = ? AND supplier_id = ? AND status <> 'HUY'").bind(poId, cur.supplier_id).first())) throw badRequest('BAD_PO', 'Phiếu mua không đúng nhà cung cấp');
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE po_payments SET pay_date = ?, amount = ?, kind = ?, note = ?, po_id = ? WHERE id = ? AND status = \'OK\'').bind(payDate, amount, kind, note, poId, id),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'PO_PAYMENT_EDITED',
+      entityType: 'PO_PAYMENT',
+      entityId: id,
+      before: { pay_date: cur.pay_date, amount: cur.amount, kind: cur.kind, note: cur.note, po_id: cur.po_id },
+      after: { pay_date: payDate, amount, kind, note, po_id: poId },
+      requestId: c.get('requestId'),
+      ip: ipOf(c),
+    }),
+  ]);
+  return ok(c, { id });
+});
+
 purchasingRoutes.post('/payments/:id/cancel', async (c) => {
   const auth = c.get('auth');
   needManage(auth);
