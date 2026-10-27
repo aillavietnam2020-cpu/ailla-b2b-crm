@@ -31,9 +31,12 @@ function spRows(){
   const LK=["qc","vc","lg","cd","kh"];R.forEach(x=>{x.lcp=x.src==="ncc"?"mh":x.src==="vc"?"vc":x.src==="ads"?"qc":x.src==="luong"?"lg":(typeof cpRowOf==="function"?LK[cpRowOf(x.catk)]:"kh")});
   return R.sort((a,b)=>String(b.ngay).localeCompare(String(a.ngay)))}
 /* Tổng chi phí chung theo tháng (lương, kho vận, thuê, agency…): dùng cho dòng "Chi phí chung" của P&L công ty.
-   Chỉ tính khoản nhập tay thuộc nhóm không gắn riêng với một kênh bán. */
+   = khoản nhập tay ở trang chi phí cũ thuộc nhóm không gắn riêng với một kênh bán
+   + Sổ chi phí (fin.nkc): dòng bổ "Chung" nhóm B/C, bỏ quảng cáo, phí sàn, vận chuyển P&L đã trừ ở từng kênh (luật ở chicalc.js). */
 function spChungTheoThang(ym){const d=D(),cat=k=>d.costCats.find(c=>c.k===k)||{nhom:"Khác"};
-  return (d.costs||[]).filter(c=>(c.ngay?c.ngay.slice(0,7):c.thang)===ym&&!c.kenh&&cat(c.cat).nhom!=="Marketing").reduce((t,c)=>t+(+c.tien||0),0)}
+  const cu=(d.costs||[]).filter(c=>(c.ngay?c.ngay.slice(0,7):c.thang)===ym&&!c.kenh&&cat(c.cat).nhom!=="Marketing").reduce((t,c)=>t+(+c.tien||0),0);
+  let so=0;try{so=scChungNkc((d.fin||{}).nkc,ym,g=>scG(g).lo)}catch(e){}
+  return cu+so}
 function pSoCP(m){
   const ed=mhManage()||can(ME,"chiphi.nhap");
   mhLoad();mhLoadPay();spLoadShip();spLoadFiles();
