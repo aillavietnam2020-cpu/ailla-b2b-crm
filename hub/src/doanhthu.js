@@ -57,7 +57,7 @@ function dtLabel(r,ch,from,to){
   if(!r||r._dt)return r;r._dt=1;const t=dtToday(),ms=tqMonths(from,to);if(ms.length!==1)return r;
   const ym=ms[0],st=dtTrangThai(ym,t);r.chot=st;r.ym=ym;
   if(st==="chot"&&!fullMonth(ym,from,to))r.nhan="một phần tháng đã chốt, số tính theo ngày";
-  else if(st==="chot"){r.nhan=r.frozen?dtNhan(ym,t):!DTS.rowsAt?"đã qua ngày chốt, đang tải số chốt":r.dt>0&&!r.tam?"đã qua ngày chốt, đang lưu số chốt":"đã qua ngày chốt, chưa đủ số để chốt"}
+  else if(st==="chot"){r.nhan=r.frozen?dtNhan(ym,t):!DTS.rowsAt?"đã qua ngày chốt, đang tải số chốt":r.dt>0&&!r.tam&&!r.thieu?"đã qua ngày chốt, đang lưu số chốt":"đã qua ngày chốt, chưa đủ số để chốt"}
   else{r.dk=ch==="fb"&&r.dt!=null?dtDuKien(r.dt,r.dangDt||0,DT_HOAN_FB):r.dt;r.nhan=dtNhan(ym,t)+(ch==="fb"&&r.dangDt?` · dự kiến ${tr(r.dk)} khi ${nf(r.dang)} đơn đang giao có kết quả (hoàn dự kiến ${Math.round(DT_HOAN_FB*100)}%)`:"")}
   r.src=r.nhan+(r.src?" · "+r.src:"");return r}
 {const _t=tqRevB2C;tqRevB2C=function(N,from,to){const out=_t.apply(this,arguments);if(DTS.live||!dtOk())return out;dtEnsure();
@@ -76,7 +76,7 @@ function dtLiveMonth(ym){DTS.live++;try{const R=plRange(ym),rows=plRowsFor(R.fro
   finally{DTS.live--}}
 /* Số trang hiện cho một tháng (đã áp số chốt + nhãn). */
 function dtShownMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),o={};rows.forEach(r=>{o[DT_ROWK[r.k]]=r});return o}
-/* Tới ngày 10 tháng sau: lưu số web các kênh đã đủ số (không lưu số trống, 0 hay số tạm tính). */
+/* Tới ngày 10 tháng sau: lưu số web các kênh đã đủ số (không lưu số trống, 0, số tạm tính hay báo cáo chưa phủ đủ tháng). */
 function dtAutoChot(){
   if(DTS.inAuto||!dtOk()||!DTS.rowsAt||DTS.err)return;const t=dtToday();
   if(typeof TSB!=="undefined"&&!Array.isArray(TSB.months))return;if(typeof FBS!=="undefined"&&!FBS.raw)return;
@@ -84,7 +84,7 @@ function dtAutoChot(){
   try{for(let ym=DT_TU;dtTrangThai(ym,t)==="chot";ym=plYmAdd(ym,1)){if(DTS.auto[ym])continue;
       const need=["tts","spe","fb","b2b","gc"].filter(ch=>!dtSnap(ym,ch));if(!need.length){DTS.auto[ym]=1;continue}
       const L=dtLiveMonth(ym);if(L._loading)continue;
-      const rows=need.map(ch=>{const r=L[ch];return r&&dtCanChot(ym,t,null,r.dt)&&!r.tam?{channel:ch,amount:Math.round(r.dt),orders:r.don==null?null:Math.round(+r.don||0),data:{dt:r.dt,don:r.don,gv:r.gv,phi:r.phi,ads:r.ads,khac:r.khac,lai:r.lai,src:r.src}}:null}).filter(Boolean);
+      const rows=need.map(ch=>{const r=L[ch];return r&&dtCanChot(ym,t,null,r.dt)&&!r.tam&&!r.thieu?{channel:ch,amount:Math.round(r.dt),orders:r.don==null?null:Math.round(+r.don||0),data:{dt:r.dt,don:r.don,gv:r.gv,phi:r.phi,ads:r.ads,khac:r.khac,lai:r.lai,src:r.src}}:null}).filter(Boolean);
       DTS.auto[ym]=1;if(!rows.length)continue;
       svApi("/api/hub/dieuhanh/doanhthu/chot",{method:"POST",body:JSON.stringify({ym,rows})}).then(()=>dtLoadRows(true)).catch(e=>{DTS.auto[ym]=0;console.warn("chốt doanh thu",ym,e.message)})}}
   finally{DTS.inAuto=false}}
@@ -155,11 +155,11 @@ function pDtDoiChieu(m){
    <div class="acts pad"><button class="btn pri" id="dt-kt-save">Lưu số kế toán</button><span class="hint">Số kế toán: chị Huệ nhập số đã chốt sổ của từng kênh (đ). Để trống ô nào thì xóa số ô đó. Bấm từng dòng để xem từng ngày / từng đơn tạo nên số web. Chênh lệch tô đỏ khi lệch trên 1% (tối thiểu 1 triệu).</span></div></section>
   ${open?`<section class="card flush"><div class="card-h pad"><h2>${open[1]} · tháng ${dtYmVN(ym)}: số web từng ngày / từng đơn</h2><button class="btn sm" id="dt-close">Đóng</button></div>${dtChiTiet(open[0],ym)}</section>`:""}
   <section class="card"><div class="card-h"><h2>Cách tính doanh thu thực (một cách cho mọi trang)</h2></div><ul class="lessons">
-   <li><b>TikTok Shop:</b> doanh thu thuần theo báo cáo quyết toán đã tải lên; ngày chưa có báo cáo thì tạm tính (đơn xuất kho × giá trị đơn trung bình), ghi rõ "tạm tính" và không được chốt. GMV chỉ là chỉ số hiệu suất.</li>
+   <li><b>TikTok Shop:</b> doanh thu thuần theo báo cáo quyết toán đã tải lên; tải báo cáo hàng tuần; ngày chưa có báo cáo thì để trống, ghi "chờ tải báo cáo" (không ước từ số đơn). Tháng chỉ chốt khi báo cáo phủ đủ cả tháng. GMV chỉ là chỉ số hiệu suất.</li>
    <li><b>Shopee:</b> doanh thu theo file báo cáo Shopee tải lên; chưa tải thì để trống.</li>
    <li><b>Facebook:</b> đơn giao thành công theo ngày tạo đơn (Pancake, cập nhật mỗi sáng). Doanh thu chốt đơn chỉ là chỉ số hiệu suất. Dự kiến = giao thành công + đơn đang giao × (1 − ${Math.round(DT_HOAN_FB*100)}% hoàn dự kiến).</li>
    <li><b>Kênh phân phối, Kênh OEM:</b> đơn đã duyệt trên CRM theo ngày đơn (sau chiết khấu, trừ thưởng).</li>
-   <li><b>Chốt số:</b> đơn tháng nào tính tháng đó. Từ ngày 10 tháng sau, số web được lưu lại và mọi trang hiện đúng số đã lưu. Kênh chưa có số, số 0 hoặc số tạm tính thì chưa lưu, chờ đủ số.</li></ul></section>`;
+   <li><b>Chốt số:</b> đơn tháng nào tính tháng đó. Từ ngày 10 tháng sau, số web được lưu lại và mọi trang hiện đúng số đã lưu. Kênh chưa có số, số 0 hoặc báo cáo chưa phủ đủ tháng thì chưa lưu, chờ đủ số.</li></ul></section>`;
   m.querySelectorAll("[data-dtym]").forEach(b=>b.onclick=()=>{DTD.ym=b.dataset.dtym;DTD.open="";renderMain()});
   m.querySelectorAll("[data-dtopen]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-stop],button,input"))return;DTD.open=DTD.open===tr.dataset.dtopen?"":tr.dataset.dtopen;renderMain()});
   const cl=m.querySelector("#dt-close");if(cl)cl.onclick=()=>{DTD.open="";renderMain()};
