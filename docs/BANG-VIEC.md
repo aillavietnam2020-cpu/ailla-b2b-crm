@@ -66,3 +66,12 @@ E2 tra lại 26/10 (đọc code): GIẢ THUYẾT CŨ "hai trang hai nguồn" SAI
 2. Sắp xếp lại menu hai web theo bảng — GIAO chat "Sắp xếp lại menu hai web ABOS" (local_4ea79cf9, nhánh claude/sap-xep-menu): XONG 26/10, main c08af27, đã lên web (điều phối kiểm menu thật hai web khớp). Chị chốt 26/10: Kho bill = sale nhập bên vận hành, kế toán xác nhận bên quản trị; Phiếu chi vận chuyển = Thảo nhập (đã giao lại chat sap-xep-menu); 3 trang Đồng bộ mã/Quy đổi mã/Chênh lệch định mức vẫn ở quản trị (vận hành đang che); Sổ chi phí đã về Tài chính – Kế toán › Thu chi (main 45aa532); Marketing giữ 5 khu; mục Của tôi nằm ở menu bấm vào tên người dùng như trước (không mất). Chat khác không sửa setup.js/admnav2.js/admmenu.js trong lúc này.
 3. Từng mảng: Doanh thu → Kho → Tiền & công nợ → Mua hàng → Task: định nghĩa chỉ số, nạp số thật, trang xem số nguồn để đối chiếu.
 4. Giao diện mới áp dần theo mảng.
+
+## H. Đang chạy (27/10)
+
+| Việc | Chat | Nhánh | Vùng file | Khối migration |
+|---|---|---|---|---|
+| Trang Phê duyệt (quản trị) | Trang Phê duyệt trên web quản trị (local_4826d81b) | claude/phe-duyet | trang mới + 1 dòng menubang.js | 0150–0154 |
+| Chuẩn hóa mảng Doanh thu + Đối chiếu doanh thu + nhãn chốt ngày 10 + tra lệch FB T9 | Chuẩn hóa mảng Doanh thu web ABOS (local_cbc8a779) | claude/doanh-thu | tqgop.js, exec.js, fbdash.js, fbpl.js, dieuhanh.js, b2bpl.js + 1 dòng menubang.js | 0140–0149 |
+
+Chat "Tiếp tục quản trị 26/10" đã được báo không sửa các file doanh thu trên trong lúc này.
