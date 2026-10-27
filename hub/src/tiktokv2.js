@@ -162,4 +162,4 @@ function tbOpsPage(m){
    +(tsbCanUp()?tsbUpOpsCard():"")+srcNote("Doanh thu thực, đơn, món, top sản phẩm: báo cáo quyết toán kế toán tải. Hiệu suất: file team TikTok tải (Key metrics, LIVE, Transaction Analysis, Creator List, Campaign overview).");
   tsbOpsBind(m);
 }
-PAGES.bc_tiktok=m=>{if(tsbAdm())return tbAdmPage(m);_pb(tbOpsPage,"tts")(m)};
+PAGES.bc_tiktok=m=>{if(tsbAdm())return tbAdmPage(m);tbOpsPage(m)};
