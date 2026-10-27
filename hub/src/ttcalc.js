@@ -3,7 +3,7 @@
    Quy tắc theo skill ailla-baocao-quantri-tiktok (chị Hoa duyệt 24/10/2026):
    - Một đơn thuộc tháng nó được TẠO. Doanh thu = Tổng phụ trước giảm giá − Giảm giá của người bán.
    - Đơn hủy/hoàn: doanh thu 0, giá vốn 0, chỉ dùng tính tỷ lệ hủy/hoàn.
-   - Phí sàn lấy số quyết toán (file income 01/tháng → ít nhất 08/tháng sau), chia về dòng SKU theo tỷ trọng
+   - Phí sàn lấy số quyết toán (file income 01/tháng → hết ngày 09 tháng sau; chị Hoa chốt sổ sáng ngày 10), chia về dòng SKU theo tỷ trọng
      doanh thu trong đơn; đơn chưa quyết toán thì ước tính theo tỷ lệ phí bình quân. "Phí khác" hứng phần dư
      để tổng khớp cột "Tổng phí" của TikTok.
    - Quảng cáo GMV Max vào lãi lỗ theo KỲ CHI TIÊU (file Campaign overview) cộng VAT 10%. Số trừ ví trong
@@ -83,7 +83,7 @@ function ttReadOrders(aoa,ky){
     const d=ttIsoDay(ttCell(a[I["Created Time"]]));if(!d)continue;
     if(ky&&d.slice(0,7)!==ky){outside++;if(d.slice(0,7)<ky)before++;else after++;continue}
     const q=ttNum(a[I["Quantity"]]),rq=ttNum(a[I["Sku Quantity of return"]]),st=ttCell(a[I["Order Status"]]);
-    lines.push({o,d,huy:st==="Đã hủy"||rq>0,sku:ttCell(a[I["SKU ID"]]),ss:ttCell(a[I["Seller SKU"]]),pn:ttCell(a[I["Product Name"]]),vr:ttCell(a[I["Variation"]]),q,dt:ttNum(a[I["SKU Subtotal Before Discount"]])-ttNum(a[I["SKU Seller Discount"]])})}
+    lines.push({o,d,huy:st==="Đã hủy"||rq>0,hoan:rq>0&&st!=="Đã hủy",sku:ttCell(a[I["SKU ID"]]),ss:ttCell(a[I["Seller SKU"]]),pn:ttCell(a[I["Product Name"]]),vr:ttCell(a[I["Variation"]]),q,dt:ttNum(a[I["SKU Subtotal Before Discount"]])-ttNum(a[I["SKU Seller Discount"]])})}
   if(!lines.length)return {err:ky?`File đơn không có đơn nào tạo trong tháng ${ky.slice(5)}/${ky.slice(0,4)}.`:"File đơn không có dòng nào đọc được."};
   return {lines,outside,before,after};
 }
@@ -94,7 +94,7 @@ function ttIncomeRange(sheets){
   return null;
 }
 /* Kiểm tra kỳ: phải bắt đầu từ ngày 01 của tháng báo cáo (hoặc sớm hơn).
-   Tới ít nhất ngày 08 tháng sau = báo cáo đầy đủ (chốt sổ). Tới sớm hơn = báo cáo GIỮA THÁNG (đến ngày X):
+   Tới hết ngày 09 tháng sau = báo cáo đầy đủ (chốt sổ sáng ngày 10, chị Hoa 27/10). Tới sớm hơn = báo cáo GIỮA THÁNG (đến ngày X):
    vẫn tính được doanh thu thực, phí sàn đơn đã quyết toán, đơn chưa quyết toán dùng phí ước tính (chị Hoa duyệt 25/10). */
 function ttCheckIncomeRange(g,ky){
   if(!g)return "Không đọc được dòng \"Khoảng thời gian\" ở tab Báo cáo của file income.";
@@ -103,7 +103,7 @@ function ttCheckIncomeRange(g,ky){
   if(g.to<start)return `File income chỉ tới ${vn(g.to)}, chưa vào tháng ${ky.slice(5)}/${ky.slice(0,4)}. Chị xuất lại file.`;
   return "";
 }
-const ttIncomePartial=(g,ky)=>!!g&&g.to<ttKyNext(ky)+"-08";
+const ttIncomePartial=(g,ky)=>!!g&&g.to<ttKyNext(ky)+"-09";
 function ttReadIncome(sheets,ky){
   const range=ttIncomeRange(sheets),bad=ttCheckIncomeRange(range,ky);if(bad)return {err:bad,range};
   const partial=ttIncomePartial(range,ky);
@@ -187,11 +187,12 @@ function ttBuildMonth({ky,orders,income,camp}){
     if(!l.qt){s.dtU+=l.dt;dtUoc+=l.dt;nUoc++}
     okOrd.add(l.o);const dd=days[l.d]||(days[l.d]={dt:0,phi:0,mon:0,don:0,hh:0});dd.dt+=l.dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.mon+=l.q;
     const k=l.d+"|"+l.o;if(!dayOrd[k]){dayOrd[k]=1;dd.don++}});
+  let hoanGiao=0;L.forEach(l=>{if(l.huy&&l.hoan)hoanGiao+=l.dt});
   L.forEach(l=>{if(l.huy){const dd=days[l.d]||(days[l.d]={dt:0,phi:0,mon:0,don:0,hh:0});dd.hh+=l.dt}});
   Object.values(sku).forEach(s=>{s.dt=Math.round(s.dt);s.hdt=Math.round(s.hdt);s.dtU=Math.round(s.dtU)});
   Object.values(days).forEach(d=>{d.dt=Math.round(d.dt);d.phi=Math.round(d.phi);d.hh=Math.round(d.hh)});
   let chi=0,nAds=0;const adsDays={};Object.entries(camp.days).forEach(([d,v])=>{if(d.slice(0,7)!==ky||(den&&d>den))return;chi+=v.chi;nAds++;adsDays[d]=v});
-  return {ky,den,sku,days,don:okOrd.size,mon,hh:Math.round(hh),dtUoc:Math.round(dtUoc),nUoc,
+  return {ky,den,sku,days,don:okOrd.size,mon,hh:Math.round(hh),hoanGiao:Math.round(hoanGiao),dtUoc:Math.round(dtUoc),nUoc,
     ads:{chi,vat:Math.round(chi*(1+TT_ADS_VAT)-1e-6),vi:-income.adsVi,nDays:nAds,days:adsDays},adj:income.adj,cut:income.cut,
     inc:{from:income.range.from,to:income.range.to,nOrd:income.nOrd},n:{lines:L.length,outside:orders.outside,before:orders.before,after:orders.after,unmatched:L.filter(l=>!l.qt).length}};
 }
@@ -215,7 +216,7 @@ function ttPL(M,costOf,extra){
   const dtUocGv=g3.reduce((a,r)=>a+r.dt,0);
   const allDays=M.den?+M.den.slice(8,10):ttKyDays(M.ky),feeOther=Math.abs(fees[TT_NG-1][1]);
   const checks=[
-   ["Kỳ file quyết toán (income)",`${M.inc.from.split("-").reverse().join("/")} → ${M.inc.to.split("-").reverse().join("/")}${M.den?" · báo cáo giữa tháng, số đến "+M.den.split("-").reverse().join("/"):""}`,M.den?"Giữa tháng: đơn chưa quyết toán dùng phí ước tính; chốt sổ cần tới 08 tháng sau":"Từ 01 tháng này tới ít nhất 08 tháng sau",true],
+   ["Kỳ file quyết toán (income)",`${M.inc.from.split("-").reverse().join("/")} → ${M.inc.to.split("-").reverse().join("/")}${M.den?" · báo cáo giữa tháng, số đến "+M.den.split("-").reverse().join("/"):""}`,M.den?"Giữa tháng (dự kiến): đơn chưa quyết toán dùng phí ước tính; chốt sổ sáng ngày 10, file tới hết ngày 09 tháng sau":"Từ 01 tháng này tới hết ngày 09 tháng sau",true],
    ["Đơn ngoài tháng trong file đơn",M.n.outside?`${M.n.outside} dòng, đã bỏ ra`:"Không có","Chỉ lấy đơn tạo trong tháng",true],
    ["Doanh thu dùng phí ước tính (đơn chưa quyết toán)",dt?M.dtUoc/dt:0,"Dưới 1% là chốt sổ được",dt?M.dtUoc/dt<0.01:true],
    ["Phí sàn khớp cột Tổng phí của TikTok",phi?feeOther/Math.abs(phi):0,"\"Phí khác\" (phần chênh) dưới 0,5% tổng phí",phi?feeOther/Math.abs(phi)<0.005:true],
@@ -223,10 +224,10 @@ function ttPL(M,costOf,extra){
    ["Quảng cáo GMV Max đủ ngày trong tháng",`${M.ads.nDays}/${allDays} ngày`,M.den?"File Campaign overview đủ các ngày đến ngày báo cáo":"File Campaign overview đủ cả tháng",M.ads.nDays>=allDays]];
   return {ky:M.ky,dt,gv,phi,lgTruoc:dt-gv,lg,ads:M.ads.vat,adsChi:M.ads.chi,adsVi:M.ads.vi,adj:M.adj,extra,extraT,lai,adsRate,ng2,
     don:M.don,mon:M.mon,aov:M.don?dt/M.don:0,hh:M.hh,hhRate:dt+M.hh?M.hh/(dt+M.hh):0,fees,rows,sp:spL,g1,g2,g3,gvRate,dtUocGv,checks,
-    nSku:rows.filter(r=>r.q>0).length,den:M.den||null,days:Object.fromEntries(Object.entries(M.days||{}).map(([d,x])=>[d,[x.dt,x.don]]))};
+    nSku:rows.filter(r=>r.q>0).length,den:M.den||null,dtUoc:M.dtUoc||0,hoanGiao:M.hoanGiao!=null?M.hoanGiao:null,days:Object.fromEntries(Object.entries(M.days||{}).map(([d,x])=>[d,[x.dt,x.don]]))};
 }
 /* Tóm tắt một tháng để lưu và đưa lên Tổng quan (không có dòng SKU). */
-const ttSummary=P=>({ky:P.ky,den:P.den||null,days:P.days||null,dt:P.dt,gv:P.gv,phi:P.phi,lg:P.lg,ads:P.ads,adsChi:P.adsChi,adsVi:P.adsVi,adj:P.adj,extraT:P.extraT,lai:P.lai,don:P.don,mon:P.mon,hh:P.hh,hhRate:P.hhRate,dtUocGv:P.dtUocGv,n1:P.g1.length,n2:P.g2.length,n3:P.g3.length,fees:P.fees.map(f=>[f[0],f[1]])});
+const ttSummary=P=>({ky:P.ky,den:P.den||null,days:P.days||null,dt:P.dt,gv:P.gv,phi:P.phi,lg:P.lg,ads:P.ads,adsChi:P.adsChi,adsVi:P.adsVi,adj:P.adj,extraT:P.extraT,lai:P.lai,don:P.don,mon:P.mon,hh:P.hh,hhRate:P.hhRate,dtUoc:P.dtUoc,hoanGiao:P.hoanGiao,dtUocGv:P.dtUocGv,n1:P.g1.length,n2:P.g2.length,n3:P.g3.length,fees:P.fees.map(f=>[f[0],f[1]])});
 
 /* ---------- Giá vốn từ dữ liệu sẵn có trên web ----------
    mapRows: bảng Quy đổi mã các sàn kênh TikTok [{sku, variant, from_day, item_label, qty}] (sku là SKU ID hoặc Seller SKU).

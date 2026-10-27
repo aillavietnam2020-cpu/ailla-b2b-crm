@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 /** Trang TikTok bản mới (hub/src/ttbc.js): cơ cấu, số theo tuần, cảnh báo & đề xuất, hiệu quả từng team. Số mẫu = số thật T9/2026. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const T: any = new Function(`${readFileSync('hub/src/ttbc.js', 'utf8')}
-  return {ttbcLanes,ttbcWeeks,ttbcLast2,ttbcCost,ttbcPri,ttbcAlerts,ttbcTeams};`)();
+  return {ttbcLanes,ttbcWeeks,ttbcLast2,ttbcCost,ttbcPri,ttbcAlerts,ttbcTeams,ttbcDuKien};`)();
 
 const KM = { gmv: 1538012277, vInh: 895475505, vKoc: 358365742, the: 260159896, lShop: 23444263, lKoc: 566871 };
 const P = {
@@ -104,10 +104,11 @@ describe('ttbc: hiệu quả từng team (số T9)', () => {
     expect(Math.round(R.ads.cpo)).toBe(23568);
     expect(R.ads.st).toBe('Theo dõi');
   });
-  it('Booking: KOC lên video, video đăng, ROI theo hoa hồng quyết toán', () => {
+  it('Booking: KOC lên video, video đăng; GMV KOC theo Key metrics (cùng số trang quản trị), ROI theo hoa hồng quyết toán', () => {
     expect(R.koc.nguoi).toBe(276);
     expect(R.koc.video).toBe(959);
-    expect(R.koc.roi.toFixed(1)).toBe('15.2');
+    expect(R.koc.gmv).toBe(358365742 + 566871);
+    expect(R.koc.roi.toFixed(1)).toBe('10.4');
     expect(R.koc.hhNguon).toBe('quyết toán');
   });
   it('Live kém, Content tốt; việc tuần này lấy việc đỏ trước', () => {
@@ -115,5 +116,19 @@ describe('ttbc: hiệu quả từng team (số T9)', () => {
     expect(R.content.st).toBe('Tốt');
     expect(R.todo[0].team).toBe('Live');
     expect(R.todo.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('ttbc: doanh thu dự kiến tháng chưa đủ số', () => {
+  const closed = [{ dt: 900e6, hoanGiao: 100e6, den: null }, { dt: 500e6, hoanGiao: null, den: null }, { dt: 300e6, hoanGiao: 50e6, den: '2026-10-20' }];
+  it('trừ phần chưa quyết toán theo tỷ lệ hoàn sau giao của tháng đủ số', () => {
+    const R = T.ttbcDuKien({ dt: 400e6, dtUoc: 100e6, den: '2026-10-26' }, closed);
+    expect(R.rate).toBe(0.1);
+    expect(R.n).toBe(1);
+    expect(R.dk).toBe(390e6);
+  });
+  it('chưa có tháng đủ số thì không đoán; tháng đủ số thì dự kiến = số thật', () => {
+    expect(T.ttbcDuKien({ dt: 400e6, dtUoc: 100e6, den: '2026-10-26' }, []).dk).toBe(null);
+    expect(T.ttbcDuKien({ dt: 400e6, dtUoc: 0, den: null }, closed).dk).toBe(400e6);
   });
 });

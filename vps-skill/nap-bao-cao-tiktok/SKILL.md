@@ -15,7 +15,7 @@ Chị Hoa giao cho **Agent · Kế toán trưởng** làm hằng tuần (sáng t
 2. Chạy thử trước, đọc số:
    `node nap-tiktok.mjs --as AGENT_ID <file đơn> <file quyết toán> <file quảng cáo> --thu`
 3. Số hợp lý thì chạy lại không có `--thu` để nạp. Lần nạp sau thay bản trước của cùng tháng (web ghi là "giữa tháng, đến ngày X").
-4. Từ ngày 01 đến 08 hằng tháng: tải thêm file của **tháng trước** (quyết toán tới ngày 08 tháng này) và nạp, đó là bản đủ tháng. Kế toán xem và **khoá sổ trên web**; agent không khoá sổ.
+4. **7h sáng ngày 10** hằng tháng: tải file của **tháng trước** (đơn từ ngày 01, quyết toán tới **hết ngày 09** tháng này) và nạp, đó là bản đủ tháng (chị Hoa chốt 27/10: chốt sổ ngày 10). Từ ngày 01 đến 09, file tháng trước nạp vào chỉ là bản giữa tháng (dự kiến). Kế toán xem và **khoá sổ trên web** từ ngày 10; agent không khoá sổ.
 5. Nhắn chị Thảo 2–3 dòng: tháng nào, đến ngày nào, doanh thu thực, lãi kênh. Không dán bảng dài.
 
 ## Nguyên tắc cứng

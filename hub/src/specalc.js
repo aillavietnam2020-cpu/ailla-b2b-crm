@@ -5,7 +5,7 @@
      (mã ưu đãi là giảm trừ doanh thu, không phải phí sàn).
    - Đơn hủy, đơn hoàn (file đơn báo hủy/hoàn, hoặc file Tài chính có Giá sản phẩm + Số tiền hoàn lại = 0): doanh thu 0.
    - Phí sàn 7 nhóm lấy từ file Tài chính (Doanh thu), chia về dòng sản phẩm theo tỷ trọng doanh thu trong đơn;
-     đơn chưa quyết toán dùng tỷ lệ phí bình quân. File Tài chính từ 01 tới trước 08 tháng sau = báo cáo "đến ngày X".
+     đơn chưa quyết toán dùng tỷ lệ phí bình quân. File Tài chính từ 01 tới trước hết ngày 09 tháng sau = báo cáo "đến ngày X" (chốt sổ sáng ngày 10).
    - Shopee Ads không có trong file Tài chính: lấy từ file Lịch sử giao dịch Dịch vụ Hiển thị (bỏ dòng nạp tiền).
    - File đơn chỉ đọc ở trình duyệt: ra khỏi đây chỉ còn số tiền, tên sản phẩm, ngày.
    Dùng chung hàm đọc số, ngày, CSV, tìm tiêu đề của ttcalc.js.
@@ -72,7 +72,7 @@ function speReadFin(sheets,ky){
     const x=ord[id]||(ord[id]={d:ttIsoDay(ttCell(a[I["Ngày đặt hàng"]])),gross:0,hoan:0,vou:0,f:new Array(SPE_NG).fill(0),aff:false});
     x.gross+=ttNum(a[I["Giá sản phẩm"]]);x.hoan+=ttNum(a[I["Số tiền hoàn lại"]]);x.vou+=vc.reduce((s,c)=>s+ttNum(a[c]),0);
     gc.forEach((cs,k)=>{x.f[k]+=cs.reduce((s,c)=>s+ttNum(a[c]),0)});if(ac!=null&&ttNum(a[ac])!==0)x.aff=true}
-  return {...meta,partial:!!ky&&g.to<ttKyNext(ky)+"-08",ord};
+  return {...meta,partial:!!ky&&g.to<ttKyNext(ky)+"-09",ord};
 }
 
 /* ---------- Quảng cáo Shopee (Lịch sử giao dịch Dịch vụ Hiển thị, CSV) ---------- */

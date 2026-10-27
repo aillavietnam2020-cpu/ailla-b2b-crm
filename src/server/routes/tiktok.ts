@@ -181,13 +181,21 @@ tiktokRoutes.get('/ops', async (c) => {
       mon: Number(s.mon) || 0,
       hh: Number(s.hh) || 0,
       hhRate: Number(s.hhRate) || 0,
+      dtUoc: Number(s.dtUoc) || 0,
+      hoanGiao: s.hoanGiao == null ? null : Number(s.hoanGiao),
       ads: Number(s.ads) || 0,
       lgRate: dt ? (Number(s.lg) || 0) / dt : 0,
       hoaHong: kocFee ? -kocFee[1] : null,
       sp: (pl.sp ?? []).slice(0, 10).map((p) => ({ n: p.n, q: p.q, dt: p.dt, pri: priOf(p, Number(pl.ng2) || 0, dt) })),
     });
   }
-  return ok(c, out);
+  // Tháng đủ số (không phải bản giữa tháng) để trang tính doanh thu dự kiến theo tỷ lệ hoàn sau giao.
+  const all = await c.env.DB.prepare('SELECT summary FROM tts_month').all<{ summary: string }>();
+  const closed = (all.results ?? [])
+    .map((r) => JSON.parse(r.summary) as Record<string, unknown>)
+    .filter((x) => !x.den && x.hoanGiao != null)
+    .map((x) => ({ dt: Number(x.dt) || 0, hoanGiao: Number(x.hoanGiao) || 0, den: null }));
+  return ok(c, { months: out, closed });
 });
 
 tiktokRoutes.get('/month/:ky', async (c) => {
