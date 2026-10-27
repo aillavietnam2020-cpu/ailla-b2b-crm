@@ -149,7 +149,7 @@ function scPhieu(x,cho){
 }
 /* ---------- Các tab ---------- */
 function scTQ(){
-  const all=scRows();if(!all.length)return scEmpty();
+  const all=scPBRows();if(!all.length)return scEmpty();
   const CD=new Set(scDM().filter(x=>x.cd).map(x=>x.g)),cp=all.filter(x=>x.k!=="Không tính"),tot=scS(cp),cd=scS(cp.filter(x=>CD.has(x.g))),bd=tot-cd,T=scS(all);
   const byTK={};all.forEach(x=>{const k=scG(x.g).tk||"?";byTK[k]=(byTK[k]||0)+x.t});
   const byG={};all.forEach(x=>{byG[x.g]=(byG[x.g]||0)+x.t});const G=Object.entries(byG).sort((a,b)=>b[1]-a[1]),mx=G[0][1];
@@ -180,27 +180,52 @@ function scViecHtml(all,title){const L=scViec(all);if(!L.length)return "";const 
 /* Nhật ký chi đủ MỌI khoản tiền chi ra (chị Hoa 27/10): ngoài phiếu chi của sổ còn hiện chung một bảng
    các khoản đã nhập ở chỗ khác (spRows ở socp.js): chi phí nhập ở trang chi phí cũ, trả nhà cung cấp, phiếu chi vận chuyển,
    quảng cáo từng kênh (một dòng mỗi kênh, bấm ra chi tiết theo ngày), lương theo bảng lương.
-   Các dòng này chỉ hiện và cộng ở Nhật ký chi; Phân bổ theo kênh vẫn chỉ tính phiếu của sổ để không cộng trùng với tiền nạp quảng cáo nạp từ MISA. */
+   Quảng cáo, lương, vận chuyển còn được tính vào Tổng quan và Phân bổ theo kênh (scAuto); trả nhà cung cấp vào giá vốn nên không tính.
+   Lương chỉ hiện khi kỳ lương đã chốt (bảng nháp chưa phải tiền đã chi, chị Hoa 27/10). */
 const SC_NGUON={tay:"Chi phí đã nhập",ncc:"Mua hàng (giá vốn)",vc:"Phiếu chi vận chuyển",ads:"Báo cáo quảng cáo",luong:"Bảng lương"};
+/* Quảng cáo TikTok chỉ lấy từ báo cáo TikTok đã tải (TSB.sum từng tháng), không lấy số tạm tính từ Poscake:
+   tiền quảng cáo trong sổ chi phải là tiền thật. Tháng chưa tải báo cáo thì báo thiếu ở Nhật ký chi. */
+function scTTAds(){const R={v:0,L:[]};
+  try{const S=(typeof TSB!=="undefined"&&TSB.sum)||{};
+    tqMonths(PERIOD.from,PERIOD.to).forEach(k=>{const s=S[k],mEnd=k+"-"+String(ttKyDays(k)).padStart(2,"0"),a=PERIOD.from>k+"-01"?PERIOD.from:k+"-01",b=PERIOD.to<mEnd?PERIOD.to:mEnd;
+      if(!s||!s.dt||!(+s.ads)){R.L.push({k,v:null});return}
+      const cov=s.den||mEnd;let r=1;
+      if(!(a===k+"-01"&&b>=cov)){if(s.days){let x=0;Object.entries(s.days).forEach(([d,y])=>{if(d>=a&&d<=b&&d<=cov)x+=+y[0]||0});r=x/s.dt}else{const nd=Math.max(0,(pdate(b<cov?b:cov)-pdate(a))/864e5+1);r=nd/+cov.slice(8,10)}}
+      const v=(+s.ads)*r;R.v+=v;R.L.push({k,v,den:s.den||""})})}catch(e){}
+  return R}
 function scExt(){
   const R=[];let L=[];try{L=spRows()}catch(e){}
+  let lgChot=false;try{lgChot=!!(cpLuongAuto()||{}).chot}catch(e){}if(!lgChot)L=L.filter(x=>x.src!=="luong");L=L.filter(x=>!(x.src==="ads"&&x.id==="ads-tt"));
   L.forEach(x=>{const kenh=x.src==="ncc"?"Giá vốn":x.kenh||(x.src==="vc"?"—":"Chung");
     R.push({id:"x-"+x.src+"-"+x.id,ext:x,d:x.ngay,ky:!!(x.kyOnly||x.thangOnly),ct:x.src==="ncc"?"Mua hàng":x.src==="vc"?(String(x.sub).match(/PCVC[\w-]*/)||[""])[0]:"",dg:x.src==="tay"?(x.sub||x.txt):x.txt,sub:x.src==="tay"?(x.sub?x.txt:""):x.sub,t:x.tien,nhom:x.src==="tay"?x.txt:x.nhom,k:kenh,st:"Ổn",nguon:SC_NGUON[x.src]||"Khác"})});
+  const TT=scTTAds(),thg=k=>k.slice(5)+"/"+k.slice(0,4);
+  if(TT.v>0)R.push({id:"x-ads-ads-tt",ext:{src:"ads",id:"ads-tt"},d:PERIOD.to,ky:true,ct:"",dg:"Quảng cáo TikTok GMV Max",sub:"từ báo cáo TikTok đã tải: "+TT.L.filter(x=>x.v!=null).map(x=>"tháng "+thg(x.k)+(x.den?" đến "+scDd(x.den):"")).join(", "),t:TT.v,nhom:"Marketing",k:"TikTok",st:"Ổn",nguon:SC_NGUON.ads});
   try{const C=execNums(PERIOD.from,PERIOD.to).C||{};if(C.adsSPE>0)R.push({id:"x-ads-spe",ext:{src:"ads",id:"ads-spe"},d:PERIOD.to,ky:true,ct:"",dg:"Quảng cáo Shopee",sub:"từ báo cáo lãi lỗ Shopee của tháng",t:C.adsSPE,nhom:"Marketing",k:"Shopee Mall",st:"Ổn",nguon:SC_NGUON.ads})}catch(e){}
   return R}
+/* Khoản nhập ở mục khác được tính vào Tổng quan và Phân bổ theo kênh, gắn đúng nhóm chi phí:
+   quảng cáo → G01/G02/G03 theo kênh, lương đã chốt → G07 theo kênh của bảng lương, phiếu chi vận chuyển → G09 (cước xe NPP).
+   Sổ đã có dòng quảng cáo (tiền nạp) hoặc lương của nhóm đó trong kỳ thì không cộng thêm, tránh tính hai lần. */
+function scAuto(){
+  const nk=scRows(),has=g=>nk.some(x=>x.g===g),R=[];
+  scExt().forEach(x=>{const s=x.ext.src;let g="",k=x.k;
+    if(s==="ads"){g={"ads-fb":"G01","ads-tt":"G02","ads-spe":"G03"}[x.ext.id];if(has(g))return}
+    else if(s==="luong"){g="G07";if(has(g))return;if(!SC_COLS.includes(k))k="Chung"}
+    else if(s==="vc"){g="G09";k="NPP"}
+    if(!g)return;R.push({...x,g,k,tk:scG(g).tk,nhom:scG(g).n,auto:1})});
+  return R}
+const scPBRows=()=>scRows().concat(scAuto());
 /* Chi tiết một dòng quảng cáo: tiền chạy theo ngày (Facebook chia theo người chạy). */
 function scAdsDetail(id){
   const inP=k=>k>=PERIOD.from&&k<=PERIOD.to,days={},who={};let ten="",ghi="";
   if(id==="ads-fb"){ten="Quảng cáo Facebook";ghi="Tiền chạy theo chiến dịch Facebook, đã cộng 10% thuế, gộp theo người chạy.";
     for(const nv in DAYD.ads||{})for(const k in DAYD.ads[nv])if(inP(k)){const v=(+DAYD.ads[nv][k][0]||0)*(1+FB_ADS_TAX);if(!v)continue;(days[k]=days[k]||{})[nv]=v;who[nv]=(who[nv]||0)+v}}
-  else if(id==="ads-tt"){ten="Quảng cáo TikTok GMV Max";ghi="Từ báo cáo TikTok đã tải, đã gồm thuế.";
-    for(const k in DAYD.tts||{})if(inP(k)){const v=+DAYD.tts[k][10]||0;if(v)days[k]={"TikTok":v}}}
+  else if(id==="ads-tt"){const T=scTTAds();openDrawerHTML(`<h2>Quảng cáo TikTok GMV Max</h2><p class="hint">${pLabel()} · lấy từ báo cáo TikTok đã tải (theo tháng), đã gồm thuế.</p><div class="tbl"><table><thead><tr><th>Tháng</th><th class="n">Tiền quảng cáo</th></tr></thead><tbody>${T.L.map(x=>`<tr><td>${x.k.slice(5)}/${x.k.slice(0,4)}${x.den?` <span class="hint">· báo cáo đến ${scDd(x.den)}</span>`:""}</td><td class="n">${x.v==null?'<span class="hint">chưa tải báo cáo</span>':scNf(x.v)}</td></tr>`).join("")}<tr class="tot"><td>Cộng</td><td class="n">${scNf(T.v)}</td></tr></tbody></table></div>`);return}
   else{openDrawerHTML(`<h2>Quảng cáo Shopee</h2><p class="hint">Shopee chỉ có số cả tháng trong báo cáo lãi lỗ Shopee, chưa có số theo ngày.</p>`);return}
   const ks=Object.keys(days).sort(),ws=Object.keys(who).sort((a,b)=>who[b]-who[a]),many=ws.length>1,dsum=k=>Object.values(days[k]).reduce((a,b)=>a+b,0),tot=ks.reduce((t,k)=>t+dsum(k),0);
   openDrawerHTML(`<h2>${ten}</h2><p class="hint">${pLabel()} · ${ghi}</p>
    ${many?`<div class="tbl"><table><thead><tr><th>Người chạy</th><th class="n">Tiền chạy</th></tr></thead><tbody>${ws.map(w=>`<tr><td>${esc(w)}</td><td class="n">${scNf(who[w])}</td></tr>`).join("")}</tbody></table></div>`:""}
    ${ks.length?`<div class="tbl"><table><thead><tr><th>Ngày</th>${many?ws.map(w=>`<th class="n">${esc(w)}</th>`).join(""):""}<th class="n">Cộng</th></tr></thead><tbody>${ks.map(k=>`<tr><td>${scDd(k)}</td>${many?ws.map(w=>`<td class="n">${days[k][w]?scNf(days[k][w]):""}</td>`).join(""):""}<td class="n"><b>${scNf(dsum(k))}</b></td></tr>`).join("")}
-   <tr class="tot"><td>Cộng ${ks.length} ngày</td>${many?ws.map(w=>`<td class="n">${scNf(who[w])}</td>`).join(""):""}<td class="n">${scNf(tot)}</td></tr></tbody></table></div>`:`<p class="empty">Chưa có số theo ngày trong kỳ này.${id==="ads-tt"?(()=>{try{const N=execNums(PERIOD.from,PERIOD.to),r=(N.rev||{}).tts||{};return `<br>Số cả kỳ ${scNf(N.C.adsTT)} đ lấy từ báo cáo TikTok theo tháng (${esc(r.src||"")}).`}catch(e){return ""}})():""}</p>`}`)}
+   <tr class="tot"><td>Cộng ${ks.length} ngày</td>${many?ws.map(w=>`<td class="n">${scNf(who[w])}</td>`).join(""):""}<td class="n">${scNf(tot)}</td></tr></tbody></table></div>`:`<p class="empty">Chưa có số theo ngày trong kỳ này.</p>`}`)}
 function scExtOpen(r){const x=r.ext||{};
   if(x.src==="ads")return scAdsDetail(x.id);
   if(x.src==="luong"){PAGE="cp_luong";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0);return}
@@ -209,9 +234,9 @@ function scExtOpen(r){const x=r.ext||{};
 function scNK(){
   try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
   try{if(typeof adfLoad==="function"&&!ADF.raw&&!SC.adf){SC.adf=1;adfLoad().then(()=>{try{adfMergeDays()}catch(e){}if(PAGE==="so_cp")renderMain()})}}catch(e){}
-  const q=kfold(SC.q||""),cho=scCho().filter(scInP),ext=scExt(),all=scRows().concat(cho,ext),R=all.filter(x=>(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!q||kfold(x.dg+" "+x.ct+" "+(x.sub||"")+" "+(x.nhom||"")).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||((a.ky?1:0)-(b.ky?1:0))||String(a.ct).localeCompare(String(b.ct)));
-  const ed=scCanDuyet(),gs=scDM().map(x=>x.g),RE=R.filter(x=>x.ext),sE=scS(RE);
-  const row=x=>{if(x.ext)return `<tr class="clk" data-x="${esc(x.id)}"><td>${x.ky?'<span class="hint">cả kỳ</span>':scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg)}${x.sub?`<div class="hint">${esc(x.sub)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(x.nhom||"")}</td><td></td><td><span class="scp p-c">${esc(x.nguon)}</span></td><td>${esc(x.k)}</td><td>${scStP(x.st)}</td></tr>`;
+  const q=kfold(SC.q||""),cho=scCho().filter(scInP),AU=new Map(scAuto().map(x=>[x.id,x])),ext=scExt().map(x=>AU.get(x.id)||x),all=scRows().concat(cho,ext),R=all.filter(x=>(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!q||kfold(x.dg+" "+x.ct+" "+(x.sub||"")+" "+(x.nhom||"")).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||((a.ky?1:0)-(b.ky?1:0))||String(a.ct).localeCompare(String(b.ct)));
+  const ed=scCanDuyet(),gs=scDM().map(x=>x.g),RE=R.filter(x=>x.ext&&!x.auto),sE=scS(RE);
+  const row=x=>{if(x.ext)return `<tr class="clk" data-x="${esc(x.id)}"><td>${x.ky?'<span class="hint">cả kỳ</span>':scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg)}${x.sub?`<div class="hint">${esc(x.sub)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(x.nhom||"")}</td><td>${esc(x.tk||"")}</td><td><span class="scp p-c">${esc(x.nguon)}</span></td><td>${esc(x.k)}</td><td>${scStP(x.st)}</td></tr>`;
     const d=scG(x.g),isCho=x.st==="Chờ duyệt";return `<tr class="clk" data-id="${x.id}"${isCho?' data-cho="1"':""}><td>${scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg)}${x.gc?`<div class="hint">${esc(x.gc)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(d.n)}</td><td>${esc(d.tk)}</td><td>${scLoP(d.lo)}</td><td>${ed&&!isCho?`<select class="scbv${x.k0&&x.k0!==x.k?" doi":""}" data-bv="${x.id}" aria-label="Bổ khoản chi vào">${SC_COLS.map(k=>`<option${x.k===k?" selected":""}>${k}</option>`).join("")}</select>${x.k0&&x.k0!==x.k?`<div class="hint">đã đổi từ ${esc(x.k0)}</div>`:""}`:esc(x.k)}</td><td>${scStP(x.st)}</td></tr>`};
   return `<section class="card flush"><div class="sch pad"><h2>Nhật ký chi</h2><span class="hint">mọi khoản tiền chi ra trong kỳ · bấm dòng để xem chi tiết · nhãn xám = khoản nhập ở mục khác, tự hiện</span><span class="sp"></span>
    <select id="scf-fg"><option value="">Tất cả nhóm chi phí</option>${gs.map(g=>`<option value="${g}"${SC.g===g?" selected":""}>${g} · ${esc(scG(g).n)}</option>`).join("")}</select>
@@ -219,22 +244,23 @@ function scNK(){
    <select id="scf-fs"><option value="">Mọi tình trạng</option>${["Ổn","Cần rà","Chờ duyệt"].map(s=>`<option${SC.st===s?" selected":""}>${s}</option>`).join("")}</select>
    <input id="scf-fq" placeholder="Tìm diễn giải, số chứng từ…" value="${esc(SC.q||"")}"></div>
   ${!MH.pay||!SOCP.ship?`<p class="hint pad">Đang tải các khoản chi ở Mua hàng và Vận chuyển…</p>`:""}
+  ${(()=>{const m=scTTAds().L.filter(x=>x.v==null).map(x=>x.k.slice(5)+"/"+x.k.slice(0,4));return m.length?`<div class="note" style="margin:0 16px 10px">Chưa có tiền quảng cáo TikTok tháng ${m.join(", ")}: chưa tải báo cáo TikTok của tháng đó (Doanh thu › TikTok Shop › Tải file tháng). Tải xong là tự hiện ở đây.</div>`:""})()}
   ${R.length?`<div class="tbl"><table><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>TK</th><th>Loại / nguồn</th><th>Bổ vào (kênh / nơi chịu)</th><th>Tình trạng</th></tr></thead><tbody>
   ${R.map(row).join("")}
   <tr class="tot"><td colspan="3">Cộng ${R.length} khoản${R.length<all.length?" (đang lọc)":""}</td><td class="n">${scNf(scS(R))}</td><td colspan="5"></td></tr>
-  ${RE.length?`<tr><td colspan="3" class="hint">trong đó phiếu chi của sổ (tính vào Phân bổ theo kênh)</td><td class="n">${scNf(scS(R)-sE)}</td><td colspan="5"></td></tr><tr><td colspan="3" class="hint">trong đó khoản nhập ở mục khác: mua hàng, vận chuyển, quảng cáo, lương, chi phí trang cũ</td><td class="n">${scNf(sE)}</td><td colspan="5"></td></tr>`:""}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
+  ${RE.length?`<tr><td colspan="3" class="hint">trong đó tính vào Phân bổ theo kênh (phiếu chi, quảng cáo, lương đã chốt, vận chuyển)</td><td class="n">${scNf(scS(R)-sE)}</td><td colspan="5"></td></tr><tr><td colspan="3" class="hint">trong đó trả nhà cung cấp và chi phí trang cũ (mua hàng vào giá vốn, không phân bổ)</td><td class="n">${scNf(sE)}</td><td colspan="5"></td></tr>`:""}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
 /* Doanh thu thực tự lấy để chia chi chung: dùng hàm doanh thu chung của web (dtShownMonth, chat Doanh thu 27/10),
    chưa có hàm đó thì lấy execNums như trước. Shopee là số chung 2 shop nên Mall / thường vẫn nhập tay. */
 function scAutoDT(ym){const o={};
   try{if(typeof dtShownMonth==="function"){const r=dtShownMonth(ym),v=x=>x&&x.dt!=null&&+x.dt>0?+x.dt:0;o["TikTok"]=v(r.tts);o["Facebook"]=v(r.fb);o["NPP"]=v(r.b2b);o["Gia công"]=v(r.gc);return o}}catch(e){}
   try{const N=execNums(ym+"-01",PERIOD.to);o["TikTok"]=N.tt||0;o["Facebook"]=N.fbGiao||0}catch(e){}return o}
 function scPB(){
-  const rows=scRows();if(!rows.length)return scEmpty();
+  const rows=scPBRows();if(!rows.length)return scEmpty();
   const gs=[...new Set(rows.map(x=>x.g))].sort(),M={};gs.forEach(g=>{M[g]={};SC_COLS.forEach(c=>M[g][c]=0)});rows.forEach(x=>{const c=SC_COLS.includes(x.k)?x.k:"Chờ xác định";M[x.g][c]+=x.t});
   const colT=c=>gs.reduce((t,g)=>t+M[g][c],0),chung=colT("Chung"),ym=PERIOD.from.slice(0,7),oneM=PERIOD.to.slice(0,7)===ym;
   const auto=scAutoDT(ym),saved=((scFin().cpDT||{})[ym])||{},DT={};SC_KENH.forEach(k=>DT[k]=saved[k]!=null&&saved[k]!==""?+saved[k]:(auto[k]||0));
   const dts=SC_KENH.reduce((t,k)=>t+DT[k],0),f=v=>v?scNf(v):'<span class="hint">—</span>',ed=scCanDuyet()&&oneM;
-  return `<section class="card flush"><div class="sch pad"><h2>Phân bổ theo kênh</h2><span class="hint">hàng = nhóm chi phí · cột = kênh / nơi chịu · đổi chỗ bổ ở tab Nhật ký chi</span></div><div class="tbl"><table class="scpbt"><colgroup><col class="c-n"><col class="c-tk">${SC_COLS.map(()=>`<col class="c-v">`).join("")}<col class="c-t"></colgroup><thead><tr><th>Nhóm chi phí</th><th>TK</th>${SC_COLS.map(c=>`<th class="n">${c}</th>`).join("")}<th class="n">Tổng</th></tr></thead><tbody>
+  return `<section class="card flush"><div class="sch pad"><h2>Phân bổ theo kênh</h2><span class="hint">hàng = nhóm chi phí · cột = kênh / nơi chịu · gồm cả quảng cáo, lương đã chốt, vận chuyển · đổi chỗ bổ ở tab Nhật ký chi</span></div><div class="tbl"><table class="scpbt"><colgroup><col class="c-n"><col class="c-tk">${SC_COLS.map(()=>`<col class="c-v">`).join("")}<col class="c-t"></colgroup><thead><tr><th>Nhóm chi phí</th><th>TK</th>${SC_COLS.map(c=>`<th class="n">${c}</th>`).join("")}<th class="n">Tổng</th></tr></thead><tbody>
   ${gs.map(g=>`<tr><td><span class="mono">${esc(g)}</span> ${esc(scG(g).n)}</td><td>${esc(scG(g).tk)}</td>${SC_COLS.map(c=>`<td class="n">${f(M[g][c])}</td>`).join("")}<td class="n"><b>${scNf(SC_COLS.reduce((t,c)=>t+M[g][c],0))}</b></td></tr>`).join("")}
   <tr class="tot"><td colspan="2">Tổng cộng</td>${SC_COLS.map(c=>`<td class="n">${f(colT(c))}</td>`).join("")}<td class="n">${scNf(scS(rows))}</td></tr></tbody></table></div></section>
   <section class="card pad"><div class="sch"><h2>Chia chi chung về kênh theo doanh thu thực</h2>${ed?`<span class="sp"></span><button class="btn sm" id="scdt-ed">Sửa doanh thu thực</button>`:""}</div><div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Doanh thu thực</th><th class="n">Tỷ trọng</th><th class="n">Chi trực tiếp</th><th class="n">Chi chung được chia</th><th class="n">Tổng kênh gánh</th><th class="n">% doanh thu</th></tr></thead><tbody>
