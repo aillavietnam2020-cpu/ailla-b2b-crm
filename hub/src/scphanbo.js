@@ -10,8 +10,11 @@
 const SC_QT0=[{g:"*",cach:"dt",ks:["TikTok","Shopee Mall","Shopee thường","Facebook","NPP","Gia công"]}];
 const scQTnow=()=>{const q=scFin().pbqt;return Array.isArray(q)?q:SC_QT0};
 function scQT(ym){const V=((scFin().pbchot||{})[ym])||[];return V.length?{qt:V[V.length-1].qt,chot:V[V.length-1],n:V.length}:{qt:scQTnow(),chot:null,n:0}}
+/* Chỉ chia đúng phần P&L tính là chi chung (cùng luật scChungNkc): nhóm loại B/C, trừ quảng cáo, phí sàn, vận chuyển.
+   Nhóm "Chờ xác định" bổ Chung không đem chia (Kế toán trưởng: chưa xác định bản chất thì không phân bổ). */
+const scLaChung=g=>/^[BC] - /.test(String(scG(g).lo||""))&&!SC_PL_TRU.includes(g);
 /* Chia chi chung của kỳ đang xem (phải là một tháng). rows = scPBRows(). */
-function scChiaPB(rows){const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,ch=(rows||[]).filter(x=>x.k==="Chung"&&x.st!=="Chờ duyệt");
+function scChiaPB(rows){const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,ch=(rows||[]).filter(x=>x.k==="Chung"&&x.st!=="Chờ duyệt"&&scLaChung(x.g));
   if(!one)return {...scChiaChung(ch,[],{}),one,chot:null,ym};
   const Q=scQT(ym),o=scChiaChung(ch,Q.qt,scDtThang().DT),ten=t=>SC_KENH.reduce((a,k)=>a.split(k).join(SC_TEN(k)),String(t));
   o.loi=o.loi.map(ten);o.con.forEach(x=>x.why=ten(x.why));return {...o,one,chot:Q.chot,ym,qt:Q.qt}}
