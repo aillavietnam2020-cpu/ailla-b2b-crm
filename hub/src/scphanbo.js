@@ -13,7 +13,8 @@ function scQT(ym){const V=((scFin().pbchot||{})[ym])||[];return V.length?{qt:V[V
 /* Chia chi chung của kỳ đang xem (phải là một tháng). rows = scPBRows(). */
 function scChiaPB(rows){const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,ch=(rows||[]).filter(x=>x.k==="Chung"&&x.st!=="Chờ duyệt");
   if(!one)return {...scChiaChung(ch,[],{}),one,chot:null,ym};
-  const Q=scQT(ym);return {...scChiaChung(ch,Q.qt,scDtThang().DT),one,chot:Q.chot,ym,qt:Q.qt}}
+  const Q=scQT(ym),o=scChiaChung(ch,Q.qt,scDtThang().DT),ten=t=>SC_KENH.reduce((a,k)=>a.split(k).join(SC_TEN(k)),String(t));
+  o.loi=o.loi.map(ten);o.con.forEach(x=>x.why=ten(x.why));return {...o,one,chot:Q.chot,ym,qt:Q.qt}}
 const scQTof=(qt,g)=>(qt||[]).find(z=>z.g===g&&z.on!==false)||(qt||[]).find(z=>z.g==="*"&&z.on!==false)||null;
 function scQTtxt(r){if(!r||!r.cach||r.cach==="giu")return "Để ở chi chung công ty";
   if(r.cach==="dt")return "Theo doanh thu thực: "+(r.ks||[]).map(SC_TEN).join(", ");
