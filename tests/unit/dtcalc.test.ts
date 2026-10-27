@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const T: any = new Function(
   `${readFileSync('hub/src/dtcalc.js', 'utf8')}
-  return {DT_KENH,DT_HOAN_FB,dtNgayChot,dtTrangThai,dtNhan,dtDuKien,dtFbNgay,dtCanChot,dtChon,dtLech};`,
+  return {DT_KENH,DT_HOAN_FB,dtNgayChot,dtTrangThai,dtNhan,dtDuKien,dtFbNgay,dtCanChot,dtChon,dtLech,dtNkcKenh};`,
 )();
 
 describe('Doanh thu thực: luật chốt ngày 10', () => {
@@ -55,5 +55,45 @@ describe('Doanh thu thực: Facebook', () => {
     expect(T.DT_KENH.map((x: string[]) => x[1])).toEqual(['TikTok Shop', 'Shopee', 'Facebook', 'CSKH cũ', 'Kênh phân phối', 'Kênh OEM']);
     expect(T.dtLech(10, 4)).toBe(6);
     expect(T.dtLech(null, 4)).toBe(null);
+  });
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const C: any = new Function(`${readFileSync('hub/src/chicalc.js', 'utf8')}
+  return {scChungNkc};`)();
+
+describe('Doanh thu thực: chi phí Sổ chi phí bổ thẳng về kênh', () => {
+  const LO: Record<string, string> = {
+    G01: 'A - Trực tiếp kênh', G05: 'A - Trực tiếp kênh', G06: 'A - Trực tiếp kênh', G09: 'A - Trực tiếp kênh', G12: 'A - Trực tiếp kênh',
+    G13: 'C - Chi chung', G17: 'Giá vốn', G20: 'Không tính', G24: 'C - Chi chung',
+  };
+  const lo = (g: string) => LO[g] || '';
+  const nkc = [
+    { d: '2026-10-05', k: 'Facebook', g: 'G12', t: 520_000 },
+    { d: '2026-10-06', k: 'NPP', g: 'G09', t: 650_000 },
+    { d: '2026-10-07', k: 'Sản xuất', g: 'G24', t: 16_000 },
+    { d: '2026-10-08', k: 'Facebook', g: 'G01', t: 9_000_000 },
+    { d: '2026-10-08', k: 'Facebook', g: 'G05', t: 300_000 },
+    { d: '2026-10-08', k: 'NPP', g: 'G05', t: 200_000 },
+    { d: '2026-10-08', k: 'TikTok', g: 'G06', t: 5_000_000 },
+    { d: '2026-10-09', k: 'Shopee thường', g: 'G17', t: 70_000 },
+    { d: '2026-10-09', k: 'Gia công', g: 'G20', t: 80_000 },
+    { d: '2026-10-09', k: 'Facebook', g: 'G12', t: 40_000, st: 'Chờ duyệt' },
+    { d: '2026-10-10', k: 'Chung', g: 'G13', t: 1_000_000 },
+    { d: '2026-09-30', k: 'Facebook', g: 'G12', t: 99_000 },
+  ];
+  it('lấy dòng bổ về kênh, bỏ quảng cáo, phí sàn, hoa hồng TikTok; ship chỉ bỏ ở kênh bán lẻ', () => {
+    const r = T.dtNkcKenh(nkc, '2026-10-01', '2026-10-31', lo);
+    expect(r.v).toEqual({ tts: 0, spe: 0, fb: 520_000, b2b: 850_000, gc: 0, sx: 16_000 });
+    expect(r.n.b2b).toBe(2);
+  });
+  it('không trừ hai lần với Chi phí chung (dòng "Chung" chỉ vào chi phí chung, dòng kênh chỉ vào kênh)', () => {
+    const k = T.dtNkcKenh(nkc, '2026-10-01', '2026-10-31', lo).v;
+    const kenh = k.tts + k.spe + k.fb + k.b2b + k.gc + k.sx;
+    const chung = C.scChungNkc(nkc, '2026-10', lo);
+    expect(chung).toBe(1_000_000);
+    const one = nkc.filter((x) => x.d.startsWith('2026-10') && x.k === 'Chung');
+    expect(T.dtNkcKenh(one, '2026-10-01', '2026-10-31', lo).v.fb).toBe(0);
+    expect(kenh + chung).toBe(520_000 + 850_000 + 16_000 + 1_000_000);
   });
 });

@@ -66,7 +66,12 @@ function dtLabel(r,ch,from,to){
   return out}}
 if(typeof b2bChannel==="function"){const _b=b2bChannel;b2bChannel=function(ch){const X=_b.apply(this,arguments);if(!X||DTS.live||!dtOk())return X;
   const f=dtFrozen(ch==="GIA_CONG"?"gc":"b2b",PERIOD.from,PERIOD.to);if(!f)return X;const d=f.dt-(+X.net||0);return {...X,has:true,net:f.dt,orders:f.don!=null?f.don:X.orders,gross:(+X.gross||0)+d,frozen:true}}}
-{const _k=tqKenhRows;tqKenhRows=function(){const rows=_k.apply(this,arguments);if(DTS.live||!dtOk())return rows;
+/* Chi phí Sổ chi phí bổ thẳng về kênh (luật ở dtcalc.js): trừ vào lãi đóng góp kênh, ghi ở r.cpk. Không áp khi tính số chốt (số chốt chỉ giữ doanh thu, chi phí sổ luôn lấy theo sổ hiện tại). */
+const DT_NKC_ROW={tts:"tts",fb:"fb",spe:"spe",B2B:"b2b",GIA_CONG:"gc"};
+function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.nkc)return null;return dtNkcKenh(f.nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
+function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEach(r=>{const k=DT_NKC_ROW[r.k],v=k?S.v[k]:0;if(!v||r._cpk||r.dt==null)return;r._cpk=1;r.cpk=v;r.khac=(r.khac||0)+v;if(r.lai!=null)r.lai-=v;
+  r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(v)} chi phí Sổ chi phí bổ về kênh (${S.n[k]} dòng)`})}
+{const _k=tqKenhRows;tqKenhRows=function(){const rows=_k.apply(this,arguments);if(DTS.live)return rows;try{dtTruSoCp(rows,PERIOD.from,PERIOD.to)}catch(e){}if(!dtOk())return rows;
   try{rows.forEach(r=>{if(r.k==="B2B"||r.k==="GIA_CONG"){const X=b2bChannel(r.k);if(X&&X.frozen)r.frozen=true;dtLabel(r,DT_ROWK[r.k],PERIOD.from,PERIOD.to)}})}catch(e){}
   try{dtAutoChot()}catch(e){}return rows}}
 
