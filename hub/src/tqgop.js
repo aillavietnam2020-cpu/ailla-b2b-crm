@@ -17,10 +17,10 @@ const tqMonths=(from,to)=>{const ms=[];for(let d=pdate(from.slice(0,7)+"-01");is
 function tqRevB2C(N,from,to){
   const ms=tqMonths(from,to),full=ms.every(k=>fullMonth(k,from,to)),S=(typeof TSB!=="undefined"&&TSB.sum)||{},rs=(i,src)=>rSum(src,i,from,to).v,co=tqCo(from,to)||{};
   const out={};
-  /* TikTok: từng tháng trong kỳ. Có báo cáo đã tải (chốt sổ hoặc giữa tháng "đến ngày X") thì lấy doanh thu thực từ báo cáo
-     cho các ngày đến X; chỉ những ngày SAU lần tải gần nhất mới tạm tính từ Poscake (số đơn xuất kho × giá trị đơn TB). */
-  {const M=(typeof TSB!=="undefined"&&TSB.months)||[],last=M.length?M[M.length-1].summary:null,vn=d=>d.slice(8,10)+"/"+d.slice(5,7);
-   let dt=0,gv=0,phi=0,ads=0,khac=0,lai=0,don=0,tam=false,den="",parts=[],thieu=false;
+  /* TikTok: từng tháng trong kỳ, CHỈ lấy doanh thu thực từ báo cáo đã tải (chốt sổ hoặc giữa tháng "đến ngày X"; tải hàng tuần).
+     Ngày sau lần tải gần nhất để trống, ghi "chờ tải báo cáo" — không ước từ Poscake (chị Hoa 27/10: không lấy số ước). */
+  {const vn=d=>d.slice(8,10)+"/"+d.slice(5,7);
+   let dt=0,gv=0,phi=0,ads=0,khac=0,lai=0,don=0,den="",parts=[],cho=[],got=false;
    ms.forEach(k=>{const s=S[k],mEnd=k+"-"+String(ttKyDays(k)).padStart(2,"0"),a=from>k+"-01"?from:k+"-01",b=to<mEnd?to:mEnd;
      let upto="";
      if(s&&s.dt){const cov=s.den||mEnd,wholeMonth=a===k+"-01"&&b>=cov;
@@ -28,14 +28,13 @@ function tqRevB2C(N,from,to){
        if(wholeMonth&&(!s.den||b>=s.den)){pdt=s.dt;pdon=s.don}
        else if(s.days){Object.entries(s.days).forEach(([d,x])=>{if(d>=a&&d<=b&&d<=cov){pdt+=+x[0]||0;pdon+=+x[1]||0}})}
        else{const nd=Math.max(0,(pdate(b<cov?b:cov)-pdate(a))/864e5+1),tot=+cov.slice(8,10);pdt=s.dt*nd/tot;pdon=s.don*nd/tot}
-       const r=s.dt?pdt/s.dt:0;dt+=pdt;don+=pdon;gv+=s.gv*r;phi+=-s.phi*r;ads+=s.ads*r;khac+=((s.extraT||0)-(s.adj||0))*r;lai+=s.lai*r;
+       const r=s.dt?pdt/s.dt:0;dt+=pdt;don+=pdon;gv+=s.gv*r;phi+=-s.phi*r;ads+=s.ads*r;khac+=((s.extraT||0)-(s.adj||0))*r;lai+=s.lai*r;got=true;
        upto=cov<b?cov:b;if(upto>den)den=upto;parts.push(s.den?`báo cáo đến ${vn(s.den)}`:"báo cáo chốt sổ")}
-     const ta=upto?iso(addD(pdate(upto),1)):a;
-     if(ta<=b){const co=tqCo(ta,b),n=co?(co.TIKTOK||0):0,base=s&&s.dt&&s.don?s:last;
-       if(n&&base&&base.dt&&base.don){const aov=base.dt/base.don,x=n*aov,rr=x/base.dt;dt+=x;don+=n;gv+=base.gv*rr;phi+=-base.phi*rr;ads+=base.ads*rr;lai+=base.lai*rr;tam=true;parts.push(`tạm tính từ Poscake ${vn(ta)}–${vn(b)}: ${nf(n)} đơn × ${nf(aov)}đ`)}
-       else if(n||co===null)thieu=true}});
-   if(dt>0)out.tts={dt,gv,phi,ads,khac,lai,don,tam,den,src:"doanh thu thuần · "+parts.join(" · ")+(den?` · cập nhật đến ngày ${vn(den)} từ báo cáo tải lên`:"")+(thieu?" · còn ngày chờ tải báo cáo":"")};
-   else out.tts={dt:null,lai:null,don:null,src:"chờ tải báo cáo TikTok (Tổng quan › Doanh thu › TikTok Shop › Tải file tháng)"}}
+     const ta=upto?iso(addD(pdate(upto),1)):a,today=iso(new Date()),tb=b<today?b:today;
+     if(ta<=tb)cho.push(ta===tb?vn(ta):`${vn(ta)}–${vn(tb)}`)});
+   const choTxt=cho.length?` · chờ tải báo cáo ngày ${cho.join(", ")}`:"";
+   if(got)out.tts={dt,gv,phi,ads,khac,lai,don,tam:false,den,thieu:cho.length>0,src:"doanh thu thuần · "+parts.join(" · ")+(den?` · có số đến ngày ${vn(den)} từ báo cáo tải lên`:"")+choTxt};
+   else out.tts={dt:null,lai:null,don:null,src:"chờ tải báo cáo TikTok"+(cho.length?" ngày "+cho.join(", "):"")+" (Tổng quan › Doanh thu › TikTok Shop › Tải file tháng)"}}
   /* Facebook: giao thành công */
   {const dtG=rs(5,"fb"),dtC=rs(6,"fb"),giao=rs(4,"fb"),chot=rs(1,"fb"),hoan=rs(3,"fb"),gvC=rs(7,"fb");
    if(dtG>0){const Dd=(typeof KDX!=="undefined"&&KDX.fbDash)||{},pr=Dd.dt>0?(-(+Dd.vc||0)-(+Dd.hoan||0))/Dd.dt+0.015:0.015,gv=dtC?gvC*dtG/dtC:0,ads=rAds(0,from,to)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1)),phi=dtG*pr;
@@ -109,7 +108,7 @@ PAGES.dh=m=>{SUB.exec=({tongquan:"kenh",homnay:"kenh",batang:"kenh"})[SUB.dh]||S
    Chi phí chung lấy từ Sổ chi phí qua spChungTheoThang(ym) (chat Dựng trang quản trị làm); chưa có thì ghi "chưa có số", không để 0.
    Kế hoạch doanh thu theo tháng, theo kênh: D().targets.thang["yyyy-mm"] = {tts,spe,fb,b2b,gc} (doanh thu thực, đ).
    ===================================================================== */
-const PLK=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["b2b","B2B / Đại lý"],["gc","Gia công"]];
+const PLK=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["b2b","Kênh phân phối"],["gc","Kênh OEM"]];
 const PLB={},PLBB={};
 const plYmEnd=ym=>ym+"-"+String(ttKyDays(ym)).padStart(2,"0");
 const plYmAdd=(ym,n)=>{const [y,m]=ym.split("-").map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};

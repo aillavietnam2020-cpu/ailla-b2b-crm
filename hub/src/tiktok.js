@@ -167,6 +167,8 @@ function tsbUpAdmCard(){
 function tsbAdmPage(m){
   if(!(typeof SV!=="undefined"&&SV.acct)){m.innerHTML=H("Kênh TikTok Shop","Báo cáo quản trị tháng")+`<section class="card"><p>Chỉ CEO và kế toán xem được lãi lỗ kênh.</p></section>`;return}
   if(!TSB.months){tsbLoadMonths();m.innerHTML=H("Kênh TikTok Shop","Đang tải…");return}
+  /* Tháng theo ô chọn thời gian; bấm nút tháng trên trang thì giữ tháng đó tới khi đổi kỳ. Tháng chưa tải báo cáo thì báo chờ tải, không hiện tháng khác. */
+  {const pk=PERIOD.from+"|"+PERIOD.to;if(TSB.pk!==pk){TSB.pk=pk;const pym=plYmNow();TSB.ky=TSB.months.some(x=>x.ky===pym)?pym:"";TSB.noRep=TSB.ky?"":pym}}
   const V=TSB.prev,ky=V?V.ky:TSB.ky;if(!V&&ky)tsbLoadMonth(ky);
   const S=!V&&ky?TSB.data[ky]:null,P=V?V.P:S?S.pl:null,todo=V?ttTodo(V.P):S?(S.data.todo||ttTodo(S.pl)):null;
   const tab=SUB.bc_tiktok||"pl",lock=S&&S.locked_at,chot=ky?"08/"+ttKyNext(ky).slice(5)+"/"+ttKyNext(ky).slice(0,4):"";
@@ -175,7 +177,7 @@ function tsbAdmPage(m){
   let body="";
   if(tab==="up")body=tsbUpAdmCard();
   else if(tab==="thang")body=tsbMonthsView();
-  else if(!P)body=ky&&!V&&TSB.data[ky]===null?`<section class="card"><p class="hint">Đang tải ${tsbKyL(ky)}…</p></section>`:`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Tải file tháng</b> để kế toán tải 3 file TikTok.</p></section>`;
+  else if(!P)body=ky&&!V&&TSB.data[ky]===null?`<section class="card"><p class="hint">Đang tải ${tsbKyL(ky)}…</p></section>`:`<section class="card"><p class="empty">${TSB.months.length&&TSB.noRep?`Tháng ${tsbKyL(TSB.noRep)} chưa tải báo cáo TikTok. Bấm <b>Tải file tháng</b> để tải báo cáo tuần này (income đến ngày gần nhất), hoặc bấm tháng khác ở trên để xem.`:`Chưa có tháng nào. Bấm <b>Tải file tháng</b> để kế toán tải 3 file TikTok.`}</p></section>`;
   else if(tab==="pl")body=`<section class="card"><div class="card-h"><h2>Lãi lỗ kênh ${tsbKyL(ky)}</h2></div>${tsbPLTbl(P)}</section><section class="card"><div class="card-h"><h2>Phí sàn 7 nhóm</h2></div>${tsbFeeTbl(P)}</section>
     <section class="card"><div class="card-h"><h2>Chỉ số điều hành</h2></div>${tbl(["Chỉ số","Giá trị","Ý nghĩa"],[["Mức chi quảng cáo trên doanh thu",tsbPct(P.ads,P.dt),"Ngưỡng quan trọng nhất: SKU có biên lãi gộp thấp hơn mức này là đang lỗ nếu bị đẩy quảng cáo ở mức trung bình"],["Số đơn bán được",nf(P.don),""],["Số món bán ra",nf(P.mon),""],["Giá trị đơn trung bình",nf(P.aov),"Doanh thu chia số đơn"],["Giá trị hàng hủy/hoàn",tsbN(P.hh),"Không ghi doanh thu, không ghi giá vốn"],["Tỷ lệ hủy/hoàn theo giá trị",tsbPct(P.hhRate,1),""],["Số SKU có bán",nf(P.nSku),""],["Chi phí riêng của kênh nhập trên web",P.extra.length?tsbN(P.extraT):"Chưa có","Khoản ở Chi phí theo tháng gắn kênh TikTok (agency, hàng mẫu KOC, livestream, quảng cáo ngoài GMV Max)"]].map(r=>`<tr><td>${r[0]}</td><td class="n"><b>${r[1]}</b></td><td class="hint">${esc(r[2])}</td></tr>`))}</section>`;
   else if(tab==="sp")body=`<section class="card"><div class="card-h"><h2>Lãi lỗ theo sản phẩm</h2><span class="hint">gộp mọi phân loại, combo của cùng sản phẩm</span></div>${tsbSpTbl(P)}</section><section class="card"><div class="card-h"><h2>Lãi lỗ theo SKU</h2><span class="hint">"Trần ads chịu được" = biên lãi gộp sau phí sàn</span></div>${tsbSkuTbl(P.rows.filter(r=>r.q>0||r.dt))}</section>`;
@@ -188,7 +190,7 @@ function tsbAdmPage(m){
    +`<div class="filters"><div class="chips"><b>Tháng</b>${chips||`<span class="hint">chưa có tháng nào</span>`}${V?`<button class="chip on">${tsbKyL(V.ky)} · xem trước</button>`:""}</div>${stat}</div>`
    +prevBar+kp+`<div class="tabs">${tabs.map(([k,t])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`+body
    +srcNote("File TikTok Shop do kế toán tải (OrderSKUList, income, Campaign overview). Giá vốn lấy từ Quy đổi mã các sàn và Giá vốn SKU. Quy tắc: báo cáo quản trị TikTok (skill ailla-baocao-quantri-tiktok).");
-  m.querySelectorAll("[data-tsbky]").forEach(b=>b.onclick=()=>{TSB.prev=null;TSB.ky=b.dataset.tsbky;if(SUB.bc_tiktok==="thang"||SUB.bc_tiktok==="up")SUB.bc_tiktok="pl";renderMain()});
+  m.querySelectorAll("[data-tsbky]").forEach(b=>b.onclick=()=>{TSB.prev=null;TSB.ky=b.dataset.tsbky;TSB.noRep="";if(SUB.bc_tiktok==="thang"||SUB.bc_tiktok==="up")SUB.bc_tiktok="pl";renderMain()});
   tsbBindFiles("tsbadm",tsbAdmFiles);
   const ki=$("#tsb-ky");if(ki)ki.onchange=()=>{TSB.up.ky=ki.value;tsbAdmCompute()};
   const on=(id,f)=>{const b=$("#"+id);if(b)b.onclick=f};
