@@ -39,6 +39,7 @@ import { tiktokRoutes } from './routes/tiktok';
 import { dieuhanhRoutes } from './routes/dieuhanh';
 import { soatRoutes } from './routes/soatSoLieu';
 import { hrRoutes } from './routes/hr';
+import { ceoSpendRoutes } from './routes/ceoSpend';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -114,6 +115,7 @@ export function createApp() {
   app.route('/api/bonus', bonusRoutes);
   app.route('/api/price-adjustments', priceAdjustmentRoutes);
   app.route('/api/shipping-vouchers', shippingVoucherRoutes);
+  app.route('/api/ceo-spend', ceoSpendRoutes);
   app.route('/api/work', workRoutes);
   app.route('/api/staff-purchases', staffPurchaseRoutes);
   app.route('/api/agent/tiktok', agentTiktokRoutes);

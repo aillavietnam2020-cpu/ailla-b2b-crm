@@ -23,7 +23,7 @@ const scG=g=>scDM().find(x=>x.g===g)||{g,n:g||"Chưa chọn nhóm",tk:"",lo:"",c
 const scNf=v=>Math.round(+v||0).toLocaleString("vi-VN"),scPc=(a,b)=>b?(a/b*100).toFixed(1).replace(".",",")+"%":"—",scDd=s=>String(s||"").slice(8,10)+"/"+String(s||"").slice(5,7);
 const scS=a=>a.reduce((t,x)=>t+(+x.t||0),0);
 const scLoP=lo=>{const k=String(lo||"")[0];return `<span class="scp ${k==="A"?"p-a":k==="B"?"p-b":"p-c"}">${esc(lo||"—")}</span>`};
-const scStP=s=>`<span class="scp ${s==="Ổn"?"p-ok":s==="Chờ duyệt"?"p-a":"p-ra"}">${esc(s||"—")}</span>`;
+const scStP=s=>`<span class="scp ${s==="Ổn"?"p-ok":s==="Chờ duyệt"||s==="Chờ CEO duyệt"?"p-a":"p-ra"}">${esc(s||"—")}</span>`;
 const scInP=r=>r.d>=PERIOD.from&&r.d<=PERIOD.to;
 const scRows=()=>((scFin().nkc)||[]).filter(scInP);
 const scCho=()=>(D().pcCho||[]);
@@ -111,14 +111,23 @@ function scForm(){
     if(ckOn&&!fromAcc){$("#scf-e").innerHTML=`<div class="note red">Chuyển khoản: chọn tài khoản công ty chi tiền (hoặc ghi tài khoản khác).</div>`;return}
     const btn=e.submitter;if(btn)btn.disabled=true;
     const ngay=$("#scf-d").value,row={id:uid("pc"),tkc:fromAcc,tkn:ckOn?$("#scf-to").value.trim():"",d:ngay,ct:scSoPhieu(ngay),lct:"Phiếu chi",dg,tk:$("#scf-ht").value==="Tiền mặt"?"1111":"1121",t,g:$("#scf-g").value,k:$("#scf-k").value,gc:$("#scf-gc").value.trim(),dn:$("#scf-dn").value.trim(),bp:$("#scf-bp").value,nn:$("#scf-nn").value.trim(),ht:$("#scf-ht").value,src:"phieu",by:ME.name,at:Date.now()};
-    if(scCanDuyet())DB.mutate(ME.name,"ghi phiếu chi "+row.ct,dt=>{dt.fin=dt.fin||{};(dt.fin.nkc=dt.fin.nkc||[]).push({...row,st:"Ổn",duyet:ME.name});(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(dg)]={g:row.g,k:row.k,st:"Ổn"}});
+    /* Từ ngưỡng chi (mặc định 5 triệu, chị Hoa chốt 27/10/2026): kế toán ghi cũng phải chờ chị Hoa duyệt mới vào sổ. */
+    const lenCeo=scCanDuyet()&&scCanCeo(row.t);
+    if(lenCeo)DB.mutate(ME.name,"ghi phiếu chi chờ CEO "+row.ct,dt=>{(dt.pcCho=dt.pcCho||[]).push({...row,st:"Chờ CEO duyệt",ceoCho:1,ktDuyet:ME.name,ktAt:Date.now()})});
+    else if(scCanDuyet())DB.mutate(ME.name,"ghi phiếu chi "+row.ct,dt=>{dt.fin=dt.fin||{};(dt.fin.nkc=dt.fin.nkc||[]).push({...row,st:"Ổn",duyet:ME.name});(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(dg)]={g:row.g,k:row.k,st:"Ổn"}});
     else DB.mutate(ME.name,"ghi phiếu chi chờ duyệt "+row.ct,dt=>{(dt.pcCho=dt.pcCho||[]).push({...row,st:"Chờ duyệt"})});
     let up=0;for(const f of [...$("#scf-f").files]){try{const x=await mhPrepFile(f);await kApi("/mh/costs/"+row.id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
-    closeDrawer();toast((scCanDuyet()?"Đã ghi "+row.ct+" vào sổ":"Đã gửi chị Huệ duyệt "+row.ct)+(up?", kèm "+up+" ảnh":""));SOCP.files=null;renderMain()}}
+    closeDrawer();toast((lenCeo?"Khoản từ ngưỡng chi: đã gửi chị Hoa duyệt "+row.ct:scCanDuyet()?"Đã ghi "+row.ct+" vào sổ":"Đã gửi chị Huệ duyệt "+row.ct)+(up?", kèm "+up+" ảnh":""));SOCP.files=null;renderMain()}}
+/* Khoản từ ngưỡng chi mà người duyệt không phải CEO: chị Huệ duyệt xong chuyển chị Hoa (nhãn "Chờ CEO duyệt"), chị Hoa duyệt mới vào sổ. */
+const scIsCeo=()=>typeof crmRole==="function"&&crmRole()==="CEO";
+const scCanCeo=t=>typeof pdNeedCeo==="function"&&pdNeedCeo(+t||0,typeof pdTh==="function"?pdTh():5e6,scIsCeo());
 function scDuyet(id){const p=scCho().find(x=>x.id===id);if(!p)return;
+  if(p.ceoCho&&!scIsCeo()){toast("Phiếu này đang chờ chị Hoa duyệt");return}
+  if(!p.ceoCho&&scCanCeo(p.t)){DB.mutate(ME.name,"duyệt phiếu chi, chuyển CEO "+p.ct,dt=>{const r=(dt.pcCho||[]).find(x=>x.id===id);if(!r)return;r.ceoCho=1;r.ktDuyet=ME.name;r.ktAt=Date.now();r.st="Chờ CEO duyệt"});
+    toast("Đã duyệt "+p.ct+". Khoản từ ngưỡng chi nên chuyển chị Hoa duyệt");closeDrawer();renderMain();return}
   DB.mutate(ME.name,"duyệt phiếu chi "+p.ct,dt=>{const i=(dt.pcCho||[]).findIndex(x=>x.id===id);if(i<0)return;const r=dt.pcCho.splice(i,1)[0];dt.fin=dt.fin||{};(dt.fin.nkc=dt.fin.nkc||[]).push({...r,st:"Ổn",duyet:ME.name,duyetAt:Date.now()});(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(r.dg)]={g:r.g,k:r.k,st:"Ổn"}});
   toast("Đã duyệt "+p.ct);closeDrawer();renderMain()}
-function scTuChoi(id){const p=scCho().find(x=>x.id===id);if(!p)return;DB.mutate(ME.name,"trả lại phiếu chi "+p.ct,dt=>{dt.pcCho=(dt.pcCho||[]).filter(x=>x.id!==id)});toast("Đã trả lại "+p.ct);closeDrawer();renderMain()}
+function scTuChoi(id){const p=scCho().find(x=>x.id===id);if(!p)return;if(p.ceoCho&&!scIsCeo()){toast("Phiếu này đang chờ chị Hoa duyệt");return}DB.mutate(ME.name,"trả lại phiếu chi "+p.ct,dt=>{dt.pcCho=(dt.pcCho||[]).filter(x=>x.id!==id)});toast("Đã trả lại "+p.ct);closeDrawer();renderMain()}
 function scPhieu(x,cho){
   spLoadFiles();const nf=(SOCP.files||{})[x.id]||0,ed=scCanDuyet()&&!cho;
   openDrawerHTML(`<h2>Phiếu chi ${esc(x.ct||"")}</h2><p class="hint">${esc(scDd(x.d))}/${esc(String(x.d).slice(0,4))} · ${esc(x.lct||"")}${x.by?" · ghi bởi "+esc(x.by):""}${x.duyet?" · duyệt: "+esc(x.duyet):""}</p>

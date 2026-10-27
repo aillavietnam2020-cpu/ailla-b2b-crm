@@ -10,9 +10,14 @@
     chi    phiếu chi chị Thảo ghi (Sổ chi phí D().pcCho, Chờ phân bổ cũ D().costsCho) · admin hoặc kế toán (order.accounting.confirm)
     thu    phiếu thu chờ xác nhận D().thuCho · như trên
     ns     đơn nghỉ phép / OT / tạm ứng D().hr · nhansu.duyet hoặc nhansu.quanly
-   Chưa có ngưỡng "chi vượt bao nhiêu phải lên CEO" (chị Hoa chưa chốt): không tự đặt.
+    tien   tiền về chờ kế toán xác nhận (payments) · CEO hoặc order.accounting.confirm (POST /api/payments/:id/confirm)
+    hoan   hàng trả lại kho đã nhận, chờ kế toán chốt giảm nợ · order.accounting.confirm (POST /api/returns/:id/confirm)
+   NGƯỠNG CHI PHẢI CEO DUYỆT (chị Hoa chốt 27/10/2026, mặc định 5.000.000đ, đổi ở Ngưỡng cảnh báo; cùng quy tắc src/shared/ceoSpend.ts):
+    khoản chi từ ngưỡng mà người duyệt/lập không phải CEO thì chờ CEO. Dòng "chờ CEO" chỉ CEO thấy; người duyệt trước không thấy lại.
    ===================================================================== */
-const PD_KINDS=[["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["thuong","Thưởng NPP"],["chi","Phiếu chi"],["thu","Phiếu thu"],["ns","Nhân sự"]];
+const PD_KINDS=[["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"]];
+/* Khoản chi này có phải chờ CEO duyệt không (giống needsCeo ở máy chủ). Ngưỡng 0 = tắt. */
+const pdNeedCeo=(amount,th,isCeo)=>!isCeo&&th>0&&amount>=th;
 const PD_KIND_N=k=>(PD_KINDS.find(x=>x[0]===k)||[k,k])[1];
 /* Mốc thời gian (ms) từ số ms, chuỗi ISO / "YYYY-MM-DD HH:MM:SS" của SQLite; không đọc được thì 0. */
 function pdTs(v){if(typeof v==="number")return v>0?v:0;if(!v)return 0;const s=String(v).trim(),vn=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -28,6 +33,9 @@ function pdRights(w){
     xuat:()=>ceo||apN,
     thuong:v=>(ceo||apN)&&!(v&&v.cash&&v.created_by&&v.created_by===w.uid&&!ceo),
     ketoan:()=>!!w.admin||P("order.accounting.confirm"),
+    tien:()=>ceo||P("order.accounting.confirm"),
+    hoan:()=>P("order.accounting.confirm"),
+    ceo:()=>ceo,
     ns:()=>!!w.ns};
 }
 const pdItems=v=>{try{const L=typeof v==="string"?JSON.parse(v):v;return Array.isArray(L)?L.map(x=>(x.name||x.item||"")+(x.qty?" × "+x.qty:"")).filter(Boolean).join(", "):""}catch(e){return ""}};
@@ -35,7 +43,8 @@ const pdApLoai=a=>a.rule_code==="PRICE_VERSION"?"Đổi giá":a.entity_type==="C
 /* Gom mọi nguồn thành một danh sách dòng, chỉ giữ dòng người xem duyệt được. Chờ lâu nhất lên đầu.
    Mỗi dòng: {k, id, loai, nd, sub, tien, by, at, act, open}. act: "api" (gọi API duyệt của loại đó), "fn" (hàm duyệt của trang gốc), "" (chỉ mở trang gốc). */
 function pdBuild(S,w){
-  const R=pdRights(w||{}),L=[],add=r=>L.push({tien:null,sub:"",by:"",at:0,act:"",...r});
+  const R=pdRights(w||{}),L=[],add=r=>L.push({tien:null,sub:"",by:"",at:0,act:"",...r}),th=S.th==null?5e6:+S.th,ceo=R.ceo();
+  const len=t=>pdNeedCeo(+t||0,th,ceo)?" · từ ngưỡng, duyệt xong chuyển CEO":"";
   (S.approvals||[]).filter(a=>(!a.status||a.status==="PENDING")&&R.don(a)).forEach(a=>add({k:"don",id:"ap:"+a.id,ref:a.id,src:"approval",loai:pdApLoai(a)+(a.required_role==="CEO"?" · CEO duyệt":""),
     nd:a.entity_label||String(a.entity_id||"").slice(0,8),sub:a.reason||"",tien:a.entity_type==="ORDER"&&+a.order_total>0?+a.order_total:null,by:a.requester_name||"",at:pdTs(a.created_at),act:"api",
     open:a.entity_type==="ORDER"?{page:"cr_dn",path:"/admin/orders/"+a.entity_id}:a.entity_type==="CUSTOMER_TIER"?{page:"cr_kh",path:"/admin/customers/"+a.entity_id}:{page:"cr_dn",path:"/admin/orders"}}));
@@ -46,13 +55,22 @@ function pdBuild(S,w){
     open:p.entity_type==="ORDER"&&p.entity_id?{page:"cr_dn",path:"/admin/orders/"+p.entity_id}:{page:"cr_dn",path:"/admin/orders"}}));
   (S.gifts||[]).filter(g=>g.status==="CHO_DUYET"&&R.thuong(g)).forEach(g=>add({k:"thuong",id:"gi:"+g.id,ref:g.id,src:"gift",loai:"Phiếu quà thưởng",
     nd:[g.voucher_no,g.customer_name].filter(Boolean).join(" · "),sub:[g.level_label,pdItems(g.items),g.month?"tháng "+g.month:""].filter(Boolean).join(" · "),at:pdTs(g.created_at),act:"api",open:{page:"cr_thuong",path:"/admin/bonus"}}));
-  (S.cash||[]).filter(v=>v.status==="CHO_DUYET"&&R.thuong({...v,cash:true})).forEach(v=>add({k:"thuong",id:"ca:"+v.id,ref:v.id,src:"cash",loai:"Phiếu chi thưởng",
+  (S.cash||[]).filter(v=>v.status==="CHO_DUYET"&&R.thuong({...v,cash:true})&&(v.ceo_status!=="CHO"||ceo)).forEach(v=>add({k:"thuong",id:"ca:"+v.id,ref:v.id,src:"cash",loai:v.ceo_status==="CHO"?"Phiếu chi thưởng · chờ CEO":"Phiếu chi thưởng"+len(v.amount),ceoCho:v.ceo_status==="CHO",
     nd:[v.voucher_no,v.customer_name].filter(Boolean).join(" · "),sub:[v.note,v.month?"tháng "+v.month:""].filter(Boolean).join(" · "),tien:+v.amount||0,by:v.created_by_name||"",at:pdTs(v.created_at),act:"api",open:{page:"cr_thuong",path:"/admin/bonus"}}));
   if(R.ketoan()){
-    (S.pcCho||[]).forEach(x=>add({k:"chi",id:"pc:"+x.id,ref:x.id,src:"pcCho",loai:"Phiếu chi",nd:x.dg||"",sub:[x.ct,x.k&&x.k!=="Chờ xác định"?"bổ vào "+x.k:""].filter(Boolean).join(" · "),tien:+x.t||0,by:x.by||x.dn||"",at:pdTs(x.at||x.d),act:"fn",open:{page:"so_cp"}}));
-    (S.costsCho||[]).forEach(x=>add({k:"chi",id:"cp:"+x.id,ref:x.id,src:"costsCho",loai:"Chi phí chờ phân bổ",nd:x.note||"",sub:(x.de&&x.de.ly)||"",tien:+x.tien||0,by:x.by||"",at:pdTs(x.at||x.ngay),act:x.de&&x.de.chac&&x.de.cat!=="CHUA-ROAT"?"fn":"",open:{page:"cp_duyet"}}));
-    (S.thuCho||[]).forEach(x=>add({k:"thu",id:"th:"+x.id,ref:x.id,src:"thuCho",loai:"Phiếu thu",nd:x.note||"",sub:x.acct||"",tien:+x.tien||0,by:x.by||"",at:pdTs(x.at||x.ngay),act:"",open:{page:"cp_duyet"}}));
+    (S.pcCho||[]).filter(x=>!x.ceoCho||ceo).forEach(x=>add({k:"chi",id:"pc:"+x.id,ref:x.id,src:"pcCho",loai:x.ceoCho?"Phiếu chi · chờ CEO"+(x.ktDuyet?" (đã qua "+x.ktDuyet+")":""):"Phiếu chi"+len(x.t),ceoCho:!!x.ceoCho,nd:x.dg||"",sub:[x.ct,x.k&&x.k!=="Chờ xác định"?"bổ vào "+x.k:""].filter(Boolean).join(" · "),tien:+x.t||0,by:x.by||x.dn||"",at:pdTs(x.at||x.d),act:"fn",open:{page:"so_cp"}}));
+    (S.costsCho||[]).forEach(x=>add({k:"chi",id:"cp:"+x.id,ref:x.id,src:"costsCho",loai:"Chi phí chờ phân bổ",nd:x.note||"",sub:(x.de&&x.de.ly)||"",tien:+x.tien||0,by:x.by||"",at:pdTs(x.at||x.ngay),act:x.de&&x.de.chac&&x.de.cat!=="CHUA-ROAT"&&!pdNeedCeo(+x.tien||0,th,ceo)?"fn":"",open:{page:"cp_duyet"}}));
+    (S.thuCho||[]).forEach(x=>add({k:"thu",id:"th:"+x.id,ref:x.id,src:"thuCho",loai:"Phiếu thu chờ xác nhận",nd:x.note||"",sub:x.acct||"",tien:+x.tien||0,by:x.by||"",at:pdTs(x.at||x.ngay),act:"fn",ok:"Xác nhận",open:{page:"cp_duyet"}}));
   }
+  /* Phiếu chi vận chuyển, phiếu chi nhà cung cấp từ ngưỡng: tiền đã chi, chờ CEO duyệt (máy chủ chỉ trả cho CEO). */
+  if(ceo)(S.ceoSpend||[]).forEach(x=>add({k:"chi",id:"cs:"+x.kind+":"+x.id,ref:x.id,src:"ceo_"+x.kind,loai:(x.kind==="ship"?"Phiếu chi vận chuyển":"Phiếu chi nhà cung cấp")+" · chờ CEO",ceoCho:true,
+    nd:[x.no,x.title].filter(Boolean).join(" · "),sub:[x.day,x.sub].filter(Boolean).join(" · "),tien:+x.amount||0,by:x.created_by_name||"",at:pdTs(x.created_at),act:"api",
+    open:x.kind==="ship"?{page:"cr_vc",path:"/admin/shipping-vouchers"}:{page:"mh_chi"}}));
+  if(R.tien())(S.payConfirm||[]).forEach(x=>add({k:"tien",id:"pm:"+x.id,ref:x.id,src:"payment",loai:"Tiền về chờ xác nhận",ok:"Xác nhận",
+    nd:x.customer_name||"",sub:[x.day,x.method==="TIEN_MAT"?"tiền mặt":x.method==="CHUYEN_KHOAN"?"chuyển khoản":x.method,x.bank_ref,x.bill_order_no?"đơn "+x.bill_order_no:"",x.note].filter(Boolean).join(" · "),
+    tien:+x.amount||0,by:x.entered_by||"",at:pdTs(x.entered_at||x.day),act:"api",open:{page:"cr_bill",path:"/admin/bills"}}));
+  if(R.hoan())(S.returns||[]).filter(x=>!x.status||x.status==="DA_NHAN_KHO").forEach(x=>add({k:"hoan",id:"rt:"+x.id,ref:x.id,src:"return",loai:"Hàng trả lại · chờ chốt giảm nợ",ok:"Xác nhận",
+    nd:[x.return_no,x.customer_name].filter(Boolean).join(" · "),sub:[x.order_no?"đơn "+x.order_no:"",x.reason].filter(Boolean).join(" · "),tien:+x.credit_amount||0,by:x.created_by_name||"",at:pdTs(x.kho_at||x.created_at),act:"api",open:{page:"cr_ret",path:"/admin/returns"}}));
   if(R.ns()){
     const ten=S.staffName||(m=>m);
     (S.hrDon||[]).filter(x=>x.tt==="cho").forEach(x=>add({k:"ns",id:"dn:"+x.id,ref:x.id,src:"hrDon",loai:x.loai||"Đơn nhân sự",nd:ten(x.ma),sub:[x.tu&&x.den&&x.den!==x.tu?x.tu+" → "+x.den:x.tu,x.ly].filter(Boolean).join(" · "),

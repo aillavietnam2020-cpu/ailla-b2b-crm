@@ -4,6 +4,8 @@ import type { AppEnv, AuthContext } from '../env';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
+import { needsCeo } from '@shared/ceoSpend';
+import { loadCeoSpend } from './ceoSpend';
 import { addPayFile, deletePayFile, getPayFile, listPayFiles, readPayMethod } from '../lib/payFiles';
 
 /**
@@ -24,6 +26,8 @@ const showMoney = (c: Context<AppEnv>) => canManage(c.get('auth'));
 const ipOf = (c: { req: { header: (n: string) => string | undefined } }) => c.req.header('CF-Connecting-IP') ?? null;
 const isDate = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
+/** Khoản chi từ ngưỡng (mặc định 5 triệu) người lập không phải CEO: gắn nhãn chờ CEO duyệt (routes/ceoSpend.ts). */
+const ceoFlag = async (db: D1Database, a: AuthContext, amount: number) => (needsCeo(amount, await loadCeoSpend(db), a.user.role === 'CEO') ? 'CHO' : '');
 const int = (v: unknown) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : 0);
 
 function needManage(a: AuthContext) {
@@ -691,17 +695,18 @@ purchasingRoutes.post('/payments', async (c) => {
         ? `Tiền mặt${pm.receiver ? ', người nhận ' + pm.receiver : ''}`
         : String(b.account ?? '').trim();
   const id = newId();
+  const ceo = await ceoFlag(c.env.DB, auth, amount);
   await c.env.DB.batch([
     c.env.DB.prepare(
-      "INSERT INTO po_payments (id, supplier_id, invoice_id, pay_date, amount, account, note, status, created_by, created_at, kind, po_id, method, from_account, to_bank, to_account_no, to_account_name, receiver) VALUES (?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(id, String(b.supplier_id), invId, b.pay_date, amount, account, String(b.note ?? '').trim(), auth.user.id, nowIso(), kind, poId, pm.method, pm.from_account, pm.to_bank, pm.to_account_no, pm.to_account_name, pm.receiver),
+      "INSERT INTO po_payments (id, supplier_id, invoice_id, pay_date, amount, account, note, status, created_by, created_at, kind, po_id, method, from_account, to_bank, to_account_no, to_account_name, receiver, ceo_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).bind(id, String(b.supplier_id), invId, b.pay_date, amount, account, String(b.note ?? '').trim(), auth.user.id, nowIso(), kind, poId, pm.method, pm.from_account, pm.to_bank, pm.to_account_no, pm.to_account_name, pm.receiver, ceo),
     // Nhớ tài khoản ngân hàng của nhà cung cấp để lần sau điền sẵn.
     ...(pm.method === 'CHUYEN_KHOAN'
       ? [c.env.DB.prepare('UPDATE suppliers SET bank = ?, bank_account_no = ?, bank_account_name = ? WHERE id = ?').bind(pm.to_bank, pm.to_account_no, pm.to_account_name, String(b.supplier_id))]
       : []),
-    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_PAYMENT_CREATED', entityType: 'PO_PAYMENT', entityId: id, after: { amount }, requestId: c.get('requestId'), ip: ipOf(c) }),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_PAYMENT_CREATED', entityType: 'PO_PAYMENT', entityId: id, after: { amount, ceo_status: ceo }, requestId: c.get('requestId'), ip: ipOf(c) }),
   ]);
-  return ok(c, { id });
+  return ok(c, { id, ceo_status: ceo });
 });
 
 /* Ảnh bill / phiếu chi của khoản chi nhập tay ở Sổ chi phí (khoản chi lưu ở bảng dữ liệu của trang quản trị, id do trình duyệt cấp). */
@@ -754,9 +759,9 @@ purchasingRoutes.put('/payments/:id', async (c) => {
   const id = c.req.param('id');
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const cur = await c.env.DB
-    .prepare('SELECT id, supplier_id, pay_date, amount, kind, note, po_id, invoice_id, status FROM po_payments WHERE id = ?')
+    .prepare('SELECT id, supplier_id, pay_date, amount, kind, note, po_id, invoice_id, status, ceo_status FROM po_payments WHERE id = ?')
     .bind(id)
-    .first<{ id: string; supplier_id: string; pay_date: string; amount: number; kind: string; note: string; po_id: string | null; invoice_id: string | null; status: string }>();
+    .first<{ id: string; supplier_id: string; pay_date: string; amount: number; kind: string; note: string; po_id: string | null; invoice_id: string | null; status: string; ceo_status: string }>();
   if (!cur) throw notFound('Không tìm thấy phiếu chi');
   if (cur.status !== 'OK') throw badRequest('CANCELLED', 'Phiếu chi này đã hủy, không sửa được');
   const payDate = b.pay_date === undefined ? cur.pay_date : b.pay_date;
@@ -767,8 +772,10 @@ purchasingRoutes.put('/payments/:id', async (c) => {
   const note = b.note === undefined ? cur.note : String(b.note ?? '').trim();
   const poId = b.po_id === undefined ? cur.po_id : b.po_id ? String(b.po_id) : null;
   if (poId && !(await c.env.DB.prepare("SELECT id FROM po_orders WHERE id = ? AND supplier_id = ? AND status <> 'HUY'").bind(poId, cur.supplier_id).first())) throw badRequest('BAD_PO', 'Phiếu mua không đúng nhà cung cấp');
+  // Sửa tăng số tiền (hoặc đổi tiền khoản đang chờ CEO) thì xét lại ngưỡng; không đổi tiền thì giữ nguyên nhãn cũ.
+  const ceo = amount > cur.amount || (cur.ceo_status === 'CHO' && amount !== cur.amount) ? (await ceoFlag(c.env.DB, auth, amount)) || (cur.ceo_status === 'DUYET' ? 'DUYET' : '') : cur.ceo_status;
   await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE po_payments SET pay_date = ?, amount = ?, kind = ?, note = ?, po_id = ? WHERE id = ? AND status = \'OK\'').bind(payDate, amount, kind, note, poId, id),
+    c.env.DB.prepare('UPDATE po_payments SET pay_date = ?, amount = ?, kind = ?, note = ?, po_id = ?, ceo_status = ? WHERE id = ? AND status = \'OK\'').bind(payDate, amount, kind, note, poId, ceo, id),
     auditStatement(c.env.DB, {
       actorId: auth.user.id,
       action: 'PO_PAYMENT_EDITED',

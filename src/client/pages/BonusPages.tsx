@@ -44,6 +44,8 @@ interface CashVoucher {
   method: string;
   note: string;
   status: 'CHO_DUYET' | 'DA_CHI' | 'HUY';
+  /** 'CHO' = quản lý đã duyệt, khoản từ ngưỡng chờ CEO duyệt mới thành đã chi. */
+  ceo_status?: string;
   cancel_reason: string | null;
   created_by_name: string | null;
   approved_by_name: string | null;
@@ -130,10 +132,10 @@ function RankingPanel({ slot }: { slot: HTMLElement | null }) {
   const rows = all;
   const giftOf = (cid: string) =>
     (gifts.data ?? []).find((g) => g.customer_id === cid && g.status !== 'HUY');
-  const act = async (fn: () => Promise<unknown>, ok: string) => {
+  const act = async (fn: () => Promise<unknown>, ok: string | ((r: unknown) => string)) => {
     try {
-      await fn();
-      toast.success(ok);
+      const r = await fn();
+      toast.success(typeof ok === 'function' ? ok(r) : ok);
       gifts.reload();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Chưa thực hiện được');
@@ -473,7 +475,8 @@ function RankingPanel({ slot }: { slot: HTMLElement | null }) {
                       <td className="right nowrap">{formatVnd(v.amount)}</td>
                       <td>{v.note}</td>
                       <td>
-                        {v.status === 'CHO_DUYET' && <span className="badge warn">Chờ duyệt (lập bởi {v.created_by_name})</span>}
+                        {v.status === 'CHO_DUYET' && v.ceo_status !== 'CHO' && <span className="badge warn">Chờ duyệt (lập bởi {v.created_by_name})</span>}
+                        {v.status === 'CHO_DUYET' && v.ceo_status === 'CHO' && <span className="badge warn">Chờ CEO duyệt (lập bởi {v.created_by_name})</span>}
                         {v.status === 'DA_CHI' && <span className="badge ok">Đã chi · duyệt bởi {v.approved_by_name}</span>}
                         {v.status === 'HUY' && <span className="badge muted">Đã hủy: {v.cancel_reason}</span>}
                       </td>
@@ -483,10 +486,14 @@ function RankingPanel({ slot }: { slot: HTMLElement | null }) {
                             className="btn sm primary"
                             onClick={() =>
                               void act(async () => {
-                                await api.post(`/api/bonus/cash/${v.id}/approve`, {});
+                                const r = await api.post<{ ceo_status?: string }>(`/api/bonus/cash/${v.id}/approve`, {});
                                 cash.reload();
                                 rep.reload();
-                              }, 'Đã duyệt: phiếu chi thưởng ghi là đã chi')
+                                return r.data?.ceo_status;
+                              }, (st) =>
+                                st === 'CHO'
+                                  ? 'Đã duyệt. Khoản từ ngưỡng chi nên chuyển chị Hoa (CEO) duyệt, chưa ghi là đã chi'
+                                  : 'Đã duyệt: phiếu chi thưởng ghi là đã chi')
                             }
                           >
                             Duyệt chi

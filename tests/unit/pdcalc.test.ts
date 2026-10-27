@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const T: any = new Function(
   `${readFileSync('hub/src/pdcalc.js', 'utf8')}
-  return {pdBuild,pdFilter,pdCounts,pdAge,pdTs,pdRights};`,
+  return {pdBuild,pdFilter,pdCounts,pdAge,pdTs,pdRights,pdNeedCeo};`,
 )();
 
 const NOW = Date.parse('2026-10-27T10:00:00Z');
@@ -90,10 +90,10 @@ describe('Phê duyệt: nội dung dòng', () => {
     expect(by('ap:a2').loai).toContain('CEO duyệt');
   });
 
-  it('chi phí chờ phân bổ: chỉ dòng web đoán chắc mới có nút Duyệt; phiếu thu chỉ mở trang gốc', () => {
+  it('chi phí chờ phân bổ: chỉ dòng web đoán chắc mới có nút Duyệt; phiếu thu xác nhận được trên dòng', () => {
     expect(by('cp:cp1').act).toBe('fn');
     expect(by('cp:cp2').act).toBe('');
-    expect(by('th:t1').act).toBe('');
+    expect(by('th:t1').act).toBe('fn'); // xác nhận bằng hàm của trang gốc (cptXacNhan)
     expect(by('pc:pc1')).toMatchObject({ act: 'fn', tien: 300000 });
   });
 
@@ -110,5 +110,54 @@ describe('Phê duyệt: nội dung dòng', () => {
     expect(T.pdAge(NOW - 30 * 60e3, NOW)).toBe('30 phút');
     expect(T.pdAge(NOW - 5 * 3600e3, NOW)).toBe('5 giờ');
     expect(T.pdAge(NOW - 3 * 864e5, NOW)).toBe('3 ngày');
+  });
+});
+
+describe('Phê duyệt: ngưỡng chi phải CEO duyệt, tiền về, hàng trả lại', () => {
+  const S2 = {
+    th: 5_000_000,
+    pcCho: [
+      { id: 'p1', dg: 'Thuê kho', t: 6_000_000, at: NOW - 3600e3 },
+      { id: 'p2', dg: 'Thuê kho đã qua Huệ', t: 7_000_000, at: NOW - 3600e3, ceoCho: 1, ktDuyet: 'Huệ' },
+      { id: 'p3', dg: 'Cước nhỏ', t: 200_000, at: NOW - 3600e3 },
+    ],
+    cash: [
+      { id: 'c1', status: 'CHO_DUYET', amount: 6_000_000, ceo_status: 'CHO', created_by: 'u_x', created_at: '2026-10-26T00:00:00Z' },
+      { id: 'c2', status: 'CHO_DUYET', amount: 6_000_000, ceo_status: '', created_by: 'u_x', created_at: '2026-10-26T00:00:00Z' },
+    ],
+    ceoSpend: [{ kind: 'ship', id: 's1', no: 'PCVC2610-001', title: 'Xe 29C', amount: 5_500_000, created_at: '2026-10-27T00:00:00Z' }],
+    payConfirm: [{ id: 'pm1', customer_name: 'NPP A', amount: 3_000_000, day: '2026-10-26', method: 'CHUYEN_KHOAN', entered_at: '2026-10-26T03:00:00Z' }],
+    returns: [{ id: 'r1', return_no: 'TH-01', customer_name: 'NPP B', status: 'DA_NHAN_KHO', credit_amount: 400_000, kho_at: '2026-10-26T05:00:00Z' }],
+  };
+  const KT = { role: 'EMPLOYEE', uid: 'u_hue', perms: ['order.accounting.confirm'], admin: false, ns: false };
+  const QL = { role: 'MANAGER', uid: 'u_thao', perms: ['order.approve.normal'], admin: false, ns: false };
+  const CEO = { role: 'CEO', uid: 'u_ceo', perms: ['order.approve.normal', 'order.accounting.confirm'], admin: true, ns: false };
+
+  it('quy tắc ngưỡng giống máy chủ', () => {
+    expect(T.pdNeedCeo(5_000_000, 5_000_000, false)).toBe(true);
+    expect(T.pdNeedCeo(4_999_999, 5_000_000, false)).toBe(false);
+    expect(T.pdNeedCeo(9e9, 5_000_000, true)).toBe(false);
+    expect(T.pdNeedCeo(9e9, 0, false)).toBe(false);
+  });
+
+  it('kế toán: thấy phiếu chưa duyệt (ghi rõ duyệt xong chuyển CEO), không thấy phiếu đã chuyển CEO; thấy tiền về, hàng trả lại', () => {
+    const r = T.pdBuild(S2, KT);
+    expect(ids(r)).toEqual(['pc:p1', 'pc:p3', 'pm:pm1', 'rt:r1']);
+    expect(r.find((x: { id: string }) => x.id === 'pc:p1').loai).toContain('chuyển CEO');
+    expect(r.find((x: { id: string }) => x.id === 'pc:p3').loai).toBe('Phiếu chi');
+    expect(r.find((x: { id: string }) => x.id === 'pm:pm1')).toMatchObject({ k: 'tien', act: 'api', ok: 'Xác nhận', tien: 3_000_000 });
+    expect(r.find((x: { id: string }) => x.id === 'rt:r1')).toMatchObject({ k: 'hoan', tien: 400_000 });
+  });
+
+  it('quản lý duyệt thưởng: không thấy phiếu thưởng đang chờ CEO', () => {
+    expect(ids(T.pdBuild(S2, QL))).toEqual(['ca:c2']);
+  });
+
+  it('CEO: thấy mọi khoản chờ CEO có nhãn, cả phiếu chi vận chuyển từ ngưỡng', () => {
+    const r = T.pdBuild(S2, CEO);
+    const ceoRows = r.filter((x: { ceoCho?: boolean }) => x.ceoCho).map((x: { id: string }) => x.id).sort();
+    expect(ceoRows).toEqual(['ca:c1', 'cs:ship:s1', 'pc:p2']);
+    expect(r.find((x: { id: string }) => x.id === 'cs:ship:s1')).toMatchObject({ k: 'chi', act: 'api', src: 'ceo_ship', tien: 5_500_000 });
+    expect(T.pdBuild(S2, { ...CEO, perms: ['order.approve.normal'] }).some((x: { k: string }) => x.k === 'hoan')).toBe(false); // hàng trả lại: chỉ người có quyền xác nhận kế toán (máy chủ)
   });
 });

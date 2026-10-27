@@ -60,7 +60,7 @@ shippingVoucherRoutes.get('/', async (c) => {
   }
   const rows = await c.env.DB.prepare(
     `SELECT v.id, v.voucher_no, v.voucher_date, v.carrier, v.destination, v.amount, v.method, v.order_refs, v.note,
-            v.status, v.created_at, v.cancel_reason, u.display_name AS created_by_name,
+            v.status, v.ceo_status, v.created_at, v.cancel_reason, u.display_name AS created_by_name,
             v.from_account, v.to_bank, v.to_account_no, v.to_account_name, v.receiver,
             (SELECT COUNT(*) FROM pay_files f WHERE f.ref_type = 'SHIP_VC' AND f.ref_id = v.id) AS file_count
      FROM shipping_vouchers v LEFT JOIN users u ON u.id = v.created_by
