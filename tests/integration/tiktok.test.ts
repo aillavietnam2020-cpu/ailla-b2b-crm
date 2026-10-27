@@ -69,3 +69,20 @@ describe('TikTok: số tháng và khoá sổ', () => {
     expect(r.status).toBe(400);
   });
 });
+
+describe('TikTok: số tháng cho trang vận hành', () => {
+  it('nhân viên xem được doanh thu, đơn, top sản phẩm kèm mức ưu tiên, không có lãi', async () => {
+    const m = {
+      data: { ky: '2026-09', M: { ky: '2026-09' }, pl: { ng2: 0.36, fees: [['Hoa hồng affiliate/KOC', -34655085]], sp: [{ n: 'Tinh dầu', q: 8628, dt: 876923400, lg: 477861929, bien: 0.545 }, { n: 'Bột tẩy', q: 3, dt: 418500, lg: -185000, bien: -0.44 }] } },
+      summary: { dt: 1392110100, don: 12350, mon: 28540, hh: 177e6, hhRate: 0.113, ads: 364658750, lg: 714059914, lai: 349577164, gv: 262583910 },
+    };
+    expect((await ctx.request('/api/hub/tiktok/month/2026-09', { method: 'PUT', as: USERS.ceo, body: m })).status).toBe(200);
+    const r = await ctx.request('/api/hub/tiktok/ops?from=2026-09-01&to=2026-09-30', { as: NV });
+    expect(r.status).toBe(200);
+    const x = r.body.data[0];
+    expect(x).toMatchObject({ ky: '2026-09', dt: 1392110100, don: 12350, mon: 28540, ads: 364658750, hoaHong: 34655085 });
+    expect(x.sp.map((p: { pri: string }) => p.pri)).toEqual(['Đẩy mạnh', 'Dừng quảng cáo']);
+    expect(JSON.stringify(x)).not.toMatch(/"lg"|"lai"|"gv"|"bien"/);
+    expect((await ctx.request('/api/hub/tiktok/ops?from=x&to=y', { as: NV })).status).toBe(400);
+  });
+});
