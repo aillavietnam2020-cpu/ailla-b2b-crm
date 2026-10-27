@@ -23,14 +23,7 @@ function scQTtxt(r){if(!r||!r.cach||r.cach==="giu")return "Để ở chi chung c
   if(r.cach==="dt")return "Theo doanh thu thực: "+(r.ks||[]).map(SC_TEN).join(", ");
   const E=Object.entries(r.tl||{}).filter(e=>+e[1]>0),s=E.reduce((a,e)=>a+ +e[1],0);
   return E.length?E.map(([k,p])=>p+"% "+SC_TEN(k)).join(" · ")+(s<100?` · ${Math.round((100-s)*100)/100}% để chung`:""):"Chưa đặt tỷ lệ"}
-function scAggSau(A0,CH){const A=JSON.parse(JSON.stringify(A0));A.Chung=A.Chung||{};
-  Object.entries(CH.kenh||{}).forEach(([k,o])=>Object.entries(o).forEach(([g,v])=>{A[k]=A[k]||{};A[k][g]=(A[k][g]||0)+v;A.Chung[g]=(A.Chung[g]||0)-v;if(Math.abs(A.Chung[g])<1)delete A.Chung[g]}));
-  return A}
-/* Dòng "chi chung được chia" hiện trong bảng khoản chi của kênh (chế độ sau phân bổ). */
-function scPBAllocRows(k,CH){return Object.entries((CH.kenh||{})[k]||{}).map(([g,v])=>({id:"pb-"+k+"-"+g,ext:{src:"pb"},d:"",ky:true,ct:"",dg:"Chi chung được chia · "+scG(g).n,sub:scQTtxt(scQTof(CH.qt,g)),g,t:v,k,nguon:"Phân bổ"}))}
 function scPBSeg(CH){const s=SC.pbm==="sau";return `<span class="scseg" role="group" aria-label="Chế độ xem"><button type="button" data-pbm="truoc" class="${s?"":"on"}" aria-pressed="${!s}">Trước phân bổ chi chung</button><button type="button" data-pbm="sau" class="${s?"on":""}" aria-pressed="${s}">Sau phân bổ</button></span>${s&&!CH.one?'<span class="hint">chọn một tháng để chia</span>':""}`}
-function scPBKenhLine(k,A0,CH,sau){const tt=scSum(A0[k]),sh=Object.values((CH.kenh||{})[k]||{}).reduce((a,b)=>a+b,0),gs=Object.keys((CH.kenh||{})[k]||{});
-  return `<div class="scpbl"><span>Ghi thẳng cho kênh <b>${scNf(tt)} đ</b></span><span>Nhận phân bổ chi chung <b>${sh?scNf(sh)+" đ":"—"}</b>${gs.length?` <span class="hint">(${gs.map(g=>esc(scG(g).n)).join(", ")})</span>`:""}</span><span>Tổng sau phân bổ <b>${scNf(tt+sh)} đ</b></span>${sau?"":'<span class="hint">đang xem trước phân bổ: số kênh chưa gồm chi chung</span>'}</div>`}
 /* ---------- Tab Quy tắc phân bổ ---------- */
 function scQTtab(){
   scNap();
@@ -45,14 +38,7 @@ function scQTtab(){
   <p class="hint">Khoản đã biết kênh thì ghi thẳng cho kênh (chọn "Bổ vào" ở Nhật ký chi), không chia lại. Ở đây chỉ đặt cách chia cho khoản <b>dùng chung</b> (đang bổ "Chi chung công ty"). Khoản đang "Cần rà" hoặc chờ duyệt không được đem chia. Lương từng người (Khanh → TikTok, Nguyệt → Shopee, kho theo doanh thu…) đặt ở trang <button class="btn sm" id="scqt-lg">Lương theo phòng ban và kênh</button></p>
   <div class="tbl"><table><thead><tr><th>Nhóm chi phí</th><th>Cách chia</th><th class="n">Kỳ này đang ở chi chung</th><th></th></tr></thead><tbody>
   ${tr("*",def,true)}${gs.map(g=>{const r=qt.find(z=>z.g===g);return tr(g,r,!!r)}).join("")}</tbody></table></div></section>
-  <section class="card pad"><div class="sch"><h2>Kết quả chia ${one?"tháng "+ym.slice(5)+"/"+ym.slice(0,4):""}</h2><span class="hint">${Q.chot?"đã chốt bản "+Q.chot.v+" (dùng quy tắc lúc chốt)":"chưa chốt, dùng quy tắc hiện tại"}</span><span class="sp"></span>${ed&&one?`<button class="btn sm${Q.chot?"":" pri"}" id="scqt-chot">${Q.chot?"Chốt bản điều chỉnh":"Chốt phân bổ tháng này"}</button>`:""}</div>
-  ${!one?`<p class="hint">Chọn <b>một tháng</b> ở ô thời gian phía trên để xem kết quả chia.</p>`:`<div class="tbl"><table><thead><tr><th>Nhận phân bổ</th><th class="n">Số tiền</th></tr></thead><tbody>
-   ${kq.map(([k,v])=>`<tr><td>${esc(SC_TEN(k))}</td><td class="n">${scNf(v)}</td></tr>`).join("")}
-   ${CH.con.map(x=>`<tr><td>Còn ở chi chung · ${esc(scG(x.g).n)} <span class="hint">${esc(x.why)}</span></td><td class="n">${scNf(x.t)}</td></tr>`).join("")}
-   <tr class="tot"><td>Tổng sau chia</td><td class="n">${scNf(CH.sau)}</td></tr></tbody></table></div>
-   <p class="hint">Kiểm tra: tổng chi chung trước chia ${scNf(CH.truoc)} đ ${Math.abs(CH.truoc-CH.sau)<1?"= sau chia ✓":"≠ sau chia ✗"} · còn ở chi chung ${scNf(conT)} đ.</p>
-   ${CH.loi.length?`<div class="note amb">Chưa chia được: ${CH.loi.map(esc).join("; ")}.</div>`:""}`}
-  ${V.length?`<div class="tbl"><table><thead><tr><th>Bản chốt</th><th>Người chốt</th><th>Lúc</th><th>Ghi chú</th></tr></thead><tbody>${V.slice().reverse().map(x=>`<tr><td>Bản ${x.v}</td><td>${esc(x.by||"")}</td><td>${new Date(x.at).toLocaleString("vi-VN")}</td><td>${esc(x.ghi||"")}</td></tr>`).join("")}</tbody></table></div>`:""}</section>
+  <section class="card pad"><div class="sch"><h2>Lương: chia theo người, bộ phận</h2><span class="sp"></span><button class="btn sm" id="scqt-lg2">Sửa cách chia lương →</button></div>${scQTluong()}</section>
   ${log.length?`<section class="card pad"><h2>Lịch sử sửa quy tắc</h2><div class="tbl"><table><thead><tr><th>Lúc</th><th>Người sửa</th><th>Nhóm</th><th>Trước</th><th>Sau</th></tr></thead><tbody>${log.map(x=>`<tr><td>${new Date(x.at).toLocaleString("vi-VN")}</td><td>${esc(x.by||"")}</td><td>${x.g==="*"?"Mặc định":esc(x.g+" "+scG(x.g).n)}</td><td class="hint">${esc(x.truoc||"")}</td><td>${esc(x.sau||"")}</td></tr>`).join("")}</tbody></table></div></section>`:""}`}
 function scQTedit(g){
   const qt=scQTnow(),cur=qt.find(z=>z.g===g),r=cur||{g,cach:"giu"},ks=SC_KENH;
@@ -89,6 +75,7 @@ function scQTbind(m){
   m.querySelectorAll("[data-pbm]").forEach(b=>b.onclick=()=>{SC.pbm=b.dataset.pbm;renderMain()});
   m.querySelectorAll("[data-qte]").forEach(b=>b.onclick=()=>scQTedit(b.dataset.qte));
   const c=m.querySelector("#scqt-chot");if(c)c.onclick=scQTchot;
+  const l2=m.querySelector("#scqt-lg2");if(l2)l2.onclick=()=>{PAGE="cp_luong";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
   const l=m.querySelector("#scqt-lg");if(l)l.onclick=()=>{PAGE="cp_luong";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
   if(!document.getElementById("scqt-css")){const s=document.createElement("style");s.id="scqt-css";s.textContent=`.sochi .scseg{display:inline-flex;border:1px solid #e3e6ee;border-radius:8px;overflow:hidden}.sochi .scseg button{border:0;background:#fff;padding:5px 10px;font:600 12.5px inherit;font-family:inherit;color:#667085;cursor:pointer}.sochi .scseg button.on{background:#5146c8;color:#fff}
 .sochi .scpbl{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;background:#f7f8fb;border:1px solid #e3e6ee;border-radius:10px;padding:9px 12px;margin:-4px 0 12px;font-size:13px}`;document.head.appendChild(s)}}
@@ -106,3 +93,7 @@ function scPLKenh(ym){const o={f:PERIOD.from,t:PERIOD.to},[y,m]=ym.split("-").ma
     const chia={};Object.entries(CH.kenh).forEach(([k,g])=>chia[k]=Object.values(g).reduce((a,b)=>a+b,0));
     return {ym,luong,luongChung,chia,con:CH.con.reduce((a,x)=>a+x.t,0),truoc:CH.truoc,sau:CH.sau,loi:CH.loi,chot:CH.chot||null}}
   finally{PERIOD.from=o.f;PERIOD.to=o.t}}
+/* Tóm tắt cách chia lương đang đặt (trang Lương theo phòng ban và kênh) để chị Huệ thấy cùng chỗ với quy tắc chi chung. */
+function scQTluong(){const d=D(),P=d.cpLuongPhong||{},C=d.cpLuongChia||{},pbN=k=>(d.departments.find(p=>p.k===k)||{n:k}).n,ten=ma=>((d.staff||[]).find(x=>x.ma===ma)||{ten:ma}).ten;
+  const L=Object.keys(P).map(k=>["Bộ phận "+pbN(k),cpLgTxt(P[k])]).concat(Object.keys(C).map(ma=>[ten(ma),cpLgTxt(C[ma])]));
+  return L.length?`<div class="tbl"><table><thead><tr><th>Áp cho</th><th>Cách chia</th></tr></thead><tbody>${L.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("")}</tbody></table></div>`:'<p class="hint">Chưa đặt cách chia lương nào: toàn bộ lương đang ở chi chung (bộ phận Sản xuất vào giá thành). Bấm "Sửa cách chia lương" để đặt: Khanh → TikTok, Nguyệt → 2 shop Shopee, sale và chạy quảng cáo → Facebook, kho → theo doanh thu thực…</p>'}
