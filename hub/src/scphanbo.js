@@ -89,3 +89,17 @@ function scQTbind(m){
   const l=m.querySelector("#scqt-lg");if(l)l.onclick=()=>{PAGE="cp_luong";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
   if(!document.getElementById("scqt-css")){const s=document.createElement("style");s.id="scqt-css";s.textContent=`.sochi .scseg{display:inline-flex;border:1px solid #e3e6ee;border-radius:8px;overflow:hidden}.sochi .scseg button{border:0;background:#fff;padding:5px 10px;font:600 12.5px inherit;font-family:inherit;color:#667085;cursor:pointer}.sochi .scseg button.on{background:#5146c8;color:#fff}
 .sochi .scpbl{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;background:#f7f8fb;border:1px solid #e3e6ee;border-radius:10px;padding:9px 12px;margin:-4px 0 12px;font-size:13px}`;document.head.appendChild(s)}}
+/* Cho trang Lãi lỗ (chat Doanh thu): chi phí tháng ym theo kênh, mã kênh là cột Sổ chi phí
+   (TikTok, Shopee Mall = Aillavn, Shopee thường = Aillavn1, Facebook, NPP, Gia công).
+   - luong{k}: lương làm riêng cho kênh từ bảng lương ĐÃ CHỐT (trang Lương theo phòng ban và kênh); trừ ở lãi đóng góp.
+   - luongChung: phần lương bảng lương chưa gắn kênh (đã nằm trong chi chung để chia, không trừ thêm).
+     Sổ đã ghi tay nhóm G07 trong tháng thì không lấy bảng lương (tránh tính hai lần), cả hai trường là 0.
+   - chia{k}: chi chung được chia theo Quy tắc phân bổ (gồm luongChung nếu quy tắc chia nó); con: phần còn ở chi chung.
+     Lãi sau phân bổ = lãi đóng góp − chia{k}. truoc = sau là kiểm tra tổng. chot: bản chốt tháng hoặc null. */
+function scPLKenh(ym){const o={f:PERIOD.from,t:PERIOD.to},[y,m]=ym.split("-").map(Number);
+  try{PERIOD.from=ym+"-01";PERIOD.to=ym+"-"+String(new Date(y,m,0).getDate()).padStart(2,"0");
+    const rows=scPBRows(),CH=scChiaPB(rows),luong={};let luongChung=0;
+    rows.filter(x=>x.ext&&x.ext.src==="luong").forEach(x=>{if(x.k==="Chung")luongChung+=+x.t||0;else luong[x.k]=(luong[x.k]||0)+(+x.t||0)});
+    const chia={};Object.entries(CH.kenh).forEach(([k,g])=>chia[k]=Object.values(g).reduce((a,b)=>a+b,0));
+    return {ym,luong,luongChung,chia,con:CH.con.reduce((a,x)=>a+x.t,0),truoc:CH.truoc,sau:CH.sau,loi:CH.loi,chot:CH.chot||null}}
+  finally{PERIOD.from=o.f;PERIOD.to=o.t}}
