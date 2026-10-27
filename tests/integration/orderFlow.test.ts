@@ -559,6 +559,16 @@ describe('Luồng đơn B2B qua kho', () => {
     const id = await newOrder(5, USERS.manager, 'cus-mgr');
     await ctx.request(`/api/orders/${id}/submit`, { as: USERS.manager, body: {} });
     expect((await status(id)).kho_status).toBe('CHO_KIEM_KHO');
+    // Người lập có quyền duyệt: đơn mặc định đã duyệt, không nằm chờ ở danh sách yêu cầu duyệt.
+    expect((await status(id)).approval_status).toBe('APPROVED');
+    const pend = await ctx.db
+      .prepare(`SELECT COUNT(*) AS n FROM approvals WHERE entity_type = 'ORDER' AND entity_id = ? AND status = 'PENDING'`)
+      .bind(id)
+      .first<{ n: number }>();
+    expect(pend?.n).toBe(0);
+    // Kho báo đủ thì đi thẳng sang chờ xuất.
+    await post(id, 'kho-report', CHUC, { lines: [{ product_id: 'prod-full', status: 'DU' }] });
+    expect((await status(id)).kho_status).toBe('CHO_XUAT');
   });
 
   it('sửa đơn đã duyệt đang chờ xuất thì quay lại duyệt, kho thả hàng đã giữ', async () => {

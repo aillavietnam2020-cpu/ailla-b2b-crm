@@ -37,6 +37,7 @@ import {
   updateOrder,
 } from '../services/orders';
 import { decideApproval, listApprovals } from '../services/approvals';
+import { canDecideApproval } from '@shared/permissions';
 import {
   flowApprove,
   flowAcceptShipped,
@@ -333,10 +334,48 @@ orderRoutes.post('/:id/submit', requirePermission('order.submit'), async (c) => 
   );
   if (replay) return ok(c, replay.response, { idempotent_replay: true });
 
-  const result = await submitOrder(c.env.DB, config, auth, c.req.param('id'), {
-    requestId: c.get('requestId'),
-    ip: clientIp(c.req.raw.headers),
-  });
+  const ctx = { requestId: c.get('requestId'), ip: clientIp(c.req.raw.headers) };
+  let result: Awaited<ReturnType<typeof submitOrder>> & { auto_approved?: boolean } = await submitOrder(
+    c.env.DB,
+    config,
+    auth,
+    c.req.param('id'),
+    ctx,
+  );
+  // Chị Hoa chốt 27/10: đơn Sale tạo thì Quản lý duyệt; đơn do chính người có quyền duyệt (Quản lý, CEO) tạo
+  // thì mặc định coi như đã duyệt. Chỉ các yêu cầu mức Quản lý được tự duyệt; yêu cầu vượt ngưỡng CEO vẫn chờ.
+  if (
+    config.allowSelfApproval &&
+    auth.permissions.includes('order.approve.normal') &&
+    result.approvals.length > 0 &&
+    result.approvals.every((a) => canDecideApproval(auth.user.role, a.required_role as 'MANAGER' | 'CEO'))
+  ) {
+    const pend = await c.env.DB
+      .prepare(`SELECT id FROM approvals WHERE entity_type = 'ORDER' AND entity_id = ? AND status = 'PENDING'`)
+      .bind(c.req.param('id'))
+      .all<{ id: string }>();
+    const before = await c.env.DB
+      .prepare('SELECT flow_on, kho_status FROM orders WHERE id = ?')
+      .bind(c.req.param('id'))
+      .first<{ flow_on: number; kho_status: string }>();
+    let last: { approval_status: string; order_status?: string } | null = null;
+    for (const a of pend.results ?? []) {
+      last = await decideApproval(c.env.DB, auth, a.id, 'APPROVED', 'Người lập đơn có quyền duyệt: tự duyệt mặc định', {
+        ...ctx,
+        allowSelfApproval: true,
+      });
+    }
+    if (last?.order_status === 'APPROVED') {
+      // Đơn qua luồng kho: duyệt sẵn nhưng kho vẫn phải kiểm hàng trước, kho báo đủ mới sang chờ xuất.
+      if (Number(before?.flow_on) === 1 && before?.kho_status && before.kho_status !== 'CHO_XUAT') {
+        await c.env.DB
+          .prepare(`UPDATE orders SET kho_status = 'CHO_KIEM_KHO' WHERE id = ? AND kho_status = 'CHO_XUAT'`)
+          .bind(c.req.param('id'))
+          .run();
+      }
+      result = { status: 'APPROVED', approvals: [], auto_approved: true };
+    }
+  }
   await completeIdempotent(c.env.DB, key, result);
   return ok(c, result);
 });

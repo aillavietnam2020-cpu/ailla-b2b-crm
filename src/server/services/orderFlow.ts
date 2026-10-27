@@ -463,7 +463,9 @@ export async function flowKhoReport(
       .bind(orderId, orderId),
   );
 
-  const to: KhoStatus = anyShort ? 'THIEU_HANG' : 'DU_HANG';
+  // Đơn đã duyệt sẵn (người lập có quyền duyệt): kho báo đủ là đi thẳng sang chờ xuất, hẹn xuất theo ngày khách cần.
+  const preApproved = o.approval_status === 'APPROVED';
+  const to: KhoStatus = anyShort ? 'THIEU_HANG' : preApproved ? 'CHO_XUAT' : 'DU_HANG';
   await db.batch(statements);
   await applyTransition(
     db,
@@ -472,7 +474,7 @@ export async function flowKhoReport(
     to,
     anyShort ? 'KHO_BAO_THIEU' : 'KHO_BAO_DU',
     input.note ?? null,
-    'kho_note = ?',
+    preApproved && !anyShort ? 'kho_note = ?, ship_date = COALESCE(ship_date, need_date)' : 'kho_note = ?',
     [input.note ?? null],
     [],
     ctx,
@@ -533,7 +535,8 @@ export async function flowApprove(
   if (!isApprover(auth)) throw forbidden('Chỉ quản lý được duyệt đơn và đặt lịch xuất.');
   const o = await loadFlowOrder(db, auth, orderId);
   requireStatus(o, ['CHO_DIEU_PHOI', 'CHO_KIEM_KHO', 'THIEU_HANG', 'CHO_HANG', 'DU_HANG'], 'duyệt đơn');
-  if (o.approval_status !== 'PENDING_APPROVAL') {
+  // Đơn đã duyệt sẵn (người lập có quyền duyệt) mà kho báo thiếu / chờ hàng: bấm duyệt chỉ để đặt lịch xuất.
+  if (o.approval_status !== 'PENDING_APPROVAL' && o.approval_status !== 'APPROVED') {
     throw badRequest('NOT_PENDING', 'Đơn này không ở trạng thái chờ duyệt.');
   }
   const pending = await db
