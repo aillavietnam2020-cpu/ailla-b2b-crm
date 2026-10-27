@@ -113,7 +113,7 @@ async function tsbRecalc(){
   TSB.busy="";renderMain();
 }
 async function tsbLock(lock){
-  const ky=TSB.ky;if(lock&&((TSB.sum||{})[ky]||{}).den){toast("Bản này là báo cáo giữa tháng. Tải báo cáo chốt sổ (income tới ngày 08 tháng sau) rồi mới khoá sổ.");return}if(!confirm(lock?`Khoá sổ TikTok ${tsbKyL(ky)}? Sau khi khoá không tải lại file tháng này được nữa.`:`Mở khoá sổ ${tsbKyL(ky)}?`))return;
+  const ky=TSB.ky;if(lock&&((TSB.sum||{})[ky]||{}).den){toast("Bản này là báo cáo giữa tháng. Tải báo cáo chốt sổ (file income tới ít nhất ngày 08 tháng sau) rồi mới khoá sổ.");return}if(!confirm(lock?`Khoá sổ TikTok ${tsbKyL(ky)}? Sau khi khoá không tải lại file tháng này được nữa.`:`Mở khoá sổ ${tsbKyL(ky)}?`))return;
   try{await tsbApi("/month/"+ky+"/lock",{method:"POST",body:JSON.stringify({lock})});toast(lock?"Đã khoá sổ":"Đã mở khoá");delete TSB.data[ky];await Promise.all([tsbLoadMonths(true),tsbLoadMonth(ky)])}catch(e){toast(e.message)}
 }
 
@@ -171,7 +171,7 @@ function tsbAdmPage(m){
   {const pk=PERIOD.from+"|"+PERIOD.to;if(TSB.pk!==pk){TSB.pk=pk;const pym=plYmNow();TSB.ky=TSB.months.some(x=>x.ky===pym)?pym:"";TSB.noRep=TSB.ky?"":pym}}
   const V=TSB.prev,ky=V?V.ky:TSB.ky;if(!V&&ky)tsbLoadMonth(ky);
   const S=!V&&ky?TSB.data[ky]:null,P=V?V.P:S?S.pl:null,todo=V?ttTodo(V.P):S?(S.data.todo||ttTodo(S.pl)):null;
-  const tab=SUB.bc_tiktok||"pl",lock=S&&S.locked_at,chot=ky?"08/"+ttKyNext(ky).slice(5)+"/"+ttKyNext(ky).slice(0,4):"";
+  const tab=SUB.bc_tiktok||"pl",lock=S&&S.locked_at,chot=ky?"10/"+ttKyNext(ky).slice(5)+"/"+ttKyNext(ky).slice(0,4):"";
   const chips=(TSB.months||[]).map(x=>`<button class="chip${!V&&x.ky===TSB.ky?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.summary&&x.summary.den?" · đến "+tsbVn(x.summary.den).slice(0,5):""}${x.locked_at?" ✓":""}</button>`).join("");
   const tabs=[["pl","Lãi lỗ"],["sp","Sản phẩm & SKU"],["cb","Cảnh báo"],["dl","Chất lượng dữ liệu"],["thang","Các tháng"],["up","Tải file tháng"]];
   let body="";
@@ -186,7 +186,7 @@ function tsbAdmPage(m){
   const kp=P&&tab!=="thang"&&tab!=="up"?`<div class="grid kpis">${kpi("Doanh thu",tr(P.dt),nf(P.don)+" đơn · TB "+tr(P.aov)+"/đơn")}${kpi("Lãi gộp sau phí sàn",tr(P.lg),tsbPct(P.lg,P.dt)+" doanh thu")}${kpi("Phí sàn",tr(-P.phi),tsbPct(-P.phi,P.dt)+" doanh thu")}${kpi("Quảng cáo (đã VAT)",tr(P.ads),tsbPct(P.ads,P.dt)+" doanh thu")}${kpi("Lãi đóng góp kênh",tr(P.lai),tsbPct(P.lai,P.dt)+" doanh thu","var(--green)")}${kpi("Hủy/hoàn",tsbPct(P.hhRate,1),tr(P.hh)+" giá trị")}</div>`:"";
   const prevBar=V?`<section class="card" style="border:2px solid var(--orange)"><div class="card-h"><h2>Bảng xem trước ${tsbKyL(V.ky)}${V.M.den?" · giữa tháng, số đến "+tsbVn(V.M.den):""} · chưa lưu</h2><span class="hint">${V.recalc?"tính lại giá vốn theo dữ liệu web hiện tại":esc(Object.values(V.files||{}).join(" · "))}</span></div><p class="hint">Xem kỹ các tab Lãi lỗ, Cảnh báo, Chất lượng dữ liệu. Bấm lưu thì số mới ghi lên web.</p>${P.dtUocGv/P.dt>0.05?`<div class="note red">Còn <b>${tsbPct(P.dtUocGv,P.dt)}</b> doanh thu chưa có giá vốn thật (đang ước tính${P.gvRate?"":", và chưa có mã nào có giá vốn nên đang tính 0"}). Chưa nên dùng số lãi theo sản phẩm để quyết định cắt hay đẩy. Xem tab Chất lượng dữ liệu.</div>`:P.dtUocGv?`<p class="hint">Còn ${tsbPct(P.dtUocGv,P.dt)} doanh thu đang ước tính giá vốn.</p>`:""}<div class="acts"><button class="btn pri" id="tsb-save"${TSB.busy?" disabled":""}>Lưu báo cáo ${tsbKyL(V.ky)}</button><button class="btn" id="tsb-cancel">Bỏ bản xem trước</button></div></section>`:"";
   const stat=S?`<span class="hint">${lock?`Đã khoá sổ ${new Date(S.locked_at).toLocaleDateString("vi-VN")}`:`${S.data&&S.data.M&&S.data.M.den?"Báo cáo giữa tháng, số đến "+tsbVn(S.data.M.den)+" · ":"Bản nháp · "}lưu ${new Date(S.updated_at).toLocaleString("vi-VN")} · chốt sổ từ ngày ${chot}`}</span>${lock?(isCeo()?`<button class="btn sm" id="tsb-unlock">Mở khoá</button>`:""):`<button class="btn sm" id="tsb-recalc">Tính lại giá vốn</button><button class="btn sm pri" id="tsb-lock">Khoá sổ ${tsbKyL(ky)}</button>`}`:"";
-  m.innerHTML=H("Kênh TikTok Shop",`Báo cáo quản trị tháng · chốt sổ ngày 8 tháng sau${ky?" · "+tsbKyL(ky):""}`)
+  m.innerHTML=H("Kênh TikTok Shop",`Báo cáo quản trị tháng · chốt sổ ngày 10 tháng sau${ky?" · "+tsbKyL(ky):""}`)
    +`<div class="filters"><div class="chips"><b>Tháng</b>${chips||`<span class="hint">chưa có tháng nào</span>`}${V?`<button class="chip on">${tsbKyL(V.ky)} · xem trước</button>`:""}</div>${stat}</div>`
    +prevBar+kp+`<div class="tabs">${tabs.map(([k,t])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`+body
    +srcNote("File TikTok Shop do kế toán tải (OrderSKUList, income, Campaign overview). Giá vốn lấy từ Quy đổi mã các sàn và Giá vốn SKU. Quy tắc: báo cáo quản trị TikTok (skill ailla-baocao-quantri-tiktok).");

@@ -14,6 +14,8 @@ const TQ={co:{},coBusy:{}};
 function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(["exec","bc_tong","pl","muctieu"].includes(PAGE))renderMain()})}return null}
 const tqMonths=(from,to)=>{const ms=[];for(let d=pdate(from.slice(0,7)+"-01");iso(d)<=to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms};
 /* Doanh thu thực + lãi đóng góp từng kênh Kênh bán lẻ trong khoảng ngày. N = số gốc của execNums (trước khi đổi). */
+/* Quảng cáo Shopee Ads theo ngày: summary.days[ngày][5] của báo cáo Shopee tải lên (migration 0180), mọi shop. */
+function tqSpeAds(from,to){if(typeof SPE==="undefined"||!SPE.sums)return 0;return SPE.sums.reduce((a,s)=>a+Object.entries(s.days||{}).reduce((b,[d,x])=>d>=from&&d<=to?b+(+(x||[])[5]||0):b,0),0)}
 function tqRevB2C(N,from,to){
   const ms=tqMonths(from,to),full=ms.every(k=>fullMonth(k,from,to)),S=(typeof TSB!=="undefined"&&TSB.sum)||{},rs=(i,src)=>rSum(src,i,from,to).v,co=tqCo(from,to)||{};
   const out={};
@@ -41,7 +43,7 @@ function tqRevB2C(N,from,to){
      out.fb={dt:dtG,gv,phi,ads,khac:0,lai:dtG-gv-phi-ads,don:giao,dang:Math.max(0,chot-giao-hoan),dangDt:Math.max(0,dtC-dtG),src:`giao thành công · Pancake · phí ship và thuế ${(pr*100).toFixed(1).replace(".",",")}%`,tam:false}}
    else out.fb={dt:null,lai:null,don:null,src:"chờ dữ liệu Pancake"}}
   /* Shopee */
-  {const dt=rs(0,"spe");if(dt>0){const gv=rs(2,"spe"),phi=-rs(1,"spe");out.spe={dt,gv,phi,ads:0,khac:0,lai:dt-gv-phi,don:rs(4,"spe"),src:"doanh thu Shopee theo ngày (chưa trừ Shopee Ads)",tam:false}}
+  {const dt=rs(0,"spe");if(dt>0){const gv=rs(2,"spe"),phi=-rs(1,"spe"),ads=tqSpeAds(from,to);out.spe={dt,gv,phi,ads,khac:0,lai:dt-gv-phi-ads,don:rs(4,"spe"),src:"doanh thu Shopee theo ngày"+(ads?" · quảng cáo Shopee Ads từ báo cáo tải lên":" (chưa có số Shopee Ads)"),tam:false}}
    else{const don=co.SHOPEE||0;out.spe={dt:null,lai:null,don:don||null,src:don?`chờ tải báo cáo Shopee · đã có ${nf(don)} đơn xuất kho (Poscake)`:"chờ tải báo cáo Shopee"}}}
   return out;
 }
