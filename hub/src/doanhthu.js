@@ -129,9 +129,12 @@ function dtChiTiet(ch,ym){
 function pDtDoiChieu(m){
   if(!dtOk()){m.innerHTML=H("Đối chiếu doanh thu","")+`<div class="note">Trang này chỉ dành cho CEO và kế toán.</div>`;return}
   dtEnsure();if(typeof dhLoad==="function")dhLoad();if(typeof fbcLoad==="function")fbcLoad();if(typeof adfLoad==="function"){adfLoad();adfMergeDays()}if(typeof tsbLoadAll==="function")tsbLoadAll();
-  const t=dtToday(),cur=t.slice(0,7),ym=DTD.ym||plYmAdd(cur,-1),st=dtTrangThai(ym,t);
+  const t=dtToday(),cur=t.slice(0,7),pk=PERIOD.from+"|"+PERIOD.to;
+  /* Tháng theo ô chọn thời gian (tháng của ngày cuối kỳ); bấm nút tháng trên trang thì giữ tháng đó tới khi đổi kỳ. */
+  if(DTD.pk!==pk){DTD.pk=pk;DTD.ym="";DTD.open=""}
+  const ym=DTD.ym||plYmNow(),st=dtTrangThai(ym,t);
   const S=dtShownMonth(ym),L=dtLiveMonth(ym),ceo=typeof isCeo==="function"&&isCeo();
-  const tabs=[];for(let i=-3;i<=0;i++){const k=plYmAdd(cur,i);if(k>="2026-08")tabs.push(`<button data-dtym="${k}" class="${k===ym?"on":""}">Tháng ${dtYmVN(k)}</button>`)}
+  const tabs=[],tk=[];for(let i=-3;i<=0;i++){const k=plYmAdd(cur,i);if(k>="2026-08")tk.push(k)}if(!tk.includes(ym))tk.unshift(ym);tk.forEach(k=>{tabs.push(`<button data-dtym="${k}" class="${k===ym?"on":""}">Tháng ${dtYmVN(k)}</button>`)})
   const tot={w:0,f:0,k:0,hasF:false,hasK:false};
   const body=DT_KENH.map(([ch,n])=>{const r=S[ch]||{dt:null,src:"mảng chưa chạy, chưa có số"},l=L[ch]||{},F=dtFile(ch,ym),K=dtKt(ym,ch),snap=dtSnap(ym,ch);
     if(r.dt!=null)tot.w+=+r.dt||0;if(F.v!=null){tot.f+=F.v;tot.hasF=true}if(K){tot.k+=K.v;tot.hasK=true}
