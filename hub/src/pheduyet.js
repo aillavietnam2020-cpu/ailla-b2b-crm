@@ -10,7 +10,7 @@
      Phiếu thu, đơn nghỉ / OT / tạm ứng chưa có nút duyệt dùng chung: chỉ hiện dòng + nút mở trang gốc.
    - Máy chủ vẫn kiểm quyền ở từng API như cũ; trang này không đổi quy tắc ai được duyệt.
    ===================================================================== */
-const PD={sv:null,at:0,busy:false,err:"",k:"",doing:{}};
+const PD={sv:null,at:0,busy:false,err:"",k:"",doing:{},view:null};
 const pdWho=()=>({role:typeof crmRole==="function"?crmRole():"",uid:(typeof SV!=="undefined"&&SV.me&&SV.me.id)||"",perms:(typeof SV!=="undefined"&&SV.perms)||[],
   admin:!!ME&&ME.role==="admin",ns:!!ME&&(can(ME,"nhansu.duyet")||can(ME,"nhansu.quanly"))});
 const pdAny=()=>{if(!ME)return false;const w=pdWho(),P=n=>w.perms.includes(n);return w.role==="CEO"||w.admin||w.ns||P("order.approve.normal")||P("order.approve.exception")||P("order.accounting.confirm")};
@@ -36,10 +36,15 @@ const pdCnt=()=>{if(!PD.sv)return "";try{return pdRows().length||""}catch(e){ret
 /* Mục Phê duyệt chỉ có một trang nên thanh bên không có dòng con: gắn số chờ vào nút mục. */
 function pdBadge(){const b=document.querySelector('.top[data-mod="q_pd"]');if(!b)return;const old=b.querySelector("b.pdn");if(old)old.remove();const n=pdCnt();if(n)b.querySelector("span").insertAdjacentHTML("afterend",`<b class="pdn">${n}</b>`)}
 function pdOpen(r){
-  const o=r.open||{};
-  if(r.src==="pcCho"){PAGE="so_cp";MOD="";render();scrollTo(0,0);const x=((D().pcCho)||[]).find(y=>y.id===r.ref);if(x&&typeof scPhieu==="function")scPhieu(x,true);return}
-  if(o.path&&typeof CRM_SRC!=="undefined")CRM_SRC[o.page]=o.path;
-  PAGE=o.page;MOD="";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}
+  if(r.src==="pcCho"){const x=((D().pcCho)||[]).find(y=>y.id===r.ref);if(x&&typeof scPhieu==="function"){scPhieu(x,true);return}}
+  /* Trang gốc (đơn hàng, khách, nhân sự…) nhiều trang không nằm trong menu quản trị: mở ngay trong trang này, có nút quay lại. */
+  PD.view={...(r.open||{}),t:r.loai+" · "+r.nd};renderMain();scrollTo(0,0)}
+function pdView(m){const v=PD.view;
+  m.innerHTML=`<p><button type="button" class="lnk" id="pd-back">← Về Phê duyệt</button> <span class="hint">${esc(v.t||"")}</span></p><div id="pd-src"></div>`;
+  $("#pd-back").onclick=()=>{PD.view=null;PD.at=0;renderMain()};
+  const s=m.querySelector("#pd-src");
+  if(v.path)s.innerHTML='<div class="crmembed"><iframe id="crmfr" src="'+esc(v.path)+'" title="Chứng từ gốc"></iframe></div>';
+  else if(PAGES[v.page])PAGES[v.page](s);else s.innerHTML='<p class="empty pad">Không mở được trang gốc.</p>'}
 async function pdAct(r,ok){
   const post=(p,b)=>svApi(p,{method:"POST",body:JSON.stringify(b||{})});
   const ask=(need)=>{const t=prompt(need?"Lý do từ chối (bắt buộc):":"Lý do từ chối (có thể bỏ trống):");if(t===null)return null;if(need&&t.trim().length<3){toast("Ghi lý do ít nhất vài chữ");return null}return t.trim()};
@@ -60,6 +65,7 @@ async function pdAct(r,ok){
   catch(e){toast(e.message||"Chưa xử lý được")}
   delete PD.doing[r.id];await pdLoad(true)}
 function pPheDuyet(m){
+  if(PD.view)return pdView(m);
   if(!PD.sv){m.innerHTML=H("Phê duyệt","Đang tải các việc chờ duyệt…");pdLoad();return}
   pdLoad();
   const all=pdRows(),c=pdCounts(all),L=pdFilter(all,PD.k),now=Date.now(),money=v=>v==null?`<span class="hint">—</span>`:nf(v)+" đ";
@@ -82,4 +88,4 @@ function pPheDuyet(m){
 PAGES.pheduyet=pPheDuyet;
 /* Chỉ trang quản trị: mục nguồn ẩn để menubang.js lấy trang vào mục "Phê duyệt" (giữa Ngân sách & chi phí và Cấu hình). */
 MODULES.push({k:"pd_src",adm:true,hide:true,ic:"check",n:"Phê duyệt",zone:"",sub:"",groups:()=>[["",[MI("pheduyet","Phê duyệt",()=>pdAny(),pdCnt)]]]});
-{const _r=render;render=function(){const r=_r.apply(this,arguments);try{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"&&ME){pdBadge();if(!PD.at)pdLoad()}}catch(e){}return r}}
+{const _r=render;render=function(){const r=_r.apply(this,arguments);try{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"&&ME){if(PAGE!=="pheduyet")PD.view=null;pdBadge();if(!PD.at)pdLoad()}}catch(e){}return r}}
