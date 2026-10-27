@@ -82,3 +82,4 @@ Chat "Tiếp tục quản trị 26/10" đã được báo không sửa các file
 - Còn: Tổng quan vận hành còn tên cũ (giao chat Doanh thu, chỉ nhánh); 421030f chưa deploy.
 - 27/10: chị bấm BAM-CAP-NHAT-PHE-DUYET.bat, 0150 đã chạy, Phê duyệt ngưỡng 5tr + gom tiền về/hàng trả/phiếu thu ĐÃ LÊN WEB (build trước 421030f). Hết tạm dừng deploy main. Chat Doanh thu sẽ deploy main tiếp (đổi tên Tổng quan vận hành + 421030f).
 - 27/10 chia chi chung T9 (chat quản trị tính, chưa sửa): Sổ chi phí trên web chưa có dòng nào. Theo file phân bổ chi Chung 112,9tr; thiếu doanh thu Shopee + OEM nên TikTok gánh dư ~9,6tr. VIỆC CỦA CHỊ HUỆ: nhập doanh thu thực T9 Shopee Mall, Shopee thường, Kênh OEM ở tab Phân bổ › Sửa doanh thu thực. Giữ commit c4b7a24 (NPP/OEM tự lấy), ghép sau khi Doanh thu deploy.
+- 27/10: main 5be4289 (đổi tên kênh + 421030f) ĐÃ LÊN WEB; hai web cùng số T9. Mảng Doanh thu XONG. Chat quản trị đang ghép c4b7a24 (Sổ chi phí dùng hàm chung) rồi deploy.
