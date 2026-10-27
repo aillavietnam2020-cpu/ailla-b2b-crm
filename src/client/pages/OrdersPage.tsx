@@ -135,28 +135,16 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
 
   return (
     <>
-      <div className="page-head">
-        <div className="stagebar" role="tablist" aria-label="Lọc đơn theo trạng thái">
-        <button type="button" className={`stagechip${stage === '' && !onlyMine ? ' on' : ''}`} onClick={() => { setStage(''); setOnlyMine(false); }}>
-          Tất cả <b>{allOrders.length}</b>
-        </button>
-        {mineCount > 0 && (
-          <button type="button" className={`stagechip mine${onlyMine ? ' on' : ''}`} onClick={() => { setOnlyMine(!onlyMine); setStage(''); }} title="Các đơn đang chờ chính bạn duyệt, xác nhận hoặc xử lý">
+      {/* Hàng 1: lọc chính (Tất cả / Cần tôi xử lý) bên trái, ô tìm + Tạo đơn bên phải.
+          Hàng 2: các trạng thái trên một dòng, dài quá thì cuộn ngang chứ không xuống dòng. */}
+      <div className="page-head ordhead">
+        <div className="ordseg" role="tablist" aria-label="Lọc đơn">
+          <button type="button" className={stage === '' && !onlyMine ? 'on' : ''} onClick={() => { setStage(''); setOnlyMine(false); setKhoFilter(''); }}>
+            Tất cả đơn <b>{allOrders.length}</b>
+          </button>
+          <button type="button" className={`mine${onlyMine ? ' on' : ''}`} onClick={() => { setOnlyMine(!onlyMine); setStage(''); }} title="Các đơn đang chờ chính bạn duyệt, xác nhận hoặc xử lý">
             Cần tôi xử lý <b>{mineCount}</b>
           </button>
-        )}
-        {[...stageCounts.entries()]
-          .sort((a, b) => b[1].n - a[1].n)
-          .map(([label, v]) => (
-            <button
-              type="button"
-              key={label}
-              className={`stagechip ${v.tone}${stage === label ? ' on' : ''}`}
-              onClick={() => setStage(stage === label ? '' : label)}
-            >
-              <i /> {label} <b>{v.n}</b>
-            </button>
-          ))}
         </div>
         <div className="actions">
           <input
@@ -174,6 +162,22 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
             </Link>
           )}
         </div>
+      </div>
+
+      <div className="stagerow" role="tablist" aria-label="Lọc đơn theo trạng thái">
+        <span className="stagerow-lb">Trạng thái</span>
+        {[...stageCounts.entries()]
+          .sort((a, b) => b[1].n - a[1].n)
+          .map(([label, v]) => (
+            <button
+              type="button"
+              key={label}
+              className={`stagechip ${v.tone}${stage === label ? ' on' : ''}`}
+              onClick={() => setStage(stage === label ? '' : label)}
+            >
+              <i /> {label} <b>{v.n}</b>
+            </button>
+          ))}
       </div>
 
       <ProposalsCard mode={mode} />
@@ -1595,18 +1599,6 @@ function isLiveFlow(o: OrderListItem): boolean {
   );
 }
 
-const CHIP_ORDER: KhoStatus[] = [
-  'CHO_DIEU_PHOI',
-  'CHO_KIEM_KHO',
-  'THIEU_HANG',
-  'CHO_HANG',
-  'DU_HANG',
-  'CHO_XUAT',
-  'DA_XUAT',
-  'CHO_CHOT_TIEN',
-  'DA_CHOT_TIEN',
-];
-
 /** Hàng chip đếm đơn theo từng bước của luồng kho; chip nào tới lượt người đang xem thì nổi bật. */
 function FlowChips({
   counts,
@@ -1623,7 +1615,6 @@ function FlowChips({
 }) {
   const { can } = useAuth();
   const toast = useToast();
-  const total = CHIP_ORDER.reduce((n, s) => n + (counts[s] ?? 0), 0);
   const myTurn = (s: KhoStatus) => {
     const who = KHO_WAITING[s];
     return (
@@ -1644,26 +1635,22 @@ function FlowChips({
     }
   }
 
+  // Hàng nút đếm theo luồng kho trùng với hàng Trạng thái phía trên (và "Cần tôi xử lý"),
+  // nên chỉ còn hiện khi đang lọc dở theo luồng kho, để có chỗ bỏ lọc.
+  const showChips = active !== '';
+  const showToggle = can('settings.manage') && enabled !== undefined && window.location.hostname.startsWith('quantri.');
+  if (!showChips && !showToggle) return null;
   return (
     <div style={{ marginBottom: 6, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-      {total > 0 || active ? (
+      {showChips ? (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className={`btn sm ${active === '' ? 'primary' : ''}`} onClick={() => onPick('')}>
-            Tất cả đơn
+          <span className="muted" style={{ fontSize: 12 }}>Đang lọc: {KHO_LABELS[active as KhoStatus] ?? active} ({counts[active] ?? 0})</span>
+          <button className="lnk" onClick={() => onPick('')} title={myTurn(active as KhoStatus) ? 'Việc đang chờ bạn' : undefined}>
+            Bỏ lọc
           </button>
-          {CHIP_ORDER.filter((s) => (counts[s] ?? 0) > 0 || active === s).map((s) => (
-            <button
-              key={s}
-              className={`btn sm ${active === s ? 'primary' : myTurn(s) ? 'dark' : ''}`}
-              onClick={() => onPick(active === s ? '' : s)}
-              title={myTurn(s) ? 'Việc đang chờ bạn' : undefined}
-            >
-              {KHO_LABELS[s]} ({counts[s] ?? 0})
-            </button>
-          ))}
         </div>
       ) : null}
-      {can('settings.manage') && enabled !== undefined && window.location.hostname.startsWith('quantri.') && (
+      {showToggle && (
         <div className="muted" style={{ marginLeft: 'auto', fontSize: 12 }}>
           Luồng kho đơn mới: <strong>{enabled ? 'bật' : 'tắt'}</strong>{' '}
           <button className="lnk" onClick={() => void toggle()}>
