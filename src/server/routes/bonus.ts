@@ -379,7 +379,7 @@ bonusRoutes.get('/cash', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT v.id, v.voucher_no, v.customer_id, cu.name AS customer_name, v.month, v.amount, v.method, v.note, v.status,
-              v.cancel_reason, v.created_at, u.display_name AS created_by_name, a.display_name AS approved_by_name
+              v.cancel_reason, v.created_at, v.created_by, u.display_name AS created_by_name, a.display_name AS approved_by_name
        FROM bonus_cash_vouchers v JOIN customers cu ON cu.id = v.customer_id
        LEFT JOIN users u ON u.id = v.created_by LEFT JOIN users a ON a.id = v.approved_by
        WHERE v.month = ? ORDER BY v.created_at DESC`,
