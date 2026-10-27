@@ -79,7 +79,8 @@ describe('TikTok: số tháng cho trang vận hành', () => {
     expect((await ctx.request('/api/hub/tiktok/month/2026-09', { method: 'PUT', as: USERS.ceo, body: m })).status).toBe(200);
     const r = await ctx.request('/api/hub/tiktok/ops?from=2026-09-01&to=2026-09-30', { as: NV });
     expect(r.status).toBe(200);
-    const x = r.body.data[0];
+    const x = r.body.data.months[0];
+    expect(r.body.data.closed).toEqual([]);
     expect(x).toMatchObject({ ky: '2026-09', dt: 1392110100, don: 12350, mon: 28540, ads: 364658750, hoaHong: 34655085 });
     expect(x.sp.map((p: { pri: string }) => p.pri)).toEqual(['Đẩy mạnh', 'Dừng quảng cáo']);
     expect(JSON.stringify(x)).not.toMatch(/"lg"|"lai"|"gv"|"bien"/);

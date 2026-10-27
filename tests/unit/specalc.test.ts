@@ -27,7 +27,7 @@ const ordersSheets = () => ({
 const FIN_HEAD = ['Mã giao dịch', 'Đơn hàng / Sản phẩm', 'Mã đơn hàng', 'Ngày đặt hàng', 'Giá sản phẩm', 'Số tiền hoàn lại',
   'Mã ưu đãi do Người Bán chịu', 'Phí cố định', 'Phí Dịch Vụ', 'Phí xử lý giao dịch', 'Phí hoa hồng Tiếp thị liên kết',
   'Phí vận chuyển Người mua trả', 'Phí vận chuyển thực tế', 'Thuế GTGT'];
-const finSheets = (to = '2026-10-08') => ({
+const finSheets = (to = '2026-10-09') => ({
   Summary: [['Bao cáo doanh thu'], [], ['Người Bán', 'aillavn']],
   Adjustment: [['Ghi chú'], ['Người Bán', 'aillavn'], ['Từ', '2026-09-01', 'Đến', to]],
   'Doanh thu': [
@@ -75,16 +75,17 @@ describe('specalc: đọc file Shopee', () => {
     expect(JSON.stringify(O.lines)).not.toMatch(/N\*+A|\*+90/);
     expect(T.speGuessKy(T.speOrderSheet(ordersSheets()))).toBe('2026-09');
   });
-  it('file Tài chính: tên shop, khoảng ngày, báo cáo giữa tháng khi chưa tới ngày 08 tháng sau', () => {
+  it('file Tài chính: tên shop, khoảng ngày, báo cáo giữa tháng khi chưa tới hết ngày 09 tháng sau', () => {
     const F = T.speReadFin(finSheets(), '2026-09');
     expect(F.shop).toBe('aillavn');
-    expect(F.range).toEqual({ from: '2026-09-01', to: '2026-10-08' });
+    expect(F.range).toEqual({ from: '2026-09-01', to: '2026-10-09' });
+    expect(T.speReadFin(finSheets('2026-10-08'), '2026-09').partial).toBe(true);
     expect(F.partial).toBe(false);
     expect(F.ord.A1.f.reduce((a: number, b: number) => a + b, 0)).toBe(-15000 - 5000 - 3000 - 8000 + 6000 - 6000 - 1000);
     expect(F.ord.A1.vou).toBe(-10000);
     expect(F.ord.A1.aff).toBe(true);
     expect(T.speReadFin(finSheets('2026-09-27'), '2026-09').partial).toBe(true);
-    expect(T.speReadFin(finSheets(), '2026-11').err).toMatch(/chỉ tới 08\/10\/2026/);
+    expect(T.speReadFin(finSheets(), '2026-11').err).toMatch(/chỉ tới 09\/10\/2026/);
     expect(T.speReadFin({ ...finSheets(), Adjustment: [['Từ', '2026-09-05', 'Đến', '2026-10-08']] }, '2026-09').err).toMatch(/phải từ 01\/09/);
   });
   it('file quảng cáo: bỏ dòng nạp ví, cộng chi theo ngày', () => {

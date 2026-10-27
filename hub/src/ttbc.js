@@ -4,7 +4,7 @@
    chỉ đọc số tháng đã lưu (P) và số theo ngày team tải (Key metrics, LIVE, Campaign overview, Transaction Analysis).
    Cảnh báo chỉ dựng từ số thật; thiếu số thì không cảnh báo, không đoán.
    ===================================================================== */
-const TTBC_LANES=[["vInh","Video của shop","#5b4bdb"],["koc","KOC (video + live)","#e0607e"],["the","Thẻ sản phẩm / tìm kiếm","#f0a020"],["lShop","LIVE của shop","#2a9d8f"]];
+const TTBC_LANES=[["vInh","Video inhouse","#5b4bdb"],["koc","KOC (video + live)","#e0607e"],["the","Thẻ sản phẩm / tìm kiếm","#f0a020"],["lShop","LIVE của shop","#2a9d8f"]];
 const ttbcPct=(a,b)=>b?a/b:0;
 
 /* Cơ cấu doanh thu theo nguồn (GMV, TikTok chỉ chia nguồn theo GMV). km = tổng Key metrics của kỳ; hoaHong = hoa hồng KOC thật. */
@@ -60,6 +60,15 @@ function ttbcAlerts(I){
   return {canh,de};
 }
 
+/* Doanh thu dự kiến của tháng chưa đủ số (báo cáo giữa tháng): phần đơn chưa quyết toán trừ theo tỷ lệ hoàn sau giao
+   bình quân của các tháng TikTok đã đủ số (chị Hoa duyệt 27/10; không dùng 8% của Facebook vì đơn hủy trước giao đã trừ sẵn).
+   cur = {dt, dtUoc, den}; closed = [{dt, hoanGiao, den}]. Trả {rate, dk, n} — rate null khi chưa có tháng đủ số để tính. */
+function ttbcDuKien(cur,closed){
+  const C=(closed||[]).filter(s=>s&&!s.den&&s.hoanGiao!=null&&+s.dt>0),a=C.reduce((x,s)=>x+(+s.hoanGiao||0),0),b=C.reduce((x,s)=>x+(+s.dt||0)+(+s.hoanGiao||0),0);
+  const rate=b?a/b:null;if(!cur||!cur.den)return {rate,dk:cur?+cur.dt||0:null,n:C.length};
+  return {rate,dk:rate==null?null:Math.round((+cur.dt||0)-(+cur.dtUoc||0)*rate),n:C.length};
+}
+
 /* Hiệu quả từng team MKT (trang vận hành). I = {km, ads:{chi, don}, adsV, live, koc (Transaction Analysis), dt, lgRate, hoaHong, last2}. */
 function ttbcTeams(I){
   const km=I.km||{},gmv=+km.gmv||0,L=I.live||{},K=I.koc||null,W=I.last2,fmt=v=>(Math.round(v*1000)/10).toString().replace(".",",")+"%";
@@ -69,7 +78,7 @@ function ttbcTeams(I){
   const ads={al:[],chi:I.adsV||0,don:+((I.ads||{}).don)||0};ads.roi=ads.chi&&I.dt?I.dt/ads.chi:null;ads.roas=ads.chi?gmv/ads.chi:null;ads.hoaVon=I.lgRate>0?1/I.lgRate:null;ads.cpo=ads.don?(+I.ads.chi||0)/ads.don:null;
   if(ads.roi!=null&&ads.hoaVon&&ads.roi<ads.hoaVon*1.2)ads.al.push({lv:"r",t:`ROI ${ads.roi.toFixed(2).replace(".",",")} sát mức hòa vốn ${ads.hoaVon.toFixed(2).replace(".",",")}`,d:"Tắt nhóm chiến dịch ROAS thấp, không mở rộng ngân sách."});
   if(W&&W[0].roas&&W[1].roas&&W[1].roas<W[0].roas*0.97)ads.al.push({lv:"a",t:`ROAS tuần ${W[1].a}–${W[1].b} giảm ${W[0].roas.toFixed(2).replace(".",",")} → ${W[1].roas.toFixed(2).replace(".",",")}`,d:"Không tăng ngân sách; dồn cho sản phẩm biên cao."});
-  const koc={al:[]};if(K){koc.nguoi=+K["Nhà sáng tạo đã đăng nội dung"]||0;koc.video=+K["Video"]||0;koc.videoDon=+K["Video có doanh số"]||0;koc.gmv=+K["GMV nhờ nhà sáng tạo"]||0;koc.mau=+K["Hàng mẫu đã vận chuyển"]||0;
+  const koc={al:[]};if(K){koc.nguoi=+K["Nhà sáng tạo đã đăng nội dung"]||0;koc.video=+K["Video"]||0;koc.videoDon=+K["Video có doanh số"]||0;koc.gmv=(+km.vKoc||0)+(+km.lKoc||0);koc.gmvFile=+K["GMV nhờ nhà sáng tạo"]||0;koc.mau=+K["Hàng mẫu đã vận chuyển"]||0;
     koc.hh=I.hoaHong!=null?I.hoaHong:+K["Hoa hồng ước tính"]||0;koc.hhNguon=I.hoaHong!=null?"quyết toán":"ước tính";koc.roi=koc.hh?koc.gmv/koc.hh:null;
     if(koc.video&&ttbcPct(koc.videoDon,koc.video)<0.4)koc.al.push({lv:"a",t:`${koc.video-koc.videoDon}/${koc.video} video KOC chưa ra đơn`,d:"Ưu tiên KOC đã ra đơn, gửi mẫu sản phẩm biên cao."})}
   const live={al:[],phien:+L.phien||0,phienGmv:+L.phienGmv||0,gmv:+L.gmv||0,don:+L.don||0,xem:+L.xem||0};live.gmv1000=live.xem?live.gmv/live.xem*1000:null;

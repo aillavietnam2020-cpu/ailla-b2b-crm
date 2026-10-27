@@ -16,7 +16,7 @@ const order = (o: string, st: string, sku: string, q: number, before: number, di
   [`${o}\t`, st, `${sku}\t`, `SS${sku}`, `SP ${sku}`, 'Mặc định', q, ret, before, disc, `${day} 10:00:00\t`, 'Nguyễn Văn A', '0900000000'];
 const INC_HEAD = ['ID đơn hàng/điều chỉnh', 'Loại giao dịch', 'Thời gian tạo đơn hàng', 'Thời gian quyết toán đơn hàng',
   'Tổng phí', 'Phí hoa hồng của TikTok Shop', 'Phí giao dịch', 'Phí vận chuyển thực tế', 'Phí vận chuyển của người bán', 'Số tiền điều chỉnh'];
-const incomeSheets = (range = '2026/09/01-2026/10/08') => ({
+const incomeSheets = (range = '2026/09/01-2026/10/09') => ({
   'Chi tiết đơn hàng': [
     INC_HEAD,
     ['1000001', 'Đơn hàng', '2026/09/02', '2026/09/10', '-30000', '-20000', '-5000', '-4000', '-999999', '0'],
@@ -84,7 +84,7 @@ describe('TikTok: file đơn và quyết toán', () => {
     expect(T.ttKind({ csv: ORDERS })).toBe('orders');
   });
   it('từ chối file income sai kỳ', () => {
-    // Tới trước 08 tháng sau = báo cáo giữa tháng (được nhận, đánh dấu partial); chưa vào tháng thì từ chối.
+    // Tới trước hết ngày 09 tháng sau = báo cáo giữa tháng (được nhận, đánh dấu partial); chưa vào tháng thì từ chối.
     expect(T.ttReadIncome(incomeSheets('2026/09/01-2026/09/30'), '2026-09').partial).toBe(true);
     expect(T.ttReadIncome(incomeSheets('2026/08/01-2026/08/31'), '2026-09').err).toMatch(/chưa vào tháng/);
     expect(T.ttReadIncome(incomeSheets(), '2026-09').partial).toBe(false);
@@ -226,5 +226,17 @@ describe.skipIf(!existsSync(DIR + 'OrderSKUList_T9_2026.csv'))('TikTok: số th�
     const s = (k: string) => Object.values(km.days).reduce((a: number, d: any) => a + d[k], 0);
     expect(s('gmv')).toBe(1538012277);
     expect([s('vInh'), s('vKoc'), s('the'), s('lShop'), s('lKoc')]).toEqual([895475505, 358365742, 260159896, 23444263, 566871]);
+  });
+});
+
+describe('TikTok: giá trị hoàn sau khi giao (để tính doanh thu dự kiến)', () => {
+  it('tách hoàn sau giao khỏi hủy trước giao; lưu cùng doanh thu chưa quyết toán', () => {
+    const orders = T.ttReadOrders([...ORDERS, order('1000006', 'Đã hoàn tất', '111', 1, 90000, 0, '10/09/2026', 1)], '2026-09');
+    const M = T.ttBuildMonth({ ky: '2026-09', orders, income: T.ttReadIncome(incomeSheets(), '2026-09'), camp: T.ttReadCampaign(CAMP) });
+    expect(M.hoanGiao).toBe(90000);
+    expect(M.hh).toBe(60000 + 90000);
+    const S = T.ttSummary(T.ttPL(M, () => ({ u: 1000 }), []));
+    expect(S.hoanGiao).toBe(90000);
+    expect(S.dtUoc).toBe(80000);
   });
 });
