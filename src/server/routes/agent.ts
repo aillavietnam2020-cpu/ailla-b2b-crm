@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { AGENT_SCOPE_PREFIX, AGENT_SCOPES, policyFor } from '@shared/agent';
+import { AGENT_PHIEU_CHI, AGENT_SCOPE_PREFIX, AGENT_SCOPES, policyFor } from '@shared/agent';
 import { KHO_WAITING } from '@shared/flow';
 import type { KhoStatus } from '@shared/flow';
 import type { AppEnv } from '../env';
-import { badRequest, forbidden, notFound, ok, unprocessable } from '../lib/http';
+import { AppError, badRequest, forbidden, notFound, ok, unprocessable } from '../lib/http';
 import { clientIp } from '../lib/audit';
 import { requirePermission } from '../middleware/rbac';
 import { zodFieldErrors } from '@shared/schemas';
@@ -46,6 +46,8 @@ agentRoutes.get('/me', requirePermission('agent.read'), (c) => {
     permissions: auth.permissions,
     scopes: scopesOf(c),
     all_scopes: AGENT_SCOPES,
+    // Được lập phiếu chi (vận chuyển, nhà cung cấp, Chi phí khác) khi người được chỉ định ra lệnh, qua lệnh ghi có giấy ủy quyền.
+    can_phieu_chi: auth.permissions.includes(AGENT_PHIEU_CHI),
     policy: {
       'proposal.create': policyFor('proposal.create'),
       'order.flow.transition': policyFor('order.flow.transition'),
@@ -685,6 +687,8 @@ const proposalSchema = z.object({
   expires_at: z.string().trim().max(40).optional().nullable(),
 });
 
+const PHIEU_CHI_RE = /phi[eế]u\s+chi/i;
+
 /** Agent ghi đề xuất. Gọi lại cùng dedupe_key thì trả đề xuất cũ (duplicate = true), không tạo thêm. */
 agentRoutes.post('/proposals', requirePermission('agent.propose'), async (c) => {
   const auth = c.get('auth');
@@ -693,6 +697,14 @@ agentRoutes.post('/proposals', requirePermission('agent.propose'), async (c) => 
   const parsed = proposalSchema.safeParse(raw);
   if (!parsed.success) {
     throw unprocessable('VALIDATION_FAILED', 'Dữ liệu chưa hợp lệ', zodFieldErrors(parsed.error));
+  }
+  // Agent đã được lập phiếu chi thì không đẻ thẻ đề xuất "lập phiếu chi" nữa (ngày 24/10 ra 3 thẻ trùng cho một khoản cước).
+  if (auth.permissions.includes(AGENT_PHIEU_CHI) && PHIEU_CHI_RE.test(`${parsed.data.title} ${parsed.data.body ?? ''}`)) {
+    throw new AppError(
+      409,
+      'USE_PHIEU_CHI',
+      'Agent này lập phiếu chi trực tiếp được khi chị Thảo ra lệnh (lệnh ghi có giấy ủy quyền), không gửi đề xuất phiếu chi. Không có lệnh thì báo người nhắn tự ghi phiếu.',
+    );
   }
   const result = await createProposal(c.env.DB, auth, parsed.data, {
     requestId: c.get('requestId'),

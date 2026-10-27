@@ -16,7 +16,7 @@ function dbbBlock(ch){
   if(low.length)A.push([low.some(g=>g.bien<0)?"red":"amb",low.length+" nhóm sản phẩm biên gộp dưới mức tối thiểu "+Math.round(minB*100)+"%",low.slice(0,4).map(g=>g.n+" "+Math.round(g.bien*100)+"%").join(", ")]);
   if(S.cover<.8&&S.uncovRev>0)A.push(["amb","Mới có giá vốn cho "+Math.round(S.cover*100)+"% doanh thu","Phần còn lại đang ước tính theo tỷ lệ phần đã có, nên lãi chưa chính xác."]);
   if(!S.cpRows.length)A.push(["blu","Chưa có chi phí phân bổ cho "+nm+" trong kỳ","Lãi ròng chưa trừ chi phí chung. Ghi chi phí ở Chi phí & Tiền › Sổ chi phí."]);
-  if(ch==="B2B"&&typeof PT!=="undefined"&&PT.d&&PT.d.rows){const late=PT.d.rows.filter(r=>r.b90p+r.old>0);if(late.length)A.push(["red",late.length+" khách B2B nợ quá 90 ngày, tổng "+nf(Math.round(late.reduce((t,r)=>t+r.b90p+r.old,0)))+" đ","Mở Chi phí & Tiền › Phải thu & tuổi nợ để xem từng khách."])}
+  if(ch==="B2B"&&typeof PT!=="undefined"&&PT.d&&PT.d.rows){const late=PT.d.rows.filter(r=>r.b90p+r.old>0);if(late.length)A.push(["red",late.length+" khách Kênh phân phối nợ quá 90 ngày, tổng "+nf(Math.round(late.reduce((t,r)=>t+r.b90p+r.old,0)))+" đ","Mở Chi phí & Tiền › Phải thu & tuổi nợ để xem từng khách."])}
   /* đề xuất */
   const best=grp.filter(g=>g.bien!=null&&g.rev>0).sort((a,b)=>b.bien-a.bien)[0],big=grp[0];
   if(big&&S.revLines&&big.rev/S.revLines>.5)X.push("Nhóm “"+big.n+"” chiếm "+Math.round(big.rev/S.revLines*100)+"% doanh thu "+nm+": phụ thuộc nhiều vào một nhóm, nên đẩy thêm nhóm khác.");

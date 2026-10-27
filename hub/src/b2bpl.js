@@ -5,7 +5,7 @@
    Số liệu quản trị nội bộ; sổ sách chính thức vẫn ở MISA.
    ===================================================================== */
 const B2BR={key:"",data:null,busy:false,err:"",map:null};
-const B2B_CH={B2B:"B2B / Đại lý",GIA_CONG:"Gia công"};
+const B2B_CH={B2B:"Kênh phân phối",GIA_CONG:"Kênh OEM"};
 const IS_ADMIN_HOST=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
 async function b2bLoad(){
   const key=PERIOD.from+"|"+PERIOD.to;
@@ -14,7 +14,7 @@ async function b2bLoad(){
   try{
     if(!B2BR.map){const mp=await kApi("/map").catch(()=>({map:[]}));B2BR.map=new Map((mp.map||[]).map(r=>[String(r.crm_sku).toLowerCase(),r]))}
     B2BR.data=await svApi("/api/dashboards/b2b-sku?from="+PERIOD.from+"&to="+PERIOD.to);
-  }catch(e){B2BR.err=e.message||"Không tải được doanh thu B2B";B2BR.data=null}
+  }catch(e){B2BR.err=e.message||"Không tải được doanh thu Kênh phân phối";B2BR.data=null}
   B2BR.busy=false;
   if(["bc_b2b","bc_gc","bc_tong","exec"].includes(PAGE))renderMain();
 }
@@ -63,7 +63,7 @@ function b2bChannelPage(m,ch){
   if(B2BR.err){m.innerHTML=head+`<div class="note red">${esc(B2BR.err)}</div>`;return}
   const S=b2bChannel(ch);
   if(!S){m.innerHTML=head+`<section class="card"><p class="hint pad">Đang tải doanh thu…</p></section>`;return}
-  if(!S.has){m.innerHTML=head+`<section class="card"><p class="pad">${ch==="GIA_CONG"?"Kỳ này chưa có đơn gia công. Khách được tính là gia công khi chỉ dùng <b>bảng giá riêng</b> (Sản phẩm & giá › Bảng giá riêng từng khách) và không có cấp giá.":"Kỳ này chưa có đơn B2B đã duyệt."}</p></section>`;return}
+  if(!S.has){m.innerHTML=head+`<section class="card"><p class="pad">${ch==="GIA_CONG"?"Kỳ này chưa có đơn gia công. Khách được tính là gia công khi chỉ dùng <b>bảng giá riêng</b> (Sản phẩm & giá › Bảng giá riêng từng khách) và không có cấp giá.":"Kỳ này chưa có đơn Kênh phân phối đã duyệt."}</p></section>`;return}
   const {net,orders,adj,revLines,covRev,uncovRev,estCost,costAll,cover,gross,cp,cpRows,share,lai,miss,grp,byMonth}=S;
   const miss10=[...miss.values()].sort((a,b)=>b.rev-a.rev).slice(0,10),b2c=b2cNet();
   const P=[["Doanh thu hàng (đơn đã duyệt)",revLines,""],["− Chiết khấu, trừ thưởng cấp đơn",-adj,""],["= Doanh thu thuần",net,"tot"],
@@ -75,8 +75,8 @@ function b2bChannelPage(m,ch){
    ${cover<.8?`<div class="note amb">Mới có giá vốn cho ${pc(covRev,revLines)} doanh thu. Phần còn lại em ước tính theo tỷ lệ giá vốn của phần đã có. Bổ sung giá vốn các mã ở bảng "Mã chưa có giá vốn" bên dưới để số chính xác.</div>`:""}</section>
   <section class="card flush"><div class="card-h pad"><h2>Theo nhóm sản phẩm</h2></div>${tbl(["Nhóm sản phẩm","Số lượng","Doanh thu","Giá vốn","Lãi gộp","Biên gộp","Phủ giá vốn"],[...grp.values()].sort((a,b)=>b.rev-a.rev).map(g=>{const ec=g.cov?g.cost+(g.rev-g.cov)*(g.cost/g.cov):0,lg=g.rev-ec;return `<tr><td><b>${esc(g.n)}</b></td><td class="n">${nf(g.qty)}</td><td class="n">${tr(g.rev)}</td><td class="n">${g.cov?tr(ec):"—"}</td><td class="n">${g.cov?(lg<0?`<span class="t-red">${tr(lg)}</span>`:tr(lg)):"—"}</td><td class="n">${g.cov&&g.rev?pill(Math.round(lg/g.rev*100)+"%",lg/g.rev>=.3?"grn":lg/g.rev>=.15?"amb":"red"):"—"}</td><td class="n">${pc(g.cov,g.rev)}</td></tr>`}))}</section>
   ${mrow.length>1?`<section class="card flush"><div class="card-h pad"><h2>Theo tháng</h2></div>${tbl(["Tháng","Doanh thu","Giá vốn","Lãi gộp","Biên gộp"],mrow.map(r=>{const ec=r.cov?r.cost+(r.rev-r.cov)*(r.cost/r.cov):0,lg=r.rev-ec;return `<tr><td>${esc(r.m)}</td><td class="n">${tr(r.rev)}</td><td class="n">${r.cov?tr(ec):"—"}</td><td class="n">${r.cov?tr(lg):"—"}</td><td class="n">${r.cov&&r.rev?pc(lg,r.rev):"—"}</td></tr>`}))}</section>`:""}
-  ${miss10.length?`<section class="card flush"><div class="card-h pad"><h2>Mã chưa có giá vốn</h2><span class="hint">${miss.size} mã · ${pc(uncovRev,revLines)} doanh thu · hiện 10 mã lớn nhất</span></div>${tbl(["Mã CRM","Tên","Số lượng","Doanh thu"],miss10.map(x=>`<tr><td class="mono">${esc(x.sku)}</td><td>${esc(x.name)}</td><td class="n">${nf(x.qty)}</td><td class="n">${tr(x.rev)}</td></tr>`))}<p class="hint pad">Mã CRM nối với mã MISA ở Sản phẩm › Đồng bộ mã B2B, giá vốn nhập ở Giá vốn SKU.</p></section>`:""}
-  ${srcNote("CRM B2B (đơn đã duyệt) + bảng giá vốn SKU + chi phí theo tháng. Giá vốn lấy tháng gần nhất không sau tháng bán.")}`;
+  ${miss10.length?`<section class="card flush"><div class="card-h pad"><h2>Mã chưa có giá vốn</h2><span class="hint">${miss.size} mã · ${pc(uncovRev,revLines)} doanh thu · hiện 10 mã lớn nhất</span></div>${tbl(["Mã CRM","Tên","Số lượng","Doanh thu"],miss10.map(x=>`<tr><td class="mono">${esc(x.sku)}</td><td>${esc(x.name)}</td><td class="n">${nf(x.qty)}</td><td class="n">${tr(x.rev)}</td></tr>`))}<p class="hint pad">Mã CRM nối với mã MISA ở Sản phẩm › Đồng bộ mã Kênh phân phối, giá vốn nhập ở Giá vốn SKU.</p></section>`:""}
+  ${srcNote("CRM Kênh phân phối (đơn đã duyệt) + bảng giá vốn SKU + chi phí theo tháng. Giá vốn lấy tháng gần nhất không sau tháng bán.")}`;
 }
 PAGES.bc_b2b=m=>b2bChannelPage(m,"B2B");
 PAGES.bc_gc=m=>b2bChannelPage(m,"GIA_CONG");
@@ -90,22 +90,22 @@ function pKetQuaKenh(m){
   const R=[
    ["TikTok Shop","GMV cả shop, đã trừ hủy hoàn",N.tt,C.gvTT,C.phiTT,C.adsTT,C.khacTT,L.tts,N.tt?"Có số":"Chưa có số trong kỳ","bc_tiktok"],
    ["Shopee","Doanh thu thuần",N.spDT,C.gvSPE,C.phiSPE,C.adsSPE,0,L.spe,N.spDT?"Có số":"Chưa có số trong kỳ","bc_shopee"],
-   ["Facebook Ads","Đơn giao thành công từ quảng cáo (Pancake)",N.fbDT,C.gvFB,0,C.adsFB,0,L.fb,N.fbDT?"Có số":"Chưa có số trong kỳ","bc_fb"],
+   ["Facebook","Đơn giao thành công (Pancake)",N.fbDT,C.gvFB,0,C.adsFB,0,L.fb,N.fbDT?"Có số":"Chưa có số trong kỳ","bc_fb"],
    ["CSKH cũ","Mảng chăm sóc khách cũ",null,null,null,null,null,null,"Chờ triển khai","cskh_cu"],
-   ["B2B / Đại lý","Đơn đã duyệt trong CRM",B?B.net:null,B?B.costAll:null,0,0,B?B.cp:null,B?B.lai:null,B?(B.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_b2b"],
-   ["Gia công","Khách dùng bảng giá riêng",G?G.net:null,G?G.costAll:null,0,0,G?G.cp:null,G?G.lai:null,G?(G.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_gc"]];
+   ["Kênh phân phối","Đơn đã duyệt trong CRM",B?B.net:null,B?B.costAll:null,0,0,B?B.cp:null,B?B.lai:null,B?(B.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_b2b"],
+   ["Kênh OEM","Khách dùng bảng giá riêng",G?G.net:null,G?G.costAll:null,0,0,G?G.cp:null,G?G.lai:null,G?(G.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_gc"]];
   const has=r=>r[2]!=null&&r[2]>0,TOT=[0,0,0,0,0,0];
   R.forEach(r=>{if(!has(r))return;TOT[0]+=r[2]||0;TOT[1]+=r[3]||0;TOT[2]+=r[4]||0;TOT[3]+=r[5]||0;TOT[4]+=r[6]||0;if(r[7]!=null)TOT[5]+=r[7]});
   const lines=R.filter(has),laiAll=TOT[5],knownLai=R.some(r=>has(r)&&r[7]!=null);
   m.innerHTML=head+`<div class="grid kpis">${kpi("Doanh thu tất cả kênh",TOT[0]?tr(TOT[0]):"—",lines.length+" kênh có số trong kỳ")}${kpi("Giá vốn",TOT[1]?tr(TOT[1]):"—","")}${kpi("Lãi",knownLai?tr(laiAll):"—",TOT[0]&&knownLai?pc(laiAll,TOT[0])+" doanh thu":"","var(--green)")}</div>
   <section class="card flush"><div class="card-h pad"><h2>Kết quả từng kênh</h2><span class="hint">bấm tên kênh để xem chi tiết</span></div>${tbl(["Kênh","Doanh thu","Giá vốn","Phí sàn & vận chuyển","Quảng cáo","Chi phí khác","Lãi","Biên lãi","Dữ liệu"],R.map(r=>{const v=has(r),lai=r[7],bien=v&&lai!=null?pc(lai,r[2]):"—";return `<tr class="clk${v?"":" mut"}" data-go="${r[9]}"><td><b>${esc(r[0])}</b><div class="hint">${esc(r[1])}</div></td><td class="n">${v?nf(Math.round(r[2])):"—"}</td><td class="n">${v?dv(r[3],1):"—"}</td><td class="n">${v?dv(r[4],1):"—"}</td><td class="n">${v?dv(r[5],1):"—"}</td><td class="n">${v?dv(r[6],1):"—"}</td><td class="n">${v&&lai!=null?(lai<0?`<span class="t-red">${nf(Math.round(lai))}</span>`:nf(Math.round(lai))):"—"}</td><td class="n">${bien}</td><td>${pill(r[8],r[8]==="Có số"?"grn":r[8]==="Chờ triển khai"?"gry":"amb")}</td></tr>`}).concat([`<tr class="tot"><td><b>Tổng các kênh có số</b></td><td class="n">${nf(Math.round(TOT[0]))}</td><td class="n">${dv(TOT[1],1)}</td><td class="n">${dv(TOT[2],1)}</td><td class="n">${dv(TOT[3],1)}</td><td class="n">${dv(TOT[4],1)}</td><td class="n">${knownLai?nf(Math.round(laiAll)):"—"}</td><td class="n">${knownLai&&TOT[0]?pc(laiAll,TOT[0]):"—"}</td><td></td></tr>`]))}
    <p class="hint pad">Lãi mỗi kênh đã trừ giá vốn, phí sàn, quảng cáo và chi phí phân bổ của kênh đó. Chưa trừ lương, kho, chi phí chung của công ty. Kênh chưa có số trong kỳ thì để trống chứ không tính là 0.</p></section>
-  ${srcNote("TikTok, Shopee: báo cáo quản trị chốt sổ ngày 8 · Facebook: Pancake + Báo cáo Ads · B2B, Gia công: CRM (đơn đã duyệt) · giá vốn SKU.")}`;
+  ${srcNote("TikTok, Shopee: báo cáo quản trị chốt sổ ngày 8 · Facebook: Pancake + Báo cáo Ads · Kênh phân phối, Kênh OEM: CRM (đơn đã duyệt) · giá vốn SKU.")}`;
   m.querySelectorAll("tr[data-go]").forEach(tr0=>tr0.onclick=()=>{PAGE=tr0.dataset.go;MOD="";render();scrollTo(0,0)});
 }
 {const _tong=PAGES.bc_tong;PAGES.bc_tong=function(m){if(IS_ADMIN_HOST())return typeof tqSoSanhKenh==="function"?tqSoSanhKenh(m):pKetQuaKenh(m);return _tong.apply(this,arguments)}}
 
-/* ---------- Tổng quan công ty: thêm kênh B2B, Gia công và cộng tổng mọi kênh ---------- */
+/* ---------- Tổng quan công ty: thêm kênh Kênh phân phối, Kênh OEM và cộng tổng mọi kênh ---------- */
 {const _ex=PAGES.exec;if(_ex)PAGES.exec=function(m){
   _ex.apply(this,arguments);
   if(typeof b2bLoad==="function")b2bLoad();
@@ -120,9 +120,9 @@ function pKetQuaKenh(m){
     const rowB=tb.querySelector('tr[data-href="/admin/ceo"]');
     if(rowB){
       rowB.classList.remove("mut");
-      const b=rowB.querySelector("b");if(b)b.textContent="B2B / Đại lý";const sm=rowB.querySelector("small");if(sm)sm.textContent="đơn đã duyệt · "+pLabel();
+      const b=rowB.querySelector("b");if(b)b.textContent="Kênh phân phối";const sm=rowB.querySelector("small");if(sm)sm.textContent="đơn đã duyệt · "+pLabel();
       set(rowB,B);rowB.removeAttribute("data-href");rowB.onclick=()=>{PAGE="bc_b2b";MOD="";render();scrollTo(0,0)};
-      const rowG=rowB.cloneNode(true);rowG.querySelector("b").textContent="Gia công";const sg=rowG.querySelector("small");if(sg)sg.textContent=G.has?"khách dùng bảng giá riêng":"chưa có đơn gia công trong kỳ";
+      const rowG=rowB.cloneNode(true);rowG.querySelector("b").textContent="Kênh OEM";const sg=rowG.querySelector("small");if(sg)sg.textContent=G.has?"khách dùng bảng giá riêng":"chưa có đơn Kênh OEM trong kỳ";
       if(G.has){set(rowG,G);rowG.classList.remove("mut")}else{[...rowG.children].slice(1).forEach(c=>{c.textContent="—"});rowG.classList.add("mut")}
       rowG.onclick=()=>{PAGE="bc_gc";MOD="";render();scrollTo(0,0)};rowB.after(rowG);
       const totRow=tb.querySelector("tr.tot");
@@ -135,8 +135,6 @@ function pKetQuaKenh(m){
         totRow.after(all);
       }
     }
-    /* Facebook là kênh quảng cáo khách mới */
-    tb.querySelectorAll("tbody tr td:first-child b").forEach(b=>{if(b.textContent.trim()==="Facebook")b.textContent="Facebook Ads"});
   }
   /* Bốn ô đầu trang: số chung của mọi kênh bán hàng */
   const cB2C=(()=>{try{return sum(execCost(N).flatMap(g=>g[1]),x=>x[1])}catch(e){return 0}})(),lr=[N.L.fb,N.L.spe,N.L.tts].filter(x=>x!=null);
@@ -144,5 +142,5 @@ function pKetQuaKenh(m){
   m.querySelectorAll(".xk").forEach(k=>{const l=k.querySelector(".xkl"),v=k.querySelector(".xkv"),key=l&&l.textContent.trim();if(!(key in tot))return;
     k.classList.remove("mut");v.textContent=key==="Đơn hàng"?nf(tot[key]):tr(tot[key]);
     k.querySelectorAll(".xkm").forEach(x=>x.remove());
-    const note=document.createElement("span");note.className="xkm";note.textContent="tất cả kênh: B2C, B2B, gia công";k.appendChild(note)});
+    const note=document.createElement("span");note.className="xkm";note.textContent="tất cả kênh: Kênh bán lẻ, Kênh phân phối, Kênh OEM";k.appendChild(note)});
 }}

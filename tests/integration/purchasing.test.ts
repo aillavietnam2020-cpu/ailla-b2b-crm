@@ -202,18 +202,38 @@ describe('Chứng từ nhà cung cấp: nhập giá + hóa đơn trong một l�
 });
 
 describe('Chứng từ nhập tay theo từng dòng hàng', () => {
-  it('ghi chứng từ không gắn lần nhận hàng, nhập nhiều dòng hàng có giá; tiền hàng tự cộng', async () => {
-    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'NCC F' } });
+  it('hóa đơn bắt buộc gắn lần nhận hàng của một phiếu mua; kèm thêm dòng hàng nhập tay có giá thì tiền hàng tự cộng', async () => {
+    const { supplierId, poId } = await setup();
+    // Không gắn lần nhận hàng nào: từ chối.
+    const none = await ctx.request(`${BASE}/invoices`, {
+      as: USERS.ceo,
+      body: { supplier_id: supplierId, doc_type: 'PG', invoice_date: '2026-10-08', manual_lines: [{ item: 'NVL1', qty: 10, unit_price: 1000 }] },
+    });
+    expect(none.status).toBe(400);
+    expect(none.body.error.code).toBe('NEED_RECEIPT');
+    await ctx.request(`${BASE}/orders/${poId}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'NVL1', qty: 10 }] } });
+    const orders = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const rc = orders.body.data[0].receipts[0];
     const r = await ctx.request(`${BASE}/invoices`, {
       as: USERS.ceo,
-      body: { supplier_id: sup.body.data.id, doc_type: 'PG', invoice_date: '2026-10-08', manual_lines: [{ item: 'NVL1', qty: 10, unit_price: 1000 }, { item: 'NVL1', qty: 5, unit_price: 2000 }], freight: 500 },
+      body: { supplier_id: supplierId, doc_type: 'PG', invoice_date: '2026-10-08', receipt_ids: [rc.id], prices: { [rc.lines[0].id]: 1000 }, manual_lines: [{ item: 'NVL1', qty: 5, unit_price: 2000 }], freight: 500 },
     });
     expect(r.status).toBe(200);
     expect(r.body.data.total).toBe(10000 + 10000 + 500);
     const lines = await ctx.request(`${BASE}/invoices/${r.body.data.id}/lines`, { as: USERS.ceo });
-    expect(lines.body.data).toHaveLength(2);
-    const bad = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo, body: { supplier_id: sup.body.data.id, invoice_date: '2026-10-08', manual_lines: [{ item: 'NVL1', qty: 10 }] } });
+    expect(lines.body.data).toHaveLength(1);
+    const bad = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo, body: { supplier_id: supplierId, invoice_date: '2026-10-08', receipt_ids: [rc.id], manual_lines: [{ item: 'NVL1', qty: 10 }] } });
     expect(bad.status).toBe(400);
+  });
+
+  it('phiếu chi phải gắn phiếu mua (hoặc hóa đơn); chỉ khi ghi "trả nợ chung" mới được không gắn', async () => {
+    const { supplierId, poId } = await setup();
+    const base = { supplier_id: supplierId, pay_date: '2026-10-10', amount: 1000, method: 'TIEN_MAT', receiver: 'A' };
+    const no = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: base });
+    expect(no.status).toBe(400);
+    expect(no.body.error.code).toBe('NEED_PO');
+    expect((await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { ...base, po_id: poId } })).status).toBe(200);
+    expect((await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { ...base, general: true } })).status).toBe(200);
   });
 });
 
@@ -294,7 +314,7 @@ describe('Phiếu chi nhà cung cấp: tiền mặt / chuyển khoản, tài kho
     const { supplierId } = await setup();
     const r = await ctx.request(`${BASE}/payments`, {
       as: USERS.ceo,
-      body: { supplier_id: supplierId, pay_date: '2026-10-10', amount: 500000, method: 'CHUYEN_KHOAN', from_account: 'Vietcombank · 0451000123 · CTY AILLA', to_bank: 'ACB', to_account_no: '0011', to_account_name: 'CTY HOA CHAT A' },
+      body: { supplier_id: supplierId, general: true, pay_date: '2026-10-10', amount: 500000, method: 'CHUYEN_KHOAN', from_account: 'Vietcombank · 0451000123 · CTY AILLA', to_bank: 'ACB', to_account_no: '0011', to_account_name: 'CTY HOA CHAT A' },
     });
     expect(r.status).toBe(200);
     const pid = r.body.data.id as string;
@@ -309,7 +329,7 @@ describe('Phiếu chi nhà cung cấp: tiền mặt / chuyển khoản, tài kho
 
   it('tiền mặt ghi người nhận, không cần tài khoản', async () => {
     const { supplierId } = await setup();
-    const r = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, pay_date: '2026-10-10', amount: 200000, method: 'TIEN_MAT', receiver: 'Anh Tuấn giao hàng' } });
+    const r = await ctx.request(`${BASE}/payments`, { as: USERS.ceo, body: { supplier_id: supplierId, general: true, pay_date: '2026-10-10', amount: 200000, method: 'TIEN_MAT', receiver: 'Anh Tuấn giao hàng' } });
     expect(r.status).toBe(200);
     const list = await ctx.request(`${BASE}/payments`, { as: USERS.ceo });
     expect(list.body.data[0]).toMatchObject({ method: 'TIEN_MAT', receiver: 'Anh Tuấn giao hàng', to_account_no: '' });

@@ -18,6 +18,8 @@ interface Voucher {
   order_refs: string;
   note: string;
   status: 'OK' | 'HUY';
+  /** 'CHO' = khoản từ ngưỡng chi đang chờ CEO duyệt, 'DUYET' = CEO đã duyệt. */
+  ceo_status?: string;
   cancel_reason: string | null;
   created_by_name: string | null;
   from_account?: string;
@@ -300,7 +302,10 @@ export function ShippingVouchersPage() {
                     <td className="nowrap">{formatVnDate(v.voucher_date)}</td>
                     <td>{v.carrier}</td>
                     <td>{v.destination || <span className="muted">—</span>}</td>
-                    <td className="right nowrap">{formatVnd(v.amount)}</td>
+                    <td className="right nowrap">
+                      {formatVnd(v.amount)}
+                      {v.status === 'OK' && v.ceo_status === 'CHO' && <div><span className="badge warn">Chờ CEO duyệt</span></div>}
+                    </td>
                     <td>
                       {METHOD_LABEL[v.method]}
                       {methodDetail(v) && <div className="muted" style={{ fontSize: 12 }}>{methodDetail(v)}</div>}
@@ -399,7 +404,10 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           toast.error(e instanceof ApiError ? e.message : 'Chưa tải được ' + f.name);
         }
       }
-      toast.success('Đã lập phiếu ' + r.data.voucher_no + (up ? `, kèm ${up} ảnh` : ''));
+      toast.success(
+        'Đã lập phiếu ' + r.data.voucher_no + (up ? `, kèm ${up} ảnh` : '') +
+          ((r.data as { ceo_status?: string }).ceo_status === 'CHO' ? '. Khoản từ ngưỡng chi: chờ chị Hoa (CEO) duyệt' : ''),
+      );
       onDone();
     } catch (e) {
       if (e instanceof ApiError) {

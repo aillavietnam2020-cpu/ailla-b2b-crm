@@ -1,5 +1,5 @@
 /* =====================================================================
-   KHO VẬT TƯ (phần 2): nối kiểm kê lô của khối Sản xuất với sổ kho + đồng bộ mã CRM B2B → mã MISA.
+   KHO VẬT TƯ (phần 2): nối kiểm kê lô của khối Sản xuất với sổ kho + đồng bộ mã CRM Kênh phân phối → mã MISA.
    Nạp SAU kho.js và sanxuat.js.
    ===================================================================== */
 
@@ -41,7 +41,7 @@ async function khoCancelLot(code,reason){
   catch(e){toast("Chưa trả được kho: "+e.message)}
 }
 
-/* ---------- Đồng bộ mã CRM B2B → mã MISA ---------- */
+/* ---------- Đồng bộ mã CRM Kênh phân phối → mã MISA ---------- */
 async function khoLoadMap(){
   KHO.mp={busy:true};
   try{Object.assign(KHO.mp,await kApi("/map"))}catch(e){toast(e.message);KHO.mp.map=[];KHO.mp.unmapped=[]}
@@ -78,13 +78,13 @@ function khoMapForm(sku,pick){
 function pKhoMap(m){
   if(!KHO.mp)khoLoadMap();
   const M=KHO.mp||{},ceo=ME.role==="admin";
-  khoFrame(m,"kho_map","Đồng bộ mã B2B","Đơn B2B trừ kho ngay khi CRM bấm Đã xuất kho. Số trừ = số trên đơn × hệ số (1 thùng = số can / chai trong thùng). Mã chưa đồng bộ thì chưa trừ.",`
-  <section class="card kmfrom"><b>Trừ kho theo đơn B2B từ ngày</b>${ceo?`<input type="date" id="mp-d" value="${M.b2b_from||kToday()}"><button class="btn sm" id="mp-save">Đặt ngày</button>`:`<b>${M.b2b_from?kDd(M.b2b_from):"chưa đặt"}</b>`}<span class="hint">${M.b2b_from?"Đơn xuất trước ngày này coi như đã nằm trong tồn đầu kỳ.":"Chưa đặt ngày nên <b>chưa trừ kho</b>. Nên đặt đúng ngày kiểm kê tồn đầu."}</span></section>
+  khoFrame(m,"kho_map","Đồng bộ mã Kênh phân phối","Đơn Kênh phân phối trừ kho ngay khi CRM bấm Đã xuất kho. Số trừ = số trên đơn × hệ số (1 thùng = số can / chai trong thùng). Mã chưa đồng bộ thì chưa trừ.",`
+  <section class="card kmfrom"><b>Trừ kho theo đơn Kênh phân phối từ ngày</b>${ceo?`<input type="date" id="mp-d" value="${M.b2b_from||kToday()}"><button class="btn sm" id="mp-save">Đặt ngày</button>`:`<b>${M.b2b_from?kDd(M.b2b_from):"chưa đặt"}</b>`}<span class="hint">${M.b2b_from?"Đơn xuất trước ngày này coi như đã nằm trong tồn đầu kỳ.":"Chưa đặt ngày nên <b>chưa trừ kho</b>. Nên đặt đúng ngày kiểm kê tồn đầu."}</span></section>
   ${M.unmapped&&M.unmapped.length?`<section class="card"><div class="card-h"><h2>Đã xuất kho nhưng chưa có mã MISA (kho chưa trừ)</h2>${khoCanMisa()?`<span class="hint">Bấm <b>Gắn mã MISA</b> ở từng dòng, gắn xong kho tự trừ số đã xuất.</span>`:""}</div>${tbl(["Mã CRM","Tên","ĐVT","Số lượng đã xuất"].concat(khoCanMisa()?[""]:[]),M.unmapped.map(u=>`<tr><td class="mono">${esc(u.sku)}</td><td>${esc(u.name)}</td><td>${esc(u.unit)}</td><td class="n">${knum(u.qty)}</td>${khoCanMisa()?`<td><button class="btn sm pri" data-mset="${esc(u.sku)}">Gắn mã MISA</button></td>`:""}</tr>`))}</section>`:""}
   <section class="card flush"><div class="card-h pad"><h2>Bảng đồng bộ (${(M.map||[]).length} mã CRM)</h2>${ceo?`<label class="btn">Nạp file đồng bộ (.xlsx / .csv)<input type="file" id="mp-f" accept=".xlsx,.xls,.csv" hidden></label>`:""}</div>
    ${M.map?khoRows(["Mã CRM","Tên CRM","Mã MISA","Tên MISA","ĐVT kho","Hệ số","Ghi chú"].concat(khoCanMisa()?[""]:[]),M.map.map(r=>`<tr><td class="mono">${esc(r.crm_sku)}</td><td>${esc(r.crm_name||"—")}</td><td class="mono">${esc(r.misa_code)}</td><td>${esc(r.misa_name||"")}</td><td>${esc(r.misa_unit||"")}</td><td class="n">${knum(r.factor)}</td><td>${esc(r.note||"")}</td>${khoCanMisa()?`<td class="nowrap"><button class="lnk" data-mset="${esc(r.crm_sku)}">Sửa</button> <button class="lnk" data-mgo="${esc(r.crm_sku)}" data-mc="${esc(r.misa_code)}" style="color:#b42318">Gỡ</button></td>`:""}</tr>`)):`<p class="hint pad">Đang tải…</p>`}</section>`);
   m.querySelectorAll("[data-mgo]").forEach(b=>b.onclick=async()=>{const sku=b.dataset.mgo;
-    if(!confirm("Gỡ quy đổi "+sku+" → "+b.dataset.mc+"?\n\nSau đó đơn B2B của mã CRM này sẽ KHÔNG trừ kho cho tới khi quy đổi lại. Mã MISA "+b.dataset.mc+" xóa được nếu không còn dùng ở chỗ khác."))return;
+    if(!confirm("Gỡ quy đổi "+sku+" → "+b.dataset.mc+"?\n\nSau đó đơn Kênh phân phối của mã CRM này sẽ KHÔNG trừ kho cho tới khi quy đổi lại. Mã MISA "+b.dataset.mc+" xóa được nếu không còn dùng ở chỗ khác."))return;
     try{await kApi("/map/"+encodeURIComponent(sku),{method:"DELETE"});toast("Đã gỡ quy đổi "+sku);KHO.at=0;await khoLoad(true);await khoLoadMap()}catch(e){toast(e.message)}});
   m.querySelectorAll("[data-mset]").forEach(b=>b.onclick=()=>khoMapForm(b.dataset.mset));
   if($("#mp-save"))$("#mp-save").onclick=async()=>{
@@ -548,7 +548,7 @@ function pKhoOnline(m){
      </section>`:"";
     body=khoSheetView(D.recon,S,myRuns,tab,{map:mapCard,missing:todo+todoMisa,setup:status+setup,nMissing:combos.length+misaRows.length,noMisa:new Set(misaRows.map(([u])=>u.label))});
   }
-  khoFrame(m,"kho_online","Xuất B2C: bán lẻ Facebook, TikTok, Shopee","Số hàng lẻ bán mỗi ngày ở Facebook, TikTok, Shopee, lấy thẳng từ Poscake, trừ vào tồn kho từ ngày bắt đầu. Kế toán chỉ cần xử lý combo chưa quy đổi, không cần mở Sheet.",tabs+body);
+  khoFrame(m,"kho_online","Xuất Kênh bán lẻ: bán lẻ Facebook, TikTok, Shopee","Số hàng lẻ bán mỗi ngày ở Facebook, TikTok, Shopee, lấy thẳng từ Poscake, trừ vào tồn kho từ ngày bắt đầu. Kế toán chỉ cần xử lý combo chưa quy đổi, không cần mở Sheet.",tabs+body);
   m.querySelectorAll("[data-ont]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.ont;renderMain()});
   const ref=async()=>{KHO.at=0;await khoLoad(true);await khoLoadOnline();if(tab!=="ALL")await khoLoadChannel(tab)};
   if($("#fb-save"))$("#fb-save").onclick=async()=>{try{await kApi("/online/source",{method:"PUT",body:JSON.stringify({channel:"FACEBOOK",shop_id:$("#fb-shop").value.trim(),api_key:$("#fb-key").value.trim()})});toast("Đã lưu kết nối Poscake Facebook");KHO.src=await kApi("/online/source");renderMain()}catch(e){toast(e.message)}};
@@ -1116,7 +1116,7 @@ function pKhoVo(m){
 }
 PAGES.kho_vo=pKhoVo;
 
-/* ---------- Xuất B2C gọn 3 tầng: tab chính / một hàng nhóm + kênh + bộ lọc / tab nội dung + bảng ---------- */
+/* ---------- Xuất Kênh bán lẻ gọn 3 tầng: tab chính / một hàng nhóm + kênh + bộ lọc / tab nội dung + bảng ---------- */
 function khoTidyOnline(m){
   const sub=m.querySelector("nav.kgsub");if(!sub||sub.dataset.tidy)return;
   const navs=[...m.querySelectorAll("nav.settabs")];

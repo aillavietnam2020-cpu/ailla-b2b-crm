@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { nowIso } from '@shared/datetime';
 import { zodFieldErrors } from '@shared/schemas';
-import { AGENT_SCOPES, AGENT_SCOPE_LABELS, AGENT_SCOPE_PREFIX } from '@shared/agent';
+import { AGENT_PHIEU_CHI, AGENT_SCOPES, AGENT_SCOPE_LABELS, AGENT_SCOPE_PREFIX } from '@shared/agent';
 import type { AppEnv } from '../env';
 import { auditStatement } from '../lib/audit';
 import { generateAgentToken, hashAgentToken, tokenHint } from '../lib/agentToken';
@@ -26,6 +26,9 @@ agentAdminRoutes.get('/', async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT a.id, a.name, a.purpose, a.status, a.token_hint, a.last_used_at, a.created_at, a.rotated_at,
             (SELECT COUNT(*) FROM user_permissions up WHERE up.user_id = a.id AND up.permission = 'agent.propose') AS can_propose,
+            (SELECT COUNT(*) FROM user_permissions up WHERE up.user_id = a.id AND up.permission = 'agent.act') AS can_act,
+            (SELECT COUNT(*) FROM user_permissions up WHERE up.user_id = a.id AND up.permission = '${AGENT_PHIEU_CHI}') AS can_phieuchi,
+            (SELECT group_concat(u.display_name, ', ') FROM agent_delegators g JOIN users u ON u.id = g.user_id WHERE g.agent_id = a.id) AS delegators,
             (SELECT group_concat(substr(up.permission, ${AGENT_SCOPE_PREFIX.length + 1}), ',') FROM user_permissions up
               WHERE up.user_id = a.id AND up.permission LIKE '${AGENT_SCOPE_PREFIX}%') AS scopes
      FROM agents a ORDER BY a.created_at DESC`,
@@ -175,4 +178,27 @@ agentAdminRoutes.put('/:id/scopes', async (c) => {
     }),
   ]);
   return ok(c, { id, scopes: keep });
+});
+
+/** Công tắc "agent được lập phiếu chi khi người được chỉ định ra lệnh" (chị Hoa đồng ý 27/10/2026; mặc định bật cho Kế toán trưởng). */
+agentAdminRoutes.post('/:id/phieuchi', async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const enabled = ((await c.req.json().catch(() => ({}))) as { enabled?: boolean }).enabled === true;
+  const exists = await c.env.DB.prepare('SELECT id FROM agents WHERE id = ?').bind(id).first();
+  if (!exists) throw notFound('Không tìm thấy agent');
+  await c.env.DB.batch([
+    enabled
+      ? c.env.DB.prepare('INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(id, AGENT_PHIEU_CHI, auth.user.id, nowIso())
+      : c.env.DB.prepare('DELETE FROM user_permissions WHERE user_id = ? AND permission = ?').bind(id, AGENT_PHIEU_CHI),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: enabled ? 'AGENT_PHIEU_CHI_ON' : 'AGENT_PHIEU_CHI_OFF',
+      entityType: 'AGENT',
+      entityId: id,
+      requestId: c.get('requestId'),
+      ip: c.req.header('CF-Connecting-IP') ?? null,
+    }),
+  ]);
+  return ok(c, { id, can_phieuchi: enabled });
 });

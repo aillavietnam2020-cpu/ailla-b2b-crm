@@ -114,7 +114,7 @@ const TITLES: Record<string, string> = {
 };
 
 const ROLE_LABEL: Record<string, string> = {
-  EMPLOYEE: 'Nhân viên Sale B2B',
+  EMPLOYEE: 'Nhân viên Sale Kênh phân phối',
   MANAGER: 'Quản lý kinh doanh',
   CEO: 'CEO · Quản trị cao nhất',
 };
@@ -184,7 +184,7 @@ export function AppShell({ space, children }: { space: 'sales' | 'admin'; childr
         <div className="brand">
           <div>
             <strong>Trang quản trị</strong>
-            <small>{space === 'admin' ? 'Quản trị B2B · AILLA Việt Nam' : 'Bàn làm việc Sale · AILLA Việt Nam'}</small>
+            <small>{space === 'admin' ? 'Quản trị Kênh phân phối · AILLA Việt Nam' : 'Bàn làm việc Sale · AILLA Việt Nam'}</small>
           </div>
         </div>
           <>

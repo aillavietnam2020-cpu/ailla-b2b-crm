@@ -19,6 +19,7 @@ import { priceAdjustmentRoutes } from './routes/priceAdjustments';
 import { workRoutes } from './routes/work';
 import { staffPurchaseRoutes } from './routes/staffPurchases';
 import { shippingVoucherRoutes } from './routes/shippingVouchers';
+import { soChiRoutes } from './routes/soChi';
 import { agentRoutes } from './routes/agent';
 import { agentTiktokRoutes } from './routes/agentTiktok';
 import { agentAdminRoutes } from './routes/agents';
@@ -36,9 +37,11 @@ import { fpPublishRoutes } from './routes/fpPublish';
 import { sttRoutes, sttWorkerRoutes } from './routes/stt';
 import { khoRoutes } from './routes/kho';
 import { tiktokRoutes } from './routes/tiktok';
+import { shopeeRoutes } from './routes/shopee';
 import { dieuhanhRoutes } from './routes/dieuhanh';
 import { soatRoutes } from './routes/soatSoLieu';
 import { hrRoutes } from './routes/hr';
+import { ceoSpendRoutes } from './routes/ceoSpend';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -114,6 +117,7 @@ export function createApp() {
   app.route('/api/bonus', bonusRoutes);
   app.route('/api/price-adjustments', priceAdjustmentRoutes);
   app.route('/api/shipping-vouchers', shippingVoucherRoutes);
+  app.route('/api/ceo-spend', ceoSpendRoutes);
   app.route('/api/work', workRoutes);
   app.route('/api/staff-purchases', staffPurchaseRoutes);
   app.route('/api/agent/tiktok', agentTiktokRoutes);
@@ -132,7 +136,9 @@ export function createApp() {
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/fp-publish', fpPublishRoutes);
   app.route('/api/hub/kho', khoRoutes);
+  app.route('/api/hub/so-chi', soChiRoutes);
   app.route('/api/hub/tiktok', tiktokRoutes);
+  app.route('/api/hub/shopee', shopeeRoutes);
   app.route('/api/hub/dieuhanh', dieuhanhRoutes);
   app.route('/api/hub/soat', soatRoutes);
   app.route('/api/hub/hr', hrRoutes);

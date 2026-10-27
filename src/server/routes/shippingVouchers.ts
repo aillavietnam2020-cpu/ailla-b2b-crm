@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { nowIso } from '@shared/datetime';
+import { nowIso, vnDate } from '@shared/datetime';
 import { zodFieldErrors } from '@shared/schemas';
 import type { AppEnv, AuthContext } from '../env';
 import { auditStatement, clientIp } from '../lib/audit';
 import { badRequest, conflict, forbidden, notFound, ok, unprocessable } from '../lib/http';
 import { createShippingVoucher } from '../services/shippingVouchers';
+import { agentSpendGuard, withSource } from '../services/agentSpend';
 import { addPayFile, deletePayFile, getPayFile, listPayFiles } from '../lib/payFiles';
 
 /**
@@ -60,7 +61,7 @@ shippingVoucherRoutes.get('/', async (c) => {
   }
   const rows = await c.env.DB.prepare(
     `SELECT v.id, v.voucher_no, v.voucher_date, v.carrier, v.destination, v.amount, v.method, v.order_refs, v.note,
-            v.status, v.created_at, v.cancel_reason, u.display_name AS created_by_name,
+            v.status, v.ceo_status, v.created_at, v.cancel_reason, u.display_name AS created_by_name,
             v.from_account, v.to_bank, v.to_account_no, v.to_account_name, v.receiver,
             (SELECT COUNT(*) FROM pay_files f WHERE f.ref_type = 'SHIP_VC' AND f.ref_id = v.id) AS file_count
      FROM shipping_vouchers v LEFT JOIN users u ON u.id = v.created_by
@@ -81,7 +82,19 @@ shippingVoucherRoutes.post('/', async (c) => {
   if (!parsed.success) {
     throw unprocessable('VALIDATION_FAILED', 'Phiếu chi chưa hợp lệ', zodFieldErrors(parsed.error));
   }
-  const r = await createShippingVoucher(c.env.DB, auth, parsed.data, {
+  // Agent lập theo lệnh chị Thảo: kiểm công tắc, trùng (cùng người nhận, số tiền, ngày), ghi nguồn vào ghi chú.
+  const d = parsed.data;
+  const day = d.voucher_date ?? vnDate();
+  const src = await agentSpendGuard(c.env.DB, auth, 'VC', { date: day, amount: d.amount, payees: [d.carrier, d.receiver, d.to_account_name, d.to_account_no] }, async () =>
+    ((await c.env.DB.prepare(
+      "SELECT voucher_no, voucher_date, amount, carrier, receiver, to_account_name, to_account_no FROM shipping_vouchers WHERE status = 'OK' AND voucher_date = ? AND amount = ?",
+    ).bind(day, d.amount).all<Record<string, string | number>>()).results ?? []).map((v) => ({
+      no: String(v.voucher_no), date: String(v.voucher_date), amount: Number(v.amount),
+      payees: [v.carrier, v.receiver, v.to_account_name, v.to_account_no].map((x) => String(x ?? '')),
+    })),
+  );
+  if (src) d.note = withSource(d.note, src.source);
+  const r = await createShippingVoucher(c.env.DB, auth, d, {
     requestId: c.get('requestId'),
     ip: clientIp(c.req.raw.headers),
   });

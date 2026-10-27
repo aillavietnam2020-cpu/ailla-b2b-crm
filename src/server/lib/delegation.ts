@@ -9,7 +9,8 @@ export const DELEGATION_PREFIX = 'dlg_';
 export const DELEGATION_TTL_MS = 30 * 60_000;
 export const DELEGATION_MAX_USES = 40;
 
-/** Chỉ các nhóm việc chị Hoa đã đồng ý: mua hàng + phiếu chi nhà cung cấp, kho, đơn B2B, thanh toán và công nợ khách, phiếu chi vận chuyển (lái xe). Không bao giờ xóa cứng. */
+/** Chỉ các nhóm việc chị Hoa đã đồng ý: mua hàng + phiếu chi nhà cung cấp, kho, đơn B2B, thanh toán và công nợ khách, phiếu chi vận chuyển (lái xe), phiếu Chi phí khác. Không bao giờ xóa cứng.
+ *  Lập phiếu chi còn qua rào riêng ở services/agentSpend.ts (công tắc agent.phieuchi, chặn trùng, ghi nguồn). */
 const ALLOW: Array<{ methods: string[]; re: RegExp }> = [
   { methods: ['GET', 'POST', 'PUT'], re: /^\/api\/hub\/kho\/mh(\/|$)/ },
   { methods: ['GET', 'POST'], re: /^\/api\/hub\/kho\/docs(\/\d+\/cancel)?$/ },
@@ -20,6 +21,8 @@ const ALLOW: Array<{ methods: string[]; re: RegExp }> = [
   { methods: ['GET', 'POST'], re: /^\/api\/payments(\/(?!.*\/delete$)[^/]+(\/[a-z-]+)?)?$/ },
   { methods: ['GET'], re: /^\/api\/customers(\/|$)/ },
   { methods: ['GET', 'POST'], re: /^\/api\/shipping-vouchers(\/[^/]+\/cancel)?$/ },
+  // Phiếu chi "Chi phí khác" của Sổ chi phí (vào hàng chờ chị Huệ duyệt), chị Hoa đồng ý 27/10/2026.
+  { methods: ['POST'], re: /^\/api\/hub\/so-chi\/phieu-chi$/ },
 ];
 
 export function delegatedPathAllowed(method: string, path: string): boolean {

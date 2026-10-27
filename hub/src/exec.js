@@ -7,11 +7,11 @@ const ico=k=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentCol
 function execAlerts(){
   const d=D(),A=[],late=d.cards.filter(isLate);try{aiTop(2).forEach(i=>A.push([i.lv==="hot"?"amb":"red","Trợ lý AI: "+i.title,"bấm để xem đề xuất","ai"]))}catch(err){}
   if(late.length)A.push(["red",`${late.length} thẻ video trễ hạn`,"Marketing · Content","cv"]);
-  const ms=(KDX.fbSale||[]).filter(s=>s.tao&&s.huy/s.tao>.2);ms.forEach(s=>A.push(["red",`${s.n}: tỷ lệ hủy ${(s.huy/s.tao*100).toFixed(1)}%`,"Facebook › Hoạt động Sale B2C · vượt ngưỡng 20%","fb_sale"]));
+  const ms=(KDX.fbSale||[]).filter(s=>s.tao&&s.huy/s.tao>.2);ms.forEach(s=>A.push(["red",`${s.n}: tỷ lệ hủy ${(s.huy/s.tao*100).toFixed(1)}%`,"Facebook › Hoạt động Sale Kênh bán lẻ · vượt ngưỡng 20%","fb_sale"]));
   if(KDX.fbDash&&KDX.fbDash.dt&&!KDX.fbDash.tienVe)A.push(["amb",`${tr(KDX.fbDash.treo)} tiền Facebook chưa ghi nhận về`,"Kế toán · kiểm mã đối soát","doisoat"]);
   if(KDX.tts){const lo=KDX.tts.sp.filter(s=>s.lai<0);if(lo.length)A.push(["amb",`${lo.length} sản phẩm TikTok lỗ sau quảng cáo`,"TikTok · tháng 7","bc_tiktok"]);const nt=(KDX.tts.booking.find(r=>/nghiệm thu/.test(r[0]))||[])[1];if(nt===0)A.push(["amb","36 KOC đã book, chưa nghiệm thu video nào","KOC · tháng 8","bc_koc"])}
   if(KDX.spe)A.push(["amb","40% doanh thu Shopee chưa chốt giá vốn","Kế toán · 95 SKU cần xác nhận","bc_shopee"]);
-  if(d.b2b){const over=d.b2b.customers.filter(c=>{const x=custDebt(c);return x.limit&&x.chinh>x.limit}).length;if(over)A.push(["red",`${over} khách B2B vượt hạn mức công nợ`,"B2B · dữ liệu mẫu","b2b_cn"])}
+  if(d.b2b){const over=d.b2b.customers.filter(c=>{const x=custDebt(c);return x.limit&&x.chinh>x.limit}).length;if(over)A.push(["red",`${over} khách Kênh phân phối vượt hạn mức công nợ`,"B2B · dữ liệu mẫu","b2b_cn"])}
   return A;
 }
 function execApprovals(){
@@ -19,12 +19,12 @@ function execApprovals(){
   const kb=d.cards.filter(c=>c.step==="dkb").length,vd=d.cards.filter(c=>c.step==="dvd").length;if(kb)L.push([`${kb} kịch bản chờ duyệt`,"Marketing · Content","cv"]);if(vd)L.push([`${vd} video chờ duyệt`,"Marketing · Content","cv"]);const vc=d.cards.filter(c=>c.step==="dceo").length;if(vc)L.push([`${vc} video chờ CEO duyệt`,"Marketing · Lead Content & Media đã duyệt","cv"]);
   const dcp=(d.adjusts||[]).filter(a=>a.st==="pending").length;if(dcp)L.push([`${dcp} phiếu điều chỉnh kế hoạch chờ duyệt`,"Marketing · Lead Content & Media / trợ lý AI đề xuất","dieuchinh"]);
   const rs=d.research.filter(r=>r.status==="Chờ kiểm tra").length;if(rs)L.push([`${rs} research chờ kiểm tra`,"Marketing","research"]);
-  if(d.b2b){const p=d.b2b.orders.filter(o=>o.approval==="PENDING_APPROVAL");if(p.length)L.push([`${p.length} đơn B2B chờ duyệt · ${tr(sum(p,ordTot))}`,"Kinh doanh B2B","b2b_don"])}
+  if(d.b2b){const p=d.b2b.orders.filter(o=>o.approval==="PENDING_APPROVAL");if(p.length)L.push([`${p.length} đơn Kênh phân phối chờ duyệt · ${tr(sum(p,ordTot))}`,"Kênh phân phối","b2b_don"])}
   return L;
 }
 function chanRows(){
   const tt=pSum("tts",0),sp=pSum("spe",0),fb=pSum("fb",6),fbt=pSum("fb",0),A=adsSum(),ad=sum(Object.values(A),a=>a.dt),ac=sum(Object.values(A),a=>a.chi);
-  return [["bag","TikTok Shop","GMV cả shop",tt.v,"",covTxt("tts"),"bc_tiktok"],["bag","Shopee 2 shop","doanh thu, đã trừ hủy/hoàn",sp.v,pSum("spe",3).v,covTxt("spe"),"bc_shopee"],["bag","Facebook (Pancake)","doanh thu chốt · "+nf(pSum("fb",1).v)+" đơn chốt",fb.v,pSum("fb",5).v-pSum("fb",7).v,covTxt("fb"),"bc_fb"],["mega","Ads Facebook","đơn chốt · chi "+tr(ac),ad,"",covTxt("ads"),"adshieuqua"],["box","Kinh doanh B2B","CRM","","","chờ nối CRM thật","b2b_today"],["fac","Sản xuất","2 nhà máy","","","chưa có số","sx"]];
+  return [["bag","TikTok Shop","GMV cả shop",tt.v,"",covTxt("tts"),"bc_tiktok"],["bag","Shopee 2 shop","doanh thu, đã trừ hủy/hoàn",sp.v,pSum("spe",3).v,covTxt("spe"),"bc_shopee"],["bag","Facebook (Pancake)","doanh thu chốt · "+nf(pSum("fb",1).v)+" đơn chốt",fb.v,pSum("fb",5).v-pSum("fb",7).v,covTxt("fb"),"bc_fb"],["mega","Ads Facebook","đơn chốt · chi "+tr(ac),ad,"",covTxt("ads"),"adshieuqua"],["box","Kênh phân phối","CRM","","","chờ nối CRM thật","b2b_today"],["fac","Sản xuất","2 nhà máy","","","chưa có số","sx"]];
 }
 /* ---------- Trung tâm điều hành: mỗi nhóm chỉ số một khối ---------- */
 function rSum(src,idx,from,to){const D0=DAYD[src]||{};let v=0,n=0;for(const k in D0)if(k>=from&&k<=to){v+=+D0[k][idx]||0;n++}return {v,n}}
@@ -91,19 +91,19 @@ function pExec(m){
   const O=execOrders(PERIOD.from,PERIOD.to),OP=execOrders(pr.from,pr.to),oTot=O.tts+O.spe+O.fb,oTotP=OP.tts+OP.spe+OP.fb,TD=execTodo();
   const upd=D().updatedAt?new Date(D().updatedAt):new Date(),updS=upd.toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"})+" "+upd.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"});
   const K=[["money","Doanh số",tr(N.tong),ok?exChg(N.tong,P.tong):`<span class="kchg">so với kỳ trước: chưa đủ số</span>`,"bc_tong",""],["wallet","Chi phí",tr(cTot),ok&&cOK?exChg(cTot,cTotP,true):`<span class="kchg">${N.tong?pc(cTot,N.tong)+" doanh số":""}</span>`,"","cost"],["trend","Lợi nhuận",tr(lTot),ok&&lOK&&lTotP?exChg(lTot,lTotP):`<span class="kchg">biên ${pc(lTot,sum(lr.filter(x=>x[1]!=null),x=>x[2]))}</span>`,"pl",""],["cart","Đơn hàng",oTot?nf(oTot):"—",ok&&oTotP?exChg(oTot,oTotP):`<span class="kchg">TikTok · Shopee · Facebook</span>`,"bc_tong",""],["task","Việc đang làm",nf(TD.doing),`<span class="kchg">${nf(TD.all.length)} việc chưa xong</span>`,"cv_nv",""],["alert","Việc quá hạn",nf(TD.late),`<span class="kchg ${TD.late?"dn":""}">${TD.late?"cần xử lý ngay":"không có việc trễ"}</span>`,"cv_nv",""]];
-  const CH=[{n:"Facebook",c:"#2f6fde",main:true,get:getD("fb",6),t:"fb"},{n:"TikTok Shop",c:"#e7357b",get:getD("tts",0),t:"tts"},{n:"Shopee",c:"#f59f00",get:getD("spe",0),t:"spe"},{n:"B2B / Đại lý",c:"#868e96",get:()=>0,t:"b2b"}];
+  const CH=[{n:"Facebook",c:"#2f6fde",main:true,get:getD("fb",6),t:"fb"},{n:"TikTok Shop",c:"#e7357b",get:getD("tts",0),t:"tts"},{n:"Shopee",c:"#f59f00",get:getD("spe",0),t:"spe"},{n:"Kênh phân phối",c:"#868e96",get:()=>0,t:"b2b"}];
   const shown=EXCH.tab==="all"?CH:CH.filter(s=>s.t===EXCH.tab),keys=pDays(),byM=keys.length>62;
   const ks=byM?[...new Set(keys.map(x=>x.slice(0,7)))]:keys,ser=shown.map(s=>({...s,get:byM?(mk=>sum(keys.filter(x=>x.startsWith(mk)),s.get)):s.get})),lbl=byM?(x=>x.slice(5)+"/"+x.slice(0,4)):(x=>x.slice(8)+"/"+x.slice(5,7));
   let lastI=-1;ks.forEach((x,i)=>{if(ser.some(s=>s.get(x)))lastI=i});const ksD=ks.slice(0,lastI+1),hasData=lastI>=0;
-  const rowsCh=[["fb","Facebook",N.fbDT,P.fbDT,O.fb,C=>C.gvFB+C.adsFB,N.L.fb,"bc_fb"],["tts","TikTok Shop",N.tt,P.tt,O.tts,C=>C.adsTT+C.gvTT+C.phiTT+C.khacTT,N.L.tts,"bc_tiktok"],["spe","Shopee",N.spDT,P.spDT,O.spe,C=>C.adsSPE+C.gvSPE+C.phiSPE,N.L.spe,"bc_shopee"],["b2b","B2B / Đại lý",0,0,0,()=>0,null,"b2b_today"]];
+  const rowsCh=[["fb","Facebook",N.fbDT,P.fbDT,O.fb,C=>C.gvFB+C.adsFB,N.L.fb,"bc_fb"],["tts","TikTok Shop",N.tt,P.tt,O.tts,C=>C.adsTT+C.gvTT+C.phiTT+C.khacTT,N.L.tts,"bc_tiktok"],["spe","Shopee",N.spDT,P.spDT,O.spe,C=>C.adsSPE+C.gvSPE+C.phiSPE,N.L.spe,"bc_shopee"],["b2b","Kênh phân phối",0,0,0,()=>0,null,"b2b_today"]];
   const ST=execStock(),al=execAlerts(),ap=execApprovals();
   const goals=[["Tổng doanh số",N.tong,T.tong],["TikTok Shop",N.tt,T.tts],["Shopee",N.spDT,T.spe],["Facebook (giao TC)",N.fbDT,T.fb],["Ads Facebook",N.adsDT,T.ads]];
   m.innerHTML=`<div class="xhead"><div class="xht"><h1>Trung tâm điều hành</h1><span>${esc(pLabel())}</span><span class="sep" aria-hidden="true"></span><span>so với ${vnd(pr.from)} – ${vnd(pr.to)}</span></div><div class="xupd">${ico("clock")} Cập nhật cuối: <span class="numeric">${updS}</span></div></div>
   <section class="kstrip" aria-label="Chỉ số chính">${K.map(([ic,l,v,h,go,act])=>`<button type="button" class="kcell" ${go?`data-go="${go}"`:""} ${act?`data-kact="${act}"`:""}><span class="kic k-${ic}">${ico(ic)}</span><span class="kl">${l}</span><span class="kv numeric">${v}</span>${h}</button>`).join("")}</section>
   <div class="xmain">
    <section class="card xchart"><div class="card-h"><h2>Doanh số theo kênh</h2><span class="hint">${byM?"theo tháng":"theo ngày"} · đơn vị: đồng</span></div>
-    <div class="tabs xtabs" role="tablist">${[["all","Tất cả"],["fb","Facebook"],["tts","TikTok Shop"],["spe","Shopee"],["b2b","B2B / Đại lý"]].map(([k2,t])=>`<button role="tab" aria-selected="${EXCH.tab===k2}" class="${EXCH.tab===k2?"on":""}" data-xt="${k2}">${t}</button>`).join("")}</div>
-    ${EXCH.tab==="b2b"?`<p class="empty xempty">Doanh số B2B chưa đưa vào biểu đồ: đơn đại lý đang nằm trong CRM B2B. <button class="lnk" data-go="b2b_today">Mở CRM B2B →</button></p>`:hasData?lineChart(ser,ksD,tr,lbl):`<p class="empty xempty">Kỳ đã chọn chưa có số doanh thu. Thử chọn tháng 7, 8 hoặc 9/2026 ở ô chọn kỳ phía trên.</p>`}</section>
+    <div class="tabs xtabs" role="tablist">${[["all","Tất cả"],["fb","Facebook"],["tts","TikTok Shop"],["spe","Shopee"],["b2b","Kênh phân phối"]].map(([k2,t])=>`<button role="tab" aria-selected="${EXCH.tab===k2}" class="${EXCH.tab===k2?"on":""}" data-xt="${k2}">${t}</button>`).join("")}</div>
+    ${EXCH.tab==="b2b"?`<p class="empty xempty">Doanh số Kênh phân phối chưa đưa vào biểu đồ: đơn đại lý đang nằm trong CRM Kênh phân phối. <button class="lnk" data-go="b2b_today">Mở CRM Kênh phân phối →</button></p>`:hasData?lineChart(ser,ksD,tr,lbl):`<p class="empty xempty">Kỳ đã chọn chưa có số doanh thu. Thử chọn tháng 7, 8 hoặc 9/2026 ở ô chọn kỳ phía trên.</p>`}</section>
    <section class="card xtodo"><div class="card-h"><h2>Việc cần xử lý</h2><button class="lnk" data-go="cv_nv">Xem tất cả →</button></div>
     ${TD.top.length?`<div class="tbl"><table><thead><tr><th>Nội dung công việc</th><th>Hạn</th><th>Trạng thái</th></tr></thead><tbody>${TD.top.map(x=>{const s=x.late?EX_ST.late:(EX_ST[x.st]||[x.st,"gry"]);return `<tr><td><div class="xtn">${exDot(s[1])}<div class="xtc"><span>${esc(x.ten||"")}</span><small>${esc(x.sub||x.lq)}</small></div></div></td><td class="${x.late?"t-red":""} xst">${x.hanTxt}</td><td class="xst">${pill(s[0],s[1])}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty">Không có việc đang mở.</p>`}</section>
   </div>

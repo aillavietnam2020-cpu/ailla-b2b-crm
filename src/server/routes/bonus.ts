@@ -9,6 +9,8 @@ import { newId } from '../lib/ids';
 import { adminOnlyEndpoint } from '../middleware/adminHost';
 import { bonusReport, loadTiers } from '../services/bonus';
 import { spanOf } from '../lib/span';
+import { needsCeo } from '@shared/ceoSpend';
+import { loadCeoSpend } from './ceoSpend';
 
 /**
  * Cơ chế thưởng NPP theo doanh số lẻ. Cơ chế (chung + riêng từng khách) do CEO đặt ở TRANG QUẢN TRỊ;
@@ -379,7 +381,7 @@ bonusRoutes.get('/cash', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT v.id, v.voucher_no, v.customer_id, cu.name AS customer_name, v.month, v.amount, v.method, v.note, v.status,
-              v.cancel_reason, v.created_at, u.display_name AS created_by_name, a.display_name AS approved_by_name
+              v.cancel_reason, v.created_at, v.created_by, v.ceo_status, u.display_name AS created_by_name, a.display_name AS approved_by_name
        FROM bonus_cash_vouchers v JOIN customers cu ON cu.id = v.customer_id
        LEFT JOIN users u ON u.id = v.created_by LEFT JOIN users a ON a.id = v.approved_by
        WHERE v.month = ? ORDER BY v.created_at DESC`,
@@ -440,16 +442,35 @@ bonusRoutes.post('/cash/:id/approve', async (c) => {
   const auth = c.get('auth');
   if (!canApprove(auth)) throw forbidden('Chỉ quản lý điều phối hoặc CEO duyệt phiếu chi thưởng');
   const v = await c.env.DB
-    .prepare('SELECT voucher_no, status, created_by FROM bonus_cash_vouchers WHERE id = ?')
+    .prepare('SELECT voucher_no, status, created_by, amount, ceo_status FROM bonus_cash_vouchers WHERE id = ?')
     .bind(c.req.param('id'))
-    .first<{ voucher_no: string; status: string; created_by: string | null }>();
+    .first<{ voucher_no: string; status: string; created_by: string | null; amount: number; ceo_status: string }>();
   if (!v) throw notFound('Không tìm thấy phiếu');
   if (v.status !== 'CHO_DUYET') throw conflict('BAD_STEP', 'Phiếu này không còn ở bước chờ duyệt');
   if (v.created_by === auth.user.id && !isCeo(auth)) throw forbidden('Người lập phiếu không tự duyệt phiếu của mình');
+  // Từ ngưỡng chi (mặc định 5 triệu, chị Hoa chốt 27/10/2026): quản lý duyệt xong thì chuyển chờ CEO, CEO duyệt mới thành "đã chi".
+  const threshold = await loadCeoSpend(c.env.DB);
+  if (needsCeo(v.amount, threshold, isCeo(auth))) {
+    if (v.ceo_status === 'CHO') throw conflict('WAIT_CEO', 'Phiếu này đã duyệt, đang chờ CEO duyệt');
+    await c.env.DB.batch([
+      c.env.DB
+        .prepare("UPDATE bonus_cash_vouchers SET ceo_status = 'CHO', pre_by = ?, pre_at = ? WHERE id = ? AND status = 'CHO_DUYET'")
+        .bind(auth.user.id, nowIso(), c.req.param('id')),
+      auditStatement(c.env.DB, {
+        actorId: auth.user.id,
+        action: 'BONUS_CASH_PRE_APPROVED',
+        entityType: 'BONUS_CASH',
+        entityId: v.voucher_no,
+        requestId: c.get('requestId'),
+        ip: clientIp(c.req.raw.headers),
+      }),
+    ]);
+    return ok(c, { ok: true, ceo_status: 'CHO' });
+  }
   await c.env.DB.batch([
     c.env.DB
-      .prepare("UPDATE bonus_cash_vouchers SET status = 'DA_CHI', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'CHO_DUYET'")
-      .bind(auth.user.id, nowIso(), c.req.param('id')),
+      .prepare("UPDATE bonus_cash_vouchers SET status = 'DA_CHI', approved_by = ?, approved_at = ?, ceo_status = ? WHERE id = ? AND status = 'CHO_DUYET'")
+      .bind(auth.user.id, nowIso(), threshold > 0 && v.amount >= threshold ? 'DUYET' : v.ceo_status, c.req.param('id')),
     auditStatement(c.env.DB, {
       actorId: auth.user.id,
       action: 'BONUS_CASH_APPROVED',

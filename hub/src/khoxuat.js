@@ -127,5 +127,5 @@ function xpOpen(id){
     catch(e){$("#xp-msg").textContent=e.message;b.disabled=false}}}
 PAGES.kho_xuat_b2b=m=>{
   const P=kPer();if(!XP.rows||Date.now()-XP.at>20000||XP.doneKey!==P.from+"|"+P.to)xpLoad();
-  khoFrame(m,"kho_xuat_b2b","Xuất B2B: đơn NPP, đại lý","Đơn đã duyệt hiện ở đây để in phiếu xuất kho, xuất hàng và xác nhận. Phải tự chọn ngày xuất và ghi tên người xuất.",xpEdits()+xpPending()+xpShipped());
+  khoFrame(m,"kho_xuat_b2b","Xuất Kênh phân phối: đơn NPP, đại lý","Đơn đã duyệt hiện ở đây để in phiếu xuất kho, xuất hàng và xác nhận. Phải tự chọn ngày xuất và ghi tên người xuất.",xpEdits()+xpPending()+xpShipped());
   xpBind(m)};

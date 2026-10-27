@@ -30,14 +30,16 @@ function cptQuick(){
 {const _q=cpQuick;cpQuick=function(){_q.apply(this,arguments);try{const h=document.querySelector("#cqf");if(!h)return;
   h.insertAdjacentHTML("beforebegin",`<div class="mhpm"><label class="chk"><input type="radio" name="cq-t" value="chi" checked> Phiếu chi</label><label class="chk"><input type="radio" name="cq-t" value="thu"> Phiếu thu</label></div>`);
   document.querySelectorAll('input[name="cq-t"]').forEach(x=>x.onchange=()=>{if(x.value==="thu"&&x.checked)cptQuick()})}catch(e){}};spForm=cpQuick}
+/* Chị Huệ xác nhận một phiếu thu: chuyển từ Chờ xác nhận sang Sổ thu (dùng ở Chờ phân bổ và trang Phê duyệt). */
+function cptXacNhan(id,ng){if(!cpCan())return;
+  DB.mutate(ME.name,"xác nhận phiếu thu",dt=>{const i=(dt.thuCho||[]).findIndex(x=>x.id===id);if(i<0)return;const p=dt.thuCho.splice(i,1)[0];if(!dt.thuTay)dt.thuTay=[];dt.thuTay.push({...p,nguon:ng||p.nguon||"khac",duyet:ME.name,duyetAt:Date.now()})});toast("Đã xác nhận phiếu thu");renderMain()}
 /* Chờ phân bổ: thêm bảng phiếu thu chờ xác nhận */
 {const _d=PAGES.cp_duyet;PAGES.cp_duyet=function(m){_d.apply(this,arguments);
   try{const d=D(),L=(d.thuCho||[]).slice().sort((a,b)=>String(a.ngay).localeCompare(String(b.ngay))),can2=cpCan();if(!L.length)return;
     const files=SOCP.files||{};
     m.insertAdjacentHTML("beforeend",`<section class="card flush"><div class="card-h pad"><h2>Phiếu thu chờ xác nhận</h2><span class="hint">${L.length} phiếu · ${nf(Math.round(L.reduce((t,x)=>t+x.tien,0)))} đ</span></div>
     ${tbl(["Ngày","Nội dung","Số tiền","Nguồn thu","Tiền về","Ảnh",""],L.map(x=>`<tr data-th="${x.id}"><td>${esc(kDd(x.ngay))}</td><td><b>${esc(x.note)}</b><div class="hint">${esc(x.by||"")}</div></td><td class="n"><b>${nf(Math.round(x.tien))}</b></td><td>${can2?`<select data-tn>${opt(CPT_NGUON,x.nguon||"khac")}</select>`:esc(cptNg(x.nguon))}</td><td>${esc(x.acct||"—")}</td><td>${files[x.id]?pill(files[x.id]+" ảnh","blu"):`<span class="hint">chưa có</span>`} <button class="btn sm" data-tfi="${x.id}">Ảnh</button></td><td class="nowrap">${can2?`<button class="btn sm pri" data-tok="${x.id}">Xác nhận</button> <button class="btn sm danger" data-tdel="${x.id}">Xóa</button>`:""}</td></tr>`))}</section>`);
-    m.querySelectorAll("[data-tok]").forEach(b=>b.onclick=()=>{const id=b.dataset.tok,sel=m.querySelector(`tr[data-th="${id}"] [data-tn]`),ng=sel?sel.value:"khac";
-      DB.mutate(ME.name,"xác nhận phiếu thu",dt=>{const i=(dt.thuCho||[]).findIndex(x=>x.id===id);if(i<0)return;const p=dt.thuCho.splice(i,1)[0];if(!dt.thuTay)dt.thuTay=[];dt.thuTay.push({...p,nguon:ng,duyet:ME.name,duyetAt:Date.now()})});toast("Đã xác nhận phiếu thu");renderMain()});
+    m.querySelectorAll("[data-tok]").forEach(b=>b.onclick=()=>{const id=b.dataset.tok,sel=m.querySelector(`tr[data-th="${id}"] [data-tn]`);cptXacNhan(id,sel?sel.value:"khac")});
     m.querySelectorAll("[data-tdel]").forEach(b=>b.onclick=()=>{const x=L.find(y=>y.id===b.dataset.tdel);if(!confirm("Xóa phiếu thu \""+x.note+"\" ("+nf(Math.round(x.tien))+" đ)?"))return;DB.mutate(ME.name,"xóa phiếu thu chờ",dt=>{dt.thuCho=(dt.thuCho||[]).filter(y=>y.id!==x.id)});renderMain()});
     m.querySelectorAll("[data-tfi]").forEach(b=>b.onclick=()=>{const x=L.find(y=>y.id===b.dataset.tfi);spFiles(x.id,x.note)})}catch(e){}}}
 /* ---------- Sổ thu ---------- */

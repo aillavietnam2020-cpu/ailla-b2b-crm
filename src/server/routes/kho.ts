@@ -33,6 +33,7 @@ import {
   type Channel,
   type ChannelDay,
 } from '../services/channelOut';
+import { khoDoiChieu, khoTonRows, type KhoTonRow } from '../services/khoTon';
 
 /**
  * Kho sản xuất: nhập NVL → pha chế BTP → kiểm kê đóng gói → xuất kho → hàng hoàn.
@@ -728,7 +729,7 @@ khoRoutes.post('/items/bulk', async (c) => {
     const REFS: Array<[string, string, string]> = [
       ['kho_bom', 'item', 'đang nằm trong định mức của sản phẩm khác'],
       ['kho_moves', 'item', 'đã có phiếu kho'],
-      ['kho_map', 'misa_code', 'đang được CRM quy đổi (trang Đồng bộ mã B2B)'],
+      ['kho_map', 'misa_code', 'đang được CRM quy đổi (trang Đồng bộ mã Kênh phân phối)'],
       ['channel_out', 'item', 'đã có số bán qua sàn'],
       ['channel_alias', 'item', 'có quy đổi tên sàn'],
       ['kho_pack', 'vo', 'được khai là vỏ của thành phẩm'],
@@ -851,7 +852,7 @@ khoRoutes.delete('/items/:code', async (c) => {
   if (parts.length) {
     throw conflict(
       'ITEM_IN_USE',
-      `Mã ${code} đã phát sinh (${parts.join(', ')}) nên không xóa hẳn được. Gỡ chỗ đang dùng trước (xóa định mức ở trang Định mức & giá thành, gỡ quy đổi ở trang Đồng bộ mã B2B), hoặc dùng "Ngừng dùng" để ẩn mã này.`,
+      `Mã ${code} đã phát sinh (${parts.join(', ')}) nên không xóa hẳn được. Gỡ chỗ đang dùng trước (xóa định mức ở trang Định mức & giá thành, gỡ quy đổi ở trang Đồng bộ mã Kênh phân phối), hoặc dùng "Ngừng dùng" để ẩn mã này.`,
     );
   }
   await c.env.DB.batch([
@@ -972,7 +973,7 @@ khoRoutes.get('/nxt', async (c) => {
 
 /**
  * Từng phiếu làm đổi tồn của một mã trong kỳ (để từ bảng Nhập – xuất – tồn bấm vào xem phiếu, không chỉ thấy số tổng).
- * Phiếu thật (kho_docs) có doc_id; phiếu xuất bán đơn B2B / trả hàng được ghép với đơn hoặc phiếu trả để mở ra xem.
+ * Phiếu thật (kho_docs) có doc_id; phiếu xuất bán đơn Kênh phân phối / trả hàng được ghép với đơn hoặc phiếu trả để mở ra xem.
  */
 khoRoutes.get('/nxt/detail', async (c) => {
   const item = (c.req.query('item') ?? '').trim();
@@ -1016,17 +1017,13 @@ khoRoutes.get('/variance', async (c) => {
   return ok(c, { tolerance_pct: VAT_TOLERANCE_PCT, rows: rows.results });
 });
 
-/** Cảnh báo cho trang kho và (sau này) cho bot Telegram: dưới mức tối thiểu, tồn âm, phiếu pha chế lệch nhiều. */
+/** Cảnh báo cho trang kho và (sau này) cho bot Telegram: dưới mức tối thiểu, tồn âm, phiếu pha chế lệch nhiều.
+ * Âm / sắp hết lấy từ chỗ tính tồn chung (services/khoTon.ts), không tự cộng sổ ở đây nữa. */
 export async function khoAlerts(db: D1Database) {
-  const stock = await db
-    .prepare(
-      `SELECT i.code, i.name, i.unit, i.cls, i.min_stock, COALESCE(s.qty, 0) AS qty
-       FROM kho_items i LEFT JOIN (
-         SELECT item, ROUND(SUM(qty), 6) AS qty FROM kho_ledger GROUP BY item) s ON s.item = i.code
-       WHERE i.active = 1 AND (COALESCE(s.qty, 0) < 0 OR (i.min_stock > 0 AND COALESCE(s.qty, 0) < i.min_stock))
-       ORDER BY COALESCE(s.qty, 0) - i.min_stock LIMIT 200`,
-    )
-    .all<{ code: string; name: string; unit: string; cls: string; min_stock: number; qty: number }>();
+  const all = await khoTonRows(db);
+  const pick = (r: KhoTonRow) => ({ code: r.code, name: r.name, unit: r.unit, cls: r.cls, nhom: r.nhom, min_stock: r.min_stock, qty: r.ton, giu: r.giu, kha_dung: r.kha_dung, active: r.active });
+  const neg = all.filter((r) => r.trang_thai === 'AM').sort((a, b) => a.ton - b.ton);
+  const low = all.filter((r) => r.trang_thai === 'SAP_HET' && r.active === 1).sort((a, b) => a.kha_dung - a.min_stock - (b.kha_dung - b.min_stock));
   const lech = await db
     .prepare(
       `SELECT d.no, d.doc_date, m.item AS code, i.name, ROUND(m.std_qty, 6) AS std_qty, ROUND(-m.qty, 6) AS actual_qty
@@ -1037,12 +1034,27 @@ export async function khoAlerts(db: D1Database) {
     )
     .bind(VAT_TOLERANCE_PCT)
     .all<Record<string, number | string>>();
-  return {
-    low: stock.results.filter((r) => r.qty >= 0),
-    negative: stock.results.filter((r) => r.qty < 0),
-    variance: lech.results,
-  };
+  return { low: low.map(pick), negative: neg.map(pick), variance: lech.results };
 }
+
+/** Tồn mọi mã theo một cách tính (services/khoTon.ts): tồn thực tế, đã giữ, khả dụng, đang sản xuất, trạng thái. */
+khoRoutes.get('/ton', async (c) => {
+  const asof = isDate(c.req.query('asof')) ? (c.req.query('asof') as string) : '9999-12-31';
+  return ok(c, { asof, rows: await khoTonRows(c.env.DB, asof) });
+});
+
+/** Đối chiếu tồn kho (trang quản trị): tồn đầu + nhập − xuất = tồn cuối từng mã, mã âm do phiếu nào, mã lệch chứng từ. */
+khoRoutes.get('/doi-chieu', async (c) => {
+  if (!canEditMap(c.get('auth'))) throw forbidden('Chỉ CEO, quản lý hoặc kế toán xem đối chiếu tồn kho');
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  if (!isDate(from) || !isDate(to)) throw badRequest('BAD_RANGE', 'Cần chọn ngày bắt đầu và kết thúc');
+  const [rows, cfg] = await Promise.all([
+    khoDoiChieu(c.env.DB, from, to),
+    c.env.DB.prepare("SELECT k, v FROM kho_cfg WHERE k IN ('b2b_from', 'online_from')").all<{ k: string; v: string }>(),
+  ]);
+  return ok(c, { from, to, rows, cfg: Object.fromEntries((cfg.results ?? []).map((r) => [r.k, r.v])) });
+});
 
 khoRoutes.get('/alerts', async (c) => {
   const a = await khoAlerts(c.env.DB);
@@ -1485,7 +1497,7 @@ khoRoutes.post('/lots/:code/cancel', async (c) => {
   return ok(c, { cancelled: docs.map((d) => d.no) });
 });
 
-/* ---------- Đồng bộ mã CRM B2B → MISA ---------- */
+/* ---------- Đồng bộ mã CRM Kênh phân phối → MISA ---------- */
 
 khoRoutes.get('/map', async (c) => {
   const [map, unmapped, from] = await Promise.all([
@@ -1607,7 +1619,7 @@ khoRoutes.put('/map', async (c) => {
   return ok(c, { rows: rows.length });
 });
 
-/** Ngày bắt đầu trừ kho theo đơn B2B (đơn xuất trước ngày này coi như đã nằm trong tồn đầu). */
+/** Ngày bắt đầu trừ kho theo đơn Kênh phân phối (đơn xuất trước ngày này coi như đã nằm trong tồn đầu). */
 khoRoutes.put('/cfg/b2b-from', async (c) => {
   const auth = c.get('auth');
   if (!isCeo(auth)) throw forbidden('Chỉ CEO đặt ngày bắt đầu');

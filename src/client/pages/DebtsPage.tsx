@@ -13,6 +13,8 @@ interface Totals {
   pending_charges: number;
   pending_cash: number;
   customers_exceeded: number;
+  receivable?: number;
+  overpaid?: number;
 }
 
 export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
@@ -55,7 +57,11 @@ export function DebtsPage({ mode }: { mode: 'sales' | 'admin' }) {
 
       <div className="kpis">
         <Kpi label="Dư nợ cũ đầu kỳ" value={formatVnd(totals?.opening_debt ?? 0)} hint="Đóng băng theo batch import" />
-        <Kpi label="Công nợ chính thức" value={formatVnd(totals?.official_debt ?? 0)} hint="Dùng cho báo cáo" />
+        <Kpi
+          label="Phải thu (công nợ chính thức)"
+          value={formatVnd(totals?.receivable ?? totals?.official_debt ?? 0)}
+          hint={`Khách còn nợ, kế toán đã xác nhận${totals?.overpaid ? ` · khách trả thừa ${formatVnd(totals.overpaid)}` : ''} · cùng số quản trị › Công nợ khách hàng`}
+        />
         <Kpi
           label="Công nợ dự kiến"
           value={formatVnd(totals?.projected_debt ?? 0)}

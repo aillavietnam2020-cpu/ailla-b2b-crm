@@ -40,7 +40,7 @@ const gcBind=m=>m.querySelectorAll("[data-gcgo]").forEach(b=>b.onclick=()=>gcGo(
 
 /* ---- Tổng quan gia công ---- */
 function pGcTq(m){
-  gcLoad();const T="Gia công",S="Khách đặt sản xuất theo yêu cầu · dùng bảng giá riêng của từng khách";
+  gcLoad();const T="Kênh OEM",S="Khách đặt sản xuất theo yêu cầu · dùng bảng giá riêng của từng khách";
   if(!GC.cust){gcLoading(m,T,S);return}
   const C=GC.cust,n=gcCounts();
   const rev=sum(C,c=>+c.revenue_month||0),debt=sum(C,c=>+c.official_debt||0);
@@ -83,7 +83,7 @@ function pGcCn(m){
   gcLoad();const T="Công nợ gia công",S="Công nợ của khách gia công";
   if(!GC.cust){gcLoading(m,T,S);return}
   const C=GC.cust.slice().sort((a,b)=>(+b.official_debt||0)-(+a.official_debt||0)),tot=k=>sum(C,c=>+c[k]||0);
-  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Công nợ chính thức",tr(tot("official_debt")),"kế toán đã xác nhận")}${kpi("Công nợ dự kiến",tr(tot("projected_debt")),"gồm đơn chờ thu")}${kpi("Khách còn nợ",nf(C.filter(c=>(+c.official_debt)>0).length),"trên "+C.length+" khách gia công")}</div>
+  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Phải thu Kênh OEM",tr(sum(C,c=>Math.max(0,+c.official_debt||0))),"công nợ chính thức của khách còn nợ"+(C.some(c=>(+c.official_debt||0)<0)?" · khách trả thừa "+tr(sum(C,c=>Math.max(0,-(+c.official_debt||0))))+" để riêng":"")+" · cùng số Phải thu, Đối chiếu công nợ")}${kpi("Công nợ dự kiến",tr(tot("projected_debt")),"gồm đơn chờ thu")}${kpi("Khách còn nợ",nf(C.filter(c=>(+c.official_debt)>0).length),"trên "+C.length+" khách gia công")}</div>
   <section class="card flush">${C.length?tbl(["Khách hàng","Công nợ chính thức","Công nợ dự kiến","Hạn mức nợ","Vượt hạn mức"],C.map(c=>{const over=(+c.debt_limit>0)&&(+c.projected_debt>+c.debt_limit);return `<tr class="clk" data-gck="${c.id}"><td><b>${esc(c.name)}</b></td><td class="n">${nf(+c.official_debt||0)}</td><td class="n">${nf(+c.projected_debt||0)}</td><td class="n">${+c.debt_limit>0?nf(+c.debt_limit):"—"}</td><td>${over?pill("Vượt hạn mức","red"):"—"}</td></tr>`})):`<p class="pad">Chưa có khách gia công.</p>`}</section>
   <div class="acts"><button class="btn" data-gcgo="cr_cn">Công nợ toàn bộ khách hàng</button></div>`;
   gcBind(m);m.querySelectorAll("[data-gck]").forEach(r=>r.onclick=()=>gcOpen("cr_kh","/admin/customers/"+r.dataset.gck));
@@ -92,7 +92,7 @@ Object.assign(PAGES,{gc_tq:pGcTq,gc_kh:pGcKh,gc_don:pGcDon,gc_sx:pGcSx,gc_cn:pGc
 
 /* ---- Menu bên vận hành: mục Gia công (bán hàng) ---- */
 {const i=MODULES.findIndex(m=>m.k==="b2blink");
- MODULES.splice(i>=0?i+1:3,0,{k:"gc",zone:"Bán hàng",ic:"fac",n:"Gia công",sub:"Khách · Đơn · Sản xuất",groups:()=>{
+ MODULES.splice(i>=0?i+1:3,0,{k:"gc",zone:"Bán hàng",ic:"fac",n:"Kênh OEM",sub:"Khách · Đơn · Sản xuất",groups:()=>{
   const a=typeof svAllowedMods==="function"?svAllowedMods():null;if(a&&!a.has("b2blink")&&!a.has("b2b"))return [];
   const ok=()=>typeof SV!=="undefined"&&SV.perms&&SV.perms.includes("price.read");
   return [["",[MI("gc_tq","Tổng quan gia công",ok),MI("gc_kh","Khách gia công",ok),MI("gc_don","Đơn gia công",ok),MI("gc_sx","Sản xuất gia công",ok),MI("gc_cn","Công nợ gia công",ok)]]]}})}

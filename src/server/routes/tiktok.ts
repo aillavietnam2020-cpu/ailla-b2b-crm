@@ -145,6 +145,51 @@ tiktokRoutes.get('/months', async (c) => {
   );
 });
 
+/** Mức ưu tiên quảng cáo của sản phẩm (giống ttbcPri ở hub/src/ttbc.js): team thấy kết luận, không thấy số lãi. */
+function priOf(p: { dt: number; lg: number; bien: number }, ng2: number, dtAll: number): string {
+  if (p.lg < 0) return 'Dừng quảng cáo';
+  if (p.bien < ng2) return 'Giảm';
+  if (dtAll && p.dt / dtAll < 0.02) return 'Thử thêm';
+  if (p.bien < ng2 + 0.1) return 'Giữ mức';
+  return 'Đẩy mạnh';
+}
+
+/**
+ * Số tháng cho trang vận hành (team MKT, ai vào khu Marketing cũng xem được): doanh thu thực, đơn, món, hủy/hoàn,
+ * quảng cáo, hoa hồng KOC quyết toán, mức hòa vốn quảng cáo và top sản phẩm kèm mức ưu tiên.
+ * Không trả giá vốn, phí sàn, lãi từng sản phẩm.
+ */
+tiktokRoutes.get('/ops', async (c) => {
+  const from = c.req.query('from') ?? '';
+  const to = c.req.query('to') ?? '';
+  if (!DAY.test(from) || !DAY.test(to)) throw badRequest('BAD_RANGE', 'Khoảng ngày không hợp lệ');
+  const rows = await c.env.DB.prepare('SELECT ky, data, summary FROM tts_month WHERE ky >= ? AND ky <= ? ORDER BY ky')
+    .bind(from.slice(0, 7), to.slice(0, 7))
+    .all<{ ky: string; data: string; summary: string }>();
+  const out = [];
+  for (const r of rows.results ?? []) {
+    const s = JSON.parse(r.summary) as Record<string, unknown>;
+    const d = JSON.parse(await unpack(r.data)) as { pl?: { sp?: Array<{ n: string; q: number; dt: number; lg: number; bien: number }>; ng2?: number; fees?: Array<[string, number]> } };
+    const pl = d.pl ?? {};
+    const dt = Number(s.dt) || 0;
+    const kocFee = (pl.fees ?? []).find((f) => /affiliate|KOC/i.test(f[0]));
+    out.push({
+      ky: r.ky,
+      den: s.den ?? null,
+      dt,
+      don: Number(s.don) || 0,
+      mon: Number(s.mon) || 0,
+      hh: Number(s.hh) || 0,
+      hhRate: Number(s.hhRate) || 0,
+      ads: Number(s.ads) || 0,
+      lgRate: dt ? (Number(s.lg) || 0) / dt : 0,
+      hoaHong: kocFee ? -kocFee[1] : null,
+      sp: (pl.sp ?? []).slice(0, 10).map((p) => ({ n: p.n, q: p.q, dt: p.dt, pri: priOf(p, Number(pl.ng2) || 0, dt) })),
+    });
+  }
+  return ok(c, out);
+});
+
 tiktokRoutes.get('/month/:ky', async (c) => {
   const auth = c.get('auth');
   if (!canMoney(auth)) throw forbidden('Chỉ CEO hoặc kế toán xem lãi lỗ kênh');

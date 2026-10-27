@@ -37,7 +37,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const tabMod=(k,ic,n,zone,keys,names)=>({k,adm:true,zone,ic,n,sub:"",groups:()=>[["",pick(pool(),keys,names)]]});
   MODULES.push(
     {k:"q_tq",adm:true,zone:"Điều hành",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",pick(pool(),["exec"],["Tổng quan"])]]},
-    tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","B2B / Đại lý (NPP)","Gia công","CSKH cũ"]),
+    tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","Kênh phân phối","Kênh OEM","CSKH cũ"]),
     tabMod("q_ll","spark","Lãi lỗ","",["pl","bc_tong","kho_boc","kho_cl","sku","kho_dm"],["P&L công ty","So sánh kênh","Giá thành & định mức","Chênh lệch định mức","Giá vốn SKU","Định mức theo sản phẩm"]),
     {k:"q_cp",adm:true,zone:"",ic:"fin",n:"Tiền & chi phí",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
       return [g("Tiền",["tien_lich"],["Tiền & lịch chi"]),
@@ -45,7 +45,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
         g("Chi",["so_cp"],["Sổ chi phí"]),
         g("Báo cáo & chứng từ",["ngan_sach","cr_bill"],["Ngân sách","Kho bill giao dịch"])].filter(x=>x[1].length)}},
     tabMod("q_mh","cart","Mua hàng","Nghiệp vụ",["mh_po","mh_no","mh_gianvl"],["Mua hàng","Công nợ nhà cung cấp","Giá nguyên vật liệu"]),
-    tabMod("q_sx","fac","Sản xuất & Kho","",["sx_nc","kho_gtri","kho_nxt","kho_vo","kho_map","kho_qd"],["Phiếu sản xuất & tiến độ","Tồn kho & giá trị","Nhập – xuất – tồn","Vỏ can, chai & thùng","Đồng bộ mã B2B","Đơn sàn & quy đổi mã"]),
+    tabMod("q_sx","fac","Sản xuất & Kho","",["sx_nc","kho_gtri","kho_nxt","kho_vo","kho_map","kho_qd"],["Phiếu sản xuất & tiến độ","Tồn kho & giá trị","Nhập – xuất – tồn","Vỏ can, chai & thùng","Đồng bộ mã Kênh phân phối","Đơn sàn & quy đổi mã"]),
     {k:"q_cfg",adm:true,zone:"Hệ thống",ic:"gear",n:"Cấu hình",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
       return [g("Tài khoản",["nhansu","phongban"],["Tài khoản & phân quyền","Phòng ban"]),
         g("Danh mục",["sanpham","kenhban","chiphidm","cr_rcv"],["Sản phẩm","Kênh bán & phí","Danh mục chi phí","Tài khoản nhận tiền"]),
@@ -57,9 +57,8 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const gnGo=p=>{PAGE=p;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
   const gnReady=async()=>{try{await mhLoad()}catch(e){}for(let i=0;i<40&&!MH.sup;i++)await new Promise(r=>setTimeout(r,150))};
   const gnItems=()=>{const mg=mhManage(),ed=mg||can(ME,"chiphi.nhap");return [
-    ["Ghi phiếu thu / phiếu chi","Chọn thu hoặc chi, kèm ảnh bill",ed,()=>spForm()],
-    ["Phiếu chi nhà cung cấp","Trả tiền hoặc cọc cho nhà cung cấp",mg,async()=>{await gnReady();mhLoadInv();mhLoadPay();mhPayForm()}],
-    ["Phiếu chi vận chuyển","Cước xe, đơn vị vận chuyển",mg,()=>gnGo("cr_vc")],
+    /* Một phiếu chi cho mọi loại (chi phí, trả nhà cung cấp, vận chuyển): chọn loại ngay trong form (phieuchigop.js). */
+    ["Ghi phiếu chi / phiếu thu","Chi phí, trả nhà cung cấp, vận chuyển · kèm ảnh bill",ed,()=>spForm()],
     ["Lập đơn mua hàng","Nguyên vật liệu, vỏ, bao bì",mg,async()=>{await gnReady();mhForm(null)}],
     ["Ghi chứng từ nhà cung cấp","Phiếu giao, bill, hóa đơn đỏ",mg,async()=>{await gnReady();await mhLoadInv();mhDocForm()}]].filter(x=>x[2])};
   function gnInject(){
