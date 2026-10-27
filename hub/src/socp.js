@@ -26,7 +26,7 @@ function spRows(){
     const tt=typeof scTTAds==="function"?scTTAds().v:0;if(tt>0)R.push({id:"ads-tt",ngay:PERIOD.to,txt:"Quảng cáo TikTok GMV Max",sub:"từ báo cáo TikTok đã tải, đã gồm VAT",nhom:"Marketing",src:"ads",loai:"Q",kyOnly:true,tien:tt,pb:"Ads / Digital",kenh:"TikTok",ht:"",acc:"",files:0})}catch(e){}
     try{/* Không đưa số dự đoán vào sổ (chị Hoa 27/10): lương chỉ lấy khi kỳ lương đã chốt, bảng nháp thì để trống chờ nhập. */
     const LG=typeof cpLuongAuto==="function"?cpLuongAuto():null;if(LG&&LG.chot){
-    Object.entries(LG.perKenh).forEach(([k,v])=>{if(v>0)R.push({id:"lg-"+k,ngay:PERIOD.to,txt:"Lương & thưởng · "+k,sub:"theo bảng lương tháng "+LG.ym.slice(5)+" ("+LG.st.toLowerCase()+")",nhom:"Nhân sự",src:"luong",kyOnly:true,tien:v,pb:"",kenh:k,ht:"",acc:"",files:0,loai:"A"})});
+    Object.entries(LG.perKenh).forEach(([k,v])=>{if(v>0)R.push({id:"lg-"+k,ngay:PERIOD.to,txt:"Lương & thưởng · "+(typeof SC_TEN==="function"?SC_TEN(k):k),sub:"theo bảng lương tháng "+LG.ym.slice(5)+" ("+LG.st.toLowerCase()+")",nhom:"Nhân sự",src:"luong",kyOnly:true,tien:v,pb:"",kenh:k,ht:"",acc:"",files:0,loai:"A"})});
     if(LG.chung>0)R.push({id:"lg-chung",ngay:PERIOD.to,txt:"Lương & thưởng · chưa gắn kênh (chi chung)",sub:"theo bảng lương tháng "+LG.ym.slice(5)+" ("+LG.st.toLowerCase()+")",nhom:"Nhân sự",src:"luong",kyOnly:true,tien:LG.chung,pb:"",kenh:"",ht:"",acc:"",files:0,loai:"C"});
     for(let i=R.length-1;i>=0;i--)if(R[i].src==="tay"&&R[i].catk==="LUONG")R.splice(i,1)}}catch(e){}
   const LK=["qc","vc","lg","cd","kh"];R.forEach(x=>{x.lcp=x.src==="ncc"?"mh":x.src==="vc"?"vc":x.src==="ads"?"qc":x.src==="luong"?"lg":(typeof cpRowOf==="function"?LK[cpRowOf(x.catk)]:"kh")});
