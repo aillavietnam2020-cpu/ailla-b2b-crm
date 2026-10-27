@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppEnv, AuthContext } from '../env';
 import { forbidden, ok } from '../lib/http';
 import { requirePermission } from '../middleware/rbac';
+import { doanhthuRoutes } from './doanhthu';
 
 /**
  * Phòng điều hành (trang quản trị): số liệu chỉ đọc để so giá bán với giá thành theo giá nguyên liệu mới nhất.
@@ -9,6 +10,8 @@ import { requirePermission } from '../middleware/rbac';
  */
 export const dieuhanhRoutes = new Hono<AppEnv>();
 dieuhanhRoutes.use('*', requirePermission('hub.access'));
+/** Doanh thu thực theo kênh × tháng: số đã chốt, số kế toán (routes/doanhthu.ts, có ghi). */
+dieuhanhRoutes.route('/doanhthu', doanhthuRoutes);
 
 const canMoney = (a: AuthContext) => a.user.role === 'CEO' || a.permissions.includes('debt.read.all');
 
