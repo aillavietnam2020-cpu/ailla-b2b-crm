@@ -71,7 +71,7 @@ E2 tra lại 26/10 (đọc code): GIẢ THUYẾT CŨ "hai trang hai nguồn" SAI
 
 | Việc | Chat | Nhánh | Vùng file | Khối migration |
 |---|---|---|---|---|
-| Trang Phê duyệt (quản trị) | Trang Phê duyệt trên web quản trị (local_4826d81b) | claude/phe-duyet | trang mới + 1 dòng menubang.js | 0150–0154 |
+| Trang Phê duyệt (quản trị) — XONG 27/10, main 3c0d555, đã lên web. Chị chốt: đơn mua hàng KHÔNG cần duyệt. Còn chờ chị: có gom xác nhận tiền về / hàng trả lại không; ngưỡng chi lên CEO | Trang Phê duyệt trên web quản trị (local_4826d81b) | claude/phe-duyet | trang mới + 1 dòng menubang.js | 0150–0154 |
 | Chuẩn hóa mảng Doanh thu + Đối chiếu doanh thu + nhãn chốt ngày 10 + tra lệch FB T9 | Chuẩn hóa mảng Doanh thu web ABOS (local_cbc8a779) | claude/doanh-thu | tqgop.js, exec.js, fbdash.js, fbpl.js, dieuhanh.js, b2bpl.js + 1 dòng menubang.js | 0140–0149 |
 
 Chat "Tiếp tục quản trị 26/10" đã được báo không sửa các file doanh thu trên trong lúc này.
