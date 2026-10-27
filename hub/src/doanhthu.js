@@ -135,7 +135,7 @@ function pDtDoiChieu(m){
   const tot={w:0,f:0,k:0,hasF:false,hasK:false};
   const body=DT_KENH.map(([ch,n])=>{const r=S[ch]||{dt:null,src:"mảng chưa chạy, chưa có số"},l=L[ch]||{},F=dtFile(ch,ym),K=dtKt(ym,ch),snap=dtSnap(ym,ch);
     if(r.dt!=null)tot.w+=+r.dt||0;if(F.v!=null){tot.f+=F.v;tot.hasF=true}if(K){tot.k+=K.v;tot.hasK=true}
-    const lab=st==="chot"?(snap?pill("đã chốt "+dtVN(String(snap.closedAt).slice(0,10)),"grn"):pill("chưa lưu số chốt","gry")):pill("chưa chốt – dự kiến","amb");
+    const lab=st==="chot"?(snap?pill("đã chốt","grn")+`<br><small class="hint">số lưu ngày ${dtVN(String(snap.closedAt).slice(0,10))}</small>`:pill("chưa lưu số chốt","gry")):pill("chưa chốt – dự kiến","amb");
     const drift=snap&&l.dt!=null&&Math.abs(l.dt-snap.dt)>=1000?`<br><small class="hint">tính lại hôm nay: ${nf(l.dt)} (${l.dt-snap.dt>0?"+":""}${nf(l.dt-snap.dt)})</small>`:"";
     const dk=st!=="chot"&&r.dk!=null&&r.dk!==r.dt?`<br><small class="hint">dự kiến ${nf(r.dk)}</small>`:"";
     return `<tr class="clk${DTD.open===ch?" sel":""}" data-dtopen="${ch}"><td><b>${n}</b><br><small class="hint">${esc(r.src||"")}</small></td><td>${lab}${ceo&&snap&&ch!=="cskh"?`<br><button class="btn sm" data-dtre="${ch}" title="Chỉ khi số chốt sai">Chốt lại</button>`:""}</td>
