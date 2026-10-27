@@ -327,7 +327,9 @@ function scPBDash(){
   return `<style>.sochi .scup{color:#c9353d;font-weight:600}.sochi .scdn{color:#23824a;font-weight:600}.sochi .p-do{background:#fde8e8;color:#c9353d}.sochi .scw{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid #eef0f4;font-size:13.5px}.sochi .scpk .scbar{grid-template-columns:minmax(180px,1.3fr) 1fr minmax(170px,auto)}</style>`+ov+wb+cards}
 /* Mở thẳng tab Tổng quan / Phân bổ: tự tải mua hàng, vận chuyển, doanh thu thực (dtEnsure của trang Doanh thu) rồi vẽ lại khi có số. */
 function scNap(){try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
-  try{if(typeof dtEnsure==="function"){dtEnsure();if(typeof DTS!=="undefined"&&!DTS.rowsAt&&!SC.dtw){SC.dtw=1;let n=0;const w=()=>{if(DTS.rowsAt||++n>25){SC.dtw=0;if(PAGE==="so_cp")renderMain()}else setTimeout(w,800)};setTimeout(w,800)}}}catch(e){}}
+  try{if(typeof dtEnsure==="function"){dtEnsure();if(typeof DTS!=="undefined"&&!DTS.rowsAt&&!SC.dtw){SC.dtw=1;let n=0;const w=()=>{if(DTS.rowsAt||++n>25){SC.dtw=0;if(PAGE==="so_cp")renderMain()}else setTimeout(w,800)};setTimeout(w,800)}}}catch(e){}
+  /* doanh thu Kênh phân phối / OEM lấy từ CRM tải chậm hơn: vẽ lại thêm hai lần ở lần mở đầu */
+  if(!SC.rr){SC.rr=1;[2500,7000].forEach(t=>setTimeout(()=>{if(PAGE==="so_cp"&&(SC.tab==="pb"||SC.tab==="tq")&&!(typeof svTyping==="function"&&svTyping()))renderMain()},t))}}
 function scPB(){
   scNap();
   if(!scPBRows().length&&!scThieu().length)return scEmpty();
