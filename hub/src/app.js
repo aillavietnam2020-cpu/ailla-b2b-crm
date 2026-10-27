@@ -96,7 +96,10 @@ function bindCommon(m){
   m.querySelectorAll("select[data-step]").forEach(s=>s.onchange=()=>{const id=s.dataset.step,v=s.value;if(v==="__back"){openCard(id,{back:true});renderMain();return}const err=moveCard(ME,id,v);if(err){toast(err);openCard(id,{err})}renderMain()});
   m.querySelectorAll("select[data-assign]").forEach(s=>s.onchange=()=>{if(!s.value)return;assignCard(ME,s.dataset.assign,s.value);toast(s.dataset.assign+" → "+userName(s.value));renderMain()});
 }
-function onRemoteChange(){if(!ME)return;const u=D().users.find(x=>x.id===ME.id);if(!u||!u.active){ME=null;render();return}ME=u;const open=!$("#drawer").hidden;render();if(open&&OPENED)openCard(OPENED);toast("Có cập nhật mới")}
+function onRemoteChange(){if(!ME)return;const u=D().users.find(x=>x.id===ME.id);if(!u||!u.active){ME=null;render();return}ME=u;
+  // Đang mở trang nhúng (tạo đơn, khách, công nợ...): vẽ lại sẽ nạp lại khung đó, mất đơn đang gõ dở. Chỉ nhận dữ liệu mới, sang trang khác mới vẽ.
+  if($("#crmfr"))return;
+  const open=!$("#drawer").hidden;render();if(open&&OPENED)openCard(OPENED);toast("Có cập nhật mới")}
 async function renderLogin(){
   $("#app").innerHTML=`<div class="loginwrap"><form class="login" id="lf"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>MKT Hub</h1><p>${APP_MODE==="admin"?"Trang quản trị Content & Digital":"Bàn làm việc Content & Digital"}</p>
    <label class="field">Tên đăng nhập<input id="lu" autocomplete="username" required></label><label class="field">Mật khẩu<input id="lp" type="password" autocomplete="current-password" required></label><label class="ck remember"><input type="checkbox" id="lr" checked> Ghi nhớ đăng nhập trên máy này (30 ngày)</label><div id="lerr" class="err"></div><button class="btn pri big">Đăng nhập</button>
