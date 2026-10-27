@@ -30,7 +30,7 @@
   if(ADMH){
     const S={
       tq:[["",[["exec","Tổng quan công ty"]]],
-        ["Kênh bán hàng",[["bc_tiktok","TikTok Shop"],["bc_shopee","Shopee"],["bc_fb","Facebook"],["cskh_cu","CSKH cũ"],["bc_b2b","Kênh phân phối"],["bc_gc","Kênh OEM"],["bc_tong","So sánh kênh"]]],
+        ["Kênh bán hàng",[["bc_tiktok","TikTok Shop"],["bc_shopee","Shopee"],["bc_fb","Facebook"],["cskh_cu","CSKH cũ"],["bc_b2b","Kênh phân phối"],["bc_gc","Kênh OEM"],["bc_tong","So sánh kênh"],["dt_dc","Đối chiếu doanh thu"]]],
         ["Kế hoạch & KPI",[["muctieu","Kế hoạch doanh thu"]]],
         ["Cảnh báo",[["soat_sl","Máy soát số liệu"],["nguong","Ngưỡng cảnh báo & chỉ số"]]]],
       tc:[["Lãi lỗ",[["pl","P&L công ty"]]],

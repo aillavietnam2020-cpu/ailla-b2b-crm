@@ -46,16 +46,17 @@ function tqRevB2C(N,from,to){
    else{const don=co.SHOPEE||0;out.spe={dt:null,lai:null,don:don||null,src:don?`chờ tải báo cáo Shopee · đã có ${nf(don)} đơn xuất kho (Poscake)`:"chờ tải báo cáo Shopee"}}}
   return out;
 }
-/* Mọi chỗ dùng execNums trên trang quản trị (Tổng quan, Báo cáo kết quả kinh doanh) nhận doanh thu thực. */
+/* Mọi chỗ dùng execNums (Tổng quan, Báo cáo kết quả kinh doanh; cả web vận hành từ 27/10) nhận doanh thu thực.
+   Chỉ tài khoản CEO / kế toán (dhOk) mới có số báo cáo TikTok nên người khác giữ số cũ. */
 {const _en=execNums;execNums=function(from,to){const N=_en(from,to);
-  if(!(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")||!dhOk())return N;
+  if(!dhOk())return N;
   try{const R=tqRevB2C(N,from,to);N.raw={tt:N.tt,fbDT:N.fbDT,spDT:N.spDT,tong:N.tong};N.rev=R;
     N.tt=R.tts.dt||0;N.fbDT=R.fb.dt||0;N.fbGiao=R.fb.dt||0;N.spDT=R.spe.dt||0;N.tong=N.tt+N.fbDT+N.spDT;
     N.L.tts=R.tts.lai;N.L.fb=R.fb.lai;N.L.spe=R.spe.lai;
     N.C.gvTT=R.tts.gv||0;N.C.phiTT=R.tts.phi||0;N.C.adsTT=R.tts.ads||0;N.C.khacTT=R.tts.khac||0;N.C.gvFB=R.fb.gv||0;N.C.adsFB=R.fb.ads||0;N.C.phiFB=R.fb.phi||0;
     N.n.tts=R.tts.dt?1:0;N.n.fb=R.fb.dt?1:0;N.n.spe=R.spe.dt?1:0}catch(e){}
   return N}}
-{const _o=execOrders;execOrders=function(from,to){const O=_o(from,to);if(!(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")||!dhOk())return O;try{const R=execNums(from,to).rev;if(R){O.tts=R.tts.don||0;O.fb=R.fb.don||0;O.spe=R.spe.don||0}}catch(e){}return O}}
+{const _o=execOrders;execOrders=function(from,to){const O=_o(from,to);if(!dhOk())return O;try{const R=execNums(from,to).rev;if(R){O.tts=R.tts.don||0;O.fb=R.fb.don||0;O.spe=R.spe.don||0}}catch(e){}return O}}
 
 /* Bảng kênh: mỗi kênh một dòng, doanh thu thực và lãi đóng góp (một chỗ duy nhất trên trang). */
 function tqKenhRows(){
