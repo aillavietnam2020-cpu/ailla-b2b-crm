@@ -75,3 +75,8 @@ E2 tra lại 26/10 (đọc code): GIẢ THUYẾT CŨ "hai trang hai nguồn" SAI
 | Chuẩn hóa mảng Doanh thu + Đối chiếu doanh thu + nhãn chốt ngày 10 + tra lệch FB T9 | Chuẩn hóa mảng Doanh thu web ABOS (local_cbc8a779) | claude/doanh-thu | tqgop.js, exec.js, fbdash.js, fbpl.js, dieuhanh.js, b2bpl.js + 1 dòng menubang.js | 0140–0149 |
 
 Chat "Tiếp tục quản trị 26/10" đã được báo không sửa các file doanh thu trên trong lúc này.
+
+### Cập nhật 27/10 sáng
+- Doanh thu: XONG, main b8b28f6 đã lên web (migration 0140 chạy). T9 đã chốt: TikTok 1.392,1tr; Facebook 1.209,6tr (Pancake, trước lệch vì Sheet kd chỉ tới 29/9 và tải ~26/9); Kênh phân phối 768,4tr; OEM chờ chị Huệ; Shopee chưa tải. Chị Huệ FB 1.084,3tr còn lệch −125,3tr. Trang Đối chiếu: quản trị › Điều hành CEO › Kênh bán hàng.
+- CẢNH BÁO: origin/main 2a37ee8 (08:55) đã có code Phê duyệt ngưỡng 5tr (08a9704) cần migration 0150, prod CHƯA chạy 0150 (file .bat dừng bước 1). Web đang chạy bản b8b28f6. KHÔNG deploy main tới khi 0150 chạy. Đã báo chat Phê duyệt, Doanh thu, Quản trị.
+- Còn: Tổng quan vận hành còn tên cũ (giao chat Doanh thu, chỉ nhánh); 421030f chưa deploy.
