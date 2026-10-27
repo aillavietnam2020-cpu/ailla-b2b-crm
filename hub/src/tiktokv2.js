@@ -44,25 +44,25 @@ const tbPill=s=>pill(s,/Kém|Dừng/.test(s)?"red":/Theo dõi|Giảm|Giữ/.test
 /* Chi phí riêng khác (bổ thẳng cho TikTok, trừ quảng cáo / phí sàn / vận chuyển / hoa hồng đã có trong báo cáo sàn) và chi chung đã chia,
    đọc từ Sổ chi phí của tháng. Thiếu số thì trả lý do. */
 function tbSoCP(ky){
-  const out={rieng:null,chung:null,why:""};
+  const out={rieng:null,chung:null,why:"",whyR:"",whyC:""};
   if(typeof scPBRows!=="function"){out.why="Sổ chi phí chưa nạp";return out}
   const keep={from:PERIOD.from,to:PERIOD.to};
   try{PERIOD.from=ky+"-01";PERIOD.to=tbKyEnd(ky);if(typeof scNap==="function")scNap();
     const rows=scPBRows(),by=(L,f)=>{const o={};L.forEach(x=>{const n=f(x);o[n]=(o[n]||0)+(+x.t||0)});return Object.entries(o).filter(e=>Math.round(e[1])).map(([n,t])=>({n,t})).sort((a,b)=>b.t-a.t)};
     const tru=typeof SC_PL_TRU!=="undefined"?SC_PL_TRU:[];
     out.rieng=by(rows.filter(x=>x.k==="TikTok"&&x.st!=="Chờ duyệt"&&!tru.includes(x.g)&&!/^H/.test(String(scG(x.g).lo||""))),x=>scG(x.g).n);
-    if(!out.rieng.length){out.rieng=null;out.why="Sổ chi phí tháng này chưa ghi khoản nào cho TikTok"}
+    if(!out.rieng.length){out.rieng=null;out.whyR="Sổ chi phí tháng này chưa ghi khoản nào cho TikTok"}
     if(typeof scChiaPB==="function"){const CH=scChiaPB(rows);
-      if(CH.loi&&CH.loi.length)out.why="Chi chung chưa chia: "+CH.loi.join("; ");
-      else{const o=(CH.kenh||{}).TikTok||{};out.chung=Object.entries(o).map(([g,t])=>({n:scG(g).n,t})).filter(x=>Math.round(x.t)).sort((a,b)=>b.t-a.t);if(!out.chung.length&&!CH.truoc){out.chung=null;out.why="Sổ chi phí tháng này chưa có chi chung"}}}
-    else out.why="Chưa có quy tắc chia chi chung";
+      if(CH.loi&&CH.loi.length)out.whyC="Chi chung chưa chia: "+CH.loi.join("; ");
+      else{const o=(CH.kenh||{}).TikTok||{};out.chung=Object.entries(o).map(([g,t])=>({n:scG(g).n,t})).filter(x=>Math.round(x.t)).sort((a,b)=>b.t-a.t);if(!out.chung.length&&!CH.truoc){out.chung=null;out.whyC="Sổ chi phí tháng này chưa có chi chung"}}}
+    else out.whyC="Chưa có quy tắc chia chi chung";
   }catch(e){out.why="Không đọc được Sổ chi phí";out.rieng=null;out.chung=null}
   finally{PERIOD.from=keep.from;PERIOD.to=keep.to}
   return out;
 }
 
 /* ---------- Quản trị ---------- */
-function tbCostTbl(C,dt,soWhy){
+function tbCostTbl(C,dt,so){const whyR=so.whyR||so.why,whyC=so.whyC||so.why;
   const row=(k,c,n,t,h,sub,sample)=>{const has=sub&&sub.length;
     return `<tr class="${has?"tb-tg":""}" ${has?`data-tbtg="${k}"`:""}><td>${has?`<span class="tb-car" data-car="${k}">▸</span>`:`<span class="tb-car"></span>`}<span class="tb-dot" style="background:${c}"></span>${has?`<b>${esc(n)}</b>`:esc(n)}</td><td class="n">${t==null?`<span class="hint">chưa có số</span>`:tbF(t)}</td><td class="n">${t==null?"":tbP(t,dt)}</td><td class="hint">${esc(h||"")}</td></tr>`
      +(has?sub.map(x=>`<tr class="tb-sub" data-tbs="${k}" style="display:none"><td>${esc(x.n)}</td><td class="n">${tbF(x.t)}</td><td class="n">${tbP(x.t,dt)}</td><td></td></tr>`).join(""):"")};
@@ -72,8 +72,8 @@ function tbCostTbl(C,dt,soWhy){
     row("phi",L[1].c,L[1].n,L[1].t,"bấm để xem từng loại phí",L[1].sub),
     row("ads",L[2].c,L[2].n,L[2].t,"theo kỳ chi tiêu, đã cộng VAT 10%"),
     `<tr class="tb-sum"><td>Lãi đóng góp kênh</td><td class="n">${tbF(C.lai)}</td><td class="n">${tbP(C.lai,dt)}</td><td class="hint">trước chi riêng khác và chi chung</td></tr>`,
-    row("rieng","#b06ab3","Chi phí riêng khác của kênh",C.rieng?C.rieng.t:null,C.rieng?(C.rieng.sub.length?"bấm để xem từng khoản · Sổ chi phí":"Sổ chi phí chưa ghi khoản nào cho TikTok"):soWhy,C.rieng&&C.rieng.sub),
-    row("chung","#5d6d8e","Chi phí chung phân bổ",C.chung?C.chung.t:null,C.chung?"bấm để xem · theo Quy tắc phân bổ ở Sổ chi phí":soWhy,C.chung&&C.chung.sub),
+    row("rieng","#b06ab3","Chi phí riêng khác của kênh",C.rieng?C.rieng.t:null,C.rieng?(C.rieng.sub.length?"bấm để xem từng khoản · Sổ chi phí":"Sổ chi phí chưa ghi khoản nào cho TikTok"):whyR,C.rieng&&C.rieng.sub),
+    row("chung","#5d6d8e","Chi phí chung phân bổ",C.chung?C.chung.t:null,C.chung?"bấm để xem · theo Quy tắc phân bổ ở Sổ chi phí":whyC,C.chung&&C.chung.sub),
     `<tr class="tb-sum"><td>Lợi nhuận ròng kênh</td><td class="n">${C.ln==null?`<span class="hint">chưa có số</span>`:tbF(C.ln)}</td><td class="n">${C.ln==null?"":tbP(C.ln,dt)}</td><td class="hint">sau khi gánh hết chi phí riêng và chi chung</td></tr>`])}
 
 function tbAdmTong(ky,P){
@@ -94,9 +94,9 @@ function tbAdmTong(ky,P){
      <table class="tb-src"><colgroup><col style="width:30%"><col style="width:14%"><col style="width:22%"><col style="width:22%"><col style="width:12%"></colgroup>
      <thead><tr><th>Nguồn</th><th class="n">GMV</th><th>Tỷ trọng</th><th>Chi phí riêng</th><th class="n">Tốn / 100đ</th></tr></thead><tbody>
      ${lanes.rows.map(r=>`<tr><td><span class="tb-dot" style="background:${r.c}"></span><b>${esc(r.n)}</b></td><td class="n">${tr(r.gmv)}</td><td><div class="tb-mini"><i style="width:${(r.ty/mx*100).toFixed(1)}%;background:${r.c}"></i></div><b>${tbP(r.ty,1)}</b></td><td>${cpTxt(r)}</td><td class="n">${r.cp100==null?"—":(r.cp100*100).toFixed(1).replace(".",",")+"đ"}</td></tr>`).join("")}
-     <tr class="tb-adsrow"><td><span class="tb-dot" style="background:#e2494a"></span><b>Quảng cáo GMV Max</b><br><small class="hint">đẩy cả shop, không chia theo nguồn</small></td><td class="n">${tr(lanes.tot)}</td><td></td><td>${tr(lanes.ads)}</td><td class="n t-red">${(lanes.ads100*100).toFixed(1).replace(".",",")}đ</td></tr></tbody></table></div></section>`})():`<section class="card"><div class="card-h"><h2>Cơ cấu doanh thu</h2></div><p class="empty">Tháng này team chưa tải file Key metrics nên chưa chia được doanh thu theo nguồn.</p></section>`;
+     <tr class="tb-adsrow"><td><span class="tb-dot" style="background:#e2494a"></span><b>Quảng cáo GMV Max</b><br><small class="hint">đẩy cả shop, không chia theo nguồn</small></td><td class="n">—</td><td></td><td>${tr(lanes.ads)}</td><td class="n t-red">${(lanes.ads100*100).toFixed(1).replace(".",",")}đ</td></tr></tbody></table></div></section>`})():`<section class="card"><div class="card-h"><h2>Cơ cấu doanh thu</h2></div><p class="empty">Tháng này team chưa tải file Key metrics nên chưa chia được doanh thu theo nguồn.</p></section>`;
   const cost=`<section class="card"><div class="card-h"><h2>Cơ cấu chi phí</h2><span class="hint">mọi khoản chi của kênh trên doanh thu thực ${tbF(dt)} đ</span></div>
-    <div class="tb-bar">${C.bar.filter(b=>b.t>0).map(b=>`<div style="width:${(b.ty*100).toFixed(2)}%;background:${b.c}" title="${esc(b.n)} ${tbF(b.t)}">${b.ty>=0.06?esc(b.n)+" "+tbP(b.t,dt):tbP(b.t,dt)}</div>`).join("")}</div>${tbCostTbl(C,dt,so.why)}</section>`;
+    <div class="tb-bar">${C.bar.filter(b=>b.t>0).map(b=>`<div style="width:${(b.ty*100).toFixed(2)}%;background:${b.c}" title="${esc(b.n)} ${tbF(b.t)}">${b.ty>=0.06?esc(b.n)+" "+tbP(b.t,dt):tbP(b.t,dt)}</div>`).join("")}</div>${tbCostTbl(C,dt,so)}</section>`;
   const ng2=P.ng2,flag=new Set((P.g1||[]).map(r=>r.pn).concat((P.g2||[]).map(r=>r.pn)));
   const top=`<section class="card"><div class="card-h"><h2>Top sản phẩm theo doanh thu thực</h2><span class="hint">ngưỡng biên = quảng cáo ${tbP(P.ads,dt)} + 10 điểm = ${tbP(ng2,1)}</span></div>
     ${tbl(["#","Sản phẩm","SL","Doanh thu","% kênh","Lãi gộp sau phí sàn","Biên","Đánh giá"],P.sp.slice(0,6).map((p,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(p.n.slice(0,60))}</td><td class="n">${nf(p.q)}</td><td class="n">${tr(p.dt)}</td><td class="n">${tbP(p.dt,dt)}</td><td class="n">${tsbRed(p.lg)}</td><td class="n">${tbP(p.lg,p.dt)}</td><td>${tsbDg(p.dg)}</td></tr>`)
