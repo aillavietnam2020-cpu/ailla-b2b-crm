@@ -74,7 +74,7 @@ function ttbcTeams(I){
   const km=I.km||{},gmv=+km.gmv||0,L=I.live||{},K=I.koc||null,W=I.last2,fmt=v=>(Math.round(v*1000)/10).toString().replace(".",",")+"%";
   const st=al=>al.some(x=>x.lv==="r")?"Kém":al.some(x=>x.lv==="a")?"Theo dõi":"Tốt";
   const content={al:[]};content.gmv=+km.vInh||0;content.ty=ttbcPct(content.gmv,gmv);
-  if(W&&W[0].vInh){const g=W[1].vInh/W[0].vInh-1;if(g<=-0.15)content.al.push({lv:"a",t:`GMV video shop tuần ${W[1].a}–${W[1].b} giảm ${fmt(-g)}`,d:"Rút mẫu video thắng tuần trước để làm lại."});else if(g>=0.15)content.al.push({lv:"g",t:`GMV video shop tuần ${W[1].a}–${W[1].b} tăng ${fmt(g)}`,d:"Giữ nhịp đăng, nhân bản mẫu video thắng."})}
+  if(W&&W[0].vInh){const g=W[1].vInh/W[0].vInh-1;if(g<=-0.15)content.al.push({lv:"a",t:`GMV video inhouse tuần ${W[1].a}–${W[1].b} giảm ${fmt(-g)}`,d:"Rút mẫu video thắng tuần trước để làm lại."});else if(g>=0.15)content.al.push({lv:"g",t:`GMV video inhouse tuần ${W[1].a}–${W[1].b} tăng ${fmt(g)}`,d:"Giữ nhịp đăng, nhân bản mẫu video thắng."})}
   const ads={al:[],chi:I.adsV||0,don:+((I.ads||{}).don)||0};ads.roi=ads.chi&&I.dt?I.dt/ads.chi:null;ads.roas=ads.chi?gmv/ads.chi:null;ads.hoaVon=I.lgRate>0?1/I.lgRate:null;ads.cpo=ads.don?(+I.ads.chi||0)/ads.don:null;
   if(ads.roi!=null&&ads.hoaVon&&ads.roi<ads.hoaVon*1.2)ads.al.push({lv:"r",t:`ROI ${ads.roi.toFixed(2).replace(".",",")} sát mức hòa vốn ${ads.hoaVon.toFixed(2).replace(".",",")}`,d:"Tắt nhóm chiến dịch ROAS thấp, không mở rộng ngân sách."});
   if(W&&W[0].roas&&W[1].roas&&W[1].roas<W[0].roas*0.97)ads.al.push({lv:"a",t:`ROAS tuần ${W[1].a}–${W[1].b} giảm ${W[0].roas.toFixed(2).replace(".",",")} → ${W[1].roas.toFixed(2).replace(".",",")}`,d:"Không tăng ngân sách; dồn cho sản phẩm biên cao."});
