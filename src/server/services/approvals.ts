@@ -26,7 +26,7 @@ export async function listApprovals(
   const rows = await db
     .prepare(
       `SELECT a.*, r.display_name AS requester_name, ap.display_name AS approver_name,
-              o.order_no AS entity_label, COALESCE(c.name, tc.name) AS customer_name
+              o.order_no AS entity_label, o.total_amount AS order_total, COALESCE(c.name, tc.name) AS customer_name
        FROM approvals a
        JOIN users r ON r.id = a.requester_id
        LEFT JOIN users ap ON ap.id = a.approver_id

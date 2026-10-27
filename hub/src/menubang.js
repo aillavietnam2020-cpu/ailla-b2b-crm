@@ -1,7 +1,7 @@
 /* =====================================================================
    SẮP MENU HAI WEB THEO BẢNG PHÂN VÙNG (chị Hoa duyệt 26/10/2026, docs/PHAN-VUNG-HAI-WEB.html, "Hai menu bản 3").
    Chạy sau cùng: gom mọi trang đang có trong menu (sau khi các file khác đã thêm/sửa) rồi xếp lại thành:
-     Quản trị: Điều hành CEO · Tài chính – Kế toán · Ngân sách & chi phí · Cấu hình  (Phê duyệt chưa có trang nên chưa hiện)
+     Quản trị: Điều hành CEO · Tài chính – Kế toán · Ngân sách & chi phí · Phê duyệt (pheduyet.js) · Cấu hình
      Vận hành: Tổng quan vận hành · Kinh doanh · Marketing · Kho – Sản xuất · Nhân sự · Công việc · AI Agent (+ Của tôi ở chỗ bấm tên)
    Chỉ đổi chỗ và đổi tên hiện trên menu; không làm trang mới. Quyền xem của từng trang giữ nguyên (lấy đúng điều kiện cũ).
    Trang nào trong các mục nguồn mà bảng không nhắc tới thì không bỏ: tự nối vào cuối mục mới tương ứng (nhóm "Khác").
@@ -41,6 +41,7 @@
         /* Đồng bộ mã B2B, Quy đổi mã các sàn: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
         ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_map","Đồng bộ mã B2B"],["kho_qd","Quy đổi mã các sàn"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
+      pd:[["",[["pheduyet","Phê duyệt"]]]],
       cfg:[["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
         ["Danh mục",[["sanpham","Sản phẩm"],["kenhban","Kênh bán & phí"],["chiphidm","Danh mục chi phí"],["cr_rcv","Tài khoản nhận tiền"]]],
         ["Chính sách bán hàng",[["cr_gia","Bảng giá"],["cr_dc","Giá điều chỉnh / khuyến mại"],["cr_thuong","Thưởng & xếp hạng NPP"],["cr_giagc","Bảng giá Kênh OEM"]]],
@@ -52,6 +53,7 @@
     NEW=[mod("q_tq","home","Điều hành CEO","",S.tq,[],DROP),
       mod("q_tc","fin","Tài chính – Kế toán","",S.tc,[],DROP),
       mod("q_ns","chart","Ngân sách & chi phí","",S.ns,[],DROP),
+      mod("q_pd","check","Phê duyệt","",S.pd,[],DROP),
       mod("q_cfg","gear","Cấu hình","Hệ thống",S.cfg,Q,DROP)];
     /* Bảng tách Giá thành thành từng trang riêng, nên bỏ nhóm gộp "Giá thành & định mức". */
     for(let i=PAGE_SETS.length-1;i>=0;i--)if(PAGE_SETS[i].adm)PAGE_SETS.splice(i,1);
