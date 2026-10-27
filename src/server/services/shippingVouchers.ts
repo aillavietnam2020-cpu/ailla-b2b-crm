@@ -5,6 +5,7 @@ import { badRequest, conflict } from '../lib/http';
 import { newId } from '../lib/ids';
 import { needsCeo } from '@shared/ceoSpend';
 import { loadCeoSpend } from '../routes/ceoSpend';
+import { realCeo } from './agentSpend';
 
 export interface ShippingVoucherInput {
   voucher_date?: string;
@@ -34,7 +35,7 @@ export async function createShippingVoucher(
   const now = nowIso();
   const id = newId();
   // Từ ngưỡng chi (mặc định 5 triệu) mà người lập không phải CEO: phiếu vẫn có hiệu lực, gắn nhãn chờ CEO duyệt.
-  const ceo = needsCeo(d.amount, await loadCeoSpend(db), auth.user.role === 'CEO') ? 'CHO' : '';
+  const ceo = needsCeo(d.amount, await loadCeoSpend(db), realCeo(auth)) ? 'CHO' : '';
   for (let attempt = 0; attempt < 4; attempt++) {
     const row = await db
       .prepare('SELECT COUNT(*) AS n FROM shipping_vouchers WHERE voucher_no LIKE ?')

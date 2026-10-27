@@ -19,6 +19,7 @@ import { priceAdjustmentRoutes } from './routes/priceAdjustments';
 import { workRoutes } from './routes/work';
 import { staffPurchaseRoutes } from './routes/staffPurchases';
 import { shippingVoucherRoutes } from './routes/shippingVouchers';
+import { soChiRoutes } from './routes/soChi';
 import { agentRoutes } from './routes/agent';
 import { agentTiktokRoutes } from './routes/agentTiktok';
 import { agentAdminRoutes } from './routes/agents';
@@ -135,6 +136,7 @@ export function createApp() {
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/fp-publish', fpPublishRoutes);
   app.route('/api/hub/kho', khoRoutes);
+  app.route('/api/hub/so-chi', soChiRoutes);
   app.route('/api/hub/tiktok', tiktokRoutes);
   app.route('/api/hub/shopee', shopeeRoutes);
   app.route('/api/hub/dieuhanh', dieuhanhRoutes);

@@ -6,6 +6,7 @@ import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
 import { needsCeo } from '@shared/ceoSpend';
 import { loadCeoSpend } from './ceoSpend';
+import { agentSpendGuard, realCeo, withSource } from '../services/agentSpend';
 import { addPayFile, deletePayFile, getPayFile, listPayFiles, readPayMethod } from '../lib/payFiles';
 
 /**
@@ -27,7 +28,7 @@ const ipOf = (c: { req: { header: (n: string) => string | undefined } }) => c.re
 const isDate = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
 /** Khoản chi từ ngưỡng (mặc định 5 triệu) người lập không phải CEO: gắn nhãn chờ CEO duyệt (routes/ceoSpend.ts). */
-const ceoFlag = async (db: D1Database, a: AuthContext, amount: number) => (needsCeo(amount, await loadCeoSpend(db), a.user.role === 'CEO') ? 'CHO' : '');
+const ceoFlag = async (db: D1Database, a: AuthContext, amount: number) => (needsCeo(amount, await loadCeoSpend(db), realCeo(a)) ? 'CHO' : '');
 const int = (v: unknown) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : 0);
 
 function needManage(a: AuthContext) {
@@ -694,12 +695,20 @@ purchasingRoutes.post('/payments', async (c) => {
       : pm.method === 'TIEN_MAT'
         ? `Tiền mặt${pm.receiver ? ', người nhận ' + pm.receiver : ''}`
         : String(b.account ?? '').trim();
+  // Agent lập theo lệnh chị Thảo: kiểm công tắc, trùng (cùng nhà cung cấp, số tiền, ngày), ghi nguồn vào ghi chú.
+  const src = await agentSpendGuard(c.env.DB, auth, 'NCC', { date: b.pay_date, amount, payees: ['ncc' + String(b.supplier_id)] }, async () =>
+    ((await c.env.DB.prepare("SELECT id, pay_date, amount FROM po_payments WHERE status = 'OK' AND supplier_id = ? AND pay_date = ? AND amount = ?")
+      .bind(String(b.supplier_id), b.pay_date, amount).all<{ id: string; pay_date: string; amount: number }>()).results ?? []).map((p) => ({
+      no: 'mã ' + p.id, date: p.pay_date, amount: p.amount, payees: ['ncc' + String(b.supplier_id)],
+    })),
+  );
+  const note = withSource(String(b.note ?? '').trim(), src?.source, 1000);
   const id = newId();
   const ceo = await ceoFlag(c.env.DB, auth, amount);
   await c.env.DB.batch([
     c.env.DB.prepare(
       "INSERT INTO po_payments (id, supplier_id, invoice_id, pay_date, amount, account, note, status, created_by, created_at, kind, po_id, method, from_account, to_bank, to_account_no, to_account_name, receiver, ceo_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(id, String(b.supplier_id), invId, b.pay_date, amount, account, String(b.note ?? '').trim(), auth.user.id, nowIso(), kind, poId, pm.method, pm.from_account, pm.to_bank, pm.to_account_no, pm.to_account_name, pm.receiver, ceo),
+    ).bind(id, String(b.supplier_id), invId, b.pay_date, amount, account, note, auth.user.id, nowIso(), kind, poId, pm.method, pm.from_account, pm.to_bank, pm.to_account_no, pm.to_account_name, pm.receiver, ceo),
     // Nhớ tài khoản ngân hàng của nhà cung cấp để lần sau điền sẵn.
     ...(pm.method === 'CHUYEN_KHOAN'
       ? [c.env.DB.prepare('UPDATE suppliers SET bank = ?, bank_account_no = ?, bank_account_name = ? WHERE id = ?').bind(pm.to_bank, pm.to_account_no, pm.to_account_name, String(b.supplier_id))]

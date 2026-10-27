@@ -101,6 +101,7 @@ describe('Agent ghi dữ liệu thay người, chỉ khi người được chỉ
 
   it('lập và hủy được phiếu chi vận chuyển (lái xe) theo lệnh chị Thảo', async () => {
     const { agent } = await setup();
+    await ctx.db.prepare("INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, 'agent.phieuchi', NULL, '2026-10-27T00:00:00Z')").bind(agent.id).run();
     await ctx.request('/api/agent-chat', { as: USERS.manager, body: { agent: CHAT_AGENT, body: 'chi cước' } });
     const dlg = (await pull())[0].delegation as string;
     const r = await call(agent.token, 'POST', '/api/shipping-vouchers', { voucher_date: '2026-10-01', carrier: 'Vũ Thanh Tâm', amount: 750000, method: 'CHUYEN_KHOAN' }, dlg);
