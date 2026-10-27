@@ -33,6 +33,7 @@ import {
   type Channel,
   type ChannelDay,
 } from '../services/channelOut';
+import { khoDoiChieu, khoTonRows, type KhoTonRow } from '../services/khoTon';
 
 /**
  * Kho sản xuất: nhập NVL → pha chế BTP → kiểm kê đóng gói → xuất kho → hàng hoàn.
@@ -1016,17 +1017,13 @@ khoRoutes.get('/variance', async (c) => {
   return ok(c, { tolerance_pct: VAT_TOLERANCE_PCT, rows: rows.results });
 });
 
-/** Cảnh báo cho trang kho và (sau này) cho bot Telegram: dưới mức tối thiểu, tồn âm, phiếu pha chế lệch nhiều. */
+/** Cảnh báo cho trang kho và (sau này) cho bot Telegram: dưới mức tối thiểu, tồn âm, phiếu pha chế lệch nhiều.
+ * Âm / sắp hết lấy từ chỗ tính tồn chung (services/khoTon.ts), không tự cộng sổ ở đây nữa. */
 export async function khoAlerts(db: D1Database) {
-  const stock = await db
-    .prepare(
-      `SELECT i.code, i.name, i.unit, i.cls, i.min_stock, COALESCE(s.qty, 0) AS qty
-       FROM kho_items i LEFT JOIN (
-         SELECT item, ROUND(SUM(qty), 6) AS qty FROM kho_ledger GROUP BY item) s ON s.item = i.code
-       WHERE i.active = 1 AND (COALESCE(s.qty, 0) < 0 OR (i.min_stock > 0 AND COALESCE(s.qty, 0) < i.min_stock))
-       ORDER BY COALESCE(s.qty, 0) - i.min_stock LIMIT 200`,
-    )
-    .all<{ code: string; name: string; unit: string; cls: string; min_stock: number; qty: number }>();
+  const all = await khoTonRows(db);
+  const pick = (r: KhoTonRow) => ({ code: r.code, name: r.name, unit: r.unit, cls: r.cls, nhom: r.nhom, min_stock: r.min_stock, qty: r.ton, giu: r.giu, kha_dung: r.kha_dung, active: r.active });
+  const neg = all.filter((r) => r.trang_thai === 'AM').sort((a, b) => a.ton - b.ton);
+  const low = all.filter((r) => r.trang_thai === 'SAP_HET' && r.active === 1).sort((a, b) => a.kha_dung - a.min_stock - (b.kha_dung - b.min_stock));
   const lech = await db
     .prepare(
       `SELECT d.no, d.doc_date, m.item AS code, i.name, ROUND(m.std_qty, 6) AS std_qty, ROUND(-m.qty, 6) AS actual_qty
@@ -1037,12 +1034,27 @@ export async function khoAlerts(db: D1Database) {
     )
     .bind(VAT_TOLERANCE_PCT)
     .all<Record<string, number | string>>();
-  return {
-    low: stock.results.filter((r) => r.qty >= 0),
-    negative: stock.results.filter((r) => r.qty < 0),
-    variance: lech.results,
-  };
+  return { low: low.map(pick), negative: neg.map(pick), variance: lech.results };
 }
+
+/** Tồn mọi mã theo một cách tính (services/khoTon.ts): tồn thực tế, đã giữ, khả dụng, đang sản xuất, trạng thái. */
+khoRoutes.get('/ton', async (c) => {
+  const asof = isDate(c.req.query('asof')) ? (c.req.query('asof') as string) : '9999-12-31';
+  return ok(c, { asof, rows: await khoTonRows(c.env.DB, asof) });
+});
+
+/** Đối chiếu tồn kho (trang quản trị): tồn đầu + nhập − xuất = tồn cuối từng mã, mã âm do phiếu nào, mã lệch chứng từ. */
+khoRoutes.get('/doi-chieu', async (c) => {
+  if (!canEditMap(c.get('auth'))) throw forbidden('Chỉ CEO, quản lý hoặc kế toán xem đối chiếu tồn kho');
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  if (!isDate(from) || !isDate(to)) throw badRequest('BAD_RANGE', 'Cần chọn ngày bắt đầu và kết thúc');
+  const [rows, cfg] = await Promise.all([
+    khoDoiChieu(c.env.DB, from, to),
+    c.env.DB.prepare("SELECT k, v FROM kho_cfg WHERE k IN ('b2b_from', 'online_from')").all<{ k: string; v: string }>(),
+  ]);
+  return ok(c, { from, to, rows, cfg: Object.fromEntries((cfg.results ?? []).map((r) => [r.k, r.v])) });
+});
 
 khoRoutes.get('/alerts', async (c) => {
   const a = await khoAlerts(c.env.DB);
