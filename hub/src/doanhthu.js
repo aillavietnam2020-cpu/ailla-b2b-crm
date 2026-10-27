@@ -11,7 +11,7 @@
 const DTS={rows:{},rowsAt:0,busy:false,err:"",live:0,fbFor:null,fbAt:"",fbMine:{},fbDay:{},fbGoc:{},mine:new WeakSet(),auto:{},inAuto:false,tsb:false};
 const dtToday=()=>iso(new Date());
 const dtOk=()=>typeof dhOk==="function"&&!!dhOk();
-const DT_PAGES=["exec","pl","bc_tong","muctieu","dt_dc","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc"];
+const DT_PAGES=["exec","pl","bc_tong","muctieu","dt_dc","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","so_cp"];
 const dtRe=()=>{if(DT_PAGES.includes(PAGE)&&!(typeof svTyping==="function"&&svTyping()))renderMain()};
 const dtYmVN=ym=>ym.slice(5,7)+"/"+ym.slice(0,4);
 const DT_ROWK={tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"};
@@ -73,7 +73,14 @@ const DT_NKC_ROW={tts:"tts",fb:"fb",spe:"spe",B2B:"b2b",GIA_CONG:"gc"};
 function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.nkc)return null;return dtNkcKenh(f.nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
 function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEach(r=>{const k=DT_NKC_ROW[r.k],v=k?S.v[k]:0;if(!v||r._cpk||r.dt==null)return;r._cpk=1;r.cpk=v;r.khac=(r.khac||0)+v;if(r.lai!=null)r.lai-=v;
   r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(v)} chi phí Sổ chi phí bổ về kênh (${S.n[k]} dòng)`})}
-{const _k=tqKenhRows;tqKenhRows=function(){const rows=_k.apply(this,arguments);if(DTS.live)return rows;try{dtTruSoCp(rows,PERIOD.from,PERIOD.to)}catch(e){}if(!dtOk())return rows;
+/* Lương làm riêng cho kênh (bảng lương đã chốt) trừ ở lãi đóng góp; chi chung được chia theo Quy tắc phân bổ ghi ở r.chia cho dòng Lãi sau phân bổ.
+   Hàm scPLKenh (scphanbo.js, chat Sổ chi phí) chỉ tính theo tháng nên chỉ áp khi kỳ nằm trong một tháng. Nó tự gọi lại doanh thu: cờ DTS.inPB chặn vòng lặp. */
+const DT_SC_K={tts:["TikTok"],spe:["Shopee Mall","Shopee thường"],fb:["Facebook"],B2B:["NPP"],GIA_CONG:["Gia công"]};
+function dtPB(ym){if(DTS.inPB||typeof scPLKenh!=="function")return null;DTS.inPB=true;try{return scPLKenh(ym)}catch(e){return null}finally{DTS.inPB=false}}
+function dtTruLuong(rows,from,to){const ym=from.slice(0,7);if(to.slice(0,7)!==ym)return;const L=dtPB(ym);if(!L)return;
+  rows.forEach(r=>{const ks=DT_SC_K[r.k];if(!ks||r._lg||r.dt==null)return;r._lg=1;const s=o=>ks.reduce((a,k)=>a+(+(o||{})[k]||0),0),lg=s(L.luong);
+    r.chia=s(L.chia);if(lg){r.luong=lg;r.khac=(r.khac||0)+lg;if(r.lai!=null)r.lai-=lg;r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(lg)} lương làm riêng cho kênh (bảng lương đã chốt)`}})}
+{const _k=tqKenhRows;tqKenhRows=function(){const rows=_k.apply(this,arguments);if(DTS.live)return rows;try{dtTruSoCp(rows,PERIOD.from,PERIOD.to)}catch(e){}try{dtTruLuong(rows,PERIOD.from,PERIOD.to)}catch(e){}if(!dtOk())return rows;
   try{rows.forEach(r=>{if(r.k==="B2B"||r.k==="GIA_CONG"){const X=b2bChannel(r.k);if(X&&X.frozen)r.frozen=true;dtLabel(r,DT_ROWK[r.k],PERIOD.from,PERIOD.to)}})}catch(e){}
   try{dtAutoChot()}catch(e){}return rows}}
 
