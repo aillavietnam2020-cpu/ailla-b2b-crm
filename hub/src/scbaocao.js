@@ -117,8 +117,8 @@ function scKenh(){
   const tong=o=>o.L.reduce((a,g)=>a+(g.v||0),0);
   if(!SC_KENH.includes(SC.pbk))SC.pbk=SC_KENH.slice().sort((a,b)=>tong(NK[b])-tong(NK[a]))[0];
   const k=SC.pbk,o=NK[k],p=NP?NP[k]:null,dt=DT[k],cs=tong(o),miss=o.L.filter(g=>g.v==null).map(g=>SC_KGN[g.k]);
-  const pv=g=>{if(!p)return null;const x=p.L.find(z=>z.k===g);return x?x.v:null};
-  const csP=p?o.L.filter(g=>g.v!=null&&pv(g.k)!=null).reduce((a,g)=>a+pv(g.k),0):null,csC=p?o.L.filter(g=>g.v!=null&&pv(g.k)!=null).reduce((a,g)=>a+g.v,0):0;
+  const pv=g=>{if(!p||!tong(p))return null;const x=p.L.find(z=>z.k===g);return x?x.v:null};
+  const csP=p&&tong(p)?o.L.filter(g=>g.v!=null&&pv(g.k)!=null).reduce((a,g)=>a+pv(g.k),0):null,csC=p?o.L.filter(g=>g.v!=null&&pv(g.k)!=null).reduce((a,g)=>a+g.v,0):0;
   const ght=scSum(scAgg(rows)[k]||{}),nhan=scSum((CH.kenh||{})[k]||{});
   const pills=`<div class="scpills" role="tablist">${SC_KENH.map(x=>`<button type="button" role="tab" aria-selected="${x===k}" class="${x===k?"on":""}" data-pbk="${esc(x)}">${esc(SC_TEN(x))} <span class="hint">${tong(NK[x])?scNf(tong(NK[x])):"—"}</span></button>`).join("")}</div>`;
   const kp=`<div class="sck4">${scKpi("Chi phí ghi nhận được",cs?scNf(cs):"—",miss.length?`đủ số ${o.L.length-miss.length}/${o.L.length} nhóm · còn thiếu ${miss.length} nhóm nên tổng thật sẽ cao hơn`:"đủ số các nhóm",miss.length?"warn":"")}
@@ -133,10 +133,10 @@ function scKenh(){
    ${miss.length?`<div class="scw"><span class="scp p-c">Thiếu số</span><div>${esc(miss.join(", "))}<div class="hint">→ tải báo cáo kênh ở trang Doanh thu, chốt bảng lương, hoặc ghi phiếu chi để có số</div></div></div>`:""}
    ${o.bo?`<div class="scw"><span class="scp p-c">Ghi chú</span><div>Phí sàn ghi trong sổ ${scNf(o.bo)} đ không cộng thêm vì báo cáo kênh đã có phí sàn (tránh tính hai lần).</div></div>`:""}
    ${k.startsWith("Shopee")?`<div class="scw"><span class="scp p-c">Ghi chú</span><div>Báo cáo Shopee trên web đang gộp 2 shop nên chưa tách được giá vốn, phí sàn cho từng shop.</div></div>`:""}</div>`;
-  const row=(l,v,vp,cls)=>`<tr class="${cls}"><td>${l}</td><td class="n">${v==null?SC_CS:scNf(v)}</td><td class="n">${v!=null&&dt?scPc(v,dt):""}</td><td class="n">${vp==null?SC_CS:scNf(vp)}</td></tr>`;
+  const row=(l,v,vp,cls)=>`<tr class="${cls}"><td>${l}</td><td class="n">${v==null?SC_CS:scNf(v)}</td><td class="n">${v!=null&&dt?scPc(v,dt):""}</td><td class="n">${vp===undefined?"":vp==null?SC_CS:scNf(vp)}</td></tr>`;
   const bang=`<div class="scch"><div class="scchh"><b>Bảng chi phí ${esc(SC_TEN(k))}</b><span class="hint">nhóm → khoản · cùng khung báo cáo kế toán</span></div><div class="tbl"><table><thead><tr><th>Khoản</th><th class="n">Kỳ này<div class="hint">${esc(pLabel())}</div></th><th class="n">% doanh thu</th><th class="n">Kỳ trước<div class="hint">${PV?scKyNhan(PV):"—"}</div></th></tr></thead><tbody>
    <tr class="scres"><td>Doanh thu thực (để tính %)</td><td class="n">${dt==null?SC_CS:scNf(dt)}</td><td class="n">${dt?"100%":""}</td><td class="n"></td></tr>
-   ${o.L.map((g,i)=>row((i+1)+". "+SC_KGN[g.k],g.v,pv(g.k),"scgrp")+g.it.map(x=>row(esc(x.n)+` <span class="hint">· ${esc(x.s)}</span>`,x.v,null,"scsub")).join("")).join("")}
+   ${o.L.map((g,i)=>row((i+1)+". "+SC_KGN[g.k],g.v,pv(g.k),"scgrp")+g.it.map(x=>row(esc(x.n)+` <span class="hint">· ${esc(x.s)}</span>`,x.v,undefined,"scsub")).join("")).join("")}
    <tr class="tot"><td>Tổng chi phí ${sau?"sau phân bổ":"ghi nhận"}${miss.length?` (chưa đủ, thiếu ${miss.length} nhóm)`:""}</td><td class="n">${scNf(cs)}</td><td class="n">${dt?scPc(cs,dt):""}</td><td class="n">${csP?scNf(csP):""}</td></tr></tbody></table></div>
    ${!full&&one?`<p class="hint">Tháng đang chạy: giá vốn, phí sàn theo báo cáo kênh chỉ có khi tháng đã đủ số, nên đang ghi "chưa có số".</p>`:""}</div>`;
   return scBCcss()+`<section class="card pad" id="scpk"><div class="sch"><h2>Chi phí theo kênh</h2><span class="hint">${esc(pLabel())}</span><span class="sp"></span>${scPBSeg(CH)}</div>${pills}${kp}<div class="sctwo">${co}${cw}</div>${bang}</section>
