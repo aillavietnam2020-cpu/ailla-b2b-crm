@@ -57,6 +57,8 @@ function pKhoDc(m){
   const P=kPer();kdcLoad(P);const D0=KTON.dc;
   if(KTON.err||(D0&&D0.err)){m.innerHTML=H(T,S)+`<div class="note red">${esc(KTON.err||D0.err)}</div>`;return}
   if(!KTON.rows||!D0||D0.busy||!KHO.items||!KHO.items.size){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
+  /* Giá bình quân tải riêng (kgLoad chỉ tự vẽ lại trang Tồn kho & giá trị): chưa có giá thì chờ rồi vẽ lại, không hiện giá trị 0. */
+  if(typeof KG!=="undefined"&&!KG.prices&&!KG.err){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải giá bình quân…</p>`;setTimeout(()=>{if(PAGE==="kho_dc")renderMain()},800);return}
   const F=KTON.f,cfg=D0.cfg||{},pr=c=>{const p=typeof KG!=="undefined"&&KG.prices&&KG.prices.get(c);return p&&p.avg_price>0?p.avg_price:null};
   const TH=khoTongHop(KTON.rows,pr),giu=KTON.rows.reduce((t,r)=>t+(+r.giu||0),0);
   const dc=new Map((D0.rows||[]).map(r=>[r.code,r])),fold=typeof kfold==="function"?kfold:(x=>String(x).toLowerCase()),q=fold(F.q||"").trim();
