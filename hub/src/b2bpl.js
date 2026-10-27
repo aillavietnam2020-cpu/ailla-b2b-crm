@@ -5,7 +5,7 @@
    Số liệu quản trị nội bộ; sổ sách chính thức vẫn ở MISA.
    ===================================================================== */
 const B2BR={key:"",data:null,busy:false,err:"",map:null};
-const B2B_CH={B2B:"B2B / Đại lý",GIA_CONG:"Gia công"};
+const B2B_CH={B2B:"Kênh phân phối",GIA_CONG:"Kênh OEM"};
 const IS_ADMIN_HOST=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
 async function b2bLoad(){
   const key=PERIOD.from+"|"+PERIOD.to;
@@ -90,10 +90,10 @@ function pKetQuaKenh(m){
   const R=[
    ["TikTok Shop","GMV cả shop, đã trừ hủy hoàn",N.tt,C.gvTT,C.phiTT,C.adsTT,C.khacTT,L.tts,N.tt?"Có số":"Chưa có số trong kỳ","bc_tiktok"],
    ["Shopee","Doanh thu thuần",N.spDT,C.gvSPE,C.phiSPE,C.adsSPE,0,L.spe,N.spDT?"Có số":"Chưa có số trong kỳ","bc_shopee"],
-   ["Facebook Ads","Đơn giao thành công từ quảng cáo (Pancake)",N.fbDT,C.gvFB,0,C.adsFB,0,L.fb,N.fbDT?"Có số":"Chưa có số trong kỳ","bc_fb"],
+   ["Facebook","Đơn giao thành công (Pancake)",N.fbDT,C.gvFB,0,C.adsFB,0,L.fb,N.fbDT?"Có số":"Chưa có số trong kỳ","bc_fb"],
    ["CSKH cũ","Mảng chăm sóc khách cũ",null,null,null,null,null,null,"Chờ triển khai","cskh_cu"],
-   ["B2B / Đại lý","Đơn đã duyệt trong CRM",B?B.net:null,B?B.costAll:null,0,0,B?B.cp:null,B?B.lai:null,B?(B.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_b2b"],
-   ["Gia công","Khách dùng bảng giá riêng",G?G.net:null,G?G.costAll:null,0,0,G?G.cp:null,G?G.lai:null,G?(G.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_gc"]];
+   ["Kênh phân phối","Đơn đã duyệt trong CRM",B?B.net:null,B?B.costAll:null,0,0,B?B.cp:null,B?B.lai:null,B?(B.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_b2b"],
+   ["Kênh OEM","Khách dùng bảng giá riêng",G?G.net:null,G?G.costAll:null,0,0,G?G.cp:null,G?G.lai:null,G?(G.has?"Có số":"Chưa có đơn trong kỳ"):"Đang tải…","bc_gc"]];
   const has=r=>r[2]!=null&&r[2]>0,TOT=[0,0,0,0,0,0];
   R.forEach(r=>{if(!has(r))return;TOT[0]+=r[2]||0;TOT[1]+=r[3]||0;TOT[2]+=r[4]||0;TOT[3]+=r[5]||0;TOT[4]+=r[6]||0;if(r[7]!=null)TOT[5]+=r[7]});
   const lines=R.filter(has),laiAll=TOT[5],knownLai=R.some(r=>has(r)&&r[7]!=null);
@@ -120,9 +120,9 @@ function pKetQuaKenh(m){
     const rowB=tb.querySelector('tr[data-href="/admin/ceo"]');
     if(rowB){
       rowB.classList.remove("mut");
-      const b=rowB.querySelector("b");if(b)b.textContent="B2B / Đại lý";const sm=rowB.querySelector("small");if(sm)sm.textContent="đơn đã duyệt · "+pLabel();
+      const b=rowB.querySelector("b");if(b)b.textContent="Kênh phân phối";const sm=rowB.querySelector("small");if(sm)sm.textContent="đơn đã duyệt · "+pLabel();
       set(rowB,B);rowB.removeAttribute("data-href");rowB.onclick=()=>{PAGE="bc_b2b";MOD="";render();scrollTo(0,0)};
-      const rowG=rowB.cloneNode(true);rowG.querySelector("b").textContent="Gia công";const sg=rowG.querySelector("small");if(sg)sg.textContent=G.has?"khách dùng bảng giá riêng":"chưa có đơn gia công trong kỳ";
+      const rowG=rowB.cloneNode(true);rowG.querySelector("b").textContent="Kênh OEM";const sg=rowG.querySelector("small");if(sg)sg.textContent=G.has?"khách dùng bảng giá riêng":"chưa có đơn Kênh OEM trong kỳ";
       if(G.has){set(rowG,G);rowG.classList.remove("mut")}else{[...rowG.children].slice(1).forEach(c=>{c.textContent="—"});rowG.classList.add("mut")}
       rowG.onclick=()=>{PAGE="bc_gc";MOD="";render();scrollTo(0,0)};rowB.after(rowG);
       const totRow=tb.querySelector("tr.tot");
@@ -135,8 +135,6 @@ function pKetQuaKenh(m){
         totRow.after(all);
       }
     }
-    /* Facebook là kênh quảng cáo khách mới */
-    tb.querySelectorAll("tbody tr td:first-child b").forEach(b=>{if(b.textContent.trim()==="Facebook")b.textContent="Facebook Ads"});
   }
   /* Bốn ô đầu trang: số chung của mọi kênh bán hàng */
   const cB2C=(()=>{try{return sum(execCost(N).flatMap(g=>g[1]),x=>x[1])}catch(e){return 0}})(),lr=[N.L.fb,N.L.spe,N.L.tts].filter(x=>x!=null);
