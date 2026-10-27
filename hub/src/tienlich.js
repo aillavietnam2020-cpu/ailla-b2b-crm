@@ -1,7 +1,7 @@
 /* =====================================================================
    TIỀN & LỊCH CHI (trang quản trị › Chi phí & Tiền).
    1) Số dư tài khoản: kế toán nhập mỗi thứ Hai (ngân hàng + tiền mặt), lưu từng lần để xem lại. Chị Hoa, Thảo, Huệ nhập thẳng.
-   2) Số ngày dự trữ tiền mặt = tổng tiền hiện có ÷ mức chi trung bình mỗi ngày trong kỳ đang xem (cả quảng cáo).
+   2) Số ngày dự trữ tiền mặt = tổng tiền hiện có ÷ chi bình quân mỗi ngày (luật chung ở tiencalc.js: nhập tay ở Thiết lập, không thì tiền chi đã duyệt tháng trước ÷ số ngày).
    3) Lịch chi 4 tuần tới: tiền còn phải trả nhà cung cấp, xếp theo hạn trả (công nợ N ngày; chuyển khoản sau nhận hàng = trả ngay; chuyển khoản trước theo ngày hẹn giao).
    ===================================================================== */
 const TL={busy:false,tried:false};
@@ -34,12 +34,13 @@ function pTienLich(m){
   const tot=ac.reduce((t,a)=>t+(L[a.k]?+L[a.k].tien||0:0),0),have=ac.some(a=>L[a.k]);
   const lastD=ac.map(a=>L[a.k]&&L[a.k].ngay).filter(Boolean).sort().pop()||"";
   const stale=lastD?tlDays(lastD,today):null;
+  /* Đủ dùng: một luật chung (tiencalc.js / tiencn.js) — cùng số ô Sức khỏe và Tổng quan › Tiền. */
   let avg=0,days=null;
-  try{const rows=spRows(),to=PERIOD.to<today?PERIOD.to:today,n=Math.max(1,tlDays(PERIOD.from,to)+1);avg=rows.reduce((t,x)=>t+x.tien,0)/n;if(have&&avg>0)days=Math.floor(tot/avg)}catch(e){}
+  try{const X=tcnTien();avg=X.cb.v;days=have?X.R.ngay:null}catch(e){}
   const S4=tlSchedule(),sum4=S4.W.reduce((t,w)=>t+w.sum,0)+S4.late.sum;
   const wl=["Tuần này","Tuần sau","Tuần thứ 3","Tuần thứ 4"],ds=i=>{const a=new Date(today+"T00:00:00");a.setDate(a.getDate()+i*7);const b=new Date(a);b.setDate(b.getDate()+6);const f=d=>String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0");return f(a)+" – "+f(b)};
   const sec=(title,w,hint)=>`<div class="tlw"><div class="tlwh"><b>${title}</b><small>${hint||""}</small><span class="tlsum${w.sum?"":" z"}">${w.sum?nf(w.sum)+" đ":"—"}</span></div>${w.rows.map(r=>`<div class="tlr"><span>${esc(r.txt)}${r.due?` <small>hạn ${esc(mhDM(r.due))}</small>`:""}</span><b>${nf(r.left)}</b></div>`).join("")}</div>`;
-  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Tiền đang có",have?nf(Math.round(tot)):"—",have?"cập nhật "+kDd(lastD)+(stale>7?" · đã "+stale+" ngày chưa cập nhật":""):"chưa nhập số dư")}${kpi("Đủ dùng khoảng",days!=null?days+" ngày":"—",avg>0?"chi trung bình "+nf(Math.round(avg))+" đ/ngày (kỳ đang xem)":"chưa có số chi trong kỳ")}${kpi("Phải trả nhà cung cấp 4 tuần tới",nf(Math.round(sum4)),(S4.late.sum?"trong đó quá hạn "+nf(Math.round(S4.late.sum)):"không có khoản quá hạn")+(S4.unk.sum?" · chưa rõ ngày trả: "+nf(Math.round(S4.unk.sum)):""))}${kpi("Sau khi trả hết",have?nf(Math.round(tot-sum4)):"—","tiền có trừ khoản phải trả bên dưới")}</div>
+  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Tiền đang có",have?nf(Math.round(tot)):"—",have?"cập nhật "+kDd(lastD)+(stale>7?" · đã "+stale+" ngày chưa cập nhật":""):"chưa nhập số dư")}${kpi("Đủ dùng khoảng",days!=null?days+" ngày":"—",avg>0?"chi bình quân "+nf(Math.round(avg))+" đ/ngày":"chưa có số chi tháng trước")}${kpi("Phải trả nhà cung cấp 4 tuần tới",nf(Math.round(sum4)),(S4.late.sum?"trong đó quá hạn "+nf(Math.round(S4.late.sum)):"không có khoản quá hạn")+(S4.unk.sum?" · chưa rõ ngày trả: "+nf(Math.round(S4.unk.sum)):""))}${kpi("Sau khi trả hết",have?nf(Math.round(tot-sum4)):"—","tiền có trừ khoản phải trả bên dưới")}</div>
   ${have&&tot>0||sum4>0?`<div class="qtwo"><section class="card pad"><b>Tiền đang có theo tài khoản</b>${qtBars(ac.filter(a=>L[a.k]).map(a=>({l:a.n.split(" · ").slice(0,2).join(" · "),v:+L[a.k].tien||0,c:"g"})))}</section><section class="card pad"><b>Phải trả nhà cung cấp theo tuần</b>${qtCols([...(S4.late.sum?[{l:"Quá hạn",v:S4.late.sum,c:"r"}]:[]),...S4.W.map((w,i)=>({l:wl[i],v:w.sum,c:i===0?"y":"b"})),...(S4.unk.sum?[{l:"Chưa rõ ngày",v:S4.unk.sum,c:"x"}]:[])])}</section></div>`:""}
   <div class="card pad"><div class="tlh"><b>Số dư tài khoản</b>${ed?`<button class="btn pri sm" id="tl-up">Cập nhật số dư</button>`:""}</div>
   <table class="tbl"><thead><tr><th>Tài khoản</th><th class="n">Số dư</th><th>Cập nhật</th></tr></thead><tbody>${ac.map(a=>{const b=L[a.k];return `<tr><td>${esc(a.n)}</td><td class="n">${b?nf(b.tien):"—"}</td><td>${b?esc(kDd(b.ngay))+(b.by?` <small class="hint">· ${esc(b.by)}</small>`:""):"chưa nhập"}</td></tr>`}).join("")}</tbody></table>

@@ -57,9 +57,8 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
   const gnGo=p=>{PAGE=p;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
   const gnReady=async()=>{try{await mhLoad()}catch(e){}for(let i=0;i<40&&!MH.sup;i++)await new Promise(r=>setTimeout(r,150))};
   const gnItems=()=>{const mg=mhManage(),ed=mg||can(ME,"chiphi.nhap");return [
-    ["Ghi phiếu thu / phiếu chi","Chọn thu hoặc chi, kèm ảnh bill",ed,()=>spForm()],
-    ["Phiếu chi nhà cung cấp","Trả tiền hoặc cọc cho nhà cung cấp",mg,async()=>{await gnReady();mhLoadInv();mhLoadPay();mhPayForm()}],
-    ["Phiếu chi vận chuyển","Cước xe, đơn vị vận chuyển",mg,()=>gnGo("cr_vc")],
+    /* Một phiếu chi cho mọi loại (chi phí, trả nhà cung cấp, vận chuyển): chọn loại ngay trong form (phieuchigop.js). */
+    ["Ghi phiếu chi / phiếu thu","Chi phí, trả nhà cung cấp, vận chuyển · kèm ảnh bill",ed,()=>spForm()],
     ["Lập đơn mua hàng","Nguyên vật liệu, vỏ, bao bì",mg,async()=>{await gnReady();mhForm(null)}],
     ["Ghi chứng từ nhà cung cấp","Phiếu giao, bill, hóa đơn đỏ",mg,async()=>{await gnReady();await mhLoadInv();mhDocForm()}]].filter(x=>x[2])};
   function gnInject(){

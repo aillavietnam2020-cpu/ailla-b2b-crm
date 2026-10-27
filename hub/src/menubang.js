@@ -36,10 +36,10 @@
       tc:[["Lãi lỗ",[["pl","P&L công ty"]]],
         ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"],["cr_vc","Phiếu chi vận chuyển"],["cr_s_vc","Phiếu chi vận chuyển"]]],
         ["Dòng tiền",[["tien_lich","Tiền & lịch chi"]]],
-        ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"]]],
+        ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"],["tcn_dc","Đối chiếu công nợ & tiền"]]],
         ["Giá thành",[["sku","Giá vốn SKU"],["kho_boc","Định mức & giá thành"],["kho_cl","Chênh lệch định mức"],["mh_gianvl","Giá nguyên vật liệu"]]],
         /* Đồng bộ mã B2B, Quy đổi mã các sàn: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
-        ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_map","Đồng bộ mã B2B"],["kho_qd","Quy đổi mã các sàn"]]]],
+        ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã B2B"],["kho_qd","Quy đổi mã các sàn"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
       pd:[["",[["pheduyet","Phê duyệt"]]]],
       cfg:[["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],

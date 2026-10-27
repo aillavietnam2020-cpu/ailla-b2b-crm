@@ -135,7 +135,7 @@ export const CHECK_DEFS: CheckDef[] = [
                  ROUND(SUM(l.qty), 2) AS balance,
                  MAX(CASE WHEN l.qty < 0 THEN l.doc_date END) AS last_out
           FROM kho_ledger l JOIN kho_items i ON i.code = l.item
-          GROUP BY l.item HAVING SUM(l.qty) < -0.0001
+          GROUP BY l.item HAVING ROUND(SUM(l.qty), 6) < 0 -- cùng luật "âm kho" ở services/khoTon.ts
           ORDER BY balance LIMIT ${LIMIT}`,
   },
   {

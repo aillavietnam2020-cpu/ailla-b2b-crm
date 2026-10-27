@@ -143,6 +143,9 @@ export interface DebtTotals {
   pending_cash: number;
   credit_balance: number;
   customers_exceeded: number;
+  /** Phải thu = cộng nợ chính thức của các khách còn nợ (dương). Khách trả thừa (nợ âm) để riêng ở overpaid. */
+  receivable: number;
+  overpaid: number;
 }
 
 export function totalDebts(list: DebtSummary[]): DebtTotals {
@@ -155,6 +158,8 @@ export function totalDebts(list: DebtSummary[]): DebtTotals {
       pending_cash: acc.pending_cash + d.pending_cash,
       credit_balance: acc.credit_balance + d.credit_balance,
       customers_exceeded: acc.customers_exceeded + (d.official_exceeded || d.projected_exceeded ? 1 : 0),
+      receivable: acc.receivable + Math.max(0, d.official_debt),
+      overpaid: acc.overpaid + Math.max(0, -d.official_debt),
     }),
     {
       opening_debt: 0,
@@ -164,6 +169,8 @@ export function totalDebts(list: DebtSummary[]): DebtTotals {
       pending_cash: 0,
       credit_balance: 0,
       customers_exceeded: 0,
+      receivable: 0,
+      overpaid: 0,
     },
   );
 }
@@ -375,15 +382,49 @@ export interface AgingRow {
   b90p: number;
   old: number;
   oldest_days: number;
+  /** Kênh của khách: B2B = Kênh phân phối, GIA_CONG = Kênh OEM (cùng luật dashboards.ts / doanhthu.ts). */
+  kenh: Kenh;
 }
 
+export type Kenh = 'B2B' | 'GIA_CONG';
+/** Kênh của khách: chỉ dùng bảng giá riêng và không có cấp giá = Kênh OEM; còn lại Kênh phân phối. */
+export const KENH_SQL = "CASE WHEN c.price_mode = 'CUSTOM' AND c.tier_id IS NULL THEN 'GIA_CONG' ELSE 'B2B' END";
+
+export interface AgingTotals { debt: number; b30: number; b60: number; b90: number; b90p: number; old: number }
 export interface DebtAging {
   as_of: string;
   rows: AgingRow[];
-  totals: { debt: number; b30: number; b60: number; b90: number; b90p: number; old: number };
+  totals: AgingTotals;
   rev90: number;
   dso: number | null;
+  /** Cùng số trên, tách theo kênh (tổng hai kênh = totals). */
+  by_kenh: Record<Kenh, AgingTotals & { rev90: number; dso: number | null; customers: number }>;
 }
+
+/**
+ * Chia một khoản nợ còn lại vào các chứng từ theo tuổi (vào trước trả trước: phần còn nợ nằm ở chứng từ MỚI nhất).
+ * docs xếp mới → cũ. Phần nợ không còn chứng từ nào đối ứng là nợ đầu kỳ (old). Dùng chung cho khách và nhà cung cấp.
+ */
+export function chiaTuoiNo(debt: number, docs: Array<{ date: string; amount: number }>, asOf: string) {
+  const r = { b30: 0, b60: 0, b90: 0, b90p: 0, old: 0, oldest_days: 0 };
+  const t0 = new Date(`${asOf}T00:00:00Z`).getTime();
+  let left = debt;
+  for (const o of docs) {
+    if (left <= 0) break;
+    const take = Math.min(left, o.amount || 0);
+    if (take <= 0) continue;
+    left -= take;
+    const days = Math.max(0, Math.round((t0 - new Date(`${String(o.date).slice(0, 10)}T00:00:00Z`).getTime()) / 864e5));
+    if (days > r.oldest_days) r.oldest_days = days;
+    if (days <= 30) r.b30 += take;
+    else if (days <= 60) r.b60 += take;
+    else if (days <= 90) r.b90 += take;
+    else r.b90p += take;
+  }
+  if (left > 0) r.old = left;
+  return r;
+}
+const dsoOf = (debt: number, rev90: number) => (rev90 > 0 ? Math.round((debt / rev90) * 90) : null);
 
 /**
  * Tuổi nợ phải thu (khách B2B). Tiền khách trả kế toán trừ thẳng vào công nợ chứ không gán từng đơn, nên tuổi nợ tính theo
@@ -393,45 +434,46 @@ export interface DebtAging {
 export async function debtAging(db: D1Database, scopeSql: string, scopeParams: unknown[], asOf: string): Promise<DebtAging> {
   const list = (await listDebts(db, scopeSql, scopeParams, { onlyWithDebt: true })).filter((d) => d.official_debt > 0);
   const ids = new Set(list.map((d) => d.customer_id));
+  const kenhOf = new Map(
+    ((await db.prepare(`SELECT c.id, ${KENH_SQL} AS kenh FROM customers c`).all<{ id: string; kenh: Kenh }>()).results ?? []).map((r) => [r.id, r.kenh]),
+  );
   const orders = await db
     .prepare(
-      `SELECT o.customer_id, o.order_date, o.total_amount FROM orders o JOIN customers c ON c.id = o.customer_id
+      `SELECT o.customer_id, o.order_date, o.total_amount, ${KENH_SQL} AS kenh FROM orders o JOIN customers c ON c.id = o.customer_id
        WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED' AND o.accounting_status = 'DA_XAC_NHAN'
          AND o.delivery_status IN ('DA_XUAT_KHO','DA_GIAO') AND c.deleted_at IS NULL AND ${scopeSql}
        ORDER BY o.order_date DESC`,
     )
     .bind(...scopeParams)
-    .all<{ customer_id: string; order_date: string; total_amount: number }>();
-  const by = new Map<string, Array<{ order_date: string; total_amount: number }>>();
+    .all<{ customer_id: string; order_date: string; total_amount: number; kenh: Kenh }>();
+  const by = new Map<string, Array<{ date: string; amount: number }>>();
   const t0 = new Date(`${asOf}T00:00:00Z`).getTime();
   const since = new Date(t0 - 90 * 864e5).toISOString().slice(0, 10);
-  let rev90 = 0;
+  const rev: Record<Kenh, number> = { B2B: 0, GIA_CONG: 0 };
   for (const o of orders.results ?? []) {
-    if (o.order_date >= since && o.order_date <= asOf) rev90 += o.total_amount || 0;
+    if (o.order_date >= since && o.order_date <= asOf) rev[o.kenh] += o.total_amount || 0;
     if (!ids.has(o.customer_id)) continue;
     const a = by.get(o.customer_id) ?? [];
-    a.push(o);
+    a.push({ date: o.order_date, amount: o.total_amount });
     by.set(o.customer_id, a);
   }
-  const rows: AgingRow[] = list.map((d) => {
-    const r: AgingRow = { customer_id: d.customer_id, customer_name: d.customer_name, owner_name: d.owner_name ?? null, official_debt: d.official_debt, b30: 0, b60: 0, b90: 0, b90p: 0, old: 0, oldest_days: 0 };
-    let left = d.official_debt;
-    for (const o of by.get(d.customer_id) ?? []) {
-      if (left <= 0) break;
-      const take = Math.min(left, o.total_amount || 0);
-      if (take <= 0) continue;
-      left -= take;
-      const days = Math.max(0, Math.round((t0 - new Date(`${o.order_date}T00:00:00Z`).getTime()) / 864e5));
-      if (days > r.oldest_days) r.oldest_days = days;
-      if (days <= 30) r.b30 += take;
-      else if (days <= 60) r.b60 += take;
-      else if (days <= 90) r.b90 += take;
-      else r.b90p += take;
-    }
-    if (left > 0) r.old = left;
-    return r;
-  });
+  const rows: AgingRow[] = list.map((d) => ({
+    customer_id: d.customer_id,
+    customer_name: d.customer_name,
+    owner_name: d.owner_name ?? null,
+    official_debt: d.official_debt,
+    ...chiaTuoiNo(d.official_debt, by.get(d.customer_id) ?? [], asOf),
+    kenh: kenhOf.get(d.customer_id) ?? 'B2B',
+  }));
   rows.sort((a, b) => b.b90p + b.old - (a.b90p + a.old) || b.official_debt - a.official_debt);
-  const totals = rows.reduce((t, r) => ({ debt: t.debt + r.official_debt, b30: t.b30 + r.b30, b60: t.b60 + r.b60, b90: t.b90 + r.b90, b90p: t.b90p + r.b90p, old: t.old + r.old }), { debt: 0, b30: 0, b60: 0, b90: 0, b90p: 0, old: 0 });
-  return { as_of: asOf, rows, totals, rev90, dso: rev90 > 0 ? Math.round((totals.debt / rev90) * 90) : null };
+  const sumT = (rs: AgingRow[]): AgingTotals =>
+    rs.reduce((t, r) => ({ debt: t.debt + r.official_debt, b30: t.b30 + r.b30, b60: t.b60 + r.b60, b90: t.b90 + r.b90, b90p: t.b90p + r.b90p, old: t.old + r.old }), { debt: 0, b30: 0, b60: 0, b90: 0, b90p: 0, old: 0 });
+  const totals = sumT(rows);
+  const rev90 = rev.B2B + rev.GIA_CONG;
+  const kt = (k: Kenh) => {
+    const rs = rows.filter((r) => r.kenh === k);
+    const t = sumT(rs);
+    return { ...t, rev90: rev[k], dso: dsoOf(t.debt, rev[k]), customers: rs.length };
+  };
+  return { as_of: asOf, rows, totals, rev90, dso: dsoOf(totals.debt, rev90), by_kenh: { B2B: kt('B2B'), GIA_CONG: kt('GIA_CONG') } };
 }
