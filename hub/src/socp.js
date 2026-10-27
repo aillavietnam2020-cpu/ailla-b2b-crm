@@ -23,8 +23,9 @@ function spRows(){
   (SOCP.ship||[]).filter(v=>v.status==="OK").forEach(v=>R.push({id:v.id,ngay:v.voucher_date,txt:"Cước vận chuyển · "+v.carrier,sub:[v.destination,v.voucher_no].filter(Boolean).join(" · "),nhom:"Logistics",src:"vc",loai:"V",tien:+v.amount||0,pb:"Kho vận",kenh:"",ht:spHT({method:v.method==="CHUYEN_KHOAN"?"CHUYEN_KHOAN":v.method}),acc:v.from_account?"từ "+v.from_account:"",files:v.file_count||0,open:()=>{PAGE="cr_vc";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}}));
   try{const N=execNums(PERIOD.from,PERIOD.to),C=N.C||{};
     if(C.adsFB>0)R.push({id:"ads-fb",ngay:PERIOD.to,txt:"Quảng cáo Facebook",sub:"tự cộng từ báo cáo Ads, đã gồm VAT",nhom:"Marketing",src:"ads",loai:"Q",kyOnly:true,tien:C.adsFB,pb:"Ads / Digital",kenh:"Facebook",ht:"",acc:"",files:0});
-    if(C.adsTT>0)R.push({id:"ads-tt",ngay:PERIOD.to,txt:"Quảng cáo TikTok GMV Max",sub:"từ báo cáo TikTok đã tải, đã gồm VAT",nhom:"Marketing",src:"ads",loai:"Q",kyOnly:true,tien:C.adsTT,pb:"Ads / Digital",kenh:"TikTok",ht:"",acc:"",files:0})}catch(e){}
-    try{const LG=typeof cpLuongAuto==="function"?cpLuongAuto():null;if(LG){
+    const tt=typeof scTTAds==="function"?scTTAds().v:0;if(tt>0)R.push({id:"ads-tt",ngay:PERIOD.to,txt:"Quảng cáo TikTok GMV Max",sub:"từ báo cáo TikTok đã tải, đã gồm VAT",nhom:"Marketing",src:"ads",loai:"Q",kyOnly:true,tien:tt,pb:"Ads / Digital",kenh:"TikTok",ht:"",acc:"",files:0})}catch(e){}
+    try{/* Không đưa số dự đoán vào sổ (chị Hoa 27/10): lương chỉ lấy khi kỳ lương đã chốt, bảng nháp thì để trống chờ nhập. */
+    const LG=typeof cpLuongAuto==="function"?cpLuongAuto():null;if(LG&&LG.chot){
     Object.entries(LG.perKenh).forEach(([k,v])=>{if(v>0)R.push({id:"lg-"+k,ngay:PERIOD.to,txt:"Lương & thưởng · "+k,sub:"theo bảng lương tháng "+LG.ym.slice(5)+" ("+LG.st.toLowerCase()+")",nhom:"Nhân sự",src:"luong",kyOnly:true,tien:v,pb:"",kenh:k,ht:"",acc:"",files:0,loai:"A"})});
     if(LG.chung>0)R.push({id:"lg-chung",ngay:PERIOD.to,txt:"Lương & thưởng · chưa gắn kênh (chi chung)",sub:"theo bảng lương tháng "+LG.ym.slice(5)+" ("+LG.st.toLowerCase()+")",nhom:"Nhân sự",src:"luong",kyOnly:true,tien:LG.chung,pb:"",kenh:"",ht:"",acc:"",files:0,loai:"C"});
     for(let i=R.length-1;i>=0;i--)if(R[i].src==="tay"&&R[i].catk==="LUONG")R.splice(i,1)}}catch(e){}
