@@ -25,7 +25,7 @@ async function pdLoad(force){
       ...months.flatMap(m=>th?[get("/api/bonus/gifts?month="+m),get("/api/bonus/cash?month="+m)]:[])]);
     PD.sv={approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
   catch(e){PD.err=e.message||"Không tải được"}
-  PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();else pdBadge()}
+  PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();pdBadge()}
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */
 function pdRows(){
   const d=(typeof D==="function"&&D())||{},h=d.hr||{};
