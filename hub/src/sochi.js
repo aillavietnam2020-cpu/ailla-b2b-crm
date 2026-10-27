@@ -149,7 +149,7 @@ function scPhieu(x,cho){
 }
 /* ---------- Các tab ---------- */
 function scTQ(){
-  try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
+  scNap();
   const all=scPBRows();if(!all.length)return scEmpty();
   const CD=new Set(scDM().filter(x=>x.cd).map(x=>x.g)),cp=all.filter(x=>x.k!=="Không tính"),tot=scS(cp),cd=scS(cp.filter(x=>CD.has(x.g))),bd=tot-cd,T=scS(all);
   const byTK={};all.forEach(x=>{const k=scG(x.g).tk||"?";byTK[k]=(byTK[k]||0)+x.t});
@@ -325,8 +325,11 @@ function scPBDash(){
      ${W.filter(x=>x.k===k&&x.m!=="thieu").map(x=>`<div class="scw"><span class="scp ${MW[x.m][0]}">${MW[x.m][1]}</span><div>${x.d?esc(x.d):esc(x.t)}</div></div>`).join("")}</section>`};
   const cards=`<div class="sctwo">${KS.concat(["Chung","Sản xuất"]).filter(k=>scSum(A[k])||TH.some(x=>x.k===k)||(SC_KENH.includes(k)&&DT[k])).map(card).join("")}</div>`;
   return `<style>.sochi .scup{color:#c9353d;font-weight:600}.sochi .scdn{color:#23824a;font-weight:600}.sochi .p-do{background:#fde8e8;color:#c9353d}.sochi .scw{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid #eef0f4;font-size:13.5px}.sochi .scpk .scbar{grid-template-columns:minmax(180px,1.3fr) 1fr minmax(170px,auto)}</style>`+ov+wb+cards}
+/* Mở thẳng tab Tổng quan / Phân bổ: tự tải mua hàng, vận chuyển, doanh thu thực (dtEnsure của trang Doanh thu) rồi vẽ lại khi có số. */
+function scNap(){try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
+  try{if(typeof dtEnsure==="function"){dtEnsure();if(typeof DTS!=="undefined"&&!DTS.rowsAt&&!SC.dtw){SC.dtw=1;let n=0;const w=()=>{if(DTS.rowsAt||++n>25){SC.dtw=0;if(PAGE==="so_cp")renderMain()}else setTimeout(w,800)};setTimeout(w,800)}}}catch(e){}}
 function scPB(){
-  try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
+  scNap();
   if(!scPBRows().length&&!scThieu().length)return scEmpty();
   return scPBDash()+`<details class="card pad scpbd"><summary><b>Bảng chi tiết nhóm × kênh và chia chi chung theo doanh thu</b></summary>${scPBBang()}</details>`}
 function scPBBang(){
