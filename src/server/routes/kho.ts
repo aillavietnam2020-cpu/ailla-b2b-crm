@@ -729,7 +729,7 @@ khoRoutes.post('/items/bulk', async (c) => {
     const REFS: Array<[string, string, string]> = [
       ['kho_bom', 'item', 'đang nằm trong định mức của sản phẩm khác'],
       ['kho_moves', 'item', 'đã có phiếu kho'],
-      ['kho_map', 'misa_code', 'đang được CRM quy đổi (trang Đồng bộ mã B2B)'],
+      ['kho_map', 'misa_code', 'đang được CRM quy đổi (trang Đồng bộ mã Kênh phân phối)'],
       ['channel_out', 'item', 'đã có số bán qua sàn'],
       ['channel_alias', 'item', 'có quy đổi tên sàn'],
       ['kho_pack', 'vo', 'được khai là vỏ của thành phẩm'],
@@ -852,7 +852,7 @@ khoRoutes.delete('/items/:code', async (c) => {
   if (parts.length) {
     throw conflict(
       'ITEM_IN_USE',
-      `Mã ${code} đã phát sinh (${parts.join(', ')}) nên không xóa hẳn được. Gỡ chỗ đang dùng trước (xóa định mức ở trang Định mức & giá thành, gỡ quy đổi ở trang Đồng bộ mã B2B), hoặc dùng "Ngừng dùng" để ẩn mã này.`,
+      `Mã ${code} đã phát sinh (${parts.join(', ')}) nên không xóa hẳn được. Gỡ chỗ đang dùng trước (xóa định mức ở trang Định mức & giá thành, gỡ quy đổi ở trang Đồng bộ mã Kênh phân phối), hoặc dùng "Ngừng dùng" để ẩn mã này.`,
     );
   }
   await c.env.DB.batch([
@@ -973,7 +973,7 @@ khoRoutes.get('/nxt', async (c) => {
 
 /**
  * Từng phiếu làm đổi tồn của một mã trong kỳ (để từ bảng Nhập – xuất – tồn bấm vào xem phiếu, không chỉ thấy số tổng).
- * Phiếu thật (kho_docs) có doc_id; phiếu xuất bán đơn B2B / trả hàng được ghép với đơn hoặc phiếu trả để mở ra xem.
+ * Phiếu thật (kho_docs) có doc_id; phiếu xuất bán đơn Kênh phân phối / trả hàng được ghép với đơn hoặc phiếu trả để mở ra xem.
  */
 khoRoutes.get('/nxt/detail', async (c) => {
   const item = (c.req.query('item') ?? '').trim();
@@ -1497,7 +1497,7 @@ khoRoutes.post('/lots/:code/cancel', async (c) => {
   return ok(c, { cancelled: docs.map((d) => d.no) });
 });
 
-/* ---------- Đồng bộ mã CRM B2B → MISA ---------- */
+/* ---------- Đồng bộ mã CRM Kênh phân phối → MISA ---------- */
 
 khoRoutes.get('/map', async (c) => {
   const [map, unmapped, from] = await Promise.all([
@@ -1619,7 +1619,7 @@ khoRoutes.put('/map', async (c) => {
   return ok(c, { rows: rows.length });
 });
 
-/** Ngày bắt đầu trừ kho theo đơn B2B (đơn xuất trước ngày này coi như đã nằm trong tồn đầu). */
+/** Ngày bắt đầu trừ kho theo đơn Kênh phân phối (đơn xuất trước ngày này coi như đã nằm trong tồn đầu). */
 khoRoutes.put('/cfg/b2b-from', async (c) => {
   const auth = c.get('auth');
   if (!isCeo(auth)) throw forbidden('Chỉ CEO đặt ngày bắt đầu');

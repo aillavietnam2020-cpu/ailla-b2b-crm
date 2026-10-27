@@ -4,7 +4,7 @@
      giá thành kế toán = theo giá BÌNH QUÂN (lên sổ). Giá nguyên liệu tăng quá ngưỡng thì báo, kéo theo giá bán / báo giá lỗ.
    - Số ngày dự trữ tiền mặt, lãi tạm tính hằng ngày, lãi theo kênh 3 tầng (chia lương, đóng gói, chi phí chung).
    ===================================================================== */
-const DH_CH=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["b2b","B2B / NPP"],["gc","Gia công"]];
+const DH_CH=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["b2b","Kênh phân phối"],["gc","Kênh OEM"]];
 const DH_CFG0=()=>({
   nguong:{nvlTang:0.05,bienTier:0.25,bienGC:0.15,runway:30,bienKenh:0.185,qcMax:0.38},
   kenh:{tts:{thuan:0.9,gv:0.19,phi:0.3,dongGoi:0},spe:{thuan:0.9,gv:0.2,phi:0.25,dongGoi:0},fb:{thuan:0.85,gv:0.2,phi:0,dongGoi:0}},
@@ -41,7 +41,7 @@ function dhGiaThanh(codes,bom,pNew,pAvg){
    lines: [{kind:"tier"|"kh", who, sku, name, price}] theo đơn vị bán trong CRM; map: crm_sku → {misa_code, factor}.
    costOf(mã kho) → {moi, miss}. Ngưỡng biên: bảng giá cấp = bienTier, giá riêng khách (gia công) = bienGC. */
 function dhSellCheck(lines,map,costOf,ng){
-  return lines.map(l=>{const mp=map.get(String(l.sku).toLowerCase());if(!mp)return {...l,code:"",why:"Chưa nối mã kho (Đồng bộ mã B2B)"};
+  return lines.map(l=>{const mp=map.get(String(l.sku).toLowerCase());if(!mp)return {...l,code:"",why:"Chưa nối mã kho (Đồng bộ mã Kênh phân phối)"};
     const g=costOf(mp.misa_code);if(!g)return {...l,code:mp.misa_code,why:"Mã chưa có định mức"};
     const f=+mp.factor||1,cost=g.moi*f,thr=l.kind==="kh"?ng.bienGC:ng.bienTier,bien=l.price?(l.price-cost)/l.price:0;
     if(g.miss.length)return {...l,code:mp.misa_code,cost,why:"Thiếu giá: "+g.miss.slice(0,4).join(", ")+(g.miss.length>4?"…":"")};

@@ -8,7 +8,7 @@
    Tính toán ở specalc.js; file đơn chỉ đọc trong trình duyệt.
    ===================================================================== */
 const SPE={sums:null,busy:"",err:"",up:{orders:[],fin:[],ads:[]},prev:null,cost:null,loading:false};
-const SPE_SHOPS={aillavn:"Shopee Mall (aillavn)",aillavn1:"Shopee thường (aillavn1)"};
+const SPE_SHOPS={aillavn:"Shopee Aillavn",aillavn1:"Shopee Aillavn1"};
 const speApi=(p,o)=>svApi("/api/hub/shopee"+p,o);
 const speShopL=s=>SPE_SHOPS[s]||s;
 const speAcct=()=>typeof SV!=="undefined"&&SV.acct;
@@ -115,7 +115,7 @@ function speSumCard(){
    <p class="hint">Quảng cáo Shopee lấy từ file Lịch sử giao dịch Dịch vụ Hiển thị (đã bỏ tiền nạp ví). Giá vốn theo Quy đổi mã các sàn kênh Shopee, mã chưa khai thì theo định mức báo cáo quản trị Shopee.</p></section>`;
 }
 {const _p=PAGES.bc_shopee;PAGES.bc_shopee=function(m){
-  if(typeof SP!=="undefined"&&SP)_p(m);else _pb(x=>{x.innerHTML=H("Kênh Shopee (2 shop)","Mall aillavn · shop thường aillavn1")},"spe")(m);
+  if(typeof SP!=="undefined"&&SP)_p(m);else _pb(x=>{x.innerHTML=H("Kênh Shopee (2 shop)","Shopee Aillavn · Shopee Aillavn1")},"spe")(m);
   if(!speAcct())return;if(!SPE.sums)speLoad();
   const ph=m.querySelector(".ph"),adm=typeof tsbAdm==="function"&&tsbAdm();
   const html=(adm?speUpCard():"")+speSumCard();if(ph)ph.insertAdjacentHTML("afterend",html);else m.insertAdjacentHTML("afterbegin",html);

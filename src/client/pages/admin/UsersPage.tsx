@@ -62,7 +62,7 @@ export function UsersPage() {
         mode === 'off'
           ? `${user.display_name}: không vào khu Marketing`
           : mode === 'only'
-            ? `${user.display_name}: chỉ vào khu Marketing (không thấy dữ liệu B2B)`
+            ? `${user.display_name}: chỉ vào khu Marketing (không thấy dữ liệu Kênh phân phối)`
             : `${user.display_name}: vào thêm khu Marketing`,
       );
       load();

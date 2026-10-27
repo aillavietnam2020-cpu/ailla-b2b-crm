@@ -2,7 +2,7 @@
    KÊNH TIKTOK SHOP trên web (thay file Excel + HTML), chị Hoa duyệt 24/10/2026.
    - Trang quản trị › Tài chính › Doanh thu › TikTok: lãi lỗ tháng, sản phẩm/SKU, phí sàn 7 nhóm, chi phí riêng kênh,
      cảnh báo 3 nhóm, chất lượng dữ liệu, khoá sổ, so nhiều tháng. Kế toán tải OrderSKUList + income + Campaign overview.
-   - Trang vận hành › Kinh doanh B2C › TikTok: hiệu suất theo ngày (5 làn, quảng cáo, KOC, video & LIVE), không có giá vốn.
+   - Trang vận hành › Kênh bán lẻ › TikTok: hiệu suất theo ngày (5 làn, quảng cáo, KOC, video & LIVE), không có giá vốn.
      Team TikTok tải Key metrics, LIVE, Transaction Analysis, Creator List hằng tuần.
    Tính toán nằm ở ttcalc.js. File đơn chỉ đọc trong trình duyệt, máy chủ không nhận thông tin khách.
    ===================================================================== */
@@ -265,7 +265,7 @@ function tsbOpsPage(m){
 PAGES.bc_tiktok=m=>{if(tsbAdm())return tsbAdmPage(m);_pb(tsbOpsPage,"tts")(m)};
 
 /* Nhập báo cáo › tab "Báo cáo tổng quan TikTok": dùng chung ô tải của team TikTok. */
-ntTq=function(){if(!TSB.all)tsbLoadAll();return tsbUpOpsCard()+`<p class="hint" style="margin:8px 4px">Số đã lưu hiện ở <button class="lnk" data-go="bc_tiktok">Kinh doanh B2C › TikTok →</button></p>`};
+ntTq=function(){if(!TSB.all)tsbLoadAll();return tsbUpOpsCard()+`<p class="hint" style="margin:8px 4px">Số đã lưu hiện ở <button class="lnk" data-go="bc_tiktok">Kênh bán lẻ › TikTok →</button></p>`};
 ntTqBind=function(m){tsbOpsBind(m)};
 
 /* Tổng quan công ty (trang quản trị): kỳ chọn trọn các tháng đã lưu thì dòng TikTok lấy lãi đóng góp kênh của tháng. */

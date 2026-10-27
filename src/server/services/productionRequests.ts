@@ -79,7 +79,7 @@ export async function createProductionRequests(
     }
     const m = mapBy.get(inp.sku);
     if (!m) {
-      skipped.push({ sku: inp.sku, reason: 'Chưa có mã kho trong bảng Đồng bộ mã B2B, nhờ kế toán kho thêm' });
+      skipped.push({ sku: inp.sku, reason: 'Chưa có mã kho trong bảng Đồng bộ mã Kênh phân phối, nhờ kế toán kho thêm' });
       continue;
     }
     const qtyCrm = inp.qty != null && inp.qty > 0 ? inp.qty : sh.short;
@@ -123,7 +123,7 @@ export async function createProductionRequests(
         nguon: 'Đơn B2B',
         uu: 'Bình thường',
         han: '',
-        ghiChu: `Mã thiếu của đơn B2B (${t.sku}).${t.note ? ' ' + t.note : ''}`,
+        ghiChu: `Mã thiếu của đơn Kênh phân phối (${t.sku}).${t.note ? ' ' + t.note : ''}`,
         st: 'CAN_LAM',
         tao: who,
         taoLuc: today,

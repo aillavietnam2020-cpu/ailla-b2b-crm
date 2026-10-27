@@ -40,7 +40,7 @@ const gcBind=m=>m.querySelectorAll("[data-gcgo]").forEach(b=>b.onclick=()=>gcGo(
 
 /* ---- Tổng quan gia công ---- */
 function pGcTq(m){
-  gcLoad();const T="Gia công",S="Khách đặt sản xuất theo yêu cầu · dùng bảng giá riêng của từng khách";
+  gcLoad();const T="Kênh OEM",S="Khách đặt sản xuất theo yêu cầu · dùng bảng giá riêng của từng khách";
   if(!GC.cust){gcLoading(m,T,S);return}
   const C=GC.cust,n=gcCounts();
   const rev=sum(C,c=>+c.revenue_month||0),debt=sum(C,c=>+c.official_debt||0);
@@ -92,7 +92,7 @@ Object.assign(PAGES,{gc_tq:pGcTq,gc_kh:pGcKh,gc_don:pGcDon,gc_sx:pGcSx,gc_cn:pGc
 
 /* ---- Menu bên vận hành: mục Gia công (bán hàng) ---- */
 {const i=MODULES.findIndex(m=>m.k==="b2blink");
- MODULES.splice(i>=0?i+1:3,0,{k:"gc",zone:"Bán hàng",ic:"fac",n:"Gia công",sub:"Khách · Đơn · Sản xuất",groups:()=>{
+ MODULES.splice(i>=0?i+1:3,0,{k:"gc",zone:"Bán hàng",ic:"fac",n:"Kênh OEM",sub:"Khách · Đơn · Sản xuất",groups:()=>{
   const a=typeof svAllowedMods==="function"?svAllowedMods():null;if(a&&!a.has("b2blink")&&!a.has("b2b"))return [];
   const ok=()=>typeof SV!=="undefined"&&SV.perms&&SV.perms.includes("price.read");
   return [["",[MI("gc_tq","Tổng quan gia công",ok),MI("gc_kh","Khách gia công",ok),MI("gc_don","Đơn gia công",ok),MI("gc_sx","Sản xuất gia công",ok),MI("gc_cn","Công nợ gia công",ok)]]]}})}

@@ -2,7 +2,7 @@
    PHÊ DUYỆT (trang quản trị › Phê duyệt): một chỗ gom mọi việc đang chờ duyệt, duyệt / từ chối ngay trên dòng.
    - Gom và lọc quyền ở pdcalc.js (hàm thuần). Ở đây chỉ tải dữ liệu, vẽ bảng, gọi đúng nút duyệt đang có của từng loại:
        đơn / đổi giá / đổi cấp khách  POST /api/approvals/:id/decide       (giống bảng "Yêu cầu chờ duyệt" ở Đơn hàng & duyệt)
-       sửa phiếu xuất kho             POST /api/orders/ship-edits/:id/decide (giống Kho › Xuất B2B)
+       sửa phiếu xuất kho             POST /api/orders/ship-edits/:id/decide (giống Kho › Xuất Kênh phân phối)
        đề xuất agent                  POST /api/proposals/:id/decide
        phiếu quà / chi thưởng NPP     POST /api/bonus/{gifts|cash}/:id/approve, từ chối = hủy phiếu /cancel (giống trang Thưởng NPP)
        phiếu chi (Sổ chi phí)         scDuyet / scTuChoi của sochi.js

@@ -47,7 +47,7 @@ function pSanPhamSku(m){
   if($("#sps-add"))$("#sps-add").onclick=()=>spsForm(null);
   m.querySelectorAll("[data-sps-img]").forEach(i=>i.onclick=()=>{const p=SPS.data.find(x=>x.id===i.dataset.spsImg);if(p)openDrawerHTML(`<h2>${esc(p.name)}</h2><p class="hint mono">${esc(p.sku)}</p><img src="${spsPhotoSrc(p,false)}" alt="${esc(p.name)}" style="width:100%;max-height:70vh;object-fit:contain;background:#f6f7f9;border-radius:10px">`)});
   m.querySelectorAll("[data-sps-ed]").forEach(b=>b.onclick=()=>spsForm(b.dataset.spsEd));
-  const spsOff=async id=>{const p=SPS.data.find(x=>x.id===id);if(!p||!confirm("Ngừng bán "+p.sku+"? Sản phẩm không còn hiện khi lập đơn, đơn cũ giữ nguyên. Bật lại ở Bảng giá B2B."))return;
+  const spsOff=async id=>{const p=SPS.data.find(x=>x.id===id);if(!p||!confirm("Ngừng bán "+p.sku+"? Sản phẩm không còn hiện khi lập đơn, đơn cũ giữ nguyên. Bật lại ở Bảng giá Kênh phân phối."))return;
     try{await svApi("/api/products/"+p.id,{method:"PATCH",body:JSON.stringify({active:false})});toast("Đã ngừng bán "+p.sku);SPS.data=null;await spsLoad()}catch(e){toast(e.message)}};
   const spsDel=async id=>{const p=SPS.data.find(x=>x.id===id);if(!p||!confirm("Xóa sản phẩm "+p.sku+" · "+p.name+"? Sản phẩm biến mất khỏi danh sách và khi lập đơn. Lịch sử đơn cũ giữ nguyên."))return;
     try{await svApi("/api/products/"+p.id,{method:"DELETE"});toast("Đã xóa "+p.sku);SPS.data=null;await spsLoad()}catch(e){toast(e.message)}};

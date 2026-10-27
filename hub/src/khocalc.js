@@ -4,7 +4,7 @@
 
    ĐỊNH NGHĨA (một mã MISA, đến hết ngày xem):
    - Tồn thực tế : tổng sổ kho = phiếu kho còn hiệu lực (tồn đầu kỳ, nhập NVL, pha chế, kiểm kê đóng gói, xuất khác, nhập hàng hoàn)
-                   + đơn Kênh phân phối đã xuất kho (từ ngày bắt đầu trừ, quy đổi theo Đồng bộ mã B2B) + hàng trả lại đã nhận
+                   + đơn Kênh phân phối đã xuất kho (từ ngày bắt đầu trừ, quy đổi theo Đồng bộ mã Kênh phân phối) + hàng trả lại đã nhận
                    + xuất bán lẻ các sàn theo ngày (từ ngày bắt đầu trừ online).
    - Đã giữ      : số trên đơn Kênh phân phối đã duyệt, kho đã nhận lệnh, chưa xuất.
    - Tồn khả dụng: tồn thực tế − đã giữ.
@@ -18,7 +18,7 @@ const KHO_NHOM=[["NVL","Nguyên vật liệu"],["VO","Vỏ can, chai"],["BTP","B
 const KHO_TT={AM:["Âm kho","red"],SAP_HET:["Sắp hết","amb"],DU:["Đủ hàng","grn"]};
 const KHO_DN=[
   ["Tồn thực tế","Cộng mọi dòng trong sổ kho đến hết ngày xem: tồn đầu kỳ, phiếu nhập, pha chế, kiểm kê đóng gói, xuất khác, nhập hàng hoàn, đơn Kênh phân phối đã xuất kho, hàng trả lại đã nhận, xuất bán lẻ các sàn theo ngày. Phiếu đã hủy không tính."],
-  ["Đã giữ cho đơn","Số trên đơn Kênh phân phối đã duyệt, kho đã nhận lệnh xuất nhưng chưa xuất (quy đổi theo Đồng bộ mã B2B)."],
+  ["Đã giữ cho đơn","Số trên đơn Kênh phân phối đã duyệt, kho đã nhận lệnh xuất nhưng chưa xuất (quy đổi theo Đồng bộ mã Kênh phân phối)."],
   ["Tồn khả dụng","Tồn thực tế trừ hàng đã giữ cho đơn."],
   ["Đang sản xuất","Phiếu sản xuất đang làm (phần chưa ra lô) cộng lô đã làm xong chưa nhập kho. Chỉ để xem, chưa cộng vào tồn."],
   ["Giá trị tồn","Phần tồn thực tế dương nhân giá bình quân gia quyền của tháng (Mua hàng › Giá nguyên vật liệu). Thành phẩm chưa có giá nên chưa tính."],
