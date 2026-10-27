@@ -52,7 +52,9 @@ if(typeof fbsLoad==="function"){const _l=fbsLoad;fbsLoad=async function(){const 
 if(typeof fbdCost==="function"){const _c=fbdCost;fbdCost=function(days){const o=_c.apply(this,arguments);try{dtSyncFb();const R=FBC.raw&&FBC.raw.days;if(R&&o.n){let d=0;days.forEach(k=>{if(R[k])d+=+((DAYD.fb||{})[k]||[])[5]||0});o.gop+=d-o.dt;o.dt=d}}catch(e){}return o}}
 
 /* ---------- Nhãn chốt + số đã chốt áp vào từng dòng kênh ---------- */
-function dtEnsure(){dtLoadRows();if(!DTS.tsb&&typeof TSB!=="undefined"&&!TSB.months&&typeof tsbLoadMonths==="function"){DTS.tsb=true;Promise.resolve(tsbLoadMonths()).then(dtRe).catch(()=>{})}}
+function dtEnsure(){dtLoadRows();
+  /* Quảng cáo Facebook theo ngày (ads_fb) chỉ có khi đã tải và gộp vào DAYD.ads: mở thẳng Lãi lỗ / So sánh kênh mà chưa qua trang Facebook thì quảng cáo bằng 0, lãi bị đội. */
+  if(!DTS.adf&&typeof adfLoad==="function"&&typeof ADF!=="undefined"){DTS.adf=true;Promise.resolve(ADF.raw||adfLoad()).then(()=>{try{adfMergeDays()}catch(e){}dtRe()}).catch(()=>{DTS.adf=false})}if(!DTS.tsb&&typeof TSB!=="undefined"&&!TSB.months&&typeof tsbLoadMonths==="function"){DTS.tsb=true;Promise.resolve(tsbLoadMonths()).then(dtRe).catch(()=>{})}}
 function dtLabel(r,ch,from,to){
   if(!r||r._dt)return r;r._dt=1;const t=dtToday(),ms=tqMonths(from,to);if(ms.length!==1)return r;
   const ym=ms[0],st=dtTrangThai(ym,t);r.chot=st;r.ym=ym;
