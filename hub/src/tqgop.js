@@ -125,25 +125,26 @@ function plRowsFor(from,to){
   try{return tqKenhRows()}finally{PERIOD=sv;B2BR.key=bk.key;B2BR.data=bk.data}}
 const plKey=r=>({tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"})[r.k];
 /* Một kênh → các dòng P&L. Phí sàn và vận chuyển = phần còn lại để các dòng cộng khớp lãi đóng góp. */
-function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,lai:0,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ads=r.ads||0,lai=r.lai;
-  const lg=gv==null?null:dt-gv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ads-lai;return {dt,gv,lg,phi,ads,lai,tam:!!r.tam,src:r.src,don:r.don}}
+function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,cpk:r.cpk||0,lai:r.lai==null?0:r.lai,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ads=r.ads||0,lai=r.lai,cpk=r.cpk||0;
+  const lg=gv==null?null:dt-gv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ads-cpk-lai;return {dt,gv,lg,phi,ads,cpk,lai,tam:!!r.tam,src:r.src,don:r.don}}
 function plSum(cols,names){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.reduce((a,c)=>a+(c[k]||0),0);
   const thieuGv=cols.map((c,i)=>c&&c.gv==null?names[i]:null).filter(Boolean);
-  return {dt:s("dt"),gv:s("gv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),lai:s("lai"),thieuGv,tam:ok.some(c=>c.tam)}}
+  return {dt:s("dt"),gv:s("gv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),cpk:s("cpk"),lai:s("lai"),thieuGv,tam:ok.some(c=>c.tam)}}
 function mtGet(ym){const t=D().targets,x=t&&t.thang&&t.thang[ym];if(!x)return null;const o={};let tong=0,co=false;PLK.forEach(([k])=>{const v=+x[k]||0;o[k]=v||null;if(v){tong+=v;co=true}});o.tong=co?tong:null;return co?o:null}
 function plChung(ym){try{if(typeof spChungTheoThang!=="function")return null;const v=spChungTheoThang(ym);return v!=null&&isFinite(+v)&&+v>0?+v:null}catch(e){return null}}
 function plMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
   const cols={};PLK.forEach(([k])=>cols[k]=plCol(by[k]));const tot=plSum(PLK.map(([k])=>cols[k]),PLK.map(x=>x[1])),chung=plChung(ym);
-  return {ym,R,by,cols,tot,chung,ln:tot&&chung!=null?tot.lai-chung:null,thieu:PLK.filter(([k])=>!cols[k]).map(x=>x[1]),loading:rows.some(r=>r.src==="đang tải…")}}
+  let sx=0;try{const S=typeof dtSoCp==="function"?dtSoCp(R.from,R.to):null;sx=S?S.v.sx:0}catch(e){}
+  return {ym,R,by,cols,tot,chung,sx,ln:tot&&chung!=null?tot.lai-chung-sx:null,thieu:PLK.filter(([k])=>!cols[k]).map(x=>x[1]),loading:rows.some(r=>r.src==="đang tải…")}}
 const PLS={ym:""};
 function pPLCty(m){
   if(!dhOk()){m.innerHTML=H("Lãi lỗ P&L","")+`<div class="note">Trang này chỉ dành cho CEO và kế toán.</div>`;return}
   dhLoad();const ym=PLS.ym||plYmNow(),A=plMonth(ym),P=plMonth(plYmAdd(ym,-1)),KH=mtGet(ym),vn=x=>x.slice(5,7)+"/"+x.slice(0,4);
   const f=v=>v==null?`<span class="hint">—</span>`:`<span class="${v<0?"t-red":""}">${nf(Math.round(v))}</span>`;
   const pct=(a,b)=>a==null||!b?"—":dhPct(a/b);
-  const ROWS=[["dt","Doanh thu thực","tot"],["gv","− Giá vốn",""],["lg","= Lãi gộp","tot"],["phi","− Phí sàn và vận chuyển",""],["ads","− Quảng cáo",""],["lai","= Lãi đóng góp kênh","tot"],["chung","− Chi phí chung (lương, kho vận, thuê, agency…)",""],["ln","= Lợi nhuận quản trị","tot big"]];
-  const cell=(c,k)=>{if(!c)return `<td class="n hint">chờ số</td>`;if(k==="chung"||k==="ln")return `<td class="n hint"></td>`;return `<td class="n">${f(c[k])}</td>`};
-  const cty=(X,k)=>{if(!X.tot)return `<td class="n hint">—</td>`;if(k==="chung")return X.chung==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n">${f(X.chung)}</td>`;if(k==="ln")return X.ln==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n"><b>${f(X.ln)}</b></td>`;return `<td class="n"><b>${f(X.tot[k])}</b></td>`};
+  const ROWS=[["dt","Doanh thu thực","tot"],["gv","− Giá vốn",""],["lg","= Lãi gộp","tot"],["phi","− Phí sàn và vận chuyển",""],["ads","− Quảng cáo",""],["cpk","− Chi phí trực tiếp kênh (Sổ chi phí)",""],["lai","= Lãi đóng góp kênh","tot"],["chung","− Chi phí chung (lương, kho vận, thuê, agency…)",""],["sx","− Chi phí Sản xuất (Sổ chi phí)",""],["ln","= Lợi nhuận quản trị","tot big"]];
+  const cell=(c,k)=>{if(!c)return `<td class="n hint">chờ số</td>`;if(k==="chung"||k==="sx"||k==="ln")return `<td class="n hint"></td>`;return `<td class="n">${f(c[k])}</td>`};
+  const cty=(X,k)=>{if(!X.tot)return `<td class="n hint">—</td>`;if(k==="sx")return `<td class="n">${f(X.sx||0)}</td>`;if(k==="chung")return X.chung==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n">${f(X.chung)}</td>`;if(k==="ln")return X.ln==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n"><b>${f(X.ln)}</b></td>`;return `<td class="n"><b>${f(X.tot[k])}</b></td>`};
   const kh=k=>k==="dt"&&KH?`<td class="n">${f(KH.tong)}<br><small class="hint">đạt ${pct(A.tot&&A.tot.dt,KH.tong)}</small></td>`:`<td class="n hint">${k==="dt"?"chưa đặt":""}</td>`;
   const body=ROWS.map(([k,l,c])=>`<tr class="${c.includes("tot")?"tot":""}"><td>${c.includes("big")?`<b>${l}</b>`:l}</td>${PLK.map(([kk])=>cell(A.cols[kk],k)).join("")}${cty(A,k)}${cty(P,k)}${kh(k)}</tr>`).join("");
   const bien=(l,k)=>`<tr><td class="hint">${l}</td>${PLK.map(([kk])=>{const c=A.cols[kk];return `<td class="n hint">${c&&c[k]!=null&&k!=="ln"?pct(c[k],c.dt):""}</td>`}).join("")}<td class="n hint">${A.tot?pct(k==="ln"?A.ln:A.tot[k],A.tot.dt):""}</td><td class="n hint">${P.tot?pct(k==="ln"?P.ln:P.tot[k],P.tot.dt):""}</td><td></td></tr>`;
@@ -156,7 +157,7 @@ function pPLCty(m){
   ${A.tot&&A.tot.tam?`<div class="note">Có phần doanh thu <b>tạm tính</b> (ngày chưa có báo cáo sàn), số sẽ chốt khi tải báo cáo tháng.</div>`:""}
   <section class="card flush"><div class="tbl"><table><thead><tr><th>Chỉ tiêu (đ)</th>${PLK.map(([,n])=>`<th class="n">${n}</th>`).join("")}<th class="n">CÔNG TY</th><th class="n">Tháng trước<br><small>${vn(P.ym)}</small></th><th class="n">Kế hoạch</th></tr></thead><tbody>
    ${body}${bien("Biên lãi gộp","lg")}${bien("Biên đóng góp","lai")}${bien("Biên lợi nhuận quản trị","ln")}</tbody></table></div>
-   <p class="hint pad">Lãi đóng góp kênh = doanh thu thực − giá vốn − phí sàn, vận chuyển, thuế − quảng cáo. Chi phí chung chưa chia cho từng kênh, chỉ trừ ở cột CÔNG TY. ${A.chung==null?"Chi phí chung lấy từ Sổ chi phí: tháng này chưa có số nên chưa ra lợi nhuận quản trị.":""}</p></section>
+   <p class="hint pad">Lãi đóng góp kênh = doanh thu thực − giá vốn − phí sàn, vận chuyển, thuế − quảng cáo − chi phí Sổ chi phí bổ thẳng về kênh (trừ quảng cáo, phí sàn, ship đã trừ ở trên). Chi phí chung chưa chia cho từng kênh, chỉ trừ ở cột CÔNG TY. ${A.chung==null?"Chi phí chung lấy từ Sổ chi phí: tháng này chưa có số nên chưa ra lợi nhuận quản trị.":""}</p></section>
   <section class="card"><div class="card-h"><h2>Nguồn số từng kênh</h2></div><ul class="lessons">${src}</ul></section>`;
   m.querySelector("#pl-ym").onchange=e=>{PLS.ym=e.target.value;renderMain()};
   m.querySelector("#pl-mt").onclick=()=>{MT.ym=ym;PAGE="muctieu";renderMain();scrollTo(0,0)};
