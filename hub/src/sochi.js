@@ -259,7 +259,75 @@ function scAutoDT(ym){const o={};
   /* Chỉ lấy số thật: kênh còn tạm tính hoặc báo cáo chưa phủ đủ tháng thì để trống cho chị nhập (chị Hoa 27/10). */
   try{if(typeof dtShownMonth==="function"){const r=dtShownMonth(ym),v=x=>x&&x.dt!=null&&+x.dt>0&&!x.tam&&!x.thieu?+x.dt:0;o["TikTok"]=v(r.tts);o["Facebook"]=v(r.fb);o["NPP"]=v(r.b2b);o["Gia công"]=v(r.gc)}}catch(e){}
   return o}
+/* =====================================================================
+   PHÂN BỔ THEO KÊNH dạng bảng điều hành (chị Hoa 27/10): mỗi kênh có chi phí gì, cơ cấu ra sao, so cùng kỳ tháng trước,
+   cảnh báo và đề xuất. Chỉ dùng số thật: chỉ số chưa có báo cáo / chưa nhập thì ghi "chưa có số", không đoán.
+   - So sánh: kỳ là một tháng thì so với tháng trước; tháng đang chạy thì so cùng số ngày (1–27/10 với 1–27/9).
+     Tổng so sánh chỉ cộng các nhóm tháng này đã có số, để nhóm "chưa có số" không làm chi phí trông như giảm.
+   - Cảnh báo: quảng cáo trên doanh thu thực vượt ngưỡng (Ngưỡng cảnh báo, mặc định 38%); chi phí kênh tăng trên 20% và
+     trên 5 triệu so cùng kỳ (chỉ ra nhóm làm tăng); thiếu số; tiền chưa biết bổ cho kênh nào.
+   ===================================================================== */
+const SC_QCG={"TikTok":["G02"],"Shopee Mall":["G03"],"Shopee thường":["G03"],"Facebook":["G01"]};
+const scQcMax=()=>{try{return +dhGet().nguong.qcMax||0.38}catch(e){return 0.38}};
+function scKyTruoc(){
+  const f=PERIOD.from,t=PERIOD.to,ym=f.slice(0,7);if(t.slice(0,7)!==ym||f.slice(8)!=="01")return null;
+  const [y,m]=ym.split("-").map(Number),pym=iso(new Date(y,m-2,1)).slice(0,7),last=new Date(y,m-1,0).getDate(),today=mhToday(),full=t<today;
+  const dd=full?last:Math.min(+today.slice(8,10),last);
+  return {from:pym+"-01",to:pym+"-"+String(dd).padStart(2,"0"),ym:pym,full,nhan:full?"tháng "+pym.slice(5)+"/"+pym.slice(0,4):`cùng kỳ 01–${String(dd).padStart(2,"0")}/${pym.slice(5)}`}}
+/* Số của kỳ trước: tạm đổi kỳ để dùng lại đúng cách tính, rồi trả kỳ về như cũ. Phiếu chi vận chuyển kỳ trước tải riêng. */
+function scPrev(){
+  const K=scKyTruoc();if(!K)return null;const key=K.from+"|"+K.to;
+  if(!SC.pvShip||SC.pvShip.key!==key){const o={key,data:null};SC.pvShip=o;
+    svApi("/api/shipping-vouchers?from="+K.from+"&to="+K.to).then(d=>{o.data=Array.isArray(d)?d:[]}).catch(()=>{o.data=[]}).finally(()=>{if(PAGE==="so_cp"&&SC.tab==="pb")renderMain()})}
+  const o={f:PERIOD.from,t:PERIOD.to,s:SOCP.ship};let R=null;
+  try{PERIOD.from=K.from;PERIOD.to=K.to;SOCP.ship=SC.pvShip.data||[];R={...K,rows:scPBRows(),dang:!SC.pvShip.data}}catch(e){}
+  finally{PERIOD.from=o.f;PERIOD.to=o.t;SOCP.ship=o.s}
+  return R}
+const scAgg=rows=>{const A={};SC_COLS.forEach(c=>A[c]={});rows.forEach(x=>{const c=SC_COLS.includes(x.k)?x.k:"Chờ xác định";A[c][x.g]=(A[c][x.g]||0)+(+x.t||0)});return A};
+const scSum=o=>Object.values(o||{}).reduce((a,b)=>a+b,0);
+function scDtThang(){const ym=PERIOD.from.slice(0,7),auto=scAutoDT(ym),saved=((scFin().cpDT||{})[ym])||{},DT={},thieu=[];
+  SC_KENH.forEach(k=>{if(saved[k]!=null&&saved[k]!=="")DT[k]=+saved[k];else if(auto[k])DT[k]=auto[k];else{DT[k]=null;thieu.push(k)}});return {DT,thieu,auto,saved}}
+function scPBDash(){
+  const rows=scPBRows(),TH=scThieu(),A=scAgg(rows),PV=scPrev(),B=PV?scAgg(PV.rows):null,{DT}=scDtThang(),qm=scQcMax(),CS='<span class="hint">chưa có số</span>';
+  const thg=(k,g)=>TH.some(x=>x.k===k&&x.g===g);
+  /* so cùng kỳ: chỉ các nhóm tháng này có số */
+  const soSanh=k=>{if(!B)return null;const gs=Object.keys(A[k]).filter(g=>!thg(k,g));const t=gs.reduce((s,g)=>s+A[k][g],0),p=gs.reduce((s,g)=>s+((B[k]||{})[g]||0),0);return {t,p}};
+  const dl=(t,p)=>{if(!p)return t?'<span class="hint">mới</span>':'<span class="hint">—</span>';const r=(t-p)/p;return `<span class="${r>0.2?"scup":r<-0.2?"scdn":"hint"}">${r>0?"▲":"▼"} ${scPc(Math.abs(t-p),p)}</span>`};
+  const qcOf=k=>(SC_QCG[k]||[]).reduce((s,g)=>s+(A[k][g]||0),0);
+  /* cảnh báo + đề xuất */
+  const W=[];
+  SC_KENH.forEach(k=>{const T=scSum(A[k]),dt=DT[k],qc=qcOf(k),qcThieu=(SC_QCG[k]||[]).some(g=>thg(k,g));
+    if(dt&&qc&&!qcThieu&&qc/dt>qm)W.push({k,m:"do",t:`${k}: quảng cáo ${scPc(qc,dt)} doanh thu thực, vượt ngưỡng ${scPc(qm,1)}.`,d:`Giảm ngân sách nhóm chiến dịch lỗ, giữ nhóm có lãi; mức quảng cáo để về ngưỡng là ${scNf(dt*qm)} đ (đang ${scNf(qc)} đ).`});
+    const S=soSanh(k);if(S&&S.p&&S.t>S.p*1.2&&S.t-S.p>5e6){const up=Object.keys(A[k]).filter(g=>!thg(k,g)).map(g=>[g,A[k][g]-((B[k]||{})[g]||0)]).sort((a,b)=>b[1]-a[1])[0];
+      W.push({k,m:"vang",t:`${k}: chi phí tăng ${scPc(S.t-S.p,S.p)} so ${PV.nhan} (+${scNf(S.t-S.p)} đ).`,d:up&&up[1]>0?`Tăng chủ yếu ở ${scG(up[0]).n} (+${scNf(up[1])} đ): xem lại khoản này ở Nhật ký chi.`:"Xem lại các khoản mới ở Nhật ký chi."})}
+    if(T&&dt==null)W.push({k,m:"thieu",t:`${k}: có ${scNf(T)} đ chi phí nhưng chưa có doanh thu thực, chưa tính được chi phí trên doanh thu.`,d:`Bấm "Sửa doanh thu thực" để nhập, hoặc tải báo cáo kênh.`});
+  });
+  TH.forEach(x=>W.push({k:x.k,m:"thieu",t:"Chưa có số: "+x.why,d:""}));
+  const cxd=scSum(A["Chờ xác định"]);if(cxd)W.push({k:"",m:"vang",t:`${scNf(cxd)} đ chưa biết bổ cho kênh nào.`,d:`Chọn "Bổ vào" cho các dòng "Chờ xác định" ở Nhật ký chi.`});
+  const MW={do:["p-do","Vượt ngưỡng"],vang:["p-ra","Cần xem"],thieu:["p-c","Thiếu số"]},ord={do:0,vang:1,thieu:2};W.sort((a,b)=>ord[a.m]-ord[b.m]);
+  const stt=k=>{const L=W.filter(x=>x.k===k);return L.some(x=>x.m==="do")?`<span class="scp p-do">Vượt ngưỡng</span>`:L.some(x=>x.m==="vang")?`<span class="scp p-ra">Cần xem</span>`:L.some(x=>x.m==="thieu")||(SC_KENH.includes(k)&&DT[k]==null)?`<span class="scp p-c">Thiếu số</span>`:`<span class="scp p-ok">Ổn</span>`};
+  /* 1. Toàn cảnh */
+  const KS=SC_KENH.slice().sort((a,b)=>scSum(A[b])-scSum(A[a]));
+  const ov=`<section class="card flush"><div class="sch pad"><h2>Chi phí từng kênh</h2>${scCanDuyet()&&PERIOD.to.slice(0,7)===PERIOD.from.slice(0,7)?`<button class="btn sm" id="scdt-ed2">Sửa doanh thu thực</button>`:""}<span class="hint">${esc(pLabel())}${PV?" · so "+PV.nhan+(PV.dang?" (đang tải vận chuyển kỳ trước…)":""):" · chọn một tháng để so tháng trước"} · bấm tên kênh để xem cơ cấu</span></div>
+   <div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Chi phí kỳ này</th>${PV?`<th class="n">${esc(PV.nhan)}</th><th class="n">Tăng / giảm</th>`:""}<th class="n">Doanh thu thực</th><th class="n">Chi phí / doanh thu</th><th class="n">Quảng cáo / doanh thu</th><th>Tình trạng</th></tr></thead><tbody>
+   ${KS.map(k=>{const T=scSum(A[k]),S=soSanh(k),dt=DT[k],qc=qcOf(k),qT=(SC_QCG[k]||[]).some(g=>thg(k,g));return `<tr class="clk" data-pbk="${esc(k)}"><td><b>${k}</b></td><td class="n"><b>${T?scNf(T):"—"}</b>${TH.some(x=>x.k===k)?'<div class="hint">còn thiếu số</div>':""}</td>${PV?`<td class="n">${S&&S.p?scNf(S.p):"—"}</td><td class="n">${S?dl(S.t,S.p):""}</td>`:""}<td class="n">${dt==null?CS:scNf(dt)}</td><td class="n">${dt?scPc(T,dt):CS}</td><td class="n">${SC_QCG[k]?(qT?CS:dt?`<span class="${qc/dt>qm?"scup":""}">${scPc(qc,dt)}</span>`:CS):'<span class="hint">không chạy QC</span>'}</td><td>${stt(k)}</td></tr>`}).join("")}
+   ${["Chung","Sản xuất","Chờ xác định"].map(k=>{const T=scSum(A[k]),S=soSanh(k);return T||TH.some(x=>x.k===k)?`<tr class="clk" data-pbk="${esc(k)}"><td>${k==="Chung"?"Chi chung công ty":k==="Sản xuất"?"Sản xuất (vào giá thành)":"Chờ xác định"}</td><td class="n">${T?scNf(T):"—"}${TH.some(x=>x.k===k)?'<div class="hint">còn thiếu số</div>':""}</td>${PV?`<td class="n">${S&&S.p?scNf(S.p):"—"}</td><td class="n">${S?dl(S.t,S.p):""}</td>`:""}<td></td><td></td><td></td><td>${stt(k)}</td></tr>`:""}).join("")}
+   </tbody></table></div></section>`;
+  /* 2. Cảnh báo & đề xuất */
+  const wb=`<section class="card pad"><h2>Cảnh báo & đề xuất</h2>${W.length?W.map(x=>`<div class="scw"><span class="scp ${MW[x.m][0]}">${MW[x.m][1]}</span><div><div>${esc(x.t)}</div>${x.d?`<div class="hint">→ ${esc(x.d)}</div>`:""}</div></div>`).join(""):'<p class="hint">Không có gì bất thường trong kỳ này.</p>'}</section>`;
+  /* 3. Cơ cấu từng kênh */
+  const card=k=>{const gs=[...new Set(Object.keys(A[k]).concat(TH.filter(x=>x.k===k).map(x=>x.g)))],T=scSum(A[k]),S=soSanh(k),dt=DT[k];
+    gs.sort((a,b)=>(A[k][b]||0)-(A[k][a]||0));
+    return `<section class="card pad scpk" id="scpk-${esc(k).replace(/\s/g,"_")}"><div class="sch"><h2>${k==="Chung"?"Chi chung công ty":k==="Sản xuất"?"Sản xuất":k}</h2>${SC_KENH.includes(k)?stt(k):""}<span class="sp"></span><b>${T?scNf(T)+" đ":"—"}</b>${S&&S.p?`<span class="hint">· ${dl(S.t,S.p)} so ${esc(PV.nhan)}</span>`:""}</div>
+     ${dt?`<div class="hint" style="margin-bottom:6px">Doanh thu thực ${scNf(dt)} đ · chi phí bằng ${scPc(T,dt)} doanh thu</div>`:SC_KENH.includes(k)?`<div class="hint" style="margin-bottom:6px">Doanh thu thực: chưa có số</div>`:""}
+     ${gs.length?gs.map(g=>{const v=A[k][g]||0,p=B?((B[k]||{})[g]||0):null,mis=!v&&thg(k,g);return `<div class="scbar"><span><span class="mono">${esc(g)}</span> ${esc(scG(g).n)}</span><span class="tr"><i style="width:${T&&v?Math.max(2,Math.round(v/T*100)):0}%"></i></span><span class="t">${mis?CS:`<b>${scNf(v)}</b> <span class="hint">${scPc(v,T)}</span>`}${p!=null&&!mis?`<div class="hint">${esc(PV.nhan)}: ${p?scNf(p):"—"} ${dl(v,p)}</div>`:""}</span></div>`}).join(""):'<p class="hint">Chưa có khoản chi nào ghi cho kênh này.</p>'}
+     ${W.filter(x=>x.k===k&&x.m!=="thieu").map(x=>`<div class="scw"><span class="scp ${MW[x.m][0]}">${MW[x.m][1]}</span><div>${x.d?esc(x.d):esc(x.t)}</div></div>`).join("")}</section>`};
+  const cards=`<div class="sctwo">${KS.concat(["Chung","Sản xuất"]).filter(k=>scSum(A[k])||TH.some(x=>x.k===k)||(SC_KENH.includes(k)&&DT[k])).map(card).join("")}</div>`;
+  return `<style>.sochi .scup{color:#c9353d;font-weight:600}.sochi .scdn{color:#23824a;font-weight:600}.sochi .p-do{background:#fde8e8;color:#c9353d}.sochi .scw{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid #eef0f4;font-size:13.5px}.sochi .scpk .scbar{grid-template-columns:minmax(180px,1.3fr) 1fr minmax(170px,auto)}</style>`+ov+wb+cards}
 function scPB(){
+  if(!scPBRows().length&&!scThieu().length)return scEmpty();
+  return scPBDash()+`<details class="card pad scpbd"><summary><b>Bảng chi tiết nhóm × kênh và chia chi chung theo doanh thu</b></summary>${scPBBang()}</details>`}
+function scPBBang(){
   const rows=scPBRows();if(!rows.length)return scEmpty();
   const TH=scThieu(),thK=(g,c)=>TH.some(x=>x.g===g&&x.k===c),thC=c=>TH.some(x=>x.k===c),CS='<span class="hint">chưa có số</span>';
   const gs=[...new Set(rows.map(x=>x.g).concat(TH.map(x=>x.g)))].sort(),M={};gs.forEach(g=>{M[g]={};SC_COLS.forEach(c=>M[g][c]=0)});rows.forEach(x=>{const c=SC_COLS.includes(x.k)?x.k:"Chờ xác định";M[x.g][c]+=x.t});
@@ -322,6 +390,8 @@ function pSoChi(m){
   m.querySelectorAll("select[data-bv]").forEach(s=>s.onchange=()=>{const id=s.dataset.bv,v=s.value;DB.mutate(ME.name,"đổi nơi chịu khoản chi",dt=>{const r=((dt.fin||{}).nkc||[]).find(y=>y.id===id);if(!r)return;if(r.k0==null)r.k0=r.k;r.k=v;if(v!=="Chờ xác định"&&r.st==="Cần rà"&&!r.gc)r.st="Ổn";(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(r.dg)]={g:r.g,k:v,st:r.st}});renderMain()});
   m.querySelectorAll("[data-dm]").forEach(el=>el.onchange=()=>{const i=+el.dataset.dm,f=el.dataset.f,v=f==="cd"?+el.value:el.value;DB.mutate(ME.name,"sửa danh mục chi phí",dt=>{dt.fin=dt.fin||{};if(!dt.fin.cpdm||!dt.fin.cpdm.length)dt.fin.cpdm=JSON.parse(JSON.stringify(SC_DM0));dt.fin.cpdm[i][f]=v});toast("Đã lưu danh mục");renderMain()});
   m.querySelectorAll("[data-go-st],[data-go-k],[data-go-g]").forEach(b=>b.onclick=()=>{Object.assign(SC,{tab:"nk",st:b.dataset.goSt||"",k:b.dataset.goK||"",g:b.dataset.goG||"",q:""});if(b.dataset.goG)SC.st="Cần rà";renderMain()});
+  on("scdt-ed2",()=>{const b=document.getElementById("scdt-ed");if(b)b.click()});
+  m.querySelectorAll("[data-pbk]").forEach(tr=>tr.onclick=()=>{const c=document.getElementById("scpk-"+tr.dataset.pbk.replace(/\s/g,"_"));if(c)c.scrollIntoView({behavior:"smooth",block:"start"})});
   on("scdt-ed",()=>{const ym=PERIOD.from.slice(0,7),sv=((scFin().cpDT||{})[ym])||{},auto=scAutoDT(ym);
     openDrawerHTML(`<h2>Doanh thu thực tháng ${ym.slice(5)}/${ym.slice(0,4)}</h2><p class="hint">Dùng để chia chi chung về kênh. Để trống thì web tự lấy số thật (không lấy số tạm tính) (TikTok, Facebook, NPP, Gia công).</p><form class="frm" id="scdt">${SC_KENH.map(k=>`<label class="field">${k} (đ)${auto[k]?` <span class="hint">· web tự lấy ${scNf(auto[k])}</span>`:""}<input type="number" min="0" data-dtk="${k}" value="${sv[k]!=null?sv[k]:""}"></label>`).join("")}<button class="btn pri">Lưu</button></form>`);
     $("#scdt").onsubmit=e=>{e.preventDefault();const o={};document.querySelectorAll("[data-dtk]").forEach(i=>{if(i.value!=="")o[i.dataset.dtk]=+i.value});DB.mutate(ME.name,"nhập doanh thu thực "+ym,dt=>{dt.fin=dt.fin||{};(dt.fin.cpDT=dt.fin.cpDT||{})[ym]=o});closeDrawer();renderMain()}});
