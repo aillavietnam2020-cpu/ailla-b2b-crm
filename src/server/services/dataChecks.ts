@@ -142,8 +142,8 @@ export const CHECK_DEFS: CheckDef[] = [
     code: 'K2',
     group: 'KHO',
     severity: 'DO',
-    title: 'Đơn B2B đã xuất kho nhưng sản phẩm chưa có mã MISA',
-    hint: 'Sản phẩm này chưa nối với mã kho nên khi xuất bán, sổ kho không bị trừ. Vào Kho, Đồng bộ mã B2B để nối mã.',
+    title: 'Đơn Kênh phân phối đã xuất kho nhưng sản phẩm chưa có mã MISA',
+    hint: 'Sản phẩm này chưa nối với mã kho nên khi xuất bán, sổ kho không bị trừ. Vào Kho, Đồng bộ mã Kênh phân phối để nối mã.',
     columns: [['order_no', 'Mã đơn'], ['sku', 'Mã sản phẩm'], ['name', 'Tên'], ['delivered', 'Ngày xuất']],
     sql: `SELECT o.order_no, p.sku, p.name, substr(o.delivered_at, 1, 10) AS delivered
           FROM orders o JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id

@@ -6,14 +6,14 @@
      (số đơn xuất kho thật từ Poscake × giá trị đơn trung bình tháng chốt gần nhất), KHÔNG dùng GMV.
    - Facebook: doanh thu đơn GIAO THÀNH CÔNG (Pancake). Không nhân tỷ lệ ước. Đơn đang giao ghi riêng, không cộng.
    - Shopee: số theo ngày nếu có; chưa có thì chỉ ghi số đơn xuất kho (Poscake).
-   - B2B, gia công: đơn đã duyệt trên CRM (b2bpl.js).
+   - Kênh phân phối, Kênh OEM: đơn đã duyệt trên CRM (b2bpl.js).
    Lãi = lãi đóng góp kênh (chưa trừ lương, chi phí chung). Ghi rõ nguồn dưới mỗi số.
    ===================================================================== */
 const TQ={co:{},coBusy:{}};
 /* Số đơn xuất kho Poscake theo kênh trong khoảng ngày (null khi chưa tải xong). */
 function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(["exec","bc_tong","pl","muctieu"].includes(PAGE))renderMain()})}return null}
 const tqMonths=(from,to)=>{const ms=[];for(let d=pdate(from.slice(0,7)+"-01");iso(d)<=to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms};
-/* Doanh thu thực + lãi đóng góp từng kênh B2C trong khoảng ngày. N = số gốc của execNums (trước khi đổi). */
+/* Doanh thu thực + lãi đóng góp từng kênh Kênh bán lẻ trong khoảng ngày. N = số gốc của execNums (trước khi đổi). */
 function tqRevB2C(N,from,to){
   const ms=tqMonths(from,to),full=ms.every(k=>fullMonth(k,from,to)),S=(typeof TSB!=="undefined"&&TSB.sum)||{},rs=(i,src)=>rSum(src,i,from,to).v,co=tqCo(from,to)||{};
   const out={};
@@ -66,7 +66,7 @@ function tqKenhRows(){
     if(!X.cover)return {k:ch,n,go,mang:ch==="GIA_CONG"?"Gia công":"Phân phối",dt:X.net,gv:null,phi:0,ads:0,lai:null,don:X.orders,src:src+" · chưa có giá vốn nên chưa tính lãi"};
     return {k:ch,n,go,mang:ch==="GIA_CONG"?"Gia công":"Phân phối",dt:X.net,gv:X.costAll-ex,phi:0,ads:0,lai:X.gross+ex,don:X.orders,src:src+(X.cover<0.95?` · ${(100-X.cover*100).toFixed(1).replace(".",",")}% doanh thu ước tính giá vốn`:"")+(ex?` · đã tạm loại ${tr(ex)} giá vốn dòng giá 0đ nghi nhập sai`:""),susp:sp}};
   const ch=(k,n,go)=>({k,n,go,mang:"Bán lẻ",...(R[k]||{dt:null,lai:null,src:"chờ tải báo cáo"})});
-  return [ch("tts","TikTok Shop","bc_tiktok"),ch("fb","Facebook","bc_fb"),ch("spe","Shopee","bc_shopee"),b2b(B,"B2B","Phân phối (NPP, đại lý)","bc_b2b","đơn đã duyệt · CRM"),b2b(G,"GIA_CONG","Gia công","bc_gc","đơn đã duyệt · CRM")];
+  return [ch("tts","TikTok Shop","bc_tiktok"),ch("fb","Facebook","bc_fb"),ch("spe","Shopee","bc_shopee"),b2b(B,"B2B","Kênh phân phối","bc_b2b","đơn đã duyệt · CRM"),b2b(G,"GIA_CONG","Kênh OEM","bc_gc","đơn đã duyệt · CRM")];
 }
 function tqTot(rows){const has=rows.filter(r=>r.dt!=null);return {dt:has.reduce((a,r)=>a+r.dt,0),lai:has.filter(r=>r.lai!=null).reduce((a,r)=>a+r.lai,0),cp:has.reduce((a,r)=>a+(r.gv||0)+(r.phi||0)+(r.ads||0)+(r.khac||0),0),don:rows.reduce((a,r)=>a+(+r.don||0),0),tam:has.some(r=>r.tam),thieu:rows.filter(r=>r.dt==null).map(r=>r.n)}}
 function tqTabKenh(){
@@ -78,7 +78,7 @@ function tqTabKenh(){
    <div class="tbl"><table><thead><tr><th>Kênh · nguồn số</th><th class="n">Doanh thu thực</th><th class="n">Đơn</th><th class="n">Giá vốn</th><th class="n">Phí sàn / ship, thuế</th><th class="n">Quảng cáo</th><th class="n">Lãi đóng góp</th><th class="n">Biên</th><th>Cảnh báo</th></tr></thead><tbody>
    ${rows.filter(r=>r.mang==="Bán lẻ").map(row).join("")}${sub("Bán lẻ")}${rows.filter(r=>r.mang!=="Bán lẻ").map(row).join("")}
    <tr class="tot"><td><b>Tổng công ty</b>${T.thieu.length?`<br><small class="hint">chờ tải báo cáo: ${esc(T.thieu.join(", "))}</small>`:""}</td><td class="n"><b>${tr(T.dt)}</b></td><td class="n">${nf(T.don)}</td><td></td><td></td><td></td><td class="n"><b>${tr(T.lai)}</b></td><td class="n">${T.dt?dhPct(T.lai/T.dt):"—"}</td><td></td></tr></tbody></table></div>
-   <p class="hint pad">Doanh thu thực: TikTok là doanh thu thuần theo quyết toán (tháng chưa chốt thì tạm tính từ đơn xuất kho, không dùng GMV); Facebook là đơn giao thành công (đơn đang giao chưa tính); B2B, gia công là đơn đã duyệt. Bấm từng dòng để xem chi tiết kênh.</p></section>`+dhTabBaTang();
+   <p class="hint pad">Doanh thu thực: TikTok là doanh thu thuần theo quyết toán (tháng chưa chốt thì tạm tính từ đơn xuất kho, không dùng GMV); Facebook là đơn giao thành công (đơn đang giao chưa tính); Kênh phân phối, Kênh OEM là đơn đã duyệt. Bấm từng dòng để xem chi tiết kênh.</p></section>`+dhTabBaTang();
 }
 /* Tab Hôm nay: dùng nội dung Tổng quan cũ, thay 4 ô số đầu bằng số chung, bỏ bảng kênh (đã ở tab Lãi theo kênh). */
 function tqPatchHomNay(m){
@@ -87,7 +87,7 @@ function tqPatchHomNay(m){
     const nw=[mk("money","Doanh thu thực",T.dt?tr(T.dt):null,T.tam?"có phần tạm tính":"nguồn ở tab Lãi theo kênh","kenh"),mk("wallet","Chi phí trực tiếp",T.cp?tr(T.cp):null,`${T.dt?dhPct(T.cp/T.dt):""} doanh thu`,"kenh"),mk("trend","Lãi đóng góp",T.dt?tr(T.lai):null,`${T.dt?dhPct(T.lai/T.dt):""} · trước lương`,"kenh"),mk("cart","Đơn hàng",T.don?nf(T.don):null,"tất cả kênh","kenh")];
     const tmp=document.createElement("div");tmp.innerHTML=nw.join("");cells.slice(0,4).forEach((c,i)=>c.replaceWith(tmp.children[0]))}
   m.querySelectorAll(".card").forEach(c=>{const h=c.querySelector(".card-h h2");if(h&&/Hiệu quả kinh doanh theo kênh/.test(h.textContent)){const p=c.parentElement;c.remove();if(p&&p.classList.contains("xrow2"))p.style.gridTemplateColumns="1fr"}});
-  /* Ô "Doanh thu kỳ" ở khối Kinh doanh B2C dùng cùng số doanh thu thực (execNums đã đổi), ghi rõ. */
+  /* Ô "Doanh thu kỳ" ở khối Kênh bán lẻ dùng cùng số doanh thu thực (execNums đã đổi), ghi rõ. */
 }
 const TQ_TABS=[["homnay","Hôm nay"],["kenh","Lãi theo kênh"],["gia","Giá thành & cảnh báo"],["tien","Tiền & cảnh báo"],["thang","Tháng chốt"],["caidat","Thiết lập"]];
 {const _ex=PAGES.exec;PAGES.exec=function(m){
@@ -114,7 +114,7 @@ const plYmEnd=ym=>ym+"-"+String(ttKyDays(ym)).padStart(2,"0");
 const plYmAdd=(ym,n)=>{const [y,m]=ym.split("-").map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
 const plRange=ym=>{const t=iso(new Date()),e=plYmEnd(ym);return {from:ym+"-01",to:e<t?e:t,partial:e>t}};
 const plYmNow=()=>{const t=iso(new Date()),p=PERIOD&&PERIOD.to?PERIOD.to:t;return (p>t?t:p).slice(0,7)};
-/* Doanh thu B2B, gia công của một khoảng ngày bất kỳ (không đụng kỳ đang chọn). */
+/* Doanh thu Kênh phân phối, gia công của một khoảng ngày bất kỳ (không đụng kỳ đang chọn). */
 function plB2b(from,to){const k=from+"|"+to;if(B2BR.key===k&&B2BR.data)return B2BR.data;if(PLB[k])return PLB[k];
   if(!PLBB[k]){PLBB[k]=1;(async()=>{try{if(!B2BR.map){const mp=await kApi("/map").catch(()=>({map:[]}));B2BR.map=new Map((mp.map||[]).map(r=>[String(r.crm_sku).toLowerCase(),r]))}PLB[k]=await svApi("/api/dashboards/b2b-sku?from="+from+"&to="+to)}catch(e){PLB[k]={lines:[],months:[],err:e.message}}PLBB[k]=0;if(["pl","bc_tong","muctieu","exec"].includes(PAGE))renderMain()})()}
   return null}
@@ -195,7 +195,7 @@ function tqSoSanhKenh(m){
    <div class="xk"><span class="xkh"><span class="xkl">Chờ tải báo cáo</span></span><span class="xkv">${T.thieu.length||"Không"}</span><span class="xkm" style="white-space:normal">${esc(T.thieu.join(", "))}</span></div></div>
   <section class="card flush"><div class="tbl"><table><thead><tr><th class="n">Hạng</th><th>Kênh · nguồn số</th><th class="n">Doanh thu thực</th><th class="n">% trong tổng</th><th class="n">Biên lãi gộp</th><th class="n">Phí sàn, ship, thuế %</th><th class="n">Quảng cáo %</th><th class="n">Lãi đóng góp</th><th class="n">Biên đóng góp</th><th class="n">Hủy/hoàn %</th></tr></thead>
    <tbody>${list.map(row).join("")}<tr class="tot"><td></td><td><b>Tổng công ty</b></td><td class="n"><b>${tr(T.dt)}</b></td><td class="n">100%</td><td></td><td></td><td></td><td class="n"><b>${tr(T.lai)}</b></td><td class="n">${T.dt?p(T.lai/T.dt):"—"}</td><td></td></tr></tbody></table></div>
-   <p class="hint pad">Các % tính trên doanh thu thực của từng kênh. Quảng cáo trên ${p(ng.qcMax)} báo đỏ (sửa ngưỡng ở Tổng quan › Thiết lập). Hủy/hoàn: TikTok theo báo cáo tháng đã tải, Facebook = (hủy + hoàn) / đơn tạo; B2B, gia công không tính. Bấm từng dòng để xem chi tiết kênh.</p></section>`;
+   <p class="hint pad">Các % tính trên doanh thu thực của từng kênh. Quảng cáo trên ${p(ng.qcMax)} báo đỏ (sửa ngưỡng ở Tổng quan › Thiết lập). Hủy/hoàn: TikTok theo báo cáo tháng đã tải, Facebook = (hủy + hoàn) / đơn tạo; Kênh phân phối, Kênh OEM không tính. Bấm từng dòng để xem chi tiết kênh.</p></section>`;
   m.querySelectorAll("tr[data-go]").forEach(t=>t.onclick=()=>{PAGE=t.dataset.go;MOD="";render();scrollTo(0,0)});
 }
 
@@ -217,7 +217,7 @@ function pMucTieu(m){
   const inp=(k2,k)=>{const v=th[k2]&&th[k2][k];return `<input type="text" inputmode="numeric" data-mt-ym="${k2}" data-mt-k="${k}" value="${v?nf(v):""}" style="width:120px;text-align:right">`};
   m.innerHTML=H("Kế hoạch doanh thu theo kênh","Kế hoạch doanh thu thực từng tháng, từng kênh · dùng cho cột Kế hoạch ở Lãi lỗ P&L và thanh tiến độ ở Tổng quan")+`
   <div class="acts" style="margin-bottom:10px"><button class="btn" id="mt-prev">‹ Tháng trước</button><b style="padding:6px 10px">Tháng ${vn(ym)}</b><button class="btn" id="mt-next">Tháng sau ›</button></div>${prog}
-  <section class="card flush"><div class="card-h pad"><h2>Nhập kế hoạch (đ, doanh thu thực)</h2><span class="hint">TikTok, Shopee: doanh thu thuần sau hủy hoàn · Facebook: giao thành công · B2B, gia công: đơn đã duyệt</span></div>
+  <section class="card flush"><div class="card-h pad"><h2>Nhập kế hoạch (đ, doanh thu thực)</h2><span class="hint">TikTok, Shopee: doanh thu thuần sau hủy hoàn · Facebook: giao thành công · Kênh phân phối, Kênh OEM: đơn đã duyệt</span></div>
    <div class="tbl"><table><thead><tr><th>Tháng</th>${PLK.map(([,n])=>`<th class="n">${n}</th>`).join("")}<th class="n">Cộng</th></tr></thead><tbody>
    ${ms.map(k2=>{const KH=mtGet(k2);return `<tr class="${k2===ym?"sel":""}"><td><b>${vn(k2)}</b></td>${PLK.map(([k])=>`<td class="n">${inp(k2,k)}</td>`).join("")}<td class="n"><b>${KH?tr(KH.tong):"—"}</b></td></tr>`}).join("")}</tbody></table></div>
    <div class="acts pad"><button class="btn pri" id="mt-save">Lưu kế hoạch</button><span class="hint">Để trống nếu kênh đó chưa đặt.</span></div></section>`;

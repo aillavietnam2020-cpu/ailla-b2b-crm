@@ -157,4 +157,4 @@ function fbdSaleView(){
     table=rank+'<div class="pc-2">'+quality+loss+"</div>"+warn+`<p class="fbd-note">Doanh thu = đơn đã xác nhận, đã trừ đơn hoàn và đơn hủy, xếp theo ngày tạo đơn. Người xử lý là người bán hàng gắn trên đơn Pancake. Người tính KPI: ${FBS_KPI.join(", ")}. Đơn hoàn tính theo ngày hoàn nên có thể nằm khác ngày với đơn gốc. Chưa có: số sản phẩm mỗi đơn và bảng người × nhóm sản phẩm (Sheet có, web cần kéo thêm từ Pancake).${havePrev?"":" Kỳ trước chưa có số theo người nên chưa so sánh."}</p>`}
   return panel+table;
 }
-PAGES.fb_sale=m=>{m.innerHTML=H("Hoạt động Sale B2C","Facebook · người xử lý đơn trên Pancake (Sale + CSKH)")+fbdSaleView();fbdBindMet(m)};
+PAGES.fb_sale=m=>{m.innerHTML=H("Hoạt động Sale Kênh bán lẻ","Facebook · người xử lý đơn trên Pancake (Sale + CSKH)")+fbdSaleView();fbdBindMet(m)};

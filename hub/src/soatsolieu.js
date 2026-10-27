@@ -1,6 +1,6 @@
 /* Máy soát số liệu: đối chiếu các chỗ nối giữa tiền, kho, hàng hoàn; chỉ hiện chỗ lệch. Chỉ đọc, không sửa dữ liệu. */
 const SOAT={data:null,busy:false,err:"",item:null};
-const SOAT_DOC={PN:"Nhập kho",PC:"Pha chế",KS:"Kiểm kê",XB:"Xuất B2B",XK:"Xuất kho",TL:"Nhập hàng hoàn",TD:"Điều chỉnh",B2B:"Xuất bán B2B (đơn)",ONLINE:"Xuất bán các sàn",TRA_HANG:"Khách trả hàng B2B"};
+const SOAT_DOC={PN:"Nhập kho",PC:"Pha chế",KS:"Kiểm kê",XB:"Xuất Kênh phân phối",XK:"Xuất kho",TL:"Nhập hàng hoàn",TD:"Điều chỉnh",B2B:"Xuất bán Kênh phân phối (đơn)",ONLINE:"Xuất bán các sàn",TRA_HANG:"Khách trả hàng Kênh phân phối"};
 const soatDoc=t=>SOAT_DOC[t]||t;
 const SOAT_GRP={TIEN:"Tiền",KHO:"Kho",HOAN:"Hàng hoàn"};
 const soatNum=v=>typeof v==="number"?v.toLocaleString("vi-VN"):esc(v);

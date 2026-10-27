@@ -452,7 +452,7 @@ function CreateCustomerModal({
 
   return (
     <Modal
-      title="Thêm khách hàng B2B"
+      title="Thêm khách hàng Kênh phân phối"
       onClose={onClose}
       footer={
         <>

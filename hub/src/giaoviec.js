@@ -102,9 +102,9 @@ function gvSeed(d){
   d.tasks.push({id:"tk_demo2",ten:"Duyệt lịch bài Fanpage tuần (agent tự tạo ảnh) + bài sale 20/10",loai:"Viết caption",nguoi:"u_oanh",han:w.den,ghiChu:"",xong:false});
 }
 
-/* ---------- CRM B2B nhúng trong khung ---------- */
+/* ---------- CRM Kênh phân phối nhúng trong khung ---------- */
 const CRM_URL="https://ailla-b2b-crm-demo.aillavietnam2020.workers.dev";
 const CRM_PAGES=[["crm_perf","Hiệu quả bán hàng","/sales/performance"],["crm_kh","Khách hàng","/sales/customers"],["crm_don","Đơn hàng","/sales/orders"],["crm_cn","Công nợ","/sales/debts"],["crm_gia","Bảng giá","/sales/prices"],["crm_ceo","Báo cáo CEO","/admin/ceo"],["crm_qt","Quản trị CRM","/admin"]];
-function pCRMFrame(path,title){return m=>{m.innerHTML=H("CRM B2B · "+title,"Khách sỉ, đại lý, đơn hàng, công nợ")+`<section class="card"><div class="crmgo"><div><h2>${title}</h2><p>CRM B2B đang chạy ở một địa chỉ riêng và có lớp bảo vệ không cho mở lồng bên trong trang khác. Vì vậy bản demo này mở CRM ở tab mới. Khi dựng bản thật, CRM sẽ nằm ngay trong khung này, đăng nhập một lần là dùng được cả Marketing, Digital, P&L lẫn CRM.</p><a class="btn pri big" href="${CRM_URL+path}" target="_blank" rel="noopener">Mở ${title} ↗</a></div></div>
+function pCRMFrame(path,title){return m=>{m.innerHTML=H("CRM Kênh phân phối · "+title,"Khách sỉ, đại lý, đơn hàng, công nợ")+`<section class="card"><div class="crmgo"><div><h2>${title}</h2><p>CRM Kênh phân phối đang chạy ở một địa chỉ riêng và có lớp bảo vệ không cho mở lồng bên trong trang khác. Vì vậy bản demo này mở CRM ở tab mới. Khi dựng bản thật, CRM sẽ nằm ngay trong khung này, đăng nhập một lần là dùng được cả Marketing, Digital, P&L lẫn CRM.</p><a class="btn pri big" href="${CRM_URL+path}" target="_blank" rel="noopener">Mở ${title} ↗</a></div></div>
   <h3>Các trang của CRM</h3><div class="crmlinks">${CRM_PAGES.map(([k,t,p])=>`<a class="btn" href="${CRM_URL+p}" target="_blank" rel="noopener">${t} ↗</a>`).join("")}</div></section>`}}
 CRM_PAGES.forEach(([k,t,p])=>PAGES[k]=pCRMFrame(p,t));

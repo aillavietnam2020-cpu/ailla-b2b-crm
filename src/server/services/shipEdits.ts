@@ -108,7 +108,7 @@ export async function requestShipEdit(
     return { id, applied: true };
   }
   const more = taskStatements(db, await approverIds(db), {
-    title: `Duyệt sửa phiếu xuất đơn ${o.order_no}: ${reason}. Vào Xuất kho › Xuất B2B xem và duyệt.`,
+    title: `Duyệt sửa phiếu xuất đơn ${o.order_no}: ${reason}. Vào Xuất kho › Xuất Kênh phân phối xem và duyệt.`,
     createdBy: auth.user.id,
     now,
   });

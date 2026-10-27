@@ -38,8 +38,8 @@
         ["Dòng tiền",[["tien_lich","Tiền & lịch chi"]]],
         ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"],["tcn_dc","Đối chiếu công nợ & tiền"]]],
         ["Giá thành",[["sku","Giá vốn SKU"],["kho_boc","Định mức & giá thành"],["kho_cl","Chênh lệch định mức"],["mh_gianvl","Giá nguyên vật liệu"]]],
-        /* Đồng bộ mã B2B, Quy đổi mã các sàn: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
-        ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã B2B"],["kho_qd","Quy đổi mã các sàn"]]]],
+        /* Đồng bộ mã Kênh phân phối, Quy đổi mã các sàn: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
+        ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã Kênh phân phối"],["kho_qd","Quy đổi mã các sàn"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
       pd:[["",[["pheduyet","Phê duyệt"]]]],
       cfg:[["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
@@ -60,7 +60,7 @@
   }else{
     const S={
       exec:[["",[["exec","Tổng quan vận hành"]]]],
-      kd:[["B2C",[["bc_tiktok","TikTok Shop"],"bc_shopee","bc_fb","fb_sale","fb_cskh"]],
+      kd:[["Kênh bán lẻ",[["bc_tiktok","TikTok Shop"],"bc_shopee","bc_fb","fb_sale","fb_cskh"]],
         ["Kênh phân phối",[["cr_rp","Dashboard kênh phân phối"],"cr_kh","cr_dn","cr_cn","cr_ret",["cr_gia","Bảng giá"],"cr_bill","cr_vc",["cr_im","Nhập dữ liệu CRM"],
           "cr_s_hn","cr_s_kh","cr_s_dn",["cr_s_gia","Bảng giá"],"cr_s_cn","cr_s_ret","cr_s_kq","cr_s_bill","cr_s_vc"]],
         ["Kênh OEM",[["gc_tq","Tổng quan Kênh OEM"],["gc_kh","Khách hàng OEM"],["gc_don","Đơn OEM"],["gc_sx","Sản xuất OEM"],["gc_cn","Công nợ OEM"]]]],

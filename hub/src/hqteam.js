@@ -2,7 +2,7 @@
    HIỆU QUẢ TEAM (trang vận hành), chị Hoa duyệt 25/10/2026.
    Một trang cho lead và nhân viên xem kết quả của từng team trong kỳ đã chọn: doanh số, đơn, tỷ lệ, xếp hạng từng người.
    KHÔNG có giá vốn, phí sàn, lãi (riêng chi phí quảng cáo vẫn hiện vì là kết quả của team Ads).
-   Nguồn: TikTok (file team TikTok tải), Pancake (sale Facebook), báo cáo Ads, CRM B2B (nhân viên chỉ thấy số của mình).
+   Nguồn: TikTok (file team TikTok tải), Pancake (sale Facebook), báo cáo Ads, CRM Kênh phân phối (nhân viên chỉ thấy số của mình).
    ===================================================================== */
 const HQ={b2b:{},busy:{}};
 async function hqLoadB2b(mo){if(HQ.b2b[mo]!==undefined||HQ.busy[mo])return;HQ.busy[mo]=1;try{HQ.b2b[mo]=await svApi("/api/dashboards/sales?period="+mo)}catch(e){HQ.b2b[mo]=null}HQ.busy[mo]=0;if(PAGE==="hq")renderMain()}
@@ -34,7 +34,7 @@ function pHieuQuaTeam(m){
    cards.push(hqCard({t:"Ads Facebook (Digital)",go:"fb_ads",sub:"báo cáo Digital, chi trước thuế",k:[["Chi quảng cáo",T.chi?tr(T.chi):"—",""],["Doanh số ads (đơn chốt)",T.dt?tr(T.dt):"—",nf(T.don)+" đơn chốt · đo hiệu suất"],["ROAS (đơn chốt)",T.chi?(T.dt/T.chi).toFixed(2).replace(".",","):"—","doanh số ads ÷ chi"],["Chi mỗi đơn",T.don?tr(T.chi/T.don):"—",""]],
     body:L.length?tbl(["#","Người chạy ads","Chi","Doanh số ads (đơn chốt)","ROAS","Đơn chốt","Chi / đơn"],L.sort((a,b)=>b[1].dt-a[1].dt).map(([n,a],i)=>hqRow([i+1,`<b>${esc(typeof adfWho==="function"?adfWho(n):n)}</b>`,tr(a.chi),tr(a.dt),a.chi?`<span class="${a.dt/a.chi<1.8?"t-red":""}">${(a.dt/a.chi).toFixed(2).replace(".",",")}</span>`:"—",nf(a.don),a.don?tr(a.chi/a.don):"—"]))):"",
     note:L.length?"Số của báo cáo Digital, tính trên đơn chốt (chưa trừ hủy, hoàn): dùng đo hiệu quả quảng cáo, không phải doanh thu thực. ROAS dưới 1,8 tô đỏ.":""}))}
-  /* Phân phối: sale B2B (CRM) */
+  /* Phân phối: sale Kênh phân phối (CRM) */
   {const ms=[...new Set(days.map(d=>d.slice(0,7)))];ms.forEach(hqLoadB2b);const S=ms.map(k=>HQ.b2b[k]).filter(Boolean),done=ms.every(k=>HQ.b2b[k]!==undefined);
    const ov=S.reduce((a,s)=>{const o=s.overview||{};a.rev+=+o.revenue||0;a.ord+=+o.orders||0;a.newc+=+o.new_first_order_customers||0;return a},{rev:0,ord:0,newc:0});
    const by={};S.forEach(s=>(s.by_sale||[]).forEach(x=>{const t=by[x.user_id]||(by[x.user_id]={n:x.display_name,rev:0,ord:0,newc:0,col:0});t.rev+=+x.revenue||0;t.ord+=+x.orders||0;t.newc+=+x.new_customers||0;t.col+=+x.collected||0}));
@@ -42,7 +42,7 @@ function pHieuQuaTeam(m){
    /* Đơn không có sale phụ trách (thường là đơn nhập từ file cũ) vẫn nằm trong tổng: hiện một dòng để cộng đủ. */
    const isEmp=SV&&SV.me&&SV.me.role==="EMPLOYEE",rest={rev:ov.rev-P.reduce((a,x)=>a+x.rev,0),ord:ov.ord-P.reduce((a,x)=>a+x.ord,0)};
    if(!isEmp&&(rest.rev>1000||rest.ord>0))P.push({n:"(đơn chưa gán sale)",rev:rest.rev,ord:rest.ord,newc:0,col:0,chua:1});
-   cards.push(hqCard({t:"Phân phối (Sale B2B)",go:"b2b_perf",sub:ms.length>1?"tính theo tháng: "+ms.map(k=>k.slice(5)+"/"+k.slice(0,4)).join(", "):"tính theo tháng "+(ms[0]||"").slice(5),k:[["Doanh số",ov.rev?tr(ov.rev):done?"—":"…",nf(ov.ord)+" đơn đã duyệt"],["Giá trị đơn trung bình",ov.ord?tr(ov.rev/ov.ord):"—",""],["Khách mới",ov.newc?nf(ov.newc):"—","đặt đơn đầu tiên"]],
+   cards.push(hqCard({t:"Kênh phân phối (Sale)",go:"b2b_perf",sub:ms.length>1?"tính theo tháng: "+ms.map(k=>k.slice(5)+"/"+k.slice(0,4)).join(", "):"tính theo tháng "+(ms[0]||"").slice(5),k:[["Doanh số",ov.rev?tr(ov.rev):done?"—":"…",nf(ov.ord)+" đơn đã duyệt"],["Giá trị đơn trung bình",ov.ord?tr(ov.rev/ov.ord):"—",""],["Khách mới",ov.newc?nf(ov.newc):"—","đặt đơn đầu tiên"]],
     body:P.length?tbl(["#","Sale","Doanh số","Đơn","Khách mới","Đã thu"],P.map((x,i)=>hqRow([x.chua?"":i+1,x.chua?`<span class="t-red">${esc(x.n)}</span>`:`<b>${esc(x.n)}</b>`,tr(x.rev),nf(x.ord),x.chua?"—":nf(x.newc),x.chua?"—":tr(x.col)]))):"",
     note:isEmp?"Bạn chỉ thấy số của chính mình.":rest.rev>1000?"Đơn chưa gán sale phụ trách: kế toán hoặc quản lý gán sale cho khách trên CRM thì số tự chia về từng người.":""}))}
   /* Shopee */

@@ -8,8 +8,8 @@ const DEPTS0=[
  {k:"CM",n:"Content & Media",khoi:"Văn phòng",truong:"u_oanh",moTa:"Kế hoạch content, quay video, lịch đăng TikTok, Fanpage, live",phanHe:["mkt"]},
  {k:"ADS",n:"Ads/Digital",khoi:"Văn phòng",truong:"u_digital",moTa:"Quảng cáo Facebook, TikTok; order video; báo cáo Ads",phanHe:["mkt"]},
  {k:"KOC",n:"KOC",khoi:"Văn phòng",truong:"",moTa:"Booking KOC, affiliate TikTok Shop",phanHe:["mkt"]},
- {k:"B2B",n:"Sale B2B",khoi:"Văn phòng",truong:"",moTa:"Khách sỉ, đại lý, NPP — dùng CRM B2B (đang tuyển)",phanHe:["sale"]},
- {k:"B2C",n:"Sale B2C",khoi:"Văn phòng",truong:"",moTa:"Vận hành sàn TikTok, Shopee, bán online",phanHe:["sale"]},
+ {k:"B2B",n:"Sale Kênh phân phối",khoi:"Văn phòng",truong:"",moTa:"Khách sỉ, đại lý, NPP — dùng CRM Kênh phân phối (đang tuyển)",phanHe:["sale"]},
+ {k:"B2C",n:"Sale Kênh bán lẻ",khoi:"Văn phòng",truong:"",moTa:"Vận hành sàn TikTok, Shopee, bán online",phanHe:["sale"]},
  {k:"CSKH",n:"CSKH",khoi:"Văn phòng",truong:"",moTa:"Sale + chăm sóc khách hàng, xử lý đơn Pancake",phanHe:["sale"]},
  {k:"SX",n:"Sản xuất",khoi:"Sản xuất & Kho",truong:"",moTa:"2 nhà máy Thanh Oai: sản xuất, kỹ thuật, đóng sàn",phanHe:[]},
  {k:"KV",n:"Kho vận",khoi:"Sản xuất & Kho",truong:"",moTa:"Kho hàng, đóng gói, giao vận",phanHe:[]},
@@ -19,7 +19,7 @@ const SALECH0=[
  {k:"TTS",n:"TikTok Shop",loai:"Sàn TMĐT",phiSan:28,phiTT:0,phiDV:0,affiliate:0,vc:0,note:"Tổng phí sàn thực tế T7/2026 = 28,0% doanh thu thuần (gộp hoa hồng, dịch vụ, giao dịch, affiliate, thuế, vận chuyển). Tách chi tiết khi có file quyết toán.",active:true},
  {k:"SPE",n:"Shopee",loai:"Sàn TMĐT",phiSan:13.1,phiTT:6.9,phiDV:10.4,affiliate:3.5,vc:0,note:"Thực tế T7/2026 (2 shop): tổng 33,8%. Phí dịch vụ đã gộp 1,7% thuế sàn khấu trừ. Đang thuê ngoài vận hành.",active:true},
  {k:"FB",n:"Facebook / Pancake",loai:"Mạng xã hội",phiSan:0,phiTT:0,phiDV:0,affiliate:0,vc:0,note:"Đơn chốt qua inbox",active:true},
- {k:"B2B",n:"B2B / Đại lý (CRM)",loai:"Bán sỉ",phiSan:0,phiTT:0,phiDV:0,affiliate:0,vc:0,note:"Số liệu lấy từ CRM B2B",active:true},
+ {k:"B2B",n:"B2B / Đại lý (CRM)",loai:"Bán sỉ",phiSan:0,phiTT:0,phiDV:0,affiliate:0,vc:0,note:"Số liệu lấy từ CRM Kênh phân phối",active:true},
  {k:"WEB",n:"Website",loai:"Website",phiSan:0,phiTT:0,phiDV:0,affiliate:0,vc:0,note:"",active:false},
 ];
 const COSTCAT0=[
@@ -78,7 +78,7 @@ const PAGE_SETS=[
   {n:"Sản xuất",ids:["sx_nc","kho_pc","sx_td","sx_lo"],labels:[],noBar:true},
   /* Trang quản trị: mỗi mục lớn một chức năng; mục nào có nhiều trang liên quan thì gom thành một dòng có tab bên trong. */
   {adm:true,n:"Báo cáo kết quả kinh doanh",ids:["bc_tong","pl"],labels:["Theo kênh","Lãi lỗ (P&L)"]},
-  {adm:true,n:"Doanh thu",ids:["bc_tiktok","bc_shopee","bc_fb","cskh_cu","bc_b2b","bc_gc"],labels:["TikTok Shop","Shopee","Facebook Ads","CSKH cũ","B2B / Đại lý","Gia công"]},
+  {adm:true,n:"Doanh thu",ids:["bc_tiktok","bc_shopee","bc_fb","cskh_cu","bc_b2b","bc_gc"],labels:["TikTok Shop","Shopee","Facebook Ads","CSKH cũ","Kênh phân phối","Kênh OEM"]},
   {adm:true,n:"Chi phí",ids:["chiphi","chiphidm","cr_vc"],labels:["Chi phí theo tháng","Danh mục & phân bổ chi phí","Phiếu chi vận chuyển"]},
   {adm:true,n:"Tiền về & đối soát",ids:["doisoat","cr_bill","cr_rcv"],labels:["Đối soát tiền về","Kho bill giao dịch","Tài khoản nhận tiền"]},
   {adm:true,n:"Mua hàng",ids:["mh_po","mh_no","mh_gianvl"],labels:["Đơn mua hàng","Công nợ nhà cung cấp","Giá nguyên vật liệu theo tháng"]},
@@ -121,9 +121,9 @@ const MODULES=[
  {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_v","Việc",null,()=>{try{return wkCount()||""}catch(e){return ""}}),MI("cv_da","Dự án"),MI("cv_mt","Mục tiêu")].filter(Boolean)]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
  {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("matkhau","Đổi mật khẩu")]]]},
- {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Kinh doanh B2C",sub:"TikTok · Shopee · Facebook",groups:()=>[
+ {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Kênh bán lẻ",sub:"TikTok · Shopee · Facebook",groups:()=>[
    ["",[MI("bc_tong","Kết quả kinh doanh",tq),MI("bc_tiktok","TikTok",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq),MI("fb_sale","Hoạt động team Sale",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
- {k:"b2b",zone:"Bán hàng",ic:"box",n:"Kinh doanh B2B",sub:"Đại lý · NPP · CRM",groups:()=>[
+ {k:"b2b",zone:"Bán hàng",ic:"box",n:"Kênh phân phối",sub:"Đại lý · NPP · CRM",groups:()=>[
    ["Bán hàng",[MI("b2b_today","Việc hôm nay"),MI("b2b_kh","Khách hàng"),MI("b2b_don","Đơn hàng & duyệt",null,()=>(D().b2b?D().b2b.orders.flatMap(o=>o.approvals||[]).filter(a=>a.status==="PENDING").length:"")||""),MI("b2b_gia","Bảng giá 8 cấp"),MI("b2b_cn","Công nợ"),MI("b2b_perf","Kết quả cá nhân")]],
    ["Quản lý",[MI("b2b_team","Điều hành đội ngũ"),MI("b2b_ceo","Bàn điều hành CEO",u=>u.role==="admin")]]]},
  {k:"mkt",zone:"Vận hành",ic:"mega",n:"Marketing",sub:"Content · Digital · KOC · Live",groups:MKT_G},
@@ -173,16 +173,16 @@ function modTabs(m){if(APP_MODE!=="admin")return;const mo=curMod();if(!mo)return
 /* ---------- P&L (khung) ---------- */
 function pPL(m){
   const d=D(),ms=monthStats(),adsChi=sum(d.weekly,w=>w.ads),costM=d.costs.filter(c=>c.thang===MONTH.key),costBy=g=>sum(costM.filter(c=>(d.costCats.find(x=>x.k===c.cat)||{}).nhom===g),c=>c.tien);
-  const L=[["Doanh thu TikTok Shop (video)",ms.all,"Báo cáo TikTok tuần (Marketing › Nhập báo cáo)","Có","grn"],["Doanh thu Shopee","—","Báo cáo Shopee tháng (thuê ngoài gửi)","Cần thêm ô nhập","amb"],["Doanh thu Facebook / Pancake","—","Xuất từ Pancake","Cần thêm ô nhập","amb"],["Doanh thu B2B / Đại lý","—","CRM B2B (đơn đã kế toán xác nhận)","Nối khi gộp CRM","amb"],["− Phí sàn, phí thanh toán","—","Doanh thu × % phí ở Thiết lập › Kênh bán & phí","Cần điền % phí","amb"],["− Giá vốn hàng bán","—","Số lượng bán × giá vốn SKU (Thiết lập › SKU & giá vốn)","Có giá vốn T8 · cần số lượng theo SKU","amb"],["= Lợi nhuận gộp","—","Tự tính","",""],["− Chi phí Marketing (Ads, KOC, content)",adsChi+costBy("Marketing"),"Báo cáo Ads + Chi phí theo tháng","Có một phần","grn"],["− Chi phí Logistics",costBy("Logistics"),"Chi phí theo tháng","Kế toán nhập","amb"],["− Chi phí Nhân sự",costBy("Nhân sự"),"Chi phí theo tháng (sau: phân hệ Nhân sự)","Kế toán nhập","amb"],["− Chi phí Vận hành, Tài chính, Khác",costBy("Vận hành")+costBy("Tài chính")+costBy("Khác"),"Chi phí theo tháng","Kế toán nhập","amb"],["= Lợi nhuận ròng","—","Tự tính","",""]];
+  const L=[["Doanh thu TikTok Shop (video)",ms.all,"Báo cáo TikTok tuần (Marketing › Nhập báo cáo)","Có","grn"],["Doanh thu Shopee","—","Báo cáo Shopee tháng (thuê ngoài gửi)","Cần thêm ô nhập","amb"],["Doanh thu Facebook / Pancake","—","Xuất từ Pancake","Cần thêm ô nhập","amb"],["Doanh thu Kênh phân phối","—","CRM Kênh phân phối (đơn đã kế toán xác nhận)","Nối khi gộp CRM","amb"],["− Phí sàn, phí thanh toán","—","Doanh thu × % phí ở Thiết lập › Kênh bán & phí","Cần điền % phí","amb"],["− Giá vốn hàng bán","—","Số lượng bán × giá vốn SKU (Thiết lập › SKU & giá vốn)","Có giá vốn T8 · cần số lượng theo SKU","amb"],["= Lợi nhuận gộp","—","Tự tính","",""],["− Chi phí Marketing (Ads, KOC, content)",adsChi+costBy("Marketing"),"Báo cáo Ads + Chi phí theo tháng","Có một phần","grn"],["− Chi phí Logistics",costBy("Logistics"),"Chi phí theo tháng","Kế toán nhập","amb"],["− Chi phí Nhân sự",costBy("Nhân sự"),"Chi phí theo tháng (sau: phân hệ Nhân sự)","Kế toán nhập","amb"],["− Chi phí Vận hành, Tài chính, Khác",costBy("Vận hành")+costBy("Tài chính")+costBy("Khác"),"Chi phí theo tháng","Kế toán nhập","amb"],["= Lợi nhuận ròng","—","Tự tính","",""]];
   m.innerHTML=H("Báo cáo P&L","Khung báo cáo · đang xây (giai đoạn 2, sau Digital)")+`<div class="note">P&L tự cộng từ các phân hệ, không nhập tay lại: doanh thu từ báo cáo kênh, giá vốn từ SKU, phí sàn từ Kênh bán, chi phí từ Chi phí theo tháng. Bảng dưới cho thấy từng dòng lấy số ở đâu và đã sẵn sàng chưa.</div>
   <section class="card">${tbl(["Dòng P&L","Tháng "+MONTH.mon+" (đến hiện tại)","Lấy số từ","Dữ liệu"],L.map(r=>`<tr class="${r[0].startsWith("=")?"tot":""}"><td><b>${r[0]}</b></td><td class="n">${typeof r[1]==="number"?money(r[1]):r[1]}</td><td>${r[2]}</td><td>${r[3]?pill(r[3],r[4]):""}</td></tr>`))}</section>
-  <section class="card"><div class="card-h"><h2>Sẽ có khi xong giai đoạn P&L</h2></div><ol class="lessons"><li>P&L theo tháng, theo kênh, theo sản phẩm, so với kế hoạch và tháng trước.</li><li>Biên lợi nhuận gộp từng SKU (giá bán − giá vốn − phí sàn).</li><li>Chi phí Marketing trên doanh thu theo kênh; ROAS thật sau giá vốn.</li><li>Nhập báo cáo Shopee, Pancake, xuất MISA; lấy doanh thu B2B từ CRM.</li></ol></section>`;
+  <section class="card"><div class="card-h"><h2>Sẽ có khi xong giai đoạn P&L</h2></div><ol class="lessons"><li>P&L theo tháng, theo kênh, theo sản phẩm, so với kế hoạch và tháng trước.</li><li>Biên lợi nhuận gộp từng SKU (giá bán − giá vốn − phí sàn).</li><li>Chi phí Marketing trên doanh thu theo kênh; ROAS thật sau giá vốn.</li><li>Nhập báo cáo Shopee, Pancake, xuất MISA; lấy doanh thu Kênh phân phối từ CRM.</li></ol></section>`;
 }
 function pHR(m){m.innerHTML=H("Nhân sự","Làm sau Digital và P&L")+`<section class="card"><p>Phân hệ Nhân sự sẽ dùng chung danh sách người và phòng ban ở <b>Thiết lập</b>. Dự kiến: hồ sơ nhân sự, chấm công, KPI và lương thưởng (gồm thưởng video winner tự lấy từ Marketing), tuyển dụng.</p><div class="acts"><button class="btn" data-go="hoso">Danh sách nhân sự</button><button class="btn" data-go="nhansu">Tài khoản & phân quyền</button><button class="btn" data-go="phongban">Phòng ban</button></div></section>`}
-function pCRM(m){m.innerHTML=H("Sale B2B — CRM","Đang chạy riêng, sẽ gộp vào khung chung")+`<section class="card"><p>CRM B2B (khách sỉ, đại lý, đơn hàng, công nợ, bảng giá 8 cấp) đang chạy ở địa chỉ riêng. Khi dựng bản thật, CRM trở thành phân hệ này: dùng chung đăng nhập, nhân sự, phòng ban và danh mục sản phẩm.</p><div class="acts"><a class="btn pri" href="https://ailla-b2b-crm-demo.aillavietnam2020.workers.dev/sales/performance" target="_blank" rel="noopener">Mở CRM B2B (bản demo)</a></div></section>`}
+function pCRM(m){m.innerHTML=H("Sale Kênh phân phối — CRM","Đang chạy riêng, sẽ gộp vào khung chung")+`<section class="card"><p>CRM Kênh phân phối (khách sỉ, đại lý, đơn hàng, công nợ, bảng giá 8 cấp) đang chạy ở địa chỉ riêng. Khi dựng bản thật, CRM trở thành phân hệ này: dùng chung đăng nhập, nhân sự, phòng ban và danh mục sản phẩm.</p><div class="acts"><a class="btn pri" href="https://ailla-b2b-crm-demo.aillavietnam2020.workers.dev/sales/performance" target="_blank" rel="noopener">Mở CRM Kênh phân phối (bản demo)</a></div></section>`}
 
 /* ---------- Thiết lập: phòng ban ---------- */
-const PHANHE_N={exec:"Tổng quan",b2c:"Bán hàng B2C",b2b:"KD B2B",sx:"Sản xuất & kho",mkt:"Marketing",fin:"Tài chính",hr:"Nhân sự",setup:"Cài đặt"};
+const PHANHE_N={exec:"Tổng quan",b2c:"Kênh bán lẻ",b2b:"Kênh phân phối",sx:"Sản xuất & kho",mkt:"Marketing",fin:"Tài chính",hr:"Nhân sự",setup:"Cài đặt"};
 function pPhongBan(m){
   const d=D(),ed=can(ME,"thietlap.quanly"),st=d.staff.filter(x=>x.tt!=="Đã nghỉ"),uOpts=[["","—"]].concat(d.users.filter(u=>u.active).map(u=>[u.id,u.name+" (tài khoản)"]));
   const byK=KHOI.map(kh=>[kh,st.filter(x=>x.khoi===kh).length]);
