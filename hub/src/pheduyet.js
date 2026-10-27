@@ -73,12 +73,14 @@ function pPheDuyet(m){
   m.innerHTML=H("Phê duyệt","Mọi việc đang chờ bạn duyệt · chờ lâu nhất ở trên · bấm Mở để xem chứng từ gốc")+
   (PD.err?`<div class="note red">${esc(PD.err)}</div>`:"")+
   `<div class="filters">${chips.map(([k,n,x])=>`<button class="btn sm${PD.k===k?" pri":""}" data-pdk="${k}">${esc(n)} <b>${x}</b></button>`).join(" ")}<span class="sp"></span><button class="btn sm" id="pd-re">Tải lại</button></div>
+  <style>.pd-t td{font-size:12.5px;font-weight:400;vertical-align:top}.pd-t .pill{font-size:11px;font-weight:500}.pd-nd{font-weight:500;line-height:1.35}.pd-sub{font-size:11.5px;font-weight:400;line-height:1.4;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}.pd-sub.on{display:block}.pd-t .btn.sm{font-size:12px}</style>
   <section class="card flush">${L.length?tbl(["Loại","Nội dung","Số tiền","Người đề xuất","Chờ",""],L.map((r,i)=>{const busy=PD.doing[r.id];
     const btn=r.act?`<button class="btn sm pri" data-pdok="${i}"${busy?" disabled":""}>Duyệt</button>${r.src==="costsCho"?"":` <button class="btn sm danger" data-pdno="${i}"${busy?" disabled":""}>Từ chối</button>`}`:`<span class="hint">duyệt ở trang gốc</span>`;
     const age=pdAge(r.at,now),old=r.at&&now-r.at>3*864e5;
-    return `<tr><td>${pill(PD_KIND_N(r.k),"gry")}<div class="hint">${esc(r.loai)}</div></td><td><b>${esc(r.nd)}</b>${r.sub?`<div class="hint">${esc(r.sub)}</div>`:""}</td><td class="n">${money(r.tien)}</td><td>${esc(r.by||"—")}</td><td class="nowrap${old?" t-red":""}">${esc(age||"—")}</td>
-    <td class="nowrap">${btn} <button class="btn sm" data-pdgo="${i}">Mở</button></td></tr>`})):`<p class="empty pad">${all.length?"Không có việc nào thuộc loại này.":"Không có việc nào đang chờ bạn duyệt."}</p>`}</section>
+    return `<tr><td>${pill(PD_KIND_N(r.k),"gry")}${r.loai!==PD_KIND_N(r.k)&&r.loai!=="Đề xuất agent"?`<div class="hint">${esc(r.loai)}</div>`:""}</td><td><div class="pd-nd">${esc(r.nd)}</div>${r.sub?`<div class="hint pd-sub" title="Bấm để xem đủ">${esc(r.sub)}</div>`:""}</td><td class="n">${money(r.tien)}</td><td>${esc(r.by||"—")}</td><td class="nowrap${old?" t-red":""}">${esc(age||"—")}</td>
+    <td class="nowrap">${btn} <button class="btn sm" data-pdgo="${i}">Mở</button></td></tr>`}),"pd-t"):`<p class="empty pad">${all.length?"Không có việc nào thuộc loại này.":"Không có việc nào đang chờ bạn duyệt."}</p>`}</section>
   <p class="hint">Mỗi người chỉ thấy việc mình được duyệt (đúng quy tắc của trang gốc). Phiếu thu và đơn nghỉ phép, OT, tạm ứng duyệt ở trang gốc (bấm Mở). Chưa có ngưỡng chi phải chuyển lên CEO.</p>`;
+  m.querySelectorAll(".pd-sub").forEach(x=>x.onclick=()=>x.classList.toggle("on"));
   m.querySelectorAll("[data-pdk]").forEach(b=>b.onclick=()=>{PD.k=b.dataset.pdk;renderMain()});
   $("#pd-re").onclick=()=>{PD.at=0;pdLoad(true)};
   m.querySelectorAll("[data-pdok]").forEach(b=>b.onclick=()=>pdAct(L[+b.dataset.pdok],true));
