@@ -41,8 +41,8 @@ function pFbPL(m){
   const tabs=`<nav class="fbd-tabs">${[["pl","Lãi lỗ (P&L)"],["bh","Quảng cáo · Digital"],["sale","Team Sale"],["sp","Sản phẩm"],["nc","Nhập chi phí"]].map(([k,t])=>`<button type="button" data-fbdtab="${k}" class="${FBD.tab===k?"on":""}">${t}</button>`).join("")}</nav>`;
   const bind=()=>{m.querySelectorAll("[data-fbdtab]").forEach(b=>b.onclick=()=>{FBD.tab=b.dataset.fbdtab;renderMain()});fbdBindMet(m)};
   const all=fbdRange(PERIOD.from,PERIOD.to),lastK=all.filter(k=>(DAYD.fb||{})[k]).pop()||PERIOD.to,days=all.filter(k=>k<=lastK),A=fbdAgg(days),len=days.length;
-  const meta=`<div class="fbd-meta"><span class="pill p-blu">${esc(pLabel())}</span><span>${A.n}/${len} ngày có số${len<all.length?" (kỳ chọn còn "+(all.length-len)+" ngày chưa tới)":""}</span></div>`;
-  if(FBD.tab==="bh"){const t=document.createElement("div");pFbdash(t,true);const body=t.innerHTML.replace(/^<div class="ph">[\s\S]*?<\/div><\/div>/,"");m.innerHTML=head+tabs+meta+body;bind();return}
+  const meta=`<div class="fbd-meta"><span>Số đến ${days.length?fbdVN(days[days.length-1]):"—"}${A.n<len?" · thiếu số "+(len-A.n)+" ngày":""}</span></div>`;/* chị Hoa 28/10: chỉ ghi số đến ngày nào, bỏ "x/y ngày có số" */
+  if(FBD.tab==="bh"){const t=document.createElement("div");pFbdash(t,true);const body=t.innerHTML.replace(/^<div class="ph">[\s\S]*?<\/div><\/div>/,"");m.innerHTML=head+tabs+body;bind();return}
   if(FBD.tab==="sale"){m.innerHTML=head+tabs+meta+fbdSaleView();bind();return}
   if(FBD.tab==="nc"){fbdRenderNc(m,head,tabs);bind();return}
   const C=fbdCost(days),pdays=days.map(fbdShiftMonth),Cp=fbdCost(pdays);
