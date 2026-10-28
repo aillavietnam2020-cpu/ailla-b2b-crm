@@ -35,7 +35,7 @@
         ["Cảnh báo",[["soat_sl","Máy soát số liệu"],["nguong","Ngưỡng cảnh báo & chỉ số"]]]],
       tc:[["Lãi lỗ",[["pl","P&L công ty"]]],
         /* Chị Hoa 28/10: Mua hàng về lại kế toán, trong Thu chi. Trang mh_po gồm đơn mua, nhận hàng, chứng từ, trả tiền NCC (bấm vào từng đơn). */
-        ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["mh_po","Mua hàng (đơn, nhận hàng, chứng từ)"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"],["cr_vc","Phiếu chi vận chuyển"],["cr_s_vc","Phiếu chi vận chuyển"]]],
+        ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["mh_po","Mua hàng (đơn, nhận hàng, chứng từ)"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"]]],
         ["Dòng tiền",[["tien_lich","Tiền & lịch chi"]]],
         ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"],["tcn_dc","Đối chiếu công nợ & tiền"]]],
         ["Giá thành",[["sku","Giá vốn SKU"],["kho_boc","Định mức & giá thành"],["kho_cl","Chênh lệch định mức"],["mh_gianvl","Giá nguyên vật liệu"]]],
@@ -52,7 +52,7 @@
         /* Bot phòng ban là cấu hình (ai duyệt đề xuất, bot làm được gì): chị Hoa 28/10 chuyển từ vận hành về đây. */
         ["Agent & bot AI",[["bots","Bot AI phòng ban"],["agents","Quyền agent"]]]]};
     /* Chuyển hẳn sang web vận hành (đã có ở đó): sản xuất, kho, quy chuẩn, agent điều hành, bot. */
-    const DROP=["sx_nc","kho_nxt","kho_vo","kho_dm","quychuan","quytac","agentchat","kho_qd"]; // kho_qd: nay là Cấu hình › Sản phẩm & combo
+    const DROP=["sx_nc","kho_nxt","kho_vo","kho_dm","quychuan","quytac","agentchat","kho_qd","cr_vc","cr_s_vc"]; // cr_vc: chị Hoa 28/10 bỏ Phiếu chi vận chuyển khỏi menu quản trị (xem ở Sổ chi phí › Nhật ký chi) // kho_qd: nay là Cấu hình › Sản phẩm & combo
     const Q=SRC.filter(m=>m.adm).map(m=>m.k);
     USED=Object.values(S).flatMap(ids);
     NEW=[mod("q_tq","home","Điều hành CEO","",S.tq,[],DROP),
