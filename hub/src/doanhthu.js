@@ -71,7 +71,7 @@ if(typeof b2bChannel==="function"){const _b=b2bChannel;b2bChannel=function(ch){c
 /* Chi phí Sổ chi phí bổ thẳng về kênh (luật ở dtcalc.js): trừ vào lãi đóng góp kênh, ghi ở r.cpk. Không áp khi tính số chốt (số chốt chỉ giữ doanh thu, chi phí sổ luôn lấy theo sổ hiện tại). */
 const DT_NKC_ROW={tts:"tts",fb:"fb",spe:"spe",B2B:"b2b",GIA_CONG:"gc"};
 function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.nkc)return null;return dtNkcKenh(f.nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
-function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEach(r=>{const k=DT_NKC_ROW[r.k],v=k?S.v[k]:0;if(!v||r._cpk||r.dt==null)return;r._cpk=1;r.cpk=v;r.khac=(r.khac||0)+v;if(r.lai!=null)r.lai-=v;
+function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEach(r=>{const k=DT_NKC_ROW[r.k],v=k?S.v[k]:0;if(!v||r._cpk||r.dt==null)return;r._cpk=1;r.cpk=(r.cpk||0)+v;r.khac=(r.khac||0)+v;if(r.lai!=null)r.lai-=v;
   r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(v)} chi phí Sổ chi phí bổ về kênh (${S.n[k]} dòng)`})}
 /* Lương làm riêng cho kênh (bảng lương đã chốt) trừ ở lãi đóng góp; chi chung được chia theo Quy tắc phân bổ ghi ở r.chia cho dòng Lãi sau phân bổ.
    Hàm scPLKenh (scphanbo.js, chat Sổ chi phí) chỉ tính theo tháng nên chỉ áp khi kỳ nằm trong một tháng. Nó tự gọi lại doanh thu: cờ DTS.inPB chặn vòng lặp. */

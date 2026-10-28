@@ -30,8 +30,8 @@ const dtLech=(a,b)=>a==null||b==null?null:a-b;
    Chỉ lấy loại A/B/C (bỏ Giá vốn, Không tính, Chờ xác định) và bỏ dòng chờ duyệt. */
 const DT_NKC_K={"TikTok":"tts","Shopee Mall":"spe","Shopee thường":"spe","Facebook":"fb","NPP":"b2b","Gia công":"gc","Sản xuất":"sx"};
 const DT_NKC_TRU=["G01","G02","G03","G04","G06"],DT_NKC_SHIP=["tts","spe","fb"];
-function dtNkcKenh(nkc,from,to,loOf){const v={tts:0,spe:0,fb:0,b2b:0,gc:0,sx:0},n={tts:0,spe:0,fb:0,b2b:0,gc:0,sx:0};
+function dtNkcKenh(nkc,from,to,loOf){const v={tts:0,spe:0,fb:0,b2b:0,gc:0,sx:0},n={tts:0,spe:0,fb:0,b2b:0,gc:0,sx:0},gd={};
   (nkc||[]).forEach(x=>{const d=String(x.d||"").slice(0,10),ch=DT_NKC_K[x.k];
     if(!ch||d<from||d>to||x.st==="Chờ duyệt"||DT_NKC_TRU.includes(x.g)||(x.g==="G05"&&DT_NKC_SHIP.includes(ch)))return;
-    if(!/^[ABC] - /.test(String(loOf(x.g)||"")))return;v[ch]+=+x.t||0;n[ch]++});
-  return {v,n}}
+    if(!/^[ABC] - /.test(String(loOf(x.g)||"")))return;v[ch]+=+x.t||0;n[ch]++;const G=gd[ch]||(gd[ch]={});G[x.g]=(G[x.g]||0)+(+x.t||0)});
+  return {v,n,gd}}
