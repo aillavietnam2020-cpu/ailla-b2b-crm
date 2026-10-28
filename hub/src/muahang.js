@@ -280,7 +280,14 @@ function mhDocForm(pre){
    <div id="mhi-sum" class="note mhtot"></div>
    <h3 class="mhstep"><span>3</span>Ảnh bill, hóa đơn đỏ</h3>
    <input type="file" id="mhi-f" multiple accept="image/*,application/pdf"><div id="mhi-fl" class="hint"></div>
+   <h3 class="mhstep"><span>4</span>Tiền chi</h3>
+   <div class="mhpm"><label class="chk"><input type="radio" name="mhi-tt" value="no" checked> Chưa trả: ghi công nợ nhà cung cấp</label><label class="chk"><input type="radio" name="mhi-tt" value="tra"> Đã trả / trả ngay</label></div>
+   <div id="mhi-tw" hidden><div class="row4"><label class="field">Ngày chi<input id="mhi-pd" type="date" value="${mhToday()}"></label><label class="field">Số tiền chi (đ)<input id="mhi-pa" type="number" min="1" placeholder="Mặc định = tổng phải trả"></label></div>${mhPayMethodHtml("mhq")}</div>
    <label class="field">Ghi chú<input id="mhi-n"></label><div id="mhi-e"></div><button class="btn pri">Ghi chứng từ</button></form>`);
+  /* Chị Hoa 28/10: ghi chứng từ thì chọn luôn tiền chi, có nguồn chi (tiền mặt / tài khoản ngân hàng nào). Trả ngay = phiếu chi gắn chứng từ này (hiện ở Nhật ký chi, trừ công nợ). */
+  const ttOn=()=>document.querySelector('input[name="mhi-tt"]:checked').value==="tra";
+  document.querySelectorAll('input[name="mhi-tt"]').forEach(x=>x.onchange=()=>{$("#mhi-tw").hidden=!ttOn()});
+  mhPayMethodBind("mhq",pre.sup||"");
   const sel=()=>[...document.querySelectorAll(".mhi-c:checked")].map(x=>x.value);
   const manualSum=()=>M.reduce((t,l)=>t+(+l.qty||0)*(+l.price||0),0);
   const rcSum=()=>{let g=0;document.querySelectorAll(".mhi-c:checked").forEach(c=>{document.querySelectorAll('.mhi-pr[data-r="'+c.value+'"]').forEach(i=>{g+=(+i.dataset.q)*(+i.value||0)})});return g};
@@ -296,7 +303,7 @@ function mhDocForm(pre){
     $("#mhi-r").innerHTML=L.length?`<p class="hint">Hàng kho đã nhận của nhà cung cấp này, chưa có chứng từ. Tick lần nhận thuộc chứng từ và <b>điền đơn giá từng dòng</b>:</p>`+L.map(({p,r})=>`<div class="mhrc"><label class="chk"><input type="checkbox" class="mhi-c" value="${r.id}" ${(pre.rids||L.map(x=>x.r.id)).includes(r.id)?"checked":""}> <b>${esc(mhD(r.receipt_date))}</b> · phiếu mua hàng ${esc(p.no)}</label><table class="mhlines"><thead><tr><th>Hàng</th><th class="n">Số nhận</th><th class="n">Đơn giá (đ)</th><th class="n">Thành tiền</th></tr></thead><tbody>${r.lines.map(l=>{const pl=p.lines.find(x=>x.id===l.po_line_id),def=l.unit_price!=null?l.unit_price:(pl&&pl.unit_price!=null?pl.unit_price:"");return `<tr><td>${esc(l.name)}</td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td><input class="mhi-pr n" data-r="${r.id}" data-l="${l.id}" data-q="${l.qty}" type="number" min="0" step="any" value="${def}" placeholder="Giá"></td><td class="n mhi-rt" data-l="${l.id}">—</td></tr>`}).join("")}</tbody></table></div>`).join(""):"";
     $("#mhi-mh").textContent=L.length?"Hàng khác trên chứng từ (không nằm trong lần nhận hàng ở trên), nếu có:":"Nhập từng dòng hàng ghi trên chứng từ: mã hàng, số lượng, đơn giá.";
     document.querySelectorAll(".mhi-c").forEach(x=>x.onchange=sum);document.querySelectorAll(".mhi-pr").forEach(x=>x.oninput=sum);sum()};
-  $("#mhi-s").onchange=drawR;mhSupPick("#mhi-s");["#mhi-vat","#mhi-fr","#mhi-hd","#mhi-ot"].forEach(i=>$(i).oninput=sum);
+  $("#mhi-s").onchange=()=>{drawR();mhPayFillTo("mhq",$("#mhi-s").value)};mhSupPick("#mhi-s");["#mhi-vat","#mhi-fr","#mhi-hd","#mhi-ot"].forEach(i=>$(i).oninput=sum);
   $("#mhi-add").onclick=()=>{M.push({item:"",qty:"",price:""});drawM();const r=document.querySelectorAll(".mhm-i");if(r.length)r[r.length-1].focus()};
   $("#mhi-f").onchange=()=>{$("#mhi-fl").textContent=[...$("#mhi-f").files].map(f=>f.name).join(", ")};
   drawR();drawM();
@@ -305,10 +312,17 @@ function mhDocForm(pre){
     ids.forEach(rid=>document.querySelectorAll('.mhi-pr[data-r="'+rid+'"]').forEach(i=>{prices[i.dataset.l]=i.value===""?null:+i.value}));
     const ml=M.filter(l=>l.item||+l.qty||+l.price);
     if(ml.some(l=>!l.item||!(+l.qty>0)||l.price===""||!(+l.price>=0))){$("#mhi-e").innerHTML=`<div class="note red">Mỗi dòng hàng nhập thêm cần đủ mã hàng, số lượng và đơn giá (hoặc xóa dòng trống).</div>`;return}
+    const tra=ttOn(),pm=tra?mhPayMethodRead("mhq"):null;
+    if(tra&&pm.method==="CHUYEN_KHOAN"&&!pm.from_account){$("#mhi-e").innerHTML=`<div class="note red">Mục 4: chọn tài khoản công ty chi tiền (hoặc chọn Tiền mặt).</div>`;return}
     const btn=e.submitter||document.querySelector("#mhi button.pri");if(btn)btn.disabled=true;
     try{const r=await kApi("/mh/invoices",{method:"POST",body:JSON.stringify({supplier_id:$("#mhi-s").value,doc_type:$("#mhi-t").value,invoice_no:$("#mhi-no").value,invoice_date:$("#mhi-d").value,receipt_ids:ids,prices,manual_lines:ml.map(l=>({item:l.item,qty:+l.qty,unit_price:+l.price})),vat_amount:g("#mhi-vat"),freight:g("#mhi-fr"),handling:g("#mhi-hd"),other:g("#mhi-ot"),vat_in_cost:$("#mhi-vc").checked,note:$("#mhi-n").value})});
       const fs=[...$("#mhi-f").files];let up=0;if(fs.length)up=await mhUploadFiles(r.id,fs);
-      closeDrawer();toast("Đã ghi chứng từ"+(up?", đính kèm "+up+" file":""));await mhReload();await mhLoadInv()}
+      let chi="";if(tra){try{const rc=(MH.orders||[]).flatMap(p=>p.receipts.map(x=>({p,x}))).find(z=>ids.includes(z.x.id)),tot=(r.total!=null?+r.total:null);
+        const amt=+$("#mhi-pa").value||tot||Math.round(rcSum()+manualSum()+g("#mhi-vat")+g("#mhi-fr")+g("#mhi-hd")+g("#mhi-ot"));
+        const pr=await kApi("/mh/payments",{method:"POST",body:JSON.stringify(Object.assign({supplier_id:$("#mhi-s").value,kind:"CHI",invoice_id:r.id,po_id:rc?rc.p.id:null,pay_date:$("#mhi-pd").value||$("#mhi-d").value,amount:amt,note:"Trả theo chứng từ "+($("#mhi-no").value||"")},pm))});
+        for(const f of [...$("#mhq-f").files]){try{const x=await mhPrepFile(f);await kApi("/mh/payments/"+pr.id+"/files",{method:"POST",body:JSON.stringify(x)})}catch(er){}}
+        chi=", đã ghi phiếu chi "+nf(amt)+" đ"+(pr.ceo_status==="CHO"?" (chờ chị Hoa duyệt)":"")}catch(er){chi=". Chưa ghi được phiếu chi: "+er.message+" (ghi ở nút Ghi chi / cọc)"}}
+      MH.pay=null;MH.debts=null;closeDrawer();toast("Đã ghi chứng từ"+(up?", đính kèm "+up+" file":"")+chi);await mhReload();await mhLoadInv()}
     catch(err){$("#mhi-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
 }
 /* --- Phiếu chi --- */
