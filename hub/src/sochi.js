@@ -370,6 +370,7 @@ const SC_CSS=`.sochi table.scnk td{padding:6px 8px;font-size:13px;vertical-align
 .sochi .scrs{border:1px solid #e3e6ee;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr 170px;gap:6px 16px}.sochi .scrs .m{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 .sochi table.scpbt{table-layout:fixed;min-width:1340px}.sochi .scpbt .c-n{width:230px}.sochi .scpbt .c-tk{width:52px}.sochi .scpbt .c-v{width:96px}.sochi .scpbt .c-t{width:112px}.sochi .scpbt th{white-space:normal;vertical-align:bottom;line-height:1.3}.sochi .scpbt td{white-space:nowrap}.sochi .scpbt td:first-child{white-space:normal}
 .sochi .sch select,.sochi .sch input{width:auto!important;max-width:260px;flex:0 1 auto;margin:0}
+.sochi table.scnk td.dg{display:table-cell!important;grid-template-columns:none} /* .dg trùng tên lưới lịch (.dw,.dg) làm cột Diễn giải bị bóp hẹp */
 .sochi .sch.scf{padding:0 16px 8px;gap:6px}.sochi .sch.scf select{height:30px;font-size:12.5px;padding:0 8px;max-width:200px}
 .sochi .scmore{display:contents}.sochi .scmore[hidden]{display:none}
 .sochi .sch .scq{min-width:240px;height:32px;font-size:13px}
