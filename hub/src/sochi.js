@@ -16,7 +16,7 @@ const SC_KENH=["TikTok","Shopee Mall","Shopee thường","Facebook","NPP","Gia c
    Danh mục cũ đã lưu còn mã 641/642/627 thì tự đổi khi đọc. */
 const SC_TK133={"641":"6421","642":"6422","627":"154"};
 const SC_TKN={"6421":"Chi phí bán hàng (TK 6421): quảng cáo, phí sàn, vận chuyển đơn, hoa hồng, hỗ trợ sale","6422":"Chi phí quản lý doanh nghiệp (TK 6422): điện, mạng, kế toán, văn phòng, VAT lẻ, chi chung","CHIA":"Phải chia 6421 / 6422 / 154 theo bộ phận: lương, bảo hiểm, phân bổ CCDC, thiết bị","154":"Chi phí sản xuất chung (TK 154): vật tư, sửa chữa, đồ dùng xưởng, vào giá thành","152":"Cước vật tư đầu vào: cộng vào giá vốn nguyên vật liệu","138":"Không phải chi phí: tiền chuyển nhầm, phải thu hồi"};
-const SC={tab:"tq",g:"",k:"",st:"",q:""};
+const SC={tab:"nk",g:"",k:"",st:"",q:""};
 const scFin=()=>(D().fin||{});
 const scSecret=()=>!!ME&&(ME.role==="admin"||mhPerm("order.accounting.confirm")||can(ME,"chiphi.xem"));
 const scCanGhi=()=>!!ME&&(ME.role==="admin"||mhManage()||can(ME,"chiphi.nhap"));
@@ -336,12 +336,13 @@ const SC_CSS=`.sochi .sch{display:flex;align-items:center;gap:8px;flex-wrap:wrap
 function pSoChi(m){
   if(!document.getElementById("sc-css")){const s=document.createElement("style");s.id="sc-css";s.textContent=SC_CSS;document.head.appendChild(s)}
   const sec=scSecret(),ghi=scCanGhi(),duyet=scCanDuyet(),choN=scCho().length;
-  const rsN=sec?scChoN():0,TABS=sec?[["tq","Tổng quan"],["cn","Theo chức năng"],["kenh","Theo kênh"],["pb","Phân bổ"],["qt","Quy tắc phân bổ"],["rs","Chờ xử lý"+(rsN?" ("+rsN+")":"")],["nk","Nhật ký chi"+(choN?" ("+choN+" chờ duyệt)":"")],["dm","Danh mục chi phí"]]:[["nk","Phiếu chi đã gửi"+(choN?" ("+choN+")":"")]];
-  if(!TABS.some(t=>t[0]===SC.tab))SC.tab=TABS[0][0];
-  const body=!sec?scMine():{tq:scTQ2,cn:scCN,kenh:scKenh,nk:scNK,pb:scPBV,qt:scQTtab,rs:scRS,dm:scDMtab}[SC.tab]();
+  /* Chị Hoa 28/10: Nhật ký chi đứng đầu; Phân bổ, Quy tắc phân bổ, Danh mục chi phí gộp một tab "Phân bổ", bấm từng phần bên trong. */
+  const rsN=sec?scChoN():0,PBG=["pb","qt","dm"],TABS=sec?[["nk","Nhật ký chi"+(choN?" ("+choN+" chờ duyệt)":"")],["tq","Tổng quan"],["cn","Theo chức năng"],["kenh","Theo kênh"],["pb","Phân bổ"],["rs","Chờ xử lý"+(rsN?" ("+rsN+")":"")]]:[["nk","Phiếu chi đã gửi"+(choN?" ("+choN+")":"")]];
+  if(!TABS.some(t=>t[0]===SC.tab)&&!(sec&&PBG.includes(SC.tab)))SC.tab=TABS[0][0];
+  const body=!sec?scMine():(PBG.includes(SC.tab)?scBCcss()+`<div class="scpills" role="tablist" style="margin:0 0 12px">${[["pb","Kết quả phân bổ"],["qt","Quy tắc phân bổ & chia lương"],["dm","Danh mục chi phí"]].map(([k,t])=>`<button type="button" role="tab" aria-selected="${SC.tab===k}" class="${SC.tab===k?"on":""}" data-sct="${k}">${t}</button>`).join("")}</div>`:"")+{tq:scTQ2,cn:scCN,kenh:scKenh,nk:scNK,pb:scPBV,qt:scQTtab,rs:scRS,dm:scDMtab}[SC.tab]();
   m.innerHTML=`<div class="sochi">${H("Sổ chi phí",pLabel()+(sec?" · hạch toán theo Thông tư 133 · nguồn: sổ cái TK 642 (MISA), phiếu chi và các khoản tự cộng":""))}
    <div class="filters">${ghi?`<button class="btn pri" id="sc-new">＋ Ghi phiếu chi</button>`:""}${duyet?`<button class="btn" id="sc-imp">Nạp sổ từ file</button>`:""}<button class="btn sm" id="sc-ncc">Phiếu chi nhà cung cấp</button><button class="btn sm" id="sc-vc">Phiếu chi vận chuyển</button></div>
-   <div class="sctabs">${TABS.map(([k,t])=>`<button class="${SC.tab===k?"on":""}" data-sct="${k}">${t}</button>`).join("")}</div>${body}</div>`;
+   <div class="sctabs">${TABS.map(([k,t])=>`<button class="${SC.tab===k||(k==="pb"&&PBG.includes(SC.tab))?"on":""}" data-sct="${k}">${t}</button>`).join("")}</div>${body}</div>`;
   m.querySelectorAll("[data-sct]").forEach(b=>b.onclick=()=>{SC.tab=b.dataset.sct;renderMain()});
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn};
   on("sc-new",()=>scForm());on("sc-imp",()=>scImport());
