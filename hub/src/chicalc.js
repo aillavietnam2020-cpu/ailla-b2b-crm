@@ -42,10 +42,11 @@ function scChiaChung(rows,rules,DT){
   return out}
 /* =====================================================================
    PHÍ VẬN HÀNH TIKTOK (bên Nguyễn Thế Hoàng) THEO HỢP ĐỒNG (chị Hoa 28/10), tính trên doanh thu đối soát của tháng:
-   - Phí: 12,5 triệu/tháng; doanh thu trên 2 tỷ thì thay bằng 3% toàn bộ doanh thu.
-   - Thưởng 2% doanh thu khi doanh thu từ 800 triệu đến 2 tỷ VÀ (quảng cáo + hoa hồng affiliate) dưới 30% doanh thu.
+   - Phí cố định luôn là 12,5 triệu/tháng.
+   - Thưởng trên doanh thu khi (quảng cáo + hoa hồng affiliate) dưới 30% doanh thu: doanh thu 800 triệu – 2 tỷ thưởng 2%,
+     trên 2 tỷ thưởng 3%; dưới 800 triệu không thưởng.
    ===================================================================== */
 const SC_HD_TT={coDinh:12500000,nguong:800000000,tran:2000000000,ptTren:0.03,thuong:0.02,max:0.30};
-function scPhiVanHanhTT(dt,ads,aff,H){H=H||SC_HD_TT;dt=+dt||0;const tl=dt?((+ads||0)+(+aff||0))/dt:null,tren=dt>H.tran;
-  const phi=tren?Math.round(dt*H.ptTren):H.coDinh,du=dt>=H.nguong&&dt<=H.tran&&tl!=null&&tl<H.max,thuong=du?Math.round(dt*H.thuong):0;
-  return {dt,tl,phi,cachPhi:tren?"3% doanh thu (trên 2 tỷ)":"cố định 12,5 triệu",thuong,duThuong:du,tong:phi+thuong}}
+function scPhiVanHanhTT(dt,ads,aff,H){H=H||SC_HD_TT;dt=+dt||0;const tl=dt?((+ads||0)+(+aff||0))/dt:null;
+  const muc=dt>H.tran?H.ptTren:dt>=H.nguong?H.thuong:0,du=muc>0&&tl!=null&&tl<H.max,thuong=du?Math.round(dt*muc):0;
+  return {dt,tl,phi:H.coDinh,muc,thuong,duThuong:du,tong:H.coDinh+thuong}}

@@ -20,15 +20,16 @@ describe('Phí vận hành TikTok theo hợp đồng', () => {
     expect(r.phi).toBe(12_500_000);
     expect(r.thuong).toBe(0);
   });
-  it('trên 2 tỷ: 3% toàn bộ doanh thu, không xét thưởng', () => {
+  it('trên 2 tỷ: vẫn 12,5 triệu, thưởng 3% khi quảng cáo + affiliate dưới 30%', () => {
     const r = C.scPhiVanHanhTT(2_500_000_000, 100_000_000, 0);
-    expect(r.phi).toBe(75_000_000);
-    expect(r.thuong).toBe(0);
-    expect(r.tong).toBe(75_000_000);
-  });
-  it('đúng 2 tỷ vẫn là 12,5 triệu và được xét thưởng', () => {
-    const r = C.scPhiVanHanhTT(2_000_000_000, 100_000_000, 0);
     expect(r.phi).toBe(12_500_000);
-    expect(r.thuong).toBe(40_000_000);
+    expect(r.thuong).toBe(75_000_000);
+    expect(r.tong).toBe(87_500_000);
+  });
+  it('trên 2 tỷ nhưng quảng cáo + affiliate từ 30%: chỉ phí cố định', () => {
+    expect(C.scPhiVanHanhTT(2_500_000_000, 700_000_000, 100_000_000).tong).toBe(12_500_000);
+  });
+  it('đúng 2 tỷ là mức 2%', () => {
+    expect(C.scPhiVanHanhTT(2_000_000_000, 100_000_000, 0).thuong).toBe(40_000_000);
   });
 });

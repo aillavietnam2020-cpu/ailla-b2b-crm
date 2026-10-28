@@ -78,7 +78,7 @@ function scImport(){
   let P=null;
   $("#sci-f").onchange=async e=>{const f=e.target.files[0];if(!f)return;$("#sci-r").innerHTML=`<p class="hint">Đang đọc…</p>`;let S;try{S=await wbSheets(f)}catch(er){$("#sci-r").innerHTML=`<div class="note red">Không đọc được file.</div>`;return}
     const r=scParse(S);if(r.err){$("#sci-r").innerHTML=`<div class="note red">${esc(r.err)}</div>`;return}
-    const have=new Set(((scFin().nkc)||[]).map(x=>[x.d,x.ct,Math.round(x.t)].join("|")));const moi=r.rows.filter(x=>!have.has([x.d,x.ct,Math.round(x.t)].join("|")));
+    const gom={};((scFin().nkc)||[]).forEach(x=>{const k=x.tach||x.tachGoc?x.d+"|"+x.ct:"#"+x.id;if(!gom[k])gom[k]={d:x.d,ct:x.ct,t:0};gom[k].t+=+x.t||0});const have=new Set(Object.values(gom).map(x=>[x.d,x.ct,Math.round(x.t)].join("|")));const moi=r.rows.filter(x=>!have.has([x.d,x.ct,Math.round(x.t)].join("|")));
     const th=[...new Set(moi.map(x=>x.d.slice(0,7)))].sort();P=moi;
     $("#sci-r").innerHTML=`<div class="note">Đọc được <b>${r.rows.length}</b> dòng từ ${esc(r.kind)} · tổng ${scNf(scS(r.rows))} đ.<br><b>${moi.length}</b> dòng mới sẽ nạp${th.length?" (tháng "+th.map(x=>x.slice(5)+"/"+x.slice(0,4)).join(", ")+")":""}, ${r.rows.length-moi.length} dòng đã có. ${moi.filter(x=>x.st!=="Ổn").length} dòng ghi "Cần rà".</div>`;
     $("#sci-ok").hidden=!moi.length};
@@ -144,8 +144,9 @@ function scPhieu(x,cho){
    <tr><td class="hint">Ghi chú rà soát</td><td>${ed?`<input id="scp-gc" value="${esc(x.gc||"")}" style="width:100%">`:esc(x.gc||"—")}</td></tr>
    <tr><td class="hint">Người đề nghị · bộ phận</td><td>${esc([x.dn,x.bp].filter(Boolean).join(" · ")||"—")}</td></tr><tr><td class="hint">Người nhận · hình thức</td><td>${esc([x.nn,x.ht].filter(Boolean).join(" · ")||"—")}</td></tr>${x.tkc||x.tkn?`<tr><td class="hint">Tiền đi từ tài khoản</td><td>${esc(x.tkc||"—")}${x.tkn?`<br><small class="hint">Chuyển đến: ${esc(x.tkn)}</small>`:""}</td></tr>`:""}
    <tr><td class="hint">Chứng từ</td><td>${nf?nf+" ảnh":"chưa có"} <button type="button" class="btn sm" id="scp-f">Xem / thêm ảnh</button></td></tr></tbody></table></div>
-   <p class="acts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${ed?`<button class="btn pri" id="scp-luu">Lưu</button><button class="btn danger" id="scp-xoa">Xóa dòng</button>`:""}${cho&&scCanDuyet()?`<button class="btn pri" id="scp-ok">Duyệt vào sổ</button><button class="btn danger" id="scp-tl">Trả lại</button>`:""}</p><div id="scp-cf"></div>`);
+   <p class="acts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${ed?`<button class="btn pri" id="scp-luu">Lưu</button><button class="btn" id="scp-tach">Tách khoản</button><button class="btn danger" id="scp-xoa">Xóa dòng</button>`:""}${cho&&scCanDuyet()?`<button class="btn pri" id="scp-ok">Duyệt vào sổ</button><button class="btn danger" id="scp-tl">Trả lại</button>`:""}</p><div id="scp-cf"></div>`);
   $("#scp-f").onclick=()=>spFiles(x.id,x.dg);
+  if($("#scp-tach"))$("#scp-tach").onclick=()=>scTach(x);
   if($("#scp-ok"))$("#scp-ok").onclick=()=>scDuyet(x.id);if($("#scp-tl"))$("#scp-tl").onclick=()=>scTuChoi(x.id);
   if($("#scp-luu"))$("#scp-luu").onclick=()=>{const v={g:$("#scp-g").value,k:$("#scp-k").value,st:$("#scp-st").value,gc:$("#scp-gc").value.trim()};
     DB.mutate(ME.name,"sửa dòng sổ chi "+(x.ct||""),dt=>{const r=((dt.fin||{}).nkc||[]).find(y=>y.id===x.id);if(r){if(r.k0==null&&r.k!==v.k)r.k0=r.k;Object.assign(r,v)}(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(x.dg)]={g:v.g,k:v.k,st:v.st}});toast("Đã lưu");closeDrawer();renderMain()};
