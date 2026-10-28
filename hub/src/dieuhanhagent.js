@@ -104,7 +104,9 @@ const AC_CSS=`<style id="ac-css">
 @media(max-width:560px){.ac-grid{grid-template-columns:1fr}}
 </style>`;
 /* Agent trả lời kiểu markdown (**đậm**, gạch đầu dòng): đổi sang chữ đậm và dấu chấm, không hiện ký tự thô. */
-const acLink=h=>h.replace(/(https?:\/\/[^\s<)]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
+// Link dừng trước dấu ` : agent hay bọc link trong `...`; nếu ăn cả dấu ` thì thẻ <code> chen vào giữa thẻ <a>,
+// trình duyệt mở <code> không đóng và mọi tin phía sau thành chữ máy, lệch hàng (lỗi 28/10).
+const acLink=h=>h.replace(/(https?:\/\/[^\s<)`]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
 /* Bảng markdown (| a | b |) đổi thành bảng thật */
 const acTb=h=>{const L=h.split("\n"),o=[],isR=r=>/^\s*\|.*\|\s*$/.test(r);
   for(let i=0;i<L.length;){
