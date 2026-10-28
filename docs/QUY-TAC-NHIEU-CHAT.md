@@ -57,8 +57,18 @@ File trong `migrations/` chạy theo số thứ tự tên file. Hai chat cùng t
 | Đơn hàng ↔ kho ↔ hàng hoàn ↔ MISA | CRM đơn, kho, hàng hoàn, chứng từ | `src/server/routes/kho*.ts`, `src/server/services/returnScan.ts`, `src/server/services/payments.ts` |
 | Agent ↔ web | Agent Sale/CSKH, giấy ủy quyền, Huấn luyện agent | `src/server/routes/agent*.ts`, `src/shared/agent*.ts`, `hub/src/dieuhanhagent.js` |
 | Thanh toán ↔ công nợ ↔ kế toán | thu tiền, phiếu thu, khoản kế toán | `src/server/services/payments.ts`, `src/server/routes/finance.ts` |
+| Mua hàng ↔ công nợ NCC ↔ Sổ chi phí ↔ Tài sản & CCDC ↔ tồn kho ↔ Lãi lỗ / giá thành | đơn mua, chứng từ, phiếu chi, sổ tài sản, kho, P&L | theo `docs/DAU-NOI-SO-CHI-TAI-SAN-KHO.md`; đụng chỗ nối thì nhắn chat Đấu nối |
 
 Khi sửa một file ở cột "file chung dễ vướng": sửa ít nhất có thể, đừng viết lại cả file, và `git merge origin/main` ngay trước khi commit để thấy thay đổi của chat khác.
+
+### 5b. BẮT BUỘC trước khi báo "xong": sửa luôn mọi chỗ ăn theo (chị Hoa 28/10)
+
+Chị Hoa: "cứ làm mà không sửa cái liên quan là dở hơi". Ví dụ đã xảy ra: chứng từ đơn ezpack thêm 65.000 vận chuyển mà sổ Công cụ dụng cụ không tự điều chỉnh, chị Huệ phải nhắc.
+
+Mỗi lần sửa một số liệu hay một luồng, trước khi báo xong phải:
+1. Rà cả chuỗi ăn theo: Mua hàng (đơn, chứng từ, trả tiền) → công nợ nhà cung cấp → Nhật ký chi / Sổ chi phí → Tài sản & CCDC → tồn kho → Lãi lỗ / giá thành. Bán hàng thì: đơn → kho xuất → công nợ khách → tiền về → doanh thu thực → Lãi lỗ.
+2. Chỗ nào phải đổi theo thì sửa luôn, ưu tiên làm thành luồng tự động để không ai phải nhắc. Nếu chỗ đó thuộc chat khác thì nhắn chat đó (hoặc chat Đấu nối / điều phối) trước khi báo xong.
+3. Mở web thật kiểm cả chỗ sửa lẫn các chỗ ăn theo. Chưa kiểm được chỗ nào thì nói rõ trong báo cáo.
 
 ## 6. Chat dành riêng cho việc dọn dẹp
 
