@@ -57,6 +57,68 @@ shopeeRoutes.get('/months', async (c) => {
   );
 });
 
+/** Mức ưu tiên quảng cáo theo biên sau phí sàn (giống speBcPri ở hub/src/spebc.js). */
+function priOf(p: { dt: number; lg: number }, ng2: number, dtAll: number): string {
+  const b = p.dt ? p.lg / p.dt : 0;
+  if (p.lg < 0) return 'Dừng quảng cáo';
+  if (b < ng2) return 'Giảm';
+  if (dtAll && p.dt / dtAll < 0.02) return 'Thử thêm';
+  if (b < ng2 + 0.1) return 'Giữ mức';
+  return 'Đẩy mạnh';
+}
+
+/**
+ * Số cho trang vận hành (team MKT, không cần quyền xem lãi lỗ): doanh thu thực, đơn, hủy/hoàn, quảng cáo, KOC theo shop,
+ * số theo ngày chỉ có doanh thu / đơn / quảng cáo, top sản phẩm kèm mức ưu tiên quảng cáo (không có lãi, giá vốn, phí sàn).
+ */
+shopeeRoutes.get('/ops', async (c) => {
+  const from = c.req.query('from') ?? '';
+  const to = c.req.query('to') ?? '';
+  if (!DAY.test(from) || !DAY.test(to)) throw badRequest('BAD_RANGE', 'Khoảng ngày không hợp lệ');
+  const rows = await c.env.DB.prepare('SELECT ky, shop, data, summary FROM spe_month WHERE ky >= ? AND ky <= ? ORDER BY ky, shop')
+    .bind(from.slice(0, 7), to.slice(0, 7))
+    .all<{ ky: string; shop: string; data: string; summary: string }>();
+  const out = [];
+  for (const r of rows.results ?? []) {
+    const s = JSON.parse(r.summary) as Record<string, unknown>;
+    const d = JSON.parse(await unpack(r.data)) as { rows?: Array<{ pn: string; q: number; dt: number; lg: number }> };
+    const dt = Number(s.dt) || 0;
+    const ads = Number(s.ads) || 0;
+    const ng2 = (dt ? ads / dt : 0) + 0.1;
+    const g = new Map<string, { n: string; q: number; dt: number; lg: number }>();
+    for (const x of d.rows ?? []) {
+      const p = g.get(x.pn) ?? { n: x.pn, q: 0, dt: 0, lg: 0 };
+      p.q += Number(x.q) || 0;
+      p.dt += Number(x.dt) || 0;
+      p.lg += Number(x.lg) || 0;
+      g.set(x.pn, p);
+    }
+    const fees = (s.fees ?? []) as Array<[string, number]>;
+    const aff = fees.find((f) => /affiliate/i.test(f[0]));
+    const days: Record<string, number[]> = {};
+    for (const [k, v] of Object.entries((s.days ?? {}) as Record<string, number[]>)) days[k] = [Number(v[0]) || 0, Number(v[4]) || 0, Number(v[5]) || 0];
+    out.push({
+      ky: r.ky,
+      shop: r.shop,
+      den: s.den ?? null,
+      dt,
+      don: Number(s.don) || 0,
+      mon: Number(s.mon) || 0,
+      hh: Number(s.hh) || 0,
+      ads,
+      koc: Number(s.koc) || 0,
+      hhAff: aff ? -aff[1] : 0,
+      vou: -(Number(s.vou) || 0),
+      days,
+      sp: [...g.values()]
+        .sort((a, b) => b.dt - a.dt)
+        .slice(0, 12)
+        .map((p) => ({ n: p.n, q: p.q, dt: p.dt, pri: priOf(p, ng2, dt) })),
+    });
+  }
+  return ok(c, { months: out });
+});
+
 shopeeRoutes.get('/month/:ky/:shop', async (c) => {
   if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem số Shopee');
   const { ky, shop } = c.req.param();
