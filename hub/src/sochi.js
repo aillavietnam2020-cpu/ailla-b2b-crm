@@ -43,7 +43,7 @@ const scKey=t=>kfold(t).replace(/[0-9.\/,]+/g," ").replace(/\s+/g," ").trim().sl
 function scDeXuat(dg){
   const r=(scFin().cpRule||{})[scKey(dg)];if(r&&r.g)return {g:r.g,k:r.k,st:r.st||"Ổn"};
   const t=" "+kfold(dg)+" ",raw=" "+String(dg).toLowerCase()+" ",h=re=>re.test(t);
-  const R=[[/quang cao|nap qc|nap tien qc/,()=>h(/tiktok|tikotk/)?["G02","TikTok"]:h(/shopee ?mall|shopemall/)?["G03","Shopee Mall"]:h(/shopee/)?["G03","Shopee thường"]:["G01","Facebook"]],
+  const R=[[/mua may|tien may|may chiet|may dan|may tit|may dong|may in|thiet bi|cong cu dung cu|ccdc|tai san co dinh/,()=>(h(/sua|cuoc|van chuyen|gui/)?["G16","Sản xuất"]:["G28","Không tính"])],[/quang cao|nap qc|nap tien qc/,()=>h(/tiktok|tikotk/)?["G02","TikTok"]:h(/shopee ?mall|shopemall/)?["G03","Shopee Mall"]:h(/shopee/)?["G03","Shopee thường"]:["G01","Facebook"]],
    [/phi tiktok/,()=>["G04","TikTok"]],[/cp shopee ?mall|shopeemall thang|cp shopemall/,()=>["G04","Shopee Mall"]],[/cp shopee thuong|shopee thuong thang/,()=>["G04","Shopee thường"]],[/rut tien/,()=>["G04","Chờ xác định"]],
    [/spx|best|j&t|cp gui hang|cp don gui|gui hang ra|lay hang mang/,()=>["G05","Chờ xác định"]],
    [/hoa hong/,()=>["G06","TikTok"]],[/luong|thuong/,()=>["G07","Chờ xác định"]],[/bao hiem/,()=>["G08","Chung"]],[/cuoc xe/,()=>["G09","NPP"]],
@@ -103,7 +103,7 @@ function scForm(){
    <div id="scf-ck" class="row4"><label class="field">Chi từ tài khoản công ty<select id="scf-from"><option value="">Đang tải…</option></select></label><label class="field">Chuyển đến (ngân hàng · số tài khoản)<input id="scf-to" placeholder="Ví dụ: MB · 0929927999"></label></div>
    <label class="field" id="scf-fxw" hidden>Tài khoản chi khác<input id="scf-fx" placeholder="Ngân hàng · số tài khoản · tên chủ tài khoản"></label>
    <label class="field">Nội dung chi (ghi rõ chi cho việc gì)<input id="scf-dg" required placeholder="Ví dụ: Cước xe giao hàng NPP Hải Dương"></label>
-   <div class="row4"><label class="field">Nhóm chi phí<select id="scf-g">${opt(dm.map(x=>[x.g,x.g+" · "+x.n]),"")}</select></label><label class="field">Bổ vào (kênh / nơi chịu)<select id="scf-k">${opt(SC_COLS.slice(0,8).map(x=>[x,x]),"Chung")}</select></label></div>
+   <div class="row4"><label class="field">Nhóm chi phí<select id="scf-g">${opt(dm.map(x=>[x.g,x.g+" · "+x.n]),"")}</select></label><label class="field">Bổ vào (kênh / nơi chịu)<select id="scf-k">${opt(SC_COLS.slice(0,8).map(x=>[x,x]),"Chung")}</select></label></div><div id="scf-tsn" class="note" hidden>Mua máy móc, thiết bị, công cụ: chọn nhóm <b>G28 · Mua tài sản cố định / công cụ dụng cụ</b> (không tính vào chi phí tháng). Lưu phiếu xong, mở lại phiếu và bấm <b>"Ghi tăng tài sản / công cụ"</b> để vào sổ Công cụ dụng cụ / Tài sản cố định; chi phí sẽ được phân bổ, khấu hao dần hằng tháng.</div>
    <div class="row4"><label class="field">Số tiền (đ)<input type="number" id="scf-t" min="1" required></label><label class="field">Chứng từ kèm (hóa đơn, ảnh chuyển khoản)<input type="file" id="scf-f" multiple accept="image/*,application/pdf"></label></div>
    <label class="field">Ghi chú<input id="scf-gc"></label><div id="scf-e"></div>
    <button class="btn pri">${scCanDuyet()?"Ghi vào sổ":"Gửi chị Huệ duyệt"}</button></form>
@@ -112,7 +112,8 @@ function scForm(){
   const ckSw=()=>{const ck=$("#scf-ht").value==="Chuyển khoản";$("#scf-ck").hidden=!ck;if(!ck)$("#scf-fxw").hidden=true;else $("#scf-fxw").hidden=$("#scf-from").value!=="__x"};
   mhAccts().then(A=>{const sel=$("#scf-from");if(!sel)return;sel.innerHTML=`<option value="">— Chọn tài khoản chi tiền —</option>`+A.map(a=>`<option>${esc(mhAcctLabel(a))}</option>`).join("")+`<option value="__x">Tài khoản khác…</option>`;sel.onchange=ckSw;ckSw()});
   $("#scf-ht").onchange=ckSw;ckSw();
-  const sug=()=>{const v=$("#scf-dg").value;if(v.length<3)return;const de=scDeXuat(v);$("#scf-g").value=de.g;if(SC_COLS.slice(0,8).includes(de.k))$("#scf-k").value=de.k};
+  const tsn=()=>{const e=document.getElementById("scf-tsn");if(e)e.hidden=!["G28","G15"].includes($("#scf-g").value)};$("#scf-g").addEventListener("change",tsn);
+  const sug=()=>{const v=$("#scf-dg").value;if(v.length<3)return;const de=scDeXuat(v);$("#scf-g").value=de.g;if(SC_COLS.includes(de.k))$("#scf-k").value=de.k;tsn()};
   $("#scf-dg").onchange=sug;$("#scf-d").onchange=e=>{$("#scf-so").value=scSoPhieu(e.target.value)};
   $("#scf-thu").onclick=()=>{if(typeof cptQuick==="function")cptQuick()};
   $("#scf").onsubmit=async e=>{e.preventDefault();const t=+$("#scf-t").value,dg=$("#scf-dg").value.trim();
@@ -121,7 +122,7 @@ function scForm(){
     const ckOn=$("#scf-ht").value==="Chuyển khoản",fromAcc=ckOn?($("#scf-from").value==="__x"?$("#scf-fx").value.trim():$("#scf-from").value):"";
     if(ckOn&&!fromAcc){$("#scf-e").innerHTML=`<div class="note red">Chuyển khoản: chọn tài khoản công ty chi tiền (hoặc ghi tài khoản khác).</div>`;return}
     const btn=e.submitter;if(btn)btn.disabled=true;
-    const ngay=$("#scf-d").value,row={id:uid("pc"),tkc:fromAcc,tkn:ckOn?$("#scf-to").value.trim():"",d:ngay,ct:scSoPhieu(ngay),lct:"Phiếu chi",dg,tk:$("#scf-ht").value==="Tiền mặt"?"1111":"1121",t,g:$("#scf-g").value,k:$("#scf-k").value,gc:$("#scf-gc").value.trim(),dn:$("#scf-dn").value.trim(),bp:$("#scf-bp").value,nn:$("#scf-nn").value.trim(),ht:$("#scf-ht").value,src:"phieu",by:ME.name,at:Date.now()};
+    const ngay=$("#scf-d").value,row={id:uid("pc"),tkc:fromAcc,tkn:ckOn?$("#scf-to").value.trim():"",d:ngay,ct:scSoPhieu(ngay),lct:"Phiếu chi",dg,tk:$("#scf-ht").value==="Tiền mặt"?"1111":"1121",t,g:$("#scf-g").value,k:$("#scf-g").value==="G28"?"Không tính":$("#scf-k").value,gc:$("#scf-gc").value.trim(),dn:$("#scf-dn").value.trim(),bp:$("#scf-bp").value,nn:$("#scf-nn").value.trim(),ht:$("#scf-ht").value,src:"phieu",by:ME.name,at:Date.now()};
     /* Từ ngưỡng chi (mặc định 5 triệu, chị Hoa chốt 27/10/2026): kế toán ghi cũng phải chờ chị Hoa duyệt mới vào sổ. */
     const lenCeo=scCanDuyet()&&scCanCeo(row.t);
     if(lenCeo)DB.mutate(ME.name,"ghi phiếu chi chờ CEO "+row.ct,dt=>{(dt.pcCho=dt.pcCho||[]).push({...row,st:"Chờ CEO duyệt",ceoCho:1,ktDuyet:ME.name,ktAt:Date.now()})});
@@ -150,7 +151,7 @@ function scPhieu(x,cho){
    <tr><td class="hint">Ghi chú rà soát</td><td>${ed?`<input id="scp-gc" value="${esc(x.gc||"")}" style="width:100%">`:esc(x.gc||"—")}</td></tr>
    <tr><td class="hint">Người đề nghị · bộ phận</td><td>${esc([x.dn,x.bp].filter(Boolean).join(" · ")||"—")}</td></tr><tr><td class="hint">Người nhận · hình thức</td><td>${esc([x.nn,x.ht].filter(Boolean).join(" · ")||"—")}</td></tr>${x.tkc||x.tkn?`<tr><td class="hint">Tiền đi từ tài khoản</td><td>${esc(x.tkc||"—")}${x.tkn?`<br><small class="hint">Chuyển đến: ${esc(x.tkn)}</small>`:""}</td></tr>`:""}
    <tr><td class="hint">Chứng từ</td><td>${nf?nf+" ảnh":"chưa có"} <button type="button" class="btn sm" id="scp-f">Xem / thêm ảnh</button></td></tr></tbody></table></div>
-   <p class="acts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${ed?`<button class="btn pri" id="scp-luu">Lưu</button><button class="btn" id="scp-tach">Tách khoản</button>${x.g==="G28"&&typeof tsGhiTangTuPhieu==="function"?`<button class="btn" id="scp-ts">Ghi tăng tài sản / công cụ</button>`:""}<button class="btn danger" id="scp-xoa">Xóa dòng</button>`:""}${cho&&scCanDuyet()?`<button class="btn pri" id="scp-ok">Duyệt vào sổ</button><button class="btn danger" id="scp-tl">Trả lại</button>`:""}</p><div id="scp-cf"></div>`);
+   <p class="acts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${["G28","G15"].includes(x.g)&&typeof tsGhiTangTuPhieu==="function"?`<button class="btn" id="scp-ts">Ghi tăng tài sản / công cụ</button>`:""}${ed?`<button class="btn pri" id="scp-luu">Lưu</button><button class="btn" id="scp-tach">Tách khoản</button><button class="btn danger" id="scp-xoa">Xóa dòng</button>`:""}${cho&&scCanDuyet()?`<button class="btn pri" id="scp-ok">Duyệt vào sổ</button><button class="btn danger" id="scp-tl">Trả lại</button>`:""}</p><div id="scp-cf"></div>`);
   $("#scp-f").onclick=()=>spFiles(x.id,x.dg);
   if($("#scp-tach"))$("#scp-tach").onclick=()=>scTach(x);
   if($("#scp-ts"))$("#scp-ts").onclick=()=>{closeDrawer();tsGhiTangTuPhieu(x.id)};
@@ -225,7 +226,8 @@ function scAuto(){
     else if(s==="ts"){g=x.ext.g;k=SC_COLS.includes(x.ext.k)?x.ext.k:"Chung"}
     if(!g)return;R.push({...x,g,k,tk:scG(g).tk,nhom:scG(g).n,auto:1})});
   return R}
-const scPBRows=()=>scRows().concat(scAuto());
+/* Mua TSCĐ / CCDC (G28) không phải chi phí tháng: chỉ phần khấu hao / phân bổ từ trang Tài sản mới vào. */
+const scPBRows=()=>scRows().filter(x=>x.g!=="G28").concat(scAuto());
 /* Chi tiết một dòng quảng cáo: tiền chạy theo ngày (Facebook chia theo người chạy). */
 function scAdsDetail(id){
   const inP=k=>k>=PERIOD.from&&k<=PERIOD.to,days={},who={};let ten="",ghi="";
