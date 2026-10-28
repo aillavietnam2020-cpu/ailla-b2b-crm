@@ -208,7 +208,7 @@ function scAuto(){
   scExt().forEach(x=>{const s=x.ext.src;let g="",k=x.k;
     if(s==="ads"){g={"ads-fb":"G01","ads-tt":"G02","ads-spe":"G03"}[x.ext.id];if(has(g))return}
     else if(s==="luong"){g="G07";if(has(g))return;k=scKenhChuan(k)||"Chung"}
-    else if(s==="vc"){g="G09";k="NPP"}
+    else if(s==="vc"){g="G09";k="NPP";if(has(g))return}
     else if(s==="san"){g="G04";if(has(g))return}
     if(!g)return;R.push({...x,g,k,tk:scG(g).tk,nhom:scG(g).n,auto:1})});
   return R}
