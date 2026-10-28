@@ -74,6 +74,8 @@ function ttbcTeams(I){
   const km=I.km||{},gmv=+km.gmv||0,L=I.live||{},K=I.koc||null,W=I.last2,fmt=v=>(Math.round(v*1000)/10).toString().replace(".",",")+"%";
   const st=al=>al.some(x=>x.lv==="r")?"Kém":al.some(x=>x.lv==="a")?"Theo dõi":"Tốt";
   const content={al:[]};content.gmv=+km.vInh||0;content.ty=ttbcPct(content.gmv,gmv);
+  const V=I.videos||null;if(V){content.nDang=+V.nDang||0;content.nDangCoDon=+V.nDangCoDon||0;content.nCoDon=+V.nCoDon||0;content.n=+V.n||0;content.gmvVideo=+V.gmv||0;content.gmvMoi=content.nCoDon?content.gmvVideo/content.nCoDon:null;content.top=(V.top||[]).slice(0,5);
+    if(content.nDang>=5&&ttbcPct(content.nDangCoDon,content.nDang)<0.3)content.al.push({lv:"a",t:`${content.nDang-content.nDangCoDon}/${content.nDang} video mới đăng chưa ra đơn`,d:"Rút hook, sản phẩm của các video đang ra đơn để làm lại."})}
   if(W&&W[0].vInh){const g=W[1].vInh/W[0].vInh-1;if(g<=-0.15)content.al.push({lv:"a",t:`GMV video inhouse tuần ${W[1].a}–${W[1].b} giảm ${fmt(-g)}`,d:"Rút mẫu video thắng tuần trước để làm lại."});else if(g>=0.15)content.al.push({lv:"g",t:`GMV video inhouse tuần ${W[1].a}–${W[1].b} tăng ${fmt(g)}`,d:"Giữ nhịp đăng, nhân bản mẫu video thắng."})}
   const ads={al:[],chi:I.adsV||0,don:+((I.ads||{}).don)||0};ads.roi=ads.chi&&I.dt?I.dt/ads.chi:null;ads.roas=ads.chi?gmv/ads.chi:null;ads.hoaVon=I.lgRate>0?1/I.lgRate:null;ads.cpo=ads.don?(+I.ads.chi||0)/ads.don:null;
   if(ads.roi!=null&&ads.hoaVon&&ads.roi<ads.hoaVon*1.2)ads.al.push({lv:"r",t:`ROI ${ads.roi.toFixed(2).replace(".",",")} sát mức hòa vốn ${ads.hoaVon.toFixed(2).replace(".",",")}`,d:"Tắt nhóm chiến dịch ROAS thấp, không mở rộng ngân sách."});
@@ -85,5 +87,5 @@ function ttbcTeams(I){
   if(live.phien>=10&&ttbcPct(live.phienGmv,live.phien)<0.1)live.al.push({lv:"r",t:`Chỉ ${fmt(live.phienGmv/live.phien)} buổi live có đơn`,d:"Đổi sản phẩm lên live, thêm ưu đãi chỉ trong live, bỏ khung giờ không ra đơn."});
   [content,ads,koc,live].forEach(x=>x.st=st(x.al));
   const todo=[["Live",live],["Ads",ads],["Booking",koc],["Content",content]].flatMap(([n,x])=>x.al.filter(a=>a.lv!=="g").map(a=>({...a,team:n}))).sort((a,b)=>(a.lv==="r"?0:1)-(b.lv==="r"?0:1)).slice(0,3);
-  return {content,ads,koc,live,todo,has:{koc:!!K,live:!!(I.live&&live.phien)}};
+  return {content,ads,koc,live,todo,has:{koc:!!K,live:!!(I.live&&live.phien),videos:!!V}};
 }

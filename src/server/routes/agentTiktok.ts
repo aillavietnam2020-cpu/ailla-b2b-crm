@@ -23,7 +23,7 @@ agentTiktokRoutes.use('*', async (c, next) => {
 
 const KY = /^\d{4}-\d{2}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const DAY_SRC = ['km', 'live', 'ads'] as const;
+import { DAY_SRC, RANGE_KIND, cleanRange } from './tiktok';
 const MAX_MONTH = 3 * 1024 * 1024;
 const ip = (c: { req: { header: (n: string) => string | undefined } }) => c.req.header('CF-Connecting-IP') ?? null;
 
@@ -135,6 +135,35 @@ agentTiktokRoutes.put('/month/:ky', async (c) => {
 });
 
 /** Số theo ngày (quảng cáo, 5 làn GMV, LIVE): ngày nào có trong file thì ghi đè ngày đó. */
+/** Số cả khoảng ngày (KOC Transaction Analysis, Creator List, Video › Chi tiết): cùng khoảng thì ghi đè. */
+agentTiktokRoutes.put('/range', async (c) => {
+  const auth = c.get('auth');
+  const body = (await c.req.json().catch(() => ({}))) as { kind?: string; from?: string; to?: string; data?: unknown; file?: string };
+  const kind = String(body.kind ?? '');
+  if (!(RANGE_KIND as readonly string[]).includes(kind)) throw badRequest('BAD_KIND', 'Loại file không hợp lệ');
+  const from = String(body.from ?? '');
+  const to = String(body.to ?? '');
+  if (!DAY.test(from) || !DAY.test(to) || from > to) throw badRequest('BAD_RANGE', 'Khoảng ngày không hợp lệ');
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO tts_range (kind, d_from, d_to, data, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (kind, d_from, d_to) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    ).bind(kind, from, to, JSON.stringify(cleanRange(kind, body.data)), nowIso(), auth.user.id),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      actorType: 'AGENT',
+      source: 'agent-tiktok',
+      action: 'TTS_RANGE_UPLOAD',
+      entityType: 'TTS_RANGE',
+      entityId: `${kind}:${from}:${to}`,
+      after: { file: String(body.file ?? '').slice(0, 200) },
+      ip: ip(c),
+      requestId: c.get('requestId'),
+    }),
+  ]);
+  return ok(c, { ok: true, kind, from, to });
+});
+
 agentTiktokRoutes.put('/days', async (c) => {
   const auth = c.get('auth');
   const body = (await c.req.json().catch(() => ({}))) as { src?: string; days?: Record<string, unknown>; file?: string };

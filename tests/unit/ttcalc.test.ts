@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 const T: any = new Function(
   `${readFileSync('hub/src/ttcalc.js', 'utf8')}
   return {ttNum,ttIsoDay,ttCsv,ttSheets,ttReadOrders,ttReadIncome,ttCheckIncomeRange,ttReadCampaign,ttReadKeyMetrics,ttReadLive,
-    ttReadKoc,ttReadCreators,ttBuildMonth,ttPL,ttSummary,ttMakeCostOf,ttTodo,ttDaydRow,ttGuessKy,ttKind,ttPackPL,ttUnpackPL,TT_LANES};`,
+    ttReadKoc,ttReadCreators,ttBuildMonth,ttPL,ttSummary,ttMakeCostOf,ttTodo,ttDaydRow,ttGuessKy,ttKind,ttPackPL,ttUnpackPL,TT_LANES,ttReadVideoDays,ttReadVideoList};`,
 )();
 
 const ORDER_HEAD = ['Order ID', 'Order Status', 'SKU ID', 'Seller SKU', 'Product Name', 'Variation', 'Quantity',
@@ -238,5 +238,32 @@ describe('TikTok: giá trị hoàn sau khi giao (để tính doanh thu dự ki�
     const S = T.ttSummary(T.ttPL(M, () => ({ u: 1000 }), []));
     expect(S.hoanGiao).toBe(90000);
     expect(S.dtUoc).toBe(80000);
+  });
+});
+
+describe('TikTok: file Video (Hiệu suất theo ngày, Chi tiết từng video)', () => {
+  const VLIST = [
+    ['[Phạm vi ngày]: 2026-10-01 ~ 2026-10-25\n'],
+    [],
+    ['Tên nhà sáng tạo', 'ID video', 'Thông tin video', 'Thời gian', 'Sản phẩm', 'VV', 'Đơn hàng SKU đã ghi nhận', 'GMV đến từ video (₫)'],
+    ['shop', '111', 'Video cũ bán chạy', '2026/05/30 10:45:00', 'Tinh dầu', '2040840', '5406', '307868218'],
+    ['shop', '222', 'Video mới có đơn', '2026/10/05 09:00:00', 'Xịt muỗi', '1000', '3', '300000'],
+    ['shop', '333', 'Video mới chưa đơn', '2026/10/20 09:00:00', 'Xịt ruồi', '500', '0', '0'],
+  ];
+  it('nhận đúng loại file', () => {
+    expect(T.ttKind({ Sheet1: VLIST })).toBe('videos');
+    expect(T.ttKind({ Sheet1: [['[Phạm vi ngày]: 2026-10-01 ~ 2026-10-25'], [], ['Thời gian', 'GMV đến từ video (₫)', 'VV']] })).toBe('vdays');
+  });
+  it('Chi tiết: đếm video đăng trong kỳ, video ra đơn, top theo GMV', () => {
+    const R = T.ttReadVideoList(VLIST);
+    expect(R.range).toEqual({ from: '2026-10-01', to: '2026-10-25' });
+    expect([R.n, R.nDang, R.nCoDon, R.nDangCoDon]).toEqual([3, 2, 2, 1]);
+    expect(R.gmv).toBe(307868218 + 300000);
+    expect(R.top[0].id).toBe('111');
+    expect(R.top[1].post).toBe('2026-10-05');
+  });
+  it('Hiệu suất: số theo ngày', () => {
+    const R = T.ttReadVideoDays([['[Phạm vi ngày]: 2026-10-01 ~ 2026-10-02'], [], ['Thời gian', 'GMV đến từ video (₫)', 'VV', 'Đơn hàng SKU đã ghi nhận'], ['2026-10-01', '40042598', '258097', '714']]);
+    expect(R.days['2026-10-01']).toMatchObject({ gmv: 40042598, vv: 258097, don: 714 });
   });
 });

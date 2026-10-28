@@ -21,8 +21,8 @@ const canMoney = (a: AuthContext) => a.user.role === 'CEO' || a.permissions.incl
 const ip = (c: { req: { header: (n: string) => string | undefined } }) => c.req.header('CF-Connecting-IP') ?? null;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const KY = /^\d{4}-\d{2}$/;
-const DAY_SRC = ['km', 'live', 'ads'] as const;
-const RANGE_KIND = ['koc', 'creators'] as const;
+export const DAY_SRC = ['km', 'live', 'ads', 'video'] as const;
+export const RANGE_KIND = ['koc', 'creators', 'videos'] as const;
 const MAX_MONTH = 3 * 1024 * 1024;
 
 /** Chỉ giữ số (tối đa 60 khoá) để không ai cất được chữ tuỳ ý vào bảng ngày. */
@@ -47,6 +47,32 @@ function cleanCreators(v: unknown) {
       return { u: String(r.u ?? '').slice(0, 80), ...numbersOnly(r, 20) };
     }),
   };
+}
+
+/** Video › Chi tiết: số tổng + tối đa 50 video GMV cao nhất (tên video cắt 80 ký tự, không có thông tin khách). */
+function cleanVideos(v: unknown) {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const top = Array.isArray(o.top) ? o.top.slice(0, 50) : [];
+  return {
+    ...numbersOnly(o, 20),
+    top: top.map((t) => {
+      const r = (t ?? {}) as Record<string, unknown>;
+      return {
+        id: String(r.id ?? '').slice(0, 40),
+        t: String(r.t ?? '').slice(0, 80),
+        post: DAY.test(String(r.post ?? '')) ? String(r.post) : '',
+        sp: String(r.sp ?? '').slice(0, 60),
+        ...numbersOnly(r, 10),
+      };
+    }),
+  };
+}
+
+/** Dữ liệu cả khoảng ngày theo loại file (dùng chung cho trang vận hành và agent). */
+export function cleanRange(kind: string, data: unknown) {
+  if (kind === 'koc') return numbersOnly(data, 80);
+  if (kind === 'videos') return cleanVideos(data);
+  return cleanCreators(data);
 }
 
 /** Số theo ngày + số theo khoảng giao với kỳ đang xem. */
@@ -114,7 +140,7 @@ tiktokRoutes.put('/range', async (c) => {
   const from = String(body.from ?? '');
   const to = String(body.to ?? '');
   if (!DAY.test(from) || !DAY.test(to) || from > to) throw badRequest('BAD_RANGE', 'Khoảng ngày không hợp lệ');
-  const data = kind === 'koc' ? numbersOnly(body.data, 80) : cleanCreators(body.data);
+  const data = cleanRange(kind, body.data);
   await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO tts_range (kind, d_from, d_to, data, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)

@@ -5,7 +5,10 @@
  * của trang Tải file tháng (ttcalc.js chép nguyên từ hub/src/ttcalc.js), rồi chỉ gửi số đã tính lên web.
  * Không gửi tên, số điện thoại, địa chỉ khách.
  *
- *   node nap-tiktok.mjs --as AGENT_ID file1 file2 file3 [--ky 2026-10] [--thu]
+ *   node nap-tiktok.mjs --as AGENT_ID file1 file2 file3 [file team …] [--ky 2026-10] [--thu]
+ * File kế toán (đủ 3 file thì tính lãi lỗ tháng): đơn hàng OrderSKUList, quyết toán income, quảng cáo Campaign overview.
+ * File team (nạp số hiệu suất, mỗi file một phần): Key metrics, Live Performance, Video › Hiệu suất, Video › Chi tiết,
+ * Transaction Analysis (KOC), Creator List (KOC). Có thể chạy chỉ với file team.
  *   --thu : chỉ tính và in số, KHÔNG ghi lên web.
  * Khoá agent: biến ABOS_AGENT_KEY hoặc /root/.config/abos/<AGENT_ID>.key (như lệnh abos).
  */
@@ -18,7 +21,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const T = new Function(
   `${readFileSync(join(here, 'ttcalc.js'), 'utf8')}
-  return {ttCsv,ttSheets,ttKind,ttGuessKy,ttReadOrders,ttReadIncome,ttReadCampaign,ttBuildMonth,ttPL,ttSummary,ttMakeCostOf,ttTodo,ttPackPL};`,
+  return {ttCsv,ttSheets,ttKind,ttGuessKy,ttReadOrders,ttReadIncome,ttReadCampaign,ttBuildMonth,ttPL,ttSummary,ttMakeCostOf,ttTodo,ttPackPL,
+    ttReadKeyMetrics,ttReadLive,ttReadKoc,ttReadCreators,ttReadVideoDays,ttReadVideoList};`,
 )();
 
 const args = process.argv.slice(2);
@@ -72,16 +76,43 @@ function readSheets(p) {
   return T.ttSheets(XLSX, XLSX.read(readFileSync(p), { type: 'buffer' }));
 }
 const up = {};
+const team = [];
 for (const p of args) {
   const sh = readSheets(p);
   const kind = T.ttKind(sh);
-  if (!['orders', 'income', 'camp'].includes(kind)) die(`File "${basename(p)}" không phải file kế toán cần (đơn hàng, quyết toán, quảng cáo Campaign).`);
-  if (kind === 'orders') {
-    const a = sh[Object.keys(sh)[0]];
-    up.orders = { name: basename(p), aoa: a, ky: T.ttGuessKy(a) };
-  } else up[kind] = { name: basename(p), sh };
+  const a = sh[Object.keys(sh)[0]];
+  if (kind === 'orders') up.orders = { name: basename(p), aoa: a, ky: T.ttGuessKy(a) };
+  else if (kind === 'income' || kind === 'camp') up[kind] = { name: basename(p), sh };
+  if (['km', 'live', 'vdays', 'videos', 'koc', 'creators', 'camp'].includes(kind)) team.push({ kind, name: basename(p), a });
+  else if (!['orders', 'income'].includes(kind)) die(`File "${basename(p)}" không nhận ra loại file TikTok.`);
 }
-for (const [k, n] of [['orders', 'đơn hàng'], ['income', 'quyết toán (income)'], ['camp', 'quảng cáo Campaign']]) if (!up[k]) die(`Thiếu file ${n}.`);
+const keToan = ['orders', 'income', 'camp'].filter((k) => up[k]);
+if (keToan.length && keToan.length < 3) die(`Thiếu file kế toán: cần đủ đơn hàng, quyết toán, quảng cáo (đang có ${keToan.join(', ')}).`);
+const vn = (n) => Math.round(n || 0).toLocaleString('vi-VN');
+
+/* File team: số theo ngày (ghi đè đúng ngày) và số cả khoảng ngày. */
+const teamPay = [];
+for (const f of team) {
+  const r = f.kind === 'km' ? T.ttReadKeyMetrics(f.a) : f.kind === 'live' ? T.ttReadLive(f.a) : f.kind === 'vdays' ? T.ttReadVideoDays(f.a)
+    : f.kind === 'videos' ? T.ttReadVideoList(f.a) : f.kind === 'koc' ? T.ttReadKoc(f.a, f.name) : f.kind === 'creators' ? T.ttReadCreators(f.a, f.name) : T.ttReadCampaign(f.a);
+  if (r.err) die(`${f.name}: ${r.err}`);
+  if (r.days) {
+    const ks = Object.keys(r.days).sort();
+    const src = { km: 'km', live: 'live', vdays: 'video', camp: 'ads' }[f.kind];
+    teamPay.push({ path: '/api/agent/tiktok/days', body: { src, days: r.days, file: f.name }, note: `${f.name}: ${ks.length} ngày ${ks[0]} → ${ks[ks.length - 1]}` });
+  } else {
+    const { range, top, m, ...S } = r;
+    const data = f.kind === 'koc' ? m : f.kind === 'videos' ? { ...S, top } : { n: r.n, nCo: r.nCo, gmv: r.gmv, top: r.top };
+    teamPay.push({ path: '/api/agent/tiktok/range', body: { kind: f.kind, from: range.from, to: range.to, data, file: f.name }, note: `${f.name}: ${range.from} → ${range.to}${f.kind === 'videos' ? ` · ${r.n} video, ${r.nDang} đăng trong kỳ, ${r.nCoDon} ra đơn` : ''}` });
+  }
+}
+teamPay.forEach((x) => console.log('File team · ' + x.note));
+if (!keToan.length) {
+  if (thu) { console.log('Chạy thử: chưa ghi gì lên web.'); process.exit(0); }
+  for (const x of teamPay) await call(x.path, 'PUT', x.body);
+  console.log(`Đã nạp ${teamPay.length} file team lên web (trang vận hành TikTok).`);
+  process.exit(0);
+}
 ky = ky || up.orders.ky;
 if (!/^\d{4}-\d{2}$/.test(ky)) die('Không đoán được tháng, thêm --ky YYYY-MM.');
 
@@ -108,7 +139,6 @@ const extra = (I.costs || [])
   .map((c) => ({ n: cat(c.cat).n + (c.note ? ' · ' + c.note : ''), v: +c.tien || 0 }));
 const P = T.ttPL(M, costOf, extra);
 const S = T.ttSummary(P);
-const vn = (n) => Math.round(n || 0).toLocaleString('vi-VN');
 console.log(`Báo cáo TikTok tháng ${ky.slice(5)}/${ky.slice(0, 4)}${S.den ? ` (giữa tháng, số đến ${S.den.slice(8)}/${S.den.slice(5, 7)})` : ' (đủ tháng)'}`);
 console.log(`Doanh thu thực ${vn(S.dt)} · giá vốn ${vn(S.gv)} · phí sàn ${vn(-S.phi)} · quảng cáo ${vn(S.ads)} · lãi kênh ${vn(S.lai)} · ${vn(S.don)} đơn`);
 if (thu) {
@@ -120,6 +150,5 @@ const me = await call('/api/agent/me');
 const files = { orders: up.orders.name, income: up.income.name, camp: up.camp.name };
 const data = { ky, M, pl: T.ttPackPL(P), todo: T.ttTodo(P), files, at: new Date().toISOString(), by: me.name };
 await call(`/api/agent/tiktok/month/${ky}`, 'PUT', { data, summary: S, files });
-const ad = Object.fromEntries(Object.entries(camp.days || {}).filter(([d]) => d.slice(0, 7) === ky));
-if (Object.keys(ad).length) await call('/api/agent/tiktok/days', 'PUT', { src: 'ads', days: ad, file: up.camp.name });
+for (const x of teamPay) await call(x.path, 'PUT', x.body);
 console.log(`Đã nạp lên web: Tổng quan › TikTok Shop tháng ${ky.slice(5)}/${ky.slice(0, 4)}. Kế toán vẫn khoá sổ trên web như cũ.`);

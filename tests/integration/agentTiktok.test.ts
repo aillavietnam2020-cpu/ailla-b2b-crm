@@ -53,6 +53,19 @@ describe('Agent nạp báo cáo TikTok', () => {
     expect(days.body.data).toMatchObject({ n: 1 });
   });
 
+  it('agent nạp số Video (theo ngày + từng video) và KOC theo khoảng ngày, chỉ giữ số và tên video', async () => {
+    const a = await makeAgent('Kế toán trưởng video', ['baocao_san']);
+    expect((await agentCall(a.token, '/api/agent/tiktok/days', 'PUT', { src: 'video', days: { '2026-10-01': { gmv: 5, vv: 9 } } })).status).toBe(200);
+    const v = { n: 3, nDang: 2, nCoDon: 2, gmv: 10, top: [{ id: '111', t: 'Video A', post: '2026-10-05', sp: 'Tinh dầu', gmv: 9, vv: 100, ghi: 'x' }], la: 'chữ' };
+    expect((await agentCall(a.token, '/api/agent/tiktok/range', 'PUT', { kind: 'videos', from: '2026-10-01', to: '2026-10-25', data: v })).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/tiktok/range', 'PUT', { kind: 'xyz', from: '2026-10-01', to: '2026-10-25', data: {} })).status).toBe(400);
+    const row = await ctx.db.prepare("SELECT data FROM tts_range WHERE kind = 'videos'").first<{ data: string }>();
+    const d = JSON.parse(row!.data);
+    expect(d).toMatchObject({ n: 3, nDang: 2, gmv: 10 });
+    expect(d.la).toBeUndefined();
+    expect(d.top[0]).toEqual({ id: '111', t: 'Video A', post: '2026-10-05', sp: 'Tinh dầu', gmv: 9, vv: 100 });
+  });
+
   it('không thay bản chốt sổ đầy đủ, không ghi tháng đã khoá sổ, không có đường khoá sổ', async () => {
     const a = await makeAgent('Kế toán trưởng thử', ['baocao_san']);
     expect((await agentCall(a.token, '/api/agent/tiktok/month/2026-09', 'PUT', month('2026-09', null))).status).toBe(200);

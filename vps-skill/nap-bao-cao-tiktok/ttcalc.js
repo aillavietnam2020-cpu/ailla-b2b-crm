@@ -168,6 +168,30 @@ function ttReadCreators(aoa,name,keep=300){
   return {range,n:all.length,nCo,gmv,top:all.slice(0,keep).filter(x=>x.gmv>0)};
 }
 
+/* ---------- Video (Phân tích LIVE & video › Video) ----------
+   Hiệu suất: số theo ngày của video tài khoản kết nối (video inhouse). Chi tiết: từng video, dòng đầu file ghi "[Phạm vi ngày]: a ~ b".
+   Chỉ giữ số và tên video (không có thông tin khách). */
+function ttReadVideoDays(aoa){
+  const H=ttHead(aoa,["Thời gian","GMV đến từ video (₫)","VV"]);if(!H)return {err:"Không thấy bảng của file Video › Hiệu suất."};
+  const I=H.ix,g=(a,k)=>k in I?ttNum(a[I[k]]):0,days={};
+  for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const d=ttIsoDay(ttCell(a[I["Thời gian"]]));if(!d)continue;
+    days[d]={gmv:g(a,"GMV đến từ video (₫)"),gmvVideo:g(a,"GMV video (₫)"),vv:g(a,"VV"),don:g(a,"Đơn hàng SKU đã ghi nhận"),hienThi:g(a,"Lượt hiển thị sản phẩm"),nhap:g(a,"Lượt nhấp vào sản phẩm")}}
+  if(!Object.keys(days).length)return {err:"File Video › Hiệu suất không có dòng ngày nào."};
+  return {days,range:ttRangeOfText(ttCell((aoa[0]||[])[0]))};
+}
+function ttReadVideoList(aoa,keep=50){
+  const H=ttHead(aoa,["ID video","Thời gian","VV","GMV đến từ video (₫)"]);if(!H)return {err:"Không thấy cột của file Video › Chi tiết (ID video, VV, GMV)."};
+  const range=ttRangeOfText(ttCell((aoa[0]||[])[0]));if(!range)return {err:"Dòng đầu file Video › Chi tiết không có khoảng ngày (\"[Phạm vi ngày]: … ~ …\")."};
+  const I=H.ix,g=(a,k)=>k in I?ttNum(a[I[k]]):0,all=[];const S={n:0,nDang:0,nCoDon:0,nDangCoDon:0,gmv:0,gmvDang:0,vv:0,don:0};
+  for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const id=ttCell(a[I["ID video"]]);if(!id)continue;
+    const post=ttIsoDay(ttCell(a[I["Thời gian"]])),dang=!!post&&post>=range.from&&post<=range.to;
+    const x={id,t:ttCell(a[I["Thông tin video"]]).slice(0,80),post,vv:g(a,"VV"),don:g(a,"Đơn hàng SKU đã ghi nhận"),gmv:g(a,"GMV đến từ video (₫)"),sp:ttCell(a[I["Sản phẩm"]]).slice(0,60)};
+    S.n++;S.gmv+=x.gmv;S.vv+=x.vv;S.don+=x.don;if(x.don>0)S.nCoDon++;if(dang){S.nDang++;S.gmvDang+=x.gmv;if(x.don>0)S.nDangCoDon++}all.push(x)}
+  if(!S.n)return {err:"File Video › Chi tiết không có video nào."};
+  all.sort((a,b)=>b.gmv-a.gmv);
+  return {range,...S,top:all.slice(0,keep)};
+}
+
 /* ---------- Gom tháng: đơn + income + quảng cáo → số đã chia phí theo SKU (chưa có giá vốn) ---------- */
 function ttBuildMonth({ky,orders,income,camp}){
   /* Báo cáo giữa tháng: số tính đến ngày đơn mới nhất trong file đơn (den); quảng cáo cũng cắt đến ngày đó. */
@@ -271,12 +295,14 @@ function ttKind(sheets){const first=sheets[Object.keys(sheets)[0]]||[];
   if(sheets["Chi tiết đơn hàng"])return "income";
   if(ttHead(first,["Order ID","SKU ID"]))return "orders";
   if(ttHead(first,["Theo ngày","Chi phí"]))return "camp";
+  if(ttHead(first,["ID video","VV"]))return "videos";
+  if(ttHead(first,["Thời gian","GMV đến từ video (₫)"]))return "vdays";
   if(ttHead(first,["Ngày","GMV","Đơn hàng"],60))return "km";
   if(ttHead(first,["Thời gian","GMV đến từ buổi LIVE (₫)"]))return "live";
   if(ttHead(first,["GMV nhờ nhà sáng tạo"]))return "koc";
   if(ttHead(first,["Tên người dùng của nhà sáng tạo","GMV liên kết"]))return "creators";
   return ""}
-const TT_KIND_NAME={orders:"Đơn hàng (OrderSKUList)",income:"Quyết toán (income)",camp:"Quảng cáo GMV Max (Campaign overview)",km:"Tổng quan shop (Key metrics)",live:"LIVE (Live Performance)",koc:"KOC (Transaction Analysis)",creators:"Nhà sáng tạo (Creator List)"};
+const TT_KIND_NAME={orders:"Đơn hàng (OrderSKUList)",income:"Quyết toán (income)",camp:"Quảng cáo GMV Max (Campaign overview)",km:"Tổng quan shop (Key metrics)",live:"LIVE (Live Performance)",koc:"KOC (Transaction Analysis)",creators:"Nhà sáng tạo (Creator List)",vdays:"Video › Hiệu suất (theo ngày)",videos:"Video › Chi tiết (từng video)"};
 /* Gói / mở số tháng để lưu: nhóm cảnh báo lưu bằng mã SKU, không lặp cả dòng. */
 const ttPackPL=P=>({...P,g1:P.g1.map(r=>r.id),g2:P.g2.map(r=>r.id),g3:P.g3.map(r=>r.id)});
 const ttUnpackPL=P=>{const by={};P.rows.forEach(r=>by[r.id]=r);const g=a=>(a||[]).map(id=>by[id]).filter(Boolean);return {...P,g1:g(P.g1),g2:g(P.g2),g3:g(P.g3)}};

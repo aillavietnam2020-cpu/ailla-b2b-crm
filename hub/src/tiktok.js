@@ -242,6 +242,8 @@ async function tsbOpsFiles(fs){
     else if(k==="camp"){const r=ttReadCampaign(a);if(r.err)x.err=r.err;else{x.pay={src:"ads",days:r.days};days(r);x.note+=" · chi "+nf(Object.values(r.days).reduce((s,d)=>s+d.chi,0))+" trước VAT"}}
     else if(k==="koc"){const r=ttReadKoc(a,f.name);if(r.err)x.err=r.err;else{x.rpay={kind:"koc",from:r.range.from,to:r.range.to,data:r.m};x.range=r.range;x.note="GMV nhờ nhà sáng tạo "+nf(r.m["GMV nhờ nhà sáng tạo"]||0)}}
     else if(k==="creators"){const r=ttReadCreators(a,f.name);if(r.err)x.err=r.err;else{x.rpay={kind:"creators",from:r.range.from,to:r.range.to,data:{n:r.n,nCo:r.nCo,gmv:r.gmv,top:r.top}};x.range=r.range;x.note=nf(r.nCo)+" người có doanh số, giữ "+r.top.length+" người cao nhất"}}
+    else if(k==="vdays"){const r=ttReadVideoDays(a);if(r.err)x.err=r.err;else{x.pay={src:"video",days:r.days};days(r);x.note+=" · GMV video "+nf(Object.values(r.days).reduce((s,d)=>s+d.gmv,0))}}
+    else if(k==="videos"){const r=ttReadVideoList(a);if(r.err)x.err=r.err;else{const {range,top,...S}=r;x.rpay={kind:"videos",from:range.from,to:range.to,data:{...S,top}};x.range=range;x.note=nf(r.n)+" video có lượt xem · "+nf(r.nDang)+" video đăng trong kỳ · "+nf(r.nCoDon)+" video ra đơn"}}
     else if(k==="orders"||k==="income")x.err="File của kế toán: tải ở trang quản trị › Doanh thu › TikTok.";
     else x.err="Không nhận ra loại file TikTok.";
     x.ok=!!(x.pay||x.rpay)}catch(e){x.err=e.message}out.push(x)}
