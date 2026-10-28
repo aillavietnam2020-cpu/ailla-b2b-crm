@@ -9,6 +9,7 @@ import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
 import { publishDue } from './services/fpPublish';
 import { syncAllChannels } from './services/poscake';
+import { syncComboTasks } from './routes/sanpham';
 import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
 import { isAdminHost } from './lib/host';
@@ -72,6 +73,8 @@ export default {
           if (hourVn === 7) {
             const day = (back: number) => new Date(Date.now() + 7 * 3_600_000 - back * 86_400_000).toISOString().slice(0, 10);
             console.info('[cron] poscake', JSON.stringify(await syncAllChannels(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
+            // Mã combo mới trên đơn mà kế toán chưa nhập: báo ở Việc hôm nay của kế toán (Sản phẩm & combo).
+            console.info('[cron] combo moi', JSON.stringify(await syncComboTasks(env.DB)));
             // Đơn hoàn (TikTok, Shopee, Facebook): hôm nay, hôm qua, hôm kia.
             console.info('[cron] don hoan', JSON.stringify(await syncReturns(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
             // Số bán hàng Facebook theo người xử lý đơn (Pancake analytics): 8 ngày gần nhất, vì đơn hoàn và đơn giao về chậm.
