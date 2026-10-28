@@ -199,8 +199,9 @@ function scExt(){
   try{const S=(typeof TSB!=="undefined"&&TSB.sum)||{};Object.keys(S).sort().forEach(ym=>{const s=S[ym],[y,m]=ym.split("-").map(Number),cuoi=ym+"-"+String(new Date(y,m,0).getDate()).padStart(2,"0");
     if(!s||!s.fees||ym+"-01"<PERIOD.from||cuoi>PERIOD.to)return;
     s.fees.forEach(([n,v],i)=>{v=Math.abs(+v||0);if(!v)return;R.push({id:"x-san-tt-"+ym+"-"+i,ext:{src:"san",id:"san-tt"},d:cuoi,ky:true,ct:"",dg:"Phí sàn TikTok · "+n,sub:"trừ vào tiền sàn về, không chi tiền · báo cáo TikTok tháng "+ym.slice(5)+"/"+ym.slice(0,4),t:v,nhom:"Phí sàn",k:"TikTok",st:"Ổn",nguon:"Báo cáo sàn (trừ ví)"})})})}catch(e){}
-  try{let ym=PERIOD.from.slice(0,7);const het=PERIOD.to.slice(0,7);for(let i=0;i<36&&ym<=het;i++){const r=scTsThang(ym);if(r&&r.chay)(r.dong||[]).forEach((z,j)=>{if(!z.t||z.d<PERIOD.from||z.d>PERIOD.to)return;
-      R.push({id:"x-ts-"+ym+"-"+j,ext:{src:"ts",id:"ts-"+ym,g:z.g,k:z.k},d:z.d,ky:false,ct:z.ct||"",dg:z.dg||("Khấu hao / phân bổ · "+(z.ten||z.ma||"")),sub:[z.ma,z.ten,"Nợ "+(z.tk||"")+" / Có "+(z.tkc||"")].filter(Boolean).join(" · "),t:+z.t,nhom:scG(z.g).n,k:z.k,st:"Ổn",nguon:"Khấu hao / phân bổ"})});
+  try{let ym=PERIOD.from.slice(0,7);const het=PERIOD.to.slice(0,7);for(let i=0;i<36&&ym<=het;i++){const r=scTsThang(ym);if(r&&r.chay)(r.dong||[]).forEach((z,j)=>{/* giống P&L (dtSoCp): kỳ dừng giữa tháng thì kéo ngày dòng tài sản về ngày cuối kỳ */
+      if(!z.t||z.d<PERIOD.from)return;
+      R.push({id:"x-ts-"+ym+"-"+j,ext:{src:"ts",id:"ts-"+ym,g:z.g,k:z.k},d:z.d>PERIOD.to?PERIOD.to:z.d,ky:false,ct:z.ct||"",dg:z.dg||("Khấu hao / phân bổ · "+(z.ten||z.ma||"")),sub:[z.ma,z.ten,"Nợ "+(z.tk||"")+" / Có "+(z.tkc||"")].filter(Boolean).join(" · "),t:+z.t,nhom:scG(z.g).n,k:z.k,st:"Ổn",nguon:"Khấu hao / phân bổ"})});
     const [y,m]=ym.split("-").map(Number);ym=m===12?(y+1)+"-01":y+"-"+String(m+1).padStart(2,"0")}}catch(e){}
   try{const C=execNums(PERIOD.from,PERIOD.to).C||{};if(C.adsSPE>0)R.push({id:"x-ads-spe",ext:{src:"ads",id:"ads-spe"},d:PERIOD.to,ky:true,ct:"",dg:"Quảng cáo Shopee",sub:"từ báo cáo lãi lỗ Shopee của tháng",t:C.adsSPE,nhom:"Marketing",k:"Shopee Mall",st:"Ổn",nguon:SC_NGUON.ads})}catch(e){}
   return R}
