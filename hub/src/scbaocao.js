@@ -168,6 +168,7 @@ function scPBV(){
 /* Số việc ở tab Chờ xử lý. */
 const scChoN=()=>{try{const r=scPBRows();return r.filter(x=>scLoaiTQ(x)==="cho").length+scCho().filter(scInP).length}catch(e){return 0}};
 function scBCbind(m){
+  m.querySelectorAll("[data-nkv]").forEach(el=>el.onclick=()=>{SC.nkv=el.dataset.nkv;Object.assign(SC,{g:"",k:"",st:"",fn:"",xl:""});renderMain()});
   m.querySelectorAll("[data-fn]").forEach(el=>el.onclick=()=>{SC.tab="cn";(SC.cnOpen=SC.cnOpen||{})[el.dataset.fn]=1;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-cnf]").forEach(el=>el.onclick=()=>{const o=SC.cnOpen=SC.cnOpen||{},f=el.dataset.cnf;o[f]=!o[f];renderMain()});
   m.querySelectorAll("[data-scgo-lg]").forEach(b=>b.onclick=()=>{PAGE="cp_luong";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
