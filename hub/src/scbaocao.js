@@ -189,3 +189,48 @@ function scBCcss(){return `<style>.sochi .scup{color:#c9353d;font-weight:600}.so
 .sochi .sc-tq{grid-template-columns:1.2fr 1fr}
 @media(max-width:900px){.sochi .sck4{grid-template-columns:repeat(2,1fr)}.sochi .scflow,.sochi .sc-tq{grid-template-columns:1fr}.sochi .scsb{grid-template-columns:1fr auto}.sochi .scsb .b{grid-column:1/3;grid-row:2}}
 @media(max-width:420px){.sochi .sck4{grid-template-columns:1fr}}</style>`}
+/* =====================================================================
+   PHÂN LOẠI TRÊN WEB + ĐỐI CHIẾU MISA (chị Hoa 28/10: web là nơi làm chuẩn, MISA chỉ để đối chiếu).
+   - Bảng phân loại (đầu tab Chờ xử lý): các dòng sổ chưa rõ nhóm / kênh / còn "Cần rà"; chị Huệ chọn nhóm, kênh từng dòng
+     hoặc tích nhiều dòng rồi áp một lần. Cách bổ được nhớ theo diễn giải (fin.cpRule) để tháng sau nạp sổ tự xếp.
+   - Đối chiếu MISA: tải sổ xuất từ MISA, so với sổ trên web theo (ngày, số chứng từ, số tiền): khớp, chỉ có ở MISA
+     (có thể nạp thêm), chỉ có trên web (chưa hạch toán MISA), tổng hai bên. Không sửa gì khi chưa bấm nạp.
+   ===================================================================== */
+const scCanPL=x=>x.st!=="Ổn"||x.k==="Chờ xác định"||x.g==="G23"||!x.g;
+function scPLTab(){
+  const ed=scCanDuyet(),L=scRows().filter(scCanPL).sort((a,b)=>(b.t||0)-(a.t||0));
+  if(!L.length)return `<section class="card pad"><h2>Phân loại chi phí</h2><p class="hint">Mọi khoản trong kỳ đã có nhóm và kênh.</p></section>`;
+  const gOpt=g=>scDM().map(x=>`<option value="${x.g}"${x.g===g?" selected":""}>${x.g} · ${esc(x.n)}</option>`).join(""),kOpt=k=>SC_COLS.map(c=>`<option value="${c}"${c===k?" selected":""}>${esc(SC_TEN(c))}</option>`).join("");
+  return `<section class="card flush"><div class="sch pad"><h2>Phân loại chi phí</h2><span class="hint">${L.length} khoản · ${scNf(scS(L))} đ chưa rõ nhóm, kênh hoặc còn "Cần rà" · chọn xong là lưu, web nhớ cách xếp cho tháng sau</span></div>
+  ${ed?`<div class="sch pad" style="background:#f7f8fb;border-block:1px solid #e3e6ee;padding:10px 16px"><b id="scpl-n">Đã chọn 0 khoản</b><select id="scpl-g"><option value="">Giữ nhóm</option>${gOpt("")}</select><select id="scpl-k"><option value="">Giữ kênh</option>${kOpt("")}</select><button class="btn sm pri" id="scpl-ap">Áp cho các khoản đã chọn</button></div>`:""}
+  <div class="tbl"><table><thead><tr>${ed?'<th><input type="checkbox" id="scpl-all" aria-label="Chọn tất cả" style="width:auto"></th>':""}<th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>Kênh / nơi chịu</th><th>Tình trạng</th>${ed?"<th></th>":""}</tr></thead><tbody>
+  ${L.map(x=>`<tr>${ed?`<td><input type="checkbox" class="scpl-c" value="${esc(x.id)}" style="width:auto"></td>`:""}<td>${scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg)}${x.gc?`<div class="hint">${esc(x.gc)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td>
+   <td>${ed?`<select data-bg="${esc(x.id)}" style="max-width:220px">${gOpt(x.g)}</select>`:esc(scG(x.g).n)}</td><td>${ed?`<select class="scbv" data-bv="${esc(x.id)}">${kOpt(x.k)}</select>`:esc(SC_TEN(x.k))}</td><td>${scStP(x.st)}</td>${ed?`<td><button class="btn sm" data-bok="${esc(x.id)}" title="Đã xem, nhóm và kênh đúng">✓ Đúng</button></td>`:""}</tr>`).join("")}</tbody></table></div></section>`}
+function scPLbind(m){
+  const fix=(dt,id,f)=>{const r=((dt.fin||{}).nkc||[]).find(y=>y.id===id);if(!r)return;f(r);(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(r.dg)]={g:r.g,k:r.k,st:r.st}};
+  m.querySelectorAll("select[data-bg]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,"đổi nhóm khoản chi",dt=>fix(dt,s.dataset.bg,r=>{r.g=s.value;if(r.k!=="Chờ xác định"&&r.g!=="G23"&&r.st==="Cần rà"&&!r.gc)r.st="Ổn"}));renderMain()});
+  m.querySelectorAll("[data-bok]").forEach(b=>b.onclick=()=>{DB.mutate(ME.name,"xác nhận khoản chi",dt=>fix(dt,b.dataset.bok,r=>{r.st="Ổn"}));renderMain()});
+  const cs=()=>[...m.querySelectorAll(".scpl-c")],cnt=()=>{const n=cs().filter(c=>c.checked).length,e=m.querySelector("#scpl-n");if(e)e.textContent="Đã chọn "+n+" khoản"};
+  cs().forEach(c=>c.onchange=cnt);const all=m.querySelector("#scpl-all");if(all)all.onchange=()=>{cs().forEach(c=>c.checked=all.checked);cnt()};
+  const ap=m.querySelector("#scpl-ap");if(ap)ap.onclick=()=>{const ids=cs().filter(c=>c.checked).map(c=>c.value),g=m.querySelector("#scpl-g").value,k=m.querySelector("#scpl-k").value;
+    if(!ids.length){toast("Tích chọn ít nhất một khoản");return}if(!g&&!k){toast("Chọn nhóm hoặc kênh để áp");return}
+    DB.mutate(ME.name,"phân loại "+ids.length+" khoản chi",dt=>ids.forEach(id=>fix(dt,id,r=>{if(g)r.g=g;if(k){if(r.k0==null)r.k0=r.k;r.k=k}if(r.k!=="Chờ xác định"&&r.g!=="G23")r.st="Ổn"})));toast("Đã phân loại "+ids.length+" khoản");renderMain()};
+  const dc=document.getElementById("sc-dcmisa");if(dc)dc.onclick=scDoiChieu}
+/* Đối chiếu sổ MISA với sổ trên web. */
+function scDoiChieu(){
+  openDrawerHTML(`<h2>Đối chiếu với sổ MISA</h2><p class="hint">Chọn file sổ cái TK 642 xuất từ MISA (.xls, .xlsx). Web so từng dòng theo ngày, số chứng từ, số tiền với sổ trên web của cùng các tháng. Chỉ xem, không sửa gì trừ khi chị bấm nạp các dòng còn thiếu.</p>
+   <label class="field">File MISA<input type="file" id="scdc-f" accept=".xls,.xlsx"></label><div id="scdc-r"></div>`);
+  $("#scdc-f").onchange=async e=>{const f=e.target.files[0];if(!f)return;$("#scdc-r").innerHTML=`<p class="hint">Đang đọc…</p>`;let S;try{S=await wbSheets(f)}catch(er){$("#scdc-r").innerHTML=`<div class="note red">Không đọc được file.</div>`;return}
+    const r=scParse(S);if(r.err){$("#scdc-r").innerHTML=`<div class="note red">${esc(r.err)}</div>`;return}
+    const key=x=>[x.d,String(x.ct||"").trim(),Math.round(+x.t||0)].join("|"),ms=[...new Set(r.rows.map(x=>x.d.slice(0,7)))].sort();
+    const web=((scFin().nkc)||[]).filter(x=>ms.includes(String(x.d||"").slice(0,7))),W=new Map(web.map(x=>[key(x),x])),M=new Map(r.rows.map(x=>[key(x),x]));
+    const chiMisa=r.rows.filter(x=>!W.has(key(x))),chiWeb=web.filter(x=>!M.has(key(x))),khop=r.rows.length-chiMisa.length;
+    const lech=chiMisa.map(x=>{const w=chiWeb.find(y=>y.d===x.d&&String(y.ct||"").trim()===String(x.ct||"").trim());return w?{m:x,w}:null}).filter(Boolean);
+    const tb=(L,cap)=>L.length?`<details${L.length<=20?" open":""}><summary><b>${cap} (${L.length} dòng · ${scNf(scS(L))} đ)</b></summary><div class="tbl"><table><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th></tr></thead><tbody>${L.slice(0,200).map(x=>`<tr><td>${scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg||"")}</td><td class="n">${scNf(x.t)}</td></tr>`).join("")}</tbody></table></div></details>`:"";
+    const okT=Math.abs(scS(r.rows)-scS(web))<1;
+    $("#scdc-r").innerHTML=`<div class="note${okT&&!chiMisa.length&&!chiWeb.length?"":" amb"}">Tháng ${ms.map(x=>x.slice(5)+"/"+x.slice(0,4)).join(", ")}: MISA <b>${r.rows.length}</b> dòng · ${scNf(scS(r.rows))} đ; web <b>${web.length}</b> dòng · ${scNf(scS(web))} đ ${okT?"✓ tổng khớp":"✗ lệch "+scNf(scS(r.rows)-scS(web))+" đ"}.<br>Khớp từng dòng: <b>${khop}</b>. Chỉ có ở MISA: <b>${chiMisa.length}</b>. Chỉ có trên web: <b>${chiWeb.length}</b>${lech.length?` (trong đó ${lech.length} dòng cùng chứng từ nhưng khác số tiền)`:""}.</div>
+     ${lech.length?`<details open><summary><b>Cùng chứng từ, khác số tiền (${lech.length})</b></summary><div class="tbl"><table><thead><tr><th>Ngày</th><th>Số CT</th><th class="n">MISA</th><th class="n">Web</th></tr></thead><tbody>${lech.map(z=>`<tr><td>${scDd(z.m.d)}</td><td class="mono">${esc(z.m.ct)}</td><td class="n">${scNf(z.m.t)}</td><td class="n">${scNf(z.w.t)}</td></tr>`).join("")}</tbody></table></div></details>`:""}
+     ${tb(chiMisa,"Chỉ có ở MISA, web chưa có")}${tb(chiWeb,"Chỉ có trên web, MISA chưa hạch toán")}
+     ${chiMisa.length&&scCanDuyet()?`<button class="btn pri" id="scdc-nap">Nạp ${chiMisa.length} dòng còn thiếu vào sổ web</button>`:""}`;
+    const nb=$("#scdc-nap");if(nb)nb.onclick=()=>{if(!confirm("Nạp "+chiMisa.length+" dòng chỉ có ở MISA vào sổ trên web?"))return;
+      DB.mutate(ME.name,"nạp "+chiMisa.length+" dòng còn thiếu từ đối chiếu MISA",dt=>{dt.fin=dt.fin||{};dt.fin.nkc=dt.fin.nkc||[];chiMisa.forEach(x=>dt.fin.nkc.push({id:uid("nk"),...x,by:ME.name,at:Date.now()}))});closeDrawer();toast("Đã nạp "+chiMisa.length+" dòng");renderMain()}}}
