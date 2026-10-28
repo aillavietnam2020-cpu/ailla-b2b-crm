@@ -61,6 +61,17 @@ function tbSoCP(ky){
   return out;
 }
 
+/* Số lưu trước 28/10/2026 có giá vốn ước cho SKU chưa có giá vốn: bỏ phần ước khi hiện (chị Hoa duyệt: không ước), không ghi lại số đã lưu.
+   Tổng giá vốn chỉ còn SKU đã có giá; lãi chưa trừ giá vốn phần chưa tính (dtUocGv); biên sản phẩm chỉ trên SKU đã có giá. */
+function tbNoUoc(P){
+  if(!P||P._nu||!P.rows)return P;const est=P.rows.reduce((a,r)=>a+(r.uoc?+r.gv||0:0),0);if(!est){P._nu=1;return P}
+  P.rows.forEach(r=>{if(!r.uoc)return;r.gv=0;r.lg=r.dt+r.phi;r.bien=null;r.dg="Chưa tính giá vốn"});
+  P.gv-=est;P.lg+=est;P.lgTruoc=(P.lgTruoc||0)+est;P.lai+=est;
+  (P.sp||[]).forEach(p=>{const R=P.rows.filter(r=>r.pn===p.n&&!r.uoc),dtK=R.reduce((a,r)=>a+r.dt,0),lgK=R.reduce((a,r)=>a+r.lg,0);
+    p.gv=R.reduce((a,r)=>a+r.gv,0);p.dtK=dtK;p.lg=lgK;p.bien=dtK?lgK/dtK:null;p.dg=p.bien==null?"Chưa tính giá vốn":lgK<0?"Lỗ ngay khi chưa tính ads":p.bien<P.ng2?"Biên mỏng, sát ngưỡng ads":"Gánh được ads"});
+  P.g1=(P.g1||[]).filter(r=>!r.uoc);P.g2=(P.g2||[]).filter(r=>!r.uoc);P._nu=1;return P;
+}
+
 /* ---------- Quản trị ---------- */
 function tbCostTbl(C,dt,so){const whyR=so.whyR||so.why,whyC=so.whyC||so.why;
   const row=(k,c,n,t,h,sub,sample)=>{const has=sub&&sub.length;
@@ -116,7 +127,7 @@ function tbAdmPage(m){
   {const pk=PERIOD.from+"|"+PERIOD.to;TSB.pk=pk;TSB.noRep="";if(TB.pk!==pk){TB.pk=pk;const pym=plYmNow(),has=TSB.months.some(x=>x.ky===pym);TSB.ky=has?pym:(TSB.months.length?TSB.months[TSB.months.length-1].ky:"");TB.noRep=has?"":pym}}
   if(TSB.prev){SUB.bc_tiktok="pl";tsbAdmPage(m);const tb=m.querySelector(".tabs");if(tb)tb.remove();tbBind(m);return}
   const ky=TSB.ky;if(ky)tsbLoadMonth(ky);if(!TSB.all)tsbLoadAll();
-  const S=ky?TSB.data[ky]:null,P=S?S.pl:null,todo=S?(S.data.todo||ttTodo(S.pl)):null;
+  const S=ky?TSB.data[ky]:null,P=S?tbNoUoc(S.pl):null,todo=S?(S.data.todo||ttTodo(S.pl)):null;
   const nViec=todo?todo.noMap.length+todo.miss.length+todo.pack.length:0,lock=S&&S.locked_at;
   const head=H("Kênh TikTok Shop",`Báo cáo quản trị${ky?" · "+tsbKyL(ky):""}${S&&S.data.M&&S.data.M.den?" · số đến "+tsbVn(S.data.M.den):""} · chốt sổ ngày 10 tháng sau`)
    +`<div class="tb-acts">${(TSB.months||[]).map(x=>`<button class="chip${x.ky===ky?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.locked_at?" ✓":""}</button>`).join("")}<span style="flex:1"></span>

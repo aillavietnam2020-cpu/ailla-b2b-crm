@@ -20,6 +20,9 @@ function speBcDg(p,ng2){if(p.lg<0)return "Lỗ trước ads";const b=p.dt?p.lg/p
 
 /* L = [{s: summary, rows: dòng sản phẩm hoặc null}] của các shop đang xem, cùng một tháng. */
 function speBcMonth(L){
+  /* Số lưu trước 28/10/2026 có giá vốn ước cho dòng chưa có giá vốn: có dòng sản phẩm thì bỏ phần ước (giá vốn chỉ dòng đã có giá). */
+  L=(L||[]).map(x=>{if(!x||!x.s||!x.rows)return x;const est=x.rows.reduce((a,r)=>a+(r.uoc?+r.gv||0:0),0);if(!est)return x;
+    return {s:{...x.s,gv:(+x.s.gv||0)-est,lg:(+x.s.lg||0)+est},rows:x.rows.map(r=>r.uoc?{...r,gv:0,lg:(+r.dt||0)+(+r.phi||0)}:r)}});
   const S=(L||[]).filter(x=>x&&x.s),sum=k=>S.reduce((a,x)=>a+(+x.s[k]||0),0);
   const dt=sum("dt"),gv=sum("gv"),phi=-sum("phi"),ads=sum("ads"),lg=sum("lg"),don=sum("don"),mon=sum("mon"),hh=sum("hh"),koc=sum("koc"),vou=-sum("vou"),dtUocGv=sum("dtUocGv");
   const fm={};S.forEach(x=>(x.s.fees||[]).forEach(([n,v])=>{fm[n]=(fm[n]||0)-(+v||0)}));
