@@ -39,6 +39,8 @@
         ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"],["tcn_dc","Đối chiếu công nợ & tiền"]]],
         ["Giá thành",[["sku","Giá vốn SKU"],["kho_boc","Định mức & giá thành"],["kho_cl","Chênh lệch định mức"],["mh_gianvl","Giá nguyên vật liệu"]]],
         /* Quy đổi mã các sàn đã chuyển sang Cấu hình › Sản phẩm & combo (28/10). Đồng bộ mã Kênh phân phối: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
+        /* Tài sản & CCDC (taisan.js, chị Hoa duyệt 28/10): khấu hao, phân bổ theo ngày, đổ vào Sổ chi phí và giá thành. */
+        ["Tài sản & CCDC",[["ts_so","Tài sản cố định"],["ts_cc","Công cụ dụng cụ"],["ts_kh","Khấu hao & phân bổ tháng"]]],
         ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã Kênh phân phối"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
       pd:[["",[["pheduyet","Phê duyệt"]]]],
