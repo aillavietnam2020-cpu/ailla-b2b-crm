@@ -24,6 +24,11 @@ const tsDs=kind=>tsAll().filter(x=>x.kind===kind);
 const tsTu=()=>tsFin().tu||"2026-11";
 const tsN=v=>Math.round(+v||0).toLocaleString("vi-VN"),tsYm=ym=>ym?ym.slice(5)+"/"+ym.slice(0,4):"",tsDmy=d=>d?String(d).slice(0,10).split("-").reverse().join("/"):"—";
 const tsCanXem=()=>scSecret(),tsCanGhi=()=>scCanDuyet();
+/* Ghi tăng (chị Hoa 28/10 "Cho Thảo ghi"): người ghi được phiếu chi cũng ghi tăng được; chạy khấu hao, ghi giảm, sửa, khai báo đầu kỳ vẫn chỉ kế toán / CEO.
+   Máy chủ chỉ nhận ghi ngăn tài chính từ CEO / người có debt.read.all, nên người khác ghi vào D().tsCho (chờ duyệt) như phiếu chi chờ duyệt; kế toán duyệt thì chuyển vào fin.ts. */
+const tsCanGhiTang=()=>tsCanGhi()||scCanGhi();
+const tsFinOk=()=>!!ME&&(ME.role==="admin"||mhPerm("debt.read.all"));
+const tsCho=()=>(D().tsCho||[]);
 const tsTen=kind=>kind==="TS"?"tài sản":"công cụ";
 /* Dòng nạp đầu kỳ đủ số: có tên, giá trị, chia đủ 100%, còn tháng để tính hoặc đã hết giá trị. */
 const tsNapOk=a=>!!a.ten&&a.gk>0&&tsBpOk(a.bp)&&(+a.dk.con>0||+a.dk.lk>=a.gk);
@@ -59,6 +64,18 @@ function tsBpWire(root){const tb=root.querySelector("[data-bpbody]");if(!tb)retu
   const add=root.querySelector("[data-bpadd]");if(add)add.onclick=()=>{tb.insertAdjacentHTML("beforeend",tsBpRows([{o:"ql",p:0}]));wire()}}
 const tsBpRead=root=>[...root.querySelectorAll("[data-bpbody] tr")].map(r=>({o:r.querySelector("[data-bpo]").value,p:+r.querySelector("[data-bpp]").value||0})).filter(x=>x.p>0);
 
+/* Ghi tăng chờ duyệt (người không ghi được ngăn tài chính gửi lên). */
+function tsChoCard(L){if(!L.length)return "";const duyet=tsCanGhi()&&tsFinOk();
+  return `<section class="card flush" style="border-color:#f5d77a"><div class="card-h pad"><h2>Ghi tăng chờ duyệt (${L.length})</h2></div><div class="tbl"><table><thead><tr><th>Ngày</th><th>Mã</th><th>Tên</th><th class="n">Giá trị</th><th class="n">Số tháng</th><th>Bộ phận chịu</th><th>Phiếu chi</th><th>Người ghi</th><th></th></tr></thead><tbody>
+  ${L.map(x=>`<tr><td>${tsDmy(x.d)}</td><td class="mono">${esc(x.ma)}</td><td><b>${esc(x.ten)}</b></td><td class="n">${tsN(x.gk)}</td><td class="n">${tsN(x.n)}</td><td>${tsBpTxt(x.bp)}</td><td>${esc(x.ct||"")}</td><td>${esc(x.by||"")}</td>
+   <td style="white-space:nowrap">${duyet?`<button class="btn sm pri" data-tscd="${esc(x.id)}">Duyệt</button> `:""}${duyet||x.by===ME.name?`<button class="btn sm" data-tscx="${esc(x.id)}">Bỏ</button>`:""}</td></tr>`).join("")}</tbody></table></div></section><div style="height:12px"></div>`}
+function tsChoWire(m){
+  m.querySelectorAll("[data-tscd]").forEach(b=>b.onclick=()=>{const x=tsCho().find(z=>z.id===b.dataset.tscd);if(!x)return;
+    if(tsAll().some(z=>z.kind===x.kind&&z.ma===x.ma)){toast("Mã "+x.ma+" đã có trong sổ, sửa mã rồi ghi lại");return}
+    tsMut("duyệt ghi tăng "+x.ma,(T,dt)=>{dt.tsCho=(dt.tsCho||[]).filter(z=>z.id!==x.id);const{st,...r}=x;T.a.push({...r,id:uid("ts"),duyet:ME.name,duyetAt:Date.now()})});toast("Đã duyệt "+x.ma);renderMain()});
+  m.querySelectorAll("[data-tscx]").forEach(b=>b.onclick=()=>{if(b.dataset.ok!=="1"){b.dataset.ok="1";b.textContent="Bấm lần nữa để bỏ";return}
+    DB.mutate(ME.name,"bỏ ghi tăng chờ duyệt",dt=>{dt.tsCho=(dt.tsCho||[]).filter(z=>z.id!==b.dataset.tscx)});renderMain()})}
+
 /* ---------- Sổ tài sản / Sổ công cụ ---------- */
 function pTsSo(m,kind){
   tsCss();tsCanDoi();const pg=kind==="TS"?"ts_so":"ts_cc";
@@ -68,7 +85,8 @@ function pTsSo(m,kind){
   if(tab==="so"){
     const ng=L.reduce((t,a)=>t+(+(a.gk??a.ng)||0),0),con=L.reduce((t,a)=>t+(tsTrangThai(a,ym)==="GIAM"?0:tsConLai(a,ym)),0),th=L.reduce((t,a)=>t+tsThang(a,ym),0),dung=L.filter(a=>tsTrangThai(a,ym)==="DUNG").length;
     const cho=tsChoGan();
-    body=(cho.length&&ghi?`<div class="hint" style="background:#fff8e1;border:1px solid #f5d77a;border-radius:10px;padding:8px 12px;margin:0 0 12px;color:#7a5600">Có <b>${cho.length}</b> phiếu chi nhóm "Mua tài sản / công cụ" chưa ghi tăng (${cho.slice(0,3).map(x=>esc(x.ct||"")+" · "+tsN(x.t)+" đ").join("; ")}${cho.length>3?"…":""}). Bấm ＋ Ghi tăng rồi chọn phiếu ở mục "Mua từ phiếu chi".</div>`:"")+
+    const tc=tsCho().filter(x=>x.kind===kind&&(tsCanGhi()||x.by===ME.name));
+    body=tsChoCard(tc)+(cho.length&&tsCanGhiTang()?`<div class="hint" style="background:#fff8e1;border:1px solid #f5d77a;border-radius:10px;padding:8px 12px;margin:0 0 12px;color:#7a5600">Có <b>${cho.length}</b> phiếu chi nhóm "Mua tài sản / công cụ" chưa ghi tăng (${cho.slice(0,3).map(x=>esc(x.ct||"")+" · "+tsN(x.t)+" đ").join("; ")}${cho.length>3?"…":""}). Bấm ＋ Ghi tăng rồi chọn phiếu ở mục "Mua từ phiếu chi".</div>`:"")+
     `<div class="kpis">${kpi(kind==="TS"?"Nguyên giá":"Giá trị công cụ",money(ng),L.length+" "+tsTen(kind)+" · "+dung+" đang dùng")}${kpi(kind==="TS"?"Giá trị còn lại":"Còn chờ phân bổ (TK 242)",money(con),"cuối tháng "+tsYm(ym))}${kpi((kind==="TS"?"Khấu hao":"Phân bổ")+" tháng "+tsYm(ym),tsN(th)+" đ")}</div>
     <section class="card flush"><div class="card-h pad"><h2>${kind==="TS"?"Sổ tài sản cố định":"Sổ công cụ dụng cụ"}</h2><span class="sp"></span>${tsYmSel("ts-ym",ym)}</div>
     ${L.length?`<div class="tbl"><table><thead><tr><th>Ngày ghi tăng</th><th>Mã</th><th>Tên</th><th>Loại</th><th>Bộ phận chịu</th><th class="n">${kind==="TS"?"Nguyên giá":"Giá trị"}</th><th class="n">Số tháng</th><th class="n">Tháng này</th><th class="n">${kind==="TS"?"Hao mòn lũy kế":"Đã phân bổ"}</th><th class="n">Còn lại</th><th>Trạng thái</th></tr></thead><tbody>
@@ -77,12 +95,12 @@ function pTsSo(m,kind){
     <tr class="tot"><td colspan="5">Cộng</td><td class="n">${tsN(ng)}</td><td></td><td class="n">${tsN(th)}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsLuyKe(a,ym),0))}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsConLai(a,ym),0))}</td><td></td></tr></tbody></table></div>
     <p class="hint pad" style="margin:0">Bấm vào một dòng để xem lịch ${kind==="TS"?"khấu hao":"phân bổ"} từng tháng và sửa.</p>`
     :`<p class="hint pad">Chưa có ${tsTen(kind)} nào. ${ghi?`Vào tab <b>Khai báo đầu kỳ</b> để nạp file xuất từ MISA, hoặc bấm <b>＋ Ghi tăng</b>.`:""}</p>`}</section>`}
-  else if(tab==="gt")body=ghi?`<section class="card" id="ts-gt"></section>`:`<p class="hint">Chỉ kế toán trưởng, CEO ghi tăng được.</p>`;
+  else if(tab==="gt")body=tsCanGhiTang()?`<section class="card" id="ts-gt"></section>`:`<p class="hint">Chỉ kế toán trưởng, CEO ghi tăng được.</p>`;
   else if(tab==="gg")body=tsGgTab(kind,ghi);
   else if(tab==="dk")body=tsDkTab(kind,ghi);
   else body=tsLuatTab();
   m.innerHTML=`<div class="sochi">${H(kind==="TS"?"Tài sản cố định":"Công cụ dụng cụ",kind==="TS"?"Tài sản dùng trên 1 năm, giá từ 30 triệu · khấu hao đường thẳng tính theo ngày · hạch toán Thông tư 133":"Đồ dùng chưa đủ là tài sản cố định và các khoản trả trước · chia dần vào chi phí (TK 242), tính theo ngày")}
-   <div class="filters" style="justify-content:flex-end">${ghi&&tab!=="gt"?`<button class="btn pri" id="ts-new">＋ Ghi tăng ${tsTen(kind)}</button>`:""}<button class="btn" data-go="ts_kh">${kind==="TS"?"Khấu hao":"Phân bổ"} tháng</button>${L.length?`<button class="btn" id="ts-xl">Tải Excel</button>`:""}</div>
+   <div class="filters" style="justify-content:flex-end">${tsCanGhiTang()&&tab!=="gt"?`<button class="btn pri" id="ts-new">＋ Ghi tăng ${tsTen(kind)}</button>`:""}<button class="btn" data-go="ts_kh">${kind==="TS"?"Khấu hao":"Phân bổ"} tháng</button>${L.length?`<button class="btn" id="ts-xl">Tải Excel</button>`:""}</div>
    ${tsTabs(tab,[["so",kind==="TS"?"Sổ tài sản":"Sổ công cụ"],["gt","Ghi tăng"],["gg","Ghi giảm & điều chuyển"],["dk","Khai báo đầu kỳ"]].concat(kind==="CC"?[["luat","Cách chia"]]:[]))}${body}</div>`;
   const $m=s=>m.querySelector(s);
   m.querySelectorAll("[data-tst]").forEach(b=>b.onclick=()=>{TSV.tab[pg]=b.dataset.tst;tsNhoTab();renderMain()});
@@ -91,6 +109,7 @@ function pTsSo(m,kind){
   if($m("#ts-new"))$m("#ts-new").onclick=()=>{TSV.tab[pg]="gt";renderMain()};
   if($m("#ts-gt"))tsForm(kind,null,$m("#ts-gt"));
   if($m("#ts-xl"))$m("#ts-xl").onclick=()=>tsXuat(kind,ym);
+  tsChoWire(m);
   m.querySelectorAll("tr[data-tsid]").forEach(r=>r.onclick=()=>tsForm(kind,tsAll().find(a=>a.id===r.dataset.tsid)));
   if(tab==="gg")tsGgWire(m,kind);if(tab==="dk")tsDkWire(m,kind);
 }
@@ -110,7 +129,7 @@ function tsXuat(kind,ym){if(typeof XLSX==="undefined"){toast("Cần mạng để
 /* pre: điền sẵn từ phiếu chi (tsGhiTangTuPhieu); pre.hoi thì cho chọn tài sản cố định hay công cụ ngay đầu form. */
 function tsForm(kind,a,el,pre){tsDtNap();
   const xong=el?()=>{TSV.tab[kind==="TS"?"ts_so":"ts_cc"]="so";renderMain()}:closeDrawer;
-  const ghi=tsCanGhi(),moi=!a,x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx2",p:100}],...(pre?{ten:pre.ten,gk:pre.gk,d:pre.d||tsHom(),s:pre.d||tsHom(),ncc:pre.ncc,ct:pre.ct,nkc:pre.nkc}:{})};
+  const moi=!a,ghi=moi?tsCanGhiTang():tsCanGhi(),x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx2",p:100}],...(pre?{ten:pre.ten,gk:pre.gk,d:pre.d||tsHom(),s:pre.d||tsHom(),ncc:pre.ncc,ct:pre.ct,nkc:pre.nkc}:{})};
   const cho=tsChoGan().concat(x.nkc?((scFin().nkc)||[]).concat(typeof scCho==="function"?scCho():[]).filter(r=>r.id===x.nkc&&!tsChoGan().includes(r)):[]);
   const goi=((scFin().nkc)||[]).filter(r=>r.src!=="ts"&&+r.t>=500000&&r.d>=tsAddD(tsHom(),-120)&&!cho.includes(r)&&!tsAll().some(z=>z.nkc===r.id)).sort((p,q)=>q.d.localeCompare(p.d)).slice(0,60);
   const pcOpt=[["","Không gắn (mua nợ nhà cung cấp, tài sản có sẵn…)"]].concat(cho.map(r=>[r.id,`${r.ct||""} · ${tsDmy(r.d)} · ${tsN(r.t)} đ · ${String(r.dg||"").slice(0,50)}`]),goi.map(r=>[r.id,`${r.ct||""} · ${tsDmy(r.d)} · ${tsN(r.t)} đ · ${String(r.dg||"").slice(0,50)} (khác nhóm)`]));
@@ -153,6 +172,8 @@ function tsForm(kind,a,el,pre){tsDtNap();
     const loi=!v.ma||!v.ten?"Cần mã và tên":!(v.gk>0)?"Cần giá trị":!v.s?"Cần ngày bắt đầu tính":!v.kkh&&!(v.n>=1)?"Cần số tháng":!tsBpOk(v.bp)?"Bộ phận chịu chi phí phải cộng đủ 100%":tsAll().some(z=>z.kind===kind&&z.ma===v.ma&&z.id!==x.id)?"Mã "+v.ma+" đã có":"";
     if(loi){toast(loi);return}
     if(x.dk&&g("tsf-lk")){const lk=+g("tsf-lk").value||0,con=Math.round(+g("tsf-con").value||0);v.dk={...x.dk,lk,con,lich:!!x.dk.lich&&lk===+x.dk.lk&&con===+x.dk.con}}
+    if(moi&&!tsFinOk()){DB.mutate(ME.name,"ghi tăng "+tsTen(kind)+" "+v.ma+" chờ duyệt",dt=>{(dt.tsCho=dt.tsCho||[]).push({...v,id:uid("tsc"),kind,ng:v.gk,by:ME.name,at:Date.now(),st:"Chờ duyệt"})});
+      xong();toast("Đã gửi ghi tăng "+v.ma+", chờ kế toán duyệt");renderMain();return}
     tsMut((moi?"ghi tăng ":"sửa ")+tsTen(kind)+" "+v.ma,(T,dt)=>{
       let r=T.a.find(z=>z.id===x.id);if(!r){r={id:uid("ts"),kind,by:ME.name,at:Date.now()};T.a.push(r)}
       Object.assign(r,v,{ng:v.gk,sua:Date.now()});
