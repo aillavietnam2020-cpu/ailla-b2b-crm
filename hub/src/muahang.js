@@ -340,12 +340,19 @@ async function mhSupPays(sid){
   document.querySelectorAll("[data-spx]").forEach(b=>b.onclick=async()=>{if(!confirm("Hủy phiếu chi này? Công nợ nhà cung cấp tăng lại đúng số tiền."))return;
     try{await kApi("/mh/payments/"+b.dataset.spx+"/cancel",{method:"POST",body:"{}"});toast("Đã hủy phiếu chi");await mhReload();await mhLoadPay();mhSupPays(sid)}catch(err){toast(err.message)}});
 }
+/* Tổng tiền và số còn phải trả của một phiếu mua, bỏ phần phiếu chi x đang sửa (nếu x đang gắn vào phiếu đó). */
+function mhPeOpt(p,x){
+  const M=mhPoMoney(p),tot=M.invTotal||mhValue(p)||0;
+  const mine=x.po_id===p.id?(+x.amount||0):0,due=Math.max(0,tot-(M.paid-mine));
+  return {tot,due,match:tot>0&&Math.abs(due-(+x.amount||0))<1?1:0}}
 /* Sửa phiếu chi: ngày, số tiền, loại (cọc / trả tiền), ghi chú, phiếu mua gắn kèm. Không phải hủy rồi ghi lại, nên không bị tính hai lần. */
 function mhPayEdit(id){
   const x=(MH.pay||[]).find(p=>p.id===id);if(!x)return;
-  const pos=(MH.orders||[]).filter(p=>p.supplier_id===x.supplier_id&&p.status!=="HUY");
+  // Mỗi phiếu mua hiện tổng tiền và số còn phải trả (không tính chính phiếu chi đang sửa), phiếu khớp số tiền xếp lên đầu.
+  const pos=(MH.orders||[]).filter(p=>p.supplier_id===x.supplier_id&&p.status!=="HUY")
+    .sort((a,b)=>(mhPeOpt(b,x).match-mhPeOpt(a,x).match)||String(b.order_date||"").localeCompare(String(a.order_date||"")));
   openDrawerHTML(`<h2>Sửa phiếu chi · ${esc(x.supplier_name)}</h2><p class="hint">Sửa trực tiếp, công nợ tự tính lại đúng số mới. Lịch sử sửa được ghi lại.</p><form class="frm" id="mhpe"><div class="row4"><label class="field">Loại<select id="mhpe-k"><option value="CHI">Trả tiền (thanh toán)</option><option value="COC">Cọc / trả trước khi đặt hàng</option></select></label><label class="field">Ngày chi<input id="mhpe-d" type="date" value="${esc(x.pay_date)}" required></label><label class="field">Số tiền (đ)<input id="mhpe-a" type="number" min="1" value="${x.amount}" required></label></div>
-   <label class="field">Gắn vào phiếu mua<select id="mhpe-o"><option value="">— Không gắn —</option>${pos.map(p=>`<option value="${p.id}">${esc(p.no)} · ${esc(mhD(p.order_date))}</option>`).join("")}</select></label><label class="field">Ghi chú<input id="mhpe-n" value="${esc(x.note||"")}"></label><div id="mhpe-e"></div><button class="btn pri">Lưu</button></form>`);
+   <label class="field">Gắn vào phiếu mua<select id="mhpe-o"><option value="">— Không gắn: trả nợ chung / nợ cũ —</option>${pos.map(p=>{const o=mhPeOpt(p,x);return `<option value="${p.id}">${o.match?"✓ ":""}${esc(p.no)} · ${esc(mhD(p.order_date))} · tổng ${o.tot?nf(Math.round(o.tot)):"chưa có giá"} · còn phải trả ${nf(Math.round(o.due))}${o.match?" (khớp số tiền)":""}</option>`}).join("")}</select></label><p class="hint">Dấu ✓ là phiếu mua có số còn phải trả đúng bằng số tiền phiếu chi này.</p><label class="field">Ghi chú<input id="mhpe-n" value="${esc(x.note||"")}"></label><div id="mhpe-e"></div><button class="btn pri">Lưu</button></form>`);
   $("#mhpe-k").value=x.kind==="COC"?"COC":"CHI";$("#mhpe-o").value=x.po_id||"";
   $("#mhpe").onsubmit=async e=>{e.preventDefault();try{await kApi("/mh/payments/"+id,{method:"PUT",body:JSON.stringify({kind:$("#mhpe-k").value,pay_date:$("#mhpe-d").value,amount:+$("#mhpe-a").value,po_id:$("#mhpe-o").value||null,note:$("#mhpe-n").value})});closeDrawer();toast("Đã sửa phiếu chi");MH.pay=null;MH.inv=null;MH.debts=null;await mhReload()}catch(err){$("#mhpe-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}}}
 function mhPayForm(supId,poId){
