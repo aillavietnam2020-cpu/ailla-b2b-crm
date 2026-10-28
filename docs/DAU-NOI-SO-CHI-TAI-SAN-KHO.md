@@ -53,3 +53,12 @@ Lỗi 28/10: máy chiết rót PC-2026-10-0006 đã được ghi tăng (CC `Mayc
 
 - `/hub/` gửi `Cache-Control: private, no-cache` + ETag theo BUILD_ID: mỗi lần mở đều hỏi lại máy chủ, bản mới thì tải mới. `public/sw.js` không lưu đệm.
 - Trang đang mở hỏi `/hub/build` mỗi 60 giây; khác BUILD_ID thì hiện "Có bản web mới · Tải lại ngay".
+
+## 7. Mua hàng trong kế toán, Nhật ký chi một danh sách (chị Hoa 28/10 tối)
+
+- Quản trị › Tài chính – Kế toán › Thu chi có **Mua hàng (đơn, nhận hàng, chứng từ)** = trang `mh_po` (bấm từng đơn: Nhận hàng, Ghi chứng từ, trả tiền NCC). `menubang.js` thôi bỏ `mh_po` ở web quản trị.
+- Nhận hàng: nguyên vật liệu / hàng hóa vào tồn kho; mã lớp CCDC không vào kho, chờ ghi tăng (mục 5).
+- Nhật ký chi (`scNK`) gộp mọi khoản chi một bảng theo ngày: phiếu chi, trả NCC, vận chuyển, quảng cáo, lương, khấu hao… Bỏ chế độ "Chi phí NVL" riêng (`SC.nkv`); thêm bộ lọc **Mọi nguồn** (`SC.ng`).
+- Trả NCC: `scDonCuaPay(pay)` tìm đơn mua (po_id, hoặc receipt_ids của chứng từ). Đơn toàn hàng CCDC (`tsDonTaiSan`) → dòng là G28 "Mua tài sản / công cụ", không vào chi phí NVL, không vào chi phí tháng. Bấm dòng → phiếu trả kèm ô **Đơn mua** (bấm mở đơn, `mhMoDon`).
+- Phiếu chi có ô **Thuộc đơn mua** (`row.po` = id đơn): chọn đơn tài sản / công cụ thì tự chuyển G28. Form phiếu hiện đơn mua (đã chọn, hoặc web đoán theo `tsTimDon`).
+- Thẻ tài sản / công cụ hiện **Đơn mua** (`a.po` số PM…, hoặc đơn khớp phiếu `a.nkc`) và **chi phí mua kèm** = phiếu chi có `po` đúng đơn đó, trừ phiếu tiền hàng (`tsPhiDon`, nhiều tài sản cùng đơn thì chia theo giá trị). Ghi tăng mới tự cộng vào nguyên giá; tài sản đã có thì bấm "Cộng … vào nguyên giá". Phiếu đã cộng lưu ở `a.phi`.

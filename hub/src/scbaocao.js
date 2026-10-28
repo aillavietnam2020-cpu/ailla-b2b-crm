@@ -12,7 +12,7 @@
 const SC_FN=[["mkt","Marketing",["G01","G02","G03","G11"]],["ban","Bán hàng và chi phí kênh",["G04","G06","G12","G19"]],["kho","Kho và giao hàng",["G05","G09","G10"]],["sx","Sản xuất",["G15","G16","G17","G25","G26"]],["lg","Lương, thưởng, bảo hiểm",["G07","G08"]],["ql","Quản lý chung",["G13","G14","G18","G21","G24"]],["tc","Tài chính, thuế và khác",["G22"]],["cho","Chờ xác minh",["G20","G23"]]];
 const scFnOf=g=>{const d=scG(g);if(d.fn&&SC_FN.some(x=>x[0]===d.fn))return d.fn;const f=SC_FN.find(x=>x[2].includes(g));return f?f[0]:"ql"};
 const scFnTen=k=>(SC_FN.find(x=>x[0]===k)||[k,k])[1];
-const scFnRow=x=>x.ext&&x.ext.src==="ncc"?"Chi phí NVL":scFnTen(scFnOf(x.g));
+const scFnRow=x=>x.g==="G28"?"Mua tài sản / công cụ":x.ext&&x.ext.src==="ncc"?"Chi phí NVL":scFnTen(scFnOf(x.g));
 const scLaCoc=x=>!!(x.ext&&x.ext.src==="ncc"&&/^cọc/i.test(String(x.dg||"")));
 /* Cách xử lý của một dòng (Nhật ký chi, Phân bổ). */
 function scXL(x,qt){
@@ -175,7 +175,6 @@ const scChoN=()=>{try{const r=scPBRows();return r.filter(x=>scLoaiTQ(x)==="cho")
 function scBCbind(m){
   m.querySelectorAll("[data-tach]").forEach(el=>el.onclick=()=>{const x=((scFin().nkc)||[]).find(y=>y.id===el.dataset.tach);if(x)scTach(x)});
   m.querySelectorAll("[data-pbo]").forEach(b=>b.onclick=()=>{SC.pbOpen=SC.pbOpen===b.dataset.pbo?"":b.dataset.pbo;renderMain()});
-  m.querySelectorAll("[data-nkv]").forEach(el=>el.onclick=()=>{SC.nkv=el.dataset.nkv;Object.assign(SC,{g:"",k:"",st:"",fn:"",xl:""});renderMain()});
   m.querySelectorAll("[data-fn]").forEach(el=>el.onclick=()=>{SC.tab="cn";(SC.cnOpen=SC.cnOpen||{})[el.dataset.fn]=1;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-cnf]").forEach(el=>el.onclick=()=>{const o=SC.cnOpen=SC.cnOpen||{},f=el.dataset.cnf;o[f]=!o[f];renderMain()});
   m.querySelectorAll("[data-scgo-lg]").forEach(b=>b.onclick=()=>{PAGE="cp_luong";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});

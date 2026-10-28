@@ -338,15 +338,22 @@ function mhPayMethodBind(k,sid){
 function mhPayMethodRead(k){const m=document.querySelector(`input[name="${k}-m"]:checked`).value,v=id=>($("#"+k+"-"+id).value||"").trim();
   return m==="TIEN_MAT"?{method:m,receiver:v("rc")}:{method:m,from_account:v("from")==="__x"?v("fx"):v("from"),to_bank:v("tb"),to_account_no:v("tn"),to_account_name:v("ta")}}
 const mhPayFileUrl=(pid,f)=>"/api/hub/kho/mh/payments/"+pid+"/files/"+f;
+/* Mở một đơn mua ở trang Mua hàng (từ Nhật ký chi, phiếu chi, thẻ tài sản). */
+function mhMoDon(id){closeDrawer();PAGE="mh_po";MH.open=id;MH.st="";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}
+/* Ô "Đơn mua" tóm tắt: số đơn, NCC, hàng × số lượng, bấm để mở đơn. */
+const mhDonTomTat=L=>L.length?`<div class="note"><b>Đơn mua:</b> ${L.map(p=>`<button type="button" class="lnk" data-mhgo="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name||"")}</button>${(p.lines||[]).length?` <span class="hint">(${p.lines.map(l=>esc(l.name||l.item)+" × "+nf(+l.qty||0)).join(", ")})</span>`:""}`).join("<br>")}</div>`:"";
+const mhDonWire=()=>document.querySelectorAll("[data-mhgo]").forEach(b=>b.onclick=()=>mhMoDon(b.dataset.mhgo));
 /* Xem một phiếu chi: hình thức, tài khoản, ảnh bill (thêm, xóa được). */
 async function mhPayDetail(id){
   const x=(MH.pay||[]).find(p=>p.id===id);if(!x)return;let files=[];try{files=await kApi("/mh/payments/"+id+"/files")}catch(e){toast(e.message)}
   const ck=x.method==="CHUYEN_KHOAN",tm=x.method==="TIEN_MAT";
   openDrawerHTML(`<h2>Phiếu chi ${nf(x.amount)} đ · ${esc(x.supplier_name)}</h2><p class="hint">Ngày ${esc(mhD(x.pay_date))} · ${x.kind==="COC"?"Tiền cọc":"Trả tiền"}${x.invoice_no?" · chứng từ "+esc(x.invoice_no):""}${x.po_no?" · phiếu mua "+esc(x.po_no):""}${x.status!=="OK"?" · "+pill("Đã hủy","gry"):""}</p>
+   ${mhDonTomTat(typeof scDonCuaPay==="function"?scDonCuaPay(x):(MH.orders||[]).filter(p=>p.id===x.po_id))}
    <div class="mhinfo mhpay"><div><span>Hình thức</span><b>${ck?"Chuyển khoản":tm?"Tiền mặt":"—"}</b></div>${ck?`<div><span>Chi từ tài khoản</span><b>${esc(x.from_account)}</b></div><div><span>Chuyển đến</span><b>${esc([x.to_bank,x.to_account_no].filter(Boolean).join(" · "))}</b><small>${esc(x.to_account_name||"")}</small></div>`:tm?`<div><span>Người nhận</span><b>${esc(x.receiver||"—")}</b></div>`:`<div><span>Ghi chú cũ</span><b>${esc(x.account||"—")}</b></div>`}</div>
    ${x.note?`<p>Ghi chú: ${esc(x.note)}</p>`:""}
    <h3>Ảnh bill / phiếu chi</h3><div class="mhfiles">${files.length?files.map(f=>f.mime==="application/pdf"?`<div class="mhfile"><a href="${mhPayFileUrl(id,f.id)}" target="_blank" rel="noopener">📄 ${esc(f.name||"file.pdf")}</a><button type="button" class="lnk" data-pfd="${f.id}">Xóa</button></div>`:`<div class="mhfile"><a href="${mhPayFileUrl(id,f.id)}" target="_blank" rel="noopener"><img src="${mhPayFileUrl(id,f.id)}" alt="${esc(f.name)}"></a><button type="button" class="lnk" data-pfd="${f.id}">Xóa</button></div>`).join(""):`<p class="hint">Chưa có ảnh nào.</p>`}</div>
    <label class="field">Thêm ảnh bill chuyển khoản / phiếu chi tiền mặt<input type="file" id="mhpd-f" multiple accept="image/*,application/pdf"></label><button class="btn" id="mhpd-up">Tải lên</button>`);
+  mhDonWire();
   document.querySelectorAll("[data-pfd]").forEach(b=>b.onclick=async()=>{if(!confirm("Xóa ảnh này?"))return;try{await kApi("/mh/payments/"+id+"/files/"+b.dataset.pfd,{method:"DELETE"});MH.pay=null;await mhLoadPay();mhPayDetail(id)}catch(e){toast(e.message)}});
   $("#mhpd-up").onclick=async()=>{const fs=[...$("#mhpd-f").files];if(!fs.length)return;$("#mhpd-up").disabled=true;let n=0;for(const f of fs){try{const d=await mhPrepFile(f);await kApi("/mh/payments/"+id+"/files",{method:"POST",body:JSON.stringify(d)});n++}catch(e){toast(e.message)}}if(n)toast("Đã tải lên "+n+" ảnh");MH.pay=null;await mhLoadPay();mhPayDetail(id)};
 }
