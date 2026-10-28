@@ -103,7 +103,7 @@ function scForm(){
    <div id="scf-ck" class="row4"><label class="field">Chi từ tài khoản công ty<select id="scf-from"><option value="">Đang tải…</option></select></label><label class="field">Chuyển đến (ngân hàng · số tài khoản)<input id="scf-to" placeholder="Ví dụ: MB · 0929927999"></label></div>
    <label class="field" id="scf-fxw" hidden>Tài khoản chi khác<input id="scf-fx" placeholder="Ngân hàng · số tài khoản · tên chủ tài khoản"></label>
    <label class="field">Nội dung chi (ghi rõ chi cho việc gì)<input id="scf-dg" required placeholder="Ví dụ: Cước xe giao hàng NPP Hải Dương"></label>
-   <div class="row4"><label class="field">Nhóm chi phí<select id="scf-g">${opt(dm.map(x=>[x.g,x.g+" · "+x.n]),"")}</select></label><label class="field">Bổ vào (kênh / nơi chịu)<select id="scf-k">${opt(SC_COLS.slice(0,8).map(x=>[x,x]),"Chung")}</select></label></div><label class="field">Thuộc đơn mua (phí vận chuyển, lắp đặt… của đơn nào; không thuộc thì để trống)<select id="scf-po">${scDonOpt("")}</select></label><div id="scf-pon" class="note" hidden></div><div id="scf-tsn" class="note" hidden>Mua máy móc, thiết bị, công cụ: chọn nhóm <b>G28 · Mua tài sản cố định / công cụ dụng cụ</b> (không tính vào chi phí tháng). Lưu phiếu xong, mở lại phiếu và bấm <b>"Ghi tăng tài sản / công cụ"</b> để vào sổ Công cụ dụng cụ / Tài sản cố định; chi phí sẽ được phân bổ, khấu hao dần hằng tháng.</div>
+   <div class="row4"><label class="field">Nhóm chi phí<select id="scf-g">${opt(dm.map(x=>[x.g,x.g+" · "+x.n]),"")}</select></label><label class="field">Bổ vào (kênh / nơi chịu)<select id="scf-k">${opt(SC_COLS.slice(0,8).map(x=>[x,x]),"Chung")}</select></label></div><label class="field">Thuộc đơn mua (phí vận chuyển, lắp đặt… của đơn nào; không thuộc thì để trống)<select id="scf-po">${scDonOpt("")}</select></label><div id="scf-pog" class="hint" hidden></div><div id="scf-pon" class="note" hidden></div><div id="scf-tsn" class="note" hidden>Mua máy móc, thiết bị, công cụ: chọn nhóm <b>G28 · Mua tài sản cố định / công cụ dụng cụ</b> (không tính vào chi phí tháng). Lưu phiếu xong, mở lại phiếu và bấm <b>"Ghi tăng tài sản / công cụ"</b> để vào sổ Công cụ dụng cụ / Tài sản cố định; chi phí sẽ được phân bổ, khấu hao dần hằng tháng.</div>
    <div class="row4"><label class="field">Số tiền (đ)<input type="number" id="scf-t" min="1" required></label><label class="field">Chứng từ kèm (hóa đơn, ảnh chuyển khoản)<input type="file" id="scf-f" multiple accept="image/*,application/pdf"></label></div>
    <label class="field">Ghi chú<input id="scf-gc"></label><div id="scf-e"></div>
    <button class="btn pri">${scCanDuyet()?"Ghi vào sổ":"Gửi chị Huệ duyệt"}</button></form>
@@ -118,7 +118,16 @@ function scForm(){
   $("#scf-po").onchange=()=>{const id=$("#scf-po").value,n=$("#scf-pon"),ts=!!id&&typeof tsDonTaiSan==="function"&&tsDonTaiSan(id);n.hidden=!ts;
     if(ts){$("#scf-g").value="G28";n.innerHTML="Đơn mua tài sản / công cụ: khoản này cộng vào nguyên giá khi ghi tăng (nhóm <b>G28</b>, không tính vào chi phí tháng).";tsn()}};
   const sug=()=>{const v=$("#scf-dg").value;if(v.length<3)return;const de=scDeXuat(v);$("#scf-g").value=de.g;if(SC_COLS.includes(de.k))$("#scf-k").value=de.k;tsn()};
-  $("#scf-dg").onchange=sug;$("#scf-d").onchange=e=>{$("#scf-so").value=scSoPhieu(e.target.value)};
+  /* Chị Hoa 28/10 "thế có tự động không?": web tự chọn đơn mua khớp (tên nhà cung cấp / hàng trong người nhận, nội dung; số tiền; ngày gần đơn) như Ghi tăng (tsTimDon).
+     Người ghi chọn tay thì thôi tự chọn. */
+  const goiY=()=>{const s=$("#scf-po");if(!s||s.dataset.tay||typeof tsTimDon!=="function")return;
+    const d=tsTimDon({t:+$("#scf-t").value||0,d:$("#scf-d").value,nn:$("#scf-nn").value,dg:$("#scf-dg").value,gc:$("#scf-gc").value}),id=d?d.p.id:"",gy=$("#scf-pog");
+    if(id&&![...s.options].some(o=>o.value===id))s.innerHTML=scDonOpt(id);
+    if(s.value!==id){s.value=id;s.onchange()}
+    gy.hidden=!id;if(id)gy.textContent="Web tự chọn đơn "+d.p.no+" (khớp nhà cung cấp / số tiền / ngày). Không đúng thì chọn lại."};
+  $("#scf-po").addEventListener("input",()=>{$("#scf-po").dataset.tay="1";$("#scf-pog").hidden=true});
+  ["scf-t","scf-nn","scf-gc"].forEach(i=>$("#"+i).addEventListener("change",goiY));
+  $("#scf-dg").onchange=()=>{sug();goiY()};$("#scf-d").onchange=e=>{$("#scf-so").value=scSoPhieu(e.target.value);goiY()};
   $("#scf-thu").onclick=()=>{if(typeof cptQuick==="function")cptQuick()};
   $("#scf").onsubmit=async e=>{e.preventDefault();const t=+$("#scf-t").value,dg=$("#scf-dg").value.trim();
     if(!(t>0)||!dg){$("#scf-e").innerHTML=`<div class="note red">Nhập nội dung chi và số tiền.</div>`;return}
@@ -202,8 +211,8 @@ function scTTAds(){const R={v:0,L:[]};
 function scDonOpt(cur){const tu=new Date(Date.now()-270*864e5).toISOString().slice(0,10);
   const L=((typeof MH!=="undefined"&&MH.orders)||[]).filter(p=>p.status!=="HUY"&&(p.id===cur||String(p.order_date||"")>=tu)).sort((a,b)=>String(b.order_date||"").localeCompare(String(a.order_date||"")));
   return `<option value="">— Không thuộc đơn mua —</option>`+L.map(p=>`<option value="${esc(p.id)}"${p.id===cur?" selected":""}>${esc(p.no)} · ${esc(p.supplier_name||"")} · ${esc((p.lines||[]).map(l=>l.name||l.item).join(", ").slice(0,50))}</option>`).join("")}
-/* Đơn mua của một phiếu chi: đã chọn (x.po), hoặc phiếu mua tài sản thì đoán theo số tiền / NCC (tsTimDon). */
-const scPoCua=x=>x.po||(["G28","G15"].includes(x.g)&&typeof tsTimDon==="function"&&((tsTimDon(x)||{}).p||{}).id)||"";
+/* Đơn mua của một phiếu chi: đã chọn (x.po), hoặc web đoán theo số tiền / NCC / ngày (tsTimDon). */
+const scPoCua=x=>x.po||(typeof tsTimDon==="function"&&((tsTimDon(x)||{}).p||{}).id)||"";
 /* Đơn mua của một phiếu trả nhà cung cấp (MH.pay): theo po_id, hoặc theo chứng từ (receipt_ids của chứng từ) như mhPoMoney. */
 function scDonCuaPay(x){const O=(typeof MH!=="undefined"&&MH.orders)||[];if(!x)return [];if(x.po_id){const p=O.find(o=>o.id===x.po_id);return p?[p]:[]}
   const v=x.invoice_id&&(MH.inv||[]).find(i=>i.id===x.invoice_id),ids=(v&&v.receipt_ids)||[];return ids.length?O.filter(o=>(o.receipts||[]).some(r=>ids.includes(r.id))):[]}
