@@ -18,20 +18,22 @@ async function spbLoadRows(ky,shop){const k=ky+"|"+shop;if(SPB.rows[k]!==undefin
   SPB.busy[k]=0;if(PAGE==="bc_shopee")renderMain()}
 
 /* Chi riêng khác (bổ thẳng cho kênh Shopee, trừ quảng cáo / phí sàn / vận chuyển đã có trong báo cáo sàn) và chi chung đã chia. */
-function spbSoCP(ky,shops){
-  const out={rieng:null,chung:null,whyR:"",whyC:""},K=shops.map(s=>SPE_BC_KENH[s]).filter(Boolean);
+function spbSoCP(ky,shops){return bcSoCP(ky,shops.map(s=>SPE_BC_KENH[s]).filter(Boolean),"Shopee")}
+/* Dùng chung cho trang kênh (Shopee, Facebook): K = tên kênh ở Sổ chi phí, ten = tên hiện trong câu báo thiếu số. */
+function bcSoCP(ky,K,ten){
+  const out={rieng:null,chung:null,whyR:"",whyC:""};
   if(typeof scPBRows!=="function"){out.whyR=out.whyC="Sổ chi phí chưa nạp";return out}
   const keep={from:PERIOD.from,to:PERIOD.to};
   try{PERIOD.from=ky+"-01";PERIOD.to=tbKyEnd(ky);if(typeof scNap==="function")scNap();
     const rows=scPBRows(),by=(L,f)=>{const o={};L.forEach(x=>{const n=f(x);o[n]=(o[n]||0)+(+x.t||0)});return Object.entries(o).filter(e=>Math.round(e[1])).map(([n,t])=>({n,t})).sort((a,b)=>b.t-a.t)};
     const tru=typeof SC_PL_TRU!=="undefined"?SC_PL_TRU:[];
     out.rieng=by(rows.filter(x=>K.includes(x.k)&&x.st!=="Chờ duyệt"&&!tru.includes(x.g)&&!/^H/.test(String(scG(x.g).lo||""))),x=>scG(x.g).n);
-    if(!out.rieng.length){out.rieng=null;out.whyR="Sổ chi phí tháng này chưa ghi khoản nào cho Shopee"}
+    if(!out.rieng.length){out.rieng=null;out.whyR="Sổ chi phí tháng này chưa ghi khoản nào cho "+ten}
     if(typeof scChiaPB==="function"){const CH=scChiaPB(rows);
       if(CH.loi&&CH.loi.length)out.whyC="Chi chung chưa chia: "+CH.loi.join("; ");
       else{const o={};K.forEach(k=>Object.entries((CH.kenh||{})[k]||{}).forEach(([g,t])=>{o[g]=(o[g]||0)+t}));
         out.chung=Object.entries(o).map(([g,t])=>({n:scG(g).n,t})).filter(x=>Math.round(x.t)).sort((a,b)=>b.t-a.t);
-        if(!out.chung.length){out.chung=null;out.whyC="Sổ chi phí tháng này chưa có chi chung chia cho Shopee"}}}
+        if(!out.chung.length){out.chung=null;out.whyC="Sổ chi phí tháng này chưa có chi chung chia cho "+ten}}}
     else out.whyC="Chưa có quy tắc chia chi chung";
   }catch(e){out.rieng=null;out.chung=null;out.whyR=out.whyC="Không đọc được Sổ chi phí"}
   finally{PERIOD.from=keep.from;PERIOD.to=keep.to}

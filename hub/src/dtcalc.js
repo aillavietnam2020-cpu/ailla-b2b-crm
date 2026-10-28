@@ -7,7 +7,7 @@
    - Dự kiến = số thật đến lúc đó + đơn đang giao × (1 − tỷ lệ hoàn dự kiến).
    ===================================================================== */
 const DT_KENH=[["tts","TikTok Shop"],["spe","Shopee"],["fb","Facebook"],["cskh","CSKH cũ"],["b2b","Kênh phân phối"],["gc","Kênh OEM"]];
-const DT_HOAN_FB=0.08;/* tỷ lệ hoàn dự kiến đơn Facebook đang giao (chị Hoa thường dùng, giống thẻ dự kiến ở trang Facebook) */
+let DT_HOAN_FB=0.08;/* tỷ lệ hoàn dự kiến đơn Facebook đang giao; từ 28/10/2026 trang Facebook (fbv2.js) đổi theo tỷ lệ hoàn thật tháng gần nhất đã chốt (chị Hoa duyệt), 8% chỉ khi chưa đủ số */
 const DT_TU="2026-09";/* luật chốt ngày 10 áp từ tháng 9/2026 */
 /* Ngày chốt số của tháng ym = ngày 10 tháng sau. */
 function dtNgayChot(ym){const y=+ym.slice(0,4),m=+ym.slice(5,7),ny=m===12?y+1:y,nm=m===12?1:m+1;return ny+"-"+String(nm).padStart(2,"0")+"-10"}
