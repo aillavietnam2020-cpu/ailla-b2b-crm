@@ -77,7 +77,7 @@ function spcComboView(C){
        <td>${first?`<b class="mono">${esc(c.sku)}</b>${c.variant?`<br><small class="hint">${esc(c.variant)}</small>`:""}<br><small class="hint" title="${esc(c.shops.join(", "))}">${c.orders?nf(c.orders)+" đơn · ":""}${c.shops.length} ${SPCB.ch==="FACEBOOK"?"nguồn":"shop"}</small>`:""}</td>
        <td>${ed?`<input class="spi-c mono" ${da} data-j="${j}" value="${esc(p.kind==="skip"?"":p.code)}" placeholder="${p.kind==="skip"?"bỏ qua":"Gõ mã hoặc tên"}" style="width:150px${bad?";border-color:#d92d20":""}">`:`<span class="mono">${esc(p.code)}</span>`}</td>
        <td>${p.kind==="skip"?`<span class="hint">không trừ kho</span>`:bad?`<span class="t-red">chưa có mã kho: ${esc(p.label)}</span>`:esc(nm(p.code))}</td>
-       <td>${ed?`<select class="spi-k" ${da} data-j="${j}">${opt(SPC_KOPT,p.kind)}</select>`:esc((SPC_KOPT.find(k=>k[0]===p.kind)||["",""])[1])}</td>
+       <td>${ed?`<select class="spi-k" ${da} data-j="${j}" style="min-width:110px">${opt(SPC_KOPT,p.kind)}</select>`:esc((SPC_KOPT.find(k=>k[0]===p.kind)||["",""])[1])}</td>
        <td class="n">${ed?`<input class="spi-q n" type="number" min="0" step="any" ${da} data-j="${j}" value="${p.qty}" style="width:64px">`:p.qty}</td>
        ${C.g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):p.kind==="pack"?`<small class="hint">—</small>`:`<small class="t-amb">chưa có giá</small>`}</td>`:""}
        <td>${first?`${pill(dirty?"Chưa lưu":st[1],dirty?"blu":st[0])}${c.flag?`<div><small class="t-amb">❓ ${esc(c.flag)}</small></div>`:""}`:""}</td>
@@ -166,7 +166,7 @@ function spcEdDraw(){
   const E=SPCB.ed,c=E.c,can=SPCB.can,g=spcSeeCost()?spcGvMap((D()&&D().skus)||[],SPCB.cost,spcKy()):null;
   const nm=code=>{const it=SPCB.items.get(spcLow(code));return it?it.name:""};
   const row=(p,i)=>{const gv=g&&g[spcLow(p.code)];return `<tr class="spc-row" data-i="${i}"><td><input class="spc-pc mono" value="${esc(p.kind==="skip"?"":p.code)}" placeholder="Gõ mã hoặc tên" style="width:140px" ${can?"":"disabled"}></td><td>${esc(nm(p.code)||(p.code?"chưa có mã kho":""))}</td>
-    <td><select class="spc-pk" ${can?"":"disabled"}>${opt(SPC_KOPT,p.kind)}</select></td><td><input class="spc-pq n" type="number" min="0" step="any" value="${p.qty}" style="width:60px" ${can?"":"disabled"}></td>${g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):p.kind==="pack"?"—":"<small class=t-amb>chưa có giá</small>"}</td>`:""}<td>${can?`<button class="btn sm" data-sprm="${i}" title="Bỏ dòng">✕</button>`:""}</td></tr>`};
+    <td><select class="spc-pk" style="min-width:110px" ${can?"":"disabled"}>${opt(SPC_KOPT,p.kind)}</select></td><td><input class="spc-pq n" type="number" min="0" step="any" value="${p.qty}" style="width:60px" ${can?"":"disabled"}></td>${g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):p.kind==="pack"?"—":"<small class=t-amb>chưa có giá</small>"}</td>`:""}<td>${can?`<button class="btn sm" data-sprm="${i}" title="Bỏ dòng">✕</button>`:""}</td></tr>`};
   const x=g?spcCost(E.parts.filter(p=>p.code||p.kind==="skip"),g):null;
   const H2=SPCB.hist;const lb={KHO_ONLINE_MAP:"Lưu",KHO_ONLINE_MAP_SWAP:"Đổi mã",KHO_ONLINE_MAP_CONFIRM:"Xác nhận",KHO_ONLINE_MAP_VERSION:"Bản mới theo ngày",KHO_ONLINE_MAP_CLONE:"Sao chép",SP_COMBO_ADD:"Thêm",SP_COMBO_SAVE:"Sửa",SP_COMBO_STOP:"Ngừng dùng",SP_COMBO_RESUME:"Dùng lại"};
   const hs=h=>{let a={};try{a=JSON.parse(h.after_json||"{}")}catch(e){}const ps=a.parts?a.parts.map(x=>(x[1]!=1?x[1]+"×":"")+spcCode(x[0])).join(", "):a.item_label?(a.qty!=1?a.qty+"×":"")+spcCode(a.item_label):"";
