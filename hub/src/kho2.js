@@ -480,6 +480,8 @@ function pKhoOnline(m){
   const S=KHO.onForm||(KHO.onForm={tab:"ALL",channel:"TIKTOK",text:"",parsed:null,mapText:"",mapParsed:null,mq:""});
   const O=KHO.on||{},ceo=ME.role==="admin",sv=(typeof SV!=="undefined"&&SV.perms)||[];
   const editMap=ceo||sv.includes("order.approve.normal")||sv.includes("order.accounting.confirm"),ed=editMap;
+  /* Sửa combo: chỉ CEO và kế toán, và chỉ ở web quản trị (Cấu hình › Sản phẩm & combo, chị Hoa chốt 28/10). Bên vận hành kho chỉ xem. */
+  const edCombo=(ceo||sv.includes("order.accounting.confirm"))&&!(typeof OPSV==="function"&&OPSV());
   const rawTab=khoOnTab(S),ds=rawTab.endsWith("_DS"),tab=ds?rawTab.slice(0,-3):rawTab,runs=O.runs||[],un=O.unmapped||[],src=(KHO.src||[]).find(x=>x.channel===tab);
   const tabs=`<nav class="settabs">${[["ALL","Tổng quan"],["FACEBOOK","Bán lẻ Facebook"],["TIKTOK","Bán lẻ TikTok"],["SHOPEE","Bán lẻ Shopee"]].map(([k,t])=>`<button class="${k===rawTab?"on":""}" data-ont="${k}">${t}</button>`).join("")}</nav>`;
   let body="";
@@ -518,6 +520,11 @@ function pKhoOnline(m){
        :`<p class="hint">Đây là mã (SKU) <b>mới xuất hiện</b> hoặc chưa được quy đổi nên chưa trừ kho. Shop đổi combo / đổi quà thường đổi SKU: chọn <b>“Giống SKU cũ”</b> để sao chép cách quy đổi của SKU trước rồi chỉnh phần khác, hoặc chọn sản phẩm lẻ + số lượng rồi bấm Thêm (combo nhiều món thì thêm nhiều lần). Món không tính kho thì bấm Bỏ qua.</p>
        ${editMap?`<div class="filters"><label class="inl">Áp dụng từ ngày <input type="date" id="cb-from"> <span class="hint">(để trống = cho mọi ngày chưa có cách quy đổi)</span></label></div>`:""}
        ${tbl(["SKU / Phân loại","Tên trên đơn","Xuất hiện từ","SL bán","Gồm các sản phẩm lẻ (mỗi món một dòng)",""],combos.slice(0,60).map((c,i)=>{const P=khoCbDraft(S,c);return `<tr><td><b class="mono">${esc(c.sku)}</b>${c.variant?"<br><span class='hint'>"+esc(c.variant)+"</span>":""}</td><td>${esc(String(c.name||""))}</td><td>${c.first_day?kDd(c.first_day):"—"}</td><td class="n">${knum(c.qty)}</td><td>${editMap?P.map((p,j)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="cb-i" data-i="${i}" data-j="${j}" value="${esc(p.code?p.code+" - "+(p.name||""):"")}" data-code="${esc(p.code||"")}" placeholder="Gõ mã hoặc tên sản phẩm lẻ" style="min-width:230px"> × <input class="cb-q n" data-i="${i}" data-j="${j}" type="number" min="0.001" step="any" value="${p.qty}" style="width:56px">${P.length>1?` <button class="btn sm cb-d" data-i="${i}" data-j="${j}" title="Bỏ dòng này">✕</button>`:""}</div>`).join("")+`<a href="#" class="cb-add" data-i="${i}">+ thêm món</a>`:"—"}</td><td style="white-space:nowrap">${editMap?`<button class="btn sm pri cb-s" data-i="${i}">Lưu quy đổi</button><br><button class="btn sm cb-c" data-i="${i}">Giống SKU cũ</button> <button class="btn sm cb-x" data-i="${i}">Bỏ qua</button>`:""}</td></tr>`}))}`}</section>`;
+    /* Sửa combo chỉ còn ở trang Sản phẩm & combo (giữ loại món sản phẩm / quà / bao bì); ở đây chỉ liệt kê. */
+    const goSpc=edCombo&&typeof PAGES!=="undefined"&&PAGES.spcombo?`<button class="btn pri" data-go="spcombo">Mở Sản phẩm &amp; combo</button>`:"";
+    const todoV=`<section class="card"><div class="card-h"><h2>Mã combo chưa quy đổi${combos.length?" ("+combos.length+")":""}</h2>${goSpc}</div>
+     <p class="hint">Kho vẫn soạn và xuất hàng bình thường. Kế toán nhập combo ở <b>web quản trị › Cấu hình › Sản phẩm &amp; combo</b>; nhập xong web tự trừ kho và tính giá vốn các đơn này.</p>
+     ${combos.length?tbl(["SKU / Phân loại","Tên trên đơn","Xuất hiện từ","SL bán"],combos.slice(0,60).map(c=>`<tr><td><b class="mono">${esc(c.sku)}</b>${c.variant?"<br><span class='hint'>"+esc(c.variant)+"</span>":""}</td><td>${esc(String(c.name||""))}</td><td>${c.first_day?kDd(c.first_day):"—"}</td><td class="n">${knum(c.qty)}</td></tr>`)):`<p class="hint">✓ Mọi mã bán trên ${KHO_CH[tab]} đã có combo.</p>`}</section>`;
     const misaRows=un.map((u,i)=>[u,i]).filter(([u])=>u.channel===tab&&!String(u.label).startsWith("[Chưa quy đổi]"));
     const todoMisa=`<section class="card"><div class="card-h"><h2>Tên sản phẩm lẻ chưa có mã MISA${misaRows.length?" ("+misaRows.length+")":""}</h2></div>
      ${misaRows.length?`<p class="hint">Các tên này có trong bảng quy đổi nhưng chưa gắn với mã MISA trong danh mục kho nên <b>chưa trừ kho</b>. Gõ mã hoặc tên, chọn trong gợi ý rồi bấm Lưu; gán một lần là các ngày sau tự trừ. Món không có trong MISA (quà mua ngoài…) thì báo kế toán thêm vào Danh mục & định mức trước.</p>
@@ -546,7 +553,7 @@ function pKhoOnline(m){
        <textarea id="mp-t" rows="4" style="width:100%" placeholder="Dán nội dung tab 'Quy đổi combo' vào đây">${esc(S.mapText||"")}</textarea>
        <div class="filters"><button class="btn" id="mp-chk">Kiểm tra</button>${S.mapParsed?`<button class="btn pri" id="mp-go">Nạp ${S.mapParsed.length} dòng</button>`:""}</div>`:""}
      </section>`:"";
-    body=khoSheetView(D.recon,S,myRuns,tab,{map:mapCard,missing:todo+todoMisa,setup:status+setup,nMissing:combos.length+misaRows.length,noMisa:new Set(misaRows.map(([u])=>u.label))});
+    body=khoSheetView(D.recon,S,myRuns,tab,{map:`<section class="card"><div class="card-h"><h2>Bảng combo</h2>${goSpc}</div><p class="hint">Bảng quy đổi combo đã chuyển sang <b>web quản trị › Cấu hình › Sản phẩm &amp; combo</b> (chị Hoa chốt 28/10). Chỉ CEO và kế toán sửa ở đó.</p></section>`,missing:todoV+todoMisa,setup:status+setup,nMissing:combos.length+misaRows.length,noMisa:new Set(misaRows.map(([u])=>u.label))});
   }
   khoFrame(m,"kho_online","Xuất Kênh bán lẻ: bán lẻ Facebook, TikTok, Shopee","Số hàng lẻ bán mỗi ngày ở Facebook, TikTok, Shopee, lấy thẳng từ Poscake, trừ vào tồn kho từ ngày bắt đầu. Kế toán chỉ cần xử lý combo chưa quy đổi, không cần mở Sheet.",tabs+body);
   m.querySelectorAll("[data-ont]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.ont;renderMain()});

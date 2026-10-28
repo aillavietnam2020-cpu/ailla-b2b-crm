@@ -59,12 +59,12 @@ describe('Sản phẩm & combo: luồng ngược (mã mới trên đơn)', () =>
     const un = await ctx.request('/api/hub/sanpham/unmapped', { as: USERS.ceo });
     expect(un.status).toBe(200);
     expect(un.body.data).toEqual([expect.objectContaining({ channel: 'SHOPEE', sku: '2TL', orders: 2, shops: ['Ailla VN'] })]);
-    const t = await syncComboTasks(ctx.db);
+    const t = await syncComboTasks(ctx.db as unknown as D1Database);
     expect(t).toMatchObject({ codes: 1, orders: 2 });
     const task = await ctx.db.prepare("SELECT title, status FROM tasks WHERE assignee_id = 'user-thao'").first<{ title: string; status: string }>();
     expect(task?.title.startsWith(TASK_PREFIX)).toBe(true);
     // Chạy lại không tạo việc trùng.
-    await syncComboTasks(ctx.db);
+    await syncComboTasks(ctx.db as unknown as D1Database);
     expect((await ctx.db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE assignee_id = 'user-thao'").first<{ n: number }>())?.n).toBe(1);
 
     const r = await put(USERS.thao, COMBO);

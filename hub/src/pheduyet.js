@@ -35,7 +35,8 @@ async function pdLoad(force){
       ap?get("/api/approvals?status=PENDING"):[],th?get("/api/orders/ship-edits"):[],get("/api/proposals?status=PENDING"),
       ...months.flatMap(m=>th?[get("/api/bonus/gifts?month="+m),get("/api/bonus/cash?month="+m)]:[])]);
     if(cs&&cs.threshold!=null)PD.th=+cs.threshold;
-    PD.sv={ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
+    const combo=ceo||kt||w.admin?await get("/api/hub/sanpham/unmapped"):[];
+    PD.sv={combo,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
   catch(e){PD.err=e.message||"Không tải được"}
   PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();pdBadge()}
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */
