@@ -54,4 +54,23 @@ describe('Shopee: số tháng', () => {
     expect((await ctx.request('/api/hub/shopee/month/2026-09/aillavn', { method: 'PUT', as: USERS.ceo, body: body(null) })).status).toBe(400);
     expect((await ctx.request('/api/hub/shopee/month/2026-10/aillavn1', { method: 'PUT', as: USERS.ceo, body: body(null) })).status).toBe(400);
   });
+
+  it('trang vận hành: nhân viên xem được số bán, ưu tiên quảng cáo; không có lãi, giá vốn, phí sàn', async () => {
+    const b = {
+      data: { rows: [{ pn: 'Tinh dầu', q: 5, dt: 1000, lg: 500 }, { pn: 'Tinh dầu', q: 1, dt: 200, lg: 100 }, { pn: 'Body mist', q: 1, dt: 100, lg: -10 }] },
+      summary: { ky: '2026-10', shop: 'aillavn1', den: '2026-10-25', dt: 1300, gv: 300, lg: 590, ads: 130, don: 7, hh: 50,
+        fees: [['Hoa hồng affiliate', -30]], days: { '2026-10-01': [1300, -400, 300, 590, 7, 130] } },
+    };
+    expect((await ctx.request('/api/hub/shopee/month/2026-10/aillavn1', { method: 'PUT', as: USERS.ceo, body: b })).status).toBe(200);
+    const r = await ctx.request('/api/hub/shopee/ops?from=2026-10-01&to=2026-10-31', { as: NV });
+    expect(r.status).toBe(200);
+    const m = r.body.data.months[0];
+    expect(m).toMatchObject({ shop: 'aillavn1', dt: 1300, don: 7, hh: 50, ads: 130, hhAff: 30, den: '2026-10-25' });
+    expect(m.days['2026-10-01']).toEqual([1300, 7, 130]);
+    expect(m.sp).toEqual([
+      { n: 'Tinh dầu', q: 6, dt: 1200, pri: 'Đẩy mạnh' },
+      { n: 'Body mist', q: 1, dt: 100, pri: 'Dừng quảng cáo' },
+    ]);
+    expect(JSON.stringify(m)).not.toMatch(/"gv"|"lg"|"phi"/);
+  });
 });
