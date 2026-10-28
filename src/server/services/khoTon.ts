@@ -196,7 +196,8 @@ export async function khoDoiChieu(db: D1Database, from: string, to: string): Pro
         `SELECT item, COUNT(*) AS n FROM (
            SELECT km.misa_code AS item FROM orders o
            JOIN order_kho_lines okl ON okl.order_id = o.id
-           JOIN order_items oi ON oi.order_id = o.id AND oi.product_id = okl.product_id
+           JOIN (SELECT order_id, product_id, SUM(qty) AS qty FROM order_items GROUP BY order_id, product_id) oi
+             ON oi.order_id = o.id AND oi.product_id = okl.product_id
            JOIN products p ON p.id = oi.product_id JOIN kho_map km ON km.crm_sku = p.sku
            WHERE o.deleted_at IS NULL AND okl.shipped_qty IS NOT NULL AND ABS(okl.shipped_qty - oi.qty) > 0.000001
              AND substr(o.delivered_at, 1, 10) >= ?1 AND substr(o.delivered_at, 1, 10) <= ?2

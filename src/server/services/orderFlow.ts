@@ -212,6 +212,30 @@ interface KhoItemRow {
 }
 
 /** Kiểm tồn từng dòng của đơn: tồn thành phẩm, hàng đã giữ cho đơn khác, khả năng sản xuất theo định mức. */
+/**
+ * Một mã có thể nằm ở nhiều dòng của đơn (dòng bán + dòng tặng cùng mã). Kho kiểm và ghi xuất theo MÃ,
+ * nên số trên đơn của một mã là tổng các dòng; số kho gửi lên của một mã cũng cộng dồn nếu gửi theo từng dòng.
+ */
+async function qtyByProduct(db: D1Database, orderId: string, giftFilter = '') {
+  return (
+    (
+      await db
+        .prepare(
+          `SELECT oi.product_id, p.sku, p.name, SUM(oi.qty) AS qty
+           FROM order_items oi JOIN products p ON p.id = oi.product_id
+           WHERE oi.order_id = ?${giftFilter} GROUP BY oi.product_id, p.sku, p.name ORDER BY MIN(oi.rowid)`,
+        )
+        .bind(orderId)
+        .all<{ product_id: string; sku: string; name: string; qty: number }>()
+    ).results ?? []
+  );
+}
+function sumByProduct(lines: Array<{ product_id: string; shipped_qty: number }>): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const l of lines) m.set(l.product_id, (m.get(l.product_id) ?? 0) + Number(l.shipped_qty));
+  return m;
+}
+
 export async function khoCheck(db: D1Database, auth: AuthContext, orderId: string): Promise<{
   lines: KhoCheckLine[];
   stock_ready: boolean;
@@ -223,16 +247,7 @@ export async function khoCheck(db: D1Database, auth: AuthContext, orderId: strin
   if (!o) throw notFound('Không tìm thấy đơn hàng');
   if (!seesAllOrders(auth) && o.owner_id !== auth.user.id) throw notFound('Không tìm thấy đơn hàng');
 
-  const items = (
-    await db
-      .prepare(
-        `SELECT oi.product_id, p.sku, p.name, oi.qty
-         FROM order_items oi JOIN products p ON p.id = oi.product_id
-         WHERE oi.order_id = ? AND oi.is_gift IN (0, 1) ORDER BY oi.created_at`,
-      )
-      .bind(orderId)
-      .all<{ product_id: string; sku: string; name: string; qty: number }>()
-  ).results ?? [];
+  const items = await qtyByProduct(db, orderId, ' AND oi.is_gift IN (0, 1)');
 
   const skus = items.map((i) => i.sku);
   const maps = new Map<string, { misa_code: string; factor: number }>();
@@ -422,11 +437,8 @@ export async function flowKhoReport(
   requireStatus(o, ['CHO_KIEM_KHO'], 'báo kết quả kiểm kho');
 
   const items = (
-    await db
-      .prepare('SELECT product_id, qty FROM order_items WHERE order_id = ?')
-      .bind(orderId)
-      .all<{ product_id: string; qty: number }>()
-  ).results ?? [];
+    await qtyByProduct(db, orderId)
+  );
   const byProduct = new Map(input.lines.map((l) => [l.product_id, l]));
   const now = nowIso();
   const statements: D1PreparedStatement[] = [];
@@ -594,13 +606,8 @@ export async function flowShip(
   requireStatus(o, ['CHO_XUAT'], 'xuất kho');
   if (o.approval_status !== 'APPROVED') throw badRequest('NOT_APPROVED', 'Đơn chưa được duyệt.');
 
-  const items = (
-    await db
-      .prepare('SELECT product_id, qty FROM order_items WHERE order_id = ?')
-      .bind(orderId)
-      .all<{ product_id: string; qty: number }>()
-  ).results ?? [];
-  const given = new Map((input.lines ?? []).map((l) => [l.product_id, l.shipped_qty]));
+  const items = await qtyByProduct(db, orderId);
+  const given = sumByProduct(input.lines ?? []);
   const now = nowIso();
   if (input.ship_day && input.ship_day > vnDate()) throw unprocessable('BAD_SHIP_DAY', 'Ngày xuất kho không được sau hôm nay.');
   const shipAt = input.ship_day ? shipDayToIso(input.ship_day) : null;
@@ -770,10 +777,10 @@ export async function flowCorrectShipped(
     (
       await db
         .prepare(
-          `SELECT oi.product_id, oi.qty, p.sku, okl.shipped_qty AS shipped
-           FROM order_items oi JOIN products p ON p.id = oi.product_id
-           LEFT JOIN order_kho_lines okl ON okl.order_id = oi.order_id AND okl.product_id = oi.product_id
-           WHERE oi.order_id = ?`,
+          `SELECT q.product_id, q.qty, q.sku, okl.shipped_qty AS shipped
+           FROM (SELECT oi.product_id, p.sku, SUM(oi.qty) AS qty FROM order_items oi JOIN products p ON p.id = oi.product_id
+                 WHERE oi.order_id = ?1 GROUP BY oi.product_id, p.sku) q
+           LEFT JOIN order_kho_lines okl ON okl.order_id = ?1 AND okl.product_id = q.product_id`,
         )
         .bind(orderId)
         .all<{ product_id: string; qty: number; sku: string; shipped: number | null }>()
@@ -782,7 +789,8 @@ export async function flowCorrectShipped(
   const now = nowIso();
   const changed: Array<{ sku: string; before: number; after: number }> = [];
   const stmts: D1PreparedStatement[] = [];
-  for (const l of input.lines) {
+  for (const [product_id, shipped_qty] of sumByProduct(input.lines)) {
+    const l = { product_id, shipped_qty };
     const it = byId.get(l.product_id);
     if (!it) {
       throw unprocessable(
@@ -909,11 +917,10 @@ export async function flowCorrectShipped(
 export async function shipDiff(db: D1Database, orderId: string) {
   const rows = await db
     .prepare(
-      `SELECT p.sku, p.name, oi.qty AS ordered, okl.shipped_qty AS shipped
-       FROM order_items oi
-       JOIN products p ON p.id = oi.product_id
-       LEFT JOIN order_kho_lines okl ON okl.order_id = oi.order_id AND okl.product_id = oi.product_id
-       WHERE oi.order_id = ?`,
+      `SELECT q.sku, q.name, q.ordered, okl.shipped_qty AS shipped
+       FROM (SELECT oi.product_id, p.sku, p.name, SUM(oi.qty) AS ordered FROM order_items oi
+             JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?1 GROUP BY oi.product_id, p.sku, p.name) q
+       LEFT JOIN order_kho_lines okl ON okl.order_id = ?1 AND okl.product_id = q.product_id`,
     )
     .bind(orderId)
     .all<{ sku: string; name: string; ordered: number; shipped: number | null }>();
@@ -934,7 +941,7 @@ async function buildShippedAdjustment(
 ): Promise<{ statements: D1PreparedStatement[]; changes: Array<{ sku: string; name: string; ordered: number; shipped: number }> }> {
   const rows = await db
     .prepare(
-      `SELECT oi.id, p.sku, p.name, oi.qty, oi.applied_price, oi.line_total, oi.is_gift, oi.gift_qty, okl.shipped_qty AS shipped
+      `SELECT oi.id, oi.product_id, p.sku, p.name, oi.qty, oi.applied_price, oi.line_total, oi.is_gift, oi.gift_qty, okl.shipped_qty AS shipped
        FROM order_items oi
        JOIN products p ON p.id = oi.product_id
        LEFT JOIN order_kho_lines okl ON okl.order_id = oi.order_id AND okl.product_id = oi.product_id
@@ -943,6 +950,7 @@ async function buildShippedAdjustment(
     .bind(o.id)
     .all<{
       id: string;
+      product_id: string;
       sku: string;
       name: string;
       qty: number;
@@ -953,10 +961,34 @@ async function buildShippedAdjustment(
       shipped: number | null;
     }>();
   const items = rows.results ?? [];
-  const changes = items
-    .filter((r) => r.shipped !== null && r.shipped !== r.qty)
-    .map((r) => ({ sku: r.sku, name: r.name, ordered: r.qty, shipped: r.shipped as number }));
+  // Số thực xuất ghi theo mã; một mã có thể nằm nhiều dòng (bán + tặng) nên so với TỔNG các dòng của mã.
+  const perProduct = new Map<string, { sku: string; name: string; ordered: number; shipped: number | null }>();
+  for (const r of items) {
+    const cur = perProduct.get(r.product_id);
+    if (cur) cur.ordered += r.qty;
+    else perProduct.set(r.product_id, { sku: r.sku, name: r.name, ordered: r.qty, shipped: r.shipped });
+  }
+  const changes = [...perProduct.values()]
+    .filter((r) => r.shipped !== null && r.shipped !== r.ordered)
+    .map((r) => ({ sku: r.sku, name: r.name, ordered: r.ordered, shipped: r.shipped as number }));
   if (changes.length === 0) return { statements: [], changes: [] };
+  // Chia số thực xuất của mã về các dòng: dòng bán nhận trước (đủ số đặt), còn lại cho dòng tặng;
+  // xuất dư thì cộng vào dòng bán cuối cùng của mã.
+  const newQty = new Map<string, number>();
+  for (const [pid, pr] of perProduct) {
+    if (pr.shipped === null || pr.shipped === pr.ordered) continue;
+    const lines = items.filter((r) => r.product_id === pid).sort((a, b) => a.is_gift - b.is_gift);
+    let left = pr.shipped;
+    for (const r of lines) {
+      const q = Math.min(r.qty, Math.max(0, left));
+      newQty.set(r.id, q);
+      left -= q;
+    }
+    if (left > 0) {
+      const tail = [...lines].reverse().find((r) => !r.is_gift) ?? lines[lines.length - 1];
+      newQty.set(tail.id, (newQty.get(tail.id) ?? 0) + left);
+    }
+  }
 
   const head = await db
     .prepare(
@@ -1000,20 +1032,19 @@ async function buildShippedAdjustment(
   const after: typeof items = [];
   let subtotal = 0;
   for (const r of items) {
-    if (r.shipped === null || r.shipped === r.qty) {
+    const q = newQty.get(r.id);
+    if (q === undefined || q === r.qty) {
       after.push(r);
       subtotal += r.line_total;
       continue;
     }
-    if (r.shipped <= 0) {
+    if (q <= 0) {
       stmts.push(db.prepare('DELETE FROM order_items WHERE id = ?').bind(r.id));
       continue;
     }
-    const lineTotal = r.is_gift ? 0 : Math.round(Math.max(0, r.shipped - (r.gift_qty ?? 0)) * r.applied_price);
-    stmts.push(
-      db.prepare('UPDATE order_items SET qty = ?, line_total = ? WHERE id = ?').bind(r.shipped, lineTotal, r.id),
-    );
-    after.push({ ...r, qty: r.shipped, line_total: lineTotal });
+    const lineTotal = r.is_gift ? 0 : Math.round(Math.max(0, q - (r.gift_qty ?? 0)) * r.applied_price);
+    stmts.push(db.prepare('UPDATE order_items SET qty = ?, line_total = ? WHERE id = ?').bind(q, lineTotal, r.id));
+    after.push({ ...r, qty: q, line_total: lineTotal });
     subtotal += lineTotal;
   }
   const newTotal = subtotal - head.discount_amount - head.bonus_deduction + head.shipping_fee;
@@ -1173,7 +1204,7 @@ export async function flowSummary(db: D1Database, auth: AuthContext) {
       `SELECT p.sku, p.name, SUM(oi.qty - COALESCE(okl.ok_qty, 0)) AS short, COUNT(DISTINCT o.id) AS orders,
               MIN(okl.eta_date) AS eta
        FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id
+       JOIN (SELECT order_id, product_id, SUM(qty) AS qty FROM order_items GROUP BY order_id, product_id) oi ON oi.order_id = o.id
        JOIN products p ON p.id = oi.product_id
        JOIN order_kho_lines okl ON okl.order_id = o.id AND okl.product_id = oi.product_id
        WHERE o.deleted_at IS NULL AND o.flow_on = 1 AND o.kho_status IN ('THIEU_HANG', 'CHO_HANG')

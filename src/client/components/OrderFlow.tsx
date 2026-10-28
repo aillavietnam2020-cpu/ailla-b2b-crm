@@ -35,6 +35,18 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 /** Tiền tố nhãn: ai đang phải làm bước kế tiếp. */
+
+/** Một mã có thể nằm nhiều dòng (dòng bán + dòng tặng). Kho kiểm và ghi xuất theo MÃ nên gộp các dòng cùng mã, cộng số lượng. */
+function byProduct<T extends { product_id: string; qty: number }>(items: T[]): T[] {
+  const m = new Map<string, T>();
+  for (const i of items) {
+    const c = m.get(i.product_id);
+    if (c) m.set(i.product_id, { ...c, qty: c.qty + i.qty });
+    else m.set(i.product_id, { ...i });
+  }
+  return [...m.values()];
+}
+
 export function waitingLabel(status: string | undefined): string | null {
   const s = (status ?? 'KHONG') as KhoStatus;
   const who = KHO_WAITING[s];
@@ -125,7 +137,7 @@ export function OrderFlowPanel({
   const isOwner = (order as unknown as { owner_id?: string | null }).owner_id === me?.user.id;
   const saleActs = isOwner || isApprover;
 
-  const lines = order.items;
+  const lines = byProduct(order.items);
   const khoMap = useMemo(
     () => new Map((order.kho_lines ?? []).map((l) => [l.product_id, l])),
     [order.kho_lines],
@@ -567,7 +579,7 @@ function CorrectShipped({
   const [reason, setReason] = useState('');
   const value = (i: { product_id: string; qty: number }) =>
     qty[i.product_id] ?? String(current.get(i.product_id) ?? i.qty);
-  const changed = order.items.filter(
+  const changed = byProduct(order.items).filter(
     (i) => Number(value(i)) !== (current.get(i.product_id) ?? i.qty),
   );
   return (
@@ -593,7 +605,7 @@ function CorrectShipped({
               </tr>
             </thead>
             <tbody>
-              {order.items.map((i) => (
+              {byProduct(order.items).map((i) => (
                 <tr key={i.product_id}>
                   <td>
                     <strong>{i.sku}</strong>
@@ -689,7 +701,7 @@ function DiffTable({
 
 function ShortageTable({ order }: { order: OrderDetail }) {
   const map = new Map((order.kho_lines ?? []).map((l) => [l.product_id, l]));
-  const rows = order.items.filter((i) => map.get(i.product_id)?.status === 'THIEU');
+  const rows = byProduct(order.items).filter((i) => map.get(i.product_id)?.status === 'THIEU');
   if (rows.length === 0) return null;
   return (
     <div className="table-wrap">
@@ -929,13 +941,13 @@ function ShipForm({
   onSubmit: (body: unknown) => void;
 }) {
   const [qty, setQty] = useState<Record<string, string>>(() =>
-    Object.fromEntries(order.items.map((i) => [i.product_id, String(i.qty)])),
+    Object.fromEntries(byProduct(order.items).map((i) => [i.product_id, String(i.qty)])),
   );
   const [note, setNote] = useState('');
   const [shipDay, setShipDay] = useState('');
   const [shipBy, setShipBy] = useState('');
   const [shipErr, setShipErr] = useState<string | null>(null);
-  const anyDiff = order.items.some((i) => Number(qty[i.product_id]) !== i.qty);
+  const anyDiff = byProduct(order.items).some((i) => Number(qty[i.product_id]) !== i.qty);
   return (
     <div>
       <p className="muted">Ghi số thực xuất của từng mã. Kho trừ tồn đúng theo số này.</p>
@@ -950,7 +962,7 @@ function ShipForm({
             </tr>
           </thead>
           <tbody>
-            {order.items.map((i) => (
+            {byProduct(order.items).map((i) => (
               <tr key={i.product_id}>
                 <td>
                   <strong>{i.sku}</strong>
@@ -993,7 +1005,7 @@ function ShipForm({
               if (shipBy.trim().length < 2) return setShipErr('Người xuất kho phải tự ghi tên mình.');
               setShipErr(null);
               onSubmit({
-                lines: order.items.map((i) => ({
+                lines: byProduct(order.items).map((i) => ({
                   product_id: i.product_id,
                   shipped_qty: Math.max(0, Math.floor(Number(qty[i.product_id]) || 0)),
                 })),

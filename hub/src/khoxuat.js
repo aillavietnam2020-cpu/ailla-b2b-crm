@@ -75,7 +75,9 @@ function xpEdit(id){
    <div class="acts" style="margin-top:12px"><button class="btn pri" id="xe-ok"${pend?" disabled":""}>${ap?"Lưu sửa":"Gửi yêu cầu sửa"}</button><span id="xe-msg" class="hint"></span></div>`);
   $("#xe-ok").onclick=async()=>{
     const d=$("#xe-d").value,n=$("#xe-n").value.trim(),why=$("#xe-r").value.trim();
-    const lines=[...document.querySelectorAll(".xe-q")].filter(i=>Math.max(0,Math.floor(+i.value||0))!==+i.dataset.cur).map(i=>({product_id:i.dataset.p,shipped_qty:Math.max(0,Math.floor(+i.value||0))}));
+    // Một mã có thể có dòng bán + dòng tặng: số thực xuất ghi theo mã nên cộng các dòng cùng mã.
+    const g={};document.querySelectorAll(".xe-q").forEach(i=>{const k=i.dataset.p;g[k]=g[k]||{v:0,c:0};g[k].v+=Math.max(0,Math.floor(+i.value||0));g[k].c+=+i.dataset.cur||0});
+    const lines=Object.keys(g).filter(k=>g[k].v!==g[k].c).map(k=>({product_id:k,shipped_qty:g[k].v}));
     const body={reason:why};if(lines.length)body.lines=lines;if(d&&d!==o.shipped_day)body.ship_day=d;if(n&&n!==(o.shipped_by_name||""))body.shipped_by_name=n;
     if(!lines.length&&!body.ship_day&&!body.shipped_by_name){$("#xe-msg").textContent="Chưa đổi gì: sửa số lượng, ngày hoặc người xuất";return}
     if(why.length<5){$("#xe-msg").textContent="Ghi lý do sửa (ít nhất vài chữ)";$("#xe-r").focus();return}
@@ -115,7 +117,9 @@ function xpOpen(id){
       if(bad.length){$("#xp-msg").textContent="Có "+bad.length+" mã xuất khác số đặt. Đơn này chạy luồng cũ nên chưa ghi được: hãy báo sale sửa đơn cho đúng số thực xuất rồi xác nhận.";return}}
     if(flow){
       lines=[...document.querySelectorAll(".xp-q")].map(i=>({product_id:i.dataset.p,shipped_qty:Math.max(0,Math.floor(+i.value||0))}));
-      const diff=lines.filter(x=>{const l=o.lines.find(y=>y.product_id===x.product_id);return l&&l.qty!==x.shipped_qty});
+      const sum=(arr,f)=>arr.reduce((m,x)=>(m[x.product_id]=(m[x.product_id]||0)+f(x),m),{});
+      const got=sum(lines,x=>x.shipped_qty),want=sum(o.lines,x=>+x.qty||0);
+      const diff=Object.keys(got).filter(k=>got[k]!==want[k]);
       if(diff.length&&!confirm("Có "+diff.length+" mã xuất khác số đặt. Vẫn xác nhận?"))return}
     const b=$("#xp-ok");b.disabled=true;$("#xp-msg").textContent="Đang ghi…";
     try{
