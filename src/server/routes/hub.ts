@@ -70,36 +70,41 @@ hubRoutes.use('*', requirePermission('hub.access'));
 
 /** Phiên bản hiện tại, để trình duyệt hỏi nhanh "có ai vừa sửa không" mà không tải cả dữ liệu. */
 hubRoutes.get('/state/version', async (c) => {
-  const row = await c.env.DB.prepare('SELECT version, updated_at FROM hub_state WHERE id = ?')
-    .bind(STATE_ID)
-    .first<{ version: number; updated_at: string }>();
-  const sx = await c.env.DB.prepare('SELECT version FROM hub_state WHERE id = ?')
-    .bind(SX_ID)
-    .first<{ version: number }>();
+  const { results } = await c.env.DB.prepare('SELECT id, version, updated_at FROM hub_state WHERE id IN (?, ?)')
+    .bind(STATE_ID, SX_ID)
+    .all<{ id: string; version: number; updated_at: string }>();
+  const row = results.find((r) => r.id === STATE_ID);
+  const sx = results.find((r) => r.id === SX_ID);
   return ok(c, { version: row?.version ?? 0, updated_at: row?.updated_at ?? null, sx_version: sx?.version ?? 0 });
 });
 
 hubRoutes.get('/state', async (c) => {
-  const row = await c.env.DB.prepare('SELECT version, data, updated_at FROM hub_state WHERE id = ?')
-    .bind(STATE_ID)
-    .first<{ version: number; data: string; updated_at: string }>();
-  if (!row) return ok(c, { version: 0, data: null, updated_at: null });
+  // Một lượt hỏi D1 lấy cả bản chung, ngăn tài chính, ngăn nhân sự và biết đã có ngăn Sản xuất chưa
+  // (trước đây 4 lượt nối nhau). Ngăn Sản xuất chỉ cần biết có hay không nên không lấy dữ liệu của nó.
+  const { results: rows } = await c.env.DB.prepare(
+    'SELECT id, version, CASE WHEN id = ? THEN NULL ELSE data END AS data, updated_at FROM hub_state WHERE id IN (?, ?, ?, ?)',
+  )
+    .bind(SX_ID, STATE_ID, SX_ID, SECURE_ID, HR_ID)
+    .all<{ id: string; version: number; data: string | null; updated_at: string }>();
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const row = byId.get(STATE_ID);
+  if (!row || row.data == null) return ok(c, { version: 0, data: null, updated_at: null });
   const auth = c.get('auth');
   const data = JSON.parse(await unpack(row.data)) as Record<string, unknown>;
   // Sản xuất đã có ngăn riêng thì không trả kèm trong bản chung (trang mới tải riêng qua /sx).
-  const sxRow = await c.env.DB.prepare('SELECT 1 AS x FROM hub_state WHERE id = ?').bind(SX_ID).first();
-  if (sxRow) delete data.sx;
+  if (byId.has(SX_ID)) delete data.sx;
   // Bản cũ có thể còn lẫn số tài chính: luôn gạt ra trước. Chưa có ngăn riêng thì CEO/kế toán nhận lại
   // đúng số cũ đó, lần ghi kế tiếp sẽ tự chuyển sang ngăn riêng.
   const legacy = splitSecure(data);
   if (canSecret(auth)) {
-    const sec = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(SECURE_ID).first<{ data: string }>();
-    Object.assign(data, sec ? JSON.parse(await unpack(sec.data)) : legacy);
+    const sec = byId.get(SECURE_ID);
+    Object.assign(data, sec?.data != null ? JSON.parse(await unpack(sec.data)) : legacy);
   }
   // Nhân sự: bản cũ còn nằm trong bản chung thì chuyển sang ngăn riêng ngay lần đọc đầu tiên.
   const hrOk = await canHr(c.env.DB, auth);
   const hrLegacy = splitHr(data);
-  let hrRow = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(HR_ID).first<{ data: string }>();
+  const hrFound = byId.get(HR_ID);
+  let hrRow: { data: string } | null = hrFound?.data != null ? { data: hrFound.data } : null;
   if (!hrRow && hrHasData(hrLegacy)) {
     const packed = await pack(JSON.stringify(hrLegacy));
     await c.env.DB.prepare(

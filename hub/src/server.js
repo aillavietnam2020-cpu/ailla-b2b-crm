@@ -9,10 +9,22 @@
    ===================================================================== */
 const SV={version:0,pending:[],busy:false,timer:0,me:null,perms:[],deferRemote:false};
 
+// Nhiều phần cùng hỏi một địa chỉ (GET) trong lúc câu trước chưa về thì dùng chung một lượt gọi; mỗi phần tự đọc JSON
+// riêng nên không đụng dữ liệu của nhau. Có thao tác ghi (POST/PUT/...) thì bỏ hết lượt đang chờ để lần đọc sau lấy số mới.
+const SV_INFL=new Map();
 async function svApi(path,opt={}){
-  const r=await fetch(path,{credentials:"same-origin",...opt,headers:{"Content-Type":"application/json",...(opt.headers||{})}});
+  const get=!opt.method||opt.method==="GET",share=get&&Object.keys(opt).every(k=>k==="method");
+  if(!get)SV_INFL.clear();
+  let p=share?SV_INFL.get(path):null;
+  if(!p){
+    // Dữ liệu lúc mở trang đã được hỏi sẵn ngay đầu trang (xem hub/build.mjs, SVPRE), dùng lại một lần.
+    const pre=share&&window.SVPRE&&SVPRE[path];if(pre)delete SVPRE[path];
+    p=(pre||fetch(path,{credentials:"same-origin",...opt,headers:{"Content-Type":"application/json",...(opt.headers||{})}})).then(async r=>({status:r.status,ok:r.ok,text:await r.text()}));
+    if(share){SV_INFL.set(path,p);p.then(()=>{},()=>{}).then(()=>{if(SV_INFL.get(path)===p)SV_INFL.delete(path)})}
+  }
+  const r=await p;
   if(r.status===401){location.href="/?next="+encodeURIComponent(location.pathname);throw new Error("Chưa đăng nhập")}
-  const j=await r.json().catch(()=>({}));
+  let j={};try{j=JSON.parse(r.text)}catch(e){}
   if(!r.ok){const e=new Error((j.error&&j.error.message)||("Lỗi máy chủ "+r.status));e.status=r.status;e.code=j.error&&j.error.code;throw e}
   return j.data;
 }
@@ -81,6 +93,8 @@ function svNotify(a,b){if(!ME||!a.kiem)return;const neu=k=>(b[k]||[]).filter(x=>
   if(!msg.length)return;toast(msg.join(" · "));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join(" · ")})}catch(e){}
   document.title="("+msg.length+") Trang quản trị Ailla";setTimeout(()=>{document.title="Trang quản trị Ailla"},15000)}
 DB.load=async function(){
+  // Bản chung và Sản xuất không phụ thuộc tài khoản: hỏi luôn cùng lúc, không đợi /api/me và số nạp sẵn xong mới hỏi.
+  const stP=svApi("/api/hub/state"),sxP=svApi("/api/hub/sx");stP.catch(()=>{});sxP.catch(()=>{});
   const me=await svApi("/api/me");SV.me=me.user;SV.perms=me.permissions||[];SV.agentChat=me.agent_chat||[];
   const blob=k=>svApi("/api/hub/blob/"+k).catch(()=>null);
   const acct=isCeo()||SV.perms.includes("debt.read.all");
@@ -90,7 +104,7 @@ DB.load=async function(){
   const kd=kdFull||(kdAds||kdSale?{...KDX,...(kdAds||{}),...(kdSale||{}),day:{tts:{},spe:{},fb:(kdSale&&kdSale.day&&kdSale.day.fb)||{},ads:(kdAds&&kdAds.day&&kdAds.day.ads)||{}}}:null);
   if(SV.perms.includes("dashboard.ceo"))svApi("/api/dashboards/ceo").then(c=>{CRM_BASE.noChinhThuc=c.official_debt||0;CRM_BASE.noDuKien=c.projected_debt||0;if(ME&&PAGE==="exec")renderMain()}).catch(()=>{});
   if(t9)window.T9FILE=t9;if(t9b){T9_BASE=t9b.base||{};T9RAW=t9b.raw||T9RAW}if(kd){KD=kd;KDX=kd;DAYD=kd.day||DAYD;TT=kd.tts||null;SP=kd.spe||null}if(sc)SKUCOST=sc;if(ns)NHANSU0=ns;
-  const st=await svApi("/api/hub/state");SV.hrOk=!!(st&&st.hr_ok);
+  const st=await stP;SV.hrOk=!!(st&&st.hr_ok);
   if(!st.data){
     if(!isCeo()){this.data=null;return}
     const d=ensureShape(seedData());d.users.forEach(u=>{delete u.pw});
@@ -99,7 +113,7 @@ DB.load=async function(){
     this.data=d;SV.version=r.version;
   }else{this.data=ensureShape(st.data);SV.version=st.version}
   // Sản xuất có ngăn riêng: tải riêng; bản chung không còn mang d.sx.
-  try{const sx=await svApi("/api/hub/sx");SXS.data=sx.data;SXS.version=sx.version}catch(e){SXS.data=null;SXS.version=0}
+  try{const sx=await sxP;SXS.data=sx.data;SXS.version=sx.version}catch(e){SXS.data=null;SXS.version=0}
   if(this.data&&this.data.sx)delete this.data.sx;
   // Gắn tài khoản CRM với người dùng trong khu Marketing.
   let u=this.data.users.find(x=>x.crm===SV.me.id&&x.active);

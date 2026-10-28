@@ -37,9 +37,14 @@ const fonts =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">';
 const xlsx = '<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>';
 
+// Hỏi sẵn dữ liệu lúc mở trang ngay khi trình duyệt đọc tới đầu trang, trong lúc phần còn lại (khoảng 4 MB mã) còn đang tải;
+// svApi (server.js) dùng lại đúng một lần. Chỉ là GET, không đổi gì trên máy chủ.
+const prefetch = '<script>window.SVPRE={};["/api/me","/api/hub/state","/api/hub/sx"].forEach(function(u){try{var p=fetch(u,{credentials:"same-origin",headers:{"Content-Type":"application/json"}});p.catch(function(){});SVPRE[u]=p}catch(e){}});setTimeout(function(){window.SVPRE={}},30000)</script>';
+
 const html = `<!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0f1b3d"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Ailla"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Trang quản trị Ailla</title>
+${prefetch}
 <link rel="icon" href="data:image/png;base64,${logo}">
 ${fonts}
 ${xlsx}

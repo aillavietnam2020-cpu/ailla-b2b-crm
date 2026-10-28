@@ -68,4 +68,4 @@ function aiEnsure(){
 setInterval(()=>{try{aiEnsure()}catch(e){}},1500);
 
 /* Tab đang mở là bản cũ thì nhắc tải lại (mỗi lần cập nhật web có một mã bản) */
-setInterval(async()=>{try{if(document.hidden||document.getElementById("newver"))return;const t=await fetch(location.pathname,{cache:"no-store",credentials:"same-origin"}).then(r=>r.text()),m=t.match(/const BUILD_ID="(\d+)"/);if(m&&m[1]!==BUILD_ID){const d=document.createElement("div");d.id="newver";d.className="newver";d.innerHTML="Có bản web mới <button type=\"button\">Tải lại ngay</button>";d.querySelector("button").onclick=()=>location.reload();document.body.appendChild(d)}}catch(e){}},60000);
+setInterval(async()=>{try{if(document.hidden||document.getElementById("newver"))return;const j=await fetch("/hub/build",{cache:"no-store",credentials:"same-origin"}).then(r=>r.json());if(j&&j.build&&j.build!==BUILD_ID){const d=document.createElement("div");d.id="newver";d.className="newver";d.innerHTML="Có bản web mới <button type=\"button\">Tải lại ngay</button>";d.querySelector("button").onclick=()=>location.reload();document.body.appendChild(d)}}catch(e){}},60000);
