@@ -341,7 +341,7 @@ function pSoChi(m){
   if(!TABS.some(t=>t[0]===SC.tab)&&!(sec&&PBG.includes(SC.tab)))SC.tab=TABS[0][0];
   const body=!sec?scMine():(PBG.includes(SC.tab)?scBCcss()+`<div class="scpills" role="tablist" style="margin:0 0 12px">${[["pb","Kết quả phân bổ"],["qt","Quy tắc phân bổ & chia lương"],["dm","Danh mục chi phí"]].map(([k,t])=>`<button type="button" role="tab" aria-selected="${SC.tab===k}" class="${SC.tab===k?"on":""}" data-sct="${k}">${t}</button>`).join("")}</div>`:"")+{tq:scTQ2,cn:scCN,kenh:scKenh,nk:scNK,pb:scPBV,qt:scQTtab,rs:scRS,dm:scDMtab}[SC.tab]();
   m.innerHTML=`<div class="sochi">${H("Sổ chi phí",pLabel()+(sec?" · hạch toán theo Thông tư 133 · nguồn: sổ cái TK 642 (MISA), phiếu chi và các khoản tự cộng":""))}
-   <div class="filters">${ghi?`<button class="btn pri" id="sc-new">＋ Ghi phiếu chi</button>`:""}${duyet?`<button class="btn" id="sc-imp">Nạp sổ từ file</button>`:""}<button class="btn sm" id="sc-ncc">Phiếu chi nhà cung cấp</button><button class="btn sm" id="sc-vc">Phiếu chi vận chuyển</button></div>
+   <div class="filters" style="justify-content:flex-end">${ghi?`<button class="btn pri" id="sc-new">＋ Ghi phiếu chi</button>`:""}${duyet?`<button class="btn" id="sc-imp">Nạp sổ từ file</button>`:""}<button class="btn sm" id="sc-ncc">Phiếu chi nhà cung cấp</button><button class="btn sm" id="sc-vc">Phiếu chi vận chuyển</button></div>
    <div class="sctabs">${TABS.map(([k,t])=>`<button class="${SC.tab===k||(k==="pb"&&PBG.includes(SC.tab))?"on":""}" data-sct="${k}">${t}</button>`).join("")}</div>${body}</div>`;
   m.querySelectorAll("[data-sct]").forEach(b=>b.onclick=()=>{SC.tab=b.dataset.sct;renderMain()});
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn};
