@@ -47,6 +47,10 @@ function vcItems(){
     if(A.length)L.push({r:6,t:A.length+" khách nợ quá 90 ngày",s:"Tổng "+nf(Math.round(A.reduce((t,r)=>t+r.b90p+r.old,0)))+" đ · "+A.slice(0,2).map(r=>r.customer_name).join(", ")+(A.length>2?"…":""),tag:["Đòi nợ","red"],han:"",go:()=>{PAGE="phai_thu";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)}})}catch(e){}
   /* việc của team (video chờ đăng, chờ duyệt…) lấy từ Task giao việc, gộp chung một hộp cho khỏi có hai danh sách */
   try{(typeof execAttention==="function"?execAttention():[]).forEach(a=>L.push({r:a.late?3:7,team:true,t:esc(a.t),s:esc([a.dep,a.who,a.han].filter(Boolean).join(" · ")),tag:[a.st[0],["red","amb","blu","grn"].includes(a.st[1])?a.st[1]:"blu"],han:"",btn:a.btn||"Mở",go:()=>vcAtGo(a)}))}catch(e){}
+  /* ghi tăng tài sản / công cụ chờ kế toán duyệt (Thảo ghi, chị Huệ duyệt số tháng và bộ phận chịu; chị Hoa chốt 28/10) */
+  try{if(typeof tsCho==="function"&&tsCanGhi()&&tsFinOk())tsCho().forEach(x=>{const pg=x.kind==="TS"?"ts_so":"ts_cc";
+    L.push({r:2,t:"Duyệt ghi tăng "+(x.kind==="TS"?"tài sản":"công cụ")+" "+esc(x.ma),s:esc(x.ten)+" · "+nf(Math.round(+x.gk||0))+" đ · "+nf(+x.n||0)+" tháng · "+esc(x.by||""),tag:["Chờ duyệt ghi tăng","amb"],han:x.at?vcAdd(iso(new Date(x.at)),2):"",
+      go:()=>{PAGE=pg;TSV.tab[pg]="so";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)}})})}catch(e){}
   L.forEach(x=>{x.over=x.han?Math.max(0,tlDays(x.han,today)):0;if(x.team&&x.r===3)x.over=1;x.leo=x.over>=S.leo});
   return L.sort((a,b)=>(b.leo-a.leo)||(b.over-a.over)||a.r-b.r);
 }

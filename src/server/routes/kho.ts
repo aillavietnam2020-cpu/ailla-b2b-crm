@@ -1209,6 +1209,12 @@ khoRoutes.post('/docs', async (c) => {
         role: 'IN',
         note: String(l.note ?? ''),
       });
+      // Công cụ dụng cụ / tài sản (lớp CCDC) không nằm trong tồn kho (chị Hoa chốt 28/10), kể cả phiếu nhập gõ tay: xuất dùng ngay cùng phiếu,
+      // như nhận hàng từ phiếu mua (purchasing.ts). Giá trị theo dõi ở sổ Tài sản & CCDC.
+      if (type === 'PN' && it.cls === 'CCDC') {
+        moves.push({ item: code, qty: -(moves[moves.length - 1].qty), std_qty: null, price: null, role: 'OUT', note: 'Xuất dùng ngay: tài sản / công cụ, theo dõi ở sổ Tài sản & CCDC' });
+        warnings.push(`${code} (${it.name}) là tài sản / công cụ: không vào tồn kho. Ghi tăng ở trang Tài sản cố định / Công cụ dụng cụ (lần sau nên lập Đơn mua tài sản / công cụ).`);
+      }
     }
   } else if (type === 'PC') {
     const btp = String(b.btp ?? '');
@@ -1389,7 +1395,7 @@ khoRoutes.post('/docs', async (c) => {
   // Nhập nguyên vật liệu không có phiếu đặt nhưng có ghi nhà cung cấp (ví dụ vỏ can): tự tạo phiếu mua để Thảo nhập giá, kế toán theo dõi công nợ.
   if (!poRow && type === 'PN' && String(b.partner ?? '').trim().length >= 2 && moves.length) {
     const agg = new Map<string, { item: string; qty: number; price: number | null }>();
-    for (const m of moves) {
+    for (const m of moves.filter((m) => m.role === 'IN')) {
       const x = agg.get(m.item);
       if (x) x.qty += m.qty;
       else agg.set(m.item, { item: m.item, qty: m.qty, price: m.price ?? null });
@@ -1407,7 +1413,7 @@ khoRoutes.post('/docs', async (c) => {
         .bind(poRow.id)
         .all<{ id: string; item: string; remain: number }>()
     ).results;
-    const mv = (await c.env.DB.prepare('SELECT id, item, qty, price FROM kho_moves WHERE doc_id = ? ORDER BY id').bind(docId).all<{ id: number; item: string; qty: number; price: number | null }>()).results;
+    const mv = (await c.env.DB.prepare("SELECT id, item, qty, price FROM kho_moves WHERE doc_id = ? AND role = 'IN' ORDER BY id").bind(docId).all<{ id: number; item: string; qty: number; price: number | null }>()).results;
     const rid = newId();
     await c.env.DB.prepare('INSERT INTO po_receipts (id, po_id, receipt_date, kho_doc_id, note, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(rid, poRow.id, date, docId, String(b.note ?? '').trim(), 'OK', auth.user.id, now)

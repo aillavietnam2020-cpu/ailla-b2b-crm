@@ -62,3 +62,10 @@ Lỗi 28/10: máy chiết rót PC-2026-10-0006 đã được ghi tăng (CC `Mayc
 - Trả NCC: `scDonCuaPay(pay)` tìm đơn mua (po_id, hoặc receipt_ids của chứng từ). Đơn toàn hàng CCDC (`tsDonTaiSan`) → dòng là G28 "Mua tài sản / công cụ", không vào chi phí NVL, không vào chi phí tháng. Bấm dòng → phiếu trả kèm ô **Đơn mua** (bấm mở đơn, `mhMoDon`).
 - Phiếu chi có ô **Thuộc đơn mua** (`row.po` = id đơn): chọn đơn tài sản / công cụ thì tự chuyển G28. Form phiếu hiện đơn mua (đã chọn, hoặc web đoán theo `tsTimDon`).
 - Thẻ tài sản / công cụ hiện **Đơn mua** (`a.po` số PM…, hoặc đơn khớp phiếu `a.nkc`) và **chi phí mua kèm** = phiếu chi có `po` đúng đơn đó, trừ phiếu tiền hàng (`tsPhiDon`, nhiều tài sản cùng đơn thì chia theo giá trị). Ghi tăng mới tự cộng vào nguyên giá; tài sản đã có thì bấm "Cộng … vào nguyên giá". Phiếu đã cộng lưu ở `a.phi`.
+
+## 8. Công cụ trong kho (chị Hoa chốt 28/10 tối)
+
+- Mua tài sản / công cụ đi qua Mua hàng: form đơn mua có ô tích **Đơn mua tài sản / công cụ dụng cụ** (đơn toàn hàng CCDC thì mặc định đang tích). Đơn vẫn hiện ở Mua hàng; nhận hàng ghi "Vào sổ tài sản / công cụ", không vào tồn kho.
+- Phiếu nhập kho gõ tay (`POST /api/hub/kho/docs` type PN) có mã lớp CCDC: máy chủ thêm dòng xuất dùng ngay cùng phiếu (như `purchasing.ts`) và cảnh báo ghi tăng ở trang Tài sản. Phiếu mua tự tạo từ phiếu nhập chỉ tính dòng IN.
+- Công cụ tồn cũ: gỡ khỏi tồn kho bằng một phiếu xuất khác (XK) ngày 28/10, không xóa lịch sử.
+- Ghi tăng chờ duyệt (`D().tsCho`) hiện ở **Việc chờ tôi** (vieccho.js) cho người duyệt được (kế toán / CEO), bấm mở trang Tài sản.
