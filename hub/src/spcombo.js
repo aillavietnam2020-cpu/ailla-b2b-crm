@@ -212,6 +212,9 @@ async function spcSave(){
 /* ---------- Sản phẩm gốc: thêm một bước / sửa ---------- */
 /* Ghi giá vốn tháng hiện tại vào Giá vốn SKU (D().skus), như trang Giá vốn SKU. */
 function spcSetGv(code,name,v){if(!(v>0)||typeof DB==="undefined")return false;const ky=spcKy();
+  /* Lưu vết: giá cũ (đang dùng) → giá mới, ai sửa, lúc nào (nhật ký máy chủ, xem ở Sửa › Lịch sử giá vốn). */
+  const g0=spcGvMap((D()&&D().skus)||[],SPCB.cost,ky)[spcLow(code)],old=g0?Math.round(g0.u):null;if(old===Math.round(v))return false;
+  spcApi("/cost-log",{method:"POST",body:JSON.stringify({code,ky,old,new:Math.round(v)})}).catch(e=>toast("Đã lưu giá nhưng chưa ghi được lịch sử: "+e.message));
   DB.mutate(ME.name,"giá vốn "+code+" tháng "+ky,dt=>{dt.skus=dt.skus||[];let s=dt.skus.find(x=>spcLow(x.ma)===spcLow(code));if(!s){s={ma:code,ten:name,k:typeof guessSku==="function"?guessSku(name)||"KHAC":"KHAC",qc:"",giaVon:{},giaBan:0,active:true};dt.skus.push(s)}s.giaVon=s.giaVon||{};s.giaVon[ky]=Math.round(v)});return true}
 function spcProd(p){
   const g=spcSeeCost()?spcGvMap((D()&&D().skus)||[],SPCB.cost,spcKy()):null,gv=p&&g&&g[spcLow(p.code)];
@@ -225,7 +228,12 @@ function spcProd(p){
    ${p?`<p class="hint">Mã kho không đổi được (đã có phiếu kho, MISA dùng). Mã bán Kênh phân phối: ${crm.map(esc).join(", ")||"chưa có"}.${gv?" Giá vốn đang dùng: "+nf(gv.u)+"đ ("+esc(gv.src)+").":""}</p>`
      :`<label class="inl"><input type="checkbox" id="spp-kpp" checked style="width:auto"> Bán cho Kênh phân phối (tạo mã bán cùng mã và nối mã kho)</label>
        <div class="note" style="margin-top:8px">Bấm Lưu là web tự: tạo mã kho/MISA · tạo mã bán Kênh phân phối cùng mã · nối mã bán ↔ mã kho (hệ số 1)${g?" · ghi giá vốn vào Giá vốn SKU":""}. Giá bán 8 cấp vẫn đặt ở Bảng giá.</div>`}
+   ${p?`<h3 style="margin:16px 0 6px">Lịch sử giá vốn và sửa sản phẩm</h3><div id="spp-hist" style="max-height:220px;overflow:auto;font-size:13px"><p class="hint">Đang tải…</p></div>`:""}
    <div class="filters" style="margin-top:14px"><button class="btn pri" id="spp-save">Lưu</button>${p?(p.active?`<button class="btn" id="spp-off" style="margin-left:auto">Ngừng dùng</button>`:`<button class="btn" id="spp-on" style="margin-left:auto">Dùng lại</button>`):""}</div>`);
+  if(p)spcApi("/cost-history?code="+encodeURIComponent(p.code)).then(L=>{const el=$("#spp-hist");if(!el)return;const t=x=>String(x||"");
+    el.innerHTML=L.length?L.map(h=>{let a={},b={};try{a=JSON.parse(h.after_json||"{}");b=JSON.parse(h.before_json||"{}")}catch(e){}const at=t(h.created_at);
+      const what=h.action==="SP_GIA_VON"?`giá vốn tháng ${esc(t(a.ky).slice(5))}/${esc(t(a.ky).slice(0,4))}: ${b.gia?nf(b.gia)+"đ → ":""}<b>${nf(a.gia)}đ</b>`:h.action==="SP_PRODUCT_ADD"?"tạo sản phẩm":"sửa "+[a.name!==b.name?"tên":"",a.unit!==b.unit?"đơn vị":"",a.active!==b.active?(a.active?"dùng lại":"ngừng dùng"):""].filter(Boolean).join(", ");
+      return `<div style="padding:5px 0;border-bottom:1px solid var(--line,#eee)"><b>${esc(at.slice(8,10)+"/"+at.slice(5,7)+" "+at.slice(11,16))}</b> · ${esc(h.by_name||"")} · ${what}</div>`}).join(""):`<p class="hint">Chưa có lần sửa nào được ghi (giá nhập trước 28/10 ở trang Giá vốn SKU chưa có lịch sử).</p>`}).catch(()=>{});
   if(!p){const n=$("#spp-n"),cd=$("#spp-code");n.oninput=()=>{if(!cd.dataset.t)cd.value=spcSuggestCode(n.value)};cd.oninput=()=>{cd.dataset.t=1}}
   const setGv=spcSetGv;
   $("#spp-save").onclick=async()=>{const name=$("#spp-n").value.trim(),unit=$("#spp-u").value.trim(),v=$("#spp-gv")?+String($("#spp-gv").value).replace(/[^0-9]/g,""):0;

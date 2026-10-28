@@ -390,3 +390,46 @@ sanphamRoutes.patch('/products/:code', async (c) => {
   ]);
   return ok(c, { code });
 });
+
+/**
+ * Lưu vết giá vốn sản phẩm gốc (chị Hoa dặn 28/10: sửa là có lịch sử). Giá vốn vẫn cất ở Giá vốn SKU (dữ liệu chung của web);
+ * trình duyệt ghi xong thì báo lên đây để ghi nhật ký: ai sửa, lúc nào, tháng nào, giá cũ → giá mới.
+ */
+sanphamRoutes.post('/cost-log', async (c) => {
+  const auth = c.get('auth');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán sửa giá vốn');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const code = String(b?.code ?? '').trim();
+  const ky = String(b?.ky ?? '').trim();
+  const v = Number(b?.new);
+  const old = b?.old == null || b.old === '' ? null : Number(b.old);
+  if (!code || code.length > 60) throw badRequest('MISSING', 'Thiếu mã');
+  if (!/^\d{4}-\d{2}$/.test(ky)) throw badRequest('BAD_KY', 'Tháng không hợp lệ');
+  if (!(Number.isFinite(v) && v > 0 && v < 1e9)) throw badRequest('BAD_PRICE', 'Giá vốn không hợp lệ');
+  await auditStatement(c.env.DB, {
+    actorId: auth.user.id,
+    action: 'SP_GIA_VON',
+    entityType: 'SP_GIA_VON',
+    entityId: code,
+    before: { ky, gia: old != null && Number.isFinite(old) ? old : null },
+    after: { ky, gia: Math.round(v) },
+    requestId: c.get('requestId'),
+    ip: ip(c),
+  }).run();
+  return ok(c, { code });
+});
+
+sanphamRoutes.get('/cost-history', async (c) => {
+  const code = String(c.req.query('code') ?? '').trim();
+  if (!code) throw badRequest('MISSING', 'Thiếu mã');
+  const r = await c.env.DB
+    .prepare(
+      `SELECT a.action, a.before_json, a.after_json, a.created_at, u.display_name AS by_name
+       FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
+       WHERE ((a.entity_type = 'SP_GIA_VON') OR (a.entity_type = 'KHO_ITEM' AND a.action LIKE 'SP_PRODUCT_%')) AND a.entity_id = ?
+       ORDER BY a.created_at DESC LIMIT 100`,
+    )
+    .bind(code)
+    .all();
+  return ok(c, r.results ?? []);
+});
