@@ -46,6 +46,20 @@ describe('Mua hàng: phiếu mua → nhận hàng → giá, hóa đơn, phiếu 
     expect(list.body.data.find((o: { id: string }) => o.id === po.body.data.id).status).toBe('DU');
   });
 
+  it('phiếu nhập kho gõ tay có công cụ (lớp CCDC): công cụ xuất dùng ngay, nguyên vật liệu vẫn vào kho, phiếu mua tự tạo đúng số', async () => {
+    await ctx.db.prepare("INSERT INTO kho_items (code, name, unit, cls, grp, min_stock, active, created_at) VALUES ('KEOCAT', 'Kéo cắt', 'cái', 'CCDC', 'Công cụ dụng cụ', 0, 1, ?)").bind(NOW).run();
+    const pn = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-08', partner: 'Cửa hàng dụng cụ B', lines: [{ item: 'KEOCAT', qty: 3 }, { item: 'NVL1', qty: 5 }] } });
+    expect(pn.status).toBe(200);
+    expect(pn.body.data.warnings.join(' ')).toMatch(/KEOCAT.*không vào tồn kho/);
+    const ton = async (code: string) => (await ctx.db.prepare('SELECT SUM(qty) AS q FROM kho_ledger WHERE item = ?').bind(code).first<{ q: number }>())?.q;
+    expect(await ton('KEOCAT')).toBe(0);
+    expect(await ton('NVL1')).toBe(5);
+    const list = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const po = list.body.data.find((o: { supplier_name: string }) => o.supplier_name === 'Cửa hàng dụng cụ B');
+    expect(po.lines.find((l: { item: string }) => l.item === 'KEOCAT').qty).toBe(3);
+    expect(po.lines.find((l: { item: string }) => l.item === 'KEOCAT').received).toBe(3);
+  });
+
   it('lập phiếu mua; đặt khác giao: nhận làm hai lần, trạng thái đổi theo số thực nhận', async () => {
     const { poId, poNo } = await setup();
     expect(poNo).toMatch(/^PM2610-001$/);
