@@ -76,7 +76,7 @@ function tsNhanCho(kind){if(typeof MH==="undefined"||!MH.orders||typeof KHO==="u
   MH.orders.forEach(p=>{if(p.status==="HUY")return;const gia=new Map((p.lines||[]).map(l=>[l.id,l.unit_price]));
     (p.receipts||[]).forEach(r=>{if(r.status&&r.status!=="OK"||String(r.receipt_date||"")<TS_NHAN_TU)return;
       (r.lines||[]).forEach(l=>{const it=KHO.items.get(l.item);if(!it||it.cls!=="CCDC"||tsLoaiHang(it)!==kind)return;
-        if(da.some(a=>a.rcl===l.id||!a.rcl&&a.ma===l.item))return;const dg=l.unit_price!=null?+l.unit_price:gia.get(l.po_line_id);
+        if(da.some(a=>a.rcl===l.id||(!a.rcl||a.po===p.no)&&a.ma===l.item))return;/* cùng đơn, cùng mã: lần nhận ghi lại sau khi hủy lần cũ vẫn là đã ghi tăng */const dg=l.unit_price!=null?+l.unit_price:gia.get(l.po_line_id);
         o.push({id:l.id,item:l.item,ten:l.name||it.name,qty:+l.qty||0,unit:l.unit||it.unit||"",gk:dg!=null?Math.round((+l.qty||0)*dg):0,d:r.receipt_date,ncc:p.supplier_name||"",po:p.no})})})});
   return o}
 function tsNhanCard(kind){if(!tsCanGhiTang())return "";if(typeof mhLoad==="function"&&!MH.orders&&!TSV.mhTai){TSV.mhTai=1;mhLoad().then(()=>{if(/^ts_/.test(PAGE))renderMain()}).catch(()=>{})}
