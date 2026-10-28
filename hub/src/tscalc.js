@@ -28,7 +28,8 @@ const tsNgay=(a,b)=>Math.round((new Date(b+"T00:00:00Z")-new Date(a+"T00:00:00Z"
 
 /* Đoạn tính: khai báo đầu kỳ thì bắt đầu từ ngày 01 tháng web làm chuẩn với phần còn lại; không thì từ ngày bắt đầu với cả giá trị. */
 function tsDoan(a){const gk=+(a.gk??a.ng)||0;
-  if(a.dk&&a.dk.tu)return {s:a.dk.tu+"-01",v:Math.max(0,gk-(+a.dk.lk||0)),m:Math.max(0,Math.round(+a.dk.con||0)),lk0:+a.dk.lk||0,tron:true};
+  /* dk.lich: đầu kỳ nhưng vẫn theo lịch gốc (web tự tính lũy kế từ ngày bắt đầu), không chia lại phần còn lại. */
+  if(a.dk&&a.dk.tu&&!a.dk.lich)return {s:a.dk.tu+"-01",v:Math.max(0,gk-(+a.dk.lk||0)),m:Math.max(0,Math.round(+a.dk.con||0)),lk0:+a.dk.lk||0,tron:true};
   return {s:a.s||a.d,v:gk,m:Math.max(0,Math.round(+a.n||0)),lk0:0,tron:false}}
 
 /* Lịch từng tháng {ym: số tiền} từ tháng bắt đầu tới hết (hoặc tới ngày ghi giảm). */
@@ -81,9 +82,9 @@ function tsNgayDoc(v){if(v==null||v==="")return "";if(typeof v==="number"&&v>200
   m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[0]:""}
 /* Cột MISA → trường. Thứ tự quan trọng: cột cụ thể đứng trước cột chung. */
 const TS_COT=[["con",/(thoi gian|so ky|so thang)( su dung| phan bo| pb)? con lai/],["conGt",/gia tri con lai/],["lk",/hao mon luy ke|luy ke|gia tri da phan bo|da phan bo/],
-  ["gk",/gia tri tinh (khau hao|phan bo)/],["s",/ngay bat dau (tinh|su dung|phan bo|khau hao)/],["d",/ngay (ghi tang|tang)|ngay chung tu/],
+  ["gk",/gia tri tinh (khau hao|phan bo|kh)/],["s",/ngay bat dau (tinh|su dung|phan bo|khau hao)/],["d",/ngay (ghi tang|tang)|ngay chung tu/],
   ["n",/thoi gian (su dung|phan bo|khau hao)|so ky phan bo|so ky pb|so thang|^so ky$/],["ng",/nguyen gia|gia tri (ccdc|cong cu|ghi tang)|^gia tri$|^thanh tien$|^so tien$/],
-  ["ma",/^ma (tai san|ts|ccdc|cong cu)|^ma$/],["ten",/^ten/],["loai",/^loai/],["bp",/don vi su dung|bo phan|doi tuong phan bo/]];
+  ["ma",/^ma (tai san|ts|ccdc|cong cu)|^ma$/],["ten",/^ten/],["loai",/^loai/],["bp",/don vi su dung|bo phan|doi tuong phan bo|tai khoan chi phi|tk chi phi/]];
 function tsTimCot(row){const o={};(row||[]).forEach((c,i)=>{const t=tsBoDau(c);if(!t)return;const f=TS_COT.find(([k,re])=>o[k]==null&&re.test(t));if(f)o[f[0]]=i});return o}
 /* Bộ phận ghi trong MISA → mã đối tượng ở TS_DT. */
 function tsBpDoan(s,mac){const t=tsBoDau(s);if(/san xuat|xuong|bpsx|154/.test(t))return "sx";if(/ban hang|kinh doanh|bpbh|6421|641/.test(t))return "bh";if(/van phong|quan ly|ke toan|bpql|6422|642/.test(t))return "ql";return mac}
@@ -97,10 +98,13 @@ function tsDocBang(rows,kind,tu){const R=rows||[];let h=-1,c={};
     if(!(ng>0||gk>0)){bo.push({dong:h+j+2,ten,why:"không có nguyên giá / giá trị"});return}
     const d=tsNgayDoc(g(r,"d")),s=tsNgayDoc(g(r,"s"))||d,n=tsSo(g(r,"n")),lk=tsSo(g(r,"lk")),con=tsSo(g(r,"con")),conGt=tsSo(g(r,"conGt"));
     const a={kind,ma:ma||ten.slice(0,20),ten,loai:String(g(r,"loai")??"").trim()||TS_LOAI[kind][0],d,s,ng:ng||gk,gk:gk||ng,n:n||0,bp:[{o:tsBpDoan(g(r,"bp"),kind==="TS"?"sx":"ql"),p:100}]};
-    const lkx=lk!=null?lk:conGt!=null?a.gk-conGt:null;
-    a.dk={tu,lk:lkx,con:con};items.push(a)});
+    /* Số MISA đã trích chỉ để đối chiếu (MISA có thể chưa chạy khấu hao / phân bổ các tháng gần đây).
+       Có số tháng và ngày bắt đầu thì web tự tính lũy kế tới hết tháng trước tháng làm chuẩn; thiếu thì mới dùng số MISA. */
+    const lkx=lk!=null?lk:conGt!=null?a.gk-conGt:null;a.misa={lk:lkx,con};
+    a.dk=a.n&&a.s?{tu,lk:null,con:null,lich:true}:{tu,lk:lkx,con};items.push(a)});
   return {items,bo,cot:c}}
-/* Điền chỗ thiếu khi khai báo đầu kỳ: hao mòn chưa có thì web tự tính theo ngày tới hết tháng trước; số tháng còn lại chưa có thì lấy số tháng − số tháng đã dùng. */
+/* Điền chỗ thiếu khi khai báo đầu kỳ: hao mòn chưa có thì web tự tính theo ngày tới hết tháng trước; số tháng còn lại chưa có thì lấy số tháng − số tháng đã dùng
+   (tháng bắt đầu giữa tháng tính là một tháng đã dùng, nên tháng còn lại chia đều phần còn lại, tháng cuối nhận phần lẻ). */
 function tsDienDauKy(a){const tu=a.dk&&a.dk.tu;if(!tu)return a;const truoc=tsYmAdd(tu,-1),moc={...a,dk:null},o={...a,dk:{...a.dk}};
   if(o.dk.lk==null||o.dk.lk==="")o.dk.lk=a.n&&a.s?tsLuyKe(moc,truoc):0,o.dk.lkTu=true;
   if(o.dk.con==null||o.dk.con===""){const s=a.s||a.d;if(a.n&&s){const da=(+truoc.slice(0,4)-+s.slice(0,4))*12+(+truoc.slice(5)-+s.slice(5,7))+1;o.dk.con=Math.max(0,a.n-Math.max(0,da))}else o.dk.con=0;o.dk.conTu=true}

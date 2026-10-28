@@ -90,6 +90,22 @@ describe('Chia chi phí và ghi sổ tháng', () => {
 });
 
 describe('Nạp file MISA', () => {
+  it('đọc đúng cột Sổ theo dõi CCDC của MISA (số kỳ, tài khoản chi phí)', () => {
+    const rows = [
+      ['Mã CCDC', 'Tên CCDC', 'Loại CCDC', 'Lý do ghi tăng', 'ĐVT', 'Ngày ghi tăng', 'Số kỳ phân bổ', 'Số kỳ phân bổ còn lại', 'Số lượng ghi tăng', 'Số lượng ghi giảm', 'Số lượng còn lại', 'Giá trị CCDC', 'Giá trị đã phân bổ', 'Giá trị còn lại', 'TK chờ phân bổ', 'Tài khoản chi phí'],
+      ['MAYBOMNUOC', 'Máy bơm nước', '', '', '1', '01/12/2024', 30, 29, 1, 0, 1, 9750000, 325000, 9425000, '242', '1542'],
+      ['Tem CHG', 'Tem chống hàng giả', '', 'Mua mới', '', '05/09/2024', 4, 1, 1, 0, 1, 13687380, 10265535, 3421845, '242', '6421'],
+      ['Số dòng = 2', '', '', '', '', '', '', '', 2, 0, 2, 23437380, 10590535, 12846845, '', ''],
+    ];
+    const r = C.tsDocBang(rows, 'CC', '2026-11');
+    expect(r.items.map((a: { ma: string; n: number; gk: number; bp: { o: string }[] }) => [a.ma, a.n, a.gk, a.bp[0].o])).toEqual([
+      ['MAYBOMNUOC', 30, 9750000, 'sx'],
+      ['Tem CHG', 4, 13687380, 'bh'],
+    ]);
+    const b = C.tsDienDauKy(r.items[0]);
+    expect(b.dk.lk).toBe(325000 * 23); // MISA mới ghi 1 kỳ, web tính đủ 23 tháng tới hết 10/2026
+    expect(b.dk.con).toBe(7);
+  });
   it('đọc số và ngày kiểu Việt Nam', () => {
     expect(C.tsSo('55.000.000')).toBe(55000000);
     expect(C.tsSo('1,234,567')).toBe(1234567);
@@ -109,7 +125,11 @@ describe('Nạp file MISA', () => {
     expect(r.items.length).toBe(1);
     const a = r.items[0];
     expect([a.ma, a.d, a.ng, a.n, a.bp[0].o]).toEqual(['BONKHUAY', '2024-12-01', 55000000, 60, 'sx']);
-    expect(a.dk.lk).toBe(21083341);
+    expect(a.misa.lk).toBe(21083341); // số MISA chỉ để đối chiếu
+    expect(a.dk.lich).toBe(true); // có số tháng + ngày bắt đầu: web tự tính theo lịch gốc
+    const d = C.tsDienDauKy(a);
+    expect(d.dk.lk).toBe(916667 * 23);
+    expect(C.tsThang(d, '2026-11')).toBe(C.tsThang({ ...bon }, '2026-11'));
     expect(C.tsDocBang([['a', 'b']], 'TS', '2026-11').err).toBeTruthy();
   });
 });

@@ -129,7 +129,7 @@ function tsForm(kind,a){
       kkh:!!(g("tsf-kkh")&&g("tsf-kkh").checked),bp:tsBpRead(root),nkc:g("tsf-pc").value||"",ncc:g("tsf-ncc").value.trim(),ct:g("tsf-ct").value.trim(),gc:g("tsf-gc").value.trim()};
     const loi=!v.ma||!v.ten?"Cần mã và tên":!(v.gk>0)?"Cần giá trị":!v.s?"Cần ngày bắt đầu tính":!v.kkh&&!(v.n>=1)?"Cần số tháng":!tsBpOk(v.bp)?"Bộ phận chịu chi phí phải cộng đủ 100%":tsAll().some(z=>z.kind===kind&&z.ma===v.ma&&z.id!==x.id)?"Mã "+v.ma+" đã có":"";
     if(loi){toast(loi);return}
-    if(x.dk&&g("tsf-lk"))v.dk={...x.dk,lk:+g("tsf-lk").value||0,con:Math.round(+g("tsf-con").value||0)};
+    if(x.dk&&g("tsf-lk")){const lk=+g("tsf-lk").value||0,con=Math.round(+g("tsf-con").value||0);v.dk={...x.dk,lk,con,lich:!!x.dk.lich&&lk===+x.dk.lk&&con===+x.dk.con}}
     tsMut((moi?"ghi tăng ":"sửa ")+tsTen(kind)+" "+v.ma,(T,dt)=>{
       let r=T.a.find(z=>z.id===x.id);if(!r){r={id:uid("ts"),kind,by:ME.name,at:Date.now()};T.a.push(r)}
       const cu=r.nkc;Object.assign(r,v,{ng:v.gk,sua:Date.now()});
@@ -182,10 +182,10 @@ function tsDkTab(kind,ghi){
   let pv="";
   if(P){const ok=P.items.filter(tsNapOk);
     pv=`<section class="card flush"><div class="card-h pad"><h2>Kiểm tra trước khi ghi: ${P.items.length} ${tsTen(kind)} từ file ${esc(P.file)}</h2></div>
-    <p class="hint pad" style="margin:0">Ô vàng là web tự tính vì file không có cột đó; chị Huệ đối chiếu với MISA rồi sửa nếu khác. Mã đã có trên web thì ghi đè số đầu kỳ.${P.bo.length?` Bỏ ${P.bo.length} dòng: ${P.bo.slice(0,4).map(x=>"dòng "+x.dong+" ("+esc(x.why)+")").join(", ")}.`:""}</p>
-    <div class="tbl"><table><thead><tr><th>Mã</th><th>Tên</th><th>Ngày ghi tăng</th><th class="n">${kind==="TS"?"Nguyên giá":"Giá trị"}</th><th class="n">Số tháng</th><th class="n">${kind==="TS"?"Hao mòn":"Đã phân bổ"} đến hết ${tsYm(tsYmAdd(tu,-1))}</th><th class="n">Tháng còn lại</th><th>Bộ phận chịu</th></tr></thead><tbody>
+    <p class="hint pad" style="margin:0">Ô vàng là web tự tính theo ngày bắt đầu và số tháng (web là số chuẩn). Cột MISA đã ghi để đối chiếu: số đỏ là MISA lệch web trên 1.000 đ, thường do MISA chưa chạy khấu hao / phân bổ các tháng gần đây. Mã đã có trên web thì ghi đè số đầu kỳ.${P.bo.length?` Bỏ ${P.bo.length} dòng: ${P.bo.slice(0,4).map(x=>"dòng "+x.dong+" ("+esc(x.why)+")").join(", ")}.`:""}</p>
+    <div class="tbl"><table><thead><tr><th>Mã</th><th>Tên</th><th>Ngày ghi tăng</th><th class="n">${kind==="TS"?"Nguyên giá":"Giá trị"}</th><th class="n">Số tháng</th><th class="n">${kind==="TS"?"Hao mòn":"Đã phân bổ"} đến hết ${tsYm(tsYmAdd(tu,-1))} (web tính)</th><th class="n">MISA đã ghi</th><th class="n">Tháng còn lại</th><th>Bộ phận chịu</th></tr></thead><tbody>
     ${P.items.map((a,i)=>`<tr><td class="mono">${esc(a.ma)}</td><td>${esc(a.ten)}</td><td>${tsDmy(a.d)}</td><td class="n">${tsN(a.gk)}</td><td class="n"><input type="number" data-pn="${i}" data-f="n" value="${a.n||""}" style="width:70px;text-align:right"></td>
-      <td class="n"><input type="number" data-pn="${i}" data-f="lk" value="${a.dk.lk??""}" style="width:130px;text-align:right${a.dk.lkTu?";background:#fff8e1":""}"></td><td class="n"><input type="number" data-pn="${i}" data-f="con" value="${a.dk.con??""}" style="width:70px;text-align:right${a.dk.conTu?";background:#fff8e1":""}"></td>
+      <td class="n"><input type="number" data-pn="${i}" data-f="lk" value="${a.dk.lk??""}" style="width:130px;text-align:right${a.dk.lkTu?";background:#fff8e1":""}"></td><td class="n">${a.misa&&a.misa.lk!=null?`<span style="color:${Math.abs(a.misa.lk-(+a.dk.lk||0))>1000?"#b42318":"inherit"}">${tsN(a.misa.lk)}</span>`:"—"}</td><td class="n"><input type="number" data-pn="${i}" data-f="con" value="${a.dk.con??""}" style="width:70px;text-align:right${a.dk.conTu?";background:#fff8e1":""}"></td>
       <td><select data-pn="${i}" data-f="bp">${tsBpOpt(a.bp[0].o)}</select></td></tr>`).join("")}</tbody></table></div>
     <div class="filters pad" style="justify-content:flex-end"><span class="hint">${ok.length}/${P.items.length} dòng đủ số</span><button class="btn" id="tsk-huy">Bỏ</button><button class="btn pri" id="tsk-ok"${ok.length?"":" disabled"}>Ghi đầu kỳ ${ok.length} ${tsTen(kind)}</button></div></section>`}
   return `<section class="card"><div class="card-h"><h2>Nạp ${kind==="TS"?"Sổ tài sản cố định":"Sổ theo dõi công cụ dụng cụ"} từ MISA</h2><span class="sp"></span>${sel}</div>
@@ -193,19 +193,19 @@ function tsDkTab(kind,ghi){
    ${ghi?`<div class="filters"><input type="file" id="tsk-f" accept=".xlsx,.xls,.csv" style="max-width:340px"></div>`:""}</section>${pv}
    <section class="card flush"><div class="card-h pad"><h2>Đã khai báo đầu kỳ (${da.length})</h2></div>${da.length?`<div class="tbl"><table><thead><tr><th>Mã</th><th>Tên</th><th class="n">Giá trị</th><th class="n">Lũy kế đến hết ${tsYm(tsYmAdd(tu,-1))}</th><th class="n">Còn lại</th><th class="n">Tháng còn lại</th></tr></thead><tbody>${da.map(a=>`<tr data-tsid="${esc(a.id)}" style="cursor:pointer"><td class="mono">${esc(a.ma)}</td><td>${esc(a.ten)}</td><td class="n">${tsN(a.gk)}</td><td class="n">${tsN(a.dk.lk)}</td><td class="n">${tsN((+a.gk||0)-(+a.dk.lk||0))}</td><td class="n">${tsN(a.dk.con)}</td></tr>`).join("")}</tbody></table></div>`:`<p class="hint pad">Chưa có.</p>`}</section>`}
 function tsDkWire(m,kind){const g=id=>m.querySelector("#"+id);
-  if(g("tsk-tu"))g("tsk-tu").onchange=e=>{const v=e.target.value;if(!v)return;tsMut("đổi tháng web làm chuẩn tài sản "+v,T=>{T.tu=v;(T.a||[]).forEach(a=>{if(a.dk)a.dk.tu=v})});if(TSV.nap)TSV.nap.items=TSV.nap.items.map(a=>tsDienDauKy({...a,dk:{...a.dk,tu:v,lk:a.dk.lkTu?null:a.dk.lk,con:a.dk.conTu?null:a.dk.con}}));renderMain()};
+  if(g("tsk-tu"))g("tsk-tu").onchange=e=>{const v=e.target.value;if(!v)return;tsMut("đổi tháng web làm chuẩn tài sản "+v,T=>{T.tu=v;(T.a||[]).forEach(a=>{if(!a.dk)return;a.dk.tu=v;if(a.dk.lich)a.dk=tsDienDauKy({...a,dk:{tu:v,lk:null,con:null,lich:true}}).dk})});if(TSV.nap)TSV.nap.items=TSV.nap.items.map(a=>tsDienDauKy({...a,dk:{...a.dk,tu:v,lk:a.dk.lkTu?null:a.dk.lk,con:a.dk.conTu?null:a.dk.con}}));renderMain()};
   if(g("tsk-f"))g("tsk-f").onchange=e=>{const f=e.target.files[0];if(!f)return;if(typeof XLSX==="undefined"){toast("Cần mạng để đọc Excel");return}
     const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:"array"});let res=null;
       for(const n of wb.SheetNames){const x=tsDocBang(XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}),kind,tsTu());if(!x.err){res=x;break}res=res||x}
       if(res.err){toast(res.err);return}if(!res.items.length){toast("File không có dòng "+tsTen(kind)+" nào có giá trị");return}
       TSV.nap={kind,file:f.name,items:res.items.map(tsDienDauKy),bo:res.bo};renderMain()}catch(err){toast("Không đọc được file: "+err.message)}};r.readAsArrayBuffer(f)};
   m.querySelectorAll("[data-pn]").forEach(el=>el.onchange=()=>{const a=TSV.nap.items[+el.dataset.pn],f=el.dataset.f,v=el.value;
-    if(f==="bp")a.bp=[{o:v,p:100}];else if(f==="n"){a.n=Math.round(+v||0);if(a.dk.conTu)a.dk.con=null;if(a.dk.lkTu)a.dk.lk=null;Object.assign(a,tsDienDauKy(a))}else{a.dk[f]=v===""?null:+v;a.dk[f+"Tu"]=false}renderMain()});
+    if(f==="bp")a.bp=[{o:v,p:100}];else if(f==="n"){a.n=Math.round(+v||0);if(a.dk.conTu)a.dk.con=null;if(a.dk.lkTu)a.dk.lk=null;Object.assign(a,tsDienDauKy(a))}else{a.dk[f]=v===""?null:+v;a.dk[f+"Tu"]=false;a.dk.lich=false}renderMain()});
   if(g("tsk-huy"))g("tsk-huy").onclick=()=>{TSV.nap=null;renderMain()};
   if(g("tsk-ok"))g("tsk-ok").onclick=()=>{const P=TSV.nap,ok=P.items.filter(tsNapOk);
-    tsMut("khai báo đầu kỳ "+ok.length+" "+tsTen(kind)+" từ "+P.file,T=>{T.tu=T.tu||tsTu();ok.forEach(a=>{const dk={tu:T.tu,lk:+a.dk.lk||0,con:Math.round(+a.dk.con)};
-      const r=T.a.find(z=>z.kind===kind&&z.ma===a.ma);if(r)Object.assign(r,{ten:a.ten,loai:a.loai,d:a.d,s:a.s,ng:a.ng,gk:a.gk,n:a.n,dk,sua:Date.now()});
-      else T.a.push({id:uid("ts"),kind,ma:a.ma,ten:a.ten,loai:a.loai,d:a.d,s:a.s,ng:a.ng,gk:a.gk,n:a.n,bp:a.bp,dk,src:"misa",by:ME.name,at:Date.now()})})});
+    tsMut("khai báo đầu kỳ "+ok.length+" "+tsTen(kind)+" từ "+P.file,T=>{T.tu=T.tu||tsTu();ok.forEach(a=>{const dk={tu:T.tu,lk:+a.dk.lk||0,con:Math.round(+a.dk.con),lich:!!a.dk.lich};
+      const r=T.a.find(z=>z.kind===kind&&z.ma===a.ma);if(r)Object.assign(r,{ten:a.ten,loai:a.loai,d:a.d,s:a.s,ng:a.ng,gk:a.gk,n:a.n,bp:a.bp,dk,misa:a.misa,sua:Date.now()});
+      else T.a.push({id:uid("ts"),kind,ma:a.ma,ten:a.ten,loai:a.loai,d:a.d,s:a.s,ng:a.ng,gk:a.gk,n:a.n,bp:a.bp,dk,misa:a.misa,src:"misa",by:ME.name,at:Date.now()})})});
     TSV.nap=null;toast("Đã ghi đầu kỳ "+ok.length+" "+tsTen(kind));renderMain()};
   m.querySelectorAll("tr[data-tsid]").forEach(r=>r.onclick=()=>tsForm(kind,tsAll().find(a=>a.id===r.dataset.tsid)));
 }
