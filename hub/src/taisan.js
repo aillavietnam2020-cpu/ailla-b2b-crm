@@ -392,6 +392,8 @@ async function tsGhiTangTuPhieu(id,kind,el){const r=((scFin().nkc)||[]).concat(t
     /* Mã thuộc lớp CCDC trong danh mục kho thì đã biết là tài sản hay công cụ, không hỏi. */
     const it=typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(don.l.item);if(!kind&&it&&it.cls==="CCDC"){kind=tsLoaiHang(it);pre.hoi=false}
     if(tsAll().concat(tsCho()).some(a=>a.kind===(kind==="CC"?"CC":"TS")&&a.ma===pre.ma))pre.ma=""}
+  /* Chị Hoa 28/10: chưa biết loại thì khoản dưới 30 triệu mặc định là công cụ dụng cụ (vẫn đổi được ở đầu form). */
+  if(!kind&&pre.gk<30e6)kind="CC";
   tsForm(kind==="CC"?"CC":"TS",null,el,pre)}
 /* Phiếu chi id trả cho đơn mua mà hàng đã ghi tăng (chưa gắn phiếu): có thì trả tài sản đó. */
 function tsTrungDon(id){const r=((scFin().nkc)||[]).concat(typeof scCho==="function"?scCho():[]).find(x=>x.id===id),don=r&&tsTimDon(r);return don?tsAll().find(a=>!a.dk&&!a.nkc&&(a.po&&a.po===don.p.no&&(!a.rcl||a.ma===don.l.item)||a.ma===don.l.item))||null:null}
