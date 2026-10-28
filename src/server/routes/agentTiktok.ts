@@ -41,13 +41,10 @@ async function hubPart(db: D1Database, id: string): Promise<Record<string, unkno
   return r ? (JSON.parse(await unpack(r.data)) as Record<string, unknown>) : {};
 }
 
-/** Số đầu vào để tính giá vốn và chi phí riêng kênh, đúng như trang Tải file tháng dùng. */
-agentTiktokRoutes.get('/inputs', async (c) => {
-  const ky = c.req.query('ky') ?? '';
-  if (!KY.test(ky)) throw badRequest('BAD_KY', 'Tháng không hợp lệ');
-  const db = c.env.DB;
+/** Số đầu vào để tính giá vốn và chi phí riêng kênh, đúng như trang Tải file tháng dùng (TikTok; Shopee dùng lại với channel SHOPEE). */
+export async function agentInputs(db: D1Database, ky: string, channel: 'TIKTOK' | 'SHOPEE') {
   const [map, items, moves, main, sec] = await Promise.all([
-    db.prepare("SELECT sku, variant, from_day, item_label, qty FROM channel_map WHERE channel = 'TIKTOK' ORDER BY sku, variant, from_day, item_label").all(),
+    db.prepare('SELECT sku, variant, from_day, item_label, qty FROM channel_map WHERE channel = ? ORDER BY sku, variant, from_day, item_label').bind(channel).all(),
     db.prepare('SELECT code, name, cls, grp FROM kho_items ORDER BY code').all(),
     db
       .prepare(
@@ -67,7 +64,7 @@ agentTiktokRoutes.get('/inputs', async (c) => {
   }
   const kho = Object.fromEntries([...acc].map(([k, a]) => [k, Math.round(a.amt / a.qty)]));
   const all = { ...main, ...sec } as { skus?: { ma?: string; giaVon?: unknown }[]; costs?: { thang?: string }[]; costCats?: unknown[] };
-  return ok(c, {
+  return {
     ky,
     map: map.results ?? [],
     items: items.results ?? [],
@@ -75,7 +72,12 @@ agentTiktokRoutes.get('/inputs', async (c) => {
     skus: (all.skus ?? []).map((s) => ({ ma: s.ma, giaVon: s.giaVon })),
     costs: (all.costs ?? []).filter((x) => x.thang === ky),
     costCats: all.costCats ?? [],
-  });
+  };
+}
+agentTiktokRoutes.get('/inputs', async (c) => {
+  const ky = c.req.query('ky') ?? '';
+  if (!KY.test(ky)) throw badRequest('BAD_KY', 'Tháng không hợp lệ');
+  return ok(c, await agentInputs(c.env.DB, ky, 'TIKTOK'));
 });
 
 /** Các tháng đã lưu: để agent biết tháng nào đã khoá sổ, đã có bản chốt sổ hay bản giữa tháng đến ngày nào. */
