@@ -52,7 +52,12 @@ function pSpcombo(m){
   m.querySelectorAll("[data-spct]").forEach(b=>b.onclick=()=>{SPCB.tab=b.dataset.spct;renderMain()});
   spcBind(m,C);
 }
+/* Bảng combo kiểu bảng quy đổi cũ bên vận hành (chị Hoa góp ý 28/10: dễ nhìn hơn): mỗi món một dòng, sửa mã / loại / số lượng ngay trong ô,
+   dòng đầu mỗi combo có mã sàn, trạng thái và nút Xác nhận / Lưu. Sửa xong chưa lưu thì giữ nháp ở SPCB.dr[key]. */
+const SPC_KOPT=[["sp","Sản phẩm"],["gift","Quà tặng"],["pack","Bao bì"],["skip","Bỏ qua"]];
+const spcDraft=c=>(SPCB.dr||{})[c.key];
 function spcComboView(C){
+  SPCB.dr=SPCB.dr||{};
   const shops=[...new Set(C.combos.filter(c=>c.ch===SPCB.ch).flatMap(c=>c.shops))].sort();
   let L=C.combos.filter(c=>c.ch===SPCB.ch);
   if(SPCB.shop)L=L.filter(c=>c.shops.includes(SPCB.shop));
@@ -60,21 +65,42 @@ function spcComboView(C){
   else if(SPCB.f==="gv"&&C.g)L=L.filter(c=>c.active&&spcCost(c.parts,C.g).u==null);
   else if(SPCB.f==="off")L=L.filter(c=>!c.active);else L=L.filter(c=>c.active);
   const fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.q||"").trim();
-  if(q)L=L.filter(c=>q.split(/\s+/).every(w=>fold(c.sku+" "+c.variant+" "+c.parts.map(p=>p.label).join(" ")).includes(w)));
-  L.sort((a,b)=>b.orders-a.orders||a.sku.localeCompare(b.sku));
+  if(q)L=L.filter(c=>q.split(/\s+/).every(w=>fold(c.sku+" "+c.variant+" "+c.parts.map(p=>p.code+" "+p.label).join(" ")).includes(w)));
+  L.sort((a,b)=>(spcDraft(b)?1:0)-(spcDraft(a)?1:0)||b.orders-a.orders||a.sku.localeCompare(b.sku));
   const fo=[["all","Đang dùng"],["flag","Cần kế toán xác nhận"]].concat(C.g?[["gv","Chưa tính được giá vốn"]]:[],[["off","Đã ngừng dùng"]]);
+  const can=SPCB.can,nm=code=>{const it=SPCB.items.get(spcLow(code));return it?it.name:""};
+  const rows=[];
+  L.slice(0,150).forEach(c=>{
+    const P=spcDraft(c)||c.parts,dirty=!!spcDraft(c),st=spcStatus({...c,parts:P},C.items,C.g),x=C.g?spcCost(P,C.g):null,da=`data-k="${esc(c.key)}"`,ed=can&&c.active;
+    P.forEach((p,j)=>{const first=j===0,gv=C.g&&C.g[spcLow(p.code)],bad=p.kind!=="skip"&&!C.items.has(spcLow(p.code));
+      rows.push(`<tr${first?' style="border-top:2px solid #d9dde3"':""}${c.active?"":' class="muted"'}>
+       <td>${first?`<b class="mono">${esc(c.sku)}</b>${c.variant?`<br><small class="hint">${esc(c.variant)}</small>`:""}<br><small class="hint" title="${esc(c.shops.join(", "))}">${c.orders?nf(c.orders)+" đơn · ":""}${c.shops.length} ${SPCB.ch==="FACEBOOK"?"nguồn":"shop"}</small>`:""}</td>
+       <td>${ed?`<input class="spi-c mono" ${da} data-j="${j}" value="${esc(p.kind==="skip"?"":p.code)}" placeholder="${p.kind==="skip"?"bỏ qua":"Gõ mã hoặc tên"}" style="width:150px${bad?";border-color:#d92d20":""}">`:`<span class="mono">${esc(p.code)}</span>`}</td>
+       <td>${p.kind==="skip"?`<span class="hint">không trừ kho</span>`:bad?`<span class="t-red">chưa có mã kho: ${esc(p.label)}</span>`:esc(nm(p.code))}</td>
+       <td>${ed?`<select class="spi-k" ${da} data-j="${j}">${opt(SPC_KOPT,p.kind)}</select>`:esc((SPC_KOPT.find(k=>k[0]===p.kind)||["",""])[1])}</td>
+       <td class="n">${ed?`<input class="spi-q n" type="number" min="0" step="any" ${da} data-j="${j}" value="${p.qty}" style="width:64px">`:p.qty}</td>
+       ${C.g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):p.kind==="pack"?`<small class="hint">—</small>`:`<small class="t-amb">chưa có giá</small>`}</td>`:""}
+       <td>${first?`${pill(dirty?"Chưa lưu":st[1],dirty?"blu":st[0])}${c.flag?`<div><small class="t-amb">❓ ${esc(c.flag)}</small></div>`:""}`:""}</td>
+       <td style="white-space:nowrap">${ed?(first?(dirty?`<button class="btn sm pri" data-spsv="${esc(c.key)}">Lưu</button> <button class="btn sm" data-spun2="${esc(c.key)}">Bỏ sửa</button>`:c.flag?`<button class="btn sm pri" data-spok="${esc(c.key)}" title="Combo quy đổi đúng: bỏ dấu cần xác nhận">✓ Xác nhận</button>`:"")+` <button class="btn sm" data-sped="${esc(c.key)}" title="Lịch sử sửa, đổi combo từ ngày, ngừng dùng">⋯</button>`:"")+(P.length>1?` <button class="btn sm" data-sprm2="${esc(c.key)}" data-j="${j}" title="Bỏ món này">✕</button>`:""):first?`<button class="btn sm" data-sped="${esc(c.key)}">${can?"Dùng lại / lịch sử":"Xem"}</button>`:""}</td></tr>`)});
+    rows.push(`<tr><td></td><td colspan="${C.g?7:6}" style="padding-top:2px">${ed?`<a href="#" data-spadd3="${esc(c.key)}">+ thêm món</a>`:""}${C.g?` <span class="hint" style="float:right">Giá vốn 1 combo: <b>${x.u==null?"chưa tính được":nf(x.u)+"đ"}</b></span>`:""}</td></tr>`);
+  });
   return `<section class="card flush"><div class="card-h pad"><div class="filters">
     <div class="seg">${SPC_CH.map(([k,n])=>`<button class="${SPCB.ch===k?"on":""}" data-spch="${k}">${n} (${C.combos.filter(c=>c.ch===k&&c.active).length})</button>`).join("")}</div>
     ${shops.length>1?`<select id="spc-shop"><option value="">Mọi ${SPCB.ch==="FACEBOOK"?"nguồn":"shop"} (${shops.length})</option>${opt(shops,SPCB.shop)}</select>`:""}
     <select id="spc-f">${opt(fo,SPCB.f)}</select><input id="spc-q" placeholder="Tìm mã sàn, phân loại, mã sản phẩm…" value="${esc(SPCB.q)}" style="max-width:240px"><span class="hint">${nf(L.length)} combo</span></div>
-    ${SPCB.can?`<button class="btn pri" data-spnew="1">+ Thêm combo</button>`:""}</div>
-   <p class="hint pad" style="padding-top:0">Mỗi combo = mã trên sàn (kèm phân loại nếu có) → sản phẩm gốc × số lượng, cộng quà tặng 🎁 và bao bì đóng gói. Lưu xong web tự tính lại phiếu xuất kho các ngày có đơn của mã đó.</p>
-   ${tbl(["Mã trên sàn","Gồm"].concat(C.g?["Giá vốn 1 combo"]:[],["Đơn","Trạng thái",""]),L.slice(0,300).map(c=>{const st=spcStatus(c,C.items,C.g),x=C.g?spcCost(c.parts,C.g):null;
-     return `<tr><td><b class="mono">${esc(c.sku)}</b>${c.variant?`<br><small class="hint">${esc(c.variant)}</small>`:""}${c.versions.length>1?`<br><small class="hint">${c.versions.length} bản theo ngày</small>`:""}<br>${c.shops.map(spcShop).join("")}</td>
-       <td>${c.parts.map(p=>spcChip(p,C.items)).join("")}${c.flag?`<div><small class="t-amb">❓ ${esc(c.flag)}</small></div>`:""}</td>
-       ${C.g?`<td class="n">${x.u==null?`<small class="hint">chưa tính được</small>`:nf(x.u)+"đ"}</td>`:""}<td class="n">${c.orders||""}</td>
-       <td>${pill(st[1],st[0])}<br><small class="hint">sửa ${spcDd((c.upd||"").slice(0,10))}</small></td><td><button class="btn sm" data-sped="${esc(c.key)}">${SPCB.can?"Sửa":"Xem"}</button></td></tr>`}))}
-   ${L.length>300?`<p class="hint pad">Đang hiện 300 / ${nf(L.length)}. Gõ vào ô tìm để thu hẹp.</p>`:""}</section>`;
+    ${can?`<button class="btn pri" data-spnew="1">+ Thêm combo</button>`:""}</div>
+   <p class="hint pad" style="padding-top:0">Mỗi combo bán trên sàn gồm những món nào. Sửa mã, loại, số lượng ngay trong ô rồi bấm <b>Lưu</b>; combo có dấu ❓ đúng rồi thì bấm <b>✓ Xác nhận</b>. Lưu xong web tự tính lại phiếu xuất kho các ngày có đơn của mã đó. Nút ⋯: lịch sử sửa, shop đổi combo từ ngày, ngừng dùng.</p>
+   ${rows.length?tbl(["Mã trên sàn","Mã kho","Tên sản phẩm","Loại","SL / 1 combo"].concat(C.g?["Giá vốn"]:[],["Trạng thái",""]),rows):`<p class="hint pad">Không có combo nào.</p>`}
+   ${L.length>150?`<p class="hint pad">Đang hiện 150 / ${nf(L.length)} combo. Gõ vào ô tìm để thu hẹp.</p>`:""}</section>`;
+}
+/* Lưu một combo từ bảng (Lưu nháp hoặc Xác nhận nguyên trạng). */
+async function spcSaveInline(c,parts,msg){
+  const P=parts.filter(p=>(p.code||p.kind==="skip")&&p.qty>0);
+  if(!P.some(p=>p.kind==="sp"||p.kind==="skip")){toast("Combo cần ít nhất 1 sản phẩm");spcLoad(true);return}
+  const bad=P.find(p=>p.kind!=="skip"&&!SPCB.items.has(spcLow(p.code)));if(bad){toast(`"${bad.code||bad.label}" chưa có trong Sản phẩm gốc. Gõ mã khác hoặc thêm sản phẩm gốc trước.`);renderMain();return}
+  try{const r=await spcApi("/combo",{method:"PUT",body:JSON.stringify({channel:c.ch,sku:c.sku,variant:c.variant,from_day:c.cur.from,parts:P.map(p=>({item_label:p.kind==="skip"?"BỎ QUA":p.code,qty:p.qty,kind:p.kind}))})});
+    delete SPCB.dr[c.key];toast(msg+" "+c.sku+(r.recomputed_days?` · tính lại phiếu xuất ${r.recomputed_days} ngày`:""));SPCB.at=0;spcLoad(true)}
+  catch(e){toast(e.message);renderMain()}
 }
 function spcProdView(C){
   let L=SPCB.prods.map(p=>({...p,crm:SPCB.khomap.filter(k=>spcLow(k.misa_code)===spcLow(p.code)).map(k=>k.crm_sku),used:C.used[spcLow(p.code)]||0,gv:C.g&&C.g[spcLow(p.code)]}));
@@ -108,6 +134,19 @@ function spcBind(m,C){
   m.querySelectorAll("[data-spnew]").forEach(b=>b.onclick=()=>spcbEdit(null,null));
   m.querySelectorAll("[data-spadd]").forEach(b=>b.onclick=()=>spcProd(null));
   m.querySelectorAll("[data-spp]").forEach(b=>b.onclick=()=>spcProd(SPCB.prods.find(p=>p.code===b.dataset.spp)));
+  /* Sửa ngay trong bảng combo: lần sửa đầu chép combo ra nháp. */
+  const cOf=k=>C.combos.find(x=>x.key===k),dr=c=>SPCB.dr[c.key]||(SPCB.dr[c.key]=c.parts.map(p=>({...p})));
+  m.querySelectorAll(".spi-q").forEach(x=>x.onchange=()=>{const c=cOf(x.dataset.k);if(!c)return;dr(c)[+x.dataset.j].qty=+String(x.value).replace(",",".")||0;renderMain()});
+  m.querySelectorAll(".spi-k").forEach(x=>x.onchange=()=>{const c=cOf(x.dataset.k);if(!c)return;dr(c)[+x.dataset.j].kind=x.value;renderMain()});
+  if(typeof khoLoad==="function")khoLoad();
+  m.querySelectorAll(".spi-c").forEach(x=>{const set=it=>{const c=cOf(x.dataset.k);if(!c||!it)return;const p=dr(c)[+x.dataset.j];p.code=it.code;p.label=it.code+" - "+it.name;if(p.kind==="skip")p.kind="sp";renderMain()};
+    if(typeof khoPick==="function"&&typeof KHO!=="undefined"&&KHO.items&&KHO.items.size)khoPick(x,null,set);
+    x.onchange=()=>{const it=SPCB.items.get(spcLow(x.value.split(" - ")[0]));if(it)set(it)}});
+  m.querySelectorAll("[data-sprm2]").forEach(b=>b.onclick=()=>{const c=cOf(b.dataset.sprm2);if(!c)return;dr(c).splice(+b.dataset.j,1);renderMain()});
+  m.querySelectorAll("[data-spadd3]").forEach(a=>a.onclick=e=>{e.preventDefault();const c=cOf(a.dataset.spadd3);if(!c)return;dr(c).push({code:"",label:"",qty:1,kind:"gift"});renderMain()});
+  m.querySelectorAll("[data-spun2]").forEach(b=>b.onclick=()=>{delete SPCB.dr[b.dataset.spun2];renderMain()});
+  m.querySelectorAll("[data-spsv]").forEach(b=>b.onclick=()=>{const c=cOf(b.dataset.spsv);if(c){b.disabled=true;spcSaveInline(c,SPCB.dr[c.key]||c.parts,"Đã lưu")}});
+  m.querySelectorAll("[data-spok]").forEach(b=>b.onclick=()=>{const c=cOf(b.dataset.spok);if(c){b.disabled=true;spcSaveInline(c,c.parts,"Đã xác nhận")}});
 }
 /* ---------- Ô sửa combo (ngăn kéo bên phải) ---------- */
 function spcbEdit(c,fromUn){
@@ -120,20 +159,18 @@ function spcbEdit(c,fromUn){
 function spcEdRead(){
   const E=SPCB.ed;if(!E)return;
   document.querySelectorAll("#drawerIn .spc-row").forEach(r=>{const p=E.parts[+r.dataset.i];if(!p)return;const v=r.querySelector(".spc-pc").value.trim(),it=SPCB.items.get(spcLow(spcCode(v)));
-    p.code=it?it.code:spcCode(v);p.label=it?it.code+" - "+it.name:v;p.qty=+String(r.querySelector(".spc-pq").value).replace(",",".")||0});
+    p.code=it?it.code:spcCode(v);p.label=it?it.code+" - "+it.name:v;p.qty=+String(r.querySelector(".spc-pq").value).replace(",",".")||0;const k=r.querySelector(".spc-pk");if(k)p.kind=k.value});
   ["sku","variant"].forEach(k=>{const e=$("#spc-e-"+k);if(e)E[k]=e.value.trim()});const ch=$("#spc-e-ch");if(ch)E.ch=ch.value;
 }
 function spcEdDraw(){
   const E=SPCB.ed,c=E.c,can=SPCB.can,g=spcSeeCost()?spcGvMap((D()&&D().skus)||[],SPCB.cost,spcKy()):null;
-  const row=(p,i)=>{const gv=g&&g[spcLow(p.code)];return `<div class="spc-row filters" data-i="${i}" style="flex-wrap:nowrap"><input class="spc-pc" list="spc-dl" value="${esc(p.label)}" placeholder="Gõ mã hoặc tên sản phẩm gốc" style="flex:1;min-width:0" ${can?"":"disabled"}>
-    <input class="spc-pq" type="number" min="0" step="any" value="${p.qty}" style="width:70px" ${can?"":"disabled"}>${g?`<small class="hint" style="width:90px;text-align:right">${gv?nf(gv.u*p.qty)+"đ":p.kind==="pack"?"bao bì":"chưa có giá"}</small>`:""}
-    ${can?`<button class="btn sm" data-sprm="${i}" title="Bỏ dòng">✕</button>`:""}</div>`};
-  const sec=(k,t,h)=>`<h3 style="margin:14px 0 6px">${t}</h3>${E.parts.map((p,i)=>p.kind===k?row(p,i):"").join("")}${can?`<button class="btn sm" data-spadd2="${k}">+ ${t.toLowerCase()}</button>`:""} ${h?`<small class="hint">${h}</small>`:""}`;
-  const x=g?spcCost(E.parts.filter(p=>p.code),g):null;
+  const nm=code=>{const it=SPCB.items.get(spcLow(code));return it?it.name:""};
+  const row=(p,i)=>{const gv=g&&g[spcLow(p.code)];return `<tr class="spc-row" data-i="${i}"><td><input class="spc-pc mono" value="${esc(p.kind==="skip"?"":p.code)}" placeholder="Gõ mã hoặc tên" style="width:140px" ${can?"":"disabled"}></td><td>${esc(nm(p.code)||(p.code?"chưa có mã kho":""))}</td>
+    <td><select class="spc-pk" ${can?"":"disabled"}>${opt(SPC_KOPT,p.kind)}</select></td><td><input class="spc-pq n" type="number" min="0" step="any" value="${p.qty}" style="width:60px" ${can?"":"disabled"}></td>${g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):p.kind==="pack"?"—":"<small class=t-amb>chưa có giá</small>"}</td>`:""}<td>${can?`<button class="btn sm" data-sprm="${i}" title="Bỏ dòng">✕</button>`:""}</td></tr>`};
+  const x=g?spcCost(E.parts.filter(p=>p.code||p.kind==="skip"),g):null;
   const H2=SPCB.hist;const lb={KHO_ONLINE_MAP:"Lưu",KHO_ONLINE_MAP_SWAP:"Đổi mã",KHO_ONLINE_MAP_CONFIRM:"Xác nhận",KHO_ONLINE_MAP_VERSION:"Bản mới theo ngày",KHO_ONLINE_MAP_CLONE:"Sao chép",SP_COMBO_ADD:"Thêm",SP_COMBO_SAVE:"Sửa",SP_COMBO_STOP:"Ngừng dùng",SP_COMBO_RESUME:"Dùng lại"};
   const hs=h=>{let a={};try{a=JSON.parse(h.after_json||"{}")}catch(e){}const ps=a.parts?a.parts.map(x=>(x[1]!=1?x[1]+"×":"")+spcCode(x[0])).join(", "):a.item_label?(a.qty!=1?a.qty+"×":"")+spcCode(a.item_label):"";
     return `<div style="padding:5px 0;border-bottom:1px solid var(--line,#eee)"><b>${esc(String(h.created_at||"").slice(8,10)+"/"+String(h.created_at||"").slice(5,7)+" "+String(h.created_at||"").slice(11,16))}</b> · ${esc(h.by_name||"")} · ${lb[h.action]||esc(h.action)}${a.from_day?" (từ "+spcDd(a.from_day)+")":""}${a.off_from?" từ "+spcDd(a.off_from):""}${ps?": "+esc(ps):""}</div>`};
-  const dl=[...SPCB.items.values()].filter(i=>i.active!==0).map(i=>`<option value="${esc(i.code+" - "+i.name)}">`).join("");
   openDrawerHTML(`<h2>${c?(can?"Sửa combo":"Combo"):"Thêm combo"} · ${SPC_CHN(E.ch)}</h2>
    ${E.fromUn?`<div class="note amb">Mã mới từ đơn: ${nf(E.fromUn.orders)} đơn kho đã xuất, đang chờ tính giá vốn.</div>`:""}
    ${c&&c.flag?`<div class="note amb">❓ Cần kế toán xác nhận: ${esc(c.flag)}</div>`:""}
@@ -141,8 +178,7 @@ function spcEdDraw(){
    <div class="filters"><label class="inl">Mã trên sàn <input id="spc-e-sku" value="${esc(E.sku)}" ${c||E.fromUn?"readonly":""}></label><label class="inl">Phân loại <input id="spc-e-variant" value="${esc(E.variant)}" placeholder="trống = mọi phân loại" ${c||E.fromUn?"readonly":""}></label></div>
    ${E.shops.length?`<p class="hint">Đang bán ở: ${E.shops.map(spcShop).join("")}</p>`:""}
    ${c&&c.versions.length>1?`<p class="hint">Combo có ${c.versions.length} bản theo ngày: ${c.versions.map(v=>v.from?"từ "+spcDd(v.from):"từ đầu").join(", ")}. Đang sửa bản ${E.from?"từ "+spcDd(E.from):"từ đầu"}.</p>`:""}
-   <datalist id="spc-dl">${dl}</datalist>
-   ${sec("sp","Sản phẩm","")}${sec("gift","Quà tặng","tính vào giá vốn combo, kho xuất kèm")}${sec("pack","Bao bì đóng gói","hộp, thùng — kho xuất kèm")}
+   <h3 style="margin:14px 0 6px">Combo gồm</h3>${tbl(["Mã kho","Tên sản phẩm","Loại","SL"].concat(g?["Giá vốn"]:[],[""]),E.parts.map(row))}${can?`<a href="#" data-spadd2="sp">+ thêm món</a> <small class="hint">Loại: sản phẩm · quà tặng (tính giá vốn, kho xuất kèm) · bao bì (hộp, thùng) · bỏ qua (không trừ kho)</small>`:""}
    ${E.parts.some(p=>p.kind==="skip")?`<p class="hint">Có dòng "Bỏ qua": mã này không trừ kho.</p>`:""}
    ${g?`<div class="note" style="margin-top:12px">Giá vốn 1 combo (sản phẩm + quà): <b>${x.u==null?"chưa tính được — thiếu giá "+esc(x.miss.join(", ")):nf(x.u)+"đ"}</b></div>`:""}
    ${can&&c?`<h3 style="margin:14px 0 6px">Áp dụng</h3><label class="inl"><input type="radio" name="spc-ap" value="" checked style="width:auto"> Sửa cho mọi ngày của bản này (nhập sai)</label><br>
@@ -151,16 +187,17 @@ function spcEdDraw(){
    ${c?`<h3 style="margin:16px 0 6px">Lịch sử sửa</h3><div style="max-height:220px;overflow:auto;font-size:13px">${H2==null?`<p class="hint">Đang tải…</p>`:H2.length?H2.map(hs).join(""):`<p class="hint">Chưa có lần sửa nào được ghi.</p>`}</div>`:""}`);
   const dr=$("#drawerIn");
   dr.querySelectorAll("[data-sprm]").forEach(b=>b.onclick=()=>{spcEdRead();E.parts.splice(+b.dataset.sprm,1);spcEdDraw()});
-  dr.querySelectorAll("[data-spadd2]").forEach(b=>b.onclick=()=>{spcEdRead();E.parts.push({label:"",code:"",qty:1,kind:b.dataset.spadd2});spcEdDraw()});
+  dr.querySelectorAll("[data-spadd2]").forEach(b=>b.onclick=e=>{e.preventDefault();spcEdRead();E.parts.push({label:"",code:"",qty:1,kind:b.dataset.spadd2});spcEdDraw()});
   if($("#spc-save"))$("#spc-save").onclick=spcSave;
   if($("#spc-stop"))$("#spc-stop").onclick=async()=>{const d=prompt("Ngừng dùng combo "+c.sku+" từ ngày (YYYY-MM-DD). Đơn trước ngày này giữ cách tính cũ; đơn từ ngày này sẽ vào Mã chưa quy đổi.",spcToday());if(!d)return;
     try{const r=await spcApi("/combo/stop",{method:"POST",body:JSON.stringify({channel:c.ch,sku:c.sku,variant:c.variant,off_from:d.trim()})});closeDrawer();toast("Đã ngừng dùng "+c.sku+(r.recomputed_days?" · tính lại "+r.recomputed_days+" ngày":""));spcLoad(true)}catch(e){toast(e.message)}};
   if($("#spc-resume"))$("#spc-resume").onclick=async()=>{try{const r=await spcApi("/combo/stop",{method:"POST",body:JSON.stringify({channel:c.ch,sku:c.sku,variant:c.variant,off_from:""})});closeDrawer();toast("Đã dùng lại "+c.sku+(r.recomputed_days?" · tính lại "+r.recomputed_days+" ngày":""));spcLoad(true)}catch(e){toast(e.message)}};
-  dr.querySelectorAll(".spc-pc,.spc-pq").forEach(i=>i.onchange=()=>{spcEdRead();spcEdDraw()});
+  dr.querySelectorAll(".spc-pc,.spc-pq,.spc-pk").forEach(i=>i.onchange=()=>{spcEdRead();spcEdDraw()});
+  if(typeof khoPick==="function"&&typeof KHO!=="undefined"&&KHO.items&&KHO.items.size)dr.querySelectorAll(".spc-pc").forEach(i=>khoPick(i,null,it=>{i.value=it.code;spcEdRead();spcEdDraw()}));
 }
 async function spcSave(){
   spcEdRead();const E=SPCB.ed,c=E.c;
-  const parts=E.parts.filter(p=>p.code&&p.qty>0);
+  const parts=E.parts.filter(p=>(p.code||p.kind==="skip")&&p.qty>0);
   if(!E.sku){toast("Cần mã trên sàn");return}
   if(!parts.some(p=>p.kind==="sp"||p.kind==="skip")){toast("Combo cần ít nhất 1 sản phẩm");return}
   const bad=parts.find(p=>p.kind!=="skip"&&!SPCB.items.has(spcLow(p.code)));if(bad){toast(`"${bad.label}" chưa có trong Sản phẩm gốc. Thêm sản phẩm gốc trước.`);return}

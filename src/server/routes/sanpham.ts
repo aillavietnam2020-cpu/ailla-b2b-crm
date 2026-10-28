@@ -6,7 +6,7 @@ import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
 import { accountantIds, taskStatements } from '../lib/notifyTasks';
 import { requirePermission } from '../middleware/rbac';
-import { CHANNELS, type Channel } from '../services/channelOut';
+import { CHANNELS, loadLookups, resolveLabel, type Channel } from '../services/channelOut';
 import { loadMapVersions, pickMap, recomputeDay } from '../services/poscake';
 
 /**
@@ -137,7 +137,13 @@ sanphamRoutes.get('/combos', async (c) => {
       )
       .all(),
   ]);
-  return ok(c, { rows: rows.results ?? [], sales: sales.results ?? [], can_edit: canEditCombo(c.get('auth')) });
+  // Mã kho của từng món: tên đã gán riêng (channel_alias, như kho đang trừ) hoặc phần "MÃ" trước " - ".
+  const lk = await loadLookups(db);
+  const out = (rows.results ?? []).map((r) => {
+    const label = String((r as { item_label: string }).item_label);
+    return { ...r, code: resolveLabel(label, lk) ?? codeOf(label) };
+  });
+  return ok(c, { rows: out, sales: sales.results ?? [], can_edit: canEditCombo(c.get('auth')) });
 });
 
 sanphamRoutes.get('/history', async (c) => {

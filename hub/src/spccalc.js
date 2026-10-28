@@ -25,7 +25,7 @@ function spcGroup(rows,sales,today){
   (rows||[]).forEach(r=>{const k=r.channel+"|"+r.sku+"|"+r.variant;let c=by.get(k);
     if(!c){c={key:k,ch:r.channel,sku:r.sku,variant:r.variant,versions:[],off:"",flag:"",upd:"",orders:0,shops:[],last:""};by.set(k,c)}
     let v=c.versions.find(x=>x.from===(r.from_day||""));if(!v){v={from:r.from_day||"",parts:[]};c.versions.push(v)}
-    v.parts.push({label:r.item_label,code:spcCode(r.item_label),qty:+r.qty||0,kind:r.kind||"sp"});
+    v.parts.push({label:r.item_label,code:r.code||spcCode(r.item_label),qty:+r.qty||0,kind:r.kind||"sp"});
     if(r.off_from&&(!c.off||r.off_from<c.off))c.off=r.off_from;
     if(/CẦN KẾ TOÁN/.test(r.note||""))c.flag=String(r.note).replace(/^\W*CẦN KẾ TOÁN XÁC NHẬN:\s*/,"");
     if((r.updated_at||"")>c.upd)c.upd=r.updated_at||""});
