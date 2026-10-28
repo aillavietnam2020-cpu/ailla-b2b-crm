@@ -31,7 +31,8 @@ function spcGroup(rows,sales,today){
     if((r.updated_at||"")>c.upd)c.upd=r.updated_at||""});
   const sv=new Map();(sales||[]).forEach(s=>{const k=s.channel+"|"+spcLow(s.sku)+"|"+spcLow(s.variant);const a=sv.get(k)||{orders:0,shops:[],last:""};
     a.orders+=+s.orders||0;if(s.shop&&!a.shops.includes(s.shop))a.shops.push(s.shop);if((s.last_day||"")>a.last)a.last=s.last_day;sv.set(k,a)});
-  return [...by.values()].map(c=>{c.versions.sort((a,b)=>a.from.localeCompare(b.from));
+  const ko={sp:0,gift:1,pack:2,skip:3};
+  return [...by.values()].map(c=>{c.versions.sort((a,b)=>a.from.localeCompare(b.from));c.versions.forEach(v=>v.parts.sort((a,b)=>(ko[a.kind]??0)-(ko[b.kind]??0)));
     const cur=c.versions.filter(v=>v.from<=day).pop()||c.versions[0];c.cur=cur;c.parts=cur.parts;
     const s=sv.get(c.ch+"|"+spcLow(c.sku)+"|"+spcLow(c.variant));
     if(s){c.orders=s.orders;c.shops=s.shops;c.last=s.last}
