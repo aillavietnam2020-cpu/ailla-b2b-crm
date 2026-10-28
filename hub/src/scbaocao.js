@@ -101,7 +101,7 @@ function scKenhNhom(k,ym,rows,CH,sau,full){
   if(dtR&&dtR.gv!=null)add("gv","Giá vốn hàng đã bán",+dtR.gv,"báo cáo kênh");
   if(tsb&&tsb.fees){tsb.fees.forEach(([n,v])=>{v=Math.abs(+v||0);if(!v)return;add(/affiliate|KOC/i.test(n)?"aff":/vận chuyển/i.test(n)?"vc":"san",n,v,"báo cáo TikTok")})}
   else if(dtR&&dtR.phi)add(SC_KG[k].includes("san")?"san":"vc","Phí sàn, vận chuyển theo báo cáo kênh",Math.abs(+dtR.phi),"báo cáo kênh");
-  const bo=[];rows.filter(x=>x.k===k).forEach(x=>{const g=SC_KGMAP[x.g]||"khac";if(g==="san"&&coPhi){bo.push(x);return}add(g,x.ext?x.dg:scG(x.g).n,+x.t||0,x.ext?x.nguon:"sổ chi phí")});
+  const bo=[];rows.filter(x=>x.k===k&&!(coPhi&&x.ext&&x.ext.src==="san")).forEach(x=>{const g=SC_KGMAP[x.g]||"khac";if(g==="san"&&coPhi){bo.push(x);return}add(g,x.ext?x.dg:scG(x.g).n,+x.t||0,x.ext?x.nguon:"sổ chi phí")});
   if(sau)Object.entries((CH.kenh||{})[k]||{}).forEach(([g,v])=>add("chia",scG(g).n,v,"phân bổ"));
   const keys=SC_KG[k]||["khac"],L=keys.concat(sau&&G.chia?["chia"]:[]).map(g=>{const it=G[g]||[];const merged={};it.forEach(([n,v,s])=>{const o=merged[n]||(merged[n]={n,v:0,s});o.v+=v});
     const items=Object.values(merged).sort((a,b)=>b.v-a.v),v=items.reduce((a,x)=>a+x.v,0);

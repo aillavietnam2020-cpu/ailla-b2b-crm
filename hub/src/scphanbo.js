@@ -31,7 +31,8 @@ function scQTtab(){
   const chungBy={};rows.filter(x=>x.k==="Chung").forEach(x=>chungBy[x.g]=(chungBy[x.g]||0)+(+x.t||0));
   const gs=[...new Set(scDM().filter(x=>/^[BC] - /.test(x.lo)).map(x=>x.g).concat(Object.keys(chungBy)).concat(qt.filter(z=>z.g!=="*").map(z=>z.g)))].sort();
   const def=qt.find(z=>z.g==="*");
-  const tr=(g,r,own)=>`<tr><td>${g==="*"?"<b>Mặc định</b><div class=\"hint\">nhóm chưa đặt riêng</div>":`<span class="mono">${esc(g)}</span> ${esc(scG(g).n)}`}</td><td>${own?esc(scQTtxt(r)):`<span class="hint">theo mặc định: ${esc(scQTtxt(def))}</span>`}${r&&r.on===false?' <span class="scp p-c">đang tắt</span>':""}</td><td class="n">${g==="*"?"":chungBy[g]?scNf(chungBy[g]):'<span class="hint">—</span>'}</td><td>${ed?`<button class="btn sm" data-qte="${esc(g)}">Sửa</button>`:""}</td></tr>`;
+  const theoMD=gs.filter(g=>!qt.some(z=>z.g===g&&z.on!==false)).map(g=>g+" "+scG(g).n);
+  const tr=(g,r,own)=>`<tr><td>${g==="*"?`<b>Mặc định</b><div class="hint">áp cho các nhóm chưa đặt riêng: ${esc(theoMD.join(", ")||"không còn nhóm nào")}</div>`:`<span class="mono">${esc(g)}</span> ${esc(scG(g).n)}`}</td><td>${own?esc(scQTtxt(r)):`<span class="hint">theo mặc định: ${esc(scQTtxt(def))}</span>`}${r&&r.on===false?' <span class="scp p-c">đang tắt</span>':""}</td><td class="n">${g==="*"?"":chungBy[g]?scNf(chungBy[g]):'<span class="hint">—</span>'}</td><td>${ed?`<button class="btn sm" data-qte="${esc(g)}">Sửa</button>`:""}</td></tr>`;
   const kq=SC_KENH.map(k=>[k,Object.values(CH.kenh[k]||{}).reduce((a,b)=>a+b,0)]).filter(x=>x[1]),conT=CH.con.reduce((a,x)=>a+x.t,0);
   const V=Q.n?((scFin().pbchot||{})[ym]):[],log=(scFin().pblog||[]).slice(-20).reverse();
   return `<section class="card pad"><div class="sch"><h2>Quy tắc phân bổ chi chung</h2><span class="hint">${ed?"chị Huệ sửa ở đây, mọi báo cáo kênh đổi theo":"chỉ kế toán sửa"}</span></div>
@@ -44,12 +45,12 @@ function scQTedit(g){
   const qt=scQTnow(),cur=qt.find(z=>z.g===g),r=cur||{g,cach:"giu"},ks=SC_KENH;
   openDrawerHTML(`<h2>Cách chia: ${g==="*"?"Mặc định":esc(g+" · "+scG(g).n)}</h2><p class="hint">Chỉ áp cho phần của nhóm này đang bổ "Chi chung công ty". Sửa xong, tháng chưa chốt tính lại ngay; tháng đã chốt giữ bản chốt.</p>
   <form class="frm" id="scqtf">
-   <label class="chk"><input type="radio" name="qtc" value="giu"${r.cach==="giu"?" checked":""}> Để ở chi chung công ty (không chia xuống kênh)</label>
-   <label class="chk"><input type="radio" name="qtc" value="dt"${r.cach==="dt"?" checked":""}> Chia theo doanh thu thực của các kênh chọn dưới đây</label>
-   <div id="qt-dt" style="padding-left:24px">${ks.map(k=>`<label class="chk"><input type="checkbox" data-qk="${esc(k)}"${(r.ks||SC_QT0[0].ks).includes(k)?" checked":""}> ${esc(SC_TEN(k))}</label>`).join("")}</div>
-   <label class="chk"><input type="radio" name="qtc" value="tl"${r.cach==="tl"?" checked":""}> Chia theo tỷ lệ % (phần còn lại để chung)</label>
+   <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input style="width:auto;margin:0" type="radio" name="qtc" value="giu"${r.cach==="giu"?" checked":""}> Để ở chi chung công ty (không chia xuống kênh)</label>
+   <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input style="width:auto;margin:0" type="radio" name="qtc" value="dt"${r.cach==="dt"?" checked":""}> Chia theo doanh thu thực của các kênh chọn dưới đây</label>
+   <div id="qt-dt" style="padding-left:24px">${ks.map(k=>`<label class="chk" style="display:flex;gap:8px;align-items:center;margin:4px 0"><input style="width:auto;margin:0" type="checkbox" data-qk="${esc(k)}"${(r.ks||SC_QT0[0].ks).includes(k)?" checked":""}> ${esc(SC_TEN(k))}</label>`).join("")}</div>
+   <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input style="width:auto;margin:0" type="radio" name="qtc" value="tl"${r.cach==="tl"?" checked":""}> Chia theo tỷ lệ % (phần còn lại để chung)</label>
    <div id="qt-tl" style="padding-left:24px">${ks.map(k=>`<label class="field">${esc(SC_TEN(k))} (%)<input type="number" min="0" max="100" step="0.1" data-qp="${esc(k)}" value="${(r.tl||{})[k]||""}"></label>`).join("")}</div>
-   ${g!=="*"?`<label class="chk"><input type="checkbox" id="qt-off"${r.on===false?" checked":""}> Tạm tắt quy tắc riêng này (dùng mặc định)</label>`:""}
+   ${g!=="*"?`<label class="chk" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input style="width:auto;margin:0" type="checkbox" id="qt-off"${r.on===false?" checked":""}> Tạm tắt quy tắc riêng này (dùng mặc định)</label>`:""}
    <div id="qt-e"></div>
    <div class="acts"><button class="btn pri">Lưu</button>${cur&&g!=="*"?`<button type="button" class="btn" id="qt-del">Bỏ quy tắc riêng, theo mặc định</button>`:""}</div></form>`);
   const save=(nr,msg)=>{const truoc=cur?scQTtxt(cur)+(cur.on===false?" (tắt)":""):"theo mặc định",sau=nr?scQTtxt(nr)+(nr.on===false?" (tắt)":""):"theo mặc định";

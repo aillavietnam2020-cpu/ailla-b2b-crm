@@ -187,6 +187,10 @@ function scExt(){
   const R=[];let L=[];try{L=spRows()}catch(e){}
   L.forEach(x=>{const kenh=x.src==="ncc"?"Giá vốn":x.kenh||(x.src==="vc"?"—":"Chung");
     R.push({id:"x-"+x.src+"-"+x.id,ext:x,d:x.ngay,ky:!!(x.kyOnly||x.thangOnly),ct:x.src==="ncc"?"Mua hàng":x.src==="vc"?(String(x.sub).match(/PCVC[\w-]*/)||[""])[0]:"",dg:x.src==="tay"?(x.sub||x.txt):x.txt,sub:x.src==="tay"?(x.sub?x.txt:""):x.sub,t:x.tien,nhom:x.src==="tay"?x.txt:x.nhom,k:kenh,st:"Ổn",nguon:SC_NGUON[x.src]||"Khác"})});
+  /* Khoản không chi tiền mà trừ vào tiền sàn về (chị Huệ 28/10): phí sàn TikTok theo báo cáo TikTok đã tải, chỉ tháng nằm trọn trong kỳ. */
+  try{const S=(typeof TSB!=="undefined"&&TSB.sum)||{};Object.keys(S).sort().forEach(ym=>{const s=S[ym],[y,m]=ym.split("-").map(Number),cuoi=ym+"-"+String(new Date(y,m,0).getDate()).padStart(2,"0");
+    if(!s||!s.fees||ym+"-01"<PERIOD.from||cuoi>PERIOD.to)return;
+    s.fees.forEach(([n,v],i)=>{v=Math.abs(+v||0);if(!v)return;R.push({id:"x-san-tt-"+ym+"-"+i,ext:{src:"san",id:"san-tt"},d:cuoi,ky:true,ct:"",dg:"Phí sàn TikTok · "+n,sub:"trừ vào tiền sàn về, không chi tiền · báo cáo TikTok tháng "+ym.slice(5)+"/"+ym.slice(0,4),t:v,nhom:"Phí sàn",k:"TikTok",st:"Ổn",nguon:"Báo cáo sàn (trừ ví)"})})})}catch(e){}
   try{const C=execNums(PERIOD.from,PERIOD.to).C||{};if(C.adsSPE>0)R.push({id:"x-ads-spe",ext:{src:"ads",id:"ads-spe"},d:PERIOD.to,ky:true,ct:"",dg:"Quảng cáo Shopee",sub:"từ báo cáo lãi lỗ Shopee của tháng",t:C.adsSPE,nhom:"Marketing",k:"Shopee Mall",st:"Ổn",nguon:SC_NGUON.ads})}catch(e){}
   return R}
 /* Chỉ số có nhưng chưa tải báo cáo hoặc chưa nhập số thì ghi "chưa có số", không đoán, không để 0 (chị Hoa 27/10). */
@@ -205,6 +209,7 @@ function scAuto(){
     if(s==="ads"){g={"ads-fb":"G01","ads-tt":"G02","ads-spe":"G03"}[x.ext.id];if(has(g))return}
     else if(s==="luong"){g="G07";if(has(g))return;k=scKenhChuan(k)||"Chung"}
     else if(s==="vc"){g="G09";k="NPP"}
+    else if(s==="san"){g="G04";if(has(g))return}
     if(!g)return;R.push({...x,g,k,tk:scG(g).tk,nhom:scG(g).n,auto:1})});
   return R}
 const scPBRows=()=>scRows().concat(scAuto());
@@ -228,14 +233,14 @@ function scExtOpen(r){const x=r.ext||{};
 function scNK(){
   try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
   try{if(typeof adfLoad==="function"&&!ADF.raw&&!SC.adf){SC.adf=1;adfLoad().then(()=>{try{adfMergeDays()}catch(e){}if(PAGE==="so_cp")renderMain()})}}catch(e){}
-  const q=kfold(SC.q||""),QT=scQT(PERIOD.from.slice(0,7)).qt,cho=scCho().filter(scInP),AU=new Map(scAuto().map(x=>[x.id,x])),ext=scExt().map(x=>AU.get(x.id)||x),all=scRows().concat(cho,ext),R=all.filter(x=>(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!SC.fn||scFnRow(x)===SC.fn)&&(!SC.xl||scXL(x,QT)===SC.xl)&&(!q||kfold(x.dg+" "+x.ct+" "+(x.sub||"")+" "+(x.nhom||"")).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||((a.ky?1:0)-(b.ky?1:0))||String(a.ct).localeCompare(String(b.ct)));
+  const q=kfold(SC.q||""),QT=scQT(PERIOD.from.slice(0,7)).qt,cho=scCho().filter(scInP),AU=new Map(scAuto().map(x=>[x.id,x])),ext=scExt().filter(x=>x.ext.src!=="ncc").map(x=>AU.get(x.id)||x),all=scRows().concat(cho,ext),R=all.filter(x=>(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!SC.fn||scFnRow(x)===SC.fn)&&(!SC.xl||scXL(x,QT)===SC.xl)&&(!q||kfold(x.dg+" "+x.ct+" "+(x.sub||"")+" "+(x.nhom||"")).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||((a.ky?1:0)-(b.ky?1:0))||String(a.ct).localeCompare(String(b.ct)));
   const ed=scCanDuyet(),gs=scDM().map(x=>x.g),RE=R.filter(x=>x.ext&&!x.auto),sE=scS(RE);
   const row=x=>{if(x.ext)return `<tr class="clk" data-x="${esc(x.id)}"><td>${x.ky?'<span class="hint">cả kỳ</span>':scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg)}${x.sub?`<div class="hint">${esc(x.sub)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(x.nhom||"")}</td><td>${esc(x.tk||"")}</td><td><span class="scp p-c">${esc(x.nguon)}</span></td><td>${esc(SC_TEN(x.k))}</td><td>${esc(scFnRow(x))}</td><td>${scXLP(scXL(x,QT))}</td><td>${scStP(x.st)}</td></tr>`;
     const d=scG(x.g),isCho=x.st==="Chờ duyệt";return `<tr class="clk" data-id="${x.id}"${isCho?' data-cho="1"':""}><td>${scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td>${esc(x.dg)}${x.gc?`<div class="hint">${esc(x.gc)}</div>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(d.n)}</td><td>${esc(d.tk)}</td><td>${scLoP(d.lo)}</td><td>${ed&&!isCho?`<select class="scbv${x.k0&&x.k0!==x.k?" doi":""}" data-bv="${x.id}" aria-label="Bổ khoản chi vào">${SC_COLS.map(k=>`<option value="${k}"${x.k===k?" selected":""}>${esc(SC_TEN(k))}</option>`).join("")}</select>${x.k0&&x.k0!==x.k?`<div class="hint">đã đổi từ ${esc(x.k0)}</div>`:""}`:esc(SC_TEN(x.k))}</td><td>${esc(scFnRow(x))}</td><td>${scXLP(scXL(x,QT))}</td><td>${scStP(x.st)}</td></tr>`};
   return `<section class="card flush"><div class="sch pad"><h2>Nhật ký chi</h2><span class="hint">mọi khoản tiền chi ra trong kỳ · bấm dòng để xem chi tiết · nhãn xám = khoản nhập ở mục khác, tự hiện</span><span class="sp"></span>
    <select id="scf-fg"><option value="">Tất cả nhóm chi phí</option>${gs.map(g=>`<option value="${g}"${SC.g===g?" selected":""}>${g} · ${esc(scG(g).n)}</option>`).join("")}</select>
    <select id="scf-fk"><option value="">Tất cả nơi chịu</option>${SC_COLS.map(k=>`<option value="${k}"${SC.k===k?" selected":""}>${esc(SC_TEN(k))}</option>`).join("")}</select>
-   <select id="scf-fn"><option value="">Tất cả chức năng</option>${SC_FN.map(f=>f[1]).concat(["Mua hàng"]).map(n=>`<option${SC.fn===n?" selected":""}>${n}</option>`).join("")}</select>
+   <select id="scf-fn"><option value="">Tất cả chức năng</option>${SC_FN.map(f=>f[1]).map(n=>`<option${SC.fn===n?" selected":""}>${n}</option>`).join("")}</select>
    <select id="scf-fx"><option value="">Mọi cách xử lý</option>${Object.keys(SC_XLC).map(n=>`<option${SC.xl===n?" selected":""}>${n}</option>`).join("")}</select>
    <select id="scf-fs"><option value="">Mọi tình trạng</option>${["Ổn","Cần rà","Chờ duyệt"].map(s=>`<option${SC.st===s?" selected":""}>${s}</option>`).join("")}</select>
    <input id="scf-fq" placeholder="Tìm diễn giải, số chứng từ…" value="${esc(SC.q||"")}"></div>
