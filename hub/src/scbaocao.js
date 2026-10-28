@@ -141,7 +141,7 @@ function scKenh(){
    ${o.L.map((g,i)=>row((i+1)+". "+SC_KGN[g.k],g.v,pv(g.k),"scgrp")+g.it.map(x=>row(esc(x.n)+` <span class="hint">· ${esc(x.s)}</span>`,x.v,undefined,"scsub")).join("")).join("")}
    <tr class="tot"><td>Tổng chi phí ${sau?"sau phân bổ":"ghi nhận"}${miss.length?` (chưa đủ, thiếu ${miss.length} nhóm)`:""}</td><td class="n">${scNf(cs)}</td><td class="n">${dt?scPc(cs,dt):""}</td><td class="n">${csP?scNf(csP):""}</td></tr></tbody></table></div>
    ${!full&&one?`<p class="hint">Tháng đang chạy: giá vốn, phí sàn theo báo cáo kênh chỉ có khi tháng đã đủ số, nên đang ghi "chưa có số".</p>`:""}</div>`;
-  return scBCcss()+`<section class="card pad" id="scpk"><div class="sch"><h2>Chi phí theo kênh</h2><span class="hint">${esc(pLabel())}</span><span class="sp"></span>${scPBSeg(CH)}</div>${pills}${kp}<div class="sctwo">${co}${cw}</div>${bang}</section>
+  return scBCcss()+`<section class="card pad" id="scpk"><div class="sch"><h2>Chi phí theo kênh</h2><span class="hint">${esc(pLabel())}</span><span class="sp"></span>${scPBSeg(CH)}</div>${pills}${kp}<div class="sctwo">${co}${cw}</div>${k==="TikTok"?scHDTTHtml(ym,full,rows):""}${bang}</section>
   <details class="card pad scpbd"><summary><b>Bảng nhóm chi phí × kênh (toàn bộ sổ) và chia chi chung</b></summary>${scPBBang()}</details>`}
 /* ---------- 4. Phân bổ (chỉ xem kết quả) ---------- */
 function scPBV(){
@@ -234,3 +234,18 @@ function scDoiChieu(){
      ${chiMisa.length&&scCanDuyet()?`<button class="btn pri" id="scdc-nap">Nạp ${chiMisa.length} dòng còn thiếu vào sổ web</button>`:""}`;
     const nb=$("#scdc-nap");if(nb)nb.onclick=()=>{if(!confirm("Nạp "+chiMisa.length+" dòng chỉ có ở MISA vào sổ trên web?"))return;
       DB.mutate(ME.name,"nạp "+chiMisa.length+" dòng còn thiếu từ đối chiếu MISA",dt=>{dt.fin=dt.fin||{};dt.fin.nkc=dt.fin.nkc||[];chiMisa.forEach(x=>dt.fin.nkc.push({id:uid("nk"),...x,by:ME.name,at:Date.now()}))});closeDrawer();toast("Đã nạp "+chiMisa.length+" dòng");renderMain()}}}
+/* Thẻ phí vận hành TikTok theo hợp đồng ở Theo kênh › TikTok: tính từ báo cáo TikTok đã tải, so với số đã ghi sổ nhóm G06. */
+function scHDTTHtml(ym,full,rows){
+  const s=full&&typeof TSB!=="undefined"&&TSB.sum?TSB.sum[ym]:null,so=scS(rows.filter(x=>x.k==="TikTok"&&x.g==="G06"));
+  const head=`<div class="scchh"><b>Phí vận hành TikTok (bên Nguyễn Thế Hoàng) theo hợp đồng</b><span class="hint">12,5 triệu/tháng; trên 2 tỷ là 3% doanh thu; thưởng 2% khi doanh thu 800 triệu – 2 tỷ và quảng cáo + affiliate dưới 30%</span></div>`;
+  if(!s||!s.dt)return `<div class="scch">${head}<p class="hint">${full?"Chưa tải báo cáo TikTok tháng này nên chưa tính được.":"Chọn một tháng đã hết để tính theo doanh thu đối soát."} Đã ghi sổ (nhóm G06): ${so?scNf(so)+" đ":"chưa có"}.</p></div>`;
+  const aff=Math.abs(+((s.fees||[]).find(f=>/affiliate|KOC/i.test(f[0]))||[0,0])[1]||0),r=scPhiVanHanhTT(+s.dt,+s.ads||0,aff),lech=so-r.tong;
+  return `<div class="scch">${head}<div class="tbl"><table><tbody>
+   <tr><td>Doanh thu đối soát (báo cáo TikTok)</td><td class="n">${scNf(r.dt)}</td></tr>
+   <tr><td>Quảng cáo + hoa hồng affiliate</td><td class="n">${scNf((+s.ads||0)+aff)} <span class="hint">${scPc((+s.ads||0)+aff,r.dt)} doanh thu</span></td></tr>
+   <tr><td>Phí vận hành <span class="hint">(${esc(r.cachPhi)})</span></td><td class="n">${scNf(r.phi)}</td></tr>
+   <tr><td>Thưởng 2% <span class="hint">${r.duThuong?"đạt điều kiện":r.dt<800e6?"doanh thu dưới 800 triệu":r.dt>2e9?"doanh thu trên 2 tỷ, không xét thưởng":"quảng cáo + affiliate từ 30% trở lên"}</span></td><td class="n">${r.thuong?scNf(r.thuong):"0"}</td></tr>
+   <tr class="tot"><td>Phải trả theo hợp đồng</td><td class="n">${scNf(r.tong)}</td></tr>
+   <tr><td>Đã ghi sổ tháng này (nhóm G06)</td><td class="n">${so?scNf(so):'<span class="scna">chưa có</span>'}</td></tr>
+   ${so?`<tr><td>Chênh lệch sổ − hợp đồng</td><td class="n"><b class="${Math.abs(lech)<1?"":"scup"}">${Math.abs(lech)<1?"khớp":scNf(lech)}</b></td></tr>`:""}</tbody></table></div>
+   <p class="hint">Chênh lệch có thể do sổ ghi theo ngày trả tiền (trả tháng sau cho tháng trước). Số trên chỉ để đối chiếu, chưa cộng vào chi phí.</p></div>`}
