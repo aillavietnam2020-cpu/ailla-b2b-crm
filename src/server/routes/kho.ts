@@ -2701,7 +2701,8 @@ async function withOrderLines(db: D1Database, orders: Array<Record<string, unkno
     const part = ids.slice(i, i + 50);
     const r = await db
       .prepare(
-        `SELECT oi.order_id, oi.product_id, p.sku, p.name, p.unit, oi.qty, oi.is_gift
+        `SELECT oi.order_id, oi.product_id, p.sku, p.name, p.unit, oi.qty, oi.is_gift,
+                (SELECT okl.shipped_qty FROM order_kho_lines okl WHERE okl.order_id = oi.order_id AND okl.product_id = oi.product_id) AS shipped_qty
          FROM order_items oi JOIN products p ON p.id = oi.product_id
          WHERE oi.order_id IN (${part.map(() => '?').join(',')}) ORDER BY oi.order_id, oi.created_at, oi.rowid`,
       )

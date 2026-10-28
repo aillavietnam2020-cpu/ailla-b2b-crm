@@ -62,13 +62,20 @@ function xpBind(sec){
     catch(e){toast(e.message||"Chưa xử lý được");b.disabled=false}})}
 /* Sửa phiếu xuất của đơn đã xuất (số thực xuất từng mã, ngày xuất, người xuất): bắt buộc có lý do.
    Kế toán kho gửi yêu cầu để quản lý điều phối / CEO duyệt; người có quyền duyệt sửa thì áp ngay. */
+/* Dòng của đơn gộp theo mã (dòng bán + dòng tặng cùng mã cộng lại): qty = số trên đơn, shipped = số kho đã ghi thực xuất
+   (chưa ghi thì bằng số trên đơn). Kho ghi số thực xuất theo mã nên xem và sửa theo mã. */
+function xpProd(o){const m=new Map();
+  for(const l of o.lines||[]){const c=m.get(l.product_id);
+    if(c){c.qty+=+l.qty||0;c.gift=c.gift&&!!l.is_gift}
+    else m.set(l.product_id,{product_id:l.product_id,sku:l.sku,name:l.name,unit:l.unit,gift:!!l.is_gift,qty:+l.qty||0,sh:l.shipped_qty})}
+  return [...m.values()].map(x=>({...x,shipped:x.sh==null?x.qty:+x.sh}))}
 function xpEdit(id){
   const o=(XP.done||[]).find(x=>x.id===id);if(!o)return;const ap=xpApprover();
   const pend=(XP.edits||[]).some(e=>e.order_id===id);
   openDrawerHTML(`<h2>Sửa phiếu xuất · ${esc(o.order_no)}</h2><p class="hint">${esc(o.customer_name)} · hiện ghi ngày ${xpDate(o.shipped_day)}</p>
    <div class="note">${ap?"Bạn có quyền duyệt nên sửa xong là áp ngay, vẫn ghi lại lý do và người sửa.":"Phiếu chỉ đổi khi <b>quản lý điều phối hoặc CEO duyệt</b>. Ghi rõ lý do để người duyệt đối chiếu."}${pend?" <b>Phiếu này đang có một yêu cầu chờ duyệt, chờ duyệt xong mới gửi tiếp.</b>":""}</div>
-   <div class="card flush"><table class="tbl"><thead><tr><th>Mã</th><th>Tên</th><th class="n">Số hiện tại</th><th class="n">Số đúng</th></tr></thead><tbody>
-   ${o.lines.filter(l=>!l.is_gift||true).map(l=>`<tr><td>${esc(l.sku)}</td><td>${esc(l.name)}${l.is_gift?` <span class="pill p-gry">Tặng</span>`:""}</td><td class="n">${l.qty}</td><td><input class="xe-q n" type="number" min="0" step="1" data-p="${l.product_id}" data-cur="${l.qty}" value="${l.qty}" style="width:90px"></td></tr>`).join("")}</tbody></table></div>
+   <div class="card flush"><table class="tbl"><thead><tr><th>Mã</th><th>Tên</th><th class="n">Kho đang ghi xuất</th><th class="n">Số đúng</th></tr></thead><tbody>
+   ${xpProd(o).map(l=>`<tr><td>${esc(l.sku)}</td><td>${esc(l.name)}${l.gift?` <span class="pill p-gry">Tặng</span>`:""}${l.shipped!==l.qty?`<div class="hint">trên đơn ${l.qty}</div>`:""}</td><td class="n">${l.shipped}</td><td><input class="xe-q n" type="number" min="0" step="1" data-p="${l.product_id}" data-cur="${l.shipped}" value="${l.shipped}" style="width:90px"></td></tr>`).join("")}</tbody></table></div>
    <div class="row4" style="margin-top:10px"><label class="field">Ngày xuất kho<input id="xe-d" type="date" max="${xpToday()}" value="${o.shipped_day||xpToday()}"></label>
    <label class="field">Người xuất kho<input id="xe-n" value="${esc(o.shipped_by_name||"")}" placeholder="Họ tên người xuất hàng"></label></div>
    <label class="field">Lý do sửa (bắt buộc)<input id="xe-r" placeholder="Ví dụ: nhập nhầm 20 thành 2, xuất ngày 18 chứ không phải 19"></label>
@@ -89,8 +96,9 @@ function xpView(id){
   const o=(XP.done||[]).find(x=>x.id===id);if(!o)return;
   openDrawerHTML(`<h2>${esc(o.order_no)} · ${esc(o.customer_name)}</h2>
    <p class="hint">Xuất kho ngày ${xpDate(o.shipped_day)} · Người xuất ${esc(o.shipped_by_name||"chưa ghi")} · Sale ${esc(o.owner_name||"—")}</p>
-   <div class="card flush"><table class="tbl"><thead><tr><th>Mã</th><th>Tên</th><th>ĐVT</th><th class="n">Số lượng</th></tr></thead><tbody>
-   ${o.lines.map(l=>`<tr><td>${esc(l.sku)}</td><td>${esc(l.name)}${l.is_gift?` <span class="pill p-gry">Tặng</span>`:""}</td><td>${esc(l.unit||"")}</td><td class="n">${l.qty}</td></tr>`).join("")}</tbody></table></div>
+   <div class="card flush"><table class="tbl"><thead><tr><th>Mã</th><th>Tên</th><th>ĐVT</th><th class="n">Trên đơn</th><th class="n">Kho ghi thực xuất</th></tr></thead><tbody>
+   ${xpProd(o).map(l=>`<tr><td>${esc(l.sku)}</td><td>${esc(l.name)}${l.gift?` <span class="pill p-gry">Tặng</span>`:""}</td><td>${esc(l.unit||"")}</td><td class="n">${l.qty}</td><td class="n">${l.shipped!==l.qty?`<b style="color:#b42318">${l.shipped}</b>`:l.shipped}</td></tr>`).join("")}</tbody></table></div>
+   ${xpProd(o).some(l=>l.shipped!==l.qty)?`<p class="note amb">Số kho ghi thực xuất khác số trên đơn. Xuất sai số thì bấm <b>Sửa phiếu xuất</b> ở danh sách để ghi lại số đúng.</p>`:""}
    <div class="acts" style="margin-top:12px"><button class="btn pri" id="xp-pr">In phiếu xuất kho</button></div>`);
   $("#xp-pr").onclick=()=>window.open("/print/orders/"+o.id+"?type=ship","_blank")}
 function xpOpen(id){
