@@ -70,7 +70,12 @@ if(typeof b2bChannel==="function"){const _b=b2bChannel;b2bChannel=function(ch){c
   const f=dtFrozen(ch==="GIA_CONG"?"gc":"b2b",PERIOD.from,PERIOD.to);if(!f)return X;const d=f.dt-(+X.net||0);return {...X,has:true,net:f.dt,orders:f.don!=null?f.don:X.orders,gross:(+X.gross||0)+d,frozen:true}}}
 /* Chi phí Sổ chi phí bổ thẳng về kênh (luật ở dtcalc.js): trừ vào lãi đóng góp kênh, ghi ở r.cpk. Không áp khi tính số chốt (số chốt chỉ giữ doanh thu, chi phí sổ luôn lấy theo sổ hiện tại). */
 const DT_NKC_ROW={tts:"tts",fb:"fb",spe:"spe",B2B:"b2b",GIA_CONG:"gc"};
-function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.nkc)return null;return dtNkcKenh(f.nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
+/* Tháng đã chạy khấu hao / phân bổ trên trang Tài sản: bỏ dòng khấu hao MISA của tháng đó (scChiDoiChieu, chỉ đối chiếu) và cộng dòng
+   tsChiPhiThang(ym).dong (không ghi vào fin.nkc) — báo của chat Sổ chi phí 28/10. Ngày của dòng tài sản là cuối tháng, kéo về `to` nếu kỳ dừng giữa tháng. */
+function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.nkc)return null;
+  let nkc=typeof scChiDoiChieu==="function"?f.nkc.filter(x=>!scChiDoiChieu(x)):f.nkc;
+  if(typeof tsChiPhiThang==="function"){const ts=[];for(let ym=from.slice(0,7);ym<=to.slice(0,7);ym=plYmAdd(ym,1)){try{const r=tsChiPhiThang(ym);if(r&&r.chay)r.dong.forEach(x=>ts.push({...x,d:x.d>to?to:x.d}))}catch(e){}}if(ts.length)nkc=nkc.concat(ts)}
+  return dtNkcKenh(nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
 function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEach(r=>{const k=DT_NKC_ROW[r.k],v=k?S.v[k]:0;if(!v||r._cpk||r.dt==null)return;r._cpk=1;r.cpk=(r.cpk||0)+v;r.khac=(r.khac||0)+v;if(r.lai!=null)r.lai-=v;
   r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(v)} chi phí Sổ chi phí bổ về kênh (${S.n[k]} dòng)`})}
 /* Lương làm riêng cho kênh (bảng lương đã chốt) trừ ở lãi đóng góp; chi chung được chia theo Quy tắc phân bổ ghi ở r.chia cho dòng Lãi sau phân bổ.
