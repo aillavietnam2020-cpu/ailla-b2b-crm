@@ -23,12 +23,12 @@ Chrome máy chị đang bật "hỏi chỗ lưu", nếu bấm tải bình thư�
 2. **Gài bẫy tải** trước khi bấm: `bash bat-tai.sh t5`
 3. Bấm nút tải bằng `openclaw browser --browser-profile chrome click <ref> --target-id t5`, rồi lấy file về VPS:
    `bash lay-file.sh t5 /root/bao-cao-san/<YYYY-MM>/<tên file>`
-   Script đọc đường link file trang vừa tạo và VPS tự tải về. Báo "Chưa bắt được link" thì gài bẫy lại rồi bấm lại. Không bao giờ bấm tải khi chưa gài bẫy.
+   Script đọc đường link file trang vừa tạo; link ký sẵn (quảng cáo) thì VPS tải thẳng, link cần đăng nhập (quyết toán, đơn) thì trang tự tải bằng phiên Chrome rồi chuyển từng phần về VPS (vài phút với file 10MB, cứ để chạy). Báo "Chưa bắt được link" thì gài bẫy lại rồi bấm lại. Không bao giờ bấm tải khi chưa gài bẫy.
 
 Gợi ý URL:
 - **Quảng cáo GMV Max**: `https://seller-vn.tiktok.com/ads-creation/dashboard?mpa=1&type=product&list_start_date=<ms>&list_end_date=<ms>` (ms = 00:00 giờ VN của ngày đầu / ngày cuối, ví dụ 01/10/2026 = 1790787600000, 25/10/2026 = 1792861200000). Nút tải là nút ngay sau ô ngày (biểu tượng ⬇).
 - **Đơn hàng**: `https://seller-vn.tiktok.com/order` → Bộ lọc → *Thời gian đã tạo* → Áp dụng → **Xuất** → *Đơn hàng đã lọc* + **CSV** → đợi ở *Lịch sử xuất* → gài bẫy → **Tải xuống**.
-- **Quyết toán (income)**: `https://seller-vn.tiktok.com/finance/bills` → tab Báo cáo → Xem theo đơn hàng → chọn ngày báo cáo → Xuất (popup trống, chọn lại ngày) → đợi 2–5 phút → gài bẫy → **Tải xuống**.
+- **Quyết toán (income)**: `https://seller-vn.tiktok.com/finance/bills` → tab Báo cáo → Xem theo đơn hàng → chọn ngày báo cáo → **Xuất** → popup "Chọn phạm vi ngày để xuất" **trống, phải bấm vào ô và chọn lại đúng 2 ngày rồi bấm OK** → **Xuất** → đợi 1–5 phút (Lịch sử xuất dữ liệu báo "Đã xuất") → gài bẫy → **Tải xuống**.
 
 Tên file trên VPS (mỗi tháng một thư mục `/root/bao-cao-san/<YYYY-MM>/`):
 `01_OrderSKUList_<từ>-<đến>.csv`, `02_income_<từ>-<đến>.xlsx`, `03_CampaignOverview_<từ>-<đến>.xlsx` (ngày dạng YYYYMMDD).
