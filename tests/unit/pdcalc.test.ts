@@ -161,3 +161,16 @@ describe('Phê duyệt: ngưỡng chi phải CEO duyệt, tiền về, hàng tr�
     expect(T.pdBuild(S2, { ...CEO, perms: ['order.approve.normal'] }).some((x: { k: string }) => x.k === 'hoan')).toBe(false); // hàng trả lại: chỉ người có quyền xác nhận kế toán (máy chủ)
   });
 });
+
+describe('Combo mới chờ kế toán nhập (Sản phẩm & combo, 28/10)', () => {
+  const combo = [
+    { channel: 'SHOPEE', sku: '2TL', orders: 3, first_day: '2026-10-22' },
+    { channel: 'TIKTOK', sku: '3TVN', orders: 2, first_day: '2026-10-23' },
+  ];
+  it('CEO và kế toán thấy một dòng gộp, chỉ mở trang; người khác không thấy', () => {
+    const r = T.pdBuild({ combo }, { role: 'CEO', uid: 'u', perms: [], admin: false, ns: false });
+    expect(r).toEqual([expect.objectContaining({ k: 'combo', act: '', nd: '2 mã · 5 đơn chưa tính giá vốn', open: { page: 'spcombo' } })]);
+    expect(T.pdBuild({ combo }, { role: 'EMPLOYEE', uid: 'u', perms: ['order.accounting.confirm'] })).toHaveLength(1);
+    expect(T.pdBuild({ combo }, { role: 'MANAGER', uid: 'u', perms: ['order.approve.normal'] })).toHaveLength(0);
+  });
+});

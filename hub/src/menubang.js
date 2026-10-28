@@ -38,18 +38,18 @@
         ["Dòng tiền",[["tien_lich","Tiền & lịch chi"]]],
         ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"],["tcn_dc","Đối chiếu công nợ & tiền"]]],
         ["Giá thành",[["sku","Giá vốn SKU"],["kho_boc","Định mức & giá thành"],["kho_cl","Chênh lệch định mức"],["mh_gianvl","Giá nguyên vật liệu"]]],
-        /* Đồng bộ mã Kênh phân phối, Quy đổi mã các sàn: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
-        ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã Kênh phân phối"],["kho_qd","Quy đổi mã các sàn"]]]],
+        /* Quy đổi mã các sàn đã chuyển sang Cấu hình › Sản phẩm & combo (28/10). Đồng bộ mã Kênh phân phối: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
+        ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã Kênh phân phối"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
       pd:[["",[["pheduyet","Phê duyệt"]]]],
       cfg:[["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
-        ["Danh mục",[["sanpham","Sản phẩm"],["kenhban","Kênh bán & phí"],["chiphidm","Danh mục chi phí"],["cr_rcv","Tài khoản nhận tiền"]]],
+        ["Danh mục",[["spcombo","Sản phẩm & combo"],["sanpham","Sản phẩm"],["kenhban","Kênh bán & phí"],["chiphidm","Danh mục chi phí"],["cr_rcv","Tài khoản nhận tiền"]]],
         ["Chính sách bán hàng",[["cr_gia","Bảng giá"],["cr_dc","Giá điều chỉnh / khuyến mại"],["cr_thuong","Thưởng & xếp hạng NPP"],["cr_giagc","Bảng giá Kênh OEM"]]],
         ["Dữ liệu & sao lưu",[["cr_import","Nhập dữ liệu CRM"],["caidat","Sao lưu dữ liệu"],["cr_audit","Nhật ký"]]],
         /* Bot phòng ban là cấu hình (ai duyệt đề xuất, bot làm được gì): chị Hoa 28/10 chuyển từ vận hành về đây. */
         ["Agent & bot AI",[["bots","Bot AI phòng ban"],["agents","Quyền agent"]]]]};
     /* Chuyển hẳn sang web vận hành (đã có ở đó): mua hàng, sản xuất, kho, quy chuẩn, agent điều hành, bot. */
-    const DROP=["mh_po","sx_nc","kho_nxt","kho_vo","kho_dm","quychuan","quytac","agentchat"];
+    const DROP=["mh_po","sx_nc","kho_nxt","kho_vo","kho_dm","quychuan","quytac","agentchat","kho_qd"]; // kho_qd: nay là Cấu hình › Sản phẩm & combo
     const Q=SRC.filter(m=>m.adm).map(m=>m.k);
     USED=Object.values(S).flatMap(ids);
     NEW=[mod("q_tq","home","Điều hành CEO","",S.tq,[],DROP),
@@ -71,13 +71,13 @@
         ["Nhập kho",["kho_nhap","kho_ton"]],
         ["Sản xuất",["sx_nc","sx_td","kho_pc","sx_lo","sx_bc"]],
         ["Thành phẩm & xuất",["kho_nhap_tp","sx_kho","kho_xuat_b2b","kho_online","kho_xuat","kho_hoan","kho_nxt","kho_cl"]],
-        ["Danh mục",["kho_dm","kho_vo","kho_map","kho_qd"]]],
+        ["Danh mục",["kho_dm","kho_vo","kho_map","kho_combo"]]],
       cv:[["",["cv_v","cv_da","cv_mt","hq","quychuan","quytac"]]],
       agt:[["",["agentchat","hoithoaiagent","huanluyenagent",["ai","Trợ lý AI"]]]]};
     /* Chuyển sang web quản trị (kế toán, chính sách): đã có sẵn ở đó.
        Kho bill, Phiếu chi vận chuyển ở CẢ hai web (chị Hoa chốt 26/10): sale nhập bill, chị Thảo lập phiếu chi bên vận hành;
        kế toán xác nhận, xem ở quản trị › Thu chi. Web quản trị chỉ mở cho CEO và tài khoản có quyền kế toán (serve.ts). */
-    const DROP=["bc_tong","cr_thuong","mh_no","mh_gianvl","bots"];
+    const DROP=["bc_tong","cr_thuong","mh_no","mh_gianvl","bots","kho_qd"];
     USED=Object.values(S).flatMap(ids);
     const mkt=keep("mkt"),hr=keep("hr"),aiq=keep("aiq"),me=keep("me");
     if(mkt)mkt.zone="";if(hr)hr.zone="";

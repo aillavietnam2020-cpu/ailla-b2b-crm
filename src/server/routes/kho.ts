@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { canEditCombo } from './sanpham';
 import { nowIso } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
@@ -1981,7 +1982,7 @@ async function daysOfSku(db: D1Database, channel: string, skus: string[], fromDa
 /** Thêm một dòng quy đổi: mã SKU (+ phân loại) → sản phẩm lẻ × số lượng. Số các ngày liên quan tự tính lại. */
 khoRoutes.post('/online/map/add', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới sửa bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới sửa bảng quy đổi (Quản trị › Cấu hình › Sản phẩm & combo)');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const sku = String(b?.sku ?? '').trim();
@@ -2028,7 +2029,7 @@ khoRoutes.post('/online/map/add', async (c) => {
  */
 khoRoutes.post('/online/map/swap', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới sửa bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới sửa bảng quy đổi (Quản trị › Cấu hình › Sản phẩm & combo)');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const sku = String(b?.sku ?? '').trim();
@@ -2081,7 +2082,7 @@ khoRoutes.post('/online/map/swap', async (c) => {
 /** Kế toán đã kiểm combo này, quy đổi đúng: bỏ cờ "CẦN KẾ TOÁN XÁC NHẬN" (không đổi số lượng, không đổi mã). */
 khoRoutes.post('/online/map/confirm', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới xác nhận bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới xác nhận bảng quy đổi');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const sku = String(b?.sku ?? '').trim();
@@ -2112,7 +2113,7 @@ khoRoutes.post('/online/map/confirm', async (c) => {
 /** Lưu trọn cách quy đổi của một mã sàn: thay toàn bộ các món của mã đó (cùng phân loại, cùng ngày áp dụng). */
 khoRoutes.post('/online/map/set', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới sửa bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới sửa bảng quy đổi (Quản trị › Cấu hình › Sản phẩm & combo)');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const sku = String(b?.sku ?? '').trim();
@@ -2152,7 +2153,7 @@ khoRoutes.post('/online/map/set', async (c) => {
 
 khoRoutes.post('/online/map/remove', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới sửa bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới sửa bảng quy đổi (Quản trị › Cấu hình › Sản phẩm & combo)');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const sku = String(b?.sku ?? '').trim();
@@ -2172,7 +2173,7 @@ khoRoutes.post('/online/map/remove', async (c) => {
  */
 khoRoutes.post('/online/map/version', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới sửa bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới sửa bảng quy đổi (Quản trị › Cấu hình › Sản phẩm & combo)');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const sku = String(b?.sku ?? '').trim();
@@ -2212,7 +2213,7 @@ khoRoutes.post('/online/map/version', async (c) => {
 /** SKU mới (shop đổi combo thì thường đổi SKU): sao chép cách quy đổi của SKU cũ sang SKU mới, rồi kế toán chỉnh quà / số lượng. */
 khoRoutes.post('/online/map/clone', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới sửa bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới sửa bảng quy đổi (Quản trị › Cấu hình › Sản phẩm & combo)');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const fromSku = String(b?.from_sku ?? '').trim();
@@ -2295,7 +2296,7 @@ khoRoutes.post('/online/lines', async (c) => {
 /** Nạp cả bảng quy đổi (dán từ tab "Quy đổi combo" của Sheet cũ). Thay toàn bộ bảng của kênh. */
 khoRoutes.put('/online/map', async (c) => {
   const auth = c.get('auth');
-  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối hoặc kế toán mới nạp bảng quy đổi');
+  if (!canEditCombo(auth)) throw forbidden('Chỉ CEO hoặc kế toán mới nạp bảng quy đổi');
   const b = (await c.req.json().catch(() => null)) as { channel?: unknown; rows?: unknown } | null;
   if (!isPosChannel(b?.channel)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const rows = Array.isArray(b?.rows) ? (b.rows as Array<Record<string, unknown>>) : [];

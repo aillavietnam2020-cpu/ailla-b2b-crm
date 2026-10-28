@@ -37,6 +37,7 @@ import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
 import { fpPublishRoutes } from './routes/fpPublish';
 import { sttRoutes, sttWorkerRoutes } from './routes/stt';
 import { khoRoutes } from './routes/kho';
+import { sanphamRoutes } from './routes/sanpham';
 import { tiktokRoutes } from './routes/tiktok';
 import { shopeeRoutes } from './routes/shopee';
 import { dieuhanhRoutes } from './routes/dieuhanh';
@@ -138,6 +139,7 @@ export function createApp() {
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/fp-publish', fpPublishRoutes);
   app.route('/api/hub/kho', khoRoutes);
+  app.route('/api/hub/sanpham', sanphamRoutes);
   app.route('/api/hub/so-chi', soChiRoutes);
   app.route('/api/hub/tiktok', tiktokRoutes);
   app.route('/api/hub/shopee', shopeeRoutes);

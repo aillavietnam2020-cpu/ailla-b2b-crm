@@ -214,24 +214,27 @@ interface MapRow {
 
 export interface MapVersion {
   from_day: string;
+  /** Combo ngừng dùng từ ngày này ('' = đang dùng): từ ngày đó mã coi như chưa quy đổi. */
+  off_from?: string;
   rows: MapRow[];
 }
 
 /** Bảng quy đổi theo phiên bản: mỗi (SKU, phân loại) có thể có nhiều bản, mỗi bản áp dụng từ một ngày. */
 export async function loadMapVersions(db: D1Database, channel: string): Promise<Map<string, MapVersion[]>> {
   const rows = await db
-    .prepare('SELECT sku, variant, from_day, item_label, qty FROM channel_map WHERE channel = ? ORDER BY from_day')
+    .prepare('SELECT sku, variant, from_day, item_label, qty, off_from FROM channel_map WHERE channel = ? ORDER BY from_day')
     .bind(channel)
-    .all<MapRow & { from_day: string }>();
+    .all<MapRow & { from_day: string; off_from: string | null }>();
   const m = new Map<string, MapVersion[]>();
   for (const r of rows.results ?? []) {
     const k = (r.variant ? `${r.sku}|${r.variant}` : r.sku).toLowerCase();
     const vs = m.get(k) ?? [];
     let v = vs.find((x) => x.from_day === r.from_day);
     if (!v) {
-      v = { from_day: r.from_day, rows: [] };
+      v = { from_day: r.from_day, off_from: '', rows: [] };
       vs.push(v);
     }
+    if (r.off_from && (!v.off_from || r.off_from < v.off_from)) v.off_from = r.off_from;
     v.rows.push(r);
     m.set(k, vs);
   }
@@ -245,6 +248,7 @@ export function pickMap(m: Map<string, MapVersion[]>, sku: string, variant: stri
     if (!vs) continue;
     let best: MapVersion | undefined;
     for (const v of vs) if (v.from_day <= day) best = v;
+    if (best && best.off_from && day >= best.off_from) continue;
     if (best) return best;
   }
   return undefined;
