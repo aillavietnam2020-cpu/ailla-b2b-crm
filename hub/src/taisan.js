@@ -63,17 +63,19 @@ function pTsSo(m,kind){
     <tr class="tot"><td colspan="5">Cộng</td><td class="n">${tsN(ng)}</td><td></td><td class="n">${tsN(th)}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsLuyKe(a,ym),0))}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsConLai(a,ym),0))}</td><td></td></tr></tbody></table></div>
     <p class="hint pad" style="margin:0">Bấm vào một dòng để xem lịch ${kind==="TS"?"khấu hao":"phân bổ"} từng tháng và sửa.</p>`
     :`<p class="hint pad">Chưa có ${tsTen(kind)} nào. ${ghi?`Vào tab <b>Khai báo đầu kỳ</b> để nạp file xuất từ MISA, hoặc bấm <b>＋ Ghi tăng</b>.`:""}</p>`}</section>`}
+  else if(tab==="gt")body=ghi?`<section class="card" id="ts-gt"></section>`:`<p class="hint">Chỉ kế toán trưởng, CEO ghi tăng được.</p>`;
   else if(tab==="gg")body=tsGgTab(kind,ghi);
   else if(tab==="dk")body=tsDkTab(kind,ghi);
   else body=tsLuatTab();
   m.innerHTML=`<div class="sochi">${H(kind==="TS"?"Tài sản cố định":"Công cụ dụng cụ",kind==="TS"?"Tài sản dùng trên 1 năm, giá từ 30 triệu · khấu hao đường thẳng tính theo ngày · hạch toán Thông tư 133":"Đồ dùng chưa đủ là tài sản cố định và các khoản trả trước · chia dần vào chi phí (TK 242), tính theo ngày")}
-   <div class="filters" style="justify-content:flex-end">${ghi?`<button class="btn pri" id="ts-new">＋ Ghi tăng ${tsTen(kind)}</button>`:""}<button class="btn" data-go="ts_kh">${kind==="TS"?"Khấu hao":"Phân bổ"} tháng</button>${L.length?`<button class="btn" id="ts-xl">Tải Excel</button>`:""}</div>
-   ${tsTabs(tab,[["so",kind==="TS"?"Sổ tài sản":"Sổ công cụ"],["gg","Ghi giảm & điều chuyển"],["dk","Khai báo đầu kỳ"]].concat(kind==="CC"?[["luat","Cách chia"]]:[]))}${body}</div>`;
+   <div class="filters" style="justify-content:flex-end">${ghi&&tab!=="gt"?`<button class="btn pri" id="ts-new">＋ Ghi tăng ${tsTen(kind)}</button>`:""}<button class="btn" data-go="ts_kh">${kind==="TS"?"Khấu hao":"Phân bổ"} tháng</button>${L.length?`<button class="btn" id="ts-xl">Tải Excel</button>`:""}</div>
+   ${tsTabs(tab,[["so",kind==="TS"?"Sổ tài sản":"Sổ công cụ"],["gt","Ghi tăng"],["gg","Ghi giảm & điều chuyển"],["dk","Khai báo đầu kỳ"]].concat(kind==="CC"?[["luat","Cách chia"]]:[]))}${body}</div>`;
   const $m=s=>m.querySelector(s);
   m.querySelectorAll("[data-tst]").forEach(b=>b.onclick=()=>{TSV.tab[pg]=b.dataset.tst;tsNhoTab();renderMain()});
   m.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.go;render();scrollTo(0,0)});
   if($m("#ts-ym"))$m("#ts-ym").onchange=e=>{TSV.ym[pg]=e.target.value;renderMain()};
-  if($m("#ts-new"))$m("#ts-new").onclick=()=>tsForm(kind);
+  if($m("#ts-new"))$m("#ts-new").onclick=()=>{TSV.tab[pg]="gt";renderMain()};
+  if($m("#ts-gt"))tsForm(kind,null,$m("#ts-gt"));
   if($m("#ts-xl"))$m("#ts-xl").onclick=()=>tsXuat(kind,ym);
   m.querySelectorAll("tr[data-tsid]").forEach(r=>r.onclick=()=>tsForm(kind,tsAll().find(a=>a.id===r.dataset.tsid)));
   if(tab==="gg")tsGgWire(m,kind);if(tab==="dk")tsDkWire(m,kind);
@@ -90,7 +92,9 @@ function tsXuat(kind,ym){if(typeof XLSX==="undefined"){toast("Cần mạng để
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),kind==="TS"?"TSCD":"CCDC");XLSX.writeFile(wb,(kind==="TS"?"so-tai-san-":"so-cong-cu-")+ym+".xlsx")}
 
 /* ---------- Ghi tăng / sửa (ngăn bên phải, như Ghi phiếu chi) ---------- */
-function tsForm(kind,a){
+/* el: vẽ ngay trong tab Ghi tăng thay vì ngăn bên phải; lưu / đóng xong quay về sổ. */
+function tsForm(kind,a,el){
+  const xong=el?()=>{TSV.tab[kind==="TS"?"ts_so":"ts_cc"]="so";renderMain()}:closeDrawer;
   const ghi=tsCanGhi(),moi=!a,x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx",p:100}]};
   const cho=tsChoGan().concat(a&&a.nkc?((scFin().nkc)||[]).filter(r=>r.id===a.nkc):[]);
   const goi=((scFin().nkc)||[]).filter(r=>r.src!=="ts"&&+r.t>=500000&&r.d>=tsAddD(tsHom(),-120)&&!cho.includes(r)&&!tsAll().some(z=>z.nkc===r.id)).sort((p,q)=>q.d.localeCompare(p.d)).slice(0,60);
@@ -98,7 +102,7 @@ function tsForm(kind,a){
   const L=tsLich(x),ks=Object.keys(L),run=tsFin().run||{};
   const lich=moi?"":`<h3 style="margin:16px 0 6px">Lịch ${kind==="TS"?"khấu hao":"phân bổ"} (${ks.length} tháng)</h3><div class="tbl" style="max-height:260px;overflow:auto"><table><thead><tr><th>Tháng</th><th class="n">Số tiền</th><th class="n">Lũy kế</th><th>Sổ chi phí</th></tr></thead><tbody>${(()=>{let c=tsDoan(x).lk0;return ks.map(k=>{c+=L[k];return `<tr><td>${tsYm(k)}</td><td class="n">${tsN(L[k])}</td><td class="n">${tsN(c)}</td><td>${run[k]?tsSc("p-ok","đã ghi"):""}</td></tr>`}).join("")})()}</tbody></table></div>`;
   const ro=ghi?"":" disabled";
-  openDrawerHTML(`<h2>${moi?"Ghi tăng "+(kind==="TS"?"tài sản cố định":"công cụ dụng cụ"):esc(x.ma)+" · "+esc(x.ten)}</h2>
+  (el?h=>{el.innerHTML=h}:openDrawerHTML)(`<h2>${moi?"Ghi tăng "+(kind==="TS"?"tài sản cố định":"công cụ dụng cụ"):esc(x.ma)+" · "+esc(x.ten)}</h2>
   <p class="hint">${kind==="TS"?"Khấu hao":"Phân bổ"} đường thẳng, tháng đầu tính theo ngày bắt đầu. Khoản chi mua không tính vào chi phí tháng; chỉ phần ${kind==="TS"?"khấu hao":"phân bổ"} từng tháng mới vào Sổ chi phí.</p>
   <form class="frm" id="tsf" onsubmit="return false"><fieldset style="border:0;padding:0;margin:0"${ro}>
    <div class="row4"><label class="field">Mã<input id="tsf-ma" value="${esc(x.ma||"")}" placeholder="VD: MAYDONGNAP" required></label><label class="field grow">Tên<input id="tsf-ten" value="${esc(x.ten||"")}" required></label></div>
@@ -124,9 +128,9 @@ function tsForm(kind,a){
   ["tsf-g","tsf-n","tsf-s"].forEach(i=>g(i).oninput=fo);fo();
   g("tsf-d").onchange=()=>{if(!g("tsf-s").value||moi)g("tsf-s").value=g("tsf-d").value;fo()};
   if(!ghi)return;
-  g("tsf-x").onclick=closeDrawer;
+  g("tsf-x").onclick=xong;
   if(g("tsf-del"))g("tsf-del").onclick=()=>{const b=g("tsf-del");if(b.dataset.ok!=="1"){b.dataset.ok="1";b.textContent="Bấm lần nữa để xóa";return}
-    tsMut("xóa "+tsTen(kind)+" "+x.ma,T=>{T.a=T.a.filter(z=>z.id!==x.id)});closeDrawer();toast("Đã xóa");renderMain()};
+    tsMut("xóa "+tsTen(kind)+" "+x.ma,T=>{T.a=T.a.filter(z=>z.id!==x.id)});xong();toast("Đã xóa");renderMain()};
   g("tsf-ok").onclick=()=>{
     const v={ma:g("tsf-ma").value.trim(),ten:g("tsf-ten").value.trim(),loai:g("tsf-loai").value,d:g("tsf-d").value,s:g("tsf-s").value||g("tsf-d").value,gk:+g("tsf-g").value||0,n:Math.round(+g("tsf-n").value||0),
       kkh:!!(g("tsf-kkh")&&g("tsf-kkh").checked),bp:tsBpRead(root),nkc:g("tsf-pc").value||"",ncc:g("tsf-ncc").value.trim(),ct:g("tsf-ct").value.trim(),gc:g("tsf-gc").value.trim()};
@@ -139,7 +143,7 @@ function tsForm(kind,a){
       const N=dt.fin.nkc||[];
       if(cu&&cu!==v.nkc){const p=N.find(z=>z.id===cu);if(p&&p.g0){p.g=p.g0;p.k=p.k0||p.k;delete p.g0;delete p.tsid}}
       if(v.nkc){const p=N.find(z=>z.id===v.nkc);if(p){if(p.g!==TS_NHOM.MUA){p.g0=p.g;if(p.k0==null)p.k0=p.k;p.g=TS_NHOM.MUA}p.k="Không tính";p.tsid=r.id}}});
-    closeDrawer();toast(moi?"Đã ghi tăng":"Đã lưu");renderMain()};
+    xong();toast(moi?"Đã ghi tăng":"Đã lưu");renderMain()};
 }
 
 /* ---------- Ghi giảm, thanh lý, điều chuyển ---------- */
