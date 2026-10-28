@@ -39,8 +39,9 @@ describe('spebc: gộp 2 shop', () => {
     expect(M.shops[0].aff).toBe(2961959);
     expect(M.sp[0]).toMatchObject({ n: 'Tinh Dầu Giặt Sấy AILLA 80ml Thơm', q: 408, dg: 'Gánh được ads' });
     expect(Object.keys(M.sp[0].by)).toEqual(['aillavn1', 'aillavn']);
-    expect(M.sp.find((p: { n: string }) => p.n === 'Chai Tẩy Mốc Gioăng').dg).toBe('Biên mỏng');
-    expect(M.sp.find((p: { n: string }) => p.n === 'Body Mist').pri).toBe('Dừng quảng cáo');
+    expect(M.sp.find((p: { n: string }) => p.n === 'Chai Tẩy Mốc Gioăng').dg).toBe('Chưa tính giá vốn');
+    expect(M.sp[0].bien).toBeCloseTo(13000000 / 26920000, 6);
+    expect(M.sp.find((p: { n: string }) => p.n === 'Body Mist').pri).toBe('Chưa tính giá vốn');
   });
   it('tuần: so 2 khối 7 ngày đủ số; shop giảm quá 25% là cảnh báo đỏ', () => {
     const W = T.speBcWeeks([A1, MALL], '2026-10');
@@ -58,7 +59,7 @@ describe('spebc: gộp 2 shop', () => {
     const A = T.speBcAlerts({ M, miss: ['khac'], adsMax: 0.38 });
     const t = A.canh.map((x: { t: string }) => x.t).join(' | ');
     expect(t).toContain('aillavn hủy/hoàn 16,4%');
-    expect(t).toContain('doanh thu đang ước giá vốn');
+    expect(t).toContain('Chưa tính giá vốn của');
     expect(t).toContain('Chưa có báo cáo khac');
     const d = A.de.map((x: { t: string }) => x.t).join(' | ');
     expect(d).toContain('Còn dư địa tăng quảng cáo');

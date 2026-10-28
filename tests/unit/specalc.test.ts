@@ -112,13 +112,13 @@ describe('specalc: số tháng một shop', () => {
     expect(M.den).toBe(null);
     expect(M.fees.find((f: [string, number]) => f[0] === 'Hoa hồng affiliate')[1]).toBe(-8000 + Math.round(60000 * (-8000 / 120000)));
   });
-  it('giá vốn theo mã đã quy đổi; mã thiếu giá ước theo tỷ lệ bình quân và đánh dấu', () => {
+  it('giá vốn theo mã đã quy đổi; mã thiếu giá KHÔNG ước: giá vốn 0, đánh dấu chưa tính', () => {
     const M = build({ costOf: (s: { pn: string }) => (s.pn === 'Tẩy lồng' ? { u: 30000 } : { u: null, why: 'Chưa quy đổi mã' }) });
     const tl = M.rows.find((r: { pn: string }) => r.pn === 'Tẩy lồng'), xm = M.rows.find((r: { pn: string }) => r.pn === 'Xịt muỗi');
     expect(tl.gv).toBe(30000);
     expect(xm.uoc).toBe(true);
-    expect(xm.gv).toBe(Math.round(xm.dt * (30000 / tl.dt)));
-    expect(M.gv).toBe(tl.gv + xm.gv);
+    expect(xm.gv).toBe(0);
+    expect(M.gv).toBe(tl.gv);
     expect(M.dtUocGv).toBe(xm.dt);
     const day = Object.values(M.days).reduce((a: number, d) => a + (d as { gv: number }).gv, 0);
     expect(Math.abs((day as number) - M.gv)).toBeLessThanOrEqual(2);

@@ -47,7 +47,7 @@ function ttbcAlerts(I){
     const ar=ttbcPct(P.ads,P.dt);if(I.adsMax&&ar>I.adsMax)canh.push({lv:"r",t:`Quảng cáo ${fmt(ar)} doanh thu, vượt ngưỡng ${fmt(I.adsMax)}`,d:"Giảm ngân sách nhóm chiến dịch lỗ.",ai:"Team Ads"});
     (P.g1||[]).slice(0,2).forEach(r=>canh.push({lv:"r",t:`${String(r.pn||r.n).slice(0,40)}: lỗ ngay khi chưa tính quảng cáo`,d:"Kiểm lại giá vốn / giá bán trước khi chạy tiếp.",ai:"Kinh doanh"}));
     const g2=(P.g2||[]).slice().sort((a,b)=>b.dt-a.dt)[0];if(g2&&g2.dt>=1e6)canh.push({lv:"a",t:`${String(g2.pn).slice(0,40)}: biên ${fmt(g2.bien)}, thấp hơn ngưỡng ${fmt(P.ng2)}`,d:"Đẩy quảng cáo mức trung bình là lỗ.",ai:"Team Ads"});
-    if(P.dtUocGv>0)canh.push({lv:"a",t:`${(P.g3||[]).length} mã chưa có giá vốn (${fmt(P.dtUocGv/P.dt)} doanh thu)`,d:"Lãi theo sản phẩm chưa dùng để cắt / đẩy được.",ai:"Kế toán"});
+    if(P.dtUocGv>0)canh.push({lv:"a",t:`${(P.g3||[]).length} mã chưa có giá vốn (${fmt(P.dtUocGv/P.dt)} doanh thu)`,d:"Chưa tính giá vốn phần này (không ước), lãi kênh chưa trừ giá vốn của nó.",ai:"Kế toán"});
   }
   const L=I.live;if(L&&L.phien>=10&&ttbcPct(L.phienGmv,L.phien)<0.1){canh.push({lv:"r",t:`LIVE ${L.phien} buổi, chỉ ${L.phienGmv} buổi có đơn`,d:"Đông buổi nhưng ít ra đơn.",ai:"Team Live"});de.push({lv:"b",t:"Cắt bớt LIVE hoặc đổi kịch bản",d:"Chỉ giữ khung giờ có đơn, đo lại sau 2 tuần."})}
   const W=I.last2;if(W&&W[0].ads&&W[1].ads){const gA=W[1].ads/W[0].ads-1,gG=W[1].gmv/W[0].gmv-1;

@@ -39,7 +39,7 @@ const tbP=(a,b)=>b?(a/b*100).toFixed(1).replace(".",",")+"%":"—";
 const tbX=v=>v==null?"—":(Math.round(v*100)/100).toFixed(2).replace(".",",");
 const tbKyEnd=ky=>ky+"-"+String(ttKyDays(ky)).padStart(2,"0");
 const tbAl=x=>`<div class="tb-al tb-${x.lv}"><b>${x.lv==="g"?"✓ ":""}${esc(x.t)}</b>${esc(x.d||"")}${x.ai?` <i>· ${esc(x.ai)}</i>`:""}</div>`;
-const tbPill=s=>pill(s,/Kém|Dừng/.test(s)?"red":/Theo dõi|Giảm|Giữ/.test(s)?"amb":/Thử/.test(s)?"blu":"grn");
+const tbPill=s=>pill(s,/Kém|Dừng/.test(s)?"red":/Theo dõi|Giảm|Giữ|Chưa tính/.test(s)?"amb":/Thử/.test(s)?"blu":"grn");
 
 /* Chi phí riêng khác (bổ thẳng cho TikTok, trừ quảng cáo / phí sàn / vận chuyển / hoa hồng đã có trong báo cáo sàn) và chi chung đã chia,
    đọc từ Sổ chi phí của tháng. Thiếu số thì trả lý do. */
@@ -68,7 +68,7 @@ function tbCostTbl(C,dt,so){const whyR=so.whyR||so.why,whyC=so.whyC||so.why;
      +(has?sub.map(x=>`<tr class="tb-sub" data-tbs="${k}" style="display:none"><td>${esc(x.n)}</td><td class="n">${tbF(x.t)}</td><td class="n">${tbP(x.t,dt)}</td><td></td></tr>`).join(""):"")};
   const L=C.lines;
   return tbl(["Khoản","Số tiền (đ)","% doanh thu","Ghi chú"],[
-    row("gv",L[0].c,L[0].n,L[0].t,"theo Quy đổi mã các sàn và Giá vốn SKU"),
+    row("gv",L[0].c,L[0].n,L[0].t,C.dtUocGv?"chưa tính giá vốn của "+tr(C.dtUocGv)+" doanh thu (mã thiếu giá vốn), không ước":"theo Quy đổi mã các sàn và Giá vốn SKU"),
     row("phi",L[1].c,L[1].n,L[1].t,"bấm để xem từng loại phí",L[1].sub),
     row("ads",L[2].c,L[2].n,L[2].t,"theo kỳ chi tiêu, đã cộng VAT 10%"),
     `<tr class="tb-sum"><td>Lãi đóng góp kênh</td><td class="n">${tbF(C.lai)}</td><td class="n">${tbP(C.lai,dt)}</td><td class="hint">trước chi riêng khác và chi chung</td></tr>`,
@@ -80,13 +80,13 @@ function tbAdmTong(ky,P){
   const from=ky+"-01",to=tbKyEnd(ky),S=tsbOpsAgg(from,to),K=S.km,dt=P.dt;
   const hoaHong=-((P.fees.find(f=>/affiliate|KOC/i.test(f[0]))||[0,0])[1]);
   const lanes=S.nKm?ttbcLanes(K,hoaHong,P.ads):null,W=ttbcWeeks((TSB.all||{}).days,ky,TT_ADS_VAT),last2=ttbcLast2(W);
-  const so=tbSoCP(ky),C=ttbcCost(P,so.rieng,so.chung),adsMax=typeof scQcMax==="function"?scQcMax():0.38;
+  const so=tbSoCP(ky),C=Object.assign(ttbcCost(P,so.rieng,so.chung),{dtUocGv:P.dtUocGv}),adsMax=typeof scQcMax==="function"?scQcMax():0.38;
   const alM=ttbcAlerts({P,lanes,last2:null,live:S.nLive?S.live:null,adsMax});
   let alW={canh:[],de:[]};if(last2){const Sw=tsbOpsAgg(ky+"-"+String(last2[1].a).padStart(2,"0"),ky+"-"+String(last2[1].b).padStart(2,"0"));alW=ttbcAlerts({P:null,lanes,last2,live:Sw.nLive?Sw.live:null,adsMax:0})}
   const AL=TB.al==="tuan"?alW:alM;
   const cur=(TSB.sum||{})[ky]||{},DK=ttbcDuKien({dt,dtUoc:cur.dtUoc!=null?cur.dtUoc:P.dtUoc,den:cur.den||P.den},Object.entries(TSB.sum||{}).filter(([k])=>k!==ky).map(([,v])=>v));
   const dtKpi=(cur.den||P.den)?kpi("Doanh thu dự kiến",DK.dk==null?tr(dt):tr(DK.dk),DK.dk==null?`Đến ${tsbVn(cur.den||P.den)}: ${tr(dt)}<br>Chưa trừ hoàn (chưa có tháng đủ số)`:`Đến ${tsbVn(cur.den||P.den)}: ${tr(dt)}<br>− Hoàn dự kiến ${tbP(DK.rate,1)} trên ${tr(cur.dtUoc||P.dtUoc||0)} chưa quyết toán: ${tr((cur.dtUoc||P.dtUoc||0)*DK.rate)}`):kpi("Doanh thu thực",tr(dt),nf(P.don)+" đơn · TB "+tr(P.aov)+"/đơn");
-  const kp=`<div class="grid kpis">${dtKpi}${kpi("Giá vốn",tr(P.gv),tbP(P.gv,dt)+" doanh thu"+(P.dtUocGv?" · "+tbP(P.dtUocGv,dt)+" đang ước":""))}${kpi("Phí sàn",tr(-P.phi),tbP(-P.phi,dt)+" doanh thu")}${kpi("Quảng cáo (đã VAT)",tr(P.ads),tbP(P.ads,dt)+" · ngưỡng "+tbP(adsMax,1))}${kpi("Lãi đóng góp kênh",tr(P.lai),tbP(P.lai,dt)+" · trước chi chung","var(--green)")}${kpi("Lợi nhuận ròng kênh",C.ln==null?"—":tr(C.ln),C.ln==null?"chờ Sổ chi phí đủ số":tbP(C.ln,dt)+" · sau phân bổ chi chung","var(--green)")}</div>`;
+  const kp=`<div class="grid kpis">${dtKpi}${kpi("Giá vốn",tr(P.gv),P.dtUocGv?tbP(P.gv,dt-P.dtUocGv)+" doanh thu có giá vốn<br><span class=\"t-red\">chưa tính giá vốn "+tr(P.dtUocGv)+"</span>":tbP(P.gv,dt)+" doanh thu")}${kpi("Phí sàn",tr(-P.phi),tbP(-P.phi,dt)+" doanh thu")}${kpi("Quảng cáo (đã VAT)",tr(P.ads),tbP(P.ads,dt)+" · ngưỡng "+tbP(adsMax,1))}${kpi("Lãi đóng góp kênh",tr(P.lai),tbP(P.lai,dt)+" · trước chi chung"+(P.dtUocGv?" · chưa trừ giá vốn của "+tr(P.dtUocGv):""),"var(--green)")}${kpi("Lợi nhuận ròng kênh",C.ln==null?"—":tr(C.ln),C.ln==null?"chờ Sổ chi phí đủ số":tbP(C.ln,dt)+" · sau phân bổ chi chung","var(--green)")}</div>`;
   const co=lanes?(()=>{let acc=0;const cg=lanes.rows.map(r=>{const a=acc;acc+=r.ty*100;return `${r.c} ${a}% ${acc}%`}).join(","),mx=Math.max(...lanes.rows.map(r=>r.ty));
     const cpTxt=r=>r.cp==null?`<span class="hint">${r.key==="vInh"?"lương content (trong chi phí riêng)":"chi phí live (trong chi phí riêng)"}</span>`:r.cp?tr(r.cp)+" hoa hồng":"không có";
     return `<section class="card"><div class="card-h"><h2>Cơ cấu doanh thu</h2><span class="hint">tỷ trọng theo GMV (trước hủy/hoàn) · TikTok chỉ chia nguồn theo GMV</span></div>
@@ -99,7 +99,7 @@ function tbAdmTong(ky,P){
     <div class="tb-bar">${C.bar.filter(b=>b.t>0).map(b=>`<div style="width:${(b.ty*100).toFixed(2)}%;background:${b.c}" title="${esc(b.n)} ${tbF(b.t)}">${b.ty>=0.06?esc(b.n)+" "+tbP(b.t,dt):tbP(b.t,dt)}</div>`).join("")}</div>${tbCostTbl(C,dt,so)}</section>`;
   const ng2=P.ng2,flag=new Set((P.g1||[]).map(r=>r.pn).concat((P.g2||[]).map(r=>r.pn)));
   const top=`<section class="card"><div class="card-h"><h2>Top sản phẩm theo doanh thu thực</h2><span class="hint">ngưỡng biên = quảng cáo ${tbP(P.ads,dt)} + 10 điểm = ${tbP(ng2,1)}</span></div>
-    ${tbl(["#","Sản phẩm","SL","Doanh thu","% kênh","Lãi gộp sau phí sàn","Biên","Đánh giá"],P.sp.slice(0,6).map((p,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(p.n.slice(0,60))}</td><td class="n">${nf(p.q)}</td><td class="n">${tr(p.dt)}</td><td class="n">${tbP(p.dt,dt)}</td><td class="n">${tsbRed(p.lg)}</td><td class="n">${tbP(p.lg,p.dt)}</td><td>${tsbDg(p.dg)}</td></tr>`)
+    ${tbl(["#","Sản phẩm","SL","Doanh thu","% kênh","Lãi gộp sau phí sàn","Biên","Đánh giá"],P.sp.slice(0,6).map((p,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(p.n.slice(0,60))}</td><td class="n">${nf(p.q)}</td><td class="n">${tr(p.dt)}</td><td class="n">${tbP(p.dt,dt)}</td><td class="n">${p.bien==null?"—":tsbRed(p.lg)}</td><td class="n">${p.bien==null?"—":tbP(p.lg,p.dtK||p.dt)}</td><td>${tsbDg(p.dg)}</td></tr>`)
       .concat((P.g1||[]).concat((P.g2||[]).slice().sort((a,b)=>b.dt-a.dt)).slice(0,3).map(r=>`<tr style="background:rgba(240,160,32,.08)"><td></td><td>${esc(String(r.pn).slice(0,60))}<br><small class="hint">${esc(r.vr||r.ss||"")}</small></td><td class="n">${nf(r.q)}</td><td class="n">${tr(r.dt)}</td><td class="n">${tbP(r.dt,dt)}</td><td class="n">${tsbRed(r.lg)}</td><td class="n">${tbP(r.lg,r.dt)}</td><td>${tsbDg(r.dg)}</td></tr>`)))}
     <div class="acts" style="justify-content:flex-end"><button class="btn sm" data-tbv="sp">Xem tất cả sản phẩm & SKU →</button></div></section>`;
   const side=`<aside class="tb-side"><section class="card"><div class="card-h"><h2>⚠️ Cảnh báo & đề xuất</h2></div>

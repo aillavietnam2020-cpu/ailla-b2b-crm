@@ -78,7 +78,7 @@ describe('Agent nạp báo cáo TikTok', () => {
 
   it('công cụ của agent dùng đúng công thức của trang Tải file tháng', () => {
     expect(readFileSync('vps-skill/nap-bao-cao-tiktok/ttcalc.js', 'utf8')).toBe(readFileSync('hub/src/ttcalc.js', 'utf8'));
-    for (const f of ['specalc.js', 'spebom.js'])
+    for (const f of ['specalc.js'])
       expect(readFileSync(`vps-skill/nap-bao-cao-tiktok/${f}`, 'utf8')).toBe(readFileSync(`hub/src/${f}`, 'utf8'));
   });
 });

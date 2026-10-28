@@ -2,7 +2,7 @@
 /*
  * nap-shopee — agent Kế toán trưởng nạp báo cáo Shopee (2 shop: Mall aillavn + thường aillavn1) vào web ABOS (làm 28/10/2026).
  * Đọc file đơn hàng, Tài chính › Doanh thu, Lịch sử giao dịch Dịch vụ Hiển thị (quảng cáo) NGAY TRÊN MÁY NÀY bằng đúng công thức
- * của trang Shopee trên web (specalc.js, spebom.js chép nguyên từ hub/src), rồi chỉ gửi số đã tính lên web.
+ * của trang Shopee trên web (ttcalc.js, specalc.js chép nguyên từ hub/src), rồi chỉ gửi số đã tính lên web.
  * Không gửi mã đơn, tên, số điện thoại, địa chỉ khách.
  *
  *   node nap-shopee.mjs --as AGENT_ID file… [--thu]
@@ -17,10 +17,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const src = ['ttcalc.js', 'spebom.js', 'specalc.js'].map((f) => readFileSync(join(here, f), 'utf8')).join('\n');
+const src = ['ttcalc.js', 'specalc.js'].map((f) => readFileSync(join(here, f), 'utf8')).join('\n');
 const T = new Function(
   `${src}
-  return {ttCsv,ttSheets,ttHead,ttCell,ttMakeCostOf,speKind,speOrderSheet,speReadOrders,speGuessKy,speFinMeta,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speKey,SPE_BOM};`,
+  return {ttCsv,ttSheets,ttHead,ttCell,ttMakeCostOf,speKind,speOrderSheet,speReadOrders,speGuessKy,speFinMeta,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speKey};`,
 )();
 
 const args = process.argv.slice(2);
@@ -113,7 +113,7 @@ const pairs = U.fin.map((F) => {
   return { shop: F.meta.shop, F, O: best, ad: U.ads.find((a) => a.A.shop === F.meta.shop) };
 });
 
-/* Giá vốn như speCostOf trên web: bảng Quy đổi mã các sàn kênh Shopee trước, thiếu thì định mức của skill. */
+/* Giá vốn như speCostOf trên web: chỉ theo bảng Quy đổi mã các sàn kênh Shopee; mã chưa có thì "chưa tính giá vốn", không ước. */
 const inputs = {};
 async function costOfFor(ky) {
   const I = inputs[ky] || (inputs[ky] = await call(`/api/agent/shopee/inputs?ky=${ky}`));
@@ -122,11 +122,9 @@ async function costOfFor(ky) {
     const it = items.get(String(code).toLowerCase());
     return !!it && /đóng gói|hộp|thùng|bao bì/i.test((it.grp || '') + ' ' + (it.name || '')) && it.cls === 'NVL';
   };
-  const bomRows = Object.entries(T.SPE_BOM).flatMap(([k, cs]) => cs.map(([code, q]) => ({ sku: k, variant: '', from_day: '', item_label: code, qty: q })));
   const web = T.ttMakeCostOf({ ky, mapRows: I.map, skus: I.skus || [], khoCost: I.kho || {}, isPack });
-  const bom = T.ttMakeCostOf({ ky, mapRows: bomRows, skus: I.skus || [], khoCost: I.kho || {}, isPack });
   return (s) => {
-    const tries = [() => (s.sv ? web(s.sv, s.sp, s.vr) : null), () => (s.sp ? web(s.sp, null, s.vr) : null), () => web(s.pn, null, s.vr), () => bom(T.speKey(s.pn, s.vr), null, '')];
+    const tries = [() => (s.sv ? web(s.sv, s.sp, s.vr) : null), () => (s.sp ? web(s.sp, null, s.vr) : null), () => web(s.pn, null, s.vr)];
     let best = null;
     for (const t of tries) {
       const c = t();
@@ -154,7 +152,7 @@ for (const p of pairs) {
   const files = { fin: p.F.name, orders: p.O.name, ads: p.ad ? p.ad.name : '' };
   console.log(`Shopee ${p.shop} tháng ${ky.slice(5)}/${ky.slice(0, 4)}${M.den ? ` (giữa tháng, số đến ${M.den.slice(8)}/${M.den.slice(5, 7)})` : ' (đủ tháng)'}`);
   console.log(
-    `  Doanh thu thực ${vn(M.dt)} · giá vốn ${vn(M.gv)}${M.dtUocGv ? ` (có ${vn(M.dtUocGv)} doanh thu giá vốn ước, chưa quy đổi mã)` : ''} · phí sàn ${vn(-M.phi)} · quảng cáo ${vn(M.ads)} · lãi sau ads ${vn(M.lg - M.ads)} · ${vn(M.don)} đơn`,
+    `  Doanh thu thực ${vn(M.dt)} · giá vốn ${vn(M.gv)}${M.dtUocGv ? ` (chưa tính giá vốn của ${vn(M.dtUocGv)} doanh thu: mã chưa quy đổi)` : ''} · phí sàn ${vn(-M.phi)} · quảng cáo ${vn(M.ads)} · lãi sau ads ${vn(M.lg - M.ads)} · ${vn(M.don)} đơn`,
   );
   done.push({ ky, M, files });
 }

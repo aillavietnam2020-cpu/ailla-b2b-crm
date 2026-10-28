@@ -59,7 +59,8 @@ shopeeRoutes.get('/months', async (c) => {
 
 /** Mức ưu tiên quảng cáo theo biên sau phí sàn (giống speBcPri ở hub/src/spebc.js). */
 function priOf(p: { dt: number; lg: number }, ng2: number, dtAll: number): string {
-  const b = p.dt ? p.lg / p.dt : 0;
+  if (!p.dt) return 'Chưa tính giá vốn';
+  const b = p.lg / p.dt;
   if (p.lg < 0) return 'Dừng quảng cáo';
   if (b < ng2) return 'Giảm';
   if (dtAll && p.dt / dtAll < 0.02) return 'Thử thêm';
@@ -81,16 +82,20 @@ shopeeRoutes.get('/ops', async (c) => {
   const out = [];
   for (const r of rows.results ?? []) {
     const s = JSON.parse(r.summary) as Record<string, unknown>;
-    const d = JSON.parse(await unpack(r.data)) as { rows?: Array<{ pn: string; q: number; dt: number; lg: number }> };
+    const d = JSON.parse(await unpack(r.data)) as { rows?: Array<{ pn: string; q: number; dt: number; lg: number; uoc?: boolean }> };
     const dt = Number(s.dt) || 0;
     const ads = Number(s.ads) || 0;
     const ng2 = (dt ? ads / dt : 0) + 0.1;
-    const g = new Map<string, { n: string; q: number; dt: number; lg: number }>();
+    // Mức ưu tiên chỉ tính trên dòng đã có giá vốn (dtK, lg); dòng chưa có giá vốn không ước (chị Hoa duyệt 28/10/2026).
+    const g = new Map<string, { n: string; q: number; dt: number; dtK: number; lg: number }>();
     for (const x of d.rows ?? []) {
-      const p = g.get(x.pn) ?? { n: x.pn, q: 0, dt: 0, lg: 0 };
+      const p = g.get(x.pn) ?? { n: x.pn, q: 0, dt: 0, dtK: 0, lg: 0 };
       p.q += Number(x.q) || 0;
       p.dt += Number(x.dt) || 0;
-      p.lg += Number(x.lg) || 0;
+      if (!x.uoc) {
+        p.dtK += Number(x.dt) || 0;
+        p.lg += Number(x.lg) || 0;
+      }
       g.set(x.pn, p);
     }
     const fees = (s.fees ?? []) as Array<[string, number]>;
@@ -113,7 +118,7 @@ shopeeRoutes.get('/ops', async (c) => {
       sp: [...g.values()]
         .sort((a, b) => b.dt - a.dt)
         .slice(0, 12)
-        .map((p) => ({ n: p.n, q: p.q, dt: p.dt, pri: priOf(p, ng2, dt) })),
+        .map((p) => ({ n: p.n, q: p.q, dt: p.dt, pri: priOf({ dt: p.dtK, lg: p.lg }, ng2, dt) })),
     });
   }
   return ok(c, { months: out });

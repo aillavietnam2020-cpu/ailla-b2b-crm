@@ -172,7 +172,8 @@ tiktokRoutes.get('/months', async (c) => {
 });
 
 /** Mức ưu tiên quảng cáo của sản phẩm (giống ttbcPri ở hub/src/ttbc.js): team thấy kết luận, không thấy số lãi. */
-function priOf(p: { dt: number; lg: number; bien: number }, ng2: number, dtAll: number): string {
+function priOf(p: { dt: number; lg: number; bien: number | null }, ng2: number, dtAll: number): string {
+  if (p.bien == null) return 'Chưa tính giá vốn';
   if (p.lg < 0) return 'Dừng quảng cáo';
   if (p.bien < ng2) return 'Giảm';
   if (dtAll && p.dt / dtAll < 0.02) return 'Thử thêm';
@@ -195,7 +196,7 @@ tiktokRoutes.get('/ops', async (c) => {
   const out = [];
   for (const r of rows.results ?? []) {
     const s = JSON.parse(r.summary) as Record<string, unknown>;
-    const d = JSON.parse(await unpack(r.data)) as { pl?: { sp?: Array<{ n: string; q: number; dt: number; lg: number; bien: number }>; ng2?: number; fees?: Array<[string, number]> } };
+    const d = JSON.parse(await unpack(r.data)) as { pl?: { sp?: Array<{ n: string; q: number; dt: number; lg: number; bien: number | null }>; ng2?: number; fees?: Array<[string, number]> } };
     const pl = d.pl ?? {};
     const dt = Number(s.dt) || 0;
     const kocFee = (pl.fees ?? []).find((f) => /affiliate|KOC/i.test(f[0]));

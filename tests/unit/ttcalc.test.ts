@@ -132,7 +132,7 @@ describe('TikTok: chia phí và lãi lỗ', () => {
     expect(M.don).toBe(3);
     expect(M.hh).toBe(60000);
   });
-  it('lãi lỗ: thiếu giá vốn thì ước tính theo tỷ lệ bình quân và đưa vào việc kế toán', () => {
+  it('lãi lỗ: thiếu giá vốn thì KHÔNG ước (chưa tính giá vốn), ghi doanh thu chưa tính và đưa vào việc kế toán', () => {
     const { M } = build();
     const P = T.ttPL(M, (id: string) => (id === '111' ? { u: 50000, src: 'x' } : id === '222' ? { u: null, why: 'Chưa quy đổi mã' } : { u: 20000 }), [
       { n: 'Agency', v: 10000 },
@@ -140,7 +140,11 @@ describe('TikTok: chia phí và lãi lỗ', () => {
     expect(P.dt).toBe(420000);
     const r222 = P.rows.find((r: any) => r.id === '222');
     expect(r222.uoc).toBe(true);
-    expect(r222.gv).toBe(Math.round(60000 * ((3 * 50000 + 20000) / (280000 + 80000))));
+    expect(r222.gv).toBe(0);
+    expect(r222.bien).toBeNull();
+    expect(r222.dg).toBe('Chưa tính giá vốn');
+    expect(P.dtUocGv).toBe(60000);
+    expect(P.gv).toBe(P.rows.filter((r: any) => !r.uoc).reduce((a: number, r: any) => a + r.gv, 0));
     expect(P.lai).toBe(P.lg - P.ads + P.adj - 10000);
     expect(P.g3.map((r: any) => r.id)).toEqual(['222']);
     expect(P.checks).toHaveLength(6);

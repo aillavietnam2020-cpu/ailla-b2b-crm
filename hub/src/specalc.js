@@ -111,10 +111,10 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf}){
     if(x&&x.aff)koc+=dt;okOrd.add(l.o);
     const dd=days[l.d]||(days[l.d]={dt:0,phi:0,gv:0,don:0,sk:{}});dd.dt+=dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.sk[k]=(dd.sk[k]||0)+l.q;
     if(!dayOrd[l.d+"|"+l.o]){dayOrd[l.d+"|"+l.o]=1;dd.don++}});
-  /* Giá vốn: mã chưa có giá ước theo tỷ lệ giá vốn bình quân của các mã đã có (đánh dấu, đưa vào việc của kế toán). */
+  /* Giá vốn: mã chưa có giá vốn KHÔNG ước (chị Hoa duyệt 28/10/2026): để 0, đánh dấu uoc = "chưa tính giá vốn"; dtUocGv = doanh thu chưa tính giá vốn. */
   const rows=Object.entries(sku).map(([k,s])=>{const c=(costOf&&costOf(s))||{u:null,why:"Chưa quy đổi mã"};return {k,...s,phi:s.f.reduce((a,b)=>a+b,0),c,u:c.u}});
-  const known=rows.filter(r=>r.u!=null),kDt=known.reduce((a,r)=>a+r.dt,0),kGv=known.reduce((a,r)=>a+r.u*r.q,0),gvRate=kDt?kGv/kDt:0;
-  rows.forEach(r=>{r.uoc=r.u==null;r.gv=Math.round(r.uoc?r.dt*gvRate:r.u*r.q);r.dt=Math.round(r.dt);r.lg=r.dt+r.phi-r.gv});
+  const gvRate=null;
+  rows.forEach(r=>{r.uoc=r.u==null;r.gv=r.uoc?0:Math.round(r.u*r.q);r.dt=Math.round(r.dt);r.lg=r.dt+r.phi-r.gv});
   const byK={};rows.forEach(r=>byK[r.k]=r);
   Object.values(days).forEach(d=>{let gv=0;for(const k in d.sk){const r=byK[k];gv+=r.q?r.gv*d.sk[k]/r.q:0}d.gv=Math.round(gv);d.dt=Math.round(d.dt);d.phi=Math.round(d.phi);delete d.sk});
   const adsDays={};let adsT=0;Object.entries((ads&&ads.days)||{}).forEach(([d,v])=>{if(d.slice(0,7)!==ky||(den&&d>den))return;adsDays[d]=Math.round(v);adsT+=v});

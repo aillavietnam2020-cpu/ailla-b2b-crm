@@ -223,20 +223,22 @@ function ttBuildMonth({ky,orders,income,camp}){
 
 /* ---------- Lãi lỗ: thêm giá vốn + chi phí riêng của kênh vào số tháng ----------
    costOf(skuId, sellerSku) trả {u: giá vốn 1 đơn vị bán, src, note} hoặc null khi chưa có giá vốn / chưa quy đổi.
-   Mã thiếu giá vốn: ước tính theo tỷ lệ giá vốn bình quân của các mã đã có, đánh dấu "Ước tính" và đưa vào việc của kế toán. */
+   Mã thiếu giá vốn: KHÔNG ước (chị Hoa duyệt 28/10/2026): giá vốn để 0, đánh dấu uoc = "chưa tính giá vốn", không xếp biên / đánh giá;
+   tổng giá vốn chỉ gồm mã đã có giá, dtUocGv = doanh thu chưa tính giá vốn (lãi chưa trừ giá vốn phần này), đưa vào việc của kế toán. */
 function ttPL(M,costOf,extra){
   extra=extra||[];const rows=Object.entries(M.sku).map(([id,s])=>{const c=costOf(id,s.ss)||null;const phi=s.f.reduce((a,b)=>a+b,0);return {id,...s,phi,c,gv:c&&c.u!=null?Math.round(c.u*s.q):null}});
-  const known=rows.filter(r=>r.gv!=null),kDt=known.reduce((a,r)=>a+r.dt,0),kGv=known.reduce((a,r)=>a+r.gv,0),gvRate=kDt?kGv/kDt:0;
-  rows.forEach(r=>{r.uoc=r.gv==null;if(r.uoc)r.gv=Math.round(r.dt*gvRate);r.lg=r.dt+r.phi-r.gv;r.bien=r.dt?r.lg/r.dt:0});
+  const gvRate=null;
+  rows.forEach(r=>{r.uoc=r.gv==null;if(r.uoc)r.gv=0;r.lg=r.dt+r.phi-r.gv;r.bien=r.uoc||!r.dt?null:r.lg/r.dt});
   rows.sort((a,b)=>b.dt-a.dt);
   const S=k=>rows.reduce((a,r)=>a+r[k],0),dt=S("dt"),gv=S("gv"),phi=S("phi"),lg=dt+phi-gv;
   const fees=TT_FEE_GROUPS.map((g,i)=>[g[0],rows.reduce((a,r)=>a+r.f[i],0),g[2]]);
   const extraT=extra.reduce((a,x)=>a+x.v,0),lai=lg-M.ads.vat+M.adj-extraT,adsRate=dt?M.ads.vat/dt:0,ng2=adsRate+0.10;
-  const sp={};rows.forEach(r=>{const p=sp[r.pn]||(sp[r.pn]={n:r.pn,nsku:0,q:0,dt:0,gv:0,phi:0,uoc:0});p.nsku++;p.q+=r.q;p.dt+=r.dt;p.gv+=r.gv;p.phi+=r.phi;if(r.uoc)p.uoc+=r.dt});
-  const spL=Object.values(sp).map(p=>({...p,lg:p.dt+p.phi-p.gv,bien:p.dt?(p.dt+p.phi-p.gv)/p.dt:0})).sort((a,b)=>b.dt-a.dt);
-  const danhGia=(lgv,b)=>lgv<0?"Lỗ ngay khi chưa tính ads":b<ng2?"Biên mỏng, sát ngưỡng ads":"Gánh được ads";
+  /* Sản phẩm: lãi gộp và biên chỉ tính trên các SKU đã có giá vốn (dtK, lgK); SKU chưa có giá vốn ghi riêng ở p.uoc. */
+  const sp={};rows.forEach(r=>{const p=sp[r.pn]||(sp[r.pn]={n:r.pn,nsku:0,q:0,dt:0,gv:0,phi:0,uoc:0,dtK:0,lgK:0});p.nsku++;p.q+=r.q;p.dt+=r.dt;p.gv+=r.gv;p.phi+=r.phi;if(r.uoc)p.uoc+=r.dt;else{p.dtK+=r.dt;p.lgK+=r.lg}});
+  const spL=Object.values(sp).map(p=>({...p,lg:p.lgK,bien:p.dtK?p.lgK/p.dtK:null})).sort((a,b)=>b.dt-a.dt);
+  const danhGia=(lgv,b)=>b==null?"Chưa tính giá vốn":lgv<0?"Lỗ ngay khi chưa tính ads":b<ng2?"Biên mỏng, sát ngưỡng ads":"Gánh được ads";
   rows.forEach(r=>r.dg=r.dt||r.lg?danhGia(r.lg,r.bien):"");spL.forEach(p=>p.dg=p.dt||p.lg?danhGia(p.lg,p.bien):"");
-  const g1=rows.filter(r=>r.lg<0),g2=rows.filter(r=>r.lg>=0&&r.dt>0&&r.bien<ng2),g3=rows.filter(r=>r.uoc&&(r.q>0||r.hq>0));
+  const g1=rows.filter(r=>!r.uoc&&r.lg<0),g2=rows.filter(r=>!r.uoc&&r.lg>=0&&r.dt>0&&r.bien<ng2),g3=rows.filter(r=>r.uoc&&(r.q>0||r.hq>0));
   const dtUocGv=g3.reduce((a,r)=>a+r.dt,0);
   const allDays=M.den?+M.den.slice(8,10):ttKyDays(M.ky),feeOther=Math.abs(fees[TT_NG-1][1]);
   const checks=[

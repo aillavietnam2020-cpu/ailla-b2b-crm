@@ -36,15 +36,14 @@ function speMerge(){
       else sp.src+=" · báo cáo Shopee tải lên đủ các shop"}}}catch(e){}
   return out}}
 
-/* ---------- Giá vốn: Quy đổi mã các sàn kênh Shopee trên web, thiếu thì định mức của skill ---------- */
+/* ---------- Giá vốn: chỉ theo Quy đổi mã các sàn kênh Shopee trên web (bỏ định mức ước của skill, chị Hoa duyệt 28/10/2026) ---------- */
 async function speCostOf(ky){
   if(!SPE.cost){const [map,cat,costs]=await Promise.all([kApi("/online/map?channel=SHOPEE").catch(()=>[]),kApi("/catalog").catch(()=>null),kApi("/costs").catch(()=>[])]);
     const items=new Map(((cat&&cat.items)||[]).map(i=>[String(i.code).toLowerCase(),i]));
-    const bom=Object.entries(SPE_BOM).flatMap(([k,cs])=>cs.map(([code,q])=>({sku:k,variant:"",from_day:"",item_label:code,qty:q})));
-    SPE.cost={web:Array.isArray(map)?map:[],bom,items,kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg]))}}
+    SPE.cost={web:Array.isArray(map)?map:[],items,kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg]))}}
   const C=SPE.cost,isPack=code=>{const it=C.items.get(String(code).toLowerCase());return !!it&&/đóng gói|hộp|thùng|bao bì/i.test((it.grp||"")+" "+(it.name||""))&&it.cls==="NVL"};
-  const web=ttMakeCostOf({ky,mapRows:C.web,skus:D().skus||[],khoCost:C.kho,isPack}),bom=ttMakeCostOf({ky,mapRows:C.bom,skus:D().skus||[],khoCost:C.kho,isPack});
-  return s=>{const tries=[()=>s.sv?web(s.sv,s.sp,s.vr):null,()=>s.sp?web(s.sp,null,s.vr):null,()=>web(s.pn,null,s.vr),()=>bom(speKey(s.pn,s.vr),null,"")];
+  const web=ttMakeCostOf({ky,mapRows:C.web,skus:D().skus||[],khoCost:C.kho,isPack});
+  return s=>{const tries=[()=>s.sv?web(s.sv,s.sp,s.vr):null,()=>s.sp?web(s.sp,null,s.vr):null,()=>web(s.pn,null,s.vr)];
     let best=null;for(const t of tries){const c=t();if(!c)continue;if(c.u!=null)return c;if(!best||/^Thiếu/.test(c.why))best=c}
     return best||{u:null,why:"Chưa quy đổi mã"}};
 }

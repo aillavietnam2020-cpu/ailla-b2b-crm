@@ -27,9 +27,10 @@ function speBcMonth(L){
   const hhAff=fm["Hoa hồng affiliate"]||0,lai=lg-ads,ng2=speBcPct(ads,dt)+0.1;
   const shops=S.map(x=>{const s=x.s,d=+s.dt||0,a=+s.ads||0,h=+s.hh||0;return {shop:s.shop,den:s.den||null,dt:d,don:+s.don||0,phi:-(+s.phi||0),ads:a,roi:a?d/a:null,hh:h,hhRate:speBcPct(h,d+h),lai:(+s.lg||0)-a,koc:+s.koc||0,gvUoc:+s.dtUocGv||0,
     aff:-((s.fees||[]).find(f=>/affiliate/i.test(f[0]))||[0,0])[1]||0}});
-  const g={};S.forEach(x=>(x.rows||[]).forEach(r=>{const k=speBcKey(r.pn),p=g[k]||(g[k]={n:speBcName(r.pn),q:0,dt:0,lg:0,uoc:0,by:{}});
-    p.q+=+r.q||0;p.dt+=+r.dt||0;p.lg+=+r.lg||0;if(r.uoc)p.uoc+=+r.dt||0;p.by[x.s.shop]=(p.by[x.s.shop]||0)+(+r.dt||0)}));
-  const sp=Object.values(g).filter(p=>Math.round(p.dt)||Math.round(p.lg)).sort((a,b)=>b.dt-a.dt).map(p=>({...p,bien:p.dt?p.lg/p.dt:0,dg:speBcDg(p,ng2),pri:speBcPri(p,ng2,dt)}));
+  /* Lãi gộp, biên của sản phẩm chỉ tính trên dòng đã có giá vốn (dtK); dòng chưa có giá vốn ghi ở uoc, không ước (chị Hoa duyệt 28/10/2026). */
+  const g={};S.forEach(x=>(x.rows||[]).forEach(r=>{const k=speBcKey(r.pn),p=g[k]||(g[k]={n:speBcName(r.pn),q:0,dt:0,lg:0,dtK:0,uoc:0,by:{}});
+    p.q+=+r.q||0;p.dt+=+r.dt||0;if(r.uoc)p.uoc+=+r.dt||0;else{p.lg+=+r.lg||0;p.dtK+=+r.dt||0}p.by[x.s.shop]=(p.by[x.s.shop]||0)+(+r.dt||0)}));
+  const sp=Object.values(g).filter(p=>Math.round(p.dt)||Math.round(p.lg)).sort((a,b)=>b.dt-a.dt).map(p=>({...p,bien:p.dtK?p.lg/p.dtK:null,dg:p.dtK?speBcDg({dt:p.dtK,lg:p.lg},ng2):"Chưa tính giá vốn",pri:p.dtK?speBcPri({dt:p.dtK,lg:p.lg},ng2,dt):"Chưa tính giá vốn"}));
   return {dt,gv,phi,ads,lg,lai,don,mon,hh,hhRate:speBcPct(hh,dt+hh),koc,hhAff,vou,dtUocGv,fees,ng2,aov:don?dt/don:0,roi:ads?dt/ads:null,shops,sp,
     den:S.reduce((m,x)=>x.s.den&&(!m||x.s.den<m)?x.s.den:m,null),hasRows:S.some(x=>x.rows)};
 }
@@ -55,7 +56,7 @@ function speBcAlerts({M,last2,miss,adsMax,label}){
     if(!canh.length)de.push({lv:"g",t:`Tuần ${c.a}–${c.b} không có shop nào giảm doanh thu quá 15%`})}
   if(M&&M.dt){
     M.shops.forEach(s=>{if(s.hhRate>0.15)canh.push({lv:"r",t:`${L(s.shop)} hủy/hoàn ${speBcF(s.hhRate)}`,d:`${Math.round(s.hh/1e5)/10}tr giá trị.`,ai:"CSKH + Kho"});else if(s.hhRate>0.12)canh.push({lv:"a",t:`${L(s.shop)} hủy/hoàn ${speBcF(s.hhRate)}`,ai:"CSKH"})});
-    if(M.dtUocGv>M.dt*0.2)canh.push({lv:"a",t:`${speBcF(M.dtUocGv/M.dt)} doanh thu đang ước giá vốn`,d:"Biên từng sản phẩm chưa tin được.",ai:"Kế toán khai Quy đổi mã kênh Shopee"});
+    if(M.dtUocGv>0)canh.push({lv:M.dtUocGv>M.dt*0.2?"a":"b",t:`Chưa tính giá vốn của ${speBcF(M.dtUocGv/M.dt)} doanh thu`,d:"Không ước: lãi đang chưa trừ giá vốn phần này.",ai:"Kế toán khai Quy đổi mã kênh Shopee"});
     const ads=speBcPct(M.ads,M.dt);
     if(adsMax&&ads>adsMax)canh.push({lv:"r",t:`Quảng cáo ${speBcF(ads)} doanh thu, vượt ngưỡng ${speBcF(adsMax)}`,ai:"Team Ads"});
     M.sp.filter(p=>p.dg==="Lỗ trước ads"&&p.dt>0).slice(0,2).forEach(p=>canh.push({lv:"r",t:`${p.n.slice(0,40)} lỗ trước quảng cáo`,ai:"Team Ads"}));
