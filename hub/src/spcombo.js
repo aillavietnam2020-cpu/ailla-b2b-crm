@@ -81,7 +81,7 @@ function spcComboView(C){
        <td>${p.kind==="skip"?`<span class="hint">không trừ kho</span>`:bad?`<span class="t-red">chưa có mã kho: ${esc(p.label)}</span>`:esc(nm(p.code))}</td>
        <td>${ed?`<select class="spi-k" ${da} data-j="${j}" style="min-width:110px">${opt(SPC_KOPT,p.kind)}</select>`:esc((SPC_KOPT.find(k=>k[0]===p.kind)||["",""])[1])}</td>
        <td class="n">${ed?`<input class="spi-q n" type="number" min="0" step="any" ${da} data-j="${j}" value="${p.qty}" style="width:64px">`:p.qty}</td>
-       ${C.g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):p.kind==="pack"?`<small class="hint">—</small>`:`<small class="t-amb">chưa có giá</small>`}</td>`:""}
+       ${C.g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):SPCB.can&&p.code&&SPCB.items.has(spcLow(p.code))?`<input class="spp-gvi n" inputmode="numeric" data-c="${esc(p.code)}" data-n="${esc(nm(p.code))}" placeholder="giá 1 ${esc((SPCB.items.get(spcLow(p.code))||{}).unit||"cái")}" title="Điền giá vốn 1 đơn vị, Enter để lưu" style="width:100px${p.kind==="pack"?"":";border-color:#f79009"}">`:p.kind==="pack"?`<small class="hint">—</small>`:`<small class="t-amb">chưa có giá</small>`}</td>`:""}
        <td>${first?`${pill(dirty?"Chưa lưu":st[1],dirty?"blu":st[0])}${c.flag?`<div><small class="t-amb">❓ ${esc(c.flag)}</small></div>`:""}`:""}</td>
        <td style="white-space:nowrap">${ed?(first?(dirty?`<button class="btn sm pri" data-spsv="${esc(c.key)}">Lưu</button> <button class="btn sm" data-spun2="${esc(c.key)}">Bỏ sửa</button>`:c.flag?`<button class="btn sm pri" data-spok="${esc(c.key)}" title="Combo quy đổi đúng: bỏ dấu cần xác nhận">✓ Xác nhận</button>`:"")+` <button class="btn sm" data-sped="${esc(c.key)}" title="Lịch sử sửa, đổi combo từ ngày, ngừng dùng">⋯</button>`:"")+(P.length>1?` <button class="btn sm" data-sprm2="${esc(c.key)}" data-j="${j}" title="Bỏ món này">✕</button>`:""):first?`<button class="btn sm" data-sped="${esc(c.key)}">${can?"Dùng lại / lịch sử":"Xem"}</button>`:""}</td></tr>`)});
     rows.push(`<tr><td></td><td colspan="${C.g?7:6}" style="padding-top:2px">${ed?`<a href="#" data-spadd3="${esc(c.key)}">+ thêm món</a>`:""}${C.g?` <span class="hint" style="float:right">Giá vốn 1 combo: <b>${x.u==null?"chưa tính được":nf(x.u)+"đ"}</b></span>`:""}</td></tr>`);
@@ -136,7 +136,7 @@ function spcBind(m,C){
   m.querySelectorAll("[data-spnew]").forEach(b=>b.onclick=()=>spcbEdit(null,null));
   m.querySelectorAll("[data-spadd]").forEach(b=>b.onclick=()=>spcProd(null));
   m.querySelectorAll("[data-spp]").forEach(b=>b.onclick=()=>spcProd(SPCB.prods.find(p=>p.code===b.dataset.spp)));
-  m.querySelectorAll(".spp-gvi").forEach(x=>{x.onkeydown=e=>{if(e.key==="Enter")x.blur()};x.onchange=()=>{const v=+String(x.value).replace(/[^0-9]/g,"");if(!(v>0)){toast("Giá vốn phải lớn hơn 0");return}if(spcSetGv(x.dataset.c,x.dataset.n,v)){toast("Đã lưu giá vốn "+x.dataset.c+": "+nf(v)+"đ (tháng "+spcKy().slice(5)+")");renderMain()}}});
+  m.querySelectorAll(".spp-gvi").forEach(x=>spcGvInput(x,renderMain));
   /* Sửa ngay trong bảng combo: lần sửa đầu chép combo ra nháp. */
   const cOf=k=>C.combos.find(x=>x.key===k),dr=c=>SPCB.dr[c.key]||(SPCB.dr[c.key]=c.parts.map(p=>({...p})));
   m.querySelectorAll(".spi-q").forEach(x=>x.onchange=()=>{const c=cOf(x.dataset.k);if(!c)return;dr(c)[+x.dataset.j].qty=+String(x.value).replace(",",".")||0;renderMain()});
@@ -169,7 +169,7 @@ function spcEdDraw(){
   const E=SPCB.ed,c=E.c,can=SPCB.can,g=spcSeeCost()?spcGvMap((D()&&D().skus)||[],SPCB.cost,spcKy()):null;
   const nm=code=>{const it=SPCB.items.get(spcLow(code));return it?it.name:""};
   const row=(p,i)=>{const gv=g&&g[spcLow(p.code)];return `<tr class="spc-row" data-i="${i}"><td><input class="spc-pc mono" value="${esc(p.kind==="skip"?"":p.code)}" placeholder="Gõ mã hoặc tên" style="width:140px" ${can?"":"disabled"}></td><td>${esc(nm(p.code)||(p.code?"chưa có mã kho":""))}</td>
-    <td><select class="spc-pk" style="min-width:110px" ${can?"":"disabled"}>${opt(SPC_KOPT,p.kind)}</select></td><td><input class="spc-pq n" type="number" min="0" step="any" value="${p.qty}" style="width:60px" ${can?"":"disabled"}></td>${g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):p.kind==="pack"?"—":"<small class=t-amb>chưa có giá</small>"}</td>`:""}<td>${can?`<button class="btn sm" data-sprm="${i}" title="Bỏ dòng">✕</button>`:""}</td></tr>`};
+    <td><select class="spc-pk" style="min-width:110px" ${can?"":"disabled"}>${opt(SPC_KOPT,p.kind)}</select></td><td><input class="spc-pq n" type="number" min="0" step="any" value="${p.qty}" style="width:60px" ${can?"":"disabled"}></td>${g?`<td class="n">${p.kind==="skip"?"":gv?nf(gv.u*p.qty):SPCB.can&&p.code&&SPCB.items.has(spcLow(p.code))?`<input class="spp-gvi n" inputmode="numeric" data-c="${esc(p.code)}" data-n="${esc(nm(p.code))}" placeholder="giá 1 ${esc((SPCB.items.get(spcLow(p.code))||{}).unit||"cái")}" title="Điền giá vốn 1 đơn vị, Enter để lưu" style="width:100px${p.kind==="pack"?"":";border-color:#f79009"}">`:p.kind==="pack"?"—":"<small class=t-amb>chưa có giá</small>"}</td>`:""}<td>${can?`<button class="btn sm" data-sprm="${i}" title="Bỏ dòng">✕</button>`:""}</td></tr>`};
   const x=g?spcCost(E.parts.filter(p=>p.code||p.kind==="skip"),g):null;
   const H2=SPCB.hist;const lb={KHO_ONLINE_MAP:"Lưu",KHO_ONLINE_MAP_SWAP:"Đổi mã",KHO_ONLINE_MAP_CONFIRM:"Xác nhận",KHO_ONLINE_MAP_VERSION:"Bản mới theo ngày",KHO_ONLINE_MAP_CLONE:"Sao chép",SP_COMBO_ADD:"Thêm",SP_COMBO_SAVE:"Sửa",SP_COMBO_STOP:"Ngừng dùng",SP_COMBO_RESUME:"Dùng lại"};
   const hs=h=>{let a={};try{a=JSON.parse(h.after_json||"{}")}catch(e){}const ps=a.parts?a.parts.map(x=>(x[1]!=1?x[1]+"×":"")+spcCode(x[0])).join(", "):a.item_label?(a.qty!=1?a.qty+"×":"")+spcCode(a.item_label):"";
@@ -196,6 +196,7 @@ function spcEdDraw(){
     try{const r=await spcApi("/combo/stop",{method:"POST",body:JSON.stringify({channel:c.ch,sku:c.sku,variant:c.variant,off_from:d.trim()})});closeDrawer();toast("Đã ngừng dùng "+c.sku+(r.recomputed_days?" · tính lại "+r.recomputed_days+" ngày":""));spcLoad(true)}catch(e){toast(e.message)}};
   if($("#spc-resume"))$("#spc-resume").onclick=async()=>{try{const r=await spcApi("/combo/stop",{method:"POST",body:JSON.stringify({channel:c.ch,sku:c.sku,variant:c.variant,off_from:""})});closeDrawer();toast("Đã dùng lại "+c.sku+(r.recomputed_days?" · tính lại "+r.recomputed_days+" ngày":""));spcLoad(true)}catch(e){toast(e.message)}};
   dr.querySelectorAll(".spc-pc,.spc-pq,.spc-pk").forEach(i=>i.onchange=()=>{spcEdRead();spcEdDraw()});
+  dr.querySelectorAll(".spp-gvi").forEach(x=>spcGvInput(x,()=>{spcEdRead();spcEdDraw();renderMain()}));
   if(typeof khoPick==="function"&&typeof KHO!=="undefined"&&KHO.items&&KHO.items.size)dr.querySelectorAll(".spc-pc").forEach(i=>khoPick(i,null,it=>{i.value=it.code;spcEdRead();spcEdDraw()}));
 }
 async function spcSave(){
@@ -211,6 +212,9 @@ async function spcSave(){
     closeDrawer();toast(`Đã lưu ${E.sku}`+(r.recomputed_days?` · tính lại phiếu xuất ${r.recomputed_days} ngày (${nf(r.orders)} đơn)`:"")+(r.unmapped_left?` · còn ${r.unmapped_left} mã chưa quy đổi`:""));SPCB.at=0;spcLoad(true)}
   catch(e){toast(e.message);if(b)b.disabled=false}
 }
+/* Ô điền nhanh giá vốn (bảng Sản phẩm gốc, ô "chưa có giá" trong combo): Enter hoặc bấm ra ngoài là lưu, có lưu vết. */
+function spcGvInput(x,after){x.onkeydown=e=>{if(e.key==="Enter")x.blur()};x.onchange=()=>{const v=+String(x.value).replace(/[^0-9]/g,"");if(!(v>0)){toast("Giá vốn phải lớn hơn 0");return}
+  if(spcSetGv(x.dataset.c,x.dataset.n,v)){toast("Đã lưu giá vốn "+x.dataset.c+": "+nf(v)+"đ (tháng "+spcKy().slice(5)+")");after()}}}
 /* ---------- Sản phẩm gốc: thêm một bước / sửa ---------- */
 /* Ghi giá vốn tháng hiện tại vào Giá vốn SKU (D().skus), như trang Giá vốn SKU. */
 function spcSetGv(code,name,v){if(!(v>0)||typeof DB==="undefined")return false;const ky=spcKy();
