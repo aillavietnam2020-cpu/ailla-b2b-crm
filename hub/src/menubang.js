@@ -35,7 +35,7 @@
         ["Cảnh báo",[["soat_sl","Máy soát số liệu"],["nguong","Ngưỡng cảnh báo & chỉ số"]]]],
       tc:[["Lãi lỗ",[["pl","P&L công ty"]]],
         /* Chị Hoa 28/10: Mua hàng về lại kế toán, trong Thu chi. Trang mh_po gồm đơn mua, nhận hàng, chứng từ, trả tiền NCC (bấm vào từng đơn). */
-        ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["mh_po","Mua hàng (đơn, nhận hàng, chứng từ)"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"]]],
+        ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["mh_po","Mua hàng"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"]]],
         ["Dòng tiền",[["tien_lich","Tiền & lịch chi"]]],
         ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"],["tcn_dc","Đối chiếu công nợ & tiền"]]],
         ["Giá thành",[["sku","Giá vốn SKU"],["kho_boc","Định mức & giá thành"],["kho_cl","Chênh lệch định mức"],["mh_gianvl","Giá nguyên vật liệu"]]],

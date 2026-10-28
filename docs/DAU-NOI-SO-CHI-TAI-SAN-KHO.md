@@ -69,3 +69,10 @@ Lỗi 28/10: máy chiết rót PC-2026-10-0006 đã được ghi tăng (CC `Mayc
 - Phiếu nhập kho gõ tay (`POST /api/hub/kho/docs` type PN) có mã lớp CCDC: máy chủ thêm dòng xuất dùng ngay cùng phiếu (như `purchasing.ts`) và cảnh báo ghi tăng ở trang Tài sản. Phiếu mua tự tạo từ phiếu nhập chỉ tính dòng IN.
 - Công cụ tồn cũ: gỡ khỏi tồn kho bằng một phiếu xuất khác (XK) ngày 28/10, không xóa lịch sử.
 - Ghi tăng chờ duyệt (`D().tsCho`) hiện ở **Việc chờ tôi** (vieccho.js) cho người duyệt được (kế toán / CEO), bấm mở trang Tài sản.
+
+## 9. Chi phí mua kèm tự vào nguyên giá (chị Huệ 28/10)
+
+- Chứng từ mua hàng có mục 4 **Tiền chi** (chưa trả → công nợ; đã trả → tiền mặt / tài khoản nào, web ghi phiếu trả NCC gắn chứng từ).
+- Vận chuyển, bốc vác, khác (và VAT khi tính vào giá vốn) trên chứng từ của đơn tài sản / công cụ, cùng phiếu chi chọn "Thuộc đơn mua", là chi phí mua kèm (`tsPhiDon`).
+- `tsDongBoPhi()` tự cộng phần chưa cộng vào `gk` (giá gốc giữ ở `gk0`, phiếu đã cộng ở `phi`) khi kế toán / CEO mở trang Tài sản, trước khi chạy khấu hao tháng. Tháng đã chạy giữ nguyên.
+- Tiền trả NCC cho đơn tài sản ghi ở Mua hàng (không ghi thêm phiếu ở Sổ chi phí, tránh tính hai lần). Phiếu Sổ chi phí đã chuyển sang Mua hàng lưu vết ở `fin.nkcChuyen`.

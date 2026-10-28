@@ -116,7 +116,7 @@ function tsChoWire(m){
 
 /* ---------- Sổ tài sản / Sổ công cụ ---------- */
 function pTsSo(m,kind){
-  tsCss();tsCanDoi();const pg=kind==="TS"?"ts_so":"ts_cc";
+  tsCss();tsCanDoi();setTimeout(tsDongBoPhi,0);const pg=kind==="TS"?"ts_so":"ts_cc";
   if(!tsCanXem()){m.innerHTML=H(kind==="TS"?"Tài sản cố định":"Công cụ dụng cụ")+`<p class="hint">Chỉ CEO và kế toán xem được trang này.</p>`;return}
   const ghi=tsCanGhi(),tab=TSV.tab[pg]||"so",ym=TSV.ym[pg]||tsThangNay(),L=tsDs(kind);
   let body="";
@@ -188,7 +188,7 @@ function tsForm(kind,a,el,pre){tsDtNap();
    <div class="row4"><label class="field">Loại<select id="tsf-loai">${opt(TS_LOAI[kind].map(v=>[v,v]).concat(TS_LOAI[kind].includes(x.loai)?[]:[[x.loai,x.loai]]),x.loai)}</select></label><label class="field">Ngày ghi tăng<input type="date" id="tsf-d" value="${esc(x.d||"")}"></label></div>
    <div class="row4"><label class="field">${kind==="TS"?"Nguyên giá":"Giá trị"} (đ)<input type="number" id="tsf-g" min="0" value="${+(x.gk??x.ng)||""}"></label><label class="field">Bắt đầu tính từ<input type="date" id="tsf-s" value="${esc(x.s||x.d||"")}"></label><label class="field">Số tháng<input type="number" id="tsf-n" min="1" step="1" value="${+x.n||""}"></label></div>
    ${x.dk?`<div class="row4"><label class="field">Hao mòn đến hết tháng ${tsYm(tsYmAdd(x.dk.tu,-1))} (đ)<input type="number" id="tsf-lk" value="${+x.dk.lk||0}"></label><label class="field">Số tháng còn lại từ ${tsYm(x.dk.tu)}<input type="number" id="tsf-con" value="${+x.dk.con||0}"></label></div>`:""}
-   <p class="hint" id="tsf-o"></p>
+   ${x.gk0!=null&&+x.gk0!==+(x.gk??x.ng)?`<p class="hint">Giá mua ${tsN(x.gk0)} đ + chi phí mua kèm ${tsN((+(x.gk??x.ng)||0)-x.gk0)} đ (tự cộng từ đơn mua).</p>`:""}<p class="hint" id="tsf-o"></p>
    ${kind==="TS"?`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="tsf-kkh" style="width:auto"${x.kkh?" checked":""}> Không tính khấu hao (đất, tài sản chờ thanh lý)</label>`:""}
    <h3 style="margin:14px 0 6px">Ai chịu chi phí</h3>
    <div class="tbl"><table><thead><tr><th>Đối tượng · TK</th><th class="n">Tỷ lệ</th><th></th></tr></thead><tbody data-bpbody>${tsBpRows(x.bp)}</tbody></table></div>
@@ -213,7 +213,7 @@ function tsForm(kind,a,el,pre){tsDtNap();
     if(!g("tsf-ten").value.trim()&&!(+g("tsf-g").value)||tsTrungDon(id))tsGhiTangTuPhieu(id,kind,el)};
   /* Đơn mua của tài sản và chi phí mua kèm nối với đơn (chị Hoa 28/10): phí vận chuyển, lắp đặt cộng vào nguyên giá. Ghi tăng mới thì tự cộng. */
   let phi=[...(x.phi||[])],tuCong=moi&&!!pre;
-  const donVe=()=>{const e=g("tsf-don");if(!e)return;const a={...x,nkc:g("tsf-pc").value||x.nkc},{p,L}=tsPhiDon(a,+(x.gk??x.ng)||+g("tsf-g").value||0);if(!p){e.innerHTML="";return}
+  const donVe=()=>{const e=g("tsf-don");if(!e)return;const a={...x,nkc:g("tsf-pc").value||x.nkc},{p,L}=tsPhiDon(a,+(x.gk0??x.gk??x.ng)||+g("tsf-g").value||0);if(!p){e.innerHTML="";return}
     const chua=L.filter(z=>!phi.includes(z.r.id)),tc=chua.reduce((t,z)=>t+z.t,0),gt=kind==="TS"?"nguyên giá":"giá trị";
     if(tuCong&&tc&&ghi){tuCong=false;g("tsf-g").value=(+g("tsf-g").value||0)+tc;chua.forEach(z=>phi.push(z.r.id));fo();return donVe()}
     e.innerHTML=`<div class="note" style="margin:0 0 10px">Đơn mua <button type="button" class="lnk" data-mhgo="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name||"")}</button>${(p.lines||[]).length?` <span class="hint">(${p.lines.map(l=>esc(l.name||l.item)+" × "+tsN(+l.qty||0)).join(", ")})</span>`:""}
@@ -228,7 +228,7 @@ function tsForm(kind,a,el,pre){tsDtNap();
     tsMut("xóa "+tsTen(kind)+" "+x.ma,T=>{T.a=T.a.filter(z=>z.id!==x.id)});xong();toast("Đã xóa");renderMain()};
   if(typeof mhLoad==="function"&&!MH.sup)mhLoad().then(()=>{const dl=g("tsf-nccl");if(dl)dl.innerHTML=tsNccTen().map(n=>`<option value="${esc(n)}">`).join("")}).catch(()=>{});
   g("tsf-ok").onclick=()=>{
-    const v={...(x.rcl?{rcl:x.rcl}:{}),...(x.po?{po:x.po}:{}),...(phi.length?{phi}:{}),ma:g("tsf-ma").value.trim(),ten:g("tsf-ten").value.trim(),loai:g("tsf-loai").value,d:g("tsf-d").value,s:g("tsf-s").value||g("tsf-d").value,gk:+g("tsf-g").value||0,n:Math.round(+g("tsf-n").value||0),
+    const v={...(x.rcl?{rcl:x.rcl}:{}),...(x.po?{po:x.po}:{}),...(phi.length?{phi,gk0:x.gk0??(+(x.gk??x.ng)||+g("tsf-g").value||0)}:{}),ma:g("tsf-ma").value.trim(),ten:g("tsf-ten").value.trim(),loai:g("tsf-loai").value,d:g("tsf-d").value,s:g("tsf-s").value||g("tsf-d").value,gk:+g("tsf-g").value||0,n:Math.round(+g("tsf-n").value||0),
       kkh:!!(g("tsf-kkh")&&g("tsf-kkh").checked),bp:tsBpRead(root),nkc:g("tsf-pc").value||"",ncc:g("tsf-ncc").value.trim(),ct:g("tsf-ct").value.trim(),gc:g("tsf-gc").value.trim()};
     if(!v.ma&&v.ten)v.ma=tsMaTuDong(v.ten,kind,x.id);
     const loi=!v.ma||!v.ten?"Cần tên":!(v.gk>0)?"Cần giá trị":!v.s?"Cần ngày bắt đầu tính":!v.kkh&&!(v.n>=1)?"Cần số tháng":!tsBpOk(v.bp)?"Bộ phận chịu chi phí phải cộng đủ 100%":tsAll().some(z=>z.kind===kind&&z.ma===v.ma&&z.id!==x.id)?"Mã "+v.ma+" đã có ở sổ "+tsTen(kind)+": đổi mã khác hoặc xóa trống ô Mã để web tự đặt":"";
@@ -329,7 +329,7 @@ function tsSxc(ym){const r=tsDongThang(tsAll(),ym),sxTs=r.dong.filter(x=>x.k==="
   const khac=((scFin().nkc)||[]).filter(x=>x.src!=="ts"&&x.k==="Sản xuất"&&String(x.d||"").slice(0,7)===ym&&x.st!=="Chờ duyệt").reduce((t,x)=>t+(+x.t||0),0);
   const tay=(tsFin().sl||{})[ym],kho=tsLitKho(ym),lit=tay>0?tay:kho;return {sxTs,khac,tong:sxTs+khac,lit,tay:tay>0,dl:lit>0?(sxTs+khac)/lit:null}}
 function pTsKh(m){
-  tsCss();tsCanDoi();if(!tsCanXem()){m.innerHTML=H("Khấu hao & phân bổ tháng")+`<p class="hint">Chỉ CEO và kế toán xem được trang này.</p>`;return}
+  tsCss();tsCanDoi();setTimeout(tsDongBoPhi,0);if(!tsCanXem()){m.innerHTML=H("Khấu hao & phân bổ tháng")+`<p class="hint">Chỉ CEO và kế toán xem được trang này.</p>`;return}
   const ghi=tsCanGhi(),hom=tsHom(),ym=TSV.ym.ts_kh||(+hom.slice(8)<=10?tsYmAdd(tsThangNay(),-1):tsThangNay()),tab=TSV.kh,R=tsDongThang(tsAll(),ym),run=(tsFin().run||{})[ym],khoa=tsKhoa(ym,hom),xong=ym<tsThangNay();
   const ts=R.dong.filter(x=>x.kind==="TS").reduce((t,x)=>t+x.t,0),cc=R.tong-ts,by={};R.dong.forEach(x=>{by[x.k]=(by[x.k]||0)+x.t});
   const misa=((scFin().nkc)||[]).filter(x=>x.src!=="ts"&&String(x.d||"").slice(0,7)===ym&&(/^PBCC/i.test(String(x.ct||""))||x.lct==="Phân bổ CCDC"));
@@ -421,6 +421,17 @@ function tsPhiDon(a,gk){const p=tsDonCua(a);if(!p)return {p:null,L:[]};
   try{if(typeof mhPoMoney==="function")mhPoMoney(p).inv.forEach(v=>{const t=Math.round(((+v.freight||0)+(+v.handling||0)+(+v.other||0)+(v.vat_in_cost?+v.vat_amount||0:0))*(v.share??1)*k);
     if(t>0)L.push({r:{id:"inv-"+v.id,ct:(v.doc_type==="HD"?"Hóa đơn ":"Chứng từ ")+(v.invoice_no||""),d:v.invoice_date,dg:"Vận chuyển, bốc vác, khác trên chứng từ",t:Math.round(((+v.freight||0)+(+v.handling||0)+(+v.other||0)+(v.vat_in_cost?+v.vat_amount||0:0))*(v.share??1))},t})})}catch(e){}
   return {p,L}}
+/* Chi phí mua kèm của đơn (vận chuyển, bốc vác, khác trên chứng từ; phiếu chi chọn "Thuộc đơn mua") TỰ cộng vào nguyên giá / giá trị
+   (chị Huệ 28/10: đơn ezpack thêm 65.000 vận chuyển thì mọi sổ liên quan tự điều chỉnh). Chạy khi kế toán / CEO mở trang Tài sản,
+   tức là trước khi chạy khấu hao tháng. Giá gốc lưu ở gk0, phiếu đã cộng ở phi; tháng đã chạy giữ nguyên, các tháng sau tính theo giá mới. */
+function tsDongBoPhi(){if(!tsCanGhi()||!tsFinOk()||TSV.phiBusy||typeof mhLoad!=="function")return;
+  if(!MH.orders||!MH.inv){TSV.phiBusy=1;Promise.all([mhLoad(),typeof mhLoadInv==="function"?mhLoadInv():0]).catch(()=>{}).finally(()=>{TSV.phiBusy=0;if(MH.orders&&MH.inv)tsDongBoPhi()});return}
+  const them=[];tsAll().filter(a=>!a.dk&&!a.gg).forEach(a=>{const {L}=tsPhiDon(a,+(a.gk0??a.gk??a.ng)||0),chua=L.filter(z=>z.t>0&&!(a.phi||[]).includes(z.r.id));
+    if(chua.length)them.push({id:a.id,ma:a.ma,ids:chua.map(z=>z.r.id),t:chua.reduce((s,z)=>s+z.t,0)})});
+  if(!them.length)return;
+  tsMut("cộng chi phí mua kèm vào nguyên giá: "+them.map(x=>x.ma+" +"+x.t).join(", "),T=>{them.forEach(x=>{const r=T.a.find(z=>z.id===x.id);if(!r||(r.phi||[]).some(i=>x.ids.includes(i)))return;
+    if(r.gk0==null)r.gk0=+(r.gk??r.ng)||0;r.gk=(+(r.gk??r.ng)||0)+x.t;r.ng=r.gk;r.phi=[...(r.phi||[]),...x.ids];r.sua=Date.now()})});
+  toast("Đã cộng chi phí mua kèm vào giá trị: "+them.map(x=>x.ma+" +"+tsN(x.t)+" đ").join(", "));if(/^ts_/.test(PAGE))renderMain()}
 /* Tài sản / công cụ (kể cả đang chờ duyệt) đã gắn phiếu chi id. */
 function tsCuaPhieu(id){return !!id&&tsAll().concat(tsCho()).find(a=>a.nkc===id)||null}
 /* Đơn mua hàng khớp với phiếu chi: cùng số tiền, cùng nhà cung cấp, ngày đặt gần ngày chi. Trả {p đơn, l dòng hàng} hoặc null. */
