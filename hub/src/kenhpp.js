@@ -56,7 +56,7 @@ function kpCalc(d){
   C.forEach(c=>{const x=gO(c.owner_name||"");x.nkh++});late.forEach(c=>{gO(c.owner_name||"").late++});
   const dt=sumR(cur),owners=[...own.values()].filter(x=>x.v||x.pv||x.nkh).sort((a,b)=>b.v-a.v||b.pv-a.pv);
   const topOwn=owners.find(x=>x.n)||null,conc=topOwn&&dt?topOwn.v/dt:0;
-  const noTier=buyers.filter(id=>!(C.get(id)||{}).tier),noTierV=cur.filter(o=>!(C.get(o.customer_id)||{}).tier).reduce((t,o)=>t+kpRev(o),0);
+  const noTier=buyers.filter(id=>C.has(id)&&!C.get(id).tier),noTierV=cur.filter(o=>C.has(o.customer_id)&&!C.get(o.customer_id).tier).reduce((t,o)=>t+kpRev(o),0);
   const tiem=[...C.values()].filter(c=>!+c.n_orders),tiemMoi=PERIOD.from>="2026-11-01"?tiem.filter(c=>String(c.created_at||"").slice(0,10)>=PERIOD.from&&String(c.created_at||"").slice(0,10)<=PERIOD.to).length:null;
   return {today,ref,pym,cur,prev,dt,pdt:sumR(prev),buyers,pBuyers,re,pRe,moi,pMoi,W,hn:{n:hn.length,v:sumR(hn)},late,owe,wait,C,
     tiers:[...tiers.values()].sort((a,b)=>b.v-a.v),owners,topOwn,conc,noTier,noTierV,tiem,tiemMoi};
@@ -71,7 +71,7 @@ const kpPct=v=>Math.round(v*100)+"%";
 
 /* ---------- Quản trị ---------- */
 function kpAdm(m,K,X,r,D2){
-  const dt=r.dt||0,cv=X.covRev,gv=X.cost,ngv=r.ngv||0,bo=X.bonus||0,lg=r.luong||0,lai=r.lai,chia=r.chia||0;
+  const dt=r.dt||0,cv=X.covRev,gv=r.gv!=null?r.gv:X.cost,ex=Math.max(0,X.cost-gv),ngv=r.ngv||0,bo=X.bonus||0,lg=r.luong||0,lai=r.lai,chia=r.chia||0;
   const one=PERIOD.from.slice(0,7)===PERIOD.to.slice(0,7),ym=PERIOD.from.slice(0,7),PB=one&&typeof dtPB==="function"?dtPB(ym):null;
   /* chi phí kênh: thưởng cấp đơn + Sổ chi phí bổ về Kênh phân phối + lương làm riêng cho kênh */
   const S=typeof dtSoCp==="function"?dtSoCp(PERIOD.from,PERIOD.to):null,gd=(S&&S.gd&&S.gd.b2b)||{};
@@ -81,7 +81,7 @@ function kpAdm(m,K,X,r,D2){
   if(lg)cpL.push({n:"Lương làm riêng cho kênh",t:lg,h:"bảng lương đã chốt"});
   const cp=cpL.reduce((a,x)=>a+x.t,0),hasChia=chia>0,ln=hasChia&&lai!=null?lai-chia:null;
   const whyChia=!one?"chọn một tháng để xem chi chung phân bổ":PB&&PB.loi&&PB.loi.length?"chưa chia được: "+PB.loi[0]:"Sổ chi phí tháng này chưa chia chi chung cho kênh";
-  const kp=`<div class="grid kpis">${kpi("Doanh thu thực",tr(dt),`${nf(X.orders)} đơn đã duyệt · ${K.buyers.length} khách`)}${kpi("Giá vốn",X.cover?tr(gv):"—",X.cover?`${kpP(gv,cv)} doanh thu hàng có giá vốn (${tr(cv)})${ngv?`<br><span class="t-red">${tr(ngv)} hàng chưa có giá vốn</span>`:""}`:"chưa có giá vốn")}${kpi("Chi phí kênh",tr(cp),`${kpP(cp,dt)} doanh thu${cpL.length?" · "+cpL.map(x=>x.n.replace(/ \(.*\)/,"").toLowerCase()+" "+tr(x.t)).join(", "):""}`)}${kpi("Lãi đóng góp kênh",lai==null?"—":tr(lai),lai==null?"chưa có giá vốn":kpP(lai,dt)+" · trước chi chung","var(--green)")}${kpi("Chi chung phân bổ",hasChia?tr(chia):"—",hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia)}${kpi("Lãi ròng kênh",ln==null?"—":tr(ln),ln==null?"chờ chi chung":kpP(ln,dt)+" · sau chi chung","var(--green)")}</div>`;
+  const kp=`<div class="grid kpis">${kpi("Doanh thu thực",tr(dt),`${nf(X.orders)} đơn đã duyệt · ${K.buyers.length} khách`)}${kpi("Giá vốn",X.cover?tr(gv):"—",X.cover?`${kpP(gv,cv)} doanh thu hàng có giá vốn (${tr(cv)})${ex?`<br>đã tạm loại ${tr(ex)} giá vốn dòng giá 0đ nghi nhập sai`:""}${ngv?`<br><span class="t-red">${tr(ngv)} hàng chưa có giá vốn</span>`:""}`:"chưa có giá vốn")}${kpi("Chi phí kênh",tr(cp),`${kpP(cp,dt)} doanh thu${cpL.length?" · "+cpL.map(x=>x.n.replace(/ \(.*\)/,"")+" "+tr(x.t)).join(", "):""}`)}${kpi("Lãi đóng góp kênh",lai==null?"—":tr(lai),lai==null?"chưa có giá vốn":kpP(lai,dt)+" · trước chi chung","var(--green)")}${kpi("Chi chung phân bổ",hasChia?tr(chia):"—",hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia)}${kpi("Lãi ròng kênh",ln==null?"—":tr(ln),ln==null?"chờ chi chung":kpP(ln,dt)+" · sau chi chung","var(--green)")}</div>`;
   /* công nợ */
   const no=!D2?`<section class="card"><div class="card-h"><h2>Công nợ Kênh phân phối</h2></div><p class="hint">${typeof PT!=="undefined"&&PT.d&&PT.d.err?esc(PT.d.err):"Đang tải công nợ…"}</p></section>`:(()=>{
     const T=D2.debt||1,seg=[["≤30 ngày",D2.b30,"#17804a"],["31–60 ngày",D2.b60,"#f0a020"],["61–90 ngày",D2.b90,"#e07a3f"],["Quá 90 ngày",D2.b90p,"#c0392b"],["Nợ cũ chưa có ngày",D2.old,"repeating-linear-gradient(45deg,#c0392b 0 6px,#d8604f 6px 12px)"]].filter(s=>s[1]>0);
