@@ -162,3 +162,16 @@ describe('Chuyển dữ liệu cũ (migration 0190): điền loại món, không
     ]);
   });
 });
+
+describe('Lưu vết giá vốn', () => {
+  it('ghi nhật ký giá cũ → mới; người không phải kế toán bị chặn', async () => {
+    const r = await ctx.request('/api/hub/sanpham/cost-log', { as: USERS.thao, body: { code: 'TLG', ky: '2026-10', old: 6000, new: 6500 } });
+    expect(r.status).toBe(200);
+    const h = await ctx.request('/api/hub/sanpham/cost-history?code=TLG', { as: USERS.ceo });
+    expect(h.body.data[0]).toMatchObject({ action: 'SP_GIA_VON' });
+    expect(JSON.parse(h.body.data[0].after_json)).toEqual({ ky: '2026-10', gia: 6500 });
+    expect(JSON.parse(h.body.data[0].before_json)).toEqual({ ky: '2026-10', gia: 6000 });
+    expect((await ctx.request('/api/hub/sanpham/cost-log', { as: USERS.manager, body: { code: 'TLG', ky: '2026-10', new: 1 } })).status).toBe(403);
+    expect((await ctx.request('/api/hub/sanpham/cost-log', { as: USERS.ceo, body: { code: 'TLG', ky: '2026-10', new: -1 } })).status).toBe(400);
+  });
+});
