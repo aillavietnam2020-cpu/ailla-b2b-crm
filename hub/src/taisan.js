@@ -127,6 +127,13 @@ function tsXuat(kind,ym){if(typeof XLSX==="undefined"){toast("Cần mạng để
 /* ---------- Ghi tăng / sửa (ngăn bên phải, như Ghi phiếu chi) ---------- */
 /* el: vẽ ngay trong tab Ghi tăng thay vì ngăn bên phải; lưu / đóng xong quay về sổ. */
 /* pre: điền sẵn từ phiếu chi (tsGhiTangTuPhieu); pre.hoi thì cho chọn tài sản cố định hay công cụ ngay đầu form. */
+/* Nhà cung cấp ở form ghi tăng (chị Hoa 28/10: thêm rồi lần sau lại phải gõ lại): gợi ý từ danh sách nhà cung cấp
+   của Mua hàng + tên đã dùng ở sổ tài sản; tên mới thì lưu luôn vào danh sách nhà cung cấp để lần sau chọn được. */
+const tsNccTen=()=>[...new Set([...((typeof MH!=="undefined"&&MH.sup)||[]).filter(x=>x.active).map(x=>x.name),...tsAll().map(a=>a.ncc).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,"vi"));
+async function tsNccLuu(ten){
+  if(!ten||typeof MH==="undefined"||typeof kApi!=="function")return;
+  try{if(!MH.sup)await mhLoad(true);const k=kfold(ten);if((MH.sup||[]).some(x=>kfold(x.name)===k))return;
+    await kApi("/mh/suppliers",{method:"POST",body:JSON.stringify({name:ten})});MH.sup=null;MH.at=0;toast("Đã lưu nhà cung cấp mới: "+ten)}catch(e){}}
 function tsForm(kind,a,el,pre){tsDtNap();
   const xong=el?()=>{TSV.tab[kind==="TS"?"ts_so":"ts_cc"]="so";renderMain()}:closeDrawer;
   const moi=!a,ghi=moi?tsCanGhiTang():tsCanGhi(),x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx2",p:100}],...(pre?{ten:pre.ten,gk:pre.gk,d:pre.d||tsHom(),s:pre.d||tsHom(),ncc:pre.ncc,ct:pre.ct,nkc:pre.nkc}:{})};
@@ -150,7 +157,7 @@ function tsForm(kind,a,el,pre){tsDtNap();
    <p class="hint">Sản xuất thành phẩm → 154.1, bán thành phẩm → 154.2, vào giá thành · Văn phòng → 6422 · Bán hàng chung → 6421, chia kênh theo Quy tắc phân bổ · Một kênh → ghi thẳng kênh đó. Tổng phải đủ 100%. <button type="button" class="lnk" data-bpadd>＋ Thêm dòng</button></p>
    <h3 style="margin:14px 0 6px">Nguồn gốc</h3>
    <div class="row4"><label class="field grow">Mua từ phiếu chi<select id="tsf-pc">${opt(pcOpt,x.nkc||"")}</select></label></div>
-   <div class="row4"><label class="field">Nhà cung cấp<input id="tsf-ncc" value="${esc(x.ncc||"")}"></label><label class="field">Số hóa đơn / chứng từ<input id="tsf-ct" value="${esc(x.ct||"")}"></label></div>
+   <div class="row4"><label class="field">Nhà cung cấp<input id="tsf-ncc" list="tsf-nccl" autocomplete="off" placeholder="Gõ để tìm; tên mới sẽ được lưu vào danh sách nhà cung cấp" value="${esc(x.ncc||"")}"><datalist id="tsf-nccl">${tsNccTen().map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label><label class="field">Số hóa đơn / chứng từ<input id="tsf-ct" value="${esc(x.ct||"")}"></label></div>
    <label class="field">Ghi chú (bộ phận cấu thành, phụ tùng kèm theo, biên bản giao nhận, bảo hành)<textarea id="tsf-gc" rows="2">${esc(x.gc||"")}</textarea></label>
    ${x.gg?`<p class="hint">Đã ghi giảm ngày ${tsDmy(x.gg.d)} (${esc(x.gg.ly||"")}).</p>`:""}
    </fieldset>
@@ -166,11 +173,13 @@ function tsForm(kind,a,el,pre){tsDtNap();
   g("tsf-x").onclick=xong;
   if(g("tsf-del"))g("tsf-del").onclick=()=>{const b=g("tsf-del");if(b.dataset.ok!=="1"){b.dataset.ok="1";b.textContent="Bấm lần nữa để xóa";return}
     tsMut("xóa "+tsTen(kind)+" "+x.ma,T=>{T.a=T.a.filter(z=>z.id!==x.id)});xong();toast("Đã xóa");renderMain()};
+  if(typeof mhLoad==="function"&&!MH.sup)mhLoad().then(()=>{const dl=g("tsf-nccl");if(dl)dl.innerHTML=tsNccTen().map(n=>`<option value="${esc(n)}">`).join("")}).catch(()=>{});
   g("tsf-ok").onclick=()=>{
     const v={ma:g("tsf-ma").value.trim(),ten:g("tsf-ten").value.trim(),loai:g("tsf-loai").value,d:g("tsf-d").value,s:g("tsf-s").value||g("tsf-d").value,gk:+g("tsf-g").value||0,n:Math.round(+g("tsf-n").value||0),
       kkh:!!(g("tsf-kkh")&&g("tsf-kkh").checked),bp:tsBpRead(root),nkc:g("tsf-pc").value||"",ncc:g("tsf-ncc").value.trim(),ct:g("tsf-ct").value.trim(),gc:g("tsf-gc").value.trim()};
     const loi=!v.ma||!v.ten?"Cần mã và tên":!(v.gk>0)?"Cần giá trị":!v.s?"Cần ngày bắt đầu tính":!v.kkh&&!(v.n>=1)?"Cần số tháng":!tsBpOk(v.bp)?"Bộ phận chịu chi phí phải cộng đủ 100%":tsAll().some(z=>z.kind===kind&&z.ma===v.ma&&z.id!==x.id)?"Mã "+v.ma+" đã có":"";
     if(loi){toast(loi);return}
+    tsNccLuu(v.ncc);
     if(x.dk&&g("tsf-lk")){const lk=+g("tsf-lk").value||0,con=Math.round(+g("tsf-con").value||0);v.dk={...x.dk,lk,con,lich:!!x.dk.lich&&lk===+x.dk.lk&&con===+x.dk.con}}
     if(moi&&!tsFinOk()){DB.mutate(ME.name,"ghi tăng "+tsTen(kind)+" "+v.ma+" chờ duyệt",dt=>{(dt.tsCho=dt.tsCho||[]).push({...v,id:uid("tsc"),kind,ng:v.gk,by:ME.name,at:Date.now(),st:"Chờ duyệt"})});
       xong();toast("Đã gửi ghi tăng "+v.ma+", chờ kế toán duyệt");renderMain();return}
