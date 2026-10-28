@@ -9,7 +9,7 @@
      phí sàn trong sổ (G04) không cộng thêm khi báo cáo kênh đã có (tránh trùng). Không có số thì ghi "chưa có số", không đoán.
    - So sánh: "Kỳ này" là kỳ đang chọn, "Kỳ trước" là tháng liền trước (tháng đang chạy thì cùng số ngày, xem scKyTruoc).
    ===================================================================== */
-const SC_FN=[["mkt","Marketing",["G01","G02","G03","G11"]],["ban","Bán hàng và chi phí kênh",["G04","G06","G12","G19"]],["kho","Kho và giao hàng",["G05","G09","G10"]],["sx","Sản xuất",["G15","G16","G17","G27","G28"]],["lg","Lương, thưởng, bảo hiểm",["G07","G08"]],["ql","Quản lý chung",["G13","G14","G18","G21","G24"]],["tc","Tài chính, thuế và khác",["G22"]],["cho","Chờ xác minh",["G20","G23"]]];
+const SC_FN=[["mkt","Marketing",["G01","G02","G03","G11"]],["ban","Bán hàng và chi phí kênh",["G04","G06","G12","G19"]],["kho","Kho và giao hàng",["G05","G09","G10"]],["sx","Sản xuất",["G15","G16","G17","G25","G26"]],["lg","Lương, thưởng, bảo hiểm",["G07","G08"]],["ql","Quản lý chung",["G13","G14","G18","G21","G24"]],["tc","Tài chính, thuế và khác",["G22"]],["cho","Chờ xác minh",["G20","G23"]]];
 const scFnOf=g=>{const d=scG(g);if(d.fn&&SC_FN.some(x=>x[0]===d.fn))return d.fn;const f=SC_FN.find(x=>x[2].includes(g));return f?f[0]:"ql"};
 const scFnTen=k=>(SC_FN.find(x=>x[0]===k)||[k,k])[1];
 const scFnRow=x=>x.ext&&x.ext.src==="ncc"?"Chi phí NVL":scFnTen(scFnOf(x.g));
