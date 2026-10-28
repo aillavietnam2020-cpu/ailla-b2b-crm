@@ -204,6 +204,37 @@ describe('Luồng đơn B2B qua kho', () => {
     }
   });
 
+  it('mã có dòng bán + dòng tặng: kho ghi theo từng dòng (6 + 1) thì cộng thành 7, đơn không bị lệch', async () => {
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: {
+        customer_id: 'cus-thao-1',
+        order_date: '2026-08-16',
+        items: [
+          { product_id: 'prod-full', qty: 6 },
+          { product_id: 'prod-full', qty: 1, is_gift: true },
+        ],
+      },
+    });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    expect((await ctx.request(`/api/orders/${id}/submit`, { as: USERS.thao, body: {} })).status).toBe(200);
+    expect((await post(id, 'approve', USERS.manager, {})).status).toBe(200);
+    const ship = await post(id, 'ship', CHUC, {
+      lines: [
+        { product_id: 'prod-full', shipped_qty: 6 },
+        { product_id: 'prod-full', shipped_qty: 1 },
+      ],
+      ship_day: '2026-08-14',
+      shipped_by_name: 'Kho A',
+    });
+    expect(ship.status).toBe(200);
+    expect(ship.body.data.diff).toEqual([]);
+    const o = await status(id);
+    expect(o.kho_status).toBe('DA_CHOT_TIEN');
+    expect(o.kho_lines.find((l: { product_id: string }) => l.product_id === 'prod-full').shipped_qty).toBe(7);
+  });
+
   it('duyệt thẳng không cần kho báo trên web, ngày hẹn không bắt buộc; đơn hiện ở danh sách chờ xuất', async () => {
     const id = await newOrder(5);
     expect((await ctx.request(`/api/orders/${id}/submit`, { as: USERS.thao, body: {} })).status).toBe(200);
