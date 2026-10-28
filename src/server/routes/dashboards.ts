@@ -92,7 +92,8 @@ dashboardRoutes.get('/b2b-sku', async (c) => {
 });
 
 /**
- * Trang Kênh phân phối (hai web): đơn, khách và sản phẩm của Kênh phân phối (không gồm Kênh OEM).
+ * Trang Kênh phân phối và Kênh OEM (hai web): đơn, khách và sản phẩm của một kênh (`channel` = B2B mặc định, hoặc GIA_CONG).
+ * - lines (chỉ Kênh OEM): từng dòng hàng của đơn đã duyệt trong [from, to].
  * Nhân viên chỉ thấy khách mình phụ trách (customerScopeClause). Không có giá vốn, lãi: giá vốn ghép ở trang quản trị.
  * - orders: mọi đơn chưa xoá từ `since` (mặc định 92 ngày trước `from`) tới `to`, kèm tiền đã thu (phân bổ phiếu thu chưa huỷ).
  * - customers: khách Kênh phân phối, cấp giá, người phụ trách, ngày tạo, chu kỳ đặt, đơn đầu tiên / số đơn đã duyệt mọi lúc.
@@ -106,10 +107,11 @@ dashboardRoutes.get('/kenh-pp', requirePermission('customer.read.own'), async (c
   const q = c.req.query('since');
   const since = ok10(q) && q <= from ? q : new Date(new Date(`${from}T00:00:00Z`).getTime() - 92 * 864e5).toISOString().slice(0, 10);
   const scope = customerScopeClause(c.get('auth'));
-  const ch = `(${CHANNEL_EXPR}) = 'B2B'`;
+  const channel = c.req.query('channel') === 'GIA_CONG' ? 'GIA_CONG' : 'B2B';
+  const ch = `(${CHANNEL_EXPR}) = '${channel}'`;
   const orders = await c.env.DB.prepare(
     `SELECT o.id, o.order_no, o.order_date, o.customer_id, o.subtotal, o.discount_amount, o.bonus_deduction, o.total_amount,
-            o.approval_status, o.delivery_status, o.accounting_status, o.payment_status,
+            o.approval_status, o.delivery_status, o.accounting_status, o.payment_status, o.kho_status, o.need_date, o.delivered_at,
             COALESCE((SELECT SUM(a.amount) FROM payment_allocations a WHERE a.order_id = o.id AND a.reversed_at IS NULL), 0) AS received
      FROM orders o JOIN customers c ON c.id = o.customer_id
      WHERE o.deleted_at IS NULL AND o.order_date BETWEEN ? AND ? AND ${ch} AND ${scope.sql}
@@ -139,5 +141,21 @@ dashboardRoutes.get('/kenh-pp', requirePermission('customer.read.own'), async (c
   )
     .bind(from, to, ...scope.params)
     .all();
-  return ok(c, { from, to, since, orders: orders.results ?? [], customers: customers.results ?? [], items: items.results ?? [] });
+  const lines =
+    channel === 'GIA_CONG'
+      ? ((
+          await c.env.DB.prepare(
+            `SELECT o.order_no, o.order_date, o.customer_id, p.sku AS sku, p.name AS name, SUM(i.qty) AS qty, SUM(i.line_total) AS revenue
+             FROM order_items i
+             JOIN orders o ON o.id = i.order_id AND o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
+             JOIN customers c ON c.id = o.customer_id
+             JOIN products p ON p.id = i.product_id
+             WHERE o.order_date BETWEEN ? AND ? AND ${ch} AND ${scope.sql}
+             GROUP BY o.order_no, o.order_date, o.customer_id, p.sku, p.name ORDER BY revenue DESC LIMIT 2000`,
+          )
+            .bind(from, to, ...scope.params)
+            .all()
+        ).results ?? [])
+      : [];
+  return ok(c, { from, to, since, channel, orders: orders.results ?? [], customers: customers.results ?? [], items: items.results ?? [], lines });
 });

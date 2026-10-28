@@ -10,6 +10,9 @@
    Nhóm: TSCĐ G25 (mới), CCDC G14 (có sẵn); phiếu chi mua tài sản G26 "Không tính" nên không vào P&L.
    ===================================================================== */
 const TSV={tab:{ts_so:"so",ts_cc:"so"},ym:{},kh:"bang",nap:null,sl:{},gg:{},dc:{}};
+/* Nhớ tab đang mở qua lần tải lại trang (chị Hoa 28/10: bấm tab xong trang tải lại là nhảy về tab đầu). */
+try{const o=JSON.parse(localStorage.getItem("ailla_ts_tab")||"{}");if(o.tab)Object.assign(TSV.tab,o.tab);if(o.kh)TSV.kh=o.kh}catch(e){}
+const tsNhoTab=()=>{try{localStorage.setItem("ailla_ts_tab",JSON.stringify({tab:TSV.tab,kh:TSV.kh}))}catch(e){}};
 TS_DM_MOI.forEach(x=>{if(!SC_DM0.some(y=>y.g===x.g))SC_DM0.push({...x})});
 const tsHom=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const tsThangNay=()=>tsHom().slice(0,7);
@@ -67,7 +70,7 @@ function pTsSo(m,kind){
    <div class="filters" style="justify-content:flex-end">${ghi?`<button class="btn pri" id="ts-new">＋ Ghi tăng ${tsTen(kind)}</button>`:""}<button class="btn" data-go="ts_kh">${kind==="TS"?"Khấu hao":"Phân bổ"} tháng</button>${L.length?`<button class="btn" id="ts-xl">Tải Excel</button>`:""}</div>
    ${tsTabs(tab,[["so",kind==="TS"?"Sổ tài sản":"Sổ công cụ"],["gg","Ghi giảm & điều chuyển"],["dk","Khai báo đầu kỳ"]].concat(kind==="CC"?[["luat","Cách chia"]]:[]))}${body}</div>`;
   const $m=s=>m.querySelector(s);
-  m.querySelectorAll("[data-tst]").forEach(b=>b.onclick=()=>{TSV.tab[pg]=b.dataset.tst;renderMain()});
+  m.querySelectorAll("[data-tst]").forEach(b=>b.onclick=()=>{TSV.tab[pg]=b.dataset.tst;tsNhoTab();renderMain()});
   m.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.go;render();scrollTo(0,0)});
   if($m("#ts-ym"))$m("#ts-ym").onchange=e=>{TSV.ym[pg]=e.target.value;renderMain()};
   if($m("#ts-new"))$m("#ts-new").onclick=()=>tsForm(kind);
@@ -256,7 +259,7 @@ function pTsKh(m){
    ${ghi&&xong&&!khoa&&tuChuan&&misaCon.length?`<label class="hint" style="display:flex;gap:6px;align-items:center;margin:0 0 10px"><input type="checkbox" id="tsk-misa" checked style="width:auto"> Khi ghi, chuyển ${misaCon.length} dòng phân bổ CCDC nạp từ MISA tháng này (${tsN(misaCon.reduce((t,x)=>t+(+x.t||0),0))} đ) sang "Không tính" để không cộng hai lần</label>`:""}
    ${tsTabs(tab,[["bang","Bảng tính"],["bt","Bút toán"],["dc","Đối chiếu MISA"]])}${body}</div>`;
   const $m=s=>m.querySelector(s);
-  m.querySelectorAll("[data-tst]").forEach(b=>b.onclick=()=>{TSV.kh=b.dataset.tst;renderMain()});
+  m.querySelectorAll("[data-tst]").forEach(b=>b.onclick=()=>{TSV.kh=b.dataset.tst;tsNhoTab();renderMain()});
   $m("#tsk-ym").onchange=e=>{TSV.ym.ts_kh=e.target.value;renderMain()};
   m.querySelectorAll("tr[data-tsid]").forEach(r=>r.onclick=()=>{const a=tsAll().find(z=>z.id===r.dataset.tsid);if(a)tsForm(a.kind,a)});
   if($m("#tsk-lit"))$m("#tsk-lit").onchange=e=>{const v=+e.target.value||0;tsMut("sản lượng pha chế "+ym,T=>{T.sl=T.sl||{};if(v>0)T.sl[ym]=v;else delete T.sl[ym]});renderMain()};

@@ -32,8 +32,8 @@ function dbbBlock(ch){
   <section class="card pad"><b>Biên gộp theo nhóm sản phẩm</b>${qtBars(grp.filter(g=>g.bien!=null).slice(0,8).map(g=>({l:g.n,v:Math.max(0,g.bien*100),p:Math.max(0,g.bien*100)*2,t:Math.round(g.bien*100)+"%",c:g.bien<0?"r":g.bien<minB?"y":"g"})))}<p class="hint">Vạch đỏ: lỗ · vàng: dưới mức tối thiểu ${Math.round(minB*100)}% · xanh: đạt.</p></section></div>
   ${mrow.length>1?`<section class="card pad"><b>Doanh thu theo tháng</b>${qtCols(mrow.map(r=>({l:r.m,v:r.rev,t:tr(r.rev),c:"b"})))}</section>`:""}`;
 }
-/* Kênh phân phối có trang riêng (kenhpp.js) với cảnh báo của nó; khối này chỉ còn cho Kênh OEM. */
-[["bc_gc","GIA_CONG"]].forEach(([pg,ch])=>{
+/* Kênh phân phối (kenhpp.js) và Kênh OEM (kenhoem.js) đã có trang riêng với cảnh báo của nó: khối này không còn gắn vào trang nào. */
+[].forEach(([pg,ch])=>{
   const _p=PAGES[pg];
   PAGES[pg]=function(m){_p.apply(this,arguments);
     if(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin")return;

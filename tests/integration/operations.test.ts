@@ -330,6 +330,12 @@ describe('Dashboard kinh doanh', () => {
     own.forEach((id: string) => expect(all.has(id)).toBe(true));
     expect(own.length).toBeLessThan(all.size);
     expect((await ctx.request('/api/dashboards/kenh-pp?from=2026-08-31&to=2026-08-01', { as: USERS.ceo })).status).toBe(400);
+    const oem = await ctx.request(`${q}&channel=GIA_CONG`, { as: USERS.ceo });
+    expect(oem.status).toBe(200);
+    expect(oem.body.data.channel).toBe('GIA_CONG');
+    expect(Array.isArray(oem.body.data.lines)).toBe(true);
+    const ids = new Set(oem.body.data.customers.map((c: { id: string }) => c.id));
+    ceo.body.data.customers.forEach((c: { id: string }) => expect(ids.has(c.id)).toBe(false));
   });
 
   it('nhân viên chỉ xem được số của chính mình', async () => {

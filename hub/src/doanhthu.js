@@ -76,7 +76,10 @@ function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEa
 /* Lương làm riêng cho kênh (bảng lương đã chốt) trừ ở lãi đóng góp; chi chung được chia theo Quy tắc phân bổ ghi ở r.chia cho dòng Lãi sau phân bổ.
    Hàm scPLKenh (scphanbo.js, chat Sổ chi phí) chỉ tính theo tháng nên chỉ áp khi kỳ nằm trong một tháng. Nó tự gọi lại doanh thu: cờ DTS.inPB chặn vòng lặp. */
 const DT_SC_K={tts:["TikTok"],spe:["Shopee Mall","Shopee thường"],fb:["Facebook"],B2B:["NPP"],GIA_CONG:["Gia công"]};
-function dtPB(ym){if(DTS.inPB||typeof scPLKenh!=="function")return null;DTS.inPB=true;try{return scPLKenh(ym)}catch(e){return null}finally{DTS.inPB=false}}
+/* scPLKenh nặng (tính lại doanh thu, chia chi chung) mà tqKenhRows gọi nhiều lần mỗi lần vẽ trang: nhớ kết quả 20 giây theo tháng (chị báo quản trị lag 28/10). */
+const DT_PBC={};
+function dtPB(ym){if(DTS.inPB||typeof scPLKenh!=="function")return null;const c=DT_PBC[ym];if(c&&Date.now()-c.t<20000)return c.v;
+  DTS.inPB=true;try{const v=scPLKenh(ym);DT_PBC[ym]={t:Date.now(),v};return v}catch(e){return null}finally{DTS.inPB=false}}
 function dtTruLuong(rows,from,to){const ym=from.slice(0,7);if(to.slice(0,7)!==ym)return;const L=dtPB(ym);if(!L)return;
   rows.forEach(r=>{const ks=DT_SC_K[r.k];if(!ks||r._lg||r.dt==null)return;r._lg=1;const s=o=>ks.reduce((a,k)=>a+(+(o||{})[k]||0),0),lg=s(L.luong);
     r.chia=s(L.chia);if(lg){r.luong=lg;r.khac=(r.khac||0)+lg;if(r.lai!=null)r.lai-=lg;r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(lg)} lương làm riêng cho kênh (bảng lương đã chốt)`}})}
