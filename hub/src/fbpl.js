@@ -38,7 +38,7 @@ function fbdAdvice(x){
 function pFbPL(m){
   adfLoad();fbsLoad();fbcLoad();adfMergeDays();
   const head=H("Facebook","Lãi lỗ (P&L) kênh Facebook · doanh thu từ Pancake, giá vốn và vận chuyển từ Sheet Pancake, quảng cáo từ Facebook Ads");
-  const tabs=`<nav class="fbd-tabs">${[["pl","Lãi lỗ (P&L)"],["bh","Quảng cáo · Digital"],["sale","Team Sale"],["sp","Sản phẩm"],["nc","Nhập chi phí"]].map(([k,t])=>`<button type="button" data-fbdtab="${k}" class="${FBD.tab===k?"on":""}">${t}</button>`).join("")}</nav>`;
+  const tabs=`<nav class="fbd-tabs">${[["pl","Tổng quan"],["bh","Quảng cáo · Digital"],["sale","Team Sale"],["sp","Sản phẩm"]]/* chị Hoa 28/10: bỏ tab Nhập chi phí, chi riêng / chi chung lấy ở Sổ chi phí, mục tiêu ở Tổng quan */.map(([k,t])=>`<button type="button" data-fbdtab="${k}" class="${FBD.tab===k?"on":""}">${t}</button>`).join("")}</nav>`;
   const bind=()=>{m.querySelectorAll("[data-fbdtab]").forEach(b=>b.onclick=()=>{FBD.tab=b.dataset.fbdtab;renderMain()});fbdBindMet(m)};
   const all=fbdRange(PERIOD.from,PERIOD.to),lastK=all.filter(k=>(DAYD.fb||{})[k]).pop()||PERIOD.to,days=all.filter(k=>k<=lastK),A=fbdAgg(days),len=days.length;
   const meta=`<div class="fbd-meta"><span>Số đến ${days.length?fbdVN(days[days.length-1]):"—"}${A.n<len?" · thiếu số "+(len-A.n)+" ngày":""}</span></div>`;/* chị Hoa 28/10: chỉ ghi số đến ngày nào, bỏ "x/y ngày có số" */

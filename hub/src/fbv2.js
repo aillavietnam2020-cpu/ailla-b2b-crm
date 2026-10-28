@@ -38,9 +38,9 @@ function fbvProds(days){const F=FBC.raw;if(!F||!F.p||!F.sk)return [];const m={};
 function fbvCamps(days){try{const D=typeof adfLive==="function"?adfLive():null;return D?adfAgg(D,days).C:[]}catch(e){return []}}
 function fbvLines(X){const days=X.cov.length?X.cov:X.days;return fbbcLines({prods:fbvProds(days),camps:fbvCamps(days),tax:X.tax,ship:X.shipAll})}
 /* Cách ra doanh thu dự kiến, mỗi bước một dòng (chị Hoa 28/10: ghi dễ hiểu). */
-const fbvDkTxt=X=>`Đã giao: <b>${tr(X.dt)}</b><br>Đang giao: ${tr(X.dang.v)} (${nf(X.dang.n)} đơn)<br>Trừ hoàn ${tbP(X.RT.r,1)}${X.RT.ym?" (như T"+X.RT.ym.slice(5)+")":""}: −${tr(X.dang.v*X.RT.r)}`;
+const fbvDkTxt=X=>`Đã giao ${tr(X.dt)}<br>+ Đang giao ${tr(X.dang.v)}<br>− Hoàn dự kiến ${tbP(X.RT.r,1)}: ${tr(X.dang.v*X.RT.r)}`;
 const fbvVn=k=>k?k.slice(8)+"/"+k.slice(5,7):"";
-const fbvTabs=()=>`<nav class="fbd-tabs">${[["pl","Tổng quan"],["bh","Quảng cáo · Digital"],["sale","Team Sale"],["sp","Sản phẩm"],["nc","Nhập chi phí"]].map(([k,t])=>`<button type="button" data-fbdtab="${k}" class="${FBD.tab===k?"on":""}">${t}</button>`).join("")}</nav>`;
+const fbvTabs=()=>`<nav class="fbd-tabs">${[["pl","Tổng quan"],["bh","Quảng cáo · Digital"],["sale","Team Sale"],["sp","Sản phẩm"]].map(([k,t])=>`<button type="button" data-fbdtab="${k}" class="${FBD.tab===k?"on":""}">${t}</button>`).join("")}</nav>`;
 function fbvAlerts(X,L){
   const ky=X.lastK.slice(0,7),W=fbbcWeeks(DAYD.fb,ky,k=>fbdQc(k)),last2=fbbcLast2(W),P=typeof fbsPeople==="function"?fbsPeople(X.days):null,src=fbdSources(X.days);
   const camps=fbvCamps(X.days),web=camps.filter(c=>c.typ!=="Tin nhắn"),ib=camps.filter(c=>c.typ==="Tin nhắn"),s=(L2,f)=>L2.reduce((a,c)=>a+(+c[f]||0),0);
