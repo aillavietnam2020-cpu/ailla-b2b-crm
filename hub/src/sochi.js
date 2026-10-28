@@ -225,11 +225,12 @@ function scExt(){
   return R}
 /* Chỉ số có nhưng chưa tải báo cáo hoặc chưa nhập số thì ghi "chưa có số", không đoán, không để 0 (chị Hoa 27/10). */
 function scThieu(){const L=[],nk=scRows(),has=g=>nk.some(x=>x.g===g),th=m=>m.slice(5)+"/"+m.slice(0,4);
-  if(!has("G02")){const m=scTTAds().L.filter(x=>x.v==null).map(x=>th(x.k));if(m.length)L.push({g:"G02",k:"TikTok",why:"Quảng cáo TikTok tháng "+m.join(", ")+": chưa tải báo cáo TikTok (Doanh thu › TikTok Shop › Tải file tháng)."})}
-  if(!has("G03")){let c=0;try{c=+(execNums(PERIOD.from,PERIOD.to).C||{}).adsSPE||0}catch(e){}if(!c)L.push({g:"G03",k:"Shopee Mall",why:"Quảng cáo Shopee: web chưa có số từ báo cáo Shopee. Ghi phiếu chi hoặc nạp sổ nhóm G03."})}
-  if(!has("G07")){let lg=null;try{lg=cpLuongAuto()}catch(e){}if(!(lg&&lg.chot))L.push({g:"G07",k:"Chung",why:"Lương: bảng lương tháng chưa chốt (Nhân sự › Bảng lương), hoặc ghi phiếu chi nhóm G07."})}
+  if(!has("G02")){const m=scTTAds().L.filter(x=>x.v==null).map(x=>th(x.k));if(m.length)L.push({g:"G02",k:"TikTok",t:"Quảng cáo TikTok "+m.join(", "),why:"Quảng cáo TikTok tháng "+m.join(", ")+": chưa tải báo cáo TikTok (Doanh thu › TikTok Shop › Tải file tháng)."})}
+  if(!has("G03")){let c=0;try{c=+(execNums(PERIOD.from,PERIOD.to).C||{}).adsSPE||0}catch(e){}if(!c)L.push({g:"G03",k:"Shopee Mall",t:"Quảng cáo Shopee",why:"Quảng cáo Shopee: web chưa có số từ báo cáo Shopee. Ghi phiếu chi hoặc nạp sổ nhóm G03."})}
+  if(!has("G07")){let lg=null;try{lg=cpLuongAuto()}catch(e){}if(!(lg&&lg.chot))L.push({g:"G07",k:"Chung",t:"Lương (bảng lương chưa chốt)",why:"Lương: bảng lương tháng chưa chốt (Nhân sự › Bảng lương), hoặc ghi phiếu chi nhóm G07."})}
   return L}
-const scThieuHtml=()=>{const L=scThieu();return L.length?`<div class="note" style="margin:0 16px 10px"><b>Chưa có số:</b><ul style="margin:4px 0 0 18px;padding:0">${L.map(x=>`<li>${esc(x.why)}</li>`).join("")}</ul></div>`:""};
+/* Một dòng gọn (chị Hoa 28/10): tên khoản thiếu, rê chuột vào để xem cách bổ sung. */
+const scThieuHtml=()=>{const L=scThieu();return L.length?`<div class="scthieu"><b>Chưa có số:</b> ${L.map(x=>`<span title="${esc(x.why)}">${esc(x.t||x.why)}</span>`).join(" · ")} <span class="hint">· rê chuột để xem cách bổ sung</span></div>`:""};
 /* Khoản nhập ở mục khác được tính vào Tổng quan và Phân bổ theo kênh, gắn đúng nhóm chi phí:
    quảng cáo → G01/G02/G03 theo kênh, lương đã chốt → G07 theo kênh của bảng lương, phiếu chi vận chuyển → G09 (cước xe NPP).
    Sổ đã có dòng quảng cáo (tiền nạp) hoặc lương của nhóm đó trong kỳ thì không cộng thêm, tránh tính hai lần. */
@@ -269,14 +270,17 @@ function scNK(){
   const ed=scCanDuyet(),gs=scDM().map(x=>x.g),sE=scS(R.filter(x=>x.ext&&x.ext.src==="ncc"&&x.g!=="G28")),sT=scS(R.filter(x=>x.g==="G28")),ngs=["Phiếu chi",...new Set(ext.map(x=>x.nguon))];
   const row=x=>{if(x.ext)return `<tr class="clk" data-x="${esc(x.id)}"><td>${x.ky?'<span class="hint">cả kỳ</span>':scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td class="dg" title="${esc(x.dg+(x.sub?" · "+x.sub:""))}"><div class="t">${esc(x.dg)}</div>${x.sub?`<span class="hint">${esc(x.sub)}</span>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(x.nhom||"")}</td><td>${esc(x.tk||"")}</td><td><span class="scp p-c">${esc(x.nguon)}</span></td><td>${esc(SC_TEN(x.k))}</td><td>${esc(scFnRow(x))}</td><td>${scXLP(scXL(x,QT))}</td><td>${scStP(x.st)}</td></tr>`;
     const d=scG(x.g),isCho=x.st==="Chờ duyệt";return `<tr class="clk" data-id="${x.id}"${isCho?' data-cho="1"':""}><td>${scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td class="dg" title="${esc(x.dg+(x.gc?" · "+x.gc:""))}"><div class="t">${esc(x.dg)}</div>${x.gc?`<span class="hint">${esc(x.gc)}</span>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(d.n)}</td><td>${esc(d.tk)}</td><td>${scLoP(d.lo)}</td><td>${ed&&!isCho?`<select class="scbv${x.k0&&x.k0!==x.k?" doi":""}" data-bv="${x.id}" aria-label="Bổ khoản chi vào">${SC_COLS.map(k=>`<option value="${k}"${x.k===k?" selected":""}>${esc(SC_TEN(k))}</option>`).join("")}</select>${x.k0&&x.k0!==x.k?`<div class="hint">đã đổi từ ${esc(x.k0)}</div>`:""}`:esc(SC_TEN(x.k))}</td><td>${esc(scFnRow(x))}</td><td>${scXLP(scXL(x,QT))}</td><td>${scStP(x.st)}</td></tr>`};
-  return `<section class="card flush"><div class="sch pad"><h2>Nhật ký chi</h2><span class="hint">mọi khoản tiền chi ra trong kỳ, xếp theo ngày (chi phí, trả nhà cung cấp, mua tài sản…) · bấm dòng để xem chi tiết và đơn mua · nhãn xám = khoản nhập ở mục khác, tự hiện</span><span class="sp"></span>
+  return `<section class="card flush"><div class="sch pad"><h2>Nhật ký chi</h2><span class="hint" title="Gồm chi phí, trả nhà cung cấp, mua tài sản… · nhãn xám = khoản nhập ở mục khác, tự hiện">mọi khoản chi trong kỳ · bấm dòng để xem chi tiết</span><span class="sp"></span><input id="scf-fq" class="scq" placeholder="Tìm diễn giải, số chứng từ…" value="${esc(SC.q||"")}"></div>
+   <div class="sch scf">
    <select id="scf-fng"><option value="">Mọi nguồn</option>${ngs.map(n=>`<option${SC.ng===n?" selected":""}>${esc(n)}</option>`).join("")}</select>
    <select id="scf-fg"><option value="">Tất cả nhóm chi phí</option>${gs.map(g=>`<option value="${g}"${SC.g===g?" selected":""}>${g} · ${esc(scG(g).n)}</option>`).join("")}</select>
    <select id="scf-fk"><option value="">Tất cả nơi chịu</option>${SC_COLS.map(k=>`<option value="${k}"${SC.k===k?" selected":""}>${esc(SC_TEN(k))}</option>`).join("")}</select>
-   <select id="scf-fn"><option value="">Tất cả chức năng</option>${SC_FN.map(f=>f[1]).map(n=>`<option${SC.fn===n?" selected":""}>${n}</option>`).join("")}</select>
+   <button type="button" class="btn sm" id="scf-more">${SC.more?"Ẩn bớt ▴":"Lọc thêm ▾"}${!SC.more&&(SC.fn||SC.xl||SC.st)?" ("+[SC.fn,SC.xl,SC.st].filter(Boolean).length+")":""}</button>
+   ${[SC.ng,SC.g,SC.k,SC.fn,SC.xl,SC.st,SC.q].some(Boolean)?`<button type="button" class="lnk" id="scf-clr">Bỏ lọc</button>`:""}
+   <span class="scmore"${SC.more?"":" hidden"}><select id="scf-fn"><option value="">Tất cả chức năng</option>${SC_FN.map(f=>f[1]).map(n=>`<option${SC.fn===n?" selected":""}>${n}</option>`).join("")}</select>
    <select id="scf-fx"><option value="">Mọi cách xử lý</option>${Object.keys(SC_XLC).map(n=>`<option${SC.xl===n?" selected":""}>${n}</option>`).join("")}</select>
    <select id="scf-fs"><option value="">Mọi tình trạng</option>${["Ổn","Cần rà","Chờ duyệt"].map(s=>`<option${SC.st===s?" selected":""}>${s}</option>`).join("")}</select>
-   <input id="scf-fq" placeholder="Tìm diễn giải, số chứng từ…" value="${esc(SC.q||"")}"></div>
+</span></div>
   ${!MH.pay||!SOCP.ship?`<p class="hint pad">Đang tải các khoản chi ở Mua hàng và Vận chuyển…</p>`:""}
   ${scThieuHtml()}
   ${R.length?`<div class="tbl"><table class="scnk"><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>TK</th><th>Loại / nguồn</th><th>Bổ vào (kênh / nơi chịu)</th><th>Chức năng</th><th>Cách xử lý</th><th>Tình trạng</th></tr></thead><tbody>
@@ -366,6 +370,10 @@ const SC_CSS=`.sochi table.scnk td{padding:6px 8px;font-size:13px;vertical-align
 .sochi .scrs{border:1px solid #e3e6ee;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr 170px;gap:6px 16px}.sochi .scrs .m{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 .sochi table.scpbt{table-layout:fixed;min-width:1340px}.sochi .scpbt .c-n{width:230px}.sochi .scpbt .c-tk{width:52px}.sochi .scpbt .c-v{width:96px}.sochi .scpbt .c-t{width:112px}.sochi .scpbt th{white-space:normal;vertical-align:bottom;line-height:1.3}.sochi .scpbt td{white-space:nowrap}.sochi .scpbt td:first-child{white-space:normal}
 .sochi .sch select,.sochi .sch input{width:auto!important;max-width:260px;flex:0 1 auto;margin:0}
+.sochi .sch.scf{padding:0 16px 8px;gap:6px}.sochi .sch.scf select{height:30px;font-size:12.5px;padding:0 8px;max-width:200px}
+.sochi .scmore{display:contents}.sochi .scmore[hidden]{display:none}
+.sochi .sch .scq{min-width:240px;height:32px;font-size:13px}
+.sochi .scthieu{margin:0 16px 10px;padding:6px 10px;border-radius:8px;background:#fffaeb;color:#93370d;font-size:12.5px}.sochi .scthieu span[title]{border-bottom:1px dotted #b54708;cursor:help}
 .sochi .scviec{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;font-size:13.5px}.sochi .scviec.od{background:#fff8e3}
 .sochi select.scbv{padding:4px 8px;font-size:12.5px;min-width:130px}.sochi select.scbv.doi{border-color:#a95a10;background:#fff1e3}.sochi .mono{font-family:Consolas,monospace;font-size:12px;color:#667085}
 @media(max-width:900px){.sochi .sck3,.sochi .sck5,.sochi .sctwo,.sochi .sccc{grid-template-columns:1fr}.sochi .scrs{grid-template-columns:1fr}.sochi .scrs .m{text-align:left}.sochi .scbar{grid-template-columns:1fr;gap:3px}.sochi .scbar .t{text-align:left}}`;
@@ -384,6 +392,8 @@ function pSoChi(m){
   on("sc-new",()=>scForm());on("sc-imp",()=>scImport());
   on("sc-ncc",async()=>{await mhLoad();mhLoadInv();mhPayForm()});on("sc-vc",()=>{PAGE="cr_vc";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
   [["scf-fg","g"],["scf-fk","k"],["scf-fs","st"],["scf-fq","q"],["scf-fn","fn"],["scf-fx","xl"],["scf-fng","ng"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SC[k]=e.value;renderMain()}});
+  {const mo=document.getElementById("scf-more");if(mo)mo.onclick=()=>{SC.more=!SC.more;renderMain()};
+   const cl=document.getElementById("scf-clr");if(cl)cl.onclick=()=>{["ng","g","k","fn","xl","st","q"].forEach(k=>SC[k]="");renderMain()}}
   const findR=id=>scRows().find(x=>x.id===id)||((scFin().nkc)||[]).find(x=>x.id===id);
   m.querySelectorAll("tr[data-x]").forEach(tr=>tr.onclick=()=>{const r=scExt().find(x=>x.id===tr.dataset.x);if(r)scExtOpen(r)});
   m.querySelectorAll("tr[data-id]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("select,button,input"))return;const id=tr.dataset.id,c=scCho().find(x=>x.id===id);if(c)scPhieu(c,true);else{const r=findR(id);if(r)scPhieu(r,false)}});
