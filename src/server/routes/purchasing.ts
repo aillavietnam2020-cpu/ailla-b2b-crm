@@ -362,6 +362,12 @@ async function receive(c: Context<AppEnv>, id: string, b: { receipt_date?: unkno
   }
   if (!docId) throw conflict('NO_CLASH', 'Không cấp được số phiếu nhập kho, thử lại');
   const rid = newId();
+  // Công cụ dụng cụ / tài sản cố định (lớp kho CCDC) không nằm trong tồn kho (chị Hoa duyệt 28/10): phiếu nhập vẫn ghi để có giá,
+  // nhưng xuất dùng ngay trong cùng phiếu, giá trị theo dõi ở sổ Tài sản & CCDC (hub/src/taisan.js).
+  const codes = [...new Set(lines.map((l) => l.item))];
+  const ccdc = new Set(
+    (await c.env.DB.prepare(`SELECT code FROM kho_items WHERE cls = 'CCDC' AND code IN (${codes.map(() => '?').join(',')})`).bind(...codes).all<{ code: string }>()).results.map((r) => r.code),
+  );
   await c.env.DB.prepare('INSERT INTO po_receipts (id, po_id, receipt_date, kho_doc_id, note, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(rid, id, date, docId, String(b.note ?? '').trim(), 'OK', auth.user.id, now).run();
   for (const l of lines) {
@@ -370,6 +376,9 @@ async function receive(c: Context<AppEnv>, id: string, b: { receipt_date?: unkno
     const mvId = (await c.env.DB.prepare('SELECT id FROM kho_moves WHERE doc_id = ? AND item = ? ORDER BY id DESC LIMIT 1').bind(docId, l.item).first<{ id: number }>())?.id ?? null;
     await c.env.DB.prepare('INSERT INTO po_receipt_lines (id, receipt_id, po_line_id, item, qty, unit_price, kho_move_id) VALUES (?, ?, ?, ?, ?, NULL, ?)')
       .bind(newId(), rid, l.po_line_id ?? null, l.item, l.qty, mvId).run();
+    if (ccdc.has(l.item))
+      await c.env.DB.prepare("INSERT INTO kho_moves (doc_id, item, qty, std_qty, price, role, note) VALUES (?, ?, ?, NULL, NULL, 'OUT', ?)")
+        .bind(docId, l.item, -l.qty, 'Xuất dùng ngay: tài sản / công cụ, theo dõi ở sổ Tài sản & CCDC').run();
   }
   await poStatus(c.env.DB, id);
   await auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_RECEIVED', entityType: 'PO', entityId: po.no, after: { receipt: rid, kho_doc: docNo, lines: lines.length }, requestId: c.get('requestId'), ip: ipOf(c) }).run();

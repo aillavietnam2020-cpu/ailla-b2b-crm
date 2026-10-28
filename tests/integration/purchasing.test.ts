@@ -33,6 +33,19 @@ beforeEach(async () => {
 });
 
 describe('Mua hàng: phiếu mua → nhận hàng → giá, hóa đơn, phiếu chi, công nợ', () => {
+  it('mua tài sản / công cụ (lớp CCDC): nhận hàng ghi phiếu nhập nhưng xuất dùng ngay, không vào tồn kho', async () => {
+    await ctx.db.prepare("INSERT INTO kho_items (code, name, unit, cls, grp, min_stock, active, created_at) VALUES ('MAYCHIET2', 'Máy chiết rót', 'cái', 'CCDC', 'Tài sản cố định', 0, 1, ?)").bind(NOW).run();
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'Ezpack' } });
+    const po = await ctx.request(`${BASE}/orders`, { as: USERS.ceo, body: { supplier_id: sup.body.data.id, order_date: '2026-10-05', lines: [{ item: 'MAYCHIET2', qty: 1, unit_price: 2160000 }, { item: 'NVL1', qty: 5 }] } });
+    const r = await ctx.request(`${BASE}/orders/${po.body.data.id}/receipts`, { as: KT, body: { receipt_date: '2026-10-07', lines: [{ item: 'MAYCHIET2', qty: 1 }, { item: 'NVL1', qty: 5 }] } });
+    expect(r.status).toBe(200);
+    const ton = async (code: string) => (await ctx.db.prepare('SELECT SUM(qty) AS q FROM kho_ledger WHERE item = ?').bind(code).first<{ q: number }>())?.q;
+    expect(await ton('MAYCHIET2')).toBe(0);
+    expect(await ton('NVL1')).toBe(5);
+    const list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(list.body.data.find((o: { id: string }) => o.id === po.body.data.id).status).toBe('DU');
+  });
+
   it('lập phiếu mua; đặt khác giao: nhận làm hai lần, trạng thái đổi theo số thực nhận', async () => {
     const { poId, poNo } = await setup();
     expect(poNo).toMatch(/^PM2610-001$/);

@@ -127,15 +127,17 @@ function mhDetail(id){
 /* Form lập / sửa phiếu mua */
 function mhForm(id,draft){
   const p=id?(MH.orders||[]).find(x=>x.id===id):null;
+  /* Đơn mua tài sản / công cụ (Ghi nhanh, chị Hoa 28/10): chỉ chọn mã lớp CCDC; nhận hàng không vào tồn kho, chờ ghi tăng ở trang Tài sản & CCDC (taisan.js). */
+  const TSM=!!(draft&&draft.ts);
   const L=draft&&draft.L?draft.L:p?p.lines.map(l=>({item:l.item,qty:l.qty,note:l.note||"",price:l.unit_price==null?"":l.unit_price})):[{item:"",qty:"",note:"",price:""}];
-  openDrawerHTML(`<h2>${p?"Sửa phiếu mua "+esc(p.no):"Lập phiếu mua hàng"}</h2><form class="frm" id="mhf"><div class="row4"><label class="field grow">Nhà cung cấp<select id="mhf-s">${mhSupOpts(draft&&draft.sup?draft.sup:p?p.supplier_id:"")}</select></label><button type="button" class="btn sm" id="mhf-ns" style="align-self:end">+ Nhà cung cấp mới</button></div>
+  openDrawerHTML(`<h2>${p?"Sửa phiếu mua "+esc(p.no):TSM?"Lập đơn mua tài sản / công cụ":"Lập phiếu mua hàng"}</h2>${TSM?`<p class="hint">Chọn mã tài sản / công cụ (hoặc bấm + Tài sản / công cụ mới). Kho nhận hàng xong, hàng không vào tồn kho mà hiện ở trang Tài sản cố định / Công cụ dụng cụ để ghi tăng. Tiền trả nhà cung cấp hiện ở Nhật ký chi, không tính vào chi phí tháng.</p>`:""}<form class="frm" id="mhf"><div class="row4"><label class="field grow">Nhà cung cấp<select id="mhf-s">${mhSupOpts(draft&&draft.sup?draft.sup:p?p.supplier_id:"")}</select></label><button type="button" class="btn sm" id="mhf-ns" style="align-self:end">+ Nhà cung cấp mới</button></div>
    <div class="row4"><label class="field">Ngày đặt hàng<input id="mhf-d" type="date" value="${esc(draft&&draft.date?draft.date:p?p.order_date:mhToday())}" required></label><label class="field">Ngày giao dự kiến<input id="mhf-e" type="date" value="${esc(draft&&draft.exp!=null?draft.exp:p?(p.expected_date||""):"")}"></label></div>
    <div class="tbl edit"><table><thead><tr><th>Mã hàng</th><th>Tên</th><th>Số lượng đặt</th><th>Giá đặt (đ)</th><th>Ghi chú</th><th></th></tr></thead><tbody id="mhf-b"></tbody></table></div>
-   <div class="row7"><button type="button" class="btn" id="mhf-add">+ Thêm dòng</button>${khoCanMisa()?`<button type="button" class="btn" id="mhf-newitem" title="Hàng chưa có trong danh mục (đồ gia dụng, quà tặng khách...)">+ Mã hàng mới (gia dụng, quà tặng…)</button>`:""}<span id="mhf-tot" class="hint"></span></div>
+   <div class="row7"><button type="button" class="btn" id="mhf-add">+ Thêm dòng</button>${TSM&&khoCanMisa()&&typeof tsMaMoi==="function"?`<button type="button" class="btn" id="mhf-newts">+ Tài sản / công cụ mới</button>`:""}${!TSM&&khoCanMisa()?`<button type="button" class="btn" id="mhf-newitem" title="Hàng chưa có trong danh mục (đồ gia dụng, quà tặng khách...)">+ Mã hàng mới (gia dụng, quà tặng…)</button>`:""}<span id="mhf-tot" class="hint"></span></div>
    <label class="field">Ghi chú phiếu<input id="mhf-n" value="${esc(draft&&draft.note!=null?draft.note:p?p.note:"")}"></label><div id="mhf-e2"></div><button class="btn pri">${p?"Lưu phiếu":"Lập phiếu"}</button></form>`);
   const tot=()=>{const v=L.reduce((t,l)=>t+(+l.qty||0)*(+l.price||0),0);$("#mhf-tot").textContent=v?"Giá trị đặt: "+nf(Math.round(v))+" đ":""};
   const draw=()=>{$("#mhf-b").innerHTML=L.map((l,i)=>`<tr><td><input class="mh-i" data-i="${i}" value="${esc(l.item)}" placeholder="Gõ mã hoặc tên" autocomplete="off"></td><td class="mh-nm">${esc(l.item?mhName(l.item):"")}</td><td><input class="mh-q n" data-i="${i}" type="number" min="0" step="any" value="${l.qty}"></td><td><input class="mh-p n" data-i="${i}" type="number" min="0" step="any" value="${l.price==null?"":l.price}" placeholder="Giá"></td><td><input class="mh-o" data-i="${i}" value="${esc(l.note)}"></td><td><button type="button" class="lnk" data-rm="${i}">✕</button></td></tr>`).join("");
-    document.querySelectorAll(".mh-i").forEach(x=>khoPick(x,["NVL","CCDC","HH"],it=>{const i=+x.dataset.i;L[i].item=it.code;x.value=it.code;x.closest("tr").querySelector(".mh-nm").textContent=it.name}));
+    document.querySelectorAll(".mh-i").forEach(x=>khoPick(x,TSM?["CCDC"]:["NVL","CCDC","HH"],it=>{const i=+x.dataset.i;L[i].item=it.code;x.value=it.code;x.closest("tr").querySelector(".mh-nm").textContent=it.name}));
     document.querySelectorAll(".mh-q").forEach(x=>x.oninput=()=>{L[+x.dataset.i].qty=x.value;tot()});document.querySelectorAll(".mh-p").forEach(x=>x.oninput=()=>{L[+x.dataset.i].price=x.value;tot()});
     document.querySelectorAll(".mh-o").forEach(x=>x.oninput=()=>L[+x.dataset.i].note=x.value);
     document.querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{L.splice(+x.dataset.rm,1);if(!L.length)L.push({item:"",qty:"",note:"",price:""});draw()});tot()};
@@ -145,8 +147,10 @@ function mhForm(id,draft){
     const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value};
     khoNewItem({cls:"HH",askProduct:true,hint:"Đồ gia dụng, quà tặng khách hoặc hàng chưa có trong danh mục. Đặt mã ngắn, không dấu, không trùng (ví dụ QUA-NOIKIM, GD-CHOIBAT). Thêm xong mã tự điền vào dòng đang trống của phiếu mua.",
       onDone:async code=>{const e=keep.L.find(l=>!l.item);if(e)e.item=code;else keep.L.push({item:code,qty:"",note:"",price:""});mhForm(id,keep)}})};
+  if($("#mhf-newts"))$("#mhf-newts").onclick=()=>{const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value,ts:true};
+    tsMaMoi(code=>{const e=keep.L.find(l=>!l.item);if(e)e.item=code;else keep.L.push({item:code,qty:"",note:"",price:""});mhForm(id,keep)},()=>mhForm(id,keep))};
   mhSupPick("#mhf-s");
-  $("#mhf-ns").onclick=()=>{const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value};mhNewSupplier(sid=>mhForm(id,{...keep,sup:sid}))};
+  $("#mhf-ns").onclick=()=>{const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value,ts:TSM};mhNewSupplier(sid=>mhForm(id,{...keep,sup:sid}))};
   $("#mhf").onsubmit=async e=>{e.preventDefault();const body={supplier_id:$("#mhf-s").value,order_date:$("#mhf-d").value,expected_date:$("#mhf-e").value||null,note:$("#mhf-n").value,lines:L.filter(l=>l.item).map(l=>({item:l.item,qty:+l.qty,note:l.note,unit_price:l.price===""||l.price==null?null:+l.price}))};
     try{const r=await kApi(p?"/mh/orders/"+p.id:"/mh/orders",{method:p?"PUT":"POST",body:JSON.stringify(body)});closeDrawer();toast(p?"Đã lưu phiếu":"Đã lập phiếu "+r.no);await mhReload()}catch(err){$("#mhf-e2").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
 }

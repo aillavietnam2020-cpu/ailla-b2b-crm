@@ -64,6 +64,42 @@ function tsBpWire(root){const tb=root.querySelector("[data-bpbody]");if(!tb)retu
   const add=root.querySelector("[data-bpadd]");if(add)add.onclick=()=>{tb.insertAdjacentHTML("beforeend",tsBpRows([{o:"ql",p:0}]));wire()}}
 const tsBpRead=root=>[...root.querySelectorAll("[data-bpbody] tr")].map(r=>({o:r.querySelector("[data-bpo]").value,p:+r.querySelector("[data-bpp]").value||0})).filter(x=>x.p>0);
 
+/* ---------- Đơn mua tài sản / công cụ (Ghi nhanh) → kho nhận hàng → chờ ghi tăng ----------
+   Hàng lớp CCDC nhận qua phiếu mua không vào tồn kho (máy chủ xuất dùng ngay). Nhóm hàng "Tài sản cố định" → sổ TSCĐ, còn lại → sổ CCDC.
+   Chỉ lấy lần nhận từ 01/10/2026 (trước đó đã có trong số đầu kỳ nạp từ MISA). Đã ghi tăng = có tài sản gắn dòng nhận (rcl) hoặc cùng mã hàng. */
+const TS_NHAN_TU="2026-10-01";
+/* Cho Sổ chi phí: phiếu mua (id hoặc số PM…) toàn hàng tài sản / công cụ thì phiếu chi trả cho nó là "Mua tài sản / công cụ", không tính vào chi phí tháng. */
+function tsDonTaiSan(x){const p=(typeof MH!=="undefined"&&MH.orders||[]).find(o=>o.id===x||o.no===x);return !!p&&!!(p.lines||[]).length&&typeof KHO!=="undefined"&&p.lines.every(l=>(KHO.items.get(l.item)||{}).cls==="CCDC")}
+const tsLoaiHang=it=>/tài sản cố định|tscđ/i.test((it&&it.grp)||"")?"TS":"CC";
+function tsNhanCho(kind){if(typeof MH==="undefined"||!MH.orders||typeof KHO==="undefined"||!KHO.items)return [];
+  const da=tsAll().concat(tsCho()),o=[];
+  MH.orders.forEach(p=>{if(p.status==="HUY")return;const gia=new Map((p.lines||[]).map(l=>[l.id,l.unit_price]));
+    (p.receipts||[]).forEach(r=>{if(r.status&&r.status!=="OK"||String(r.receipt_date||"")<TS_NHAN_TU)return;
+      (r.lines||[]).forEach(l=>{const it=KHO.items.get(l.item);if(!it||it.cls!=="CCDC"||tsLoaiHang(it)!==kind)return;
+        if(da.some(a=>a.rcl===l.id||!a.rcl&&a.ma===l.item))return;const dg=l.unit_price!=null?+l.unit_price:gia.get(l.po_line_id);
+        o.push({id:l.id,item:l.item,ten:l.name||it.name,qty:+l.qty||0,unit:l.unit||it.unit||"",gk:dg!=null?Math.round((+l.qty||0)*dg):0,d:r.receipt_date,ncc:p.supplier_name||"",po:p.no})})})});
+  return o}
+function tsNhanCard(kind){if(!tsCanGhiTang())return "";if(typeof mhLoad==="function"&&!MH.orders&&!TSV.mhTai){TSV.mhTai=1;mhLoad().then(()=>{if(/^ts_/.test(PAGE))renderMain()}).catch(()=>{})}
+  const L=tsNhanCho(kind);if(!L.length)return "";
+  return `<section class="card flush" style="border-color:#f5d77a"><div class="card-h pad"><h2>Hàng mua đã nhận, chưa ghi tăng (${L.length})</h2></div><div class="tbl"><table><thead><tr><th>Ngày nhận</th><th>Đơn mua</th><th>Mã</th><th>Tên</th><th class="n">Số lượng</th><th class="n">Giá trị</th><th>Nhà cung cấp</th><th></th></tr></thead><tbody>
+  ${L.map(x=>`<tr><td>${tsDmy(x.d)}</td><td class="mono">${esc(x.po)}</td><td class="mono">${esc(x.item)}</td><td><b>${esc(x.ten)}</b></td><td class="n">${tsN(x.qty)} ${esc(x.unit)}</td><td class="n">${x.gk?tsN(x.gk):`<span class="hint">chưa có giá</span>`}</td><td>${esc(x.ncc)}</td><td><button class="btn sm pri" data-tsnhan="${esc(x.id)}">Ghi tăng</button></td></tr>`).join("")}</tbody></table></div></section><div style="height:12px"></div>`}
+function tsNhanWire(m,kind){m.querySelectorAll("[data-tsnhan]").forEach(b=>b.onclick=()=>{const x=tsNhanCho(kind).find(z=>z.id===b.dataset.tsnhan);if(!x)return;
+  tsForm(kind,null,null,{ma:tsAll().concat(tsCho()).some(a=>a.kind===kind&&a.ma===x.item)?"":x.item,ten:x.ten,gk:x.gk,d:x.d,ncc:x.ncc,ct:x.po,gc:"Đơn mua "+x.po+(x.qty!==1?" · số lượng "+tsN(x.qty)+" "+x.unit:""),rcl:x.id,po:x.po})})}
+/* Mã tài sản / công cụ mới trong danh mục kho (lớp CCDC; nhóm "Tài sản cố định" hoặc "Công cụ dụng cụ") cho đơn mua. done(code) khi tạo xong, back() khi hủy. */
+function tsMaMoi(done,back){
+  openDrawerHTML(`<h2>Thêm tài sản / công cụ mới</h2><p class="hint">Mã dùng cho đơn mua. Nhận hàng xong, hàng không vào tồn kho mà chờ ghi tăng ở sổ tương ứng.</p>
+  <form class="frm" id="tsm"><div class="scpills" style="margin:0 0 10px"><button type="button" class="on" data-tsmk="TS">Tài sản cố định</button><button type="button" data-tsmk="CC">Công cụ dụng cụ</button></div>
+   <div class="row4"><label class="field grow">Tên<input id="tsm-n" required placeholder="VD: Máy chiết rót 4 vòi"></label><label class="field">Đơn vị tính<input id="tsm-u" value="cái"></label></div>
+   <label class="field">Mã (để trống: web tự đặt theo tên)<input id="tsm-c"></label><div id="tsm-e"></div>
+   <div class="filters" style="justify-content:flex-end"><button type="button" class="btn" id="tsm-x">Quay lại</button><button class="btn pri">Thêm</button></div></form>`);
+  let kind="TS";const f=document.getElementById("tsm");
+  f.querySelectorAll("[data-tsmk]").forEach(b=>b.onclick=()=>{kind=b.dataset.tsmk;f.querySelectorAll("[data-tsmk]").forEach(z=>z.classList.toggle("on",z===b))});
+  document.getElementById("tsm-x").onclick=()=>back&&back();
+  f.onsubmit=async e=>{e.preventDefault();const name=document.getElementById("tsm-n").value.trim();if(!name)return;
+    let code=document.getElementById("tsm-c").value.trim();if(!code){const g=tsBoDau(name).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,18)||"TS";code=g;for(let i=2;KHO.items&&KHO.items.has(code);i++)code=g+i}
+    try{await kApi("/items",{method:"POST",body:JSON.stringify({code,name,unit:document.getElementById("tsm-u").value.trim(),cls:"CCDC",grp:kind==="TS"?"Tài sản cố định":"Công cụ dụng cụ",min_stock:0})});
+      if(typeof khoLoad==="function")await khoLoad(true);toast("Đã thêm mã "+code);done(code)}catch(err){document.getElementById("tsm-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}}}
+
 /* Ghi tăng chờ duyệt (người không ghi được ngăn tài chính gửi lên). */
 function tsChoCard(L){if(!L.length)return "";const duyet=tsCanGhi()&&tsFinOk();
   return `<section class="card flush" style="border-color:#f5d77a"><div class="card-h pad"><h2>Ghi tăng chờ duyệt (${L.length})</h2></div><div class="tbl"><table><thead><tr><th>Ngày</th><th>Mã</th><th>Tên</th><th class="n">Giá trị</th><th class="n">Số tháng</th><th>Bộ phận chịu</th><th>Phiếu chi</th><th>Người ghi</th><th></th></tr></thead><tbody>
@@ -86,7 +122,7 @@ function pTsSo(m,kind){
     const ng=L.reduce((t,a)=>t+(+(a.gk??a.ng)||0),0),con=L.reduce((t,a)=>t+(tsTrangThai(a,ym)==="GIAM"?0:tsConLai(a,ym)),0),th=L.reduce((t,a)=>t+tsThang(a,ym),0),dung=L.filter(a=>tsTrangThai(a,ym)==="DUNG").length;
     const cho=tsChoGan();
     const tc=tsCho().filter(x=>x.kind===kind&&(tsCanGhi()||x.by===ME.name));
-    body=tsChoCard(tc)+(cho.length&&tsCanGhiTang()?`<div class="hint" style="background:#fff8e1;border:1px solid #f5d77a;border-radius:10px;padding:8px 12px;margin:0 0 12px;color:#7a5600">Có <b>${cho.length}</b> phiếu chi nhóm "Mua tài sản / công cụ" chưa ghi tăng (${cho.slice(0,3).map(x=>esc(x.ct||"")+" · "+tsN(x.t)+" đ").join("; ")}${cho.length>3?"…":""}). Bấm ＋ Ghi tăng rồi chọn phiếu ở mục "Mua từ phiếu chi".</div>`:"")+
+    body=tsNhanCard(kind)+tsChoCard(tc)+(cho.length&&tsCanGhiTang()?`<div class="hint" style="background:#fff8e1;border:1px solid #f5d77a;border-radius:10px;padding:8px 12px;margin:0 0 12px;color:#7a5600">Có <b>${cho.length}</b> phiếu chi nhóm "Mua tài sản / công cụ" chưa ghi tăng (${cho.slice(0,3).map(x=>esc(x.ct||"")+" · "+tsN(x.t)+" đ").join("; ")}${cho.length>3?"…":""}). Bấm ＋ Ghi tăng rồi chọn phiếu ở mục "Mua từ phiếu chi".</div>`:"")+
     `<div class="kpis">${kpi(kind==="TS"?"Nguyên giá":"Giá trị công cụ",money(ng),L.length+" "+tsTen(kind)+" · "+dung+" đang dùng")}${kpi(kind==="TS"?"Giá trị còn lại":"Còn chờ phân bổ (TK 242)",money(con),"cuối tháng "+tsYm(ym))}${kpi((kind==="TS"?"Khấu hao":"Phân bổ")+" tháng "+tsYm(ym),tsN(th)+" đ")}</div>
     <section class="card flush"><div class="card-h pad"><h2>${kind==="TS"?"Sổ tài sản cố định":"Sổ công cụ dụng cụ"}</h2><span class="sp"></span>${tsYmSel("ts-ym",ym)}</div>
     ${L.length?`<div class="tbl"><table><thead><tr><th>Ngày ghi tăng</th><th>Mã</th><th>Tên</th><th>Loại</th><th>Bộ phận chịu</th><th class="n">${kind==="TS"?"Nguyên giá":"Giá trị"}</th><th class="n">Số tháng</th><th class="n">Tháng này</th><th class="n">${kind==="TS"?"Hao mòn lũy kế":"Đã phân bổ"}</th><th class="n">Còn lại</th><th>Trạng thái</th></tr></thead><tbody>
@@ -109,7 +145,7 @@ function pTsSo(m,kind){
   if($m("#ts-new"))$m("#ts-new").onclick=()=>{TSV.tab[pg]="gt";renderMain()};
   if($m("#ts-gt"))tsForm(kind,null,$m("#ts-gt"));
   if($m("#ts-xl"))$m("#ts-xl").onclick=()=>tsXuat(kind,ym);
-  tsChoWire(m);
+  tsChoWire(m);tsNhanWire(m,kind);
   m.querySelectorAll("tr[data-tsid]").forEach(r=>r.onclick=()=>tsForm(kind,tsAll().find(a=>a.id===r.dataset.tsid)));
   if(tab==="gg")tsGgWire(m,kind);if(tab==="dk")tsDkWire(m,kind);
 }
@@ -136,7 +172,7 @@ async function tsNccLuu(ten){
     await kApi("/mh/suppliers",{method:"POST",body:JSON.stringify({name:ten})});MH.sup=null;MH.at=0;toast("Đã lưu nhà cung cấp mới: "+ten)}catch(e){}}
 function tsForm(kind,a,el,pre){tsDtNap();
   const xong=el?()=>{TSV.tab[kind==="TS"?"ts_so":"ts_cc"]="so";renderMain()}:closeDrawer;
-  const moi=!a,ghi=moi?tsCanGhiTang():tsCanGhi(),x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx2",p:100}],...(pre?{ma:pre.ma||"",ten:pre.ten,gk:pre.gk,d:pre.d||tsHom(),s:pre.d||tsHom(),ncc:pre.ncc,ct:pre.ct,nkc:pre.nkc,gc:pre.gc||""}:{})};
+  const moi=!a,ghi=moi?tsCanGhiTang():tsCanGhi(),x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx2",p:100}],...(pre?{ma:pre.ma||"",ten:pre.ten,gk:pre.gk,d:pre.d||tsHom(),s:pre.d||tsHom(),ncc:pre.ncc,ct:pre.ct,nkc:pre.nkc,gc:pre.gc||"",rcl:pre.rcl,po:pre.po}:{})};
   const cho=tsChoGan().concat(x.nkc?((scFin().nkc)||[]).concat(typeof scCho==="function"?scCho():[]).filter(r=>r.id===x.nkc&&!tsChoGan().includes(r)):[]);
   const goi=((scFin().nkc)||[]).filter(r=>r.src!=="ts"&&+r.t>=500000&&r.d>=tsAddD(tsHom(),-120)&&!cho.includes(r)&&!tsAll().some(z=>z.nkc===r.id)).sort((p,q)=>q.d.localeCompare(p.d)).slice(0,60);
   const pcOpt=[["","Không gắn (mua nợ nhà cung cấp, tài sản có sẵn…)"]].concat(cho.map(r=>[r.id,`${r.ct||""} · ${tsDmy(r.d)} · ${tsN(r.t)} đ · ${String(r.dg||"").slice(0,50)}`]),goi.map(r=>[r.id,`${r.ct||""} · ${tsDmy(r.d)} · ${tsN(r.t)} đ · ${String(r.dg||"").slice(0,50)} (khác nhóm)`]));
@@ -175,7 +211,7 @@ function tsForm(kind,a,el,pre){tsDtNap();
     tsMut("xóa "+tsTen(kind)+" "+x.ma,T=>{T.a=T.a.filter(z=>z.id!==x.id)});xong();toast("Đã xóa");renderMain()};
   if(typeof mhLoad==="function"&&!MH.sup)mhLoad().then(()=>{const dl=g("tsf-nccl");if(dl)dl.innerHTML=tsNccTen().map(n=>`<option value="${esc(n)}">`).join("")}).catch(()=>{});
   g("tsf-ok").onclick=()=>{
-    const v={ma:g("tsf-ma").value.trim(),ten:g("tsf-ten").value.trim(),loai:g("tsf-loai").value,d:g("tsf-d").value,s:g("tsf-s").value||g("tsf-d").value,gk:+g("tsf-g").value||0,n:Math.round(+g("tsf-n").value||0),
+    const v={...(x.rcl?{rcl:x.rcl,po:x.po}:{}),ma:g("tsf-ma").value.trim(),ten:g("tsf-ten").value.trim(),loai:g("tsf-loai").value,d:g("tsf-d").value,s:g("tsf-s").value||g("tsf-d").value,gk:+g("tsf-g").value||0,n:Math.round(+g("tsf-n").value||0),
       kkh:!!(g("tsf-kkh")&&g("tsf-kkh").checked),bp:tsBpRead(root),nkc:g("tsf-pc").value||"",ncc:g("tsf-ncc").value.trim(),ct:g("tsf-ct").value.trim(),gc:g("tsf-gc").value.trim()};
     if(!v.ma&&v.ten)v.ma=tsMaTuDong(v.ten,kind,x.id);
     const loi=!v.ma||!v.ten?"Cần tên":!(v.gk>0)?"Cần giá trị":!v.s?"Cần ngày bắt đầu tính":!v.kkh&&!(v.n>=1)?"Cần số tháng":!tsBpOk(v.bp)?"Bộ phận chịu chi phí phải cộng đủ 100%":tsAll().some(z=>z.kind===kind&&z.ma===v.ma&&z.id!==x.id)?"Mã "+v.ma+" đã có":"";

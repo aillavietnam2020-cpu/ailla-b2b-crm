@@ -60,6 +60,8 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     /* Một phiếu chi cho mọi loại (chi phí, trả nhà cung cấp, vận chuyển): chọn loại ngay trong form (phieuchigop.js). */
     ["Ghi phiếu chi / phiếu thu","Chi phí, trả nhà cung cấp, vận chuyển · kèm ảnh bill",ed,()=>spForm()],
     ["Lập đơn mua hàng","Nguyên vật liệu, vỏ, bao bì",mg,async()=>{await gnReady();mhForm(null)}],
+    /* Tài sản cố định, công cụ dụng cụ: nhận hàng không vào tồn kho, chờ ghi tăng ở trang Tài sản & CCDC (taisan.js). */
+    ["Lập đơn mua tài sản / công cụ","Máy móc, dụng cụ · nhận hàng là vào sổ Tài sản",mg,async()=>{await gnReady();mhForm(null,{ts:true})}],
     ["Ghi chứng từ nhà cung cấp","Phiếu giao, bill, hóa đơn đỏ",mg,async()=>{await gnReady();await mhLoadInv();mhDocForm()}]].filter(x=>x[2])};
   function gnInject(){
     const nav=document.querySelector(".side nav");if(!nav||document.getElementById("gn"))return;
