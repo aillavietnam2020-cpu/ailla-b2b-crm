@@ -45,7 +45,7 @@ function b2bChannel(ch){
   const R=B2BR.data;if(!R||B2BR.key!==PERIOD.from+"|"+PERIOD.to)return null;
   const lines=R.lines.filter(l=>l.channel===ch),ms=R.months.filter(x=>x.channel===ch);
   const netAll=sum(R.months,x=>+x.revenue||0)+b2cNet();
-  const months=[...new Set(ms.map(x=>x.month))],net=sum(ms,x=>+x.revenue||0),orders=sum(ms,x=>+x.orders||0),adj=sum(ms,x=>+x.order_adjust||0);
+  const months=[...new Set(ms.map(x=>x.month))],net=sum(ms,x=>+x.revenue||0),orders=sum(ms,x=>+x.orders||0),adj=sum(ms,x=>+x.order_adjust||0),bonus=sum(ms,x=>+x.bonus||0);
   const revLines=sum(lines,l=>+l.revenue||0);
   let cost=0,covRev=0;const miss=new Map(),grp=new Map(),byMonth=new Map();
   lines.forEach(l=>{
@@ -53,9 +53,10 @@ function b2bChannel(ch){
     if(c==null){const x=miss.get(l.sku)||{sku:l.sku,name:l.name,rev:0,qty:0};x.rev+=rv;x.qty+=+l.qty||0;miss.set(l.sku,x)}else{cost+=c;covRev+=rv}
     const g=grp.get(l.group_name)||{n:l.group_name,qty:0,rev:0,cost:0,cov:0};g.qty+=+l.qty||0;g.rev+=rv;if(c!=null){g.cost+=c;g.cov+=rv}grp.set(l.group_name,g);
     const mo=byMonth.get(l.month)||{m:l.month,rev:0,cost:0,cov:0};mo.rev+=rv;if(c!=null){mo.cost+=c;mo.cov+=rv}byMonth.set(l.month,mo)});
-  const ratio=covRev?cost/covRev:0,uncovRev=revLines-covRev,estCost=uncovRev*ratio,costAll=cost+estCost;
-  const share=netAll?net/netAll:1,CP=b2bCosts(months,share),gross=net-costAll;
-  return {ch,net,orders,adj,revLines,cost,covRev,uncovRev,estCost,costAll,cover:revLines?covRev/revLines:0,gross,cp:CP.total,cpRows:CP.rows,share,lai:gross-CP.total,miss,grp,byMonth,months,has:lines.length>0};
+  /* Không ước giá vốn (chị Hoa chốt 28/10): lãi gộp chỉ tính trên hàng đã có giá vốn, hàng chưa có giá vốn để riêng (uncovRev). */
+  const uncovRev=revLines-covRev,estCost=0,costAll=cost;
+  const share=netAll?net/netAll:1,CP=b2bCosts(months,share),gross=covRev-cost;
+  return {ch,net,orders,adj,bonus,revLines,cost,covRev,uncovRev,estCost,costAll,cover:revLines?covRev/revLines:0,gross,cp:CP.total,cpRows:CP.rows,share,lai:gross-bonus-CP.total,miss,grp,byMonth,months,has:lines.length>0};
 }
 function b2bChannelPage(m,ch){
   b2bLoad();
@@ -78,7 +79,7 @@ function b2bChannelPage(m,ch){
   ${miss10.length?`<section class="card flush"><div class="card-h pad"><h2>Mã chưa có giá vốn</h2><span class="hint">${miss.size} mã · ${pc(uncovRev,revLines)} doanh thu · hiện 10 mã lớn nhất</span></div>${tbl(["Mã CRM","Tên","Số lượng","Doanh thu"],miss10.map(x=>`<tr><td class="mono">${esc(x.sku)}</td><td>${esc(x.name)}</td><td class="n">${nf(x.qty)}</td><td class="n">${tr(x.rev)}</td></tr>`))}<p class="hint pad">Mã CRM nối với mã MISA ở Sản phẩm › Đồng bộ mã Kênh phân phối, giá vốn nhập ở Giá vốn SKU.</p></section>`:""}
   ${srcNote("CRM Kênh phân phối (đơn đã duyệt) + bảng giá vốn SKU + chi phí theo tháng. Giá vốn lấy tháng gần nhất không sau tháng bán.")}`;
 }
-PAGES.bc_b2b=m=>b2bChannelPage(m,"B2B");
+PAGES.bc_b2b=m=>{if(typeof kpPage!=="function")return b2bChannelPage(m,"B2B");try{kpPage(m)}catch(e){console.error(e);b2bChannelPage(m,"B2B")}};
 PAGES.bc_gc=m=>b2bChannelPage(m,"GIA_CONG");
 
 /* ---------- Báo cáo kết quả kinh doanh theo kênh (trang quản trị) ---------- */

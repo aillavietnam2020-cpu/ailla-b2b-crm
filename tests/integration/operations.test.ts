@@ -318,6 +318,20 @@ describe('Khuyến mại và vận hành đơn hàng', () => {
 });
 
 describe('Dashboard kinh doanh', () => {
+  it('trang Kênh phân phối: nhân viên chỉ thấy khách mình, CEO thấy hết', async () => {
+    const q = '/api/dashboards/kenh-pp?from=2026-08-01&to=2026-08-31';
+    const ceo = await ctx.request(q, { as: USERS.ceo });
+    expect(ceo.status).toBe(200);
+    for (const k of ['orders', 'customers', 'items']) expect(Array.isArray(ceo.body.data[k])).toBe(true);
+    const thao = await ctx.request(q, { as: USERS.thao });
+    expect(thao.status).toBe(200);
+    const all = new Set(ceo.body.data.customers.map((c: { id: string }) => c.id));
+    const own = thao.body.data.customers.map((c: { id: string }) => c.id);
+    own.forEach((id: string) => expect(all.has(id)).toBe(true));
+    expect(own.length).toBeLessThan(all.size);
+    expect((await ctx.request('/api/dashboards/kenh-pp?from=2026-08-31&to=2026-08-01', { as: USERS.ceo })).status).toBe(400);
+  });
+
   it('nhân viên chỉ xem được số của chính mình', async () => {
     const res = await ctx.request('/api/dashboards/sales?period=2026-08&user_id=user-huyen', {
       as: USERS.thao,

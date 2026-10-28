@@ -66,7 +66,8 @@ function tqKenhRows(){
   const b2b=(X,ch,n,go,src)=>{if(!X)return {k:ch,n,go,mang:ch==="GIA_CONG"?"Gia công":"Phân phối",dt:null,lai:null,src:"đang tải…"};if(!X.has)return {k:ch,n,go,mang:ch==="GIA_CONG"?"Gia công":"Phân phối",dt:0,lai:0,don:0,src:ch==="GIA_CONG"?"không có đơn gia công trong kỳ":"không có đơn trong kỳ"};
     const sp=susp(ch),ex=sp.reduce((a,l)=>a+l.cost,0);
     if(!X.cover)return {k:ch,n,go,mang:ch==="GIA_CONG"?"Gia công":"Phân phối",dt:X.net,gv:null,phi:0,ads:0,lai:null,don:X.orders,src:src+" · chưa có giá vốn nên chưa tính lãi"};
-    return {k:ch,n,go,mang:ch==="GIA_CONG"?"Gia công":"Phân phối",dt:X.net,gv:X.costAll-ex,phi:0,ads:0,lai:X.gross+ex,don:X.orders,src:src+(X.cover<0.95?` · ${(100-X.cover*100).toFixed(1).replace(".",",")}% doanh thu ước tính giá vốn`:"")+(ex?` · đã tạm loại ${tr(ex)} giá vốn dòng giá 0đ nghi nhập sai`:""),susp:sp}};
+    const bo=X.bonus||0,ngv=X.uncovRev>0?X.uncovRev:0;
+    return {k:ch,n,go,mang:ch==="GIA_CONG"?"Gia công":"Phân phối",dt:X.net,gv:X.costAll-ex,ngv,phi:0,ads:0,cpk:bo,khac:bo,lai:X.gross+ex-bo,don:X.orders,src:src+(bo?` · đã trừ ${tr(bo)} thưởng cấp đơn (chi phí kênh)`:"")+(ngv?` · ${tr(ngv)} hàng chưa có giá vốn, không tính lãi phần này`:"")+(ex?` · đã tạm loại ${tr(ex)} giá vốn dòng giá 0đ nghi nhập sai`:""),susp:sp}};
   const ch=(k,n,go)=>({k,n,go,mang:"Bán lẻ",...(R[k]||{dt:null,lai:null,src:"chờ tải báo cáo"})});
   return [ch("tts","TikTok Shop","bc_tiktok"),ch("fb","Facebook","bc_fb"),ch("spe","Shopee","bc_shopee"),b2b(B,"B2B","Kênh phân phối","bc_b2b","đơn đã duyệt · CRM"),b2b(G,"GIA_CONG","Kênh OEM","bc_gc","đơn đã duyệt · CRM")];
 }
@@ -127,11 +128,11 @@ function plRowsFor(from,to){
   try{return tqKenhRows()}finally{PERIOD=sv;B2BR.key=bk.key;B2BR.data=bk.data}}
 const plKey=r=>({tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"})[r.k];
 /* Một kênh → các dòng P&L. Phí sàn và vận chuyển = phần còn lại để các dòng cộng khớp lãi đóng góp. */
-function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,cpk:r.cpk||0,luong:r.luong||0,chia:r.chia||0,lai:r.lai==null?0:r.lai,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ads=r.ads||0,lai=r.lai,cpk=r.cpk||0,luong=r.luong||0,chia=r.chia||0;
-  const lg=gv==null?null:dt-gv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ads-cpk-luong-lai;return {dt,gv,lg,phi,ads,cpk,luong,lai,chia,lsp:lai==null?null:lai-chia,tam:!!r.tam,src:r.src,don:r.don}}
+function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,cpk:r.cpk||0,luong:r.luong||0,chia:r.chia||0,lai:r.lai==null?0:r.lai,ngv:0,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ngv=r.ngv||0,ads=r.ads||0,lai=r.lai,cpk=r.cpk||0,luong=r.luong||0,chia=r.chia||0;
+  const lg=gv==null?null:dt-gv-ngv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ngv-ads-cpk-luong-lai;return {dt,gv,ngv,lg,phi,ads,cpk,luong,lai,chia,lsp:lai==null?null:lai-chia,tam:!!r.tam,src:r.src,don:r.don}}
 function plSum(cols,names){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.reduce((a,c)=>a+(c[k]||0),0);
   const thieuGv=cols.map((c,i)=>c&&c.gv==null?names[i]:null).filter(Boolean);
-  return {dt:s("dt"),gv:s("gv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),cpk:s("cpk"),luong:s("luong"),lai:s("lai"),chia:s("chia"),thieuGv,tam:ok.some(c=>c.tam)}}
+  return {dt:s("dt"),gv:s("gv"),ngv:s("ngv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),cpk:s("cpk"),luong:s("luong"),lai:s("lai"),chia:s("chia"),thieuGv,tam:ok.some(c=>c.tam)}}
 function mtGet(ym){const t=D().targets,x=t&&t.thang&&t.thang[ym];if(!x)return null;const o={};let tong=0,co=false;PLK.forEach(([k])=>{const v=+x[k]||0;o[k]=v||null;if(v){tong+=v;co=true}});o.tong=co?tong:null;return co?o:null}
 function plChung(ym){try{if(typeof spChungTheoThang!=="function")return null;const v=spChungTheoThang(ym);return v!=null&&isFinite(+v)&&+v>0?+v:null}catch(e){return null}}
 function plMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
@@ -147,7 +148,7 @@ function pPLCty(m){
   dhLoad();const ym=PLS.ym||plYmNow(),A=plMonth(ym),P=plMonth(plYmAdd(ym,-1)),KH=mtGet(ym),vn=x=>x.slice(5,7)+"/"+x.slice(0,4);
   const f=v=>v==null?`<span class="hint">—</span>`:`<span class="${v<0?"t-red":""}">${nf(Math.round(v))}</span>`;
   const pct=(a,b)=>a==null||!b?"—":dhPct(a/b);
-  const ROWS=[["dt","Doanh thu thực","tot"],["gv","− Giá vốn",""],["lg","= Lãi gộp","tot"],["phi","− Phí sàn và vận chuyển",""],["ads","− Quảng cáo",""],["cpk","− Chi phí trực tiếp kênh (Sổ chi phí)",""],["luong","− Lương làm riêng cho kênh",""],["lai","= Lãi đóng góp","tot"],["chia","− Chi phí chung được chia (Quy tắc phân bổ)",""],["lsp","= Lãi sau phân bổ","tot"],["chung","− Chi phí chung chưa chia cho kênh",""],["sx","− Chi phí Sản xuất (Sổ chi phí)",""],["ln","= Lợi nhuận hoạt động","tot big"]];
+  const ROWS=[["dt","Doanh thu thực","tot"],["gv","− Giá vốn",""]].concat(A.tot&&A.tot.ngv?[["ngv","− Hàng chưa có giá vốn (không tính lãi)",""]]:[]).concat([["lg","= Lãi gộp","tot"],["phi","− Phí sàn và vận chuyển",""],["ads","− Quảng cáo",""],["cpk","− Chi phí trực tiếp kênh (thưởng cấp đơn, Sổ chi phí)",""],["luong","− Lương làm riêng cho kênh",""],["lai","= Lãi đóng góp","tot"],["chia","− Chi phí chung được chia (Quy tắc phân bổ)",""],["lsp","= Lãi sau phân bổ","tot"],["chung","− Chi phí chung chưa chia cho kênh",""],["sx","− Chi phí Sản xuất (Sổ chi phí)",""],["ln","= Lợi nhuận hoạt động","tot big"]]);
   const cell=(c,k)=>{if(!c)return `<td class="n hint">chờ số</td>`;if(k==="chung"||k==="sx"||k==="ln")return `<td class="n hint"></td>`;return `<td class="n">${f(c[k])}</td>`};
   const cty=(X,k)=>{if(!X.tot)return `<td class="n hint">—</td>`;if(k==="sx")return `<td class="n">${f(X.sx||0)}</td>`;if(k==="chung")return X.tot.chung==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n">${f(X.tot.chung)}</td>`;if(k==="ln")return X.ln==null?`<td class="n"><span class="pill p-gry">chưa có số</span></td>`:`<td class="n"><b>${f(X.ln)}</b></td>`;return `<td class="n"><b>${f(X.tot[k])}</b></td>`};
   const kh=k=>k==="dt"&&KH?`<td class="n">${f(KH.tong)}<br><small class="hint">đạt ${pct(A.tot&&A.tot.dt,KH.tong)}</small></td>`:`<td class="n hint">${k==="dt"?"chưa đặt":""}</td>`;

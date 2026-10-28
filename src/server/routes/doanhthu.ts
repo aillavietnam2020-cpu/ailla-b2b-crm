@@ -127,7 +127,7 @@ doanhthuRoutes.get('/b2b-orders', async (c) => {
   if (!isYm(ym) || (ch !== 'B2B' && ch !== 'GIA_CONG')) throw badRequest('BAD_RANGE', 'Tháng hoặc kênh không hợp lệ');
   const r = await c.env.DB.prepare(
     `SELECT o.order_no, o.order_date, c.name AS customer,
-            (o.subtotal - o.discount_amount - o.bonus_deduction) AS revenue
+            (o.subtotal - o.discount_amount) AS revenue, o.bonus_deduction AS bonus
      FROM orders o JOIN customers c ON c.id = o.customer_id
      WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED' AND substr(o.order_date, 1, 7) = ?
        AND (CASE WHEN c.price_mode = 'CUSTOM' AND c.tier_id IS NULL THEN 'GIA_CONG' ELSE 'B2B' END) = ?
