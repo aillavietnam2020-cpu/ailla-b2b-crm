@@ -49,6 +49,14 @@ Trong thư mục skill này:
 4. **Xoá thư mục file** sau khi nạp xong (file đơn có tên, số điện thoại, địa chỉ khách): `rm -rf /root/bao-cao-san/<YYYY-MM>`.
 5. Nhắn chị Thảo 2–3 dòng: tháng nào, số đến ngày nào (hoặc "đủ tháng, chờ khoá sổ"), doanh thu thực, lãi kênh.
 
+## Shopee (2 shop: aillavn1 thường, aillavn Mall) — cùng lịch, cùng lượt chạy (chị Hoa giao 28/10)
+Cùng khoảng ngày như TikTok. Mỗi shop 3 file, chuyển shop ở góc trên phải Kênh Người bán (không đăng xuất):
+- **Đơn hàng**: `https://banhang.shopee.vn/portal/sale/order` → lọc *Ngày đặt hàng* → **Xuất** → đợi ở *Báo cáo gần nhất* → gài bẫy → **Tải về**.
+- **Quảng cáo**: `https://banhang.shopee.vn/portal/marketing/pas/wallet?tab=ads_credit_bill_label` → *Lịch sử giao dịch* → ô *Ngày giao dịch* chọn 2 ngày → gài bẫy → **Tải dữ liệu**. File này là blob trong trang (không có link): lấy bằng file CSV cuối cùng trong `window.__blobs`.
+- **Tài chính › Doanh thu**: `https://banhang.shopee.vn/portal/finance/income` → *Đã thanh toán* → chọn khoảng ngày → **Xuất** → **Tải về**. Shopee **bắt nhập lại mật khẩu** ở trang này: **dừng, nhắn chị Hoa tự nhập**, không tự nhập mật khẩu.
+Tên file: `/root/bao-cao-san/<YYYY-MM>/spe/01_DonHang_<shop>_…xlsx`, `02_DoanhThu_<shop>_…xlsx`, `03_QuangCao_<shop>_…csv`.
+Nạp: `node nap-shopee.mjs --as ke-toan-truong-ailla /root/bao-cao-san/<YYYY-MM>/spe/* --thu` → đọc số từng shop → chạy lại không `--thu`. Công cụ tự ghép file theo shop. Web chặn bản cũ hơn / bản giữa tháng đè bản đủ tháng giống TikTok.
+
 ## Chống trùng số (web đã chặn, agent không cần cộng dồn)
 - Mỗi tháng TikTok **chỉ có một bản** trên web. Nạp lại thì **bản mới thay bản cũ**, không cộng thêm.
 - Web từ chối: tháng đã khoá sổ; tháng đã có bản đủ tháng mà mình nạp bản giữa tháng; bản mới có số đến ngày **cũ hơn** bản đang có. Gặp từ chối thì báo chị Thảo, **không tìm cách khác**.

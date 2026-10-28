@@ -78,5 +78,32 @@ describe('Agent nạp báo cáo TikTok', () => {
 
   it('công cụ của agent dùng đúng công thức của trang Tải file tháng', () => {
     expect(readFileSync('vps-skill/nap-bao-cao-tiktok/ttcalc.js', 'utf8')).toBe(readFileSync('hub/src/ttcalc.js', 'utf8'));
+    for (const f of ['specalc.js', 'spebom.js'])
+      expect(readFileSync(`vps-skill/nap-bao-cao-tiktok/${f}`, 'utf8')).toBe(readFileSync(`hub/src/${f}`, 'utf8'));
+  });
+});
+
+describe('Agent nạp báo cáo Shopee', () => {
+  const spe = (ky: string, shop: string, den: string | null, dt = 100) => ({
+    data: { rows: [] },
+    summary: { ky, shop, den, dt, days: { [`${ky}-01`]: [dt, -10, 30, 60, 1, 5], 'x': [1] } },
+    files: { orders: 'a.xlsx' },
+  });
+  it('cần phạm vi Báo cáo sàn; ghi đúng bảng spe_month, chặn bản cũ hơn và bản giữa tháng đè bản đủ tháng', async () => {
+    const no = await makeAgent('Không quyền', ['orders']);
+    expect((await agentCall(no.token, '/api/agent/shopee/months')).status).toBe(403);
+    const a = await makeAgent('Kế toán trưởng Shopee', ['baocao_san']);
+    expect((await agentCall(a.token, '/api/agent/shopee/inputs?ky=2026-10')).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', '2026-10-25'))).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', '2026-10-20'))).status).toBe(409);
+    expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn', '2026-10-25'))).status).toBe(400);
+    expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', null, 300))).status).toBe(200);
+    expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', '2026-10-30'))).status).toBe(409);
+    const ms = await agentCall(a.token, '/api/agent/shopee/months');
+    expect(ms.body.data).toEqual([expect.objectContaining({ ky: '2026-10', shop: 'aillavn1', den: null, dt: 300 })]);
+    const web = await ctx.request('/api/hub/shopee/months', { as: USERS.ceo });
+    expect(web.body.data[0].summary.days).toEqual({ '2026-10-01': [300, -10, 30, 60, 1, 5] });
+    const log = await ctx.db.prepare("SELECT actor_type, source FROM audit_logs WHERE action = 'SPE_MONTH_SAVE'").all<any>();
+    expect(log.results[0]).toMatchObject({ actor_type: 'AGENT', source: 'agent-shopee' });
   });
 });

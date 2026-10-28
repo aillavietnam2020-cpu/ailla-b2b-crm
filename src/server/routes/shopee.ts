@@ -32,7 +32,7 @@ interface Summary {
 }
 
 /** Số theo ngày chỉ nhận ngày trong tháng và 6 con số, để không ai cất chữ tuỳ ý vào chỗ các trang đọc. */
-function cleanDays(v: unknown, ky: string): Record<string, number[]> {
+export function cleanDays(v: unknown, ky: string): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
   for (const [d, x] of Object.entries(v as Record<string, unknown>)) {
