@@ -12,18 +12,18 @@
 const SC_FN=[["mkt","Marketing",["G01","G02","G03","G11"]],["ban","Bán hàng và chi phí kênh",["G04","G06","G12","G19"]],["kho","Kho và giao hàng",["G05","G09","G10"]],["sx","Sản xuất",["G15","G16","G17"]],["lg","Lương, thưởng, bảo hiểm",["G07","G08"]],["ql","Quản lý chung",["G13","G14","G18","G21","G24"]],["tc","Tài chính, thuế và khác",["G22"]],["cho","Chờ xác minh",["G20","G23"]]];
 const scFnOf=g=>{const d=scG(g);if(d.fn&&SC_FN.some(x=>x[0]===d.fn))return d.fn;const f=SC_FN.find(x=>x[2].includes(g));return f?f[0]:"ql"};
 const scFnTen=k=>(SC_FN.find(x=>x[0]===k)||[k,k])[1];
-const scFnRow=x=>x.ext&&x.ext.src==="ncc"?"Mua hàng":scFnTen(scFnOf(x.g));
+const scFnRow=x=>x.ext&&x.ext.src==="ncc"?"Chi phí NVL":scFnTen(scFnOf(x.g));
 const scLaCoc=x=>!!(x.ext&&x.ext.src==="ncc"&&/^cọc/i.test(String(x.dg||"")));
 /* Cách xử lý của một dòng (Nhật ký chi, Phân bổ). */
 function scXL(x,qt){
-  if(x.ext&&x.ext.src==="ncc")return scLaCoc(x)?"Chặn":"Vào giá vốn";
+  if(x.ext&&x.ext.src==="ncc")return scLaCoc(x)?"Chặn":"Vào giá thành theo định mức";
   if(x.st==="Chờ duyệt"||x.st==="Chờ CEO duyệt")return "Chờ duyệt";
   if(x.k==="Không tính")return "Chặn";
   if(x.k==="Chờ xác định"||x.st==="Cần rà")return "Chờ";
   if(x.k==="Sản xuất")return "Vào giá thành";
   if(x.k==="Chung"){const r=scQTof(qt||scQT(PERIOD.from.slice(0,7)).qt,x.g);return !r||r.cach==="giu"||!scLaChung(x.g)?"Không chia":"Phân bổ"}
   return SC_KENH.includes(x.k)?"Ghi thẳng":"Chờ"}
-const SC_XLC={"Ghi thẳng":"p-ok","Phân bổ":"p-a","Không chia":"p-c","Vào giá thành":"p-c","Vào giá vốn":"p-c","Chờ":"p-ra","Chờ duyệt":"p-a","Chặn":"p-do"};
+const SC_XLC={"Ghi thẳng":"p-ok","Phân bổ":"p-a","Không chia":"p-c","Vào giá thành":"p-c","Vào giá thành theo định mức":"p-c","Chờ":"p-ra","Chờ duyệt":"p-a","Chặn":"p-do"};
 const scXLP=t=>`<span class="scp ${SC_XLC[t]||"p-c"}">${esc(t)}</span>`;
 const scKpi=(l,v,h,cls)=>`<div class="sckpi${cls?" "+cls:""}"><div class="l">${l}</div><div class="v${v==null?" na":""}">${v==null?"chưa có số":v}</div><div class="h">${h||""}</div></div>`;
 const SC_CS='<span class="scna">chưa có số</span>';
