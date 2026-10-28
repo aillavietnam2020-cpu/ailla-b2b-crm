@@ -252,7 +252,7 @@ function scHDTTHtml(ym,full,rows){
    <tr class="tot"><td>Phải trả theo hợp đồng</td><td class="n">${scNf(r.tong)}</td></tr>
    <tr><td>Đã ghi sổ tháng này (nhóm G06)</td><td class="n">${so?scNf(so):'<span class="scna">chưa có</span>'}</td></tr>
    ${so?`<tr><td>Chênh lệch sổ − hợp đồng</td><td class="n"><b class="${Math.abs(lech)<1?"":"scup"}">${Math.abs(lech)<1?"khớp":scNf(lech)}</b></td></tr>`:""}</tbody></table></div>
-   <p class="hint">Chênh lệch có thể do sổ ghi theo ngày trả tiền (trả tháng sau cho tháng trước). Số trên chỉ để đối chiếu, chưa cộng vào chi phí.</p></div>`}
+   ${ym<="2026-09"&&so&&Math.abs(lech)>=1?`<div class="note" style="margin-top:8px">Tháng 9 chi phí ghi nhận theo sổ (${scNf(so)} đ): chị Huệ tính thưởng trên doanh thu chốt đến ngày cuối tháng, còn web dùng doanh thu đối soát chốt hết ngày 9 tháng sau, nên lệch. Từ tháng 10 hai bên cùng chốt hết ngày 9 tháng sau, số sổ và số hợp đồng phải khớp.</div>`:`<p class="hint">Chi phí ghi nhận theo sổ; số hợp đồng để đối chiếu. Doanh thu tính thưởng là doanh thu đối soát chốt hết ngày 9 tháng sau (cùng kỳ với chị Huệ từ tháng 10).</p>`}</div>`}
 /* Tách một dòng sổ thành hai phần (chị Hoa 28/10): ví dụ dòng phân bổ TK 242 có phí cố định vận hành TikTok 12,5 triệu.
    Phần tách giữ ngày, số chứng từ, tài khoản; đánh dấu để đối chiếu MISA vẫn cộng lại đúng số gốc. */
 function scTach(x){
