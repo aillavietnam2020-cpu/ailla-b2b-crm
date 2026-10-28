@@ -36,23 +36,25 @@ function scCanhBao(rows,PV){
   const W=[],qm=scQcMax(),{DT}=scDtThang(),A=scAgg(rows),TH=scThieu();
   SC_KENH.forEach(k=>{const qc=["G01","G02","G03"].reduce((s,g)=>s+((A[k]||{})[g]||0),0),dt=DT[k];
     if(dt&&qc&&qc/dt>qm)W.push({m:"do",fn:"mkt",k,t:`${SC_TEN(k)}: quảng cáo bằng ${scPc(qc,dt)} doanh thu thực, vượt ngưỡng ${scPc(qm,1)}.`,d:`Giảm ngân sách nhóm chiến dịch lỗ; về ngưỡng thì quảng cáo khoảng ${scNf(dt*qm)} đ (đang ${scNf(qc)} đ).`})});
-  if(PV){const by=L=>{const o={};L.forEach(x=>{const f=scFnOf(x.g);o[f]=(o[f]||0)+(+x.t||0)});return o},a=by(rows),b=by(PV.rows);
+  if(PV&&!PV.chuaSo){const by=L=>{const o={};L.forEach(x=>{const f=scFnOf(x.g);o[f]=(o[f]||0)+(+x.t||0)});return o},a=by(rows),b=by(PV.rows);
     SC_FN.forEach(([f,n])=>{const t=a[f]||0,p=b[f]||0;if(p&&t>p*1.2&&t-p>5e6)W.push({m:"vang",fn:f,t:`${n} tăng ${scPc(t-p,p)} so ${PV.nhan} (+${scNf(t-p)} đ).`,d:"Mở tab Theo chức năng để xem nhóm nào làm tăng."})})}
   const cho=rows.filter(x=>scLoaiTQ(x)==="cho"),cxd=cho.filter(x=>x.k==="Chờ xác định");
   if(cho.length)W.push({m:"do",fn:"cho",t:`${scNf(scS(cho))} đ chưa đủ căn cứ (${cho.length} khoản): không được đem phân bổ.`,d:"Xử lý ở tab Chờ xử lý trước khi chốt tháng."});
   if(cxd.length)W.push({m:"vang",fn:"kho",t:`${scNf(scS(cxd))} đ chưa biết bổ cho kênh nào.`,d:`Chọn "Bổ vào" ở Nhật ký chi để ghi thẳng cho kênh.`});
   TH.forEach(x=>W.push({m:"thieu",fn:x.g==="G07"?"lg":"mkt",t:x.why,d:""}));
   const o={do:0,vang:1,thieu:2};return W.sort((a,b)=>o[a.m]-o[b.m])}
+/* Kỳ trước chưa nạp sổ (chỉ có khoản tự cộng) mà kỳ này đã có sổ thì không so tổng, tránh báo tăng ảo. */
+const scPrevSo=rows=>{const P=scPrev();if(P&&rows.some(x=>!x.ext)&&!P.rows.some(x=>!x.ext))P.chuaSo=true;return P};
 const SC_MW={do:["p-do","Vượt ngưỡng"],vang:["p-ra","Cần xem"],thieu:["p-c","Thiếu số"]};
 const scWHtml=W=>W.length?W.map(x=>`<div class="scw"><span class="scp ${SC_MW[x.m][0]}">${x.m==="do"&&x.fn==="cho"?"Phải xử lý":SC_MW[x.m][1]}</span><div><div>${esc(x.t)}</div>${x.d?`<div class="hint">→ ${esc(x.d)}</div>`:""}</div></div>`).join(""):'<p class="hint">Không có gì bất thường trong kỳ này.</p>';
 /* ---------- 1. Tổng quan ---------- */
 function scTQ2(){
   scNap();
   const rows=scPBRows();if(!rows.length&&!scThieu().length)return scEmpty();
-  const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,T=scS(rows),PV=scPrev(),CH=scChiaPB(rows),by={kenh:0,chung:0,cho:0,sx:0};
+  const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,T=scS(rows),PV=scPrevSo(rows),CH=scChiaPB(rows),by={kenh:0,chung:0,cho:0,sx:0};
   rows.forEach(x=>by[scLoaiTQ(x)]+=+x.t||0);
   const da=Object.values(CH.kenh).reduce((a,o)=>a+scSum(o),0),con=CH.con.reduce((a,x)=>a+x.t,0);
-  const bud=one?scSum(((scFin().budgets||{})[ym])||{}):0,pT=PV?scS(PV.rows):null;
+  const bud=one?scSum(((scFin().budgets||{})[ym])||{}):0,pT=PV&&!PV.chuaSo?scS(PV.rows):null;
   const kp=`<div class="sck4">
    ${scKpi("Tổng chi phí trong sổ",scNf(T),"Nợ TK 642 và khoản tự cộng · chưa phải tiền đã chi")}
    ${scKpi("Chi phí phân bổ theo kênh",scNf(by.kenh),scPc(by.kenh,T)+" · ghi thẳng, không chia lại")}
@@ -61,7 +63,7 @@ function scTQ2(){
    ${scKpi("Đã phân bổ",one&&da?scNf(da):null,CH.chot?"đã chốt bản "+CH.chot.v:one?"chưa chốt, theo quy tắc hiện tại":"chọn một tháng")}
    ${scKpi("Còn chưa phân bổ",scNf(con),CH.loi.length?"chưa chia được: "+esc(CH.loi[0]):"để ở chi chung công ty")}
    ${scKpi("So với ngân sách",bud?scPc(T,bud):null,bud?"ngân sách "+scNf(bud):"chưa đặt ngân sách tháng này")}
-   ${scKpi("So với kỳ trước",pT?scDl(T,pT):null,PV?(pT?scNf(pT)+" · "+scKyNhan(PV):scKyNhan(PV)+" chưa có số"):"chọn một tháng")}</div>`;
+   ${scKpi("So với kỳ trước",pT?scDl(T,pT):null,PV?(pT?scNf(pT)+" · "+scKyNhan(PV):"sổ "+scKyNhan(PV)+" chưa nạp"):"chọn một tháng")}</div>`;
   const F=SC_FN.map(([f,n])=>[f,n,scS(rows.filter(x=>scFnOf(x.g)===f))]).filter(x=>x[2]),mx=Math.max(1,...F.map(x=>x[2]));
   const cn=`<div class="scch"><div class="scchh"><b>Chi phí theo chức năng</b><span class="hint">bấm để xem các khoản</span></div>${F.map(([f,n,v])=>`<div class="scsb" data-fn="${f}"><span class="n">${esc(n)}</span><span class="b"><i style="width:${v/mx*100}%;background:${f==="cho"?"#b8c7dd":"#2a78d6"}"></i></span><span class="v"><b>${scNf(v)}</b> <span class="hint">${scPc(v,T)}</span></span></div>`).join("")||'<p class="hint">Chưa có khoản chi.</p>'}</div>`;
   const wb=`<div class="scch"><div class="scchh"><b>Đánh giá &amp; cảnh báo</b></div>${scWHtml(scCanhBao(rows,PV))}</div>`;
@@ -72,7 +74,7 @@ const SC_FND={mkt:"Đối chiếu tiền nạp quảng cáo với tiền chạy 
 function scCN(){
   scNap();
   const rows=scPBRows();if(!rows.length)return scEmpty();
-  const T=scS(rows),PV=scPrev(),W=scCanhBao(rows,PV),open=SC.cnOpen||(SC.cnOpen={}),pr=PV?PV.rows:null;
+  const T=scS(rows),PV=scPrevSo(rows),W=scCanhBao(rows,PV),open=SC.cnOpen||(SC.cnOpen={}),pr=PV&&!PV.chuaSo?PV.rows:null;
   const sumF=(L,f)=>scS(L.filter(x=>scFnOf(x.g)===f)),sumG=(L,g)=>scS(L.filter(x=>x.g===g));
   const st=f=>{const L=W.filter(x=>x.fn===f);return L.some(x=>x.m==="do")?`<span class="scp p-do">${f==="cho"?"Phải xử lý":"Vượt ngưỡng"}</span>`:L.some(x=>x.m==="vang")?'<span class="scp p-ra">Cần xem</span>':L.length?'<span class="scp p-c">Thiếu số</span>':'<span class="scp p-ok">Ổn</span>'};
   const body=SC_FN.map(([f,n])=>{const v=sumF(rows,f),p=pr?sumF(pr,f):null;if(!v&&!p)return "";
