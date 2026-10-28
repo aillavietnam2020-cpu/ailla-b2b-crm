@@ -1,6 +1,6 @@
 ---
 name: nap-bao-cao-tiktok
-description: Kéo báo cáo kế toán TikTok Shop (đơn hàng, quyết toán income, quảng cáo GMV Max) THẲNG VỀ VPS (không lưu xuống máy chị Hoa) và nạp số lãi lỗ tháng lên web ABOS. Sáng thứ Hai hằng tuần + 7h sáng ngày 10 chốt sổ. CHỈ agent Kế toán trưởng dùng.
+description: Kéo báo cáo TikTok Shop (đơn hàng, quyết toán income, quảng cáo GMV Max, file team) và Shopee 2 shop (đơn, Doanh thu, quảng cáo) THẲNG VỀ VPS (không lưu xuống máy chị Hoa) và nạp số lãi lỗ tháng lên web ABOS. Sáng thứ Hai hằng tuần + 7h sáng ngày 10 chốt sổ. CHỈ agent Kế toán trưởng dùng.
 ---
 
 # nap-bao-cao-tiktok — kéo báo cáo TikTok Shop và nạp lên web ABOS
@@ -50,10 +50,18 @@ Trong thư mục skill này:
 5. Nhắn chị Thảo 2–3 dòng: tháng nào, số đến ngày nào (hoặc "đủ tháng, chờ khoá sổ"), doanh thu thực, lãi kênh.
 
 ## Shopee (2 shop: aillavn1 thường, aillavn Mall) — cùng lịch, cùng lượt chạy (chị Hoa giao 28/10)
-Cùng khoảng ngày như TikTok. Mỗi shop 3 file, chuyển shop ở góc trên phải Kênh Người bán (không đăng xuất):
-- **Đơn hàng**: `https://banhang.shopee.vn/portal/sale/order` → lọc *Ngày đặt hàng* → **Xuất** → đợi ở *Báo cáo gần nhất* → gài bẫy → **Tải về**.
-- **Quảng cáo**: `https://banhang.shopee.vn/portal/marketing/pas/wallet?tab=ads_credit_bill_label` → *Lịch sử giao dịch* → ô *Ngày giao dịch* chọn 2 ngày → gài bẫy → **Tải dữ liệu**. File này là blob trong trang (không có link): lấy bằng file CSV cuối cùng trong `window.__blobs`.
-- **Tài chính › Doanh thu**: `https://banhang.shopee.vn/portal/finance/income` → *Đã thanh toán* → chọn khoảng ngày → **Xuất** → **Tải về**. Shopee **bắt nhập lại mật khẩu** ở trang này: **dừng, nhắn chị Hoa tự nhập**, không tự nhập mật khẩu.
+Làm SAU TikTok, cùng khoảng ngày (đơn + quảng cáo: 01 → ngày cuối; Doanh thu (Tài chính): 01 → ngày cuối, ngày chốt sổ thì tới hết ngày 09 tháng này).
+**Shopee tạo file ngay trong trình duyệt (blob), nên dùng bộ gài bẫy riêng:** `bash bat-tai-blob.sh <tab>` trước mỗi lần bấm tải, rồi `bash lay-blob.sh <tab> <file>`. Không dùng bat-tai.sh / lay-file.sh của TikTok cho Shopee.
+Thứ tự: shop **aillavn1** trước, rồi **aillavn (Mall)**. Chuyển shop: `https://banhang.shopee.vn/portal/shop` → bấm **Chi tiết** ở dòng shop cần (không đăng xuất).
+Mỗi shop 3 file:
+- **Đơn hàng**: `https://banhang.shopee.vn/portal/sale/order` → **Xuất** → chọn 2 ngày → **Xuất** → đợi ô *Báo cáo gần nhất* hết "Đang được xử lý" (1–2 phút) → gài bẫy → **Tải về**.
+- **Quảng cáo**: `https://banhang.shopee.vn/portal/marketing/pas/wallet?tab=ads_credit_bill_label` → ô *Ngày giao dịch* chọn 2 ngày → gài bẫy → **Tải dữ liệu** (ra file CSV).
+- **Doanh thu**: `https://banhang.shopee.vn/portal/finance/income?type=2&dateRange=<YYYYMMDD từ><YYYYMMDD đến>` (vd `dateRange=2026100120261025`) → **Xuất** → đợi *Báo cáo gần nhất* xong → gài bẫy → **Tải về** (file .zip, lay-blob.sh tự giải nén lấy file Income).
+
+**Shopee đòi nhập mật khẩu ở trang Doanh thu (mỗi shop một lần)** — hộp "Để đảm bảo tài khoản của bạn luôn an toàn, vui lòng nhập mật khẩu":
+1. **Không tự nhập mật khẩu, không bấm Hủy.** Chạy: `bash nhan-chi.sh "Chị ơi, em đang kéo báo cáo Shopee shop <shop>. Shopee đòi mật khẩu ở trang Tài chính trên Chrome máy chị (tab Kênh Người bán). Chị nhập giúp em nhé, xong em tự làm tiếp."` (tin đi Telegram và hiện trong khung chat Kế toán trưởng trên web).
+2. Mỗi 1 phút kiểm lại bằng `snapshot` tab đó; hộp mật khẩu biến mất thì làm tiếp.
+3. Chờ tối đa **30 phút**. Quá 30 phút: vẫn nạp TikTok bình thường, bỏ Doanh thu shop đó (KHÔNG nạp shop đó vì thiếu file), giữ file đơn + quảng cáo trong thư mục, nhắn `nhan-chi.sh "Chưa nhập mật khẩu Shopee nên em chưa nạp shop <shop>. Chị nhập xong nhắn em kéo lại."` và ghi vào báo cáo cuối.
 Tên file: `/root/bao-cao-san/<YYYY-MM>/spe/01_DonHang_<shop>_…xlsx`, `02_DoanhThu_<shop>_…xlsx`, `03_QuangCao_<shop>_…csv`.
 Nạp: `node nap-shopee.mjs --as ke-toan-truong-ailla /root/bao-cao-san/<YYYY-MM>/spe/* --thu` → đọc số từng shop → chạy lại không `--thu`. Công cụ tự ghép file theo shop. Web chặn bản cũ hơn / bản giữa tháng đè bản đủ tháng giống TikTok.
 
