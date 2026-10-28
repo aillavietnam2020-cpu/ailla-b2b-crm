@@ -67,13 +67,15 @@ describe('Chia chi phí và ghi sổ tháng', () => {
     const r = C.tsChiaPct(1000001, [{ o: 'sx', p: 70 }, { o: 'ql', p: 30 }]);
     expect(r.reduce((t: number, x: { v: number }) => t + x.v, 0)).toBe(1000001);
   });
-  it('dòng tháng: TSCĐ có TK 2141 nhóm G25, CCDC có TK 242 nhóm G14; chưa đủ 100% thì báo lỗi', () => {
+  it('dòng tháng: xưởng vào G25 (154.1) / G26 (154.2), TSCĐ ngoài xưởng G27, CCDC ngoài xưởng G14; chưa đủ 100% thì báo lỗi', () => {
     const cc = { id: 'c2', kind: 'CC', ma: 'THUE', ten: 'Thuê xưởng', s: '2026-07-01', gk: 54000000, n: 6, bp: [{ o: 'sx', p: 70 }, { o: 'ql', p: 30 }] };
     const sai = { ...bon, id: 'x', ma: 'SAI', bp: [{ o: 'sx', p: 50 }] };
     const r = C.tsDongThang([bon, cc, sai], '2026-10');
     expect(r.loi.length).toBe(1);
     const ts = r.dong.find((x: { ma: string }) => x.ma === 'BONKHUAY');
-    expect([ts.tkc, ts.g, ts.k, ts.tkn]).toEqual(['2141', 'G25', 'Sản xuất', '154']);
+    expect([ts.tkc, ts.g, ts.k, ts.tkn]).toEqual(['2141', 'G25', 'Sản xuất', '154.1']);
+    const vp = C.tsDongThang([{ ...bon, bp: [{ o: 'sx2', p: 50 }, { o: 'ql', p: 50 }] }], '2026-10').dong;
+    expect(vp.map((x: { g: string; tkn: string }) => x.g + ' ' + x.tkn)).toEqual(['G26 154.2', 'G27 6422']);
     const ql = r.dong.find((x: { o: string }) => x.o === 'ql');
     expect([ql.tkc, ql.g, ql.k, ql.tkn, ql.t]).toEqual(['242', 'G14', 'Chung', '6422', 2700000]);
   });
@@ -99,7 +101,7 @@ describe('Nạp file MISA', () => {
     ];
     const r = C.tsDocBang(rows, 'CC', '2026-11');
     expect(r.items.map((a: { ma: string; n: number; gk: number; bp: { o: string }[] }) => [a.ma, a.n, a.gk, a.bp[0].o])).toEqual([
-      ['MAYBOMNUOC', 30, 9750000, 'sx'],
+      ['MAYBOMNUOC', 30, 9750000, 'sx2'],
       ['Tem CHG', 4, 13687380, 'bh'],
     ]);
     const b = C.tsDienDauKy(r.items[0]);
@@ -124,7 +126,7 @@ describe('Nạp file MISA', () => {
     const r = C.tsDocBang(rows, 'TS', '2026-11');
     expect(r.items.length).toBe(1);
     const a = r.items[0];
-    expect([a.ma, a.d, a.ng, a.n, a.bp[0].o]).toEqual(['BONKHUAY', '2024-12-01', 55000000, 60, 'sx']);
+    expect([a.ma, a.d, a.ng, a.n, a.bp[0].o]).toEqual(['BONKHUAY', '2024-12-01', 55000000, 60, 'sx2']); // MISA phân bổ TSCĐ xưởng vào 1542
     expect(a.misa.lk).toBe(21083341); // số MISA chỉ để đối chiếu
     expect(a.dk.lich).toBe(true); // có số tháng + ngày bắt đầu: web tự tính theo lịch gốc
     const d = C.tsDienDauKy(a);

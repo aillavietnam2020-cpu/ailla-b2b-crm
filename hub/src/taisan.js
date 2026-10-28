@@ -7,7 +7,7 @@
      fin.ts.run  {tháng: {at,by,t,n}} các tháng đã ghi vào Sổ chi phí
      fin.ts.sl   {tháng: lít} sản lượng bán thành phẩm nhập tay (không có thì lấy từ phiếu pha chế ở kho)
    Ghi sổ tháng: mỗi tài sản × bộ phận chịu thành một dòng fin.nkc {src:"ts", ct:"TS-yyyy-mm"}; ghi lại thì xóa dòng cũ của tháng đó.
-   Nhóm: TSCĐ G25 (mới), CCDC G14 (có sẵn); phiếu chi mua tài sản G26 "Không tính" nên không vào P&L.
+   Nhóm: phần xưởng G25 (154.1) / G26 (154.2) của Sổ chi phí; còn lại TSCĐ G27 (mới), CCDC G14; phiếu chi mua tài sản G28 "Không tính" nên không vào P&L.
    ===================================================================== */
 const TSV={tab:{ts_so:"so",ts_cc:"so"},ym:{},kh:"bang",nap:null,sl:{},gg:{},dc:{}};
 /* Nhớ tab đang mở qua lần tải lại trang (chị Hoa 28/10: bấm tab xong trang tải lại là nhảy về tab đầu). */
@@ -25,9 +25,17 @@ const tsCanXem=()=>scSecret(),tsCanGhi=()=>scCanDuyet();
 const tsTen=kind=>kind==="TS"?"tài sản":"công cụ";
 /* Dòng nạp đầu kỳ đủ số: có tên, giá trị, chia đủ 100%, còn tháng để tính hoặc đã hết giá trị. */
 const tsNapOk=a=>!!a.ten&&a.gk>0&&tsBpOk(a.bp)&&(+a.dk.con>0||+a.dk.lk>=a.gk);
-/* Danh mục chi phí đã lưu riêng (fin.cpdm) thì thêm hai nhóm mới G25, G26 nếu thiếu. */
+/* Danh mục chi phí đã lưu riêng (fin.cpdm) thì thêm hai nhóm mới G27, G28 nếu thiếu. */
 function tsDmEnsure(dt){const L=dt.fin.cpdm;if(L&&L.length)TS_DM_MOI.forEach(x=>{if(!L.some(y=>y.g===x.g))L.push({...x})})}
-function tsMut(msg,fn){DB.mutate(ME.name,msg,dt=>{dt.fin=dt.fin||{};const T=dt.fin.ts=dt.fin.ts||{};T.a=T.a||[];T.run=T.run||{};tsDmEnsure(dt);fn(T,dt)})}
+/* Bản dữ liệu 2 (28/10 tối): Sổ chi phí lấy G25 / G26 cho 154.1 / 154.2, nên nhóm của trang này đổi G25 → G27 (khấu hao), G26 → G28 (mua tài sản);
+   tài sản nạp từ MISA đang "Sản xuất" đổi sang 154.2 (MISA phân bổ vào TK 1542). Chạy một lần, không đụng số tiền. */
+function tsDoiMa(dt){const T=dt.fin.ts;if(!T||(T.v||0)>=2)return;
+  const L=dt.fin.cpdm;if(L&&L.length)dt.fin.cpdm=L.filter(x=>!(x.g==="G25"&&/^Khấu hao tài sản/.test(x.n||"")||x.g==="G26"&&/^Mua tài sản/.test(x.n||"")));
+  (dt.fin.nkc||[]).forEach(x=>{if(x.src==="ts"&&x.g==="G25"&&x.k!=="Sản xuất")x.g="G27";if(x.tsid&&x.src!=="ts"&&x.g==="G26")x.g="G28"});
+  const sx2=bp=>(bp||[]).forEach(b=>{if(b.o==="sx")b.o="sx2"});(T.a||[]).forEach(a=>{if(a.src==="misa"){sx2(a.bp);(a.dc||[]).forEach(v=>sx2(v.bp))}});T.v=2}
+function tsMut(msg,fn){DB.mutate(ME.name,msg,dt=>{dt.fin=dt.fin||{};const T=dt.fin.ts=dt.fin.ts||{};T.a=T.a||[];T.run=T.run||{};tsDoiMa(dt);tsDmEnsure(dt);fn(T,dt)})}
+/* Dữ liệu cũ thì chuyển ngay khi kế toán / CEO mở trang (một lần). */
+function tsCanDoi(){if(!tsCanGhi()||!tsAll().length||(tsFin().v||0)>=2||TSV.doi)return;TSV.doi=1;setTimeout(()=>tsMut("đổi mã nhóm tài sản sang G27 / G28, sản xuất 154.2",()=>{}),0)}
 const tsBpTxt=bp=>(bp||[]).map(x=>`${esc((TS_DT[x.o]||[x.o])[0])} ${x.p}%`).join("<br>")||`<span class="hint">chưa chia</span>`;
 const tsSc=(c,t)=>`<span class="scp ${c}">${t}</span>`;
 const TS_TT={DUNG:["p-ok","Đang dùng"],HET:["p-c","Đã hết"],GIAM:["p-ra","Đã ghi giảm"],CHUA:["p-a","Chưa bắt đầu"],KKH:["p-c","Không khấu hao"]};
@@ -47,7 +55,7 @@ const tsBpRead=root=>[...root.querySelectorAll("[data-bpbody] tr")].map(r=>({o:r
 
 /* ---------- Sổ tài sản / Sổ công cụ ---------- */
 function pTsSo(m,kind){
-  tsCss();const pg=kind==="TS"?"ts_so":"ts_cc";
+  tsCss();tsCanDoi();const pg=kind==="TS"?"ts_so":"ts_cc";
   if(!tsCanXem()){m.innerHTML=H(kind==="TS"?"Tài sản cố định":"Công cụ dụng cụ")+`<p class="hint">Chỉ CEO và kế toán xem được trang này.</p>`;return}
   const ghi=tsCanGhi(),tab=TSV.tab[pg]||"so",ym=TSV.ym[pg]||tsThangNay(),L=tsDs(kind);
   let body="";
@@ -85,7 +93,7 @@ function tsLuatTab(){return `<section class="card flush"><div class="card-h pad"
   <tr><td>${tsSc("p-ok","Nhiều kỳ")}</td><td>Từ 2 triệu đến dưới 30 triệu</td><td>Mặc định 12 tháng (sửa được từng món), tháng đầu tính theo ngày</td></tr>
   <tr><td>${tsSc("p-b","Trả trước")}</td><td>Tiền thuê văn phòng, xưởng, phần mềm trả nhiều tháng</td><td>Chia đều đúng số tháng đã trả</td></tr>
   <tr><td>${tsSc("p-ra","Thành tài sản cố định")}</td><td>Từ 30 triệu và dùng trên 1 năm</td><td>Ghi ở trang Tài sản cố định</td></tr></tbody></table></div></section>`}
-/* Phiếu chi nhóm G26 chưa gắn với tài sản nào. */
+/* Phiếu chi nhóm G28 (mua tài sản) chưa gắn với tài sản nào. */
 function tsChoGan(){const gan=new Set(tsAll().map(a=>a.nkc).filter(Boolean));return ((scFin().nkc)||[]).filter(x=>x.g===TS_NHOM.MUA&&!gan.has(x.id))}
 function tsXuat(kind,ym){if(typeof XLSX==="undefined"){toast("Cần mạng để tạo file Excel");return}
   const rows=[["Ngày ghi tăng","Mã","Tên","Loại","Bộ phận chịu","Giá trị","Số tháng","Tháng "+tsYm(ym),"Lũy kế","Còn lại","Trạng thái"]].concat(tsDs(kind).map(a=>[tsDmy(a.d),a.ma,a.ten,a.loai||"",tsBpTai(a,ym).map(x=>(TS_DT[x.o]||[x.o])[0]+" "+x.p+"%").join("; "),+(a.gk??a.ng)||0,a.n||0,tsThang(a,ym),tsLuyKe(a,ym),tsConLai(a,ym),TS_TT[tsTrangThai(a,ym)][1]]));
@@ -95,7 +103,7 @@ function tsXuat(kind,ym){if(typeof XLSX==="undefined"){toast("Cần mạng để
 /* el: vẽ ngay trong tab Ghi tăng thay vì ngăn bên phải; lưu / đóng xong quay về sổ. */
 function tsForm(kind,a,el){
   const xong=el?()=>{TSV.tab[kind==="TS"?"ts_so":"ts_cc"]="so";renderMain()}:closeDrawer;
-  const ghi=tsCanGhi(),moi=!a,x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx",p:100}]};
+  const ghi=tsCanGhi(),moi=!a,x=a||{kind,loai:TS_LOAI[kind][0],d:tsHom(),s:tsHom(),n:kind==="TS"?60:12,bp:[{o:"sx2",p:100}]};
   const cho=tsChoGan().concat(a&&a.nkc?((scFin().nkc)||[]).filter(r=>r.id===a.nkc):[]);
   const goi=((scFin().nkc)||[]).filter(r=>r.src!=="ts"&&+r.t>=500000&&r.d>=tsAddD(tsHom(),-120)&&!cho.includes(r)&&!tsAll().some(z=>z.nkc===r.id)).sort((p,q)=>q.d.localeCompare(p.d)).slice(0,60);
   const pcOpt=[["","Không gắn (mua nợ nhà cung cấp, tài sản có sẵn…)"]].concat(cho.map(r=>[r.id,`${r.ct||""} · ${tsDmy(r.d)} · ${tsN(r.t)} đ · ${String(r.dg||"").slice(0,50)}`]),goi.map(r=>[r.id,`${r.ct||""} · ${tsDmy(r.d)} · ${tsN(r.t)} đ · ${String(r.dg||"").slice(0,50)} (khác nhóm)`]));
@@ -113,7 +121,7 @@ function tsForm(kind,a,el){
    ${kind==="TS"?`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="tsf-kkh" style="width:auto"${x.kkh?" checked":""}> Không tính khấu hao (đất, tài sản chờ thanh lý)</label>`:""}
    <h3 style="margin:14px 0 6px">Ai chịu chi phí</h3>
    <div class="tbl"><table><thead><tr><th>Đối tượng · TK</th><th class="n">Tỷ lệ</th><th></th></tr></thead><tbody data-bpbody>${tsBpRows(x.bp)}</tbody></table></div>
-   <p class="hint">Sản xuất → 154, vào giá thành · Văn phòng → 6422 · Bán hàng chung → 6421, chia kênh theo Quy tắc phân bổ · Một kênh → ghi thẳng kênh đó. Tổng phải đủ 100%. <button type="button" class="lnk" data-bpadd>＋ Thêm dòng</button></p>
+   <p class="hint">Sản xuất thành phẩm → 154.1, bán thành phẩm → 154.2, vào giá thành · Văn phòng → 6422 · Bán hàng chung → 6421, chia kênh theo Quy tắc phân bổ · Một kênh → ghi thẳng kênh đó. Tổng phải đủ 100%. <button type="button" class="lnk" data-bpadd>＋ Thêm dòng</button></p>
    <h3 style="margin:14px 0 6px">Nguồn gốc</h3>
    <div class="row4"><label class="field grow">Mua từ phiếu chi<select id="tsf-pc">${opt(pcOpt,x.nkc||"")}</select></label></div>
    <div class="row4"><label class="field">Nhà cung cấp<input id="tsf-ncc" value="${esc(x.ncc||"")}"></label><label class="field">Số hóa đơn / chứng từ<input id="tsf-ct" value="${esc(x.ct||"")}"></label></div>
@@ -229,7 +237,7 @@ function tsSxc(ym){const r=tsDongThang(tsAll(),ym),sxTs=r.dong.filter(x=>x.k==="
   const khac=((scFin().nkc)||[]).filter(x=>x.src!=="ts"&&x.k==="Sản xuất"&&String(x.d||"").slice(0,7)===ym&&x.st!=="Chờ duyệt").reduce((t,x)=>t+(+x.t||0),0);
   const tay=(tsFin().sl||{})[ym],kho=tsLitKho(ym),lit=tay>0?tay:kho;return {sxTs,khac,tong:sxTs+khac,lit,tay:tay>0,dl:lit>0?(sxTs+khac)/lit:null}}
 function pTsKh(m){
-  tsCss();if(!tsCanXem()){m.innerHTML=H("Khấu hao & phân bổ tháng")+`<p class="hint">Chỉ CEO và kế toán xem được trang này.</p>`;return}
+  tsCss();tsCanDoi();if(!tsCanXem()){m.innerHTML=H("Khấu hao & phân bổ tháng")+`<p class="hint">Chỉ CEO và kế toán xem được trang này.</p>`;return}
   const ghi=tsCanGhi(),hom=tsHom(),ym=TSV.ym.ts_kh||(+hom.slice(8)<=10?tsYmAdd(tsThangNay(),-1):tsThangNay()),tab=TSV.kh,R=tsDongThang(tsAll(),ym),run=(tsFin().run||{})[ym],khoa=tsKhoa(ym,hom),xong=ym<tsThangNay();
   const ts=R.dong.filter(x=>x.kind==="TS").reduce((t,x)=>t+x.t,0),cc=R.tong-ts,by={};R.dong.forEach(x=>{by[x.k]=(by[x.k]||0)+x.t});
   const misa=((scFin().nkc)||[]).filter(x=>x.src!=="ts"&&String(x.d||"").slice(0,7)===ym&&(/^PBCC/i.test(String(x.ct||""))||x.lct==="Phân bổ CCDC"));
@@ -251,7 +259,7 @@ function pTsKh(m){
     body=`<section class="card flush"><div class="card-h pad"><h2>Bút toán tháng ${tsYm(ym)}</h2></div>${R.dong.length?`<div class="tbl"><table><thead><tr><th>Nợ</th><th>Có</th><th>Chịu chi phí</th><th class="n">Số tiền</th><th>Hiện ở</th></tr></thead><tbody>
      ${Object.entries(G).map(([k,v])=>{const[no,co,kk]=k.split("|");return `<tr><td>${no}</td><td>${co}</td><td>${esc(kk)}</td><td class="n">${tsN(v)}</td><td>${kk==="Sản xuất"?"Giá thành, P&L Sản xuất":kk==="Chung"?"Sổ chi phí · chi chung, chia theo Quy tắc phân bổ":"Sổ chi phí · kênh "+esc(kk)}</td></tr>`}).join("")}
      <tr class="tot"><td colspan="3">Cộng</td><td class="n">${tsN(R.tong)}</td><td></td></tr></tbody></table></div>`:`<p class="hint pad">Không có bút toán.</p>`}
-     <p class="hint pad" style="margin:0">Khi bấm Ghi, mỗi tài sản thành một dòng ở Sổ chi phí, chứng từ <span class="mono">TS-${ym}</span>: tài sản cố định nhóm G25 "Khấu hao tài sản cố định", công cụ nhóm G14 "Phân bổ CCDC".</p></section>`}
+     <p class="hint pad" style="margin:0">Khi bấm Ghi, mỗi tài sản thành một dòng ở Sổ chi phí, chứng từ <span class="mono">TS-${ym}</span>: tài sản cố định phần xưởng vào nhóm G25 (154.1) / G26 (154.2), phần còn lại: tài sản cố định nhóm G27 "Khấu hao tài sản cố định", công cụ nhóm G14 "Phân bổ CCDC".</p></section>`}
   else body=`<section class="card flush"><div class="card-h pad"><h2>Đối chiếu MISA tháng ${tsYm(ym)}</h2></div><div class="tbl"><table><thead><tr><th>Khoản</th><th class="n">Web</th><th class="n">MISA (đã nạp vào Sổ chi phí)</th><th class="n">Lệch</th></tr></thead><tbody>
      <tr><td>Phân bổ công cụ dụng cụ (TK 242)</td><td class="n">${tsN(cc)}</td><td class="n">${misa.length?tsN(misa.reduce((t,x)=>t+(+x.t||0),0)):"chưa nạp"}</td><td class="n">${misa.length?tsN(cc-misa.reduce((t,x)=>t+(+x.t||0),0)):"—"}</td></tr>
      <tr><td>Khấu hao tài sản cố định (TK 2141)</td><td class="n">${tsN(ts)}</td><td class="n hint">xem sổ cái 2141 ở MISA</td><td class="n">—</td></tr></tbody></table></div>

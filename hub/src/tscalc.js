@@ -10,14 +10,16 @@
      bp:[{o,p}] ai chịu chi phí (o là mã ở TS_DT, p là %), dc:[{tu:"yyyy-mm",bp}] điều chuyển, gg:{d,ly,thu} ghi giảm}
    ===================================================================== */
 /* Đối tượng chịu chi phí: mã → [tên, cột kênh ở Sổ chi phí (fin.nkc .k), TK Nợ]. "Chung" đi qua Quy tắc phân bổ của chị Huệ. */
-const TS_DT={sx:["Sản xuất (xưởng)","Sản xuất","154"],ql:["Văn phòng, quản lý","Chung","6422"],bh:["Bán hàng chung (chia kênh theo Quy tắc phân bổ)","Chung","6421"],
+/* TK 154 chi tiết (chị Hoa 28/10): 154.1 giá thành thành phẩm, 154.2 giá thành bán thành phẩm. Mã "sx" giữ cho 154.1 để dữ liệu cũ vẫn đọc được. */
+const TS_DT={sx:["Sản xuất thành phẩm","Sản xuất","154.1"],sx2:["Sản xuất bán thành phẩm","Sản xuất","154.2"],ql:["Văn phòng, quản lý","Chung","6422"],bh:["Bán hàng chung (chia kênh theo Quy tắc phân bổ)","Chung","6421"],
   tts:["Kênh TikTok","TikTok","6421"],spm:["Kênh Shopee Mall","Shopee Mall","6421"],spt:["Kênh Shopee thường","Shopee thường","6421"],fb:["Kênh Facebook","Facebook","6421"],
   npp:["Kênh phân phối","NPP","6421"],gc:["Kênh OEM","Gia công","6421"]};
 const TS_LOAI={TS:["Máy móc, thiết bị","Nhà cửa, vật kiến trúc","Phương tiện vận tải","Thiết bị, dụng cụ quản lý","Tài sản khác"],CC:["Phân bổ nhiều kỳ","Phân bổ 1 lần","Chi phí trả trước (thuê, phần mềm)"]};
-/* Nhóm ở Sổ chi phí cho dòng tự ghi. G14 có sẵn; G25, G26 thêm mới (taisan.js tự thêm vào danh mục khi cần). */
-const TS_NHOM={TS:"G25",CC:"G14",MUA:"G26"};
-const TS_DM_MOI=[{g:"G25",n:"Khấu hao tài sản cố định",tk:"CHIA",lo:"B - Phòng ban",cd:1,gc:"Web tự ghi hằng tháng từ Tài sản cố định (Có TK 2141). Xưởng vào 154, giá thành"},
-  {g:"G26",n:"Mua tài sản cố định / công cụ dụng cụ",tk:"211",lo:"Không tính",cd:0,gc:"Tiền mua tài sản, công cụ: không vào chi phí tháng, chỉ phần khấu hao / phân bổ từng tháng mới vào"}];
+/* Nhóm ở Sổ chi phí cho dòng tự ghi. Phần sản xuất theo TK: 154.1 → G25, 154.2 → G26 (nhóm của Sổ chi phí).
+   Phần còn lại: TSCĐ G27 (mới), CCDC G14 (có sẵn); phiếu chi mua tài sản G28 (mới). Lúc đầu dùng G25/G26, trùng mã Sổ chi phí nên đổi (tsDoiMa ở taisan.js). */
+const TS_NHOM={TS:"G27",CC:"G14",MUA:"G28"},TS_NHOM_TK={"154.1":"G25","154.2":"G26"};
+const TS_DM_MOI=[{g:"G27",n:"Khấu hao tài sản cố định",tk:"CHIA",lo:"B - Phòng ban",cd:1,gc:"Web tự ghi hằng tháng từ Tài sản cố định (Có TK 2141), phần bán hàng, quản lý. Phần xưởng vào G25 / G26"},
+  {g:"G28",n:"Mua tài sản cố định / công cụ dụng cụ",tk:"211",lo:"Không tính",cd:0,gc:"Tiền mua tài sản, công cụ: không vào chi phí tháng, chỉ phần khấu hao / phân bổ từng tháng mới vào"}];
 
 const tsDim=(y,m)=>new Date(Date.UTC(y,m,0)).getUTCDate();
 const tsYmAdd=(ym,k)=>{const[y,m]=ym.split("-").map(Number),t=y*12+m-1+k;return Math.floor(t/12)+"-"+String(t%12+1).padStart(2,"0")};
@@ -63,7 +65,7 @@ function tsChiaPct(t,bp){const L=(bp||[]).filter(x=>+x.p>0);if(!L.length)return 
 function tsDongThang(list,ym){const dong=[],loi=[];
   (list||[]).forEach(a=>{const v=tsThang(a,ym);if(!v)return;const bp=tsBpTai(a,ym);
     if(!tsBpOk(bp)){loi.push(a.ma+": chưa chia đủ 100% cho bộ phận chịu chi phí");return}
-    tsChiaPct(v,bp).forEach(x=>{const[n,k,tkn]=TS_DT[x.o];dong.push({id:a.id,ma:a.ma,ten:a.ten,kind:a.kind,o:x.o,on:n,p:x.p,k,tkn,tkc:a.kind==="TS"?"2141":"242",g:TS_NHOM[a.kind],t:x.v})})});
+    tsChiaPct(v,bp).forEach(x=>{const[n,k,tkn]=TS_DT[x.o];dong.push({id:a.id,ma:a.ma,ten:a.ten,kind:a.kind,o:x.o,on:n,p:x.p,k,tkn,tkc:a.kind==="TS"?"2141":"242",g:TS_NHOM_TK[tkn]||TS_NHOM[a.kind],t:x.v})})});
   return {dong,loi,tong:dong.reduce((t,x)=>t+x.t,0)}}
 /* Tháng ym khóa khi đã qua ngày 10 tháng sau (ngày chốt sổ). */
 const tsKhoa=(ym,today)=>today>tsYmAdd(ym,1)+"-10";
@@ -87,7 +89,7 @@ const TS_COT=[["con",/(thoi gian|so ky|so thang)( su dung| phan bo| pb)? con lai
   ["ma",/^ma (tai san|ts|ccdc|cong cu)|^ma$/],["ten",/^ten/],["loai",/^loai/],["bp",/don vi su dung|bo phan|doi tuong phan bo|tai khoan chi phi|tk chi phi/]];
 function tsTimCot(row){const o={};(row||[]).forEach((c,i)=>{const t=tsBoDau(c);if(!t)return;const f=TS_COT.find(([k,re])=>o[k]==null&&re.test(t));if(f)o[f[0]]=i});return o}
 /* Bộ phận ghi trong MISA → mã đối tượng ở TS_DT. */
-function tsBpDoan(s,mac){const t=tsBoDau(s);if(/san xuat|xuong|bpsx|154/.test(t))return "sx";if(/ban hang|kinh doanh|bpbh|6421|641/.test(t))return "bh";if(/van phong|quan ly|ke toan|bpql|6422|642/.test(t))return "ql";return mac}
+function tsBpDoan(s,mac){const t=tsBoDau(s);if(/1542|154\.2|ban thanh pham/.test(t))return "sx2";if(/san xuat|xuong|bpsx|154/.test(t))return mac==="sx2"?"sx2":"sx";if(/ban hang|kinh doanh|bpbh|6421|641/.test(t))return "bh";if(/van phong|quan ly|ke toan|bpql|6422|642/.test(t))return "ql";return mac}
 /* Bảng (mảng các dòng) → danh sách tài sản đọc được + dòng không đọc được. */
 function tsDocBang(rows,kind,tu){const R=rows||[];let h=-1,c={};
   for(let i=0;i<Math.min(R.length,30);i++){const x=tsTimCot(R[i]);if(x.ten!=null&&(x.ng!=null||x.gk!=null)){h=i;c=x;break}}
@@ -97,7 +99,7 @@ function tsDocBang(rows,kind,tu){const R=rows||[];let h=-1,c={};
     if(!ten||/^(tong|cong)( cong)?\b/.test(tsBoDau(ten))||/^(tong|cong)\b/.test(tsBoDau(ma))){return}
     if(!(ng>0||gk>0)){bo.push({dong:h+j+2,ten,why:"không có nguyên giá / giá trị"});return}
     const d=tsNgayDoc(g(r,"d")),s=tsNgayDoc(g(r,"s"))||d,n=tsSo(g(r,"n")),lk=tsSo(g(r,"lk")),con=tsSo(g(r,"con")),conGt=tsSo(g(r,"conGt"));
-    const a={kind,ma:ma||ten.slice(0,20),ten,loai:String(g(r,"loai")??"").trim()||TS_LOAI[kind][0],d,s,ng:ng||gk,gk:gk||ng,n:n||0,bp:[{o:tsBpDoan(g(r,"bp"),kind==="TS"?"sx":"ql"),p:100}]};
+    const a={kind,ma:ma||ten.slice(0,20),ten,loai:String(g(r,"loai")??"").trim()||TS_LOAI[kind][0],d,s,ng:ng||gk,gk:gk||ng,n:n||0,bp:[{o:tsBpDoan(g(r,"bp"),kind==="TS"?"sx2":"ql"),p:100}]};
     /* Số MISA đã trích chỉ để đối chiếu (MISA có thể chưa chạy khấu hao / phân bổ các tháng gần đây).
        Có số tháng và ngày bắt đầu thì web tự tính lũy kế tới hết tháng trước tháng làm chuẩn; thiếu thì mới dùng số MISA. */
     const lkx=lk!=null?lk:conGt!=null?a.gk-conGt:null;a.misa={lk:lkx,con};
