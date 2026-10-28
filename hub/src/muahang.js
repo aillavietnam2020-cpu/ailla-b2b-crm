@@ -28,6 +28,25 @@ async function mhLoad(force){
 const mhReload=async()=>{MH.at=0;MH.debts=MH.inv=MH.pay=MH.prices=null;for(let i=0;i<50&&MH.busy;i++)await new Promise(r=>setTimeout(r,100));await mhLoad(true);if(/^mh_|^sx_mh$/.test(PAGE))renderMain()};
 const mhSupOpts=(sel)=>opt([["","— Chọn nhà cung cấp —"]].concat((MH.sup||[]).filter(s=>s.active).map(s=>[s.id,s.name])),sel||"");
 
+/* Ô chọn nhà cung cấp gõ tìm được (chị Hoa 28/10): gõ một phần tên là lọc danh sách, chỉ còn một thì tự chọn;
+   chưa có thì bấm "＋ Thêm … làm nhà cung cấp mới" để tạo ngay, không rời form. Danh sách chưa tải xong thì chờ tải. */
+async function mhSupPick(sel){
+  const s=$(sel);if(!s||s.dataset.pick)return;s.dataset.pick="1";
+  const w=document.createElement("div");w.className="mhpick";w.style.cssText="display:flex;flex-direction:column;gap:4px;margin-bottom:4px";
+  w.innerHTML=`<input type="search" placeholder="Gõ tên nhà cung cấp để tìm…" autocomplete="off"><div hidden></div>`;
+  s.parentNode.insertBefore(w,s);
+  const q=w.querySelector("input"),add=w.querySelector("div"),pick=id=>{s.value=id;s.dispatchEvent(new Event("change"))};
+  const fill=()=>{const v=s.value,t=q.value.trim(),k=kfold(t),L=(MH.sup||[]).filter(x=>x.active&&(!k||kfold(x.name).includes(k)));
+    s.innerHTML=opt([["",!MH.sup?"Đang tải danh sách nhà cung cấp…":L.length?"— Chọn nhà cung cấp —":"— Chưa có, bấm Thêm ở trên —"]].concat(L.map(x=>[x.id,x.name])),v);
+    if(k&&L.length===1&&s.value!==L[0].id)pick(L[0].id);
+    add.hidden=!k||!MH.sup||(MH.sup||[]).some(x=>kfold(x.name)===k);
+    add.innerHTML=`<button type="button" class="btn sm">＋ Thêm “${esc(t)}” làm nhà cung cấp mới</button>`;
+    add.querySelector("button").onclick=async e=>{const b=e.currentTarget;b.disabled=true;
+      try{const r=await kApi("/mh/suppliers",{method:"POST",body:JSON.stringify({name:t})});toast("Đã thêm nhà cung cấp "+t);await mhReload();q.value="";fill();pick(r.id)}
+      catch(err){toast(err.message||"Chưa thêm được");b.disabled=false}}};
+  q.oninput=fill;fill();
+  for(let i=0;i<80&&!MH.sup;i++){if(!MH.busy)await mhLoad(true);await new Promise(r=>setTimeout(r,150))}
+  fill()}
 /* ---------- Thêm nhà cung cấp (dùng chung) ---------- */
 function mhNewSupplier(done,opt){
   opt=opt||{};const withDebt=!!opt.debt&&mhManage();
@@ -126,6 +145,7 @@ function mhForm(id,draft){
     const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value};
     khoNewItem({cls:"HH",askProduct:true,hint:"Đồ gia dụng, quà tặng khách hoặc hàng chưa có trong danh mục. Đặt mã ngắn, không dấu, không trùng (ví dụ QUA-NOIKIM, GD-CHOIBAT). Thêm xong mã tự điền vào dòng đang trống của phiếu mua.",
       onDone:async code=>{const e=keep.L.find(l=>!l.item);if(e)e.item=code;else keep.L.push({item:code,qty:"",note:"",price:""});mhForm(id,keep)}})};
+  mhSupPick("#mhf-s");
   $("#mhf-ns").onclick=()=>{const keep={L,sup:$("#mhf-s").value,date:$("#mhf-d").value,exp:$("#mhf-e").value,note:$("#mhf-n").value};mhNewSupplier(sid=>mhForm(id,{...keep,sup:sid}))};
   $("#mhf").onsubmit=async e=>{e.preventDefault();const body={supplier_id:$("#mhf-s").value,order_date:$("#mhf-d").value,expected_date:$("#mhf-e").value||null,note:$("#mhf-n").value,lines:L.filter(l=>l.item).map(l=>({item:l.item,qty:+l.qty,note:l.note,unit_price:l.price===""||l.price==null?null:+l.price}))};
     try{const r=await kApi(p?"/mh/orders/"+p.id:"/mh/orders",{method:p?"PUT":"POST",body:JSON.stringify(body)});closeDrawer();toast(p?"Đã lưu phiếu":"Đã lập phiếu "+r.no);await mhReload()}catch(err){$("#mhf-e2").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
@@ -267,7 +287,7 @@ function mhDocForm(pre){
     $("#mhi-r").innerHTML=L.length?`<p class="hint">Hàng kho đã nhận của nhà cung cấp này, chưa có chứng từ. Tick lần nhận thuộc chứng từ và <b>điền đơn giá từng dòng</b>:</p>`+L.map(({p,r})=>`<div class="mhrc"><label class="chk"><input type="checkbox" class="mhi-c" value="${r.id}" ${(pre.rids||L.map(x=>x.r.id)).includes(r.id)?"checked":""}> <b>${esc(mhD(r.receipt_date))}</b> · phiếu mua hàng ${esc(p.no)}</label><table class="mhlines"><thead><tr><th>Hàng</th><th class="n">Số nhận</th><th class="n">Đơn giá (đ)</th><th class="n">Thành tiền</th></tr></thead><tbody>${r.lines.map(l=>{const pl=p.lines.find(x=>x.id===l.po_line_id),def=l.unit_price!=null?l.unit_price:(pl&&pl.unit_price!=null?pl.unit_price:"");return `<tr><td>${esc(l.name)}</td><td class="n">${mhN(l.qty)} ${esc(l.unit||"")}</td><td><input class="mhi-pr n" data-r="${r.id}" data-l="${l.id}" data-q="${l.qty}" type="number" min="0" step="any" value="${def}" placeholder="Giá"></td><td class="n mhi-rt" data-l="${l.id}">—</td></tr>`}).join("")}</tbody></table></div>`).join(""):"";
     $("#mhi-mh").textContent=L.length?"Hàng khác trên chứng từ (không nằm trong lần nhận hàng ở trên), nếu có:":"Nhập từng dòng hàng ghi trên chứng từ: mã hàng, số lượng, đơn giá.";
     document.querySelectorAll(".mhi-c").forEach(x=>x.onchange=sum);document.querySelectorAll(".mhi-pr").forEach(x=>x.oninput=sum);sum()};
-  $("#mhi-s").onchange=drawR;["#mhi-vat","#mhi-fr","#mhi-hd","#mhi-ot"].forEach(i=>$(i).oninput=sum);
+  $("#mhi-s").onchange=drawR;mhSupPick("#mhi-s");["#mhi-vat","#mhi-fr","#mhi-hd","#mhi-ot"].forEach(i=>$(i).oninput=sum);
   $("#mhi-add").onclick=()=>{M.push({item:"",qty:"",price:""});drawM();const r=document.querySelectorAll(".mhm-i");if(r.length)r[r.length-1].focus()};
   $("#mhi-f").onchange=()=>{$("#mhi-fl").textContent=[...$("#mhi-f").files].map(f=>f.name).join(", ")};
   drawR();drawM();
@@ -364,7 +384,7 @@ function mhPayForm(supId,poId){
    ${poId?`<p class="hint">Phiếu chi tự gắn vào phiếu mua này.</p>`:""}${mhPayMethodHtml("mhp")}<label class="field">Ghi chú<input id="mhp-n"></label><div id="mhp-e"></div><button class="btn pri">Ghi phiếu chi</button></form>`);
   const fill=()=>{const sid=$("#mhp-s").value;$("#mhp-i").innerHTML=`<option value="">— Không gắn, trừ vào công nợ chung —</option>`+(MH.inv||[]).filter(v=>v.status==="OK"&&v.supplier_id===sid&&v.total>v.paid).map(v=>`<option value="${v.id}">${esc(mhD(v.invoice_date))} · ${esc(v.invoice_no||"không số")} · còn ${nf(v.total-v.paid)}</option>`).join("");
     $("#mhp-o").innerHTML=`<option value="">— Chọn phiếu mua —</option>`+(MH.orders||[]).filter(p=>p.supplier_id===sid&&p.status!=="HUY").map(p=>`<option value="${p.id}">${esc(p.no)} · ${esc(mhD(p.order_date))}${p.status==="DU"?" · đã đủ hàng":""}</option>`).join("")};
-  $("#mhp-s").onchange=()=>{fill();mhPayFillTo("mhp",$("#mhp-s").value)};fill();mhPayMethodBind("mhp",$("#mhp-s").value);
+  $("#mhp-s").onchange=()=>{fill();mhPayFillTo("mhp",$("#mhp-s").value)};fill();mhPayMethodBind("mhp",$("#mhp-s").value);mhSupPick("#mhp-s");
   if(poId){const p=(MH.orders||[]).find(x=>x.id===poId);$("#mhp-o").value=poId;if(p){const open=mhPoMoney(p).inv.filter(v=>v.total>v.paid);if(open.length===1){$("#mhp-i").value=open[0].id;$("#mhp-a").value=open[0].total-open[0].paid}else if(!open.length)$("#mhp-k").value="COC"}}
   $("#mhp").onsubmit=async e=>{e.preventDefault();
     const pm=mhPayMethodRead("mhp");if(pm.method==="CHUYEN_KHOAN"&&(!pm.from_account||!pm.to_account_no)){$("#mhp-e").innerHTML=`<div class="note red">Chuyển khoản: chọn tài khoản công ty chi tiền và ghi số tài khoản nhận.</div>`;return}
