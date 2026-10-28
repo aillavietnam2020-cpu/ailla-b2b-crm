@@ -32,6 +32,8 @@ const spcChip=(p,items)=>p.kind==="skip"?`<span class="pill p-gry">bỏ qua</spa
   `<span class="pill ${!items.has(spcLow(p.code))?"p-red":p.kind==="gift"?"p-vio":p.kind==="pack"?"p-gry":"p-grn"}" title="${esc(p.label)}">${p.kind==="gift"?"🎁 ":""}${p.qty!=1?p.qty+" × ":""}${esc(p.code)}</span> `;
 const spcShop=s=>`<small class="pill p-gry">${esc(String(s).replace(/^(Landing|Page): /,""))}</small> `;
 const spcDd=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"";
+/* Giờ máy chủ (UTC) → "dd/mm HH:MM" giờ Việt Nam. */
+const spcAt=iso=>{const t=Date.parse(String(iso||"").replace(" ","T")+(/[zZ+]/.test(String(iso||"").slice(10))?"":"Z"));if(isNaN(t))return "";const d=new Date(t+7*3600e3).toISOString();return d.slice(8,10)+"/"+d.slice(5,7)+" "+d.slice(11,16)};
 
 function pSpcombo(m){
   const T="Sản phẩm & combo",S="Sản phẩm gốc (mã kho/MISA) và combo từng kênh: dùng để tính phiếu xuất kho hằng ngày và giá vốn từng kênh";
@@ -171,7 +173,7 @@ function spcEdDraw(){
   const x=g?spcCost(E.parts.filter(p=>p.code||p.kind==="skip"),g):null;
   const H2=SPCB.hist;const lb={KHO_ONLINE_MAP:"Lưu",KHO_ONLINE_MAP_SWAP:"Đổi mã",KHO_ONLINE_MAP_CONFIRM:"Xác nhận",KHO_ONLINE_MAP_VERSION:"Bản mới theo ngày",KHO_ONLINE_MAP_CLONE:"Sao chép",SP_COMBO_ADD:"Thêm",SP_COMBO_SAVE:"Sửa",SP_COMBO_STOP:"Ngừng dùng",SP_COMBO_RESUME:"Dùng lại"};
   const hs=h=>{let a={};try{a=JSON.parse(h.after_json||"{}")}catch(e){}const ps=a.parts?a.parts.map(x=>(x[1]!=1?x[1]+"×":"")+spcCode(x[0])).join(", "):a.item_label?(a.qty!=1?a.qty+"×":"")+spcCode(a.item_label):"";
-    return `<div style="padding:5px 0;border-bottom:1px solid var(--line,#eee)"><b>${esc(String(h.created_at||"").slice(8,10)+"/"+String(h.created_at||"").slice(5,7)+" "+String(h.created_at||"").slice(11,16))}</b> · ${esc(h.by_name||"")} · ${lb[h.action]||esc(h.action)}${a.from_day?" (từ "+spcDd(a.from_day)+")":""}${a.off_from?" từ "+spcDd(a.off_from):""}${ps?": "+esc(ps):""}</div>`};
+    return `<div style="padding:5px 0;border-bottom:1px solid var(--line,#eee)"><b>${esc(spcAt(h.created_at))}</b> · ${esc(h.by_name||"")} · ${lb[h.action]||esc(h.action)}${a.from_day?" (từ "+spcDd(a.from_day)+")":""}${a.off_from?" từ "+spcDd(a.off_from):""}${ps?": "+esc(ps):""}</div>`};
   openDrawerHTML(`<h2>${c?(can?"Sửa combo":"Combo"):"Thêm combo"} · ${SPC_CHN(E.ch)}</h2>
    ${E.fromUn?`<div class="note amb">Mã mới từ đơn: ${nf(E.fromUn.orders)} đơn kho đã xuất, đang chờ tính giá vốn.</div>`:""}
    ${c&&c.flag?`<div class="note amb">❓ Cần kế toán xác nhận: ${esc(c.flag)}</div>`:""}
@@ -233,7 +235,7 @@ function spcProd(p){
   if(p)spcApi("/cost-history?code="+encodeURIComponent(p.code)).then(L=>{const el=$("#spp-hist");if(!el)return;const t=x=>String(x||"");
     el.innerHTML=L.length?L.map(h=>{let a={},b={};try{a=JSON.parse(h.after_json||"{}");b=JSON.parse(h.before_json||"{}")}catch(e){}const at=t(h.created_at);
       const what=h.action==="SP_GIA_VON"?`giá vốn tháng ${esc(t(a.ky).slice(5))}/${esc(t(a.ky).slice(0,4))}: ${b.gia?nf(b.gia)+"đ → ":""}<b>${nf(a.gia)}đ</b>`:h.action==="SP_PRODUCT_ADD"?"tạo sản phẩm":"sửa "+[a.name!==b.name?"tên":"",a.unit!==b.unit?"đơn vị":"",a.active!==b.active?(a.active?"dùng lại":"ngừng dùng"):""].filter(Boolean).join(", ");
-      return `<div style="padding:5px 0;border-bottom:1px solid var(--line,#eee)"><b>${esc(at.slice(8,10)+"/"+at.slice(5,7)+" "+at.slice(11,16))}</b> · ${esc(h.by_name||"")} · ${what}</div>`}).join(""):`<p class="hint">Chưa có lần sửa nào được ghi (giá nhập trước 28/10 ở trang Giá vốn SKU chưa có lịch sử).</p>`}).catch(()=>{});
+      return `<div style="padding:5px 0;border-bottom:1px solid var(--line,#eee)"><b>${esc(spcAt(at))}</b> · ${esc(h.by_name||"")} · ${what}</div>`}).join(""):`<p class="hint">Chưa có lần sửa nào được ghi (giá nhập trước 28/10 ở trang Giá vốn SKU chưa có lịch sử).</p>`}).catch(()=>{});
   if(!p){const n=$("#spp-n"),cd=$("#spp-code");n.oninput=()=>{if(!cd.dataset.t)cd.value=spcSuggestCode(n.value)};cd.oninput=()=>{cd.dataset.t=1}}
   const setGv=spcSetGv;
   $("#spp-save").onclick=async()=>{const name=$("#spp-n").value.trim(),unit=$("#spp-u").value.trim(),v=$("#spp-gv")?+String($("#spp-gv").value).replace(/[^0-9]/g,""):0;
