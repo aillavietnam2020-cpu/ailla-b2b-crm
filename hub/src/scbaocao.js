@@ -16,6 +16,7 @@ const scFnRow=x=>x.g==="G28"?"Mua tài sản / công cụ":x.ext&&x.ext.src==="n
 const scLaCoc=x=>!!(x.ext&&x.ext.src==="ncc"&&/^cọc/i.test(String(x.dg||"")));
 /* Cách xử lý của một dòng (Nhật ký chi, Phân bổ). */
 function scXL(x,qt){
+  if(x.trung)return "Trùng sổ, không tính";
   if(x.g==="G28")return "Ghi tăng tài sản";
   if(x.ext&&x.ext.src==="ncc")return scLaCoc(x)?"Chặn":"Vào giá thành theo định mức";
   if(x.st==="Chờ duyệt"||x.st==="Chờ CEO duyệt")return "Chờ duyệt";
@@ -24,7 +25,7 @@ function scXL(x,qt){
   if(x.k==="Sản xuất")return "Vào giá thành";
   if(x.k==="Chung"){const r=scQTof(qt||scQT(PERIOD.from.slice(0,7)).qt,x.g);return !r||r.cach==="giu"||!scLaChung(x.g)?"Không chia":"Phân bổ"}
   return SC_KENH.includes(x.k)?"Ghi thẳng":"Chờ"}
-const SC_XLC={"Ghi tăng tài sản":"p-c","Ghi thẳng":"p-ok","Phân bổ":"p-a","Không chia":"p-c","Vào giá thành":"p-c","Vào giá thành theo định mức":"p-c","Chờ":"p-ra","Chờ duyệt":"p-a","Chặn":"p-do"};
+const SC_XLC={"Trùng sổ, không tính":"p-c","Ghi tăng tài sản":"p-c","Ghi thẳng":"p-ok","Phân bổ":"p-a","Không chia":"p-c","Vào giá thành":"p-c","Vào giá thành theo định mức":"p-c","Chờ":"p-ra","Chờ duyệt":"p-a","Chặn":"p-do"};
 const scXLP=t=>`<span class="scp ${SC_XLC[t]||"p-c"}">${esc(t)}</span>`;
 const scKpi=(l,v,h,cls)=>`<div class="sckpi${cls?" "+cls:""}"><div class="l">${l}</div><div class="v${v==null?" na":""}">${v==null?"chưa có số":v}</div><div class="h">${h||""}</div></div>`;
 const SC_CS='<span class="scna">chưa có số</span>';
