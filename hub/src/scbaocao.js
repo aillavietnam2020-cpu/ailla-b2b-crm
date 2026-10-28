@@ -237,14 +237,14 @@ function scDoiChieu(){
 /* Thẻ phí vận hành TikTok theo hợp đồng ở Theo kênh › TikTok: tính từ báo cáo TikTok đã tải, so với số đã ghi sổ nhóm G06. */
 function scHDTTHtml(ym,full,rows){
   const s=full&&typeof TSB!=="undefined"&&TSB.sum?TSB.sum[ym]:null,so=scS(rows.filter(x=>x.k==="TikTok"&&x.g==="G06"));
-  const head=`<div class="scchh"><b>Phí vận hành TikTok (bên Nguyễn Thế Hoàng) theo hợp đồng</b><span class="hint">12,5 triệu/tháng; trên 2 tỷ là 3% doanh thu; thưởng 2% khi doanh thu 800 triệu – 2 tỷ và quảng cáo + affiliate dưới 30%</span></div>`;
+  const head=`<div class="scchh"><b>Phí vận hành TikTok (bên Nguyễn Thế Hoàng) theo hợp đồng</b><span class="hint">phí cố định 12,5 triệu/tháng; thưởng khi quảng cáo + affiliate dưới 30% doanh thu: 2% doanh thu nếu doanh thu 800 triệu – 2 tỷ, 3% nếu trên 2 tỷ</span></div>`;
   if(!s||!s.dt)return `<div class="scch">${head}<p class="hint">${full?"Chưa tải báo cáo TikTok tháng này nên chưa tính được.":"Chọn một tháng đã hết để tính theo doanh thu đối soát."} Đã ghi sổ (nhóm G06): ${so?scNf(so)+" đ":"chưa có"}.</p></div>`;
   const aff=Math.abs(+((s.fees||[]).find(f=>/affiliate|KOC/i.test(f[0]))||[0,0])[1]||0),r=scPhiVanHanhTT(+s.dt,+s.ads||0,aff),lech=so-r.tong;
   return `<div class="scch">${head}<div class="tbl"><table><tbody>
    <tr><td>Doanh thu đối soát (báo cáo TikTok)</td><td class="n">${scNf(r.dt)}</td></tr>
    <tr><td>Quảng cáo + hoa hồng affiliate</td><td class="n">${scNf((+s.ads||0)+aff)} <span class="hint">${scPc((+s.ads||0)+aff,r.dt)} doanh thu</span></td></tr>
-   <tr><td>Phí vận hành <span class="hint">(${esc(r.cachPhi)})</span></td><td class="n">${scNf(r.phi)}</td></tr>
-   <tr><td>Thưởng 2% <span class="hint">${r.duThuong?"đạt điều kiện":r.dt<800e6?"doanh thu dưới 800 triệu":r.dt>2e9?"doanh thu trên 2 tỷ, không xét thưởng":"quảng cáo + affiliate từ 30% trở lên"}</span></td><td class="n">${r.thuong?scNf(r.thuong):"0"}</td></tr>
+   <tr><td>Phí cố định</td><td class="n">${scNf(r.phi)}</td></tr>
+   <tr><td>Thưởng ${r.muc?Math.round(r.muc*100)+"%":""} <span class="hint">${r.duThuong?"đạt điều kiện":r.dt<800e6?"doanh thu dưới 800 triệu, không thưởng":"quảng cáo + affiliate từ 30% trở lên, không thưởng"}</span></td><td class="n">${r.thuong?scNf(r.thuong):"0"}</td></tr>
    <tr class="tot"><td>Phải trả theo hợp đồng</td><td class="n">${scNf(r.tong)}</td></tr>
    <tr><td>Đã ghi sổ tháng này (nhóm G06)</td><td class="n">${so?scNf(so):'<span class="scna">chưa có</span>'}</td></tr>
    ${so?`<tr><td>Chênh lệch sổ − hợp đồng</td><td class="n"><b class="${Math.abs(lech)<1?"":"scup"}">${Math.abs(lech)<1?"khớp":scNf(lech)}</b></td></tr>`:""}</tbody></table></div>
