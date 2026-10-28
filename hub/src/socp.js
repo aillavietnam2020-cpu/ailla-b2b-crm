@@ -36,8 +36,10 @@ function spRows(){
    + Sổ chi phí (fin.nkc): dòng bổ "Chung" nhóm B/C, bỏ quảng cáo, phí sàn, vận chuyển P&L đã trừ ở từng kênh (luật ở chicalc.js). */
 function spChungTheoThang(ym){const d=D(),cat=k=>d.costCats.find(c=>c.k===k)||{nhom:"Khác"};
   const cu=(d.costs||[]).filter(c=>(c.ngay?c.ngay.slice(0,7):c.thang)===ym&&!c.kenh&&cat(c.cat).nhom!=="Marketing").reduce((t,c)=>t+(+c.tien||0),0);
-  let so=0;try{so=scChungNkc((d.fin||{}).nkc,ym,g=>scG(g).lo)}catch(e){}
-  return cu+so}
+  let so=0;try{so=scChungNkc(((d.fin||{}).nkc||[]).filter(x=>!(typeof scChiDoiChieu==="function"&&scChiDoiChieu(x))),ym,g=>scG(g).lo)}catch(e){}
+  /* khấu hao / phân bổ chung (văn phòng, bán hàng chung) từ trang Tài sản của tháng đã chạy */
+  let ts=0;try{const r=typeof scTsThang==="function"?scTsThang(ym):null;if(r&&r.chay)ts=scChungNkc((r.dong||[]).map(z=>({d:z.d,g:z.g,k:z.k,t:z.t,st:"Ổn"})),ym,g=>scG(g).lo)}catch(e){}
+  return cu+so+ts}
 function pSoCP(m){
   const ed=mhManage()||can(ME,"chiphi.nhap");
   mhLoad();mhLoadPay();spLoadShip();spLoadFiles();
