@@ -69,3 +69,6 @@ setInterval(()=>{try{aiEnsure()}catch(e){}},1500);
 
 /* Tab đang mở là bản cũ thì nhắc tải lại (mỗi lần cập nhật web có một mã bản) */
 setInterval(async()=>{try{if(document.hidden||document.getElementById("newver"))return;const j=await fetch("/hub/build",{cache:"no-store",credentials:"same-origin"}).then(r=>r.json());if(j&&j.build&&j.build!==BUILD_ID){const d=document.createElement("div");d.id="newver";d.className="newver";d.innerHTML="Có bản web mới <button type=\"button\">Tải lại ngay</button>";d.querySelector("button").onclick=()=>location.reload();document.body.appendChild(d)}}catch(e){}},60000);
+/* Chrome không phải lúc nào cũng giữ lại trang lúc mở trực tiếp; trang được hỏi bằng fetch thì giữ chắc. Mở được 15 giây mà
+   trình duyệt chưa có đúng bản này thì tải ngầm một lần cho nó giữ: những lần mở sau máy chủ chỉ trả 304 (vài trăm byte). */
+setTimeout(async()=>{try{if(document.hidden)return;const c=await fetch(location.pathname,{cache:"only-if-cached",mode:"same-origin",credentials:"same-origin"}).catch(()=>null);const tag=c&&c.ok?c.headers.get("etag")||"":"";if(c&&c.body)c.body.cancel().catch(()=>{});if(tag.includes(BUILD_ID))return;await fetch(location.pathname,{credentials:"same-origin"}).then(r=>r.arrayBuffer())}catch(e){}},15000);
