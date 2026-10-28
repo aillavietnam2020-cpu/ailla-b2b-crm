@@ -54,7 +54,7 @@ describe('fbbc: tuần và cảnh báo', () => {
     const A = T.fbbcAlerts({ last2: L2, adsMax: 0.38 });
     expect(A.canh[0].t).toContain('Đơn hoàn tăng 46,7%');
     expect(A.canh.some((x: { t: string }) => x.t.startsWith('Quảng cáo'))).toBe(true);
-    expect(A.de.some((x: { t: string }) => x.t.startsWith('Doanh thu tuần +'))).toBe(true);
+    expect(A.de.some((x: { t: string }) => x.t.startsWith('Doanh thu chốt tuần +'))).toBe(true);
   });
   it('tháng: quảng cáo vượt ngưỡng, hoàn, người hủy cao, đề xuất dồn quảng cáo', () => {
     const L = T.fbbcLines({

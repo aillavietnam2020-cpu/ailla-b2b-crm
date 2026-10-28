@@ -2,7 +2,7 @@
    TRANG FACEBOOK BẢN MỚI — hàm tính thuần (chị Hoa duyệt demo 28/10/2026, cùng khung TikTok / Shopee).
    - fbbcHoan: tỷ lệ hoàn thật một tháng (đơn hoàn / (giao thành công + hoàn)) từ DAYD.fb → tỷ lệ hoàn dự kiến cho đơn đang giao.
    - fbbcLines: lãi sau quảng cáo theo nhóm hàng (quảng cáo gán theo mã trong tên chiến dịch, adfParse ở adsday.js).
-   - fbbcWeeks / fbbcLast2: số theo khối 7 ngày để so tuần. fbbcAlerts: cảnh báo & đề xuất tuần / tháng.
+   - fbbcWeeks / fbbcLast2: số theo khối 7 ngày để so tuần (so theo doanh thu chốt: đơn tuần gần nhất chưa kịp giao nên doanh thu giao thành công luôn thấp). fbbcAlerts: cảnh báo & đề xuất tuần / tháng.
    DAYD.fb[ngày] = [đơn tạo, chốt, hủy, hoàn, giao thành công, doanh thu giao thành công, doanh thu chốt, giá vốn ước, …].
    ===================================================================== */
 const FBBC_LINES=[["TL","Tẩy lồng giặt",["TLAI","AIBIO","TLG"],/t[ẩa]y\s*l[ồo]ng/i],["TD","Tinh dầu giặt sấy",["TINHDAU"],/tinh\s*d[ầa]u/i],
@@ -42,18 +42,18 @@ function fbbcWeeks(dayd,ky,qcOf){
     w.du=w.n===b-a+1;out.push(w)}
   return out;
 }
-const fbbcLast2=W=>{const F=(W||[]).filter(w=>w.du&&w.b-w.a===6&&w.dt>0);return F.length>=2?[F[F.length-2],F[F.length-1]]:null};
+const fbbcLast2=W=>{const F=(W||[]).filter(w=>w.du&&w.b-w.a===6&&w.dtChot>0);return F.length>=2?[F[F.length-2],F[F.length-1]]:null};
 
 /* Cảnh báo & đề xuất. Tuần: last2. Tháng: M = {dt, qcT, tao, huy, hoan, giao}, L = fbbcLines, people = fbsPeople().list, src = fbdSources, kpi = tên người tính KPI. */
 function fbbcAlerts({last2,M,L,people,src,kpi,adsMax}){
   const canh=[],de=[],mx=adsMax||0.38,rt=(h,g)=>h+g?h/(h+g):0,tr1=v=>(Math.round(v/1e5)/10).toString().replace(".",",")+"tr";
   if(last2){const [p,c]=last2,hp=rt(p.hoan,p.giao),hc=rt(c.hoan,c.giao);
     if(p.hoan>=20&&c.hoan>p.hoan*1.3)canh.push({lv:hc>FBBC_HOAN?"r":"a",t:`Đơn hoàn tăng ${fbbcF(c.hoan/p.hoan-1)}: ${c.hoan} đơn`,d:`Tuần trước ${p.hoan} đơn; tỷ lệ ${fbbcF(hp)} → ${fbbcF(hc)}.`,ai:"CSKH + Sale"});
-    if(p.dt>0&&c.dt<p.dt*0.85)canh.push({lv:c.dt<p.dt*0.75?"r":"a",t:`Doanh thu tuần ${c.a}–${c.b} giảm ${fbbcF(1-c.dt/p.dt)}`,d:`${tr1(p.dt)} → ${tr1(c.dt)}.`,ai:"Team Digital + Sale"});
-    if(c.dt&&c.qc/c.dt>mx)canh.push({lv:"a",t:`Quảng cáo ${fbbcF(c.qc/c.dt)} doanh thu tuần, trên ngưỡng ${fbbcF(mx)}`,ai:"Team Digital"});
+    if(p.dtChot>0&&c.dtChot<p.dtChot*0.85)canh.push({lv:c.dtChot<p.dtChot*0.75?"r":"a",t:`Doanh thu chốt tuần ${c.a}–${c.b} giảm ${fbbcF(1-c.dtChot/p.dtChot)}`,d:`${tr1(p.dtChot)} → ${tr1(c.dtChot)}.`,ai:"Team Digital + Sale"});
+    if(c.dtChot&&c.qc/c.dtChot>mx)canh.push({lv:"a",t:`Quảng cáo ${fbbcF(c.qc/c.dtChot)} doanh thu chốt tuần, trên ngưỡng ${fbbcF(mx)}`,ai:"Team Digital"});
     if(c.tao>=50&&c.huy/c.tao>FBBC_HUY)canh.push({lv:"a",t:`Hủy tuần ${c.a}–${c.b} ${fbbcF(c.huy/c.tao)}`,ai:"Team Sale"});
     if(hc>FBBC_HOAN)de.push({lv:"b",t:"Gọi xác nhận đơn trước khi giao",d:"Ưu tiên đơn trang bán hàng, giá trị cao."});
-    if(p.dt>0&&c.dt>=p.dt*1.05)de.push({lv:"g",t:`Doanh thu tuần +${fbbcF(c.dt/p.dt-1)}`,d:`${tr1(p.dt)} → ${tr1(c.dt)}${p.qc?", quảng cáo "+(c.qc>=p.qc?"+":"−")+fbbcF(Math.abs(c.qc/p.qc-1)):""}.`})}
+    if(p.dtChot>0&&c.dtChot>=p.dtChot*1.05)de.push({lv:"g",t:`Doanh thu chốt tuần +${fbbcF(c.dtChot/p.dtChot-1)}`,d:`${tr1(p.dtChot)} → ${tr1(c.dtChot)}${p.qc?", quảng cáo "+(c.qc>=p.qc?"+":"−")+fbbcF(Math.abs(c.qc/p.qc-1)):""}.`})}
   if(M&&M.dt){const qp=M.qcT/M.dt,hr=rt(M.hoan,M.giao);
     if(qp>mx)canh.push({lv:"r",t:`Quảng cáo ${fbbcF(qp)} doanh thu, ngưỡng ${fbbcF(mx)}`,d:`Mỗi 1 điểm giảm được ≈ ${tr1(M.dt*0.01)}.`,ai:"Team Digital"});
     if(hr>FBBC_HOAN)canh.push({lv:hr>FBBC_HOAN+0.02?"r":"a",t:`Hoàn ${fbbcF(hr)} (ngưỡng ${fbbcF(FBBC_HOAN)})`,d:`${M.hoan} đơn hoàn.`,ai:"CSKH + Sale"});
