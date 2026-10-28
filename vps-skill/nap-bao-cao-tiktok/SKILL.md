@@ -30,12 +30,20 @@ Gợi ý URL:
 - **Đơn hàng**: `https://seller-vn.tiktok.com/order` → Bộ lọc → *Thời gian đã tạo* → Áp dụng → **Xuất** → *Đơn hàng đã lọc* + **CSV** → đợi ở *Lịch sử xuất* → gài bẫy → **Tải xuống**.
 - **Quyết toán (income)**: `https://seller-vn.tiktok.com/finance/bills` → tab Báo cáo → Xem theo đơn hàng → chọn ngày báo cáo → **Xuất** → popup "Chọn phạm vi ngày để xuất" **trống, phải bấm vào ô và chọn lại đúng 2 ngày rồi bấm OK** → **Xuất** → đợi 1–5 phút (Lịch sử xuất dữ liệu báo "Đã xuất") → gài bẫy → **Tải xuống**.
 
+**File team (đo hiệu quả từng team, chị Hoa giao thêm 28/10) — kéo cùng lượt, cùng khoảng ngày, cùng cách gài bẫy:**
+- **Key metrics** (video inhouse, KOC, live, thẻ SP theo ngày): `https://seller-vn.tiktok.com/compass/data-overview` → khối Số liệu chính → ô ngày → *Tùy chỉnh* → chọn ngày → biểu tượng ⬇ cạnh ô ngày.
+- **Live Performance**: `https://seller-vn.tiktok.com/compass/live-analysis` → ô ngày → *Tùy chỉnh* → chọn ngày → **Xuất** (bấm lần 1 chỉ mở danh sách; bấm lần 2 mới tạo file).
+- **Video › Hiệu suất**: `https://seller-vn.tiktok.com/compass/video-analytics` → ô ngày → *Tùy chỉnh* → biểu tượng ⬇.
+- **Video › Chi tiết** (từng video inhouse): `https://seller-vn.tiktok.com/compass/video-analytics/video-details` → ô ngày góc trên phải → **Xuất** (bấm 2 lần như Live).
+- **Transaction Analysis** và **Creator List** (KOC): `https://affiliate.tiktok.com/insights/transaction-analysis` — trang rất nặng, chụp màn hình hay bị treo; dùng `snapshot` để tìm nút. Không lấy được thì bỏ qua 2 file này và báo, không chờ mãi.
+
 Tên file trên VPS (mỗi tháng một thư mục `/root/bao-cao-san/<YYYY-MM>/`):
 `01_OrderSKUList_<từ>-<đến>.csv`, `02_income_<từ>-<đến>.xlsx`, `03_CampaignOverview_<từ>-<đến>.xlsx` (ngày dạng YYYYMMDD).
+File team: `04_KeyMetrics_…xlsx`, `05_LivePerformance_…xlsx`, `06_VideoPerformance_…xlsx`, `07_VideoList_…xlsx`, `08_TransactionAnalysis_…xlsx`, `09_CreatorList_…xlsx`. Tên file KOC phải giữ khoảng ngày `YYYYMMDD-YYYYMMDD` (công cụ đọc khoảng ngày từ tên).
 
 ## Nạp lên web
 Trong thư mục skill này:
-1. Chạy thử, đọc số: `node nap-tiktok.mjs --as ke-toan-truong-ailla <đơn> <income> <quảng cáo> --ky YYYY-MM --thu`
+1. Chạy thử, đọc số: `node nap-tiktok.mjs --as ke-toan-truong-ailla /root/bao-cao-san/<YYYY-MM>/* --ky YYYY-MM --thu` (đưa hết file vào một lệnh; công cụ tự nhận loại file; chỉ có file team cũng chạy được)
 2. Kiểm: kỳ income in ra đúng khoảng đã chọn; số đơn hợp lý; doanh thu không lệch quá 30% so với tuần trước (cùng tháng). Lệch bất thường thì **dừng, báo chị Thảo**, không nạp.
 3. Nạp thật: chạy lại không có `--thu`.
 4. **Xoá thư mục file** sau khi nạp xong (file đơn có tên, số điện thoại, địa chỉ khách): `rm -rf /root/bao-cao-san/<YYYY-MM>`.

@@ -73,7 +73,7 @@ function tbCostTbl(C,dt,so){const whyR=so.whyR||so.why,whyC=so.whyC||so.why;
     row("ads",L[2].c,L[2].n,L[2].t,"theo kỳ chi tiêu, đã cộng VAT 10%"),
     `<tr class="tb-sum"><td>Lãi đóng góp kênh</td><td class="n">${tbF(C.lai)}</td><td class="n">${tbP(C.lai,dt)}</td><td class="hint">trước chi riêng khác và chi chung</td></tr>`,
     row("rieng","#b06ab3","Chi phí riêng khác của kênh",C.rieng?C.rieng.t:null,C.rieng?(C.rieng.sub.length?"bấm để xem từng khoản · Sổ chi phí":"Sổ chi phí chưa ghi khoản nào cho TikTok"):whyR,C.rieng&&C.rieng.sub),
-    row("chung","#5d6d8e","Chi phí chung phân bổ",C.chung?C.chung.t:null,C.chung?"bấm để xem · theo Quy tắc phân bổ ở Sổ chi phí":whyC,C.chung&&C.chung.sub),
+    row("chung","#5d6d8e","Chi phí chung phân bổ",C.chung?C.chung.t:null,C.chung?(C.chung.sub.length?"bấm để xem · theo Quy tắc phân bổ ở Sổ chi phí":"Sổ chi phí tháng này chưa có khoản chi chung chia cho TikTok"):whyC,C.chung&&C.chung.sub),
     `<tr class="tb-sum"><td>Lợi nhuận ròng kênh</td><td class="n">${C.ln==null?`<span class="hint">chưa có số</span>`:tbF(C.ln)}</td><td class="n">${C.ln==null?"":tbP(C.ln,dt)}</td><td class="hint">sau khi gánh hết chi phí riêng và chi chung</td></tr>`])}
 
 function tbAdmTong(ky,P){
