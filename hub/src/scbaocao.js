@@ -12,18 +12,18 @@
 const SC_FN=[["mkt","Marketing",["G01","G02","G03","G11"]],["ban","Bán hàng và chi phí kênh",["G04","G06","G12","G19"]],["kho","Kho và giao hàng",["G05","G09","G10"]],["sx","Sản xuất",["G15","G16","G17"]],["lg","Lương, thưởng, bảo hiểm",["G07","G08"]],["ql","Quản lý chung",["G13","G14","G18","G21","G24"]],["tc","Tài chính, thuế và khác",["G22"]],["cho","Chờ xác minh",["G20","G23"]]];
 const scFnOf=g=>{const d=scG(g);if(d.fn&&SC_FN.some(x=>x[0]===d.fn))return d.fn;const f=SC_FN.find(x=>x[2].includes(g));return f?f[0]:"ql"};
 const scFnTen=k=>(SC_FN.find(x=>x[0]===k)||[k,k])[1];
-const scFnRow=x=>x.ext&&x.ext.src==="ncc"?"Mua hàng":scFnTen(scFnOf(x.g));
+const scFnRow=x=>x.ext&&x.ext.src==="ncc"?"Chi phí NVL":scFnTen(scFnOf(x.g));
 const scLaCoc=x=>!!(x.ext&&x.ext.src==="ncc"&&/^cọc/i.test(String(x.dg||"")));
 /* Cách xử lý của một dòng (Nhật ký chi, Phân bổ). */
 function scXL(x,qt){
-  if(x.ext&&x.ext.src==="ncc")return scLaCoc(x)?"Chặn":"Vào giá vốn";
+  if(x.ext&&x.ext.src==="ncc")return scLaCoc(x)?"Chặn":"Vào giá thành theo định mức";
   if(x.st==="Chờ duyệt"||x.st==="Chờ CEO duyệt")return "Chờ duyệt";
   if(x.k==="Không tính")return "Chặn";
   if(x.k==="Chờ xác định"||x.st==="Cần rà")return "Chờ";
   if(x.k==="Sản xuất")return "Vào giá thành";
   if(x.k==="Chung"){const r=scQTof(qt||scQT(PERIOD.from.slice(0,7)).qt,x.g);return !r||r.cach==="giu"||!scLaChung(x.g)?"Không chia":"Phân bổ"}
   return SC_KENH.includes(x.k)?"Ghi thẳng":"Chờ"}
-const SC_XLC={"Ghi thẳng":"p-ok","Phân bổ":"p-a","Không chia":"p-c","Vào giá thành":"p-c","Vào giá vốn":"p-c","Chờ":"p-ra","Chờ duyệt":"p-a","Chặn":"p-do"};
+const SC_XLC={"Ghi thẳng":"p-ok","Phân bổ":"p-a","Không chia":"p-c","Vào giá thành":"p-c","Vào giá thành theo định mức":"p-c","Chờ":"p-ra","Chờ duyệt":"p-a","Chặn":"p-do"};
 const scXLP=t=>`<span class="scp ${SC_XLC[t]||"p-c"}">${esc(t)}</span>`;
 const scKpi=(l,v,h,cls)=>`<div class="sckpi${cls?" "+cls:""}"><div class="l">${l}</div><div class="v${v==null?" na":""}">${v==null?"chưa có số":v}</div><div class="h">${h||""}</div></div>`;
 const SC_CS='<span class="scna">chưa có số</span>';
@@ -36,23 +36,25 @@ function scCanhBao(rows,PV){
   const W=[],qm=scQcMax(),{DT}=scDtThang(),A=scAgg(rows),TH=scThieu();
   SC_KENH.forEach(k=>{const qc=["G01","G02","G03"].reduce((s,g)=>s+((A[k]||{})[g]||0),0),dt=DT[k];
     if(dt&&qc&&qc/dt>qm)W.push({m:"do",fn:"mkt",k,t:`${SC_TEN(k)}: quảng cáo bằng ${scPc(qc,dt)} doanh thu thực, vượt ngưỡng ${scPc(qm,1)}.`,d:`Giảm ngân sách nhóm chiến dịch lỗ; về ngưỡng thì quảng cáo khoảng ${scNf(dt*qm)} đ (đang ${scNf(qc)} đ).`})});
-  if(PV){const by=L=>{const o={};L.forEach(x=>{const f=scFnOf(x.g);o[f]=(o[f]||0)+(+x.t||0)});return o},a=by(rows),b=by(PV.rows);
+  if(PV&&!PV.chuaSo){const by=L=>{const o={};L.forEach(x=>{const f=scFnOf(x.g);o[f]=(o[f]||0)+(+x.t||0)});return o},a=by(rows),b=by(PV.rows);
     SC_FN.forEach(([f,n])=>{const t=a[f]||0,p=b[f]||0;if(p&&t>p*1.2&&t-p>5e6)W.push({m:"vang",fn:f,t:`${n} tăng ${scPc(t-p,p)} so ${PV.nhan} (+${scNf(t-p)} đ).`,d:"Mở tab Theo chức năng để xem nhóm nào làm tăng."})})}
   const cho=rows.filter(x=>scLoaiTQ(x)==="cho"),cxd=cho.filter(x=>x.k==="Chờ xác định");
   if(cho.length)W.push({m:"do",fn:"cho",t:`${scNf(scS(cho))} đ chưa đủ căn cứ (${cho.length} khoản): không được đem phân bổ.`,d:"Xử lý ở tab Chờ xử lý trước khi chốt tháng."});
   if(cxd.length)W.push({m:"vang",fn:"kho",t:`${scNf(scS(cxd))} đ chưa biết bổ cho kênh nào.`,d:`Chọn "Bổ vào" ở Nhật ký chi để ghi thẳng cho kênh.`});
   TH.forEach(x=>W.push({m:"thieu",fn:x.g==="G07"?"lg":"mkt",t:x.why,d:""}));
   const o={do:0,vang:1,thieu:2};return W.sort((a,b)=>o[a.m]-o[b.m])}
+/* Kỳ trước chưa nạp sổ (chỉ có khoản tự cộng) mà kỳ này đã có sổ thì không so tổng, tránh báo tăng ảo. */
+const scPrevSo=rows=>{const P=scPrev();if(P&&rows.some(x=>!x.ext)&&!P.rows.some(x=>!x.ext))P.chuaSo=true;return P};
 const SC_MW={do:["p-do","Vượt ngưỡng"],vang:["p-ra","Cần xem"],thieu:["p-c","Thiếu số"]};
 const scWHtml=W=>W.length?W.map(x=>`<div class="scw"><span class="scp ${SC_MW[x.m][0]}">${x.m==="do"&&x.fn==="cho"?"Phải xử lý":SC_MW[x.m][1]}</span><div><div>${esc(x.t)}</div>${x.d?`<div class="hint">→ ${esc(x.d)}</div>`:""}</div></div>`).join(""):'<p class="hint">Không có gì bất thường trong kỳ này.</p>';
 /* ---------- 1. Tổng quan ---------- */
 function scTQ2(){
   scNap();
   const rows=scPBRows();if(!rows.length&&!scThieu().length)return scEmpty();
-  const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,T=scS(rows),PV=scPrev(),CH=scChiaPB(rows),by={kenh:0,chung:0,cho:0,sx:0};
+  const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,T=scS(rows),PV=scPrevSo(rows),CH=scChiaPB(rows),by={kenh:0,chung:0,cho:0,sx:0};
   rows.forEach(x=>by[scLoaiTQ(x)]+=+x.t||0);
   const da=Object.values(CH.kenh).reduce((a,o)=>a+scSum(o),0),con=CH.con.reduce((a,x)=>a+x.t,0);
-  const bud=one?scSum(((scFin().budgets||{})[ym])||{}):0,pT=PV?scS(PV.rows):null;
+  const bud=one?scSum(((scFin().budgets||{})[ym])||{}):0,pT=PV&&!PV.chuaSo?scS(PV.rows):null;
   const kp=`<div class="sck4">
    ${scKpi("Tổng chi phí trong sổ",scNf(T),"Nợ TK 642 và khoản tự cộng · chưa phải tiền đã chi")}
    ${scKpi("Chi phí phân bổ theo kênh",scNf(by.kenh),scPc(by.kenh,T)+" · ghi thẳng, không chia lại")}
@@ -61,7 +63,7 @@ function scTQ2(){
    ${scKpi("Đã phân bổ",one&&da?scNf(da):null,CH.chot?"đã chốt bản "+CH.chot.v:one?"chưa chốt, theo quy tắc hiện tại":"chọn một tháng")}
    ${scKpi("Còn chưa phân bổ",scNf(con),CH.loi.length?"chưa chia được: "+esc(CH.loi[0]):"để ở chi chung công ty")}
    ${scKpi("So với ngân sách",bud?scPc(T,bud):null,bud?"ngân sách "+scNf(bud):"chưa đặt ngân sách tháng này")}
-   ${scKpi("So với kỳ trước",pT?scDl(T,pT):null,PV?(pT?scNf(pT)+" · "+scKyNhan(PV):scKyNhan(PV)+" chưa có số"):"chọn một tháng")}</div>`;
+   ${scKpi("So với kỳ trước",pT?scDl(T,pT):null,PV?(pT?scNf(pT)+" · "+scKyNhan(PV):"sổ "+scKyNhan(PV)+" chưa nạp"):"chọn một tháng")}</div>`;
   const F=SC_FN.map(([f,n])=>[f,n,scS(rows.filter(x=>scFnOf(x.g)===f))]).filter(x=>x[2]),mx=Math.max(1,...F.map(x=>x[2]));
   const cn=`<div class="scch"><div class="scchh"><b>Chi phí theo chức năng</b><span class="hint">bấm để xem các khoản</span></div>${F.map(([f,n,v])=>`<div class="scsb" data-fn="${f}"><span class="n">${esc(n)}</span><span class="b"><i style="width:${v/mx*100}%;background:${f==="cho"?"#b8c7dd":"#2a78d6"}"></i></span><span class="v"><b>${scNf(v)}</b> <span class="hint">${scPc(v,T)}</span></span></div>`).join("")||'<p class="hint">Chưa có khoản chi.</p>'}</div>`;
   const wb=`<div class="scch"><div class="scchh"><b>Đánh giá &amp; cảnh báo</b></div>${scWHtml(scCanhBao(rows,PV))}</div>`;
@@ -72,7 +74,7 @@ const SC_FND={mkt:"Đối chiếu tiền nạp quảng cáo với tiền chạy 
 function scCN(){
   scNap();
   const rows=scPBRows();if(!rows.length)return scEmpty();
-  const T=scS(rows),PV=scPrev(),W=scCanhBao(rows,PV),open=SC.cnOpen||(SC.cnOpen={}),pr=PV?PV.rows:null;
+  const T=scS(rows),PV=scPrevSo(rows),W=scCanhBao(rows,PV),open=SC.cnOpen||(SC.cnOpen={}),pr=PV&&!PV.chuaSo?PV.rows:null;
   const sumF=(L,f)=>scS(L.filter(x=>scFnOf(x.g)===f)),sumG=(L,g)=>scS(L.filter(x=>x.g===g));
   const st=f=>{const L=W.filter(x=>x.fn===f);return L.some(x=>x.m==="do")?`<span class="scp p-do">${f==="cho"?"Phải xử lý":"Vượt ngưỡng"}</span>`:L.some(x=>x.m==="vang")?'<span class="scp p-ra">Cần xem</span>':L.length?'<span class="scp p-c">Thiếu số</span>':'<span class="scp p-ok">Ổn</span>'};
   const body=SC_FN.map(([f,n])=>{const v=sumF(rows,f),p=pr?sumF(pr,f):null;if(!v&&!p)return "";
@@ -147,27 +149,31 @@ function scPBV(){
   const rows=scPBRows();if(!rows.length)return scEmpty();
   const ym=PERIOD.from.slice(0,7),one=PERIOD.to.slice(0,7)===ym,CH=scChiaPB(rows),Q=scQT(ym),ed=scCanDuyet(),R=[];
   const nguon=x=>x.ext?({ads:"Báo cáo quảng cáo",vc:"Phiếu chi vận chuyển",luong:"Bảng lương (cách chia lương từng người)"}[x.ext.src]||x.nguon):"Chứng từ ghi kênh";
-  const go=t=>t==="lg"?`<button class="btn sm" data-scgo-lg="1">Chia lương →</button>`:`<button class="btn sm" data-sct="${t}">${{qt:"Quy tắc phân bổ",nk:"Nhật ký chi",rs:"Chờ xử lý"}[t]} →</button>`;
-  const agg={};rows.forEach(x=>{const xl=scXL(x,CH.qt);const key=xl+"|"+x.g+"|"+x.k+"|"+(x.ext&&x.ext.src==="luong"?"lg":"");const a=agg[key]||(agg[key]={xl,g:x.g,k:x.k,t:0,lg:x.ext&&x.ext.src==="luong",src:nguon(x)});a.t+=+x.t||0});
+  /* Sửa ngay tại tab (chị Hoa 28/10): mở dòng để đổi "Bổ vào" từng khoản (lưu vào sổ, Nhật ký chi đổi theo), sửa cách chia nhóm chi chung, chia lương. */
+  const op=SC.pbOpen||"",go=(a,key)=>{if(!ed)return "";const b=[];if(a.lg)b.push(`<button class="btn sm" data-sct="qt">Chia lương</button>`);
+    if(a.xl==="Phân bổ"||a.xl==="Không chia")b.push(`<button class="btn sm" data-qte="${esc(a.g)}">Sửa cách chia nhóm này</button>`);return b.join(" ")};
+  const agg={};rows.forEach(x=>{const xl=scXL(x,CH.qt);const key=xl+"|"+x.g+"|"+x.k+"|"+(x.ext&&x.ext.src==="luong"?"lg":"");const a=agg[key]||(agg[key]={key,xl,g:x.g,k:x.k,t:0,L:[],lg:x.ext&&x.ext.src==="luong",src:nguon(x)});a.t+=+x.t||0;a.L.push(x)});
   const ord={"Ghi thẳng":0,"Phân bổ":1,"Không chia":2,"Vào giá thành":3,"Chờ":4,"Chờ duyệt":4,"Chặn":5};
-  Object.values(agg).sort((a,b)=>ord[a.xl]-ord[b.xl]||b.t-a.t).forEach(a=>{const n=scG(a.g).n;
-    if(a.xl==="Ghi thẳng")R.push([n,a.t,a.xl,a.src,SC_TEN(a.k),"100%",a.t,'<span class="scp p-ok">Đủ căn cứ</span>',go(a.lg?"lg":"nk")]);
+  Object.values(agg).sort((a,b)=>ord[a.xl]-ord[b.xl]||b.t-a.t).forEach(a=>{const n=scG(a.g).n,A=a;
+    if(a.xl==="Ghi thẳng")R.push([n,a.t,a.xl,a.src,SC_TEN(a.k),"100%",a.t,'<span class="scp p-ok">Đủ căn cứ</span>',go(a,a.key),a]);
     else if(a.xl==="Phân bổ"){const r=scQTof(CH.qt,a.g),nh=SC_KENH.map(k=>[k,((CH.kenh||{})[k]||{})[a.g]||0]).filter(z=>z[1]),got=nh.reduce((s,z)=>s+z[1],0),c=CH.con.filter(z=>z.g===a.g);
-      R.push([n,a.t,a.xl,esc(scQTtxt(r)),nh.length?nh.map(z=>esc(SC_TEN(z[0]))).join(" · "):"—",nh.length?nh.map(z=>scPc(z[1],a.t)).join(" · "):"—",got||null,c.length?`<span class="scp p-ra">${esc(c[0].why)}</span>`:'<span class="scp p-ok">Đủ căn cứ</span>',go("qt")])}
-    else if(a.xl==="Không chia")R.push([n,a.t,a.xl,"Để ở chi chung công ty","Chi chung công ty","—",null,'<span class="scp p-ok">Đủ căn cứ</span>',go("qt")]);
-    else if(a.xl==="Vào giá thành")R.push([n,a.t,a.xl,"Chi phí sản xuất","Sản xuất (giá thành)","—",null,'<span class="scp p-c">Không chia</span>',go("nk")]);
-    else R.push([n,a.t,a.xl,"—",esc(SC_TEN(a.k)),"—",null,`<span class="scp ${a.xl==="Chặn"?"p-do":"p-ra"}">${a.xl==="Chặn"?"Không phải chi phí":"Chờ xác minh"}</span>`,go("rs")])});
+      R.push([n,a.t,a.xl,esc(scQTtxt(r)),nh.length?nh.map(z=>esc(SC_TEN(z[0]))).join(" · "):"—",nh.length?nh.map(z=>scPc(z[1],a.t)).join(" · "):"—",got||null,c.length?`<span class="scp p-ra">${esc(c[0].why)}</span>`:'<span class="scp p-ok">Đủ căn cứ</span>',go(a,a.key),a])}
+    else if(a.xl==="Không chia")R.push([n,a.t,a.xl,"Để ở chi chung công ty","Chi chung công ty","—",null,'<span class="scp p-ok">Đủ căn cứ</span>',go(a,a.key),a]);
+    else if(a.xl==="Vào giá thành")R.push([n,a.t,a.xl,"Chi phí sản xuất","Sản xuất (giá thành)","—",null,'<span class="scp p-c">Không chia</span>',go(a,a.key),a]);
+    else R.push([n,a.t,a.xl,"—",esc(SC_TEN(a.k)),"—",null,`<span class="scp ${a.xl==="Chặn"?"p-do":"p-ra"}">${a.xl==="Chặn"?"Không phải chi phí":"Chờ xác minh"}</span>`,go(a,a.key),a])});
   const ok1=Math.abs(CH.truoc-CH.sau)<1,ok2=!CH.loi.length,V=Q.n?((scFin().pbchot||{})[ym]):[];
   return scBCcss()+`<section class="card flush"><div class="sch pad"><h2>Phân bổ chi phí ${one?"tháng "+ym.slice(5)+"/"+ym.slice(0,4):""}</h2>${Q.chot?`<span class="scp p-ok">Đã chốt bản ${Q.chot.v}</span>`:'<span class="scp p-ra">Chưa chốt</span>'}<span class="sp"></span>${ed&&one?`<button class="btn sm${Q.chot?"":" pri"}" id="scqt-chot">${Q.chot?"Chốt bản điều chỉnh":"Chốt phân bổ tháng này"}</button>`:""}</div>
-  <div class="note" style="margin:0 16px 10px"><b>Tab này chỉ để xem kết quả, không sửa trực tiếp.</b> Đổi cách chia: <b>Quy tắc phân bổ</b> (chị Huệ). Lương từng người: <b>Lương theo phòng ban và kênh</b>. Khoản ghi nhầm kênh: ô "Bổ vào" ở <b>Nhật ký chi</b>. Khoản bị chặn: <b>Chờ xử lý</b>. Tháng đã chốt thì phải chốt bản điều chỉnh.</div>
-  <div class="tbl"><table><thead><tr><th>Khoản chi phí</th><th class="n">Số tiền gốc</th><th>Cách xử lý</th><th>Tiêu thức</th><th>Kênh nhận</th><th class="n">Tỷ lệ</th><th class="n">Số nhận</th><th>Tình trạng</th><th>Sửa ở</th></tr></thead><tbody>
-  ${R.map(r=>`<tr><td>${esc(r[0])}</td><td class="n">${scNf(r[1])}</td><td>${scXLP(r[2])}</td><td>${r[3]}</td><td>${r[4]}</td><td class="n">${r[5]}</td><td class="n">${r[6]==null?"—":scNf(r[6])}</td><td>${r[7]}</td><td>${r[8]}</td></tr>`).join("")}
-  <tr class="tot"><td>Tổng</td><td class="n">${scNf(scS(rows))}</td><td colspan="7"></td></tr></tbody></table></div>
+  <div class="note" style="margin:0 16px 10px">Bấm vào một dòng để xem các khoản bên trong: ghi sai kênh thì chọn lại kênh ngay ở đó (Nhật ký chi đổi theo); nhóm chi chung có nút sửa cách chia, dòng lương có nút chia lương. Khoản "tự cộng" (quảng cáo, vận chuyển lấy từ báo cáo) chỉ xem. Tháng đã chốt thì phải chốt bản điều chỉnh.</div>
+  <div class="tbl"><table><thead><tr><th>Khoản chi phí</th><th class="n">Số tiền gốc</th><th>Cách xử lý</th><th>Tiêu thức</th><th>Kênh nhận</th><th class="n">Tỷ lệ</th><th class="n">Số nhận</th><th>Tình trạng</th></tr></thead><tbody>
+  ${R.map(r=>`<tr class="clk" data-pbo="${esc(r[9].key)}" title="Bấm để xem các khoản"><td>${op===r[9].key?"▾":"▸"} ${esc(r[0])}</td><td class="n">${scNf(r[1])}</td><td>${scXLP(r[2])}</td><td>${r[3]}</td><td>${r[4]}</td><td class="n">${r[5]}</td><td class="n">${r[6]==null?"—":scNf(r[6])}</td><td>${r[7]}</td></tr>`+(op===r[9].key&&r[8]?`<tr class="scsub"><td colspan="8">${r[8]}</td></tr>`:"")+(r[9]&&op===r[9].key?r[9].L.slice().sort((a,b)=>(b.t||0)-(a.t||0)).map(x=>`<tr class="scsub"><td>${x.d?scDd(x.d):'<span class="hint">cả kỳ</span>'} <span class="mono">${esc(x.ct||"")}</span> ${esc(x.dg||"")}${x.gc?`<div class="hint">${esc(x.gc)}</div>`:""}</td><td class="n">${scNf(x.t)}</td><td colspan="3"></td><td colspan="2">${!x.ext?`<select class="scbv" data-bv="${esc(x.id)}" aria-label="Bổ khoản chi vào">${SC_COLS.map(k=>`<option value="${k}"${x.k===k?" selected":""}>${esc(SC_TEN(k))}</option>`).join("")}</select>`:esc(SC_TEN(x.k))+' <span class="hint">tự cộng</span>'}</td><td>${scStP(x.st)}</td></tr>`).join(""):"")).join("")}
+  <tr class="tot"><td>Tổng</td><td class="n">${scNf(scS(rows))}</td><td colspan="6"></td></tr></tbody></table></div>
   <p class="hint pad">Kiểm tra trước khi chốt: chi chung trước chia ${scNf(CH.truoc)} đ ${ok1?"= sau chia ✓":"≠ sau chia ✗"} · ${ok2?"tỷ lệ, doanh thu đủ để chia ✓":"chưa chia được: "+esc(CH.loi.join("; "))} · khoản chờ xác minh không nằm trong bảng chia ✓ · không khoản nào vừa ghi thẳng vừa chia ✓</p></section>
   <section class="card pad"><h2>Lịch sử phiên bản</h2>${V.length?`<div class="tbl"><table><thead><tr><th>Bản</th><th>Người chốt</th><th>Lúc</th><th>Ghi chú</th></tr></thead><tbody>${V.slice().reverse().map(x=>`<tr><td>Bản ${x.v}</td><td>${esc(x.by||"")}</td><td>${new Date(x.at).toLocaleString("vi-VN")}</td><td>${esc(x.ghi||"")}</td></tr>`).join("")}</tbody></table></div>`:'<p class="hint">Chưa có bản chốt. Chốt xong thì sửa quy tắc không làm đổi số tháng này; muốn đổi phải chốt bản điều chỉnh, ghi lý do, bản cũ giữ nguyên.</p>'}</section>`}
 /* Số việc ở tab Chờ xử lý. */
 const scChoN=()=>{try{const r=scPBRows();return r.filter(x=>scLoaiTQ(x)==="cho").length+scCho().filter(scInP).length}catch(e){return 0}};
 function scBCbind(m){
+  m.querySelectorAll("[data-pbo]").forEach(b=>b.onclick=()=>{SC.pbOpen=SC.pbOpen===b.dataset.pbo?"":b.dataset.pbo;renderMain()});
+  m.querySelectorAll("[data-nkv]").forEach(el=>el.onclick=()=>{SC.nkv=el.dataset.nkv;Object.assign(SC,{g:"",k:"",st:"",fn:"",xl:""});renderMain()});
   m.querySelectorAll("[data-fn]").forEach(el=>el.onclick=()=>{SC.tab="cn";(SC.cnOpen=SC.cnOpen||{})[el.dataset.fn]=1;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-cnf]").forEach(el=>el.onclick=()=>{const o=SC.cnOpen=SC.cnOpen||{},f=el.dataset.cnf;o[f]=!o[f];renderMain()});
   m.querySelectorAll("[data-scgo-lg]").forEach(b=>b.onclick=()=>{PAGE="cp_luong";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});

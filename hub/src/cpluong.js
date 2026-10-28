@@ -13,7 +13,8 @@
    - Bật "Tính lương từ bảng lương" thì dòng Lương nhập tay trong sổ không cộng vào bảng kênh nữa (tránh tính hai lần).
    - Chỉ người có quyền làm lương (hoặc CEO) thấy trang này.
    ===================================================================== */
-const cpLgCan=()=>!!ME&&(ME.role==="admin"||can(ME,"luong.quanly"));
+/* Kế toán duyệt chi (chị Huệ) cũng đặt được cách chia lương ngay trong Sổ chi phí (chị Hoa 28/10). */
+const cpLgCan=()=>!!ME&&(ME.role==="admin"||can(ME,"luong.quanly")||(typeof scCanDuyet==="function"&&scCanDuyet()));
 const cpLgYm=()=>{const f=PERIOD.from.slice(0,7);return PERIOD.to.slice(0,7)===f?f:""};
 /* Lương từng người của một tháng: {ok, st, rows:[{ma,ten,pb,tong}]} */
 function cpLgRows(ym){
