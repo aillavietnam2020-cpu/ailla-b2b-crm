@@ -1102,3 +1102,9 @@ td.bvstc .bvwl{max-width:172px}
 .xkenh td:first-child{white-space:nowrap}
 .xchi{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;color:#fff;font-size:12.5px;font-weight:800;margin-right:8px;vertical-align:middle;line-height:1}
 .xchi .ic{width:13px;height:13px;stroke:#fff}
+/* Hai khung Tổng quan luôn cao bằng nhau (chị Hoa 29/10): khung bảng kênh giãn bảng cho đầy, các dòng chia đều chiều cao. */
+.xrow2{align-items:stretch}
+.xrow2>.xkenh{display:flex;flex-direction:column}
+.xrow2>.xkenh>.tbl{flex:1;display:flex}
+.xrow2>.xkenh>.tbl>table{height:100%}
+.xkenh td,.xkenh th{height:auto!important}
