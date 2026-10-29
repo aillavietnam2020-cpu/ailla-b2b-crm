@@ -87,10 +87,25 @@ function speReadAds(rows){
   return {shop,days,nap};
 }
 
+/* Giá vốn theo hàng xuất kho (chị Hoa chốt 29/10/2026): ghép đơn trong file Shopee với đơn Poscake đã xuất kho cùng mã đơn
+   để biết mỗi sản phẩm/phân loại Shopee là mã Poscake nào (sku + phân loại), rồi quy đổi ra hàng kho như trang Kho.
+   pos: [{o: mã đơn, sku, vr: phân loại}] (channel_order_lines). Trả {speKey: {sku, vr}} theo số đơn khớp nhiều nhất. */
+function speLearnPos(lines,pos){
+  const nz=s=>String(s||"").toLowerCase().replace(/[^\p{L}\p{N}]/gu,""),P={},E={},vote={};
+  (pos||[]).forEach(p=>{if(!p||!p.o||!p.sku)return;const a=P[p.o]||(P[p.o]={});a[p.sku+"|"+(p.vr||"")]={sku:String(p.sku),vr:p.vr||""}});
+  (lines||[]).forEach(l=>{if(!P[l.o])return;const a=E[l.o]||(E[l.o]={});a[speKey(l.pn,l.vr)]=l.vr});
+  const add=(k,p)=>{const v=vote[k]||(vote[k]={}),id=p.sku+"|"+p.vr;(v[id]=v[id]||{p,n:0}).n++};
+  Object.entries(E).forEach(([o,ex])=>{const ps=Object.values(P[o]),ks=Object.keys(ex);
+    if(ks.length===1&&new Set(ps.map(p=>p.sku+"|"+p.vr)).size===1){add(ks[0],ps[0]);return}
+    ks.forEach(k=>{const m=ps.filter(p=>nz(p.vr)&&nz(p.vr)===nz(ex[k]));if(new Set(m.map(p=>p.sku+"|"+p.vr)).size===1)add(k,m[0])})});
+  const out={};Object.entries(vote).forEach(([k,v])=>{const b=Object.values(v).sort((a,c)=>c.n-a.n)[0];out[k]={sku:b.p.sku,vr:b.p.vr}});
+  return out;
+}
+
 /* ---------- Gom tháng của MỘT shop ----------
    costOf(line) → {u: giá vốn 1 đơn vị bán, why} ; u = null khi chưa có giá vốn / chưa quy đổi.
    Trả: số tháng có dòng sản phẩm, số theo ngày [doanh thu, phí sàn (âm), giá vốn, lãi gộp, đơn, quảng cáo]. */
-function speBuildMonth({ky,shop,orders,fin,ads,costOf}){
+function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   const L=orders.lines,F=fin.ord,den=fin.partial?L.reduce((m,l)=>l.d>m?l.d:m,""):null;
   /* Shopee là nguồn sự thật về hoàn tiền: tổng hàng hoá về 0 = hoàn toàn bộ. */
   const hoan=new Set(Object.keys(F).filter(id=>F[id].gross>0&&Math.abs(F[id].gross+F[id].hoan)<1));
@@ -112,7 +127,8 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf}){
     const dd=days[l.d]||(days[l.d]={dt:0,phi:0,gv:0,don:0,sk:{}});dd.dt+=dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.sk[k]=(dd.sk[k]||0)+l.q;
     if(!dayOrd[l.d+"|"+l.o]){dayOrd[l.d+"|"+l.o]=1;dd.don++}});
   /* Giá vốn: mã chưa có giá vốn KHÔNG ước (chị Hoa duyệt 28/10/2026): để 0, đánh dấu uoc = "chưa tính giá vốn"; dtUocGv = doanh thu chưa tính giá vốn. */
-  const rows=Object.entries(sku).map(([k,s])=>{const c=(costOf&&costOf(s))||{u:null,why:"Chưa quy đổi mã"};return {k,...s,phi:s.f.reduce((a,b)=>a+b,0),c,u:c.u}});
+  const learn=pos?speLearnPos(L,pos):{};
+  const rows=Object.entries(sku).map(([k,s])=>{if(learn[k])s.ps=learn[k];const c=(costOf&&costOf(s))||{u:null,why:"Chưa quy đổi mã"};return {k,...s,phi:s.f.reduce((a,b)=>a+b,0),c,u:c.u}});
   const gvRate=null;
   rows.forEach(r=>{r.uoc=r.u==null;r.gv=r.uoc?0:Math.round(r.u*r.q);r.dt=Math.round(r.dt);r.lg=r.dt+r.phi-r.gv});
   const byK={};rows.forEach(r=>byK[r.k]=r);

@@ -489,3 +489,35 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 .kvb{font-weight:700}.kvb.kg{color:#1a7f37}.kvb.ka{color:#9a6700}.kvb.kr{color:#b42318}
 .kvsrc{padding:10px 16px 14px;border-top:1px solid #eef0f6}.kvsrc summary{cursor:pointer;color:#4b54d1;font-weight:600;font-size:13px}
 .kvsrc ul{margin:8px 0 6px 18px;padding:0;font-size:12.5px;color:#4a5168;line-height:1.5}
+
+/* ===== Cửa sổ nổi giữa màn hình kiểu Poscake (chị Hoa 29/10) ===== */
+.drawer{justify-content:center;align-items:center;padding:3vh 2vw}
+.drawer .in{width:min(1100px,96vw);height:auto;max-height:94vh;border-radius:14px;box-shadow:0 24px 64px rgba(16,24,40,.35)}
+.pop{position:fixed;inset:0;z-index:65;background:rgba(16,24,40,.42);display:flex;justify-content:center;align-items:center;padding:3vh 2vw}
+.pop[hidden]{display:none}
+.pop-in{position:relative;width:min(1280px,96vw);max-height:94vh;overflow:auto;background:#f6f7fb;border-radius:14px;box-shadow:0 24px 64px rgba(16,24,40,.35);padding:14px 16px 20px}
+.pop-in>#popx{position:sticky;top:0;float:right;width:34px;height:34px;border:0;border-radius:50%;background:#fff;color:#4b5565;font-size:15px;cursor:pointer;z-index:3;box-shadow:0 1px 3px rgba(20,30,60,.15)}
+.pop-in>#popx:hover{background:#e3e7f3}
+body.pop-open{overflow:hidden}
+@media(max-width:700px){.drawer,.pop{padding:0}.drawer .in,.pop-in{width:100%;max-height:100%;height:100%;border-radius:0}}
+
+/* Phải thu gọn (chị Hoa 29/10) */
+.ptgon .ptgon-h{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ptgon .ptleg{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:#475069}.ptgon .ptleg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.ptgon .ptbar{height:8px;margin:8px 0 2px}
+.ptgon table.pttop td{padding:4px 8px;font-size:13px}.ptgon table.pttop th{font-size:12px}
+.ptmini{height:6px;background:#eef0f6;border-radius:4px;overflow:hidden}.ptmini span{display:block;height:100%;background:#5b6ee1;border-radius:4px;overflow:hidden}.ptmini i{display:block;height:100%;background:#d92d20}
+.pttop2{display:grid;grid-template-columns:1fr 1fr;column-gap:28px;margin-top:4px}
+.pttop2 .ptr{display:grid;grid-template-columns:18px minmax(0,1.3fr) minmax(60px,1fr) 64px 60px;gap:8px;align-items:center;height:24px;font-size:12.5px;border-bottom:1px solid #f0f2f6}
+.pttop2 .ptr .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pttop2 .n{text-align:right}.pttop2 .t-red{color:#d92d20}
+@media(max-width:900px){.pttop2{grid-template-columns:1fr}}
+/* Phải thu: ô số đầu trang (chị Hoa 29/10) */
+.ptacts{display:flex;justify-content:flex-end;margin:-4px 0 8px}
+.pttiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.pttile{display:flex;gap:12px;align-items:center;background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 3px rgba(20,30,60,.06)}
+.pttile .pti{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center}.pttile .pti .ic{width:20px;height:20px}
+.pttile .ptl{font-size:12px;color:#667085;font-weight:600}.pttile .ptv{font-size:19px;font-weight:700;color:#1f2433;line-height:1.25;margin:2px 0}.pttile .pth{font-size:11.5px;color:#8a93a6}
+.pttile.t-pnk .pti{background:#fdeef4;color:#e7357b}.pttile.t-red .pti{background:#fdecec;color:#d92d20}.pttile.t-red .ptv{color:#b42318}
+.pttile.t-grn .pti{background:#e8f6ee;color:#12a150}.pttile.t-amb .pti{background:#fff6e5;color:#dc8a00}
+.pttile.t-blu .pti{background:#eaf1fe;color:#2e6ff2}.pttile.t-vio .pti{background:#f1edfd;color:#6d4ae6}
+@media(max-width:1300px){.pttiles{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:700px){.pttiles{grid-template-columns:1fr 1fr}}

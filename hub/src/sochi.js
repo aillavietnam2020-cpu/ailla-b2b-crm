@@ -123,7 +123,7 @@ function scForm(){
    <div id="scf-ck" class="row4"><label class="field">Chi từ tài khoản công ty<select id="scf-from"><option value="">Đang tải…</option></select></label><label class="field">Chuyển đến (ngân hàng · số tài khoản)<input id="scf-to" placeholder="Ví dụ: MB · 0929927999"></label></div>
    <label class="field" id="scf-fxw" hidden>Tài khoản chi khác<input id="scf-fx" placeholder="Ngân hàng · số tài khoản · tên chủ tài khoản"></label>
    <label class="field">Nội dung chi (ghi rõ chi cho việc gì)<input id="scf-dg" required placeholder="Ví dụ: Cước xe giao hàng NPP Hải Dương"></label>
-   <div class="row4"><label class="field">Nhóm chi phí<select id="scf-g">${opt(dm.map(x=>[x.g,x.g+" · "+x.n]),"")}</select></label><label class="field">Bổ vào (kênh / nơi chịu)<select id="scf-k">${opt(SC_COLS.slice(0,8).map(x=>[x,x]),"Chung")}</select></label></div><label class="field">Thuộc đơn mua (phí vận chuyển, lắp đặt… của đơn nào; không thuộc thì để trống)<select id="scf-po">${scDonOpt("")}</select></label><div id="scf-pog" class="hint" hidden></div><div id="scf-pon" class="note" hidden></div><div id="scf-tsn" class="note" hidden>Mua máy móc, thiết bị, công cụ: chọn nhóm <b>G28 · Mua tài sản cố định / công cụ dụng cụ</b> (không tính vào chi phí tháng). Lưu phiếu xong, mở lại phiếu và bấm <b>"Ghi tăng tài sản / công cụ"</b> để vào sổ Công cụ dụng cụ / Tài sản cố định; chi phí sẽ được phân bổ, khấu hao dần hằng tháng.</div>
+   <div class="row4"><label class="field">Nhóm chi phí<select id="scf-g">${opt(dm.map(x=>[x.g,x.g+" · "+x.n]),"")}</select></label><label class="field">Bổ vào (kênh / nơi chịu)<select id="scf-k">${opt(SC_COLS.slice(0,8).map(x=>[x,x]),"Chung")}</select></label></div><label class="field" id="scf-pow" hidden>Thuộc đơn mua (phí vận chuyển, lắp đặt… của đơn nào; không thuộc thì để trống)<select id="scf-po">${scDonOpt("")}</select></label><div id="scf-pog" class="hint" hidden></div><div id="scf-pon" class="note" hidden></div><div id="scf-tsn" class="note" hidden>Mua máy móc, thiết bị, công cụ: chọn nhóm <b>G28 · Mua tài sản cố định / công cụ dụng cụ</b> (không tính vào chi phí tháng). Lưu phiếu xong, mở lại phiếu và bấm <b>"Ghi tăng tài sản / công cụ"</b> để vào sổ Công cụ dụng cụ / Tài sản cố định; chi phí sẽ được phân bổ, khấu hao dần hằng tháng.</div>
    <div class="row4"><label class="field">Số tiền (đ)<input type="number" id="scf-t" min="1" required></label><label class="field">Chứng từ kèm (hóa đơn, ảnh chuyển khoản)<input type="file" id="scf-f" multiple accept="image/*,application/pdf"></label></div>
    <label class="field">Ghi chú<input id="scf-gc"></label><div id="scf-e"></div>
    <button class="btn pri">${scCanDuyet()?"Ghi vào sổ":"Gửi chị Huệ duyệt"}</button></form>
@@ -140,11 +140,14 @@ function scForm(){
   const sug=()=>{const v=$("#scf-dg").value;if(v.length<3)return;const de=scDeXuat(v);$("#scf-g").value=de.g;if(SC_COLS.includes(de.k))$("#scf-k").value=de.k;tsn()};
   /* Chị Hoa 28/10 "thế có tự động không?": web tự chọn đơn mua khớp (tên nhà cung cấp / hàng trong người nhận, nội dung; số tiền; ngày gần đơn) như Ghi tăng (tsTimDon).
      Người ghi chọn tay thì thôi tự chọn. */
-  const goiY=()=>{const s=$("#scf-po");if(!s||s.dataset.tay||typeof tsTimDon!=="function")return;
+  /* Chị Hoa 29/10: ô "Thuộc đơn mua" chỉ hiện ở nhóm mua hàng / tài sản / cước (SC_NHOM_DON), phiếu quảng cáo… không hiện cho đỡ rối. */
+  const poHien=()=>{const on=SC_NHOM_DON.includes($("#scf-g").value)||!!$("#scf-po").value;$("#scf-pow").hidden=!on;if(!on){$("#scf-pog").hidden=true;$("#scf-pon").hidden=true}return on};
+  $("#scf-g").addEventListener("change",()=>{if(!SC_NHOM_DON.includes($("#scf-g").value)&&!$("#scf-po").dataset.tay)$("#scf-po").value="";poHien();goiY()});
+  const goiY=()=>{const s=$("#scf-po");if(!s||s.dataset.tay||typeof tsTimDon!=="function")return;if(!SC_NHOM_DON.includes($("#scf-g").value)){poHien();return}
     const d=tsTimDon({t:+$("#scf-t").value||0,d:$("#scf-d").value,nn:$("#scf-nn").value,dg:$("#scf-dg").value,gc:$("#scf-gc").value}),id=d?d.p.id:"",gy=$("#scf-pog");
     if(id&&![...s.options].some(o=>o.value===id))s.innerHTML=scDonOpt(id);
     if(s.value!==id){s.value=id;s.onchange()}
-    gy.hidden=!id;if(id)gy.textContent="Web tự chọn đơn "+d.p.no+" (khớp nhà cung cấp / số tiền / ngày). Không đúng thì chọn lại."};
+    poHien();gy.hidden=!id;if(id)gy.textContent="Web tự chọn đơn "+d.p.no+" (khớp nhà cung cấp / số tiền / ngày). Không đúng thì chọn lại."};
   $("#scf-po").addEventListener("input",()=>{$("#scf-po").dataset.tay="1";$("#scf-pog").hidden=true});
   ["scf-t","scf-nn","scf-gc"].forEach(i=>$("#"+i).addEventListener("change",goiY));
   $("#scf-dg").onchange=()=>{sug();goiY()};$("#scf-d").onchange=e=>{$("#scf-so").value=scSoPhieu(e.target.value);goiY()};
@@ -155,7 +158,7 @@ function scForm(){
     const ckOn=$("#scf-ht").value==="Chuyển khoản",fromAcc=ckOn?($("#scf-from").value==="__x"?$("#scf-fx").value.trim():$("#scf-from").value):"";
     if(ckOn&&!fromAcc){$("#scf-e").innerHTML=`<div class="note red">Chuyển khoản: chọn tài khoản công ty chi tiền (hoặc ghi tài khoản khác).</div>`;return}
     const btn=e.submitter;if(btn)btn.disabled=true;
-    const ngay=$("#scf-d").value,row={id:uid("pc"),tkc:fromAcc,tkn:ckOn?$("#scf-to").value.trim():"",d:ngay,ct:scSoPhieu(ngay),lct:"Phiếu chi",dg,tk:$("#scf-ht").value==="Tiền mặt"?"1111":"1121",t,g:$("#scf-g").value,k:$("#scf-g").value==="G28"?"Không tính":$("#scf-k").value,gc:$("#scf-gc").value.trim(),dn:$("#scf-dn").value.trim(),bp:$("#scf-bp").value,nn:$("#scf-nn").value.trim(),ht:$("#scf-ht").value,src:"phieu",by:ME.name,at:Date.now(),...($("#scf-po").value?{po:$("#scf-po").value}:{})};
+    const ngay=$("#scf-d").value,row={id:uid("pc"),tkc:fromAcc,tkn:ckOn?$("#scf-to").value.trim():"",d:ngay,ct:scSoPhieu(ngay),lct:"Phiếu chi",dg,tk:$("#scf-ht").value==="Tiền mặt"?"1111":"1121",t,g:$("#scf-g").value,k:$("#scf-g").value==="G28"?"Không tính":$("#scf-k").value,gc:$("#scf-gc").value.trim(),dn:$("#scf-dn").value.trim(),bp:$("#scf-bp").value,nn:$("#scf-nn").value.trim(),ht:$("#scf-ht").value,src:"phieu",by:ME.name,at:Date.now(),...($("#scf-po").value&&!$("#scf-pow").hidden?{po:$("#scf-po").value}:{})};
     /* Từ ngưỡng chi (mặc định 5 triệu, chị Hoa chốt 27/10/2026): kế toán ghi cũng phải chờ chị Hoa duyệt mới vào sổ. */
     const lenCeo=scCanDuyet()&&scCanCeo(row.t);
     if(lenCeo)DB.mutate(ME.name,"ghi phiếu chi chờ CEO "+row.ct,dt=>{(dt.pcCho=dt.pcCho||[]).push({...row,st:"Chờ CEO duyệt",ceoCho:1,ktDuyet:ME.name,ktAt:Date.now()})});
@@ -182,7 +185,7 @@ function scPhieu(x,cho){
    <tr><td class="hint">TK đề xuất / đối ứng</td><td>${esc(scG(x.g).tk)} / ${esc(x.tk||"—")}</td></tr><tr><td class="hint">Loại</td><td>${scLoP(scG(x.g).lo)}</td></tr>
    <tr><td class="hint">Tình trạng</td><td>${ed?`<select id="scp-st">${opt([["Ổn","Ổn"],["Cần rà","Cần rà"]],x.st)}</select>`:scStP(x.st)}</td></tr>
    <tr><td class="hint">Ghi chú rà soát</td><td>${ed?`<input id="scp-gc" value="${esc(x.gc||"")}" style="width:100%">`:esc(x.gc||"—")}</td></tr>
-   ${(()=>{const pid=scPoCua(x),p=pid&&(MH.orders||[]).find(o=>o.id===pid);return ed?`<tr><td class="hint">Thuộc đơn mua</td><td><select id="scp-po">${scDonOpt(x.po||"")}</select>${p&&!x.po?`<div class="hint">Web đoán khớp đơn ${esc(p.no)} (theo số tiền, nhà cung cấp)</div>`:""}${p?` <button type="button" class="lnk" data-mhgo="${esc(p.id)}">Mở đơn ${esc(p.no)}</button>`:""}</td></tr>`:p?`<tr><td class="hint">Đơn mua</td><td><button type="button" class="lnk" data-mhgo="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name||"")}</button></td></tr>`:""})()}
+   ${(()=>{const pid=scPoCua(x),p=pid&&(MH.orders||[]).find(o=>o.id===pid);if(!x.po&&!SC_NHOM_DON.includes(x.g))return "";return ed?`<tr><td class="hint">Thuộc đơn mua</td><td><select id="scp-po">${scDonOpt(x.po||"")}</select>${p&&!x.po?`<div class="hint">Web đoán khớp đơn ${esc(p.no)} (theo số tiền, nhà cung cấp)</div>`:""}${p?` <button type="button" class="lnk" data-mhgo="${esc(p.id)}">Mở đơn ${esc(p.no)}</button>`:""}</td></tr>`:p?`<tr><td class="hint">Đơn mua</td><td><button type="button" class="lnk" data-mhgo="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name||"")}</button></td></tr>`:""})()}
    <tr><td class="hint">Người đề nghị · bộ phận</td><td>${esc([x.dn,x.bp].filter(Boolean).join(" · ")||"—")}</td></tr><tr><td class="hint">Người nhận · hình thức</td><td>${esc([x.nn,x.ht].filter(Boolean).join(" · ")||"—")}</td></tr>${x.tkc||x.tkn?`<tr><td class="hint">Tiền đi từ tài khoản</td><td>${esc(x.tkc||"—")}${x.tkn?`<br><small class="hint">Chuyển đến: ${esc(x.tkn)}</small>`:""}</td></tr>`:""}
    <tr><td class="hint">Chứng từ</td><td>${nf?nf+" ảnh":"chưa có"} <button type="button" class="btn sm" id="scp-f">Xem / thêm ảnh</button></td></tr></tbody></table></div>
    <p class="acts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${["G28","G15"].includes(x.g)&&typeof tsGhiTangTuPhieu==="function"?((typeof tsCanGhiTang==="function"?tsCanGhiTang():typeof tsCanGhi==="function"&&tsCanGhi())?`<button class="btn" id="scp-ts">${typeof tsCuaPhieu==="function"&&tsCuaPhieu(x.id)?"Xem tài sản / công cụ đã ghi tăng":"Ghi tăng tài sản / công cụ"}</button>`:`<span class="hint">Phiếu mua tài sản / công cụ: kế toán (chị Huệ) ghi tăng vào sổ Tài sản / Công cụ dụng cụ.</span>`):""}${ed?`<button class="btn pri" id="scp-luu">Lưu</button><button class="btn" id="scp-tach">Tách khoản</button><button class="btn danger" id="scp-xoa">Xóa dòng</button>`:""}${cho&&scCanDuyet()?`<button class="btn pri" id="scp-ok">Duyệt vào sổ</button><button class="btn danger" id="scp-tl">Trả lại</button>`:""}</p><div id="scp-cf"></div>`);
@@ -232,6 +235,8 @@ function scDonOpt(cur){const tu=new Date(Date.now()-270*864e5).toISOString().sli
   const L=((typeof MH!=="undefined"&&MH.orders)||[]).filter(p=>p.status!=="HUY"&&(p.id===cur||String(p.order_date||"")>=tu)).sort((a,b)=>String(b.order_date||"").localeCompare(String(a.order_date||"")));
   return `<option value="">— Không thuộc đơn mua —</option>`+L.map(p=>`<option value="${esc(p.id)}"${p.id===cur?" selected":""}>${esc(p.no)} · ${esc(p.supplier_name||"")} · ${esc((p.lines||[]).map(l=>l.name||l.item).join(", ").slice(0,50))}</option>`).join("")}
 /* Đơn mua của một phiếu chi: đã chọn (x.po), hoặc web đoán theo số tiền / NCC / ngày (tsTimDon). */
+/* Nhóm chi có thể thuộc một đơn mua: NVL / sản xuất, cước vật tư đầu vào, mua tài sản / công cụ. */
+const SC_NHOM_DON=["G15","G16","G17","G28"];
 const scPoCua=x=>x.po||(typeof tsTimDon==="function"&&((tsTimDon(x)||{}).p||{}).id)||"";
 /* Đơn mua của một phiếu trả nhà cung cấp (MH.pay): theo po_id, hoặc theo chứng từ (receipt_ids của chứng từ) như mhPoMoney. */
 function scDonCuaPay(x){const O=(typeof MH!=="undefined"&&MH.orders)||[];if(!x)return [];if(x.po_id){const p=O.find(o=>o.id===x.po_id);return p?[p]:[]}
@@ -313,9 +318,8 @@ function scNK(){
   ${!MH.pay||!SOCP.ship?`<p class="hint pad">Đang tải các khoản chi ở Mua hàng và Vận chuyển…</p>`:""}
   ${scThieuHtml()}
   ${R.length?`<div class="tbl"><table class="scnk gd"><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>Liên quan</th><th>Nguồn</th><th>Kênh / nơi chịu</th><th>Chức năng</th><th>Cách xử lý</th><th>Tình trạng</th></tr></thead><tbody>
-  ${R.map(row).join("")}
-  <tr class="tot"><td colspan="3">Cộng ${R.length} khoản${R.length<all.length?" (đang lọc)":""}</td><td class="n">${scNf(scS(R))}</td><td colspan="7"></td></tr>
-  ${sE?`<tr><td colspan="3" class="hint">trong đó trả nhà cung cấp hàng, nguyên vật liệu (vào giá thành theo định mức, không phân bổ)</td><td class="n">${scNf(sE)}</td><td colspan="7"></td></tr>`:""}${sT?`<tr><td colspan="3" class="hint">trong đó mua tài sản / công cụ (không tính chi phí tháng, khấu hao / phân bổ dần)</td><td class="n">${scNf(sT)}</td><td colspan="7"></td></tr>`:""}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
+  ${gdCat(R,SC.nkp||(SC.nkp={co:gdCoNho("nk",100),trang:1})).map(row).join("")}
+</tbody></table></div>${gdChan(`<span>Cộng <b>${R.length}</b> khoản${R.length<all.length?" (đang lọc)":""}: <b>${scNf(scS(R))}</b> đ</span>${sE?`<span class="hint">trong đó trả NCC hàng, NVL (vào giá thành): <b>${scNf(sE)}</b></span>`:""}${sT?`<span class="hint">mua tài sản / công cụ (phân bổ dần): <b>${scNf(sT)}</b></span>`:""}`,R.length,SC.nkp,"nk")}`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
 /* Doanh thu thực tự lấy để chia chi chung: dùng hàm doanh thu chung của web (dtShownMonth, chat Doanh thu 27/10),
    chưa có hàm đó thì lấy execNums như trước. Shopee là số chung 2 shop nên Mall / thường vẫn nhập tay. */
 function scAutoDT(ym){const o={};
@@ -425,7 +429,7 @@ function pSoChi(m){
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn};
   on("sc-new",()=>scForm());on("sc-imp",()=>scImport());
   on("sc-ncc",async()=>{await mhLoad();mhLoadInv();mhPayForm()});on("sc-vc",()=>{SC.tab="nk";SC.ng="Phiếu chi vận chuyển";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
-  [["scf-fg","g"],["scf-fk","k"],["scf-fs","st"],["scf-fq","q"],["scf-fn","fn"],["scf-fx","xl"],["scf-fng","ng"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SC[k]=e.value;renderMain()}});
+  [["scf-fg","g"],["scf-fk","k"],["scf-fs","st"],["scf-fq","q"],["scf-fn","fn"],["scf-fx","xl"],["scf-fng","ng"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SC[k]=e.value;if(SC.nkp)SC.nkp.trang=1;renderMain()}});
   {const mo=document.getElementById("scf-more");if(mo)mo.onclick=()=>{SC.more=!SC.more;renderMain()};
    const cl=document.getElementById("scf-clr");if(cl)cl.onclick=()=>{["ng","g","k","fn","xl","st","q"].forEach(k=>SC[k]="");renderMain()}}
   const findR=id=>scRows().find(x=>x.id===id)||((scFin().nkc)||[]).find(x=>x.id===id);
@@ -434,7 +438,7 @@ function pSoChi(m){
   m.querySelectorAll("select[data-bv]").forEach(s=>s.onchange=()=>{const id=s.dataset.bv,v=s.value;DB.mutate(ME.name,"đổi nơi chịu khoản chi",dt=>{const r=((dt.fin||{}).nkc||[]).find(y=>y.id===id);if(!r)return;if(r.k0==null)r.k0=r.k;r.k=v;if(v!=="Chờ xác định"&&r.st==="Cần rà"&&!r.gc)r.st="Ổn";(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(r.dg)]={g:r.g,k:v,st:r.st}});renderMain()});
   m.querySelectorAll("[data-dm]").forEach(el=>el.onchange=()=>{const i=+el.dataset.dm,f=el.dataset.f,v=f==="cd"?+el.value:el.value;DB.mutate(ME.name,"sửa danh mục chi phí",dt=>{dt.fin=dt.fin||{};if(!dt.fin.cpdm||!dt.fin.cpdm.length||!dt.fin.cpdm[i])dt.fin.cpdm=JSON.parse(JSON.stringify(scDM()));dt.fin.cpdm[i][f]=v});toast("Đã lưu danh mục");renderMain()});
   m.querySelectorAll("[data-go-st],[data-go-k],[data-go-g]").forEach(b=>b.onclick=()=>{Object.assign(SC,{tab:"nk",st:b.dataset.goSt||"",k:b.dataset.goK||"",g:b.dataset.goG||"",q:"",fn:"",xl:""});if(b.dataset.goG)SC.st="Cần rà";renderMain()});
-  scQTbind(m);scBCbind(m);scPLbind(m);gdBind(m);
+  scQTbind(m);scBCbind(m);scPLbind(m);gdBind(m);if(SC.nkp)gdChanBind(m,"nk",SC.nkp,renderMain);
   on("scdt-ed2",()=>{const b=document.getElementById("scdt-ed");if(b)b.click()});
   m.querySelectorAll("[data-pbk]").forEach(el=>el.onclick=()=>{const go=!el.closest(".scpills");SC.pbk=el.dataset.pbk;renderMain();if(go){const c=document.getElementById("scpk");if(c)c.scrollIntoView({behavior:"smooth",block:"start"})}});
   on("scdt-ed",()=>{const ym=PERIOD.from.slice(0,7),sv=((scFin().cpDT||{})[ym])||{},auto=scAutoDT(ym);

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const T: any = new Function(
   `${readFileSync('hub/src/ttcalc.js', 'utf8')}${readFileSync('hub/src/specalc.js', 'utf8')}
-  return {ttSheets,ttCsv,speKind,speOrderSheet,speReadOrders,speGuessKy,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speDayd,speCoverage,speKey};`,
+  return {ttSheets,ttCsv,speKind,speOrderSheet,speReadOrders,speGuessKy,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speDayd,speCoverage,speKey,speLearnPos};`,
 )();
 
 const ORD_HEAD = ['Mã đơn hàng', 'Ngày đặt hàng', 'Trạng Thái Đơn Hàng', 'SKU sản phẩm', 'Tên sản phẩm', 'SKU phân loại hàng', 'Tên phân loại hàng',
@@ -181,4 +181,47 @@ describe.skipIf(!REAL.every((p) => existsSync(p)))('specalc: số thật T07/202
     expect(M.don).toBe(968);
     expect(M.mon).toBe(1160);
   }, 120000);
+});
+
+describe('Giá vốn Shopee theo hàng xuất kho (ghép mã đơn với đơn Poscake, 29/10/2026)', () => {
+  const L = [
+    { o: 'X1', pn: 'Tinh dầu 80ml', vr: 'Hương Luxury,1 chai' },
+    { o: 'X2', pn: 'Tinh dầu 80ml', vr: 'Hương Luxury,1 chai' },
+    { o: 'X3', pn: 'Tinh dầu 80ml', vr: 'Hương Luxury,1 chai' },
+    { o: 'X3', pn: 'Arila 10kg', vr: '1 can 10kg' },
+    { o: 'X4', pn: 'Xịt muỗi', vr: '' },
+  ];
+  const pos = [
+    { o: 'X1', sku: '3109', vr: 'Hương Luxury,1 chai' },
+    { o: 'X2', sku: '3109', vr: 'Hương Luxury,1 chai' },
+    { o: 'X3', sku: '3109', vr: 'Hương Luxury,1 chai' },
+    { o: 'X3', sku: '2383', vr: '1 can 10kg' },
+  ];
+  it('đơn một sản phẩm ghép thẳng; đơn nhiều sản phẩm ghép theo tên phân loại; không có đơn Poscake thì không đoán', () => {
+    const m = T.speLearnPos(L, pos);
+    expect(m[T.speKey('Tinh dầu 80ml', 'Hương Luxury,1 chai')]).toEqual({ sku: '3109', vr: 'Hương Luxury,1 chai' });
+    expect(m[T.speKey('Arila 10kg', '1 can 10kg')]).toEqual({ sku: '2383', vr: '1 can 10kg' });
+    expect(m[T.speKey('Xịt muỗi', '')]).toBeUndefined();
+  });
+  it('speBuildMonth đưa mã Poscake vào costOf để quy đổi ra hàng kho', () => {
+    const O = T.speReadOrders(ordersSheets().orders, '2026-09');
+    const F = T.speReadFin(finSheets(), '2026-09');
+    const seen: any[] = [];
+    T.speBuildMonth({ ky: '2026-09', shop: 'x', orders: O, fin: F, ads: null, pos: [{ o: 'A3', sku: 'P1', vr: 'Chai 300g' }],
+      costOf: (s: any) => { seen.push(s); return s.ps ? { u: 1000 } : { u: null, why: 'Chưa quy đổi mã' }; } });
+    expect(seen.find((s) => s.pn === 'Tẩy lồng').ps).toEqual({ sku: 'P1', vr: 'Chai 300g' });
+    expect(seen.find((s) => s.pn === 'Xịt muỗi').ps).toBeUndefined();
+  });
+});
+
+describe('Nhãn quy đổi chỉ ghi tên đọc mã như trang Kho (29/10/2026)', () => {
+  it('"Phao lọc cặn" (đã gán tên) lấy giá vốn mã phaoloccan', () => {
+    const TT: any = new Function(`${readFileSync('hub/src/ttcalc.js', 'utf8')}; return {ttMakeCostOf};`)();
+    const mapRows = [{ sku: 'S1', variant: '', from_day: '', item_label: 'Phao lọc cặn', qty: 1 }, { sku: 'S1', variant: '', from_day: '', item_label: 'AILLATLG - Tẩy lồng', qty: 2 }];
+    const skus = [{ ma: 'phaoloccan', giaVon: { '2026-10': 4000 } }, { ma: 'AILLATLG', giaVon: { '2026-10': 10000 } }];
+    const no = TT.ttMakeCostOf({ ky: '2026-10', mapRows, skus, khoCost: {} })('S1', null, '');
+    expect(no.u).toBeNull();
+    const c = TT.ttMakeCostOf({ ky: '2026-10', mapRows, skus, khoCost: {}, alias: [{ label: 'Phao lọc cặn', item: 'phaoloccan' }] })('S1', null, '');
+    expect(c.u).toBe(24000);
+  });
 });

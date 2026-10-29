@@ -132,7 +132,7 @@ const isPack = (code) => {
   const it = items.get(String(code).toLowerCase());
   return !!it && /đóng gói|hộp|thùng|bao bì/i.test((it.grp || '') + ' ' + (it.name || '')) && it.cls === 'NVL';
 };
-const costOf = T.ttMakeCostOf({ ky, mapRows: I.map, skus: I.skus || [], khoCost: I.kho || {}, isPack });
+const costOf = T.ttMakeCostOf({ ky, mapRows: I.map, skus: I.skus || [], khoCost: I.kho || {}, isPack, alias: I.alias || [] });
 const cat = (k) => (I.costCats || []).find((c) => c.k === k) || { n: k };
 const extra = (I.costs || [])
   .filter((c) => c.thang === ky && /tik\s*tok/i.test(c.kenh || '') && c.cat !== 'PHI-SAN' && !(c.cat === 'ADS-TT' && /gmv\s*max/i.test(c.note || '')))

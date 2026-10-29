@@ -8,7 +8,7 @@
    tab Tiền), trang mới Đối chiếu công nợ & tiền (tcn_dc, quản trị › Tài chính – Kế toán › Công nợ).
    Trang này chỉ ĐỌC: không sửa tiền, công nợ, phiếu thu chi nào.
    ===================================================================== */
-const TCN={th:null,thAt:0,busy:false,err:"",dc:null,dcKey:"",dt:{},tab:"kh",q:"",kenh:"",lech:false};
+const TCN={th:null,thAt:0,busy:false,err:"",dc:null,dcKey:"",dt:{},tab:"kh",q:"",kenh:"",lech:false,pg:{}};
 const tcnOk=()=>typeof dhOk==="function"&&!!dhOk();
 const tcnApi=p=>svApi("/api/hub/dieuhanh/tien"+p);
 const TCN_PAGES=["tien_lich","phai_thu","gc_cn","exec","dieuhanh","tcn_dc","bc_b2b"];
@@ -90,11 +90,14 @@ function pTcnDc(m){
     let R=(isK?dc.khach:dc.ncc).filter(r=>(!q||kfold(r.name).includes(q))&&(!isK||!TCN.kenh||r.kenh===TCN.kenh)&&(!TCN.lech||!tcnKhop(r)));
     R=R.sort((a,b)=>(tcnKhop(a)-tcnKhop(b))||Math.abs(b.cuoi)-Math.abs(a.cuoi));
     const sum=k=>R.reduce((t,r)=>t+(+r[k]||0),0),nLech=(isK?dc.khach:dc.ncc).filter(r=>!tcnKhop(r)).length;
+    /* Chân bảng kiểu Poscake (gdbang.js): tổng cộng + phân trang, dính đáy màn hình. */
+    const pk="tcn"+TCN.tab,pg=TCN.pg[pk]||(TCN.pg[pk]={co:typeof gdCoNho==="function"?gdCoNho(pk,100):100,trang:1});
+    const tong=`<span>Cộng <b>${R.length}</b> ${isK?"khách":"nhà cung cấp"}${R.length<(isK?dc.khach:dc.ncc).length?" (đang lọc)":""}</span><span>nợ đầu <b>${nf(tcnR(sum("dau")))}</b></span><span>phát sinh <b>${nf(tcnR(sum("phat_sinh")))}</b></span><span>đã trả <b>${nf(tcnR(sum("da_tra")))}</b></span>${isK?`<span>trả lại <b>${nf(tcnR(sum("tra_lai")))}</b></span>`:""}<span>nợ cuối <b>${nf(tcnR(sum("cuoi")))}</b></span><span class="hint">trang đang hiện ${nf(tcnR(sum("hien")))}</span>${isK?`<span class="hint">chờ ghi nợ ${nf(tcnR(sum("cho_ghi_no")))} · chờ tiền về ${nf(tcnR(sum("cho_tien_ve")))}</span>`:""}`;
     body=`<div class="filters"><input id="tcn-q" class="mhq" placeholder="Tìm ${isK?"khách":"nhà cung cấp"}…" value="${esc(TCN.q||"")}">${isK?`<select id="tcn-k">${opt([["","Mọi kênh"],...TCN_KENH],TCN.kenh)}</select>`:""}<label class="chk"><input type="checkbox" id="tcn-l" ${TCN.lech?"checked":""}> Chỉ dòng lệch (${nLech})</label></div>
     <section class="card flush"><div class="nsw"><table class="tbl gd"><thead><tr><th>${isK?"Khách":"Nhà cung cấp"}</th>${isK?"<th>Kênh</th>":""}<th class="n">Nợ đầu kỳ</th><th class="n">Phát sinh</th><th class="n">Đã trả</th>${isK?`<th class="n">Hàng trả lại</th>`:""}<th class="n">Nợ cuối</th><th class="n">Trang đang hiện</th><th>Khớp</th>${isK?`<th class="n">Chờ ghi nợ</th><th class="n">Chờ tiền về</th>`:""}<th>Liên quan</th></tr></thead><tbody>
-    ${R.length?R.map(r=>`<tr class="clk" data-tcn="${esc(r.id)}"><td><b>${esc(r.name)}</b></td>${isK?`<td>${esc((TCN_KENH.find(x=>x[0]===r.kenh)||["",""])[1])}</td>`:""}<td class="n">${nf(tcnR(r.dau))}</td><td class="n">${nf(tcnR(r.phat_sinh))}</td><td class="n">${nf(tcnR(r.da_tra))}</td>${isK?`<td class="n">${r.tra_lai?nf(tcnR(r.tra_lai)):"—"}</td>`:""}<td class="n"><b>${nf(tcnR(r.cuoi))}</b></td><td class="n">${nf(tcnR(r.hien))}</td><td>${tcnKhop(r)?pill("Khớp","grn"):pill("Lệch "+nf(tcnR(r.hien-r.cuoi)),"red")}</td>${isK?`<td class="n hint">${r.cho_ghi_no?nf(tcnR(r.cho_ghi_no)):"—"}</td><td class="n hint">${r.cho_tien_ve?nf(tcnR(r.cho_tien_ve)):"—"}</td>`:""}<td>${tcnLk("Chứng từ",`data-tcnct="${esc(r.id)}"`,"Xem từng đơn, phiếu thu, hàng trả lại")}</td></tr>`).join("")
-      +`<tr><td><b>Cộng ${R.length} dòng</b></td>${isK?"<td></td>":""}<td class="n"><b>${nf(tcnR(sum("dau")))}</b></td><td class="n"><b>${nf(tcnR(sum("phat_sinh")))}</b></td><td class="n"><b>${nf(tcnR(sum("da_tra")))}</b></td>${isK?`<td class="n"><b>${nf(tcnR(sum("tra_lai")))}</b></td>`:""}<td class="n"><b>${nf(tcnR(sum("cuoi")))}</b></td><td class="n"><b>${nf(tcnR(sum("hien")))}</b></td><td></td>${isK?`<td class="n">${nf(tcnR(sum("cho_ghi_no")))}</td><td class="n">${nf(tcnR(sum("cho_tien_ve")))}</td>`:""}<td></td></tr>`
-      :`<tr><td colspan="12" class="empty">Không có dòng nào.</td></tr>`}</tbody></table></div></section>
+    ${R.length?(typeof gdCat==="function"?gdCat(R,pg):R).map(r=>`<tr class="clk" data-tcn="${esc(r.id)}"><td><b>${esc(r.name)}</b></td>${isK?`<td>${esc((TCN_KENH.find(x=>x[0]===r.kenh)||["",""])[1])}</td>`:""}<td class="n">${nf(tcnR(r.dau))}</td><td class="n">${nf(tcnR(r.phat_sinh))}</td><td class="n">${nf(tcnR(r.da_tra))}</td>${isK?`<td class="n">${r.tra_lai?nf(tcnR(r.tra_lai)):"—"}</td>`:""}<td class="n"><b>${nf(tcnR(r.cuoi))}</b></td><td class="n">${nf(tcnR(r.hien))}</td><td>${tcnKhop(r)?pill("Khớp","grn"):pill("Lệch "+nf(tcnR(r.hien-r.cuoi)),"red")}</td>${isK?`<td class="n hint">${r.cho_ghi_no?nf(tcnR(r.cho_ghi_no)):"—"}</td><td class="n hint">${r.cho_tien_ve?nf(tcnR(r.cho_tien_ve)):"—"}</td>`:""}<td>${tcnLk("Chứng từ",`data-tcnct="${esc(r.id)}"`,"Xem từng đơn, phiếu thu, hàng trả lại")}</td></tr>`).join("")
+      
+      :`<tr><td colspan="12" class="empty">Không có dòng nào.</td></tr>`}</tbody></table></div>${R.length&&typeof gdChan==="function"?gdChan(tong,R.length,pg,pk):""}</section>
     <p class="hint pad">Chỉ cộng chứng từ đã vào công nợ chính thức${isK?" (đơn kế toán đã xác nhận, tiền kế toán đã xác nhận, hàng trả lại đã giảm nợ). Chờ ghi nợ, chờ tiền về chỉ để xem":" (sau ngày chốt đầu kỳ của nhà cung cấp, như Mua hàng)"}. Ngày theo ngày ${isK?"đơn / ngày tiền về / ngày trả hàng":"chứng từ / ngày chi"}. "Trang đang hiện" = số ở ${isK?"Công nợ khách hàng, Phải thu":"Mua hàng › Công nợ nhà cung cấp"} hôm nay; lệch khi có chứng từ ghi ngày sau kỳ đang xem (chọn kỳ tới hôm nay để so) hoặc dữ liệu sai. Bấm một dòng để xem từng chứng từ.</p>`;
   }else if(TCN.tab==="tk"){
     const unk=ac.find(a=>a.k==="");
@@ -108,16 +111,18 @@ function pTcnDc(m){
   <div class="tabs">${tabs.map(([k,n])=>`<button class="tab${TCN.tab===k?" on":""}" data-tcnt="${k}">${n}</button>`).join("")}</div>${body}
   <p class="hint pad">Kỳ ${esc(pLabel())}. Trang chỉ đọc số; thấy sai thì ghi lại để chị Hoa quyết, không sửa ở đây.</p>`;
   m.querySelectorAll("[data-tcnt]").forEach(b=>b.onclick=()=>{TCN.tab=b.dataset.tcnt;renderMain()});
-  const qi=m.querySelector("#tcn-q");if(qi)qi.oninput=()=>{TCN.q=qi.value;const p=qi.selectionStart;renderMain();const n=document.querySelector("#tcn-q");if(n){n.focus();n.setSelectionRange(p,p)}};
-  const ks=m.querySelector("#tcn-k");if(ks)ks.onchange=e=>{TCN.kenh=e.target.value;renderMain()};
-  const lc=m.querySelector("#tcn-l");if(lc)lc.onchange=e=>{TCN.lech=e.target.checked;renderMain()};
+  const qi=m.querySelector("#tcn-q");if(qi)qi.oninput=()=>{TCN.q=qi.value;tcnPg1();const p=qi.selectionStart;renderMain();const n=document.querySelector("#tcn-q");if(n){n.focus();n.setSelectionRange(p,p)}};
+  const ks=m.querySelector("#tcn-k");if(ks)ks.onchange=e=>{TCN.kenh=e.target.value;tcnPg1();renderMain()};
+  const lc=m.querySelector("#tcn-l");if(lc)lc.onchange=e=>{TCN.lech=e.target.checked;tcnPg1();renderMain()};
   m.querySelectorAll("[data-tcn]").forEach(r=>r.onclick=()=>tcnCtOpen(TCN.tab,r.dataset.tcn,P));
   m.querySelectorAll("[data-tcnct]").forEach(el=>el.onclick=ev=>{ev.stopPropagation();tcnCtOpen(TCN.tab,el.dataset.tcnct,P)});
   const acOpen=k0=>{const k=k0==="_"?"":k0,a=ac.find(x=>x.k===k);if(a)tcnAcctOpen(a,P)};
   m.querySelectorAll("[data-tcna]").forEach(r=>r.onclick=()=>acOpen(r.dataset.tcna));
   m.querySelectorAll("[data-tcnca]").forEach(el=>el.onclick=ev=>{ev.stopPropagation();acOpen(el.dataset.tcnca)});
   if(typeof gdBind==="function")gdBind(m);
+  const pk="tcn"+TCN.tab;if(TCN.pg[pk]&&typeof gdChanBind==="function")gdChanBind(m,pk,TCN.pg[pk],renderMain);
 }
+const tcnPg1=()=>{Object.values(TCN.pg).forEach(p=>p.trang=1)};
 function tcnCtOpen(tab,id,P,name){
   const isK=tab==="kh",r=TCN.dc&&!TCN.dc.err?(isK?TCN.dc.khach:TCN.dc.ncc).find(x=>x.id===id):null,nm=r?r.name:name||"";
   openDrawerHTML(`<h2>${esc(nm)}</h2><p class="hint">Đang tải chứng từ…</p>`);

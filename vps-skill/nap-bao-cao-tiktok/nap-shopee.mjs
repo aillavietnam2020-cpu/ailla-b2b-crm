@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url);
 const src = ['ttcalc.js', 'specalc.js'].map((f) => readFileSync(join(here, f), 'utf8')).join('\n');
 const T = new Function(
   `${src}
-  return {ttCsv,ttSheets,ttHead,ttCell,ttMakeCostOf,speKind,speOrderSheet,speReadOrders,speGuessKy,speFinMeta,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speKey};`,
+  return {ttCsv,ttSheets,ttHead,ttCell,ttMakeCostOf,speKind,speOrderSheet,speReadOrders,speGuessKy,speFinMeta,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speKey,speLearnPos};`,
 )();
 
 const args = process.argv.slice(2);
@@ -122,9 +122,9 @@ async function costOfFor(ky) {
     const it = items.get(String(code).toLowerCase());
     return !!it && /đóng gói|hộp|thùng|bao bì/i.test((it.grp || '') + ' ' + (it.name || '')) && it.cls === 'NVL';
   };
-  const web = T.ttMakeCostOf({ ky, mapRows: I.map, skus: I.skus || [], khoCost: I.kho || {}, isPack });
+  const web = T.ttMakeCostOf({ ky, mapRows: I.map, skus: I.skus || [], khoCost: I.kho || {}, isPack, alias: I.alias || [] });
   return (s) => {
-    const tries = [() => (s.sv ? web(s.sv, s.sp, s.vr) : null), () => (s.sp ? web(s.sp, null, s.vr) : null), () => web(s.pn, null, s.vr)];
+    const tries = [() => (s.ps ? web(s.ps.sku, null, s.ps.vr) : null), () => (s.sv ? web(s.sv, s.sp, s.vr) : null), () => (s.sp ? web(s.sp, null, s.vr) : null), () => web(s.pn, null, s.vr)];
     let best = null;
     for (const t of tries) {
       const c = t();
@@ -147,7 +147,7 @@ for (const p of pairs) {
   const F = T.speReadFin(p.F.sh, ky);
   if (F.err) die(`Shop ${p.shop}: ${F.err}`);
   if (!p.ad) console.log(`Shop ${p.shop}: KHÔNG có file quảng cáo, quảng cáo tính 0.`);
-  const M = T.speBuildMonth({ ky, shop: p.shop, orders: O, fin: F, ads: p.ad ? p.ad.A : null, costOf: await costOfFor(ky) });
+  const M = T.speBuildMonth({ ky, shop: p.shop, orders: O, fin: F, ads: p.ad ? p.ad.A : null, costOf: await costOfFor(ky), pos: (inputs[ky].pos || []).map((l) => ({ o: l.order_id, sku: l.sku, vr: l.variant })) });
   if (M.err) die(M.err);
   const files = { fin: p.F.name, orders: p.O.name, ads: p.ad ? p.ad.name : '' };
   console.log(`Shopee ${p.shop} tháng ${ky.slice(5)}/${ky.slice(0, 4)}${M.den ? ` (giữa tháng, số đến ${M.den.slice(8)}/${M.den.slice(5, 7)})` : ' (đủ tháng)'}`);

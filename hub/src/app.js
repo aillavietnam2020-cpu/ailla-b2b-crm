@@ -42,6 +42,7 @@ let _rLast="";
    Chị Hoa 29/10: ẩn menu xong mà nút dẫn tới trang đó bị đẩy về trang đầu (P&L) là sai luồng. Ẩn trang nào khỏi menu thì thêm vào đây. */
 const NAV_AN_MO=new Set(["cr_vc","cr_s_vc","cr_bill","cr_s_bill","cr_im","cr_import"]);
 function render(){
+  if(typeof closePop==="function"&&PAGE!=="mh_po")closePop(true);
   if(!ME){renderLogin();return}
   const _m0=$("#main"),_keep=_rLast===PAGE&&_m0&&_m0.childElementCount>0?_rmSave(_m0):null,_y0=window.scrollY;
   let items=menuItems().flatMap(g=>g[1]);if(!items.some(i=>i[0]===PAGE)&&!(NAV_AN_MO.has(PAGE)&&PAGES[PAGE])){PAGE=items[0][0];items=menuItems().flatMap(g=>g[1])}
@@ -52,7 +53,7 @@ function render(){
    <div class="me"><b>${esc(ME.name)}</b><span>${esc(ME.title)} · ${ROLES[ME.role]}</span><button class="lnk" id="logout">Đăng xuất</button></div></aside>
    <div class="mainwrap"><header class="topbar"><button class="hamb" id="hamb" aria-label="Mở menu">☰</button><div class="tbslot" id="tbslot"></div>${ADM?`<div class="srch">${ico("search")}<input id="qs" placeholder="${HOST_MODE==='admin'?'Tìm chức năng…':'Tìm trang, thẻ video, khách hàng…'}" autocomplete="off"><div class="qsr" id="qsr" hidden></div></div>`:`<div class="crumb">${esc((items.find(i=>i[0]===PAGE)||[])[1]||"")}</div>`}<span class="sp"></span>${ADM?`<span class="crumb sm"><span class="cm">${esc(cm.n)}</span>${cm.k!=="exec"?" › "+esc((items.find(i=>i[0]===PAGE)||[])[1]||""):""}</span>`:""}${ADM?periodPicker():`<span class="sync"><i></i>Tháng ${MONTH.mon}/${MONTH.year}</span>`}${ME?`<button class="chatbtn" id="chatbtn" title="Trao đổi nội bộ">💬</button><button class="bell" title="Thông báo">${ico("bell")}${alN?`<b>${alN}</b>`:""}</button>`:""}${typeof SERVER!=="undefined"?`<i id="svsync" class="svsync ok" title="Đã lưu lên máy chủ"></i>`:""}${ADM&&MODULES.some(mo=>mo.k==="aiq"&&modGroups(mo).length)?`<button class="aibtn" data-go="ai" title="Trợ lý AI">${ico("spark")}<span>Trợ lý AI</span></button>`:""}<span class="uchip" id="uchip" title="Của tôi"><i>${esc((ME.name||"?").trim().split(" ").pop()[0]||"")}</i><span><b>${esc(ME.name)}</b><small>${esc(ME.title)}</small></span></span></header><main id="main"></main></div>`;
   $$(".mi").forEach(b=>b.onclick=()=>{PAGE=b.dataset.p;if(typeof CRM_SRC!=="undefined")for(const k in CRM_SRC)delete CRM_SRC[k];if(typeof B2B!=="undefined"){B2B.kh=null;B2B.don=null;B2B.newOrder=null}try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0);document.body.classList.remove("menu-open")});
-  $$(".top").forEach(b=>b.onclick=()=>{if(b.dataset.mod===MOD&&b.classList.contains("open")){b.classList.remove("open");const s=b.nextElementSibling;if(s&&s.classList.contains("subnav"))s.remove();return}MOD=b.dataset.mod;PAGE="";try{localStorage.setItem(SKEY+"_m",MOD)}catch(e){}render();scrollTo(0,0);if(modGroups(curMod()).flatMap(g=>g[1]).length===1)document.body.classList.remove("menu-open")});
+  $$(".top").forEach(b=>b.onclick=()=>{if(b.dataset.mod===MOD&&b.classList.contains("open")){b.classList.remove("open");const s=b.nextElementSibling;if(s&&s.classList.contains("subnav"))s.remove();return}MOD=b.dataset.mod;PAGE="";_navAuto=true;try{localStorage.setItem(SKEY+"_m",MOD)}catch(e){}render();scrollTo(0,0);if(modGroups(curMod()).flatMap(g=>g[1]).length===1)document.body.classList.remove("menu-open")});
   bindPeriodPicker();
   $$(".bell").forEach(b=>b.onclick=()=>{MOD="exec";PAGE="exec";render()});
   if($("#qs")){const q=$("#qs"),r=$("#qsr");q.oninput=()=>{const L=quickSearch(q.value);r.hidden=!L.length;r.innerHTML=L.map(x=>`<button data-qp="${esc(x[0])}"><b>${esc(x[1])}</b><span>${esc(x[2])}</span></button>`).join("");r.querySelectorAll("[data-qp]").forEach(btn=>btn.onmousedown=()=>{const v=btn.dataset.qp;if(v.startsWith("#card:"))openCard(v.slice(6));else if(v.startsWith("#kh:")){B2B.kh=v.slice(4);MOD="b2b";PAGE="b2b_kh";render()}else{PAGE=v;MOD="";render()}})};q.onblur=()=>setTimeout(()=>{r.hidden=true},150)}
@@ -68,17 +69,46 @@ function render(){
   _rLast=PAGE;_rmLast=PAGE;navRecord();
   if(_keep){_rmRestore(m,_keep,_y0);requestAnimationFrame(()=>{_rmRestore($("#main")||m,_keep,_y0)})}
 }
-/* Nút Back của trình duyệt (chị Hoa 29/10: bấm Back là thoát ra Google): mỗi lần đổi trang hoặc mở trang chi tiết
-   (đơn mua) thì ghi một bước vào lịch sử trình duyệt; bấm Back quay về đúng trang trước, đóng cửa sổ chi tiết nếu đang mở. */
-let _navBack=false;
-const _navKey=()=>PAGE+"|"+((typeof MH!=="undefined"&&MH&&MH.open)||"");
+/* Cửa sổ chi tiết nổi giữa màn hình (chị Hoa 29/10, kiểu Poscake): xem chi tiết một chứng từ (đơn mua…) đè lên danh sách,
+   không chuyển trang. Các form ghi / sửa vẫn mở ở #drawer, nằm trên cửa sổ này; đóng form xong vẫn thấy cửa sổ chi tiết.
+   onClose chạy khi người dùng bấm ✕, bấm ra ngoài hoặc Esc. */
+let _popClose=null;
+function openPop(html,onClose){let p=document.getElementById("pop");
+  if(!p){p=document.createElement("div");p.id="pop";p.className="pop";p.innerHTML=`<div class="pop-in"><button type="button" class="x" id="popx" aria-label="Đóng">✕</button><div id="popIn"></div></div>`;document.body.appendChild(p);
+    p.addEventListener("mousedown",e=>{if(e.target===p)closePop()});p.querySelector("#popx").onclick=()=>closePop();
+    addEventListener("keydown",e=>{const d=document.getElementById("drawer");if(e.key==="Escape"&&!p.hidden&&(!d||d.hidden))closePop()})}
+  _popClose=onClose||null;document.getElementById("popIn").innerHTML=html;p.hidden=false;document.body.classList.add("pop-open")}
+function closePop(silent){const p=document.getElementById("pop");if(!p||p.hidden)return;p.hidden=true;document.body.classList.remove("pop-open");const f=_popClose;_popClose=null;if(f&&!silent)f()}
+/* Nút Back của trình duyệt (chị Hoa 29/10: bấm Back là thoát ra Google, "cả web đều có tình trạng đó"):
+   - đổi trang, mở trang chi tiết (đơn mua), đổi tab trong trang (Sổ chi phí, Tài sản) đều ghi một bước vào lịch sử;
+   - mở cửa sổ chi tiết bên phải (#drawer) cũng ghi một bước: bấm Back là đóng cửa sổ đó trước, chưa đổi trang;
+   - bấm ✕ đóng cửa sổ thì bỏ bước đó đi để Back lần sau về đúng trang trước.
+   Trang có trạng thái riêng muốn Back được thì thêm vào NAV_SUB [tên, đọc, ghi]. */
+let _navBack=false,_navDrOpen=false,_navSkipPop=0,_navAuto=false;
+/* Bấm tên nhóm menu (vd Tài chính – Kế toán) thì web tự mở trang đầu của nhóm (P&L); trang tự mở đó chỉ là bước tạm:
+   chọn trang khác ngay sau đó thì thay bước tạm, để Back không quay về P&L (chị Hoa 29/10). */
+const NAV_SUB=[
+  ["mh",()=>typeof MH!=="undefined"&&MH?MH.open||null:null,v=>{if(typeof MH!=="undefined"&&MH)MH.open=v||null}],
+  ["sct",()=>typeof SC!=="undefined"&&PAGE==="so_cp"?SC.tab:null,v=>{if(typeof SC!=="undefined"&&v)SC.tab=v}],
+  ["tst",()=>typeof TSV!=="undefined"&&TSV.tab&&TSV.tab[PAGE]?TSV.tab[PAGE]:null,v=>{if(typeof TSV!=="undefined"&&TSV.tab&&v)TSV.tab[PAGE]=v}],
+  ["tkh",()=>typeof TSV!=="undefined"&&PAGE==="ts_kh"?TSV.kh:null,v=>{if(typeof TSV!=="undefined"&&v)TSV.kh=v}]];
+const _navSub=()=>{const o={};NAV_SUB.forEach(([k,g])=>{try{o[k]=g()}catch(e){o[k]=null}});return o};
+const _navKey=sub=>PAGE+"|"+JSON.stringify(sub);
+function navDrawerWatch(){const dr=document.getElementById("drawer");if(!dr||dr._navW)return;dr._navW=1;_navDrOpen=!dr.hidden;
+  new MutationObserver(()=>{const open=!dr.hidden;
+    if(open&&!_navDrOpen){_navDrOpen=true;try{history.pushState(Object.assign({},history.state||{},{drawer:1}),"")}catch(e){}}
+    else if(!open&&_navDrOpen){_navDrOpen=false;if(history.state&&history.state.drawer){_navSkipPop++;try{history.back()}catch(e){_navSkipPop--}}}
+  }).observe(dr,{attributes:true,attributeFilter:["hidden"]})}
 function navRecord(){
-  if(_navBack||!ME||!PAGE)return;const k=_navKey(),cur=history.state&&history.state.abos;
-  try{if(!cur)history.replaceState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"");
-      else if(cur!==k)history.pushState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"")}catch(e){}}
-addEventListener("popstate",e=>{const st=e.state;if(!st||!st.abos||!ME)return;
-  {const dr=document.getElementById("drawer");if(dr&&!dr.hidden&&typeof closeDrawer==="function"){try{closeDrawer()}catch(er){}}}
-  _navBack=true;try{PAGE=st.p;MOD=st.mod||MOD;if(typeof MH!=="undefined"&&MH)MH.open=st.mh||null;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(er){}render();scrollTo(0,0)}finally{_navBack=false}});
+  navDrawerWatch();
+  if(_navBack||!ME||!PAGE)return;const sub=_navSub(),k=_navKey(sub),hs=history.state,cur=hs&&hs.abos,st={abos:k,p:PAGE,mod:MOD,sub,auto:_navAuto};_navAuto=false;
+  try{if(!cur)history.replaceState(st,"");else if(cur!==k){if(hs.drawer||hs.auto)history.replaceState(st,"");else history.pushState(st,"")}}catch(e){}}
+addEventListener("popstate",e=>{
+  if(_navSkipPop>0){_navSkipPop--;return}
+  const st=e.state,dr=document.getElementById("drawer");
+  if(dr&&!dr.hidden&&typeof closeDrawer==="function"){_navDrOpen=false;try{closeDrawer()}catch(er){}if(st&&st.abos&&st.abos===_navKey(_navSub()))return}
+  if(!st||!st.abos||!ME)return;
+  _navBack=true;try{PAGE=st.p;MOD=st.mod||MOD;NAV_SUB.forEach(([k,,set])=>{try{set(st.sub?st.sub[k]:null)}catch(er){}});try{localStorage.setItem(SKEY+"_p",PAGE)}catch(er){}render();scrollTo(0,0)}finally{_navBack=false}});
 /* vẽ lại trang chính; nếu vẫn đang ở đúng trang đó thì giữ nguyên vị trí cuộn (cả trang lẫn các bảng cuộn bên trong), để bấm tích / chọn không bị nhảy về đầu */
 let _rmLast="";
 /* Quy tắc chung: vẽ lại trang (bấm chọn, mở / đóng chi tiết, lưu, đổi bộ lọc) KHÔNG được làm trang nhảy về đầu.

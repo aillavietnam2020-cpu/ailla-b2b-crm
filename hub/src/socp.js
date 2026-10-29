@@ -107,6 +107,6 @@ function spVcXem(v){
   const don=v.order_refs?(typeof gdDonLinks==="function"?gdDonLinks(v.order_refs):esc(v.order_refs)):"—";
   const R=[["Số phiếu",esc(v.voucher_no||"")],["Ngày chi",dd(v.voucher_date)],["Số tiền",`<b>${nf0(v.amount)} đ</b>`],["Đơn vị vận chuyển / xe",esc(v.carrier||"")],["Chở đi",esc(v.destination||"")],["Chở cho đơn",don],
     ["Hình thức",esc(ht)+(v.from_account?" · từ "+esc(v.from_account):"")],["Người nhận",esc(v.receiver_name||v.receiver||"")],["Ghi chú",esc(v.note||"")],["Ảnh / chứng từ",v.file_count?v.file_count+" file":"chưa có"]].filter(x=>x[1]);
-  openDrawerHTML(`<h2>Phiếu chi vận chuyển ${esc(v.voucher_no||"")}</h2><div class="tbl"><table class="gd"><tbody>${R.map(([a,b])=>`<tr><td class="hint" style="width:170px">${a}</td><td>${b}</td></tr>`).join("")}</tbody></table></div>`);
+  openDrawerHTML(`<h2>Phiếu chi vận chuyển ${esc(v.voucher_no||"")}</h2><div class="tbl"><table class="gd"><tbody>${R.map(([a,b])=>`<tr><td class="hint" style="width:170px;white-space:nowrap">${a}</td><td style="white-space:normal">${b}</td></tr>`).join("")}</tbody></table></div>`);
   try{if(typeof gdBind==="function")gdBind(document.getElementById("drawerIn"))}catch(e){}
 }
