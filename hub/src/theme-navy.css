@@ -1093,3 +1093,18 @@ td.bvstc .bvwl{max-width:172px}
 .bvscT{width:100%;min-height:360px;border:0;outline:0;resize:none;background:transparent;font:16px/1.8 'Segoe UI',Roboto,Arial,sans-serif;color:inherit;padding:10px 2px;white-space:pre-wrap}
 .bvscT:not([readonly]){background:#fbfbfe;border-radius:10px;padding:12px 14px}
 .bvscN{width:100%;min-height:80px;margin:8px 0;padding:10px;border:1px solid #d7daf0;border-radius:10px;font:14px/1.5 inherit}
+
+/* Ô số Tổng quan: chữ phụ dài không được tràn sang ô bên cạnh (chị Hoa 29/10) */
+.xk{min-width:0;overflow:hidden}.xk .xkm{display:block;max-width:100%}
+/* Bảng kênh Tổng quan gọn, có icon (chị Hoa 29/10) */
+.xkenh td,.xkenh th{padding-top:6px!important;padding-bottom:6px!important}
+.xkenh td small{display:none!important}
+.xkenh td:first-child{white-space:nowrap}
+.xchi{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;color:#fff;font-size:12.5px;font-weight:800;margin-right:8px;vertical-align:middle;line-height:1}
+.xchi .ic{width:13px;height:13px;stroke:#fff}
+/* Hai khung Tổng quan luôn cao bằng nhau (chị Hoa 29/10): khung bảng kênh giãn bảng cho đầy, các dòng chia đều chiều cao. */
+.xrow2{align-items:stretch}
+.xrow2>.xkenh{display:flex;flex-direction:column}
+.xrow2>.xkenh>.tbl{flex:1;display:flex}
+.xrow2>.xkenh>.tbl>table{height:100%}
+.xkenh td,.xkenh th{height:auto!important}

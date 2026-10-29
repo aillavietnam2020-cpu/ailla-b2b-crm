@@ -143,5 +143,5 @@ function pKetQuaKenh(m){
   m.querySelectorAll(".xk").forEach(k=>{const l=k.querySelector(".xkl"),v=k.querySelector(".xkv"),key=l&&l.textContent.trim();if(!(key in tot))return;
     k.classList.remove("mut");v.textContent=key==="Đơn hàng"?nf(tot[key]):tr(tot[key]);
     k.querySelectorAll(".xkm").forEach(x=>x.remove());
-    const note=document.createElement("span");note.className="xkm";note.textContent="tất cả kênh: Kênh bán lẻ, Kênh phân phối, Kênh OEM";k.appendChild(note)});
+    const note=document.createElement("span");note.className="xkm";note.textContent="gồm mọi kênh";note.title="Kênh bán lẻ, Kênh phân phối, Kênh OEM";k.appendChild(note)});
 }}

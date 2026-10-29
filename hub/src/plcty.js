@@ -40,9 +40,8 @@ function plcPop(html){openPop(`<div class="plc plc-popw">${html}</div>`);const p
   p.querySelectorAll("[data-plck]").forEach(b=>b.onclick=()=>plcKenhPop(b.dataset.plck));
   p.querySelectorAll("[data-plcl]").forEach(b=>b.onclick=()=>plcLinePop(b.dataset.plcl))}
 let PLC_A=null;
-/* Các tháng cũ (xu hướng, lũy kế) nhớ 60 giây để trang không tính lại mỗi lần vẽ (plMonth nặng). */
-const PLC_OLD={};
-function plcOld(ym){const c=PLC_OLD[ym];if(c&&Date.now()-c.t<60000)return c.v;const v=plMonth(ym);if(!v.loading)PLC_OLD[ym]={t:Date.now(),v};return v}
+/* Các tháng cũ (xu hướng, lũy kế): tính lại mỗi lần vẽ (~7ms/tháng). Không nhớ đệm: bản nhớ lúc đơn Kênh phân phối chưa tải xong làm ẩn mất tháng. */
+const plcOld=ym=>plMonth(ym);
 function plcKenhPop(k){const A=PLC_A,c=A.cols[k],r=A.by[k],n=(PLC_K.find(x=>x[0]===k)||[])[1]||k;
   if(!c)return plcPop(`<section class="card plc-pc"><h2>${esc(n)} · ${plcVn(A.ym)}</h2><p class="hint">${esc(r?r.src||"":"chờ số")}</p>${r&&r.go?`<p><button type="button" class="btn sm" data-plcgo="${r.go}">Mở trang kênh</button></p>`:""}</section>`);
   plcPop(`<section class="card plc-pc"><h2>${esc(n)} · ${plcVn(A.ym)}</h2><p class="hint">${esc(c.src||"")}${r&&r.dang?` · đang giao chưa tính ${nf(r.dang)} đơn (${tr(r.dangDt)})`:""}</p><table class="plc-t"><tbody>
@@ -83,16 +82,6 @@ function pPLCty(m){
       return `<tr class="clk" data-plck="${k}"><td><span class="plc-chn"><span class="plc-lg" style="background:${cl}">${ic}</span>${esc(n)}</span></td>${!c?`<td class="n hint" colspan="6" style="text-align:left">chờ số · ${esc((A.by[k]&&A.by[k].src)||"chờ tải báo cáo")}</td>`:
       `<td class="n">${plcNum(c.dt)}</td><td class="n">${c.gv==null?`<span class="hint">chưa có giá vốn</span>`:plcNum(c.lg)}</td><td class="n"><b>${c.lai==null?"—":plcNum(c.lai)}</b></td><td class="n">${plcPc(c.lai,c.dt)}</td><td class="n">${p?plcChg(c.dt,p.dt):`<span class="hint">—</span>`}</td><td class="n">${plcPc(c.dt,CT.dt)}<span class="plc-bar"><i style="width:${CT.dt?Math.max(0,c.dt/CT.dt*100):0}%;background:${cl}"></i></span></td>`}</tr>`}).join("")}
     <tr class="plc-tot"><td>Tổng cộng</td><td class="n">${plcNum(CT.dt)}</td><td class="n">${plcNum(CT.lg)}</td><td class="n">${plcNum(CT.lai)}</td><td class="n">${plcPc(CT.lai,CT.dt)}</td><td class="n">${CP?plcChg(CT.dt,CP.dt):"—"}</td><td class="n">100%</td></tr></tbody></table></div>`;
-  /* Cầu nối lợi nhuận (thác nước). */
-  const cpk2=(T.phi||0)+(T.ads||0)+(T.cpk||0)+(T.luong||0);
-  const steps=[["Doanh\nthu thực",T.dt,"t","dt"],["Giá vốn",T.lg==null?null:-((T.gv||0)+(T.ngv||0)),"d","gv"],["Lãi gộp",T.lg,"t","lg"],["Chi phí\nkênh",T.lai==null?null:-cpk2,"d","cpk2"],["Lãi đóng\ngóp",T.lai,"t","lai"]].concat(full&&T.ln!=null?[["Chi phí\nchung, SX",-(T.chung+T.sx),"d","chung"],["Lợi nhuận\nhoạt động",T.ln,"t","ln"]]:[]);
-  const wf=(()=>{const W=400,Hh=250,pl=30,pb=40,pt=18,mx=Math.max(T.dt,1)*1.05,y=v=>pt+(Hh-pt-pb)*(1-v/mx),bw=(W-pl-10)/steps.length;let run=0,s=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" class="plc-svg">`;
-    for(let i=0;i<=4;i++){const v=mx*i/4;s+=`<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#eef1f6"/><text x="${pl-4}" y="${y(v)+3}" font-size="9" text-anchor="end" fill="#8a93a8">${Math.round(v/1e6).toLocaleString("vi-VN")}</text>`}
-    steps.forEach(([l,v,t,f],i)=>{const x=pl+i*bw+bw*.17,w=bw*.66;l.split("\n").forEach((ln,j)=>s+=`<text x="${x+w/2}" y="${Hh-pb+14+j*11}" font-size="9.5" text-anchor="middle" fill="#56607a">${ln}</text>`);if(v==null)return;let a,b,col;
-      if(t==="t"){a=Math.min(0,v);b=Math.max(0,v);run=v;col=i===0||f==="ln"?"#1d3266":"#22b07d";if(v<0)col="#d63c3c"}else{a=run+v;b=run;run=a;col="#f08c8c"}
-      const top=y(Math.max(a,b)),h=Math.max(1,Math.abs(y(a)-y(b)));
-      s+=`<rect x="${x}" y="${top}" width="${w}" height="${h}" fill="${col}" rx="2" class="plc-wfb" data-plcw="${f}"/><text x="${x+w/2}" y="${top-4}" font-size="11.5" font-weight="700" text-anchor="middle" fill="${t==="d"?"#d63c3c":"#16213a"}">${t==="d"?"−":""}${plcM(Math.abs(v),0)}</text>`});
-    return s+`</svg>`})();
   /* Bảng P&L chi tiết. */
   const PM=PA,ytdMs=[];for(let i=-5;i<=0;i++){const k=plYmAdd(ym,i);if(k.slice(0,4)===ym.slice(0,4))ytdMs.push(k)}
   const MS=ytdMs.map(k=>({k,A:k===ym?A:k===pym?PA:plcOld(k)})).map(o=>({...o,T:plcTot(o.A,KK)}));
@@ -124,18 +113,21 @@ function pPLCty(m){
   const pl=`<div class="tbl"><table class="plc-t plc-pl"><thead><tr><th>Chỉ tiêu</th><th class="n">${plcVn(ym)}</th><th class="n">% DT</th><th class="n">${plcVn(pym)}</th><th class="n">Chênh lệch</th><th class="n" title="${esc("Cộng "+MS.map(o=>plcVn(o.k)).join(", ")+(ytdTip?". "+ytdTip:""))}">Lũy kế năm*</th><th class="n">Kế hoạch</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   /* Xu hướng 6 tháng (bỏ các tháng đầu chưa có số). */
   const TR=[];for(let i=-5;i<=0;i++){const k=plYmAdd(ym,i),o=MS.find(x=>x.k===k),a=o?o.A:(k===pym?PA:plcOld(k));TR.push({k,A:a,T:o?o.T:plcTot(a,KK)})}
-  while(TR.length>1&&!(TR[0].T&&TR[0].T.dt))TR.shift();
-  const trend=(()=>{const W=460,Hh=200,pl=40,pb=34,pt=12,mx=Math.max(1,...TR.map(o=>o.T?o.T.dt:0))*1.1,n=TR.length,x=i=>n<2?W/2:pl+20+i*(W-pl-50)/(n-1),y=v=>pt+(Hh-pt-pb)*(1-v/mx);let s=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" class="plc-svg">`;
+  /* Bỏ các tháng đầu web chưa có số (thiếu từ 3 kênh trở lên, hoặc doanh thu chưa tới 5% tháng cao nhất). */
+  {const mxd=Math.max(0,...TR.map(o=>o.T?o.T.dt:0));while(TR.length>1&&!(TR[0].T&&TR[0].T.dt&&(TR[0].T.thieu||[]).length<3&&TR[0].T.dt>=mxd*.05))TR.shift()}
+  const plcNg=n=>({"TikTok Shop":"TikTok","Kênh phân phối":"Phân phối","Kênh OEM":"OEM"})[n]||n;
+  const trNote=TR.filter(o=>o.T&&(o.T.thieu||[]).length).map(o=>"T"+o.k.slice(5)+" thiếu "+o.T.thieu.map(plcNg).join(", ")).join(" · ");
+  const trend=(()=>{const W=460,Hh=170,pl=40,pb=24,pt=12,mx=Math.max(1,...TR.map(o=>o.T?o.T.dt:0))*1.1,n=TR.length,x=i=>n<2?W/2:pl+20+i*(W-pl-50)/(n-1),y=v=>pt+(Hh-pt-pb)*(1-v/mx);let s=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" class="plc-svg">`;
     for(let i=0;i<=4;i++){const v=mx*i/4;s+=`<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#eef1f6"/><text x="${pl-4}" y="${y(v)+3}" font-size="9" text-anchor="end" fill="#8a93a8">${Math.round(v/1e6).toLocaleString("vi-VN")}</text>`}
     const thieu=o=>(o.T&&o.T.thieu)||[];
-    TR.forEach((o,i)=>{const th=thieu(o);s+=`<text x="${x(i)}" y="${Hh-pb+14}" font-size="10" text-anchor="middle" fill="#16213a">T${o.k.slice(5)}</text><text x="${x(i)}" y="${Hh-pb+26}" font-size="8.5" text-anchor="middle" fill="${th.length?"#c2810f":"#8a93a8"}">${th.length?"thiếu "+esc(th.map(z=>z.split(" ")[0]).join(", ")):o.k===ym&&!chot?"dự kiến":""}</text>`});
+    TR.forEach((o,i)=>{const th=thieu(o);s+=`<text x="${x(i)}" y="${Hh-pb+14}" font-size="10" text-anchor="middle" fill="#16213a">T${o.k.slice(5)}</text>${th.length||(o.k===ym&&!chot)?`<text x="${th.length?x(i)+14:x(i)-15}" y="${Hh-pb+14}" font-size="9" text-anchor="${th.length?"start":"end"}" fill="#c2810f">${th.length?"*":"dự kiến"}</text>`:""}`});
     [["dt","#1d3266"],["lai","#22b07d"],["ln","#3b6fd8"]].forEach(([f,c])=>{const pts=TR.map((o,i)=>o.T&&o.T[f]!=null?[x(i),y(o.T[f]),o]:null);
       for(let i=1;i<pts.length;i++)if(pts[i]&&pts[i-1])s+=`<line x1="${pts[i-1][0]}" y1="${pts[i-1][1]}" x2="${pts[i][0]}" y2="${pts[i][1]}" stroke="${c}" stroke-width="2" ${thieu(pts[i][2]).length||thieu(pts[i-1][2]).length?`stroke-dasharray="4 3"`:""}/>`;
       pts.forEach(p=>{if(p)s+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#fff" stroke="${c}" stroke-width="2"><title>${plcTr(p[2].T[f])}</title></circle>`})});
     return s+`</svg>`})();
   /* Cơ cấu chi phí và top chi phí. */
   const CC=[["Giá vốn",T.gv||0,"#3b6fd8","gv"],["Quảng cáo",T.ads||0,"#f29a2e","ads"],["Phí sàn, ship",T.phi||0,"#22b07d","phi"],["Chi phí chung",full?T.chung||0:0,"#9b7be0","chung"],["Chi phí khác",(T.cpk||0)+(T.luong||0)+(full?T.sx||0:0),"#b7bfcf","cpk"]],cpT=CC.reduce((a,c)=>a+Math.max(0,c[1]),0);
-  const donut=(()=>{let a=-Math.PI/2,s=`<svg viewBox="0 0 120 120" width="104" style="flex:none">`;CC.forEach(([,v,c])=>{if(v<=0||!cpT)return;const b=a+v/cpT*Math.PI*2-1e-6,r=50,ri=34,p=(g,R)=>[60+R*Math.cos(g),60+R*Math.sin(g)],L=b-a>Math.PI?1:0,[x1,y1]=p(a,r),[x2,y2]=p(b,r),[x3,y3]=p(b,ri),[x4,y4]=p(a,ri);
+  const donut=(()=>{let a=-Math.PI/2,s=`<svg viewBox="0 0 120 120" width="150" style="flex:none">`;CC.forEach(([,v,c])=>{if(v<=0||!cpT)return;const b=a+v/cpT*Math.PI*2-1e-6,r=50,ri=34,p=(g,R)=>[60+R*Math.cos(g),60+R*Math.sin(g)],L=b-a>Math.PI?1:0,[x1,y1]=p(a,r),[x2,y2]=p(b,r),[x3,y3]=p(b,ri),[x4,y4]=p(a,ri);
     s+=`<path d="M${x1} ${y1}A${r} ${r} 0 ${L} 1 ${x2} ${y2}L${x3} ${y3}A${ri} ${ri} 0 ${L} 0 ${x4} ${y4}Z" fill="${c}"/>`;a=b});
     return s+`<text x="60" y="54" font-size="8" text-anchor="middle" fill="#6b7590">Tổng chi phí</text><text x="60" y="67" font-size="12" font-weight="800" text-anchor="middle" fill="#16213a">${plcM(cpT,0)}tr</text><text x="60" y="78" font-size="8" text-anchor="middle" fill="#6b7590">${plcPc(cpT,T.dt)} DT</text></svg>`})();
   const TP=[];PLC_K.forEach(([k,n])=>{const c=A.cols[k];if(!c||(KK&&KK!==k))return;[["ads","Quảng cáo","#f29a2e"],["phi","Phí sàn, ship","#22b07d"],["gv","Giá vốn","#3b6fd8"]].forEach(([f,l,cl])=>{if(c[f]>0)TP.push([`${l} ${n.replace("Kênh ","")}`,c[f],cl,`data-plck="${k}"`])})});
@@ -159,14 +151,13 @@ function pPLCty(m){
     <div><label>Kênh bán</label>${sel("plcK",[["","Tất cả kênh"]].concat(PLC_K.map(([k,n])=>[k,n])),KK)}</div></div>
    ${kpis}
    <div class="plc-grid"><section class="card"><div class="plc-ch"><h2>Hiệu quả kinh doanh theo kênh</h2><span class="hint">bấm từng kênh để xem chi tiết</span></div>${kenh}</section>
-    <section class="card"><div class="plc-ch"><h2>Cầu nối lợi nhuận</h2><span class="hint">triệu đồng</span></div>${wf}</section></div>
+    <section class="card"><div class="plc-ch"><h2>Cơ cấu chi phí</h2><span class="hint">% doanh thu · bấm để xem chi tiết</span></div><div class="plc-dn">${donut}<div class="plc-dl">${CC.map(([l,v,c,f])=>`<div data-plcl="${f}"><i style="background:${c}"></i>${l}<b>${plcPc(v,T.dt)}</b><span class="hint">${plcTr(v)}</span></div>`).join("")}</div></div></section></div>
    <div class="plc-grid plc-g2"><section class="card"><div class="plc-ch"><h2>Bảng P&L chi tiết</h2><span class="hint">triệu đồng</span><a class="plc-all">${Object.values(PLC.open).some(Boolean)?"Thu gọn":"Mở hết"}</a></div>${pl}
      <p class="hint plc-foot">Lãi đóng góp = lãi gộp − phí sàn, vận chuyển, thuế − quảng cáo − chi phí Sổ chi phí bổ thẳng về kênh − lương làm riêng cho kênh. Lợi nhuận hoạt động = lãi đóng góp − chi phí chung − chi phí Sản xuất. Hàng chưa có giá vốn để riêng, không tính lãi.${A.pb&&A.pb.loi&&A.pb.loi.length?" Chưa chia được: "+esc(A.pb.loi.join("; "))+".":""}</p></section>
     <div class="plc-col">
-     <section class="card"><div class="plc-ch"><h2>Xu hướng doanh thu và lợi nhuận</h2><span class="hint">triệu đồng</span></div><div class="plc-leg"><span><i style="background:#1d3266"></i>Doanh thu thực</span><span><i style="background:#22b07d"></i>Lãi đóng góp</span><span><i style="background:#3b6fd8"></i>Lợi nhuận hoạt động</span></div>${trend}<p class="hint plc-foot">Nét đứt: tháng còn thiếu kênh nên chưa so được.</p></section>
-     <div class="plc-two"><section class="card"><div class="plc-ch"><h2>Cơ cấu chi phí</h2><span class="hint">% doanh thu</span></div><div class="plc-dn">${donut}<div class="plc-dl">${CC.map(([l,v,c,f])=>`<div data-plcl="${f}"><i style="background:${c}"></i>${l}<b>${plcPc(v,T.dt)}</b></div>`).join("")}</div></div></section>
-      <section class="card"><div class="plc-ch"><h2>Top chi phí lớn nhất</h2></div>${top.map(([l,v,c,at])=>`<div class="plc-tb" ${at}><span>${esc(l)}</span><span class="t"><i style="width:${v/tmx*100}%;background:${c}"></i></span><b>${plcTr(v)}</b><span>${plcPc(v,T.dt,0)}</span></div>`).join("")||`<p class="hint">Chưa có số.</p>`}</section></div>
-     <section class="card"><div class="plc-ch"><h2>Cảnh báo & ghi chú</h2></div><div class="plc-warns">${W.map(([c,b,s,at])=>`<div class="plc-w ${c}" ${at}><b>${c==="blu"?"ⓘ":"⚠"} ${esc(b)}</b><span>${esc(s)}</span>${at?`<u>Xem chi tiết ›</u>`:""}</div>`).join("")||`<span class="hint">Không có cảnh báo.</span>`}</div></section>
+     <section class="card"><div class="plc-ch"><h2>Top chi phí lớn nhất</h2></div>${top.map(([l,v,c,at])=>`<div class="plc-tb" ${at}><span>${esc(l)}</span><span class="t"><i style="width:${v/tmx*100}%;background:${c}"></i></span><b>${plcTr(v)}</b><span>${plcPc(v,T.dt,0)}</span></div>`).join("")||`<p class="hint">Chưa có số.</p>`}</section>
+     <section class="card plc-warn"><div class="plc-ch"><h2>Cảnh báo & đề xuất</h2></div><div class="plc-warns">${W.map(([c,b,s,at])=>`<div class="plc-w ${c}" ${at}><b>${c==="blu"?"ⓘ":"⚠"} ${esc(b)}</b><span>${esc(s)}</span>${at?`<u>Xem chi tiết ›</u>`:""}</div>`).join("")||`<span class="hint">Không có cảnh báo.</span>`}</div></section>
+     <section class="card plc-trend"><div class="plc-ch"><h2>Xu hướng doanh thu và lợi nhuận</h2><span class="hint">triệu đồng</span></div><div class="plc-leg"><span><i style="background:#1d3266"></i>Doanh thu thực</span><span><i style="background:#22b07d"></i>Lãi đóng góp</span><span><i style="background:#3b6fd8"></i>Lợi nhuận hoạt động</span></div>${trend}<p class="hint plc-foot">${trNote?`* Nét đứt, chưa so được: ${esc(trNote)}.`:""}</p></section>
     </div></div></div>`;
   /* Gắn sự kiện */
   const $m=s=>m.querySelector(s);
@@ -177,7 +168,6 @@ function pPLCty(m){
     if(f==="lnst")return plcPop(`<section class="card plc-pc"><h2>Lợi nhuận sau thuế</h2><p>Lợi nhuận sau thuế = lợi nhuận hoạt động + thu nhập khác − chi phí khác (bồi thường sàn, lãi vay…) − thuế thu nhập doanh nghiệp.</p><p class="hint">Web chưa có chỗ nhập thu nhập, chi phí khác và thuế TNDN nên chưa ra số. Khi có chỗ nhập thì ô này tự có số.</p></section>`);
     if(f==="cp")return plcPop(`<section class="card plc-pc"><h2>Tổng chi phí · ${plcVn(ym)}</h2><table class="plc-t"><tbody>${[["gv","Giá vốn hàng bán"],["ads","Quảng cáo"],["phi","Phí sàn, vận chuyển, thuế"],["cpk","Chi phí trực tiếp kênh"],["luong","Lương làm riêng cho kênh"]].concat(full?[["chung","Chi phí chung"],["sx","Chi phí Sản xuất"]]:[]).map(([k,l])=>[k,l,T[k]||0]).sort((a,b)=>b[2]-a[2]).map(([k,l,v])=>`<tr class="clk" data-plcl="${k}"><td>${l}</td><td class="n">${plcTr(v)}</td><td class="n hint">${plcPc(v,T.dt)} doanh thu</td></tr>`).join("")}<tr class="plc-tot"><td>Tổng</td><td class="n">${plcTr(T.cp)}</td><td class="n hint">${plcPc(T.cp,T.dt)}</td></tr></tbody></table><p class="hint">Bấm từng dòng để xem chi tiết.</p></section>`);
     plcLinePop(f==="ln"?"chung":f)});
-  m.querySelectorAll(".plc-wfb").forEach(r=>r.onclick=()=>{const f=r.dataset.plcw;if(f==="cpk2")return plcPop(`<section class="card plc-pc"><h2>Chi phí kênh · ${plcVn(ym)}</h2><table class="plc-t"><tbody>${["phi","ads","cpk","luong"].map(x=>`<tr class="clk" data-plcl="${x}"><td>${PLC_L[x]}</td><td class="n">${plcTr(T[x]||0)}</td><td class="n hint">${plcPc(T[x]||0,T.dt)}</td></tr>`).join("")}</tbody></table></section>`);plcLinePop(f==="ln"?"chung":f)});
   m.querySelectorAll(".plc-ck").forEach(td=>td.onclick=e=>{e.stopPropagation();plcLinePop(td.dataset.plcl)});
   const tg=(g,on)=>{PLC.open[g]=on;const r=m.querySelector(`tr[data-plcg="${g}"]`);if(r)r.classList.toggle("open",on);m.querySelectorAll(`tr[data-plcp="${g}"]`).forEach(s=>s.hidden=!on)};
   m.querySelectorAll("tr.plc-tg").forEach(r=>r.querySelector("td").onclick=()=>tg(r.dataset.plcg,!PLC.open[r.dataset.plcg]));
@@ -196,7 +186,8 @@ function pPLCty(m){
 .plc-kl{font-size:12px;font-weight:600}.plc-kv{font-size:19px;font-weight:800;margin:4px 0 2px}.plc-km{font-size:11.5px;color:#6b7590}
 .plc-up{color:#17915f;font-weight:700}.plc-dn{color:#d63c3c;font-weight:700}
 .plc-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:10px;margin-bottom:10px;align-items:start}.plc-grid>*,.plc-two>*{min-width:0}.plc-grid .card,.plc-col .card{margin:0;padding:10px 12px}
-.plc-col{display:flex;flex-direction:column;gap:10px;min-width:0}.plc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}
+.plc-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.plc-grid:not(.plc-g2){align-items:stretch}.plc-grid:not(.plc-g2)>.card{display:flex;flex-direction:column}.plc-grid:not(.plc-g2)>.card>.plc-svg{margin:auto}.plc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}
 .plc-ch{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}.plc-ch h2{font-size:13.5px;font-weight:700;margin:0}.plc-ch .hint{margin-left:auto}.plc-ch a{color:#3b6fd8;cursor:pointer;font-size:12px}
 .plc-t{width:100%;border-collapse:collapse}.plc-t th,.plc-t td{padding:5px 6px;border-bottom:1px solid #e5e9f0;white-space:nowrap}.plc-t th{font-size:11.5px;color:#6b7590;font-weight:600;background:#f6f8fc}
 .plc-t .n{text-align:right}.plc-pl td:first-child{min-width:200px}
@@ -206,16 +197,16 @@ function pPLCty(m){
 .plc-ck{cursor:pointer}.plc-ck:hover{text-decoration:underline dotted;background:#f2f6fd}.plc-t tr.clk{cursor:pointer}.plc-t tr.clk:hover td{background:#f5f8fe}
 .plc-chn{display:flex;align-items:center;gap:7px;font-weight:600}.plc-lg{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;color:#fff;font-size:10px;font-weight:800;flex:none}
 .plc-bar{display:inline-block;width:34px;height:7px;background:#edf0f6;border-radius:4px;vertical-align:middle;margin-left:6px;overflow:hidden}.plc-bar i{display:block;height:100%;border-radius:4px}
-.plc-svg{max-height:250px;display:block;margin:0 auto}.plc-wfb{cursor:pointer}.plc-svg text{font-family:inherit}
+.plc-svg{max-height:250px;display:block;margin:0 auto}.plc-svg text{font-family:inherit}
 .plc-leg{display:flex;gap:12px;justify-content:flex-end;font-size:11.5px;color:#6b7590}.plc-leg span{display:flex;align-items:center;gap:4px}.plc-leg i{width:14px;height:3px;border-radius:2px}
-.plc-dn{display:flex;align-items:center;gap:10px}.plc-dl{flex:1;min-width:0}.plc-dl div{display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer;white-space:nowrap}.plc-dl i{width:9px;height:9px;border-radius:50%;flex:none}.plc-dl b{margin-left:auto;font-weight:600}
+.plc-dn{display:flex;align-items:center;gap:10px}.plc-dl{flex:1;min-width:0}.plc-dl div{display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer;white-space:nowrap}.plc-dl i{width:9px;height:9px;border-radius:50%;flex:none}.plc-dl b{margin-left:auto;font-weight:600}.plc-dl .hint{width:62px;text-align:right}.plc-grid:not(.plc-g2) .plc-dn{flex:1;gap:24px;padding:0 10px}.plc-grid:not(.plc-g2) .plc-dl div{margin:8px 0;font-size:12.5px}
 .plc-tb{display:grid;grid-template-columns:minmax(0,150px) minmax(40px,1fr) 62px 32px;gap:6px;align-items:center;font-size:11.5px;margin:5px 0;cursor:pointer}.plc-tb>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plc-tb .t{height:9px;background:#edf0f6;border-radius:3px;overflow:hidden}.plc-tb .t i{display:block;height:100%;border-radius:3px}.plc-tb b{text-align:right;font-weight:600}.plc-tb span:last-child{text-align:right;color:#6b7590}
 .plc-warns{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
 .plc-w{border-radius:8px;padding:9px 10px;border:1px solid;display:flex;flex-direction:column;gap:3px}.plc-w[data-plck],.plc-w[data-plcl]{cursor:pointer}.plc-w b{font-size:12px}.plc-w span{font-size:11.5px;color:#56607a}.plc-w u{text-decoration:none;font-size:11.5px;font-weight:600}
 .plc-w.red{background:#fff3f3;border-color:#f6caca}.plc-w.red b,.plc-w.red u{color:#d63c3c}.plc-w.amb{background:#fff8ea;border-color:#f3dcab}.plc-w.amb b,.plc-w.amb u{color:#c2810f}.plc-w.blu{background:#f1f5fe;border-color:#cfdbf7}.plc-w.blu b,.plc-w.blu u{color:#3b6fd8}
 .plc-foot{margin:6px 2px 0}.plc-popw{max-width:640px;margin:0 auto}.plc-pc h2{font-size:14px;margin:0 0 4px}.plc-pc p{margin:6px 0}
-@media(max-width:1300px){.plc-grid:not(.plc-g2){grid-template-columns:1.75fr 1fr}.plc-g2{grid-template-columns:1fr}.plc-col{display:grid;grid-template-columns:1fr 1fr}.plc-col>.card:first-child,.plc-col>.card:last-child{grid-column:1/-1}.plc-col>.plc-two{display:contents}}
+@media(max-width:1300px){.plc-grid:not(.plc-g2){grid-template-columns:1.45fr 1fr}.plc-g2{grid-template-columns:1fr}.plc-grid:not(.plc-g2) .plc-dn{gap:12px;padding:0}}
 @media(max-width:1100px){.plc-kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:1000px){.plc-grid,.plc-grid:not(.plc-g2){grid-template-columns:1fr}}
 @media(max-width:640px){.plc-kpis{grid-template-columns:repeat(2,1fr)}.plc-filt{grid-template-columns:1fr}.plc-col{display:flex}.plc-two{grid-template-columns:1fr}}
