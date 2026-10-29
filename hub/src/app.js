@@ -42,6 +42,7 @@ let _rLast="";
    Chị Hoa 29/10: ẩn menu xong mà nút dẫn tới trang đó bị đẩy về trang đầu (P&L) là sai luồng. Ẩn trang nào khỏi menu thì thêm vào đây. */
 const NAV_AN_MO=new Set(["cr_vc","cr_s_vc","cr_bill","cr_s_bill","cr_im","cr_import"]);
 function render(){
+  if(typeof closePop==="function"&&PAGE!=="mh_po")closePop(true);
   if(!ME){renderLogin();return}
   const _m0=$("#main"),_keep=_rLast===PAGE&&_m0&&_m0.childElementCount>0?_rmSave(_m0):null,_y0=window.scrollY;
   let items=menuItems().flatMap(g=>g[1]);if(!items.some(i=>i[0]===PAGE)&&!(NAV_AN_MO.has(PAGE)&&PAGES[PAGE])){PAGE=items[0][0];items=menuItems().flatMap(g=>g[1])}
@@ -68,6 +69,16 @@ function render(){
   _rLast=PAGE;_rmLast=PAGE;navRecord();
   if(_keep){_rmRestore(m,_keep,_y0);requestAnimationFrame(()=>{_rmRestore($("#main")||m,_keep,_y0)})}
 }
+/* Cửa sổ chi tiết nổi giữa màn hình (chị Hoa 29/10, kiểu Poscake): xem chi tiết một chứng từ (đơn mua…) đè lên danh sách,
+   không chuyển trang. Các form ghi / sửa vẫn mở ở #drawer, nằm trên cửa sổ này; đóng form xong vẫn thấy cửa sổ chi tiết.
+   onClose chạy khi người dùng bấm ✕, bấm ra ngoài hoặc Esc. */
+let _popClose=null;
+function openPop(html,onClose){let p=document.getElementById("pop");
+  if(!p){p=document.createElement("div");p.id="pop";p.className="pop";p.innerHTML=`<div class="pop-in"><button type="button" class="x" id="popx" aria-label="Đóng">✕</button><div id="popIn"></div></div>`;document.body.appendChild(p);
+    p.addEventListener("mousedown",e=>{if(e.target===p)closePop()});p.querySelector("#popx").onclick=()=>closePop();
+    addEventListener("keydown",e=>{const d=document.getElementById("drawer");if(e.key==="Escape"&&!p.hidden&&(!d||d.hidden))closePop()})}
+  _popClose=onClose||null;document.getElementById("popIn").innerHTML=html;p.hidden=false;document.body.classList.add("pop-open")}
+function closePop(silent){const p=document.getElementById("pop");if(!p||p.hidden)return;p.hidden=true;document.body.classList.remove("pop-open");const f=_popClose;_popClose=null;if(f&&!silent)f()}
 /* Nút Back của trình duyệt (chị Hoa 29/10: bấm Back là thoát ra Google, "cả web đều có tình trạng đó"):
    - đổi trang, mở trang chi tiết (đơn mua), đổi tab trong trang (Sổ chi phí, Tài sản) đều ghi một bước vào lịch sử;
    - mở cửa sổ chi tiết bên phải (#drawer) cũng ghi một bước: bấm Back là đóng cửa sổ đó trước, chưa đổi trang;

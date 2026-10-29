@@ -524,7 +524,10 @@ function pMhDon(m){
   if(mhNeedAdmin(m,T,S))return;
   if(MH.err){m.innerHTML=H(T,S)+`<div class="note red">${esc(MH.err)}</div>`;return}
   if(!MH.orders||!MH.inv||!MH.pay){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
-  if(MH.open){const p=MH.orders.find(x=>x.id===MH.open);if(p){m.innerHTML=`<div class="mhpage"><a href="#" class="mhback" id="mh-back">← Danh sách đơn mua hàng</a><div id="mh-detail"></div></div>`;$("#mh-back").onclick=e=>{e.preventDefault();MH.open=null;renderMain()};mhPoDrawer(p.id,$("#mh-detail"));return}MH.open=null}
+  /* Đơn mua mở trong cửa sổ nổi giữa màn hình đè lên danh sách (chị Hoa 29/10), không còn là trang riêng. */
+  {const po=MH.open?MH.orders.find(x=>x.id===MH.open):null;if(MH.open&&!po)MH.open=null;
+   if(po)setTimeout(()=>{if(MH.open!==po.id)return;openPop(`<div id="mh-detail"></div>`,()=>{MH.open=null;const hs=history.state;if(hs&&hs.sub&&hs.sub.mh){_navSkipPop++;history.back()}});mhPoDrawer(po.id,$("#mh-detail"))},0);
+   else if(typeof closePop==="function")closePop(true)}
   const [from,to]=mhPeriod(),q=(MH.q||"").trim().toLowerCase(),need=mhNeedBuy();
   const rows=MH.orders.map(p=>{const M=mhPoMoney(p);return {p,M,st:mhStage(p,M),val:M.invTotal||mhValue(p)||0}})
     .filter(x=>(!from||x.p.order_date>=from)&&(!to||x.p.order_date<to)&&(!MH.sid||x.p.supplier_id===MH.sid)&&(!q||(x.p.no+" "+x.p.supplier_name+" "+x.p.lines.map(l=>l.item+" "+l.name).join(" ")).toLowerCase().includes(q)));
