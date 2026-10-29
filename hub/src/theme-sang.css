@@ -500,3 +500,10 @@ table.mhlines td small.mh-nm{display:block;color:#7a8396;font-size:12px;margin-t
 .pop-in>#popx:hover{background:#e3e7f3}
 body.pop-open{overflow:hidden}
 @media(max-width:700px){.drawer,.pop{padding:0}.drawer .in,.pop-in{width:100%;max-height:100%;height:100%;border-radius:0}}
+
+/* Phải thu gọn (chị Hoa 29/10) */
+.ptgon .ptgon-h{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ptgon .ptleg{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:#475069}.ptgon .ptleg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.ptgon .ptbar{height:8px;margin:8px 0 2px}
+.ptgon table.pttop td{padding:4px 8px;font-size:13px}.ptgon table.pttop th{font-size:12px}
+.ptmini{height:6px;background:#eef0f6;border-radius:4px;overflow:hidden}.ptmini span{display:block;height:100%;background:#5b6ee1;border-radius:4px;overflow:hidden}.ptmini i{display:block;height:100%;background:#d92d20}
