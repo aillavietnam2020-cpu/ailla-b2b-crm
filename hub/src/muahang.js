@@ -509,7 +509,8 @@ const mhLqPo=p=>gdLink(p.no,`data-gdpo="${esc(p.id)}"`,"Đơn mua "+p.no+" · "+
 const mhTsCuaDon=p=>typeof tsAll==="function"&&typeof tsDonCua==="function"?tsAll().filter(a=>tsDonCua(a)===p):[];
 const mhPcCuaDon=p=>typeof scFin==="function"?((scFin().nkc)||[]).filter(r=>r.po===p.id):[];
 function mhLienQuan(p,M){M=M||mhPoMoney(p);
-  return [...M.inv.map(mhLqHv),...M.pays.map(mhLqPv),...mhPcCuaDon(p).map(r=>gdLink(r.ct||"Phiếu chi",`data-gdpc="${esc(r.id)}"`,"Phiếu chi Sổ chi phí · "+nf(r.t)+" đ")),
+  /* Chị Hoa 29/10: cột Liên quan hiện cả mã đơn mua đứng đầu, rồi chứng từ, phiếu chi, tài sản. */
+  return [mhLqPo(p),...M.inv.map(mhLqHv),...M.pays.map(mhLqPv),...mhPcCuaDon(p).map(r=>gdLink(r.ct||"Phiếu chi",`data-gdpc="${esc(r.id)}"`,"Phiếu chi Sổ chi phí · "+nf(r.t)+" đ")),
     ...mhTsCuaDon(p).map(a=>gdLink(a.ma,`data-gdts="${esc(a.id)}"`,(a.kind==="TS"?"Tài sản ":"Công cụ ")+a.ten))].join(" ")||`<span class="hint">—</span>`}
 /* Gắn bấm cho mọi link Liên quan trong vùng m. */
 function mhLqBind(m){if(typeof gdBind==="function")gdBind(m);
