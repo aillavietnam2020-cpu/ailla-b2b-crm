@@ -1093,3 +1093,6 @@ td.bvstc .bvwl{max-width:172px}
 .bvscT{width:100%;min-height:360px;border:0;outline:0;resize:none;background:transparent;font:16px/1.8 'Segoe UI',Roboto,Arial,sans-serif;color:inherit;padding:10px 2px;white-space:pre-wrap}
 .bvscT:not([readonly]){background:#fbfbfe;border-radius:10px;padding:12px 14px}
 .bvscN{width:100%;min-height:80px;margin:8px 0;padding:10px;border:1px solid #d7daf0;border-radius:10px;font:14px/1.5 inherit}
+
+/* Ô số Tổng quan: chữ phụ dài không được tràn sang ô bên cạnh (chị Hoa 29/10) */
+.xk{min-width:0;overflow:hidden}.xk .xkm{display:block;max-width:100%}
