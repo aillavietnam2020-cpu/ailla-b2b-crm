@@ -16,7 +16,7 @@ const scFnRow=x=>x.g==="G28"?"Mua tài sản / công cụ":x.ext&&x.ext.src==="n
 const scLaCoc=x=>!!(x.ext&&x.ext.src==="ncc"&&/^cọc/i.test(String(x.dg||"")));
 /* Cách xử lý của một dòng (Nhật ký chi, Phân bổ). */
 function scXL(x,qt){
-  if(x.trung)return "Trùng sổ, không tính";
+  if(x.trung)return x.trungLy||"Trùng sổ, không tính";
   if(x.g==="G28")return "Ghi tăng tài sản";
   if(x.ext&&x.ext.src==="ncc")return scLaCoc(x)?"Chặn":"Vào giá thành theo định mức";
   if(x.st==="Chờ duyệt"||x.st==="Chờ CEO duyệt")return "Chờ duyệt";
