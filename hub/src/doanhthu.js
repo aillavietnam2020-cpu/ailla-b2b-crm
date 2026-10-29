@@ -75,14 +75,25 @@ const DT_NKC_ROW={tts:"tts",fb:"fb",spe:"spe",B2B:"b2b",GIA_CONG:"gc"};
 function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.nkc)return null;
   let nkc=typeof scChiDoiChieu==="function"?f.nkc.filter(x=>!scChiDoiChieu(x)):f.nkc;
   if(typeof tsChiPhiThang==="function"){const ts=[];for(let ym=from.slice(0,7);ym<=to.slice(0,7);ym=plYmAdd(ym,1)){try{const r=tsChiPhiThang(ym);if(r&&r.chay)r.dong.forEach(x=>ts.push({...x,d:x.d>to?to:x.d}))}catch(e){}}if(ts.length)nkc=nkc.concat(ts)}
+  nkc=nkc.concat(dtVcRows(f.nkc,from,to));
   return dtNkcKenh(nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
+/* Phiếu chi vận chuyển (SOCP.ship) cộng vào kênh như Sổ chi phí (scAuto, chat Sổ chi phí 29/10): kênh theo đơn được chở (scVcKenh) —
+   đơn mua → Sản xuất, đơn khách OEM → Kênh OEM, đơn bán khác → Kênh phân phối, còn lại "Chờ xác định" (không trừ kênh nào).
+   Sổ đã có dòng G09 nạp từ MISA trong kỳ thì bỏ (tránh trừ hai lần), giống scAuto. Chưa tải phiếu thì gọi tải rồi vẽ lại. */
+function dtVcRows(nkc,from,to){if(typeof SOCP==="undefined"||typeof scVcKenh!=="function")return [];
+  if(typeof spLoadShip==="function"&&PERIOD.from<=from&&PERIOD.to>=to){const k=PERIOD.from+"|"+PERIOD.to;if(SOCP.shipKey!==k&&!SOCP.busy)spLoadShip().then(()=>{DT_PBC_CLR();dtRe()})}
+  if(typeof gcLoad==="function"&&typeof GC!=="undefined"&&!GC.orders&&!GC.busy)gcLoad().then(()=>{DT_PBC_CLR();dtRe()});
+  if(!SOCP.ship||(nkc||[]).some(y=>y.g==="G09"&&y.src!=="phieu"&&String(y.d||"").slice(0,10)>=from&&String(y.d||"").slice(0,10)<=to))return [];
+  const R=[];SOCP.ship.forEach(v=>{if(v.status!=="OK")return;const d=String(v.voucher_date||"").slice(0,10);if(d<from||d>to)return;
+    let r;try{r=scVcKenh({or:v.order_refs||""})}catch(e){return}R.push({d,g:r.g,k:r.k,t:+v.amount||0,src:"vc"})});
+  return R}
 function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEach(r=>{const k=DT_NKC_ROW[r.k],v=k?S.v[k]:0;if(!v||r._cpk||r.dt==null)return;r._cpk=1;r.cpk=(r.cpk||0)+v;r.khac=(r.khac||0)+v;if(r.lai!=null)r.lai-=v;
   r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(v)} chi phí Sổ chi phí bổ về kênh (${S.n[k]} dòng)`})}
 /* Lương làm riêng cho kênh (bảng lương đã chốt) trừ ở lãi đóng góp; chi chung được chia theo Quy tắc phân bổ ghi ở r.chia cho dòng Lãi sau phân bổ.
    Hàm scPLKenh (scphanbo.js, chat Sổ chi phí) chỉ tính theo tháng nên chỉ áp khi kỳ nằm trong một tháng. Nó tự gọi lại doanh thu: cờ DTS.inPB chặn vòng lặp. */
 const DT_SC_K={tts:["TikTok"],spe:["Shopee Mall","Shopee thường"],fb:["Facebook"],B2B:["NPP"],GIA_CONG:["Gia công"]};
 /* scPLKenh nặng (tính lại doanh thu, chia chi chung) mà tqKenhRows gọi nhiều lần mỗi lần vẽ trang: nhớ kết quả 20 giây theo tháng (chị báo quản trị lag 28/10). */
-const DT_PBC={};
+const DT_PBC={},DT_PBC_CLR=()=>{for(const k in DT_PBC)delete DT_PBC[k]};
 function dtPB(ym){if(DTS.inPB||typeof scPLKenh!=="function")return null;const c=DT_PBC[ym];if(c&&Date.now()-c.t<20000)return c.v;
   DTS.inPB=true;try{const v=scPLKenh(ym);DT_PBC[ym]={t:Date.now(),v};return v}catch(e){return null}finally{DTS.inPB=false}}
 function dtTruLuong(rows,from,to){const ym=from.slice(0,7);if(to.slice(0,7)!==ym)return;const L=dtPB(ym);if(!L)return;
