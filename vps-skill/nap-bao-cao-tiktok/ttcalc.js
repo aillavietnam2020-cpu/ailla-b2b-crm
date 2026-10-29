@@ -261,8 +261,11 @@ const ttSummary=P=>({ky:P.ky,den:P.den||null,days:P.days||null,dt:P.dt,gv:P.gv,p
    khoCost: giá bình quân theo phiếu nhập kho {mã: giá} (dùng khi Giá vốn SKU chưa có mã đó).
    isPack(mã): hộp, thùng đóng gói. Bao bì chưa có giá thì chưa cộng vào giá vốn (bảng giá vốn cũ cũng không có),
    nhưng vẫn đưa vào việc của kế toán. Hàng hoá thiếu giá thì cả SKU bị coi là thiếu giá vốn (không tính bằng 0). */
-function ttMakeCostOf({ky,mapRows,skus,khoCost,isPack}){
+function ttMakeCostOf({ky,mapRows,skus,khoCost,isPack,alias}){
   const end=ky+"-"+ttP2(ttKyDays(ky)),low=s=>String(s||"").trim().toLowerCase(),gv={};
+  /* Nhãn quy đổi chỉ ghi tên (vd "Phao lọc cặn"): đọc mã như trang Kho — tên đã gán (channel_alias) trước, rồi phần "MÃ" trước " - " (29/10/2026). */
+  const al={};(alias||[]).forEach(a=>{if(a&&a.label&&a.item)al[low(a.label)]=String(a.item)});
+  const codeOf=lab=>{const c=String(lab||"").trim();return al[low(c)]||c.split(" - ")[0].trim()};
   (skus||[]).forEach(s=>{const g=s.giaVon||{},ms=Object.keys(g).filter(m=>+g[m]>0).sort();if(!ms.length)return;const pick=ms.filter(m=>m<=ky).pop()||ms[0];gv[low(s.ma)]={u:+g[pick],src:"Giá vốn SKU "+pick.slice(5)+"/"+pick.slice(0,4)}});
   const kc={};Object.entries(khoCost||{}).forEach(([k,v])=>{if(+v>0)kc[low(k)]=+v});
   const by={};(mapRows||[]).forEach(r=>{(by[low(r.sku)]=by[low(r.sku)]||[]).push(r)});
@@ -272,7 +275,7 @@ function ttMakeCostOf({ky,mapRows,skus,khoCost,isPack}){
     rows=rows.filter(r=>!r.from_day||r.from_day<=end);if(!rows.length)return {u:null,why:"Chưa quy đổi mã",parts:[]};
     const fd=rows.reduce((m,r)=>(r.from_day||"")>m?(r.from_day||""):m,"");rows=rows.filter(r=>(r.from_day||"")===fd);
     let u=0;const parts=[],miss=[],pack=[];
-    rows.forEach(r=>{const code=String(r.item_label||"").split(" - ")[0].trim();if(!code||/^bỏ qua$/i.test(code))return;const q=+r.qty||0;
+    rows.forEach(r=>{const code=codeOf(r.item_label);if(!code||/^bỏ qua$/i.test(code))return;const q=+r.qty||0;
       const c=gv[low(code)]||(kc[low(code)]?{u:kc[low(code)],src:"Giá nhập kho bình quân"}:null);
       if(c){u+=c.u*q;parts.push({code,q,u:c.u,src:c.src})}else if(isPack&&isPack(code))pack.push(code);else miss.push(code)});
     if(miss.length)return {u:null,why:"Thiếu giá vốn: "+miss.join(", "),miss,pack,parts};

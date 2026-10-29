@@ -54,9 +54,9 @@ function tsbBindFiles(id,fn){const z=$("#dz-"+id);if(!z)return;
 async function tsbCostOf(ky){
   if(!TSB.cost){const [map,cat,costs]=await Promise.all([kApi("/online/map?channel=TIKTOK"),kApi("/catalog"),kApi("/costs").catch(()=>[])]);
     const items=new Map(((cat&&cat.items)||[]).map(i=>[String(i.code).toLowerCase(),i]));
-    TSB.cost={map:Array.isArray(map)?map:(map.map||map.rows||[]),items,kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg]))}}
+    const on=await kApi("/online").catch(()=>null);TSB.cost={map:Array.isArray(map)?map:(map.map||map.rows||[]),items,kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg])),alias:(on&&on.aliases)||[]}}
   const C=TSB.cost,isPack=code=>{const it=C.items.get(String(code).toLowerCase());return !!it&&/đóng gói|hộp|thùng|bao bì/i.test((it.grp||"")+" "+(it.name||""))&&it.cls==="NVL"};
-  return ttMakeCostOf({ky,mapRows:C.map,skus:D().skus||[],khoCost:C.kho,isPack});
+  return ttMakeCostOf({ky,mapRows:C.map,skus:D().skus||[],khoCost:C.kho,isPack,alias:C.alias});
 }
 /* Chi phí gắn kênh TikTok nhập ở "Chi phí theo tháng" (agency, hàng mẫu KOC, livestream, quảng cáo ngoài GMV Max). */
 function tsbExtra(ky){

@@ -47,9 +47,9 @@ async function spePosOf(ky){
 async function speCostOf(ky){
   if(!SPE.cost){const [map,cat,costs]=await Promise.all([kApi("/online/map?channel=SHOPEE").catch(()=>[]),kApi("/catalog").catch(()=>null),kApi("/costs").catch(()=>[])]);
     const items=new Map(((cat&&cat.items)||[]).map(i=>[String(i.code).toLowerCase(),i]));
-    SPE.cost={web:Array.isArray(map)?map:[],items,kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg]))}}
+    const on=await kApi("/online").catch(()=>null);SPE.cost={web:Array.isArray(map)?map:[],items,kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg])),alias:(on&&on.aliases)||[]}}
   const C=SPE.cost,isPack=code=>{const it=C.items.get(String(code).toLowerCase());return !!it&&/đóng gói|hộp|thùng|bao bì/i.test((it.grp||"")+" "+(it.name||""))&&it.cls==="NVL"};
-  const web=ttMakeCostOf({ky,mapRows:C.web,skus:D().skus||[],khoCost:C.kho,isPack});
+  const web=ttMakeCostOf({ky,mapRows:C.web,skus:D().skus||[],khoCost:C.kho,isPack,alias:C.alias});
   return s=>{const tries=[()=>s.ps?web(s.ps.sku,null,s.ps.vr):null,()=>s.sv?web(s.sv,s.sp,s.vr):null,()=>s.sp?web(s.sp,null,s.vr):null,()=>web(s.pn,null,s.vr)];
     let best=null;for(const t of tries){const c=t();if(!c)continue;if(c.u!=null)return c;if(!best||/^Thiếu/.test(c.why))best=c}
     return best||{u:null,why:"Chưa quy đổi mã"}};

@@ -213,3 +213,15 @@ describe('Giá vốn Shopee theo hàng xuất kho (ghép mã đơn với đơn P
     expect(seen.find((s) => s.pn === 'Xịt muỗi').ps).toBeUndefined();
   });
 });
+
+describe('Nhãn quy đổi chỉ ghi tên đọc mã như trang Kho (29/10/2026)', () => {
+  it('"Phao lọc cặn" (đã gán tên) lấy giá vốn mã phaoloccan', () => {
+    const TT: any = new Function(`${readFileSync('hub/src/ttcalc.js', 'utf8')}; return {ttMakeCostOf};`)();
+    const mapRows = [{ sku: 'S1', variant: '', from_day: '', item_label: 'Phao lọc cặn', qty: 1 }, { sku: 'S1', variant: '', from_day: '', item_label: 'AILLATLG - Tẩy lồng', qty: 2 }];
+    const skus = [{ ma: 'phaoloccan', giaVon: { '2026-10': 4000 } }, { ma: 'AILLATLG', giaVon: { '2026-10': 10000 } }];
+    const no = TT.ttMakeCostOf({ ky: '2026-10', mapRows, skus, khoCost: {} })('S1', null, '');
+    expect(no.u).toBeNull();
+    const c = TT.ttMakeCostOf({ ky: '2026-10', mapRows, skus, khoCost: {}, alias: [{ label: 'Phao lọc cặn', item: 'phaoloccan' }] })('S1', null, '');
+    expect(c.u).toBe(24000);
+  });
+});

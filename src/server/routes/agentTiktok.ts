@@ -53,9 +53,10 @@ export async function agentInputs(db: D1Database, ky: string, channel: 'TIKTOK' 
           .bind(`${ky}-01`, posTo.toISOString().slice(0, 10))
           .all<{ order_id: string; sku: string; variant: string }>()
       : null;
-  const [map, items, moves, main, sec] = await Promise.all([
+  const [map, items, alias, moves, main, sec] = await Promise.all([
     db.prepare('SELECT sku, variant, from_day, item_label, qty FROM channel_map WHERE channel = ? ORDER BY sku, variant, from_day, item_label').bind(channel).all(),
     db.prepare('SELECT code, name, cls, grp FROM kho_items ORDER BY code').all(),
+    db.prepare('SELECT label, item FROM channel_alias').all(),
     db
       .prepare(
         `SELECT m.item, m.qty, m.price FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
@@ -78,6 +79,7 @@ export async function agentInputs(db: D1Database, ky: string, channel: 'TIKTOK' 
     ky,
     map: map.results ?? [],
     items: items.results ?? [],
+    alias: alias.results ?? [],
     kho,
     skus: (all.skus ?? []).map((s) => ({ ma: s.ma, giaVon: s.giaVon })),
     costs: (all.costs ?? []).filter((x) => x.thang === ky),
