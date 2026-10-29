@@ -38,10 +38,13 @@ function curMod(){const vm=visibleMods();if(!MOD){try{MOD=localStorage.getItem(S
 
 /* ---------------- KHUNG ---------------- */
 let _rLast="";
+/* Trang đã ẩn khỏi menu nhưng vẫn mở được khi bấm từ chỗ khác (Phê duyệt, Việc của tôi, Nhật ký chi…).
+   Chị Hoa 29/10: ẩn menu xong mà nút dẫn tới trang đó bị đẩy về trang đầu (P&L) là sai luồng. Ẩn trang nào khỏi menu thì thêm vào đây. */
+const NAV_AN_MO=new Set(["cr_vc","cr_s_vc","cr_bill","cr_s_bill","cr_im","cr_import"]);
 function render(){
   if(!ME){renderLogin();return}
   const _m0=$("#main"),_keep=_rLast===PAGE&&_m0&&_m0.childElementCount>0?_rmSave(_m0):null,_y0=window.scrollY;
-  let items=menuItems().flatMap(g=>g[1]);if(!items.some(i=>i[0]===PAGE)){PAGE=items[0][0];items=menuItems().flatMap(g=>g[1])}
+  let items=menuItems().flatMap(g=>g[1]);if(!items.some(i=>i[0]===PAGE)&&!(NAV_AN_MO.has(PAGE)&&PAGES[PAGE])){PAGE=items[0][0];items=menuItems().flatMap(g=>g[1])}
   const ADM=APP_MODE==="admin",alN=ADM&&typeof execAlerts==="function"?execAlerts().length:0,cm=ADM?curMod():null;
   const navAdmin=()=>{let z0=null;return visibleMods().filter(mo=>!mo.hide).map(mo=>{const zh=mo.zone!==z0?(z0=mo.zone,mo.zone?`<div class="nz">${mo.zone}</div>`:""):"";const on=mo.k===cm.k,G=modGroups(mo).map(([g,its])=>[g,typeof collapseSets==="function"?collapseSets(its):its,its]),single=(G.length===1&&G[0][1].length===1)||!!mo.tabs;const sub=on&&!single?`<div class="subnav">${G.map(([g,its,raw])=>`${g?`<div class="sg">${g}</div>`:""}${its.map(([id,t,,cnt,st])=>{const n=cnt?cnt():"";if(st&&st.acc){const op=st.ids.includes(PAGE),kids=st.ids.map((k,ix)=>[k,st.labels[ix]]).filter(([k])=>raw.some(r=>r[0]===k)&&!(st.hide||[]).includes(k));return `<button class="mi par${op?" open":""}" data-p="${id}"><span>${st.n}</span>${n!==""&&n!==0?`<b>${n}</b>`:""}<i class="car2">›</i></button>${op?kids.map(([k,lb])=>`<button class="mi kid${k===PAGE?" on":""}" data-p="${k}"><span>${lb}</span></button>`).join(""):""}`}return `<button class="mi${g?" l3":" l2"}${id===PAGE||(st&&st.ids.includes(PAGE))?" on":""}" data-p="${id}"><span>${t}</span>${n!==""&&n!==0?`<b>${n}</b>`:""}</button>`}).join("")}`).join("")}</div>`:"";return zh+`<button class="top${on?" on":""}${on&&!single?" open":""}" data-mod="${mo.k}">${ico(mo.ic)}<span>${mo.n}</span>${single?"":`<i class="car">›</i>`}</button>`+sub}).join("")};
   $("#app").innerHTML=`<aside class="side"><button type="button" class="sidex" id="sidex" aria-label="Đóng menu">✕</button><div class="logo"><img src="data:image/png;base64,${LOGO}" alt="Ailla"></div><div class="appname">${ADM?(HOST_MODE==="admin"?"Quản trị":ADMIN_URL?"Vận hành":"Trang quản trị"):"MKT Hub"}<span>${ADM?"AILLA Việt Nam":"Bàn làm việc Content"}</span></div>
@@ -62,9 +65,20 @@ function render(){
   if(ADM&&$("#uchip")){const me=MODULES.find(mo=>mo.k==="me"),its=me?modGroups(me).flatMap(g=>g[1]):[];$("#uchip").onclick=e=>{e.stopPropagation();let d=$("#umenu");if(d){d.remove();return}d=document.createElement("div");d.id="umenu";d.className="umenu";d.innerHTML=its.map(([id,t])=>`<button data-um="${id}">${t}</button>`).join("")+`<button data-um="__out">Đăng xuất</button>`;$("#uchip").after(d);d.querySelectorAll("[data-um]").forEach(b=>b.onclick=()=>{d.remove();if(b.dataset.um==="__out"){$("#logout").click();return}MOD="me";PAGE=b.dataset.um;render();scrollTo(0,0)});setTimeout(()=>addEventListener("click",()=>{const x=$("#umenu");if(x)x.remove()},{once:true}),0)}}
   $$(".aibtn").forEach(b=>b.onclick=()=>{MOD="aiq";PAGE="ai";render();scrollTo(0,0)});
   const m=$("#main");PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);
-  _rLast=PAGE;_rmLast=PAGE;
+  _rLast=PAGE;_rmLast=PAGE;navRecord();
   if(_keep){_rmRestore(m,_keep,_y0);requestAnimationFrame(()=>{_rmRestore($("#main")||m,_keep,_y0)})}
 }
+/* Nút Back của trình duyệt (chị Hoa 29/10: bấm Back là thoát ra Google): mỗi lần đổi trang hoặc mở trang chi tiết
+   (đơn mua) thì ghi một bước vào lịch sử trình duyệt; bấm Back quay về đúng trang trước, đóng cửa sổ chi tiết nếu đang mở. */
+let _navBack=false;
+const _navKey=()=>PAGE+"|"+((typeof MH!=="undefined"&&MH&&MH.open)||"");
+function navRecord(){
+  if(_navBack||!ME||!PAGE)return;const k=_navKey(),cur=history.state&&history.state.abos;
+  try{if(!cur)history.replaceState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"");
+      else if(cur!==k)history.pushState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"")}catch(e){}}
+addEventListener("popstate",e=>{const st=e.state;if(!st||!st.abos||!ME)return;
+  {const dr=document.getElementById("drawer");if(dr&&!dr.hidden&&typeof closeDrawer==="function"){try{closeDrawer()}catch(er){}}}
+  _navBack=true;try{PAGE=st.p;MOD=st.mod||MOD;if(typeof MH!=="undefined"&&MH)MH.open=st.mh||null;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(er){}render();scrollTo(0,0)}finally{_navBack=false}});
 /* vẽ lại trang chính; nếu vẫn đang ở đúng trang đó thì giữ nguyên vị trí cuộn (cả trang lẫn các bảng cuộn bên trong), để bấm tích / chọn không bị nhảy về đầu */
 let _rmLast="";
 /* Quy tắc chung: vẽ lại trang (bấm chọn, mở / đóng chi tiết, lưu, đổi bộ lọc) KHÔNG được làm trang nhảy về đầu.
@@ -87,7 +101,7 @@ function renderMain(){if(!ME)return;const m=$("#main");if(!m){render();return}
   if(same)m.style.minHeight=h+"px";
   /* Trang không tồn tại (tên sai, trang đã bỏ) thì về trang đầu của mục đang chọn và quên trang đã nhớ, đừng để trắng trang mãi. */
   if(!PAGES[PAGE]){try{localStorage.removeItem(SKEY+"_p")}catch(e){}let its=[];try{const mo0=curMod();its=mo0?modGroups(mo0).flatMap(g=>g[1]):[]}catch(e){}const ok=its.find(i=>PAGES[i[0]]);PAGE=ok?ok[0]:(PAGES.exec?"exec":Object.keys(PAGES)[0])}
-  m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);_rmLast=PAGE;
+  m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);_rmLast=PAGE;navRecord();
   if(same){_rmRestore(m,sv,y);m.style.minHeight="";_rmRestore(m,sv,y);requestAnimationFrame(()=>{_rmRestore(m,sv,y);setTimeout(()=>_rmRestore(m,sv,y),120)})}else{m.style.minHeight="";if(top){window.scrollTo(0,0);const sb=_rmSave(m);}}}
 function bindCommon(m){
   m.querySelectorAll("[data-card]").forEach(e=>e.addEventListener("click",ev=>{if(ev.target.closest("select,input,button:not([data-card]),a"))return;openCard(e.dataset.card)}));

@@ -23,7 +23,7 @@ function pcgVC(){
   openDrawerHTML(`<h2>Ghi phiếu chi</h2><form class="frm" id="pcv">
    <div class="row4"><label class="field">Ngày chi<input type="date" id="pcv-d" value="${mhToday()}" required></label><label class="field">Số tiền (đ)<input type="number" id="pcv-a" min="1" required></label></div>
    <div class="row4"><label class="field">Đơn vị vận chuyển / biển số xe<input id="pcv-c" required placeholder="Ví dụ: Xe anh Tuấn 29C-123.45"></label><label class="field">Chở đi đâu<input id="pcv-to" placeholder="Ví dụ: NPP Hải Dương"></label></div>
-   <label class="field">Các đơn xe chở (chọn đơn bên dưới, hoặc gõ chữ nếu chở gộp không bổ được)<input id="pcv-o" placeholder="Ví dụ: DH202610-0040, PM2610-009, hàng sàn ngày 28/10"></label>
+   <label class="field">Các đơn xe chở (chọn đơn bên dưới, hoặc gõ chữ nếu chở gộp không bổ được)<input id="pcv-o" placeholder="Chọn đơn ở ô bên dưới, hoặc gõ chữ, ví dụ: hàng sàn ngày 28/10"></label>
    <label class="field">Hình thức<select id="pcv-m"><option value="TIEN_MAT">Tiền mặt</option><option value="CHUYEN_KHOAN">Chuyển khoản</option><option value="KHAC">Khác</option></select></label>
    <div id="pcv-ck" class="row4" hidden><label class="field">Chi từ tài khoản công ty<select id="pcv-from"><option value="">Đang tải…</option></select></label><label class="field">Ngân hàng nhận<input id="pcv-bank"></label></div>
    <div id="pcv-ck2" class="row4" hidden><label class="field">Số tài khoản nhận<input id="pcv-no"></label><label class="field">Tên chủ tài khoản<input id="pcv-nm"></label></div>
