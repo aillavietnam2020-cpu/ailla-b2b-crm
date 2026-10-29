@@ -38,10 +38,13 @@ function curMod(){const vm=visibleMods();if(!MOD){try{MOD=localStorage.getItem(S
 
 /* ---------------- KHUNG ---------------- */
 let _rLast="";
+/* Trang đã ẩn khỏi menu nhưng vẫn mở được khi bấm từ chỗ khác (Phê duyệt, Việc của tôi, Nhật ký chi…).
+   Chị Hoa 29/10: ẩn menu xong mà nút dẫn tới trang đó bị đẩy về trang đầu (P&L) là sai luồng. Ẩn trang nào khỏi menu thì thêm vào đây. */
+const NAV_AN_MO=new Set(["cr_vc","cr_s_vc","cr_bill","cr_s_bill","cr_im","cr_import"]);
 function render(){
   if(!ME){renderLogin();return}
   const _m0=$("#main"),_keep=_rLast===PAGE&&_m0&&_m0.childElementCount>0?_rmSave(_m0):null,_y0=window.scrollY;
-  let items=menuItems().flatMap(g=>g[1]);if(!items.some(i=>i[0]===PAGE)){PAGE=items[0][0];items=menuItems().flatMap(g=>g[1])}
+  let items=menuItems().flatMap(g=>g[1]);if(!items.some(i=>i[0]===PAGE)&&!(NAV_AN_MO.has(PAGE)&&PAGES[PAGE])){PAGE=items[0][0];items=menuItems().flatMap(g=>g[1])}
   const ADM=APP_MODE==="admin",alN=ADM&&typeof execAlerts==="function"?execAlerts().length:0,cm=ADM?curMod():null;
   const navAdmin=()=>{let z0=null;return visibleMods().filter(mo=>!mo.hide).map(mo=>{const zh=mo.zone!==z0?(z0=mo.zone,mo.zone?`<div class="nz">${mo.zone}</div>`:""):"";const on=mo.k===cm.k,G=modGroups(mo).map(([g,its])=>[g,typeof collapseSets==="function"?collapseSets(its):its,its]),single=(G.length===1&&G[0][1].length===1)||!!mo.tabs;const sub=on&&!single?`<div class="subnav">${G.map(([g,its,raw])=>`${g?`<div class="sg">${g}</div>`:""}${its.map(([id,t,,cnt,st])=>{const n=cnt?cnt():"";if(st&&st.acc){const op=st.ids.includes(PAGE),kids=st.ids.map((k,ix)=>[k,st.labels[ix]]).filter(([k])=>raw.some(r=>r[0]===k)&&!(st.hide||[]).includes(k));return `<button class="mi par${op?" open":""}" data-p="${id}"><span>${st.n}</span>${n!==""&&n!==0?`<b>${n}</b>`:""}<i class="car2">›</i></button>${op?kids.map(([k,lb])=>`<button class="mi kid${k===PAGE?" on":""}" data-p="${k}"><span>${lb}</span></button>`).join(""):""}`}return `<button class="mi${g?" l3":" l2"}${id===PAGE||(st&&st.ids.includes(PAGE))?" on":""}" data-p="${id}"><span>${t}</span>${n!==""&&n!==0?`<b>${n}</b>`:""}</button>`}).join("")}`).join("")}</div>`:"";return zh+`<button class="top${on?" on":""}${on&&!single?" open":""}" data-mod="${mo.k}">${ico(mo.ic)}<span>${mo.n}</span>${single?"":`<i class="car">›</i>`}</button>`+sub}).join("")};
   $("#app").innerHTML=`<aside class="side"><button type="button" class="sidex" id="sidex" aria-label="Đóng menu">✕</button><div class="logo"><img src="data:image/png;base64,${LOGO}" alt="Ailla"></div><div class="appname">${ADM?(HOST_MODE==="admin"?"Quản trị":ADMIN_URL?"Vận hành":"Trang quản trị"):"MKT Hub"}<span>${ADM?"AILLA Việt Nam":"Bàn làm việc Content"}</span></div>

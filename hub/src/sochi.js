@@ -46,7 +46,9 @@ function scVcKenh(e){const A=typeof gdMaDon==="function"?gdMaDon(e.or):[],T=A.fi
   if(!T.length||T.length<A.length)return {g:"G09",k:"Chờ xác định"};
   const P=(typeof MH!=="undefined"&&MH.orders)||[],mua=T.filter(t=>P.some(o=>o.no===t)||/^PM\d/i.test(t)),ban=T.filter(t=>!mua.includes(t));
   if(mua.length&&ban.length)return {g:"G09",k:"Chờ xác định"};
-  if(mua.length)return {g:"G17",k:"Sản xuất"};
+  /* quy ước chat Đấu nối (docs/DAU-NOI-SO-CHI-TAI-SAN-KHO.md mục 10): đơn tài sản → cộng nguyên giá; chứng từ đơn mua đã có cước bằng số này → trùng */
+  if(mua.length){const v=typeof mhVcXuLy==="function"?mhVcXuLy(e.or,+e.tien||0):"sx";
+    if(v==="ts")return {skip:"ts",g:"G28",k:"Không tính"};if(v==="trung")return {skip:"trung",g:"G17",k:"Sản xuất"};return {g:"G17",k:"Sản xuất"}}
   const O=(typeof GC!=="undefined"&&GC.orders)||[];return ban.some(t=>O.some(o=>o.order_no===t))?{g:"G09",k:"Gia công"}:{g:"G09",k:"NPP"}}
 /* Liên kết của một khoản chi (chị Hoa 29/10, kiểu Poscake): chi vận chuyển → các đơn được chở; trả nhà cung cấp, phiếu gắn đơn mua → mã đơn mua;
    dòng tách → chứng từ gốc. Bấm để mở. */
@@ -266,7 +268,7 @@ function scAuto(){
   scExt().forEach(x=>{const s=x.ext.src;let g="",k=x.k;
     if(s==="ads"){g={"ads-fb":"G01","ads-tt":"G02","ads-spe":"G03"}[x.ext.id];if(has(g))return}
     else if(s==="luong"){g="G07";if(has(g))return;k=scKenhChuan(k)||"Chung"}
-    else if(s==="vc"){if(nk.some(y=>y.g==="G09"&&y.src!=="phieu"))return;const r=scVcKenh(x.ext);g=r.g;k=r.k}
+    else if(s==="vc"){if(nk.some(y=>y.g==="G09"&&y.src!=="phieu"))return;const r=scVcKenh(x.ext);if(r.skip)return;g=r.g;k=r.k}
     else if(s==="san"){g="G04";if(has(g))return}
     else if(s==="ts"){g=x.ext.g;k=SC_COLS.includes(x.ext.k)?x.ext.k:"Chung"}
     if(!g)return;R.push({...x,g,k,tk:scG(g).tk,nhom:scG(g).n,auto:1})});
@@ -293,7 +295,7 @@ function scExtOpen(r){const x=r.ext||{};
 function scNK(){
   try{mhLoad();mhLoadPay();spLoadShip();if(typeof mhLoadInv==="function")mhLoadInv();if(typeof gcLoad==="function"&&!GC.orders&&!GC.busy)gcLoad().then(()=>{if(PAGE==="so_cp")renderMain()})}catch(e){}
   try{if(typeof adfLoad==="function"&&!ADF.raw&&!SC.adf){SC.adf=1;adfLoad().then(()=>{try{adfMergeDays()}catch(e){}if(PAGE==="so_cp")renderMain()})}}catch(e){}
-  const q=kfold(SC.q||""),QT=scQT(PERIOD.from.slice(0,7)).qt,cho=scCho().filter(scInP),AU=new Map(scAuto().map(x=>[x.id,x])),ext=scExt().map(x=>AU.get(x.id)||(["ads","vc","san","luong"].includes(x.ext.src)?{...x,trung:1}:x)),all=scRows().concat(cho,ext),R=all.filter(x=>(!SC.ng||(SC.ng==="Phiếu chi"?!x.ext:!!x.ext&&x.nguon===SC.ng))&&(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!SC.fn||scFnRow(x)===SC.fn)&&(!SC.xl||scXL(x,QT)===SC.xl)&&(!q||kfold(x.dg+" "+x.ct+" "+(x.sub||"")+" "+(x.nhom||"")+" "+(x.po||"")).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||((a.ky?1:0)-(b.ky?1:0))||String(a.ct).localeCompare(String(b.ct)));
+  const q=kfold(SC.q||""),QT=scQT(PERIOD.from.slice(0,7)).qt,cho=scCho().filter(scInP),AU=new Map(scAuto().map(x=>[x.id,x])),ext=scExt().map(x=>AU.get(x.id)||(["ads","vc","san","luong"].includes(x.ext.src)?{...x,trung:1,trungLy:x.ext.src==="vc"?({ts:"Vào nguyên giá tài sản",trung:"Trùng chứng từ đơn mua"})[scVcKenh(x.ext).skip]:""}:x)),all=scRows().concat(cho,ext),R=all.filter(x=>(!SC.ng||(SC.ng==="Phiếu chi"?!x.ext:!!x.ext&&x.nguon===SC.ng))&&(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!SC.fn||scFnRow(x)===SC.fn)&&(!SC.xl||scXL(x,QT)===SC.xl)&&(!q||kfold(x.dg+" "+x.ct+" "+(x.sub||"")+" "+(x.nhom||"")+" "+(x.po||"")).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||((a.ky?1:0)-(b.ky?1:0))||String(a.ct).localeCompare(String(b.ct)));
   const ed=scCanDuyet(),gs=scDM().map(x=>x.g),sE=scS(R.filter(x=>x.ext&&x.ext.src==="ncc"&&x.g!=="G28")),sT=scS(R.filter(x=>x.g==="G28")),ngs=["Phiếu chi",...new Set(ext.map(x=>x.nguon))];
   const row=x=>{if(x.ext)return `<tr class="clk" data-x="${esc(x.id)}"><td>${x.ky?'<span class="hint">cả kỳ</span>':scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td class="scdg" title="${esc(x.dg+(x.sub?" · "+x.sub:""))}"><div class="t">${esc(x.dg)}</div>${x.sub?`<span class="hint">${esc(x.sub)}</span>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(x.nhom||"")}</td><td>${scLienQuan(x)}</td><td><span class="scp p-c">${esc(x.nguon)}</span></td><td>${esc(SC_TEN(x.k))}</td><td>${esc(scFnRow(x))}</td><td>${scXLP(scXL(x,QT))}</td><td>${scStP(x.st)}</td></tr>`;
     const d=scG(x.g),isCho=x.st==="Chờ duyệt";return `<tr class="clk" data-id="${x.id}"${isCho?' data-cho="1"':""}><td>${scDd(x.d)}</td><td class="mono">${esc(x.ct||"")}</td><td class="scdg" title="${esc(x.dg+(x.gc?" · "+x.gc:""))}"><div class="t">${esc(x.dg)}</div>${x.gc?`<span class="hint">${esc(x.gc)}</span>`:""}</td><td class="n"><b>${scNf(x.t)}</b></td><td>${esc(d.n)}</td><td>${scLienQuan(x)}</td><td>${scLoP(d.lo)}</td><td>${ed&&!isCho?`<select class="scbv${x.k0&&x.k0!==x.k?" doi":""}" data-bv="${x.id}" aria-label="Bổ khoản chi vào">${SC_COLS.map(k=>`<option value="${k}"${x.k===k?" selected":""}>${esc(SC_TEN(k))}</option>`).join("")}</select>${x.k0&&x.k0!==x.k?`<div class="hint">đã đổi từ ${esc(x.k0)}</div>`:""}`:esc(SC_TEN(x.k))}</td><td>${esc(scFnRow(x))}</td><td>${scXLP(scXL(x,QT))}</td><td>${scStP(x.st)}</td></tr>`};
@@ -422,7 +424,7 @@ function pSoChi(m){
   m.querySelectorAll("[data-sct]").forEach(b=>b.onclick=()=>{SC.tab=b.dataset.sct;renderMain()});
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn};
   on("sc-new",()=>scForm());on("sc-imp",()=>scImport());
-  on("sc-ncc",async()=>{await mhLoad();mhLoadInv();mhPayForm()});on("sc-vc",()=>{PAGE="cr_vc";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
+  on("sc-ncc",async()=>{await mhLoad();mhLoadInv();mhPayForm()});on("sc-vc",()=>{SC.tab="nk";SC.ng="Phiếu chi vận chuyển";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
   [["scf-fg","g"],["scf-fk","k"],["scf-fs","st"],["scf-fq","q"],["scf-fn","fn"],["scf-fx","xl"],["scf-fng","ng"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SC[k]=e.value;renderMain()}});
   {const mo=document.getElementById("scf-more");if(mo)mo.onclick=()=>{SC.more=!SC.more;renderMain()};
    const cl=document.getElementById("scf-clr");if(cl)cl.onclick=()=>{["ng","g","k","fn","xl","st","q"].forEach(k=>SC[k]="");renderMain()}}

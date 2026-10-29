@@ -417,6 +417,9 @@ function tsDonCua(a){const O=(typeof MH!=="undefined"&&MH.orders)||[];if(a.po){c
 function tsPhiDon(a,gk){const p=tsDonCua(a);if(!p)return {p:null,L:[]};
   const tien=(p.lines||[]).reduce((s,l)=>s+(+l.qty||0)*(+l.unit_price||0),0),cung=tsAll().filter(z=>z.id!==a.id&&tsDonCua(z)===p),tong=(+gk||0)+cung.reduce((t,z)=>t+(+(z.gk??z.ng)||0),0),k=tong>0?(+gk||0)/tong:1/(cung.length+1);
   const L=((scFin().nkc)||[]).concat(typeof scCho==="function"?scCho():[]).filter(r=>r.po===p.id&&r.id!==a.nkc&&!tsAll().some(z=>z.nkc===r.id)&&!(tien&&Math.abs((+r.t||0)-tien)<=Math.max(1000,tien*0.01))).map(r=>({r,t:Math.round((+r.t||0)*k)}));
+  /* Phiếu chi vận chuyển (Thu chi › Phiếu chi vận chuyển) gắn mã đơn này: phần chia đều theo số đơn mua ghi trong phiếu (mhVcXuLy = "ts"). */
+  (TSV.vc||[]).filter(v=>v.status==="OK").forEach(v=>{const M=(typeof gdMaDon==="function"?gdMaDon(v.order_refs):[]).filter(t=>/^PM\d/i.test(t));if(!M.includes(p.no))return;
+    const t0=Math.round((+v.amount||0)/M.length);L.push({r:{id:"vc-"+v.id,ct:v.voucher_no||"Phiếu chi vận chuyển",d:v.voucher_date,dg:"Cước vận chuyển · "+(v.carrier||""),t:t0},t:Math.round(t0*k)})});
   /* Vận chuyển, bốc vác, khác (và VAT khi tính vào giá vốn) ghi trên chứng từ của đơn cũng là chi phí mua kèm (chị Hoa 28/10: chứng từ máy chiết rót có 65.000 vận chuyển). */
   try{if(typeof mhPoMoney==="function")mhPoMoney(p).inv.forEach(v=>{const t=Math.round(((+v.freight||0)+(+v.handling||0)+(+v.other||0)+(v.vat_in_cost?+v.vat_amount||0:0))*(v.share??1)*k);
     if(t>0)L.push({r:{id:"inv-"+v.id,ct:(v.doc_type==="HD"?"Hóa đơn ":"Chứng từ ")+(v.invoice_no||""),d:v.invoice_date,dg:"Vận chuyển, bốc vác, khác trên chứng từ",t:Math.round(((+v.freight||0)+(+v.handling||0)+(+v.other||0)+(v.vat_in_cost?+v.vat_amount||0:0))*(v.share??1))},t})})}catch(e){}
@@ -425,7 +428,8 @@ function tsPhiDon(a,gk){const p=tsDonCua(a);if(!p)return {p:null,L:[]};
    (chị Huệ 28/10: đơn ezpack thêm 65.000 vận chuyển thì mọi sổ liên quan tự điều chỉnh). Chạy khi kế toán / CEO mở trang Tài sản,
    tức là trước khi chạy khấu hao tháng. Giá gốc lưu ở gk0, phiếu đã cộng ở phi; tháng đã chạy giữ nguyên, các tháng sau tính theo giá mới. */
 function tsDongBoPhi(){if(!tsCanGhi()||!tsFinOk()||TSV.phiBusy||typeof mhLoad!=="function")return;
-  if(!MH.orders||!MH.inv){TSV.phiBusy=1;Promise.all([mhLoad(),typeof mhLoadInv==="function"?mhLoadInv():0]).catch(()=>{}).finally(()=>{TSV.phiBusy=0;if(MH.orders&&MH.inv)tsDongBoPhi()});return}
+  if(!MH.orders||!MH.inv||!TSV.vc){TSV.phiBusy=1;Promise.all([mhLoad(),typeof mhLoadInv==="function"?mhLoadInv():0,
+    TSV.vc?0:svApi("/api/shipping-vouchers?from=2025-01-01&to="+tsHom()).then(r=>{TSV.vc=Array.isArray(r)?r:[]}).catch(()=>{TSV.vc=[]})]).catch(()=>{}).finally(()=>{TSV.phiBusy=0;if(MH.orders&&MH.inv&&TSV.vc)tsDongBoPhi()});return}
   const them=[];tsAll().filter(a=>!a.dk&&!a.gg).forEach(a=>{const {L}=tsPhiDon(a,+(a.gk0??a.gk??a.ng)||0),chua=L.filter(z=>z.t>0&&!(a.phi||[]).includes(z.r.id));
     if(chua.length)them.push({id:a.id,ma:a.ma,ids:chua.map(z=>z.r.id),t:chua.reduce((s,z)=>s+z.t,0)})});
   if(!them.length)return;
