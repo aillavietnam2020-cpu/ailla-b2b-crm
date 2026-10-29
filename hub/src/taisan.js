@@ -127,10 +127,10 @@ function pTsSo(m,kind){
     body=tsNhanCard(kind)+tsChoCard(tc)+(cho.length&&tsCanGhiTang()?`<div class="hint" style="background:#fff8e1;border:1px solid #f5d77a;border-radius:10px;padding:8px 12px;margin:0 0 12px;color:#7a5600">Có <b>${cho.length}</b> phiếu chi nhóm "Mua tài sản / công cụ" chưa ghi tăng (${cho.slice(0,3).map(x=>esc(x.ct||"")+" · "+tsN(x.t)+" đ").join("; ")}${cho.length>3?"…":""}). Bấm ＋ Ghi tăng rồi chọn phiếu ở mục "Mua từ phiếu chi".</div>`:"")+
     `<div class="kpis">${kpi(kind==="TS"?"Nguyên giá":"Giá trị công cụ",money(ng),L.length+" "+tsTen(kind)+" · "+dung+" đang dùng")}${kpi(kind==="TS"?"Giá trị còn lại":"Còn chờ phân bổ (TK 242)",money(con),"cuối tháng "+tsYm(ym))}${kpi((kind==="TS"?"Khấu hao":"Phân bổ")+" tháng "+tsYm(ym),tsN(th)+" đ")}</div>
     <section class="card flush"><div class="card-h pad"><h2>${kind==="TS"?"Sổ tài sản cố định":"Sổ công cụ dụng cụ"}</h2><span class="sp"></span>${tsYmSel("ts-ym",ym)}</div>
-    ${L.length?`<div class="tbl"><table><thead><tr><th>Ngày ghi tăng</th><th>Mã</th><th>Tên</th><th>Loại</th><th>Bộ phận chịu</th><th class="n">${kind==="TS"?"Nguyên giá":"Giá trị"}</th><th class="n">Số tháng</th><th class="n">Tháng này</th><th class="n">${kind==="TS"?"Hao mòn lũy kế":"Đã phân bổ"}</th><th class="n">Còn lại</th><th>Trạng thái</th></tr></thead><tbody>
+    ${L.length?`<div class="tbl"><table class="gd"><thead><tr><th>Ngày ghi tăng</th><th>Mã</th><th>Tên</th><th>Loại</th><th>Bộ phận chịu</th><th class="n">${kind==="TS"?"Nguyên giá":"Giá trị"}</th><th class="n">Số tháng</th><th class="n">Tháng này</th><th class="n">${kind==="TS"?"Hao mòn lũy kế":"Đã phân bổ"}</th><th class="n">Còn lại</th><th>Trạng thái</th><th>Liên quan</th></tr></thead><tbody>
     ${L.slice().sort((a,b)=>(a.d||"").localeCompare(b.d||"")||a.ma.localeCompare(b.ma)).map(a=>{const st=TS_TT[tsTrangThai(a,ym)],lk=tsLuyKe(a,ym);
-      return `<tr data-tsid="${esc(a.id)}" style="cursor:pointer"><td>${tsDmy(a.d)}</td><td class="mono">${esc(a.ma)}</td><td><b>${esc(a.ten)}</b>${a.dk?` <small class="hint">đầu kỳ</small>`:""}${a.po?` <small class="hint">· đơn ${esc(a.po)}</small>`:""}</td><td>${esc(a.loai||"")}</td><td>${tsBpTxt(tsBpTai(a,ym))}</td><td class="n">${tsN(a.gk??a.ng)}</td><td class="n">${a.kkh?"—":tsN(a.n)}</td><td class="n">${tsN(tsThang(a,ym))}</td><td class="n">${tsN(lk)}</td><td class="n">${tsN(Math.max(0,(+(a.gk??a.ng)||0)-lk))}</td><td>${tsSc(st[0],st[1])}</td></tr>`}).join("")}
-    <tr class="tot"><td colspan="5">Cộng</td><td class="n">${tsN(ng)}</td><td></td><td class="n">${tsN(th)}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsLuyKe(a,ym),0))}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsConLai(a,ym),0))}</td><td></td></tr></tbody></table></div>
+      return `<tr data-tsid="${esc(a.id)}" style="cursor:pointer"><td>${tsDmy(a.d)}</td><td class="mono">${esc(a.ma)}</td><td class="gdd" title="${esc(a.ten)}"><b>${esc(a.ten)}</b>${a.dk?` <small class="hint">đầu kỳ</small>`:""}</td><td>${esc(a.loai||"")}</td><td>${tsBpTxt(tsBpTai(a,ym))}</td><td class="n">${tsN(a.gk??a.ng)}</td><td class="n">${a.kkh?"—":tsN(a.n)}</td><td class="n">${tsN(tsThang(a,ym))}</td><td class="n">${tsN(lk)}</td><td class="n">${tsN(Math.max(0,(+(a.gk??a.ng)||0)-lk))}</td><td>${tsSc(st[0],st[1])}</td><td class="gdd">${tsLienQuan(a)}</td></tr>`}).join("")}
+    <tr class="tot"><td colspan="5">Cộng</td><td class="n">${tsN(ng)}</td><td></td><td class="n">${tsN(th)}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsLuyKe(a,ym),0))}</td><td class="n">${tsN(L.reduce((t,a)=>t+tsConLai(a,ym),0))}</td><td></td><td></td></tr></tbody></table></div>
     <p class="hint pad" style="margin:0">Bấm vào một dòng để xem lịch ${kind==="TS"?"khấu hao":"phân bổ"} từng tháng và sửa.</p>`
     :`<p class="hint pad">Chưa có ${tsTen(kind)} nào. ${ghi?`Vào tab <b>Khai báo đầu kỳ</b> để nạp file xuất từ MISA, hoặc bấm <b>＋ Ghi tăng</b>.`:""}</p>`}</section>`}
   else if(tab==="gt")body=tsCanGhiTang()?`<section class="card" id="ts-gt"></section>`:`<p class="hint">Chỉ kế toán trưởng, CEO ghi tăng được.</p>`;
@@ -147,7 +147,7 @@ function pTsSo(m,kind){
   if($m("#ts-new"))$m("#ts-new").onclick=()=>{TSV.tab[pg]="gt";renderMain()};
   if($m("#ts-gt"))tsForm(kind,null,$m("#ts-gt"));
   if($m("#ts-xl"))$m("#ts-xl").onclick=()=>tsXuat(kind,ym);
-  tsChoWire(m);tsNhanWire(m,kind);
+  tsChoWire(m);tsNhanWire(m,kind);if(typeof gdCss==="function"){gdCss();if(typeof mhLqBind==="function")mhLqBind(m)}
   m.querySelectorAll("tr[data-tsid]").forEach(r=>r.onclick=()=>tsForm(kind,tsAll().find(a=>a.id===r.dataset.tsid)));
   if(tab==="gg")tsGgWire(m,kind);if(tab==="dk")tsDkWire(m,kind);
 }
@@ -432,6 +432,12 @@ function tsDongBoPhi(){if(!tsCanGhi()||!tsFinOk()||TSV.phiBusy||typeof mhLoad!==
   tsMut("cộng chi phí mua kèm vào nguyên giá: "+them.map(x=>x.ma+" +"+x.t).join(", "),T=>{them.forEach(x=>{const r=T.a.find(z=>z.id===x.id);if(!r||(r.phi||[]).some(i=>x.ids.includes(i)))return;
     if(r.gk0==null)r.gk0=+(r.gk??r.ng)||0;r.gk=(+(r.gk??r.ng)||0)+x.t;r.ng=r.gk;r.phi=[...(r.phi||[]),...x.ids];r.sua=Date.now()})});
   toast("Đã cộng chi phí mua kèm vào giá trị: "+them.map(x=>x.ma+" +"+tsN(x.t)+" đ").join(", "));if(/^ts_/.test(PAGE))renderMain()}
+/* Cột "Liên quan" ở sổ (kiểu bảng giao dịch chung): đơn mua, chứng từ, phiếu trả NCC của đơn, phiếu chi Sổ chi phí đã gắn. Bấm mở đúng chỗ (mhLqBind). */
+function tsLienQuan(a){if(typeof gdLink!=="function")return "";const o=[],p=tsDonCua(a);
+  if(p&&typeof mhLqPo==="function"){o.push(mhLqPo(p));try{const M=mhPoMoney(p);M.inv.forEach(v=>o.push(mhLqHv(v)));M.pays.forEach(x=>o.push(mhLqPv(x)))}catch(e){}}
+  else if(a.po)o.push(`<span class="hint">${esc(a.po)}</span>`);
+  const r=a.nkc&&((scFin().nkc)||[]).find(z=>z.id===a.nkc);if(r)o.push(gdLink(r.ct||"Phiếu chi",`data-gdpc="${esc(r.id)}"`,"Phiếu chi Sổ chi phí · "+tsN(r.t)+" đ"));
+  return o.join(" ")||(a.dk?`<span class="hint">đầu kỳ MISA</span>`:`<span class="hint">—</span>`)}
 /* Tài sản / công cụ (kể cả đang chờ duyệt) đã gắn phiếu chi id. */
 function tsCuaPhieu(id){return !!id&&tsAll().concat(tsCho()).find(a=>a.nkc===id)||null}
 /* Đơn mua hàng khớp với phiếu chi: cùng số tiền, cùng nhà cung cấp, ngày đặt gần ngày chi. Trả {p đơn, l dòng hàng} hoặc null. */
