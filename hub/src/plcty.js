@@ -40,9 +40,8 @@ function plcPop(html){openPop(`<div class="plc plc-popw">${html}</div>`);const p
   p.querySelectorAll("[data-plck]").forEach(b=>b.onclick=()=>plcKenhPop(b.dataset.plck));
   p.querySelectorAll("[data-plcl]").forEach(b=>b.onclick=()=>plcLinePop(b.dataset.plcl))}
 let PLC_A=null;
-/* Các tháng cũ (xu hướng, lũy kế) nhớ 60 giây để trang không tính lại mỗi lần vẽ (plMonth nặng). */
-const PLC_OLD={};
-function plcOld(ym){const c=PLC_OLD[ym];if(c&&Date.now()-c.t<60000)return c.v;const v=plMonth(ym);if(!v.loading)PLC_OLD[ym]={t:Date.now(),v};return v}
+/* Các tháng cũ (xu hướng, lũy kế): tính lại mỗi lần vẽ (~7ms/tháng). Không nhớ đệm: bản nhớ lúc đơn Kênh phân phối chưa tải xong làm ẩn mất tháng. */
+const plcOld=ym=>plMonth(ym);
 function plcKenhPop(k){const A=PLC_A,c=A.cols[k],r=A.by[k],n=(PLC_K.find(x=>x[0]===k)||[])[1]||k;
   if(!c)return plcPop(`<section class="card plc-pc"><h2>${esc(n)} · ${plcVn(A.ym)}</h2><p class="hint">${esc(r?r.src||"":"chờ số")}</p>${r&&r.go?`<p><button type="button" class="btn sm" data-plcgo="${r.go}">Mở trang kênh</button></p>`:""}</section>`);
   plcPop(`<section class="card plc-pc"><h2>${esc(n)} · ${plcVn(A.ym)}</h2><p class="hint">${esc(c.src||"")}${r&&r.dang?` · đang giao chưa tính ${nf(r.dang)} đơn (${tr(r.dangDt)})`:""}</p><table class="plc-t"><tbody>
