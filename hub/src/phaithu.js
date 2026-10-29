@@ -18,9 +18,19 @@ function pPhaiThu(m){
   const seg=[["0–30 ngày","b30","nsg2"],["31–60 ngày","b60","nsy2"],["61–90 ngày","b90","nso2"],["Trên 90 ngày","b90p","nsr2"],["Nợ đầu kỳ (từ trước khi dùng web)","old","nsr2"]];
   const pc=v=>t.debt?Math.round(v/t.debt*100):0;
   const dso=D0.dso,bk=D0.by_kenh,kn=k=>bk&&bk[k]?bk[k]:null;
-  const kenhRow=bk?`<div class="grid kpis">${TCN_KENH.map(([k,n])=>{const x=kn(k);return kpi("Phải thu "+n,nf(Math.round(x.debt)),x.customers+" khách · nợ quá 90 ngày "+(x.debt?Math.round((x.b90p+x.old)/x.debt*100):0)+"% · DSO "+(x.dso!=null?x.dso+" ngày":"—"))}).join("")}</div>`:"";
-  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Tổng phải thu",nf(Math.round(t.debt)),R.length===D0.rows.length?D0.rows.length+" khách đang nợ":"")}${kpi("Nợ quá 90 ngày (gồm nợ đầu kỳ)",nf(Math.round(late)),t.debt?pc(late)+"% tổng nợ":"")}${kpi("Số ngày thu tiền (DSO)",dso!=null?dso+" ngày":"—",dso!=null?"doanh thu 90 ngày gần nhất "+nf(Math.round(D0.rev90)):"chưa có doanh thu 90 ngày")}${kpi("Nợ trong 30 ngày",nf(Math.round(t.b30)),t.debt?pc(t.b30)+"% tổng nợ":"")}</div>${kenhRow}
-  <p class="hint pad">Phải thu = công nợ chính thức (kế toán đã xác nhận) của khách còn nợ; khách trả thừa để riêng. Chưa có hạn nợ cho khách nên tuổi nợ tính từ ngày đơn (ngày phát sinh), chưa tính quá hạn. Đối chiếu từng khách, từng chứng từ: <button class="lnk" data-ptgo="tcn_dc">Đối chiếu công nợ & tiền →</button></p>
+  /* Ô số đầu trang gọn một hàng, có icon (chị Hoa 29/10): bỏ dòng chú thích nhỏ, link Đối chiếu đưa lên góc phải. */
+  const tile=(ic,tone,l,v,h)=>`<div class="pttile t-${tone}"><span class="pti">${typeof ico==="function"?ico(ic):""}</span><div><div class="ptl">${l}</div><div class="ptv">${v}</div>${h?`<div class="pth">${h}</div>`:""}</div></div>`;
+  const kx=k=>{const x=kn(k)||{debt:0,customers:0,b90p:0,old:0,dso:null};return x};
+  const kpp=kx("B2B"),koem=kx("GIA_CONG");
+  m.innerHTML=H(T,S)+`<div class="ptacts"><button class="lnk" data-ptgo="tcn_dc">Đối chiếu công nợ & tiền →</button></div>
+  <div class="pttiles">
+   ${tile("money","pnk","Tổng phải thu",nf(Math.round(t.debt)),R.length===D0.rows.length?D0.rows.length+" khách đang nợ":"")}
+   ${tile("alert","red","Nợ quá 90 ngày",nf(Math.round(late)),(t.debt?pc(late)+"% tổng nợ":"")+" · gồm nợ đầu kỳ")}
+   ${tile("check","grn","Nợ trong 30 ngày",nf(Math.round(t.b30)),t.debt?pc(t.b30)+"% tổng nợ":"")}
+   ${tile("clock","amb","Số ngày thu tiền (DSO)",dso!=null?dso+" ngày":"—",dso!=null?"doanh thu 90 ngày "+(Math.round(D0.rev90/1e7)/100).toLocaleString("vi-VN")+" tỷ":"")}
+   ${tile("bag","blu","Kênh phân phối",nf(Math.round(kpp.debt)),kpp.customers+" khách · quá 90 ngày "+(kpp.debt?Math.round((kpp.b90p+kpp.old)/kpp.debt*100):0)+"%")}
+   ${tile("fac","vio","Kênh OEM",nf(Math.round(koem.debt)),koem.customers+" khách"+(koem.debt?" · quá 90 ngày "+Math.round((koem.b90p+koem.old)/koem.debt*100)+"%":""))}
+  </div>
   ${/* Gọn lại (chị Hoa 29/10): tuổi nợ một thanh mảnh + chú thích một dòng, 10 khách nợ nhiều nhất thành bảng gọn một dòng một khách. */""}
   <div class="card pad ptgon"><div class="ptgon-h"><b>Nợ theo tuổi</b><span class="ptleg">${seg.map(x=>`<span><i class="${x[2]}"></i>${x[0].replace(" (từ trước khi dùng web)","")} <b>${nf(Math.round(t[x[1]]))}</b>${t.debt&&t[x[1]]?` <small class="hint">${pc(t[x[1]])}%</small>`:""}</span>`).join("")}</span></div>
    <div class="ptbar">${t.debt?seg.filter(x=>t[x[1]]>0).map(x=>`<span class="${x[2]}" style="flex:${t[x[1]]}" title="${x[0]}: ${nf(Math.round(t[x[1]]))}"></span>`).join(""):""}</div>
