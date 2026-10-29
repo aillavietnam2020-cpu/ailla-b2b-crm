@@ -43,6 +43,16 @@ async function hubPart(db: D1Database, id: string): Promise<Record<string, unkno
 
 /** Số đầu vào để tính giá vốn và chi phí riêng kênh, đúng như trang Tải file tháng dùng (TikTok; Shopee dùng lại với channel SHOPEE). */
 export async function agentInputs(db: D1Database, ky: string, channel: 'TIKTOK' | 'SHOPEE') {
+  // Shopee: đơn đã xuất kho trên Poscake để ghép giá vốn theo hàng xuất kho (chị Hoa chốt 29/10/2026), ngày 01 tới 45 ngày sau.
+  const posTo = new Date(`${ky}-01T00:00:00Z`);
+  posTo.setUTCDate(posTo.getUTCDate() + 45);
+  const posQ =
+    channel === 'SHOPEE'
+      ? db
+          .prepare("SELECT order_id, sku, variant FROM channel_order_lines WHERE channel = 'SHOPEE' AND day >= ? AND day <= ?")
+          .bind(`${ky}-01`, posTo.toISOString().slice(0, 10))
+          .all<{ order_id: string; sku: string; variant: string }>()
+      : null;
   const [map, items, moves, main, sec] = await Promise.all([
     db.prepare('SELECT sku, variant, from_day, item_label, qty FROM channel_map WHERE channel = ? ORDER BY sku, variant, from_day, item_label').bind(channel).all(),
     db.prepare('SELECT code, name, cls, grp FROM kho_items ORDER BY code').all(),
@@ -72,6 +82,7 @@ export async function agentInputs(db: D1Database, ky: string, channel: 'TIKTOK' 
     skus: (all.skus ?? []).map((s) => ({ ma: s.ma, giaVon: s.giaVon })),
     costs: (all.costs ?? []).filter((x) => x.thang === ky),
     costCats: all.costCats ?? [],
+    ...(posQ ? { pos: (await posQ).results ?? [] } : {}),
   };
 }
 agentTiktokRoutes.get('/inputs', async (c) => {

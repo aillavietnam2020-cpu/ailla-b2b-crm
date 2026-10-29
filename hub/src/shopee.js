@@ -37,13 +37,20 @@ function speMerge(){
   return out}}
 
 /* ---------- Giá vốn: chỉ theo Quy đổi mã các sàn kênh Shopee trên web (bỏ định mức ước của skill, chị Hoa duyệt 28/10/2026) ---------- */
+/* Đơn Shopee đã xuất kho trên Poscake (mã đơn + sku + phân loại), từ ngày 01 của tháng tới 45 ngày sau (đơn đặt cuối tháng xuất đầu tháng sau). */
+async function spePosOf(ky){
+  SPE.pos=SPE.pos||{};if(SPE.pos[ky])return SPE.pos[ky];
+  const a=new Date(ky+"-01T00:00:00Z"),b=new Date(a);b.setUTCDate(b.getUTCDate()+45);
+  try{const r=await kApi(`/online/sheet?channel=SHOPEE&from=${ky}-01&to=${b.toISOString().slice(0,10)}`);SPE.pos[ky]=(r.lines||[]).map(l=>({o:l.order_id,sku:l.sku,vr:l.variant}))}catch(e){SPE.pos[ky]=[]}
+  return SPE.pos[ky];
+}
 async function speCostOf(ky){
   if(!SPE.cost){const [map,cat,costs]=await Promise.all([kApi("/online/map?channel=SHOPEE").catch(()=>[]),kApi("/catalog").catch(()=>null),kApi("/costs").catch(()=>[])]);
     const items=new Map(((cat&&cat.items)||[]).map(i=>[String(i.code).toLowerCase(),i]));
     SPE.cost={web:Array.isArray(map)?map:[],items,kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg]))}}
   const C=SPE.cost,isPack=code=>{const it=C.items.get(String(code).toLowerCase());return !!it&&/đóng gói|hộp|thùng|bao bì/i.test((it.grp||"")+" "+(it.name||""))&&it.cls==="NVL"};
   const web=ttMakeCostOf({ky,mapRows:C.web,skus:D().skus||[],khoCost:C.kho,isPack});
-  return s=>{const tries=[()=>s.sv?web(s.sv,s.sp,s.vr):null,()=>s.sp?web(s.sp,null,s.vr):null,()=>web(s.pn,null,s.vr)];
+  return s=>{const tries=[()=>s.ps?web(s.ps.sku,null,s.ps.vr):null,()=>s.sv?web(s.sv,s.sp,s.vr):null,()=>s.sp?web(s.sp,null,s.vr):null,()=>web(s.pn,null,s.vr)];
     let best=null;for(const t of tries){const c=t();if(!c)continue;if(c.u!=null)return c;if(!best||/^Thiếu/.test(c.why))best=c}
     return best||{u:null,why:"Chưa quy đổi mã"}};
 }
@@ -76,7 +83,7 @@ async function speCompute(){
       if(!p.O)throw new Error(`Shop ${speShopL(p.shop)}: chưa có file đơn hàng của shop này.`);
       const ky=speGuessKy(p.O.aoa),O=speReadOrders(p.O.aoa,ky);if(O.err)throw new Error(O.err);
       const F=speReadFin(p.F.sh,ky);if(F.err)throw new Error(`Shop ${speShopL(p.shop)}: ${F.err}`);
-      const M=speBuildMonth({ky,shop:p.shop,orders:O,fin:F,ads:p.A,costOf:await speCostOf(ky)});if(M.err)throw new Error(M.err);
+      const M=speBuildMonth({ky,shop:p.shop,orders:O,fin:F,ads:p.A,costOf:await speCostOf(ky),pos:await spePosOf(ky)});if(M.err)throw new Error(M.err);
       x.ky=ky;x.M=M}catch(e){x.err=e.message}
     res.push(x)}
   SPE.prev=res;SPE.busy="";renderMain();

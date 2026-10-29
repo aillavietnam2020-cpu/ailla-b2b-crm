@@ -93,7 +93,11 @@ describe('Agent nạp báo cáo Shopee', () => {
     const no = await makeAgent('Không quyền', ['orders']);
     expect((await agentCall(no.token, '/api/agent/shopee/months')).status).toBe(403);
     const a = await makeAgent('Kế toán trưởng Shopee', ['baocao_san']);
-    expect((await agentCall(a.token, '/api/agent/shopee/inputs?ky=2026-10')).status).toBe(200);
+    await ctx.db.prepare("INSERT INTO channel_order_lines (channel, order_id, line_no, day, shipped_at, shop, sku, variant, name, qty) VALUES ('SHOPEE', '2610ABC', 0, '2026-11-02', '2026-11-02T01:00:00Z', 'Ailla VN', '238314716093', '1 can 10kg', 'Arila', 1), ('SHOPEE', '2612ZZZ', 0, '2026-12-20', '2026-12-20T01:00:00Z', 'Ailla VN', 'x', '', 'x', 1), ('TIKTOK', 'T1', 0, '2026-10-05', '2026-10-05T01:00:00Z', 't', 'y', '', 'y', 1)").run();
+    const inp = await agentCall(a.token, '/api/agent/shopee/inputs?ky=2026-10');
+    expect(inp.status).toBe(200);
+    // Giá vốn theo hàng xuất kho: đơn Poscake Shopee xuất trong 45 ngày từ đầu tháng (đơn đặt cuối tháng xuất đầu tháng sau).
+    expect(inp.body.data.pos).toEqual([{ order_id: '2610ABC', sku: '238314716093', variant: '1 can 10kg' }]);
     expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', '2026-10-25'))).status).toBe(200);
     expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', '2026-10-20'))).status).toBe(409);
     expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn', '2026-10-25'))).status).toBe(400);
