@@ -79,7 +79,7 @@ function pExec(m){
   m.innerHTML=`<div class="xhead"><div class="xht"><h1>Tổng quan công ty</h1><span>${esc(pLabel())}</span><span class="sep" aria-hidden="true"></span><span>so với ${vnd(pr.from)} – ${vnd(pr.to)}</span><span class="xinfo" tabindex="0" title="Số liệu quản trị nội bộ để điều hành (ước tính, phân bổ, so mục tiêu), không phải báo cáo tài chính. Sổ sách chính thức do Kế toán quản lý trên MISA." aria-label="Số liệu quản trị nội bộ, sổ sách chính thức trên MISA">ⓘ</span></div><div class="xupd">${ico("clock")} Cập nhật <span class="numeric">${updS}</span></div></div>
   <section class="xkstrip" aria-label="Tóm tắt điều hành">${K.map(kcell).join("")}</section>
   <div class="xrow2">
-   <section class="card flush xch"><div class="card-h pad"><h2>Hiệu quả kinh doanh theo kênh</h2><span class="hint">lãi đóng góp chưa trừ lương, kho, chi phí chung · <button class="lnk" id="tg-ed">Sửa mục tiêu</button></span></div>
+   <section class="card flush xkenh"><div class="card-h pad"><h2>Hiệu quả kinh doanh theo kênh</h2><span class="hint">lãi đóng góp chưa trừ lương, kho, chi phí chung · <button class="lnk" id="tg-ed">Sửa mục tiêu</button></span></div>
     <div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Doanh thu</th><th class="n">Đơn</th><th class="n">Chi phí</th><th class="n">Lãi</th><th class="n">% MT</th><th class="n">Kỳ trước</th><th>Xu hướng</th></tr></thead><tbody>${CH.map(chRow).join("")}${b2bRow}
     <tr class="tot"><td>Tổng Kênh bán lẻ</td><td class="n">${tr(N.tong)}</td><td class="n">${oTot?nf(oTot):"—"}</td><td class="n">${tr(cTot)}</td><td class="n">${lr.length?tr(lTot):"—"}</td><td class="n">${tg?Math.round(N.tong/tg*100)+"%":"—"}</td><td class="n">${ok?xChg(N.tong,P.tong):"—"}</td><td></td></tr></tbody></table></div></section>
    <section class="card flush xatt"><div class="card-h pad"><h2>${execFull()?"Việc cần chị xử lý":"Việc của tôi cần xử lý"} <span class="hint">${AT.length}</span></h2><button class="lnk" data-go="cv_nv">Tất cả việc →</button></div>
@@ -130,7 +130,7 @@ PAGES.cv_tq=pCvTong;
 /* Bảng Hiệu quả kinh doanh theo kênh: icon màu đầu mỗi kênh (chị Hoa 29/10). Hàng Kênh phân phối / OEM do b2bpl.js chèn sau
    nên theo dõi bảng và gắn icon cho hàng mới. */
 const XCH_IC={"Facebook":["#1877f2","f"],"TikTok":["#111827","♪"],"Shopee":["#ee4d2d","S"],"Kênh phân phối":["#0e9384","","users"],"Kênh OEM":["#7a5af8","","fac"]};
-function xchIcons(m){const tb=m.querySelector(".xch tbody");if(!tb)return;
+function xchIcons(m){const tb=m.querySelector(".xkenh tbody");if(!tb)return;
   /* Hàng Kênh OEM được b2bpl.js chép từ hàng Kênh phân phối (chép luôn icon), nên so tên kênh với icon đang có, sai thì thay. */
   const dec=()=>tb.querySelectorAll("tr:not(.tot)").forEach(r=>{const td=r.cells[0];if(!td)return;const old=td.querySelector(".xchi"),name=(td.querySelector("b")||td).textContent.trim();
     const k=Object.keys(XCH_IC).find(x=>name.startsWith(x));if(!k||(old&&old.dataset.k===k))return;if(old)old.remove();const [c,t,ic]=XCH_IC[k];
