@@ -58,6 +58,21 @@ Mỗi shop 3 file:
 - **Quảng cáo**: `https://banhang.shopee.vn/portal/marketing/pas/wallet?tab=ads_credit_bill_label` → ô *Ngày giao dịch* chọn 2 ngày → gài bẫy → **Tải dữ liệu** (ra file CSV).
 - **Doanh thu**: `https://banhang.shopee.vn/portal/finance/income?type=2&dateRange=<YYYYMMDD từ><YYYYMMDD đến>` (vd `dateRange=2026100120261025`) → **Xuất** → đợi *Báo cáo gần nhất* xong → gài bẫy → **Tải về** (file .zip, lay-blob.sh tự giải nén lấy file Income).
 
+**Đi chậm như người (chị Hoa chốt 29/10 — bấm nhanh bằng lệnh là Shopee bật hộp kiểm tra chống máy):**
+- Bấm bằng `snapshot` → `click <ref>` (chuột thật). **Không bấm nút Shopee bằng `evaluate`** (`.click()` trong JS).
+- Đợi 3–5 giây sau mỗi lần mở trang / bấm. Mỗi shop chỉ chuyển một lần, làm xong cả 3 file rồi mới sang shop kia.
+- Trước khi chuyển shop, đọc tên shop trên thanh trên cùng: đang đúng shop rồi thì **không** vào trang chọn shop.
+
+**Hộp kiểm tra chống máy** (trang đổi sang `shopee.vn/verify/captcha` hoặc `verify/traffic`, chữ "Kéo qua để hoàn thiện bức hình" / "Xác nhận để tiếp tục"):
+1. **Không tự kéo, không tải lại trang, không thử cách khác.** Chạy: `bash nhan-chi.sh "Chị ơi, Shopee hiện hộp kiểm tra (kéo mảnh hình) trên Chrome máy chị, tab Shopee. Chị kéo giúp em, xong em tự làm tiếp."`
+2. Mỗi 1 phút kiểm lại URL tab; hết trang verify thì đợi 5 giây rồi làm tiếp từ bước đang dở.
+3. Chờ tối đa **30 phút**, quá thì xử lý như thiếu mật khẩu ở dưới (giữ file đã có, báo shop nào chưa nạp).
+
+**Tải bù file còn thiếu:** lượt trước thiếu file nào (vì mật khẩu / hộp kiểm tra) thì file đã tải vẫn nằm trong `/root/bao-cao-san/<YYYY-MM>/spe/`. Lượt sau (hoặc khi chị nhắn "kéo lại"):
+- Cùng ngày cuối với file đã có → chỉ tải file còn thiếu, cùng khoảng ngày như tên file cũ.
+- Lượt mới có ngày cuối mới hơn → tải lại cả 3 file của shop đó và xoá file cũ của shop đó.
+- Chỉ nạp shop đủ 3 file. Nạp xong shop nào thì xoá file shop đó.
+
 **Shopee đòi nhập mật khẩu ở trang Doanh thu (mỗi shop một lần)** — hộp "Để đảm bảo tài khoản của bạn luôn an toàn, vui lòng nhập mật khẩu":
 1. **Không tự nhập mật khẩu, không bấm Hủy.** Chạy: `bash nhan-chi.sh "Chị ơi, em đang kéo báo cáo Shopee shop <shop>. Shopee đòi mật khẩu ở trang Tài chính trên Chrome máy chị (tab Kênh Người bán). Chị nhập giúp em nhé, xong em tự làm tiếp."` (tin đi Telegram và hiện trong khung chat Kế toán trưởng trên web).
 2. Mỗi 1 phút kiểm lại bằng `snapshot` tab đó; hộp mật khẩu biến mất thì làm tiếp.
@@ -73,7 +88,7 @@ Nạp: `node nap-shopee.mjs --as ke-toan-truong-ailla /root/bao-cao-san/<YYYY-MM
 
 ## Gặp trở ngại
 - Bị đẩy về trang đăng nhập / đòi mã xác minh: **dừng, nhắn chị Hoa tự đăng nhập**. Không tự nhập mật khẩu.
-- Chrome máy chị tắt hoặc tiện ích OpenClaw mất kết nối (`tabs` không trả về): nhắn chị bật máy / mở Chrome, thử lại sau 30 phút, tối đa 3 lần.
+- Chrome máy chị tắt hoặc tiện ích OpenClaw mất kết nối (`tabs` báo "No tabs"): `bash nhan-chi.sh "Chị ơi, em chưa nối được Chrome máy chị để tải báo cáo. Chị bật máy, mở Chrome; vẫn không được thì nhắn Claude trên máy nối lại đường OpenClaw."`, thử lại sau 30 phút, tối đa 3 lần.
 
 ## Cài lần đầu trên VPS
 Trong thư mục này: `npm install` (thư viện đọc Excel `xlsx`). `ttcalc.js` là bản chép nguyên công thức của web; web đổi công thức thì chép lại từ `hub/src/ttcalc.js` (test trên web báo lệch nếu quên). Khoá agent: `/root/.config/abos/ke-toan-truong-ailla.key`, không in ra.
