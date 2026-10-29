@@ -158,8 +158,7 @@ function pPLCty(m){
   const opts=[];for(let i=-12;i<=0;i++){const k=plYmAdd(plYmNow(),i);opts.push(`<option value="${k}" ${k===ym?"selected":""}>Tháng ${vn(k)}</option>`)}
   m.innerHTML=H("Lãi lỗ P&L công ty",`Tháng ${vn(ym)}${A.R.partial?" · đến hôm nay "+A.R.to.slice(8,10)+"/"+A.R.to.slice(5,7):""} · doanh thu thực · số quản trị nội bộ, sổ sách chính thức ở MISA`)+`
   <div class="acts" style="margin-bottom:10px"><select id="pl-ym" style="width:auto">${opts.join("")}</select><button class="btn" id="pl-mt">Đặt kế hoạch tháng</button></div>
-  ${A.thieu.length?`<div class="note amb">Cột CÔNG TY chưa gồm: ${esc(A.thieu.join(", "))} (chờ tải báo cáo). ${A.loading?"Đang tải B2B…":""}</div>`:""}
-  ${A.tot&&A.tot.thieuGv.length?`<div class="note amb">${esc(A.tot.thieuGv.join(", "))} chưa có giá vốn: cột CÔNG TY chỉ cộng giá vốn, lãi của các kênh đã có giá vốn.</div>`:""}
+  ${/* Chị Hoa 29/10: bỏ hai dòng nhắc "Cột CÔNG TY chưa gồm…" và "… chưa có giá vốn…" ở đầu trang. */""}
   ${A.tot&&A.tot.tam?`<div class="note">Có phần doanh thu <b>tạm tính</b> (ngày chưa có báo cáo sàn), số sẽ chốt khi tải báo cáo tháng.</div>`:""}
   <section class="card flush"><div class="tbl"><table><thead><tr><th>Chỉ tiêu (đ)</th>${PLK.map(([,n])=>`<th class="n">${n}</th>`).join("")}<th class="n">CÔNG TY</th><th class="n">Tháng trước<br><small>${vn(P.ym)}</small></th><th class="n">Kế hoạch</th></tr></thead><tbody>
    ${body}${bien("Biên lãi gộp","lg")}${bien("Biên đóng góp","lai")}${bien("Biên lợi nhuận hoạt động","ln")}</tbody></table></div>
