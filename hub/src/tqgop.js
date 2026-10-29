@@ -145,7 +145,7 @@ function plMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.
 const PLS={ym:""};
 function pPLCty(m){
   if(!dhOk()){m.innerHTML=H("Lãi lỗ P&L","")+`<div class="note">Trang này chỉ dành cho CEO và kế toán.</div>`;return}
-  dhLoad();const ym=PLS.ym||plYmNow(),A=plMonth(ym),P=plMonth(plYmAdd(ym,-1)),KH=mtGet(ym),vn=x=>x.slice(5,7)+"/"+x.slice(0,4);
+  dhLoad();const ym=plYmNow(),A=plMonth(ym),P=plMonth(plYmAdd(ym,-1)),KH=mtGet(ym),vn=x=>x.slice(5,7)+"/"+x.slice(0,4);
   const f=v=>v==null?`<span class="hint">—</span>`:`<span class="${v<0?"t-red":""}">${nf(Math.round(v))}</span>`;
   const pct=(a,b)=>a==null||!b?"—":dhPct(a/b);
   const ROWS=[["dt","Doanh thu thực","tot"],["gv","− Giá vốn",""]].concat(A.tot&&A.tot.ngv?[["ngv","− Hàng chưa có giá vốn (không tính lãi)",""]]:[]).concat([["lg","= Lãi gộp","tot"],["phi","− Phí sàn và vận chuyển",""],["ads","− Quảng cáo",""],["cpk","− Chi phí trực tiếp kênh (thưởng cấp đơn, Sổ chi phí)",""],["luong","− Lương làm riêng cho kênh",""],["lai","= Lãi đóng góp","tot"],["chia","− Chi phí chung được chia (Quy tắc phân bổ)",""],["lsp","= Lãi sau phân bổ","tot"],["chung","− Chi phí chung chưa chia cho kênh",""],["sx","− Chi phí Sản xuất (Sổ chi phí)",""],["ln","= Lợi nhuận hoạt động","tot big"]]);
@@ -157,15 +157,14 @@ function pPLCty(m){
   const src=PLK.map(([k,n])=>{const r=A.by[k];return `<li><b>${n}:</b> ${esc(r?r.src||"":"chờ số")}${r&&r.dang?` · đang giao chưa tính ${nf(r.dang)} đơn (${tr(r.dangDt)})`:""}</li>`}).join("");
   const opts=[];for(let i=-12;i<=0;i++){const k=plYmAdd(plYmNow(),i);opts.push(`<option value="${k}" ${k===ym?"selected":""}>Tháng ${vn(k)}</option>`)}
   m.innerHTML=H("Lãi lỗ P&L công ty",`Tháng ${vn(ym)}${A.R.partial?" · đến hôm nay "+A.R.to.slice(8,10)+"/"+A.R.to.slice(5,7):""} · doanh thu thực · số quản trị nội bộ, sổ sách chính thức ở MISA`)+`
-  <div class="acts" style="margin-bottom:10px"><select id="pl-ym" style="width:auto">${opts.join("")}</select><button class="btn" id="pl-mt">Đặt kế hoạch tháng</button></div>
+  ${/* Chị Hoa 29/10: bỏ ô chọn tháng và nút Đặt kế hoạch tháng; tháng theo ô thời gian trên cùng, kế hoạch đặt ở Điều hành CEO › Kế hoạch doanh thu. */""}
   ${/* Chị Hoa 29/10: bỏ hai dòng nhắc "Cột CÔNG TY chưa gồm…" và "… chưa có giá vốn…" ở đầu trang. */""}
   ${A.tot&&A.tot.tam?`<div class="note">Có phần doanh thu <b>tạm tính</b> (ngày chưa có báo cáo sàn), số sẽ chốt khi tải báo cáo tháng.</div>`:""}
   <section class="card flush"><div class="tbl"><table><thead><tr><th>Chỉ tiêu (đ)</th>${PLK.map(([,n])=>`<th class="n">${n}</th>`).join("")}<th class="n">CÔNG TY</th><th class="n">Tháng trước<br><small>${vn(P.ym)}</small></th><th class="n">Kế hoạch</th></tr></thead><tbody>
    ${body}${bien("Biên lãi gộp","lg")}${bien("Biên đóng góp","lai")}${bien("Biên lợi nhuận hoạt động","ln")}</tbody></table></div>
    <p class="hint pad">Lãi đóng góp = doanh thu thực − giá vốn − phí sàn, vận chuyển, thuế − quảng cáo − chi phí Sổ chi phí bổ thẳng về kênh − lương làm riêng cho kênh (bảng lương đã chốt). So hiệu quả các kênh dùng lãi đóng góp. Lãi sau phân bổ = lãi đóng góp − phần chi phí chung được chia theo Quy tắc phân bổ ở Sổ chi phí; phần chưa chia chỉ trừ ở cột CÔNG TY. Lợi nhuận hoạt động = tổng lãi đóng góp − toàn bộ chi phí chung − chi phí Sản xuất. Thu nhập, chi phí khác (bồi thường sàn…) và thuế TNDN chưa có chỗ nhập nên chưa ra lợi nhuận trước thuế và sau thuế. ${A.chung==null?"Chi phí chung lấy từ Sổ chi phí: tháng này chưa có số nên chưa ra lợi nhuận hoạt động.":""}${A.pb&&A.pb.loi&&A.pb.loi.length?" Chưa chia được: "+esc(A.pb.loi.join("; "))+".":""}</p></section>
   <section class="card"><div class="card-h"><h2>Nguồn số từng kênh</h2></div><ul class="lessons">${src}</ul></section>`;
-  m.querySelector("#pl-ym").onchange=e=>{PLS.ym=e.target.value;renderMain()};
-  m.querySelector("#pl-mt").onclick=()=>{MT.ym=ym;PAGE="muctieu";renderMain();scrollTo(0,0)};
+
 }
 PAGES.pl=m=>{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")return pPLCty(m);return pPL(m)};
 
