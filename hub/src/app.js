@@ -68,17 +68,34 @@ function render(){
   _rLast=PAGE;_rmLast=PAGE;navRecord();
   if(_keep){_rmRestore(m,_keep,_y0);requestAnimationFrame(()=>{_rmRestore($("#main")||m,_keep,_y0)})}
 }
-/* Nút Back của trình duyệt (chị Hoa 29/10: bấm Back là thoát ra Google): mỗi lần đổi trang hoặc mở trang chi tiết
-   (đơn mua) thì ghi một bước vào lịch sử trình duyệt; bấm Back quay về đúng trang trước, đóng cửa sổ chi tiết nếu đang mở. */
-let _navBack=false;
-const _navKey=()=>PAGE+"|"+((typeof MH!=="undefined"&&MH&&MH.open)||"");
+/* Nút Back của trình duyệt (chị Hoa 29/10: bấm Back là thoát ra Google, "cả web đều có tình trạng đó"):
+   - đổi trang, mở trang chi tiết (đơn mua), đổi tab trong trang (Sổ chi phí, Tài sản) đều ghi một bước vào lịch sử;
+   - mở cửa sổ chi tiết bên phải (#drawer) cũng ghi một bước: bấm Back là đóng cửa sổ đó trước, chưa đổi trang;
+   - bấm ✕ đóng cửa sổ thì bỏ bước đó đi để Back lần sau về đúng trang trước.
+   Trang có trạng thái riêng muốn Back được thì thêm vào NAV_SUB [tên, đọc, ghi]. */
+let _navBack=false,_navDrOpen=false,_navSkipPop=0;
+const NAV_SUB=[
+  ["mh",()=>typeof MH!=="undefined"&&MH?MH.open||null:null,v=>{if(typeof MH!=="undefined"&&MH)MH.open=v||null}],
+  ["sct",()=>typeof SC!=="undefined"&&PAGE==="so_cp"?SC.tab:null,v=>{if(typeof SC!=="undefined"&&v)SC.tab=v}],
+  ["tst",()=>typeof TSV!=="undefined"&&TSV.tab&&TSV.tab[PAGE]?TSV.tab[PAGE]:null,v=>{if(typeof TSV!=="undefined"&&TSV.tab&&v)TSV.tab[PAGE]=v}],
+  ["tkh",()=>typeof TSV!=="undefined"&&PAGE==="ts_kh"?TSV.kh:null,v=>{if(typeof TSV!=="undefined"&&v)TSV.kh=v}]];
+const _navSub=()=>{const o={};NAV_SUB.forEach(([k,g])=>{try{o[k]=g()}catch(e){o[k]=null}});return o};
+const _navKey=sub=>PAGE+"|"+JSON.stringify(sub);
+function navDrawerWatch(){const dr=document.getElementById("drawer");if(!dr||dr._navW)return;dr._navW=1;_navDrOpen=!dr.hidden;
+  new MutationObserver(()=>{const open=!dr.hidden;
+    if(open&&!_navDrOpen){_navDrOpen=true;try{history.pushState(Object.assign({},history.state||{},{drawer:1}),"")}catch(e){}}
+    else if(!open&&_navDrOpen){_navDrOpen=false;if(history.state&&history.state.drawer){_navSkipPop++;try{history.back()}catch(e){_navSkipPop--}}}
+  }).observe(dr,{attributes:true,attributeFilter:["hidden"]})}
 function navRecord(){
-  if(_navBack||!ME||!PAGE)return;const k=_navKey(),cur=history.state&&history.state.abos;
-  try{if(!cur)history.replaceState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"");
-      else if(cur!==k)history.pushState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"")}catch(e){}}
-addEventListener("popstate",e=>{const st=e.state;if(!st||!st.abos||!ME)return;
-  {const dr=document.getElementById("drawer");if(dr&&!dr.hidden&&typeof closeDrawer==="function"){try{closeDrawer()}catch(er){}}}
-  _navBack=true;try{PAGE=st.p;MOD=st.mod||MOD;if(typeof MH!=="undefined"&&MH)MH.open=st.mh||null;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(er){}render();scrollTo(0,0)}finally{_navBack=false}});
+  navDrawerWatch();
+  if(_navBack||!ME||!PAGE)return;const sub=_navSub(),k=_navKey(sub),hs=history.state,cur=hs&&hs.abos,st={abos:k,p:PAGE,mod:MOD,sub};
+  try{if(!cur)history.replaceState(st,"");else if(cur!==k){if(hs.drawer)history.replaceState(st,"");else history.pushState(st,"")}}catch(e){}}
+addEventListener("popstate",e=>{
+  if(_navSkipPop>0){_navSkipPop--;return}
+  const st=e.state,dr=document.getElementById("drawer");
+  if(dr&&!dr.hidden&&typeof closeDrawer==="function"){_navDrOpen=false;try{closeDrawer()}catch(er){}if(st&&st.abos&&st.abos===_navKey(_navSub()))return}
+  if(!st||!st.abos||!ME)return;
+  _navBack=true;try{PAGE=st.p;MOD=st.mod||MOD;NAV_SUB.forEach(([k,,set])=>{try{set(st.sub?st.sub[k]:null)}catch(er){}});try{localStorage.setItem(SKEY+"_p",PAGE)}catch(er){}render();scrollTo(0,0)}finally{_navBack=false}});
 /* vẽ lại trang chính; nếu vẫn đang ở đúng trang đó thì giữ nguyên vị trí cuộn (cả trang lẫn các bảng cuộn bên trong), để bấm tích / chọn không bị nhảy về đầu */
 let _rmLast="";
 /* Quy tắc chung: vẽ lại trang (bấm chọn, mở / đóng chi tiết, lưu, đổi bộ lọc) KHÔNG được làm trang nhảy về đầu.
