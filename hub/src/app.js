@@ -62,9 +62,20 @@ function render(){
   if(ADM&&$("#uchip")){const me=MODULES.find(mo=>mo.k==="me"),its=me?modGroups(me).flatMap(g=>g[1]):[];$("#uchip").onclick=e=>{e.stopPropagation();let d=$("#umenu");if(d){d.remove();return}d=document.createElement("div");d.id="umenu";d.className="umenu";d.innerHTML=its.map(([id,t])=>`<button data-um="${id}">${t}</button>`).join("")+`<button data-um="__out">Đăng xuất</button>`;$("#uchip").after(d);d.querySelectorAll("[data-um]").forEach(b=>b.onclick=()=>{d.remove();if(b.dataset.um==="__out"){$("#logout").click();return}MOD="me";PAGE=b.dataset.um;render();scrollTo(0,0)});setTimeout(()=>addEventListener("click",()=>{const x=$("#umenu");if(x)x.remove()},{once:true}),0)}}
   $$(".aibtn").forEach(b=>b.onclick=()=>{MOD="aiq";PAGE="ai";render();scrollTo(0,0)});
   const m=$("#main");PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);
-  _rLast=PAGE;_rmLast=PAGE;
+  _rLast=PAGE;_rmLast=PAGE;navRecord();
   if(_keep){_rmRestore(m,_keep,_y0);requestAnimationFrame(()=>{_rmRestore($("#main")||m,_keep,_y0)})}
 }
+/* Nút Back của trình duyệt (chị Hoa 29/10: bấm Back là thoát ra Google): mỗi lần đổi trang hoặc mở trang chi tiết
+   (đơn mua) thì ghi một bước vào lịch sử trình duyệt; bấm Back quay về đúng trang trước, đóng cửa sổ chi tiết nếu đang mở. */
+let _navBack=false;
+const _navKey=()=>PAGE+"|"+((typeof MH!=="undefined"&&MH&&MH.open)||"");
+function navRecord(){
+  if(_navBack||!ME||!PAGE)return;const k=_navKey(),cur=history.state&&history.state.abos;
+  try{if(!cur)history.replaceState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"");
+      else if(cur!==k)history.pushState({abos:k,p:PAGE,mod:MOD,mh:(typeof MH!=="undefined"&&MH&&MH.open)||null},"")}catch(e){}}
+addEventListener("popstate",e=>{const st=e.state;if(!st||!st.abos||!ME)return;
+  {const dr=document.getElementById("drawer");if(dr&&!dr.hidden&&typeof closeDrawer==="function"){try{closeDrawer()}catch(er){}}}
+  _navBack=true;try{PAGE=st.p;MOD=st.mod||MOD;if(typeof MH!=="undefined"&&MH)MH.open=st.mh||null;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(er){}render();scrollTo(0,0)}finally{_navBack=false}});
 /* vẽ lại trang chính; nếu vẫn đang ở đúng trang đó thì giữ nguyên vị trí cuộn (cả trang lẫn các bảng cuộn bên trong), để bấm tích / chọn không bị nhảy về đầu */
 let _rmLast="";
 /* Quy tắc chung: vẽ lại trang (bấm chọn, mở / đóng chi tiết, lưu, đổi bộ lọc) KHÔNG được làm trang nhảy về đầu.
@@ -87,7 +98,7 @@ function renderMain(){if(!ME)return;const m=$("#main");if(!m){render();return}
   if(same)m.style.minHeight=h+"px";
   /* Trang không tồn tại (tên sai, trang đã bỏ) thì về trang đầu của mục đang chọn và quên trang đã nhớ, đừng để trắng trang mãi. */
   if(!PAGES[PAGE]){try{localStorage.removeItem(SKEY+"_p")}catch(e){}let its=[];try{const mo0=curMod();its=mo0?modGroups(mo0).flatMap(g=>g[1]):[]}catch(e){}const ok=its.find(i=>PAGES[i[0]]);PAGE=ok?ok[0]:(PAGES.exec?"exec":Object.keys(PAGES)[0])}
-  m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);_rmLast=PAGE;
+  m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);_rmLast=PAGE;navRecord();
   if(same){_rmRestore(m,sv,y);m.style.minHeight="";_rmRestore(m,sv,y);requestAnimationFrame(()=>{_rmRestore(m,sv,y);setTimeout(()=>_rmRestore(m,sv,y),120)})}else{m.style.minHeight="";if(top){window.scrollTo(0,0);const sb=_rmSave(m);}}}
 function bindCommon(m){
   m.querySelectorAll("[data-card]").forEach(e=>e.addEventListener("click",ev=>{if(ev.target.closest("select,input,button:not([data-card]),a"))return;openCard(e.dataset.card)}));
