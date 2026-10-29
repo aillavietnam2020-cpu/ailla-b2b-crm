@@ -64,9 +64,9 @@ Mỗi shop 3 file:
 - Trước khi chuyển shop, đọc tên shop trên thanh trên cùng: đang đúng shop rồi thì **không** vào trang chọn shop.
 
 **Hộp kiểm tra chống máy** (trang đổi sang `shopee.vn/verify/captcha` hoặc `verify/traffic`, chữ "Kéo qua để hoàn thiện bức hình" / "Xác nhận để tiếp tục"):
-1. **Không tự kéo, không tải lại trang, không thử cách khác.** Chạy: `bash nhan-chi.sh "⛔ Shopee <shop> · <file đang tải> T<tháng>: kẹt hộp kiểm tra kéo hình.
-👉 Chị mở Chrome, tab Shopee, kéo mảnh hình.
-Em chờ đến <giờ:phút>."`
+1. **Không tự kéo, không tải lại trang, không thử cách khác.** Chạy: `bash nhan-chi.sh "Chị ơi, em đang tải file <file> tháng <tháng> của Shopee <shop> thì Shopee hiện hộp kiểm tra kéo mảnh hình.
+Chị mở Chrome, vào tab Shopee, kéo mảnh hình vào chỗ trống giúp em.
+Chị kéo xong em tự làm tiếp, em chờ đến <giờ:phút>."`
 2. Mỗi 1 phút kiểm lại URL tab; hết trang verify thì đợi 5 giây rồi làm tiếp từ bước đang dở.
 3. Chờ tối đa **30 phút**, quá thì xử lý như thiếu mật khẩu ở dưới (giữ file đã có, báo shop nào chưa nạp).
 
@@ -76,20 +76,21 @@ Em chờ đến <giờ:phút>."`
 - Chỉ nạp shop đủ 3 file. Nạp xong shop nào thì xoá file shop đó.
 
 **Shopee đòi nhập mật khẩu ở trang Doanh thu (mỗi shop một lần)** — hộp "Để đảm bảo tài khoản của bạn luôn an toàn, vui lòng nhập mật khẩu":
-1. **Không tự nhập mật khẩu, không bấm Hủy.** Chạy: `bash nhan-chi.sh "⛔ Shopee <shop> · Doanh thu T<tháng>: Shopee đòi mật khẩu.
-👉 Chị mở Chrome, tab Kênh Người bán, nhập mật khẩu.
-Em chờ đến <giờ:phút>."` (tin đi Telegram và hiện trong khung chat Kế toán trưởng trên web).
+1. **Không tự nhập mật khẩu, không bấm Hủy.** Chạy: `bash nhan-chi.sh "Chị ơi, em đang tải file Doanh thu tháng <tháng> của Shopee <shop> thì Shopee đòi nhập mật khẩu.
+Chị mở Chrome, vào tab Kênh Người bán, nhập mật khẩu Shopee giúp em.
+Chị nhập xong em tự làm tiếp, em chờ đến <giờ:phút>."` (tin đi Telegram và hiện trong khung chat Kế toán trưởng trên web).
 2. Mỗi 1 phút kiểm lại bằng `snapshot` tab đó; hộp mật khẩu biến mất thì làm tiếp.
 3. Chờ tối đa **30 phút**. Quá 30 phút: vẫn nạp TikTok bình thường, bỏ Doanh thu shop đó (KHÔNG nạp shop đó vì thiếu file), giữ file đơn + quảng cáo trong thư mục, nhắn `nhan-chi.sh "Chưa nhập mật khẩu Shopee nên em chưa nạp shop <shop>. Chị nhập xong nhắn em kéo lại."` và ghi vào báo cáo cuối.
 Tên file: `/root/bao-cao-san/<YYYY-MM>/spe/01_DonHang_<shop>_…xlsx`, `02_DoanhThu_<shop>_…xlsx`, `03_QuangCao_<shop>_…csv`.
 Nạp: `node nap-shopee.mjs --as ke-toan-truong-ailla /root/bao-cao-san/<YYYY-MM>/spe/* --thu` → đọc số từng shop → chạy lại không `--thu`. Công cụ tự ghép file theo shop. Web chặn bản cũ hơn / bản giữa tháng đè bản đủ tháng giống TikTok.
 
-## Cách nhắn chị (chị Hoa chốt 29/10: ngắn, vào việc)
-Mọi tin (Telegram, web, báo cáo cuối lượt) theo đúng khuôn, **không** kể đã đọc skill, không xin lỗi, không hứa chung chung:
-- Kẹt: `⛔ <kênh/shop> · <file> T<tháng>: <kẹt ở đâu, 1 câu>` / `👉 <chị cần làm gì, 1 câu>` / `Em chờ đến <giờ>` (hoặc `Em thử lại lúc <giờ>`).
-- Xong: `✅ <kênh/shop> T<tháng> đến <ngày>: doanh thu thực <x>tr · <n> đơn · lãi kênh <y>tr · đã nạp web`. Mỗi shop / kênh một dòng.
-- Bỏ: `❌ <kênh/shop> · <file>: chưa nạp vì <lý do>. 👉 <chị cần làm gì>`.
-Tối đa 4 dòng. Đã nhắn tin "kẹt" bằng nhan-chi.sh thì câu trả lời cuối lượt không nhắc lại tin đó.
+## Cách nhắn chị (chị Hoa chốt 29/10: rõ ràng, đủ câu, vào việc)
+Viết câu đầy đủ, lễ phép, nhưng chỉ nói việc. Mỗi tin trả lời đủ 3 ý: **đang làm gì** (kênh/shop, file, tháng) → **kẹt ở đâu / kết quả** → **chị cần làm gì, hoặc em làm gì tiếp, lúc mấy giờ**.
+Không kể đã đọc skill, không lặp lại tin vừa gửi, không gửi 2 tin cùng ý. Chị trả lời "làm lại đi" thì kiểm lại ngay; vẫn kẹt cùng lỗi thì nói rõ lỗi đó **không** do việc chị vừa làm và chỉ đúng việc cần làm (như mẫu mất kết nối ở trên).
+- Kẹt: dùng đúng mẫu nhan-chi.sh ở các mục trên.
+- Xong: "Chị ơi, em đã nạp Shopee <shop> tháng <tháng> (số đến ngày <ngày>) lên web: doanh thu thực <x> triệu, <n> đơn, lãi kênh <y> triệu." Mỗi shop / kênh một câu.
+- Bỏ: "Shopee <shop> tháng <tháng> em chưa nạp vì <lý do>. Chị <việc cần làm> rồi nhắn em kéo lại."
+Cả tin không quá 5 dòng.
 
 ## Chống trùng số (web đã chặn, agent không cần cộng dồn)
 - Mỗi tháng TikTok **chỉ có một bản** trên web. Nạp lại thì **bản mới thay bản cũ**, không cộng thêm.
@@ -99,9 +100,9 @@ Tối đa 4 dòng. Đã nhắn tin "kẹt" bằng nhan-chi.sh thì câu trả l�
 
 ## Gặp trở ngại
 - Bị đẩy về trang đăng nhập / đòi mã xác minh: **dừng, nhắn chị Hoa tự đăng nhập**. Không tự nhập mật khẩu.
-- Chrome máy chị tắt hoặc tiện ích OpenClaw mất kết nối (`tabs` báo "No tabs"): `bash nhan-chi.sh "⛔ <việc đang làm>: mất nối Chrome máy chị (OpenClaw báo No tabs).
-👉 Chị nhắn Claude trên máy: nối lại OpenClaw Chrome.
-Em thử lại lúc <giờ:phút>."`, thử lại sau 30 phút, tối đa 3 lần.
+- Chrome máy chị tắt hoặc tiện ích OpenClaw mất kết nối (`tabs` báo "No tabs"): `bash nhan-chi.sh "Chị ơi, em đang <việc đang làm> thì mất kết nối tới Chrome máy chị. Lỗi này nằm ở đường nối, chị mở lại Shopee cũng không hết.
+Chị nhắn Claude trên máy: \"nối lại OpenClaw Chrome cho agent\".
+Nối xong em tự làm tiếp, em thử lại lúc <giờ:phút>."`, thử lại sau 30 phút, tối đa 3 lần.
 
 ## Cài lần đầu trên VPS
 Trong thư mục này: `npm install` (thư viện đọc Excel `xlsx`). `ttcalc.js` là bản chép nguyên công thức của web; web đổi công thức thì chép lại từ `hub/src/ttcalc.js` (test trên web báo lệch nếu quên). Khoá agent: `/root/.config/abos/ke-toan-truong-ailla.key`, không in ra.
