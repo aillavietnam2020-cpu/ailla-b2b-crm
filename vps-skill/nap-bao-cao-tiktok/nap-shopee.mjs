@@ -147,7 +147,7 @@ for (const p of pairs) {
   const F = T.speReadFin(p.F.sh, ky);
   if (F.err) die(`Shop ${p.shop}: ${F.err}`);
   if (!p.ad) console.log(`Shop ${p.shop}: KHÔNG có file quảng cáo, quảng cáo tính 0.`);
-  const M = T.speBuildMonth({ ky, shop: p.shop, orders: O, fin: F, ads: p.ad ? p.ad.A : null, costOf: await costOfFor(ky), pos: (inputs[ky].pos || []).map((l) => ({ o: l.order_id, sku: l.sku, vr: l.variant })) });
+  const M = T.speBuildMonth({ ky, shop: p.shop, orders: O, fin: F, ads: p.ad ? p.ad.A : null, costOf: await costOfFor(ky), pos: (inputs[ky].pos || []).map((l) => ({ o: l.order_id, sku: l.sku, vr: l.variant, name: l.name })) });
   if (M.err) die(M.err);
   const files = { fin: p.F.name, orders: p.O.name, ads: p.ad ? p.ad.name : '' };
   console.log(`Shopee ${p.shop} tháng ${ky.slice(5)}/${ky.slice(0, 4)}${M.den ? ` (giữa tháng, số đến ${M.den.slice(8)}/${M.den.slice(5, 7)})` : ' (đủ tháng)'}`);

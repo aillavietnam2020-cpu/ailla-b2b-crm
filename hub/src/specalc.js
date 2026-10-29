@@ -99,6 +99,10 @@ function speLearnPos(lines,pos){
     if(ks.length===1&&new Set(ps.map(p=>p.sku+"|"+p.vr)).size===1){add(ks[0],ps[0]);return}
     ks.forEach(k=>{const m=ps.filter(p=>nz(p.vr)&&nz(p.vr)===nz(ex[k]));if(new Set(m.map(p=>p.sku+"|"+p.vr)).size===1)add(k,m[0])})});
   const out={};Object.entries(vote).forEach(([k,v])=>{const b=Object.values(v).sort((a,c)=>c.n-a.n)[0];out[k]={sku:b.p.sku,vr:b.p.vr}});
+  /* Tháng chưa có đơn Poscake (trước 09/10/2026): ghép theo tên sản phẩm + phân loại TRÙNG KHỚP với dòng Poscake (Poscake lấy tên từ Shopee).
+     Tên trùng mà ra nhiều mã khác nhau thì bỏ, không đoán. */
+  const byName={};(pos||[]).forEach(p=>{if(!p||!p.sku||!p.name)return;const k=nz(p.name)+"|"+nz(p.vr),id=p.sku+"|"+(p.vr||"");(byName[k]=byName[k]||{})[id]={sku:String(p.sku),vr:p.vr||""}});
+  (lines||[]).forEach(l=>{const k=speKey(l.pn,l.vr);if(out[k])return;const c=byName[nz(l.pn)+"|"+nz(l.vr)];if(c&&Object.keys(c).length===1)out[k]=Object.values(c)[0]});
   return out;
 }
 

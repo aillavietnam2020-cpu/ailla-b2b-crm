@@ -97,7 +97,10 @@ describe('Agent nạp báo cáo Shopee', () => {
     const inp = await agentCall(a.token, '/api/agent/shopee/inputs?ky=2026-10');
     expect(inp.status).toBe(200);
     // Giá vốn theo hàng xuất kho: đơn Poscake Shopee xuất trong 45 ngày từ đầu tháng (đơn đặt cuối tháng xuất đầu tháng sau).
-    expect(inp.body.data.pos).toEqual([{ order_id: '2610ABC', sku: '238314716093', variant: '1 can 10kg' }]);
+    expect(inp.body.data.pos).toEqual([
+      { order_id: '2610ABC', sku: '238314716093', variant: '1 can 10kg', name: 'Arila' },
+      { order_id: '', sku: 'x', variant: '', name: 'x' },
+    ]);
     expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', '2026-10-25'))).status).toBe(200);
     expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn1', '2026-10-20'))).status).toBe(409);
     expect((await agentCall(a.token, '/api/agent/shopee/month/2026-10/aillavn1', 'PUT', spe('2026-10', 'aillavn', '2026-10-25'))).status).toBe(400);

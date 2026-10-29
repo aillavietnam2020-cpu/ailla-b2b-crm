@@ -49,9 +49,14 @@ export async function agentInputs(db: D1Database, ky: string, channel: 'TIKTOK' 
   const posQ =
     channel === 'SHOPEE'
       ? db
-          .prepare("SELECT order_id, sku, variant FROM channel_order_lines WHERE channel = 'SHOPEE' AND day >= ? AND day <= ?")
+          .prepare(
+            // Đơn xuất trong 45 ngày từ đầu tháng (ghép mã đơn) + một dòng mỗi tên/phân loại từ đó về sau (ghép theo tên khi tháng chưa có đơn Poscake).
+            `SELECT order_id, sku, variant, name FROM channel_order_lines WHERE channel = 'SHOPEE' AND day >= ?1 AND day <= ?2
+             UNION ALL
+             SELECT '' AS order_id, sku, variant, MAX(name) AS name FROM channel_order_lines WHERE channel = 'SHOPEE' AND day > ?2 GROUP BY sku, variant, name`,
+          )
           .bind(`${ky}-01`, posTo.toISOString().slice(0, 10))
-          .all<{ order_id: string; sku: string; variant: string }>()
+          .all<{ order_id: string; sku: string; variant: string; name: string }>()
       : null;
   const [map, items, alias, moves, main, sec] = await Promise.all([
     db.prepare('SELECT sku, variant, from_day, item_label, qty FROM channel_map WHERE channel = ? ORDER BY sku, variant, from_day, item_label').bind(channel).all(),

@@ -225,3 +225,22 @@ describe('Nhãn quy đổi chỉ ghi tên đọc mã như trang Kho (29/10/2026)
     expect(c.u).toBe(24000);
   });
 });
+
+describe('Tháng chưa có đơn Poscake: ghép theo tên + phân loại trùng khớp (29/10/2026)', () => {
+  it('tên trùng một mã thì ghép, trùng nhiều mã thì bỏ, khác tên thì không ghép', () => {
+    const L = [
+      { o: 'S1', pn: 'Tinh dầu 80ml', vr: 'Hương Luxury' },
+      { o: 'S2', pn: 'Arila 10kg', vr: '1 can' },
+      { o: 'S3', pn: 'Xịt muỗi', vr: '' },
+    ];
+    const pos = [
+      { o: '', sku: '3109', vr: 'Hương Luxury', name: 'Tinh dầu  80ml' },
+      { o: '', sku: '2383', vr: '1 can', name: 'Arila 10kg' },
+      { o: '', sku: '9999', vr: '1 can', name: 'Arila 10kg' },
+    ];
+    const m = T.speLearnPos(L, pos);
+    expect(m[T.speKey('Tinh dầu 80ml', 'Hương Luxury')]).toEqual({ sku: '3109', vr: 'Hương Luxury' });
+    expect(m[T.speKey('Arila 10kg', '1 can')]).toBeUndefined();
+    expect(m[T.speKey('Xịt muỗi', '')]).toBeUndefined();
+  });
+});

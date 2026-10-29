@@ -41,7 +41,7 @@ function speMerge(){
 async function spePosOf(ky){
   SPE.pos=SPE.pos||{};if(SPE.pos[ky])return SPE.pos[ky];
   const a=new Date(ky+"-01T00:00:00Z"),b=new Date(a);b.setUTCDate(b.getUTCDate()+45);
-  try{const r=await kApi(`/online/sheet?channel=SHOPEE&from=${ky}-01&to=${b.toISOString().slice(0,10)}`);SPE.pos[ky]=(r.lines||[]).map(l=>({o:l.order_id,sku:l.sku,vr:l.variant}))}catch(e){SPE.pos[ky]=[]}
+  try{const r=await kApi(`/online/sheet?channel=SHOPEE&from=${ky}-01&to=${b.toISOString().slice(0,10)}`);SPE.pos[ky]=(r.lines||[]).map(l=>({o:l.order_id,sku:l.sku,vr:l.variant,name:l.name}))}catch(e){SPE.pos[ky]=[]}
   return SPE.pos[ky];
 }
 async function speCostOf(ky){
