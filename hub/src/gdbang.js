@@ -38,15 +38,17 @@ function gdBind(m){
 function gdChonDon(idInput){
   const inp=document.getElementById(idInput);if(!inp||inp.dataset.gdchon)return;inp.dataset.gdchon="1";
   const box=document.createElement("div");box.className="gdchon";const dl="gddl-"+idInput;
-  box.innerHTML=`<input id="${idInput}-tim" list="${dl}" placeholder="Tìm đơn để chọn: mã đơn, tên khách, nhà cung cấp…" autocomplete="off"><datalist id="${dl}"></datalist><span class="hint">chọn được nhiều đơn; không có đơn thì gõ chữ ở ô trên</span>`;
+  box.innerHTML=`<input id="${idInput}-tim" list="${dl}" placeholder="Bấm vào đây để chọn đơn (đơn bán cho khách hoặc đơn mua của nhà cung cấp)" autocomplete="off"><datalist id="${dl}"></datalist><span class="hint">gõ tên khách, nhà cung cấp hoặc mã đơn để tìm; chọn được nhiều đơn. Không có đơn thì gõ chữ ở ô trên.</span>`;
   inp.insertAdjacentElement("afterend",box);
   const tim=box.querySelector("input"),list=box.querySelector("datalist");let map={},t=0;
   const them=ma=>{const L=gdMaDon(inp.value);if(!L.includes(ma))L.push(ma);inp.value=L.join(", ");tim.value=""};
-  tim.addEventListener("input",()=>{const v=tim.value.trim();if(map[v]){them(map[v]);return}clearTimeout(t);if(v.length<2)return;
-    t=setTimeout(async()=>{const k=kfold(v),opts=[];
-      ((typeof MH!=="undefined"&&MH.orders)||[]).filter(p=>kfold((p.no||"")+" "+(p.supplier_name||"")).includes(k)).slice(0,10).forEach(p=>opts.push([p.no+" · đơn mua · "+(p.supplier_name||""),p.no]));
-      try{const r=await svApi("/api/orders?q="+encodeURIComponent(v)+"&limit=15");(Array.isArray(r)?r:(r&&r.items)||[]).forEach(o=>o.order_no&&opts.push([o.order_no+" · đơn bán · "+(o.customer_name||""),o.order_no]))}catch(e){}
-      map={};list.innerHTML=opts.map(([l,ma])=>{map[l]=ma;return `<option value="${esc(l)}"></option>`}).join("")},250)});
+  /* dựng danh sách gợi ý: đơn bán (mã DH…, khách mua) và đơn mua (mã PM…, nhà cung cấp); bấm vào ô là hiện ngay các đơn gần đây */
+  const nap=async v=>{const k=kfold(v||""),opts=[];
+    ((typeof MH!=="undefined"&&MH.orders)||[]).slice().sort((a,b)=>String(b.order_date||"").localeCompare(String(a.order_date||""))).filter(p=>!k||kfold((p.no||"")+" "+(p.supplier_name||"")).includes(k)).slice(0,k?10:8).forEach(p=>opts.push([p.no+" · đơn mua của "+(p.supplier_name||"")+(p.order_date?" · "+kDd(p.order_date):""),p.no]));
+    try{const r=await svApi("/api/orders?"+(k?"q="+encodeURIComponent(v)+"&":"")+"limit="+(k?15:10));(Array.isArray(r)?r:(r&&r.items)||[]).forEach(o=>o.order_no&&opts.push([o.order_no+" · đơn bán cho "+(o.customer_name||"")+(o.created_at?" · "+kDd(String(o.created_at).slice(0,10)):""),o.order_no]))}catch(e){}
+    map={};list.innerHTML=opts.map(([l,ma])=>{map[l]=ma;return `<option value="${esc(l)}"></option>`}).join("")};
+  tim.addEventListener("focus",()=>{if(!list.children.length)nap("")});
+  tim.addEventListener("input",()=>{const v=tim.value.trim();if(map[v]){them(map[v]);nap("");return}clearTimeout(t);t=setTimeout(()=>nap(v),250)});
   Promise.resolve(typeof mhLoad==="function"?mhLoad():0).catch(()=>{})}
 /* tbl() của app.js nhưng bảng mang kiểu giao dịch chung. */
 const gdTbl=(head,rows,cls)=>tbl(head,rows,cls).replace("<table>",'<table class="gd">');
