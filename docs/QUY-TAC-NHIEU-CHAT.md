@@ -66,7 +66,7 @@ Khi sửa một file ở cột "file chung dễ vướng": sửa ít nhất có 
 Chị Hoa: "cứ làm mà không sửa cái liên quan là dở hơi". Ví dụ đã xảy ra: chứng từ đơn ezpack thêm 65.000 vận chuyển mà sổ Công cụ dụng cụ không tự điều chỉnh, chị Huệ phải nhắc.
 
 Mỗi lần sửa một số liệu hay một luồng, trước khi báo xong phải:
-1. Rà cả chuỗi ăn theo: Mua hàng (đơn, chứng từ, trả tiền) → công nợ nhà cung cấp → Nhật ký chi / Sổ chi phí → Tài sản & CCDC → tồn kho → Lãi lỗ / giá thành. Bán hàng thì: đơn → kho xuất → công nợ khách → tiền về → doanh thu thực → Lãi lỗ.
+1. Rà cả chuỗi ăn theo: Mua hàng (đơn, chứng từ, trả tiền) → công nợ nhà cung cấp → Nhật ký chi / Sổ chi phí → Tài sản & CCDC → tồn kho → Lãi lỗ / giá thành. Bán hàng, giá vốn, doanh thu (chị Hoa: "thực tế là cả luồng giá vốn, doanh thu các kiểu cũng thế đấy"): đơn hàng / doanh thu → kho xuất → đối soát tiền về → công nợ khách → giá vốn SKU / giá thành (định mức, NVL, khấu hao 154, quy đổi combo kênh) → tồn kho → Lãi lỗ theo kênh / P&L công ty / Tổng quan.
 2. Chỗ nào phải đổi theo thì sửa luôn, ưu tiên làm thành luồng tự động để không ai phải nhắc. Nếu chỗ đó thuộc chat khác thì nhắn chat đó (hoặc chat Đấu nối / điều phối) trước khi báo xong.
 3. Mở web thật kiểm cả chỗ sửa lẫn các chỗ ăn theo. Chưa kiểm được chỗ nào thì nói rõ trong báo cáo.
 
