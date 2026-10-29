@@ -13,7 +13,7 @@ function tlSchedule(){
   (MH.orders||[]).forEach(p=>{if(p.status==="HUY")return;
     let M,st;try{M=mhPoMoney(p);st=mhStage(p,M)}catch(e){return}
     const k=st[0],T=mhTermOf(p).pay_terms,val=M.invTotal||mhValue(p)||0,left=Math.round(val-M.paid);if(left<=1)return;
-    const row={left,txt:(p.supplier_name||"")+" · "+(p.no||"")};
+    const row={left,txt:(p.supplier_name||"")+" · "+(p.no||""),sup:p.supplier_name||"",no:p.no||""};
     let due="";
     if(k==="no")due=T==="CONG_NO"?mhDueOf(p):today;
     else if(k==="tr")due=p.expected_date||"";
@@ -39,16 +39,19 @@ function pTienLich(m){
   try{const X=tcnTien();avg=X.cb.v;days=have?X.R.ngay:null}catch(e){}
   const S4=tlSchedule(),sum4=S4.W.reduce((t,w)=>t+w.sum,0)+S4.late.sum;
   const wl=["Tuần này","Tuần sau","Tuần thứ 3","Tuần thứ 4"],ds=i=>{const a=new Date(today+"T00:00:00");a.setDate(a.getDate()+i*7);const b=new Date(a);b.setDate(b.getDate()+6);const f=d=>String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0");return f(a)+" – "+f(b)};
-  const sec=(title,w,hint)=>`<div class="tlw"><div class="tlwh"><b>${title}</b><small>${hint||""}</small><span class="tlsum${w.sum?"":" z"}">${w.sum?nf(w.sum)+" đ":"—"}</span></div>${w.rows.map(r=>`<div class="tlr"><span>${esc(r.txt)}${r.due?` <small>hạn ${esc(mhDM(r.due))}</small>`:""}</span><b>${nf(r.left)}</b></div>`).join("")}</div>`;
+  /* Kiểu bảng giao dịch chung (gdbang.js): mỗi khoản một dòng, cột Liên quan bấm mở đơn mua. */
+  if(typeof gdCss==="function")gdCss();
+  const sec=(title,w,hint)=>`<div class="tlw"><div class="tlwh"><b>${title}</b><small>${hint||""}</small><span class="tlsum${w.sum?"":" z"}">${w.sum?nf(w.sum)+" đ":"—"}</span></div>${w.rows.length?`<table class="tbl gd"><thead><tr><th>Nhà cung cấp</th><th>Liên quan</th><th>Hạn trả</th><th class="n">Còn phải trả</th></tr></thead><tbody>${w.rows.map(r=>`<tr><td class="gdd" title="${esc(r.sup)}">${esc(r.sup)}</td><td>${r.no?tcnDon(r.no):"—"}</td><td>${r.due?esc(mhDM(r.due)):"—"}</td><td class="n"><b>${nf(r.left)}</b></td></tr>`).join("")}</tbody></table>`:""}</div>`;
   m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Tiền đang có",have?nf(Math.round(tot)):"—",have?"cập nhật "+kDd(lastD)+(stale>7?" · đã "+stale+" ngày chưa cập nhật":""):"chưa nhập số dư")}${kpi("Đủ dùng khoảng",days!=null?days+" ngày":"—",avg>0?"chi bình quân "+nf(Math.round(avg))+" đ/ngày":"chưa có số chi tháng trước")}${kpi("Phải trả nhà cung cấp 4 tuần tới",nf(Math.round(sum4)),(S4.late.sum?"trong đó quá hạn "+nf(Math.round(S4.late.sum)):"không có khoản quá hạn")+(S4.unk.sum?" · chưa rõ ngày trả: "+nf(Math.round(S4.unk.sum)):""))}${kpi("Sau khi trả hết",have?nf(Math.round(tot-sum4)):"—","tiền có trừ khoản phải trả bên dưới")}</div>
   ${have&&tot>0||sum4>0?`<div class="qtwo"><section class="card pad"><b>Tiền đang có theo tài khoản</b>${qtBars(ac.filter(a=>L[a.k]).map(a=>({l:a.n.split(" · ").slice(0,2).join(" · "),v:+L[a.k].tien||0,c:"g"})))}</section><section class="card pad"><b>Phải trả nhà cung cấp theo tuần</b>${qtCols([...(S4.late.sum?[{l:"Quá hạn",v:S4.late.sum,c:"r"}]:[]),...S4.W.map((w,i)=>({l:wl[i],v:w.sum,c:i===0?"y":"b"})),...(S4.unk.sum?[{l:"Chưa rõ ngày",v:S4.unk.sum,c:"x"}]:[])])}</section></div>`:""}
   <div class="card pad"><div class="tlh"><b>Số dư tài khoản</b>${ed?`<button class="btn pri sm" id="tl-up">Cập nhật số dư</button>`:""}</div>
-  <table class="tbl"><thead><tr><th>Tài khoản</th><th class="n">Số dư</th><th>Cập nhật</th></tr></thead><tbody>${ac.map(a=>{const b=L[a.k];return `<tr><td>${esc(a.n)}</td><td class="n">${b?nf(b.tien):"—"}</td><td>${b?esc(kDd(b.ngay))+(b.by?` <small class="hint">· ${esc(b.by)}</small>`:""):"chưa nhập"}</td></tr>`}).join("")}</tbody></table>
+  <table class="tbl gd"><thead><tr><th>Tài khoản</th><th class="n">Số dư</th><th>Cập nhật</th></tr></thead><tbody>${ac.map(a=>{const b=L[a.k];return `<tr><td>${esc(a.n)}</td><td class="n">${b?nf(b.tien):"—"}</td><td>${b?esc(kDd(b.ngay))+(b.by?` <small class="hint">· ${esc(b.by)}</small>`:""):"chưa nhập"}</td></tr>`}).join("")}</tbody></table>
   <p class="hint">Nên cập nhật mỗi sáng thứ Hai. Mỗi lần cập nhật được lưu lại, số mới nhất của từng tài khoản được dùng để tính.</p></div>
   <div class="card pad"><div class="tlh"><b>Lịch trả nhà cung cấp 4 tuần tới</b></div>
   ${S4.late.rows.length?sec("Quá hạn",S4.late,"trả ngay"):""}${S4.W.map((w,i)=>sec(wl[i],w,ds(i))).join("")}${S4.unk.rows.length?sec("Chưa rõ ngày trả",S4.unk,"chưa có hạn công nợ hoặc ngày hẹn giao"):""}
   <p class="hint">Chưa gồm lương, thuê mặt bằng, quảng cáo. Những khoản đó có trong Sổ chi phí sau khi ghi.</p></div>`;
-  const up=m.querySelector("#tl-up");if(up)up.onclick=()=>tlForm(ac,L)}
+  const up=m.querySelector("#tl-up");if(up)up.onclick=()=>tlForm(ac,L);
+  if(typeof gdBind==="function")gdBind(m)}
 function tlForm(ac,L){
   openDrawerHTML(`<h2>Cập nhật số dư</h2><p class="hint">Nhập số tiền đang có ở từng tài khoản. Để trống tài khoản nào thì giữ số cũ.</p><form class="frm" id="tlf"><label class="field">Số dư tính tới ngày<input id="tlf-d" type="date" value="${mhToday()}" required></label>
    ${ac.map(a=>`<label class="field">${esc(a.n)}<input type="number" min="0" step="1" data-tla="${esc(a.k)}" placeholder="${L[a.k]?nf(L[a.k].tien):"chưa có"}"></label>`).join("")}
