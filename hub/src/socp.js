@@ -20,7 +20,7 @@ function spRows(){
   (d.costs||[]).forEach(c=>{const ngay=c.ngay||"",ok=ngay?spInP(ngay):spMonthIn(c.thang);if(!ok)return;
     R.push({id:c.id,catk:c.cat,ngay:ngay||c.thang+"-01",thangOnly:!ngay,txt:cat(c.cat).n,sub:c.note||"",nhom:cat(c.cat).nhom,src:"tay",loai:(typeof cpLoai==="function"?cpLoai(c.cat,c.kenh):"C"),tien:+c.tien||0,pb:(d.departments.find(p=>p.k===c.pb)||{}).n||"",kenh:c.kenh||"",ht:spHT(c),acc:c.method==="CHUYEN_KHOAN"?"từ "+(c.from_account||"?"):c.method==="TIEN_MAT"&&c.receiver?"nhận: "+c.receiver:"",files:(SOCP.files||{})[c.id]||0,del:true})});
   (MH.pay||[]).filter(x=>x.status==="OK"&&spInP(x.pay_date)).forEach(x=>R.push({id:x.id,ngay:x.pay_date,txt:(x.kind==="COC"?"Cọc nhà cung cấp · ":"Trả nhà cung cấp · ")+x.supplier_name,sub:x.invoice_no?"chứng từ "+x.invoice_no:x.po_no?"phiếu mua "+x.po_no:"",nhom:"Mua hàng",src:"ncc",loai:"H",tien:+x.amount||0,pb:"Mua hàng",kenh:"",ht:spHT(x),acc:x.account||"",files:x.file_count||0,open:()=>mhPayDetail(x.id)}));
-  (SOCP.ship||[]).filter(v=>v.status==="OK").forEach(v=>R.push({id:v.id,ngay:v.voucher_date,txt:"Cước vận chuyển · "+v.carrier,sub:[v.destination,v.voucher_no].filter(Boolean).join(" · "),nhom:"Logistics",src:"vc",or:v.order_refs||"",loai:"V",tien:+v.amount||0,pb:"Kho vận",kenh:"",ht:spHT({method:v.method==="CHUYEN_KHOAN"?"CHUYEN_KHOAN":v.method}),acc:v.from_account?"từ "+v.from_account:"",files:v.file_count||0,open:()=>{PAGE="cr_vc";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}}));
+  (SOCP.ship||[]).filter(v=>v.status==="OK").forEach(v=>R.push({id:v.id,ngay:v.voucher_date,txt:"Cước vận chuyển · "+v.carrier,sub:[v.destination,v.voucher_no].filter(Boolean).join(" · "),nhom:"Logistics",src:"vc",or:v.order_refs||"",loai:"V",tien:+v.amount||0,pb:"Kho vận",kenh:"",ht:spHT({method:v.method==="CHUYEN_KHOAN"?"CHUYEN_KHOAN":v.method}),acc:v.from_account?"từ "+v.from_account:"",files:v.file_count||0,open:()=>spVcXem(v)}));
   try{const N=execNums(PERIOD.from,PERIOD.to),C=N.C||{};
     if(C.adsFB>0)R.push({id:"ads-fb",ngay:PERIOD.to,txt:"Quảng cáo Facebook",sub:"tự cộng từ báo cáo Ads, đã gồm VAT",nhom:"Marketing",src:"ads",loai:"Q",kyOnly:true,tien:C.adsFB,pb:"Ads / Digital",kenh:"Facebook",ht:"",acc:"",files:0});
     const tt=typeof scTTAds==="function"?scTTAds().v:0;if(tt>0)R.push({id:"ads-tt",ngay:PERIOD.to,txt:"Quảng cáo TikTok GMV Max",sub:"từ báo cáo TikTok đã tải, đã gồm VAT",nhom:"Marketing",src:"ads",loai:"Q",kyOnly:true,tien:tt,pb:"Ads / Digital",kenh:"TikTok",ht:"",acc:"",files:0})}catch(e){}
@@ -65,7 +65,7 @@ function pSoCP(m){
   $("#sp-q").onchange=e=>{SOCP.q=e.target.value;renderMain()};
   if($("#sp-new"))$("#sp-new").onclick=()=>spForm();
   if($("#sp-ncc"))$("#sp-ncc").onclick=async()=>{await mhLoad();mhLoadInv();mhPayForm()};
-  if($("#sp-vc"))$("#sp-vc").onclick=()=>{PAGE="cr_vc";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
+  if($("#sp-vc"))$("#sp-vc").onclick=()=>{SC.tab="nk";SC.ng="Phiếu chi vận chuyển";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
   m.querySelectorAll("tr[data-ri]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("button"))return;const x=R[+tr.dataset.ri];if(x&&x.open)x.open();else if(x&&x.src==="tay")spFiles(x.id,x.txt)});
   m.querySelectorAll("[data-sf]").forEach(b=>b.onclick=e=>{e.stopPropagation();const x=R[+b.dataset.sf];spFiles(x.id,x.txt)});
   m.querySelectorAll("[data-sx]").forEach(b=>b.onclick=e=>{e.stopPropagation();const x=R[+b.dataset.sx];if(!confirm("Xóa khoản chi \""+x.txt+"\" ("+nf(Math.round(x.tien))+" đ)?"))return;DB.mutate(ME.name,"xóa khoản chi",dt=>{dt.costs=dt.costs.filter(c=>c.id!==x.id)});toast("Đã xóa khoản chi");renderMain()});
@@ -98,3 +98,15 @@ function spForm(){
     DB.mutate(ME.name,"nhập chi phí",dt=>dt.costs.push({id,thang,ngay,cat:$("#spf-c").value,tien,pb:$("#spf-p").value,kenh:$("#spf-k").value,sku:"",note:$("#spf-n").value,by:ME.name,...pm}));
     let up=0;for(const f of [...$("#spf-f").files]){try{const x=await mhPrepFile(f);await kApi("/mh/costs/"+id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
     closeDrawer();toast("Đã ghi chi phí"+(up?", đính kèm "+up+" ảnh":""));SOCP.files=null;if(PAGE==="so_cp")renderMain()}}
+
+/* Bấm một phiếu chi vận chuyển ở Nhật ký chi: hiện chi tiết ngay (trang Phiếu chi vận chuyển đã bỏ khỏi menu quản trị 28/10,
+   nếu chuyển trang thì web rơi về trang đầu là P&L). Đơn được chở bấm mở được qua gdDonLinks. */
+function spVcXem(v){
+  const nf0=n=>Math.round(+n||0).toLocaleString("vi-VN"),dd=x=>{const s=String(x||"").slice(0,10);return s?s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4):""};
+  const ht={TIEN_MAT:"Tiền mặt",CHUYEN_KHOAN:"Chuyển khoản",KHAC:"Khác"}[v.method]||v.method||"";
+  const don=v.order_refs?(typeof gdDonLinks==="function"?gdDonLinks(v.order_refs):esc(v.order_refs)):"—";
+  const R=[["Số phiếu",esc(v.voucher_no||"")],["Ngày chi",dd(v.voucher_date)],["Số tiền",`<b>${nf0(v.amount)} đ</b>`],["Đơn vị vận chuyển / xe",esc(v.carrier||"")],["Chở đi",esc(v.destination||"")],["Chở cho đơn",don],
+    ["Hình thức",esc(ht)+(v.from_account?" · từ "+esc(v.from_account):"")],["Người nhận",esc(v.receiver_name||v.receiver||"")],["Ghi chú",esc(v.note||"")],["Ảnh / chứng từ",v.file_count?v.file_count+" file":"chưa có"]].filter(x=>x[1]);
+  openDrawerHTML(`<h2>Phiếu chi vận chuyển ${esc(v.voucher_no||"")}</h2><div class="tbl"><table class="gd"><tbody>${R.map(([a,b])=>`<tr><td class="hint" style="width:170px">${a}</td><td>${b}</td></tr>`).join("")}</tbody></table></div>`);
+  try{if(typeof gdBind==="function")gdBind(document.getElementById("drawerIn"))}catch(e){}
+}
