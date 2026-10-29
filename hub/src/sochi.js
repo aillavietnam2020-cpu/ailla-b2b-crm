@@ -38,6 +38,16 @@ const scLaKhauHaoMisa=x=>x.src!=="phieu"&&(/^(PBCC|KHTS|KHCC|PBTT)/i.test(String
 const scChiDoiChieu=x=>{if(!scLaKhauHaoMisa(x))return false;const r=scTsThang(String(x.d||"").slice(0,7));return !!(r&&r.chay)};
 const scRows=()=>((scFin().nkc)||[]).filter(scInP).filter(x=>!scChiDoiChieu(x));
 const scCho=()=>(D().pcCho||[]);
+/* Phiếu chi vận chuyển tính vào đâu theo đơn được gắn (chị Hoa 29/10; chở gộp chỉ gộp đơn cùng kênh):
+   đơn mua (PM…) → cước mua hàng, vào giá thành (G17, không phải chi phí bán hàng); đơn bán của khách gia công → Kênh OEM;
+   đơn bán khác → Kênh phân phối (G09); chỉ ghi chữ / trống / có chữ tự do kèm mã / lẫn đơn mua với đơn bán → Chờ xác định để chị Huệ chọn hoặc tách. */
+function scVcKenh(e){const A=typeof gdMaDon==="function"?gdMaDon(e.or):[],T=A.filter(t=>typeof gdLaMa==="function"&&gdLaMa(t));
+  /* có cả mã đơn lẫn chữ tự do (chở thêm hàng khác) thì chưa chắc của ai: để chị Huệ bổ hoặc tách */
+  if(!T.length||T.length<A.length)return {g:"G09",k:"Chờ xác định"};
+  const P=(typeof MH!=="undefined"&&MH.orders)||[],mua=T.filter(t=>P.some(o=>o.no===t)||/^PM\d/i.test(t)),ban=T.filter(t=>!mua.includes(t));
+  if(mua.length&&ban.length)return {g:"G09",k:"Chờ xác định"};
+  if(mua.length)return {g:"G17",k:"Sản xuất"};
+  const O=(typeof GC!=="undefined"&&GC.orders)||[];return ban.some(t=>O.some(o=>o.order_no===t))?{g:"G09",k:"Gia công"}:{g:"G09",k:"NPP"}}
 /* Liên kết của một khoản chi (chị Hoa 29/10, kiểu Poscake): chi vận chuyển → các đơn được chở; trả nhà cung cấp, phiếu gắn đơn mua → mã đơn mua;
    dòng tách → chứng từ gốc. Bấm để mở. */
 function scLienQuan(x){const e=x.ext||{},L=[];
@@ -256,7 +266,7 @@ function scAuto(){
   scExt().forEach(x=>{const s=x.ext.src;let g="",k=x.k;
     if(s==="ads"){g={"ads-fb":"G01","ads-tt":"G02","ads-spe":"G03"}[x.ext.id];if(has(g))return}
     else if(s==="luong"){g="G07";if(has(g))return;k=scKenhChuan(k)||"Chung"}
-    else if(s==="vc"){g="G09";k="NPP";if(nk.some(y=>y.g===g&&y.src!=="phieu"))return}
+    else if(s==="vc"){if(nk.some(y=>y.g==="G09"&&y.src!=="phieu"))return;const r=scVcKenh(x.ext);g=r.g;k=r.k}
     else if(s==="san"){g="G04";if(has(g))return}
     else if(s==="ts"){g=x.ext.g;k=SC_COLS.includes(x.ext.k)?x.ext.k:"Chung"}
     if(!g)return;R.push({...x,g,k,tk:scG(g).tk,nhom:scG(g).n,auto:1})});
@@ -281,7 +291,7 @@ function scExtOpen(r){const x=r.ext||{};
   if(typeof x.open==="function")return x.open();
   openDrawerHTML(`<h2>${esc(r.dg)}</h2><div class="tbl"><table><tbody>${[["Ngày",r.ky?"cả kỳ":scDd(r.d)],["Số tiền",scNf(r.t)+" đ"],["Nhóm",r.nhom],["Kênh / nơi chịu",r.k],["Ghi chú",r.sub],["Nguồn",r.nguon+(x.ht?" · "+x.ht:"")+(x.acc?" · "+x.acc:"")]].filter(z=>z[1]).map(([a,b])=>`<tr><td class="hint">${a}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></div>`)}
 function scNK(){
-  try{mhLoad();mhLoadPay();spLoadShip();if(typeof mhLoadInv==="function")mhLoadInv()}catch(e){}
+  try{mhLoad();mhLoadPay();spLoadShip();if(typeof mhLoadInv==="function")mhLoadInv();if(typeof gcLoad==="function"&&!GC.orders&&!GC.busy)gcLoad().then(()=>{if(PAGE==="so_cp")renderMain()})}catch(e){}
   try{if(typeof adfLoad==="function"&&!ADF.raw&&!SC.adf){SC.adf=1;adfLoad().then(()=>{try{adfMergeDays()}catch(e){}if(PAGE==="so_cp")renderMain()})}}catch(e){}
   const q=kfold(SC.q||""),QT=scQT(PERIOD.from.slice(0,7)).qt,cho=scCho().filter(scInP),AU=new Map(scAuto().map(x=>[x.id,x])),ext=scExt().map(x=>AU.get(x.id)||(["ads","vc","san","luong"].includes(x.ext.src)?{...x,trung:1}:x)),all=scRows().concat(cho,ext),R=all.filter(x=>(!SC.ng||(SC.ng==="Phiếu chi"?!x.ext:!!x.ext&&x.nguon===SC.ng))&&(!SC.g||x.g===SC.g)&&(!SC.k||x.k===SC.k)&&(!SC.st||x.st===SC.st)&&(!SC.fn||scFnRow(x)===SC.fn)&&(!SC.xl||scXL(x,QT)===SC.xl)&&(!q||kfold(x.dg+" "+x.ct+" "+(x.sub||"")+" "+(x.nhom||"")+" "+(x.po||"")).includes(q))).sort((a,b)=>String(a.d).localeCompare(String(b.d))||((a.ky?1:0)-(b.ky?1:0))||String(a.ct).localeCompare(String(b.ct)));
   const ed=scCanDuyet(),gs=scDM().map(x=>x.g),sE=scS(R.filter(x=>x.ext&&x.ext.src==="ncc"&&x.g!=="G28")),sT=scS(R.filter(x=>x.g==="G28")),ngs=["Phiếu chi",...new Set(ext.map(x=>x.nguon))];
@@ -339,7 +349,7 @@ function scDtThang(){const ym=PERIOD.from.slice(0,7),auto=scAutoDT(ym),saved=((s
   SC_KENH.forEach(k=>{if(saved[k]!=null&&saved[k]!=="")DT[k]=+saved[k];else if(auto[k])DT[k]=auto[k];else{DT[k]=null;thieu.push(k)}});return {DT,thieu,auto,saved}}
 const SC_TEN=k=>k==="Chung"?"Chi chung công ty":k==="Sản xuất"?"Sản xuất":k==="NPP"?"Kênh phân phối":k==="Gia công"?"Kênh OEM":k==="Shopee Mall"?"Shopee Aillavn":k==="Shopee thường"?"Shopee Aillavn1":k;
 /* Mở thẳng tab Tổng quan / Phân bổ: tự tải mua hàng, vận chuyển, doanh thu thực (dtEnsure của trang Doanh thu) rồi vẽ lại khi có số. */
-function scNap(){try{mhLoad();mhLoadPay();spLoadShip()}catch(e){}
+function scNap(){try{mhLoad();mhLoadPay();spLoadShip();if(typeof gcLoad==="function"&&!GC.orders&&!GC.busy)gcLoad().then(()=>{if(PAGE==="so_cp")renderMain()})}catch(e){}
   try{if(typeof dtEnsure==="function"){dtEnsure();if(typeof DTS!=="undefined"&&!DTS.rowsAt&&!SC.dtw){SC.dtw=1;let n=0;const w=()=>{if(DTS.rowsAt||++n>25){SC.dtw=0;if(PAGE==="so_cp")renderMain()}else setTimeout(w,800)};setTimeout(w,800)}}}catch(e){}
   /* doanh thu Kênh phân phối / OEM lấy từ CRM tải chậm hơn: vẽ lại thêm hai lần ở lần mở đầu */
   if(!SC.rr){SC.rr=1;[2500,7000].forEach(t=>setTimeout(()=>{if(PAGE==="so_cp"&&["tq","cn","kenh","pb"].includes(SC.tab)&&!(typeof svTyping==="function"&&svTyping()))renderMain()},t))}}
