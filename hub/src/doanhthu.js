@@ -80,9 +80,11 @@ function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.n
 /* Phiếu chi vận chuyển (SOCP.ship) cộng vào kênh như Sổ chi phí (scAuto, chat Sổ chi phí 29/10): kênh theo đơn được chở (scVcKenh) —
    r.skip ("ts" cước đơn tài sản vào nguyên giá, "trung" đã có trong chứng từ đơn mua) thì không tính; đơn mua → Sản xuất, đơn khách OEM → Kênh OEM, đơn bán khác → Kênh phân phối, còn lại "Chờ xác định" (không trừ kênh nào).
    Sổ đã có dòng G09 nạp từ MISA trong kỳ thì bỏ (tránh trừ hai lần), giống scAuto. Chưa tải phiếu thì gọi tải rồi vẽ lại. */
+/* Mỗi kỳ chỉ thử tải phiếu vận chuyển / đơn OEM một lần: tải lỗi hay trả rỗng thì không gọi lại (tránh vẽ lại liên tục, chat P&L 29/10). */
+const DT_VCT={ship:"",gc:0};
 function dtVcRows(nkc,from,to){if(typeof SOCP==="undefined"||typeof scVcKenh!=="function")return [];
-  if(typeof spLoadShip==="function"&&PERIOD.from<=from&&PERIOD.to>=to){const k=PERIOD.from+"|"+PERIOD.to;if(SOCP.shipKey!==k&&!SOCP.busy)spLoadShip().then(()=>{DT_PBC_CLR();dtRe()})}
-  if(typeof gcLoad==="function"&&typeof GC!=="undefined"&&!GC.orders&&!GC.busy)gcLoad().then(()=>{DT_PBC_CLR();dtRe()});
+  if(typeof spLoadShip==="function"&&PERIOD.from<=from&&PERIOD.to>=to){const k=PERIOD.from+"|"+PERIOD.to;if(SOCP.shipKey!==k&&!SOCP.busy&&DT_VCT.ship!==k){DT_VCT.ship=k;spLoadShip().then(()=>{DT_PBC_CLR();dtRe()})}}
+  if(typeof gcLoad==="function"&&typeof GC!=="undefined"&&!GC.orders&&!GC.busy&&!DT_VCT.gc){DT_VCT.gc=1;gcLoad().then(()=>{DT_PBC_CLR();dtRe()})}
   if(!SOCP.ship||(nkc||[]).some(y=>y.g==="G09"&&y.src!=="phieu"&&String(y.d||"").slice(0,10)>=from&&String(y.d||"").slice(0,10)<=to))return [];
   const R=[];SOCP.ship.forEach(v=>{if(v.status!=="OK")return;const d=String(v.voucher_date||"").slice(0,10);if(d<from||d>to)return;
     let r;try{r=scVcKenh({or:v.order_refs||""})}catch(e){return}if(!r||r.skip)return;R.push({d,g:r.g,k:r.k,t:+v.amount||0,src:"vc"})});

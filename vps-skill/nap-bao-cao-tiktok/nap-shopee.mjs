@@ -122,7 +122,7 @@ async function costOfFor(ky) {
     const it = items.get(String(code).toLowerCase());
     return !!it && /đóng gói|hộp|thùng|bao bì/i.test((it.grp || '') + ' ' + (it.name || '')) && it.cls === 'NVL';
   };
-  const web = T.ttMakeCostOf({ ky, mapRows: I.map, skus: I.skus || [], khoCost: I.kho || {}, isPack });
+  const web = T.ttMakeCostOf({ ky, mapRows: I.map, skus: I.skus || [], khoCost: I.kho || {}, isPack, alias: I.alias || [] });
   return (s) => {
     const tries = [() => (s.ps ? web(s.ps.sku, null, s.ps.vr) : null), () => (s.sv ? web(s.sv, s.sp, s.vr) : null), () => (s.sp ? web(s.sp, null, s.vr) : null), () => web(s.pn, null, s.vr)];
     let best = null;
