@@ -1096,3 +1096,9 @@ td.bvstc .bvwl{max-width:172px}
 
 /* Ô số Tổng quan: chữ phụ dài không được tràn sang ô bên cạnh (chị Hoa 29/10) */
 .xk{min-width:0;overflow:hidden}.xk .xkm{display:block;max-width:100%}
+/* Bảng kênh Tổng quan gọn, có icon (chị Hoa 29/10) */
+.xch td,.xch th{padding-top:6px!important;padding-bottom:6px!important}
+.xch td small{display:none}
+.xch td:first-child{white-space:nowrap}
+.xchi{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;color:#fff;font-size:12.5px;font-weight:800;margin-right:8px;vertical-align:middle;line-height:1}
+.xchi .ic{width:13px;height:13px;stroke:#fff}

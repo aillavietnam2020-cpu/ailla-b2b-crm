@@ -79,7 +79,7 @@ function pExec(m){
   m.innerHTML=`<div class="xhead"><div class="xht"><h1>Tổng quan công ty</h1><span>${esc(pLabel())}</span><span class="sep" aria-hidden="true"></span><span>so với ${vnd(pr.from)} – ${vnd(pr.to)}</span><span class="xinfo" tabindex="0" title="Số liệu quản trị nội bộ để điều hành (ước tính, phân bổ, so mục tiêu), không phải báo cáo tài chính. Sổ sách chính thức do Kế toán quản lý trên MISA." aria-label="Số liệu quản trị nội bộ, sổ sách chính thức trên MISA">ⓘ</span></div><div class="xupd">${ico("clock")} Cập nhật <span class="numeric">${updS}</span></div></div>
   <section class="xkstrip" aria-label="Tóm tắt điều hành">${K.map(kcell).join("")}</section>
   <div class="xrow2">
-   <section class="card flush"><div class="card-h pad"><h2>Hiệu quả kinh doanh theo kênh</h2><span class="hint">lãi đóng góp chưa trừ lương, kho, chi phí chung · <button class="lnk" id="tg-ed">Sửa mục tiêu</button></span></div>
+   <section class="card flush xch"><div class="card-h pad"><h2>Hiệu quả kinh doanh theo kênh</h2><span class="hint">lãi đóng góp chưa trừ lương, kho, chi phí chung · <button class="lnk" id="tg-ed">Sửa mục tiêu</button></span></div>
     <div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Doanh thu</th><th class="n">Đơn</th><th class="n">Chi phí</th><th class="n">Lãi</th><th class="n">% MT</th><th class="n">Kỳ trước</th><th>Xu hướng</th></tr></thead><tbody>${CH.map(chRow).join("")}${b2bRow}
     <tr class="tot"><td>Tổng Kênh bán lẻ</td><td class="n">${tr(N.tong)}</td><td class="n">${oTot?nf(oTot):"—"}</td><td class="n">${tr(cTot)}</td><td class="n">${lr.length?tr(lTot):"—"}</td><td class="n">${tg?Math.round(N.tong/tg*100)+"%":"—"}</td><td class="n">${ok?xChg(N.tong,P.tong):"—"}</td><td></td></tr></tbody></table></div></section>
    <section class="card flush xatt"><div class="card-h pad"><h2>${execFull()?"Việc cần chị xử lý":"Việc của tôi cần xử lý"} <span class="hint">${AT.length}</span></h2><button class="lnk" data-go="cv_nv">Tất cả việc →</button></div>
@@ -88,6 +88,7 @@ function pExec(m){
   <div class="xrow3">${blocks.join("")}</div>
   <section class="card flush" id="xal"><div class="card-h pad"><h2>Hoạt động mới nhất</h2><span class="hint">${AL.length?`${AL.length} cảnh báo vận hành ở danh sách bên trên`:""}</span></div>
    <div class="tbl"><table><thead><tr><th>Thời gian</th><th>Nội dung thay đổi</th><th>Người thực hiện</th><th>Bộ phận</th><th>Trạng thái</th></tr></thead><tbody>${act.map(a=>{const s=actSt(a.msg);return `<tr><td class="numeric">${esc(a.t||"")} ${esc(String(a.d||"").replace(/\/\d{4}$/,""))}</td><td>${esc(a.msg)}</td><td>${esc(a.who)}</td><td>${esc(depOfName(a.who)||"—")}</td><td>${pill(s[0],s[1])}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">Chưa có hoạt động.</td></tr>`}</tbody></table></div></section>`;
+  xchIcons(m);
   m.querySelectorAll("[data-href]").forEach(b=>b.onclick=()=>{location.href=b.dataset.href});
   m.querySelectorAll("[data-xai]").forEach(b=>b.onclick=()=>{const a=AT[+b.dataset.xai];if(a.href){location.href=a.href;return}if(a.open){if(a.open.src==="card")openCard(a.open.id);else if(a.open.src==="order"){PAGE="order";MOD="";render()}else openTask(a.open.id);return}if(a.go){PAGE=a.go;MOD="";render();scrollTo(0,0)}});
   m.querySelectorAll("[data-anc]").forEach(b=>b.onclick=()=>{const t=document.querySelector(".xatt");if(t)t.scrollIntoView({behavior:"smooth",block:"center"})});
@@ -125,3 +126,12 @@ function pCvTong(m){
   m.querySelectorAll("[data-cvq]").forEach(b=>b.onclick=()=>{CVQ.f=b.dataset.cvq;renderMain()});
 }
 PAGES.cv_tq=pCvTong;
+
+/* Bảng Hiệu quả kinh doanh theo kênh: icon màu đầu mỗi kênh (chị Hoa 29/10). Hàng Kênh phân phối / OEM do b2bpl.js chèn sau
+   nên theo dõi bảng và gắn icon cho hàng mới. */
+const XCH_IC={"Facebook":["#1877f2","f"],"TikTok":["#111827","♪"],"Shopee":["#ee4d2d","S"],"Kênh phân phối":["#0e9384","","users"],"Kênh OEM":["#7a5af8","","fac"]};
+function xchIcons(m){const tb=m.querySelector(".xch tbody");if(!tb)return;
+  const dec=()=>tb.querySelectorAll("tr:not(.tot)").forEach(r=>{const td=r.cells[0];if(!td||td.querySelector(".xchi"))return;const name=(td.textContent||"").trim();
+    const k=Object.keys(XCH_IC).find(x=>name.startsWith(x));if(!k)return;const [c,t,ic]=XCH_IC[k];
+    td.insertAdjacentHTML("afterbegin",`<span class="xchi" style="background:${c}">${t?t:(typeof ico==="function"?ico(ic):"")}</span>`)});
+  dec();new MutationObserver(dec).observe(tb,{childList:true})}
