@@ -41,7 +41,7 @@ const scCho=()=>(D().pcCho||[]);
 /* Liên kết của một khoản chi (chị Hoa 29/10, kiểu Poscake): chi vận chuyển → các đơn được chở; trả nhà cung cấp, phiếu gắn đơn mua → mã đơn mua;
    dòng tách → chứng từ gốc. Bấm để mở. */
 function scLienQuan(x){const e=x.ext||{},L=[];
-  if(e.src==="vc"){const r=String(e.or||"").trim();L.push(`<a class="sclk" data-lkx="${esc(x.id)}" title="${esc(r?"Chở cho đơn: "+r:"Mở phiếu chi vận chuyển")}">${esc(r?"Đơn "+r:"Phiếu VC")}</a>`)}
+  if(e.src==="vc"){const r=String(e.or||"").trim();L.push(r?gdDonLinks(r):`<a class="sclk" data-lkx="${esc(x.id)}" title="Mở phiếu chi vận chuyển">Phiếu VC</a>`)}
   const pos=e.src==="ncc"&&typeof scDonCuaPay==="function"?scDonCuaPay(e):x.po?((typeof MH!=="undefined"&&MH.orders)||[]).filter(o=>o.id===x.po):[];
   pos.forEach(p=>L.push(`<a class="sclk" data-lkpo="${esc(p.id)}" title="Mở đơn mua ${esc(p.no)} · ${esc(p.supplier_name||"")}">${esc(p.no)}</a>`));
   if(x.tach)L.push(`<span class="hint" title="Tách từ chứng từ ${esc(x.ct||"")}">tách từ ${esc(x.ct||"")}</span>`);
@@ -300,7 +300,7 @@ function scNK(){
 </span></div>
   ${!MH.pay||!SOCP.ship?`<p class="hint pad">Đang tải các khoản chi ở Mua hàng và Vận chuyển…</p>`:""}
   ${scThieuHtml()}
-  ${R.length?`<div class="tbl"><table class="scnk"><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>Liên quan</th><th>Nguồn</th><th>Kênh / nơi chịu</th><th>Chức năng</th><th>Cách xử lý</th><th>Tình trạng</th></tr></thead><tbody>
+  ${R.length?`<div class="tbl"><table class="scnk gd"><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>Liên quan</th><th>Nguồn</th><th>Kênh / nơi chịu</th><th>Chức năng</th><th>Cách xử lý</th><th>Tình trạng</th></tr></thead><tbody>
   ${R.map(row).join("")}
   <tr class="tot"><td colspan="3">Cộng ${R.length} khoản${R.length<all.length?" (đang lọc)":""}</td><td class="n">${scNf(scS(R))}</td><td colspan="7"></td></tr>
   ${sE?`<tr><td colspan="3" class="hint">trong đó trả nhà cung cấp hàng, nguyên vật liệu (vào giá thành theo định mức, không phân bổ)</td><td class="n">${scNf(sE)}</td><td colspan="7"></td></tr>`:""}${sT?`<tr><td colspan="3" class="hint">trong đó mua tài sản / công cụ (không tính chi phí tháng, khấu hao / phân bổ dần)</td><td class="n">${scNf(sT)}</td><td colspan="7"></td></tr>`:""}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
@@ -399,6 +399,7 @@ const SC_CSS=`.sochi .schead{display:flex;align-items:center;gap:8px 16px;flex-w
 .sochi select.scbv{padding:4px 8px;font-size:12.5px;min-width:130px}.sochi select.scbv.doi{border-color:#a95a10;background:#fff1e3}.sochi .mono{font-family:Consolas,monospace;font-size:12px;color:#667085}
 @media(max-width:900px){.sochi .sck3,.sochi .sck5,.sochi .sctwo,.sochi .sccc{grid-template-columns:1fr}.sochi .scrs{grid-template-columns:1fr}.sochi .scrs .m{text-align:left}.sochi .scbar{grid-template-columns:1fr;gap:3px}.sochi .scbar .t{text-align:left}}`;
 function pSoChi(m){
+  gdCss();
   if(!document.getElementById("sc-css")){const s=document.createElement("style");s.id="sc-css";s.textContent=SC_CSS;document.head.appendChild(s)}
   const sec=scSecret(),ghi=scCanGhi(),duyet=scCanDuyet(),choN=scCho().length;
   /* Chị Hoa 28/10: Nhật ký chi đứng đầu; Phân bổ, Quy tắc phân bổ, Danh mục chi phí gộp một tab "Phân bổ", bấm từng phần bên trong. */
@@ -421,7 +422,7 @@ function pSoChi(m){
   m.querySelectorAll("select[data-bv]").forEach(s=>s.onchange=()=>{const id=s.dataset.bv,v=s.value;DB.mutate(ME.name,"đổi nơi chịu khoản chi",dt=>{const r=((dt.fin||{}).nkc||[]).find(y=>y.id===id);if(!r)return;if(r.k0==null)r.k0=r.k;r.k=v;if(v!=="Chờ xác định"&&r.st==="Cần rà"&&!r.gc)r.st="Ổn";(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(r.dg)]={g:r.g,k:v,st:r.st}});renderMain()});
   m.querySelectorAll("[data-dm]").forEach(el=>el.onchange=()=>{const i=+el.dataset.dm,f=el.dataset.f,v=f==="cd"?+el.value:el.value;DB.mutate(ME.name,"sửa danh mục chi phí",dt=>{dt.fin=dt.fin||{};if(!dt.fin.cpdm||!dt.fin.cpdm.length||!dt.fin.cpdm[i])dt.fin.cpdm=JSON.parse(JSON.stringify(scDM()));dt.fin.cpdm[i][f]=v});toast("Đã lưu danh mục");renderMain()});
   m.querySelectorAll("[data-go-st],[data-go-k],[data-go-g]").forEach(b=>b.onclick=()=>{Object.assign(SC,{tab:"nk",st:b.dataset.goSt||"",k:b.dataset.goK||"",g:b.dataset.goG||"",q:"",fn:"",xl:""});if(b.dataset.goG)SC.st="Cần rà";renderMain()});
-  scQTbind(m);scBCbind(m);scPLbind(m);
+  scQTbind(m);scBCbind(m);scPLbind(m);gdBind(m);
   on("scdt-ed2",()=>{const b=document.getElementById("scdt-ed");if(b)b.click()});
   m.querySelectorAll("[data-pbk]").forEach(el=>el.onclick=()=>{const go=!el.closest(".scpills");SC.pbk=el.dataset.pbk;renderMain();if(go){const c=document.getElementById("scpk");if(c)c.scrollIntoView({behavior:"smooth",block:"start"})}});
   on("scdt-ed",()=>{const ym=PERIOD.from.slice(0,7),sv=((scFin().cpDT||{})[ym])||{},auto=scAutoDT(ym);
