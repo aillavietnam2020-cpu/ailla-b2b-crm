@@ -119,5 +119,10 @@ describe('Tiền & công nợ: một chỗ tính', () => {
     expect(k.filter((x: { tinh: boolean }) => !x.tinh).length).toBe(2); // đơn chờ ghi nợ + tiền chờ xác nhận
     const n = (await ctx.request(`${API}/chung-tu?kind=ncc&id=s1`, { as: USERS.ceo })).body.data;
     expect(n.rows.find((x: { ref: string }) => x.ref === 'HD00').tinh).toBe(false);
+    // cột Liên quan: tiền khách trả trừ vào đơn nào, đơn mua của phiếu mua
+    await ctx.db.prepare("INSERT INTO payment_allocations (id, payment_id, order_id, amount, created_at) VALUES ('al1', 'p1', 'o2', 1500000, ?)").bind(NOW).run();
+    const k2 = (await ctx.request(`${API}/chung-tu?kind=kh&id=cus-thao-1`, { as: USERS.ceo })).body.data.rows;
+    expect(k2.find((x: { ref: string }) => x.ref === 'PT-p1').lq).toBe('DH-o2');
+    expect(n.rows.find((x: { ref: string }) => x.ref === 'PM2610-001').lq).toBe('PM2610-001');
   });
 });
