@@ -493,6 +493,14 @@ function mhStage(p,M){
 /* Khoảng thời gian lọc theo ngày đặt: [từ, đến (không gồm)] */
 function mhPeriod(){const t=mhToday(),y=+t.slice(0,4),mo=+t.slice(5,7),f=(Y,M)=>{while(M<1){M+=12;Y--}return Y+"-"+String(M).padStart(2,"0")+"-01"};
   return {m0:[f(y,mo),null],m1:[f(y,mo-1),f(y,mo)],m3:[f(y,mo-2),null],y:[y+"-01-01",null]}[MH.per]||[null,null]}
+/* Phiếu chi vận chuyển gắn đơn mua (mã PM… trong order_refs): cước chỉ tính MỘT nơi (đấu nối 29/10, docs/DAU-NOI-SO-CHI-TAI-SAN-KHO.md mục 10).
+   Trả null nếu không gắn đơn mua; "ts" = đơn toàn tài sản / công cụ: cộng vào nguyên giá (tsPhiDon), Sổ chi phí để G28 Không tính;
+   "trung" = chứng từ của đơn đã ghi ô Vận chuyển đúng bằng số này (±1%): đã vào giá nhập qua chứng từ, Sổ chi phí không tính;
+   "sx" = cước vật tư đầu vào, Sổ chi phí G17 Sản xuất. */
+function mhVcXuLy(ma,tien){const O=(typeof MH!=="undefined"&&MH.orders)||[],P=(typeof gdMaDon==="function"?gdMaDon(ma):[]).map(t=>O.find(o=>o.no===t)).filter(Boolean);if(!P.length)return null;
+  if(typeof tsDonTaiSan==="function"&&P.every(p=>tsDonTaiSan(p.id)))return "ts";
+  let fr=0;try{P.forEach(p=>mhPoMoney(p).inv.forEach(v=>{fr+=(+v.freight||0)*(v.share??1)}))}catch(e){}
+  return fr>0&&Math.abs(fr-(+tien||0))<=Math.max(1000,fr*0.01)?"trung":"sx"}
 /* ---------- Cột "Liên quan" (kiểu bảng giao dịch chung gdbang.js, chị Hoa 29/10): đơn mua ↔ chứng từ ↔ phiếu chi ↔ tài sản ghi tăng ---------- */
 const mhLqHv=v=>gdLink((v.doc_type==="HD"?"HĐ ":"CT ")+(v.invoice_no||mhDM(v.invoice_date)),`data-gdhv="${esc(v.id)}"`,"Chứng từ "+(v.invoice_no||"")+" · "+nf(v.total)+" đ");
 const mhLqPv=x=>gdLink("Chi "+nf(x.amount),`data-gdpv="${esc(x.id)}"`,"Phiếu chi ngày "+mhD(x.pay_date)+" · "+(x.account||""));
