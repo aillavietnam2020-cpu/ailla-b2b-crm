@@ -100,9 +100,22 @@ Cả tin không quá 5 dòng.
 - Web chỉ lấy đơn **tạo trong tháng** báo cáo (đơn tháng khác trong file tự bỏ), income phải bắt đầu từ ngày 01.
 - Mỗi lần chạy chỉ một phiên; đang chạy mà lịch khác tới thì bỏ lượt đó.
 
+## Đánh thức Chrome trước khi làm (bước 0 mỗi lượt)
+Máy chị bật lại thì tiện ích OpenClaw chỉ nối khi VPS hỏi Chrome lần đầu (biểu tượng con cua có dấu "!" đỏ tới lúc đó). Đầu lượt:
+1. `openclaw browser --browser-profile chrome status`, chờ 45 giây, rồi `openclaw browser --browser-profile chrome tabs`.
+2. Vẫn "No tabs" thì chờ thêm 60 giây, thử `tabs` lại 3 lần. Hết 3 lần mới coi là mất kết nối (mục Gặp trở ngại).
+
+## Khi Chrome rớt nối giữa chừng (đường nối tự nối lại trong 1–5 phút)
+Dấu hiệu: `tab not found` (id tab cũ như t4, t6 không còn), `Target page, context or browser has been closed`, `Execution context was destroyed`, `node invoke timed out`, `extension relay command timed out`, `connectOverCDP: Timeout`.
+1. **Không bỏ việc, không nhắn chị ngay.** Chờ 60 giây rồi gọi `openclaw browser --browser-profile chrome tabs`. Thử tối đa 5 lần (khoảng 10 phút).
+2. **Không dùng lại id tab cũ** sau khi rớt. Tìm lại tab theo đầu URL của bước đang làm (`seller-vn.tiktok.com/...`, `banhang.shopee.vn/...`) trong danh sách `tabs`; không còn thì `open` lại đúng URL của bước đó và đặt lại bộ lọc ngày. `cho-chi.sh` in `MAT_TAB` cũng xử lý y như vậy.
+3. **Làm tiếp từ bước dở:** file nào đã nằm trong `/root/bao-cao-san/<YYYY-MM>/` (hoặc `spe/`) thì không tải lại; chỉ tải file còn thiếu. Gài bẫy lại (`bat-tai.sh` / `bat-tai-blob.sh`) trên tab mới trước khi bấm tải.
+4. Mở lại trang Shopee mà gặp hộp mật khẩu / kéo hình / Điều khoản: làm theo đúng các mục Shopee ở trên (`nhan-chi.sh` + `cho-chi.sh`).
+5. Sau 5 lần vẫn rớt mới nhắn chị theo mẫu mất kết nối ở dưới.
+
 ## Gặp trở ngại
 - Bị đẩy về trang đăng nhập / đòi mã xác minh: **dừng, nhắn chị Hoa tự đăng nhập**. Không tự nhập mật khẩu.
-- Chrome máy chị tắt hoặc tiện ích OpenClaw mất kết nối (`tabs` báo "No tabs"): `bash nhan-chi.sh "Chị ơi, em đang <việc đang làm> thì mất kết nối tới Chrome máy chị. Lỗi này nằm ở đường nối, chị mở lại Shopee cũng không hết.
+- Chrome máy chị tắt hoặc tiện ích OpenClaw mất kết nối (đã làm bước đánh thức và 5 lần thử ở trên mà `tabs` vẫn báo "No tabs"): `bash nhan-chi.sh "Chị ơi, em đang <việc đang làm> thì mất kết nối tới Chrome máy chị. Lỗi này nằm ở đường nối, chị mở lại Shopee cũng không hết.
 Chị nhắn Claude trên máy: \"nối lại OpenClaw Chrome cho agent\".
 Nối xong em tự làm tiếp, em thử lại lúc <giờ:phút>."`, thử lại sau 30 phút, tối đa 3 lần.
 
