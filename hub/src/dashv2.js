@@ -131,7 +131,8 @@ PAGES.cv_tq=pCvTong;
    nên theo dõi bảng và gắn icon cho hàng mới. */
 const XCH_IC={"Facebook":["#1877f2","f"],"TikTok":["#111827","♪"],"Shopee":["#ee4d2d","S"],"Kênh phân phối":["#0e9384","","users"],"Kênh OEM":["#7a5af8","","fac"]};
 function xchIcons(m){const tb=m.querySelector(".xch tbody");if(!tb)return;
-  const dec=()=>tb.querySelectorAll("tr:not(.tot)").forEach(r=>{const td=r.cells[0];if(!td||td.querySelector(".xchi"))return;const name=(td.textContent||"").trim();
-    const k=Object.keys(XCH_IC).find(x=>name.startsWith(x));if(!k)return;const [c,t,ic]=XCH_IC[k];
-    td.insertAdjacentHTML("afterbegin",`<span class="xchi" style="background:${c}">${t?t:(typeof ico==="function"?ico(ic):"")}</span>`)});
+  /* Hàng Kênh OEM được b2bpl.js chép từ hàng Kênh phân phối (chép luôn icon), nên so tên kênh với icon đang có, sai thì thay. */
+  const dec=()=>tb.querySelectorAll("tr:not(.tot)").forEach(r=>{const td=r.cells[0];if(!td)return;const old=td.querySelector(".xchi"),name=(td.querySelector("b")||td).textContent.trim();
+    const k=Object.keys(XCH_IC).find(x=>name.startsWith(x));if(!k||(old&&old.dataset.k===k))return;if(old)old.remove();const [c,t,ic]=XCH_IC[k];
+    td.insertAdjacentHTML("afterbegin",`<span class="xchi" data-k="${k}" style="background:${c}">${t?t:(typeof ico==="function"?ico(ic):"")}</span>`)});
   dec();new MutationObserver(dec).observe(tb,{childList:true})}
