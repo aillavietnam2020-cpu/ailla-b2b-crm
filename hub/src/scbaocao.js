@@ -174,6 +174,8 @@ function scPBV(){
 /* Số việc ở tab Chờ xử lý. */
 const scChoN=()=>{try{const r=scPBRows();return r.filter(x=>scLoaiTQ(x)==="cho").length+scCho().filter(scInP).length}catch(e){return 0}};
 function scBCbind(m){
+  m.querySelectorAll("[data-lkpo]").forEach(el=>el.onclick=ev=>{ev.stopPropagation();const id=el.dataset.lkpo;Promise.resolve(typeof mhLoad==="function"?mhLoad():0).then(()=>mhDetail(id))});
+  m.querySelectorAll("[data-lkx]").forEach(el=>el.onclick=ev=>{ev.stopPropagation();const r=scExt().find(y=>y.id===el.dataset.lkx);if(r)scExtOpen(r)});
   m.querySelectorAll("[data-tach]").forEach(el=>el.onclick=()=>{const x=((scFin().nkc)||[]).find(y=>y.id===el.dataset.tach);if(x)scTach(x)});
   m.querySelectorAll("[data-pbo]").forEach(b=>b.onclick=()=>{SC.pbOpen=SC.pbOpen===b.dataset.pbo?"":b.dataset.pbo;renderMain()});
   m.querySelectorAll("[data-fn]").forEach(el=>el.onclick=()=>{SC.tab="cn";(SC.cnOpen=SC.cnOpen||{})[el.dataset.fn]=1;renderMain();scrollTo(0,0)});
