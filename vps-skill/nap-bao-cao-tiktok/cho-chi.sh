@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Chờ chị Hoa xử lý hộp mật khẩu / hộp kiểm tra kéo hình của Shopee trên tab <tab>.
 # Dùng: bash cho-chi.sh <tab> [số phút, mặc định 10]
-# Thoát 0 khi hộp đã biến mất (làm tiếp được), 1 khi hết giờ vẫn còn hộp.
+# Thoát 0 khi hộp đã biến mất (làm tiếp được), 1 khi hết giờ vẫn còn hộp, 3 khi tab không còn (mở lại tab rồi chạy lại).
+# Chỉ chạy MỘT lệnh cho-chi.sh một lúc.
 # Agent phải CHẠY LỆNH NÀY và đợi nó xong, không được trả lời "em đang chờ" rồi kết thúc lượt.
 TAB="$1"; PHUT="${2:-10}"; export XDG_RUNTIME_DIR=/run/user/0
 [ -z "$TAB" ] && { echo "Thiếu tab"; exit 2; }
 con_hop() {
   local t; t=$(timeout 40 openclaw browser --browser-profile chrome evaluate --target-id "$TAB" \
     --fn '() => location.href + "\n" + document.body.innerText.slice(0,3000)' 2>/dev/null)
-  [ -z "$t" ] && return 0
+  [ -z "$t" ] && { echo "MAT_TAB: tab $TAB không còn hoặc Chrome mất nối — xem lại openclaw browser tabs, mở lại trang rồi chạy lại"; exit 3; }
   echo "$t" | grep -qiE 'verify/(captcha|traffic)|Kéo qua để hoàn thiện|Xác nhận để tiếp tục|vui lòng nhập mật khẩu'
 }
 for ((i=0; i<PHUT; i++)); do
