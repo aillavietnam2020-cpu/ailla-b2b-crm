@@ -14,6 +14,7 @@ const GD_CSS=`table.gd td{padding:5px 8px;font-size:12.5px;vertical-align:middle
 table.gd td.gdd{max-width:280px;overflow:hidden;text-overflow:ellipsis}table.gd tr[data-x],table.gd tr[data-id],table.gd tr.clk{cursor:pointer}table.gd tbody tr:hover td{background:#f7f8fb}
 table.gd .scp{white-space:nowrap;font-size:11.5px}
 .gdlk{color:#5146c8;cursor:pointer;font-size:12px;text-decoration:none;border-bottom:1px dashed #b9b3f0}.gdlk:hover{border-bottom-style:solid}
+.gdfoot{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:6px 18px;flex-wrap:wrap;background:#fff;border-top:1px solid #e3e6ee;padding:8px 14px;font-size:12.5px;box-shadow:0 -2px 6px rgba(16,24,40,.05)}.gdfoot b{font-variant-numeric:tabular-nums}.gdfoot .sp{flex:1}.gdpg{display:flex;align-items:center;gap:4px}.gdpg button{min-width:28px;height:26px;border:1px solid #e3e6ee;background:#fff;border-radius:6px;font:600 12px inherit;font-family:inherit;cursor:pointer;color:#344054}.gdpg button.on{border-color:#5146c8;color:#5146c8}.gdpg button:disabled{opacity:.4;cursor:default}.gdpg select{padding:3px 6px;font-size:12px;width:auto}
 .gdchon{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.gdchon input{flex:1 1 220px}`;
 function gdCss(){if(document.getElementById("gd-css"))return;const s=document.createElement("style");s.id="gd-css";s.textContent=GD_CSS;document.head.appendChild(s)}
 const gdLink=(t,attrs,title)=>`<a class="gdlk" ${attrs||""} title="${esc(title||t)}">${esc(t)}</a>`;
@@ -52,3 +53,16 @@ function gdChonDon(idInput){
   Promise.resolve(typeof mhLoad==="function"?mhLoad():0).catch(()=>{})}
 /* tbl() của app.js nhưng bảng mang kiểu giao dịch chung. */
 const gdTbl=(head,rows,cls)=>tbl(head,rows,cls).replace("<table>",'<table class="gd">');
+/* Chân bảng luôn hiện ở đáy màn hình (kiểu Poscake): tổng cộng bên trái, phân trang + số dòng mỗi trang bên phải.
+   tong: chuỗi HTML tổng; n: số dòng; st: {trang, co} (đối tượng trạng thái của trang, sửa trực tiếp); key: tên để gắn sự kiện. */
+const GD_CO=[50,100,200,500];
+const gdCat=(L,st)=>{const co=st.co||100,max=Math.max(1,Math.ceil(L.length/co));if(!st.trang||st.trang>max)st.trang=1;return L.slice((st.trang-1)*co,st.trang*co)};
+function gdChan(tong,n,st,key){const co=st.co||100,max=Math.max(1,Math.ceil(n/co)),p=st.trang||1,sh=new Set([1,max,p-1,p,p+1].filter(x=>x>=1&&x<=max));let last=0,b="";
+  [...sh].sort((a,c)=>a-c).forEach(x=>{if(x-last>1)b+='<span class="hint">…</span>';b+=`<button type="button" class="${x===p?"on":""}" data-gdpg="${key}" data-p="${x}">${x}</button>`;last=x});
+  return `<div class="gdfoot">${tong}<span class="sp"></span><span class="gdpg"><button type="button" data-gdpg="${key}" data-p="${p-1}"${p<=1?" disabled":""} aria-label="Trang trước">‹</button>${b}<button type="button" data-gdpg="${key}" data-p="${p+1}"${p>=max?" disabled":""} aria-label="Trang sau">›</button>
+   <select data-gdco="${key}" aria-label="Số dòng mỗi trang">${GD_CO.map(c=>`<option value="${c}"${c===co?" selected":""}>${c} / trang</option>`).join("")}</select></span></div>`}
+/* Gắn bấm phân trang: st là đối tượng trạng thái đã truyền cho gdChan, ve() vẽ lại trang. */
+function gdChanBind(m,key,st,ve){
+  m.querySelectorAll(`[data-gdpg="${key}"]`).forEach(b=>b.onclick=()=>{st.trang=+b.dataset.p;ve()});
+  m.querySelectorAll(`[data-gdco="${key}"]`).forEach(s=>s.onchange=()=>{st.co=+s.value;st.trang=1;try{localStorage.setItem("gdco_"+key,s.value)}catch(e){}ve()})}
+const gdCoNho=(key,def)=>{try{return +localStorage.getItem("gdco_"+key)||def}catch(e){return def}};

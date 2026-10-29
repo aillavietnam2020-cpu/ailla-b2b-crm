@@ -318,9 +318,8 @@ function scNK(){
   ${!MH.pay||!SOCP.ship?`<p class="hint pad">Đang tải các khoản chi ở Mua hàng và Vận chuyển…</p>`:""}
   ${scThieuHtml()}
   ${R.length?`<div class="tbl"><table class="scnk gd"><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th class="n">Số tiền</th><th>Nhóm chi phí</th><th>Liên quan</th><th>Nguồn</th><th>Kênh / nơi chịu</th><th>Chức năng</th><th>Cách xử lý</th><th>Tình trạng</th></tr></thead><tbody>
-  ${R.map(row).join("")}
-  <tr class="tot"><td colspan="3">Cộng ${R.length} khoản${R.length<all.length?" (đang lọc)":""}</td><td class="n">${scNf(scS(R))}</td><td colspan="7"></td></tr>
-  ${sE?`<tr><td colspan="3" class="hint">trong đó trả nhà cung cấp hàng, nguyên vật liệu (vào giá thành theo định mức, không phân bổ)</td><td class="n">${scNf(sE)}</td><td colspan="7"></td></tr>`:""}${sT?`<tr><td colspan="3" class="hint">trong đó mua tài sản / công cụ (không tính chi phí tháng, khấu hao / phân bổ dần)</td><td class="n">${scNf(sT)}</td><td colspan="7"></td></tr>`:""}</tbody></table></div>`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
+  ${gdCat(R,SC.nkp||(SC.nkp={co:gdCoNho("nk",100),trang:1})).map(row).join("")}
+</tbody></table></div>${gdChan(`<span>Cộng <b>${R.length}</b> khoản${R.length<all.length?" (đang lọc)":""}: <b>${scNf(scS(R))}</b> đ</span>${sE?`<span class="hint">trong đó trả NCC hàng, NVL (vào giá thành): <b>${scNf(sE)}</b></span>`:""}${sT?`<span class="hint">mua tài sản / công cụ (phân bổ dần): <b>${scNf(sT)}</b></span>`:""}`,R.length,SC.nkp,"nk")}`:`<p class="empty pad">${all.length?"Không có khoản nào khớp bộ lọc.":"Chưa có khoản chi nào trong kỳ này."}</p>`}</section>`}
 /* Doanh thu thực tự lấy để chia chi chung: dùng hàm doanh thu chung của web (dtShownMonth, chat Doanh thu 27/10),
    chưa có hàm đó thì lấy execNums như trước. Shopee là số chung 2 shop nên Mall / thường vẫn nhập tay. */
 function scAutoDT(ym){const o={};
@@ -430,7 +429,7 @@ function pSoChi(m){
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn};
   on("sc-new",()=>scForm());on("sc-imp",()=>scImport());
   on("sc-ncc",async()=>{await mhLoad();mhLoadInv();mhPayForm()});on("sc-vc",()=>{SC.tab="nk";SC.ng="Phiếu chi vận chuyển";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
-  [["scf-fg","g"],["scf-fk","k"],["scf-fs","st"],["scf-fq","q"],["scf-fn","fn"],["scf-fx","xl"],["scf-fng","ng"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SC[k]=e.value;renderMain()}});
+  [["scf-fg","g"],["scf-fk","k"],["scf-fs","st"],["scf-fq","q"],["scf-fn","fn"],["scf-fx","xl"],["scf-fng","ng"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SC[k]=e.value;if(SC.nkp)SC.nkp.trang=1;renderMain()}});
   {const mo=document.getElementById("scf-more");if(mo)mo.onclick=()=>{SC.more=!SC.more;renderMain()};
    const cl=document.getElementById("scf-clr");if(cl)cl.onclick=()=>{["ng","g","k","fn","xl","st","q"].forEach(k=>SC[k]="");renderMain()}}
   const findR=id=>scRows().find(x=>x.id===id)||((scFin().nkc)||[]).find(x=>x.id===id);
@@ -439,7 +438,7 @@ function pSoChi(m){
   m.querySelectorAll("select[data-bv]").forEach(s=>s.onchange=()=>{const id=s.dataset.bv,v=s.value;DB.mutate(ME.name,"đổi nơi chịu khoản chi",dt=>{const r=((dt.fin||{}).nkc||[]).find(y=>y.id===id);if(!r)return;if(r.k0==null)r.k0=r.k;r.k=v;if(v!=="Chờ xác định"&&r.st==="Cần rà"&&!r.gc)r.st="Ổn";(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(r.dg)]={g:r.g,k:v,st:r.st}});renderMain()});
   m.querySelectorAll("[data-dm]").forEach(el=>el.onchange=()=>{const i=+el.dataset.dm,f=el.dataset.f,v=f==="cd"?+el.value:el.value;DB.mutate(ME.name,"sửa danh mục chi phí",dt=>{dt.fin=dt.fin||{};if(!dt.fin.cpdm||!dt.fin.cpdm.length||!dt.fin.cpdm[i])dt.fin.cpdm=JSON.parse(JSON.stringify(scDM()));dt.fin.cpdm[i][f]=v});toast("Đã lưu danh mục");renderMain()});
   m.querySelectorAll("[data-go-st],[data-go-k],[data-go-g]").forEach(b=>b.onclick=()=>{Object.assign(SC,{tab:"nk",st:b.dataset.goSt||"",k:b.dataset.goK||"",g:b.dataset.goG||"",q:"",fn:"",xl:""});if(b.dataset.goG)SC.st="Cần rà";renderMain()});
-  scQTbind(m);scBCbind(m);scPLbind(m);gdBind(m);
+  scQTbind(m);scBCbind(m);scPLbind(m);gdBind(m);if(SC.nkp)gdChanBind(m,"nk",SC.nkp,renderMain);
   on("scdt-ed2",()=>{const b=document.getElementById("scdt-ed");if(b)b.click()});
   m.querySelectorAll("[data-pbk]").forEach(el=>el.onclick=()=>{const go=!el.closest(".scpills");SC.pbk=el.dataset.pbk;renderMain();if(go){const c=document.getElementById("scpk");if(c)c.scrollIntoView({behavior:"smooth",block:"start"})}});
   on("scdt-ed",()=>{const ym=PERIOD.from.slice(0,7),sv=((scFin().cpDT||{})[ym])||{},auto=scAutoDT(ym);
