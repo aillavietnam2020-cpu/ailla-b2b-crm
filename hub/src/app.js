@@ -52,7 +52,7 @@ function render(){
    <div class="me"><b>${esc(ME.name)}</b><span>${esc(ME.title)} · ${ROLES[ME.role]}</span><button class="lnk" id="logout">Đăng xuất</button></div></aside>
    <div class="mainwrap"><header class="topbar"><button class="hamb" id="hamb" aria-label="Mở menu">☰</button><div class="tbslot" id="tbslot"></div>${ADM?`<div class="srch">${ico("search")}<input id="qs" placeholder="${HOST_MODE==='admin'?'Tìm chức năng…':'Tìm trang, thẻ video, khách hàng…'}" autocomplete="off"><div class="qsr" id="qsr" hidden></div></div>`:`<div class="crumb">${esc((items.find(i=>i[0]===PAGE)||[])[1]||"")}</div>`}<span class="sp"></span>${ADM?`<span class="crumb sm"><span class="cm">${esc(cm.n)}</span>${cm.k!=="exec"?" › "+esc((items.find(i=>i[0]===PAGE)||[])[1]||""):""}</span>`:""}${ADM?periodPicker():`<span class="sync"><i></i>Tháng ${MONTH.mon}/${MONTH.year}</span>`}${ME?`<button class="chatbtn" id="chatbtn" title="Trao đổi nội bộ">💬</button><button class="bell" title="Thông báo">${ico("bell")}${alN?`<b>${alN}</b>`:""}</button>`:""}${typeof SERVER!=="undefined"?`<i id="svsync" class="svsync ok" title="Đã lưu lên máy chủ"></i>`:""}${ADM&&MODULES.some(mo=>mo.k==="aiq"&&modGroups(mo).length)?`<button class="aibtn" data-go="ai" title="Trợ lý AI">${ico("spark")}<span>Trợ lý AI</span></button>`:""}<span class="uchip" id="uchip" title="Của tôi"><i>${esc((ME.name||"?").trim().split(" ").pop()[0]||"")}</i><span><b>${esc(ME.name)}</b><small>${esc(ME.title)}</small></span></span></header><main id="main"></main></div>`;
   $$(".mi").forEach(b=>b.onclick=()=>{PAGE=b.dataset.p;if(typeof CRM_SRC!=="undefined")for(const k in CRM_SRC)delete CRM_SRC[k];if(typeof B2B!=="undefined"){B2B.kh=null;B2B.don=null;B2B.newOrder=null}try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0);document.body.classList.remove("menu-open")});
-  $$(".top").forEach(b=>b.onclick=()=>{if(b.dataset.mod===MOD&&b.classList.contains("open")){b.classList.remove("open");const s=b.nextElementSibling;if(s&&s.classList.contains("subnav"))s.remove();return}MOD=b.dataset.mod;PAGE="";try{localStorage.setItem(SKEY+"_m",MOD)}catch(e){}render();scrollTo(0,0);if(modGroups(curMod()).flatMap(g=>g[1]).length===1)document.body.classList.remove("menu-open")});
+  $$(".top").forEach(b=>b.onclick=()=>{if(b.dataset.mod===MOD&&b.classList.contains("open")){b.classList.remove("open");const s=b.nextElementSibling;if(s&&s.classList.contains("subnav"))s.remove();return}MOD=b.dataset.mod;PAGE="";_navAuto=true;try{localStorage.setItem(SKEY+"_m",MOD)}catch(e){}render();scrollTo(0,0);if(modGroups(curMod()).flatMap(g=>g[1]).length===1)document.body.classList.remove("menu-open")});
   bindPeriodPicker();
   $$(".bell").forEach(b=>b.onclick=()=>{MOD="exec";PAGE="exec";render()});
   if($("#qs")){const q=$("#qs"),r=$("#qsr");q.oninput=()=>{const L=quickSearch(q.value);r.hidden=!L.length;r.innerHTML=L.map(x=>`<button data-qp="${esc(x[0])}"><b>${esc(x[1])}</b><span>${esc(x[2])}</span></button>`).join("");r.querySelectorAll("[data-qp]").forEach(btn=>btn.onmousedown=()=>{const v=btn.dataset.qp;if(v.startsWith("#card:"))openCard(v.slice(6));else if(v.startsWith("#kh:")){B2B.kh=v.slice(4);MOD="b2b";PAGE="b2b_kh";render()}else{PAGE=v;MOD="";render()}})};q.onblur=()=>setTimeout(()=>{r.hidden=true},150)}
@@ -73,7 +73,9 @@ function render(){
    - mở cửa sổ chi tiết bên phải (#drawer) cũng ghi một bước: bấm Back là đóng cửa sổ đó trước, chưa đổi trang;
    - bấm ✕ đóng cửa sổ thì bỏ bước đó đi để Back lần sau về đúng trang trước.
    Trang có trạng thái riêng muốn Back được thì thêm vào NAV_SUB [tên, đọc, ghi]. */
-let _navBack=false,_navDrOpen=false,_navSkipPop=0;
+let _navBack=false,_navDrOpen=false,_navSkipPop=0,_navAuto=false;
+/* Bấm tên nhóm menu (vd Tài chính – Kế toán) thì web tự mở trang đầu của nhóm (P&L); trang tự mở đó chỉ là bước tạm:
+   chọn trang khác ngay sau đó thì thay bước tạm, để Back không quay về P&L (chị Hoa 29/10). */
 const NAV_SUB=[
   ["mh",()=>typeof MH!=="undefined"&&MH?MH.open||null:null,v=>{if(typeof MH!=="undefined"&&MH)MH.open=v||null}],
   ["sct",()=>typeof SC!=="undefined"&&PAGE==="so_cp"?SC.tab:null,v=>{if(typeof SC!=="undefined"&&v)SC.tab=v}],
@@ -88,8 +90,8 @@ function navDrawerWatch(){const dr=document.getElementById("drawer");if(!dr||dr.
   }).observe(dr,{attributes:true,attributeFilter:["hidden"]})}
 function navRecord(){
   navDrawerWatch();
-  if(_navBack||!ME||!PAGE)return;const sub=_navSub(),k=_navKey(sub),hs=history.state,cur=hs&&hs.abos,st={abos:k,p:PAGE,mod:MOD,sub};
-  try{if(!cur)history.replaceState(st,"");else if(cur!==k){if(hs.drawer)history.replaceState(st,"");else history.pushState(st,"")}}catch(e){}}
+  if(_navBack||!ME||!PAGE)return;const sub=_navSub(),k=_navKey(sub),hs=history.state,cur=hs&&hs.abos,st={abos:k,p:PAGE,mod:MOD,sub,auto:_navAuto};_navAuto=false;
+  try{if(!cur)history.replaceState(st,"");else if(cur!==k){if(hs.drawer||hs.auto)history.replaceState(st,"");else history.pushState(st,"")}}catch(e){}}
 addEventListener("popstate",e=>{
   if(_navSkipPop>0){_navSkipPop--;return}
   const st=e.state,dr=document.getElementById("drawer");
