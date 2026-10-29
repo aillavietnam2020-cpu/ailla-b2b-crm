@@ -78,14 +78,14 @@ function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.n
   nkc=nkc.concat(dtVcRows(f.nkc,from,to));
   return dtNkcKenh(nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
 /* Phiếu chi vận chuyển (SOCP.ship) cộng vào kênh như Sổ chi phí (scAuto, chat Sổ chi phí 29/10): kênh theo đơn được chở (scVcKenh) —
-   đơn mua → Sản xuất, đơn khách OEM → Kênh OEM, đơn bán khác → Kênh phân phối, còn lại "Chờ xác định" (không trừ kênh nào).
+   r.skip ("ts" cước đơn tài sản vào nguyên giá, "trung" đã có trong chứng từ đơn mua) thì không tính; đơn mua → Sản xuất, đơn khách OEM → Kênh OEM, đơn bán khác → Kênh phân phối, còn lại "Chờ xác định" (không trừ kênh nào).
    Sổ đã có dòng G09 nạp từ MISA trong kỳ thì bỏ (tránh trừ hai lần), giống scAuto. Chưa tải phiếu thì gọi tải rồi vẽ lại. */
 function dtVcRows(nkc,from,to){if(typeof SOCP==="undefined"||typeof scVcKenh!=="function")return [];
   if(typeof spLoadShip==="function"&&PERIOD.from<=from&&PERIOD.to>=to){const k=PERIOD.from+"|"+PERIOD.to;if(SOCP.shipKey!==k&&!SOCP.busy)spLoadShip().then(()=>{DT_PBC_CLR();dtRe()})}
   if(typeof gcLoad==="function"&&typeof GC!=="undefined"&&!GC.orders&&!GC.busy)gcLoad().then(()=>{DT_PBC_CLR();dtRe()});
   if(!SOCP.ship||(nkc||[]).some(y=>y.g==="G09"&&y.src!=="phieu"&&String(y.d||"").slice(0,10)>=from&&String(y.d||"").slice(0,10)<=to))return [];
   const R=[];SOCP.ship.forEach(v=>{if(v.status!=="OK")return;const d=String(v.voucher_date||"").slice(0,10);if(d<from||d>to)return;
-    let r;try{r=scVcKenh({or:v.order_refs||""})}catch(e){return}R.push({d,g:r.g,k:r.k,t:+v.amount||0,src:"vc"})});
+    let r;try{r=scVcKenh({or:v.order_refs||""})}catch(e){return}if(!r||r.skip)return;R.push({d,g:r.g,k:r.k,t:+v.amount||0,src:"vc"})});
   return R}
 function dtTruSoCp(rows,from,to){const S=dtSoCp(from,to);if(!S)return;rows.forEach(r=>{const k=DT_NKC_ROW[r.k],v=k?S.v[k]:0;if(!v||r._cpk||r.dt==null)return;r._cpk=1;r.cpk=(r.cpk||0)+v;r.khac=(r.khac||0)+v;if(r.lai!=null)r.lai-=v;
   r.src=(r.src?r.src+" · ":"")+`đã trừ ${tr(v)} chi phí Sổ chi phí bổ về kênh (${S.n[k]} dòng)`})}
