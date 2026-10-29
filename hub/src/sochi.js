@@ -422,7 +422,7 @@ function pSoChi(m){
   m.querySelectorAll("[data-sct]").forEach(b=>b.onclick=()=>{SC.tab=b.dataset.sct;renderMain()});
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn};
   on("sc-new",()=>scForm());on("sc-imp",()=>scImport());
-  on("sc-ncc",async()=>{await mhLoad();mhLoadInv();mhPayForm()});on("sc-vc",()=>{PAGE="cr_vc";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
+  on("sc-ncc",async()=>{await mhLoad();mhLoadInv();mhPayForm()});on("sc-vc",()=>{SC.tab="nk";SC.ng="Phiếu chi vận chuyển";PAGE="so_cp";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)});
   [["scf-fg","g"],["scf-fk","k"],["scf-fs","st"],["scf-fq","q"],["scf-fn","fn"],["scf-fx","xl"],["scf-fng","ng"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.onchange=()=>{SC[k]=e.value;renderMain()}});
   {const mo=document.getElementById("scf-more");if(mo)mo.onclick=()=>{SC.more=!SC.more;renderMain()};
    const cl=document.getElementById("scf-clr");if(cl)cl.onclick=()=>{["ng","g","k","fn","xl","st","q"].forEach(k=>SC[k]="");renderMain()}}
