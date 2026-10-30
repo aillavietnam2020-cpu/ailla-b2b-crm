@@ -9,7 +9,7 @@
      chỉ lấy cái mới từ mốc since). Kế toán: mã combo chưa nhập hỏi 15 phút một lần.
    - Không báo trùng: nhớ khóa đã báo trong localStorage theo từng người (500 khóa gần nhất); lần đầu dùng trên máy nào thì lấy mốc
      bây giờ, không báo dồn việc cũ. Việc cũ hơn 24 giờ chỉ đánh dấu đã thấy.
-   - Hiện: tối đa 3 thẻ ở góc dưới phải, nhiều hơn thì gom thành một dòng "+N thông báo khác"; tự ẩn sau 8 giây (rê chuột vào thì dừng).
+   - Hiện: tối đa 3 thẻ ở góc dưới phải, nhiều hơn thì gom thành một dòng "+N thông báo khác"; tự ẩn sau 12 giây (rê chuột vào thì dừng); thẻ tóm tắt việc chờ duyệt lúc mở web thì đứng yên tới khi bấm.
      Đang ở tab khác / thu nhỏ Chrome: hiện thêm thông báo của Windows (Notification API) nếu người dùng đã bấm "Bật thông báo".
    - CEO: Phê duyệt chỉ báo các dòng chờ CEO (chi từ ngưỡng, đơn cấp CEO) và đề xuất agent; các dòng kế toán / quản lý duyệt trước thì
      không báo chị (chị vẫn thấy đủ ở trang Phê duyệt).
@@ -51,7 +51,7 @@ function ntCard(it){const w=ntWrap(),[,ic,lb]=ntType(it.type);
   e.innerHTML=`<button class="ntpx" aria-label="Đóng">✕</button><b>${ic} ${esc(lb)}${it.by?" · "+esc(it.by):""}</b><span class="ntpt">${esc(it.text)}</span><small>${typeof agoTxt==="function"?agoTxt(new Date(it.t).toISOString()):""}${it.go?" · bấm để mở":""}</small>`;
   e.onclick=ev=>{e.remove();if(ev.target.closest(".ntpx"))return;if(it.go)try{it.go()}catch(er){console.warn("[thông báo]",er)}};
   let tm=0;const hide=ms=>{clearTimeout(tm);tm=setTimeout(()=>e.remove(),ms)};
-  e.onmouseenter=()=>clearTimeout(tm);e.onmouseleave=()=>hide(4000);hide(8000);
+  if(!it.stay){e.onmouseenter=()=>clearTimeout(tm);e.onmouseleave=()=>hide(5000);hide(12000)}
   const mo=w.querySelector(".ntmore");mo?w.insertBefore(e,mo):w.appendChild(e);ntMoreDraw();ntAsk();
 }
 /* Nhiều hơn 3 tin: một dòng gom "+N thông báo khác", bấm mở danh sách. */
@@ -93,10 +93,18 @@ function ntScanHub(){if(!ME||!DB.data||typeof pdBuild!=="function"||typeof pdWho
   try{rows=pdBuild({th:typeof pdTh==="function"?pdTh():5e6,pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],staffName:ma=>{try{return staffBy(ma).ten}catch(e){return ma}}},pdWho())}catch(e){return}
   ntBase();if(!NT.scanned&&NT.fresh){rows.forEach(r=>ntSeen("pd:"+r.id+(r.ceoCho?":ceo":"")))}else ntFromPd(rows);NT.scanned=true}
 
+/* Mở web: một thẻ tóm tắt việc đang chờ mình duyệt (cùng lọc như trên), tối đa 4 giờ một lần, để thấy ngay có việc gì, không chờ việc mới. */
+async function ntSum(){if(NT.sum||!ME||typeof pdAny!=="function"||!pdAny()||typeof pdRows!=="function")return;NT.sum=1;
+  if(Date.now()-(+ntLS("sumAt")||0)<4*3600e3||!ntPrefs().duyet)return;
+  try{await pdLoad();if(!PD.sv)return;const ceo=!!(SV.me&&SV.me.role==="CEO");
+    const R=pdRows().filter(r=>ceo?(r.ceoCho||/CEO/.test(r.loai||"")||r.k==="dx"):!r.ceoCho);if(!R.length)return;
+    ntLS("sumAt",Date.now());const g={};R.forEach(r=>{const k=String(r.loai||"Khác").split(" · ")[0];g[k]=(g[k]||0)+1});
+    NT.batch.push({key:"sum:"+Date.now(),type:"duyet",t:Date.now(),stay:1,text:`Đang chờ duyệt ${R.length} việc: ${Object.entries(g).map(([k,n])=>n+" "+k.toLowerCase()).join(", ")}`,go:()=>ntPage("pheduyet")});
+    clearTimeout(NT.timer);NT.timer=setTimeout(ntFlush,250)}catch(e){}}
 /* Hỏi máy chủ phần mới (một API nhẹ, có since). */
 async function ntTick(){
   if(!ME||!SV.me||NT.busy||typeof svApi!=="function")return;
-  ntScanHub();
+  ntScanHub();ntSum();
   if(Date.now()-NT.at<(document.hidden?60000:45000))return;NT.at=Date.now();NT.busy=true;
   try{
     const since=ntLS("since"),after=ntLS("after");
