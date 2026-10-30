@@ -712,3 +712,35 @@ agentRoutes.post('/proposals', requirePermission('agent.propose'), async (c) => 
   });
   return ok(c, result, undefined, result.duplicate ? 200 : 201);
 });
+
+/**
+ * Agent chủ động nhắn người mình nhận lệnh (chị Hoa giao 30/10/2026: 8h30 hằng ngày Kế toán trưởng báo việc cần xử lý cho
+ * chị Huệ, chị Thảo). Chỉ nhắn được người có trong agent_delegators của chính agent này; tin hiện ở Điều hành agent
+ * của người đó và bật thông báo đẩy như tin agent trả lời.
+ */
+agentRoutes.get('/notice/targets', requirePermission('agent.read'), async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT g.user_id AS id, u.display_name AS name, g.chat_agent AS agent FROM agent_delegators g JOIN users u ON u.id = g.user_id WHERE g.agent_id = ? ORDER BY u.display_name`,
+  )
+    .bind(c.get('auth').user.id)
+    .all<{ id: string; name: string; agent: string }>();
+  return ok(c, rows.results ?? []);
+});
+
+const noticeSchema = z.object({ to: z.string().trim().min(1).max(80), body: z.string().trim().min(1).max(6000) });
+
+agentRoutes.post('/notice', requirePermission('agent.read'), async (c) => {
+  const parsed = noticeSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) throw unprocessable('VALIDATION_FAILED', 'Thiếu người nhận hoặc nội dung', zodFieldErrors(parsed.error));
+  const g = await c.env.DB.prepare('SELECT chat_agent FROM agent_delegators WHERE agent_id = ? AND user_id = ?')
+    .bind(c.get('auth').user.id, parsed.data.to)
+    .first<{ chat_agent: string }>();
+  if (!g) throw forbidden('Agent này chỉ nhắn được người đã được chỉ định ra lệnh cho nó');
+  const now = new Date().toISOString();
+  const res = await c.env.DB.prepare(
+    `INSERT INTO agent_chat (agent, role, body, status, source, owner_id, created_at, updated_at) VALUES (?, 'AGENT', ?, 'done', 'NOTICE', ?, ?, ?)`,
+  )
+    .bind(g.chat_agent, parsed.data.body, parsed.data.to, now, now)
+    .run();
+  return ok(c, { id: Number(res.meta.last_row_id) || null }, undefined, 201);
+});

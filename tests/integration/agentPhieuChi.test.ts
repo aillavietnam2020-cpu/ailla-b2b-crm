@@ -218,3 +218,19 @@ it('agent chưa có ai ra lệnh: vẫn chọn được người (ghép agent th
   expect(put.status).toBe(200);
   expect(put.body.data.chat_agent).toBe(CHAT_AGENT);
 });
+
+describe('Agent chủ động nhắn người nhận lệnh (8h30 báo việc, 30/10)', () => {
+  it('chỉ nhắn được người trong agent_delegators; tin hiện ở Điều hành agent của người đó', async () => {
+    const { agent } = await setup(false);
+    const mgr = await uid(USERS.manager);
+    const t = await call(agent.token, 'GET', '/api/agent/notice/targets');
+    expect(t.status).toBe(200);
+    expect(t.body.data.map((x: any) => x.id)).toEqual([mgr]);
+    const ok1 = await call(agent.token, 'POST', '/api/agent/notice', { to: mgr, body: 'Việc hôm nay của chị: 2 phiếu chờ xác nhận' });
+    expect(ok1.status).toBe(201);
+    const row = await ctx.db.prepare('SELECT agent, role, owner_id, source FROM agent_chat WHERE id = ?').bind(ok1.body.data.id).first<any>();
+    expect(row).toMatchObject({ agent: CHAT_AGENT, role: 'AGENT', owner_id: mgr, source: 'NOTICE' });
+    const bad = await call(agent.token, 'POST', '/api/agent/notice', { to: await uid(USERS.ceo), body: 'x' });
+    expect(bad.status).toBe(403);
+  });
+});
