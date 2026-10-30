@@ -40,7 +40,7 @@ function curMod(){const vm=visibleMods();if(!MOD){try{MOD=localStorage.getItem(S
 let _rLast="";
 /* Trang đã ẩn khỏi menu nhưng vẫn mở được khi bấm từ chỗ khác (Phê duyệt, Việc của tôi, Nhật ký chi…).
    Chị Hoa 29/10: ẩn menu xong mà nút dẫn tới trang đó bị đẩy về trang đầu (P&L) là sai luồng. Ẩn trang nào khỏi menu thì thêm vào đây. */
-const NAV_AN_MO=new Set(["cr_vc","cr_s_vc","cr_bill","cr_s_bill","cr_im","cr_import"]);
+const NAV_AN_MO=new Set(["cr_vc","cr_s_vc","cr_bill","cr_s_bill","cr_im","cr_import","thongbao","matkhau"]);
 function render(){
   if(typeof closePop==="function"&&PAGE!=="mh_po")closePop(true);
   if(!ME){renderLogin();return}
@@ -63,7 +63,7 @@ function render(){
   const closeMenu=()=>document.body.classList.remove("menu-open");
   $("#sidex").onclick=closeMenu;
   $(".mainwrap").addEventListener("click",e=>{if(document.body.classList.contains("menu-open")&&!e.target.closest("#hamb")){e.preventDefault();e.stopPropagation();closeMenu()}},true);
-  if(ADM&&$("#uchip")){const me=MODULES.find(mo=>mo.k==="me"),its=me?modGroups(me).flatMap(g=>g[1]):[];$("#uchip").onclick=e=>{e.stopPropagation();let d=$("#umenu");if(d){d.remove();return}d=document.createElement("div");d.id="umenu";d.className="umenu";d.innerHTML=its.map(([id,t])=>`<button data-um="${id}">${t}</button>`).join("")+`<button data-um="__out">Đăng xuất</button>`;$("#uchip").after(d);d.querySelectorAll("[data-um]").forEach(b=>b.onclick=()=>{d.remove();if(b.dataset.um==="__out"){$("#logout").click();return}MOD="me";PAGE=b.dataset.um;render();scrollTo(0,0)});setTimeout(()=>addEventListener("click",()=>{const x=$("#umenu");if(x)x.remove()},{once:true}),0)}}
+  if(ADM&&$("#uchip")){const me=MODULES.find(mo=>mo.k==="me"),its=me?(HOST_MODE==="admin"?me.groups().flatMap(g=>g[1]).filter(i=>["thongbao","matkhau"].includes(i[0])):modGroups(me).flatMap(g=>g[1])):[];$("#uchip").onclick=e=>{e.stopPropagation();let d=$("#umenu");if(d){d.remove();return}d=document.createElement("div");d.id="umenu";d.className="umenu";d.innerHTML=its.map(([id,t])=>`<button data-um="${id}">${t}</button>`).join("")+`<button data-um="__out">Đăng xuất</button>`;$("#uchip").after(d);d.querySelectorAll("[data-um]").forEach(b=>b.onclick=()=>{d.remove();if(b.dataset.um==="__out"){$("#logout").click();return}MOD="me";PAGE=b.dataset.um;render();scrollTo(0,0)});setTimeout(()=>addEventListener("click",()=>{const x=$("#umenu");if(x)x.remove()},{once:true}),0)}}
   $$(".aibtn").forEach(b=>b.onclick=()=>{MOD="aiq";PAGE="ai";render();scrollTo(0,0)});
   const m=$("#main");PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);
   _rLast=PAGE;_rmLast=PAGE;navRecord();
