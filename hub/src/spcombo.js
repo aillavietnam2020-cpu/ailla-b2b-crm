@@ -176,7 +176,8 @@ function spcEdDraw(){
   const hs=h=>{let a={};try{a=JSON.parse(h.after_json||"{}")}catch(e){}const ps=a.parts?a.parts.map(x=>(x[1]!=1?x[1]+"×":"")+spcCode(x[0])).join(", "):a.item_label?(a.qty!=1?a.qty+"×":"")+spcCode(a.item_label):"";
     return `<div style="padding:5px 0;border-bottom:1px solid var(--line,#eee)"><b>${esc(spcAt(h.created_at))}</b> · ${esc(h.by_name||"")} · ${lb[h.action]||esc(h.action)}${a.from_day?" (từ "+spcDd(a.from_day)+")":""}${a.off_from?" từ "+spcDd(a.off_from):""}${ps?": "+esc(ps):""}</div>`};
   openDrawerHTML(`<h2>${c?(can?"Sửa combo":"Combo"):"Thêm combo"} · ${SPC_CHN(E.ch)}</h2>
-   ${E.fromUn?`<div class="note amb">Mã mới từ đơn: ${nf(E.fromUn.orders)} đơn kho đã xuất, đang chờ tính giá vốn.</div>`:""}
+   ${E.fromUn?`<div class="note amb">Mã mới từ đơn: ${nf(E.fromUn.orders)} đơn kho đã xuất, đang chờ tính giá vốn.</div>
+     <div class="spc-ten"><div class="hint">Sản phẩm khách mua trên sàn</div><div class="t">${esc(E.fromUn.name||"(sàn không ghi tên)")}</div>${E.fromUn.variant?`<div>Phân loại: <b>${esc(E.fromUn.variant)}</b></div>`:""}<div class="hint" style="margin-top:4px">Dựa vào tên và phân loại này để chọn sản phẩm trong kho ở bảng "Combo gồm" bên dưới.</div></div>`:""}
    ${c&&c.flag?`<div class="note amb">❓ Cần kế toán xác nhận: ${esc(c.flag)}</div>`:""}
    <div class="filters"><label class="inl">Kênh <select id="spc-e-ch" ${c||E.fromUn?"disabled":""}>${opt(SPC_CH,E.ch)}</select></label></div>
    <div class="filters"><label class="inl">Mã trên sàn <input id="spc-e-sku" value="${esc(E.sku)}" ${c||E.fromUn?"readonly":""}></label><label class="inl">Phân loại <input id="spc-e-variant" value="${esc(E.variant)}" placeholder="trống = mọi phân loại" ${c||E.fromUn?"readonly":""}></label></div>
