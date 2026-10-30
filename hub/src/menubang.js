@@ -50,15 +50,18 @@
         ["Chính sách bán hàng",[["cr_gia","Bảng giá"],["cr_dc","Giá điều chỉnh / khuyến mại"],["cr_thuong","Thưởng & xếp hạng NPP"],["cr_giagc","Bảng giá Kênh OEM"]]],
         ["Dữ liệu & sao lưu",[["cr_import","Nhập dữ liệu CRM"],["caidat","Sao lưu dữ liệu"],["cr_audit","Nhật ký"]]],
         /* Bot phòng ban là cấu hình (ai duyệt đề xuất, bot làm được gì): chị Hoa 28/10 chuyển từ vận hành về đây. */
-        ["Agent & bot AI",[["bots","Bot AI phòng ban"],["agents","Quyền agent"]]]]};
+        ["Agent & bot AI",[["bots","Bot AI phòng ban"],["agents","Quyền agent"]]]],
+      /* Chị Hoa 30/10: mục AI Agent giống bên vận hành (Điều hành agent, hội thoại, huấn luyện, Trợ lý AI). */
+      agt:[["",["agentchat","hoithoaiagent","huanluyenagent",["ai","Trợ lý AI"]]]]};
     /* Chuyển hẳn sang web vận hành (đã có ở đó): sản xuất, kho, quy chuẩn, agent điều hành, bot. */
-    const DROP=["sx_nc","kho_nxt","kho_vo","kho_dm","quychuan","quytac","agentchat","kho_qd","cr_vc","cr_s_vc"]; // cr_vc: chị Hoa 28/10 bỏ Phiếu chi vận chuyển khỏi menu quản trị (xem ở Sổ chi phí › Nhật ký chi) // kho_qd: nay là Cấu hình › Sản phẩm & combo
+    const DROP=["sx_nc","kho_nxt","kho_vo","kho_dm","quychuan","quytac","kho_qd","cr_vc","cr_s_vc"]; // cr_vc: chị Hoa 28/10 bỏ Phiếu chi vận chuyển khỏi menu quản trị (xem ở Sổ chi phí › Nhật ký chi) // kho_qd: nay là Cấu hình › Sản phẩm & combo
     const Q=SRC.filter(m=>m.adm).map(m=>m.k);
     USED=Object.values(S).flatMap(ids);
     NEW=[mod("q_tq","home","Điều hành CEO","",S.tq,[],DROP),
       mod("q_tc","fin","Tài chính – Kế toán","",S.tc,[],DROP),
       mod("q_ns","chart","Ngân sách & chi phí","",S.ns,[],DROP),
       mod("q_pd","check","Phê duyệt","",S.pd,[],DROP),
+      mod("q_agt","spark","AI Agent","",S.agt,[],DROP),
       mod("q_cfg","gear","Cấu hình","Hệ thống",S.cfg,Q,DROP)];
     /* Bảng tách Giá thành thành từng trang riêng, nên bỏ nhóm gộp "Giá thành & định mức". */
     for(let i=PAGE_SETS.length-1;i>=0;i--)if(PAGE_SETS[i].adm)PAGE_SETS.splice(i,1);
