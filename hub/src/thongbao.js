@@ -11,8 +11,8 @@
      bây giờ, không báo dồn việc cũ. Việc cũ hơn 24 giờ chỉ đánh dấu đã thấy.
    - Hiện: tối đa 3 thẻ ở góc dưới phải, nhiều hơn thì gom thành một dòng "+N thông báo khác"; tự ẩn sau 12 giây (rê chuột vào thì dừng); thẻ tóm tắt việc chờ duyệt lúc mở web thì đứng yên tới khi bấm.
      Đang ở tab khác / thu nhỏ Chrome: hiện thêm thông báo của Windows (Notification API) nếu người dùng đã bấm "Bật thông báo".
-   - CEO: Phê duyệt chỉ báo các dòng chờ CEO (chi từ ngưỡng, đơn cấp CEO) và đề xuất agent; các dòng kế toán / quản lý duyệt trước thì
-     không báo chị (chị vẫn thấy đủ ở trang Phê duyệt).
+   - CEO: Phê duyệt báo mọi dòng chị duyệt được, trừ dòng kế toán làm trước (phiếu chi chưa qua Huệ, phiếu thu, tiền về, hàng trả lại,
+     combo chờ nhập), xem ntForMe; chị vẫn thấy đủ ở trang Phê duyệt.
    ===================================================================== */
 const NT_TYPES=[["agent","🤖","Tin mới từ agent","Agent trả lời hoặc nhắn chị/anh trong Điều hành agent, Hội thoại"],["duyet","✅","Việc cần duyệt","Phiếu chi, đơn hàng, đề xuất của agent, combo mới… đúng các dòng ở trang Phê duyệt"],["giao","📌","Việc được giao","Việc, thẻ video giao cho mình, lệnh sản xuất, việc chăm sóc khách"],["tin","💬","Tin nhắn và thông báo khác","Nhắn riêng, gọi tên trong nhóm, các thông báo khác trong chuông"]];
 const NT={batch:[],timer:0,at:0,busy:false,cbAt:0,sig:"",scanned:false,fresh:null,recent:[],more:0,unseen:0,title:""};
@@ -82,9 +82,11 @@ function ntPage(p){if(typeof ntGo==="function")ntGo({ref:"page:"+p});else{PAGE=p
 function ntOpenPd(r){ntPage("pheduyet");if(typeof pdOpen==="function")setTimeout(()=>{try{pdOpen(r)}catch(e){}},60)}
 function ntOpenAgent(a){if(typeof AC!=="undefined"){AC.cur=a;try{localStorage.setItem("ac_cur",a)}catch(e){}}ntPage("agentchat")}
 
-/* Dòng Phê duyệt → thông báo. CEO chỉ nhận dòng chờ CEO và đề xuất agent. */
-function ntFromPd(rows){const ceo=!!(SV.me&&SV.me.role==="CEO");
-  (rows||[]).filter(r=>ceo?(r.ceoCho||/CEO/.test(r.loai||"")||r.k==="dx"):!r.ceoCho).filter(r=>!ntMine(r.by)&&r.k!=="combo").forEach(r=>ntPush({key:"pd:"+r.id+(r.ceoCho?":ceo":""),type:"duyet",
+/* Dòng Phê duyệt nào báo người này. CEO: bỏ các dòng người khác làm trước (phiếu chi Huệ chưa duyệt, phiếu thu, tiền về, hàng trả lại, combo
+   chờ kế toán); còn lại (đơn, sửa phiếu xuất, đề xuất agent, phiếu thưởng, nhân sự, khoản chờ CEO) đều báo. Người khác: bỏ dòng chờ CEO. */
+const ntForMe=r=>SV.me&&SV.me.role==="CEO"?(r.ceoCho||!["chi","thu","tien","hoan","combo"].includes(r.k)):!r.ceoCho;
+function ntFromPd(rows){
+  (rows||[]).filter(ntForMe).filter(r=>!ntMine(r.by)&&r.k!=="combo").forEach(r=>ntPush({key:"pd:"+r.id+(r.ceoCho?":ceo":""),type:"duyet",
     text:`${r.loai}: ${r.nd||""}${r.tien?" · "+nf(r.tien)+" đ":""}`,by:r.by||"",at:r.ceoCho?0:r.at,go:()=>ntOpenPd(r)}))}
 /* Dữ liệu chung của web (phiếu chi, phiếu thu, đơn nhân sự đang chờ) — chạy lại khi dữ liệu đổi. */
 function ntScanHub(){if(!ME||!DB.data||typeof pdBuild!=="function"||typeof pdWho!=="function")return;
@@ -96,8 +98,7 @@ function ntScanHub(){if(!ME||!DB.data||typeof pdBuild!=="function"||typeof pdWho
 /* Mở web: một thẻ tóm tắt việc đang chờ mình duyệt (cùng lọc như trên), tối đa 4 giờ một lần, để thấy ngay có việc gì, không chờ việc mới. */
 async function ntSum(){if(NT.sum||!ME||typeof pdAny!=="function"||!pdAny()||typeof pdRows!=="function")return;NT.sum=1;
   if(Date.now()-(+ntLS("sumAt")||0)<4*3600e3||!ntPrefs().duyet)return;
-  try{await pdLoad();if(!PD.sv)return;const ceo=!!(SV.me&&SV.me.role==="CEO");
-    const R=pdRows().filter(r=>ceo?(r.ceoCho||/CEO/.test(r.loai||"")||r.k==="dx"):!r.ceoCho);if(!R.length)return;
+  try{await pdLoad();if(!PD.sv)return;const R=pdRows().filter(ntForMe);if(!R.length)return;
     ntLS("sumAt",Date.now());const g={};R.forEach(r=>{const k=String(r.loai||"Khác").split(" · ")[0];g[k]=(g[k]||0)+1});
     NT.batch.push({key:"sum:"+Date.now(),type:"duyet",t:Date.now(),stay:1,text:`Đang chờ duyệt ${R.length} việc: ${Object.entries(g).map(([k,n])=>n+" "+k.toLowerCase()).join(", ")}`,go:()=>ntPage("pheduyet")});
     clearTimeout(NT.timer);NT.timer=setTimeout(ntFlush,250)}catch(e){}}
