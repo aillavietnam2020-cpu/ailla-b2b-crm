@@ -173,3 +173,35 @@ describe('Agent lập phiếu chi nhà cung cấp và Chi phí khác', () => {
     expect(old.body.error.message).toContain('PC-2026-10-0001');
   });
 });
+
+describe('Chị Hoa chọn thêm người ra lệnh cho agent (chị Huệ như chị Thảo)', () => {
+  it('người kế toán được thêm: được nhắn agent, tin của người đó kèm giấy ủy quyền và lập được phiếu', async () => {
+    const { agent } = await setup();
+    const ceo = await uid(USERS.ceo);
+    const hue = await uid(USERS.thao); // tài khoản thử đóng vai kế toán
+    await ctx.db.prepare('INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(hue, 'order.accounting.confirm', ceo, T0).run();
+    const cand = await ctx.request('/api/admin/agents/delegator-candidates', { as: USERS.ceo });
+    expect(cand.body.data.map((u: any) => u.id)).toContain(hue);
+    const mgr = await uid(USERS.manager);
+    const put = await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [mgr, hue] } });
+    expect(put.status).toBe(200);
+    const list = await ctx.request('/api/admin/agents', { as: USERS.ceo });
+    expect(list.body.data.find((a: any) => a.id === agent.id).delegator_ids.sort()).toEqual([mgr, hue].sort());
+    expect(await ctx.db.prepare('SELECT 1 FROM agent_chat_access WHERE user_id = ? AND agent = ?').bind(hue, CHAT_AGENT).first()).toBeTruthy();
+    await ctx.request('/api/agent-chat', { as: USERS.thao, body: { agent: CHAT_AGENT, body: 'lập phiếu chi cước' } });
+    const r = await ctx.app.fetch(new Request('http://x/api/agent-relay/pull', { method: 'POST', headers: { 'X-Relay-Key': RELAY, 'Content-Type': 'application/json' }, body: '{}' }), ctx.env);
+    const dlg = ((await r.json()) as any).data.find((m: any) => m.delegation)?.delegation as string;
+    expect(dlg).toBeTruthy();
+    const v = await call(agent.token, 'POST', '/api/shipping-vouchers', vc({ carrier: 'Lái xe B', receiver: 'Lái xe B' }), dlg);
+    expect(v.status).toBe(200);
+  });
+
+  it('không chọn được người không làm kế toán; bỏ chọn thì mất quyền; chỉ CEO được đổi', async () => {
+    const { agent } = await setup();
+    const huyen = await uid(USERS.huyen);
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [huyen] } })).status).toBe(422);
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.manager, method: 'PUT', body: { user_ids: [] } })).status).toBe(403);
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [] } })).status).toBe(200);
+    expect(await ctx.db.prepare('SELECT 1 FROM agent_delegators WHERE agent_id = ?').bind(agent.id).first()).toBeNull();
+  });
+});

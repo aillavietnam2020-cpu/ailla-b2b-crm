@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { nowIso } from '@shared/datetime';
 import { zodFieldErrors } from '@shared/schemas';
 import { AGENT_PHIEU_CHI, AGENT_SCOPES, AGENT_SCOPE_LABELS, AGENT_SCOPE_PREFIX } from '@shared/agent';
+import { AGENT_IDS } from '@shared/agentRoster';
+import type { Role } from '@shared/enums';
+import { effectivePermissions } from '@shared/permissions';
 import type { AppEnv } from '../env';
 import { auditStatement } from '../lib/audit';
 import { generateAgentToken, hashAgentToken, tokenHint } from '../lib/agentToken';
@@ -29,13 +32,19 @@ agentAdminRoutes.get('/', async (c) => {
             (SELECT COUNT(*) FROM user_permissions up WHERE up.user_id = a.id AND up.permission = 'agent.act') AS can_act,
             (SELECT COUNT(*) FROM user_permissions up WHERE up.user_id = a.id AND up.permission = '${AGENT_PHIEU_CHI}') AS can_phieuchi,
             (SELECT group_concat(u.display_name, ', ') FROM agent_delegators g JOIN users u ON u.id = g.user_id WHERE g.agent_id = a.id) AS delegators,
+            (SELECT group_concat(g.user_id, ',') FROM agent_delegators g WHERE g.agent_id = a.id) AS delegator_ids,
+            (SELECT g.chat_agent FROM agent_delegators g WHERE g.agent_id = a.id LIMIT 1) AS chat_agent,
             (SELECT group_concat(substr(up.permission, ${AGENT_SCOPE_PREFIX.length + 1}), ',') FROM user_permissions up
               WHERE up.user_id = a.id AND up.permission LIKE '${AGENT_SCOPE_PREFIX}%') AS scopes
      FROM agents a ORDER BY a.created_at DESC`,
   ).all<Record<string, unknown>>();
   return ok(
     c,
-    (rows.results ?? []).map((r) => ({ ...r, scopes: r.scopes ? String(r.scopes).split(',') : [] })),
+    (rows.results ?? []).map((r) => ({
+      ...r,
+      scopes: r.scopes ? String(r.scopes).split(',') : [],
+      delegator_ids: r.delegator_ids ? String(r.delegator_ids).split(',') : [],
+    })),
     { all_scopes: AGENT_SCOPES, scope_labels: AGENT_SCOPE_LABELS },
   );
 });
@@ -201,4 +210,60 @@ agentAdminRoutes.post('/:id/phieuchi', async (c) => {
     }),
   ]);
   return ok(c, { id, can_phieuchi: enabled });
+});
+
+/** Người có thể được chỉ định ra lệnh ghi cho agent: nhân sự đang làm, có vai kế toán / điều phối (khớp rào ở agentSpend). */
+async function delegatorCandidates(db: D1Database) {
+  const rows = await db
+    .prepare(
+      `SELECT u.id, u.display_name, u.role, (SELECT group_concat(p.permission, ',') FROM user_permissions p WHERE p.user_id = u.id) AS extra
+       FROM users u WHERE u.kind = 'HUMAN' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.role <> 'CEO' ORDER BY u.display_name`,
+    )
+    .all<{ id: string; display_name: string; role: Role; extra: string | null }>();
+  return (rows.results ?? [])
+    .filter((u) => {
+      const p = effectivePermissions(u.role, u.extra ? u.extra.split(',') : []);
+      return p.includes('order.accounting.confirm') || p.includes('order.approve.normal');
+    })
+    .map((u) => ({ id: u.id, display_name: u.display_name }));
+}
+
+agentAdminRoutes.get('/delegator-candidates', async (c) => ok(c, await delegatorCandidates(c.env.DB)));
+
+/**
+ * Chị Hoa chọn ai được ra lệnh ghi cho agent (lập phiếu chi...). Người được chọn cũng được nhắn agent đó trên web Điều hành agent.
+ * Giữ nguyên số Telegram đã gắn của người cũ; người bỏ chọn thì mất quyền ra lệnh (giấy ủy quyền cũ hết hiệu lực vì phải khớp bảng này).
+ */
+agentAdminRoutes.put('/:id/delegators', async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const b = (await c.req.json().catch(() => ({}))) as { user_ids?: string[]; chat_agent?: string };
+  const exists = await c.env.DB.prepare('SELECT id FROM agents WHERE id = ?').bind(id).first();
+  if (!exists) throw notFound('Không tìm thấy agent');
+  const cur = await c.env.DB.prepare('SELECT chat_agent FROM agent_delegators WHERE agent_id = ? LIMIT 1').bind(id).first<{ chat_agent: string }>();
+  const chatAgent = cur?.chat_agent ?? String(b.chat_agent ?? '');
+  if (!AGENT_IDS.includes(chatAgent)) throw unprocessable('NEED_CHAT_AGENT', 'Chọn agent trên trang Điều hành agent ứng với tài khoản này', { chat_agent: 'Bắt buộc' });
+  const allowed = new Set((await delegatorCandidates(c.env.DB)).map((u) => u.id));
+  const want = [...new Set((b.user_ids ?? []).map(String))];
+  const bad = want.filter((u) => !allowed.has(u));
+  if (bad.length) throw unprocessable('NOT_ACCOUNTANT', 'Chỉ chọn được người có vai kế toán hoặc điều phối', { user_ids: bad.join(',') });
+  const now = nowIso();
+  const keep = want.length ? `AND user_id NOT IN (${want.map(() => '?').join(',')})` : '';
+  await c.env.DB.batch([
+    c.env.DB.prepare(`DELETE FROM agent_delegators WHERE agent_id = ? ${keep}`).bind(id, ...want),
+    ...want.flatMap((u) => [
+      c.env.DB.prepare('INSERT OR IGNORE INTO agent_delegators (agent_id, chat_agent, user_id, granted_by, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, chatAgent, u, auth.user.id, now),
+      c.env.DB.prepare('INSERT OR IGNORE INTO agent_chat_access (user_id, agent, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(u, chatAgent, auth.user.id, now),
+    ]),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'AGENT_DELEGATORS_SET',
+      entityType: 'AGENT',
+      entityId: id,
+      requestId: c.get('requestId'),
+      after: { chat_agent: chatAgent, user_ids: want },
+      ip: c.req.header('CF-Connecting-IP') ?? null,
+    }),
+  ]);
+  return ok(c, { id, chat_agent: chatAgent, user_ids: want });
 });
