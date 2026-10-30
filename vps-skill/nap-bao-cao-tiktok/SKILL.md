@@ -32,7 +32,7 @@ Gợi ý URL:
 
 **File team (đo hiệu quả từng team, chị Hoa giao thêm 28/10) — kéo cùng lượt, cùng khoảng ngày, cùng cách gài bẫy:**
 - **Key metrics** (video inhouse, KOC, live, thẻ SP theo ngày): `https://seller-vn.tiktok.com/compass/data-overview` → khối Số liệu chính → ô ngày → *Tùy chỉnh* → chọn ngày → biểu tượng ⬇ cạnh ô ngày.
-- **Live Performance**: `https://seller-vn.tiktok.com/compass/live-analysis` → ô ngày → *Tùy chỉnh* → chọn ngày → **Xuất** (bấm lần 1 chỉ mở danh sách; bấm lần 2 mới tạo file).
+- **Live Performance**: `https://seller-vn.tiktok.com/compass/live-analysis` → ô **"Tất cả tài khoản"** (góc phải khối Số liệu chính) → **BỎ tick "Tài khoản liên kết"**, chỉ giữ *Tài khoản chính thức* + *Tài khoản marketing* (chị Hoa chốt 30/10: file này là số của **team Live của shop**; để cả tài khoản liên kết thì cộng thêm ~800 buổi live của KOC, gần như không ra đơn, làm sai cảnh báo team Live. Live KOC đã nằm trong file KOC) → ô ngày → *Tùy chỉnh* → chọn ngày → **Xuất** → mở biểu tượng lịch sử xuất cạnh nút Xuất, tải dòng mới nhất. Kiểm: số buổi trong file phải cỡ 1 buổi/ngày; ra hàng trăm buổi là quên bỏ tài khoản liên kết, xuất lại.
 - **Video › Hiệu suất**: `https://seller-vn.tiktok.com/compass/video-analytics` → ô ngày → *Tùy chỉnh* → biểu tượng ⬇.
 - **Video › Chi tiết** (từng video inhouse): `https://seller-vn.tiktok.com/compass/video-analytics/video-details` → ô ngày góc trên phải → **Xuất** (bấm 2 lần như Live).
 - **Transaction Analysis** và **Creator List** (KOC): `https://affiliate.tiktok.com/insights/transaction-analysis` — trang rất nặng, chụp màn hình hay bị treo; dùng `snapshot` để tìm nút. Không lấy được thì bỏ qua 2 file này và báo, không chờ mãi.
