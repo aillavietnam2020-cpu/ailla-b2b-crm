@@ -55,11 +55,17 @@ if(typeof fbdCost==="function"){const _c=fbdCost;fbdCost=function(days){const o=
 function dtEnsure(){dtLoadRows();
   /* Quảng cáo Facebook theo ngày (ads_fb) chỉ có khi đã tải và gộp vào DAYD.ads: mở thẳng Lãi lỗ / So sánh kênh mà chưa qua trang Facebook thì quảng cáo bằng 0, lãi bị đội. */
   if(!DTS.adf&&typeof adfLoad==="function"&&typeof ADF!=="undefined"){DTS.adf=true;Promise.resolve(ADF.raw||adfLoad()).then(()=>{try{adfMergeDays()}catch(e){}dtRe()}).catch(()=>{DTS.adf=false})}if(!DTS.tsb&&typeof TSB!=="undefined"&&!TSB.months&&typeof tsbLoadMonths==="function"){DTS.tsb=true;Promise.resolve(tsbLoadMonths()).then(dtRe).catch(()=>{})}}
+/* Lý do kênh sàn chưa tự chốt được tháng ym (dtChuaDuThang): Shopee xét từng shop, TikTok một báo cáo. Kênh khác: []. */
+function dtChuaDu(ch,ym){try{
+  if(ch==="spe"){if(typeof SPE==="undefined"||!SPE.sums)return ["báo cáo Shopee đang tải"];const sh=typeof speShopsAll==="function"?speShopsAll():[...new Set(SPE.sums.map(x=>x.shop))];
+    return dtChuaDuThang(sh.map(x=>({ten:"Shopee "+(typeof speShopL==="function"?speShopL(x):x),s:SPE.sums.find(z=>z.ky===ym&&z.shop===x)||null})))}
+  if(ch==="tts"){if(typeof TSB==="undefined"||!TSB.sum)return ["báo cáo TikTok đang tải"];const s=TSB.sum[ym];return dtChuaDuThang([{ten:"TikTok",s:s&&s.dt?s:null}])}}catch(e){}
+  return []}
 function dtLabel(r,ch,from,to){
   if(!r||r._dt)return r;r._dt=1;const t=dtToday(),ms=tqMonths(from,to);if(ms.length!==1)return r;
   const ym=ms[0],st=dtTrangThai(ym,t);r.chot=st;r.ym=ym;
   if(st==="chot"&&!fullMonth(ym,from,to))r.nhan="một phần tháng đã chốt, số tính theo ngày";
-  else if(st==="chot"){r.nhan=r.frozen?dtNhan(ym,t):!DTS.rowsAt?"đã qua ngày chốt, đang tải số chốt":r.dt>0&&!r.tam&&!r.thieu?"đã qua ngày chốt, đang lưu số chốt":"đã qua ngày chốt, chưa đủ số để chốt"}
+  else if(st==="chot"){const ly=r.frozen?[]:dtChuaDu(ch,ym);r.nhan=r.frozen?dtNhan(ym,t):ly.length?"dự kiến, chưa chốt: "+ly.join("; "):!DTS.rowsAt?"đã qua ngày chốt, đang tải số chốt":r.dt>0&&!r.tam&&!r.thieu?"đã qua ngày chốt, đang lưu số chốt":"đã qua ngày chốt, chưa đủ số để chốt"}
   else{r.dk=ch==="fb"&&r.dt!=null?dtDuKien(r.dt,r.dangDt||0,DT_HOAN_FB):r.dt;r.nhan=dtNhan(ym,t)+(ch==="fb"&&r.dangDt?` · dự kiến ${tr(r.dk)} khi ${nf(r.dang)} đơn đang giao có kết quả (hoàn dự kiến ${Math.round(DT_HOAN_FB*100)}%)`:"")}
   r.src=r.nhan+(r.src?" · "+r.src:"");return r}
 {const _t=tqRevB2C;tqRevB2C=function(N,from,to){const out=_t.apply(this,arguments);if(DTS.live||!dtOk())return out;dtEnsure();
@@ -120,8 +126,8 @@ function dtAutoChot(){
   DTS.inAuto=true;
   try{for(let ym=DT_TU;dtTrangThai(ym,t)==="chot";ym=plYmAdd(ym,1)){if(DTS.auto[ym])continue;
       const need=["tts","spe","fb","b2b","gc"].filter(ch=>!dtSnap(ym,ch));if(!need.length){DTS.auto[ym]=1;continue}
-      const L=dtLiveMonth(ym);if(L._loading)continue;
-      const rows=need.map(ch=>{const r=L[ch];return r&&dtCanChot(ym,t,null,r.dt)&&!r.tam&&!r.thieu?{channel:ch,amount:Math.round(r.dt),orders:r.don==null?null:Math.round(+r.don||0),data:{dt:r.dt,don:r.don,gv:r.gv,phi:r.phi,ads:r.ads,khac:r.khac,lai:r.lai,src:r.src}}:null}).filter(Boolean);
+      const L=dtLiveMonth(ym);if(L._loading||need.some(ch=>dtChuaDu(ch,ym).some(x=>/đang tải/.test(x))))continue;
+      const rows=need.map(ch=>{const r=L[ch];return r&&dtCanChot(ym,t,null,r.dt)&&!r.tam&&!r.thieu&&!dtChuaDu(ch,ym).length?{channel:ch,amount:Math.round(r.dt),orders:r.don==null?null:Math.round(+r.don||0),data:{dt:r.dt,don:r.don,gv:r.gv,phi:r.phi,ads:r.ads,khac:r.khac,lai:r.lai,src:r.src}}:null}).filter(Boolean);
       DTS.auto[ym]=1;if(!rows.length)continue;
       svApi("/api/hub/dieuhanh/doanhthu/chot",{method:"POST",body:JSON.stringify({ym,rows})}).then(()=>dtLoadRows(true)).catch(e=>{DTS.auto[ym]=0;console.warn("chốt doanh thu",ym,e.message)})}}
   finally{DTS.inAuto=false}}
