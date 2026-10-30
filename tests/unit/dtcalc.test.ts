@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const T: any = new Function(
   `${readFileSync('hub/src/dtcalc.js', 'utf8')}
-  return {DT_KENH,DT_HOAN_FB,dtNgayChot,dtTrangThai,dtNhan,dtDuKien,dtFbNgay,dtCanChot,dtChon,dtLech,dtNkcKenh};`,
+  return {DT_KENH,DT_HOAN_FB,dtNgayChot,dtTrangThai,dtNhan,dtDuKien,dtFbNgay,dtCanChot,dtChon,dtLech,dtNkcKenh,dtChuaDuThang};`,
 )();
 
 describe('Doanh thu thực: luật chốt ngày 10', () => {
@@ -95,5 +95,15 @@ describe('Doanh thu thực: chi phí Sổ chi phí bổ thẳng về kênh', () 
     const one = nkc.filter((x) => x.d.startsWith('2026-10') && x.k === 'Chung');
     expect(T.dtNkcKenh(one, '2026-10-01', '2026-10-31', lo).v.fb).toBe(0);
     expect(kenh + chung).toBe(520_000 + 850_000 + 16_000 + 1_000_000);
+  });
+});
+
+describe('Sàn chỉ tự chốt khi mọi shop có bản đủ tháng', () => {
+  it('bản giữa tháng (có ngày "đến") hoặc thiếu shop thì chưa chốt, ghi lý do', () => {
+    const full = { dt: 1, den: null };
+    expect(T.dtChuaDuThang([{ ten: 'Shopee A', s: full }, { ten: 'Shopee B', s: full }])).toEqual([]);
+    const ly = T.dtChuaDuThang([{ ten: 'Shopee A', s: { dt: 1, den: '2026-09-30' } }, { ten: 'Shopee B', s: null }]);
+    expect(ly).toEqual(['Shopee A mới có bản đến ngày 30/09/2026, chưa có bản đủ tháng', 'Shopee B chưa tải báo cáo']);
+    expect(T.dtChuaDuThang([{ ten: 'TikTok', s: { dt: 1, den: '2026-09-28' } }]).length).toBe(1);
   });
 });

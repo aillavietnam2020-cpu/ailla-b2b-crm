@@ -20,6 +20,9 @@ const dtDuKien=(that,dang,hoan)=>(+that||0)+Math.max(0,+dang||0)*(1-(hoan==null?
    dt = doanh thu đơn chốt (chưa hủy), phần còn lại dt − giao − hoàn là đơn đang giao. */
 function dtFbNgay(L){const o={tao:0,huy:0,giao:0,hoan:0,dt:0,dtGiao:0,hoanDt:0};(L||[]).forEach(r=>{for(const k in o)o[k]+=+r[k]||0});o.dang=Math.max(0,o.dt-o.dtGiao-o.hoanDt);return o}
 /* Tháng ym có cần lưu số chốt không: đã tới ngày chốt, chưa có số chốt, từ tháng áp luật, và có số (không chốt số trống / 0). */
+/* Sàn chỉ tự chốt khi MỌI shop đã có báo cáo đủ tháng (bản chốt sổ, không "đến ngày X" — bản giữa tháng phí còn ước).
+   items: [{ten, s}] mỗi shop một dòng, s = bản đã tải của tháng (null nếu chưa tải). Trả các lý do chưa chốt; rỗng = đủ. (điều phối 30/10) */
+const dtChuaDuThang=items=>(items||[]).map(({ten,s})=>!s?`${ten} chưa tải báo cáo`:s.den?`${ten} mới có bản đến ngày ${String(s.den).slice(0,10).split("-").reverse().join("/")}, chưa có bản đủ tháng`:"").filter(Boolean);
 const dtCanChot=(ym,today,snap,dt)=>ym>=DT_TU&&dtTrangThai(ym,today)==="chot"&&!snap&&dt!=null&&+dt>0;
 /* Số hiện trên trang: tháng đã chốt và có số chốt thì lấy số chốt (đóng băng), còn lại lấy số đang tính. */
 const dtChon=(live,snap,ym,today)=>dtTrangThai(ym,today)==="chot"&&snap?{...snap,frozen:true}:{...live,frozen:false};
