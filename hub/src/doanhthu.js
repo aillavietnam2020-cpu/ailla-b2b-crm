@@ -58,7 +58,7 @@ function dtEnsure(){dtLoadRows();
 /* Lý do kênh sàn chưa tự chốt được tháng ym (dtChuaDuThang): Shopee xét từng shop, TikTok một báo cáo. Kênh khác: []. */
 function dtChuaDu(ch,ym){try{
   if(ch==="spe"){if(typeof SPE==="undefined"||!SPE.sums)return ["báo cáo Shopee đang tải"];const sh=typeof speShopsAll==="function"?speShopsAll():[...new Set(SPE.sums.map(x=>x.shop))];
-    return dtChuaDuThang(sh.map(x=>({ten:"Shopee "+(typeof speShopL==="function"?speShopL(x):x),s:SPE.sums.find(z=>z.ky===ym&&z.shop===x)||null})))}
+    return dtChuaDuThang(sh.map(x=>({ten:typeof speShopL==="function"?speShopL(x):"Shopee "+x,s:SPE.sums.find(z=>z.ky===ym&&z.shop===x)||null})))}
   if(ch==="tts"){if(typeof TSB==="undefined"||!TSB.sum)return ["báo cáo TikTok đang tải"];const s=TSB.sum[ym];return dtChuaDuThang([{ten:"TikTok",s:s&&s.dt?s:null}])}}catch(e){}
   return []}
 function dtLabel(r,ch,from,to){
