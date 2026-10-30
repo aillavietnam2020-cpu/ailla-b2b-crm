@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { nowIso } from '@shared/datetime';
 import { zodFieldErrors } from '@shared/schemas';
 import { AGENT_PHIEU_CHI, AGENT_SCOPES, AGENT_SCOPE_LABELS, AGENT_SCOPE_PREFIX } from '@shared/agent';
-import { AGENT_IDS } from '@shared/agentRoster';
+import { AGENT_IDS, AGENT_ROSTER } from '@shared/agentRoster';
 import type { Role } from '@shared/enums';
 import { effectivePermissions } from '@shared/permissions';
 import type { AppEnv } from '../env';
@@ -42,6 +42,7 @@ agentAdminRoutes.get('/', async (c) => {
     c,
     (rows.results ?? []).map((r) => ({
       ...r,
+      chat_agent: r.chat_agent ?? rosterIdByName(String(r.name ?? '')),
       scopes: r.scopes ? String(r.scopes).split(',') : [],
       delegator_ids: r.delegator_ids ? String(r.delegator_ids).split(',') : [],
     })),
@@ -212,6 +213,13 @@ agentAdminRoutes.post('/:id/phieuchi', async (c) => {
   return ok(c, { id, can_phieuchi: enabled });
 });
 
+/** Tài khoản agent chưa gắn agent nào trên trang Điều hành agent: ghép theo tên ("Kế toán trưởng" → ke-toan-truong-ailla). */
+const normName = (x: string) => x.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/^agent\s*·\s*/, '').replace(/[^a-z0-9]/g, '');
+function rosterIdByName(name: string): string | null {
+  const n = normName(name);
+  return n ? (AGENT_ROSTER.find((a) => normName(a.name) === n)?.id ?? null) : null;
+}
+
 /** Người có thể được chỉ định ra lệnh ghi cho agent: nhân sự đang làm, có vai kế toán / điều phối (khớp rào ở agentSpend). */
 async function delegatorCandidates(db: D1Database) {
   const rows = await db
@@ -241,7 +249,8 @@ agentAdminRoutes.put('/:id/delegators', async (c) => {
   const exists = await c.env.DB.prepare('SELECT id FROM agents WHERE id = ?').bind(id).first();
   if (!exists) throw notFound('Không tìm thấy agent');
   const cur = await c.env.DB.prepare('SELECT chat_agent FROM agent_delegators WHERE agent_id = ? LIMIT 1').bind(id).first<{ chat_agent: string }>();
-  const chatAgent = cur?.chat_agent ?? String(b.chat_agent ?? '');
+  const nm = await c.env.DB.prepare('SELECT name FROM agents WHERE id = ?').bind(id).first<{ name: string }>();
+  const chatAgent = cur?.chat_agent ?? (String(b.chat_agent ?? '') || rosterIdByName(nm?.name ?? '') || '');
   if (!AGENT_IDS.includes(chatAgent)) throw unprocessable('NEED_CHAT_AGENT', 'Chọn agent trên trang Điều hành agent ứng với tài khoản này', { chat_agent: 'Bắt buộc' });
   const allowed = new Set((await delegatorCandidates(c.env.DB)).map((u) => u.id));
   const want = [...new Set((b.user_ids ?? []).map(String))];

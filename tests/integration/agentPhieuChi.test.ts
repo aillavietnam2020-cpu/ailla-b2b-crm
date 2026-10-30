@@ -205,3 +205,16 @@ describe('Chị Hoa chọn thêm người ra lệnh cho agent (chị Huệ như 
     expect(await ctx.db.prepare('SELECT 1 FROM agent_delegators WHERE agent_id = ?').bind(agent.id).first()).toBeNull();
   });
 });
+
+it('agent chưa có ai ra lệnh: vẫn chọn được người (ghép agent theo tên)', async () => {
+  const made = await ctx.request('/api/admin/agents', { as: USERS.ceo, body: { name: 'Kế toán trưởng' } });
+  const id = made.body.data.id as string;
+  const list = await ctx.request('/api/admin/agents', { as: USERS.ceo });
+  expect(list.body.data.find((a: any) => a.id === id).chat_agent).toBe(CHAT_AGENT);
+  const ceo = await uid(USERS.ceo);
+  const hue = await uid(USERS.thao);
+  await ctx.db.prepare('INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(hue, 'order.accounting.confirm', ceo, T0).run();
+  const put = await ctx.request(`/api/admin/agents/${id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [hue] } });
+  expect(put.status).toBe(200);
+  expect(put.body.data.chat_agent).toBe(CHAT_AGENT);
+});
