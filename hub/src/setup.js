@@ -120,7 +120,7 @@ const MODULES=[
  {k:"exec",zone:"",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
  {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_v","Việc",null,()=>{try{return wkCount()||""}catch(e){return ""}}),MI("cv_da","Dự án"),MI("cv_mt","Mục tiêu")].filter(Boolean)]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
- {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("matkhau","Đổi mật khẩu")]]]},
+ {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("thongbao","Cài đặt thông báo"),MI("matkhau","Đổi mật khẩu")]]]},
  {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Kênh bán lẻ",sub:"TikTok · Shopee · Facebook",groups:()=>[
    ["",[MI("bc_tong","Kết quả kinh doanh",tq),MI("bc_tiktok","TikTok",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq),MI("fb_sale","Hoạt động team Sale",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
  {k:"b2b",zone:"Bán hàng",ic:"box",n:"Kênh phân phối",sub:"Đại lý · NPP · CRM",groups:()=>[

@@ -65,7 +65,8 @@ const svTyping=()=>{const a=document.activeElement;return a&&/^(INPUT|TEXTAREA|S
 let svActive=Date.now(),svLastPoll=0;["mousemove","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,()=>{svActive=Date.now()},{passive:true}));
 async function svPoll(){
   try{
-    if(SV.busy||SV.pending.length||document.hidden)return;
+    // Đang ở tab khác / thu nhỏ: một phút hỏi một lần để vẫn báo kịp (thông báo của Windows, thongbao.js).
+    if(SV.busy||SV.pending.length||(document.hidden&&Date.now()-svLastPoll<60000))return;
     if(Date.now()-svActive>120000&&Date.now()-svLastPoll<30000)return;svLastPoll=Date.now();
     const v=await svApi("/api/hub/state/version");
     if(v.version>SV.version){
@@ -84,14 +85,17 @@ async function svPoll(){
 }
 
 /* Báo ngay việc mới đến tay mình (xưởng báo xong → kế toán; nhu cầu mới → xưởng; lô đã kiểm → người in tem). */
-function svWatch(){const s=typeof SX==="function"?SX():null;if(!s)return {};return {kiem:s.batches.filter(b=>b.st==="CHO_KIEM").map(b=>b.id),req:s.requests.filter(r=>r.st==="CAN_LAM").map(r=>r.id),tem:s.batches.filter(b=>b.st==="DA_KIEM"||b.st==="TEM_SAN").map(b=>b.id),task:(D().tasks||[]).filter(t=>t.nguoi===(ME&&ME.id)&&t.st!=="done").map(t=>t.id),duyet:(D().tasks||[]).filter(t=>t.duyet===(ME&&ME.id)&&t.st==="review").map(t=>t.id+":"+(t.trinh||[]).join(",")).concat(ME&&ME.role==="admin"?(D().tasks||[]).filter(t=>(t.oanhOk||[]).length).map(t=>t.id+":ceo:"+t.oanhOk.join(",")):[])}}
-function svNotify(a,b){if(!ME||!a.kiem)return;const neu=k=>(b[k]||[]).filter(x=>!(a[k]||[]).includes(x)),s=SX(),msg=[];
-  if(can(ME,"sx.kiemke"))neu("kiem").forEach(id=>{const x=s.batches.find(y=>y.id===id);if(x)msg.push(`Xưởng vừa báo xong ${sxP(x.sp).ten}: ${nf(x.baoSL)} · chờ kiểm kê`)});
-  if(can(ME,"sx.xuong"))neu("req").forEach(id=>{const x=s.requests.find(y=>y.id===id);if(x)msg.push(`Nhu cầu mới: ${sxP(x.sp).ten}${x.sl?" · "+nf(x.sl):""}${x.uu==="Gấp"?" · GẤP":""}`)});
-  neu("task").forEach(id=>{const t=D().tasks.find(y=>y.id===id);if(t)msg.push("Việc mới giao cho bạn: "+t.ten)});
-  neu("duyet").forEach(k=>{const t=D().tasks.find(y=>y.id===k.split(":")[0]);if(t)msg.push("Có video trình bạn duyệt: "+t.ten)});
-  if(!msg.length)return;toast(msg.join(" · "));try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join(" · ")})}catch(e){}
-  document.title="("+msg.length+") Trang quản trị Ailla";setTimeout(()=>{document.title="Trang quản trị Ailla"},15000)}
+function svWatch(){const s=(typeof SX==="function"&&SX())||{batches:[],requests:[]};return {kiem:s.batches.filter(b=>b.st==="CHO_KIEM").map(b=>b.id),req:s.requests.filter(r=>r.st==="CAN_LAM").map(r=>r.id),tem:s.batches.filter(b=>b.st==="DA_KIEM"||b.st==="TEM_SAN").map(b=>b.id),task:(D().tasks||[]).filter(t=>t.nguoi===(ME&&ME.id)&&t.st!=="done").map(t=>t.id),duyet:(D().tasks||[]).filter(t=>t.duyet===(ME&&ME.id)&&t.st==="review").map(t=>t.id+":"+(t.trinh||[]).join(",")).concat(ME&&ME.role==="admin"?(D().tasks||[]).filter(t=>(t.oanhOk||[]).length).map(t=>t.id+":ceo:"+t.oanhOk.join(",")):[])}}
+function svNotify(a,b){if(!ME||!a.task)return;const neu=k=>(b[k]||[]).filter(x=>!(a[k]||[]).includes(x)),s=SX(),msg=[];
+  // [loại, khóa, nội dung, mở]: thongbao.js hiện ở góc dưới phải, không báo trùng; thiếu file đó thì báo bằng toast như cũ.
+  const ot=id=>()=>{if(typeof openTask==="function")openTask(id)};
+  if(can(ME,"sx.kiemke"))neu("kiem").forEach(id=>{const x=s.batches.find(y=>y.id===id);if(x)msg.push(["giao","sxk:"+id,`Xưởng vừa báo xong ${sxP(x.sp).ten}: ${nf(x.baoSL)} · chờ kiểm kê`])});
+  if(can(ME,"sx.xuong"))neu("req").forEach(id=>{const x=s.requests.find(y=>y.id===id);if(x)msg.push(["giao","sxr:"+id,`Nhu cầu sản xuất mới: ${sxP(x.sp).ten}${x.sl?" · "+nf(x.sl):""}${x.uu==="Gấp"?" · GẤP":""}`])});
+  neu("task").forEach(id=>{const t=D().tasks.find(y=>y.id===id);if(t)msg.push(["giao","task:"+id,"Việc mới giao cho bạn: "+t.ten,ot(id)])});
+  neu("duyet").forEach(k=>{const t=D().tasks.find(y=>y.id===k.split(":")[0]);if(t)msg.push(["duyet","tdu:"+k,"Có video trình bạn duyệt: "+t.ten,ot(t.id)])});
+  if(!msg.length)return;
+  if(typeof ntPush==="function"){msg.forEach(([type,key,text,go])=>ntPush({key,type,text,go}));return}
+  toast(msg.map(x=>x[2]).join(" · "))}
 DB.load=async function(){
   // Bản chung và Sản xuất không phụ thuộc tài khoản: hỏi luôn cùng lúc, không đợi /api/me và số nạp sẵn xong mới hỏi.
   const stP=svApi("/api/hub/state"),sxP=svApi("/api/hub/sx");stP.catch(()=>{});sxP.catch(()=>{});

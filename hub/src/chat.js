@@ -124,7 +124,7 @@ const _snNt=svNotify;
 svNotify=function(a,b){_snNt(a,b);if(!ME||!b||!b.nt)return;const neu=(b.nt||[]).filter(x=>!(a.nt||[]).includes(x)),L=myNotifs().filter(n=>neu.includes(n.id));
   const chNew=CH_ROOMS.filter(([k])=>chUnread(k)&&!(a.ch||[]).includes(k+":"+chMsgs(k).length));
   const msg=L.map(n=>n.text).concat(chNew.length?["Tin nhắn mới trong nhóm "+chNew.map(r=>r[1]).join(", ")]:[]);
-  if(msg.length){L.forEach(n=>ntPop(n));chNew.forEach(([k,nm])=>{const m=chMsgs(k).slice(-1)[0];if(m&&!L.some(n=>n.ref==="room:"+k))ntPop({id:"",text:`💬 ${userName(m.by)||m.who} (nhóm ${nm}): ${String(m.text).slice(0,120)}`,ref:"room:"+k,at:m.t})});try{if(document.hidden&&"Notification" in window&&Notification.permission==="granted")new Notification("Trang quản trị Ailla",{body:msg.join("\n")})}catch(e){}}
+  if(msg.length){L.forEach(n=>ntPop(n));chNew.forEach(([k,nm])=>{const m=chMsgs(k).slice(-1)[0];if(m&&!L.some(n=>n.ref==="room:"+k))ntPop({id:"",text:`💬 ${userName(m.by)||m.who} (nhóm ${nm}): ${String(m.text).slice(0,120)}`,ref:"room:"+k,at:m.t})})}
   bellBadge();const p=$("#chp");if(p&&p._draw&&!(document.activeElement&&document.activeElement.id==="ch-in"&&document.activeElement.value))p._draw()};
 
 /* ---------- Giữ trang khi F5 (chỉ trong tab đang mở) ---------- */
@@ -149,4 +149,4 @@ renderMain=function(){_renderMainView();saveView();_backScr()};
 /* Mở web mà còn thông báo chưa đọc: bật lên một lần ở góc dưới */
 let NT_FIRST=false;
 setInterval(()=>{if(NT_FIRST||!ME||!DB.data)return;NT_FIRST=true;const L=myNotifs().filter(n=>!n.read);if(!L.length)return;
-  if(L.length===1)ntPop(L[0]);else ntPop({id:"",text:`Bạn có ${L.length} thông báo chưa đọc. Mới nhất: ${L[0].text}`,ref:""})},1500);
+  L.slice(0,10).reverse().forEach(ntPop)},1500); // thongbao.js bỏ tin đã báo trước đó, gom lại khi nhiều

@@ -693,6 +693,12 @@ table.kstab td{vertical-align:middle}
 .ntpc{position:relative;background:#fff;border:1px solid #d9dcf5;border-left:4px solid #5b5bd6;border-radius:12px;box-shadow:0 10px 30px rgba(40,40,90,.18);padding:10px 30px 10px 12px;display:flex;flex-direction:column;gap:3px;cursor:pointer;font-size:13.5px;animation:ntin .25s ease-out}
 .ntpc b{font-size:12px;color:#5b5bd6}.ntpc small{color:var(--muted);font-size:11px}.ntpc:hover{background:#f7f7ff}
 .ntpx{position:absolute;right:6px;top:6px;border:0;background:none;cursor:pointer;color:var(--muted);font-size:13px}
+.ntpc .ntpt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ntpc.nt-agent{border-left-color:#0d9488}.ntpc.nt-agent b{color:#0f766e}.ntpc.nt-duyet{border-left-color:#d97706}.ntpc.nt-duyet b{color:#b45309}.ntpc.nt-giao{border-left-color:#2563eb}.ntpc.nt-giao b{color:#1d4ed8}
+body:has(#aibtn) .ntpop{bottom:74px}
+.ntpc.ntmore{padding:7px 30px 7px 12px;font-size:12.5px;color:#4b4b8f;border-left-color:#9a9ae0}
+.ntpc.ntask{cursor:default;gap:6px;background:#f7f7ff}.ntpc.ntask .btn{align-self:flex-start}
+.nttog{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}.nttog input{margin-top:3px;width:auto;flex:none}.nttog span{display:flex;flex-direction:column;gap:2px}.nttog small{color:var(--muted)}
 @keyframes ntin{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
 /* nhắn riêng */
 .chdm{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line)}.chdm small{color:var(--muted);margin-right:2px}

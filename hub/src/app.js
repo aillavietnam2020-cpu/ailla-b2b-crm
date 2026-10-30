@@ -30,7 +30,7 @@ const MENU_USER=[
  ["Triển khai",[["giaoviec","Lịch quay & giao việc",u=>can(u,"lich.xem"),()=>D().tasks.filter(t=>t.nguoi===ME.id&&!t.xong).length||""],["lich","Calendar",u=>can(u,"lich.xem")],["research","Research",u=>can(u,"research.xem"),()=>D().questions.filter(q=>q.to===ME.id&&q.status!=="Xong").length||""],["win","Nhân bản video win",u=>can(u,"win.xem")],["order","Order Digital",u=>can(u,"order.xem")],["kho","Kho video cũ",u=>can(u,"kho.xem")]]],
  ["Đo lường",[["baocao","Nhập báo cáo",u=>can(u,"baocao.tiktok")||can(u,"baocao.ads")]]],
  ["Nhân sự của tôi",[["hr_me","Đơn nghỉ phép, OT, tạm ứng",()=>true],["hr_kpime","KPI của tôi",()=>true],["hr_plme","Phiếu lương của tôi",()=>true,()=>{const h=D().hr,ma=ME&&ME.maNS;if(!h||!ma)return "";return Object.values(h.payroll).filter(p=>p.st==="phathanh"&&(p.rows||[]).some(r=>r.ma===ma)&&!(p.xem||{})[ma]).length||""}]]],
- ["Tài khoản",[["quychuan","Quy chuẩn",()=>true],["matkhau","Đổi mật khẩu",()=>true]]],
+ ["Tài khoản",[["quychuan","Quy chuẩn",()=>true],["thongbao","Cài đặt thông báo",()=>true],["matkhau","Đổi mật khẩu",()=>true]]],
 ];
 const PAGES={giaoviec:pGiaoViec,phongban:pPhongBan,hoso:pHoSo,sku:pSku,kenhban:pKenhBan,chiphidm:pChiPhiDM,chiphi:pChiPhi,pl:pPL,hr:pHR,crm:pCRM,adshieuqua:pAdsHieuQua,sanpham:pSanPham,phanbo:pPhanBo,hieuqua:pHieuQua,cv:pCV,kehoach:pKeHoach,research:pResearch,lich:pLich,congviec:pCongViec,win:pWin,order:pOrder,kho:pKho,baocao:pBaoCao,nhansu:pNhanSu,quychuan:pQuyChuan,caidat:pCaiDat,matkhau:pMatKhau,viectoi:pViecToi,ketquatoi:pKetQuaToi};
 function menuItems(){if(APP_MODE!=="admin")return MENU_USER.map(([g,items])=>[g,items.filter(i=>i[2](ME))]).filter(g=>g[1].length);return modGroups(curMod())}
