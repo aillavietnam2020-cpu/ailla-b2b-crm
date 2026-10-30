@@ -70,19 +70,20 @@ async function speFiles(fs){
 /* File đơn không ghi tên shop: ghép với file Tài chính có nhiều mã đơn trùng nhất. */
 function spePair(){
   const U=SPE.up,ids=o=>{const H=ttHead(o.aoa,["Mã đơn hàng"],5);const s=new Set();if(H)for(let r=H.at+1;r<o.aoa.length;r++){const v=ttCell((o.aoa[r]||[])[H.ix["Mã đơn hàng"]]);if(v)s.add(v)}return s};
-  return U.fin.map(F=>{const raw=speReadFin(F.sh,null),keys=Object.keys(raw.ord||{});let best=null,bn=0;
+  const by={};U.fin.forEach(F=>{(by[F.meta.shop]=by[F.meta.shop]||[]).push(F)});
+  return Object.values(by).map(Fs=>{const F=Fs[0],keys=Fs.flatMap(f=>Object.keys(speReadFin(f.sh,null).ord||{}));let best=null,bn=0;
     U.orders.forEach(o=>{o.ids=o.ids||ids(o);const n=keys.filter(k=>o.ids.has(k)).length;if(n>bn){bn=n;best=o}});
-    return {shop:F.meta.shop,F,O:best,A:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).A||null,adsName:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).name||""}});
+    return {shop:F.meta.shop,F,Fs,O:best,A:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).A||null,adsName:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).name||""}});
 }
 async function speCompute(){
   SPE.prev=null;const U=SPE.up;if(!U.fin.length){renderMain();return}
   SPE.busy="Đang tính số Shopee…";renderMain();await new Promise(r=>setTimeout(r,30));
   const res=[];
-  for(const p of spePair()){const x={shop:p.shop,files:{fin:p.F.name,orders:p.O?p.O.name:"",ads:p.adsName}};
+  for(const p of spePair()){const x={shop:p.shop,files:{fin:p.Fs.map(f=>f.name).join(" + "),orders:p.O?p.O.name:"",ads:p.adsName}};
     try{if(!p.shop)throw new Error(`File ${p.F.name}: không đọc được tên shop (dòng Người Bán).`);
       if(!p.O)throw new Error(`Shop ${speShopL(p.shop)}: chưa có file đơn hàng của shop này.`);
       const ky=speGuessKy(p.O.aoa),O=speReadOrders(p.O.aoa,ky);if(O.err)throw new Error(O.err);
-      const F=speReadFin(p.F.sh,ky);if(F.err)throw new Error(`Shop ${speShopL(p.shop)}: ${F.err}`);
+      const F=speReadFins(p.Fs.map(f=>f.sh),ky);if(F.err)throw new Error(`Shop ${speShopL(p.shop)}: ${F.err}`);
       const M=speBuildMonth({ky,shop:p.shop,orders:O,fin:F,ads:p.A,costOf:await speCostOf(ky),pos:await spePosOf(ky)});if(M.err)throw new Error(M.err);
       x.ky=ky;x.M=M}catch(e){x.err=e.message}
     res.push(x)}

@@ -75,6 +75,24 @@ function speReadFin(sheets,ky){
   return {...meta,partial:!!ky&&g.to<ttKyNext(ky)+"-09",ord};
 }
 
+/* Nhiều file Tài chính › Doanh thu của CÙNG một shop cho một tháng (chị Hoa duyệt 30/10/2026): Shopee chỉ cho xuất tối đa 31 ngày,
+   nên chốt sổ cần 01→cuối tháng + 01→09 tháng sau. Các file phải nối liền nhau, không chồng ngày (không cộng trùng), file đầu từ ngày 01. */
+function speReadFins(list,ky){
+  if(!list||list.length<2)return speReadFin(list&&list[0],ky);
+  const P=list.map(sh=>({sh,meta:speFinMeta(sh)})),vn=s=>s.split("-").reverse().join("/");
+  if(P.some(p=>!p.meta.range))return {err:"Không đọc được khoảng ngày (dòng Từ … Đến …) trong một file Tài chính Shopee."};
+  P.sort((a,b)=>a.meta.range.from<b.meta.range.from?-1:1);
+  const shop=P[0].meta.shop;if(P.some(p=>p.meta.shop!==shop))return {err:"Các file Tài chính không cùng một shop."};
+  for(let i=1;i<P.length;i++){const a=P[i-1].meta.range,b=P[i].meta.range;
+    if(b.from<=a.to)return {err:`Hai file Tài chính chồng ngày (${vn(a.from)}–${vn(a.to)} và ${vn(b.from)}–${vn(b.to)}), sẽ cộng trùng. Chị xuất lại cho nối liền.`,shop};
+    if(b.from!==speDayAfter(a.to))return {err:`Hai file Tài chính hở ngày: thiếu từ ${vn(speDayAfter(a.to))} tới ${vn(speDayBefore(b.from))}.`,shop}}
+  const first=speReadFin(P[0].sh,ky);if(first.err)return first;const ord=first.ord;
+  for(let i=1;i<P.length;i++){const x=speReadFin(P[i].sh,null);if(x.err)return x;
+    Object.entries(x.ord).forEach(([id,o])=>{const t=ord[id];if(!t){ord[id]=o;return}t.gross+=o.gross;t.hoan+=o.hoan;t.vou+=o.vou;for(let k=0;k<t.f.length;k++)t.f[k]+=o.f[k];t.aff=t.aff||o.aff;t.d=t.d||o.d})}
+  const to=P[P.length-1].meta.range.to;
+  return {shop,range:{from:P[0].meta.range.from,to},partial:!!ky&&to<ttKyNext(ky)+"-09",ord,n:P.length};
+}
+
 /* ---------- Quảng cáo Shopee (Lịch sử giao dịch Dịch vụ Hiển thị, CSV) ---------- */
 function speReadAds(rows){
   let shop="",at=-1;

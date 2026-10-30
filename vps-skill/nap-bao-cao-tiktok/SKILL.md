@@ -50,7 +50,7 @@ Trong thư mục skill này:
 5. Nhắn chị Thảo 2–3 dòng: tháng nào, số đến ngày nào (hoặc "đủ tháng, chờ khoá sổ"), doanh thu thực, lãi kênh.
 
 ## Shopee (2 shop: aillavn1 thường, aillavn Mall) — cùng lịch, cùng lượt chạy (chị Hoa giao 28/10)
-Làm SAU TikTok, cùng khoảng ngày (đơn + quảng cáo: 01 → ngày cuối; Doanh thu (Tài chính): 01 → ngày cuối, ngày chốt sổ thì tới hết ngày 09 tháng này).
+Làm SAU TikTok, cùng khoảng ngày (đơn + quảng cáo: 01 → ngày cuối; Doanh thu (Tài chính): 01 → ngày cuối). **Ngày chốt sổ (ngày 10)**: Shopee chỉ cho xuất Doanh thu tối đa 31 ngày, nên mỗi shop tải **2 file Doanh thu**: `01 → cuối tháng trước` và `01 → 09 tháng này` (vd 20260901-20260930 và 20261001-20261009). Hai file phải nối liền, không chồng ngày; công cụ tự gộp, đơn quyết toán tới ngày 09 lấy phí thật, bản lưu là **đủ tháng**. Đơn hàng + quảng cáo vẫn 01 → cuối tháng trước.
 **Shopee tạo file ngay trong trình duyệt (blob), nên dùng bộ gài bẫy riêng:** `bash bat-tai-blob.sh <tab>` trước mỗi lần bấm tải, rồi `bash lay-blob.sh <tab> <file>`. Không dùng bat-tai.sh / lay-file.sh của TikTok cho Shopee.
 Thứ tự: shop **aillavn1** trước, rồi **aillavn (Mall)**. Chuyển shop: `https://banhang.shopee.vn/portal/shop` → bấm **Chi tiết** ở dòng shop cần (không đăng xuất).
 Mỗi shop 3 file:
@@ -81,7 +81,7 @@ Chị mở Chrome, vào tab Kênh Người bán, nhập mật khẩu Shopee giú
 Chị nhập xong em tự làm tiếp, em chờ đến <giờ:phút>."` (tin đi Telegram và hiện trong khung chat Kế toán trưởng trên web).
 2. Chạy `bash cho-chi.sh <tab> 10` và **đợi lệnh chạy xong**. Chỉ chạy một lệnh chờ một lúc. In `MAT_TAB` thì chạy `openclaw browser --browser-profile chrome tabs`, dùng đúng tab Shopee đang mở (hoặc mở lại trang). In `HET_HOP` thì làm tiếp; in `VAN_CON_HOP` thì chạy lại, tổng cộng tối đa 3 lần.
 3. Chờ tối đa **30 phút**. Quá 30 phút: vẫn nạp TikTok bình thường, bỏ Doanh thu shop đó (KHÔNG nạp shop đó vì thiếu file), giữ file đơn + quảng cáo trong thư mục, nhắn `nhan-chi.sh "Chưa nhập mật khẩu Shopee nên em chưa nạp shop <shop>. Chị nhập xong nhắn em kéo lại."` và ghi vào báo cáo cuối.
-Tên file: `/root/bao-cao-san/<YYYY-MM>/spe/01_DonHang_<shop>_…xlsx`, `02_DoanhThu_<shop>_…xlsx`, `03_QuangCao_<shop>_…csv`.
+Tên file: `/root/bao-cao-san/<YYYY-MM>/spe/01_DonHang_<shop>_…xlsx`, `02_DoanhThu_<shop>_<từ>-<đến>.xlsx` (ngày chốt sổ có 2 file 02_DoanhThu cho mỗi shop), `03_QuangCao_<shop>_…csv`.
 Nạp: `node nap-shopee.mjs --as ke-toan-truong-ailla /root/bao-cao-san/<YYYY-MM>/spe/* --thu` → đọc số từng shop → chạy lại không `--thu`. Công cụ tự ghép file theo shop. Web chặn bản cũ hơn / bản giữa tháng đè bản đủ tháng giống TikTok.
 
 **Quan trọng khi chờ chị:** không được trả lời "em đang chờ, sẽ tự làm tiếp" rồi kết thúc lượt — kết thúc lượt là không còn ai chờ, chị nhập xong cũng không có gì chạy tiếp. Phải chờ bằng `cho-chi.sh` ngay trong lượt.

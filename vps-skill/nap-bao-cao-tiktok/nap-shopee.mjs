@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url);
 const src = ['ttcalc.js', 'specalc.js'].map((f) => readFileSync(join(here, f), 'utf8')).join('\n');
 const T = new Function(
   `${src}
-  return {ttCsv,ttSheets,ttHead,ttCell,ttMakeCostOf,speKind,speOrderSheet,speReadOrders,speGuessKy,speFinMeta,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speKey,speLearnPos};`,
+  return {ttCsv,ttSheets,ttHead,ttCell,ttMakeCostOf,speKind,speOrderSheet,speReadOrders,speGuessKy,speFinMeta,speReadFin,speReadFins,speReadAds,speBuildMonth,speSummary,speRowsPack,speKey,speLearnPos};`,
 )();
 
 const args = process.argv.slice(2);
@@ -98,8 +98,12 @@ const ids = (o) => {
     }
   return s;
 };
-const pairs = U.fin.map((F) => {
-  const keys = Object.keys(T.speReadFin(F.sh, null).ord || {});
+/* Nhiều file Doanh thu cùng shop (chốt sổ: 01→cuối tháng + 01→09 tháng sau) gộp thành một. */
+const byShop = {};
+U.fin.forEach((F) => (byShop[F.meta.shop] = byShop[F.meta.shop] || []).push(F));
+const pairs = Object.values(byShop).map((Fs) => {
+  const F = Fs[0];
+  const keys = Fs.flatMap((f) => Object.keys(T.speReadFin(f.sh, null).ord || {}));
   let best = null;
   let bn = 0;
   U.orders.forEach((o) => {
@@ -110,7 +114,7 @@ const pairs = U.fin.map((F) => {
       best = o;
     }
   });
-  return { shop: F.meta.shop, F, O: best, ad: U.ads.find((a) => a.A.shop === F.meta.shop) };
+  return { shop: F.meta.shop, F, Fs, O: best, ad: U.ads.find((a) => a.A.shop === F.meta.shop) };
 });
 
 /* Giá vốn như speCostOf trên web: chỉ theo bảng Quy đổi mã các sàn kênh Shopee; mã chưa có thì "chưa tính giá vốn", không ước. */
@@ -144,12 +148,12 @@ for (const p of pairs) {
   const ky = T.speGuessKy(p.O.aoa);
   const O = T.speReadOrders(p.O.aoa, ky);
   if (O.err) die(`Shop ${p.shop}: ${O.err}`);
-  const F = T.speReadFin(p.F.sh, ky);
+  const F = T.speReadFins(p.Fs.map((f) => f.sh), ky);
   if (F.err) die(`Shop ${p.shop}: ${F.err}`);
   if (!p.ad) console.log(`Shop ${p.shop}: KHÔNG có file quảng cáo, quảng cáo tính 0.`);
   const M = T.speBuildMonth({ ky, shop: p.shop, orders: O, fin: F, ads: p.ad ? p.ad.A : null, costOf: await costOfFor(ky), pos: (inputs[ky].pos || []).map((l) => ({ o: l.order_id, sku: l.sku, vr: l.variant, name: l.name })) });
   if (M.err) die(M.err);
-  const files = { fin: p.F.name, orders: p.O.name, ads: p.ad ? p.ad.name : '' };
+  const files = { fin: p.Fs.map((f) => f.name).join(' + '), orders: p.O.name, ads: p.ad ? p.ad.name : '' };
   console.log(`Shopee ${p.shop} tháng ${ky.slice(5)}/${ky.slice(0, 4)}${M.den ? ` (giữa tháng, số đến ${M.den.slice(8)}/${M.den.slice(5, 7)})` : ' (đủ tháng)'}`);
   console.log(
     `  Doanh thu thực ${vn(M.dt)} · giá vốn ${vn(M.gv)}${M.dtUocGv ? ` (chưa tính giá vốn của ${vn(M.dtUocGv)} doanh thu: mã chưa quy đổi)` : ''} · phí sàn ${vn(-M.phi)} · quảng cáo ${vn(M.ads)} · lãi sau ads ${vn(M.lg - M.ads)} · ${vn(M.don)} đơn`,

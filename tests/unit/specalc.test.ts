@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const T: any = new Function(
   `${readFileSync('hub/src/ttcalc.js', 'utf8')}${readFileSync('hub/src/specalc.js', 'utf8')}
-  return {ttSheets,ttCsv,speKind,speOrderSheet,speReadOrders,speGuessKy,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speDayd,speCoverage,speKey,speLearnPos};`,
+  return {ttSheets,ttCsv,speKind,speOrderSheet,speReadOrders,speGuessKy,speReadFin,speReadAds,speBuildMonth,speSummary,speRowsPack,speDayd,speCoverage,speKey,speLearnPos,speReadFins};`,
 )();
 
 const ORD_HEAD = ['Mã đơn hàng', 'Ngày đặt hàng', 'Trạng Thái Đơn Hàng', 'SKU sản phẩm', 'Tên sản phẩm', 'SKU phân loại hàng', 'Tên phân loại hàng',
@@ -242,5 +242,30 @@ describe('Tháng chưa có đơn Poscake: ghép theo tên + phân loại trùng 
     expect(m[T.speKey('Tinh dầu 80ml', 'Hương Luxury')]).toEqual({ sku: '3109', vr: 'Hương Luxury' });
     expect(m[T.speKey('Arila 10kg', '1 can')]).toBeUndefined();
     expect(m[T.speKey('Xịt muỗi', '')]).toBeUndefined();
+  });
+});
+
+describe('Chốt sổ Shopee bằng 2 file Doanh thu (01→cuối tháng + 01→09 tháng sau, 30/10/2026)', () => {
+  const fin = (from: string, to: string, rows: unknown[][]) => ({
+    Summary: [['x'], [], ['Người Bán', 'aillavn']],
+    Adjustment: [['Ghi chú'], ['Người Bán', 'aillavn'], ['Từ', from, 'Đến', to]],
+    'Doanh thu': [['Thông tin'], [''], FIN_HEAD, ...rows],
+  });
+  const A1 = [1, 'Order', 'A1', '2026-09-02', 160000, 0, -10000, -15000, -5000, -3000, -8000, 6000, -6000, -1000];
+  const A3 = [2, 'Order', 'A3', '2026-09-29', 100000, 0, 0, -9000, 0, 0, 0, 0, 0, 0];
+  it('gộp hai file nối liền: đơn quyết toán ở file sau có phí thật, bản lưu là đủ tháng', () => {
+    const F = T.speReadFins([fin('2026-10-01', '2026-10-09', [A3]), fin('2026-09-01', '2026-09-30', [A1])], '2026-09');
+    expect(F.err).toBeUndefined();
+    expect(F.partial).toBe(false);
+    expect(F.range).toEqual({ from: '2026-09-01', to: '2026-10-09' });
+    expect(Object.keys(F.ord).sort()).toEqual(['A1', 'A3']);
+    expect(F.ord.A3.gross).toBe(100000);
+  });
+  it('một file 01→30 là bản chưa đủ (còn đơn quyết toán sau)', () => {
+    expect(T.speReadFins([fin('2026-09-01', '2026-09-30', [A1])], '2026-09').partial).toBe(true);
+  });
+  it('chồng ngày hoặc hở ngày thì báo lỗi, không cộng trùng', () => {
+    expect(T.speReadFins([fin('2026-09-01', '2026-09-30', [A1]), fin('2026-09-30', '2026-10-09', [A3])], '2026-09').err).toMatch(/chồng ngày/);
+    expect(T.speReadFins([fin('2026-09-01', '2026-09-28', [A1]), fin('2026-10-01', '2026-10-09', [A3])], '2026-09').err).toMatch(/hở ngày/);
   });
 });
