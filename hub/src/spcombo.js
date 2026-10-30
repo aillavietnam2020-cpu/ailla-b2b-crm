@@ -120,7 +120,7 @@ function spcProdView(C){
 }
 function spcUnView(){
   const L=SPCB.un||[];
-  return `<section class="card flush"><p class="hint pad">Web tự liệt kê mã trên đơn sàn mà <b>chưa có combo</b>. Kho vẫn soạn và xuất hàng bình thường; các đơn này <b>chưa tính giá vốn</b> (không ước số) và sổ tồn chưa trừ. Kế toán bấm <b>Nhập combo</b>; lưu xong web tự tính lại phiếu xuất và giá vốn các đơn đó, việc ở Việc hôm nay tự đóng khi hết mã.</p>
+  return `<section class="card flush"><p class="hint pad">Mã trên đơn sàn mà web <b>chưa biết gồm những sản phẩm gì</b>. Bấm <b>Nhập combo</b> ở từng dòng để khai. <button type="button" class="spinfo" id="spun-hd" title="Hướng dẫn">ⓘ Hướng dẫn</button></p>
    ${tbl(["Kênh","Mã trên đơn","Tên trên sàn","Đơn","Ngày",""],L.map((u,i)=>`<tr><td>${SPC_CHN(u.channel)}<br>${(u.shops||[]).map(spcShop).join("")}</td><td><b class="mono">${esc(u.sku)}</b>${u.variant?`<br><small class="hint">${esc(u.variant)}</small>`:""}</td><td><small>${esc(String(u.name||"").slice(0,90))}</small></td><td class="n">${nf(u.orders)}</td>
      <td>${spcDd(u.first_day)}${u.last_day!==u.first_day?"–"+spcDd(u.last_day):""}<br>${pill("chưa tính giá vốn","amb")}</td><td>${SPCB.can?`<button class="btn sm pri" data-spun="${i}">Nhập combo</button>`:""}</td></tr>`))}
    </section>`;
@@ -133,6 +133,7 @@ function spcBind(m,C){
   m.querySelectorAll("[data-spch]").forEach(b=>b.onclick=()=>{SPCB.ch=b.dataset.spch;SPCB.shop="";renderMain()});
   m.querySelectorAll("[data-sped]").forEach(b=>b.onclick=()=>{const c=C.combos.find(x=>x.key===b.dataset.sped);if(c)spcbEdit(c)});
   m.querySelectorAll("[data-spun]").forEach(b=>b.onclick=()=>spcbEdit(null,SPCB.un[+b.dataset.spun]));
+  {const hd=m.querySelector("#spun-hd");if(hd)hd.onclick=spcUnHuongDan}
   m.querySelectorAll("[data-spnew]").forEach(b=>b.onclick=()=>spcbEdit(null,null));
   m.querySelectorAll("[data-spadd]").forEach(b=>b.onclick=()=>spcProd(null));
   m.querySelectorAll("[data-spp]").forEach(b=>b.onclick=()=>spcProd(SPCB.prods.find(p=>p.code===b.dataset.spp)));
@@ -276,3 +277,16 @@ PAGES.kho_qd=pSpcombo;
 /* Đưa trang vào kho trang để menubang.js xếp: quản trị › Cấu hình › Danh mục; vận hành › Kho – Sản xuất › Danh mục. */
 MODULES.push({k:"q_spc",adm:true,zone:"Quản trị",ic:"box",n:"Sản phẩm & combo",sub:"",groups:()=>[["",[MI("spcombo","Sản phẩm & combo",()=>typeof mhManage==="function"&&mhManage())]]]});
 MODULES.push({k:"spc_kho",zone:"Vận hành",ic:"box",n:"Combo soạn hàng",sub:"",groups:()=>[["",[MI("kho_combo","Combo soạn hàng")]]]});
+
+/* Hướng dẫn tab Mã chưa quy đổi (chị Hoa 30/10: chị Huệ mở ra chưa biết làm gì) — bấm ⓘ mới hiện. */
+function spcUnHuongDan(){openDrawerHTML(`<h2>Mã chưa quy đổi là gì, làm thế nào?</h2>
+ <p><b>Không phải chưa có giá vốn.</b> Đây là mã trên đơn sàn (TikTok, Shopee, Facebook) mà web <b>chưa biết mã đó gồm sản phẩm gì trong kho</b>. Ví dụ mã <b>"2TVN nhỏ"</b> = 2 lọ Bột tẩy vạn năng 250g, nhưng web chưa được khai.</p>
+ <p>Trong lúc chưa khai: kho vẫn xuất hàng bình thường, nhưng các đơn đó <b>chưa trừ tồn kho</b> và <b>chưa tính giá vốn</b> (web không đoán số).</p>
+ <h3>Cách làm từng dòng</h3>
+ <ol style="margin:4px 0 0 18px;line-height:1.7">
+  <li>Bấm nút xanh <b>Nhập combo</b> ở cuối dòng. Mã trên sàn đã điền sẵn.</li>
+  <li>Chọn <b>sản phẩm gốc</b> trong kho và <b>số lượng</b>. Ví dụ "2TVN nhỏ" → Bột tẩy vạn năng 250g × 2; "3TVN nhỏ" → × 3.</li>
+  <li>Combo có kèm quà thì thêm dòng quà. Ví dụ "12TL + 1 Phao" → Tẩy lồng 125g × 12 và Phao lọc cặn × 1 (quà).</li>
+  <li>Bấm <b>Lưu</b>. Web tự tính lại phiếu xuất và giá vốn các đơn đó; dòng tự biến khỏi danh sách.</li>
+ </ol>
+ <p class="hint" style="margin-top:10px">Mỗi mã chỉ khai một lần, lần sau đơn có mã đó web tự hiểu. Còn ô <b>"Combo chưa tính được giá vốn"</b> là việc khác: combo đã khai nhưng có món bên trong chưa có giá; việc đó điền ở tab <b>Sản phẩm gốc</b>.</p>`)}

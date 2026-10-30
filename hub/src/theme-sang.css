@@ -521,3 +521,4 @@ body.pop-open{overflow:hidden}
 .pttile.t-grn .pti{background:#e8f6ee;color:#12a150}.pttile.t-amb .pti{background:#fff6e5;color:#dc8a00}
 .pttile.t-blu .pti{background:#eaf1fe;color:#2e6ff2}.pttile.t-vio .pti{background:#f1edfd;color:#6d4ae6}
 @media(max-width:1300px){.pttiles{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:700px){.pttiles{grid-template-columns:1fr 1fr}}
+.spinfo{border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;border-radius:999px;padding:1px 10px;font-size:12px;font-weight:600;cursor:pointer;margin-left:6px}.spinfo:hover{background:#e0e7ff}
