@@ -526,3 +526,4 @@ body.pop-open{overflow:hidden}
    (form Nhập combo không thấy dòng chọn sản phẩm). Không cho khối con co lại; cả cửa sổ cuộn thay vì từng bảng. */
 .drawer .in>*{flex-shrink:0}
 .pop-in>*{flex-shrink:0}
+.spc-ten{margin:10px 0;padding:10px 12px;border:1px solid #c7d2fe;background:#f5f7ff;border-radius:10px;font-size:13px}.spc-ten .t{font-size:14.5px;font-weight:700;color:#1f2433;margin:2px 0 4px;line-height:1.4}
