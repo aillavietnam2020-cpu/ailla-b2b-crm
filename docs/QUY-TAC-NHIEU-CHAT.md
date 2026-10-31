@@ -82,3 +82,11 @@ Chị Hoa không rành kỹ thuật: báo bằng lời đời thường, nói th
 ## 8. Báo chị Hoa ngắn gọn, và được tự động (23/10)
 
 Xem phần đầu `CLAUDE.md`. Tóm tắt: báo tối đa 4 dòng đời thường, nói chị thấy gì, đã lên web chưa, chị có phải làm gì không (mặc định "Chị không cần làm gì"). Chat được tự ghép `main` và tự đưa web lên khi đủ 5 điều kiện (merge origin/main, tsc + vitest qua, chốt chặn cho qua, không xóa/sửa đè dữ liệu thật, đúng phạm vi chị nhờ). Thứ tự: ghi main trước rồi deploy ngay sau, để chat khác thấy main mới và không đè nhau.
+
+## 9. Không nhắn tiến độ sang chat khác (chị Hoa 31/10)
+
+Chị Hoa đọc thấy mọi tin chat nhắn qua lại, tin tiến độ làm chị rối mà không có tác dụng.
+- KHÔNG nhắn chat điều phối hay chat khác để báo "đang làm", "đã xong", "đã deploy", "hiện trạng…". Xong việc thì chỉ báo chị ngay trong chat của mình.
+- Chỉ nhắn chat khác khi chat đó PHẢI làm hoặc quyết một việc: đụng file/vùng của chat đó, chặn việc của nó, xung đột khi ghép. Một tin, nói rõ cần nó làm gì; không kèm tường thuật.
+- Nhận tin từ chat khác: làm việc được nhờ, KHÔNG nhắn lại để xác nhận "đã nhận / đã xong" (trừ khi bên kia hỏi đúng câu cần trả lời).
+- Việc cần chị quyết: hỏi chị ngay trong chat của mình, không nhờ chat điều phối chuyển lời. Chat điều phối chỉ nhắc chị khi một chat chờ chị trả lời quá 15 phút.
