@@ -24,6 +24,7 @@ export const AGENT_ROSTER: readonly AgentProfile[] = [
   { id: 'duan-ads-agent', name: 'Ads Duẩn', title: 'Chuyên viên Ads · Duẩn', emoji: '🎯', color: '#dc2626', quyen: 'Order Digital, số quảng cáo' },
   { id: 'thaodinh-ads-agent', name: 'Ads Thảo Đinh', title: 'Chuyên viên Ads · Thảo Đinh', emoji: '🎯', color: '#0891b2', quyen: 'Order Digital, số quảng cáo' },
   { id: 'viet-anh-ads-agent', name: 'Ads Việt Anh', title: 'Chuyên viên Ads · Việt Anh', emoji: '🎯', color: '#4f46e5', quyen: 'Order Digital, số quảng cáo' },
+  { id: 'ailla-tiktok-shop', name: 'Đăng', title: 'Vận hành shop TikTok', emoji: '🛒', color: '#e11d48', quyen: 'Tạm chưa đọc dữ liệu web' },
   { id: 'zalo-tro-ly-hoa', name: 'Zalo trợ lý', title: 'Trợ lý Zalo của chị Hoa', emoji: '💬', color: '#0284c7', quyen: 'Tạm chưa đọc dữ liệu web' },
 ];
 

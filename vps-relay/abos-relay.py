@@ -457,7 +457,7 @@ def ask_agent(m):
 # ---------- Đồng bộ tin Telegram của chị Hoa lên web (từ lúc bật trở đi) ----------
 ALL_AGENTS = ["main", "lead-sale-ailla", "ke-toan-truong-ailla", "ke-toan-kho-ailla", "ky-thuat-san-xuat-ailla",
               "lead-content-ailla", "lead-digital-ailla", "media-ailla-agent", "duan-ads-agent",
-              "thaodinh-ads-agent", "viet-anh-ads-agent", "zalo-tro-ly-hoa", "sale-b2b-ailla"]
+              "thaodinh-ads-agent", "viet-anh-ads-agent", "zalo-tro-ly-hoa", "sale-b2b-ailla", "ailla-tiktok-shop"]
 # Agent có người được chỉ định ra lệnh ghi qua Telegram: báo định danh người gửi (do OpenClaw ghi) cho web tạo giấy ủy quyền
 DELEG_AGENTS = ("sale-b2b-ailla", "ke-toan-truong-ailla")
 DELEG_PENDING = []
