@@ -9,6 +9,7 @@ Chị Hoa không rành kỹ thuật và rất phiền khi bị báo dài, nhiề
 - Nói 3 điều: (1) đã làm gì và chị thấy gì trên màn hình, (2) đã lên web chưa, (3) chị có phải làm gì không. Không cần làm gì thì viết đúng câu "Chị không cần làm gì."
 - Chỉ nhờ chị làm khi thật sự cần (bấm cửa sổ cập nhật, thử một thao tác, quyết một việc). Khi nhờ, nói từng bước nhìn thấy trên màn hình.
 - Chi tiết kỹ thuật chỉ viết khi chị hỏi, hoặc đưa vào phần cuối tin dưới dòng "Chi tiết cho người làm web".
+- KHÔNG nhắn tin tiến độ sang chat điều phối hay chat khác ("đang làm", "đã xong", "đã deploy"): chị đọc thấy hết và bị rối. Chỉ nhắn chat khác khi nó phải làm hoặc quyết một việc, và không nhắn lại để xác nhận đã nhận. Chi tiết: `docs/QUY-TAC-NHIEU-CHAT.md` mục 9.
 
 ## Được tự động (chị Hoa đã đồng ý ngày 23/10)
 
