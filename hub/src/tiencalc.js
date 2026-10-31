@@ -68,8 +68,8 @@ function tcnTong(rows,k){let duong=0,am=0;(rows||[]).forEach(r=>{const v=+r[k]||
    ===================================================================== */
 /* [mã, nhóm I KD / II DT / III TC, "thu"|"chi", tên dòng, lấy số ở đâu, web đã có chỗ ghi (1) hay chưa (0)] */
 const TCN_LC=[
-  ["kpp","KD","thu","Kênh phân phối: khách trả tiền","Tiền khách kế toán đã xác nhận (+ Sổ thu nguồn NPP)",1],
-  ["oem","KD","thu","Kênh OEM: khách trả tiền","Tiền khách kế toán đã xác nhận (+ Sổ thu nguồn khách gia công)",1],
+  ["kpp","KD","thu","Kênh phân phối: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn NPP)",1],
+  ["oem","KD","thu","Kênh OEM: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn khách gia công)",1],
   ["tts","KD","thu","TikTok Shop: tiền rút về tài khoản","Chưa có chứng từ tách riêng sàn",0],
   ["spe","KD","thu","Shopee: tiền rút về tài khoản","Chưa có chứng từ tách riêng sàn",0],
   ["fbcod","KD","thu","Facebook: tiền COD về tài khoản","Chưa có chứng từ trên web",0],
