@@ -70,8 +70,8 @@ function tcnTong(rows,k){let duong=0,am=0;(rows||[]).forEach(r=>{const v=+r[k]||
 const TCN_LC=[
   ["kpp","KD","thu","Kênh phân phối: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn NPP)",1],
   ["oem","KD","thu","Kênh OEM: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn khách gia công)",1],
-  ["tts","KD","thu","TikTok Shop: tiền rút về tài khoản","Chưa có chứng từ tách riêng sàn",0],
-  ["spe","KD","thu","Shopee: tiền rút về tài khoản","Chưa có chứng từ tách riêng sàn",0],
+  ["tts","KD","thu","TikTok Shop: tiền rút về tài khoản","Phiếu chuyển tiền nội bộ: ví TikTok Shop → tài khoản",1],
+  ["spe","KD","thu","Shopee: tiền rút về tài khoản","Phiếu chuyển tiền nội bộ: ví Shopee → tài khoản",1],
   ["fbcod","KD","thu","Facebook: tiền COD về tài khoản","Chưa có chứng từ trên web",0],
   ["sanrut","KD","thu","Tiền sàn rút về (chưa tách theo sàn)","Sổ thu, nguồn \"Tiền sàn rút về\"",1],
   ["thukhac","KD","thu","Thu khác","Sổ thu (khách lẻ, nhà cung cấp hoàn tiền, thu khác)",1],
@@ -92,6 +92,9 @@ const TCN_LC=[
 function tcnLcKey(d){
   switch(d.loai){
     case "THU":return d.kenh==="GIA_CONG"?"oem":"kpp";
+    /* Chuyển tiền nội bộ giữa ngân hàng và tiền mặt: không phải tiền vào / ra công ty. Ví sàn rút về tài khoản: tiền vào. */
+    case "CK_VAO":case "CK_RA":return "noibo";
+    case "SAN_RUT":return d.san==="VI_SPE"?"spe":"tts";
     case "HOAN":return "hoan";case "CHI_NCC":return "ncc";case "CHI_VC":return "vc";case "CHI_THUONG":return "thuong";case "TS_TL":return "thanh_ly";
     case "THU_SO":return d.nguon==="sanrut"?"sanrut":d.nguon==="gc"?"oem":d.nguon==="npp"?"kpp":"thukhac";
     case "CHI_SO":{const g=String(d.g||"");return /^G0[123]$/.test(g)?"qc":/^G0[59]$/.test(g)?"vc":/^G0[78]$/.test(g)?"luong":g==="G28"?"mua_ts":"khac"}}
@@ -99,7 +102,7 @@ function tcnLcKey(d){
 /* Cộng chứng từ trong [from,to] theo dòng. Dòng web chưa có chỗ ghi để null (hiện "chưa có"). */
 function tcnLctt(docs,from,to){
   const v={};TCN_LC.forEach(r=>v[r[0]]=r[5]?0:null);
-  (docs||[]).forEach(d=>{if(d.date<from||d.date>to)return;const k=tcnLcKey(d);v[k]=(v[k]||0)+(+d.amount||0)});
+  (docs||[]).forEach(d=>{if(d.date<from||d.date>to)return;const k=tcnLcKey(d);if(k==="noibo")return;v[k]=(v[k]||0)+(+d.amount||0)});
   const g=(n,dir)=>TCN_LC.filter(r=>r[1]===n&&(!dir||r[2]===dir)).reduce((t,r)=>t+(v[r[0]]||0),0);
   const o={v,thu:g("KD","thu"),chiKd:g("KD","chi"),dt:g("DT"),tc:g("TC")};o.kd=o.thu+o.chiKd;o.net=o.kd+o.dt+o.tc;
   o.vao=TCN_LC.reduce((t,r)=>t+Math.max(0,v[r[0]]||0),0);o.ra=-TCN_LC.reduce((t,r)=>t+Math.min(0,v[r[0]]||0),0);return o}
@@ -111,6 +114,14 @@ function tcnTuan(today){const o=[];for(let i=0;i<4;i++){const a=new Date(today+"
 function tcnChiaTuan(weeks,thang){return weeks.map(w=>{let t=0;for(let d=new Date(w.tu+"T00:00:00Z");d.toISOString().slice(0,10)<=w.den;d.setUTCDate(d.getUTCDate()+1)){const ym=d.toISOString().slice(0,7),n=new Date(Date.UTC(+ym.slice(0,4),+ym.slice(5,7),0)).getUTCDate();t+=(+thang(ym)||0)/n}return Math.round(t)})}
 /* Tuần chứa ngày d (−1 nếu ngoài 4 tuần). */
 const tcnTuanCua=(weeks,d)=>weeks.findIndex(w=>d>=w.tu&&d<=w.den);
+/* Phiếu chuyển tiền nội bộ {id,ngay,tu,den,tien,note} → chứng từ tiền theo tài khoản.
+   Giữa ngân hàng / tiền mặt: tài khoản đi trừ, tài khoản đến cộng (công ty không thêm, không bớt tiền).
+   Từ ví sàn (VI_TT, VI_SPE) về tài khoản: chỉ tài khoản đến cộng, là tiền sàn rút về (tiền vào). */
+const TCN_VI=["VI_TT","VI_SPE"];
+function tcnCkDocs(L,from,to,ten){const o=[],n=k=>ten?ten(k):k;(L||[]).forEach(x=>{const d=String(x.ngay||"");if(d<from||d>to||!(+x.tien>0)||!x.den||x.tu===x.den)return;const t=+x.tien;
+  if(TCN_VI.includes(x.tu)){o.push({date:d,loai:"SAN_RUT",san:x.tu,ref:"Chuyển tiền nội bộ",party:n(x.tu),amount:t,acct:x.den,acct_text:n(x.den),ceo:"",note:x.note||"",ck:x.id});return}
+  o.push({date:d,loai:"CK_RA",ref:"Chuyển tiền nội bộ",party:"sang "+n(x.den),amount:-t,acct:x.tu,acct_text:n(x.tu),ceo:"",note:x.note||"",ck:x.id});
+  o.push({date:d,loai:"CK_VAO",ref:"Chuyển tiền nội bộ",party:"từ "+n(x.tu),amount:t,acct:x.den,acct_text:n(x.den),ceo:"",note:x.note||"",ck:x.id})});return o}
 /* Dự báo: tiền đầu tuần 1 = start; mỗi dòng thu/chi là mảng 4 số (null = chưa có, tính 0). min: mức tối thiểu cần giữ. */
 function tcnDuBao(start,thu,chi,min){const open=[],close=[],ti=[0,0,0,0],ci=[0,0,0,0];let run=start==null?null:+start;
   for(let w=0;w<4;w++){(thu||[]).forEach(r=>{ti[w]+=+((r.v||[])[w])||0});(chi||[]).forEach(r=>{ci[w]+=+((r.v||[])[w])||0});

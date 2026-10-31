@@ -7,7 +7,7 @@ import { chiaTuoiNo } from '../../src/server/services/debts';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const C: any = new Function(
   `${readFileSync('hub/src/tiencalc.js', 'utf8')}
-  return {TCN_DN,TCN_LC,tcnSoDu,tcnSoDuTinh,tcnChiNgay,tcnRunway,tcnAcctOf,tcnCuoi,tcnKhop,tcnTong,tcnLcKey,tcnLctt,tcnSoDuCong,tcnTuan,tcnChiaTuan,tcnTuanCua,tcnDuBao};`,
+  return {TCN_DN,TCN_LC,tcnSoDu,tcnSoDuTinh,tcnChiNgay,tcnRunway,tcnAcctOf,tcnCuoi,tcnKhop,tcnTong,tcnLcKey,tcnLctt,tcnSoDuCong,tcnTuan,tcnChiaTuan,tcnTuanCua,tcnDuBao,tcnCkDocs};`,
 )();
 
 describe('Tiền: số dư, chi bình quân, đủ dùng', () => {
@@ -83,7 +83,7 @@ describe('Dòng tiền: lưu chuyển tiền tệ trực tiếp, dự báo 4 tu�
   it('xếp chứng từ vào dòng; dòng web chưa có chỗ ghi để trống (không ước)', () => {
     const A = C.tcnLctt(docs, '2026-10-01', '2026-10-31');
     expect(A.v).toMatchObject({ kpp: 100, oem: 45, sanrut: 30, ncc: -60, qc: -20, luong: -15, vc: -3, hoan: -2, mua_ts: -25, thanh_ly: 7 });
-    expect(A.v.tts).toBeNull();
+    expect(A.v.tts).toBe(0);
     expect(A.v.vay).toBeNull();
     expect(A.v.thue).toBeNull();
     expect(A.thu).toBe(175);
@@ -115,5 +115,24 @@ describe('Dòng tiền: lưu chuyển tiền tệ trực tiếp, dự báo 4 tu�
     expect(F.st).toEqual(['DU', 'THIEU', 'THIEU', 'THIEU']);
     expect(C.tcnDuBao(100, [], [{ v: [32, 0, 0, 0] }], 70).st[0]).toBe('SAT');
     expect(C.tcnDuBao(null, [], [], 70).close[0]).toBeNull();
+  });
+});
+
+describe('Chuyển tiền nội bộ', () => {
+  const L = [
+    { id: 'a', ngay: '2026-10-10', tu: 'acc-mb', den: 'TIEN_MAT', tien: 50 },
+    { id: 'b', ngay: '2026-10-11', tu: 'VI_TT', den: 'acc-mb', tien: 80 },
+    { id: 'c', ngay: '2026-10-12', tu: 'VI_SPE', den: 'acc-mb', tien: 20 },
+    { id: 'd', ngay: '2026-10-12', tu: 'acc-mb', den: 'acc-mb', tien: 9 },
+  ];
+  it('ngân hàng ↔ tiền mặt: tài khoản đi trừ, đến cộng; không tính vào tiền vào / ra', () => {
+    const D = C.tcnCkDocs(L, '2026-10-01', '2026-10-31');
+    expect(D.filter((d: { acct: string }) => d.acct === 'acc-mb').reduce((t: number, d: { amount: number }) => t + d.amount, 0)).toBe(-50 + 80 + 20);
+    expect(D.filter((d: { acct: string }) => d.acct === 'TIEN_MAT')[0].amount).toBe(50);
+    const A = C.tcnLctt(D, '2026-10-01', '2026-10-31');
+    expect(A.v.tts).toBe(80);
+    expect(A.v.spe).toBe(20);
+    expect(A.net).toBe(100);
+    expect(A.vao).toBe(100);
   });
 });

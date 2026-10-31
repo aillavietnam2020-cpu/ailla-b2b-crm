@@ -101,7 +101,7 @@ function tlTabLc(X,ym){
    <section class="card pad"><b>Vì sao lãi mà tiền không tăng bằng</b><p class="hint">Nối từ Lãi lỗ ${tlVn(ym).toLowerCase()} sang tiền kinh doanh. Đơn vị: triệu đồng.</p>${br}</section></div>
    <section class="card pad"><b>Báo cáo lưu chuyển tiền tệ (phương pháp trực tiếp)</b><p class="hint">Đơn vị: triệu đồng. Theo khung mẫu B03-DN, gom thành dòng dễ đọc. Bấm một dòng để xem từng chứng từ.</p>
    <div class="nsw"><table class="tbl gd tllc"><thead><tr><th>Khoản mục</th><th class="n">${tlVn(ym)}</th><th class="n">${tlVn(pm)}</th><th>Lấy số ở đâu</th></tr></thead><tbody>${rows}</tbody></table></div>
-   <p class="hint">"Chưa có" là dòng web chưa có chỗ ghi chứng từ nên để trống, không ước số. Tiền sàn và COD Facebook về tài khoản: kế toán ghi phiếu thu ở Sổ thu, nguồn "Tiền sàn rút về" (hiện chưa tách từng sàn).</p></section>
+   <p class="hint">"Chưa có" là dòng web chưa có chỗ ghi chứng từ nên để trống, không ước số. Tiền ví TikTok Shop / Shopee rút về: ghi ở tab Số dư tài khoản › Chuyển tiền nội bộ. Chuyển giữa ngân hàng và tiền mặt không tính vào tiền vào / ra.</p></section>
    <section class="card pad"><b>Tiền kinh doanh 6 tháng</b><p class="hint">Cột xanh: tháng kinh doanh tự sinh ra tiền. Cột đỏ: tháng phải lấy tiền dự trữ ra bù. Chỉ tính chứng từ đã có trên web.</p>${tlXuHuong(tr6)}</section>`}
 function tlLcOpen(X,key,ym){const r=TCN_LC.find(x=>x[0]===key);if(!r)return;const f=ym+"-01",e=tlEnd(ym),L=X.docs.filter(d=>d.date>=f&&d.date<=e&&tcnLcKey(d)===key);
   openDrawerHTML(`<h2>${esc(r[3])}</h2><p class="hint">${tlVn(ym)} · ${esc(r[4])}</p>${!r[5]?`<div class="note">Web chưa có chỗ ghi khoản này nên chưa có số.</div>`:L.length?tcnGd(["Ngày","Loại","Chứng từ","Bên kia","Liên quan","Tài khoản","Số tiền"],L.map(d=>`<tr><td>${tcnDd(d.date)}</td><td>${esc(TCN_LOAI[d.loai]||d.loai)}${d.ceo==="CHO"?" "+pill("chờ CEO duyệt","amb"):""}</td><td class="mono">${esc(d.ref||"")}</td><td class="gdd" title="${esc(d.party||"")}">${esc(d.party||"")}</td><td>${tcnDon(d.lq)}</td><td class="gdd hint" title="${esc(d.acct_text||"")}">${esc(d.acct_text||"")}</td><td class="n">${nf(tcnR(d.amount))}</td></tr>`))+`<p class="hint">Cộng ${L.length} chứng từ: <b>${nf(tcnR(L.reduce((t,d)=>t+d.amount,0)))}</b> đ</p>`:`<p class="empty">Không có chứng từ trong tháng.</p>`}${key==="kpp"||key==="oem"?`<p class="hint">Cùng số tiền với Thu chi › Kho bill giao dịch › Báo cáo tháng (cột đã xác nhận). Báo cáo đó còn gồm tiền chờ kế toán xác nhận và khoản bù trừ cước khách trả hộ, hai loại này không phải tiền đã về nên Dòng tiền không cộng. <button class="lnk" id="tl-bill">Mở Kho bill giao dịch →</button></p>`:""}`);tcnBindDr();
@@ -156,11 +156,12 @@ function tlTabSd(X){
     const s=vi||!prev?null:tcnSoDuTinh(prev,X.docs.filter(d=>d.acct===a.k),b.ngay);return {a,b,prev,s,lech:s&&s.tinh!=null?(+b.tien||0)-s.tinh:null,vi}});
   const sum=k=>rows.reduce((t,r)=>t+(r[k]!=null?+r[k]:0),0);
   return `<div class="grid kpis">${kpi("Tiền đang có",have?nf(Math.round(T&&T.now?T.now.co:0)):"—",have?"ngân hàng, tiền mặt, ví sàn · cập nhật "+kDd(lastD)+(stale>7?" · đã "+stale+" ngày chưa cập nhật":""):"chưa nhập số dư")}${kpi("Đủ dùng khoảng",T&&T.R.ngay!=null?T.R.ngay+" ngày":"—",T&&T.cb.v>0?"chi bình quân "+nf(Math.round(T.cb.v))+" đ/ngày ("+T.cb.src+")":"chưa có số chi tháng trước")}</div>
-  <section class="card pad"><div class="tlh"><b>Số dư từng tài khoản</b><span>${ed?`<button class="btn sm" data-tlgo="cr_rcv" title="Thêm, sửa tài khoản ngân hàng của công ty">+ Thêm tài khoản</button> <button class="btn pri sm" id="tl-up">Cập nhật số dư</button>`:""}</span></div>
+  <section class="card pad"><div class="tlh"><b>Số dư từng tài khoản</b><span>${ed?`<button class="btn sm" data-tlgo="cr_rcv" title="Thêm, sửa tài khoản ngân hàng của công ty">+ Thêm tài khoản</button> <button class="btn sm" id="tl-ck" title="Rút ngân hàng về quỹ, nộp tiền mặt vào ngân hàng, rút tiền ví sàn">Chuyển tiền nội bộ</button> <button class="btn pri sm" id="tl-up">Cập nhật số dư</button>`:""}</span></div>
   <p class="hint">Kế toán nhập mỗi sáng thứ Hai (cả <b>tiền mặt tại công ty</b> và ví sàn). Tài khoản ngân hàng thêm ở Cấu hình › Tài khoản nhận tiền (nút "+ Thêm tài khoản"). Số dư tính = lần nhập trước + thu − chi theo chứng từ trên web tới ngày nhập lần này; lệch là khoản chưa ghi chứng từ (tiền sàn, COD về, phí ngân hàng…) hoặc ghi sai tài khoản.</p>
   <div class="nsw"><table class="tbl gd"><thead><tr><th>Tài khoản</th><th class="n">Số dư nhập</th><th>Ngày nhập</th><th class="n">Số dư tính</th><th class="n">Lệch</th><th>Liên quan</th></tr></thead><tbody>${rows.map(r=>{const b=r.b;if(!b)return `<tr><td>${esc(r.a.n)}</td><td class="n">—</td><td class="hint">chưa nhập</td><td class="n">—</td><td class="n">—</td><td></td></tr>`;
     return `<tr><td>${esc(r.a.n)}</td><td class="n">${nf(b.tien)}</td><td>${esc(kDd(b.ngay))}${b.by?` <small class="hint">· ${esc(b.by)}</small>`:""}</td><td class="n">${r.vi?`<span class="hint">ví sàn, không theo chứng từ</span>`:r.s&&r.s.tinh!=null?nf(tcnR(r.s.tinh))+` <small class="hint">từ ${tcnDd(r.prev.ngay)}</small>`:`<span class="hint">cần lần nhập trước</span>`}</td><td class="n">${r.lech==null?"—":Math.abs(r.lech)<1?pill("Khớp","grn"):`<b style="color:var(--red)">${nf(tcnR(r.lech))}</b>`}</td><td>${!r.vi?tcnLk("Chứng từ",`data-tlsd="${esc(r.a.k)}"`,"Xem thu chi của tài khoản"):""}</td></tr>`}).join("")}
    <tr class="tltot"><td>Cộng</td><td class="n">${nf(Math.round(rows.reduce((t,r)=>t+(r.b?+r.b.tien||0:0),0)))}</td><td></td><td></td><td class="n">${rows.some(r=>r.lech!=null)?nf(tcnR(sum("lech"))):"—"}</td><td></td></tr></tbody></table></div>
+  ${tlCkList(ed)}
   <p class="hint">Mỗi lần cập nhật được lưu lại; số mới nhất của từng tài khoản dùng để tính tiền đang có, đủ dùng bao lâu và dự báo. Đối chiếu theo kỳ: Công nợ › Đối chiếu công nợ & tiền › Tài khoản tiền.</p></section>`}
 function tlSdOpen(X,k){const a=tlAccts().find(x=>x.k===k);const L=X.docs.filter(d=>d.acct===k).slice(-200).reverse();
   openDrawerHTML(`<h2>${esc(a?a.n:k)}</h2><p class="hint">Thu chi theo chứng từ trên web, mới nhất trước (tối đa 200 dòng).</p>${L.length?tcnGd(["Ngày","Loại","Chứng từ","Bên kia","Liên quan","Số tiền"],L.map(d=>`<tr><td>${tcnDd(d.date)}</td><td>${esc(TCN_LOAI[d.loai]||d.loai)}</td><td class="mono">${esc(d.ref||"")}</td><td class="gdd" title="${esc(d.party||"")}">${esc(d.party||"")}</td><td>${tcnDon(d.lq)}</td><td class="n">${nf(tcnR(d.amount))}</td></tr>`)):`<p class="empty">Chưa có chứng từ nào ghi tài khoản này.</p>`}`);tcnBindDr()}
@@ -186,6 +187,8 @@ function pTienLich(m){
   m.querySelectorAll("[data-tlgo]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.tlgo;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-tlsd]").forEach(el=>el.onclick=ev=>{ev.stopPropagation();tlSdOpen(X,el.dataset.tlsd)});
   const up=m.querySelector("#tl-up");if(up)up.onclick=()=>tlForm(tlAccts(),tlLatest());
+  const ck=m.querySelector("#tl-ck");if(ck)ck.onclick=()=>tlCkForm();
+  m.querySelectorAll("[data-tlckx]").forEach(b=>b.onclick=()=>tlCkXoa(b.dataset.tlckx));
   if(typeof gdBind==="function")gdBind(m)}
 function tlForm(ac,L){
   openDrawerHTML(`<h2>Cập nhật số dư</h2><p class="hint">Nhập số tiền đang có ở từng tài khoản, gồm cả tiền mặt tại công ty. Để trống tài khoản nào thì giữ số cũ. Thiếu tài khoản ngân hàng thì thêm ở Cấu hình › Tài khoản nhận tiền.</p><form class="frm" id="tlf"><label class="field">Số dư tính tới ngày<input id="tlf-d" type="date" value="${mhToday()}" required></label>
@@ -199,4 +202,25 @@ function tlForm(ac,L){
         const bank=Object.entries(last).filter(([k])=>k!=="VI_TT"&&k!=="VI_SPE").reduce((t,[,b])=>t+(+b.tien||0),0);
         c.tien=c.tien.filter(x=>!(x.ngay===ngay&&x.src==="tl"));c.tien.push({id:uid("t"),ngay,tien:bank,viTT:last.VI_TT?+last.VI_TT.tien:0,viSPE:last.VI_SPE?+last.VI_SPE.tien:0,note:"từ Dòng tiền › Số dư tài khoản",by:ME.name,src:"tl"});dt.fin.dh=c}});
     closeDrawer();toast("Đã lưu số dư");renderMain()}}
+/* ---------- Phiếu chuyển tiền nội bộ (chị Hoa đồng ý 31/10) ----------
+   Lưu ở D().fin.ck: {id,ngay,tu,den,tien,note,by,at}. Rút ngân hàng về quỹ tiền mặt, nộp tiền mặt vào ngân hàng, chuyển giữa hai
+   tài khoản ngân hàng, rút tiền ví TikTok / Shopee về tài khoản. Chứng từ tính ở tcnCkDocs (tiencalc.js): giữa ngân hàng và tiền mặt
+   thì công ty không thêm bớt tiền, chỉ đổi chỗ; ví sàn rút về là tiền vào (dòng TikTok / Shopee rút về ở Lưu chuyển tiền tệ). */
+function tlCkList(ed){const L=(((D().fin||{}).ck)||[]).slice().sort((a,b)=>a.ngay<b.ngay?1:-1).slice(0,30);if(!L.length)return "";
+  return `<b style="display:block;margin-top:14px">Chuyển tiền nội bộ gần đây</b><div class="nsw"><table class="tbl gd"><thead><tr><th>Ngày</th><th>Từ</th><th>Đến</th><th class="n">Số tiền</th><th>Ghi chú</th><th>Người ghi</th><th></th></tr></thead><tbody>${L.map(x=>`<tr><td>${tcnDd(x.ngay)}</td><td>${esc(tcnAcctTen(x.tu))}</td><td>${esc(tcnAcctTen(x.den))}</td><td class="n">${nf(x.tien)}</td><td class="gdd" title="${esc(x.note||"")}">${esc(x.note||"")}</td><td class="hint">${esc(x.by||"")}</td><td>${ed?`<button class="lnk" data-tlckx="${esc(x.id)}">Xóa</button>`:""}</td></tr>`).join("")}</tbody></table></div>`}
+function tlCkForm(){const ac=tlAccts(),o=a=>`<option value="${esc(a.k)}">${esc(a.n)}</option>`,cash=ac.filter(a=>!TCN_VI.includes(a.k));
+  openDrawerHTML(`<h2>Chuyển tiền nội bộ</h2><p class="hint">Ghi khi rút tiền ngân hàng về quỹ tiền mặt, nộp tiền mặt vào ngân hàng, chuyển giữa hai tài khoản công ty, hoặc rút tiền ví TikTok Shop / Shopee về tài khoản. Không phải thu chi: tiền chỉ đổi chỗ (riêng tiền ví sàn rút về được tính là tiền sàn về).</p>
+  <form class="frm" id="tlck"><label class="field">Ngày<input id="tlck-d" type="date" value="${mhToday()}" required></label>
+   <label class="field">Từ<select id="tlck-tu">${ac.map(o).join("")}</select></label>
+   <label class="field">Đến<select id="tlck-den">${cash.map(o).join("")}</select></label>
+   <label class="field">Số tiền (đ)<input id="tlck-t" type="number" min="1" step="1" required></label>
+   <label class="field">Ghi chú<input id="tlck-n" placeholder="Ví dụ: rút tiền mặt trả lương thời vụ"></label>
+   <div id="tlck-e"></div><button class="btn pri">Lưu phiếu</button></form>`);
+  $("#tlck").onsubmit=e=>{e.preventDefault();const x={id:uid("ck"),ngay:$("#tlck-d").value,tu:$("#tlck-tu").value,den:$("#tlck-den").value,tien:Math.round(+$("#tlck-t").value),note:$("#tlck-n").value.trim(),by:ME.name,at:Date.now()};
+    if(x.tu===x.den){$("#tlck-e").innerHTML=`<div class="note red">Chọn hai tài khoản khác nhau</div>`;return}
+    if(!(x.tien>0)){$("#tlck-e").innerHTML=`<div class="note red">Nhập số tiền</div>`;return}
+    DB.mutate(ME.name,"ghi chuyển tiền nội bộ",dt=>{dt.fin=dt.fin||{};dt.fin.ck=dt.fin.ck||[];dt.fin.ck.push(x)});closeDrawer();toast("Đã ghi phiếu chuyển tiền");renderMain()}}
+function tlCkXoa(id){const x=(((D().fin||{}).ck)||[]).find(y=>y.id===id);if(!x)return;
+  if(!confirm(`Xóa phiếu chuyển ${nf(x.tien)} đ từ ${tcnAcctTen(x.tu)} sang ${tcnAcctTen(x.den)} ngày ${tcnDd(x.ngay)}? Chỉ xóa phiếu ghi nhầm.`))return;
+  DB.mutate(ME.name,"xóa phiếu chuyển tiền nội bộ ("+nf(x.tien)+" đ, "+x.ngay+")",dt=>{dt.fin.ck=(dt.fin.ck||[]).filter(y=>y.id!==id)});toast("Đã xóa phiếu");renderMain()}
 PAGES.tien_lich=pTienLich;

@@ -32,13 +32,19 @@ function tcnDongTienWeb(from,to){const k=from+"|"+to,c=TCN.dt[k];if(c)return c.b
 function tcnDocsSo(from,to,accts){const d=D(),f=d.fin||{},o=[];
   (d.thuTay||[]).forEach(x=>{const n=x.ngay||"";if(n>=from&&n<=to)o.push({date:n,loai:"THU_SO",ref:"Sổ thu",party:x.note||"",amount:+x.tien||0,acct:tcnAcctOf(x.acct,accts),acct_text:x.acct||"",ceo:"",nguon:x.nguon||"khac"})});
   (f.nkc||[]).forEach(x=>{const n=String(x.d||"");if(n<from||n>to||!/^11[12]/.test(String(x.tk)))return;o.push({date:n,loai:"CHI_SO",ref:x.ct||"Sổ chi phí",party:x.dg||"",amount:-(+x.t||0),acct:tcnAcctOf(x.tkc,accts,x.tk),acct_text:x.tkc||(String(x.tk).startsWith("111")?"Tiền mặt":"Ngân hàng (sổ không ghi tài khoản)"),ceo:"",g:x.g||""})});
+  /* Phiếu chuyển tiền nội bộ (Dòng tiền › Số dư tài khoản): ngân hàng ↔ tiền mặt, ví sàn rút về. */
+  o.push(...tcnCkDocs(f.ck,from,to,tcnAcctTen));
   /* Thanh lý tài sản có thu tiền (Tài sản & CCDC › ghi giảm). */
   (((f.ts||{}).a)||[]).forEach(x=>{const z=x.gg;if(!z||!(+z.thu>0))return;const n=String(z.d||"");if(n<from||n>to)return;o.push({date:n,loai:"TS_TL",ref:x.ma||"Thanh lý",party:x.ten||"",amount:+z.thu,acct:"",acct_text:"Tài sản & CCDC (không ghi tài khoản)",ceo:""})});
   return o}
+/* Tên tài khoản theo mã (receiving_accounts nạp ở Mua hàng / Dòng tiền). */
+function tcnAcctTen(k){if(k==="TIEN_MAT")return "Tiền mặt tại công ty";if(k==="VI_TT")return "Ví TikTok Shop";if(k==="VI_SPE")return "Ví Shopee";
+  const a=(typeof MH!=="undefined"&&MH.accts||[]).find(x=>x.id===k);return a?[a.bank,a.account_no].filter(Boolean).join(" · "):k}
 /* Mọi chứng từ tiền trong khoảng ngày (null = đang tải). */
 function tcnDongTien(from,to){const w=tcnDongTienWeb(from,to);if(!w)return null;const docs=w.docs.concat(tcnDocsSo(from,to,w.accounts)).sort((a,b)=>a.date.localeCompare(b.date));return {accounts:w.accounts,docs,err:w.err}}
-const TCN_LOAI={TS_TL:"Thanh lý tài sản",THU:"Tiền khách trả (đã xác nhận)",THU_SO:"Phiếu thu Sổ thu",HOAN:"Bút toán đảo / hoàn tiền khách",CHI_NCC:"Phiếu chi nhà cung cấp",CHI_VC:"Phiếu chi vận chuyển",CHI_THUONG:"Phiếu chi thưởng NPP",CHI_SO:"Sổ chi phí (tiền thật)"};
-function tcnTongTien(docs){const by={};let thu=0,chi=0,choCeo=0;(docs||[]).forEach(d=>{by[d.loai]=(by[d.loai]||0)+d.amount;if(d.amount>0)thu+=d.amount;else chi-=d.amount;if(d.ceo==="CHO")choCeo-=d.amount});return {thu,chi,thuan:thu-chi,by,choCeo}}
+const TCN_LOAI={SAN_RUT:"Tiền ví sàn rút về",CK_VAO:"Chuyển tiền nội bộ (nhận)",CK_RA:"Chuyển tiền nội bộ (chuyển đi)",TS_TL:"Thanh lý tài sản",THU:"Tiền khách trả (đã xác nhận)",THU_SO:"Phiếu thu Sổ thu",HOAN:"Bút toán đảo / hoàn tiền khách",CHI_NCC:"Phiếu chi nhà cung cấp",CHI_VC:"Phiếu chi vận chuyển",CHI_THUONG:"Phiếu chi thưởng NPP",CHI_SO:"Sổ chi phí (tiền thật)"};
+/* noibo: cộng cả chuyển tiền nội bộ (khi xem từng tài khoản); xem cả công ty thì bỏ vì không phải tiền vào / ra. */
+function tcnTongTien(docs,noibo){const by={};let thu=0,chi=0,choCeo=0;(docs||[]).forEach(d=>{if(!noibo&&(d.loai==="CK_VAO"||d.loai==="CK_RA"))return;by[d.loai]=(by[d.loai]||0)+d.amount;if(d.amount>0)thu+=d.amount;else chi-=d.amount;if(d.ceo==="CHO")choCeo-=d.amount});return {thu,chi,thuan:thu-chi,by,choCeo}}
 
 /* ---------- Tiền đang có + đủ dùng: một luật cho Dòng tiền, Tổng quan (Sức khỏe, tab Tiền) ---------- */
 function tcnTienNow(){
@@ -74,7 +80,7 @@ function tcnAcctRows(dc,P){
   const B=(D().fin||{}).balances||[],docs=dc.tien.docs.concat(tcnDocsSo(dc.tienFrom||P.from,P.to,dc.tien.accounts)),lb=a=>[a.bank,a.account_no,a.account_name].filter(Boolean).join(" · ");
   const L=dc.tien.accounts.map(a=>({k:a.id,n:lb(a)+(a.active?"":" (ngừng dùng)")})).concat([{k:"TIEN_MAT",n:"Tiền mặt tại công ty"},{k:"VI_TT",n:"Ví TikTok Shop (chưa rút)"},{k:"VI_SPE",n:"Ví Shopee (chưa rút)"},{k:"",n:"Chưa rõ tài khoản (phiếu không ghi tài khoản)"}]);
   return L.map(a=>{const D0=docs.filter(d=>d.acct===a.k),moc=a.k?tcnSoDu(B,a.k,tcnPrevDay(P.from)):null,kt=a.k?tcnSoDu(B,a.k,P.to):null,ktIn=kt&&kt.ngay>=P.from?kt:null;
-    const inP=D0.filter(d=>d.date>=P.from&&d.date<=P.to),t=tcnTongTien(inP),s=tcnSoDuTinh(moc,D0,ktIn?ktIn.ngay:P.to);
+    const inP=D0.filter(d=>d.date>=P.from&&d.date<=P.to),t=tcnTongTien(inP,true),s=tcnSoDuTinh(moc,D0,ktIn?ktIn.ngay:P.to);
     return {...a,docs:D0,inP,thu:t.thu,chi:t.chi,moc,s,kt:ktIn,chenh:ktIn&&s.tinh!=null?(+ktIn.tien||0)-s.tinh:null}}).filter(r=>r.k===""?r.inP.length:true)}
 function pTcnDc(m){
   const T="Đối chiếu công nợ & tiền",P=PERIOD;tcnLoad();if(typeof gdCss==="function")gdCss();
