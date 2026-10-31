@@ -7,7 +7,7 @@ import { chiaTuoiNo } from '../../src/server/services/debts';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const C: any = new Function(
   `${readFileSync('hub/src/tiencalc.js', 'utf8')}
-  return {TCN_DN,tcnSoDu,tcnSoDuTinh,tcnChiNgay,tcnRunway,tcnAcctOf,tcnCuoi,tcnKhop,tcnTong};`,
+  return {TCN_DN,TCN_LC,tcnSoDu,tcnSoDuTinh,tcnChiNgay,tcnRunway,tcnAcctOf,tcnCuoi,tcnKhop,tcnTong,tcnLcKey,tcnLctt,tcnSoDuCong,tcnTuan,tcnChiaTuan,tcnTuanCua,tcnDuBao};`,
 )();
 
 describe('Tiền: số dư, chi bình quân, đủ dùng', () => {
@@ -62,5 +62,58 @@ describe('Công nợ: đối chiếu, tổng, tuổi nợ', () => {
   });
   it('mỗi chỉ số có định nghĩa', () => {
     expect(C.TCN_DN.map((x: string[]) => x[0])).toEqual(expect.arrayContaining(['Phải thu khách', 'DSO', 'Phải trả nhà cung cấp', 'Số dư tính', 'Tiền đủ dùng']));
+  });
+});
+
+describe('Dòng tiền: lưu chuyển tiền tệ trực tiếp, dự báo 4 tuần', () => {
+  const docs = [
+    { date: '2026-10-02', loai: 'THU', kenh: 'B2B', amount: 100 },
+    { date: '2026-10-03', loai: 'THU', kenh: 'GIA_CONG', amount: 40 },
+    { date: '2026-10-04', loai: 'THU_SO', nguon: 'sanrut', amount: 30 },
+    { date: '2026-10-04', loai: 'THU_SO', nguon: 'gc', amount: 5 },
+    { date: '2026-10-05', loai: 'CHI_NCC', amount: -60 },
+    { date: '2026-10-06', loai: 'CHI_SO', g: 'G01', amount: -20 },
+    { date: '2026-10-06', loai: 'CHI_SO', g: 'G07', amount: -15 },
+    { date: '2026-10-07', loai: 'CHI_SO', g: 'G28', amount: -25 },
+    { date: '2026-10-07', loai: 'CHI_VC', amount: -3 },
+    { date: '2026-10-08', loai: 'HOAN', amount: -2 },
+    { date: '2026-10-09', loai: 'TS_TL', amount: 7 },
+    { date: '2026-11-01', loai: 'THU', kenh: 'B2B', amount: 999 },
+  ];
+  it('xếp chứng từ vào dòng; dòng web chưa có chỗ ghi để trống (không ước)', () => {
+    const A = C.tcnLctt(docs, '2026-10-01', '2026-10-31');
+    expect(A.v).toMatchObject({ kpp: 100, oem: 45, sanrut: 30, ncc: -60, qc: -20, luong: -15, vc: -3, hoan: -2, mua_ts: -25, thanh_ly: 7 });
+    expect(A.v.tts).toBeNull();
+    expect(A.v.vay).toBeNull();
+    expect(A.v.thue).toBeNull();
+    expect(A.thu).toBe(175);
+    expect(A.kd).toBe(175 - 100);
+    expect(A.dt).toBe(-18);
+    expect(A.net).toBe(57);
+    expect(A.vao - A.ra).toBe(A.net);
+  });
+  it('mỗi dòng có tên, nguồn và nhóm hợp lệ', () => {
+    for (const r of C.TCN_LC) expect(['KD', 'DT', 'TC']).toContain(r[1]);
+  });
+  it('số dư nhiều tài khoản: thiếu tài khoản nào thì báo', () => {
+    const B = [{ id: 'a', acct: 'mb', ngay: '2026-09-30', tien: 500 }];
+    expect(C.tcnSoDuCong(B, ['mb', 'TIEN_MAT'], '2026-09-30')).toEqual({ tien: 500, thieu: ['TIEN_MAT'], co: 1 });
+    expect(C.tcnSoDuCong(B, ['mb'], '2026-09-29').tien).toBeNull();
+  });
+  it('4 tuần tính từ hôm nay; ngân sách tháng chia theo ngày', () => {
+    const W = C.tcnTuan('2026-10-31');
+    expect(W[0]).toEqual({ tu: '2026-10-31', den: '2026-11-06' });
+    expect(W[3].den).toBe('2026-11-27');
+    expect(C.tcnTuanCua(W, '2026-11-10')).toBe(1);
+    const v = C.tcnChiaTuan(W, (ym: string) => (ym === '2026-11' ? 30_000_000 : 31_000_000));
+    expect(v[0]).toBe(1_000_000 + 6 * 1_000_000);
+    expect(v[1]).toBe(7_000_000);
+  });
+  it('dự báo: tiền cuối tuần so mức tối thiểu', () => {
+    const F = C.tcnDuBao(100, [{ v: [10, 0, 0, 0] }, { v: null }], [{ v: [20, 30, 5, 0] }], 70);
+    expect(F.close).toEqual([90, 60, 55, 55]);
+    expect(F.st).toEqual(['DU', 'THIEU', 'THIEU', 'THIEU']);
+    expect(C.tcnDuBao(100, [], [{ v: [32, 0, 0, 0] }], 70).st[0]).toBe('SAT');
+    expect(C.tcnDuBao(null, [], [], 70).close[0]).toBeNull();
   });
 });

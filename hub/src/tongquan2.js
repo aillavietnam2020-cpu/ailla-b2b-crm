@@ -57,7 +57,7 @@ function tq2Warn(N,V,D2,C,stk,HL){const W=[],ng=dhGet().nguong||{},qc=ng.qcMax||
   const am=(stk||[]).filter(r=>r.st[1]==="red");
   if(am.length)W.push(["amb",`${am.length} mã âm kho`,am.slice(0,3).map(r=>r.ten).join(", ")+(am.length>3?"…":"")+".","Đề xuất: kế toán kho kiểm lại phiếu xuất, nhập bù hoặc điều chỉnh tồn.",()=>tq2Go("sx_kho")]);
   const ti=(HL||[]).find(x=>x.l==="Tiền đủ dùng");
-  if(ti&&ti.st==="gry")W.push(["blu","Chưa biết tiền đủ dùng bao lâu","Chưa nhập số dư tài khoản ngân hàng, tiền mặt.","Đề xuất: kế toán nhập số dư ở Tiền & lịch chi mỗi tuần.",()=>tq2Go("tien_lich")]);
+  if(ti&&ti.st==="gry")W.push(["blu","Chưa biết tiền đủ dùng bao lâu","Chưa nhập số dư tài khoản ngân hàng, tiền mặt.","Đề xuất: kế toán nhập số dư ở Dòng tiền mỗi tuần.",()=>tq2Go("tien_lich")]);
   (V&&V.cb||[]).filter(x=>!/quảng cáo/i.test(tq2Strip(x.t))).forEach(x=>W.push(["blu",tq2Strip(x.t),tq2Strip(x.s).replace(/ · —$/,""),"",()=>x.go()]));
   return W.sort((a,b)=>["red","amb","blu"].indexOf(a[0])-["red","amb","blu"].indexOf(b[0]))}
 function tq2Page(m){
@@ -98,7 +98,7 @@ function tq2Page(m){
         <div class="tq2-gl" ${op?"":"hidden"}><table>${g.items.map((x,i)=>`<tr><td>${x.t}</td><td class="hint">${x.s}</td><td class="n">${x.han?"hạn "+esc(mhDM(x.han)):""}</td><td class="n">${x.over>0?`<b class="t-red">quá ${x.over} ngày</b>`:""}</td><td class="n"><button type="button" class="btn sm" data-tq2open="${gi}|${i}">${esc(x.btn||"Mở")}</button></td></tr>`).join("")}</table></div></div>`}).join(""):`<p class="hint">Không có việc nào.</p>`}</section>`;
   const warn=`<section class="card"><div class="tq2-ch"><h2>Cảnh báo & đề xuất</h2><span class="hint">xếp theo mức ảnh hưởng tới tiền và lãi · bấm để mở trang liên quan</span></div>${W.length?`<div class="tq2-wa">${W.map(([c,b,s,de],i)=>`<div class="tq2-w ${c}" data-tq2w="${i}"><b>${esc(b)}</b><span>${esc(s)}</span>${de?`<i>${esc(de)}</i>`:""}</div>`).join("")}</div>`:`<p class="hint">Không có cảnh báo.</p>`}</section>`;
   const html=`<div class="tq2"><div class="tq2-head"><h1>Tổng quan công ty</h1><span class="tq2-tag ${chot?"ok":""}">Tháng ${vn} · ${chot?"đã chốt":"dự kiến · chốt ngày 10/"+plYmAdd(N.ym,1).slice(5,7)}</span>
-     <div class="tq2-links"><button type="button" class="btn sm" data-tq2go="pl">Lãi lỗ P&L ›</button><button type="button" class="btn sm" data-tq2go="tien_lich">Tiền & lịch chi ›</button><button type="button" class="btn sm" data-tq2sub="gia">Giá thành & cảnh báo ›</button><button type="button" class="btn sm" data-tq2sub="caidat">Thiết lập ›</button></div></div>
+     <div class="tq2-links"><button type="button" class="btn sm" data-tq2go="pl">Lãi lỗ P&L ›</button><button type="button" class="btn sm" data-tq2go="tien_lich">Dòng tiền ›</button><button type="button" class="btn sm" data-tq2sub="gia">Giá thành & cảnh báo ›</button><button type="button" class="btn sm" data-tq2sub="caidat">Thiết lập ›</button></div></div>
     <section class="card"><div class="tq2-ch"><h2>Sức khỏe công ty</h2><span class="hint">xanh: ổn · vàng: cần để ý · đỏ: cần xử lý · xám: chưa có số · bấm ô để xem chi tiết</span></div>
      <div class="tq2-sk">${HL.map((x,i)=>`<button type="button" class="tq2-skt s-${x.st}" data-tq2h="${i}"><span>${esc(x.l)}</span><b>${esc(x.v)}</b><small>${esc(x.sub)}</small></button>`).join("")}</div></section>
     <div class="tq2-blks">${blk("Kênh bán lẻ","bc_tong",bLe)}${blk("Kênh phân phối","bc_b2b",bPp)}${blk("Content & Media","bang_video",bCt)}${blk("Sản xuất & kho","sx_tq",bKho)}</div>

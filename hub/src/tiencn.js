@@ -3,8 +3,8 @@
    Một nguồn số:
    - Máy chủ /api/hub/dieuhanh/tien (src/server/routes/tienCongNo.ts): phải thu theo kênh + tuổi nợ + DSO (cùng /api/debts/aging),
      phải trả nhà cung cấp + tuổi nợ (cùng Mua hàng), đối chiếu từng khách / nhà cung cấp, chứng từ tiền trên web theo tài khoản.
-   - Ngăn tài chính (D().fin, D().thuTay): số dư kế toán nhập (Tiền & lịch chi), phiếu thu Sổ thu đã xác nhận, dòng tiền thật Sổ chi phí.
-   Các trang chỉ đọc từ đây: Tiền & lịch chi (tien_lich), Phải thu (phai_thu), Công nợ OEM (gc_cn), Tổng quan công ty (ô Sức khỏe,
+   - Ngăn tài chính (D().fin, D().thuTay): số dư kế toán nhập (Dòng tiền), phiếu thu Sổ thu đã xác nhận, dòng tiền thật Sổ chi phí.
+   Các trang chỉ đọc từ đây: Dòng tiền (tien_lich), Phải thu (phai_thu), Công nợ OEM (gc_cn), Tổng quan công ty (ô Sức khỏe,
    tab Tiền), trang mới Đối chiếu công nợ & tiền (tcn_dc, quản trị › Tài chính – Kế toán › Công nợ).
    Trang này chỉ ĐỌC: không sửa tiền, công nợ, phiếu thu chi nào.
    ===================================================================== */
@@ -18,7 +18,7 @@ const tcnDd=d=>d?d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4):"—";
 const TCN_SRC={
   thu:"Nguồn: công nợ chính thức (đơn đã giao/xuất + kế toán xác nhận − tiền đã xác nhận − hàng trả lại đã giảm nợ). Đối chiếu từng khách: quản trị › Tài chính – Kế toán › Công nợ › Đối chiếu công nợ & tiền.",
   tra:"Nguồn: Mua hàng (đầu kỳ + hóa đơn + phiếu mua chưa chứng từ − đã chi). Đối chiếu: Đối chiếu công nợ & tiền › Nhà cung cấp.",
-  tien:"Nguồn: số dư kế toán nhập ở Tiền & lịch chi (mới nhất từng tài khoản). So với số dư tính từ chứng từ: Đối chiếu công nợ & tiền › Tài khoản tiền."};
+  tien:"Nguồn: số dư kế toán nhập ở Dòng tiền (mới nhất từng tài khoản). So với số dư tính từ chứng từ: Đối chiếu công nợ & tiền › Tài khoản tiền."};
 
 /* ---------- Nạp số ---------- */
 function tcnLoad(force){
@@ -30,21 +30,23 @@ function tcnDongTienWeb(from,to){const k=from+"|"+to,c=TCN.dt[k];if(c)return c.b
   tcnApi(`/dong-tien?from=${from}&to=${to}`).then(r=>{TCN.dt[k]=r}).catch(e=>{TCN.dt[k]={err:e.message,accounts:[],docs:[]}}).finally(tcnRe);return null}
 /* Chứng từ tiền nằm trong ngăn tài chính: phiếu thu Sổ thu đã xác nhận, dòng tiền thật (TK 111/112) Sổ chi phí. */
 function tcnDocsSo(from,to,accts){const d=D(),f=d.fin||{},o=[];
-  (d.thuTay||[]).forEach(x=>{const n=x.ngay||"";if(n>=from&&n<=to)o.push({date:n,loai:"THU_SO",ref:"Sổ thu",party:x.note||"",amount:+x.tien||0,acct:tcnAcctOf(x.acct,accts),acct_text:x.acct||"",ceo:""})});
-  (f.nkc||[]).forEach(x=>{const n=String(x.d||"");if(n<from||n>to||!/^11[12]/.test(String(x.tk)))return;o.push({date:n,loai:"CHI_SO",ref:x.ct||"Sổ chi phí",party:x.dg||"",amount:-(+x.t||0),acct:tcnAcctOf(x.tkc,accts,x.tk),acct_text:x.tkc||(String(x.tk).startsWith("111")?"Tiền mặt":"Ngân hàng (sổ không ghi tài khoản)"),ceo:""})});
+  (d.thuTay||[]).forEach(x=>{const n=x.ngay||"";if(n>=from&&n<=to)o.push({date:n,loai:"THU_SO",ref:"Sổ thu",party:x.note||"",amount:+x.tien||0,acct:tcnAcctOf(x.acct,accts),acct_text:x.acct||"",ceo:"",nguon:x.nguon||"khac"})});
+  (f.nkc||[]).forEach(x=>{const n=String(x.d||"");if(n<from||n>to||!/^11[12]/.test(String(x.tk)))return;o.push({date:n,loai:"CHI_SO",ref:x.ct||"Sổ chi phí",party:x.dg||"",amount:-(+x.t||0),acct:tcnAcctOf(x.tkc,accts,x.tk),acct_text:x.tkc||(String(x.tk).startsWith("111")?"Tiền mặt":"Ngân hàng (sổ không ghi tài khoản)"),ceo:"",g:x.g||""})});
+  /* Thanh lý tài sản có thu tiền (Tài sản & CCDC › ghi giảm). */
+  (((f.ts||{}).a)||[]).forEach(x=>{const z=x.gg;if(!z||!(+z.thu>0))return;const n=String(z.d||"");if(n<from||n>to)return;o.push({date:n,loai:"TS_TL",ref:x.ma||"Thanh lý",party:x.ten||"",amount:+z.thu,acct:"",acct_text:"Tài sản & CCDC (không ghi tài khoản)",ceo:""})});
   return o}
 /* Mọi chứng từ tiền trong khoảng ngày (null = đang tải). */
 function tcnDongTien(from,to){const w=tcnDongTienWeb(from,to);if(!w)return null;const docs=w.docs.concat(tcnDocsSo(from,to,w.accounts)).sort((a,b)=>a.date.localeCompare(b.date));return {accounts:w.accounts,docs,err:w.err}}
-const TCN_LOAI={THU:"Tiền khách trả (đã xác nhận)",THU_SO:"Phiếu thu Sổ thu",HOAN:"Bút toán đảo / hoàn tiền khách",CHI_NCC:"Phiếu chi nhà cung cấp",CHI_VC:"Phiếu chi vận chuyển",CHI_THUONG:"Phiếu chi thưởng NPP",CHI_SO:"Sổ chi phí (tiền thật)"};
+const TCN_LOAI={TS_TL:"Thanh lý tài sản",THU:"Tiền khách trả (đã xác nhận)",THU_SO:"Phiếu thu Sổ thu",HOAN:"Bút toán đảo / hoàn tiền khách",CHI_NCC:"Phiếu chi nhà cung cấp",CHI_VC:"Phiếu chi vận chuyển",CHI_THUONG:"Phiếu chi thưởng NPP",CHI_SO:"Sổ chi phí (tiền thật)"};
 function tcnTongTien(docs){const by={};let thu=0,chi=0,choCeo=0;(docs||[]).forEach(d=>{by[d.loai]=(by[d.loai]||0)+d.amount;if(d.amount>0)thu+=d.amount;else chi-=d.amount;if(d.ceo==="CHO")choCeo-=d.amount});return {thu,chi,thuan:thu-chi,by,choCeo}}
 
-/* ---------- Tiền đang có + đủ dùng: một luật cho Tiền & lịch chi, Tổng quan (Sức khỏe, tab Tiền) ---------- */
+/* ---------- Tiền đang có + đủ dùng: một luật cho Dòng tiền, Tổng quan (Sức khỏe, tab Tiền) ---------- */
 function tcnTienNow(){
   const f=(D().fin||{}),B=f.balances||[],last={};B.forEach(b=>{const x=last[b.acct];if(!x||b.ngay>x.ngay||(b.ngay===x.ngay&&String(b.id)>String(x.id)))last[b.acct]=b});
   const ks=Object.keys(last);
   if(!ks.length)return null;
   const g=k=>last[k]?+last[k].tien||0:0,bank=ks.filter(k=>k!=="VI_TT"&&k!=="VI_SPE").reduce((t,k)=>t+g(k),0),ngay=ks.map(k=>last[k].ngay).sort().pop();
-  return {ngay,tien:bank,viTT:g("VI_TT"),viSPE:g("VI_SPE"),co:bank+g("VI_TT")+g("VI_SPE"),src:"số dư kế toán nhập ở Tiền & lịch chi",by:last}}
+  return {ngay,tien:bank,viTT:g("VI_TT"),viSPE:g("VI_SPE"),co:bank+g("VI_TT")+g("VI_SPE"),src:"số dư kế toán nhập ở Dòng tiền",by:last}}
 function tcnChiBq(){const c=typeof dhGet==="function"&&D().fin?dhGet():{},t=mhToday(),d=new Date(t.slice(0,7)+"-01T00:00:00Z");d.setUTCDate(0);
   const to=d.toISOString().slice(0,10),from=to.slice(0,8)+"01",ym=to.slice(0,7);if(+c.chiNgay>0)return tcnChiNgay(c.chiNgay,0,ym);
   const x=tcnDongTien(from,to);if(!x)return {v:0,src:"đang tải chứng từ chi tháng trước",loading:true};return tcnChiNgay(0,tcnTongTien(x.docs).chi,ym)}

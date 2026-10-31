@@ -110,6 +110,7 @@ describe('Tiền & công nợ: một chỗ tính', () => {
     // chứng từ tiền: thu đã xác nhận (không gồm bù trừ cước), chi NCC kể cả khoản chờ CEO, chi vận chuyển trừ "khách trả hộ"
     const docs = d.tien.docs as Array<{ loai: string; amount: number; acct: string; ceo: string }>;
     expect(docs.filter((x) => x.loai === 'THU').map((x) => [x.amount, x.acct])).toEqual([[1_500_000, 'acc-mb'], [1_000_000, 'TIEN_MAT']]);
+    expect(docs.filter((x) => x.loai === 'THU').map((x) => (x as unknown as { kenh: string }).kenh)).toEqual(['B2B', 'GIA_CONG']);
     expect(docs.filter((x) => x.loai === 'CHI_NCC').map((x) => [x.amount, x.acct, x.ceo])).toEqual([[-4_000_000, 'acc-mb', ''], [-1_000_000, 'TIEN_MAT', 'CHO']]);
     expect(docs.filter((x) => x.loai === 'CHI_VC').map((x) => x.amount)).toEqual([-250_000]);
   });

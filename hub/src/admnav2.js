@@ -19,7 +19,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     if(!o.mh_hd)o.mh_hd=MI("mh_hd","Chứng từ nhà cung cấp",mg);
     if(!o.mh_chi)o.mh_chi=MI("mh_chi","Phiếu chi nhà cung cấp",mg);
     o.muctieu=MI("muctieu","Kế hoạch doanh thu",u=>can(u,"pl.xem")||mg());
-    o.tien_lich=MI("tien_lich","Tiền & lịch chi",u=>can(u,"chiphi.xem")||mg());
+    o.tien_lich=MI("tien_lich","Dòng tiền",u=>can(u,"chiphi.xem")||mg());
     o.ngan_sach=MI("ngan_sach","Ngân sách chi phí",u=>can(u,"chiphi.xem")||mg());
     o.phai_thu=MI("phai_thu","Phải thu khách",u=>can(u,"chiphi.xem")||mg());
     o.nguong=MI("nguong","Ngưỡng cảnh báo & chỉ số",mg);
@@ -40,7 +40,7 @@ if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"){
     tabMod("q_kb","bag","Kênh bán hàng","",["muctieu","bc_tiktok","bc_shopee","bc_fb","bc_b2b","bc_gc","cskh_cu"],["Kế hoạch doanh thu","TikTok Shop","Shopee","Facebook","Kênh phân phối","Kênh OEM","CSKH cũ"]),
     tabMod("q_ll","spark","Lãi lỗ","",["pl","bc_tong","kho_boc","kho_cl","sku","kho_dm"],["P&L công ty","So sánh kênh","Giá thành & định mức","Chênh lệch định mức","Giá vốn SKU","Định mức theo sản phẩm"]),
     {k:"q_cp",adm:true,zone:"",ic:"fin",n:"Tiền & chi phí",sub:"",groups:()=>{const P=pool(),g=(n,ids,names)=>[n,pick(P,ids,names)];
-      return [g("Tiền",["tien_lich"],["Tiền & lịch chi"]),
+      return [g("Tiền",["tien_lich"],["Dòng tiền"]),
         g("Thu",["doisoat","phai_thu","cp_thu"],["Đối soát tiền về","Phải thu & tuổi nợ","Sổ thu"]),
         g("Chi",["so_cp"],["Sổ chi phí"]),
         g("Báo cáo & chứng từ",["ngan_sach","cr_bill"],["Ngân sách","Kho bill giao dịch"])].filter(x=>x[1].length)}},

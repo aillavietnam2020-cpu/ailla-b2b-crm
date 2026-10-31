@@ -193,6 +193,8 @@ export interface TienDoc {
   ceo: string;
   /** mã đơn liên quan (đơn bán khách trả / đơn mua / đơn được chở) */
   lq: string;
+  /** kênh của khách (tiền khách trả): B2B = Kênh phân phối, GIA_CONG = Kênh OEM */
+  kenh?: Kenh;
 }
 
 /** Nhận ra tài khoản từ chữ ghi trên phiếu chi ("MB · 0123 · CTY AILLA"): khớp số tài khoản. */
@@ -207,7 +209,7 @@ export function acctOf(text: string, method: string, accts: Array<{ id: string; 
 export async function dongTien(db: D1Database, from: string, to: string): Promise<{ accounts: Array<{ id: string; bank: string; account_no: string; account_name: string; active: number }>; docs: TienDoc[] }> {
   const accounts = (await db.prepare('SELECT id, bank, account_no, account_name, active FROM receiving_accounts ORDER BY bank').all<{ id: string; bank: string; account_no: string; account_name: string; active: number }>()).results ?? [];
   const [pay, po, vc, bo] = await Promise.all([
-    db.prepare(`SELECT x.paid_at AS date, COALESCE(x.external_receipt_no, '') AS ref, c.name AS party, x.amount, x.is_adjustment AS adj, x.method, x.receiving_account_id AS acct, ${PAY_DON} AS lq
+    db.prepare(`SELECT x.paid_at AS date, COALESCE(x.external_receipt_no, '') AS ref, c.name AS party, x.amount, x.is_adjustment AS adj, x.method, x.receiving_account_id AS acct, ${PAY_DON} AS lq, ${KENH_SQL} AS kenh
       FROM payments x JOIN customers c ON c.id = x.customer_id
       WHERE x.accounting_status = 'DA_XAC_NHAN' AND COALESCE(x.method, '') <> 'Bù trừ cước vận chuyển' AND substr(x.paid_at, 1, 10) BETWEEN ? AND ?`).bind(from, to).all<Record<string, any>>(),
     db.prepare(`SELECT x.pay_date AS date, s.name AS party, x.amount, x.kind, x.method, x.from_account, x.account, x.ceo_status, ${PO_NO} AS lq
@@ -221,7 +223,7 @@ export async function dongTien(db: D1Database, from: string, to: string): Promis
   const docs: TienDoc[] = [];
   for (const p of pay.results ?? []) {
     const acct = p.acct || (/tiền mặt/i.test(p.method || '') ? 'TIEN_MAT' : '');
-    docs.push({ date: String(p.date).slice(0, 10), loai: p.adj === 1 ? 'HOAN' : 'THU', ref: p.ref, party: p.party, amount: p.adj === 1 ? -p.amount : p.amount, acct, acct_text: p.acct ? lb.get(p.acct) ?? '' : p.method || '', ceo: '', lq: p.lq ?? '' });
+    docs.push({ date: String(p.date).slice(0, 10), loai: p.adj === 1 ? 'HOAN' : 'THU', ref: p.ref, party: p.party, amount: p.adj === 1 ? -p.amount : p.amount, acct, acct_text: p.acct ? lb.get(p.acct) ?? '' : p.method || '', ceo: '', lq: p.lq ?? '', kenh: p.kenh });
   }
   for (const p of po.results ?? []) {
     const txt = p.from_account || p.account || '';
