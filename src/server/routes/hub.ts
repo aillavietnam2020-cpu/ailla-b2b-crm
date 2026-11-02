@@ -7,6 +7,7 @@ import { auditStatement } from '../lib/audit';
 import type { AuthContext } from '../env';
 import { requirePermission } from '../middleware/rbac';
 import { canHr, hrGrantFromUsers, saveHrGrant } from '../lib/hrAccess';
+import { membersFromHub, saveMembers } from '../services/daoTao';
 import { neutralizeTags, protectUsers, type GuardUser } from '../lib/stateGuard';
 
 /**
@@ -182,6 +183,12 @@ hubRoutes.put('/state', async (c) => {
       .bind(SECURE_ID, await pack(JSON.stringify(secure)), now, auth.user.id)
       .run();
   };
+  // Đào tạo: bản chụp phòng ban / vai trò tin cậy, chỉ CEO hoặc người làm nhân sự (đã nhận phần nhân sự) ghi mới cập nhật.
+  const saveDtMembers = async () => {
+    if (!Array.isArray(data.users)) return;
+    if (!isCeo && !((body as { hr?: unknown }).hr && (await canHr(c.env.DB, auth)))) return;
+    await saveMembers(c.env.DB, membersFromHub(data as never), auth.user.id);
+  };
   const saveHr = async () => {
     // Trang cũ còn mở từ trước khi tách ngăn: lần ghi đầu tiên cất luôn phần nhân sự (chưa có ngăn mới cất).
     if (hrHasData(hrSec)) {
@@ -216,6 +223,7 @@ hubRoutes.put('/state', async (c) => {
     await saveSecure();
     await saveHr();
     if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
+    await saveDtMembers();
     return ok(c, { version: 1, updated_at: now });
   }
 
@@ -229,6 +237,7 @@ hubRoutes.put('/state', async (c) => {
   await saveSecure();
   await saveHr();
   if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
+  await saveDtMembers();
   return ok(c, { version: base + 1, updated_at: now });
 });
 
