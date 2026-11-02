@@ -1276,10 +1276,10 @@ PAGES.mkt_tq=function(m){_pMktTqTre(m);const r=m.querySelector(".xr2");if(r){r.i
 
 
 
-/* Tổng quan Marketing: tình trạng video theo kênh. Bấm chọn kênh, mỗi sản phẩm một hàng, các trạng thái xếp hàng ngang */
+/* Tổng quan Marketing: tình trạng video theo kênh. Luôn hiện đủ các kênh (kể cả kênh chưa có kế hoạch). Bấm chọn kênh, mỗi sản phẩm một hàng, các trạng thái xếp hàng ngang */
 let TQ_K="";
 function tqKenhHtml(){
-  const d=D(),pairs=ptPairs(),chs=CHANNELS.filter(ch=>ch.needId&&pairs.some(x=>x.kenh===ch.k&&+x.sl>0));if(!chs.length)return "";
+  const d=D(),pairs=ptPairs(),chs=CHANNELS;if(!chs.length)return "";
   if(!TQ_K||!chs.some(c=>c.k===TQ_K))TQ_K=chs[0].k;
   const ch=chOf(TQ_K),P=pairs.filter(x=>x.kenh===TQ_K),C=d.cards.filter(c=>c.kenh===TQ_K&&c.nguon!=="Order Digital"),skus=[...new Set(P.filter(x=>+x.sl>0).map(x=>x.sku).concat(C.map(c=>c.sku)))];
   const rowOf=s=>{const pl=sum(P.filter(x=>x.sku===s),x=>+x.sl||0),cs=C.filter(c=>c.sku===s),cb=cs.filter(c=>["cg","kb"].includes(c.step)&&!c.hookText&&!c.noiDung).length,lam=cs.filter(c=>KV_PIPE.includes(c.step)||(c.step==="kb"&&(c.hookText||c.noiDung))).length,cho=cs.filter(c=>c.step==="dang").length,xong=cs.filter(c=>c.step==="xong").length;return {s,pl,cb,lam,cho,xong,th:Math.max(0,pl-cho-xong)}};
