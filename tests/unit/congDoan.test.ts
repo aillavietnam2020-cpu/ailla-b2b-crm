@@ -110,6 +110,6 @@ describe('Công đoạn của việc giao', () => {
     tkCdPart('t1', 'a', 'u_m', 15, true);
     expect(t.cd[0].st).toBe('xong');
     expect(t.st).toBe('review');
-    expect(notes.some(([to, txt]) => to === 'u_lead' && txt.includes('chờ bạn duyệt'))).toBe(true);
+    expect(notes.some(([to, txt]: [string, string]) => to === 'u_lead' && txt.includes('chờ bạn duyệt'))).toBe(true);
   });
 });
