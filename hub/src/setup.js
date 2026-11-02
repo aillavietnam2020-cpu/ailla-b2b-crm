@@ -141,7 +141,7 @@ const MODULES=[
  {k:"setup",zone:"Quản trị",ic:"gear",n:"Cài đặt",sub:"",groups:()=>[
    ["Tổ chức",[MI("nhansu","Tài khoản & phân quyền",u=>can(u,"nhansu.quanly")),MI("phongban","Phòng ban",u=>can(u,"thietlap.quanly"))]],
    ["Danh mục",[MI("sanpham","Sản phẩm",u=>can(u,"sanpham.quanly")),MI("kenhban","Kênh bán & phí",u=>can(u,"thietlap.quanly")),MI("chiphidm","Danh mục chi phí",u=>can(u,"thietlap.quanly"))]],
-   ["Hệ thống",[MI("bots","Bot AI phòng ban",u=>can(u,"caidat.quanly")),MI("quychuan","Quy chuẩn"),MI("caidat","Sao lưu dữ liệu",u=>can(u,"caidat.quanly"))]]]},
+   ["Hệ thống",[MI("bots","Bot AI phòng ban",u=>can(u,"caidat.quanly")),MI("quychuan","Quy chuẩn",()=>false),MI("caidat","Sao lưu dữ liệu",u=>can(u,"caidat.quanly"))]]]},
 ];
 let MOD="";
 /* Hai địa chỉ: quản trị (chỉ Cài đặt + Tài chính) và vận hành (mọi thứ còn lại; Cài đặt chỉ còn Quy chuẩn). Chưa cấu hình địa chỉ quản trị thì giữ như cũ. */
