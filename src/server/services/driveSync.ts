@@ -39,10 +39,12 @@ export async function loadStaff(db: D1Database): Promise<{ staff: StaffRow[]; na
   const d = main ? (JSON.parse(await unpack(main.data)) as { staff?: { ma: string; ten?: string; pb?: string; tt?: string }[]; users?: HubUser[] }) : {};
   const ns = hr ? ((JSON.parse(await unpack(hr.data)) as { ns?: Record<string, { hs?: { email?: string } }> }).ns ?? {}) : {};
   const leads = new Set((d.users ?? []).filter((u) => u.active !== false && u.maNS && ['lead', 'truongphong'].includes(u.role ?? '')).map((u) => u.maNS as string));
+  // Tài khoản web đã khóa ("Đã nghỉ việc" ở Tài khoản & phân quyền) mà có gắn mã nhân viên: coi như đã nghỉ.
+  const locked = new Set((d.users ?? []).filter((u) => u.active === false && u.maNS).map((u) => u.maNS as string));
   const names = new Map<string, string>();
   const staff = (d.staff ?? []).map((s) => {
     names.set(s.ma, s.ten ?? s.ma);
-    return { ma: s.ma, pb: s.pb ?? '', tt: s.tt ?? '', email: ns[s.ma]?.hs?.email ?? '', lead: leads.has(s.ma) };
+    return { ma: s.ma, pb: s.pb ?? '', tt: locked.has(s.ma) ? 'Đã nghỉ' : (s.tt ?? ''), email: ns[s.ma]?.hs?.email ?? '', lead: leads.has(s.ma) };
   });
   return { staff, names };
 }
