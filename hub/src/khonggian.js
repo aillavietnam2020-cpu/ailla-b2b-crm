@@ -6,7 +6,7 @@
    - Mẫu & SOP của phòng: tài liệu team ở Thư viện Đào tạo (daotao.js, Lead soạn, CEO duyệt) — SOP / biểu mẫu; thêm mẫu việc giao nhanh.
    - Phòng = mã phòng ban của nhân sự (D().departments, giống thư mục Drive). Nhân sự xem phòng mình; CEO, Ban điều hành chọn phòng khác.
    ===================================================================== */
-const KPB={pb:"",msgs:{},files:{},more:false,cg:false,chat:"",doc:"sop"};
+const KPB={dirs:{},teams:null,pb:"",msgs:{},files:{},more:false,cg:false,chat:"",doc:"sop"};
 /* mã phòng ban → nhóm việc (TEAMS) và nhóm chat */
 const KPB_TEAM={CM:"content",ADS:"digital",KOC:"koc",KT:"ketoan",KV:"kho",SX:"sx",HCNS:"hcns",B2B:"sale",B2C:"sale"};
 const KPB_ORD=["CM","ADS","KOC","B2C","B2B","CSKH","KT","SX","KV","HCNS"];
@@ -24,7 +24,14 @@ function kpbLoadMsgs(room){if(room in KPB.msgs)return;KPB.msgs[room]=null;
   svApi("/api/hub/chat/msgs?room="+encodeURIComponent(room)).then(r=>{KPB.msgs[room]=r||[];if(PAGE==="cv_pb")renderMain()}).catch(()=>{KPB.msgs[room]=[]})}
 function kpbLoad(pb,room){kpbLoadMsgs(room);
   if(!KPB.files[pb])svApi("/api/drive/find?pb="+encodeURIComponent(pb)).then(r=>{KPB.files[pb]=r||{};if(PAGE==="cv_pb")renderMain()}).catch(e=>{KPB.files[pb]={err:e.message||"Chưa mở được"};if(PAGE==="cv_pb")renderMain()});
+  if(!KPB.dirs[pb]){KPB.dirs[pb]={loading:true};svApi("/api/drive/list?pb="+encodeURIComponent(pb)).then(r=>{KPB.dirs[pb]=r||{}}).catch(e=>{KPB.dirs[pb]={err:e.message||""}}).then(()=>{if(PAGE==="cv_pb")renderMain()})}
+  if(!KPB.teams){KPB.teams={loading:true};svApi("/api/drive/teams").then(r=>{KPB.teams=r||{}}).catch(()=>{KPB.teams={teams:[]}}).then(()=>{if(PAGE==="cv_pb")renderMain()})}
   if(typeof dtLoad==="function"&&!(typeof DT!=="undefined"&&DT.docs))dtLoad().then(()=>{if(PAGE==="cv_pb")renderMain()}).catch(()=>{})}
+/* Thư mục sổ ngay trong trang phòng (chị Hoa 02/11): thư mục con của phòng, tư liệu chung, thư mục dự án; nhiều thì hiện bớt, bấm xem thêm */
+function kpbDirHtml(pb,T){const Dd=KPB.dirs[pb]||{},chung=((KPB.teams||{}).teams||[]).filter(t=>/^chung/.test(t.pb)),pj=kpbPrj(T).filter(p=>p.drive),fd=Dd.folders||[];
+  const grp=(k,title,items,lim)=>{const all=KPB.dmore===k,sh=all?items:items.slice(0,lim);return `<div class="kgdh">${title}</div>${items.length?`<div class="kgdir">${sh.join("")}${items.length>lim?`<button type="button" class="kgdx" data-kgdmore="${k}">${all?"Thu gọn":"+"+(items.length-lim)+" thư mục"}</button>`:""}</div>`:`<p class="hint">${k==="pj"?"Chưa có dự án nào gắn thư mục.":Dd.loading?"Đang tải…":Dd.err&&k==="team"?esc(Dd.err):"Chưa có thư mục."}</p>`}`};
+  const btn=(p2,f,name)=>`<button type="button" data-kgdir="${esc(p2)}|${esc(f||"")}" title="${esc(name)}">📁 <span>${esc(name)}</span></button>`;
+  return grp("team","Thư mục phòng",fd.map(f=>btn(pb,f.id,f.name)),6)+grp("chung","Tư liệu chung",chung.map(t=>btn(t.pb,"",t.name)),4)+grp("pj","Thư mục dự án",pj.map(p=>`<a href="${esc(p.drive)}" target="_blank" rel="noopener" title="Mở trên Google Drive">📁 <span>${esc(p.ten)}</span></a>`),4)}
 function pKhongGian(m){
   const D0=kpbDepts();if(!KPB.pb)KPB.pb=(ME.phongBan&&ME.phongBan!=="BDH"&&D0.some(p=>p.k===ME.phongBan)?ME.phongBan:(D0[0]||{}).k)||"CM";
   if(!kpbAll()&&ME.phongBan&&ME.phongBan!=="BDH")KPB.pb=ME.phongBan;
@@ -65,7 +72,8 @@ function pKhongGian(m){
       <form class="kgf" id="kg-f"><input id="kg-in" placeholder="${room.startsWith("p:")?"Nhắn cho nhóm dự án…":"Nhắn cho cả phòng…"}"><button class="btn sm pri">Gửi</button></form>
       ${mem.filter(u=>u.id!==ME.id&&u.crm).length?`<div class="kgdm"><small>Nhắn riêng:</small>${mem.filter(u=>u.id!==ME.id&&u.crm).map(u=>`<button type="button" data-kgdm="${esc(u.crm)}" title="Nhắn riêng với ${esc(u.name)}">${avatar(u.id)}${esc(u.name.split(" ").pop())}</button>`).join("")}</div>`:""}</section>
      <section class="card kgs"><div class="kgsh"><h3>📁 Thư mục Drive</h3><span class="sp"></span><button type="button" class="btn sm" id="kg-drive">Mở thư mục</button></div>
-      ${!F?`<p class="hint">Đang tải…</p>`:F.err?`<p class="hint">${esc(F.err)}</p>`:(F.files||[]).length?`<div class="kgdf">${F.files.slice(0,6).map(f=>`<a href="${esc(f.link)}" target="_blank" rel="noopener">${typeof tmIc==="function"?tmIc(f.kind):""}<span><b>${esc(f.name)}</b><small>${esc(f.by||"")} · ${typeof tmTime==="function"?tmTime(f.modified):""}</small></span></a>`).join("")}</div>`:`<p class="hint">Chưa có tệp nào, hoặc phòng chưa được gán thư mục.</p>`}</section>
+      ${kpbDirHtml(pb,T)}<div class="kgdh">Tệp mới sửa</div>
+      ${!F?`<p class="hint">Đang tải…</p>`:F.err?`<p class="hint">${esc(F.err)}</p>`:(F.files||[]).length?`<div class="kgdf">${F.files.slice(0,4).map(f=>`<a href="${esc(f.link)}" target="_blank" rel="noopener">${typeof tmIc==="function"?tmIc(f.kind):""}<span><b>${esc(f.name)}</b><small>${esc(f.by||"")} · ${typeof tmTime==="function"?tmTime(f.modified):""}</small></span></a>`).join("")}</div>`:`<p class="hint">Chưa có tệp nào, hoặc phòng chưa được gán thư mục.</p>`}</section>
     </div></div>`;
   m.querySelectorAll("[data-kgpb]").forEach(b=>b.onclick=()=>{KPB.pb=b.dataset.kgpb;KPB.more=KPB.cg=false;KPB.chat="";renderMain()});
   m.querySelectorAll("[data-kgo]").forEach(b=>b.onclick=()=>{const [s,id]=b.dataset.kgo.split("|");if(s==="task")openTask(id);else if(s==="card")openCard(id)});
@@ -77,6 +85,8 @@ function pKhongGian(m){
   $("#kg-chat").onclick=()=>openChat(room);
   m.querySelectorAll("[data-kgch]").forEach(b=>b.onclick=()=>{KPB.chat=b.dataset.kgch;renderMain()});
   m.querySelectorAll("[data-kgdm]").forEach(b=>b.onclick=()=>openChat(tnDm(b.dataset.kgdm)));
+  m.querySelectorAll("[data-kgdir]").forEach(b=>b.onclick=()=>{const [p2,f]=b.dataset.kgdir.split("|");if(typeof TM!=="undefined"){TM.scope=pb;TM.pb=p2;TM.folder=f||"";TM.list=null;TM.listKey="";TM.q=""}ntPage("thumuc")});
+  m.querySelectorAll("[data-kgdmore]").forEach(b=>b.onclick=()=>{KPB.dmore=KPB.dmore===b.dataset.kgdmore?"":b.dataset.kgdmore;renderMain()});
   $("#kg-drive").onclick=()=>{if(typeof TM!=="undefined"){TM.scope=pb;TM.pb=pb;TM.folder="";TM.list=null;TM.listKey="";TM.q=""}ntPage("thumuc")};
   m.querySelectorAll("[data-kgtpl]").forEach(b=>b.onclick=()=>{openTask(null);const s=$("#t-tpl");if(s){s.value=b.dataset.kgtpl;s.onchange&&s.onchange()}});
   m.querySelectorAll("[data-kgdt]").forEach(b=>b.onclick=()=>{KPB.doc=b.dataset.kgdt;renderMain()});

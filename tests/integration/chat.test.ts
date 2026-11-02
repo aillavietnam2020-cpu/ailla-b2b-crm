@@ -44,6 +44,27 @@ describe('Tin nhắn (/api/hub/chat)', () => {
     expect(sum.body.data.rooms.find((x: { room: string }) => x.room === 'p:DA-07').unread).toBe(1);
   });
 
+  it('ảnh / tệp: gửi vào phòng thành tin loại tệp, nhắn riêng thì người ngoài không mở được', async () => {
+    const f = new FormData();
+    f.set('room', DM);
+    f.set('file', new File([new Uint8Array(500).fill(3)], 'bao-cao.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const up = await ctx.request('/api/hub/chat/files', { as: USERS.ceo, method: 'POST', formData: f });
+    expect(up.status).toBe(200);
+    expect(up.body.data.msg.kind).toBe('file');
+    const id = up.body.data.file.id as string;
+    const get = await ctx.app.fetch(new Request(`http://local/api/hub/chat/files/${id}`, { headers: { 'X-Dev-Email': USERS.thao } }), ctx.env);
+    expect(get.status).toBe(200);
+    expect((await get.arrayBuffer()).byteLength).toBe(500);
+    const other = await ctx.app.fetch(new Request(`http://local/api/hub/chat/files/${id}`, { headers: { 'X-Dev-Email': USERS.huyen } }), ctx.env);
+    expect(other.status).toBe(403);
+    const list = await ctx.request(`/api/hub/chat/files?room=${DM}`, { as: USERS.thao });
+    expect(list.body.data.map((x: { name: string }) => x.name)).toEqual(['bao-cao.xlsx']);
+    const bad = new FormData();
+    bad.set('room', 'g:content');
+    bad.set('file', new File([new Uint8Array(10)], 'x.exe', { type: 'application/x-msdownload' }));
+    expect((await ctx.request('/api/hub/chat/files', { as: USERS.thao, method: 'POST', formData: bad })).status).toBe(400);
+  });
+
   it('thẻ giao việc: lưu loại tin và mã việc', async () => {
     const s = await ctx.request('/api/hub/chat/msgs', { as: USERS.ceo, body: { room: 'g:content', body: 'Làm 30 hook tinh dầu', kind: 'task', ref: 'task:cv_1' } });
     expect(s.body.data.kind).toBe('task');

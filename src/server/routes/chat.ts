@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { nowIso } from '@shared/datetime';
 import type { AppEnv } from '../env';
-import { badRequest, forbidden, ok } from '../lib/http';
+import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { requirePermission } from '../middleware/rbac';
 
 /**
@@ -81,7 +81,7 @@ chatRoutes.post('/msgs', async (c) => {
   const b = (await c.req.json().catch(() => null)) as { room?: unknown; body?: unknown; kind?: unknown; ref?: unknown } | null;
   const room = needRoom(b?.room, me);
   const body = String(b?.body ?? '').trim().slice(0, 4000);
-  const kind = ['', 'task', 'remind'].includes(String(b?.kind ?? '')) ? String(b?.kind ?? '') : '';
+  const kind = ['', 'task', 'remind', 'file'].includes(String(b?.kind ?? '')) ? String(b?.kind ?? '') : '';
   const ref = String(b?.ref ?? '').slice(0, 80);
   if (!body && !ref) throw badRequest('EMPTY', 'Chưa có nội dung');
   const at = nowIso();
@@ -158,4 +158,70 @@ chatRoutes.delete('/reminders/:id', async (c) => {
   const me = c.get('auth').user.id;
   const r = await c.env.DB.prepare('DELETE FROM chat_reminders WHERE id = ? AND (user_id = ? OR by_id = ?)').bind(Number(c.req.param('id')), me, me).run();
   return ok(c, { deleted: r.meta.changes ?? 0 });
+});
+
+/* ---------- Ảnh / tệp trong cuộc trò chuyện (học Zalo) ---------- */
+export const CHAT_FILE_MAX = 1_600_000;
+const FILE_TYPES = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf', 'text/plain', 'text/csv',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+];
+
+/** Gửi tệp: lưu tệp rồi đăng một tin loại 'file' (ref = mã tệp) vào phòng. */
+chatRoutes.post('/files', async (c) => {
+  const me = c.get('auth').user.id;
+  const form = await c.req.formData().catch(() => null);
+  const room = needRoom(form?.get('room'), me);
+  const file = form?.get('file');
+  if (!file || typeof file === 'string') throw badRequest('MISSING', 'Chưa chọn tệp');
+  if (!FILE_TYPES.includes(file.type)) throw badRequest('BAD_TYPE', 'Chỉ gửi được ảnh, PDF, Word, Excel, PowerPoint hoặc tệp chữ');
+  if (file.size > CHAT_FILE_MAX) throw badRequest('TOO_LARGE', 'Tệp quá 1,5 MB, hãy gửi link Google Drive');
+  const id = crypto.randomUUID();
+  const name = (file.name || 'tep').slice(0, 160);
+  const at = nowIso();
+  await c.env.DB.prepare('INSERT INTO chat_files (id, room, name, mime, size, data, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, room, name, file.type, file.size, new Uint8Array(await file.arrayBuffer()), me, at)
+    .run();
+  const r = await c.env.DB.prepare('INSERT INTO chat_msgs (room, user_id, body, kind, ref, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(room, me, name, 'file', 'f:' + id, at)
+    .run();
+  const mid = Number(r.meta.last_row_id);
+  await c.env.DB.prepare(
+    'INSERT INTO chat_reads (user_id, room, last_id) VALUES (?, ?, ?) ON CONFLICT(user_id, room) DO UPDATE SET last_id = MAX(last_id, excluded.last_id)',
+  )
+    .bind(me, room, mid)
+    .run();
+  return ok(c, { msg: { id: mid, room, user_id: me, body: name, kind: 'file', ref: 'f:' + id, created_at: at }, file: { id, name, mime: file.type, size: file.size, user_id: me, created_at: at } });
+});
+
+/** Danh sách ảnh / tệp của một phòng (cột Thông tin hội thoại). */
+chatRoutes.get('/files', async (c) => {
+  const me = c.get('auth').user.id;
+  const room = needRoom(c.req.query('room'), me);
+  const rows = await c.env.DB.prepare('SELECT id, name, mime, size, user_id, created_at FROM chat_files WHERE room = ? ORDER BY created_at DESC LIMIT 200')
+    .bind(room)
+    .all();
+  return ok(c, rows.results ?? []);
+});
+
+chatRoutes.get('/files/:id', async (c) => {
+  const me = c.get('auth').user.id;
+  const row = await c.env.DB.prepare('SELECT room, name, mime, data FROM chat_files WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<{ room: string; name: string; mime: string; data: unknown }>();
+  if (!row) throw notFound('Không thấy tệp');
+  if (!canRoom(row.room, me)) throw forbidden('Tệp trong tin nhắn riêng của người khác');
+  const d = row.data;
+  const bytes =
+    d instanceof Uint8Array ? d : d instanceof ArrayBuffer ? new Uint8Array(d) : Uint8Array.from((Array.isArray(d) ? d : Object.values(d as object)) as number[]);
+  const dl = c.req.query('dl') === '1';
+  return new Response(bytes as unknown as BodyInit, {
+    headers: {
+      'content-type': row.mime,
+      'content-disposition': `${dl ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(row.name)}`,
+      'cache-control': 'private, max-age=3600',
+    },
+  });
 });
