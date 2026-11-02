@@ -38,7 +38,7 @@ type DocRow = {
   id: string; nhom: string; teams: string; title: string; summary: string; body: string; version: number; status: string;
   bat_buoc: string; lo_trinh: string; han_ngay: number; quiz: string; sort: number; created_at: string; created_by: string;
   updated_at: string; updated_by: string; published_at: string | null; approved_by: string | null;
-  drive_id: string; drive_mod: string; drive_sync_at: string | null;
+  drive_id: string; drive_mod: string; drive_sync_at: string | null; files: string;
 };
 
 async function ctx(db: D1Database, auth: AuthContext): Promise<{ v: Viewer; m: Members }> {
@@ -56,7 +56,7 @@ function shape(r: DocRow, v: Viewer, withBody: boolean) {
   return {
     id: r.id, nhom: r.nhom, teams: parseJsonArr(r.teams), title: r.title, summary: r.summary, version: r.version, status: r.status,
     bat_buoc: r.bat_buoc, lo_trinh: r.lo_trinh, han_ngay: r.han_ngay, sort: r.sort, updated_at: r.updated_at, updated_by: r.updated_by,
-    published_at: r.published_at, quiz_n: quiz.length, can_edit: edit, drive_id: r.drive_id ?? '', drive_mod: r.drive_mod ?? '', drive_sync_at: r.drive_sync_at ?? null,
+    published_at: r.published_at, quiz_n: quiz.length, can_edit: edit, drive_id: r.drive_id ?? '', drive_mod: r.drive_mod ?? '', drive_sync_at: r.drive_sync_at ?? null, files: parseJsonArr(r.files),
     ...(withBody ? { body: r.body, quiz: edit ? quiz : quiz.map((q) => ({ q: q.q, o: q.o })) } : {}),
   };
 }
@@ -170,6 +170,8 @@ const docSchema = z.object({
   major: z.boolean().default(false),
   /** Link / mã file Google Docs: có thì nội dung lấy từ Drive (bỏ qua body gửi lên). '' = soạn trên web. */
   drive: z.string().trim().max(400).default(''),
+  /** Tệp đính kèm đã tải lên qua POST /file. */
+  files: z.array(z.object({ id: z.string().uuid(), name: z.string().max(200), size: z.number().int().min(0), mime: z.string().max(120) })).max(20).default([]),
 });
 
 function parseDoc(body: unknown) {
@@ -182,6 +184,10 @@ function parseDoc(body: unknown) {
   if (driveId === null) throw badRequest('BAD_LINK', 'Link Google Docs không đúng');
   return { ...d, driveId };
 }
+
+/** Gắn tệp vừa tải lên vào tài liệu (tệp đã thuộc tài liệu khác thì không chuyển). */
+const linkFiles = (db: D1Database, docId: string, files: { id: string }[]) =>
+  files.map((f) => db.prepare('UPDATE dt_file SET doc_id = ? WHERE id = ? AND (doc_id IS NULL OR doc_id = ?)').bind(docId, f.id, docId));
 
 /** Tài liệu nguồn Drive: lấy nội dung mới nhất ngay lúc lưu. */
 async function withDrive(env: AppEnv['Bindings'], d: ReturnType<typeof parseDoc>) {
@@ -202,11 +208,12 @@ daoTaoRoutes.post('/docs', async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO dt_doc (id, nhom, teams, title, summary, body, version, status, bat_buoc, lo_trinh, han_ngay, quiz, sort,
-         created_at, created_by, updated_at, updated_by, published_at, approved_by, drive_id, drive_mod, drive_sync_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         created_at, created_by, updated_at, updated_by, published_at, approved_by, drive_id, drive_mod, drive_sync_at, files)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(id, d.nhom, JSON.stringify(d.teams), d.title, d.summary, g.body, status, d.bat_buoc, d.lo_trinh, d.han_ngay, JSON.stringify(d.quiz), d.sort,
       now, auth.user.id, now, auth.user.id, status === 'dang' ? now : null, status === 'dang' && d.nhom === 'chung' ? auth.user.id : null,
-      g.drive_id, g.drive_mod, g.drive_sync_at),
+      g.drive_id, g.drive_mod, g.drive_sync_at, JSON.stringify(d.files)),
+    ...linkFiles(c.env.DB, id, d.files),
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'DT_DOC_ADD', entityType: 'DT_DOC', entityId: id, after: { title: d.title, nhom: d.nhom, status } }),
   ]);
   return ok(c, { id, status });
@@ -227,9 +234,10 @@ daoTaoRoutes.put('/docs/:id', async (c) => {
     c.env.DB.prepare(
       `UPDATE dt_doc SET nhom = ?, teams = ?, title = ?, summary = ?, body = ?, version = ?, status = ?, bat_buoc = ?, lo_trinh = ?, han_ngay = ?,
          quiz = ?, sort = ?, updated_at = ?, updated_by = ?, published_at = CASE WHEN ? = 'dang' THEN COALESCE(published_at, ?) ELSE published_at END,
-         approved_by = CASE WHEN ? = 'dang' AND ? = 'chung' THEN ? ELSE approved_by END, drive_id = ?, drive_mod = ?, drive_sync_at = ? WHERE id = ?`,
+         approved_by = CASE WHEN ? = 'dang' AND ? = 'chung' THEN ? ELSE approved_by END, drive_id = ?, drive_mod = ?, drive_sync_at = ?, files = ? WHERE id = ?`,
     ).bind(d.nhom, JSON.stringify(d.teams), d.title, d.summary, g.body, version, status, d.bat_buoc, d.lo_trinh, d.han_ngay, JSON.stringify(d.quiz),
-      d.sort, now, auth.user.id, status, now, status, d.nhom, auth.user.id, g.drive_id, g.drive_mod, g.drive_sync_at, old.id),
+      d.sort, now, auth.user.id, status, now, status, d.nhom, auth.user.id, g.drive_id, g.drive_mod, g.drive_sync_at, JSON.stringify(d.files), old.id),
+    ...linkFiles(c.env.DB, old.id, d.files),
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'DT_DOC_EDIT', entityType: 'DT_DOC', entityId: old.id,
       before: { title: old.title, version: old.version, status: old.status }, after: { title: d.title, version, status } }),
   ]);
@@ -436,6 +444,61 @@ daoTaoRoutes.get('/img/:id', async (c) => {
       'Content-Type': IMG_OK.includes(row.mime) ? row.mime : 'application/octet-stream',
       'Content-Security-Policy': "default-src 'none'; sandbox",
       'Cache-Control': 'private, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+});
+
+/* ---------- Tệp đính kèm (Word, PDF, Excel, PowerPoint, ảnh): tối đa 1,8 MB mỗi tệp, cất trong D1 như file hồ sơ nhân sự ---------- */
+const FILE_MAX = 1_800_000;
+const FILE_EXT: Record<string, string> = {
+  pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', txt: 'text/plain',
+};
+const INLINE_MIME = ['application/pdf', 'image/png', 'image/jpeg'];
+
+daoTaoRoutes.post('/file', async (c) => {
+  const auth = c.get('auth');
+  const { v } = await ctx(c.env.DB, auth);
+  if (!isEditor(v)) throw forbidden('Chỉ người soạn tài liệu tải tệp lên được');
+  const form = await c.req.formData().catch(() => null);
+  const file = form?.get('file');
+  if (!file || typeof file === 'string') throw badRequest('MISSING', 'Chưa chọn tệp');
+  const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+  const mime = FILE_EXT[ext];
+  if (!mime) throw badRequest('BAD_TYPE', 'Chỉ tải được Word, PDF, Excel, PowerPoint hoặc ảnh');
+  if (file.size > FILE_MAX) throw badRequest('TOO_LARGE', 'Tệp quá 1,8 MB. File lớn hơn thì để trên Google Drive rồi dán link Google Docs, hoặc lưu PDF nhỏ lại.');
+  const id = newId();
+  const name = file.name.slice(0, 200);
+  await c.env.DB.prepare('INSERT INTO dt_file (id, name, mime, size, data, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, name, mime, file.size, new Uint8Array(await file.arrayBuffer()), nowIso(), auth.user.id)
+    .run();
+  return ok(c, { id, name, size: file.size, mime });
+});
+
+daoTaoRoutes.get('/file/:id', async (c) => {
+  const auth = c.get('auth');
+  const { v } = await ctx(c.env.DB, auth);
+  const row = await c.env.DB.prepare('SELECT doc_id, name, mime, data, created_by FROM dt_file WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<{ doc_id: string | null; name: string; mime: string; data: unknown; created_by: string }>();
+  if (!row) throw notFound('Không tìm thấy tệp');
+  if (row.doc_id) {
+    const r = await getDoc(c.env.DB, row.doc_id);
+    if (!canSeeDoc(v, lite(r))) throw forbidden('Tệp này thuộc tài liệu của team khác');
+  } else if (row.created_by !== auth.user.id && !v.ceo) throw forbidden();
+  const d = row.data;
+  const bytes =
+    d instanceof Uint8Array ? d : d instanceof ArrayBuffer ? new Uint8Array(d) : Array.isArray(d) ? Uint8Array.from(d as number[]) : Uint8Array.from(Object.values(d as object) as number[]);
+  const inline = INLINE_MIME.includes(row.mime) && c.req.query('tai') !== '1';
+  return new Response(bytes as unknown as BodyInit, {
+    headers: {
+      'Content-Type': row.mime,
+      'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(row.name)}`,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Cache-Control': 'private, max-age=300',
       'X-Content-Type-Options': 'nosniff',
     },
   });
