@@ -109,9 +109,10 @@ const MKT_G=()=>[
    MI("order_c","Order từ Ads",tm("content",u=>can(u,"order.xem")||u.role==="content"||u.role==="lead"||u.role==="admin"),ordCnt),
    MI("nhaplieu","Nhập báo cáo",tm("content",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead"))].filter(Boolean).map(CT)],
  ["",[MI("xuongvideo","Sản xuất video",tm("content"))]],
- ["",[MI("bc_koc","Booking KOC",u=>{const T=userTeam(u);return (!T||T==="all"||T==="koc")&&(tq(u)||u.role==="admin"||T==="koc")})]],
+ /* Chị Hoa 02/11: team Content (Lead Content sẽ vận hành cả Booking) xem được Booking KOC và Thư viện video ads của Digital. */
+ ["",[MI("bc_koc","Booking KOC",u=>{const T=userTeam(u);return T==="content"||((!T||T==="all"||T==="koc")&&(tq(u)||u.role==="admin"||T==="koc"))})]],
  ["",[MI("live","Livestream",tm("live"))]],
- ["",[MI("dg_tq","Tổng quan Digital",tm("ads",dgOk)),MI("dg_lib","Thư viện video ads",tm("ads",dgOk)),
+ ["",[MI("dg_tq","Tổng quan Digital",tm("ads",dgOk)),MI("dg_lib","Thư viện video ads",u=>tm("ads",dgOk)(u)||userTeam(u)==="content"),
    MI("fb_ads","Báo cáo Ads theo ngày",tm("ads",dgOk)),
    MI("order","Order cho Content",tm("ads",u=>dgOk(u)||can(u,"order.xem")),ordCnt),
    /* Chị Hoa 02/11: team Digital xem thêm hiệu quả Sale B2C, kho video, video win (trang dùng chung với Kinh doanh / Content, chỉ hiện ở đây cho người team Digital). */
