@@ -75,24 +75,27 @@ function cvFilter(L){
   const d=D(),me=ME.id,t=teamOf(ME),today=d.settings.today,W=WEEKS.find(w=>today>=w.tu&&today<=w.den)||WEEKS[0],LW=WEEKS.find(w=>w.w===W.w-1)||W;
   cvWho();
   return L.filter(x=>{
-    if(CVF.scope==="mine"&&x.nguoi!==me&&!x.phoi.includes(me)&&!(x.src==="task"&&x.st==="review"&&tkMgr(d.tasks.find(t=>t.id===x.id)||{})))return false;
+    if(CVF.scope==="mine"&&x.nguoi!==me&&!x.phoi.includes(me)&&!(x.src==="task"&&x.st==="review"&&tkMyTurn(d.tasks.find(t=>t.id===x.id)||{})))return false;
     if(ME.role!=="admin"&&!cvSummaryOnly()&&t!=="all"&&x.nguoi!==me&&!x.phoi.includes(me)&&!cvTeamSee(t,x.team)&&!(t==="content"&&x.src==="order"))return false;
     if(CVF.wt){const ux=d.users.find(y=>y.id===x.nguoi);if(!ux||!cvTeamSee(CVF.wt,teamOf(ux)))return false}
     if(CVF.tao&&x.tao!==CVF.tao)return false;
     if(CVF.team&&x.team!==CVF.team)return false;if(CVF.nguoi&&x.nguoi!==CVF.nguoi&&!x.phoi.includes(CVF.nguoi))return false;if(CVF.da&&x.da!==CVF.da)return false;if(CVF.st&&(CVF.st==="late"?!x.late:CVF.st==="todo"?!["cg","todo","nhan"].includes(x.st):x.st!==CVF.st))return false;if(CVF.uu&&x.uu!==CVF.uu)return false;
     if(CVF.q&&!(x.ten+" "+x.mo+" "+x.id+" "+userName(x.nguoi)).toLowerCase().includes(CVF.q.toLowerCase()))return false;
+    if(CVF.tg==="all"&&typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from&&x.han&&typeof tkDay==="function"){const a=tkDay(PERIOD.from),b=tkDay(PERIOD.to);if((x.han<a||x.han>b)&&!(x.st!=="done"&&x.han<a&&x.han<today))return false}
     if(CVF.tg==="today"&&x.han!==today)return false;if(CVF.tg==="week"&&(x.han<W.tu||x.han>W.den))return false;if(CVF.tg==="lweek"&&(x.han<LW.tu||x.han>LW.den))return false;
     return true});
 }
 /* một hàng lọc gọn ở góc phải: tìm · người · thời gian · trạng thái · dự án · nút Giao việc */
-function cvFilterBar(opts={}){const d=D();const names=cvMgrView()&&!cvSummaryOnly()?d.users.filter(u=>u.active&&u.role!=="admin").map(u=>`<option value="${esc(u.name)}">`).join(""):"";const more=(CVF.tg&&CVF.tg!=="all")||CVF.da||(CVF.who&&!["all","mine"].includes(CVF.who));return `<div class="cvbar"><input id="cv-q" placeholder="${names?"Tìm việc hoặc gõ tên người…":"Tìm việc…"}" value="${esc(CVF.q)}"${names?` list="cv-names" autocomplete="off"`:""}>${names?`<datalist id="cv-names">${names}</datalist>`:""}${opts.noSt?"":`<select id="cv-st" aria-label="Trạng thái">${opt([["","Mọi trạng thái"],["todo","Cần làm"],["doing","Đang làm"],["review","Chờ duyệt"],["done","Hoàn thành"],["late","Trễ hạn"]],CVF.st)}</select>`}<details class="cvmoref"${more?" open":""}><summary>Lọc thêm</summary>${cvWhoSelect()}<select id="cv-tg" aria-label="Thời gian">${opt([["all","Cả tháng"],["today","Hôm nay"],["week","Tuần này"],["lweek","Tuần trước"]],CVF.tg)}</select><select id="cv-da" aria-label="Dự án">${opt([["","Mọi dự án"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),CVF.da)}</select></details></div>`}
+function cvFilterBar(opts={}){const d=D();const names=cvMgrView()&&!cvSummaryOnly()?d.users.filter(u=>u.active&&u.role!=="admin").map(u=>`<option value="${esc(u.name)}">`).join(""):"";const more=CVF.da||(CVF.who&&!["all","mine"].includes(CVF.who));return `<div class="cvbar"><input id="cv-q" placeholder="${names?"Tìm việc hoặc gõ tên người…":"Tìm việc…"}" value="${esc(CVF.q)}"${names?` list="cv-names" autocomplete="off"`:""}>${names?`<datalist id="cv-names">${names}</datalist>`:""}${opts.noSt?"":`<select id="cv-st" aria-label="Trạng thái">${opt([["","Mọi trạng thái"],["todo","Cần làm"],["doing","Đang làm"],["review","Chờ duyệt"],["done","Hoàn thành"],["late","Trễ hạn"]],CVF.st)}</select>`}<details class="cvmoref"${more?" open":""}><summary>Lọc thêm</summary>${cvWhoSelect()}<select id="cv-da" aria-label="Dự án">${opt([["","Mọi dự án"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),CVF.da)}</select></details></div>`}
 function bindCvFilter(m){
   m.querySelectorAll("[data-tg]").forEach(b=>b.onclick=()=>{CVF.tg=b.dataset.tg;renderMain()});const wh=$("#cv-who");if(wh)wh.onchange=()=>{cvWhoSet(wh.value);renderMain()};
   [["cv-q","q"],["cv-tg","tg"],["cv-team","team"],["cv-da","da"],["cv-st","st"],["cv-uu","uu"]].forEach(([id,k])=>{const e=$("#"+id);if(e)e.onchange=()=>{CVF[k]=e.value;renderMain()}});
   bindNew();
 }
 const prjN=id=>((D().projects||[]).find(p=>p.id===id)||{ten:""}).ten;
-const avatar=id=>{const n=userName(id);return n?`<i class="av">${esc(n.trim().split(" ").pop()[0])}</i>`:""};
+const AV_C=[["#e7f0ff","#1c4fb8"],["#e3f5ea","#1f7a3d"],["#fff1dc","#9a5200"],["#f1e8ff","#6b2fb3"],["#dff5f5","#0b6e6e"],["#ffe9ee","#b4234a"],["#eef0f4","#3d4656"]];
+const avC=id=>{let h=0;for(const ch of String(id||""))h=(h*31+ch.charCodeAt(0))>>>0;return AV_C[h%AV_C.length]};
+const avatar=id=>{const n=userName(id);if(!n)return "";const [bg,fg]=avC(id);return `<i class="av" style="background:${bg};color:${fg}">${esc(n.trim().split(" ").pop()[0])}</i>`};
 function cvCard(x){const ed=x.src==="task"&&(can(ME,"viec.giao")||x.nguoi===ME.id||x.phoi.includes(ME.id));return `<div class="cvc ${x.late?"late":x.st==="done"?"done":""}" data-cv="${x.id}" data-src="${x.src}"${x.n>1?` data-grp="${x.ids.join(",")}"`:""}>
   <div class="cvh">${x.src==="task"&&ed?`<select data-cvst="${x.id}" class="sts st-${x.st}">${opt(CV_ST.filter(s=>s[0]!=="cg").map(s=>[s[0],s[1]]),x.st)}</select>`:pill(cvStN(x.st),(CV_ST.find(s=>s[0]===x.st)||[])[2])}${pill(x.uu.toUpperCase(),x.uu==="Cao"?"red":x.uu==="Thấp"?"gry":"amb")}<span class="sp"></span><span class="hint">${esc(x.loai)}</span></div>
   <b class="cvt${x.st==="done"?" strike":""}">${esc(x.ten)}</b><div class="cvm">${esc(x.mo)}</div>${cvSegHtml(x)}
@@ -109,7 +112,13 @@ function bindCvCards(m){
 }
 /* Quản lý của một việc: người giao (nếu không phải chính người làm), quản lý có quyền giao việc, chị */
 const tkMgrIds=t=>{const ids=new Set();if(t.tao&&t.tao!==t.nguoi)ids.add(t.tao);if(t.duyet&&t.duyet!==t.nguoi)ids.add(t.duyet);D().users.filter(u=>u.active&&u.id!==t.nguoi&&(u.role==="admin"||(u.role==="lead"&&(u.perms||[]).includes("viec.giao")&&(!t.team||teamOf(u)===t.team))||(tkLead(u)&&tkSameTeam(u,D().users.find(z=>z.id===t.nguoi))))).forEach(u=>ids.add(u.id));return [...ids]};
-const tkMgr=t=>!!ME&&ME.id!==t.nguoi&&(ME.role==="admin"||t.tao===ME.id||tkMgrIds(t).includes(ME.id));
+/* Duyệt hai vòng (chị Hoa 02/11): nhân sự nộp → lead / trưởng phòng của người làm duyệt (vòng 1) → chị duyệt (vòng 2).
+   Không có lead thì người giao / chị duyệt một vòng. Mỗi vòng góp ý, trả lại được; mọi trao đổi nằm trong việc (t.chat). */
+const tkLeadOf=t=>{const U=D().users,doer=U.find(u=>u.id===t.nguoi);if(!doer)return null;const tao=U.find(u=>u.id===t.tao);if(tao&&tkLead(tao)&&tao.id!==doer.id)return tao;return U.find(u=>u.active&&u.id!==doer.id&&tkLead(u)&&tkSameTeam(u,doer))||null};
+const tkV2=t=>t.v2!==false&&!!tkLeadOf(t);
+const tkAdmins=()=>D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id);
+const tkAppr=t=>{if(t.st==="review"&&t.vong===2)return tkAdmins();const L=tkLeadOf(t);return L?[L.id]:tkMgrIds(t)};
+const tkMgr=t=>!!ME&&ME.id!==t.nguoi&&(ME.role==="admin"||(t.st==="review"&&t.vong===2?false:(t.tao===ME.id||tkMgrIds(t).includes(ME.id)||tkAppr(t).includes(ME.id))));
 /* Quy tắc đóng việc: việc do người khác giao thì người làm chỉ bấm "Chờ duyệt", người giao (hoặc quản lý) duyệt mới Hoàn thành. Việc tự tạo cho mình thì tự đóng. */
 /* CEO (và ai có quyền "viec.giao") giao cho mọi người; trưởng phòng / lead giao cho người trong team mình (chị Hoa chốt 02/11) */
 const tkAll=()=>!!ME&&(ME.role==="admin"||can(ME,"viec.giao"));
@@ -140,15 +149,71 @@ const tkPctHtml=x=>{const p=tkPct(x),c=x.cd||[],k=x.ck||[],sub=c.length?`${c.fil
   return `<div class="tkpc"><div class="tkprog"><i style="width:${p}%;background:${x.late&&x.st!=="done"?"#e03131":p>=100?"#2f9e44":"#2f6fde"}"></i></div><small>${p}%${sub?" · "+sub:""}</small></div>`};
 /* nút việc tôi cần làm ngay trên bảng */
 function tkActBtn(x){if(x.src!=="task"||x.st==="done")return "";const t=(D().tasks||[]).find(y=>y.id===x.id);if(!t||(t.cd&&t.cd.length))return "";
-  if(t.st==="review"&&tkMgr(t))return `<button type="button" class="btn sm pri" data-tkopen="${t.id}">Duyệt</button>`;
+  if(tkMyTurn(t))return `<button type="button" class="btn sm pri" data-tkopen="${t.id}">Duyệt</button>`;
   if(t.st!=="review"&&(t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)))return `<button type="button" class="btn sm pri" data-tkopen="${t.id}">Nộp kết quả</button>`;return ""}
+/* Mẫu việc và việc lặp lại (học Lark): mẫu lưu ở d.taskTpl; mẫu có lặp thì web tự giao lại mỗi tuần / tháng khi có người mở trang Việc. */
+const tkTpls=()=>(D().taskTpl||[]).filter(p=>!p.xoa);
+const tkLapLbl=p=>p.lap==="tuan"?"mỗi "+(+p.ngay===7?"Chủ nhật":"thứ "+(+p.ngay+1)):p.lap==="thang"?"ngày "+p.ngay+" hằng tháng":"";
+const tkTodayIso=()=>{const x=new Date();return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
+function tkTplSave(v,lap,ngay){const today=tkTodayIso();DB.mutate(ME.name,"lưu mẫu việc "+v.ten,dt=>{dt.taskTpl=dt.taskTpl||[];dt.taskTpl.push({id:uid("tp"),ten:v.ten,moTa:v.moTa,team:v.team,da:v.da,nguoi:v.nguoi,phoi:v.phoi||[],uu:v.uu,v2:v.v2,checklist:(v.checklist||[]).map(c=>({t:c.t})),hanSau:Math.max(0,(+v.han||0)-dt.settings.today),lap:lap||"",ngay:+ngay||0,tao:ME.id,last:today,dung:false})})}
+function tkRecur(){const P=tkTpls().filter(p=>p.lap&&!p.dung),today=tkTodayIso();if(!P.length||!P.some(p=>(p.last||"")<today))return;
+  const hit=(p,iso)=>{const x=new Date(iso+"T00:00:00");return p.lap==="tuan"?((x.getDay()+6)%7+1)===+p.ngay:x.getDate()===+p.ngay};
+  DB.mutate("Hệ thống","tự giao việc lặp lại",dt=>{(dt.taskTpl||[]).forEach(p=>{if(p.xoa||!p.lap||p.dung||(p.last||"")>=today)return;const x=new Date((p.last||today)+"T00:00:00");
+    for(let i=0;i<62;i++){x.setDate(x.getDate()+1);const iso=x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");if(iso>today)break;
+      if(hit(p,iso)){const d0=tkDay(iso),nt={id:uid("cv"),ten:p.ten,moTa:p.moTa||"",team:p.team,da:p.da||"",nguoi:p.nguoi||"",phoi:p.phoi||[],han:d0+(+p.hanSau||0),bd:d0,uu:p.uu||"Trung bình",st:"todo",v2:p.v2,checklist:(p.checklist||[]).map(c=>({t:c.t,x:false})),loai:"Việc",tao:p.tao,tpl:p.id,log:[{at:new Date().toLocaleString("vi-VN"),by:"Hệ thống",txt:"Tự giao theo mẫu lặp lại ("+tkLapLbl(p)+")"}]};
+        dt.tasks.push(nt);if(typeof notifyU==="function"&&nt.nguoi){dt.notifs=dt.notifs||[];dt.notifs.push({id:uid("nt"),to:nt.nguoi,text:`Việc lặp lại: "${nt.ten}" · hạn ${dd(nt.han)}`,at:nowISO(),ref:"task:"+nt.id,by:"",read:false})}}}
+    p.last=today})})}
+/* ghim (lưu trên web, theo từng người) và gần đây (lưu trên máy này) */
+const tkPinned=id=>(((D().taskPins||{})[ME.id])||[]).includes(id);
+function tkPinToggle(id){DB.mutate(ME.name,"ghim việc",dt=>{dt.taskPins=dt.taskPins||{};const L=dt.taskPins[ME.id]=dt.taskPins[ME.id]||[];const i=L.indexOf(id);if(i>=0)L.splice(i,1);else L.unshift(id);dt.taskPins[ME.id]=L.slice(0,12)})}
+const tkRecentKey=()=>"ailla_tk_recent_"+(ME&&ME.id);
+function tkRecent(){try{return JSON.parse(localStorage.getItem(tkRecentKey())||"[]")}catch(e){return []}}
+function tkRecentAdd(id){try{const L=tkRecent().filter(x=>x!==id);L.unshift(id);localStorage.setItem(tkRecentKey(),JSON.stringify(L.slice(0,6)))}catch(e){}}
+function tkQuickHtml(){const T=D().tasks||[],f=id=>T.find(t=>t.id===id),pin=(((D().taskPins||{})[ME.id])||[]).map(f).filter(Boolean),rec=tkRecent().map(f).filter(t=>t&&!pin.includes(t));
+  if(!pin.length&&!rec.length)return "";const chip=t=>`<button type="button" class="tkqc${t.st==="done"?" done":""}" data-tkopen="${t.id}" title="${esc(t.ten)}">${esc(cvShort(t.ten,34))}</button>`;
+  return `<div class="tkquick">${pin.length?`<span class="tkql">📌 Ghim</span>${pin.map(chip).join("")}`:""}${rec.length?`<span class="tkql">🕘 Gần đây</span>${rec.slice(0,5).map(chip).join("")}`:""}</div>`}
+/* xem theo phòng (học Lark "Không gian làm việc"): một hàng chọn nhanh */
+function tkTeamChips(){if(!cvMgrView()||CVF.scope==="mine"||CVF.tao)return "";const T=cvWhoOpts().filter(o=>String(o[0]).indexOf("t:")===0);if(T.length<2)return "";
+  const on=k=>CVF.who===k;return `<div class="tkteams"><button type="button" class="cvchip${!String(CVF.who||"").startsWith("t:")?" on":""}" data-tmw="all">Tất cả phòng</button>${T.map(o=>`<button type="button" class="cvchip${on(o[0])?" on":""}" data-tmw="${esc(o[0])}">${esc(String(o[1]).replace(/^Team\s*/i,""))}</button>`).join("")}</div>`}
+function pCvTpl(m){const L=tkTpls();
+  m.innerHTML=`<section class="card flush cvtk"><div class="card-h pad"><h2>Mẫu việc & việc lặp lại</h2><span class="hint">Tạo mẫu: bấm ＋ Giao việc, chọn "Lặp lại" hoặc "Lưu làm mẫu việc"</span></div>${L.length?tbl(["Mẫu việc","Người làm","Lặp lại","Hạn","Lần giao gần nhất",""],L.map(p=>`<tr><td><b>${esc(p.ten)}</b></td><td>${avatar(p.nguoi)}${esc(userName(p.nguoi)||"—")}</td><td>${p.lap?esc(tkLapLbl(p))+(p.dung?` <span class="pill p-gry">tạm dừng</span>`:""):"Không lặp"}</td><td>sau ${+p.hanSau||0} ngày</td><td>${esc(p.last||"—")}</td><td>${p.lap?`<button type="button" class="btn sm" data-tpd="${p.id}">${p.dung?"Chạy lại":"Tạm dừng"}</button> `:""}<button type="button" class="btn sm" data-tpx="${p.id}">Xóa</button></td></tr>`)):`<p class="empty pad">Chưa có mẫu việc nào.</p>`}</section>`;
+  m.querySelectorAll("[data-tpd]").forEach(b=>b.onclick=()=>{DB.mutate(ME.name,"đổi mẫu việc",dt=>{const p=(dt.taskTpl||[]).find(x=>x.id===b.dataset.tpd);if(p){p.dung=!p.dung;if(!p.dung)p.last=tkTodayIso()}});renderMain()});
+  m.querySelectorAll("[data-tpx]").forEach(b=>b.onclick=()=>{if(!confirm("Xóa mẫu việc này? Việc đã giao vẫn giữ nguyên."))return;DB.mutate(ME.name,"xóa mẫu việc",dt=>{const p=(dt.taskTpl||[]).find(x=>x.id===b.dataset.tpx);if(p)p.xoa=true});renderMain()})}
 const tkStC=k=>(CV_ST.find(s=>s[0]===k)||[])[2]||"gry";
 const tkCk=t=>{const c=t.checklist||[];return c.length?c.filter(x=>x.x).length+"/"+c.length+" việc nhỏ":""};
 const tkStChip=t=>[t.tlNote&&t.st!=="done"&&t.st!=="review"?"Bị trả lại":cvStN(t.st),tkCk(t)].filter(Boolean).join(" · ");
 /* thanh tiến trình: Giao → Nhận → Đang làm → Nộp → Duyệt → Hoàn thành (việc tự giao cho mình thì bỏ bước Duyệt) */
+function tkChatAdd(x,kind,text,vong){x.chat=x.chat||[];x.chat.push({at:new Date().toLocaleString("vi-VN"),by:ME.name,byId:ME.id,kind,text:String(text||"").slice(0,1000),vong:vong||0});if(x.chat.length>80)x.chat=x.chat.slice(-80)}
+const TK_KIND={tra:"↩ Trả lại",ok1:"✓ Duyệt vòng 1",ok2:"✓ Duyệt hoàn thành",nop:"📤 Nộp kết quả"};
+const tkNamesDesc=()=>D().users.filter(u=>u.active&&u.name).sort((a,b)=>b.name.length-a.name.length);
+const tkMentions=txt=>{const low=String(txt||"").toLowerCase();return tkNamesDesc().filter(u=>low.includes("@"+u.name.toLowerCase())).map(u=>u.id)};
+const tkMention=txt=>{let h=esc(txt);tkNamesDesc().forEach(u=>{const k="@"+esc(u.name);if(h.includes(k))h=h.split(k).join(`<b class="tkat">${k}</b>`)});return h.replace(/\n/g,"<br>")};
+function tkChatHtml(t){const L=t.chat||[];
+  return `<div class="tkchat"><div class="tkch"><b>Trao đổi</b><small class="hint">hỏi lại, góp ý, gọi người bằng @tên</small></div>${L.length?`<div class="tkcl">${L.map(c=>`<div class="tkc${c.byId===ME.id?" me":""}${c.kind==="tra"?" tra":c.kind?" ok":""}"><small><b>${esc(c.by)}</b> · ${esc(c.at)}${TK_KIND[c.kind]?" · "+TK_KIND[c.kind]:""}</small>${c.text?`<div>${tkMention(c.text)}</div>`:""}</div>`).join("")}</div>`:""}
+   <div class="tkcin"><textarea id="t-cm" rows="1" placeholder="Viết trao đổi… gõ @ để gọi người"></textarea><button type="button" class="btn sm" id="t-cmok">Gửi</button></div><div id="t-cmat" class="tkatl" hidden></div></div>`}
+function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
+  DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
+    tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
+    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển chị duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ chị duyệt vòng 2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ chị duyệt`)}
+    else{tkLog(x,"Duyệt hoàn thành");x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
+  return r2}
+function tkReturn(id,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
+  DB.mutate(ME.name,`trả lại "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"tra",note,x.vong||1);tkLog(x,"Trả lại: "+note);x.st="doing";x.tlNote=note;x.vong=0;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);
+    if(typeof notifyU==="function")notifyU(dt,[x.nguoi,...(x.phoi||[])],`${ME.name} trả lại việc "${x.ten}": ${note}`,"task:"+x.id)})}
+function tkComment(id,text){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
+  DB.mutate(ME.name,`trao đổi ở "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"",text,x.vong||0);
+    if(typeof notifyU!=="function")return;const at=tkMentions(text),who=[x.nguoi,...(x.phoi||[]),x.tao,...tkAppr(x)].filter(z=>!at.includes(z));
+    if(at.length)notifyU(dt,at,`${ME.name} nhắc bạn ở việc "${x.ten}": ${text.slice(0,90)}`,"task:"+x.id);notifyU(dt,who,`${ME.name} trao đổi ở việc "${x.ten}": ${text.slice(0,90)}`,"task:"+x.id)})}
+/* gợi ý tên khi gõ @ trong ô trao đổi */
+function tkBindChat(t){const ta=$("#t-cm"),box=$("#t-cmat");if(!ta)return;
+  ta.oninput=()=>{ta.style.height="auto";ta.style.height=Math.min(140,ta.scrollHeight)+"px";const v=ta.value.slice(0,ta.selectionStart),m=/@([^@\n]{0,20})$/.exec(v);if(!m){box.hidden=true;return}
+    const fd=typeof foldName==="function"?foldName:(z=>String(z).toLowerCase()),q=fd(m[1]),L=D().users.filter(u=>u.active&&u.name&&fd(u.name).includes(q)).slice(0,6);
+    if(!L.length){box.hidden=true;return}box.hidden=false;box.innerHTML=L.map(u=>`<button type="button" class="btn sm" data-atn="${esc(u.name)}">${esc(u.name)}</button>`).join("");
+    box.querySelectorAll("[data-atn]").forEach(b=>b.onclick=()=>{const pos=ta.selectionStart,pre=ta.value.slice(0,pos).replace(/@([^@\n]{0,20})$/,"@"+b.dataset.atn+" ");ta.value=pre+ta.value.slice(pos);box.hidden=true;ta.focus()})};
+  $("#t-cmok").onclick=()=>{const v=ta.value.trim();if(!v){toast("Viết nội dung trao đổi");return}tkComment(t.id,v);toast("Đã gửi");openTask(t.id);renderMain()}}
 function tkStepper(t){
-  const appr=!!(t.tao&&t.tao!==t.nguoi)||!!t.duyet,S=[["giao","Đã giao"],["nhan","Đã nhận"],["doing","Đang làm"],["nop","Đã nộp"]].concat(appr?[["duyet","Duyệt"]]:[]).concat([["done","Hoàn thành"]]);
-  const at={todo:0,cg:0,nhan:1,doing:2,review:appr?4:3,done:S.length-1}[t.st];const cur=at==null?0:at,c=t.checklist||[],cn=c.filter(x=>x.x).length;
+  const v2=tkV2(t),appr=v2||!!(t.tao&&t.tao!==t.nguoi)||!!t.duyet,S=[["giao","Đã giao"],["nhan","Đã nhận"],["doing","Đang làm"],["nop","Đã nộp"]].concat(v2?[["l","Lead duyệt"],["c","Chị duyệt"]]:appr?[["duyet","Duyệt"]]:[]).concat([["done","Hoàn thành"]]);
+  const at={todo:0,cg:0,nhan:1,doing:2,review:v2?(t.vong===2?5:4):appr?4:3,done:S.length-1}[t.st];const cur=at==null?0:at,c=t.checklist||[],cn=c.filter(x=>x.x).length;
   return `<div class="tkstep">${S.map(([k,n],i)=>`<span class="${i<cur?"ok":i===cur?"on":""}${i===cur&&t.tlNote&&t.st!=="done"&&t.st!=="review"?" back":""}">${i<cur?"✓ ":""}${n}</span>`).join("")}</div>
    ${c.length?`<div class="tkprog"><i style="width:${Math.round(cn/c.length*100)}%"></i></div><small class="hint">Việc nhỏ đã xong ${cn}/${c.length}</small>`:""}`
 }
@@ -159,8 +224,8 @@ function tkResultHtml(t){
 function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}</div>`;
-  if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt hoàn thành</button></div></div>`
-    :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt</b>${sub}</div>`;
+  if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">${t.vong!==2&&tkV2(t)&&ME.role!=="admin"?"✓ Duyệt, chuyển chị duyệt":"✓ Duyệt hoàn thành"}</button></div></div>`
+    :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt${tkV2(t)?(t.vong===2?" vòng 2":" vòng 1"):""}</b>${sub}</div>`;
   if(doer){const need=!!tkDoneErr(t);
     return `<div class="tkres"><b>Nộp kết quả</b>${t.st==="todo"||t.st==="nhan"?`<div class="acts"><span class="hint">Trạng thái: ${cvStN(t.st)}</span>${t.st==="todo"?`<button type="button" class="btn sm" data-tkq="nhan">Nhận việc</button>`:""}<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button></div>`:""}${t.tlNote?`<p class="tkback">↩ Bị trả lại: ${esc(t.tlNote)}</p>`:""}
       <textarea id="t-kqn" rows="2" placeholder="Đã làm gì, kết quả ra sao">${esc(t.kqNote||"")}</textarea>
@@ -175,20 +240,25 @@ function tkLog(x,txt){x.log=x.log||[];x.log.push({at:new Date().toLocaleString("
 /* ghi ngày xong để tính đúng hạn / trễ hạn */
 function tkDoneDay(x,today){if(x.st==="done"){if(!x.xongNgay)x.xongNgay=today}else delete x.xongNgay}
 function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
-  DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});tkDoneDay(x,dt.settings.today);
+  DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});if(k==="review"&&old!=="review")x.vong=1;if(x.__chat){tkChatAdd(x,x.__chat[0],x.__chat[1],1);delete x.__chat}tkDoneDay(x,dt.settings.today);
     if(old===k||typeof notifyU!=="function")return;
-    if(k==="review")notifyU(dt,[x.tao,...tkMgrIds(x)],`${ME.name} gửi duyệt việc "${x.ten}"`,ref);
+    if(k==="review")notifyU(dt,tkAppr(x),`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
     else if(k==="done"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} đã duyệt xong việc "${x.ten}"`,ref);
     else if(old==="review"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} trả lại việc "${x.ten}"${note?": "+note:""}`,ref);
     else if(k==="done")notifyU(dt,[x.tao],`${ME.name} đã xong việc "${x.ten}"`,ref)})}
 function tkDoneErr(t){if(!t||tkMgr(t))return "";if(t.tao&&t.tao!==t.nguoi)return `Việc này do ${userName(t.tao)||"người giao"} giao. Bấm "Chờ duyệt" để người giao xem rồi mới hoàn thành.`;return ""}
-const tkMgrNames=t=>tkMgrIds(t).map(userName).filter(Boolean).join(", ")||"quản lý";
+/* đến lượt tôi duyệt: đúng người của vòng hiện tại (vòng 1 lead, vòng 2 chị) */
+const tkMyTurn=t=>!!ME&&t.st==="review"&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id);
+const tkMgrNames=t=>tkAppr(t).map(userName).filter(Boolean).join(", ")||"quản lý";
 function openTask(id){
   const d=D(),t=id?d.tasks.find(x=>x.id===id):null,giver=tkGiver(),own=!!t&&t.tao===ME.id&&t.nguoi===ME.id,ed=giver||!t||t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)||(!!t&&t.tao===ME.id),gv=giver||!t||own;
   const users=d.users.filter(u=>u.active&&u.role!=="admin"||u.id===ME.id),ngUsers=tkAssignable(users).concat(t&&t.nguoi&&!tkAssignable(users).some(u=>u.id===t.nguoi)?users.filter(u=>u.id===t.nguoi):[]);
-  openDrawerHTML(`<h2>${t?"Chi tiết việc":"Giao việc"}</h2>${t&&t.tao?`<p class="hint">Người giao: ${esc(userName(t.tao)||"—")}</p>`:""}${!t&&!giver?`<p class="hint">Bạn tạo việc cho chính mình. Muốn giao cho người khác, nhờ quản lý giao.</p>`:""}${t?tkResultHtml(t):""}<form class="frm" id="tkf2"><label class="field">Tên việc<input id="t-ten" required value="${esc(t?t.ten:"")}" ${gv?"":"disabled"}></label><label class="field">Mô tả<textarea id="t-mo" rows="2" ${gv?"":"disabled"}>${esc(t?t.moTa:"")}</textarea></label>
+  if(t)tkRecentAdd(t.id);
+  openDrawerHTML(`<h2>${t?"Chi tiết việc":"Giao việc"}${t?` <button type="button" class="btn sm tkpin" id="t-pin">${tkPinned(t.id)?"★ Bỏ ghim":"☆ Ghim"}</button>`:""}</h2>${!t&&tkTpls().length?`<label class="field">Giao từ mẫu<select id="t-tpl">${opt([["","— chọn mẫu việc có sẵn"]].concat(tkTpls().map(p=>[p.id,p.ten+(p.lap?" · "+tkLapLbl(p):"")])),"")}</select></label>`:""}${t&&t.tao?`<p class="hint">Người giao: ${esc(userName(t.tao)||"—")}</p>`:""}${!t&&!giver?`<p class="hint">Bạn tạo việc cho chính mình. Muốn giao cho người khác, nhờ quản lý giao.</p>`:""}${t?tkResultHtml(t)+tkChatHtml(t):""}<form class="frm" id="tkf2"><label class="field">Tên việc<input id="t-ten" required value="${esc(t?t.ten:"")}" ${gv?"":"disabled"}></label><label class="field">Mô tả<textarea id="t-mo" rows="2" ${gv?"":"disabled"}>${esc(t?t.moTa:"")}</textarea></label>
    <div class="row4"><label class="field">Team<select id="t-team" ${gv?"":"disabled"}>${opt(Object.entries(TEAMS),t?t.team:(TEAMS[teamOf(ME)]?teamOf(ME):"content"))}</select></label><label class="field">Dự án<select id="t-da" ${gv?"":"disabled"}>${opt([["","—"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),t?t.da:CVF.da)}</select></label></div>
    <div class="row4"><label class="field">Người làm<select id="t-ng" ${gv&&giver?"":"disabled"}>${opt([["","— chưa giao"]].concat(ngUsers.map(u=>[u.id,u.name+" · "+(TEAMS[teamOf(u)]||u.phongBan||"Quản lý")])),t?t.nguoi:(giver?"":ME.id))}</select></label><label class="field">Hạn${tkDate("t-han",t?t.han:d.settings.today+2,gv?"required":"disabled")}</label><label class="field">Bắt đầu <small class="hint">(trống = như hạn)</small>${tkDate("t-bd",t?(t.bd||0):0,gv?"":"disabled")}</label><label class="field">Ưu tiên<select id="t-uu" ${gv?"":"disabled"}>${opt(UU,t?t.uu:"Trung bình")}</select></label></div>
+   ${gv?`<label class="ck sm"><input type="checkbox" id="t-v2" ${t&&t.v2===false?"":"checked"}> Lead duyệt xong thì chị duyệt vòng 2</label>`:""}
+   ${!t&&giver?`<div class="row4 tklap"><label class="field">Lặp lại<select id="t-lap">${opt([["","Không lặp"],["tuan","Mỗi tuần"],["thang","Mỗi tháng"]],"")}</select></label><label class="field" id="t-lapdw" hidden>Vào<select id="t-lapd"></select></label><label class="ck sm"><input type="checkbox" id="t-tplsave"> Lưu làm mẫu việc</label></div>`:""}
    <div class="field" id="t-cdw">Công đoạn <small class="hint">(một việc có nhiều người, mỗi người một phần)</small><div id="t-cd"></div>${gv&&giver?`<div class="acts"><button type="button" class="btn sm" id="t-cdadd">＋ Công đoạn</button><button type="button" class="btn sm" id="t-cddu">＋ Bước duyệt</button><label class="ck sm"><input type="checkbox" id="t-seq" ${t&&t.tuanTu===false?"":"checked"}> Làm lần lượt</label></div>`:""}</div>
    <div class="field" id="t-stw">Trạng thái <small class="hint">bấm để đổi${t&&ed?", tự lưu ngay":""}</small><div class="tkst">${CV_ST.filter(s=>s[0]!=="cg").map(([k,n,c])=>`<button type="button" class="tkb tk-${c}${(t?t.st:"todo")===k?" on":""}" data-tkst="${k}" ${ed?"":"disabled"}>${(t?t.st:"todo")===k?"✓ ":""}${n}</button>`).join("")}</div><input type="hidden" id="t-st" value="${t?t.st:"todo"}">${t&&t.stAt?`<small class="hint">Đổi lần cuối: ${esc(t.stAt)} bởi ${esc(t.stBy||"")}</small>`:""}</div>
    ${t&&t.st!=="done"&&t.han&&(t.han<d.settings.today||(t.treReq||{}).st==="cho"||(ed&&!tkMgr(t)))?(()=>{const R=t.treReq||{},mg=tkMgr(t),cho=R.st==="cho",lt=t.han<d.settings.today;return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Hạn "+dayLbl(t.han)}</b>${lt?` (hạn ${dayLbl(t.han)}${t.hanCu?`, hạn cũ ${dd(t.hanCu)}`:""})`:t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}
@@ -229,8 +299,13 @@ function openTask(id){
     if(t)DB.mutate(ME.name,`gửi ${add.length} file vào việc "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(x){x.files=(x.files||[]).concat(add);tkLog(x,"Gửi kèm "+add.map(f=>f.name).join(", "))}});toast("Đã gửi file");fl()};
   if($("#t-kqf"))$("#t-kqf").onchange=async e=>{const add=await tkUpload(e.target.files,t?t.id:"");e.target.value="";if(add.length){kqF.push(...add);fl()}};
   $("#drawer").querySelectorAll("[data-tkq]").forEach(b=>b.onclick=()=>{tkSetSt(t.id,b.dataset.tkq);toast("Đã chuyển: "+cvStN(b.dataset.tkq));openTask(t.id);renderMain()});
+  if($("#t-pin"))$("#t-pin").onclick=()=>{tkPinToggle(t.id);openTask(t.id);renderMain()};
+  if(t)tkBindChat(t);
+  if($("#t-lap")){const lw=()=>{const k=$("#t-lap").value;$("#t-lapdw").hidden=!k;$("#t-lapd").innerHTML=k==="tuan"?opt(THU.map((x,i)=>[i+1,x==="CN"?"Chủ nhật":"Thứ "+(i+2)]),(new Date().getDay()+6)%7+1):opt(Array.from({length:28},(_,i)=>[i+1,"Ngày "+(i+1)]),Math.min(28,new Date().getDate()))};$("#t-lap").onchange=lw;lw()}
+  if($("#t-tpl"))$("#t-tpl").onchange=()=>{const p=tkTpls().find(x=>x.id===$("#t-tpl").value);if(!p)return;$("#t-ten").value=p.ten;$("#t-mo").value=p.moTa||"";if($("#t-team"))$("#t-team").value=p.team||$("#t-team").value;if($("#t-ng"))$("#t-ng").value=p.nguoi||"";if($("#t-uu"))$("#t-uu").value=p.uu||"Trung bình";$("#t-han").value=tkIso(D().settings.today+(+p.hanSau||2));
+    (p.checklist||[]).forEach(c=>{ck.push({t:c.t,x:false});$("#t-ck").insertAdjacentHTML("beforeend",`<label class="ck"><input type="checkbox" data-ck="${ck.length-1}"> ${esc(c.t)}</label>`)});toast("Đã điền từ mẫu, chị xem lại rồi bấm Giao việc")};
   if($("#t-nop"))$("#t-nop").onclick=()=>{const note=$("#t-kqn").value.trim(),link=$("#t-kql").value.trim();if(!note&&!link&&!kqF.length){toast("Ghi kết quả, dán link hoặc thêm file");return}
-    const k=tkDoneErr(t)?"review":"done";tkSetSt(t.id,k,{kqNote:note,kq:link,kqFiles:kqF.slice(),nopAt:new Date().toLocaleString("vi-VN"),nopBy:ME.name,tlNote:""},"Nộp kết quả");
+    const k=tkDoneErr(t)?"review":"done";tkSetSt(t.id,k,{kqNote:note,kq:link,kqFiles:kqF.slice(),nopAt:new Date().toLocaleString("vi-VN"),nopBy:ME.name,tlNote:"",__chat:["nop",[note,link].filter(Boolean).join(" · ")]},"Nộp kết quả");
     toast(k==="review"?"Đã nộp, chờ "+tkMgrNames(t)+" duyệt":"Đã nộp, việc xong");openTask(t.id);renderMain()};
   const stSave=(k,extra)=>{tkSetSt(t.id,k,extra);toast("Đã chuyển: "+cvStN(k))};
   $("#tkf2").querySelectorAll("[data-tkst]").forEach(b=>b.onclick=()=>{const k=b.dataset.tkst;
@@ -240,13 +315,13 @@ function openTask(id){
   const now=()=>new Date().toLocaleString("vi-VN");
   if($("#t-trego"))$("#t-trego").onclick=()=>{const v=$("#t-tre").value.trim();if(!v){toast("Ghi lý do trễ");return}
     DB.mutate(ME.name,`lý do trễ "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;const hm=$("#t-hm")?tkDay($("#t-hm").value):0,lt=x.han<dt.settings.today;tkLog(x,(lt?"Báo trễ":"Xin gia hạn")+": "+v.slice(0,120)+(hm?" · xin đến "+dd(hm):""));x.treReq={lyDo:v,at:now(),by:ME.name,st:"cho",hanMoi:hm};x.tre={lyDo:v,at:now(),by:ME.name};if(typeof notifyU==="function")notifyU(dt,[x.tao,...tkMgrIds(x)],`${lt?"⚠ "+ME.name+" báo trễ":ME.name+" xin gia hạn"} việc "${x.ten}"${hm?" đến "+dd(hm):""}: ${v.slice(0,100)}`,"task:"+x.id)});toast("Đã gửi quản lý");openTask(t.id)};
-  if($("#t-duyet"))$("#t-duyet").onclick=()=>{tkSetSt(t.id,"done");toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
-  if($("#t-tlok"))$("#t-tlok").onclick=()=>{const n=$("#t-tl").value.trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}tkSetSt(t.id,"doing",{tlNote:n},n);toast("Đã trả lại cho "+(userName(t.nguoi)||"người làm"));closeDrawer();renderMain()};
+  if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển chị duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
+  if($("#t-tlok"))$("#t-tlok").onclick=()=>{const n=$("#t-tl").value.trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}tkReturn(t.id,n);toast("Đã trả lại cho "+(userName(t.nguoi)||"người làm"));openTask(t.id);renderMain()};
   if($("#t-ghok"))$("#t-ghok").onclick=()=>{const h=tkDay($("#t-gh").value);if(!h){toast("Chọn ngày gia hạn");return}DB.mutate(ME.name,`gia hạn "${t.ten}" đến ${dd(h)}`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.hanCu=x.hanCu||x.han;tkLog(x,"Gia hạn đến "+dd(h));x.han=h;x.treReq=Object.assign({},x.treReq||{},{st:"giahan",xl:ME.name,xlAt:now(),hanMoi:h});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} gia hạn việc "${x.ten}" đến ${dayLbl(h)}`,"task:"+x.id)});toast("Đã gia hạn đến "+dd(h));openTask(t.id);renderMain()};
   if($("#t-dok"))$("#t-dok").onclick=()=>{DB.mutate(ME.name,`duyệt hoàn thành "${t.ten}" (trễ hạn)`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;tkLog(x,"Duyệt hoàn thành");x.st="done";tkDoneDay(x,dt.settings.today);x.stAt=now();x.stBy=ME.name;x.treReq=Object.assign({},x.treReq||{},{st:"ok",xl:ME.name,xlAt:now()});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} duyệt hoàn thành việc "${x.ten}"`,"task:"+x.id)});toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
   $("#tkf2").onsubmit=e=>{e.preventDefault();$("#tkf2").querySelectorAll("[data-ck]").forEach(x=>{if(ck[+x.dataset.ck])ck[+x.dataset.ck].x=x.checked});
     const v={ten:$("#t-ten").value,moTa:$("#t-mo").value,team:$("#t-team").value,da:$("#t-da").value,nguoi:$("#t-ng").value,han:tkDay($("#t-han").value),uu:$("#t-uu").value,bd:$("#t-bd")?tkDay($("#t-bd").value):0,st:$("#t-st").value,phoi:[...document.querySelectorAll("[name=t-phoi]:checked")].map(x=>x.value),checklist:ck,kq:t?(t.kq||""):"",dk:$("#t-dk")?$("#t-dk").value.trim():""};const trv=$("#t-tre")&&$("#t-tre").value.trim();if(trv&&(!t.tre||t.tre.lyDo!==trv))v.tre={lyDo:trv,at:new Date().toLocaleString("vi-VN"),by:ME.name};
-    v.cd=cd.map(s=>Object.assign({},s));v.tuanTu=!$("#t-seq")||$("#t-seq").checked;
+    v.cd=cd.map(s=>Object.assign({},s));v.tuanTu=!$("#t-seq")||$("#t-seq").checked;if($("#t-v2"))v.v2=$("#t-v2").checked;
     if(v.cd.some(s=>!s.nguoi||!String(s.ten).trim())){toast("Mỗi công đoạn cần có tên và người làm");return}
     if(!v.cd.length&&!v.han){toast("Chọn hạn xong việc");return}
     if(!giver)v.nguoi=t?t.nguoi:ME.id;
@@ -256,7 +331,8 @@ function openTask(id){
       if(x.cd&&x.cd.length){tkSync(x);v.nguoi=x.nguoi;v.han=x.han;v.phoi=x.phoi}
       tkDoneDay(x,dt.settings.today);
       tkLog(x,t?("Sửa việc"+(oldNg!==x.nguoi?" · người làm: "+(userName(oldNg)||"—")+" → "+(userName(x.nguoi)||"—"):"")+(oldHan&&oldHan!==x.han?" · hạn: "+dd(oldHan)+" → "+dd(x.han):"")):("Giao việc"+(x.nguoi?" cho "+userName(x.nguoi):"")+(x.han?" · hạn "+dd(x.han):"")));
-      if(typeof notifyU==="function"&&gv){const ds=v.han?` · hạn ${dd(v.han)}`:"";const nw=[];if(v.nguoi&&v.nguoi!==oldNg)nw.push(v.nguoi);v.phoi.filter(p=>!oldPhoi.includes(p)).forEach(p=>nw.push(p));if(nw.length)notifyU(dt,nw,`${ME.name} giao bạn việc "${v.ten}"${ds}`,"task:"+x.id);else if(t&&t.han!==v.han&&v.nguoi)notifyU(dt,[v.nguoi],`${ME.name} đổi hạn việc "${v.ten}" thành ${dd(v.han)}`,"task:"+x.id)}});toast(t?"Đã lưu":"Đã giao");closeDrawer();renderMain()};
+      if(typeof notifyU==="function"&&gv){const ds=v.han?` · hạn ${dd(v.han)}`:"";const nw=[];if(v.nguoi&&v.nguoi!==oldNg)nw.push(v.nguoi);v.phoi.filter(p=>!oldPhoi.includes(p)).forEach(p=>nw.push(p));if(nw.length)notifyU(dt,nw,`${ME.name} giao bạn việc "${v.ten}"${ds}`,"task:"+x.id);else if(t&&t.han!==v.han&&v.nguoi)notifyU(dt,[v.nguoi],`${ME.name} đổi hạn việc "${v.ten}" thành ${dd(v.han)}`,"task:"+x.id)}});if(!t&&$("#t-lap")&&($("#t-lap").value||$("#t-tplsave").checked))tkTplSave(v,$("#t-lap").value,+$("#t-lapd").value||0);
+    toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+($("#t-lap").value==="tuan"?"mỗi tuần":"mỗi tháng"):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
 }
 const newTaskBtn=()=>`<button class="btn pri" id="cv-new">＋ Giao việc</button>`;
@@ -465,9 +541,22 @@ function cvWarn(){
 }
 function cvOpenMk(g){
   const d=D(),cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean);
-  openDrawerHTML(`<h2>${esc(g.ten)} · ${g.done}/${g.n}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa giao")}</p>
-   <div class="xlist">${cs.map(c=>`<div class="xmini"><span class="xmt"><b class="mono">${esc(c.id)}</b> ${esc(cvShort(c.hookText||c.yTuong||c.tuyen,70))}</span>${pill(stepName(c.step),["dang","xong"].includes(c.step)?"grn":"gry")}<button type="button" class="btn sm" data-opc="${esc(c.id)}">Mở</button></div>`).join("")}</div>`);
-  document.querySelectorAll("[data-opc]").forEach(b=>b.onclick=()=>{closeDrawer();openCard(b.dataset.opc)})
+  const href=l=>/^https?:\/\//.test(l)?l:"https://"+l,fb=c=>`<input data-vfb="${c.id}" placeholder="Góp ý / cần sửa gì"><button type="button" class="btn sm" data-vtra="${c.id}">Trả lại</button>`;
+  const act=c=>{const st=c.step,lk=c.linkFinal||c.linkVideo||"";
+    if(["edit","worker"].includes(st)&&canMove(ME,c,"dvd"))return `<input data-vl="${c.id}" placeholder="Dán link video đã edit (Drive)" value="${esc(lk)}">${!c.fpId&&chOf(c.kenh).needId?`<input data-vcap="${c.id}" placeholder="Caption đăng" value="${esc(c.caption||"")}">`:""}<button type="button" class="btn sm pri" data-vsend="${c.id}">Nộp, gửi lead duyệt</button>`;
+    if(st==="dkb"&&canMove(ME,c,"quay"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="quay">✓ Duyệt kịch bản</button>${fb(c)}`;
+    if(st==="dvd"&&canMove(ME,c,"dceo"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dceo">✓ Duyệt vòng 1, chuyển chị</button>${fb(c)}`;
+    if(st==="dceo"&&canMove(ME,c,"dang"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dang">✓ Chị duyệt, cho đăng</button>${fb(c)}`;
+    return ""};
+  const row=c=>{const lk=c.linkFinal||c.linkVideo||"",gy=(c.gopy||[]).slice(-3),a=act(c);
+    return `<div class="vrow"><div class="vrt"><b class="mono">${esc(c.id)}</b><span class="xmt">${esc(cvShort(c.hookText||c.yTuong||c.tuyen,60))}</span>${pill(stepName(c.step),["dang","xong"].includes(c.step)?"grn":["dvd","dceo","dkb"].includes(c.step)?"amb":"gry")}${lk?`<a href="${esc(href(lk))}" target="_blank" rel="noopener">▶ Xem video</a>`:""}<button type="button" class="lnk" data-opc="${esc(c.id)}">Mở thẻ</button></div>${gy.length?`<div class="vgy">${gy.map(x=>`↩ <b>${esc(x.who)}</b> (${esc(x.t)}): ${esc(x.note)}`).join("<br>")}</div>`:""}${a?`<div class="vact">${a}</div>`:""}</div>`};
+  openDrawerHTML(`<h2>${esc(g.ten)} · ${g.done}/${g.n}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa giao")} · Nộp link, lead duyệt, chị duyệt vòng 2 ngay tại đây; link và góp ý tự ghi vào thẻ ở Content › Điều phối.</p>
+   <div class="vlist">${cs.map(row).join("")}</div>`);
+  const re=()=>{cvOpenMk(g);renderMain()};
+  document.querySelectorAll("[data-opc]").forEach(b=>b.onclick=()=>{closeDrawer();openCard(b.dataset.opc)});
+  document.querySelectorAll("[data-vsend]").forEach(b=>b.onclick=()=>{const id=b.dataset.vsend,v=(document.querySelector(`[data-vl="${id}"]`)||{}).value||"";if(!v.trim()){toast("Dán link video trước");return}const cap=document.querySelector(`[data-vcap="${id}"]`),inp={linkVideo:v.trim()};if(cap)inp.caption=cap.value.trim();const e=moveCard(ME,id,"dvd",inp);if(e){toast(e);return}toast("Đã nộp "+id+", chờ lead duyệt");re()});
+  document.querySelectorAll("[data-vok]").forEach(b=>b.onclick=()=>{const id=b.dataset.vok,n=(document.querySelector(`[data-vfb="${id}"]`)||{}).value||"";const e=moveCard(ME,id,b.dataset.to,{});if(e){toast(e);return}if(n.trim())DB.mutate(ME.name,"góp ý "+id,d=>{const x=d.cards.find(y=>y.id===id);if(x)x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:ME.name,note:n.trim()})});toast("Đã duyệt "+id);re()});
+  document.querySelectorAll("[data-vtra]").forEach(b=>b.onclick=()=>{const id=b.dataset.vtra,n=((document.querySelector(`[data-vfb="${id}"]`)||{}).value||"").trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}sendBack(ME,id,n);toast("Đã trả lại "+id);re()})
 }
 function cvOpenDg(g){
   const d=D(),td=d.settings.today,cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean),days=[[0,"Chưa chọn ngày"]].concat(Array.from({length:Math.max(0,MONTH.ndays-td+1)},(_,i)=>[td+i,dayLbl(td+i)]));
@@ -488,7 +577,7 @@ function pCvNv2(m){
   const d=D(),td=d.settings.today,sm=cvSummaryOnly(),mk=sm?[]:cvAutoMk(),dg=sm?[]:cvAutoDg(),lead=(CVF.st||sm)?[]:cvLeadLines(),warn=sm?[]:cvWarn();
   const auto=mk.concat(dg).filter(cvStMatch).sort((a,b)=>(b.late-a.late)||((a.han||0)-(b.han||0))),
     tasks=cvGroup(cvFilter(cvItems().filter(x=>x.src!=="card"))).sort((a,b)=>(b.late-a.late)||(a.st==="done")-(b.st==="done")||(b.st==="review")-(a.st==="review")||a.han-b.han);
-  const rawT=D().tasks||[],openT=rawT.filter(t=>t.st!=="done"),mineN=openT.filter(t=>t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)).length,waitN=rawT.filter(t=>t.st==="review"&&tkMgr(t)).length,lateN=tasks.filter(x=>x.late).length,dueT=tasks.filter(x=>x.han&&x.han<=td),okT=dueT.filter(x=>x.st==="done"||!x.late).length;
+  const rawT=D().tasks||[],openT=rawT.filter(t=>t.st!=="done"),mineN=openT.filter(t=>t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)).length,waitN=rawT.filter(t=>tkMyTurn(t)).length,lateN=tasks.filter(x=>x.late).length,dueT=tasks.filter(x=>x.han&&x.han<=td),okT=dueT.filter(x=>x.st==="done"||!x.late).length;
   const tile=(k,l,v,cls)=>`<${k?`button type="button" data-tile="${k}"`:"div"} class="cvtile${cls?" "+cls:""}"><span>${l}</span><b>${v}</b></${k?"button":"div"}>`;
   const tilesHtml=`<div class="cvtiles">${tile("mine","Việc của tôi",mineN)}${tile("wait","Chờ tôi duyệt",waitN,waitN?"amb":"")}${tile("late","Quá hạn",lateN,lateN?"red":"")}${tile("","Đúng hạn",dueT.length?Math.round(okT/dueT.length*100)+"%":"—")}</div>`;
   const hanL=x=>!x.han?"—":x.han===td?"Hôm nay":x.han===td+1?"Mai":dayLbl(x.han);
@@ -500,7 +589,7 @@ function pCvNv2(m){
   const taskTbl=`<section class="card flush cvscroll cvtk">${tasks.length?tbl(["Việc","Người làm","Người giao","Hạn","Trạng thái","Tiến độ",""],tasks.slice(0,200).map(x=>`<tr class="clk${x.late?" late":""}" title="${esc(x.mo?cvShort(x.mo,160):x.ten)}" data-cv="${x.id}" data-src="${x.src}"${x.n>1?` data-grp="${x.ids.join(",")}"`:""}><td><b${x.st==="done"?` class="strike"`:""}>${esc(x.ten)}</b>${x.da?`<small>${esc(prjN(x.da))}</small>`:x.mo?`<small>${esc(cvShort(x.mo,80))}</small>`:""}</td><td>${x.cd&&x.cd.length?`${avatar(x.nguoi)}${esc(userName(x.nguoi)||"—")}<small>${x.cd.filter(s=>s.st==="xong").length}/${x.cd.length} công đoạn</small>`:`${avatar(x.nguoi)}${esc(userName(x.nguoi)||"Chưa giao")}${x.phoi.length?` <small>+${x.phoi.length}</small>`:""}`}</td><td>${esc(userName(x.tao)||"—")}</td><td${x.late?` class="t-red"`:""}>${hanL(x)}</td><td>${stP(x)}${x.src==="task"&&x.tl&&!["done","review"].includes(x.st)?` <span class="pill p-red">trả lại</span>`:""}</td><td>${tkPctHtml(x)}</td><td>${tkActBtn(x)}</td></tr>`)):`<p class="empty">Chưa có việc nào. Bấm “Giao việc” để tạo.</p>`}</section>`;
   const row=g=>`<div class="cvr${g.late?" late":""}" data-au="${esc(g.key)}"><span class="cvri">${g.kind==="dg"?"📤":"🎬"}</span><div class="cvrt"><b>${esc(g.ten)}</b>${g.kind==="mk"?` <span class="cvrp">${g.done}/${g.n}</span>`:""}<small>${esc(g.mo)}</small></div><span class="who">${avatar(g.nguoi)}${esc(userName(g.nguoi)||"Chưa giao")}${g.nguoi&&!cvActive(g.nguoi)?` <small class="t-red">đã nghỉ</small>`:""}</span>${g.kind==="mk"&&g.nguoi===ME.id?`<button type="button" class="btn sm${g.st==="doing"?" pri":""}" data-aust="${esc(g.key)}">${g.st==="doing"?"✓ Đang làm":"Đang làm"}</button>`:(g.st==="doing"?pill("Đang làm","blu"):"")}</div>`;
   m.innerHTML=`<style>.cvr{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #e6e9f2;cursor:pointer;background:#fff}.cvr:hover{background:#f6f8fd}.cvr.late{border-left:4px solid #e03131}.cvri{font-size:18px}.cvrt{flex:1;min-width:0}.cvrt b{font-size:15px}.cvrt small{display:block;color:#6b7280;margin-top:2px}.cvrp{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:99px;background:#eef2ff;color:#3b5bdb;font-weight:700;font-size:13px}.cvwarn{background:#fff1f1;border:1px solid #f3b4b4;color:#b42318;border-radius:12px;padding:12px 16px;margin:0 0 12px}.cvlead .cvr b{font-size:15px}.cvbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;margin:0 0 12px}.cvbar input,.cvbar select{font:inherit;font-size:13.5px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;min-width:0;max-width:190px}.cvbar input{width:170px}.cvtiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 12px}.cvtile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 14px;font:inherit}button.cvtile{cursor:pointer}button.cvtile:hover{background:#f6f8fd}.cvtile span{font-size:12.5px;color:#6b7280}.cvtile b{font-size:22px;font-weight:600}.cvtile.red b{color:#e03131}.cvtile.amb b{color:#b45309}tr.late td:first-child{box-shadow:inset 3px 0 #e03131}.tklate.ok{background:#f6f8fd;border-color:#dfe5f4}@media (max-width:700px){.cvtiles{grid-template-columns:repeat(2,minmax(0,1fr))}.cvbar{justify-content:stretch}.cvbar input,.cvbar select{flex:1 1 130px;max-width:none}}.cvn{display:inline-block;min-width:26px;text-align:center;padding:2px 9px;border-radius:99px;background:#fff4e0;color:#b45309;font-weight:800}</style>`
-  +cvFilterBar()+tilesHtml+`
+  +cvFilterBar()+tkTeamChips()+tilesHtml+`
   ${taskTbl}
   ${(auto.length||lead.length||warn.length)?`<details class="card flush cvvid"${CVF.st?" open":""}><summary class="card-h pad"><h2>Việc video, đăng bài</h2><span class="hint">${auto.length} nhóm việc${warn.length?` · <span class="t-red">mai ${warn.length} kênh thiếu video</span>`:""} · bấm để mở</span></summary>
   ${warn.length?`<details class="cvwarn"><summary>⚠ Ngày mai ${warn.length} kênh chưa đủ video đăng · bấm để xem</summary>${warn.map(w=>`Mai (${dd(td+1)}) ${esc(w.short)} cần đăng <b>${w.need}</b> video, hiện mới có <b>${w.have}</b> video đã lên lịch${w.own?" · "+esc(userName(w.own)):""}`).join("<br>")}</details>`:""}
@@ -509,6 +598,7 @@ function pCvNv2(m){
   m.querySelectorAll("[data-tile]").forEach(b=>b.onclick=()=>{const k=b.dataset.tile;if(k==="mine"){cvWhoSet("mine");CVF.st=""}else CVF.st=k==="wait"?"review":"late";renderMain()});
   bindCvFilter(m);bindCvCards(m);bindNew();
   m.querySelectorAll("[data-tkopen]").forEach(b=>b.onclick=e=>{e.stopPropagation();openTask(b.dataset.tkopen)});
+  m.querySelectorAll("[data-tmw]").forEach(b=>b.onclick=()=>{cvWhoSet(b.dataset.tmw);CVF.st="";renderMain()});
   m.querySelectorAll("details.cvgrp").forEach(g=>g.addEventListener("toggle",()=>{CVG[g.dataset.gk]=g.open}));
   m.querySelectorAll("[data-aust]").forEach(b=>b.onclick=e=>{e.stopPropagation();const k=b.dataset.aust,on=(cvAutoSt()[k]||{}).st==="doing";cvAutoSet(k,on?"":"doing");renderMain()});
   m.querySelectorAll("[data-au]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;const g=auto.find(x=>x.key===r.dataset.au);if(g){if(g.kind==="dg")cvOpenDg(g);else cvOpenMk(g)}});
@@ -644,7 +734,7 @@ async function cvoLoad(force){
 function pCvTcCeo(m){
   if(CVO.ppl)return pCvTcPpl(m);
   if(!CVO.at||typeof _rLast==="undefined"||_rLast!==PAGE)cvoLoad(true);
-  const d=D(),td=d.settings.today,O=CVO.data,its=(O&&O.items)||[];
+  const d=D(),td=d.settings.today,O=CVO.data&&CVO.data.sale&&CVO.data.cskh?CVO.data:null,its=(O&&O.items)||[];
   const I=cvItems().filter(x=>!CV_TEST.includes(x.nguoi)).map(cvTestToChi),open=I.filter(x=>x.st!=="done"),late=open.filter(x=>x.late);
   const doneN=I.length-open.length,doingN=open.filter(x=>x.st==="doing"||x.st==="nhan").length,rvN=open.filter(x=>x.st==="review").length,todoN=open.length-doingN-rvN-late.filter(x=>x.st!=="doing"&&x.st!=="nhan"&&x.st!=="review").length;
   const lateBy={};late.forEach(x=>{const k=x.nguoi||"";const o=lateBy[k]=lateBy[k]||{id:k,n:0,max:0};o.n++;o.max=Math.max(o.max,x.lateD||0)});
@@ -766,7 +856,7 @@ function cvMyItems(){
         }else{const prev=act[0];add({key:"c_"+s.id,group:G3,title:`${t.ten} · ${s.ten}`,detail:prev?`Chờ ${userName(prev.nguoi)||"—"} xong "${prev.ten}"`:"Chờ công đoạn trước",taskId:t.id})}
       });
     }else{
-      if(t.st==="review"&&tkMgr(t))add({key:"r_"+t.id,group:G2,title:t.ten,detail:`${userName(t.nguoi)||"—"} đã nộp kết quả`,age_days:late(t.han),taskId:t.id,btn:"Xem & duyệt"});
+      if(tkMyTurn(t))add({key:"r_"+t.id,group:G2,title:t.ten,detail:`${userName(t.nguoi)||"—"} đã nộp kết quả${t.vong===2?" · lead đã duyệt, chờ chị":""}`,age_days:late(t.han),taskId:t.id,btn:"Xem & duyệt"});
       else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st==="review")add({key:"s_"+t.id,group:"Đã nộp, chờ duyệt",title:t.ten,detail:`Chờ ${tkMgrNames(t)} duyệt${t.nopAt?" · nộp lúc "+t.nopAt:""}`,taskId:t.id,btn:"Xem",chip:"Chờ duyệt",chipC:"amb"});
       else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st!=="review")add({key:"t_"+t.id,group:G1,title:t.ten,detail:`Hạn ${t.han?dd(t.han):"—"} · giao bởi ${who}${t.tlNote?" · bị trả lại: "+t.tlNote:""}`,age_days:late(t.han),han:t.han||0,taskId:t.id,btn:"Nộp kết quả",chip:tkStChip(t),chipC:t.tlNote?"red":tkStC(t.st)});
     }
@@ -801,12 +891,13 @@ function pCvV(m){
   const view=(k,l)=>`<button type="button" class="cvview${CVV.view===k?" on":""}" data-vv="${k}">${l}</button>`;
   const tq=CVV.view==="tq",listMine=CVV.view==="list"&&CVV.scope==="mine";
   const mgr=cvMgrView();
-  m.innerHTML=`<div class="cvvbar">${tq||CVV.view==="dh"?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}<select class="cvmore${["gantt","tq","dh"].includes(CVV.view)?" on":""}" id="cvv-more" aria-label="Kiểu xem khác">${opt([["","Xem khác…"],["gantt","Gantt (theo thời gian)"]].concat(mgr?[["tq","Tổng quan cả công ty"],["dh","Đúng hạn từng người"]]:[]),["gantt","tq","dh"].includes(CVV.view)?CVV.view:"")}</select>${newTaskBtn()}</div>${CVV.view==="board"||CVV.view==="cal"?`<div class="cvsub">${CVV.view==="board"?`<button type="button" class="lnk" data-vgo="congviec">Xem theo bước video →</button>`:`<button type="button" class="lnk" data-vgo="giaoviec">Xem lịch quay →</button>`}</div>`:""}<div id="cvv-body"></div>`;
+  m.innerHTML=`<div class="cvvbar">${tq||CVV.view==="dh"?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}<select class="cvmore${["gantt","tq","dh","tpl"].includes(CVV.view)?" on":""}" id="cvv-more" aria-label="Kiểu xem khác">${opt([["","Xem khác…"],["gantt","Gantt (theo thời gian)"]].concat(mgr?[["tq","Tổng quan cả công ty"],["dh","Đúng hạn từng người"]]:[]).concat(tkGiver()?[["tpl","Mẫu việc & việc lặp lại"]]:[]),["gantt","tq","dh","tpl"].includes(CVV.view)?CVV.view:"")}</select>${newTaskBtn()}</div>${CVV.view==="board"||CVV.view==="cal"?`<div class="cvsub">${CVV.view==="board"?`<button type="button" class="lnk" data-vgo="congviec">Xem theo bước video →</button>`:`<button type="button" class="lnk" data-vgo="giaoviec">Xem lịch quay →</button>`}</div>`:""}${CVV.view==="list"?tkQuickHtml():""}<div id="cvv-body"></div>`;
   const body=m.querySelector("#cvv-body");
   CVF.tao=(CVV.scope==="giao"&&!tq)?ME.id:"";
   try{
     if(tq)pCvTc(body);
     else if(CVV.view==="dh")pCvDh(body);
+    else if(CVV.view==="tpl")pCvTpl(body);
     else if(CVV.view==="board")pCvKb(body);
     else if(CVV.view==="cal")pCvLich(body);
     else if(CVV.view==="gantt")pCvGantt(body);
@@ -816,6 +907,8 @@ function pCvV(m){
   m.querySelectorAll("[data-vs]").forEach(b=>b.onclick=()=>{CVV.scope=b.dataset.vs;cvWhoSet(CVV.scope==="mine"?"mine":"all");CVF.st="";renderMain()});
   m.querySelectorAll("[data-vv]").forEach(b=>b.onclick=()=>{CVV.view=b.dataset.vv;if(CVV.view==="tq")CVF.tao="";renderMain()});
   m.querySelectorAll("[data-vgo]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.vgo;render()});
+  try{tkRecur()}catch(e){console.error("việc lặp lại",e)}
+  m.querySelectorAll(".tkquick [data-tkopen]").forEach(b=>b.onclick=()=>openTask(b.dataset.tkopen));
   {const mo=m.querySelector("#cvv-more");if(mo)mo.onchange=()=>{if(!mo.value)return;CVV.view=mo.value;if(CVV.view==="tq")CVF.tao="";renderMain()}}
   bindNew();
   const re=m.querySelector("#wk-re");if(re)re.onclick=()=>{wkLoad(true);toast("Đang tải lại…")};
