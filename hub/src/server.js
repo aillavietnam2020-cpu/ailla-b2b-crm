@@ -277,7 +277,8 @@ function pNhanSuSV(m){
   const A=SV_CRMUSERS||[],acc=id=>A.find(a=>a.id===id);
   const used=id=>U.find(u=>u.crm===id);
   const accOpts=u=>[["","— chưa gắn"]].concat(A.filter(a=>a.id===u.crm||!used(a.id)).map(a=>[a.id,a.display_name+" · "+a.email]));
-  const accCell=u=>{const a=acc(u.crm);if(ed&&crm&&u.id!==ME.id)return `<select data-uc="${u.id}">${opt(accOpts(u),u.crm||"")}</select>`;return a?esc(a.email):(u.crm?"(đã gắn)":"—")};
+  /* Chưa có tài khoản: nút thêm email + mật khẩu (chị Hoa 02/11); có rồi thì vẫn đổi gắn được bằng ô chọn. */
+  const accCell=u=>{const a=acc(u.crm);if(ed&&crm&&u.id!==ME.id&&!a&&u.active)return `<button class="btn sm" data-mkacc="${u.id}">+ Thêm email đăng nhập</button>`;if(ed&&crm&&u.id!==ME.id)return `<select data-uc="${u.id}">${opt(accOpts(u),u.crm||"")}</select>`;return a?esc(a.email):(u.crm?"(đã gắn)":"—")};
   const hubBtn=a=>crm&&!a.is_marketing&&a.role==="EMPLOYEE"&&(a.is_accountant||a.is_warehouse)?` <button class="btn sm" data-hubg="${a.id}" title="Tài khoản này chưa vào được Trang quản trị nên không thấy Kho, Bán qua sàn, Hàng hoàn">Cấp quyền vào Trang quản trị</button>`:"";
   const b2bCell=u=>{const a=acc(u.crm);if(!a)return "—";if(a.role!=="EMPLOYEE"||u.id===ME.id||a.is_accountant)return "Có"+hubBtn(a);return crm?`<label class="sw-t"><input type="checkbox" data-b2b="${a.id}" ${a.is_hub_only?"":"checked"}> ${a.is_hub_only?"Không":"Có"}</label>`:(a.is_hub_only?"Không":"Có")};
   const ktCell=u=>{const a=acc(u.crm);if(!a)return "—";if(a.role==="CEO")return "Có";return crm?`<label class="sw-t"><input type="checkbox" data-kt="${a.id}" ${a.is_accountant?"checked":""}> ${a.is_accountant?"Có":"Không"}</label>`:(a.is_accountant?"Có":"Không")};
@@ -321,6 +322,21 @@ function pNhanSuSV(m){
   m.querySelectorAll("[data-utm]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,`đổi team Marketing ${esc(userName(s.dataset.utm))}`,d=>{d.users.find(x=>x.id===s.dataset.utm).team=s.value});toast("Đã đổi team, người đó tải lại trang là thấy khu mới");renderMain()});
   m.querySelectorAll("[data-utl]").forEach(i=>i.onchange=()=>{DB.mutate(ME.name,`đổi chức vụ ${esc(userName(i.dataset.utl))}`,d=>{d.users.find(x=>x.id===i.dataset.utl).title=i.value.trim()});toast("Đã lưu chức vụ")});
   m.querySelectorAll("[data-upb]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,`đổi phòng ban ${esc(userName(s.dataset.upb))}`,d=>{d.users.find(x=>x.id===s.dataset.upb).phongBan=s.value});toast("Đã đổi phòng ban");renderMain()});
+  m.querySelectorAll("[data-mkacc]").forEach(b=>b.onclick=()=>{const u=userBy(b.dataset.mkacc);if(!u)return;
+    const free=A.filter(a=>!used(a.id));
+    openDrawerHTML(`<h2>Email đăng nhập cho ${esc(u.name)}</h2><p class="hint">Web tạo tài khoản đăng nhập bằng email và mật khẩu này${gate?", mở luôn cửa vào vanhanh.ailla.vn":""}. Lần đầu đăng nhập họ phải đổi sang mật khẩu riêng. Chị gửi email + mật khẩu ban đầu cho họ.</p>
+     <form class="frm" id="mka"><div class="row4"><label class="field">Email đăng nhập<input id="mka-e" type="email" required placeholder="ten@gmail.com" autocomplete="off"></label><label class="field">Mật khẩu ban đầu<input id="mka-p" type="text" autocomplete="off" placeholder="ít nhất 8 ký tự, có chữ và số"></label></div>
+     ${free.length?`<details><summary class="hint">Email này đã có tài khoản từ trước?</summary><p class="hint">Chọn ở đây thay vì nhập: <select id="mka-c">${opt([["","—"]].concat(free.map(a=>[a.id,a.display_name+" · "+a.email])),"")}</select></p></details>`:""}
+     <div id="mka-x"></div><div class="acts"><button class="btn pri" id="mka-go">Lưu</button></div></form>`);
+    if($("#mka-c"))$("#mka-c").onchange=e=>{$("#mka-e").required=!e.target.value};
+    $("#mka").onsubmit=ev=>{ev.preventDefault();busy($("#mka-go"),async()=>{
+      let c=$("#mka-c")?$("#mka-c").value:"",note="";const em=$("#mka-e").value.trim(),pw=$("#mka-p").value;
+      if(!c){const ex=A.find(a=>String(a.email||"").toLowerCase()===em.toLowerCase());
+        if(ex){const owner=U.find(x=>x.crm===ex.id);if(owner)throw new Error(em+" đã gắn với "+owner.name);c=ex.id}
+        else{if(!pw)throw new Error("nhập mật khẩu ban đầu");const res=await svApi("/api/admin/users",{method:"POST",body:JSON.stringify({email:em,display_name:u.name,role:"EMPLOYEE",password:pw})});c=res.id;note=svAccessMsg(res.access);
+          await svApi(`/api/admin/users/${c}/marketing`,{method:"POST",body:JSON.stringify({mode:"only"})})}}
+      DB.mutate(ME.name,"gắn tài khoản đăng nhập cho "+u.name,d=>{d.users.forEach(x=>{if(x.crm===c)x.crm=""});d.users.find(x=>x.id===u.id).crm=c});
+      closeDrawer();toast("Đã thêm email đăng nhập cho "+u.name+note);await svLoadUsers();renderMain()})}});
   m.querySelectorAll("[data-uc]").forEach(s=>s.onchange=()=>{const id=s.dataset.uc,v=s.value;DB.mutate(ME.name,`gắn tài khoản đăng nhập cho ${esc(userName(id))}`,d=>{d.users.forEach(x=>{if(v&&x.crm===v)x.crm=""});d.users.find(x=>x.id===id).crm=v});toast(v?"Đã gắn tài khoản":"Đã bỏ gắn");renderMain()});
   const bindAcc=R=>{
   R.querySelectorAll("[data-b2b]").forEach(s=>s.onchange=()=>busy(s,async()=>{await svApi(`/api/admin/users/${s.dataset.b2b}/marketing`,{method:"POST",body:JSON.stringify({mode:s.checked?"with_b2b":"only"})});toast(s.checked?"Đã cho vào CRM Kênh phân phối":"Đã bỏ quyền CRM Kênh phân phối");await svLoadUsers()}));
