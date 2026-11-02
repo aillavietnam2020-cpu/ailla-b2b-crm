@@ -7,7 +7,8 @@
    chép nội dung về và tự lấy lại khi file trên Drive được sửa.
    Máy chủ: src/server/routes/daoTao.ts (quyền xem/soạn kiểm ở máy chủ, services/daoTao.ts). Trang chỉ vẽ.
    Nội dung tài liệu viết kiểu chữ thường có vài dấu: "# " tiêu đề, "## " tiêu đề nhỏ, "- " gạch đầu dòng, "1. " bước,
-   "> " lưu ý, "**chữ đậm**", "[chữ](https://…)", "![mô tả](mã ảnh)". dtMd() đổi sang HTML (đã thoát ký tự trước).
+   "> " lưu ý, "**chữ đậm**", "[chữ](https://…)", "![mô tả](mã ảnh)",
+   luồng việc: các dòng liền nhau "=> Ai làm | Việc gì | Ở trang nào" vẽ thành sơ đồ từng bước có mũi tên (chị Hoa 02/11: sổ tay phải có luồng + hình). dtMd() đổi sang HTML (đã thoát ký tự trước).
    ===================================================================== */
 const DT={me:null,docs:null,acks:[],at:0,busy:false,err:"",cur:null,doc:{},road:"d1",f:"",q:"",edit:null,track:null,eds:null,ans:{}};
 const DT_API="/api/hub/daotao";
@@ -48,12 +49,15 @@ function dtGo(p){dtClose();PAGE=p;MOD="dt";render();scrollTo(0,0)}
 function dtInline(s){
   return esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,'<code>$1</code>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,t,u)=>`<a href="${u}" target="_blank" rel="noopener">${t}</a>`)}
-function dtImgSrc(s){s=String(s||"").trim();if(/^[0-9a-f-]{36}$/i.test(s))return DT_API+"/img/"+s;if(/^https:\/\/[^\s"'<>]+$/.test(s))return s;return ""}
+function dtImgSrc(s){s=String(s||"").trim();if(/^[0-9a-f-]{36}$/i.test(s))return DT_API+"/img/"+s;if(/^\/daotao\/[\w.-]+\.(png|jpe?g|webp)$/i.test(s))return s;if(/^https:\/\/[^\s"'<>]+$/.test(s))return s;return ""}
 function dtMd(text){
   const out=[],L=String(text||"").replace(/\r/g,"").split("\n");let ul=false,para=[],h=0;
   const flush=()=>{if(para.length){out.push(`<p>${para.map(dtInline).join("<br>")}</p>`);para=[]}if(ul){out.push("</ul>");ul=false}};
+  let fl=null;const flEnd=()=>{if(fl){out.push(`<div class="dt-flow">${fl.map((r,i)=>`${i?'<span class="dt-fa">➜</span>':""}<div class="dt-fs" style="--c:${dtRoleC(r[0])}"><span class="dt-fn">${i+1}</span><span class="dt-fr">${esc(r[0])}</span><b>${dtInline(r[1]||"")}</b>${r[2]?`<small>${dtInline(r[2])}</small>`:""}</div>`).join("")}</div>`);fl=null}};
   let tb=null;const tbEnd=()=>{if(tb){out.push(`<div class="tbl"><table>${tb.map((r,i)=>`<tr>${r.map(c=>i?`<td>${dtInline(c)}</td>`:`<th>${dtInline(c)}</th>`).join("")}</tr>`).join("")}</table></div>`);tb=null}};
   for(const raw of L){const t=raw.trim();let m;
+    if(t.startsWith("=>")){flush();tbEnd();(fl=fl||[]).push(t.slice(2).split("|").map(c=>c.trim()));continue}
+    flEnd();
     if(t.startsWith("|")&&t.endsWith("|")){flush();if(/^\|[\s:|-]+\|$/.test(t))continue;(tb=tb||[]).push(t.slice(1,-1).split("|").map(c=>c.trim()));continue}
     tbEnd();
     if(!t){flush();continue}
@@ -64,7 +68,10 @@ function dtMd(text){
     if((m=t.match(/^(\d+)[.)]\s+(.+)$/))){flush();out.push(`<p class="dt-step"><span class="dt-num">${m[1]}</span><span>${dtInline(m[2])}</span></p>`);continue}
     if((m=t.match(/^[-*•]\s+(.+)$/))){if(para.length){out.push(`<p>${para.map(dtInline).join("<br>")}</p>`);para=[]}if(!ul){out.push("<ul>");ul=true}out.push(`<li>${dtInline(m[1])}</li>`);continue}
     if(ul){out.push("</ul>");ul=false}para.push(t)}
-  flush();tbEnd();return out.join("")}
+  flush();tbEnd();flEnd();return out.join("")}
+/* Mỗi vai một màu cố định trong sơ đồ luồng. */
+const DT_RC=["#4b54d1","#e7357b","#087a55","#b54708","#175cd3","#6941c6","#0e7490"];
+const dtRoleC=r=>{let h=0;for(const ch of String(r||""))h=(h*31+ch.charCodeAt(0))>>>0;return DT_RC[h%DT_RC.length]};
 const dtToc=text=>String(text||"").split("\n").map(x=>x.trim().match(/^(#{1,2})\s+(.+)$/)).filter(Boolean).map((m,i)=>`<a href="#dth${i}" class="${m[1].length===2?"sub":""}">${esc(m[2].replace(/\*\*/g,""))}</a>`).join("");
 
 /* Câu kiểm tra soạn bằng chữ: "? câu hỏi" rồi các dòng "* đáp án đúng" / "- đáp án sai". */
@@ -87,6 +94,10 @@ const DT_CSS=`<style>
 .dt-doc code{background:var(--gray-soft,#f2f4f7);padding:1px 6px;border-radius:6px;font-size:13.5px}
 .dt-step{display:flex;gap:10px;align-items:flex-start}.dt-num{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:50%;background:var(--pink,#e7357b);color:#fff;font-size:12.5px;font-weight:700;margin-top:1px}
 .dt-tip{background:var(--blue-soft,#eef4ff);color:#1b3d8a;border-radius:12px;padding:10px 14px;margin:10px 0}
+.dt-flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:12px 0 16px}.dt-fs{flex:1 1 150px;max-width:220px;border:1px solid var(--line);border-top:4px solid var(--c);border-radius:12px;background:#fff;padding:8px 10px 10px;position:relative;font-size:13.5px;line-height:1.4}
+.dt-fs b{display:block;margin-top:2px}.dt-fs small{display:block;color:var(--muted);font-size:12px;margin-top:3px}.dt-fr{font-size:11.5px;font-weight:700;color:var(--c);text-transform:uppercase;letter-spacing:.03em}.dt-fn{position:absolute;top:6px;right:8px;width:20px;height:20px;border-radius:50%;background:var(--c);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.dt-fa{align-self:center;color:#98a2b3;font-size:18px}
+@media(max-width:700px){.dt-flow{flex-direction:column}.dt-fs{max-width:none}.dt-fa{transform:rotate(90deg);align-self:center}}
 .dt-fig{margin:12px 0}.dt-fig img{max-width:100%;border:1px solid var(--line);border-radius:10px}.dt-fig figcaption{font-size:13px;color:var(--muted)}
 .dt-read{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}.dt-toc{position:sticky;top:0}.dt-toc a{display:block;color:var(--ink);text-decoration:none;padding:4px 8px;border-radius:8px;font-size:13.5px}.dt-toc a.sub{padding-left:20px;color:var(--muted)}.dt-toc a:hover{background:var(--gray-soft,#f2f4f7)}
 .dt-ok{background:var(--green-soft,#e8f8f0);border:1px solid #9ee0c2;border-radius:12px;padding:14px 16px;margin-top:18px}
