@@ -25,6 +25,9 @@ const DQ_CSS=`<style>
 .dq .red{color:#dc2626;font-weight:600}.dq .mut{color:#6b7280}.dq .mono{font-family:ui-monospace,monospace;font-size:12px;color:#6b7280}
 .dq .empty{color:#6b7280;padding:14px 0;text-align:center}
 .dq .dqtabs{margin-bottom:14px}
+.dq .dqdd{position:relative;font-size:13px;font-weight:400}.dq .dqddb{border:1px solid #c7d2fe;background:#fff;color:#4338ca;border-radius:8px;padding:6px 12px;cursor:pointer}.dq .dqddb.on{background:#eef2ff}.dq .dqddb b{font-weight:600}
+.dq .dqddm{position:absolute;right:0;top:calc(100% + 4px);z-index:50;min-width:210px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.14);padding:6px}.dq .dqddm[hidden]{display:none}.dq .dqddh{font-size:11.5px;color:#6b7280;padding:4px 10px 6px}
+.dq .dqddm button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:7px;cursor:pointer;color:#111827}.dq .dqddm button:hover{background:#f3f4f6}.dq .dqddm button.on{color:#4338ca;font-weight:600}
 @media(max-width:1100px){.dq .dqk{grid-template-columns:repeat(4,minmax(0,1fr))}.dq .dqch{grid-template-columns:repeat(2,minmax(0,1fr))}.dq .dqg2{grid-template-columns:1fr}}
 @media(max-width:640px){.dq .dqk{grid-template-columns:repeat(2,minmax(0,1fr))}.dq .dqch{grid-template-columns:1fr}}
 </style>`;
@@ -101,14 +104,20 @@ function pDqContent(m){
   const tabs=`<div class="seg ptk dqtabs">${[["sx","🎬 Tiến độ sản xuất"],["hq","💹 Hiệu quả kênh"]].map(([k2,t])=>`<button type="button" data-dqtab="${k2}" class="${tab===k2?"on":""}">${t}</button>`).join("")}</div>`;
   const body=tab==="hq"?dqHieuQua(C,past,M,set)+win:kpis+alert+chHtml+prHtml+`<div class="dqg2">${pplHtml}${fun}</div>`;
   m.innerHTML=DQ_CSS+H("Tổng quan Content",past?"Tháng "+M.mon:"Tháng "+M.mon+" · cập nhật theo dữ liệu trên web")+`<div class="dq">${tabs}${body}</div>`;
-  m.querySelectorAll("[data-dqspk]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqspk",b.dataset.dqspk)}catch(e){}renderMain()});
-  m.querySelectorAll("[data-dqwf]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqwf",b.dataset.dqwf)}catch(e){}renderMain()});
+  dqDropBind(m);
   m.querySelectorAll("[data-dqwin]").forEach(r=>r.onclick=e=>{if(e.target.closest("a"))return;dqWinGo(r.dataset.dqwin)});
   m.querySelectorAll("[data-dqtab]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqtab",b.dataset.dqtab)}catch(e){}renderMain()});
   m.querySelectorAll("[data-dqsku]").forEach(r=>r.onclick=()=>{if(typeof bvGo==="function"){const s=r.dataset.dqsku,kn=(C.find(c=>c.sku===s)||{}).kenh||(ptPairs().find(x=>x.sku===s)||{}).kenh||"TikTok chính";bvGo(kn,s,"")}});
   m.querySelectorAll("[data-dqch]").forEach(e=>e.onclick=()=>{const r=chRows.find(x=>x.ch.k===e.dataset.dqch);if(r)dqChOpen(r,C.filter(c=>c.kenh===r.ch.k),past,M)});
   if(typeof bindCommon==="function")bindCommon(m);
 }
+/* Bộ lọc sổ xuống (chị Hoa 02/11, kiểu "Thêm bộ lọc"): nút ghi lựa chọn đang xem, bấm sổ danh sách, chọn xong lưu theo máy rồi vẽ lại */
+function dqDrop(key,lb,opts,cur){const o=opts.find(x=>x[0]===cur)||opts[0];
+  return `<span class="dqdd"><button type="button" class="dqddb${o[0]!==opts[0][0]?" on":""}" data-dqdd="1">${esc(lb)}: <b>${esc(o[1])}</b> ▾</button><div class="dqddm" hidden><div class="dqddh">${esc(lb)}</div>${opts.map(([v,t])=>`<button type="button" data-dqddk="${esc(key)}" data-dqddv="${esc(v)}" class="${v===o[0]?"on":""}">${v===o[0]?"✓ ":""}${esc(t)}</button>`).join("")}</div></span>`}
+function dqDropBind(m){
+  m.querySelectorAll("[data-dqdd]").forEach(b=>b.onclick=e=>{e.stopPropagation();const mm=b.nextElementSibling,op=mm.hidden;m.querySelectorAll(".dqddm").forEach(x=>x.hidden=true);mm.hidden=!op;
+    if(op){const off=ev=>{if(!mm.contains(ev.target)){mm.hidden=true;document.removeEventListener("mousedown",off,true)}};setTimeout(()=>document.addEventListener("mousedown",off,true),0)}});
+  m.querySelectorAll("[data-dqddv]").forEach(b=>b.onclick=()=>{try{localStorage.setItem(b.dataset.dqddk,b.dataset.dqddv)}catch(e){}renderMain()})}
 /* Top video win (chị Hoa 02/11): gộp video win inhouse (video shop, từ báo cáo TikTok) và video win KOC, lọc Tất cả / Inhouse / KOC.
    Bấm một dòng: mở trang Video win đúng tab và mở luôn khung nhân bản của video đó. */
 function dqWinTop(set){
@@ -119,7 +128,7 @@ function dqWinTop(set){
   const all=(f==="in"?IN:f==="koc"?KO:IN.concat(KO)).sort((a,b)=>b.don-a.don||b.gmv-a.gmv).slice(0,12),medal=["🥇","🥈","🥉"];
   const chip=(k,t,n)=>`<button type="button" data-dqwf="${k}" class="${f===k?"on":""}">${t} <span class="mut">${n}</span></button>`;
   const st=x=>x.loai!=="Winner"?`<span class="mut">tiềm năng</span>`:x.g==="koc"&&!x.duyet?`<span class="mut">chưa vào kho win</span>`:(()=>{const n=nb(x.ref);return n?n+" bản":`<span class="red">chưa nhân bản</span>`})();
-  return `<div class="card dqc" style="margin-top:14px"><h2 class="dqh" style="flex-wrap:wrap">🏆 Top video win <small>≥${wOrd} đơn là Win, ≥${pot} đơn là tiềm năng · bấm một dòng để xem chi tiết và nhân bản</small><span style="flex:1"></span><span class="seg ptk" style="font-size:12px">${chip("all","Tất cả",IN.length+KO.length)}${chip("in","Video win inhouse",IN.length)}${chip("koc","Video win KOC",KO.length)}</span></h2>
+  return `<div class="card dqc" style="margin-top:14px"><h2 class="dqh" style="flex-wrap:wrap">🏆 Top video win <small>≥${wOrd} đơn là Win, ≥${pot} đơn là tiềm năng · bấm một dòng để xem chi tiết và nhân bản</small><span style="flex:1"></span>${dqDrop("ailla_dqwf","Nguồn",[["all","Tất cả ("+(IN.length+KO.length)+")"],["in","Video win inhouse ("+IN.length+")"],["koc","Video win KOC ("+KO.length+")"]],f)}</h2>
    ${all.length?`<table class="dqt"><tr><th>#</th><th>Video</th><th>Nguồn</th><th>Sản phẩm</th><th>Kênh</th><th>Người làm</th><th>View</th><th>Đơn</th><th>GMV</th><th>Đã nhân bản</th></tr>
    ${all.map((x,i)=>`<tr class="clk" data-dqwin="${esc(x.go)}"><td>${medal[i]||i+1}</td><td style="text-align:left;max-width:340px">${esc(String(x.ten||"").slice(0,70))}<div class="mono">${esc(x.id)}</div></td><td>${x.g==="koc"?"KOC":"Inhouse"}</td><td>${esc(sk(x.sku).n)}</td><td>${esc(x.kenh)}</td><td>${esc(x.who)}</td><td>${nf(x.view)}</td><td>${nf(x.don)}</td><td>${money(x.gmv)}</td><td>${st(x)}</td></tr>`).join("")}</table>`:`<p class="empty">Chưa có video nào đạt mức tiềm năng.</p>`}</div>`}
 function dqWinGo(go){const [g,ref]=String(go).split("|");PAGE="win";if(typeof modGroups==="function"&&typeof curMod==="function"&&!modGroups(curMod()).some(x=>x[1].some(i=>i[0]==="win")))MOD="";SUB.win=g==="koc"?"koc":"rank";render();scrollTo(0,0);
@@ -152,9 +161,9 @@ function dqHieuQua(C,past,M,set){
   const kk=(cl,ic,lb,v,sub)=>`<div class="${cl}"><small>${ic} ${lb}</small><b>${v}</b><i>${sub}</i></div>`;
   const head=`<div class="dqk">${kk("g","💰","GMV từ video",money(T.gmv),gtT?dqPct(T.gmv,gtT)+"% mục tiêu "+money(gtT):"chưa đặt mục tiêu GMV")}${kk("b","🛒","Đơn",nf(T.don),"từ "+nf(T.dang)+" video đã đăng")}${kk("","💵","GMV / video",money(T.gpv),"trung bình mỗi video")}${kk("p","👁️","View",nf(T.view),"TB "+nf(Math.round(T.vtb))+" / video")}${kk("a","👆","Tỷ lệ bấm",p1(T.ctr),"click / view")}${kk("g","✅","Tỷ lệ chốt",p1(T.chot),"đơn / click")}${kk("r","💤","Video <1k view",nf(T.dead),T.rp?"trên "+nf(T.rp)+" video có số":"chưa có báo cáo")}${kk("p","🏆","Video win",nf(T.win),"≥"+wOrd+" đơn · tỷ lệ "+(T.dang?dqPct(T.win,T.dang):0)+"%")}</div>`;
   /* top sản phẩm bán chạy: GMV từ video đã đăng trong tháng, cộng các kênh */
-  let spk="";try{spk=localStorage.getItem("ailla_dqspk")||""}catch(e){}if(spk&&!R.some(r=>r.ch.k===spk))spk="";
+  let spk="";try{spk=localStorage.getItem("ailla_dqspk")||""}catch(e){}if(spk&&!chs.some(ch=>ch.k===spk))spk="";
   const ps=C.filter(c=>c.step==="xong"&&chOf(c.kenh).needId&&(!spk||c.kenh===spk)),sp=[...new Set(ps.map(c=>c.sku))].map(s2=>{const L=ps.filter(c=>c.sku===s2);return {s:s2,n:L.length,g:sum(L,c=>+c.gmv||0),dn:sum(L,c=>+c.don||0),v:sum(L,c=>+c.view||0),ch:[...new Set(L.map(c=>chOf(c.kenh).short))].join(", ")}}).filter(x=>x.g>0||x.dn>0).sort((a,b)=>b.g-a.g).slice(0,10);
-  const spHtml=`<div class="card dqc" style="margin-bottom:14px"><h2 class="dqh" style="flex-wrap:wrap">🛍️ Top sản phẩm bán chạy <small>GMV từ video đã đăng trong tháng${spk?" · "+esc(chOf(spk).short):", cộng các kênh"}</small><span style="flex:1"></span><span class="seg ptk" style="font-size:12px">${[["","Tất cả kênh"]].concat(R.map(r=>[r.ch.k,r.ch.short])).map(([k3,t3])=>`<button type="button" data-dqspk="${esc(k3)}" class="${spk===k3?"on":""}">${esc(t3)}</button>`).join("")}</span></h2>${sp.length?`<table class="dqt"><tr><th>#</th><th>Sản phẩm</th><th>Kênh</th><th>Video</th><th>View</th><th>Đơn</th><th>GMV</th><th>GMV / video</th></tr>${sp.map((x,i)=>`<tr><td>${i+1}</td><td>${swatch(x.s)}${esc(sk(x.s).n)}</td><td>${esc(x.ch)}</td><td>${x.n}</td><td>${nf(x.v)}</td><td>${nf(x.dn)}</td><td>${money(x.g)}</td><td>${money(x.n?x.g/x.n:0)}</td></tr>`).join("")}</table>`:`<p class="empty">Chưa có số bán từ video tháng này. Số lên sau khi nhập báo cáo TikTok.</p>`}</div>`;
+  const spHtml=`<div class="card dqc" style="margin-bottom:14px"><h2 class="dqh" style="flex-wrap:wrap">🛍️ Top sản phẩm bán chạy <small>GMV từ video đã đăng trong tháng${spk?" · "+esc(chOf(spk).short):", cộng các kênh"}</small><span style="flex:1"></span>${dqDrop("ailla_dqspk","Kênh",[["","Tất cả kênh"]].concat(chs.map(ch=>[ch.k,ch.short])),spk)}</h2>${sp.length?`<table class="dqt"><tr><th>#</th><th>Sản phẩm</th><th>Kênh</th><th>Video</th><th>View</th><th>Đơn</th><th>GMV</th><th>GMV / video</th></tr>${sp.map((x,i)=>`<tr><td>${i+1}</td><td>${swatch(x.s)}${esc(sk(x.s).n)}</td><td>${esc(x.ch)}</td><td>${x.n}</td><td>${nf(x.v)}</td><td>${nf(x.dn)}</td><td>${money(x.g)}</td><td>${money(x.n?x.g/x.n:0)}</td></tr>`).join("")}</table>`:`<p class="empty">Chưa có số bán từ video tháng này. Số lên sau khi nhập báo cáo TikTok.</p>`}</div>`;
   return head+tbl+spHtml+topHtml}
 /* Bấm thẻ kênh (chị Hoa 02/11): cửa sổ chi tiết — số tổng, theo sản phẩm, theo người, danh sách video chưa đăng (bấm mở thẻ Điều phối) */
 const DQ_ST=[["chua","Chưa làm"],["lam","Đang làm"],["sua","Cần sửa"],["dkb","Chờ duyệt kịch bản"],["dvd","Chờ duyệt video"],["cho","Duyệt xong, chờ đăng"],["dang","Đã đăng"]];
