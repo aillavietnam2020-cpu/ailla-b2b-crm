@@ -195,3 +195,17 @@ export async function thumbnail(key: SaKey, fileId: string, size = 400): Promise
   const r = await fetch(url, { headers: { Authorization: `Bearer ${await accessToken(key)}` } });
   return r.ok ? r : null;
 }
+
+/** Tải file gốc (đúng độ phân giải, đúng dung lượng như trên Drive). File Google Docs / Sheets / Slides không có bản gốc để tải: trả null. */
+export async function download(key: SaKey, fileId: string): Promise<{ body: ReadableStream | null; name: string; mime: string; size: string | null } | null> {
+  const f = await get<{ name: string; mimeType: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=name,mimeType&${COMMON}`);
+  if (!f || f.mimeType.startsWith('application/vnd.google-apps')) return null;
+  const r = await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${await accessToken(key)}` },
+  });
+  if (!r.ok) {
+    console.error('[drive] download', r.status);
+    return null;
+  }
+  return { body: r.body, name: f.name, mime: r.headers.get('Content-Type') ?? f.mimeType, size: r.headers.get('Content-Length') };
+}

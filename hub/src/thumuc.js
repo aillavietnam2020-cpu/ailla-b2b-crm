@@ -51,15 +51,17 @@ const tmIc=(k,big)=>`<span class="gd-ic${big?" big":""}" style="background:${TM_
 const tmFolderSvg=`<svg class="gd-fsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>`;
 TM.mode=(()=>{try{return localStorage.getItem("ailla_tm_mode")||"grid"}catch(e){return "grid"}})();
 const tmWhere=f=>{const nm=TM.teams&&TM.q?((TM.teams.teams.find(t=>t.pb===f.pb)||{}).name||""):"";return [nm,f.where].filter(Boolean).join(" › ")};
+/* Nút tải bản gốc (giữ nguyên độ phân giải); file Google Tài liệu / Trang tính không có nút này. */
+const tmDl=f=>f.dl?`<a class="gd-dl" href="${esc(f.dl)}" download title="Tải về bản gốc${f.size?" ("+tmSize(f.size)+")":""}" aria-label="Tải ${esc(f.name)} về máy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></a>`:"";
 function tmFiles(files,showWhere){
   const L=files.filter(f=>!TM.kind||f.kind===TM.kind);
   if(!L.length)return `<p class="gd-empty">${files.length?"Không có file thuộc loại này.":"Thư mục này chưa có file."}</p>`;
   if(TM.mode==="list")return `<div class="gd-list" role="table"><div class="gd-lh" role="row"><span>Tên</span><span>Người sửa cuối</span><span>Ngày sửa đổi</span><span>Kích cỡ</span></div>${L.map(f=>
-    `<a class="gd-lr" role="row" href="${esc(f.link)}" target="_blank" rel="noopener" title="Mở trên Google Drive"><span class="gd-ln">${tmIc(f.kind)}<span class="gd-nm"><b>${esc(f.name)}</b>${showWhere&&tmWhere(f)?`<small>${esc(tmWhere(f))}</small>`:""}</span></span><span class="gd-mu">${esc(f.by||"—")}</span><span class="gd-mu">${tmTime(f.modified)}</span><span class="gd-mu">${f.size?tmSize(f.size):"—"}</span></a>`).join("")}</div>`;
-  return `<div class="gd-grid">${L.map(f=>`<a class="gd-file" href="${esc(f.link)}" target="_blank" rel="noopener" title="${esc(f.name)}${showWhere&&tmWhere(f)?" · "+esc(tmWhere(f)):""}">
+    `<div class="gd-lr" role="row"><a class="gd-open" href="${esc(f.link)}" target="_blank" rel="noopener" title="Mở trên Google Drive" aria-label="Mở ${esc(f.name)}"></a><span class="gd-ln">${tmIc(f.kind)}<span class="gd-nm"><b>${esc(f.name)}</b>${showWhere&&tmWhere(f)?`<small>${esc(tmWhere(f))}</small>`:""}</span></span><span class="gd-mu">${esc(f.by||"—")}</span><span class="gd-mu">${tmTime(f.modified)}</span><span class="gd-mu">${f.size?tmSize(f.size):"—"}${tmDl(f)}</span></div>`).join("")}</div>`;
+  return `<div class="gd-grid">${L.map(f=>`<div class="gd-file" title="${esc(f.name)}${showWhere&&tmWhere(f)?" · "+esc(tmWhere(f)):""}"><a class="gd-open" href="${esc(f.link)}" target="_blank" rel="noopener" aria-label="Mở ${esc(f.name)} trên Google Drive"></a>${tmDl(f)}
     <div class="gd-fh">${tmIc(f.kind)}<b>${esc(f.name)}</b></div>
     <div class="gd-th">${tmIc(f.kind,true)}${f.thumb?`<img loading="lazy" alt="" src="${esc(f.thumb)}" onerror="this.remove()">`:""}</div>
-    <div class="gd-ft">${esc(f.by||"")}${f.by?" · ":""}${tmTime(f.modified)}</div></a>`).join("")}</div>`;
+    <div class="gd-ft">${esc(f.by||"")}${f.by?" · ":""}${tmTime(f.modified)}${f.size?" · "+tmSize(f.size):""}</div></div>`).join("")}</div>`;
 }
 
 function pThuMuc(m){
@@ -82,7 +84,12 @@ function pThuMuc(m){
   .gd-grid,.gd-fold{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
   .gd-fold button{display:flex;gap:12px;align-items:center;background:var(--gray-soft);border:0;border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;min-width:0;color:inherit}
   .gd-fold button:hover{filter:brightness(.96)}.gd-fold .gd-fsvg{width:22px;height:22px;flex:none;color:var(--muted)}.gd-fold b{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .gd-file{display:flex;flex-direction:column;background:var(--gray-soft);border-radius:12px;padding:6px 8px 8px;text-decoration:none;color:inherit;min-width:0}
+  .gd-file{position:relative;display:flex;flex-direction:column;background:var(--gray-soft);border-radius:12px;padding:6px 8px 8px;text-decoration:none;color:inherit;min-width:0}
+  .gd-open{position:absolute;inset:0;z-index:1;border-radius:inherit}
+  .gd-dl{position:absolute;z-index:2;top:8px;right:8px;width:32px;height:32px;border-radius:999px;background:var(--surface);color:var(--ink);display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25);opacity:0;transition:opacity .15s}
+  .gd-dl svg{width:18px;height:18px}.gd-file:hover .gd-dl,.gd-dl:focus-visible{opacity:1}
+  @media(hover:none){.gd-dl{opacity:1}}
+  .gd-lr{position:relative}.gd-lr .gd-dl{position:relative;top:auto;right:auto;display:inline-grid;width:28px;height:28px;margin-left:8px;vertical-align:middle;opacity:1;box-shadow:none;background:transparent}.gd-lr .gd-dl:hover{background:var(--gray-soft)}
   .gd-file:hover{filter:brightness(.96)}
   .gd-fh{display:flex;gap:10px;align-items:center;padding:6px 4px 8px;min-width:0}.gd-fh b{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .gd-th{position:relative;aspect-ratio:4/3;max-width:100%;background:var(--surface);border-radius:8px;overflow:hidden;display:grid;place-items:center}
