@@ -102,7 +102,8 @@ export function canTrack(v: Viewer, target: Member | undefined): boolean {
 }
 
 /** Tài liệu Chung do người không phải CEO đăng thì phải chờ CEO duyệt. */
-export const publishStatus = (v: Viewer, nhom: string) => (nhom === 'chung' && !v.ceo ? 'cho_duyet' : 'dang');
+/** Chị Hoa 02/11: mọi tài liệu người khác CEO tạo hoặc sửa đều phải CEO duyệt mới hiện (trước đây chỉ tài liệu Chung). */
+export const publishStatus = (v: Viewer, _nhom?: string) => (v.ceo ? 'dang' : 'cho_duyet');
 
 /** Tài liệu này có bắt buộc với người này không (nhân viên mới = đang trong onboarding). */
 export function requiredFor(d: { bat_buoc: string }, isNewbie: boolean): boolean {
