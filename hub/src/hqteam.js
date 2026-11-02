@@ -14,10 +14,10 @@ function hqCard(o){
    ${o.body||""}${o.note?`<p class="hint">${o.note}</p>`:""}</section>`;
 }
 function pHieuQuaTeam(m){
-  /* chị Hoa 02/11: team làm việc (không bán hàng) như Content, Media, Kho… xem hiệu suất làm việc của team, không xem số bán hàng. CEO xem cả hai. */
+  /* chị Hoa 02/11: team làm việc (không bán hàng) như Content, Media, Kho… xem tổng quan việc của team, không xem số bán hàng. */
   {const t=typeof teamOf==="function"?teamOf(ME):"",sale=["sale","digital","ads","koc"].includes(t)||["ADS","KOC","SALE"].includes(ME.phongBan||"");
-   if(typeof pHsWork==="function"&&ME.role!=="admin"&&!sale){pHsWork(m);return}
-   if(typeof pHsWork==="function"&&ME.role==="admin"){const w=document.createElement("div");m.appendChild(w);pHsWork(w);const r=document.createElement("div");m.appendChild(r);pHieuQuaBan(r);return}}
+   /* dùng trang Công việc › Tổng quan chị đã duyệt (tqviec.js), không làm bảng thứ hai */
+   if(PAGES.cv_tq&&ME.role!=="admin"&&!sale){PAGES.cv_tq(m);return}}
   pHieuQuaBan(m)}
 function pHieuQuaBan(m){
   try{if(typeof adfLoad==="function"){adfLoad();adfMergeDays()}if(typeof fbsLoad==="function")fbsLoad();if(typeof tsbLoadAll==="function")tsbLoadAll()}catch(e){}

@@ -73,7 +73,7 @@ function pDqContent(m){
   const prHtml=`<div class="card dqc"><h2 class="dqh">📦 Tình trạng theo sản phẩm <small>bấm một dòng để mở Điều phối đúng sản phẩm</small></h2>${pr.length?`<table class="dqt"><tr><th>Sản phẩm</th><th>Mục tiêu</th><th>Chưa làm</th><th>Đang làm</th><th>Chờ duyệt</th><th>Cần sửa</th><th>Đã duyệt</th><th>Đã đăng</th><th>% đạt</th></tr>
    ${pr.map(r=>`<tr class="clk" data-dqsku="${esc(r.s)}"><td>${swatch(r.s)}${esc(sk(r.s).n)}</td><td>${nf(r.pl)}</td><td>${r.n.cg+r.n.chua}</td><td>${r.n.lam}</td><td>${r.n.doi}</td><td>${r.n.sua}</td><td>${r.n.duyet}</td><td>${r.n.dang}</td><td>${dqPc(r.p)}</td></tr>`).join("")}
    <tr class="tot"><td>Tổng</td><td>${nf(sum(pr,r=>r.pl))}</td><td>${N.cg+N.chua}</td><td>${N.lam}</td><td>${N.doi}</td><td>${N.sua}</td><td>${N.duyet}</td><td>${N.dang}</td><td>${dqPc(dqPct(N.dang,sum(pr,r=>r.pl)))}</td></tr></table>`:`<p class="empty">Chưa có sản phẩm nào trong kế hoạch tháng. Thêm ở Kế hoạch tháng › ① Kế hoạch.</p>`}</div>`;
-  /* ---- biểu đồ cộng dồn ---- */
+  /* ---- biểu đồ cộng dồn: chị Hoa 02/11 bỏ khỏi trang, giữ phần tính để dùng lại nếu cần ---- */
   let acc=0;const act=[];for(let x=1;x<=today;x++){acc+=posted.filter(c=>(+c.ngayDang||+c.day)===x).length;act.push(acc)}
   const Wd=520,Hh=170,mx=Math.max(1,plan,acc),px=x=>30+(x-1)/(Math.max(2,M.nd)-1)*(Wd-40),py=v=>Hh-10-(v/mx)*(Hh-30);
   const ticks=[1,8,15,22,M.nd],lbl=x=>String(x).padStart(2,"0")+"/"+String(M.mon).padStart(2,"0");
@@ -98,7 +98,7 @@ function pDqContent(m){
   const nb=w=>typeof winVars==="function"?winVars("TT-"+w.key).length:0;
   const win=`<div class="card dqc" style="margin-top:14px"><h2 class="dqh">🏆 Top video win <small>≥${wOrd} đơn là Win, ≥${+set.potential||30} đơn là tiềm năng · số từ báo cáo TikTok</small></h2>${T.length?`<table class="dqt"><tr><th>#</th><th>Video</th><th>Sản phẩm</th><th>Kênh</th><th>Người làm</th><th>View</th><th>Đơn</th><th>GMV</th><th>Đã nhân bản</th></tr>
    ${T.map((w,i)=>{const n=nb(w);return `<tr><td>${medal[i]||i+1}</td><td style="text-align:left;max-width:340px">${esc(String(w.ten||"").slice(0,70))}<div class="mono">${esc(w.key)}</div></td><td>${esc(sk(w.sku).n)}</td><td>${esc(chOf(w.kenh).short)}</td><td>${esc(userName(w.nguoi)||"—")}</td><td>${nf(w.view)}</td><td>${nf(w.don)}</td><td>${money(w.gmv)}</td><td>${w.loai==="Winner"?(n?n+" bản":`<span class="red">chưa nhân bản</span>`):`<span class="mut">tiềm năng</span>`}</td></tr>`}).join("")}</table>`:`<p class="empty">Chưa có video nào đạt mức tiềm năng.</p>`}</div>`;
-  m.innerHTML=DQ_CSS+`<div class="dq">${kpis}${alert}${chHtml}<div class="dqg2">${prHtml}${chart}</div><div class="dqg2">${pplHtml}${fun}</div>${win}</div>`;
+  m.innerHTML=DQ_CSS+`<div class="dq">${kpis}${alert}${chHtml}${prHtml}<div class="dqg2">${pplHtml}${fun}</div>${win}</div>`;
   m.querySelectorAll("[data-dqsku]").forEach(r=>r.onclick=()=>{if(typeof bvGo==="function"){const s=r.dataset.dqsku,kn=(C.find(c=>c.sku===s)||{}).kenh||(ptPairs().find(x=>x.sku===s)||{}).kenh||"TikTok chính";bvGo(kn,s,"")}});
   if(typeof bindCommon==="function")bindCommon(m);
 }
