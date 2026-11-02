@@ -34,11 +34,13 @@ const hyAnalyses=()=>HYW.tasks.filter(t=>t.kind==="win_analyze"&&!((DB.data&&D()
 const hyFor=ref=>hyAnalyses().find(t=>t.ref===ref);
 function hyBtn(ref){const t=hyFor(ref);if(t&&t.status==="error"&&hyCan())return `<button class="btn sm" data-hyopen="${t.id}">Lỗi · xem</button> <button class="btn sm pri" data-hy="${esc(ref)}">Phân tích lại</button>`;if(t)return `<button class="btn sm" data-hyopen="${t.id}">${esc((HY_ST[t.status]||[t.status])[0])}</button>`;return ""}
 
+/* Video của KOC (không phải kênh shop): lấy đúng link kênh KOC, không ghép vào @aillavietnamstore. */
+function hyKocLink(d,id){const r=(d.winResearch||[]).find(x=>x.kocId===id&&x.link);if(r)return r.link;const v=(d.kocVideos||[]).find(x=>String(x.id)===id);return v&&typeof kocLink==="function"?kocLink(v):""}
 /* Nguồn video win: nhập tay (research) + từ báo cáo shop. */
 function winSources(){
   const d=D(),out=[];
   (d.winResearch||[]).forEach(r=>out.push({ref:r.id,ten:r.ten||r.link,link:r.link,sku:r.sp,nguon:"Research: "+(r.nguon||"đối thủ"),by:r.byName,at:r.at,soLieu:r.soLieu,lyDo:r.lyDo}));
-  winners().forEach(w=>{const c=w.cardId?d.cards.find(x=>x.id===w.cardId):null,id=(c&&c.tiktokId)||(/^\d{15,}$/.test(w.key)?w.key:"");out.push({ref:"TT-"+w.key,ten:w.ten,link:((d.winLinks||{})[w.key])||(c&&c.linkDang)||(id?`https://www.tiktok.com/@aillavietnamstore/video/${id}`:""),sku:w.sku,nguon:"Shop TikTok · "+w.loai,don:w.don,gmv:w.gmv,view:w.view,loai:w.loai})});
+  winners().forEach(w=>{const c=w.cardId?d.cards.find(x=>x.id===w.cardId):null,id=(c&&c.tiktokId)||(/^\d{15,}$/.test(w.key)?w.key:"");out.push({ref:"TT-"+w.key,ten:w.ten,link:((d.winLinks||{})[w.key])||(c&&c.linkDang)||(id&&hyKocLink(d,id))||(id?`https://www.tiktok.com/@aillavietnamstore/video/${id}`:""),sku:w.sku,nguon:"Shop TikTok · "+w.loai,don:w.don,gmv:w.gmv,view:w.view,loai:w.loai})});
   return out;
 }
 
@@ -57,8 +59,8 @@ function hyTabs(m,tab){const t=m.querySelector(".tabs");if(!t)return;const n=hyA
 function hyDecorateRank(m){const tb=m.querySelector("#wb table");if(tb)tb.classList.add("wrank");if(tb){const H=[...tb.querySelectorAll("thead th")].map(x=>x.textContent.trim()),ci=n=>H.indexOf(n),rows=[...tb.querySelectorAll("tbody tr")];
   const iN=ci("Nguồn");if(iN>=0)rows.forEach(r=>{const c=r.cells[iN];if(!c)return;const t=c.textContent,mm=t.match(/(\d{4})\/(\d{2})\/(\d{2})/);if(mm){c.title=t;c.textContent=(/cũ/i.test(t)?"Cũ · ":"")+mm[3]+"/"+mm[2]+"/"+mm[1].slice(2)}});
   const iP=ci("Người làm");if(iP>=0&&rows.every(r=>!(r.cells[iP]&&r.cells[iP].textContent.trim())))[tb.querySelector("thead tr")].concat(rows).forEach(r=>{const c=r.cells[iP];if(c)c.remove()});}if(tb)tb.querySelectorAll("td.wide").forEach(td=>{const t=td.firstChild&&td.firstChild.nodeType===3?td.firstChild.textContent:"",sm=td.querySelector("small");td.innerHTML=`<div class="wclip"><span title="${esc(t)}">${esc(t)}</span>${sm?`<small title="${esc(sm.textContent)}">${esc(sm.textContent)}</small>`:""}</div>`});if(tb){const th=tb.querySelector("thead tr"),last=th&&th.lastElementChild;if(last)last.insertAdjacentHTML("beforebegin","<th>Link video</th>");const srcs=winSources();
-    tb.querySelectorAll("tbody tr").forEach(r=>{const last2=r.lastElementChild,bt=r.querySelector("[data-mkplan]");if(!last2||!bt)return;const key=bt.dataset.mkplan,s=srcs.find(x=>x.ref==="TT-"+key),lk=(s&&s.link)||"";
-      last2.insertAdjacentHTML("beforebegin",lk?'<td class="wlkc"><a href="'+esc(lk)+'" target="_blank" rel="noopener">▶ Mở video</a> <button type="button" class="lnk" data-wlkedit="'+esc(key)+'" title="Sửa link">✎</button></td>':'<td class="wlkc"><input class="wlk" data-wlk="'+esc(key)+'" placeholder="Dán link video…"></td>')})}
+    tb.querySelectorAll("tbody tr").forEach(r=>{const last2=r.lastElementChild,key=r.dataset.wkey;if(!last2||!key)return;const s=srcs.find(x=>x.ref==="TT-"+key),lk=(s&&s.link)||"",edLk=can(ME,"win.sua");/* mọi người xem được trang đều mở được video; sửa / dán link chỉ người lên kế hoạch nhân bản */
+      last2.insertAdjacentHTML("beforebegin",lk?'<td class="wlkc"><a href="'+esc(lk)+'" target="_blank" rel="noopener">▶ Mở video</a>'+(edLk?' <button type="button" class="lnk" data-wlkedit="'+esc(key)+'" title="Sửa link">✎</button>':'')+'</td>':edLk?'<td class="wlkc"><input class="wlk" data-wlk="'+esc(key)+'" placeholder="Dán link video…"></td>':'<td class="wlkc">—</td>')})}
   m.querySelectorAll("[data-mkplan]").forEach(x=>{x.insertAdjacentHTML("afterend",hyBtn("TT-"+x.dataset.mkplan));x.remove()})}
 /* lưu link video win nhân sự dán (video không tự có link từ báo cáo) */
 function hyLinkSave(key,v){v=String(v||"").trim();if(v&&!/^https?:\/\//.test(v)){toast("Link phải bắt đầu bằng http");return}DB.mutate(ME.name,"lưu link video win "+key,d=>{d.winLinks=d.winLinks||{};if(v)d.winLinks[key]=v;else delete d.winLinks[key]});toast(v?"Đã lưu link":"Đã xóa link");renderMain()}
