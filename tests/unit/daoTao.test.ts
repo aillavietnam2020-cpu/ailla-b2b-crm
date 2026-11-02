@@ -3,6 +3,8 @@ import {
   canEditDoc,
   canSeeDoc,
   canTrack,
+  driveIdFrom,
+  fromDriveMarkdown,
   gradeQuiz,
   isEditor,
   membersFromHub,
@@ -101,5 +103,18 @@ describe('Đào tạo: theo dõi, bắt buộc, kiểm tra', () => {
     expect(gradeQuiz(q, [0, 1, 2, 0, 0]).pass).toBe(true);
     expect(gradeQuiz(q, [0, 1, 0, 0, 0]).pass).toBe(false);
     expect(gradeQuiz([], undefined).pass).toBe(true);
+  });
+});
+
+describe('Đào tạo: lấy nội dung Google Docs', () => {
+  it('đọc mã file từ link', () => {
+    expect(driveIdFrom('https://docs.google.com/document/d/1AbCdEfGhIjKlMnOp_q-r/edit?usp=sharing')).toBe('1AbCdEfGhIjKlMnOp_q-r');
+    expect(driveIdFrom('https://drive.google.com/open?id=1AbCdEfGhIjKlMnOp')).toBe('1AbCdEfGhIjKlMnOp');
+    expect(driveIdFrom('abc')).toBeNull();
+    expect(driveIdFrom('')).toBeNull();
+  });
+  it('đổi markdown của Google sang kiểu chữ tài liệu', () => {
+    const md = ['# **Nội quy**', '### Mục nhỏ', '* Gạch đầu dòng', '  * Dòng con', '1\. Bước một', 'Giờ làm 8:30 \- 17:30, *nghiêng*', '![][image1]', '', '', '', '[image1]: <data:image/png;base64,AAAA>'].join('\n');
+    expect(fromDriveMarkdown(md)).toBe(['# **Nội quy**', '## Mục nhỏ', '- Gạch đầu dòng', '- Dòng con', '1. Bước một', 'Giờ làm 8:30 - 17:30, nghiêng'].join('\n'));
   });
 });

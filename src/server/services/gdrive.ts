@@ -127,3 +127,20 @@ export async function recentFiles(key: SaKey, name: string, max: number): Promis
   const q = `trashed = false and mimeType != 'application/vnd.google-apps.folder'${n ? ` and name contains '${n}'` : ''}`;
   return listQuery(key, q, 'modifiedTime desc', max);
 }
+
+/* ---------- Đào tạo (routes/daoTao.ts): đọc nội dung một Google Docs để hiện trong tài liệu đào tạo. Vẫn chỉ xem. ---------- */
+export async function fileInfo(key: SaKey, id: string): Promise<DriveFile | null> {
+  const f = await get<DriveFile & { trashed?: boolean }>(key, `${API}/files/${encodeURIComponent(id)}?fields=${encodeURIComponent(FILE_FIELDS + ',trashed')}&${COMMON}`);
+  return f && !f.trashed ? f : null;
+}
+
+/** Nội dung Google Docs dạng markdown (Drive xuất sẵn); không được thì lấy chữ thường. File không phải Google Docs trả null. */
+export async function exportDocText(key: SaKey, id: string): Promise<string | null> {
+  const token = await accessToken(key);
+  for (const mime of ['text/markdown', 'text/plain']) {
+    const r = await fetch(`${API}/files/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(mime)}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (r.ok) return await r.text();
+    if (r.status === 401 || r.status === 403 || r.status === 404) return null;
+  }
+  return null;
+}
