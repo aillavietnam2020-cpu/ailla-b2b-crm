@@ -893,7 +893,7 @@ function pCvV(m){
   const view=(k,l)=>`<button type="button" class="cvview${CVV.view===k?" on":""}" data-vv="${k}">${l}</button>`;
   const tq=CVV.view==="tq",listMine=CVV.view==="list"&&CVV.scope==="mine";
   const mgr=cvMgrView();
-  m.innerHTML=`<div class="cvvbar">${tq||CVV.view==="dh"?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}<select class="cvmore${["gantt","tq","dh","tpl"].includes(CVV.view)?" on":""}" id="cvv-more" aria-label="Kiểu xem khác">${opt([["","Xem khác…"],["gantt","Gantt (theo thời gian)"]].concat(mgr?[["tq","Tổng quan cả công ty"],["dh","Đúng hạn từng người"]]:[]).concat(tkGiver()?[["tpl","Mẫu việc & việc lặp lại"]]:[]),["gantt","tq","dh","tpl"].includes(CVV.view)?CVV.view:"")}</select>${newTaskBtn()}</div>${CVV.view==="board"||CVV.view==="cal"?`<div class="cvsub">${CVV.view==="board"?`<button type="button" class="lnk" data-vgo="congviec">Xem theo bước video →</button>`:`<button type="button" class="lnk" data-vgo="giaoviec">Xem lịch quay →</button>`}</div>`:""}${CVV.view==="list"?tkQuickHtml():""}<div id="cvv-body"></div>`;
+  m.innerHTML=`<div class="cvvbar">${tq||CVV.view==="dh"?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}<select class="cvmore${["gantt","tq","dh","tpl"].includes(CVV.view)?" on":""}" id="cvv-more" aria-label="Kiểu xem khác">${opt([["","Xem khác…"],["gantt","Gantt (theo thời gian)"]].concat(mgr?[["tq","Tổng quan cả công ty"]]:[]).concat(tkGiver()?[["tpl","Mẫu việc & việc lặp lại"]]:[]),["gantt","tq","dh","tpl"].includes(CVV.view)?CVV.view:"")}</select>${newTaskBtn()}</div>${CVV.view==="board"||CVV.view==="cal"?`<div class="cvsub">${CVV.view==="board"?`<button type="button" class="lnk" data-vgo="congviec">Xem theo bước video →</button>`:`<button type="button" class="lnk" data-vgo="giaoviec">Xem lịch quay →</button>`}</div>`:""}${CVV.view==="list"?tkQuickHtml():""}<div id="cvv-body"></div>`;
   const body=m.querySelector("#cvv-body");
   CVF.tao=(CVV.scope==="giao"&&!tq)?ME.id:"";
   try{
@@ -916,6 +916,61 @@ function pCvV(m){
   const re=m.querySelector("#wk-re");if(re)re.onclick=()=>{wkLoad(true);toast("Đang tải lại…")};
 }
 PAGES.cv_v=m=>pCvV(m);
+
+/* =====================================================================
+   HIỆU SUẤT LÀM VIỆC CỦA TEAM (Lead Content cần, chị Hoa 02/11): tổng quan, tiến độ, từng người, việc đang tắc.
+   Tính từ việc giao (Task giao việc) + thẻ video (Điều phối) trong kỳ chọn ở ô thời gian trên cùng.
+   Lead / trưởng phòng: team mình. CEO: chọn team.
+   ===================================================================== */
+const HSW={team:""};
+function hsTeams(){const ks=[];D().users.forEach(u=>{const k=teamOf(u);if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k))ks.push(k)});return ks}
+function pHsWork(m){
+  const d=D(),td=d.settings.today,boss=ME.role==="admin",tms=hsTeams();
+  let team=boss?(HSW.team||(tms.includes("content")?"content":tms[0]||"")):teamOf(ME);
+  const ppl=d.users.filter(u=>u.active&&u.role!=="admin"&&!CV_TEST.includes(u.id)&&(boss?cvTeamSee(team,teamOf(u))||teamOf(u)===team:tkSameTeam(ME,u)));
+  const ids=ppl.map(u=>u.id);
+  const a=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from?tkDay(PERIOD.from):1,b=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.to?tkDay(PERIOD.to):MONTH.ndays;
+  const inK=h=>h>=a&&h<=b;
+  /* việc giao: tính từng người làm (việc có công đoạn thì từng công đoạn) */
+  const U=[];(d.tasks||[]).forEach(t=>{const one=(ng,han,st,xn,ten,tl)=>{if(ids.includes(ng))U.push({ng,han:+han||0,st,xn:+xn||0,ten,tl,id:t.id,src:"task"})};
+    if(t.cd&&t.cd.length)t.cd.forEach(s=>{if(s.loai!=="duyet")one(s.nguoi,s.han,s.st==="xong"?"done":s.st==="lam"?"doing":"todo",s.xongNgay,t.ten+" · "+s.ten,0)});
+    else one(t.nguoi,t.han,t.st,t.xongNgay,t.ten,(t.chat||[]).filter(c=>c.kind==="tra").length)});
+  /* thẻ video: người đang giữ thẻ hoặc người edit / viết kịch bản */
+  const C=(d.cards||[]).filter(c=>c.step!=="cg"&&[c.nguoi,c.nguoiEdit,c.nguoiKB].some(x=>ids.includes(x)));
+  const cOwn=c=>ids.includes(c.nguoiEdit)?c.nguoiEdit:ids.includes(c.nguoi)?c.nguoi:c.nguoiKB;
+  const per={};ppl.forEach(u=>per[u.id]={u,mo:0,doing:0,rv:0,late:0,dung:0,tre:0,vGiao:0,vNop:0,vDuyet:0,tra:0,load:Array(7).fill(0)});
+  U.forEach(x=>{const p=per[x.ng];if(!p)return;const open=x.st!=="done";
+    if(open){p.mo++;if(x.st==="doing"||x.st==="nhan")p.doing++;if(x.st==="review")p.rv++;if(x.han&&x.han<td)p.late++;const k=x.han-td;if(k>=0&&k<7)p.load[k]++}
+    else if(x.xn&&inK(x.xn)){if(x.xn<=x.han)p.dung++;else p.tre++}p.tra+=x.tl||0});
+  C.forEach(c=>{const p=per[cOwn(c)];if(!p)return;const day=c.day||0;if(day&&!inK(day)&&!["edit","kb","quay","worker","dkb","dvd","dceo"].includes(c.step))return;
+    p.vGiao++;if(["dvd","dceo","dang","xong"].includes(c.step))p.vNop++;if(["dang","xong"].includes(c.step))p.vDuyet++;p.tra+=(c.gopy||[]).length;
+    if(!["dang","xong"].includes(c.step)){if(typeof isLate==="function"&&isLate(c))p.late++;if(["dvd","dceo","dkb"].includes(c.step))p.rv++;else p.doing++;const k=(c.han||c.day||0)-td;if(k>=0&&k<7)p.load[k]++}});
+  const P=Object.values(per),S=k=>P.reduce((z,p)=>z+p[k],0),pct=(x,y)=>y?Math.round(x/y*100):null;
+  const tot={mo:S("mo")+C.filter(c=>!["dang","xong"].includes(c.step)).length,rv:S("rv"),late:S("late"),dung:S("dung"),tre:S("tre"),vGiao:S("vGiao"),vNop:S("vNop"),vDuyet:S("vDuyet"),tra:S("tra")};
+  const okP=pct(tot.dung,tot.dung+tot.tre+tot.late);
+  const tile=(l,v,h,cls)=>`<div class="hsw-t${cls?" "+cls:""}"><span>${l}</span><b>${v}</b>${h?`<small>${h}</small>`:""}</div>`;
+  const bar=(x,y,col)=>{const p=y?Math.min(100,Math.round(x/y*100)):0;return `<div class="hsw-bar"><i style="width:${p}%;background:${col||"#2f6fde"}"></i></div>`};
+  /* tiến độ theo kênh: video trong kỳ đã nộp / đã duyệt, đăng */
+  const byK={};C.forEach(c=>{const k=c.kenh||"Khác",o=byK[k]=byK[k]||{n:0,nop:0,dang:0};o.n++;if(["dvd","dceo","dang","xong"].includes(c.step))o.nop++;if(["dang","xong"].includes(c.step))o.dang++});
+  /* việc đang tắc */
+  const stuck=U.filter(x=>x.st!=="done"&&x.han&&x.han<td).map(x=>({ten:x.ten,ng:x.ng,lt:td-x.han,go:`data-tkopen="${x.id}"`}))
+    .concat(C.filter(c=>!["dang","xong"].includes(c.step)&&typeof isLate==="function"&&isLate(c)).map(c=>({ten:(c.hookText||c.yTuong||c.id)+" · "+stepName(c.step),ng:cOwn(c),lt:Math.max(1,td-((c.han&&WORK_STEPS.includes(c.step))?c.han:c.day)),go:`data-opcard="${c.id}"`})))
+    .sort((x,y)=>y.lt-x.lt).slice(0,8);
+  const dayL=i=>i===0?"Hôm nay":i===1?"Mai":(THU[(((MONTH.first+td+i-1)%7)+7)%7]);
+  m.innerHTML=`<div class="hsw">
+   <div class="hsw-h"><h2>Hiệu suất làm việc ${boss?"":"team "}${esc(boss?"":cvTeamName(team))}</h2>${boss&&tms.length>1?`<div class="tkteams">${tms.map(k=>`<button type="button" class="cvchip${k===team?" on":""}" data-hst="${esc(k)}">${esc(cvTeamName(k))}</button>`).join("")}</div>`:""}<span class="hint">Kỳ: ô thời gian trên cùng · ${ppl.length} người</span></div>
+   <div class="hsw-tiles">${tile("Việc đang mở",tot.mo,"")}${tile("Chờ duyệt",tot.rv,"",tot.rv?"amb":"")}${tile("Trễ hạn",tot.late,"",tot.late?"red":"")}${tile("Đúng hạn",okP==null?"—":okP+"%",`${tot.dung} xong đúng · ${tot.tre} xong trễ · ${tot.late} đang trễ`,okP!=null&&okP<70?"red":"")}${tile("Video đã nộp",`${tot.vNop}/${tot.vGiao}`,"đã nộp / được giao")}${tile("Video đã duyệt",tot.vDuyet,tot.tra?`${tot.tra} lần bị trả lại`:"")}</div>
+   <div class="hsw-grid">
+    <section class="card flush cvtk"><div class="card-h pad"><h3>Từng người</h3><span class="hint">bấm tên để xem việc của người đó</span></div>${tbl(["Người","Đang làm","Chờ duyệt","Trễ","Xong (đúng / trễ)","Đúng hạn","Video nộp","Trả lại","Việc 7 ngày tới"],P.sort((x,y)=>y.late-x.late||y.mo-x.mo).map(p=>{const o=pct(p.dung,p.dung+p.tre+p.late),mx=Math.max(3,...p.load);return `<tr><td><button type="button" class="lnk" data-hsp="${p.u.id}">${avatar(p.u.id)}${esc(p.u.name)}</button></td><td class="n">${p.doing||""}</td><td class="n">${p.rv?`<span class="pill p-amb">${p.rv}</span>`:""}</td><td class="n">${p.late?`<span class="pill p-red">${p.late}</span>`:""}</td><td class="n">${p.dung} / ${p.tre}</td><td class="n">${o==null?"—":`<b class="${o>=90?"t-grn":o>=70?"t-amb":"t-red"}">${o}%</b>`}</td><td>${p.vGiao?`${bar(p.vNop,p.vGiao)}<small>${p.vNop}/${p.vGiao}</small>`:""}</td><td class="n">${p.tra||""}</td><td><div class="hsw-load" title="Số việc tới hạn 7 ngày tới">${p.load.map((n,i)=>`<i style="height:${Math.round(n/mx*100)}%;background:${n>=3?"#e03131":"#4c6ef5"}" title="${dayL(i)}: ${n} việc"></i>`).join("")}</div></td></tr>`}))}</section>
+    <div class="hsw-side">
+     <section class="card"><h3>Tiến độ video theo kênh</h3>${Object.keys(byK).length?Object.entries(byK).map(([k,o])=>`<div class="hsw-k"><div><b>${esc(chOf(k).short||k)}</b><small>${o.dang} đã duyệt · ${o.nop} đã nộp / ${o.n}</small></div>${bar(o.dang,o.n,"#2f9e44")}</div>`).join(""):`<p class="hint">Chưa có thẻ video trong kỳ.</p>`}</section>
+     <section class="card"><h3>Đang tắc, cần đốc</h3>${stuck.length?stuck.map(x=>`<div class="hsw-s"><span>${avatar(x.ng)}<b>${esc(cvShort(x.ten,46))}</b></span><span class="pill p-red">trễ ${x.lt} ngày</span><button type="button" class="btn sm" ${x.go}>Mở</button></div>`).join(""):`<p class="hint">Không có việc nào trễ. 👍</p>`}</section>
+    </div></div></div>`;
+  m.querySelectorAll("[data-hst]").forEach(b=>b.onclick=()=>{HSW.team=b.dataset.hst;renderMain()});
+  m.querySelectorAll("[data-tkopen]").forEach(b=>b.onclick=()=>openTask(b.dataset.tkopen));
+  m.querySelectorAll("[data-opcard]").forEach(b=>b.onclick=()=>openCard(b.dataset.opcard));
+  m.querySelectorAll("[data-hsp]").forEach(b=>b.onclick=()=>{PAGE="cv_v";MOD="cv";CVV.view="list";CVV.scope="team";cvWhoSet("p:"+b.dataset.hsp);CVF.st="";render()});
+}
 
 /* =====================================================================
    ĐÚNG HẠN — mỗi người: việc trong tháng, xong đúng hạn, xong trễ, đang trễ (chị Hoa 02/11: có số liệu để đánh giá, chưa chấm điểm KPI).

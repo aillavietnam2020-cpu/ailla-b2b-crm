@@ -64,11 +64,11 @@ const LISTS={
 const STEPS=[
  {id:"cg",t:"Chưa giao",who:"Lead Content & Media giao"},
  {id:"kb",t:"Viết kịch bản",who:"Người được giao"},
- {id:"dkb",t:"Người duyệt kịch bản",who:"Oanh"},
+ {id:"dkb",t:"Người duyệt kịch bản",who:"Lead Content"},
  {id:"quay",t:"Chờ quay",who:"Theo buổi quay tuần"},
  {id:"edit",t:"Đang edit",who:"Người edit · dán link"},
  {id:"worker",t:"Worker đang dựng",who:"Máy tự làm",auto:true},
- {id:"dvd",t:"Người duyệt video",who:"Oanh"},
+ {id:"dvd",t:"Người duyệt video",who:"Lead Content"},
  {id:"dceo",t:"CEO duyệt video",who:"Chị Hoa"},
  {id:"dang",t:"Chờ đăng",who:"Người giữ kênh · dán ID / link"},
  {id:"xong",t:"Đã đăng",who:"Số về theo báo cáo tuần"},

@@ -14,6 +14,12 @@ function hqCard(o){
    ${o.body||""}${o.note?`<p class="hint">${o.note}</p>`:""}</section>`;
 }
 function pHieuQuaTeam(m){
+  /* chị Hoa 02/11: team làm việc (không bán hàng) như Content, Media, Kho… xem hiệu suất làm việc của team, không xem số bán hàng. CEO xem cả hai. */
+  {const t=typeof teamOf==="function"?teamOf(ME):"",sale=["sale","digital","ads","koc"].includes(t)||["ADS","KOC","SALE"].includes(ME.phongBan||"");
+   if(typeof pHsWork==="function"&&ME.role!=="admin"&&!sale){pHsWork(m);return}
+   if(typeof pHsWork==="function"&&ME.role==="admin"){const w=document.createElement("div");m.appendChild(w);pHsWork(w);const r=document.createElement("div");m.appendChild(r);pHieuQuaBan(r);return}}
+  pHieuQuaBan(m)}
+function pHieuQuaBan(m){
   try{if(typeof adfLoad==="function"){adfLoad();adfMergeDays()}if(typeof fbsLoad==="function")fbsLoad();if(typeof tsbLoadAll==="function")tsbLoadAll()}catch(e){}
   const days=pDays(),g=(s,i)=>pSum(s,i).v,cards=[];
   /* TikTok Shop */
