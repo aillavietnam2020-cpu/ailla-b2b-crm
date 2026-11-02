@@ -133,14 +133,27 @@ const tkLink=u=>/^https?:\/\//.test(u||"")?`<a href="${esc(u)}" target="_blank" 
 /* kết quả đã nộp: ghi chú, link, file */
 const tkSubHtml=t=>{const a=[];if(t.kqNote)a.push(`<div class="tksn">${esc(t.kqNote).replace(/\n/g,"<br>")}</div>`);if(t.kq)a.push(`<div>🔗 ${tkLink(t.kq)}</div>`);a.push(tkFilesHtml(t.kqFiles,"kqFiles",false));const s=a.filter(Boolean).join("");return s?`<div class="tksub">${s}${t.nopAt?`<small class="hint">Nộp lúc ${esc(t.nopAt)}${t.nopBy?" · "+esc(t.nopBy):""}</small>`:""}</div>`:""};
 /* Khung đầu việc: người làm nộp kết quả ngay tại đây, người giao duyệt / trả lại ngay tại đây (chị Hoa 02/11) */
+const tkStC=k=>(CV_ST.find(s=>s[0]===k)||[])[2]||"gry";
+const tkCk=t=>{const c=t.checklist||[];return c.length?c.filter(x=>x.x).length+"/"+c.length+" việc nhỏ":""};
+const tkStChip=t=>[t.tlNote&&t.st!=="done"&&t.st!=="review"?"Bị trả lại":cvStN(t.st),tkCk(t)].filter(Boolean).join(" · ");
+/* thanh tiến trình: Giao → Nhận → Đang làm → Nộp → Duyệt → Hoàn thành (việc tự giao cho mình thì bỏ bước Duyệt) */
+function tkStepper(t){
+  const appr=!!(t.tao&&t.tao!==t.nguoi)||!!t.duyet,S=[["giao","Đã giao"],["nhan","Đã nhận"],["doing","Đang làm"],["nop","Đã nộp"]].concat(appr?[["duyet","Duyệt"]]:[]).concat([["done","Hoàn thành"]]);
+  const at={todo:0,cg:0,nhan:1,doing:2,review:appr?4:3,done:S.length-1}[t.st];const cur=at==null?0:at,c=t.checklist||[],cn=c.filter(x=>x.x).length;
+  return `<div class="tkstep">${S.map(([k,n],i)=>`<span class="${i<cur?"ok":i===cur?"on":""}${i===cur&&t.tlNote&&t.st!=="done"&&t.st!=="review"?" back":""}">${i<cur?"✓ ":""}${n}</span>`).join("")}</div>
+   ${c.length?`<div class="tkprog"><i style="width:${Math.round(cn/c.length*100)}%"></i></div><small class="hint">Việc nhỏ đã xong ${cn}/${c.length}</small>`:""}`
+}
 function tkResultHtml(t){
   if(!t||(t.cd&&t.cd.length))return "";
+  return tkStepper(t)+tkResultBox(t);
+}
+function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}</div>`;
   if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt hoàn thành</button></div></div>`
     :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt</b>${sub}</div>`;
   if(doer){const need=!!tkDoneErr(t);
-    return `<div class="tkres"><b>Nộp kết quả</b>${t.tlNote?`<p class="tkback">↩ Bị trả lại: ${esc(t.tlNote)}</p>`:""}
+    return `<div class="tkres"><b>Nộp kết quả</b>${t.st==="todo"||t.st==="nhan"?`<div class="acts"><span class="hint">Trạng thái: ${cvStN(t.st)}</span>${t.st==="todo"?`<button type="button" class="btn sm" data-tkq="nhan">Nhận việc</button>`:""}<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button></div>`:""}${t.tlNote?`<p class="tkback">↩ Bị trả lại: ${esc(t.tlNote)}</p>`:""}
       <textarea id="t-kqn" rows="2" placeholder="Đã làm gì, kết quả ra sao">${esc(t.kqNote||"")}</textarea>
       <input id="t-kql" placeholder="Link kết quả (Drive, bài đăng, video…) nếu có" value="${esc(t.kq||"")}">
       <div id="t-kqfl"></div><label class="btn sm tkup">📎 Thêm ảnh / file<input type="file" id="t-kqf" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label>
@@ -206,6 +219,7 @@ function openTask(id){
   if($("#t-bf"))$("#t-bf").onchange=async e=>{const add=await tkUpload(e.target.files,t?t.id:"");e.target.value="";if(!add.length)return;bf.push(...add);
     if(t)DB.mutate(ME.name,`gửi ${add.length} file vào việc "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(x){x.files=(x.files||[]).concat(add);tkLog(x,"Gửi kèm "+add.map(f=>f.name).join(", "))}});toast("Đã gửi file");fl()};
   if($("#t-kqf"))$("#t-kqf").onchange=async e=>{const add=await tkUpload(e.target.files,t?t.id:"");e.target.value="";if(add.length){kqF.push(...add);fl()}};
+  $("#drawer").querySelectorAll("[data-tkq]").forEach(b=>b.onclick=()=>{tkSetSt(t.id,b.dataset.tkq);toast("Đã chuyển: "+cvStN(b.dataset.tkq));openTask(t.id);renderMain()});
   if($("#t-nop"))$("#t-nop").onclick=()=>{const note=$("#t-kqn").value.trim(),link=$("#t-kql").value.trim();if(!note&&!link&&!kqF.length){toast("Ghi kết quả, dán link hoặc thêm file");return}
     const k=tkDoneErr(t)?"review":"done";tkSetSt(t.id,k,{kqNote:note,kq:link,kqFiles:kqF.slice(),nopAt:new Date().toLocaleString("vi-VN"),nopBy:ME.name,tlNote:""},"Nộp kết quả");
     toast(k==="review"?"Đã nộp, chờ "+tkMgrNames(t)+" duyệt":"Đã nộp, việc xong");openTask(t.id);renderMain()};
@@ -742,7 +756,8 @@ function cvMyItems(){
       });
     }else{
       if(t.st==="review"&&tkMgr(t))add({key:"r_"+t.id,group:G2,title:t.ten,detail:`${userName(t.nguoi)||"—"} đã nộp kết quả`,age_days:late(t.han),taskId:t.id,btn:"Xem & duyệt"});
-      else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st!=="review")add({key:"t_"+t.id,group:G1,title:t.ten,detail:`Hạn ${t.han?dd(t.han):"—"} · giao bởi ${who}${t.tlNote?" · bị trả lại: "+t.tlNote:""}`,age_days:late(t.han),han:t.han||0,taskId:t.id,btn:"Nộp kết quả"});
+      else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st==="review")add({key:"s_"+t.id,group:"Đã nộp, chờ duyệt",title:t.ten,detail:`Chờ ${tkMgrNames(t)} duyệt${t.nopAt?" · nộp lúc "+t.nopAt:""}`,taskId:t.id,btn:"Xem",chip:"Chờ duyệt",chipC:"amb"});
+      else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st!=="review")add({key:"t_"+t.id,group:G1,title:t.ten,detail:`Hạn ${t.han?dd(t.han):"—"} · giao bởi ${who}${t.tlNote?" · bị trả lại: "+t.tlNote:""}`,age_days:late(t.han),han:t.han||0,taskId:t.id,btn:"Nộp kết quả",chip:tkStChip(t),chipC:t.tlNote?"red":tkStC(t.st)});
     }
     if((t.treReq||{}).st==="cho"&&tkMgr(t))add({key:"g_"+t.id,group:G2,title:t.ten,detail:`${(t.treReq||{}).by||"Người làm"} xin gia hạn${(t.treReq||{}).hanMoi?" đến "+dd(t.treReq.hanMoi):""}`,taskId:t.id});
   });
