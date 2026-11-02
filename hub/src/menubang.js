@@ -87,7 +87,7 @@
        phiếu chi ghi ở quản trị › Sổ chi phí, nhập CRM chỉ làm một lần). */
     const DROP=["bc_tong","cr_thuong","mh_no","mh_gianvl","bots","kho_qd","cr_bill","cr_s_bill","cr_vc","cr_s_vc","cr_im","cr_import"];
     USED=Object.values(S).flatMap(ids);
-    const mkt=keep("mkt"),hr=keep("hr"),aiq=keep("aiq"),me=keep("me");
+    const mkt=keep("mkt"),hr=keep("hr"),dt=keep("dt"),aiq=keep("aiq"),me=keep("me");
     if(mkt)mkt.zone="";if(hr)hr.zone="";
     /* Chị Hoa 29/10: Công việc đưa lên ngay dưới Tổng quan vận hành. */
     NEW=[mod("exec","home","Tổng quan vận hành","",S.exec,["exec"],DROP),
@@ -96,6 +96,7 @@
       mkt,
       mod("sx","fac","Kho – Sản xuất","",S.sx,["sx","mhop"],DROP),
       hr,
+      dt, // Đào tạo & onboarding (daotao.js, chị Hoa duyệt 02/11)
       mod("agt","spark","AI Agent","",S.agt,["agt"],DROP),
       aiq,me].filter(Boolean);
     /* Hai nhóm "Kho vật tư", "Sản xuất" đang gộp nhiều trang thành một dòng; bảng muốn thấy từng trang theo đường đi của hàng. */
