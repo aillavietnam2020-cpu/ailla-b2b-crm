@@ -534,6 +534,8 @@ function cvWarn(){
   const d=D(),td=d.settings.today,out=[];if(td+1>MONTH.ndays)return out;
   const lead=ME.role==="admin"||ME.role==="lead"||(can(ME,"viec.giao")&&cvTeamSee(teamOf(ME),"content"));
   CHANNELS.forEach(ch=>{const own=cvOwner(ch.k);if(!lead&&own!==ME.id)return;
+    /* kênh chưa có kế hoạch tháng này (chưa sản phẩm nào có số video, Fanpage chưa có tuyến bài) thì không nhắc thiếu video */
+    if(!ptPairs().some(x=>x.kenh===ch.k&&+x.sl>0)&&!(!ch.needId&&(d.fpPlan||[]).some(r=>+r.sl>0)))return;
     let need=0;try{need=calCap(ch.k,td+1)}catch(e){}
     const have=d.cards.filter(c=>c.kenh===ch.k&&c.step==="dang"&&(+c.day||0)===td+1).length;
     if(need>0&&have<need)out.push({short:ch.short,need,have,own})});

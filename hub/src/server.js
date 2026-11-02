@@ -240,7 +240,9 @@ function svAllowedMods(){
   const s=new Set(["cv","me",...m]);if(s.has("mkt"))s.add("aiq");
   {const T=userTeam(ME);if(["content","koc","ads","live"].includes(T)){s.add("mkt");s.add("aiq")}}
   // Ai được cấp một quyền Sản xuất (Thảo điều phối, kế toán kho, kỹ thuật...) thì thấy phân hệ Sản xuất.
-  if(["sx.dieuphoi","sx.xuong","sx.kiemke","sx.kythuat"].some(k=>can(ME,k))||ME.phongBan==="KT")s.add("sx");if(s.has("b2b")||s.has("b2c"))s.add("b2blink");return s;
+  if(["sx.dieuphoi","sx.xuong","sx.kiemke","sx.kythuat"].some(k=>can(ME,k))||ME.phongBan==="KT")s.add("sx");if(s.has("b2b")||s.has("b2c"))s.add("b2blink");
+  // Ai được cấp quyền nhắn agent (Tài khoản › Quyền agent) thì thấy mục AI Agent (chị Hoa 02/11: Uyên có quyền mà không thấy menu).
+  if(SV.agentChat&&SV.agentChat.length)s.add("agt");return s;
 }
 // Phòng được dùng phân hệ nào thì người trong phòng xem được các trang của phân hệ đó (B2C, Sản xuất,
 // Tài chính, Nhân sự, Tổng quan); Marketing và Quản trị hệ thống vẫn theo quyền chi tiết từng người.
