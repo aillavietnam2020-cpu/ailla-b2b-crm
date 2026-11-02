@@ -94,7 +94,7 @@ async function getDoc(db: D1Database, id: string) {
 const DRIVE_DOC = 'application/vnd.google-apps.document';
 async function loadDrive(env: AppEnv['Bindings'], id: string) {
   const key = saKey(env.GDRIVE_SA_JSON);
-  if (!key) throw badRequest('DRIVE_OFF', 'Web chưa nối Google Drive. Nhờ chị Hoa chạy NOI-GOOGLE-DRIVE.bat trước.');
+  if (!key) throw badRequest('DRIVE_OFF', 'Web chưa nối Google Drive. Nhờ CEO nối Google Drive trước.');
   const f = await fileInfo(key, id);
   if (!f) throw badRequest('DRIVE_NO_ACCESS', `Web chưa xem được file này. Chia sẻ file (hoặc thư mục chứa nó) cho email ${key.client_email} quyền Người xem.`);
   if (f.mimeType !== DRIVE_DOC) throw badRequest('DRIVE_NOT_DOC', 'Chỉ lấy được nội dung từ file Google Docs (file Word, PDF thì mở trong Drive rồi chọn Lưu dưới dạng Google Docs).');
@@ -331,9 +331,9 @@ daoTaoRoutes.post('/docs/:id/tra-lai', async (c) => {
   const r = await getDoc(c.env.DB, c.req.param('id'));
   const note = String(((await c.req.json().catch(() => ({}))) as { note?: unknown }).note ?? '').trim().slice(0, 1000);
   if (r.pending) {
-    await c.env.DB.prepare("UPDATE dt_doc SET pending = '', pending_by = NULL, pending_at = NULL, review_note = ? WHERE id = ?").bind(note || 'Chị Hoa trả lại bản sửa', r.id).run();
+    await c.env.DB.prepare("UPDATE dt_doc SET pending = '', pending_by = NULL, pending_at = NULL, review_note = ? WHERE id = ?").bind(note || 'CEO trả lại bản sửa', r.id).run();
   } else if (r.status === 'cho_duyet') {
-    await c.env.DB.prepare("UPDATE dt_doc SET status = 'nhap', review_note = ? WHERE id = ?").bind(note || 'Chị Hoa trả lại', r.id).run();
+    await c.env.DB.prepare("UPDATE dt_doc SET status = 'nhap', review_note = ? WHERE id = ?").bind(note || 'CEO trả lại', r.id).run();
   } else throw badRequest('NOT_PENDING', 'Tài liệu không có gì chờ duyệt');
   return ok(c, { id: r.id });
 });
@@ -374,7 +374,7 @@ daoTaoRoutes.post('/docs/:id/hoi', async (c) => {
   const r = await getDoc(c.env.DB, c.req.param('id'));
   if (!canSeeDoc(v, lite(r))) throw forbidden();
   const text = String(((await c.req.json().catch(() => ({}))) as { text?: unknown }).text ?? '').trim().slice(0, 1000);
-  if (text.length < 3) throw badRequest('EMPTY', 'Gõ câu hỏi giúp em');
+  if (text.length < 3) throw badRequest('EMPTY', 'Gõ câu hỏi trước khi gửi');
   const id = newId();
   await c.env.DB.prepare('INSERT INTO dt_hoi (id, doc_id, user_id, text, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, r.id, auth.user.id, text, nowIso()).run();
   return ok(c, { id });
@@ -503,7 +503,7 @@ daoTaoRoutes.post('/img', async (c) => {
   const file = form?.get('file');
   if (!file || typeof file === 'string') throw badRequest('MISSING', 'Chưa chọn ảnh');
   if (!IMG_OK.includes(file.type)) throw badRequest('BAD_TYPE', 'Chỉ chèn được ảnh (jpg, png, gif, webp)');
-  if (file.size > IMG_MAX) throw badRequest('TOO_LARGE', 'Ảnh quá 1,5 MB, chị thu nhỏ hoặc chụp lại giúp em');
+  if (file.size > IMG_MAX) throw badRequest('TOO_LARGE', 'Ảnh quá 1,5 MB, hãy thu nhỏ hoặc chụp lại');
   const id = newId();
   await c.env.DB.prepare('INSERT INTO dt_img (id, mime, size, data, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)')
     .bind(id, file.type, file.size, new Uint8Array(await file.arrayBuffer()), nowIso(), auth.user.id)

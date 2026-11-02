@@ -179,7 +179,7 @@ function pDtHome(m){
   const lt=road.filter(d=>d.lo_trinh===DT.road);
   m.innerHTML=DT_CSS+(me.editor?`<div style="float:right;margin-top:-4px"><button class="btn pri" data-dtnew="1">＋ Tạo tài liệu</button></div>`:"")+H("Đào tạo của tôi",nb?`Vào làm ${dtDay(nb.start_date)}${nb.done_at?" · đã xong onboarding":" · đang trong lộ trình nhân viên mới"}`:"Tài liệu công ty, sổ tay dùng web và tài liệu của team bạn")+
   (DT.err?`<div class="note red">${esc(DT.err)}</div>`:"")+
-  (me.ceo&&pend.length?`<div class="warn">Có <b>${pend.length}</b> tài liệu đang chờ chị duyệt: ${pend.map(d=>`<a href="#" data-dtopen="${esc(d.id)}">${esc(d.title)}</a>`).join(", ")}</div>`:"")+
+  (me.ceo&&pend.length?`<div class="warn">Có <b>${pend.length}</b> tài liệu cần duyệt: ${pend.map(d=>`<a href="#" data-dtopen="${esc(d.id)}">${esc(d.title)}</a>`).join(", ")}</div>`:"")+
   `<div class="dt-kpis">
     <div class="kpi"><div class="l">Lộ trình onboarding</div><div class="v">${pct}%</div><div class="dt-bar"><i style="width:${pct}%"></i></div></div>
     <div class="kpi"><div class="l">Bắt buộc chưa đọc</div><div class="v${todo.length?" t-red":""}">${todo.length}</div><div class="h">trên ${req.length} tài liệu bắt buộc</div></div>
@@ -242,7 +242,7 @@ function pDtRead(m){
   <article class="card"><div class="dt-chips" style="margin-bottom:8px">${pill(DT_NHOM[d.nhom]+(d.nhom==="team"?": "+dtTeams(d):""),"vio")}${d.bat_buoc!=="khong"?pill(DT_BB[d.bat_buoc],"red"):""}${d.lo_trinh?pill("Lộ trình "+DT_LT[d.lo_trinh],"blu"):""}${pill("Bản "+d.version,"gry")}${d.drive_id?pill("📄 Soạn trong Google Docs","blu"):""}</div>
    ${d.drive_id?`<p class="hint" style="margin:0 0 8px">Nội dung lấy từ Google Drive${d.drive_mod?", bản sửa lúc "+new Date(d.drive_mod).toLocaleString("vi-VN"):""}. Web tự cập nhật khi file trên Drive được sửa.${d.can_edit?` <a href="https://docs.google.com/document/d/${esc(d.drive_id)}/edit" target="_blank" rel="noopener">Sửa trong Google Docs ↗</a>`:""}</p>`:""}
    <p class="hint" style="margin:0 0 8px">${dtStamp(d)}</p>
-   ${d.review_note&&d.can_edit?`<div class="warn">Chị Hoa trả lại: ${esc(d.review_note)}</div>`:""}
+   ${d.review_note&&d.can_edit?`<div class="warn">CEO trả lại: ${esc(d.review_note)}</div>`:""}
    ${d.pending?`<div class="warn">Có <b>bản sửa chờ duyệt</b> của ${esc(d.pending_by_name||"người soạn")} lúc ${dtTime(d.pending_at)} — mọi người vẫn đang đọc bản đã duyệt.
      <button class="btn sm" id="dt-pvw">${DT.pv?"Xem bản đang hiện":"Xem bản sửa"}</button>${ceo?` <button class="btn pri sm" id="dt-appr2">Duyệt bản sửa</button> <button class="btn sm danger" id="dt-rej">Trả lại</button>`:""}</div>`:""}
    <div class="dt-doc"><h1 style="font-size:24px;margin:0 0 6px">${esc(d.title)}</h1>${d.summary?`<p class="hint" style="font-size:14.5px">${esc(d.summary)}</p>`:""}${dtMd(d.body)}</div>
@@ -267,7 +267,7 @@ function pDtRead(m){
     ak.disabled=true;try{const r=await svApi(DT_API+"/docs/"+id+"/ack",{method:"POST",body:JSON.stringify({answers:A})});
       if(!r.pass){m.querySelector("#dt-ackm").textContent=`Đúng ${r.right}/${r.total} câu, chưa đạt. Đọc lại phần trên rồi thử lại nhé.`;ak.disabled=false;return}
       toast("Đã xác nhận");delete DT.ans[id];await dtLoad(true);dtOpen(id)}catch(e){m.querySelector("#dt-ackm").textContent=e.message;ak.disabled=false}};
-  const ab=m.querySelector("#dt-askb");if(ab)ab.onclick=async()=>{const t=m.querySelector("#dt-ask").value.trim();if(t.length<3){toast("Gõ câu hỏi giúp em");return}
+  const ab=m.querySelector("#dt-askb");if(ab)ab.onclick=async()=>{const t=m.querySelector("#dt-ask").value.trim();if(t.length<3){toast("Gõ câu hỏi trước khi gửi");return}
     try{await svApi(DT_API+"/docs/"+id+"/hoi",{method:"POST",body:JSON.stringify({text:t})});toast("Đã gửi câu hỏi cho người soạn");dtOpen(id)}catch(e){toast(e.message)}};
   m.querySelectorAll("[data-dthoi]").forEach(b=>b.onclick=async()=>{const v=m.querySelector(`[data-dthoi-in="${b.dataset.dthoi}"]`).value.trim();if(!v)return;
     try{await svApi(DT_API+"/hoi/"+b.dataset.dthoi+"/tra-loi",{method:"POST",body:JSON.stringify({answer:v})});toast("Đã trả lời");dtOpen(id)}catch(e){toast(e.message)}})}
@@ -292,11 +292,11 @@ function pDtSoan(m){
   const me=DT.me||{};if(!me.editor){m.innerHTML=H("Soạn tài liệu","")+`<p class="empty">Bạn chưa được giao quyền soạn tài liệu.</p>`;return}
   if(DT.edit)return dtEditor(m);
   const mine=(DT.docs||[]).filter(d=>d.can_edit),st=d=>d.status==="dang"&&d.has_pending?pill("Có bản sửa chờ duyệt","amb"):d.status==="dang"?pill("Đang hiện","grn"):d.status==="cho_duyet"?pill("Chờ CEO duyệt","amb"):pill("Nháp","gry");
-  m.innerHTML=DT_CSS+H("Soạn tài liệu",me.ceo?"Chị soạn và duyệt được mọi tài liệu":me.hr?"Bạn soạn được tài liệu Chung (cần CEO duyệt), Sổ tay web và tài liệu các team":"Bạn soạn được tài liệu của team mình")+
+  m.innerHTML=DT_CSS+H("Soạn tài liệu",me.ceo?"Soạn và duyệt được mọi tài liệu":me.hr?"Bạn soạn được tài liệu Chung (cần CEO duyệt), Sổ tay web và tài liệu các team":"Bạn soạn được tài liệu của team mình")+
   `<div class="filters"><button class="btn pri" id="dt-new">＋ Tài liệu mới</button></div>
   <section class="card flush">${tbl(["Tài liệu","Nhóm","Bắt buộc","Lộ trình","Trạng thái","Cập nhật · Duyệt",""],mine.map(d=>`<tr><td><b>${esc(d.title)}</b>${d.drive_id?" "+pill("Google Docs","blu"):""}${d.quiz_n?`<small>${d.quiz_n} câu kiểm tra</small>`:""}</td><td>${esc(d.nhom==="team"?dtTeams(d):DT_NHOM[d.nhom])}</td><td>${esc(DT_BB[d.bat_buoc])}</td><td>${esc(DT_LT[d.lo_trinh]||"—")}</td><td>${st(d)}</td><td><small style="display:block;color:var(--muted);font-size:12.5px;white-space:normal">${dtStamp(d)}</small></td>
     <td class="nowrap"><button class="btn sm" data-dtopen="${esc(d.id)}">Xem</button> <button class="btn sm" data-dted="${esc(d.id)}">Sửa</button> <button class="btn sm danger" data-dtdel="${esc(d.id)}">Gỡ</button></td></tr>`))}</section>
-  <p class="hint">Chỉ đăng tài liệu chuẩn (nội quy, quy trình, hướng dẫn). File làm việc hằng ngày để ở thư mục Drive của team. Mọi tài liệu do Lead / quản lý tạo hoặc sửa đều gửi chị Hoa duyệt; trong lúc chờ, mọi người vẫn đọc bản đã duyệt.</p>`;
+  <p class="hint">Chỉ đăng tài liệu chuẩn (nội quy, quy trình, hướng dẫn). File làm việc hằng ngày để ở thư mục Drive của team. Mọi tài liệu do Lead / quản lý tạo hoặc sửa đều gửi CEO duyệt; trong lúc chờ, mọi người vẫn đọc bản đã duyệt.</p>`;
   m.querySelector("#dt-new").onclick=dtNewChoose;
   m.querySelectorAll("[data-dted]").forEach(b=>b.onclick=()=>dtEditOpen(DT.docs.find(x=>x.id===b.dataset.dted)));
   m.querySelectorAll("[data-dtdel]").forEach(b=>b.onclick=async()=>{const d=DT.docs.find(x=>x.id===b.dataset.dtdel);if(!confirm("Gỡ tài liệu \""+d.title+"\"? Mọi người sẽ không thấy nữa."))return;
@@ -380,7 +380,7 @@ function dtEditor(m){
       else{e.files.push(r);if(!e.title.trim()&&r.name!=="File trên Google Drive")e.title=r.name;toast("Đã gắn link")}dtEditor(m)}
     catch(er){$m("#dte-msg").textContent=er.message;$m("#dte-get").disabled=false}};
   {const x=$m("#dte-drvx");if(x)x.onclick=()=>{keep();e.drive="";e.body="";dtEditor(m)}}
-  $m("#dte-img").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;if(f.size>1.5e6){toast("Ảnh quá 1,5 MB, thu nhỏ hoặc chụp lại giúp em");return}
+  $m("#dte-img").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;if(f.size>1.5e6){toast("Ảnh quá 1,5 MB, hãy thu nhỏ hoặc chụp lại");return}
     const fd=new FormData();fd.append("file",f);toast("Đang tải ảnh…");
     try{const r=await fetch(DT_API+"/img",{method:"POST",body:fd,credentials:"same-origin"}),j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||"Chưa tải được ảnh");
       const alt=(prompt("Mô tả ngắn cho ảnh (hiện dưới ảnh):","Màn hình "+($m("#dte-title").value||""))||"").replace(/[\[\]]/g,""),md="![" + alt + "](" + j.data.id + ")";
@@ -398,7 +398,7 @@ function dtEditor(m){
     const body={nhom:e.nhom,teams:e.teams,title:e.title.trim(),summary:e.summary.trim(),body:e.src==="web"?e.body:"",bat_buoc:e.bat_buoc,lo_trinh:e.lo_trinh,han_ngay:e.han_ngay,sort:e.sort,quiz,action,major:e.major,drive:e.src==="link"?e.drive:"",files:e.files||[]};
     m.querySelectorAll("#dte-pub,#dte-draft").forEach(b=>b.disabled=true);
     try{const r=await svApi(DT_API+"/docs"+(e.id?"/"+e.id:""),{method:e.id?"PUT":"POST",body:JSON.stringify(body)});
-      toast(r.pending?"Đã gửi bản sửa — chờ chị Hoa duyệt, mọi người vẫn đọc bản cũ":r.status==="cho_duyet"?"Đã gửi, chờ chị Hoa duyệt":r.status==="dang"?"Đã đăng":"Đã lưu nháp");if(r.id)delete DT.doc[r.id];DT.edit=null;await dtLoad(true)}
+      toast(r.pending?"Đã gửi bản sửa — chờ CEO duyệt, mọi người vẫn đọc bản cũ":r.status==="cho_duyet"?"Đã gửi, chờ CEO duyệt":r.status==="dang"?"Đã đăng":"Đã lưu nháp");if(r.id)delete DT.doc[r.id];DT.edit=null;await dtLoad(true)}
     catch(er){$m("#dte-msg").textContent=er.message;m.querySelectorAll("#dte-pub,#dte-draft").forEach(b=>b.disabled=false)}};
   $m("#dte-pub").onclick=()=>save("dang");$m("#dte-draft").onclick=()=>save("nhap")}
 
@@ -454,10 +454,10 @@ function pDtQuyen(m){
     `<tr><td><b>Chung</b> (nội quy, quy chế)</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td></tr>`,
     `<tr><td><b>Sổ tay web vận hành</b></td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td></tr>`,
     `<tr><td><b>Tài liệu team</b></td><td class="t-grn">Xem</td><td class="hint">Không thấy</td><td class="t-grn">Xem, soạn, theo dõi ai đã đọc</td><td class="t-grn">Xem tất cả</td></tr>`])}
-   <p class="hint">Quản lý = tài khoản vai trò Trưởng phòng / Trưởng nhóm có ghi phòng ban. Phòng ban của từng người sửa ở Tài khoản & phân quyền; web cập nhật khi chị Hoa hoặc người làm nhân sự lưu.</p></section>
+   <p class="hint">Quản lý = tài khoản vai trò Trưởng phòng / Trưởng nhóm có ghi phòng ban. Phòng ban của từng người sửa ở Tài khoản & phân quyền; web cập nhật khi CEO hoặc người làm nhân sự lưu.</p></section>
   <section class="card"><div class="card-h"><h2>Người được soạn / sửa</h2>${me.ceo?`<span class="sp"></span><button class="btn pri sm" id="dt-grn">＋ Giao quyền soạn cho người khác</button>`:""}</div>
    ${tbl(["Người","Phòng","Được soạn",""],auto.concat(gr))}
-   <p class="hint">Tài liệu Chung do người không phải CEO soạn hoặc sửa phải chị Hoa bấm duyệt mới hiện cho mọi người.</p></section>`;
+   <p class="hint">Tài liệu Chung do người không phải CEO soạn hoặc sửa phải CEO duyệt mới hiện cho mọi người.</p></section>`;
   const nb=m.querySelector("#dt-grn");if(nb)nb.onclick=()=>dtGrantForm(null);
   m.querySelectorAll("[data-dtgr]").forEach(b=>b.onclick=()=>dtGrantForm(b.dataset.dtgr))}
 function dtGrantForm(uid){
