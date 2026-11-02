@@ -127,16 +127,18 @@ function pDtLib(m){
   const L=dtPub().filter(d=>(!q||(d.title+" "+d.summary).toLowerCase().includes(q))&&(!f||(f==="req"?dtReq(d):d.nhom===f)));
   const box=(t,arr,empty)=>`<section class="card"><div class="card-h"><h2>${t}</h2><span class="hint">${arr.length}</span></div>${arr.map(d=>dtItem(d)).join("")||`<p class="empty">${empty}</p>`}</section>`;
   const team=L.filter(d=>d.nhom==="team"),byT={};team.forEach(d=>(d.teams.length?d.teams:["?"]).forEach(t=>(byT[t]=byT[t]||[]).push(d)));
-  m.innerHTML=DT_CSS+H("Thư viện tài liệu","Chỉ hiện tài liệu bạn được xem. Tài liệu team chỉ người trong team đó, quản lý và CEO thấy.")+
+  m.innerHTML=DT_CSS+H("Thư viện tài liệu","Chỉ tài liệu chuẩn đã duyệt: nội quy, quy trình, hướng dẫn. File làm việc hằng ngày của team xem ở Thư mục làm việc.")+
   `<div class="filters"><input id="dt-q" placeholder="Tìm tài liệu…" value="${esc(DT.q)}" style="max-width:300px">
    ${[["","Tất cả"],["chung","Chung"],["web","Sổ tay web"],["team","Team"],["req","Bắt buộc"]].map(([k,n])=>`<button class="btn sm${f===k?" pri":""}" data-dtf="${k}">${n}</button>`).join(" ")}
-   <span class="sp"></span>${DT.me&&DT.me.editor?`<button class="btn sm" data-dtgo="dt_soan">✎ Soạn tài liệu</button>`:""}</div>
+   <span class="sp"></span>${PAGES.thumuc?`<button class="btn sm" id="dt-tm">📁 Thư mục làm việc của team →</button>`:""}${DT.me&&DT.me.editor?` <button class="btn sm" data-dtgo="dt_soan">✎ Soạn tài liệu</button>`:""}</div>
   <div class="dt-cols">${box("🏢 Chung — mọi nhân viên",L.filter(d=>d.nhom==="chung"),"Chưa có tài liệu chung.")}
    ${box("🧭 Sổ tay web vận hành",L.filter(d=>d.nhom==="web"),"Chưa có trang sổ tay nào.")}
    <section class="card"><div class="card-h"><h2>👥 Tài liệu theo team</h2><span class="hint">${team.length}</span></div>
      ${Object.keys(byT).length?Object.entries(byT).map(([t,arr])=>`<h3 style="margin:10px 0 2px">${esc(dtDep(t))}</h3>`+arr.map(d=>dtItem(d)).join("")).join(""):`<p class="empty">Team của bạn chưa có tài liệu riêng.</p>`}</section></div>`;
   const qi=m.querySelector("#dt-q");qi.onkeydown=e=>{if(e.key==="Enter"){DT.q=qi.value.trim();renderMain()}};qi.onchange=()=>{DT.q=qi.value.trim();renderMain()};
-  m.querySelectorAll("[data-dtf]").forEach(b=>b.onclick=()=>{DT.f=b.dataset.dtf;renderMain()});dtWire(m)}
+  m.querySelectorAll("[data-dtf]").forEach(b=>b.onclick=()=>{DT.f=b.dataset.dtf;renderMain()});
+  /* File làm việc hằng ngày không đưa vào thư viện (chị Hoa 02/11): dẫn sang trang Thư mục làm việc (thumuc.js). */
+  const tm=m.querySelector("#dt-tm");if(tm)tm.onclick=()=>{DT.cur=null;MOD="tm";PAGE="thumuc";render();scrollTo(0,0)};dtWire(m)}
 
 /* ---------- Đọc một tài liệu ---------- */
 function pDtRead(m){
@@ -195,7 +197,7 @@ function pDtSoan(m){
   `<div class="filters"><button class="btn pri" id="dt-new">＋ Tài liệu mới</button></div>
   <section class="card flush">${tbl(["Tài liệu","Nhóm","Bắt buộc","Lộ trình","Trạng thái","Sửa lần cuối",""],mine.map(d=>`<tr><td><b>${esc(d.title)}</b>${d.quiz_n?`<small>${d.quiz_n} câu kiểm tra</small>`:""}</td><td>${esc(d.nhom==="team"?dtTeams(d):DT_NHOM[d.nhom])}</td><td>${esc(DT_BB[d.bat_buoc])}</td><td>${esc(DT_LT[d.lo_trinh]||"—")}</td><td>${st(d)}</td><td class="nowrap">${dtDay(d.updated_at)} · bản ${d.version}</td>
     <td class="nowrap"><button class="btn sm" data-dtopen="${esc(d.id)}">Xem</button> <button class="btn sm" data-dted="${esc(d.id)}">Sửa</button> <button class="btn sm danger" data-dtdel="${esc(d.id)}">Gỡ</button></td></tr>`))}</section>
-  <p class="hint">Tài liệu Chung (nội quy, quy chế) do người khác soạn phải chị Hoa duyệt mới hiện. Sổ tay web và tài liệu team đăng là hiện ngay.</p>`;
+  <p class="hint">Chỉ đăng tài liệu chuẩn (nội quy, quy trình, hướng dẫn). File làm việc hằng ngày để ở thư mục Drive của team. Tài liệu Chung (nội quy, quy chế) do người khác soạn phải chị Hoa duyệt mới hiện; Sổ tay web và tài liệu team đăng là hiện ngay.</p>`;
   m.querySelector("#dt-new").onclick=()=>dtEditOpen(null);
   m.querySelectorAll("[data-dted]").forEach(b=>b.onclick=()=>dtEditOpen(DT.docs.find(x=>x.id===b.dataset.dted)));
   m.querySelectorAll("[data-dtdel]").forEach(b=>b.onclick=async()=>{const d=DT.docs.find(x=>x.id===b.dataset.dtdel);if(!confirm("Gỡ tài liệu \""+d.title+"\"? Mọi người sẽ không thấy nữa."))return;
