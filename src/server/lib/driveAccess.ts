@@ -115,3 +115,61 @@ export function fileKind(mime: string, name = ''): 'folder' | 'sheet' | 'doc' | 
   if (m.startsWith('image/')) return 'img';
   return 'other';
 }
+
+/* ---------- Đồng bộ quyền trên Drive theo danh sách nhân viên ở trang quản trị (chị Hoa 02/11) ----------
+ * Nhân viên đang làm (không "Đã nghỉ") có email trong hồ sơ:
+ *  - thư mục của phòng mình: được sửa (writer);
+ *  - thư mục khác mình được xem theo cấu hình (thư mục dùng chung "all", trưởng nhóm…): chỉ xem (reader).
+ * Nhân viên đã nghỉ, hoặc người web từng cấp mà nay không còn trong danh sách: gỡ quyền.
+ * Không bao giờ đụng tới chủ thư mục, tài khoản của web, hay người chị tự chia sẻ tay (web không cấp thì web không gỡ). */
+export type StaffRow = { ma: string; pb: string; tt?: string; email?: string; lead?: boolean };
+export type DriveRole = 'writer' | 'reader';
+export type DrivePerm = { id: string; email: string; role: string };
+
+const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+export const normEmail = (e: unknown) => {
+  const s = String(e ?? '').trim().toLowerCase();
+  return EMAIL_RE.test(s) ? s : '';
+};
+export const isActiveStaff = (s: StaffRow) => !/nghỉ/i.test(s.tt ?? '');
+
+/** Quyền cần có trên từng thư mục gốc: mã thư mục → (email → quyền). */
+export function desiredGrants(cfg: DriveConfig, staff: StaffRow[]): Map<string, Map<string, DriveRole>> {
+  const out = new Map<string, Map<string, DriveRole>>();
+  for (const t of cfg.teams) {
+    const m = new Map<string, DriveRole>();
+    for (const s of staff) {
+      const email = normEmail(s.email);
+      if (!email || !isActiveStaff(s)) continue;
+      if (s.pb === t.pb) m.set(email, 'writer');
+      else if (canSeeTeam(t, { phongBan: s.pb, role: s.lead ? 'lead' : 'nhanvien' }, false) && !m.has(email)) m.set(email, 'reader');
+    }
+    out.set(t.folderId, m);
+  }
+  return out;
+}
+
+/**
+ * So quyền đang có trên một thư mục với quyền cần có.
+ * `managed`: email web đã từng cấp ở thư mục này; `left`: email của nhân viên đã nghỉ.
+ * Chỉ nâng reader → writer; hạ writer → reader chỉ với người web quản lý. Chủ thư mục không bao giờ bị đổi.
+ */
+export function planSync(current: DrivePerm[], want: Map<string, DriveRole>, managed: Set<string>, left: Set<string>) {
+  const add: { email: string; role: DriveRole }[] = [];
+  const update: { id: string; email: string; role: DriveRole }[] = [];
+  const remove: { id: string; email: string }[] = [];
+  const byEmail = new Map(current.filter((p) => p.email).map((p) => [p.email.toLowerCase(), p]));
+  for (const [email, role] of want) {
+    const p = byEmail.get(email);
+    if (!p) add.push({ email, role });
+    else if (p.role === 'reader' || p.role === 'commenter') {
+      if (role === 'writer') update.push({ id: p.id, email, role });
+    } else if (p.role === 'writer' && role === 'reader' && managed.has(email)) update.push({ id: p.id, email, role });
+  }
+  for (const p of current) {
+    const email = (p.email || '').toLowerCase();
+    if (!email || p.role === 'owner' || want.has(email)) continue;
+    if (managed.has(email) || left.has(email)) remove.push({ id: p.id, email });
+  }
+  return { add, update, remove };
+}

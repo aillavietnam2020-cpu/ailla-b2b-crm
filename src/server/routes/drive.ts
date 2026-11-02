@@ -14,6 +14,7 @@ import {
   type DriveUser,
 } from '../lib/driveAccess';
 import { children, meta, recentFiles, saKey, type DriveFile } from '../services/gdrive';
+import { syncDrivePermissions } from '../services/driveSync';
 
 /**
  * Thư mục làm việc: xem thư mục Google Drive của phòng ban ngay trên web (chỉ xem; mở file thì sang Drive).
@@ -177,4 +178,11 @@ driveRoutes.put('/config', async (c) => {
     .bind(CFG_KEY, JSON.stringify(cfg), nowIso(), auth.user.id)
     .run();
   return ok(c, cfg);
+});
+
+/** Cấp / gỡ quyền Drive theo danh sách nhân viên (CEO). ?dry=1: chỉ xem trước sẽ đổi gì. */
+driveRoutes.post('/sync', async (c) => {
+  const { auth, ceo } = await who(c);
+  if (!ceo) throw forbidden('Chỉ CEO đồng bộ quyền Drive.');
+  return ok(c, await syncDrivePermissions(c.env.DB, c.env.GDRIVE_SA_JSON, auth.user.id, c.req.query('dry') === '1'));
 });

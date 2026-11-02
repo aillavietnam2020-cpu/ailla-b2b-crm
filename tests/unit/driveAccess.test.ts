@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canSeeTeam, fileKind, folderIdFrom, locate, normalizeConfig, rootsFor, teamsFor, type DriveMeta } from '../../src/server/lib/driveAccess';
+import { canSeeTeam, desiredGrants, fileKind, folderIdFrom, locate, normalizeConfig, planSync, rootsFor, teamsFor, type DriveMeta } from '../../src/server/lib/driveAccess';
 
 const ID_CM = '1AbCdEfGhIjKlMnOpQrStUv';
 const ID_ADS = '1ZyXwVuTsRqPoNmLkJiHgFe';
@@ -130,5 +130,40 @@ describe('thư mục dùng chung chứa thư mục phòng', () => {
   it('nhận tên thư mục chung và quyền all', () => {
     const c = normalizeConfig({ teams: [{ pb: 'chung1', folderId: ID_CM, viewers: ['all', 'bad'], name: '  Kho ảnh  ' }] });
     expect(c.teams[0]).toEqual({ pb: 'chung1', folderId: ID_CM, viewers: ['all'], name: 'Kho ảnh' });
+  });
+});
+
+describe('đồng bộ quyền Drive theo danh sách nhân viên', () => {
+  const cfg = { teams: [
+    { pb: 'CM', folderId: 'fCM', viewers: [] },
+    { pb: 'ADS', folderId: 'fADS', viewers: ['lead:CM'] },
+    { pb: 'chung2', folderId: 'fKHO', viewers: ['all'], name: 'Kho hình ảnh' },
+  ] };
+  const staff = [
+    { ma: 'NV1', pb: 'CM', tt: 'Chính thức', email: ' A@Gmail.com ' },
+    { ma: 'NV2', pb: 'CM', tt: 'Thử việc', email: 'lead@gmail.com', lead: true },
+    { ma: 'NV3', pb: 'ADS', tt: 'Chính thức', email: 'ads@gmail.com' },
+    { ma: 'NV4', pb: 'ADS', tt: 'Đã nghỉ', email: 'nghi@gmail.com' },
+    { ma: 'NV5', pb: 'KT', tt: 'Chính thức', email: '' },
+  ];
+  const g = desiredGrants(cfg, staff);
+  it('phòng mình được sửa, thư mục chung chỉ xem, người nghỉ hay không có email thì không', () => {
+    expect([...g.get('fCM')!]).toEqual([['a@gmail.com', 'writer'], ['lead@gmail.com', 'writer']]);
+    expect([...g.get('fADS')!]).toEqual([['lead@gmail.com', 'reader'], ['ads@gmail.com', 'writer']]);
+    expect([...g.get('fKHO')!].map(([, r]) => r)).toEqual(['reader', 'reader', 'reader']);
+  });
+  it('kế hoạch: thêm người thiếu, gỡ người nghỉ, không đụng chủ và người chị tự chia sẻ', () => {
+    const cur = [
+      { id: 'o', email: 'owner@gmail.com', role: 'owner' },
+      { id: 's', email: 'abos-drive@x.iam.gserviceaccount.com', role: 'reader' },
+      { id: 'h', email: 'tay@gmail.com', role: 'writer' },
+      { id: 'n', email: 'nghi@gmail.com', role: 'writer' },
+      { id: 'r', email: 'ads@gmail.com', role: 'reader' },
+      { id: 'm', email: 'cu@gmail.com', role: 'reader' },
+    ];
+    const p = planSync(cur, g.get('fADS')!, new Set(['cu@gmail.com']), new Set(['nghi@gmail.com']));
+    expect(p.add).toEqual([{ email: 'lead@gmail.com', role: 'reader' }]);
+    expect(p.update).toEqual([{ id: 'r', email: 'ads@gmail.com', role: 'writer' }]);
+    expect(p.remove.map((x) => x.email).sort()).toEqual(['cu@gmail.com', 'nghi@gmail.com']);
   });
 });
