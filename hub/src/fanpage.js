@@ -95,7 +95,7 @@ function pFanpageLich(m,chs){
 }
 function fpLichBind(m,rows,all){
   const d=D();
-  m.querySelectorAll("[data-bvk]").forEach(b=>b.onclick=()=>{BV.k=b.dataset.bvk;BV.chon=true;renderMain()});
+  m.querySelectorAll("[data-bvk]").forEach(b=>b.onclick=()=>{BV.k=b.dataset.bvk;renderMain()});
   m.querySelectorAll("[data-fptu]").forEach(b=>b.onclick=()=>{FP.tuyen=FP.tuyen===b.dataset.fptu?"":b.dataset.fptu;renderMain()});
   m.querySelectorAll("[data-fpf]").forEach(s=>s.onchange=()=>{FP[s.dataset.fpf]=s.value;renderMain()});
   m.querySelectorAll("[data-fpo]").forEach(b=>b.onclick=()=>{const id=b.dataset.fpo;FP_OPEN.has(id)?FP_OPEN.delete(id):FP_OPEN.add(id);bvRe()});

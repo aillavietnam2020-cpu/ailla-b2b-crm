@@ -237,13 +237,13 @@ function bvAutoTrim(){
 }
 /* số trên tab kênh: đã duyệt / kế hoạch tháng của kênh (kế hoạch = mục tiêu tổng tháng chị đặt; = 0 thì chỉ hiện số đã duyệt) */
 function bvTabN(d,k){const kp=k===WP_K?(d.fpPlan||[]).reduce((a,x)=>a+(+x.sl||0),0):kn(d,k).T,dn=d.cards.filter(x=>x.kenh===k&&["dang","xong"].includes(x.step)).length;return kp?dn+"/"+kp:String(dn)}
-function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc&&chOf(BV.kTruoc).needId?BV.kTruoc:"";BV.fbTam=false}if(!BV.chon&&BV.k&&!chOf(BV.k).needId)BV.k=""; /* Fanpage chỉ mở khi người dùng tự bấm trong lần mở trang này (không theo kênh nhớ từ lần trước) */
+function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
   const d=D(),lead=xvGive(),give=true,team=xvTeam(),td=d.settings.today,chs=CHANNELS.filter(ch=>ptPairs().some(x=>x.kenh===ch.k||d.cards.some(c=>c.kenh===ch.k)));
   if(!BV.k||!chs.some(c=>c.k===BV.k))BV.k=(chs[0]||{}).k||"";
   if(!lead)BV.ng=ME.id;
   if(bvAutoTrim()){renderMain();return}
   if(bvAutoSync(chs)){renderMain();return}
-  if(!chOf(BV.k).needId){pFanpageLich(m,chs);return}
+  /* Fanpage cũng chia việc bằng bảng như các kênh TikTok (chị Hoa 02/11); lịch đăng bài nằm ở trang Lịch đăng Fanpage */
   const ch=chOf(BV.k),prs=ptPairs().filter(x=>x.kenh===BV.k&&knShown(d,x)),all=d.cards.filter(c=>c.kenh===BV.k),rows=bvRows(d),miss=bvMissing(d,BV.k);
   const kpiT=sum(prs,x=>+x.sl||0),rowsPlan=sum(prs,x=>sum(BV_RT,t2=>bvPlanN(d,x.sku,BV.k,t2))),tonP=sum(prs,x=>bvPlanN(d,x.sku,BV.k,"ton")),nbP=sum(prs,x=>bvPlanN(d,x.sku,BV.k,"nhanban")),thieu=sum(prs,x=>sum(BV_RT.concat(["ton"]),t2=>Math.max(0,bvPlanN(d,x.sku,BV.k,t2)-all.filter(c=>c.sku===x.sku&&mixOf(c)===t2).length))),made=all.filter(c=>BV_RT.includes(mixOf(c))||mixOf(c)==="ton").length;
   const kpi=cs=>({tao:cs.length,duyet:cs.filter(c=>["dang","xong"].includes(c.step)).length,dang:cs.filter(c=>c.step==="xong").length});
@@ -272,7 +272,7 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc&&chOf(BV.kTruoc).needId?BV.kT
   </tbody></table></div>${rows.length>400?`<p class="hint pad">Chỉ hiện 400 dòng đầu, lọc theo sản phẩm hoặc dạng để xem tiếp.</p>`:""}</section>
   `;
   const oo=m.querySelector("[data-bvonly]");if(oo)oo.onclick=()=>{BV.only=new Set();renderMain()};
-  m.querySelectorAll("[data-bvk]").forEach(b=>b.onclick=()=>{BV.k=b.dataset.bvk;BV.chon=true;BV.sel=new Set();BV.sku=BV.t=BV.w=BV.st=BV.ng="";renderMain()});
+  m.querySelectorAll("[data-bvk]").forEach(b=>b.onclick=()=>{BV.k=b.dataset.bvk;BV.sel=new Set();BV.sku=BV.t=BV.w=BV.st=BV.ng="";renderMain()});
   m.querySelectorAll("[data-bvf]").forEach(s=>s.onchange=()=>{BV[s.dataset.bvf]=s.value;BV.sel=new Set();renderMain()});
   const bvCount=()=>{const n=rows.filter(c=>BV.sel.has(c.id)).length,h=m.querySelector(".bvbar .hint");if(h)h.textContent=tong+" dòng"+(n?" · "+n+" đã tích":"");const a=m.querySelector("[data-bvall]");if(a)a.checked=tong>0&&n===tong};
   m.querySelectorAll("[data-bvs]").forEach(i=>i.onchange=()=>{const tr=i.closest("tr");if(i.checked){BV.sel.add(i.dataset.bvs);tr.classList.add("sel")}else{BV.sel.delete(i.dataset.bvs);tr.classList.remove("sel")}bvCount()});
@@ -310,7 +310,7 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc&&chOf(BV.kTruoc).needId?BV.kT
 }
 PAGES.bang_video=pBangVideo;
 /* chuyển sang bảng video đã lọc sẵn theo sản phẩm và dạng */
-function bvGo(kenh,sku,t){BV.only=new Set();BV.k=kenh;BV.chon=true;BV.sku=sku||"";BV.t=t||"";BV.w=BV.st=BV.ng="";BV.sel=new Set();MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="pc";render();scrollTo(0,0)}
+function bvGo(kenh,sku,t){BV.only=new Set();BV.k=kenh;BV.sku=sku||"";BV.t=t||"";BV.w=BV.st=BV.ng="";BV.sel=new Set();MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="pc";render();scrollTo(0,0)}
 
 /* gửi duyệt video phải có caption (cmt cần trả lời tùy loại video, lead không duyệt thì bấm Cần sửa) */
 const _ckCap=checkMove;
