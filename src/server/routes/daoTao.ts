@@ -116,6 +116,25 @@ daoTaoRoutes.post('/drive/xem', async (c) => {
   return ok(c, await loadDrive(c.env, id));
 });
 
+/** Người soạn dán link một file trên Drive (PDF, bảng tính, trình chiếu, thư mục…): web thử đọc tên file; không đọc được vẫn nhận link. */
+daoTaoRoutes.post('/drive/ten', async (c) => {
+  const { v } = await ctx(c.env.DB, c.get('auth'));
+  if (!isEditor(v)) throw forbidden('Chỉ người soạn tài liệu dùng được');
+  const link = String(((await c.req.json().catch(() => ({}))) as { link?: unknown }).link ?? '').trim();
+  if (!/^https:\/\/\S+$/.test(link) || link.length > 500) throw badRequest('BAD_LINK', 'Dán link bắt đầu bằng https://');
+  const id = /google\.com/.test(link) ? driveIdFrom(link) : null;
+  const key = saKey(c.env.GDRIVE_SA_JSON);
+  let name = /google\.com/.test(link) ? 'File trên Google Drive' : link.replace(/^https:\/\//, '').slice(0, 80);
+  let mime = /\/folders\//.test(link) ? 'application/vnd.google-apps.folder' : '';
+  if (id && key) {
+    try {
+      const f = await fileInfo(key, id);
+      if (f) { name = f.name; mime = f.mimeType; }
+    } catch { /* không đọc được tên thì giữ tên mặc định */ }
+  }
+  return ok(c, { url: link, name: name.slice(0, 200), mime });
+});
+
 /** Ai đang xem + quyền của họ, danh sách phòng ban (để trang biết hiện mục nào). */
 daoTaoRoutes.get('/me', async (c) => {
   const auth = c.get('auth');
@@ -171,7 +190,11 @@ const docSchema = z.object({
   /** Link / mã file Google Docs: có thì nội dung lấy từ Drive (bỏ qua body gửi lên). '' = soạn trên web. */
   drive: z.string().trim().max(400).default(''),
   /** Tệp đính kèm đã tải lên qua POST /file. */
-  files: z.array(z.object({ id: z.string().uuid(), name: z.string().max(200), size: z.number().int().min(0), mime: z.string().max(120) })).max(20).default([]),
+  files: z.array(z.union([
+    z.object({ id: z.string().uuid(), name: z.string().max(200), size: z.number().int().min(0), mime: z.string().max(120) }),
+    /** Link file trên Google Drive (hoặc trang web khác): chỉ lưu đường dẫn, mở bằng quyền Drive của người đọc. */
+    z.object({ url: z.string().url().max(500).refine((u) => u.startsWith('https://'), 'Link phải bắt đầu bằng https://'), name: z.string().trim().min(1).max(200), mime: z.string().max(120).default('') }),
+  ])).max(20).default([]),
 });
 
 function parseDoc(body: unknown) {
@@ -186,8 +209,8 @@ function parseDoc(body: unknown) {
 }
 
 /** Gắn tệp vừa tải lên vào tài liệu (tệp đã thuộc tài liệu khác thì không chuyển). */
-const linkFiles = (db: D1Database, docId: string, files: { id: string }[]) =>
-  files.map((f) => db.prepare('UPDATE dt_file SET doc_id = ? WHERE id = ? AND (doc_id IS NULL OR doc_id = ?)').bind(docId, f.id, docId));
+const linkFiles = (db: D1Database, docId: string, files: ({ id: string } | { url: string })[]) =>
+  files.filter((f): f is { id: string } => 'id' in f).map((f) => db.prepare('UPDATE dt_file SET doc_id = ? WHERE id = ? AND (doc_id IS NULL OR doc_id = ?)').bind(docId, f.id, docId));
 
 /** Tài liệu nguồn Drive: lấy nội dung mới nhất ngay lúc lưu. */
 async function withDrive(env: AppEnv['Bindings'], d: ReturnType<typeof parseDoc>) {
