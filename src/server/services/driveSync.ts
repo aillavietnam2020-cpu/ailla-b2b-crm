@@ -47,6 +47,12 @@ export async function loadStaff(db: D1Database): Promise<{ staff: StaffRow[]; na
   return { staff, names };
 }
 
+/** Tự đồng bộ mỗi giờ chỉ bật sau khi CEO đã xem trước và bấm "Áp dụng" ít nhất một lần (tránh cấp nhầm khi hồ sơ chưa cập nhật). */
+export async function autoSyncEnabled(db: D1Database): Promise<boolean> {
+  const row = await db.prepare('SELECT 1 AS x FROM hub_blobs WHERE key = ?').bind(GRANTS_KEY).first<{ x: number }>();
+  return !!row;
+}
+
 export async function syncDrivePermissions(db: D1Database, saJson: string | undefined, actorId: string | null, dry = false): Promise<SyncResult> {
   const key = saKey(saJson);
   if (!key) return { ok: false, message: 'Web chưa nối Google Drive.', folders: [], no_email: [] };

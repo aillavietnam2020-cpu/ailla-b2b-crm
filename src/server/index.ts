@@ -12,7 +12,7 @@ import { syncAllChannels } from './services/poscake';
 import { syncComboTasks } from './routes/sanpham';
 import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
-import { syncDrivePermissions } from './services/driveSync';
+import { autoSyncEnabled, syncDrivePermissions } from './services/driveSync';
 import { isAdminHost } from './lib/host';
 import { readSessionCookie, resolveSession } from './lib/session';
 
@@ -86,7 +86,7 @@ export default {
         }
         // Thư mục làm việc: cấp / gỡ quyền Drive theo danh sách nhân viên ở trang quản trị (mỗi giờ).
         try {
-          if (env.GDRIVE_SA_JSON) {
+          if (env.GDRIVE_SA_JSON && (await autoSyncEnabled(env.DB))) {
             const r = await syncDrivePermissions(env.DB, env.GDRIVE_SA_JSON, null);
             console.info('[cron] quyen drive', JSON.stringify(r.folders.map((f) => [f.pb, f.added.length, f.changed.length, f.removed.length, f.error ?? ''])));
           }
