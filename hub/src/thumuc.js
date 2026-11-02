@@ -110,10 +110,15 @@ function pThuMuc(m){
   const head=H("Thư mục làm việc","File làm hằng ngày của các phòng, lấy thẳng từ Google Drive · bấm vào file để mở trên Drive");
   if(!TM.teams){m.innerHTML=head+(TM.err?`<div class="note red">${esc(TM.err)}</div>`:`<p class="hint">Đang tải…</p>`);if(!TM.busy)tmTeams();return}
   if(PAGE==="thumuc_gan"||TM.view==="gan"){m.innerHTML=css+head+tabs+tmCfgHtml();tmCfgBind(m);tmBindTabs(m);return}
-  const T=TM.teams.teams;
+  const T0=TM.teams.teams,T=TM.scope?T0.filter(t=>t.pb===TM.scope||/^chung/.test(t.pb)):T0;
+  if(TM.scope&&T.length&&!T.some(t=>t.pb===TM.pb)){TM.pb=T[0].pb;TM.folder="";TM.list=null;TM.listKey=""}
   if(!TM.teams.connected){m.innerHTML=css+head+tabs+`<div class="note amb">Web chưa được nối với Google Drive.${ceo?" Chạy file NOI-GOOGLE-DRIVE.bat một lần (hướng dẫn ở tab Gán thư mục).":" Cần CEO nối Drive trước."}</div>`;tmBindTabs(m);return}
   if(!T.length){m.innerHTML=css+head+tabs+`<div class="card pad"><p>Phòng của bạn chưa được gán thư mục Drive.</p><p class="hint">${ceo?"Gán thư mục cho từng phòng ở tab Gán thư mục.":"Nhờ CEO gán thư mục Drive cho phòng mình."}</p></div>`;tmBindTabs(m);return}
-  const side=`<nav class="gd-side" aria-label="Thư mục"><div class="gd-sh">Thư mục của bạn</div>${T.map(t=>`<button class="${t.pb===TM.pb&&!TM.q?"on":""}" data-tmpb="${esc(t.pb)}" title="${esc(t.name)}">${tmFolderSvg}<span>${esc(t.name)}</span></button>`).join("")}</nav>`;
+  const sb=t=>`<button class="${t.pb===TM.pb&&!TM.q?"on":""}" data-tmpb="${esc(t.pb)}" title="${esc(t.name)}">${tmFolderSvg}<span>${esc(t.name)}</span></button>`;
+  /* mở từ Công việc › Phòng ban (chị Hoa 02/11): thư mục phòng · tư liệu chung · thư mục dự án phòng tham gia */
+  const PJ=TM.scope&&typeof kpbPrj==="function"?kpbPrj(kpbTeam(TM.scope)).filter(p=>p.drive):[];
+  const side=TM.scope?`<nav class="gd-side" aria-label="Thư mục"><button class="gd-back" id="tm-back">‹ Về ${esc(typeof kpbName==="function"?kpbName(TM.scope):TM.scope)}</button><div class="gd-sh">Thư mục phòng</div>${T.filter(t=>t.pb===TM.scope).map(sb).join("")||`<small class="hint">Phòng chưa được gán thư mục</small>`}<div class="gd-sh">Tư liệu chung</div>${T.filter(t=>/^chung/.test(t.pb)).map(sb).join("")}<div class="gd-sh">Thư mục dự án</div>${PJ.map(p=>`<a class="gd-pj" href="${esc(p.drive)}" target="_blank" rel="noopener" title="Mở trên Google Drive">${tmFolderSvg}<span>${esc(p.ten)}</span></a>`).join("")||`<small class="hint">Chưa có dự án nào gắn thư mục</small>`}</nav>`
+    :`<nav class="gd-side" aria-label="Thư mục"><div class="gd-sh">Thư mục của bạn</div>${T.map(sb).join("")}</nav>`;
   const kinds=`<select id="tm-kind" aria-label="Loại file"><option value="">Loại: tất cả</option>${Object.entries(TM_KIND).filter(([k])=>k!=="link"&&k!=="other").map(([k,x])=>`<option value="${k}"${TM.kind===k?" selected":""}>${x[0]}</option>`).join("")}</select>`;
   const top=`<div class="gd-top"><label class="gd-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICONS.search}</svg><input type="search" id="tm-q" placeholder="Tìm trong các thư mục bạn được xem" value="${esc(TM.q)}" aria-label="Tìm file"></label>${kinds}
     <span class="gd-vt" role="group" aria-label="Kiểu xem"><button data-tmmode="grid" class="${TM.mode==="grid"?"on":""}">▦ Lưới</button><button data-tmmode="list" class="${TM.mode==="list"?"on":""}">☰ Danh sách</button></span><button class="btn sm" id="tm-re">Tải lại</button></div>`;
@@ -137,7 +142,7 @@ function pThuMuc(m){
     }
   }
   m.innerHTML=css+head+tabs+`<div class="gd">${side}<div style="min-width:0">${top}${body}</div></div>`+`<p class="hint" style="margin-top:16px">Bấm vào file để mở trên Google Drive. Chưa mở được thì nhờ trưởng phòng kiểm tra email của bạn trong hồ sơ nhân viên. Tài liệu chuẩn (quy trình, biểu mẫu, hướng dẫn) xem ở Thư viện tài liệu trong khu Đào tạo.</p>`;
-  tmBindTabs(m);
+  tmBindTabs(m);{const bk=m.querySelector("#tm-back");if(bk)bk.onclick=()=>{TM.scope="";MOD="cv";PAGE="cv_pb";render()}}
   m.querySelectorAll("[data-tmpb]").forEach(b=>b.onclick=()=>{TM.pb=b.dataset.tmpb;TM.folder="";TM.q="";renderMain()});
   m.querySelectorAll("[data-tmf]").forEach(b=>b.onclick=()=>{TM.folder=b.dataset.tmf;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-tmmode]").forEach(b=>b.onclick=()=>{TM.mode=b.dataset.tmmode;try{localStorage.setItem("ailla_tm_mode",TM.mode)}catch(e){}renderMain()});
@@ -201,6 +206,6 @@ PAGES.thumuc_gan=pThuMuc;
 /* Menu (chạy sau menubang.js): bên vận hành một mục riêng ngay dưới "Công việc"; bên quản trị thêm vào Cấu hình › Tài khoản. */
 {
   const ADMH=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
-  if(ADMH){const c=MODULES.find(x=>x.k==="q_cfg");if(c){const g0=c.groups;c.groups=()=>{const G=g0();const tk=G.find(g=>g[0]==="Tài khoản");const it=MI("thumuc_gan","Thư mục Drive các phòng",u=>u.role==="admin");if(tk)tk[1].push(it);else G.push(["Tài khoản",[it]]);return G}}}
-  else{const i=MODULES.findIndex(x=>x.k==="cv");MODULES.splice(i>=0?i+1:0,0,{k:"tm",zone:"",ic:"folder",n:"Thư mục làm việc",sub:"",groups:()=>[["",[MI("thumuc","Thư mục làm việc")]]]})}
+  if(ADMH){const c=MODULES.find(x=>x.k==="q_cfg");if(c){const g0=c.groups;c.groups=()=>{const G=g0();const tk=G.find(g=>g[0]==="Tài khoản");const it=MI("thumuc_gan","Thư mục Drive các phòng",u=>u.role==="admin"),iv=MI("thumuc","Thư mục làm việc");if(tk)tk[1].push(iv,it);else G.push(["Tài khoản",[iv,it]]);return G}}}
+  else{const i=MODULES.findIndex(x=>x.k==="cv");MODULES.splice(i>=0?i+1:0,0,{k:"tm",zone:"",ic:"folder",n:"Thư mục làm việc",sub:"",hide:true,groups:()=>[["",[MI("thumuc","Thư mục làm việc")]]]})}
 }

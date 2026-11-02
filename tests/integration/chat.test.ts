@@ -38,6 +38,12 @@ describe('Tin nhắn (/api/hub/chat)', () => {
     expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:Bad Room', body: 'x' } })).status).toBe(400);
   });
 
+  it('nhóm dự án liên phòng: người các phòng cùng đọc, viết', async () => {
+    expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'p:DA-07', body: 'Hook xong rồi' } })).status).toBe(200);
+    const sum = await ctx.request('/api/hub/chat/summary', { as: USERS.huyen });
+    expect(sum.body.data.rooms.find((x: { room: string }) => x.room === 'p:DA-07').unread).toBe(1);
+  });
+
   it('thẻ giao việc: lưu loại tin và mã việc', async () => {
     const s = await ctx.request('/api/hub/chat/msgs', { as: USERS.ceo, body: { room: 'g:content', body: 'Làm 30 hook tinh dầu', kind: 'task', ref: 'task:cv_1' } });
     expect(s.body.data.kind).toBe('task');

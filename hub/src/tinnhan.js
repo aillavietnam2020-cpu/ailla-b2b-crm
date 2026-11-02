@@ -16,7 +16,10 @@ const tnGroups=()=>[["chung","Chung toàn công ty"]].concat(Object.entries(TEAM
 const tnMyTeam=()=>{const t=ME.phongBan&&typeof KPB_TEAM!=="undefined"&&KPB_TEAM[ME.phongBan]?KPB_TEAM[ME.phongBan]:String(teamOf(ME)||"").toLowerCase();return TEAMS[t]&&t!=="chung"?t:""};
 const tnDm=id=>"dm:"+[tnMe(),id].sort().join("~");
 const tnOther=r=>r.startsWith("dm:")?r.slice(3).split("~").find(x=>x!==tnMe())||tnMe():"";
-const tnName=r=>r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";
+const tnPrj=r=>(D().projects||[]).find(p=>"p:"+p.id===r);
+/* dự án tôi tham gia: phụ trách, thành viên, có việc trong dự án, hoặc phòng tôi tham gia dự án */
+const tnMyPrj=()=>(D().projects||[]).filter(p=>p.owner===ME.id||(p.tv||[]).includes(ME.id)||(D().tasks||[]).some(t=>t.da===p.id&&(t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)))||[p.team].concat(p.teams||[]).includes(tnMyTeam()));
+const tnName=r=>r.startsWith("p:")?((tnPrj(r)||{}).ten||"Dự án "+r.slice(2)):r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";
 const tnTime=t=>{const d=new Date(t),n=new Date();return d.toDateString()===n.toDateString()?d.toTimeString().slice(0,5):d.toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit"})};
 const tnDay=t=>{const d=new Date(t),n=new Date(),y=new Date(n-864e5);return d.toDateString()===n.toDateString()?"Hôm nay":d.toDateString()===y.toDateString()?"Hôm qua":d.toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit"})};
 const tnInit=n=>{const w=String(n||"?").trim().split(/\s+/);return (w.length>1?w[w.length-2][0]+w[w.length-1][0]:w[0].slice(0,2)).toUpperCase()};
@@ -52,11 +55,11 @@ async function tnSend(room,body,kind,ref){
 
 /* ---------- vẽ ---------- */
 function tnListRows(){const q=TN.q.trim().toLowerCase(),by=new Map(TN.rooms.map(r=>[r.room,r]));
-  if(q){const G=tnGroups().filter(([k,n])=>n.toLowerCase().includes(q)).map(([k])=>"g:"+k),P=tnPeople().filter(u=>u.name.toLowerCase().includes(q)).map(u=>tnDm(u.crm));return G.concat(P).map(r=>by.get(r)||{room:r,last:null,unread:0})}
-  const base=["g:chung"].concat(tnMyTeam()?["g:"+tnMyTeam()]:[]),R=TN.rooms.slice();base.forEach(r=>{if(!by.has(r))R.push({room:r,last:null,unread:0})});
-  return R.filter(r=>r.room.startsWith("dm:")||TEAMS[r.room.slice(2)]).sort((a,b)=>(b.last?b.last.id:0)-(a.last?a.last.id:0))}
-function tnRowHtml(r){const g=r.room.startsWith("g:"),n=tnName(r.room),l=r.last,un=r.room===TN.room?0:r.unread;
-  const pv=l?(l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
+  if(q){const G=tnGroups().filter(([k,n])=>n.toLowerCase().includes(q)).map(([k])=>"g:"+k),P=tnPeople().filter(u=>u.name.toLowerCase().includes(q)).map(u=>tnDm(u.crm));const J=(D().projects||[]).filter(p=>p.ten.toLowerCase().includes(q)).map(p=>"p:"+p.id);return G.concat(J,P).map(r=>by.get(r)||{room:r,last:null,unread:0})}
+  const base=["g:chung"].concat(tnMyTeam()?["g:"+tnMyTeam()]:[],tnMyPrj().map(p=>"p:"+p.id)),R=TN.rooms.slice();base.forEach(r=>{if(!by.has(r))R.push({room:r,last:null,unread:0})});
+  return R.filter(r=>r.room.startsWith("dm:")||(r.room.startsWith("p:")?!!tnPrj(r.room):TEAMS[r.room.slice(2)])).sort((a,b)=>(b.last?b.last.id:0)-(a.last?a.last.id:0))}
+function tnRowHtml(r){const g=r.room.startsWith("g:")||r.room.startsWith("p:"),n=tnName(r.room),l=r.last,un=r.room===TN.room?0:r.unread;
+  const pv=l?(l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
   return `<button class="tnrow${r.room===TN.room?" on":""}${un?" un":""}" data-tnr="${esc(r.room)}">${tnAv(g?r.room:tnOther(r.room),n,g)}<span class="tnrb"><span class="tnr1"><b>${esc(n)}</b>${l?`<small>${tnTime(l.created_at)}</small>`:""}</span><span class="tnr2"><span>${esc(String(pv).replace(/\s+/g," ").slice(0,70))}</span>${un?`<em>${un>99?"99+":un}</em>`:""}</span></span></button>`}
 function tnDrawList(){const el=$("#tnlist");if(!el)return;const R=tnListRows();
   el.innerHTML=R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`;
@@ -90,11 +93,11 @@ async function tnOpen(room){TN.room=room;TN.mob=true;try{localStorage.setItem("t
 /* ---------- trang ---------- */
 PAGES.tinnhan=m=>{
   if(!TN.room){let r="";try{r=localStorage.getItem("tn_room_"+tnMe())||""}catch(e){}TN.room=r&&(r.startsWith("g:")||r.includes(tnMe()))?r:"g:chung"}
-  const room=TN.room,g=room.startsWith("g:"),n=tnName(room),dm=!g&&tnOther(room);
+  const room=TN.room,pj=room.startsWith("p:"),g=room.startsWith("g:")||pj,n=tnName(room),dm=!g&&tnOther(room);
   m.innerHTML=`<div class="tn${TN.mob?" open":""}">
    <aside class="tnside"><div class="tnsh"><b>Tin nhắn</b><button class="btn sm" id="tnrem" title="Nhắc việc sắp tới">⏰ Nhắc việc</button></div>
     <input class="tnq" id="tnq" placeholder="Tìm nhóm phòng hoặc người để nhắn…" value="${esc(TN.q)}"><div class="tnlist" id="tnlist"></div></aside>
-   <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${g?(room==="g:chung"?"Mọi người trong công ty":"Nhóm phòng · ai trong công ty cũng xem được"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
+   <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${pj?"Nhóm dự án · mọi phòng tham gia cùng xem":g?(room==="g:chung"?"Mọi người trong công ty":"Nhóm phòng · ai trong công ty cũng xem được"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
      <span class="tnhb"><button class="btn sm" id="tngiao">📋 Giao việc</button><button class="btn sm" id="tnnhac">⏰ Nhắc</button></span></header>
     <div class="tnmsgs" id="tnmsgs"></div>
     <form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section></div>`;
@@ -122,7 +125,7 @@ PAGES.tinnhan=m=>{
 function tnGiao(text){const room=TN.room;openTask(null);
   const t=String(text||"").trim(),f=(s,v)=>{const e=$(s);if(e&&v&&!e.disabled&&[...(e.options||[{value:v}])].some(o=>o.value===v))e.value=v};
   if(t&&$("#t-ten")){$("#t-ten").value=t.split("\n")[0].slice(0,120);if($("#t-mo")&&(t.length>120||t.includes("\n")))$("#t-mo").value=t}
-  if(room.startsWith("dm:"))f("#t-ng",(tnU(tnOther(room))||{}).id);else f("#t-team",room.slice(2));
+  if(room.startsWith("dm:"))f("#t-ng",(tnU(tnOther(room))||{}).id);else if(room.startsWith("p:")){const p=tnPrj(room);if(p){f("#t-da",p.id);f("#t-team",p.team)}}else f("#t-team",room.slice(2));
   TK_AFTER_NEW=id=>{const x=(D().tasks||[]).find(y=>y.id===id);if(!x)return;tnSend(room,x.ten,"task","task:"+id).then(()=>{if(PAGE==="tinnhan"&&TN.room===room){tnDrawMsgs();tnDrawList()}}).catch(e=>toast(e.message||"Chưa gửi được thẻ việc vào tin nhắn"))}}
 
 /* ---------- nhắc việc ---------- */
@@ -149,7 +152,7 @@ async function tnDue(){if(!ME||typeof svApi!=="function")return;try{const L=awai
 
 /* ---------- nút 💬, số chưa đọc, hỏi tin mới ---------- */
 NAV_AN_MO.add("tinnhan");
-openChat=function(room){if(room){room=room.startsWith("dm:")||room.startsWith("g:")?room:"g:"+room;if(room.startsWith("dm:")&&!room.includes(tnMe())){const o=room.slice(3).split("~").map(tnU).find(u=>u&&u.id!==ME.id);room=o&&o.crm?tnDm(o.crm):""}}
+openChat=function(room){if(room){room=/^(dm|g|p):/.test(room)?room:"g:"+room;if(room.startsWith("dm:")&&!room.includes(tnMe())){const o=room.slice(3).split("~").map(tnU).find(u=>u&&u.id!==ME.id);room=o&&o.crm?tnDm(o.crm):""}}
   if(room)TN.room=room;TN.mob=!!room;if(PAGE==="tinnhan"&&room)tnOpen(room);else ntPage("tinnhan")};
 const _bbTn=bellBadge;
 bellBadge=function(){_bbTn();const c=$("#chatbtn");if(!c)return;c.title="Tin nhắn";const u=tnTotal();let t=c.querySelector("b");if(u){if(!t){t=document.createElement("b");c.appendChild(t)}t.textContent=u>99?"99+":u}else if(t)t.remove()};
