@@ -117,7 +117,8 @@ const tkMgrIds=t=>{const ids=new Set();if(t.tao&&t.tao!==t.nguoi)ids.add(t.tao);
 const tkLeadOf=t=>{const U=D().users,doer=U.find(u=>u.id===t.nguoi);if(!doer)return null;const tao=U.find(u=>u.id===t.tao);if(tao&&tkLead(tao)&&tao.id!==doer.id)return tao;return U.find(u=>u.active&&u.id!==doer.id&&tkLead(u)&&tkSameTeam(u,doer))||null};
 const tkV2=t=>t.v2!==false&&!!tkLeadOf(t);
 const tkAdmins=()=>D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id);
-const tkAppr=t=>{if(t.st==="review"&&t.vong===2)return tkAdmins();const L=tkLeadOf(t);return L?[L.id]:tkMgrIds(t)};
+/* việc order hỗ trợ (orderlen.js): người order xác nhận kết quả */
+const tkAppr=t=>{if(t.order&&t.tao)return [t.tao];if(t.st==="review"&&t.vong===2)return tkAdmins();const L=tkLeadOf(t);return L?[L.id]:tkMgrIds(t)};
 const tkMgr=t=>!!ME&&ME.id!==t.nguoi&&(ME.role==="admin"||(t.st==="review"&&t.vong===2?false:(t.tao===ME.id||tkMgrIds(t).includes(ME.id)||tkAppr(t).includes(ME.id))));
 /* Quy tắc đóng việc: việc do người khác giao thì người làm chỉ bấm "Chờ duyệt", người giao (hoặc quản lý) duyệt mới Hoàn thành. Việc tự tạo cho mình thì tự đóng. */
 /* CEO (và ai có quyền "viec.giao") giao cho mọi người; trưởng phòng / lead giao cho người trong team mình (chị Hoa chốt 02/11) */
