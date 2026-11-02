@@ -322,12 +322,12 @@ function pNhanSuSV(m){
     if(!confirm("Xóa hẳn "+u.name+" khỏi danh sách? Không hoàn tác được."))return;
     DB.mutate(ME.name,"xóa nhân sự đã nghỉ "+u.name,d=>{d.users=d.users.filter(x=>x.id!==id)});toast("Đã xóa "+u.name);renderMain()});
   m.querySelectorAll("[data-ucv]").forEach(s=>s.onchange=()=>{const cv=SV_CV.find(x=>x[0]===s.value);if(!cv)return;const id=s.dataset.ucv,u=userBy(id),roleDoi=u.role!==cv[1];
-    DB.mutate(ME.name,`đổi chức vụ ${esc(u.name)} → ${cv[0]}`,d=>{const x=d.users.find(y=>y.id===id);x.title=cv[0];if(roleDoi){x.role=cv[1];x.perms=ROLE_PRESET[cv[1]].slice()}});
+    DB.mutate(ME.name,`đổi chức vụ ${esc(u.name)} → ${cv[0]}`,d=>{const x=d.users.find(y=>y.id===id);x.title=cv[0];if(roleDoi){x.role=cv[1];x.perms=ROLE_PRESET[cv[1]].slice()}nsdbFromUser(d,id,["title"],hrNow().iso)});
     toast(roleDoi?"Đã đổi chức vụ, quyền áp theo "+ROLES[cv[1]]:"Đã đổi chức vụ");renderMain()});
   m.querySelectorAll("[data-ur]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,`đổi vai trò ${esc(userName(s.dataset.ur))} → ${ROLES[s.value]}`,d=>{const u=d.users.find(x=>x.id===s.dataset.ur);u.role=s.value;u.perms=ROLE_PRESET[s.value].slice()});toast("Đã đổi vai trò và áp quyền mặc định");renderMain()});
   m.querySelectorAll("[data-utm]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,`đổi team Marketing ${esc(userName(s.dataset.utm))}`,d=>{d.users.find(x=>x.id===s.dataset.utm).team=s.value});toast("Đã đổi team, người đó tải lại trang là thấy khu mới");renderMain()});
-  m.querySelectorAll("[data-utl]").forEach(i=>i.onchange=()=>{DB.mutate(ME.name,`đổi chức vụ ${esc(userName(i.dataset.utl))}`,d=>{d.users.find(x=>x.id===i.dataset.utl).title=i.value.trim()});toast("Đã lưu chức vụ")});
-  m.querySelectorAll("[data-upb]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,`đổi phòng ban ${esc(userName(s.dataset.upb))}`,d=>{d.users.find(x=>x.id===s.dataset.upb).phongBan=s.value});toast("Đã đổi phòng ban");renderMain()});
+  m.querySelectorAll("[data-utl]").forEach(i=>i.onchange=()=>{DB.mutate(ME.name,`đổi chức vụ ${esc(userName(i.dataset.utl))}`,d=>{d.users.find(x=>x.id===i.dataset.utl).title=i.value.trim();nsdbFromUser(d,i.dataset.utl,["title"],hrNow().iso)});toast("Đã lưu chức vụ")});
+  m.querySelectorAll("[data-upb]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,`đổi phòng ban ${esc(userName(s.dataset.upb))}`,d=>{d.users.find(x=>x.id===s.dataset.upb).phongBan=s.value;nsdbFromUser(d,s.dataset.upb,["pb"],hrNow().iso)});toast("Đã đổi phòng ban");renderMain()});
   m.querySelectorAll("[data-mkacc]").forEach(b=>b.onclick=()=>{const u=userBy(b.dataset.mkacc);if(!u)return;
     const free=A.filter(a=>!used(a.id));
     openDrawerHTML(`<h2>Email đăng nhập cho ${esc(u.name)}</h2><p class="hint">Web tạo tài khoản đăng nhập bằng email và mật khẩu này${gate?", mở luôn cửa vào vanhanh.ailla.vn":""}. Lần đầu đăng nhập họ phải đổi sang mật khẩu riêng. Chị gửi email + mật khẩu ban đầu cho họ.</p>
@@ -353,7 +353,7 @@ function pNhanSuSV(m){
   /* Trạng thái: "Đã nghỉ việc" = khoá tài khoản đăng nhập (như bỏ tick Đang làm trước đây); nghỉ phép / thai sản vẫn giữ tài khoản. */
   m.querySelectorAll("[data-utt]").forEach(s=>s.onchange=()=>busy(s,async()=>{const u=userBy(s.dataset.utt),a=acc(u.crm),on=s.value!=="nghi";let note="";
     if(on!==!!u.active&&a&&crm&&a.role!=="CEO"){const r=await svApi(`/api/admin/users/${a.id}`,{method:"PATCH",body:JSON.stringify({status:on?"ACTIVE":"DISABLED"})});note=svAccessMsg(r&&r.access)}
-    DB.mutate(ME.name,"đổi trạng thái "+u.name+" → "+(TT.find(x=>x[0]===s.value)||[0,""])[1],d=>{const x=d.users.find(x=>x.id===u.id);x.active=on;x.tt=on&&s.value!=="lam"?s.value:""});
+    DB.mutate(ME.name,"đổi trạng thái "+u.name+" → "+(TT.find(x=>x[0]===s.value)||[0,""])[1],d=>{const x=d.users.find(x=>x.id===u.id);x.active=on;x.tt=on&&s.value!=="lam"?s.value:"";nsdbFromUser(d,u.id,["tt"],hrNow().iso)});
     toast(s.value==="nghi"?"Đã chuyển "+u.name+" sang Đã nghỉ việc, khoá tài khoản"+note:"Đã lưu trạng thái "+u.name+note);if(a)await svLoadUsers();renderMain()}));
   m.querySelectorAll("[data-pw]").forEach(b=>b.onclick=()=>{const a=acc(b.dataset.pw);const p=prompt(`Mật khẩu mới cho ${a.display_name} (ít nhất 8 ký tự, có chữ và số). Lần đăng nhập tới họ phải đổi lại.`);if(!p)return;busy(b,async()=>{await svApi(`/api/admin/users/${a.id}/set-password`,{method:"POST",body:JSON.stringify({password:p})});toast("Đã cấp lại mật khẩu cho "+a.display_name)})});
   m.querySelectorAll("[data-aem]").forEach(b=>b.onclick=()=>{const a=acc(b.dataset.aem);if(!a)return;
@@ -387,7 +387,7 @@ function pNhanSuSV(m){
       const res=await svApi("/api/admin/users",{method:"POST",body:JSON.stringify({email:em,display_name:n,role:"EMPLOYEE",password:pw})});c=res.id;note=svAccessMsg(res.access);}
       if(!ex)await svApi(`/api/admin/users/${c}/marketing`,{method:"POST",body:JSON.stringify({mode:"only"})})}
     const un=foldName(n).replace(/[^a-z0-9]+/g,".").replace(/^\.|\.$/g,"")||"nv";
-    DB.mutate(ME.name,"thêm nhân sự "+n,d=>d.users.push({id:uid("u_"),username:un,name:n,role:r,title:$("#u-t").value,phongBan:$("#u-pb").value,team:"",active:true,crm:c,perms:ROLE_PRESET[r].slice()}));
+    DB.mutate(ME.name,"thêm nhân sự "+n,d=>{const id=uid("u_");d.users.push({id,username:un,name:n,role:r,title:$("#u-t").value,phongBan:$("#u-pb").value,team:"",active:true,crm:c,perms:ROLE_PRESET[r].slice()});nsdbFromUser(d,id,null,hrNow().iso)});
     closeDrawer();toast("Đã thêm "+n+(em?". Gửi cho họ email + mật khẩu ban đầu để đăng nhập":"")+note);if(crm)await svLoadUsers();renderMain()})}}
 }
 PAGES.nhansu=pNhanSuSV;

@@ -1,6 +1,7 @@
 import type { AuthContext } from '../env';
 import { nowIso } from '@shared/datetime';
 import { unpack } from './pack';
+import { auditStatement } from './audit';
 
 /**
  * Ai được xem dữ liệu nhân sự (lương, CCCD, ngân hàng, hồ sơ, file đính kèm):
@@ -57,4 +58,48 @@ export async function canHr(db: D1Database, auth: AuthContext): Promise<boolean>
     await saveHrGrant(db, ids, auth.user.id);
   }
   return ids.includes(auth.user.id);
+}
+
+/** Người bị khóa (Đã nghỉ) thì rút khỏi danh sách được xem nhân sự ngay, không đợi CEO ghi lại. */
+export async function dropHrGrant(db: D1Database, crmIds: string[], userId: string): Promise<void> {
+  const ids = await loadHrGrant(db);
+  if (!ids) return;
+  const left = ids.filter((id) => !crmIds.includes(id));
+  if (left.length !== ids.length) await saveHrGrant(db, left, userId);
+}
+
+/**
+ * Khóa / mở lại tài khoản đăng nhập theo trạng thái nhân sự (hub.ts). Không đụng tài khoản CEO và chính người đang ghi.
+ * Trả về những tài khoản thực sự đổi.
+ */
+export async function setAccountStatus(
+  db: D1Database,
+  crmIds: string[],
+  status: 'ACTIVE' | 'DISABLED',
+  actorId: string,
+  requestId: string | null,
+): Promise<string[]> {
+  const done: string[] = [];
+  const now = nowIso();
+  for (const id of [...new Set(crmIds)]) {
+    if (id === actorId) continue;
+    const res = await db
+      .prepare(
+        `UPDATE users SET status = ?, updated_at = ? WHERE id = ? AND role <> 'CEO' AND status <> ? AND deleted_at IS NULL`,
+      )
+      .bind(status, now, id, status)
+      .run();
+    if (!res.meta.changes) continue;
+    done.push(id);
+    await auditStatement(db, {
+      actorId,
+      action: 'USER_UPDATED',
+      entityType: 'USER',
+      entityId: id,
+      after: { status, reason: status === 'DISABLED' ? 'Nhân sự: Đã nghỉ' : 'Nhân sự: quay lại làm' },
+      requestId,
+      ip: null,
+    }).run();
+  }
+  return done;
 }

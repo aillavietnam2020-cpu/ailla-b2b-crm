@@ -6,9 +6,11 @@ import { AppError, badRequest, conflict, forbidden, notFound, ok } from '../lib/
 import { auditStatement } from '../lib/audit';
 import type { AuthContext } from '../env';
 import { requirePermission } from '../middleware/rbac';
-import { canHr, hrGrantFromUsers, saveHrGrant } from '../lib/hrAccess';
+import { canHr, dropHrGrant, hrGrantFromUsers, saveHrGrant, setAccountStatus } from '../lib/hrAccess';
 import { membersFromHub, saveMembers } from '../services/daoTao';
-import { neutralizeTags, protectUsers, type GuardUser } from '../lib/stateGuard';
+import { accountChanges, neutralizeTags, protectStaff, protectUsers, type GuardUser } from '../lib/stateGuard';
+import { revokeAllSessions } from '../lib/session';
+import { syncAccessEmails } from '../lib/access-sync';
 
 /**
  * Khu Marketing & công việc (trang tĩnh /hub/).
@@ -156,12 +158,19 @@ hubRoutes.put('/state', async (c) => {
   }
   // Bản chung ai trong khu Marketing cũng ghi được: người không phải CEO không được đổi quyền / vai trò / tên,
   // không được thêm bớt tài khoản (người làm nhân sự đã được CEO duyệt thì sửa được trừ tài khoản quản trị).
-  if (!isCeo && Array.isArray(data.users)) {
+  // Hồ sơ Nhân sự (data.staff) cũng vậy: chỉ CEO / người làm nhân sự đổi được (trạng thái "Đã nghỉ" kéo theo khóa tài khoản).
+  let prevUsers: GuardUser[] = [];
+  if (Array.isArray(data.users) || 'staff' in data) {
     const cur = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(STATE_ID).first<{ data: string }>();
     if (cur) {
-      const existing = (JSON.parse(await unpack(cur.data)) as { users?: unknown }).users;
-      if (Array.isArray(existing)) {
-        data.users = protectUsers(data.users as GuardUser[], existing as GuardUser[], auth.user.id, await canHr(c.env.DB, auth));
+      const old = JSON.parse(await unpack(cur.data)) as { users?: unknown; staff?: unknown };
+      if (Array.isArray(old.users)) prevUsers = old.users as GuardUser[];
+      if (!isCeo) {
+        const hrOk = await canHr(c.env.DB, auth);
+        if (Array.isArray(data.users) && Array.isArray(old.users)) {
+          data.users = protectUsers(data.users as GuardUser[], old.users as GuardUser[], auth.user.id, hrOk);
+        }
+        if ('staff' in data) data.staff = protectStaff(data.staff, old.staff, hrOk);
       }
     }
   }
@@ -210,6 +219,18 @@ hubRoutes.put('/state', async (c) => {
       .run();
   };
 
+  // Tài khoản đăng nhập theo trạng thái: "Đã nghỉ" (bên Nhân sự hoặc Tài khoản & phân quyền) thì khóa tài khoản CRM, đá khỏi
+  // phiên, rút email khỏi cửa vào; CEO mở lại thì mở tài khoản. Người làm nhân sự khóa ai thì rút luôn quyền xem nhân sự của người đó.
+  const syncAccounts = async () => {
+    if (!Array.isArray(data.users)) return;
+    const { lock, unlock } = accountChanges(data.users as GuardUser[], prevUsers, isCeo);
+    const done = await setAccountStatus(c.env.DB, lock, 'DISABLED', auth.user.id, c.get('requestId'));
+    const reopened = await setAccountStatus(c.env.DB, unlock, 'ACTIVE', auth.user.id, c.get('requestId'));
+    for (const id of done) await revokeAllSessions(c.env.DB, id);
+    if (!isCeo && done.length) await dropHrGrant(c.env.DB, done, auth.user.id);
+    if (done.length || reopened.length) await syncAccessEmails(c.env).catch(() => undefined);
+  };
+
   // Bản đầu tiên chỉ CEO được khởi tạo (tránh nhân viên vô tình tạo kho rỗng).
   if (base === 0) {
     if (!isHubAdmin(auth.user.role)) throw forbidden('Khu Marketing chưa được khởi tạo. Nhờ CEO mở trang trước.');
@@ -224,6 +245,7 @@ hubRoutes.put('/state', async (c) => {
     await saveHr();
     if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
     await saveDtMembers();
+    await syncAccounts();
     return ok(c, { version: 1, updated_at: now });
   }
 
@@ -238,6 +260,7 @@ hubRoutes.put('/state', async (c) => {
   await saveHr();
   if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
   await saveDtMembers();
+  await syncAccounts();
   return ok(c, { version: base + 1, updated_at: now });
 });
 

@@ -425,8 +425,8 @@ describe('Phân vai và phân quyền chỉ CEO', () => {
     const thao = us.find((u) => u.id === 'u_thao')!;
     expect(thao.role).toBe('nhanvien');
     expect(thao.perms).toEqual([]);
-    expect(thao.phongBan).toBe('KD');
-    expect(thao.active).toBe(true);
+    expect(thao.phongBan).toBe('KD'); // không tự đưa ai vào phòng HCNS
+    expect(thao.active).toBe(false); // từ 02/11: người làm nhân sự chuyển "Đã nghỉ" được (khóa tài khoản)
     expect(thao.title).toBe('Kế toán');
     expect(thao.name).toBe('Thảo A');
     const nu = us.find((u) => u.id === 'u_new')!;

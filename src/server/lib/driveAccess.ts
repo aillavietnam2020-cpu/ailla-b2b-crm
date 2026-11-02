@@ -131,7 +131,8 @@ export const normEmail = (e: unknown) => {
   const s = String(e ?? '').trim().toLowerCase();
   return EMAIL_RE.test(s) ? s : '';
 };
-export const isActiveStaff = (s: StaffRow) => !/nghỉ/i.test(s.tt ?? '');
+/** Chỉ người đã nghỉ việc mới mất quyền; nghỉ phép, thai sản, tạm nghỉ vẫn giữ (cùng cách với khóa tài khoản đăng nhập). */
+export const isActiveStaff = (s: StaffRow) => !/^đã nghỉ|nghỉ việc/i.test((s.tt ?? '').trim());
 
 /** Quyền cần có trên từng thư mục gốc: mã thư mục → (email → quyền). */
 export function desiredGrants(cfg: DriveConfig, staff: StaffRow[]): Map<string, Map<string, DriveRole>> {
