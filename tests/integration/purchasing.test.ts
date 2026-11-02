@@ -285,6 +285,21 @@ describe('Phiếu nhập kho của kho gắn với phiếu mua', () => {
     expect(list.body.data[0].lines[0].received).toBe(60);
   });
 
+  it('sửa phiếu nhập (02/11): ghi phiếu mới thay phiếu cũ, phiếu cũ + lần nhận hàng cũ tự hủy, phiếu mua tính lại', async () => {
+    const { poId } = await setup();
+    const pn = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-08', po_id: poId, lines: [{ item: 'NVL1', qty: 30 }] } });
+    expect(pn.status).toBe(200);
+    const fix = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-08', po_id: poId, replace_doc_id: pn.body.data.id, lines: [{ item: 'NVL1', qty: 100 }] } });
+    expect(fix.status).toBe(200);
+    expect(await ctx.db.prepare('SELECT status FROM kho_docs WHERE id = ?').bind(pn.body.data.id).first()).toEqual({ status: 'HUY' });
+    const list = await ctx.request(`${BASE}/orders`, { as: KT });
+    expect(list.body.data[0].lines[0].received).toBe(100);
+    expect(list.body.data[0].status).toBe('DU');
+    expect(list.body.data[0].receipts.filter((r: { status: string }) => r.status === 'OK').map((r: { kho_doc_id: number }) => r.kho_doc_id)).toEqual([fix.body.data.id]);
+    const again = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-08', replace_doc_id: pn.body.data.id, lines: [{ item: 'NVL1', qty: 1 }] } });
+    expect(again.status).toBe(409);
+  });
+
   it('phiếu nhập không chọn phiếu mua vẫn ghi bình thường (có tên nhà cung cấp thì tự gắn vào phiếu mua tự tạo)', async () => {
     const pn = await ctx.request('/api/hub/kho/docs', { as: KT, body: { type: 'PN', date: '2026-10-08', partner: 'Mua lẻ', lines: [{ item: 'NVL1', qty: 5 }] } });
     expect(pn.status).toBe(200);

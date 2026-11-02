@@ -1335,6 +1335,26 @@ khoRoutes.post('/docs', async (c) => {
     }
   }
 
+  // Sửa phiếu nhập (chị Hoa 02/11: kế toán kho lỡ lưu khi chưa nhập đủ, không có nút sửa): ghi phiếu mới, phiếu cũ tự hủy cùng lúc,
+  // lần nhận hàng của phiếu cũ cũng hủy để phiếu mua tính lại. Phiếu cũ đã vào chứng từ nhà cung cấp thì không sửa được.
+  let replacedReceipts: Array<{ id: string; po_id: string }> = [];
+  if (type === 'PN' && b.replace_doc_id != null) {
+    const old = await c.env.DB.prepare('SELECT id, no, type, status FROM kho_docs WHERE id = ?')
+      .bind(Number(b.replace_doc_id))
+      .first<{ id: number; no: string; type: string; status: string }>();
+    if (!old || old.type !== 'PN') throw badRequest('BAD_REPLACE', 'Không tìm thấy phiếu nhập cần sửa');
+    if (old.status !== 'OK') throw conflict('ALREADY', `Phiếu ${old.no} đã hủy, không sửa được`);
+    replacedReceipts = (
+      await c.env.DB.prepare("SELECT id, po_id FROM po_receipts WHERE kho_doc_id = ? AND status = 'OK'").bind(old.id).all<{ id: string; po_id: string }>()
+    ).results;
+    for (const r of replacedReceipts) {
+      const inv = await c.env.DB.prepare("SELECT invoice_no FROM po_invoices WHERE status = 'OK' AND receipt_ids LIKE ?").bind(`%"${r.id}"%`).first<{ invoice_no: string }>();
+      if (inv) throw badRequest('INVOICED', `Phiếu ${old.no} đã nằm trong chứng từ nhà cung cấp ${inv.invoice_no || '(chưa có số)'}. Hủy chứng từ trước rồi mới sửa.`);
+    }
+    replaced.push({ id: old.id, no: old.no });
+    if (!b.reason) b.reason = `sửa phiếu ${old.no}`;
+  }
+
   // Phiếu nhập nguyên vật liệu có thể gắn với một phiếu mua (đặt hàng ở trang quản trị): hàng về thì phiếu mua tự nhảy trạng thái.
   const poId = type === 'PN' && b.po_id ? String(b.po_id) : '';
   let poRow: { id: string; no: string; status: string } | null = null;
@@ -1382,6 +1402,7 @@ khoRoutes.post('/docs', async (c) => {
         "UPDATE kho_docs SET status = 'HUY', cancelled_by = ?, cancelled_at = ?, cancel_reason = ? WHERE id = ? AND status = 'OK'",
       ).bind(auth.user.id, now, `Thay bằng phiếu ${no}: ${String(b.reason ?? 'điều chỉnh kiểm kê lô')}`, d.id),
     ),
+    ...replacedReceipts.map((r) => c.env.DB.prepare("UPDATE po_receipts SET status = 'HUY' WHERE id = ?").bind(r.id)),
     auditStatement(c.env.DB, {
       actorId: auth.user.id,
       action: 'KHO_DOC_CREATED',
@@ -1429,6 +1450,8 @@ khoRoutes.post('/docs', async (c) => {
     await poStatus(c.env.DB, poRow.id);
     warnings.push(`Đã ghi nhận hàng về cho phiếu mua ${poRow.no}.`);
   }
+  for (const po of new Set(replacedReceipts.map((r) => r.po_id))) if (po !== poRow?.id) await poStatus(c.env.DB, po);
+  if (replaced.length && type === 'PN') warnings.push(`Phiếu cũ ${replaced.map((d) => d.no).join(', ')} đã tự hủy, thay bằng ${no}.`);
   return ok(c, { id: docId, no, warnings });
 });
 
