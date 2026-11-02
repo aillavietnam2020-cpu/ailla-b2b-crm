@@ -353,7 +353,7 @@ function fpcRender(m){
   fpcInit();fchSync();
   const box=document.createElement("div");
   box.innerHTML=`${fpcStyle}<section class="fpc">${fpcBar()}<div class="fpc-body"><div class="fpc-cal">${FPC.view==="week"?fpcWeekView():fpcMonth()}</div></div></section>${fpcList()}`;
-  m.insertBefore(box,m.firstChild);
+  /* trong Điều phối: lịch nằm dưới hàng nút chọn kênh, để luôn bấm đổi được sang kênh TikTok */const seg=m.querySelector(":scope > .seg.ptk");if(seg)seg.after(box);else m.insertBefore(box,m.firstChild);
   fpcBind(m)
 }
 const fpcOrig=pFanpageLich;
@@ -361,7 +361,7 @@ pFanpageLich=function(m,chs){fpcOrig(m,chs);fpcRender(m)};
 
 /* Trang riêng trên menu Marketing › Content: Lịch đăng Fanpage (lịch + yêu cầu tháng + bảng chi tiết) */
 PAGES.lich_fb=function(m){
-  const fp=CHANNELS.filter(c=>!c.needId);BV.k=(fp[0]||{}).k||BV.k;
+  const fp=CHANNELS.filter(c=>!c.needId);if(!BV.fbTam){BV.kTruoc=BV.k;BV.fbTam=true}BV.k=(fp[0]||{}).k||BV.k; /* chỉ mượn kênh Fanpage cho trang này; sang Điều phối thì trả lại kênh đang chọn trước đó */
   m.innerHTML=H("Lịch đăng Fanpage","Soạn bài, duyệt, đặt ngày giờ; agent Fanpage đăng bài đã duyệt khi tới giờ");
   const box=document.createElement("div");m.appendChild(box);fpcRender(box)
 };

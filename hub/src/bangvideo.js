@@ -237,7 +237,7 @@ function bvAutoTrim(){
 }
 /* số trên tab kênh: đã duyệt / kế hoạch tháng của kênh (kế hoạch = mục tiêu tổng tháng chị đặt; = 0 thì chỉ hiện số đã duyệt) */
 function bvTabN(d,k){const kp=k===WP_K?(d.fpPlan||[]).reduce((a,x)=>a+(+x.sl||0),0):kn(d,k).T,dn=d.cards.filter(x=>x.kenh===k&&["dang","xong"].includes(x.step)).length;return kp?dn+"/"+kp:String(dn)}
-function pBangVideo(m){
+function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc&&chOf(BV.kTruoc).needId?BV.kTruoc:"";BV.fbTam=false}
   const d=D(),lead=xvGive(),give=true,team=xvTeam(),td=d.settings.today,chs=CHANNELS.filter(ch=>ptPairs().some(x=>x.kenh===ch.k||d.cards.some(c=>c.kenh===ch.k)));
   if(!BV.k||!chs.some(c=>c.k===BV.k))BV.k=(chs[0]||{}).k||"";
   if(!lead)BV.ng=ME.id;
