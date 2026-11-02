@@ -237,13 +237,13 @@ function bvAutoTrim(){
 }
 /* số trên tab kênh: đã duyệt / kế hoạch tháng của kênh (kế hoạch = mục tiêu tổng tháng chị đặt; = 0 thì chỉ hiện số đã duyệt) */
 function bvTabN(d,k){const kp=k===WP_K?(d.fpPlan||[]).reduce((a,x)=>a+(+x.sl||0),0):kn(d,k).T,dn=d.cards.filter(x=>x.kenh===k&&["dang","xong"].includes(x.step)).length;return kp?dn+"/"+kp:String(dn)}
-function pBangVideo(m){
+function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
   const d=D(),lead=xvGive(),give=true,team=xvTeam(),td=d.settings.today,chs=CHANNELS.filter(ch=>ptPairs().some(x=>x.kenh===ch.k||d.cards.some(c=>c.kenh===ch.k)));
   if(!BV.k||!chs.some(c=>c.k===BV.k))BV.k=(chs[0]||{}).k||"";
   if(!lead)BV.ng=ME.id;
   if(bvAutoTrim()){renderMain();return}
   if(bvAutoSync(chs)){renderMain();return}
-  if(!chOf(BV.k).needId){pFanpageLich(m,chs);return}
+  /* Fanpage cũng chia việc bằng bảng như các kênh TikTok (chị Hoa 02/11); lịch đăng bài nằm ở trang Lịch đăng Fanpage */
   const ch=chOf(BV.k),prs=ptPairs().filter(x=>x.kenh===BV.k&&knShown(d,x)),all=d.cards.filter(c=>c.kenh===BV.k),rows=bvRows(d),miss=bvMissing(d,BV.k);
   const kpiT=sum(prs,x=>+x.sl||0),rowsPlan=sum(prs,x=>sum(BV_RT,t2=>bvPlanN(d,x.sku,BV.k,t2))),tonP=sum(prs,x=>bvPlanN(d,x.sku,BV.k,"ton")),nbP=sum(prs,x=>bvPlanN(d,x.sku,BV.k,"nhanban")),thieu=sum(prs,x=>sum(BV_RT.concat(["ton"]),t2=>Math.max(0,bvPlanN(d,x.sku,BV.k,t2)-all.filter(c=>c.sku===x.sku&&mixOf(c)===t2).length))),made=all.filter(c=>BV_RT.includes(mixOf(c))||mixOf(c)==="ton").length;
   const kpi=cs=>({tao:cs.length,duyet:cs.filter(c=>["dang","xong"].includes(c.step)).length,dang:cs.filter(c=>c.step==="xong").length});
