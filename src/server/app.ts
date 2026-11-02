@@ -34,6 +34,7 @@ import { financeRoutes } from './routes/finance';
 import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
+import { driveRoutes } from './routes/drive';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
 import { fpPublishRoutes } from './routes/fpPublish';
 import { sttRoutes, sttWorkerRoutes } from './routes/stt';
@@ -151,6 +152,7 @@ export function createApp() {
   app.route('/api/hub/hr', hrRoutes);
   app.route('/api/hub/daotao', daoTaoRoutes);
   app.route('/api/hub', hubRoutes);
+  app.route('/api/drive', driveRoutes);
 
   app.notFound((c) =>
     c.json(

@@ -30,6 +30,8 @@ export interface Env {
   /** Khoá VPS đẩy số liệu (file báo cáo Digital) lên /api/ingest. */
   INGEST_KEY?: string;
   /** Địa chỉ trang vận hành (qt.ailla.vn) và trang quản trị (quantri.ailla.vn). Trống thì không tách. */
+  /** Tài khoản máy Google (service account, khóa JSON) để web xem thư mục Drive các phòng ban, chỉ đọc. Đặt bằng `wrangler secret put`. */
+  GDRIVE_SA_JSON?: string;
   OPS_HOST?: string;
   ADMIN_HOST?: string;
 }
