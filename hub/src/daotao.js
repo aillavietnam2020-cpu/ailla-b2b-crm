@@ -18,6 +18,9 @@ const DT_LT={d1:"Ngày 1",w1:"Tuần 1",m1:"Tháng 1"};
 const dtDep=k=>((DT.me&&DT.me.deps)||[]).find(d=>d.k===k)?.n||k;
 const dtTeams=d=>(d.teams||[]).map(dtDep).join(", ");
 const dtDay=s=>s?String(s).slice(0,10).split("-").reverse().join("/"):"";
+const dtTime=s=>{if(!s)return "";const d=new Date(s);return isNaN(d)?dtDay(s):d.toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit",year:"numeric"})};
+/* Dòng "Cập nhật … bởi … · Duyệt … bởi …" (chị Hoa 02/11: phải thấy lần cập nhật và lần duyệt mới nhất). */
+const dtStamp=d=>`Cập nhật ${dtTime(d.updated_at)}${d.updated_by_name?" bởi "+esc(d.updated_by_name):""} · `+(d.approved_at?`Duyệt ${dtTime(d.approved_at)}${d.approved_by_name?" bởi "+esc(d.approved_by_name):""}`:"<b>Chưa duyệt</b>");
 const dtAck=id=>DT.acks.find(a=>a.doc_id===id);
 /* Đã đọc bản hiện tại chưa; đã đọc bản cũ = phải đọc lại. */
 const dtDone=d=>{const a=dtAck(d.id);return !!a&&a.version>=d.version};
@@ -33,7 +36,7 @@ async function dtLoad(force){
   catch(e){DT.err=e.message||"Không tải được";if(!DT.docs)DT.docs=[]}
   DT.busy=false;DT.at=Date.now();if(String(PAGE).startsWith("dt_"))renderMain()}
 /* Đọc tài liệu trong cửa sổ nổi trên trang đang xem, không chuyển trang (chị Hoa 02/11). */
-async function dtOpen(id){DT.cur=id;dtModal();
+async function dtOpen(id){if(DT.cur!==id)DT.pv=false;DT.cur=id;dtModal();
   try{DT.doc[id]=await svApi(DT_API+"/docs/"+id)}catch(e){DT.doc[id]={err:e.message||"Không mở được tài liệu"}}if(DT.cur===id)dtModal()}
 function dtClose(){DT.cur=null;const w=document.getElementById("dt-modal");if(w)w.remove();document.body.style.overflow=""}
 function dtModal(){let w=document.getElementById("dt-modal");if(!DT.cur){dtClose();return}
@@ -43,6 +46,16 @@ function dtModal(){let w=document.getElementById("dt-modal");if(!DT.cur){dtClose
     w.addEventListener("mousedown",e=>{if(e.target===w)dtClose()});document.body.appendChild(w);document.body.style.overflow="hidden"}
   pDtRead(w.firstChild)}
 addEventListener("keydown",e=>{if(e.key==="Escape"&&DT.cur)dtClose()});
+const dtSize=n=>n>=1e6?(n/1e6).toLocaleString("vi-VN",{maximumFractionDigits:1})+" MB":Math.max(1,Math.round(n/1e3))+" KB";
+const dtFileIc=f=>/folder/.test(f.mime||"")?"📁":/spreadsheet|sheet|excel/.test(f.mime||"")?"📗":/presentation|powerpoint/.test(f.mime||"")?"📙":/document|word/.test(f.mime||"")?"📘":!f.mime&&f.url?"🔗":/pdf/.test(f.mime)?"📕":/word/.test(f.mime)?"📘":/sheet|excel/.test(f.mime)?"📗":/presentation|powerpoint/.test(f.mime)?"📙":/image/.test(f.mime)?"🖼":"📄";
+const dtFileUrl=(f,tai)=>f.url||DT_API+"/file/"+f.id+(tai?"?tai=1":"");
+/* Link Drive xem ngay trong tài liệu: Google Docs/Sheets/Slides và file Drive có trang /preview (người đọc phải có quyền xem trên Drive). */
+const dtPreview=u=>{const m=String(u||"").match(/^https:\/\/docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([\w-]+)/);if(m)return `https://docs.google.com/${m[1]}/d/${m[2]}/preview`;
+  const f=String(u||"").match(/^https:\/\/drive\.google\.com\/(?:file\/d\/|open\?id=)([\w-]+)/);return f?`https://drive.google.com/file/d/${f[1]}/preview`:""};
+/* In / lưu PDF: mở bản in gọn của tài liệu đang đọc. */
+function dtPrint(d){const w=window.open("","_blank");if(!w){toast("Trình duyệt chặn cửa sổ in, cho phép rồi bấm lại");return}
+  w.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${esc(d.title)}</title><style>body{font-family:system-ui,"Segoe UI",sans-serif;max-width:820px;margin:24px auto;padding:0 16px;line-height:1.6;color:#1c1f33}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left}.dt-flow{display:flex;flex-wrap:wrap;gap:6px}.dt-fs{border:1px solid #ccc;border-radius:8px;padding:6px 8px;flex:1 1 140px;font-size:13px}.dt-fs small{display:block;color:#666}.dt-fn,.dt-fa{display:none}.dt-fr{font-size:11px;font-weight:700;display:block}.dt-tip{background:#eef4ff;padding:8px 12px;border-radius:8px}.dt-num{font-weight:700;margin-right:6px}.dt-step{display:flex}</style></head><body><h1>${esc(d.title)}</h1>${d.summary?`<p><i>${esc(d.summary)}</i></p>`:""}${dtMd(d.body)}<p style="color:#888;font-size:12px">AILLA · bản ${d.version} · in ngày ${new Date().toLocaleDateString("vi-VN")}</p></body></html>`);
+  w.document.close();setTimeout(()=>w.print(),400)}
 function dtGo(p){dtClose();PAGE=p;MOD="dt";render();scrollTo(0,0)}
 
 /* ---------- chữ → HTML (thoát ký tự trước, chỉ cho vài dấu đơn giản) ---------- */
@@ -72,6 +85,43 @@ function dtMd(text){
 /* Mỗi vai một màu cố định trong sơ đồ luồng. */
 const DT_RC=["#4b54d1","#e7357b","#087a55","#b54708","#175cd3","#6941c6","#0e7490"];
 const dtRoleC=r=>{let h=0;for(const ch of String(r||""))h=(h*31+ch.charCodeAt(0))>>>0;return DT_RC[h%DT_RC.length]};
+/* Ô soạn hiện đúng định dạng (chị Hoa 02/11: không muốn thấy ký hiệu #, **, |). Lưu vẫn bằng kiểu chữ cũ để trang đọc,
+   Google Docs, migration dùng chung. Sơ đồ luồng, bảng, ảnh là khối khóa (giữ nguyên chữ gốc trong data-md); sửa chúng ở "Sửa dạng chữ". */
+function dtMdEdit(text){
+  const L=String(text||"").replace(/\r/g,"").split("\n"),out=[];let i=0;
+  const lock=(raw,html)=>`<div class="dt-lock" contenteditable="false" data-md="${esc(raw)}">${html}</div>`;
+  while(i<L.length){const t=L[i].trim();let m;
+    if(!t){i++;continue}
+    if(t.startsWith("=>")||(t.startsWith("|")&&t.endsWith("|"))){const k=t.startsWith("=>")?(x=>x.startsWith("=>")):(x=>x.startsWith("|")&&x.endsWith("|"));const raw=[];while(i<L.length&&k(L[i].trim())){raw.push(L[i].trim());i++}out.push(lock(raw.join("\n"),dtMd(raw.join("\n"))));continue}
+    if(/^!\[[^\]]*\]\([^)]+\)$/.test(t)){out.push(lock(t,dtMd(t)));i++;continue}
+    if((m=t.match(/^(#{1,2})\s+(.+)$/))){out.push(`<${m[1].length===1?"h2":"h3"}>${dtInline(m[2])}</${m[1].length===1?"h2":"h3"}>`);i++;continue}
+    if(t==="---"){out.push("<hr>");i++;continue}
+    if(t.startsWith(">")){out.push(`<blockquote>${dtInline(t.replace(/^>\s?/,""))}</blockquote>`);i++;continue}
+    if(/^\d+[.)]\s+/.test(t)){const li=[];while(i<L.length&&/^\d+[.)]\s+/.test(L[i].trim())){li.push(`<li>${dtInline(L[i].trim().replace(/^\d+[.)]\s+/,""))}</li>`);i++}out.push(`<ol>${li.join("")}</ol>`);continue}
+    if(/^[-*•]\s+/.test(t)){const li=[];while(i<L.length&&/^[-*•]\s+/.test(L[i].trim())){li.push(`<li>${dtInline(L[i].trim().replace(/^[-*•]\s+/,""))}</li>`);i++}out.push(`<ul>${li.join("")}</ul>`);continue}
+    const pl=[];while(i<L.length&&L[i].trim()&&!/^(#{1,2}\s|=>|\||!\[|>|---$|\d+[.)]\s|[-*•]\s)/.test(L[i].trim())){pl.push(dtInline(L[i].trim()));i++}
+    if(pl.length)out.push(`<p>${pl.join("<br>")}</p>`);else i++}
+  return out.join("")||"<p><br></p>"}
+function dtHtmlToMd(root){
+  const inl=n=>{let s="";n.childNodes.forEach(c=>{if(c.nodeType===3){s+=c.nodeValue.replace(/\s+/g," ");return}if(c.nodeType!==1)return;const tg=c.tagName;
+      if(tg==="BR"){s+="\n";return}const x=inl(c);
+      if(tg==="B"||tg==="STRONG"||/font-weight:\s*(bold|[6-9]00)/.test(c.getAttribute("style")||"")){s+=x.trim()?`**${x.trim()}**`:x;return}
+      if(tg==="A"&&/^https?:/.test(c.getAttribute("href")||"")){s+=`[${x.trim()}](${c.getAttribute("href")})`;return}s+=x});return s};
+  const out=[],line=t=>t.split("\n").map(x=>x.trim()).filter(Boolean).join("\n");
+  const walk=parent=>parent.childNodes.forEach(n=>{
+    if(n.nodeType===3){const t=n.nodeValue.trim();if(t)out.push(t);return}if(n.nodeType!==1)return;
+    if(n.dataset&&n.dataset.md!=null){out.push(n.dataset.md);return}
+    const tg=n.tagName;
+    if(tg==="H1"||tg==="H2"){const t=inl(n).trim();if(t)out.push("# "+t.replace(/\n/g," "));return}
+    if(/^H[3-6]$/.test(tg)){const t=inl(n).trim();if(t)out.push("## "+t.replace(/\n/g," "));return}
+    if(tg==="UL"||tg==="OL"){const L=[...n.children].filter(x=>x.tagName==="LI").map((li,k)=>(tg==="OL"?(k+1)+". ":"- ")+inl(li).trim().replace(/\n/g," ")).filter(x=>!/^(\d+\. |- )$/.test(x));if(L.length)out.push(L.join("\n"));return}
+    if(tg==="BLOCKQUOTE"){const t=inl(n).trim();if(t)out.push("> "+t.replace(/\n/g," "));return}
+    if(tg==="HR"){out.push("---");return}
+    if(tg==="TABLE"){const R=[...n.querySelectorAll("tr")].map(tr=>"| "+[...tr.children].map(td=>inl(td).trim().replace(/\|/g,"/").replace(/\n/g," ")).join(" | ")+" |");if(R.length){R.splice(1,0,"|"+R[0].split("|").slice(1,-1).map(()=>"---").join("|")+"|");out.push(R.join("\n"))}return}
+    if(tg==="IMG"){const src=n.getAttribute("src")||"",id=(src.match(/\/img\/([0-9a-f-]{36})/)||[])[1];if(id)out.push(`![${n.alt||""}](${id})`);return}
+    if(tg==="DIV"&&n.querySelector("p,h1,h2,h3,ul,ol,blockquote,table,div")){walk(n);return}
+    const t=line(inl(n));if(t)out.push(t)});
+  walk(root);return out.join("\n\n").replace(/\n{3,}/g,"\n\n").trim()}
 const dtToc=text=>String(text||"").split("\n").map(x=>x.trim().match(/^(#{1,2})\s+(.+)$/)).filter(Boolean).map((m,i)=>`<a href="#dth${i}" class="${m[1].length===2?"sub":""}">${esc(m[2].replace(/\*\*/g,""))}</a>`).join("");
 
 /* Câu kiểm tra soạn bằng chữ: "? câu hỏi" rồi các dòng "* đáp án đúng" / "- đáp án sai". */
@@ -103,15 +153,19 @@ const DT_CSS=`<style>
 .dt-ok{background:var(--green-soft,#e8f8f0);border:1px solid #9ee0c2;border-radius:12px;padding:14px 16px;margin-top:18px}
 .dt-quiz label{display:block;padding:6px 10px;border:1px solid var(--line);border-radius:10px;margin:5px 0;cursor:pointer;font-size:14px}.dt-quiz label input{width:auto;margin-right:8px}
 .dt-chips{display:flex;gap:6px;flex-wrap:wrap}
+.dt-vis{min-height:420px;max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:14px 18px;background:#fff;outline:none}.dt-vis:focus{border-color:#4b54d1}
+.dt-vis h2{font-size:18px;margin:16px 0 6px}.dt-vis h3{font-size:16px;margin:12px 0 4px}.dt-vis blockquote{background:var(--blue-soft,#eef4ff);color:#1b3d8a;border-radius:12px;padding:10px 14px;margin:10px 0}.dt-vis blockquote::before{content:"💡 "}
+.dt-vis ol,.dt-vis ul{padding-left:24px}.dt-vis ol li::marker{color:var(--pink,#e7357b);font-weight:700}.dt-lock{position:relative;margin:8px 0;border:1px dashed #c5cad8;border-radius:12px;padding:2px 8px;cursor:default;user-select:none}.dt-lock::after{content:"khối cố định · sửa ở chế độ Sửa dạng chữ";position:absolute;right:8px;top:-9px;font-size:11px;background:#fff;color:var(--muted);padding:0 6px}
 .dt-ed textarea{font-family:var(--fm,monospace);font-size:13.5px;line-height:1.5}.dt-tb{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
 .dt-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.dt-cols>.card{margin:0}
 @media(max-width:900px){.dt-read,.dt-cols{grid-template-columns:1fr}.dt-toc{position:static}}
 </style>`;
 const dtCk=on=>`<span class="dt-ck${on?" on":""}">${on?"✓":""}</span>`;
 function dtItem(d,sub){const done=dtDone(d),old=dtOld(d);
-  const tag=d.status!=="dang"?pill(d.status==="cho_duyet"?"Chờ CEO duyệt":"Nháp","amb"):done?pill("Đã hiểu","grn"):old?pill("Có bản mới, đọc lại","amb"):dtReq(d)?pill("Bắt buộc","red"):"";
+  const tag=d.status!=="dang"?pill(d.status==="cho_duyet"?"Chờ CEO duyệt":"Nháp","amb"):d.has_pending&&DT.me&&DT.me.ceo?pill("Có bản sửa chờ duyệt","amb"):done?pill("Đã hiểu","grn"):old?pill("Có bản mới, đọc lại","amb"):dtReq(d)?pill("Bắt buộc","red"):"";
   return `<div class="dt-item" data-dtopen="${esc(d.id)}">${dtCk(done)}<div class="t"><b>${esc(d.title)}</b><small>${esc(sub!=null?sub:(d.summary||DT_NHOM[d.nhom]||""))}</small></div>${tag}</div>`}
 function dtWire(m){
+  m.querySelectorAll("[data-dtnew]").forEach(b=>b.onclick=dtNewChoose);
   m.querySelectorAll("[data-dtopen]").forEach(b=>b.onclick=()=>dtOpen(b.dataset.dtopen));
   m.querySelectorAll("[data-dtgo]").forEach(b=>b.onclick=()=>dtGo(b.dataset.dtgo))}
 function dtWait(m,t){m.innerHTML=H(t,"Đang tải…");dtLoad()}
@@ -121,11 +175,11 @@ function pDtHome(m){
   if(!DT.docs)return dtWait(m,"Đào tạo của tôi");dtLoad();
   const P=dtPub(),road=P.filter(d=>d.lo_trinh),req=P.filter(dtReq),todo=req.filter(d=>!dtDone(d)),old=P.filter(dtOld),me=DT.me||{},nb=me.newbie;
   const pct=road.length?Math.round(road.filter(dtDone).length/road.length*100):0;
-  const pend=(DT.docs||[]).filter(d=>d.status==="cho_duyet");
+  const pend=(DT.docs||[]).filter(d=>d.status==="cho_duyet"||d.has_pending);
   const lt=road.filter(d=>d.lo_trinh===DT.road);
-  m.innerHTML=DT_CSS+H("Đào tạo của tôi",nb?`Vào làm ${dtDay(nb.start_date)}${nb.done_at?" · đã xong onboarding":" · đang trong lộ trình nhân viên mới"}`:"Tài liệu công ty, sổ tay dùng web và tài liệu của team bạn")+
+  m.innerHTML=DT_CSS+(me.editor?`<div style="float:right;margin-top:-4px"><button class="btn pri" data-dtnew="1">＋ Tạo tài liệu</button></div>`:"")+H("Đào tạo của tôi",nb?`Vào làm ${dtDay(nb.start_date)}${nb.done_at?" · đã xong onboarding":" · đang trong lộ trình nhân viên mới"}`:"Tài liệu công ty, sổ tay dùng web và tài liệu của team bạn")+
   (DT.err?`<div class="note red">${esc(DT.err)}</div>`:"")+
-  (me.ceo&&pend.length?`<div class="warn">Có <b>${pend.length}</b> tài liệu Chung đang chờ chị duyệt: ${pend.map(d=>`<a href="#" data-dtopen="${esc(d.id)}">${esc(d.title)}</a>`).join(", ")}</div>`:"")+
+  (me.ceo&&pend.length?`<div class="warn">Có <b>${pend.length}</b> tài liệu cần duyệt: ${pend.map(d=>`<a href="#" data-dtopen="${esc(d.id)}">${esc(d.title)}</a>`).join(", ")}</div>`:"")+
   `<div class="dt-kpis">
     <div class="kpi"><div class="l">Lộ trình onboarding</div><div class="v">${pct}%</div><div class="dt-bar"><i style="width:${pct}%"></i></div></div>
     <div class="kpi"><div class="l">Bắt buộc chưa đọc</div><div class="v${todo.length?" t-red":""}">${todo.length}</div><div class="h">trên ${req.length} tài liệu bắt buộc</div></div>
@@ -153,7 +207,7 @@ function pDtLib(m){
   m.innerHTML=DT_CSS+H("Thư viện tài liệu","Chỉ tài liệu chuẩn đã duyệt: nội quy, quy trình, hướng dẫn. File làm việc hằng ngày của team xem ở Thư mục làm việc.")+
   `<div class="filters"><input id="dt-q" placeholder="Tìm tài liệu…" value="${esc(DT.q)}" style="max-width:300px">
    ${[["","Tất cả"],["chung","Chung"],["web","Sổ tay web"],["team","Team"],["req","Bắt buộc"]].map(([k,n])=>`<button class="btn sm${f===k?" pri":""}" data-dtf="${k}">${n}</button>`).join(" ")}
-   <span class="sp"></span>${PAGES.thumuc?`<button class="btn sm" id="dt-tm">📁 Thư mục làm việc của team →</button>`:""}${DT.me&&DT.me.editor?` <button class="btn sm" data-dtgo="dt_soan">✎ Soạn tài liệu</button>`:""}</div>
+   <span class="sp"></span>${PAGES.thumuc?`<button class="btn sm" id="dt-tm">📁 Thư mục làm việc của team →</button>`:""}${DT.me&&DT.me.editor?` <button class="btn sm pri" data-dtnew="1">＋ Tạo tài liệu</button>`:""}</div>
   <div class="dt-cols">${box("🏢 Chung — mọi nhân viên",L.filter(d=>d.nhom==="chung"),"Chưa có tài liệu chung.")}
    ${box("🧭 Sổ tay web vận hành",L.filter(d=>d.nhom==="web"),"Chưa có trang sổ tay nào.")}
    <section class="card"><div class="card-h"><h2>👥 Tài liệu theo team</h2><span class="hint">${team.length}</span></div>
@@ -169,11 +223,12 @@ function pDtRead(m){
   const back=`<button class="btn sm" id="dt-back">✕ Đóng</button>`;
   if(!d){m.innerHTML=DT_CSS+back+H("Đang mở tài liệu…","");m.querySelector("#dt-back").onclick=dtClose;return}
   if(d.err){m.innerHTML=DT_CSS+back+`<div class="note red" style="margin-top:12px">${esc(d.err)}</div>`;m.querySelector("#dt-back").onclick=dtClose;return}
+  if(d.pending&&DT.pv){const P=d.pending;d={...d,title:P.title,summary:P.summary,body:P.body,files:P.files||[],quiz:P.quiz||[]}}
   const done=d.ack&&d.ack.version>=d.version,old=d.ack&&d.ack.version<d.version,ceo=DT.me&&DT.me.ceo;
   const A=DT.ans[id]||(DT.ans[id]=[]);
   const quiz=d.quiz&&d.quiz.length&&!done?`<div class="card dt-quiz" style="box-shadow:none;margin-top:18px"><b>Kiểm tra nhanh (${d.quiz.length} câu, đúng 80% là đạt)</b>
     ${d.quiz.map((q,i)=>`<div style="margin-top:10px"><b style="font-size:14px">${i+1}. ${esc(q.q)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="dtq${i}" value="${j}" data-dtq="${i}"${A[i]===j?" checked":""}>${esc(o)}</label>`).join("")}</div>`).join("")}</div>`:"";
-  const ackBox=d.status!=="dang"?`<div class="warn" style="margin-top:18px">${d.status==="cho_duyet"?"Tài liệu đang chờ CEO duyệt, chưa hiện cho mọi người.":"Bản nháp — chưa hiện cho ai ngoài người soạn."}${ceo&&d.status==="cho_duyet"?` <button class="btn pri sm" id="dt-appr">Duyệt, cho hiện</button>`:""}${d.can_edit?` <button class="btn sm" data-dted2="1">✎ Sửa tài liệu</button>`:""}</div>`
+  const ackBox=d.status!=="dang"?`<div class="warn" style="margin-top:18px">${d.status==="cho_duyet"?"Tài liệu đang chờ CEO duyệt, chưa hiện cho mọi người.":"Bản nháp — chưa hiện cho ai ngoài người soạn."}${ceo&&d.status==="cho_duyet"?` <button class="btn pri sm" id="dt-appr">Duyệt, cho hiện</button> <button class="btn sm danger" id="dt-rej">Trả lại</button>`:""}${d.can_edit?` <button class="btn sm" data-dted2="1">✎ Sửa tài liệu</button>`:""}</div>`
     :done?`<div class="dt-ok"><b>✓ Bạn đã xác nhận đọc và hiểu</b> — ${new Date(d.ack.at).toLocaleString("vi-VN")}${d.ack.score!=null?` · đúng ${d.ack.score}/${d.quiz.length} câu`:""}</div>`
     :`<div class="dt-ok"><b>${old?"Tài liệu có bản mới — bạn đọc lại giúp nhé.":"Bạn đã đọc hết?"}</b><p class="hint" style="margin:4px 0 10px">Bấm xác nhận để web ghi lại ngày giờ. Khi tài liệu sửa sang bản mới, web sẽ nhờ bạn đọc lại.</p>
       <button class="btn pri" id="dt-ack">${d.nhom==="web"?"Tôi đã đọc và làm thử được":"Tôi đã đọc và hiểu"}</button> <span class="hint" id="dt-ackm"></span></div>`;
@@ -182,23 +237,37 @@ function pDtRead(m){
       ${h.answer?`<div style="margin-top:4px">💬 ${esc(h.answer)}</div>`:d.can_edit?`<div class="acts" style="margin-top:6px"><input placeholder="Trả lời…" data-dthoi-in="${esc(h.id)}"><button class="btn sm" data-dthoi="${esc(h.id)}">Gửi</button></div>`:`<div class="hint">Đang chờ trả lời</div>`}</div>`).join("")}
     <div class="acts" style="margin-top:8px"><input id="dt-ask" placeholder="Chỗ nào chưa rõ, gõ vào đây…"><button class="btn sm" id="dt-askb">Gửi câu hỏi</button></div></section>`;
   const toc=dtToc(d.body);
-  m.innerHTML=DT_CSS+`<div class="acts" style="margin:-16px -18px 10px;padding:10px 18px;justify-content:space-between;display:flex;position:sticky;top:0;z-index:3;background:var(--canvas,#f6f7fb);border-radius:16px 16px 0 0">${back}${d.can_edit?` <button class="btn sm" id="dt-edit">✎ Sửa tài liệu</button>`:""}</div>
+  m.innerHTML=DT_CSS+`<div class="acts" style="margin:-16px -18px 10px;padding:10px 18px;justify-content:space-between;display:flex;position:sticky;top:0;z-index:3;background:var(--canvas,#f6f7fb);border-radius:16px 16px 0 0">${back}<span><button class="btn sm" id="dt-print">🖨 In / lưu PDF</button>${d.can_edit?` <button class="btn sm" id="dt-edit">✎ Sửa tài liệu</button>`:""}</span></div>
   <div class="${toc?"dt-read":""}">${toc?`<nav class="card dt-toc"><b class="hint">MỤC LỤC</b>${toc}</nav>`:""}
-  <article class="card"><div class="dt-chips" style="margin-bottom:8px">${pill(DT_NHOM[d.nhom]+(d.nhom==="team"?": "+dtTeams(d):""),"vio")}${d.bat_buoc!=="khong"?pill(DT_BB[d.bat_buoc],"red"):""}${d.lo_trinh?pill("Lộ trình "+DT_LT[d.lo_trinh],"blu"):""}${pill("Bản "+d.version+" · sửa "+dtDay(d.updated_at),"gry")}${d.drive_id?pill("📄 Soạn trong Google Docs","blu"):""}</div>
+  <article class="card"><div class="dt-chips" style="margin-bottom:8px">${pill(DT_NHOM[d.nhom]+(d.nhom==="team"?": "+dtTeams(d):""),"vio")}${d.bat_buoc!=="khong"?pill(DT_BB[d.bat_buoc],"red"):""}${d.lo_trinh?pill("Lộ trình "+DT_LT[d.lo_trinh],"blu"):""}${pill("Bản "+d.version,"gry")}${d.drive_id?pill("📄 Soạn trong Google Docs","blu"):""}</div>
    ${d.drive_id?`<p class="hint" style="margin:0 0 8px">Nội dung lấy từ Google Drive${d.drive_mod?", bản sửa lúc "+new Date(d.drive_mod).toLocaleString("vi-VN"):""}. Web tự cập nhật khi file trên Drive được sửa.${d.can_edit?` <a href="https://docs.google.com/document/d/${esc(d.drive_id)}/edit" target="_blank" rel="noopener">Sửa trong Google Docs ↗</a>`:""}</p>`:""}
+   <p class="hint" style="margin:0 0 8px">${dtStamp(d)}</p>
+   ${d.review_note&&d.can_edit?`<div class="warn">CEO trả lại: ${esc(d.review_note)}</div>`:""}
+   ${d.pending?`<div class="warn">Có <b>bản sửa chờ duyệt</b> của ${esc(d.pending_by_name||"người soạn")} lúc ${dtTime(d.pending_at)} — mọi người vẫn đang đọc bản đã duyệt.
+     <button class="btn sm" id="dt-pvw">${DT.pv?"Xem bản đang hiện":"Xem bản sửa"}</button>${ceo?` <button class="btn pri sm" id="dt-appr2">Duyệt bản sửa</button> <button class="btn sm danger" id="dt-rej">Trả lại</button>`:""}</div>`:""}
    <div class="dt-doc"><h1 style="font-size:24px;margin:0 0 6px">${esc(d.title)}</h1>${d.summary?`<p class="hint" style="font-size:14.5px">${esc(d.summary)}</p>`:""}${dtMd(d.body)}</div>
+   ${(d.files||[]).length?`<section style="margin-top:16px"><h3>📎 Tệp đính kèm</h3>${d.files.map((f,i)=>`<div class="dt-item" style="cursor:default"><span style="font-size:22px">${dtFileIc(f)}</span><div class="t"><b>${esc(f.name)}</b><small>${f.url?"Trên Google Drive · cần quyền xem trên Drive":dtSize(f.size)}</small></div>${f.url?`${dtPreview(f.url)?`<button class="btn sm" data-dtpv="${i}">Xem ngay</button> `:""}<a class="btn sm" href="${esc(f.url)}" target="_blank" rel="noopener">Mở trên Drive</a>`:`<a class="btn sm" href="${dtFileUrl(f)}" target="_blank" rel="noopener">Mở</a> <a class="btn sm" href="${dtFileUrl(f,1)}">Tải về</a>`}</div><div data-dtpvbox="${i}"></div>`).join("")}
+     ${(()=>{const pdf=d.files.find(f=>/pdf/.test(f.mime));return pdf&&!pdf.url?`<iframe src="${dtFileUrl(pdf)}" title="${esc(pdf.name)}" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:12px;margin-top:8px"></iframe>`:""})()}</section>`:""}
    ${quiz}${ackBox}${d.status==="dang"?hoi:""}</article></div>`;
   m.querySelector("#dt-back").onclick=dtClose;
+  m.querySelector("#dt-print").onclick=()=>dtPrint(d);
+  m.querySelectorAll("[data-dtpv]").forEach(b=>b.onclick=()=>{const i=+b.dataset.dtpv,box=m.querySelector(`[data-dtpvbox="${i}"]`);
+    if(box.innerHTML){box.innerHTML="";b.textContent="Xem ngay";return}box.innerHTML=`<iframe src="${esc(dtPreview(d.files[i].url))}" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:12px;margin:6px 0" allow="autoplay"></iframe>`;b.textContent="Thu gọn"});
   m.querySelectorAll("#dt-edit,[data-dted2]").forEach(ed=>ed.onclick=()=>{dtClose();dtEditOpen(d)});
   m.querySelectorAll(".dt-toc a").forEach(a=>a.onclick=e=>{e.preventDefault();const t=m.querySelector(a.getAttribute("href"));if(t)t.scrollIntoView({behavior:"smooth",block:"start"})});
   m.querySelectorAll("[data-dtq]").forEach(r=>r.onchange=()=>{A[+r.dataset.dtq]=+r.value});
+  const pvw=m.querySelector("#dt-pvw");if(pvw)pvw.onclick=()=>{DT.pv=!DT.pv;dtModal()};
+  const rej=m.querySelector("#dt-rej");if(rej)rej.onclick=async()=>{const note=prompt("Nhắn người soạn cần sửa gì:","");if(note===null)return;
+    try{await svApi(DT_API+"/docs/"+id+"/tra-lai",{method:"POST",body:JSON.stringify({note})});toast("Đã trả lại");delete DT.doc[id];DT.pv=false;await dtLoad(true);dtOpen(id)}catch(e){toast(e.message)}};
+  const ap2=m.querySelector("#dt-appr2");if(ap2)ap2.onclick=async()=>{if(!confirm("Duyệt bản sửa và cho mọi người thấy?"))return;
+    try{await svApi(DT_API+"/docs/"+id+"/approve",{method:"POST",body:"{}"});toast("Đã duyệt bản sửa");delete DT.doc[id];DT.pv=false;await dtLoad(true);dtOpen(id)}catch(e){toast(e.message)}};
   const ap=m.querySelector("#dt-appr");if(ap)ap.onclick=async()=>{if(!confirm("Duyệt và cho mọi người thấy tài liệu \""+d.title+"\"?"))return;try{await svApi(DT_API+"/docs/"+id+"/approve",{method:"POST",body:"{}"});toast("Đã duyệt");delete DT.doc[id];await dtLoad(true);dtOpen(id)}catch(e){toast(e.message)}};
   const ak=m.querySelector("#dt-ack");if(ak)ak.onclick=async()=>{
     if(d.quiz&&d.quiz.length&&d.quiz.some((q,i)=>A[i]==null)){m.querySelector("#dt-ackm").textContent="Trả lời hết câu kiểm tra ở trên trước nhé.";return}
     ak.disabled=true;try{const r=await svApi(DT_API+"/docs/"+id+"/ack",{method:"POST",body:JSON.stringify({answers:A})});
       if(!r.pass){m.querySelector("#dt-ackm").textContent=`Đúng ${r.right}/${r.total} câu, chưa đạt. Đọc lại phần trên rồi thử lại nhé.`;ak.disabled=false;return}
       toast("Đã xác nhận");delete DT.ans[id];await dtLoad(true);dtOpen(id)}catch(e){m.querySelector("#dt-ackm").textContent=e.message;ak.disabled=false}};
-  const ab=m.querySelector("#dt-askb");if(ab)ab.onclick=async()=>{const t=m.querySelector("#dt-ask").value.trim();if(t.length<3){toast("Gõ câu hỏi giúp em");return}
+  const ab=m.querySelector("#dt-askb");if(ab)ab.onclick=async()=>{const t=m.querySelector("#dt-ask").value.trim();if(t.length<3){toast("Gõ câu hỏi trước khi gửi");return}
     try{await svApi(DT_API+"/docs/"+id+"/hoi",{method:"POST",body:JSON.stringify({text:t})});toast("Đã gửi câu hỏi cho người soạn");dtOpen(id)}catch(e){toast(e.message)}};
   m.querySelectorAll("[data-dthoi]").forEach(b=>b.onclick=async()=>{const v=m.querySelector(`[data-dthoi-in="${b.dataset.dthoi}"]`).value.trim();if(!v)return;
     try{await svApi(DT_API+"/hoi/"+b.dataset.dthoi+"/tra-loi",{method:"POST",body:JSON.stringify({answer:v})});toast("Đã trả lời");dtOpen(id)}catch(e){toast(e.message)}})}
@@ -207,22 +276,28 @@ function pDtRead(m){
 function dtScopes(){const me=DT.me||{};if(me.ceo||me.hr)return {chung:1,web:1,teams:null};
   const t=(me.scopes||[]).filter(s=>s.startsWith("team:")).map(s=>s.slice(5));if(me.manager&&me.pb)t.push(me.pb);
   return {chung:(me.scopes||[]).includes("chung"),web:(me.scopes||[]).includes("web"),teams:[...new Set(t)]}}
+/* Tạo tài liệu: hỏi trước tạo bằng cách nào (chị Hoa 02/11). */
+function dtNewChoose(){openDrawerHTML(`<h2>Tạo tài liệu</h2><p class="hint">Chọn cách tạo:</p>
+  ${[["web","✎","Tạo mới","Soạn ngay trên web như soạn Word: tiêu đề, gạch đầu dòng, ảnh, câu hỏi kiểm tra."],["file","📎","Tải file lên","Chọn file Word, PDF, Excel, PowerPoint, ảnh từ máy (tối đa 1,8 MB) — không cần gõ nội dung."],["link","🔗","Gắn link Google Drive","Dán link file, thư mục hoặc Google Docs trên Drive. Google Docs thì web chép nội dung để đọc ngay."]]
+   .map(([k,ic,n,h])=>`<button class="card dt-item" data-dtnc="${k}" style="width:100%;text-align:left;margin-bottom:10px;border:1px solid var(--line)"><span style="font-size:26px">${ic}</span><div class="t"><b>${n}</b><small>${h}</small></div></button>`).join("")}`);
+  document.querySelectorAll("[data-dtnc]").forEach(b=>b.onclick=()=>{DT.newSrc=b.dataset.dtnc;closeDrawer();dtEditOpen(null).then(()=>{DT.newSrc=null;if(b.dataset.dtnc==="file"){const f=document.querySelector("#dte-file");if(f)f.click()}else if(b.dataset.dtnc==="link"){const i=document.querySelector("#dte-link");if(i)i.focus()}})})}
 async function dtEditOpen(d){
   if(d&&d.id&&d.body==null){try{d=await svApi(DT_API+"/docs/"+d.id)}catch(e){toast(e.message);return}}
+  if(d&&d.pending){const P=d.pending;d={...d,title:P.title,summary:P.summary,body:P.body,nhom:P.nhom,teams:P.teams,bat_buoc:P.bat_buoc,lo_trinh:P.lo_trinh,han_ngay:P.han_ngay,quiz:P.quiz,sort:P.sort,files:P.files||[],drive_id:P.drive_id||""}}
   const S=dtScopes();
-  DT.edit=d?{...d,quizText:dtQuizText(d.quiz),major:false,src:d.drive_id?"drive":"web",drive:d.drive_id||""}:{src:"web",drive:"",id:null,nhom:S.chung?"chung":S.web?"web":"team",teams:S.teams&&S.teams.length===1?[S.teams[0]]:[],title:"",summary:"",body:"",bat_buoc:"moi",lo_trinh:"w1",han_ngay:7,sort:100,quizText:"",major:false};
+  DT.edit=d?{...d,quiz:(d.quiz||[]).map(q=>({q:q.q,o:q.o.slice(),a:q.a})),major:false,src:d.drive_id?"link":!String(d.body||"").trim()&&(d.files||[]).length?((d.files||[]).some(f=>f.id)?"file":"link"):"web",drive:d.drive_id||""}:{quiz:[],files:[],src:DT.newSrc||"web",drive:"",id:null,nhom:S.chung?"chung":S.web?"web":"team",teams:S.teams&&S.teams.length===1?[S.teams[0]]:[],title:"",summary:"",body:"",bat_buoc:"moi",lo_trinh:"w1",han_ngay:7,sort:100,quizText:"",major:false};
   dtClose();PAGE="dt_soan";MOD="dt";render();scrollTo(0,0)}
 function pDtSoan(m){
   if(!DT.docs)return dtWait(m,"Soạn tài liệu");dtLoad();
   const me=DT.me||{};if(!me.editor){m.innerHTML=H("Soạn tài liệu","")+`<p class="empty">Bạn chưa được giao quyền soạn tài liệu.</p>`;return}
   if(DT.edit)return dtEditor(m);
-  const mine=(DT.docs||[]).filter(d=>d.can_edit),st=d=>d.status==="dang"?pill("Đang hiện","grn"):d.status==="cho_duyet"?pill("Chờ CEO duyệt","amb"):pill("Nháp","gry");
-  m.innerHTML=DT_CSS+H("Soạn tài liệu",me.ceo?"Chị soạn và duyệt được mọi tài liệu":me.hr?"Bạn soạn được tài liệu Chung (cần CEO duyệt), Sổ tay web và tài liệu các team":"Bạn soạn được tài liệu của team mình")+
+  const mine=(DT.docs||[]).filter(d=>d.can_edit),st=d=>d.status==="dang"&&d.has_pending?pill("Có bản sửa chờ duyệt","amb"):d.status==="dang"?pill("Đang hiện","grn"):d.status==="cho_duyet"?pill("Chờ CEO duyệt","amb"):pill("Nháp","gry");
+  m.innerHTML=DT_CSS+H("Soạn tài liệu",me.ceo?"Soạn và duyệt được mọi tài liệu":me.hr?"Bạn soạn được tài liệu Chung (cần CEO duyệt), Sổ tay web và tài liệu các team":"Bạn soạn được tài liệu của team mình")+
   `<div class="filters"><button class="btn pri" id="dt-new">＋ Tài liệu mới</button></div>
-  <section class="card flush">${tbl(["Tài liệu","Nhóm","Bắt buộc","Lộ trình","Trạng thái","Sửa lần cuối",""],mine.map(d=>`<tr><td><b>${esc(d.title)}</b>${d.drive_id?" "+pill("Google Docs","blu"):""}${d.quiz_n?`<small>${d.quiz_n} câu kiểm tra</small>`:""}</td><td>${esc(d.nhom==="team"?dtTeams(d):DT_NHOM[d.nhom])}</td><td>${esc(DT_BB[d.bat_buoc])}</td><td>${esc(DT_LT[d.lo_trinh]||"—")}</td><td>${st(d)}</td><td class="nowrap">${dtDay(d.updated_at)} · bản ${d.version}</td>
+  <section class="card flush">${tbl(["Tài liệu","Nhóm","Bắt buộc","Lộ trình","Trạng thái","Cập nhật · Duyệt",""],mine.map(d=>`<tr><td><b>${esc(d.title)}</b>${d.drive_id?" "+pill("Google Docs","blu"):""}${d.quiz_n?`<small>${d.quiz_n} câu kiểm tra</small>`:""}</td><td>${esc(d.nhom==="team"?dtTeams(d):DT_NHOM[d.nhom])}</td><td>${esc(DT_BB[d.bat_buoc])}</td><td>${esc(DT_LT[d.lo_trinh]||"—")}</td><td>${st(d)}</td><td><small style="display:block;color:var(--muted);font-size:12.5px;white-space:normal">${dtStamp(d)}</small></td>
     <td class="nowrap"><button class="btn sm" data-dtopen="${esc(d.id)}">Xem</button> <button class="btn sm" data-dted="${esc(d.id)}">Sửa</button> <button class="btn sm danger" data-dtdel="${esc(d.id)}">Gỡ</button></td></tr>`))}</section>
-  <p class="hint">Chỉ đăng tài liệu chuẩn (nội quy, quy trình, hướng dẫn). File làm việc hằng ngày để ở thư mục Drive của team. Tài liệu Chung (nội quy, quy chế) do người khác soạn phải chị Hoa duyệt mới hiện; Sổ tay web và tài liệu team đăng là hiện ngay.</p>`;
-  m.querySelector("#dt-new").onclick=()=>dtEditOpen(null);
+  <p class="hint">Chỉ đăng tài liệu chuẩn (nội quy, quy trình, hướng dẫn). File làm việc hằng ngày để ở thư mục Drive của team. Mọi tài liệu do Lead / quản lý tạo hoặc sửa đều gửi CEO duyệt; trong lúc chờ, mọi người vẫn đọc bản đã duyệt.</p>`;
+  m.querySelector("#dt-new").onclick=dtNewChoose;
   m.querySelectorAll("[data-dted]").forEach(b=>b.onclick=()=>dtEditOpen(DT.docs.find(x=>x.id===b.dataset.dted)));
   m.querySelectorAll("[data-dtdel]").forEach(b=>b.onclick=async()=>{const d=DT.docs.find(x=>x.id===b.dataset.dtdel);if(!confirm("Gỡ tài liệu \""+d.title+"\"? Mọi người sẽ không thấy nữa."))return;
     try{await svApi(DT_API+"/docs/"+d.id,{method:"DELETE"});toast("Đã gỡ");dtLoad(true)}catch(e){toast(e.message)}});dtWire(m)}
@@ -234,16 +309,28 @@ function dtEditor(m){
    <section class="card dt-ed"><label class="field">Tên tài liệu<input id="dte-title" value="${esc(e.title)}" maxlength="160"></label>
     <label class="field">Một dòng giới thiệu (hiện ở thư viện)<input id="dte-sum" value="${esc(e.summary)}" maxlength="300"></label>
     <label class="field" style="margin-bottom:4px">Nội dung soạn ở đâu</label>
-    <div class="dt-chips" style="margin-bottom:8px"><button type="button" class="btn sm${e.src==="web"?" pri":""}" data-dtsrc="web">✎ Gõ ngay trên web</button><button type="button" class="btn sm${e.src==="drive"?" pri":""}" data-dtsrc="drive">📄 File Google Docs trên Drive</button></div>
-    <div id="dte-drv"${e.src==="drive"?"":" hidden"}><div class="acts"><input id="dte-link" value="${esc(e.drive)}" placeholder="Dán link file Google Docs (Chia sẻ › Sao chép đường liên kết)"><button type="button" class="btn sm" id="dte-get">Lấy nội dung</button></div>
-     <p class="hint">Soạn và sửa trong Google Docs như bình thường; web chép nội dung về, ai được xem đọc ngay trên web và web tự cập nhật khi file được sửa. Lần đầu: chia sẻ file (hoặc thư mục ĐÀO TẠO) cho tài khoản của web quyền Người xem. Ảnh trong file Docs không chép sang — cần ảnh thì chèn ở chế độ gõ trên web.</p>
-     <div id="dte-dprev" class="dt-doc card" style="box-shadow:none">${e.src==="drive"&&e.body?dtMd(e.body):'<p class="hint">Bấm Lấy nội dung để xem trước.</p>'}</div></div>
+    <div class="dt-chips" style="margin-bottom:8px">${[["web","✎ Tạo mới (soạn trên web)"],["file","📎 Tải file lên"],["link","🔗 Gắn link Google Drive"]].map(([k,n])=>`<button type="button" class="btn sm${e.src===k?" pri":""}" data-dtsrc="${k}">${n}</button>`).join("")}</div>
+    ${e.src==="file"?`<p class="note">Chọn file từ máy ở ô bên dưới (Word, PDF, Excel, PowerPoint, ảnh). Không cần gõ nội dung — ghi tên tài liệu rồi bấm Đăng.</p>`:""}
+    <div id="dte-drv"${e.src==="link"?"":" hidden"}><div class="acts"><input id="dte-link" placeholder="Dán link file, thư mục hoặc Google Docs trên Drive (Chia sẻ › Sao chép đường liên kết)" style="flex:1"><button type="button" class="btn sm pri" id="dte-get">Gắn link</button></div>
+     <p class="hint">Link <b>Google Docs</b>: web chép nội dung về để đọc ngay trên web và tự cập nhật khi file được sửa (lần đầu chia sẻ file cho tài khoản của web quyền Người xem). Link khác (PDF, bảng tính, trình chiếu, thư mục): người đọc bấm <b>Xem ngay</b> hoặc <b>Mở trên Drive</b> — họ cần được chia sẻ file trên Drive.</p>
+     ${e.drive?`<div class="dt-item" style="cursor:default"><span>📘</span><div class="t"><b>Nội dung lấy từ Google Docs</b><small>${esc(e.drive)}</small></div><button type="button" class="btn sm danger" id="dte-drvx">Bỏ</button></div>
+     <div id="dte-dprev" class="dt-doc card" style="box-shadow:none;max-height:50vh;overflow:auto">${e.body?dtMd(e.body):'<p class="hint">Đang lấy nội dung…</p>'}</div>`:'<div id="dte-dprev"></div>'}</div>
     <div id="dte-web"${e.src==="web"?"":" hidden"}>
-    <div class="dt-tb">${[["# ","Tiêu đề"],["## ","Tiêu đề nhỏ"],["- ","• Gạch đầu dòng"],["1. ","1. Bước"],["> ","💡 Lưu ý"],["**","B Đậm"]].map(([k,n])=>`<button type="button" class="btn sm" data-dtins="${esc(k)}">${n}</button>`).join("")}
-     <label class="btn sm" style="cursor:pointer">🖼 Chèn ảnh<input type="file" accept="image/*" id="dte-img" hidden></label><span class="sp"></span><button type="button" class="btn sm" id="dte-pv">Xem trước</button></div>
-    <textarea id="dte-body" rows="22">${esc(e.body)}</textarea><div id="dte-prev" class="dt-doc card" style="box-shadow:none" hidden></div>
-    <p class="hint">Gõ như viết tin nhắn. Dòng bắt đầu "# " là tiêu đề mục (hiện ở mục lục), "- " gạch đầu dòng, "1. " các bước, "> " ô lưu ý. Ảnh chụp màn hình: bấm Chèn ảnh (tối đa 1,5 MB).</p></div>
-    <label class="field">Câu hỏi kiểm tra (không bắt buộc)<textarea id="dte-quiz" rows="6" placeholder="? Đi muộn quá 15 phút thì phải làm gì?&#10;- Không cần báo&#10;* Báo quản lý trước giờ vào làm&#10;- Báo sau khi tới công ty">${esc(e.quizText)}</textarea><small class="hint">Mỗi câu: dòng "? câu hỏi", rồi các đáp án — "*" là đáp án đúng, "-" là sai. Người đọc phải đúng 80% mới xác nhận được.</small></label>
+    <div class="dt-tb">${[["h2","Tiêu đề mục"],["h3","Tiêu đề nhỏ"],["p","Chữ thường"],["ul","• Gạch đầu dòng"],["ol","1. Các bước"],["blockquote","💡 Lưu ý"],["b","B Đậm"]].map(([k,n])=>`<button type="button" class="btn sm" data-dtfmt="${k}">${n}</button>`).join("")}
+     <label class="btn sm" style="cursor:pointer">🖼 Chèn ảnh<input type="file" accept="image/*" id="dte-img" hidden></label><span class="sp"></span><button type="button" class="btn sm" id="dte-raw">${e.raw?"Về ô soạn thường":"Sửa dạng chữ (nâng cao)"}</button></div>
+    <div id="dte-vis" class="dt-vis dt-doc" contenteditable="true"${e.raw?" hidden":""}>${e.raw?"":dtMdEdit(e.body)}</div>
+    <textarea id="dte-body" rows="22"${e.raw?"":" hidden"}>${esc(e.body)}</textarea>
+    <p class="hint">${e.raw?'Dạng chữ: "# " tiêu đề mục, "- " gạch đầu dòng, "1. " bước, "> " lưu ý, "=> Ai | Việc | Trang" sơ đồ luồng, "| a | b |" bảng.':"Gõ và định dạng như soạn văn bản: bôi đen chữ rồi bấm nút trên thanh công cụ. Dán từ Word / Google Docs được. Sơ đồ luồng, bảng, ảnh có viền chấm là khối cố định — muốn sửa thì bấm Sửa dạng chữ."}</p></div>
+    <div class="card" style="box-shadow:none;background:#fbfcfe;margin:6px 0 14px${e.src!=="web"?";border-color:#4b54d1":""}"><b>${e.src==="link"?"🔗 Các link đã gắn":"📎 Tệp và link đính kèm"}</b> <small class="hint">${e.src==="web"?"(không bắt buộc)":"— nội dung chính của tài liệu"}</small>
+    <div id="dte-files" style="margin-top:6px">${(e.files||[]).map((f,i)=>`<div class="dt-item" style="cursor:default;padding:6px 0"><span>${dtFileIc(f)}</span><div class="t"><b>${esc(f.name)}</b><small>${f.url?esc(f.url):dtSize(f.size)}</small></div><button type="button" class="btn sm danger" data-dtfx="${i}">Bỏ</button></div>`).join("")||'<p class="hint" style="margin:4px 0">Chưa có tệp nào.</p>'}</div>
+    <div class="acts" style="flex-wrap:wrap;margin-top:6px"><label class="btn sm${e.src==="file"?" pri":""}" style="cursor:pointer"${e.src==="link"?" hidden":""}>📎 Tải file từ máy<input type="file" id="dte-file" multiple hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt"></label>
+     <input id="dte-dlink" placeholder="🔗 Hoặc dán link file / thư mục trên Google Drive" style="flex:1;min-width:220px"${e.src==="web"?"":" hidden"}><button type="button" class="btn sm" id="dte-dadd"${e.src==="web"?"":" hidden"}>Thêm link</button></div>
+    <small class="hint">File từ máy: Word, PDF, Excel, PowerPoint, ảnh — tối đa 1,8 MB, người đọc mở hoặc tải về được, PDF xem ngay trong tài liệu. File lớn hơn hoặc đã có trên Drive: dán link — người đọc cần được chia sẻ file đó trên Drive.</small></div>
+    <div class="field"><b>✅ Câu hỏi kiểm tra</b> <small class="hint">(không bắt buộc) — bấm chấm tròn cạnh đáp án đúng. Người đọc phải đúng 80% mới xác nhận được.</small></div>
+    <div id="dte-qz">${(e.quiz||[]).map((q,i)=>`<div class="card dt-qe" data-qi="${i}" style="box-shadow:none;padding:10px 12px;margin-bottom:8px"><div class="acts"><b style="white-space:nowrap">Câu ${i+1}</b><input data-qq value="${esc(q.q)}" placeholder="Gõ câu hỏi" style="flex:1"><button type="button" class="btn sm danger" data-qdel="${i}">Xóa câu</button></div>
+      ${q.o.map((o,j)=>`<div class="acts" style="margin:6px 0 0 20px"><input type="radio" name="qa${i}" value="${j}"${q.a===j?" checked":""} style="width:auto" title="Đáp án đúng"><input data-qo value="${esc(o)}" placeholder="Đáp án ${j+1}" style="flex:1"><button type="button" class="btn sm" data-qodel="${i}:${j}" title="Bỏ đáp án">×</button></div>`).join("")}
+      <button type="button" class="btn sm" data-qoadd="${i}" style="margin:6px 0 0 20px">＋ Đáp án</button></div>`).join("")}</div>
+    <button type="button" class="btn sm" id="dte-qadd">＋ Thêm câu hỏi</button>
    </section>
    <section class="card"><label class="field">Thuộc nhóm<select id="dte-nhom">${nh.map(([k,n])=>`<option value="${k}"${e.nhom===k?" selected":""}>${n}</option>`).join("")}</select></label>
     <div id="dte-teams"${e.nhom==="team"?"":" hidden"}><label class="field" style="margin-bottom:4px">Team được xem</label><div class="dt-chips">${teamOk.map(x=>`<label class="btn sm"><input type="checkbox" value="${esc(x.k)}"${(e.teams||[]).includes(x.k)?" checked":""} style="width:auto;margin-right:4px">${esc(x.n)}</label>`).join("")||'<span class="hint">Chưa có phòng ban nào</span>'}</div><small class="hint">Quản lý các team này và CEO luôn xem được.</small></div>
@@ -254,31 +341,64 @@ function dtEditor(m){
     ${e.id&&e.status==="dang"?`<label class="field"><span><input type="checkbox" id="dte-major" style="width:auto;margin-right:6px">Sửa lớn — lên bản mới, mọi người phải đọc lại</span></label>`:""}
     <div class="acts" style="margin-top:14px;flex-wrap:wrap"><button class="btn pri" id="dte-pub">Đăng tài liệu</button><button class="btn" id="dte-draft">Lưu nháp</button><button class="btn" id="dte-x">Thôi</button></div>
     <p class="hint" id="dte-msg"></p></section></div>`;
-  const $m=s=>m.querySelector(s),ta=$m("#dte-body");
-  const keep=()=>{Object.assign(e,{title:$m("#dte-title").value,summary:$m("#dte-sum").value,body:ta.value,nhom:$m("#dte-nhom").value,bat_buoc:$m("#dte-bb").value,lo_trinh:$m("#dte-lt").value,
-    han_ngay:+$m("#dte-han").value||7,sort:+$m("#dte-sort").value||100,quizText:$m("#dte-quiz").value,drive:$m("#dte-link").value.trim(),teams:[...m.querySelectorAll("#dte-teams input:checked")].map(x=>x.value),major:!!($m("#dte-major")&&$m("#dte-major").checked)})};
-  const ins=(pre,post="")=>{const a=ta.selectionStart,b=ta.selectionEnd,v=ta.value;let ls=v.lastIndexOf("\n",a-1)+1;
-    if(post){ta.value=v.slice(0,a)+pre+v.slice(a,b)+post+v.slice(b);ta.selectionStart=a+pre.length;ta.selectionEnd=b+pre.length}else{ta.value=v.slice(0,ls)+pre+v.slice(ls);ta.selectionStart=ta.selectionEnd=b+pre.length}ta.focus()};
-  m.querySelectorAll("[data-dtins]").forEach(b=>b.onclick=()=>{const k=b.dataset.dtins;k==="**"?ins("**","**"):ins(k)});
+  const $m=s=>m.querySelector(s),ta=$m("#dte-body"),vis=$m("#dte-vis");
+  const readQuiz=()=>[...m.querySelectorAll(".dt-qe")].map(el=>{const i=el.dataset.qi,r=el.querySelector(`input[name=qa${i}]:checked`);
+    return {q:el.querySelector("[data-qq]").value,o:[...el.querySelectorAll("[data-qo]")].map(x=>x.value),a:r?+r.value:-1}});
+  const bodyNow=()=>e.raw?ta.value:dtHtmlToMd(vis);
+  const keep=()=>{Object.assign(e,{title:$m("#dte-title").value,summary:$m("#dte-sum").value,body:bodyNow(),nhom:$m("#dte-nhom").value,bat_buoc:$m("#dte-bb").value,lo_trinh:$m("#dte-lt").value,
+    han_ngay:+$m("#dte-han").value||7,sort:+$m("#dte-sort").value||100,quiz:readQuiz(),teams:[...m.querySelectorAll("#dte-teams input:checked")].map(x=>x.value),major:!!($m("#dte-major")&&$m("#dte-major").checked)})};
+  /* Nút định dạng: dùng lệnh soạn thảo sẵn của trình duyệt trên ô soạn; ở dạng chữ thì chèn ký hiệu đầu dòng như cũ. */
+  const insRaw=(pre,post="")=>{const a=ta.selectionStart,b=ta.selectionEnd,v=ta.value;let ls=v.lastIndexOf("\n",a-1)+1;
+    if(post){ta.value=v.slice(0,a)+pre+v.slice(a,b)+post+v.slice(b)}else{ta.value=v.slice(0,ls)+pre+v.slice(ls)}ta.focus()};
+  const RAWK={h2:"# ",h3:"## ",p:"",ul:"- ",ol:"1. ",blockquote:"> "};
+  m.querySelectorAll("[data-dtfmt]").forEach(b=>{b.onmousedown=ev=>ev.preventDefault();b.onclick=()=>{const k=b.dataset.dtfmt;
+    if(e.raw){k==="b"?insRaw("**","**"):RAWK[k]&&insRaw(RAWK[k]);return}
+    vis.focus();if(k==="b")document.execCommand("bold");else if(k==="ul")document.execCommand("insertUnorderedList");else if(k==="ol")document.execCommand("insertOrderedList");else document.execCommand("formatBlock",false,k.toUpperCase())}});
+  e.files=e.files||[];
+  m.querySelectorAll("[data-dtfx]").forEach(b=>b.onclick=()=>{keep();e.files.splice(+b.dataset.dtfx,1);dtEditor(m)});
+  $m("#dte-file").onchange=async ev=>{const L=[...ev.target.files];if(!L.length)return;keep();
+    for(const f of L){if(f.size>1.8e6){toast(f.name+": quá 1,8 MB. File lớn để trên Google Drive rồi dán link Google Docs.");continue}
+      const fd=new FormData();fd.append("file",f);toast("Đang tải "+f.name+"…");
+      try{const r=await fetch(DT_API+"/file",{method:"POST",body:fd,credentials:"same-origin"}),j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||"Chưa tải được tệp");e.files.push(j.data)}catch(er){toast(f.name+": "+er.message)}}
+    if(!e.title.trim()&&e.files.length)e.title=e.files[0].name.replace(/\.[^.]+$/,"");dtEditor(m);toast("Đã tải tệp lên — nhớ bấm Đăng tài liệu")};
+  $m("#dte-qadd").onclick=()=>{keep();e.quiz.push({q:"",o:["",""],a:-1});dtEditor(m)};
+  m.querySelectorAll("[data-qdel]").forEach(b=>b.onclick=()=>{keep();e.quiz.splice(+b.dataset.qdel,1);dtEditor(m)});
+  m.querySelectorAll("[data-qoadd]").forEach(b=>b.onclick=()=>{keep();e.quiz[+b.dataset.qoadd].o.push("");dtEditor(m)});
+  m.querySelectorAll("[data-qodel]").forEach(b=>b.onclick=()=>{keep();const [i,j]=b.dataset.qodel.split(":").map(Number),q=e.quiz[i];q.o.splice(j,1);if(q.a===j)q.a=-1;else if(q.a>j)q.a--;dtEditor(m)});
+  $m("#dte-dadd").onclick=async()=>{const l=$m("#dte-dlink").value.trim();if(!l){toast("Dán link file trên Drive");return}keep();
+    try{const r=await svApi(DT_API+"/drive/ten",{method:"POST",body:JSON.stringify({link:l})});e.files.push(r);if(!e.title.trim()&&r.name!=="File trên Google Drive")e.title=r.name;dtEditor(m);toast("Đã thêm link — nhớ bấm Đăng tài liệu")}catch(er){toast(er.message)}};
+  $m("#dte-raw").onclick=()=>{keep();e.raw=!e.raw;dtEditor(m)};
+  /* Dán từ Word / Docs: giữ chữ đậm, danh sách, bảng; bỏ màu, cỡ chữ, phông lạ. */
+  vis.addEventListener("paste",ev=>{const h=ev.clipboardData&&ev.clipboardData.getData("text/html");if(!h)return;ev.preventDefault();
+    const d=document.createElement("div");d.innerHTML=h;d.querySelectorAll("style,script,meta,link,title").forEach(x=>x.remove());
+    document.execCommand("insertHTML",false,dtMdEdit(dtHtmlToMd(d)))});
   $m("#dte-nhom").onchange=()=>{$m("#dte-teams").hidden=$m("#dte-nhom").value!=="team"};
   m.querySelectorAll("[data-dtsrc]").forEach(b=>b.onclick=()=>{keep();e.src=b.dataset.dtsrc;dtEditor(m)});
-  $m("#dte-get").onclick=async()=>{const l=$m("#dte-link").value.trim();if(!l){toast("Dán link file Google Docs");return}$m("#dte-get").disabled=true;$m("#dte-msg").textContent="";
-    try{const r=await svApi(DT_API+"/drive/xem",{method:"POST",body:JSON.stringify({link:l})});$m("#dte-dprev").innerHTML=dtMd(r.body)||'<p class="hint">File chưa có nội dung.</p>';
-      if(!$m("#dte-title").value.trim())$m("#dte-title").value=r.title;toast("Đã lấy nội dung từ Drive")}catch(er){$m("#dte-dprev").innerHTML=`<p class="t-red">${esc(er.message)}</p>`}$m("#dte-get").disabled=false};
-  $m("#dte-pv").onclick=()=>{const p=$m("#dte-prev"),on=p.hidden;p.hidden=!on;ta.hidden=on;if(on)p.innerHTML=dtMd(ta.value)||'<p class="hint">Chưa có nội dung.</p>';$m("#dte-pv").textContent=on?"Sửa tiếp":"Xem trước"};
-  $m("#dte-img").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;if(f.size>1.5e6){toast("Ảnh quá 1,5 MB, thu nhỏ hoặc chụp lại giúp em");return}
+  $m("#dte-get").onclick=async()=>{const l=$m("#dte-link").value.trim();if(!l){toast("Dán link trên Google Drive");return}$m("#dte-get").disabled=true;$m("#dte-msg").textContent="";keep();
+    try{const r=await svApi(DT_API+"/drive/ten",{method:"POST",body:JSON.stringify({link:l})});
+      if(r.mime==="application/vnd.google-apps.document"){e.drive=l;e.body="";const x=await svApi(DT_API+"/drive/xem",{method:"POST",body:JSON.stringify({link:l})});e.body=x.body;if(!e.title.trim())e.title=x.title;toast("Đã lấy nội dung từ Google Docs")}
+      else{e.files.push(r);if(!e.title.trim()&&r.name!=="File trên Google Drive")e.title=r.name;toast("Đã gắn link")}dtEditor(m)}
+    catch(er){$m("#dte-msg").textContent=er.message;$m("#dte-get").disabled=false}};
+  {const x=$m("#dte-drvx");if(x)x.onclick=()=>{keep();e.drive="";e.body="";dtEditor(m)}}
+  $m("#dte-img").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;if(f.size>1.5e6){toast("Ảnh quá 1,5 MB, hãy thu nhỏ hoặc chụp lại");return}
     const fd=new FormData();fd.append("file",f);toast("Đang tải ảnh…");
     try{const r=await fetch(DT_API+"/img",{method:"POST",body:fd,credentials:"same-origin"}),j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||"Chưa tải được ảnh");
-      const alt=prompt("Mô tả ngắn cho ảnh (hiện dưới ảnh):","Màn hình "+($m("#dte-title").value||""))||"";ins("\n![" + alt.replace(/[\[\]]/g,"") + "](" + j.data.id + ")\n");toast("Đã chèn ảnh")}catch(er){toast(er.message)}ev.target.value=""};
+      const alt=(prompt("Mô tả ngắn cho ảnh (hiện dưới ảnh):","Màn hình "+($m("#dte-title").value||""))||"").replace(/[\[\]]/g,""),md="![" + alt + "](" + j.data.id + ")";
+      if(e.raw)insRaw("\n"+md+"\n");else{vis.focus();document.execCommand("insertHTML",false,dtMdEdit(md)+"<p><br></p>")}toast("Đã chèn ảnh")}catch(er){toast(er.message)}ev.target.value=""};
   $m("#dte-x").onclick=()=>{if(!confirm("Bỏ các thay đổi chưa lưu?"))return;DT.edit=null;renderMain()};
-  const save=async action=>{keep();const q=dtQuizParse(e.quizText);if(q.err){$m("#dte-msg").textContent=q.err;return}
+  const save=async action=>{keep();
+    const Q=e.quiz.map(q=>({q:q.q.trim(),o:q.o.map(o=>o.trim()),a:q.a})).filter(q=>q.q||q.o.some(Boolean));let qerr="";
+    const quiz=Q.map((q,i)=>{const keepIdx=q.o.map((o,j)=>o?j:-1).filter(j=>j>=0);if(!q.q)qerr=qerr||`Câu ${i+1}: gõ câu hỏi`;else if(keepIdx.length<2)qerr=qerr||`Câu ${i+1}: cần ít nhất 2 đáp án`;else if(!keepIdx.includes(q.a))qerr=qerr||`Câu ${i+1}: bấm chấm tròn cạnh đáp án đúng`;
+      return {q:q.q,o:keepIdx.map(j=>q.o[j]),a:keepIdx.indexOf(q.a)}});
+    if(qerr){$m("#dte-msg").textContent=qerr;return}
+    if(e.src==="file"&&!(e.files||[]).length){$m("#dte-msg").textContent="Chọn file từ máy để tải lên";return}
+    if(e.src==="link"&&!e.drive&&!(e.files||[]).length){$m("#dte-msg").textContent="Dán link rồi bấm Gắn link";return}
     if(e.title.trim().length<3){$m("#dte-msg").textContent="Ghi tên tài liệu";return}
     if(e.nhom==="team"&&!e.teams.length){$m("#dte-msg").textContent="Chọn ít nhất một team được xem";return}
-    if(e.src==="drive"&&!e.drive){$m("#dte-msg").textContent="Dán link file Google Docs";return}
-    const body={nhom:e.nhom,teams:e.teams,title:e.title.trim(),summary:e.summary.trim(),body:e.body,bat_buoc:e.bat_buoc,lo_trinh:e.lo_trinh,han_ngay:e.han_ngay,sort:e.sort,quiz:q.quiz,action,major:e.major,drive:e.src==="drive"?e.drive:""};
+    const body={nhom:e.nhom,teams:e.teams,title:e.title.trim(),summary:e.summary.trim(),body:e.src==="web"?e.body:"",bat_buoc:e.bat_buoc,lo_trinh:e.lo_trinh,han_ngay:e.han_ngay,sort:e.sort,quiz,action,major:e.major,drive:e.src==="link"?e.drive:"",files:e.files||[]};
     m.querySelectorAll("#dte-pub,#dte-draft").forEach(b=>b.disabled=true);
     try{const r=await svApi(DT_API+"/docs"+(e.id?"/"+e.id:""),{method:e.id?"PUT":"POST",body:JSON.stringify(body)});
-      toast(r.status==="cho_duyet"?"Đã gửi, chờ chị Hoa duyệt":r.status==="dang"?"Đã đăng":"Đã lưu nháp");if(r.id)delete DT.doc[r.id];DT.edit=null;await dtLoad(true)}
+      toast(r.pending?"Đã gửi bản sửa — chờ CEO duyệt, mọi người vẫn đọc bản cũ":r.status==="cho_duyet"?"Đã gửi, chờ CEO duyệt":r.status==="dang"?"Đã đăng":"Đã lưu nháp");if(r.id)delete DT.doc[r.id];DT.edit=null;await dtLoad(true)}
     catch(er){$m("#dte-msg").textContent=er.message;m.querySelectorAll("#dte-pub,#dte-draft").forEach(b=>b.disabled=false)}};
   $m("#dte-pub").onclick=()=>save("dang");$m("#dte-draft").onclick=()=>save("nhap")}
 
@@ -334,10 +454,10 @@ function pDtQuyen(m){
     `<tr><td><b>Chung</b> (nội quy, quy chế)</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td></tr>`,
     `<tr><td><b>Sổ tay web vận hành</b></td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td><td class="t-grn">Xem</td></tr>`,
     `<tr><td><b>Tài liệu team</b></td><td class="t-grn">Xem</td><td class="hint">Không thấy</td><td class="t-grn">Xem, soạn, theo dõi ai đã đọc</td><td class="t-grn">Xem tất cả</td></tr>`])}
-   <p class="hint">Quản lý = tài khoản vai trò Trưởng phòng / Trưởng nhóm có ghi phòng ban. Phòng ban của từng người sửa ở Tài khoản & phân quyền; web cập nhật khi chị Hoa hoặc người làm nhân sự lưu.</p></section>
+   <p class="hint">Quản lý = tài khoản vai trò Trưởng phòng / Trưởng nhóm có ghi phòng ban. Phòng ban của từng người sửa ở Tài khoản & phân quyền; web cập nhật khi CEO hoặc người làm nhân sự lưu.</p></section>
   <section class="card"><div class="card-h"><h2>Người được soạn / sửa</h2>${me.ceo?`<span class="sp"></span><button class="btn pri sm" id="dt-grn">＋ Giao quyền soạn cho người khác</button>`:""}</div>
    ${tbl(["Người","Phòng","Được soạn",""],auto.concat(gr))}
-   <p class="hint">Tài liệu Chung do người không phải CEO soạn hoặc sửa phải chị Hoa bấm duyệt mới hiện cho mọi người.</p></section>`;
+   <p class="hint">Tài liệu Chung do người không phải CEO soạn hoặc sửa phải CEO duyệt mới hiện cho mọi người.</p></section>`;
   const nb=m.querySelector("#dt-grn");if(nb)nb.onclick=()=>dtGrantForm(null);
   m.querySelectorAll("[data-dtgr]").forEach(b=>b.onclick=()=>dtGrantForm(b.dataset.dtgr))}
 function dtGrantForm(uid){
@@ -358,4 +478,4 @@ if(typeof ICONS!=="undefined"&&!ICONS.book)ICONS.book='<path d="M4 5a2 2 0 0 1 2
  const meOk=k=>()=>!!(DT.me&&DT.me[k]);
  MODULES.push({k:"dt",ic:"book",n:"Đào tạo",zone:"",sub:"",groups:()=>[["",[MI("dt_home","Đào tạo của tôi",null,dtCnt),MI("dt_lib","Thư viện tài liệu")]],
    ["Dành cho quản lý",[MI("dt_theo","Theo dõi nhân viên mới",meOk("tracker")),MI("dt_soan","Soạn tài liệu",meOk("editor")),MI("dt_quyen","Ai xem được gì",()=>!!(DT.me&&(DT.me.ceo||DT.me.hr)))]]]})}
-{const _r=render;render=function(){const r=_r.apply(this,arguments);try{if(ME&&!(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")&&!DT.at&&!DT.busy)dtLoad().then(()=>{if(DT.me&&(DT.me.tracker||DT.me.editor))render()})}catch(e){}return r}}
+{const _r=render;render=function(){const r=_r.apply(this,arguments);try{const pp=document.querySelector(".topbar .pp");if(pp)pp.style.display=String(PAGE).startsWith("dt_")?"none":"";}catch(e){}try{if(ME&&!(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")&&!DT.at&&!DT.busy)dtLoad().then(()=>{if(DT.me&&(DT.me.tracker||DT.me.editor))render()})}catch(e){}return r}}
