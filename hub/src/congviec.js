@@ -40,7 +40,7 @@ function cvSeed(d){
 }
 /* ---------- gộp mọi việc thành một danh sách ---------- */
 function cardStatus(c){return c.step==="cg"||!c.nguoi?"cg":(c.step==="kb"||c.step==="dang")?"todo":["dkb","dvd","dceo"].includes(c.step)?"review":c.step==="xong"?"done":"doing"}
-function cardProject(c){const d=D();for(const p of d.projects||[]){const L=p.loc||{};if(L.orders)continue;if(L.tuyen&&!L.tuyen.includes(c.tuyen))continue;if(L.kenh&&!L.kenh.includes(c.kenh))continue;if(L.tuyenNot&&L.tuyenNot.includes(c.tuyen))continue;if(L.toiNgay&&c.day>L.toiNgay)continue;if(L.tuNgay&&c.day<L.tuNgay)continue;return p.id}return c.order?"DA-06":""}
+function cardProject(c){const d=D();for(const p of d.projects||[]){const L=p.loc||{};if(L.orders||L.none)continue;if(L.sku&&!L.sku.includes(c.sku))continue;if(L.tuyen&&!L.tuyen.includes(c.tuyen))continue;if(L.kenh&&!L.kenh.includes(c.kenh))continue;if(L.tuyenNot&&L.tuyenNot.includes(c.tuyen))continue;if(L.toiNgay&&c.day>L.toiNgay)continue;if(L.tuNgay&&c.day<L.tuNgay)continue;return p.id}return c.order?"DA-06":""}
 /* Gom các việc video giống hệt nhau (cùng người, tên, hạn, trạng thái) thành một dòng "× N video", khỏi mỗi video một task */
 const CV_CAT=[["dang","đã đăng"],["duyet","đã duyệt"],["dung","đang dựng"],["sua","đang sửa"],["doi","đợi duyệt"],["quay","đang quay"],["viet","đang viết"],["chua","chưa làm"]];
 const cvCat=c=>{const s=c.step;if(s==="xong")return "dang";if(s==="dang")return "duyet";if(["dkb","dvd","dceo"].includes(s))return "doi";if((c.gopy||[]).length&&["kb","edit","worker","quay"].includes(s))return "sua";if(["edit","worker"].includes(s))return "dung";if(s==="quay")return "quay";if(s==="kb"&&(c.nguoiKB||c.hookText||c.noiDung))return "viet";return "chua"};
@@ -396,6 +396,21 @@ function prjStats(p){
   if(!L.length){st="Chưa có việc";tone="gry"}else if(done===L.length){st="Hoàn thành";tone="grn"}else if(late){st="Có việc trễ";tone="red"}else if(p.han<td){st="Quá hạn dự án";tone="red"}else if(pc2<exp-10){st="Chậm";tone="amb"}
   return {L,done,late,doing,pc2,exp,st,tone};
 }
+/* Tiến độ dự án video theo giai đoạn (chị Hoa 02/11): đọc thẳng thẻ video ở Điều phối (Lead Content chia việc ở đó), không chỗ phân việc thứ hai.
+   Mỗi giai đoạn: đã qua bao nhiêu / tổng số video của dự án, đang nằm ở đây bao nhiêu, ai đang giữ. Bấm một giai đoạn để xem từng video. */
+const PJ_GD=[["kb","Kịch bản / hook",["cg","kb","dkb"]],["quay","Quay",["quay"]],["edit","Edit",["edit","worker"]],["duyet","Duyệt video",["dvd","dceo"]],["dang","Đăng",["dang","xong"]]];
+const pjGdOf=c=>PJ_GD.findIndex(g=>g[2].includes(c.step));
+const pjHolder=c=>c.step==="kb"?(c.nguoiKB||c.nguoi):c.step==="edit"?(c.nguoiEdit||c.nguoi):c.step==="quay"?c.nguoi:c.step==="dang"?(((D().kenhPT||{})[c.kenh]||{}).chinh||""):"";
+const pjHolderLbl=c=>c.step==="cg"?"Chưa giao":c.step==="dkb"||c.step==="dvd"?"Lead Content duyệt":c.step==="dceo"?"CEO duyệt":c.step==="worker"?"Máy đang dựng":userName(pjHolder(c))||"—";
+const pjCards=p=>D().cards.filter(c=>c.step!=="huy"&&cardProject(c)===p.id);
+function pjStageHtml(p){const C=pjCards(p),N=C.length;if(!N)return "";
+  return `<div class="pjgd"><div class="pjgdh">Tiến độ ${N} video theo giai đoạn <small>(đọc từ Điều phối)</small></div>${PJ_GD.map(([k,t],i)=>{const here=C.filter(c=>pjGdOf(c)===i&&c.step!=="xong"),past=C.filter(c=>pjGdOf(c)>i||c.step==="xong").length,
+    who=[...new Set(here.map(pjHolder).filter(Boolean))],late=here.filter(c=>typeof isLate==="function"&&isLate(c)).length,pc=Math.round(past/N*100);
+    return `<button type="button" class="pjs${late?" late":""}" data-pjs="${esc(p.id)}|${k}" title="Bấm để xem từng video"><b class="pjs1">${t}</b><i class="pjsb"><i style="width:${pc}%"></i></i><span class="pjs2"><b>${past}</b>/${N}</span><span class="pjs3">${here.length?`${here.length} đang làm${late?` · <em>${late} trễ</em>`:""} ${who.slice(0,3).map(avatar).join("")}`:""}</span></button>`}).join("")}</div>`}
+function pjStageOpen(pid,k){const p=(D().projects||[]).find(x=>x.id===pid);if(!p)return;const i=PJ_GD.findIndex(g=>g[0]===k),C=pjCards(p).filter(c=>pjGdOf(c)===i).sort((a,b)=>(a.han||99)-(b.han||99));
+  openDrawerHTML(`<h2>${esc(p.ten)} · ${PJ_GD[i][1]}</h2><p class="hint">${C.length} video đang ở giai đoạn này. Chia lại việc, đổi hạn ở Điều phối (bấm từng video để mở thẻ).</p>
+   ${C.length?tbl(["Video","Bước","Đang giữ","Hạn"],C.map(c=>`<tr class="clk" data-pjc="${esc(c.id)}"><td><b>${esc(cvShort(c.hookText||c.yTuong||c.tuyen||c.id,60))}</b><small>${esc(c.id)} · ${esc(chOf(c.kenh).short||"")} · ${esc(sk(c.sku).n)}</small></td><td>${esc((STEPS.find(s=>s.id===c.step)||{}).t||c.step)}</td><td>${esc(pjHolderLbl(c))}</td><td class="${c.step!=="xong"&&isLate(c)?"t-red":""}">${c.han?dd(c.han):"—"}</td></tr>`)):`<p class="empty">Không có video nào ở giai đoạn này.</p>`}`);
+  $("#drawerIn").querySelectorAll("[data-pjc]").forEach(r=>r.onclick=()=>openCard(r.dataset.pjc))}
 function pCvDa(m){
   const d=D(),td=d.settings.today,ed=tkGiver(),P=d.projects||[],S={};P.forEach(p=>S[p.id]=prjStats(p));
   const L=P.filter(p=>(!CVP.q||(p.ten+" "+p.id+" "+userName(p.owner)).toLowerCase().includes(CVP.q.toLowerCase()))&&(!CVP.st||S[p.id].st===CVP.st)&&(!CVP.ow||p.owner===CVP.ow)&&(!CVP.uu||(p.uu||"Trung bình")===CVP.uu));
@@ -406,6 +421,7 @@ function pCvDa(m){
     <div class="pjm"><div><small>Phụ trách</small><span>${avatar(p.owner)}${esc(userName(p.owner)||"—")}</span></div><div><small>Hạn</small><span>${dd(p.han)} <i class="${p.han<td&&s.pc2<100?"t-red":""}">${p.han>=td?"còn "+(p.han-td)+" ngày":"trễ "+(td-p.han)+" ngày"}</i></span></div><div><small>Ưu tiên</small>${pill(uu.toUpperCase(),uu==="Cao"?"red":uu==="Thấp"?"gry":"amb")}</div></div>
     <div class="progress big"><i style="width:${s.pc2}%"></i><em style="left:${s.exp}%"></em></div>
     <div class="pjn"><b>${s.pc2}%</b> · ${s.done}/${s.L.length} việc xong${s.doing?` · ${s.doing} đang làm`:""}${s.late?` · <b class="t-red">${s.late} trễ</b>`:""}</div>
+    ${pjStageHtml(p)}
     <div class="pjf"><span class="pjav">${mem.slice(0,4).map(avatar).join("")}${mem.length>4?`<small>+${mem.length-4}</small>`:""}</span><span class="sp"></span><button type="button" class="btn sm" data-pjv="${p.id}">Xem việc</button><button type="button" class="btn sm" data-pjg="${p.id}">Gantt</button>${ed?`<button type="button" class="btn sm" data-pje="${p.id}">Sửa</button>`:""}</div></section>`};
   m.innerHTML=`<div class="cvbar"><input id="pj-q" placeholder="Tìm dự án, người phụ trách…" value="${esc(CVP.q)}"><select id="pj-st">${opt([["","Mọi trạng thái"]].concat(sts),CVP.st)}</select><select id="pj-ow">${opt([["","Mọi người phụ trách"]].concat(owners.map(o=>[o,userName(o)])),CVP.ow)}</select><select id="pj-uu">${opt([["","Mọi mức ưu tiên"]].concat(UU),CVP.uu)}</select>${ed?`<button class="btn pri" type="button" id="pj-new">＋ Thêm dự án</button>`:""}</div>
   ${ed?`<form class="pjq" id="pj-quick"><b>Thêm nhanh</b><input id="pjq-t" placeholder="Tên dự án, chiến dịch" required><select id="pjq-o">${opt(d.users.filter(u=>u.active).map(u=>[u.id,u.name]),ME.id)}</select><select id="pjq-h">${opt(Array.from({length:MONTH.ndays},(_,i)=>[i+1,"Hạn "+dayLbl(i+1)]),MONTH.ndays)}</select><button class="btn sm pri">Thêm</button></form>`:""}
@@ -417,6 +433,7 @@ function pCvDa(m){
   m.querySelectorAll("[data-pjv]").forEach(b=>b.onclick=()=>goView(b.dataset.pjv,"list"));
   m.querySelectorAll("[data-pjg]").forEach(b=>b.onclick=()=>goView(b.dataset.pjg,"gantt"));
   m.querySelectorAll("[data-pje]").forEach(b=>b.onclick=()=>openProject(b.dataset.pje));
+  m.querySelectorAll("[data-pjs]").forEach(b=>b.onclick=()=>{const [id,k]=b.dataset.pjs.split("|");pjStageOpen(id,k)});
 }
 function prjSave(id,v){
   DB.mutate(ME.name,(id?"sửa dự án ":"thêm dự án ")+v.ten,dt=>{dt.projects=dt.projects||[];
@@ -425,14 +442,22 @@ function prjSave(id,v){
       dt.projects.push(Object.assign({id:"DA-"+String(n).padStart(2,"0"),moTa:"",uu:"Trung bình",tv:[],batDau:0,loc:{none:true,kenh:["__"]}},v));
       if(typeof notifyU==="function")notifyU(dt,[v.owner,...(v.tv||[])],`${ME.name} thêm bạn vào dự án "${v.ten}"`,"page:cv_da")}});
 }
+/* sản phẩm / kênh chọn trong form dự án → p.loc; dự án cũ đã có bộ lọc riêng (tuyến, ngày…) mà không chọn gì thì giữ nguyên */
+function pjLocForm(p){const sku=[...document.querySelectorAll("[name=pf-sku]:checked")].map(x=>x.value),kenh=[...document.querySelectorAll("[name=pf-kenh]:checked")].map(x=>x.value);
+  if(sku.length)return {loc:Object.assign({sku},kenh.length?{kenh}:{})};
+  if(p&&p.loc&&!p.loc.none&&!p.loc.sku)return kenh.length?{loc:Object.assign({},p.loc,{kenh})}:{};
+  return {loc:kenh.length?{kenh}:{none:true,kenh:["__"]}}}
 function openProject(id){
   const d=D(),p=id?(d.projects||[]).find(x=>x.id===id):null,users=d.users.filter(u=>u.active&&u.role!=="admin"||u.id===ME.id),days=Array.from({length:MONTH.ndays},(_,i)=>[i+1,dayLbl(i+1)]);
   openDrawerHTML(`<h2>${p?"Sửa dự án":"Thêm dự án"}</h2><form class="frm" id="pjf2"><label class="field">Tên dự án<input id="pf-t" required value="${esc(p?p.ten:"")}"></label><label class="field">Mô tả<textarea id="pf-m" rows="2">${esc(p?p.moTa||"":"")}</textarea></label>
    <div class="row4"><label class="field">Team<select id="pf-team">${opt(Object.entries(TEAMS),p?p.team:"content")}</select></label><label class="field">Phụ trách<select id="pf-o">${opt(users.map(u=>[u.id,u.name]),p?p.owner:ME.id)}</select></label></div>
    <div class="row4"><label class="field">Bắt đầu<select id="pf-b">${opt([[0,"—"]].concat(days),p?p.batDau||0:0)}</select></label><label class="field">Hạn<select id="pf-h">${opt(days,p?p.han:MONTH.ndays)}</select></label><label class="field">Ưu tiên<select id="pf-u">${opt(UU,p?p.uu||"Trung bình":"Trung bình")}</select></label></div>
+   <div class="field">Video ở Điều phối thuộc dự án <small class="hint">(chọn sản phẩm, có thể thêm kênh; để trống nếu dự án không có video)</small>
+    <div class="phc">${prods().map(s=>`<label class="ck sm"><input type="checkbox" name="pf-sku" value="${esc(s.k)}" ${p&&p.loc&&(p.loc.sku||[]).includes(s.k)?"checked":""}> ${esc(s.n)}</label>`).join("")}</div>
+    <div class="phc">${CHANNELS.map(ch=>`<label class="ck sm"><input type="checkbox" name="pf-kenh" value="${esc(ch.k)}" ${p&&p.loc&&!p.loc.none&&(p.loc.kenh||[]).includes(ch.k)?"checked":""}> ${esc(ch.short||ch.k)}</label>`).join("")}</div></div>
    <div class="field">Thành viên<div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="pf-tv" value="${u.id}" ${p&&(p.tv||[]).includes(u.id)?"checked":""}> ${esc(u.name)}</label>`).join("")}</div></div>
    <div class="acts"><button class="btn pri">${p?"Lưu":"Thêm dự án"}</button>${p&&ME.role==="admin"?`<button type="button" class="btn danger" id="pf-del">Xóa</button>`:""}</div></form>`);
-  $("#pjf2").onsubmit=e=>{e.preventDefault();prjSave(id,{ten:$("#pf-t").value.trim(),moTa:$("#pf-m").value,team:$("#pf-team").value,owner:$("#pf-o").value,batDau:+$("#pf-b").value||0,han:+$("#pf-h").value,uu:$("#pf-u").value,tv:[...document.querySelectorAll("[name=pf-tv]:checked")].map(x=>x.value)});toast(id?"Đã lưu":"Đã thêm dự án");closeDrawer();renderMain()};
+  $("#pjf2").onsubmit=e=>{e.preventDefault();prjSave(id,{ten:$("#pf-t").value.trim(),moTa:$("#pf-m").value,team:$("#pf-team").value,owner:$("#pf-o").value,batDau:+$("#pf-b").value||0,han:+$("#pf-h").value,uu:$("#pf-u").value,tv:[...document.querySelectorAll("[name=pf-tv]:checked")].map(x=>x.value),...pjLocForm(p)});toast(id?"Đã lưu":"Đã thêm dự án");closeDrawer();renderMain()};
   if($("#pf-del"))$("#pf-del").onclick=()=>{if(!confirm("Xóa dự án này? Các việc trong dự án vẫn còn, chỉ bỏ gắn dự án."))return;DB.mutate(ME.name,"xóa dự án "+p.ten,dt=>{dt.projects=(dt.projects||[]).filter(x=>x.id!==id);(dt.tasks||[]).forEach(t=>{if(t.da===id)t.da=""})});closeDrawer();renderMain()};
 }
 /* ---------- Gantt: dự án và việc theo trục thời gian của tháng; việc nhiều công đoạn hiện từng đoạn theo từng người ---------- */

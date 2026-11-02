@@ -840,3 +840,10 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .tnrq{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
 .tnrl{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #f0f1f5;font-size:13px}
 @media(max-width:760px){.tn{grid-template-columns:1fr;height:calc(100vh - 130px)}.tn .tnmain{display:none}.tn.open .tnside{display:none}.tn.open .tnmain{display:flex}.tnback{display:block}.tnhb .btn{padding:4px 7px}}
+/* Dự án: tiến độ theo giai đoạn (thẻ video ở Điều phối) */
+.pjgd{margin:10px 0 4px;border-top:1px solid #f0f1f5;padding-top:8px}.pjgdh{font-size:12px;font-weight:700;color:#344054;margin-bottom:4px}.pjgdh small{font-weight:500;color:#98a2b3}
+.pjs{display:grid;grid-template-columns:92px minmax(40px,1fr) 46px 1.3fr;gap:8px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:4px 6px;border-radius:8px;cursor:pointer;font:inherit;color:inherit}
+.pjs:hover{background:#f3f5fa}.pjs1{font-size:12px;font-weight:600}
+.pjsb{display:block;height:6px;border-radius:3px;background:#e6e8ef;overflow:hidden}.pjsb i{display:block;height:100%;background:#2f9e44}
+.pjs2{font-size:11.5px;color:#667085;text-align:right}.pjs2 b{font-size:13px;color:#101828}
+.pjs3{font-size:11px;color:#475467;display:flex;align-items:center;gap:3px;flex-wrap:wrap}.pjs3 em{font-style:normal;color:#c92a2a;font-weight:700}.pjs3 .av{width:18px;height:18px;font-size:9.5px}
