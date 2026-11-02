@@ -13,7 +13,7 @@ const tnMe=()=>(typeof SV!=="undefined"&&SV.me&&SV.me.id)||ME.crm||ME.id;
 const tnU=id=>id?D().users.find(x=>x.crm===id)||D().users.find(x=>x.id===id):null;
 const tnUN=id=>(tnU(id)||{}).name||"";
 const tnGroups=()=>[["chung","Chung toàn công ty"]].concat(Object.entries(TEAMS).filter(([k])=>k!=="chung"));
-const tnMyTeam=()=>{const t=ME.phongBan&&typeof KG_TEAM!=="undefined"&&KG_TEAM[ME.phongBan]?KG_TEAM[ME.phongBan]:String(teamOf(ME)||"").toLowerCase();return TEAMS[t]&&t!=="chung"?t:""};
+const tnMyTeam=()=>{const t=ME.phongBan&&typeof KPB_TEAM!=="undefined"&&KPB_TEAM[ME.phongBan]?KPB_TEAM[ME.phongBan]:String(teamOf(ME)||"").toLowerCase();return TEAMS[t]&&t!=="chung"?t:""};
 const tnDm=id=>"dm:"+[tnMe(),id].sort().join("~");
 const tnOther=r=>r.startsWith("dm:")?r.slice(3).split("~").find(x=>x!==tnMe())||tnMe():"";
 const tnName=r=>r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";
