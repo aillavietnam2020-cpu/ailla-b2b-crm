@@ -24,6 +24,7 @@ const DQ_CSS=`<style>
 .dq .dqfun{display:flex;flex-direction:column;gap:7px}.dq .dqfr{display:grid;grid-template-columns:110px minmax(0,1fr) 44px;align-items:center;gap:8px;font-size:13px}.dq .dqfr .b{height:20px;border-radius:6px;min-width:3px}
 .dq .red{color:#dc2626;font-weight:600}.dq .mut{color:#6b7280}.dq .mono{font-family:ui-monospace,monospace;font-size:12px;color:#6b7280}
 .dq .empty{color:#6b7280;padding:14px 0;text-align:center}
+.dq .dqtabs{margin-bottom:14px}
 @media(max-width:1100px){.dq .dqk{grid-template-columns:repeat(4,minmax(0,1fr))}.dq .dqch{grid-template-columns:repeat(2,minmax(0,1fr))}.dq .dqg2{grid-template-columns:1fr}}
 @media(max-width:640px){.dq .dqk{grid-template-columns:repeat(2,minmax(0,1fr))}.dq .dqch{grid-template-columns:1fr}}
 </style>`;
@@ -53,8 +54,8 @@ function pDqContent(m){
    ${k("a","✂️","Đang làm",nf(N.lam),"kịch bản, quay, dựng")}
    ${k("p","⏳","Chờ duyệt",nf(N.doi),"kịch bản "+N.dkb+" · video "+N.dvd)}
    ${k("r","🔧","Cần sửa",nf(N.sua),"bị trả lại")}
-   ${k("g","💰","GMV từ video",money(gmv),nf(don)+" đơn")}
-   ${k("p","🏆","Video win",nf(winNew),"≥"+wOrd+" đơn"+(winGoal?" · mục tiêu "+winGoal:""))}</div>`;
+   ${k("","📋","Chưa giao",nf(N.cg+N.chua),"chưa ai nhận")}
+   ${k("b","📤","Chờ đăng",nf(N.cho),"duyệt xong, chưa đăng")}</div>`;
   /* ---- tiến độ từng kênh ---- */
   const chRows=CHANNELS.map(ch=>{const cs=C.filter(c=>c.kenh===ch.k),n=dqCount(cs),pl=past?cs.length:(dqPlanOf(ch.k)||cs.length),nd=past?pl:Math.min(pl,Math.round(pl*Math.min(today,M.nd)/M.nd));return {ch,n,pl,nd,cham:Math.max(0,nd-n.dang)}});
   const al=[];
@@ -94,15 +95,35 @@ function pDqContent(m){
   const F=[["Chưa giao",N.cg+N.chua,"#cbd5e1"],["Đang làm",N.lam,"#f59e0b"],["Chờ duyệt kịch bản",N.dkb,"#a78bfa"],["Chờ duyệt video",N.dvd,"#8b5cf6"],["Cần sửa",N.sua,"#ef4444"],["Chờ đăng",N.cho,"#3b82f6"],["Đã đăng",N.dang,"#22c55e"]],fm=Math.max(1,...F.map(f=>f[1]));
   const fun=`<div class="card dqc"><h2 class="dqh">🎞️ Video đang ở bước nào <small>toàn team</small></h2><div class="dqfun">${F.map(f=>`<div class="dqfr"><span>${f[0]}</span><div class="b" style="width:${(f[1]/fm*100).toFixed(1)}%;background:${f[2]}"></div><b>${f[1]}</b></div>`).join("")}</div></div>`;
   /* ---- top video win ---- */
-  const T=(typeof winners==="function"?winners():[]).filter(w=>w.loai!=="Có đơn").slice(0,8),medal=["🥇","🥈","🥉"];
-  const nb=w=>typeof winVars==="function"?winVars("TT-"+w.key).length:0;
-  const win=`<div class="card dqc" style="margin-top:14px"><h2 class="dqh">🏆 Top video win <small>≥${wOrd} đơn là Win, ≥${+set.potential||30} đơn là tiềm năng · số từ báo cáo TikTok</small></h2>${T.length?`<table class="dqt"><tr><th>#</th><th>Video</th><th>Sản phẩm</th><th>Kênh</th><th>Người làm</th><th>View</th><th>Đơn</th><th>GMV</th><th>Đã nhân bản</th></tr>
-   ${T.map((w,i)=>{const n=nb(w);return `<tr><td>${medal[i]||i+1}</td><td style="text-align:left;max-width:340px">${esc(String(w.ten||"").slice(0,70))}<div class="mono">${esc(w.key)}</div></td><td>${esc(sk(w.sku).n)}</td><td>${esc(chOf(w.kenh).short)}</td><td>${esc(userName(w.nguoi)||"—")}</td><td>${nf(w.view)}</td><td>${nf(w.don)}</td><td>${money(w.gmv)}</td><td>${w.loai==="Winner"?(n?n+" bản":`<span class="red">chưa nhân bản</span>`):`<span class="mut">tiềm năng</span>`}</td></tr>`}).join("")}</table>`:`<p class="empty">Chưa có video nào đạt mức tiềm năng.</p>`}</div>`;
-  m.innerHTML=DQ_CSS+`<div class="dq">${kpis}${alert}${chHtml}${dqHieuQua(C,past,M,set)}${prHtml}<div class="dqg2">${pplHtml}${fun}</div>${win}</div>`;
+  const win=dqWinTop(set);
+  /* 2 tab (chị Hoa 02/11): Hiệu quả kênh = kết quả bán hàng; Tiến độ sản xuất = khối lượng việc của team */
+  let tab="sx";try{tab=localStorage.getItem("ailla_dqtab")||"sx"}catch(e){}if(!["hq","sx"].includes(tab))tab="sx";
+  const tabs=`<div class="seg ptk dqtabs">${[["sx","🎬 Tiến độ sản xuất"],["hq","💹 Hiệu quả kênh"]].map(([k2,t])=>`<button type="button" data-dqtab="${k2}" class="${tab===k2?"on":""}">${t}</button>`).join("")}</div>`;
+  const body=tab==="hq"?dqHieuQua(C,past,M,set)+win:kpis+alert+chHtml+prHtml+`<div class="dqg2">${pplHtml}${fun}</div>`;
+  m.innerHTML=DQ_CSS+H("Tổng quan Content",past?"Tháng "+M.mon:"Tháng "+M.mon+" · cập nhật theo dữ liệu trên web")+`<div class="dq">${tabs}${body}</div>`;
+  m.querySelectorAll("[data-dqspk]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqspk",b.dataset.dqspk)}catch(e){}renderMain()});
+  m.querySelectorAll("[data-dqwf]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqwf",b.dataset.dqwf)}catch(e){}renderMain()});
+  m.querySelectorAll("[data-dqwin]").forEach(r=>r.onclick=e=>{if(e.target.closest("a"))return;dqWinGo(r.dataset.dqwin)});
+  m.querySelectorAll("[data-dqtab]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqtab",b.dataset.dqtab)}catch(e){}renderMain()});
   m.querySelectorAll("[data-dqsku]").forEach(r=>r.onclick=()=>{if(typeof bvGo==="function"){const s=r.dataset.dqsku,kn=(C.find(c=>c.sku===s)||{}).kenh||(ptPairs().find(x=>x.sku===s)||{}).kenh||"TikTok chính";bvGo(kn,s,"")}});
   m.querySelectorAll("[data-dqch]").forEach(e=>e.onclick=()=>{const r=chRows.find(x=>x.ch.k===e.dataset.dqch);if(r)dqChOpen(r,C.filter(c=>c.kenh===r.ch.k),past,M)});
   if(typeof bindCommon==="function")bindCommon(m);
 }
+/* Top video win (chị Hoa 02/11): gộp video win inhouse (video shop, từ báo cáo TikTok) và video win KOC, lọc Tất cả / Inhouse / KOC.
+   Bấm một dòng: mở trang Video win đúng tab và mở luôn khung nhân bản của video đó. */
+function dqWinTop(set){
+  const d=D(),wOrd=+set.winnerOrders||100,pot=+set.potential||30;let f="all";try{f=localStorage.getItem("ailla_dqwf")||"all"}catch(e){}if(!["all","in","koc"].includes(f))f="all";
+  const nb=ref=>typeof winVars==="function"?winVars(ref).length:0,lo=n=>n>=wOrd?"Winner":"Tiềm năng";
+  const IN=(typeof winners==="function"?winners():[]).filter(w=>w.loai!=="Có đơn").map(w=>({g:"in",go:"in|TT-"+w.key,ten:w.ten,id:w.key,sku:w.sku,kenh:chOf(w.kenh).short,who:userName(w.nguoi)||"—",view:+w.view||0,don:+w.don||0,gmv:+w.gmv||0,loai:w.loai,ref:"TT-"+w.key}));
+  const KO=(d.kocVideos||[]).filter(v=>(+v.don||0)>=pot).map(v=>{const r=(d.winResearch||[]).find(x=>x.kocId===v.id);return {g:"koc",go:"koc|"+(r?r.id:""),ten:v.ten,id:v.id,sku:v.sku,kenh:"KOC @"+(v.acc||""),who:"—",view:+v.view||0,don:+v.don||0,gmv:+v.gmv||0,loai:lo(+v.don||0),ref:r?r.id:"",duyet:!!r}});
+  const all=(f==="in"?IN:f==="koc"?KO:IN.concat(KO)).sort((a,b)=>b.don-a.don||b.gmv-a.gmv).slice(0,12),medal=["🥇","🥈","🥉"];
+  const chip=(k,t,n)=>`<button type="button" data-dqwf="${k}" class="${f===k?"on":""}">${t} <span class="mut">${n}</span></button>`;
+  const st=x=>x.loai!=="Winner"?`<span class="mut">tiềm năng</span>`:x.g==="koc"&&!x.duyet?`<span class="mut">chưa vào kho win</span>`:(()=>{const n=nb(x.ref);return n?n+" bản":`<span class="red">chưa nhân bản</span>`})();
+  return `<div class="card dqc" style="margin-top:14px"><h2 class="dqh" style="flex-wrap:wrap">🏆 Top video win <small>≥${wOrd} đơn là Win, ≥${pot} đơn là tiềm năng · bấm một dòng để xem chi tiết và nhân bản</small><span style="flex:1"></span><span class="seg ptk" style="font-size:12px">${chip("all","Tất cả",IN.length+KO.length)}${chip("in","Video win inhouse",IN.length)}${chip("koc","Video win KOC",KO.length)}</span></h2>
+   ${all.length?`<table class="dqt"><tr><th>#</th><th>Video</th><th>Nguồn</th><th>Sản phẩm</th><th>Kênh</th><th>Người làm</th><th>View</th><th>Đơn</th><th>GMV</th><th>Đã nhân bản</th></tr>
+   ${all.map((x,i)=>`<tr class="clk" data-dqwin="${esc(x.go)}"><td>${medal[i]||i+1}</td><td style="text-align:left;max-width:340px">${esc(String(x.ten||"").slice(0,70))}<div class="mono">${esc(x.id)}</div></td><td>${x.g==="koc"?"KOC":"Inhouse"}</td><td>${esc(sk(x.sku).n)}</td><td>${esc(x.kenh)}</td><td>${esc(x.who)}</td><td>${nf(x.view)}</td><td>${nf(x.don)}</td><td>${money(x.gmv)}</td><td>${st(x)}</td></tr>`).join("")}</table>`:`<p class="empty">Chưa có video nào đạt mức tiềm năng.</p>`}</div>`}
+function dqWinGo(go){const [g,ref]=String(go).split("|");PAGE="win";if(typeof modGroups==="function"&&typeof curMod==="function"&&!modGroups(curMod()).some(x=>x[1].some(i=>i[0]==="win")))MOD="";SUB.win=g==="koc"?"koc":"rank";render();scrollTo(0,0);
+  if(ref&&typeof hyWin==="function")setTimeout(()=>hyWin(ref),150);else if(g==="koc")toast("Video KOC này chưa duyệt vào kho win: vào KOC / Affiliate bấm “✓ Vào kho win” để nhân bản")}
 /* Hiệu quả kênh (chị Hoa duyệt 02/11): bán được gì, video có được xem không, xem rồi có mua không, video win.
    Số view / click / đơn / GMV của từng video lấy từ báo cáo TikTok nhập hằng tuần; video chưa có báo cáo không tính vào view. */
 function dqHieuQua(C,past,M,set){
@@ -124,11 +145,17 @@ function dqHieuQua(C,past,M,set){
   const koc=(d.kocVideos||[]).filter(inM),kW=koc.filter(v=>(+v.don||0)>=wOrd),kT=koc.filter(v=>(+v.don||0)>=pot&&(+v.don||0)<wOrd);
   const W=(typeof winners==="function"?winners():[]).filter(w=>w.loai==="Winner"),nbN=w=>typeof winVars==="function"?winVars("TT-"+w.key).length:0,daNb=W.filter(w=>nbN(w)>0).length;
   const k=(cl,ic,lb,v,sub)=>`<div class="${cl}"><small>${ic} ${lb}</small><b>${v}</b><i>${sub}</i></div>`;
-  const wins=`<div class="dqk" style="grid-template-columns:repeat(5,minmax(0,1fr))">${k("p","🏆","Win nội bộ",nf(T.win),"video team làm trong tháng")}${k("b","✨","Tiềm năng nội bộ",nf(T.tn),"≥"+pot+" đơn")}${k("g","🤝","Win KOC",nf(kW.length),kT.length+" video KOC tiềm năng")}${k("a","🧬","Win đã nhân bản",nf(daNb),"trên "+W.length+" video win")}${k("r","⏳","Win chưa nhân bản",nf(W.length-daNb),"nên giao nhân bản")}</div>`;
+  const wins=`<div class="dqk" style="grid-template-columns:repeat(4,minmax(0,1fr))">${k("b","✨","Tiềm năng nội bộ",nf(T.tn),"≥"+pot+" đơn")}${k("g","🤝","Win KOC",nf(kW.length),kT.length+" video KOC tiềm năng")}${k("a","🧬","Win đã nhân bản",nf(daNb),"trên "+W.length+" video win")}${k("r","⏳","Win chưa nhân bản",nf(W.length-daNb),"nên giao nhân bản")}</div>`;
   /* top 5 video theo GMV từng kênh */
   const tops=R.filter(r=>r.s.top.length);
   const topHtml=tops.length?`<h2 class="dqh">🔝 Top 5 video theo GMV từng kênh</h2><div class="dqch">${tops.map(r=>`<div><div class="hd">${esc(r.ch.short)}</div><table class="dqt"><tr><th>Video</th><th>View</th><th>Đơn</th><th>GMV</th></tr>${r.s.top.map(c=>`<tr class="clk" data-card="${esc(c.id)}"><td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(c.hookText||c.yTuong||"")}">${esc(String(c.hookText||c.yTuong||c.id).slice(0,40))}</td><td>${nf(c.view)}</td><td>${nf(c.don)}</td><td>${money(c.gmv)}</td></tr>`).join("")}</table></div>`).join("")}</div>`:"";
-  return tbl+wins+topHtml}
+  const kk=(cl,ic,lb,v,sub)=>`<div class="${cl}"><small>${ic} ${lb}</small><b>${v}</b><i>${sub}</i></div>`;
+  const head=`<div class="dqk">${kk("g","💰","GMV từ video",money(T.gmv),gtT?dqPct(T.gmv,gtT)+"% mục tiêu "+money(gtT):"chưa đặt mục tiêu GMV")}${kk("b","🛒","Đơn",nf(T.don),"từ "+nf(T.dang)+" video đã đăng")}${kk("","💵","GMV / video",money(T.gpv),"trung bình mỗi video")}${kk("p","👁️","View",nf(T.view),"TB "+nf(Math.round(T.vtb))+" / video")}${kk("a","👆","Tỷ lệ bấm",p1(T.ctr),"click / view")}${kk("g","✅","Tỷ lệ chốt",p1(T.chot),"đơn / click")}${kk("r","💤","Video <1k view",nf(T.dead),T.rp?"trên "+nf(T.rp)+" video có số":"chưa có báo cáo")}${kk("p","🏆","Video win",nf(T.win),"≥"+wOrd+" đơn · tỷ lệ "+(T.dang?dqPct(T.win,T.dang):0)+"%")}</div>`;
+  /* top sản phẩm bán chạy: GMV từ video đã đăng trong tháng, cộng các kênh */
+  let spk="";try{spk=localStorage.getItem("ailla_dqspk")||""}catch(e){}if(spk&&!R.some(r=>r.ch.k===spk))spk="";
+  const ps=C.filter(c=>c.step==="xong"&&chOf(c.kenh).needId&&(!spk||c.kenh===spk)),sp=[...new Set(ps.map(c=>c.sku))].map(s2=>{const L=ps.filter(c=>c.sku===s2);return {s:s2,n:L.length,g:sum(L,c=>+c.gmv||0),dn:sum(L,c=>+c.don||0),v:sum(L,c=>+c.view||0),ch:[...new Set(L.map(c=>chOf(c.kenh).short))].join(", ")}}).filter(x=>x.g>0||x.dn>0).sort((a,b)=>b.g-a.g).slice(0,10);
+  const spHtml=`<div class="card dqc" style="margin-bottom:14px"><h2 class="dqh" style="flex-wrap:wrap">🛍️ Top sản phẩm bán chạy <small>GMV từ video đã đăng trong tháng${spk?" · "+esc(chOf(spk).short):", cộng các kênh"}</small><span style="flex:1"></span><span class="seg ptk" style="font-size:12px">${[["","Tất cả kênh"]].concat(R.map(r=>[r.ch.k,r.ch.short])).map(([k3,t3])=>`<button type="button" data-dqspk="${esc(k3)}" class="${spk===k3?"on":""}">${esc(t3)}</button>`).join("")}</span></h2>${sp.length?`<table class="dqt"><tr><th>#</th><th>Sản phẩm</th><th>Kênh</th><th>Video</th><th>View</th><th>Đơn</th><th>GMV</th><th>GMV / video</th></tr>${sp.map((x,i)=>`<tr><td>${i+1}</td><td>${swatch(x.s)}${esc(sk(x.s).n)}</td><td>${esc(x.ch)}</td><td>${x.n}</td><td>${nf(x.v)}</td><td>${nf(x.dn)}</td><td>${money(x.g)}</td><td>${money(x.n?x.g/x.n:0)}</td></tr>`).join("")}</table>`:`<p class="empty">Chưa có số bán từ video tháng này. Số lên sau khi nhập báo cáo TikTok.</p>`}</div>`;
+  return head+tbl+spHtml+topHtml}
 /* Bấm thẻ kênh (chị Hoa 02/11): cửa sổ chi tiết — số tổng, theo sản phẩm, theo người, danh sách video chưa đăng (bấm mở thẻ Điều phối) */
 const DQ_ST=[["chua","Chưa làm"],["lam","Đang làm"],["sua","Cần sửa"],["dkb","Chờ duyệt kịch bản"],["dvd","Chờ duyệt video"],["cho","Duyệt xong, chờ đăng"],["dang","Đã đăng"]];
 function dqChOpen(r,cs,past,M){const ch=r.ch,u=ch.needId?"video":"bài",late=c=>typeof isLate==="function"&&c.step!=="xong"&&isLate(c);
