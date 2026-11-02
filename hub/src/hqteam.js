@@ -13,11 +13,10 @@ function hqCard(o){
    ${o.k&&o.k.length?`<div class="xkstrip" style="grid-template-columns:repeat(${Math.min(o.k.length,5)},minmax(0,1fr));box-shadow:none;margin-bottom:12px">${o.k.map(([l,v,h])=>`<div class="xk ro${v==="—"?" mut":""}" style="min-height:0"><span class="xkl">${l}</span><span class="xkv numeric" style="font-size:22px">${v==="—"?"Chưa có số":v}</span><span class="xkm">${h||""}</span></div>`).join("")}</div>`:""}
    ${o.body||""}${o.note?`<p class="hint">${o.note}</p>`:""}</section>`;
 }
+/* chị Hoa 02/11: thẻ Hiệu quả team (số bán hàng) chỉ cho team bán hàng (CEO cũng không cần); người khác xem Công việc › Tổng quan */
+const hqSaleSee=u=>{if(!u||u.role==="admin")return false;const t=typeof teamOf==="function"?teamOf(u):"";return ["sale","digital","ads","koc"].includes(t)||["ADS","KOC","SALE"].includes(u.phongBan||"")};
 function pHieuQuaTeam(m){
-  /* chị Hoa 02/11: team làm việc (không bán hàng) như Content, Media, Kho… xem tổng quan việc của team, không xem số bán hàng. */
-  {const t=typeof teamOf==="function"?teamOf(ME):"",sale=["sale","digital","ads","koc"].includes(t)||["ADS","KOC","SALE"].includes(ME.phongBan||"");
-   /* dùng trang Công việc › Tổng quan chị đã duyệt (tqviec.js), không làm bảng thứ hai */
-   if(PAGES.cv_tq&&ME.role!=="admin"&&!sale){PAGES.cv_tq(m);return}}
+  if(PAGES.cv_tq&&!hqSaleSee(ME)){PAGES.cv_tq(m);return} // vào bằng đường dẫn cũ: mở Tổng quan việc
   pHieuQuaBan(m)}
 function pHieuQuaBan(m){
   try{if(typeof adfLoad==="function"){adfLoad();adfMergeDays()}if(typeof fbsLoad==="function")fbsLoad();if(typeof tsbLoadAll==="function")tsbLoadAll()}catch(e){}
@@ -59,5 +58,5 @@ PAGES.hq=pHieuQuaTeam;
 /* Menu trang vận hành: "Hiệu quả team" ngay dưới "Tổng quan". */
 if(typeof HOST_MODE==="undefined"||HOST_MODE!=="admin"){
   const i=MODULES.findIndex(x=>x.k==="exec");
-  MODULES.splice(i>=0?i+1:0,0,{k:"hq",zone:"",ic:"users",n:"Hiệu quả team",sub:"",groups:()=>[["",[MI("hq","Hiệu quả team")]]]});
+  MODULES.splice(i>=0?i+1:0,0,{k:"hq",zone:"",ic:"users",n:"Hiệu quả team",sub:"",groups:()=>[["",[MI("hq","Hiệu quả team",hqSaleSee)]]]});
 }
