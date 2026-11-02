@@ -847,3 +847,9 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .pjsb{display:block;height:6px;border-radius:3px;background:#e6e8ef;overflow:hidden}.pjsb i{display:block;height:100%;background:#2f9e44}
 .pjs2{font-size:11.5px;color:#667085;text-align:right}.pjs2 b{font-size:13px;color:#101828}
 .pjs3{font-size:11px;color:#475467;display:flex;align-items:center;gap:3px;flex-wrap:wrap}.pjs3 em{font-style:normal;color:#c92a2a;font-weight:700}.pjs3 .av{width:18px;height:18px;font-size:9.5px}
+/* công đoạn: số lượng + nhiều người */
+.tcdq{display:inline-flex;gap:4px;align-items:center}.tcdq input{width:86px}.tcdq input[data-f=sl]{width:78px}
+.tcdph{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-left:28px}
+.tcdp{display:inline-flex;gap:4px;align-items:center;border:1px solid #e6e8ef;border-radius:8px;padding:3px 7px;font-size:12.5px;background:#fafbfd}.tcdp.fin{background:#eefaf1;border-color:#c8ead2}
+.tcdp em{font-style:normal;font-weight:700}.tcdp input[type=number]{width:58px}.tcdp select{max-width:150px}.tcdp .av{width:20px;height:20px;font-size:10px}
+.tcd2 .tcdp{white-space:nowrap}.tcd2 .tcdp input[type=number]{width:56px!important;flex:none;padding:3px 6px}.tcd2 .tcdp select{width:auto!important;flex:none}.tcd2 .tcdq input{flex:none}
