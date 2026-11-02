@@ -295,7 +295,7 @@ billRoutes.post('/', requirePermission('order.payment.record'), async (c) => {
   if (!file || typeof file === 'string') throw badRequest('MISSING', 'Chưa chọn ảnh bill');
   if (!customerId) throw badRequest('MISSING', 'Chưa chọn khách hàng');
   if (!ALLOWED.includes(file.type)) throw badRequest('BAD_TYPE', 'Chỉ nhận ảnh (jpg, png, webp) hoặc PDF');
-  if (file.size > MAX_FILE) throw badRequest('TOO_LARGE', 'File quá 1,5 MB, chụp lại hoặc thu nhỏ giúp em');
+  if (file.size > MAX_FILE) throw badRequest('TOO_LARGE', 'File quá 1,5 MB, hãy chụp lại hoặc thu nhỏ ảnh');
 
   const scope = scopeOf(auth);
   const customer = await c.env.DB.prepare(

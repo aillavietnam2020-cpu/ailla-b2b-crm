@@ -59,7 +59,7 @@ function tmRoll(dt,newKey){
   dt.month=newKey;
   if(dt.settings)dt.settings.today=1;
   dt.notifs=dt.notifs||[];
-  (dt.users||[]).filter(u=>u.active!==false&&u.role==="admin").forEach(u=>dt.notifs.push({id:"nt-"+Date.now().toString(36)+u.id,to:u.id,text:"Web đã chuyển sang tháng "+ni.mon+"/"+ni.year+": việc chưa xong giữ hạn cũ (hiện trễ hạn), kế hoạch KPI để trống chờ chị nhập mới.",at:new Date().toISOString(),ref:"",by:"",read:false}))
+  (dt.users||[]).filter(u=>u.active!==false&&u.role==="admin").forEach(u=>dt.notifs.push({id:"nt-"+Date.now().toString(36)+u.id,to:u.id,text:"Web đã chuyển sang tháng "+ni.mon+"/"+ni.year+": việc chưa xong giữ hạn cũ (hiện trễ hạn), kế hoạch KPI để trống chờ nhập mới.",at:new Date().toISOString(),ref:"",by:"",read:false}))
 }
 
 /* kiểm tra khi mở web và mỗi phút: tháng thật đã qua tháng đang chạy thì tự chuyển */

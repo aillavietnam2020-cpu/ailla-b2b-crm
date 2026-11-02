@@ -122,7 +122,7 @@ function fpLichBind(m,rows,all){
     const days=[];for(let x=Math.max(1,td);x<=MONTH.ndays;x++){if(new Date(MONTH.year,MONTH.mon-1,x).getDay()!==0)days.push(x)}
     if(!days.length){toast("Hết ngày trong tháng để xếp");return}
     DB.mutate(ME.name,"tự xếp ngày đăng Fanpage "+U.length+" bài",dt=>{U.forEach(u=>{const c=dt.cards.find(x=>x.id===u.id);if(!c)return;let best=days[0];days.forEach(x=>{if((cnt[x]||0)<(cnt[best]||0))best=x});c.day=best;cnt[best]=(cnt[best]||0)+1})});
-    toast("Đã xếp ngày cho "+U.length+" bài. Chị chỉnh lại từng bài nếu cần");renderMain()};
+    toast("Đã xếp ngày cho "+U.length+" bài. Chỉnh lại từng bài nếu cần");renderMain()};
   const im=m.querySelector("[data-fpimp]"),fi=m.querySelector("#fp-file");if(im&&fi){im.onclick=()=>fi.click();fi.onchange=()=>{if(fi.files[0])fpImport(fi.files[0]);fi.value=""}}
 }
 

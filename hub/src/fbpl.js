@@ -29,10 +29,10 @@ function fbdAdvice(x){
     const neg=L2.filter(t=>t.dt-t.gv<0).sort((a,b)=>(a.dt-a.gv)-(b.dt-b.gv)).slice(0,3);
     if(neg.length)L.push(["red",neg.length+" sản phẩm bán lỗ ở mức giá vốn",neg.map(t=>esc(t.n)+" (lỗ gộp "+money(t.gv-t.dt)+" trên doanh thu "+money(t.dt)+")").join("; ")+". Đề xuất xem lại giá bán hoặc dừng bán lẻ mã này."]);
     const nogv=L2.filter(t=>!t.gv).slice(0,4);
-    if(nogv.length)L.push(["amb",nogv.length+" sản phẩm chưa có giá vốn trong Sheet nên lãi bị thổi lên",nogv.map(t=>esc(t.n)).join(", ")+". Chị bổ sung giá vốn vào bảng NHAP_Gia_von để P&L đúng."]);
+    if(nogv.length)L.push(["amb",nogv.length+" sản phẩm chưa có giá vốn trong Sheet nên lãi bị thổi lên",nogv.map(t=>esc(t.n)).join(", ")+". Hãy bổ sung giá vốn vào bảng NHAP_Gia_von để P&L đúng."]);
     const top=L2.filter(t=>t.gv).sort((a,b)=>(b.dt-b.gv)-(a.dt-a.gv))[0];
     if(top)L.push(["grn","Mã lãi gộp cao nhất: "+esc(top.n),"Lãi gộp "+money(top.dt-top.gv)+", biên "+fbdPct(top.dt-top.gv,top.dt,0)+". Ưu tiên ngân sách và nội dung cho mã này, tăng dần khoảng 20% mỗi ngày."])}
-  if(!x.OP||!x.OP.has)L.push(["blu","Chi phí vận hành chưa nhập","Lợi nhuận trên đây chưa trừ lương, kho, mặt bằng, quản lý. Chị nhập ở tab Nhập chi phí, lợi nhuận tự tính lại."]);
+  if(!x.OP||!x.OP.has)L.push(["blu","Chi phí vận hành chưa nhập","Lợi nhuận trên đây chưa trừ lương, kho, mặt bằng, quản lý. Nhập ở tab Nhập chi phí, lợi nhuận tự tính lại."]);
   return L;
 }
 function pFbPL(m){
@@ -63,7 +63,7 @@ function pFbPL(m){
   const y=+PERIOD.from.slice(0,4),mo=+PERIOD.from.slice(5,7),mDays=new Date(y,mo,0).getDate(),fc=oneMonth&&startsDay1&&A.n?A.dtChot/A.n*mDays:0,pctT=tg?A.dtChot/tg*100:0;
   const cmpRows=[fbdCmp("Doanh thu giao thành công",C.dt,Cp.dt),fbdCmp("Giá vốn",C.gv,Cp.gv,true),fbdCmp("Chi phí vận chuyển (gồm ship hoàn)",C.ship+C.shipRet,Cp.ship+Cp.shipRet,true),fbdCmp("Chi phí quảng cáo (gồm thuế)",C.qcT,Cp.qcT,true),fbdCmp("Tổng chi phí",tot,totP,true),fbdCmp("Lợi nhuận (chưa trừ vận hành)",prof,profP),fbdCmp("Biên lợi nhuận",margin,Cp.dt?profP/Cp.dt*100:0,false,fbdPlPct)].join("");
   const bar=(v,c)=>`<div class="fbd-rb big"><i style="width:${Math.max(0,Math.min(100,v)).toFixed(1)}%;background:${c}"></i></div>`;
-  const goal=`<div class="fbd-goal"><div class="l">Mục tiêu doanh số Facebook tháng ${mo}/${y}</div>${tg?`<div class="v">${money(A.dtChot)} <small>/ ${money(tg)}</small></div>${bar(pctT,pctT>=100?"#087a55":"#e7357b")}<div class="s">đạt ${fbdPct(A.dtChot,tg)} mục tiêu (doanh thu đơn chốt)${fc?`; theo đà hiện tại cuối tháng khoảng <b>${money(fc)}</b> (${fbdPct(fc,tg,0)} mục tiêu)`:""}</div>`:`<div class="s">Chưa đặt mục tiêu doanh số Facebook. Chị đặt ở trang Tổng quan, mục "Mục tiêu doanh số theo tháng", em sẽ so sánh tại đây.</div>`}<div class="l" style="margin-top:12px">Biên lợi nhuận so với mục tiêu ${FBD_TARGET.toLocaleString("vi-VN")}%</div>${bar(margin/FBD_TARGET*100,margin>=FBD_TARGET?"#087a55":"#f59f00")}<div class="s">hiện ${fbdPct(prof,C.dt)} (chưa trừ chi phí vận hành)</div></div>`;
+  const goal=`<div class="fbd-goal"><div class="l">Mục tiêu doanh số Facebook tháng ${mo}/${y}</div>${tg?`<div class="v">${money(A.dtChot)} <small>/ ${money(tg)}</small></div>${bar(pctT,pctT>=100?"#087a55":"#e7357b")}<div class="s">đạt ${fbdPct(A.dtChot,tg)} mục tiêu (doanh thu đơn chốt)${fc?`; theo đà hiện tại cuối tháng khoảng <b>${money(fc)}</b> (${fbdPct(fc,tg,0)} mục tiêu)`:""}</div>`:`<div class="s">Chưa đặt mục tiêu doanh số Facebook. Đặt ở trang Tổng quan, mục "Mục tiêu doanh số theo tháng" để so sánh tại đây.</div>`}<div class="l" style="margin-top:12px">Biên lợi nhuận so với mục tiêu ${FBD_TARGET.toLocaleString("vi-VN")}%</div>${bar(margin/FBD_TARGET*100,margin>=FBD_TARGET?"#087a55":"#f59f00")}<div class="s">hiện ${fbdPct(prof,C.dt)} (chưa trừ chi phí vận hành)</div></div>`;
   /* Dự kiến khi các đơn đang giao có kết quả: chỉ hiện với kỳ còn đơn mới (14 ngày cuối của số liệu). Tháng đã đóng, tiền về hết thì số thật là số chuẩn. */
   const dataLast=Object.keys(DAYD.fb||{}).sort().pop()||lastK,matureEnd=iso(addD(pdate(dataLast),-14)),young=days.some(k=>k>matureEnd);
   let fcCard="";

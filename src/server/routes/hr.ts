@@ -37,7 +37,7 @@ hrRoutes.post('/files', async (c) => {
   const ma = String(form?.get('ma') ?? '').trim();
   const kind = String(form?.get('kind') ?? 'khac');
   if (!ma || !file || typeof file === 'string') throw badRequest('MISSING', 'Thiếu file hoặc mã nhân sự');
-  if (file.size > MAX_FILE) throw badRequest('TOO_LARGE', 'File quá 1,5 MB, chị thu nhỏ hoặc chụp lại giúp em');
+  if (file.size > MAX_FILE) throw badRequest('TOO_LARGE', 'File quá 1,5 MB, hãy thu nhỏ hoặc chụp lại ảnh');
   const id = crypto.randomUUID();
   const now = nowIso();
   await c.env.DB.batch([

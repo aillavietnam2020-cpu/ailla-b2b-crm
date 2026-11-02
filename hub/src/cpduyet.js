@@ -20,7 +20,7 @@ const CP_CATS_NEW=[
  ["LE","Lễ, văn hóa, phúc lợi","Nhân sự","Biến đổi","Toàn công ty","HCNS"],
  ["DEN-BU","Đền bù, hoàn tiền cho khách","Bán hàng","Biến đổi","Kênh","B2C"],
  ["VATTU","Vật tư nhỏ xưởng, văn phòng","Vận hành","Biến đổi","Toàn công ty","BDH"],
- ["CHUA-ROAT","Chưa rõ, chờ chị Huệ xem","Khác","Biến đổi","Toàn công ty","KT"],
+ ["CHUA-ROAT","Chưa rõ, chờ Kế toán xem","Khác","Biến đổi","Toàn công ty","KT"],
  ["NAP-ADS","Nạp tiền quảng cáo (chỉ đối chiếu)","Marketing","Biến đổi","Kênh","ADS"],
  ["TRUNG","Đã có trong báo cáo sàn (không tính lại)","Khác","Biến đổi","Kênh","KT"],
  ["NHAM","Chuyển nhầm, không phải chi phí","Khác","Biến đổi","Toàn công ty","KT"]
@@ -36,7 +36,7 @@ const CP_LOAI_TXT={A:"A · trực tiếp kênh",B:"B · của phòng ban",C:"C �
 /* Đề xuất khoản chi từ diễn giải. Trả về {cat,kenh,pb,ly,chac}. */
 function cpDeXuat(text){
   const d=D(),rule=(d.cpRules||{})[cpKey(text)];
-  if(rule&&rule.cat)return {cat:rule.cat,kenh:rule.kenh||"",pb:rule.pb||"",ly:"giống lần chị Huệ đã duyệt",chac:true};
+  if(rule&&rule.cat)return {cat:rule.cat,kenh:rule.kenh||"",pb:rule.pb||"",ly:"giống lần Kế toán đã duyệt",chac:true};
   const t=" "+kfold(text)+" ",has=re=>re.test(t),FB="Facebook / Pancake",TT="TikTok Shop",SP="Shopee",NPP="B2B / Đại lý (CRM)";
   const kenhSan=has(/tiktok|tikotk/)?TT:has(/shopee|shopemall/)?SP:"";
   const R=[
@@ -63,19 +63,19 @@ function cpDeXuat(text){
   ];
   const raw=" "+String(text).toLowerCase()+" ";
   for(const [re,f] of R)if(re.test(re.raw?raw:t)){return {kenh:"",pb:"",...f(),chac:true}}
-  return {cat:"CHUA-ROAT",kenh:"",pb:"",ly:"web chưa đoán được, chị Huệ chọn",chac:false};
+  return {cat:"CHUA-ROAT",kenh:"",pb:"",ly:"web chưa đoán được, Kế toán chọn",chac:false};
 }
 const cpNote=x=>x.note||"";
 /* ---------- Chị Thảo ghi nhanh ---------- */
 function cpQuick(){
   const today=mhToday();
-  openDrawerHTML(`<h2>Ghi chi phí</h2><p class="hint">Chỉ cần ngày, số tiền, diễn giải, ảnh bill. Web đề xuất khoản chi và kênh, chị Huệ duyệt.</p>
+  openDrawerHTML(`<h2>Ghi chi phí</h2><p class="hint">Chỉ cần ngày, số tiền, diễn giải, ảnh bill. Web đề xuất khoản chi và kênh, Kế toán duyệt.</p>
   <div class="note amb">Mua nguyên vật liệu, vỏ, bao bì: đừng ghi ở đây. Lập <b>Phiếu mua hàng</b> khi đặt, khi trả tiền ghi <b>Phiếu chi nhà cung cấp</b> gắn phiếu mua đó (đi vào giá vốn).</div>
   <form class="frm" id="cqf">
    <label class="field">Diễn giải (ghi như trên sổ: "Nạp quảng cáo FB", "Cước xe", "Mua quạt dưới xưởng"…)<input id="cqf-n" required></label>
    <div class="row4"><label class="field">Số tiền (đ)<input id="cqf-t" type="number" min="1" required></label><label class="field">Ngày chi<input id="cqf-d" type="date" value="${today}" required></label></div>
    ${mhPayMethodHtml("cqf")}
-   <div id="cqf-e"></div><div id="cqf-g" class="hint"></div><button class="btn pri">Gửi chị Huệ</button></form>`);
+   <div id="cqf-e"></div><div id="cqf-g" class="hint"></div><button class="btn pri">Gửi Kế toán</button></form>`);
   mhPayMethodBind("cqf","");
   $("#cqf-n").oninput=e=>{const x=cpDeXuat(e.target.value);$("#cqf-g").innerHTML=e.target.value.length>2?`Web đề xuất: <b>${esc(cpCat(x.cat).n)}</b>${x.kenh?" · "+esc(x.kenh):""} <span class="hint">(${esc(x.ly)})</span>`:""};
   $("#cqf").onsubmit=async e=>{e.preventDefault();const pm=mhPayMethodRead("cqf"),err=t=>{$("#cqf-e").innerHTML=`<div class="note red">${esc(t)}</div>`};
@@ -85,7 +85,7 @@ function cpQuick(){
     const id=uid("cp"),ngay=$("#cqf-d").value,note=$("#cqf-n").value.trim(),de=cpDeXuat(note);
     DB.mutate(ME.name,"ghi chi phí chờ duyệt",dt=>{cpEnsureCats(dt);if(!dt.costsCho)dt.costsCho=[];dt.costsCho.push({id,ngay,thang:ngay.slice(0,7),tien,note,by:ME.name,at:Date.now(),de,...pm})});
     let up=0;for(const f of [...$("#cqf-f").files]){try{const x=await mhPrepFile(f);await kApi("/mh/costs/"+id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
-    closeDrawer();toast("Đã gửi chị Huệ phân bổ"+(up?", đính kèm "+up+" ảnh":""));SOCP.files=null;if(["cp_duyet","so_cp"].includes(PAGE))renderMain()}}
+    closeDrawer();toast("Đã gửi Kế toán phân bổ"+(up?", đính kèm "+up+" ảnh":""));SOCP.files=null;if(["cp_duyet","so_cp"].includes(PAGE))renderMain()}}
 spForm=cpQuick;
 /* ---------- Dán nhiều dòng từ sổ MISA ---------- */
 function cpParseMisa(txt){
@@ -134,9 +134,9 @@ function pCpDuyet(m){
   const chac=L.filter(x=>(x.de||{}).chac&&val(x).cat!=="CHUA-ROAT"&&(val(x).kenh||cpCat(val(x).cat).phanBo!=="Kênh"||CP_BO[val(x).cat]||val(x).cat==="VC"));
   const tong=L.reduce((t,x)=>t+x.tien,0),files=SOCP.files||{};spLoadFiles();
   const doi=(d.costsDoiChieu||[]);
-  m.innerHTML=H("Chờ phân bổ","Chị Thảo ghi, web đề xuất, chị Huệ duyệt · "+L.length+" khoản · "+nf(Math.round(tong))+" đ")+
+  m.innerHTML=H("Chờ phân bổ","Quản lý ghi, web đề xuất, Kế toán duyệt · "+L.length+" khoản · "+nf(Math.round(tong))+" đ")+
   `<div class="filters"><button class="btn pri" id="cp-new">＋ Ghi chi phí</button>${can2?`<button class="btn" id="cp-paste">Dán từ sổ MISA</button>`:""}<span class="sp"></span>${can2&&chac.length?`<button class="btn pri" id="cp-all">Duyệt ${chac.length} dòng web đoán chắc</button>`:""}</div>
-  ${can2?"":`<div class="note amb">Chị Huệ (kế toán) hoặc chị Hoa duyệt. Em chỉ xem được trạng thái.</div>`}
+  ${can2?"":`<div class="note amb">Kế toán hoặc CEO duyệt. Bạn chỉ xem được trạng thái.</div>`}
   <section class="card flush">${L.length?tbl(["Ngày","Diễn giải","Số tiền","Khoản chi","Kênh","Phòng ban","Loại","Ảnh",""],L.map(x=>{const v=val(x),lo=cpLoai(v.cat,v.kenh),bo=CP_BO[v.cat],de=x.de||{};
     return `<tr data-id="${x.id}"><td>${esc(kDd(x.ngay))}</td><td><b>${esc(x.note)}</b><div class="hint">${esc(x.by||"")} · ${de.chac?esc(de.ly):`<span class="t-red">${esc(de.ly||"chưa rõ")}</span>`}</div></td><td class="n"><b>${nf(Math.round(x.tien))}</b></td>
     <td>${can2?`<select data-f="cat">${opt(catOpt,v.cat)}</select>`:esc(cpCat(v.cat).n)}</td>
@@ -144,7 +144,7 @@ function pCpDuyet(m){
     <td>${can2?`<select data-f="pb">${opt(pbOpt,v.pb)}</select>`:esc((d.departments.find(p=>p.k===v.pb)||{}).n||"—")}</td>
     <td>${bo?`<span class="hint">${esc(bo)}</span>`:pill(CP_LOAI_TXT[lo],lo==="A"?"blu":lo==="B"?"amb":"gry")}</td>
     <td>${files[x.id]?pill(files[x.id]+" ảnh","blu"):`<span class="hint">chưa có</span>`} <button class="btn sm" data-fi="${x.id}">Ảnh</button></td>
-    <td class="nowrap">${can2?`<button class="btn sm pri" data-ok="${x.id}">Duyệt</button> <button class="btn sm danger" data-del="${x.id}">Xóa</button>`:""}</td></tr>`})):`<p class="empty pad">Không có khoản nào chờ. Chị Thảo ghi bằng nút "＋ Ghi chi phí" hoặc dán từ sổ MISA.</p>`}</section>
+    <td class="nowrap">${can2?`<button class="btn sm pri" data-ok="${x.id}">Duyệt</button> <button class="btn sm danger" data-del="${x.id}">Xóa</button>`:""}</td></tr>`})):`<p class="empty pad">Không có khoản nào chờ. Quản lý ghi bằng nút "＋ Ghi chi phí" hoặc dán từ sổ MISA.</p>`}</section>
   <p class="hint">Loại <b>A</b> đi thẳng vào kênh · <b>B</b> của phòng ban (chọn kênh nếu là lương riêng một kênh) · <b>C</b> chi chung công ty, chia cho kênh theo quy tắc ở Sổ chi phí. Nạp quảng cáo, phí sàn đã có trong báo cáo sàn và chuyển nhầm chỉ để đối chiếu, không cộng vào chi phí. ${doi.length?`Đã đối chiếu: ${doi.length} khoản, ${nf(Math.round(doi.reduce((t,x)=>t+x.tien,0)))} đ.`:""}</p>`;
   $("#cp-new").onclick=()=>cpQuick();if($("#cp-paste"))$("#cp-paste").onclick=()=>cpPaste();
   if($("#cp-all"))$("#cp-all").onclick=()=>{if(confirm("Duyệt "+chac.length+" dòng theo đề xuất của web?"))cpApprove(chac.map(x=>x.id))};
@@ -181,7 +181,7 @@ function cpBaLoai(){
   const rs=Object.values(rev).reduce((a,b)=>a+b,0),act=kenhs.filter(k=>(rev[k]||0)>0||colT[k]>0),chung=colT.__c;
   const share=k=>mode==="khong"||!chung?0:mode==="deu"?chung/Math.max(1,act.length):rs?chung*(rev[k]||0)/rs:0;
   const f=v=>v?nf(Math.round(v)):"—",pc=(a,b)=>b?(a/b*100).toFixed(1).replace(".",",")+"%":"—";
-  if(!grand)return `<section class="card pad"><b>Chi phí theo kênh và theo loại</b><p class="hint">Chưa có khoản chi nào trong kỳ này. Khoản chi nằm ở tab "Chờ phân bổ" cho tới khi chị Huệ duyệt.</p></section>`;
+  if(!grand)return `<section class="card pad"><b>Chi phí theo kênh và theo loại</b><p class="hint">Chưa có khoản chi nào trong kỳ này. Khoản chi nằm ở tab "Chờ phân bổ" cho tới khi Kế toán duyệt.</p></section>`;
   const head=["Loại chi phí"].concat(act.map(k=>k),["Chi chung / chưa gắn kênh","Tổng"]);
   const rows=CP_ROWS.map((n,i)=>rowT[i]?`<tr><td><b>${n}</b></td>${act.map(k=>`<td class="n">${f(M[i][k])}</td>`).join("")}<td class="n">${f(M[i].__c)}</td><td class="n"><b>${f(rowT[i])}</b></td></tr>`:"").join("");
   const tot=`<tr class="tot"><td>Cộng chi phí trực tiếp</td>${act.map(k=>`<td class="n">${f(colT[k])}</td>`).join("")}<td class="n">${f(chung)}</td><td class="n">${f(grand)}</td></tr>`;
@@ -207,7 +207,7 @@ function cpGoCho(){CPT_TAB.t="cho";PAGE="so_cp";try{localStorage.setItem(SKEY+"_
   if(CPT_TAB.t==="th"&&typeof pChiPhi==="function"){m.innerHTML=strip+`<div id="cpt-body"></div>`;pChiPhi(m.querySelector("#cpt-body"));bindTab();return}
   _s.apply(this,arguments);try{m.insertAdjacentHTML("afterbegin",strip);bindTab()}catch(e){}
   try{const n=(D().costsCho||[]).length,k=m.querySelector(".kpis");if(!k)return;
-    const bar=`<div class="note ${n?"amb":""}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${n?`<b>${n} khoản chờ chị Huệ phân bổ</b> (chưa tính vào các số bên dưới)`:"Không có khoản nào chờ phân bổ"}</span><button class="btn sm" id="cp-go">Mở Chờ phân bổ</button></div>`;
+    const bar=`<div class="note ${n?"amb":""}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${n?`<b>${n} khoản chờ Kế toán phân bổ</b> (chưa tính vào các số bên dưới)`:"Không có khoản nào chờ phân bổ"}</span><button class="btn sm" id="cp-go">Mở Chờ phân bổ</button></div>`;
     k.insertAdjacentHTML("beforebegin",bar);
     $("#cp-go").onclick=()=>{CPT_TAB.t="cho";renderMain()};
   }catch(e){}}}

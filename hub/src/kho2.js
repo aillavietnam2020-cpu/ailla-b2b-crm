@@ -180,7 +180,7 @@ function khoParseTdFile(wb){
 async function khoTdImport(){
   let docs=[];try{docs=(await kApi("/docs?type=TD")).filter(d=>d.status==="OK")}catch(e){}
   openDrawerHTML(`<h2>Nạp tồn đầu kỳ từ Excel</h2>
-   <p class="hint">Tải file mẫu: trang <b>NGUYEN_VAT_LIEU</b> kê sẵn toàn bộ nguyên vật liệu theo nhóm, trang <b>BTP_TP</b> để chọn / gõ tên bán thành phẩm, thành phẩm. Điền số vào các ô vàng rồi chọn file lên đây. Hệ thống cho xem trước, chị kiểm lại rồi mới ghi <b>một phiếu</b>.</p>
+   <p class="hint">Tải file mẫu: trang <b>NGUYEN_VAT_LIEU</b> kê sẵn toàn bộ nguyên vật liệu theo nhóm, trang <b>BTP_TP</b> để chọn / gõ tên bán thành phẩm, thành phẩm. Điền số vào các ô vàng rồi chọn file lên đây. Hệ thống cho xem trước, kiểm lại rồi mới ghi <b>một phiếu</b>.</p>
    ${docs.length?`<div class="note amb"><b>Đã có phiếu tồn đầu kỳ:</b> ${docs.map(d=>esc(d.no)+" ("+kDd(d.doc_date)+", "+d.n_lines+" dòng)").join("; ")}. Nạp thêm sẽ <b>cộng dồn</b> vào tồn. Muốn nạp lại từ đầu thì hủy phiếu cũ trước.<div class="row7">${docs.map(d=>`<button class="btn td-cx" data-id="${d.id}" data-no="${esc(d.no)}">Hủy phiếu ${esc(d.no)}</button>`).join(" ")}</div></div>`:""}
    <div class="row7"><button class="btn pri" id="td-tpl">Tải file mẫu (có sẵn danh mục)</button><label class="btn">Chọn file Excel đã điền<input type="file" id="td-f" accept=".xlsx,.xls,.csv" hidden></label>
    <label class="field">Ngày chốt tồn<input type="date" id="td-d" value="${kToday()}"></label></div>
@@ -205,7 +205,7 @@ async function khoTdImport(){
         unknown.push(r)});
       const sum=(a,n)=>a.length?`<div class="note amb"><b>${n}</b> (${a.length}): ${a.slice(0,12).map(r=>esc(r.raw)+" (dòng "+r.line+")").join(", ")}${a.length>12?"…":""}</div>`:"";
       out.innerHTML=`<div class="grid kpis">${kpi("Dòng ghi được",good.length)}${kpi("Cần chọn mã",amb.length)}${kpi("Không tìm ra mã",unknown.length)}${kpi("Lỗi số / bỏ qua",bad.length+zero.length)}</div>
-       ${amb.length?`<section class="card flush"><div class="card-h pad"><h3>Tên gợi nhớ trùng nhiều mã, chọn đúng mã</h3></div>${tbl(["Chị ghi","Số lượng","Chọn mã đúng"],amb.map((a,i)=>`<tr><td>${esc(a.raw)}<small> dòng ${a.line}</small></td><td class="n">${knum(a.qty)}</td><td><select class="td-amb" data-i="${i}"><option value="">— chưa chọn (bỏ qua) —</option>${a.cands.map(c=>`<option value="${esc(c.code)}">${esc(c.code)} · ${esc(c.name)}</option>`).join("")}</select></td></tr>`))}</section>`:""}
+       ${amb.length?`<section class="card flush"><div class="card-h pad"><h3>Tên gợi nhớ trùng nhiều mã, chọn đúng mã</h3></div>${tbl(["Đã ghi","Số lượng","Chọn mã đúng"],amb.map((a,i)=>`<tr><td>${esc(a.raw)}<small> dòng ${a.line}</small></td><td class="n">${knum(a.qty)}</td><td><select class="td-amb" data-i="${i}"><option value="">— chưa chọn (bỏ qua) —</option>${a.cands.map(c=>`<option value="${esc(c.code)}">${esc(c.code)} · ${esc(c.name)}</option>`).join("")}</select></td></tr>`))}</section>`:""}
        ${sum(unknown,"Không tìm ra mã nào khớp (kiểm tra lại tên hoặc thêm mã ở trang Danh mục)")}${sum(bad,"Số lượng không đọc được / âm")}${dup.length?sum(dup,"Mã lặp trong file, đã cộng gộp"):""}
        ${good.length||amb.length?`<section class="card flush">${tbl(["Mã","Tên","ĐVT","Số lượng","Tồn hiện tại","Sau khi nạp"],good.slice(0,300).map(g=>{const it=KHO.items.get(g.code);return `<tr><td class="mono">${esc(g.code)}</td><td>${esc(it.name)}</td><td>${esc(it.unit)}</td><td class="n"><b>${knum(g.qty)}</b></td><td class="n">${knum(khoStock(g.code))}</td><td class="n">${knum(khoStock(g.code)+g.qty)}</td></tr>`}))}${good.length>300?`<p class="hint pad">Đang hiện 300 / ${good.length} dòng.</p>`:""}</section>
        <div class="row7"><button class="btn pri" id="td-ok">Ghi phiếu tồn đầu kỳ</button><span class="hint" id="td-msg"></span></div>`:`<p class="hint">Không có dòng nào ghi được.</p>`}`;
@@ -514,7 +514,7 @@ function pKhoOnline(m){
     const status=src?`<section class="card"><div class="card-h"><h2>${KHO_CH[tab]} · Poscake</h2><span class="tag ${isErr?"amb":""}">${isErr?"Lần kéo gần nhất bị lỗi":"Đang nối"}</span></div>
       <p class="hint">Cửa hàng <b>${esc(src.shop_id)}</b> · tự kéo mỗi sáng 7 giờ (đơn hôm qua và hôm kia) · lần gần nhất <b>${last}</b>${src.last_sync_note?" · "+esc(src.last_sync_note):""}</p>
       ${editMap?`<div class="filters"><input type="date" id="ch-day" value="${kToday()}"><button class="btn" id="ch-sync1">Kéo ngày này</button><button class="btn" id="ch-sync3">Kéo 3 ngày gần nhất</button></div>`:""}</section>`
-      :`<section class="card"><div class="note amb">Chưa nối Poscake cho kênh này.${ceo?" Mở mục “Kết nối Poscake” ở cuối trang để nối.":" Nhờ chị Hoa nối."}</div></section>`;
+      :`<section class="card"><div class="note amb">Chưa nối Poscake cho kênh này.${ceo?" Mở mục “Kết nối Poscake” ở cuối trang để nối.":" Nhờ CEO nối."}</div></section>`;
     const todo=`<section class="card"><div class="card-h"><h2>Cần xử lý${combos.length?" ("+combos.length+")":""}</h2></div>
      ${D.busy||!KHO.chd[tab].combos?`<p class="hint">Đang tải…</p>`:combos.length===0?(D.recon&&!(D.recon.lines||[]).length?`<p class="hint">Chưa có đơn ${KHO_CH[tab]} nào kéo thẳng từ Poscake${D.recon.start_day?" (kênh này tính từ "+kDd(D.recon.start_day)+")":""}, nên chưa có mã nào để kiểm. Số đang hiện là số Sheet đã tách sẵn.</p>`:`<p class="hint">✓ Mọi mã bán trên sàn đều đã có cách quy đổi.</p>`)
        :`<p class="hint">Đây là mã (SKU) <b>mới xuất hiện</b> hoặc chưa được quy đổi nên chưa trừ kho. Shop đổi combo / đổi quà thường đổi SKU: chọn <b>“Giống SKU cũ”</b> để sao chép cách quy đổi của SKU trước rồi chỉnh phần khác, hoặc chọn sản phẩm lẻ + số lượng rồi bấm Thêm (combo nhiều món thì thêm nhiều lần). Món không tính kho thì bấm Bỏ qua.</p>
@@ -553,7 +553,7 @@ function pKhoOnline(m){
        <textarea id="mp-t" rows="4" style="width:100%" placeholder="Dán nội dung tab 'Quy đổi combo' vào đây">${esc(S.mapText||"")}</textarea>
        <div class="filters"><button class="btn" id="mp-chk">Kiểm tra</button>${S.mapParsed?`<button class="btn pri" id="mp-go">Nạp ${S.mapParsed.length} dòng</button>`:""}</div>`:""}
      </section>`:"";
-    body=khoSheetView(D.recon,S,myRuns,tab,{map:`<section class="card"><div class="card-h"><h2>Bảng combo</h2>${goSpc}</div><p class="hint">Bảng quy đổi combo đã chuyển sang <b>web quản trị › Cấu hình › Sản phẩm &amp; combo</b> (chị Hoa chốt 28/10). Chỉ CEO và kế toán sửa ở đó.</p></section>`,missing:todoV+todoMisa,setup:status+setup,nMissing:combos.length+misaRows.length,noMisa:new Set(misaRows.map(([u])=>u.label))});
+    body=khoSheetView(D.recon,S,myRuns,tab,{map:`<section class="card"><div class="card-h"><h2>Bảng combo</h2>${goSpc}</div><p class="hint">Bảng quy đổi combo đã chuyển sang <b>web quản trị › Cấu hình › Sản phẩm &amp; combo</b> (CEO chốt 28/10). Chỉ CEO và kế toán sửa ở đó.</p></section>`,missing:todoV+todoMisa,setup:status+setup,nMissing:combos.length+misaRows.length,noMisa:new Set(misaRows.map(([u])=>u.label))});
   }
   khoFrame(m,"kho_online","Xuất Kênh bán lẻ: bán lẻ Facebook, TikTok, Shopee","Số hàng lẻ bán mỗi ngày ở Facebook, TikTok, Shopee, lấy thẳng từ Poscake, trừ vào tồn kho từ ngày bắt đầu. Kế toán chỉ cần xử lý combo chưa quy đổi, không cần mở Sheet.",tabs+body);
   m.querySelectorAll("[data-ont]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.ont;renderMain()});
@@ -1011,7 +1011,7 @@ function pKhoVo(m){
         const newCode=(nc==null?code:nc).trim(),newName=(nn==null?cur0.name:nn).trim();
         if(newCode!==code||newName!==cur0.name){
           if(!newCode||!newName){msg("Mã và tên không được để trống");return}
-          if(newCode!==code&&!confirm("Đổi mã "+code+" thành "+newCode+"?\n\nWeb đổi mã này ở định mức, phiếu kho, ảnh và hồ sơ vỏ. Chị Huệ cần đổi cùng mã trên MISA để hai bên khớp."))return;
+          if(newCode!==code&&!confirm("Đổi mã "+code+" thành "+newCode+"?\n\nWeb đổi mã này ở định mức, phiếu kho, ảnh và hồ sơ vỏ. Kế toán cần đổi cùng mã trên MISA để hai bên khớp."))return;
           await kApi("/vo/"+encodeURIComponent(code)+"/rename",{method:"POST",body:JSON.stringify({code:newCode,name:newName})});
           code=newCode;S.sel=newCode;
         }
@@ -1079,12 +1079,12 @@ function pKhoVo(m){
       const R=await kApi("/vo/renames"),L=R.renamed||[],AD=R.added||[];
       if(!L.length&&!AD.length){toast("Chưa có vỏ nào đổi mã, đổi tên hoặc thêm mới trên web");return}
       const fd=t=>{const d=new Date(t);return isNaN(d)?"":d.toLocaleDateString("vi-VN")+" "+d.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})};
-      const rows=[["STT","Mã MISA CŨ","Mã MISA MỚI","Loại thay đổi","Tên cũ","Tên mới","Ngày đổi trên web","Người đổi","Chị Huệ đã đổi trên MISA (ghi x)"]]
+      const rows=[["STT","Mã MISA CŨ","Mã MISA MỚI","Loại thay đổi","Tên cũ","Tên mới","Ngày đổi trên web","Người đổi","Kế toán đã đổi trên MISA (ghi x)"]]
         .concat(L.map((r,k)=>[k+1,r.old_code,r.new_code,r.old_code!==r.new_code?"ĐỔI MÃ":"chỉ đổi tên",r.old_name,r.new_name,fd(r.at),r.by,""]));
       const ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
       ws["!cols"]=[{wch:5},{wch:24},{wch:24},{wch:14},{wch:34},{wch:34},{wch:18},{wch:14},{wch:24}];
       XLSX.utils.book_append_sheet(wb,ws,"DOI_MA");
-      const ad=[["STT","Mã MISA mới thêm trên web","Tên","Ngày thêm","Người thêm","Chị Huệ đã tạo trên MISA (ghi x)"]].concat(AD.map((r,k)=>[k+1,r.code,r.name,fd(r.at),r.by,""]));
+      const ad=[["STT","Mã MISA mới thêm trên web","Tên","Ngày thêm","Người thêm","Kế toán đã tạo trên MISA (ghi x)"]].concat(AD.map((r,k)=>[k+1,r.code,r.name,fd(r.at),r.by,""]));
       const ws2=XLSX.utils.aoa_to_sheet(ad);ws2["!cols"]=[{wch:5},{wch:28},{wch:40},{wch:18},{wch:14},{wch:26}];
       XLSX.utils.book_append_sheet(wb,ws2,"MA_MOI_THEM");
       XLSX.writeFile(wb,"vo-da-doi-ma-"+new Date().toISOString().slice(0,10)+".xlsx");
@@ -1109,7 +1109,7 @@ function pKhoVo(m){
       if(P.err){toast(P.err);return}
       if(!confirm("Nạp "+P.vo.length+" vỏ và "+P.pack.length+" thành phẩm từ file? Dữ liệu đã có sẽ được cập nhật theo file."))return;
       const ren=P.vo.filter(x=>x.rename);
-      if(ren.length&&!confirm("File có "+ren.length+" vỏ đổi mã hoặc tên.\n\nWeb đổi ở định mức, phiếu kho, quy đổi, ảnh, hồ sơ vỏ. Chị Huệ cần đổi cùng như vậy trên MISA.\n\nTiếp tục?"))return;
+      if(ren.length&&!confirm("File có "+ren.length+" vỏ đổi mã hoặc tên.\n\nWeb đổi ở định mức, phiếu kho, quy đổi, ảnh, hồ sơ vỏ. Kế toán cần đổi cùng như vậy trên MISA.\n\nTiếp tục?"))return;
       const r=await kApi("/vo/import",{method:"POST",body:JSON.stringify({vo:P.vo.map(x=>{const y=Object.assign({},x);delete y.rename;delete y.renameTo;return y}),pack:P.pack,create:!!P.simple})});
       let renOk=0;const renBad=[];
       for(const x of ren){

@@ -15,7 +15,7 @@ export const fpPublishRoutes = new Hono<AppEnv>();
 fpPublishRoutes.use('*', requirePermission('hub.access'));
 
 const onlyCeo = (c: { get: (k: 'auth') => { user: { role: string } } }) => {
-  if (c.get('auth').user.role !== 'CEO') throw forbidden('Chỉ chị Hoa được nối page và bật đăng tự động');
+  if (c.get('auth').user.role !== 'CEO') throw forbidden('Chỉ CEO được nối page và bật đăng tự động');
 };
 
 fpPublishRoutes.get('/', async (c) => {

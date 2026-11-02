@@ -99,6 +99,6 @@ function pDvViec(m){
   m.querySelectorAll("[data-dvok]").forEach(b=>b.onclick=()=>{if(typeof tkApprove==="function"&&tkApprove(b.dataset.dvok)!==false){toast("Đã duyệt");renderMain()}});
   m.querySelectorAll("[data-dvtre]").forEach(b=>b.onclick=()=>{const [id,ok]=b.dataset.dvtre.split("|"),yes=ok==="1";DB.mutate(ME.name,(yes?"duyệt":"không duyệt")+" lý do trễ "+id,dt=>{const c=dt.cards.find(y=>y.id===id);if(c&&c.tre){c.tre.st=yes?"ok":"khong";c.tre.duyet=ME.name}});toast(yes?"Đã chấp nhận lý do trễ":"Đã ghi không duyệt (tính trễ)");renderMain()});
 }
-PAGES.cv_tq=function(m){try{pDvViec(m)}catch(e){console.error("Tổng quan việc lỗi",e);m.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chị chụp dòng này gửi em: ${esc(String(e&&e.message||e))}</div>`}};
+PAGES.cv_tq=function(m){try{pDvViec(m)}catch(e){console.error("Tổng quan việc lỗi",e);m.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}};
 /* mục menu: chỉ người quản lý việc (CEO, trưởng nhóm, người được giao việc) thấy; nhân viên vào thẳng trang Việc */
 {const i=MODULES.findIndex(x=>x.k==="cv");MODULES.splice(i>=0?i+1:MODULES.length,0,{k:"cvtq",zone:"",ic:"task",n:"Tổng quan việc",sub:"",hide:true,groups:()=>[["",[MI("cv_tq","Tổng quan",()=>dvMgr())]]]})}

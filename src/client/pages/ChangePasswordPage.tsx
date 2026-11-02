@@ -39,7 +39,7 @@ export function ChangePasswordPage({ forced }: { forced?: boolean }) {
       <div className="login-screen">
         <div className="login-card">
           <h1>Đã đổi mật khẩu</h1>
-          <p className="muted">Đang đưa chị về màn hình đăng nhập để vào lại bằng mật khẩu mới…</p>
+          <p className="muted">Đang đưa về màn hình đăng nhập để vào lại bằng mật khẩu mới…</p>
         </div>
       </div>
     );

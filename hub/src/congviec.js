@@ -17,7 +17,7 @@ function cvSeed(d){
     {id:"DA-03",ten:"Fanpage chính T10 — 28 bài",team:"content",owner:"u_oanh",han:31,moTa:"Mỗi tuần 3 video + 4 bài ảnh. Lên lịch cả tháng, agent tạo ảnh và đăng tự động hằng ngày",loc:{kenh:["Fanpage chính"],tuyenNot:["Sale 10/10 & 20/10"]}},
     {id:"DA-04",ten:"Sale đôi 10/10",team:"content",owner:"u_oanh",han:10,moTa:"Truyền thông trên TikTok chính + Fanpage chính; Digital chạy Ads nhắc giờ vàng",loc:{tuyen:["Sale 10/10 & 20/10"],toiNgay:10}},
     {id:"DA-05",ten:"Sale 20/10",team:"content",owner:"u_oanh",han:20,moTa:"Truyền thông trên TikTok chính + Fanpage chính; tinh dầu làm quà 20/10",loc:{tuyen:["Sale 10/10 & 20/10"],tuNgay:11}},
-    {id:"DA-06",ten:"Ads Facebook T10 — đẩy 4 sản phẩm",team:"digital",owner:"u_chi",han:31,moTa:"Tinh dầu, Tẩy lồng AiBio, Bột tẩy vạn năng, Tẩy đa năng XClean. Digital chưa có lead — chị trực tiếp quản",loc:{orders:true}},
+    {id:"DA-06",ten:"Ads Facebook T10 — đẩy 4 sản phẩm",team:"digital",owner:"u_chi",han:31,moTa:"Tinh dầu, Tẩy lồng AiBio, Bột tẩy vạn năng, Tẩy đa năng XClean. Digital chưa có lead — CEO trực tiếp quản",loc:{orders:true}},
   ];
   const T=(ten,team,da,nguoi,han,uu,st,loai,moTa,phoi=[],ck=[])=>({id:uid("cv"),ten,team,da,nguoi,phoi,han,uu,st,loai,moTa,checklist:ck.map(x=>({t:x,x:false})),tao:"u_chi",kq:""});
   const add=[
@@ -133,7 +133,7 @@ const tkDate=(id,n,attrs)=>`<input type="date" id="${id}" value="${n?tkIso(n):""
 /* ---- ảnh / file đính kèm (máy chủ /api/hub/task-files, mỗi file ≤ 1,5 MB) ---- */
 const TK_FMAX=1600000;
 async function tkShrink(f){if(!f.type.startsWith("image/")||f.size<1400000||f.type==="image/gif")return f;try{const img=await createImageBitmap(f),k=Math.min(1,2000/Math.max(img.width,img.height)),cv=document.createElement("canvas");cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);const b=await new Promise(r=>cv.toBlob(r,"image/jpeg",.82));return b?new File([b],f.name.replace(/\.\w+$/,"")+".jpg",{type:"image/jpeg"}):f}catch(e){return f}}
-async function tkUpload(list,taskId){const out=[];for(const f0 of [...(list||[])]){const f=await tkShrink(f0);if(f.size>TK_FMAX){toast(f0.name+" quá 1,5 MB, dán link Drive giúp em");continue}
+async function tkUpload(list,taskId){const out=[];for(const f0 of [...(list||[])]){const f=await tkShrink(f0);if(f.size>TK_FMAX){toast(f0.name+" quá 1,5 MB, hãy dán link Drive");continue}
   try{const fd=new FormData();fd.set("task",taskId||"");fd.set("file",f,f.name);const r=await fetch("/api/hub/task-files",{method:"POST",body:fd,credentials:"same-origin"});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error((j.error&&j.error.message)||"Chưa tải lên được");
     out.push({id:j.data.id,name:f.name,size:f.size,type:f.type,by:ME.name,at:new Date().toLocaleString("vi-VN")})}catch(e){toast(f0.name+": "+(e.message||"chưa tải lên được"))}}return out}
 const tkFileUrl=id=>"/api/hub/task-files/"+encodeURIComponent(id);
@@ -194,7 +194,7 @@ function tkChatHtml(t){const L=t.chat||[];
 function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
   DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
-    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển chị duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ chị duyệt vòng 2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ chị duyệt`)}
+    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ CEO duyệt vòng 2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ CEO duyệt`)}
     else{tkLog(x,"Duyệt hoàn thành");x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
   return r2}
 function tkReturn(id,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
@@ -212,7 +212,7 @@ function tkBindChat(t){const ta=$("#t-cm"),box=$("#t-cmat");if(!ta)return;
     box.querySelectorAll("[data-atn]").forEach(b=>b.onclick=()=>{const pos=ta.selectionStart,pre=ta.value.slice(0,pos).replace(/@([^@\n]{0,20})$/,"@"+b.dataset.atn+" ");ta.value=pre+ta.value.slice(pos);box.hidden=true;ta.focus()})};
   $("#t-cmok").onclick=()=>{const v=ta.value.trim();if(!v){toast("Viết nội dung trao đổi");return}tkComment(t.id,v);toast("Đã gửi");openTask(t.id);renderMain()}}
 function tkStepper(t){
-  const v2=tkV2(t),appr=v2||!!(t.tao&&t.tao!==t.nguoi)||!!t.duyet,S=[["giao","Đã giao"],["nhan","Đã nhận"],["doing","Đang làm"],["nop","Đã nộp"]].concat(v2?[["l","Lead duyệt"],["c","Chị duyệt"]]:appr?[["duyet","Duyệt"]]:[]).concat([["done","Hoàn thành"]]);
+  const v2=tkV2(t),appr=v2||!!(t.tao&&t.tao!==t.nguoi)||!!t.duyet,S=[["giao","Đã giao"],["nhan","Đã nhận"],["doing","Đang làm"],["nop","Đã nộp"]].concat(v2?[["l","Lead duyệt"],["c","CEO duyệt"]]:appr?[["duyet","Duyệt"]]:[]).concat([["done","Hoàn thành"]]);
   const at={todo:0,cg:0,nhan:1,doing:2,review:v2?(t.vong===2?5:4):appr?4:3,done:S.length-1}[t.st];const cur=at==null?0:at,c=t.checklist||[],cn=c.filter(x=>x.x).length;
   return `<div class="tkstep">${S.map(([k,n],i)=>`<span class="${i<cur?"ok":i===cur?"on":""}${i===cur&&t.tlNote&&t.st!=="done"&&t.st!=="review"?" back":""}">${i<cur?"✓ ":""}${n}</span>`).join("")}</div>
    ${c.length?`<div class="tkprog"><i style="width:${Math.round(cn/c.length*100)}%"></i></div><small class="hint">Việc nhỏ đã xong ${cn}/${c.length}</small>`:""}`
@@ -224,7 +224,7 @@ function tkResultHtml(t){
 function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}</div>`;
-  if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">${t.vong!==2&&tkV2(t)&&ME.role!=="admin"?"✓ Duyệt, chuyển chị duyệt":"✓ Duyệt hoàn thành"}</button></div></div>`
+  if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">${t.vong!==2&&tkV2(t)&&ME.role!=="admin"?"✓ Duyệt, chuyển CEO duyệt":"✓ Duyệt hoàn thành"}</button></div></div>`
     :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt${tkV2(t)?(t.vong===2?" vòng 2":" vòng 1"):""}</b>${sub}</div>`;
   if(doer){const need=!!tkDoneErr(t);
     return `<div class="tkres"><b>Nộp kết quả</b>${t.st==="todo"||t.st==="nhan"?`<div class="acts"><span class="hint">Trạng thái: ${cvStN(t.st)}</span>${t.st==="todo"?`<button type="button" class="btn sm" data-tkq="nhan">Nhận việc</button>`:""}<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button></div>`:""}${t.tlNote?`<p class="tkback">↩ Bị trả lại: ${esc(t.tlNote)}</p>`:""}
@@ -257,7 +257,7 @@ function openTask(id){
   openDrawerHTML(`<h2>${t?"Chi tiết việc":"Giao việc"}${t?` <button type="button" class="btn sm tkpin" id="t-pin">${tkPinned(t.id)?"★ Bỏ ghim":"☆ Ghim"}</button>`:""}</h2>${!t&&tkTpls().length?`<label class="field">Giao từ mẫu<select id="t-tpl">${opt([["","— chọn mẫu việc có sẵn"]].concat(tkTpls().map(p=>[p.id,p.ten+(p.lap?" · "+tkLapLbl(p):"")])),"")}</select></label>`:""}${t&&t.tao?`<p class="hint">Người giao: ${esc(userName(t.tao)||"—")}</p>`:""}${!t&&!giver?`<p class="hint">Bạn tạo việc cho chính mình. Muốn giao cho người khác, nhờ quản lý giao.</p>`:""}${t?tkResultHtml(t)+tkChatHtml(t):""}<form class="frm" id="tkf2"><label class="field">Tên việc<input id="t-ten" required value="${esc(t?t.ten:"")}" ${gv?"":"disabled"}></label><label class="field">Mô tả<textarea id="t-mo" rows="2" ${gv?"":"disabled"}>${esc(t?t.moTa:"")}</textarea></label>
    <div class="row4"><label class="field">Team<select id="t-team" ${gv?"":"disabled"}>${opt(Object.entries(TEAMS),t?t.team:(TEAMS[teamOf(ME)]?teamOf(ME):"content"))}</select></label><label class="field">Dự án<select id="t-da" ${gv?"":"disabled"}>${opt([["","—"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),t?t.da:CVF.da)}</select></label></div>
    <div class="row4"><label class="field">Người làm<select id="t-ng" ${gv&&giver?"":"disabled"}>${opt([["","— chưa giao"]].concat(ngUsers.map(u=>[u.id,u.name+" · "+(TEAMS[teamOf(u)]||u.phongBan||"Quản lý")])),t?t.nguoi:(giver?"":ME.id))}</select></label><label class="field">Hạn${tkDate("t-han",t?t.han:d.settings.today+2,gv?"required":"disabled")}</label><label class="field">Bắt đầu <small class="hint">(trống = như hạn)</small>${tkDate("t-bd",t?(t.bd||0):0,gv?"":"disabled")}</label><label class="field">Ưu tiên<select id="t-uu" ${gv?"":"disabled"}>${opt(UU,t?t.uu:"Trung bình")}</select></label></div>
-   ${gv?`<label class="ck sm"><input type="checkbox" id="t-v2" ${t&&t.v2===false?"":"checked"}> Lead duyệt xong thì chị duyệt vòng 2</label>`:""}
+   ${gv?`<label class="ck sm"><input type="checkbox" id="t-v2" ${t&&t.v2===false?"":"checked"}> Lead duyệt xong thì CEO duyệt vòng 2</label>`:""}
    ${!t&&giver?`<div class="row4 tklap"><label class="field">Lặp lại<select id="t-lap">${opt([["","Không lặp"],["tuan","Mỗi tuần"],["thang","Mỗi tháng"]],"")}</select></label><label class="field" id="t-lapdw" hidden>Vào<select id="t-lapd"></select></label><label class="ck sm"><input type="checkbox" id="t-tplsave"> Lưu làm mẫu việc</label></div>`:""}
    <div class="field" id="t-cdw">Công đoạn <small class="hint">(một việc có nhiều người, mỗi người một phần)</small><div id="t-cd"></div>${gv&&giver?`<div class="acts"><button type="button" class="btn sm" id="t-cdadd">＋ Công đoạn</button><button type="button" class="btn sm" id="t-cddu">＋ Bước duyệt</button><label class="ck sm"><input type="checkbox" id="t-seq" ${t&&t.tuanTu===false?"":"checked"}> Làm lần lượt</label></div>`:""}</div>
    <div class="field" id="t-stw">Trạng thái <small class="hint">bấm để đổi${t&&ed?", tự lưu ngay":""}</small><div class="tkst">${CV_ST.filter(s=>s[0]!=="cg").map(([k,n,c])=>`<button type="button" class="tkb tk-${c}${(t?t.st:"todo")===k?" on":""}" data-tkst="${k}" ${ed?"":"disabled"}>${(t?t.st:"todo")===k?"✓ ":""}${n}</button>`).join("")}</div><input type="hidden" id="t-st" value="${t?t.st:"todo"}">${t&&t.stAt?`<small class="hint">Đổi lần cuối: ${esc(t.stAt)} bởi ${esc(t.stBy||"")}</small>`:""}</div>
@@ -303,7 +303,7 @@ function openTask(id){
   if(t)tkBindChat(t);
   if($("#t-lap")){const lw=()=>{const k=$("#t-lap").value;$("#t-lapdw").hidden=!k;$("#t-lapd").innerHTML=k==="tuan"?opt(THU.map((x,i)=>[i+1,x==="CN"?"Chủ nhật":"Thứ "+(i+2)]),(new Date().getDay()+6)%7+1):opt(Array.from({length:28},(_,i)=>[i+1,"Ngày "+(i+1)]),Math.min(28,new Date().getDate()))};$("#t-lap").onchange=lw;lw()}
   if($("#t-tpl"))$("#t-tpl").onchange=()=>{const p=tkTpls().find(x=>x.id===$("#t-tpl").value);if(!p)return;$("#t-ten").value=p.ten;$("#t-mo").value=p.moTa||"";if($("#t-team"))$("#t-team").value=p.team||$("#t-team").value;if($("#t-ng"))$("#t-ng").value=p.nguoi||"";if($("#t-uu"))$("#t-uu").value=p.uu||"Trung bình";$("#t-han").value=tkIso(D().settings.today+(+p.hanSau||2));
-    (p.checklist||[]).forEach(c=>{ck.push({t:c.t,x:false});$("#t-ck").insertAdjacentHTML("beforeend",`<label class="ck"><input type="checkbox" data-ck="${ck.length-1}"> ${esc(c.t)}</label>`)});toast("Đã điền từ mẫu, chị xem lại rồi bấm Giao việc")};
+    (p.checklist||[]).forEach(c=>{ck.push({t:c.t,x:false});$("#t-ck").insertAdjacentHTML("beforeend",`<label class="ck"><input type="checkbox" data-ck="${ck.length-1}"> ${esc(c.t)}</label>`)});toast("Đã điền từ mẫu, xem lại rồi bấm Giao việc")};
   if($("#t-nop"))$("#t-nop").onclick=()=>{const note=$("#t-kqn").value.trim(),link=$("#t-kql").value.trim();if(!note&&!link&&!kqF.length){toast("Ghi kết quả, dán link hoặc thêm file");return}
     const k=tkDoneErr(t)?"review":"done";tkSetSt(t.id,k,{kqNote:note,kq:link,kqFiles:kqF.slice(),nopAt:new Date().toLocaleString("vi-VN"),nopBy:ME.name,tlNote:"",__chat:["nop",[note,link].filter(Boolean).join(" · ")]},"Nộp kết quả");
     toast(k==="review"?"Đã nộp, chờ "+tkMgrNames(t)+" duyệt":"Đã nộp, việc xong");openTask(t.id);renderMain()};
@@ -315,7 +315,7 @@ function openTask(id){
   const now=()=>new Date().toLocaleString("vi-VN");
   if($("#t-trego"))$("#t-trego").onclick=()=>{const v=$("#t-tre").value.trim();if(!v){toast("Ghi lý do trễ");return}
     DB.mutate(ME.name,`lý do trễ "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;const hm=$("#t-hm")?tkDay($("#t-hm").value):0,lt=x.han<dt.settings.today;tkLog(x,(lt?"Báo trễ":"Xin gia hạn")+": "+v.slice(0,120)+(hm?" · xin đến "+dd(hm):""));x.treReq={lyDo:v,at:now(),by:ME.name,st:"cho",hanMoi:hm};x.tre={lyDo:v,at:now(),by:ME.name};if(typeof notifyU==="function")notifyU(dt,[x.tao,...tkMgrIds(x)],`${lt?"⚠ "+ME.name+" báo trễ":ME.name+" xin gia hạn"} việc "${x.ten}"${hm?" đến "+dd(hm):""}: ${v.slice(0,100)}`,"task:"+x.id)});toast("Đã gửi quản lý");openTask(t.id)};
-  if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển chị duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
+  if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển CEO duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
   if($("#t-tlok"))$("#t-tlok").onclick=()=>{const n=$("#t-tl").value.trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}tkReturn(t.id,n);toast("Đã trả lại cho "+(userName(t.nguoi)||"người làm"));openTask(t.id);renderMain()};
   if($("#t-ghok"))$("#t-ghok").onclick=()=>{const h=tkDay($("#t-gh").value);if(!h){toast("Chọn ngày gia hạn");return}DB.mutate(ME.name,`gia hạn "${t.ten}" đến ${dd(h)}`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.hanCu=x.hanCu||x.han;tkLog(x,"Gia hạn đến "+dd(h));x.han=h;x.treReq=Object.assign({},x.treReq||{},{st:"giahan",xl:ME.name,xlAt:now(),hanMoi:h});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} gia hạn việc "${x.ten}" đến ${dayLbl(h)}`,"task:"+x.id)});toast("Đã gia hạn đến "+dd(h));openTask(t.id);renderMain()};
   if($("#t-dok"))$("#t-dok").onclick=()=>{DB.mutate(ME.name,`duyệt hoàn thành "${t.ten}" (trễ hạn)`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;tkLog(x,"Duyệt hoàn thành");x.st="done";tkDoneDay(x,dt.settings.today);x.stAt=now();x.stBy=ME.name;x.treReq=Object.assign({},x.treReq||{},{st:"ok",xl:ME.name,xlAt:now()});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} duyệt hoàn thành việc "${x.ten}"`,"task:"+x.id)});toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
@@ -547,12 +547,12 @@ function cvOpenMk(g){
   const act=c=>{const st=c.step,lk=c.linkFinal||c.linkVideo||"";
     if(["edit","worker"].includes(st)&&canMove(ME,c,"dvd"))return `<input data-vl="${c.id}" placeholder="Dán link video đã edit (Drive)" value="${esc(lk)}">${!c.fpId&&chOf(c.kenh).needId?`<input data-vcap="${c.id}" placeholder="Caption đăng" value="${esc(c.caption||"")}">`:""}<button type="button" class="btn sm pri" data-vsend="${c.id}">Nộp, gửi lead duyệt</button>`;
     if(st==="dkb"&&canMove(ME,c,"quay"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="quay">✓ Duyệt kịch bản</button>${fb(c)}`;
-    if(st==="dvd"&&canMove(ME,c,"dceo"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dceo">✓ Duyệt vòng 1, chuyển chị</button>${fb(c)}`;
-    if(st==="dceo"&&canMove(ME,c,"dang"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dang">✓ Chị duyệt, cho đăng</button>${fb(c)}`;
+    if(st==="dvd"&&canMove(ME,c,"dceo"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dceo">✓ Duyệt vòng 1, chuyển CEO</button>${fb(c)}`;
+    if(st==="dceo"&&canMove(ME,c,"dang"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dang">✓ CEO duyệt, cho đăng</button>${fb(c)}`;
     return ""};
   const row=c=>{const lk=c.linkFinal||c.linkVideo||"",gy=(c.gopy||[]).slice(-3),a=act(c);
     return `<div class="vrow"><div class="vrt"><b class="mono">${esc(c.id)}</b><span class="xmt">${esc(cvShort(c.hookText||c.yTuong||c.tuyen,60))}</span>${pill(stepName(c.step),["dang","xong"].includes(c.step)?"grn":["dvd","dceo","dkb"].includes(c.step)?"amb":"gry")}${lk?`<a href="${esc(href(lk))}" target="_blank" rel="noopener">▶ Xem video</a>`:""}<button type="button" class="lnk" data-opc="${esc(c.id)}">Mở thẻ</button></div>${gy.length?`<div class="vgy">${gy.map(x=>`↩ <b>${esc(x.who)}</b> (${esc(x.t)}): ${esc(x.note)}`).join("<br>")}</div>`:""}${a?`<div class="vact">${a}</div>`:""}</div>`};
-  openDrawerHTML(`<h2>${esc(g.ten)} · ${g.done}/${g.n}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa giao")} · Nộp link, lead duyệt, chị duyệt vòng 2 ngay tại đây; link và góp ý tự ghi vào thẻ ở Content › Điều phối.</p>
+  openDrawerHTML(`<h2>${esc(g.ten)} · ${g.done}/${g.n}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa giao")} · Nộp link, lead duyệt, CEO duyệt vòng 2 ngay tại đây; link và góp ý tự ghi vào thẻ ở Content › Điều phối.</p>
    <div class="vlist">${cs.map(row).join("")}</div>`);
   const re=()=>{cvOpenMk(g);renderMain()};
   document.querySelectorAll("[data-opc]").forEach(b=>b.onclick=()=>{closeDrawer();openCard(b.dataset.opc)});
@@ -776,7 +776,7 @@ function pCvTcCeo(m){
   m.innerHTML=`<div class="cvbar"><button class="btn sm pri" type="button" disabled>Theo phòng ban</button><button class="btn sm" type="button" id="cvo-ppl">Theo người</button><button class="btn sm" type="button" id="cvo-re">Tải lại</button>${newTaskBtn()}</div>
   ${CVO.err?`<div class="note red">${esc(CVO.err)}</div>`:""}
   <div class="tctiles" style="grid-template-columns:repeat(6,minmax(0,1fr))">${tile("all","Tổng việc",I.length,"tháng ${MONTH.mon}".replace("${MONTH.mon}",MONTH.mon))}${tile("done","Hoàn thành",doneN,pct+"% tổng","grn")}${tile("doing","Đang làm",doingN,"")}${tile("review","Chờ duyệt",rvN,"","amb")}${tile("late","Quá hạn",late.length,ppl.length+" người đang trễ","red")}${tile("","Đúng hạn",due.length?Math.round(okN/due.length*100)+"%":"—",`${okN}/${due.length} việc tới hạn`,"grn")}</div>
-  ${mineN?`<div class="tcmine"><b>${mineN} việc đang chờ chị</b> (đến lượt chị làm, cần chị duyệt, cần giao hoặc đốc) <button class="lnk" id="cvo-mine">Mở Việc của tôi →</button></div>`:""}
+  ${mineN?`<div class="tcmine"><b>${mineN} việc đang chờ bạn</b> (đến lượt bạn làm, cần bạn duyệt, cần giao hoặc đốc) <button class="lnk" id="cvo-mine">Mở Việc của tôi →</button></div>`:""}
   <div class="tcmain"><section class="card tcbox"><h3>Theo phòng ban <small class="hint">xanh: xong · xanh dương: đang làm · vàng: chờ duyệt · đỏ: trễ · xám: chưa làm</small></h3><table class="tcp tcdept2"><thead><tr><th>Phòng</th><th>Tổng</th><th>Xong</th><th>Làm</th><th>Duyệt</th><th>Trễ</th><th>Tiến độ</th><th>Trễ nhiều nhất</th></tr></thead><tbody>${deptRows||'<tr><td colspan="8" class="empty">Chưa có dữ liệu.</td></tr>'}</tbody></table></section>
   <section class="card tcbox"><h3>Ai đang trễ <small class="hint">${ppl.length} người</small></h3>${pplRows||'<p class="empty">Không ai đang trễ.</p>'}</section></div>
   <div class="tcmain"><section class="card tcbox"><h3>Các phòng khác <small class="hint">bấm vào dòng để mở chi tiết</small></h3><table class="tcp tcdept"><thead><tr><th>Phòng</th><th>Phụ trách</th><th>Chỉ số chính</th><th>Tồn lâu nhất</th><th>Tình trạng</th></tr></thead><tbody>${otherRows}</tbody></table></section>
@@ -804,10 +804,10 @@ function pCvTcPpl(m){
 function cvCeoMine(){
   const d=D(),ok=x=>!CV_TEST.includes(x.nguoi),T=(d.tasks||[]).filter(ok),L=[];
   const add=(key,title,detail,count,go,extra)=>{if(count>0)L.push(Object.assign({key,group:"Marketing và Task",title,detail,count,oldest:null,age_days:0,page:"",go},extra||{}))};
-  add("c_vid","Video, kịch bản chờ chị duyệt","Duyệt xong thì video đi tiếp",d.cards.filter(x=>ok(x)&&["dkb","dvd","dceo"].includes(x.step)).length,"cv");
-  add("c_rv","Việc giao chờ chị duyệt","Người làm đã bấm Chờ duyệt",T.filter(t=>t.st==="review"&&tkMgr(t)).length,"cv_nv",{st:"review",who:"all"});
-  add("c_gh","Người xin gia hạn","Cần chị gia hạn hoặc duyệt xong",T.filter(t=>(t.treReq||{}).st==="cho"&&t.st!=="done"&&tkMgr(t)).length,"cv_nv",{st:"",who:"all"});
-  add("c_mine","Việc giao cho chị chưa xong","Việc chị là người làm",T.filter(t=>t.st!=="done"&&(t.nguoi===ME.id||(t.phoi||[]).includes(ME.id))).length,"cv_nv",{st:"",who:"mine"});
+  add("c_vid","Video, kịch bản cần duyệt","Duyệt xong thì video đi tiếp",d.cards.filter(x=>ok(x)&&["dkb","dvd","dceo"].includes(x.step)).length,"cv");
+  add("c_rv","Việc giao cần duyệt","Người làm đã bấm Chờ duyệt",T.filter(t=>t.st==="review"&&tkMgr(t)).length,"cv_nv",{st:"review",who:"all"});
+  add("c_gh","Người xin gia hạn","Cần gia hạn hoặc duyệt xong",T.filter(t=>(t.treReq||{}).st==="cho"&&t.st!=="done"&&tkMgr(t)).length,"cv_nv",{st:"",who:"all"});
+  add("c_mine","Việc giao cho bạn chưa xong","Việc bạn là người làm",T.filter(t=>t.st!=="done"&&(t.nguoi===ME.id||(t.phoi||[]).includes(ME.id))).length,"cv_nv",{st:"",who:"mine"});
   return L;
 }
 
@@ -858,7 +858,7 @@ function cvMyItems(){
         }else{const prev=act[0];add({key:"c_"+s.id,group:G3,title:`${t.ten} · ${s.ten}`,detail:prev?`Chờ ${userName(prev.nguoi)||"—"} xong "${prev.ten}"`:"Chờ công đoạn trước",taskId:t.id})}
       });
     }else{
-      if(tkMyTurn(t))add({key:"r_"+t.id,group:G2,title:t.ten,detail:`${userName(t.nguoi)||"—"} đã nộp kết quả${t.vong===2?" · lead đã duyệt, chờ chị":""}`,age_days:late(t.han),taskId:t.id,btn:"Xem & duyệt"});
+      if(tkMyTurn(t))add({key:"r_"+t.id,group:G2,title:t.ten,detail:`${userName(t.nguoi)||"—"} đã nộp kết quả${t.vong===2?" · lead đã duyệt, chờ CEO":""}`,age_days:late(t.han),taskId:t.id,btn:"Xem & duyệt"});
       else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st==="review")add({key:"s_"+t.id,group:"Đã nộp, chờ duyệt",title:t.ten,detail:`Chờ ${tkMgrNames(t)} duyệt${t.nopAt?" · nộp lúc "+t.nopAt:""}`,taskId:t.id,btn:"Xem",chip:"Chờ duyệt",chipC:"amb"});
       else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st!=="review")add({key:"t_"+t.id,group:G1,title:t.ten,detail:`Hạn ${t.han?dd(t.han):"—"} · giao bởi ${who}${t.tlNote?" · bị trả lại: "+t.tlNote:""}`,age_days:late(t.han),han:t.han||0,taskId:t.id,btn:"Nộp kết quả",chip:tkStChip(t),chipC:t.tlNote?"red":tkStC(t.st)});
     }
@@ -903,9 +903,9 @@ function pCvV(m){
     else if(CVV.view==="board")pCvKb(body);
     else if(CVV.view==="cal")pCvLich(body);
     else if(CVV.view==="gantt")pCvGantt(body);
-    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ ${wkCeo()?"chị":"bạn"}${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}}
+    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ bạn${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}}
     else cvNvRaw(body);
-  }catch(e){console.error("Trang Việc lỗi",e);body.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chị chụp dòng này gửi em: ${esc(String(e&&e.message||e))}</div>`}
+  }catch(e){console.error("Trang Việc lỗi",e);body.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}
   m.querySelectorAll("[data-vs]").forEach(b=>b.onclick=()=>{CVV.scope=b.dataset.vs;cvWhoSet(CVV.scope==="mine"?"mine":"all");CVF.st="";renderMain()});
   m.querySelectorAll("[data-vv]").forEach(b=>b.onclick=()=>{CVV.view=b.dataset.vv;if(CVV.view==="tq")CVF.tao="";renderMain()});
   m.querySelectorAll("[data-vgo]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.vgo;render()});
@@ -934,7 +934,7 @@ function pCvDh(m){
   const seeAll=tkAll(),rows=cvDhRows(cvDhUnits(L),d.settings.today,MONTH.ndays,cur).filter(r=>{const u=d.users.find(x=>x.id===r.id);return seeAll||tkSameTeam(ME,u)});
   const tot=k=>rows.reduce((z,r)=>z+r[k],0),pc=r=>r.pct==null?"—":`<b class="${r.pct>=90?"t-grn":r.pct>=70?"t-amb":"t-red"}">${r.pct}%</b>`;
   m.innerHTML=`<section class="card"><div class="card-h"><h2>Đúng hạn từng người</h2><select id="cvd-m" aria-label="Tháng">${opt([[MONTH.key,"Tháng "+MONTH.mon+" (đang chạy)"]].concat(months.map(k=>[k,"Tháng "+(+k.slice(5))+"/"+k.slice(0,4)])),cur?MONTH.key:CVD.m)}</select></div>
-   <p class="hint">Tính trên việc giao qua Task giao việc. Tỷ lệ đúng hạn = xong đúng hạn ÷ (xong đúng hạn + xong trễ + đang trễ). Chưa trừ điểm KPI, chị dùng để đánh giá.${cur?"":" Tháng cũ chỉ còn việc đã xong; việc chưa xong đã chuyển sang tháng sau."}</p>
+   <p class="hint">Tính trên việc giao qua Task giao việc. Tỷ lệ đúng hạn = xong đúng hạn ÷ (xong đúng hạn + xong trễ + đang trễ). Chưa trừ điểm KPI, dùng để đánh giá.${cur?"":" Tháng cũ chỉ còn việc đã xong; việc chưa xong đã chuyển sang tháng sau."}</p>
    ${rows.length?`<div class="tbl"><table><thead><tr><th>Người làm</th><th class="n">Việc trong tháng</th><th class="n">Xong đúng hạn</th><th class="n">Xong trễ</th><th class="n">Đang trễ</th><th class="n">Chưa tới hạn</th><th class="n">Tỷ lệ đúng hạn</th><th></th></tr></thead><tbody>
     ${rows.map(r=>`<tr><td><b>${esc(userName(r.id)||r.id)}</b>${r.late.length?`<br><small class="t-red">${r.late.slice(0,2).map(u=>esc(cvShort(u.ten,40))+" (trễ "+(d.settings.today-u.han)+" ngày)").join(" · ")}${r.late.length>2?" …":""}</small>`:""}</td><td class="n">${r.n}</td><td class="n">${r.dung}</td><td class="n">${r.tre||""}</td><td class="n">${r.dangTre?`<b class="t-red">${r.dangTre}</b>`:""}</td><td class="n">${r.chua||""}</td><td class="n">${pc(r)}${r.khongRo?`<br><small class="hint">${r.khongRo} việc xong trước 02/11 chưa có ngày xong</small>`:""}</td><td>${cur?`<button class="btn sm" data-cvdp="${esc(r.id)}">Xem việc</button>`:""}</td></tr>`).join("")}
     <tr class="knt"><td><b>Cộng</b></td><td class="n">${tot("n")}</td><td class="n">${tot("dung")}</td><td class="n">${tot("tre")}</td><td class="n">${tot("dangTre")}</td><td class="n">${tot("chua")}</td><td class="n"></td><td></td></tr></tbody></table></div>`:`<p class="empty pad">Chưa có việc nào có hạn trong tháng này.</p>`}</section>`;

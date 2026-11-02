@@ -77,7 +77,7 @@ const ttRangeOfText=s=>{const d=String(s||"").match(/(\d{1,4}[-/.]\d{1,2}[-/.]\d
 /* ---------- File đơn hàng OrderSKUList (CSV hoặc Excel) ---------- */
 const TT_ORDER_COLS=["Order ID","Order Status","SKU ID","Seller SKU","Product Name","Variation","Quantity","Sku Quantity of return","SKU Subtotal Before Discount","SKU Seller Discount","Created Time"];
 function ttReadOrders(aoa,ky){
-  const H=ttHead(aoa,TT_ORDER_COLS);if(!H)return {err:"Không thấy các cột của file OrderSKUList (Order ID, SKU ID, Created Time…). Chị kiểm tra lại đúng file đơn hàng TikTok."};
+  const H=ttHead(aoa,TT_ORDER_COLS);if(!H)return {err:"Không thấy các cột của file OrderSKUList (Order ID, SKU ID, Created Time…). Hãy kiểm tra lại đúng file đơn hàng TikTok."};
   const I=H.ix,lines=[];let outside=0,before=0,after=0;
   for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const o=ttCell(a[I["Order ID"]]);if(!/^\d{6,}$/.test(o))continue;
     const d=ttIsoDay(ttCell(a[I["Created Time"]]));if(!d)continue;
@@ -99,8 +99,8 @@ function ttIncomeRange(sheets){
 function ttCheckIncomeRange(g,ky){
   if(!g)return "Không đọc được dòng \"Khoảng thời gian\" ở tab Báo cáo của file income.";
   const start=ky+"-01",vn=s=>s.split("-").reverse().join("/");
-  if(g.from>start)return `File income bắt đầu từ ${vn(g.from)}, phải từ ${vn(start)}. Chị xuất lại file từ ngày 01.`;
-  if(g.to<start)return `File income chỉ tới ${vn(g.to)}, chưa vào tháng ${ky.slice(5)}/${ky.slice(0,4)}. Chị xuất lại file.`;
+  if(g.from>start)return `File income bắt đầu từ ${vn(g.from)}, phải từ ${vn(start)}. Hãy xuất lại file từ ngày 01.`;
+  if(g.to<start)return `File income chỉ tới ${vn(g.to)}, chưa vào tháng ${ky.slice(5)}/${ky.slice(0,4)}. Hãy xuất lại file.`;
   return "";
 }
 const ttIncomePartial=(g,ky)=>!!g&&g.to<ttKyNext(ky)+"-09";
@@ -152,14 +152,14 @@ function ttReadLive(aoa){
 /* Transaction Analysis (KOC): một dòng tổng của cả khoảng ngày (khoảng ngày lấy từ tên file). */
 function ttReadKoc(aoa,name){
   const H=ttHead(aoa,["GMV nhờ nhà sáng tạo"]);if(!H)return {err:"Không thấy cột \"GMV nhờ nhà sáng tạo\" của file Transaction Analysis."};
-  const range=ttRangeOfName(name);if(!range)return {err:"Tên file Transaction Analysis không có khoảng ngày (dạng 20260901-20260930). Chị giữ nguyên tên file TikTok đặt."};
+  const range=ttRangeOfName(name);if(!range)return {err:"Tên file Transaction Analysis không có khoảng ngày (dạng 20260901-20260930). Hãy giữ nguyên tên file TikTok đặt."};
   const row=aoa.slice(H.at+1).find(a=>a&&/\d/.test(ttCell(a[H.ix["GMV nhờ nhà sáng tạo"]]))&&ttCell(a[H.ix["GMV nhờ nhà sáng tạo"]]).length<40);if(!row)return {err:"File Transaction Analysis không có dòng số."};
   const m={};H.h.forEach((k,i)=>{if(k)m[k]=ttNum(row[i])});return {range,m};
 }
 /* Danh sách nhà sáng tạo: giữ 300 người GMV cao nhất. */
 function ttReadCreators(aoa,name,keep=300){
   const H=ttHead(aoa,["Tên người dùng của nhà sáng tạo","GMV liên kết"]);if(!H)return {err:"Không thấy cột của file Creator List."};
-  const range=ttRangeOfName(name);if(!range)return {err:"Tên file Creator List không có khoảng ngày (dạng 20260901-20260930). Chị giữ nguyên tên file TikTok đặt."};
+  const range=ttRangeOfName(name);if(!range)return {err:"Tên file Creator List không có khoảng ngày (dạng 20260901-20260930). Hãy giữ nguyên tên file TikTok đặt."};
   const I=H.ix,g=(a,k)=>k in I?ttNum(a[I[k]]):0,all=[];let nCo=0,gmv=0;
   for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const u=ttCell(a[I["Tên người dùng của nhà sáng tạo"]]);if(!u)continue;
     const x={u,gmv:g(a,"GMV liên kết"),live:g(a,"GMV LIVE của liên kết"),video:g(a,"GMV video link bán hàng của liên kết"),the:g(a,"GMV thẻ sản phẩm của liên kết"),mon:g(a,"Số món bán ra"),don:g(a,"Đơn hàng liên kết"),hh:g(a,"Hoa hồng ước tính"),nVideo:g(a,"Video link bán hàng của liên kết"),nLive:g(a,"Buổi LIVE liên kết"),hoan:g(a,"GMV đã hoàn tiền từ liên kết"),fl:g(a,"Người theo dõi của liên kết")};
@@ -200,7 +200,7 @@ function ttBuildMonth({ky,orders,income,camp}){
   L.forEach(l=>{ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q});
   L.forEach(l=>{const w=ordDt[l.o]?l.dt/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:0);l.w=w;l.qt=!!F[l.o]});
   const base=L.filter(l=>l.qt&&!l.huy),baseDt=base.reduce((s,l)=>s+l.dt,0);
-  if(!baseDt)return {err:"Không ghép được đơn nào giữa file đơn và file income. Chị kiểm tra hai file có cùng tháng không."};
+  if(!baseDt)return {err:"Không ghép được đơn nào giữa file đơn và file income. Hãy kiểm tra hai file có cùng tháng không."};
   const rate=new Array(TT_NG).fill(0);base.forEach(l=>{const f=F[l.o];for(let g=0;g<TT_NG;g++)rate[g]+=f[g]*l.w});for(let g=0;g<TT_NG;g++)rate[g]/=baseDt;
   const sku={},days={},okOrd=new Set(),dayOrd={};let hh=0,dtUoc=0,nUoc=0,mon=0;
   /* Làm tròn phí từng dòng (giống file Excel cũ) rồi mới cộng, để tổng khớp từng đồng. */

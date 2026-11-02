@@ -31,7 +31,7 @@ function kocImport(u,res,quiet){
       notifyU(dt,approvers().concat(admins()),`🏆 Báo cáo TikTok có ${moi.length} video KOC ra số${win?` (${win} video win)`:""}: check video win KOC, cái nào ok đưa vào kho video win để phân tích và nhân bản`,"page:bc_koc")}
   });
   if(moi.length){const ap=typeof hyApprover==="function"&&hyApprover();svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind:"card_notify",ref:"koc",payload:{to:["chi"].concat(ap?[ap.name]:[]),text:`🏆 Báo cáo video KOC ${res.range||""}: ${moi.length} video KOC ra số (nhiều nhất ${nf(Math.max(...moi.map(r=>r.don)))} đơn). Check video win KOC ở Marketing › KOC / Affiliate, cái nào ok đưa vào kho video win để phân tích và nhân bản.`}})}).catch(()=>{})}
-  toast(`Đã nhập ${all.length} video KOC${moi.length?` · ${moi.length} video ra số mới, đã báo Lead Content & Media và chị`:""}`);
+  toast(`Đã nhập ${all.length} video KOC${moi.length?` · ${moi.length} video ra số mới, đã báo Lead Content & Media và CEO`:""}`);
   return {n:all.length,moi:moi.length};
 }
 const _applyTikTokKoc=applyTikTok;

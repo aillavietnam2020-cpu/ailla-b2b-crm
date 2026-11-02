@@ -155,7 +155,7 @@ function fpcBind(m){
   m.querySelectorAll("[data-fpcagt]").forEach(b=>b.onclick=()=>{FPC.at.open=!FPC.at.open;renderMain()});
   const agt=m.querySelector("#fpc-agt");if(agt)agt.oninput=()=>{FPC.at.text=agt.value};
   m.querySelectorAll("[data-fpcagq]").forEach(b=>b.onclick=()=>{FPC.at.text=b.dataset.fpcagq+(FPC.at.text&&!FPC.at.text.startsWith(b.dataset.fpcagq)?". "+FPC.at.text:"");renderMain()});
-  m.querySelectorAll("[data-fpcago]").forEach(b=>b.onclick=async()=>{const t=(FPC.at.text||"").trim();if(t.length<6){toast("Chị ghi rõ hơn việc cần agent làm");return}
+  m.querySelectorAll("[data-fpcago]").forEach(b=>b.onclick=async()=>{const t=(FPC.at.text||"").trim();if(t.length<6){toast("Ghi rõ hơn việc cần agent làm");return}
     if(!fpcPages().length){toast("Chưa có page nào. Thêm page ở ô Kênh trước");return}
     FPC.at.busy=true;renderMain();
     try{await svApi("/api/hub/worker-tasks",{method:"POST",body:JSON.stringify({kind:"fp_plan",ref:BV.k,payload:fpcAtPayload(t)})});FPC.at.text="";toast("Đã giao cho agent. Bài sẽ hiện ở lịch (Chờ duyệt) sau vài phút");FPC.at.busy=false;await fpcAtLoad();renderMain()}
@@ -218,7 +218,7 @@ function fpcAtState(t){
 function fpcAgentBox(){
   if(!xvGive())return "";
   const A=FPC.at,L=A.tasks.slice(0,4);
-  return `<div class="fpc-ag"><div class="fpc-agh"><b>Giao việc cho agent</b><span class="hint">Chị nói như nhờ người: agent tự viết bài, tạo ảnh, chọn video, đặt lịch. Bài hiện trên lịch ở <b>Chờ duyệt</b>, chị duyệt rồi mới đăng.</span><button type="button" class="lnk" data-fpcagt="1">${A.open?"Thu gọn":"Mở"}</button></div>
+  return `<div class="fpc-ag"><div class="fpc-agh"><b>Giao việc cho agent</b><span class="hint">Nói như nhờ người: agent tự viết bài, tạo ảnh, chọn video, đặt lịch. Bài hiện trên lịch ở <b>Chờ duyệt</b>, duyệt rồi mới đăng.</span><button type="button" class="lnk" data-fpcagt="1">${A.open?"Thu gọn":"Mở"}</button></div>
    ${A.open?`<details class="fpc-bd"><summary>Yêu cầu chung của tháng (agent đọc cùng mỗi lần giao việc)</summary>${fpcBriefHtml()}</details>`:""}
    ${A.open?`<textarea id="fpc-agt" rows="3" placeholder="VD: Lên lịch tuần này cho page Tẩy Lồng Giặt, mỗi ngày 2 bài (9:00 và 20:00), đẩy bột tẩy vạn năng, có 2 video lấy từ kho, bình luận đầu kèm link bán hàng.">${esc(A.text)}</textarea>
    <div class="fpc-agr">${FPC_QUICK.map(q=>`<button type="button" class="fpc-chipb" data-fpcagq="${esc(q)}">${esc(q)}</button>`).join("")}<span class="sp"></span><span class="hint">Page: ${FPC.sel.size?FPC.sel.size+" page đã chọn ở ô Kênh":"agent tự chọn trong tất cả page (nên chọn ở ô Kênh cho gọn)"}</span><button type="button" class="btn pri" data-fpcago="1" ${A.busy?"disabled":""}>${A.busy?"Đang giao…":"Giao cho agent"}</button></div>`:""}
@@ -289,7 +289,7 @@ function fchBadge(){const n=fchPending();return n?` <span class="fch-n">${n}</sp
 async function fchInit(){
   if(FCH.ready)return;FCH.ready=true;
   try{const r=await svApi("/api/agent-chat/agents"),a=(r.agents||[]).find(x=>/lead content/i.test(x.name||"")||/lead-content/.test(x.id||""));
-    if(!a)FCH.err="Chưa thấy agent Lead Content, hoặc chị chưa được cấp quyền nhắn agent (Điều hành agent › Hội thoại).";else{FCH.agent=a.id;FCH.name=a.name||FCH.name;FCH.color=a.color||FCH.color}}
+    if(!a)FCH.err="Chưa thấy agent Lead Content, hoặc bạn chưa được cấp quyền nhắn agent (Điều hành agent › Hội thoại).";else{FCH.agent=a.id;FCH.name=a.name||FCH.name;FCH.color=a.color||FCH.color}}
   catch(e){FCH.err=e.message||String(e)}
 }
 function fchEl(){
@@ -308,11 +308,11 @@ function fchDraw(keep){
   const el=fchEl(),ta=el.querySelector("#fch-t"),had=ta&&document.activeElement===ta,val=ta?ta.value:FCH.text;
   const L=[...FCH.msgs].sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at))||a.id-b.id).filter(m=>m.role!=="SYSTEM");
   const n=fchPending();
-  el.innerHTML=`<div class="fch-h"><span class="fpc-av" style="width:34px;height:34px;background:${esc(FCH.color)}">${esc((FCH.name||"A").charAt(0))}</span><b>${esc(FCH.name)}<br><small style="font-weight:400;color:#5b6176">Nhờ lên lịch, viết bài, chọn video. Bài hiện ở lịch để chị duyệt.</small></b><button type="button" class="fch-x" data-fchx="1" aria-label="Đóng">✕</button></div>
+  el.innerHTML=`<div class="fch-h"><span class="fpc-av" style="width:34px;height:34px;background:${esc(FCH.color)}">${esc((FCH.name||"A").charAt(0))}</span><b>${esc(FCH.name)}<br><small style="font-weight:400;color:#5b6176">Nhờ lên lịch, viết bài, chọn video. Bài hiện ở lịch để duyệt.</small></b><button type="button" class="fch-x" data-fchx="1" aria-label="Đóng">✕</button></div>
    <button type="button" class="fch-go" data-fchgo="1">Xem bài chờ duyệt${n?" ("+n+")":""} trên lịch →</button>
    <details class="fpc-bd" style="margin:6px 14px 0"><summary>Yêu cầu chung của tháng (agent đọc cùng mỗi lần nhờ)</summary>${fpcBriefHtml()}</details>
    ${FCH.err?`<div class="fch-e">${esc(FCH.err)}</div>`:`<div class="fch-ms" id="fch-ms">${L.length?L.map(m=>{const u=m.role==="USER",b=u?fchShow(String(m.body||"").replace(/^\[KHÁCH\] /,"")):String(m.body||""),st=u?(m.status==="queued"?"đang chờ agent":m.status==="taken"?"agent đang làm…":m.status==="error"?"lỗi":""):"";
-      return `<div class="fch-m ${u?"u":"a"}">${u?esc(b):(typeof acFmt==="function"?acFmt(b):esc(b))}${st?`<small>${st}</small>`:""}</div>`}).join(""):`<div class="hint">Chưa có tin nào. Chị nhắn như nhờ người: "Lên lịch tuần này cho page Tẩy Lồng, mỗi ngày 2 bài".</div>`}</div>
+      return `<div class="fch-m ${u?"u":"a"}">${u?esc(b):(typeof acFmt==="function"?acFmt(b):esc(b))}${st?`<small>${st}</small>`:""}</div>`}).join(""):`<div class="hint">Chưa có tin nào. Nhắn như nhờ người: "Lên lịch tuần này cho page Tẩy Lồng, mỗi ngày 2 bài".</div>`}</div>
    <div class="fch-q">${FCH_QUICK.map(q=>`<button type="button" data-fchq="${esc(q)}">${esc(q)}</button>`).join("")}</div>
    <div class="fch-f"><textarea id="fch-t" rows="2" placeholder="Nhắn agent… (Enter để gửi, Shift+Enter xuống dòng)">${esc(val)}</textarea><button type="button" class="btn pri" data-fchsend="1" ${FCH.sending?"disabled":""}>Gửi</button></div>`}`;
   const ms=el.querySelector("#fch-ms");if(ms&&(keep||true))ms.scrollTop=ms.scrollHeight;

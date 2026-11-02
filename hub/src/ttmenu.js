@@ -51,18 +51,18 @@ function ttKhoView(){
   const PU=(s?s.purchases:[]).filter(p=>p.st==="Đã đặt").sort((a,b)=>String(a.ngayVe||"9999").localeCompare(String(b.ngayVe||"9999")));
   const buyRows=PU.length?PU.map(p=>{const late=p.ngayVe&&p.ngayVe<today,days=late?Math.round((new Date(today)-new Date(p.ngayVe))/864e5):0;
     const state=!p.ngayVe?`<em class="ttem">chưa ghi ngày dự kiến về</em>`:late?`<em class="ttem">trễ ${days} ngày</em>`:p.ngayVe===today?`<em class="ttem amb">về hôm nay</em>`:"";
-    const btn=p.baoKt?`<span class="hint">Đã báo chị Thảo ${esc(String(p.baoKt.at||"").slice(0,16))}</span>`:(late||!p.ngayVe)?`<button class="btn sm" data-ttbao="${p.id}">Báo chị Thảo kiểm tra</button>`:"";
+    const btn=p.baoKt?`<span class="hint">Đã báo Quản lý ${esc(String(p.baoKt.at||"").slice(0,16))}</span>`:(late||!p.ngayVe)?`<button class="btn sm" data-ttbao="${p.id}">Báo Quản lý kiểm tra</button>`:"";
     return ttRow(`<b>${esc(p.ten)}</b> ${state}<br><small>${nf(p.sl)} ${esc(p.dvt||"")}${p.ncc?" · "+esc(p.ncc):" · chưa ghi nhà cung cấp"}${p.ngayVe?" · dự kiến về "+ttDd(p.ngayVe):""}</small>`,`${btn} <button class="btn sm${late||p.ngayVe===today?" pri":""}" data-ttgo="kho_nhap">Nhập kho</button>`)}).join(""):`<p class="empty pad">Không có hàng nào đang chờ về.</p>`;
   const kk=(s?s.batches:[]).filter(b=>b.st==="CHO_KIEM"),sau=(s?s.batches:[]).filter(b=>["DA_KIEM","TEM_SAN","DA_IN"].includes(b.st));
   const kkRows=kk.map(b=>ttRow(`<b>${esc(sxP(b.sp).ten)}</b><br><small>Xưởng báo ${nf(b.baoSL)} · ${esc((b.nguoi||[]).join(", "))}</small>`,`<button class="btn sm pri" data-kk="${b.id}">Kiểm kê</button>`)).join("")+sau.map(b=>ttRow(`<b>${esc(sxP(b.sp).ten)}</b> ${pill("đã kiểm","grn")}<br><small>Lô ${esc(b.ma||"")} · còn in tem / nhập kho</small>`,`<button class="btn sm" data-ttgo="sx_lo">Mở</button>`)).join("");
   const none=!PU.length&&!kkRows;
   return `<section class="card ttw"><div class="card-h"><h2>Đơn cần xuất, theo ngày</h2><span class="hint">${TTX.pend?TTX.pend.length+" đơn":"đang tải…"}</span></div>${shipRows}</section>
-   ${none?`<p class="ttnone">Hàng đặt đang chờ về: không có · Lô chờ kiểm kê: không có</p>`:`<div class="sxgrid2 ttgrid"><section class="card"><div class="card-h"><h2>Hàng đặt, chờ về</h2><span class="hint">trễ hoặc chưa có ngày thì báo chị Thảo</span></div><div class="sxalerts">${buyRows}</div></section>
+   ${none?`<p class="ttnone">Hàng đặt đang chờ về: không có · Lô chờ kiểm kê: không có</p>`:`<div class="sxgrid2 ttgrid"><section class="card"><div class="card-h"><h2>Hàng đặt, chờ về</h2><span class="hint">trễ hoặc chưa có ngày thì báo Quản lý</span></div><div class="sxalerts">${buyRows}</div></section>
    <section class="card"><div class="card-h"><h2>Kiểm kê hàng sản xuất</h2></div><div class="sxalerts">${kkRows||`<p class="empty pad">Không có lô nào chờ kiểm kê.</p>`}</div></section></div>`}`;
 }
 function ttKhoBind(m){
   m.querySelectorAll("[data-ttprint]").forEach(b=>b.onclick=()=>window.open("/print/orders/"+b.dataset.ttprint+"?type=ship","_blank"));
-  m.querySelectorAll("[data-ttbao]").forEach(b=>b.onclick=()=>{const id=b.dataset.ttbao;sxMut("báo chị Thảo kiểm tra hàng đặt "+id,s=>{const x=s.purchases.find(q=>q.id===id);if(x)x.baoKt={at:sxNow(),by:ME.name}});toast("Đã báo chị Thảo kiểm tra hàng này");renderMain()});
+  m.querySelectorAll("[data-ttbao]").forEach(b=>b.onclick=()=>{const id=b.dataset.ttbao;sxMut("báo Quản lý kiểm tra hàng đặt "+id,s=>{const x=s.purchases.find(q=>q.id===id);if(x)x.baoKt={at:sxNow(),by:ME.name}});toast("Đã báo Quản lý kiểm tra hàng này");renderMain()});
 }
 PAGES.tt_home=m=>{
   const all=ttTasks().slice(0,6),B=ttBoard();

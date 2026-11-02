@@ -196,7 +196,7 @@ async function acOpenDoc(id,name){
     else if(ext==="csv")body.innerHTML=acTable(acCsv(await blob.text()));
     else if(ext==="xlsx"||ext==="docx"){
       const p=await svApi("/api/agent-chat/doc/"+id+"/preview");
-      if(!p||!p.preview){body.innerHTML='<p class="hint">File này chưa xem trước được trên web (file chị tải lên, hoặc định dạng không đọc được). Bấm ⬇ để tải về mở bằng Excel/Word.</p>';return}
+      if(!p||!p.preview){body.innerHTML='<p class="hint">File này chưa xem trước được trên web (file tải lên, hoặc định dạng không đọc được). Bấm ⬇ để tải về mở bằng Excel/Word.</p>';return}
       const d=JSON.parse(p.preview);
       if(d.sheets){
         const show=k=>{body.querySelector(".acv-sheet").innerHTML=acTable(d.sheets[k].rows)+(d.sheets[k].truncated?'<p class="hint">Chỉ hiện 300 dòng đầu, tải file về để xem đủ.</p>':"");body.querySelectorAll("[data-sh]").forEach(b=>b.classList.toggle("on",+b.dataset.sh===k))};
@@ -243,12 +243,12 @@ function acMicInit(){
     const tk=()=>say("🔴 Đang nghe "+Math.round((Date.now()-t0)/1000)+" giây… nói xong bấm ⏹ để chữ hiện ra");tk();tick.t=setInterval(tk,1000);
   };
   const browser=()=>{
-    if(!SR){toast("Máy văn phòng đang tắt và trình duyệt này chưa hỗ trợ ghi âm. Chị dùng Chrome hoặc Edge nhé");return}
+    if(!SR){toast("Máy văn phòng đang tắt và trình duyệt này chưa hỗ trợ ghi âm. Hãy dùng Chrome hoặc Edge");return}
     const r=new SR();r.lang="vi-VN";r.continuous=true;r.interimResults=true;
     const base=ta.value&&!/\s$/.test(ta.value)?ta.value+" ":ta.value;let fin="";
     r.onresult=e=>{let it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t+" ";else it+=t}
       ta.value=base+fin+it;if(ta._grow)ta._grow()};
-    r.onerror=e=>{const m={"not-allowed":"Chưa cho phép micro. Chị bấm biểu tượng ổ khóa cạnh địa chỉ web, chọn cho phép Micro","no-speech":"Không nghe thấy tiếng nói","audio-capture":"Không tìm thấy micro","network":"Mất mạng khi nhận giọng nói"}[e.error];if(m)toast(m)};
+    r.onerror=e=>{const m={"not-allowed":"Chưa cho phép micro. Bấm biểu tượng ổ khóa cạnh địa chỉ web, chọn cho phép Micro","no-speech":"Không nghe thấy tiếng nói","audio-capture":"Không tìm thấy micro","network":"Mất mạng khi nhận giọng nói"}[e.error];if(m)toast(m)};
     r.onend=()=>{reset();if(ta.value.trim())ta.focus()};
     try{r.start();AC_REC=r;b.classList.add("rec");b.textContent="⏹"}catch(e){toast("Chưa bật được micro: "+e.message)}
   };
@@ -258,7 +258,7 @@ function acMicInit(){
     let online=false;
     try{online=!!(window.MediaRecorder&&navigator.mediaDevices&&(await acSttPost("/api/agent-chat/stt/status")).online)}catch(e){}
     try{if(online)await whisper();else browser()}
-    catch(e){reset();toast(/Permission|NotAllowed/i.test(e.name+e.message)?"Chưa cho phép micro. Chị bấm biểu tượng ổ khóa cạnh địa chỉ web, chọn cho phép Micro":"Chưa bật được micro: "+(e.message||e))}
+    catch(e){reset();toast(/Permission|NotAllowed/i.test(e.name+e.message)?"Chưa cho phép micro. Bấm biểu tượng ổ khóa cạnh địa chỉ web, chọn cho phép Micro":"Chưa bật được micro: "+(e.message||e))}
   };
 }
 const acHour=s=>{try{return new Date(s).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch(e){return ""}};
@@ -284,7 +284,7 @@ function acGrid(){
    <div class="ac-bar"><b style="margin-right:6px">Danh sách ${tot} agent</b><button class="ac-chipb${AC.filter==="all"?" on":""}" data-f="all">Tất cả (${tot})</button><button class="ac-chipb${AC.filter==="busy"?" on":""}" data-f="busy">Đang xử lý (${L.filter(a=>a.pending>0).length})</button></div>
    <div class="ac-grid">${(show.length?show:[]).map(a=>{const[s,t]=acStatus(a);return `<button class="ac-pc" data-ac="${esc(a.id)}" style="--ac:${esc(a.color||"#64748b")}"><div class="ph">${acAv(a)}<div><span class="ac-st ${s}">${t}</span><b>${esc(a.name)}</b><small>${esc(a.title||"")}</small></div></div>
      <div class="ac-mini"><div><b>${a.today||0}</b><span>Tin hôm nay</span></div><div><b>${a.pending||0}</b><span>Đang chờ</span></div><div><b style="font-size:12px;line-height:20px">${acAgo(a.last_at)}</b><span>Hoạt động</span></div></div>
-     <div class="ac-q">Được đọc: ${esc(a.quyen||"")}</div></button>`}).join("")||'<div class="hint">Bạn chưa được cấp quyền nhắn agent nào. Nhờ chị Hoa cấp quyền nhé.</div>'}</div><div id="ac-access"></div>`;
+     <div class="ac-q">Được đọc: ${esc(a.quyen||"")}</div></button>`}).join("")||'<div class="hint">Bạn chưa được cấp quyền nhắn agent nào. Nhờ CEO cấp quyền.</div>'}</div><div id="ac-access"></div>`;
   if(AC.isCeo)acAccess();
   R.querySelectorAll("[data-ac]").forEach(b=>b.onclick=()=>acPick(b.dataset.ac));
   R.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{AC.filter=b.dataset.f;acGrid()});
@@ -298,7 +298,7 @@ function acChat(){
     </div>
     <div class="ac-msgs" id="ac-msgs"></div>
     <div class="ac-send" id="ac-send"><div id="ac-quote"></div><div class="ac-pend" id="ac-pend"></div>
-    <div class="ac-bar"><button class="ac-clip" id="ac-clip" title="Đính kèm ảnh, Excel, PDF, Word, video (tối đa 25 MB mỗi file)">📎</button><button class="ac-clip" id="ac-mic" type="button" title="Bấm để nói, bấm lần nữa để dừng. Máy văn phòng bật thì chữ chuẩn hơn, hiện sau vài giây">🎤</button><textarea id="ac-text" rows="1" placeholder="Nhắn cho ${esc(a.name)}…  (/stop dừng việc đang làm · /new phiên mới)"></textarea><span class="ac-opt"><button class="ac-clip" id="ac-more" title="Tùy chọn gửi">⋯</button><div class="ac-optp" id="ac-optp" hidden>${AC.cur==="lead-sale-ailla"?'<label title="Tin chị gõ được xử lý như khách nhắn vào page: agent chỉ chọn câu mẫu kịch bản Pancake V5, không tự viết"><input type="checkbox" id="ac-kh"> Thử như khách (kịch bản V5)</label>':""}${AC.isCeo?'<label><input type="checkbox" id="ac-tg"> Gửi cả bản trả lời sang Telegram</label>':""}</div></span><button class="btn pri" id="ac-go">Gửi</button></div><input type="file" id="ac-file" accept="image/*,.xlsx,.xls,.csv,.pdf,.docx,.doc,.pptx,.txt,.md,.json,.mp4,.mov,.webm,.mp3,.wav,.m4a" multiple hidden></div></div>
+    <div class="ac-bar"><button class="ac-clip" id="ac-clip" title="Đính kèm ảnh, Excel, PDF, Word, video (tối đa 25 MB mỗi file)">📎</button><button class="ac-clip" id="ac-mic" type="button" title="Bấm để nói, bấm lần nữa để dừng. Máy văn phòng bật thì chữ chuẩn hơn, hiện sau vài giây">🎤</button><textarea id="ac-text" rows="1" placeholder="Nhắn cho ${esc(a.name)}…  (/stop dừng việc đang làm · /new phiên mới)"></textarea><span class="ac-opt"><button class="ac-clip" id="ac-more" title="Tùy chọn gửi">⋯</button><div class="ac-optp" id="ac-optp" hidden>${AC.cur==="lead-sale-ailla"?'<label title="Tin bạn gõ được xử lý như khách nhắn vào page: agent chỉ chọn câu mẫu kịch bản Pancake V5, không tự viết"><input type="checkbox" id="ac-kh"> Thử như khách (kịch bản V5)</label>':""}${AC.isCeo?'<label><input type="checkbox" id="ac-tg"> Gửi cả bản trả lời sang Telegram</label>':""}</div></span><button class="btn pri" id="ac-go">Gửi</button></div><input type="file" id="ac-file" accept="image/*,.xlsx,.xls,.csv,.pdf,.docx,.doc,.pptx,.txt,.md,.json,.mp4,.mov,.webm,.mp3,.wav,.m4a" multiple hidden></div></div>
    <div class="ac-right" id="ac-right"></div></div>`;
   R.querySelectorAll("[data-ac]").forEach(b=>b.onclick=()=>acPick(b.dataset.ac));
   {const sc=$("#ac-strip"),on=sc&&sc.querySelector(".ac-sc.on");if(on&&sc)sc.scrollLeft=Math.max(0,on.offsetLeft-sc.offsetLeft-120);const nx=$("#ac-next"),pv=$("#ac-prev");if(nx&&sc)nx.onclick=()=>{sc.scrollLeft+=330};if(pv&&sc){pv.onclick=()=>{sc.scrollLeft-=330};const fit=()=>{pv.style.visibility=sc.scrollLeft>4?"visible":"hidden";if(nx)nx.style.visibility=sc.scrollLeft+sc.clientWidth<sc.scrollWidth-4?"visible":"hidden"};sc.addEventListener("scroll",fit);setTimeout(fit,50);setTimeout(fit,400)}}
@@ -353,7 +353,7 @@ function acDrawMsgs(stick){
     const act=m.role==="SYSTEM"?"":`<span class="ac-act"><button data-cp="${i}" title="Bôi đen một đoạn rồi bấm để chỉ copy đoạn đó">Copy</button><button data-rp="${i}" title="Bôi đen một đoạn rồi bấm để chỉ trả lời đoạn đó">Trả lời</button></span>`;
     const st=u?(m.status==="queued"?" · đang chờ":m.status==="taken"?" · agent đang làm…":m.status==="error"?" · lỗi":""):"";
     const who=u?`<span class="ac-me">${esc(((ME&&ME.name)||"H").trim().split(/\s+/).pop().slice(0,1).toUpperCase())}</span>`:m.role==="AGENT"?acAv(a):"";
-    return `<div class="ac-row2 ${u?"u":""}" style="--ac:${esc(a.color||"#64748b")}">${who}<div class="ac-m ${k}"><span class="nm">${u?esc((ME&&ME.name)||"Chị Hoa"):m.role==="AGENT"?esc(a.name):"Hệ thống"}</span>${qhtml}${m.role==="AGENT"?acFmt(m.body):esc(mbody)}${(m.files||[]).length?`<div class="ac-imgs n${Math.min((m.files||[]).length,4)}">${(m.files||[]).map(f=>`<a href="/api/agent-chat/file/${f.id}" target="_blank" rel="noopener"><img class="ac-img" src="/api/agent-chat/file/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>`:""}${(m.docs||[]).map(d=>`<button type="button" class="ac-dl" data-doc="${d.id}" data-dn="${esc(d.name)}" title="Bấm để xem ngay">📄 ${esc(d.name)} · ${d.size>1048576?(d.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(d.size/1024))+" KB"}</button>`).join("")}<small>${acHour(m.created_at)}${st}${u&&m.tg?" · gửi cả Telegram":""}${m.source==="TELEGRAM"?" · từ Telegram":""}</small>${act}</div></div>`}).join(""):`<div class="hint">${AC.tab==="files"?"Chưa có ảnh hay link nào.":"Chưa có tin nào. Gõ bên dưới để nhắn agent."}</div>`;
+    return `<div class="ac-row2 ${u?"u":""}" style="--ac:${esc(a.color||"#64748b")}">${who}<div class="ac-m ${k}"><span class="nm">${u?esc((ME&&ME.name)||"Bạn"):m.role==="AGENT"?esc(a.name):"Hệ thống"}</span>${qhtml}${m.role==="AGENT"?acFmt(m.body):esc(mbody)}${(m.files||[]).length?`<div class="ac-imgs n${Math.min((m.files||[]).length,4)}">${(m.files||[]).map(f=>`<a href="/api/agent-chat/file/${f.id}" target="_blank" rel="noopener"><img class="ac-img" src="/api/agent-chat/file/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>`:""}${(m.docs||[]).map(d=>`<button type="button" class="ac-dl" data-doc="${d.id}" data-dn="${esc(d.name)}" title="Bấm để xem ngay">📄 ${esc(d.name)} · ${d.size>1048576?(d.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(d.size/1024))+" KB"}</button>`).join("")}<small>${acHour(m.created_at)}${st}${u&&m.tg?" · gửi cả Telegram":""}${m.source==="TELEGRAM"?" · từ Telegram":""}</small>${act}</div></div>`}).join(""):`<div class="hint">${AC.tab==="files"?"Chưa có ảnh hay link nào.":"Chưa có tin nào. Gõ bên dưới để nhắn agent."}</div>`;
   box.querySelectorAll("[data-cp],[data-rp]").forEach(b=>b.onmousedown=e=>e.preventDefault()); // bấm nút không làm mất vùng bôi đen
   box.querySelectorAll("[data-doc]").forEach(b=>b.onclick=()=>acOpenDoc(+b.dataset.doc,b.dataset.dn));
   box.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>acCopy(AC.shown[+b.dataset.cp],b));
@@ -374,7 +374,7 @@ async function acCopy(m,btn){
 }
 function acReply(m,btn){
   const t=(acSel(btn)||acPlain(m)).replace(/\s+/g," ").trim();
-  AC.quote={who:m.role==="AGENT"?(acA(AC.cur)||{}).name||"Agent":"Chị",text:t.length>240?t.slice(0,240)+"…":t};
+  AC.quote={who:m.role==="AGENT"?(acA(AC.cur)||{}).name||"Agent":(ME&&ME.name)||"Bạn",text:t.length>240?t.slice(0,240)+"…":t};
   acDrawQuote();const ta=$("#ac-text");if(ta)ta.focus();
 }
 function acDrawQuote(){
@@ -411,7 +411,7 @@ async function acCompress(file){
     const cv=document.createElement("canvas");cv.width=w;cv.height=h;const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,w,h);cx.drawImage(img,0,0,w,h);
     let q=.88,d=cv.toDataURL("image/jpeg",q);
     while(d.length>1900000&&q>.4){q-=.12;d=cv.toDataURL("image/jpeg",q)}
-    if(d.length>1950000)throw new Error("Ảnh quá nặng, chị chọn ảnh nhỏ hơn");
+    if(d.length>1950000)throw new Error("Ảnh quá nặng, hãy chọn ảnh nhỏ hơn");
     return {name:(file.name||"anh").replace(/\.[^.]+$/,"")+".jpg",mime:"image/jpeg",b64:d.split(",")[1],url:d};
   }finally{URL.revokeObjectURL(url)}
 }
@@ -451,8 +451,8 @@ function acDrawPend(){
 }
 async function acSend(){
   const ta=$("#ac-text"),t0=ta.value.trim();if((!t0&&!AC.pend.length&&!AC.docs.length)||!AC.cur)return;
-  if(AC.docs.some(d=>!d.ok&&!d.err)){toast("File đang tải lên, chị đợi một chút rồi gửi");return}
-  if(AC.docs.some(d=>d.err)){toast("Có file chưa tải được, chị bỏ file đó (dấu ×) rồi gửi lại");return}
+  if(AC.docs.some(d=>!d.ok&&!d.err)){toast("File đang tải lên, đợi một chút rồi gửi");return}
+  if(AC.docs.some(d=>d.err)){toast("Có file chưa tải được, bỏ file đó (dấu ×) rồi gửi lại");return}
   const t1=AC.quote?"↩ «"+AC.quote.text.replace(/[«»]/g,"")+"»\n"+(t0||"(trả lời tin trên)"):t0;
   const kh=$("#ac-kh")&&$("#ac-kh").checked;try{localStorage.setItem("ac_kh",kh?"1":"0")}catch(e){}
   const t=kh?"[KHÁCH] "+t1:t1;
@@ -467,7 +467,7 @@ async function acAccess(){
   try{AC.access=await svApi("/api/agent-chat/access")}catch(e){return}
   const L=AC.agents||[];
   box.innerHTML=`<section class="card" style="margin-top:16px"><div class="card-h"><h2>Ai được nhắn agent nào</h2></div>
-   <p class="hint">Mỗi nhân sự chỉ thấy cuộc trò chuyện của chính mình, và chỉ các agent chị tích ở đây. Chị Hoa luôn thấy tất cả.</p>
+   <p class="hint">Mỗi nhân sự chỉ thấy cuộc trò chuyện của chính mình, và chỉ các agent được tích ở đây. CEO luôn thấy tất cả.</p>
    ${(AC.access||[]).map(u=>`<div style="border-top:1px solid var(--line);padding:10px 0"><b>${esc(u.display_name)}</b> <span class="hint">(${u.role==="MANAGER"?"quản lý":"nhân viên"})</span>
     <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0">${L.map(a=>`<label style="white-space:nowrap"><input type="checkbox" data-acu="${esc(u.id)}" value="${esc(a.id)}"${u.agents.includes(a.id)?" checked":""} style="width:auto;margin-right:5px">${esc(a.name)}</label>`).join("")}</div>
     <button class="btn sm" data-acs="${esc(u.id)}">Lưu quyền của ${esc(u.display_name)}</button></div>`).join("")||'<div class="hint">Chưa có nhân sự nào.</div>'}</section>`;

@@ -372,7 +372,7 @@ function bvColPop(anchor){
 function bvScrOpen(id){
   const c=(D().cards||[]).find(x=>x.id===id);if(!c)return;
   const ed=!!(c.wt&&c.wStage==="script"&&c.wStatus==="review"&&(can(ME,"viec.duyet")||ME.role==="admin"));
-  openDrawerHTML(`<h2 style="margin:6px 0 2px">Kịch bản ${esc(c.wJob||c.id)}</h2><p class="hint">${ed?"Chị sửa thẳng vào chữ bên dưới. Sửa xong bấm Duyệt, Worker sẽ dựng theo đúng bản chị sửa. Không ưng thì bấm Góp ý để Worker viết lại.":"Kịch bản Worker đã viết."}</p><textarea id="bvScT" class="bvscT" ${ed?"":"readonly"}>${esc(c.wScript||"")}</textarea>${ed?`<div class="acts"><button class="btn pri" id="bvScOk">Duyệt kịch bản</button><button class="btn" id="bvScFixB">Góp ý để Worker viết lại</button></div><div id="bvScFixBox" hidden><textarea id="bvScN" class="bvscN" placeholder="Chị góp ý ngắn, ví dụ: bớt cảm thán, nói rõ cách pha cồn…"></textarea><button class="btn pri" id="bvScFix">Gửi góp ý, viết lại</button></div>`:""}`);
+  openDrawerHTML(`<h2 style="margin:6px 0 2px">Kịch bản ${esc(c.wJob||c.id)}</h2><p class="hint">${ed?"Sửa thẳng vào chữ bên dưới. Sửa xong bấm Duyệt, Worker sẽ dựng theo đúng bản đã sửa. Không ưng thì bấm Góp ý để Worker viết lại.":"Kịch bản Worker đã viết."}</p><textarea id="bvScT" class="bvscT" ${ed?"":"readonly"}>${esc(c.wScript||"")}</textarea>${ed?`<div class="acts"><button class="btn pri" id="bvScOk">Duyệt kịch bản</button><button class="btn" id="bvScFixB">Góp ý để Worker viết lại</button></div><div id="bvScFixBox" hidden><textarea id="bvScN" class="bvscN" placeholder="Góp ý ngắn, ví dụ: bớt cảm thán, nói rõ cách pha cồn…"></textarea><button class="btn pri" id="bvScFix">Gửi góp ý, viết lại</button></div>`:""}`);
   const T=document.getElementById("bvScT");if(!T)return;
   const fit=()=>{T.style.height="auto";T.style.height=Math.max(360,T.scrollHeight+4)+"px"};fit();
   if(!ed)return;
@@ -383,9 +383,9 @@ function bvScrOpen(id){
     const changed=txt!==orig;ok.disabled=true;
     const er=await wkTask(changed?"card_script_edit":"card_script_ok",c,changed?{script:txt}:{});
     if(er){toast(er);ok.disabled=false;return}
-    done(changed?"Đã lưu bản chị sửa, Worker tạo giọng và ghép cảnh":"Đã duyệt kịch bản, Worker tạo giọng và ghép cảnh",y=>{y.wHadScr=true;y.wDetail="Kịch bản đã duyệt, Worker đang tạo giọng + ghép cảnh";if(changed)y.wScript=txt})};
+    done(changed?"Đã lưu bản đã sửa, Worker tạo giọng và ghép cảnh":"Đã duyệt kịch bản, Worker tạo giọng và ghép cảnh",y=>{y.wHadScr=true;y.wDetail="Kịch bản đã duyệt, Worker đang tạo giọng + ghép cảnh";if(changed)y.wScript=txt})};
   document.getElementById("bvScFixB").onclick=()=>{const bx=document.getElementById("bvScFixBox");bx.hidden=!bx.hidden;if(!bx.hidden)document.getElementById("bvScN").focus()};
-  document.getElementById("bvScFix").onclick=async()=>{const n=document.getElementById("bvScN").value.trim();if(!n){toast("Chị ghi góp ý ngắn trước nhé");return}
+  document.getElementById("bvScFix").onclick=async()=>{const n=document.getElementById("bvScN").value.trim();if(!n){toast("Ghi góp ý ngắn trước");return}
     const er=await wkTask("card_script_fix",c,{note:n});if(er){toast(er);return}
     done("Đã gửi góp ý, Worker viết lại kịch bản",y=>{y.wDetail="Worker đang viết lại kịch bản theo góp ý"})};
 }

@@ -77,7 +77,7 @@ async function pdAct(r,ok){
     else if(r.src==="shipEdit")await post("/api/orders/ship-edits/"+r.ref+"/decide",{decision:ok?"APPROVED":"REJECTED",note});
     else if(r.src==="proposal")await post("/api/proposals/"+r.ref+"/decide",{decision:ok?"ACCEPTED":"REJECTED",note:note||null});
     else if(r.src==="gift"||r.src==="cash"){const x=await post("/api/bonus/"+(r.src==="gift"?"gifts":"cash")+"/"+r.ref+(ok?"/approve":"/cancel"),ok?{}:{reason:note});
-      if(ok&&x&&x.ceo_status==="CHO"){toast("Đã duyệt. Khoản từ ngưỡng chi nên chuyển chị Hoa duyệt");delete PD.doing[r.id];await pdLoad(true);return}}
+      if(ok&&x&&x.ceo_status==="CHO"){toast("Đã duyệt. Khoản từ ngưỡng chi nên chuyển CEO duyệt");delete PD.doing[r.id];await pdLoad(true);return}}
     else if(r.src==="payment")await post("/api/payments/"+r.ref+"/confirm",{confirmed:true});
     else if(r.src==="ceo_ship")await post(ok?"/api/ceo-spend/ship/"+r.ref+"/approve":"/api/shipping-vouchers/"+r.ref+"/cancel",ok?{}:{reason:note});
     else if(r.src==="ceo_ncc")await post(ok?"/api/ceo-spend/ncc/"+r.ref+"/approve":"/api/hub/kho/mh/payments/"+r.ref+"/cancel",{});
@@ -108,7 +108,7 @@ function pPheDuyet(m){
     const age=pdAge(r.at,now),old=r.at&&now-r.at>3*864e5;
     return `<tr><td>${pill(PD_KIND_N(r.k),"gry")}${r.ceoCho?" "+pill("chờ CEO","amb"):""}${r.loai!==PD_KIND_N(r.k)&&r.loai!=="Đề xuất agent"?`<div class="hint">${esc(r.loai)}</div>`:""}</td><td><div class="pd-nd">${esc(r.nd)}</div>${r.sub?`<div class="hint pd-sub" title="Bấm để xem đủ">${esc(r.sub)}</div>`:""}</td><td class="n">${money(r.tien)}</td><td>${esc(r.by||"—")}</td><td class="nowrap${old?" t-red":""}">${esc(age||"—")}</td>
     <td class="nowrap">${btn} <button class="btn sm" data-pdgo="${i}">Mở</button></td></tr>`}),"pd-t"):`<p class="empty pad">${all.length?"Không có việc nào thuộc loại này.":"Không có việc nào đang chờ bạn duyệt."}</p>`}</section>
-  <p class="hint">Mỗi người chỉ thấy việc mình được duyệt (đúng quy tắc của trang gốc). Đơn nghỉ phép, OT, tạm ứng duyệt ở trang gốc (bấm Mở). Khoản chi từ ${nf(pdTh())} đ trở lên phải chị Hoa duyệt (đổi mức ở Cấu hình › Ngưỡng cảnh báo).</p>`;
+  <p class="hint">Mỗi người chỉ thấy việc mình được duyệt (đúng quy tắc của trang gốc). Đơn nghỉ phép, OT, tạm ứng duyệt ở trang gốc (bấm Mở). Khoản chi từ ${nf(pdTh())} đ trở lên phải CEO duyệt (đổi mức ở Cấu hình › Ngưỡng cảnh báo).</p>`;
   m.querySelectorAll(".pd-sub").forEach(x=>x.onclick=()=>x.classList.toggle("on"));
   m.querySelectorAll("[data-pdk]").forEach(b=>b.onclick=()=>{PD.k=b.dataset.pdk;renderMain()});
   $("#pd-re").onclick=()=>{PD.at=0;pdLoad(true)};
@@ -123,8 +123,8 @@ MODULES.push({k:"pd_src",adm:true,hide:true,ic:"check",n:"Phê duyệt",zone:"",
 /* Cấu hình › Ngưỡng cảnh báo: thêm ô "Khoản chi phải chị Hoa duyệt". Lưu ở máy chủ (app_settings) để máy chủ và web dùng chung một số; chỉ CEO sửa. */
 {const _n=PAGES.nguong;if(_n)PAGES.nguong=function(m){_n.apply(this,arguments);
   try{const ceo=typeof crmRole==="function"&&crmRole()==="CEO",v=pdTh();
-    m.querySelector(".ph").insertAdjacentHTML("afterend",`<div class="card pad"><div class="tlh"><b>Khoản chi phải chị Hoa duyệt</b></div>
+    m.querySelector(".ph").insertAdjacentHTML("afterend",`<div class="card pad"><div class="tlh"><b>Khoản chi phải CEO duyệt</b></div>
      <form class="frm" id="ng-ceo"><div class="row4"><label class="field">Khoản chi từ (đ) trở lên<input type="number" min="0" step="100000" id="ng-ceo-v" value="${v}" ${ceo?"":"disabled"}><small class="hint">Phiếu chi Sổ chi phí, phiếu chi vận chuyển, chi nhà cung cấp, phiếu chi thưởng NPP. Dưới mức này duyệt như cũ. Để 0 là tắt.</small></label></div>
-     ${ceo?'<button class="btn pri">Lưu mức duyệt</button>':'<p class="hint">Chỉ chị Hoa đổi được mức này.</p>'}</form></div>`);
+     ${ceo?'<button class="btn pri">Lưu mức duyệt</button>':'<p class="hint">Chỉ CEO đổi được mức này.</p>'}</form></div>`);
     const fm=m.querySelector("#ng-ceo");if(ceo&&fm)fm.onsubmit=async e=>{e.preventDefault();const n=Math.max(0,Math.round(+m.querySelector("#ng-ceo-v").value||0));
-      try{await svApi("/api/settings",{method:"PATCH",body:JSON.stringify({"spend.ceo_threshold_vnd":n})});PD.th=n;toast("Đã lưu: khoản chi từ "+nf(n)+" đ phải chị Hoa duyệt");renderMain()}catch(er){toast(er.message||"Chưa lưu được")}}}catch(e){}}}
+      try{await svApi("/api/settings",{method:"PATCH",body:JSON.stringify({"spend.ceo_threshold_vnd":n})});PD.th=n;toast("Đã lưu: khoản chi từ "+nf(n)+" đ phải CEO duyệt");renderMain()}catch(er){toast(er.message||"Chưa lưu được")}}}catch(e){}}}

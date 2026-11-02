@@ -32,7 +32,7 @@ function fpaiMakeFrame(kenh){
       }
     })
   });
-  toast(add?`Đã tạo ${add} bài theo kế hoạch và xếp ngày. Chị chỉnh lại nếu cần`:"Các tuyến đã đủ số bài theo kế hoạch");renderMain()
+  toast(add?`Đã tạo ${add} bài theo kế hoạch và xếp ngày. Chỉnh lại nếu cần`:"Các tuyến đã đủ số bài theo kế hoạch");renderMain()
 }
 async function fpaiWrite(kenh,all){
   const d=D(),B=fpBriefOf(d);
@@ -108,7 +108,7 @@ pFanpageLich=function(m,chs){
   const d=D(),B=fpBriefOf(d),kenh=BV.k,all=d.cards.filter(c=>c.kenh===kenh);
   const nEmpty=all.filter(c=>!String(c.noiDung||"").trim()&&!["dang","xong"].includes(c.step)).length,nWait=all.filter(c=>fpStOf(c)==="dvd").length;
   const html=`<section class="card pad fpai"><style>.fpai .fpg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(max-width:800px){.fpai .fpg{grid-template-columns:1fr}}.fpai label{display:block;font-size:12px;color:#6b7280}.fpai textarea,.fpai input{width:100%;margin-top:3px}.fpwh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:6px 4px}.fpai .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}</style>
-   <div class="card-h"><h2>Yêu cầu tháng ${MONTH.mon} cho Fanpage</h2><span class="hint">Chị ghi yêu cầu → tạo khung bài → AI viết nội dung và brief ảnh → chị duyệt cả tháng</span></div>
+   <div class="card-h"><h2>Yêu cầu tháng ${MONTH.mon} cho Fanpage</h2><span class="hint">Ghi yêu cầu → tạo khung bài → AI viết nội dung và brief ảnh → CEO duyệt cả tháng</span></div>
    <div class="fpg"><label>Mục tiêu tháng<textarea rows="2" data-fpb="mucTieu" placeholder="VD: tăng tương tác, kéo khách về mua trên TikTok Shop, đẩy sale đôi 20/10">${esc(B.mucTieu)}</textarea></label>
     <label>Giọng văn<textarea rows="2" data-fpb="giong" placeholder="VD: gần gũi như người nhà, hài nhẹ, không văn quảng cáo">${esc(B.giong)}</textarea></label>
     <label>Sản phẩm cần đẩy<textarea rows="2" data-fpb="spDay" placeholder="VD: Tinh dầu giặt sấy, Bột tẩy vạn năng">${esc(B.spDay)}</textarea></label>
@@ -126,7 +126,7 @@ pFanpageLich=function(m,chs){
     const k=b.dataset.fpai;
     if(k==="frame")fpaiMakeFrame(kenh);
     else if(k==="write")fpaiSend(kenh,false);
-    else if(k==="rewrite"){if(confirm("Viết lại nội dung của tất cả bài chưa duyệt? Nội dung chị đã sửa tay sẽ bị thay."))fpaiSend(kenh,true)}
+    else if(k==="rewrite"){if(confirm("Viết lại nội dung của tất cả bài chưa duyệt? Nội dung đã sửa tay sẽ bị thay."))fpaiSend(kenh,true)}
     else if(k==="ok"){
       const L=D().cards.filter(c=>c.kenh===kenh&&fpStOf(c)==="dvd");if(!L.length)return;
       if(!confirm("Duyệt "+L.length+" bài đang chờ duyệt của Fanpage?"))return;

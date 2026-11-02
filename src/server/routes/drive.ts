@@ -64,7 +64,7 @@ async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AuthContext
 
 function needKey(env: AppEnv['Bindings']) {
   const k = saKey(env.GDRIVE_SA_JSON);
-  if (!k) throw badRequest('DRIVE_NOT_CONNECTED', 'Web chưa được nối với Google Drive. Chị Hoa cần chạy file NOI-GOOGLE-DRIVE.bat một lần.');
+  if (!k) throw badRequest('DRIVE_NOT_CONNECTED', 'Web chưa được nối với Google Drive. CEO cần chạy file NOI-GOOGLE-DRIVE.bat một lần.');
   return k;
 }
 

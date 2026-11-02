@@ -69,7 +69,7 @@ const STEPS=[
  {id:"edit",t:"Đang edit",who:"Người edit · dán link"},
  {id:"worker",t:"Worker đang dựng",who:"Máy tự làm",auto:true},
  {id:"dvd",t:"Người duyệt video",who:"Oanh"},
- {id:"dceo",t:"CEO duyệt video",who:"Chị Hoa"},
+ {id:"dceo",t:"CEO duyệt video",who:"CEO"},
  {id:"dang",t:"Chờ đăng",who:"Người giữ kênh · dán ID / link"},
  {id:"xong",t:"Đã đăng",who:"Số về theo báo cáo tuần"},
 ];

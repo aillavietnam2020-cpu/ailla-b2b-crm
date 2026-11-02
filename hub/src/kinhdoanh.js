@@ -7,7 +7,7 @@ const tr=v=>v?money(v):"—";
 const pc=(a,b)=>b?(a/b*100).toFixed(1)+"%":"—";
 const cleanN=s=>String(s||"").replace(/\\n/g," ").replace(/\s+/g," ").trim();
 const srcNote=t=>`<div class="hint src">Nguồn: ${t}</div>`;
-const needFile=(t,what)=>`<section class="card waitf"><h2>${t}</h2><p>${what}</p><p class="hint">Chị gửi file (link Google Sheet hoặc Excel) là em đấu vào trang này, giống cách đã làm với báo cáo Digital và Pancake.</p></section>`;
+const needFile=(t,what)=>`<section class="card waitf"><h2>${t}</h2><p>${what}</p><p class="hint">Gửi file (link Google Sheet hoặc Excel) để nối vào trang này, giống cách đã làm với báo cáo Digital và Pancake.</p></section>`;
 const barRow=(vals,lbl,fmt)=>{const mx=Math.max(1,...vals);return `<div class="dbar">${vals.map((v,i)=>`<div class="b" title="${lbl(i)}: ${fmt(v)}"><i style="height:${v?Math.max(3,v/mx*100):0}%"></i></div>`).join("")}</div>`};
 
 /* ---------- Toàn công ty ---------- */
@@ -16,7 +16,7 @@ function pBcTong(m){
   const ads9=sum(KDX.adsPeople,p=>p.dt),chi9=sum(KDX.adsPeople,p=>p.chi),A=m7=>(KDX.adsMonths.find(x=>x.m===m7)||{}).tong;
   const T7=KDX.tts?plv(KDX.tts.pl,/^Doanh thu thuần/):0,TL7=KDX.tts?plv(KDX.tts.pl,/^LÃI ĐÓNG GÓP/):0,S7=KDX.spe?plv(KDX.spe.pl,/^Doanh thu thuần/):0,SL7=KDX.spe?plv(KDX.spe.pl,/^LÃI ĐÓNG GÓP/):0;
   const rows=[
-   ["TikTok Shop (cả shop, doanh thu thuần)",tr(T7),"—","~1,4 tỷ GMV video (chị báo)","Báo cáo quản trị TikTok, chốt sổ ngày 8","amb","Có T7 · chờ T8, T9"],
+   ["TikTok Shop (cả shop, doanh thu thuần)",tr(T7),"—","~1,4 tỷ GMV video (CEO báo)","Báo cáo quản trị TikTok, chốt sổ ngày 8","amb","Có T7 · chờ T8, T9"],
    ["   trong đó qua KOC / Affiliate (đã nằm trong TikTok)",KDX.tts?tr(plv(KDX.tts.kocPL,/^Doanh thu quy đổi/)):"—","—","—","TikTok M3_KOC","amb","Có T7"],
    ["Shopee 2 shop (doanh thu thuần)",tr(S7),"—","—","Báo cáo quản trị Shopee, chốt sổ ngày 8","amb","Có T7 · chờ T8, T9"],
    ["Facebook (Pancake, đơn giao thành công)","—",tr(f8["Doanh thu ghi nhận"]),tr(f9["Doanh thu ghi nhận"])+` <small>(1–${f9["Số ngày"]||"?"}/9)</small>`,"Sheet Pancake (tự kéo 7h sáng)","grn","Có T8, T9"],

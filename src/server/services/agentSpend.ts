@@ -77,7 +77,7 @@ export async function agentSpendGuard(
   }
   const p = auth.permissions;
   if (!(p.includes('order.accounting.confirm') || p.includes('order.approve.normal'))) {
-    throw forbidden('Chỉ lập phiếu chi theo lệnh của kế toán hoặc quản lý điều phối (chị Thảo).');
+    throw forbidden('Chỉ lập phiếu chi theo lệnh của kế toán hoặc quản lý điều phối.');
   }
   if (!cand.payees.some((x) => normPayee(x))) {
     throw new AppError(422, 'NEED_PAYEE', 'Agent lập phiếu chi phải ghi rõ người nhận tiền (để chống tạo trùng).', { payee: 'Bắt buộc' });

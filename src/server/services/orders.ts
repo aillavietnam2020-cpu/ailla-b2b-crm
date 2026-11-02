@@ -137,7 +137,7 @@ export async function prepareOrder(
   const orderDate = input.order_date ?? vnDate();
   // Nhân viên mua hàng công ty (cấp Nhân viên, trừ lương cuối tháng): chỉ quản lý điều phối (chị Thảo) hoặc CEO lập đơn.
   if (customer.tier_code === 'NHAN_VIEN' && auth.user.role === 'EMPLOYEE') {
-    throw forbidden('Đơn nhân viên mua hàng công ty chỉ quản lý (chị Thảo) hoặc CEO lập.');
+    throw forbidden('Đơn nhân viên mua hàng công ty chỉ quản lý hoặc CEO lập.');
   }
   // Khách lên cấp: sale phụ trách (hoặc quản lý) đổi cấp ngay trên đơn. Chỉ tính trong bộ nhớ ở đây, được lưu cùng đơn.
   let tierChange: PreparedOrder['tier_change'];

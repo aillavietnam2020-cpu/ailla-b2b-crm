@@ -14,7 +14,7 @@
    - CEO: Phê duyệt báo mọi dòng chị duyệt được, trừ dòng kế toán làm trước (phiếu chi chưa qua Huệ, phiếu thu, tiền về, hàng trả lại,
      combo chờ nhập), xem ntForMe; chị vẫn thấy đủ ở trang Phê duyệt.
    ===================================================================== */
-const NT_TYPES=[["agent","🤖","Tin mới từ agent","Agent trả lời hoặc nhắn chị/anh trong Điều hành agent, Hội thoại"],["duyet","✅","Việc cần duyệt","Phiếu chi, đơn hàng, đề xuất của agent, combo mới… đúng các dòng ở trang Phê duyệt"],["giao","📌","Việc được giao","Việc, thẻ video giao cho mình, lệnh sản xuất, việc chăm sóc khách"],["tin","💬","Tin nhắn và thông báo khác","Nhắn riêng, gọi tên trong nhóm, các thông báo khác trong chuông"]];
+const NT_TYPES=[["agent","🤖","Tin mới từ agent","Agent trả lời hoặc nhắn bạn trong Điều hành agent, Hội thoại"],["duyet","✅","Việc cần duyệt","Phiếu chi, đơn hàng, đề xuất của agent, combo mới… đúng các dòng ở trang Phê duyệt"],["giao","📌","Việc được giao","Việc, thẻ video giao cho mình, lệnh sản xuất, việc chăm sóc khách"],["tin","💬","Tin nhắn và thông báo khác","Nhắn riêng, gọi tên trong nhóm, các thông báo khác trong chuông"]];
 const NT={batch:[],timer:0,at:0,busy:false,cbAt:0,sig:"",scanned:false,fresh:null,recent:[],more:0,unseen:0,title:""};
 const ntUid=()=>(typeof SV!=="undefined"&&SV.me&&SV.me.id)||(ME&&ME.id)||"";
 function ntLS(k,v){const key="ailla_nt_"+k+"_"+ntUid();try{if(v===undefined)return JSON.parse(localStorage.getItem(key)||"null");localStorage.setItem(key,JSON.stringify(v))}catch(e){}return null}
@@ -142,7 +142,7 @@ PAGES.thongbao=m=>{const p=ntPrefs(),has="Notification" in window,perm=has?Notif
     <h3 style="margin-top:18px">Thông báo của Windows</h3>
     <p class="hint">Khi đang mở tab khác hoặc thu nhỏ Chrome, máy vẫn hiện thông báo ở góc dưới bên phải màn hình (web vẫn phải đang mở ở một tab).</p>
     <label class="nttog"><input type="checkbox" data-ntk="os"${p.os?" checked":""}><span><b>🪟 Hiện cả thông báo của Windows</b><small>${perm==="granted"?"Máy này đã cho phép.":perm==="denied"?"Máy này đang chặn thông báo của web.":perm==="unsupported"?"Trình duyệt này không hỗ trợ.":"Máy này chưa cho phép, bấm nút bên dưới."}</small></span></label>
-    ${perm==="default"?`<p><button class="btn pri" id="nt-on">Bật thông báo</button> <span class="hint">Chrome sẽ hỏi một lần, chị/anh bấm <b>Cho phép</b>.</span></p>`:""}
+    ${perm==="default"?`<p><button class="btn pri" id="nt-on">Bật thông báo</button> <span class="hint">Chrome sẽ hỏi một lần, bấm <b>Cho phép</b>.</span></p>`:""}
     ${perm==="denied"?`<p class="hint">Muốn bật lại: bấm biểu tượng bên trái địa chỉ web (ổ khóa / hai gạch), chọn <b>Thông báo</b> → <b>Cho phép</b>, rồi tải lại trang.</p>`:""}
     <p style="margin-top:14px"><button class="btn" id="nt-test">Thử một thông báo</button> <button class="lnk" id="nt-rec">Xem thông báo vừa nhận</button></p></section>`;
   m.querySelectorAll("[data-ntk]").forEach(x=>x.onchange=()=>{const q=ntPrefs();q[x.dataset.ntk]=x.checked;ntLS("pref",q);toast(x.checked?"Đã bật":"Đã tắt")});

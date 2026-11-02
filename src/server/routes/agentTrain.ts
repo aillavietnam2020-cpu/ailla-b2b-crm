@@ -247,7 +247,7 @@ agentTrainRoutes.post('/pages', async (c) => {
   if (!fb) {
     throw badRequest(
       'BAD_PAGE',
-      'Không thấy dãy số của Page trong cái chị dán. Link chỉ có tên Page (facebook.com/tên) thì không đủ. Dán link có số, ví dụ botcake.io/105017945992971/home hoặc facebook.com/profile.php?id=105017945992971, hoặc gõ thẳng dãy số.',
+      'Không thấy dãy số của Page trong link đã dán. Link chỉ có tên Page (facebook.com/tên) thì không đủ. Dán link có số, ví dụ botcake.io/105017945992971/home hoặc facebook.com/profile.php?id=105017945992971, hoặc gõ thẳng dãy số.',
     );
   }
   const dup = await c.env.DB.prepare('SELECT id FROM agent_train_pages WHERE fb_page_id = ?').bind(fb).first();
@@ -271,7 +271,7 @@ agentTrainRoutes.patch('/pages/:id', async (c) => {
     if (botId) await loadBot(c, botId);
   }
   // Chỉ có "tắt" hoặc "chỉ tài khoản thử". Mở cho khách thật là việc riêng, chị duyệt riêng.
-  if (b.mode !== undefined && b.mode !== 'off' && b.mode !== 'tester') throw badRequest('BAD_MODE', 'Chỉ có chế độ tắt hoặc chỉ thử với tài khoản của chị');
+  if (b.mode !== undefined && b.mode !== 'off' && b.mode !== 'tester') throw badRequest('BAD_MODE', 'Chỉ có chế độ tắt hoặc chỉ thử với tài khoản CEO');
   let mode = (b.mode ?? page.mode) as 'off' | 'tester';
   if (!botId) mode = 'off';
   if (mode === 'tester') {

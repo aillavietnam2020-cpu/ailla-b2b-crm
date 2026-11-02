@@ -464,7 +464,7 @@ function TierRulesCard({ canEdit }: { canEdit: boolean }) {
     <Card title="Điều kiện lên cấp giá (sale tự đưa khách lên cấp ngay trên đơn)" bodyClass="">
       <p className="muted" style={{ margin: '8px 14px' }}>
         Điền <b>tiền hàng tối thiểu của một đơn</b> để được lên cấp đó. Đơn đạt thì cấp của khách đổi luôn khi lưu đơn. Đơn chưa đạt hoặc
-        cấp để trống (0) thì sale vẫn lập đơn nháp giá cấp mới, gửi khách được, và gửi xin Quản lý duyệt đổi cấp. Chị, chị Thảo và quản lý
+        cấp để trống (0) thì sale vẫn lập đơn nháp giá cấp mới, gửi khách được, và gửi xin Quản lý duyệt đổi cấp. CEO và quản lý
         đổi cấp ở đâu cũng không bị ràng buộc.
       </p>
       <div className="table-wrap">

@@ -261,9 +261,9 @@ agentChatRoutes.post('/', async (c) => {
   const docRows: Array<{ id: number; nparts: number }> = [];
   for (const did of wantDocs) {
     const d = await c.env.DB.prepare('SELECT id, nparts FROM agent_chat_docs WHERE id = ? AND owner_id = ? AND chat_id IS NULL').bind(did, me0).first<{ id: number; nparts: number }>();
-    if (!d) throw badRequest('BAD_DOC', 'File đính kèm không còn, chị tải lại nhé');
+    if (!d) throw badRequest('BAD_DOC', 'File đính kèm không còn, hãy tải lại');
     const have = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM agent_chat_doc_parts WHERE doc_id = ?').bind(did).first<{ n: number }>();
-    if ((have?.n ?? 0) !== d.nparts) throw badRequest('DOC_INCOMPLETE', 'File chưa tải xong, chị đợi một chút rồi gửi');
+    if ((have?.n ?? 0) !== d.nparts) throw badRequest('DOC_INCOMPLETE', 'File chưa tải xong, đợi một chút rồi gửi');
     docRows.push(d);
   }
   const text = String(body.body ?? '').trim() || (docRows.length ? '(gửi file)' : files.length ? '(gửi ảnh)' : '');

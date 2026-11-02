@@ -12,7 +12,7 @@ function pNganSach(m){
   mhLoad();mhLoadPay();spLoadShip();
   const T="Ngân sách chi phí",S="Mỗi tháng đặt mức chi cho từng nhóm chi phí và phòng ban, theo dõi đã chi bao nhiêu";
   const ym=nsYm();
-  if(!ym){m.innerHTML=H(T,S)+`<div class="note">Ngân sách đặt theo từng tháng. Chị chọn <b>một tháng</b> ở ô thời gian phía trên (ví dụ “Tháng này”) để xem và đặt ngân sách.</div>`;return}
+  if(!ym){m.innerHTML=H(T,S)+`<div class="note">Ngân sách đặt theo từng tháng. Chọn <b>một tháng</b> ở ô thời gian phía trên (ví dụ “Tháng này”) để xem và đặt ngân sách.</div>`;return}
   if(!MH.pay){m.innerHTML=H(T,S)+`<p class="hint pad">Đang tải…</p>`;return}
   const d=D(),ed=mhManage()||can(ME,"chiphi.nhap"),B=((d.fin||{}).budgets||{})[ym]||{},A=nsActual();
   const nhomsAll=[...new Set([...(d.costCats||[]).map(c=>c.nhom),...Object.keys(A).map(k=>k.split("||")[0]),...Object.keys(B).map(k=>k.split("||")[0])])].filter(Boolean);
