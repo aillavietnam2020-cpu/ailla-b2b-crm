@@ -65,7 +65,7 @@ const tq=u=>can(u,"tongquan.xem");
 /* Nhóm trang: một dòng ở thanh bên (hoặc một tab), bấm vào có hàng nút chuyển giữa các trang trong nhóm.
    Dòng ở thanh bên lấy tên nhóm và trỏ tới trang đầu tiên người đó được xem. */
 const PAGE_SETS=[
-  {n:"Việc",ids:["cv_v","cv_tc","cv_nv","cv_kb","cv_lich","cv_vt","cv"],labels:[],noBar:true},
+  {n:"Tổng quan",ids:["cv_v","cv_tc","cv_nv","cv_kb","cv_lich","cv_vt","cv"],labels:[],noBar:true},
   {n:"Bảng tiến độ",ids:["cv_kb","congviec"],labels:["Tất cả việc","Theo bước video"]},
   {n:"Lịch",ids:["cv_lich","giaoviec"],labels:["Lịch việc","Lịch quay"]},
   {n:"Dự án và mục tiêu",ids:["cv_da","cv_mt"],labels:["Dự án","Mục tiêu"]},
@@ -121,7 +121,7 @@ const MKT_G=()=>[
    "tabs" = các trang con hiện thành thanh tab trong trang, thanh bên chỉ còn một dòng. */
 const MODULES=[
  {k:"exec",zone:"",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
- {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_v","Việc",null,()=>{try{return wkCount()||""}catch(e){return ""}}),MI("cv_da","Dự án"),MI("cv_mt","Mục tiêu")].filter(Boolean)]]},
+ {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",tabs:true,groups:()=>[["",[MI("cv_v","Tổng quan",null,()=>{try{return wkCount()||""}catch(e){return ""}}),MI("cv_da","Dự án"),MI("cv_mt","Mục tiêu")].filter(Boolean)]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
  {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("thongbao","Cài đặt thông báo"),MI("matkhau","Đổi mật khẩu")]]]},
  {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Kênh bán lẻ",sub:"TikTok · Shopee · Facebook",groups:()=>[

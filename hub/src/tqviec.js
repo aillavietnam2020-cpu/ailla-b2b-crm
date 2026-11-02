@@ -36,7 +36,7 @@ function dvDoneDay(x){const d=D();if(x.src==="task"){const t=(d.tasks||[]).find(
   if(x.src==="card"){const c=d.cards.find(y=>y.id===x.id);return c?(+c.ngayDang||+c.day||0):0}return 0}
 const dvAv=id=>{const n=userName(id)||"?";return `<span class="av">${esc(n.trim().slice(0,1).toUpperCase())}</span>`};
 const dvOpen=(src,id)=>`data-dvo="${esc(src)}|${esc(id)}"`;
-function pDvViec(m){
+function pDvViec(m,embed){
   const d=D(),today=d.settings.today,nd=MONTH.ndays,mgr=dvMgr();
   if(!DV.scope)DV.scope=mgr?"team":"mine";
   const L=dvItems(DV.scope),open=L.filter(x=>x.st!=="done");
@@ -90,7 +90,7 @@ function pDvViec(m){
   const wkHtml=`<div class="card dvc"><h2 class="dvh">📈 Hoàn thành theo tuần <small>đúng hạn / trễ</small></h2><svg viewBox="0 0 300 150" width="100%" style="display:block">${wk.map((x,i)=>{const X=gap+i*(bw+gap),h1=x.ok/wm*110,h2=x.tre/wm*110;return `<rect x="${X}" y="${125-h1}" width="${bw}" height="${h1}" rx="4" fill="#22c55e" opacity="${x.fut?.25:x.cur?.6:1}"/><rect x="${X}" y="${125-h1-h2}" width="${bw}" height="${h2}" rx="2" fill="#ef4444"/><text x="${X+bw/2}" y="${125-h1-h2-4}" text-anchor="middle" style="font-size:11px;fill:#1f2340">${x.ok+x.tre||""}</text><text x="${X+bw/2}" y="142" text-anchor="middle" style="font-size:11px;fill:#6b7280">T${x.w.w}${x.cur?" (nay)":""}</text>`}).join("")}</svg>
    <div class="dvleg"><span><em style="background:#22c55e"></em>Đúng hạn</span><span><em style="background:#ef4444"></em>Trễ</span></div></div>`;
   const chips=mgr?`<div class="dvtop">${[["team","Cả team"],["mine","Của tôi"],["giao","Tôi giao"]].map(([k2,t])=>`<button type="button" data-dvsc="${k2}" class="${DV.scope===k2?"on":""}">${t}</button>`).join("")}<span class="mut" style="font-size:12px;margin-left:6px">Bấm vào thẻ để mở đúng việc</span></div>`:"";
-  m.innerHTML=DV_CSS+`<div class="dv">${chips}${kpis}${kb}<div class="dvg2">${lateHtml}${rvHtml}</div><div class="dvg3">${loadHtml}${calHtml}${wkHtml}</div></div>`;
+  m.innerHTML=DV_CSS+`<div class="dv">${embed?"":chips}${kpis}${embed?"":kb}<div class="dvg2">${lateHtml}${rvHtml}</div><div class="dvg3">${loadHtml}${calHtml}${wkHtml}</div></div>`;
   /* ---- thao tác ---- */
   m.querySelectorAll("[data-dvsc]").forEach(b=>b.onclick=()=>{DV.scope=b.dataset.dvsc;renderMain()});
   m.querySelectorAll("[data-dvo]").forEach(e=>e.onclick=ev=>{ev.stopPropagation();const [src,id]=e.dataset.dvo.split("|");if(src==="task"&&typeof openTask==="function")openTask(id);else if(src==="card"&&typeof openCard==="function")openCard(id);else{PAGE="cv_v";renderMain()}});
@@ -99,6 +99,7 @@ function pDvViec(m){
   m.querySelectorAll("[data-dvok]").forEach(b=>b.onclick=()=>{if(typeof tkApprove==="function"&&tkApprove(b.dataset.dvok)!==false){toast("Đã duyệt");renderMain()}});
   m.querySelectorAll("[data-dvtre]").forEach(b=>b.onclick=()=>{const [id,ok]=b.dataset.dvtre.split("|"),yes=ok==="1";DB.mutate(ME.name,(yes?"duyệt":"không duyệt")+" lý do trễ "+id,dt=>{const c=dt.cards.find(y=>y.id===id);if(c&&c.tre){c.tre.st=yes?"ok":"khong";c.tre.duyet=ME.name}});toast(yes?"Đã chấp nhận lý do trễ":"Đã ghi không duyệt (tính trễ)");renderMain()});
 }
-PAGES.cv_tq=function(m){try{pDvViec(m)}catch(e){console.error("Tổng quan việc lỗi",e);m.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}};
+/* chị Hoa 02/11: Tổng quan và Việc gộp một trang (trang Việc, thẻ tên Tổng quan) — đường dẫn cũ cv_tq mở trang đó */
+PAGES.cv_tq=function(m){if(typeof pCvV==="function"){pCvV(m);return}try{pDvViec(m)}catch(e){console.error("Tổng quan việc lỗi",e);m.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}};
 /* mục menu: chỉ người quản lý việc (CEO, trưởng nhóm, người được giao việc) thấy; nhân viên vào thẳng trang Việc */
 {const i=MODULES.findIndex(x=>x.k==="cv");MODULES.splice(i>=0?i+1:MODULES.length,0,{k:"cvtq",zone:"",ic:"task",n:"Tổng quan việc",sub:"",hide:true,groups:()=>[["",[MI("cv_tq","Tổng quan",()=>dvMgr())]]]})}

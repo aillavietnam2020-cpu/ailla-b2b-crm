@@ -250,7 +250,10 @@ function tkDoneErr(t){if(!t||tkMgr(t))return "";if(t.tao&&t.tao!==t.nguoi)return
 /* đến lượt tôi duyệt: đúng người của vòng hiện tại (vòng 1 lead, vòng 2 chị) */
 const tkMyTurn=t=>!!ME&&t.st==="review"&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id);
 const tkMgrNames=t=>tkAppr(t).map(userName).filter(Boolean).join(", ")||"quản lý";
+/* tinnhan.js: giao việc từ tin nhắn — giao xong gọi hàm này với mã việc mới để gửi thẻ việc vào cuộc trò chuyện */
+let TK_AFTER_NEW=null;
 function openTask(id){
+  TK_AFTER_NEW=null;
   const d=D(),t=id?d.tasks.find(x=>x.id===id):null,giver=tkGiver(),own=!!t&&t.tao===ME.id&&t.nguoi===ME.id,ed=giver||!t||t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)||(!!t&&t.tao===ME.id),gv=giver||!t||own;
   const users=d.users.filter(u=>u.active&&u.role!=="admin"||u.id===ME.id),ngUsers=tkAssignable(users).concat(t&&t.nguoi&&!tkAssignable(users).some(u=>u.id===t.nguoi)?users.filter(u=>u.id===t.nguoi):[]);
   if(t)tkRecentAdd(t.id);
@@ -332,6 +335,7 @@ function openTask(id){
       tkDoneDay(x,dt.settings.today);
       tkLog(x,t?("Sửa việc"+(oldNg!==x.nguoi?" · người làm: "+(userName(oldNg)||"—")+" → "+(userName(x.nguoi)||"—"):"")+(oldHan&&oldHan!==x.han?" · hạn: "+dd(oldHan)+" → "+dd(x.han):"")):("Giao việc"+(x.nguoi?" cho "+userName(x.nguoi):"")+(x.han?" · hạn "+dd(x.han):"")));
       if(typeof notifyU==="function"&&gv){const ds=v.han?` · hạn ${dd(v.han)}`:"";const nw=[];if(v.nguoi&&v.nguoi!==oldNg)nw.push(v.nguoi);v.phoi.filter(p=>!oldPhoi.includes(p)).forEach(p=>nw.push(p));if(nw.length)notifyU(dt,nw,`${ME.name} giao bạn việc "${v.ten}"${ds}`,"task:"+x.id);else if(t&&t.han!==v.han&&v.nguoi)notifyU(dt,[v.nguoi],`${ME.name} đổi hạn việc "${v.ten}" thành ${dd(v.han)}`,"task:"+x.id)}});if(!t&&$("#t-lap")&&($("#t-lap").value||$("#t-tplsave").checked))tkTplSave(v,$("#t-lap").value,+$("#t-lapd").value||0);
+    if(!t&&TK_AFTER_NEW){const f=TK_AFTER_NEW;TK_AFTER_NEW=null;try{f(nid)}catch(e){}}
     toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+($("#t-lap").value==="tuan"?"mỗi tuần":"mỗi tháng"):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
 }
@@ -882,7 +886,7 @@ function cvMyItems(){
    ===================================================================== */
 const CVV={scope:"",view:""};
 const cvNvRaw=m=>{try{pCvNv2(m)}catch(e){console.error("Task mới lỗi, dùng bản cũ",e);pCvNv(m)}};
-function cvvDefault(){const top=ME.role==="admin"||cvSummaryOnly();CVV.view=top?"tq":"list";CVV.scope=top?"team":"mine"}
+function cvvDefault(){const top=ME.role==="admin"||cvSummaryOnly()||(typeof dvMgr==="function"&&dvMgr());CVV.view="list";CVV.scope=top?"team":"mine"}
 function pCvV(m){
   if(!CVV.view)cvvDefault();
   PAGE="cv_v";
@@ -893,7 +897,7 @@ function pCvV(m){
   const view=(k,l)=>`<button type="button" class="cvview${CVV.view===k?" on":""}" data-vv="${k}">${l}</button>`;
   const tq=CVV.view==="tq",listMine=CVV.view==="list"&&CVV.scope==="mine";
   const mgr=cvMgrView();
-  m.innerHTML=`<div class="cvvbar">${tq||CVV.view==="dh"?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}<select class="cvmore${["gantt","tq","dh","tpl"].includes(CVV.view)?" on":""}" id="cvv-more" aria-label="Kiểu xem khác">${opt([["","Xem khác…"],["gantt","Gantt (theo thời gian)"]].concat(mgr?[["tq","Tổng quan cả công ty"]]:[]).concat(tkGiver()?[["tpl","Mẫu việc & việc lặp lại"]]:[]),["gantt","tq","dh","tpl"].includes(CVV.view)?CVV.view:"")}</select>${newTaskBtn()}</div>${CVV.view==="board"||CVV.view==="cal"?`<div class="cvsub">${CVV.view==="board"?`<button type="button" class="lnk" data-vgo="congviec">Xem theo bước video →</button>`:`<button type="button" class="lnk" data-vgo="giaoviec">Xem lịch quay →</button>`}</div>`:""}${CVV.view==="list"?tkQuickHtml():""}<div id="cvv-body"></div>`;
+  m.innerHTML=`<div class="cvvbar">${tq||CVV.view==="dh"?"":chip("mine","Của tôi",nMine)+chip("giao","Tôi giao",nGiao)+chip("team","Cả team",nTeam)}<span class="sp"></span>${view("list","Danh sách")}${view("board","Bảng")}${view("cal","Lịch")}<select class="cvmore${["gantt","tq","dh","tpl"].includes(CVV.view)?" on":""}" id="cvv-more" aria-label="Kiểu xem khác">${opt([["","Xem khác…"],["gantt","Gantt (theo thời gian)"]].concat(tkGiver()?[["tpl","Mẫu việc & việc lặp lại"]]:[]),["gantt","tq","dh","tpl"].includes(CVV.view)?CVV.view:"")}</select>${newTaskBtn()}</div>${CVV.view==="board"||CVV.view==="cal"?`<div class="cvsub">${CVV.view==="board"?`<button type="button" class="lnk" data-vgo="congviec">Xem theo bước video →</button>`:`<button type="button" class="lnk" data-vgo="giaoviec">Xem lịch quay →</button>`}</div>`:""}${CVV.view==="list"?tkQuickHtml():""}<div id="cvv-body"></div>`;
   const body=m.querySelector("#cvv-body");
   CVF.tao=(CVV.scope==="giao"&&!tq)?ME.id:"";
   try{
@@ -913,9 +917,15 @@ function pCvV(m){
   m.querySelectorAll(".tkquick [data-tkopen]").forEach(b=>b.onclick=()=>openTask(b.dataset.tkopen));
   {const mo=m.querySelector("#cvv-more");if(mo)mo.onchange=()=>{if(!mo.value)return;CVV.view=mo.value;if(CVV.view==="tq")CVF.tao="";renderMain()}}
   bindNew();
+  cvDvAttach(m);
   const re=m.querySelector("#wk-re");if(re)re.onclick=()=>{wkLoad(true);toast("Đang tải lại…")};
 }
 PAGES.cv_v=m=>pCvV(m);
+/* Tổng quan gộp vào trang Việc (chị Hoa 02/11: hai thẻ lặp nhau): ô số ở trên, danh sách việc ở giữa, việc trễ / chờ duyệt / tải việc / hạn 7 ngày ở dưới.
+   Cùng phạm vi Của tôi · Tôi giao · Cả team với danh sách (tqviec.js pDvViec). */
+function cvDvAttach(m){if(typeof pDvViec!=="function"||!["list","board","cal"].includes(CVV.view))return;
+  try{DV.scope=CVV.scope;const w=document.createElement("div");pDvViec(w,true);const dv=w.querySelector(".dv"),k=dv&&dv.querySelector(".dvk");if(!k)return;
+    const top=document.createElement("div");top.className="dv dvtopk";top.append(k);m.prepend(top);m.prepend(w.querySelector("style"));m.querySelectorAll(".cvtiles").forEach(e=>e.remove());dv.classList.add("dvfoot");m.append(dv)}catch(e){console.error("Tổng quan việc lỗi",e)}}
 
 /* =====================================================================
    HIỆU SUẤT LÀM VIỆC CỦA TEAM (Lead Content cần, chị Hoa 02/11): tổng quan, tiến độ, từng người, việc đang tắc.
