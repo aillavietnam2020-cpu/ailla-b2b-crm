@@ -6,7 +6,7 @@
    - Oanh          → Leader (trong khu Marketing; khu Nhân sự giữ nguyên tên thật)
    Dữ liệu và mã kênh bên trong vẫn là "TikTok Via 1", "TikTok Via 2" để không làm hỏng số liệu cũ.
    ===================================================================== */
-const RL_MAP=[[/TikTok chính/g,"Ailla Việt Nam Store"],[/TT chính/g,"Ailla Việt Nam Store"],[/TikTok Via 1/g,"Gia dụng AiBio"],[/TikTok Via 2/g,"Ailla VN Store 2"],[/\bVia 1\b/g,"Gia dụng AiBio"],[/\bVia 2\b/g,"Ailla VN Store 2"]];
+const RL_MAP=[[/TikTok chính/g,"Ailla Việt Nam Store"],[/TT chính/g,"Ailla Việt Nam Store"],[/Dán link video win mẫu rồi bấm Nhân bản [(]Hypit[)]/g,"Nhân bản video win: chọn video mẫu, tự viết kịch bản hoặc dùng Hypit"],[/TikTok Via 1/g,"Gia dụng AiBio"],[/TikTok Via 2/g,"Ailla VN Store 2"],[/\bVia 1\b/g,"Gia dụng AiBio"],[/\bVia 2\b/g,"Ailla VN Store 2"]];
 const RL_OANH=/\bOanh\b/g;
 const rlHr=()=>{try{return (typeof MOD!=="undefined"&&MOD==="hr")||(typeof PAGE!=="undefined"&&/^(nhansu|hoso|hr|nv|luong|phongban)/.test(PAGE))}catch(e){return false}};
 function relabelDom(root){
