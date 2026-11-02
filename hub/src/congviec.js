@@ -191,7 +191,7 @@ const tkMention=txt=>{let h=esc(txt);tkNamesDesc().forEach(u=>{const k="@"+esc(u
 function tkChatHtml(t){const L=t.chat||[];
   return `<div class="tkchat"><div class="tkch"><b>Trao đổi</b><small class="hint">hỏi lại, góp ý, gọi người bằng @tên</small></div>${L.length?`<div class="tkcl">${L.map(c=>`<div class="tkc${c.byId===ME.id?" me":""}${c.kind==="tra"?" tra":c.kind?" ok":""}"><small><b>${esc(c.by)}</b> · ${esc(c.at)}${TK_KIND[c.kind]?" · "+TK_KIND[c.kind]:""}</small>${c.text?`<div>${tkMention(c.text)}</div>`:""}</div>`).join("")}</div>`:""}
    <div class="tkcin"><textarea id="t-cm" rows="1" placeholder="Viết trao đổi… gõ @ để gọi người"></textarea><button type="button" class="btn sm" id="t-cmok">Gửi</button></div><div id="t-cmat" class="tkatl" hidden></div></div>`}
-function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
+function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;if(t0.cd&&t0.cd.length){openTask(id);return false}const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
   DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
     if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ CEO duyệt vòng 2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ CEO duyệt`)}
@@ -248,7 +248,7 @@ function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)r
     else if(k==="done")notifyU(dt,[x.tao],`${ME.name} đã xong việc "${x.ten}"`,ref)})}
 function tkDoneErr(t){if(!t||tkMgr(t))return "";if(t.tao&&t.tao!==t.nguoi)return `Việc này do ${userName(t.tao)||"người giao"} giao. Bấm "Chờ duyệt" để người giao xem rồi mới hoàn thành.`;return ""}
 /* đến lượt tôi duyệt: đúng người của vòng hiện tại (vòng 1 lead, vòng 2 chị) */
-const tkMyTurn=t=>!!ME&&t.st==="review"&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id);
+const tkMyTurn=t=>!!ME&&(t.cd&&t.cd.length?tkCdWait(t).length>0:t.st==="review"&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id));
 const tkMgrNames=t=>tkAppr(t).map(userName).filter(Boolean).join(", ")||"quản lý";
 /* tinnhan.js: giao việc từ tin nhắn — giao xong gọi hàm này với mã việc mới để gửi thẻ việc vào cuộc trò chuyện */
 let TK_AFTER_NEW=null;
@@ -280,22 +280,30 @@ function openTask(id){
   const cd=t&&t.cd?t.cd.map(s=>Object.assign({},s)):[];
   const userOpts2=n=>opt([["","— chọn người"]].concat(users.map(u=>[u.id,u.name])),n);
   /* số lượng + nhiều người trong một công đoạn; người đang đến lượt báo số / xong phần mình */
-  const cdx=(s,i,on,edit)=>{if(s.loai==="duyet")return "";const P=s.phan&&s.phan.length?s.phan:null,dv=esc(s.dv||"");
+  const PS={duyet:["Chờ duyệt","amb"],ok:["Đã duyệt","grn"],sua:["Cần sửa","red"]};
+  const cdx=(s,i,on,edit)=>{if(s.loai==="duyet")return "";const P=s.phan&&s.phan.length?s.phan:null,dv=esc(s.dv||""),x=t?Object.assign({},t,{cd}):null,ap=x?tkCdApprId(x,s):"";
     if(edit&&s.st!=="xong")return `<span class="tcdq"><input type="number" min="0" data-f="sl" value="${s.sl||""}" placeholder="Số lượng"><input data-f="dv" value="${dv}" placeholder="hook, video…"><button type="button" class="btn sm" data-cdp="${i}">＋ Người</button></span>`+
-      (P?`<div class="tcdph">${P.map((p,j)=>`<span class="tcdp" data-j="${j}"><select data-pf="nguoi">${userOpts2(p.nguoi)}</select><input type="number" min="0" data-pf="sl" value="${p.sl||""}" placeholder="SL">${s.st==="lam"?`<small class="hint">đã làm ${+p.xong||0}</small>`:""}<button type="button" class="lnk" data-pr="${j}" title="Bỏ người này">✕</button></span>`).join("")}</div>`:(s.st==="lam"&&s.sl?`<small class="hint">đã làm ${+s.xong||0}/${s.sl}</small>`:""));
-    if(!s.sl&&!P)return "";
-    const rows=P||[{nguoi:s.nguoi,sl:s.sl,xong:s.xong}];
-    return `<div class="tcdph">${rows.map(p=>{const fin=p.fin||s.st==="xong",me=!!t&&on&&p.nguoi===ME.id&&!fin;
-      return `<span class="tcdp${fin?" fin":""}">${avatar(p.nguoi)}<b>${esc(userName(p.nguoi)||"—")}</b> ${me?`<input type="number" min="0" data-me="${s.id}" value="${+p.xong||0}">`:`<em>${+p.xong||0}</em>`}${+p.sl?"/"+p.sl:""} ${dv}${fin?" ✓":""}${me?`<button type="button" class="btn sm" data-meu="${s.id}">Lưu số</button>${P?`<button type="button" class="btn sm pri" data-mef="${s.id}">Xong phần tôi</button>`:""}`:""}</span>`}).join("")}${P&&s.sl?`<small class="hint">Cả công đoạn: ${tkCdDone(s)}/${s.sl} ${dv}</small>`:""}</div>`};
+      (P?`<div class="tcdph">${P.map((p,j)=>`<span class="tcdp" data-j="${j}"><select data-pf="nguoi">${userOpts2(p.nguoi)}</select><input type="number" min="0" data-pf="sl" value="${p.sl||""}" placeholder="SL"><button type="button" class="lnk" data-pr="${j}" title="Bỏ người này">✕</button></span>`).join("")}</div>`:"")+cdParts(s,on,dv,ap,false);
+    return cdParts(s,on,dv,ap,false)};
+  const cdParts=(s,on,dv,ap,ro)=>{if(!t||s.st==="cho"&&!on)return "";const P=s.phan&&s.phan.length;if(!ap&&!s.sl&&!P)return "";
+    const appr=ap&&(ap===ME.id||ME.role==="admin");
+    return `<div class="tcdph">${tkParts(s).map(p=>{const fin=s.st==="xong",st=fin?["Hoàn thành","grn"]:PS[p.ps],me=!ro&&on&&!fin&&p.nguoi===ME.id&&!["duyet","ok"].includes(p.ps);
+      return `<span class="tcdp${fin||p.ps==="ok"?" fin":""}">${avatar(p.nguoi)}<b>${esc(userName(p.nguoi)||"—")}</b>${s.sl?` ${me?`<input type="number" min="0" data-me="${s.id}" value="${+p.xong||0}">`:`<em>${+p.xong||0}</em>`}${+(p.sl||s.sl)?"/"+(P?p.sl:s.sl):""} ${dv}`:""}${st?` <span class="pill p-${st[1]}">${st[0]}</span>`:on?` <span class="pill p-blu">Đang làm</span>`:""}${p.ps==="sua"&&p.note?` <small class="t-red">“${esc(p.note)}”</small>`:""}
+        ${me?`${s.sl?`<button type="button" class="btn sm" data-meu="${s.id}">Lưu số</button>`:""}${ap?`<button type="button" class="btn sm pri" data-mes="${s.id}">Gửi duyệt</button>`:""}`:""}
+        ${!ro&&on&&appr&&p.ps==="duyet"?`<button type="button" class="btn sm pri" data-pok="${s.id}|${p.nguoi}">Duyệt</button><button type="button" class="btn sm" data-psua="${s.id}|${p.nguoi}">Trả lại</button>`:""}</span>`}).join("")}${P&&s.sl?`<small class="hint">Cả công đoạn: ${tkCdDone(s)}/${s.sl} ${dv}</small>`:""}${ap&&!fin0(s)?`<small class="hint">Người duyệt: ${esc(userName(ap)||"—")}</small>`:""}</div>`};
+  const fin0=s=>s.st==="xong";
   const rcd=()=>{const w=$("#t-cd");if(!w)return;const seqOn=!$("#t-seq")||$("#t-seq").checked,act=tkActive({cd,tuanTu:seqOn?undefined:false}),edit=gv&&giver;
     $("#t-cdw").style.display=(cd.length||edit)?"":"none";$("#t-stw").style.display=cd.length?"none":"";{const ph=$("#t-phw");if(ph)ph.style.display=cd.length?"none":"";[["#t-ng",gv&&giver],["#t-han",gv],["#t-bd",gv]].forEach(([q,okk])=>{const e=$(q);if(e)e.disabled=cd.length>0||!okk})}
-    w.innerHTML=cd.map((s,i)=>{const on=act.includes(s),can=!!t&&on&&((s.phan&&s.phan.length?false:s.nguoi===ME.id)||(s.loai==="duyet"?ME.role==="admin":(giver||tkMgr(t))));
-      return `<div class="tcd2${on?" on":""}${s.st==="xong"?" fin":""}" data-i="${i}"><span class="tcdn">${i+1}</span>${edit&&s.st!=="xong"?`<input data-f="ten" value="${esc(s.ten)}" placeholder="Tên công đoạn">`:`<b>${esc(s.ten)}</b>`}${edit&&s.st!=="xong"?`${s.phan&&s.phan.length?`<span class="hint">${s.phan.length} người ↓</span>`:`<select data-f="nguoi">${userOpts2(s.nguoi)}</select>`}<input type="date" data-f="han" value="${s.han?tkIso(s.han):""}">`:`<span>${esc(tkPpl(s).map(userName).join(", ")||"—")}</span><span>${s.han?dd(s.han):""}</span>`}<span class="tcds">${s.st==="xong"?"✓ Xong":on?(s.st==="lam"?"Đang làm":"Đến lượt"):"Chờ"}</span>${can?`<button type="button" class="btn sm pri" data-cdx="${s.id}">${s.loai==="duyet"?"Duyệt xong":"Xong"}</button>${s.loai==="duyet"?`<button type="button" class="btn sm" data-cdt="${s.id}">Trả lại</button>`:(s.st!=="lam"?`<button type="button" class="btn sm" data-cdl="${s.id}">Đang làm</button>`:"")}`:""}${edit&&s.st!=="xong"?`<button type="button" class="btn sm danger" data-cdr="${i}" title="Bỏ công đoạn">✕</button>`:""}${cdx(s,i,on,edit)}</div>`}).join("");
+    w.innerHTML=cd.map((s,i)=>{const on=act.includes(s),ap=t?tkCdApprId(Object.assign({},t,{cd}),s):"",can=!!t&&on&&!ap&&((s.phan&&s.phan.length?false:s.nguoi===ME.id)||(s.loai==="duyet"?ME.role==="admin":(giver||tkMgr(t)))),ps=tkParts(s).map(q=>q.ps);
+      return `<div class="tcd2${on?" on":""}${s.st==="xong"?" fin":""}" data-i="${i}"><span class="tcdn">${i+1}</span>${edit&&s.st!=="xong"?`<input data-f="ten" value="${esc(s.ten)}" placeholder="Tên công đoạn">`:`<b>${esc(s.ten)}</b>`}${edit&&s.st!=="xong"?`${s.phan&&s.phan.length?`<span class="hint">${s.phan.length} người ↓</span>`:`<select data-f="nguoi">${userOpts2(s.nguoi)}</select>`}<input type="date" data-f="han" value="${s.han?tkIso(s.han):""}">`:`<span>${esc(tkPpl(s).map(userName).join(", ")||"—")}</span><span>${s.han?dd(s.han):""}</span>`}<span class="tcds">${s.st==="xong"?(s.loai==="duyet"?"✓ Đã duyệt":"✓ Hoàn thành"):on?(ps.includes("sua")?"Cần sửa":ps.includes("duyet")&&ps.every(z=>z==="duyet"||z==="ok")?"Chờ duyệt":s.st==="lam"?"Đang làm":"Đến lượt"):"Chờ"}</span>${can?`<button type="button" class="btn sm pri" data-cdx="${s.id}">${s.loai==="duyet"?"Duyệt xong":"Xong"}</button>${s.loai==="duyet"?`<button type="button" class="btn sm" data-cdt="${s.id}">Trả lại</button>`:(s.st!=="lam"?`<button type="button" class="btn sm" data-cdl="${s.id}">Đang làm</button>`:"")}`:""}${edit&&s.st!=="xong"?`<button type="button" class="btn sm danger" data-cdr="${i}" title="Bỏ công đoạn">✕</button>`:""}${cdx(s,i,on,edit)}</div>`}).join("");
     w.querySelectorAll("[data-f]").forEach(e=>e.onchange=e.oninput=ev=>{const i=+e.closest("[data-i]").dataset.i,f=e.dataset.f;cd[i][f]=f==="han"?tkDay(e.value):f==="sl"?(+e.value||0):e.value;if(f==="sl")tkSplit(cd[i]);if(f==="ten"||f==="dv"||(f==="sl"&&ev.type==="input"))return;rcd()});
     w.querySelectorAll("[data-cdp]").forEach(b=>b.onclick=()=>{const s=cd[+b.dataset.cdp];if(!s.phan||!s.phan.length)s.phan=[{nguoi:s.nguoi,sl:0,xong:0}];s.phan.push({nguoi:"",sl:0,xong:0});tkSplit(s);rcd()});
     w.querySelectorAll("[data-pf]").forEach(e=>e.onchange=()=>{const s=cd[+e.closest("[data-i]").dataset.i],j=+e.closest("[data-j]").dataset.j,f=e.dataset.pf;s.phan[j][f]=f==="sl"?(+e.value||0):e.value;if(j===0&&f==="nguoi")s.nguoi=e.value});
     w.querySelectorAll("[data-pr]").forEach(b=>b.onclick=()=>{const s=cd[+b.closest("[data-i]").dataset.i];s.phan.splice(+b.dataset.pr,1);if(s.phan.length<2){s.nguoi=(s.phan[0]||{}).nguoi||s.nguoi;delete s.phan}else{s.nguoi=s.phan[0].nguoi;tkSplit(s)}rcd()});
-    w.querySelectorAll("[data-meu],[data-mef]").forEach(b=>b.onclick=()=>{const sid=b.dataset.meu||b.dataset.mef,inp=w.querySelector(`[data-me="${sid}"]`);tkCdPart(t.id,sid,ME.id,+(inp&&inp.value)||0,!!b.dataset.mef);toast(b.dataset.mef?"Đã xong phần của bạn":"Đã lưu số");openTask(t.id);renderMain()});
+    const re=()=>{openTask(t.id);renderMain()};
+    w.querySelectorAll("[data-meu],[data-mes]").forEach(b=>b.onclick=()=>{const sid=b.dataset.meu||b.dataset.mes,inp=w.querySelector(`[data-me="${sid}"]`);tkCdSend(t.id,sid,ME.id,b.dataset.mes?"gui":"so",inp?+inp.value:null);toast(b.dataset.mes?"Đã gửi duyệt":"Đã lưu số");re()});
+    w.querySelectorAll("[data-pok]").forEach(b=>b.onclick=()=>{const [sid,ng]=b.dataset.pok.split("|");tkCdSend(t.id,sid,ng,"ok");toast("Đã duyệt");re()});
+    w.querySelectorAll("[data-psua]").forEach(b=>b.onclick=()=>{const [sid,ng]=b.dataset.psua.split("|"),note=(prompt("Cần sửa gì? (người làm sẽ nhận được)")||"").trim();if(!note){toast("Ghi cần sửa gì để người làm biết");return}tkCdSend(t.id,sid,ng,"sua",null,note);toast("Đã trả lại");re()});
     w.querySelectorAll("[data-cdr]").forEach(b=>b.onclick=()=>{cd.splice(+b.dataset.cdr,1);rcd()});
     const go=(sel,act,ask)=>w.querySelectorAll(sel).forEach(b=>b.onclick=()=>{let note="";if(ask){note=(prompt("Cần sửa gì? (người làm sẽ nhận được)")||"").trim();if(!note){toast("Ghi cần sửa gì để người làm biết");return}}tkCdAct(t.id,b.dataset[sel.slice(6,-1)],act,note);toast(act==="xong"?"Đã xong công đoạn":act==="lam"?"Đã bấm Đang làm":"Đã trả lại");openTask(t.id);renderMain()});
     go("[data-cdx]","xong");go("[data-cdl]","lam");go("[data-cdt]","tra",true)};
@@ -864,30 +872,45 @@ const tkPpl=s=>s.phan&&s.phan.length?s.phan.map(p=>p.nguoi).filter(Boolean):[s.n
 const tkCdDone=s=>s.phan&&s.phan.length?s.phan.reduce((a,p)=>a+(+p.xong||0),0):(+s.xong||0);
 const tkCdFrac=s=>s.st==="xong"?1:s.sl?Math.min(.95,tkCdDone(s)/s.sl):0;
 function tkSplit(s){if(!s.phan||!s.phan.length||!s.sl)return;const n=s.phan.length,b=Math.floor(s.sl/n);s.phan.forEach((p,i)=>p.sl=b+(i<s.sl%n?1:0))}
-function tkCdPart(id,sid,ng,n,fin){let all=false;
-  DB.mutate(ME.name,"báo số công đoạn",dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x||!x.cd)return;const s=x.cd.find(z=>z.id===sid);if(!s||s.st==="xong")return;
-    const P=s.phan&&s.phan.length?s.phan.find(z=>z.nguoi===ng):s;if(!P)return;P.xong=Math.max(0,n);if(fin)P.fin=true;
-    if(s.st==="cho")s.st="lam";tkLog(x,`${ME.name} ${fin?"xong phần":"báo số"} "${s.ten}": ${P.xong}${P.sl?"/"+P.sl:""} ${s.dv||""}`);tkSync(x);
-    all=s.phan&&s.phan.length?s.phan.every(z=>z.fin):!!fin});
-  if(all)tkCdAct(id,sid,"xong")}
+/* Gửi duyệt như việc thường (chị Hoa 02/11): nhân sự làm xong bấm Gửi duyệt → phần của mình "Chờ duyệt";
+   người duyệt (bước duyệt ngay sau, không có thì người giao) Duyệt → phần đó Hoàn thành, Trả lại → "Cần sửa" kèm góp ý.
+   Mọi phần đã duyệt thì công đoạn tự hoàn thành (bước duyệt ngay sau cũng xong), sang công đoạn kế. Trạng thái phần: p.ps = "" | duyet | ok | sua */
+const tkParts=s=>s.phan&&s.phan.length?s.phan:[s];
+const tkPartOf=(s,ng)=>s.phan&&s.phan.length?s.phan.find(q=>q.nguoi===ng):(s.nguoi===ng?s:null);
+const tkCdNext=(x,s)=>{const n=x.cd[x.cd.indexOf(s)+1];return s.loai!=="duyet"&&n&&n.loai==="duyet"?n:null};
+const tkCdApprId=(x,s)=>{if(s.loai==="duyet")return "";const n=tkCdNext(x,s);return n?n.nguoi:(x.tao&&!tkPpl(s).includes(x.tao)?x.tao:"")};
+const tkCdWait=x=>!ME||!x.cd?[]:tkActive(x).filter(s=>tkCdApprId(x,s)===ME.id).flatMap(s=>tkParts(s).filter(q=>q.ps==="duyet").map(q=>({s,q})));
+function tkCdSend(id,sid,ng,act,n,note){let fin=false,nid="";
+  DB.mutate(ME.name,"công đoạn: "+act,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x||!x.cd)return;const s=x.cd.find(z=>z.id===sid);if(!s||s.st==="xong")return;
+    const P=tkPartOf(s,ng);if(!P)return;const N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,"task:"+x.id)},who=userName(ng)||"",lb=`"${x.ten}" · ${s.ten}`;
+    if(n!=null&&!isNaN(n)&&(act==="so"||act==="gui"))P.xong=Math.max(0,+n);
+    if(s.st==="cho")s.st="lam";
+    if(act==="so")tkLog(x,`${who} báo số "${s.ten}": ${P.xong}${P.sl?"/"+P.sl:""} ${s.dv||""}`);
+    else if(act==="gui"){P.ps="duyet";P.note="";tkLog(x,`${who} gửi duyệt "${s.ten}"`);const a=tkCdApprId(x,s);if(a)N([a],`${who} gửi duyệt ${lb}`)}
+    else if(act==="ok"){P.ps="ok";tkLog(x,`${ME.name} duyệt phần của ${who} · ${s.ten}`);N([ng],`${ME.name} đã duyệt ${lb}`)}
+    else if(act==="sua"){P.ps="sua";P.note=note||"";tkLog(x,`${ME.name} trả lại ${who} · ${s.ten}: ${note||""}`);N([ng],`${ME.name} trả lại ${lb}: ${note||"cần sửa"}`)}
+    fin=act==="ok"&&tkParts(s).every(q=>q.ps==="ok");const nx=tkCdNext(x,s);nid=nx?nx.id:"";
+    tkSync(x)});
+  if(fin)tkCdAct(id,sid,"xong","",nid)}
 function tkSync(x){
   const c=x.cd||[];if(!c.length)return;
   const rest=c.filter(s=>s.st!=="xong"),act=tkActive(x),a=act[0]||c[c.length-1];
-  x.st=!rest.length?"done":act.some(s=>s.loai==="duyet")?"review":(c.some(s=>s.st==="xong"||s.st==="lam")?"doing":"todo");
+  const sent=s=>s.loai!=="duyet"&&tkParts(s).every(q=>q.ps==="duyet"||q.ps==="ok")&&tkParts(s).some(q=>q.ps==="duyet");
+  x.st=!rest.length?"done":act.some(s=>s.loai==="duyet"||sent(s))?"review":(c.some(s=>s.st==="xong"||s.st==="lam")?"doing":"todo");
   x.nguoi=a.nguoi;x.han=a.han||x.han;
   x.phoi=[...new Set(c.flatMap(tkPpl).filter(p=>p&&p!==x.nguoi))];
   x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME?ME.name:"";
 }
-function tkCdAct(id,sid,act,note){
+function tkCdAct(id,sid,act,note,also){
   const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
   DB.mutate(ME.name,`công đoạn "${t0.ten}": ${act}`,dt=>{
     const x=dt.tasks.find(y=>y.id===id);if(!x||!x.cd)return;const s=x.cd.find(z=>z.id===sid);if(!s)return;
     const before=tkActive(x).map(z=>z.id),nowS=new Date().toLocaleString("vi-VN"),ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkLog(x,`${act==="xong"?"Xong":act==="lam"?"Bắt đầu":"Trả lại"} công đoạn "${s.ten}"${note?": "+note:""}`);
     if(act==="lam"){s.st="lam";s.at=nowS;s.by=ME.name}
-    else if(act==="xong"){s.st="xong";s.at=nowS;s.by=ME.name;s.xongNgay=dt.settings.today}
+    else if(act==="xong"){s.st="xong";s.at=nowS;s.by=ME.name;s.xongNgay=dt.settings.today;const z=also&&x.cd.find(q=>q.id===also);if(z){z.st="xong";z.at=nowS;z.by=ME.name;z.xongNgay=dt.settings.today}}
     else if(act==="tra"){const i=x.cd.indexOf(s);let j=i-1;while(j>=0&&x.cd[j].loai==="duyet")j--;
-      if(j>=0){x.cd.slice(j).forEach(z=>{z.st="cho";(z.phan||[]).forEach(q=>q.fin=false)});x.cd[j].st="lam";x.tlNote=note;N(tkPpl(x.cd[j]),`${ME.name} trả lại công đoạn "${x.cd[j].ten}" của việc "${x.ten}": ${note}`)}else{s.st="cho"}}
+      if(j>=0){x.cd.slice(j).forEach(z=>{z.st="cho";tkParts(z).forEach(q=>{q.ps=""})});tkParts(x.cd[j]).forEach(q=>{q.ps="sua";q.note=note});x.cd[j].st="lam";x.tlNote=note;N(tkPpl(x.cd[j]),`${ME.name} trả lại công đoạn "${x.cd[j].ten}" của việc "${x.ten}": ${note}`)}else{s.st="cho"}}
     tkSync(x);tkDoneDay(x,dt.settings.today);
     const after=tkActive(x);
     after.filter(z=>!before.includes(z.id)&&z.id!==sid).forEach(z=>N(tkPpl(z),z.loai==="duyet"?`Việc "${x.ten}" chờ bạn duyệt`:`Đến lượt bạn: "${x.ten}" · ${z.ten}${z.han?" · hạn "+dd(z.han):""}`));
@@ -904,10 +927,11 @@ function cvMyItems(){
     const who=userName(t.tao)||"—";
     if(t.cd&&t.cd.length){
       const act=tkActive(t);
-      t.cd.filter(s=>tkPpl(s).includes(ME_)&&s.st!=="xong"&&!((s.phan||[]).find(p=>p.nguoi===ME_)||{}).fin).forEach(s=>{
+      tkCdWait(t).forEach(({s,q})=>add({key:"dp_"+s.id+q.nguoi,group:G2,title:`${t.ten} · ${s.ten}`,chip:"Duyệt",detail:`${userName(q.nguoi)||"—"} gửi duyệt${q.sl?` · ${+q.xong||0}/${q.sl} ${s.dv||""}`:""}`,age_days:late(s.han),taskId:t.id}));
+      t.cd.filter(s=>tkPpl(s).includes(ME_)&&s.st!=="xong"&&!["duyet","ok"].includes((tkPartOf(s,ME_)||{}).ps)).forEach(s=>{
         if(act.includes(s)){
           if(s.loai==="duyet")add({key:"d_"+s.id,group:G2,title:t.ten,chip:"Duyệt",detail:`Chờ bạn duyệt · giao bởi ${who}${s.han?" · hạn "+dd(s.han):""}`,age_days:late(s.han),taskId:t.id});
-          else add({key:"w_"+s.id,group:G1,title:`${t.ten} · ${s.ten}`,detail:`Hạn ${s.han?dd(s.han):"—"} · giao bởi ${who}${s.st==="lam"?" · đang làm":""}`,age_days:late(s.han),han:s.han||0,chip:`${t.cd.filter(z=>z.st==="xong").length}/${t.cd.length} công đoạn`,taskId:t.id,cdId:s.id,...(s.phan&&s.phan.length?{}:{act:"xong"})});
+          else add({key:"w_"+s.id,group:G1,title:`${t.ten} · ${s.ten}`,detail:`Hạn ${s.han?dd(s.han):"—"} · giao bởi ${who}${s.st==="lam"?" · đang làm":""}`,age_days:late(s.han),han:s.han||0,chip:`${t.cd.filter(z=>z.st==="xong").length}/${t.cd.length} công đoạn`,taskId:t.id,cdId:s.id,...(s.phan&&s.phan.length||tkCdApprId(t,s)?{}:{act:"xong"})});
         }else{const prev=act[0];add({key:"c_"+s.id,group:G3,title:`${t.ten} · ${s.ten}`,detail:prev?`Chờ ${userName(prev.nguoi)||"—"} xong "${prev.ten}"`:"Chờ công đoạn trước",taskId:t.id})}
       });
     }else{

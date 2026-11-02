@@ -17,7 +17,8 @@ function load() {
     'ME',
     'notifyU',
     'dd',
-    `${src.slice(l, lEnd)}\n${src.slice(a, b)}\nreturn {tkActive,tkSync,tkCdAct,tkCdPart,tkPct:typeof tkPct==='function'?tkPct:null};`,
+    'userName',
+    `${src.slice(l, lEnd)}\n${src.slice(a, b)}\nreturn {tkActive,tkSync,tkCdAct,tkCdSend,tkPct:typeof tkPct==='function'?tkPct:null};`,
   );
   const api = fn(
     () => data,
@@ -25,6 +26,7 @@ function load() {
     ME,
     (_dt: unknown, ids: string[], txt: string) => notes.push([ids.filter((i) => i !== ME.id).join(','), txt]),
     (n: number) => `${n}/10`,
+    (id: string) => id,
   );
   return { data, notes, ...api };
 }
@@ -90,26 +92,33 @@ describe('Công đoạn của việc giao', () => {
     expect(h.tkActive(p)).toHaveLength(2);
   });
 
-  it('nhiều người cùng một công đoạn có số lượng: mỗi người xong phần mình, đủ người mới sang bước sau', () => {
-    const { data, notes, tkCdPart, tkSync } = load();
+  it('nhiều người cùng một công đoạn: mỗi người gửi duyệt, người duyệt duyệt hoặc trả lại từng phần, đủ phần đã duyệt thì sang bước sau', () => {
+    const { data, notes, tkCdSend, tkSync } = load();
     const t: any = {
       id: 't1', ten: '30 video tinh dầu', tao: 'u_chi', st: 'todo',
       cd: [
         { id: 'a', ten: 'Quay', nguoi: 'u_q', han: 22, loai: 'lam', st: 'cho', sl: 30, dv: 'video', phan: [{ nguoi: 'u_q', sl: 15, xong: 0 }, { nguoi: 'u_m', sl: 15, xong: 0 }] },
         { id: 'b', ten: 'Duyệt', nguoi: 'u_lead', han: 25, loai: 'duyet', st: 'cho' },
+        { id: 'c', ten: 'Đăng', nguoi: 'u_q', han: 26, loai: 'lam', st: 'cho' },
       ],
     };
     tkSync(t);
     data.tasks.push(t);
     expect(t.phoi).toEqual(expect.arrayContaining(['u_m', 'u_lead']));
-    tkCdPart('t1', 'a', 'u_q', 9, false);
-    expect(t.cd[0].st).toBe('lam');
-    expect(t.cd[0].phan[0].xong).toBe(9);
-    tkCdPart('t1', 'a', 'u_q', 15, true);
-    expect(t.cd[0].st).toBe('lam');
-    tkCdPart('t1', 'a', 'u_m', 15, true);
-    expect(t.cd[0].st).toBe('xong');
+    tkCdSend('t1', 'a', 'u_q', 'gui', 15);
+    expect(t.cd[0].phan[0].ps).toBe('duyet');
+    expect(notes.some(([to, txt]: [string, string]) => to === 'u_lead' && txt.includes('gửi duyệt'))).toBe(true);
+    tkCdSend('t1', 'a', 'u_q', 'sua', null, 'Thiếu cảnh cận');
+    expect(t.cd[0].phan[0].ps).toBe('sua');
+    tkCdSend('t1', 'a', 'u_q', 'gui', 15);
+    tkCdSend('t1', 'a', 'u_m', 'gui', 15);
     expect(t.st).toBe('review');
-    expect(notes.some(([to, txt]: [string, string]) => to === 'u_lead' && txt.includes('chờ bạn duyệt'))).toBe(true);
+    tkCdSend('t1', 'a', 'u_q', 'ok');
+    expect(t.cd[0].st).toBe('lam');
+    tkCdSend('t1', 'a', 'u_m', 'ok');
+    expect(t.cd[0].st).toBe('xong');
+    expect(t.cd[1].st).toBe('xong');
+    expect(t.nguoi).toBe('u_q');
+    expect(notes.some(([to, txt]: [string, string]) => to === 'u_q' && txt.includes('Đến lượt bạn'))).toBe(true);
   });
 });

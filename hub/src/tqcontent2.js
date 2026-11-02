@@ -42,7 +42,7 @@ function dqPlanOf(kenh,sku){
   return sum(ptPairs().filter(x=>(!kenh||x.kenh===kenh)&&(!sku||x.sku===sku)),x=>+x.sl||0)}
 function pDqContent(m){
   const M=tqcMonth(),d=M.d,C=(d.cards||[]).filter(c=>c.nguon!=="Order Digital"),N=dqCount(C),past=M.past;
-  const plan=past?C.length:(sum(CHANNELS,ch=>dqPlanOf(ch.k))||C.length),today=M.today,need=past?plan:Math.round(plan*today/M.nd);
+  const plan=past?C.length:(sum(CHANNELS,ch=>dqPlanOf(ch.k))||C.length),today=M.today,need=past?plan:Math.min(plan,Math.round(plan*Math.min(today,M.nd)/M.nd));
   const posted=C.filter(c=>c.step==="xong"),gmv=sum(posted,c=>+c.gmv||0),don=sum(posted,c=>+c.don||0);
   const set=D().settings||{},wOrd=+set.winnerOrders||100,W=(typeof winners==="function"?winners():[]).filter(w=>w.loai==="Winner"),winNew=W.filter(w=>w.cardId).length,winGoal=+(D().kpiTargets||{}).winMoi||0;
   /* ---- 8 ô số ---- */
@@ -56,7 +56,7 @@ function pDqContent(m){
    ${k("g","💰","GMV từ video",money(gmv),nf(don)+" đơn")}
    ${k("p","🏆","Video win",nf(winNew),"≥"+wOrd+" đơn"+(winGoal?" · mục tiêu "+winGoal:""))}</div>`;
   /* ---- tiến độ từng kênh ---- */
-  const chRows=CHANNELS.map(ch=>{const cs=C.filter(c=>c.kenh===ch.k),n=dqCount(cs),pl=past?cs.length:(dqPlanOf(ch.k)||cs.length),nd=past?pl:Math.round(pl*today/M.nd);return {ch,n,pl,nd,cham:Math.max(0,nd-n.dang)}});
+  const chRows=CHANNELS.map(ch=>{const cs=C.filter(c=>c.kenh===ch.k),n=dqCount(cs),pl=past?cs.length:(dqPlanOf(ch.k)||cs.length),nd=past?pl:Math.min(pl,Math.round(pl*Math.min(today,M.nd)/M.nd));return {ch,n,pl,nd,cham:Math.max(0,nd-n.dang)}});
   const al=[];
   chRows.forEach(r=>{if(!past&&r.pl&&r.cham>=3)al.push(`${esc(r.ch.short)} chậm <b>${r.cham} ${r.ch.needId?"video":"bài"}</b> so với nhịp`)});
   /* ---- tình trạng từng sản phẩm ---- */
@@ -67,7 +67,7 @@ function pDqContent(m){
   if(!past&&winGoal&&winNew<winGoal)al.push(`Video win mới: <b>${winNew}/${winGoal}</b>`);
   const alert=al.length?`<div class="dqal"><span>⚠️ <b>Cần chú ý:</b></span>${al.slice(0,6).map(x=>`<span>${x}</span>`).join("")}</div>`:(C.length?`<div class="dqal ok"><span>✅ <b>Đúng nhịp:</b></span><span>không kênh nào chậm, không video nào chờ sửa.</span></div>`:"");
   const seg=(n,tot)=>{const T=Math.max(tot,1),w=v=>(v/T*100).toFixed(1)+"%";return `<div class="dqbar"><i style="width:${w(n.dang)};background:#16a34a"></i><i style="width:${w(n.cho)};background:#2563eb"></i><i style="width:${w(n.lam+n.sua)};background:#d97706"></i><i style="width:${w(n.doi)};background:#7c3aed"></i></div>`};
-  const chHtml=`<h2 class="dqh">📡 Tiến độ theo kênh <small>${past?"tháng "+M.mon:"kế hoạch tháng · thanh màu = trạng thái từng video"}</small></h2><div class="dqch">${chRows.map(r=>`<div><div class="hd">${esc(r.ch.short)}<span>giữ kênh: ${esc(userName(chanOwner(r.ch.k))||"chưa đặt")}</span></div>
+  const chHtml=`<h2 class="dqh">📡 Tiến độ theo kênh <small>${past?"tháng "+M.mon:"kế hoạch tháng · thanh màu = trạng thái từng video"}</small></h2><div class="dqch">${chRows.map(r=>`<div class="clk" data-dqch="${esc(r.ch.k)}" title="Bấm để xem chi tiết kênh"><div class="hd">${esc(r.ch.short)}<span>giữ kênh: ${esc(userName(chanOwner(r.ch.k))||"chưa đặt")}</span></div>
    <div class="big">${nf(r.n.dang)} <span>/ ${nf(r.pl)} đã đăng</span></div>${seg(r.n,r.pl)}
    <div class="dqleg"><span><em style="background:#16a34a"></em>Đăng ${r.n.dang}</span><span><em style="background:#2563eb"></em>Chờ đăng ${r.n.cho}</span><span><em style="background:#d97706"></em>Đang làm ${r.n.lam+r.n.sua}</span>${r.n.doi?`<span><em style="background:#7c3aed"></em>Chờ duyệt ${r.n.doi}</span>`:""}${!past&&r.cham&&r.pl?`<span class="red">chậm ${r.cham}</span>`:""}${!r.pl?`<span>chưa có kế hoạch</span>`:""}</div></div>`).join("")}</div>`;
   const prHtml=`<div class="card dqc"><h2 class="dqh">📦 Tình trạng theo sản phẩm <small>bấm một dòng để mở Điều phối đúng sản phẩm</small></h2>${pr.length?`<table class="dqt"><tr><th>Sản phẩm</th><th>Mục tiêu</th><th>Chưa làm</th><th>Đang làm</th><th>Chờ duyệt</th><th>Cần sửa</th><th>Đã duyệt</th><th>Đã đăng</th><th>% đạt</th></tr>
@@ -100,6 +100,25 @@ function pDqContent(m){
    ${T.map((w,i)=>{const n=nb(w);return `<tr><td>${medal[i]||i+1}</td><td style="text-align:left;max-width:340px">${esc(String(w.ten||"").slice(0,70))}<div class="mono">${esc(w.key)}</div></td><td>${esc(sk(w.sku).n)}</td><td>${esc(chOf(w.kenh).short)}</td><td>${esc(userName(w.nguoi)||"—")}</td><td>${nf(w.view)}</td><td>${nf(w.don)}</td><td>${money(w.gmv)}</td><td>${w.loai==="Winner"?(n?n+" bản":`<span class="red">chưa nhân bản</span>`):`<span class="mut">tiềm năng</span>`}</td></tr>`}).join("")}</table>`:`<p class="empty">Chưa có video nào đạt mức tiềm năng.</p>`}</div>`;
   m.innerHTML=DQ_CSS+`<div class="dq">${kpis}${alert}${chHtml}${prHtml}<div class="dqg2">${pplHtml}${fun}</div>${win}</div>`;
   m.querySelectorAll("[data-dqsku]").forEach(r=>r.onclick=()=>{if(typeof bvGo==="function"){const s=r.dataset.dqsku,kn=(C.find(c=>c.sku===s)||{}).kenh||(ptPairs().find(x=>x.sku===s)||{}).kenh||"TikTok chính";bvGo(kn,s,"")}});
+  m.querySelectorAll("[data-dqch]").forEach(e=>e.onclick=()=>{const r=chRows.find(x=>x.ch.k===e.dataset.dqch);if(r)dqChOpen(r,C.filter(c=>c.kenh===r.ch.k),past,M)});
   if(typeof bindCommon==="function")bindCommon(m);
 }
+/* Bấm thẻ kênh (chị Hoa 02/11): cửa sổ chi tiết — số tổng, theo sản phẩm, theo người, danh sách video chưa đăng (bấm mở thẻ Điều phối) */
+const DQ_ST=[["chua","Chưa làm"],["lam","Đang làm"],["sua","Cần sửa"],["dkb","Chờ duyệt kịch bản"],["dvd","Chờ duyệt video"],["cho","Duyệt xong, chờ đăng"],["dang","Đã đăng"]];
+function dqChOpen(r,cs,past,M){const ch=r.ch,u=ch.needId?"video":"bài",late=c=>typeof isLate==="function"&&c.step!=="xong"&&isLate(c);
+  const skus=[...new Set(cs.map(c=>c.sku).concat(past?[]:ptPairs().filter(x=>x.kenh===ch.k&&x.sl>0).map(x=>x.sku)))];
+  const byS=skus.map(k=>{const L=cs.filter(c=>c.sku===k),n=dqCount(L),pl=past?L.length:(dqPlanOf(ch.k,k)||L.length);return {k,n,pl}}).sort((a,b)=>b.pl-a.pl);
+  const holder=c=>typeof pjHolder==="function"?pjHolder(c):c.nguoi;
+  const ppl={};cs.filter(c=>c.step!=="xong").forEach(c=>{const h=holder(c)||"";const o=ppl[h]=ppl[h]||{n:0,tre:0};o.n++;if(late(c))o.tre++});
+  const open=cs.filter(c=>c.step!=="xong").sort((a,b)=>DQ_ST.findIndex(x=>x[0]===dqStep(a))-DQ_ST.findIndex(x=>x[0]===dqStep(b))||(a.han||99)-(b.han||99));
+  const stN=c=>(DQ_ST.find(x=>x[0]===dqStep(c))||["",""])[1],who=c=>typeof pjHolderLbl==="function"?pjHolderLbl(c):userName(c.nguoi)||"—";
+  const box=(l,v,cl)=>`<div class="dqmb${cl?" "+cl:""}"><small>${l}</small><b>${v}</b></div>`;
+  openDrawerHTML(DQ_CSS+`<div class="dq dqm"><h2>${esc(ch.short||ch.k)}</h2><p class="hint">Giữ kênh: ${esc(userName(chanOwner(ch.k))||"chưa đặt")} · ${past?"tháng "+M.mon:"kế hoạch tháng "+M.mon}</p>
+   <div class="dqmk">${box("Mục tiêu",nf(r.pl)+" "+u)}${box("Đã đăng",nf(r.n.dang),"g")}${past?"":box("Cần đạt đến hôm nay",nf(r.nd))}${!past&&r.pl?box(r.cham?"Chậm so với nhịp":"Tiến độ",r.cham?nf(r.cham)+" "+u:"Đúng nhịp",r.cham?"r":"g"):""}${box("Chờ đăng",nf(r.n.cho))}${box("Chờ duyệt",nf(r.n.doi),r.n.doi?"a":"")}${box("Cần sửa",nf(r.n.sua),r.n.sua?"r":"")}</div>
+   <h3>Theo sản phẩm</h3>${byS.length?`<table class="dqt"><tr><th>Sản phẩm</th><th>Mục tiêu</th><th>Đang làm</th><th>Chờ duyệt</th><th>Chờ đăng</th><th>Đã đăng</th><th>% đạt</th></tr>${byS.map(x=>`<tr><td style="text-align:left">${esc(sk(x.k).n)}</td><td>${nf(x.pl)}</td><td>${x.n.lam+x.n.sua}</td><td>${x.n.doi}</td><td>${x.n.cho}</td><td>${x.n.dang}</td><td>${dqPc(dqPct(x.n.dang,x.pl))}</td></tr>`).join("")}</table>`:`<p class="hint">Chưa có kế hoạch sản phẩm cho kênh này.</p>`}
+   <h3>Ai đang giữ video</h3>${Object.keys(ppl).length?`<div class="dqmp">${Object.entries(ppl).sort((a,b)=>b[1].n-a[1].n).map(([id,o])=>`<span>${id?esc(userName(id)||id):"Đang chờ duyệt / chưa giao"} <b>${o.n}</b>${o.tre?` <em>${o.tre} trễ</em>`:""}</span>`).join("")}</div>`:`<p class="hint">Không còn video nào đang làm.</p>`}
+   <h3>Video chưa đăng <small class="hint">${open.length} · bấm để mở thẻ</small></h3>${open.length?`<table class="dqt">${open.slice(0,80).map(c=>`<tr class="clk" data-dqc="${esc(c.id)}"><td style="text-align:left"><b>${esc(String(c.hookText||c.yTuong||c.tuyen||c.id).slice(0,60))}</b><div class="mono">${esc(c.id)} · ${esc(sk(c.sku).n)}</div></td><td>${esc(stN(c))}</td><td>${esc(who(c))}</td><td class="${late(c)?"red":""}">${c.han?dd(c.han):"—"}${late(c)?" · trễ":""}</td></tr>`).join("")}</table>${open.length>80?`<p class="hint">Đang hiện 80/${open.length} video.</p>`:""}`:`<p class="hint">Đã đăng hết.</p>`}
+   <div class="acts" style="margin-top:12px"><button type="button" class="btn pri" id="dq-go">Mở Điều phối kênh này</button></div></div>`);
+  $("#drawerIn").querySelectorAll("[data-dqc]").forEach(e=>e.onclick=()=>openCard(e.dataset.dqc));
+  const g=$("#dq-go");if(g)g.onclick=()=>{closeDrawer();if(typeof bvGo==="function")bvGo(ch.k,"","")}}
 PAGES.mkt_tq=function(m){try{pDqContent(m)}catch(e){console.error("Tổng quan Content lỗi",e);m.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}};
