@@ -7,7 +7,8 @@
 const KPB={pb:"",msgs:{},files:{}};
 /* mã phòng ban → nhóm việc (TEAMS) và nhóm chat */
 const KPB_TEAM={CM:"content",ADS:"digital",KOC:"koc",KT:"ketoan",KV:"kho",SX:"sx",HCNS:"hcns",B2B:"sale",B2C:"sale"};
-const kpbDepts=()=>((D().departments||[]).filter(p=>p&&p.k&&p.k!=="BDH"));
+const KPB_ORD=["CM","ADS","KOC","B2C","B2B","CSKH","KT","SX","KV","HCNS"];
+const kpbDepts=()=>((D().departments||[]).filter(p=>p&&p.k&&p.k!=="BDH").sort((a,b)=>(KPB_ORD.indexOf(a.k)+99)%109-(KPB_ORD.indexOf(b.k)+99)%109));
 const kpbName=pb=>((kpbDepts().find(p=>p.k===pb)||{}).n)||TEAMS[KPB_TEAM[pb]]||pb;
 const kpbTeam=pb=>KPB_TEAM[pb]||String(pb).toLowerCase().replace(/[^a-z0-9_-]/g,"");
 const kpbAll=()=>!!ME&&(ME.role==="admin"||ME.phongBan==="BDH");
@@ -22,7 +23,7 @@ function pKhongGian(m){
   if(!kpbAll()&&ME.phongBan&&ME.phongBan!=="BDH")KPB.pb=ME.phongBan;
   const pb=KPB.pb,T=kpbTeam(pb),room="g:"+T,td=D().settings.today;kpbLoad(pb);
   const mem=kpbMembers(pb),L=kpbItems(pb),open=L.filter(x=>x.st!=="done"),late=open.filter(x=>x.late),rv=open.filter(x=>x.st==="review");
-  const G=typeof cvGroup==="function"?cvGroup(open):open,rows=G.sort((a,b)=>(b.late-a.late)||(a.han||99)-(b.han||99)).slice(0,12);
+  const G=typeof cvGroup==="function"?cvGroup(open):open,rows=G.filter(x=>x.st!=="cg"&&x.nguoi).sort((a,b)=>(b.late-a.late)||(a.han||99)-(b.han||99)).slice(0,12),cgN=open.filter(x=>x.st==="cg"||!x.nguoi).length;
   const P=(D().projects||[]).filter(p=>p.team===T);
   const tpl=tkTpls().filter(p=>p.team===T);
   const M=(KPB.msgs[room]||[]).slice(-8),F=KPB.files[pb];
@@ -33,7 +34,7 @@ function pKhongGian(m){
    <div class="kgg">
     <div class="kgc">
      <section class="card kgs"><div class="kgsh"><h3>📋 Việc của phòng</h3><span class="sp"></span><button type="button" class="btn sm pri" id="kg-new">＋ Giao việc</button><button type="button" class="btn sm" id="kg-all">Xem tất cả</button></div>
-      ${rows.length?`<div class="kgl">${rows.map(x=>`<button type="button" class="kgr" data-kgo="${esc(x.src)}|${esc(x.ids?x.ids[0]:x.id)}">${avatar(x.nguoi)}<span class="kgrt"><b>${esc(cvShort(String(x.ten||""),70))}${x.n>1?` <small>× ${x.n}</small>`:""}</b><small>${esc(userName(x.nguoi)||"Chưa giao")} · ${esc(cvStN(x.st))}</small></span><span class="kgrh${x.late?" r":""}">${x.late?"trễ "+x.lateD+" ngày":x.han?(x.han===td?"hạn hôm nay":"hạn "+dd(x.han)):"—"}</span></button>`).join("")}</div>`:`<p class="hint">Phòng chưa có việc đang mở.</p>`}</section>
+      ${rows.length?`<div class="kgl">${rows.map(x=>`<button type="button" class="kgr" data-kgo="${esc(x.src)}|${esc(x.ids?x.ids[0]:x.id)}">${avatar(x.nguoi)}<span class="kgrt"><b>${esc(cvShort(String(x.ten||""),70))}${x.n>1?` <small>× ${x.n}</small>`:""}</b><small>${esc(userName(x.nguoi)||"Chưa giao")} · ${esc(cvStN(x.st))}</small></span><span class="kgrh${x.late?" r":""}">${x.late?"trễ "+x.lateD+" ngày":x.han?(x.han===td?"hạn hôm nay":"hạn "+dd(x.han)):"—"}</span></button>`).join("")}</div>`:`<p class="hint">${cgN?"Chưa có việc nào đã giao người làm.":"Phòng chưa có việc đang mở."}</p>`}${cgN?`<p class="hint kgcg">${cgN} việc chưa giao người làm · <button type="button" class="lnk" id="kg-cg">xem và giao</button></p>`:""}</section>
      <section class="card kgs"><div class="kgsh"><h3>👥 Từng người</h3></div>${load.length?`<div class="kgp">${load.map(o=>`<span>${avatar(o.u.id)}<b>${esc(o.u.name)}</b> ${o.n} việc${o.t?` · <em>${o.t} trễ</em>`:""}</span>`).join("")}</div>`:`<p class="hint">Chưa có nhân sự nào thuộc phòng này.</p>`}</section>
      <section class="card kgs"><div class="kgsh"><h3>▣ Dự án của phòng</h3><span class="sp"></span><button type="button" class="btn sm" id="kg-da">Mở Dự án</button></div>${P.length?P.map(p=>{const s=prjStats(p);return `<div class="kgda"><div><b>${esc(p.ten)}</b><small>${esc(userName(p.owner)||"")} · hạn ${dd(p.han)} · ${s.done}/${s.L.length} việc xong${s.late?` · <em>${s.late} trễ</em>`:""}</small></div><div class="progress"><i style="width:${s.pc2}%"></i></div><b>${s.pc2}%</b></div>`}).join(""):`<p class="hint">Chưa có dự án nào của phòng.</p>`}</section>
     </div>
@@ -50,6 +51,7 @@ function pKhongGian(m){
   const team=()=>{const e=$("#t-team");if(e&&!e.disabled&&[...e.options].some(o=>o.value===T))e.value=T};
   $("#kg-new").onclick=()=>{openTask(null);team()};
   $("#kg-all").onclick=()=>{CVV.view="list";CVV.scope="team";cvWhoSet("all");CVF.st="";CVF.team=T;PAGE="cv_v";render()};
+  if($("#kg-cg"))$("#kg-cg").onclick=()=>{CVV.view="list";CVV.scope="team";cvWhoSet("all");CVF.st="cg";CVF.team=T;PAGE="cv_v";render()};
   $("#kg-da").onclick=()=>{PAGE="cv_da";render()};
   $("#kg-chat").onclick=()=>openChat(room);
   $("#kg-drive").onclick=()=>{if(typeof TM!=="undefined"){TM.pb=pb;TM.folder="";TM.list=null;TM.listKey=""}ntPage("thumuc")};
