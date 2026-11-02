@@ -136,7 +136,7 @@ function xvTuan(b,o){
     ov.onclick=e=>{if(e.target===ov)close()};ov.querySelectorAll("[data-wpmx]").forEach(y=>y.onclick=close);ov.querySelector("[data-tyok]").onclick=go;inp.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();go()}if(e.key==="Escape")close()};document.body.appendChild(ov);inp.focus()});
   b.querySelectorAll("[data-tydel]").forEach(x=>x.onclick=()=>{const ma=x.dataset.tydel;if(D().cards.some(c=>c.maTuyen===ma)){toast("Tuyến này đã có video, không xóa được");return}DB.mutate(ME.name,"xóa tuyến "+ma,dt=>{dt.tuyen=dt.tuyen.filter(z=>z.ma!==ma)});renderMain()});
   b.querySelectorAll("[data-kkh]").forEach(i=>i.onchange=()=>{const [kenh,sku]=i.dataset.kkh.split("|");DB.mutate(ME.name,"đổi hướng "+sk(sku).n+" · "+kenh,dt=>{const p=dt.products.find(y=>y.k===sku);if(p)p.kenhs=pKenhs(p).map(e=>e.kenh===kenh?Object.assign({},e,{huong:i.value}):e)});renderMain()});
-  b.querySelectorAll("[data-gonq]").forEach(x=>x.onclick=()=>{XV.tab="quay";renderMain();scrollTo(0,0)});
+  b.querySelectorAll("[data-gonq]").forEach(x=>x.onclick=()=>{const t=document.querySelector('[data-khs="pc"]');if(t)t.click();else{XV.tab="pc";renderMain()}scrollTo(0,0)});
   b.querySelectorAll("[data-kk]").forEach(i=>i.onchange=()=>{const [kenh,f]=i.dataset.kk.split("|"),raw=i.type==="date"?String(i.value?+String(i.value).slice(8,10):0):String(i.value).trim();DB.mutate(ME.name,"mục tiêu video "+kenh,dt=>{dt.kpiNgay=dt.kpiNgay||{};const o=dt.kpiNgay[kenh]=Object.assign({},dt.kpiNgay[kenh]||{});if(f==="saleDay"){o.saleDay=Math.max(0,Math.min(MONTH.ndays,Math.floor(+raw||0)));delete o.tuanSale}else if(f==="tu"){o.tuanSale={tu:Math.max(1,Math.min(MONTH.ndays,Math.floor(+raw||1)))}}else if(f==="tb"&&raw!==""&&+raw>=0)o.tb=+raw;else if(raw===""||!(+raw>0))delete o[f];else o[f]=+raw});renderMain()});
   b.querySelectorAll("[data-kkt]").forEach(i=>i.onchange=()=>{const [kenh,sku]=i.dataset.kkt.split("|");DB.mutate(ME.name,"tồn dùng được "+sk(sku).n+" · "+kenh,dt=>{const p=dt.products.find(y=>y.k===sku);if(!p)return;p.kenhs=pKenhs(p).map(e=>e.kenh===kenh?Object.assign({},e,{ton:Math.max(0,Math.floor(+i.value||0))}):e)});renderMain()});
   b.querySelectorAll("[data-kkp]").forEach(i=>i.onchange=()=>{const [kenh,sku]=i.dataset.kkp.split("|");DB.mutate(ME.name,"đặt KPI số video "+sk(sku).n+" · "+kenh,dt=>{const p=dt.products.find(y=>y.k===sku);if(!p)return;p.kenhs=pKenhs(p).map(e=>e.kenh===kenh?Object.assign({},e,{sl:Math.max(0,Math.floor(+i.value||0))}):e)});toast("Đã lưu KPI");renderMain()});
@@ -421,7 +421,7 @@ function kpiNgayHtml(d,give,kenh){
 /* cần sản xuất thêm bao nhiêu video (cộng mọi kênh): kế hoạch ngày trừ video tồn và video đã có / đang làm */
 function pbNeed(d){
   const W5=PB_W(),P=knPlanAll(d),pairs=ptPairs(),wM=wpOf(d,"M"),ks=P.ks,bySku={},free=xvKhoFree();
-  const ton={};ks.forEach(k=>ton[k]=0);pairs.forEach(x=>{if(ks.includes(x.sku))ton[x.sku]+=(+x.ton>0?+x.ton:(+((((wM[wpKey(x.sku,x.kenh)]||{}).mix)||{}).ton)||0))});
+  const ton={};ks.forEach(k=>ton[k]=0);pairs.forEach(x=>{if(ks.includes(x.sku)&&+x.sl>0){const mx=(wM[wpKey(x.sku,x.kenh)]||{}).mix;ton[x.sku]+=Math.min(+x.sl,mx?(+mx.ton||0):(+x.ton||0))}});
   ks.forEach(k=>{const r=bySku[k]={need:[0,0,0,0,0]},tp=sum(P,m=>m[k]||0);
     P.forEach((m,i)=>{const t=tp?Math.round(ton[k]*(m[k]||0)/tp):0;r.need[i]=Math.max(0,(m[k]||0)-t)});
     r.ton=ton[k];r.kho=free.filter(q=>q.sku===k).length;
@@ -431,12 +431,12 @@ function pbNeed(d){
 /* quay một lần có thể đủ cho cả tháng nên đối chiếu theo cả tháng: kế hoạch tháng - video tồn - video đã có / đang làm */
 function pbRows(d){
   const {bySku,ks,P}=pbNeed(d);
-  const all=ks.map(k=>{const r=bySku[k],plan=sum(P,m=>m[k]||0),after=sum(r.need,n=>n),tot=Math.max(0,after-r.have);return {sku:k,plan,ton:r.ton,kho:r.kho,have:r.have,tot,quaTon:r.ton>r.kho}}).filter(x=>x.plan>0);
+  const all=ks.map(k=>{const r=bySku[k],plan=sum(P,m=>m[k]||0),after=Math.max(0,plan-Math.min(plan,r.ton)),tot=Math.max(0,after-r.have);return {sku:k,plan,ton:r.ton,kho:r.kho,have:r.have,tot,quaTon:r.ton>r.kho}}).filter(x=>x.plan>0);
   return {rows:all.filter(x=>x.tot>0),all,tonBad:all.filter(x=>x.quaTon)}
 }
 function pbBanner(d){
   const {rows,tonBad}=pbRows(d);if(!rows.length&&!tonBad.length)return "";
-  return `<div class="note pbneed">${rows.length?`<b>Còn cần sản xuất cho cả tháng (cộng các kênh):</b> ${rows.map(x=>x.tot+" "+esc(knLbl(x.sku))).join(", ")}. `:""}${tonBad.length?`<b>⚠ Dùng video tồn nhiều hơn kho đang có:</b> ${tonBad.map(x=>esc(knLbl(x.sku))+" kế hoạch dùng "+x.ton+", kho còn "+x.kho).join("; ")}. `:""}<button class="lnk" data-gonq="1">Xem ở ② Lịch quay →</button></div>`
+  return `<div class="note pbneed">${rows.length?`<b>Còn cần sản xuất cho cả tháng (cộng các kênh):</b> ${rows.map(x=>x.tot+" "+esc(knLbl(x.sku))).join(", ")}. `:""}${tonBad.length?`<b>⚠ Dùng video tồn nhiều hơn kho đang có:</b> ${tonBad.map(x=>esc(knLbl(x.sku))+" kế hoạch dùng "+x.ton+", kho còn "+x.kho).join("; ")}. `:""}<button class="lnk" data-gonq="1">Xem ở ② Điều phối →</button></div>`
 }
 function quayNeedHtml(d,give){
   const {rows,all,tonBad}=pbRows(d);
