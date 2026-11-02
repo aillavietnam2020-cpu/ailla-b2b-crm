@@ -187,6 +187,7 @@ function priOf(p: { dt: number; lg: number; bien: number | null }, ng2: number, 
  * Không trả giá vốn, phí sàn, lãi từng sản phẩm.
  */
 tiktokRoutes.get('/ops', async (c) => {
+  const money = canMoney(c.get('auth'));
   const from = c.req.query('from') ?? '';
   const to = c.req.query('to') ?? '';
   if (!DAY.test(from) || !DAY.test(to)) throw badRequest('BAD_RANGE', 'Khoảng ngày không hợp lệ');
@@ -211,7 +212,8 @@ tiktokRoutes.get('/ops', async (c) => {
       dtUoc: Number(s.dtUoc) || 0,
       hoanGiao: s.hoanGiao == null ? null : Number(s.hoanGiao),
       ads: Number(s.ads) || 0,
-      lgRate: dt ? (Number(s.lg) || 0) / dt : 0,
+      // Tỷ lệ lãi gộp lộ ra giá vốn: chỉ CEO / kế toán nhận (02/11, trang vận hành không dùng số này).
+      lgRate: money ? (dt ? (Number(s.lg) || 0) / dt : 0) : null,
       hoaHong: kocFee ? -kocFee[1] : null,
       sp: (pl.sp ?? []).slice(0, 10).map((p) => ({ n: p.n, q: p.q, dt: p.dt, pri: priOf(p, Number(pl.ng2) || 0, dt) })),
     });

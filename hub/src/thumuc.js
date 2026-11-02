@@ -8,7 +8,7 @@
    - Tài liệu chuẩn (quy trình, biểu mẫu) để ở Thư viện tài liệu của khu Đào tạo; trang này chỉ cho file làm hằng ngày.
    - Nhãn trên màn hình theo vai trò, không ghi tên người (chị Hoa 02/11).
    ===================================================================== */
-const TM={teams:null,err:"",pb:"",folder:"",list:null,listKey:"",busy:false,q:"",kind:"",find:null,findKey:"",recent:{},view:"xem",cfg:null,cfgErr:"",saving:false};
+const TM={teams:null,err:"",pb:"",folder:"",list:null,listKey:"",busy:false,q:"",kind:"",find:null,findKey:"",recent:{},view:"xem",cfg:null,cfgErr:"",saving:false,sync:null};
 ICONS.folder='<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>';
 const TM_KIND={sheet:["Bảng tính","XLS","grn"],doc:["Tài liệu","DOC","blu"],slide:["Trình chiếu","PPT","amb"],pdf:["PDF","PDF","gry"],vid:["Video","MP4","pnk"],img:["Ảnh","IMG","amb"],link:["Lối tắt","↗","gry"],other:["Khác","FILE","gry"]};
 const tmOn=()=>typeof PAGE!=="undefined"&&(PAGE==="thumuc"||PAGE==="thumuc_gan");
@@ -122,11 +122,21 @@ function tmCfgHtml(){
   const sh=C.teams.filter(t=>!isDept(t.pb));let n=1;const used=new Set(C.teams.map(t=>t.pb));const nextPb=()=>{while(used.has("chung"+n))n++;used.add("chung"+n);return "chung"+n};
   const shRows=sh.concat([{pb:nextPb(),folderId:"",viewers:["all"],name:"",blank:true}]).map(t=>{const st=t.blank?"":!C.connected?pill("Chờ nối Drive","amb"):t.ok?pill("Đã thấy: "+(t.folder_name||"thư mục"),"grn"):pill("Chưa chia sẻ cho web","amb");
     return `<tr><td style="min-width:180px"><input data-tmnm="${esc(t.pb)}" placeholder="${t.blank?"Thêm thư mục chung: tên":"Tên thư mục"}" value="${esc(t.name||"")}"></td><td style="min-width:240px"><input data-tmfo="${esc(t.pb)}" placeholder="Dán link thư mục Google Drive" value="${t.folderId?esc("https://drive.google.com/drive/folders/"+t.folderId):""}"></td><td style="min-width:220px">${extra(t.pb,t,true)}</td><td>${st}</td></tr>`});
-  return guide+`<section class="card flush">${tbl(["Phòng ban","Thư mục Drive gốc","Ai được xem thêm","Kết nối"],rows)}</section>
+  const sy=TM.sync,syHtml=!sy?"":sy.loading?`<p class="hint">Đang kiểm tra quyền trên Drive…</p>`:sy.err?`<div class="note red">${esc(sy.err)}</div>`:
+    `<div class="card pad" style="margin-top:10px">${sy.dry?"<b>Xem trước:</b> ":"<b>Đã đồng bộ.</b> "}${sy.folders.map(f=>{const nm=(D_.find(d=>d.k===f.pb)||C.teams.find(t=>t.pb===f.pb)||{}).n||(C.teams.find(t=>t.pb===f.pb)||{}).name||f.pb;
+      return `<div style="margin-top:6px"><b>${esc(nm)}</b>: ${f.error?`<span class="t-red">${esc(f.error)}</span>`:[f.added.length?"thêm "+esc(f.added.join(", ")):"",f.changed.length?"đổi "+esc(f.changed.join(", ")):"",f.removed.length?"gỡ "+esc(f.removed.join(", ")):""].filter(Boolean).join(" · ")||"không cần đổi"}</div>`}).join("")}
+      ${sy.no_email.length?`<div class="note amb" style="margin-top:10px">${sy.no_email.length} nhân viên chưa có email trong hồ sơ nên chưa được cấp quyền: ${esc(sy.no_email.map(x=>x.ten).join(", "))}. Thêm email ở Nhân sự › Nhân viên.</div>`:""}
+      ${sy.dry?`<button class="btn pri sm" id="tm-sync-go" style="margin-top:10px">Áp dụng</button>`:""}</div>`;
+  const syncBox=`<div class="card pad" style="margin-bottom:14px"><b>Quyền trên Google Drive theo danh sách nhân viên</b>
+    <p class="hint" style="margin:6px 0 8px">Nhân viên đang làm có email trong hồ sơ (Nhân sự › Nhân viên): được sửa thư mục phòng mình, chỉ xem thư mục dùng chung. Người đã nghỉ bị gỡ quyền. Web tự làm mỗi giờ; người chị tự chia sẻ tay web không đụng tới. Web cần là Người chỉnh sửa của thư mục.</p>
+    <button class="btn sm" id="tm-sync">Kiểm tra &amp; đồng bộ ngay</button>${syHtml}</div>`;
+  return guide+syncBox+`<section class="card flush">${tbl(["Phòng ban","Thư mục Drive gốc","Ai được xem thêm","Kết nối"],rows)}</section>
   <h3 style="margin:18px 0 6px">Thư mục dùng chung</h3><p class="hint" style="margin:0 0 8px">Thư mục không thuộc riêng phòng nào (thư mục chung công ty, kho hình ảnh thương hiệu…). Thư mục phòng nằm bên trong vẫn chỉ phòng đó xem.</p>
   <section class="card flush">${tbl(["Tên hiện trên web","Thư mục Drive","Ai được xem","Kết nối"],shRows)}<div class="pad" style="display:flex;gap:10px;align-items:center"><button class="btn pri" id="tm-save"${TM.saving?" disabled":""}>${TM.saving?"Đang lưu…":"Lưu"}</button><span class="hint">Để trống link = bỏ thư mục đó.</span></div></section>`;
 }
+async function tmSync(dry){TM.sync={loading:true};tmRedraw();try{TM.sync={...(await svApi("/api/drive/sync"+(dry?"?dry=1":""),{method:"POST"})),dry}}catch(e){TM.sync={err:e.message||"Không đồng bộ được"}}tmRedraw()}
 function tmCfgBind(m){
+  const sb=$("#tm-sync");if(sb)sb.onclick=()=>tmSync(true);const sg=$("#tm-sync-go");if(sg)sg.onclick=()=>tmSync(false);
   const cp=$("#tm-cp");if(cp)cp.onclick=()=>{try{navigator.clipboard.writeText(TM.cfg.sa_email).then(()=>toast("Đã chép email"),()=>toast(TM.cfg.sa_email))}catch(e){toast(TM.cfg.sa_email)}};
   const sv=$("#tm-save");if(sv)sv.onclick=async()=>{
     const teams=[...m.querySelectorAll("[data-tmfo]")].map(i=>{const pb=i.dataset.tmfo,nm=m.querySelector(`[data-tmnm="${CSS.escape(pb)}"]`);

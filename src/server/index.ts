@@ -12,6 +12,7 @@ import { syncAllChannels } from './services/poscake';
 import { syncComboTasks } from './routes/sanpham';
 import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
+import { autoSyncEnabled, syncDrivePermissions } from './services/driveSync';
 import { isAdminHost } from './lib/host';
 import { readSessionCookie, resolveSession } from './lib/session';
 
@@ -82,6 +83,15 @@ export default {
           }
         } catch (error) {
           console.error('[cron] poscake loi', error);
+        }
+        // Thư mục làm việc: cấp / gỡ quyền Drive theo danh sách nhân viên ở trang quản trị (mỗi giờ).
+        try {
+          if (env.GDRIVE_SA_JSON && (await autoSyncEnabled(env.DB))) {
+            const r = await syncDrivePermissions(env.DB, env.GDRIVE_SA_JSON, null);
+            console.info('[cron] quyen drive', JSON.stringify(r.folders.map((f) => [f.pb, f.added.length, f.changed.length, f.removed.length, f.error ?? ''])));
+          }
+        } catch (error) {
+          console.error('[cron] quyen drive loi', error);
         }
         // Nhắc buổi quay của khu Marketing (chỉ chạy lúc 8 giờ sáng giờ Việt Nam).
         try {

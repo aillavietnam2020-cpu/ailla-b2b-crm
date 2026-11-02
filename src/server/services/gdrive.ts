@@ -44,16 +44,19 @@ const b64url = (b: ArrayBuffer | Uint8Array | string) => {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
-let TOKEN: { email: string; value: string; exp: number } | null = null;
+/** Quyền đầy đủ chỉ dùng cho việc cấp / gỡ quyền chia sẻ theo danh sách nhân viên (driveSync.ts); mọi chỗ khác dùng quyền chỉ xem. */
+const SCOPE_SHARE = 'https://www.googleapis.com/auth/drive';
+const TOKENS = new Map<string, { value: string; exp: number }>();
 
-async function accessToken(key: SaKey): Promise<string> {
+async function accessToken(key: SaKey, scope = SCOPE): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  if (TOKEN && TOKEN.email === key.client_email && TOKEN.exp - 120 > now) return TOKEN.value;
+  const hit = TOKENS.get(`${key.client_email}|${scope}`);
+  if (hit && hit.exp - 120 > now) return hit.value;
   const pem = key.private_key.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
   const der = Uint8Array.from(atob(pem), (ch) => ch.charCodeAt(0));
   const pk = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
   const unsigned = `${b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${b64url(
-    JSON.stringify({ iss: key.client_email, scope: SCOPE, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }),
+    JSON.stringify({ iss: key.client_email, scope, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }),
   )}`;
   const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', pk, new TextEncoder().encode(unsigned));
   const r = await fetch('https://oauth2.googleapis.com/token', {
@@ -66,7 +69,7 @@ async function accessToken(key: SaKey): Promise<string> {
     console.error('[drive] token', r.status);
     throw new AppError(502, 'DRIVE_AUTH', 'Web chưa đăng nhập được Google Drive (khóa tài khoản máy sai hoặc đã bị xóa).');
   }
-  TOKEN = { email: key.client_email, value: j.access_token, exp: now + (j.expires_in ?? 3600) };
+  TOKENS.set(`${key.client_email}|${scope}`, { value: j.access_token, exp: now + (j.expires_in ?? 3600) });
   return j.access_token;
 }
 
@@ -143,4 +146,42 @@ export async function exportDocText(key: SaKey, id: string): Promise<string | nu
     if (r.status === 401 || r.status === 403 || r.status === 404) return null;
   }
   return null;
+}
+
+/* ---------- Quyền chia sẻ thư mục (chỉ driveSync.ts gọi) ---------- */
+export type DrivePermission = { id: string; emailAddress?: string; role: string; type: string };
+
+async function shareCall(key: SaKey, method: string, url: string, body?: unknown): Promise<{ ok: boolean; status: number; json: unknown }> {
+  const r = await fetch(url, {
+    method,
+    headers: { Authorization: `Bearer ${await accessToken(key, SCOPE_SHARE)}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = r.status === 204 ? null : await r.json().catch(() => null);
+  if (!r.ok) console.error('[drive share]', method, r.status, url.replace(/\?.*/, ''));
+  return { ok: r.ok, status: r.status, json };
+}
+
+export async function listPermissions(key: SaKey, fileId: string): Promise<DrivePermission[] | null> {
+  const out: DrivePermission[] = [];
+  let page = '';
+  do {
+    const r = await shareCall(key, 'GET', `${API}/files/${encodeURIComponent(fileId)}/permissions?supportsAllDrives=true&pageSize=100&fields=nextPageToken,permissions(id,emailAddress,role,type)${page ? `&pageToken=${page}` : ''}`);
+    if (!r.ok) return null;
+    const j = r.json as { permissions?: DrivePermission[]; nextPageToken?: string };
+    out.push(...(j.permissions ?? []));
+    page = j.nextPageToken ?? '';
+  } while (page);
+  return out;
+}
+
+/** Cấp quyền cho một email (không gửi thư báo). */
+export async function addPermission(key: SaKey, fileId: string, email: string, role: 'writer' | 'reader') {
+  return (await shareCall(key, 'POST', `${API}/files/${encodeURIComponent(fileId)}/permissions?supportsAllDrives=true&sendNotificationEmail=false`, { type: 'user', role, emailAddress: email })).ok;
+}
+export async function setPermissionRole(key: SaKey, fileId: string, permId: string, role: 'writer' | 'reader') {
+  return (await shareCall(key, 'PATCH', `${API}/files/${encodeURIComponent(fileId)}/permissions/${encodeURIComponent(permId)}?supportsAllDrives=true`, { role })).ok;
+}
+export async function removePermission(key: SaKey, fileId: string, permId: string) {
+  return (await shareCall(key, 'DELETE', `${API}/files/${encodeURIComponent(fileId)}/permissions/${encodeURIComponent(permId)}?supportsAllDrives=true`)).ok;
 }
