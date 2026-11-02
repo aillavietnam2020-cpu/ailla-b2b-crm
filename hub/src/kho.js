@@ -125,9 +125,23 @@ async function khoFillFromPsx(type,id,addLine){
   }
 }
 
+/* Chị Hoa 02/11: đang nhập dở mà lỡ Enter là phiếu tự ghi. Trong form phiếu, Enter chỉ nhảy sang ô kế, muốn ghi phải bấm nút. */
+function khoNoEnter(f){if(!f)return;f.addEventListener("keydown",e=>{if(e.key!=="Enter"||e.target.tagName==="TEXTAREA"||e.target.tagName==="BUTTON")return;e.preventDefault();
+  const els=[...f.querySelectorAll("input:not([type=hidden]),select")].filter(x=>!x.disabled&&x.offsetParent),i=els.indexOf(e.target);if(i>=0&&els[i+1])els[i+1].focus()})}
+/* Sửa phiếu nhập: mở lại form với số cũ điền sẵn; ghi xong phiếu mới thì phiếu cũ (và lần nhận hàng của phiếu mua) tự hủy. */
+function khoEditPN(d,moves){
+  const po=typeof MH!=="undefined"?((MH.orders||[]).find(p=>(p.receipts||[]).some(x=>x.kho_doc_id===d.id&&x.status==="OK"))||{}).id:"";
+  KHO.editNext={id:d.id,no:d.no,po:po||""};
+  khoForm("PN",addLine=>{
+    $("#kf-d").value=d.doc_date;if($("#kf-p"))$("#kf-p").value=d.partner||"";if($("#kf-r"))$("#kf-r").value=d.ref_no||"";if($("#kf-n"))$("#kf-n").value=d.note||"";
+    $("#kf-b").innerHTML="";
+    moves.filter(m=>m.role==="IN").forEach(m=>{const tr=addLine({item:m.item,qty:m.qty});const pr=tr.querySelector(".kf-pr");if(pr&&m.price!=null)pr.value=m.price});
+    const h=document.querySelector("#drawer h2");if(h)h.insertAdjacentHTML("afterend",`<div class="note amb">Đang sửa phiếu <b>${esc(d.no)}</b>. Bấm Ghi phiếu thì web lập phiếu mới theo số dưới đây và tự hủy ${esc(d.no)}.</div>`)});
+}
 /* ---------- Form lập phiếu (mở trong ngăn bên, không mất khi trang tự làm mới) ---------- */
 const KHO_LINE_CLS={PN:["NVL","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null};
 function khoForm(type,pre,clsO){
+  KHO.edit=KHO.editNext||null;KHO.editNext=null; // chỉ là "sửa" khi mở từ nút Sửa phiếu
   const T=KHO_TYPES[type],price=KHO.cat.can_price;
   const isPC=type==="PC",isKS=type==="KS",isOut=type==="XB",isTL=type==="TL",isPN=type==="PN"||type==="TD";
   const head=`<div class="row7"><label class="field">Ngày<input type="date" id="kf-d" value="${kToday()}" required></label>
@@ -179,12 +193,13 @@ function khoForm(type,pre,clsO){
   if(type==="PN"&&$("#kf-po")){
     /* Hàng về theo một phiếu mua (Thảo lập ở trang quản trị): chọn phiếu thì điền sẵn nhà cung cấp và số còn thiếu; lưu xong phiếu mua tự nhảy "đã nhập kho" */
     (async()=>{try{await mhLoad(true)}catch(e){}
-      const sel=$("#kf-po");if(!sel)return;const O=(typeof MH!=="undefined"&&MH.orders||[]).filter(p=>p.status==="DAT"||p.status==="DANG_GIAO");
-      sel.innerHTML='<option value="">Không có phiếu đặt: web tự tạo phiếu mua theo nhà cung cấp, Thảo nhập giá sau</option>'+O.map(p=>`<option value="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name)} · ${esc(p.lines.slice(0,2).map(l=>l.name||l.item).join(", "))}</option>`).join("")})();
+      const sel=$("#kf-po");if(!sel)return;const ePo=KHO.edit&&KHO.edit.po,O=(typeof MH!=="undefined"&&MH.orders||[]).filter(p=>p.status==="DAT"||p.status==="DANG_GIAO"||p.id===ePo);
+      sel.innerHTML='<option value="">Không có phiếu đặt: web tự tạo phiếu mua theo nhà cung cấp, Thảo nhập giá sau</option>'+O.map(p=>`<option value="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name)} · ${esc(p.lines.slice(0,2).map(l=>l.name||l.item).join(", "))}</option>`).join("");if(ePo)sel.value=ePo})();
     $("#kf-po").onchange=()=>{const p=(MH.orders||[]).find(x=>x.id===$("#kf-po").value);if(!p)return;
       $("#kf-p").value=p.supplier_name;body.innerHTML="";const rest=p.lines.filter(l=>l.qty-l.received>1e-9);
       (rest.length?rest:p.lines).forEach(l=>addLine({item:l.item,qty:rest.length?Math.round((l.qty-l.received)*1e6)/1e6:l.qty}));refresh()}}
   if(pre)pre(addLine);
+  khoNoEnter($("#kf"));
   $("#kf-print").onclick=()=>{
     const L=lines().filter(l=>l.item),dt=$("#kf-d").value,tp=isOut?$("#kf-k").value:type;
     const mv=L.map(l=>{const it=KHO.items.get(l.item)||{name:"",unit:""};return {item:l.item,name:it.name,unit:it.unit,qty:0,std_qty:l.std_qty!=null?l.std_qty:null,price:null,role:isPC?"USE":"IN",note:""}});
@@ -194,9 +209,10 @@ function khoForm(type,pre,clsO){
     try{const L=lines().filter(l=>l.item);const body={type:isOut?$("#kf-k").value:type,date:$("#kf-d").value,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",note:$("#kf-n").value,
       lines:L.map(l=>({item:l.item,qty:l.qty===""?undefined:+l.qty,ref_qty:l.ref_qty===""?undefined:+l.ref_qty,verdict:l.verdict||undefined,price:l.price===""?undefined:+l.price,std_qty:l.std_qty}))};
       if($("#kf-po")&&$("#kf-po").value)body.po_id=$("#kf-po").value;
+      if(KHO.edit&&type==="PN")body.replace_doc_id=KHO.edit.id;
       if(isPC){body.btp=$("#kf-btp").dataset.code;body.liters=+$("#kf-lit").value;body.ref_qty=$("#kf-rq").value===""?undefined:+$("#kf-rq").value}
       if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");
-      const r=await kApi("/docs",{method:"POST",body:JSON.stringify(body)});closeDrawer();KHO.at=0;KHO.list={};KHO.nxt=null;KHO.cl=null;KHO.mp=null;await khoLoad(true);renderMain();toast("Đã ghi phiếu "+r.no);khoOpenDoc(r.id,r.warnings)}
+      const r=await kApi("/docs",{method:"POST",body:JSON.stringify(body)});closeDrawer();KHO.at=0;KHO.list={};KHO.nxt=null;KHO.cl=null;KHO.mp=null;await khoLoad(true);renderMain();KHO.edit=null;if(typeof MH!=="undefined"&&typeof mhReload==="function")mhReload().catch(()=>{});toast("Đã ghi phiếu "+r.no);khoOpenDoc(r.id,r.warnings)}
     catch(err){$("#kf-msg").textContent="";$("#kf-warn").innerHTML=`<div class="note red">${esc(err.message)}</div>`;ok.disabled=false}};
 }
 
@@ -218,7 +234,8 @@ async function khoOpenDoc(id,warnings){
      return `<h3 style="margin:10px 0 4px">${esc(sp.inName)} <span class="mono">${nIn}</span></h3><div class="card flush">${tbl(["Mã","Tên","ĐVT","Số lượng"],[mk(sp.inRole)])}</div>
       <h3 style="margin:14px 0 4px">${esc(sp.outName)} <span class="mono">${nOut}</span></h3><div class="card flush">${tbl(["Mã","Tên","ĐVT","Số lượng"].concat(d.type==="PC"?["Định mức"]:[]),[mk(sp.outRole)])}</div>
       <p class="hint">Hai phiếu này sinh ra cùng lúc từ ${esc(T.name.toLowerCase())} ${esc(d.no)}. Hủy hoặc sửa ${esc(d.no)} thì cả hai cùng đổi.</p>`})():`<div id="kdoc">${tbl(head,[rows])}</div>`}
-   <div class="row7">${KHO_SPLIT[d.type]?`<button class="btn" id="kd-pa">In ${khoSubNos(d)[0]}</button><button class="btn" id="kd-pb">In ${khoSubNos(d)[1]}</button>`:`<button class="btn" id="kd-print">In phiếu</button><button class="btn" id="kd-blank">In bản điền tay</button>`}${!cancelled&&(d.type==="TD"?ME.role==="admin":(kCan(d.type)||ME.role==="admin"))?`<button class="btn" id="kd-cancel">Hủy phiếu</button>`:""}</div>`);
+   <div class="row7">${KHO_SPLIT[d.type]?`<button class="btn" id="kd-pa">In ${khoSubNos(d)[0]}</button><button class="btn" id="kd-pb">In ${khoSubNos(d)[1]}</button>`:`<button class="btn" id="kd-print">In phiếu</button><button class="btn" id="kd-blank">In bản điền tay</button>`}${!cancelled&&(d.type==="TD"?ME.role==="admin":(kCan(d.type)||ME.role==="admin"))?`<button class="btn" id="kd-cancel">Hủy phiếu</button>`:""}${!cancelled&&d.type==="PN"&&(kCan(d.type)||ME.role==="admin")?`<button class="btn pri" id="kd-edit">Sửa phiếu</button>`:""}</div>`);
+  if($("#kd-edit"))$("#kd-edit").onclick=()=>khoEditPN(d,r.moves);
   if(KHO_SPLIT[d.type]){const sp=KHO_SPLIT[d.type],nos=khoSubNos(d),sub=(role,no,typ,nm,neg)=>({doc:Object.assign({},d,{no,type:typ}),moves:r.moves.filter(m=>m.role===role).map(m=>Object.assign({},m,{qty:Math.abs(m.qty),role:neg?"OUT":"IN"}))});
     $("#kd-pa").onclick=()=>khoPrintDoc(sub(sp.inRole,nos[0],"PN",sp.inName,false),Object.assign({},KHO_TYPES.PN,{name:sp.inName}),price,ex);
     $("#kd-pb").onclick=()=>khoPrintDoc(sub(sp.outRole,nos[1],"XK",sp.outName,true),Object.assign({},KHO_TYPES.XB,{name:sp.outName}),price,ex)}
