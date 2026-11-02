@@ -39,10 +39,11 @@ type DocRow = {
   bat_buoc: string; lo_trinh: string; han_ngay: number; quiz: string; sort: number; created_at: string; created_by: string;
   updated_at: string; updated_by: string; published_at: string | null; approved_by: string | null;
   drive_id: string; drive_mod: string; drive_sync_at: string | null; files: string;
+  approved_at: string | null; pending: string; pending_by: string | null; pending_at: string | null; review_note: string | null;
 };
 
 async function ctx(db: D1Database, auth: AuthContext): Promise<{ v: Viewer; m: Members }> {
-  const m = await loadMembers(db, auth.user.id);
+  const [m] = await Promise.all([loadMembers(db, auth.user.id), loadNames(db)]);
   const g = await db.prepare('SELECT scopes FROM dt_editor WHERE user_id = ?').bind(auth.user.id).first<{ scopes: string }>();
   return { v: viewerOf(auth.user.id, auth.user.role, m, parseJsonArr(g?.scopes)), m };
 }
@@ -50,10 +51,27 @@ async function ctx(db: D1Database, auth: AuthContext): Promise<{ v: Viewer; m: M
 const lite = (r: DocRow) => ({ nhom: r.nhom, teams: parseJsonArr(r.teams), status: r.status, created_by: r.created_by });
 
 /** Bỏ phần nặng (nội dung, đáp án) khi trả danh sách; người không soạn được thì không thấy đáp án câu kiểm tra. */
-function shape(r: DocRow, v: Viewer, withBody: boolean) {
+const who = (m: Members, id: string | null | undefined) => (!id ? '' : id.startsWith('he-thong') ? 'Hệ thống' : m.users[id]?.name || NAMES.get(id) || '');
+/* Tên hiển thị của tài khoản (người chưa gắn vào danh sách nhân sự vẫn có tên). Giữ 5 phút trong máy chủ. */
+let NAMES = new Map<string, string>();
+let NAMES_AT = 0;
+async function loadNames(db: D1Database) {
+  if (Date.now() - NAMES_AT < 300_000) return;
+  const { results } = await db.prepare('SELECT id, display_name FROM users').all<{ id: string; display_name: string }>();
+  NAMES = new Map(results.map((r) => [r.id, r.display_name]));
+  NAMES_AT = Date.now();
+}
+const pendingOf = (r: DocRow) => { try { return r.pending ? (JSON.parse(r.pending) as Record<string, unknown>) : null; } catch { return null; } };
+
+function shape(r: DocRow, v: Viewer, withBody: boolean, m: Members) {
   const quiz = parseJsonArr<Quiz[number]>(r.quiz);
   const edit = canEditDoc(v, lite(r));
+  const pend = edit || v.ceo ? pendingOf(r) : null;
   return {
+    updated_by_name: who(m, r.updated_by), approved_at: r.approved_at ?? null, approved_by_name: who(m, r.approved_by),
+    has_pending: !!r.pending && (edit || v.ceo), pending_by_name: pend ? who(m, r.pending_by) : '', pending_at: pend ? r.pending_at : null,
+    review_note: edit ? r.review_note ?? '' : '',
+    ...(withBody && pend ? { pending: pend } : {}),
     id: r.id, nhom: r.nhom, teams: parseJsonArr(r.teams), title: r.title, summary: r.summary, version: r.version, status: r.status,
     bat_buoc: r.bat_buoc, lo_trinh: r.lo_trinh, han_ngay: r.han_ngay, sort: r.sort, updated_at: r.updated_at, updated_by: r.updated_by,
     published_at: r.published_at, quiz_n: quiz.length, can_edit: edit, drive_id: r.drive_id ?? '', drive_mod: r.drive_mod ?? '', drive_sync_at: r.drive_sync_at ?? null, files: parseJsonArr(r.files),
@@ -146,17 +164,17 @@ daoTaoRoutes.get('/me', async (c) => {
 /** Tài liệu tôi xem được + lượt xác nhận của tôi. */
 daoTaoRoutes.get('/docs', async (c) => {
   const auth = c.get('auth');
-  const { v } = await ctx(c.env.DB, auth);
+  const { v, m } = await ctx(c.env.DB, auth);
   const docs = (await allDocs(c.env.DB)).filter((r) => canSeeDoc(v, lite(r)));
   const { results: acks } = await c.env.DB.prepare('SELECT doc_id, version, score, at FROM dt_ack WHERE user_id = ?')
     .bind(auth.user.id)
     .all<{ doc_id: string; version: number; score: number | null; at: string }>();
-  return ok(c, { docs: docs.map((r) => shape(r, v, false)), acks });
+  return ok(c, { docs: docs.map((r) => shape(r, v, false, m)), acks });
 });
 
 daoTaoRoutes.get('/docs/:id', async (c) => {
   const auth = c.get('auth');
-  const { v } = await ctx(c.env.DB, auth);
+  const { v, m } = await ctx(c.env.DB, auth);
   const r = await refreshDrive(c.env, await getDoc(c.env.DB, c.req.param('id')));
   if (!canSeeDoc(v, lite(r))) throw forbidden('Tài liệu này chỉ dành cho team khác');
   const [{ results: hoi }, ack] = await Promise.all([
@@ -165,7 +183,7 @@ daoTaoRoutes.get('/docs/:id', async (c) => {
   ]);
   // Người đọc thường chỉ thấy câu hỏi của mình; người soạn thấy hết để trả lời.
   const edit = canEditDoc(v, lite(r));
-  return ok(c, { ...shape(r, v, true), ack: ack ?? null, hoi: edit ? hoi : hoi.filter((h) => h.user_id === auth.user.id) });
+  return ok(c, { ...shape(r, v, true, m), ack: ack ?? null, hoi: edit ? hoi : hoi.filter((h) => h.user_id === auth.user.id) });
 });
 
 const quizSchema = z.array(z.object({ q: z.string().trim().min(1).max(300), o: z.array(z.string().trim().min(1).max(200)).min(2).max(6), a: z.number().int().min(0) }))
@@ -234,8 +252,9 @@ daoTaoRoutes.post('/docs', async (c) => {
          created_at, created_by, updated_at, updated_by, published_at, approved_by, drive_id, drive_mod, drive_sync_at, files)
        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(id, d.nhom, JSON.stringify(d.teams), d.title, d.summary, g.body, status, d.bat_buoc, d.lo_trinh, d.han_ngay, JSON.stringify(d.quiz), d.sort,
-      now, auth.user.id, now, auth.user.id, status === 'dang' ? now : null, status === 'dang' && d.nhom === 'chung' ? auth.user.id : null,
+      now, auth.user.id, now, auth.user.id, status === 'dang' ? now : null, status === 'dang' ? auth.user.id : null,
       g.drive_id, g.drive_mod, g.drive_sync_at, JSON.stringify(d.files)),
+    ...(status === 'dang' ? [c.env.DB.prepare('UPDATE dt_doc SET approved_at = ? WHERE id = ?').bind(now, id)] : []),
     ...linkFiles(c.env.DB, id, d.files),
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'DT_DOC_ADD', entityType: 'DT_DOC', entityId: id, after: { title: d.title, nhom: d.nhom, status } }),
   ]);
@@ -249,17 +268,29 @@ daoTaoRoutes.put('/docs/:id', async (c) => {
   const d = parseDoc(await c.req.json().catch(() => ({})));
   if (!canEditDoc(v, lite(old)) || !canEditDoc(v, d)) throw forbidden('Bạn chưa được giao quyền sửa tài liệu này');
   const now = nowIso();
-  // Một tài liệu một nội dung: lưu nháp là gỡ xuống; người không phải CEO sửa tài liệu Chung thì chờ CEO duyệt lại.
+  const g = await withDrive(c.env, d);
+  // Người khác CEO sửa tài liệu đang hiện: cất bản sửa chờ CEO duyệt, mọi người vẫn đọc bản đã duyệt.
+  if (!v.ceo && old.status === 'dang') {
+    const pend = { nhom: d.nhom, teams: d.teams, title: d.title, summary: d.summary, body: g.body, bat_buoc: d.bat_buoc, lo_trinh: d.lo_trinh,
+      han_ngay: d.han_ngay, quiz: d.quiz, sort: d.sort, drive_id: g.drive_id, drive_mod: g.drive_mod, files: d.files, major: d.major };
+    await c.env.DB.batch([
+      c.env.DB.prepare('UPDATE dt_doc SET pending = ?, pending_by = ?, pending_at = ?, review_note = NULL WHERE id = ?').bind(JSON.stringify(pend), auth.user.id, now, old.id),
+      ...linkFiles(c.env.DB, old.id, d.files),
+      auditStatement(c.env.DB, { actorId: auth.user.id, action: 'DT_DOC_EDIT_PENDING', entityType: 'DT_DOC', entityId: old.id, after: { title: d.title } }),
+    ]);
+    return ok(c, { id: old.id, status: 'cho_duyet', pending: true, version: old.version });
+  }
+  // Một tài liệu một nội dung: lưu nháp là gỡ xuống. CEO đăng là duyệt luôn; người khác đăng thì chờ CEO duyệt.
   const status = d.action === 'dang' ? publishStatus(v, d.nhom) : 'nhap';
   const version = old.version + (d.major && old.published_at ? 1 : 0);
-  const g = await withDrive(c.env, d);
   await c.env.DB.batch([
     c.env.DB.prepare(
       `UPDATE dt_doc SET nhom = ?, teams = ?, title = ?, summary = ?, body = ?, version = ?, status = ?, bat_buoc = ?, lo_trinh = ?, han_ngay = ?,
          quiz = ?, sort = ?, updated_at = ?, updated_by = ?, published_at = CASE WHEN ? = 'dang' THEN COALESCE(published_at, ?) ELSE published_at END,
-         approved_by = CASE WHEN ? = 'dang' AND ? = 'chung' THEN ? ELSE approved_by END, drive_id = ?, drive_mod = ?, drive_sync_at = ?, files = ? WHERE id = ?`,
+         approved_by = CASE WHEN ? = 'dang' THEN ? ELSE approved_by END, approved_at = CASE WHEN ? = 'dang' THEN ? ELSE approved_at END,
+         drive_id = ?, drive_mod = ?, drive_sync_at = ?, files = ?, pending = '', pending_by = NULL, pending_at = NULL, review_note = NULL WHERE id = ?`,
     ).bind(d.nhom, JSON.stringify(d.teams), d.title, d.summary, g.body, version, status, d.bat_buoc, d.lo_trinh, d.han_ngay, JSON.stringify(d.quiz),
-      d.sort, now, auth.user.id, status, now, status, d.nhom, auth.user.id, g.drive_id, g.drive_mod, g.drive_sync_at, JSON.stringify(d.files), old.id),
+      d.sort, now, auth.user.id, status, now, status, auth.user.id, status, now, g.drive_id, g.drive_mod, g.drive_sync_at, JSON.stringify(d.files), old.id),
     ...linkFiles(c.env.DB, old.id, d.files),
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'DT_DOC_EDIT', entityType: 'DT_DOC', entityId: old.id,
       before: { title: old.title, version: old.version, status: old.status }, after: { title: d.title, version, status } }),
@@ -267,20 +298,44 @@ daoTaoRoutes.put('/docs/:id', async (c) => {
   return ok(c, { id: old.id, status, version });
 });
 
-/** CEO duyệt tài liệu Chung đang chờ. */
+/** CEO duyệt: tài liệu mới chờ duyệt, hoặc bản sửa đang chờ của tài liệu đã hiện. */
 daoTaoRoutes.post('/docs/:id/approve', async (c) => {
   const auth = c.get('auth');
   const { v } = await ctx(c.env.DB, auth);
-  if (!v.ceo) throw forbidden('Chỉ CEO duyệt tài liệu Chung');
+  if (!v.ceo) throw forbidden('Chỉ CEO duyệt tài liệu');
   const r = await getDoc(c.env.DB, c.req.param('id'));
-  if (r.status !== 'cho_duyet') throw badRequest('NOT_PENDING', 'Tài liệu không ở trạng thái chờ duyệt');
+  const p = pendingOf(r) as null | { nhom: string; teams: string[]; title: string; summary: string; body: string; bat_buoc: string; lo_trinh: string;
+    han_ngay: number; quiz: unknown[]; sort: number; drive_id: string; drive_mod: string; files: unknown[]; major: boolean };
+  if (r.status !== 'cho_duyet' && !p) throw badRequest('NOT_PENDING', 'Tài liệu không có gì chờ duyệt');
   const now = nowIso();
   await c.env.DB.batch([
-    c.env.DB.prepare("UPDATE dt_doc SET status = 'dang', approved_by = ?, published_at = COALESCE(published_at, ?), updated_at = ? WHERE id = ?")
-      .bind(auth.user.id, now, now, r.id),
+    p
+      ? c.env.DB.prepare(
+          `UPDATE dt_doc SET nhom = ?, teams = ?, title = ?, summary = ?, body = ?, bat_buoc = ?, lo_trinh = ?, han_ngay = ?, quiz = ?, sort = ?, drive_id = ?,
+             drive_mod = ?, files = ?, version = version + ?, updated_at = ?, updated_by = ?, status = 'dang', approved_by = ?, approved_at = ?,
+             pending = '', pending_by = NULL, pending_at = NULL, review_note = NULL WHERE id = ?`,
+        ).bind(p.nhom, JSON.stringify(p.teams), p.title, p.summary, p.body, p.bat_buoc, p.lo_trinh, p.han_ngay, JSON.stringify(p.quiz), p.sort, p.drive_id ?? '',
+          p.drive_mod ?? '', JSON.stringify(p.files ?? []), p.major ? 1 : 0, r.pending_at ?? now, r.pending_by ?? auth.user.id, auth.user.id, now, r.id)
+      : c.env.DB.prepare("UPDATE dt_doc SET status = 'dang', approved_by = ?, approved_at = ?, published_at = COALESCE(published_at, ?), review_note = NULL WHERE id = ?")
+          .bind(auth.user.id, now, now, r.id),
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'DT_DOC_APPROVE', entityType: 'DT_DOC', entityId: r.id }),
   ]);
   return ok(c, { id: r.id, status: 'dang' });
+});
+
+/** CEO trả lại kèm lời nhắn: bỏ bản sửa đang chờ (giữ bản đã duyệt), hoặc đưa tài liệu mới về nháp để người soạn sửa. */
+daoTaoRoutes.post('/docs/:id/tra-lai', async (c) => {
+  const auth = c.get('auth');
+  const { v } = await ctx(c.env.DB, auth);
+  if (!v.ceo) throw forbidden('Chỉ CEO trả lại tài liệu');
+  const r = await getDoc(c.env.DB, c.req.param('id'));
+  const note = String(((await c.req.json().catch(() => ({}))) as { note?: unknown }).note ?? '').trim().slice(0, 1000);
+  if (r.pending) {
+    await c.env.DB.prepare("UPDATE dt_doc SET pending = '', pending_by = NULL, pending_at = NULL, review_note = ? WHERE id = ?").bind(note || 'Chị Hoa trả lại bản sửa', r.id).run();
+  } else if (r.status === 'cho_duyet') {
+    await c.env.DB.prepare("UPDATE dt_doc SET status = 'nhap', review_note = ? WHERE id = ?").bind(note || 'Chị Hoa trả lại', r.id).run();
+  } else throw badRequest('NOT_PENDING', 'Tài liệu không có gì chờ duyệt');
+  return ok(c, { id: r.id });
 });
 
 /** Gỡ tài liệu (ẩn, không xóa hẳn). */

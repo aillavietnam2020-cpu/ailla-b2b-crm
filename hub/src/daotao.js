@@ -18,6 +18,9 @@ const DT_LT={d1:"Ngày 1",w1:"Tuần 1",m1:"Tháng 1"};
 const dtDep=k=>((DT.me&&DT.me.deps)||[]).find(d=>d.k===k)?.n||k;
 const dtTeams=d=>(d.teams||[]).map(dtDep).join(", ");
 const dtDay=s=>s?String(s).slice(0,10).split("-").reverse().join("/"):"";
+const dtTime=s=>{if(!s)return "";const d=new Date(s);return isNaN(d)?dtDay(s):d.toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit",year:"numeric"})};
+/* Dòng "Cập nhật … bởi … · Duyệt … bởi …" (chị Hoa 02/11: phải thấy lần cập nhật và lần duyệt mới nhất). */
+const dtStamp=d=>`Cập nhật ${dtTime(d.updated_at)}${d.updated_by_name?" bởi "+esc(d.updated_by_name):""} · `+(d.approved_at?`Duyệt ${dtTime(d.approved_at)}${d.approved_by_name?" bởi "+esc(d.approved_by_name):""}`:"<b>Chưa duyệt</b>");
 const dtAck=id=>DT.acks.find(a=>a.doc_id===id);
 /* Đã đọc bản hiện tại chưa; đã đọc bản cũ = phải đọc lại. */
 const dtDone=d=>{const a=dtAck(d.id);return !!a&&a.version>=d.version};
@@ -33,7 +36,7 @@ async function dtLoad(force){
   catch(e){DT.err=e.message||"Không tải được";if(!DT.docs)DT.docs=[]}
   DT.busy=false;DT.at=Date.now();if(String(PAGE).startsWith("dt_"))renderMain()}
 /* Đọc tài liệu trong cửa sổ nổi trên trang đang xem, không chuyển trang (chị Hoa 02/11). */
-async function dtOpen(id){DT.cur=id;dtModal();
+async function dtOpen(id){if(DT.cur!==id)DT.pv=false;DT.cur=id;dtModal();
   try{DT.doc[id]=await svApi(DT_API+"/docs/"+id)}catch(e){DT.doc[id]={err:e.message||"Không mở được tài liệu"}}if(DT.cur===id)dtModal()}
 function dtClose(){DT.cur=null;const w=document.getElementById("dt-modal");if(w)w.remove();document.body.style.overflow=""}
 function dtModal(){let w=document.getElementById("dt-modal");if(!DT.cur){dtClose();return}
@@ -159,7 +162,7 @@ const DT_CSS=`<style>
 </style>`;
 const dtCk=on=>`<span class="dt-ck${on?" on":""}">${on?"✓":""}</span>`;
 function dtItem(d,sub){const done=dtDone(d),old=dtOld(d);
-  const tag=d.status!=="dang"?pill(d.status==="cho_duyet"?"Chờ CEO duyệt":"Nháp","amb"):done?pill("Đã hiểu","grn"):old?pill("Có bản mới, đọc lại","amb"):dtReq(d)?pill("Bắt buộc","red"):"";
+  const tag=d.status!=="dang"?pill(d.status==="cho_duyet"?"Chờ CEO duyệt":"Nháp","amb"):d.has_pending&&DT.me&&DT.me.ceo?pill("Có bản sửa chờ duyệt","amb"):done?pill("Đã hiểu","grn"):old?pill("Có bản mới, đọc lại","amb"):dtReq(d)?pill("Bắt buộc","red"):"";
   return `<div class="dt-item" data-dtopen="${esc(d.id)}">${dtCk(done)}<div class="t"><b>${esc(d.title)}</b><small>${esc(sub!=null?sub:(d.summary||DT_NHOM[d.nhom]||""))}</small></div>${tag}</div>`}
 function dtWire(m){
   m.querySelectorAll("[data-dtnew]").forEach(b=>b.onclick=dtNewChoose);
@@ -172,11 +175,11 @@ function pDtHome(m){
   if(!DT.docs)return dtWait(m,"Đào tạo của tôi");dtLoad();
   const P=dtPub(),road=P.filter(d=>d.lo_trinh),req=P.filter(dtReq),todo=req.filter(d=>!dtDone(d)),old=P.filter(dtOld),me=DT.me||{},nb=me.newbie;
   const pct=road.length?Math.round(road.filter(dtDone).length/road.length*100):0;
-  const pend=(DT.docs||[]).filter(d=>d.status==="cho_duyet");
+  const pend=(DT.docs||[]).filter(d=>d.status==="cho_duyet"||d.has_pending);
   const lt=road.filter(d=>d.lo_trinh===DT.road);
   m.innerHTML=DT_CSS+(me.editor?`<div style="float:right;margin-top:-4px"><button class="btn pri" data-dtnew="1">＋ Tạo tài liệu</button></div>`:"")+H("Đào tạo của tôi",nb?`Vào làm ${dtDay(nb.start_date)}${nb.done_at?" · đã xong onboarding":" · đang trong lộ trình nhân viên mới"}`:"Tài liệu công ty, sổ tay dùng web và tài liệu của team bạn")+
   (DT.err?`<div class="note red">${esc(DT.err)}</div>`:"")+
-  (me.ceo&&pend.length?`<div class="warn">Có <b>${pend.length}</b> tài liệu Chung đang chờ chị duyệt: ${pend.map(d=>`<a href="#" data-dtopen="${esc(d.id)}">${esc(d.title)}</a>`).join(", ")}</div>`:"")+
+  (me.ceo&&pend.length?`<div class="warn">Có <b>${pend.length}</b> tài liệu đang chờ chị duyệt: ${pend.map(d=>`<a href="#" data-dtopen="${esc(d.id)}">${esc(d.title)}</a>`).join(", ")}</div>`:"")+
   `<div class="dt-kpis">
     <div class="kpi"><div class="l">Lộ trình onboarding</div><div class="v">${pct}%</div><div class="dt-bar"><i style="width:${pct}%"></i></div></div>
     <div class="kpi"><div class="l">Bắt buộc chưa đọc</div><div class="v${todo.length?" t-red":""}">${todo.length}</div><div class="h">trên ${req.length} tài liệu bắt buộc</div></div>
@@ -220,11 +223,12 @@ function pDtRead(m){
   const back=`<button class="btn sm" id="dt-back">✕ Đóng</button>`;
   if(!d){m.innerHTML=DT_CSS+back+H("Đang mở tài liệu…","");m.querySelector("#dt-back").onclick=dtClose;return}
   if(d.err){m.innerHTML=DT_CSS+back+`<div class="note red" style="margin-top:12px">${esc(d.err)}</div>`;m.querySelector("#dt-back").onclick=dtClose;return}
+  if(d.pending&&DT.pv){const P=d.pending;d={...d,title:P.title,summary:P.summary,body:P.body,files:P.files||[],quiz:P.quiz||[]}}
   const done=d.ack&&d.ack.version>=d.version,old=d.ack&&d.ack.version<d.version,ceo=DT.me&&DT.me.ceo;
   const A=DT.ans[id]||(DT.ans[id]=[]);
   const quiz=d.quiz&&d.quiz.length&&!done?`<div class="card dt-quiz" style="box-shadow:none;margin-top:18px"><b>Kiểm tra nhanh (${d.quiz.length} câu, đúng 80% là đạt)</b>
     ${d.quiz.map((q,i)=>`<div style="margin-top:10px"><b style="font-size:14px">${i+1}. ${esc(q.q)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="dtq${i}" value="${j}" data-dtq="${i}"${A[i]===j?" checked":""}>${esc(o)}</label>`).join("")}</div>`).join("")}</div>`:"";
-  const ackBox=d.status!=="dang"?`<div class="warn" style="margin-top:18px">${d.status==="cho_duyet"?"Tài liệu đang chờ CEO duyệt, chưa hiện cho mọi người.":"Bản nháp — chưa hiện cho ai ngoài người soạn."}${ceo&&d.status==="cho_duyet"?` <button class="btn pri sm" id="dt-appr">Duyệt, cho hiện</button>`:""}${d.can_edit?` <button class="btn sm" data-dted2="1">✎ Sửa tài liệu</button>`:""}</div>`
+  const ackBox=d.status!=="dang"?`<div class="warn" style="margin-top:18px">${d.status==="cho_duyet"?"Tài liệu đang chờ CEO duyệt, chưa hiện cho mọi người.":"Bản nháp — chưa hiện cho ai ngoài người soạn."}${ceo&&d.status==="cho_duyet"?` <button class="btn pri sm" id="dt-appr">Duyệt, cho hiện</button> <button class="btn sm danger" id="dt-rej">Trả lại</button>`:""}${d.can_edit?` <button class="btn sm" data-dted2="1">✎ Sửa tài liệu</button>`:""}</div>`
     :done?`<div class="dt-ok"><b>✓ Bạn đã xác nhận đọc và hiểu</b> — ${new Date(d.ack.at).toLocaleString("vi-VN")}${d.ack.score!=null?` · đúng ${d.ack.score}/${d.quiz.length} câu`:""}</div>`
     :`<div class="dt-ok"><b>${old?"Tài liệu có bản mới — bạn đọc lại giúp nhé.":"Bạn đã đọc hết?"}</b><p class="hint" style="margin:4px 0 10px">Bấm xác nhận để web ghi lại ngày giờ. Khi tài liệu sửa sang bản mới, web sẽ nhờ bạn đọc lại.</p>
       <button class="btn pri" id="dt-ack">${d.nhom==="web"?"Tôi đã đọc và làm thử được":"Tôi đã đọc và hiểu"}</button> <span class="hint" id="dt-ackm"></span></div>`;
@@ -235,8 +239,12 @@ function pDtRead(m){
   const toc=dtToc(d.body);
   m.innerHTML=DT_CSS+`<div class="acts" style="margin:-16px -18px 10px;padding:10px 18px;justify-content:space-between;display:flex;position:sticky;top:0;z-index:3;background:var(--canvas,#f6f7fb);border-radius:16px 16px 0 0">${back}<span><button class="btn sm" id="dt-print">🖨 In / lưu PDF</button>${d.can_edit?` <button class="btn sm" id="dt-edit">✎ Sửa tài liệu</button>`:""}</span></div>
   <div class="${toc?"dt-read":""}">${toc?`<nav class="card dt-toc"><b class="hint">MỤC LỤC</b>${toc}</nav>`:""}
-  <article class="card"><div class="dt-chips" style="margin-bottom:8px">${pill(DT_NHOM[d.nhom]+(d.nhom==="team"?": "+dtTeams(d):""),"vio")}${d.bat_buoc!=="khong"?pill(DT_BB[d.bat_buoc],"red"):""}${d.lo_trinh?pill("Lộ trình "+DT_LT[d.lo_trinh],"blu"):""}${pill("Bản "+d.version+" · sửa "+dtDay(d.updated_at),"gry")}${d.drive_id?pill("📄 Soạn trong Google Docs","blu"):""}</div>
+  <article class="card"><div class="dt-chips" style="margin-bottom:8px">${pill(DT_NHOM[d.nhom]+(d.nhom==="team"?": "+dtTeams(d):""),"vio")}${d.bat_buoc!=="khong"?pill(DT_BB[d.bat_buoc],"red"):""}${d.lo_trinh?pill("Lộ trình "+DT_LT[d.lo_trinh],"blu"):""}${pill("Bản "+d.version,"gry")}${d.drive_id?pill("📄 Soạn trong Google Docs","blu"):""}</div>
    ${d.drive_id?`<p class="hint" style="margin:0 0 8px">Nội dung lấy từ Google Drive${d.drive_mod?", bản sửa lúc "+new Date(d.drive_mod).toLocaleString("vi-VN"):""}. Web tự cập nhật khi file trên Drive được sửa.${d.can_edit?` <a href="https://docs.google.com/document/d/${esc(d.drive_id)}/edit" target="_blank" rel="noopener">Sửa trong Google Docs ↗</a>`:""}</p>`:""}
+   <p class="hint" style="margin:0 0 8px">${dtStamp(d)}</p>
+   ${d.review_note&&d.can_edit?`<div class="warn">Chị Hoa trả lại: ${esc(d.review_note)}</div>`:""}
+   ${d.pending?`<div class="warn">Có <b>bản sửa chờ duyệt</b> của ${esc(d.pending_by_name||"người soạn")} lúc ${dtTime(d.pending_at)} — mọi người vẫn đang đọc bản đã duyệt.
+     <button class="btn sm" id="dt-pvw">${DT.pv?"Xem bản đang hiện":"Xem bản sửa"}</button>${ceo?` <button class="btn pri sm" id="dt-appr2">Duyệt bản sửa</button> <button class="btn sm danger" id="dt-rej">Trả lại</button>`:""}</div>`:""}
    <div class="dt-doc"><h1 style="font-size:24px;margin:0 0 6px">${esc(d.title)}</h1>${d.summary?`<p class="hint" style="font-size:14.5px">${esc(d.summary)}</p>`:""}${dtMd(d.body)}</div>
    ${(d.files||[]).length?`<section style="margin-top:16px"><h3>📎 Tệp đính kèm</h3>${d.files.map((f,i)=>`<div class="dt-item" style="cursor:default"><span style="font-size:22px">${dtFileIc(f)}</span><div class="t"><b>${esc(f.name)}</b><small>${f.url?"Trên Google Drive · cần quyền xem trên Drive":dtSize(f.size)}</small></div>${f.url?`${dtPreview(f.url)?`<button class="btn sm" data-dtpv="${i}">Xem ngay</button> `:""}<a class="btn sm" href="${esc(f.url)}" target="_blank" rel="noopener">Mở trên Drive</a>`:`<a class="btn sm" href="${dtFileUrl(f)}" target="_blank" rel="noopener">Mở</a> <a class="btn sm" href="${dtFileUrl(f,1)}">Tải về</a>`}</div><div data-dtpvbox="${i}"></div>`).join("")}
      ${(()=>{const pdf=d.files.find(f=>/pdf/.test(f.mime));return pdf&&!pdf.url?`<iframe src="${dtFileUrl(pdf)}" title="${esc(pdf.name)}" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:12px;margin-top:8px"></iframe>`:""})()}</section>`:""}
@@ -248,6 +256,11 @@ function pDtRead(m){
   m.querySelectorAll("#dt-edit,[data-dted2]").forEach(ed=>ed.onclick=()=>{dtClose();dtEditOpen(d)});
   m.querySelectorAll(".dt-toc a").forEach(a=>a.onclick=e=>{e.preventDefault();const t=m.querySelector(a.getAttribute("href"));if(t)t.scrollIntoView({behavior:"smooth",block:"start"})});
   m.querySelectorAll("[data-dtq]").forEach(r=>r.onchange=()=>{A[+r.dataset.dtq]=+r.value});
+  const pvw=m.querySelector("#dt-pvw");if(pvw)pvw.onclick=()=>{DT.pv=!DT.pv;dtModal()};
+  const rej=m.querySelector("#dt-rej");if(rej)rej.onclick=async()=>{const note=prompt("Nhắn người soạn cần sửa gì:","");if(note===null)return;
+    try{await svApi(DT_API+"/docs/"+id+"/tra-lai",{method:"POST",body:JSON.stringify({note})});toast("Đã trả lại");delete DT.doc[id];DT.pv=false;await dtLoad(true);dtOpen(id)}catch(e){toast(e.message)}};
+  const ap2=m.querySelector("#dt-appr2");if(ap2)ap2.onclick=async()=>{if(!confirm("Duyệt bản sửa và cho mọi người thấy?"))return;
+    try{await svApi(DT_API+"/docs/"+id+"/approve",{method:"POST",body:"{}"});toast("Đã duyệt bản sửa");delete DT.doc[id];DT.pv=false;await dtLoad(true);dtOpen(id)}catch(e){toast(e.message)}};
   const ap=m.querySelector("#dt-appr");if(ap)ap.onclick=async()=>{if(!confirm("Duyệt và cho mọi người thấy tài liệu \""+d.title+"\"?"))return;try{await svApi(DT_API+"/docs/"+id+"/approve",{method:"POST",body:"{}"});toast("Đã duyệt");delete DT.doc[id];await dtLoad(true);dtOpen(id)}catch(e){toast(e.message)}};
   const ak=m.querySelector("#dt-ack");if(ak)ak.onclick=async()=>{
     if(d.quiz&&d.quiz.length&&d.quiz.some((q,i)=>A[i]==null)){m.querySelector("#dt-ackm").textContent="Trả lời hết câu kiểm tra ở trên trước nhé.";return}
@@ -270,6 +283,7 @@ function dtNewChoose(){openDrawerHTML(`<h2>Tạo tài liệu</h2><p class="hint"
   document.querySelectorAll("[data-dtnc]").forEach(b=>b.onclick=()=>{DT.newSrc=b.dataset.dtnc;closeDrawer();dtEditOpen(null).then(()=>{DT.newSrc=null;if(b.dataset.dtnc==="file"){const f=document.querySelector("#dte-file");if(f)f.click()}else if(b.dataset.dtnc==="link"){const i=document.querySelector("#dte-link");if(i)i.focus()}})})}
 async function dtEditOpen(d){
   if(d&&d.id&&d.body==null){try{d=await svApi(DT_API+"/docs/"+d.id)}catch(e){toast(e.message);return}}
+  if(d&&d.pending){const P=d.pending;d={...d,title:P.title,summary:P.summary,body:P.body,nhom:P.nhom,teams:P.teams,bat_buoc:P.bat_buoc,lo_trinh:P.lo_trinh,han_ngay:P.han_ngay,quiz:P.quiz,sort:P.sort,files:P.files||[],drive_id:P.drive_id||""}}
   const S=dtScopes();
   DT.edit=d?{...d,quiz:(d.quiz||[]).map(q=>({q:q.q,o:q.o.slice(),a:q.a})),major:false,src:d.drive_id?"link":!String(d.body||"").trim()&&(d.files||[]).length?((d.files||[]).some(f=>f.id)?"file":"link"):"web",drive:d.drive_id||""}:{quiz:[],files:[],src:DT.newSrc||"web",drive:"",id:null,nhom:S.chung?"chung":S.web?"web":"team",teams:S.teams&&S.teams.length===1?[S.teams[0]]:[],title:"",summary:"",body:"",bat_buoc:"moi",lo_trinh:"w1",han_ngay:7,sort:100,quizText:"",major:false};
   dtClose();PAGE="dt_soan";MOD="dt";render();scrollTo(0,0)}
@@ -277,12 +291,12 @@ function pDtSoan(m){
   if(!DT.docs)return dtWait(m,"Soạn tài liệu");dtLoad();
   const me=DT.me||{};if(!me.editor){m.innerHTML=H("Soạn tài liệu","")+`<p class="empty">Bạn chưa được giao quyền soạn tài liệu.</p>`;return}
   if(DT.edit)return dtEditor(m);
-  const mine=(DT.docs||[]).filter(d=>d.can_edit),st=d=>d.status==="dang"?pill("Đang hiện","grn"):d.status==="cho_duyet"?pill("Chờ CEO duyệt","amb"):pill("Nháp","gry");
+  const mine=(DT.docs||[]).filter(d=>d.can_edit),st=d=>d.status==="dang"&&d.has_pending?pill("Có bản sửa chờ duyệt","amb"):d.status==="dang"?pill("Đang hiện","grn"):d.status==="cho_duyet"?pill("Chờ CEO duyệt","amb"):pill("Nháp","gry");
   m.innerHTML=DT_CSS+H("Soạn tài liệu",me.ceo?"Chị soạn và duyệt được mọi tài liệu":me.hr?"Bạn soạn được tài liệu Chung (cần CEO duyệt), Sổ tay web và tài liệu các team":"Bạn soạn được tài liệu của team mình")+
   `<div class="filters"><button class="btn pri" id="dt-new">＋ Tài liệu mới</button></div>
-  <section class="card flush">${tbl(["Tài liệu","Nhóm","Bắt buộc","Lộ trình","Trạng thái","Sửa lần cuối",""],mine.map(d=>`<tr><td><b>${esc(d.title)}</b>${d.drive_id?" "+pill("Google Docs","blu"):""}${d.quiz_n?`<small>${d.quiz_n} câu kiểm tra</small>`:""}</td><td>${esc(d.nhom==="team"?dtTeams(d):DT_NHOM[d.nhom])}</td><td>${esc(DT_BB[d.bat_buoc])}</td><td>${esc(DT_LT[d.lo_trinh]||"—")}</td><td>${st(d)}</td><td class="nowrap">${dtDay(d.updated_at)} · bản ${d.version}</td>
+  <section class="card flush">${tbl(["Tài liệu","Nhóm","Bắt buộc","Lộ trình","Trạng thái","Cập nhật · Duyệt",""],mine.map(d=>`<tr><td><b>${esc(d.title)}</b>${d.drive_id?" "+pill("Google Docs","blu"):""}${d.quiz_n?`<small>${d.quiz_n} câu kiểm tra</small>`:""}</td><td>${esc(d.nhom==="team"?dtTeams(d):DT_NHOM[d.nhom])}</td><td>${esc(DT_BB[d.bat_buoc])}</td><td>${esc(DT_LT[d.lo_trinh]||"—")}</td><td>${st(d)}</td><td><small style="display:block;color:var(--muted);font-size:12.5px;white-space:normal">${dtStamp(d)}</small></td>
     <td class="nowrap"><button class="btn sm" data-dtopen="${esc(d.id)}">Xem</button> <button class="btn sm" data-dted="${esc(d.id)}">Sửa</button> <button class="btn sm danger" data-dtdel="${esc(d.id)}">Gỡ</button></td></tr>`))}</section>
-  <p class="hint">Chỉ đăng tài liệu chuẩn (nội quy, quy trình, hướng dẫn). File làm việc hằng ngày để ở thư mục Drive của team. Tài liệu Chung (nội quy, quy chế) do người khác soạn phải chị Hoa duyệt mới hiện; Sổ tay web và tài liệu team đăng là hiện ngay.</p>`;
+  <p class="hint">Chỉ đăng tài liệu chuẩn (nội quy, quy trình, hướng dẫn). File làm việc hằng ngày để ở thư mục Drive của team. Mọi tài liệu do Lead / quản lý tạo hoặc sửa đều gửi chị Hoa duyệt; trong lúc chờ, mọi người vẫn đọc bản đã duyệt.</p>`;
   m.querySelector("#dt-new").onclick=dtNewChoose;
   m.querySelectorAll("[data-dted]").forEach(b=>b.onclick=()=>dtEditOpen(DT.docs.find(x=>x.id===b.dataset.dted)));
   m.querySelectorAll("[data-dtdel]").forEach(b=>b.onclick=async()=>{const d=DT.docs.find(x=>x.id===b.dataset.dtdel);if(!confirm("Gỡ tài liệu \""+d.title+"\"? Mọi người sẽ không thấy nữa."))return;
@@ -384,7 +398,7 @@ function dtEditor(m){
     const body={nhom:e.nhom,teams:e.teams,title:e.title.trim(),summary:e.summary.trim(),body:e.src==="web"?e.body:"",bat_buoc:e.bat_buoc,lo_trinh:e.lo_trinh,han_ngay:e.han_ngay,sort:e.sort,quiz,action,major:e.major,drive:e.src==="link"?e.drive:"",files:e.files||[]};
     m.querySelectorAll("#dte-pub,#dte-draft").forEach(b=>b.disabled=true);
     try{const r=await svApi(DT_API+"/docs"+(e.id?"/"+e.id:""),{method:e.id?"PUT":"POST",body:JSON.stringify(body)});
-      toast(r.status==="cho_duyet"?"Đã gửi, chờ chị Hoa duyệt":r.status==="dang"?"Đã đăng":"Đã lưu nháp");if(r.id)delete DT.doc[r.id];DT.edit=null;await dtLoad(true)}
+      toast(r.pending?"Đã gửi bản sửa — chờ chị Hoa duyệt, mọi người vẫn đọc bản cũ":r.status==="cho_duyet"?"Đã gửi, chờ chị Hoa duyệt":r.status==="dang"?"Đã đăng":"Đã lưu nháp");if(r.id)delete DT.doc[r.id];DT.edit=null;await dtLoad(true)}
     catch(er){$m("#dte-msg").textContent=er.message;m.querySelectorAll("#dte-pub,#dte-draft").forEach(b=>b.disabled=false)}};
   $m("#dte-pub").onclick=()=>save("dang");$m("#dte-draft").onclick=()=>save("nhap")}
 
@@ -464,4 +478,4 @@ if(typeof ICONS!=="undefined"&&!ICONS.book)ICONS.book='<path d="M4 5a2 2 0 0 1 2
  const meOk=k=>()=>!!(DT.me&&DT.me[k]);
  MODULES.push({k:"dt",ic:"book",n:"Đào tạo",zone:"",sub:"",groups:()=>[["",[MI("dt_home","Đào tạo của tôi",null,dtCnt),MI("dt_lib","Thư viện tài liệu")]],
    ["Dành cho quản lý",[MI("dt_theo","Theo dõi nhân viên mới",meOk("tracker")),MI("dt_soan","Soạn tài liệu",meOk("editor")),MI("dt_quyen","Ai xem được gì",()=>!!(DT.me&&(DT.me.ceo||DT.me.hr)))]]]})}
-{const _r=render;render=function(){const r=_r.apply(this,arguments);try{if(ME&&!(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")&&!DT.at&&!DT.busy)dtLoad().then(()=>{if(DT.me&&(DT.me.tracker||DT.me.editor))render()})}catch(e){}return r}}
+{const _r=render;render=function(){const r=_r.apply(this,arguments);try{const pp=document.querySelector(".topbar .pp");if(pp)pp.style.display=String(PAGE).startsWith("dt_")?"none":"";}catch(e){}try{if(ME&&!(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")&&!DT.at&&!DT.busy)dtLoad().then(()=>{if(DT.me&&(DT.me.tracker||DT.me.editor))render()})}catch(e){}return r}}

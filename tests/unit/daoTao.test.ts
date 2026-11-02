@@ -77,10 +77,11 @@ describe('Đào tạo: ai soạn được', () => {
     expect(canEditDoc(V('nvkd', '', ['web']), { nhom: 'web', teams: [] })).toBe(true);
     expect(canSeeDoc(V('nvkho', '', ['team:KD']), teamKD)).toBe(true);
   });
-  it('nhân sự soạn Chung nhưng phải chờ CEO duyệt', () => {
+  it('ai không phải CEO đăng tài liệu đều phải chờ CEO duyệt', () => {
     expect(canEditDoc(V('hcns'), chung)).toBe(true);
     expect(publishStatus(V('hcns'), 'chung')).toBe('cho_duyet');
-    expect(publishStatus(V('hcns'), 'web')).toBe('dang');
+    expect(publishStatus(V('hcns'), 'web')).toBe('cho_duyet');
+    expect(publishStatus(V('qlkd'), 'team')).toBe('cho_duyet');
     expect(publishStatus(V('ceo'), 'chung')).toBe('dang');
   });
 });
