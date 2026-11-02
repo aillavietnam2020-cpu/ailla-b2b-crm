@@ -173,7 +173,7 @@ function slotSum(d,k,x){
   try{const K=kn(d,k),P=knPlan(d,k),w=weekOf(x)||1,W=WEEKS.find(z=>z.w===w)||WEEKS[0],pw=P[w-1]||{tong:0},C=d.cards.filter(c=>c.kenh===k&&+c.day>0),mo=C.length,inW=C.filter(c=>c.day>=W.tu&&c.day<=W.den),tm=K.T,tw=pw.tong;
     const ch=(l,a,b)=>'<span class="'+(a<b?"lack":"ok")+'">'+l+' <b>'+a+'/'+b+'</b>'+(a<b?' <i>thiếu '+(b-a)+'</i>':'')+'</span>';
     const prod=(P.ks||[]).filter(s=>(pw[s]||0)>0||inW.some(c=>c.sku===s)).map(s=>ch(esc(sk(s).n.split(" ").slice(0,3).join(" ")),inW.filter(c=>c.sku===s).length,pw[s]||0)).join("");
-    return '<div class="slsum"><b class="slh">Tuần '+w+' ('+dd(W.tu)+'–'+dd(Math.min(W.den,MONTH.ndays))+')</b>'+ch("Cả tuần",inW.length,tw)+prod+'</div><div class="slsum">'+ch("Cả tháng",mo,tm)+'<span>Trung bình <b>'+K.tb+'</b>/ngày</span></div>'}catch(e){return ""}
+    return '<div class="slsum"><b class="slh">Tuần '+w+' ('+dd(W.tu)+'–'+dd(Math.min(W.den,MONTH.ndays))+')</b>'+ch("Cả tuần",inW.length,tw)+prod+'</div><div class="slsum">'+ch("Cả tháng",mo,tm)+'<span>Ngày thường <b>'+K.tb+'</b>/ngày</span></div>'}catch(e){return ""}
 }
 function openSlot(k,x){
   const d=D(),ready=d.cards.filter(c=>c.step==="dang"&&!c.day&&c.kenh===k).sort((a,b)=>(a.kenh===k?0:1)-(b.kenh===k?0:1)),kho=xvKhoFree();
