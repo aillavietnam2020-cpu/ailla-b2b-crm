@@ -44,58 +44,103 @@ async function tmFind(){
   tmRedraw();
 }
 
-const tmTy=k=>{const x=TM_KIND[k]||TM_KIND.other;return `<span class="tm-ty p-${x[2]}">${x[1]}</span>`};
-function tmRows(files,showWhere){
+/* ---------- Giao diện kiểu Google Drive (chị Hoa 02/11): cột thư mục bên trái, ô tìm kiếm, xem dạng lưới (có ảnh thu nhỏ) hoặc danh sách ---------- */
+const TM_COLOR={sheet:"#188038",doc:"#1a73e8",slide:"#f29900",pdf:"#d93025",vid:"#d93025",img:"#d93025",link:"#5f6368",other:"#5f6368"};
+const TM_GLYPH={sheet:"▦",doc:"≡",slide:"▭",pdf:"P",vid:"▶",img:"◩",link:"↗",other:"•"};
+const tmIc=(k,big)=>`<span class="gd-ic${big?" big":""}" style="background:${TM_COLOR[k]||TM_COLOR.other}" aria-hidden="true">${TM_GLYPH[k]||"•"}</span>`;
+const tmFolderSvg=`<svg class="gd-fsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>`;
+TM.mode=(()=>{try{return localStorage.getItem("ailla_tm_mode")||"grid"}catch(e){return "grid"}})();
+const tmWhere=f=>{const nm=TM.teams&&TM.q?((TM.teams.teams.find(t=>t.pb===f.pb)||{}).name||""):"";return [nm,f.where].filter(Boolean).join(" › ")};
+/* Nút tải bản gốc (giữ nguyên độ phân giải); file Google Tài liệu / Trang tính không có nút này. */
+const tmDl=f=>f.dl?`<a class="gd-dl" href="${esc(f.dl)}" download title="Tải về bản gốc${f.size?" ("+tmSize(f.size)+")":""}" aria-label="Tải ${esc(f.name)} về máy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></a>`:"";
+function tmFiles(files,showWhere){
   const L=files.filter(f=>!TM.kind||f.kind===TM.kind);
-  return tbl(["Tên file","Loại","Người sửa cuối","Sửa lúc",""],L.map(f=>{const nm=TM.teams&&showWhere&&TM.q?((TM.teams.teams.find(t=>t.pb===f.pb)||{}).name||""):"";
-    return `<tr><td><div class="tm-fn">${tmTy(f.kind)}<div><div class="tm-nm">${esc(f.name)}</div>${showWhere&&(nm||f.where)?`<div class="hint">${esc([nm,f.where].filter(Boolean).join(" · "))}</div>`:""}</div></div></td>
-    <td class="hint nowrap">${esc((TM_KIND[f.kind]||TM_KIND.other)[0])}${f.size?" · "+tmSize(f.size):""}</td><td>${esc(f.by||"—")}</td><td class="nowrap">${tmTime(f.modified)}</td>
-    <td class="nowrap"><a class="btn sm" href="${esc(f.link)}" target="_blank" rel="noopener">Mở ↗</a></td></tr>`}),"tm-t");
+  if(!L.length)return `<p class="gd-empty">${files.length?"Không có file thuộc loại này.":"Thư mục này chưa có file."}</p>`;
+  if(TM.mode==="list")return `<div class="gd-list" role="table"><div class="gd-lh" role="row"><span>Tên</span><span>Người sửa cuối</span><span>Ngày sửa đổi</span><span>Kích cỡ</span></div>${L.map(f=>
+    `<div class="gd-lr" role="row"><a class="gd-open" href="${esc(f.link)}" target="_blank" rel="noopener" title="Mở trên Google Drive" aria-label="Mở ${esc(f.name)}"></a><span class="gd-ln">${tmIc(f.kind)}<span class="gd-nm"><b>${esc(f.name)}</b>${showWhere&&tmWhere(f)?`<small>${esc(tmWhere(f))}</small>`:""}</span></span><span class="gd-mu">${esc(f.by||"—")}</span><span class="gd-mu">${tmTime(f.modified)}</span><span class="gd-mu">${f.size?tmSize(f.size):"—"}${tmDl(f)}</span></div>`).join("")}</div>`;
+  return `<div class="gd-grid">${L.map(f=>`<div class="gd-file" title="${esc(f.name)}${showWhere&&tmWhere(f)?" · "+esc(tmWhere(f)):""}"><a class="gd-open" href="${esc(f.link)}" target="_blank" rel="noopener" aria-label="Mở ${esc(f.name)} trên Google Drive"></a>${tmDl(f)}
+    <div class="gd-fh">${tmIc(f.kind)}<b>${esc(f.name)}</b></div>
+    <div class="gd-th">${tmIc(f.kind,true)}${f.thumb?`<img loading="lazy" alt="" src="${esc(f.thumb)}" onerror="this.remove()">`:""}</div>
+    <div class="gd-ft">${esc(f.by||"")}${f.by?" · ":""}${tmTime(f.modified)}${f.size?" · "+tmSize(f.size):""}</div></div>`).join("")}</div>`;
 }
 
 function pThuMuc(m){
-  const css=`<style>.tm-t td{vertical-align:middle}.tm-fn{display:flex;gap:10px;align-items:center;min-width:0}.tm-nm{font-weight:500;word-break:break-word}
-  .tm-ty{flex:none;width:34px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:800}
-  .tm-fd{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px}
-  .tm-fd button{display:flex;gap:10px;align-items:center;text-align:left;padding:10px 12px;border:1px solid var(--line);background:var(--surface);border-radius:12px;cursor:pointer;min-width:0}
-  .tm-fd button:hover{border-color:var(--blue)}.tm-fd svg{flex:none;width:22px;height:22px;color:var(--blue)}.tm-fd b{display:block;font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tm-cr{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:14px}.tm-cr button{border:0;background:none;color:var(--blue);padding:2px 4px;cursor:pointer;font-weight:500}
-  .tm-q{flex:1 1 260px;max-width:460px}</style>`;
+  const css=`<style>
+  .gd{display:grid;grid-template-columns:230px minmax(0,1fr);gap:20px;align-items:start}
+  .gd-side{display:flex;flex-direction:column;gap:2px;position:sticky;top:10px}
+  .gd-side .gd-sh{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:4px 14px 6px}
+  .gd-side button{display:flex;gap:12px;align-items:center;border:0;background:none;text-align:left;padding:8px 14px;border-radius:999px;cursor:pointer;font-size:14px;color:inherit;min-width:0}
+  .gd-side button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gd-side button:hover{background:var(--gray-soft)}.gd-side button.on{background:var(--blue-soft);color:var(--blue);font-weight:600}
+  .gd-side .gd-fsvg{width:20px;height:20px;flex:none;color:var(--muted)}.gd-side button.on .gd-fsvg{color:var(--blue)}
+  .gd-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .gd-search{flex:1 1 320px;display:flex;align-items:center;gap:10px;background:var(--gray-soft);border-radius:999px;padding:0 16px;max-width:720px}
+  .gd-search input{border:0;background:transparent;padding:11px 0;outline:none;width:100%}.gd-search:focus-within{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .gd-search svg{width:20px;height:20px;flex:none;color:var(--muted)}
+  .gd-top select{width:auto;border-radius:8px}
+  .gd-vt{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}.gd-vt button{border:0;background:none;padding:6px 14px;cursor:pointer;font-size:13px;color:inherit}.gd-vt button.on{background:var(--blue-soft);color:var(--blue);font-weight:600}
+  .gd-cr{display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:20px;margin:2px 0 14px}.gd-cr button{border:0;background:none;padding:4px 10px;border-radius:999px;cursor:pointer;font-size:20px;color:var(--muted)}.gd-cr button:hover{background:var(--gray-soft)}.gd-cr b{padding:4px 10px;font-weight:500}.gd-cr .s{color:var(--muted)}
+  .gd-sec{font-size:14px;font-weight:600;margin:16px 0 10px}
+  .gd-grid,.gd-fold{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .gd-fold button{display:flex;gap:12px;align-items:center;background:var(--gray-soft);border:0;border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;min-width:0;color:inherit}
+  .gd-fold button:hover{filter:brightness(.96)}.gd-fold .gd-fsvg{width:22px;height:22px;flex:none;color:var(--muted)}.gd-fold b{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gd-file{position:relative;display:flex;flex-direction:column;background:var(--gray-soft);border-radius:12px;padding:6px 8px 8px;text-decoration:none;color:inherit;min-width:0}
+  .gd-open{position:absolute;inset:0;z-index:1;border-radius:inherit}
+  .gd-dl{position:absolute;z-index:2;top:8px;right:8px;width:32px;height:32px;border-radius:999px;background:var(--surface);color:var(--ink);display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25);opacity:0;transition:opacity .15s}
+  .gd-dl svg{width:18px;height:18px}.gd-file:hover .gd-dl,.gd-dl:focus-visible{opacity:1}
+  @media(hover:none){.gd-dl{opacity:1}}
+  .gd-lr{position:relative}.gd-lr .gd-dl{position:relative;top:auto;right:auto;display:inline-grid;width:28px;height:28px;margin-left:8px;vertical-align:middle;opacity:1;box-shadow:none;background:transparent}.gd-lr .gd-dl:hover{background:var(--gray-soft)}
+  .gd-file:hover{filter:brightness(.96)}
+  .gd-fh{display:flex;gap:10px;align-items:center;padding:6px 4px 8px;min-width:0}.gd-fh b{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gd-th{position:relative;aspect-ratio:4/3;max-width:100%;background:var(--surface);border-radius:8px;overflow:hidden;display:grid;place-items:center}
+  .gd-th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .gd-ft{font-size:12px;color:var(--muted);padding:8px 4px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gd-ic{flex:none;width:20px;height:20px;border-radius:4px;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;line-height:1}
+  .gd-ic.big{width:56px;height:56px;border-radius:10px;font-size:28px;opacity:.9}
+  .gd-list{border-top:1px solid var(--line)}.gd-lh,.gd-lr{display:grid;grid-template-columns:minmax(0,1fr) 170px 130px 90px;gap:12px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+  .gd-lh{font-size:13px;font-weight:600;color:var(--muted)}.gd-lr{text-decoration:none;color:inherit;font-size:14px}.gd-lr:hover{background:var(--gray-soft)}
+  .gd-ln{display:flex;gap:12px;align-items:center;min-width:0}.gd-nm{display:flex;flex-direction:column;min-width:0}.gd-nm b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gd-nm small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gd-mu{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gd-empty{color:var(--muted);padding:18px 4px}
+  @media(max-width:860px){.gd{grid-template-columns:1fr}.gd-side{position:static;flex-direction:row;overflow-x:auto;gap:6px}.gd-side .gd-sh{display:none}.gd-side button{flex:none;background:var(--gray-soft)}
+    .gd-lh,.gd-lr{grid-template-columns:minmax(0,1fr) 110px}.gd-lh span:nth-child(2),.gd-lh span:nth-child(4),.gd-lr>span:nth-child(2),.gd-lr>span:nth-child(4){display:none}.gd-grid,.gd-fold{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+  </style>`;
   const ceo=!!TM.teams&&TM.teams.can_manage;
   const tabs=ceo&&!(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")?`<div class="filters"><button class="btn sm${TM.view==="xem"?" pri":""}" data-tmv="xem">Thư mục</button><button class="btn sm${TM.view==="gan"?" pri":""}" data-tmv="gan">Gán thư mục cho phòng ban</button></div>`:"";
-  const head=H("Thư mục làm việc","File làm hằng ngày của các phòng, lấy thẳng từ Google Drive · web chỉ xem, bấm Mở để làm việc trên Drive");
+  const head=H("Thư mục làm việc","File làm hằng ngày của các phòng, lấy thẳng từ Google Drive · bấm vào file để mở trên Drive");
   if(!TM.teams){m.innerHTML=head+(TM.err?`<div class="note red">${esc(TM.err)}</div>`:`<p class="hint">Đang tải…</p>`);if(!TM.busy)tmTeams();return}
   if(PAGE==="thumuc_gan"||TM.view==="gan"){m.innerHTML=css+head+tabs+tmCfgHtml();tmCfgBind(m);tmBindTabs(m);return}
   const T=TM.teams.teams;
   if(!TM.teams.connected){m.innerHTML=css+head+tabs+`<div class="note amb">Web chưa được nối với Google Drive.${ceo?" Chị chạy file NOI-GOOGLE-DRIVE.bat một lần (hướng dẫn ở tab Gán thư mục).":" Cần CEO nối Drive trước."}</div>`;tmBindTabs(m);return}
   if(!T.length){m.innerHTML=css+head+tabs+`<div class="card pad"><p>Phòng của bạn chưa được gán thư mục Drive.</p><p class="hint">${ceo?"Gán thư mục cho từng phòng ở tab Gán thư mục.":"Nhờ CEO gán thư mục Drive cho phòng mình."}</p></div>`;tmBindTabs(m);return}
-  const chips=`<div class="filters">${T.map(t=>`<button class="btn sm${t.pb===TM.pb&&!TM.q?" pri":""}" data-tmpb="${esc(t.pb)}">${esc(t.name)}</button>`).join("")}</div>`;
-  const kinds=`<select id="tm-kind" aria-label="Loại file"><option value="">Mọi loại file</option>${Object.entries(TM_KIND).filter(([k])=>k!=="link"&&k!=="other").map(([k,x])=>`<option value="${k}"${TM.kind===k?" selected":""}>${x[0]}</option>`).join("")}</select>`;
-  const bar=`<div class="filters"><input type="search" class="tm-q" id="tm-q" placeholder="Tìm tên file trong các thư mục bạn được xem…" value="${esc(TM.q)}" aria-label="Tìm file"> ${kinds}<span class="sp"></span><button class="btn sm" id="tm-re">Tải lại</button></div>`;
+  const side=`<nav class="gd-side" aria-label="Thư mục"><div class="gd-sh">Thư mục của bạn</div>${T.map(t=>`<button class="${t.pb===TM.pb&&!TM.q?"on":""}" data-tmpb="${esc(t.pb)}" title="${esc(t.name)}">${tmFolderSvg}<span>${esc(t.name)}</span></button>`).join("")}</nav>`;
+  const kinds=`<select id="tm-kind" aria-label="Loại file"><option value="">Loại: tất cả</option>${Object.entries(TM_KIND).filter(([k])=>k!=="link"&&k!=="other").map(([k,x])=>`<option value="${k}"${TM.kind===k?" selected":""}>${x[0]}</option>`).join("")}</select>`;
+  const top=`<div class="gd-top"><label class="gd-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICONS.search}</svg><input type="search" id="tm-q" placeholder="Tìm trong các thư mục bạn được xem" value="${esc(TM.q)}" aria-label="Tìm file"></label>${kinds}
+    <span class="gd-vt" role="group" aria-label="Kiểu xem"><button data-tmmode="grid" class="${TM.mode==="grid"?"on":""}">▦ Lưới</button><button data-tmmode="list" class="${TM.mode==="list"?"on":""}">☰ Danh sách</button></span><button class="btn sm" id="tm-re">Tải lại</button></div>`;
   let body="";
   if(TM.q){
     if(!TM.find||TM.findKey!==TM.q)tmFind();
     const F=TM.find||{loading:true};
-    body=F.loading?`<p class="hint">Đang tìm…</p>`:F.err?`<div class="note red">${esc(F.err)}</div>`:
-      `<section class="card flush"><div class="pad"><b>${F.files.length} file khớp “${esc(TM.q)}”</b> <span class="hint">· mới sửa lên trước</span></div>${tmRows(F.files,true)}</section>`;
+    body=`<div class="gd-cr"><b>Kết quả tìm “${esc(TM.q)}”</b></div>`+(F.loading?`<p class="gd-empty">Đang tìm…</p>`:F.err?`<div class="note red">${esc(F.err)}</div>`:tmFiles(F.files,true));
   }else{
     tmLoadList();
     const L=TM.list||{loading:true};
-    if(L.loading)body=`<p class="hint">Đang mở thư mục…</p>`;
+    if(L.loading)body=`<p class="gd-empty">Đang mở thư mục…</p>`;
     else if(L.err)body=`<div class="note red">${esc(L.err)}</div>`;
     else{
-      const crumb=`<div class="tm-cr">${L.path.map((p,i)=>i===L.path.length-1?`<b>${esc(p.name)}</b>`:`<button data-tmf="${i?esc(p.id):""}">${esc(p.name)}</button><span class="hint">›</span>`).join("")}</div>`;
-      const fds=L.folders.length?`<div class="tm-fd">${L.folders.map(f=>`<button data-tmf="${esc(f.id)}" title="${esc(f.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${ICONS.folder}</svg><span style="min-width:0"><b>${esc(f.name)}</b><span class="hint">sửa ${tmTime(f.modified)}</span></span></button>`).join("")}</div>`:"";
+      const crumb=`<div class="gd-cr">${L.path.map((p,i)=>i===L.path.length-1?`<b>${esc(p.name)}</b>`:`<button data-tmf="${i?esc(p.id):""}">${esc(p.name)}</button><span class="s">›</span>`).join("")}</div>`;
       let recent="";
       if(!TM.folder){tmLoadRecent(TM.pb);const R=TM.recent[TM.pb]||{loading:true};
-        recent=R.loading?"":R.err?"":R.files.length?`<section class="card flush" style="margin-bottom:14px"><div class="pad"><b>Sửa gần đây trong phòng</b> <span class="hint">· ${R.files.length} file mới nhất, ở mọi thư mục con</span></div>${tmRows(R.files,true)}</section>`:""}
-      body=crumb+fds+recent+`<section class="card flush"><div class="pad"><b>File trong thư mục này</b> <span class="hint">· mới sửa lên trước</span></div>${L.files.length?tmRows(L.files,false):`<p class="empty pad">Thư mục này không có file (chỉ có thư mục con).</p>`}</section>`;
+        if(R.files&&R.files.length){const keep=TM.mode;TM.mode="grid";recent=`<div class="gd-sec">Tệp được sửa gần đây</div>`+tmFiles(R.files.slice(0,4),true);TM.mode=keep}}
+      body=crumb+recent+(L.folders.length?`<div class="gd-sec">Thư mục</div><div class="gd-fold">${L.folders.map(f=>`<button data-tmf="${esc(f.id)}" title="${esc(f.name)}">${tmFolderSvg}<b>${esc(f.name)}</b></button>`).join("")}</div>`:"")+
+        `<div class="gd-sec">Tệp</div>`+tmFiles(L.files,false);
     }
   }
-  m.innerHTML=css+head+tabs+chips+bar+body+`<p class="hint" style="margin-top:12px">Bấm Mở thì Google Drive vẫn kiểm quyền của chính bạn: chưa mở được thì nhờ trưởng phòng chia sẻ thư mục cho email của bạn. Tài liệu chuẩn (quy trình, biểu mẫu, hướng dẫn) xem ở Thư viện tài liệu trong khu Đào tạo.</p>`;
+  m.innerHTML=css+head+tabs+`<div class="gd">${side}<div style="min-width:0">${top}${body}</div></div>`+`<p class="hint" style="margin-top:16px">Bấm vào file để mở trên Google Drive. Chưa mở được thì nhờ trưởng phòng kiểm tra email của bạn trong hồ sơ nhân viên. Tài liệu chuẩn (quy trình, biểu mẫu, hướng dẫn) xem ở Thư viện tài liệu trong khu Đào tạo.</p>`;
   tmBindTabs(m);
   m.querySelectorAll("[data-tmpb]").forEach(b=>b.onclick=()=>{TM.pb=b.dataset.tmpb;TM.folder="";TM.q="";renderMain()});
   m.querySelectorAll("[data-tmf]").forEach(b=>b.onclick=()=>{TM.folder=b.dataset.tmf;renderMain();scrollTo(0,0)});
+  m.querySelectorAll("[data-tmmode]").forEach(b=>b.onclick=()=>{TM.mode=b.dataset.tmmode;try{localStorage.setItem("ailla_tm_mode",TM.mode)}catch(e){}renderMain()});
   const q=$("#tm-q");if(q){let t=0;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{TM.q=q.value.trim();renderMain();const n=$("#tm-q");if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},450)}}
   const k=$("#tm-kind");if(k)k.onchange=()=>{TM.kind=k.value;renderMain()};
   const re=$("#tm-re");if(re)re.onclick=()=>{TM.list=null;TM.listKey="";TM.find=null;TM.findKey="";TM.recent={};tmTeams(true)};

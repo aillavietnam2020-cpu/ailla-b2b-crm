@@ -13,7 +13,7 @@ import {
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
-import { children, meta, recentFiles, saKey, type DriveFile } from '../services/gdrive';
+import { children, download, meta, recentFiles, saKey, thumbnail, type DriveFile } from '../services/gdrive';
 import { syncDrivePermissions } from '../services/driveSync';
 
 /**
@@ -79,6 +79,9 @@ const shape = (f: DriveFile, extra?: Record<string, unknown>) => {
     by: f.lastModifyingUser?.displayName ?? '',
     size: f.size ? Number(f.size) : null,
     link: f.webViewLink ?? `https://drive.google.com/open?id=${f.shortcutDetails?.targetId ?? f.id}`,
+    thumb: f.hasThumbnail ? `/api/drive/thumb/${encodeURIComponent(f.id)}` : null,
+    // Tải bản gốc qua web (chỉ file thường: ảnh, video, PDF, Excel…; Google Docs / Sheets mở trên Drive).
+    dl: f.mimeType.startsWith('application/vnd.google-apps') ? null : `/api/drive/download/${encodeURIComponent(f.id)}`,
     ...extra,
   };
 };
@@ -185,4 +188,38 @@ driveRoutes.post('/sync', async (c) => {
   const { auth, ceo } = await who(c);
   if (!ceo) throw forbidden('Chỉ CEO đồng bộ quyền Drive.');
   return ok(c, await syncDrivePermissions(c.env.DB, c.env.GDRIVE_SA_JSON, auth.user.id, c.req.query('dry') === '1'));
+});
+
+/** Ảnh thu nhỏ: chỉ trả khi file nằm trong thư mục người này được xem (cùng quy tắc với /list). */
+driveRoutes.get('/thumb/:id', async (c) => {
+  const key = needKey(c.env);
+  const { me, ceo } = await who(c);
+  const id = folderIdFrom(c.req.param('id'));
+  if (!id) throw notFound();
+  const where = await locate(id, rootsFor(await loadConfig(c.env.DB), me, ceo), (x) => meta(key, x));
+  if (!where?.pb) throw forbidden('Bạn chưa được xem file này.');
+  const img = await thumbnail(key, id, Number(c.req.query('s')) === 800 ? 800 : 400);
+  if (!img) throw notFound();
+  return new Response(img.body, {
+    headers: { 'Content-Type': img.headers.get('Content-Type') ?? 'image/jpeg', 'Cache-Control': 'private, max-age=3600' },
+  });
+});
+
+/** Tải file gốc về máy: cùng quy tắc quyền với /list; chuyển thẳng dữ liệu từ Drive, không lưu lại trên web. */
+driveRoutes.get('/download/:id', async (c) => {
+  const key = needKey(c.env);
+  const { me, ceo } = await who(c);
+  const id = folderIdFrom(c.req.param('id'));
+  if (!id) throw notFound();
+  const where = await locate(id, rootsFor(await loadConfig(c.env.DB), me, ceo), (x) => meta(key, x));
+  if (!where?.pb) throw forbidden('Bạn chưa được xem file này.');
+  const f = await download(key, id);
+  if (!f) throw notFound('File này không tải về được (file Google Tài liệu / Trang tính thì mở trên Drive).');
+  const headers: Record<string, string> = {
+    'Content-Type': f.mime,
+    'Content-Disposition': `attachment; filename="${f.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(f.name)}`,
+    'Cache-Control': 'private, no-store',
+  };
+  if (f.size) headers['Content-Length'] = f.size;
+  return new Response(f.body, { headers });
 });

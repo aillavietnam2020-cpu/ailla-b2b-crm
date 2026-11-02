@@ -12,7 +12,7 @@ const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 const API = 'https://www.googleapis.com/drive/v3';
 const COMMON = 'supportsAllDrives=true&includeItemsFromAllDrives=true';
 export const FILE_FIELDS =
-  'id,name,mimeType,modifiedTime,size,webViewLink,parents,lastModifyingUser(displayName),shortcutDetails(targetId,targetMimeType)';
+  'id,name,mimeType,modifiedTime,size,webViewLink,parents,hasThumbnail,lastModifyingUser(displayName),shortcutDetails(targetId,targetMimeType)';
 
 export type DriveFile = {
   id: string;
@@ -24,6 +24,7 @@ export type DriveFile = {
   parents?: string[];
   lastModifyingUser?: { displayName?: string };
   shortcutDetails?: { targetId?: string; targetMimeType?: string };
+  hasThumbnail?: boolean;
 };
 
 export function saKey(json: string | undefined): SaKey | null {
@@ -184,4 +185,27 @@ export async function setPermissionRole(key: SaKey, fileId: string, permId: stri
 }
 export async function removePermission(key: SaKey, fileId: string, permId: string) {
   return (await shareCall(key, 'DELETE', `${API}/files/${encodeURIComponent(fileId)}/permissions/${encodeURIComponent(permId)}?supportsAllDrives=true`)).ok;
+}
+
+/** Ảnh thu nhỏ của file (Drive tự tạo cho ảnh, video, PDF, Docs…). Trả ảnh để máy chủ chuyển tiếp; không có thì null. */
+export async function thumbnail(key: SaKey, fileId: string, size = 400): Promise<Response | null> {
+  const f = await get<{ thumbnailLink?: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=thumbnailLink&${COMMON}`);
+  if (!f?.thumbnailLink) return null;
+  const url = f.thumbnailLink.replace(/=s\d+$/, `=s${size}`);
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${await accessToken(key)}` } });
+  return r.ok ? r : null;
+}
+
+/** Tải file gốc (đúng độ phân giải, đúng dung lượng như trên Drive). File Google Docs / Sheets / Slides không có bản gốc để tải: trả null. */
+export async function download(key: SaKey, fileId: string): Promise<{ body: ReadableStream | null; name: string; mime: string; size: string | null } | null> {
+  const f = await get<{ name: string; mimeType: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=name,mimeType&${COMMON}`);
+  if (!f || f.mimeType.startsWith('application/vnd.google-apps')) return null;
+  const r = await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${await accessToken(key)}` },
+  });
+  if (!r.ok) {
+    console.error('[drive] download', r.status);
+    return null;
+  }
+  return { body: r.body, name: f.name, mime: r.headers.get('Content-Type') ?? f.mimeType, size: r.headers.get('Content-Length') };
 }
