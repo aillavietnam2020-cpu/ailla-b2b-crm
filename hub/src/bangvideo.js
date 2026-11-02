@@ -39,12 +39,12 @@ function bvNewCard(dt,sku,kenh,t){
 /* hạn hoàn thiện video: trước tuần đăng, tức cuối tuần liền trước; tuần hiện tại hoặc chưa xếp tuần thì 2 ngày tới */
 function bvHan(d,c){const td=d.settings.today,nd=MONTH.ndays,cw=weekOf(td)||1,w=bvTuan(c);if(w>cw)return Math.min(nd,(WEEKS.find(x=>x.w===w-1)||WEEKS[0]).den);return Math.min(nd,td+2)}
 /* xóa hẳn các dòng đang tích (trưởng nhóm / CEO); video kho đang gắn vào dòng đó được trả về Chưa dùng */
-function bvDelSel(){
-  const ids=bvRows(D()).filter(c=>BV.sel.has(c.id)).map(c=>c.id);if(!ids.length){toast("Chưa tích dòng nào");return}
-  if(!confirm("Xóa hẳn "+ids.length+" dòng đã tích? Kịch bản, hook, người giao của các dòng này sẽ mất."))return;
+function bvDelSel(one){
+  const ids=one?[one]:bvRows(D()).filter(c=>BV.sel.has(c.id)).map(c=>c.id);if(!ids.length){toast("Chưa tích dòng nào");return}
+  if(!confirm(one?"Xóa hẳn dòng "+one+"? Kịch bản, hook, người giao của dòng này sẽ mất.":"Xóa hẳn "+ids.length+" dòng đã tích? Kịch bản, hook, người giao của các dòng này sẽ mất."))return;
   const del=new Set(ids);
   DB.mutate(ME.name,"xóa "+ids.length+" dòng ở Điều phối: "+ids.join(", "),dt=>{dt.cards=dt.cards.filter(c=>!del.has(c.id));(dt.kho||[]).forEach(k=>{if(del.has(k.maDang)){k.maDang="";k.trangThai="Chưa dùng"}})});
-  BV.sel=new Set();toast("Đã xóa "+ids.length+" dòng");renderMain()}
+  ids.forEach(i=>BV.sel.delete(i));toast("Đã xóa "+ids.length+" dòng");renderMain()}
 /* áp hàng loạt */
 function bvApply(){
   const d0=D(),order=bvRows(d0).filter(c=>BV.sel.has(c.id)).map(c=>c.id);if(!order.length){toast("Chưa tích dòng nào");return}
@@ -265,7 +265,7 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
   ${bvPeopleHtml(d,rows)}
   ${bvHidCss()}<div class="tbl bvscroll"><table class="bvtab pn34"><thead><tr><th><input type="checkbox" data-bvall="1" ${allSel?"checked":""}></th><th class="bvstt">STT</th><th>Mã</th><th>Sản phẩm</th><th>Dạng</th><th>Tuần</th><th>Hook / Link mẫu</th><th>Viết hook</th><th>Quay / mẫu</th><th>Dựng / làm</th><th>Link video (gửi duyệt)</th><th>Caption đăng</th><th>Cmt cần trả lời</th><th>Hạn</th><th>Duyệt</th><th>CEO check</th><th>Trạng thái · chuyển bước</th></tr></thead><tbody>
   ${rows.slice(0,400).map((c,ix)=>{const t=mixOf(c),late=isLate(c);return `<tr data-bvr="${esc(c.id)}" class="${BV.sel.has(c.id)?"sel":""}"><td><input type="checkbox" data-bvs="${esc(c.id)}" ${BV.sel.has(c.id)?"checked":""}></td>
-   <td class="bvstt">${ix+1}</td><td class="mono clk" data-card="${esc(c.id)}">${esc(c.id)}</td><td>${swatch(c.sku)}${esc(sk(c.sku).n)}</td><td>${esc(bvLbl(t))}</td>
+   <td class="bvstt">${ix+1}${lead?` <button type="button" class="lnk danger" data-bvx="${esc(c.id)}" title="Xóa dòng này">✕</button>`:""}</td><td class="mono clk" data-card="${esc(c.id)}">${esc(c.id)}</td><td>${swatch(c.sku)}${esc(sk(c.sku).n)}</td><td>${esc(bvLbl(t))}</td>
    <td>${give?`<select data-bvc="${esc(c.id)}|tuan">${opt(wk,bvTuan(c))}</select>`:"T"+bvTuan(c)}</td>
    <td>${mixOf(c)==="worker"?(c.wScript?`<button type="button" class="btn sm" onclick="bvScrOpen('${esc(c.id)}')">Xem kịch bản</button>`:c.wt&&c.wStatus!=="error"&&!c.wDone?`<span class="hint">⏳ Worker đang viết kịch bản…</span>`:`<span class="hint">Worker tự viết</span>`):bvMau(c)?bvMauCell(c,give):`<input class="bvhook" data-bvc="${esc(c.id)}|hook" value="${esc(c.hookText||"")}" placeholder="${esc(c.yTuong||"Viết hook ở đây…")}" ${give||c.nguoi===ME.id||c.nguoiKB===ME.id?"":"disabled"}>`}</td>
    <td>${mixOf(c)==="worker"?`<span class="hint">—</span>`:give?`<select data-bvc="${esc(c.id)}|nguoiKB">${opt(pOpt,c.nguoiKB||"")}</select>`:esc(bvNg(d,c.nguoiKB))}</td>
@@ -290,7 +290,8 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
   m.querySelectorAll("[data-bvhan]").forEach(b=>b.onclick=()=>{const id=b.dataset.bvhan,c=D().cards.find(x=>x.id===id);bvCal(b,c?+c.han||0:0,v=>{DB.mutate(ME.name,"sửa hạn "+id,dt=>{const k=dt.cards.find(x=>x.id===id);if(k)k.han=+v});bvRe()},[["0","Xóa hạn"]])});
   const qk=m.querySelector("[data-bvquick]");if(qk)qk.onclick=bvQuick;
   const dn=m.querySelector("[data-bvdon]");if(dn)dn.onclick=bvDon;
-  const dl=m.querySelector("[data-bvdel]");if(dl)dl.onclick=bvDelSel;
+  const dl=m.querySelector("[data-bvdel]");if(dl)dl.onclick=()=>bvDelSel();
+  m.querySelectorAll("[data-bvx]").forEach(b=>b.onclick=e=>{e.stopPropagation();bvDelSel(b.dataset.bvx)});
   const ad=m.querySelector("[data-bvadd]");if(ad)ad.onclick=bvAdd;
   m.querySelectorAll("[data-bvsku]").forEach(b=>b.onclick=()=>{BV.sku=BV.sku===b.dataset.bvsku?"":b.dataset.bvsku;BV.sel=new Set();renderMain()});
   m.querySelectorAll("[data-bvst]").forEach(s=>s.onchange=()=>{const err=moveCard(ME,s.dataset.bvst,s.value);if(err)toast(err);else toast("Đã chuyển "+s.dataset.bvst+" sang "+bvStT(s.value));bvRe()});
