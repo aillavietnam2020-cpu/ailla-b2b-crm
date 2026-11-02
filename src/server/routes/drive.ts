@@ -13,7 +13,7 @@ import {
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
-import { children, meta, recentFiles, saKey, type DriveFile } from '../services/gdrive';
+import { children, meta, recentFiles, saKey, thumbnail, type DriveFile } from '../services/gdrive';
 import { syncDrivePermissions } from '../services/driveSync';
 
 /**
@@ -79,6 +79,7 @@ const shape = (f: DriveFile, extra?: Record<string, unknown>) => {
     by: f.lastModifyingUser?.displayName ?? '',
     size: f.size ? Number(f.size) : null,
     link: f.webViewLink ?? `https://drive.google.com/open?id=${f.shortcutDetails?.targetId ?? f.id}`,
+    thumb: f.hasThumbnail ? `/api/drive/thumb/${encodeURIComponent(f.id)}` : null,
     ...extra,
   };
 };
@@ -185,4 +186,19 @@ driveRoutes.post('/sync', async (c) => {
   const { auth, ceo } = await who(c);
   if (!ceo) throw forbidden('Chỉ CEO đồng bộ quyền Drive.');
   return ok(c, await syncDrivePermissions(c.env.DB, c.env.GDRIVE_SA_JSON, auth.user.id, c.req.query('dry') === '1'));
+});
+
+/** Ảnh thu nhỏ: chỉ trả khi file nằm trong thư mục người này được xem (cùng quy tắc với /list). */
+driveRoutes.get('/thumb/:id', async (c) => {
+  const key = needKey(c.env);
+  const { me, ceo } = await who(c);
+  const id = folderIdFrom(c.req.param('id'));
+  if (!id) throw notFound();
+  const where = await locate(id, rootsFor(await loadConfig(c.env.DB), me, ceo), (x) => meta(key, x));
+  if (!where?.pb) throw forbidden('Bạn chưa được xem file này.');
+  const img = await thumbnail(key, id, Number(c.req.query('s')) === 800 ? 800 : 400);
+  if (!img) throw notFound();
+  return new Response(img.body, {
+    headers: { 'Content-Type': img.headers.get('Content-Type') ?? 'image/jpeg', 'Cache-Control': 'private, max-age=3600' },
+  });
 });
