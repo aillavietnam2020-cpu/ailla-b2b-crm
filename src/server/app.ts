@@ -47,6 +47,7 @@ import { soatRoutes } from './routes/soatSoLieu';
 import { hrRoutes } from './routes/hr';
 import { daoTaoRoutes } from './routes/daoTao';
 import { taskFileRoutes } from './routes/taskFiles';
+import { chatRoutes } from './routes/chat';
 import { ceoSpendRoutes } from './routes/ceoSpend';
 
 /**
@@ -153,6 +154,7 @@ export function createApp() {
   app.route('/api/hub/hr', hrRoutes);
   app.route('/api/hub/daotao', daoTaoRoutes);
   app.route('/api/hub/task-files', taskFileRoutes);
+  app.route('/api/hub/chat', chatRoutes);
   app.route('/api/hub', hubRoutes);
   app.route('/api/drive', driveRoutes);
 
