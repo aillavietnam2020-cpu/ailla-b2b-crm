@@ -102,4 +102,4 @@ function pDqContent(m){
   m.querySelectorAll("[data-dqsku]").forEach(r=>r.onclick=()=>{if(typeof bvGo==="function"){const s=r.dataset.dqsku,kn=(C.find(c=>c.sku===s)||{}).kenh||(ptPairs().find(x=>x.sku===s)||{}).kenh||"TikTok chính";bvGo(kn,s,"")}});
   if(typeof bindCommon==="function")bindCommon(m);
 }
-PAGES.mkt_tq=function(m){try{pDqContent(m)}catch(e){console.error("Tổng quan Content lỗi",e);m.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chị chụp dòng này gửi em: ${esc(String(e&&e.message||e))}</div>`}};
+PAGES.mkt_tq=function(m){try{pDqContent(m)}catch(e){console.error("Tổng quan Content lỗi",e);m.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}};

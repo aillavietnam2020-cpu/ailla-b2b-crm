@@ -328,7 +328,7 @@ function mhDocForm(pre){
         const amt=+$("#mhi-pa").value||tot||Math.round(rcSum()+manualSum()+g("#mhi-vat")+g("#mhi-fr")+g("#mhi-hd")+g("#mhi-ot"));
         const pr=await kApi("/mh/payments",{method:"POST",body:JSON.stringify(Object.assign({supplier_id:$("#mhi-s").value,kind:"CHI",invoice_id:r.id,po_id:rc?rc.p.id:null,pay_date:$("#mhi-pd").value||$("#mhi-d").value,amount:amt,note:"Trả theo chứng từ "+($("#mhi-no").value||"")},pm))});
         for(const f of [...$("#mhq-f").files]){try{const x=await mhPrepFile(f);await kApi("/mh/payments/"+pr.id+"/files",{method:"POST",body:JSON.stringify(x)})}catch(er){}}
-        chi=", đã ghi phiếu chi "+nf(amt)+" đ"+(pr.ceo_status==="CHO"?" (chờ chị Hoa duyệt)":"")}catch(er){chi=". Chưa ghi được phiếu chi: "+er.message+" (ghi ở nút Ghi chi / cọc)"}}
+        chi=", đã ghi phiếu chi "+nf(amt)+" đ"+(pr.ceo_status==="CHO"?" (chờ CEO duyệt)":"")}catch(er){chi=". Chưa ghi được phiếu chi: "+er.message+" (ghi ở nút Ghi chi / cọc)"}}
       MH.pay=null;MH.debts=null;closeDrawer();toast("Đã ghi chứng từ"+(up?", đính kèm "+up+" file":"")+chi);await mhReload();await mhLoadInv()}
     catch(err){$("#mhi-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
 }
@@ -432,7 +432,7 @@ function mhPayForm(supId,poId){
     const btn=e.submitter||document.querySelector("#mhp button.pri");if(btn)btn.disabled=true;
     try{const r=await kApi("/mh/payments",{method:"POST",body:JSON.stringify(Object.assign({supplier_id:$("#mhp-s").value,kind:$("#mhp-k").value,po_id:$("#mhp-o").value||null,invoice_id:$("#mhp-i").value||null,pay_date:$("#mhp-d").value,amount:+$("#mhp-a").value,note:$("#mhp-n").value,general:$("#mhp-g").checked},mhPayMethodRead("mhp")))});
       const fs=[...$("#mhp-f").files];let up=0;for(const f of fs){try{const x=await mhPrepFile(f);await kApi("/mh/payments/"+r.id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
-      closeDrawer();toast("Đã ghi phiếu chi"+(up?", đính kèm "+up+" ảnh":"")+(r.ceo_status==="CHO"?". Khoản từ ngưỡng chi: chờ chị Hoa duyệt":""));MH.pay=null;MH.inv=null;MH.debts=null;if(PAGE==="mh_chi"){mhLoadPay();mhLoadInv()}else renderMain()}catch(err){$("#mhp-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
+      closeDrawer();toast("Đã ghi phiếu chi"+(up?", đính kèm "+up+" ảnh":"")+(r.ceo_status==="CHO"?". Khoản từ ngưỡng chi: chờ CEO duyệt":""));MH.pay=null;MH.inv=null;MH.debts=null;if(PAGE==="mh_chi"){mhLoadPay();mhLoadInv()}else renderMain()}catch(err){$("#mhp-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;if(btn)btn.disabled=false}};
 }
 /* Sửa nhà cung cấp: tên, điện thoại, điều khoản thanh toán, tài khoản ngân hàng nhận tiền (điền sẵn khi ghi phiếu chi). */
 function mhSupEdit(id){

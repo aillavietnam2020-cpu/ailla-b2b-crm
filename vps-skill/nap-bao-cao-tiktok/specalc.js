@@ -61,7 +61,7 @@ function speReadFin(sheets,ky){
   const meta=speFinMeta(sheets),g=meta.range,vn=s=>s.split("-").reverse().join("/");
   if(!g)return {err:"Không đọc được khoảng ngày (dòng Từ … Đến …) trong file Tài chính Shopee.",...meta};
   if(ky){const start=ky+"-01";
-    if(g.from>start)return {err:`File Tài chính bắt đầu từ ${vn(g.from)}, phải từ ${vn(start)}. Chị xuất lại từ ngày 01.`,...meta};
+    if(g.from>start)return {err:`File Tài chính bắt đầu từ ${vn(g.from)}, phải từ ${vn(start)}. Hãy xuất lại từ ngày 01.`,...meta};
     if(g.to<start)return {err:`File Tài chính chỉ tới ${vn(g.to)}, chưa vào tháng ${ky.slice(5)}/${ky.slice(0,4)}.`,...meta}}
   const aoa=sheets["Doanh thu"],H=aoa&&ttHead(aoa,["Đơn hàng / Sản phẩm","Mã đơn hàng","Giá sản phẩm","Số tiền hoàn lại"]);
   if(!H)return {err:"Không thấy tab \"Doanh thu\" đúng mẫu trong file Tài chính Shopee.",...meta};
@@ -84,7 +84,7 @@ function speReadFins(list,ky){
   P.sort((a,b)=>a.meta.range.from<b.meta.range.from?-1:1);
   const shop=P[0].meta.shop;if(P.some(p=>p.meta.shop!==shop))return {err:"Các file Tài chính không cùng một shop."};
   for(let i=1;i<P.length;i++){const a=P[i-1].meta.range,b=P[i].meta.range;
-    if(b.from<=a.to)return {err:`Hai file Tài chính chồng ngày (${vn(a.from)}–${vn(a.to)} và ${vn(b.from)}–${vn(b.to)}), sẽ cộng trùng. Chị xuất lại cho nối liền.`,shop};
+    if(b.from<=a.to)return {err:`Hai file Tài chính chồng ngày (${vn(a.from)}–${vn(a.to)} và ${vn(b.from)}–${vn(b.to)}), sẽ cộng trùng. Hãy xuất lại cho nối liền.`,shop};
     if(b.from!==speDayAfter(a.to))return {err:`Hai file Tài chính hở ngày: thiếu từ ${vn(speDayAfter(a.to))} tới ${vn(speDayBefore(b.from))}.`,shop}}
   const first=speReadFin(P[0].sh,ky);if(first.err)return first;const ord=first.ord;
   for(let i=1;i<P.length;i++){const x=speReadFin(P[i].sh,null);if(x.err)return x;
@@ -135,7 +135,7 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   const ordDt={},ordQ={};L.forEach(l=>{ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q});
   L.forEach(l=>{l.w=ordDt[l.o]?l.dt/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:0);l.qt=!!F[l.o]});
   const base=L.filter(l=>l.qt&&!l.huy),baseDt=base.reduce((s,l)=>s+l.dt,0);
-  if(!baseDt)return {err:`Shop ${shop||"?"}: không ghép được đơn nào giữa file đơn và file Tài chính. Chị kiểm tra hai file cùng shop, cùng tháng.`};
+  if(!baseDt)return {err:`Shop ${shop||"?"}: không ghép được đơn nào giữa file đơn và file Tài chính. Hãy kiểm tra hai file cùng shop, cùng tháng.`};
   const rate=new Array(SPE_NG).fill(0);let rateV=0;
   base.forEach(l=>{const x=F[l.o];for(let g=0;g<SPE_NG;g++)rate[g]+=x.f[g]*l.w;rateV+=x.vou*l.w});
   for(let g=0;g<SPE_NG;g++)rate[g]/=baseDt;rateV/=baseDt;

@@ -93,7 +93,7 @@ function tsBpDoan(s,mac){const t=tsBoDau(s);if(/1542|154\.2|ban thanh pham/.test
 /* Bảng (mảng các dòng) → danh sách tài sản đọc được + dòng không đọc được. */
 function tsDocBang(rows,kind,tu){const R=rows||[];let h=-1,c={};
   for(let i=0;i<Math.min(R.length,30);i++){const x=tsTimCot(R[i]);if(x.ten!=null&&(x.ng!=null||x.gk!=null)){h=i;c=x;break}}
-  if(h<0)return {err:"Không thấy dòng tiêu đề có cột Tên và Nguyên giá / Giá trị. Chị xuất lại file từ MISA (Sổ tài sản cố định hoặc Sổ theo dõi CCDC).",items:[],bo:[]};
+  if(h<0)return {err:"Không thấy dòng tiêu đề có cột Tên và Nguyên giá / Giá trị. Hãy xuất lại file từ MISA (Sổ tài sản cố định hoặc Sổ theo dõi CCDC).",items:[],bo:[]};
   const items=[],bo=[],g=(r,k)=>c[k]==null?null:r[c[k]];
   R.slice(h+1).forEach((r,j)=>{const ten=String(g(r,"ten")??"").trim(),ma=String(g(r,"ma")??"").trim(),ng=tsSo(g(r,"ng")),gk=tsSo(g(r,"gk"));
     if(!ten||/^(tong|cong)( cong)?\b/.test(tsBoDau(ten))||/^(tong|cong)\b/.test(tsBoDau(ma))){return}

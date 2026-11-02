@@ -406,7 +406,7 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
       }
       toast.success(
         'Đã lập phiếu ' + r.data.voucher_no + (up ? `, kèm ${up} ảnh` : '') +
-          ((r.data as { ceo_status?: string }).ceo_status === 'CHO' ? '. Khoản từ ngưỡng chi: chờ chị Hoa (CEO) duyệt' : ''),
+          ((r.data as { ceo_status?: string }).ceo_status === 'CHO' ? '. Khoản từ ngưỡng chi: chờ CEO duyệt' : ''),
       );
       onDone();
     } catch (e) {

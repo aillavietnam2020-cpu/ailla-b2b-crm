@@ -703,7 +703,7 @@ agentRoutes.post('/proposals', requirePermission('agent.propose'), async (c) => 
     throw new AppError(
       409,
       'USE_PHIEU_CHI',
-      'Agent này lập phiếu chi trực tiếp được khi chị Thảo ra lệnh (lệnh ghi có giấy ủy quyền), không gửi đề xuất phiếu chi. Không có lệnh thì báo người nhắn tự ghi phiếu.',
+      'Agent này lập phiếu chi trực tiếp được khi Quản lý ra lệnh (lệnh ghi có giấy ủy quyền), không gửi đề xuất phiếu chi. Không có lệnh thì báo người nhắn tự ghi phiếu.',
     );
   }
   const result = await createProposal(c.env.DB, auth, parsed.data, {

@@ -17,7 +17,7 @@ const canHR=()=>can(ME,"nhansu.quanly");
 const canLuong=()=>can(ME,"luong.quanly")||ME.role==="admin";
 const vndate=s=>s?String(s).slice(0,10).split("-").reverse().join("/"):"—";
 const daysTo=s=>s?Math.round((pdate(String(s).slice(0,10))-pdate(hrNow().iso))/864e5):null;
-const hrEmpty=()=>`<section class="card waitf"><h2>Chưa nạp dữ liệu nhân sự</h2><p>Lương, hợp đồng, phép, KPI, xét bậc, tạm ứng không nằm sẵn trong file web để giữ bí mật. Chị (hoặc HCNS) tải file <b>AILLA HR MASTER</b> trên Google Drive về dạng Excel rồi nạp ở trang <b>Nạp file HR MASTER</b>. Số chỉ lưu trong trình duyệt của máy đó.</p><div class="acts"><button class="btn pri" data-go="hr_nap">Nạp file HR MASTER</button></div></section>`;
+const hrEmpty=()=>`<section class="card waitf"><h2>Chưa nạp dữ liệu nhân sự</h2><p>Lương, hợp đồng, phép, KPI, xét bậc, tạm ứng không nằm sẵn trong file web để giữ bí mật. CEO (hoặc HCNS) tải file <b>AILLA HR MASTER</b> trên Google Drive về dạng Excel rồi nạp ở trang <b>Nạp file HR MASTER</b>. Số chỉ lưu trong trình duyệt của máy đó.</p><div class="acts"><button class="btn pri" data-go="hr_nap">Nạp file HR MASTER</button></div></section>`;
 
 /* ---------- Nạp file ---------- */
 function wbSheets(f){return new Promise((res,rej)=>{if(typeof XLSX==="undefined"){toast("Cần mạng để đọc Excel");rej();return}const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:"array",cellDates:true});const o={};wb.SheetNames.forEach(n=>o[n]=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null}));res(o)}catch(e){toast("Không đọc được file");rej(e)}};r.readAsArrayBuffer(f)})}

@@ -10,7 +10,7 @@ const XW_SIZE={"tay-van-nang":[["hu-450g","Hũ 450g"],["chai-250g","Chai 250g"]]
 const XW_MODE=[["broll","Dựng video one shot","Gửi video quay thô, Worker cắt chỗ vấp, tăng tốc, chỉnh màu, chèn cảnh trám, hook và chữ"],
  ["text","Chỉ chèn chữ","Giữ nguyên hình và tiếng, Worker chỉ đổi hook, chèn chữ"],
  ["rebrand","Đổi thương hiệu","Video có tên hãng khác: Worker cắt / che chỗ lộ tên cũ"],
- ["voice","Giọng đọc","Giọng AI đọc kịch bản, ghép cảnh trong kho hoặc thư mục cảnh chị gửi"],
+ ["voice","Giọng đọc","Giọng AI đọc kịch bản, ghép cảnh trong kho hoặc thư mục cảnh đã gửi"],
  ["win","Nhân bản video win","Gửi link video win, Worker viết vài kịch bản mới cùng kiểu rồi dựng"]];
 const XW_VOICE=[["adam","Adam"],["anh-thu","Anh Thư"],["an-nhien","An Nhiên"],["cam-hong","Cẩm Hồng"],["tham","Thắm"],["ngan","Ngân"],["my","My"]];
 const XW={tab:"order",who:"",list:[],at:0,busy:false,err:""};
@@ -81,7 +81,7 @@ function xwForm(b){
   <div class="frm kfrm">
    <label class="field full">Loại video<select id="xw-m">${opt(XW_MODE.map(x=>[x[0],x[1]]),"broll")}</select><small id="xw-md" class="hint"></small></label>
    <label class="field full">Link video <small id="xw-lh"></small><input id="xw-l" placeholder="Dán link Google Drive (1 video hoặc cả thư mục), hoặc link TikTok / Facebook"></label>
-   <div class="field full" id="xw-gw" hidden>Thư mục có nhiều video, chị muốn:
+   <div class="field full" id="xw-gw" hidden>Thư mục có nhiều video, muốn:
      <span><label><input type="radio" name="xw-g" value="rieng" checked style="width:auto"> Dựng từng video riêng</label>
      <label><input type="radio" name="xw-g" value="ghep" style="width:auto"> Ghép thành 1 video</label></span></div>
    <label class="field" id="xw-pw">Sản phẩm<select id="xw-p">${opt([["","— Chọn sản phẩm —"]].concat(XW_PROD),"")}</select></label>
@@ -173,7 +173,7 @@ function pXuongMo(m){
   if(Date.now()-XV_OPENED>3000){XV_OPENED=Date.now();try{window.open(XV_URL,"_blank","noopener")}catch(e){}}
   m.innerHTML=H("Công xưởng SX video","Đặt video, xem bản nháp, duyệt hoặc góp ý sửa trên trang Worker của công ty")+
    `<section class="card" style="max-width:640px"><div class="card-h"><h2>Mở Công xưởng SX video</h2></div>
-   <p>Trang Công xưởng mở ở thẻ mới. Đăng nhập bằng <b>tài khoản Worker riêng</b> của bạn (hỏi chị Hoa nếu chưa có).
+   <p>Trang Công xưởng mở ở thẻ mới. Đăng nhập bằng <b>tài khoản Worker riêng</b> của bạn (hỏi CEO nếu chưa có).
    Máy Worker ở văn phòng phải đang bật thì video mới được dựng; order gửi lúc máy tắt sẽ chờ.</p>
    <p><a class="btn" href="${XV_URL}" target="_blank" rel="noopener">🎬 Mở Công xưởng SX video</a></p></section>`;
 }

@@ -117,7 +117,7 @@ function pTcnDc(m){
   }else body=`<section class="card pad">${tbl(["Chỉ số","Cách tính"],TCN_DN.map(([a,b])=>`<tr><td><b>${esc(a)}</b></td><td>${esc(b)}</td></tr>`))}</section>`;
   m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Phải thu Kênh phân phối",nf(tcnR(bk.B2B.debt)),bk.B2B.customers+" khách · nợ quá 90 ngày "+pc(late(bk.B2B),bk.B2B.debt)+" · DSO "+(bk.B2B.dso!=null?bk.B2B.dso+" ngày":"—"))}${kpi("Phải thu Kênh OEM",nf(tcnR(bk.GIA_CONG.debt)),bk.GIA_CONG.customers+" khách · DSO "+(bk.GIA_CONG.dso!=null?bk.GIA_CONG.dso+" ngày":"—"))}${kpi("Khách trả thừa",nf(tcnR(khT.am)),"nợ âm, để riêng, không trừ vào phải thu")}${kpi("Phải trả nhà cung cấp",nf(tcnR(nccT.duong)),nccT.am?"mình trả trước "+nf(tcnR(nccT.am))+" (để riêng)":th.ncc.filter(r=>r.balance>0).length+" nhà cung cấp")}</div>
   <div class="tabs">${tabs.map(([k,n])=>`<button class="tab${TCN.tab===k?" on":""}" data-tcnt="${k}">${n}</button>`).join("")}</div>${body}
-  <p class="hint pad">Kỳ ${esc(pLabel())}. Trang chỉ đọc số; thấy sai thì ghi lại để chị Hoa quyết, không sửa ở đây.</p>`;
+  <p class="hint pad">Kỳ ${esc(pLabel())}. Trang chỉ đọc số; thấy sai thì ghi lại để CEO quyết, không sửa ở đây.</p>`;
   m.querySelectorAll("[data-tcnt]").forEach(b=>b.onclick=()=>{TCN.tab=b.dataset.tcnt;renderMain()});
   const qi=m.querySelector("#tcn-q");if(qi)qi.oninput=()=>{TCN.q=qi.value;tcnPg1();const p=qi.selectionStart;renderMain();const n=document.querySelector("#tcn-q");if(n){n.focus();n.setSelectionRange(p,p)}};
   const ks=m.querySelector("#tcn-k");if(ks)ks.onchange=e=>{TCN.kenh=e.target.value;tcnPg1();renderMain()};

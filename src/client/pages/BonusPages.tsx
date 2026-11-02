@@ -492,7 +492,7 @@ function RankingPanel({ slot }: { slot: HTMLElement | null }) {
                                 return r.data?.ceo_status;
                               }, (st) =>
                                 st === 'CHO'
-                                  ? 'Đã duyệt. Khoản từ ngưỡng chi nên chuyển chị Hoa (CEO) duyệt, chưa ghi là đã chi'
+                                  ? 'Đã duyệt. Khoản từ ngưỡng chi nên chuyển CEO duyệt, chưa ghi là đã chi'
                                   : 'Đã duyệt: phiếu chi thưởng ghi là đã chi')
                             }
                           >

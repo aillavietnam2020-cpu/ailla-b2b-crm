@@ -138,7 +138,7 @@ function rvShow(){
   const Q=rvQueue().filter(c=>!RVQ.skip.has(c.id)),c=Q[0],all=rvQueue().length;
   const close=()=>{closeDrawer();renderMain()};
   if(!c){$("#drawerIn").innerHTML=`<div class="dh"><h2>Duyệt lần lượt</h2><button class="btn sm" id="dx">Đóng</button></div><div class="empty" style="padding:40px 0">${all?`Đã xem hết. Còn ${all} cái bấm "Bỏ qua", mở lại để duyệt tiếp.`:"Không còn kịch bản hay video nào chờ duyệt."}</div>`;$("#drawer").hidden=false;$("#dx").onclick=close;return}
-  const isKB=c.step==="dkb",link=c.linkFinal||c.linkVideo,lbl={dkb:"Duyệt kịch bản",dvd:"Duyệt video (Lead Content & Media)",dceo:"Duyệt video (chị)"}[c.step];
+  const isKB=c.step==="dkb",link=c.linkFinal||c.linkVideo,lbl={dkb:"Duyệt kịch bản",dvd:"Duyệt video (Lead Content & Media)",dceo:"Duyệt video (CEO)"}[c.step];
   $("#drawerIn").innerHTML=`<div class="dh"><div><b>${lbl}</b> <span class="hint">còn ${Q.length} cái · ${RVQ.skip.size?RVQ.skip.size+" đã bỏ qua":""}</span></div><button class="btn sm" id="dx">Đóng</button></div>
    <h2 class="dtitle">${esc(c.hookText||c.yTuong||c.id)}</h2>
    <p class="hint"><span class="mono">${c.id}</span> · ${esc(sk(c.sku).n)} · ${esc(chOf(c.kenh).short)} · lên kênh ${dayLbl(c.day)} · ${isKB?"người viết":"người edit"}: <b>${esc(userName(isKB?(c.nguoiKB||c.nguoi):(c.nguoiEdit||c.nguoi))||"—")}</b></p>

@@ -116,7 +116,7 @@ export function OrdersPage({ mode }: { mode: 'sales' | 'admin' }) {
   const allChosen = shownOrders.length > 0 && chosen.length === shownOrders.length;
   const printMany = (type: 'ship' | 'order') => {
     if (chosen.length > 10) {
-      alert('Mỗi lần in tối đa 10 đơn. Chị chọn ít đơn hơn.');
+      alert('Mỗi lần in tối đa 10 đơn. Hãy chọn ít đơn hơn.');
       return;
     }
     chosen.forEach((o) => window.open(`/print/orders/${o.id}?type=${type}`, '_blank'));
@@ -1846,7 +1846,7 @@ function OrderPayments({ order, onChanged }: { order: OrderDetail; onChanged: ()
             <Field label={`Số tiền hoàn (khách đã trả ${formatVnd(paid)})`} full>
               <input value={rAmount} onChange={(e) => setRAmount(e.target.value)} inputMode="numeric" placeholder="Ví dụ: 1500000" />
             </Field>
-            <Field label="Bill / số tham chiếu chuyển khoản" hint="Bắt buộc. Có bill này là đủ, không cần chị Hoa duyệt." full>
+            <Field label="Bill / số tham chiếu chuyển khoản" hint="Bắt buộc. Có bill này là đủ, không cần CEO duyệt." full>
               <input value={rBill} onChange={(e) => setRBill(e.target.value)} />
             </Field>
             <Field label="Lý do hoàn tiền" hint="Ví dụ: kho xuất thiếu 3 thùng, hoàn lại phần chênh." full>

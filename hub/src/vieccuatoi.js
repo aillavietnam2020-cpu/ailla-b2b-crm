@@ -56,7 +56,7 @@ function wkBind(m){
 function wkEmbed(m){
   if(!WK.at||typeof _rLast=="undefined"||_rLast!==PAGE)wkLoad(true);
   const body=WK.items?wkBodyHtml():"";
-  m.innerHTML=(WK.err?`<div class="note red">${esc(WK.err)}</div>`:"")+(!WK.items?`<p class="hint pad">Đang tải…</p>`:body||`<section class="card"><p class="empty pad">Hiện không có việc nào đang chờ ${wkCeo()?"chị":"bạn"}. Cảm ơn!</p></section>`);
+  m.innerHTML=(WK.err?`<div class="note red">${esc(WK.err)}</div>`:"")+(!WK.items?`<p class="hint pad">Đang tải…</p>`:body||`<section class="card"><p class="empty pad">Hiện không có việc nào đang chờ bạn. Cảm ơn!</p></section>`);
   wkBind(m);
 }
 /* Xem từng khoản chờ kế toán xác nhận, bấm xác nhận từng dòng hoặc cả danh sách (kế toán tự đối chiếu bill rồi mới bấm) */
@@ -90,7 +90,7 @@ async function wkQueue(key){
     if(!confirm("Xóa khoản này? Hệ thống giữ lại bản ghi cũ trong nhật ký."))return;
     try{await svApi(`/api/payments/${b.dataset.wkdel}/void`,{method:"POST",body:JSON.stringify({reason:why})});toast("Đã xóa khoản");wkQueue(key);wkLoad(true)}catch(e){toast(e.message||"Chưa xóa được")}});
   const all=document.getElementById("wq-all");
-  if(all)all.onclick=async()=>{if(!confirm("Xác nhận "+rows.length+" khoản này? Chị đã đối chiếu bill/đơn rồi chứ?"))return;all.disabled=true;let ok=0,bad=0,last="";
+  if(all)all.onclick=async()=>{if(!confirm("Xác nhận "+rows.length+" khoản này? Đã đối chiếu bill/đơn rồi chứ?"))return;all.disabled=true;let ok=0,bad=0,last="";
     for(const r of rows){try{await one(r.id);ok++}catch(e){bad++;last=e.message||""}}
     toast("Đã xác nhận "+ok+" khoản"+(bad?", "+bad+" khoản chưa được: "+last:""));wkLoad(true);if(!bad)closeDrawer();else all.disabled=false};
 }

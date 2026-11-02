@@ -564,7 +564,7 @@ export function PaymentForm({
                   </select>
                   {accountOptions.length === 0 && (
                     <span className="muted" style={{ fontSize: 12 }}>
-                      Chưa có danh sách tài khoản hợp lệ. Nhờ chị Hoa thêm ở Trang quản trị › Cài
+                      Chưa có danh sách tài khoản hợp lệ. Nhờ CEO thêm ở Trang quản trị › Cài
                       đặt › Tài khoản nhận tiền.
                     </span>
                   )}

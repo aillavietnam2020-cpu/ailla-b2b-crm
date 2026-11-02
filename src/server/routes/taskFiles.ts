@@ -25,7 +25,7 @@ taskFileRoutes.post('/', async (c) => {
   const task = String(form?.get('task') ?? '').slice(0, 60);
   if (!file || typeof file === 'string') throw badRequest('MISSING', 'Chưa chọn file');
   if (!TYPES.includes(file.type)) throw badRequest('BAD_TYPE', 'Chỉ nhận ảnh, PDF, Word, Excel hoặc file chữ');
-  if (file.size > TASK_FILE_MAX) throw badRequest('TOO_LARGE', 'File quá 1,5 MB, chị gửi link Drive giúp em');
+  if (file.size > TASK_FILE_MAX) throw badRequest('TOO_LARGE', 'File quá 1,5 MB, hãy gửi link Drive');
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
     'INSERT INTO task_files (id, task_id, name, mime, size, data, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

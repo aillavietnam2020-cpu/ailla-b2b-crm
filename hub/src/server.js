@@ -150,8 +150,8 @@ DB.reset=async function(){toast("Bản trên máy chủ không xoá về dữ li
 
 /* ---------- Khung giao diện ---------- */
 function renderLogin(){
-  const msg=!DB.data?"Khu Marketing chưa được khởi tạo. Nhờ chị Hoa (CEO) mở trang này một lần để tạo dữ liệu ban đầu."
-    :`Tài khoản <b>${esc(SV.me?SV.me.display_name:"")}</b> chưa được gắn với nhân sự nào trong khu Marketing. Nhờ chị Hoa vào <b>Cài đặt › Tài khoản & phân quyền</b> để gắn.`;
+  const msg=!DB.data?"Khu Marketing chưa được khởi tạo. Nhờ CEO mở trang này một lần để tạo dữ liệu ban đầu."
+    :`Tài khoản <b>${esc(SV.me?SV.me.display_name:"")}</b> chưa được gắn với nhân sự nào trong khu Marketing. Nhờ CEO vào <b>Cài đặt › Tài khoản & phân quyền</b> để gắn.`;
   $("#app").innerHTML=`<div class="loginwrap"><div class="login"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>Trang quản trị Ailla</h1><p>${msg}</p><div class="acts">${SV.perms.includes("price.read")?`<a class="btn" href="/admin">Mở CRM Kênh phân phối</a>`:""}<button class="btn" id="svout">Đăng xuất</button></div></div></div>`;
   $("#svout").onclick=svLogout;
 }
@@ -332,7 +332,7 @@ function pNhanSuSV(m){
   m.querySelectorAll("[data-upb]").forEach(s=>s.onchange=()=>{DB.mutate(ME.name,`đổi phòng ban ${esc(userName(s.dataset.upb))}`,d=>{d.users.find(x=>x.id===s.dataset.upb).phongBan=s.value;nsdbFromUser(d,s.dataset.upb,["pb"],hrNow().iso)});toast("Đã đổi phòng ban");renderMain()});
   m.querySelectorAll("[data-mkacc]").forEach(b=>b.onclick=()=>{const u=userBy(b.dataset.mkacc);if(!u)return;
     const free=A.filter(a=>!used(a.id));
-    openDrawerHTML(`<h2>Email đăng nhập cho ${esc(u.name)}</h2><p class="hint">Web tạo tài khoản đăng nhập bằng email và mật khẩu này${gate?", mở luôn cửa vào vanhanh.ailla.vn":""}. Lần đầu đăng nhập họ phải đổi sang mật khẩu riêng. Chị gửi email + mật khẩu ban đầu cho họ.</p>
+    openDrawerHTML(`<h2>Email đăng nhập cho ${esc(u.name)}</h2><p class="hint">Web tạo tài khoản đăng nhập bằng email và mật khẩu này${gate?", mở luôn cửa vào vanhanh.ailla.vn":""}. Lần đầu đăng nhập họ phải đổi sang mật khẩu riêng. Gửi email + mật khẩu ban đầu cho họ.</p>
      <form class="frm" id="mka"><div class="row4"><label class="field">Email đăng nhập<input id="mka-e" type="email" required placeholder="ten@gmail.com" autocomplete="off"></label><label class="field">Mật khẩu ban đầu<input id="mka-p" type="text" autocomplete="off" placeholder="ít nhất 8 ký tự, có chữ và số"></label></div>
      ${free.length?`<details><summary class="hint">Email này đã có tài khoản từ trước?</summary><p class="hint">Chọn ở đây thay vì nhập: <select id="mka-c">${opt([["","—"]].concat(free.map(a=>[a.id,a.display_name+" · "+a.email])),"")}</select></p></details>`:""}
      <div id="mka-x"></div><div class="acts"><button class="btn pri" id="mka-go">Lưu</button></div></form>`);
@@ -383,7 +383,7 @@ function pNhanSuSV(m){
       if(ex){
         const owner=U.find(u=>u.crm===ex.id);
         if(owner)throw new Error(em+" đã gắn với nhân sự "+owner.name+". Mỗi email chỉ gắn một người");
-        c=ex.id;note=". Email này đã có tài khoản nên em dùng luôn, không cần mật khẩu mới";
+        c=ex.id;note=". Email này đã có tài khoản nên dùng luôn, không cần mật khẩu mới";
       }else{
       if(!pw)throw new Error("nhập mật khẩu ban đầu");
       const res=await svApi("/api/admin/users",{method:"POST",body:JSON.stringify({email:em,display_name:n,role:"EMPLOYEE",password:pw})});c=res.id;note=svAccessMsg(res.access);}

@@ -3,7 +3,7 @@
    Gom 5 nguồn, ghi rõ nguồn từng dòng:
    - nhập tay: khoản chi ghi ở đây (thuê, lương, agency, tiếp khách…), có hình thức chi, tài khoản đi / đến, ảnh bill
    - phiếu chi nhà cung cấp (Mua hàng) · phiếu chi vận chuyển · quảng cáo Facebook · quảng cáo TikTok (tự cộng từ báo cáo)
-   Chị Hoa, chị Thảo, chị Huệ ghi thẳng, không chờ duyệt. Khoản nhập tay xóa được, các nguồn khác sửa ở trang gốc của nó.
+   CEO, Quản lý, Kế toán ghi thẳng, không chờ duyệt. Khoản nhập tay xóa được, các nguồn khác sửa ở trang gốc của nó.
    Lương, ngân sách theo nhóm sẽ nối sau.
    ===================================================================== */
 const SOCP={ship:null,shipKey:"",busy:false,files:null,src:"",q:"",lcp:"",kenh:"",pb:""};
@@ -82,7 +82,7 @@ async function spFiles(id,title){
 /* Form ghi một khoản chi: ngày, tháng ghi nhận (vào P&L), phòng ban, kênh, chuyển khoản hay tiền mặt, tài khoản đi và đến, ảnh bill. */
 function spForm(){
   const d=D(),today=mhToday(),cats=d.costCats||[];
-  openDrawerHTML(`<h2>Ghi chi phí</h2><p class="hint">Chị Hoa, chị Thảo, chị Huệ ghi thẳng, không chờ duyệt.</p><form class="frm" id="spf">
+  openDrawerHTML(`<h2>Ghi chi phí</h2><p class="hint">CEO, Quản lý, Kế toán ghi thẳng, không chờ duyệt.</p><form class="frm" id="spf">
    <label class="field">Khoản chi<select id="spf-c">${opt(cats.map(c=>[c.k,c.n+" · "+c.nhom]),"")}</select></label>
    <div class="row4"><label class="field">Số tiền (đ)<input id="spf-t" type="number" min="1" required></label><label class="field">Ngày chi<input id="spf-d" type="date" value="${today}" required></label><label class="field">Tháng ghi nhận (vào lãi lỗ)<input id="spf-m" type="month" value="${today.slice(0,7)}" required></label></div>
    <div class="row4"><label class="field">Phòng ban<select id="spf-p">${opt([["","—"]].concat((d.departments||[]).map(p=>[p.k,p.n])),"")}</select></label><label class="field">Kênh (nếu chi riêng cho một kênh)<select id="spf-k">${opt([["","— chi chung —"]].concat((d.saleChannels||[]).map(c=>[c.n,c.n])),"")}</select></label></div>

@@ -111,7 +111,7 @@ function pThuMuc(m){
   if(!TM.teams){m.innerHTML=head+(TM.err?`<div class="note red">${esc(TM.err)}</div>`:`<p class="hint">Đang tải…</p>`);if(!TM.busy)tmTeams();return}
   if(PAGE==="thumuc_gan"||TM.view==="gan"){m.innerHTML=css+head+tabs+tmCfgHtml();tmCfgBind(m);tmBindTabs(m);return}
   const T=TM.teams.teams;
-  if(!TM.teams.connected){m.innerHTML=css+head+tabs+`<div class="note amb">Web chưa được nối với Google Drive.${ceo?" Chị chạy file NOI-GOOGLE-DRIVE.bat một lần (hướng dẫn ở tab Gán thư mục).":" Cần CEO nối Drive trước."}</div>`;tmBindTabs(m);return}
+  if(!TM.teams.connected){m.innerHTML=css+head+tabs+`<div class="note amb">Web chưa được nối với Google Drive.${ceo?" Chạy file NOI-GOOGLE-DRIVE.bat một lần (hướng dẫn ở tab Gán thư mục).":" Cần CEO nối Drive trước."}</div>`;tmBindTabs(m);return}
   if(!T.length){m.innerHTML=css+head+tabs+`<div class="card pad"><p>Phòng của bạn chưa được gán thư mục Drive.</p><p class="hint">${ceo?"Gán thư mục cho từng phòng ở tab Gán thư mục.":"Nhờ CEO gán thư mục Drive cho phòng mình."}</p></div>`;tmBindTabs(m);return}
   const side=`<nav class="gd-side" aria-label="Thư mục"><div class="gd-sh">Thư mục của bạn</div>${T.map(t=>`<button class="${t.pb===TM.pb&&!TM.q?"on":""}" data-tmpb="${esc(t.pb)}" title="${esc(t.name)}">${tmFolderSvg}<span>${esc(t.name)}</span></button>`).join("")}</nav>`;
   const kinds=`<select id="tm-kind" aria-label="Loại file"><option value="">Loại: tất cả</option>${Object.entries(TM_KIND).filter(([k])=>k!=="link"&&k!=="other").map(([k,x])=>`<option value="${k}"${TM.kind===k?" selected":""}>${x[0]}</option>`).join("")}</select>`;
@@ -154,7 +154,7 @@ function tmCfgHtml(){
   if(TM.cfg.loading)return `<p class="hint">Đang tải…</p>`;
   const C=TM.cfg,by=Object.fromEntries(C.teams.map(t=>[t.pb,t])),D_=C.depts;
   const guide=`<div class="card pad" style="margin-bottom:14px"><b>Cách nối thư mục của một phòng</b>
-    ${C.connected?"":`<div class="note amb" style="margin-top:8px">Web chưa có tài khoản Google để đọc Drive. Làm theo file HUONG-DAN-NOI-GOOGLE-DRIVE (em gửi chị) rồi chạy NOI-GOOGLE-DRIVE.bat một lần.</div>`}
+    ${C.connected?"":`<div class="note amb" style="margin-top:8px">Web chưa có tài khoản Google để đọc Drive. Làm theo file HUONG-DAN-NOI-GOOGLE-DRIVE rồi chạy NOI-GOOGLE-DRIVE.bat một lần.</div>`}
     <ol style="margin:8px 0 0 18px;padding:0;line-height:1.7"><li>Mở thư mục của phòng trên Google Drive → Chia sẻ → thêm ${C.sa_email?`<b style="word-break:break-all">${esc(C.sa_email)}</b> <button class="btn sm" id="tm-cp">Chép</button>`:"email tài khoản của web"} với quyền <b>Người xem</b>.</li>
     <li>Dán link thư mục vào dòng của phòng bên dưới, chọn ai được xem thêm, bấm Lưu. Cột Kết nối báo web đã thấy thư mục chưa.</li></ol>
     <p class="hint" style="margin:8px 0 0">Người trong phòng luôn xem được thư mục phòng mình; CEO xem được tất cả. Web chỉ xem, không sửa hay xóa file trên Drive.</p></div>`;
@@ -173,7 +173,7 @@ function tmCfgHtml(){
       ${sy.no_email.length?`<div class="note amb" style="margin-top:10px">${sy.no_email.length} nhân viên chưa có email trong hồ sơ nên chưa được cấp quyền: ${esc(sy.no_email.map(x=>x.ten).join(", "))}. Thêm email ở Nhân sự › Nhân viên.</div>`:""}
       ${sy.dry?`<button class="btn pri sm" id="tm-sync-go" style="margin-top:10px">Áp dụng</button>`:""}</div>`;
   const syncBox=`<div class="card pad" style="margin-bottom:14px"><b>Quyền trên Google Drive theo danh sách nhân viên</b>
-    <p class="hint" style="margin:6px 0 8px">Nhân viên đang làm có email trong hồ sơ (Nhân sự › Nhân viên): được sửa thư mục phòng mình, chỉ xem thư mục dùng chung. Người đã nghỉ bị gỡ quyền. Web tự làm mỗi giờ; người chị tự chia sẻ tay web không đụng tới. Web cần là Người chỉnh sửa của thư mục.</p>
+    <p class="hint" style="margin:6px 0 8px">Nhân viên đang làm có email trong hồ sơ (Nhân sự › Nhân viên): được sửa thư mục phòng mình, chỉ xem thư mục dùng chung. Người đã nghỉ bị gỡ quyền. Web tự làm mỗi giờ; người được chia sẻ tay thì web không đụng tới. Web cần là Người chỉnh sửa của thư mục.</p>
     ${C.sync_paused?`<div class="note amb" style="margin-bottom:8px">Đang TẠM DỪNG tự cấp quyền mỗi giờ. Bấm "Bật lại" khi thư mục trên Drive đã sắp xong.</div>`:""}
     <button class="btn sm" id="tm-sync">Kiểm tra &amp; đồng bộ ngay</button> <button class="btn sm" id="tm-pause">${C.sync_paused?"Bật lại tự cấp quyền":"Tạm dừng tự cấp quyền"}</button>${syHtml}</div>`;
   return guide+syncBox+`<section class="card flush">${tbl(["Phòng ban","Thư mục Drive gốc","Ai được xem thêm","Kết nối"],rows)}</section>

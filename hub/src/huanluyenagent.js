@@ -290,7 +290,7 @@ async function goHome(){
 function D(){return ST.doc}
 function pageOfBot(){return ST.pages.filter(function(p){return p.bot_id===ST.botId})[0]||null}
 function pc(c){return {ok:"p-grn",warn:"p-amb",bad:"p-red",blue:"p-blu",gray:"p-gry",acc:"p-pnk"}[c]||c}
-function modePill(m){return m==="tester"?'<span class="pill p-amb">Chỉ thử tài khoản chị</span>':'<span class="pill p-gry">Tắt</span>'}
+function modePill(m){return m==="tester"?'<span class="pill p-amb">Chỉ thử tài khoản CEO</span>':'<span class="pill p-gry">Tắt</span>'}
 
 /* ---------- Vẽ ---------- */
 function draw(){
@@ -309,7 +309,7 @@ function draw(){
   if(ST.view==="bot"&&ST.tab==="tc"&&!ST.drawer)loadPreview();
 }
 function topbar(){
-  if(ST.view==="inbox")return '<div class="hph"><h1>Hội thoại</h1><span class="hint">Tin khách và agent trả lời, như hộp thư Pancake · chỉ chị xem</span><span class="sp"></span><button class="btn '+(ST.ctl.kill?"pri":"danger")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button></div>";
+  if(ST.view==="inbox")return '<div class="hph"><h1>Hội thoại</h1><span class="hint">Tin khách và agent trả lời, như hộp thư Pancake · chỉ CEO xem</span><span class="sp"></span><button class="btn '+(ST.ctl.kill?"pri":"danger")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button></div>";
   var kill='<button class="btn '+(ST.ctl.kill?"pri":"danger")+'" data-act="kill">'+(ST.ctl.kill?"Gỡ tắt khẩn":"TẮT KHẨN")+"</button>";
   if(ST.view!=="bot")return '<div class="hph"><h1>Huấn luyện agent</h1><span class="hint">Dạy agent bán hàng trực Page · agent chỉ dùng bản đã xuất bản</span><span class="sp"></span>'+kill+"</div>";
   var pg=pageOfBot();
@@ -338,16 +338,16 @@ function homeBots(){
     var st=(b.current_version?'<span class="pill p-grn">Đã xuất bản · bản '+b.current_version+"</span>":'<span class="pill p-gry">Chưa xuất bản</span>')+(b.dirty&&b.current_version?' <span class="pill p-amb">Có thay đổi chưa xuất bản</span>':"");
     return "<tr><td><b>"+esc(b.name)+'</b><br><span class="hint">'+b.counts.flows+" luồng · "+b.counts.lib+" câu mẫu · "+b.counts.offers+" mức giá</span></td><td>"+pg+"</td><td>"+st+'</td><td class="num">'+b.runs.sent+'</td><td class="num">'+b.runs.handoff+'</td><td class="num">'+(b.runs.blocked+b.runs.out_of_script)+"</td><td>"+fm(b.updated_at)+'</td><td><div class="row"><button class="btn pri sm" data-act="openbot" data-id="'+b.id+'">Mở</button><button class="btn sm" data-act="clonebot" data-id="'+b.id+'">Nhân bản</button><button class="btn sm" data-act="delbot" data-id="'+b.id+'">Xóa</button></div></td></tr>'}).join("");
   return '<div class="tbar"><input type="text" id="q" placeholder="Tìm bot…" value="'+esc(ST.q||"")+'"><span class="sp"></span><button class="btn pri" data-act="newbot">+ Tạo bot</button></div>'+
-   (ST.bots.length?'<div class="tbl"><table><thead><tr><th>Bot</th><th>Page đang dùng</th><th>Trạng thái</th><th class="num">Đã gửi (7 ngày)</th><th class="num">Chuyển chị</th><th class="num">Dừng / chặn</th><th>Cập nhật</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div>":'<div class="card hint">Chưa có bot nào. Bấm "+ Tạo bot" để bắt đầu.</div>')+
+   (ST.bots.length?'<div class="tbl"><table><thead><tr><th>Bot</th><th>Page đang dùng</th><th>Trạng thái</th><th class="num">Đã gửi (7 ngày)</th><th class="num">Chuyển người</th><th class="num">Dừng / chặn</th><th>Cập nhật</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div>":'<div class="card hint">Chưa có bot nào. Bấm "+ Tạo bot" để bắt đầu.</div>')+
    '<p class="hint" style="margin-top:10px">Mỗi Page gắn với một bot. Nhiều Page dùng chung một bot, hoặc nhân bản bot để chỉnh riêng cho Page khác. Số liệu 7 ngày lấy từ nhật ký agent.</p>';
 }
 function homePages(){
   var pages=ST.pages.map(function(p){
     var opts='<option value="">(chưa gắn bot)</option>'+ST.bots.map(function(b){return '<option value="'+b.id+'"'+(p.bot_id===b.id?" selected":"")+">"+esc(b.name)+"</option>"}).join("");
-    return "<tr><td><b>"+esc(p.name)+'</b><br><span class="hint">'+esc(p.fb_page_id)+'</span></td><td><select data-act="pagebot" data-id="'+p.id+'">'+opts+"</select></td><td>"+modePill(p.mode)+'</td><td><select class="hinl" data-act="pagemode" data-id="'+p.id+'"><option value="off"'+(p.mode==="off"?" selected":"")+'>Tắt</option><option value="tester"'+(p.mode==="tester"?" selected":"")+'>Chỉ thử tài khoản chị</option></select></td><td><button class="btn sm ghost" data-act="delpage" data-id="'+p.id+'" aria-label="Xóa Page">✕</button></td></tr>'}).join("");
+    return "<tr><td><b>"+esc(p.name)+'</b><br><span class="hint">'+esc(p.fb_page_id)+'</span></td><td><select data-act="pagebot" data-id="'+p.id+'">'+opts+"</select></td><td>"+modePill(p.mode)+'</td><td><select class="hinl" data-act="pagemode" data-id="'+p.id+'"><option value="off"'+(p.mode==="off"?" selected":"")+'>Tắt</option><option value="tester"'+(p.mode==="tester"?" selected":"")+'>Chỉ thử tài khoản CEO</option></select></td><td><button class="btn sm ghost" data-act="delpage" data-id="'+p.id+'" aria-label="Xóa Page">✕</button></td></tr>'}).join("");
   return '<div class="tbar"><span class="hint">Page Facebook và bot đang chạy cho từng Page.</span><span class="sp"></span><button class="btn pri" data-act="newpage">+ Thêm Page</button></div>'+
    (ST.pages.length?'<div class="tbl"><table><thead><tr><th>Page</th><th>Bot đang dùng</th><th>Trạng thái</th><th>Chế độ</th><th></th></tr></thead><tbody>'+pages+"</tbody></table></div>":'<div class="card hint">Chưa có Page. Thêm Page (tên và id Page Facebook) rồi gắn bot.</div>')+
-   '<p class="hint" style="margin-top:10px">Chỉ bật thử được khi bot đã xuất bản. Chế độ gửi cho khách thật chưa có ở đây: chị duyệt riêng rồi mới mở.</p>';
+   '<p class="hint" style="margin-top:10px">Chỉ bật thử được khi bot đã xuất bản. Chế độ gửi cho khách thật chưa có ở đây: CEO duyệt riêng rồi mới mở.</p>';
 }
 function homeCtl(){
   var c=ST.ctl;
@@ -356,10 +356,10 @@ function homeCtl(){
    '<div class="card"><h3>Thiết lập</h3><label class="f"><span>Tài khoản thử được phép (tên hoặc mã Facebook, cách nhau dấu phẩy)</span><input type="text" id="c_testers" value="'+esc(c.testers||"")+'"></label>'+
    '<label class="f"><span>Nhân viên nhắn tay thì agent im trong (phút)</span><input type="number" id="c_silent" min="1" max="1440" value="'+(c.silent_minutes||30)+'"></label>'+
    '<label class="f"><span>Khung giờ agent được trả lời (để trống = cả ngày)</span><span class="row"><input type="time" id="c_hf" style="max-width:150px" value="'+esc(c.hours_from||"")+'"><input type="time" id="c_ht" style="max-width:150px" value="'+esc(c.hours_to||"")+'"></span></label>'+
-   '<div class="hint" style="margin-bottom:10px">Câu khách hỏi ngoài kịch bản đã xuất bản: agent dừng và báo chị, không dùng kiến thức chung để đoán.</div><button class="btn pri" data-act="savectl">Lưu thiết lập</button></div>';
+   '<div class="hint" style="margin-bottom:10px">Câu khách hỏi ngoài kịch bản đã xuất bản: agent dừng và báo CEO, không dùng kiến thức chung để đoán.</div><button class="btn pri" data-act="savectl">Lưu thiết lập</button></div>';
 }
 var ACT={"bot.create":"Tạo bot","bot.delete":"Xóa bot","bot.publish":"Xuất bản","page.add":"Thêm Page","page.update":"Sửa Page","page.delete":"Xóa Page","control.kill":"BẬT tắt khẩn","control.unkill":"Gỡ tắt khẩn","control.save":"Lưu thiết lập"};
-var RES={sent:["Đã gửi","ok"],handoff:["Chuyển chị","bad"],blocked:["Bị chặn","warn"],out_of_script:["Ngoài kịch bản","bad"],skipped:["Bỏ qua","gray"]};
+var RES={sent:["Đã gửi","ok"],handoff:["Chuyển người","bad"],blocked:["Bị chặn","warn"],out_of_script:["Ngoài kịch bản","bad"],skipped:["Bỏ qua","gray"]};
 function homeLog(){
   var h=ST.hlog.length?'<div class="tbl"><table><thead><tr><th>Lúc</th><th>Ai</th><th>Việc</th><th>Chi tiết</th></tr></thead><tbody>'+ST.hlog.map(function(l){return "<tr><td>"+fm(l.at)+"</td><td>"+esc(l.by_name||"")+"</td><td>"+esc(ACT[l.action]||l.action)+"</td><td>"+esc(l.detail)+"</td></tr>"}).join("")+"</tbody></table></div>":'<span class="hint">Chưa có thay đổi nào.</span>';
   var r=ST.runs.length?'<div class="tbl"><table><thead><tr><th>Lúc</th><th>Page</th><th>Bản</th><th>Luồng</th><th>Kết quả</th><th>Khách nói (đã che thông tin)</th></tr></thead><tbody>'+ST.runs.map(function(x){var q=RES[x.result]||[x.result,"gray"];return "<tr><td>"+fm(x.at)+"</td><td>"+esc(x.fb_page_id)+"</td><td>"+(x.version||"")+"</td><td>"+esc(x.flow)+'</td><td><span class="pill '+pc(q[1])+'">'+q[0]+"</span>"+(x.note?'<br><span class="hint">'+esc(x.note)+"</span>":"")+"</td><td>"+esc(x.customer)+"</td></tr>"}).join("")+"</tbody></table></div>":'<span class="hint">Chưa có lượt nào. Khi công cụ trên VPS nối vào, mỗi lượt agent trả lời hay dừng sẽ ghi ở đây, kèm phiên bản và luồng đã chọn.</span>';
@@ -436,16 +436,16 @@ function demoData(){
      A(164,"Dạ em đã ghi nhận đơn của chị, bên em báo kho đi đơn cho chị rồi ạ.","TL-05 Chốt","Đủ tên, số điện thoại, địa chỉ: lập đơn chờ xác nhận.","Đơn 73595 (chờ xác nhận) · câu mẫu DA_NHAN_DON",{order:true})]},
    {name:"Anh Hùng (ví dụ)",tags:["HỎI GIÁ SỈ"],unread:1,note:"",order:null,
     msgs:[K(75,"bên em có giá sỉ không, mình lấy 50 hộp"),
-     A(74,"Dạ để em hỏi lại bộ phận kinh doanh về giá sỉ rồi báo anh ngay nhé ạ.","SI-01 Giá sỉ","Khách hỏi giá sỉ: không báo giá, chuyển người thật.","Luồng chuyển chị Hoa, không gửi giá",{who:"system"})]},
+     A(74,"Dạ để em hỏi lại bộ phận kinh doanh về giá sỉ rồi báo anh ngay nhé ạ.","SI-01 Giá sỉ","Khách hỏi giá sỉ: không báo giá, chuyển người thật.","Luồng chuyển người, không gửi giá",{who:"system"})]},
    {name:"Chị Mai (ví dụ)",tags:["ĐÃ BÁO GIÁ","Tẩy lồng"],unread:2,note:"",order:null,
     msgs:[K(30,"xin chào"),
      A(29,"Dạ em chào chị ạ 🌸 Nhà mình dùng máy lồng đứng hay lồng ngang vậy ạ?","TL-01 Mở đầu","Khách chào: chạy luồng mở đầu.","Câu mẫu CHAO_01"),
      K(12,"đắt quá, bên khác bán rẻ hơn"),
-     A(11,"Ngoài kịch bản đã có. Agent dừng và báo chị Hoa, không đoán.","-","Chưa có câu chê đắt được duyệt trong bản này.","Không gửi gì cho khách",{who:"system"}),
+     A(11,"Ngoài kịch bản đã có. Agent dừng và báo CEO, không đoán.","-","Chưa có câu chê đắt được duyệt trong bản này.","Không gửi gì cho khách",{who:"system"}),
      K(5,"sao không ai trả lời vậy")]},
    {name:"Anh Nam (ví dụ)",tags:["CÂU HỎI"],unread:0,note:"",order:null,
     msgs:[K(1500,"tẩy lồng có làm hỏng máy giặt không shop"),
-     A(1499,"Ngoài kịch bản đã có. Agent dừng và báo chị Hoa, không đoán.","-","Không có luồng nào khớp câu về độ an toàn của máy.","Đây là chỗ nên thêm luồng mới",{who:"system"}),
+     A(1499,"Ngoài kịch bản đã có. Agent dừng và báo CEO, không đoán.","-","Không có luồng nào khớp câu về độ an toàn của máy.","Đây là chỗ nên thêm luồng mới",{who:"system"}),
      {id:0,at:iso(1480),who:"sale",text:"Dạ sản phẩm an toàn cho máy anh nhé, anh dùng đúng hướng dẫn ạ.",flow:"",version:null,why:"",got:"",wrong:0,wrong_note:""}]}
   ];
   var n=1000;
@@ -497,7 +497,7 @@ function hl(){
      '<div class="comp">Chỉ xem. Trả lời khách ở Pancake. Tin ở đây đã che số điện thoại, email, link.</div>';
     var tabs='<div class="rtabs"><button data-act="rptab" data-id="info" class="'+(ST.rpTab==="info"?"on":"")+'">Thông tin</button><button data-act="rptab" data-id="order" class="'+(ST.rpTab==="order"?"on":"")+'">Tạo đơn</button></div>';
     if(ST.rpTab==="order"){
-      right=tabs+'<div class="rpb"><span class="pill p-gry">Sắp có</span><p class="hint" style="margin:8px 0 0">Khi nối Pancake POS, agent lập đơn ở trạng thái "chờ xác nhận" từ thông tin khách đã gửi (tên, số điện thoại, địa chỉ, combo). Chị hoặc nhân viên duyệt ở Pancake.</p></div>';
+      right=tabs+'<div class="rpb"><span class="pill p-gry">Sắp có</span><p class="hint" style="margin:8px 0 0">Khi nối Pancake POS, agent lập đơn ở trạng thái "chờ xác nhận" từ thông tin khách đã gửi (tên, số điện thoại, địa chỉ, combo). CEO hoặc nhân viên duyệt ở Pancake.</p></div>';
     }else{
       right=tabs+'<div class="rpb"><div class="hint">Khách: <b style="color:var(--ink)">'+esc(cv.name||"(chưa có tên)")+'</b></div><div class="hint">Tin gần nhất: '+fm(cv.last_at)+"</div>"+
        '<textarea data-act="cvnote" placeholder="Nhập ghi chú…" style="min-height:64px;margin:8px 0">'+esc(cv.note||"")+"</textarea>"+
@@ -508,11 +508,11 @@ function hl(){
   }else{mid='<div class="emp">Chọn một hội thoại ở bên trái</div>';right='<div class="rpb hint">Chưa chọn hội thoại.</div>'}
   var pgsel=pages.length>1?'<select data-act="cvpage"><option value="">Page của bot này</option><option value="all"'+(ST.cvPage==="all"?" selected":"")+">Tất cả Page</option></select>":"";
   var empty=!ST.demo&&!(ST.convs||[]).length;
-  var bar=ST.demo?'<div class="demobar"><b>BẢN MẪU</b> khách, hội thoại và đơn dưới đây chỉ là ví dụ để chị xem giao diện, không phải dữ liệu thật và không lưu gì. <button class="btn sm" data-act="demooff">Thoát bản mẫu</button></div>':(empty?'<div class="demobar">Chưa có hội thoại thật (chờ nối công cụ VPS). <button class="btn sm pri" data-act="demoon">Xem bản mẫu</button></div>':'<div class="demobar slim"><button class="btn sm" data-act="demoon">Xem bản mẫu</button></div>');
+  var bar=ST.demo?'<div class="demobar"><b>BẢN MẪU</b> khách, hội thoại và đơn dưới đây chỉ là ví dụ để xem giao diện, không phải dữ liệu thật và không lưu gì. <button class="btn sm" data-act="demooff">Thoát bản mẫu</button></div>':(empty?'<div class="demobar">Chưa có hội thoại thật (chờ nối công cụ VPS). <button class="btn sm pri" data-act="demoon">Xem bản mẫu</button></div>':'<div class="demobar slim"><button class="btn sm" data-act="demoon">Xem bản mẫu</button></div>');
   return bar+'<div class="inbox"><div class="cl"><div class="cft"><input type="text" id="cvq" placeholder="Tìm kiếm" value="'+esc(ST.cvQ||"")+'">'+pgsel+filt+'</div><div class="clist">'+lhtml+'</div></div><div class="cm2">'+mid+'</div><div class="rp">'+right+"</div></div>";
 }
-function dx(){return soonPage("Đề xuất","Hệ thống đọc hội thoại rồi đề xuất cải tiến, chị duyệt mới thành bản nháp.",["Khách hỏi lặp lại mà chưa có luồng: đề xuất luồng mới.","Câu nhân viên hay gửi mà khách hay chốt: đề xuất thành câu mẫu.","Nút ít người bấm, luồng ít người đi tiếp: đề xuất sửa.","Agent bị chặn nhiều vì thiếu giá: nhắc chị nhập giá."],"Chỉ đề xuất. Vẫn phải xuất bản mới tới agent.")}
-function tk(){return soonPage("Thống kê luồng","Giống thống kê của Botcake: mỗi luồng gửi bao nhiêu lần, hiệu quả ra sao.",["Đã gửi, khách nhắn tiếp, bấm nút, chuyển chị, bị chặn theo từng luồng.","Cảnh báo luồng ít người đi tiếp để chị sửa.","Số liệu lấy từ nhật ký agent (đã có bảng ghi, chờ công cụ VPS nối vào)."])}
+function dx(){return soonPage("Đề xuất","Hệ thống đọc hội thoại rồi đề xuất cải tiến, CEO duyệt mới thành bản nháp.",["Khách hỏi lặp lại mà chưa có luồng: đề xuất luồng mới.","Câu nhân viên hay gửi mà khách hay chốt: đề xuất thành câu mẫu.","Nút ít người bấm, luồng ít người đi tiếp: đề xuất sửa.","Agent bị chặn nhiều vì thiếu giá: nhắc nhập giá."],"Chỉ đề xuất. Vẫn phải xuất bản mới tới agent.")}
+function tk(){return soonPage("Thống kê luồng","Giống thống kê của Botcake: mỗi luồng gửi bao nhiêu lần, hiệu quả ra sao.",["Đã gửi, khách nhắn tiếp, bấm nút, chuyển người, bị chặn theo từng luồng.","Cảnh báo luồng ít người đi tiếp để sửa.","Số liệu lấy từ nhật ký agent (đã có bảng ghi, chờ công cụ VPS nối vào)."])}
 function th(){
   var rows=ST.tags.map(function(t){return "<tr><td>"+tagChip(t.id)+"</td><td>"+(t.kind==="product"?"Sản phẩm":"Giai đoạn")+"</td><td>"+TCOLN[t.color]+'</td><td><div class="row"><button class="btn sm" data-act="edittag" data-id="'+t.id+'">Sửa</button><button class="btn sm" data-act="deltag" data-id="'+t.id+'">Xóa</button></div></td></tr>'}).join("");
   return '<div class="hph"><div><h1>Thẻ hội thoại</h1><div class="hint">Thẻ giai đoạn hiện thanh màu dưới khung chat (bấm một lần để gắn). Thẻ sản phẩm cho biết khách đang hỏi gì. Luồng có thể tự gắn thẻ khi gửi (xem ô "Thẻ tự gắn" ở Luồng kịch bản). Thẻ ở đây chỉ nằm trong web, chưa đồng bộ sang Pancake.</div></div></div>'+
@@ -534,13 +534,13 @@ function tt(){
   var pg=ST.pages.filter(function(p){return p.bot_id===ST.botId}),cur=ST.versions.filter(function(v){return v.is_current})[0];
   var er=ST.issues.filter(function(i){return i.level==="error"}),wr=ST.issues.filter(function(i){return i.level==="warn"});
   return '<div class="hph"><div><h1>Tổng quan</h1><div class="hint">Bot này làm gì và còn thiếu gì.</div></div><label class="f" style="min-width:260px;margin:0"><span>Tên bot</span><input type="text" data-act="botname" value="'+esc(ST.name)+'"></label></div>'+
-   '<div class="grid"><div class="card"><h3>Phiên bản đang dùng</h3>'+(cur?'<span class="pill p-grn">Bản '+cur.version+"</span> <span class=\"hint\">"+fm(cur.published_at)+"</span>":'<span class="pill p-gry">Chưa xuất bản</span><p class="hint" style="margin:6px 0 0">Agent chưa thấy gì cho tới khi chị xuất bản.</p>')+"</div>"+
+   '<div class="grid"><div class="card"><h3>Phiên bản đang dùng</h3>'+(cur?'<span class="pill p-grn">Bản '+cur.version+"</span> <span class=\"hint\">"+fm(cur.published_at)+"</span>":'<span class="pill p-gry">Chưa xuất bản</span><p class="hint" style="margin:6px 0 0">Agent chưa thấy gì cho tới khi xuất bản.</p>')+"</div>"+
    '<div class="card"><h3>Page đang dùng bot này</h3>'+(pg.length?pg.map(function(p){return "<div>"+esc(p.name)+" "+modePill(p.mode)+"</div>"}).join(""):'<span class="hint">Chưa gắn. Vào "Tất cả bot" để gắn.</span>')+"</div></div>"+
    '<div class="card"><h3>Kiểm tra kịch bản</h3>'+(!er.length&&!wr.length?'<span class="pill p-grn">Không có lỗi hay cảnh báo</span>':er.map(function(i){return '<div style="padding:3px 0"><span class="pill p-red">Lỗi</span> '+esc(i.msg)+"</div>"}).join("")+wr.map(function(i){return '<div style="padding:3px 0"><span class="pill p-amb">Cảnh báo</span> '+esc(i.msg)+"</div>"}).join("")+'<p class="hint" style="margin:8px 0 0">Còn lỗi thì chưa xuất bản được. Cảnh báo thì vẫn xuất bản được.</p>')+"</div>";
 }
 
 /* ---- Luồng kịch bản (sơ đồ giống Botcake: gửi một mạch, không chờ khách) ---- */
-var NT={msg:"Câu mẫu",img:"Ảnh",cond:"Điều kiện",jump:"Chuyển luồng",handoff:"Chuyển chị Hoa"};
+var NT={msg:"Câu mẫu",img:"Ảnh",cond:"Điều kiện",jump:"Chuyển luồng",handoff:"Chuyển người"};
 var CONDS={xh:"Đã biết giới tính khách",phone:"Khách đã để số điện thoại"};
 function flowName(id){var f=mk(D().flows,id);return f?f.code+" "+f.name:"(đã xóa)"}
 function nodeSummary(n){
@@ -586,7 +586,7 @@ function nodeEditor(f,n){
   }else if(n.t==="jump"){
     body='<label class="f"><span>Chạy tiếp luồng</span><select data-nb="to">'+flowOpts(n.to,f.id)+"</select></label>";
   }else{
-    body='<label class="f"><span>Lý do chuyển chị Hoa</span><input type="text" data-nb="ref" value="'+esc(n.ref||"")+'"></label>';
+    body='<label class="f"><span>Lý do chuyển người</span><input type="text" data-nb="ref" value="'+esc(n.ref||"")+'"></label>';
   }
   return '<div class="card"><div class="row between"><h3 style="margin:0">Sửa ô: '+NT[n.t]+'</h3><div class="row"><button class="btn sm" data-act="setstart">Đặt làm ô bắt đầu</button><button class="btn sm" data-act="unlink">Gỡ đường nối</button><button class="btn sm" data-act="delnodesel">Xóa ô</button></div></div><div style="margin-top:10px">'+body+"</div></div>";
 }
@@ -628,7 +628,7 @@ function tc(){
      '<p class="hint" style="margin:8px 0 0">Luồng gửi một mạch từ ô bắt đầu rồi dừng, không chờ khách trả lời. Khách nói tiếp thì khách bấm nút, hoặc agent chọn luồng kế trong danh sách được phép ở trên.</p></div>'+
      '<div class="split">'+nodeEditor(f,n)+'<div class="card"><h3>Xem thử luồng</h3><div class="row" style="margin-bottom:8px"><label class="hint"><input type="checkbox" data-act="setphone"'+(ST.phone?" checked":"")+"> khách đã để SĐT</label>"+xhSelect()+'</div><div class="phone"><div class="chat" id="pvchat"><span class="hint">Đang tải…</span></div></div></div></div>';
   }else ed='<div class="card hint">Chưa có luồng nào. Bấm "+ Thêm luồng".</div>';
-  return '<div class="hph"><div><h1>Luồng kịch bản</h1><div class="hint">Mỗi luồng là một sơ đồ các ô gửi liên tiếp, giống Botcake. Chị thêm luồng, thêm ô, nối đường, đặt nút bấm sang luồng khác.</div></div><button class="btn pri" data-act="addflow">+ Thêm luồng</button></div>'+
+  return '<div class="hph"><div><h1>Luồng kịch bản</h1><div class="hint">Mỗi luồng là một sơ đồ các ô gửi liên tiếp, giống Botcake. Thêm luồng, thêm ô, nối đường, đặt nút bấm sang luồng khác.</div></div><button class="btn pri" data-act="addflow">+ Thêm luồng</button></div>'+
    '<div class="two"><div class="list">'+list+"</div><div>"+ed+"</div></div>";
 }
 function xhSelect(){return '<select class="hinl" data-act="setxh"><option value="">chưa rõ giới tính</option><option value="anh"'+(ST.xh==="anh"?" selected":"")+'>anh</option><option value="chị"'+(ST.xh==="chị"?" selected":"")+">chị</option></select>"}
@@ -651,9 +651,9 @@ function sp(){
   var cards=b.products.map(function(p){
     var of=b.offers.filter(function(o){return o.prod===p.id});
     return '<div class="card"><div class="row between"><div><h3 style="margin:0">'+esc(p.name)+'</h3><span class="hint">biến trong câu mẫu: <code>{gia_'+esc(p.id)+"}</code></span></div><div class=\"row\">"+(of.length?'<span class="pill p-grn">Có giá</span>':'<span class="pill p-amb">Chưa có giá</span>')+'<button class="btn sm" data-act="delprod" data-id="'+p.id+'">Xóa sản phẩm</button></div></div>'+
-     (of.length?'<div class="tbl"><table><thead><tr><th>Chương trình</th><th>Mức</th><th class="num">Giá</th><th>Hiệu lực từ</th><th></th></tr></thead><tbody>'+of.map(function(o){return "<tr><td>"+esc(o.name)+"</td><td>"+esc(o.lv)+'</td><td class="num"><b>'+esc(o.price)+"</b></td><td>"+esc(o.from)+'</td><td><button class="btn sm" data-act="deloffer" data-id="'+o.id+'">Xóa</button></td></tr>'}).join("")+"</tbody></table></div>":'<p class="hint" style="margin:8px 0">Chưa có bảng giá nên agent không báo giá cho sản phẩm này, sẽ dừng và báo chị.</p>')+
+     (of.length?'<div class="tbl"><table><thead><tr><th>Chương trình</th><th>Mức</th><th class="num">Giá</th><th>Hiệu lực từ</th><th></th></tr></thead><tbody>'+of.map(function(o){return "<tr><td>"+esc(o.name)+"</td><td>"+esc(o.lv)+'</td><td class="num"><b>'+esc(o.price)+"</b></td><td>"+esc(o.from)+'</td><td><button class="btn sm" data-act="deloffer" data-id="'+o.id+'">Xóa</button></td></tr>'}).join("")+"</tbody></table></div>":'<p class="hint" style="margin:8px 0">Chưa có bảng giá nên agent không báo giá cho sản phẩm này, sẽ dừng và báo CEO.</p>')+
      '<div style="margin-top:8px"><button class="btn sm pri" data-act="addoffer" data-id="'+p.id+'">+ Thêm mức giá</button></div></div>'}).join("");
-  return '<div class="hph"><div><h1>Sản phẩm &amp; giá</h1><div class="hint">Giá chỉ lấy từ đây. Câu nào có giá khác bảng này đều bị chặn. Quà và combo chi tiết chị nhập khi có.</div></div><button class="btn pri" data-act="addprod">+ Thêm sản phẩm</button></div>'+(cards||'<div class="card hint">Chưa có sản phẩm nào. Bấm "+ Thêm sản phẩm".</div>');
+  return '<div class="hph"><div><h1>Sản phẩm &amp; giá</h1><div class="hint">Giá chỉ lấy từ đây. Câu nào có giá khác bảng này đều bị chặn. Quà và combo chi tiết nhập khi có.</div></div><button class="btn pri" data-act="addprod">+ Thêm sản phẩm</button></div>'+(cards||'<div class="card hint">Chưa có sản phẩm nào. Bấm "+ Thêm sản phẩm".</div>');
 }
 /* ---- Ảnh / video ---- */
 function md(){
@@ -661,7 +661,7 @@ function md(){
   return '<div class="hph"><div><h1>Ảnh / video</h1><div class="hint">Nhóm ảnh gắn vào câu mẫu hoặc ô ảnh trong luồng. Dán đường dẫn ảnh (https://...), mỗi dòng một ảnh. Tải ảnh lên trực tiếp sẽ làm ở bước sau.</div></div><button class="btn pri" data-act="addgroup">+ Thêm nhóm ảnh</button></div>'+
    (b.media.map(function(g){return '<div class="card"><div class="row between"><h3 style="margin:0">'+esc(g.g)+" · "+esc(g.d)+" ("+g.urls.length+')</h3><div class="row"><button class="btn sm" data-act="addurls" data-id="'+esc(g.g)+'">+ Thêm ảnh</button><button class="btn sm" data-act="delgroup" data-id="'+esc(g.g)+'">Xóa nhóm</button></div></div>'+
      (g.urls.length?'<div class="media" style="margin-top:8px">'+g.urls.map(function(u,i){return '<div class="im"><img src="'+esc(u)+'" alt=""><button class="btn sm" data-act="delurl" data-id="'+esc(g.g)+":"+i+'" aria-label="Xóa ảnh">✕</button></div>'}).join("")+"</div>":'<p class="hint" style="margin:8px 0 0">Nhóm chưa có ảnh.</p>')+"</div>"}).join("")||'<div class="card hint">Chưa có nhóm ảnh nào.</div>')+
-   '<div class="card"><div class="row between"><h3 style="margin:0">Câu cấm (agent không được nói)</h3><button class="btn sm pri" data-act="addbanned">+ Thêm</button></div><p class="hint" style="margin:4px 0 8px">Câu mẫu nào chứa các cụm này sẽ bị chặn. Ví dụ câu về oxygen hoạt tính chị đã yêu cầu bỏ.</p>'+
+   '<div class="card"><div class="row between"><h3 style="margin:0">Câu cấm (agent không được nói)</h3><button class="btn sm pri" data-act="addbanned">+ Thêm</button></div><p class="hint" style="margin:4px 0 8px">Câu mẫu nào chứa các cụm này sẽ bị chặn. Ví dụ câu về oxygen hoạt tính CEO đã yêu cầu bỏ.</p>'+
    (b.banned.map(function(x,i){return '<div class="row between" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>'+esc(x)+'</span><button class="btn sm ghost" data-act="delbanned" data-id="'+i+'" aria-label="Xóa">✕</button></div>'}).join("")||'<span class="hint">Chưa có.</span>')+"</div>";
 }
 function bd(){
@@ -675,13 +675,13 @@ function bd(){
 function qt(){
   var b=D();
   function list(key,arr,title,hint){return '<div class="card"><div class="row between"><h3 style="margin:0">'+title+'</h3><button class="btn sm pri" data-act="addlist" data-id="'+key+'">+ Thêm</button></div><p class="hint" style="margin:4px 0 8px">'+hint+"</p>"+arr.map(function(r){return '<div class="row between" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>'+esc(r.text)+'</span><span class="row"><button class="btn sm" data-act="togglelist" data-id="'+key+":"+r.id+'">'+(r.on?"Đang bật":"Đã tắt")+'</button><button class="btn sm ghost" data-act="dellist" data-id="'+key+":"+r.id+'" aria-label="Xóa">✕</button></span></div>'}).join("")+"</div>"}
-  return '<div class="hph"><div><h1>Quy tắc &amp; chuyển người</h1></div></div>'+list("rules",b.rules,"Quy tắc ứng xử chung","Agent luôn theo các quy tắc này.")+list("handoff",b.handoff,"Khi nào chuyển chị Hoa","Gặp các trường hợp này agent dừng và báo chị, không tự trả lời.");
+  return '<div class="hph"><div><h1>Quy tắc &amp; chuyển người</h1></div></div>'+list("rules",b.rules,"Quy tắc ứng xử chung","Agent luôn theo các quy tắc này.")+list("handoff",b.handoff,"Khi nào chuyển người","Gặp các trường hợp này agent dừng và báo CEO, không tự trả lời.");
 }
 /* ---- Mô phỏng ---- */
 function ms(){
   var chat=chatHtml(ST.chat,true)||'<div class="hint">Gõ một câu khách rồi Gửi, hoặc bấm nút trong tin của agent. Mô phỏng chạy trên bản nháp đang sửa, không gửi cho ai, không cần bật Page.</div>';
   var lg=ST.simlog[0];
-  return '<div class="hph"><div><h1>Mô phỏng</h1><div class="hint">Thử với bản đang sửa (kể cả chưa xuất bản). Agent thật chọn luồng bằng AI; ở đây chọn bằng từ khóa để chị kiểm tra kịch bản.</div></div><div class="row"><label class="hint">Khách xưng</label>'+xhSelect()+'<label class="hint"><input type="checkbox" data-act="setphone"'+(ST.phone?" checked":"")+'> đã để SĐT</label><button class="btn sm" data-act="clearchat">Làm mới</button></div></div>'+
+  return '<div class="hph"><div><h1>Mô phỏng</h1><div class="hint">Thử với bản đang sửa (kể cả chưa xuất bản). Agent thật chọn luồng bằng AI; ở đây chọn bằng từ khóa để kiểm tra kịch bản.</div></div><div class="row"><label class="hint">Khách xưng</label>'+xhSelect()+'<label class="hint"><input type="checkbox" data-act="setphone"'+(ST.phone?" checked":"")+'> đã để SĐT</label><button class="btn sm" data-act="clearchat">Làm mới</button></div></div>'+
    '<div class="split"><div class="card"><div class="chat" id="chat">'+chat+'</div><div class="row" style="margin-top:10px"><input type="text" id="simin" placeholder="Gõ câu của khách…" style="flex:1;min-width:160px"><button class="btn pri" data-act="send">Gửi</button></div></div>'+
    '<div class="card"><h3>Agent đã lấy gì để trả lời</h3><div class="log">'+(lg?esc(lg.text):"Chưa có lần thử nào.")+"</div></div></div>"+
    '<div class="card"><h3>Nhật ký lần thử</h3>'+(ST.simlog.length?'<div class="tbl"><table><thead><tr><th>Giờ</th><th>Khách nói</th><th>Luồng</th><th>Kết quả</th></tr></thead><tbody>'+ST.simlog.map(function(l){return "<tr><td>"+l.time+"</td><td>"+esc(l.said)+"</td><td>"+esc(l.flow)+'</td><td><span class="pill '+pc(l.cls)+'">'+esc(l.res)+"</span></td></tr>"}).join("")+"</tbody></table></div>":'<span class="hint">Chưa có.</span>')+"</div>";
@@ -705,10 +705,10 @@ function drawerHtml(){
      '<label class="f"><span>Cam kết đi kèm (nếu có, phải nằm trong kịch bản đã duyệt)</span><input type="text" id="d_claim" value="'+esc(m.claim)+'"></label><label class="f"><span>Ảnh đi kèm</span><select id="d_img">'+imgs+"</select></label>";
   }else if(d.type==="flow"){
     title="Thêm luồng";ok="Tạo luồng";
-    body='<label class="f"><span>Mã luồng</span><input type="text" id="d_code" placeholder="VD: BT-07"></label><label class="f"><span>Tên luồng</span><input type="text" id="d_name" placeholder="VD: Hỏi về bột tẩy vạn năng"></label><label class="f"><span>Gợi ý để agent chọn luồng (từ khóa)</span><input type="text" id="d_keys" placeholder="VD: bột tẩy, tẩy vạn năng"></label><p class="hint">Luồng mới có sẵn một ô câu mẫu. Chị thêm ô và nối đường trên sơ đồ.</p>';
+    body='<label class="f"><span>Mã luồng</span><input type="text" id="d_code" placeholder="VD: BT-07"></label><label class="f"><span>Tên luồng</span><input type="text" id="d_name" placeholder="VD: Hỏi về bột tẩy vạn năng"></label><label class="f"><span>Gợi ý để agent chọn luồng (từ khóa)</span><input type="text" id="d_keys" placeholder="VD: bột tẩy, tẩy vạn năng"></label><p class="hint">Luồng mới có sẵn một ô câu mẫu. Thêm ô và nối đường trên sơ đồ.</p>';
   }else if(d.type==="node"){
     title="Thêm ô vào sơ đồ";ok="Thêm ô";
-    body='<label class="f"><span>Loại ô</span><select id="d_k"><option value="msg">Câu mẫu</option><option value="img">Ảnh</option><option value="cond">Điều kiện</option><option value="jump">Chuyển luồng</option><option value="handoff">Chuyển chị Hoa</option></select></label><p class="hint">Chị chọn nội dung ô ở bảng "Sửa ô" bên dưới sơ đồ.</p>';
+    body='<label class="f"><span>Loại ô</span><select id="d_k"><option value="msg">Câu mẫu</option><option value="img">Ảnh</option><option value="cond">Điều kiện</option><option value="jump">Chuyển luồng</option><option value="handoff">Chuyển người</option></select></label><p class="hint">Chọn nội dung ô ở bảng "Sửa ô" bên dưới sơ đồ.</p>';
   }else if(d.type==="product"){
     title="Thêm sản phẩm";
     body='<label class="f"><span>Tên sản phẩm</span><input type="text" id="d_name" placeholder="VD: Tẩy lồng máy giặt AILLA"></label><label class="f"><span>Mã ngắn (chữ thường không dấu, dùng trong biến giá)</span><input type="text" id="d_id" placeholder="VD: long  →  biến {gia_long}"></label>';
@@ -831,7 +831,7 @@ async function runSim(body,said){
   var r=await sim(body);
   r.messages.forEach(function(m){ST.chat.push(toChat(m))});
   ST.cur=r.state.cur;
-  var q={sent:["Đã gửi (thử)","ok"],handoff:["Chuyển chị: "+r.result.note,"bad"],blocked:["Chặn: "+r.result.note,"warn"],out_of_script:["Ngoài kịch bản: báo chị","bad"],nothing:["-","gray"]}[r.result.kind]||["-","gray"];
+  var q={sent:["Đã gửi (thử)","ok"],handoff:["Chuyển người: "+r.result.note,"bad"],blocked:["Chặn: "+r.result.note,"warn"],out_of_script:["Ngoài kịch bản: báo CEO","bad"],nothing:["-","gray"]}[r.result.kind]||["-","gray"];
   ST.simlog.unshift({time:nowHM(),said:said,flow:r.result.flow||"-",res:q[0],cls:q[1],text:r.log.join("\n")});
   draw();
 }

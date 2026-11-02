@@ -47,7 +47,7 @@ function cpLuongAuto(){
 const CPLG={};
 function pCpLuong(m){
   const d=D(),ym=cpLgYm(),kenhs=SC_KENH;
-  if(!cpLgCan()){m.innerHTML=H("Lương theo phòng ban và kênh")+`<p class="empty pad">Trang này dành cho người làm lương và chị Hoa.</p>`;return}
+  if(!cpLgCan()){m.innerHTML=H("Lương theo phòng ban và kênh")+`<p class="empty pad">Trang này dành cho người làm lương và CEO.</p>`;return}
   if(!ym){m.innerHTML=H("Lương theo phòng ban và kênh")+`<div class="note">Chọn <b>một tháng</b> ở ô thời gian phía trên (ví dụ "Tháng này" hoặc "Tháng trước") để xem lương của tháng đó.</div>`;return}
   const S=cpLgRows(ym);
   /* Bảng lương chưa chốt thì không hiện số (chị Huệ 28/10: số tạm tính bị hiểu là số thật), chỉ đặt cách chia. */
@@ -60,7 +60,7 @@ function pCpLuong(m){
   const perK=A.perKenh;
   m.innerHTML=H("Lương theo phòng ban và kênh","Kỳ "+ym.slice(5)+"/"+ym.slice(0,4)+" · bảng lương "+S.st.toLowerCase())+
   `<div class="filters"><label class="chk"><input type="checkbox" id="lg-auto"${on?" checked":""}${ed?"":" disabled"}> Đưa lương từ bảng lương vào Sổ chi phí</label><span class="sp"></span><button class="btn" data-go="hr_bl">Mở Bảng lương</button></div>
-  ${ed&&!Object.keys(d.cpLuongChia||{}).length&&!Object.keys(d.cpLuongPhong||{}).length?`<div class="note amb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>Chưa đặt cách chia nào. Gợi ý theo chị Huệ: Khanh → TikTok · Nguyệt → Shopee Aillavn (chia 2 shop thì chọn "Chia % cho nhiều kênh") · Ads/Digital và Sale bán lẻ → Facebook · Sản xuất → vào giá thành. Kho chọn "Theo doanh thu thực"; Content & Media, quản lý, Kế toán, HCNS chị tự đặt.</span><button class="btn pri" id="lg-goiy">Áp gợi ý này</button></div>`:""}
+  ${ed&&!Object.keys(d.cpLuongChia||{}).length&&!Object.keys(d.cpLuongPhong||{}).length?`<div class="note amb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>Chưa đặt cách chia nào. Gợi ý theo Kế toán: Khanh → TikTok · Nguyệt → Shopee Aillavn (chia 2 shop thì chọn "Chia % cho nhiều kênh") · Ads/Digital và Sale bán lẻ → Facebook · Sản xuất → vào giá thành. Kho chọn "Theo doanh thu thực"; Content & Media, quản lý, Kế toán, HCNS tự đặt.</span><button class="btn pri" id="lg-goiy">Áp gợi ý này</button></div>`:""}
   ${A.dtThieu?`<div class="note amb">Có lương chia theo doanh thu nhưng tháng này chưa đủ doanh thu thực của ${CPLG_DTK.map(SC_TEN).join(", ")}, nên phần đó đang để ở chi chung. Nhập doanh thu ở Sổ chi phí › Phân bổ theo kênh › Sửa doanh thu thực.</div>`:""}
   ${S.chot?"":`<div class="note amb">Bảng lương tháng này chưa chốt nên chưa hiện số lương. Vẫn đặt được cách chia cho từng người; chốt bảng lương ở Nhân sự xong số mới hiện và mới vào chi phí.</div>`}
   <div class="grid kpis">${kpi("Tổng thu nhập",cpLgSo((A.tong)),A.n+" người")}${kpi("Vào chi phí các kênh",cpLgSo((Object.values(perK).reduce((a,b)=>a+b,0))),"trực tiếp từng kênh")}${kpi("Chi chung công ty",cpLgSo((A.chung)),"chia theo quy tắc ở Sổ chi phí")}${kpi("Vào giá thành",cpLgSo((A.gv)),"lương sản xuất")}</div>
