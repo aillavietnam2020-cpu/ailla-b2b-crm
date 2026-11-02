@@ -22,7 +22,7 @@ function bvRows(d){
    .sort((a,b)=>a.sku.localeCompare(b.sku)||String(mixOf(a)).localeCompare(String(mixOf(b)))||String(a.id).localeCompare(String(b.id)))
 }
 /* số video cần có theo kế hoạch của một sản phẩm và dạng */
-const bvPlanN=(d,sku,kenh,t)=>{if(!ptPairs().some(x=>x.sku===sku&&x.kenh===kenh&&knShown(d,x)))return 0;if(t==="ton"){const pr=ptPairs().find(x=>x.sku===sku&&x.kenh===kenh);if(pr&&+pr.ton>0)return +pr.ton}const M=((d.weekPlan||{}).M||{})[wpKey(sku,kenh)];if(M&&M.mix&&M.mix[t]!=null)return Math.max(0,Math.floor(+M.mix[t]||0));return lvPlan(d,sku,kenh,t).reduce((a,b)=>a+b,0)};
+const bvPlanN=(d,sku,kenh,t)=>{if(!ptPairs().some(x=>x.sku===sku&&x.kenh===kenh&&knShown(d,x)))return 0;const M=((d.weekPlan||{}).M||{})[wpKey(sku,kenh)];if(t==="ton"&&!(M&&M.mix)){const pr=ptPairs().find(x=>x.sku===sku&&x.kenh===kenh);if(pr&&+pr.ton>0)return +pr.ton}if(M&&M.mix&&M.mix[t]!=null)return Math.max(0,Math.floor(+M.mix[t]||0));return lvPlan(d,sku,kenh,t).reduce((a,b)=>a+b,0)};
 const BV_RT=["oneshot","kichban","worker","reup","outsource","nhanban"];
 function bvMissing(d,kenh){
   if(!chOf(kenh).needId)return (d.fpPlan||[]).map(r=>({fp:r.id,sku:"TH",t:"bai",n:Math.max(0,(+r.sl||0)-d.cards.filter(c=>c.kenh===kenh&&c.fpId===r.id).length)})).filter(x=>x.n>0);
