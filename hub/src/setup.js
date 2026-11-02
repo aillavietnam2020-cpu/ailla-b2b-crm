@@ -146,6 +146,9 @@ const modGroups=mo=>{
   const G=mo.groups().map(([g,items])=>[g,items.filter(i=>i[2](ME))]).filter(g=>g[1].length);
   if(HOST_MODE==="admin")return mo.adm?G:[];
   if(mo.adm)return [];
+  /* Chị Hoa 02/11: tài khoản Content/Digital vẫn thấy "Kho – Sản xuất" (trang Combo soạn hàng không gắn quyền). Phân hệ Kho – Sản xuất
+     của menu vận hành mới dựng sau bộ lọc phòng ban (server.js) nên lọc lại ở đây: phòng không dùng phân hệ sx thì ẩn. */
+  if(mo.k==="sx"&&typeof svAllowedMods==="function"){const a=svAllowedMods();if(a&&!a.has("sx"))return []}
   if(HOST_MODE==="ops"&&ADMIN_URL){
     if(mo.k==="fin")return [];
     if(mo.k==="setup")return G.map(([g,its])=>[g,its.filter(i=>i[0]==="quychuan")]).filter(g=>g[1].length);
