@@ -84,3 +84,12 @@ describe('fileKind', () => {
     expect(fileKind('application/vnd.google-apps.folder')).toBe('folder');
   });
 });
+
+describe('saKey', () => {
+  it('đọc được khóa có BOM ở đầu (PowerShell chèn vào)', async () => {
+    const { saKey } = await import('../../src/server/services/gdrive');
+    const k = saKey('﻿{"client_email":"a@b.iam.gserviceaccount.com","private_key":"x"}\r\n');
+    expect(k?.client_email).toBe('a@b.iam.gserviceaccount.com');
+    expect(saKey('khong phai json')).toBeNull();
+  });
+});

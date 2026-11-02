@@ -29,7 +29,8 @@ export type DriveFile = {
 export function saKey(json: string | undefined): SaKey | null {
   if (!json) return null;
   try {
-    const k = JSON.parse(json) as Partial<SaKey>;
+    // Bỏ ký tự BOM mà PowerShell trên Windows tự chèn vào đầu khi đặt khóa (NOI-GOOGLE-DRIVE.bat).
+    const k = JSON.parse(json.replace(/^﻿/, '').trim()) as Partial<SaKey>;
     return k.client_email && k.private_key ? { client_email: k.client_email, private_key: k.private_key } : null;
   } catch {
     return null;
