@@ -46,7 +46,7 @@ const NHOMS=["Giặt — xả","Vệ sinh nhà cửa","Kiểm soát côn trùng 
 function catalog0(){const pk=PRODUCTS0.map(p=>p.k);return PRODUCTS0.map(p=>({k:p.k,n:p.n,nhom:NHOM_OF[p.k]||"Khác",c:p.c,gia:p.gia,mo:p.mo,pain:p.pain,claim:p.claim,kenh:p.kenh,active:true})).concat(CATALOG_EXTRA.filter(p=>!pk.includes(p.k)).map(p=>({...p,kenh:"TikTok chính",active:true})))}
 const OTHER_PRODUCTS=[{k:"TH",n:"Thương hiệu Ailla",c:"#e7357b"},{k:"LS",n:"Lau sàn",c:"#7a8399"},{k:"XR",n:"Xịt ruồi AiBio",c:"#7a8399"},{k:"KHAC",n:"Khác",c:"#7a8399"}];
 const CHANNELS=[
- {k:"TikTok chính",short:"TT chính",needId:true,acc:"aillavietnamstore",tab:"TIKTOK"},
+ {k:"TikTok chính",short:"Ailla Việt Nam Store",needId:true,acc:"aillavietnamstore",tab:"TIKTOK"},
  {k:"TikTok Via 1",short:"Via 1",needId:true,acc:"(Via 1 — 2 video/ngày: edit footage có sẵn + đăng lại video kho)",tab:"TIKTOK_VIA 1"},
  {k:"TikTok Via 2",short:"Via 2",needId:true,acc:"(Via phụ — reup 1 video/ngày)",tab:"TIKTOK_VIA 2"},
  {k:"Fanpage chính",short:"Fanpage",needId:false,acc:"Fanpage Ailla",tab:"FANPAGE_CHINH"},
