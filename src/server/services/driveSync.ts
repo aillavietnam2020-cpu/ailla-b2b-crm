@@ -63,6 +63,8 @@ export async function syncDrivePermissions(db: D1Database, saJson: string | unde
     no_email: staff.filter((s) => isActiveStaff(s) && pbs.has(s.pb) && !normEmail(s.email)).map((s) => ({ ma: s.ma, ten: names.get(s.ma) ?? s.ma, pb: s.pb })),
   };
   for (const t of cfg.teams) {
+    // Thư mục chỉ CEO xem (không ai cần cấp, web chưa từng cấp ai): bỏ qua, khỏi cần quyền chỉnh sửa.
+    if (!(want.get(t.folderId)?.size) && !(grants[t.folderId]?.length)) continue;
     const row: SyncResult['folders'][number] = { folder_id: t.folderId, pb: t.pb, added: [], changed: [], removed: [] };
     result.folders.push(row);
     const cur = await listPermissions(key, t.folderId);
