@@ -174,14 +174,16 @@ function tmCfgHtml(){
       ${sy.dry?`<button class="btn pri sm" id="tm-sync-go" style="margin-top:10px">Áp dụng</button>`:""}</div>`;
   const syncBox=`<div class="card pad" style="margin-bottom:14px"><b>Quyền trên Google Drive theo danh sách nhân viên</b>
     <p class="hint" style="margin:6px 0 8px">Nhân viên đang làm có email trong hồ sơ (Nhân sự › Nhân viên): được sửa thư mục phòng mình, chỉ xem thư mục dùng chung. Người đã nghỉ bị gỡ quyền. Web tự làm mỗi giờ; người chị tự chia sẻ tay web không đụng tới. Web cần là Người chỉnh sửa của thư mục.</p>
-    <button class="btn sm" id="tm-sync">Kiểm tra &amp; đồng bộ ngay</button>${syHtml}</div>`;
+    ${C.sync_paused?`<div class="note amb" style="margin-bottom:8px">Đang TẠM DỪNG tự cấp quyền mỗi giờ. Bấm "Bật lại" khi thư mục trên Drive đã sắp xong.</div>`:""}
+    <button class="btn sm" id="tm-sync">Kiểm tra &amp; đồng bộ ngay</button> <button class="btn sm" id="tm-pause">${C.sync_paused?"Bật lại tự cấp quyền":"Tạm dừng tự cấp quyền"}</button>${syHtml}</div>`;
   return guide+syncBox+`<section class="card flush">${tbl(["Phòng ban","Thư mục Drive gốc","Ai được xem thêm","Kết nối"],rows)}</section>
   <h3 style="margin:18px 0 6px">Thư mục dùng chung</h3><p class="hint" style="margin:0 0 8px">Thư mục không thuộc riêng phòng nào (thư mục chung công ty, kho hình ảnh thương hiệu…). Thư mục phòng nằm bên trong vẫn chỉ phòng đó xem.</p>
   <section class="card flush">${tbl(["Tên hiện trên web","Thư mục Drive","Ai được xem","Kết nối"],shRows)}<div class="pad" style="display:flex;gap:10px;align-items:center"><button class="btn pri" id="tm-save"${TM.saving?" disabled":""}>${TM.saving?"Đang lưu…":"Lưu"}</button><span class="hint">Để trống link = bỏ thư mục đó.</span></div></section>`;
 }
 async function tmSync(dry){TM.sync={loading:true};tmRedraw();try{TM.sync={...(await svApi("/api/drive/sync"+(dry?"?dry=1":""),{method:"POST"})),dry}}catch(e){TM.sync={err:e.message||"Không đồng bộ được"}}tmRedraw()}
 function tmCfgBind(m){
-  const sb=$("#tm-sync");if(sb)sb.onclick=()=>tmSync(true);const sg=$("#tm-sync-go");if(sg)sg.onclick=()=>tmSync(false);
+  const sb=$("#tm-sync");if(sb)sb.onclick=()=>tmSync(true);
+  const pz=$("#tm-pause");if(pz)pz.onclick=async()=>{try{await svApi("/api/drive/sync-pause",{method:"PUT",body:JSON.stringify({paused:!TM.cfg.sync_paused})});toast(TM.cfg.sync_paused?"Đã bật lại tự cấp quyền":"Đã tạm dừng tự cấp quyền");tmCfgLoad()}catch(e){toast(e.message||"Không đổi được")}};const sg=$("#tm-sync-go");if(sg)sg.onclick=()=>tmSync(false);
   const cp=$("#tm-cp");if(cp)cp.onclick=()=>{try{navigator.clipboard.writeText(TM.cfg.sa_email).then(()=>toast("Đã chép email"),()=>toast(TM.cfg.sa_email))}catch(e){toast(TM.cfg.sa_email)}};
   const sv=$("#tm-save");if(sv)sv.onclick=async()=>{
     const teams=[...m.querySelectorAll("[data-tmfo]")].map(i=>{const pb=i.dataset.tmfo,nm=m.querySelector(`[data-tmnm="${CSS.escape(pb)}"]`);

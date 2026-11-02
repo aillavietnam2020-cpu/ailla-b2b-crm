@@ -14,7 +14,7 @@ import {
   type DriveUser,
 } from '../lib/driveAccess';
 import { children, download, meta, recentFiles, saKey, thumbnail, type DriveFile } from '../services/gdrive';
-import { syncDrivePermissions } from '../services/driveSync';
+import { setSyncPaused, syncDrivePermissions, syncPaused } from '../services/driveSync';
 
 /**
  * Thư mục làm việc: xem thư mục Google Drive của phòng ban ngay trên web (chỉ xem; mở file thì sang Drive).
@@ -162,7 +162,7 @@ driveRoutes.get('/config', async (c) => {
       return { ...t, folder_name: m?.name ?? null, ok: !!m };
     }),
   );
-  return ok(c, { connected: !!k, sa_email: k?.client_email ?? null, depts, teams });
+  return ok(c, { connected: !!k, sa_email: k?.client_email ?? null, depts, teams, sync_paused: await syncPaused(c.env.DB) });
 });
 
 driveRoutes.put('/config', async (c) => {
@@ -222,4 +222,13 @@ driveRoutes.get('/download/:id', async (c) => {
   };
   if (f.size) headers['Content-Length'] = f.size;
   return new Response(f.body, { headers });
+});
+
+/** Tạm dừng / bật lại tự cấp quyền mỗi giờ (CEO). */
+driveRoutes.put('/sync-pause', async (c) => {
+  const { auth, ceo } = await who(c);
+  if (!ceo) throw forbidden('Chỉ CEO đổi việc tự cấp quyền.');
+  const body = (await c.req.json().catch(() => ({}))) as { paused?: boolean };
+  await setSyncPaused(c.env.DB, !!body.paused, auth.user.id);
+  return ok(c, { paused: !!body.paused });
 });

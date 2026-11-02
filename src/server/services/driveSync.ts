@@ -52,7 +52,26 @@ export async function loadStaff(db: D1Database): Promise<{ staff: StaffRow[]; na
 /** Tự đồng bộ mỗi giờ chỉ bật sau khi CEO đã xem trước và bấm "Áp dụng" ít nhất một lần (tránh cấp nhầm khi hồ sơ chưa cập nhật). */
 export async function autoSyncEnabled(db: D1Database): Promise<boolean> {
   const row = await db.prepare('SELECT 1 AS x FROM hub_blobs WHERE key = ?').bind(GRANTS_KEY).first<{ x: number }>();
-  return !!row;
+  return !!row && !(await syncPaused(db));
+}
+
+/** CEO tạm dừng tự cấp quyền (ví dụ lúc đang sắp lại thư mục trên Drive). Lúc dừng, nút "Áp dụng" bằng tay vẫn chạy. */
+const PAUSE_KEY = 'drive_sync_paused';
+export async function syncPaused(db: D1Database): Promise<boolean> {
+  return !!(await db.prepare('SELECT 1 AS x FROM hub_blobs WHERE key = ?').bind(PAUSE_KEY).first<{ x: number }>());
+}
+export async function setSyncPaused(db: D1Database, paused: boolean, actorId: string): Promise<void> {
+  if (!paused) {
+    await db.prepare('DELETE FROM hub_blobs WHERE key = ?').bind(PAUSE_KEY).run();
+    return;
+  }
+  await db
+    .prepare(
+      `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, '1', 1, ?, ?)
+       ON CONFLICT (key) DO UPDATE SET updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    )
+    .bind(PAUSE_KEY, nowIso(), actorId)
+    .run();
 }
 
 export async function syncDrivePermissions(db: D1Database, saJson: string | undefined, actorId: string | null, dry = false): Promise<SyncResult> {
