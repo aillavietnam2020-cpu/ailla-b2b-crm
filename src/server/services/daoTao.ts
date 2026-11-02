@@ -126,3 +126,32 @@ export const parseJsonArr = <T = string>(s: unknown): T[] => {
     return [];
   }
 };
+
+/** Mã file từ link Google Docs / Drive (…/d/<mã>/…, ?id=<mã>) hoặc mã dán thẳng. */
+export function driveIdFrom(input: string): string | null {
+  const s = String(input ?? '').trim();
+  if (!s) return null;
+  const m = s.match(/\/d\/([A-Za-z0-9_-]{10,})/) ?? s.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  const id = m ? m[1] : s;
+  return /^[A-Za-z0-9_-]{10,100}$/.test(id) ? id : null;
+}
+
+/**
+ * Markdown Google Docs xuất ra → kiểu chữ của tài liệu đào tạo (hub/src/daotao.js dtMd):
+ * bỏ ảnh nhúng (dữ liệu ảnh rất nặng; xem ảnh thì mở file Drive), bỏ dấu \ thoát ký tự, tiêu đề cấp 3+ thành "## ",
+ * "* " thành "- ", chữ nghiêng bỏ dấu. Bảng giữ nguyên dòng "| … |" (trang tự vẽ bảng).
+ */
+export function fromDriveMarkdown(md: string): string {
+  const lines = String(md ?? '').replace(/\r/g, '').split('\n');
+  const out: string[] = [];
+  for (let raw of lines) {
+    if (/^\s*\[[^\]]+\]:\s*<?data:/i.test(raw)) continue;
+    raw = raw.replace(/!\[[^\]]*\]\[[^\]]*\]/g, '').replace(/!\[[^\]]*\]\((data:[^)]*|[^)]*)\)/g, '');
+    let t = raw.replace(/\\([\\`*_{}[\]()#+\-.!|>~=])/g, '$1').replace(/\s+$/, '');
+    t = t.replace(/^#{3,6}\s+/, '## ');
+    t = t.replace(/^\s*[*+]\s+/, '- ').replace(/^\s+-\s+/, '- ').replace(/^\s+(\d+[.)]\s+)/, '$1');
+    t = t.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1$2').replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g, '$1$2');
+    out.push(t);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200_000);
+}
