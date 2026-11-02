@@ -14,8 +14,8 @@ function tqcSeries(d,metric,today){
   for(let x=1;x<=today;x++){C.filter(c=>c.day===x).forEach(c=>{acc+=metric==="gmv"?(+c.gmv||0):1});out.push(acc)}
   return out;
 }
-function tqcChart(d,today){
-  const n=MONTH.ndays,act=tqcSeries(d,TQC_M,today);
+function tqcChart(d,today,nd){
+  const n=nd||MONTH.ndays,act=tqcSeries(d,TQC_M,today);
   const plan=TQC_M==="gmv"?(+(d.kpiTargets||{}).gmvVideo||0):d.cards.length;
   const mx=Math.max(1,plan,...act),W=600,H=170,px=x=>(x-1)/(n-1)*W,py=v=>H-8-(v/mx)*(H-24);
   const pts=act.map((v,i)=>`${px(i+1).toFixed(1)},${py(v).toFixed(1)}`).join(" ");
@@ -27,22 +27,27 @@ function tqcChart(d,today){
    <div class="tqax">${ticks.map(x=>`<span>${dd(x)}</span>`).join("")}</div></div>
    <div class="tqleg"><span><i></i>Thực tế</span><span><i class="ds"></i>Nhịp kế hoạch (tới ${fmt(plan)})</span><span class="r">Cộng dồn theo ngày · đang ${fmt(act[act.length-1]||0)}</span></div>`;
 }
+/* Tháng đang xem theo ô chọn thời gian trên cùng: tháng trước thì lấy video đã cất vào Kho lưu trữ của tháng đó (chị Hoa 02/11) */
+function tqcMonth(){const d0=D(),P=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.to?PERIOD:null,k=P&&P.from.slice(0,7)===P.to.slice(0,7)?P.to.slice(0,7):MONTH.key;
+  if(k>=MONTH.key)return {d:d0,mon:MONTH.mon,nd:MONTH.ndays,today:d0.settings.today,past:false};
+  const mon=+k.slice(5),nd=new Date(+k.slice(0,4),mon,0).getDate();
+  return {d:Object.assign({},d0,{cards:((d0.luuTru||{}).cards||[]).filter(c=>(c.thang||"")===k),kpiTargets:{}}),mon,nd,today:nd,past:true}}
 function tqcTop(){
-  const d=D(),today=d.settings.today,C=d.cards,N=C.length;
+  const M=tqcMonth(),d=M.d,today=M.today,C=d.cards,N=C.length;
   const posted=C.filter(c=>c.step==="xong"),cho=C.filter(c=>c.step==="dang").length,chua=C.filter(c=>c.step==="cg").length;
   const lam=C.filter(c=>["kb","dkb","quay","edit","worker","dvd","dceo"].includes(c.step)).length;
-  const exp=Math.round(N*today/MONTH.ndays),late=C.filter(c=>c.step!=="xong"&&isLate(c)).length;
-  const gmv=sum(posted,c=>+c.gmv||0),don=sum(posted,c=>+c.don||0),tg=+(d.kpiTargets||{}).gmvVideo||0,paceG=tg*today/MONTH.ndays;
+  const exp=M.past?0:Math.round(N*today/M.nd),late=C.filter(c=>c.step!=="xong"&&isLate(c)).length;
+  const gmv=sum(posted,c=>+c.gmv||0),don=sum(posted,c=>+c.don||0),tg=+(d.kpiTargets||{}).gmvVideo||0,paceG=tg*today/M.nd;
   const wk=WEEKS.findIndex(w=>today>=w.tu&&today<=w.den),cur=WEEKS[wk],prev=WEEKS[wk-1];
-  const inW=w=>w?posted.filter(c=>c.day>=w.tu&&c.day<=w.den).length:0;
+  const inW=w=>w&&!M.past?posted.filter(c=>c.day>=w.tu&&c.day<=w.den).length:0;
   const thisW=inW(cur),lastW=inW(prev),thieu=Math.max(0,N-cho-posted.length);
   let T=[];try{T=aiTop(3)}catch(e){}
   const blank=`<div class="tqd">&nbsp;</div>`;
   const cell=(k,lb,v,sub,click)=>`<div class="tqcell${click?" clk":""}${click&&TQC_M===k?" on":""}" ${click?`data-tqm="${k}"`:""}><small>${lb}</small><b>${v}</b>${sub}</div>`;
   return `<div class="tqtop">
-   <section class="card tqc"><div class="tqh"><span class="tqi i1">${ico("task")}</span>Video tháng ${MONTH.mon}</div><div class="tqtwo"><div><small>Đã đăng</small><b>${posted.length} / ${N}</b>${tqcCmp(posted.length,exp,"so với nhịp cần ("+exp+")")}</div><div><small>Còn thiếu</small><b>${thieu}</b><div class="tqd">${N?Math.round(thieu/N*100):0}% kế hoạch</div></div></div></section>
+   <section class="card tqc"><div class="tqh"><span class="tqi i1">${ico("task")}</span>Video tháng ${M.mon}${M.past?" <small class=\"hint\">· đã kết thúc, số từ Kho lưu trữ</small>":""}</div><div class="tqtwo"><div><small>Đã đăng</small><b>${posted.length} / ${N}</b>${tqcCmp(posted.length,exp,"so với nhịp cần ("+exp+")")}</div><div><small>Còn thiếu</small><b>${thieu}</b><div class="tqd">${N?Math.round(thieu/N*100):0}% kế hoạch</div></div></div></section>
    <section class="card tqc"><div class="tqh"><span class="tqi i2">${ico("clock")}</span>Đang xử lý</div><div class="tqtwo"><div><small>Chờ đăng</small><b>${cho}</b><div class="tqd">chờ người giữ kênh đăng</div></div><div><small>Trễ hạn</small><b class="${late?"dn":""}">${late}</b><div class="tqd ${late?"dn":""}">${late?"cần xử lý":"không trễ"}</div></div></div></section>
-   <section class="card tqc"><div class="tqh"><span class="tqi i3">${ico("money")}</span>Doanh thu video</div><div class="tqtwo"><div><small>Tháng này</small><b>${money(gmv)}</b>${tg?tqcCmp(gmv,paceG,"so với nhịp mục tiêu"):blank}</div><div><small>Đơn</small><b>${nf(don)}</b><div class="tqd">${tg?"mục tiêu "+money(tg):"&nbsp;"}</div></div></div></section>
+   <section class="card tqc"><div class="tqh"><span class="tqi i3">${ico("money")}</span>Doanh thu video</div><div class="tqtwo"><div><small>${M.past?"Tháng "+M.mon:"Tháng này"}</small><b>${money(gmv)}</b>${tg?tqcCmp(gmv,paceG,"so với nhịp mục tiêu"):blank}</div><div><small>Đơn</small><b>${nf(don)}</b><div class="tqd">${tg?"mục tiêu "+money(tg):"&nbsp;"}</div></div></div></section>
   </div>
   <section class="card tqmain"><div class="tqstrip">
    ${cell("dang","Video đã đăng",posted.length,lastW||thisW?tqcCmp(thisW,lastW,"tuần này vs trước"):blank,true)}
@@ -51,6 +56,6 @@ function tqcTop(){
    ${cell("x","Chưa làm",chua,blank)}
    ${cell("o","Đơn từ video",nf(don),blank)}
    ${cell("gmv","Doanh thu",money(gmv),tg?tqcCmp(gmv,paceG,"vs nhịp"):blank,true)}
-  </div>${tqcChart(d,today)}</section>
+  </div>${tqcChart(d,today,M.nd)}</section>
   ${T.length?`<section class="tqai"><b>✨ Đề xuất của Trợ lý AI</b>${T.map(i=>`<span>${esc(i.title)}</span>`).join("")}<button type="button" class="btn sm" data-go="ai">Xem và áp dụng</button></section>`:""}`;
 }
