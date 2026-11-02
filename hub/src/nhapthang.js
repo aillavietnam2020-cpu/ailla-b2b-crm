@@ -97,7 +97,7 @@ function ntImportFile(f){
     DB.mutate(ME.name,"nhập hiệu quả từ Excel: "+daN.length+" đã đăng, "+choN.length+" chờ đăng"+(fill.length?", bổ sung link "+fill.length:"")+(drop.length?", bỏ "+drop.length+" chờ đăng cũ":""),dt=>{
       if(drop.length){const ids=new Set(drop.map(c=>c.id));dt.cards=dt.cards.filter(c=>!ids.has(c.id))}
         fill.forEach(x=>{const c=dt.cards.find(y=>y.id===x.id);if(!c)return;if(x.href&&!c.linkVideo){c.linkVideo=x.href;c.linkFinal=x.href}if(x.href2&&!c.linkDang){c.linkDang=x.href2;const m=x.href2.match(/[0-9]{19}/);if(m&&!c.tiktokId)c.tiktokId=m[0]}});
-      let seq=Math.max(0,...dt.cards.map(c=>+String(c.id||"").replace(/\D/g,"")||0));
+      let seq=Math.max(0,+dt.cardSeq||0,...dt.cards.map(c=>+String(c.id||"").replace(/\D/g,"")||0));
       const byK={};daN.forEach(r=>{const k=NT_KENH(ntG(r,"Tài khoản đăng"));(byK[k]=byK[k]||[]).push(r)});
       Object.entries(byK).forEach(([k,L])=>L.forEach((r,i)=>{dt.cards.push(ntCard(dt,r,"xong",k,1+Math.floor(i*end/L.length),++seq))}));
       choN.forEach(r=>{const all=Object.values(r).join(" "),k=/gia dung aibio/.test(ntFold(all))?"TikTok Via 1":/aillavietnamstore[ ]*2/.test(ntFold(all))?"TikTok Via 2":NT_KENH(ntG(r,"Tài khoản đăng"));dt.cards.push(ntCard(dt,r,"dang",k,0,++seq))})});

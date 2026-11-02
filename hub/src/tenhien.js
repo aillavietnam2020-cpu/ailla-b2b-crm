@@ -1,11 +1,12 @@
 /* =====================================================================
    TÊN HIỂN THỊ (chỉ đổi chữ hiện ra trên màn hình, không đổi dữ liệu đang lưu)
+   - TikTok chính  → Ailla Việt Nam Store (chị Hoa 02/11)
    - TikTok Via 1  → Gia dụng AiBio
    - TikTok Via 2  → Ailla VN Store 2
    - Oanh          → Leader (trong khu Marketing; khu Nhân sự giữ nguyên tên thật)
    Dữ liệu và mã kênh bên trong vẫn là "TikTok Via 1", "TikTok Via 2" để không làm hỏng số liệu cũ.
    ===================================================================== */
-const RL_MAP=[[/TikTok Via 1/g,"Gia dụng AiBio"],[/TikTok Via 2/g,"Ailla VN Store 2"],[/\bVia 1\b/g,"Gia dụng AiBio"],[/\bVia 2\b/g,"Ailla VN Store 2"]];
+const RL_MAP=[[/TikTok chính/g,"Ailla Việt Nam Store"],[/TT chính/g,"Ailla Việt Nam Store"],[/TikTok Via 1/g,"Gia dụng AiBio"],[/TikTok Via 2/g,"Ailla VN Store 2"],[/\bVia 1\b/g,"Gia dụng AiBio"],[/\bVia 2\b/g,"Ailla VN Store 2"]];
 const RL_OANH=/\bOanh\b/g;
 const rlHr=()=>{try{return (typeof MOD!=="undefined"&&MOD==="hr")||(typeof PAGE!=="undefined"&&/^(nhansu|hoso|hr|nv|luong|phongban)/.test(PAGE))}catch(e){return false}};
 function relabelDom(root){

@@ -236,7 +236,7 @@ const HOOK={
 };
 let _seq=100;
 function newCard(d,o){
-  const mx=Math.max(_seq,...(d.cards||[]).map(c=>+String(c.id||"").replace(/\D/g,"")||0));_seq=mx+1;const ix=_seq;const id="TT-"+String(_seq).padStart(4,"0"); // không trùng mã thẻ đã có (kể cả sau khi tải lại trang)
+  const mx=Math.max(_seq,+d.cardSeq||0,...(d.cards||[]).map(c=>+String(c.id||"").replace(/\D/g,"")||0));_seq=mx+1;const ix=_seq;const id="TT-"+String(_seq).padStart(4,"0"); // không trùng mã thẻ đã có (kể cả sau khi tải lại trang); d.cardSeq = số lớn nhất đã cấp trước khi xóa dữ liệu tháng cũ (02/11), để mã mới không trùng mã cũ
   const sku=o.sku,kenh=o.kenh;const tu=d.tuyen.find(t=>t.ma===o.maTuyen);
   const tac=(d.tactics.find(t=>t.sku.includes(sku))||{k:"DT"}).k;
   const hk=""; // thẻ mới để trống ý tưởng cho người viết kịch bản (không điền ý tưởng mẫu)
