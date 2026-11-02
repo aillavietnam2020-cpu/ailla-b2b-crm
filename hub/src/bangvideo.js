@@ -33,7 +33,7 @@ function bvNewCard(dt,sku,kenh,t){
   const base={sku,kenh,day:0,qday:0,mix:t,batDau:dt.settings.today,han:0,giao:"",nguoi:"",step:"cg"};
   const by={oneshot:{nguon:"Quay mới",loai:"moi",oneShot:true,yTuong:"Viết hook one shot",dangVideo:"One shot"},kichban:{nguon:"Quay mới",loai:"moi",yTuong:"Viết kịch bản review / voice off"},
    worker:{nguon:"Kho cảnh + Worker",loai:"worker",wkMode:"A",nguoiDung:"Worker",dangVideo:"Giọng đọc (Adam/AI)",yTuong:"Chọn cảnh trong kho cảnh, cho Worker dựng + voice"},
-   reup:{nguon:"Reup có sửa",loai:"reup",yTuong:"Tìm video reup, dán link video gốc rồi gửi Worker"},bai:{nguon:"Fanpage",loai:"moi",dangVideo:"Ảnh",yTuong:"Viết caption, chuẩn bị ảnh / video"},nhanban:{nguon:"Nhân bản winner",loai:"nhanban",yTuong:"Dán link video win mẫu rồi bấm Nhân bản (Hypit)"},outsource:{nguon:"Order outsource",loai:"outsource",wkBat:true,dangVideo:"Video outsource",yTuong:"Gửi brief cho bên outsource, nhận video về rồi dán link"}};
+   reup:{nguon:"Reup có sửa",loai:"reup",yTuong:"Tìm video reup, dán link video gốc rồi gửi Worker"},bai:{nguon:"Fanpage",loai:"moi",dangVideo:"Ảnh",yTuong:"Viết caption, chuẩn bị ảnh / video"},nhanban:{nguon:"Nhân bản winner",loai:"nhanban",yTuong:"Nhân bản video win: chọn video mẫu, tự viết kịch bản hoặc dùng Hypit"},outsource:{nguon:"Order outsource",loai:"outsource",wkBat:true,dangVideo:"Video outsource",yTuong:"Gửi brief cho bên outsource, nhận video về rồi dán link"}};
   return newCard(dt,Object.assign(base,by[t]||{}))
 }
 /* hạn hoàn thiện video: trước tuần đăng, tức cuối tuần liền trước; tuần hiện tại hoặc chưa xếp tuần thì 2 ngày tới */
