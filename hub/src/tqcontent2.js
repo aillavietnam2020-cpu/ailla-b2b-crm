@@ -98,11 +98,37 @@ function pDqContent(m){
   const nb=w=>typeof winVars==="function"?winVars("TT-"+w.key).length:0;
   const win=`<div class="card dqc" style="margin-top:14px"><h2 class="dqh">🏆 Top video win <small>≥${wOrd} đơn là Win, ≥${+set.potential||30} đơn là tiềm năng · số từ báo cáo TikTok</small></h2>${T.length?`<table class="dqt"><tr><th>#</th><th>Video</th><th>Sản phẩm</th><th>Kênh</th><th>Người làm</th><th>View</th><th>Đơn</th><th>GMV</th><th>Đã nhân bản</th></tr>
    ${T.map((w,i)=>{const n=nb(w);return `<tr><td>${medal[i]||i+1}</td><td style="text-align:left;max-width:340px">${esc(String(w.ten||"").slice(0,70))}<div class="mono">${esc(w.key)}</div></td><td>${esc(sk(w.sku).n)}</td><td>${esc(chOf(w.kenh).short)}</td><td>${esc(userName(w.nguoi)||"—")}</td><td>${nf(w.view)}</td><td>${nf(w.don)}</td><td>${money(w.gmv)}</td><td>${w.loai==="Winner"?(n?n+" bản":`<span class="red">chưa nhân bản</span>`):`<span class="mut">tiềm năng</span>`}</td></tr>`}).join("")}</table>`:`<p class="empty">Chưa có video nào đạt mức tiềm năng.</p>`}</div>`;
-  m.innerHTML=DQ_CSS+`<div class="dq">${kpis}${alert}${chHtml}${prHtml}<div class="dqg2">${pplHtml}${fun}</div>${win}</div>`;
+  m.innerHTML=DQ_CSS+`<div class="dq">${kpis}${alert}${chHtml}${dqHieuQua(C,past,M,set)}${prHtml}<div class="dqg2">${pplHtml}${fun}</div>${win}</div>`;
   m.querySelectorAll("[data-dqsku]").forEach(r=>r.onclick=()=>{if(typeof bvGo==="function"){const s=r.dataset.dqsku,kn=(C.find(c=>c.sku===s)||{}).kenh||(ptPairs().find(x=>x.sku===s)||{}).kenh||"TikTok chính";bvGo(kn,s,"")}});
   m.querySelectorAll("[data-dqch]").forEach(e=>e.onclick=()=>{const r=chRows.find(x=>x.ch.k===e.dataset.dqch);if(r)dqChOpen(r,C.filter(c=>c.kenh===r.ch.k),past,M)});
   if(typeof bindCommon==="function")bindCommon(m);
 }
+/* Hiệu quả kênh (chị Hoa duyệt 02/11): bán được gì, video có được xem không, xem rồi có mua không, video win.
+   Số view / click / đơn / GMV của từng video lấy từ báo cáo TikTok nhập hằng tuần; video chưa có báo cáo không tính vào view. */
+function dqHieuQua(C,past,M,set){
+  const d=D(),wOrd=+set.winnerOrders||100,pot=+set.potential||30,chs=CHANNELS.filter(ch=>ch.needId);
+  const yr=M.mon>MONTH.mon?MONTH.year-1:MONTH.year,ym=yr+"-"+String(M.mon).padStart(2,"0");
+  const gTarget=k=>sum(d.products||[],p=>sum(pKenhs(p).filter(e=>!k||e.kenh===k),e=>+e.gmv||0));
+  const st=cs=>{const ps=cs.filter(c=>c.step==="xong"),rp=ps.filter(c=>c.hist||+c.view>0),view=sum(rp,c=>+c.view||0),click=sum(rp,c=>+c.click||0),don=sum(ps,c=>+c.don||0),gmv=sum(ps,c=>+c.gmv||0);
+    return {dang:ps.length,rp:rp.length,view,click,don,gmv,gpv:ps.length?gmv/ps.length:0,vtb:rp.length?view/rp.length:0,dead:rp.filter(c=>(+c.view||0)<1000).length,ctr:view?click/view*100:0,chot:click?don/click*100:0,
+      win:ps.filter(c=>(+c.don||0)>=wOrd).length,tn:ps.filter(c=>(+c.don||0)>=pot&&(+c.don||0)<wOrd).length,top:ps.filter(c=>+c.gmv>0).sort((a,b)=>b.gmv-a.gmv).slice(0,5)}};
+  const R=chs.map(ch=>({ch,s:st(C.filter(c=>c.kenh===ch.k)),gt:gTarget(ch.k)})).filter(r=>r.s.dang||r.gt||dqPlanOf(r.ch.k)),T=st(C.filter(c=>chOf(c.kenh).needId)),gtT=gTarget("");
+  const p1=v=>v?v.toFixed(1).replace(".",",")+"%":"—",gcell=(g,t)=>`${money(g)}${t?`<div class="mut" style="font-size:11px">${dqPct(g,t)}% mục tiêu ${money(t)}</div>`:""}`;
+  const row=(lb,s,gt,cls)=>`<tr class="${cls||""}"><td>${lb}</td><td>${nf(s.dang)}</td><td>${gcell(s.gmv,gt)}</td><td>${nf(s.don)}</td><td>${money(s.gpv)}</td><td>${nf(s.view)}</td><td>${nf(Math.round(s.vtb))}</td><td>${s.rp?(s.dead?`<span class="red">${s.dead}</span>`:"0"):"—"}</td><td>${p1(s.ctr)}</td><td>${p1(s.chot)}</td><td>${nf(s.win)}</td><td>${nf(s.tn)}</td><td>${s.dang?dqPc(dqPct(s.win,s.dang)):"—"}</td></tr>`;
+  const imp=(d.imports||[]).find(i=>i.loai==="TikTok"),noRp=T.dang-T.rp;
+  const tbl=`<div class="card dqc" style="margin-bottom:14px"><h2 class="dqh">💹 Hiệu quả kênh <small>${imp?"báo cáo TikTok nhập gần nhất: "+esc(imp.range||imp.at||""):"chưa nhập báo cáo TikTok"}${noRp>0?` · ${noRp} video đã đăng chưa có số view`:""}</small></h2>
+   <div style="overflow-x:auto"><table class="dqt"><tr><th>Kênh</th><th>Đã đăng</th><th>GMV</th><th>Đơn</th><th>GMV / video</th><th>View</th><th>View TB / video</th><th title="Video đã có báo cáo mà dưới 1.000 view">Video &lt;1k view</th><th title="Click vào sản phẩm / view">Tỷ lệ bấm</th><th title="Đơn / click">Tỷ lệ chốt</th><th>Win (≥${wOrd} đơn)</th><th>Tiềm năng</th><th>Tỷ lệ win</th></tr>
+   ${R.map(r=>row(esc(r.ch.short),r.s,r.gt)).join("")||`<tr><td colspan="13" class="empty">Chưa có video đăng ở kênh TikTok nào.</td></tr>`}${R.length>1?row("Tất cả kênh",T,gtT,"tot"):""}</table></div></div>`;
+  /* video win: nội bộ, KOC, đã nhân bản */
+  const inM=v=>{const H=v.hist||[];return H.length?H.some(h=>String(h.f||"").startsWith(ym)||String(h.t||"").startsWith(ym)):!past};
+  const koc=(d.kocVideos||[]).filter(inM),kW=koc.filter(v=>(+v.don||0)>=wOrd),kT=koc.filter(v=>(+v.don||0)>=pot&&(+v.don||0)<wOrd);
+  const W=(typeof winners==="function"?winners():[]).filter(w=>w.loai==="Winner"),nbN=w=>typeof winVars==="function"?winVars("TT-"+w.key).length:0,daNb=W.filter(w=>nbN(w)>0).length;
+  const k=(cl,ic,lb,v,sub)=>`<div class="${cl}"><small>${ic} ${lb}</small><b>${v}</b><i>${sub}</i></div>`;
+  const wins=`<div class="dqk" style="grid-template-columns:repeat(5,minmax(0,1fr))">${k("p","🏆","Win nội bộ",nf(T.win),"video team làm trong tháng")}${k("b","✨","Tiềm năng nội bộ",nf(T.tn),"≥"+pot+" đơn")}${k("g","🤝","Win KOC",nf(kW.length),kT.length+" video KOC tiềm năng")}${k("a","🧬","Win đã nhân bản",nf(daNb),"trên "+W.length+" video win")}${k("r","⏳","Win chưa nhân bản",nf(W.length-daNb),"nên giao nhân bản")}</div>`;
+  /* top 5 video theo GMV từng kênh */
+  const tops=R.filter(r=>r.s.top.length);
+  const topHtml=tops.length?`<h2 class="dqh">🔝 Top 5 video theo GMV từng kênh</h2><div class="dqch">${tops.map(r=>`<div><div class="hd">${esc(r.ch.short)}</div><table class="dqt"><tr><th>Video</th><th>View</th><th>Đơn</th><th>GMV</th></tr>${r.s.top.map(c=>`<tr class="clk" data-card="${esc(c.id)}"><td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(c.hookText||c.yTuong||"")}">${esc(String(c.hookText||c.yTuong||c.id).slice(0,40))}</td><td>${nf(c.view)}</td><td>${nf(c.don)}</td><td>${money(c.gmv)}</td></tr>`).join("")}</table></div>`).join("")}</div>`:"";
+  return tbl+wins+topHtml}
 /* Bấm thẻ kênh (chị Hoa 02/11): cửa sổ chi tiết — số tổng, theo sản phẩm, theo người, danh sách video chưa đăng (bấm mở thẻ Điều phối) */
 const DQ_ST=[["chua","Chưa làm"],["lam","Đang làm"],["sua","Cần sửa"],["dkb","Chờ duyệt kịch bản"],["dvd","Chờ duyệt video"],["cho","Duyệt xong, chờ đăng"],["dang","Đã đăng"]];
 function dqChOpen(r,cs,past,M){const ch=r.ch,u=ch.needId?"video":"bài",late=c=>typeof isLate==="function"&&c.step!=="xong"&&isLate(c);
