@@ -751,3 +751,4 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 .tkstep span{flex:1 1 auto;text-align:center;font-size:12.5px;padding:6px 8px;border-radius:999px;background:var(--gray-soft,#eef0f4);color:#667085;white-space:nowrap}
 .tkstep span.ok{background:#e6f4ea;color:#2b8a3e}.tkstep span.on{background:#2f6fde;color:#fff;font-weight:700}.tkstep span.on.back{background:#e03131}
 .tkprog{height:6px;border-radius:6px;background:var(--gray-soft,#eef0f4);overflow:hidden;margin:2px 0}.tkprog i{display:block;height:100%;background:#2f9e44}
+.tkpc{min-width:120px}.tkpc small{color:#667085;font-size:12px}
