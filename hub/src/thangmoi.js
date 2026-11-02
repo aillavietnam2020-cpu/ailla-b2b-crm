@@ -72,6 +72,8 @@ function tmCheck(silent){
     DB.mutate("Hệ thống","tự chuyển sang tháng "+real,dt=>tmRoll(dt,real));
     tmApply(real);changed=true
   }
+  /* trang mở với tháng mặc định trong code rồi mới đổi sang tháng của dữ liệu: tính lại "hôm nay" theo tháng mới (02/11: còn giữ ngày 31 của tháng 10 làm số trễ, số chậm sai) */
+  if(changed&&typeof syncToday==="function")syncToday();
   if(changed&&!silent&&typeof render==="function")render()
 }
 {
