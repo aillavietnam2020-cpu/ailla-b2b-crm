@@ -752,3 +752,15 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 .tkstep span.ok{background:#e6f4ea;color:#2b8a3e}.tkstep span.on{background:#2f6fde;color:#fff;font-weight:700}.tkstep span.on.back{background:#e03131}
 .tkprog{height:6px;border-radius:6px;background:var(--gray-soft,#eef0f4);overflow:hidden;margin:2px 0}.tkprog i{display:block;height:100%;background:#2f9e44}
 .tkpc{min-width:120px}.tkpc small{color:#667085;font-size:12px}
+.cvmore{font:inherit;font-size:13.5px;padding:6px 10px;border:1px solid var(--line,#e3e6ee);border-radius:9px;background:#fff;cursor:pointer}.cvmore.on{border-color:#4c6ef5;background:#eef2ff;font-weight:700}
+.cvsub{display:flex;justify-content:flex-end;margin:-4px 0 8px}
+.cvmoref{display:inline-flex}.cvmoref>summary{cursor:pointer;font-size:13.5px;padding:6px 10px;border:1px solid var(--line,#e3e6ee);border-radius:9px;background:#fff;list-style:none}.cvmoref[open]{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px}details.cvvid>summary h2{margin:0}
+/* bảng việc gọn: chữ nhỏ, mỗi việc một dòng thấp (chị Hoa 02/11) */
+.cvtk table{font-size:13px}.cvtk th{font-size:12px;padding:6px 10px}.cvtk td{padding:5px 10px;vertical-align:middle}
+.cvtk td b{font-size:13px;font-weight:600}.cvtk td:first-child small,.cvtk td:nth-child(2) small{display:none}
+.cvtk .av{width:20px;height:20px;font-size:11px;line-height:20px;margin-right:4px}
+.cvtk .pill{font-size:11.5px;padding:1px 7px}.cvtk .btn.sm{padding:3px 10px;font-size:12px}
+.cvtk .tkpc{display:flex;align-items:center;gap:6px;min-width:0}.cvtk .tkprog{width:60px;flex:none;margin:0}.cvtk .tkpc small{font-size:11.5px;white-space:nowrap}
+.cvtiles{gap:8px!important}.cvtiles .cvtile{padding:6px 12px!important;min-height:0!important}.cvtiles .cvtile span{font-size:12px}.cvtiles .cvtile b{font-size:17px!important}
+.cvvbar{flex-wrap:wrap;align-items:center}.cvvbar select.cvmore{width:auto!important;flex:none!important;max-width:200px;margin:0}.cvvbar .btn{flex:none;width:auto}
