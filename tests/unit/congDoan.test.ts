@@ -56,6 +56,8 @@ describe('Công đoạn của việc giao', () => {
     h.tkCdAct('t1', 'c', 'xong');
     expect(t.st).toBe('done');
     expect(h.notes.some(([, tx]: [string, string]) => /đã xong hết/.test(tx))).toBe(true);
+    // ngày xong để tính đúng hạn: từng công đoạn và cả việc
+    expect([t.cd[0].xongNgay, t.xongNgay]).toEqual([20, 20]);
   });
 
   it('duyệt trả lại: mở lại công đoạn làm gần nhất và báo người làm', () => {

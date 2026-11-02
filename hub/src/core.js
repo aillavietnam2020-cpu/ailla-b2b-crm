@@ -123,7 +123,7 @@ const sum=(a,f)=>a.reduce((x,c)=>x+(+f(c)||0),0);
 const dow=d=>(((d-1+MONTH.first)%7)+7)%7;
 /* ngày <= 0 là ngày của tháng trước (việc dở sang tháng mới vẫn giữ hạn cũ) */
 const tmDateLbl=d=>{const t=new Date(MONTH.year,MONTH.mon-1,d);return String(t.getDate()).padStart(2,"0")+"/"+String(t.getMonth()+1).padStart(2,"0")};
-const dd=d=>d?(d>0?(d<10?"0":"")+d+"/"+String(MONTH.mon).padStart(2,"0"):tmDateLbl(d)):"—";
+const dd=d=>d?(d>0&&d<=MONTH.ndays?(d<10?"0":"")+d+"/"+String(MONTH.mon).padStart(2,"0"):tmDateLbl(d)):"—";
 const weekOf=d=>{if(!d||d<1)return 0;for(const w of WEEKS)if(d<=w.den)return w.w;return WEEKS.length?WEEKS[WEEKS.length-1].w:5};
 const WEEKS=[{w:1,tu:1,den:4},{w:2,tu:5,den:11},{w:3,tu:12,den:18},{w:4,tu:19,den:25},{w:5,tu:26,den:31}];
 const nowHM=()=>new Date().toTimeString().slice(0,5);

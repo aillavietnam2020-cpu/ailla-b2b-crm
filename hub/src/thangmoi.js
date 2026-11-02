@@ -43,7 +43,9 @@ function tmRoll(dt,newKey){
   (dt.orders||[]).forEach(o=>{if(o.trangThai==="Xong"){o.thang=o.thang||oldKey;L.orders.push(o)}else{o.han=sh(o.han);keepO.push(o)}});
   dt.orders=keepO;
   const keepT=[];
-  (dt.tasks||[]).forEach(t=>{if(t.st==="done"){t.thang=t.thang||oldKey;L.tasks.push(t)}else{t.han=sh(t.han);if(t.batDau)t.batDau=sh(t.batDau);keepT.push(t)}});
+  /* việc: dời mọi mốc ngày, kể cả mốc đã trễ (âm) và mốc tháng sau, để số ngày trễ / ngày hạn vẫn đúng */
+  const shT=v=>(+v?+v-off:v);
+  (dt.tasks||[]).forEach(t=>{if(t.st==="done"){t.thang=t.thang||oldKey;L.tasks.push(t)}else{t.han=shT(t.han);if(t.batDau)t.batDau=shT(t.batDau);if(t.bd)t.bd=shT(t.bd);if(t.hanCu)t.hanCu=shT(t.hanCu);if(t.treReq&&t.treReq.hanMoi)t.treReq.hanMoi=shT(t.treReq.hanMoi);(t.cd||[]).forEach(s=>{s.han=shT(s.han);if(s.xongNgay)s.xongNgay=shT(s.xongNgay)});keepT.push(t)}});
   dt.tasks=keepT;
   L.shoots=L.shoots.concat((dt.shoots||[]).map(s=>Object.assign({thang:oldKey},s)));
   dt.shoots=[];
