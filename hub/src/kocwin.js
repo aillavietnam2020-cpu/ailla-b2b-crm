@@ -37,6 +37,9 @@ function kocImport(u,res,quiet){
 const _applyTikTokKoc=applyTikTok;
 applyTikTok=function(u,res,kenh){const cl=_applyTikTokKoc(u,res,kenh);kocImport(u,res,true);return cl};
 
+/* Chị Hoa 02/11: trang KOC có ô chọn ngày riêng (mặc định tháng này) cạnh ô kỳ chung trên cùng nên tháng 10 không hiện số.
+   Giờ chỉ dùng ô kỳ chung (PERIOD): kocSync() chép kỳ chung vào KOCF trước khi vẽ. */
+const kocSync=()=>{if(typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from){KOCF.f=PERIOD.from;KOCF.t=PERIOD.to}};
 let KOCF=(()=>{const t=new Date(),y=t.getFullYear(),m=t.getMonth(),z=n=>String(n).padStart(2,"0");return {st:"all",sku:"",top:10,k:"mo",f:`${y}-${z(m+1)}-01`,t:`${y}-${z(m+1)}-${z(new Date(y,m+1,0).getDate())}`}})();
 /* Số của một video trong khoảng ngày chọn: cộng các lần nhập báo cáo nằm trọn trong khoảng (bỏ báo cáo chồng ngày) */
 const kocHist=v=>{if(v.hist&&v.hist.length)return v.hist;const m=String(v.ky||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);return m?[{f:m[1],t:m[2],d:v.don,g:v.gmv,v:v.view,c:v.click}]:[]};
@@ -46,7 +49,7 @@ function kocIn(v,f,t){const H=kocHist(v).filter(h=>h.f>=f&&h.t<=t).sort((a,b)=>(
 const KOC_ST=[["all","Tất cả"],["pot","Chờ check (từ ngưỡng tiềm năng)"],["win","Đã duyệt vào kho win"],["bo","Bỏ qua"]];
 const kocUpBtn=()=>""; // tải báo cáo KOC làm ở menu Nhập báo cáo
 function kocSection(){
-  const d=D(),S=d.settings,all=d.kocVideos||[],can=kocCan(),pot=S.potential||30,F=KOCF;
+  kocSync();const d=D(),S=d.settings,all=d.kocVideos||[],can=kocCan(),pot=S.potential||30,F=KOCF;
   const R=all.map(v=>{const x=kocIn(v,F.f,F.t);return x?Object.assign({},v,x):null}).filter(Boolean);
   const stOk=v=>F.st==="all"||(F.st==="pot"?v.don>=pot&&!v.st:v.st===F.st);
   const L=R.filter(v=>stOk(v)&&(!F.sku||v.sku===F.sku)).sort((a,b)=>b.don-a.don||b.gmv-a.gmv).slice(0,Math.max(1,+F.top||10));
@@ -62,10 +65,10 @@ function kocSection(){
 }
 function kocBind(m){
   const fi=$("#koc-fi");if(fi){$("#koc-up").onclick=()=>fi.click();fi.onchange=async()=>{const f=fi.files[0];if(!f)return;const rows=await readXlsx(f);const res=parseTikTok(rows,f.name);if(res.err){toast(res.err);return}
-    const mR=String(res.range||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);if(mR&&(mR[1]<KOCF.f||mR[2]>KOCF.t)){KOCF.k="c";KOCF.f=mR[1];KOCF.t=mR[2]}kocImport(ME,res,false);renderMain()}}
+    const mR=String(res.range||"").match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);if(mR&&(mR[1]<KOCF.f||mR[2]>KOCF.t)&&typeof setPeriod==="function"){kocImport(ME,res,false);setPeriod({k:"c",from:mR[1],to:mR[2],label:"Tùy chọn"});return}kocImport(ME,res,false);renderMain()}}
   const mo=off=>{const t=new Date(),y=t.getFullYear(),mm=t.getMonth()+off,a=new Date(y,mm,1),b=new Date(y,mm+1,0),z=n=>String(n).padStart(2,"0");return [`${a.getFullYear()}-${z(a.getMonth()+1)}-01`,`${b.getFullYear()}-${z(b.getMonth()+1)}-${z(b.getDate())}`]};
   $("#koc-top").onchange=e=>{let v=e.target.value;if(v==="__"){v=prompt("Hiện top bao nhiêu video?","15");if(!v||!(+v>0)){renderMain();return}}KOCF.top=Math.round(+v);renderMain()};
-  $("#koc-rg").onclick=ev=>{ev.stopPropagation();drpOpen($("#koc-rg"),{from:KOCF.f,to:KOCF.t,preset:""},KHO_PRESETS.map(([k,t])=>[k,t,()=>khoPresetRange(k)]),r=>{KOCF.k="c";KOCF.f=r.from;KOCF.t=r.to;renderMain()})};
+  if($("#koc-rg"))$("#koc-rg").onclick=ev=>{ev.stopPropagation();drpOpen($("#koc-rg"),{from:KOCF.f,to:KOCF.t,preset:""},KHO_PRESETS.map(([k,t])=>[k,t,()=>khoPresetRange(k)]),r=>{KOCF.k="c";KOCF.f=r.from;KOCF.t=r.to;renderMain()})};
   $("#koc-st").onchange=e=>{KOCF.st=e.target.value;renderMain()};$("#koc-s").onchange=e=>{KOCF.sku=e.target.value;renderMain()};
   if($("#koc-own"))$("#koc-own").onclick=()=>{const v=prompt("Tên tài khoản TikTok của shop (cách nhau dấu phẩy). Video của các tài khoản này không tính là KOC:",ownAccs().join(", "));if(v===null)return;DB.mutate(ME.name,"tài khoản shop TikTok",dt=>{dt.settings.ownAccs=v.split(",").map(s=>s.trim().replace(/^@/,"")).filter(Boolean)});renderMain()};
   m.querySelectorAll("[data-kocw]").forEach(x=>x.onclick=()=>{const v=(D().kocVideos||[]).find(y=>y.id===x.dataset.kocw);if(!v)return;
@@ -77,10 +80,10 @@ function kocBind(m){
 }
 
 /* Chọn thời gian cho cả trang KOC (dải số + TOP KOC) */
-const kocTimeCtl=()=>{const F=KOCF;return `<span class="kocper"><button type="button" class="btn rcbtn" id="koc-rg">📅 ${esc(kocVnd(F.f))} – ${esc(kocVnd(F.t))} ▾</button></span>`};
+const kocTimeCtl=()=>"";
 const kocVnd=s=>s?s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4):"";
 function kocKpis(){
-  const d=D(),S=d.settings,F=KOCF,R=(d.kocVideos||[]).map(v=>{const x=kocIn(v,F.f,F.t);return x?Object.assign({},v,x):null}).filter(Boolean);
+  kocSync();const d=D(),S=d.settings,F=KOCF,R=(d.kocVideos||[]).map(v=>{const x=kocIn(v,F.f,F.t);return x?Object.assign({},v,x):null}).filter(Boolean);
   const imps=(d.kocImports||[]).filter(i=>{const f=i.f||((String(i.range||"").match(/(\d{4}-\d{2}-\d{2})/)||[])[1]||""),t=i.t||((String(i.range||"").match(/~\s*(\d{4}-\d{2}-\d{2})/)||[])[1]||"");return f&&f>=F.f&&t<=F.t});
   const gmv=sum(R,v=>v.gmv||0),don=sum(R,v=>v.don||0),sold=R.filter(v=>v.don>0),accSold=new Set(sold.map(v=>v.acc)).size;
   const accAll=imps.some(i=>i.accs)?new Set(imps.flatMap(i=>i.accs||[])).size:Math.max(0,...imps.map(i=>i.koc||0));
