@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canSeeTeam, fileKind, folderIdFrom, locate, normalizeConfig, teamsFor, type DriveMeta } from '../../src/server/lib/driveAccess';
+import { canSeeTeam, fileKind, folderIdFrom, locate, normalizeConfig, rootsFor, teamsFor, type DriveMeta } from '../../src/server/lib/driveAccess';
 
 const ID_CM = '1AbCdEfGhIjKlMnOpQrStUv';
 const ID_ADS = '1ZyXwVuTsRqPoNmLkJiHgFe';
@@ -91,5 +91,44 @@ describe('saKey', () => {
     const k = saKey('﻿{"client_email":"a@b.iam.gserviceaccount.com","private_key":"x"}\r\n');
     expect(k?.client_email).toBe('a@b.iam.gserviceaccount.com');
     expect(saKey('khong phai json')).toBeNull();
+  });
+});
+
+describe('thư mục dùng chung chứa thư mục phòng', () => {
+  // AILLA CENTER AI (chung, mọi người) chứa TEAM CONTENT (CM) và TEAM DIGITAL (ADS)
+  const tree: Record<string, DriveMeta> = {
+    center: { name: 'AILLA CENTER AI', parents: ['mydrive'] },
+    content: { name: 'TEAM CONTENT', parents: ['center'] },
+    digital: { name: 'TEAM DIGITAL', parents: ['center'] },
+    dx: { name: 'Báo cáo Ads', parents: ['digital'] },
+    brand: { name: 'BRAND ASSETS', parents: ['center'] },
+  };
+  const meta = async (id: string) => tree[id] ?? null;
+  const cfg = normalizeConfig({
+    teams: [
+      { pb: 'CM', folderId: 'content', viewers: [] },
+      { pb: 'ADS', folderId: 'digital', viewers: [] },
+      { pb: 'chung1', folderId: 'center', viewers: ['all'], name: 'AILLA CENTER AI' },
+    ],
+  });
+  it('mã thư mục sai dạng (quá ngắn) bị bỏ', () => expect(cfg.teams).toHaveLength(0));
+  const cfg2 = { teams: [
+    { pb: 'CM', folderId: 'content', viewers: [] },
+    { pb: 'ADS', folderId: 'digital', viewers: [] },
+    { pb: 'chung1', folderId: 'center', viewers: ['all'], name: 'AILLA CENTER AI' },
+  ] };
+  const nv = { phongBan: 'CM', role: 'content' };
+  it('mọi người thấy thư mục chung', () => {
+    expect(teamsFor(cfg2, nv, false).map((t) => t.pb)).toEqual(['CM', 'chung1']);
+  });
+  it('đi từ thư mục chung vào thư mục Digital thì bị chặn (gốc gần nhất là Digital)', async () => {
+    const roots = rootsFor(cfg2, nv, false);
+    expect((await locate('dx', roots, meta))?.pb).toBe('');
+    expect((await locate('brand', roots, meta))?.pb).toBe('chung1');
+    expect((await locate('content', roots, meta))?.pb).toBe('CM');
+  });
+  it('nhận tên thư mục chung và quyền all', () => {
+    const c = normalizeConfig({ teams: [{ pb: 'chung1', folderId: ID_CM, viewers: ['all', 'bad'], name: '  Kho ảnh  ' }] });
+    expect(c.teams[0]).toEqual({ pb: 'chung1', folderId: ID_CM, viewers: ['all'], name: 'Kho ảnh' });
   });
 });

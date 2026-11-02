@@ -6,11 +6,13 @@
  *  - Người trong phòng ban luôn xem được thư mục của phòng mình.
  *  - Mỗi thư mục có thể cho xem thêm: "pb:ADS" = cả phòng Ads/Digital, "lead:CM" = trưởng nhóm / trưởng phòng của
  *    phòng Content, "lead:*" = trưởng nhóm / trưởng phòng mọi phòng.
+ *  - Thư mục dùng chung (không thuộc riêng phòng nào, mã bắt đầu bằng "chung"): có tên riêng; "all" = mọi người có tài khoản.
+ *  - Thư mục nằm trong thư mục khác: tính theo thư mục gốc GẦN NHẤT, nên thư mục phòng nằm trong thư mục chung vẫn chỉ phòng đó xem.
  *  - CEO thấy tất cả.
  * Phòng ban, vai trò của từng người lấy ở bản dữ liệu chung, nhưng chỉ CEO đổi được hai ô đó (lib/stateGuard.ts),
  * nên dùng làm căn cứ phân quyền được.
  */
-export type DriveTeam = { pb: string; folderId: string; viewers: string[] };
+export type DriveTeam = { pb: string; folderId: string; viewers: string[]; name?: string };
 export type DriveConfig = { teams: DriveTeam[] };
 export type DriveUser = { phongBan?: string; role?: string; active?: boolean };
 
@@ -36,10 +38,12 @@ export function normalizeConfig(raw: unknown): DriveConfig {
     const folderId = folderIdFrom(String(t.folderId ?? ''));
     if (!pb || !folderId || seen.has(pb)) continue;
     seen.add(pb);
+    if (!/^[A-Za-z0-9_-]{1,20}$/.test(pb)) continue;
     const viewers = Array.isArray(t.viewers)
-      ? [...new Set(t.viewers.map(String).filter((v) => /^(pb|lead):[A-Za-z0-9_*-]{1,20}$/.test(v)))]
+      ? [...new Set(t.viewers.map(String).filter((v) => /^(all|(pb|lead):[A-Za-z0-9_*-]{1,20})$/.test(v)))]
       : [];
-    teams.push({ pb, folderId, viewers });
+    const name = String(t.name ?? '').trim().slice(0, 60);
+    teams.push(name ? { pb, folderId, viewers, name } : { pb, folderId, viewers });
   }
   return { teams };
 }
@@ -51,6 +55,7 @@ export function canSeeTeam(team: DriveTeam, user: DriveUser | null, isCeo: boole
   const lead = LEAD_ROLES.includes(user.role ?? '');
   if (pb && pb === team.pb) return true;
   return team.viewers.some((v) => {
+    if (v === 'all') return true;
     const [kind, code] = v.split(':');
     if (kind === 'pb') return !!pb && code === pb;
     if (kind === 'lead') return lead && (code === '*' || code === pb);
@@ -60,6 +65,13 @@ export function canSeeTeam(team: DriveTeam, user: DriveUser | null, isCeo: boole
 
 export const teamsFor = (cfg: DriveConfig, user: DriveUser | null, isCeo: boolean) =>
   cfg.teams.filter((t) => canSeeTeam(t, user, isCeo));
+
+/**
+ * Mọi thư mục gốc đã gán → mã phòng; thư mục người này KHÔNG được xem thì mã rỗng ('').
+ * Dùng với locate: gốc gần nhất là thư mục bị chặn thì locate trả pb '' và nơi gọi phải từ chối.
+ */
+export const rootsFor = (cfg: DriveConfig, user: DriveUser | null, isCeo: boolean) =>
+  new Map(cfg.teams.map((t) => [t.folderId, canSeeTeam(t, user, isCeo) ? t.pb : '']));
 
 export type DriveMeta = { name: string; parents: string[] };
 
@@ -80,7 +92,7 @@ export async function locate(
     const m = await meta(cur);
     if (!m) return null;
     const pb = roots.get(cur);
-    if (pb) return { pb, path: [{ id: cur, name: m.name }] };
+    if (pb !== undefined) return { pb, path: [{ id: cur, name: m.name }] };
     for (const p of m.parents) {
       const up = await walk(p, depth + 1, seen);
       if (up) return { pb: up.pb, path: [...up.path, { id: cur, name: m.name }] };

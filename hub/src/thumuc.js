@@ -26,7 +26,9 @@ async function tmTeams(force){
 }
 async function tmLoadList(){
   const key=TM.pb+"|"+TM.folder;if(TM.listKey===key&&TM.list)return;TM.listKey=key;TM.list={loading:true};
-  try{const r=await svApi("/api/drive/list?pb="+encodeURIComponent(TM.pb)+(TM.folder?"&folder="+encodeURIComponent(TM.folder):""));if(TM.listKey===key)TM.list=r}
+  try{const r=await svApi("/api/drive/list?pb="+encodeURIComponent(TM.pb)+(TM.folder?"&folder="+encodeURIComponent(TM.folder):""));
+    /* Mở thư mục của phòng khác nằm trong thư mục chung: máy chủ trả về đúng phòng của thư mục đó. */
+    if(TM.listKey===key){if(r.pb&&r.pb!==TM.pb){TM.pb=r.pb;TM.listKey=r.pb+"|"+TM.folder}TM.list=r}}
   catch(e){if(TM.listKey===key)TM.list={err:e.message||"Không tải được thư mục"}}
   tmRedraw();
 }
@@ -111,16 +113,25 @@ function tmCfgHtml(){
     <ol style="margin:8px 0 0 18px;padding:0;line-height:1.7"><li>Mở thư mục của phòng trên Google Drive → Chia sẻ → thêm ${C.sa_email?`<b style="word-break:break-all">${esc(C.sa_email)}</b> <button class="btn sm" id="tm-cp">Chép</button>`:"email tài khoản của web"} với quyền <b>Người xem</b>.</li>
     <li>Dán link thư mục vào dòng của phòng bên dưới, chọn ai được xem thêm, bấm Lưu. Cột Kết nối báo web đã thấy thư mục chưa.</li></ol>
     <p class="hint" style="margin:8px 0 0">Người trong phòng luôn xem được thư mục phòng mình; CEO xem được tất cả. Web chỉ xem, không sửa hay xóa file trên Drive.</p></div>`;
-  const extra=(pb,t)=>{const v=new Set((t&&t.viewers)||[]);const opts=[["lead:*","Trưởng nhóm, trưởng phòng mọi phòng"]].concat(D_.filter(d=>d.k!==pb).flatMap(d=>[["lead:"+d.k,"Trưởng nhóm / trưởng phòng "+d.n],["pb:"+d.k,"Cả phòng "+d.n]]));
-    return `<details><summary class="hint" style="cursor:pointer">${v.size?esc(opts.filter(o=>v.has(o[0])).map(o=>o[1]).join(", ")):"Chỉ người trong phòng"}</summary><div style="display:grid;gap:4px;margin-top:6px">${opts.map(([k,n])=>`<label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" style="width:auto" data-tmvw="${esc(pb)}" value="${esc(k)}"${v.has(k)?" checked":""}> ${esc(n)}</label>`).join("")}</div></details>`};
+  const extra=(pb,t,all)=>{const v=new Set((t&&t.viewers)||[]);const opts=(all?[["all","Mọi người có tài khoản web"]]:[]).concat([["lead:*","Trưởng nhóm, trưởng phòng mọi phòng"]]).concat(D_.filter(d=>d.k!==pb).flatMap(d=>[["lead:"+d.k,"Trưởng nhóm / trưởng phòng "+d.n],["pb:"+d.k,"Cả phòng "+d.n]]));
+    return `<details><summary class="hint" style="cursor:pointer">${v.size?esc(opts.filter(o=>v.has(o[0])).map(o=>o[1]).join(", ")):all?"Chưa chọn ai (chỉ CEO)":"Chỉ người trong phòng"}</summary><div style="display:grid;gap:4px;margin-top:6px">${opts.map(([k,n])=>`<label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" style="width:auto" data-tmvw="${esc(pb)}" value="${esc(k)}"${v.has(k)?" checked":""}> ${esc(n)}</label>`).join("")}</div></details>`};
   const rows=D_.map(d=>{const t=by[d.k];const st=!t?pill("Chưa gán","gry"):!C.connected?pill("Chờ nối Drive","amb"):t.ok?pill("Đã thấy: "+(t.folder_name||"thư mục"),"grn"):pill("Chưa chia sẻ cho web","amb");
     return `<tr><td><b>${esc(d.n)}</b></td><td style="min-width:240px"><input id="tm-f-${esc(d.k)}" data-tmfo="${esc(d.k)}" placeholder="Dán link thư mục Google Drive" value="${t?esc("https://drive.google.com/drive/folders/"+t.folderId):""}"></td><td style="min-width:220px">${extra(d.k,t)}</td><td>${st}</td></tr>`});
-  return guide+`<section class="card flush">${tbl(["Phòng ban","Thư mục Drive gốc","Ai được xem thêm","Kết nối"],rows)}<div class="pad" style="display:flex;gap:10px;align-items:center"><button class="btn pri" id="tm-save"${TM.saving?" disabled":""}>${TM.saving?"Đang lưu…":"Lưu"}</button><span class="hint">Để trống link = phòng đó chưa có thư mục.</span></div></section>`;
+  /* Thư mục dùng chung (không thuộc riêng phòng nào): mã "chung1", "chung2"…; luôn có thêm một dòng trống để thêm mới. */
+  const isDept=pb=>D_.some(d=>d.k===pb);
+  const sh=C.teams.filter(t=>!isDept(t.pb));let n=1;const used=new Set(C.teams.map(t=>t.pb));const nextPb=()=>{while(used.has("chung"+n))n++;used.add("chung"+n);return "chung"+n};
+  const shRows=sh.concat([{pb:nextPb(),folderId:"",viewers:["all"],name:"",blank:true}]).map(t=>{const st=t.blank?"":!C.connected?pill("Chờ nối Drive","amb"):t.ok?pill("Đã thấy: "+(t.folder_name||"thư mục"),"grn"):pill("Chưa chia sẻ cho web","amb");
+    return `<tr><td style="min-width:180px"><input data-tmnm="${esc(t.pb)}" placeholder="${t.blank?"Thêm thư mục chung: tên":"Tên thư mục"}" value="${esc(t.name||"")}"></td><td style="min-width:240px"><input data-tmfo="${esc(t.pb)}" placeholder="Dán link thư mục Google Drive" value="${t.folderId?esc("https://drive.google.com/drive/folders/"+t.folderId):""}"></td><td style="min-width:220px">${extra(t.pb,t,true)}</td><td>${st}</td></tr>`});
+  return guide+`<section class="card flush">${tbl(["Phòng ban","Thư mục Drive gốc","Ai được xem thêm","Kết nối"],rows)}</section>
+  <h3 style="margin:18px 0 6px">Thư mục dùng chung</h3><p class="hint" style="margin:0 0 8px">Thư mục không thuộc riêng phòng nào (thư mục chung công ty, kho hình ảnh thương hiệu…). Thư mục phòng nằm bên trong vẫn chỉ phòng đó xem.</p>
+  <section class="card flush">${tbl(["Tên hiện trên web","Thư mục Drive","Ai được xem","Kết nối"],shRows)}<div class="pad" style="display:flex;gap:10px;align-items:center"><button class="btn pri" id="tm-save"${TM.saving?" disabled":""}>${TM.saving?"Đang lưu…":"Lưu"}</button><span class="hint">Để trống link = bỏ thư mục đó.</span></div></section>`;
 }
 function tmCfgBind(m){
   const cp=$("#tm-cp");if(cp)cp.onclick=()=>{try{navigator.clipboard.writeText(TM.cfg.sa_email).then(()=>toast("Đã chép email"),()=>toast(TM.cfg.sa_email))}catch(e){toast(TM.cfg.sa_email)}};
   const sv=$("#tm-save");if(sv)sv.onclick=async()=>{
-    const teams=[...m.querySelectorAll("[data-tmfo]")].map(i=>({pb:i.dataset.tmfo,folder:i.value.trim(),viewers:[...m.querySelectorAll(`[data-tmvw="${CSS.escape(i.dataset.tmfo)}"]:checked`)].map(c=>c.value)})).filter(t=>t.folder);
+    const teams=[...m.querySelectorAll("[data-tmfo]")].map(i=>{const pb=i.dataset.tmfo,nm=m.querySelector(`[data-tmnm="${CSS.escape(pb)}"]`);
+      return {pb,folder:i.value.trim(),name:nm?nm.value.trim():"",viewers:[...m.querySelectorAll(`[data-tmvw="${CSS.escape(pb)}"]:checked`)].map(c=>c.value)}}).filter(t=>t.folder);
+    const noName=teams.find(t=>m.querySelector(`[data-tmnm="${CSS.escape(t.pb)}"]`)&&!t.name);if(noName){toast("Đặt tên cho thư mục dùng chung trước khi lưu");return}
     TM.saving=true;renderMain();
     try{await svApi("/api/drive/config",{method:"PUT",body:JSON.stringify({teams})});toast("Đã lưu thư mục các phòng");TM.teams=null;TM.recent={};TM.list=null;TM.listKey="";await tmCfgLoad();tmTeams(true)}
     catch(e){toast(e.message||"Không lưu được")}

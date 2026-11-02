@@ -8,6 +8,7 @@ import {
   folderIdFrom,
   locate,
   normalizeConfig,
+  rootsFor,
   teamsFor,
   type DriveConfig,
   type DriveUser,
@@ -90,7 +91,7 @@ driveRoutes.get('/teams', async (c) => {
     connected: !!saKey(c.env.GDRIVE_SA_JSON),
     can_manage: ceo,
     my_pb: me?.phongBan ?? '',
-    teams: teamsFor(cfg, me, ceo).map((t) => ({ pb: t.pb, name: name(t.pb), folder_id: t.folderId })),
+    teams: teamsFor(cfg, me, ceo).map((t) => ({ pb: t.pb, name: t.name || name(t.pb), folder_id: t.folderId })),
   });
 });
 
@@ -99,18 +100,25 @@ driveRoutes.get('/list', async (c) => {
   const key = needKey(c.env);
   const { me, ceo } = await who(c);
   const pb = c.req.query('pb') ?? '';
-  const team = teamsFor(await loadConfig(c.env.DB), me, ceo).find((t) => t.pb === pb);
+  const cfg = await loadConfig(c.env.DB);
+  const team = teamsFor(cfg, me, ceo).find((t) => t.pb === pb);
   if (!team) throw forbidden('Bạn chưa được xem thư mục của phòng này.');
   const folder = folderIdFrom(c.req.query('folder') ?? '') ?? team.folderId;
-  const where = await locate(folder, new Map([[team.folderId, team.pb]]), (id) => meta(key, id));
+  const roots = rootsFor(cfg, me, ceo);
+  const where = await locate(folder, roots, (id) => meta(key, id));
   if (!where) {
     if (folder === team.folderId) throw notFound('Web chưa thấy thư mục gốc của phòng này. Kiểm tra thư mục đã chia sẻ cho tài khoản của web chưa.');
     throw forbidden('Thư mục này không nằm trong thư mục của phòng.');
   }
+  // Thư mục của phòng khác nằm trong thư mục chung: gốc gần nhất là thư mục bị chặn thì không cho mở.
+  if (!where.pb) throw forbidden('Bạn chưa được xem thư mục này.');
   const items = await children(key, folder);
   return ok(c, {
+    pb: where.pb,
     path: where.path,
-    folders: items.filter((f) => f.mimeType === 'application/vnd.google-apps.folder').map((f) => ({ id: f.id, name: f.name, modified: f.modifiedTime ?? null })),
+    folders: items
+      .filter((f) => f.mimeType === 'application/vnd.google-apps.folder' && roots.get(f.id) !== '')
+      .map((f) => ({ id: f.id, name: f.name, modified: f.modifiedTime ?? null })),
     files: items.filter((f) => f.mimeType !== 'application/vnd.google-apps.folder').map((f) => shape(f)),
   });
 });
@@ -124,14 +132,14 @@ driveRoutes.get('/find', async (c) => {
   const { me, ceo } = await who(c);
   const q = (c.req.query('q') ?? '').trim().slice(0, 80);
   const pb = c.req.query('pb') ?? '';
-  const mine = teamsFor(await loadConfig(c.env.DB), me, ceo).filter((t) => !pb || t.pb === pb);
-  if (!mine.length) return ok(c, { files: [] });
-  const roots = new Map(mine.map((t) => [t.folderId, t.pb]));
+  const cfg = await loadConfig(c.env.DB);
+  if (!teamsFor(cfg, me, ceo).length) return ok(c, { files: [] });
+  const roots = rootsFor(cfg, me, ceo);
   const limit = q ? 40 : 15;
   const out: ReturnType<typeof shape>[] = [];
   for (const f of await recentFiles(key, q, q ? 300 : 200)) {
     const where = await locate(f.id, roots, (id) => meta(key, id));
-    if (!where) continue;
+    if (!where || !where.pb || (pb && where.pb !== pb)) continue;
     out.push(shape(f, { pb: where.pb, where: where.path.slice(0, -1).map((p) => p.name).join(' › '), folder_id: where.path.at(-2)?.id ?? null }));
     if (out.length >= limit) break;
   }
@@ -156,12 +164,12 @@ driveRoutes.get('/config', async (c) => {
 driveRoutes.put('/config', async (c) => {
   const { auth, ceo } = await who(c);
   if (!ceo) throw forbidden('Chỉ CEO gán thư mục Drive cho phòng ban.');
-  const body = (await c.req.json().catch(() => null)) as { teams?: { pb?: string; folder?: string; viewers?: string[] }[] } | null;
+  const body = (await c.req.json().catch(() => null)) as { teams?: { pb?: string; folder?: string; viewers?: string[]; name?: string }[] } | null;
   if (!body || !Array.isArray(body.teams)) throw badRequest('INVALID', 'Dữ liệu gửi lên không đúng.');
   for (const t of body.teams) {
     if (t?.folder && !folderIdFrom(t.folder)) throw badRequest('INVALID_FOLDER', `Link thư mục của phòng ${t.pb ?? ''} không đúng dạng link Google Drive.`);
   }
-  const cfg = normalizeConfig({ teams: body.teams.map((t) => ({ pb: t?.pb, folderId: t?.folder, viewers: t?.viewers })) });
+  const cfg = normalizeConfig({ teams: body.teams.map((t) => ({ pb: t?.pb, folderId: t?.folder, viewers: t?.viewers, name: t?.name })) });
   await c.env.DB.prepare(
     `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)
      ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
