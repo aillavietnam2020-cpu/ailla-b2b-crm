@@ -115,6 +115,7 @@ function wpGiveLink(d,give){if(!give)return "";const n=gvCount(d);return n?`<div
 })();
 
 /* Tổng quan Content = gộp "Tổng quan" cũ và "Hiệu quả tháng": số lớn + đề xuất AI, tình trạng video theo kênh, rồi nhịp tuần / KPI / sản phẩm / nhân sự */
+let TQC_TAB="kq";
 (function(){
   const tq0=PAGES.mkt_tq,hq0=PAGES.hieuqua;if(!tq0||!hq0||tq0._gop)return;
   const gop=function(m){
@@ -125,13 +126,18 @@ function wpGiveLink(d,give){if(!give)return "";const n=gvCount(d);return n?`<div
     const ph=A.querySelector(":scope > .ph");if(ph)ph.remove();
     const grid=A.querySelector(".hqgrid"),head=B.querySelector(":scope > .ph");
     const top=document.createElement("div");top.innerHTML=tqcTop();
-    const frag=document.createDocumentFragment();
+    /* chị Hoa 02/11: tách 2 phần — Kết quả (số video, doanh thu, KPI, kênh, sản phẩm) và Tiến độ việc (giao, duyệt, ai làm gì, dây chuyền) */
+    const frag=document.createDocumentFragment(),kq=document.createElement("div"),td=document.createElement("div");
     if(head)frag.appendChild(head);
     [...A.children].forEach(x=>{if(x===grid)x.remove();else if(x.classList.contains("demoband"))frag.appendChild(x)});
-    while(top.firstChild)frag.appendChild(top.firstChild);
-    [...B.children].forEach(x=>frag.appendChild(x));
-    [...A.children].forEach(x=>frag.appendChild(x));
+    while(top.firstChild)kq.appendChild(top.firstChild);
+    [...B.children].forEach(x=>td.appendChild(x));
+    [...A.children].forEach(x=>kq.appendChild(x));
+    const tab=TQC_TAB==="td"?"td":"kq",bar=document.createElement("div");bar.className="tabs";
+    bar.innerHTML=[["kq","Kết quả video"],["td","Tiến độ việc"]].map(([k,t])=>`<button type="button" data-tqtab="${k}" class="${k===tab?"on":""}">${t}</button>`).join("");
+    frag.appendChild(bar);frag.appendChild(tab==="td"?td:kq);
     m.innerHTML="";m.appendChild(frag);
+    m.querySelectorAll("[data-tqtab]").forEach(x=>x.onclick=()=>{TQC_TAB=x.dataset.tqtab;renderMain()});
     m.querySelectorAll("[data-tqm]").forEach(x=>x.onclick=()=>{TQC_M=x.dataset.tqm;renderMain()});
     if(typeof bindCommon==="function")bindCommon(m);
   };
