@@ -791,3 +791,14 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .hsw-s{display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 0;border-bottom:1px solid #f0f1f5}.hsw-s>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hsw-load{display:flex;align-items:flex-end;gap:2px;height:22px;width:70px}.hsw-load i{flex:1;min-height:2px;border-radius:2px}
 @media(max-width:900px){.hsw-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.hsw-grid{grid-template-columns:1fr}}
+.hsw-t{flex-direction:row!important;align-items:center;gap:10px}.hsw-tb{display:flex;flex-direction:column;min-width:0;flex:1}.hsw-tb .hsw-bar{margin-top:4px}.hsw-of{font-size:13px;color:#667085;font-weight:600}
+.hsw-ic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center}.hsw-ic svg{width:19px;height:19px}
+.hsw-ring{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;position:relative}.hsw-ring::before{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--card,#fff)}.hsw-ring b{position:relative;font-size:12px;font-style:normal}
+.hsw-ch{padding:12px 14px;margin:0 0 12px}.hsw-chh{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin:0 0 8px}.hsw-chh h3{margin:0;font-size:14px}
+.hsw-lg{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:11.5px;color:#667085}.hsw-lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:-6px}.hsw-lg i.mk{width:0;height:12px;border-left:2px dashed #343a40;border-radius:0}
+.hsw-cr{display:grid;grid-template-columns:150px minmax(0,1fr) 210px;gap:12px;align-items:center;padding:6px 0;border-top:1px solid #f0f1f5}
+.hsw-cn{display:flex;flex-direction:column}.hsw-cn small,.hsw-cv small{color:#667085;font-size:11.5px}
+.hsw-sb{position:relative;display:flex;height:14px;border-radius:7px;background:#eef0f4;overflow:visible}.hsw-sb i{height:100%}.hsw-sb i:first-child{border-radius:7px 0 0 7px}
+.hsw-sb em{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed #343a40}
+.hsw-cv{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.hsw-cv b{font-size:16px}
+@media(max-width:900px){.hsw-cr{grid-template-columns:1fr}}

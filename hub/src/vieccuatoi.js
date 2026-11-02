@@ -18,7 +18,7 @@ async function wkLoad(force){
 }
 /* Chị (CEO): việc của kế toán, kho đã có người phụ trách, xem ở "Toàn cảnh". Ở đây chỉ việc chính chị phải quyết hoặc làm. */
 const wkCeo=()=>!!ME&&ME.role==="admin";
-const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho"].includes(x.group)));const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Tôi cần giao, đốc","Đã nộp, chờ duyệt","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
+const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho"].includes(x.group)));const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Cần phân công / theo dõi","Đã nộp, chờ duyệt","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
 const wkCount=()=>wkMine().reduce((n,x)=>n+x.count,0);
 function wkPage(k){
   const emp=typeof crmRole==="function"&&crmRole()==="EMPLOYEE";
@@ -33,7 +33,7 @@ function wkSec(x){
   const td=D().settings.today,W=WEEKS.find(w=>td>=w.tu&&td<=w.den)||WEEKS[0],g=x.group;
   if(g==="Cần tôi duyệt"||g==="Duyệt")return "Chờ tôi duyệt";
   if(g==="Đang chờ người trước"||g==="Đã nộp, chờ duyệt")return g;
-  if(g==="Tôi cần giao, đốc")return "Quá hạn";
+  if(g==="Cần phân công / theo dõi")return "Quá hạn";
   if(g==="Đến lượt tôi làm"){const h=x.han;return h&&h<td?"Quá hạn":h===td?"Hôm nay":(h&&h<=W.den)?"Tuần này":"Sau này"}
   return g;
 }

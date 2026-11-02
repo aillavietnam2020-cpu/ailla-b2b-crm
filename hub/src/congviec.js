@@ -865,10 +865,10 @@ function cvMyItems(){
     if((t.treReq||{}).st==="cho"&&tkMgr(t))add({key:"g_"+t.id,group:G2,title:t.ten,detail:`${(t.treReq||{}).by||"Người làm"} xin gia hạn${(t.treReq||{}).hanMoi?" đến "+dd(t.treReq.hanMoi):""}`,taskId:t.id});
   });
   if(ME.role==="admin"||ME.role==="lead"){
-    const CL=typeof cvList==="function"?cvList(ME).L:[],n=k=>{const g=CL.find(y=>y.key===k);return g?g.items.filter(i=>!CV_TEST.includes(i.nguoi)).length:0},G4="Tôi cần giao, đốc";
+    const CL=typeof cvList==="function"?cvList(ME).L:[],n=k=>{const g=CL.find(y=>y.key===k);return g?g.items.filter(i=>!CV_TEST.includes(i.nguoi)).length:0},G4="Cần phân công / theo dõi";
     if(n("cg"))add({key:"k_cg",group:G4,title:`${n("cg")} thẻ video 7 ngày tới chưa giao người`,detail:"Giao người viết kịch bản, quay, edit để kịp đăng",count:n("cg"),mod:"mkt",go:"dieuphoi"});
     const late=cvGroup(cvItems().filter(x=>!CV_TEST.includes(x.nguoi))).filter(x=>x.late&&x.st!=="done"&&x.nguoi!==ME_);
-    if(late.length)add({key:"k_tre",group:G4,title:`${late.length} việc của team đang trễ hạn`,detail:"Nhắc hoặc dời hạn: "+[...new Set(late.map(x=>userName(x.nguoi)).filter(Boolean))].slice(0,4).join(", "),count:late.length,age_days:late.reduce((z,x)=>Math.max(z,x.lateD||0),0),go:"cv_nv",st:"late",who:"all"});
+    if(late.length)add({key:"k_tre",group:G4,title:`${late.length} việc của team đang trễ hạn`,detail:"Nhắc người làm hoặc gia hạn: "+[...new Set(late.map(x=>userName(x.nguoi)).filter(Boolean))].slice(0,4).join(", "),count:late.length,age_days:late.reduce((z,x)=>Math.max(z,x.lateD||0),0),go:"cv_nv",st:"late",who:"all"});
     if(n("id"))add({key:"k_id",group:G4,title:`${n("id")} bài đã đăng nhưng thiếu link / ID`,detail:"Nhờ người đăng bổ sung",count:n("id"),go:"cv"});
   }
   const vid=d.cards.filter(c=>ok(c)&&["dkb","dvd","dceo"].includes(c.step)&&(ME.role==="admin"||can(ME,"viec.duyet"))&&(c.step!=="dceo"||ME.role==="admin")).length;
@@ -923,6 +923,18 @@ PAGES.cv_v=m=>pCvV(m);
    Lead / trưởng phòng: team mình. CEO: chọn team.
    ===================================================================== */
 const HSW={team:""};
+/* Tiến độ từng kênh trong tháng: mục tiêu (Kế hoạch tháng) so với đã đăng / đã duyệt / chờ duyệt / đang làm; vạch đứt = đến hôm nay lẽ ra phải đăng được bao nhiêu */
+function hsChanHtml(d,td){
+  const nd=MONTH.ndays,rows=(typeof CHANNELS!=="undefined"?CHANNELS:[]).map(ch=>{let T=0;try{T=typeof kn==="function"?kn(d,ch.k).T||0:0}catch(e){}
+    const C=(d.cards||[]).filter(c=>c.kenh===ch.k&&c.step!=="cg"),n=k=>C.filter(c=>k.includes(c.step)).length;
+    const o={ch,T,dang:n(["xong"]),cho:n(["dang"]),rv:n(["dkb","dvd","dceo"]),lam:n(["kb","quay","edit","worker"])};o.all=o.dang+o.cho+o.rv+o.lam;return o}).filter(o=>o.T||o.all);
+  if(!rows.length)return "";
+  const seg=(v,base,col,t)=>v?`<i style="width:${v/base*100}%;background:${col}" title="${t}: ${v}"></i>`:"";
+  return `<section class="card hsw-ch"><div class="hsw-chh"><h3>Tiến độ từng kênh · tháng ${MONTH.mon}</h3><span class="hsw-lg"><i style="background:#2f9e44"></i>Đã đăng<i style="background:#20c997"></i>Duyệt, chờ đăng<i style="background:#f59f00"></i>Chờ duyệt<i style="background:#4c6ef5"></i>Đang làm<i class="mk"></i>Lẽ ra đến hôm nay</span></div>
+   ${rows.map(o=>{const base=Math.max(o.T,o.all,1),exp=o.T?Math.round(o.T*Math.min(td,nd)/nd):0,done=o.dang+o.cho,p=o.T?Math.round(o.dang/o.T*100):null,lag=o.T?exp-done:0;
+     return `<div class="hsw-cr"><div class="hsw-cn"><b>${esc(o.ch.short||o.ch.k)}</b><small>${o.T?`mục tiêu ${o.T} video`:"chưa đặt mục tiêu"}</small></div>
+      <div class="hsw-sb">${seg(o.dang,base,"#2f9e44","Đã đăng")}${seg(o.cho,base,"#20c997","Duyệt, chờ đăng")}${seg(o.rv,base,"#f59f00","Chờ duyệt")}${seg(o.lam,base,"#4c6ef5","Đang làm")}${exp?`<em style="left:${exp/base*100}%" title="Đến hôm nay lẽ ra: ${exp}"></em>`:""}</div>
+      <div class="hsw-cv"><b>${o.dang}</b><small>/${o.T||"—"} đã đăng${p!=null?` · ${p}%`:""}</small>${o.T?(lag>0?`<span class="pill p-red">chậm ${lag}</span>`:`<span class="pill p-grn">đúng tiến độ</span>`):""}</div></div>`}).join("")}</section>`}
 function hsTeams(){const ks=[];D().users.forEach(u=>{const k=teamOf(u);if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k))ks.push(k)});return ks}
 function pHsWork(m){
   const d=D(),td=d.settings.today,boss=ME.role==="admin",tms=hsTeams();
@@ -948,7 +960,10 @@ function pHsWork(m){
   const P=Object.values(per),S=k=>P.reduce((z,p)=>z+p[k],0),pct=(x,y)=>y?Math.round(x/y*100):null;
   const tot={mo:S("mo")+C.filter(c=>!["dang","xong"].includes(c.step)).length,rv:S("rv"),late:S("late"),dung:S("dung"),tre:S("tre"),vGiao:S("vGiao"),vNop:S("vNop"),vDuyet:S("vDuyet"),tra:S("tra")};
   const okP=pct(tot.dung,tot.dung+tot.tre+tot.late);
-  const tile=(l,v,h,cls)=>`<div class="hsw-t${cls?" "+cls:""}"><span>${l}</span><b>${v}</b>${h?`<small>${h}</small>`:""}</div>`;
+  const IC={mo:'<path d="M4 6h16M4 12h16M4 18h10"/>',rv:'<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="8"/>',late:'<path d="M12 8v5M12 16.5v.5"/><path d="M10.3 4.3 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z"/>',nop:'<path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/>',ok:'<path d="m5 12 4 4 10-10"/>'};
+  const icon=(k,c)=>`<i class="hsw-ic" style="background:${c[0]};color:${c[1]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg></i>`;
+  const tile=(l,v,h,cls,ic,extra)=>`<div class="hsw-t${cls?" "+cls:""}">${ic||""}<div class="hsw-tb"><span>${l}</span><b>${v}</b>${extra||""}${h?`<small>${h}</small>`:""}</div></div>`;
+  const ring=p=>`<i class="hsw-ring" style="background:conic-gradient(${p>=90?"#2f9e44":p>=70?"#f08c00":"#e03131"} ${p*3.6}deg,#eef0f4 0)"><b>${p}%</b></i>`;
   const bar=(x,y,col)=>{const p=y?Math.min(100,Math.round(x/y*100)):0;return `<div class="hsw-bar"><i style="width:${p}%;background:${col||"#2f6fde"}"></i></div>`};
   /* tiến độ theo kênh: video trong kỳ đã nộp / đã duyệt, đăng */
   const byK={};C.forEach(c=>{const k=c.kenh||"Khác",o=byK[k]=byK[k]||{n:0,nop:0,dang:0};o.n++;if(["dvd","dceo","dang","xong"].includes(c.step))o.nop++;if(["dang","xong"].includes(c.step))o.dang++});
@@ -959,12 +974,12 @@ function pHsWork(m){
   const dayL=i=>i===0?"Hôm nay":i===1?"Mai":(THU[(((MONTH.first+td+i-1)%7)+7)%7]);
   m.innerHTML=`<div class="hsw">
    <div class="hsw-h"><h2>Hiệu suất làm việc ${boss?"":"team "}${esc(boss?"":cvTeamName(team))}</h2>${boss&&tms.length>1?`<div class="tkteams">${tms.map(k=>`<button type="button" class="cvchip${k===team?" on":""}" data-hst="${esc(k)}">${esc(cvTeamName(k))}</button>`).join("")}</div>`:""}<span class="hint">Kỳ: ô thời gian trên cùng · ${ppl.length} người</span></div>
-   <div class="hsw-tiles">${tile("Việc đang mở",tot.mo,"")}${tile("Chờ duyệt",tot.rv,"",tot.rv?"amb":"")}${tile("Trễ hạn",tot.late,"",tot.late?"red":"")}${tile("Đúng hạn",okP==null?"—":okP+"%",`${tot.dung} xong đúng · ${tot.tre} xong trễ · ${tot.late} đang trễ`,okP!=null&&okP<70?"red":"")}${tile("Video đã nộp",`${tot.vNop}/${tot.vGiao}`,"đã nộp / được giao")}${tile("Video đã duyệt",tot.vDuyet,tot.tra?`${tot.tra} lần bị trả lại`:"")}</div>
+   <div class="hsw-tiles">${tile("Việc đang mở",tot.mo,"","",icon("mo",["#e7f0ff","#1c4fb8"]))}${tile("Chờ duyệt",tot.rv,"",tot.rv?"amb":"",icon("rv",["#fff1dc","#9a5200"]))}${tile("Trễ hạn",tot.late,"",tot.late?"red":"",icon("late",["#ffe9ee","#c92a2a"]))}${okP==null?tile("Đúng hạn","—","chưa có việc tới hạn","",icon("ok",["#e3f5ea","#1f7a3d"])):tile("Đúng hạn","",`${tot.dung} đúng · ${tot.tre} trễ · ${tot.late} đang trễ`,"",ring(okP))}${tile("Video đã nộp",`${tot.vNop}<small class="hsw-of">/${tot.vGiao}</small>`,"","",icon("nop",["#f1e8ff","#6b2fb3"]),bar(tot.vNop,tot.vGiao,"#7048e8"))}${tile("Video đã duyệt",tot.vDuyet,tot.tra?`${tot.tra} lần bị trả lại`:"","",icon("ok",["#e3f5ea","#1f7a3d"]))}</div>
+   ${hsChanHtml(d,td)}
    <div class="hsw-grid">
     <section class="card flush cvtk"><div class="card-h pad"><h3>Từng người</h3><span class="hint">bấm tên để xem việc của người đó</span></div>${tbl(["Người","Đang làm","Chờ duyệt","Trễ","Xong (đúng / trễ)","Đúng hạn","Video nộp","Trả lại","Việc 7 ngày tới"],P.sort((x,y)=>y.late-x.late||y.mo-x.mo).map(p=>{const o=pct(p.dung,p.dung+p.tre+p.late),mx=Math.max(3,...p.load);return `<tr><td><button type="button" class="lnk" data-hsp="${p.u.id}">${avatar(p.u.id)}${esc(p.u.name)}</button></td><td class="n">${p.doing||""}</td><td class="n">${p.rv?`<span class="pill p-amb">${p.rv}</span>`:""}</td><td class="n">${p.late?`<span class="pill p-red">${p.late}</span>`:""}</td><td class="n">${p.dung} / ${p.tre}</td><td class="n">${o==null?"—":`<b class="${o>=90?"t-grn":o>=70?"t-amb":"t-red"}">${o}%</b>`}</td><td>${p.vGiao?`${bar(p.vNop,p.vGiao)}<small>${p.vNop}/${p.vGiao}</small>`:""}</td><td class="n">${p.tra||""}</td><td><div class="hsw-load" title="Số việc tới hạn 7 ngày tới">${p.load.map((n,i)=>`<i style="height:${Math.round(n/mx*100)}%;background:${n>=3?"#e03131":"#4c6ef5"}" title="${dayL(i)}: ${n} việc"></i>`).join("")}</div></td></tr>`}))}</section>
     <div class="hsw-side">
-     <section class="card"><h3>Tiến độ video theo kênh</h3>${Object.keys(byK).length?Object.entries(byK).map(([k,o])=>`<div class="hsw-k"><div><b>${esc(chOf(k).short||k)}</b><small>${o.dang} đã duyệt · ${o.nop} đã nộp / ${o.n}</small></div>${bar(o.dang,o.n,"#2f9e44")}</div>`).join(""):`<p class="hint">Chưa có thẻ video trong kỳ.</p>`}</section>
-     <section class="card"><h3>Đang tắc, cần đốc</h3>${stuck.length?stuck.map(x=>`<div class="hsw-s"><span>${avatar(x.ng)}<b>${esc(cvShort(x.ten,46))}</b></span><span class="pill p-red">trễ ${x.lt} ngày</span><button type="button" class="btn sm" ${x.go}>Mở</button></div>`).join(""):`<p class="hint">Không có việc nào trễ. 👍</p>`}</section>
+     <section class="card"><h3>Việc quá hạn cần xử lý</h3>${stuck.length?stuck.map(x=>`<div class="hsw-s"><span>${avatar(x.ng)}<b>${esc(cvShort(x.ten,46))}</b></span><span class="pill p-red">trễ ${x.lt} ngày</span><button type="button" class="btn sm" ${x.go}>Mở</button></div>`).join(""):`<p class="hint">Không có việc quá hạn.</p>`}</section>
     </div></div></div>`;
   m.querySelectorAll("[data-hst]").forEach(b=>b.onclick=()=>{HSW.team=b.dataset.hst;renderMain()});
   m.querySelectorAll("[data-tkopen]").forEach(b=>b.onclick=()=>openTask(b.dataset.tkopen));
