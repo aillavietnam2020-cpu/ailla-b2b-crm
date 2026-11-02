@@ -103,7 +103,7 @@ const tm=(t,p)=>u=>{const T=userTeam(u);return (!T||T==="all"||T===t)&&(!p||p(u)
 const CT=i=>[i[0],i[1],(u=>{const T=userTeam(u);return (!T||T==="all"||T==="content")&&i[2](u)}),i[3]];
 const MKT_G=()=>[
  ["",[MI("mkt_tq","Tổng quan",tm("content",u=>u.role!=="digital"),()=>{try{return rvQueue().length||""}catch(e){return ""}}),
-   ADM_ITEM("kehoach"),ADM_ITEM("research"),ADM_ITEM("lich","Calendar"),MI("dieuphoi","Điều phối sản xuất",tm("content",u=>u.role==="admin"||u.role==="lead"||can(u,"viec.giao"))),
+   ADM_ITEM("kehoach"),ADM_ITEM("research"),ADM_ITEM("lich","Calendar"),/* chị Hoa 02/11: bỏ mục Điều phối sản xuất ở thanh bên, điều phối làm ở Kế hoạch tháng › ② Điều phối */
    MI("lich_fb","Lịch đăng Fanpage",tm("content",u=>u.role==="admin"||u.role==="lead"||u.role==="content")),
    MI("kho_luutru","Kho lưu trữ video",tm("content",u=>u.role==="admin"||u.role==="lead"||u.role==="content"||u.role==="digital")),ADM_ITEM("win","Video win"),
    MI("order_c","Order từ Ads",tm("content",u=>can(u,"order.xem")||u.role==="content"||u.role==="lead"||u.role==="admin"),ordCnt),
