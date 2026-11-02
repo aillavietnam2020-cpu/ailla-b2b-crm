@@ -908,3 +908,10 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .odrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 2px;border-top:1px solid #f0f1f5;cursor:pointer}.odrow:hover{background:#f7f8fb}.odrow span{display:flex;flex-direction:column;min-width:0}.odrow small{color:#667085;font-size:12px}
 .odinfo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}.odinfo div{background:#f6f7fb;border-radius:10px;padding:8px 10px}.odinfo small{display:block;color:#667085;font-size:11.5px}
 .odcard{padding:10px 14px;margin:0 0 12px}.odch{display:flex;align-items:center;gap:8px;margin-bottom:4px}.odch h3{margin:0;font-size:14px}
+/* Công việc › Tổng quan: hàng ô số gọn (chị Hoa 02/11: "hơi cao") */
+.dv.dvtopk .dvk{gap:8px;margin-bottom:10px}
+.dv.dvtopk .dvk>div{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;align-items:baseline;padding:7px 12px;border-radius:12px;border-left-width:4px}
+.dv.dvtopk .dvk small{grid-column:1/-1;font-size:11.5px}
+.dv.dvtopk .dvk b{font-size:20px;line-height:1.2}
+.dv.dvtopk .dvk i{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1100px){.dv.dvtopk .dvk{grid-template-columns:repeat(3,minmax(0,1fr))}}
