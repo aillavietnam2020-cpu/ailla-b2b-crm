@@ -159,3 +159,5 @@ function winVarOpen(ref){
   const x=document.querySelector("#drawerIn #wv-x");if(x)x.onclick=closeDrawer;bindCommon(document.querySelector("#drawerIn"))
 }
 if(!window._wvOn){window._wvOn=1;document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-wvar]");if(!b)return;e.preventDefault();e.stopPropagation();winVarOpen(b.dataset.wvar)},true)}
+/* Trang dùng chung mở trong khu Digital (setup.js: dg_sale, dg_kho, dg_win): vẽ đúng trang gốc. */
+PAGES.dg_sale=m=>PAGES.fb_sale(m);PAGES.dg_kho=m=>PAGES.kho_luutru(m);PAGES.dg_win=m=>PAGES.win(m);

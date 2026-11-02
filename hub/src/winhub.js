@@ -13,9 +13,9 @@ const HY_ST={queued:["Chờ Worker nhận","gry"],taken:["Worker đã nhận","b
 const HYW={tasks:[],at:0,busy:false,draft:{}};
 async function hyRefresh(force){
   if(typeof svApi!=="function"||HYW.busy||(!force&&Date.now()-HYW.at<8000))return;HYW.busy=true;
-  try{const L=await svApi("/api/hub/worker-tasks");const ch=JSON.stringify(L)!==JSON.stringify(HYW.tasks);HYW.tasks=L||[];HYW.at=Date.now();if(ch&&PAGE==="win"&&!svTyping())renderMain();if(ch&&HYW.win)hyWinPaint(false)}catch(e){}finally{HYW.busy=false}
+  try{const L=await svApi("/api/hub/worker-tasks");const ch=JSON.stringify(L)!==JSON.stringify(HYW.tasks);HYW.tasks=L||[];HYW.at=Date.now();if(ch&&(PAGE==="win"||PAGE==="dg_win")&&!svTyping())renderMain();if(ch&&HYW.win)hyWinPaint(false)}catch(e){}finally{HYW.busy=false}
 }
-setInterval(()=>{if(ME&&(PAGE==="win"||HYW.win)&&!document.hidden)hyRefresh()},10000);
+setInterval(()=>{if(ME&&(PAGE==="win"||PAGE==="dg_win"||HYW.win)&&!document.hidden)hyRefresh()},10000);
 /* cửa sổ nhân bản video win ngay trong Điều phối: phân tích, sửa kịch bản, duyệt, dựng đều làm trong cửa sổ này */
 function hyWin(id){HYW.win=id;hyRefresh(true);hyWinPaint(true)}
 function hyWinPaint(first){const id=HYW.win;if(!id)return;

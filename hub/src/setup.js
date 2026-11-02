@@ -72,7 +72,7 @@ const PAGE_SETS=[
   /* Marketing: mục cha bấm vào sổ ra các trang con ngay ở thanh bên (kiểu Pancake), trong trang không có hàng tab */
   /* Marketing: 5 team ngang hàng; team nhiều trang thì bấm vào sổ ra các trang con ngay thanh bên (mỗi lần chỉ mở một team) */
   {n:"Content",ids:["mkt_tq","kehoach","research","dieuphoi","lich_fb","lich","kho_luutru","win","order_c","nhaplieu"],labels:["Tổng quan","Kế hoạch tháng","Research","Điều phối sản xuất","Lịch đăng Fanpage","Calendar","Kho lưu trữ video","Video win","Order từ Ads","Nhập báo cáo"],acc:true,noBar:true,hide:["lich","research"]},
-  {n:"Digital Marketing",ids:["dg_tq","fb_ads","dg_lib","order","nhaplieu_ads"],labels:["Tổng quan","Báo cáo theo ngày","Thư viện video ads","Order cho Content","Nhập báo cáo Ads"],acc:true,noBar:true},
+  {n:"Digital Marketing",ids:["dg_tq","fb_ads","dg_lib","order","dg_sale","dg_kho","dg_win","nhaplieu_ads"],labels:["Tổng quan","Báo cáo theo ngày","Thư viện video ads","Order cho Content","Hiệu quả Sale B2C","Kho video","Video win","Nhập báo cáo Ads"],acc:true,noBar:true},
   {n:"Facebook",ids:["bc_fb","fb_sale"],labels:["Doanh thu Facebook","Hoạt động team Sale"],noBar:true},
   /* Kho vật tư gồm nhiều trang con; mục "Kho vật tư" trên thanh bên mở trang Tồn kho, các tab con nằm trong trang. */
   {n:"Sản xuất",ids:["sx_nc","kho_pc","sx_td","sx_lo"],labels:[],noBar:true},
@@ -113,7 +113,9 @@ const MKT_G=()=>[
  ["",[MI("live","Livestream",tm("live"))]],
  ["",[MI("dg_tq","Tổng quan Digital",tm("ads",dgOk)),MI("dg_lib","Thư viện video ads",tm("ads",dgOk)),
    MI("fb_ads","Báo cáo Ads theo ngày",tm("ads",dgOk)),
-   MI("order","Order cho Content",tm("ads",u=>dgOk(u)||can(u,"order.xem")),ordCnt),MI("nhaplieu_ads","Nhập báo cáo Ads",u=>userTeam(u)==="ads"&&(can(u,"baocao.ads")||u.role==="digital"))].filter(Boolean)]];
+   MI("order","Order cho Content",tm("ads",u=>dgOk(u)||can(u,"order.xem")),ordCnt),
+   /* Chị Hoa 02/11: team Digital xem thêm hiệu quả Sale B2C, kho video, video win (trang dùng chung với Kinh doanh / Content, chỉ hiện ở đây cho người team Digital). */
+   MI("dg_sale","Hiệu quả Sale B2C",u=>userTeam(u)==="ads"),MI("dg_kho","Kho video",u=>userTeam(u)==="ads"),MI("dg_win","Video win",u=>userTeam(u)==="ads"&&can(u,"win.xem")),MI("nhaplieu_ads","Nhập báo cáo Ads",u=>userTeam(u)==="ads"&&(can(u,"baocao.ads")||u.role==="digital"))].filter(Boolean)]];
 /* Menu: 8 mục lớn. "hide" = không hiện ở thanh bên (Trợ lý AI ở nút trên cùng, mục Của tôi ở chỗ bấm vào tên).
    "tabs" = các trang con hiện thành thanh tab trong trang, thanh bên chỉ còn một dòng. */
 const MODULES=[

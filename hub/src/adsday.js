@@ -84,7 +84,7 @@ function adlDaily(L,last){
 const ADF={raw:null,at:0,busy:false,who:"",per:"m0",open:""};
 async function adfLoad(force){
   if(typeof svApi!=="function"||ADF.busy||(!force&&Date.now()-ADF.at<1800000))return;ADF.busy=true;
-  try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp"||PAGE==="bc_fb"||PAGE==="fb_sale")&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
+  try{const r=await svApi("/api/hub/blob/ads_fb");const ch=JSON.stringify(r)!==JSON.stringify(ADF.raw);ADF.raw=r;ADF.at=Date.now();if(ch&&(PAGE==="fb_ads"||PAGE==="dg_tq"||PAGE==="adshieuqua"||PAGE==="adssp"||PAGE==="bc_fb"||PAGE==="fb_sale"||PAGE==="dg_sale")&&!svTyping())renderMain()}catch(e){}finally{ADF.busy=false}
 }
 /* Trang Facebook (Doanh thu, Hoạt động team Sale): Sheet Pancake chỉ có đến 29/9, nên ngày nào Sheet không có thì dựng từ số tự động (ads_fb).
    Đơn tạo = đơn; hủy = đơn hủy; chốt = đơn − hủy; Pancake chỉ trả doanh số hoàn nên số đơn hoàn là ước lượng (250 nghìn/đơn hoàn, hiệu chỉnh theo 8/8–29/9);

@@ -215,7 +215,7 @@ PAGES.bc_fb=m=>pFbdash(m);
 const FBS={raw:null,at:0,busy:false},FBS_KPI=["Mai Hương","Huyền Phạm","Linh Ha"];/* người tính KPI: chị Hoa chốt 22/10/2026 (Dũng Hoàng đã nghỉ) */
 async function fbsLoad(force){
   if(typeof svApi!=="function"||FBS.busy||(!force&&Date.now()-FBS.at<1800000))return;FBS.busy=true;
-  try{const r=await svApi("/api/hub/blob/fb_sale_days");const ch=(r&&r.at)!==(FBS.raw&&FBS.raw.at);FBS.raw=r;if(r)FBS.at=Date.now();if(ch&&(PAGE==="bc_fb"||PAGE==="fb_sale")&&!svTyping())renderMain()}catch(e){}finally{FBS.busy=false}
+  try{const r=await svApi("/api/hub/blob/fb_sale_days");const ch=(r&&r.at)!==(FBS.raw&&FBS.raw.at);FBS.raw=r;if(r)FBS.at=Date.now();if(ch&&(PAGE==="bc_fb"||PAGE==="fb_sale"||PAGE==="dg_sale")&&!svTyping())renderMain()}catch(e){}finally{FBS.busy=false}
 }
 function fbsPeople(days){
   const R=FBS.raw;if(!R||!R.days)return null;const m={};let n=0;
