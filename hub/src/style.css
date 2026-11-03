@@ -987,3 +987,4 @@ body:has(#tnpop) #ntpop{right:392px}
 .tnpop.big{width:min(620px,calc(100vw - 36px));height:min(78vh,760px)}
 .tnpgrip{position:absolute;left:0;top:0;width:16px;height:16px;cursor:nwse-resize;z-index:2;background:linear-gradient(135deg,#c7cbd6 0 2px,transparent 2px 5px,#c7cbd6 5px 7px,transparent 7px)}
 .tnpop.big{width:min(900px,calc(100vw - 36px))!important;height:calc(100vh - 40px)!important}
+.tkhg{display:flex;gap:6px}.tkhg input[type=time]{width:110px;flex:none}
