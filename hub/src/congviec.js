@@ -67,7 +67,9 @@ const cvMgrView=()=>!!ME&&(ME.role==="admin"||ME.role==="lead"||ME.role==="truon
 const cvTeamName=k=>TEAMS[k]||(k==="mkt"?"Marketing":k);
 function cvWhoOpts(){const d=D(),t=teamOf(ME),o=[["all","Tất cả"],["mine","Việc của tôi"]];
   if(cvMgrView()){const ks=[];d.users.forEach(u=>{const k=teamOf(u);if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,k)))ks.push(k)});ks.forEach(k=>o.push(["t:"+k,"Team "+cvTeamName(k)]))}
-  if(CVF.who&&CVF.who.indexOf("p:")===0&&CVF.nguoi)o.push([CVF.who,userName(CVF.nguoi)]);return o}
+  /* từng nhân sự (CEO thấy mọi người, Lead / trưởng phòng thấy người team mình) */
+  if(cvMgrView())d.users.filter(u=>u.active&&u.name&&u.role!=="admin"&&u.id!==ME.id&&!CV_TEST.includes(u.id)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,teamOf(u)))).sort((a,b)=>String(cvTeamName(teamOf(a))).localeCompare(String(cvTeamName(teamOf(b))))||a.name.localeCompare(b.name)).forEach(u=>o.push(["p:"+u.id,"👤 "+u.name+" · "+(cvTeamName(teamOf(u))||"")]));
+  if(CVF.who&&CVF.who.indexOf("p:")===0&&CVF.nguoi&&!o.some(x=>x[0]===CVF.who))o.push([CVF.who,userName(CVF.nguoi)]);return o}
 function cvWhoSet(v){CVF.who=v;CVF.scope=v==="mine"?"mine":(ME.role==="admin"?"all":"team");CVF.nguoi=v.indexOf("p:")===0?v.slice(2):"";CVF.wt=v.indexOf("t:")===0?v.slice(2):""}
 function cvWho(){if(!CVF.who)cvWhoSet(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong"||can(ME,"viec.giao")?"all":"mine");return CVF.who}
 const cvWhoSelect=()=>`<select id="cv-who" aria-label="Xem việc của">${opt(cvWhoOpts(),cvWho())}</select>`;
@@ -86,9 +88,9 @@ function cvFilter(L){
     return true});
 }
 /* một hàng lọc gọn ở góc phải: tìm · người · thời gian · trạng thái · dự án · nút Giao việc */
-function cvFilterBar(opts={}){const d=D();const names=cvMgrView()&&!cvSummaryOnly()?d.users.filter(u=>u.active&&u.role!=="admin").map(u=>`<option value="${esc(u.name)}">`).join(""):"";const more=CVF.da||(CVF.who&&!["all","mine"].includes(CVF.who));return `<div class="cvbar"><input id="cv-q" placeholder="${names?"Tìm việc hoặc gõ tên người…":"Tìm việc…"}" value="${esc(CVF.q)}"${names?` list="cv-names" autocomplete="off"`:""}>${names?`<datalist id="cv-names">${names}</datalist>`:""}${opts.noSt?"":`<select id="cv-st" aria-label="Trạng thái">${opt([["","Mọi trạng thái"],["todo","Cần làm"],["doing","Đang làm"],["review","Chờ duyệt"],["done","Hoàn thành"],["late","Trễ hạn"]],CVF.st)}</select>`}<details class="cvmoref"${more?" open":""}><summary>Lọc thêm</summary>${cvWhoSelect()}<select id="cv-da" aria-label="Dự án">${opt([["","Mọi dự án"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),CVF.da)}</select></details></div>`}
+function cvFilterBar(opts={}){const d=D();const names=cvMgrView()&&!cvSummaryOnly()?d.users.filter(u=>u.active&&u.role!=="admin").map(u=>`<option value="${esc(u.name)}">`).join(""):"";const more=CVF.da||(CVF.who&&!["all","mine"].includes(CVF.who));return `<div class="cvbar"><input id="cv-q" placeholder="${names?"Tìm việc hoặc gõ tên người…":"Tìm việc…"}" value="${esc(CVF.q)}"${names?` list="cv-names" autocomplete="off"`:""}>${names?`<datalist id="cv-names">${names}</datalist>`:""}${opts.noSt?"":`<select id="cv-st" aria-label="Trạng thái">${opt([["","Mọi trạng thái"],["todo","Cần làm"],["doing","Đang làm"],["review","Chờ duyệt"],["done","Hoàn thành"],["late","Trễ hạn"]],CVF.st)}</select>`}${cvMgrView()?cvWhoSelect():""}<details class="cvmoref"${more?" open":""}><summary>Lọc thêm</summary>${cvMgrView()?"":cvWhoSelect()}<select id="cv-da" aria-label="Dự án">${opt([["","Mọi dự án"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),CVF.da)}</select></details></div>`}
 function bindCvFilter(m){
-  m.querySelectorAll("[data-tg]").forEach(b=>b.onclick=()=>{CVF.tg=b.dataset.tg;renderMain()});const wh=$("#cv-who");if(wh)wh.onchange=()=>{cvWhoSet(wh.value);renderMain()};
+  m.querySelectorAll("[data-tg]").forEach(b=>b.onclick=()=>{CVF.tg=b.dataset.tg;renderMain()});const wh=$("#cv-who");if(wh)wh.onchange=()=>{cvWhoSet(wh.value);if(typeof CVV!=="undefined")CVV.scope=wh.value==="mine"?"mine":"team";renderMain()};
   [["cv-q","q"],["cv-tg","tg"],["cv-team","team"],["cv-da","da"],["cv-st","st"],["cv-uu","uu"]].forEach(([id,k])=>{const e=$("#"+id);if(e)e.onchange=()=>{CVF[k]=e.value;renderMain()}});
   bindNew();
 }

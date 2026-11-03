@@ -39,8 +39,9 @@ const tnOld=r=>{let k=r.startsWith("g:")?r.slice(2):"";if(r.startsWith("dm:")){c
 async function tnSummary(){if(!ME||typeof svApi!=="function")return;
   try{const r=await svApi("/api/hub/chat/summary");const old=new Map(TN.rooms.map(x=>[x.room,x.last&&x.last.id]));TN.rooms=r.rooms||[];
     if(TN.sumAt)TN.rooms.forEach(x=>{if(!x.last||x.last.user_id===tnMe()||!x.unread||old.get(x.room)===x.last.id)return;if(TN.room===x.room&&PAGE==="tinnhan"&&!document.hidden)return;
-      const dm=x.room.startsWith("dm:");if(!dm&&!tnMentionsMe(x.last.body))return;
-      ntPush({key:"tn:"+x.last.id,type:"tin",text:(dm?"":"Gọi bạn trong nhóm "+tnName(x.room)+": ")+(x.last.kind==="task"?"📋 Giao việc: ":"")+x.last.body,by:tnUN(x.last.user_id),at:x.last.created_at,go:()=>openChat(x.room)})});
+      /* mọi tin nhắn mới đều báo (chị Hoa 03/11), nhóm thì ghi tên nhóm, được gọi tên thì ghi rõ */
+      const dm=x.room.startsWith("dm:");
+      ntPush({key:"tn:"+x.last.id,type:"tin",text:(dm?"":(tnMentionsMe(x.last.body)?"Gọi bạn trong ":"")+tnName(x.room)+": ")+(x.last.kind==="task"?"📋 Giao việc: ":"")+x.last.body,by:tnUN(x.last.user_id),at:x.last.created_at,go:()=>openChat(x.room)})});
     TN.sumAt=Date.now();bellBadge();if(PAGE==="tinnhan")tnDrawList()}catch(e){}}
 async function tnLoad(room,older){const L=TN.msgs[room]||[];
   try{if(older){const r=await svApi(`/api/hub/chat/msgs?room=${encodeURIComponent(room)}&before=${L[0]?L[0].id:0}`);TN.more[room]=r.length>=60;TN.msgs[room]=r.concat(L)}
@@ -238,3 +239,15 @@ function tnGroupForm(g){const P=D().users.filter(u=>u.active&&u.name&&u.crm&&u.c
   $("#tng-f").onsubmit=async e=>{e.preventDefault();const name=$("#tng-n").value.trim(),members=[...document.querySelectorAll("[name=tng-m]:checked")].map(i=>i.value);if(!members.length){toast("Chọn ít nhất một thành viên");return}
     try{const r=await svApi("/api/hub/chat/groups"+(g?"/"+g.id:""),{method:g?"PUT":"POST",body:JSON.stringify({name,members})});await tnLoadGroups();closeDrawer();toast(g?"Đã lưu nhóm":"Đã tạo nhóm");openChat("n:"+(g?g.id:r.id))}catch(er){toast(er.message||"Chưa lưu được")}};
   if($("#tng-del"))$("#tng-del").onclick=async()=>{if(!confirm("Xoá nhóm này? Tin nhắn cũ trong nhóm không còn ai mở được."))return;try{await svApi("/api/hub/chat/groups/"+g.id,{method:"DELETE"});await tnLoadGroups();closeDrawer();TN.room="g:chung";renderMain()}catch(er){toast(er.message||"Chưa xoá được")}}}
+
+/* ---------- tiếng "ting" khi có thông báo mới + nhắc bật thông báo Windows (chị Hoa 03/11) ----------
+   Đang làm ở Zalo / trang khác vẫn thấy: thông báo của Windows (thongbao.js ntOs) + tiếng ting. Tắt tiếng: localStorage ailla_nt_am_<người> = false.
+   Trình duyệt chỉ cho phát tiếng sau khi người dùng đã bấm vào trang một lần, nên tạo bộ phát tiếng ở lần bấm đầu tiên. */
+let TN_AC=null;
+["pointerdown","keydown"].forEach(ev=>addEventListener(ev,()=>{if(!TN_AC)try{TN_AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}if(TN_AC&&TN_AC.state==="suspended")TN_AC.resume()},{capture:true,passive:true}));
+function tnTing(){try{if(typeof ntLS==="function"&&ntLS("am")===false)return;const ac=TN_AC;if(!ac)return;if(ac.state==="suspended")ac.resume();const t=ac.currentTime;
+  [[1318.5,0],[1760,.12]].forEach(([f,d])=>{const o=ac.createOscillator(),g=ac.createGain();o.type="sine";o.frequency.value=f;g.gain.setValueAtTime(0,t+d);g.gain.linearRampToValueAtTime(.22,t+d+.01);g.gain.exponentialRampToValueAtTime(.001,t+d+.45);o.connect(g).connect(ac.destination);o.start(t+d);o.stop(t+d+.5)})}catch(e){}}
+if(typeof ntFlush==="function"){const _ntFlushTn=ntFlush;ntFlush=function(){const n=NT.batch.length;_ntFlushTn();if(n)tnTing()}}
+/* chưa bật thông báo Windows: nhắc lại mỗi ngày một lần (trước đây bấm ✕ một lần là không bao giờ hỏi lại) */
+if(typeof ntAsk==="function"){const _ntAskTn=ntAsk;ntAsk=function(){try{const day=new Date().toDateString();if(ntLS("asked")&&ntLS("askedDay")!==day&&"Notification" in window&&Notification.permission==="default"){ntLS("asked",null);ntLS("askedDay",day)}}catch(e){}return _ntAskTn()};
+  setTimeout(()=>{try{if(ME&&"Notification" in window&&Notification.permission==="default")ntAsk()}catch(e){}},6000)}
