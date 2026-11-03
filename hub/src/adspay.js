@@ -73,17 +73,31 @@ function apyModal(){const M=APY.modal;if(!M)return "";const d=M.d,s=apyStore();
 function apyMdDraw(){let el=document.getElementById("apy-ov");if(!APY.modal){if(el)el.remove();return}
   if(!el){el=document.createElement("div");el.id="apy-ov";el.className="apy-ov";document.body.appendChild(el)}el.innerHTML=apyModal()}
 
+/* Tình trạng thẻ: ngừng / sắp dùng / âm tiền / đang chạy */
+function apyStatus(c,td){if(c.den&&c.den<=td)return [apyChotDung(c.id)?"Ngừng · đã chốt":"Ngừng · chưa chốt",apyChotDung(c.id)?"gry":"red"];if(c.tu&&c.tu>td)return ["Sắp dùng","amb"];if(apyLedger(c).bal(td)<0)return ["Đang chạy · âm tiền","red"];return ["Đang chạy","grn"]}
+/* Trang đầu tab: bảng danh sách thẻ, mỗi dòng một thẻ với tình trạng; bấm dòng để xem chi tiết */
+function apyList(s,ed,td){
+  const okd=v=>Math.abs(v)<1000,names=apyAccs();let tong=0;
+  const rows=s.cards.slice().sort((a,b)=>(apyOn(b)?1:0)-(apyOn(a)?1:0)||String(b.tu||"").localeCompare(String(a.tu||""))).map(c=>{const L=apyLedger(c),b=L.bal(td),st=apyStatus(c,td),on=apyOn(c);if(on)tong+=b;
+    const accs=s.gan.filter(g=>g.card===c.id&&(!g.tu||g.tu<=td)&&(!g.den||g.den>=td)).map(g=>names[g.acc]||g.accName||g.acc);
+    const lk=s.kt.filter(k=>k.card===c.id).sort((x,y)=>y.ngay.localeCompare(x.ngay))[0],df=lk?lk.soDu-L.bal(lk.ngay):null;
+    const chua=apyMonths(c).map(mo=>apyMonthRow(c,L,mo)).filter(r=>r.het&&!r.k).length,noBill=L.naps.filter(n=>!(n.files||[]).length).length;
+    return `<tr class="clk" data-apy="pick" data-id="${esc(c.id)}"><td><b>${esc(c.ten)}</b>${c.so4?` · ${esc(c.so4)}`:""}<small class="hint" style="display:block">${esc(c.nh||"")}${c.chu?" · "+esc(c.chu):""}</small></td><td>${pill(st[0],st[1])}</td><td>${c.tu?apyVN(c.tu):"—"}<small class="hint" style="display:block">${c.den?(c.den<=td?"ngừng ":"đến ")+apyVN(c.den):"chưa có ngày ngừng"}</small></td><td>${accs.length?accs.map(esc).join("<br>"):'<span class="hint">chưa gắn</span>'}</td><td class="n">${nf(c.duDau||0)}<small class="hint" style="display:block">${apyVN(c.duDauNgay)}</small></td><td class="n">${nf(L.nap)}</td><td class="n">${nf(L.tru)}</td><td class="n"><b style="color:${b<0?"var(--red)":"var(--ink)"}">${nf(b)}</b></td><td>${lk?(okd(df)?'<span class="apy-ok">Khớp</span>':`<span class="apy-bad">Lệch ${nf(df)}</span>`)+`<small class="hint" style="display:block">${apyVN(lk.ngay)}</small>`:'<span class="hint">chưa kiểm</span>'}</td><td>${chua?`<span class="apy-bad">${chua} tháng chưa chốt</span>`:'<span class="apy-ok">Đủ</span>'}${noBill?`<small class="apy-bad" style="display:block">${noBill} lần nạp thiếu bill</small>`:""}</td></tr>`}).join("");
+  const nOn=s.cards.filter(apyOn).length;
+  return `<div class="grid kpis">${kpi("Thẻ đang chạy",nOn,(s.cards.length-nOn)+" thẻ đã ngừng / chưa dùng")}${kpi("Tổng dư các thẻ đang chạy",nf(tong)+"đ","tính ra = đầu kỳ + nạp − trừ",tong<0?"var(--red)":"")}</div>
+  <section class="card flush"><div class="card-h pad"><h2>Danh sách thẻ / tài khoản thanh toán</h2><span class="hint">bấm một dòng để xem nạp, trừ, đối chiếu, chốt số dư của thẻ đó</span>${ed?`<button class="btn pri" data-apy="cadd" style="margin-left:auto">+ Thêm thẻ</button>`:""}</div><div class="tbl"><table><thead><tr><th>Thẻ</th><th>Tình trạng</th><th>Dùng từ</th><th>TKQC đang gắn</th><th class="n">Dư đầu kỳ</th><th class="n">Đã nạp</th><th class="n">Đã trừ</th><th class="n">Dư hiện tại</th><th>Đối chiếu gần nhất</th><th>Chốt cuối tháng</th></tr></thead><tbody>${rows}</tbody></table></div></section>`}
 function apyHtml(){
   const s=apyStore(),ed=apyCanEdit(),td=apyToday();
   const head=`<style>${APY_CSS}</style>`;
   if(!s.cards.length)return head+`<section class="card"><div class="card-h"><h2>Thẻ / tài khoản thanh toán quảng cáo</h2></div><p class="empty">Chưa có thẻ nào. ${ed?"Bấm <b>+ Thêm thẻ</b>, ghi dư đầu kỳ và gắn các tài khoản quảng cáo đang trả bằng thẻ đó.":"Team Digital thêm thẻ ở đây."}</p>${ed?`<div class="acts"><button class="btn pri" data-apy="cadd">+ Thêm thẻ</button></div>`:""}</section>`;
-  if(!s.cards.some(c=>c.id===APY.card))APY.card=(s.cards.find(apyOn)||s.cards[0]).id;
+  if(!s.cards.some(c=>c.id===APY.card))return head+apyList(s,ed,td);
   const c=s.cards.find(x=>x.id===APY.card),L=apyLedger(c),now=L.bal(td),first=apyFirstFb();
   const kts=s.kt.filter(k=>k.card===c.id).sort((a,b)=>b.ngay.localeCompare(a.ngay)),lk=kts[0],diff=lk?lk.soDu-L.bal(lk.ngay):null,okd=v=>Math.abs(v)<1000;
   const noBill=L.naps.filter(n=>!(n.files||[]).length).length;
   /* TKQC có tiền bị trừ mà chưa gắn thẻ nào */
   const R=(typeof ADF!=="undefined"&&ADF.raw)||{},names=apyAccs(),loose={};const minDau=s.cards.map(x=>x.duDauNgay||"").filter(Boolean).sort()[0]||"";(R.billing||[]).forEach(b=>{if(b.kind==="tru"&&adfDt(b.time)>=minDau&&!apyCardOf(b.account,adfDt(b.time))){const k=b.account;loose[k]=(loose[k]||0)+vatAmt(b)}});
-  const cardsBar=`<div class="apy-cards">${s.cards.map(x=>{const on=apyOn(x),b=apyLedger(x).bal(td);return `<button type="button" class="apy-card${x.id===c.id?" on":""}" data-apy="pick" data-id="${esc(x.id)}"><b>${esc(x.ten)}</b>${x.so4?` · ${esc(x.so4)}`:""} ${pill(on?"Đang chạy":"Ngừng",on?"grn":"gry")}<small>${esc(x.nh||"")}${x.chu?" · "+esc(x.chu):""}</small><small>Dư tính ra: <b style="color:${b<0?"var(--red)":"var(--ink)"}">${nf(b)}đ</b></small><small>${x.tu?"dùng từ "+apyVN(x.tu):""}${x.den?(x.den<=td?" · ngừng ngày ":" · dùng đến ")+apyVN(x.den):""}</small>${x.den&&x.den<=td?(()=>{const k=apyChotDung(x.id);return `<small>${k?"chốt lúc dừng: <b>"+nf(k.soDu)+"đ</b>":'<span class="apy-bad">chưa chốt số dư lúc dừng</span>'}</small>`})():""}</button>`}).join("")}${ed?`<button type="button" class="apy-card" data-apy="cadd" style="display:flex;align-items:center;justify-content:center"><b>+ Thêm thẻ</b></button>`:""}</div>`;
+  const st=apyStatus(c,td);
+  const cardsBar=`<div class="acts" style="margin:0 0 10px;align-items:center"><button class="btn" data-apy="back">← Danh sách thẻ</button><h2 style="margin:0 0 0 6px;font-size:18px">${esc(c.ten)}${c.so4?` · ${esc(c.so4)}`:""}</h2>${pill(st[0],st[1])}<span class="hint">${esc(c.nh||"")}${c.chu?" · "+esc(c.chu):""} · ${c.tu?"dùng từ "+apyVN(c.tu):""}${c.den?(c.den<=td?" · ngừng ngày ":" · dùng đến ")+apyVN(c.den):""}${c.den&&c.den<=td?(apyChotDung(c.id)?" · chốt lúc dừng "+nf(apyChotDung(c.id).soDu)+"đ":" · chưa chốt số dư lúc dừng"):""}</span></div>`;
   const acts=ed?`<div class="acts" style="margin:0 0 12px"><button class="btn pri" data-apy="nadd">+ Nạp tiền</button><button class="btn" data-apy="kadd">Kiểm số dư ngân hàng</button><button class="btn" data-apy="tadd">Ghi tay khoản trừ</button><button class="btn" data-apy="cedit" data-id="${esc(c.id)}">Sửa thẻ, gắn TKQC</button>${c.den&&c.den<=td?(apyChotDung(c.id)?"":`<button class="btn" data-apy="dung" data-id="${esc(c.id)}">Chốt số dư lúc dừng</button>`):`<button class="btn" data-apy="dung" data-id="${esc(c.id)}">Ngừng dùng thẻ</button>`}</div>`:"";
   const MR=apyMonths(c).map(mo=>apyMonthRow(c,L,mo)),chuaChot=MR.filter(r=>r.het&&!r.k);
   const warn=[c.duDauNgay?"":"Chưa ghi ngày của dư đầu kỳ: bấm Sửa thẻ để điền.",c.duDauNgay&&first&&c.duDauNgay<first?`Facebook chỉ ghi lại tiền trừ từ ${apyVN(first)}; các khoản trừ từ ${apyVN(c.duDauNgay)} đến trước ngày đó cần ghi tay, hoặc đổi dư đầu kỳ sang ngày ${apyVN(first)}.`:"",!s.gan.some(g=>g.card===c.id)?"Thẻ chưa gắn tài khoản quảng cáo nào nên chưa tự lấy được tiền trừ.":"",noBill?`${noBill} lần nạp chưa có bill.`:"",chuaChot.length?`Chưa chốt số dư cuối tháng: ${chuaChot.map(r=>r.mo.slice(5)+"/"+r.mo.slice(0,4)).join(", ")} (bảng Chốt số dư cuối tháng bên dưới).`:"",c.den&&c.den<=td&&!apyChotDung(c.id)?`Thẻ đã ngừng ngày ${apyVN(c.den)} nhưng chưa chốt số dư lúc dừng.`:"",Object.keys(loose).length?`Có ${Object.keys(loose).length} TKQC bị Facebook trừ tiền (từ ngày dư đầu kỳ) nhưng chưa gắn vào thẻ nào: ${Object.entries(loose).map(([a,v])=>esc(names[a]||a)+" ("+nf(v)+"đ)").join(", ")}.`:""].filter(Boolean);
@@ -123,7 +137,8 @@ if(!window.__apyBound){window.__apyBound=1;
   document.addEventListener("keydown",e=>{if(e.key==="Escape"&&APY.modal){APY.modal=null;apyMdDraw()}});
   document.addEventListener("click",e=>{const b=e.target&&e.target.closest?e.target.closest("[data-apy]"):null;if(!b)return;const a=b.dataset.apy,id=b.dataset.id,s=apyStore(),td=apyToday();
     if(a==="tab"){APY.tab=id;renderMain();return}
-    if(a==="pick"){APY.card=id;APY.mo="";renderMain();return}
+    if(a==="pick"){APY.card=id;APY.mo="";renderMain();scrollTo(0,0);return}
+    if(a==="back"){APY.card="";renderMain();return}
     if(a==="close"){APY.modal=null;apyMdDraw();return}
     if(!apyCanEdit())return;
     const cl=o=>JSON.parse(JSON.stringify(o));
