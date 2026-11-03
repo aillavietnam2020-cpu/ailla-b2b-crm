@@ -904,7 +904,7 @@ function ktApplyLead(dt,k){k.duyet="Chờ CEO duyệt";k.choDuyet=true;k.sua=nul
   const t=ktTaskOf(dt,k);if(t&&t.st!=="done"){tkLog(t,"Lead duyệt, chờ CEO duyệt");t.st="review";t.vong=2;t.stAt=ktNow();t.stBy=ME.name}
   ktNoti(dt,tkAdmins(),`${ME.name} đã duyệt video tồn ${k.ma}, chờ CEO duyệt`,k.ma);if(t)ktNoti(dt,[t.nguoi],`${ME.name} đã duyệt video ${k.ma}, chờ CEO duyệt`,"task:"+t.id)}
 function ktDuyet(ma){if(!xvGive()){toast("Lead Content duyệt video này");return}const ceo=ME.role==="admin";
-  DB.mutate(ME.name,(ceo?"CEO duyệt":"Lead duyệt")+" video tồn "+ma,dt=>{const k=dt.kho.find(x=>x.ma===ma);if(!k)return;if(ceo)ktApplyDuyet(dt,k,"CEO duyệt ở Kho video tồn");else ktApplyLead(dt,k)});toast(ceo?"Đã duyệt "+ma+", chọn kênh đăng được rồi":"Đã duyệt "+ma+", chuyển CEO duyệt")}
+  DB.mutate(ME.name,(ceo?"CEO duyệt":"Lead duyệt")+" video tồn "+ma,dt=>{const k=dt.kho.find(x=>x.ma===ma);if(!k)return;if(ceo)ktApplyDuyet(dt,k,"CEO duyệt ở Kho video tồn");else ktApplyLead(dt,k)});const kd=ceo&&(D().kho.find(x=>x.ma===ma)||{}).kenhDeXuat;if(kd&&ktPick(ma,kd)){toast("Đã duyệt "+ma+", vào Chờ đăng ở "+chOf(kd).short);return}toast(ceo?"Đã duyệt "+ma+", chọn kênh đăng được rồi":"Đã duyệt "+ma+", chuyển CEO duyệt")}
 function ktCanSua(ma){
   if(!xvGive()){toast("Lead Content mới yêu cầu sửa được");return}
   const d=D(),k=(d.kho||[]).find(x=>x.ma===ma);if(!k)return;
@@ -928,7 +928,7 @@ function ktGuiLai(ma,link){
 function ktSyncTask(id){
   const d=D(),t=(d.tasks||[]).find(x=>x.id===id),k=t&&t.khoMa&&(d.kho||[]).find(x=>x.ma===t.khoMa&&x.taskId===id);if(!k)return;
   const lk=String(t.kq||"").match(/https?:\/\/\S+/),cs=!!k.sua,ok=khoOk(k);
-  if(t.st==="done"&&!ok&&(ME.role==="admin"||k.duyet!=="Chờ CEO duyệt"))DB.mutate(ME.name,"duyệt video tồn "+k.ma+" theo việc",dt=>{const x=dt.kho.find(y=>y.ma===k.ma);if(!x)return;if(ME.role==="admin")ktApplyDuyet(dt,x,"CEO duyệt ở Công việc");else{const tt=ktTaskOf(dt,x);if(tt)tt.st="review";ktApplyLead(dt,x)}});
+  if(t.st==="done"&&!ok&&(ME.role==="admin"||k.duyet!=="Chờ CEO duyệt"))DB.mutate(ME.name,"duyệt video tồn "+k.ma+" theo việc",dt=>{const x=dt.kho.find(y=>y.ma===k.ma);if(!x)return;if(ME.role==="admin")ktApplyDuyet(dt,x,"CEO duyệt ở Công việc");else{const tt=ktTaskOf(dt,x);if(tt)tt.st="review";ktApplyLead(dt,x)}});if(ME.role==="admin"&&k.kenhDeXuat)ktPick(k.ma,k.kenhDeXuat);
   else if(t.st==="review"&&cs)DB.mutate(ME.name,"video tồn "+k.ma+" đã sửa, chờ duyệt",dt=>{const x=dt.kho.find(y=>y.ma===k.ma);if(x)ktApplyGuiLai(dt,x,lk?lk[0]:"")});
   else if((t.st==="doing"||t.st==="todo")&&!cs&&!ok&&t.tlNote)DB.mutate(ME.name,"video tồn "+k.ma+" cần sửa theo việc",dt=>{const x=dt.kho.find(y=>y.ma===k.ma);if(x){const at=ktNow();x.sua={note:t.tlNote,nguoi:t.nguoi,by:ME.id,byName:ME.name,at};x.suaLog=(x.suaLog||[]).concat([{note:t.tlNote,nguoi:t.nguoi,by:ME.name,at}])}})}
 (function(){
@@ -946,7 +946,7 @@ function ktModal(ma){
    <div class="frm kfrm">
     ${s==="cs"?`<div class="k2box full" style="border-color:var(--danger,#dc2626)"><b>Cần sửa</b> · ${esc(k.sua.byName||"")} · ${esc(k.sua.at||"")}<p style="margin:6px 0">${esc(k.sua.note)}</p><p class="hint">Người sửa: <b>${esc(userName(k.sua.nguoi)||"—")}</b></p>${xvGive()||k.sua.nguoi===ME.id?`<label class="field full">Link video đã sửa (Drive)<input id="kt-nl" placeholder="Dán link bản đã sửa…"></label><div class="acts"><button type="button" class="btn sm pri" id="kt-gl">Đã sửa, gửi duyệt lại</button></div>`:""}</div>`:""}${(k.suaLog||[]).length?`<details class="full"><summary class="hint">Lịch sử sửa (${k.suaLog.length})</summary>${k.suaLog.map(x=>`<div class="hint">• ${esc(x.at)} · ${esc(x.by)}: ${esc(x.note)} → ${esc(userName(x.nguoi)||"")}${x.xong?" · đã sửa "+esc(x.xong):""}</div>`).join("")}</details>`:""}
     <label class="field">Link video (Drive)<span>${k.link?`<a href="${esc(khoLink(k))}" target="_blank" rel="noopener">▶ Mở video</a>`:"—"}</span></label>
-    <label class="field">Kênh đăng<select id="kt-k" ${s==="done"||s==="cd"||s==="cs"||s==="cceo"?"disabled":dis}><option value="">— chưa chọn —</option>${(c?CHANNELS.map(x=>x.k):ko).map(x=>`<option value="${esc(x)}" ${c&&c.kenh===x?"selected":""}>${esc(chOf(x).short)}</option>`).join("")}</select></label>
+    <label class="field">Kênh đăng${["cd","cceo","cs"].includes(s)?' <small class="hint">(duyệt xong tự vào Chờ đăng ở kênh này)</small>':""}<select id="kt-k" ${s==="done"?"disabled":dis}><option value="">— chưa chọn —</option>${(c?CHANNELS.map(x=>x.k):ko).map(x=>`<option value="${esc(x)}" ${(c?c.kenh===x:["cd","cceo","cs"].includes(s)&&k.kenhDeXuat===x)?"selected":""}>${esc(chOf(x).short)}</option>`).join("")}</select></label>
     <label class="field">Ngày sản xuất<input type="date" id="kt-sx" value="${esc(k.ngaySX||"")}" ${dis}></label>
     <label class="field full">Caption 1 / chú thích<textarea id="kt-cap" rows="4" placeholder="Viết caption cho video này (giữ lại nếu video đẩy sang tháng sau)…" ${dis}>${esc(cap)}</textarea></label>
     <label class="field">Ngày đăng dự kiến<input type="date" id="kt-day" value="${dv(dk)}" min="${dv(1)}" max="${dv(MONTH.ndays)}" ${dis}></label>
@@ -959,7 +959,7 @@ function ktModal(ma){
   on("#kt-day",v=>{ktSet(ma,"day",v);renderMain()});
   on("#kt-tt",v=>{ktSet(ma,"ngayDang",v);renderMain()});
   on("#kt-lb",v=>{if(ktSet(ma,"linkBai",v.trim())===false){ktModal(ma);return}renderMain()});
-  on("#kt-k",v=>{if(!v)return;if(!c){if(ktPick(ma,v)){toast("Đã chọn "+ma+" cho "+chOf(v).short+": Chờ đăng");renderMain();ktModal(ma)}}else{DB.mutate(ME.name,"đổi kênh đăng "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(x)x.kenh=v});renderMain();ktModal(ma)}});
+  on("#kt-k",v=>{if(["cd","cceo","cs"].includes(s)){DB.mutate(ME.name,"kênh dự kiến video tồn "+ma,dt=>{const k2=dt.kho.find(x=>x.ma===ma);if(k2)k2.kenhDeXuat=v});toast(v?"Đã ghi kênh "+chOf(v).short+", duyệt xong video tự vào Chờ đăng ở kênh này":"Đã bỏ kênh dự kiến");renderMain();return}if(!v)return;if(!c){if(ktPick(ma,v)){toast("Đã chọn "+ma+" cho "+chOf(v).short+": Chờ đăng");renderMain();ktModal(ma)}}else{DB.mutate(ME.name,"đổi kênh đăng "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(x)x.kenh=v});renderMain();ktModal(ma)}});
   if(c)kenh2Bind(c.id,()=>ktModal(ma));
   const gb=q("#kt-gb");if(gb)gb.onclick=()=>{ktGan(ma,q("#kt-gk").value);renderMain();ktModal(ma)};
   const x=q("#kt-x");if(x)x.onclick=closeDrawer;
