@@ -23,7 +23,8 @@ const tsAll=()=>tsFin().a||[];
 const tsDs=kind=>tsAll().filter(x=>x.kind===kind);
 const tsTu=()=>tsFin().tu||"2026-11";
 const tsN=v=>Math.round(+v||0).toLocaleString("vi-VN"),tsYm=ym=>ym?ym.slice(5)+"/"+ym.slice(0,4):"",tsDmy=d=>d?String(d).slice(0,10).split("-").reverse().join("/"):"—";
-const tsCanXem=()=>scSecret(),tsCanGhi=()=>scCanDuyet();
+/* Kế toán (đọc / ghi được ngăn tài chính và ghi được Sổ chi phí) sửa được dòng tài sản như người duyệt chi (chị Huệ 03/11 không sửa được dòng ghi nhầm). */
+const tsCanXem=()=>scSecret(),tsCanGhi=()=>scCanDuyet()||(tsFinOk()&&scCanGhi());
 /* Ghi tăng (chị Hoa 28/10 "Cho Thảo ghi"): người ghi được phiếu chi cũng ghi tăng được; chạy khấu hao, ghi giảm, sửa, khai báo đầu kỳ vẫn chỉ kế toán / CEO.
    Máy chủ chỉ nhận ghi ngăn tài chính từ CEO / người có debt.read.all, nên người khác ghi vào D().tsCho (chờ duyệt) như phiếu chi chờ duyệt; kế toán duyệt thì chuyển vào fin.ts. */
 const tsCanGhiTang=()=>tsCanGhi()||scCanGhi();
@@ -436,12 +437,27 @@ function tsPhiDon(a,gk){const p=tsDonCua(a);if(!p)return {p:null,L:[]};
 function tsDongBoPhi(){if(!tsCanGhi()||!tsFinOk()||TSV.phiBusy||typeof mhLoad!=="function")return;
   if(!MH.orders||!MH.inv||!TSV.vc){TSV.phiBusy=1;Promise.all([mhLoad(),typeof mhLoadInv==="function"?mhLoadInv():0,
     TSV.vc?0:svApi("/api/shipping-vouchers?from=2025-01-01&to="+tsHom()).then(r=>{TSV.vc=Array.isArray(r)?r:[]}).catch(()=>{TSV.vc=[]})]).catch(()=>{}).finally(()=>{TSV.phiBusy=0;if(MH.orders&&MH.inv&&TSV.vc)tsDongBoPhi()});return}
+  if(tsSuaNham())return;
   const them=[];tsAll().filter(a=>!a.dk&&!a.gg).forEach(a=>{const {L}=tsPhiDon(a,+(a.gk0??a.gk??a.ng)||0),chua=L.filter(z=>z.t>0&&!(a.phi||[]).includes(z.r.id));
     if(chua.length)them.push({id:a.id,ma:a.ma,ids:chua.map(z=>z.r.id),t:chua.reduce((s,z)=>s+z.t,0)})});
   if(!them.length)return;
   tsMut("cộng chi phí mua kèm vào nguyên giá: "+them.map(x=>x.ma+" +"+x.t).join(", "),T=>{them.forEach(x=>{const r=T.a.find(z=>z.id===x.id);if(!r||(r.phi||[]).some(i=>x.ids.includes(i)))return;
     if(r.gk0==null)r.gk0=+(r.gk??r.ng)||0;r.gk=(+(r.gk??r.ng)||0)+x.t;r.ng=r.gk;r.phi=[...(r.phi||[]),...x.ids];r.sua=Date.now()})});
   toast("Đã cộng chi phí mua kèm vào giá trị: "+them.map(x=>x.ma+" +"+tsN(x.t)+" đ").join(", "));if(/^ts_/.test(PAGE))renderMain()}
+/* Sửa một lần các dòng đã ghi tăng NHẦM do cách đoán đơn mua cũ (trước 03/11): dòng gắn phiếu chi mà mã là hàng quà tặng
+   (ví dụ phiếu máy hàn miệng túi PC-2026-10-0006 thành QUA-CAMY "ca mỳ", đơn PM2610-007). Chị Huệ 03/11 nhờ chạy lại.
+   Tìm lại đơn theo luật mới: có đơn khớp thì lấy mã / tên / đơn đó; không có thì tên theo diễn giải phiếu, mã tự đặt, bỏ gắn đơn.
+   Giữ giá trị, số tháng, bộ phận; bỏ chi phí mua kèm đã cộng từ đơn sai. Trả true nếu có sửa. */
+function tsSuaNham(){if(TSV.suaNham||typeof KHO==="undefined"||!KHO.items||!KHO.items.size)return false;
+  const N=(scFin().nkc)||[],sai=tsAll().filter(a=>a.nkc&&tsQua(a.ma,KHO.items.get(a.ma)));if(!sai.length)return false;TSV.suaNham=1;
+  const fix=sai.map(a=>{const r=N.find(z=>z.id===a.nkc);if(!r)return null;const don=tsTimDon(r),ten0=String(r.dg||"").replace(/^(thanh toán|trả tiền|mua|chi)\s+/i,"").trim()||a.ten;
+    const ten=don?(don.l.name||don.l.item):ten0.charAt(0).toUpperCase()+ten0.slice(1);let ma=don?don.l.item:"";
+    if(!ma||tsAll().some(z=>z.id!==a.id&&z.kind===a.kind&&z.ma===ma))ma=tsMaTuDong(ten,a.kind,a.id);
+    return {id:a.id,cu:a.ma+" · "+a.ten,ma,ten,po:don?don.p.no:"",gk:a.gk0!=null&&(a.phi||[]).length?+a.gk0:+(a.gk??a.ng)||0}}).filter(Boolean);
+  if(!fix.length)return false;
+  tsMut("sửa dòng ghi tăng nhầm đơn mua: "+fix.map(x=>x.cu+" → "+x.ma).join(", "),T=>{fix.forEach(x=>{const r=T.a.find(z=>z.id===x.id);if(!r)return;
+    r.suaNham={ma:r.ma,ten:r.ten,po:r.po||"",at:Date.now()};Object.assign(r,{ma:x.ma,ten:x.ten,po:x.po,rcl:"",gk:x.gk,ng:x.gk,phi:[],gk0:undefined,sua:Date.now()})})});
+  toast("Đã sửa dòng ghi nhầm: "+fix.map(x=>x.cu+" → "+x.ma+" · "+x.ten).join("; "));if(/^ts_/.test(PAGE))renderMain();return true}
 /* Cột "Liên quan" ở sổ (kiểu bảng giao dịch chung): đơn mua, chứng từ, phiếu trả NCC của đơn, phiếu chi Sổ chi phí đã gắn. Bấm mở đúng chỗ (mhLqBind). */
 function tsLienQuan(a){if(typeof gdLink!=="function")return "";const o=[],p=tsDonCua(a);
   if(p&&typeof mhLqPo==="function"){o.push(mhLqPo(p));try{const M=mhPoMoney(p);M.inv.forEach(v=>o.push(mhLqHv(v)));M.pays.forEach(x=>o.push(mhLqPv(x)))}catch(e){}}
