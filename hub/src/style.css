@@ -961,3 +961,17 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .tnrxp button{border:0;background:none;font-size:20px;cursor:pointer;padding:2px 3px;border-radius:50%;transition:transform .1s}.tnrxp button:hover{transform:scale(1.25)}
 .tnemop{position:absolute;left:14px;bottom:100%;margin-bottom:4px;width:300px;max-height:220px;overflow:auto;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;background:#fff;border:1px solid #e3e6ee;border-radius:12px;padding:6px;box-shadow:0 8px 24px #1018281f;z-index:7}
 .tnemop button{border:0;background:none;font-size:20px;padding:3px;cursor:pointer;border-radius:6px}.tnemop button:hover{background:#f0f2f7}
+/* Tin nhắn: cửa sổ nhỏ góc dưới phải */
+.tnpop{position:fixed;right:18px;bottom:76px;width:360px;height:min(540px,calc(100vh - 110px));z-index:9000;background:#fff;border:1px solid #e3e6ee;border-radius:14px;box-shadow:0 14px 40px #10182833;display:flex;flex-direction:column;overflow:hidden}
+.tnph{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #eceef3;background:#fafbfd}.tnph .sp{flex:1}.tnpn{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+.tnpx{border:0;background:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;color:#475467}.tnpx:hover{background:#eef0f4}
+.tnpop .tnq{margin:8px 10px;box-sizing:border-box;width:calc(100% - 20px)}.tnpop .tnlist{flex:1;overflow:auto;padding:0 6px 8px}
+.tnpop .tnpm{flex:1;display:flex;flex-direction:column;min-height:0}.tnpop .tnmsgs{flex:1;padding:8px 10px}.tnpop .tnmb{max-width:82%}
+.tnpop .tnf{padding:8px;gap:4px}.tnpop .tnf textarea{min-width:0}.tnpop .tnatt{width:28px;height:28px}.tnpop .tnimg img{max-width:200px}
+.tnpop .tnemop{left:8px;width:280px}
+@media(max-width:600px){.tnpop{right:6px;left:6px;width:auto;bottom:70px}}
+#chatbtn{border:1.5px solid #3b82f6!important;background:#eff6ff!important;color:#2563eb}#chatbtn:hover{background:#dbeafe!important}
+#chatbtn .chatic{width:20px;height:20px;fill:none;stroke:#2563eb;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+body:has(#tnpop) #ntpop{right:392px}
+#tnmic.rec{background:#fee2e2;color:#dc2626;position:relative}#tnmic.rec::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;white-space:nowrap}
+.tnaud audio{height:36px;max-width:260px}.tnpa{padding-right:28px}.tnpa audio{height:32px;width:220px}

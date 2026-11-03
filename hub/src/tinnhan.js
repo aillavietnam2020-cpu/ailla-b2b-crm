@@ -39,7 +39,7 @@ const tnOld=r=>{let k=r.startsWith("g:")?r.slice(2):"";if(r.startsWith("dm:")){c
 /* ---------- máy chủ ---------- */
 async function tnSummary(){if(!ME||typeof svApi!=="function")return;
   try{const r=await svApi("/api/hub/chat/summary");const old=new Map(TN.rooms.map(x=>[x.room,x.last&&x.last.id]));TN.rooms=r.rooms||[];
-    if(TN.sumAt)TN.rooms.forEach(x=>{if(!x.last||x.last.user_id===tnMe()||!x.unread||old.get(x.room)===x.last.id||x.last.kind==="react")return;if(TN.room===x.room&&PAGE==="tinnhan"&&!document.hidden)return;
+    if(TN.sumAt)TN.rooms.forEach(x=>{if(!x.last||x.last.user_id===tnMe()||!x.unread||old.get(x.room)===x.last.id||x.last.kind==="react")return;if(TN.room===x.room&&(PAGE==="tinnhan"||TN.popRoom===x.room)&&!document.hidden)return;
       /* mọi tin nhắn mới đều báo (chị Hoa 03/11), nhóm thì ghi tên nhóm, được gọi tên thì ghi rõ */
       const dm=x.room.startsWith("dm:");
       ntPush({key:"tn:"+x.last.id,type:"tin",text:(dm?"":(tnMentionsMe(x.last.body)?"Gọi bạn trong ":"")+tnName(x.room)+": ")+(x.last.kind==="task"?"📋 Giao việc: ":"")+x.last.body,by:tnUN(x.last.user_id),at:x.last.created_at,go:()=>openChat(x.room)})});
@@ -67,7 +67,7 @@ function tnRowHtml(r){const g=/^(g|p|n):/.test(r.room),n=tnName(r.room),l=r.last
   return `<button class="tnrow${r.room===TN.room?" on":""}${un?" un":""}" data-tnr="${esc(r.room)}">${tnAv(g?r.room:tnOther(r.room),n,g)}<span class="tnrb"><span class="tnr1"><b>${esc(n)}</b>${l?`<small>${tnTime(l.created_at)}</small>`:""}</span><span class="tnr2"><span>${esc(String(pv).replace(/\s+/g," ").slice(0,70))}</span>${un?`<em>${un>99?"99+":un}</em>`:""}</span></span></button>`}
 function tnDrawList(){const el=$("#tnlist");if(!el)return;const R=tnListRows();
   el.innerHTML=R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`;
-  el.querySelectorAll("[data-tnr]").forEach(b=>b.onclick=()=>tnOpen(b.dataset.tnr))}
+  el.querySelectorAll("[data-tnr]").forEach(b=>b.onclick=()=>TN.popOn&&PAGE!=="tinnhan"?tnPop(b.dataset.tnr):tnOpen(b.dataset.tnr))}
 function tnTaskCard(m){const id=String(m.ref||"").replace(/^task:/,""),t=(D().tasks||[]).find(x=>x.id===id);
   if(!t)return `<div class="tntask gone">📋 ${esc(m.body)} <small>(việc đã xóa)</small></div>`;
   const st=t.st||"todo",cls=st==="done"?"p-grn":st==="review"?"p-amb":"p-blu";
@@ -99,7 +99,7 @@ async function tnOpen(room){TN.room=room;TN.mob=true;try{localStorage.setItem("t
   renderMain();if(!TN.msgs[room]){await tnLoad(room);if(TN.room===room){tnDrawMsgs();tnRead(room)}}else{tnRead(room);if(await tnLoad(room)&&TN.room===room){tnDrawMsgs(true);tnRead(room)}}}
 
 /* ---------- trang ---------- */
-PAGES.tinnhan=m=>{
+PAGES.tinnhan=m=>{if(TN.popOn)tnPopClose();
   if(!TN.room){let r="";try{r=localStorage.getItem("tn_room_"+tnMe())||""}catch(e){}TN.room=r&&(r.startsWith("g:")||r.includes(tnMe()))?r:"g:chung"}
   const room=TN.room,pj=room.startsWith("p:"),ng=room.startsWith("n:"),g=room.startsWith("g:")||pj||ng,n=tnName(room),dm=!g&&tnOther(room);
   m.innerHTML=`<div class="tn${TN.mob?" open":""}${tnInfoOn()?" wi":""}">
@@ -108,7 +108,7 @@ PAGES.tinnhan=m=>{
    <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${ng?`🔒 Nhóm phối hợp · ${((tnGrp(room)||{}).members||[]).length} thành viên${(tnGrp(room)||{}).created_by===tnMe()||ME.role==="admin"?` · <button type="button" class="lnk" id="tngedit">sửa thành viên</button>`:""}`:pj?"🔒 Nhóm dự án · chỉ người trong dự án":g?(room==="g:chung"?"Mọi người trong công ty":"🔒 Nhóm phòng · chỉ nhân sự phòng này"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
      <span class="tnhb"><button class="btn sm" id="tngiao">📋 Giao việc</button><button class="btn sm" id="tnnhac">⏰ Nhắc</button><button class="btn sm${tnInfoOn()?" on":""}" id="tninfo" title="Ảnh, tệp, link, nhắc hẹn của cuộc trò chuyện">ⓘ</button></span></header>
     <div class="tnmsgs" id="tnmsgs"></div>
-    <div class="tnpend" id="tnpend" hidden></div><form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc" aria-label="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
+    <div class="tnpend" id="tnpend" hidden></div><form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc" aria-label="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><button type="button" class="tnatt" id="tnmic" title="Ghi âm tin nhắn thoại" aria-label="Ghi âm"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
   tnDrawList();tnDrawMsgs();tnBindAtt(room);tnBindEmo();tnBindInfo(room);if(!TN.files[room])tnLoadFiles(room);
   if(!TN.msgs[room])tnLoad(room).then(()=>{if(TN.room===room&&PAGE==="tinnhan"){tnDrawMsgs();tnRead(room)}});else tnRead(room);
   if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();
@@ -164,11 +164,15 @@ async function tnDue(){if(!ME||typeof svApi!=="function")return;try{const L=awai
 /* ---------- nút 💬, số chưa đọc, hỏi tin mới ---------- */
 NAV_AN_MO.add("tinnhan");
 openChat=function(room){if(room){room=/^(dm|g|p):/.test(room)?room:"g:"+room;if(room.startsWith("dm:")&&!room.includes(tnMe())){const o=room.slice(3).split("~").map(tnU).find(u=>u&&u.id!==ME.id);room=o&&o.crm?tnDm(o.crm):""}}
-  if(room)TN.room=room;TN.mob=!!room;if(PAGE==="tinnhan"&&room)tnOpen(room);else ntPage("tinnhan")};
+  /* đang ở trang khác: mở cửa sổ chat nhỏ góc dưới phải, không rời trang (chị Hoa 03/11) */
+  if(PAGE!=="tinnhan"){if(!room&&TN.popOn){tnPopClose();return}tnPop(room||"");return}
+  if(room)TN.room=room;TN.mob=!!room;if(room)tnOpen(room);else ntPage("tinnhan")};
 const _bbTn=bellBadge;
-bellBadge=function(){_bbTn();const c=$("#chatbtn");if(!c)return;c.title="Tin nhắn";const u=tnTotal();let t=c.querySelector("b");if(u){if(!t){t=document.createElement("b");c.appendChild(t)}t.textContent=u>99?"99+":u}else if(t)t.remove()};
+bellBadge=function(){_bbTn();const c=$("#chatbtn");if(!c)return;c.title="Tin nhắn";
+  /* nút tin nhắn: biểu tượng nét xanh dương, viền xanh (chị Hoa 03/11) */
+  if(!c.dataset.ic){c.dataset.ic="1";[...c.childNodes].forEach(n=>{if(n.nodeType===3)n.remove()});c.insertAdjacentHTML("afterbegin",'<svg class="chatic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg>')}const u=tnTotal();let t=c.querySelector("b");if(u){if(!t){t=document.createElement("b");c.appendChild(t)}t.textContent=u>99?"99+":u}else if(t)t.remove()};
 setInterval(()=>{if(!ME||document.hidden)return;
-  if(PAGE==="tinnhan"&&TN.room&&TN.msgs[TN.room]){const r=TN.room;tnLoad(r).then(ch=>{if(ch&&TN.room===r&&PAGE==="tinnhan"){tnDrawMsgs(true);tnRead(r)}})}
+  if((PAGE==="tinnhan"||TN.popRoom)&&TN.room&&TN.msgs[TN.room]){const r=TN.room;tnLoad(r).then(ch=>{if(ch&&TN.room===r&&(PAGE==="tinnhan"||TN.popRoom===r)){tnDrawMsgs(true);tnRead(r)}})}
   if(Date.now()-TN.sumAt>(PAGE==="tinnhan"?8e3:25e3))tnSummary()},4000);
 setInterval(tnDue,45e3);setTimeout(tnDue,8e3);
 
@@ -181,6 +185,7 @@ const tnExt=n=>(String(n).split(".").pop()||"").toLowerCase();
 const tnFIc=(mime,name)=>{const e=tnExt(name);const c=/pdf/.test(mime)||e==="pdf"?["PDF","#e03131"]:/sheet|excel|csv/.test(mime)||/^(xlsx?|csv)$/.test(e)?["XLS","#2f9e44"]:/word/.test(mime)||/^docx?$/.test(e)?["DOC","#1c4fb8"]:/presentation|powerpoint/.test(mime)||/^pptx?$/.test(e)?["PPT","#e8590c"]:["TXT","#667085"];return `<i class="tnfic" style="background:${c[1]}">${c[0]}</i>`};
 const tnSize=n=>!n?"":n>=1e6?(n/1e6).toFixed(1)+" MB":Math.max(1,Math.round(n/1e3))+" KB";
 function tnFileHtml(m){const id=String(m.ref||"").replace(/^f:/,""),f=tnFMeta(m.room||TN.room,id)||{name:m.body},img=f.mime?f.mime.startsWith("image/"):/\.(png|jpe?g|webp|gif)$/i.test(m.body||"");
+  const aud=f.mime?f.mime.startsWith("audio/"):/^Ghi âm/.test(m.body||"");if(aud)return `<div class="tnaud"><audio controls preload="metadata" src="${tnFUrl(id)}"></audio></div>`;
   return img?`<a class="tnimg" href="${tnFUrl(id)}" data-tnlb="${esc(id)}"><img src="${tnFUrl(id)}" alt="${esc(m.body)}" loading="lazy"></a>`
     :`<div class="tnfile">${tnFIc(f.mime||"",f.name)}<span><b>${esc(f.name||m.body)}</b><small>${tnSize(f.size)}</small></span><a class="btn sm" href="${tnFUrl(id)}" target="_blank" rel="noopener">Mở</a><a class="btn sm" href="${tnFUrl(id,1)}">Tải</a></div>`}
 const TN_DRV=/https?:\/\/(?:drive|docs)\.google\.com\/[^\s<]+/i;
@@ -197,7 +202,7 @@ async function tnUpload(room,list){for(const f0 of [...(list||[])]){
     const x=TN.rooms.find(z=>z.room===room);if(x)x.last=j.data.msg;else TN.rooms.push({room,last:j.data.msg,unread:0})}
   catch(e){toast((f0.name||"Tệp")+": "+(e.message||"chưa gửi được"))}}
   if(PAGE==="tinnhan"&&TN.room===room){tnDrawMsgs();tnDrawList();const i=$("#tninfo-box");if(i){i.outerHTML=tnInfoHtml(room);tnBindInfo(room)}}}
-function tnBindAtt(room){const fi=$("#tnfi");if(!fi)return;
+function tnBindAtt(room){const fi=$("#tnfi");if(!fi)return;const mic=$("#tnmic");if(mic)mic.onclick=()=>tnRecToggle(room,mic);
   $("#tnimg").onclick=()=>{fi.accept="image/*";fi.click()};$("#tnfile").onclick=()=>{fi.accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt";fi.click()};
   fi.onchange=()=>{const L=[...fi.files];fi.value="";if(L.length)tnAddPend(room,L)};
   const inp=$("#tnin");inp.addEventListener("paste",e=>{const L=[...(e.clipboardData&&e.clipboardData.files||[])];if(L.length){e.preventDefault();tnAddPend(room,L)}});
@@ -221,7 +226,8 @@ function tnBindInfo(room){const b=$("#tninfo");if(b)b.onclick=()=>{TN.info=!tnIn
 /* khay ảnh / tệp chờ gửi (chị Hoa 03/11: dán ảnh là gửi luôn là sai — phải bấm Gửi) */
 function tnAddPend(room,L){const A=TN.pend[room]=TN.pend[room]||[];[...L].forEach(f=>{if(f.size>TN_FMAX&&!f.type.startsWith("image/")){toast((f.name||"Tệp")+" quá 1,5 MB, hãy gửi link Google Drive");return}A.push(f)});tnDrawPend(room);const i=$("#tnin");if(i)i.focus()}
 function tnDrawPend(room){const w=$("#tnpend");if(!w)return;const A=TN.pend[room]||[];w.hidden=!A.length;(w._urls||[]).forEach(u=>URL.revokeObjectURL(u));w._urls=[];
-  w.innerHTML=A.map((f,i)=>{const img=f.type.startsWith("image/");let u="";if(img){u=URL.createObjectURL(f);w._urls.push(u)}return `<span class="tnpi">${img?`<img src="${u}" alt="">`:tnFIc(f.type,f.name||"")}<small>${esc(f.name||"Ảnh dán")}</small><button type="button" data-tnpx="${i}" aria-label="Bỏ">✕</button></span>`}).join("")+(A.length?`<span class="hint">Bấm Gửi để gửi ${A.length} tệp</span>`:"");
+  w.innerHTML=A.map((f,i)=>{const img=f.type.startsWith("image/");let u="";if(img){u=URL.createObjectURL(f);w._urls.push(u)}if(f.type.startsWith("audio/")){const au=URL.createObjectURL(f);w._urls.push(au);return `<span class="tnpi tnpa"><audio controls src="${au}"></audio><button type="button" data-tnpx="${i}" aria-label="Bỏ">✕</button></span>`}
+    return `<span class="tnpi">${img?`<img src="${u}" alt="">`:tnFIc(f.type,f.name||"")}<small>${esc(f.name||"Ảnh dán")}</small><button type="button" data-tnpx="${i}" aria-label="Bỏ">✕</button></span>`}).join("")+(A.length?`<span class="hint">Bấm Gửi để gửi ${A.length} tệp</span>`:"");
   w.querySelectorAll("[data-tnpx]").forEach(b=>b.onclick=()=>{A.splice(+b.dataset.tnpx,1);tnDrawPend(room)})}
 /* xem ảnh: khung nổi trên trang, ✕ / bấm ra ngoài / Esc để tắt, ‹ › xem ảnh khác trong cuộc trò chuyện */
 function tnLightbox(id){const room=TN.room,L=(TN.files[room]||[]).filter(f=>f.mime&&f.mime.startsWith("image/")).map(f=>f.id);let i=Math.max(0,L.indexOf(id));if(!L.includes(id))L.unshift(id),i=0;
@@ -277,3 +283,41 @@ function tnBindEmo(){const b=$("#tnemo"),inp=$("#tnin");if(!b||!inp)return;b.onc
   p=document.createElement("div");p.id="tnemop";p.className="tnemop";p.innerHTML=TN_EMO.map(e=>`<button type="button">${e}</button>`).join("");$("#tnf").appendChild(p);
   p.querySelectorAll("button").forEach(x=>x.onmousedown=e=>{e.preventDefault();const s=inp.selectionStart??inp.value.length,v=inp.value;inp.value=v.slice(0,s)+x.textContent+v.slice(inp.selectionEnd??s);const c=s+x.textContent.length;inp.setSelectionRange(c,c);TN.draft[TN.room]=inp.value;inp.focus()});
   setTimeout(()=>document.addEventListener("click",function f(e){if(!p.contains(e.target)&&e.target!==b){p.remove();document.removeEventListener("click",f)}}),0)}}
+
+/* ---------- cửa sổ chat nhỏ góc dưới phải (kiểu Messenger) ---------- */
+function tnPopClose(){const p=$("#tnpop");if(p)p.remove();TN.popOn=false;TN.popRoom=""}
+async function tnPop(room){let p=$("#tnpop");if(!p){p=document.createElement("div");p.id="tnpop";p.className="tnpop";document.body.appendChild(p)}TN.popOn=true;TN.popRoom=room||"";
+  if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();
+  const full=`<button type="button" class="tnpx" id="tnp-full" title="Mở trang Tin nhắn đầy đủ">⤢</button><button type="button" class="tnpx" id="tnp-x" title="Đóng">✕</button>`;
+  if(!room){p.innerHTML=`<div class="tnph"><b>Tin nhắn</b><span class="sp"></span>${full}</div><input class="tnq" id="tnq" placeholder="Tìm nhóm hoặc người…" value="${esc(TN.q||"")}"><div class="tnlist" id="tnlist"></div>`;
+    tnDrawList();const q=$("#tnq");q.oninput=()=>{TN.q=q.value;tnDrawList()}}
+  else{TN.room=room;const g=/^(g|p|n):/.test(room),n=tnName(room);
+    p.innerHTML=`<div class="tnph"><button type="button" class="tnpx" id="tnp-back" title="Danh sách">‹</button>${tnAv(g?room:tnOther(room),n,g)}<b class="tnpn">${esc(n)}</b><span class="sp"></span>${full}</div>
+     <div class="tnmain tnpm"><div class="tnmsgs" id="tnmsgs"><p class="hint tnempty">Đang tải…</p></div><div class="tnpend" id="tnpend" hidden></div>
+     <form class="tnf" id="tnf"><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><button type="button" class="tnatt" id="tnmic" title="Ghi âm tin nhắn thoại" aria-label="Ghi âm"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><input type="file" id="tnfi" hidden multiple>
+      <textarea id="tnin" rows="1" placeholder="Nhắn ${esc(n)}…">${esc(TN.draft[room]||"")}</textarea><button class="btn sm pri">Gửi</button></form></div>`;
+    $("#tnp-back").onclick=()=>tnPop("");
+    const inp=$("#tnin"),send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;inp.value="";TN.draft[room]="";
+      if(P.length){TN.pend[room]=[];tnDrawPend(room);await tnUpload(room,P)}
+      if(v)try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;toast(e.message||"Chưa gửi được")}};
+    $("#tnf").onsubmit=e=>{e.preventDefault();send()};inp.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}};inp.oninput=()=>{TN.draft[room]=inp.value};
+    tnBindAtt(room);tnBindEmo();setTimeout(()=>inp.focus(),0);
+    if(!TN.files[room])tnLoadFiles(room);
+    if(!TN.msgs[room])await tnLoad(room);else tnLoad(room);if(TN.popRoom===room){tnDrawMsgs();tnRead(room)}}
+  $("#tnp-x").onclick=tnPopClose;$("#tnp-full").onclick=()=>{const r=TN.popRoom;tnPopClose();if(r)TN.room=r,TN.mob=true;ntPage("tinnhan")}}
+
+/* ---------- ghi âm tin nhắn thoại (chị Hoa 03/11): bấm 🎤 nói, bấm lại để dừng → vào khay chờ, nghe thử rồi bấm Gửi ----------
+   Ghi dạng opus 24 kbps (1 phút ≈ 180 KB), tối đa 5 phút. */
+let TN_REC=null;
+async function tnRecToggle(room,btn){
+  if(TN_REC){TN_REC.stop();return}
+  if(!navigator.mediaDevices||!window.MediaRecorder){toast("Trình duyệt này chưa ghi âm được");return}
+  let st;try{st=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){toast("Chưa cho phép dùng micro. Bấm biểu tượng ổ khoá cạnh địa chỉ web › Micro › Cho phép");return}
+  const type=["audio/webm;codecs=opus","audio/ogg;codecs=opus","audio/mp4"].find(t=>MediaRecorder.isTypeSupported(t))||"";
+  const rec=new MediaRecorder(st,type?{mimeType:type,audioBitsPerSecond:24000}:{}),parts=[],t0=Date.now();
+  rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+  const tick=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);btn.dataset.t=Math.floor(s/60)+":"+String(s%60).padStart(2,"0");if(s>=300)rec.stop()},500);
+  rec.onstop=()=>{clearInterval(tick);st.getTracks().forEach(t=>t.stop());btn.classList.remove("rec");delete btn.dataset.t;TN_REC=null;
+    const s=Math.max(1,Math.round((Date.now()-t0)/1000)),base=(rec.mimeType||type||"audio/webm").split(";")[0],ext=base.includes("ogg")?"ogg":base.includes("mp4")?"m4a":"webm";
+    if(!parts.length||s<1)return;const f=new File(parts,`Ghi âm ${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}.${ext}`,{type:base});tnAddPend(room,[f])};
+  rec.start(1000);TN_REC=rec;btn.classList.add("rec");btn.title="Bấm để dừng ghi âm";toast("Đang ghi âm… bấm lại nút 🎤 để dừng")}

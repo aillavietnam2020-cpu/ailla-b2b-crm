@@ -237,6 +237,7 @@ const FILE_TYPES = [
   'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', // ghi âm tin nhắn thoại
 ];
 
 /** Gửi tệp: lưu tệp rồi đăng một tin loại 'file' (ref = mã tệp) vào phòng. */
@@ -247,7 +248,7 @@ chatRoutes.post('/files', async (c) => {
   const room = await needRoom(form?.get('room'), A);
   const file = form?.get('file');
   if (!file || typeof file === 'string') throw badRequest('MISSING', 'Chưa chọn tệp');
-  if (!FILE_TYPES.includes(file.type)) throw badRequest('BAD_TYPE', 'Chỉ gửi được ảnh, PDF, Word, Excel, PowerPoint hoặc tệp chữ');
+  if (!FILE_TYPES.includes(file.type)) throw badRequest('BAD_TYPE', 'Chỉ gửi được ảnh, ghi âm, PDF, Word, Excel, PowerPoint hoặc tệp chữ');
   if (file.size > CHAT_FILE_MAX) throw badRequest('TOO_LARGE', 'Tệp quá 1,5 MB, hãy gửi link Google Drive');
   const id = crypto.randomUUID();
   const name = (file.name || 'tep').slice(0, 160);
