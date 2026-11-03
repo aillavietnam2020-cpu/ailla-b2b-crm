@@ -519,6 +519,14 @@ agentRelayRoutes.post('/push', async (c) => {
     await c.env.DB.prepare('UPDATE agent_chat_docs SET chat_id = ? WHERE id = ? AND chat_id IS NULL AND owner_id IS ?').bind(replyId, did, row.owner_id).run();
   }
   await c.env.DB.prepare(`UPDATE agent_chat SET status = ?, updated_at = ? WHERE id = ?`).bind(failed ? 'error' : 'done', now, id).run();
+  /* tin hỏi từ nhóm chat (hub chat.ts callAgents): đưa câu trả lời về đúng nhóm */
+  const link = await c.env.DB.prepare(`SELECT v FROM app_kv WHERE k = ?`).bind('chatlink:' + id).first<{ v: string }>();
+  if (link?.v) {
+    await c.env.DB.prepare(`INSERT INTO chat_msgs (room, user_id, body, kind, ref, created_at) VALUES (?, ?, ?, 'agent', ?, ?)`)
+      .bind(link.v, 'agent:' + row.agent, failed ? '⚠ Agent chưa trả lời được: ' + text : text, 'ac:' + replyId, now)
+      .run();
+    await c.env.DB.prepare(`DELETE FROM app_kv WHERE k = ?`).bind('chatlink:' + id).run();
+  }
   return ok(c, { ok: true, files: files.length });
 });
 

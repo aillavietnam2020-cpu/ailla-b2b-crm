@@ -979,3 +979,9 @@ body:has(#tnpop) #ntpop{right:392px}
 #aibtn{display:none!important}
 .tnpop{height:min(360px,calc(100vh - 90px));bottom:16px}
 body:has(#tnpop) #ntpop{right:392px}
+/* Tin nhắn: agent */
+.tnavag{font-size:16px!important}.tnagb{background:#f5f3ff!important;border-color:#ddd6fe!important}
+.tnagwait{color:#6d28d9;font-style:italic;animation:tnpulse 1.4s ease-in-out infinite}@keyframes tnpulse{50%{opacity:.45}}
+.tnagh{font-size:11.5px;font-weight:700;color:#667085;text-transform:uppercase;letter-spacing:.3px;margin:10px 8px 4px}
+.tnagl{display:flex;flex-direction:column;gap:6px}.tnagl label{display:flex;align-items:center;gap:8px;border:1px solid #eceef3;border-radius:10px;padding:6px 10px}
+.tnpop.big{width:min(620px,calc(100vw - 36px));height:min(78vh,760px)}
