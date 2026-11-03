@@ -372,8 +372,18 @@ function openTask(id){
     if(!t&&TK_AFTER_NEW){const f=TK_AFTER_NEW;TK_AFTER_NEW=null;try{f(nid)}catch(e){}}
     toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+($("#t-lap").value==="tuan"?"mỗi tuần":"mỗi tháng"):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
+  try{tkFormRow()}catch(e){console.error("bố cục form giao việc",e)}
   if(t)try{tkLayout(t,gv)}catch(e){console.error("bố cục chi tiết việc",e)}
 }
+/* Form giao việc gọn (chị Hoa 03/11): "Người cùng làm / hỗ trợ" thành ô bấm sổ ra, chọn nhiều người;
+   ô đó và "Lặp lại" lên cùng hàng với Team, Dự án. Chỉ dời chỗ, giữ nguyên ô nhập đã gắn việc. */
+function tkFormRow(){const team=$("#t-team"),row=team&&team.closest(".row4"),ph=$("#t-phw");if(!row)return;row.classList.add("tkrow4");
+  if(ph&&!ph.querySelector(".tkdd")){const box=ph.querySelector(".phc"),lb=[...ph.childNodes].filter(n=>n!==box);if(box){
+    const dd=document.createElement("details");dd.className="tkdd";const sm=document.createElement("summary");dd.append(sm,box);
+    const upd=()=>{const L=[...box.querySelectorAll("input:checked")].map(i=>i.closest("label").textContent.trim());sm.textContent=L.length?L.join(", "):"— chọn người";sm.title=sm.textContent};upd();box.addEventListener("change",upd);
+    ph.innerHTML='Người cùng làm / hỗ trợ';ph.appendChild(dd);document.addEventListener("click",e=>{if(dd.open&&!dd.contains(e.target))dd.open=false})}
+    row.appendChild(ph)}
+  const lap=$("#t-lap"),lapRow=lap&&lap.closest(".tklap");if(lapRow){const cell=document.createElement("div");cell.className="field tklapc";cell.append(...lapRow.childNodes);row.appendChild(cell);lapRow.remove()}}
 /* Bố cục khung Chi tiết việc (chị Hoa 03/11): nội dung việc lên đầu (tên, người giao / làm, hạn, mô tả, link, file);
    góc phải đầu khung có nút 💬 Trao đổi và ⏰ Xin gia hạn (bấm mới mở); các ô sửa thông tin gom vào "Sửa thông tin việc".
    Chỉ dời chỗ các phần đã vẽ (giữ nguyên ô nhập và nút đã gắn việc) nên mọi thao tác cũ vẫn chạy. */

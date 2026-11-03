@@ -988,3 +988,11 @@ body:has(#tnpop) #ntpop{right:392px}
 .tnpgrip{position:absolute;left:0;top:0;width:16px;height:16px;cursor:nwse-resize;z-index:2;background:linear-gradient(135deg,#c7cbd6 0 2px,transparent 2px 5px,#c7cbd6 5px 7px,transparent 7px)}
 .tnpop.big{width:min(900px,calc(100vw - 36px))!important;height:calc(100vh - 40px)!important}
 .tkhg{display:flex;gap:6px}.tkhg input[type=time]{width:110px;flex:none}
+/* form giao việc: một hàng Team · Dự án · Người cùng làm · Lặp lại */
+.row4.tkrow4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+.tkdd{position:relative}.tkdd>summary{list-style:none;cursor:pointer;border:1px solid var(--line,#e3e6ee);border-radius:10px;padding:9px 30px 9px 12px;background:#fff;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.tkdd>summary::-webkit-details-marker{display:none}.tkdd>summary::after{content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#667085}
+.tkdd[open]>.phc{position:absolute;z-index:20;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid #e3e6ee;border-radius:10px;box-shadow:0 10px 30px #10182822;padding:8px;max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.tklapc{display:flex;flex-direction:column;gap:4px}.tklapc .field{margin:0}.tklapc .ck{font-size:12.5px}
+@media(max-width:800px){.row4.tkrow4{grid-template-columns:1fr 1fr}}
+.tkdd[open]>.phc{flex-wrap:nowrap!important;overflow-x:hidden!important;min-width:220px}.tkdd[open]>.phc label{width:100%;padding:3px 4px;border-radius:6px}.tkdd[open]>.phc label:hover{background:#f3f5fa}
