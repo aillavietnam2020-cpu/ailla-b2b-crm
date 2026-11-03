@@ -109,4 +109,8 @@ pCvV=function(m){_pCvVOd(m);try{odAttach(m)}catch(e){console.error("order lên q
 PAGES.cv_v=m=>pCvV(m);
 /* bấm thông báo lịch họp: mở đúng lịch */
 const _ntGoOd=ntGo;
-ntGo=function(n){if(n&&n.ref&&String(n.ref).startsWith("meet:")){_ntGoOd(Object.assign({},n,{ref:""}));openMeet(String(n.ref).slice(5));return}return _ntGoOd(n)};
+ntGo=function(n){if(n&&n.ref&&String(n.ref).startsWith("meet:")){_ntGoOd(Object.assign({},n,{ref:""}));openMeet(String(n.ref).slice(5));return}
+  /* thông báo cũ dẫn tới trang Nhiệm vụ / Việc của tôi kiểu cũ: mở đúng việc có tên trong thông báo, không thấy thì mở Công việc › Của tôi */
+  if(n&&/^page:(cv_nv|viectoi|cv_vt)$/.test(String(n.ref||""))){_ntGoOd(Object.assign({},n,{ref:""}));const tx=String(n.text||""),t=(D().tasks||[]).filter(x=>x.ten&&tx.includes(x.ten)).sort((a,b)=>b.ten.length-a.ten.length)[0];
+    if(t){openTask(t.id);return}MOD="cv";PAGE="cv_v";if(typeof CVV!=="undefined"){CVV.view="list";CVV.scope="mine"}if(typeof cvWhoSet==="function")cvWhoSet("mine");render();return}
+  return _ntGoOd(n)};

@@ -673,19 +673,20 @@ PAGES.cv_nv=m=>{try{pCvNv2(m)}catch(e){console.error("Task mới lỗi, dùng b�
 function cvPush(dt,ids,text,ref){dt.notifs=dt.notifs||[];[...new Set([].concat(ids).filter(Boolean))].forEach(to=>{dt.notifs.push({id:uid("nt"),to,text,at:nowISO(),ref:ref||"",by:"",read:false})});if(typeof NT_KEEP!=="undefined"&&dt.notifs.length>NT_KEEP)dt.notifs=dt.notifs.slice(-NT_KEEP)}
 function cvRemindList(){
   const d=D(),td=d.settings.today,out=[],leads=(d.users||[]).filter(u=>u.active!==false&&(u.role==="admin"||u.role==="lead")).map(u=>u.id);
-  const push=(type,key,to,text)=>{to=[...new Set((to||[]).filter(Boolean))];if(to.length)out.push({k:type+"|"+key,to,text})};
+  /* ref: bấm thông báo mở đúng việc (chị Hoa 03/11: nhận thông báo mà bấm vào không ra việc) */
+  const push=(type,key,to,text,ref)=>{to=[...new Set((to||[]).filter(Boolean))];if(to.length)out.push({k:type+"|"+key,to,text,ref})};
   cvAutoMk(true).forEach(g=>{const who=userName(g.nguoi)||"chưa giao",mine=g.nguoi&&cvActive(g.nguoi)?[g.nguoi]:[],t=`${g.ten} (${g.done}/${g.n})`;if(!g.han)return;
-    if(g.han>=td&&g.han-td<=2&&g.st!=="doing")push("n",g.key,mine,`Bạn chưa bấm "Đang làm": ${t} · hạn ${dd(g.han)}`);
-    if(g.han===td)push("d",g.key,mine.concat(leads),`Đến hạn hôm nay: ${t} · ${who}`);
-    if(g.han<td)push("l",g.key,mine.concat(leads),`⚠ Trễ ${td-g.han} ngày: ${t} · ${who}`)});
+    if(g.han>=td&&g.han-td<=2&&g.st!=="doing")push("n",g.key,mine,`Bạn chưa bấm "Đang làm": ${t} · hạn ${dd(g.han)}`,(g.ids||[])[0]);
+    if(g.han===td)push("d",g.key,mine.concat(leads),`Đến hạn hôm nay: ${t} · ${who}`,(g.ids||[])[0]);
+    if(g.han<td)push("l",g.key,mine.concat(leads),`⚠ Trễ ${td-g.han} ngày: ${t} · ${who}`,(g.ids||[])[0])});
   cvAutoDg(true).forEach(g=>{const who=userName(g.nguoi)||"chưa có người phụ trách",mine=g.nguoi&&cvActive(g.nguoi)?[g.nguoi]:[];
-    if(!g.day)push("s",g.key,mine,`${g.ten}`);
-    else if(g.day===td)push("d",g.key,mine.concat(leads),`Hôm nay cần đăng: ${g.ten} · ${who}`);
-    else if(g.day<td)push("l",g.key,mine.concat(leads),`⚠ Đăng trễ ${td-g.day} ngày: ${g.ten} · ${who}`)});
+    if(!g.day)push("s",g.key,mine,`${g.ten}`,(g.ids||[])[0]);
+    else if(g.day===td)push("d",g.key,mine.concat(leads),`Hôm nay cần đăng: ${g.ten} · ${who}`,(g.ids||[])[0]);
+    else if(g.day<td)push("l",g.key,mine.concat(leads),`⚠ Đăng trễ ${td-g.day} ngày: ${g.ten} · ${who}`,(g.ids||[])[0])});
   (d.tasks||[]).forEach(t=>{if(t.st==="done"||!t.han)return;const mine=[t.nguoi].concat(t.phoi||[]).filter(x=>x&&cvActive(x)),who=userName(t.nguoi)||"chưa giao";
-    if(t.han>=td&&t.han-td<=2&&["todo","nhan"].includes(t.st))push("n","tk|"+t.id,mine,`Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`);
-    if(t.han===td)push("d","tk|"+t.id,mine.concat(leads),`Đến hạn hôm nay: ${t.ten} · ${who}`);
-    if(t.han<td)push("l","tk|"+t.id,mine.concat(leads),`⚠ Trễ ${td-t.han} ngày: ${t.ten} · ${who}`)});
+    if(t.han>=td&&t.han-td<=2&&["todo","nhan"].includes(t.st))push("n","tk|"+t.id,mine,`Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`,"task:"+t.id);
+    if(t.han===td)push("d","tk|"+t.id,mine.concat(leads),`Đến hạn hôm nay: ${t.ten} · ${who}`,"task:"+t.id);
+    if(t.han<td)push("l","tk|"+t.id,mine.concat(leads),`⚠ Trễ ${td-t.han} ngày: ${t.ten} · ${who}`,"task:"+t.id)});
   return out
 }
 function cvRemind(){
@@ -693,7 +694,7 @@ function cvRemind(){
   const sfx="#"+MONTH.key+"-"+D().settings.today,done=D().autoRem||{},L=cvRemindList().filter(r=>!done[r.k+sfx]);
   if(!L.length)return;
   DB.mutate("Hệ thống","nhắc việc tự động",dt=>{dt.autoRem=dt.autoRem||{};const sf="#"+MONTH.key+"-"+dt.settings.today;Object.keys(dt.autoRem).forEach(k=>{if(!k.endsWith(sf))delete dt.autoRem[k]});
-    L.forEach(r=>{const key=r.k+sf;if(dt.autoRem[key])return;dt.autoRem[key]=1;cvPush(dt,r.to,r.text,"page:cv_nv")})})
+    L.forEach(r=>{const key=r.k+sf;if(dt.autoRem[key])return;dt.autoRem[key]=1;cvPush(dt,r.to,r.text,r.ref||"page:cv_v")})})
 }
 setTimeout(()=>{try{cvRemind()}catch(e){console.warn("nhắc việc lỗi",e)}},8000);
 setInterval(()=>{try{if(!document.hidden)cvRemind()}catch(e){console.warn("nhắc việc lỗi",e)}},300000);
