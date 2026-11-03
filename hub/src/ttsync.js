@@ -12,23 +12,37 @@ function ttsEnsure(){
   if(typeof TSB==="undefined"||TSB.all||TSB.allBusy||TTS_KICK||typeof tsbLoadAll!=="function")return;
   TTS_KICK=true;tsbLoadAll().then(()=>{if(typeof renderMain==="function"&&(MOD==="mkt"||["win","bc_koc","kehoach","tq_content"].includes(PAGE)))renderMain()}).catch(()=>{})}
 const ttsVn=s=>s?s.slice(8,10)+"/"+s.slice(5,7):"";
-/* các khoảng của một loại nằm trong [from,to]; khoảng chồng nhau thì giữ khoảng mới nhất, rộng nhất */
+/* GỘP các khoảng của một loại trong kỳ [from,to] (chị Hoa 03/11): agent nạp mỗi ngày một ngày, đôi khi thêm file tuần / tháng.
+   Như tkPick ở Nhập báo cáo: khoảng dài chọn trước, khoảng nào chồng lên khoảng đã chọn thì bỏ → ngày lẻ nằm trong file tuần
+   không bị cộng trùng; các khoảng không chồng nhau thì cộng. Ưu tiên khoảng nằm trọn trong kỳ; không có thì lấy khoảng giao kỳ. */
+const ttsLen=r=>Date.parse(r.to)-Date.parse(r.from);
 function ttsRanges(kind,from,to){
-  const A=(typeof TSB!=="undefined"&&TSB.all&&TSB.all.ranges)||[];
-  const R=A.filter(r=>r.kind===kind&&r.from<=to&&r.to>=from).sort((a,b)=>b.to.localeCompare(a.to)||a.from.localeCompare(b.from)),out=[];
+  const A=((typeof TSB!=="undefined"&&TSB.all&&TSB.all.ranges)||[]).filter(r=>r.kind===kind&&r.from<=to&&r.to>=from),IN=A.filter(r=>r.from>=from&&r.to<=to);
+  const R=(IN.length?IN:A).slice().sort((a,b)=>ttsLen(b)-ttsLen(a)||b.to.localeCompare(a.to)||String(b.at||"").localeCompare(String(a.at||""))),out=[];
   R.forEach(r=>{if(!out.some(x=>x.from<=r.to&&x.to>=r.from))out.push(r)});
   return out.sort((a,b)=>a.from.localeCompare(b.from))}
+/* số đã gộp của một loại: videos / kocvideos (từng video cộng theo ID), koc (cộng số), creators (cộng theo @) */
+function ttsMerge(kind,from,to){
+  const R=ttsRanges(kind,from,to);if(!R.length)return null;
+  if(kind==="koc"){const M={};R.forEach(r=>Object.entries(r.data||{}).forEach(([k,v])=>{if(typeof v==="number")M[k]=(M[k]||0)+v}));return {data:M,R}}
+  if(kind==="creators"){const U=new Map();let n=0,nCo=0,gmv=0;R.forEach(r=>{const x=r.data||{};n=Math.max(n,+x.n||0);nCo+=+x.nCo||0;gmv+=+x.gmv||0;(x.top||[]).forEach(t=>{const o=U.get(t.u)||{u:t.u};Object.entries(t).forEach(([k,v])=>{if(typeof v==="number")o[k]=k==="fl"?Math.max(o[k]||0,v):(o[k]||0)+v});U.set(t.u,o)})});
+    return {data:{n,nCo:Math.min(nCo,n||nCo),gmv,top:[...U.values()].sort((a,b)=>(b.gmv||0)-(a.gmv||0))},R}}
+  const V=new Map(),S={};R.forEach(r=>{const x=r.data||{};Object.entries(x).forEach(([k,v])=>{if(typeof v==="number")S[k]=(S[k]||0)+v});
+    (x.top||[]).forEach(v=>{const o=V.get(v.id)||{id:v.id,t:v.t,post:v.post,sp:v.sp,u:v.u||""};Object.entries(v).forEach(([k,val])=>{if(typeof val==="number"&&k!=="xh")o[k]=(o[k]||0)+val});if(!o.u&&v.u)o.u=v.u;V.set(v.id,o)})});
+  const top=[...V.values()].sort((a,b)=>(b.gmv||0)-(a.gmv||0));
+  /* số video đếm theo ID (một video có ở nhiều ngày chỉ tính một lần) khi danh sách đủ; danh sách bị cắt thì giữ số cộng */
+  const full=R.every(r=>((r.data||{}).top||[]).length>=(+(r.data||{}).n||0));
+  if(full||R.length===1){S.n=R.length===1?(+(R[0].data||{}).n||top.length):top.length;S.nCoDon=R.length===1?(+(R[0].data||{}).nCoDon||top.filter(v=>v.don>0).length):top.filter(v=>(v.don||0)>0).length}
+  return {data:Object.assign(S,{top}),R}}
 const ttsLbl=R=>R.map(r=>ttsVn(r.from)+"–"+ttsVn(r.to)).join(", ");
 const ttsAt=R=>{const t=R.map(r=>r.at||"").sort().pop();return t?new Date(t).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"}):""};
 /* thẻ đã đăng theo ID video (thẻ tháng này + video win cũ) */
 function ttsCardMap(){const m=new Map(),d=D();(d.cards||[]).forEach(c=>{const id=c.tiktokId||((String(c.linkDang||"").match(/[0-9]{19}/)||[])[0]);if(id&&!m.has(id))m.set(id,c)});return m}
 /* Video › Chi tiết gộp các khoảng: số tổng + từng video (cộng số nếu có ở nhiều khoảng) */
-function ttsVideos(from,to){
-  const R=ttsRanges("videos",from,to);if(!R.length)return null;
-  const T={n:0,nDang:0,gmv:0,vv:0,don:0},V=new Map(),cm=ttsCardMap();
-  R.forEach(r=>{const x=r.data||{};["n","nDang","gmv","vv","don"].forEach(k=>T[k]+=+x[k]||0);
-    (x.top||[]).forEach(v=>{const o=V.get(v.id)||{id:v.id,t:v.t,post:v.post,sp:v.sp,u:v.u||"",vv:0,don:0,gmv:0};o.vv+=+v.vv||0;o.don+=+v.don||0;o.gmv+=+v.gmv||0;V.set(v.id,o)})});
-  const rows=[...V.values()].map(v=>{const c=cm.get(v.id)||null,sku=c?c.sku:(typeof bkSku==="function"?bkSku(v.sp||v.t||""):""),ch=c?c.kenh:ttsChOfAcc(v.u);return {...v,card:c,sku,kenh:ch}}).sort((a,b)=>b.gmv-a.gmv);
+function ttsVideos(from,to,kind){
+  const MG=ttsMerge(kind||"videos",from,to);if(!MG)return null;const R=MG.R,x=MG.data,cm=ttsCardMap();
+  const T={n:+x.n||0,nDang:+x.nDang||0,nCoDon:+x.nCoDon||0,gmv:+x.gmv||0,vv:+x.vv||0,don:+x.don||0};
+  const rows=x.top.map(v=>({vv:0,don:0,gmv:0,...v})).map(v=>{const c=cm.get(v.id)||null,sku=c?c.sku:(typeof bkSku==="function"?bkSku(v.sp||v.t||""):""),ch=c?c.kenh:ttsChOfAcc(v.u);return {...v,card:c,sku,kenh:ch}}).sort((a,b)=>b.gmv-a.gmv);
   return {T,rows,R,lbl:ttsLbl(R),at:ttsAt(R)}}
 function ttsChOfAcc(u){u=String(u||"").replace(/^@/,"").toLowerCase();if(!u)return "";const c=CHANNELS.find(x=>String(x.acc||"").replace(/^@/,"").toLowerCase()===u);return c?c.k:""}
 /* số của thẻ đã đăng: ưu tiên số agent (cùng kỳ) */
@@ -99,10 +113,12 @@ function ttsMirror(){
   if(upd.length)DB.mutate(ME.name,"cập nhật số "+upd.length+" video từ kho TikTok chung",dt=>{upd.forEach(([id,nh])=>{const c=dt.cards.find(x=>x.id===id);if(!c)return;c.hist=nh;const p=tkPick(nh);c.don=p.d;c.gmv=p.g;c.view=p.v;c.click=p.c})});
   /* video KOC → TOP KOC, video chờ check, Video win KOC: lấy từ kocvideos (thẻ "Tài khoản liên kết") và từ videos có @tài khoản KOC.
      Mỗi lần kho có bản mới (khoảng + giờ nạp) thì đọc lại; file tải tay cũ cùng khoảng ngày thì bỏ qua với videos. */
-  if(typeof kocImport==="function"){const KI=d.kocImports||[],files=new Set(KI.map(i=>i.file)),seen=new Set(KI.map(i=>{const g=i.f?{f:i.f,t:i.t}:tkRange(i.range)||{};return g.f+"~"+g.t}));
+  if(typeof kocImport==="function"){const KI=d.kocImports||[],files=new Set(KI.map(i=>i.file).concat(d.ttsKocSeen||[])),done=[],seen=new Set(KI.map(i=>{const g=i.f?{f:i.f,t:i.t}:tkRange(i.range)||{};return g.f+"~"+g.t}));
     (TSB.all.ranges||[]).filter(r=>r.kind==="videos"||r.kind==="kocvideos").forEach(r=>{const nm="Kho TikTok · "+(r.kind==="kocvideos"?"video KOC":"video")+" · "+r.from+"~"+r.to+" · "+(r.at||"");if(files.has(nm)||(r.kind==="videos"&&seen.has(r.from+"~"+r.to)))return;
       const rows=((r.data||{}).top||[]).filter(v=>r.kind==="kocvideos"||v.u);if(!rows.length)return;
-      try{kocImport(ME,{name:nm,range:r.from+" ~ "+r.to,recs:rows.map(v=>({id:v.id,acc:v.u||"koc",ten:v.t,sp:v.sp,tm:v.post,view:+v.vv||0,click:+v.click||0,don:+v.don||0,gmv:+v.gmv||0,xh:+v.xh||0}))},true)}catch(e){}})}}
+      try{kocImport(ME,{name:nm,range:r.from+" ~ "+r.to,recs:rows.map(v=>({id:v.id,acc:v.u||"koc",ten:v.t,sp:v.sp,tm:v.post,view:+v.vv||0,click:+v.click||0,don:+v.don||0,gmv:+v.gmv||0,xh:+v.xh||0}))},true);done.push(nm)}catch(e){}});
+    /* nhớ bản đã đọc (agent nạp mỗi ngày, danh sách nhập KOC chỉ giữ 20 lần gần nhất) để không đọc lại */
+    if(done.length)DB.mutate(ME.name,"ghi nhận "+done.length+" bản video KOC từ kho TikTok chung",dt=>{dt.ttsKocSeen=(dt.ttsKocSeen||[]).concat(done).slice(-400)})}}
 (function(){const go=()=>{try{if(typeof TSB!=="undefined"&&TSB.all&&typeof D==="function"&&D()&&typeof ME!=="undefined"&&ME){ttsMigrate();ttsMirror()}}catch(e){}};
   const _rm=renderMain;renderMain=function(){const r=_rm.apply(this,arguments);setTimeout(go,50);return r};
   const _r=render;render=function(){const r=_r.apply(this,arguments);setTimeout(()=>{ttsEnsure();go()},50);return r}})();
