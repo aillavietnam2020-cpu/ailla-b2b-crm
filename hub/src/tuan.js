@@ -708,7 +708,7 @@ function kenhPop(anchor,opt){
     if(x.checked){
       if(!c){if(opt.pick&&opt.pick(k)){close();renderMain()}else x.checked=false;return}
       const r2=repostCard(ME,c.id,k,+c.day||0,c.nguoi);if(!r2||String(r2).startsWith("Video")||String(r2).startsWith("Không")){toast(r2||"Chưa tạo được");x.checked=false;return}
-      toast("Đã thêm kênh "+chOf(k).short+" cho video này");close();renderMain();return}
+      ktNotiKenh(c.id+" · "+sk(c.sku).n+(c.hookText?" · "+c.hookText:""),k,c.id);toast("Đã thêm kênh "+chOf(k).short+" cho video này");close();renderMain();return}
     if(!c){x.checked=true;return}
     const done=y=>y.step==="xong"||y.linkDang,kidK=kids.filter(y=>y.kenh===k&&!done(y));
     /* bỏ một kênh: ưu tiên bỏ bản đăng thêm của kênh đó; nếu là kênh đầu thì kênh thêm đầu tiên lên làm kênh chính; còn một kênh duy nhất thì bỏ chọn video */
@@ -861,11 +861,14 @@ function ktGan(ma,kenh){
   DB.mutate(ME.name,"gắn video đã đăng "+ma+" vào kênh "+kenh,dt=>{const kk=dt.kho.find(x=>x.ma===ma);if(!kk)return;const td=dt.settings.today,cc=newCard(dt,{sku:kk.sku,kenh,day:td});Object.assign(cc,{mix:"ton",loai:"kho",nguon:"Footage cũ",khoMa:ma,oneShot:false,hookText:kk.ten||kk.tuyen||"Video "+sk(kk.sku).n,linkVideo:kk.link||"",linkFinal:kk.link||"",caption:kk.caption||"",nguoi:ME.id,nguoiEdit:ME.id,nguoiKB:ME.id,giao:ME.id,duyet:"Đã duyệt",ceo:"PASS",step:"xong",ngayDang:td,nhapTay:true,tuan:weekOf(td)||1,batDau:td});dt.cards.push(cc);kk.maDang=cc.id;kk.trangThai="Đã lên lịch"});
   toast("Đã gắn "+ma+" vào "+chOf(kenh).short)
 }
+function ktNotiKenh(label,kenh,ref){const to=[chanOwner(kenh)].concat(chanHelp(kenh)).filter(Boolean);if(!to.length||typeof notifyU!=="function")return;
+  DB.mutate(ME.name,"báo kênh "+kenh+" có video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp video ${label} vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,ref||""))}
 function ktPick(ma,kenh){
   const k0=(D().kho||[]).find(y=>y.ma===ma);if(!k0||!kenh)return false;if(!k0.maDang&&!khoOk(k0)){toast("Video "+ma+" chưa duyệt, Lead duyệt xong mới phân bổ kênh được");return false}
   if(k0.maDang&&!D().cards.find(y=>y.id===k0.maDang)){ktGan(ma,kenh);return true}
   if(!ksPick(k0.sku,kenh,ma))return false;
-  DB.mutate(ME.name,"áp thông tin video kho "+ma,dt=>{const k=dt.kho.find(x=>x.ma===ma),c=k&&dt.cards.find(y=>y.id===k.maDang);ktMirror(dt,k,c)});return true
+  DB.mutate(ME.name,"áp thông tin video kho "+ma,dt=>{const k=dt.kho.find(x=>x.ma===ma),c=k&&dt.cards.find(y=>y.id===k.maDang);ktMirror(dt,k,c)});
+  ktNotiKenh(ma+" · "+sk(k0.sku).n+(k0.ten?" · "+k0.ten:""),kenh,ma);return true
 }
 /* bỏ chọn một video kho đang chờ đăng: trả về Chưa phân bổ để chọn lại kênh, ngày */
 function ktBo(ma){
@@ -959,7 +962,7 @@ function ktModal(ma){
   on("#kt-day",v=>{ktSet(ma,"day",v);renderMain()});
   on("#kt-tt",v=>{ktSet(ma,"ngayDang",v);renderMain()});
   on("#kt-lb",v=>{if(ktSet(ma,"linkBai",v.trim())===false){ktModal(ma);return}renderMain()});
-  on("#kt-k",v=>{if(["cd","cceo","cs"].includes(s)){DB.mutate(ME.name,"kênh dự kiến video tồn "+ma,dt=>{const k2=dt.kho.find(x=>x.ma===ma);if(k2)k2.kenhDeXuat=v});toast(v?"Đã ghi kênh "+chOf(v).short+", duyệt xong video tự vào Chờ đăng ở kênh này":"Đã bỏ kênh dự kiến");renderMain();return}if(!v)return;if(!c){if(ktPick(ma,v)){toast("Đã chọn "+ma+" cho "+chOf(v).short+": Chờ đăng");renderMain();ktModal(ma)}}else{DB.mutate(ME.name,"đổi kênh đăng "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(x)x.kenh=v});renderMain();ktModal(ma)}});
+  on("#kt-k",v=>{if(["cd","cceo","cs"].includes(s)){DB.mutate(ME.name,"kênh dự kiến video tồn "+ma,dt=>{const k2=dt.kho.find(x=>x.ma===ma);if(k2)k2.kenhDeXuat=v});toast(v?"Đã ghi kênh "+chOf(v).short+", duyệt xong video tự vào Chờ đăng ở kênh này":"Đã bỏ kênh dự kiến");renderMain();return}if(!v)return;if(!c){if(ktPick(ma,v)){toast("Đã chọn "+ma+" cho "+chOf(v).short+": Chờ đăng");renderMain();ktModal(ma)}}else{if(c.kenh===v)return;DB.mutate(ME.name,"đổi kênh đăng "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(x)x.kenh=v});ktNotiKenh(ma+" · "+sk(k.sku).n+(k.ten?" · "+k.ten:""),v,ma);renderMain();ktModal(ma)}});
   if(c)kenh2Bind(c.id,()=>ktModal(ma));
   const gb=q("#kt-gb");if(gb)gb.onclick=()=>{ktGan(ma,q("#kt-gk").value);renderMain();ktModal(ma)};
   const x=q("#kt-x");if(x)x.onclick=closeDrawer;
