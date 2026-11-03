@@ -955,3 +955,9 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .pdoh{display:flex;justify-content:space-between;gap:8px;font-size:13px}.pdoh span{color:#667085;font-size:12px}.pdoc.late .pdoh span b{color:#dc2626}
 .pdop{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}.pdop span{background:#fff;border:1px solid #e6e8ef;border-radius:8px;padding:1px 7px;font-size:11.5px}
 .pdor{display:flex;flex-direction:column;padding:4px 0;border-top:1px solid #f0f1f5;font-size:12.5px}.pdor small{color:#98a2b3;font-size:11px}
+/* Tin nhắn: cảm xúc */
+.tnrx{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}.tnrx button{border:1px solid #e3e6ee;background:#fff;border-radius:12px;padding:1px 7px;font:inherit;font-size:12.5px;cursor:pointer}.tnrx button.on{border-color:#a5b4fc;background:#eef2ff}.tnrx b{font-size:11px;color:#475467}
+.tnma{position:relative}.tnrxp{position:absolute;bottom:100%;right:0;display:flex;gap:2px;background:#fff;border:1px solid #e3e6ee;border-radius:20px;padding:3px 6px;box-shadow:0 6px 20px #10182822;z-index:6}.tnm.me .tnrxp{right:auto;left:0}
+.tnrxp button{border:0;background:none;font-size:20px;cursor:pointer;padding:2px 3px;border-radius:50%;transition:transform .1s}.tnrxp button:hover{transform:scale(1.25)}
+.tnemop{position:absolute;left:14px;bottom:100%;margin-bottom:4px;width:300px;max-height:220px;overflow:auto;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;background:#fff;border:1px solid #e3e6ee;border-radius:12px;padding:6px;box-shadow:0 8px 24px #1018281f;z-index:7}
+.tnemop button{border:0;background:none;font-size:20px;padding:3px;cursor:pointer;border-radius:6px}.tnemop button:hover{background:#f0f2f7}

@@ -28,9 +28,10 @@ const tnInit=n=>{const w=String(n||"?").trim().split(/\s+/);return (w.length>1?w
 const tnAv=(id,name,grp)=>{const c=avC(id);return `<i class="tnav${grp?" g":""}" style="background:${c[0]};color:${c[1]}">${grp?"#":esc(tnInit(name))}</i>`};
 const tnPeople=()=>D().users.filter(u=>u.active&&u.name&&u.crm&&u.crm!==tnMe());
 const tnTotal=()=>TN.rooms.reduce((a,r)=>a+(r.room===TN.room&&PAGE==="tinnhan"?0:r.unread||0),0);
-const tnLink=t=>esc(t).replace(/https?:\/\/[^\s<]+/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m.length>56?m.slice(0,56)+"…":m}</a>`)
+const tnLink=t=>esc(t).replace(/@(all|tất cả)(?![\p{L}\d])/giu,'<b class="tnat">@$1</b>').replace(/https?:\/\/[^\s<]+/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m.length>56?m.slice(0,56)+"…":m}</a>`)
   .replace(/@([\p{L}\d][\p{L}\d ]{0,30}?)(?=[\s,.!?:]|$)/gu,(m,n)=>tnPeople().concat([ME]).some(u=>u.name.toLowerCase()===n.toLowerCase())?`<b class="tnat">${m}</b>`:m).replace(/\n/g,"<br>");
-const tnMentionsMe=b=>!!ME&&new RegExp("@"+ME.name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![\\p{L}\\d])","iu").test(b||"");
+const TN_ALL=/@(all|tất cả|tatca)(?![\p{L}\d])/iu;
+const tnMentionsMe=b=>!!ME&&TN_ALL.test(b||"")||!!ME&&new RegExp("@"+ME.name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![\\p{L}\\d])","iu").test(b||"");
 /* tin của khung trao đổi cũ (dữ liệu chung) */
 const tnOld=r=>{let k=r.startsWith("g:")?r.slice(2):"";if(r.startsWith("dm:")){const o=tnU(tnOther(r));if(!o)return [];k="dm:"+[ME.id,o.id].sort().join("~")}
   return ((D().chat||{})[k]||[]).slice(-80).map(m=>({id:0,old:true,user_id:(tnU(m.by)||{}).crm||m.by,body:m.text,kind:"",created_at:m.t}))};
@@ -38,7 +39,7 @@ const tnOld=r=>{let k=r.startsWith("g:")?r.slice(2):"";if(r.startsWith("dm:")){c
 /* ---------- máy chủ ---------- */
 async function tnSummary(){if(!ME||typeof svApi!=="function")return;
   try{const r=await svApi("/api/hub/chat/summary");const old=new Map(TN.rooms.map(x=>[x.room,x.last&&x.last.id]));TN.rooms=r.rooms||[];
-    if(TN.sumAt)TN.rooms.forEach(x=>{if(!x.last||x.last.user_id===tnMe()||!x.unread||old.get(x.room)===x.last.id)return;if(TN.room===x.room&&PAGE==="tinnhan"&&!document.hidden)return;
+    if(TN.sumAt)TN.rooms.forEach(x=>{if(!x.last||x.last.user_id===tnMe()||!x.unread||old.get(x.room)===x.last.id||x.last.kind==="react")return;if(TN.room===x.room&&PAGE==="tinnhan"&&!document.hidden)return;
       /* mọi tin nhắn mới đều báo (chị Hoa 03/11), nhóm thì ghi tên nhóm, được gọi tên thì ghi rõ */
       const dm=x.room.startsWith("dm:");
       ntPush({key:"tn:"+x.last.id,type:"tin",text:(dm?"":(tnMentionsMe(x.last.body)?"Gọi bạn trong ":"")+tnName(x.room)+": ")+(x.last.kind==="task"?"📋 Giao việc: ":"")+x.last.body,by:tnUN(x.last.user_id),at:x.last.created_at,go:()=>openChat(x.room)})});
@@ -62,7 +63,7 @@ function tnListRows(){const q=TN.q.trim().toLowerCase(),by=new Map(TN.rooms.map(
   const base=["g:chung"].concat(tnMyTeam()?["g:"+tnMyTeam()]:[],tnMyPrj().map(p=>"p:"+p.id),(TN.groups||[]).map(g=>"n:"+g.id)),R=TN.rooms.slice();base.forEach(r=>{if(!by.has(r))R.push({room:r,last:null,unread:0})});
   return R.filter(r=>r.room.startsWith("dm:")||(r.room.startsWith("n:")?!!tnGrp(r.room):r.room.startsWith("p:")?!!tnPrj(r.room):TEAMS[r.room.slice(2)])).sort((a,b)=>(b.last?b.last.id:0)-(a.last?a.last.id:0))}
 function tnRowHtml(r){const g=/^(g|p|n):/.test(r.room),n=tnName(r.room),l=r.last,un=r.room===TN.room?0:r.unread;
-  const pv=l?(l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("n:")?"Nhóm phối hợp · chưa có tin":r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
+  const pv=l?(l.kind==="react"?(l.user_id===tnMe()?"Bạn":tnUN(l.user_id)||"")+(l.body?" đã thả "+l.body:" bỏ cảm xúc"):l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("n:")?"Nhóm phối hợp · chưa có tin":r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
   return `<button class="tnrow${r.room===TN.room?" on":""}${un?" un":""}" data-tnr="${esc(r.room)}">${tnAv(g?r.room:tnOther(r.room),n,g)}<span class="tnrb"><span class="tnr1"><b>${esc(n)}</b>${l?`<small>${tnTime(l.created_at)}</small>`:""}</span><span class="tnr2"><span>${esc(String(pv).replace(/\s+/g," ").slice(0,70))}</span>${un?`<em>${un>99?"99+":un}</em>`:""}</span></span></button>`}
 function tnDrawList(){const el=$("#tnlist");if(!el)return;const R=tnListRows();
   el.innerHTML=R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`;
@@ -74,9 +75,9 @@ function tnTaskCard(m){const id=String(m.ref||"").replace(/^task:/,""),t=(D().ta
 function tnMsgHtml(m,prev){const me=m.user_id===tnMe(),cont=prev&&prev.user_id===m.user_id&&new Date(m.created_at)-new Date(prev.created_at)<5*60e3&&!prev.old===!m.old;
   if(m.kind==="remind")return `<div class="tnsys">⏰ ${esc(tnUN(m.user_id)||"")} ${esc(m.body)}</div>`;
   const body=m.kind==="task"?tnTaskCard(m):m.kind==="file"?tnFileHtml(m):`<div class="tnbub">${tnLink(m.body)}</div>${tnDriveCard(m.body)}`;
-  return `<div class="tnm${me?" me":""}${cont?" cont":""}" data-mid="${m.id||""}">${me||cont?`<i class="tnav sp"></i>`:tnAv(m.user_id,tnUN(m.user_id))}<div class="tnmb">${cont?"":`<div class="tnmh">${me?"":`<b>${esc(tnUN(m.user_id)||"")}</b>`}<small>${new Date(m.created_at).toTimeString().slice(0,5)}</small></div>`}${body}</div>${m.old||m.kind==="task"||m.kind==="file"?"":`<span class="tnma"><button title="Giao việc từ tin này" data-tnact="task">📋</button><button title="Nhắc tôi việc này" data-tnact="rem">⏰</button></span>`}</div>`}
-function tnMsgsHtml(room){const old=tnOld(room),L=TN.msgs[room];
-  if(!L)return `<p class="hint tnempty">Đang tải…</p>`;
+  return `<div class="tnm${me?" me":""}${cont?" cont":""}" data-mid="${m.id||""}">${me||cont?`<i class="tnav sp"></i>`:tnAv(m.user_id,tnUN(m.user_id))}<div class="tnmb">${cont?"":`<div class="tnmh">${me?"":`<b>${esc(tnUN(m.user_id)||"")}</b>`}<small>${new Date(m.created_at).toTimeString().slice(0,5)}</small></div>`}${body}${m.old?"":tnReactHtml(m)}</div>${m.old?"":`<span class="tnma"><button title="Thả cảm xúc" data-tnact="emo">☺</button>${m.kind==="task"||m.kind==="file"?"":`<button title="Giao việc từ tin này" data-tnact="task">📋</button><button title="Nhắc tôi việc này" data-tnact="rem">⏰</button>`}</span>`}</div>`}
+function tnMsgsHtml(room){const old=tnOld(room),L0=TN.msgs[room];
+  if(!L0)return `<p class="hint tnempty">Đang tải…</p>`;tnReactBuild(L0);const L=L0.filter(m=>m.kind!=="react");
   let h="",day="",prev=null;const add=m=>{const d=tnDay(m.created_at);if(d!==day){day=d;h+=`<div class="tnday"><span>${d}</span></div>`;prev=null}h+=tnMsgHtml(m,prev);prev=m};
   if(TN.more[room])h+=`<div class="tnday"><button class="lnk" id="tnmore">Xem tin cũ hơn</button></div>`;
   if(old.length&&!TN.more[room]){h+=`<div class="tnday old"><span>Tin của khung trao đổi trước</span></div>`;old.forEach(add);day=""}
@@ -88,7 +89,9 @@ function tnDrawMsgs(keepPos){const el=$("#tnmsgs");if(!el)return;const atEnd=el.
   if($("#tnmore"))$("#tnmore").onclick=async()=>{await tnLoad(TN.room,true);tnDrawMsgs("top")};
   el.querySelectorAll("[data-tntask]").forEach(b=>b.onclick=()=>openTask(b.dataset.tntask));
   el.querySelectorAll("[data-tnact]").forEach(b=>b.onclick=()=>{const mid=+b.closest("[data-mid]").dataset.mid,m=(TN.msgs[TN.room]||[]).find(x=>x.id===mid);if(!m)return;
-    if(b.dataset.tnact==="task")tnGiao(m.body);else tnRemind(m.body,tnMe())})}
+    if(b.dataset.tnact==="emo"){tnReactPick(b,m);return}
+    if(b.dataset.tnact==="task")tnGiao(m.body);else tnRemind(m.body,tnMe())});
+  el.querySelectorAll("[data-tnrx]").forEach(b=>b.onclick=()=>{const [mid,e]=b.dataset.tnrx.split("|"),m=(TN.msgs[TN.room]||[]).find(x=>x.id===+mid);if(m)tnReact(m,e)})}
 async function tnOpen(room){TN.room=room;TN.mob=true;try{localStorage.setItem("tn_room_"+tnMe(),room)}catch(e){}
   if(PAGE!=="tinnhan"){ntPage("tinnhan");return}
   renderMain();if(!TN.msgs[room]){await tnLoad(room);if(TN.room===room){tnDrawMsgs();tnRead(room)}}else{tnRead(room);if(await tnLoad(room)&&TN.room===room){tnDrawMsgs(true);tnRead(room)}}}
@@ -103,8 +106,8 @@ PAGES.tinnhan=m=>{
    <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${ng?`🔒 Nhóm phối hợp · ${((tnGrp(room)||{}).members||[]).length} thành viên${(tnGrp(room)||{}).created_by===tnMe()||ME.role==="admin"?` · <button type="button" class="lnk" id="tngedit">sửa thành viên</button>`:""}`:pj?"🔒 Nhóm dự án · chỉ người trong dự án":g?(room==="g:chung"?"Mọi người trong công ty":"🔒 Nhóm phòng · chỉ nhân sự phòng này"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
      <span class="tnhb"><button class="btn sm" id="tngiao">📋 Giao việc</button><button class="btn sm" id="tnnhac">⏰ Nhắc</button><button class="btn sm${tnInfoOn()?" on":""}" id="tninfo" title="Ảnh, tệp, link, nhắc hẹn của cuộc trò chuyện">ⓘ</button></span></header>
     <div class="tnmsgs" id="tnmsgs"></div>
-    <div class="tnpend" id="tnpend" hidden></div><form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
-  tnDrawList();tnDrawMsgs();tnBindAtt(room);tnBindInfo(room);if(!TN.files[room])tnLoadFiles(room);
+    <div class="tnpend" id="tnpend" hidden></div><form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc" aria-label="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
+  tnDrawList();tnDrawMsgs();tnBindAtt(room);tnBindEmo();tnBindInfo(room);if(!TN.files[room])tnLoadFiles(room);
   if(!TN.msgs[room])tnLoad(room).then(()=>{if(TN.room===room&&PAGE==="tinnhan"){tnDrawMsgs();tnRead(room)}});else tnRead(room);
   if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();
   if($("#tnnew"))$("#tnnew").onclick=()=>tnGroupForm(null);if($("#tngedit"))$("#tngedit").onclick=()=>tnGroupForm(tnGrp(room));
@@ -117,7 +120,8 @@ PAGES.tinnhan=m=>{
     if(v)try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;TN.draft[room]=v;toast(e.message||"Chưa gửi được")}};
   const atQ=()=>{const s=inp.value.slice(0,inp.selectionStart),mm=s.match(/@([\p{L}\d ]{0,20})$/u);return mm?mm[1]:null};
   const drawSug=()=>{const a=atQ();if(a===null){sug.hidden=true;return}const L=tnPeople().filter(u=>u.name.toLowerCase().includes(a.toLowerCase())).slice(0,6);
-    if(!L.length){sug.hidden=true;return}sug.hidden=false;sug.innerHTML=L.map(u=>`<button type="button" data-at="${esc(u.name)}">${tnAv(u.crm,u.name)}${esc(u.name)}<small>${esc(TEAMS[teamOf(u)]||"")}</small></button>`).join("");
+    const all=g&&"all tất cả".includes(a.toLowerCase());
+    if(!L.length&&!all){sug.hidden=true;return}sug.hidden=false;sug.innerHTML=(all?`<button type="button" data-at="all"><i class="tnav g">@</i>all<small>gọi cả nhóm</small></button>`:"")+L.map(u=>`<button type="button" data-at="${esc(u.name)}">${tnAv(u.crm,u.name)}${esc(u.name)}<small>${esc(TEAMS[teamOf(u)]||"")}</small></button>`).join("");
     sug.querySelectorAll("[data-at]").forEach(b=>b.onmousedown=e=>{e.preventDefault();const p=inp.selectionStart,s=inp.value.slice(0,p).replace(/@([\p{L}\d ]{0,20})$/u,"@"+b.dataset.at+" ");inp.value=s+inp.value.slice(p);inp.setSelectionRange(s.length,s.length);TN.draft[room]=inp.value;sug.hidden=true;inp.focus()})};
   inp.oninput=()=>{TN.draft[room]=inp.value;fit();drawSug()};
   inp.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();const b=sug.hidden?null:sug.querySelector("[data-at]");if(b)b.onmousedown(e);else send()}else if(e.key==="Escape")sug.hidden=true};
@@ -251,3 +255,23 @@ if(typeof ntFlush==="function"){const _ntFlushTn=ntFlush;ntFlush=function(){cons
 /* chưa bật thông báo Windows: nhắc lại mỗi ngày một lần (trước đây bấm ✕ một lần là không bao giờ hỏi lại) */
 if(typeof ntAsk==="function"){const _ntAskTn=ntAsk;ntAsk=function(){try{const day=new Date().toDateString();if(ntLS("asked")&&ntLS("askedDay")!==day&&"Notification" in window&&Notification.permission==="default"){ntLS("asked",null);ntLS("askedDay",day)}}catch(e){}return _ntAskTn()};
   setTimeout(()=>{try{if(ME&&"Notification" in window&&Notification.permission==="default")ntAsk()}catch(e){}},6000)}
+
+/* ---------- biểu tượng cảm xúc + thả cảm xúc vào tin (chị Hoa 03/11) ----------
+   Thả cảm xúc lưu thành tin loại "react" (ref r:<mã tin>, body = biểu tượng, rỗng = bỏ); mỗi người giữ cái thả sau cùng. */
+const TN_RX=["❤️","👍","😂","😮","😢","😡"];
+const TN_EMO="😀 😁 😂 🤣 😊 😍 🥰 😘 😉 😎 🤩 🥳 🤗 🤔 😅 😆 🙂 😇 😴 😮 😯 😢 😭 😤 😡 🥺 😱 🤯 😬 🙄 👍 👎 👏 🙏 💪 👌 ✌️ 🤝 🙌 👀 ❤️ 💖 💯 🔥 ⭐ ✨ 🎉 🎁 ✅ ❌ ⚠️ ⏰ 📌 📎 📷 🎬 🛒 💰 📦 🚚".split(" ");
+let TN_RMAP={};
+function tnReactBuild(L){const per={};L.filter(m=>m.kind==="react").forEach(m=>{const id=String(m.ref||"").slice(2);(per[id]=per[id]||{})[m.user_id]=m.body});
+  TN_RMAP={};Object.entries(per).forEach(([id,u])=>{const g={};Object.entries(u).forEach(([who,e])=>{if(e)(g[e]=g[e]||[]).push(who)});TN_RMAP[id]=g})}
+function tnReactHtml(m){const g=TN_RMAP[String(m.id)];if(!g||!Object.keys(g).length)return "";
+  return `<div class="tnrx">${Object.entries(g).map(([e,L])=>`<button type="button" class="${L.includes(tnMe())?"on":""}" data-tnrx="${m.id}|${e}" title="${esc(L.map(tnUN).join(", "))}">${e} <b>${L.length}</b></button>`).join("")}</div>`}
+async function tnReact(m,e){const room=TN.room,mine=(TN_RMAP[String(m.id)]||{})[e]||[],off=mine.includes(tnMe());
+  try{await tnSend(room,off?"":e,"react","r:"+m.id);tnDrawMsgs(true);tnDrawList()}catch(er){toast(er.message||"Chưa thả được")}}
+function tnReactPick(btn,m){document.querySelectorAll(".tnrxp").forEach(x=>x.remove());const p=document.createElement("div");p.className="tnrxp";
+  p.innerHTML=TN_RX.map(e=>`<button type="button" data-e="${e}">${e}</button>`).join("");btn.parentNode.appendChild(p);
+  p.querySelectorAll("[data-e]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();p.remove();tnReact(m,b.dataset.e)});
+  setTimeout(()=>document.addEventListener("click",function f(ev){if(!p.contains(ev.target)){p.remove();document.removeEventListener("click",f)}}),0)}
+function tnBindEmo(){const b=$("#tnemo"),inp=$("#tnin");if(!b||!inp)return;b.onclick=ev=>{ev.stopPropagation();let p=$("#tnemop");if(p){p.remove();return}
+  p=document.createElement("div");p.id="tnemop";p.className="tnemop";p.innerHTML=TN_EMO.map(e=>`<button type="button">${e}</button>`).join("");$("#tnf").appendChild(p);
+  p.querySelectorAll("button").forEach(x=>x.onmousedown=e=>{e.preventDefault();const s=inp.selectionStart??inp.value.length,v=inp.value;inp.value=v.slice(0,s)+x.textContent+v.slice(inp.selectionEnd??s);const c=s+x.textContent.length;inp.setSelectionRange(c,c);TN.draft[TN.room]=inp.value;inp.focus()});
+  setTimeout(()=>document.addEventListener("click",function f(e){if(!p.contains(e.target)&&e.target!==b){p.remove();document.removeEventListener("click",f)}}),0)}}
