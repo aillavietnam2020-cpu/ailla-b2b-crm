@@ -142,7 +142,7 @@ function pdOthersHtml(L,now){if(!L.length)return "";const by={};
   L.forEach(r=>{const p=pdProp(r),dep=PD_ROUTE_N[p.route_to]||"Khác",u=p.owner_id?(D().users||[]).find(x=>x.crm===p.owner_id):null,who=p.route_to==="SALE"?(u&&u.name)||"Sale phụ trách":dep;
     const g=by[dep]=by[dep]||{n:0,old:0,ppl:{},rows:[]};g.n++;g.old=Math.max(g.old,r.at?now-r.at:0);g.ppl[who]=(g.ppl[who]||0)+1;g.rows.push({r,who})});
   const dd2=ms=>ms>=864e5?Math.floor(ms/864e5)+" ngày":Math.max(1,Math.floor(ms/36e5))+" giờ";
-  return `<details class="card pdoth"><summary><b>Đang chờ ở các phòng</b> <span class="pill p-gry">${L.length}</span> <span class="hint">việc phòng khác tự xử lý · chị xem để biết chỗ nào đang nghẽn</span></summary>
+  return `<details class="card pdoth" open><summary><b>Đang chờ ở các phòng</b> <span class="pill p-gry">${L.length}</span> <span class="hint">việc phòng khác tự xử lý · chị xem để biết chỗ nào đang nghẽn</span></summary>
    <div class="pdog">${Object.entries(by).sort((a,b)=>b[1].old-a[1].old).map(([dep,g])=>`<div class="pdoc${g.old>3*864e5?" late":""}"><div class="pdoh"><b>${esc(dep)}</b><span>${g.n} việc · chờ lâu nhất <b>${dd2(g.old)}</b></span></div>
      <div class="pdop">${Object.entries(g.ppl).sort((a,b)=>b[1]-a[1]).map(([w,n])=>`<span>${esc(w)} <b>${n}</b></span>`).join("")}</div>
      ${g.rows.sort((a,b)=>(a.r.at||0)-(b.r.at||0)).slice(0,6).map(({r,who})=>`<div class="pdor"><span>${esc(r.nd)}</span><small>${esc(who)} · ${r.at?dd2(now-r.at):""}</small></div>`).join("")}${g.rows.length>6?`<div class="hint">+${g.rows.length-6} việc nữa</div>`:""}</div>`).join("")}</div></details>`}
