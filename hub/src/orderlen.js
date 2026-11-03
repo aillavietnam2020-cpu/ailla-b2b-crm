@@ -103,6 +103,11 @@ function odCardHtml(){if(!ME)return "";const today=odIso(new Date()),M=odMeets()
   return `<section class="card odcard"><div class="odch"><h3>📅 Lịch họp</h3>${wait.length?`<span class="pill p-amb">${wait.length} cần trả lời</span>`:""}</div>${wait.concat(up).map(odRow).join("")}</section>`}
 function odAttach(m){const bar=m.querySelector(".cvvbar");if(!bar)return;
   if(!m.querySelector("#cv-order")){const nb=bar.querySelector("#cv-new");const b=document.createElement("button");b.className="btn";b.id="cv-order";b.type="button";b.textContent="↑ Order quản lý";b.title="Order hỗ trợ việc hoặc xin lịch họp với Lead, trưởng phòng, CEO";if(nb)nb.before(b);else bar.append(b);b.onclick=()=>openOrder()}
+  /* Phê duyệt (trang của khu quản trị) mở được ngay bên vận hành (chị Hoa 03/11: "việc kế toán, kho chờ chị duyệt đâu hết") */
+  if(typeof pdAny==="function"&&pdAny()&&!m.querySelector("#cv-pd")){const nb=bar.querySelector("#cv-order")||bar.querySelector("#cv-new"),b=document.createElement("button");b.className="btn";b.id="cv-pd";b.type="button";
+    const n=typeof pdCnt==="function"?pdCnt():"";b.innerHTML="✅ Phê duyệt"+(n?` <b class="xbadge">${n}</b>`:"");b.title="Phiếu chi, tiền về, đơn hàng, sửa phiếu kho, đề xuất của agent… đang chờ bạn duyệt";
+    if(nb)nb.before(b);else bar.append(b);b.onclick=()=>{if(typeof NAV_AN_MO!=="undefined")NAV_AN_MO.add("pheduyet");MOD="";PAGE="pheduyet";render();scrollTo(0,0)};
+    if(typeof PD!=="undefined"&&!PD.at&&typeof pdLoad==="function")pdLoad().then(()=>{const x=$("#cv-pd"),k=pdCnt();if(x)x.innerHTML="✅ Phê duyệt"+(k?` <b class="xbadge">${k}</b>`:"")}).catch(()=>{})}
   const h=odCardHtml();if(h){bar.insertAdjacentHTML("beforebegin",h);m.querySelectorAll(".odcard [data-odm]").forEach(e=>e.onclick=()=>openMeet(e.dataset.odm))}}
 const _pCvVOd=pCvV;
 pCvV=function(m){_pCvVOd(m);try{odAttach(m)}catch(e){console.error("order lên quản lý",e)}};

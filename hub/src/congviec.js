@@ -363,7 +363,36 @@ function openTask(id){
     if(!t&&TK_AFTER_NEW){const f=TK_AFTER_NEW;TK_AFTER_NEW=null;try{f(nid)}catch(e){}}
     toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+($("#t-lap").value==="tuan"?"mỗi tuần":"mỗi tháng"):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
+  if(t)try{tkLayout(t,gv)}catch(e){console.error("bố cục chi tiết việc",e)}
 }
+/* Bố cục khung Chi tiết việc (chị Hoa 03/11): nội dung việc lên đầu (tên, người giao / làm, hạn, mô tả, link, file);
+   góc phải đầu khung có nút 💬 Trao đổi và ⏰ Xin gia hạn (bấm mới mở); các ô sửa thông tin gom vào "Sửa thông tin việc".
+   Chỉ dời chỗ các phần đã vẽ (giữ nguyên ô nhập và nút đã gắn việc) nên mọi thao tác cũ vẫn chạy. */
+function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.querySelector("h2"),td=D().settings.today,late=t.st!=="done"&&t.han&&t.han<td;
+  const link=u=>/^https?:\/\//.test(u)?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.length>70?u.slice(0,70)+"…":u)}</a>`:esc(u);
+  const ppl=[t.nguoi].concat(t.phoi||[]).filter(Boolean).map(userName).filter(Boolean);
+  const brief=document.createElement("div");brief.className="tkbrief";
+  brief.innerHTML=`<div class="tkbt">${esc(t.ten)}</div>
+   <div class="tkbm"><span><small>Người giao</small>${esc(userName(t.tao)||"—")}</span><span><small>Người làm</small>${esc(ppl.join(", ")||"chưa giao")}</span><span class="${late?"t-red":""}"><small>Hạn</small>${t.han?dd(t.han)+(late?` · trễ ${td-t.han} ngày`:""):"—"}</span><span><small>Ưu tiên</small>${esc(t.uu||"Trung bình")}</span>${t.da?`<span><small>Dự án</small>${esc(prjN(t.da))}</span>`:""}</div>
+   ${t.moTa?`<div class="tkbd">${esc(t.moTa).replace(/https?:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`).replace(/\n/g,"<br>")}</div>`:`<div class="tkbd hint">Chưa có mô tả / yêu cầu.</div>`}
+   ${t.dk||(t.files||[]).length?`<div class="tkbl">📎 ${t.dk?link(t.dk):""}${typeof tkFilesHtml==="function"?tkFilesHtml(t.files||[]):""}</div>`:""}
+   ${(t.checklist||[]).length?`<div class="tkbc hint">Việc nhỏ: ${(t.checklist||[]).filter(c=>c.x).length}/${(t.checklist||[]).length} đã xong</div>`:""}`;
+  /* nút góc phải */
+  const chat=di.querySelector(".tkchat"),lateBox=di.querySelector(".tklate"),nChat=(t.chat||[]).length;
+  const tools=document.createElement("span");tools.className="tktools";
+  if(chat)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm" id="tk-chatbtn" title="Trao đổi về việc này">💬 Trao đổi${nChat?` <b>${nChat}</b>`:""}</button>`);
+  if(lateBox)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm${late?" danger":""}" id="tk-ghbtn" title="${late?"Báo lý do trễ / xin gia hạn":"Xin gia hạn"}">⏰ ${late?"Trễ hạn":"Xin gia hạn"}</button>`);
+  if(h2){h2.classList.add("tkh2");h2.appendChild(tools);h2.after(brief)}
+  di.querySelectorAll("p.hint").forEach(p=>{if(/^Người giao:/.test(p.textContent.trim()))p.remove()});
+  /* trao đổi, gia hạn: ẩn tới khi bấm (có tin trả lại / đang chờ gia hạn thì mở sẵn) */
+  const tra=(t.chat||[]).some(c=>c.kind==="tra")&&t.st!=="done",cho=((t.treReq||{}).st==="cho");
+  if(chat){brief.after(chat);chat.hidden=!tra;$("#tk-chatbtn").onclick=()=>{chat.hidden=!chat.hidden;if(!chat.hidden){chat.scrollIntoView({block:"nearest"});const i=$("#t-cm");if(i)i.focus()}}}
+  if(lateBox){brief.after(lateBox);lateBox.hidden=!(late||cho);$("#tk-ghbtn").onclick=()=>{lateBox.hidden=!lateBox.hidden;if(!lateBox.hidden)lateBox.scrollIntoView({block:"nearest"})}}
+  /* các ô thông tin việc: gom vào mục thu gọn (người giao mở để sửa; người làm chỉ xem, đã có ở phần đầu) */
+  const f=$("#tkf2");if(!f)return;const pick=sel=>{const e=f.querySelector(sel);return e&&(e.closest(".row4")||e.closest("label.field")||e.closest(".field")||e.closest("label.ck"))};
+  const parts=["#t-ten","#t-mo","#t-team","#t-ng","#t-v2","#t-phw","#t-dk","#t-bfl"].map(pick).filter((e,i,a)=>e&&a.indexOf(e)===i);
+  if(!parts.length)return;const dt=document.createElement("details");dt.className="tkedit";dt.innerHTML=`<summary>${gv?"✎ Sửa thông tin việc":"Thông tin chi tiết"}</summary>`;
+  parts.forEach(e=>dt.appendChild(e));f.prepend(dt)}
 const newTaskBtn=()=>`<button class="btn pri" id="cv-new">＋ Giao việc</button>`;
 const bindNew=()=>{if($("#cv-new"))$("#cv-new").onclick=()=>openTask(null)};
 
