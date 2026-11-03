@@ -22,7 +22,7 @@ const ip = (c: { req: { header: (n: string) => string | undefined } }) => c.req.
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const KY = /^\d{4}-\d{2}$/;
 export const DAY_SRC = ['km', 'live', 'ads', 'video'] as const;
-export const RANGE_KIND = ['koc', 'creators', 'videos'] as const;
+export const RANGE_KIND = ['koc', 'creators', 'videos', 'kocvideos'] as const; // kocvideos: Video › Chi tiết thẻ "Tài khoản liên kết" (video KOC), cùng định dạng Video Chi tiết
 const MAX_MONTH = 3 * 1024 * 1024;
 
 /** Chỉ giữ số (tối đa 60 khoá) để không ai cất được chữ tuỳ ý vào bảng ngày. */
@@ -49,10 +49,10 @@ function cleanCreators(v: unknown) {
   };
 }
 
-/** Video › Chi tiết: số tổng + tối đa 50 video GMV cao nhất (tên video cắt 80 ký tự, không có thông tin khách). */
+/** Kho số video TikTok chung (Video › Chi tiết của agent, Video Performance List tải tay): số tổng + từng video, tối đa 3000 (tên video cắt 80 ký tự, không có thông tin khách). */
 function cleanVideos(v: unknown) {
   const o = (v ?? {}) as Record<string, unknown>;
-  const top = Array.isArray(o.top) ? o.top.slice(0, 50) : [];
+  const top = Array.isArray(o.top) ? o.top.slice(0, 3000) : [];
   return {
     ...numbersOnly(o, 20),
     top: top.map((t) => {
@@ -72,7 +72,7 @@ function cleanVideos(v: unknown) {
 /** Dữ liệu cả khoảng ngày theo loại file (dùng chung cho trang vận hành và agent). */
 export function cleanRange(kind: string, data: unknown) {
   if (kind === 'koc') return numbersOnly(data, 80);
-  if (kind === 'videos') return cleanVideos(data);
+  if (kind === 'videos' || kind === 'kocvideos') return cleanVideos(data);
   return cleanCreators(data);
 }
 
