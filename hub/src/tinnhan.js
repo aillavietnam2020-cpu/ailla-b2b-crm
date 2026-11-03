@@ -91,7 +91,9 @@ function tnDrawMsgs(keepPos){const el=$("#tnmsgs");if(!el)return;const atEnd=el.
   el.querySelectorAll("[data-tnact]").forEach(b=>b.onclick=()=>{const mid=+b.closest("[data-mid]").dataset.mid,m=(TN.msgs[TN.room]||[]).find(x=>x.id===mid);if(!m)return;
     if(b.dataset.tnact==="emo"){tnReactPick(b,m);return}
     if(b.dataset.tnact==="task")tnGiao(m.body);else tnRemind(m.body,tnMe())});
-  el.querySelectorAll("[data-tnrx]").forEach(b=>b.onclick=()=>{const [mid,e]=b.dataset.tnrx.split("|"),m=(TN.msgs[TN.room]||[]).find(x=>x.id===+mid);if(m)tnReact(m,e)})}
+  el.querySelectorAll("[data-tnrx]").forEach(b=>b.onclick=()=>{const [mid,e]=b.dataset.tnrx.split("|"),m=(TN.msgs[TN.room]||[]).find(x=>x.id===+mid);if(m)tnReact(m,e)})
+  /* cột Thông tin hội thoại: link lấy từ tin vừa tải */
+  const ib=$("#tninfo-box");if(ib&&typeof tnInfoHtml==="function"){ib.outerHTML=tnInfoHtml(TN.room);tnBindInfo(TN.room)}}
 async function tnOpen(room){TN.room=room;TN.mob=true;try{localStorage.setItem("tn_room_"+tnMe(),room)}catch(e){}
   if(PAGE!=="tinnhan"){ntPage("tinnhan");return}
   renderMain();if(!TN.msgs[room]){await tnLoad(room);if(TN.room===room){tnDrawMsgs();tnRead(room)}}else{tnRead(room);if(await tnLoad(room)&&TN.room===room){tnDrawMsgs(true);tnRead(room)}}}
