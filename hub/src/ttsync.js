@@ -11,6 +11,8 @@ let TTS_KICK=false;
 function ttsEnsure(){
   if(typeof TSB==="undefined"||TSB.all||TSB.allBusy||TTS_KICK||typeof tsbLoadAll!=="function")return;
   TTS_KICK=true;tsbLoadAll().then(()=>{if(typeof renderMain==="function"&&(MOD==="mkt"||["win","bc_koc","kehoach","tq_content"].includes(PAGE)))renderMain()}).catch(()=>{})}
+/* khoảng ngày đang lọc (ô thời gian trên đầu trang), giới hạn trong tháng đang xem */
+function ttsPer(ym,yr,mon){const e=ym+"-"+String(new Date(yr,mon,0).getDate()).padStart(2,"0"),P=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from?PERIOD:{from:ym+"-01",to:e};return [P.from>ym+"-01"&&P.from<=e?P.from:ym+"-01",P.to<e&&P.to>=ym+"-01"?P.to:e]}
 const ttsVn=s=>s?s.slice(8,10)+"/"+s.slice(5,7):"";
 /* GỘP các khoảng của một loại trong kỳ [from,to] (chị Hoa 03/11): agent nạp mỗi ngày một ngày, đôi khi thêm file tuần / tháng.
    Như tkPick ở Nhập báo cáo: khoảng dài chọn trước, khoảng nào chồng lên khoảng đã chọn thì bỏ → ngày lẻ nằm trong file tuần
@@ -62,10 +64,10 @@ function ttsKocHtml(from,to,note){
 (function(){
   /* video win: thêm video có đơn trong số agent (gộp mọi khoảng đã nạp) mà chưa có trong danh sách */
   if(typeof winners==="function"){const _w=winners;winners=function(){const L=_w.apply(this,arguments);
-    try{ttsEnsure();const V=ttsVideos("2000-01-01","2999-12-31");if(!V)return L;const set=D().settings,by=new Map(L.map(w=>[String(w.key),w]));
+    try{ttsEnsure();const V=ttsVideos(PERIOD.from,PERIOD.to);if(!V)return L;const set=D().settings,by=new Map(L.map(w=>[String(w.key),w]));
       V.rows.filter(v=>v.don>0).forEach(v=>{const w=by.get(String(v.id))||(v.card?by.get(String(v.card.tiktokId||v.card.id)):null);
-        if(w){if(v.don>(+w.don||0)){w.don=v.don;w.gmv=v.gmv;w.view=v.vv;w.nguon=(w.nguon||"")+" · số TikTok "+V.lbl}}
-        else{const nw={key:v.id,ten:v.t,sku:v.sku,kenh:v.kenh,nguoi:v.card?v.card.nguoi:"",view:v.vv,don:v.don,gmv:v.gmv,nguon:"Số TikTok "+V.lbl+(v.post?" · đăng "+ttsVn(v.post)+"/"+v.post.slice(0,4):""),tm:v.post?ttsVn(v.post):""};if(v.card)nw.cardId=v.card.id;L.push(nw);by.set(String(v.id),nw)}});
+        if(w){if(v.don>(+w.don||0)){w.don=v.don;w.gmv=v.gmv;w.view=v.vv}}
+        else{const nw={key:v.id,ten:v.t,sku:v.sku,kenh:v.kenh,nguoi:v.card?v.card.nguoi:"",view:v.vv,don:v.don,gmv:v.gmv,nguon:v.post?(v.post.slice(0,7)<MONTH.year+"-"+String(MONTH.mon).padStart(2,"0")?"Cũ · ":"Mới · ")+ttsVn(v.post)+"/"+v.post.slice(2,4):"TikTok",tm:v.post?ttsVn(v.post):""};if(v.card)nw.cardId=v.card.id;L.push(nw);by.set(String(v.id),nw)}});
       return L.sort((x,y)=>y.don-x.don||y.gmv-x.gmv).map((w,i)=>({...w,hang:i+1,loai:w.don>=set.winnerOrders?"Winner":w.don>=set.potential?"Tiềm năng":"Có đơn"}))}catch(e){return L}}}
   /* trang KOC / Affiliate: thêm số agent của kỳ đang chọn */
   if(typeof PAGES!=="undefined"&&PAGES.bc_koc){const _k=PAGES.bc_koc;PAGES.bc_koc=function(m){const r=_k.apply(this,arguments);try{ttsEnsure();const F=typeof KOCF!=="undefined"&&KOCF.f?KOCF:{f:PERIOD.from,t:PERIOD.to};let h=ttsKocHtml(F.f,F.t);if(!h&&TSB.all){const L=(TSB.all.ranges||[]).filter(r=>r.kind==="koc"||r.kind==="creators").sort((a,b)=>b.to.localeCompare(a.to))[0];if(L)h=ttsKocHtml(L.from,L.to,"Kỳ đang chọn chưa có số KOC, đang hiện kỳ gần nhất")}
@@ -122,3 +124,17 @@ function ttsMirror(){
 (function(){const go=()=>{try{if(typeof TSB!=="undefined"&&TSB.all&&typeof D==="function"&&D()&&typeof ME!=="undefined"&&ME){ttsMigrate();ttsMirror()}}catch(e){}};
   const _rm=renderMain;renderMain=function(){const r=_rm.apply(this,arguments);setTimeout(go,50);return r};
   const _r=render;render=function(){const r=_r.apply(this,arguments);setTimeout(()=>{ttsEnsure();go()},50);return r}})();
+/* Video win › Video win KOC (chị Hoa 03/11: "koc vẫn ko hiện"): ngoài video đã duyệt vào kho win, hiện luôn video KOC ra số
+   (từ kho chung) để duyệt ngay tại đây, không phải sang TOP KOC. */
+function ttsKocWin(id,bo){const v=(D().kocVideos||[]).find(y=>y.id===id);if(!v)return;
+  if(bo){DB.mutate(ME.name,"bỏ qua video KOC",dt=>{const y=(dt.kocVideos||[]).find(q=>q.id===id);if(y){y.st="bo";y.by=ME.name}});renderMain();return}
+  DB.mutate(ME.name,"đưa video KOC @"+v.acc+" vào kho video win",dt=>{const y=dt.kocVideos.find(q=>q.id===v.id);if(y){y.st="win";y.by=ME.name}dt.winResearch=dt.winResearch||[];if(!dt.winResearch.some(r=>r.kocId===v.id)){const t=new Date();
+    dt.winResearch.push({id:"VW-"+Date.now().toString(36).toUpperCase(),kocId:v.id,link:typeof kocLink==="function"?kocLink(v):"",ten:v.ten||"Video KOC @"+v.acc,nguon:"KOC @"+v.acc,sp:v.sku,soLieu:`${nf(v.view||0)} view · ${nf(v.don||0)} đơn · ${money(v.gmv||0)}`,lyDo:"Video KOC ra số, Lead Content & Media check ok",by:ME.id,byName:ME.name,at:`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`})}});
+  toast("Đã đưa vào kho video win");renderMain()}
+if(typeof hyKocHtml==="function"){const _h=hyKocHtml;hyKocHtml=function(){let h=_h.apply(this,arguments);
+  try{const d=D(),S=d.settings,pot=S.potential||30,wo=S.winnerOrders||100,can=typeof kocCan==="function"?kocCan():ME.role==="admin";
+    /* số theo khoảng ngày đang lọc ở đầu trang */
+    const F=PERIOD.from,T=PERIOD.to,L=(d.kocVideos||[]).map(v=>{const x=typeof kocIn==="function"?kocIn(v,F,T):null;return x?Object.assign({},v,x):null}).filter(v=>v&&(v.don||0)>=pot&&v.st!=="win").sort((a,b)=>(b.don||0)-(a.don||0)).slice(0,30);
+    h+=`<section class="card"><div class="card-h"><h2>Video KOC ra số</h2><span class="hint">${ttsVn(F)}/${F.slice(0,4)} – ${ttsVn(T)}/${T.slice(0,4)} · từ ${pot} đơn · duyệt vào kho win ngay tại đây</span></div>${L.length?"":`<p class="empty">Khoảng ngày này chưa có video KOC nào từ ${pot} đơn.</p>`}${L.length?tbl(["#","Video","KOC","Sản phẩm","View","Đơn","GMV","Mức",""],L.map((v,i)=>`<tr><td>${i+1}</td><td class="wide wvid"><a href="${esc(typeof kocLink==="function"?kocLink(v):"#")}" target="_blank" rel="noopener" title="${esc(v.ten||"")}">▶ ${esc(String(v.ten||v.id).slice(0,60))}</a></td><td>@${esc(v.acc||"")}</td><td>${v.sku&&v.sku!=="KHAC"?swatch(v.sku)+esc(sk(v.sku).n):"—"}</td><td class="n">${nf(v.view||0)}</td><td class="n"><b>${nf(v.don||0)}</b></td><td class="n">${money(v.gmv||0)}</td><td>${pill((v.don||0)>=wo?"Win":"Tiềm năng",(v.don||0)>=wo?"grn":"amb")}</td><td>${v.st==="bo"?'<span class="hint">đã bỏ qua</span>':can?`<button class="btn sm pri" data-ttkw="${esc(v.id)}">✓ Vào kho win</button> <button class="btn sm" data-ttkb="${esc(v.id)}">Bỏ qua</button>`:'<span class="hint">chờ Lead check</span>'}</td></tr>`)):""}</section>`}catch(e){}
+  return h}}
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-ttkw],[data-ttkb]");if(!b)return;e.preventDefault();ttsKocWin(b.dataset.ttkw||b.dataset.ttkb,!!b.dataset.ttkb)});
