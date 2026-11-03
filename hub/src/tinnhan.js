@@ -17,13 +17,13 @@ const tnUN=id=>{const a=tnAg(id);return a?a.name:(tnU(id)||{}).name||""};
 const tnGroups=()=>[["chung","Chung toàn công ty"]].concat(Object.entries(TEAMS).filter(([k])=>k!=="chung"));
 const tnMyTeam=()=>{const t=ME.phongBan&&typeof KPB_TEAM!=="undefined"&&KPB_TEAM[ME.phongBan]?KPB_TEAM[ME.phongBan]:String(teamOf(ME)||"").toLowerCase();return TEAMS[t]&&t!=="chung"?t:""};
 const tnDm=id=>"dm:"+[tnMe(),id].sort().join("~");
-const tnOther=r=>r.startsWith("dm:")?r.slice(3).split("~").find(x=>x!==tnMe())||tnMe():"";
+const tnOther=r=>r.startsWith("ag:")?"agent:"+r.slice(3):r.startsWith("dm:")?r.slice(3).split("~").find(x=>x!==tnMe())||tnMe():"";
 const tnPrj=r=>(D().projects||[]).find(p=>"p:"+p.id===r);
 /* dự án tôi được vào nhóm chat: phụ trách, thành viên, hoặc phòng tôi tham gia dự án (khớp quyền máy chủ chat.ts) */
 const tnMyPrj=()=>(D().projects||[]).filter(p=>ME.role==="admin"||p.owner===ME.id||(p.tv||[]).includes(ME.id)||[p.team].concat(p.teams||[]).includes(tnMyTeam()));
 const tnGrp=r=>(TN.groups||[]).find(g=>"n:"+g.id===r);
 const tnBoss=()=>!!ME&&(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong");
-const tnName=r=>r.startsWith("n:")?((tnGrp(r)||{}).name||"Nhóm"):r.startsWith("p:")?((tnPrj(r)||{}).ten||"Dự án "+r.slice(2)):r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";
+const tnName=r=>r.startsWith("ag:")?((tnAg("agent:"+r.slice(3))||{}).name||"Agent"):r.startsWith("n:")?((tnGrp(r)||{}).name||"Nhóm"):r.startsWith("p:")?((tnPrj(r)||{}).ten||"Dự án "+r.slice(2)):r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";
 const tnTime=t=>{const d=new Date(t),n=new Date();return d.toDateString()===n.toDateString()?d.toTimeString().slice(0,5):d.toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit"})};
 const tnDay=t=>{const d=new Date(t),n=new Date(),y=new Date(n-864e5);return d.toDateString()===n.toDateString()?"Hôm nay":d.toDateString()===y.toDateString()?"Hôm qua":d.toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit"})};
 const tnInit=n=>{const w=String(n||"?").trim().split(/\s+/);return (w.length>1?w[w.length-2][0]+w[w.length-1][0]:w[0].slice(0,2)).toUpperCase()};
@@ -70,7 +70,7 @@ function tnRowHtml(r){const g=/^(g|p|n):/.test(r.room),n=tnName(r.room),l=r.last
 function tnDrawList(){const el=$("#tnlist");if(!el)return;const R=tnListRows();
   el.innerHTML=(R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`)+tnAgentRows();
   el.querySelectorAll("[data-tnr]").forEach(b=>b.onclick=()=>TN.popOn&&PAGE!=="tinnhan"?tnPop(b.dataset.tnr):tnOpen(b.dataset.tnr));
-  el.querySelectorAll("[data-tnag]").forEach(b=>b.onclick=()=>{if(TN.popOn)tnPopClose();ntOpenAgent(b.dataset.tnag)})}
+  el.querySelectorAll("[data-tnag]").forEach(b=>b.onclick=()=>{const r="ag:"+b.dataset.tnag;TN.popOn&&PAGE!=="tinnhan"?tnPop(r):tnOpen(r)})}
 function tnTaskCard(m){const id=String(m.ref||"").replace(/^task:/,""),t=(D().tasks||[]).find(x=>x.id===id);
   if(!t)return `<div class="tntask gone">📋 ${esc(m.body)} <small>(việc đã xóa)</small></div>`;
   const st=t.st||"todo",cls=st==="done"?"p-grn":st==="review"?"p-amb":"p-blu";
@@ -292,7 +292,7 @@ function tnBindEmo(){const b=$("#tnemo"),inp=$("#tnin");if(!b||!inp)return;b.onc
 function tnPopClose(){const p=$("#tnpop");if(p)p.remove();TN.popOn=false;TN.popRoom=""}
 async function tnPop(room){let p=$("#tnpop");if(!p){p=document.createElement("div");p.id="tnpop";p.className="tnpop";document.body.appendChild(p)}TN.popOn=true;TN.popRoom=room||"";
   if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();if(!TN.agents)tnLoadAgents();
-  const full=`<button type="button" class="tnpx" id="tnp-big" title="${TN.popBig?"Thu nhỏ":"Phóng to"}">${TN.popBig?"🗕":"🗖"}</button><button type="button" class="tnpx" id="tnp-full" title="Mở trang Tin nhắn đầy đủ">⤢</button><button type="button" class="tnpx" id="tnp-x" title="Đóng">✕</button>`;
+  const full=`<button type="button" class="tnpx" id="tnp-big" title="${TN.popBig?"Thu nhỏ":"Phóng to"}">${TN.popBig?"🗕":"🗖"}</button><button type="button" class="tnpx" id="tnp-x" title="Đóng">✕</button>`;
   if(!room){p.innerHTML=`<div class="tnph"><b>Tin nhắn</b><span class="sp"></span>${full}</div><input class="tnq" id="tnq" placeholder="Tìm nhóm hoặc người…" value="${esc(TN.q||"")}"><div class="tnlist" id="tnlist"></div>`;
     tnDrawList();const q=$("#tnq");q.oninput=()=>{TN.q=q.value;tnDrawList()}}
   else{TN.room=room;const g=/^(g|p|n):/.test(room),n=tnName(room);
@@ -309,7 +309,7 @@ async function tnPop(room){let p=$("#tnpop");if(!p){p=document.createElement("di
     if(!TN.files[room])tnLoadFiles(room);
     if(!TN.msgs[room])await tnLoad(room);else tnLoad(room);if(TN.popRoom===room){tnDrawMsgs();tnRead(room)}}
   p.classList.toggle("big",!!TN.popBig);$("#tnp-big").onclick=()=>{TN.popBig=!TN.popBig;tnPop(TN.popRoom)};
-  $("#tnp-x").onclick=tnPopClose;$("#tnp-full").onclick=()=>{const r=TN.popRoom;tnPopClose();if(r)TN.room=r,TN.mob=true;ntPage("tinnhan")}}
+  $("#tnp-x").onclick=tnPopClose;tnPopGrip(p)}
 
 /* ---------- ghi âm tin nhắn thoại (chị Hoa 03/11): bấm 🎤 nói, bấm lại để dừng → vào khay chờ, nghe thử rồi bấm Gửi ----------
    Ghi dạng opus 24 kbps (1 phút ≈ 180 KB), tối đa 5 phút. */
@@ -345,3 +345,31 @@ function tnAgentWait(room,v){const A=tnRoomAgents(room).filter(a=>(v||"").toLowe
   TN.agWait=TN.agWait||{};TN.agWait[room]=(TN.agWait[room]||[]).concat(A.map(a=>({id:a.id,at:Date.now()})))}
 function tnAgentWaitHtml(room,L){const W=((TN.agWait||{})[room]||[]).filter(w=>Date.now()-w.at<15*60e3&&!L.some(m=>m.user_id==="agent:"+w.id&&Date.parse(m.created_at)>=w.at-5e3));
   if(TN.agWait)TN.agWait[room]=W;return W.map(w=>{const a=(TN.agents||[]).find(x=>x.id===w.id)||{name:"Agent"};return `<div class="tnsys tnagwait">${esc(a.emoji||"🤖")} ${esc(a.name)} đang đọc nhóm và trả lời…</div>`}).join("")}
+
+/* ---------- chat với agent ngay trong khung Tin nhắn (chị Hoa 03/11): phòng "ag:<mã agent>" dùng /api/agent-chat ----------
+   Không nhảy sang Điều hành agent. Tin agent được gọi trong nhóm (có bối cảnh nhóm) không hiện ở đây. */
+TN.agRaw={};
+const TN_GRP_CTX="[Bạn đang được gọi trong nhóm chat";
+function tnAgMap(room){const id=room.slice(3),L=TN.agRaw[room]||[],hide=new Set(L.filter(m=>m.role==="USER"&&String(m.body).startsWith(TN_GRP_CTX)).map(m=>m.id));
+  TN.msgs[room]=L.filter(m=>!hide.has(m.id)&&!hide.has(m.reply_to)).map(m=>({id:m.id,room,user_id:m.role==="USER"?tnMe():"agent:"+id,body:m.body,kind:m.role==="AGENT"?"agent":m.role==="SYSTEM"?"remind":"",created_at:m.created_at,st:m.status}));
+  const last=[...L].reverse().find(m=>m.role==="USER"&&!hide.has(m.id));TN.agWait=TN.agWait||{};TN.agWait[room]=last&&["queued","taken","working"].includes(last.status)?[{id,at:Date.parse(last.created_at)}]:[]}
+const _tnLoadAg=tnLoad;
+tnLoad=async function(room,older){if(!String(room).startsWith("ag:"))return _tnLoadAg(room,older);if(older)return false;
+  const L=TN.agRaw[room]||[],after=L.length?L[L.length-1].id:0;
+  try{const r=await svApi(`/api/agent-chat?agent=${encodeURIComponent(room.slice(3))}${after?"&after="+after:""}`)||[];
+    const st=L.filter(m=>m.role==="USER"&&m.status!=="done").map(m=>m.id);
+    if(after&&!r.length&&!st.length){tnAgMap(room);return false}
+    if(after&&st.length){const all=await svApi(`/api/agent-chat?agent=${encodeURIComponent(room.slice(3))}`)||[];TN.agRaw[room]=all}else TN.agRaw[room]=after?L.concat(r):r;
+    tnAgMap(room);return true}catch(e){if(!TN.msgs[room])TN.msgs[room]=[];toast(e.message||"Chưa mở được chat với agent");return false}};
+const _tnSendAg=tnSend;
+tnSend=async function(room,body,kind,ref){if(!String(room).startsWith("ag:"))return _tnSendAg(room,body,kind,ref);if(kind)return null;
+  await svApi("/api/agent-chat",{method:"POST",body:JSON.stringify({agent:room.slice(3),body,tg:false,files:[],docs:[]})});await tnLoad(room);return (TN.msgs[room]||[]).slice(-1)[0]};
+const _tnReadAg=tnRead;tnRead=function(room){if(String(room).startsWith("ag:"))return;return _tnReadAg(room)};
+const _tnUploadAg=tnUpload;tnUpload=function(room,list){if(String(room).startsWith("ag:")){toast("Gửi ảnh, tệp cho agent ở trang Điều hành agent");return Promise.resolve()}return _tnUploadAg(room,list)};
+const _tnLoadFilesAg=tnLoadFiles;tnLoadFiles=function(room){if(String(room).startsWith("ag:")){TN.files[room]=[];return Promise.resolve()}return _tnLoadFilesAg(room)};
+/* kéo góc trên bên trái để đổi cỡ cửa sổ chat nổi */
+function tnPopGrip(p){if(p.querySelector(".tnpgrip"))return;const g=document.createElement("i");g.className="tnpgrip";g.title="Kéo để đổi cỡ";p.appendChild(g);
+  if(TN.popW)p.style.width=TN.popW+"px";if(TN.popH)p.style.height=TN.popH+"px";
+  g.onmousedown=e=>{e.preventDefault();const x0=e.clientX,y0=e.clientY,w0=p.offsetWidth,h0=p.offsetHeight;
+    const mv=ev=>{TN.popW=Math.max(300,Math.min(innerWidth-30,w0+(x0-ev.clientX)));TN.popH=Math.max(260,Math.min(innerHeight-30,h0+(y0-ev.clientY)));p.style.width=TN.popW+"px";p.style.height=TN.popH+"px"};
+    const up=()=>{removeEventListener("mousemove",mv);removeEventListener("mouseup",up)};addEventListener("mousemove",mv);addEventListener("mouseup",up)}}
