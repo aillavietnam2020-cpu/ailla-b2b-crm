@@ -383,7 +383,9 @@ function tkFormRow(){const team=$("#t-team"),row=team&&team.closest(".row4"),ph=
     const upd=()=>{const L=[...box.querySelectorAll("input:checked")].map(i=>i.closest("label").textContent.trim());sm.textContent=L.length?L.join(", "):"— chọn người";sm.title=sm.textContent};upd();box.addEventListener("change",upd);
     ph.innerHTML='Người cùng làm / hỗ trợ';ph.appendChild(dd);document.addEventListener("click",e=>{if(dd.open&&!dd.contains(e.target))dd.open=false})}
     row.appendChild(ph)}
-  const lap=$("#t-lap"),lapRow=lap&&lap.closest(".tklap");if(lapRow){const cell=document.createElement("div");cell.className="field tklapc";cell.append(...lapRow.childNodes);row.appendChild(cell);lapRow.remove()}}
+  /* "Lặp lại" ngang hàng "Công đoạn", ở góc phải (chị Hoa 03/11) */
+  const lap=$("#t-lap"),lapRow=lap&&lap.closest(".tklap"),cdw=$("#t-cdw");if(lapRow){const cell=document.createElement("div");cell.className="field tklapc";cell.append(...lapRow.childNodes);
+    if(cdw){const w=document.createElement("div");w.className="tkcdrow";cdw.before(w);w.append(cdw,cell)}else row.appendChild(cell);lapRow.remove()}}
 /* Bố cục khung Chi tiết việc (chị Hoa 03/11): nội dung việc lên đầu (tên, người giao / làm, hạn, mô tả, link, file);
    góc phải đầu khung có nút 💬 Trao đổi và ⏰ Xin gia hạn (bấm mới mở); các ô sửa thông tin gom vào "Sửa thông tin việc".
    Chỉ dời chỗ các phần đã vẽ (giữ nguyên ô nhập và nút đã gắn việc) nên mọi thao tác cũ vẫn chạy. */

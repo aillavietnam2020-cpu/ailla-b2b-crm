@@ -996,3 +996,6 @@ body:has(#tnpop) #ntpop{right:392px}
 .tklapc{display:flex;flex-direction:column;gap:4px}.tklapc .field{margin:0}.tklapc .ck{font-size:12.5px}
 @media(max-width:800px){.row4.tkrow4{grid-template-columns:1fr 1fr}}
 .tkdd[open]>.phc{flex-wrap:nowrap!important;overflow-x:hidden!important;min-width:220px}.tkdd[open]>.phc label{width:100%;padding:3px 4px;border-radius:6px}.tkdd[open]>.phc label:hover{background:#f3f5fa}
+.row4.tkrow4{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tkcdrow{display:flex;gap:16px;align-items:flex-start}.tkcdrow>#t-cdw{flex:1;min-width:0}.tkcdrow>.tklapc{width:240px;flex:none}
+@media(max-width:700px){.tkcdrow{flex-direction:column}.tkcdrow>.tklapc{width:auto}}
