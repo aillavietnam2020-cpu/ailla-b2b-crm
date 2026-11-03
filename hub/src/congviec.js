@@ -178,7 +178,7 @@ function tkPinToggle(id){DB.mutate(ME.name,"ghim việc",dt=>{dt.taskPins=dt.tas
 const tkRecentKey=()=>"ailla_tk_recent_"+(ME&&ME.id);
 function tkRecent(){try{return JSON.parse(localStorage.getItem(tkRecentKey())||"[]")}catch(e){return []}}
 function tkRecentAdd(id){try{const L=tkRecent().filter(x=>x!==id);L.unshift(id);localStorage.setItem(tkRecentKey(),JSON.stringify(L.slice(0,6)))}catch(e){}}
-function tkQuickHtml(){const T=D().tasks||[],f=id=>T.find(t=>t.id===id),pin=(((D().taskPins||{})[ME.id])||[]).map(f).filter(Boolean),rec=tkRecent().map(f).filter(t=>t&&!pin.includes(t));
+function tkQuickHtml(){const T=D().tasks||[],f=id=>T.find(t=>t.id===id),pin=(((D().taskPins||{})[ME.id])||[]).map(f).filter(Boolean),rec=[]; /* chị Hoa 03/11: bỏ dòng "Gần đây" (việc đã hiện ngay trong danh sách), chỉ giữ việc đã ghim */
   if(!pin.length&&!rec.length)return "";const chip=t=>`<button type="button" class="tkqc${t.st==="done"?" done":""}" data-tkopen="${t.id}" title="${esc(t.ten)}">${esc(cvShort(t.ten,34))}</button>`;
   return `<div class="tkquick">${pin.length?`<span class="tkql">📌 Ghim</span>${pin.map(chip).join("")}`:""}${rec.length?`<span class="tkql">🕘 Gần đây</span>${rec.slice(0,5).map(chip).join("")}`:""}</div>`}
 /* xem theo phòng (học Lark "Không gian làm việc"): một hàng chọn nhanh */
