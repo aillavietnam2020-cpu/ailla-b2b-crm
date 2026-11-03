@@ -945,3 +945,6 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .tkedit{border:1px solid #eceef3;border-radius:10px;padding:6px 10px;margin:0 0 10px}.tkedit>summary{cursor:pointer;font-weight:600;font-size:13px;color:#4f46e5}.tkedit[open]>summary{margin-bottom:6px}
 #drawerIn .tkchat[hidden],#drawerIn .tklate[hidden]{display:none}
 #drawerIn .tkres,#drawerIn .tkchat,#drawerIn .tklate{margin-bottom:10px}
+.tkself{display:flex;gap:8px;align-items:center;background:var(--surface,#fff);border:1px dashed #c7d2fe;border-radius:12px;padding:6px 10px;margin:0 0 10px}.tkself>span{color:#4f46e5;font-weight:700;font-size:16px}
+.tkself #tks-ten{flex:1;border:0;outline:0;font:inherit;font-size:13.5px;background:none;min-width:120px}.tkself label{display:flex;align-items:center;gap:4px;font-size:12px;color:#667085}.tkself label input{width:auto}.tkself select{width:auto}
+@media(max-width:700px){.tkself{flex-wrap:wrap}}

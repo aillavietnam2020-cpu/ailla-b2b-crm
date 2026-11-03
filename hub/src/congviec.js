@@ -224,10 +224,12 @@ function tkStepper(t){
 }
 function tkResultHtml(t){
   if(!t||(t.cd&&t.cd.length))return "";
-  return tkStepper(t)+tkResultBox(t);
+  return (t.tuThem?"":tkStepper(t))+tkResultBox(t);
 }
 function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
+  /* việc nhân sự tự thêm cho mình: tự bấm Xong, không qua duyệt */
+  if(t.tuThem&&t.tao===t.nguoi&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}</div>`;
   if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">${t.vong!==2&&tkV2(t)&&ME.role!=="admin"?"✓ Duyệt, chuyển CEO duyệt":"✓ Duyệt hoàn thành"}</button></div></div>`
     :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt${tkV2(t)?(t.vong===2?" vòng 2":" vòng 1"):""}</b>${sub}</div>`;
@@ -384,6 +386,7 @@ function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.queryS
   if(lateBox)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm${late?" danger":""}" id="tk-ghbtn" title="${late?"Báo lý do trễ / xin gia hạn":"Xin gia hạn"}">⏰ ${late?"Trễ hạn":"Xin gia hạn"}</button>`);
   if(h2){h2.classList.add("tkh2");h2.appendChild(tools);h2.after(brief)}
   di.querySelectorAll("p.hint").forEach(p=>{if(/^Người giao:/.test(p.textContent.trim()))p.remove()});
+  {const ok=$("#t-selfok");if(ok)ok.onclick=()=>{DB.mutate(ME.name,"xong việc tự thêm: "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);tkLog(x,"Xong (việc tự thêm)")});toast("Đã xong");closeDrawer();renderMain()}}
   /* trao đổi, gia hạn: ẩn tới khi bấm (có tin trả lại / đang chờ gia hạn thì mở sẵn) */
   const tra=(t.chat||[]).some(c=>c.kind==="tra")&&t.st!=="done",cho=((t.treReq||{}).st==="cho");
   if(chat){brief.after(chat);chat.hidden=!tra;$("#tk-chatbtn").onclick=()=>{chat.hidden=!chat.hidden;if(!chat.hidden){chat.scrollIntoView({block:"nearest"});const i=$("#t-cm");if(i)i.focus()}}}
@@ -393,7 +396,13 @@ function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.queryS
   const parts=["#t-ten","#t-mo","#t-team","#t-ng","#t-v2","#t-phw","#t-dk","#t-bfl"].map(pick).filter((e,i,a)=>e&&a.indexOf(e)===i);
   if(!parts.length)return;const dt=document.createElement("details");dt.className="tkedit";dt.innerHTML=`<summary>${gv?"✎ Sửa thông tin việc":"Thông tin chi tiết"}</summary>`;
   parts.forEach(e=>dt.appendChild(e));f.prepend(dt)}
-const newTaskBtn=()=>`<button class="btn pri" id="cv-new">＋ Giao việc</button>`;
+const newTaskBtn=()=>`<button class="btn pri" id="cv-new">${tkGiver()?"＋ Giao việc":"＋ Thêm việc"}</button>`;
+/* Nhân sự tự thêm việc cho mình (chị Hoa 03/11): một dòng ở đầu "Của tôi", gõ tên + hạn, Enter là thêm */
+const tkSelfHtml=()=>`<form class="tkself" id="tk-self"><span>＋</span><input id="tks-ten" placeholder="Thêm việc của tôi… (Enter để thêm)" autocomplete="off"><label>Hạn${tkDate("tks-han",D().settings.today)}</label><select id="tks-uu" aria-label="Ưu tiên">${opt(UU,"Trung bình")}</select><button class="btn sm pri">Thêm</button></form>`;
+function tkSelfBind(b){const f=b.querySelector("#tk-self");if(!f)return;f.onsubmit=e=>{e.preventDefault();const ten=$("#tks-ten").value.trim();if(!ten){$("#tks-ten").focus();return}
+  const han=tkDay($("#tks-han").value)||D().settings.today,id=uid("cv"),team=TEAMS[teamOf(ME)]?teamOf(ME):((typeof KPB_TEAM!=="undefined"&&KPB_TEAM[ME.phongBan])||"chung");
+  DB.mutate(ME.name,"tự thêm việc: "+ten,dt=>{const x={id,ten,moTa:"",team,da:"",nguoi:ME.id,phoi:[],han,bd:0,uu:$("#tks-uu").value,st:"todo",checklist:[],files:[],loai:"Việc",tao:ME.id,tuThem:true,v2:false,log:[]};tkLog(x,ME.name+" tự thêm việc cho mình · hạn "+dd(han));dt.tasks.push(x)});
+  toast("Đã thêm việc");renderMain();setTimeout(()=>{const i=$("#tks-ten");if(i)i.focus()},50)}}
 const bindNew=()=>{if($("#cv-new"))$("#cv-new").onclick=()=>openTask(null)};
 
 /* ---------- 1. Tổng quan công việc ---------- */
@@ -1018,7 +1027,8 @@ function pCvV(m){
     else if(CVV.view==="board")pCvKb(body);
     else if(CVV.view==="cal")pCvLich(body);
     else if(CVV.view==="gantt")pCvGantt(body);
-    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ bạn${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}
+    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`${tkSelfHtml()}<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ bạn${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}
+      tkSelfBind(body);
       /* bảng việc giao trống thì mở sẵn "Việc khác đang chờ bạn" (chị Hoa 03/11: tưởng mất việc của tôi) */
       {const mt=body.querySelector("#cvv-mt"),dt=body.querySelector(".cvvid");if(dt&&nOther&&(!mt.querySelector("tbody tr")||/Chưa có việc/.test(mt.textContent)))dt.open=true}}
     else cvNvRaw(body);
