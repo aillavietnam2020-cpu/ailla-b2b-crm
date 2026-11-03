@@ -922,3 +922,12 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .kdwarn{margin:4px 0;font-size:12.5px;color:#b54708}
 .kdppl{display:flex;flex-direction:column;gap:4px}.kdppl span{display:flex;align-items:center;gap:6px;font-size:12.5px;flex-wrap:wrap}.kdppl small{color:#667085}.kdppl em{font-style:normal;color:#dc2626;font-weight:700}
 .kdchia{display:flex;flex-direction:column;gap:6px}.kdchia label{display:flex;align-items:center;gap:8px;border:1px solid #eceef3;border-radius:10px;padding:6px 10px}.kdchia span{flex:1;display:flex;flex-direction:column}.kdchia small{color:#667085;font-size:11.5px}.kdchia input{width:80px!important;flex:none}
+/* Tin nhắn: khay chờ gửi + khung xem ảnh */
+.tnpend{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 14px 0;border-top:1px solid #eceef3}.tnpend[hidden]{display:none}
+.tnpi{position:relative;display:flex;align-items:center;gap:6px;border:1px solid #e3e6ee;border-radius:10px;padding:4px 26px 4px 4px;background:#fafbfd;max-width:220px}.tnpi img{width:52px;height:52px;object-fit:cover;border-radius:7px}.tnpi small{font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tnpi button{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;border-radius:50%;background:#1f2a44cc;color:#fff;font-size:11px;cursor:pointer;line-height:20px;padding:0}
+.tnlb{position:fixed;inset:0;z-index:10000;background:rgba(16,24,40,.82);display:flex;align-items:center;justify-content:center;padding:56px 60px 24px}
+.tnlb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 10px 40px #0008;background:#fff}
+.tnlbbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;padding:10px 16px;color:#fff;font-size:13px}.tnlbbar .sp{flex:1}
+.tnlbx{width:36px;height:36px;border:0;border-radius:50%;background:#ffffff26;color:#fff;font-size:18px;cursor:pointer}.tnlbx:hover{background:#ffffff40}
+.tnlbn{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:50%;background:#ffffff26;color:#fff;font-size:28px;cursor:pointer}.tnlbn.p{left:10px}.tnlbn.n{right:10px}

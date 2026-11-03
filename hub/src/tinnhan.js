@@ -7,7 +7,7 @@
    - Dữ liệu ở máy chủ /api/hub/chat (src/server/routes/chat.ts): tin nhắn riêng chỉ hai người đọc được, không nằm trong dữ liệu chung.
    - Tin cũ của khung trao đổi trước (d.chat trong dữ liệu chung) vẫn xem được ở đầu nhóm / cuộc nhắn riêng tương ứng.
    ===================================================================== */
-const TN={files:{},rems:null,info:null,room:"",rooms:[],msgs:{},more:{},q:"",draft:{},seen:{},sumAt:0,loading:false,mob:false};
+const TN={pend:{},files:{},rems:null,info:null,room:"",rooms:[],msgs:{},more:{},q:"",draft:{},seen:{},sumAt:0,loading:false,mob:false};
 /* máy chủ dùng mã đăng nhập (u.crm), trang dùng mã người trong dữ liệu chung (u.id): phòng, người gửi, người được nhắc đều theo mã đăng nhập */
 const tnMe=()=>(typeof SV!=="undefined"&&SV.me&&SV.me.id)||ME.crm||ME.id;
 const tnU=id=>id?D().users.find(x=>x.crm===id)||D().users.find(x=>x.id===id):null;
@@ -100,7 +100,7 @@ PAGES.tinnhan=m=>{
    <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${pj?"Nhóm dự án · mọi phòng tham gia cùng xem":g?(room==="g:chung"?"Mọi người trong công ty":"Nhóm phòng · ai trong công ty cũng xem được"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
      <span class="tnhb"><button class="btn sm" id="tngiao">📋 Giao việc</button><button class="btn sm" id="tnnhac">⏰ Nhắc</button><button class="btn sm${tnInfoOn()?" on":""}" id="tninfo" title="Ảnh, tệp, link, nhắc hẹn của cuộc trò chuyện">ⓘ</button></span></header>
     <div class="tnmsgs" id="tnmsgs"></div>
-    <form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
+    <div class="tnpend" id="tnpend" hidden></div><form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
   tnDrawList();tnDrawMsgs();tnBindAtt(room);tnBindInfo(room);if(!TN.files[room])tnLoadFiles(room);
   if(!TN.msgs[room])tnLoad(room).then(()=>{if(TN.room===room&&PAGE==="tinnhan"){tnDrawMsgs();tnRead(room)}});else tnRead(room);
   if(!TN.sumAt)tnSummary();
@@ -108,8 +108,9 @@ PAGES.tinnhan=m=>{
   $("#tnback").onclick=()=>{TN.mob=false;$(".tn").classList.remove("open")};
   $("#tngiao").onclick=()=>tnGiao("");$("#tnnhac").onclick=()=>tnRemind("",dm||tnMe());$("#tnrem").onclick=()=>tnRemind("",tnMe());
   const inp=$("#tnin"),sug=$("#tnsug"),fit=()=>{inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,140)+"px"};fit();
-  const send=async()=>{const v=inp.value.trim();if(!v)return;inp.value="";TN.draft[room]="";fit();sug.hidden=true;
-    try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;TN.draft[room]=v;toast(e.message||"Chưa gửi được")}};
+  const send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;inp.value="";TN.draft[room]="";fit();sug.hidden=true;
+    if(P.length){TN.pend[room]=[];tnDrawPend(room);await tnUpload(room,P)}
+    if(v)try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;TN.draft[room]=v;toast(e.message||"Chưa gửi được")}};
   const atQ=()=>{const s=inp.value.slice(0,inp.selectionStart),mm=s.match(/@([\p{L}\d ]{0,20})$/u);return mm?mm[1]:null};
   const drawSug=()=>{const a=atQ();if(a===null){sug.hidden=true;return}const L=tnPeople().filter(u=>u.name.toLowerCase().includes(a.toLowerCase())).slice(0,6);
     if(!L.length){sug.hidden=true;return}sug.hidden=false;sug.innerHTML=L.map(u=>`<button type="button" data-at="${esc(u.name)}">${tnAv(u.crm,u.name)}${esc(u.name)}<small>${esc(TEAMS[teamOf(u)]||"")}</small></button>`).join("");
@@ -170,7 +171,7 @@ const tnExt=n=>(String(n).split(".").pop()||"").toLowerCase();
 const tnFIc=(mime,name)=>{const e=tnExt(name);const c=/pdf/.test(mime)||e==="pdf"?["PDF","#e03131"]:/sheet|excel|csv/.test(mime)||/^(xlsx?|csv)$/.test(e)?["XLS","#2f9e44"]:/word/.test(mime)||/^docx?$/.test(e)?["DOC","#1c4fb8"]:/presentation|powerpoint/.test(mime)||/^pptx?$/.test(e)?["PPT","#e8590c"]:["TXT","#667085"];return `<i class="tnfic" style="background:${c[1]}">${c[0]}</i>`};
 const tnSize=n=>!n?"":n>=1e6?(n/1e6).toFixed(1)+" MB":Math.max(1,Math.round(n/1e3))+" KB";
 function tnFileHtml(m){const id=String(m.ref||"").replace(/^f:/,""),f=tnFMeta(m.room||TN.room,id)||{name:m.body},img=f.mime?f.mime.startsWith("image/"):/\.(png|jpe?g|webp|gif)$/i.test(m.body||"");
-  return img?`<a class="tnimg" href="${tnFUrl(id)}" target="_blank" rel="noopener"><img src="${tnFUrl(id)}" alt="${esc(m.body)}" loading="lazy"></a>`
+  return img?`<a class="tnimg" href="${tnFUrl(id)}" data-tnlb="${esc(id)}"><img src="${tnFUrl(id)}" alt="${esc(m.body)}" loading="lazy"></a>`
     :`<div class="tnfile">${tnFIc(f.mime||"",f.name)}<span><b>${esc(f.name||m.body)}</b><small>${tnSize(f.size)}</small></span><a class="btn sm" href="${tnFUrl(id)}" target="_blank" rel="noopener">Mở</a><a class="btn sm" href="${tnFUrl(id,1)}">Tải</a></div>`}
 const TN_DRV=/https?:\/\/(?:drive|docs)\.google\.com\/[^\s<]+/i;
 function tnDriveCard(t){const u=(String(t||"").match(TN_DRV)||[])[0];if(!u)return "";
@@ -188,20 +189,36 @@ async function tnUpload(room,list){for(const f0 of [...(list||[])]){
   if(PAGE==="tinnhan"&&TN.room===room){tnDrawMsgs();tnDrawList();const i=$("#tninfo-box");if(i){i.outerHTML=tnInfoHtml(room);tnBindInfo(room)}}}
 function tnBindAtt(room){const fi=$("#tnfi");if(!fi)return;
   $("#tnimg").onclick=()=>{fi.accept="image/*";fi.click()};$("#tnfile").onclick=()=>{fi.accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt";fi.click()};
-  fi.onchange=()=>{const L=[...fi.files];fi.value="";if(L.length)tnUpload(room,L)};
-  const inp=$("#tnin");inp.addEventListener("paste",e=>{const L=[...(e.clipboardData&&e.clipboardData.files||[])];if(L.length){e.preventDefault();tnUpload(room,L)}});
+  fi.onchange=()=>{const L=[...fi.files];fi.value="";if(L.length)tnAddPend(room,L)};
+  const inp=$("#tnin");inp.addEventListener("paste",e=>{const L=[...(e.clipboardData&&e.clipboardData.files||[])];if(L.length){e.preventDefault();tnAddPend(room,L)}});
   const box=$(".tnmain");box.ondragover=e=>{e.preventDefault();box.classList.add("drop")};box.ondragleave=()=>box.classList.remove("drop");
-  box.ondrop=e=>{e.preventDefault();box.classList.remove("drop");const L=[...(e.dataTransfer&&e.dataTransfer.files||[])];if(L.length)tnUpload(room,L)}}
+  box.ondrop=e=>{e.preventDefault();box.classList.remove("drop");const L=[...(e.dataTransfer&&e.dataTransfer.files||[])];if(L.length)tnAddPend(room,L)}
+  tnDrawPend(room)}
 function tnInfoHtml(room){const F=TN.files[room],img=(F||[]).filter(f=>f.mime.startsWith("image/")),doc=(F||[]).filter(f=>!f.mime.startsWith("image/")),ex=TN.infoAll||"";
   const links=[];(TN.msgs[room]||[]).slice().reverse().forEach(m=>{if(m.kind)return;(String(m.body).match(/https?:\/\/[^\s<]+/g)||[]).forEach(u=>{if(!links.some(l=>l.u===u))links.push({u,at:m.created_at})})});
   const R=(TN.rems||[]).filter(r=>r.room===room);
   const more=(k,n,lim)=>n>lim?`<button type="button" class="tnmore" data-tnex="${k}">${ex===k?"Thu gọn":"Xem tất cả ("+n+")"}</button>`:"";
   return `<aside class="tninfo" id="tninfo-box"><div class="tnih"><b>Thông tin hội thoại</b><button type="button" class="lnk" id="tninfo-x">Ẩn</button></div>
    <section><h4>⏰ Nhắc hẹn</h4>${TN.rems===null?`<p class="hint">Đang tải…</p>`:R.length?R.map(r=>`<div class="tnir"><b>${tnAt(r.due_at)}</b> · ${r.user_id===tnMe()?"nhắc tôi":"nhắc "+esc(tnUN(r.user_id))}<br><small>${esc(r.text)}</small></div>`).join(""):`<p class="hint">Chưa có nhắc hẹn.</p>`}</section>
-   <section><h4>Ảnh</h4>${!F?`<p class="hint">Đang tải…</p>`:img.length?`<div class="tnig">${(ex==="img"?img:img.slice(0,6)).map(f=>`<a href="${tnFUrl(f.id)}" target="_blank" rel="noopener"><img src="${tnFUrl(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>${more("img",img.length,6)}`:`<p class="hint">Chưa có ảnh.</p>`}</section>
+   <section><h4>Ảnh</h4>${!F?`<p class="hint">Đang tải…</p>`:img.length?`<div class="tnig">${(ex==="img"?img:img.slice(0,6)).map(f=>`<a href="${tnFUrl(f.id)}" data-tnlb="${esc(f.id)}"><img src="${tnFUrl(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>${more("img",img.length,6)}`:`<p class="hint">Chưa có ảnh.</p>`}</section>
    <section><h4>Tệp</h4>${!F?"":doc.length?(ex==="doc"?doc:doc.slice(0,5)).map(f=>`<a class="tnif" href="${tnFUrl(f.id)}" target="_blank" rel="noopener">${tnFIc(f.mime,f.name)}<span><b>${esc(f.name)}</b><small>${tnSize(f.size)} · ${tnTime(f.created_at)}</small></span></a>`).join("")+more("doc",doc.length,5):`<p class="hint">Chưa có tệp.</p>`}</section>
    <section><h4>Link</h4>${links.length?(ex==="link"?links:links.slice(0,5)).map(l=>`<a class="tnil" href="${esc(l.u)}" target="_blank" rel="noopener"><i>${TN_DRV.test(l.u)?"📁":"🔗"}</i><span><b>${esc(l.u.replace(/^https?:\/\//,"").slice(0,48))}</b><small>${tnTime(l.at)}</small></span></a>`).join("")+more("link",links.length,5):`<p class="hint">Chưa có link.</p>`}</section></aside>`}
 function tnBindInfo(room){const b=$("#tninfo");if(b)b.onclick=()=>{TN.info=!tnInfoOn();renderMain()};
   const x=$("#tninfo-x");if(x)x.onclick=()=>{TN.info=false;renderMain()};
   document.querySelectorAll("[data-tnex]").forEach(e=>e.onclick=()=>{TN.infoAll=TN.infoAll===e.dataset.tnex?"":e.dataset.tnex;const i=$("#tninfo-box");if(i){i.outerHTML=tnInfoHtml(room);tnBindInfo(room)}});
   if(TN.rems===null&&tnInfoOn()&&!TN.remBusy){TN.remBusy=true;svApi("/api/hub/chat/reminders").then(r=>{TN.rems=r||[]}).catch(()=>{TN.rems=[]}).then(()=>{TN.remBusy=false;const i=$("#tninfo-box");if(i&&TN.room===room){i.outerHTML=tnInfoHtml(room);tnBindInfo(room)}})}}
+
+/* khay ảnh / tệp chờ gửi (chị Hoa 03/11: dán ảnh là gửi luôn là sai — phải bấm Gửi) */
+function tnAddPend(room,L){const A=TN.pend[room]=TN.pend[room]||[];[...L].forEach(f=>{if(f.size>TN_FMAX&&!f.type.startsWith("image/")){toast((f.name||"Tệp")+" quá 1,5 MB, hãy gửi link Google Drive");return}A.push(f)});tnDrawPend(room);const i=$("#tnin");if(i)i.focus()}
+function tnDrawPend(room){const w=$("#tnpend");if(!w)return;const A=TN.pend[room]||[];w.hidden=!A.length;(w._urls||[]).forEach(u=>URL.revokeObjectURL(u));w._urls=[];
+  w.innerHTML=A.map((f,i)=>{const img=f.type.startsWith("image/");let u="";if(img){u=URL.createObjectURL(f);w._urls.push(u)}return `<span class="tnpi">${img?`<img src="${u}" alt="">`:tnFIc(f.type,f.name||"")}<small>${esc(f.name||"Ảnh dán")}</small><button type="button" data-tnpx="${i}" aria-label="Bỏ">✕</button></span>`}).join("")+(A.length?`<span class="hint">Bấm Gửi để gửi ${A.length} tệp</span>`:"");
+  w.querySelectorAll("[data-tnpx]").forEach(b=>b.onclick=()=>{A.splice(+b.dataset.tnpx,1);tnDrawPend(room)})}
+/* xem ảnh: khung nổi trên trang, ✕ / bấm ra ngoài / Esc để tắt, ‹ › xem ảnh khác trong cuộc trò chuyện */
+function tnLightbox(id){const room=TN.room,L=(TN.files[room]||[]).filter(f=>f.mime&&f.mime.startsWith("image/")).map(f=>f.id);let i=Math.max(0,L.indexOf(id));if(!L.includes(id))L.unshift(id),i=0;
+  let o=$("#tnlb");if(o)o.remove();o=document.createElement("div");o.id="tnlb";o.className="tnlb";document.body.appendChild(o);
+  const draw=()=>{const f=(TN.files[room]||[]).find(x=>x.id===L[i])||{};o.innerHTML=`<div class="tnlbbar"><span>${esc(f.name||"")}</span><span class="sp"></span><a class="btn sm" href="${tnFUrl(L[i],1)}">Tải về</a><button type="button" class="tnlbx" aria-label="Đóng">✕</button></div>
+    ${L.length>1?`<button type="button" class="tnlbn p" aria-label="Ảnh trước">‹</button><button type="button" class="tnlbn n" aria-label="Ảnh sau">›</button>`:""}<img src="${tnFUrl(L[i])}" alt="">`;
+    o.querySelector(".tnlbx").onclick=close;const p=o.querySelector(".tnlbn.p"),n=o.querySelector(".tnlbn.n");if(p)p.onclick=e=>{e.stopPropagation();i=(i-1+L.length)%L.length;draw()};if(n)n.onclick=e=>{e.stopPropagation();i=(i+1)%L.length;draw()}};
+  const close=()=>{o.remove();document.removeEventListener("keydown",key)},key=e=>{if(e.key==="Escape")close();else if(e.key==="ArrowLeft"&&L.length>1){i=(i-1+L.length)%L.length;draw()}else if(e.key==="ArrowRight"&&L.length>1){i=(i+1)%L.length;draw()}};
+  o.onclick=e=>{if(e.target===o)close()};document.addEventListener("keydown",key);draw()}
+document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("[data-tnlb]");if(!a)return;e.preventDefault();tnLightbox(a.dataset.tnlb)});
