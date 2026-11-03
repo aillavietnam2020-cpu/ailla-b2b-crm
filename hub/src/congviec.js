@@ -425,7 +425,7 @@ const pjHolder=c=>c.step==="kb"?(c.nguoiKB||c.nguoi):c.step==="edit"?(c.nguoiEdi
 const pjHolderLbl=c=>c.step==="cg"?"Chưa giao":c.step==="dkb"||c.step==="dvd"?"Lead Content duyệt":c.step==="dceo"?"CEO duyệt":c.step==="worker"?"Máy đang dựng":userName(pjHolder(c))||"—";
 const pjCards=p=>D().cards.filter(c=>c.step!=="huy"&&cardProject(c)===p.id);
 function pjStageHtml(p){const C=pjCards(p),N=C.length;if(!N)return "";
-  return `<div class="pjgd"><div class="pjgdh">Tiến độ video <small>· ${N} video</small></div>${PJ_GD.map(([k,t],i)=>{const here=C.filter(c=>pjGdOf(c)===i&&c.step!=="xong"),past=C.filter(c=>pjGdOf(c)>i||c.step==="xong").length,
+  return `<div class="pjgd"><div class="pjgdh">Tiến độ video <small>· ${N} video</small></div>${PJ_GD.map(([k,t],i)=>{const here=C.filter(c=>pjGdOf(c)===i&&c.step!=="xong"&&c.step!=="cg"),past=C.filter(c=>pjGdOf(c)>i||c.step==="xong").length,
     who=[...new Set(here.map(pjHolder).filter(Boolean))],late=here.filter(c=>typeof isLate==="function"&&isLate(c)).length,pc=Math.round(past/N*100);
     return `<button type="button" class="pjs${late?" late":""}" data-pjs="${esc(p.id)}|${k}" title="Bấm để xem từng video"><b class="pjs1">${t}</b><i class="pjsb"><i style="width:${pc}%"></i></i><span class="pjs2"><b>${past}</b>/${N}</span><span class="pjs3">${here.length?`${here.length} đang làm${late?` · <em>${late} trễ</em>`:""} ${who.slice(0,3).map(avatar).join("")}`:""}</span></button>`}).join("")}</div>`}
 function pjStageOpen(pid,k){const p=(D().projects||[]).find(x=>x.id===pid);if(!p)return;const i=PJ_GD.findIndex(g=>g[0]===k),C=pjCards(p).filter(c=>pjGdOf(c)===i).sort((a,b)=>(a.han||99)-(b.han||99));
