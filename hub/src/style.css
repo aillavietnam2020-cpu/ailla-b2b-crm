@@ -975,3 +975,7 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 body:has(#tnpop) #ntpop{right:392px}
 #tnmic.rec{background:#fee2e2;color:#dc2626;position:relative}#tnmic.rec::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;white-space:nowrap}
 .tnaud audio{height:36px;max-width:260px}.tnpa{padding-right:28px}.tnpa audio{height:32px;width:220px}
+/* chị Hoa 03/11: bỏ nút "Hỏi AI" nổi góc dưới (đầu trang đã có Trợ lý AI); cửa sổ chat nhỏ thấp còn 2/3 */
+#aibtn{display:none!important}
+.tnpop{height:min(360px,calc(100vh - 90px));bottom:16px}
+body:has(#tnpop) #ntpop{right:392px}
