@@ -49,10 +49,10 @@ function cleanCreators(v: unknown) {
   };
 }
 
-/** Video › Chi tiết: số tổng + tối đa 50 video GMV cao nhất (tên video cắt 80 ký tự, không có thông tin khách). */
+/** Kho số video TikTok chung (Video › Chi tiết của agent, Video Performance List tải tay): số tổng + từng video, tối đa 3000 (tên video cắt 80 ký tự, không có thông tin khách). */
 function cleanVideos(v: unknown) {
   const o = (v ?? {}) as Record<string, unknown>;
-  const top = Array.isArray(o.top) ? o.top.slice(0, 50) : [];
+  const top = Array.isArray(o.top) ? o.top.slice(0, 3000) : [];
   return {
     ...numbersOnly(o, 20),
     top: top.map((t) => {
