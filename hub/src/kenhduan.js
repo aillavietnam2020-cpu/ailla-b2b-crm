@@ -11,6 +11,8 @@ const KDA={chia:""};
 const kdOwner=k=>((D().kenhPT||{})[k]||{}).chinh||"";
 const kdMine=()=>!ME?[]:CHANNELS.filter(ch=>kdOwner(ch.k)===ME.id);
 const kdSee=()=>!ME?[]:(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong")?CHANNELS:CHANNELS.filter(ch=>kdOwner(ch.k)===ME.id||((D().kenhPT||{})[ch.k]||{}).phu===ME.id);
+/* tên kênh hiện ra giống các trang khác (tenhien.js: TikTok Via 1 → Gia dụng AiBio…) */
+const kdNm=ch=>{let n=ch.k;if(typeof RL_MAP!=="undefined")RL_MAP.forEach(([a,b])=>{n=n.replace(a,b)});return n===ch.k?(ch.short||ch.k):n};
 const kdCards=k=>(D().cards||[]).filter(c=>c.kenh===k&&c.step!=="huy");
 /* số video cần đăng mỗi ngày: kế hoạch tháng của kênh chia đều số ngày (ít nhất 1 khi có kế hoạch) */
 const kdPerDay=k=>{let T=0;try{T=typeof dqPlanOf==="function"?dqPlanOf(k):0}catch(e){}return T?Math.max(1,Math.round(T/MONTH.ndays)):0};
@@ -26,7 +28,7 @@ const kdDay=x=>{const d=new Date(MONTH.year,MONTH.mon-1,x);return ["CN","T2","T3
 const _cvMyKd=cvMyItems;
 cvMyItems=function(){const L=_cvMyKd();if(!ME||!D())return L;
   const add=o=>L.push(Object.assign({oldest:null,age_days:0,page:"",count:1,go:"cv_da",mod:"cv"},o));
-  kdMine().forEach(ch=>{const s=kdStat(ch),nm=ch.short||ch.k;
+  kdMine().forEach(ch=>{const s=kdStat(ch),nm=kdNm(ch);
     if(s.todayReady.length)add({key:"kd_post_"+ch.k,group:"Đến lượt tôi làm",title:`Đăng ${s.todayReady.length} video hôm nay · ${nm}`,detail:"Video đã duyệt, lịch đăng hôm nay",chip:"Đăng bài",chipC:"blu"});
     if(s.per&&!s.today.length&&!s.todayPosted.length)add({key:"kd_none_"+ch.k,group:"Đến lượt tôi làm",title:`Hôm nay chưa có video lên lịch · ${nm}`,detail:`Cần ${s.per} video/ngày theo kế hoạch tháng · xếp video vào lịch đăng hôm nay`,chip:"Thiếu lịch",chipC:"red",age_days:1});
     if(s.miss.length)add({key:"kd_miss_"+ch.k,group:"Cần phân công / theo dõi",title:`Thiếu video lên lịch 3 ngày tới · ${nm}`,detail:s.miss.map(o=>`${kdDay(o.x)}: ${o.n}/${s.per}`).join(" · "),chip:"Cảnh báo",chipC:"amb"});
@@ -34,14 +36,14 @@ cvMyItems=function(){const L=_cvMyKd();if(!ME||!D())return L;
   return L};
 /* thông báo góc dưới: mỗi việc mỗi ngày một lần */
 function kdNotify(){if(!ME||!D()||typeof ntPush!=="function")return;const day=MONTH.key+"-"+D().settings.today;
-  kdMine().forEach(ch=>{const s=kdStat(ch),nm=ch.short||ch.k,go=()=>{MOD="cv";PAGE="cv_da";render()};
+  kdMine().forEach(ch=>{const s=kdStat(ch),nm=kdNm(ch),go=()=>{MOD="cv";PAGE="cv_da";render()};
     if(s.todayReady.length)ntPush({key:`kd:${day}:${ch.k}:post`,type:"giao",text:`Hôm nay có ${s.todayReady.length} video cần đăng trên ${nm}`,go});
     if(s.per&&!s.today.length&&!s.todayPosted.length)ntPush({key:`kd:${day}:${ch.k}:none`,type:"giao",text:`${nm}: hôm nay chưa có video nào lên lịch đăng`,go});
     if(s.miss.length)ntPush({key:`kd:${day}:${ch.k}:miss`,type:"giao",text:`${nm}: thiếu video lên lịch ${s.miss.map(o=>kdDay(o.x)).join(", ")}`,go})})}
 setInterval(kdNotify,60e3);setTimeout(kdNotify,12e3);
 
 /* ---- thẻ dự án kênh (trang Dự án) ---- */
-function kdCardHtml(ch){const s=kdStat(ch),own=kdOwner(ch.k),nm=ch.short||ch.k,N=s.C.length;
+function kdCardHtml(ch){const s=kdStat(ch),own=kdOwner(ch.k),nm=kdNm(ch),N=s.C.length;
   const holders={};s.C.filter(c=>c.step!=="xong"&&c.step!=="cg"&&c.nguoi).forEach(c=>{const h=c.step==="dang"?own:(typeof pjHolder==="function"?pjHolder(c):c.nguoi)||c.nguoi;if(!h)return;const o=holders[h]=holders[h]||{n:0,tre:0,st:{}};o.n++;if(isLate(c))o.tre++;const g=(PJ_GD.find(z=>z[2].includes(c.step))||["","?"])[1];o.st[g]=(o.st[g]||0)+1});
   const lead=ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong";
   return `<section class="pj kdpj"><div class="pjh"><span class="pjic">📡</span><div class="pjt"><b>Vận hành kênh ${esc(nm)}</b><small>Dự án kênh · phụ trách ${esc(userName(own)||"chưa giao kênh")}</small></div>${s.miss.length||(!s.today.length&&!s.todayPosted.length&&s.per)?pill("Thiếu lịch đăng","red"):pill("Đủ lịch","grn")}</div>
@@ -57,7 +59,7 @@ function kdBind(m){
 /* Lead chia video chưa giao cho nhiều người: mỗi người một số lượng, video quay mới giao viết kịch bản, còn lại giao edit */
 function kdChia(k){const ch=chOf(k),s=kdStat(CHANNELS.find(x=>x.k===k)||ch),C=s.cg.slice().sort((a,b)=>(+a.day||99)-(+b.day||99));
   const ppl=D().users.filter(u=>u.active&&u.name&&u.role!=="admin"&&(teamOf(u)==="content"||u.phongBan==="CM"));
-  openDrawerHTML(`<h2>Chia video · ${esc(ch.short||k)}</h2><p class="hint">${C.length} video chưa giao, xếp theo ngày đăng. Nhập số video cho từng người, mỗi người nhận một thông báo gộp. Video quay mới giao viết kịch bản trước, video reup / có sẵn giao edit.</p>
+  openDrawerHTML(`<h2>Chia video · ${esc(kdNm(chOf(k).k?chOf(k):{k,short:k}))}</h2><p class="hint">${C.length} video chưa giao, xếp theo ngày đăng. Nhập số video cho từng người, mỗi người nhận một thông báo gộp. Video quay mới giao viết kịch bản trước, video reup / có sẵn giao edit.</p>
    <form class="frm" id="kd-f"><div class="kdchia">${ppl.map(u=>`<label>${avatar(u.id)}<span>${esc(u.name)}<small>đang làm ${typeof xvOpen==="function"?xvOpen(u.id).length:0}</small></span><input type="number" min="0" max="${C.length}" data-kdu="${esc(u.id)}" value="0"></label>`).join("")}</div>
    <div class="acts"><button type="button" class="btn" id="kd-deu">Chia đều</button><span class="hint" id="kd-sum"></span><span class="sp"></span><button class="btn pri">Giao</button></div></form>`);
   const I=[...document.querySelectorAll("[data-kdu]")],sum=()=>{const n=I.reduce((z,i)=>z+(+i.value||0),0);$("#kd-sum").textContent=`${n}/${C.length} video`;$("#kd-sum").style.color=n>C.length?"#dc2626":""};I.forEach(i=>i.oninput=sum);sum();
@@ -74,6 +76,6 @@ PAGES.cv_da=m=>pCvDa(m);
 /* Công việc › Tổng quan: khung "Kênh tôi phụ trách" (chỉ người giữ kênh) */
 const _pCvVKd=pCvV;
 pCvV=function(m){_pCvVKd(m);try{const L=kdMine();if(!L.length)return;const bar=m.querySelector(".cvvbar");if(!bar)return;
-  bar.insertAdjacentHTML("beforebegin",`<section class="card odcard kdmine"><div class="odch"><h3>📡 Kênh tôi phụ trách</h3></div>${L.map(ch=>{const s=kdStat(ch);return `<div class="odrow" data-kdgo="1"><span><b>${esc(ch.short||ch.k)}</b><small>Hôm nay: ${s.todayPosted.length} đã đăng · ${s.todayReady.length} chờ đăng${s.per?" · cần "+s.per:""}${s.miss.length?` · <b class="t-red">thiếu lịch ${s.miss.map(o=>kdDay(o.x)).join(", ")}</b>`:""}</small></span>${s.miss.length||(!s.today.length&&!s.todayPosted.length&&s.per)?pill("Thiếu lịch","red"):pill("Đủ lịch","grn")}</div>`}).join("")}</section>`);
+  bar.insertAdjacentHTML("beforebegin",`<section class="card odcard kdmine"><div class="odch"><h3>📡 Kênh tôi phụ trách</h3></div>${L.map(ch=>{const s=kdStat(ch);return `<div class="odrow" data-kdgo="1"><span><b>${esc(kdNm(ch))}</b><small>Hôm nay: ${s.todayPosted.length} đã đăng · ${s.todayReady.length} chờ đăng${s.per?" · cần "+s.per:""}${s.miss.length?` · <b class="t-red">thiếu lịch ${s.miss.map(o=>kdDay(o.x)).join(", ")}</b>`:""}</small></span>${s.miss.length||(!s.today.length&&!s.todayPosted.length&&s.per)?pill("Thiếu lịch","red"):pill("Đủ lịch","grn")}</div>`}).join("")}</section>`);
   m.querySelectorAll("[data-kdgo]").forEach(e=>e.onclick=()=>{PAGE="cv_da";render()})}catch(e){console.error("dự án kênh",e)}};
 PAGES.cv_v=m=>pCvV(m);
