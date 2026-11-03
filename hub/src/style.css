@@ -935,3 +935,17 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .kdstrip{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px;font-size:13px}.kdstrip>b{margin-right:2px}
 .kdchip{display:inline-flex;align-items:center;gap:5px;border:1px solid #c8ead2;background:#f1fbf4;border-radius:16px;padding:4px 10px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}.kdchip small{color:#667085;font-weight:500}.kdchip i{font-style:normal;font-size:11px;color:#1f7a3d}
 .kdchip.bad{border-color:#f3c2c2;background:#fff4f4}.kdchip.bad i{color:#c92a2a}
+/* Chi tiết việc: nội dung lên đầu, gọn (tkLayout) */
+.tkh2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:44px}.tktools{margin-left:auto;display:flex;gap:6px}.tktools b{background:#eef2ff;color:#3730a3;border-radius:9px;padding:0 6px;font-size:11px}
+.tkbrief{border:1px solid #e3e6ee;border-left:4px solid #4f46e5;border-radius:12px;padding:10px 14px;margin:6px 0 10px;background:#fff}
+.tkbt{font-size:16px;font-weight:700;margin-bottom:6px}
+.tkbm{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;margin-bottom:6px}.tkbm small{display:block;color:#98a2b3;font-size:11px}
+.tkbd{font-size:13.5px;line-height:1.5;white-space:normal;background:#f8f9fc;border-radius:8px;padding:8px 10px}
+.tkbl{margin-top:6px;font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.tkbc{margin-top:4px;font-size:12px}
+.tkedit{border:1px solid #eceef3;border-radius:10px;padding:6px 10px;margin:0 0 10px}.tkedit>summary{cursor:pointer;font-weight:600;font-size:13px;color:#4f46e5}.tkedit[open]>summary{margin-bottom:6px}
+#drawerIn .tkchat[hidden],#drawerIn .tklate[hidden]{display:none}
+#drawerIn .tkres,#drawerIn .tkchat,#drawerIn .tklate{margin-bottom:10px}
+.tkself{display:flex;gap:8px;align-items:center;background:var(--surface,#fff);border:1px dashed #c7d2fe;border-radius:12px;padding:6px 10px;margin:0 0 10px}.tkself>span{color:#4f46e5;font-weight:700;font-size:16px}
+.tkself #tks-ten{flex:1;border:0;outline:0;font:inherit;font-size:13.5px;background:none;min-width:120px}.tkself label{display:flex;align-items:center;gap:4px;font-size:12px;color:#667085}.tkself label input{width:auto}.tkself select{width:auto}
+@media(max-width:700px){.tkself{flex-wrap:wrap}}
+#t-cmat{max-height:150px;overflow:auto;display:flex;flex-wrap:wrap;gap:4px}#t-cmat[hidden]{display:none}#t-cmat small{color:#98a2b3;font-weight:500}

@@ -53,7 +53,7 @@ export async function taskReminders(
     for (const k of Object.keys(d.autoRem)) if (!k.endsWith(sfx)) delete d.autoRem[k];
     d.notifs = d.notifs ?? [];
     let sent = 0;
-    const push = (key: string, to: Iterable<string | undefined>, text: string, ref = 'page:cv_nv') => {
+    const push = (key: string, to: Iterable<string | undefined>, text: string, ref = 'page:cv_v') => {
       const k = key + sfx;
       if (d.autoRem![k]) return;
       d.autoRem![k] = 1;
@@ -73,17 +73,17 @@ export async function taskReminders(
       const who = nameOf(t.nguoi);
       if (t.st === 'review') {
         reviewN++;
-        push(`v|tk|${t.id}`, [t.tao, ...(t.tao ? [] : admins)], `Việc "${t.ten}" của ${who} đang chờ bạn duyệt`);
+        push(`v|tk|${t.id}`, [t.tao, ...(t.tao ? [] : admins)], `Việc "${t.ten}" của ${who} đang chờ bạn duyệt`, `task:${t.id}`);
       }
       if (!t.han) continue;
       if (t.han < today) {
         lateN++;
         lateBy.set(who, (lateBy.get(who) ?? 0) + 1);
-        push(`l|tk|${t.id}`, [...mine, t.tao, ...leads], `⚠ Trễ ${today - t.han} ngày: ${t.ten} · ${who}`);
+        push(`l|tk|${t.id}`, [...mine, t.tao, ...leads], `⚠ Trễ ${today - t.han} ngày: ${t.ten} · ${who}`, `task:${t.id}`);
       } else if (t.han === today) {
-        push(`d|tk|${t.id}`, [...mine, t.tao, ...leads], `Đến hạn hôm nay: ${t.ten} · ${who}`);
+        push(`d|tk|${t.id}`, [...mine, t.tao, ...leads], `Đến hạn hôm nay: ${t.ten} · ${who}`, `task:${t.id}`);
       } else if (t.han - today <= 2 && (t.st === 'todo' || t.st === 'nhan')) {
-        push(`n|tk|${t.id}`, mine, `Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`);
+        push(`n|tk|${t.id}`, mine, `Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`, `task:${t.id}`);
       }
     }
     if (lateN || reviewN) {
