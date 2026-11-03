@@ -23,7 +23,7 @@ function pHieuQuaBan(m){
   const days=pDays(),g=(s,i)=>pSum(s,i).v,cards=[];
   /* TikTok Shop */
   {const A=typeof TSB!=="undefined"&&TSB.all?tsbOpsAgg(PERIOD.from,PERIOD.to):null,K=A?A.km:{},gmv=K.gmv||0,ads=A?Math.round((A.ads.chi||0)*1.1):0;
-   const R=A?(TSB.all.ranges||[]).filter(r=>r.kind==="creators"&&r.from<=PERIOD.to&&r.to>=PERIOD.from).sort((a,b)=>b.to.localeCompare(a.to))[0]:null;
+   const R=A?(typeof ttsMerge==="function"?ttsMerge("creators",PERIOD.from,PERIOD.to):(TSB.all.ranges||[]).filter(r=>r.kind==="creators"&&r.from<=PERIOD.to&&r.to>=PERIOD.from).sort((a,b)=>b.to.localeCompare(a.to))[0]):null;
    cards.push(hqCard({t:"TikTok Shop",go:"bc_tiktok",sub:A?`${A.nKm} ngày có số · GMV là số đo hiệu suất, chưa trừ hủy, hoàn, không phải doanh thu thực`:"đang tải",k:[["GMV",gmv?tr(gmv):"—",K.don?nf(K.don)+" đơn":""],["ROAS trên GMV",ads&&gmv?(gmv/ads).toFixed(2).replace(".",","):"—",ads?"quảng cáo "+tr(ads):""],["GMV video inhouse",K.vInh?tr(K.vInh):"—",hqPct(K.vInh,gmv)+" GMV"],["GMV video KOC",K.vKoc?tr(K.vKoc):"—",hqPct(K.vKoc,gmv)+" GMV"],["GMV LIVE",(K.lShop||0)+(K.lKoc||0)?tr((K.lShop||0)+(K.lKoc||0)):"—",hqPct((K.lShop||0)+(K.lKoc||0),gmv)+" GMV"]],
     body:R?`<h3>KOC bán tốt nhất</h3>${tbl(["#","Nhà sáng tạo","GMV","Đơn","Hoa hồng ước tính"],R.data.top.slice(0,5).map((x,i)=>hqRow([i+1,`<b>${esc(x.u)}</b>`,tr(x.gmv),nf(x.don),tr(x.hh)])))}`:"",
     note:A&&!A.nKm?"Kỳ này team TikTok chưa tải file Key metrics (Marketing › Nhập báo cáo).":""}))}
