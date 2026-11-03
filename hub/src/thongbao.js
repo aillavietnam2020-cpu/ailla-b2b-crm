@@ -86,7 +86,7 @@ function ntOpenAgent(a){if(typeof AC!=="undefined"){AC.cur=a;try{localStorage.se
    chờ kế toán); còn lại (đơn, sửa phiếu xuất, đề xuất agent, phiếu thưởng, nhân sự, khoản chờ CEO) đều báo. Người khác: bỏ dòng chờ CEO. */
 const ntForMe=r=>SV.me&&SV.me.role==="CEO"?(r.ceoCho||!["chi","thu","tien","hoan","combo","cbdx"].includes(r.k)):!r.ceoCho;
 function ntFromPd(rows){
-  (rows||[]).filter(ntForMe).filter(r=>!ntMine(r.by)&&r.k!=="combo").forEach(r=>ntPush({key:"pd:"+r.id+(r.ceoCho?":ceo":""),type:"duyet",
+  (rows||[]).filter(ntForMe).filter(r=>!ntMine(r.by)&&r.k!=="combo"&&!(typeof pdOther==="function"&&pdOther(r))).forEach(r=>ntPush({key:"pd:"+r.id+(r.ceoCho?":ceo":""),type:"duyet",
     text:`${r.loai}: ${r.nd||""}${r.tien?" · "+nf(r.tien)+" đ":""}`,by:r.by||"",at:r.ceoCho?0:r.at,go:()=>ntOpenPd(r)}))}
 /* Dữ liệu chung của web (phiếu chi, phiếu thu, đơn nhân sự đang chờ) — chạy lại khi dữ liệu đổi. */
 function ntScanHub(){if(!ME||!DB.data||typeof pdBuild!=="function"||typeof pdWho!=="function")return;

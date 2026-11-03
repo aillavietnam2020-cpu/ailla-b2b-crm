@@ -45,7 +45,13 @@ function pdRows(){
   return pdBuild({...(PD.sv||{}),th:pdTh(),pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],...(typeof spcPdSrc==="function"?spcPdSrc(d):{}),
     staffName:ma=>{try{return staffBy(ma).ten}catch(e){return ma}}},pdWho());
 }
-const pdCnt=()=>{if(!PD.sv)return "";try{return pdRows().length||""}catch(e){return ""}};
+/* CEO chỉ thấy việc của mình trong danh sách duyệt (chị Hoa 03/11); đề xuất agent đã gửi Kho / Sale / Kế toán là việc của phòng đó,
+   gom ở mục "Đang chờ ở các phòng" để biết bộ phận nào, ai đang nghẽn. */
+const PD_ROUTE_N={KHO:"Kho",SALE:"Sale phụ trách khách",KE_TOAN:"Kế toán"};
+const pdProp=r=>r&&r.src==="proposal"?(((PD.sv||{}).proposals||[]).find(p=>p.id===r.ref)||null):null;
+const pdOther=r=>{if(!(pdWho().role==="CEO"||pdWho().admin))return false;const p=pdProp(r);return !!p&&!!PD_ROUTE_N[p.route_to]};
+const pdMine=rows=>rows.filter(r=>!pdOther(r));
+const pdCnt=()=>{if(!PD.sv)return "";try{return pdMine(pdRows()).length||""}catch(e){return ""}};
 /* Mục Phê duyệt chỉ có một trang nên thanh bên không có dòng con: gắn số chờ vào nút mục. */
 function pdBadge(){const b=document.querySelector('.top[data-mod="q_pd"]');if(!b)return;const old=b.querySelector("b.pdn");if(old)old.remove();const n=pdCnt();if(n)b.querySelector("span").insertAdjacentHTML("afterend",`<b class="pdn">${n}</b>`)}
 function pdOpen(r){
@@ -97,7 +103,7 @@ function pPheDuyet(m){
   if(PD.view)return pdView(m);
   if(!PD.sv){m.innerHTML=H("Phê duyệt","Đang tải các việc chờ duyệt…");pdLoad();return}
   pdLoad();
-  const all=pdRows(),c=pdCounts(all),L=pdFilter(all,PD.k),now=Date.now(),money=v=>v==null?`<span class="hint">—</span>`:nf(v)+" đ";
+  const all0=pdRows(),others=all0.filter(pdOther),all=pdMine(all0),c=pdCounts(all),L=pdFilter(all,PD.k),now=Date.now(),money=v=>v==null?`<span class="hint">—</span>`:nf(v)+" đ";
   const chips=[["","Tất cả",all.length]].concat(PD_KINDS.filter(([k])=>c[k]).map(([k,n])=>[k,n,c[k]]));
   m.innerHTML=H("Phê duyệt","Mọi việc đang chờ bạn duyệt · chờ lâu nhất ở trên · bấm Mở để xem chứng từ gốc")+
   (PD.err?`<div class="note red">${esc(PD.err)}</div>`:"")+
@@ -109,6 +115,7 @@ function pPheDuyet(m){
     const age=pdAge(r.at,now),old=r.at&&now-r.at>3*864e5;
     return `<tr><td>${pill(PD_KIND_N(r.k),"gry")}${r.ceoCho?" "+pill("chờ CEO","amb"):""}${r.loai!==PD_KIND_N(r.k)&&r.loai!=="Đề xuất agent"?`<div class="hint">${esc(r.loai)}</div>`:""}</td><td><div class="pd-nd">${esc(r.nd)}</div>${r.sub?`<div class="hint pd-sub" title="Bấm để xem đủ">${esc(r.sub)}</div>`:""}</td><td class="n">${money(r.tien)}</td><td>${esc(r.by||"—")}</td><td class="nowrap${old?" t-red":""}">${esc(age||"—")}</td>
     <td class="nowrap">${btn} <button class="btn sm" data-pdgo="${i}">Mở</button></td></tr>`}),"pd-t"):`<p class="empty pad">${all.length?"Không có việc nào thuộc loại này.":"Không có việc nào đang chờ bạn duyệt."}</p>`}</section>
+  ${pdOthersHtml(others,now)}
   <p class="hint">Mỗi người chỉ thấy việc mình được duyệt (đúng quy tắc của trang gốc). Đơn nghỉ phép, OT, tạm ứng duyệt ở trang gốc (bấm Mở). Khoản chi từ ${nf(pdTh())} đ trở lên phải CEO duyệt (đổi mức ở Cấu hình › Ngưỡng cảnh báo).</p>`;
   m.querySelectorAll(".pd-sub").forEach(x=>x.onclick=()=>x.classList.toggle("on"));
   m.querySelectorAll("[data-pdk]").forEach(b=>b.onclick=()=>{PD.k=b.dataset.pdk;renderMain()});
@@ -129,3 +136,13 @@ MODULES.push({k:"pd_src",adm:true,hide:true,ic:"check",n:"Phê duyệt",zone:"",
      ${ceo?'<button class="btn pri">Lưu mức duyệt</button>':'<p class="hint">Chỉ CEO đổi được mức này.</p>'}</form></div>`);
     const fm=m.querySelector("#ng-ceo");if(ceo&&fm)fm.onsubmit=async e=>{e.preventDefault();const n=Math.max(0,Math.round(+m.querySelector("#ng-ceo-v").value||0));
       try{await svApi("/api/settings",{method:"PATCH",body:JSON.stringify({"spend.ceo_threshold_vnd":n})});PD.th=n;toast("Đã lưu: khoản chi từ "+nf(n)+" đ phải CEO duyệt");renderMain()}catch(er){toast(er.message||"Chưa lưu được")}}}catch(e){}}}
+
+/* "Đang chờ ở các phòng" (CEO): bộ phận nào, ai đang giữ, chờ lâu nhất bao nhiêu ngày; chỉ xem, phòng đó tự xử lý */
+function pdOthersHtml(L,now){if(!L.length)return "";const by={};
+  L.forEach(r=>{const p=pdProp(r),dep=PD_ROUTE_N[p.route_to]||"Khác",u=p.owner_id?(D().users||[]).find(x=>x.crm===p.owner_id):null,who=p.route_to==="SALE"?(u&&u.name)||"Sale phụ trách":dep;
+    const g=by[dep]=by[dep]||{n:0,old:0,ppl:{},rows:[]};g.n++;g.old=Math.max(g.old,r.at?now-r.at:0);g.ppl[who]=(g.ppl[who]||0)+1;g.rows.push({r,who})});
+  const dd2=ms=>ms>=864e5?Math.floor(ms/864e5)+" ngày":Math.max(1,Math.floor(ms/36e5))+" giờ";
+  return `<details class="card pdoth"><summary><b>Đang chờ ở các phòng</b> <span class="pill p-gry">${L.length}</span> <span class="hint">việc phòng khác tự xử lý · chị xem để biết chỗ nào đang nghẽn</span></summary>
+   <div class="pdog">${Object.entries(by).sort((a,b)=>b[1].old-a[1].old).map(([dep,g])=>`<div class="pdoc${g.old>3*864e5?" late":""}"><div class="pdoh"><b>${esc(dep)}</b><span>${g.n} việc · chờ lâu nhất <b>${dd2(g.old)}</b></span></div>
+     <div class="pdop">${Object.entries(g.ppl).sort((a,b)=>b[1]-a[1]).map(([w,n])=>`<span>${esc(w)} <b>${n}</b></span>`).join("")}</div>
+     ${g.rows.sort((a,b)=>(a.r.at||0)-(b.r.at||0)).slice(0,6).map(({r,who})=>`<div class="pdor"><span>${esc(r.nd)}</span><small>${esc(who)} · ${r.at?dd2(now-r.at):""}</small></div>`).join("")}${g.rows.length>6?`<div class="hint">+${g.rows.length-6} việc nữa</div>`:""}</div>`).join("")}</div></details>`}
