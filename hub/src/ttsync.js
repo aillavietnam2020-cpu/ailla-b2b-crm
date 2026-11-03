@@ -92,14 +92,17 @@ async function ttsMigrate(){
 let TTS_MIR="";
 function ttsMirror(){
   const d=D();if(!TSB.all||!d.fixTtsMig||!(ME.role==="admin"||(typeof xvGive==="function"&&xvGive())))return;
-  const VR=(TSB.all.ranges||[]).filter(r=>r.kind==="videos"),sig=VR.map(r=>r.from+r.to+r.at).join("|")+"#"+(d.cards||[]).length;if(sig===TTS_MIR)return;TTS_MIR=sig;
+  const VR=(TSB.all.ranges||[]).filter(r=>r.kind==="videos"),sig=(TSB.all.ranges||[]).filter(r=>r.kind==="videos"||r.kind==="kocvideos").map(r=>r.kind+r.from+r.to+r.at).join("|")+"#"+(d.cards||[]).length;if(sig===TTS_MIR)return;TTS_MIR=sig;
   const H=new Map();VR.forEach(r=>((r.data||{}).top||[]).forEach(v=>{const L=H.get(v.id)||[];L.push({f:r.from,t:r.to,d:+v.don||0,g:+v.gmv||0,v:+v.vv||0,c:+v.click||0});H.set(v.id,L)}));
   const key=L=>JSON.stringify(L.slice().sort((a,b)=>(a.f+a.t).localeCompare(b.f+b.t)));
   const upd=[];(d.cards||[]).forEach(c=>{const L=c.tiktokId&&H.get(c.tiktokId);if(!L)return;const S=new Set(L.map(h=>h.f+"~"+h.t)),nh=(c.hist||[]).filter(h=>!S.has(h.f+"~"+h.t)).concat(L);if(key(nh)!==key(c.hist||[]))upd.push([c.id,nh])});
   if(upd.length)DB.mutate(ME.name,"cập nhật số "+upd.length+" video từ kho TikTok chung",dt=>{upd.forEach(([id,nh])=>{const c=dt.cards.find(x=>x.id===id);if(!c)return;c.hist=nh;const p=tkPick(nh);c.don=p.d;c.gmv=p.g;c.view=p.v;c.click=p.c})});
-  /* video KOC: khoảng nào trong kho có @tài khoản mà trang KOC chưa đọc thì đọc */
-  if(typeof kocImport==="function"){const seen=new Set((d.kocImports||[]).map(i=>{const g=i.f?{f:i.f,t:i.t}:tkRange(i.range)||{};return g.f+"~"+g.t}));VR.forEach(r=>{if(seen.has(r.from+"~"+r.to))return;const rows=((r.data||{}).top||[]).filter(v=>v.u);if(!rows.length)return;
-    try{kocImport(ME,{name:"Kho số TikTok chung",range:r.from+" ~ "+r.to,recs:rows.map(v=>({id:v.id,acc:v.u,ten:v.t,sp:v.sp,tm:v.post,view:+v.vv||0,click:+v.click||0,don:+v.don||0,gmv:+v.gmv||0,xh:+v.xh||0}))},true)}catch(e){}})}}
+  /* video KOC → TOP KOC, video chờ check, Video win KOC: lấy từ kocvideos (thẻ "Tài khoản liên kết") và từ videos có @tài khoản KOC.
+     Mỗi lần kho có bản mới (khoảng + giờ nạp) thì đọc lại; file tải tay cũ cùng khoảng ngày thì bỏ qua với videos. */
+  if(typeof kocImport==="function"){const KI=d.kocImports||[],files=new Set(KI.map(i=>i.file)),seen=new Set(KI.map(i=>{const g=i.f?{f:i.f,t:i.t}:tkRange(i.range)||{};return g.f+"~"+g.t}));
+    (TSB.all.ranges||[]).filter(r=>r.kind==="videos"||r.kind==="kocvideos").forEach(r=>{const nm="Kho TikTok · "+(r.kind==="kocvideos"?"video KOC":"video")+" · "+r.from+"~"+r.to+" · "+(r.at||"");if(files.has(nm)||(r.kind==="videos"&&seen.has(r.from+"~"+r.to)))return;
+      const rows=((r.data||{}).top||[]).filter(v=>r.kind==="kocvideos"||v.u);if(!rows.length)return;
+      try{kocImport(ME,{name:nm,range:r.from+" ~ "+r.to,recs:rows.map(v=>({id:v.id,acc:v.u||"koc",ten:v.t,sp:v.sp,tm:v.post,view:+v.vv||0,click:+v.click||0,don:+v.don||0,gmv:+v.gmv||0,xh:+v.xh||0}))},true)}catch(e){}})}}
 (function(){const go=()=>{try{if(typeof TSB!=="undefined"&&TSB.all&&typeof D==="function"&&D()&&typeof ME!=="undefined"&&ME){ttsMigrate();ttsMirror()}}catch(e){}};
   const _rm=renderMain;renderMain=function(){const r=_rm.apply(this,arguments);setTimeout(go,50);return r};
   const _r=render;render=function(){const r=_r.apply(this,arguments);setTimeout(()=>{ttsEnsure();go()},50);return r}})();
