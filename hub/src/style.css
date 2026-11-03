@@ -915,3 +915,10 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .dv.dvtopk .dvk b{font-size:20px;line-height:1.2}
 .dv.dvtopk .dvk i{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:1100px){.dv.dvtopk .dvk{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* Dự án kênh (kenhduan.js) */
+.kdh{margin:6px 0 8px;font-size:15px}.kdgrid{margin-bottom:16px}
+.kdday{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:6px;margin:10px 0 6px}.kdday>div{background:#f6f7fb;border-radius:10px;padding:6px 9px;display:flex;flex-direction:column}.kdday small{color:#667085;font-size:11px}.kdday b{font-size:18px;line-height:1.2}.kdday span{font-size:11px;color:#667085}
+.kdday .kdt{background:#eef2ff}.kdday .miss{background:#fff1f1}.kdday .miss b{color:#dc2626}
+.kdwarn{margin:4px 0;font-size:12.5px;color:#b54708}
+.kdppl{display:flex;flex-direction:column;gap:4px}.kdppl span{display:flex;align-items:center;gap:6px;font-size:12.5px;flex-wrap:wrap}.kdppl small{color:#667085}.kdppl em{font-style:normal;color:#dc2626;font-weight:700}
+.kdchia{display:flex;flex-direction:column;gap:6px}.kdchia label{display:flex;align-items:center;gap:8px;border:1px solid #eceef3;border-radius:10px;padding:6px 10px}.kdchia span{flex:1;display:flex;flex-direction:column}.kdchia small{color:#667085;font-size:11.5px}.kdchia input{width:80px!important;flex:none}
