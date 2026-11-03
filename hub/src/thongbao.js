@@ -84,7 +84,7 @@ function ntOpenAgent(a){if(typeof AC!=="undefined"){AC.cur=a;try{localStorage.se
 
 /* Dòng Phê duyệt nào báo người này. CEO: bỏ các dòng người khác làm trước (phiếu chi Huệ chưa duyệt, phiếu thu, tiền về, hàng trả lại, combo
    chờ kế toán); còn lại (đơn, sửa phiếu xuất, đề xuất agent, phiếu thưởng, nhân sự, khoản chờ CEO) đều báo. Người khác: bỏ dòng chờ CEO. */
-const ntForMe=r=>SV.me&&SV.me.role==="CEO"?(r.ceoCho||!["chi","thu","tien","hoan","combo"].includes(r.k)):!r.ceoCho;
+const ntForMe=r=>SV.me&&SV.me.role==="CEO"?(r.ceoCho||!["chi","thu","tien","hoan","combo","cbdx"].includes(r.k)):!r.ceoCho;
 function ntFromPd(rows){
   (rows||[]).filter(ntForMe).filter(r=>!ntMine(r.by)&&r.k!=="combo").forEach(r=>ntPush({key:"pd:"+r.id+(r.ceoCho?":ceo":""),type:"duyet",
     text:`${r.loai}: ${r.nd||""}${r.tien?" · "+nf(r.tien)+" đ":""}`,by:r.by||"",at:r.ceoCho?0:r.at,go:()=>ntOpenPd(r)}))}
@@ -92,7 +92,7 @@ function ntFromPd(rows){
 function ntScanHub(){if(!ME||!DB.data||typeof pdBuild!=="function"||typeof pdWho!=="function")return;
   const sig=SV.version+":"+(typeof SXS!=="undefined"?SXS.version:0);if(sig===NT.sig)return;NT.sig=sig;
   const d=D(),h=d.hr||{};let rows=[];
-  try{rows=pdBuild({th:typeof pdTh==="function"?pdTh():5e6,pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],staffName:ma=>{try{return staffBy(ma).ten}catch(e){return ma}}},pdWho())}catch(e){return}
+  try{rows=pdBuild({th:typeof pdTh==="function"?pdTh():5e6,pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],...(typeof spcPdSrc==="function"?spcPdSrc(d):{}),staffName:ma=>{try{return staffBy(ma).ten}catch(e){return ma}}},pdWho())}catch(e){return}
   ntBase();if(!NT.scanned&&NT.fresh){rows.forEach(r=>ntSeen("pd:"+r.id+(r.ceoCho?":ceo":"")))}else ntFromPd(rows);NT.scanned=true}
 
 /* Mở web: một thẻ tóm tắt việc đang chờ mình duyệt (cùng lọc như trên), tối đa 4 giờ một lần, để thấy ngay có việc gì, không chờ việc mới. */

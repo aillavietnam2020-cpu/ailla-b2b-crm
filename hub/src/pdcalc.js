@@ -12,11 +12,13 @@
     ns     đơn nghỉ phép / OT / tạm ứng D().hr · nhansu.duyet hoặc nhansu.quanly
     tien   tiền về chờ kế toán xác nhận (payments) · CEO hoặc order.accounting.confirm (POST /api/payments/:id/confirm)
     hoan   hàng trả lại kho đã nhận, chờ kế toán chốt giảm nợ · order.accounting.confirm (POST /api/returns/:id/confirm)
+    cbdx   phiếu combo Digital gửi (thêm combo mới / dừng chạy, D().fbCat.phieu) + combo đã duyệt chờ kế toán trưởng nhập mã MISA
+           · admin hoặc kế toán (giống trang Sản phẩm và combo, spdangchay.js spcDuyetPhieu)
     combo  mã combo mới trên đơn sàn chưa nhập (GET /api/hub/sanpham/unmapped) · CEO hoặc kế toán; một dòng gộp, chỉ Mở trang (28/10)
    NGƯỠNG CHI PHẢI CEO DUYỆT (chị Hoa chốt 27/10/2026, mặc định 5.000.000đ, đổi ở Ngưỡng cảnh báo; cùng quy tắc src/shared/ceoSpend.ts):
     khoản chi từ ngưỡng mà người duyệt/lập không phải CEO thì chờ CEO. Dòng "chờ CEO" chỉ CEO thấy; người duyệt trước không thấy lại.
    ===================================================================== */
-const PD_KINDS=[["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"]];
+const PD_KINDS=[["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"],["cbdx","Combo Digital"]];
 /* Khoản chi này có phải chờ CEO duyệt không (giống needsCeo ở máy chủ). Ngưỡng 0 = tắt. */
 const pdNeedCeo=(amount,th,isCeo)=>!isCeo&&th>0&&amount>=th;
 const PD_KIND_N=k=>(PD_KINDS.find(x=>x[0]===k)||[k,k])[1];
@@ -83,6 +85,11 @@ function pdBuild(S,w){
   if(cb.length&&(ceo||R.ketoan())){const by={};cb.forEach(u=>{by[u.channel]=(by[u.channel]||0)+1});const od=cb.reduce((t,u)=>t+(+u.orders||0),0),first=cb.map(u=>u.first_day).filter(Boolean).sort()[0]||"";
     add({k:"combo",id:"combo",ref:"combo",src:"combo",loai:"Combo mới chờ kế toán nhập",nd:cb.length+" mã · "+od+" đơn chưa tính giá vốn",
       sub:Object.entries(by).map(([c,n])=>(c==="FACEBOOK"?"Facebook":c==="SHOPEE"?"Shopee":"TikTok")+" "+n).join(", ")+" · kho vẫn xuất bình thường",at:pdTs(first),act:"",open:{page:"spcombo"}})}
+  if(R.ketoan()){
+    (S.cbPhieu||[]).forEach(p=>{const it=p.items||[],moi=it.filter(x=>x.loai==="moi").length,dung=it.length-moi;
+      add({k:"cbdx",id:"cbp:"+p.id,ref:p.id,src:"cbPhieu",loai:"Duyệt combo Digital",nd:p.ten||"",sub:[moi?moi+" combo mới":"",dung?dung+" combo dừng chạy":"",p.ghi||""].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"dg_sp"}})});
+    const mi=S.cbMisa||[];
+    if(mi.length)add({k:"cbdx",id:"cbmisa",ref:"cbmisa",src:"cbMisa",loai:"Combo chờ mã MISA",nd:mi.length+" combo đã duyệt chưa có mã MISA",sub:"kế toán trưởng nhập ở Sản phẩm và combo",at:pdTs(mi.map(x=>x.at).filter(Boolean).sort()[0]||0),act:"",open:{page:"dg_sp"}})}
   return L.sort((a,b)=>(a.at||Infinity)-(b.at||Infinity));
 }
 /* Lọc theo loại ("" = tất cả) và đếm từng loại để hiện ở nút lọc. */

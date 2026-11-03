@@ -75,7 +75,7 @@ async function spcSyncKho(prod){try{const vs=(prod.bt||[]).filter(v=>String(v.mi
   const g=await svApi("/api/hub/kho/online/map?channel=FACEBOOK"),have=new Set((g.data||g||[]).map(r=>String(r.sku||"").trim().toLowerCase()));let n=0;
   for(const v of vs){const k=v.pk.trim();if(have.has(k.toLowerCase()))continue;await svApi("/api/hub/kho/online/map/add",{method:"POST",body:JSON.stringify({channel:"FACEBOOK",sku:k,variant:"",item_label:v.misa.trim()+" - "+prod.ten+((v.dt||v.pl)?" "+spcVar(v):""),qty:1,from_day:""})});n++}
   if(n)toast("Đã thêm "+n+" mã vào bảng quy đổi của kế toán")}catch(e){toast("Chưa thêm được vào bảng quy đổi của kế toán ("+(e.message||"")+"); nhờ kế toán xác nhận")}}
-function spcEdit(msg,fn){DB.mutate(ME.name,msg,d=>{if(!d.fbCat)d.fbCat={};const c=d.fbCat;if(!Array.isArray(c.sp))c.sp=spcClone(SPC_DEF_CAT);if(!Array.isArray(c.combos))c.combos=spcClone(SPC_DEF_COMBOS);fn(c)});toast("Đã lưu");renderMain()}
+function spcEdit(msg,fn){DB.mutate(ME.name,msg,d=>{if(!d.fbCat)d.fbCat={};const c=d.fbCat;if(!Array.isArray(c.sp))c.sp=spcClone(SPC_DEF_CAT);if(!Array.isArray(c.combos))c.combos=spcClone(SPC_DEF_COMBOS);fn(c,d)});toast("Đã lưu");renderMain()}
 const spcSt=c=>{const t=iso(new Date());if(c.tu&&c.tu>t)return ["Sắp chạy","amb"];if(c.den&&c.den<t)return ["Đã hết","gry"];return ["Đang áp dụng","grn"]};
 const spcShort=u=>String(u||"").replace(/^https?:\/\/(www\.)?/,"");
 const spcVN=d=>d?d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4):"";
@@ -127,6 +127,16 @@ const spcTag=c=>{const t=spcTT(c),st=spcSt(c),dx=c.dx;
   if(c.misaCho)h+=" "+pill("Chờ mã MISA","blu");return h};
 /* Việc chưa gửi: combo mới nháp / bị trả lại và đề xuất dừng chưa gửi */
 const spcDrafts=()=>{const L=[];spcCombos().forEach(c=>{const t=spcTT(c);if(t==="nhap"||t==="tralai")L.push({loai:"moi",c});if(c.dx&&c.dx.tt!=="cho")L.push({loai:"dung",c})});return L};
+/* Kế toán duyệt / trả lại một phiếu (trang này và trang Phê duyệt dùng chung). Duyệt hay trả lại đều báo chuông cho người gửi và người làm từng mục. */
+function spcDuyetPhieu(id,ok,ly){if(!spcCanDuyet())return;const p0=spcPhieu().find(x=>x.id===id);if(!p0||p0.tt!=="cho")return;const by=ME.name||"",at=spcNow();
+  spcEdit((ok?"duyệt":"trả lại")+" phiếu combo: "+p0.ten,(c,d)=>{const p=(c.phieu||[]).find(x=>x.id===id);if(!p||p.tt!=="cho")return;p.tt=ok?"ok":"tralai";p.duyetBy=by;p.duyetAt=at;if(ly)p.ly=ly;const to=[p.byId];
+    (p.items||[]).forEach(it=>{const x=c.combos.find(y=>y.id===it.id);if(!x)return;
+      if(it.loai==="moi"&&x.tt==="cho"){to.push(x.tao&&x.tao.byId);if(ok){x.tt="ok";x.duyet={by,at,phieu:id};x.misaCho=true;delete x.traLai}else{x.tt="tralai";x.traLai={by,at,ly}}}
+      else if(it.loai==="dung"&&x.dx&&x.dx.tt==="cho"){to.push(x.dx.byId);if(ok){const den=spcDayBefore(x.dx.ngay);if(!x.den||x.den>den)x.den=den;x.dung={ngay:x.dx.ngay,ly:x.dx.ly,by:x.dx.by,at:x.dx.at,duyetBy:by,duyetAt:at};delete x.dx}else{x.dx.tt="tralai";x.dx.traLai=ly}}});
+    try{if(typeof notifyU==="function")notifyU(d,to,ok?`Kế toán đã duyệt phiếu combo “${p.ten}”: combo mới đã vào danh sách chạy`:`Phiếu combo “${p.ten}” bị trả về sửa: ${ly||""}`,"page:dg_sp")}catch(e){}})}
+/* Cho trang Phê duyệt (pdcalc.js): phiếu combo đang chờ kế toán + combo đã duyệt chờ mã MISA */
+function spcPdSrc(d){const f=d&&d.fbCat;if(!f)return {};const cs=Array.isArray(f.combos)?f.combos:[];
+  return {cbPhieu:(f.phieu||[]).filter(p=>p.tt==="cho"),cbMisa:cs.filter(c=>c.misaCho).map(c=>({id:c.id,at:c.duyet&&c.duyet.at}))}}
 /* Menu ⋯ riêng của combo (Sửa, Đổi giá, Dừng chạy, Xóa); class "rmb" để menu ⋯ chung (rowmenu.js) bỏ qua ô này, không thành hai nút */
 function spcMenu(c){const t=spcTT(c),live=t==="ok"&&spcSt(c)[0]!=="Đã hết",id=esc(c.id),bt=(a,l,cl)=>`<button type="button" data-spc-act="${a}" data-spid="${id}"${cl?` class="${cl}"`:""}>${l}</button>`;
   return `<details class="spc-mn"><summary class="btn rmb" data-spc-act="noop" title="Sửa, đổi giá, dừng chạy, xóa">⋯</summary><div class="spc-mnl" data-spc-act="noop">${bt("cedit","Sửa")}${live?bt("gopen","Đổi giá từ ngày…"):""}${live&&!c.dx?bt("sopen","Dừng chạy"):""}${c.dx&&c.dx.tt!=="cho"?bt("sbo","Bỏ đề xuất dừng"):""}${bt("cdelx","Xóa","dn")}</div></details>`}
@@ -283,7 +293,7 @@ if(!window.__spcBound){window.__spcBound=1;
     else if(act==="vadd"){spcCapture();SPC.modal.d.bt.push({id:"v"+Date.now(),ma:"",dt:"",pl:"",on:true});spcMdDraw()}
     else if(act==="vdel"){spcCapture();const vid=b.dataset.spvid;SPC.modal.d.bt=SPC.modal.d.bt.filter(v=>v.id!==vid);spcMdDraw()}
     else if(act==="msave"){spcCapture();const M=SPC.modal;if(!M)return;
-      if(M.t==="c"){M.d.ship=Math.round(+String(M.d.ship).replace(/[^\d]/g,""))||0;M.d.gia=Math.round(+String(M.d.gia).replace(/[^\d]/g,""))||0;M.d.landings=spcLands(M.d);M.d.landing=M.d.landings[0]||"";M.d.combo=spcCompText(M.d.gom,1);M.d.qua=spcCompText(M.d.tang,1);if(!(M.d.gom||[]).length){toast("Chọn ít nhất một sản phẩm trong combo");return}if(!M.d.tu){toast("Chọn ngày bắt đầu áp dụng giá");return}if(M.d.den&&M.d.den<M.d.tu){toast("Đến ngày phải sau ngày bắt đầu");return}if(!String(M.d.nhom||"").trim())M.d.nhom=spcCompName(M.d.gom[0]).replace(/\s*\(.*$/,"");const who={by:ME.name||"",at:spcNow()};spcEdit(M.id?"sửa combo":"thêm combo nháp",c=>{if(M.id){const i=c.combos.findIndex(x=>x.id===M.id);if(i>=0)c.combos[i]=Object.assign({},c.combos[i],M.d,{sua:who})}else c.combos.unshift(Object.assign({id:"n"+Date.now()},M.d,{tt:"nhap",tao:who}))});if(!M.id)toast("Đã lưu nháp. Nhập xong thì bấm Gửi duyệt ở đầu trang")}
+      if(M.t==="c"){M.d.ship=Math.round(+String(M.d.ship).replace(/[^\d]/g,""))||0;M.d.gia=Math.round(+String(M.d.gia).replace(/[^\d]/g,""))||0;M.d.landings=spcLands(M.d);M.d.landing=M.d.landings[0]||"";M.d.combo=spcCompText(M.d.gom,1);M.d.qua=spcCompText(M.d.tang,1);if(!(M.d.gom||[]).length){toast("Chọn ít nhất một sản phẩm trong combo");return}if(!M.d.tu){toast("Chọn ngày bắt đầu áp dụng giá");return}if(M.d.den&&M.d.den<M.d.tu){toast("Đến ngày phải sau ngày bắt đầu");return}if(!String(M.d.nhom||"").trim())M.d.nhom=spcCompName(M.d.gom[0]).replace(/\s*\(.*$/,"");const who={by:ME.name||"",byId:ME.id||"",at:spcNow()};spcEdit(M.id?"sửa combo":"thêm combo nháp",c=>{if(M.id){const i=c.combos.findIndex(x=>x.id===M.id);if(i>=0)c.combos[i]=Object.assign({},c.combos[i],M.d,{sua:who})}else c.combos.unshift(Object.assign({id:"n"+Date.now()},M.d,{tt:"nhap",tao:who}))});if(!M.id)toast("Đã lưu nháp. Nhập xong thì bấm Gửi duyệt ở đầu trang")}
       else{if(!String(M.d.ten||"").trim()){toast("Nhập tên sản phẩm trước");return}M.d.bt=(M.d.bt||[]).filter(v=>String(v.ma||"").trim()||String(v.dt||"").trim()||String(v.pl||"").trim());spcSyncKho(M.d);spcEdit(M.id?"sửa sản phẩm "+M.d.ten:"thêm sản phẩm "+M.d.ten,c=>{if(M.id){const i=c.sp.findIndex(x=>x.id===M.id);if(i>=0)c.sp[i]=Object.assign({},c.sp[i],M.d)}else c.sp.push(Object.assign({id:"p"+Date.now()},M.d))})}
       SPC.modal=null;spcMdDraw()}
     else if(act==="gopen"){const c=spcCombos().find(x=>x.id===(id||(SPC.modal&&SPC.modal.id)));if(c){SPC.modal={t:"g",id:c.id,d:{gia:c.gia||0,ship:c.ship||0,tu:today,ghi:""}};spcMdDraw()}}
@@ -297,7 +307,7 @@ if(!window.__spcBound){window.__spcBound=1;
     else if(act==="sopen"){const c=spcCombos().find(x=>x.id===id);if(c){SPC.modal={t:"s",id,d:{ngay:today,ly:""}};spcMdDraw()}}
     else if(act==="ssave"){const M=SPC.modal;if(!M||M.t!=="s")return;const c0=spcCombos().find(x=>x.id===M.id);if(!c0)return;const ngay=M.d.ngay;
       if(!ngay){toast("Chọn ngày dừng chạy");return}if(c0.tu&&ngay<=c0.tu){toast("Ngày dừng phải sau ngày bắt đầu ("+spcVN(c0.tu)+")");return}
-      spcEdit("đề xuất dừng combo từ "+spcVN(ngay),c=>{const x=c.combos.find(y=>y.id===M.id);if(x)x.dx={ngay,ly:String(M.d.ly||"").trim(),by:ME.name||"",at:spcNow(),tt:"nhap"}});SPC.modal=null;spcMdDraw()}
+      spcEdit("đề xuất dừng combo từ "+spcVN(ngay),c=>{const x=c.combos.find(y=>y.id===M.id);if(x)x.dx={ngay,ly:String(M.d.ly||"").trim(),by:ME.name||"",byId:ME.id||"",at:spcNow(),tt:"nhap"}});SPC.modal=null;spcMdDraw()}
     else if(act==="sbo"){spcEdit("bỏ đề xuất dừng combo",c=>{const x=c.combos.find(y=>y.id===id);if(x&&x.dx&&x.dx.tt!=="cho")delete x.dx})}
     else if(act==="psend"){const ten=String((document.getElementById("spc-pten")||{}).value||"").trim(),ghi=String((document.getElementById("spc-pghi")||{}).value||"").trim();
       const sel=[...document.querySelectorAll("[data-spcsel]")].filter(i=>i.checked).map(i=>{const k=i.dataset.spcsel,j=k.indexOf(":");return {loai:k.slice(0,j),id:k.slice(j+1)}});
@@ -306,14 +316,10 @@ if(!window.__spcBound){window.__spcBound=1;
       spcEdit("gửi duyệt combo: "+ten,c=>{if(!Array.isArray(c.phieu))c.phieu=[];const items=[];sel.forEach(s=>{const x=c.combos.find(y=>y.id===s.id);if(!x)return;
         if(s.loai==="moi"&&(x.tt==="nhap"||x.tt==="tralai")){x.tt="cho";x.phieu=pid;items.push({loai:"moi",id:x.id,ten:spcDesc(x),gia:x.gia||0,ngay:x.tu||""})}
         else if(s.loai==="dung"&&x.dx&&x.dx.tt!=="cho"){x.dx.tt="cho";x.dx.phieu=pid;items.push({loai:"dung",id:x.id,ten:spcDesc(x),gia:x.gia||0,ngay:x.dx.ngay})}});
-        if(items.length)c.phieu.unshift({id:pid,ten,ghi,by:ME.name||"",at,tt:"cho",items})})}
-    else if(act==="pok"||act==="pno"){if(!spcCanDuyet())return;const p0=spcPhieu().find(x=>x.id===id);if(!p0||p0.tt!=="cho")return;let ly="";
+        if(items.length)c.phieu.unshift({id:pid,ten,ghi,by:ME.name||"",byId:ME.id||"",at,tt:"cho",items})})}
+    else if(act==="pok"||act==="pno"){let ly="";
       if(act==="pno"){ly=prompt("Lý do trả lại (Digital sẽ thấy để sửa):","");if(ly===null)return;ly=ly.trim();if(!ly){toast("Ghi lý do trả lại");return}}
-      const by=ME.name||"",at=spcNow();
-      spcEdit((act==="pok"?"duyệt":"trả lại")+" phiếu combo: "+p0.ten,c=>{const p=(c.phieu||[]).find(x=>x.id===id);if(!p||p.tt!=="cho")return;p.tt=act==="pok"?"ok":"tralai";p.duyetBy=by;p.duyetAt=at;if(ly)p.ly=ly;
-        (p.items||[]).forEach(it=>{const x=c.combos.find(y=>y.id===it.id);if(!x)return;
-          if(it.loai==="moi"&&x.tt==="cho"){if(act==="pok"){x.tt="ok";x.duyet={by,at,phieu:id};x.misaCho=true;delete x.traLai}else{x.tt="tralai";x.traLai={by,at,ly}}}
-          else if(it.loai==="dung"&&x.dx&&x.dx.tt==="cho"){if(act==="pok"){const den=spcDayBefore(x.dx.ngay);if(!x.den||x.den>den)x.den=den;x.dung={ngay:x.dx.ngay,ly:x.dx.ly,by:x.dx.by,at:x.dx.at,duyetBy:by,duyetAt:at};delete x.dx}else{x.dx.tt="tralai";x.dx.traLai=ly}}})})}
+      spcDuyetPhieu(id,act==="pok",ly)}
     else if(act==="mok"){if(!spcCanMisa())return;const v=String((document.querySelector('[data-spcmisa="'+CSS.escape(id)+'"]')||{}).value||"").trim();if(!v){toast("Nhập mã combo MISA");return}
       spcEdit("thêm mã MISA combo "+v,c=>{const x=c.combos.find(y=>y.id===id);if(x){x.misa=v;delete x.misaCho;x.misaBy={by:ME.name||"",at:spcNow()}}})}
     else if(act==="mdel"||act==="cdelx"){const M=act==="cdelx"?{t:"c",id}:SPC.modal;if(!M||!M.id)return;if(M.t==="c"){const c0=spcCombos().find(x=>x.id===M.id),t0=spcTT(c0);if(c0&&!spcCanDuyet()&&(t0==="ok"||t0==="cho")){toast(t0==="cho"?"Combo đang chờ kế toán duyệt, chưa xóa được":"Combo đã duyệt chỉ kế toán, CEO xóa được. Muốn ngừng thì bấm ⋯ › Dừng chạy");return}}if(!confirm(M.t==="c"?"Xóa combo này?":"Xóa sản phẩm này?"))return;spcEdit(M.t==="c"?"xóa combo":"xóa sản phẩm",c=>{if(M.t==="c")c.combos=c.combos.filter(x=>x.id!==M.id);else c.sp=c.sp.filter(x=>x.id!==M.id)});if(act==="mdel"){SPC.modal=null;spcMdDraw()}}})}

@@ -174,3 +174,20 @@ describe('Combo mới chờ kế toán nhập (Sản phẩm & combo, 28/10)', ()
     expect(T.pdBuild({ combo }, { role: 'MANAGER', uid: 'u', perms: ['order.approve.normal'] })).toHaveLength(0);
   });
 });
+
+describe('Phê duyệt: phiếu combo Digital (thêm combo mới / dừng chạy) và combo chờ mã MISA', () => {
+  const cb = {
+    cbPhieu: [{ id: 'ph1', ten: 'Sale 11/11', by: 'Ads', at: '2026-11-03T04:00:00Z', tt: 'cho', items: [{ loai: 'moi', id: 'n1' }, { loai: 'moi', id: 'n2' }, { loai: 'dung', id: 'd1' }] }],
+    cbMisa: [{ id: 'n0', at: '2026-11-02T04:00:00Z' }],
+  };
+  it('kế toán thấy phiếu (duyệt được ngay trên dòng) và một dòng gộp combo chờ mã MISA', () => {
+    const r = T.pdBuild(cb, { role: 'EMPLOYEE', uid: 'u', perms: ['order.accounting.confirm'] });
+    expect(r).toEqual([
+      expect.objectContaining({ id: 'cbmisa', k: 'cbdx', act: '', nd: '1 combo đã duyệt chưa có mã MISA' }),
+      expect.objectContaining({ id: 'cbp:ph1', k: 'cbdx', src: 'cbPhieu', act: 'fn', nd: 'Sale 11/11', sub: '2 combo mới · 1 combo dừng chạy', by: 'Ads' }),
+    ]);
+  });
+  it('người không phải kế toán không thấy', () => {
+    expect(T.pdBuild(cb, { role: 'MANAGER', uid: 'u', perms: ['order.approve.normal'] })).toHaveLength(0);
+  });
+});

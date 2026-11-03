@@ -42,7 +42,7 @@ async function pdLoad(force){
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */
 function pdRows(){
   const d=(typeof D==="function"&&D())||{},h=d.hr||{};
-  return pdBuild({...(PD.sv||{}),th:pdTh(),pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],
+  return pdBuild({...(PD.sv||{}),th:pdTh(),pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],...(typeof spcPdSrc==="function"?spcPdSrc(d):{}),
     staffName:ma=>{try{return staffBy(ma).ten}catch(e){return ma}}},pdWho());
 }
 const pdCnt=()=>{if(!PD.sv)return "";try{return pdRows().length||""}catch(e){return ""}};
@@ -64,6 +64,7 @@ async function pdAct(r,ok){
   if(r.act==="fn"){
     if(r.src==="pcCho"){if(ok){if(confirm("Duyệt phiếu chi \""+r.nd+"\" vào sổ?"))scDuyet(r.ref)}else if(confirm("Trả lại phiếu chi \""+r.nd+"\"?"))scTuChoi(r.ref);return}
     if(r.src==="costsCho"&&ok){if(confirm("Duyệt khoản \""+r.nd+"\" theo đề xuất của web ("+r.sub+")?"))cpApprove([r.ref]);return}
+    if(r.src==="cbPhieu"&&typeof spcDuyetPhieu==="function"){if(ok){if(confirm("Duyệt phiếu combo \""+r.nd+"\"? Combo mới vào danh sách chạy, combo dừng tự hết hạn."))spcDuyetPhieu(r.ref,true)}else{const t=ask(true);if(t!==null)spcDuyetPhieu(r.ref,false,t)}return}
     if(r.src==="thuCho"&&ok&&typeof cptXacNhan==="function"){if(confirm("Xác nhận phiếu thu \""+r.nd+"\" ("+nf(r.tien)+" đ) vào Sổ thu?"))cptXacNhan(r.ref);return}
     return}
   if(r.src==="return"&&ok)return pdReturn(r);
