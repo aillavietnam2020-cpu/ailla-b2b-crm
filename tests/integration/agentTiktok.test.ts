@@ -63,7 +63,7 @@ describe('Agent nạp báo cáo TikTok', () => {
     const d = JSON.parse(row!.data);
     expect(d).toMatchObject({ n: 3, nDang: 2, gmv: 10 });
     expect(d.la).toBeUndefined();
-    expect(d.top[0]).toEqual({ id: '111', t: 'Video A', post: '2026-10-05', sp: 'Tinh dầu', gmv: 9, vv: 100 });
+    expect(d.top[0]).toEqual({ id: '111', t: 'Video A', post: '2026-10-05', sp: 'Tinh dầu', gmv: 9, vv: 100, u: '' });
   });
 
   it('không thay bản chốt sổ đầy đủ, không ghi tháng đã khoá sổ, không có đường khoá sổ', async () => {
