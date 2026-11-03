@@ -62,6 +62,7 @@ function cleanVideos(v: unknown) {
         t: String(r.t ?? '').slice(0, 80),
         post: DAY.test(String(r.post ?? '')) ? String(r.post) : '',
         sp: String(r.sp ?? '').slice(0, 60),
+        u: String(r.u ?? r.acc ?? '').replace(/^@/, '').slice(0, 60),
         ...numbersOnly(r, 10),
       };
     }),
