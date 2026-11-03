@@ -64,9 +64,11 @@ const cvTeamSee=(t,tx)=>t==="all"||tx===t||(t==="mkt"&&["content","digital","koc
 /* Khối hành chính nhân sự (trưởng phòng Ban điều hành): chỉ xem hiệu quả từng team, không xem việc hằng ngày của từng người */
 const cvSummaryOnly=()=>!!ME&&ME.role==="truongphong"&&ME.phongBan==="BDH";
 const cvMgrView=()=>!!ME&&(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong"||can(ME,"viec.giao"));
-const cvTeamName=k=>TEAMS[k]||(k==="mkt"?"Marketing":k);
+/* mã phòng ban (CM, ADS, KT…) gộp về đúng team (content, digital, ketoan…) để không hiện "Team CM" cạnh "Team Content" (khonggian.js KPB_TEAM) */
+const cvTeamNorm=k=>(typeof KPB_TEAM!=="undefined"&&KPB_TEAM[k])||k;
+const cvTeamName=k=>TEAMS[cvTeamNorm(k)]||(k==="mkt"?"Marketing":k);
 function cvWhoOpts(){const d=D(),t=teamOf(ME),o=[["all","Tất cả"],["mine","Việc của tôi"]];
-  if(cvMgrView()){const ks=[];d.users.forEach(u=>{const k=teamOf(u);if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,k)))ks.push(k)});ks.forEach(k=>o.push(["t:"+k,"Team "+cvTeamName(k)]))}
+  if(cvMgrView()){const ks=[];d.users.forEach(u=>{const k=cvTeamNorm(teamOf(u));if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,k)))ks.push(k)});ks.forEach(k=>o.push(["t:"+k,"Team "+cvTeamName(k)]))}
   /* từng nhân sự (CEO thấy mọi người, Lead / trưởng phòng thấy người team mình) */
   if(cvMgrView())d.users.filter(u=>u.active&&u.name&&u.role!=="admin"&&u.id!==ME.id&&!CV_TEST.includes(u.id)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,teamOf(u)))).sort((a,b)=>String(cvTeamName(teamOf(a))).localeCompare(String(cvTeamName(teamOf(b))))||a.name.localeCompare(b.name)).forEach(u=>o.push(["p:"+u.id,"👤 "+u.name+" · "+(cvTeamName(teamOf(u))||"")]));
   if(CVF.who&&CVF.who.indexOf("p:")===0&&CVF.nguoi&&!o.some(x=>x[0]===CVF.who))o.push([CVF.who,userName(CVF.nguoi)]);return o}
@@ -79,7 +81,7 @@ function cvFilter(L){
   return L.filter(x=>{
     if(CVF.scope==="mine"&&x.nguoi!==me&&!x.phoi.includes(me)&&!(x.src==="task"&&x.st==="review"&&tkMyTurn(d.tasks.find(t=>t.id===x.id)||{})))return false;
     if(ME.role!=="admin"&&!cvSummaryOnly()&&t!=="all"&&x.nguoi!==me&&!x.phoi.includes(me)&&!cvTeamSee(t,x.team)&&!(t==="content"&&x.src==="order"))return false;
-    if(CVF.wt){const ux=d.users.find(y=>y.id===x.nguoi);if(!ux||!cvTeamSee(CVF.wt,teamOf(ux)))return false}
+    if(CVF.wt){const ux=d.users.find(y=>y.id===x.nguoi);if(!ux||!(cvTeamSee(CVF.wt,teamOf(ux))||cvTeamNorm(teamOf(ux))===CVF.wt))return false}
     if(CVF.tao&&x.tao!==CVF.tao)return false;
     if(CVF.team&&x.team!==CVF.team)return false;if(CVF.nguoi&&x.nguoi!==CVF.nguoi&&!x.phoi.includes(CVF.nguoi))return false;if(CVF.da&&x.da!==CVF.da)return false;if(CVF.st&&(CVF.st==="late"?!x.late:CVF.st==="todo"?!["cg","todo","nhan"].includes(x.st):x.st!==CVF.st))return false;if(CVF.uu&&x.uu!==CVF.uu)return false;
     if(CVF.q&&!(x.ten+" "+x.mo+" "+x.id+" "+userName(x.nguoi)).toLowerCase().includes(CVF.q.toLowerCase()))return false;
