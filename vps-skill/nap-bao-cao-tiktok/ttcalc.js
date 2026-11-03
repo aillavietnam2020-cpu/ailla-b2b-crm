@@ -182,10 +182,16 @@ function ttReadVideoDays(aoa){
 function ttReadVideoList(aoa,keep=50){
   const H=ttHead(aoa,["ID video","Thời gian","VV","GMV đến từ video (₫)"]);if(!H)return {err:"Không thấy cột của file Video › Chi tiết (ID video, VV, GMV)."};
   const range=ttRangeOfText(ttCell((aoa[0]||[])[0]));if(!range)return {err:"Dòng đầu file Video › Chi tiết không có khoảng ngày (\"[Phạm vi ngày]: … ~ …\")."};
-  const I=H.ix,g=(a,k)=>k in I?ttNum(a[I[k]]):0,all=[];const S={n:0,nDang:0,nCoDon:0,nDangCoDon:0,gmv:0,gmvDang:0,vv:0,don:0};
+  const I=H.ix,g=(a,k)=>k in I?ttNum(a[I[k]]):0,all=[];const S={n:0,nDang:0,nCoDon:0,nDangCoDon:0,gmv:0,gmvDang:0,vv:0,don:0,nQc:0};
   for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const id=ttCell(a[I["ID video"]]);if(!id)continue;
-    const post=ttIsoDay(ttCell(a[I["Thời gian"]])),dang=!!post&&post>=range.from&&post<=range.to;
-    const x={id,t:ttCell(a[I["Thông tin video"]]).slice(0,80),post,vv:g(a,"VV"),don:g(a,"Đơn hàng SKU đã ghi nhận"),gmv:g(a,"GMV đến từ video (₫)"),sp:ttCell(a[I["Sản phẩm"]]).slice(0,60)};
+    const post=ttIsoDay(ttCell(a[I["Thời gian"]]));let dang=!!post&&post>=range.from&&post<=range.to;
+    const tFull=ttCell(a[I["Thông tin video"]]),x={id,t:tFull.slice(0,80),post,vv:g(a,"VV"),don:g(a,"Đơn hàng SKU đã ghi nhận"),gmv:g(a,"GMV đến từ video (₫)"),sp:ttCell(a[I["Sản phẩm"]]).slice(0,60)};
+    /* File có cả video quảng cáo TikTok tự tạo (GMV Max): tiêu đề chung chung, không hashtag, 0 view. Video thật = có # hoặc có view.
+       Dòng không view, không đơn, không GMV, không hashtag thì bỏ; "đăng trong kỳ" chỉ tính video thật (03/11). */
+    const that=tFull.includes("#")||x.vv>0;
+    if(dang&&!that)S.nQc++;
+    if(!that&&!x.don&&!x.gmv)continue;
+    if(!that)dang=false;
     S.n++;S.gmv+=x.gmv;S.vv+=x.vv;S.don+=x.don;if(x.don>0)S.nCoDon++;if(dang){S.nDang++;S.gmvDang+=x.gmv;if(x.don>0)S.nDangCoDon++}all.push(x)}
   if(!S.n)return {err:"File Video › Chi tiết không có video nào."};
   all.sort((a,b)=>b.gmv-a.gmv);
