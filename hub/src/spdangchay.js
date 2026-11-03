@@ -67,8 +67,8 @@ const spcCat=()=>{const s=spcStore();return s&&Array.isArray(s.sp)?s.sp:SPC_DEF_
 const spcCombos=()=>{const s=spcStore();return s&&Array.isArray(s.combos)?s.combos:SPC_DEF_COMBOS};
 function spcCls(code){const cat=spcCat();for(const p of cat){const v=(p.bt||[]).find(x=>x.ma===code);if(v)return v.on===false?SPC_OFF:p.loai}const s=spcStore();return (s&&s.cls&&s.cls[code])||SPC_OFF}
 function spcLookup(code){const cat=spcCat();for(const p of cat){const v=(p.bt||[]).find(x=>x.ma===code);if(v)return {p,v}}return null}
-/* Chỉ chị Hoa (quản trị), kế toán (chị Huệ) và chị Thảo được thêm/sửa; người khác chỉ xem */
-const spcCanEdit=()=>{try{return ME.role==="admin"||/huệ|thảo/i.test(ME.name||"")}catch(e){return false}};
+/* CEO, cả team Digital (CEO duyệt 03/11), kế toán và Quản lý được thêm/sửa; người khác chỉ xem */
+const spcCanEdit=()=>{try{return ME.role==="admin"||ME.role==="digital"||(typeof userTeam==="function"&&userTeam(ME)==="ads")||/huệ|thảo/i.test(ME.name||"")}catch(e){return false}};
 const spcClone=o=>JSON.parse(JSON.stringify(o));
 /* Mã kho + tên Pancake đã điền thì tự thêm vào bảng quy đổi Facebook của kế toán, chỉ thêm khi chưa có dòng, không ghi đè */
 async function spcSyncKho(prod){try{const vs=(prod.bt||[]).filter(v=>String(v.misa||"").trim()&&String(v.pk||"").trim());if(!vs.length)return;
@@ -170,7 +170,7 @@ function spcEditor(F,days,opt){
   const orph=all.filter(c=>!used.has(c.id)),noDay=all.filter(c=>!c.tu&&spcSt(c)[0]!=="Đã hết").length;
   spcMdDraw();return `<style>${SPC_CSS}</style>
   <section class="fbd-card fbd-wide"><h3>Sản phẩm đang chạy quảng cáo <span class="hint" style="font-weight:400">${runN} đang chạy · ${giftN} quà tặng · ${all.length} combo</span></h3>
-  <p class="fbd-note">${opt.van?"Digital tự điền, không có giá vốn. ":""}<b>Bấm vào một sản phẩm</b> để xem combo, giá bán, page áp dụng. Chỉ sản phẩm <b>đang chạy</b> được tính vào bảng hiệu quả ở trang quản trị; quà tặng tách riêng.${ed?"":" Chỉ CEO, kế toán và Quản lý được sửa."}</p>
+  <p class="fbd-note">${opt.van?"Digital tự điền, không có giá vốn. ":""}<b>Bấm vào một sản phẩm</b> để xem combo, giá bán, page áp dụng. Chỉ sản phẩm <b>đang chạy</b> được tính vào bảng hiệu quả ở trang quản trị; quà tặng tách riêng.${ed?"":" Chỉ CEO, team Digital, kế toán và Quản lý được sửa."}</p>
   ${wait.length?`<p class="fbd-note" style="background:var(--amber-soft,#fff6e0);padding:8px 12px;border-radius:8px"><b>Chờ kế toán thêm mã kho (${wait.length}):</b> ${wait.slice(0,12).map(x=>esc(x)).join(", ")}${wait.length>12?"…":""}. Kế toán vào “Sửa” sản phẩm để điền mã MISA.</p>`:""}${ed?`<div class="spc-bt" style="margin:0 0 10px"><button class="btn pri" data-spc-act="padd">+ Thêm sản phẩm</button><button class="btn pri" data-spc-act="cadd">+ Thêm combo</button>${noDay?`<span class="hint" style="align-self:center;color:var(--red)">${noDay} combo đang chạy chưa có ngày bắt đầu: bấm Sửa để điền</span>`:""}</div>`:""}<div class="tbl"><table><thead><tr><th>Sản phẩm</th><th>Loại</th><th>Biến thể đang chạy</th><th class="n">Combo</th>${ed?"<th></th>":""}</tr></thead><tbody>${pr}</tbody></table></div></section>
   ${orph.length?`<section class="fbd-card fbd-wide"><h3>Combo chưa gắn vào sản phẩm nào <span class="hint" style="font-weight:400">${orph.length} combo</span></h3><div style="overflow-x:auto">${cTbl(orph,"")}</div></section>`:""}`;
 }
