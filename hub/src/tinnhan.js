@@ -7,7 +7,7 @@
    - Dữ liệu ở máy chủ /api/hub/chat (src/server/routes/chat.ts): tin nhắn riêng chỉ hai người đọc được, không nằm trong dữ liệu chung.
    - Tin cũ của khung trao đổi trước (d.chat trong dữ liệu chung) vẫn xem được ở đầu nhóm / cuộc nhắn riêng tương ứng.
    ===================================================================== */
-const TN={pend:{},files:{},rems:null,info:null,room:"",rooms:[],msgs:{},more:{},q:"",draft:{},seen:{},sumAt:0,loading:false,mob:false};
+const TN={groups:null,pend:{},files:{},rems:null,info:null,room:"",rooms:[],msgs:{},more:{},q:"",draft:{},seen:{},sumAt:0,loading:false,mob:false};
 /* máy chủ dùng mã đăng nhập (u.crm), trang dùng mã người trong dữ liệu chung (u.id): phòng, người gửi, người được nhắc đều theo mã đăng nhập */
 const tnMe=()=>(typeof SV!=="undefined"&&SV.me&&SV.me.id)||ME.crm||ME.id;
 const tnU=id=>id?D().users.find(x=>x.crm===id)||D().users.find(x=>x.id===id):null;
@@ -17,9 +17,11 @@ const tnMyTeam=()=>{const t=ME.phongBan&&typeof KPB_TEAM!=="undefined"&&KPB_TEAM
 const tnDm=id=>"dm:"+[tnMe(),id].sort().join("~");
 const tnOther=r=>r.startsWith("dm:")?r.slice(3).split("~").find(x=>x!==tnMe())||tnMe():"";
 const tnPrj=r=>(D().projects||[]).find(p=>"p:"+p.id===r);
-/* dự án tôi tham gia: phụ trách, thành viên, có việc trong dự án, hoặc phòng tôi tham gia dự án */
-const tnMyPrj=()=>(D().projects||[]).filter(p=>p.owner===ME.id||(p.tv||[]).includes(ME.id)||(D().tasks||[]).some(t=>t.da===p.id&&(t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)))||[p.team].concat(p.teams||[]).includes(tnMyTeam()));
-const tnName=r=>r.startsWith("p:")?((tnPrj(r)||{}).ten||"Dự án "+r.slice(2)):r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";
+/* dự án tôi được vào nhóm chat: phụ trách, thành viên, hoặc phòng tôi tham gia dự án (khớp quyền máy chủ chat.ts) */
+const tnMyPrj=()=>(D().projects||[]).filter(p=>ME.role==="admin"||p.owner===ME.id||(p.tv||[]).includes(ME.id)||[p.team].concat(p.teams||[]).includes(tnMyTeam()));
+const tnGrp=r=>(TN.groups||[]).find(g=>"n:"+g.id===r);
+const tnBoss=()=>!!ME&&(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong");
+const tnName=r=>r.startsWith("n:")?((tnGrp(r)||{}).name||"Nhóm"):r.startsWith("p:")?((tnPrj(r)||{}).ten||"Dự án "+r.slice(2)):r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";
 const tnTime=t=>{const d=new Date(t),n=new Date();return d.toDateString()===n.toDateString()?d.toTimeString().slice(0,5):d.toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit"})};
 const tnDay=t=>{const d=new Date(t),n=new Date(),y=new Date(n-864e5);return d.toDateString()===n.toDateString()?"Hôm nay":d.toDateString()===y.toDateString()?"Hôm qua":d.toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit"})};
 const tnInit=n=>{const w=String(n||"?").trim().split(/\s+/);return (w.length>1?w[w.length-2][0]+w[w.length-1][0]:w[0].slice(0,2)).toUpperCase()};
@@ -55,11 +57,11 @@ async function tnSend(room,body,kind,ref){
 
 /* ---------- vẽ ---------- */
 function tnListRows(){const q=TN.q.trim().toLowerCase(),by=new Map(TN.rooms.map(r=>[r.room,r]));
-  if(q){const G=tnGroups().filter(([k,n])=>n.toLowerCase().includes(q)).map(([k])=>"g:"+k),P=tnPeople().filter(u=>u.name.toLowerCase().includes(q)).map(u=>tnDm(u.crm));const J=(D().projects||[]).filter(p=>p.ten.toLowerCase().includes(q)).map(p=>"p:"+p.id);return G.concat(J,P).map(r=>by.get(r)||{room:r,last:null,unread:0})}
-  const base=["g:chung"].concat(tnMyTeam()?["g:"+tnMyTeam()]:[],tnMyPrj().map(p=>"p:"+p.id)),R=TN.rooms.slice();base.forEach(r=>{if(!by.has(r))R.push({room:r,last:null,unread:0})});
-  return R.filter(r=>r.room.startsWith("dm:")||(r.room.startsWith("p:")?!!tnPrj(r.room):TEAMS[r.room.slice(2)])).sort((a,b)=>(b.last?b.last.id:0)-(a.last?a.last.id:0))}
-function tnRowHtml(r){const g=r.room.startsWith("g:")||r.room.startsWith("p:"),n=tnName(r.room),l=r.last,un=r.room===TN.room?0:r.unread;
-  const pv=l?(l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
+  if(q){const G=tnGroups().filter(([k,n])=>(k==="chung"||k===tnMyTeam()||ME.role==="admin")&&n.toLowerCase().includes(q)).map(([k])=>"g:"+k).concat((TN.groups||[]).filter(g=>g.name.toLowerCase().includes(q)).map(g=>"n:"+g.id)),P=tnPeople().filter(u=>u.name.toLowerCase().includes(q)).map(u=>tnDm(u.crm));const J=(ME.role==="admin"?(D().projects||[]):tnMyPrj()).filter(p=>p.ten.toLowerCase().includes(q)).map(p=>"p:"+p.id);return G.concat(J,P).map(r=>by.get(r)||{room:r,last:null,unread:0})}
+  const base=["g:chung"].concat(tnMyTeam()?["g:"+tnMyTeam()]:[],tnMyPrj().map(p=>"p:"+p.id),(TN.groups||[]).map(g=>"n:"+g.id)),R=TN.rooms.slice();base.forEach(r=>{if(!by.has(r))R.push({room:r,last:null,unread:0})});
+  return R.filter(r=>r.room.startsWith("dm:")||(r.room.startsWith("n:")?!!tnGrp(r.room):r.room.startsWith("p:")?!!tnPrj(r.room):TEAMS[r.room.slice(2)])).sort((a,b)=>(b.last?b.last.id:0)-(a.last?a.last.id:0))}
+function tnRowHtml(r){const g=/^(g|p|n):/.test(r.room),n=tnName(r.room),l=r.last,un=r.room===TN.room?0:r.unread;
+  const pv=l?(l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("n:")?"Nhóm phối hợp · chưa có tin":r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
   return `<button class="tnrow${r.room===TN.room?" on":""}${un?" un":""}" data-tnr="${esc(r.room)}">${tnAv(g?r.room:tnOther(r.room),n,g)}<span class="tnrb"><span class="tnr1"><b>${esc(n)}</b>${l?`<small>${tnTime(l.created_at)}</small>`:""}</span><span class="tnr2"><span>${esc(String(pv).replace(/\s+/g," ").slice(0,70))}</span>${un?`<em>${un>99?"99+":un}</em>`:""}</span></span></button>`}
 function tnDrawList(){const el=$("#tnlist");if(!el)return;const R=tnListRows();
   el.innerHTML=R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`;
@@ -93,17 +95,18 @@ async function tnOpen(room){TN.room=room;TN.mob=true;try{localStorage.setItem("t
 /* ---------- trang ---------- */
 PAGES.tinnhan=m=>{
   if(!TN.room){let r="";try{r=localStorage.getItem("tn_room_"+tnMe())||""}catch(e){}TN.room=r&&(r.startsWith("g:")||r.includes(tnMe()))?r:"g:chung"}
-  const room=TN.room,pj=room.startsWith("p:"),g=room.startsWith("g:")||pj,n=tnName(room),dm=!g&&tnOther(room);
+  const room=TN.room,pj=room.startsWith("p:"),ng=room.startsWith("n:"),g=room.startsWith("g:")||pj||ng,n=tnName(room),dm=!g&&tnOther(room);
   m.innerHTML=`<div class="tn${TN.mob?" open":""}${tnInfoOn()?" wi":""}">
-   <aside class="tnside"><div class="tnsh"><b>Tin nhắn</b><button class="btn sm" id="tnrem" title="Nhắc việc sắp tới">⏰ Nhắc việc</button></div>
+   <aside class="tnside"><div class="tnsh"><b>Tin nhắn</b><span>${tnBoss()?`<button class="btn sm" id="tnnew" title="Tạo nhóm phối hợp nhiều phòng, ví dụ Team Content – Digital">＋ Nhóm</button> `:""}<button class="btn sm" id="tnrem" title="Nhắc việc sắp tới">⏰ Nhắc việc</button></span></div>
     <input class="tnq" id="tnq" placeholder="Tìm nhóm phòng hoặc người để nhắn…" value="${esc(TN.q)}"><div class="tnlist" id="tnlist"></div></aside>
-   <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${pj?"Nhóm dự án · mọi phòng tham gia cùng xem":g?(room==="g:chung"?"Mọi người trong công ty":"Nhóm phòng · ai trong công ty cũng xem được"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
+   <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${ng?`🔒 Nhóm phối hợp · ${((tnGrp(room)||{}).members||[]).length} thành viên${(tnGrp(room)||{}).created_by===tnMe()||ME.role==="admin"?` · <button type="button" class="lnk" id="tngedit">sửa thành viên</button>`:""}`:pj?"🔒 Nhóm dự án · chỉ người trong dự án":g?(room==="g:chung"?"Mọi người trong công ty":"🔒 Nhóm phòng · chỉ nhân sự phòng này"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
      <span class="tnhb"><button class="btn sm" id="tngiao">📋 Giao việc</button><button class="btn sm" id="tnnhac">⏰ Nhắc</button><button class="btn sm${tnInfoOn()?" on":""}" id="tninfo" title="Ảnh, tệp, link, nhắc hẹn của cuộc trò chuyện">ⓘ</button></span></header>
     <div class="tnmsgs" id="tnmsgs"></div>
     <div class="tnpend" id="tnpend" hidden></div><form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
   tnDrawList();tnDrawMsgs();tnBindAtt(room);tnBindInfo(room);if(!TN.files[room])tnLoadFiles(room);
   if(!TN.msgs[room])tnLoad(room).then(()=>{if(TN.room===room&&PAGE==="tinnhan"){tnDrawMsgs();tnRead(room)}});else tnRead(room);
-  if(!TN.sumAt)tnSummary();
+  if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();
+  if($("#tnnew"))$("#tnnew").onclick=()=>tnGroupForm(null);if($("#tngedit"))$("#tngedit").onclick=()=>tnGroupForm(tnGrp(room));
   const q=$("#tnq");q.oninput=()=>{TN.q=q.value;tnDrawList()};
   $("#tnback").onclick=()=>{TN.mob=false;$(".tn").classList.remove("open")};
   $("#tngiao").onclick=()=>tnGiao("");$("#tnnhac").onclick=()=>tnRemind("",dm||tnMe());$("#tnrem").onclick=()=>tnRemind("",tnMe());
@@ -222,3 +225,16 @@ function tnLightbox(id){const room=TN.room,L=(TN.files[room]||[]).filter(f=>f.mi
   const close=()=>{o.remove();document.removeEventListener("keydown",key)},key=e=>{if(e.key==="Escape")close();else if(e.key==="ArrowLeft"&&L.length>1){i=(i-1+L.length)%L.length;draw()}else if(e.key==="ArrowRight"&&L.length>1){i=(i+1)%L.length;draw()}};
   o.onclick=e=>{if(e.target===o)close()};document.addEventListener("keydown",key);draw()}
 document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("[data-tnlb]");if(!a)return;e.preventDefault();tnLightbox(a.dataset.tnlb)});
+
+/* ---------- nhóm phối hợp tự tạo (chị Hoa 03/11: ví dụ Team Content – Digital; chỉ thành viên thấy) ---------- */
+async function tnLoadGroups(){TN.groups=TN.groups||[];try{TN.groups=await svApi("/api/hub/chat/groups")}catch(e){}if(PAGE==="tinnhan")tnDrawList()}
+function tnGroupForm(g){const P=D().users.filter(u=>u.active&&u.name&&u.crm&&u.crm!==tnMe()),sel=new Set(g?g.members:[]);
+  const byT={};P.forEach(u=>{const t=(typeof KPB_TEAM!=="undefined"&&KPB_TEAM[u.phongBan])||String(teamOf(u)||"").toLowerCase();(byT[t]=byT[t]||[]).push(u)});
+  openDrawerHTML(`<h2>${g?"Sửa nhóm":"Tạo nhóm phối hợp"}</h2><p class="hint">Nhóm để các phòng phối hợp (ví dụ Team Content – Digital). Chỉ thành viên thấy và nhắn được.</p>
+   <form class="frm" id="tng-f"><label class="field">Tên nhóm<input id="tng-n" required value="${esc(g?g.name:"")}" placeholder="Ví dụ: Team Content – Digital"></label>
+   <div class="field">Thành viên${Object.entries(byT).map(([t,L])=>`<div class="tngt"><b>${esc(TEAMS[t]||t||"Khác")}</b> <button type="button" class="lnk" data-tngall="${esc(t)}">chọn cả phòng</button><div class="phc">${L.map(u=>`<label class="ck sm"><input type="checkbox" name="tng-m" value="${esc(u.crm)}" data-t="${esc(t)}" ${sel.has(u.crm)?"checked":""}> ${esc(u.name)}</label>`).join("")}</div></div>`).join("")}</div>
+   <div class="acts"><button class="btn pri">${g?"Lưu":"Tạo nhóm"}</button>${g?`<button type="button" class="btn danger" id="tng-del">Xoá nhóm</button>`:""}</div></form>`);
+  document.querySelectorAll("[data-tngall]").forEach(b=>b.onclick=()=>document.querySelectorAll(`[name=tng-m][data-t="${b.dataset.tngall}"]`).forEach(i=>i.checked=true));
+  $("#tng-f").onsubmit=async e=>{e.preventDefault();const name=$("#tng-n").value.trim(),members=[...document.querySelectorAll("[name=tng-m]:checked")].map(i=>i.value);if(!members.length){toast("Chọn ít nhất một thành viên");return}
+    try{const r=await svApi("/api/hub/chat/groups"+(g?"/"+g.id:""),{method:g?"PUT":"POST",body:JSON.stringify({name,members})});await tnLoadGroups();closeDrawer();toast(g?"Đã lưu nhóm":"Đã tạo nhóm");openChat("n:"+(g?g.id:r.id))}catch(er){toast(er.message||"Chưa lưu được")}};
+  if($("#tng-del"))$("#tng-del").onclick=async()=>{if(!confirm("Xoá nhóm này? Tin nhắn cũ trong nhóm không còn ai mở được."))return;try{await svApi("/api/hub/chat/groups/"+g.id,{method:"DELETE"});await tnLoadGroups();closeDrawer();TN.room="g:chung";renderMain()}catch(er){toast(er.message||"Chưa xoá được")}}}
