@@ -449,14 +449,19 @@ function tsDongBoPhi(){if(!tsCanGhi()||!tsFinOk()||TSV.phiBusy||typeof mhLoad!==
    Tìm lại đơn theo luật mới: có đơn khớp thì lấy mã / tên / đơn đó; không có thì tên theo diễn giải phiếu, mã tự đặt, bỏ gắn đơn.
    Giữ giá trị, số tháng, bộ phận; bỏ chi phí mua kèm đã cộng từ đơn sai. Trả true nếu có sửa. */
 function tsSuaNham(){if(TSV.suaNham||typeof KHO==="undefined"||!KHO.items||!KHO.items.size)return false;
+  /* Lần sửa đầu (03/11 13:5x) giữ nguyên số tiền cũ, mà số đó là giá trị lô ca mỳ chứ không phải phiếu chi: lấy lại đúng số tiền phiếu chi đã gắn. */
+  const N0=(scFin().nkc)||[],tien=tsAll().filter(a=>a.suaNham&&a.suaNham.gk==null&&a.nkc&&!tsAll().some(z=>z.id!==a.id&&z.nkc===a.nkc)).map(a=>{const r=N0.find(z=>z.id===a.nkc),t=r?Math.round(+r.t||0):0;return t&&t!==Math.round(+(a.gk??a.ng)||0)?{id:a.id,ma:a.ma,t,cu:+(a.gk??a.ng)||0}:null}).filter(Boolean);
+  if(tien.length){TSV.suaNham=1;tsMut("sửa số tiền dòng ghi nhầm theo phiếu chi: "+tien.map(x=>x.ma+" "+x.cu+" → "+x.t).join(", "),T=>{tien.forEach(x=>{const r=T.a.find(z=>z.id===x.id);if(!r)return;
+      r.suaNham={...r.suaNham,gk:x.cu};Object.assign(r,{gk:x.t,ng:x.t,phi:[],gk0:undefined,sua:Date.now()})})});
+    toast("Đã sửa số tiền theo phiếu chi: "+tien.map(x=>x.ma+" "+tsN(x.cu)+" → "+tsN(x.t)+" đ").join("; "));if(/^ts_/.test(PAGE))renderMain();return true}
   const N=(scFin().nkc)||[],sai=tsAll().filter(a=>a.nkc&&tsQua(a.ma,KHO.items.get(a.ma)));if(!sai.length)return false;TSV.suaNham=1;
   const fix=sai.map(a=>{const r=N.find(z=>z.id===a.nkc);if(!r)return null;const don=tsTimDon(r),ten0=String(r.dg||"").replace(/^(thanh toán|trả tiền|mua|chi)\s+/i,"").trim()||a.ten;
     const ten=don?(don.l.name||don.l.item):ten0.charAt(0).toUpperCase()+ten0.slice(1);let ma=don?don.l.item:"";
     if(!ma||tsAll().some(z=>z.id!==a.id&&z.kind===a.kind&&z.ma===ma))ma=tsMaTuDong(ten,a.kind,a.id);
-    return {id:a.id,cu:a.ma+" · "+a.ten,ma,ten,po:don?don.p.no:"",gk:a.gk0!=null&&(a.phi||[]).length?+a.gk0:+(a.gk??a.ng)||0}}).filter(Boolean);
+    return {id:a.id,cu:a.ma+" · "+a.ten,ma,ten,po:don?don.p.no:"",gk:Math.round(+r.t||0)||+(a.gk??a.ng)||0}}).filter(Boolean);
   if(!fix.length)return false;
   tsMut("sửa dòng ghi tăng nhầm đơn mua: "+fix.map(x=>x.cu+" → "+x.ma).join(", "),T=>{fix.forEach(x=>{const r=T.a.find(z=>z.id===x.id);if(!r)return;
-    r.suaNham={ma:r.ma,ten:r.ten,po:r.po||"",at:Date.now()};Object.assign(r,{ma:x.ma,ten:x.ten,po:x.po,rcl:"",gk:x.gk,ng:x.gk,phi:[],gk0:undefined,sua:Date.now()})})});
+    r.suaNham={ma:r.ma,ten:r.ten,po:r.po||"",gk:+(r.gk??r.ng)||0,at:Date.now()};Object.assign(r,{ma:x.ma,ten:x.ten,po:x.po,rcl:"",gk:x.gk,ng:x.gk,phi:[],gk0:undefined,sua:Date.now()})})});
   toast("Đã sửa dòng ghi nhầm: "+fix.map(x=>x.cu+" → "+x.ma+" · "+x.ten).join("; "));if(/^ts_/.test(PAGE))renderMain();return true}
 /* Cột "Liên quan" ở sổ (kiểu bảng giao dịch chung): đơn mua, chứng từ, phiếu trả NCC của đơn, phiếu chi Sổ chi phí đã gắn. Bấm mở đúng chỗ (mhLqBind). */
 function tsLienQuan(a){if(typeof gdLink!=="function")return "";const o=[],p=tsDonCua(a);
