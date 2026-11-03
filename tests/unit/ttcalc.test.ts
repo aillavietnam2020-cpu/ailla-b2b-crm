@@ -266,6 +266,14 @@ describe('TikTok: file Video (Hiệu suất theo ngày, Chi tiết từng video)
     expect(R.top[0].id).toBe('111');
     expect(R.top[1].post).toBe('2026-10-05');
   });
+  it('Chi tiết: bỏ video quảng cáo tự tạo (không #, 0 view), không tính vào đăng trong kỳ', () => {
+    const R = T.ttReadVideoList(VLIST.concat([
+      ['shop', '444', 'Sản phẩm giặt sấy thơm lâu', '2026/10/06 05:00:00', 'Tinh dầu', '0', '0', '0'],
+      ['shop', '555', 'Video thật #ailla', '2026/10/07 09:00:00', 'Tinh dầu', '0', '0', '0'],
+    ]));
+    expect([R.n, R.nDang, R.nQc]).toEqual([4, 3, 1]);
+    expect(R.top.some((x: { id: string }) => x.id === '444')).toBe(false);
+  });
   it('Hiệu suất: số theo ngày', () => {
     const R = T.ttReadVideoDays([['[Phạm vi ngày]: 2026-10-01 ~ 2026-10-02'], [], ['Thời gian', 'GMV đến từ video (₫)', 'VV', 'Đơn hàng SKU đã ghi nhận'], ['2026-10-01', '40042598', '258097', '714']]);
     expect(R.days['2026-10-01']).toMatchObject({ gmv: 40042598, vv: 258097, don: 714 });
