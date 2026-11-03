@@ -148,9 +148,10 @@ chatRoutes.post('/msgs', async (c) => {
   const b = (await c.req.json().catch(() => null)) as { room?: unknown; body?: unknown; kind?: unknown; ref?: unknown } | null;
   const room = await needRoom(b?.room, A);
   const body = String(b?.body ?? '').trim().slice(0, 4000);
-  const kind = ['', 'task', 'remind', 'file'].includes(String(b?.kind ?? '')) ? String(b?.kind ?? '') : '';
+  const kind = ['', 'task', 'remind', 'file', 'react'].includes(String(b?.kind ?? '')) ? String(b?.kind ?? '') : '';
   const ref = String(b?.ref ?? '').slice(0, 80);
   if (!body && !ref) throw badRequest('EMPTY', 'Chưa có nội dung');
+  if (kind === 'react' && !/^r:\d{1,12}$/.test(ref)) throw badRequest('BAD_REACT', 'Thả cảm xúc cho tin không hợp lệ');
   const at = nowIso();
   const r = await c.env.DB.prepare('INSERT INTO chat_msgs (room, user_id, body, kind, ref, created_at) VALUES (?, ?, ?, ?, ?, ?)')
     .bind(room, me, body, kind, ref, at)
