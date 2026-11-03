@@ -12,7 +12,7 @@ const kdOwner=k=>((D().kenhPT||{})[k]||{}).chinh||"";
 /* CEO, Lead, trưởng phòng thấy mọi dự án kênh (chị Hoa 03/11) */
 const kdBoss=()=>!!ME&&(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong");
 const kdMine=()=>!ME?[]:CHANNELS.filter(ch=>kdOwner(ch.k)===ME.id);
-const kdSee=()=>!ME?[]:(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong")?CHANNELS:CHANNELS.filter(ch=>kdOwner(ch.k)===ME.id||((D().kenhPT||{})[ch.k]||{}).phu===ME.id);
+const kdSee=()=>!ME?[]:(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong")?CHANNELS:CHANNELS.filter(ch=>kdOwner(ch.k)===ME.id||chanHelp(ch.k).includes(ME.id));
 /* tên kênh hiện ra giống các trang khác (tenhien.js: TikTok Via 1 → Gia dụng AiBio…) */
 const kdNm=ch=>{let n=ch.k;if(typeof RL_MAP!=="undefined")RL_MAP.forEach(([a,b])=>{n=n.replace(a,b)});return n===ch.k?(ch.short||ch.k):n};
 const kdCards=k=>(D().cards||[]).filter(c=>c.kenh===k&&c.step!=="huy");

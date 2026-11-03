@@ -78,6 +78,8 @@ const LOAI_V={moi:"Quay mới",reup:"Reup có sửa",kho:"Video có sẵn trong 
 function loaiOf(c){if(c.loai)return c.loai;if(c.nguon==="Nhân bản winner")return "nhanban";if(c.nguon==="Đăng lại")return "kho";if(c.nguon==="Footage cũ")return c.khoMa&&!/hook/i.test(c.tuyen||"")&&c.step==="dang"?"kho":"reup";return "moi"}
 /* Người giữ kênh (đăng bài): Phụ trách chính của kênh ở Kế hoạch tháng */
 const chanOwner=k=>((D().kenhPT||{})[k]||{}).chinh||"";
+/* người hỗ trợ kênh: nhiều người (phuDs), phu giữ người đầu tiên cho chỗ cũ đọc */
+const chanHelp=k=>{const p=(D().kenhPT||{})[k]||{};return Array.isArray(p.phuDs)&&p.phuDs.length?p.phuDs.filter(Boolean):(p.phu?[p.phu]:[])};
 const stepName=id=>(STEPS.find(s=>s.id===id)||{t:id}).t;
 const stepIdx=id=>STEPS.findIndex(s=>s.id===id);
 /* Cột trạng thái kiểu sheet (suy ra từ bước) */
@@ -170,7 +172,7 @@ function nextAct(c){
   const fb=!chOf(c.kenh).needId,L=loaiOf(c);
   return ({kb:L==="moi"?["Gửi duyệt kịch bản","dkb"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi duyệt","dvd"],worker:["Dựng xong, gửi duyệt","dvd"],dvd:["người duyệt, gửi CEO","dceo"],dceo:["CEO duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
 }
-function canEditCard(u,c){if(!u)return false;if(can(u,"lich.sua_tat_ca"))return true;return can(u,"lich.sua_cua_minh")&&([c.nguoi,c.nguoiKB,c.nguoiEdit,c.nguoiQuay].includes(u.id)||chanOwner(c.kenh)===u.id)}
+function canEditCard(u,c){if(!u)return false;if(can(u,"lich.sua_tat_ca"))return true;return can(u,"lich.sua_cua_minh")&&([c.nguoi,c.nguoiKB,c.nguoiEdit,c.nguoiQuay].includes(u.id)||chanOwner(c.kenh)===u.id||chanHelp(c.kenh).includes(u.id))}
 function canMove(u,c,to){
   if(c.step==="cg")return can(u,"viec.giao");
   if(["dkb","dvd"].includes(c.step))return can(u,"viec.duyet");
