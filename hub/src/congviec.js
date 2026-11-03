@@ -64,10 +64,14 @@ const cvTeamSee=(t,tx)=>t==="all"||tx===t||(t==="mkt"&&["content","digital","koc
 /* Khối hành chính nhân sự (trưởng phòng Ban điều hành): chỉ xem hiệu quả từng team, không xem việc hằng ngày của từng người */
 const cvSummaryOnly=()=>!!ME&&ME.role==="truongphong"&&ME.phongBan==="BDH";
 const cvMgrView=()=>!!ME&&(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong"||can(ME,"viec.giao"));
-const cvTeamName=k=>TEAMS[k]||(k==="mkt"?"Marketing":k);
+/* mã phòng ban (CM, ADS, KT…) gộp về đúng team (content, digital, ketoan…) để không hiện "Team CM" cạnh "Team Content" (khonggian.js KPB_TEAM) */
+const cvTeamNorm=k=>(typeof KPB_TEAM!=="undefined"&&KPB_TEAM[k])||k;
+const cvTeamName=k=>TEAMS[cvTeamNorm(k)]||(k==="mkt"?"Marketing":k);
 function cvWhoOpts(){const d=D(),t=teamOf(ME),o=[["all","Tất cả"],["mine","Việc của tôi"]];
-  if(cvMgrView()){const ks=[];d.users.forEach(u=>{const k=teamOf(u);if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,k)))ks.push(k)});ks.forEach(k=>o.push(["t:"+k,"Team "+cvTeamName(k)]))}
-  if(CVF.who&&CVF.who.indexOf("p:")===0&&CVF.nguoi)o.push([CVF.who,userName(CVF.nguoi)]);return o}
+  if(cvMgrView()){const ks=[];d.users.forEach(u=>{const k=cvTeamNorm(teamOf(u));if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,k)))ks.push(k)});ks.forEach(k=>o.push(["t:"+k,"Team "+cvTeamName(k)]))}
+  /* từng nhân sự (CEO thấy mọi người, Lead / trưởng phòng thấy người team mình) */
+  if(cvMgrView())d.users.filter(u=>u.active&&u.name&&u.role!=="admin"&&u.id!==ME.id&&!CV_TEST.includes(u.id)&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,teamOf(u)))).sort((a,b)=>String(cvTeamName(teamOf(a))).localeCompare(String(cvTeamName(teamOf(b))))||a.name.localeCompare(b.name)).forEach(u=>o.push(["p:"+u.id,"👤 "+u.name+" · "+(cvTeamName(teamOf(u))||"")]));
+  if(CVF.who&&CVF.who.indexOf("p:")===0&&CVF.nguoi&&!o.some(x=>x[0]===CVF.who))o.push([CVF.who,userName(CVF.nguoi)]);return o}
 function cvWhoSet(v){CVF.who=v;CVF.scope=v==="mine"?"mine":(ME.role==="admin"?"all":"team");CVF.nguoi=v.indexOf("p:")===0?v.slice(2):"";CVF.wt=v.indexOf("t:")===0?v.slice(2):""}
 function cvWho(){if(!CVF.who)cvWhoSet(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong"||can(ME,"viec.giao")?"all":"mine");return CVF.who}
 const cvWhoSelect=()=>`<select id="cv-who" aria-label="Xem việc của">${opt(cvWhoOpts(),cvWho())}</select>`;
@@ -77,7 +81,7 @@ function cvFilter(L){
   return L.filter(x=>{
     if(CVF.scope==="mine"&&x.nguoi!==me&&!x.phoi.includes(me)&&!(x.src==="task"&&x.st==="review"&&tkMyTurn(d.tasks.find(t=>t.id===x.id)||{})))return false;
     if(ME.role!=="admin"&&!cvSummaryOnly()&&t!=="all"&&x.nguoi!==me&&!x.phoi.includes(me)&&!cvTeamSee(t,x.team)&&!(t==="content"&&x.src==="order"))return false;
-    if(CVF.wt){const ux=d.users.find(y=>y.id===x.nguoi);if(!ux||!cvTeamSee(CVF.wt,teamOf(ux)))return false}
+    if(CVF.wt){const ux=d.users.find(y=>y.id===x.nguoi);if(!ux||!(cvTeamSee(CVF.wt,teamOf(ux))||cvTeamNorm(teamOf(ux))===CVF.wt))return false}
     if(CVF.tao&&x.tao!==CVF.tao)return false;
     if(CVF.team&&x.team!==CVF.team)return false;if(CVF.nguoi&&x.nguoi!==CVF.nguoi&&!x.phoi.includes(CVF.nguoi))return false;if(CVF.da&&x.da!==CVF.da)return false;if(CVF.st&&(CVF.st==="late"?!x.late:CVF.st==="todo"?!["cg","todo","nhan"].includes(x.st):x.st!==CVF.st))return false;if(CVF.uu&&x.uu!==CVF.uu)return false;
     if(CVF.q&&!(x.ten+" "+x.mo+" "+x.id+" "+userName(x.nguoi)).toLowerCase().includes(CVF.q.toLowerCase()))return false;
@@ -86,9 +90,9 @@ function cvFilter(L){
     return true});
 }
 /* một hàng lọc gọn ở góc phải: tìm · người · thời gian · trạng thái · dự án · nút Giao việc */
-function cvFilterBar(opts={}){const d=D();const names=cvMgrView()&&!cvSummaryOnly()?d.users.filter(u=>u.active&&u.role!=="admin").map(u=>`<option value="${esc(u.name)}">`).join(""):"";const more=CVF.da||(CVF.who&&!["all","mine"].includes(CVF.who));return `<div class="cvbar"><input id="cv-q" placeholder="${names?"Tìm việc hoặc gõ tên người…":"Tìm việc…"}" value="${esc(CVF.q)}"${names?` list="cv-names" autocomplete="off"`:""}>${names?`<datalist id="cv-names">${names}</datalist>`:""}${opts.noSt?"":`<select id="cv-st" aria-label="Trạng thái">${opt([["","Mọi trạng thái"],["todo","Cần làm"],["doing","Đang làm"],["review","Chờ duyệt"],["done","Hoàn thành"],["late","Trễ hạn"]],CVF.st)}</select>`}<details class="cvmoref"${more?" open":""}><summary>Lọc thêm</summary>${cvWhoSelect()}<select id="cv-da" aria-label="Dự án">${opt([["","Mọi dự án"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),CVF.da)}</select></details></div>`}
+function cvFilterBar(opts={}){const d=D();const names=cvMgrView()&&!cvSummaryOnly()?d.users.filter(u=>u.active&&u.role!=="admin").map(u=>`<option value="${esc(u.name)}">`).join(""):"";const more=CVF.da||(CVF.who&&!["all","mine"].includes(CVF.who));return `<div class="cvbar"><input id="cv-q" placeholder="${names?"Tìm việc hoặc gõ tên người…":"Tìm việc…"}" value="${esc(CVF.q)}"${names?` list="cv-names" autocomplete="off"`:""}>${names?`<datalist id="cv-names">${names}</datalist>`:""}${opts.noSt?"":`<select id="cv-st" aria-label="Trạng thái">${opt([["","Mọi trạng thái"],["todo","Cần làm"],["doing","Đang làm"],["review","Chờ duyệt"],["done","Hoàn thành"],["late","Trễ hạn"]],CVF.st)}</select>`}${cvMgrView()?cvWhoSelect():""}<details class="cvmoref"${more?" open":""}><summary>Lọc thêm</summary>${cvMgrView()?"":cvWhoSelect()}<select id="cv-da" aria-label="Dự án">${opt([["","Mọi dự án"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),CVF.da)}</select></details></div>`}
 function bindCvFilter(m){
-  m.querySelectorAll("[data-tg]").forEach(b=>b.onclick=()=>{CVF.tg=b.dataset.tg;renderMain()});const wh=$("#cv-who");if(wh)wh.onchange=()=>{cvWhoSet(wh.value);renderMain()};
+  m.querySelectorAll("[data-tg]").forEach(b=>b.onclick=()=>{CVF.tg=b.dataset.tg;renderMain()});const wh=$("#cv-who");if(wh)wh.onchange=()=>{cvWhoSet(wh.value);if(typeof CVV!=="undefined")CVV.scope=wh.value==="mine"?"mine":"team";renderMain()};
   [["cv-q","q"],["cv-tg","tg"],["cv-team","team"],["cv-da","da"],["cv-st","st"],["cv-uu","uu"]].forEach(([id,k])=>{const e=$("#"+id);if(e)e.onchange=()=>{CVF[k]=e.value;renderMain()}});
   bindNew();
 }
@@ -209,9 +213,11 @@ function tkComment(id,text){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
     if(at.length)notifyU(dt,at,`${ME.name} nhắc bạn ở việc "${x.ten}": ${text.slice(0,90)}`,"task:"+x.id);notifyU(dt,who,`${ME.name} trao đổi ở việc "${x.ten}": ${text.slice(0,90)}`,"task:"+x.id)})}
 /* gợi ý tên khi gõ @ trong ô trao đổi */
 function tkBindChat(t){const ta=$("#t-cm"),box=$("#t-cmat");if(!ta)return;
-  ta.oninput=()=>{ta.style.height="auto";ta.style.height=Math.min(140,ta.scrollHeight)+"px";const v=ta.value.slice(0,ta.selectionStart),m=/@([^@\n]{0,20})$/.exec(v);if(!m){box.hidden=true;return}
-    const fd=typeof foldName==="function"?foldName:(z=>String(z).toLowerCase()),q=fd(m[1]),L=D().users.filter(u=>u.active&&u.name&&fd(u.name).includes(q)).slice(0,6);
-    if(!L.length){box.hidden=true;return}box.hidden=false;box.innerHTML=L.map(u=>`<button type="button" class="btn sm" data-atn="${esc(u.name)}">${esc(u.name)}</button>`).join("");
+  ta.oninput=()=>{ta.style.height="auto";ta.style.height=Math.min(140,ta.scrollHeight)+"px";const v=ta.value.slice(0,ta.selectionStart),m=/@([^@\n]{0,20})$/.exec(v);if(!m||!m[1].trim()){box.hidden=true;return}
+    const fd=typeof foldName==="function"?foldName:(z=>String(z).toLowerCase()),q=fd(m[1]),/* đủ mọi người (chị Hoa 03/11: trước chỉ 6 người đầu): người của việc → cùng phòng → còn lại */
+      rel=new Set([t.tao,t.nguoi,...(t.phoi||[]),...(t.chat||[]).map(c=>c.byId)].filter(Boolean)),tm=teamOf(ME),rk=u=>rel.has(u.id)?0:teamOf(u)===tm?1:2,
+      L=D().users.filter(u=>u.active&&u.name&&u.id!==ME.id&&fd(u.name).includes(q)).sort((a,b)=>rk(a)-rk(b)||a.name.localeCompare(b.name)).slice(0,8);
+    if(!L.length){box.hidden=true;return}box.hidden=false;box.innerHTML=L.map(u=>`<button type="button" class="btn sm" data-atn="${esc(u.name)}">${esc(u.name)}<small> · ${esc(cvTeamName(teamOf(u))||"")}</small></button>`).join("");
     box.querySelectorAll("[data-atn]").forEach(b=>b.onclick=()=>{const pos=ta.selectionStart,pre=ta.value.slice(0,pos).replace(/@([^@\n]{0,20})$/,"@"+b.dataset.atn+" ");ta.value=pre+ta.value.slice(pos);box.hidden=true;ta.focus()})};
   $("#t-cmok").onclick=()=>{const v=ta.value.trim();if(!v){toast("Viết nội dung trao đổi");return}tkComment(t.id,v);toast("Đã gửi");openTask(t.id);renderMain()}}
 function tkStepper(t){
@@ -222,10 +228,12 @@ function tkStepper(t){
 }
 function tkResultHtml(t){
   if(!t||(t.cd&&t.cd.length))return "";
-  return tkStepper(t)+tkResultBox(t);
+  return (t.tuThem?"":tkStepper(t))+tkResultBox(t);
 }
 function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
+  /* việc nhân sự tự thêm cho mình: tự bấm Xong, không qua duyệt */
+  if(t.tuThem&&t.tao===t.nguoi&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}</div>`;
   if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">${t.vong!==2&&tkV2(t)&&ME.role!=="admin"?"✓ Duyệt, chuyển CEO duyệt":"✓ Duyệt hoàn thành"}</button></div></div>`
     :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt${tkV2(t)?(t.vong===2?" vòng 2":" vòng 1"):""}</b>${sub}</div>`;
@@ -362,8 +370,44 @@ function openTask(id){
     if(!t&&TK_AFTER_NEW){const f=TK_AFTER_NEW;TK_AFTER_NEW=null;try{f(nid)}catch(e){}}
     toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+($("#t-lap").value==="tuan"?"mỗi tuần":"mỗi tháng"):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
+  if(t)try{tkLayout(t,gv)}catch(e){console.error("bố cục chi tiết việc",e)}
 }
-const newTaskBtn=()=>`<button class="btn pri" id="cv-new">＋ Giao việc</button>`;
+/* Bố cục khung Chi tiết việc (chị Hoa 03/11): nội dung việc lên đầu (tên, người giao / làm, hạn, mô tả, link, file);
+   góc phải đầu khung có nút 💬 Trao đổi và ⏰ Xin gia hạn (bấm mới mở); các ô sửa thông tin gom vào "Sửa thông tin việc".
+   Chỉ dời chỗ các phần đã vẽ (giữ nguyên ô nhập và nút đã gắn việc) nên mọi thao tác cũ vẫn chạy. */
+function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.querySelector("h2"),td=D().settings.today,late=t.st!=="done"&&t.han&&t.han<td;
+  const link=u=>/^https?:\/\//.test(u)?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.length>70?u.slice(0,70)+"…":u)}</a>`:esc(u);
+  const ppl=[t.nguoi].concat(t.phoi||[]).filter(Boolean).map(userName).filter(Boolean);
+  const brief=document.createElement("div");brief.className="tkbrief";
+  brief.innerHTML=`<div class="tkbt">${esc(t.ten)}</div>
+   <div class="tkbm"><span><small>Người giao</small>${esc(userName(t.tao)||"—")}</span><span><small>Người làm</small>${esc(ppl.join(", ")||"chưa giao")}</span><span class="${late?"t-red":""}"><small>Hạn</small>${t.han?dd(t.han)+(late?` · trễ ${td-t.han} ngày`:""):"—"}</span><span><small>Ưu tiên</small>${esc(t.uu||"Trung bình")}</span>${t.da?`<span><small>Dự án</small>${esc(prjN(t.da))}</span>`:""}</div>
+   ${t.moTa?`<div class="tkbd">${esc(t.moTa).replace(/https?:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`).replace(/\n/g,"<br>")}</div>`:`<div class="tkbd hint">Chưa có mô tả / yêu cầu.</div>`}
+   ${t.dk||(t.files||[]).length?`<div class="tkbl">📎 ${t.dk?link(t.dk):""}${typeof tkFilesHtml==="function"?tkFilesHtml(t.files||[]):""}</div>`:""}
+   ${(t.checklist||[]).length?`<div class="tkbc hint">Việc nhỏ: ${(t.checklist||[]).filter(c=>c.x).length}/${(t.checklist||[]).length} đã xong</div>`:""}`;
+  /* nút góc phải */
+  const chat=di.querySelector(".tkchat"),lateBox=di.querySelector(".tklate"),nChat=(t.chat||[]).length;
+  const tools=document.createElement("span");tools.className="tktools";
+  if(chat)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm" id="tk-chatbtn" title="Trao đổi về việc này">💬 Trao đổi${nChat?` <b>${nChat}</b>`:""}</button>`);
+  if(lateBox)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm${late?" danger":""}" id="tk-ghbtn" title="${late?"Báo lý do trễ / xin gia hạn":"Xin gia hạn"}">⏰ ${late?"Trễ hạn":"Xin gia hạn"}</button>`);
+  if(h2){h2.classList.add("tkh2");h2.appendChild(tools);h2.after(brief)}
+  di.querySelectorAll("p.hint").forEach(p=>{if(/^Người giao:/.test(p.textContent.trim()))p.remove()});
+  {const ok=$("#t-selfok");if(ok)ok.onclick=()=>{DB.mutate(ME.name,"xong việc tự thêm: "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);tkLog(x,"Xong (việc tự thêm)")});toast("Đã xong");closeDrawer();renderMain()}}
+  /* trao đổi, gia hạn: ẩn tới khi bấm (có tin trả lại / đang chờ gia hạn thì mở sẵn) */
+  const tra=(t.chat||[]).some(c=>c.kind==="tra")&&t.st!=="done",cho=((t.treReq||{}).st==="cho");
+  if(chat){brief.after(chat);chat.hidden=!tra;$("#tk-chatbtn").onclick=()=>{chat.hidden=!chat.hidden;if(!chat.hidden){chat.scrollIntoView({block:"nearest"});const i=$("#t-cm");if(i)i.focus()}}}
+  if(lateBox){brief.after(lateBox);lateBox.hidden=!(late||cho);$("#tk-ghbtn").onclick=()=>{lateBox.hidden=!lateBox.hidden;if(!lateBox.hidden)lateBox.scrollIntoView({block:"nearest"})}}
+  /* các ô thông tin việc: gom vào mục thu gọn (người giao mở để sửa; người làm chỉ xem, đã có ở phần đầu) */
+  const f=$("#tkf2");if(!f)return;const pick=sel=>{const e=f.querySelector(sel);return e&&(e.closest(".row4")||e.closest("label.field")||e.closest(".field")||e.closest("label.ck"))};
+  const parts=["#t-ten","#t-mo","#t-team","#t-ng","#t-v2","#t-phw","#t-dk","#t-bfl"].map(pick).filter((e,i,a)=>e&&a.indexOf(e)===i);
+  if(!parts.length)return;const dt=document.createElement("details");dt.className="tkedit";dt.innerHTML=`<summary>${gv?"✎ Sửa thông tin việc":"Thông tin chi tiết"}</summary>`;
+  parts.forEach(e=>dt.appendChild(e));f.prepend(dt)}
+const newTaskBtn=()=>`<button class="btn pri" id="cv-new">${tkGiver()?"＋ Giao việc":"＋ Thêm việc"}</button>`;
+/* Nhân sự tự thêm việc cho mình (chị Hoa 03/11): một dòng ở đầu "Của tôi", gõ tên + hạn, Enter là thêm */
+const tkSelfHtml=()=>`<form class="tkself" id="tk-self"><span>＋</span><input id="tks-ten" placeholder="Thêm việc của tôi… (Enter để thêm)" autocomplete="off"><label>Hạn${tkDate("tks-han",D().settings.today)}</label><select id="tks-uu" aria-label="Ưu tiên">${opt(UU,"Trung bình")}</select><button class="btn sm pri">Thêm</button></form>`;
+function tkSelfBind(b){const f=b.querySelector("#tk-self");if(!f)return;f.onsubmit=e=>{e.preventDefault();const ten=$("#tks-ten").value.trim();if(!ten){$("#tks-ten").focus();return}
+  const han=tkDay($("#tks-han").value)||D().settings.today,id=uid("cv"),team=TEAMS[teamOf(ME)]?teamOf(ME):((typeof KPB_TEAM!=="undefined"&&KPB_TEAM[ME.phongBan])||"chung");
+  DB.mutate(ME.name,"tự thêm việc: "+ten,dt=>{const x={id,ten,moTa:"",team,da:"",nguoi:ME.id,phoi:[],han,bd:0,uu:$("#tks-uu").value,st:"todo",checklist:[],files:[],loai:"Việc",tao:ME.id,tuThem:true,v2:false,log:[]};tkLog(x,ME.name+" tự thêm việc cho mình · hạn "+dd(han));dt.tasks.push(x)});
+  toast("Đã thêm việc");renderMain();setTimeout(()=>{const i=$("#tks-ten");if(i)i.focus()},50)}}
 const bindNew=()=>{if($("#cv-new"))$("#cv-new").onclick=()=>openTask(null)};
 
 /* ---------- 1. Tổng quan công việc ---------- */
@@ -643,7 +687,7 @@ function pCvNv2(m){
   const gmap={};auto.forEach(g=>{const k=g.kenh?chOf(g.kenh).short:"Khác";(gmap[k]=gmap[k]||[]).push(g)});
   const gl=Object.entries(gmap).map(([k,a])=>({k,a,late:a.filter(x=>x.late).length,n:a.reduce((z,x)=>z+(x.kind==="mk"?x.n:0),0),done:a.reduce((z,x)=>z+(x.kind==="mk"?x.done:0),0)})).sort((x,y)=>y.late-x.late||y.a.length-x.a.length);
   const autoGroupsHtml=()=>gl.map(G=>`<details class="cvgrp" data-gk="${esc(G.k)}"${(G.k in CVG?CVG[G.k]:false)?" open":""}><summary><b>${esc(G.k)}</b><span class="cvgc">${G.a.length} việc</span>${G.late?`<span class="pill p-red">${G.late} trễ</span>`:""}${G.n?`<span class="cvgp">${G.done}/${G.n} video xong</span>`:""}</summary>${G.a.map(row).join("")}</details>`).join("");
-  const taskTbl=`<section class="card flush cvscroll cvtk">${tasks.length?tbl(["Việc","Người làm","Người giao","Hạn","Trạng thái","Tiến độ",""],tasks.slice(0,200).map(x=>`<tr class="clk${x.late?" late":""}" title="${esc(x.mo?cvShort(x.mo,160):x.ten)}" data-cv="${x.id}" data-src="${x.src}"${x.n>1?` data-grp="${x.ids.join(",")}"`:""}><td><b${x.st==="done"?` class="strike"`:""}>${esc(x.ten)}</b>${x.da?`<small>${esc(prjN(x.da))}</small>`:x.mo?`<small>${esc(cvShort(x.mo,80))}</small>`:""}</td><td>${x.cd&&x.cd.length?`${avatar(x.nguoi)}${esc(userName(x.nguoi)||"—")}<small>${x.cd.filter(s=>s.st==="xong").length}/${x.cd.length} công đoạn</small>`:`${avatar(x.nguoi)}${esc(userName(x.nguoi)||"Chưa giao")}${x.phoi.length?` <small>+${x.phoi.length}</small>`:""}`}</td><td>${esc(userName(x.tao)||"—")}</td><td${x.late?` class="t-red"`:""}>${hanL(x)}</td><td>${stP(x)}${x.src==="task"&&x.tl&&!["done","review"].includes(x.st)?` <span class="pill p-red">trả lại</span>`:""}</td><td>${tkPctHtml(x)}</td><td>${tkActBtn(x)}</td></tr>`)):`<p class="empty">Chưa có việc nào. Bấm “Giao việc” để tạo.</p>`}</section>`;
+  const taskTbl=`<section class="card flush cvscroll cvtk">${tasks.length?tbl(["Việc","Người làm","Người giao","Hạn","Trạng thái","Tiến độ",""],tasks.slice(0,200).map(x=>`<tr class="clk${x.late?" late":""}" title="${esc(x.mo?cvShort(x.mo,160):x.ten)}" data-cv="${x.id}" data-src="${x.src}"${x.n>1?` data-grp="${x.ids.join(",")}"`:""}><td><b${x.st==="done"?` class="strike"`:""}>${esc(x.ten)}</b>${x.da?`<small>${esc(prjN(x.da))}</small>`:x.mo?`<small>${esc(cvShort(x.mo,80))}</small>`:""}</td><td>${x.cd&&x.cd.length?`${avatar(x.nguoi)}${esc(userName(x.nguoi)||"—")}<small>${x.cd.filter(s=>s.st==="xong").length}/${x.cd.length} công đoạn</small>`:`${avatar(x.nguoi)}${esc(userName(x.nguoi)||"Chưa giao")}${x.phoi.length?` <small>+${x.phoi.length}</small>`:""}`}</td><td>${esc(userName(x.tao)||"—")}</td><td${x.late?` class="t-red"`:""}>${hanL(x)}</td><td>${stP(x)}${x.src==="task"&&x.tl&&!["done","review"].includes(x.st)?` <span class="pill p-red">cần sửa</span>`:""}</td><td>${tkPctHtml(x)}</td><td>${tkActBtn(x)}</td></tr>`)):`<p class="empty">Chưa có việc nào. Bấm “Giao việc” để tạo.</p>`}</section>`;
   const row=g=>`<div class="cvr${g.late?" late":""}" data-au="${esc(g.key)}"><span class="cvri">${g.kind==="dg"?"📤":"🎬"}</span><div class="cvrt"><b>${esc(g.ten)}</b>${g.kind==="mk"?` <span class="cvrp">${g.done}/${g.n}</span>`:""}<small>${esc(g.mo)}</small></div><span class="who">${avatar(g.nguoi)}${esc(userName(g.nguoi)||"Chưa giao")}${g.nguoi&&!cvActive(g.nguoi)?` <small class="t-red">đã nghỉ</small>`:""}</span>${g.kind==="mk"&&g.nguoi===ME.id?`<button type="button" class="btn sm${g.st==="doing"?" pri":""}" data-aust="${esc(g.key)}">${g.st==="doing"?"✓ Đang làm":"Đang làm"}</button>`:(g.st==="doing"?pill("Đang làm","blu"):"")}</div>`;
   m.innerHTML=`<style>.cvr{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #e6e9f2;cursor:pointer;background:#fff}.cvr:hover{background:#f6f8fd}.cvr.late{border-left:4px solid #e03131}.cvri{font-size:18px}.cvrt{flex:1;min-width:0}.cvrt b{font-size:15px}.cvrt small{display:block;color:#6b7280;margin-top:2px}.cvrp{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:99px;background:#eef2ff;color:#3b5bdb;font-weight:700;font-size:13px}.cvwarn{background:#fff1f1;border:1px solid #f3b4b4;color:#b42318;border-radius:12px;padding:12px 16px;margin:0 0 12px}.cvlead .cvr b{font-size:15px}.cvbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;margin:0 0 12px}.cvbar input,.cvbar select{font:inherit;font-size:13.5px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;min-width:0;max-width:190px}.cvbar input{width:170px}.cvtiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 12px}.cvtile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 14px;font:inherit}button.cvtile{cursor:pointer}button.cvtile:hover{background:#f6f8fd}.cvtile span{font-size:12.5px;color:#6b7280}.cvtile b{font-size:22px;font-weight:600}.cvtile.red b{color:#e03131}.cvtile.amb b{color:#b45309}tr.late td:first-child{box-shadow:inset 3px 0 #e03131}.tklate.ok{background:#f6f8fd;border-color:#dfe5f4}@media (max-width:700px){.cvtiles{grid-template-columns:repeat(2,minmax(0,1fr))}.cvbar{justify-content:stretch}.cvbar input,.cvbar select{flex:1 1 130px;max-width:none}}.cvn{display:inline-block;min-width:26px;text-align:center;padding:2px 9px;border-radius:99px;background:#fff4e0;color:#b45309;font-weight:800}</style>`
   +cvFilterBar()+tilesHtml+`
@@ -676,19 +720,20 @@ PAGES.cv_nv=m=>{try{pCvNv2(m)}catch(e){console.error("Task mới lỗi, dùng b�
 function cvPush(dt,ids,text,ref){dt.notifs=dt.notifs||[];[...new Set([].concat(ids).filter(Boolean))].forEach(to=>{dt.notifs.push({id:uid("nt"),to,text,at:nowISO(),ref:ref||"",by:"",read:false})});if(typeof NT_KEEP!=="undefined"&&dt.notifs.length>NT_KEEP)dt.notifs=dt.notifs.slice(-NT_KEEP)}
 function cvRemindList(){
   const d=D(),td=d.settings.today,out=[],leads=(d.users||[]).filter(u=>u.active!==false&&(u.role==="admin"||u.role==="lead")).map(u=>u.id);
-  const push=(type,key,to,text)=>{to=[...new Set((to||[]).filter(Boolean))];if(to.length)out.push({k:type+"|"+key,to,text})};
+  /* ref: bấm thông báo mở đúng việc (chị Hoa 03/11: nhận thông báo mà bấm vào không ra việc) */
+  const push=(type,key,to,text,ref)=>{to=[...new Set((to||[]).filter(Boolean))];if(to.length)out.push({k:type+"|"+key,to,text,ref})};
   cvAutoMk(true).forEach(g=>{const who=userName(g.nguoi)||"chưa giao",mine=g.nguoi&&cvActive(g.nguoi)?[g.nguoi]:[],t=`${g.ten} (${g.done}/${g.n})`;if(!g.han)return;
-    if(g.han>=td&&g.han-td<=2&&g.st!=="doing")push("n",g.key,mine,`Bạn chưa bấm "Đang làm": ${t} · hạn ${dd(g.han)}`);
-    if(g.han===td)push("d",g.key,mine.concat(leads),`Đến hạn hôm nay: ${t} · ${who}`);
-    if(g.han<td)push("l",g.key,mine.concat(leads),`⚠ Trễ ${td-g.han} ngày: ${t} · ${who}`)});
+    if(g.han>=td&&g.han-td<=2&&g.st!=="doing")push("n",g.key,mine,`Bạn chưa bấm "Đang làm": ${t} · hạn ${dd(g.han)}`,(g.ids||[])[0]);
+    if(g.han===td)push("d",g.key,mine.concat(leads),`Đến hạn hôm nay: ${t} · ${who}`,(g.ids||[])[0]);
+    if(g.han<td)push("l",g.key,mine.concat(leads),`⚠ Trễ ${td-g.han} ngày: ${t} · ${who}`,(g.ids||[])[0])});
   cvAutoDg(true).forEach(g=>{const who=userName(g.nguoi)||"chưa có người phụ trách",mine=g.nguoi&&cvActive(g.nguoi)?[g.nguoi]:[];
-    if(!g.day)push("s",g.key,mine,`${g.ten}`);
-    else if(g.day===td)push("d",g.key,mine.concat(leads),`Hôm nay cần đăng: ${g.ten} · ${who}`);
-    else if(g.day<td)push("l",g.key,mine.concat(leads),`⚠ Đăng trễ ${td-g.day} ngày: ${g.ten} · ${who}`)});
+    if(!g.day)push("s",g.key,mine,`${g.ten}`,(g.ids||[])[0]);
+    else if(g.day===td)push("d",g.key,mine.concat(leads),`Hôm nay cần đăng: ${g.ten} · ${who}`,(g.ids||[])[0]);
+    else if(g.day<td)push("l",g.key,mine.concat(leads),`⚠ Đăng trễ ${td-g.day} ngày: ${g.ten} · ${who}`,(g.ids||[])[0])});
   (d.tasks||[]).forEach(t=>{if(t.st==="done"||!t.han)return;const mine=[t.nguoi].concat(t.phoi||[]).filter(x=>x&&cvActive(x)),who=userName(t.nguoi)||"chưa giao";
-    if(t.han>=td&&t.han-td<=2&&["todo","nhan"].includes(t.st))push("n","tk|"+t.id,mine,`Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`);
-    if(t.han===td)push("d","tk|"+t.id,mine.concat(leads),`Đến hạn hôm nay: ${t.ten} · ${who}`);
-    if(t.han<td)push("l","tk|"+t.id,mine.concat(leads),`⚠ Trễ ${td-t.han} ngày: ${t.ten} · ${who}`)});
+    if(t.han>=td&&t.han-td<=2&&["todo","nhan"].includes(t.st))push("n","tk|"+t.id,mine,`Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`,"task:"+t.id);
+    if(t.han===td)push("d","tk|"+t.id,mine.concat(leads),`Đến hạn hôm nay: ${t.ten} · ${who}`,"task:"+t.id);
+    if(t.han<td)push("l","tk|"+t.id,mine.concat(leads),`⚠ Trễ ${td-t.han} ngày: ${t.ten} · ${who}`,"task:"+t.id)});
   return out
 }
 function cvRemind(){
@@ -696,7 +741,7 @@ function cvRemind(){
   const sfx="#"+MONTH.key+"-"+D().settings.today,done=D().autoRem||{},L=cvRemindList().filter(r=>!done[r.k+sfx]);
   if(!L.length)return;
   DB.mutate("Hệ thống","nhắc việc tự động",dt=>{dt.autoRem=dt.autoRem||{};const sf="#"+MONTH.key+"-"+dt.settings.today;Object.keys(dt.autoRem).forEach(k=>{if(!k.endsWith(sf))delete dt.autoRem[k]});
-    L.forEach(r=>{const key=r.k+sf;if(dt.autoRem[key])return;dt.autoRem[key]=1;cvPush(dt,r.to,r.text,"page:cv_nv")})})
+    L.forEach(r=>{const key=r.k+sf;if(dt.autoRem[key])return;dt.autoRem[key]=1;cvPush(dt,r.to,r.text,r.ref||"page:cv_v")})})
 }
 setTimeout(()=>{try{cvRemind()}catch(e){console.warn("nhắc việc lỗi",e)}},8000);
 setInterval(()=>{try{if(!document.hidden)cvRemind()}catch(e){console.warn("nhắc việc lỗi",e)}},300000);
@@ -987,7 +1032,10 @@ function pCvV(m){
     else if(CVV.view==="board")pCvKb(body);
     else if(CVV.view==="cal")pCvLich(body);
     else if(CVV.view==="gantt")pCvGantt(body);
-    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ bạn${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}}
+    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`${tkSelfHtml()}<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ bạn${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}
+      tkSelfBind(body);
+      /* bảng việc giao trống thì mở sẵn "Việc khác đang chờ bạn" (chị Hoa 03/11: tưởng mất việc của tôi) */
+      {const mt=body.querySelector("#cvv-mt"),dt=body.querySelector(".cvvid");if(dt&&nOther&&(!mt.querySelector("tbody tr")||/Chưa có việc/.test(mt.textContent)))dt.open=true}}
     else cvNvRaw(body);
   }catch(e){console.error("Trang Việc lỗi",e);body.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}
   m.querySelectorAll("[data-vs]").forEach(b=>b.onclick=()=>{CVV.scope=b.dataset.vs;cvWhoSet(CVV.scope==="mine"?"mine":"all");CVF.st="";renderMain()});

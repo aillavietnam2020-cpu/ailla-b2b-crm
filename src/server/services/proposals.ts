@@ -201,6 +201,7 @@ export async function listProposals(
       agent_id: r.agent_id as string,
       agent_name: (r.agent_name as string | null) ?? null,
       route_to: r.route_to as ProposalRoute,
+      owner_id: (r.owner_id as string | null) ?? null,
       entity_type: r.entity_type as string,
       entity_id: r.entity_id as string,
       entity_label: (r.entity_label as string | null) ?? null,

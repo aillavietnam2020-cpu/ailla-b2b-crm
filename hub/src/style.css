@@ -922,3 +922,60 @@ details.cvvid>summary{cursor:pointer;list-style:none;display:flex;align-items:ce
 .kdwarn{margin:4px 0;font-size:12.5px;color:#b54708}
 .kdppl{display:flex;flex-direction:column;gap:4px}.kdppl span{display:flex;align-items:center;gap:6px;font-size:12.5px;flex-wrap:wrap}.kdppl small{color:#667085}.kdppl em{font-style:normal;color:#dc2626;font-weight:700}
 .kdchia{display:flex;flex-direction:column;gap:6px}.kdchia label{display:flex;align-items:center;gap:8px;border:1px solid #eceef3;border-radius:10px;padding:6px 10px}.kdchia span{flex:1;display:flex;flex-direction:column}.kdchia small{color:#667085;font-size:11.5px}.kdchia input{width:80px!important;flex:none}
+/* Tin nhắn: khay chờ gửi + khung xem ảnh */
+.tnpend{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 14px 0;border-top:1px solid #eceef3}.tnpend[hidden]{display:none}
+.tnpi{position:relative;display:flex;align-items:center;gap:6px;border:1px solid #e3e6ee;border-radius:10px;padding:4px 26px 4px 4px;background:#fafbfd;max-width:220px}.tnpi img{width:52px;height:52px;object-fit:cover;border-radius:7px}.tnpi small{font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tnpi button{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;border-radius:50%;background:#1f2a44cc;color:#fff;font-size:11px;cursor:pointer;line-height:20px;padding:0}
+.tnlb{position:fixed;inset:0;z-index:10000;background:rgba(16,24,40,.82);display:flex;align-items:center;justify-content:center;padding:56px 60px 24px}
+.tnlb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 10px 40px #0008;background:#fff}
+.tnlbbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;padding:10px 16px;color:#fff;font-size:13px}.tnlbbar .sp{flex:1}
+.tnlbx{width:36px;height:36px;border:0;border-radius:50%;background:#ffffff26;color:#fff;font-size:18px;cursor:pointer}.tnlbx:hover{background:#ffffff40}
+.tnlbn{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:50%;background:#ffffff26;color:#fff;font-size:28px;cursor:pointer}.tnlbn.p{left:10px}.tnlbn.n{right:10px}
+.tngt{margin:6px 0 8px}.tngt b{font-size:12.5px}.tnsh>span{display:flex;gap:4px}
+.kdstrip{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px;font-size:13px}.kdstrip>b{margin-right:2px}
+.kdchip{display:inline-flex;align-items:center;gap:5px;border:1px solid #c8ead2;background:#f1fbf4;border-radius:16px;padding:4px 10px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}.kdchip small{color:#667085;font-weight:500}.kdchip i{font-style:normal;font-size:11px;color:#1f7a3d}
+.kdchip.bad{border-color:#f3c2c2;background:#fff4f4}.kdchip.bad i{color:#c92a2a}
+/* Chi tiết việc: nội dung lên đầu, gọn (tkLayout) */
+.tkh2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:44px}.tktools{margin-left:auto;display:flex;gap:6px}.tktools b{background:#eef2ff;color:#3730a3;border-radius:9px;padding:0 6px;font-size:11px}
+.tkbrief{border:1px solid #e3e6ee;border-left:4px solid #4f46e5;border-radius:12px;padding:10px 14px;margin:6px 0 10px;background:#fff}
+.tkbt{font-size:16px;font-weight:700;margin-bottom:6px}
+.tkbm{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;margin-bottom:6px}.tkbm small{display:block;color:#98a2b3;font-size:11px}
+.tkbd{font-size:13.5px;line-height:1.5;white-space:normal;background:#f8f9fc;border-radius:8px;padding:8px 10px}
+.tkbl{margin-top:6px;font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.tkbc{margin-top:4px;font-size:12px}
+.tkedit{border:1px solid #eceef3;border-radius:10px;padding:6px 10px;margin:0 0 10px}.tkedit>summary{cursor:pointer;font-weight:600;font-size:13px;color:#4f46e5}.tkedit[open]>summary{margin-bottom:6px}
+#drawerIn .tkchat[hidden],#drawerIn .tklate[hidden]{display:none}
+#drawerIn .tkres,#drawerIn .tkchat,#drawerIn .tklate{margin-bottom:10px}
+.tkself{display:flex;gap:8px;align-items:center;background:var(--surface,#fff);border:1px dashed #c7d2fe;border-radius:12px;padding:6px 10px;margin:0 0 10px}.tkself>span{color:#4f46e5;font-weight:700;font-size:16px}
+.tkself #tks-ten{flex:1;border:0;outline:0;font:inherit;font-size:13.5px;background:none;min-width:120px}.tkself label{display:flex;align-items:center;gap:4px;font-size:12px;color:#667085}.tkself label input{width:auto}.tkself select{width:auto}
+@media(max-width:700px){.tkself{flex-wrap:wrap}}
+#t-cmat{max-height:150px;overflow:auto;display:flex;flex-wrap:wrap;gap:4px}#t-cmat[hidden]{display:none}#t-cmat small{color:#98a2b3;font-weight:500}
+/* Phê duyệt: đang chờ ở các phòng */
+.pdoth{padding:10px 14px;margin:12px 0}.pdoth>summary{cursor:pointer}.pdog{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:10px}
+.pdoc{border:1px solid #eceef3;border-radius:10px;padding:8px 10px;background:#fafbfd}.pdoc.late{border-color:#f3c2c2;background:#fff7f7}
+.pdoh{display:flex;justify-content:space-between;gap:8px;font-size:13px}.pdoh span{color:#667085;font-size:12px}.pdoc.late .pdoh span b{color:#dc2626}
+.pdop{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}.pdop span{background:#fff;border:1px solid #e6e8ef;border-radius:8px;padding:1px 7px;font-size:11.5px}
+.pdor{display:flex;flex-direction:column;padding:4px 0;border-top:1px solid #f0f1f5;font-size:12.5px}.pdor small{color:#98a2b3;font-size:11px}
+/* Tin nhắn: cảm xúc */
+.tnrx{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}.tnrx button{border:1px solid #e3e6ee;background:#fff;border-radius:12px;padding:1px 7px;font:inherit;font-size:12.5px;cursor:pointer}.tnrx button.on{border-color:#a5b4fc;background:#eef2ff}.tnrx b{font-size:11px;color:#475467}
+.tnma{position:relative}.tnrxp{position:absolute;bottom:100%;right:0;display:flex;gap:2px;background:#fff;border:1px solid #e3e6ee;border-radius:20px;padding:3px 6px;box-shadow:0 6px 20px #10182822;z-index:6}.tnm.me .tnrxp{right:auto;left:0}
+.tnrxp button{border:0;background:none;font-size:20px;cursor:pointer;padding:2px 3px;border-radius:50%;transition:transform .1s}.tnrxp button:hover{transform:scale(1.25)}
+.tnemop{position:absolute;left:14px;bottom:100%;margin-bottom:4px;width:300px;max-height:220px;overflow:auto;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;background:#fff;border:1px solid #e3e6ee;border-radius:12px;padding:6px;box-shadow:0 8px 24px #1018281f;z-index:7}
+.tnemop button{border:0;background:none;font-size:20px;padding:3px;cursor:pointer;border-radius:6px}.tnemop button:hover{background:#f0f2f7}
+/* Tin nhắn: cửa sổ nhỏ góc dưới phải */
+.tnpop{position:fixed;right:18px;bottom:76px;width:360px;height:min(540px,calc(100vh - 110px));z-index:9000;background:#fff;border:1px solid #e3e6ee;border-radius:14px;box-shadow:0 14px 40px #10182833;display:flex;flex-direction:column;overflow:hidden}
+.tnph{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #eceef3;background:#fafbfd}.tnph .sp{flex:1}.tnpn{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+.tnpx{border:0;background:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;color:#475467}.tnpx:hover{background:#eef0f4}
+.tnpop .tnq{margin:8px 10px;box-sizing:border-box;width:calc(100% - 20px)}.tnpop .tnlist{flex:1;overflow:auto;padding:0 6px 8px}
+.tnpop .tnpm{flex:1;display:flex;flex-direction:column;min-height:0}.tnpop .tnmsgs{flex:1;padding:8px 10px}.tnpop .tnmb{max-width:82%}
+.tnpop .tnf{padding:8px;gap:4px}.tnpop .tnf textarea{min-width:0}.tnpop .tnatt{width:28px;height:28px}.tnpop .tnimg img{max-width:200px}
+.tnpop .tnemop{left:8px;width:280px}
+@media(max-width:600px){.tnpop{right:6px;left:6px;width:auto;bottom:70px}}
+#chatbtn{border:1.5px solid #3b82f6!important;background:#eff6ff!important;color:#2563eb}#chatbtn:hover{background:#dbeafe!important}
+#chatbtn .chatic{width:20px;height:20px;fill:none;stroke:#2563eb;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+body:has(#tnpop) #ntpop{right:392px}
+#tnmic.rec{background:#fee2e2;color:#dc2626;position:relative}#tnmic.rec::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;white-space:nowrap}
+.tnaud audio{height:36px;max-width:260px}.tnpa{padding-right:28px}.tnpa audio{height:32px;width:220px}
+/* chị Hoa 03/11: bỏ nút "Hỏi AI" nổi góc dưới (đầu trang đã có Trợ lý AI); cửa sổ chat nhỏ thấp còn 2/3 */
+#aibtn{display:none!important}
+.tnpop{height:min(360px,calc(100vh - 90px));bottom:16px}
+body:has(#tnpop) #ntpop{right:392px}

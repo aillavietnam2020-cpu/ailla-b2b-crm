@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { pack } from '../../src/server/lib/pack';
 import { createTestContext, seedUsers, USERS, type TestContext } from '../helpers/app';
 
 let ctx: TestContext;
@@ -6,13 +7,24 @@ let ctx: TestContext;
 beforeEach(async () => {
   ctx = createTestContext();
   await seedUsers(ctx.db);
-  for (const id of ['user-thao', 'user-huyen']) await ctx.request(`/api/admin/users/${id}/marketing`, { as: USERS.ceo, body: { mode: 'with_b2b' } });
+  for (const id of ['user-thao', 'user-huyen', 'user-manager']) await ctx.request(`/api/admin/users/${id}/marketing`, { as: USERS.ceo, body: { mode: 'with_b2b' } });
+  /* dữ liệu chung: Thảo, Huyền phòng Content (CM); Quản lý phòng Digital (ADS); dự án DA-07 của Content */
+  const hub = {
+    users: [
+      { id: 'u_thao', crm: 'user-thao', role: 'content', phongBan: 'CM' },
+      { id: 'u_huyen', crm: 'user-huyen', role: 'nhanvien', phongBan: 'CM' },
+      { id: 'u_ql', crm: 'user-manager', role: 'lead', phongBan: 'ADS' },
+      { id: 'u_chi', crm: 'user-ceo', role: 'admin', phongBan: 'BDH' },
+    ],
+    projects: [{ id: 'DA-07', team: 'content', teams: [], owner: 'u_thao', tv: [] }],
+  };
+  await ctx.db.prepare("INSERT INTO hub_state (id, version, data, updated_at) VALUES ('main', 1, ?, ?)").bind(await pack(JSON.stringify(hub)), '2026-11-03T00:00:00Z').run();
 });
 
 const DM = 'dm:user-ceo~user-thao';
 
 describe('Tin nhắn (/api/hub/chat)', () => {
-  it('nhóm phòng: ai vào web vận hành cũng đọc, viết được; số chưa đọc giảm khi đã đọc', async () => {
+  it('nhóm phòng: người trong phòng đọc, viết được; số chưa đọc giảm khi đã đọc', async () => {
     const s = await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: 'Chào cả nhóm @CEO' } });
     expect(s.status).toBe(200);
     const sum = await ctx.request('/api/hub/chat/summary', { as: USERS.huyen });
@@ -38,7 +50,7 @@ describe('Tin nhắn (/api/hub/chat)', () => {
     expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:Bad Room', body: 'x' } })).status).toBe(400);
   });
 
-  it('nhóm dự án liên phòng: người các phòng cùng đọc, viết', async () => {
+  it('nhóm dự án: người phòng tham gia đọc, viết; phòng khác bị chặn', async () => {
     expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'p:DA-07', body: 'Hook xong rồi' } })).status).toBe(200);
     const sum = await ctx.request('/api/hub/chat/summary', { as: USERS.huyen });
     expect(sum.body.data.rooms.find((x: { room: string }) => x.room === 'p:DA-07').unread).toBe(1);
@@ -63,6 +75,32 @@ describe('Tin nhắn (/api/hub/chat)', () => {
     bad.set('room', 'g:content');
     bad.set('file', new File([new Uint8Array(10)], 'x.exe', { type: 'application/x-msdownload' }));
     expect((await ctx.request('/api/hub/chat/files', { as: USERS.thao, method: 'POST', formData: bad })).status).toBe(400);
+  });
+
+  it('nhóm phòng chỉ người phòng đó và CEO thấy; nhóm dự án chặn phòng không tham gia', async () => {
+    await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: 'Việc riêng team Content' } });
+    expect((await ctx.request('/api/hub/chat/msgs?room=g:content', { as: USERS.manager })).status).toBe(403);
+    expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.manager, body: { room: 'g:content', body: 'xen vào' } })).status).toBe(403);
+    const sum = await ctx.request('/api/hub/chat/summary', { as: USERS.manager });
+    expect(sum.body.data.rooms.some((x: { room: string }) => x.room === 'g:content')).toBe(false);
+    expect((await ctx.request('/api/hub/chat/msgs?room=g:content', { as: USERS.ceo })).status).toBe(200);
+    expect((await ctx.request('/api/hub/chat/msgs?room=p:DA-07', { as: USERS.manager })).status).toBe(403);
+    expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.manager, body: { room: 'g:chung', body: 'chào cả công ty' } })).status).toBe(200);
+  });
+
+  it('nhóm phối hợp tự tạo (Team Content – Digital): chỉ thành viên thấy; nhân viên không tạo được nhóm', async () => {
+    expect((await ctx.request('/api/hub/chat/groups', { as: USERS.huyen, body: { name: 'Nhóm lạ', members: ['user-thao'] } })).status).toBe(403);
+    const g = await ctx.request('/api/hub/chat/groups', { as: USERS.manager, body: { name: 'Team Content – Digital', members: ['user-thao'] } });
+    expect(g.status).toBe(200);
+    const room = 'n:' + g.body.data.id;
+    expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room, body: 'Ads cần thêm 5 video' } })).status).toBe(200);
+    expect((await ctx.request(`/api/hub/chat/msgs?room=${room}`, { as: USERS.huyen })).status).toBe(403);
+    expect((await ctx.request('/api/hub/chat/groups', { as: USERS.huyen })).body.data).toHaveLength(0);
+    expect((await ctx.request('/api/hub/chat/groups', { as: USERS.thao })).body.data.map((x: { name: string }) => x.name)).toEqual(['Team Content – Digital']);
+    expect((await ctx.request(`/api/hub/chat/groups/${g.body.data.id}`, { as: USERS.thao, method: 'PUT', body: { name: 'Đổi', members: [] } })).status).toBe(403);
+    const up = await ctx.request(`/api/hub/chat/groups/${g.body.data.id}`, { as: USERS.manager, method: 'PUT', body: { name: 'Team Content – Digital', members: ['user-thao', 'user-huyen'] } });
+    expect(up.status).toBe(200);
+    expect((await ctx.request(`/api/hub/chat/msgs?room=${room}`, { as: USERS.huyen })).status).toBe(200);
   });
 
   it('thẻ giao việc: lưu loại tin và mã việc', async () => {

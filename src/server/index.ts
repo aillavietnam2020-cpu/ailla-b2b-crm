@@ -14,6 +14,7 @@ import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
 import { autoSyncEnabled, syncDrivePermissions } from './services/driveSync';
 import { isAdminHost } from './lib/host';
+import { syncAccessEmails } from './lib/access-sync';
 import { readSessionCookie, resolveSession } from './lib/session';
 
 const app = createApp();
@@ -57,6 +58,13 @@ export default {
           console.info('[cron] dang fanpage', JSON.stringify(await publishDue(env.DB, env.INGEST_KEY, (u, i) => fetch(u, i))));
         } catch (error) {
           console.error('[cron] dang fanpage loi', error);
+        }
+        // Cửa vào vanhanh: 15 phút tự cập nhật danh sách email được vào một lần, để CEO không phải bấm "Đồng bộ cửa vào vanhanh"
+        // (thêm / đổi email / khóa tài khoản vẫn đồng bộ ngay; lần chạy này bù khi lần đó lỗi mạng).
+        try {
+          console.info('[cron] cua vao', JSON.stringify(await syncAccessEmails(env)));
+        } catch (error) {
+          console.error('[cron] cua vao loi', error);
         }
         if (new Date(event.scheduledTime).getUTCMinutes() >= 15) return;
         const config = await loadConfig(env.DB);
