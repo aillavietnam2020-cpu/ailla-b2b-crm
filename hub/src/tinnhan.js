@@ -11,7 +11,9 @@ const TN={groups:null,pend:{},files:{},rems:null,info:null,room:"",rooms:[],msgs
 /* máy chủ dùng mã đăng nhập (u.crm), trang dùng mã người trong dữ liệu chung (u.id): phòng, người gửi, người được nhắc đều theo mã đăng nhập */
 const tnMe=()=>(typeof SV!=="undefined"&&SV.me&&SV.me.id)||ME.crm||ME.id;
 const tnU=id=>id?D().users.find(x=>x.crm===id)||D().users.find(x=>x.id===id):null;
-const tnUN=id=>(tnU(id)||{}).name||"";
+/* agent trong chat: mã người gửi "agent:<mã agent>" */
+const tnAg=id=>String(id||"").startsWith("agent:")?(TN.agents||[]).find(a=>"agent:"+a.id===id)||{id:String(id).slice(6),name:"Agent",emoji:"🤖",color:"#4f46e5"}:null;
+const tnUN=id=>{const a=tnAg(id);return a?a.name:(tnU(id)||{}).name||""};
 const tnGroups=()=>[["chung","Chung toàn công ty"]].concat(Object.entries(TEAMS).filter(([k])=>k!=="chung"));
 const tnMyTeam=()=>{const t=ME.phongBan&&typeof KPB_TEAM!=="undefined"&&KPB_TEAM[ME.phongBan]?KPB_TEAM[ME.phongBan]:String(teamOf(ME)||"").toLowerCase();return TEAMS[t]&&t!=="chung"?t:""};
 const tnDm=id=>"dm:"+[tnMe(),id].sort().join("~");
@@ -25,7 +27,7 @@ const tnName=r=>r.startsWith("n:")?((tnGrp(r)||{}).name||"Nhóm"):r.startsWith("
 const tnTime=t=>{const d=new Date(t),n=new Date();return d.toDateString()===n.toDateString()?d.toTimeString().slice(0,5):d.toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit"})};
 const tnDay=t=>{const d=new Date(t),n=new Date(),y=new Date(n-864e5);return d.toDateString()===n.toDateString()?"Hôm nay":d.toDateString()===y.toDateString()?"Hôm qua":d.toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit"})};
 const tnInit=n=>{const w=String(n||"?").trim().split(/\s+/);return (w.length>1?w[w.length-2][0]+w[w.length-1][0]:w[0].slice(0,2)).toUpperCase()};
-const tnAv=(id,name,grp)=>{const c=avC(id);return `<i class="tnav${grp?" g":""}" style="background:${c[0]};color:${c[1]}">${grp?"#":esc(tnInit(name))}</i>`};
+const tnAv=(id,name,grp)=>{const ag=tnAg(id);if(ag)return `<i class="tnav tnavag" style="background:${ag.color}1a;border:1.5px solid ${ag.color}">${ag.emoji||"🤖"}</i>`;const c=avC(id);return `<i class="tnav${grp?" g":""}" style="background:${c[0]};color:${c[1]}">${grp?"#":esc(tnInit(name))}</i>`};
 const tnPeople=()=>D().users.filter(u=>u.active&&u.name&&u.crm&&u.crm!==tnMe());
 const tnTotal=()=>TN.rooms.reduce((a,r)=>a+(r.room===TN.room&&PAGE==="tinnhan"?0:r.unread||0),0);
 const tnLink=t=>esc(t).replace(/@(all|tất cả)(?![\p{L}\d])/giu,'<b class="tnat">@$1</b>').replace(/https?:\/\/[^\s<]+/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m.length>56?m.slice(0,56)+"…":m}</a>`)
@@ -66,22 +68,23 @@ function tnRowHtml(r){const g=/^(g|p|n):/.test(r.room),n=tnName(r.room),l=r.last
   const pv=l?(l.kind==="react"?(l.user_id===tnMe()?"Bạn":tnUN(l.user_id)||"")+(l.body?" đã thả "+l.body:" bỏ cảm xúc"):l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("n:")?"Nhóm phối hợp · chưa có tin":r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
   return `<button class="tnrow${r.room===TN.room?" on":""}${un?" un":""}" data-tnr="${esc(r.room)}">${tnAv(g?r.room:tnOther(r.room),n,g)}<span class="tnrb"><span class="tnr1"><b>${esc(n)}</b>${l?`<small>${tnTime(l.created_at)}</small>`:""}</span><span class="tnr2"><span>${esc(String(pv).replace(/\s+/g," ").slice(0,70))}</span>${un?`<em>${un>99?"99+":un}</em>`:""}</span></span></button>`}
 function tnDrawList(){const el=$("#tnlist");if(!el)return;const R=tnListRows();
-  el.innerHTML=R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`;
-  el.querySelectorAll("[data-tnr]").forEach(b=>b.onclick=()=>TN.popOn&&PAGE!=="tinnhan"?tnPop(b.dataset.tnr):tnOpen(b.dataset.tnr))}
+  el.innerHTML=(R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`)+tnAgentRows();
+  el.querySelectorAll("[data-tnr]").forEach(b=>b.onclick=()=>TN.popOn&&PAGE!=="tinnhan"?tnPop(b.dataset.tnr):tnOpen(b.dataset.tnr));
+  el.querySelectorAll("[data-tnag]").forEach(b=>b.onclick=()=>{if(TN.popOn)tnPopClose();ntOpenAgent(b.dataset.tnag)})}
 function tnTaskCard(m){const id=String(m.ref||"").replace(/^task:/,""),t=(D().tasks||[]).find(x=>x.id===id);
   if(!t)return `<div class="tntask gone">📋 ${esc(m.body)} <small>(việc đã xóa)</small></div>`;
   const st=t.st||"todo",cls=st==="done"?"p-grn":st==="review"?"p-amb":"p-blu";
   return `<div class="tntask"><div class="tntk1"><b>📋 ${esc(t.ten)}</b><span class="pill ${cls}">${esc(cvStN(st))}</span></div><div class="tntk2">Người làm: <b>${esc(userName(t.nguoi)||"chưa giao")}</b>${t.han?` · hạn ${dd(t.han)}`:""}</div><button class="btn sm" data-tntask="${esc(t.id)}">Mở việc</button></div>`}
 function tnMsgHtml(m,prev){const me=m.user_id===tnMe(),cont=prev&&prev.user_id===m.user_id&&new Date(m.created_at)-new Date(prev.created_at)<5*60e3&&!prev.old===!m.old;
   if(m.kind==="remind")return `<div class="tnsys">⏰ ${esc(tnUN(m.user_id)||"")} ${esc(m.body)}</div>`;
-  const body=m.kind==="task"?tnTaskCard(m):m.kind==="file"?tnFileHtml(m):`<div class="tnbub">${tnLink(m.body)}</div>${tnDriveCard(m.body)}`;
+  const body=m.kind==="agent"?`<div class="tnbub tnagb">${tnLink(m.body)}</div>`:m.kind==="task"?tnTaskCard(m):m.kind==="file"?tnFileHtml(m):`<div class="tnbub">${tnLink(m.body)}</div>${tnDriveCard(m.body)}`;
   return `<div class="tnm${me?" me":""}${cont?" cont":""}" data-mid="${m.id||""}">${me||cont?`<i class="tnav sp"></i>`:tnAv(m.user_id,tnUN(m.user_id))}<div class="tnmb">${cont?"":`<div class="tnmh">${me?"":`<b>${esc(tnUN(m.user_id)||"")}</b>`}<small>${new Date(m.created_at).toTimeString().slice(0,5)}</small></div>`}${body}${m.old?"":tnReactHtml(m)}</div>${m.old?"":`<span class="tnma"><button title="Thả cảm xúc" data-tnact="emo">☺</button>${m.kind==="task"||m.kind==="file"?"":`<button title="Giao việc từ tin này" data-tnact="task">📋</button><button title="Nhắc tôi việc này" data-tnact="rem">⏰</button>`}</span>`}</div>`}
 function tnMsgsHtml(room){const old=tnOld(room),L0=TN.msgs[room];
   if(!L0)return `<p class="hint tnempty">Đang tải…</p>`;tnReactBuild(L0);const L=L0.filter(m=>m.kind!=="react");
   let h="",day="",prev=null;const add=m=>{const d=tnDay(m.created_at);if(d!==day){day=d;h+=`<div class="tnday"><span>${d}</span></div>`;prev=null}h+=tnMsgHtml(m,prev);prev=m};
   if(TN.more[room])h+=`<div class="tnday"><button class="lnk" id="tnmore">Xem tin cũ hơn</button></div>`;
   if(old.length&&!TN.more[room]){h+=`<div class="tnday old"><span>Tin của khung trao đổi trước</span></div>`;old.forEach(add);day=""}
-  L.forEach(add);
+  L.forEach(add);h+=tnAgentWaitHtml(room,L);
   return h||`<div class="tnempty"><b>${room.startsWith("dm:")?"Bắt đầu cuộc trò chuyện":"Chưa có tin nhắn trong nhóm"}</b><p class="hint">Gõ @ để gọi tên · 📋 giao việc · ⏰ nhắc việc ngay tại đây.</p></div>`}
 function tnDrawMsgs(keepPos){const el=$("#tnmsgs");if(!el)return;const atEnd=el.scrollHeight-el.scrollTop-el.clientHeight<80,h0=el.scrollHeight,t0=el.scrollTop;
   el.innerHTML=tnMsgsHtml(TN.room);
@@ -106,24 +109,25 @@ PAGES.tinnhan=m=>{if(TN.popOn)tnPopClose();
    <aside class="tnside"><div class="tnsh"><b>Tin nhắn</b><span>${tnBoss()?`<button class="btn sm" id="tnnew" title="Tạo nhóm phối hợp nhiều phòng, ví dụ Team Content – Digital">＋ Nhóm</button> `:""}<button class="btn sm" id="tnrem" title="Nhắc việc sắp tới">⏰ Nhắc việc</button></span></div>
     <input class="tnq" id="tnq" placeholder="Tìm nhóm phòng hoặc người để nhắn…" value="${esc(TN.q)}"><div class="tnlist" id="tnlist"></div></aside>
    <section class="tnmain"><header class="tnhd"><button class="tnback" id="tnback" aria-label="Quay lại">‹</button>${tnAv(g?room:dm,n,g)}<div class="tnhn"><b>${esc(n)}</b><small>${ng?`🔒 Nhóm phối hợp · ${((tnGrp(room)||{}).members||[]).length} thành viên${(tnGrp(room)||{}).created_by===tnMe()||ME.role==="admin"?` · <button type="button" class="lnk" id="tngedit">sửa thành viên</button>`:""}`:pj?"🔒 Nhóm dự án · chỉ người trong dự án":g?(room==="g:chung"?"Mọi người trong công ty":"🔒 Nhóm phòng · chỉ nhân sự phòng này"):"🔒 Nhắn riêng · chỉ hai người thấy"}</small></div>
-     <span class="tnhb"><button class="btn sm" id="tngiao">📋 Giao việc</button><button class="btn sm" id="tnnhac">⏰ Nhắc</button><button class="btn sm${tnInfoOn()?" on":""}" id="tninfo" title="Ảnh, tệp, link, nhắc hẹn của cuộc trò chuyện">ⓘ</button></span></header>
+     <span class="tnhb">${g&&tnBoss()?`<button class="btn sm" id="tnagbtn" title="Thêm agent vào nhóm này">🤖 Agent${tnRoomAgents(room).length?" "+tnRoomAgents(room).length:""}</button>`:""}<button class="btn sm" id="tngiao">📋 Giao việc</button><button class="btn sm" id="tnnhac">⏰ Nhắc</button><button class="btn sm${tnInfoOn()?" on":""}" id="tninfo" title="Ảnh, tệp, link, nhắc hẹn của cuộc trò chuyện">ⓘ</button></span></header>
     <div class="tnmsgs" id="tnmsgs"></div>
     <div class="tnpend" id="tnpend" hidden></div><form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc" aria-label="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh" aria-label="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp Word, Excel, PDF…" aria-label="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><button type="button" class="tnatt" id="tnmic" title="Ghi âm tin nhắn thoại" aria-label="Ghi âm"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><input type="file" id="tnfi" hidden multiple><textarea id="tnin" rows="1" placeholder="Nhắn ${g?"cho nhóm "+esc(n):"riêng cho "+esc(n)}… (Enter gửi, Shift+Enter xuống dòng, @ gọi tên)">${esc(TN.draft[room]||"")}</textarea><button class="btn pri" id="tnsend">Gửi</button></form></section>${tnInfoOn()?tnInfoHtml(room):""}</div>`;
   tnDrawList();tnDrawMsgs();tnBindAtt(room);tnBindEmo();tnBindInfo(room);if(!TN.files[room])tnLoadFiles(room);
   if(!TN.msgs[room])tnLoad(room).then(()=>{if(TN.room===room&&PAGE==="tinnhan"){tnDrawMsgs();tnRead(room)}});else tnRead(room);
-  if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();
+  if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();if(!TN.agents)tnLoadAgents();
+  if($("#tnagbtn"))$("#tnagbtn").onclick=()=>tnAgentForm(room);
   if($("#tnnew"))$("#tnnew").onclick=()=>tnGroupForm(null);if($("#tngedit"))$("#tngedit").onclick=()=>tnGroupForm(tnGrp(room));
   const q=$("#tnq");q.oninput=()=>{TN.q=q.value;tnDrawList()};
   $("#tnback").onclick=()=>{TN.mob=false;$(".tn").classList.remove("open")};
   $("#tngiao").onclick=()=>tnGiao("");$("#tnnhac").onclick=()=>tnRemind("",dm||tnMe());$("#tnrem").onclick=()=>tnRemind("",tnMe());
   const inp=$("#tnin"),sug=$("#tnsug"),fit=()=>{inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,140)+"px"};fit();
-  const send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;inp.value="";TN.draft[room]="";fit();sug.hidden=true;
+  const send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;tnAgentWait(room,v);inp.value="";TN.draft[room]="";fit();sug.hidden=true;
     if(P.length){TN.pend[room]=[];tnDrawPend(room);await tnUpload(room,P)}
     if(v)try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;TN.draft[room]=v;toast(e.message||"Chưa gửi được")}};
   const atQ=()=>{const s=inp.value.slice(0,inp.selectionStart),mm=s.match(/@([\p{L}\d ]{0,20})$/u);return mm?mm[1]:null};
   const drawSug=()=>{const a=atQ();if(a===null){sug.hidden=true;return}const L=tnPeople().filter(u=>u.name.toLowerCase().includes(a.toLowerCase())).slice(0,6);
-    const all=g&&"all tất cả".includes(a.toLowerCase());
-    if(!L.length&&!all){sug.hidden=true;return}sug.hidden=false;sug.innerHTML=(all?`<button type="button" data-at="all"><i class="tnav g">@</i>all<small>gọi cả nhóm</small></button>`:"")+L.map(u=>`<button type="button" data-at="${esc(u.name)}">${tnAv(u.crm,u.name)}${esc(u.name)}<small>${esc(TEAMS[teamOf(u)]||"")}</small></button>`).join("");
+    const all=g&&"all tất cả".includes(a.toLowerCase()),AG=tnRoomAgents(room).filter(x=>x.name.toLowerCase().includes(a.toLowerCase()));
+    if(!L.length&&!all&&!AG.length){sug.hidden=true;return}sug.hidden=false;sug.innerHTML=(all?`<button type="button" data-at="all"><i class="tnav g">@</i>all<small>gọi cả nhóm</small></button>`:"")+AG.map(x=>`<button type="button" data-at="${esc(x.name)}">${tnAv("agent:"+x.id,x.name)}${esc(x.name)}<small>agent</small></button>`).join("")+L.map(u=>`<button type="button" data-at="${esc(u.name)}">${tnAv(u.crm,u.name)}${esc(u.name)}<small>${esc(TEAMS[teamOf(u)]||"")}</small></button>`).join("");
     sug.querySelectorAll("[data-at]").forEach(b=>b.onmousedown=e=>{e.preventDefault();const p=inp.selectionStart,s=inp.value.slice(0,p).replace(/@([\p{L}\d ]{0,20})$/u,"@"+b.dataset.at+" ");inp.value=s+inp.value.slice(p);inp.setSelectionRange(s.length,s.length);TN.draft[room]=inp.value;sug.hidden=true;inp.focus()})};
   inp.oninput=()=>{TN.draft[room]=inp.value;fit();drawSug()};
   inp.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();const b=sug.hidden?null:sug.querySelector("[data-at]");if(b)b.onmousedown(e);else send()}else if(e.key==="Escape")sug.hidden=true};
@@ -287,8 +291,8 @@ function tnBindEmo(){const b=$("#tnemo"),inp=$("#tnin");if(!b||!inp)return;b.onc
 /* ---------- cửa sổ chat nhỏ góc dưới phải (kiểu Messenger) ---------- */
 function tnPopClose(){const p=$("#tnpop");if(p)p.remove();TN.popOn=false;TN.popRoom=""}
 async function tnPop(room){let p=$("#tnpop");if(!p){p=document.createElement("div");p.id="tnpop";p.className="tnpop";document.body.appendChild(p)}TN.popOn=true;TN.popRoom=room||"";
-  if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();
-  const full=`<button type="button" class="tnpx" id="tnp-full" title="Mở trang Tin nhắn đầy đủ">⤢</button><button type="button" class="tnpx" id="tnp-x" title="Đóng">✕</button>`;
+  if(!TN.sumAt)tnSummary();if(TN.groups===null)tnLoadGroups();if(!TN.agents)tnLoadAgents();
+  const full=`<button type="button" class="tnpx" id="tnp-big" title="${TN.popBig?"Thu nhỏ":"Phóng to"}">${TN.popBig?"🗕":"🗖"}</button><button type="button" class="tnpx" id="tnp-full" title="Mở trang Tin nhắn đầy đủ">⤢</button><button type="button" class="tnpx" id="tnp-x" title="Đóng">✕</button>`;
   if(!room){p.innerHTML=`<div class="tnph"><b>Tin nhắn</b><span class="sp"></span>${full}</div><input class="tnq" id="tnq" placeholder="Tìm nhóm hoặc người…" value="${esc(TN.q||"")}"><div class="tnlist" id="tnlist"></div>`;
     tnDrawList();const q=$("#tnq");q.oninput=()=>{TN.q=q.value;tnDrawList()}}
   else{TN.room=room;const g=/^(g|p|n):/.test(room),n=tnName(room);
@@ -297,13 +301,14 @@ async function tnPop(room){let p=$("#tnpop");if(!p){p=document.createElement("di
      <form class="tnf" id="tnf"><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><button type="button" class="tnatt" id="tnmic" title="Ghi âm tin nhắn thoại" aria-label="Ghi âm"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><input type="file" id="tnfi" hidden multiple>
       <textarea id="tnin" rows="1" placeholder="Nhắn ${esc(n)}…">${esc(TN.draft[room]||"")}</textarea><button class="btn sm pri">Gửi</button></form></div>`;
     $("#tnp-back").onclick=()=>tnPop("");
-    const inp=$("#tnin"),send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;inp.value="";TN.draft[room]="";
+    const inp=$("#tnin"),send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;tnAgentWait(room,v);inp.value="";TN.draft[room]="";
       if(P.length){TN.pend[room]=[];tnDrawPend(room);await tnUpload(room,P)}
       if(v)try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;toast(e.message||"Chưa gửi được")}};
     $("#tnf").onsubmit=e=>{e.preventDefault();send()};inp.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}};inp.oninput=()=>{TN.draft[room]=inp.value};
     tnBindAtt(room);tnBindEmo();setTimeout(()=>inp.focus(),0);
     if(!TN.files[room])tnLoadFiles(room);
     if(!TN.msgs[room])await tnLoad(room);else tnLoad(room);if(TN.popRoom===room){tnDrawMsgs();tnRead(room)}}
+  p.classList.toggle("big",!!TN.popBig);$("#tnp-big").onclick=()=>{TN.popBig=!TN.popBig;tnPop(TN.popRoom)};
   $("#tnp-x").onclick=tnPopClose;$("#tnp-full").onclick=()=>{const r=TN.popRoom;tnPopClose();if(r)TN.room=r,TN.mob=true;ntPage("tinnhan")}}
 
 /* ---------- ghi âm tin nhắn thoại (chị Hoa 03/11): bấm 🎤 nói, bấm lại để dừng → vào khay chờ, nghe thử rồi bấm Gửi ----------
@@ -321,3 +326,22 @@ async function tnRecToggle(room,btn){
     const s=Math.max(1,Math.round((Date.now()-t0)/1000)),base=(rec.mimeType||type||"audio/webm").split(";")[0],ext=base.includes("ogg")?"ogg":base.includes("mp4")?"m4a":"webm";
     if(!parts.length||s<1)return;const f=new File(parts,`Ghi âm ${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}.${ext}`,{type:base});tnAddPend(room,[f])};
   rec.start(1000);TN_REC=rec;btn.classList.add("rec");btn.title="Bấm để dừng ghi âm";toast("Đang ghi âm… bấm lại nút 🎤 để dừng")}
+
+/* ---------- agent trong nhóm chat (chị Hoa 03/11): CEO / Lead thêm agent vào nhóm; agent chỉ trả lời khi được gọi @tên ---------- */
+async function tnLoadAgents(){TN.agents=TN.agents||[];try{TN.agents=await svApi("/api/hub/chat/agents")}catch(e){}
+  try{TN.myAgents=(await svApi("/api/agent-chat/agents")||{}).agents||[]}catch(e){TN.myAgents=[]}if(PAGE==="tinnhan"||TN.popOn){tnDrawList();if(TN.msgs[TN.room])tnDrawMsgs(true)}}
+const tnRoomAgents=room=>((D().chatAgents||{})[room]||[]).map(id=>(TN.agents||[]).find(a=>a.id===id)).filter(Boolean);
+function tnAgentRows(){const L=(TN.myAgents||[]).map(a=>(TN.agents||[]).find(x=>x.id===(a.id||a.agent))||a).filter(a=>a&&a.id);if(!L.length||(TN.q||"").trim())return "";
+  return `<div class="tnagh">🤖 Nói chuyện riêng với agent</div>${L.map(a=>`<button class="tnrow" data-tnag="${esc(a.id)}">${tnAv("agent:"+a.id,a.name)}<span class="tnrb"><span class="tnr1"><b>${esc(a.name)}</b></span><span class="tnr2"><span>${esc(a.title||"Agent")}</span></span></span></button>`).join("")}`}
+function tnAgentForm(room){const cur=new Set((D().chatAgents||{})[room]||[]);
+  openDrawerHTML(`<h2>🤖 Agent trong nhóm ${esc(tnName(room))}</h2><p class="hint">Agent chỉ trả lời khi có người gọi @tên (ví dụ @Lead Content). Khi được gọi, agent đọc các tin gần đây của nhóm nên không cần kể lại việc đang làm.</p>
+   <form class="frm" id="tnag-f"><div class="tnagl">${(TN.agents||[]).map(a=>`<label class="ck">${tnAv("agent:"+a.id,a.name)}<input type="checkbox" name="tnag" value="${esc(a.id)}" ${cur.has(a.id)?"checked":""}> <b>${esc(a.name)}</b> <small class="hint">${esc(a.title||"")}</small></label>`).join("")}</div>
+   <div class="acts"><button class="btn pri">Lưu</button></div></form>`);
+  $("#tnag-f").onsubmit=e=>{e.preventDefault();const ids=[...document.querySelectorAll("[name=tnag]:checked")].map(i=>i.value);
+    DB.mutate(ME.name,"agent trong nhóm chat "+tnName(room),dt=>{dt.chatAgents=dt.chatAgents||{};if(ids.length)dt.chatAgents[room]=ids;else delete dt.chatAgents[room]});
+    toast(ids.length?"Đã thêm "+ids.length+" agent vào nhóm":"Đã bỏ agent khỏi nhóm");closeDrawer();renderMain()}}
+/* gửi tin có gọi @agent: hiện "đang trả lời…" tới khi agent trả lời (tối đa 15 phút) */
+function tnAgentWait(room,v){const A=tnRoomAgents(room).filter(a=>(v||"").toLowerCase().includes("@"+a.name.toLowerCase()));if(!A.length)return;
+  TN.agWait=TN.agWait||{};TN.agWait[room]=(TN.agWait[room]||[]).concat(A.map(a=>({id:a.id,at:Date.now()})))}
+function tnAgentWaitHtml(room,L){const W=((TN.agWait||{})[room]||[]).filter(w=>Date.now()-w.at<15*60e3&&!L.some(m=>m.user_id==="agent:"+w.id&&Date.parse(m.created_at)>=w.at-5e3));
+  if(TN.agWait)TN.agWait[room]=W;return W.map(w=>{const a=(TN.agents||[]).find(x=>x.id===w.id)||{name:"Agent"};return `<div class="tnsys tnagwait">${esc(a.emoji||"🤖")} ${esc(a.name)} đang đọc nhóm và trả lời…</div>`}).join("")}

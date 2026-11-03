@@ -17,6 +17,7 @@ beforeEach(async () => {
       { id: 'u_chi', crm: 'user-ceo', role: 'admin', phongBan: 'BDH' },
     ],
     projects: [{ id: 'DA-07', team: 'content', teams: [], owner: 'u_thao', tv: [] }],
+    chatAgents: { 'g:content': ['lead-content-ailla'] },
   };
   await ctx.db.prepare("INSERT INTO hub_state (id, version, data, updated_at) VALUES ('main', 1, ?, ?)").bind(await pack(JSON.stringify(hub)), '2026-11-03T00:00:00Z').run();
 });
@@ -101,6 +102,27 @@ describe('Tin nhắn (/api/hub/chat)', () => {
     const up = await ctx.request(`/api/hub/chat/groups/${g.body.data.id}`, { as: USERS.manager, method: 'PUT', body: { name: 'Team Content – Digital', members: ['user-thao', 'user-huyen'] } });
     expect(up.status).toBe(200);
     expect((await ctx.request(`/api/hub/chat/msgs?room=${room}`, { as: USERS.huyen })).status).toBe(200);
+  });
+
+  it('agent trong nhóm: chỉ trả lời khi được gọi @tên, nhận tin gần đây làm bối cảnh, câu trả lời về đúng nhóm', async () => {
+    ctx.env.AGENT_RELAY_KEY = 'relay-k';
+    await ctx.request('/api/hub/chat/msgs', { as: USERS.huyen, body: { room: 'g:content', body: 'Tuần này quay 30 video tinh dầu' } });
+    await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: 'Không gọi ai cả' } });
+    expect((await ctx.db.prepare("SELECT COUNT(*) AS n FROM agent_chat").first<{ n: number }>())!.n).toBe(0);
+    await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: '@Lead Content chia việc giúp nhóm' } });
+    const q = await ctx.db.prepare("SELECT id, agent, body, owner_id FROM agent_chat WHERE role = 'USER'").first<{ id: number; agent: string; body: string; owner_id: string }>();
+    expect(q!.agent).toBe('lead-content-ailla');
+    expect(q!.body).toContain('Tuần này quay 30 video tinh dầu');
+    expect(q!.owner_id).toBe('user-thao');
+    const push = await ctx.app.fetch(new Request('http://x/api/agent-relay/push', { method: 'POST', headers: { 'X-Relay-Key': 'relay-k', 'Content-Type': 'application/json' }, body: JSON.stringify({ id: q!.id, reply: 'Quỳnh 15 video, May 15 video' }) }), ctx.env);
+    expect(push.status).toBe(200);
+    const list = await ctx.request('/api/hub/chat/msgs?room=g:content', { as: USERS.huyen });
+    const last = list.body.data[list.body.data.length - 1];
+    expect(last.user_id).toBe('agent:lead-content-ailla');
+    expect(last.body).toBe('Quỳnh 15 video, May 15 video');
+    // agent không thuộc nhóm thì gọi tên cũng không gửi
+    await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: '@Kế toán trưởng xem giúp' } });
+    expect((await ctx.db.prepare("SELECT COUNT(*) AS n FROM agent_chat WHERE agent = 'ke-toan-truong-ailla'").first<{ n: number }>())!.n).toBe(0);
   });
 
   it('thẻ giao việc: lưu loại tin và mã việc', async () => {

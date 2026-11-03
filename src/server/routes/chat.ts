@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { nowIso } from '@shared/datetime';
 import type { AppEnv } from '../env';
 import { badRequest, forbidden, notFound, ok } from '../lib/http';
+import { AGENT_ROSTER } from '@shared/agentRoster';
 import { unpack } from '../lib/pack';
 import { requirePermission } from '../middleware/rbac';
 
@@ -32,7 +33,7 @@ export function teamKey(u: HubU | null): string {
   return String(u.phongBan ?? '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
 }
 /* người + dự án trong dữ liệu chung: chỉ giải nén lại khi bản chung đổi phiên bản (bản chung nặng) */
-let HUB: { v: string; users: HubU[]; projects: HubP[] } | null = null;
+let HUB: { v: string; users: HubU[]; projects: HubP[]; agents: Record<string, string[]> } | null = null;
 async function hubCtx(db: D1Database, fresh = false) {
   const vr = await db.prepare("SELECT version, updated_at FROM hub_state WHERE id = 'main'").first<{ version: number; updated_at: string }>();
   const v = vr ? vr.version + '|' + vr.updated_at : '';
@@ -40,16 +41,18 @@ async function hubCtx(db: D1Database, fresh = false) {
   const row = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
   let users: HubU[] = [];
   let projects: HubP[] = [];
+  let agents: Record<string, string[]> = {};
   if (row) {
     try {
-      const d = JSON.parse(await unpack(row.data)) as { users?: HubU[]; projects?: HubP[] };
+      const d = JSON.parse(await unpack(row.data)) as { users?: HubU[]; projects?: HubP[]; chatAgents?: Record<string, string[]> };
       users = Array.isArray(d.users) ? d.users : [];
       projects = Array.isArray(d.projects) ? d.projects : [];
+      agents = d.chatAgents && typeof d.chatAgents === 'object' ? d.chatAgents : {};
     } catch {
       /* dữ liệu hỏng: coi như chưa có ai */
     }
   }
-  HUB = { v, users, projects };
+  HUB = { v, users, projects, agents };
   return HUB;
 }
 type Acc = { id: string; hubId: string; team: string; ceo: boolean; lead: boolean; db: D1Database };
@@ -162,6 +165,7 @@ chatRoutes.post('/msgs', async (c) => {
   )
     .bind(me, room, id)
     .run();
+  if (!kind && body.includes('@')) await callAgents(A, room, body, me).catch(() => undefined);
   return ok(c, { id, room, user_id: me, body, kind, ref, created_at: at });
 });
 
@@ -346,3 +350,33 @@ chatRoutes.delete('/groups/:id', async (c) => {
   await c.env.DB.prepare('DELETE FROM chat_groups WHERE id = ?').bind(c.req.param('id')).run();
   return ok(c, { deleted: true });
 });
+
+/* ---------- Agent trong nhóm chat (chị Hoa 03/11): Lead / CEO thêm agent vào nhóm (dữ liệu chung chatAgents[phòng]);
+   agent CHỈ trả lời khi được gọi @tên. Web gửi cho agent các tin gần đây của nhóm để agent hiểu bối cảnh, không phải kể lại;
+   câu trả lời (cầu nối VPS /api/agent-relay/push) được đưa về đúng nhóm (app_kv chatlink:<mã tin agent>). ---------- */
+const CONTEXT_N = 20;
+async function callAgents(A: Acc, room: string, body: string, me: string) {
+  const hub = await hubCtx(A.db);
+  const ids = hub.agents[room] ?? [];
+  if (!ids.length) return;
+  const low = body.toLowerCase();
+  const called = AGENT_ROSTER.filter((a) => ids.includes(a.id) && low.includes('@' + a.name.toLowerCase()));
+  if (!called.length) return;
+  const rows = await A.db.prepare("SELECT user_id, body, kind, created_at FROM chat_msgs WHERE room = ? AND kind IN ('', 'agent', 'task') ORDER BY id DESC LIMIT ?").bind(room, CONTEXT_N).all<{ user_id: string; body: string; kind: string; created_at: string }>();
+  const who = (id: string) => (id.startsWith('agent:') ? AGENT_ROSTER.find((a) => 'agent:' + a.id === id)?.name ?? 'Agent' : (hub.users.find((u) => u.crm === id) as (HubU & { name?: string }) | undefined)?.name ?? 'Nhân sự');
+  const hhmm = (s: string) => new Date(Date.parse(s) + 7 * 3600e3).toISOString().slice(11, 16);
+  const ctx = (rows.results ?? []).reverse().map((m) => `- ${who(m.user_id)} (${hhmm(m.created_at)}): ${m.body.slice(0, 600)}`).join('\n');
+  const sender = who(me);
+  const now = nowIso();
+  for (const a of called) {
+    const text = `[Bạn đang được gọi trong nhóm chat "${room}" trên web AILLA. Trả lời ngắn gọn bằng tiếng Việt, trả lời ngay trong nhóm.]\nTin gần đây trong nhóm:\n${ctx}\n\n${sender} hỏi bạn: ${body}`;
+    const r = await A.db.prepare(`INSERT INTO agent_chat (agent, role, body, status, tg, created_by, owner_id, created_at, updated_at) VALUES (?, 'USER', ?, 'queued', 0, ?, ?, ?, ?)`)
+      .bind(a.id, text.slice(0, 20000), me, me, now, now)
+      .run();
+    const acId = Number(r.meta.last_row_id);
+    await A.db.prepare('INSERT INTO app_kv (k, v, updated_at) VALUES (?, ?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at').bind('chatlink:' + acId, room, now).run();
+  }
+}
+
+/** Agent để hiện tên / gợi ý @ trong chat (ai vào web vận hành cũng xem được danh sách tên). */
+chatRoutes.get('/agents', (c) => ok(c, AGENT_ROSTER.map((a) => ({ id: a.id, name: a.name, title: a.title, emoji: a.emoji, color: a.color }))));
