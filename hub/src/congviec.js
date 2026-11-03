@@ -984,7 +984,9 @@ function pCvV(m){
     else if(CVV.view==="board")pCvKb(body);
     else if(CVV.view==="cal")pCvLich(body);
     else if(CVV.view==="gantt")pCvGantt(body);
-    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ bạn${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}}
+    else if(listMine){const nOther=WK.items?wkMine().filter(x=>!x.taskId).reduce((z,x)=>z+x.count,0):"";body.innerHTML=`<div id="cvv-mt"></div><details class="card flush cvvid"><summary class="card-h pad"><h2>Việc khác đang chờ bạn${nOther?` <span class="pill p-amb">${nOther}</span>`:""}</h2><span class="hint">đơn hàng, kho, kế toán, duyệt video… · bấm để mở</span></summary><div id="cvv-wk"></div></details>`;cvWhoSet("mine");cvNvRaw(body.querySelector("#cvv-mt"));WK.noTask=true;try{wkEmbed(body.querySelector("#cvv-wk"))}finally{WK.noTask=false}
+      /* bảng việc giao trống thì mở sẵn "Việc khác đang chờ bạn" (chị Hoa 03/11: tưởng mất việc của tôi) */
+      {const mt=body.querySelector("#cvv-mt"),dt=body.querySelector(".cvvid");if(dt&&nOther&&(!mt.querySelector("tbody tr")||/Chưa có việc/.test(mt.textContent)))dt.open=true}}
     else cvNvRaw(body);
   }catch(e){console.error("Trang Việc lỗi",e);body.innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> Chụp dòng này gửi người quản trị web: ${esc(String(e&&e.message||e))}</div>`}
   m.querySelectorAll("[data-vs]").forEach(b=>b.onclick=()=>{CVV.scope=b.dataset.vs;cvWhoSet(CVV.scope==="mine"?"mine":"all");CVF.st="";renderMain()});
