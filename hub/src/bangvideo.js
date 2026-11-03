@@ -245,8 +245,9 @@ function bvAutoTrim(){
 /* số trên tab kênh: đã duyệt / kế hoạch tháng của kênh (kế hoạch = mục tiêu tổng tháng chị đặt; = 0 thì chỉ hiện số đã duyệt) */
 function bvTabN(d,k){const kp=k===WP_K?(d.fpPlan||[]).reduce((a,x)=>a+(+x.sl||0),0):kn(d,k).T,dn=d.cards.filter(x=>x.kenh===k&&["dang","xong"].includes(x.step)).length;return kp?dn+"/"+kp:String(dn)}
 function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
-  const d=D(),lead=xvGive(),give=true,team=xvTeam(),td=d.settings.today,chs=CHANNELS.filter(ch=>ptPairs().some(x=>x.kenh===ch.k||d.cards.some(c=>c.kenh===ch.k)));
-  if(!BV.k||!chs.some(c=>c.k===BV.k))BV.k=(chs[0]||{}).k||"";
+  const d=D(),lead=xvGive(),give=true,team=xvTeam(),td=d.settings.today,chs=CHANNELS.filter(ch=>ptPairs().some(x=>x.kenh===ch.k&&+x.sl>0)||d.cards.some(c=>c.kenh===ch.k));
+  /* mở Điều phối: kênh mình giữ có video thì vào kênh đó, không thì kênh đầu tiên có video (không đứng ở kênh trống) */
+  if(!BV.k||!chs.some(c=>c.k===BV.k)){const has=k=>d.cards.some(c=>c.kenh===k),mine=chs.find(c=>chanOwner(c.k)===ME.id&&has(c.k));BV.k=(mine||chs.find(c=>has(c.k))||chs[0]||{}).k||""}
   if(!lead)BV.ng=ME.id;
   if(bvAutoTrim()){renderMain();return}
   if(bvAutoSync(chs)){renderMain();return}
