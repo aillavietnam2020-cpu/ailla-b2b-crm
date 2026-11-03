@@ -235,12 +235,16 @@ function tkResultHtml(t){
 function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
   /* việc nhân sự tự thêm cho mình: tự bấm Xong, không qua duyệt */
+  /* xin từ chối việc (chị Hoa 03/11): nhân sự ghi lý do, người giao / Lead duyệt */
+  {const tc=t.tuChoi;if(tc&&tc.st==="cho"){const can=tkTcCan(t);return `<div class="tkres rv"><b>${esc(userName(tc.by)||"")} xin từ chối việc này</b><p>“${esc(tc.lyDo)}”</p><small class="hint">Gửi lúc ${esc(tc.at||"")}</small>${can?`<div class="acts"><button type="button" class="btn sm pri" id="t-tcok">Đồng ý, không cần làm</button><button type="button" class="btn sm" id="t-tcno">Không đồng ý, vẫn làm</button></div>`:`<p class="hint">Đang chờ ${esc(userName(t.tao)||"quản lý")} duyệt.</p>`}</div>`}}
+  const tcBtn=doer&&!t.tuThem&&t.tao&&t.tao!==ME.id&&["todo","nhan","doing"].includes(t.st)?`<button type="button" class="btn sm danger" id="t-tc" title="Không làm được việc này: ghi lý do gửi người giao duyệt">Từ chối việc</button>`:"";
+  const tcNo=t.tuChoi&&t.tuChoi.st==="khong"&&t.st!=="done"?`<div class="note amb">Xin từ chối không được duyệt${t.tuChoi.note?": "+esc(t.tuChoi.note):""}. Việc vẫn cần làm.</div>`:"";
   if(t.tuThem&&t.tao===t.nguoi&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}</div>`;
   if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Trả lại</button><button type="button" class="btn sm pri" id="t-duyet">${t.vong!==2&&tkV2(t)&&ME.role!=="admin"?"✓ Duyệt, chuyển CEO duyệt":"✓ Duyệt hoàn thành"}</button></div></div>`
     :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt${tkV2(t)?(t.vong===2?" vòng 2":" vòng 1"):""}</b>${sub}</div>`;
   if(doer){const need=!!tkDoneErr(t);
-    return `<div class="tkres"><b>Nộp kết quả</b>${t.st==="todo"||t.st==="nhan"?`<div class="acts"><span class="hint">Trạng thái: ${cvStN(t.st)}</span>${t.st==="todo"?`<button type="button" class="btn sm" data-tkq="nhan">Nhận việc</button>`:""}<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button></div>`:""}${t.tlNote?`<p class="tkback">↩ Bị trả lại: ${esc(t.tlNote)}</p>`:""}
+    return tcNo+`<div class="tkres"><b>Nộp kết quả</b>${tcBtn?`<span style="float:right">${tcBtn}</span>`:""}${t.st==="todo"||t.st==="nhan"?`<div class="acts"><span class="hint">Trạng thái: ${cvStN(t.st)}</span>${t.st==="todo"?`<button type="button" class="btn sm" data-tkq="nhan">Nhận việc</button>`:""}<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button></div>`:""}${t.tlNote?`<p class="tkback">↩ Bị trả lại: ${esc(t.tlNote)}</p>`:""}
       <textarea id="t-kqn" rows="2" placeholder="Đã làm gì, kết quả ra sao">${esc(t.kqNote||"")}</textarea>
       <input id="t-kql" placeholder="Link kết quả (Drive, bài đăng, video…) nếu có" value="${esc(t.kq||"")}">
       <div id="t-kqfl"></div><label class="btn sm tkup">📎 Thêm ảnh / file<input type="file" id="t-kqf" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label>
@@ -334,6 +338,9 @@ function openTask(id){
   if($("#t-bf"))$("#t-bf").onchange=async e=>{const add=await tkUpload(e.target.files,t?t.id:"");e.target.value="";if(!add.length)return;bf.push(...add);
     if(t)DB.mutate(ME.name,`gửi ${add.length} file vào việc "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(x){x.files=(x.files||[]).concat(add);tkLog(x,"Gửi kèm "+add.map(f=>f.name).join(", "))}});toast("Đã gửi file");fl()};
   if($("#t-kqf"))$("#t-kqf").onchange=async e=>{const add=await tkUpload(e.target.files,t?t.id:"");e.target.value="";if(add.length){kqF.push(...add);fl()}};
+  if($("#t-tc"))$("#t-tc").onclick=()=>{const r=(prompt("Lý do từ chối việc này (gửi người giao duyệt):")||"").trim();if(!r){toast("Ghi lý do để người giao biết");return}tkTuChoi(t.id,"gui",r);toast("Đã gửi xin từ chối");openTask(t.id);renderMain()};
+  if($("#t-tcok"))$("#t-tcok").onclick=()=>{if(!confirm("Đồng ý từ chối: việc được bỏ, không cần làm?"))return;tkTuChoi(t.id,"ok");toast("Đã đồng ý, việc được bỏ");closeDrawer();renderMain()};
+  if($("#t-tcno"))$("#t-tcno").onclick=()=>{const n=(prompt("Vì sao vẫn cần làm? (nhân sự sẽ nhận được)")||"").trim();tkTuChoi(t.id,"khong",n);toast("Đã báo nhân sự vẫn làm");openTask(t.id);renderMain()};
   $("#drawer").querySelectorAll("[data-tkq]").forEach(b=>b.onclick=()=>{tkSetSt(t.id,b.dataset.tkq);toast("Đã chuyển: "+cvStN(b.dataset.tkq));openTask(t.id);renderMain()});
   if($("#t-pin"))$("#t-pin").onclick=()=>{tkPinToggle(t.id);openTask(t.id);renderMain()};
   if(t)tkBindChat(t);
@@ -375,6 +382,14 @@ function openTask(id){
   try{tkFormRow()}catch(e){console.error("bố cục form giao việc",e)}
   if(t)try{tkLayout(t,gv)}catch(e){console.error("bố cục chi tiết việc",e)}
 }
+/* Từ chối việc: người duyệt là người giao (CEO / Lead cũng duyệt được). Đồng ý thì việc chuyển sang lưu trữ (dt.tasksHuy), không tính vào số liệu. */
+const tkTcCan=t=>!!ME&&ME.id!==t.nguoi&&(t.tao===ME.id||ME.role==="admin"||(typeof tkLeadOf==="function"&&(tkLeadOf(t)||{}).id===ME.id));
+function tkTuChoi(id,act,txt){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
+  DB.mutate(ME.name,(act==="gui"?"xin từ chối việc: ":act==="ok"?"đồng ý từ chối việc: ":"không đồng ý từ chối việc: ")+t0.ten,dt=>{const i=dt.tasks.findIndex(y=>y.id===id);if(i<0)return;const x=dt.tasks[i],now=new Date().toLocaleString("vi-VN"),ref="task:"+x.id,N=(ids,m)=>{if(typeof notifyU==="function")notifyU(dt,ids,m,ref)};
+    if(act==="gui"){x.tuChoi={by:ME.id,lyDo:txt,at:now,st:"cho"};tkLog(x,ME.name+" xin từ chối: "+txt);const to=[x.tao,(tkLeadOf(x)||{}).id].filter(Boolean);N(to,`${ME.name} xin từ chối việc "${x.ten}": ${txt}`)}
+    else if(act==="ok"){x.tuChoi=Object.assign({},x.tuChoi,{st:"ok",duyet:ME.name,duyetAt:now});tkLog(x,ME.name+" đồng ý từ chối, việc được bỏ");N([x.nguoi,...(x.phoi||[])],`${ME.name} đồng ý: việc "${x.ten}" không cần làm nữa`);
+      dt.tasksHuy=(dt.tasksHuy||[]).concat(Object.assign({},x,{huyAt:now})).slice(-300);dt.tasks.splice(i,1)}
+    else{x.tuChoi=Object.assign({},x.tuChoi,{st:"khong",note:txt||"",duyet:ME.name,duyetAt:now});tkLog(x,ME.name+" không đồng ý từ chối"+(txt?": "+txt:""));N([x.nguoi],`${ME.name} không đồng ý từ chối, việc "${x.ten}" vẫn cần làm${txt?": "+txt:""}`)}})}
 /* Form giao việc gọn (chị Hoa 03/11): "Người cùng làm / hỗ trợ" thành ô bấm sổ ra, chọn nhiều người;
    ô đó và "Lặp lại" lên cùng hàng với Team, Dự án. Chỉ dời chỗ, giữ nguyên ô nhập đã gắn việc. */
 function tkFormRow(){const team=$("#t-team"),row=team&&team.closest(".row4"),ph=$("#t-phw");if(!row)return;row.classList.add("tkrow4");
@@ -990,6 +1005,7 @@ function cvMyItems(){
   const add=(o)=>L.push(Object.assign({oldest:null,age_days:0,page:"",count:1},o));
   (d.tasks||[]).filter(t=>t.st!=="done").forEach(t=>{
     const who=userName(t.tao)||"—";
+    if(t.tuChoi&&t.tuChoi.st==="cho"&&tkTcCan(t)){add({key:"tc_"+t.id,group:G2,title:t.ten,chip:"Xin từ chối",chipC:"red",detail:`${userName(t.tuChoi.by)||""}: ${t.tuChoi.lyDo}`,taskId:t.id,btn:"Xem & duyệt"});return}
     if(t.cd&&t.cd.length){
       const act=tkActive(t);
       tkCdWait(t).forEach(({s,q})=>add({key:"dp_"+s.id+q.nguoi,group:G2,title:`${t.ten} · ${s.ten}`,chip:"Duyệt",detail:`${userName(q.nguoi)||"—"} gửi duyệt${q.sl?` · ${+q.xong||0}/${q.sl} ${s.dv||""}`:""}`,age_days:late(s.han),taskId:t.id}));

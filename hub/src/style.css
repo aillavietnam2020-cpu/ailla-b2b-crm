@@ -999,3 +999,5 @@ body:has(#tnpop) #ntpop{right:392px}
 .row4.tkrow4{grid-template-columns:repeat(3,minmax(0,1fr))}
 .tkcdrow{display:flex;gap:16px;align-items:flex-start}.tkcdrow>#t-cdw{flex:1;min-width:0}.tkcdrow>.tklapc{width:240px;flex:none}
 @media(max-width:700px){.tkcdrow{flex-direction:column}.tkcdrow>.tklapc{width:auto}}
+/* chị Hoa 03/11: bỏ ô Trạng thái trong khung việc (việc mới là Cần làm; tiến độ ở thanh bước trên đầu) */
+#drawerIn #t-stw{display:none!important}
