@@ -80,6 +80,7 @@
     const P=pagesOf(),has=id=>P.some(x=>x.id===id),first=ids=>ids.find(has);
     const don=first(["cr_dn","cr_s_dn"]),ret=first(["kho_hoan"]),xuat=first(["kho_xuat_b2b","kho_xuat","sx_kho"]);
     const A=[];
+    if(has("cc_toi"))A.push(["Chấm công","user",()=>goPage("cc_toi")]); // chấm công trên điện thoại (chamcong.js)
     if(don)A.push(["Tạo đơn","plus",()=>newOrder(don)]);
     if(don)A.push(["Đơn hàng","order",()=>goPage(don)]);
     if(ret)A.push(["Hàng hoàn","box",()=>goPage(ret)]);
