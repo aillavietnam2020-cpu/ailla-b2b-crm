@@ -82,7 +82,7 @@
         ["Kho thành phẩm",[["kho_ton_tp","Tồn kho thành phẩm"],["kho_nhap_tp","Nhập hàng mua ngoài"],"kho_xuat_b2b","kho_online","kho_hoan",["kho_xuat_tp","Xuất thành phẩm khác"]]],
         ["Kiểm kê & đối chiếu",[["kho_kk","Kiểm kê tồn"],"kho_nxt","kho_cl"]],
         ["Danh mục",["kho_dm","kho_vo","kho_map","kho_combo","kho_boc"]]],
-      cv:[["",["cv_ov","cv_v","cv_pbv","cv_da","cv_mt","cv_pb","cv_nk","hq"]]], /* chị Hoa 02/11: bỏ Quy chuẩn (bảng cũ từ Sheet); Quy tắc vận hành chỉ để ở quản trị › Cấu hình › Theo dõi */
+      cv:[["",["cv_ov","cv_v","cv_pbv","cv_pb","cv_da","cv_mt","cv_nk","hq"]]], /* chị Hoa 02/11: bỏ Quy chuẩn (bảng cũ từ Sheet); Quy tắc vận hành chỉ để ở quản trị › Cấu hình › Theo dõi */
       agt:[["",["agentchat","hoithoaiagent","huanluyenagent",["ai","Trợ lý AI"]]]]};
     /* Chuyển sang web quản trị (kế toán, chính sách): đã có sẵn ở đó.
        Kho bill, Phiếu chi vận chuyển ở CẢ hai web (chị Hoa chốt 26/10): sale nhập bill, chị Thảo lập phiếu chi bên vận hành;

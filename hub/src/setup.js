@@ -68,7 +68,7 @@ const PAGE_SETS=[
   {n:"Việc của tôi",ids:["cv_v","cv_tc","cv_nv","cv_kb","cv_lich","cv_vt","cv"],labels:[],noBar:true},
   {n:"Bảng tiến độ",ids:["cv_kb","congviec"],labels:["Tất cả việc","Theo bước video"]},
   {n:"Lịch",ids:["cv_lich","giaoviec"],labels:["Lịch việc","Lịch quay"]},
-  {n:"Phòng ban",ids:["cv_pbv"],labels:[],noBar:true},
+  {n:"Phòng ban",ids:["cv_pbv","cv_pb"],labels:[],noBar:true},
   {n:"Dự án",ids:["cv_da","cv_mt"],labels:[],noBar:true},
   /* Marketing: mục cha bấm vào sổ ra các trang con ngay ở thanh bên (kiểu Pancake), trong trang không có hàng tab */
   /* Marketing: 5 team ngang hàng; team nhiều trang thì bấm vào sổ ra các trang con ngay thanh bên (mỗi lần chỉ mở một team) */
