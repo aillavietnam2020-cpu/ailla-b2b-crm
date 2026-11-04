@@ -539,7 +539,7 @@ body.pop-open{overflow:hidden}
 
 /* Kho – Sản xuất (04/11): không còn hàng tab trong trang, chỉ thanh nút thao tác; bảng chọn Lập phiếu nhanh */
 .kgbar{border-bottom:0;justify-content:flex-end}.kgbar:not(:has(.kact > *)){display:none}
-.kqpop{position:fixed;z-index:60;background:#fff;border:1px solid #e3e6ef;border-radius:12px;box-shadow:0 10px 30px rgba(20,30,60,.18);padding:8px;width:min(520px,94vw);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}
+.kqpop{position:fixed;z-index:1000;background:#fff;border:1px solid #e3e6ef;border-radius:12px;box-shadow:0 10px 30px rgba(20,30,60,.18);padding:8px;width:min(520px,94vw);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}
 .kqpop .kqg h4{margin:6px 8px 2px;font-size:11.5px;color:#7a8199;text-transform:uppercase;letter-spacing:.04em}
 .kqpop button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 8px;border-radius:7px;font:inherit;font-size:14px;color:#1d2433;cursor:pointer}
 .kqpop button:hover{background:#f1f3fb}.kqpop .hint{grid-column:1/-1;margin:4px 8px 2px;font-size:12px}
