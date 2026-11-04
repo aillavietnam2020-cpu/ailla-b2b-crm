@@ -508,7 +508,7 @@ function ksSearchHtml(q){
 }
 function xvKhoAll(b,o){
   if(!["wait","can","sx"].includes(XV.ks))XV.ks="wait";
-  const pend=o.d.cards.filter(c=>["edit","dvd","dceo"].includes(c.step)&&!c.wt).length,n=xvKhoFree().length;
+  const pend=o.d.cards.filter(c=>["edit","dvd","dceo"].includes(c.step)&&!c.wt).length,n=xvKhoFree().length+(o.d.kho||[]).filter(k=>k.choDuyet&&!khoOk(k)&&!k.maDang).length /* 04/11: tính cả video tồn đang chờ duyệt / cần sửa, khớp số ở dòng sản phẩm */;
   const ndn=o.d.cards.filter(c=>c.step==="xong").length,nsx=o.d.cards.filter(c=>["dang","xong"].includes(c.step)&&((loaiOf(c)!=="kho"&&c.mix!=="ton")||c.repostOf)).length,TB=[["wait","① Video đợi duyệt"+(pend?` (${pend})`:"")],["sx","② Video sản xuất trong tháng ("+nsx+")"],["can","③ Kho video tồn ("+n+")"]];
   b.innerHTML=`${khoSummary(o)}<div class="ntrow ktool"><div class="seg ptk">${TB.map(([k,t])=>`<button data-xks="${k}" class="${XV.ks===k?"on":""}">${t}</button>`).join("")}</div><div class="ktool2"><input type="search" class="ksearch" id="xk-q" value="${esc(XV.q||"")}" placeholder="🔍 Tìm video: dán link Drive, mã, hook…" title="Dán link Drive hoặc gõ mã, hook, caption rồi bấm Enter"><button type="button" class="btn sm pri" data-xadd="1" title="Thêm một video chưa có trong hệ thống">+ Thêm video</button><button type="button" class="btn sm" data-xadd="1" title="Tải file Excel có nhiều link video một lúc (có file mẫu)">⬆ Tải hàng loạt</button><button type="button" class="btn sm" data-xexp="1" title="Xuất danh sách đang xem ra Excel">⬇ Xuất danh sách</button></div></div><div id="xk-b"></div>`;ntBind(b);
   b.querySelectorAll("[data-xadd]").forEach(x=>x.onclick=openThemVideo);
