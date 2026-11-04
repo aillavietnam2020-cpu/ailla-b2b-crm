@@ -369,6 +369,16 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 /* Nhân sự › Nhân viên */
 .d-red{background:#e03131}
 .nv-top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.4fr);gap:14px;margin-bottom:16px}.nv-top .card{margin:0}
+.nv-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}.nv-stats .card{margin:0}
+.nv-st{display:flex;gap:12px;align-items:flex-start;padding:14px 16px}.nv-stb{min-width:0}.nv-st .l{color:var(--muted);font-size:12.5px;font-weight:600}
+.nv-st .v{font-size:24px;font-weight:800;line-height:1.2;margin:2px 0;color:var(--navy);font-variant-numeric:tabular-nums}.nv-st.zero .v{color:var(--muted)}
+.nv-st .s{font-size:12.5px;color:var(--muted)}.nv-st .s b{color:var(--ink)}
+.nv-strip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;margin:0 0 16px}
+.nv-sh{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-right:4px}
+.nv-chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.nv-chip:hover{border-color:var(--violet)}.nv-chip.on{background:var(--violet-soft);border-color:var(--violet)}.nv-ok{font-size:13px;color:var(--green)}
+.nv-flt{font-size:12.5px;background:var(--violet-soft);color:var(--violet);border-radius:999px;padding:3px 10px;font-weight:600}.nv-flt button{border:0;background:none;color:inherit;font:inherit;cursor:pointer;margin-left:4px}
+@media (max-width:900px){.nv-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .nv-t .l,.nv-w .l{color:var(--muted);font-size:13px;font-weight:600}.nv-t .v{font-size:28px;font-weight:800;margin:4px 0 8px;color:var(--navy)}
 .nv-sub{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}.nv-sub b{color:var(--ink)}.nv-sub b.g{color:var(--green)}.nv-sub b.b{color:var(--blue)}.nv-sub b.o{color:var(--orange)}
 .nv-wr{font-size:13.5px;padding:3px 0;display:flex;align-items:center;gap:8px}.nv-wr b{min-width:18px}
@@ -386,7 +396,7 @@ tr.lech td{background:#fff4e0}.kt-min{width:90px}.note.red{background:#fdecec;co
 /* Nhân viên — bố cục gần mẫu phần mềm nhân sự: ô số có biểu tượng, bảng gọn, hồ sơ 4 khung */
 .card.nv-t{position:relative;padding-left:94px;min-height:118px}.nv-ic{position:absolute;left:20px;top:22px;width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .nv-ic .ic{width:28px;height:28px}.nv-ic.sm{position:static;width:34px;height:34px}.nv-ic.sm .ic{width:18px;height:18px}.nv-wh{display:flex;align-items:center;gap:10px;margin-bottom:6px}.nv-wh .l{font-size:16px;color:var(--ink);font-weight:800}
-.c-blu{background:#e7f0ff;color:#1d5fd6}.c-grn{background:#e3f7ec;color:#0a8a4f}.c-amb{background:#fff1d6;color:#d27a00}.c-red{background:#ffe3e3;color:#d92d20}
+.c-vio{background:#efeaff;color:#6941c6}.c-blu{background:#e7f0ff;color:#1d5fd6}.c-grn{background:#e3f7ec;color:#0a8a4f}.c-amb{background:#fff1d6;color:#d27a00}.c-red{background:#ffe3e3;color:#d92d20}
 .nv-t .v{font-size:32px;margin:0 0 6px}.nv-t .l{font-size:14px;color:var(--ink);font-weight:600}
 .nv-list table{font-size:13.5px}.nv-list th{background:#eaf1fc;color:#1d3f7a;font-weight:700;white-space:nowrap;padding:8px 10px;position:sticky;top:0;z-index:1}
 .nv-list td{padding:6px 10px;white-space:nowrap;border-bottom:1px solid #edf0f5}.nv-list tbody tr:nth-child(even) td{background:#fafbfd}
