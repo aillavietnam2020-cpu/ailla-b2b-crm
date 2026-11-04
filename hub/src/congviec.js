@@ -3,7 +3,7 @@
    Phạm vi xem: Của tôi · Cả team · Tất cả (theo vai trò). Ưu tiên Content & Digital.
    ===================================================================== */
 const TEAMS={content:"Content",digital:"Digital – Ads",koc:"KOC",ketoan:"Kế toán",kho:"Kho",sx:"Sản xuất",hcns:"Hành chính nhân sự",sale:"Sale",chung:"Chung"};
-const CV_ST=[["cg","Chưa giao","gry"],["todo","Cần làm","gry"],["nhan","Đã nhận việc","blu"],["doing","Đang làm","blu"],["review","Chờ duyệt","amb"],["done","Hoàn thành","grn"]];
+const CV_ST=[["cg","Chưa giao","gry"],["todo","Cần làm","gry"],["nhan","Đã nhận việc","blu"],["doing","Đang làm","blu"],["pause","Tạm dừng","gry"],["review","Chờ duyệt","amb"],["done","Hoàn thành","grn"]];
 const cvStN=k=>(CV_ST.find(s=>s[0]===k)||[k,k])[1];
 const UU=["Cao","Trung bình","Thấp"];
 // Team của một người: Content/Digital theo vai trò; các phòng khác (Sale, Sản xuất, Kế toán...) theo phòng ban.
@@ -52,7 +52,7 @@ function cvItems(){
   const d=D(),today=d.settings.today,out=[];
   d.cards.forEach(c=>{const st=cardStatus(c),late=st!=="done"&&isLate(c);out.push({id:c.id,src:"card",kenh:c.kenh,sku:c.sku,mix:mixOf(c),cat:cvCat(c),fpId:c.fpId||"",tuyen:c.tuyen||"",ten:c.hookText||c.yTuong||c.tuyen,mo:`${chOf(c.kenh).short} · ${esc(sk(c.sku).n)} · ${c.tuyen||c.nguon}`,team:"content",da:cardProject(c),nguoi:c.nguoi||"",phoi:[],han:(c.han&&WORK_STEPS.includes(c.step))?c.han:c.day,batDau:c.batDau||0,uu:c.uuTien||"Trung bình",st,late,lateD:late?Math.max(1,today-((c.han&&WORK_STEPS.includes(c.step))?c.han:c.day)):0,loai:"Video "+(stepName(c.step)||"")})});
   d.orders.forEach(o=>{const st=o.trangThai==="Xong"?"done":o.trangThai==="Mới"&&!o.giao?"cg":o.trangThai==="Mới"?"todo":"doing",late=st!=="done"&&o.han<today;out.push({id:o.ma,src:"order",ten:"Order: "+o.muc,mo:`${o.kenh} · ${esc(sk(o.sku).n)} · ${o.sl} video`,team:"digital",da:"DA-06",nguoi:o.giao||"",phoi:[o.nguoiOrder],han:o.han,uu:"Cao",st,late,lateD:late?today-o.han:0,loai:"Order Digital → Content"})});
-  (d.tasks||[]).forEach(t=>{const late=t.st!=="done"&&t.han<today,nb=t.loai==="Nhân bản video win"&&typeof cvWinInfo==="function"?cvWinInfo(t):null;out.push({id:t.id,src:"task",gio:t.gio||"",ten:nb?nb.ten:t.ten,mo:nb?nb.mo:(t.moTa||""),sub:nb?nb.mo:"",team:t.team,da:t.da,nguoi:t.nguoi,phoi:t.phoi||[],han:t.han,uu:t.uu,st:t.st,late,lateD:late?today-t.han:0,loai:t.loai||"Việc",ck:t.checklist||[],tao:t.tao||"",cd:t.cd||null,tl:!!t.tlNote})});
+  (d.tasks||[]).forEach(t=>{const late=t.st!=="done"&&!!t.han&&t.han<today,nb=t.loai==="Nhân bản video win"&&typeof cvWinInfo==="function"?cvWinInfo(t):null;out.push({id:t.id,src:"task",gio:t.gio||"",ten:nb?nb.ten:t.ten,mo:nb?nb.mo:(t.moTa||""),sub:nb?nb.mo:"",team:t.team,da:t.da,nguoi:t.nguoi,phoi:t.phoi||[],han:t.han,uu:t.uu,st:t.st,late,lateD:late?today-t.han:0,loai:t.loai||"Việc",ck:t.checklist||[],tao:t.tao||"",cd:t.cd||null,tl:!!t.tlNote})});
   return out;
 }
 const CVG={};
@@ -83,7 +83,7 @@ function cvFilter(L){
     if(ME.role!=="admin"&&!cvSummaryOnly()&&t!=="all"&&x.nguoi!==me&&!x.phoi.includes(me)&&!cvTeamSee(t,x.team)&&!(t==="content"&&x.src==="order"))return false;
     if(CVF.wt){const ux=d.users.find(y=>y.id===x.nguoi);if(!ux||!(cvTeamSee(CVF.wt,teamOf(ux))||cvTeamNorm(teamOf(ux))===CVF.wt))return false}
     if(CVF.tao&&x.tao!==CVF.tao)return false;
-    if(CVF.team&&x.team!==CVF.team)return false;if(CVF.nguoi&&x.nguoi!==CVF.nguoi&&!x.phoi.includes(CVF.nguoi))return false;if(CVF.da&&x.da!==CVF.da)return false;if(CVF.st&&(CVF.st==="late"?!x.late:CVF.st==="todo"?!["cg","todo","nhan"].includes(x.st):x.st!==CVF.st))return false;if(CVF.uu&&x.uu!==CVF.uu)return false;
+    if(CVF.team&&x.team!==CVF.team)return false;if(CVF.nguoi&&x.nguoi!==CVF.nguoi&&!x.phoi.includes(CVF.nguoi))return false;if(CVF.da&&x.da!==CVF.da)return false;if(CVF.st&&(CVF.st==="late"?!x.late:CVF.st==="todo"?!["cg","todo","nhan","pause"].includes(x.st):x.st!==CVF.st))return false;if(CVF.uu&&x.uu!==CVF.uu)return false;
     if(CVF.q&&!(x.ten+" "+x.mo+" "+x.id+" "+userName(x.nguoi)).toLowerCase().includes(CVF.q.toLowerCase()))return false;
     if(CVF.tg==="all"&&typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from&&x.han&&typeof tkDay==="function"){const a=tkDay(PERIOD.from),b=tkDay(PERIOD.to);if((x.han<a||x.han>b)&&!(x.st!=="done"&&x.han<a&&x.han<today))return false}
     if(CVF.tg==="today"&&x.han!==today)return false;if(CVF.tg==="week"&&(x.han<W.tu||x.han>W.den))return false;if(CVF.tg==="lweek"&&(x.han<LW.tu||x.han>LW.den))return false;
@@ -160,16 +160,20 @@ const tkPctHtml=x=>{const p=tkPct(x),c=x.cd||[],k=x.ck||[],sub=c.length?`${c.fil
 function tkActBtn(x){if(x.src!=="task"||x.st==="done")return "";const t=(D().tasks||[]).find(y=>y.id===x.id);if(!t||(t.cd&&t.cd.length))return "";
   if(tkMyTurn(t))return `<button type="button" class="btn sm pri" data-tkopen="${t.id}">Duyệt</button>`;
   if(t.st!=="review"&&(t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)))return `<button type="button" class="btn sm pri" data-tkopen="${t.id}">Nộp kết quả</button>`;return ""}
-/* Mẫu việc và việc lặp lại (học Lark): mẫu lưu ở d.taskTpl; mẫu có lặp thì web tự giao lại mỗi tuần / tháng khi có người mở trang Việc. */
+/* Mẫu việc và việc lặp lại (học Lark): mẫu lưu ở d.taskTpl; mẫu có lặp thì web tự giao lại mỗi ngày / tuần / tháng.
+   Giao ở hai nơi, cùng mốc p.last nên không giao trùng: khi có người mở trang Việc (tkRecur) và máy chủ chạy mỗi giờ (src/server/services/taskRecurring.ts, cùng luật).
+   "Hằng ngày" chỉ giao việc của hôm nay, không bù những ngày trước. */
+/* tên việc có chữ "gấp" / "khẩn": tự gắn cờ Gấp (t.gap), xếp lên đầu */
+const cwGapT=s=>/gấp|khẩn/i.test(String(s||"").normalize("NFC"));
 const tkTpls=()=>(D().taskTpl||[]).filter(p=>!p.xoa);
-const tkLapLbl=p=>p.lap==="tuan"?"mỗi "+(+p.ngay===7?"Chủ nhật":"thứ "+(+p.ngay+1)):p.lap==="thang"?"ngày "+p.ngay+" hằng tháng":"";
+const tkLapLbl=p=>p.lap==="ngay"?"hằng ngày":p.lap==="tuan"?"mỗi "+(+p.ngay===7?"Chủ nhật":"thứ "+(+p.ngay+1)):p.lap==="thang"?"ngày "+p.ngay+" hằng tháng":"";
 const tkTodayIso=()=>{const x=new Date();return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
-function tkTplSave(v,lap,ngay){const today=tkTodayIso();DB.mutate(ME.name,"lưu mẫu việc "+v.ten,dt=>{dt.taskTpl=dt.taskTpl||[];dt.taskTpl.push({id:uid("tp"),ten:v.ten,moTa:v.moTa,team:v.team,da:v.da,nguoi:v.nguoi,phoi:v.phoi||[],uu:v.uu,v2:v.v2,v2ceo:v.v2ceo,checklist:(v.checklist||[]).map(c=>({t:c.t})),hanSau:Math.max(0,(+v.han||0)-dt.settings.today),lap:lap||"",ngay:+ngay||0,tao:ME.id,last:today,dung:false})})}
+function tkTplSave(v,lap,ngay){const today=tkTodayIso();DB.mutate(ME.name,"lưu mẫu việc "+v.ten,dt=>{dt.taskTpl=dt.taskTpl||[];dt.taskTpl.push({id:uid("tp"),ten:v.ten,moTa:v.moTa,team:v.team,da:v.da,nguoi:v.nguoi,phoi:v.phoi||[],theoDoi:v.theoDoi||[],gio:v.gio||"",uu:v.uu,v2:v.v2,v2ceo:v.v2ceo,checklist:(v.checklist||[]).map(c=>({t:c.t})),hanSau:Math.max(0,(+v.han||0)-dt.settings.today),lap:lap||"",ngay:+ngay||0,tao:ME.id,last:today,dung:false})})}
 function tkRecur(){const P=tkTpls().filter(p=>p.lap&&!p.dung),today=tkTodayIso();if(!P.length||!P.some(p=>(p.last||"")<today))return;
-  const hit=(p,iso)=>{const x=new Date(iso+"T00:00:00");return p.lap==="tuan"?((x.getDay()+6)%7+1)===+p.ngay:x.getDate()===+p.ngay};
-  DB.mutate("Hệ thống","tự giao việc lặp lại",dt=>{(dt.taskTpl||[]).forEach(p=>{if(p.xoa||!p.lap||p.dung||(p.last||"")>=today)return;const x=new Date((p.last||today)+"T00:00:00");
+  const hit=(p,iso)=>{const x=new Date(iso+"T00:00:00");return p.lap==="ngay"?iso===today:p.lap==="tuan"?((x.getDay()+6)%7+1)===+p.ngay:x.getDate()===+p.ngay};
+  DB.mutate("Hệ thống","tự giao việc lặp lại",dt=>{(dt.taskTpl||[]).forEach(p=>{if(p.xoa||!p.lap||p.dung||(p.last||"")>=today)return;const x=new Date((p.last||today)+"T00:00:00");if(p.lap==="ngay"&&p.last){const y=new Date(today+"T00:00:00");y.setDate(y.getDate()-1);if(x<y)x.setTime(y.getTime())}
     for(let i=0;i<62;i++){x.setDate(x.getDate()+1);const iso=x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");if(iso>today)break;
-      if(hit(p,iso)){const d0=tkDay(iso),nt={id:uid("cv"),ten:p.ten,moTa:p.moTa||"",team:p.team,da:p.da||"",nguoi:p.nguoi||"",phoi:p.phoi||[],han:d0+(+p.hanSau||0),bd:d0,uu:p.uu||"Trung bình",st:"todo",v2:p.v2,v2ceo:p.v2ceo,checklist:(p.checklist||[]).map(c=>({t:c.t,x:false})),loai:"Việc",tao:p.tao,tpl:p.id,log:[{at:new Date().toLocaleString("vi-VN"),by:"Hệ thống",txt:"Tự giao theo mẫu lặp lại ("+tkLapLbl(p)+")"}]};
+      if(hit(p,iso)){const d0=tkDay(iso),nt={id:uid("cv"),ten:p.ten,moTa:p.moTa||"",team:p.team,da:p.da||"",nguoi:p.nguoi||"",phoi:p.phoi||[],theoDoi:p.theoDoi||[],gio:p.gio||"",gap:cwGapT(p.ten),han:d0+(+p.hanSau||0),bd:d0,uu:p.uu||"Trung bình",st:"todo",v2:p.v2,v2ceo:p.v2ceo,checklist:(p.checklist||[]).map(c=>({t:c.t,x:false})),loai:"Việc",tao:p.tao,tpl:p.id,log:[{at:new Date().toLocaleString("vi-VN"),by:"Hệ thống",txt:"Tự giao theo mẫu lặp lại ("+tkLapLbl(p)+")"}]};
         dt.tasks.push(nt);if(typeof notifyU==="function"&&nt.nguoi){dt.notifs=dt.notifs||[];dt.notifs.push({id:uid("nt"),to:nt.nguoi,text:`Việc lặp lại: "${nt.ten}" · hạn ${dd(nt.han)}`,at:nowISO(),ref:"task:"+nt.id,by:"",read:false})}}}
     p.last=today})})}
 /* ghim (lưu trên web, theo từng người) và gần đây (lưu trên máy này) */
@@ -203,12 +207,12 @@ function tkChatHtml(t){const L=t.chat||[];
 function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;if(t0.cd&&t0.cd.length){openTask(id);return false}const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
   DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
-    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
-    else{tkLog(x,"Duyệt hoàn thành");x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
+    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);cwTdNotify(dt,x,`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
+    else{tkLog(x,"Duyệt hoàn thành");x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`);cwTdNotify(dt,x,`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
   return r2}
 function tkReturn(id,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
   DB.mutate(ME.name,`trả lại "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"tra",note,x.vong||1);tkLog(x,"Trả lại: "+note);x.st="doing";x.tlNote=note;x.vong=0;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);
-    if(typeof notifyU==="function")notifyU(dt,[x.nguoi,...(x.phoi||[])],`${ME.name} trả lại việc "${x.ten}": ${note}`,"task:"+x.id)})}
+    if(typeof notifyU==="function")notifyU(dt,[x.nguoi,...(x.phoi||[])],`${ME.name} trả lại việc "${x.ten}": ${note}`,"task:"+x.id);cwTdNotify(dt,x,`${ME.name} trả lại việc "${x.ten}" để sửa`)})}
 function tkComment(id,text){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
   DB.mutate(ME.name,`trao đổi ở "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"",text,x.vong||0);
     if(typeof notifyU!=="function")return;const at=tkMentions(text),who=[x.nguoi,...(x.phoi||[]),x.tao,...tkAppr(x)].filter(z=>!at.includes(z));
@@ -253,12 +257,15 @@ function tkResultBox(t){
 }
 /* đổi trạng thái một việc + báo chuông đúng người: gửi duyệt → người giao/quản lý · duyệt xong, trả lại → người làm */
 /* nhật ký từng việc: ai làm gì lúc nào (giữ 60 dòng gần nhất) */
+/* người theo dõi (t.theoDoi): được báo khi việc đổi trạng thái, nộp / duyệt / trả lại kết quả; không tính là việc của mình */
+function cwTdNotify(dt,x,txt){const L=(x.theoDoi||[]).filter(id=>id&&id!==x.nguoi&&!(x.phoi||[]).includes(id));if(L.length&&typeof notifyU==="function")notifyU(dt,L,txt,"task:"+x.id)}
 function tkLog(x,txt){x.log=x.log||[];x.log.push({at:new Date().toLocaleString("vi-VN"),by:(typeof ME!=="undefined"&&ME)?ME.name:"Hệ thống",txt});if(x.log.length>60)x.log=x.log.slice(-60)}
 /* ghi ngày xong để tính đúng hạn / trễ hạn */
 function tkDoneDay(x,today){if(x.st==="done"){if(!x.xongNgay)x.xongNgay=today}else delete x.xongNgay}
 function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
   DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});if(k==="review"&&old!=="review")x.vong=1;if(x.__chat){tkChatAdd(x,x.__chat[0],x.__chat[1],1);delete x.__chat}tkDoneDay(x,dt.settings.today);
     if(old===k||typeof notifyU!=="function")return;
+    cwTdNotify(dt,x,k==="review"?`${ME.name} nộp kết quả việc "${x.ten}", đang chờ duyệt`:`${ME.name} chuyển việc "${x.ten}" sang ${cvStN(k)}`);
     if(k==="review")notifyU(dt,tkAppr(x),`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
     else if(k==="done"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} đã duyệt xong việc "${x.ten}"`,ref);
     else if(old==="review"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} trả lại việc "${x.ten}"${note?": "+note:""}`,ref);
@@ -273,12 +280,13 @@ function openTask(id){
   TK_AFTER_NEW=null;
   const d=D(),t=id?d.tasks.find(x=>x.id===id):null,giver=tkGiver(),own=!!t&&t.tao===ME.id&&t.nguoi===ME.id,ed=giver||!t||t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)||(!!t&&t.tao===ME.id),gv=giver||!t||own;
   const users=d.users.filter(u=>u.active&&u.role!=="admin"||u.id===ME.id),ngUsers=tkAssignable(users).concat(t&&t.nguoi&&!tkAssignable(users).some(u=>u.id===t.nguoi)?users.filter(u=>u.id===t.nguoi):[]);
-  if(t)tkRecentAdd(t.id);
-  openDrawerHTML(`<h2>${t?"Chi tiết việc":"Giao việc"}${t?` <button type="button" class="btn sm tkpin" id="t-pin">${tkPinned(t.id)?"★ Bỏ ghim":"☆ Ghim"}</button>`:""}</h2>${!t&&tkTpls().length?`<label class="field">Giao từ mẫu<select id="t-tpl">${opt([["","— chọn mẫu việc có sẵn"]].concat(tkTpls().map(p=>[p.id,p.ten+(p.lap?" · "+tkLapLbl(p):"")])),"")}</select></label>`:""}${t&&t.tao?`<p class="hint">Người giao: ${esc(userName(t.tao)||"—")}</p>`:""}${!t&&!giver?`<p class="hint">Bạn tạo việc cho chính mình. Muốn giao cho người khác, nhờ quản lý giao.</p>`:""}${t?tkResultHtml(t)+tkChatHtml(t):""}<form class="frm" id="tkf2"><label class="field">Tên việc<input id="t-ten" required value="${esc(t?t.ten:"")}" ${gv?"":"disabled"}></label><label class="field">Mô tả<textarea id="t-mo" rows="2" ${gv?"":"disabled"}>${esc(t?t.moTa:"")}</textarea></label>
+  if(t)tkRecentAdd(t.id);if(typeof cwCss==="function")cwCss();
+  const tdUsers=d.users.filter(u=>u.active&&u.name&&!(typeof CV_TEST!=="undefined"&&CV_TEST.includes(u.id))).sort((a,b)=>(b.role==="admin")-(a.role==="admin")||a.name.localeCompare(b.name));
+  openDrawerHTML(`<h2>${t?"Chi tiết việc":"Giao việc"}${t?` <button type="button" class="btn sm tkpin" id="t-pin">${tkPinned(t.id)?"★ Bỏ ghim":"☆ Ghim"}</button>`:""}</h2>${!t&&tkTpls().length?`<label class="field">Giao từ mẫu<select id="t-tpl">${opt([["","— chọn mẫu việc có sẵn"]].concat(tkTpls().map(p=>[p.id,p.ten+(p.lap?" · "+tkLapLbl(p):"")])),"")}</select></label>`:""}${t&&t.tao?`<p class="hint">Người giao: ${esc(userName(t.tao)||"—")}</p>`:""}${!t&&!giver?`<p class="hint">Bạn tạo việc cho chính mình. Muốn giao cho người khác, nhờ quản lý giao.</p>`:""}${t?tkResultHtml(t)+tkChatHtml(t):""}<form class="frm" id="tkf2"><label class="field">Tên việc<input id="t-ten" required value="${esc(t?t.ten:"")}" ${gv?"":"disabled"}><small class="hint t-red" id="t-gapn"${t&&t.gap?"":" hidden"}>${t&&t.gap?"Việc gắn cờ Gấp, xếp lên đầu":"Có chữ \"gấp\" nên web tự gắn cờ Gấp, xếp lên đầu"}</small></label><label class="field">Mô tả<textarea id="t-mo" rows="2" ${gv?"":"disabled"}>${esc(t?t.moTa:"")}</textarea></label>
    <div class="row4"><label class="field">Team<select id="t-team" ${gv?"":"disabled"}>${opt(Object.entries(TEAMS),t?t.team:(TEAMS[teamOf(ME)]?teamOf(ME):"content"))}</select></label><label class="field">Dự án<select id="t-da" ${gv?"":"disabled"}>${opt([["","—"]].concat((d.projects||[]).map(p=>[p.id,p.ten])),t?t.da:CVF.da)}</select></label></div>
-   <div class="row4"><label class="field">Người làm<select id="t-ng" ${gv&&giver?"":"disabled"}>${opt([["","— chưa giao"]].concat(ngUsers.map(u=>[u.id,u.name+" · "+(TEAMS[teamOf(u)]||u.phongBan||"Quản lý")])),t?t.nguoi:(giver?"":ME.id))}</select></label><label class="field">Hạn <small class="hint">(giờ không bắt buộc)</small><span class="tkhg">${tkDate("t-han",t?t.han:d.settings.today+2,gv?"required":"disabled")}<input type="time" id="t-gio" value="${esc(t&&t.gio||"")}" ${gv?"":"disabled"} aria-label="Giờ hạn"></span></label><label class="field">Bắt đầu <small class="hint">(trống = như hạn)</small>${tkDate("t-bd",t?(t.bd||0):0,gv?"":"disabled")}</label><label class="field">Ưu tiên<select id="t-uu" ${gv?"":"disabled"}>${opt(UU,t?t.uu:"Trung bình")}</select></label></div>
+   <div class="row4"><label class="field">Người làm<select id="t-ng" ${gv&&giver?"":"disabled"}>${opt([["","— chưa giao"]].concat(ngUsers.map(u=>[u.id,u.name+" · "+(TEAMS[teamOf(u)]||u.phongBan||"Quản lý")])),t?t.nguoi:(giver?"":ME.id))}</select></label><label class="field">Ngày làm / hạn xong · giờ <small class="hint">(giờ không bắt buộc)</small><span class="tkhg">${tkDate("t-han",t?t.han:d.settings.today+2,gv?"":"disabled")}<input type="time" id="t-gio" value="${esc(t&&t.gio||"")}" ${gv?"":"disabled"} aria-label="Giờ làm"></span>${gv?cwHanChips():""}</label><label class="field">Bắt đầu <small class="hint">(trống = như hạn)</small>${tkDate("t-bd",t?(t.bd||0):0,gv?"":"disabled")}</label><label class="field">Ưu tiên<select id="t-uu" ${gv?"":"disabled"}>${opt(UU,t?t.uu:"Trung bình")}</select></label></div>
    ${gv&&ME.role!=="admin"&&!tkCeoGiao(t)?`<label class="ck sm"><input type="checkbox" id="t-v2" ${tkV2On(t||{team:TEAMS[teamOf(ME)]?teamOf(ME):"content"})?"checked":""}> Lead duyệt xong thì CEO duyệt vòng 2</label>`:""}
-   ${!t&&giver?`<div class="row4 tklap"><label class="field">Lặp lại<select id="t-lap">${opt([["","Không lặp"],["tuan","Mỗi tuần"],["thang","Mỗi tháng"]],"")}</select></label><label class="field" id="t-lapdw" hidden>Vào<select id="t-lapd"></select></label><label class="ck sm"><input type="checkbox" id="t-tplsave"> Lưu làm mẫu việc</label></div>`:""}
+   ${!t&&giver?`<div class="row4 tklap"><label class="field">Lặp lại<select id="t-lap">${opt([["","Không lặp"],["ngay","Hằng ngày"],["tuan","Mỗi tuần"],["thang","Mỗi tháng"]],"")}</select></label><label class="field" id="t-lapdw" hidden>Vào<select id="t-lapd"></select></label><label class="ck sm"><input type="checkbox" id="t-tplsave"> Lưu làm mẫu việc</label></div>`:""}
    <div class="field" id="t-cdw">Công đoạn <small class="hint">(một việc có nhiều người, mỗi người một phần)</small><div id="t-cd"></div>${gv&&giver?`<div class="acts"><button type="button" class="btn sm" id="t-cdadd">＋ Công đoạn</button><button type="button" class="btn sm" id="t-cddu">＋ Bước duyệt</button><label class="ck sm"><input type="checkbox" id="t-seq" ${t&&t.tuanTu===false?"":"checked"}> Làm lần lượt</label></div>`:""}</div>
    <div class="field" id="t-stw">Trạng thái <small class="hint">bấm để đổi${t&&ed?", tự lưu ngay":""}</small><div class="tkst">${CV_ST.filter(s=>s[0]!=="cg").map(([k,n,c])=>`<button type="button" class="tkb tk-${c}${(t?t.st:"todo")===k?" on":""}" data-tkst="${k}" ${ed?"":"disabled"}>${(t?t.st:"todo")===k?"✓ ":""}${n}</button>`).join("")}</div><input type="hidden" id="t-st" value="${t?t.st:"todo"}">${t&&t.stAt?`<small class="hint">Đổi lần cuối: ${esc(t.stAt)} bởi ${esc(t.stBy||"")}</small>`:""}</div>
    ${t&&t.st!=="done"&&t.han&&(t.han<d.settings.today||(t.treReq||{}).st==="cho"||(ed&&!tkMgr(t)))?(()=>{const R=t.treReq||{},mg=tkMgr(t),cho=R.st==="cho",lt=t.han<d.settings.today;return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Hạn "+dayLbl(t.han)}</b>${lt?` (hạn ${dayLbl(t.han)}${t.hanCu?`, hạn cũ ${dd(t.hanCu)}`:""})`:t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}
@@ -286,6 +294,7 @@ function openTask(id){
        ${mg?`<div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:d.settings.today+2)}</label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button><button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button></div>`:""}`
      :`${ed&&!mg?`<label class="field">${lt?"Lý do trễ":"Xin gia hạn"}<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu, cần thêm bao lâu">${esc(R.lyDo||"")}</textarea></label><label class="field">Xin dời hạn đến${tkDate("t-hm",Math.max(t.han,d.settings.today)+1)}</label><button type="button" class="btn sm pri" id="t-trego">Gửi quản lý</button>`:mg?`<p class="hint">Người làm chưa gửi lý do trễ.</p><div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:d.settings.today+2)}</label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button><button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button></div>`:""}`}</div>`})():""}
    <div class="field" id="t-phw">Người cùng làm / hỗ trợ <small class="hint">(một việc có thể nhiều người)</small><div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="t-phoi" value="${u.id}" ${t&&(t.phoi||[]).includes(u.id)?"checked":""} ${gv?"":"disabled"}> ${esc(u.name)}</label>`).join("")}</div></div>
+   <div class="field" id="t-tdw">Người theo dõi <small class="hint">· được báo khi việc đổi trạng thái, không tính là việc của mình</small><div class="phc">${tdUsers.map(u=>`<label class="ck sm"><input type="checkbox" name="t-td" value="${u.id}" ${t&&(t.theoDoi||[]).includes(u.id)?"checked":""} ${gv?"":"disabled"}> ${esc(u.name)}</label>`).join("")}</div></div>
    <div class="field">Các bước nhỏ <small class="hint">(tích khi làm xong từng bước)</small><div id="t-ck">${((t&&t.checklist)||[]).map((c,i)=>`<label class="ck"><input type="checkbox" data-ck="${i}" ${c.x?"checked":""} ${ed?"":"disabled"}> ${esc(c.t)}</label>`).join("")}</div>${gv?`<input id="t-ckn" placeholder="Thêm việc nhỏ, Enter để thêm">`:""}</div>
    ${t?`<details class="field tklog"><summary>Nhật ký <small class="hint">(${(t.log||[]).length} dòng)</small></summary>${(t.log||[]).length?(t.log||[]).slice().reverse().slice(0,40).map(l=>`<div class="tkl"><span>${esc(l.at)}</span> <b>${esc(l.by)}</b> ${esc(l.txt)}</div>`).join(""):`<p class="hint">Chưa có dòng nào. Từ nay mọi thay đổi của việc này được ghi lại.</p>`}</details>`:""}
    <label class="field">Link / tài liệu đính kèm <small class="hint">(không bắt buộc)</small><input id="t-dk" value="${esc(t?t.dk||"":"")}" placeholder="Link Drive, brief…" ${gv?"":"disabled"}></label>
@@ -344,7 +353,10 @@ function openTask(id){
   $("#drawer").querySelectorAll("[data-tkq]").forEach(b=>b.onclick=()=>{tkSetSt(t.id,b.dataset.tkq);toast("Đã chuyển: "+cvStN(b.dataset.tkq));openTask(t.id);renderMain()});
   if($("#t-pin"))$("#t-pin").onclick=()=>{tkPinToggle(t.id);openTask(t.id);renderMain()};
   if(t)tkBindChat(t);
-  if($("#t-lap")){const lw=()=>{const k=$("#t-lap").value;$("#t-lapdw").hidden=!k;$("#t-lapd").innerHTML=k==="tuan"?opt(THU.map((x,i)=>[i+1,x==="CN"?"Chủ nhật":"Thứ "+(i+2)]),(new Date().getDay()+6)%7+1):opt(Array.from({length:28},(_,i)=>[i+1,"Ngày "+(i+1)]),Math.min(28,new Date().getDate()))};$("#t-lap").onchange=lw;lw()}
+  if($("#t-lap")){const lw=()=>{const k=$("#t-lap").value;$("#t-lapdw").hidden=!k||k==="ngay";$("#t-lapd").innerHTML=k==="tuan"?opt(THU.map((x,i)=>[i+1,x==="CN"?"Chủ nhật":"Thứ "+(i+2)]),(new Date().getDay()+6)%7+1):opt(Array.from({length:28},(_,i)=>[i+1,"Ngày "+(i+1)]),Math.min(28,new Date().getDate()))};$("#t-lap").onchange=lw;lw()}
+  $("#drawer").querySelectorAll("[data-cwhan]").forEach(b=>b.onclick=()=>{const n=cwHanDay(b.dataset.cwhan),h=$("#t-han");if(!h||h.disabled)return;h.value=n?tkIso(n):"";if(!n&&$("#t-gio"))$("#t-gio").value="";cwHanOn()});
+  if($("#t-han"))$("#t-han").addEventListener("change",cwHanOn);cwHanOn();
+  if(!t&&$("#t-ten"))$("#t-ten").addEventListener("input",()=>{const g=$("#t-gapn");if(g)g.hidden=!cwGapT($("#t-ten").value)});
   if(!t&&$("#t-team")&&$("#t-v2"))$("#t-team").addEventListener("change",()=>{$("#t-v2").checked=$("#t-team").value!=="content"});
   if($("#t-tpl"))$("#t-tpl").onchange=()=>{const p=tkTpls().find(x=>x.id===$("#t-tpl").value);if(!p)return;$("#t-ten").value=p.ten;$("#t-mo").value=p.moTa||"";if($("#t-team"))$("#t-team").value=p.team||$("#t-team").value;if($("#t-ng"))$("#t-ng").value=p.nguoi||"";if($("#t-uu"))$("#t-uu").value=p.uu||"Trung bình";$("#t-han").value=tkIso(D().settings.today+(+p.hanSau||2));
     (p.checklist||[]).forEach(c=>{ck.push({t:c.t,x:false});$("#t-ck").insertAdjacentHTML("beforeend",`<label class="ck"><input type="checkbox" data-ck="${ck.length-1}"> ${esc(c.t)}</label>`)});toast("Đã điền từ mẫu, xem lại rồi bấm Giao việc")};
@@ -362,22 +374,25 @@ function openTask(id){
   if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển CEO duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
   if($("#t-tlok"))$("#t-tlok").onclick=()=>{const n=$("#t-tl").value.trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}tkReturn(t.id,n);toast("Đã trả lại cho "+(userName(t.nguoi)||"người làm"));openTask(t.id);renderMain()};
   if($("#t-ghok"))$("#t-ghok").onclick=()=>{const h=tkDay($("#t-gh").value);if(!h){toast("Chọn ngày gia hạn");return}DB.mutate(ME.name,`gia hạn "${t.ten}" đến ${dd(h)}`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.hanCu=x.hanCu||x.han;tkLog(x,"Gia hạn đến "+dd(h));x.han=h;x.treReq=Object.assign({},x.treReq||{},{st:"giahan",xl:ME.name,xlAt:now(),hanMoi:h});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} gia hạn việc "${x.ten}" đến ${dayLbl(h)}`,"task:"+x.id)});toast("Đã gia hạn đến "+dd(h));openTask(t.id);renderMain()};
-  if($("#t-dok"))$("#t-dok").onclick=()=>{DB.mutate(ME.name,`duyệt hoàn thành "${t.ten}" (trễ hạn)`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;tkLog(x,"Duyệt hoàn thành");x.st="done";tkDoneDay(x,dt.settings.today);x.stAt=now();x.stBy=ME.name;x.treReq=Object.assign({},x.treReq||{},{st:"ok",xl:ME.name,xlAt:now()});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} duyệt hoàn thành việc "${x.ten}"`,"task:"+x.id)});toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
+  if($("#t-dok"))$("#t-dok").onclick=()=>{DB.mutate(ME.name,`duyệt hoàn thành "${t.ten}" (trễ hạn)`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;tkLog(x,"Duyệt hoàn thành");x.st="done";tkDoneDay(x,dt.settings.today);x.stAt=now();x.stBy=ME.name;x.treReq=Object.assign({},x.treReq||{},{st:"ok",xl:ME.name,xlAt:now()});if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`${ME.name} duyệt hoàn thành việc "${x.ten}"`,"task:"+x.id);cwTdNotify(dt,x,`${ME.name} duyệt hoàn thành việc "${x.ten}"`)});toast("Đã duyệt hoàn thành");closeDrawer();renderMain()};
   $("#tkf2").onsubmit=e=>{e.preventDefault();$("#tkf2").querySelectorAll("[data-ck]").forEach(x=>{if(ck[+x.dataset.ck])ck[+x.dataset.ck].x=x.checked});
-    const v={ten:$("#t-ten").value,moTa:$("#t-mo").value,team:$("#t-team").value,da:$("#t-da").value,nguoi:$("#t-ng").value,han:tkDay($("#t-han").value),gio:$("#t-gio")?$("#t-gio").value:"",uu:$("#t-uu").value,bd:$("#t-bd")?tkDay($("#t-bd").value):0,st:$("#t-st").value,phoi:[...document.querySelectorAll("[name=t-phoi]:checked")].map(x=>x.value),checklist:ck,kq:t?(t.kq||""):"",dk:$("#t-dk")?$("#t-dk").value.trim():""};const trv=$("#t-tre")&&$("#t-tre").value.trim();if(trv&&(!t.tre||t.tre.lyDo!==trv))v.tre={lyDo:trv,at:new Date().toLocaleString("vi-VN"),by:ME.name};
+    const v={ten:$("#t-ten").value,moTa:$("#t-mo").value,team:$("#t-team").value,da:$("#t-da").value,nguoi:$("#t-ng").value,han:tkDay($("#t-han").value),gio:$("#t-gio")?$("#t-gio").value:"",uu:$("#t-uu").value,bd:$("#t-bd")?tkDay($("#t-bd").value):0,st:$("#t-st").value,phoi:[...document.querySelectorAll("[name=t-phoi]:checked")].map(x=>x.value),theoDoi:[...document.querySelectorAll("[name=t-td]:checked")].map(x=>x.value),checklist:ck,kq:t?(t.kq||""):"",dk:$("#t-dk")?$("#t-dk").value.trim():""};const trv=$("#t-tre")&&$("#t-tre").value.trim();if(trv&&(!t.tre||t.tre.lyDo!==trv))v.tre={lyDo:trv,at:new Date().toLocaleString("vi-VN"),by:ME.name};
     v.cd=cd.map(s=>Object.assign({},s));v.tuanTu=!$("#t-seq")||$("#t-seq").checked;if($("#t-v2")){if(v.team==="content")v.v2ceo=$("#t-v2").checked;else v.v2=$("#t-v2").checked}
     if(v.cd.some(s=>!s.nguoi||!String(s.ten).trim()||(s.phan||[]).some(p=>!p.nguoi))){toast("Mỗi công đoạn cần có tên và người làm");return}
-    if(!v.cd.length&&!v.han){toast("Chọn hạn xong việc");return}
+    /* để trống ngày (hoặc bấm "Chưa có hạn") = việc chưa có hạn, nằm ở tab Chưa có hạn */
+    if(!v.han)v.gio="";
+    if(!t)v.gap=cwGapT(v.ten);else if(gv&&t.gap===undefined&&cwGapT(v.ten))v.gap=true;
     if(!giver)v.nguoi=t?t.nguoi:ME.id;
     if(!t&&v.st==="done"&&v.nguoi!==ME.id)v.st="todo";
-    const nid=uid("cv"),oldNg=t?t.nguoi:"",oldPhoi=t?(t.phoi||[]):[],oldHan=t?t.han:0;
+    const nid=uid("cv"),oldNg=t?t.nguoi:"",oldPhoi=t?(t.phoi||[]):[],oldTd=t?(t.theoDoi||[]):[],oldHan=t?t.han:0;
     DB.mutate(ME.name,(t?"cập nhật việc: ":"giao việc: ")+v.ten+(v.nguoi?" → "+userName(v.nguoi):""),dt=>{let x;if(t){x=dt.tasks.find(y=>y.id===t.id);Object.assign(x,gv?v:{st:v.st,checklist:v.checklist,kq:v.kq,...(v.tre?{tre:v.tre}:{})})}else{x={id:nid,...v,files:bf,loai:"Việc",tao:ME.id};dt.tasks.push(x)}
       if(x.cd&&x.cd.length){tkSync(x);v.nguoi=x.nguoi;v.han=x.han;v.phoi=x.phoi}
       tkDoneDay(x,dt.settings.today);
       tkLog(x,t?("Sửa việc"+(oldNg!==x.nguoi?" · người làm: "+(userName(oldNg)||"—")+" → "+(userName(x.nguoi)||"—"):"")+(oldHan&&oldHan!==x.han?" · hạn: "+dd(oldHan)+" → "+dd(x.han):"")):("Giao việc"+(x.nguoi?" cho "+userName(x.nguoi):"")+(x.han?" · hạn "+dd(x.han):"")));
-      if(typeof notifyU==="function"&&gv){const ds=v.han?` · hạn ${dd(v.han)}`:"";const nw=[];if(v.nguoi&&v.nguoi!==oldNg)nw.push(v.nguoi);v.phoi.filter(p=>!oldPhoi.includes(p)).forEach(p=>nw.push(p));if(nw.length)notifyU(dt,nw,`${ME.name} giao bạn việc "${v.ten}"${ds}`,"task:"+x.id);else if(t&&t.han!==v.han&&v.nguoi)notifyU(dt,[v.nguoi],`${ME.name} đổi hạn việc "${v.ten}" thành ${dd(v.han)}`,"task:"+x.id)}});if(!t&&$("#t-lap")&&($("#t-lap").value||$("#t-tplsave").checked))tkTplSave(v,$("#t-lap").value,+$("#t-lapd").value||0);
+      if(typeof notifyU==="function"&&gv){const ds=v.han?` · hạn ${dd(v.han)}`:"";const nw=[];if(v.nguoi&&v.nguoi!==oldNg)nw.push(v.nguoi);v.phoi.filter(p=>!oldPhoi.includes(p)).forEach(p=>nw.push(p));if(nw.length)notifyU(dt,nw,`${ME.name} giao bạn việc "${v.ten}"${ds}`,"task:"+x.id);else if(t&&t.han!==v.han&&v.nguoi)notifyU(dt,[v.nguoi],`${ME.name} đổi hạn việc "${v.ten}" thành ${dd(v.han)}`,"task:"+x.id);
+        const nTd=(v.theoDoi||[]).filter(p=>!oldTd.includes(p)&&p!==v.nguoi&&!v.phoi.includes(p));if(nTd.length)notifyU(dt,nTd,`${ME.name} thêm bạn theo dõi việc "${v.ten}"${ds}`,"task:"+x.id)}});if(!t&&$("#t-lap")&&($("#t-lap").value||$("#t-tplsave").checked))tkTplSave(v,$("#t-lap").value,+$("#t-lapd").value||0);
     if(!t&&TK_AFTER_NEW){const f=TK_AFTER_NEW;TK_AFTER_NEW=null;try{f(nid)}catch(e){}}
-    toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+($("#t-lap").value==="tuan"?"mỗi tuần":"mỗi tháng"):""));closeDrawer();renderMain()};
+    toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+({ngay:"hằng ngày",tuan:"mỗi tuần",thang:"mỗi tháng"}[$("#t-lap").value]||""):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
   try{tkFormRow()}catch(e){console.error("bố cục form giao việc",e)}
   if(t)try{tkLayout(t,gv)}catch(e){console.error("bố cục chi tiết việc",e)}
@@ -397,11 +412,12 @@ function tkFormRow(){const team=$("#t-team"),row=team&&team.closest(".row4"),ph=
   {const dk=$("#t-dk"),dkF=dk&&dk.closest("label.field"),bfl=$("#t-bfl"),bfF=bfl&&bfl.closest(".field"),up=bfF&&bfF.querySelector("label.tkup"),mo=$("#t-mo"),moF=mo&&mo.closest("label.field");
     if(dk&&bfl&&moF&&!$(".tkatt")){const f=document.createElement("div");f.className="field tkatt";f.innerHTML=`Tư liệu đính kèm <small class="hint">(link Drive, ảnh hoặc file ≤ 1,5 MB · không bắt buộc)</small>`;
       const line=document.createElement("div");line.className="tkattl";dk.placeholder="Dán link Drive, brief…";line.appendChild(dk);if(up)line.appendChild(up);f.append(line,bfl);moF.after(f);if(dkF)dkF.remove();if(bfF)bfF.remove()}}
-  if(ph&&!ph.querySelector(".tkdd")){const box=ph.querySelector(".phc"),lb=[...ph.childNodes].filter(n=>n!==box);if(box){
+  const mkDd=(w,lbl)=>{const box=w.querySelector(".phc");if(!box)return;
     const dd=document.createElement("details");dd.className="tkdd";const sm=document.createElement("summary");dd.append(sm,box);
     const upd=()=>{const L=[...box.querySelectorAll("input:checked")].map(i=>i.closest("label").textContent.trim());sm.textContent=L.length?L.join(", "):"— chọn người";sm.title=sm.textContent};upd();box.addEventListener("change",upd);
-    ph.innerHTML='Người cùng làm / hỗ trợ';ph.appendChild(dd);document.addEventListener("click",e=>{if(dd.open&&!dd.contains(e.target))dd.open=false})}
-    row.appendChild(ph)}
+    w.innerHTML=lbl;w.appendChild(dd);document.addEventListener("click",e=>{if(dd.open&&!dd.contains(e.target))dd.open=false})};
+  if(ph&&!ph.querySelector(".tkdd")){mkDd(ph,'Người cùng làm / hỗ trợ');row.appendChild(ph)}
+  {const td=$("#t-tdw");if(td&&!td.querySelector(".tkdd"))mkDd(td,'Người theo dõi <small class="hint">· được báo khi việc đổi trạng thái, không tính là việc của mình</small>')}
   /* "Lặp lại" ngang hàng "Công đoạn", ở góc phải (chị Hoa 03/11) */
   const lap=$("#t-lap"),lapRow=lap&&lap.closest(".tklap"),cdw=$("#t-cdw");if(lapRow){const cell=document.createElement("div");cell.className="field tklapc";cell.append(...lapRow.childNodes);
     if(cdw){const w=document.createElement("div");w.className="tkcdrow";cdw.before(w);w.append(cdw,cell)}else row.appendChild(cell);lapRow.remove()}}
@@ -413,7 +429,7 @@ function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.queryS
   const ppl=[t.nguoi].concat(t.phoi||[]).filter(Boolean).map(userName).filter(Boolean);
   const brief=document.createElement("div");brief.className="tkbrief";
   brief.innerHTML=`<div class="tkbt">${esc(t.ten)}</div>
-   <div class="tkbm"><span><small>Người giao</small>${esc(userName(t.tao)||"—")}</span><span><small>Người làm</small>${esc(ppl.join(", ")||"chưa giao")}</span><span class="${late?"t-red":""}"><small>Hạn</small>${t.han?dd(t.han)+(t.gio?" · "+t.gio:"")+(late?` · trễ ${td-t.han} ngày`:""):"—"}</span><span><small>Ưu tiên</small>${esc(t.uu||"Trung bình")}</span>${t.da?`<span><small>Dự án</small>${esc(prjN(t.da))}</span>`:""}</div>
+   <div class="tkbm"><span><small>Người giao</small>${esc(userName(t.tao)||"—")}</span><span><small>Người làm</small>${esc(ppl.join(", ")||"chưa giao")}</span><span class="${late?"t-red":""}"><small>Hạn</small>${t.han?dd(t.han)+(t.gio?" · "+t.gio:"")+(late?` · trễ ${td-t.han} ngày`:""):"—"}</span><span><small>Ưu tiên</small>${t.gap?'<b class="t-red">GẤP</b> · ':""}${esc(t.uu||"Trung bình")}</span>${(t.theoDoi||[]).length?`<span><small>Người theo dõi</small>${esc((t.theoDoi||[]).map(userName).filter(Boolean).join(", "))}</span>`:""}${t.da?`<span><small>Dự án</small>${esc(prjN(t.da))}</span>`:""}</div>
    ${t.moTa?`<div class="tkbd">${esc(t.moTa).replace(/https?:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`).replace(/\n/g,"<br>")}</div>`:`<div class="tkbd hint">Chưa có mô tả / yêu cầu.</div>`}
    ${t.dk||(t.files||[]).length?`<div class="tkbl">📎 ${t.dk?link(t.dk):""}${typeof tkFilesHtml==="function"?tkFilesHtml(t.files||[]):""}</div>`:""}
    ${(t.checklist||[]).length?`<div class="tkbc hint">Việc nhỏ: ${(t.checklist||[]).filter(c=>c.x).length}/${(t.checklist||[]).length} đã xong</div>`:""}`;
@@ -424,22 +440,26 @@ function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.queryS
   if(lateBox)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm${late?" danger":""}" id="tk-ghbtn" title="${late?"Báo lý do trễ / xin gia hạn":"Xin gia hạn"}">⏰ ${late?"Trễ hạn":"Xin gia hạn"}</button>`);
   if(h2){h2.classList.add("tkh2");h2.appendChild(tools);h2.after(brief)}
   di.querySelectorAll("p.hint").forEach(p=>{if(/^Người giao:/.test(p.textContent.trim()))p.remove()});
-  {const ok=$("#t-selfok");if(ok)ok.onclick=()=>{DB.mutate(ME.name,"xong việc tự thêm: "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);tkLog(x,"Xong (việc tự thêm)")});toast("Đã xong");closeDrawer();renderMain()}}
+  {const ok=$("#t-selfok");if(ok)ok.onclick=()=>{DB.mutate(ME.name,"xong việc tự thêm: "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);tkLog(x,"Xong (việc tự thêm)");cwTdNotify(dt,x,`${ME.name} đã xong việc "${x.ten}"`)});toast("Đã xong");closeDrawer();renderMain()}}
   /* trao đổi, gia hạn: ẩn tới khi bấm (có tin trả lại / đang chờ gia hạn thì mở sẵn) */
   const tra=(t.chat||[]).some(c=>c.kind==="tra")&&t.st!=="done",cho=((t.treReq||{}).st==="cho");
   if(chat){brief.after(chat);chat.hidden=!tra;$("#tk-chatbtn").onclick=()=>{chat.hidden=!chat.hidden;if(!chat.hidden){chat.scrollIntoView({block:"nearest"});const i=$("#t-cm");if(i)i.focus()}}}
   if(lateBox){brief.after(lateBox);lateBox.hidden=!(late||cho);$("#tk-ghbtn").onclick=()=>{lateBox.hidden=!lateBox.hidden;if(!lateBox.hidden)lateBox.scrollIntoView({block:"nearest"})}}
   /* các ô thông tin việc: gom vào mục thu gọn (người giao mở để sửa; người làm chỉ xem, đã có ở phần đầu) */
   const f=$("#tkf2");if(!f)return;const pick=sel=>{const e=f.querySelector(sel);return e&&(e.closest(".row4")||e.closest("label.field")||e.closest(".field")||e.closest("label.ck"))};
-  const parts=["#t-ten","#t-mo","#t-team","#t-ng","#t-v2","#t-phw","#t-dk","#t-bfl"].map(pick).filter((e,i,a)=>e&&a.indexOf(e)===i);
+  const parts=["#t-ten","#t-mo","#t-team","#t-ng","#t-v2","#t-phw","#t-tdw","#t-dk","#t-bfl"].map(pick).filter((e,i,a)=>e&&a.indexOf(e)===i);
   if(!parts.length)return;const dt=document.createElement("details");dt.className="tkedit";dt.innerHTML=`<summary>${gv?"✎ Sửa thông tin việc":"Thông tin chi tiết"}</summary>`;
   parts.forEach(e=>dt.appendChild(e));f.prepend(dt)}
+const CW_HAN=[["td","Hôm nay"],["mai","Mai"],["cn","Cuối tuần"],["ct","Cuối tháng"],["no","Chưa có hạn"]];
+function cwHanDay(k){const td=D().settings.today,wd=((MONTH.first+td-1)%7+7)%7;return k==="td"?td:k==="mai"?td+1:k==="cn"?td+(6-wd):k==="ct"?Math.max(td,MONTH.ndays):0}
+const cwHanChips=()=>`<span class="cwhc" role="group" aria-label="Chọn nhanh ngày">${CW_HAN.map(([k,l])=>`<button type="button" class="cwhcb" data-cwhan="${k}">${l}</button>`).join("")}</span>`;
+function cwHanOn(){const h=$("#t-han");if(!h)return;const n=tkDay(h.value);document.querySelectorAll("#drawer [data-cwhan]").forEach(b=>b.classList.toggle("on",cwHanDay(b.dataset.cwhan)===n))}
 const newTaskBtn=()=>`<button class="btn pri" id="cv-new">${tkGiver()?"＋ Giao việc":"＋ Thêm việc"}</button>`;
 /* Nhân sự tự thêm việc cho mình (chị Hoa 03/11): một dòng ở đầu "Của tôi", gõ tên + hạn, Enter là thêm */
 const tkSelfHtml=()=>`<form class="tkself" id="tk-self"><span>＋</span><input id="tks-ten" placeholder="Thêm việc của tôi… (Enter để thêm)" autocomplete="off"><label>Hạn${tkDate("tks-han",D().settings.today)}</label><select id="tks-uu" aria-label="Ưu tiên">${opt(UU,"Trung bình")}</select><button class="btn sm pri">Thêm</button></form>`;
 function tkSelfBind(b){const f=b.querySelector("#tk-self");if(!f)return;f.onsubmit=e=>{e.preventDefault();const ten=$("#tks-ten").value.trim();if(!ten){$("#tks-ten").focus();return}
   const han=tkDay($("#tks-han").value)||D().settings.today,id=uid("cv"),team=TEAMS[teamOf(ME)]?teamOf(ME):((typeof KPB_TEAM!=="undefined"&&KPB_TEAM[ME.phongBan])||"chung");
-  DB.mutate(ME.name,"tự thêm việc: "+ten,dt=>{const x={id,ten,moTa:"",team,da:"",nguoi:ME.id,phoi:[],han,bd:0,uu:$("#tks-uu").value,st:"todo",checklist:[],files:[],loai:"Việc",tao:ME.id,tuThem:true,v2:false,log:[]};tkLog(x,ME.name+" tự thêm việc cho mình · hạn "+dd(han));dt.tasks.push(x)});
+  DB.mutate(ME.name,"tự thêm việc: "+ten,dt=>{const x={id,ten,moTa:"",team,da:"",nguoi:ME.id,phoi:[],han,bd:0,uu:$("#tks-uu").value,gap:cwGapT(ten),st:"todo",checklist:[],files:[],loai:"Việc",tao:ME.id,tuThem:true,v2:false,log:[]};tkLog(x,ME.name+" tự thêm việc cho mình · hạn "+dd(han));dt.tasks.push(x)});
   toast("Đã thêm việc");renderMain();setTimeout(()=>{const i=$("#tks-ten");if(i)i.focus()},50)}}
 const bindNew=()=>{if($("#cv-new"))$("#cv-new").onclick=()=>openTask(null)};
 
@@ -1131,32 +1151,33 @@ function hsEffIds(){const d=D(),w=typeof cvWho==="function"?cvWho():"mine",t=tea
   return U.filter(u=>u.id===ME.id||u.role!=="admin"&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,teamOf(u)))).map(u=>u.id)}
 /* Hiệu quả việc được giao và việc tự tạo (chị Hoa 04/11): mỗi ngày trong tháng = % xong đúng hạn, cộng dồn từ đầu tháng tới ngày đó,
    tính trên việc đã tới hạn (xong đúng hạn / xong trễ / tới hạn chưa xong). Hai đường: việc được giao và việc tự tạo
-   (nhân sự tự thêm cho mình, hoặc người tạo cũng là người làm). Theo ô "Xem việc của". */
-function hsEffData(d,td,U){const T=d.tasks||[],N=Math.max(1,Math.min(td,MONTH.ndays)),D0=Array.from({length:N},(_,i)=>i+1);
-  const kind=x=>{const t=T.find(y=>y.id===x.id)||{};return t.tuThem||t.tao===x.ng?"tu":"giao"};
-  const line=k=>{const L=U.filter(x=>x.han&&x.han<=N&&kind(x)===k);return D0.map(day=>{let dung=0,tre=0,late=0;
+   (nhân sự tự thêm cho mình, hoặc người tạo cũng là người làm). Theo ô "Xem việc của".
+   P (không bắt buộc, Công việc › Tổng quan › Của tôi): {a,b,lb} = khoảng ngày của kỳ Tuần / Tháng / Quý (đánh số ngày như han), x.tu có sẵn thì dùng luôn. */
+function hsEffData(d,td,U,P){const T=d.tasks||[],a=P?P.a:1,N=P?Math.max(a,Math.min(td,P.b)):Math.max(1,Math.min(td,MONTH.ndays)),D0=Array.from({length:N-a+1},(_,i)=>a+i);
+  const kind=x=>{if(x.tu!==undefined)return x.tu?"tu":"giao";const t=T.find(y=>y.id===x.id)||{};return t.tuThem||t.tao===x.ng?"tu":"giao"};
+  const line=k=>{const L=U.filter(x=>x.han&&x.han>=a&&x.han<=N&&kind(x)===k);return D0.map(day=>{let dung=0,tre=0,late=0;
     L.forEach(x=>{if(x.han>day)return;const xn=x.st==="done"?(x.xn||x.han):0;if(xn&&xn<=day){if(xn>x.han)tre++;else dung++}else if(x.han<day||day<td)late++});
     const n=dung+tre+late;return n?{p:Math.round(dung/n*100),n,dung,tre,late}:null})};
   return {D0,giao:line("giao"),tu:line("tu")}}
-function hsEffHtml(d,td,U){const {D0,giao,tu}=hsEffData(d,td,U);
+function hsEffHtml(d,td,U,P){const {D0,giao,tu}=hsEffData(d,td,U,P);
   const last=A=>A.filter(Boolean).slice(-1)[0],sum=A=>{const o=last(A);return o?`${o.p}% đúng hạn · ${o.n} việc tới hạn`:"chưa có việc tới hạn"};
   const w=1000,h=170,L=44,R=14,Tp=12,B=26,n=D0.length,X=i=>n<2?L+(w-L-R)/2:L+i*(w-L-R)/(n-1),Y=p=>Tp+(100-p)*(h-Tp-B)/100,step=n<2?w-L-R:(w-L-R)/(n-1);
   const path=A=>{let s="",on=false;A.forEach((o,i)=>{if(!o){on=false;return}s+=(on?"L":"M")+X(i).toFixed(1)+" "+Y(o.p).toFixed(1);on=true});return s};
-  const SER=[["Việc được giao","var(--hsef-1)",giao],["Việc tự tạo","var(--hsef-2)",tu]];
-  const tick=i=>i===0||i===n-1||(i+1)%5===0;
-  return `<section class="card hsef"><div class="hsw-chh"><h3>Hiệu quả làm việc · tháng ${MONTH.mon}</h3><span class="hint">% việc xong đúng hạn, cộng dồn từ đầu tháng · rê chuột để xem từng ngày</span></div>
+  const SER=[["Việc được giao","var(--hsef-1)",giao],["Việc tự giao","var(--hsef-2)",tu]];
+  const tick=i=>i===0||i===n-1||(n>40?(i+1)%14===0:n>10?(i+1)%5===0:true);
+  return `<section class="card hsef"><div class="hsw-chh"><h3>Hiệu quả làm việc · ${P?esc(P.lb):"tháng "+MONTH.mon}</h3><span class="hint">% việc xong đúng hạn, cộng dồn từ đầu ${P?"kỳ":"tháng"} · rê chuột để xem từng ngày</span></div>
    <div class="hsefl">${SER.map(([nm,c,A])=>`<span><i style="background:${c}"></i><b>${nm}</b> <small>${sum(A)}</small></span>`).join("")}</div>
-   <div class="hsefw"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Hiệu quả việc được giao và việc tự tạo trong tháng">
+   <div class="hsefw"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Hiệu quả việc được giao và việc tự giao">
     ${[0,50,100].map(p=>`<line x1="${L}" x2="${w-R}" y1="${Y(p)}" y2="${Y(p)}" class="hsefg"/><text x="${L-8}" y="${Y(p)+4}" text-anchor="end" class="hseft">${p}%</text>`).join("")}
     ${D0.map((day,i)=>tick(i)?`<text x="${X(i)}" y="${h-6}" text-anchor="middle" class="hseft">${dd(day)}</text>`:"").join("")}
     <line class="hsefx" x1="0" x2="0" y1="${Tp}" y2="${h-B}" visibility="hidden"/>
     ${SER.map(([nm,c,A])=>`<path d="${path(A)}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${A.map((o,i)=>o&&(i===n-1||!A[i-1]||!A[i+1]||n<=12)?`<circle cx="${X(i)}" cy="${Y(o.p)}" r="4" fill="${c}" stroke="var(--hsef-bg)" stroke-width="2"/>`:"").join("")}`).join("")}
     ${D0.map((day,i)=>`<rect class="hsefh" data-hsew="${i}" x="${X(i)-step/2}" y="0" width="${step}" height="${h-B}"/>`).join("")}
    </svg><div class="hseftip" hidden></div></div>
-   <table class="sr-only"><tr><th>Ngày</th><th>Việc được giao</th><th>Việc tự tạo</th></tr>${D0.map((day,i)=>`<tr><td>${dd(day)}</td><td>${giao[i]?giao[i].p+"%":"—"}</td><td>${tu[i]?tu[i].p+"%":"—"}</td></tr>`).join("")}</table></section>`}
-function hsEffBind(m,d,td,U){const box=m.querySelector(".hsefw");if(!box)return;const {D0,giao,tu}=hsEffData(d,td,U),tip=box.querySelector(".hseftip"),cx=box.querySelector(".hsefx");
+   <table class="sr-only"><tr><th>Ngày</th><th>Việc được giao</th><th>Việc tự giao</th></tr>${D0.map((day,i)=>`<tr><td>${dd(day)}</td><td>${giao[i]?giao[i].p+"%":"—"}</td><td>${tu[i]?tu[i].p+"%":"—"}</td></tr>`).join("")}</table></section>`}
+function hsEffBind(m,d,td,U,P){const box=m.querySelector(".hsefw");if(!box)return;const {D0,giao,tu}=hsEffData(d,td,U,P),tip=box.querySelector(".hseftip"),cx=box.querySelector(".hsefx");
   const row=(nm,o)=>`<div><b>${nm}</b> ${o?`${o.p}% <small>(${o.dung} đúng hạn · ${o.tre} xong trễ · ${o.late} còn trễ)</small>`:`<small>chưa có việc tới hạn</small>`}</div>`;
-  box.querySelectorAll("[data-hsew]").forEach(r=>{r.onmouseenter=()=>{const i=+r.dataset.hsew;tip.innerHTML=`<b>Đến ${dd(D0[i])}</b>${row("Được giao",giao[i])}${row("Tự tạo",tu[i])}`;tip.hidden=false;
+  box.querySelectorAll("[data-hsew]").forEach(r=>{r.onmouseenter=()=>{const i=+r.dataset.hsew;tip.innerHTML=`<b>Đến ${dd(D0[i])}</b>${row("Được giao",giao[i])}${row("Tự giao",tu[i])}`;tip.hidden=false;
     const x=+r.getAttribute("x")+ +r.getAttribute("width")/2;cx.setAttribute("x1",x);cx.setAttribute("x2",x);cx.setAttribute("visibility","visible");
     const bb=box.getBoundingClientRect(),rb=r.getBoundingClientRect();tip.style.left=Math.max(0,Math.min(bb.width-tip.offsetWidth,rb.left-bb.left+rb.width/2+12))+"px"};
     r.onmouseleave=()=>{tip.hidden=true;cx.setAttribute("visibility","hidden")}})}

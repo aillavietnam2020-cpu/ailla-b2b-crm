@@ -7,6 +7,7 @@ import { serveHub } from './hub/serve';
 import HUB_HTML from './hub/hub.html';
 import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
+import { taskRecurring } from './services/taskRecurring';
 import { publishDue } from './services/fpPublish';
 import { syncAllChannels } from './services/poscake';
 import { syncComboTasks } from './routes/sanpham';
@@ -107,7 +108,13 @@ export default {
         } catch (error) {
           console.error('[cron] nhac buoi quay loi', error);
         }
-        // Nhắc việc Task giao việc: việc trễ, đến hạn, chờ duyệt + tóm tắt cho chị (8 giờ sáng giờ Việt Nam).
+        // Việc lặp lại (hằng ngày / tuần / tháng): máy chủ tự giao mỗi giờ, không chờ có người mở trang Việc (cùng mốc p.last với trình duyệt).
+        try {
+          console.info('[cron] viec lap lai', JSON.stringify(await taskRecurring(env.DB)));
+        } catch (error) {
+          console.error('[cron] viec lap lai loi', error);
+        }
+        // Nhắc việc Task giao việc: trễ, đến hạn, chờ duyệt + tóm tắt cho CEO, và tin nhắn của Trợ lý công việc (giờ đặt ở Cấu hình, mặc định 8 giờ).
         try {
           console.info('[cron] nhac task', JSON.stringify(await taskReminders(env.DB)));
         } catch (error) {
