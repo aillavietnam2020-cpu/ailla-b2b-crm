@@ -749,7 +749,7 @@ PAGES.cv_nv=m=>{try{pCvNv2(m)}catch(e){console.error("Task mới lỗi, dùng b�
 /* =====================================================================
    NHẮC VIỆC BẰNG CHUÔNG (Task kiểu mới)
    - Còn ≤ 2 ngày tới hạn mà người làm chưa bấm "Đang làm": nhắc người làm, mỗi ngày một lần
-   - Đến hạn hôm nay: nhắc người làm và lead
+   - Đến hạn hôm nay / trễ: nhắc người làm, người giao và Lead team đó; team chưa có Lead mới nhắc CEO
    - Trễ từ 1 ngày: cảnh báo người làm và lead, mỗi ngày một lần
    - Đăng bài: hôm nay cần đăng thì nhắc người phụ trách kênh và lead; đăng trễ thì cảnh báo
    - Việc lead giao tay: nhắc tương tự (người làm + người cùng làm / hỗ trợ)
@@ -757,21 +757,25 @@ PAGES.cv_nv=m=>{try{pCvNv2(m)}catch(e){console.error("Task mới lỗi, dùng b�
    ===================================================================== */
 function cvPush(dt,ids,text,ref){dt.notifs=dt.notifs||[];[...new Set([].concat(ids).filter(Boolean))].forEach(to=>{dt.notifs.push({id:uid("nt"),to,text,at:nowISO(),ref:ref||"",by:"",read:false})});if(typeof NT_KEEP!=="undefined"&&dt.notifs.length>NT_KEEP)dt.notifs=dt.notifs.slice(-NT_KEEP)}
 function cvRemindList(){
-  const d=D(),td=d.settings.today,out=[],leads=(d.users||[]).filter(u=>u.active!==false&&(u.role==="admin"||u.role==="lead")).map(u=>u.id);
+  const d=D(),td=d.settings.today,out=[],act=(d.users||[]).filter(u=>u.active!==false),ceo=act.filter(u=>u.role==="admin").map(u=>u.id);
+  /* Đến hạn / trễ hạn: báo Lead của team người làm; team chưa có Lead thì báo CEO; người làm chính là Lead thì không báo thêm ai (chị Hoa 04/11) */
+  const leadOf=id=>{const u=act.find(x=>x.id===id),k=u?cvTeamNorm(teamOf(u)):"";if(!k||k==="all"||u.role==="admin")return ceo;if(u.role==="lead"||u.role==="truongphong")return [];
+    const L=act.filter(x=>x.id!==id&&(x.role==="lead"||x.role==="truongphong")&&cvTeamSee(cvTeamNorm(teamOf(x)),k)).map(x=>x.id);return L.length?L:ceo},
+    leads=g=>leadOf(g.nguoi);
   /* ref: bấm thông báo mở đúng việc (chị Hoa 03/11: nhận thông báo mà bấm vào không ra việc) */
   const push=(type,key,to,text,ref)=>{to=[...new Set((to||[]).filter(Boolean))];if(to.length)out.push({k:type+"|"+key,to,text,ref})};
   cvAutoMk(true).forEach(g=>{const who=userName(g.nguoi)||"chưa giao",mine=g.nguoi&&cvActive(g.nguoi)?[g.nguoi]:[],t=`${g.ten} (${g.done}/${g.n})`;if(!g.han)return;
     if(g.han>=td&&g.han-td<=2&&g.st!=="doing")push("n",g.key,mine,`Bạn chưa bấm "Đang làm": ${t} · hạn ${dd(g.han)}`,(g.ids||[])[0]);
-    if(g.han===td)push("d",g.key,mine.concat(leads),`Đến hạn hôm nay: ${t} · ${who}`,(g.ids||[])[0]);
-    if(g.han<td)push("l",g.key,mine.concat(leads),`⚠ Trễ ${td-g.han} ngày: ${t} · ${who}`,(g.ids||[])[0])});
+    if(g.han===td)push("d",g.key,mine.concat(leads(g)),`Đến hạn hôm nay: ${t} · ${who}`,(g.ids||[])[0]);
+    if(g.han<td)push("l",g.key,mine.concat(leads(g)),`⚠ Trễ ${td-g.han} ngày: ${t} · ${who}`,(g.ids||[])[0])});
   cvAutoDg(true).forEach(g=>{const who=userName(g.nguoi)||"chưa có người phụ trách",mine=g.nguoi&&cvActive(g.nguoi)?[g.nguoi]:[];
     if(!g.day)push("s",g.key,mine,`${g.ten}`,(g.ids||[])[0]);
-    else if(g.day===td)push("d",g.key,mine.concat(leads),`Hôm nay cần đăng: ${g.ten} · ${who}`,(g.ids||[])[0]);
-    else if(g.day<td)push("l",g.key,mine.concat(leads),`⚠ Đăng trễ ${td-g.day} ngày: ${g.ten} · ${who}`,(g.ids||[])[0])});
+    else if(g.day===td)push("d",g.key,mine.concat(leads(g)),`Hôm nay cần đăng: ${g.ten} · ${who}`,(g.ids||[])[0]);
+    else if(g.day<td)push("l",g.key,mine.concat(leads(g)),`⚠ Đăng trễ ${td-g.day} ngày: ${g.ten} · ${who}`,(g.ids||[])[0])});
   (d.tasks||[]).forEach(t=>{if(t.st==="done"||!t.han)return;const mine=[t.nguoi].concat(t.phoi||[]).filter(x=>x&&cvActive(x)),who=userName(t.nguoi)||"chưa giao";
     if(t.han>=td&&t.han-td<=2&&["todo","nhan"].includes(t.st))push("n","tk|"+t.id,mine,`Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`,"task:"+t.id);
-    if(t.han===td)push("d","tk|"+t.id,mine.concat(leads),`Đến hạn hôm nay: ${t.ten} · ${who}`,"task:"+t.id);
-    if(t.han<td)push("l","tk|"+t.id,mine.concat(leads),`⚠ Trễ ${td-t.han} ngày: ${t.ten} · ${who}`,"task:"+t.id)});
+    if(t.han===td)push("d","tk|"+t.id,mine.concat(t.tao&&cvActive(t.tao)?[t.tao]:[],leads(t)),`Đến hạn hôm nay: ${t.ten} · ${who}`,"task:"+t.id);
+    if(t.han<td)push("l","tk|"+t.id,mine.concat(t.tao&&cvActive(t.tao)?[t.tao]:[],leads(t)),`⚠ Trễ ${td-t.han} ngày: ${t.ten} · ${who}`,"task:"+t.id)});
   return out
 }
 function cvRemind(){

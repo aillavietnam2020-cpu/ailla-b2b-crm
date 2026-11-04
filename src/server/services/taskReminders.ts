@@ -2,14 +2,14 @@ import { pack, unpack } from '../lib/pack';
 
 /**
  * Nhắc việc "Task giao việc" mỗi sáng 8 giờ (chạy từ cron mỗi giờ, chỉ làm việc lúc 8 giờ giờ Việt Nam):
- *  - Việc trễ hạn: nhắc người làm, người cùng làm, người giao và quản lý.
+ *  - Việc trễ hạn / đến hạn: nhắc người làm, người cùng làm, người giao và Lead team đó (team chưa có Lead thì CEO).
  *  - Việc đến hạn hôm nay, việc còn 0–2 ngày mà người làm chưa bấm "Đang làm".
  *  - Việc đang chờ duyệt: nhắc người giao.
  *  - Một bản tóm tắt cho chị (admin): bao nhiêu việc trễ, ai trễ nhiều, bao nhiêu việc chờ duyệt.
  * Ghi vào chuông (hub_state.notifs). Dùng chung khóa autoRem với phần nhắc chạy trên trình duyệt để không báo trùng.
  */
 
-interface HubUser { id: string; name?: string; active?: boolean; role?: string }
+interface HubUser { id: string; name?: string; active?: boolean; role?: string; phongBan?: string }
 interface Task { id: string; ten: string; nguoi?: string; phoi?: string[]; tao?: string; han?: number; st?: string }
 interface Notif { id: string; to: string; text: string; at: string; ref: string; by: string; read: boolean }
 interface HubData {
@@ -21,6 +21,8 @@ interface HubData {
 }
 
 const NT_KEEP = 600;
+const MKT_PB = ['CM', 'ADS', 'KOC', 'BDH', ''];
+const KPB_TEAM: Record<string, string> = { CM: 'content', ADS: 'digital', KOC: 'koc', KT: 'ketoan', KV: 'kho', SX: 'sx', HCNS: 'hcns', B2B: 'sale', B2C: 'sale' };
 
 export async function taskReminders(
   db: D1Database,
@@ -46,8 +48,24 @@ export async function taskReminders(
     const users = (d.users ?? []).filter((u) => u.active !== false);
     const active = new Set(users.map((u) => u.id));
     const nameOf = (id?: string) => users.find((u) => u.id === id)?.name ?? 'chưa giao';
-    const leads = users.filter((u) => u.role === 'admin' || u.role === 'lead').map((u) => u.id);
     const admins = users.filter((u) => u.role === 'admin').map((u) => u.id);
+    // Lead của team người làm (giống teamOf/cvTeamNorm ở hub/src/congviec.js); team chưa có Lead thì báo CEO, người làm là Lead thì thôi
+    const teamOf = (u: HubUser) => {
+      if (u.role === 'digital') return 'digital';
+      if (u.role === 'content' || u.role === 'lead') return 'content';
+      if (u.role === 'truongphong') return MKT_PB.includes(u.phongBan ?? '') ? 'mkt' : (KPB_TEAM[u.phongBan ?? ''] ?? u.phongBan ?? '');
+      if (u.role === 'nhanvien' && u.phongBan) return KPB_TEAM[u.phongBan] ?? u.phongBan;
+      return 'all';
+    };
+    const sees = (t: string, k: string) => t === k || (t === 'mkt' && ['content', 'digital', 'koc'].includes(k));
+    const leadOf = (id?: string): string[] => {
+      const u = users.find((x) => x.id === id);
+      const k = u ? teamOf(u) : '';
+      if (!u || !k || k === 'all' || u.role === 'admin') return admins;
+      if (u.role === 'lead' || u.role === 'truongphong') return [];
+      const l = users.filter((x) => x.id !== id && (x.role === 'lead' || x.role === 'truongphong') && sees(teamOf(x), k)).map((x) => x.id);
+      return l.length ? l : admins;
+    };
     const at = now.toISOString();
     d.autoRem = d.autoRem ?? {};
     for (const k of Object.keys(d.autoRem)) if (!k.endsWith(sfx)) delete d.autoRem[k];
@@ -79,9 +97,9 @@ export async function taskReminders(
       if (t.han < today) {
         lateN++;
         lateBy.set(who, (lateBy.get(who) ?? 0) + 1);
-        push(`l|tk|${t.id}`, [...mine, t.tao, ...leads], `⚠ Trễ ${today - t.han} ngày: ${t.ten} · ${who}`, `task:${t.id}`);
+        push(`l|tk|${t.id}`, [...mine, t.tao, ...leadOf(t.nguoi)], `⚠ Trễ ${today - t.han} ngày: ${t.ten} · ${who}`, `task:${t.id}`);
       } else if (t.han === today) {
-        push(`d|tk|${t.id}`, [...mine, t.tao, ...leads], `Đến hạn hôm nay: ${t.ten} · ${who}`, `task:${t.id}`);
+        push(`d|tk|${t.id}`, [...mine, t.tao, ...leadOf(t.nguoi)], `Đến hạn hôm nay: ${t.ten} · ${who}`, `task:${t.id}`);
       } else if (t.han - today <= 2 && (t.st === 'todo' || t.st === 'nhan')) {
         push(`n|tk|${t.id}`, mine, `Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`, `task:${t.id}`);
       }
