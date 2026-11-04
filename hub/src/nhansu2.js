@@ -31,6 +31,8 @@ async function nvLoadFiles(ma,force){
   NVFILES.busy=false;if(["hr_nv","hr_tq","hr"].includes(PAGE)&&NVF.sel===ma)renderMain();
 }
 function nvList(){const d=D();return d.staff.filter(x=>(NVF.tt==="all"||(NVF.tt==="dang"?x.tt!=="Đã nghỉ":x.tt===NVF.tt))&&(!NVF.pb||x.pb===NVF.pb)&&(!NVF.q||foldName(x.ma+" "+x.ten+" "+(x.viTri||"")+" "+(hsOf(x.ma).cccd||"")+" "+(hsOf(x.ma).mst||"")+" "+(hsOf(x.ma).sdt||"")).includes(foldName(NVF.q))))}
+/* Tên loại hợp đồng gọn cho bảng danh sách (đủ tên khi rê chuột). */
+const nvHdNgan=t=>/không xác định/i.test(t)?"Không thời hạn":/xác định thời hạn/i.test(t)?"Có thời hạn":t;
 function pHrNV(m){
   if(!hrOk()){m.innerHTML=H("Nhân viên")+`<section class="card"><p>Trang này chỉ CEO, kế toán và phòng Hành chính nhân sự xem được.</p></section>`;return}
   const d=D(),h=HRD(),S=d.staff,dang=S.filter(x=>x.tt!=="Đã nghỉ"),A=nvAlerts(),L=nvList(),ed=can(ME,"nhansu.quanly")||ME.role==="admin"||ME.phongBan==="HCNS";
@@ -48,7 +50,7 @@ function pHrNV(m){
    ${ed?`<button class="btn sm pri" id="nv-add">+ Thêm</button>`:""}<button class="btn sm" data-go="hr_nap">Nhập Excel</button><button class="btn sm" id="nv-xl">Xuất Excel</button><button class="btn sm" id="nv-in">In danh sách</button></div>
    <div class="filters pad"><input id="nv-q" placeholder="Tìm mã, tên, CCCD, MST, số điện thoại…" value="${esc(NVF.q)}" style="max-width:300px"><select id="nv-pb">${opt([["","Mọi phòng ban"]].concat(d.departments.map(p=>[p.k,p.n])),NVF.pb)}</select><select id="nv-tt">${opt([["dang","Đang làm"],["Chính thức","Chính thức"],["Thử việc","Thử việc"],["Theo giờ","Theo giờ"],["Nghỉ phép","Nghỉ phép"],["Nghỉ thai sản","Nghỉ thai sản"],["Tạm nghỉ","Tạm nghỉ"],["Đã nghỉ","Đã nghỉ"],["all","Tất cả"]],NVF.tt)}</select><span class="hint">${L.length} người</span></div>
    <div class="tbl nv-list"><table><thead><tr><th>STT</th><th>Mã NV</th><th>Họ và tên</th><th>Giới tính</th><th>Ngày sinh</th><th>Phòng ban</th><th>Vị trí</th><th>Ngày vào làm</th><th>Loại HĐ</th><th class="n">Lương cơ bản</th><th>Trạng thái</th></tr></thead><tbody>
-   ${L.map((x,i)=>{const n=nvNs(x.ma),hs=n.hs||{};return `<tr data-nv="${x.ma}" class="${x.ma===NVF.sel?"on":""}"><td>${i+1}</td><td class="mono">${x.ma}</td><td><b>${esc(x.ten)}</b></td><td>${esc(hs.gioi||n.gioi||"")}</td><td>${vndate(hs.ngaySinh)}</td><td>${esc(pbName(x.pb))}</td><td>${esc(x.viTri||"")}</td><td>${vndate(x.ngayVao)}</td><td>${esc((n.hd||{}).loai||"")}</td><td class="n">${n.luong?nf(n.luong):"—"}</td><td><i class="dot d-${ttTone(x.tt)}"></i> ${esc(x.tt||"")}</td></tr>`}).join("")||`<tr><td colspan="11" class="empty">Không có ai khớp bộ lọc.</td></tr>`}
+   ${L.map((x,i)=>{const n=nvNs(x.ma),hs=n.hs||{};return `<tr data-nv="${x.ma}" class="${x.ma===NVF.sel?"on":""}"><td>${i+1}</td><td class="mono">${x.ma}</td><td><b>${esc(x.ten)}</b></td><td>${esc(hs.gioi||n.gioi||"")}</td><td>${vndate(hs.ngaySinh)}</td><td>${esc(pbName(x.pb))}</td><td>${esc(x.viTri||"")}</td><td>${vndate(x.ngayVao)}</td><td title="${esc((n.hd||{}).loai||"")}">${esc(nvHdNgan((n.hd||{}).loai||""))}</td><td class="n">${n.luong?nf(n.luong):"—"}</td><td><i class="dot d-${ttTone(x.tt)}"></i> ${esc(x.tt||"")}</td></tr>`}).join("")||`<tr><td colspan="11" class="empty">Không có ai khớp bộ lọc.</td></tr>`}
    </tbody></table></div></section>
   ${NVF.sel?nvHoSo(NVF.sel,ed):""}`;
   $("#nv-q").onchange=e=>{NVF.q=e.target.value;renderMain()};$("#nv-pb").onchange=e=>{NVF.pb=e.target.value;renderMain()};$("#nv-tt").onchange=e=>{NVF.tt=e.target.value;renderMain()};
