@@ -78,7 +78,8 @@ pCvDa=function(m){_pCvDaKd(m);const L=kdSee();if(!L.length)return;const g=m.quer
 PAGES.cv_da=m=>pCvDa(m);
 /* Công việc › Tổng quan: khung "Kênh tôi phụ trách" (chỉ người giữ kênh) */
 const _pCvVKd=pCvV;
-pCvV=function(m){_pCvVKd(m);try{const boss=kdBoss(),L=boss?CHANNELS.filter(ch=>kdOwner(ch.k)||kdCards(ch.k).length):kdMine();if(!L.length)return;const bar=m.querySelector(".cvvbar");if(!bar)return;
+/* CEO / Lead xem dự án kênh ở Dự án, không hiện hàng này ở Công việc (chị Hoa 04/11: "bỏ cái này đi") — chỉ người giữ kênh thấy kênh mình */
+pCvV=function(m){_pCvVKd(m);try{const boss=kdBoss(),L=boss?[]:kdMine();if(!L.length)return;const bar=m.querySelector(".cvvbar");if(!bar)return;
   /* một hàng gọn (chị Hoa 03/11: khung to đẩy "Việc của tôi" khuất xuống dưới) */
   bar.insertAdjacentHTML("beforebegin",`<div class="kdstrip"><b>📡 ${boss?"Dự án kênh":"Kênh tôi phụ trách"}</b>${L.map(ch=>{const s=kdStat(ch),bad=s.miss.length||(!s.today.length&&!s.todayPosted.length&&s.per);return `<button type="button" class="kdchip${bad?" bad":""}" data-kdgo="1" title="${esc(kdNm(ch))} · ${esc(userName(kdOwner(ch.k))||"chưa giao kênh")} · hôm nay ${s.todayPosted.length} đã đăng, ${s.todayReady.length} chờ đăng${s.miss.length?" · thiếu lịch "+s.miss.map(o=>kdDay(o.x)).join(", "):""}${s.cg.length?" · "+s.cg.length+" video chưa giao":""}">${esc(kdNm(ch))}${boss?` <small>${esc((userName(kdOwner(ch.k))||"").split(" ").pop())}</small>`:""} <i>${bad?"thiếu lịch":"đủ lịch"}</i></button>`}).join("")}</div>`);
   m.querySelectorAll("[data-kdgo]").forEach(e=>e.onclick=()=>{PAGE="cv_da";render()})}catch(e){console.error("dự án kênh",e)}};
