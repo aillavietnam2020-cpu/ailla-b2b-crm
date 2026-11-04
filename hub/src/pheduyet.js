@@ -49,7 +49,9 @@ function pdRows(){
    gom ở mục "Đang chờ ở các phòng" để biết bộ phận nào, ai đang nghẽn. */
 const PD_ROUTE_N={KHO:"Kho",SALE:"Sale phụ trách khách",KE_TOAN:"Kế toán"};
 const pdProp=r=>r&&r.src==="proposal"?(((PD.sv||{}).proposals||[]).find(p=>p.id===r.ref)||null):null;
-const pdOther=r=>{if(!(pdWho().role==="CEO"||pdWho().admin))return false;const p=pdProp(r);return !!p&&!!PD_ROUTE_N[p.route_to]};
+/* Việc của kế toán (tiền về chờ xác nhận, combo mới chờ nhập, duyệt combo Digital, combo chờ mã MISA): CEO chỉ theo dõi (chị Hoa 04/11). */
+const PD_KT_K=["tien","combo","cbdx"];
+const pdOther=r=>{if(!(pdWho().role==="CEO"||pdWho().admin))return false;if(PD_KT_K.includes(r.k))return true;const p=pdProp(r);return !!p&&!!PD_ROUTE_N[p.route_to]};
 const pdMine=rows=>rows.filter(r=>!pdOther(r));
 const pdCnt=()=>{if(!PD.sv)return "";try{return pdMine(pdRows()).length||""}catch(e){return ""}};
 /* Mục Phê duyệt chỉ có một trang nên thanh bên không có dòng con: gắn số chờ vào nút mục. */
@@ -139,10 +141,10 @@ MODULES.push({k:"pd_src",adm:true,hide:true,ic:"check",n:"Phê duyệt",zone:"",
 
 /* "Đang chờ ở các phòng" (CEO): bộ phận nào, ai đang giữ, chờ lâu nhất bao nhiêu ngày; chỉ xem, phòng đó tự xử lý */
 function pdOthersHtml(L,now){if(!L.length)return "";const by={};
-  L.forEach(r=>{const p=pdProp(r),dep=PD_ROUTE_N[p.route_to]||"Khác",u=p.owner_id?(D().users||[]).find(x=>x.crm===p.owner_id):null,who=p.route_to==="SALE"?(u&&u.name)||"Sale phụ trách":dep;
+  L.forEach(r=>{const p=pdProp(r)||{route_to:"KE_TOAN"},dep=PD_ROUTE_N[p.route_to]||"Khác",u=p.owner_id?(D().users||[]).find(x=>x.crm===p.owner_id):null,who=p.route_to==="SALE"?(u&&u.name)||"Sale phụ trách":dep;
     const g=by[dep]=by[dep]||{n:0,old:0,ppl:{},rows:[]};g.n++;g.old=Math.max(g.old,r.at?now-r.at:0);g.ppl[who]=(g.ppl[who]||0)+1;g.rows.push({r,who})});
   const dd2=ms=>ms>=864e5?Math.floor(ms/864e5)+" ngày":Math.max(1,Math.floor(ms/36e5))+" giờ";
-  return `<details class="card pdoth" open><summary><b>Đang chờ ở các phòng</b> <span class="pill p-gry">${L.length}</span> <span class="hint">việc phòng khác tự xử lý · chị xem để biết chỗ nào đang nghẽn</span></summary>
+  return `<details class="card pdoth" open><summary><b>Đang chờ ở các phòng</b> <span class="pill p-gry">${L.length}</span> <span class="hint">việc phòng khác tự xử lý · xem để biết chỗ nào đang nghẽn</span></summary>
    <div class="pdog">${Object.entries(by).sort((a,b)=>b[1].old-a[1].old).map(([dep,g])=>`<div class="pdoc${g.old>3*864e5?" late":""}"><div class="pdoh"><b>${esc(dep)}</b><span>${g.n} việc · chờ lâu nhất <b>${dd2(g.old)}</b></span></div>
      <div class="pdop">${Object.entries(g.ppl).sort((a,b)=>b[1]-a[1]).map(([w,n])=>`<span>${esc(w)} <b>${n}</b></span>`).join("")}</div>
-     ${g.rows.sort((a,b)=>(a.r.at||0)-(b.r.at||0)).slice(0,6).map(({r,who})=>`<div class="pdor"><span>${esc(r.nd)}</span><small>${esc(who)} · ${r.at?dd2(now-r.at):""}</small></div>`).join("")}${g.rows.length>6?`<div class="hint">+${g.rows.length-6} việc nữa</div>`:""}</div>`).join("")}</div></details>`}
+     ${g.rows.sort((a,b)=>(a.r.at||0)-(b.r.at||0)).slice(0,6).map(({r,who})=>`<div class="pdor"><span>${esc(pdProp(r)?r.nd:r.loai+": "+r.nd)}</span><small>${esc(who)} · ${r.at?dd2(now-r.at):""}</small></div>`).join("")}${g.rows.length>6?`<div class="hint">+${g.rows.length-6} việc nữa</div>`:""}</div>`).join("")}</div></details>`}
