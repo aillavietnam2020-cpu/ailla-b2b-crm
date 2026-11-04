@@ -240,8 +240,8 @@ const cwGo=(page)=>{PAGE=page;MOD="cv";try{localStorage.setItem(SKEY+"_p",PAGE)}
 function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const h=di.querySelector("h2");if(h)h.textContent="Thêm việc cho mình";
   const ng=$("#t-ng");if(ng&&[...ng.options].some(o=>o.value===ME.id))ng.value=ME.id;const hn=$("#t-han");if(hn)hn.value=tkIso(cwTd());
   const b=di.querySelector("#tkf2 .acts .btn.pri");if(b)b.textContent="Thêm việc";
-  /* tự thêm việc cho mình: chỉ cần tên việc, hạn hoàn thành (ngày + giờ) và mức ưu tiên — ẩn các ô khác */
-  const f=di.querySelector("#tkf2"),keep=["t-ten","t-han","t-gio","t-uu"],has=el=>keep.some(id=>el.querySelector("#"+id)||el.id===id);
+  /* tự thêm việc cho mình: tên, mô tả, hạn hoàn thành (ngày + giờ), ưu tiên, link đính kèm, các bước nhỏ — ẩn các ô giao việc khác */
+  const f=di.querySelector("#tkf2"),keep=["t-ten","t-mo","t-han","t-gio","t-uu","t-dk","t-ck","t-ckn"],has=el=>keep.some(id=>el.querySelector("#"+id)||el.id===id);
   const prune=el=>[...el.children].forEach(c=>{if(c.matches(".acts,input[type=hidden],script"))return;if(!has(c)){c.hidden=true;c.style.display="none";return}if(!c.matches(".field"))prune(c)});
   if(f)prune(f);
   TK_AFTER_NEW=nid=>{DB.mutate(ME.name,"tự thêm việc",dt=>{const x=(dt.tasks||[]).find(y=>y.id===nid);if(x&&x.nguoi===ME.id&&x.tao===ME.id)x.tuThem=true})}}
