@@ -34,7 +34,7 @@ const CW_CSS=`.cwhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;marg
 .cwhd>.sp{flex:1}.cwhd>.kdstrip,.cwhd>.odcard{order:9;flex-basis:100%;margin:6px 0 0}
 .cwph{margin:0 0 6px}.cwtop>.cvbar.cwtopbar{margin:0 0 6px auto;padding:0;border:0;background:none;box-shadow:none;flex-wrap:wrap;justify-content:flex-end}.cwtop{display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
 .cwtop>.cwtabs{flex:1;min-width:0;border-bottom:0;margin:0}.cwtop>.cwhd{margin:0 0 6px;flex-wrap:nowrap}.cwtop>.cwhd .cwbar{flex-wrap:nowrap}
-.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
+.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.topbar .cwsrch-tb{margin-right:6px}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
 .cwtop+.kdstrip,.cwtop+.odcard,.kdstrip+.odcard{margin:0 0 12px}
 svg.cwi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
 .cwbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cwbar .btn{display:inline-flex;align-items:center;gap:6px}
@@ -158,7 +158,7 @@ const cwMine=r=>r.nguoi===ME.id&&!r.rvOnly;
 const cwGiao=r=>r.src==="task"&&!!r.tao&&r.tao===ME.id&&r.nguoi!==ME.id;
 /* "Tôi theo dõi": việc có mình trong ô Người theo dõi (t.theoDoi). Chỉ để biết tiến độ: không vào Hôm nay, không tính trễ / hiệu suất của mình */
 const cwFollow=r=>(r.theoDoi||[]).includes(ME.id)&&r.nguoi!==ME.id&&!r.rvOnly;
-const cwQ=L=>{const q=CWS.q.trim().toLowerCase();if(!q)return L;return L.filter(r=>(r.ten+" "+(r.mo||"")+" "+userName(r.nguoi)+" "+(r.da?prjN(r.da):"")).toLowerCase().includes(q))};
+const cwQ=L=>{const q=CWS.q.trim().toLowerCase();if(!q)return L;return L.filter(r=>(r.ten+" "+(r.mo||"")+" "+(PAGE==="cv_v"?"":userName(r.nguoi))+" "+(r.da?prjN(r.da):"")).toLowerCase().includes(q))};
 const cwDaF=L=>CWS.da?L.filter(r=>r.da===CWS.da):L;
 const cwTask=r=>r&&r.src==="task"?(D().tasks||[]).find(t=>t.id===r.id):null;
 const cwCanDo=r=>{const t=cwTask(r);return !!t&&!(t.cd&&t.cd.length)&&(t.nguoi===ME.id||(t.phoi||[]).includes(ME.id)||tkMgr(t))};
@@ -234,12 +234,18 @@ const cwView=L=>CWS.kx==="board"?cwBoard(L):CWS.kx==="cal"?cwCal(L):CWS.kx==="we
 /* ---------- khung trang: tiêu đề + mô tả, hàng tab, nội dung ---------- */
 /* tiêu đề trang: khối .ph được modTabs (setup.js) đưa lên thanh trên cùng, bên trái (như Tổng quan công ty); không còn dòng mô tả dưới tiêu đề.
    Nút thao tác (Tìm, Thêm việc, Giao việc, Phê duyệt, Order quản lý) nằm cùng hàng tab, bên phải (cwTop). */
-function cwHead(title,desc,o){o=o||{};return `<div class="ph cwph"><h1>${title}</h1></div><div class="cwhd">${o.btns===false?"":`<div class="cvvbar cwbar">${o.search===false?"":`<label class="cwsrch">${cwI("srch")}<input id="cw-q" placeholder="Tìm việc, tên người" value="${esc(CWS.q)}" autocomplete="off"></label>`}<button type="button" class="btn" data-cwadd="1">${cwI("plus")}Thêm việc</button>${tkGiver()?`<button type="button" class="btn pri" id="cv-new">${cwI("send")}Giao việc</button>`:""}</div>`}</div>`}
+function cwHead(title,desc,o){o=o||{};return `<div class="ph cwph"><h1>${title}</h1></div><div class="cwhd">${o.btns===false?"":`<div class="cvvbar cwbar">${o.search===false?"":`<label class="cwsrch">${cwI("srch")}<input id="cw-q" placeholder="${PAGE==="cv_v"?"Tìm việc":"Tìm việc, tên người"}" value="${esc(CWS.q)}" autocomplete="off"></label>`}<button type="button" class="btn" data-cwadd="1">${cwI("plus")}Thêm việc</button>${tkGiver()?`<button type="button" class="btn pri" id="cv-new">${cwI("send")}Giao việc</button>`:""}</div>`}</div>`}
 /* gom hàng tab và nút thao tác vào một hàng */
-function cwTop(m){const hd=m.querySelector(":scope>.cwhd"),nv=m.querySelector(":scope>.cwtabs");if(!hd)return;if(!nv||!hd.children.length){if(!hd.children.length)hd.remove();return}
+function cwTop(m){cwTbSearch(m);const hd=m.querySelector(":scope>.cwhd"),nv=m.querySelector(":scope>.cwtabs");if(!hd)return;if(!nv||!hd.children.length){if(!hd.children.length)hd.remove();return}
   const w=document.createElement("div");w.className="cwtop";nv.before(w);w.append(nv,hd);
-  /* hàng tab dài (Việc của tôi, Phòng ban): không chen nút vào làm tab bị cuộn, đưa nút lên một hàng riêng ở đầu nội dung, bên phải */
-  if(nv.scrollWidth>nv.clientWidth+4){w.before(hd);hd.classList.add("cwhdr")}}
+  /* hàng tab dài (Việc của tôi, Phòng ban): hàng tab giữ ở trên, nút thao tác xuống cùng hàng với Kiểu xem, bên phải */
+  if(nv.scrollWidth>nv.clientWidth+4){const tb=m.querySelector(":scope>.cwtb"),bar=hd.querySelector(".cwbar");
+    if(tb&&bar){bar.classList.add("cwbar2");tb.append(bar);hd.remove()}else{w.after(hd);hd.classList.add("cwhdr")}}}
+/* ô Tìm việc nằm trên thanh trên cùng, thay chỗ ô chọn ngày (trang Công việc không dùng ô chọn ngày) */
+function cwTbSearch(m){const top=document.querySelector(".topbar");if(!top)return;top.querySelectorAll(".cwsrch").forEach(x=>x.remove());
+  const q=m.querySelector(".cwsrch"),pp=top.querySelector(".pp");if(!q){if(pp)pp.style.display="";return}
+  q.classList.add("cwsrch-tb");if(pp){pp.style.display="none";pp.before(q)}else{const sp=top.querySelector(".sp");if(sp)sp.after(q);else top.append(q)}}
+if(typeof renderMain==="function"){const _cwRM=renderMain;renderMain=function(){const r=_cwRM.apply(this,arguments);if(MOD!=="cv"){const top=document.querySelector(".topbar");if(top){top.querySelectorAll(".cwsrch-tb").forEach(x=>x.remove());const pp=top.querySelector(".pp");if(pp)pp.style.display=""}}return r}}
 const cwTabs=L=>`<nav class="cwtabs" role="tablist">${L.map(t=>`<button type="button" role="tab" class="${t.on?"on":""}" ${t.attr}>${t.ic?cwI(t.ic):""}${t.l}${t.n?`<span class="n${t.r?" r":""}">${t.n}</span>`:""}</button>`).join("")}</nav>`;
 const cwGo=(page)=>{PAGE=page;MOD="cv";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
 function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const h=di.querySelector("h2");if(h)h.textContent="Thêm việc cho mình";
@@ -252,7 +258,7 @@ function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const 
   TK_AFTER_NEW=nid=>{DB.mutate(ME.name,"tự thêm việc",dt=>{const x=(dt.tasks||[]).find(y=>y.id===nid);if(x&&x.nguoi===ME.id&&x.tao===ME.id)x.tuThem=true})}}
 /* thao tác dùng chung cho mọi trang trong mục */
 function cwBind(m,list){const by={};(list||cwRows()).forEach(r=>by[r.k]=r);const R=k=>by[k]||cwRows().find(r=>r.k===k);
-  const q=m.querySelector("#cw-q");if(q){let tm=0;q.oninput=()=>{clearTimeout(tm);tm=setTimeout(()=>{CWS.q=q.value;renderMain();const q2=$("#cw-q");if(q2){q2.focus();const n=q2.value.length;try{q2.setSelectionRange(n,n)}catch(e){}}},300)}}
+  const q=m.querySelector("#cw-q")||document.querySelector(".topbar #cw-q");if(q){let tm=0;q.oninput=()=>{clearTimeout(tm);tm=setTimeout(()=>{CWS.q=q.value;renderMain();const q2=$("#cw-q");if(q2){q2.focus();const n=q2.value.length;try{q2.setSelectionRange(n,n)}catch(e){}}},300)}}
   m.querySelectorAll("[data-cwadd]").forEach(b=>b.onclick=()=>cwAddSelf());
   const nb=m.querySelector("#cv-new");if(nb)nb.onclick=()=>openTask(null);
   m.querySelectorAll("[data-cwkx]").forEach(b=>b.onclick=()=>{CWS.kx=b.dataset.cwkx;CWS.sel.clear();try{localStorage.setItem("ailla_cw_kx",CWS.kx)}catch(e){}renderMain()});
@@ -313,7 +319,7 @@ const CW_MY=[
   ["today","sun","Hôm nay",R=>{const td=cwTd();return R.filter(r=>cwOpen(r)&&(cwMine(r)||r.rv||(cwGiao(r)&&r.late))&&(r.late||r.han===td||r.st==="doing"||r.rv))}],
   ["soon","cal","Sắp tới",R=>R.filter(r=>cwOpen(r)&&cwMine(r)&&r.han>cwTd())],
   ["giao","send","Tôi giao",R=>R.filter(r=>cwOpen(r)&&cwGiao(r))],
-  ["rv","cc","Chờ tôi duyệt",R=>R.filter(r=>r.rv)],
+  ["rv","cc","Chờ duyệt",R=>R.filter(r=>r.rv)],
   ["td","eye","Tôi theo dõi",R=>R.filter(r=>cwOpen(r)&&cwFollow(r))],
   ["nodue","inbox","Chưa có hạn",R=>R.filter(r=>cwOpen(r)&&!r.han&&(cwMine(r)||cwGiao(r)))],
   ["lap","rep","Việc định kỳ",R=>R.filter(r=>r.tpl&&(cwMine(r)||cwGiao(r)))],
@@ -331,6 +337,8 @@ function cwMyList(R,key){const v=CW_MY.find(x=>x[0]===key),L=cwDaF(cwQ(v[3](R)))
   if(key==="soon"){const b=(a,z)=>L.filter(r=>r.han>=a&&r.han<=z);return cwSec("Ngày mai · "+dd(td+1),b(td+1,td+1))+cwSec("Tuần này",b(td+2,Math.max(td+1,W.den)))+cwSec("Sau đó",b(Math.max(td+1,W.den)+1,99999))}
   if(key==="giao")return cwSec(`${cwI("alert")}Đang trễ`,L.filter(r=>r.late),{empty:"Không có việc nào trễ."})+cwSec("Đang làm / cần làm",L.filter(r=>!r.late));
   if(key==="lap")return cwSec(v[2],L,{empty:"Chưa có việc định kỳ nào đang chạy."})+(tkGiver()?'<div id="cw-tpl"></div>':"");
+  if(key==="rv"){const pd=typeof pdAny==="function"&&pdAny(),n=pd&&typeof pdCnt==="function"?pdCnt():0;
+    return (pd?`<section class="cwcard cwpd"><div class="cwpad" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${cwI("cc")}<b>Phiếu chi, tiền về, đơn hàng, phiếu kho chờ duyệt</b>${n?`<span class="pill p-amb">${n}</span>`:""}<span class="sp" style="flex:1"></span><button type="button" class="btn sm" data-cwpd="1">Mở danh sách</button></div></section>`:"")+cwSec("Việc, video, kịch bản chờ duyệt",L)}
   if(key==="done")return cwSec(v[2],L,{sort:X=>X.slice().sort((a,b)=>(b.xong||0)-(a.xong||0)),empty:"Chưa có việc nào xong trong tháng này."});
   return cwSec(v[2],L)}
 function cwMy(m){cwCss();PAGE="cv_v";
@@ -351,6 +359,8 @@ function cwMy(m){cwCss();PAGE="cv_v";
   m.innerHTML=cwHead(title,desc)+tabs+`<div class="cwtb">${daChip}<span class="sp"></span>${cwKxSel()}</div>`+body;
   cwTop(m);cwBind(m,R);
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
+  m.querySelectorAll("[data-cwpd]").forEach(b=>b.onclick=()=>{if(typeof NAV_AN_MO!=="undefined")NAV_AN_MO.add("pheduyet");MOD="";PAGE="pheduyet";render();scrollTo(0,0)});
+  if(CWS.my==="rv"&&typeof PD!=="undefined"&&!PD.at&&typeof pdLoad==="function"&&!CWS.pdL){CWS.pdL=1;pdLoad().then(()=>{if(PAGE==="cv_v"&&CWS.my==="rv")renderMain()}).catch(()=>{})}
   m.querySelectorAll("[data-cwrl]").forEach(b=>b.onclick=()=>{CWS.rl=b.dataset.cwrl;renderMain()});
   /* việc khác từ máy chủ (đơn hàng, kho, kế toán…) như "Việc khác đang chờ bạn" cũ */
   const ow=m.querySelector("#cw-wk");if(ow&&typeof wkEmbed==="function"){WK.noTask=true;try{wkEmbed(ow)}catch(e){console.error("việc khác",e)}finally{WK.noTask=false}
