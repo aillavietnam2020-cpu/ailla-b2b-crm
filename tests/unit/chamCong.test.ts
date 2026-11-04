@@ -111,3 +111,35 @@ describe('chấm công: ai xem được', () => {
     expect(ccViewer('a', 'STAFF', { pb: 'KD', role: 'nhanvien', hr: false }, false)).toEqual({ id: 'a', all: false, pb: null });
   });
 });
+
+describe('chấm công: góp ý CEO 04/11', () => {
+  const s2 = normalizeSettings({
+    diem: [
+      { id: 'vp', ten: 'Văn phòng', lat: 21.0285, lng: 105.8542, bk: 150 },
+      { id: 'xg', ten: 'Xưởng', lat: 21.1, lng: 105.9, bk: 150 },
+    ],
+    lich: [
+      { id: 'vp', ten: 'Văn phòng', diem: ['vp', 'khong-co'] },
+      { id: 'xuong', ten: 'Xưởng', diem: ['xg'] },
+      { id: 'sale', ten: 'Sale', kieu: 'tudo' },
+    ],
+  });
+  const L = (id: string) => s2.lich.find((l) => l.id === id) as Lich;
+  it('văn phòng và xưởng chấm ở điểm riêng; điểm không còn thì bỏ', () => {
+    expect(L('vp').diem).toEqual(['vp']);
+    expect(nearest(s2, 21.1, 105.9, L('vp'))).toMatchObject({ trong: false });
+    expect(nearest(s2, 21.1, 105.9, L('xuong'))).toMatchObject({ trong: true, diem: { ten: 'Xưởng' } });
+    expect(nearest(s2, 21.1, 105.9, L('sale')).trong).toBe(true); // lịch không chọn điểm: mọi điểm
+  });
+  it('chỉ Sale được chấm ngoài phạm vi', () => {
+    expect(L('sale').ngoaiOk).toBe(true);
+    expect(L('vp').ngoaiOk).toBe(false);
+    expect(normalizeSettings({}).lich.filter((l) => l.ngoaiOk).map((l) => l.id)).toEqual(['sale']);
+  });
+  it('muộn quá 10 phút không ghi lý do thì cảnh báo; có lý do thì thôi; muộn 8 phút không hỏi', () => {
+    const at = vn('2026-11-04', '08:15');
+    expect(tongNgay([{ loai: 'vao', at, trong: 1 }], vp, '2026-11-04', true)).toMatchObject({ muon: 15, canhBao: true });
+    expect(tongNgay([{ loai: 'vao', at, trong: 1, ly_do_muon: 'Tắc đường' }], vp, '2026-11-04', true)).toMatchObject({ canhBao: false, lyDoMuon: 'Tắc đường' });
+    expect(tongNgay([{ loai: 'vao', at: vn('2026-11-04', '08:08'), trong: 1 }], vp, '2026-11-04', true)).toMatchObject({ muon: 8, canhBao: false });
+  });
+});

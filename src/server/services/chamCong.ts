@@ -15,7 +15,11 @@ export type Diem = { id: string; ten: string; lat: number; lng: number; bk: numb
  * 'nghi13' nghỉ thứ Bảy thứ 1 và thứ 3 của tháng, 'nghi24' nghỉ thứ Bảy thứ 2 và thứ 4. Chủ nhật luôn nghỉ.
  */
 export type ThuBay = 'ca' | 'nua' | 'nghi' | 'nghi13' | 'nghi24';
-export type Lich = { id: string; ten: string; kieu: 'codinh' | 'ca' | 'tudo'; gioVao: string; gioRa: string; anHan: number; thuBay: ThuBay; gioRaT7: string; chuyenCan: boolean };
+/**
+ * diem: các điểm chấm của lịch này (văn phòng, xưởng khác nhau); rỗng = mọi điểm.
+ * ngoaiOk: được chấm ngoài phạm vi khi ghi lý do (CEO 04/11: chỉ Sale); lịch khác ngoài phạm vi là không chấm được.
+ */
+export type Lich = { id: string; ten: string; kieu: 'codinh' | 'ca' | 'tudo'; gioVao: string; gioRa: string; anHan: number; thuBay: ThuBay; gioRaT7: string; chuyenCan: boolean; diem: string[]; ngoaiOk: boolean };
 /** pbLich: lịch theo phòng ban; nguoiLich: lịch riêng từng người (mã đăng nhập), ưu tiên hơn phòng ban; macDinh: còn lại. */
 export type CcSettings = { diem: Diem[]; lich: Lich[]; pbLich: Record<string, string>; nguoiLich: Record<string, string>; macDinh: string };
 
@@ -23,10 +27,10 @@ export type CcSettings = { diem: Diem[]; lich: Lich[]; pbLich: Record<string, st
 export const CC_DEFAULT: CcSettings = {
   diem: [],
   lich: [
-    { id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'nghi24', gioRaT7: '12:00', chuyenCan: true },
-    { id: 'xuong', ten: 'Xưởng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false },
-    { id: 'live', ten: 'Live (theo ca)', kieu: 'ca', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false },
-    { id: 'sale', ten: 'Sale (giờ linh hoạt)', kieu: 'tudo', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false },
+    { id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'nghi24', gioRaT7: '12:00', chuyenCan: true, diem: [], ngoaiOk: false },
+    { id: 'xuong', ten: 'Xưởng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false, diem: [], ngoaiOk: false },
+    { id: 'live', ten: 'Live (theo ca)', kieu: 'ca', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false, diem: [], ngoaiOk: false },
+    { id: 'sale', ten: 'Sale (giờ linh hoạt)', kieu: 'tudo', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false, diem: [], ngoaiOk: true },
   ],
   pbLich: { SX: 'xuong', KV: 'xuong', B2B: 'sale', B2C: 'sale' },
   nguoiLich: {},
@@ -54,6 +58,8 @@ function normLich(x: unknown, i: number): Lich {
     thuBay: THU_BAY.includes(o.thuBay as ThuBay) ? (o.thuBay as ThuBay) : d.thuBay,
     gioRaT7: hm(o.gioRaT7, d.gioRaT7),
     chuyenCan: o.chuyenCan === undefined ? i === 0 : o.chuyenCan === true,
+    diem: Array.isArray(o.diem) ? o.diem.map(String).slice(0, 10) : [],
+    ngoaiOk: o.ngoaiOk === undefined ? o.kieu === 'tudo' : o.ngoaiOk === true,
   };
 }
 
@@ -85,6 +91,8 @@ export function normalizeSettings(v: unknown): CcSettings {
     for (const [k, val] of Object.entries(src)) if (typeof val === 'string' && ids.has(val)) out[String(k).slice(0, 60)] = val;
     return out;
   };
+  const diemIds = new Set(diem.map((d) => d.id));
+  for (const l of lich) l.diem = l.diem.filter((id) => diemIds.has(id));
   const macDinh = typeof o.macDinh === 'string' && ids.has(o.macDinh) ? o.macDinh : lich[0].id;
   return { diem, lich, pbLich: map(o.pbLich, CC_DEFAULT.pbLich), nguoiLich: map(o.nguoiLich, {}), macDinh };
 }
@@ -104,11 +112,12 @@ export function distanceM(lat1: number, lng1: number, lat2: number, lng2: number
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
-/** Điểm chấm gần nhất. trong = null khi chưa cài điểm nào (chưa kiểm vị trí được). */
-export function nearest(s: CcSettings, lat: number, lng: number): { diem: Diem | null; kc: number | null; trong: boolean | null } {
+/** Điểm chấm gần nhất trong các điểm của lịch (lịch không chọn điểm thì xét mọi điểm). trong = null khi chưa cài điểm nào. */
+export function nearest(s: CcSettings, lat: number, lng: number, l?: Lich): { diem: Diem | null; kc: number | null; trong: boolean | null } {
   let best: Diem | null = null;
   let kc = Infinity;
-  for (const d of s.diem) {
+  const pts = l && l.diem.length ? s.diem.filter((d) => l.diem.includes(d.id)) : s.diem;
+  for (const d of pts) {
     const k = distanceM(lat, lng, d.lat, d.lng);
     if (k < kc) {
       kc = k;
@@ -143,7 +152,9 @@ export function dayRule(l: Lich, ngay: string): { lam: boolean; vao: number; ra:
   return { lam: true, vao, ra: l.thuBay === 'nua' ? toMin(l.gioRaT7) : ra };
 }
 
-export type Luot = { loai: 'vao' | 'ra'; at: string; trong: number | null };
+export type Luot = { loai: 'vao' | 'ra'; at: string; trong: number | null; ly_do_muon?: string | null };
+/** Đi muộn quá số phút này thì hiện ô lý do; không ghi thì cảnh báo (CEO 04/11). */
+export const MUON_LY_DO = 10;
 export type NgayCong = {
   vao: string | null;
   ra: string | null;
@@ -155,6 +166,9 @@ export type NgayCong = {
   quenRa: boolean;
   ngoai: boolean;
   lam: boolean;
+  /** Lý do đi muộn đã ghi; canhBao = muộn quá 10 phút mà chưa ghi lý do. */
+  lyDoMuon: string | null;
+  canhBao: boolean;
 };
 
 /**
@@ -186,6 +200,8 @@ export function tongNgay(luot: Luot[], l: Lich, ngay: string, homNay: boolean): 
     quenRa: !!vaoL && !raL && !homNay,
     ngoai: luot.some((x) => x.trong === 0),
     lam: rule.lam,
+    lyDoMuon: vaoL?.ly_do_muon || null,
+    canhBao: muon > MUON_LY_DO && !vaoL?.ly_do_muon,
   };
 }
 
@@ -199,6 +215,8 @@ export type TongThang = {
   somLan: number;
   quenRa: number;
   ngoai: number;
+  /** Số lần muộn quá 10 phút mà không ghi lý do. */
+  canhBao: number;
   /** Ngày phải làm (đã qua) mà không chấm: tạm coi là nghỉ, chưa trừ ngày nghỉ có đơn, lễ tết. */
   nghi: number;
   phut: number;
@@ -221,6 +239,7 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
     somLan,
     quenRa: ngay.filter((x) => x.quenRa).length,
     ngoai: ngay.filter((x) => x.ngoai).length,
+    canhBao: co.filter((x) => x.canhBao).length,
     nghi,
     phut: co.reduce((t, x) => t + x.phut, 0),
     chuyenCan: l.kieu === 'codinh' && l.chuyenCan ? muonLan + somLan <= 2 && nghi <= 2 : null,
