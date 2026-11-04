@@ -1,5 +1,5 @@
 /* =====================================================================
-   LẬP PHIẾU NHANH (chị Hoa duyệt 04/11, phương án C menu kho).
+   GHI NHANH PHIẾU KHO (chị Hoa duyệt 04/11, phương án C menu kho). Xem ghi chú ở kqInject: một nút "＋ Ghi nhanh" cho cả hai web.
    - Nút "＋ Lập phiếu nhanh" ở góc trên mọi trang Kho – Sản xuất (web vận hành): chọn loại phiếu, phiếu mở ngay tại chỗ.
      Chỉ hiện loại phiếu người đó được làm (cùng quyền như nút lập phiếu ở từng trang). Web quản trị không có nút này.
    - Trong phiếu: dán nhiều dòng từ Excel (mã, số lượng) vào ô mã hàng thì web tự thêm từng dòng.
@@ -7,23 +7,33 @@
    ===================================================================== */
 const KQ_ADM=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
 const KQ_GO=p=>{if(!PAGES[p])return;PAGE=p;renderMain();scrollTo(0,0)};
+const KQ_MH=()=>typeof mhManage==="function"&&mhManage();
+const KQ_PN=()=>kCan("PN")||KQ_MH(); // chị Hoa 04/11: người phụ trách mua hàng (Thảo) tạo được phiếu nhập kho từ Ghi nhanh
 const KQ_LIST=()=>[
-  ["Kho nguyên vật liệu",[["Nhập nguyên vật liệu",()=>kCan("PN"),()=>khoForm("PN",null,["NVL","CCDC"])],
-    ["Xuất nguyên vật liệu khác",()=>kCan("XB"),()=>khoForm("XB",null,["NVL","BTP","CCDC"])]]],
+  ["Mua hàng & nhập kho",[["Lập đơn mua hàng",()=>!KQ_ADM()&&KQ_MH()&&typeof mhForm==="function",async()=>{try{await mhLoad()}catch(e){}for(let i=0;i<40&&!(MH&&MH.sup);i++)await new Promise(r=>setTimeout(r,150));mhForm(null)}],
+    ["Tạo phiếu nhập kho · nguyên vật liệu",KQ_PN,()=>khoForm("PN",null,["NVL","CCDC"])],
+    ["Tạo phiếu nhập kho · hàng mua ngoài",KQ_PN,()=>khoForm("PN",null,["TP","HH"])]]],
+  ["Xuất kho",[["Xuất nguyên vật liệu khác",()=>kCan("XB"),()=>khoForm("XB",null,["NVL","BTP","CCDC"])],
+    ["Xuất thành phẩm khác",()=>kCan("XB"),()=>khoForm("XB",null,["TP","HH"])]]],
   ["Sản xuất",[["Phiếu pha chế",()=>kCan("PC"),()=>khoForm("PC")],
-    ["Đóng gói & kiểm kê",()=>kCan("KS")&&!!PAGES.sx_lo,()=>KQ_GO("sx_lo")]]],
-  ["Kho thành phẩm",[["Nhập hàng mua ngoài",()=>kCan("PN"),()=>khoForm("PN",null,["TP","HH"])],
-    ["Xuất thành phẩm khác",()=>kCan("XB"),()=>khoForm("XB",null,["TP","HH"])],
-    ["Hàng hoàn",()=>kCan("TL")&&!!PAGES.kho_hoan,()=>KQ_GO("kho_hoan")]]],
-  ["Kiểm kê",[["Kiểm tồn bổ sung",()=>kCan("TB")&&typeof KTON!=="undefined"&&KTON.moc&&!!KTON.moc.moc,()=>khoForm("TB")]]]]
+    ["Đóng gói & kiểm kê",()=>kCan("KS")&&!!PAGES.sx_lo&&!KQ_ADM(),()=>KQ_GO("sx_lo")]]],
+  ["Kho",[["Hàng hoàn",()=>kCan("TL")&&!!PAGES.kho_hoan&&!KQ_ADM(),()=>KQ_GO("kho_hoan")],
+    ["Kiểm tồn bổ sung",()=>kCan("TB")&&typeof KTON!=="undefined"&&KTON.moc&&!!KTON.moc.moc,()=>khoForm("TB")]]]]
   .map(([g,a])=>[g,a.filter(x=>{try{return x[1]()}catch(e){return false}})]).filter(g=>g[1].length);
-/* Chị Hoa 04/11: nút đưa lên đầu thanh menu bên trái (giống "＋ Ghi nhanh" bên quản trị), không để trong từng trang nữa. */
+/* Chị Hoa 04/11: một nút "＋ Ghi nhanh" ở đầu thanh menu cho cả hai web.
+   - Vận hành: nút mới, gồm đơn mua hàng + các phiếu kho.
+   - Quản trị: đã có "＋ Ghi nhanh" (admnav2.js: phiếu chi, đơn mua, chứng từ) — thêm các phiếu kho vào cuối bảng chọn đó. */
 function khoQuickBtn(){return ""}
+const kqRun=async it=>{document.body.classList.remove("menu-open");if(!KHO.cat){try{await khoLoad()}catch(err){}}if(!KHO.cat){toast("Đang tải kho, bấm lại sau vài giây");return}try{await it[2]()}catch(e){toast(e.message||"Chưa mở được")}};
 function kqInject(){
-  if(KQ_ADM()||typeof ME==="undefined"||!ME)return;const nav=document.querySelector(".side nav");if(!nav||document.getElementById("kqside"))return;
-  let ok=false;try{ok=KQ_LIST().length>0}catch(e){}if(!ok)return;
+  if(typeof ME==="undefined"||!ME)return;let L=[];try{L=KQ_LIST()}catch(e){}if(!L.length)return;
+  if(KQ_ADM()){const gp=document.getElementById("gnp");if(!gp||gp.querySelector("[data-kqa]"))return;
+    const its=L.flatMap(([g,a])=>a.map(x=>[g,x]));
+    gp.insertAdjacentHTML("beforeend",`<div class="gnsep" data-kqa="1">Kho</div>`+its.map(([g,x],i)=>`<button type="button" data-kqa="${i}"><b>${esc(x[0])}</b><small>${esc(g)}</small></button>`).join(""));
+    gp.querySelectorAll("button[data-kqa]").forEach(b=>b.onclick=e=>{e.stopPropagation();gp.hidden=true;kqRun(its[+b.dataset.kqa][1])});return}
+  const nav=document.querySelector(".side nav");if(!nav||document.getElementById("kqside"))return;
   const w=document.createElement("div");w.id="kqside";w.className="gnbox";
-  w.innerHTML=`<button type="button" class="gnbtn kqbtn kqs"><span>＋ Tạo phiếu nhập kho</span><span>▾</span></button>`;nav.before(w)}
+  w.innerHTML=`<button type="button" class="gnbtn kqbtn kqs"><span>＋ Ghi nhanh</span><span>▾</span></button>`;nav.before(w)}
 {const _r=render;render=function(){const r=_r.apply(this,arguments);try{kqInject()}catch(e){}return r}}
 function kqClose(){const p=document.getElementById("kqpop");if(p)p.remove()}
 function kqOpen(btn){
@@ -33,7 +43,7 @@ function kqOpen(btn){
   document.body.appendChild(p);
   const w=p.offsetWidth,side=btn.classList.contains("kqs");p.style.top=(r.bottom+6)+"px";p.style.left=Math.max(8,Math.min(side?r.left:r.right-w,innerWidth-w-8))+"px";
   p.querySelectorAll("[data-kq]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const [gi,i]=b.dataset.kq.split(".").map(Number),it=L[gi][1][i];kqClose();document.body.classList.remove("menu-open");
-    if(!KHO.cat){try{await khoLoad()}catch(err){}}if(!KHO.cat){toast("Đang tải kho, bấm lại sau vài giây");return}it[2]()});
+    kqRun(it)});
 }
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".kqbtn");if(b){e.preventDefault();e.stopPropagation();if(document.getElementById("kqpop"))kqClose();else kqOpen(b);return}
   if(!(e.target.closest&&e.target.closest("#kqpop")))kqClose()},true);
