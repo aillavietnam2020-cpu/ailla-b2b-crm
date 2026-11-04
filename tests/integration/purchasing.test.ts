@@ -149,6 +149,24 @@ describe('Mua hàng: phiếu mua → nhận hàng → giá, hóa đơn, phiếu 
     expect(row.in_price).toBe(1200);
     expect(row.avg_price).toBe(1100); // (100×1000 + 100×1200) / 200
   });
+
+  it('giá nguyên vật liệu theo mốc tồn: bỏ hàng nhập trước mốc, tồn chốt không giá thì lấy giá nhập gần nhất trước mốc', async () => {
+    const doc = async (no: string, type: string, d: string, qty: number, price: number | null) => {
+      await ctx.db.prepare("INSERT INTO kho_docs (no, type, doc_date, partner, ref_no, note, extra, status, created_at) VALUES (?, ?, ?, '', '', '', '{}', 'OK', ?)").bind(no, type, d, NOW).run();
+      const id = (await ctx.db.prepare('SELECT id FROM kho_docs WHERE no = ?').bind(no).first<{ id: number }>())?.id;
+      await ctx.db.prepare("INSERT INTO kho_moves (doc_id, item, qty, price, role, note) VALUES (?, 'NVL1', ?, ?, 'IN', '')").bind(id, qty, price).run();
+    };
+    await doc('PN2609-001', 'PN', '2026-09-10', 50, 900);
+    await doc('TD2609-002', 'TD', '2026-09-30', 80, null);
+    await ctx.db.prepare("INSERT INTO kho_cfg (k, v) VALUES ('ton_moc', '2026-09-30')").run();
+    await doc('PN2610-009', 'PN', '2026-10-07', 100, 1200);
+    const r = await ctx.request(`${BASE}/material-prices?month=2026-10`, { as: USERS.ceo });
+    const row = r.body.data.rows.find((x: { item: string }) => x.item === 'NVL1');
+    expect(row.open_qty).toBe(80);
+    expect(row.open_price).toBe(900);
+    expect(row.in_qty).toBe(100);
+    expect(row.avg_price).toBeCloseTo((80 * 900 + 100 * 1200) / 180, 4);
+  });
 });
 
 describe('Mua hàng: ngày giao dự kiến, giá đặt, cọc', () => {

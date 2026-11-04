@@ -8,6 +8,7 @@ import { needsCeo } from '@shared/ceoSpend';
 import { loadCeoSpend } from './ceoSpend';
 import { agentSpendGuard, realCeo, withSource } from '../services/agentSpend';
 import { addPayFile, deletePayFile, getPayFile, listPayFiles, readPayMethod } from '../lib/payFiles';
+import { khoMocMap } from '../services/khoTon';
 
 /**
  * Mua hàng nguyên vật liệu.
@@ -873,12 +874,35 @@ purchasingRoutes.get('/material-prices', async (c) => {
   if (!/^\d{4}-\d{2}$/.test(month)) throw badRequest('BAD_MONTH', 'Chọn tháng (YYYY-MM)');
   const end = `${month}-31`;
   const start = `${month}-01`;
-  const inbound = (
+  // Hàng nhập theo cùng mốc tồn với kho_ledger (đấu nối 04/11, chat Kho 9bb46ac): mã có mốc (riêng hoặc chung) thì chỉ lấy
+  // phiếu tồn đầu (TD) ở ngày mốc + hàng nhập sau mốc; TD không ghi giá thì lấy giá nhập gần nhất trước mốc làm giá đầu kỳ.
+  const moc = await khoMocMap(c.env.DB);
+  const mocOf = (item: string) => moc.by.get(item) ?? moc.g;
+  const all = (
     await c.env.DB.prepare(
-      `SELECT m.item, d.doc_date AS d, m.qty, m.price FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
-       WHERE d.status = 'OK' AND m.qty > 0 AND m.price IS NOT NULL AND m.price > 0 AND d.doc_date <= ?`,
-    ).bind(end).all<{ item: string; d: string; qty: number; price: number }>()
+      `SELECT m.item, d.doc_date AS d, d.type AS t, m.qty, m.price FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
+       WHERE d.status = 'OK' AND m.qty > 0 AND d.doc_date <= ? ORDER BY d.doc_date, m.id`,
+    ).bind(end).all<{ item: string; d: string; t: string; qty: number; price: number | null }>()
   ).results;
+  const priced = (r: { price: number | null }) => r.price != null && r.price > 0;
+  const lastBefore = new Map<string, number>();
+  const inbound: Array<{ item: string; d: string; qty: number; price: number }> = [];
+  for (const r of all) {
+    const m = mocOf(r.item);
+    if (!m) {
+      if (priced(r)) inbound.push({ item: r.item, d: r.d, qty: r.qty, price: r.price as number });
+      continue;
+    }
+    if (r.d < m) {
+      if (priced(r)) lastBefore.set(r.item, r.price as number);
+      continue;
+    }
+    if (r.t === 'TD') {
+      if (r.d !== m) continue;
+      const price = priced(r) ? (r.price as number) : lastBefore.get(r.item);
+      if (price) inbound.push({ item: r.item, d: r.d, qty: r.qty, price });
+    } else if (priced(r)) inbound.push({ item: r.item, d: r.d, qty: r.qty, price: r.price as number });
+  }
   const items = [...new Set(inbound.map((r) => r.item))];
   if (!items.length) return ok(c, { month, rows: [] });
   const out = (
