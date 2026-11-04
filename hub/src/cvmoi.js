@@ -384,7 +384,7 @@ function cwWhoSel(idA,idB,team,who){const T=cwTeams(),boss=cwBoss(),o=(boss?[[""
 const CW_PB=[["open","list","Đang làm / cần làm",S=>S.filter(cwOpen)],["late","alert","Đang trễ",S=>S.filter(r=>cwOpen(r)&&r.late)],["rv","cc","Chờ duyệt",S=>S.filter(r=>r.st==="review")],
   ["nodue","inbox","Chưa có hạn",S=>S.filter(r=>cwOpen(r)&&!r.han)],["done","chk","Hoàn thành",S=>S.filter(r=>r.st==="done")]];
 function cwPbTabs(S,cur){const L=(cwMgr()?(CW_DATEKX.includes(CWS.kx)&&cur!=="space"?[{l:"Việc đang mở",ic:"list",on:true,attr:'data-cwpb="open"'}]:CW_PB.map(([k,ic,l,f])=>{const X=S?f(S):[];return {l,ic,n:X.length||"",r:k==="late"?X.length>0:X.some(r=>r.late),on:cur===k,attr:`data-cwpb="${k}"`}})):[]);
-  L.push({l:"Tài liệu & trao đổi",ic:"msg",on:cur==="space",attr:'data-cwpb="space"'});return cwTabs(L)}
+  return L.length?cwTabs(L):""}
 function cwBulk(L){const S=CWS.sel;return `<section class="cwcard">${S.size?`<div class="cwbulk"><b>Đã chọn ${S.size} việc</b><span class="sp"></span><button type="button" data-cwbk="doing">Đang làm</button><button type="button" data-cwbk="pause">Tạm dừng</button><button type="button" data-cwbk="todo">Cần làm</button><button type="button" data-cwbk="done">Xong</button><button type="button" data-cwbk="han">Dời hạn sang mai</button><button type="button" data-cwbk="ng">Đổi người làm</button><button type="button" data-cwbk="clr">Bỏ chọn</button></div>`:""}
   <div class="cwflt"><label><input type="checkbox" class="cwsel" id="cw-selall"${L.length&&L.filter(r=>r.src==="task").every(r=>S.has(r.k))?" checked":""}>Chọn tất cả (${L.filter(r=>r.src==="task").length})</label><span>· tick nhiều việc để đổi trạng thái, dời hạn, đổi người làm cùng lúc</span></div>${cwList(L,{sel:1,flat:1})}</section>`}
 function cwBulkDo(k,rows){const X=rows.filter(r=>CWS.sel.has(r.k)).map(cwTask).filter(Boolean);if(k==="clr"){CWS.sel.clear();renderMain();return}if(!X.length)return;const td=cwTd();
@@ -418,10 +418,9 @@ function cwPb(m){cwCss();if(!cwMgr()){PAGE="cv_pb";PAGES.cv_pb(m);return}PAGE="c
   const sa=m.querySelector("#cw-selall");if(sa)sa.onchange=()=>{L.filter(r=>r.src==="task").forEach(r=>sa.checked?CWS.sel.add(r.k):CWS.sel.delete(r.k));renderMain()};
   m.querySelectorAll("[data-cwbk]").forEach(b=>b.onclick=()=>cwBulkDo(b.dataset.cwbk,L));
 }
-/* khung Phòng ban cho trang "Tài liệu & trao đổi" (trang Không gian phòng cũ, khonggian.js) */
-function cwPbSpace(m,old){cwCss();const desc=cwMgr()?"Nhóm chat, thư mục Drive, tài liệu và mẫu việc của phòng":"Nhóm chat, thư mục Drive, tài liệu của phòng bạn";
-  m.innerHTML=cwHead("Phòng ban",desc,{search:false})+cwPbTabs(cwMgr()?cwDaF(cwPbScope(cwRows())):null,"space")+'<div id="cw-body"></div>';cwTop(m);cwBind(m);
-  m.querySelectorAll("[data-cwpb]").forEach(b=>b.onclick=()=>{const k=b.dataset.cwpb;if(k==="space")return;CWS.pb=k;cwGo("cv_pbv")});
+/* trang "Thư mục công việc" (trang Không gian phòng cũ, khonggian.js): mục riêng ở thanh bên, dưới Dự án */
+function cwPbSpace(m,old){cwCss();
+  m.innerHTML=cwHead("Thư mục công việc","",{btns:false})+'<div id="cw-body"></div>';cwTop(m);
   old(m.querySelector("#cw-body"))}
 
 /* ---------- 4. DỰ ÁN (tab Dự án · Mục tiêu) ---------- */
@@ -534,12 +533,12 @@ if(typeof pCvV==="function"){const _p=pCvV;pCvV=function(m){_p.apply(this,argume
 PAGES.cv_ov=cwSafe(cwOv,"Tổng quan việc");
 PAGES.cv_pbv=cwSafe(cwPb,"Phòng ban");
 PAGES.cv_nk=cwSafe(cwNk,"Nhật ký việc");
-{const old=PAGES.cv_pb;if(old)PAGES.cv_pb=cwSafe(m=>cwPbSpace(m,old),"Tài liệu & trao đổi")}
+{const old=PAGES.cv_pb;if(old)PAGES.cv_pb=cwSafe(m=>cwPbSpace(m,old),"Thư mục công việc")}
 PAGES.cv_da=cwSafe(m=>cwDaFrame(m,"da",b=>pCvDa(b)),"Dự án");
 PAGES.cv_mt=cwSafe(m=>cwDaFrame(m,"mt",b=>pCvMt(b)),"Mục tiêu");
 /* trang cũ của "Tổng quan" Công việc (cv_tq) mở Tổng quan mới */
 PAGES.cv_tq=m=>{PAGE="cv_ov";PAGES.cv_ov(m)};
-if(typeof NAV_AN_MO!=="undefined")NAV_AN_MO.add("cv_pb");
+
 /* Quản trị › Cấu hình › Ngưỡng cảnh báo: thẻ "Nhắc việc 8 giờ" (Trợ lý công việc nhắn vào Tin nhắn mỗi sáng).
    Lưu ở máy chủ (app_settings, khóa task.reminder = {on, hour}); máy chủ đọc khi chạy mỗi giờ (taskReminders.ts). Mặc định bật, 8 giờ. Chỉ CEO sửa. */
 const CW_NV_KEY="task.reminder";
