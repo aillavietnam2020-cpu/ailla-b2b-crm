@@ -1055,6 +1055,8 @@ const CVV={scope:"",view:""};
 const cvNvRaw=m=>{try{pCvNv2(m)}catch(e){console.error("Task mới lỗi, dùng bản cũ",e);pCvNv(m)}};
 function cvvDefault(){const top=ME.role==="admin"||cvSummaryOnly()||(typeof dvMgr==="function"&&dvMgr());CVV.view="list";CVV.scope=top?"team":"mine"}
 function pCvV(m){
+  /* bố cục mới (cvmoi.js, chị Hoa duyệt demo 04/11): Việc của tôi có tab Hôm nay, Sắp tới, Tôi giao… Bản cũ bên dưới chỉ chạy khi file mới không nạp được. */
+  if(typeof cwMy==="function"){cwMy(m);return}
   if(!CVV.view)cvvDefault();
   PAGE="cv_v";
   const td=D().settings.today,tasks=D().tasks||[];
