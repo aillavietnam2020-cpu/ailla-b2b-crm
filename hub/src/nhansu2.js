@@ -8,7 +8,7 @@ const hrOk=()=>!!(typeof SV!=="undefined"&&SV.hrOk);
 const HSK=[["gioi","Giới tính"],["ngaySinh","Ngày sinh","date"],["cccd","Số CCCD"],["ngayCap","Ngày cấp","date"],["noiCap","Nơi cấp"],["mst","Mã số thuế"],["sdt","Số điện thoại"],["email","Email"],["diaChi","Địa chỉ"],["stk","Số tài khoản"],["nh","Ngân hàng"]];
 const LDK=[["luong","Lương cơ bản","n"],["nenBH","Mức đóng BHXH","n"],["pcCV","Phụ cấp chức vụ","n"],["pcKhac","Phụ cấp khác","n"],["bac","Bậc lương"],["nghe","Nhóm nghề"],["hinhThuc","Hình thức trả lương"],["noiLam","Nơi làm việc"]];
 const FKIND=[["anh","Ảnh thẻ"],["cccd","CCCD"],["hd","Hợp đồng / phụ lục"],["qd","Quyết định"],["khac","Giấy tờ khác"]];
-let NVF={q:"",pb:"",tt:"dang",sel:"",tab:"chung",edit:""},NVFILES={ma:"",L:[],busy:false};
+let NVF={q:"",pb:"",tt:"dang",sel:"",tab:"chung",edit:"",w:""},NVFILES={ma:"",L:[],busy:false};
 const nvNs=ma=>HRD().ns[ma]||{};
 const hsOf=ma=>nvNs(ma).hs||{};
 const nptOf=ma=>(nvNs(ma).npts||[]);
@@ -33,24 +33,30 @@ async function nvLoadFiles(ma,force){
 function nvList(){const d=D();return d.staff.filter(x=>(NVF.tt==="all"||(NVF.tt==="dang"?x.tt!=="Đã nghỉ":x.tt===NVF.tt))&&(!NVF.pb||x.pb===NVF.pb)&&(!NVF.q||foldName(x.ma+" "+x.ten+" "+(x.viTri||"")+" "+(hsOf(x.ma).cccd||"")+" "+(hsOf(x.ma).mst||"")+" "+(hsOf(x.ma).sdt||"")).includes(foldName(NVF.q))))}
 function pHrNV(m){
   if(!hrOk()){m.innerHTML=H("Nhân viên")+`<section class="card"><p>Trang này chỉ CEO, kế toán và phòng Hành chính nhân sự xem được.</p></section>`;return}
-  const d=D(),h=HRD(),S=d.staff,dang=S.filter(x=>x.tt!=="Đã nghỉ"),A=nvAlerts(),L=nvList(),ed=can(ME,"nhansu.quanly")||ME.role==="admin"||ME.phongBan==="HCNS";
+  const d=D(),h=HRD(),S=d.staff,dang=S.filter(x=>x.tt!=="Đã nghỉ"),A=nvAlerts(),L0=nvList(),WS=NVF.w&&A[NVF.w]?new Set(A[NVF.w].map(x=>x.ma)):null,L=WS?L0.filter(x=>WS.has(x.ma)):L0,ed=can(ME,"nhansu.quanly")||ME.role==="admin"||ME.phongBan==="HCNS";
   if(!NVF.sel||!S.some(x=>x.ma===NVF.sel))NVF.sel=(L[0]||{}).ma||"";
   const quy=dang.reduce((a,x)=>a+(nvNs(x.ma).luong||0),0);
-  const warn=[["red",A.hd.length,"hợp đồng hết hạn trong 30 ngày"],["red",A.cccd.length,"hồ sơ thiếu CCCD"],["amb",A.npt.length,"người phụ thuộc chưa có MST"],["amb",A.mst.length,"nhân viên chưa có MST"],["amb",A.nh.length,"nhân viên chưa có tài khoản ngân hàng"]];
+  /* CEO 04/11: 4 thẻ số cùng chiều cao; cảnh báo tách thành dải chip, bấm chip lọc danh sách (NVF.w). */
+  const tv=dang.filter(x=>x.tt==="Thử việc"&&(nvNs(x.ma).hd||{}).hetTV&&daysTo(nvNs(x.ma).hd.hetTV)<=15).map(x=>[x,daysTo(nvNs(x.ma).hd.hetTV)]);
+  const sub=(a,f)=>a.slice(0,2).map(([x,c])=>`${esc(x.ten)} ${f(c)}`).join(" · ")+(a.length>2?` · +${a.length-2}`:"");
+  const tile=(ic,c,l,v,s,zero)=>`<section class="card nv-st${zero?" zero":""}"><div class="nv-ic ${c}">${ico(ic)}</div><div class="nv-stb"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div></section>`;
+  const W=[["cccd","red",A.cccd,"hồ sơ thiếu CCCD"],["mst","amb",A.mst,"chưa có MST"],["npt","amb",A.npt,"người phụ thuộc chưa có MST"],["nh","amb",A.nh,"chưa có tài khoản ngân hàng"]].filter(w=>w[2].length);
   m.innerHTML=H("Nhân viên",`${dang.length} người đang làm · bấm vào một người để xem hồ sơ`)+`
-  <div class="nv-top">
-   <section class="card nv-t"><div class="nv-ic c-blu">${ico("users")}</div><div class="l">Nhân viên</div><div class="v">${dang.length}</div><div class="nv-sub"><span><b class="g">${dang.filter(x=>x.tt==="Chính thức"||x.tt==="Theo giờ").length}</b> chính thức</span><span><b class="b">${dang.filter(x=>x.tt==="Thử việc").length}</b> thử việc</span><span><b class="o">${S.filter(x=>x.tt==="Đã nghỉ").length}</b> đã nghỉ</span></div></section>
-   <section class="card nv-t"><div class="nv-ic c-grn">${ico("money")}</div><div class="l">Tổng lương cơ bản / tháng</div><div class="v">${money(quy)}</div><div class="nv-sub"><span><b>${dang.filter(x=>nvNs(x.ma).luong).length}</b> người có lương</span><span><b class="o">${dang.filter(x=>!nvNs(x.ma).luong).length}</b> chưa nhập lương</span></div></section>
-   <section class="card nv-t"><div class="nv-ic c-amb">${ico("task")}</div><div class="l">Hợp đồng sắp hết hạn</div><div class="v" style="color:var(--orange)">${A.hd.length}</div><div class="nv-sub">${A.hd.slice(0,3).map(([x,c])=>`<span>${esc(x.ten)}: ${c<0?"quá "+(-c):"còn "+c} ngày</span>`).join("")||"<span>Không có hợp đồng nào sắp hết</span>"}</div></section>
-   <section class="card nv-w"><div class="nv-wh"><div class="nv-ic c-red sm">${ico("alert")}</div><div class="l">Cảnh báo</div></div>${warn.filter(w=>w[1]).map(w=>`<div class="nv-wr"><i class="dot d-${w[0]}"></i><b>${w[1]}</b> ${w[2]}</div>`).join("")||`<div class="nv-wr">Hồ sơ đủ cả, không có gì cần bổ sung.</div>`}</section>
+  <div class="nv-stats">
+   ${tile("users","c-blu","Nhân viên đang làm",dang.length,`<b>${dang.filter(x=>x.tt==="Chính thức"||x.tt==="Theo giờ").length}</b> chính thức · <b>${dang.filter(x=>x.tt==="Thử việc").length}</b> thử việc · <b>${S.filter(x=>x.tt==="Đã nghỉ").length}</b> đã nghỉ`)}
+   ${tile("money","c-grn","Tổng lương cơ bản / tháng",money(quy),`<b>${dang.filter(x=>nvNs(x.ma).luong).length}</b> người có lương · <b>${dang.filter(x=>!nvNs(x.ma).luong).length}</b> chưa nhập`)}
+   ${tile("task","c-amb","Hợp đồng sắp hết hạn",A.hd.length,A.hd.length?sub(A.hd,c=>c<0?"quá "+(-c)+" ngày":"còn "+c+" ngày"):"Không có trong 30 ngày tới",!A.hd.length)}
+   ${tile("clock","c-vio","Sắp hết thử việc",tv.length,tv.length?sub(tv,c=>c<0?"quá "+(-c)+" ngày":"còn "+c+" ngày"):"Không có trong 15 ngày tới",!tv.length)}
   </div>
+  <section class="card nv-strip"><span class="nv-sh"><span class="nv-ic c-amb sm">${ico("alert")}</span>Cần bổ sung hồ sơ</span>${W.map(w=>`<button type="button" class="nv-chip${NVF.w===w[0]?" on":""}" data-nvw="${w[0]}"><i class="dot d-${w[1]}"></i><b>${w[2].length}</b> ${w[3]}</button>`).join("")||`<span class="nv-ok">Hồ sơ đủ cả, không có gì cần bổ sung.</span>`}</section>
   <section class="card flush"><div class="card-h pad"><h2>Danh sách nhân viên</h2><span class="sp"></span>
    ${ed?`<button class="btn sm pri" id="nv-add">+ Thêm</button>`:""}<button class="btn sm" data-go="hr_nap">Nhập Excel</button><button class="btn sm" id="nv-xl">Xuất Excel</button><button class="btn sm" id="nv-in">In danh sách</button></div>
-   <div class="filters pad"><input id="nv-q" placeholder="Tìm mã, tên, CCCD, MST, số điện thoại…" value="${esc(NVF.q)}" style="max-width:300px"><select id="nv-pb">${opt([["","Mọi phòng ban"]].concat(d.departments.map(p=>[p.k,p.n])),NVF.pb)}</select><select id="nv-tt">${opt([["dang","Đang làm"],["Chính thức","Chính thức"],["Thử việc","Thử việc"],["Theo giờ","Theo giờ"],["Nghỉ phép","Nghỉ phép"],["Nghỉ thai sản","Nghỉ thai sản"],["Tạm nghỉ","Tạm nghỉ"],["Đã nghỉ","Đã nghỉ"],["all","Tất cả"]],NVF.tt)}</select><span class="hint">${L.length} người</span></div>
+   <div class="filters pad"><input id="nv-q" placeholder="Tìm mã, tên, CCCD, MST, số điện thoại…" value="${esc(NVF.q)}" style="max-width:300px"><select id="nv-pb">${opt([["","Mọi phòng ban"]].concat(d.departments.map(p=>[p.k,p.n])),NVF.pb)}</select><select id="nv-tt">${opt([["dang","Đang làm"],["Chính thức","Chính thức"],["Thử việc","Thử việc"],["Theo giờ","Theo giờ"],["Nghỉ phép","Nghỉ phép"],["Nghỉ thai sản","Nghỉ thai sản"],["Tạm nghỉ","Tạm nghỉ"],["Đã nghỉ","Đã nghỉ"],["all","Tất cả"]],NVF.tt)}</select><span class="hint">${L.length} người</span>${WS?`<span class="nv-flt">Đang lọc theo cảnh báo <button type="button" id="nv-wclr" aria-label="Bỏ lọc">✕</button></span>`:""}</div>
    <div class="tbl nv-list"><table><thead><tr><th>STT</th><th>Mã NV</th><th>Họ và tên</th><th>Giới tính</th><th>Ngày sinh</th><th>Phòng ban</th><th class="nv-vt">Vị trí</th><th>Ngày vào làm</th><th class="nv-hd">Loại hợp đồng</th><th class="n">Lương cơ bản</th><th>Trạng thái</th></tr></thead><tbody>
    ${L.map((x,i)=>{const n=nvNs(x.ma),hs=n.hs||{};return `<tr data-nv="${x.ma}" class="${x.ma===NVF.sel?"on":""}"><td>${i+1}</td><td class="mono">${x.ma}</td><td><b>${esc(x.ten)}</b></td><td>${esc(hs.gioi||n.gioi||"")}</td><td>${vndate(hs.ngaySinh)}</td><td>${esc(pbName(x.pb))}</td><td class="nv-vt" title="${esc(x.viTri||"")}">${esc(x.viTri||"")}</td><td>${vndate(x.ngayVao)}</td><td class="nv-hd">${esc((n.hd||{}).loai||"")}</td><td class="n">${n.luong?nf(n.luong):"—"}</td><td><i class="dot d-${ttTone(x.tt)}"></i> ${esc(x.tt||"")}</td></tr>`}).join("")||`<tr><td colspan="11" class="empty">Không có ai khớp bộ lọc.</td></tr>`}
    </tbody></table></div></section>
   ${NVF.sel?nvHoSo(NVF.sel,ed):""}`;
+  m.querySelectorAll("[data-nvw]").forEach(b=>b.onclick=()=>{NVF.w=NVF.w===b.dataset.nvw?"":b.dataset.nvw;renderMain()});if($("#nv-wclr"))$("#nv-wclr").onclick=()=>{NVF.w="";renderMain()};
   $("#nv-q").onchange=e=>{NVF.q=e.target.value;renderMain()};$("#nv-pb").onchange=e=>{NVF.pb=e.target.value;renderMain()};$("#nv-tt").onchange=e=>{NVF.tt=e.target.value;renderMain()};
   m.querySelectorAll("[data-nv]").forEach(r=>r.onclick=()=>{NVF.sel=r.dataset.nv;NVF.edit="";renderMain();setTimeout(()=>{const p=$("#nv-hs");if(p)p.scrollIntoView({behavior:"smooth",block:"start"})},30)});
   $("#nv-xl").onclick=()=>nvExcel(L);$("#nv-in").onclick=()=>nvPrintList(L);

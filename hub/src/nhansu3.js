@@ -58,10 +58,12 @@ let NVCC="";
   return s.replace(/<div class="nv-body">[\s\S]*<\/div><\/div><\/section>$/,`<div class="nv-body">${body}</div></div></section>`)}}
 {const _b=nvBind;nvBind=function(ma,ed){_b(ma,ed);if($("#nvcc-k"))$("#nvcc-k").onchange=e=>{NVCC=e.target.value;renderMain()}}}
 /* Tổng quan nhân sự = trang một màn (ô số + danh sách + hồ sơ), giống mẫu chị chọn. Mục "Nhân viên" gộp vào đây. */
-{const _p=pHrNV;pHrNV=function(m){_p(m);if(!hrOk())return;const h=HRD(),w=m.querySelector(".nv-w");if(!w)return;
-  const cho=(h.don||[]).filter(x=>x.tt==="cho").length+(h.tu||[]).filter(x=>x.tt==="cho").length,kc=(h.kpi||[]).filter(k=>k.st==="cho").length,tv=D().staff.filter(x=>x.tt==="Thử việc"&&((nvNs(x.ma).hd||{}).hetTV)&&daysTo(nvNs(x.ma).hd.hetTV)<=15).length,loi=(h.ccLoi||[]).length;
-  const add=[["amb",cho,"đơn nghỉ / OT / tạm ứng chờ duyệt","hr_nghi"],["amb",kc,"phiếu KPI chờ duyệt","hr_kpi"],["amb",tv,"người sắp hết thử việc (≤ 15 ngày)","hr_hd"],["amb",loi,"dòng chấm công chưa gắn mã NV","hr_nap"]].filter(a=>a[1]);
-  w.insertAdjacentHTML("beforeend",add.map(a=>`<div class="nv-wr nv-go" data-go="${a[3]}"><i class="dot d-${a[0]}"></i><b>${a[1]}</b> ${a[2]}</div>`).join(""));
+{const _p=pHrNV;pHrNV=function(m){_p(m);if(!hrOk())return;const h=HRD(),w=m.querySelector(".nv-strip");if(!w)return;
+  /* Việc chờ xử lý (bấm để mở trang): thêm vào cuối dải "Cần bổ sung hồ sơ". Sắp hết thử việc đã có thẻ riêng. */
+  const cho=(typeof NP!=="undefined"&&NP.cho&&NP.cho.hcns)||0,kc=(h.kpi||[]).filter(k=>k.st==="cho").length,loi=(h.ccLoi||[]).length;
+  const add=[["amb",cho,"đơn nghỉ phép, tăng ca chờ HCNS","np_ql"],["amb",kc,"phiếu KPI chờ duyệt","hr_kpi"],["amb",loi,"dòng chấm công chưa gắn mã NV","hr_nap"]].filter(a=>a[1]);
+  if(add.length){const ok=w.querySelector(".nv-ok");if(ok)ok.remove();w.insertAdjacentHTML("beforeend",add.map(a=>`<button type="button" class="nv-chip" data-go="${a[3]}"><i class="dot d-${a[0]}"></i><b>${a[1]}</b> ${a[2]}</button>`).join(""));
+    w.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.go;renderMain()})}
   const t=m.querySelector(".ph h1");if(t)t.textContent="Tổng quan nhân sự"}}
 PAGES.hr_tq=pHrNV;PAGES.hr=pHrNV;PAGES.hr_nv=pHrNV;
 {const hr=MODULES.find(m=>m.k==="hr");if(hr){const g0=hr.groups;hr.groups=()=>g0().map(([g,its])=>[g,its.filter(i=>i[0]!=="hr_nv")])}}
