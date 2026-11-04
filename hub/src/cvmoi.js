@@ -32,7 +32,7 @@ const CW_IC={sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.
 const cwI=(n,s)=>`<svg class="cwi" viewBox="0 0 24 24"${s?` style="width:${s}px;height:${s}px"`:""} aria-hidden="true">${CW_IC[n]||""}</svg>`;
 const CW_CSS=`.cwhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 4px}.cwht h1{font-size:20px;margin:0;line-height:1.3}.cwht small{color:var(--muted,#6b7385);font-size:13px}
 .cwhd>.sp{flex:1}.cwhd>.kdstrip,.cwhd>.odcard{order:9;flex-basis:100%;margin:6px 0 0}
-.cwph{margin:0 0 6px}.cwtop{display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
+.cwph{margin:0 0 6px}.cwtop>.cvbar.cwtopbar{margin:0 0 6px auto;padding:0;border:0;background:none;box-shadow:none;flex-wrap:wrap;justify-content:flex-end}.cwtop{display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
 .cwtop>.cwtabs{flex:1;min-width:0;border-bottom:0;margin:0}.cwtop>.cwhd{margin:0 0 6px;flex-wrap:nowrap}.cwtop>.cwhd .cwbar{flex-wrap:nowrap}
 .cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
 .cwtop+.kdstrip,.cwtop+.odcard,.kdstrip+.odcard{margin:0 0 12px}
@@ -417,7 +417,10 @@ function cwDaFrame(m,tab,inner){cwCss();
   m.innerHTML=cwHead(tab==="mt"?"Mục tiêu":"Dự án",tab==="mt"?"Mục tiêu tháng của từng người, từng phòng":"Mỗi dự án gồm nhiều việc, tiến độ tự tính từ số việc xong",{btns:false})+
     cwTabs([{l:"Dự án",ic:"fold",on:tab!=="mt",attr:'data-cwda="cv_da"'},{l:"Mục tiêu",ic:"target",on:tab==="mt",attr:'data-cwda="cv_mt"'}])+'<div id="cw-body"></div>';cwTop(m);
   m.querySelectorAll("[data-cwda]").forEach(b=>b.onclick=()=>{if(b.dataset.cwda!==PAGE)cwGo(b.dataset.cwda)});
-  try{inner(m.querySelector("#cw-body"))}catch(e){console.error("Dự án / mục tiêu lỗi",e);m.querySelector("#cw-body").innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> ${esc(String(e&&e.message||e))}</div>`}}
+  try{inner(m.querySelector("#cw-body"))}catch(e){console.error("Dự án / mục tiêu lỗi",e);m.querySelector("#cw-body").innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> ${esc(String(e&&e.message||e))}</div>`}
+  /* ô tìm, bộ lọc, nút Thêm dự án đưa lên cùng hàng tab, bên phải */
+  const nv=m.querySelector(":scope>.cwtabs"),bar=m.querySelector("#cw-body>.cvbar");
+  if(nv&&bar){let w=m.querySelector(":scope>.cwtop");if(!w){w=document.createElement("div");w.className="cwtop";nv.before(w);w.append(nv)}bar.classList.add("cwtopbar");w.append(bar)}}
 
 /* ---------- 1. TỔNG QUAN (Của tôi · Phòng / Cả công ty) ---------- */
 /* số liệu tính từ việc giao (Task giao việc): việc tháng này + việc đã xong các tháng trước (lưu trữ), đổi về cùng cách đánh số ngày */
