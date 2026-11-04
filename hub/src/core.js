@@ -68,7 +68,7 @@ const STEPS=[
  {id:"quay",t:"Chờ quay",who:"Theo buổi quay tuần"},
  {id:"edit",t:"Đang edit",who:"Người edit · dán link"},
  {id:"worker",t:"Worker đang dựng",who:"Máy tự làm",auto:true},
- {id:"dvd",t:"Người duyệt video",who:"Lead Content"},
+ {id:"dvd",t:"Duyệt V1",who:"Lead Content"},
  {id:"dceo",t:"Duyệt V2",who:"CEO"},
  {id:"dang",t:"Chờ đăng",who:"Người giữ kênh · dán ID / link"},
  {id:"xong",t:"Đã đăng",who:"Số về theo báo cáo tuần"},
