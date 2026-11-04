@@ -117,8 +117,7 @@ function bvQuick(){
            P.forEach(u=>{const n=QN[u]!=null?QN[u]:Math.floor(rest/free.length)+(free.indexOf(u)<rest%free.length?1:0);for(let j=0;j<n;j++)ex.push(u)});P=ex.slice(0,ids.length);
            if(P.length<ids.length){bvCore(dt,ids.slice(0,P.length),k,P.length?P:[],false,"");return}}
          bvCore(dt,ids,k,P,none,"");
-         if(k==="hook"&&!none&&typeof notifyU==="function"){const per={};ids.forEach(id=>{const c=dt.cards.find(x=>x.id===id);if(c&&c.nguoiKB)(per[c.nguoiKB]=per[c.nguoiKB]||[]).push(c)});
-           Object.entries(per).forEach(([u,L])=>{const sk0=[...new Set(L.map(c=>sk(c.sku).n))].slice(0,2).join(", "),hn=L.map(c=>+c.han||0).filter(Boolean).sort((a,b)=>a-b)[0];notifyU(dt,[u],`✍️ ${ME.name} giao bạn viết ${L.length} hook · ${sk0}${hn?" · hạn "+dd(hn):""} · bấm Viết hook hàng loạt ở Công việc`,"page:cv_v")})}});
+         if(k==="hook"&&!none&&typeof hlGiao==="function")hlGiao(dt,ids)});
        if(han)bvCore(dt,ids,"han",[],false,han);
        if(dy||ce)dt.cards.forEach(c=>{if(ids.includes(c.id)){if(dy)c.duyet=dy;if(ce)c.ceo=ce}})});
      let moved=0;const errs={};
@@ -275,7 +274,7 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
   ${rows.slice(0,400).map((c,ix)=>{const t=mixOf(c),late=isLate(c);return `<tr data-bvr="${esc(c.id)}" class="${BV.sel.has(c.id)?"sel":""}"><td><input type="checkbox" data-bvs="${esc(c.id)}" ${BV.sel.has(c.id)?"checked":""}></td>
    <td class="bvstt">${ix+1}</td><td class="mono clk" data-card="${esc(c.id)}">${esc(c.id)}</td><td>${swatch(c.sku)}${esc(sk(c.sku).n)}</td><td>${esc(bvLbl(t))}</td>
    <td>${give?`<select data-bvc="${esc(c.id)}|tuan">${opt(wk,bvTuan(c))}</select>`:"T"+bvTuan(c)}</td>
-   <td>${mixOf(c)==="worker"?(c.wScript?`<button type="button" class="btn sm" onclick="bvScrOpen('${esc(c.id)}')">Xem kịch bản</button>`:c.wt&&c.wStatus!=="error"&&!c.wDone?`<span class="hint">⏳ Worker đang viết kịch bản…</span>`:`<span class="hint">Worker tự viết</span>`):bvMau(c)?bvMauCell(c,give):`<input class="bvhook" data-bvc="${esc(c.id)}|hook" value="${esc(c.hookText||"")}" placeholder="${esc(c.yTuong||"Viết hook ở đây…")}" ${give||c.nguoi===ME.id||c.nguoiKB===ME.id?"":"disabled"}>`}</td>
+   <td>${mixOf(c)==="worker"?(c.wScript?`<button type="button" class="btn sm" onclick="bvScrOpen('${esc(c.id)}')">Xem kịch bản</button>`:c.wt&&c.wStatus!=="error"&&!c.wDone?`<span class="hint">⏳ Worker đang viết kịch bản…</span>`:`<span class="hint">Worker tự viết</span>`):bvMau(c)?bvMauCell(c,give):c.hookTask&&typeof hlCell==="function"&&hlCell(c)?hlCell(c):`<input class="bvhook" data-bvc="${esc(c.id)}|hook" value="${esc(c.hookText||"")}" placeholder="${esc(c.yTuong||"Viết hook ở đây…")}" ${give||c.nguoi===ME.id||c.nguoiKB===ME.id?"":"disabled"}>`}</td>
    <td>${mixOf(c)==="worker"?`<span class="hint">—</span>`:give?`<select data-bvc="${esc(c.id)}|nguoiKB">${opt(pOpt,c.nguoiKB||"")}</select>`:esc(bvNg(d,c.nguoiKB))}</td>
    <td>${mixOf(c)==="worker"?`<span class="hint">—</span>`:give?`<select data-bvc="${esc(c.id)}|nguoiQuay">${opt(pOpt,c.nguoiQuay||"")}</select>`:esc(bvNg(d,c.nguoiQuay))}</td>
    <td>${give?`<select data-bvc="${esc(c.id)}|nguoiEdit">${opt(pOpt,c.nguoiEdit||"")}</select>`:esc(bvNg(d,c.nguoiEdit))}</td>

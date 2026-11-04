@@ -1,34 +1,37 @@
 /* =====================================================================
-   VIẾT HOOK HÀNG LOẠT (chị Hoa 04/11/2026)
-   Lead giao viết hook ở Điều phối › Cập nhật nhanh (chọn người, số hook mỗi người). Nhân sự nhận việc bao nhiêu hook
-   thì mở một khung điền một loạt: gõ từng ô hoặc dán nhiều hook một lần (mỗi dòng một hook), Lưu hoặc Gửi duyệt cả loạt.
-   Gửi duyệt: thẻ sang bước "Người duyệt kịch bản" (dkb) như bấm từng thẻ, nhưng Lead chỉ nhận MỘT thông báo gộp.
-   Nút mở: Công việc › Tổng quan (đầu trang) và Marketing › Content › Điều phối, chỉ hiện khi có hook đang chờ mình viết.
+   GIAO VIẾT HOOK THÀNH TASK (chị Hoa 04/11/2026)
+   Lead chọn video ở Điều phối › Cập nhật nhanh, giao người viết hook (số hook mỗi người).
+   Video dạng hook (one shot): mỗi người nhận MỘT task "Viết N hook" ở Công việc. Nhân sự viết hook vào file Drive,
+   dán link ở ô Kết quả rồi Nộp. Lead duyệt task là các video đó sang "Chờ quay"; Lead trả lại thì video giữ nguyên.
+   Không cần điền từng hook vào ô ở Điều phối (viết hook chỉ để đi quay).
+   Video dạng kịch bản: vẫn làm và nộp từng kịch bản ở từng video như cũ.
    ===================================================================== */
-const HLL={k:""};
-const hlMine=()=>!ME?[]:(D().cards||[]).filter(c=>c.nguoiKB===ME.id&&c.step==="kb");
-const hlGroups=L=>{const g={};L.forEach(c=>{const k=c.sku+"|"+(c.tuyen||"");(g[k]=g[k]||[]).push(c)});return Object.entries(g).map(([k,cs])=>({k,cs:cs.sort((a,b)=>(+a.han||99)-(+b.han||99)||String(a.id).localeCompare(String(b.id)))}))};
-function hlOpen(){const L=hlMine();if(!L.length){toast("Bạn không có hook nào đang chờ viết");return}const G=hlGroups(L);
-  openDrawerHTML(`<h2>✍️ Viết hook hàng loạt <small class="hint">${L.length} video</small></h2>
-   <div class="hkpaste"><b>Dán nhiều hook một lần</b> <small class="hint">mỗi dòng một hook · điền lần lượt vào các ô còn trống bên dưới</small>
-    <textarea id="hk-paste" rows="4" placeholder="Hook 1&#10;Hook 2&#10;Hook 3…"></textarea><div class="acts"><button type="button" class="btn sm" id="hk-fill">Điền vào ô trống</button><span class="hint" id="hk-left"></span></div></div>
-   ${G.map(({k,cs})=>{const c0=cs[0],hn=cs.map(c=>+c.han||0).filter(Boolean).sort((a,b)=>a-b)[0];return `<section class="hkg"><div class="hkgh"><b>${esc(sk(c0.sku).n)}</b>${c0.tuyen?` · ${esc(c0.tuyen)}`:""}<span class="hint"> · ${cs.length} video · ${esc(chOf(c0.kenh).short||"")}${hn?" · hạn "+dd(hn):""}</span></div>
-     ${cs.map((c,i)=>`<div class="hkr"><span class="hkn">${i+1}</span><div class="hkb">${c.yTuong&&!/^Viết /.test(c.yTuong)?`<small class="hint">${esc(c.yTuong)}</small>`:""}${(c.gopy||[]).length?`<small class="t-red">Cần sửa: ${esc((c.gopy[c.gopy.length-1]||{}).note||"")}</small>`:""}<textarea rows="2" data-hk="${esc(c.id)}" placeholder="Hook cho video ${esc(c.id)}">${esc(c.hookText||"")}</textarea></div></div>`).join("")}</section>`}).join("")}
-   <div class="acts hkacts"><span class="hint" id="hk-n"></span><span class="sp"></span><button type="button" class="btn" id="hk-save">Lưu nháp</button><button type="button" class="btn pri" id="hk-send">Gửi duyệt các hook đã viết</button></div>`);
-  const T=()=>[...document.querySelectorAll("[data-hk]")],cnt=()=>{const n=T().filter(t=>t.value.trim()).length;$("#hk-n").textContent=`Đã viết ${n}/${T().length} hook`};T().forEach(t=>t.oninput=cnt);cnt();
-  $("#hk-fill").onclick=()=>{const lines=$("#hk-paste").value.split(/\r?\n/).map(x=>x.replace(/^\s*(\d+[.)]|[-•*])\s*/,"").trim()).filter(Boolean);let i=0;T().forEach(t=>{if(!t.value.trim()&&i<lines.length)t.value=lines[i++]});
-    $("#hk-left").textContent=i<lines.length?`Còn ${lines.length-i} hook chưa có ô để điền`:`Đã điền ${i} hook`;$("#hk-paste").value=lines.slice(i).join("\n");cnt()};
-  const save=send=>{const V={};T().forEach(t=>{V[t.dataset.hk]=t.value.trim()});const sendIds=send?Object.keys(V).filter(id=>V[id]):[];
-    if(send&&!sendIds.length){toast("Chưa có hook nào để gửi duyệt");return}
-    DB.mutate(ME.name,send?`gửi duyệt ${sendIds.length} hook`:"lưu nháp hook",dt=>{const now=new Date().toLocaleString("vi-VN");
-      Object.entries(V).forEach(([id,h])=>{const x=dt.cards.find(y=>y.id===id);if(!x||x.step!=="kb")return;x.hookText=h;
-        if(send&&h){x.step="dkb";x.nguoiKB=x.nguoiKB||ME.id;x.duyet="Chưa duyệt";x.ceo="CẦN KIỂM TRA";x.history=(x.history||[]).concat({t:now,who:ME.name,to:"dkb"})}});
-      if(send&&typeof notifyU==="function"&&typeof approvers==="function"){const c0=dt.cards.find(y=>y.id===sendIds[0]);notifyU(dt,approvers(),`✍️ ${ME.name} gửi ${sendIds.length} hook chờ duyệt${c0?" · "+sk(c0.sku).n:""}`,"page:bang_video")}});
-    toast(send?`Đã gửi duyệt ${sendIds.length} hook`:"Đã lưu nháp");closeDrawer();renderMain()};
-  $("#hk-save").onclick=()=>save(false);$("#hk-send").onclick=()=>save(true)}
-/* nút mở: đầu Công việc › Tổng quan và Điều phối */
-function hlBtn(){const n=hlMine().length;return n?`<button type="button" class="btn pri hkbtn" data-hkopen="1">✍️ Viết hook hàng loạt <b>${n}</b></button>`:""}
-const _pCvVHl=pCvV;
-pCvV=function(m){_pCvVHl(m);try{const b=hlBtn(),bar=m.querySelector(".cvvbar");if(b&&bar){bar.insertAdjacentHTML("afterbegin",b);bar.querySelector("[data-hkopen]").onclick=hlOpen}}catch(e){console.error("viết hook hàng loạt",e)}};
-PAGES.cv_v=m=>pCvV(m);
-if(PAGES.bang_video){const _bv=PAGES.bang_video;PAGES.bang_video=m=>{_bv(m);try{const b=hlBtn();if(b){m.insertAdjacentHTML("afterbegin",`<div class="hkbar">${b}<span class="hint">Bạn có hook đang chờ viết. Bấm để điền một loạt, không cần gõ từng dòng trong bảng.</span></div>`);m.querySelector("[data-hkopen]").onclick=hlOpen}}catch(e){console.error("viết hook hàng loạt",e)}}}
+const hlTask=(dt,c)=>c&&c.hookTask?(dt.tasks||[]).find(t=>t.id===c.hookTask):null;
+const hlName=(dt,ids)=>{const L=ids.map(id=>dt.cards.find(c=>c.id===id)).filter(Boolean),sp=[...new Set(L.map(c=>sk(c.sku).n))].slice(0,2).join(", "),tu=[...new Set(L.map(c=>{const t=(dt.tuyen||[]).find(x=>x.ma===c.maTuyen);return t?t.tuyen:""}).filter(Boolean))];
+  return `Viết ${L.length} hook · ${sp}${tu.length===1?" · "+tu[0]:""}`};
+const hlDesc=(dt,ids)=>ids.map((id,i)=>{const c=dt.cards.find(y=>y.id===id);if(!c)return "";const t=(dt.tuyen||[]).find(x=>x.ma===c.maTuyen);return `${i+1}. ${c.id} · ${sk(c.sku).n}${t?" · "+t.tuyen:""}${c.yTuong&&!/^Viết /.test(c.yTuong)?" · "+c.yTuong:""}`}).filter(Boolean).join("\n")
+  +"\n\nViết các hook vào một file Drive, dán link ở ô Kết quả rồi bấm Nộp. Lead duyệt xong là các video này sang Chờ quay.";
+/* gọi trong DB.mutate của Cập nhật nhanh, sau khi đã gán người viết */
+function hlGiao(dt,ids){const per={},kb={},td=dt.settings.today;dt.tasks=dt.tasks||[];
+  ids.forEach(id=>{const c=dt.cards.find(x=>x.id===id);if(!c||!c.nguoiKB||c.step!=="kb")return;
+    if(!hkIsHook(c)){(kb[c.nguoiKB]=kb[c.nguoiKB]||[]).push(c);return}
+    const o=hlTask(dt,c);if(o&&o.st!=="done"&&o.nguoi===c.nguoiKB)return;
+    if(o&&o.st!=="done"){o.hookCards=(o.hookCards||[]).filter(x=>x!==c.id);if(o.hookCards.length){o.ten=hlName(dt,o.hookCards);o.moTa=hlDesc(dt,o.hookCards)}else{o.st="done";o.huy=true;tkLog(o,"Các video đã giao người khác viết hook")}}
+    (per[c.nguoiKB]=per[c.nguoiKB]||[]).push(c)});
+  Object.entries(per).forEach(([u,L])=>{const ids2=L.map(c=>c.id),hn=L.map(c=>+c.han||0).filter(Boolean).sort((a,b)=>a-b)[0]||Math.min(MONTH.ndays,td+1),id=uid("cv");
+    const x={id,ten:hlName(dt,ids2),moTa:hlDesc(dt,ids2),team:"content",da:"",nguoi:u,phoi:[],han:hn,bd:td,uu:"Cao",st:"todo",checklist:[],files:[],loai:"Viết hook",tao:ME.id,duyet:ME.id,hookCards:ids2,log:[]};
+    tkLog(x,`${ME.name} giao viết ${ids2.length} hook từ Điều phối`);dt.tasks.push(x);L.forEach(c=>{c.hookTask=id});
+    if(typeof notifyU==="function")notifyU(dt,[u],`✍️ ${ME.name} giao bạn viết ${ids2.length} hook · hạn ${dd(hn)}`,"task:"+id)});
+  if(typeof notifyU==="function")Object.entries(kb).forEach(([u,L])=>{const hn=L.map(c=>+c.han||0).filter(Boolean).sort((a,b)=>a-b)[0];notifyU(dt,[u],`📝 ${ME.name} giao bạn viết ${L.length} kịch bản · ${[...new Set(L.map(c=>sk(c.sku).n))].slice(0,2).join(", ")}${hn?" · hạn "+dd(hn):""} · làm và nộp từng kịch bản ở Điều phối`,"page:bang_video")})}
+/* Lead duyệt task viết hook → các video sang Chờ quay */
+function hlDone(id){const t=(D().tasks||[]).find(x=>x.id===id);if(!t||t.st!=="done"||t.huy||!(t.hookCards||[]).length)return;
+  const now=new Date().toLocaleString("vi-VN");
+  DB.mutate(ME.name,`duyệt ${t.hookCards.length} hook · ${t.ten}`,dt=>t.hookCards.forEach(cid=>{const c=dt.cards.find(y=>y.id===cid);if(!c||!["kb","dkb"].includes(c.step))return;
+    c.step="quay";c.duyet="Đã duyệt";c.hookLink=t.kq||"";c.history=(c.history||[]).concat({t:now,who:ME.name,to:"quay"})}))}
+const _tkApproveHl=tkApprove;
+tkApprove=function(id){const r=_tkApproveHl(id);try{hlDone(id)}catch(e){console.error("duyệt viết hook",e)}return r};
+/* ô hook ở Điều phối: video đã giao theo task thì hiện tên task + link file, không bắt điền */
+function hlCell(c){const d=D(),t=hlTask(d,c);if(!t)return "";const st=t.st==="done"?"đã duyệt":t.st==="review"?"chờ Lead duyệt":"đang viết";
+  return `<span class="hlcell">📄 <button type="button" class="lnk" onclick="openTask('${esc(t.id)}')">${esc(t.ten)}</button> <small class="hint">· ${esc(userName(t.nguoi)||"")} · ${st}</small>${t.kq?` <a href="${esc(t.kq)}" target="_blank" rel="noopener">Mở file hook</a>`:""}</span>`}
+const _tkSetStHl=tkSetSt;
+tkSetSt=function(id,k,extra,note){const r=_tkSetStHl(id,k,extra,note);if(k==="done")try{hlDone(id)}catch(e){console.error("duyệt viết hook",e)}return r};
