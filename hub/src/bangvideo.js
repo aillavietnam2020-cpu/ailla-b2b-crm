@@ -401,7 +401,7 @@ function bvScrOpen(id){
   const fit=()=>{T.style.height="auto";T.style.height=Math.max(360,T.scrollHeight+4)+"px"};fit();
   if(!ed)return;
   const ok=document.getElementById("bvScOk"),orig=(c.wScript||"").trim();
-  T.oninput=()=>{fit();ok.textContent=T.value.trim()!==orig?"Lưu bản sửa & duyệt":"Duyệt kịch bản"};
+  T.oninput=()=>{fit();ok.textContent=T.value.trim()!==orig?"Lưu bản sửa & duyệt":"Duyệt"};
   const done=(msg,upd)=>{toast(msg);DB.mutate(ME.name,"kịch bản Worker "+c.id,dt=>{const y=dt.cards.find(z=>z.id===c.id);if(y){y.wStage="";y.wStatus="running";y.wFixAt=new Date().toISOString();upd(y)}});closeDrawer();renderMain()};
   ok.onclick=async()=>{const txt=T.value.trim();if(!txt){toast("Kịch bản đang trống");return}
     const changed=txt!==orig;ok.disabled=true;
