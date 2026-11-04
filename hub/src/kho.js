@@ -199,11 +199,11 @@ function khoForm(type,pre,clsO){
   if(type==="PN"&&$("#kf-po")){
     /* Hàng về theo một phiếu mua (Thảo lập ở trang quản trị): chọn phiếu thì điền sẵn nhà cung cấp và số còn thiếu; lưu xong phiếu mua tự nhảy "đã nhập kho" */
     (async()=>{try{await mhLoad(true)}catch(e){}
-      const sel=$("#kf-po");if(!sel)return;const ePo=KHO.edit&&KHO.edit.po,O=(typeof MH!=="undefined"&&MH.orders||[]).filter(p=>p.status==="DAT"||p.status==="DANG_GIAO"||p.id===ePo);
+      const sel=$("#kf-po");if(!sel)return;const ePo=KHO.edit&&KHO.edit.po,inK=l=>!clsO||clsO.includes((KHO.items.get(l.item)||{}).cls),O=(typeof MH!=="undefined"&&MH.orders||[]).filter(p=>(p.status==="DAT"||p.status==="DANG_GIAO")&&p.lines.some(inK)||p.id===ePo); // 04/11: trang nhập nào chỉ hiện đơn mua có hàng của kho đó
       sel.innerHTML='<option value="">Không có phiếu đặt: web tự tạo phiếu mua theo nhà cung cấp, Thảo nhập giá sau</option>'+O.map(p=>`<option value="${esc(p.id)}">${esc(p.no)} · ${esc(p.supplier_name)} · ${esc(p.lines.slice(0,2).map(l=>l.name||l.item).join(", "))}</option>`).join("");if(ePo)sel.value=ePo})();
     $("#kf-po").onchange=()=>{const p=(MH.orders||[]).find(x=>x.id===$("#kf-po").value);if(!p)return;
-      $("#kf-p").value=p.supplier_name;body.innerHTML="";const rest=p.lines.filter(l=>l.qty-l.received>1e-9);
-      (rest.length?rest:p.lines).forEach(l=>addLine({item:l.item,qty:rest.length?Math.round((l.qty-l.received)*1e6)/1e6:l.qty}));refresh()}}
+      $("#kf-p").value=p.supplier_name;body.innerHTML="";const inK=l=>!clsO||clsO.includes((KHO.items.get(l.item)||{}).cls),PL=p.lines.filter(inK).length?p.lines.filter(inK):p.lines,rest=PL.filter(l=>l.qty-l.received>1e-9);
+      (rest.length?rest:PL).forEach(l=>addLine({item:l.item,qty:rest.length?Math.round((l.qty-l.received)*1e6)/1e6:l.qty}));refresh()}}
   if(pre)pre(addLine);
   khoNoEnter($("#kf"));
   $("#kf-print").onclick=()=>{
