@@ -72,7 +72,7 @@ const PAGE_SETS=[
   {n:"Dự án và mục tiêu",ids:["cv_da","cv_mt"],labels:["Dự án","Mục tiêu"]},
   /* Marketing: mục cha bấm vào sổ ra các trang con ngay ở thanh bên (kiểu Pancake), trong trang không có hàng tab */
   /* Marketing: 5 team ngang hàng; team nhiều trang thì bấm vào sổ ra các trang con ngay thanh bên (mỗi lần chỉ mở một team) */
-  {n:"Content",ids:["mkt_tq","kehoach","research","dieuphoi","lich_fb","lich","kho_luutru","win","order_c","nhaplieu"],labels:["Tổng quan","Kế hoạch tháng","Research","Điều phối sản xuất","Lịch đăng Fanpage","Calendar","Kho lưu trữ video","Video win","Order từ Ads","Nhập báo cáo"],acc:true,noBar:true,hide:["lich","research"]},
+  {n:"Content",ids:["mkt_tq","kehoach","research","dieuphoi","lich_fb","lich","kho_luutru","win","order_c"],labels:["Tổng quan","Kế hoạch tháng","Research","Điều phối sản xuất","Lịch đăng Fanpage","Calendar","Kho lưu trữ video","Video win","Order từ Ads"],acc:true,noBar:true,hide:["lich","research"]},
   {n:"Digital Marketing",ids:["dg_tq","fb_ads","dg_lib","order","dg_sale","dg_kho","dg_win","nhaplieu_ads"],labels:["Tổng quan","Báo cáo theo ngày","Thư viện video ads","Order cho Content","Hiệu quả Sale B2C","Kho video","Video win","Nhập báo cáo Ads"],acc:true,noBar:true},
   {n:"Facebook",ids:["bc_fb","fb_sale"],labels:["Doanh thu Facebook","Hoạt động team Sale"],noBar:true},
   /* Kho vật tư gồm nhiều trang con; mục "Kho vật tư" trên thanh bên mở trang Tồn kho, các tab con nằm trong trang. */
