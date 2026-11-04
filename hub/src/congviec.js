@@ -1030,8 +1030,8 @@ function cvMyItems(){
   if(ME.role==="admin"||ME.role==="lead"){
     const CL=typeof cvList==="function"?cvList(ME).L:[],n=k=>{const g=CL.find(y=>y.key===k);return g?g.items.filter(i=>!CV_TEST.includes(i.nguoi)).length:0},G4="Cần phân công / theo dõi";
     if(n("cg")&&ME.role!=="admin")add({key:"k_cg",group:G4,title:`${n("cg")} thẻ video 7 ngày tới chưa giao người`,detail:"Giao người viết kịch bản, quay, edit để kịp đăng",count:n("cg"),mod:"mkt",go:"dieuphoi"});
-    const late=cvGroup(cvItems().filter(x=>!CV_TEST.includes(x.nguoi))).filter(x=>x.late&&x.st!=="done"&&x.nguoi!==ME_);
-    if(late.length)add({key:"k_tre",group:G4,title:`${late.length} việc của team đang trễ hạn`,detail:"Nhắc người làm hoặc gia hạn: "+[...new Set(late.map(x=>userName(x.nguoi)).filter(Boolean))].slice(0,4).join(", "),count:late.length,age_days:late.reduce((z,x)=>Math.max(z,x.lateD||0),0),go:"cv_nv",st:"late",who:"all"});
+    const late=cvGroup(cvItems().filter(x=>!CV_TEST.includes(x.nguoi))).filter(x=>x.late&&x.st!=="done"&&x.nguoi!==ME_&&(ME.role!=="admin"||x.src==="task"&&x.tao===ME_));/* CEO chỉ nhắc việc chính mình giao (chị Hoa 04/11) */
+    if(late.length)add({key:"k_tre",group:G4,title:ME.role==="admin"?`${late.length} việc bạn giao đang trễ hạn`:`${late.length} việc của team đang trễ hạn`,detail:"Nhắc người làm hoặc gia hạn: "+[...new Set(late.map(x=>userName(x.nguoi)).filter(Boolean))].slice(0,4).join(", "),count:late.length,age_days:late.reduce((z,x)=>Math.max(z,x.lateD||0),0),go:"cv_nv",st:"late",who:"all"});
     if(n("id"))add({key:"k_id",group:G4,title:`${n("id")} bài đã đăng nhưng thiếu link / ID`,detail:"Nhờ người đăng bổ sung",count:n("id"),go:"cv"});
   }
   const vid=d.cards.filter(c=>ok(c)&&["dkb","dvd","dceo"].includes(c.step)&&(ME.role==="admin"||can(ME,"viec.duyet"))&&(c.step!=="dceo"||ME.role==="admin")).length;
