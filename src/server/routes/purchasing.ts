@@ -9,6 +9,7 @@ import { loadCeoSpend } from './ceoSpend';
 import { agentSpendGuard, realCeo, withSource } from '../services/agentSpend';
 import { addPayFile, deletePayFile, getPayFile, listPayFiles, readPayMethod } from '../lib/payFiles';
 import { khoMocMap } from '../services/khoTon';
+import { bellTo } from '../lib/hubBell';
 
 /**
  * Mua hàng nguyên vật liệu.
@@ -174,9 +175,138 @@ export async function poStatus(db: D1Database, poId: string) {
     ).results.map((r) => [r.id, r.q]),
   );
   const anyReceipt = (await db.prepare("SELECT COUNT(*) AS n FROM po_receipts WHERE po_id = ? AND status = 'OK'").bind(poId).first<{ n: number }>())?.n ?? 0;
-  const full = lines.length > 0 && lines.every((l) => (got.get(l.id) ?? 0) >= l.qty - 1e-9);
+  // Phiếu nhập không ghi đơn giá thì lấy giá trên đơn mua (chị Hoa duyệt 04/11), để có giá vốn và giá nguyên vật liệu ngay.
+  const filled = await db
+    .prepare(
+      `UPDATE po_receipt_lines SET unit_price = (SELECT pl.unit_price FROM po_lines pl WHERE pl.id = po_receipt_lines.po_line_id)
+       WHERE unit_price IS NULL
+         AND po_line_id IN (SELECT id FROM po_lines WHERE po_id = ? AND unit_price IS NOT NULL)
+         AND receipt_id IN (SELECT id FROM po_receipts WHERE po_id = ? AND status = 'OK')`,
+    )
+    .bind(poId, poId)
+    .run();
+  if (filled.meta.changes) await reprice(db, (await db.prepare("SELECT id FROM po_receipts WHERE po_id = ? AND status = 'OK'").bind(poId).all<{ id: string }>()).results.map((r) => r.id));
+  await syncLech(db, poId);
+  // Dòng thiếu đã chốt theo số thực nhận thì coi như đủ: đơn đóng.
+  const closed = new Set(
+    (await db.prepare("SELECT po_line_id FROM po_lech WHERE po_id = ? AND status = 'XONG' AND resolution = 'CHOT'").bind(poId).all<{ po_line_id: string }>()).results.map((r) => r.po_line_id),
+  );
+  const full = lines.length > 0 && lines.every((l) => closed.has(l.id) || (got.get(l.id) ?? 0) >= l.qty - 1e-9);
   const status = full ? 'DU' : anyReceipt ? 'DANG_GIAO' : 'DAT';
   await db.prepare("UPDATE po_orders SET status = ?, updated_at = ? WHERE id = ? AND status <> 'HUY'").bind(status, nowIso(), poId).run();
+}
+
+/* ---------------- Hàng về lệch đơn mua (chị Hoa duyệt 04/11, migration 0220) ----------------
+ * Kho ghi số thực nhận như thường. Dòng đặt nào nhận khác số đặt thì có một dòng po_lech chờ người phụ trách mua hàng chốt tiền
+ * (hiện ở Phê duyệt và trong đơn mua, kèm chuông). Cách chốt ăn vào:
+ *   công nợ (PO_PENDING_SQL): TINH, CHOT tính theo số thực nhận; còn lại theo số đặt
+ *   tiền hàng trên chứng từ (lechBill): TANG, TRA tính tiền theo số đặt; NO_HANG tính theo số đặt dù nhận thiếu
+ *   giá vốn nhập (reprice): TANG = phần dư giá 0, giá bình quân hạ
+ * Điều chỉnh gắn vào lần nhận cuối của dòng đặt đó. Chỉ xét đơn có hàng nhận sau mốc tồn chung (kho_cfg ton_moc). */
+export const LECH_DU = ['TINH', 'TANG', 'TRA'] as const;
+export const LECH_THIEU = ['BU', 'CHOT', 'NO_HANG'] as const;
+const LECH_TEN: Record<string, string> = {
+  TINH: 'NCC tính tiền phần dư',
+  TANG: 'NCC tặng phần dư',
+  TRA: 'Trả lại phần dư',
+  BU: 'NCC giao bù sau',
+  CHOT: 'Chốt theo số thực nhận',
+  NO_HANG: 'NCC nợ hàng',
+};
+const fmtQ = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
+
+/** Người nhận chuông việc mua hàng: có quyền duyệt đơn (order.approve.normal), không phải CEO; không ai thì CEO. */
+async function buyerIds(db: D1Database): Promise<string[]> {
+  const q = (where: string) =>
+    db
+      .prepare(`SELECT DISTINCT u.id FROM users u WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.kind = 'HUMAN' AND ${where}`)
+      .all<{ id: string }>()
+      .then((r) => r.results.map((x) => x.id));
+  const ids = await q("u.role <> 'CEO' AND EXISTS (SELECT 1 FROM user_permissions p WHERE p.user_id = u.id AND p.permission = 'order.approve.normal')");
+  return ids.length ? ids : q("u.role = 'CEO'");
+}
+async function khoIds(db: D1Database): Promise<string[]> {
+  return (
+    await db
+      .prepare(
+        `SELECT DISTINCT u.id FROM users u JOIN user_permissions p ON p.user_id = u.id AND p.permission IN ('order.kho.process', 'sx.kiemke')
+         WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.kind = 'HUMAN'`,
+      )
+      .all<{ id: string }>()
+  ).results.map((x) => x.id);
+}
+
+/** Tạo / cập nhật / xóa dòng lệch của một đơn theo số thực nhận hiện tại. Dòng mới hoặc số lệch đổi thì về chờ chốt và báo chuông. */
+async function syncLech(db: D1Database, poId: string) {
+  const po = await db
+    .prepare('SELECT o.no, o.status, s.name AS supplier FROM po_orders o JOIN suppliers s ON s.id = o.supplier_id WHERE o.id = ?')
+    .bind(poId)
+    .first<{ no: string; status: string; supplier: string }>();
+  if (!po) return;
+  const moc = (await db.prepare("SELECT v FROM kho_cfg WHERE k = 'ton_moc'").first<{ v: string }>())?.v ?? '';
+  const recent = await db.prepare("SELECT 1 FROM po_receipts WHERE po_id = ? AND status = 'OK' AND receipt_date > ? LIMIT 1").bind(poId, moc).first();
+  const lines = (
+    await db
+      .prepare(
+        `SELECT l.id, l.item, i.name, l.qty,
+                COALESCE((SELECT SUM(rl.qty) FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id WHERE rl.po_line_id = l.id AND r.status = 'OK'), 0) AS got
+         FROM po_lines l JOIN kho_items i ON i.code = l.item WHERE l.po_id = ?`,
+      )
+      .bind(poId)
+      .all<{ id: string; item: string; name: string; qty: number; got: number }>()
+  ).results;
+  const old = new Map(
+    (await db.prepare('SELECT id, po_line_id, diff, status FROM po_lech WHERE po_id = ?').bind(poId).all<{ id: string; po_line_id: string; diff: number; status: string }>()).results.map((r) => [
+      r.po_line_id,
+      r,
+    ]),
+  );
+  const now = nowIso();
+  const st: D1PreparedStatement[] = [];
+  const fresh: string[] = [];
+  const keep = new Set<string>();
+  for (const l of po.status === 'HUY' || !recent ? [] : lines) {
+    const diff = round6(l.got - l.qty);
+    if (Math.abs(diff) < 1e-9) continue;
+    keep.add(l.id);
+    const ex = old.get(l.id);
+    if (ex && Math.abs(ex.diff - diff) < 1e-9) continue;
+    if (ex)
+      st.push(
+        db
+          .prepare("UPDATE po_lech SET ordered = ?, received = ?, diff = ?, status = 'CHO', resolution = NULL, resolved_by = NULL, resolved_at = NULL, updated_at = ? WHERE id = ?")
+          .bind(l.qty, l.got, diff, now, ex.id),
+      );
+    else
+      st.push(
+        db
+          .prepare('INSERT INTO po_lech (id, po_id, po_line_id, item, ordered, received, diff, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(newId(), poId, l.id, l.item, l.qty, l.got, diff, 'CHO', now, now),
+      );
+    fresh.push(`${l.name} đặt ${fmtQ(l.qty)}, nhận ${fmtQ(l.got)} (${diff > 0 ? 'dư' : 'thiếu'} ${fmtQ(Math.abs(diff))})`);
+  }
+  for (const [lineId, ex] of old) if (!keep.has(lineId)) st.push(db.prepare('DELETE FROM po_lech WHERE id = ?').bind(ex.id));
+  if (st.length) await db.batch(st);
+  if (fresh.length)
+    await bellTo(db, await buyerIds(db), `Hàng về lệch đơn mua ${po.no} (${po.supplier}): ${fresh.join('; ')}. Cần chốt tiền ở Phê duyệt.`, 'page:pheduyet').catch(() => 0);
+}
+
+/** Điều chỉnh tiền hàng / giá vốn theo cách chốt, gắn vào dòng nhận cuối của mỗi dòng đặt có lệch đã chốt.
+ *  bill = số lượng trừ khỏi số nhận khi tính tiền hàng; free = số lượng giá 0 khi tính giá vốn. */
+async function lechBill(db: D1Database): Promise<Map<string, { bill: number; free: number }>> {
+  const rows = (
+    await db
+      .prepare(
+        `SELECT x.diff, x.resolution,
+                (SELECT rl.id FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id
+                 WHERE rl.po_line_id = x.po_line_id AND r.status = 'OK' ORDER BY r.receipt_date DESC, r.created_at DESC, rl.id DESC LIMIT 1) AS anchor
+         FROM po_lech x WHERE x.status = 'XONG' AND x.resolution IN ('TANG', 'TRA', 'NO_HANG')`,
+      )
+      .all<{ diff: number; resolution: string; anchor: string | null }>()
+  ).results;
+  const m = new Map<string, { bill: number; free: number }>();
+  for (const r of rows) if (r.anchor) m.set(r.anchor, { bill: r.diff, free: r.resolution === 'TANG' ? r.diff : 0 });
+  return m;
 }
 
 purchasingRoutes.get('/orders', async (c) => {
@@ -230,6 +360,9 @@ purchasingRoutes.get('/orders', async (c) => {
     arr.push({ ...r, lines: rlBy.get(String(r.id)) ?? [] });
     rcBy.set(String(r.po_id), arr);
   }
+  const lech = (await c.env.DB.prepare(`SELECT id, po_id, po_line_id, item, ordered, received, diff, status, resolution, note, resolved_at FROM po_lech WHERE po_id IN (${ph})`)
+    .bind(...ids)
+    .all<Record<string, unknown>>()).results;
   const received = new Map<string, number>();
   for (const r of receipts) if (r.status === 'OK') for (const l of rlBy.get(String(r.id)) ?? []) if (l.po_line_id) received.set(String(l.po_line_id), (received.get(String(l.po_line_id)) ?? 0) + Number(l.qty));
   return ok(
@@ -243,6 +376,7 @@ purchasingRoutes.get('/orders', async (c) => {
           return { ...rest, ...(money ? { unit_price } : {}), received: round6(received.get(String(l.id)) ?? 0) };
         }),
       receipts: rcBy.get(String(o.id)) ?? [],
+      lech: lech.filter((x) => x.po_id === o.id),
     })),
   );
 });
@@ -314,6 +448,82 @@ purchasingRoutes.post('/orders/:id/cancel', async (c) => {
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_CANCELLED', entityType: 'PO', entityId: po.no, requestId: c.get('requestId'), ip: ipOf(c) }),
   ]);
   return ok(c, { id });
+});
+
+/* ---------------- Hàng về lệch đơn: danh sách chờ chốt + chốt tiền ---------------- */
+
+/** Danh sách dòng lệch (mặc định đang chờ chốt; ?all=1 lấy cả đã chốt). Đơn có hàng nhận sau mốc tồn mà chưa đối chiếu thì đối chiếu luôn. */
+purchasingRoutes.get('/lech', async (c) => {
+  needManage(c.get('auth'));
+  const db = c.env.DB;
+  const moc = (await db.prepare("SELECT v FROM kho_cfg WHERE k = 'ton_moc'").first<{ v: string }>())?.v ?? '';
+  const todo = (
+    await db
+      .prepare(
+        `SELECT DISTINCT o.id FROM po_orders o JOIN po_receipts r ON r.po_id = o.id AND r.status = 'OK' AND r.receipt_date > ?
+         WHERE o.status <> 'HUY' AND r.receipt_date >= date('now', '-120 day')`,
+      )
+      .bind(moc)
+      .all<{ id: string }>()
+  ).results;
+  for (const t of todo) await poStatus(db, t.id);
+  const all = c.req.query('all') === '1';
+  const rows = (
+    await db
+      .prepare(
+        `SELECT x.*, o.no AS po_no, o.order_date, o.supplier_id, s.name AS supplier_name, i.name, i.unit, l.unit_price, u.display_name AS resolved_by_name,
+                (SELECT MAX(r.receipt_date) FROM po_receipts r WHERE r.po_id = o.id AND r.status = 'OK') AS last_receipt,
+                (SELECT d.no FROM po_receipts r JOIN kho_docs d ON d.id = r.kho_doc_id WHERE r.po_id = o.id AND r.status = 'OK' ORDER BY r.receipt_date DESC, r.created_at DESC LIMIT 1) AS kho_doc_no
+         FROM po_lech x JOIN po_orders o ON o.id = x.po_id JOIN suppliers s ON s.id = o.supplier_id JOIN kho_items i ON i.code = x.item
+         JOIN po_lines l ON l.id = x.po_line_id LEFT JOIN users u ON u.id = x.resolved_by
+         ${all ? '' : "WHERE x.status = 'CHO'"} ORDER BY x.status, x.created_at DESC LIMIT 300`,
+      )
+      .all<Record<string, unknown>>()
+  ).results;
+  return ok(c, rows);
+});
+
+/** Người phụ trách mua hàng chốt tiền phần lệch: chọn cách xử lý + ghi chú. Đơn đã có chứng từ thì hủy chứng từ trước rồi chốt lại. */
+purchasingRoutes.post('/lech/:id/resolve', async (c) => {
+  const auth = c.get('auth');
+  needManage(auth);
+  const db = c.env.DB;
+  const x = await db
+    .prepare(
+      `SELECT x.id, x.po_id, x.item, x.diff, x.status, x.resolution, o.no, s.name AS supplier, i.name, i.unit
+       FROM po_lech x JOIN po_orders o ON o.id = x.po_id JOIN suppliers s ON s.id = o.supplier_id JOIN kho_items i ON i.code = x.item WHERE x.id = ?`,
+    )
+    .bind(c.req.param('id'))
+    .first<{ id: string; po_id: string; item: string; diff: number; status: string; resolution: string | null; no: string; supplier: string; name: string; unit: string }>();
+  if (!x) throw notFound('Không tìm thấy dòng hàng lệch');
+  const b = (await c.req.json().catch(() => ({}))) as { resolution?: unknown; note?: unknown };
+  const res = String(b.resolution ?? '');
+  const okSet: readonly string[] = x.diff > 0 ? LECH_DU : LECH_THIEU;
+  if (!okSet.includes(res)) throw badRequest('BAD_RESOLUTION', x.diff > 0 ? 'Chọn một cách xử lý phần dư' : 'Chọn một cách xử lý phần thiếu');
+  const inv = await db
+    .prepare(
+      `SELECT v.invoice_no FROM po_invoices v, json_each(v.receipt_ids) j JOIN po_receipts r ON r.id = j.value
+       WHERE r.po_id = ? AND v.status = 'OK' AND r.status = 'OK' LIMIT 1`,
+    )
+    .bind(x.po_id)
+    .first<{ invoice_no: string }>();
+  if (inv && x.status === 'XONG' && x.resolution !== res)
+    throw badRequest('INVOICED', `Đơn đã có chứng từ ${inv.invoice_no || '(chưa có số)'} tính theo cách chốt cũ. Hủy chứng từ trước rồi chốt lại.`);
+  const note = String(b.note ?? '').trim().slice(0, 500);
+  const now = nowIso();
+  await db.batch([
+    db.prepare("UPDATE po_lech SET status = 'XONG', resolution = ?, note = ?, resolved_by = ?, resolved_at = ?, updated_at = ? WHERE id = ?").bind(res, note, auth.user.id, now, now, x.id),
+    auditStatement(db, { actorId: auth.user.id, action: 'PO_LECH_RESOLVED', entityType: 'PO', entityId: x.no, after: { item: x.item, diff: x.diff, resolution: res, note }, requestId: c.get('requestId'), ip: ipOf(c) }),
+  ]);
+  await reprice(db, (await db.prepare("SELECT id FROM po_receipts WHERE po_id = ? AND status = 'OK'").bind(x.po_id).all<{ id: string }>()).results.map((r) => r.id));
+  await poStatus(db, x.po_id);
+  const warnings: string[] = [];
+  if (inv) warnings.push(`Đơn đã có chứng từ ${inv.invoice_no || '(chưa có số)'}: kiểm lại tiền hàng trên chứng từ có khớp cách chốt này không.`);
+  if (res === 'TRA') {
+    const n = await bellTo(db, await khoIds(db), `Trả lại ${x.supplier} ${fmtQ(x.diff)} ${x.unit} ${x.name} (dư so với đơn mua ${x.no}): lập phiếu xuất trả khi giao lại cho nhà cung cấp.`, 'page:sx_kho').catch(() => 0);
+    warnings.push(n ? 'Đã báo kho lập phiếu xuất trả phần dư.' : 'Chưa có người kho nào nhận được chuông: nhắn kho lập phiếu xuất trả phần dư.');
+  }
+  return ok(c, { id: x.id, resolution: res, label: LECH_TEN[res], warnings });
 });
 
 /* ---------------- Nhận hàng (kho báo thực nhận) ---------------- */
@@ -484,6 +694,8 @@ purchasingRoutes.post('/receipts/:id/cancel', async (c) => {
 
 /** Tính lại giá vốn nhập của các dòng nhận hàng: giá lúc giao + phí phát sinh trên hóa đơn chia theo giá trị dòng. */
 async function reprice(db: D1Database, receiptIds: string[]) {
+  const adj = await lechBill(db);
+  const paidQty = (l: { id: string; qty: number }) => Math.max(0, l.qty - (adj.get(l.id)?.free ?? 0));
   for (const rid of receiptIds) {
     const lines = (await db.prepare('SELECT id, qty, unit_price, kho_move_id FROM po_receipt_lines WHERE receipt_id = ?').bind(rid).all<{ id: string; qty: number; unit_price: number | null; kho_move_id: number | null }>()).results;
     const inv = await db.prepare("SELECT id, receipt_ids, freight, handling, other, vat_amount, vat_in_cost FROM po_invoices WHERE status = 'OK' AND receipt_ids LIKE ?").bind(`%"${rid}"%`).first<{ id: string; receipt_ids: string; freight: number; handling: number; other: number; vat_amount: number; vat_in_cost: number }>();
@@ -493,8 +705,8 @@ async function reprice(db: D1Database, receiptIds: string[]) {
       extra = inv.freight + inv.handling + inv.other + (inv.vat_in_cost ? inv.vat_amount : 0);
       const ids = (JSON.parse(inv.receipt_ids) as string[]).filter(Boolean);
       if (ids.length) {
-        const all = (await db.prepare(`SELECT qty, unit_price FROM po_receipt_lines WHERE receipt_id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all<{ qty: number; unit_price: number | null }>()).results;
-        base = all.reduce((s, l) => s + (l.unit_price != null ? l.qty * l.unit_price : 0), 0);
+        const all = (await db.prepare(`SELECT id, qty, unit_price FROM po_receipt_lines WHERE receipt_id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all<{ id: string; qty: number; unit_price: number | null }>()).results;
+        base = all.reduce((s, l) => s + (l.unit_price != null ? paidQty(l) * l.unit_price : 0), 0);
       }
     }
     for (const l of lines) {
@@ -503,8 +715,10 @@ async function reprice(db: D1Database, receiptIds: string[]) {
         await db.prepare('UPDATE kho_moves SET price = NULL WHERE id = ?').bind(l.kho_move_id).run();
         continue;
       }
-      const alloc = base > 0 ? (extra * (l.qty * l.unit_price)) / base : 0;
-      await db.prepare('UPDATE kho_moves SET price = ? WHERE id = ?').bind(round6(l.unit_price + alloc / l.qty), l.kho_move_id).run();
+      // Hàng NCC tặng (po_lech TANG) vào kho giá 0: giá vốn của lần nhận = tiền phải trả / số thực nhận.
+      const pay = paidQty(l) * l.unit_price;
+      const alloc = base > 0 ? (extra * pay) / base : 0;
+      await db.prepare('UPDATE kho_moves SET price = ? WHERE id = ?').bind(round6((pay + alloc) / l.qty), l.kho_move_id).run();
     }
   }
 }
@@ -553,6 +767,7 @@ purchasingRoutes.post('/invoices', async (c) => {
   // Hóa đơn / phiếu giao luôn gắn vào lần nhận hàng của một phiếu mua (không còn chứng từ lơ lửng).
   if (!receiptIds.length) throw badRequest('NEED_RECEIPT', 'Hóa đơn phải gắn vào lần nhận hàng của một phiếu mua. Nhận hàng vào kho trước, rồi ghi hóa đơn ngay trong phiếu mua đó.');
   let goods = int(b.goods_amount);
+  const warnings: string[] = [];
   if (receiptIds.length) {
     const ph = receiptIds.map(() => '?').join(',');
     const rs = (await c.env.DB.prepare(`SELECT r.id, o.supplier_id, r.status FROM po_receipts r JOIN po_orders o ON o.id = r.po_id WHERE r.id IN (${ph})`).bind(...receiptIds).all<{ id: string; supplier_id: string; status: string }>()).results;
@@ -571,9 +786,25 @@ purchasingRoutes.post('/invoices', async (c) => {
       if (price !== null && (!Number.isFinite(price) || price < 0)) throw badRequest('BAD_PRICE', 'Có giá không hợp lệ');
       await c.env.DB.prepare('UPDATE po_receipt_lines SET unit_price = ? WHERE id = ?').bind(price, lineId).run();
     }
-    const lines = (await c.env.DB.prepare(`SELECT qty, unit_price FROM po_receipt_lines WHERE receipt_id IN (${ph})`).bind(...receiptIds).all<{ qty: number; unit_price: number | null }>()).results;
+    const lines = (
+      await c.env.DB.prepare(
+        `SELECT l.id, l.qty, l.unit_price, pl.unit_price AS po_price, i.name FROM po_receipt_lines l LEFT JOIN po_lines pl ON pl.id = l.po_line_id JOIN kho_items i ON i.code = l.item
+         WHERE l.receipt_id IN (${ph})`,
+      ).bind(...receiptIds).all<{ id: string; qty: number; unit_price: number | null; po_price: number | null; name: string }>()
+    ).results;
     if (lines.some((l) => l.unit_price == null)) throw badRequest('NO_PRICE', 'Còn dòng hàng chưa có giá. Nhập giá từng dòng rồi ghi chứng từ.');
-    goods = Math.round(lines.reduce((s, l) => s + l.qty * (l.unit_price as number), 0));
+    // Hàng lệch đơn đã chốt: tặng / trả lại / NCC nợ hàng thì tiền hàng tính theo số đặt, không theo số nhận.
+    const adj = await lechBill(c.env.DB);
+    const billQty = (l: { id: string; qty: number }) => Math.max(0, l.qty - (adj.get(l.id)?.bill ?? 0));
+    goods = Math.round(lines.reduce((s, l) => s + billQty(l) * (l.unit_price as number), 0));
+    // Chứng từ khác số đã chốt (giá khác giá đơn mua) thì báo lệch để kế toán kiểm.
+    const expect = Math.round(lines.reduce((s, l) => s + billQty(l) * (l.po_price ?? (l.unit_price as number)), 0));
+    if (goods !== expect) warnings.push(`Tiền hàng trên chứng từ ${goods.toLocaleString('vi-VN')} đ khác số đã chốt theo đơn mua ${expect.toLocaleString('vi-VN')} đ (giá khác giá đặt). Kiểm lại với nhà cung cấp.`);
+    for (const l of lines) if (l.po_price != null && l.unit_price !== l.po_price) warnings.push(`${l.name}: giá chứng từ ${Number(l.unit_price).toLocaleString('vi-VN')} đ, giá đơn mua ${l.po_price.toLocaleString('vi-VN')} đ.`);
+    const cho = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM po_lech x WHERE x.status = 'CHO' AND x.po_id IN (SELECT po_id FROM po_receipts WHERE id IN (${ph}))`,
+    ).bind(...receiptIds).first<{ n: number }>();
+    if (cho?.n) warnings.push('Đơn mua này còn hàng về lệch đơn chưa chốt tiền (ở Phê duyệt). Chứng từ đang tính theo số thực nhận.');
   }
   // Dòng hàng nhập tay (chứng từ chưa gắn lần nhận hàng của kho, hoặc hàng ngoài phiếu): mã, số lượng, đơn giá.
   const manualIn = Array.isArray(b.manual_lines) ? (b.manual_lines as Array<Record<string, unknown>>) : [];
@@ -596,7 +827,7 @@ purchasingRoutes.post('/invoices', async (c) => {
     auditStatement(c.env.DB, { actorId: auth.user.id, action: 'PO_INVOICE_CREATED', entityType: 'PO_INVOICE', entityId: id, after: { total, receipts: receiptIds.length, manual_lines: manual.length }, requestId: c.get('requestId'), ip: ipOf(c) }),
   ]);
   await reprice(c.env.DB, receiptIds);
-  return ok(c, { id, total });
+  return ok(c, { id, total, warnings });
 });
 
 purchasingRoutes.post('/invoices/:id/cancel', async (c) => {
@@ -825,7 +1056,9 @@ purchasingRoutes.post('/payments/:id/cancel', async (c) => {
 
 /** Công nợ từng nhà cung cấp = đầu kỳ + hóa đơn (sau ngày chốt đầu kỳ) − đã chi (sau ngày chốt đầu kỳ). */
 /** Phiếu mua chưa có chứng từ nào (hóa đơn, phiếu giao) gắn vào lần nhận hàng của nó: giá trị theo giá đặt, tính vào công nợ ngay. */
-const PO_PENDING_SQL = `SELECT po.supplier_id, po.id, po.no, po.order_date, SUM(l.qty * l.unit_price) AS value
+/** Hàng lệch đơn đã chốt "NCC tính tiền phần dư" / "chốt theo thực nhận" thì tính theo số thực nhận (po_lech). */
+const PO_PENDING_SQL = `SELECT po.supplier_id, po.id, po.no, po.order_date,
+    SUM((l.qty + COALESCE((SELECT x.diff FROM po_lech x WHERE x.po_line_id = l.id AND x.status = 'XONG' AND x.resolution IN ('TINH', 'CHOT')), 0)) * l.unit_price) AS value
   FROM po_orders po JOIN po_lines l ON l.po_id = po.id
   WHERE po.status <> 'HUY' AND l.unit_price IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM po_invoices v, json_each(v.receipt_ids) j JOIN po_receipts r ON r.id = j.value

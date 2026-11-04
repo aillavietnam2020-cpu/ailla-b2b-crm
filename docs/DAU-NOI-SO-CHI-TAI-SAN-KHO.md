@@ -76,3 +76,23 @@ Lỗi 28/10: máy chiết rót PC-2026-10-0006 đã được ghi tăng (CC `Mayc
 - Vận chuyển, bốc vác, khác (và VAT khi tính vào giá vốn) trên chứng từ của đơn tài sản / công cụ, cùng phiếu chi chọn "Thuộc đơn mua", là chi phí mua kèm (`tsPhiDon`).
 - `tsDongBoPhi()` tự cộng phần chưa cộng vào `gk` (giá gốc giữ ở `gk0`, phiếu đã cộng ở `phi`) khi kế toán / CEO mở trang Tài sản, trước khi chạy khấu hao tháng. Tháng đã chạy giữ nguyên.
 - Tiền trả NCC cho đơn tài sản ghi ở Mua hàng (không ghi thêm phiếu ở Sổ chi phí, tránh tính hai lần). Phiếu Sổ chi phí đã chuyển sang Mua hàng lưu vết ở `fin.nkcChuyen`.
+
+## 10. Hàng về lệch đơn mua (chị Hoa duyệt 04/11)
+
+- Kho ghi số thực nhận như thường, tồn kho theo số thực nhận. Mỗi dòng đặt nhận khác số đặt (dư hoặc thiếu) có một dòng `po_lech` (migration 0220). Web tự tạo hoặc cập nhật dòng này mỗi lần `poStatus` chạy (nhận hàng, sửa hoặc hủy phiếu nhập, mở danh sách lệch), rồi báo chuông cho người có quyền `order.approve.normal` không phải CEO. Chỉ xét đơn có hàng nhận sau mốc tồn chung `ton_moc`.
+- Người mua hàng chốt ở **Phê duyệt** (loại "Hàng về lệch đơn mua", nút **Xử lý**) hoặc trong đơn mua (khối "Hàng về lệch đơn", nút **Xử lý**). Mỗi lần chốt có ô ghi chú. CEO chỉ theo dõi việc này ở "Đang chờ ở các phòng › Mua hàng".
+- Các cách chốt và chỗ ăn theo:
+
+  | Cách chốt | Công nợ (`PO_PENDING_SQL`) | Tiền hàng trên chứng từ (`lechBill`) | Giá vốn nhập (`reprice`) |
+  |---|---|---|---|
+  | Dư, NCC tính tiền (TINH) | theo số nhận | theo số nhận | giá đơn |
+  | Dư, NCC tặng (TANG) | theo số đặt | theo số đặt | phần dư giá 0, bình quân hạ |
+  | Dư, trả lại (TRA) | theo số đặt | theo số đặt | giá đơn; web báo kho lập phiếu xuất trả |
+  | Thiếu, giao bù sau (BU) | theo số đặt | theo số nhận từng lần | giá đơn; đơn còn mở |
+  | Thiếu, chốt theo thực nhận (CHOT) | theo số nhận | theo số nhận | giá đơn; đơn đóng (Đủ hàng) |
+  | Thiếu, NCC nợ hàng (NO_HANG) | theo số đặt | theo số đặt | giá đơn |
+
+  Phần điều chỉnh gắn vào lần nhận cuối của dòng đặt đó. Chưa chốt thì công nợ tạm theo đơn.
+- Phiếu nhập thuộc đơn mua mà để trống đơn giá thì lấy giá trên đơn mua: giá vốn, trang Giá nguyên vật liệu và lãi lỗ có số ngay.
+- Có chứng từ thì chứng từ thay số tạm (như cũ). Nếu tiền hàng trên chứng từ khác số đã chốt theo giá đơn, hoặc đơn còn dòng lệch chưa chốt, thì web báo lệch khi ghi chứng từ. Đơn đã có chứng từ thì phải hủy chứng từ rồi mới đổi cách chốt.
+- Sổ chi phí không đổi: tiền trả NCC vẫn đi qua Mua hàng.
