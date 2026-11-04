@@ -81,7 +81,8 @@ export async function taskReminders(
         lateBy.set(who, (lateBy.get(who) ?? 0) + 1);
         push(`l|tk|${t.id}`, [...mine, t.tao, ...leads], `⚠ Trễ ${today - t.han} ngày: ${t.ten} · ${who}`, `task:${t.id}`);
       } else if (t.han === today) {
-        push(`d|tk|${t.id}`, [...mine, t.tao, ...leads], `Đến hạn hôm nay: ${t.ten} · ${who}`, `task:${t.id}`);
+        // Đến hạn hôm nay chỉ nhắc người làm và người giao, không báo CEO việc người khác tự giao
+        push(`d|tk|${t.id}`, [...mine, t.tao], `Đến hạn hôm nay: ${t.ten} · ${who}`, `task:${t.id}`);
       } else if (t.han - today <= 2 && (t.st === 'todo' || t.st === 'nhan')) {
         push(`n|tk|${t.id}`, mine, `Bạn chưa bấm "Đang làm": ${t.ten} · hạn ${dd(t.han)}`, `task:${t.id}`);
       }
