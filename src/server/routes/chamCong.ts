@@ -120,6 +120,38 @@ async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>
 const donOpt = (e?: DonNgay) => ({ don: e?.don ?? null, coPhep: !!e?.coPhep, ot: e?.ot ?? 0 });
 const leOf = (s: CcSettings, d: string) => s.ngayLe.some((x) => x.ngay === d);
 
+/** Máy chấm công: 'vp' máy văn phòng, 'xg' máy xưởng. */
+export const MAY: Record<string, string> = { vp: 'Máy văn phòng', xg: 'Máy xưởng' };
+/** Giờ 'HH:MM' (giờ Việt Nam) của một ngày → thời điểm UTC ISO, cùng kiểu với lượt chấm điện thoại. */
+const vnIso = (ngay: string, hm: string) => new Date(Date.parse(`${ngay}T${hm}:00Z`) - 7 * 3600e3).toISOString();
+/**
+ * Lượt chấm từ máy (đã ghép với tài khoản web) theo khóa 'người|ngày': giờ đầu là vào, giờ cuối là ra (chỉ một giờ thì coi là vào).
+ * Giai đoạn chạy song song (CEO 04/11): ngày nào có ở máy hoặc điện thoại đều tính, lấy giờ vào sớm nhất, giờ ra muộn nhất của cả hai.
+ */
+async function loadMay(db: D1Database, tu: string, den: string, userId?: string): Promise<Map<string, Luot[]>> {
+  const q = userId
+    ? db.prepare("SELECT m.user_id, c.ngay, c.gio FROM cc_may c JOIN cc_may_map m ON m.may = c.may AND m.ma = c.ma WHERE m.user_id = ? AND c.ngay BETWEEN ? AND ?").bind(userId, tu, den)
+    : db.prepare("SELECT m.user_id, c.ngay, c.gio FROM cc_may c JOIN cc_may_map m ON m.may = c.may AND m.ma = c.ma WHERE m.user_id <> '' AND c.ngay BETWEEN ? AND ?").bind(tu, den);
+  const rows = (await q.all<{ user_id: string; ngay: string; gio: string }>()).results ?? [];
+  const out = new Map<string, Luot[]>();
+  for (const r of rows) {
+    let g: string[] = [];
+    try {
+      g = (JSON.parse(r.gio) as string[]).filter((x) => /^\d{2}:\d{2}$/.test(x)).sort();
+    } catch {
+      /* bỏ dòng hỏng */
+    }
+    if (!g.length) continue;
+    const k = r.user_id + '|' + r.ngay;
+    const l = out.get(k) ?? [];
+    l.push({ loai: 'vao', at: vnIso(r.ngay, g[0]), trong: 1, may: true });
+    if (g.length > 1) l.push({ loai: 'ra', at: vnIso(r.ngay, g[g.length - 1]), trong: 1, may: true });
+    out.set(k, l);
+  }
+  return out;
+}
+const nguon = (dt: Luot[], may: Luot[]) => (dt.length && may.length ? 'ca hai' : may.length ? 'may' : dt.length ? 'dt' : '');
+
 const vai = (v: CcViewer, hr: boolean) => ({ all: v.all, pb: v.pb, caiDat: v.all && hr });
 const THANG = /^\d{4}-\d{2}$/;
 const NGAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -143,9 +175,11 @@ chamCongRoutes.get('/me', async (c) => {
   const xep = lich.kieu === 'ca' ? await loadXep(db, s, thang + '-01', tuan[6], auth.user.id) : new Map<string, Ca>();
   const caOf = (d: string) => xep.get(auth.user.id + '|' + d) ?? null;
   const myDon = (await loadDon(db)).get(auth.user.id);
+  const may = await loadMay(db, thang + '-01', thang + '-31', auth.user.id);
   const ngay = daysOf(thang, today).map((d) => {
-    const l = list.filter((r) => r.ngay === d);
-    return { ngay: d, ...tongNgay(l as Luot[], lich, d, d === today, { ca: caOf(d), q: s.quyTac, le: leOf(s, d), ...donOpt(myDon?.get(d)) }), luot: l.length };
+    const l = list.filter((r) => r.ngay === d) as Luot[];
+    const m = may.get(auth.user.id + '|' + d) ?? [];
+    return { ngay: d, ...tongNgay([...l, ...m], lich, d, d === today, { ca: caOf(d), q: s.quyTac, le: leOf(s, d), ...donOpt(myDon?.get(d)) }), luot: l.length, nguon: nguon(l, m) };
   });
   return ok(c, {
     today,
@@ -233,12 +267,13 @@ chamCongRoutes.get('/ngay', async (c) => {
   if (ids && !cx.v.pb) throw forbidden('Chỉ CEO, HCNS và trưởng nhóm xem được chấm công của người khác');
   const rows = (await db.prepare('SELECT id, user_id, ngay, loai, at, kc, diem, trong, ly_do, ly_do_muon, acc FROM cc_luot WHERE ngay = ? ORDER BY at').bind(ngay).all<Row>()).results ?? [];
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
-  const [xep, don] = await Promise.all([loadXep(db, s, ngay, ngay), loadDon(db)]);
+  const [xep, don, may] = await Promise.all([loadXep(db, s, ngay, ngay), loadDon(db), loadMay(db, ngay, ngay)]);
   const extra = [...new Set(rows.map((r) => r.user_id))].filter((id) => !cx.m.users[id] && !ids);
   const list = [...people.map(([id, u]) => ({ id, name: u.name, pb: u.pb })), ...extra.map((id) => ({ id, name: id, pb: '' }))].map((p) => {
     const l = rows.filter((r) => r.user_id === p.id);
     const lich = lichOf(s, p.id, p.pb);
-    return { ...p, lich: lich.ten, kieu: lich.kieu, ...tongNgay(l as Luot[], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), ...donOpt(don.get(p.id)?.get(ngay)) }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc })) };
+    const mm = may.get(p.id + '|' + ngay) ?? [];
+    return { ...p, lich: lich.ten, kieu: lich.kieu, nguon: nguon(l as Luot[], mm), ...tongNgay([...(l as Luot[]), ...mm], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), ...donOpt(don.get(p.id)?.get(ngay)) }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc })) };
   });
   return ok(c, { ngay, today, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
 });
@@ -255,11 +290,21 @@ chamCongRoutes.get('/thang', async (c) => {
   const rows = (await db.prepare('SELECT user_id, ngay, loai, at, trong, ly_do_muon FROM cc_luot WHERE ngay LIKE ? ORDER BY at').bind(thang + '%').all<Row>()).results ?? [];
   const days = daysOf(thang, today);
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
-  const [xep, don] = await Promise.all([days.length ? loadXep(db, s, days[0], days[days.length - 1]) : new Map<string, Ca>(), loadDon(db)]);
+  const [xep, don, may] = await Promise.all([
+    days.length ? loadXep(db, s, days[0], days[days.length - 1]) : new Map<string, Ca>(),
+    loadDon(db),
+    days.length ? loadMay(db, days[0], days[days.length - 1]) : new Map<string, Luot[]>(),
+  ]);
   const list = people.map(([id, u]) => {
     const mine = rows.filter((r) => r.user_id === id);
     const lich = lichOf(s, id, u.pb);
-    const ngay = days.map((d) => ({ ngay: d, ...tongNgay(mine.filter((r) => r.ngay === d) as Luot[], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac, le: leOf(s, d), ...donOpt(don.get(id)?.get(d)) }) }));
+    const src = new Map<string, string>();
+    const ngay = days.map((d) => {
+      const l = mine.filter((r) => r.ngay === d) as Luot[];
+      const mm = may.get(id + '|' + d) ?? [];
+      src.set(d, nguon(l, mm));
+      return { ngay: d, ...tongNgay([...l, ...mm], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac, le: leOf(s, d), ...donOpt(don.get(id)?.get(d)) }) };
+    });
     return {
       id,
       name: u.name,
@@ -267,8 +312,12 @@ chamCongRoutes.get('/thang', async (c) => {
       lich: lich.ten,
       kieu: lich.kieu,
       chuyenCanCo: lich.chuyenCan && lich.kieu !== 'tudo',
+      mayNgay: [...src.values()].filter((v) => v === 'may' || v === 'ca hai').length,
+      dtNgay: [...src.values()].filter((v) => v === 'dt' || v === 'ca hai').length,
+      // Lệch chỉ tính khi người đó dùng cả máy lẫn điện thoại trong tháng (giai đoạn chạy song song).
+      lech: [...src.values()].some((v) => v === 'may' || v === 'ca hai') && [...src.values()].some((v) => v === 'dt' || v === 'ca hai') ? [...src.values()].filter((v) => v === 'may' || v === 'dt').length : 0,
       ...tongThang(ngay, lich, today, s.quyTac),
-      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, coPhep: x.coPhep, ot: x.ot, lyDoMuon: x.lyDoMuon, canhBao: x.canhBao })),
+      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, coPhep: x.coPhep, ot: x.ot, nguon: src.get(x.ngay) ?? '', lyDoMuon: x.lyDoMuon, canhBao: x.canhBao })),
     };
   });
   return ok(c, { thang, today, quyTac: s.quyTac, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
@@ -357,4 +406,71 @@ chamCongRoutes.put('/xepca', async (c) => {
     await db.batch(stmts);
   }
   return ok(c, { n: items.length });
+});
+
+/* ---------------- Nạp file máy chấm công (Nhân sự › Chấm công › Nạp file máy chấm công) ---------------- */
+/** Mã đã ghép của một máy + danh sách người để chọn (CEO, HCNS). */
+chamCongRoutes.get('/may/map', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const cx = await ctx(db, auth);
+  if (!(cx.v.all && cx.hr)) throw forbidden('Chỉ CEO và HCNS nạp file máy chấm công');
+  const may = MAY[c.req.query('may') ?? ''] ? (c.req.query('may') as string) : 'vp';
+  const map = (await db.prepare('SELECT ma, ten, user_id FROM cc_may_map WHERE may = ?').bind(may).all<{ ma: string; ten: string; user_id: string }>()).results ?? [];
+  const nap = await db.prepare('SELECT MIN(ngay) AS tu, MAX(ngay) AS den, MAX(nap_at) AS at, COUNT(*) AS n FROM cc_may WHERE may = ?').bind(may).first<{ tu: string; den: string; at: string; n: number }>();
+  const people = Object.entries(cx.m.users).map(([id, u]) => ({ id, name: u.name, pb: u.pb }));
+  return ok(c, { may, ten: MAY[may], map, nap, people, deps: cx.m.deps });
+});
+
+/**
+ * Lưu một file: thay các dòng của máy đó trong khoảng ngày của file, và lưu cách ghép mã.
+ * body: { may, tu, den, rows: [{ ma, ten, ngay, gio: ['08:01','17:30'], kh }], map: { ma: user_id | '' } }
+ */
+chamCongRoutes.post('/may', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const cx = await ctx(db, auth);
+  if (!(cx.v.all && cx.hr)) throw forbidden('Chỉ CEO và HCNS nạp file máy chấm công');
+  const b = (await c.req.json().catch(() => ({}))) as { may?: string; tu?: string; den?: string; rows?: { ma?: unknown; ten?: unknown; ngay?: unknown; gio?: unknown; kh?: unknown }[]; map?: Record<string, unknown> };
+  const may = MAY[b.may ?? ''] ? (b.may as string) : '';
+  if (!may) throw badRequest('MAY', 'Chọn máy chấm công');
+  const tu = String(b.tu ?? '');
+  const den = String(b.den ?? '');
+  if (!NGAY.test(tu) || !NGAY.test(den) || den < tu || Date.parse(den) - Date.parse(tu) > 62 * 864e5) throw badRequest('KY', 'File chưa đúng kỳ (tối đa 2 tháng một file)');
+  const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6000).flatMap((r) => {
+    const ma = String(r.ma ?? '').trim().slice(0, 30);
+    const ngay = String(r.ngay ?? '');
+    if (!ma || !NGAY.test(ngay) || ngay < tu || ngay > den) return [];
+    const gio = (Array.isArray(r.gio) ? r.gio : []).map(String).filter((x) => /^\d{2}:\d{2}$/.test(x)).slice(0, 8);
+    return [{ ma, ngay, gio, kh: String(r.kh ?? '').slice(0, 20), ten: String(r.ten ?? '').slice(0, 80) }];
+  });
+  if (!rows.length) throw badRequest('TRONG', 'Không đọc được dòng chấm công nào trong file');
+  const now = nowIso();
+  const users = new Set(Object.keys(cx.m.users));
+  const names = new Map(rows.map((r) => [r.ma, r.ten]));
+  const stmts: D1PreparedStatement[] = [db.prepare('DELETE FROM cc_may WHERE may = ? AND ngay BETWEEN ? AND ?').bind(may, tu, den)];
+  // D1 giới hạn 100 tham số mỗi câu: ghi 15 dòng một lần (6 tham số mỗi dòng).
+  for (let i = 0; i < rows.length; i += 15) {
+    const part = rows.slice(i, i + 15);
+    stmts.push(
+      db
+        .prepare(`INSERT OR REPLACE INTO cc_may (may, ma, ngay, gio, ky_hieu, nap_at) VALUES ${part.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')}`)
+        .bind(...part.flatMap((r) => [may, r.ma, r.ngay, JSON.stringify(r.gio), r.kh || null, now])),
+    );
+  }
+  for (const [ma, v] of Object.entries(b.map ?? {}).slice(0, 300)) {
+    const uid = String(v ?? '');
+    if (uid && !users.has(uid)) continue;
+    stmts.push(
+      db
+        .prepare(
+          `INSERT INTO cc_may_map (may, ma, ten, user_id, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT (may, ma) DO UPDATE SET ten = excluded.ten, user_id = excluded.user_id, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
+        )
+        .bind(may, String(ma).slice(0, 30), names.get(String(ma)) ?? null, uid, auth.user.id, now),
+    );
+  }
+  stmts.push(auditStatement(db, { actorId: auth.user.id, action: 'CC_NAP_MAY', entityType: 'CHAM_CONG', entityId: may, after: { tu, den, n: rows.length } }));
+  await db.batch(stmts);
+  return ok(c, { may, tu, den, n: rows.length, ma: names.size });
 });

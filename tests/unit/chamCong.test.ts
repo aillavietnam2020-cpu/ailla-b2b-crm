@@ -202,3 +202,19 @@ describe('chấm công: ngày nghỉ theo thông báo 01102026 (trừ nghỉ ch�
     expect(tongThang(days, vp, '2026-11-30')).toMatchObject({ nghi: 2, nghiPhep: 2, chuyenCan: true });
   });
 });
+
+describe('chấm công: quy định đổi theo thời gian (CEO 04/11)', () => {
+  it('văn phòng trước 1/10/2026 vào 8:30, làm thứ Bảy buổi sáng; từ 1/10 vào 8:00, nghỉ thứ Bảy tuần 2 và 4', () => {
+    const v = normalizeSettings({}).lich.find((l) => l.id === 'vp') as Lich;
+    expect(dayRule(v, '2026-09-12')).toMatchObject({ lam: true, vao: 510, ra: 720 });
+    expect(dayRule(v, '2026-10-10').lam).toBe(false);
+    expect(tongNgay([{ loai: 'vao', at: vn('2026-09-14', '08:22'), trong: 1, may: true }], v, '2026-09-14', true).muon).toBe(0);
+    expect(tongNgay([{ loai: 'vao', at: vn('2026-10-14', '08:22'), trong: 1 }], v, '2026-10-14', true).muon).toBe(22);
+  });
+  it('lịch đã lưu không có lịch cũ thì giữ nguyên; xóa ngày áp dụng là bỏ lịch cũ', () => {
+    const s2 = normalizeSettings({ lich: [{ id: 'vp', ten: 'Văn phòng', tuNgay: '', cu: null }] });
+    expect(s2.lich[0].cu).toBeNull();
+    const s3 = normalizeSettings({ lich: [{ id: 'vp', ten: 'Văn phòng' }] });
+    expect(s3.lich[0].tuNgay).toBe('2026-10-01');
+  });
+});

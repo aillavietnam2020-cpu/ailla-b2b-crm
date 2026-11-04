@@ -33,7 +33,14 @@ export type Lich = {
   chuyenCan: boolean;
   diem: string[];
   ngoaiOk: boolean;
+  /**
+   * Quy định đổi theo thời gian (CEO 04/11: văn phòng trước vào 8:30 và làm mọi thứ Bảy; từ khi vào 8:00 mới nghỉ 2 thứ Bảy).
+   * tuNgay: ngày bắt đầu áp dụng giờ hiện tại; ngày trước đó dùng giờ trong cu. '' = không có lịch cũ.
+   */
+  tuNgay: string;
+  cu: LichCu | null;
 };
+export type LichCu = { gioVao: string; gioRa: string; truaTu: string; truaDen: string; anHan: number; thuBay: ThuBay; gioRaT7: string };
 /** Một ca làm (team live…): giờ bắt đầu, giờ kết thúc trong cùng một ngày. */
 export type Ca = { id: string; ten: string; tu: string; den: string };
 /**
@@ -61,10 +68,11 @@ const BASE = { anHan: 5, gioRaT7: '12:00', diem: [] as string[] };
 export const CC_DEFAULT: CcSettings = {
   diem: [],
   lich: [
-    { ...BASE, id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', truaTu: '12:00', truaDen: '13:30', thuBay: 'nghi24', chuyenCan: true, ngoaiOk: false },
-    { ...BASE, id: 'xuong', ten: 'Xưởng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:00', truaTu: '12:00', truaDen: '13:00', thuBay: 'ca', chuyenCan: false, ngoaiOk: false },
-    { ...BASE, id: 'live', ten: 'Live (theo ca)', kieu: 'ca', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: false },
-    { ...BASE, id: 'sale', ten: 'Sale (giờ linh hoạt)', kieu: 'tudo', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: true },
+    { ...BASE, id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', truaTu: '12:00', truaDen: '13:30', thuBay: 'nghi24', chuyenCan: true, ngoaiOk: false,
+      tuNgay: '2026-10-01', cu: { gioVao: '08:30', gioRa: '17:30', truaTu: '12:00', truaDen: '13:30', anHan: 5, thuBay: 'nua', gioRaT7: '12:00' } },
+    { ...BASE, id: 'xuong', ten: 'Xưởng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:00', truaTu: '12:00', truaDen: '13:00', thuBay: 'ca', chuyenCan: false, ngoaiOk: false, tuNgay: '', cu: null },
+    { ...BASE, id: 'live', ten: 'Live (theo ca)', kieu: 'ca', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: false, tuNgay: '', cu: null },
+    { ...BASE, id: 'sale', ten: 'Sale (giờ linh hoạt)', kieu: 'tudo', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: true, tuNgay: '', cu: null },
   ],
   ca: [],
   ngayLe: [],
@@ -100,7 +108,35 @@ function normLich(x: unknown, i: number): Lich {
     chuyenCan: typeof o.chuyenCan === 'boolean' ? o.chuyenCan : d.chuyenCan,
     diem: Array.isArray(o.diem) ? o.diem.map(String).slice(0, 10) : [],
     ngoaiOk: typeof o.ngoaiOk === 'boolean' ? o.ngoaiOk : o.kieu === 'tudo',
+    ...normCu(o, d),
   };
+}
+
+const NGAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Lịch cũ trước ngày áp dụng; lịch chưa từng lưu phần này thì lấy mặc định (văn phòng: 8:30, làm thứ Bảy buổi sáng, đến 30/9/2026). */
+function normCu(o: Record<string, unknown>, d: Lich): { tuNgay: string; cu: LichCu | null } {
+  const has = 'tuNgay' in o || 'cu' in o;
+  const tuNgay = has ? (typeof o.tuNgay === 'string' && NGAY_RE.test(o.tuNgay) ? o.tuNgay : '') : d.tuNgay;
+  const src = (has ? o.cu : d.cu) as Record<string, unknown> | null | undefined;
+  if (!tuNgay || !src || typeof src !== 'object') return { tuNgay: '', cu: null };
+  const base = d.cu ?? { gioVao: d.gioVao, gioRa: d.gioRa, truaTu: d.truaTu, truaDen: d.truaDen, anHan: d.anHan, thuBay: d.thuBay, gioRaT7: d.gioRaT7 };
+  return {
+    tuNgay,
+    cu: {
+      gioVao: hm(src.gioVao, base.gioVao),
+      gioRa: hm(src.gioRa, base.gioRa),
+      truaTu: hmOrEmpty(src.truaTu, base.truaTu),
+      truaDen: hmOrEmpty(src.truaDen, base.truaDen),
+      anHan: Math.round(num(src.anHan, 0, 120, base.anHan)),
+      thuBay: THU_BAY.includes(src.thuBay as ThuBay) ? (src.thuBay as ThuBay) : base.thuBay,
+      gioRaT7: hm(src.gioRaT7, base.gioRaT7),
+    },
+  };
+}
+
+/** Lịch áp dụng cho một ngày: trước ngày áp dụng thì dùng giờ cũ. */
+export function lichNgay(l: Lich, ngay: string): Lich {
+  return l.tuNgay && l.cu && ngay < l.tuNgay ? { ...l, ...l.cu } : l;
 }
 
 function normCa(x: unknown, i: number): Ca | null {
@@ -213,7 +249,8 @@ export function weekday(ngay: string): number {
  * Ngày đó có phải đi làm không, giờ vào giờ ra chuẩn (phút), có tính đi muộn / về sớm không.
  * Lịch theo ca: chỉ đi làm ngày được xếp ca, giờ theo ca. Giờ linh hoạt: không tính muộn.
  */
-export function dayRule(l: Lich, ngay: string, ca?: Ca | null, le = false): { lam: boolean; vao: number; ra: number; tinh: boolean } {
+export function dayRule(l0: Lich, ngay: string, ca?: Ca | null, le = false): { lam: boolean; vao: number; ra: number; tinh: boolean } {
+  const l = lichNgay(l0, ngay);
   if (l.kieu === 'ca') return ca ? { lam: true, vao: toMin(ca.tu), ra: toMin(ca.den), tinh: true } : { lam: false, vao: 0, ra: 0, tinh: false };
   const w = weekday(ngay);
   const vao = toMin(l.gioVao);
@@ -227,7 +264,8 @@ export function dayRule(l: Lich, ngay: string, ca?: Ca | null, le = false): { la
   return { lam: true, vao, ra: l.thuBay === 'nua' ? toMin(l.gioRaT7) : ra, tinh };
 }
 
-export type Luot = { loai: 'vao' | 'ra'; at: string; trong: number | null; ly_do_muon?: string | null };
+/** Một lượt chấm; may = lấy từ file máy chấm công (không phải bấm trên điện thoại). */
+export type Luot = { loai: 'vao' | 'ra'; at: string; trong: number | null; ly_do_muon?: string | null; may?: boolean };
 export type NgayCong = {
   vao: string | null;
   ra: string | null;
@@ -260,11 +298,12 @@ export type NgayCong = {
  */
 export function tongNgay(
   luot: Luot[],
-  l: Lich,
+  l0: Lich,
   ngay: string,
   homNay: boolean,
   opt: { ca?: Ca | null; q?: QuyTac; le?: boolean; don?: string | null; coPhep?: boolean; ot?: number } = {},
 ): NgayCong {
+  const l = lichNgay(l0, ngay);
   const q = opt.q ?? CC_DEFAULT.quyTac;
   const rule = dayRule(l, ngay, opt.ca, opt.le);
   const vaoL = luot.filter((x) => x.loai === 'vao').sort((a, b) => a.at.localeCompare(b.at))[0];
