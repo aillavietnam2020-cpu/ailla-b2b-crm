@@ -68,7 +68,7 @@ const khoStock=c=>KHO.stock.get(c)||0;
 function khoFrame(m,key,title,sub,body,actions=""){
   const pp=$("#khopop");if(pp)pp.hidden=true;
   khoLoad();
-  const qk=typeof khoQuickBtn==="function"?khoQuickBtn():"";
+  const qk=typeof khoQuickBtn==="function"&&!/kho-new|btn pri/.test(actions||"")?khoQuickBtn():""; // trang đã có nút lập phiếu riêng thì không thêm nút nhanh (chị Hoa 04/11)
   m.innerHTML=`<div class="sxhead"><div><h1>${title}</h1><div class="ph-sub">${sub}</div></div></div>
   ${khoNav(key).replace("</nav>",`<span class="kact">${actions}${qk}</span></nav>`)}
   ${KHO.err?`<div class="note"><b>Chưa tải được kho:</b> ${esc(KHO.err)} <button class="lnk" id="kho-retry">Thử lại</button></div>`:!KHO.cat?`<p class="hint">Đang tải kho…</p>`:body}`;
