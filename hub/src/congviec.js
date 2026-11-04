@@ -648,17 +648,18 @@ function cvAutoDg(raw){
 }
 /* việc của lead: tự sinh theo số đang chờ */
 function cvLeadLines(){
-  const d=D(),cs=d.cards,O=d.orders||[],L=[],add=(t,n,go)=>{if(n>0)L.push({ten:t,n,go})};
+  /* CEO (chị Hoa 04/11: "cái này của Uyên mà"): giao người, đặt hạn, Lead duyệt, phân công order là việc của Lead; CEO chỉ còn việc CEO duyệt và check video win */
+  const d=D(),cs=d.cards,O=d.orders||[],L=[],ceo=ME.role==="admin",add=(t,n,go,lead)=>{if(n>0&&!(ceo&&lead))L.push({ten:t,n,go})};
   if(!(can(ME,"viec.duyet")||ME.role==="admin"||ME.role==="lead"))return L;
-  add("Video mới cần duyệt",cs.filter(c=>c.step==="dvd").length,"cv");
-  add("Kịch bản cần duyệt",cs.filter(c=>c.step==="dkb").length,"cv");
+  add("Video mới cần duyệt",cs.filter(c=>c.step==="dvd").length,"cv",1);
+  add("Kịch bản cần duyệt",cs.filter(c=>c.step==="dkb").length,"cv",1);
   if(ME.role==="admin")add("Video chờ CEO duyệt",cs.filter(c=>c.step==="dceo").length,"cv");
-  add("Order Digital cần phân công",O.filter(o=>o.trangThai==="Mới"&&!o.giao).length,"order_c");
-  add("Order Digital cần bàn giao",O.filter(o=>o.trangThai!=="Xong"&&cs.some(c=>c.order===o.ma&&stepIdx(c.step)>=stepIdx("dang")&&!c.bg)).length,"order_c");
+  add("Order Digital cần phân công",O.filter(o=>o.trangThai==="Mới"&&!o.giao).length,"order_c",1);
+  add("Order Digital cần bàn giao",O.filter(o=>o.trangThai!=="Xong"&&cs.some(c=>c.order===o.ma&&stepIdx(c.step)>=stepIdx("dang")&&!c.bg)).length,"order_c",1);
   try{add("Video win inhouse cần check",hyAnalyses().filter(t=>t.status==="review").length,"win:rank")}catch(e){}
   add("Video win KOC cần check",(d.kocVideos||[]).filter(v=>(+v.don||0)>=(d.settings.potential||30)&&!v.st).length,"win:koc");
-  add("Video đã giao nhưng chưa có hạn",cs.filter(c=>c.nguoi&&["kb","quay","edit","worker"].includes(c.step)&&!c.han&&!c.day).length,"dieuphoi");
-  add("Video chưa giao người làm",cs.filter(c=>c.step==="cg").length,"dieuphoi");
+  add("Video đã giao nhưng chưa có hạn",cs.filter(c=>c.nguoi&&["kb","quay","edit","worker"].includes(c.step)&&!c.han&&!c.day).length,"dieuphoi",1);
+  add("Video chưa giao người làm",cs.filter(c=>c.step==="cg").length,"dieuphoi",1);
   return L
 }
 /* cảnh báo đỏ: ngày mai kênh cần đăng N video mà mới có M video đã lên lịch cho ngày mai */
@@ -1028,7 +1029,7 @@ function cvMyItems(){
   });
   if(ME.role==="admin"||ME.role==="lead"){
     const CL=typeof cvList==="function"?cvList(ME).L:[],n=k=>{const g=CL.find(y=>y.key===k);return g?g.items.filter(i=>!CV_TEST.includes(i.nguoi)).length:0},G4="Cần phân công / theo dõi";
-    if(n("cg"))add({key:"k_cg",group:G4,title:`${n("cg")} thẻ video 7 ngày tới chưa giao người`,detail:"Giao người viết kịch bản, quay, edit để kịp đăng",count:n("cg"),mod:"mkt",go:"dieuphoi"});
+    if(n("cg")&&ME.role!=="admin")add({key:"k_cg",group:G4,title:`${n("cg")} thẻ video 7 ngày tới chưa giao người`,detail:"Giao người viết kịch bản, quay, edit để kịp đăng",count:n("cg"),mod:"mkt",go:"dieuphoi"});
     const late=cvGroup(cvItems().filter(x=>!CV_TEST.includes(x.nguoi))).filter(x=>x.late&&x.st!=="done"&&x.nguoi!==ME_);
     if(late.length)add({key:"k_tre",group:G4,title:`${late.length} việc của team đang trễ hạn`,detail:"Nhắc người làm hoặc gia hạn: "+[...new Set(late.map(x=>userName(x.nguoi)).filter(Boolean))].slice(0,4).join(", "),count:late.length,age_days:late.reduce((z,x)=>Math.max(z,x.lateD||0),0),go:"cv_nv",st:"late",who:"all"});
     if(n("id"))add({key:"k_id",group:G4,title:`${n("id")} bài đã đăng nhưng thiếu link / ID`,detail:"Nhờ người đăng bổ sung",count:n("id"),go:"cv"});
