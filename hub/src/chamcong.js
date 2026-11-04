@@ -245,13 +245,13 @@ function pCcCaiDat(m){
     <div class="filters"><button class="btn" id="cc-caadd">Thêm ca</button></div>
   </section>
   <section class="card"><div class="card-h"><h2>Quy tắc tính công</h2></div>
-    <div class="cc-form">${qIn("mocLyDo","Muộn quá bao nhiêu phút thì hỏi lý do",240)}${qIn("mocNang","Mốc muộn nặng, đếm riêng (phút)",240)}${qIn("ccLan","Chuyên cần: tối đa số lần muộn + về sớm / tháng",31)}${qIn("ccNghi","Chuyên cần: tối đa số ngày nghỉ / tháng",31)}${qIn("tienCC","Tiền chuyên cần (đồng / tháng)",100000000,1000)}${qIn("tienTrua","Hỗ trợ ăn trưa (đồng / bữa)",10000000,1000)}</div>
+    <div class="cc-form">${qIn("mocLyDo","Muộn quá bao nhiêu phút thì hỏi lý do",240)}${qIn("mocNang","Mốc muộn nặng, đếm riêng (phút)",240)}${qIn("ccLan","Chuyên cần: tối đa số lần muộn + về sớm / tháng",31)}${qIn("ccNghi","Chuyên cần: tối đa số ngày nghỉ / tháng",31)}${qIn("tienCC","Tiền chuyên cần (đồng / tháng)",100000000,1000)}${qIn("tienTrua","Hỗ trợ ăn trưa (đồng / bữa)",10000000,1000)}${qIn("mocVong2","Nghỉ từ bao nhiêu ngày thì HCNS duyệt vòng 2",60)}${qIn("tuMax","Tạm ứng mỗi lần phải dưới (đồng)",1000000000,100000)}</div>
     <p class="hint">Mặc định theo thông báo 01102026: được trễ 5 phút (ô Được trễ của lịch), muộn quá 10 phút hỏi lý do và đếm riêng, chuyên cần 200.000đ khi muộn + về sớm không quá 2 lần và nghỉ không quá 2 ngày, ăn trưa 25.000đ/bữa. Chưa tự trừ vào lương.</p>
   </section>
   <section class="card"><div class="card-h"><h2>Ngày lễ, tết công ty cho nghỉ</h2></div>
     ${tbl(["Ngày","Tên",""],(s.ngayLe||[]).map(rowLe))}
-    <div class="filters"><button class="btn" id="cc-leadd">Thêm ngày lễ</button></div>
-    <p class="hint">Ngày lễ không tính là ngày phải đi làm nên không bị tính nghỉ khi xét chuyên cần (thông báo 01102026). Người làm ca được xếp ca ngày lễ thì vẫn tính đi làm.</p>
+    <div class="filters"><button class="btn" id="cc-leadd">Thêm ngày lễ</button><button class="btn" id="cc-lefix">Thêm ngày lễ cố định (1/1, 30/4, 1/5, 2/9)</button></div>
+    <p class="hint">Ngày 25 hằng tháng web nhắc HCNS điền ngày lễ tháng sau. Ngày lễ không tính là ngày phải đi làm nên không bị tính nghỉ khi xét chuyên cần (thông báo 01102026). Người làm ca được xếp ca ngày lễ thì vẫn tính đi làm.</p>
   </section>
   <section class="card"><div class="card-h"><h2>Phòng ban theo lịch nào</h2></div>
     <div class="cc-form">${deps.map((d,i)=>`<label>${esc(d.n)}${lichSel("cc-pb-"+i,s.pbLich[d.k]||"","Mặc định ("+esc((s.lich.find(l=>l.id===s.macDinh)||{}).ten||"")+")")}</label>`).join("")}<label>Mặc định cho phòng chưa chọn${lichSel("cc-md",s.macDinh)}</label></div>
@@ -274,6 +274,9 @@ function pCcCaiDat(m){
   m.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{pull();s.diem.splice(Number(b.dataset.del),1);renderMain()});
   m.querySelectorAll("[data-ledel]").forEach(b=>b.onclick=()=>{pull();s.ngayLe.splice(Number(b.dataset.ledel),1);renderMain()});
   $("#cc-leadd").onclick=()=>{pull();(s.ngayLe=s.ngayLe||[]).push({ngay:"",ten:""});renderMain()};
+  $("#cc-lefix").onclick=()=>{pull();const y=new Date().getFullYear(),now=new Date(Date.now()+7*3600e3).toISOString().slice(0,10),F=[["01-01","Tết Dương lịch"],["04-30","Giải phóng miền Nam"],["05-01","Quốc tế Lao động"],["09-02","Quốc khánh"]];let n=0;
+    s.ngayLe=s.ngayLe||[];[y,y+1].forEach(yy=>F.forEach(([md,t])=>{const d=yy+"-"+md;if(d>=now&&!s.ngayLe.some(x=>x.ngay===d)){s.ngayLe.push({ngay:d,ten:t});n++}}));s.ngayLe.sort((a,b)=>a.ngay.localeCompare(b.ngay));
+    toast(n?`Đã thêm ${n} ngày, bấm Lưu cài đặt. Tết Nguyên đán, Giỗ Tổ, nghỉ bù điền theo thông báo nhà nước.`:"Các ngày lễ cố định đã có đủ");renderMain()};
   m.querySelectorAll("[data-cadel]").forEach(b=>b.onclick=()=>{pull();s.ca.splice(Number(b.dataset.cadel),1);renderMain()});
   m.querySelectorAll("[data-ovdel]").forEach(b=>b.onclick=()=>{pull();delete s.nguoiLich[b.dataset.ovdel];renderMain()});
   $("#cc-ova").onclick=()=>{const p=v("cc-ovp");if(!p){toast("Chọn người trước");return}pull();s.nguoiLich[p]=v("cc-ovl");renderMain()};
@@ -289,14 +292,21 @@ function pCcCaiDat(m){
 
 PAGES.cc_toi=pCcToi;PAGES.cc_ngay=pCcNgay;PAGES.cc_thang=pCcThang;PAGES.cc_xepca=pCcXepCa;PAGES.cc_caidat=pCcCaiDat;
 
-/* Menu (chạy sau menubang.js):
-   - bên vận hành một mục "Chấm công" ngay dưới "Công việc": ai cũng có Của tôi; Lead, HCNS thêm Hôm nay, Bảng tháng, Xếp ca;
-   - Cài đặt chấm công và Xếp ca nằm trong mục Nhân sự (CEO 04/11: phần quản trị của HCNS). */
+/* Menu (chạy sau menubang.js). CEO 04/11: mọi thứ nằm trong mục Nhân sự; nhân viên dùng Của tôi.
+   - Nhân sự (CEO, HCNS): Chấm công (Hôm nay, Bảng chấm công tháng, Xếp ca, Chốt công tháng, Cài đặt chấm công),
+     Nghỉ phép & tạm ứng (nghiphep.js), rồi các nhóm cũ (Hồ sơ, Hiệu suất, Lương…).
+   - Nhân sự (Lead): chỉ nhóm "Nhóm của tôi" (Hôm nay, Duyệt nghỉ phép & tăng ca, Xếp ca, Bảng chấm công tháng của phòng mình).
+   - Của tôi: Chấm công (nghiphep.js thêm Nghỉ phép & tăng ca, Tạm ứng lương, Phiếu lương). */
 {
-  const ADMH=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
-  if(!ADMH){const i=MODULES.findIndex(x=>x.k==="cv");MODULES.splice(i>=0?i+1:0,0,{k:"ccg",zone:"",ic:"clock",n:"Chấm công",sub:"",tabs:true,groups:()=>[["",[MI("cc_toi","Của tôi"),MI("cc_ngay","Hôm nay",u=>ccHr(u)||ccLead(u)),MI("cc_thang","Bảng tháng",u=>ccHr(u)||ccLead(u)),MI("cc_xepca","Xếp ca",u=>ccHr(u)||ccLead(u))]]]})}
+  const MOVED=["hr_nghi","hr_cc","cc_caidat","cc_xepca","cc_thang","cc_ngay"];
   const hr=MODULES.find(x=>x.k==="hr");
-  if(hr){const g0=hr.groups;hr.groups=()=>{const G=g0();const add=[MI("cc_caidat","Cài đặt chấm công",ccHr),MI("cc_xepca","Xếp ca",ccHr),MI("cc_thang","Bảng chấm công điện thoại",ccHr)];
-    const g=G.find(([,its])=>its.some(i=>i[0]==="hr_cc"));if(g){if(!g[1].some(i=>i[0]==="cc_caidat"))g[1].push(...add)}else G.push(["Chấm công điện thoại",add]);return G}}
+  if(hr){const g0=hr.groups;hr.groups=()=>{const G0=g0(),hrcc=G0.flatMap(([,its])=>its).find(i=>i[0]==="hr_cc");
+    const rest=G0.map(([g,its])=>[g==="Chấm công & hiệu suất"?"Hiệu suất":g,its.filter(i=>!MOVED.includes(i[0]))]);
+    const lead=u=>ccLead(u)&&!ccHr(u),cho=k=>()=>(typeof NP!=="undefined"&&NP.cho[k])||"";
+    const ketoan=u=>ccHr(u)||(typeof npKetoan==="function"&&npKetoan());
+    return [["Nhóm của tôi",[MI("cc_ngay","Hôm nay",lead),MI("np_duyet","Duyệt nghỉ phép & tăng ca",lead,cho("lead")),MI("cc_xepca","Xếp ca",lead),MI("cc_thang","Bảng chấm công tháng",lead)]],
+      ["Chấm công",[MI("cc_ngay","Hôm nay",ccHr),MI("cc_thang","Bảng chấm công tháng",ccHr),MI("cc_xepca","Xếp ca",ccHr),...(hrcc?[[hrcc[0],"Chốt công tháng",hrcc[2],hrcc[3]]]:[]),MI("cc_caidat","Cài đặt chấm công",ccHr)]],
+      ["Nghỉ phép & tạm ứng",[MI("np_ql","Nghỉ phép & tăng ca",ccHr,cho("hcns")),MI("tu_ql","Tạm ứng lương",ketoan,cho("tu"))]],
+      ...rest]}}
   const me=MODULES.find(x=>x.k==="me");if(me){const g0=me.groups;me.groups=()=>{const G=g0();if(G[0]&&!G[0][1].some(i=>i[0]==="cc_toi"))G[0][1].unshift(MI("cc_toi","Chấm công"));return G}}
 }

@@ -6,6 +6,7 @@ import { badRequest, forbidden, ok } from '../lib/http';
 import { canHr } from '../lib/hrAccess';
 import { unpack } from '../lib/pack';
 import { requirePermission } from '../middleware/rbac';
+import { donTheoNgay, LOAI_DON, type Buoi, type LoaiDon } from '../services/nghiPhep';
 import { loadMembers, type Members } from '../services/daoTao';
 import {
   CC_SETTINGS_KEY,
@@ -36,7 +37,7 @@ chamCongRoutes.use('*', requirePermission('hub.access'));
 
 type Row = { id: string; user_id: string; ngay: string; loai: 'vao' | 'ra'; at: string; kc: number | null; diem: string | null; trong: number | null; ly_do: string | null; ly_do_muon: string | null; acc: number | null };
 
-async function loadSettings(db: D1Database): Promise<CcSettings> {
+export async function loadSettings(db: D1Database): Promise<CcSettings> {
   const row = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(CC_SETTINGS_KEY).first<{ data: string }>();
   try {
     return normalizeSettings(row ? JSON.parse(row.data) : null);
@@ -73,23 +74,50 @@ async function loadXep(db: D1Database, s: CcSettings, tu: string, den: string, u
   return out;
 }
 
-/** Đơn nghỉ đã duyệt theo người (đọc bản dữ liệu chung, giữ 60 giây trong máy chủ để khỏi đọc lại mỗi lần mở trang). */
-let DON_CACHE: { at: number; map: Map<string, Map<string, string>> } | null = null;
-async function loadDon(db: D1Database): Promise<Map<string, Map<string, string>>> {
+/**
+ * Đơn đã duyệt theo người và ngày: đơn cũ trong dữ liệu chung (hub_state.hr.don) và đơn mới (bảng ns_don, routes/nghiPhep.ts).
+ * Giữ 60 giây trong máy chủ; duyệt đơn mới thì xóa ngay (resetDonCache).
+ */
+export type DonNgay = { don?: string; coPhep?: boolean; ot?: number };
+let DON_CACHE: { at: number; map: Map<string, Map<string, DonNgay>> } | null = null;
+export function resetDonCache() {
+  DON_CACHE = null;
+}
+async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>>> {
   if (DON_CACHE && Date.now() - DON_CACHE.at < 60_000) return DON_CACHE.map;
-  let map = new Map<string, Map<string, string>>();
+  const map = new Map<string, Map<string, DonNgay>>();
+  const at = (u: string, d: string) => {
+    const m = map.get(u) ?? new Map<string, DonNgay>();
+    map.set(u, m);
+    const e = m.get(d) ?? {};
+    m.set(d, e);
+    return e;
+  };
   try {
     const row = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
     if (row) {
       const d = JSON.parse(await unpack(row.data)) as { users?: { crm?: string; maNS?: string }[]; hr?: { don?: [] } };
-      map = donNghiTheoNguoi(d.users, d.hr?.don);
+      for (const [u, days] of donNghiTheoNguoi(d.users, d.hr?.don)) for (const [n, loai] of days) at(u, n).don = loai;
     }
   } catch {
-    /* không đọc được đơn thì coi như không có đơn */
+    /* không đọc được đơn cũ thì bỏ qua */
   }
+  const tu = vnDate(new Date(Date.now() - 400 * 864e5));
+  const rows = (await db.prepare("SELECT user_id, loai, tu, den, buoi, gio FROM ns_don WHERE st = 'xong' AND den >= ?").bind(tu).all<{ user_id: string; loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null }>()).results ?? [];
+  const byUser = new Map<string, typeof rows>();
+  for (const r of rows) byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), r]);
+  for (const [u, list] of byUser)
+    for (const [n, ds] of donTheoNgay(list))
+      for (const x of ds) {
+        const e = at(u, n);
+        if (x.loai === 'vesom') e.coPhep = true;
+        else if (x.loai === 'ot') e.ot = (e.ot ?? 0) + (x.gio ?? 0);
+        else e.don = LOAI_DON[x.loai] + (x.buoi === 'sang' ? ' (sáng)' : x.buoi === 'chieu' ? ' (chiều)' : '');
+      }
   DON_CACHE = { at: Date.now(), map };
   return map;
 }
+const donOpt = (e?: DonNgay) => ({ don: e?.don ?? null, coPhep: !!e?.coPhep, ot: e?.ot ?? 0 });
 const leOf = (s: CcSettings, d: string) => s.ngayLe.some((x) => x.ngay === d);
 
 const vai = (v: CcViewer, hr: boolean) => ({ all: v.all, pb: v.pb, caiDat: v.all && hr });
@@ -117,7 +145,7 @@ chamCongRoutes.get('/me', async (c) => {
   const myDon = (await loadDon(db)).get(auth.user.id);
   const ngay = daysOf(thang, today).map((d) => {
     const l = list.filter((r) => r.ngay === d);
-    return { ngay: d, ...tongNgay(l as Luot[], lich, d, d === today, { ca: caOf(d), q: s.quyTac, le: leOf(s, d), don: myDon?.get(d) ?? null }), luot: l.length };
+    return { ngay: d, ...tongNgay(l as Luot[], lich, d, d === today, { ca: caOf(d), q: s.quyTac, le: leOf(s, d), ...donOpt(myDon?.get(d)) }), luot: l.length };
   });
   return ok(c, {
     today,
@@ -210,7 +238,7 @@ chamCongRoutes.get('/ngay', async (c) => {
   const list = [...people.map(([id, u]) => ({ id, name: u.name, pb: u.pb })), ...extra.map((id) => ({ id, name: id, pb: '' }))].map((p) => {
     const l = rows.filter((r) => r.user_id === p.id);
     const lich = lichOf(s, p.id, p.pb);
-    return { ...p, lich: lich.ten, kieu: lich.kieu, ...tongNgay(l as Luot[], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), don: don.get(p.id)?.get(ngay) ?? null }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc })) };
+    return { ...p, lich: lich.ten, kieu: lich.kieu, ...tongNgay(l as Luot[], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), ...donOpt(don.get(p.id)?.get(ngay)) }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc })) };
   });
   return ok(c, { ngay, today, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
 });
@@ -231,7 +259,7 @@ chamCongRoutes.get('/thang', async (c) => {
   const list = people.map(([id, u]) => {
     const mine = rows.filter((r) => r.user_id === id);
     const lich = lichOf(s, id, u.pb);
-    const ngay = days.map((d) => ({ ngay: d, ...tongNgay(mine.filter((r) => r.ngay === d) as Luot[], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac, le: leOf(s, d), don: don.get(id)?.get(d) ?? null }) }));
+    const ngay = days.map((d) => ({ ngay: d, ...tongNgay(mine.filter((r) => r.ngay === d) as Luot[], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac, le: leOf(s, d), ...donOpt(don.get(id)?.get(d)) }) }));
     return {
       id,
       name: u.name,
@@ -240,7 +268,7 @@ chamCongRoutes.get('/thang', async (c) => {
       kieu: lich.kieu,
       chuyenCanCo: lich.chuyenCan && lich.kieu !== 'tudo',
       ...tongThang(ngay, lich, today, s.quyTac),
-      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, lyDoMuon: x.lyDoMuon, canhBao: x.canhBao })),
+      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, coPhep: x.coPhep, ot: x.ot, lyDoMuon: x.lyDoMuon, canhBao: x.canhBao })),
     };
   });
   return ok(c, { thang, today, quyTac: s.quyTac, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });

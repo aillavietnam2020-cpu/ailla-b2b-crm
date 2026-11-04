@@ -1,3 +1,4 @@
+import { nhacNgayLe } from './services/nhacNgayLe';
 import type { Env } from './env';
 import { createApp } from './app';
 import { loadConfig } from './lib/settings';
@@ -119,6 +120,12 @@ export default {
           console.info('[cron] nhac task', JSON.stringify(await taskReminders(env.DB)));
         } catch (error) {
           console.error('[cron] nhac task loi', error);
+        }
+        // Ngày 25 hằng tháng: nhắc HCNS điền ngày lễ tháng sau (services/nhacNgayLe.ts).
+        try {
+          console.info('[cron] nhac ngay le', JSON.stringify(await nhacNgayLe(env.DB)));
+        } catch (error) {
+          console.error('[cron] nhac ngay le loi', error);
         }
       })(),
     );
