@@ -203,7 +203,7 @@ function tkChatHtml(t){const L=t.chat||[];
 function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;if(t0.cd&&t0.cd.length){openTask(id);return false}const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
   DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
-    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ CEO duyệt vòng 2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ CEO duyệt`)}
+    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
     else{tkLog(x,"Duyệt hoàn thành");x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
   return r2}
 function tkReturn(id,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
@@ -502,7 +502,7 @@ function prjStats(p){
 const PJ_GD=[["kb","Kịch bản / hook",["cg","kb","dkb"]],["quay","Quay",["quay"]],["edit","Edit",["edit","worker"]],["duyet","Duyệt video",["dvd","dceo"]],["dang","Đăng",["dang","xong"]]];
 const pjGdOf=c=>PJ_GD.findIndex(g=>g[2].includes(c.step));
 const pjHolder=c=>c.step==="kb"?(c.nguoiKB||c.nguoi):c.step==="edit"?(c.nguoiEdit||c.nguoi):c.step==="quay"?c.nguoi:c.step==="dang"?(((D().kenhPT||{})[c.kenh]||{}).chinh||""):"";
-const pjHolderLbl=c=>c.step==="cg"?"Chưa giao":c.step==="dkb"||c.step==="dvd"?"Lead Content duyệt":c.step==="dceo"?"CEO duyệt":c.step==="worker"?"Máy đang dựng":userName(pjHolder(c))||"—";
+const pjHolderLbl=c=>c.step==="cg"?"Chưa giao":c.step==="dkb"||c.step==="dvd"?"Lead Content duyệt":c.step==="dceo"?"Duyệt V2":c.step==="worker"?"Máy đang dựng":userName(pjHolder(c))||"—";
 const pjCards=p=>D().cards.filter(c=>c.step!=="huy"&&cardProject(c)===p.id);
 function pjStageHtml(p){const C=pjCards(p),N=C.length;if(!N)return "";
   return `<div class="pjgd"><div class="pjgdh">Tiến độ video <small>· ${N} video</small></div>${PJ_GD.map(([k,t],i)=>{const here=C.filter(c=>pjGdOf(c)===i&&c.step!=="xong"&&c.step!=="cg"),past=C.filter(c=>pjGdOf(c)>i||c.step==="xong").length,
@@ -653,7 +653,7 @@ function cvLeadLines(){
   if(!(can(ME,"viec.duyet")||ME.role==="admin"||ME.role==="lead"))return L;
   add("Video mới cần duyệt",cs.filter(c=>c.step==="dvd").length,"cv",1);
   add("Kịch bản cần duyệt",cs.filter(c=>c.step==="dkb").length,"cv",1);
-  if(ME.role==="admin")add("Video chờ CEO duyệt",cs.filter(c=>c.step==="dceo").length,"cv");
+  if(ME.role==="admin")add("Video chờ duyệt V2",cs.filter(c=>c.step==="dceo").length,"cv");
   add("Order Digital cần phân công",O.filter(o=>o.trangThai==="Mới"&&!o.giao).length,"order_c",1);
   add("Order Digital cần bàn giao",O.filter(o=>o.trangThai!=="Xong"&&cs.some(c=>c.order===o.ma&&stepIdx(c.step)>=stepIdx("dang")&&!c.bg)).length,"order_c",1);
   try{add("Video win inhouse cần check",hyAnalyses().filter(t=>t.status==="review").length,"win:rank")}catch(e){}

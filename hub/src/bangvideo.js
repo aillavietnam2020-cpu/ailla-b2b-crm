@@ -8,7 +8,7 @@ const BV_T=["oneshot","kichban","worker","reup","outsource","ton","nhanban"];
 const BV_ACT=[["hook","Người viết hook / kịch bản"],["quay","Người quay / làm mẫu"],["dung","Người dựng / làm"],["tuan","Tuần đăng"],["han","Hạn"]];
 const bvLbl=t=>t==="bai"?"Bài Fanpage":(MIX.find(z=>z[0]===t)||[])[1]||t;
 const bvTuan=c=>+c.tuan||(weekOf(cDay(c))||0);
-const BV_STL={cg:"Cần làm",dkb:"Chờ duyệt kịch bản",dvd:"Chờ duyệt video",dceo:"Chờ CEO duyệt"};
+const BV_STL={cg:"Cần làm",dkb:"Chờ duyệt kịch bản",dvd:"Chờ duyệt video",dceo:"Chờ duyệt V2"};
 /* Video đã gửi Worker và Worker còn đang làm (viết kịch bản / dựng): vẫn hiện ở "Cần làm", chỉ đổi dòng trạng thái */
 const bvWkAct=c=>!!(c.wt&&c.step==="worker"&&!c.wDone&&!(c.wStatus==="review"&&c.wStage==="video"));
 const bvWkTxt=c=>{if(c.wStatus==="error")return "Worker báo lỗi";if(c.wStatus==="review"&&c.wStage==="script")return "Worker viết xong, chờ duyệt kịch bản";if(c.wStatus==="review")return "Worker dựng xong bản nháp, chờ duyệt";if(c.wStatus==="queued")return "Chờ máy Worker nhận việc";

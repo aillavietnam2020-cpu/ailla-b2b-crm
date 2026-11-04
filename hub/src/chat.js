@@ -32,7 +32,7 @@ moveCard=function(u,id,to,inp){const c=D().cards.find(x=>x.id===id),from=c&&c.st
     if(to==="dkb"||to==="dvd"){x.duyet="Chưa duyệt";x.ceo="CẦN KIỂM TRA"}else if(to==="dceo"){x.ceo="CẦN KIỂM TRA"}
     if(to==="dkb")notifyU(dt,approvers(),`${who} gửi ${x.oneShot?"hook":"kịch bản"} chờ duyệt: ${L}`,id);
     else if(to==="dvd"&&!(typeof isApprover==="function"&&isApprover(u)))notifyU(dt,approvers(),`Video mới ${who} vừa làm xong, cần duyệt: ${L}`,id);
-    else if(to==="dceo")notifyU(dt,admins(),`Video chờ CEO duyệt: ${L} (${who} đã duyệt)`,id);
+    else if(to==="dceo")notifyU(dt,admins(),`Video chờ duyệt V2: ${L} (${who} đã duyệt)`,id);
     else if(to==="dang"){const o=((dt.kenhPT||{})[x.kenh]||{}).chinh;notifyU(dt,[o],`Video đã duyệt xong, chờ bạn đăng: ${L}`,id)}
     else if(from==="dkb"&&to==="quay")notifyU(dt,[x.nguoiKB||x.nguoi],`${x.oneShot?"Hook":"Kịch bản"} đã được duyệt: ${L}`,id);
     if(x.tre&&x.tre.st==="cho"&&x.tre.by===who)notifyU(dt,approvers(),`${who} nộp trễ hạn (${x.tre.buoc}): ${x.tre.lyDo} · ${L}`,id)})}
