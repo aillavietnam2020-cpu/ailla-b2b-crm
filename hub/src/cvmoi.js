@@ -122,10 +122,15 @@ const cwBoss=()=>!!ME&&(ME.role==="admin"||can(ME,"viec.giao")||(typeof cvSummar
 const cwDashOk=()=>!!ME&&typeof cvMgrView==="function"&&cvMgrView();
 const cwTeamOfU=u=>u?cvTeamNorm(teamOf(u)):"";
 const cwUsers=()=>(D().users||[]).filter(u=>u.active!==false&&u.name&&!CV_TEST.includes(u.id));
+/* Phòng Marketing gồm các nhóm Content, Digital – Ads, KOC: lọc được cả phòng hoặc từng nhóm */
+const CW_MKT=["content","digital","koc"],cwIsMkt=k=>k==="mkt"||CW_MKT.includes(k),cwPhKey=k=>cwIsMkt(k)?"mkt":k;
 function cwTeams(){const t=teamOf(ME),ks=[];cwUsers().forEach(u=>{if(u.role==="admin")return;const k=cwTeamOfU(u);if(k&&k!=="all"&&!ks.includes(k)&&(cwBoss()||cvTeamSee(t,k)||k===cvTeamNorm(t)))ks.push(k)});
-  return ks.sort((a,b)=>String(cvTeamName(a)).localeCompare(String(cvTeamName(b))))}
-const cwMembers=k=>cwUsers().filter(u=>u.role!=="admin"&&cwTeamOfU(u)===k).sort((a,b)=>a.name.localeCompare(b.name));
-const cwPhong=k=>"Phòng "+cvTeamName(k);
+  const sub=CW_MKT.filter(k=>ks.includes(k)),hasM=ks.includes("mkt")||(sub.length&&(cwBoss()||t==="mkt")),oth=ks.filter(k=>!cwIsMkt(k));
+  if(hasM)oth.push("mkt");oth.sort((a,b)=>String(cvTeamName(a)).localeCompare(String(cvTeamName(b))));
+  const i=oth.indexOf("mkt");return i<0?sub.concat(oth):oth.slice(0,i+1).concat(sub,oth.slice(i+1))}
+const cwMembers=k=>cwUsers().filter(u=>u.role!=="admin"&&(k==="mkt"?cwIsMkt(cwTeamOfU(u)):cwTeamOfU(u)===k)).sort((a,b)=>a.name.localeCompare(b.name));
+const cwPhong=k=>CW_MKT.includes(k)?"Marketing · "+cvTeamName(k):"Phòng "+cvTeamName(k);
+const cwPhongOpt=(k,T)=>CW_MKT.includes(k)&&T.includes("mkt")?"   · "+cvTeamName(k):cwPhong(k);
 
 /* ---------- gom mọi việc về một dạng dòng ---------- */
 /* Gộp việc giống nhau: phần tên trước dấu " · ", hoặc phần chữ trước mã (vd "Sửa video tồn KHO-T10-0789" → "Sửa video tồn") */
@@ -363,7 +368,7 @@ function cwPbScope(R){const w=cwPbSel();R=R.filter(r=>!r.rvOnly&&r.nguoi);
   if(w.team){const ids=new Set(cwMembers(w.team).map(u=>u.id));return R.filter(r=>ids.has(r.nguoi))}
   if(cwBoss())return R;const ids=new Set(w.T.flatMap(k=>cwMembers(k).map(u=>u.id)).concat([ME.id]));return R.filter(r=>ids.has(r.nguoi))}
 /* lọc 2 bước: chọn phòng trước, chọn phòng rồi mới hiện người của phòng đó */
-function cwWhoSel(idA,idB,team,who){const T=cwTeams(),boss=cwBoss(),o=(boss?[["","Cả công ty"]]:[]).concat(T.map(k=>[k,cwPhong(k)])),mem=team?cwMembers(team):[];
+function cwWhoSel(idA,idB,team,who){const T=cwTeams(),boss=cwBoss(),o=(boss?[["","Cả công ty"]]:[]).concat(T.map(k=>[k,cwPhongOpt(k,T)])),mem=team?cwMembers(team):[];
   return `<label class="cwfsel">${cwI("filter")}<span>Lọc</span><select id="${idA}" aria-label="Chọn phòng">${opt(o,team)}</select></label>`+
     (team?`<label class="cwfsel">${cwI("users")}<select id="${idB}" aria-label="Chọn người">${opt([["","Cả phòng ("+mem.length+" người)"]].concat(mem.map(u=>[u.id,u.name])),who)}</select></label>`:"")}
 const CW_PB=[["open","list","Đang làm / cần làm",S=>S.filter(cwOpen)],["late","alert","Đang trễ",S=>S.filter(r=>cwOpen(r)&&r.late)],["rv","cc","Chờ duyệt",S=>S.filter(r=>r.st==="review")],
@@ -463,7 +468,7 @@ function cwDash(){const P=cwPer(CWS.per),td=cwTd(),w=cwOvSel(),boss=cwBoss();
   const lt=op.filter(t=>t.han&&t.han<td),d3=op.filter(t=>t.han>=td&&t.han<=td+3),d7=op.filter(t=>t.han>=td&&t.han<=td+7),doing=op.filter(t=>t.st==="doing");
   const pct=PA.length?Math.round(PA.filter(t=>t.st==="done").length/PA.length*100):0,ot=cwOtp(dn),ch=pdn.length?Math.round((dn.length/pdn.length-1)*100):null;
   const people=[...new Set(A.map(t=>t.nguoi))].map(p=>{const X=A.filter(t=>t.nguoi===p),Dn=cwDoneIn(X,P.a,P.b);return {p,g:X.filter(inP).length,d:Dn.length,o:cwOtp(Dn),l:X.filter(t=>t.st!=="done"&&t.han&&t.han<td).length,doing:X.filter(t=>t.st==="doing").length}}).filter(r=>r.g||r.d||r.l).sort((x,y)=>y.l-x.l||(x.o===null?101:x.o)-(y.o===null?101:y.o));
-  const grpBy=!w.team&&!w.who?"team":"ng",bars=(grpBy==="team"?[...new Set(A.map(t=>cwTeamOfU(userBy(t.nguoi))).filter(Boolean))].map(k=>{const Dn=cwDoneIn(A.filter(t=>cwTeamOfU(userBy(t.nguoi))===k),P.a,P.b);return [cvTeamName(k),Dn.length,cwOtp(Dn)]})
+  const grpBy=!w.who&&(!w.team||w.team==="mkt")?"team":"ng",gk=u=>{const k=cwTeamOfU(u);return w.team==="mkt"?k:cwPhKey(k)},bars=(grpBy==="team"?[...new Set(A.map(t=>gk(userBy(t.nguoi))).filter(Boolean))].map(k=>{const Dn=cwDoneIn(A.filter(t=>gk(userBy(t.nguoi))===k),P.a,P.b);return [w.team==="mkt"&&k==="mkt"?"Trưởng phòng":cvTeamName(k),Dn.length,cwOtp(Dn)]})
     :people.map(r=>{const Dn=cwDoneIn(A.filter(t=>t.nguoi===r.p),P.a,P.b);return [userName(r.p),Dn.length,cwOtp(Dn)]})).filter(x=>x[1]).sort((x,y)=>y[1]-x[1]),bmx=Math.max(1,...bars.map(x=>x[1]));
   const oc=o=>o===null?"var(--muted,#6b7385)":o>=80?"#2f9e5b":o>=60?"#a86a12":"#d93a3a";
   return `<div class="cwtb">${cwWhoSel("cw-ovt","cw-ovw",w.team,w.who)}<span class="hint">${esc(P.lb)} · tự đếm từ việc đã giao</span><span class="sp"></span>${cwPerSeg()}</div>
