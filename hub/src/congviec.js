@@ -666,7 +666,11 @@ function cvLeadLines(){
 function cvWarn(){
   const d=D(),td=d.settings.today,out=[];if(td+1>MONTH.ndays)return out;
   const lead=ME.role==="admin"||ME.role==="lead"||(can(ME,"viec.giao")&&cvTeamSee(teamOf(ME),"content"));
+  /* CEO: không phải việc CEO tự làm, chỉ nhắc khi đang xem việc của team / người giữ kênh đó (04/11) */
+  const w=ME.role==="admin"?cvWho():"";if(ME.role==="admin"&&!/^[tp]:/.test(w))return out;
   CHANNELS.forEach(ch=>{const own=cvOwner(ch.k);if(!lead&&own!==ME.id)return;
+    if(w.startsWith("p:")&&own!==w.slice(2))return;
+    if(w.startsWith("t:")){const ou=own&&D().users.find(u=>u.id===own),k=ou?cvTeamNorm(teamOf(ou)):"content";if(k!==w.slice(2))return}
     /* kênh chưa có kế hoạch tháng này (chưa sản phẩm nào có số video, Fanpage chưa có tuyến bài) thì không nhắc thiếu video */
     if(!ptPairs().some(x=>x.kenh===ch.k&&+x.sl>0)&&!(!ch.needId&&(d.fpPlan||[]).some(r=>+r.sl>0)))return;
     let need=0;try{need=calCap(ch.k,td+1)}catch(e){}
