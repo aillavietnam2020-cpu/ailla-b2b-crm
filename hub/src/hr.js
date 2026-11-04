@@ -58,8 +58,12 @@ function calcRow(ma,thang){
   const h=HRD(),cs=csOf(thang),st=staffBy(ma),ns=h.ns[ma]||{},cc=((h.cc[thang]||{})[ma])||null,cong=cc?cc.cong:cs.cong,tamTinh=!cc;
   const luong=ns.luong||0,lCong=Math.round(luong*Math.min(cong,cs.cong+5)/cs.cong),dg=luong/cs.cong/cs.gio;
   const sale=["B2C","B2B","CSKH"].includes(st.pb),sx=st.khoi==="Sản xuất & Kho",muon=cc?cc.muon:0;
-  const pc={anTrua:cs.anTrua,xang:sale?cs.xang:0,dt:sale?cs.dt:0,cc:muon<=cs.muonMax?cs.cc:0,docHai:sx?cs.docHai:0};const pcT=Object.values(pc).reduce((a,b)=>a+b,0);
-  const ot=Math.round(((cc?cc.ot:0)*cs.ot+(cc?cc.otCN:0)*cs.otCN)*dg);
+  /* Chấm công điện thoại (chamcong.js, CEO 04/11): ăn trưa = số bữa × đơn giá; chuyên cần theo chấm công (lịch không xét thì theo số lần muộn đã chốt);
+     tăng ca lấy giờ đã duyệt, trừ khi HCNS đã nhập giờ tăng ca ở trang Chốt công tháng. */
+  const x=typeof ccLuong==="function"?ccLuong(ma,thang):{bua:null,giaBua:Math.round(cs.anTrua/cs.cong),cc:null,tienCC:cs.cc,ot:0,otCN:0};
+  const bua=x.bua!=null?x.bua:Math.round(cong),daNhapOT=!!(cc&&(cc.ot||cc.otCN));
+  const pc={anTrua:bua*x.giaBua,xang:sale?cs.xang:0,dt:sale?cs.dt:0,cc:(x.cc!==null?x.cc:muon<=cs.muonMax)?x.tienCC:0,docHai:sx?cs.docHai:0};const pcT=Object.values(pc).reduce((a,b)=>a+b,0);
+  const ot=Math.round(((daNhapOT?cc.ot:x.ot)*cs.ot+(daNhapOT?cc.otCN:x.otCN)*cs.otCN)*dg);
   const th=(h.thuong[thang]||{})[ma]||{kpi:0,khac:0},wb=winnerBonus(ma,thang);
   const tong=lCong+pcT+ot+th.kpi+th.khac+wb;
   const bh=Math.round(Math.min(ns.nenBH||0,cs.tranBH)*cs.bhxh);
@@ -67,7 +71,7 @@ function calcRow(ma,thang){
   const thue=taxOf(tnTT,cs.bieu);
   const tu=h.tu.filter(x=>x.ma===ma&&x.ky===thang&&x.tt==="duyet").reduce((a,x)=>a+x.tien,0);
   const mh=((STAFFBUY[thang]||{}).map||{})[ma]||0;
-  return {ma,ten:st.ten,pb:st.pb,khoi:st.khoi,bac:ns.bac||"",cong,congChuan:cs.cong,tamTinh,luong,lCong,pc,pcT,ot,kpi:th.kpi,khac:th.khac,wb,tong,nenBH:ns.nenBH||0,bh,npt:ns.npt||0,tnTT,thue,tu,mh,thucLinh:tong-bh-thue-tu-mh,cs:cs.ma};
+  return {ma,ten:st.ten,pb:st.pb,khoi:st.khoi,bac:ns.bac||"",cong,bua,congChuan:cs.cong,tamTinh,luong,lCong,pc,pcT,ot,kpi:th.kpi,khac:th.khac,wb,tong,nenBH:ns.nenBH||0,bh,npt:ns.npt||0,tnTT,thue,tu,mh,thucLinh:tong-bh-thue-tu-mh,cs:cs.ma};
 }
 const payPeriod=thang=>HRD().payroll[thang]||{st:"nhap"};
 const PST={nhap:["Nháp","gry"],chot:["Đã chốt","amb"],phathanh:["Đã phát hành","grn"]};
@@ -92,7 +96,7 @@ function pHrBangLuong(m){
   $("#bl-xl").onclick=()=>{if(typeof XLSX==="undefined")return;const ws=XLSX.utils.aoa_to_sheet([["Mã NS","Họ tên","Phòng","Công","Lương cứng","Lương theo công","Phụ cấp","KPI/thưởng","Thưởng video win","OT","Tổng thu nhập","BHXH","Thuế TNCN","Tạm ứng","Mua hàng trừ lương","Thực lĩnh"]].concat(rows.map(r=>[r.ma,r.ten,pbName(r.pb),r.cong,r.luong,r.lCong,r.pcT,r.kpi,r.wb,r.ot,r.tong,r.bh,r.thue,r.tu,r.mh||0,r.thucLinh])));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Bang luong");XLSX.writeFile(wb,`Bang-luong-${HRM}.xlsx`)};
 }
 function openPhieu(r,thang,P){
-  if(!r)return;const L=[["Lương theo công",r.lCong],["Ăn trưa",r.pc.anTrua],["Xăng xe",r.pc.xang],["Điện thoại",r.pc.dt],["Chuyên cần",r.pc.cc],["Độc hại",r.pc.docHai],["KPI / thưởng",r.kpi],["Thưởng video winner",r.wb],["Thưởng khác",r.khac],["Tăng ca",r.ot]].filter(x=>x[1]);
+  if(!r)return;const L=[["Lương theo công",r.lCong],["Ăn trưa"+(r.bua!=null?` (${r.bua} bữa)`:""),r.pc.anTrua],["Xăng xe",r.pc.xang],["Điện thoại",r.pc.dt],["Chuyên cần",r.pc.cc],["Độc hại",r.pc.docHai],["KPI / thưởng",r.kpi],["Thưởng video winner",r.wb],["Thưởng khác",r.khac],["Tăng ca",r.ot]].filter(x=>x[1]);
   openDrawerHTML(`<div class="phieu" id="phieu"><h2>Phiếu lương tháng ${thang.slice(5)}/${thang.slice(0,4)}</h2><div class="grid kpis">${kpi("Nhân viên",esc(r.ten),r.ma)}${kpi("Bộ phận",esc(pbName(r.pb)),r.bac?"bậc "+r.bac:"")}${kpi("Công thực tế / chuẩn",`${r.cong} / ${r.congChuan}`)}</div>
    <div class="grid cols2"><div><h3>Thu nhập</h3>${tbl(["Khoản","Số tiền"],L.map(x=>`<tr><td>${x[0]}</td><td class="n">${nf(x[1])}</td></tr>`).concat([`<tr class="tot"><td>TỔNG THU NHẬP</td><td class="n">${nf(r.tong)}</td></tr>`]))}</div>
    <div><h3>Khấu trừ</h3>${tbl(["Khoản","Số tiền"],[["BHXH, BHYT, BHTN người lao động",r.bh],["Thuế TNCN",r.thue],["Tạm ứng",r.tu],["Mua hàng công ty (trừ lương)",r.mh||0]].map(x=>`<tr><td>${x[0]}</td><td class="n">${nf(x[1])}</td></tr>`).concat([`<tr class="tot"><td>THỰC LĨNH</td><td class="n">${nf(r.thucLinh)}</td></tr>`]))}</div></div>
@@ -193,7 +197,7 @@ function pHrTD(m){
 let CDT="cs";
 function pHrCaiDat(m){
   const h=HRD(),cs=h.cs[h.cs.length-1],ed=canLuong();
-  const F=[["cong","Ngày công chuẩn"],["gio","Giờ / ngày"],["ot","Hệ số OT ngày thường"],["otCN","Hệ số OT CN, lễ"],["anTrua","Ăn trưa (đ/tháng)"],["xang","Xăng xe — Sale, CSKH"],["dt","Điện thoại — Sale, CSKH"],["cc","Chuyên cần"],["docHai","Độc hại — Sản xuất & Kho"],["muonMax","Muộn/về sớm tối đa để giữ chuyên cần"],["bhxh","Tỷ lệ BHXH+BHYT+BHTN người lao động"],["tranBH","Trần nền đóng BHXH"],["gtBan","Giảm trừ bản thân"],["gtNPT","Giảm trừ người phụ thuộc"],["phepNam","Phép năm (ngày)"],["xetBacThang","Chu kỳ xét bậc (tháng)"],["nguongBac","Ngưỡng điểm mỗi cửa"]];
+  const F=[["cong","Ngày công chuẩn"],["gio","Giờ / ngày"],["ot","Hệ số OT ngày thường"],["otCN","Hệ số OT CN, lễ"],["anTrua","Ăn trưa cũ (đ/tháng, nay tính theo bữa ở Cài đặt chấm công)"],["xang","Xăng xe — Sale, CSKH"],["dt","Điện thoại — Sale, CSKH"],["cc","Chuyên cần"],["docHai","Độc hại — Sản xuất & Kho"],["muonMax","Muộn/về sớm tối đa để giữ chuyên cần"],["bhxh","Tỷ lệ BHXH+BHYT+BHTN người lao động"],["tranBH","Trần nền đóng BHXH"],["gtBan","Giảm trừ bản thân"],["gtNPT","Giảm trừ người phụ thuộc"],["phepNam","Phép năm (ngày)"],["xetBacThang","Chu kỳ xét bậc (tháng)"],["nguongBac","Ngưỡng điểm mỗi cửa"]];
   m.innerHTML=H("Cài đặt lương","Chính sách có ngày hiệu lực — kỳ đã chốt không bị sửa ngược")+`<div class="tabs">${[["cs","Chính sách"],["tl","Thang bảng lương"],["ls","Lịch sử chính sách"]].map(([k,t])=>`<button data-cdt="${k}" class="${CDT===k?"on":""}">${t}</button>`).join("")}</div>
   ${CDT==="cs"?`<section class="card"><div class="card-h"><h2>${esc(cs.ma)} · hiệu lực từ ${vndate(cs.hieuLuc)}</h2></div><div class="note warn">${esc(cs.note||"")}</div><div class="grid cols3">${F.map(([k,l])=>`<label class="field">${l}<input ${ed?"":"disabled"} data-cs="${k}" value="${cs[k]}"></label>`).join("")}<label class="field">Biểu thuế TNCN<select data-cs="bieu" ${ed?"":"disabled"}>${opt([["7","7 bậc (đang dùng trong file)"],["5","5 bậc (luật sửa đổi — kế toán xác nhận)"]],cs.bieu)}</select></label></div>
    ${ed?`<div class="acts"><button class="btn" id="cs-2026">Điền mức mới: giảm trừ 15,5tr / 6,2tr + biểu 5 bậc</button><button class="btn pri" id="cs-new">Lưu thành chính sách mới (chọn ngày hiệu lực)</button></div><p class="hint">Sửa ô bên trên là sửa chính sách hiện tại. Muốn đổi từ một tháng nào đó mà giữ nguyên các tháng trước, bấm "Lưu thành chính sách mới".</p>`:""}</section>`:""}

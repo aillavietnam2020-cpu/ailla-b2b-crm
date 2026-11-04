@@ -290,6 +290,18 @@ function pCcCaiDat(m){
     try{const r=await svApi("/api/hub/chamcong/caidat",{method:"PUT",body:JSON.stringify(s)});CC.cfg={...r,people:s.people,deps:s.deps};CC.me=null;CC.day=null;CC.mon=null;CC.xep=null;toast("Đã lưu cài đặt chấm công");renderMain()}catch(e){toast(e.message)}};
 }
 
+/* Bảng lương (hr.js calcRow): số bữa ăn trưa, chuyên cần, giờ tăng ca đã duyệt từ chấm công điện thoại, theo mã nhân sự. */
+const CCL={};
+async function ccLuongLoad(thang){
+  if(CCL[thang]&&(CCL[thang].loading||Date.now()-CCL[thang].at<60000))return false;CCL[thang]={loading:true,at:Date.now()};
+  try{const r=await svApi("/api/hub/chamcong/thang?thang="+thang);const by={},mOf={};(D().users||[]).forEach(u=>{if(u.crm&&u.maNS)mOf[u.crm]=u.maNS});
+    r.list.forEach(x=>{const ma=mOf[x.id];if(!ma)return;let ot=0,otCN=0;(x.ngay||[]).forEach(d=>{if(!d.ot)return;const w=new Date(d.n+"T00:00:00Z").getUTCDay();if(w===0||d.le)otCN+=d.ot;else ot+=d.ot});
+      by[ma]={bua:x.cong>0?x.cong:null,cc:x.cong>0?x.chuyenCan:null,ot,otCN}});
+    CCL[thang]={at:Date.now(),q:r.quyTac,by};return true}catch(e){CCL[thang]={at:Date.now(),err:1,by:{}};return false}
+}
+function ccLuong(ma,thang){const L=CCL[thang]||{},q=L.q||{tienTrua:25000,tienCC:200000},e=(L.by||{})[ma]||{};return {bua:e.bua??null,giaBua:q.tienTrua,cc:e.cc??null,tienCC:q.tienCC,ot:e.ot||0,otCN:e.otCN||0}}
+{const o=PAGES.hr_bl;if(o)PAGES.hr_bl=m=>{o(m);if(typeof HRM!=="undefined"&&HRM)ccLuongLoad(HRM).then(ch=>{if(ch&&PAGE==="hr_bl")renderMain()});const h=m.querySelector(".card.flush");if(h)h.insertAdjacentHTML("afterend",`<p class="hint">Ăn trưa = số bữa (ngày có chấm công điện thoại, chưa dùng điện thoại thì theo ngày công) × đơn giá; chuyên cần, giờ tăng ca đã duyệt lấy từ chấm công điện thoại. Đơn giá, tiền chuyên cần sửa ở Nhân sự › Cài đặt chấm công.</p>`)}}
+
 PAGES.cc_toi=pCcToi;PAGES.cc_ngay=pCcNgay;PAGES.cc_thang=pCcThang;PAGES.cc_xepca=pCcXepCa;PAGES.cc_caidat=pCcCaiDat;
 
 /* Menu (chạy sau menubang.js). CEO 04/11: mọi thứ nằm trong mục Nhân sự; nhân viên dùng Của tôi.
