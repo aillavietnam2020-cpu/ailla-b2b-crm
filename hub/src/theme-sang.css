@@ -545,3 +545,4 @@ body.pop-open{overflow:hidden}
 .kqpop button:hover{background:#f1f3fb}.kqpop .hint{grid-column:1/-1;margin:4px 8px 2px;font-size:12px}
 @media (max-width:640px){.kqpop{grid-template-columns:1fr}}
 .gnpop .gnsep{font-size:11px;color:#7a8199;text-transform:uppercase;letter-spacing:.05em;padding:8px 10px 2px;border-top:1px solid #eceef5;margin-top:4px}
+.kqpop.one{display:block;width:240px}.gnbox.kqin{margin:4px 6px 8px}

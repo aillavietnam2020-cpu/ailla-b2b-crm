@@ -8,41 +8,33 @@
 const KQ_ADM=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
 const KQ_GO=p=>{if(!PAGES[p])return;PAGE=p;renderMain();scrollTo(0,0)};
 const KQ_MH=()=>typeof mhManage==="function"&&mhManage();
-const KQ_PN=()=>kCan("PN")||KQ_MH(); // chị Hoa 04/11: người phụ trách mua hàng (Thảo) tạo được phiếu nhập kho từ Ghi nhanh
+const KQ_CHI=()=>KQ_MH()||(typeof can==="function"&&can(ME,"chiphi.nhap"));
+/* Chị Hoa 04/11: Ghi nhanh chỉ 5 việc, nằm trong mục Kho – Sản xuất (web vận hành). Không còn "xuất khác", pha chế, đóng gói, hàng hoàn, kiểm tồn ở đây.
+   Phiếu xuất kho / nhập kho mở form chung cho cả hai kho: chọn mã nào thì sổ tự xếp vào kho nguyên vật liệu hay kho thành phẩm. */
 const KQ_LIST=()=>[
-  ["Mua hàng & nhập kho",[["Lập đơn mua hàng",()=>!KQ_ADM()&&KQ_MH()&&typeof mhForm==="function",async()=>{try{await mhLoad()}catch(e){}for(let i=0;i<40&&!(MH&&MH.sup);i++)await new Promise(r=>setTimeout(r,150));mhForm(null)}],
-    ["Tạo phiếu nhập kho · nguyên vật liệu",KQ_PN,()=>khoForm("PN",null,["NVL","CCDC"])],
-    ["Tạo phiếu nhập kho · hàng mua ngoài",KQ_PN,()=>khoForm("PN",null,["TP","HH"])]]],
-  ["Xuất kho",[["Xuất nguyên vật liệu khác",()=>kCan("XB"),()=>khoForm("XB",null,["NVL","BTP","CCDC"])],
-    ["Xuất thành phẩm khác",()=>kCan("XB"),()=>khoForm("XB",null,["TP","HH"])]]],
-  ["Sản xuất",[["Phiếu pha chế",()=>kCan("PC"),()=>khoForm("PC")],
-    ["Đóng gói & kiểm kê",()=>kCan("KS")&&!!PAGES.sx_lo&&!KQ_ADM(),()=>KQ_GO("sx_lo")]]],
-  ["Kho",[["Hàng hoàn",()=>kCan("TL")&&!!PAGES.kho_hoan&&!KQ_ADM(),()=>KQ_GO("kho_hoan")],
-    ["Kiểm tồn bổ sung",()=>kCan("TB")&&typeof KTON!=="undefined"&&KTON.moc&&!!KTON.moc.moc,()=>khoForm("TB")]]]]
-  .map(([g,a])=>[g,a.filter(x=>{try{return x[1]()}catch(e){return false}})]).filter(g=>g[1].length);
-/* Chị Hoa 04/11: một nút "＋ Ghi nhanh" ở đầu thanh menu cho cả hai web.
-   - Vận hành: nút mới, gồm đơn mua hàng + các phiếu kho.
-   - Quản trị: đã có "＋ Ghi nhanh" (admnav2.js: phiếu chi, đơn mua, chứng từ) — thêm các phiếu kho vào cuối bảng chọn đó. */
+  ["Lập phiếu thu",()=>KQ_CHI()&&typeof cptQuick==="function",()=>cptQuick(),false],
+  ["Lập phiếu chi",()=>KQ_CHI()&&typeof spForm==="function",()=>spForm(),false],
+  ["Lập phiếu mua hàng",()=>KQ_MH()&&typeof mhForm==="function",async()=>{try{await mhLoad()}catch(e){}for(let i=0;i<40&&!(MH&&MH.sup);i++)await new Promise(r=>setTimeout(r,150));mhForm(null)},false],
+  ["Lập phiếu nhập kho",()=>kCan("PN")||KQ_MH(),()=>khoForm("PN",null,["NVL","CCDC","TP","HH"]),true],
+  ["Lập phiếu xuất kho",()=>kCan("XB"),()=>khoForm("XB",null,null),true]]
+  .filter(x=>{try{return x[1]()}catch(e){return false}});
 function khoQuickBtn(){return ""}
-const kqRun=async it=>{document.body.classList.remove("menu-open");if(!KHO.cat){try{await khoLoad()}catch(err){}}if(!KHO.cat){toast("Đang tải kho, bấm lại sau vài giây");return}try{await it[2]()}catch(e){toast(e.message||"Chưa mở được")}};
+const kqRun=async it=>{document.body.classList.remove("menu-open");if(it[3]){if(!KHO.cat){try{await khoLoad()}catch(err){}}if(!KHO.cat){toast("Đang tải kho, bấm lại sau vài giây");return}}try{await it[2]()}catch(e){toast(e.message||"Chưa mở được")}};
 function kqInject(){
-  if(typeof ME==="undefined"||!ME)return;let L=[];try{L=KQ_LIST()}catch(e){}if(!L.length)return;
-  if(KQ_ADM()){const gp=document.getElementById("gnp");if(!gp||gp.querySelector("[data-kqa]"))return;
-    const its=L.flatMap(([g,a])=>a.map(x=>[g,x]));
-    gp.insertAdjacentHTML("beforeend",`<div class="gnsep" data-kqa="1">Kho</div>`+its.map(([g,x],i)=>`<button type="button" data-kqa="${i}"><b>${esc(x[0])}</b><small>${esc(g)}</small></button>`).join(""));
-    gp.querySelectorAll("button[data-kqa]").forEach(b=>b.onclick=e=>{e.stopPropagation();gp.hidden=true;kqRun(its[+b.dataset.kqa][1])});return}
-  const nav=document.querySelector(".side nav");if(!nav||document.getElementById("kqside"))return;
-  const w=document.createElement("div");w.id="kqside";w.className="gnbox";
-  w.innerHTML=`<button type="button" class="gnbtn kqbtn kqs"><span>＋ Ghi nhanh</span><span>▾</span></button>`;nav.before(w)}
+  if(KQ_ADM()||typeof ME==="undefined"||!ME||document.getElementById("kqside"))return;
+  const top=document.querySelector('.side .top[data-mod="sx"]'),sub=top&&top.nextElementSibling;if(!sub||!sub.classList.contains("subnav"))return;
+  let L=[];try{L=KQ_LIST()}catch(e){}if(!L.length)return;
+  const w=document.createElement("div");w.id="kqside";w.className="gnbox kqin";
+  w.innerHTML=`<button type="button" class="gnbtn kqbtn kqs"><span>＋ Ghi nhanh</span><span>▾</span></button>`;sub.prepend(w)}
 {const _r=render;render=function(){const r=_r.apply(this,arguments);try{kqInject()}catch(e){}return r}}
 function kqClose(){const p=document.getElementById("kqpop");if(p)p.remove()}
 function kqOpen(btn){
   kqClose();const L=KQ_LIST();if(!L.length)return;const r=btn.getBoundingClientRect();
   const p=document.createElement("div");p.id="kqpop";p.className="kqpop";
-  p.innerHTML=L.map(([g,a],gi)=>`<div class="kqg"><h4>${esc(g)}</h4>${a.map(([t],i)=>`<button type="button" data-kq="${gi}.${i}">${esc(t)}</button>`).join("")}</div>`).join("")+`<p class="hint">Chỉ hiện loại phiếu bạn được làm.</p>`;
+  p.innerHTML=L.map(([t],i)=>`<button type="button" data-kq="${i}">${esc(t)}</button>`).join("");p.classList.add("one");
   document.body.appendChild(p);
   const w=p.offsetWidth,side=btn.classList.contains("kqs");p.style.top=(r.bottom+6)+"px";p.style.left=Math.max(8,Math.min(side?r.left:r.right-w,innerWidth-w-8))+"px";
-  p.querySelectorAll("[data-kq]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const [gi,i]=b.dataset.kq.split(".").map(Number),it=L[gi][1][i];kqClose();document.body.classList.remove("menu-open");
+  p.querySelectorAll("[data-kq]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const it=L[+b.dataset.kq];kqClose();document.body.classList.remove("menu-open");
     kqRun(it)});
 }
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".kqbtn");if(b){e.preventDefault();e.stopPropagation();if(document.getElementById("kqpop"))kqClose();else kqOpen(b);return}
