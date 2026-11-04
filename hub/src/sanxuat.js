@@ -150,12 +150,24 @@ function pSxTq(m){
   <div class="sxflowbar">${["Cần làm","Đang sản xuất","Chờ kế toán kiểm","Đã kiểm & tạo lô","Đã in tem","Nhập kho / bàn giao"].map(x=>`<span>${x}</span>`).join("<i>→</i>")}</div>
   <div class="sxgrid2"><section class="card"><div class="card-h"><h2>Luồng sản xuất</h2><button class="lnk" data-sxt="sx_td">Xem tất cả ›</button></div>${(R.some(r=>r.st==="CAN_LAM"||r.st==="DANG_LAM")||B.some(b=>["CHO_KIEM","DA_KIEM","TEM_SAN","DA_IN"].includes(b.st)))?"<div class=\"sxcols\">":"<p class=\"hint pad\">Chưa có phiếu sản xuất nào đang chạy. Quản lý tạo phiếu ở mục Phiếu sản xuất.</p><div class=\"sxcols\" hidden>"}${col("Cần làm","pnk",R.filter(r=>r.st==="CAN_LAM").map(rq))}${col("Đang sản xuất","grn",R.filter(r=>r.st==="DANG_LAM").map(rq))}${col("Chờ kế toán kiểm","org",B.filter(b=>b.st==="CHO_KIEM").map(bt))}${col("Đã kiểm & tạo tem","blu",B.filter(b=>["DA_KIEM","TEM_SAN","DA_IN"].includes(b.st)).map(bt))}</div></section>
   </div>
-  <div class="sxgrid3">${sxCard("Tồn thành phẩm cần chú ý","sx_kho",tbl(["Sản phẩm","Sẵn sàng","Chờ nhập","Đang làm","Trạng thái"],stock.map(o=>{const p=sxP(o.sp),low=p.toiThieu&&o.san<p.toiThieu;return `<tr><td>${esc(p.ten)}</td><td class="n">${nf(o.san)}</td><td class="n">${nf(o.choNhap)}</td><td class="n">${o.dangLam?o.dangLam+" việc":"—"}</td><td>${low?pill("Dưới mức tối thiểu","red"):p.toiThieu?pill("Đủ hàng","grn"):pill("Chưa đặt mức","gry")}</td></tr>`})))}
-  ${sxCard("Kiểm kê & Tem","sx_lo",lastLot?`<p>Lô gần nhất: <b>${esc(lastLot.ma)}</b> ${sxStPill(SX_LOT_ST,lastLot.st)}</p><p class="hint">Đạt <b class="ok">${nf(lastLot.dat)}</b> · Lỗi <b class="bad">${nf(lastLot.loi)}</b> · Chờ xử lý <b class="warn">${nf(lastLot.cho)}</b></p>${lastLot.containers.length?`<div class="sxlblmini">${sxLabel(lastLot,lastLot.containers.find(c=>c.st==="OK")||lastLot.containers[0],true)}</div>`:""}<div class="acts"><button class="btn" data-sxb="${lastLot.id}">Xem lô & tem</button></div>`:`<p class="empty">Chưa có lô nào.</p>`)}</div>
+  <div class="sxgrid2">${sxCard("Tồn thành phẩm cần chú ý","kho_ton_tp",sxTpWatch())}
+  ${sxCard("Kiểm kê & Tem","sx_lo",lastLot?`<p>Lô gần nhất: <b>${esc(lastLot.ma)}</b> ${sxStPill(SX_LOT_ST,lastLot.st)}</p><p class="hint">Đạt <b class="ok">${nf(lastLot.dat)}</b> · Lỗi <b class="bad">${nf(lastLot.loi)}</b> · Chờ xử lý <b class="warn">${nf(lastLot.cho)}</b></p>${lastLot.containers.length?`<div class="sxlblmini">${sxLabel(lastLot,lastLot.containers.find(c=>c.st==="OK")||lastLot.containers[0],true)}</div>`:""}<div class="acts"><button class="btn" data-sxb="${lastLot.id}">Xem lô & tem</button></div>`:`<p class="hint" style="margin:0">Chưa có lô nào. Lô được tạo khi kế toán kho kiểm kê sau đóng gói (mục Đóng gói & kiểm kê).</p>`)}</div>
   ${sxCard("Hoạt động gần đây","",`<div class="sxlog">${s.log.slice(0,8).map(l=>`<div><b>${esc(l.by)}</b> ${esc(l.act)}<small>${esc(l.at)}</small></div>`).join("")||`<p class="empty">Chưa có hoạt động.</p>`}</div>`)}`,
   "");
   sxBindCommon(m);if($("#sx-new"))$("#sx-new").onclick=()=>sxReqForm();
 }
+/* Tổng quan Sản xuất › Tồn thành phẩm cần chú ý (04/11): cùng số trang Tồn kho thành phẩm (sổ kho), âm kho trước rồi sắp hết.
+   Trước đây bảng lấy "sẵn sàng / chờ nhập" từ lô sản xuất, cột chật phải cuộn ngang, mã chưa khai tên hiện mã thô. */
+function sxTpWatch(){
+  if(typeof KTON==="undefined"){return `<p class="hint">Đang tải tồn kho…</p>`}
+  if(typeof ktonLoad==="function")ktonLoad();if(!KTON.rows)return `<p class="hint">Đang tải tồn kho…</p>`;
+  const R=KTON.rows.filter(r=>r.nhom==="TP"&&(r.trang_thai==="AM"||(r.trang_thai==="SAP_HET"&&r.active)));
+  const nAm=R.filter(r=>r.trang_thai==="AM").length,nSh=R.length-nAm;
+  if(!R.length)return `<p class="hint" style="margin:0">Không có thành phẩm âm kho hay sắp hết.</p>`;
+  const L=R.sort((a,b)=>(a.trang_thai==="AM"?0:1)-(b.trang_thai==="AM"?0:1)||a.ton-b.ton).slice(0,6);
+  return `<p class="hint" style="margin:0 0 8px">${nAm?`<b class="t-red">${nf(nAm)} mã âm kho</b>`:""}${nAm&&nSh?" · ":""}${nSh?`${nf(nSh)} mã sắp hết`:""} · số theo sổ kho, cùng trang Tồn kho thành phẩm</p>
+   <div class="tbl"><table><thead><tr><th>Sản phẩm</th><th class="n">Tồn</th><th class="n">Đang sản xuất</th><th>Trạng thái</th></tr></thead><tbody>${L.map(r=>`<tr><td>${esc(r.name||r.code)}<br><small class="hint mono">${esc(r.code)}</small></td><td class="n"><b class="${r.ton<0?"t-red":""}">${knum(r.ton)}</b></td><td class="n">${r.dang_sx>0?knum(r.dang_sx):"—"}</td><td>${pill(KHO_TT[r.trang_thai][0],KHO_TT[r.trang_thai][1])}</td></tr>`).join("")}</tbody></table></div>
+   ${R.length>6?`<p class="hint" style="margin:6px 0 0">Còn ${nf(R.length-6)} mã nữa ở Tồn kho thành phẩm.</p>`:""}`}
 function sxBindCommon(m){
   m.querySelectorAll("[data-sxt]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.sxt;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-sxr]").forEach(e=>e.onclick=ev=>{if(ev.target.closest("button,select,input"))return;sxReqDetail(e.dataset.sxr)});
