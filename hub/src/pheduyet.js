@@ -154,7 +154,12 @@ function pdOthersHtml(L,now){if(!L.length)return "";const by={};
 const pdViAt=s=>{const m=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s||""));if(!m)return 0;const t=/(\d{1,2}):(\d{2})/.exec(String(s));return new Date(+m[3],+m[2]-1,+m[1],t?+t[1]:0,t?+t[2]:0).getTime()};
 const pdAgeS=ms=>ms>=864e5?Math.floor(ms/864e5)+" ngày":Math.max(1,Math.floor(ms/36e5))+" giờ";
 function pdTeamData(){const d=D(),td=d.settings.today,now=Date.now(),day=864e5,T=d.tasks||[],out=[];
-  const N=k=>typeof cvTeamNorm==="function"?cvTeamNorm(k):k;[...new Set(hsTeams().map(N))].forEach(team=>{const {ppl:pp0,U,C,cOwn,per}=hsCalc(d,td,team,true),ppl=pp0.filter(u=>N(teamOf(u))===team);if(!ppl.length)return;
+  const N=k=>typeof cvTeamNorm==="function"?cvTeamNorm(k):k,G={};hsTeams().forEach(k=>(G[N(k)]=G[N(k)]||[]).push(k));
+  Object.entries(G).forEach(([team,raw])=>{/* một phòng có thể ghi nhiều mã (KT / ketoan, CM / content): gộp, mỗi người tính một lần */
+    const ppl=[],U=[],C=[],per={},own={};raw.forEach(k=>{const r=hsCalc(d,td,k,true),mine=r.ppl.filter(u=>N(teamOf(u))===team&&!per[u.id]);
+      mine.forEach(u=>{ppl.push(u);per[u.id]=r.per[u.id]});const ok=new Set(mine.map(u=>u.id));
+      r.U.forEach(x=>{if(ok.has(x.ng))U.push(x)});r.C.forEach(c=>{const o=r.cOwn(c);if(ok.has(o)&&!own[c.id]){own[c.id]=o;C.push(c)}})});
+    if(!ppl.length)return;const cOwn=c=>own[c.id];
     const items=[];
     U.filter(x=>x.st!=="done").forEach(x=>{const t=T.find(y=>y.id===x.id)||{},rv=x.st==="review",late=x.han&&x.han<td?(td-x.han)*day:0,wait=rv?Math.max(0,now-(pdViAt(t.nopAt)||now)):0;
       items.push({ng:x.ng,ten:x.ten,rv,late,age:Math.max(late,wait),txt:rv?"chờ duyệt"+(wait?" "+pdAgeS(wait):""):late?"trễ "+pdAgeS(late):x.han?"hạn "+dd(x.han):"đang làm"})});
