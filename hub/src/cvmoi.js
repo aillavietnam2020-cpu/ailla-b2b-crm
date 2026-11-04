@@ -323,7 +323,7 @@ const CW_MY=[
   ["td","eye","Tôi theo dõi",R=>R.filter(r=>cwOpen(r)&&cwFollow(r))],
   ["nodue","inbox","Chưa có hạn",R=>R.filter(r=>cwOpen(r)&&!r.han&&(cwMine(r)||cwGiao(r)))],
   ["lap","rep","Việc định kỳ",R=>R.filter(r=>r.tpl&&(cwMine(r)||cwGiao(r)))],
-  ["done","chk","Đã xong",R=>R.filter(r=>!cwOpen(r)&&(cwMine(r)||cwGiao(r)))]];
+  ["done","chk","Hoàn thành",R=>R.filter(r=>!cwOpen(r)&&(cwMine(r)||cwGiao(r)))]];
 const CW_MYD={today:"việc cần làm ngay",soon:"Việc của bạn chia theo ngày mai, tuần này, sau đó",giao:"Việc bạn giao cho người khác, việc trễ lên đầu",rv:"Bấm Duyệt hoặc Cần sửa ngay tại dòng",
   td:"Việc người khác làm mà bạn được thêm vào ô Người theo dõi, để biết tiến độ",nodue:"Việc để dành, khi nào làm thì đặt hạn",lap:"Việc tự giao theo mẫu lặp lại hằng ngày, mỗi tuần, mỗi tháng",done:"Việc đã hoàn thành trong tháng này"};
 const cwTodayN=()=>{try{return CW_MY[0][3](cwRows()).length}catch(e){return 0}};
@@ -382,7 +382,7 @@ function cwWhoSel(idA,idB,team,who){const T=cwTeams(),boss=cwBoss(),o=(boss?[[""
   return `<label class="cwfsel">${cwI("filter")}<span>Lọc</span><select id="${idA}" aria-label="Chọn phòng">${opt(o,team)}</select></label>`+
     (team?`<label class="cwfsel">${cwI("users")}<select id="${idB}" aria-label="Chọn người">${opt([["","Cả phòng ("+mem.length+" người)"]].concat(mem.map(u=>[u.id,u.name])),who)}</select></label>`:"")}
 const CW_PB=[["open","list","Đang làm / cần làm",S=>S.filter(cwOpen)],["late","alert","Đang trễ",S=>S.filter(r=>cwOpen(r)&&r.late)],["rv","cc","Chờ duyệt",S=>S.filter(r=>r.st==="review")],
-  ["nodue","inbox","Chưa có hạn",S=>S.filter(r=>cwOpen(r)&&!r.han)],["done","chk","Đã xong",S=>S.filter(r=>r.st==="done")]];
+  ["nodue","inbox","Chưa có hạn",S=>S.filter(r=>cwOpen(r)&&!r.han)],["done","chk","Hoàn thành",S=>S.filter(r=>r.st==="done")]];
 function cwPbTabs(S,cur){const L=(cwMgr()?(CW_DATEKX.includes(CWS.kx)&&cur!=="space"?[{l:"Việc đang mở",ic:"list",on:true,attr:'data-cwpb="open"'}]:CW_PB.map(([k,ic,l,f])=>{const X=S?f(S):[];return {l,ic,n:X.length||"",r:k==="late"?X.length>0:X.some(r=>r.late),on:cur===k,attr:`data-cwpb="${k}"`}})):[]);
   L.push({l:"Tài liệu & trao đổi",ic:"msg",on:cur==="space",attr:'data-cwpb="space"'});return cwTabs(L)}
 function cwBulk(L){const S=CWS.sel;return `<section class="cwcard">${S.size?`<div class="cwbulk"><b>Đã chọn ${S.size} việc</b><span class="sp"></span><button type="button" data-cwbk="doing">Đang làm</button><button type="button" data-cwbk="pause">Tạm dừng</button><button type="button" data-cwbk="todo">Cần làm</button><button type="button" data-cwbk="done">Xong</button><button type="button" data-cwbk="han">Dời hạn sang mai</button><button type="button" data-cwbk="ng">Đổi người làm</button><button type="button" data-cwbk="clr">Bỏ chọn</button></div>`:""}
