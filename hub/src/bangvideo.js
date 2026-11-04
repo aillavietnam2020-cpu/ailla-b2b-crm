@@ -140,12 +140,16 @@ function bvDuyetCells(d,c,give){
 const bvMau=c=>["reup","nhanban"].includes(mixOf(c));
 function bvWkOk(c){const k=typeof wkKind==="function"?wkKind(c):"";if(!k||c.wt||mixOf(c)==="nhanban")return false;if(!xvGive()&&![c.nguoiEdit,c.nguoiQuay,c.nguoiKB,c.nguoi,c.giao].includes(ME.id))return false;return k==="oneshot"||k==="review"?c.step==="edit":["cg","kb","worker"].includes(c.step)}
 /* nhãn nút bước tiếp theo viết ngắn để không kéo dài cột */
-const bvShort=l=>({"Đã quay, chuyển sang edit":"Quay xong","Edit xong, gửi duyệt":"Edit xong → gửi duyệt","Dựng xong, gửi duyệt":"Dựng xong → gửi duyệt","Người duyệt, gửi CEO duyệt":"Gửi CEO duyệt","Người duyệt, gửi CEO":"Gửi CEO duyệt","CEO duyệt, cho đăng":"Cho đăng","Đã đăng, lưu ID":"Đã đăng","Đã đăng, lưu link bài":"Đã đăng","Duyệt kịch bản, gửi Worker dựng":"Duyệt, gửi Worker","Đã có link video gốc, gửi Worker":"Gửi Worker","Bắt đầu edit":"Bắt đầu edit"})[l]||l;
+const bvShort=l=>({"Đã quay, chuyển sang edit":"Quay xong","Edit xong, gửi duyệt":"Edit xong → gửi duyệt","Dựng xong, gửi duyệt":"Dựng xong → gửi duyệt","Người duyệt, gửi CEO duyệt":"Gửi CEO duyệt","Người duyệt, gửi CEO":"Gửi CEO duyệt","Lead duyệt, gửi CEO":"Gửi CEO duyệt","CEO duyệt, cho đăng":"Cho đăng","Đã đăng, lưu ID":"Đã đăng","Đã đăng, lưu link bài":"Đã đăng","Duyệt kịch bản, gửi Worker dựng":"Duyệt, gửi Worker","Đã có link video gốc, gửi Worker":"Gửi Worker","Bắt đầu edit":"Bắt đầu edit"})[l]||l;
 /* dán link video ở Điều phối = gửi duyệt: chưa tới bước duyệt thì chuyển Chờ Lead duyệt, báo Lead (trong DB.mutate) */
-function bvGuiDuyet(dt,c){if(!(c.linkVideo||c.linkFinal))return;if(!["cg","kb","dkb","quay","edit"].includes(c.step))return;c.step="dvd";if(!c.nguoiEdit)c.nguoiEdit=ME.id;
+function bvGuiDuyet(dt,c){if(!(c.linkVideo||c.linkFinal)){bvRutDuyet(dt,c);return}if(!["cg","kb","dkb","quay","edit"].includes(c.step))return;c.step="dvd";if(!c.nguoiEdit)c.nguoiEdit=ME.id;
   c.history=(c.history||[]).concat([{at:new Date().toLocaleString("vi-VN"),by:ME.name,txt:"Dán link video, gửi Lead duyệt"}]);
   const leads=(dt.users||[]).filter(u=>u.active!==false&&u.role==="lead"&&(typeof teamOf!=="function"||teamOf(u)==="content")).map(u=>u.id);
   if(typeof notifyU==="function")notifyU(dt,leads,ME.name+" gửi duyệt video "+c.id+" ("+sk(c.sku).n+" · "+chOf(c.kenh).short+")",c.id)}
+/* xóa link video khi thẻ đang chờ duyệt = rút lại: thẻ viết hook (việc hook chưa xong) về bước viết hook, thẻ khác về bước edit */
+function bvRutDuyet(dt,c){if(!["dvd","dceo"].includes(c.step))return;const t=c.hookTask&&(dt.tasks||[]).find(x=>x.id===c.hookTask),hk=t&&t.st!=="done";
+  c.step=hk?"kb":"edit";c.nguoi=(hk?c.nguoiKB:c.nguoiEdit)||c.nguoi;c.duyet="";c.ceo="CẦN KIỂM TRA";
+  c.history=(c.history||[]).concat([{at:new Date().toLocaleString("vi-VN"),by:ME.name,txt:"Xóa link video, rút lại không gửi duyệt"}])}
 /* Giao việc: mở khung tạo việc ở Công việc, điền sẵn số video còn cần làm của kênh đang xem */
 function bvGiaoViec(){const d=D(),prs=ptPairs().filter(x=>x.kenh===BV.k&&knShown(d,x)),all=d.cards.filter(c=>c.kenh===BV.k);
   const L=prs.map(x=>{const pl=sum(BV_RT,t=>bvPlanN(d,x.sku,BV.k,t)),ok=all.filter(c=>c.sku===x.sku&&BV_RT.includes(mixOf(c))&&(c.linkVideo||c.linkFinal||["dvd","dceo","dang","xong"].includes(c.step))).length,mix=BV_RT.map(t=>[t,bvPlanN(d,x.sku,BV.k,t)]).filter(z=>z[1]>0).map(z=>bvLbl(z[0])+" "+z[1]).join(", ");return pl>ok?"• "+sk(x.sku).n+": còn "+(pl-ok)+"/"+pl+" video"+(mix?" ("+mix+")":""):""}).filter(Boolean);

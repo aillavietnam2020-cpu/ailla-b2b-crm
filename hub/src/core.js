@@ -170,7 +170,7 @@ const MAX_FILE=10*1024*1024;
 /* ---------- Luồng thẻ ---------- */
 function nextAct(c){
   const fb=!chOf(c.kenh).needId,L=loaiOf(c);
-  return ({kb:L==="moi"?["Gửi duyệt kịch bản","dkb"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi duyệt","dvd"],worker:["Dựng xong, gửi duyệt","dvd"],dvd:["người duyệt, gửi CEO","dceo"],dceo:["CEO duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
+  return ({kb:L==="moi"?["Gửi duyệt kịch bản","dkb"]:["Bắt đầu edit","edit"],dkb:["Duyệt kịch bản","quay"],quay:["Đã quay, chuyển sang edit","edit"],edit:["Edit xong, gửi duyệt","dvd"],worker:["Dựng xong, gửi duyệt","dvd"],dvd:["Lead duyệt, gửi CEO","dceo"],dceo:["CEO duyệt, cho đăng","dang"],dang:fb?["Đã đăng, lưu link bài","xong"]:["Đã đăng, lưu ID","xong"]})[c.step]||null;
 }
 function canEditCard(u,c){if(!u)return false;if(can(u,"lich.sua_tat_ca"))return true;return can(u,"lich.sua_cua_minh")&&([c.nguoi,c.nguoiKB,c.nguoiEdit,c.nguoiQuay].includes(u.id)||chanOwner(c.kenh)===u.id||chanHelp(c.kenh).includes(u.id))}
 function canMove(u,c,to){
