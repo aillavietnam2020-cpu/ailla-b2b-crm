@@ -1087,7 +1087,7 @@ PAGES.cv_v=m=>pCvV(m);
    Cùng phạm vi Của tôi · Tôi giao · Cả team với danh sách (tqviec.js pDvViec). */
 function cvDvAttach(m){if(typeof pDvViec!=="function"||!["list","board","cal"].includes(CVV.view))return;
   try{DV.scope=CVV.scope;const w=document.createElement("div");pDvViec(w,true);const dv=w.querySelector(".dv"),k=dv&&dv.querySelector(".dvk");if(!k)return;
-    const top=document.createElement("div");top.className="dv dvtopk";top.append(k);m.prepend(top);m.prepend(w.querySelector("style"));m.querySelectorAll(".cvtiles").forEach(e=>e.remove());dv.classList.add("dvfoot");m.append(dv)}catch(e){console.error("Tổng quan việc lỗi",e)}}
+    const top=document.createElement("div");top.className="dv dvtopk";top.append(k);m.prepend(top);m.prepend(w.querySelector("style"));m.querySelectorAll(".cvtiles").forEach(e=>e.remove());dv.classList.add("dvfoot");m.append(dv);try{const d=D(),td=d.settings.today,U=hsU(d,hsEffIds());dv.insertAdjacentHTML("afterbegin",hsEffHtml(d,td,U));hsEffBind(dv,d,td,U)}catch(e){console.error("biểu đồ hiệu quả",e)}}catch(e){console.error("Tổng quan việc lỗi",e)}}
 
 /* =====================================================================
    HIỆU SUẤT LÀM VIỆC CỦA TEAM (Lead Content cần, chị Hoa 02/11): tổng quan, tiến độ, từng người, việc đang tắc.
@@ -1108,6 +1108,47 @@ function hsChanHtml(d,td){
       <div class="hsw-sb">${seg(o.dang,base,"#2f9e44","Đã đăng")}${seg(o.cho,base,"#20c997","Duyệt, chờ đăng")}${seg(o.rv,base,"#f59f00","Chờ duyệt")}${seg(o.lam,base,"#4c6ef5","Đang làm")}${exp?`<em style="left:${exp/base*100}%" title="Đến hôm nay lẽ ra: ${exp}"></em>`:""}</div>
       <div class="hsw-cv"><b>${o.dang}</b><small>/${o.T||"—"} đã đăng${p!=null?` · ${p}%`:""}</small>${o.T?(lag>0?`<span class="pill p-red">chậm ${lag}</span>`:`<span class="pill p-grn">đúng tiến độ</span>`):""}</div></div>`}).join("")}</section>`}
 function hsTeams(){const ks=[];D().users.forEach(u=>{const k=teamOf(u);if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k))ks.push(k)});return ks}
+/* việc giao của những người ids: tính từng người làm (việc có công đoạn thì từng công đoạn) */
+function hsU(d,ids){
+  const U=[];(d.tasks||[]).forEach(t=>{const one=(ng,han,st,xn,ten,tl)=>{if(ids.includes(ng))U.push({ng,han:+han||0,st,xn:+xn||0,ten,tl,id:t.id,src:"task"})};
+    if(t.cd&&t.cd.length)t.cd.forEach(s=>{if(s.loai!=="duyet")tkPpl(s).forEach(ng=>one(ng,s.han,s.st==="xong"?"done":s.st==="lam"?"doing":"todo",s.xongNgay,t.ten+" · "+s.ten,0))});
+    else one(t.nguoi,t.han,t.st,t.xongNgay,t.ten,(t.chat||[]).filter(c=>c.kind==="tra").length)});
+  return U}
+/* người đang xem ở ô "Xem việc của" (Của tôi · Team · từng người · Tất cả) */
+function hsEffIds(){const d=D(),w=typeof cvWho==="function"?cvWho():"mine",t=teamOf(ME),U=d.users.filter(u=>u.active&&!CV_TEST.includes(u.id));
+  if(w==="mine")return [ME.id];if(w.indexOf("p:")===0)return [w.slice(2)];if(w.indexOf("t:")===0){const k=w.slice(2);return U.filter(u=>cvTeamNorm(teamOf(u))===k).map(u=>u.id)}
+  return U.filter(u=>u.id===ME.id||u.role!=="admin"&&(ME.role==="admin"||can(ME,"viec.giao")||cvTeamSee(t,teamOf(u)))).map(u=>u.id)}
+/* Hiệu quả việc được giao và việc tự tạo (chị Hoa 04/11): mỗi ngày trong tháng = % xong đúng hạn, cộng dồn từ đầu tháng tới ngày đó,
+   tính trên việc đã tới hạn (xong đúng hạn / xong trễ / tới hạn chưa xong). Hai đường: việc được giao và việc tự tạo
+   (nhân sự tự thêm cho mình, hoặc người tạo cũng là người làm). Theo ô "Xem việc của". */
+function hsEffData(d,td,U){const T=d.tasks||[],N=Math.max(1,Math.min(td,MONTH.ndays)),D0=Array.from({length:N},(_,i)=>i+1);
+  const kind=x=>{const t=T.find(y=>y.id===x.id)||{};return t.tuThem||t.tao===x.ng?"tu":"giao"};
+  const line=k=>{const L=U.filter(x=>x.han&&x.han<=N&&kind(x)===k);return D0.map(day=>{let dung=0,tre=0,late=0;
+    L.forEach(x=>{if(x.han>day)return;const xn=x.st==="done"?(x.xn||x.han):0;if(xn&&xn<=day){if(xn>x.han)tre++;else dung++}else if(x.han<day||day<td)late++});
+    const n=dung+tre+late;return n?{p:Math.round(dung/n*100),n,dung,tre,late}:null})};
+  return {D0,giao:line("giao"),tu:line("tu")}}
+function hsEffHtml(d,td,U){const {D0,giao,tu}=hsEffData(d,td,U);
+  const last=A=>A.filter(Boolean).slice(-1)[0],sum=A=>{const o=last(A);return o?`${o.p}% đúng hạn · ${o.n} việc tới hạn`:"chưa có việc tới hạn"};
+  const w=1000,h=170,L=44,R=14,Tp=12,B=26,n=D0.length,X=i=>n<2?L+(w-L-R)/2:L+i*(w-L-R)/(n-1),Y=p=>Tp+(100-p)*(h-Tp-B)/100,step=n<2?w-L-R:(w-L-R)/(n-1);
+  const path=A=>{let s="",on=false;A.forEach((o,i)=>{if(!o){on=false;return}s+=(on?"L":"M")+X(i).toFixed(1)+" "+Y(o.p).toFixed(1);on=true});return s};
+  const SER=[["Việc được giao","var(--hsef-1)",giao],["Việc tự tạo","var(--hsef-2)",tu]];
+  const tick=i=>i===0||i===n-1||(i+1)%5===0;
+  return `<section class="card hsef"><div class="hsw-chh"><h3>Hiệu quả làm việc · tháng ${MONTH.mon}</h3><span class="hint">% việc xong đúng hạn, cộng dồn từ đầu tháng · rê chuột để xem từng ngày</span></div>
+   <div class="hsefl">${SER.map(([nm,c,A])=>`<span><i style="background:${c}"></i><b>${nm}</b> <small>${sum(A)}</small></span>`).join("")}</div>
+   <div class="hsefw"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Hiệu quả việc được giao và việc tự tạo trong tháng">
+    ${[0,50,100].map(p=>`<line x1="${L}" x2="${w-R}" y1="${Y(p)}" y2="${Y(p)}" class="hsefg"/><text x="${L-8}" y="${Y(p)+4}" text-anchor="end" class="hseft">${p}%</text>`).join("")}
+    ${D0.map((day,i)=>tick(i)?`<text x="${X(i)}" y="${h-6}" text-anchor="middle" class="hseft">${dd(day)}</text>`:"").join("")}
+    <line class="hsefx" x1="0" x2="0" y1="${Tp}" y2="${h-B}" visibility="hidden"/>
+    ${SER.map(([nm,c,A])=>`<path d="${path(A)}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${A.map((o,i)=>o&&(i===n-1||!A[i-1]||!A[i+1]||n<=12)?`<circle cx="${X(i)}" cy="${Y(o.p)}" r="4" fill="${c}" stroke="var(--hsef-bg)" stroke-width="2"/>`:"").join("")}`).join("")}
+    ${D0.map((day,i)=>`<rect class="hsefh" data-hsew="${i}" x="${X(i)-step/2}" y="0" width="${step}" height="${h-B}"/>`).join("")}
+   </svg><div class="hseftip" hidden></div></div>
+   <table class="sr-only"><tr><th>Ngày</th><th>Việc được giao</th><th>Việc tự tạo</th></tr>${D0.map((day,i)=>`<tr><td>${dd(day)}</td><td>${giao[i]?giao[i].p+"%":"—"}</td><td>${tu[i]?tu[i].p+"%":"—"}</td></tr>`).join("")}</table></section>`}
+function hsEffBind(m,d,td,U){const box=m.querySelector(".hsefw");if(!box)return;const {D0,giao,tu}=hsEffData(d,td,U),tip=box.querySelector(".hseftip"),cx=box.querySelector(".hsefx");
+  const row=(nm,o)=>`<div><b>${nm}</b> ${o?`${o.p}% <small>(${o.dung} đúng hạn · ${o.tre} xong trễ · ${o.late} còn trễ)</small>`:`<small>chưa có việc tới hạn</small>`}</div>`;
+  box.querySelectorAll("[data-hsew]").forEach(r=>{r.onmouseenter=()=>{const i=+r.dataset.hsew;tip.innerHTML=`<b>Đến ${dd(D0[i])}</b>${row("Được giao",giao[i])}${row("Tự tạo",tu[i])}`;tip.hidden=false;
+    const x=+r.getAttribute("x")+ +r.getAttribute("width")/2;cx.setAttribute("x1",x);cx.setAttribute("x2",x);cx.setAttribute("visibility","visible");
+    const bb=box.getBoundingClientRect(),rb=r.getBoundingClientRect();tip.style.left=Math.max(0,Math.min(bb.width-tip.offsetWidth,rb.left-bb.left+rb.width/2+12))+"px"};
+    r.onmouseleave=()=>{tip.hidden=true;cx.setAttribute("visibility","hidden")}})}
 /* số từng người của Công việc › Tổng quan (dùng chung với Phê duyệt › Đang chờ ở các phòng để hai nơi không lệch) */
 function hsCalc(d,td,team,boss){
   const ppl=d.users.filter(u=>u.active&&u.role!=="admin"&&!CV_TEST.includes(u.id)&&(boss?cvTeamSee(team,teamOf(u))||teamOf(u)===team:tkSameTeam(ME,u)));
@@ -1115,9 +1156,7 @@ function hsCalc(d,td,team,boss){
   const a=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from?tkDay(PERIOD.from):1,b=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.to?tkDay(PERIOD.to):MONTH.ndays;
   const inK=h=>h>=a&&h<=b;
   /* việc giao: tính từng người làm (việc có công đoạn thì từng công đoạn) */
-  const U=[];(d.tasks||[]).forEach(t=>{const one=(ng,han,st,xn,ten,tl)=>{if(ids.includes(ng))U.push({ng,han:+han||0,st,xn:+xn||0,ten,tl,id:t.id,src:"task"})};
-    if(t.cd&&t.cd.length)t.cd.forEach(s=>{if(s.loai!=="duyet")tkPpl(s).forEach(ng=>one(ng,s.han,s.st==="xong"?"done":s.st==="lam"?"doing":"todo",s.xongNgay,t.ten+" · "+s.ten,0))});
-    else one(t.nguoi,t.han,t.st,t.xongNgay,t.ten,(t.chat||[]).filter(c=>c.kind==="tra").length)});
+  const U=hsU(d,ids);
   /* thẻ video: người đang giữ thẻ hoặc người edit / viết kịch bản */
   const C=(d.cards||[]).filter(c=>c.step!=="cg"&&[c.nguoi,c.nguoiEdit,c.nguoiKB].some(x=>ids.includes(x)));
   const cOwn=c=>ids.includes(c.nguoiEdit)?c.nguoiEdit:ids.includes(c.nguoi)?c.nguoi:c.nguoiKB;
@@ -1151,6 +1190,7 @@ function pHsWork(m){
   m.innerHTML=`<div class="hsw">
    <div class="hsw-h"><h2>Hiệu suất làm việc ${boss?"":"team "}${esc(boss?"":cvTeamName(team))}</h2>${boss&&tms.length>1?`<div class="tkteams">${tms.map(k=>`<button type="button" class="cvchip${k===team?" on":""}" data-hst="${esc(k)}">${esc(cvTeamName(k))}</button>`).join("")}</div>`:""}<span class="hint">Kỳ: ô thời gian trên cùng · ${ppl.length} người</span></div>
    <div class="hsw-tiles">${tile("Việc đang mở",tot.mo,"","",icon("mo",["#e7f0ff","#1c4fb8"]))}${tile("Chờ duyệt",tot.rv,"",tot.rv?"amb":"",icon("rv",["#fff1dc","#9a5200"]))}${tile("Trễ hạn",tot.late,"",tot.late?"red":"",icon("late",["#ffe9ee","#c92a2a"]))}${okP==null?tile("Đúng hạn","—","chưa có việc tới hạn","",icon("ok",["#e3f5ea","#1f7a3d"])):tile("Đúng hạn","",`${tot.dung} đúng · ${tot.tre} trễ · ${tot.late} đang trễ`,"",ring(okP))}${tile("Video đã nộp",`${tot.vNop}<small class="hsw-of">/${tot.vGiao}</small>`,"","",icon("nop",["#f1e8ff","#6b2fb3"]),bar(tot.vNop,tot.vGiao,"#7048e8"))}${tile("Video đã duyệt",tot.vDuyet,tot.tra?`${tot.tra} lần bị trả lại`:"","",icon("ok",["#e3f5ea","#1f7a3d"]))}</div>
+   ${hsEffHtml(d,td,U)}
    ${hsChanHtml(d,td)}
    <div class="hsw-grid">
     <section class="card flush cvtk"><div class="card-h pad"><h3>Từng người</h3><span class="hint">bấm tên để xem việc của người đó</span></div>${tbl(["Người","Đang làm","Chờ duyệt","Trễ","Xong (đúng / trễ)","Đúng hạn","Video nộp","Trả lại","Việc 7 ngày tới"],P.sort((x,y)=>y.late-x.late||y.mo-x.mo).map(p=>{const o=pct(p.dung,p.dung+p.tre+p.late),mx=Math.max(3,...p.load);return `<tr><td><button type="button" class="lnk" data-hsp="${p.u.id}">${avatar(p.u.id)}${esc(p.u.name)}</button></td><td class="n">${p.doing||""}</td><td class="n">${p.rv?`<span class="pill p-amb">${p.rv}</span>`:""}</td><td class="n">${p.late?`<span class="pill p-red">${p.late}</span>`:""}</td><td class="n">${p.dung} / ${p.tre}</td><td class="n">${o==null?"—":`<b class="${o>=90?"t-grn":o>=70?"t-amb":"t-red"}">${o}%</b>`}</td><td>${p.vGiao?`${bar(p.vNop,p.vGiao)}<small>${p.vNop}/${p.vGiao}</small>`:""}</td><td class="n">${p.tra||""}</td><td><div class="hsw-load" title="Số việc tới hạn 7 ngày tới">${p.load.map((n,i)=>`<i style="height:${Math.round(n/mx*100)}%;background:${n>=3?"#e03131":"#4c6ef5"}" title="${dayL(i)}: ${n} việc"></i>`).join("")}</div></td></tr>`}))}</section>
@@ -1158,6 +1198,7 @@ function pHsWork(m){
      <section class="card"><h3>Việc quá hạn cần xử lý</h3>${stuck.length?stuck.map(x=>`<div class="hsw-s"><span>${avatar(x.ng)}<b>${esc(cvShort(x.ten,46))}</b></span><span class="pill p-red">trễ ${x.lt} ngày</span><button type="button" class="btn sm" ${x.go}>Mở</button></div>`).join(""):`<p class="hint">Không có việc quá hạn.</p>`}</section>
     </div></div></div>`;
   m.querySelectorAll("[data-hst]").forEach(b=>b.onclick=()=>{HSW.team=b.dataset.hst;renderMain()});
+  hsEffBind(m,d,td,U);
   m.querySelectorAll("[data-tkopen]").forEach(b=>b.onclick=()=>openTask(b.dataset.tkopen));
   m.querySelectorAll("[data-opcard]").forEach(b=>b.onclick=()=>openCard(b.dataset.opcard));
   m.querySelectorAll("[data-hsp]").forEach(b=>b.onclick=()=>{PAGE="cv_v";MOD="cv";CVV.view="list";CVV.scope="team";cvWhoSet("p:"+b.dataset.hsp);CVF.st="";render()});

@@ -1037,3 +1037,11 @@ body:has(#tnpop) #ntpop{right:392px}
 .pdpt td{padding:3px 4px;border-top:1px solid #f0f1f5}.pdpt td.n{text-align:right;white-space:nowrap}
 .pdtag{display:inline-block;margin-left:4px;font-size:10.5px;background:#eef2ff;color:#3b5bdb;border-radius:6px;padding:0 5px}
 .pdpl{display:flex;flex-direction:column}
+/* Công việc › Tổng quan: hiệu quả việc được giao / tự tạo (chị Hoa 04/11) */
+.hsef{--hsef-1:#2a78d6;--hsef-2:#eb6834;--hsef-bg:#fff}
+.hsefl{display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;margin:4px 0 6px}.hsefl i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}.hsefl small{color:#667085}
+.hsefw{position:relative}.hsefw svg{width:100%;height:auto;display:block}
+.hsefg{stroke:#eceef3;stroke-width:1}.hseft{font-size:11px;fill:#8a92a3}
+.hsefh{fill:transparent;cursor:crosshair}.hsefx{stroke:#98a2b3;stroke-width:1;stroke-dasharray:3 3}
+.hseftip{position:absolute;top:0;background:#fff;border:1px solid #e3e6ee;border-radius:10px;box-shadow:0 6px 20px #10182822;padding:8px 10px;font-size:12px;pointer-events:none;min-width:220px;z-index:5;color:#1d2433}.hseftip small{color:#667085}.hseftip div{margin-top:3px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
