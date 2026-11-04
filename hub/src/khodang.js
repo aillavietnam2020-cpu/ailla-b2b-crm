@@ -23,7 +23,7 @@ function kdDu(d,W){
   return CHANNELS.map(ch=>{let can=0;for(let x=a;x<=z;x++)can+=nhipOf(ch.k,x);
     const ready=d.cards.filter(c=>c.kenh===ch.k&&c.step==="dang"&&(!c.day||c.day>=a)).length,
       DL=d.cards.filter(c=>c.kenh===ch.k&&KD_PIPE.includes(c.step)),doing=DL.length,thieu=Math.max(0,can-ready),
-      KD_ST={kb:"đang viết kịch bản",dkb:"chờ duyệt kịch bản",quay:"chờ quay",worker:"Worker đang dựng",edit:"đang edit",dvd:"chờ duyệt",dceo:"chờ CEO duyệt"},
+      KD_ST={kb:"đang viết kịch bản",dkb:"chờ duyệt kịch bản",quay:"chờ quay",worker:"Worker đang dựng",edit:"đang edit",dvd:"chờ duyệt",dceo:"chờ duyệt V2"},
       tach=Object.keys(KD_ST).map(k=>[KD_ST[k],DL.filter(c=>c.step===k).length]).filter(x=>x[1]).map(x=>x[1]+" "+x[0]).join(", ");
     return {ch,a,z,n,can,ready,doing,thieu,tach,conThieu:Math.max(0,thieu-doing)}});
 }

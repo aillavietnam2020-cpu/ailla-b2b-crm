@@ -8,7 +8,7 @@
    ===================================================================== */
 let DP={step:"",kenh:"",loai:"",nguoi:"",sku:"",tuyen:"",view:"buoc",sel:new Set()};
 const DP_ICO={cg:"users",kb:"task",dkb:"search",quay:"cal",edit:"spark",dvd:"check",dceo:"alert",dang:"clock",xong:"mega"};
-const DP_SHORT={dkb:"Duyệt kịch bản",dvd:"Duyệt video",dceo:"CEO duyệt"};
+const DP_SHORT={dkb:"Duyệt kịch bản",dvd:"Duyệt video",dceo:"Duyệt V2"};
 const DP_STEPS=["cg","kb","dkb","quay","edit","dvd","dceo","dang","xong"];
 const dpCanGive=()=>can(ME,"viec.giao")||ME.role==="admin";
 function dpCards(){return D().cards.filter(c=>(!DP.kenh||c.kenh===DP.kenh)&&(!DP.loai||loaiOf(c)===DP.loai)&&(!DP.nguoi||c.nguoi===DP.nguoi)&&(!DP.sku||c.sku===DP.sku)&&(!DP.tuyen||c.maTuyen===DP.tuyen))}

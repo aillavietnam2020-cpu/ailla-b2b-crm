@@ -194,7 +194,7 @@ function pHieuQua(m){
 function cvList(u){
   const d=D(),C=d.cards,td=d.settings.today,mine=c=>["admin","lead"].includes(u.role)||c.nguoi===u.id;
   const L=[];const add=(key,t,lvl,items,act)=>{if(items.length)L.push({key,t,lvl,items,act})};
-  if(can(u,"viec.duyet")){add("dkb","Kịch bản chờ duyệt","blu",C.filter(c=>c.step==="dkb"),"card");add("dvd","Video chờ duyệt","blu",C.filter(c=>c.step==="dvd"),"card")}if(u.role==="admin")add("dceo","Video chờ CEO duyệt","red",C.filter(c=>c.step==="dceo"),"card");
+  if(can(u,"viec.duyet")){add("dkb","Kịch bản chờ duyệt","blu",C.filter(c=>c.step==="dkb"),"card");add("dvd","Video chờ duyệt","blu",C.filter(c=>c.step==="dvd"),"card")}if(u.role==="admin")add("dceo","Video chờ duyệt V2","red",C.filter(c=>c.step==="dceo"),"card");
   if(can(u,"viec.giao"))add("cg","Thẻ 7 ngày tới chưa giao","red",C.filter(c=>c.step==="cg"&&c.day<=td+7),"assign");
   add("tre","Trễ hạn","red",C.filter(c=>isLate(c)&&mine(c)),"card");
   add("bitra","Bị trả lại, cần sửa","amb",C.filter(c=>["kb","quay"].includes(c.step)&&(c.gopy||[]).length&&mine(c)),"card");
