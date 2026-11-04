@@ -30,7 +30,7 @@ if(typeof execStock==="function"){execStock=function(){
     return {code:r.code,ten:r.name,ton:r.ton,nhap:+d.qty_in||0,xuat:+d.qty_out||0,st}}).filter(r=>r.ton||r.nhap||r.xuat)
    .sort((a,b)=>(b.st[1]==="red")-(a.st[1]==="red")||(b.nhap+b.xuat)-(a.nhap+a.xuat)||b.ton-a.ton)}}
 {const _ex=PAGES.exec;if(_ex)PAGES.exec=function(m){const r=_ex.apply(this,arguments);try{if(KTON.rows){const n=KTON.rows.filter(x=>x.trang_thai==="AM").length,s=KTON.rows.filter(x=>x.trang_thai==="SAP_HET"&&x.active).length;
-  m.querySelectorAll(".xblk").forEach(b=>{const h=b.querySelector("h2");if(h&&/Sản xuất & kho/.test(h.textContent)&&!b.querySelector(".ksrc"))b.insertAdjacentHTML("beforeend",`<div class="ksrc hint" style="font-size:11px;padding:0 14px 10px">Sắp hết / âm kho = ${nf(s)} sắp hết + ${nf(n)} âm, đếm từ sổ kho (cùng số Kho vật tư bên vận hành).</div>`)})}}catch(e){}return r}}
+  m.querySelectorAll(".xblk").forEach(b=>{const h=b.querySelector("h2");if(h&&/Sản xuất & kho/.test(h.textContent)&&!b.querySelector(".ksrc"))b.insertAdjacentHTML("beforeend",`<div class="ksrc hint" style="font-size:11px;padding:0 14px 10px">Sắp hết / âm kho = ${nf(s)} sắp hết + ${nf(n)} âm, đếm từ sổ kho (cùng số trang Tồn kho nguyên vật liệu / thành phẩm bên vận hành).</div>`)})}}catch(e){}return r}}
 
 /* ---------- Sản xuất › Kho thành phẩm, Trung tâm điều hành: "sẵn sàng bán" = tồn thực tế theo sổ kho ---------- */
 if(typeof sxStock==="function"){const _ss=sxStock;sxStock=function(){
@@ -38,11 +38,11 @@ if(typeof sxStock==="function"){const _ss=sxStock;sxStock=function(){
   L.forEach(o=>{const r=ktonRow(o.sp);seen.add(o.sp);o.lo=o.san;o.san=r?r.ton:0;o.xuatB2B=0;if(r)o.kton=r});
   KTON.rows.filter(r=>r.nhom==="TP"&&!seen.has(r.code)&&(r.ton||r.dang_sx)).forEach(r=>L.push({sp:r.code,san:r.ton,thung:0,khay:0,cho:0,loi:0,choNhap:0,dangLam:0,canLam:0,kton:r}));
   return L.sort((a,b)=>a.san-b.san)}}
-{const _sk=PAGES.sx_kho;if(_sk)PAGES.sx_kho=function(m){const r=_sk.apply(this,arguments);try{const n=m.querySelector(".note");if(n&&!m.querySelector(".ktonfoot"))n.insertAdjacentHTML("afterend",`<p class="hint ktonfoot"><b>Sẵn sàng bán</b> = tồn thực tế theo sổ kho (cùng số Kho vật tư, Tồn kho & giá trị). Cột thùng / khay là số lô bàn giao ban đầu ở Sản xuất, chỉ để tra vị trí.</p>`)}catch(e){}return r}}
+{const _sk=PAGES.sx_kho;if(_sk)PAGES.sx_kho=function(m){const r=_sk.apply(this,arguments);try{const n=m.querySelector(".note");if(n&&!m.querySelector(".ktonfoot"))n.insertAdjacentHTML("afterend",`<p class="hint ktonfoot"><b>Sẵn sàng bán</b> = tồn thực tế theo sổ kho (cùng số Tồn kho thành phẩm, Tồn kho & giá trị). Cột thùng / khay là số lô bàn giao ban đầu ở Sản xuất, chỉ để tra vị trí.</p>`)}catch(e){}return r}}
 
 /* ---------- Kho vật tư (vận hành) và Tồn kho & giá trị (quản trị): ghi nguồn dưới ô ---------- */
-{const _kt=PAGES.kho_ton;if(_kt)PAGES.kho_ton=function(m){ktonLoad();const r=_kt.apply(this,arguments);
-  ktonTag(m,{"Mã đang có tồn":"tồn thực tế khác 0, mã đang dùng","Dưới mức tối thiểu":"sắp hết: tồn khả dụng dưới định mức an toàn","Tồn âm (cần kiểm tra)":"tồn thực tế < 0 theo sổ kho"});ktonFoot(m);return r}}
+["kho_ton","kho_ton_tp"].forEach(k=>{const _kt=PAGES[k];if(_kt)PAGES[k]=function(m){ktonLoad();const r=_kt.apply(this,arguments);
+  ktonTag(m,{"Mã đang có tồn":"tồn thực tế khác 0, mã đang dùng","Dưới mức tối thiểu":"sắp hết: tồn khả dụng dưới định mức an toàn","Tồn âm (cần kiểm tra)":"tồn thực tế < 0 theo sổ kho"});ktonFoot(m);return r}});
 {const _kg=PAGES.kho_gtri;if(_kg)PAGES.kho_gtri=function(m){ktonLoad();const r=_kg.apply(this,arguments);
   ktonTag(m,{"Tổng giá trị tồn kho":"phần tồn dương × giá bình quân gia quyền"});
   if(KTON.rows&&m.querySelector(".grid.kpis")&&!m.querySelector(".ktonam")){const n=KTON.rows.filter(x=>x.trang_thai==="AM").length;if(n)m.querySelector(".grid.kpis").insertAdjacentHTML("beforeend",`<div class="ktonam" style="display:contents">${kpi("Mã âm kho",nf(n),"không tính vào giá trị · xem Đối chiếu tồn kho","#b42318")}</div>`)}

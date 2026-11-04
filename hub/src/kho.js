@@ -4,18 +4,20 @@
    Dữ liệu nằm ở các bảng kho_* trong D1 (không nằm trong hub_state); mỗi phiếu ghi sổ theo từng dòng, sai thì HỦY rồi lập lại.
    Telegram: làm sau, đã có /api/hub/kho/alerts để bot đọc.
    ===================================================================== */
-const KHO_SUB=[["kho_ton","Tồn kho"],["kho_nhap","Nhập nguyên vật liệu"],["kho_nhap_tp","Nhập thành phẩm"],["kho_pc","Pha chế"],["sx_lo","Kiểm kê đóng gói"],["kho_xuat_b2b","Xuất Kênh phân phối"],["kho_online","Xuất Kênh bán lẻ"],["kho_xuat","Xuất khác"],["kho_hoan","Hàng hoàn"],["kho_nxt","Nhập – xuất – tồn"],["kho_cl","Chênh lệch & cảnh báo"],["kho_dm","Danh mục & định mức"],["kho_boc","Định mức & giá thành"],["kho_vo","Vỏ can, chai & thùng"],["kho_map","Đồng bộ mã Kênh phân phối"]];
+const KHO_SUB=[["kho_ton","Tồn kho"],["kho_nhap","Nhập nguyên vật liệu"],["kho_nhap_tp","Nhập hàng mua ngoài"],["kho_pc","Pha chế"],["sx_lo","Kiểm kê đóng gói"],["kho_xuat_b2b","Xuất Kênh phân phối"],["kho_online","Xuất Kênh bán lẻ"],["kho_xuat","Xuất nguyên vật liệu khác"],["kho_ton_tp","Tồn kho thành phẩm"],["kho_xuat_tp","Xuất thành phẩm khác"],["kho_kk","Kiểm kê tồn"],["kho_hoan","Hàng hoàn"],["kho_nxt","Nhập – xuất – tồn"],["kho_cl","Chênh lệch & cảnh báo"],["kho_dm","Danh mục & định mức"],["kho_boc","Định mức & giá thành"],["kho_vo","Vỏ can, chai & thùng"],["kho_map","Đồng bộ mã Kênh phân phối"]];
 const KHO_GRP=[["Tồn kho",["kho_ton"]],["Nhập kho",["kho_nhap","kho_nhap_tp","kho_hoan"]],["Xuất kho",["kho_xuat_b2b","kho_online","kho_xuat"]],["Đối chiếu",["kho_nxt","kho_cl"]],["Danh mục",["kho_dm","kho_boc","kho_vo","kho_map"]]];
-const khoNav=key=>{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")return "";const GV=KHO_GRP.map(([t,ids])=>[t,ids.filter(i=>!(typeof OPSV==="function"&&OPSV()&&typeof OPS_HIDE!=="undefined"&&OPS_HIDE.includes(i)))]).filter(g=>g[1].length);const g=GV.find(x=>x[1].includes(key))||GV[0],nm=id=>(KHO_SUB.find(s=>s[0]===id)||[])[1]||id;return `<nav class="kgtabs">${GV.map(([t,ids])=>`<button class="${ids.includes(key)?"on":""}" data-sxt="${ids[0]}">${t}${ids.length>1?`<i>${ids.length}</i>`:""}</button>`).join("")}</nav>${g[1].length>1?`<nav class="kgsub">${g[1].map(id=>`<button class="${id===key?"on":""}" data-sxt="${id}">${nm(id)}</button>`).join("")}</nav>`:""}`};
+/* 04/11 (chị Hoa duyệt phương án C): bỏ hàng tab Tồn kho · Nhập kho · Xuất kho trong trang, chỉ đi bằng menu trái.
+   Còn một thanh nút thao tác (Lập phiếu…, Lập phiếu nhanh). Web quản trị không có thanh này (giữ như cũ). */
+const khoNav=key=>{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")return "";return `<nav class="kgtabs kgbar"></nav>`};
 const KHO_TYPES={
   PN:{page:"kho_nhap",name:"Phiếu nhập kho",who:["sx.kiemke"],hint:"Hàng mua về: nguyên vật liệu, vỏ, tem, hàng hóa. Kế toán kho ghi theo số thực nhận."},
   PC:{page:"kho_pc",name:"Phiếu pha chế",who:["sx.kythuat","sx.kiemke"],hint:"Mỗi mẻ pha một phiếu, pha theo phiếu sản xuất của Thảo. Ghi số lít thực tế và số thực tế từng nguyên liệu (nguyên liệu không dùng ghi 0)."},
   KS:{page:"sx_lo",name:"Phiếu kiểm kê đóng gói",who:["sx.kiemke"],hint:"Chúc kiểm kê sau khi đóng gói xong. Hệ thống tự trừ bán thành phẩm, vỏ, tem theo định mức."},
-  XB:{page:"kho_xuat",name:"Phiếu xuất kho",who:["sx.kiemke"],hint:"Xuất ngoài bán hàng: gia công, bán nguyên liệu, hàng mẫu, hủy hỏng. Đơn Kênh phân phối ở tab Xuất Kênh phân phối, bán lẻ TikTok, Shopee, Facebook ở tab Xuất Kênh bán lẻ."},
+  XB:{page:"kho_xuat",name:"Phiếu xuất kho",who:["sx.kiemke"],hint:"Xuất ngoài bán hàng: gia công, bán nguyên liệu, hàng mẫu, hủy hỏng. Đơn Kênh phân phối ở mục Xuất Kênh phân phối; bán lẻ TikTok, Shopee, Facebook ở mục Xuất Kênh bán lẻ."},
   TL:{page:"kho_hoan",name:"Phiếu nhập hàng hoàn",who:["sx.kiemke"],hint:"Hàng hoàn về kho: chọn Bán tiếp (cộng tồn) hoặc Bỏ (chỉ ghi nhận)."},
-  TD:{page:"kho_ton",name:"Tồn đầu kỳ",who:[],hint:"Số kiểm kê tại ngày chốt. Chỉ CEO nhập."},
+  TD:{page:"kho_kk",name:"Tồn đầu kỳ",who:[],hint:"Số kiểm kê tại ngày chốt. Chỉ CEO nhập."},
   /* Kiểm tồn bổ sung (04/11): ghi thành phiếu TD, máy chủ lấy ngày kiểm làm mốc tồn riêng của mã (khoton.js, migration 0070). */
-  TB:{page:"kho_ton",name:"Kiểm tồn bổ sung",who:["sx.kiemke"],hint:"Mã chưa có trong phiếu tồn chốt chung thì đếm thực tế rồi ghi ở đây. Ngày phiếu = ngày đếm thật. Số đếm là số cuối ngày đó: hàng nhập, xuất, bán sàn trong và trước ngày kiểm đã nằm trong số đếm nên web không trừ lại. Mỗi mã chỉ kiểm một lần; đếm được 0 thì ghi 0."}};
+  TB:{page:"kho_kk",name:"Kiểm tồn bổ sung",who:["sx.kiemke"],hint:"Mã chưa có trong phiếu tồn chốt chung thì đếm thực tế rồi ghi ở đây. Ngày phiếu = ngày đếm thật. Số đếm là số cuối ngày đó: hàng nhập, xuất, bán sàn trong và trước ngày kiểm đã nằm trong số đếm nên web không trừ lại. Mỗi mã chỉ kiểm một lần; đếm được 0 thì ghi 0."}};
 const KHO_CLS={NVL:"Nguyên vật liệu",BTP:"Bán thành phẩm",TP:"Thành phẩm",HH:"Hàng hóa",CCDC:"Công cụ",COMBO:"Combo"};
 const KHO_XK_KIND=["Gia công","Bán nguyên liệu","Hàng mẫu","Hủy hỏng","Khác"];
 const KHO={cat:null,items:new Map(),bom:new Map(),stock:new Map(),alerts:null,at:0,busy:false,err:"",f:{q:"",cls:"",low:false},list:{},nxt:null,cl:null,period:null};
@@ -66,9 +68,9 @@ const khoStock=c=>KHO.stock.get(c)||0;
 function khoFrame(m,key,title,sub,body,actions=""){
   const pp=$("#khopop");if(pp)pp.hidden=true;
   khoLoad();
-  const top=SX_TABS.map(([k,t])=>`<button class="${k==="kho_ton"?"on":""}" data-sxt="${k}">${t}</button>`).join("");
-  m.innerHTML=`<div class="sxhead"><div><h1>${title}</h1><div class="ph-sub">${sub}</div></div></div><nav class="sxtabs">${top}</nav>
-  ${khoNav(key).replace("</nav>",`<span class="kact">${actions}</span></nav>`)}
+  const qk=typeof khoQuickBtn==="function"?khoQuickBtn():"";
+  m.innerHTML=`<div class="sxhead"><div><h1>${title}</h1><div class="ph-sub">${sub}</div></div></div>
+  ${khoNav(key).replace("</nav>",`<span class="kact">${actions}${qk}</span></nav>`)}
   ${KHO.err?`<div class="note"><b>Chưa tải được kho:</b> ${esc(KHO.err)} <button class="lnk" id="kho-retry">Thử lại</button></div>`:!KHO.cat?`<p class="hint">Đang tải kho…</p>`:body}`;
   m.querySelectorAll("[data-sxt]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.sxt;renderMain();scrollTo(0,0)});
   if($("#kho-retry"))$("#kho-retry").onclick=()=>khoLoad(true);
@@ -303,7 +305,7 @@ async function khoLoadList(type,key,cls,page){
 /* v: biến thể của trang phiếu (Nhập NVL / Nhập thành phẩm dùng chung phiếu nhập, chỉ khác nhóm hàng). */
 function pKhoDocs(m,type,v){
   const T=Object.assign({},KHO_TYPES[type],v?{page:v.page,name:v.name,hint:v.hint}:{}),key=v?v.key:type,L=KHO.list[key];if(!L||(!L.rows&&!L.busy))khoLoadList(type,key,v&&v.cls,T.page);
-  let rows=L&&L.rows;if(type==="XB"&&L&&!L.x){L.x=true;kApi("/docs?type=XK").then(r=>{L.rows=(L.rows||[]).concat(r).sort((a,b)=>String(b.doc_date).localeCompare(a.doc_date)||b.id-a.id);if(PAGE===T.page)renderMain()}).catch(()=>{})}
+  let rows=L&&L.rows;if(type==="XB"&&L&&!L.x){L.x=true;kApi("/docs?type=XK"+(v&&v.cls?"&cls="+v.cls:"")).then(r=>{L.rows=(L.rows||[]).concat(r).sort((a,b)=>String(b.doc_date).localeCompare(a.doc_date)||b.id-a.id);if(PAGE===T.page)renderMain()}).catch(()=>{})}
   /* Lọc theo kỳ chọn ở thanh trên cùng (ngày phiếu); bấm "Xem tất cả" để bỏ lọc. */
   const P=kPer(),allRows=rows;let nAll=0;
   if(rows){nAll=rows.length;if(!KHO.docAll)rows=rows.filter(r=>String(r.doc_date)>=P.from&&String(r.doc_date)<=P.to)}
@@ -316,26 +318,53 @@ function pKhoDocs(m,type,v){
   m.querySelectorAll("[data-doc]").forEach(r=>r.onclick=()=>khoOpenDoc(+r.dataset.doc));
 }
 
-/* ---------- Tồn kho ---------- */
-function pKhoTon(m){
-  const F=KHO.f,A=KHO.alerts||{low:[],negative:[]},ed=ME.role==="admin"||can(ME,"sx.kiemke");
-  khoFrame(m,"kho_ton","Kho vật tư","Tồn kho nguyên vật liệu, bán thành phẩm, thành phẩm. Số tự tính từ các phiếu, không gõ đè.",(()=>{
-    const q=kfold(F.q).trim(),all=[...KHO.items.values()].filter(i=>i.active),hasStock=all.filter(i=>khoStock(i.code)!==0);
+/* ---------- Tồn kho: hai kho tách hẳn (chị Hoa duyệt 04/11) ----------
+   kho_ton    = Tồn kho nguyên vật liệu: nguyên vật liệu, vỏ can chai, tem, hộp, bán thành phẩm, công cụ.
+   kho_ton_tp = Tồn kho thành phẩm: thành phẩm, hàng hóa, combo. Lô, thùng, vị trí xem ở Sản xuất › Kho thành phẩm (sx_kho).
+   Nạp tồn đầu, kiểm tồn bổ sung chuyển sang trang Kiểm kê tồn (kho_kk). Nút Nhập / Xuất ở từng dòng mở phiếu điền sẵn mã. */
+const KHO_SCOPE={NVL:{page:"kho_ton",name:"Tồn kho nguyên vật liệu",cls:["NVL","BTP","CCDC"],sub:"Nguyên vật liệu, vỏ can chai, tem, hộp, bán thành phẩm, công cụ. Số tự tính từ sổ kho, không gõ đè. Thành phẩm xem ở Tồn kho thành phẩm.",inCls:["NVL","CCDC"],outCls:["NVL","BTP","CCDC"]},
+  TP:{page:"kho_ton_tp",name:"Tồn kho thành phẩm",cls:["TP","HH","COMBO"],sub:"Thành phẩm, hàng hóa, combo. Số tự tính từ sổ kho, không gõ đè. Nguyên vật liệu xem ở Tồn kho nguyên vật liệu.",inCls:["TP","HH"],outCls:["TP","HH"]}};
+/* Mở phiếu nhập / xuất điền sẵn một mã (nút ở dòng tồn kho, Lập phiếu nhanh). */
+function khoFormFor(type,cls,code){khoForm(type,code?add=>{document.querySelectorAll("#kf-b tr").forEach(tr=>{const i=tr.querySelector(".kf-i");if(i&&!i.dataset.code)tr.remove()});const tr=add({item:code});const q=tr&&tr.querySelector(".kf-q");if(q)setTimeout(()=>q.focus(),50)}:null,cls)}
+function pKhoTon(m,scope){
+  const SC=KHO_SCOPE[scope||"NVL"],F=KHO.f,A=KHO.alerts||{low:[],negative:[]},ed=ME.role==="admin"||can(ME,"sx.kiemke");
+  const inSc=c=>SC.cls.includes(c);if(F.cls&&!inSc(F.cls))F.cls="";
+  const cIn=kCan("PN"),cOut=kCan("XB");
+  khoFrame(m,SC.page,SC.name,SC.sub,(()=>{
+    const q=kfold(F.q).trim(),all=[...KHO.items.values()].filter(i=>i.active&&inSc(i.cls)),hasStock=all.filter(i=>khoStock(i.code)!==0);
     let L=all.filter(i=>(!F.cls||i.cls===F.cls)&&(!q||q.split(/\s+/).every(w=>kfold(i.code+" "+i.name).includes(w)))&&(!F.low||(khoStock(i.code)<0||(i.min_stock>0&&khoStock(i.code)<i.min_stock))));
     if(!q&&!F.cls&&!F.low)L=L.filter(i=>khoStock(i.code)!==0);
     const total=L.length;L=L.slice(0,300);
-    return `<div class="grid kpis">${kpi("Mã đang có tồn",hasStock.length)}${kpi("Dưới mức tối thiểu",A.low.length)}${kpi("Tồn âm (cần kiểm tra)",A.negative.length)}${kpi("Tổng số mã",all.length)}</div>
-    <section class="card flush"><div class="card-h pad"><div class="filters"><input id="kt-q" placeholder="Tìm theo mã hoặc tên" value="${esc(F.q)}"><select id="kt-c">${opt([["","Mọi loại hàng"],...Object.entries(KHO_CLS)],F.cls)}</select><label class="inl"><input type="checkbox" id="kt-l"${F.low?" checked":""}> Chỉ hàng cần chú ý</label></div>
-    <span>${ME.role==="admin"?`<button class="btn" id="kt-tdx">Nạp tồn đầu từ Excel</button> <button class="btn" id="kt-td">Nhập tồn đầu kỳ (gõ tay)</button> `:""}${kCan("TB")&&typeof KTON!=="undefined"&&KTON.moc&&KTON.moc.moc?`<button class="btn pri" id="kt-tb">Kiểm tồn bổ sung</button>`:""}</span></div>
-    ${typeof KTON!=="undefined"&&KTON.moc?`<p class="hint pad" style="margin:0">${KTON.moc.moc?`Mốc tồn chung: <b>${kDd(KTON.moc.moc)}</b> (phiếu tồn chốt). ${nf(KTON.moc.counted.filter(x=>x.bo_sung).length)} mã đã kiểm bổ sung theo ngày kiểm riêng. Mã chưa có số kiểm thì đang tính từ mốc chung.`:`Chưa có phiếu tồn chốt chung (mốc tồn). CEO nạp phiếu tồn chốt và tích "phiếu tồn chốt chung" để đặt mốc.`}</p>`:""}
-    ${khoRows(["Mã","Tên","ĐVT","Loại","Tồn kho","Tồn tối thiểu","Trạng thái"],L.map(i=>{const s=khoStock(i.code),kr=typeof ktonRow==="function"&&ktonRow(i.code),low=kr?kr.trang_thai==="SAP_HET":i.min_stock>0&&s<i.min_stock;return `<tr><td class="mono">${esc(i.code)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td>${esc(KHO_CLS[i.cls]||i.cls)}</td><td class="n"><b>${knum(s)}</b></td><td class="n">${ed?`<input class="kt-min n" data-c="${esc(i.code)}" type="number" min="0" step="any" value="${i.min_stock||""}" placeholder="—">`:knum(i.min_stock)}</td><td>${s<0?pill("Âm kho","red"):low?pill("Dưới tối thiểu","amb"):s>0?pill("Còn hàng","grn"):""}</td></tr>`}))}
+    const nLow=A.low.filter(x=>inSc(x.cls)).length,nNeg=A.negative.filter(x=>inSc(x.cls)).length;
+    const btn=i=>{const b=[];if(cIn&&SC.inCls.includes(i.cls))b.push(`<button class="btn sm" data-kin="${esc(i.code)}">+ Nhập</button>`);if(cOut&&SC.outCls.includes(i.cls))b.push(`<button class="btn sm" data-kout="${esc(i.code)}">− Xuất</button>`);return b.join(" ")};
+    return `<div class="grid kpis">${kpi("Mã đang có tồn",hasStock.length)}${kpi("Dưới mức tối thiểu",nLow)}${kpi("Tồn âm (cần kiểm tra)",nNeg)}${kpi("Tổng số mã",all.length)}</div>
+    <section class="card flush"><div class="card-h pad"><div class="filters"><input id="kt-q" placeholder="Tìm theo mã hoặc tên" value="${esc(F.q)}"><select id="kt-c">${opt([["","Mọi loại trong kho này"],...SC.cls.map(c=>[c,KHO_CLS[c]||c])],F.cls)}</select><label class="inl"><input type="checkbox" id="kt-l"${F.low?" checked":""}> Chỉ hàng cần chú ý</label></div>
+    <span>${scope==="TP"&&PAGES.sx_kho?`<button class="btn" id="kt-lo">Lô, thùng, vị trí ›</button>`:""}</span></div>
+    ${typeof KTON!=="undefined"&&KTON.moc?`<p class="hint pad" style="margin:0">${KTON.moc.moc?`Mốc tồn chung: <b>${kDd(KTON.moc.moc)}</b> (phiếu tồn chốt). Mã chưa có số kiểm thì đang tính từ mốc chung; kiểm tồn bổ sung ở mục <a href="#" class="lnk" data-kgo="kho_kk">Kiểm kê tồn</a>.`:`Chưa có phiếu tồn chốt chung (mốc tồn). CEO nạp ở mục <a href="#" class="lnk" data-kgo="kho_kk">Kiểm kê tồn</a>.`}</p>`:""}
+    ${khoRows(["Mã","Tên","ĐVT","Loại","Tồn kho","Tồn tối thiểu","Trạng thái",""],L.map(i=>{const s=khoStock(i.code),kr=typeof ktonRow==="function"&&ktonRow(i.code),low=kr?kr.trang_thai==="SAP_HET":i.min_stock>0&&s<i.min_stock;return `<tr><td class="mono">${esc(i.code)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td>${esc(KHO_CLS[i.cls]||i.cls)}</td><td class="n"><b>${knum(s)}</b></td><td class="n">${ed?`<input class="kt-min n" data-c="${esc(i.code)}" type="number" min="0" step="any" value="${i.min_stock||""}" placeholder="—">`:knum(i.min_stock)}</td><td>${s<0?pill("Âm kho","red"):low?pill("Dưới tối thiểu","amb"):s>0?pill("Còn hàng","grn"):""}</td><td style="white-space:nowrap">${btn(i)}</td></tr>`}))}
     ${total>300?`<p class="hint pad">Đang hiện 300 / ${total} mã. Gõ vào ô tìm để thu hẹp.</p>`:""}</section>`})());
   const re=()=>{KHO.f.q=$("#kt-q").value;KHO.f.cls=$("#kt-c").value;KHO.f.low=$("#kt-l").checked;const p=$("#kt-q").selectionStart;renderMain();const q=$("#kt-q");if(q){q.focus();q.setSelectionRange(p,p)}};
   if($("#kt-q")){$("#kt-q").oninput=re;$("#kt-c").onchange=re;$("#kt-l").onchange=re;
     m.querySelectorAll(".kt-min").forEach(x=>x.onchange=async()=>{try{await kApi("/items/"+encodeURIComponent(x.dataset.c),{method:"PUT",body:JSON.stringify({min_stock:+x.value||0})});KHO.items.get(x.dataset.c).min_stock=+x.value||0;toast("Đã lưu tồn tối thiểu");KHO.at=0;khoLoad(true)}catch(e){toast(e.message)}});
-    if($("#kt-td"))$("#kt-td").onclick=()=>khoForm("TD");
-    if($("#kt-tb"))$("#kt-tb").onclick=()=>khoForm("TB");
-    if($("#kt-tdx"))$("#kt-tdx").onclick=()=>khoTdImport()}
+    m.querySelectorAll("[data-kin]").forEach(b=>b.onclick=()=>khoFormFor("PN",SC.inCls,b.dataset.kin));
+    m.querySelectorAll("[data-kout]").forEach(b=>b.onclick=()=>khoFormFor("XB",SC.outCls,b.dataset.kout));
+    if($("#kt-lo"))$("#kt-lo").onclick=()=>{PAGE="sx_kho";renderMain();scrollTo(0,0)};
+    m.querySelectorAll("[data-kgo]").forEach(a=>a.onclick=e=>{e.preventDefault();PAGE=a.dataset.kgo;renderMain();scrollTo(0,0)})}
+}
+
+/* ---------- Kiểm kê tồn: phiếu tồn chốt chung (mốc), kiểm tồn bổ sung từng mã; danh sách mọi phiếu kiểm ---------- */
+function pKhoKk(m){
+  if(typeof ktonLoad==="function")ktonLoad();
+  const sv=KHO.docAll;KHO.docAll=true; // phiếu kiểm ít, luôn hiện tất cả (không lọc theo kỳ)
+  pKhoDocs(m,"TD",{key:"TD",page:"kho_kk",name:"Kiểm kê tồn",hint:"Phiếu tồn chốt chung (mốc tồn) do CEO nạp; mã chưa có trong phiếu chốt thì kế toán kho đếm thực tế rồi ghi Kiểm tồn bổ sung. Số kiểm là số cuối ngày đếm. Dùng cho cả kho nguyên vật liệu và kho thành phẩm."});
+  const mc=typeof KTON!=="undefined"?KTON.moc:null,cnt=mc&&mc.counted||[],bs=cnt.filter(x=>x.bo_sung).length;
+  const b=[ME.role==="admin"?`<button class="btn" id="kk-tdx">Nạp tồn chốt từ Excel</button> <button class="btn" id="kk-td">Nhập tồn đầu kỳ (gõ tay)</button>`:"",kCan("TB")&&mc&&mc.moc?`<button class="btn pri" id="kk-tb">Kiểm tồn bổ sung</button>`:""].filter(Boolean).join(" ");
+  const card=`<section class="card"><div class="card-h"><h2>Mốc tồn</h2><span>${b}</span></div><p class="hint" style="margin:0">${mc&&mc.moc?`Mốc tồn chung: <b>${kDd(mc.moc)}</b>. Đã có số kiểm: <b>${nf(cnt.length)}</b> mã (${nf(cnt.length-bs)} trong phiếu chốt, ${nf(bs)} kiểm bổ sung). Mã đã kiểm không kiểm lại được; cần sửa thì lập phiếu điều chỉnh.`:mc?`Chưa có phiếu tồn chốt chung. CEO bấm "Nạp tồn chốt từ Excel", chọn ngày chốt và tích "phiếu tồn chốt chung".`:"Đang tải mốc tồn…"}</p></section>`;
+  const first=m.querySelector("section.card");if(first)first.insertAdjacentHTML("beforebegin",card);
+  KHO.docAll=sv;const kn=m.querySelector("#kho-new");if(kn)kn.remove();const ka=m.querySelector("#kho-all");if(ka)ka.remove();
+  if($("#kk-td"))$("#kk-td").onclick=()=>khoForm("TD");
+  if($("#kk-tb"))$("#kk-tb").onclick=()=>khoForm("TB");
+  if($("#kk-tdx"))$("#kk-tdx").onclick=()=>khoTdImport();
 }
 
 /* ---------- Nhập – xuất – tồn ---------- */
@@ -355,10 +384,12 @@ async function khoNxtDetail(code){
 }
 function pKhoNxt(m){
   const P=kPer();if(!KHO.nxt||KHO.nxtKey!==P.from+"|"+P.to)khoLoadNxt();const R=(KHO.nxt&&KHO.nxt.rows)||null;
-  const rows=R?R.filter(r=>r.opening||r.qty_in||r.qty_out||r.closing).map(r=>({...r,it:KHO.items.get(r.code)||{name:r.code,unit:"",cls:""}})).sort((a,b)=>a.code.localeCompare(b.code)):null;
-  khoFrame(m,"kho_nxt","Nhập – xuất – tồn","Tồn đầu kỳ + nhập − xuất = tồn cuối kỳ, theo từng mã. Kỳ lấy theo bộ chọn thời gian ở trên cùng.",`<section class="card flush"><div class="card-h pad"><div class="filters"><b>Kỳ: ${kPerLabel(P)}</b></div><button class="btn" id="nx-x">Tải Excel</button></div>
+  const kk=KHO.f.nxk||"",scC=kk?KHO_SCOPE[kk].cls:null;
+  const rows=R?R.filter(r=>r.opening||r.qty_in||r.qty_out||r.closing).map(r=>({...r,it:KHO.items.get(r.code)||{name:r.code,unit:"",cls:""}})).filter(r=>!scC||scC.includes(r.it.cls)).sort((a,b)=>a.code.localeCompare(b.code)):null;
+  khoFrame(m,"kho_nxt","Nhập – xuất – tồn","Tồn đầu kỳ + nhập − xuất = tồn cuối kỳ, theo từng mã. Kỳ lấy theo bộ chọn thời gian ở trên cùng.",`<section class="card flush"><div class="card-h pad"><div class="filters"><b>Kỳ: ${kPerLabel(P)}</b><select id="nx-k">${opt([["","Cả hai kho"],["NVL","Kho nguyên vật liệu"],["TP","Kho thành phẩm"]],kk)}</select></div><button class="btn" id="nx-x">Tải Excel</button></div>
    ${rows?khoRows(["Mã","Tên","ĐVT","Loại","Tồn đầu","Nhập","Xuất","Tồn cuối"],rows.map(r=>`<tr class="clk" data-nxd="${esc(r.code)}"><td class="mono">${esc(r.code)}</td><td>${esc(r.it.name)}</td><td>${esc(r.it.unit)}</td><td>${esc(KHO_CLS[r.it.cls]||"")}</td><td class="n">${knum(r.opening)}</td><td class="n">${knum(r.qty_in)}</td><td class="n">${knum(r.qty_out)}</td><td class="n"><b>${knum(r.closing)}</b></td></tr>`)):`<p class="hint pad">Đang tải…</p>`}</section>`);
   m.querySelectorAll("[data-nxd]").forEach(tr=>tr.onclick=()=>khoNxtDetail(tr.dataset.nxd));
+  if($("#nx-k"))$("#nx-k").onchange=()=>{KHO.f.nxk=$("#nx-k").value;renderMain()};
   if($("#nx-x"))$("#nx-x").onclick=()=>{if(!rows||typeof XLSX==="undefined"){toast("Chưa có dữ liệu để tải");return}const ws=XLSX.utils.aoa_to_sheet([["Mã","Tên","ĐVT","Loại","Tồn đầu","Nhập","Xuất","Tồn cuối"],...rows.map(r=>[r.code,r.it.name,r.it.unit,KHO_CLS[r.it.cls]||"",r.opening,r.qty_in,r.qty_out,r.closing])]),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"NXT");XLSX.writeFile(wb,`NXT_${P.from}_${P.to}.xlsx`)};
 }
 
@@ -559,4 +590,4 @@ function pKhoBoc(m){
     w.document.write(`<html><head><meta charset="utf-8"><title>Định mức ${esc(d.it.code)}</title><style>body{font:13px Arial;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:4px 6px}th{background:#eee}.n{text-align:right}</style></head><body><h2 style="text-align:center">ĐỊNH MỨC NGUYÊN VẬT LIỆU</h2><p><b>Sản phẩm:</b> ${esc(d.it.code)} – ${esc(d.it.name)} · <b>ĐVT:</b> ${esc(d.it.unit||"")} · <b>Số lượng:</b> ${knum(S.qty)}</p><table><tr>${d.head.map(h=>"<th>"+h+"</th>").join("")}</tr>${d.body.map(r=>"<tr>"+r.map((c,k)=>`<td class="${k>=4?"n":""}">${typeof c==="number"?knum(c):esc(c)}</td>`).join("")+"</tr>").join("")}</table>${d.P?`<p style="text-align:right"><b>Giá thành / 1 ${esc(d.it.unit||"")}: ${khoVnd(d.R.unitCost)} đ</b><br>Cho ${knum(S.qty)}: ${khoVnd(d.R.unitCost*S.qty)} đ</p>`:""}</body></html>`);w.document.close();w.print()};
 }
 
-Object.assign(PAGES,{kho_boc:pKhoBoc,kho_ton:pKhoTon,kho_nhap:m=>pKhoDocs(m,"PN",{key:"PN_NVL",page:"kho_nhap",cls:"NVL",formCls:["NVL","CCDC"],name:"Nhập nguyên vật liệu",hint:"Hàng mua về: nguyên vật liệu, vỏ, tem, bao bì, công cụ. Kế toán kho ghi theo số thực nhận."}),kho_nhap_tp:m=>pKhoDocs(m,"PN",{key:"PN_TP",page:"kho_nhap_tp",cls:"TP",formCls:["TP","HH"],name:"Nhập thành phẩm",hint:"Thành phẩm, hàng hóa nhập về kho (mua ngoài, gia công xong giao về). Ghi theo số thực nhận."}),kho_pc:m=>pKhoDocs(m,"PC"),kho_ks:m=>pKhoDocs(m,"KS"),kho_xuat:m=>pKhoDocs(m,"XB"),kho_hoan:m=>pKhoDocs(m,"TL"),kho_nxt:pKhoNxt,kho_cl:pKhoCl,kho_dm:pKhoDm});
+Object.assign(PAGES,{kho_boc:pKhoBoc,kho_ton:m=>pKhoTon(m,"NVL"),kho_ton_tp:m=>pKhoTon(m,"TP"),kho_kk:pKhoKk,kho_nhap:m=>pKhoDocs(m,"PN",{key:"PN_NVL",page:"kho_nhap",cls:"NVL",formCls:["NVL","CCDC"],name:"Nhập nguyên vật liệu",hint:"Hàng mua về: nguyên vật liệu, vỏ, tem, bao bì, công cụ. Kế toán kho ghi theo số thực nhận."}),kho_nhap_tp:m=>pKhoDocs(m,"PN",{key:"PN_TP",page:"kho_nhap_tp",cls:"TP",formCls:["TP","HH"],name:"Nhập hàng mua ngoài",hint:"Thành phẩm, hàng hóa mua sẵn hoặc gia công ngoài giao về. Thành phẩm tự sản xuất thì vào kho qua Đóng gói & kiểm kê, không ghi ở đây. Ghi theo số thực nhận."}),kho_pc:m=>pKhoDocs(m,"PC"),kho_ks:m=>pKhoDocs(m,"KS"),kho_xuat:m=>pKhoDocs(m,"XB",{key:"XB_NVL",page:"kho_xuat",cls:"NVL",formCls:["NVL","BTP","CCDC"],name:"Xuất nguyên vật liệu khác",hint:"Nguyên vật liệu, vỏ, tem, bán thành phẩm ra khỏi kho ngoài sản xuất: bán nguyên liệu, đưa đi gia công, hủy hỏng."}),kho_xuat_tp:m=>pKhoDocs(m,"XB",{key:"XB_TP",page:"kho_xuat_tp",cls:"TP",formCls:["TP","HH"],name:"Xuất thành phẩm khác",hint:"Thành phẩm, hàng hóa ra khỏi kho ngoài đơn bán: hàng mẫu, tặng, hủy hỏng, gia công. Đơn Kênh phân phối và bán lẻ các sàn tự trừ ở mục Xuất Kênh phân phối, Xuất Kênh bán lẻ."}),kho_hoan:m=>pKhoDocs(m,"TL"),kho_nxt:pKhoNxt,kho_cl:pKhoCl,kho_dm:pKhoDm});

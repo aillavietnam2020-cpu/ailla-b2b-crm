@@ -112,7 +112,7 @@ function retClaimTab(){
 function pKhoHoan(m){
   const T=[["scan","Quét hàng hoàn"],["unm","Chưa tra ra đơn"],["recon","Đối soát"],["claim","Khiếu nại"],["docs","Phiếu đã nhập"]];
   const nav=`<nav class="settabs">${T.map(([k,t])=>`<button class="${k===RET.tab?"on":""}" data-rt="${k}">${t}${k==="unm"&&RET.unm&&RET.unm.length?" ("+RET.unm.length+")":""}${k==="claim"&&RET.recon&&RET.recon.claims&&RET.recon.claims.filter(c=>c.claim).length?" ("+RET.recon.claims.filter(c=>c.claim).length+")":""}</button>`).join("")}</nav>`;
-  if(RET.tab==="docs"){pKhoDocs(m,"TL");const s=m.querySelector("nav.kgsub")||m.querySelector("nav.settabs");if(s)s.insertAdjacentHTML("afterend",nav);retBind(m);return}
+  if(RET.tab==="docs"){pKhoDocs(m,"TL");const s=m.querySelector("nav.kgsub")||m.querySelector("nav.kgtabs")||m.querySelector("nav.settabs");if(s)s.insertAdjacentHTML("afterend",nav);retBind(m);return}
   if(RET.tab==="scan"&&!RET.scans&&!RET.busy)retLoadScans();
   if(RET.tab!=="scan"&&!RET.recon)retLoadRecon();
   if(!RET.recon&&RET.tab==="scan")retLoadRecon();

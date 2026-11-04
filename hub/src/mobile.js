@@ -62,7 +62,7 @@
     if(mid)items.push(mid);
     const kho=first(["sx_kho","kho_ton","kho_hoan","sx_tq"]);
     const cv=first(["cv_v","cv_nv","cv_tq","cv","congviec"]);
-    if(kho&&kho!==home)items.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:["sx_kho","kho_ton","kho_hoan","kho_nhap","kho_nhap_tp","kho_xuat","kho_xuat_b2b","kho_online","kho_nxt","sx_tq"]});
+    if(kho&&kho!==home)items.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:["sx_kho","kho_ton","kho_ton_tp","kho_kk","kho_xuat_tp","kho_hoan","kho_nhap","kho_nhap_tp","kho_xuat","kho_xuat_b2b","kho_online","kho_nxt","sx_tq"]});
     else if(cv&&cv!==home)items.push({k:"cv",t:"Việc",ic:"task",go:()=>goPage(cv),pages:["cv_tq","cv_nv","cv","congviec","cv_kb"]});
     if(items.length<4){visibleMods().forEach(mo=>{if(items.length>=4)return;const g=modGroups(mo)[0];const it=g&&g[1][0];if(!it||items.some(i=>i.pages.includes(it[0])))return;items.push({k:"m"+mo.k,t:(mo.n||it[1]).split(" ")[0],ic:"chart",go:()=>goPage(it[0]),pages:[it[0]]})})}
     items.push({k:"more",t:"Menu",ic:"more",go:()=>document.body.classList.add("menu-open"),pages:[]});
