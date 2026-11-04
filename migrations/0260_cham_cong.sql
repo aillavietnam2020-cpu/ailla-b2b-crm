@@ -21,3 +21,14 @@ CREATE TABLE cc_luot (
 );
 CREATE INDEX idx_cc_luot_user_ngay ON cc_luot (user_id, ngay);
 CREATE INDEX idx_cc_luot_ngay ON cc_luot (ngay);
+
+-- Xếp ca (người làm theo ca, ví dụ team live): mỗi người mỗi ngày một ca; ca_id trỏ tới danh sách ca trong 'cc_caidat'.
+CREATE TABLE cc_xepca (
+  user_id TEXT NOT NULL,
+  ngay TEXT NOT NULL,
+  ca_id TEXT NOT NULL,
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, ngay)
+);
+CREATE INDEX idx_cc_xepca_ngay ON cc_xepca (ngay);

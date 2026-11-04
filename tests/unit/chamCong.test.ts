@@ -60,7 +60,7 @@ describe('chấm công: lịch làm', () => {
   it('văn phòng nghỉ thứ Bảy thứ 2 và thứ 4; xưởng làm mọi thứ Bảy; Chủ nhật nghỉ', () => {
     expect(['2026-11-07', '2026-11-14', '2026-11-21', '2026-11-28'].map((d) => dayRule(vp, d).lam)).toEqual([true, false, true, false]);
     expect(dayRule({ ...vp, thuBay: 'nghi13' }, '2026-11-07').lam).toBe(false);
-    expect(dayRule(xuong, '2026-11-14')).toEqual({ lam: true, vao: 480, ra: 1050 });
+    expect(dayRule(xuong, '2026-11-14')).toEqual({ lam: true, vao: 480, ra: 1020, tinh: true });
     expect(dayRule(xuong, '2026-11-08').lam).toBe(false);
   });
   it('đổi giờ Việt Nam', () => {
@@ -89,13 +89,13 @@ describe('chấm công: đi muộn theo thông báo 01102026', () => {
     const C = [ngay('2026-11-02', '08:20', '17:30'), ngay('2026-11-03', null, null), ngay('2026-11-04', '08:00', '17:30')];
     expect(tongThang(C, vp, '2026-11-30')).toMatchObject({ muonLan: 1, nghi: 1, chuyenCan: true });
     const D = [ngay('2026-11-02', '08:07', '17:30'), ngay('2026-11-03', '08:08', '17:30'), ngay('2026-11-04', '08:00', '16:00')];
-    expect(tongThang(D, vp, '2026-11-30')).toMatchObject({ muonLan: 2, somLan: 1, muon10: 0, chuyenCan: false });
+    expect(tongThang(D, vp, '2026-11-30')).toMatchObject({ muonLan: 2, somLan: 1, muonNang: 0, chuyenCan: false });
     expect(tongThang([ngay('2026-11-02', '10:00', '15:00', sale)], sale, '2026-11-30').chuyenCan).toBeNull();
     expect(tongThang([ngay('2026-11-02', '08:30', '17:30', xuong)], xuong, '2026-11-30')).toMatchObject({ muonLan: 1, chuyenCan: null });
   });
   it('đếm số lần muộn quá 10 phút; hôm nay chưa chấm không tính nghỉ', () => {
     const t = tongThang([ngay('2026-11-02', '08:11', '17:30'), ngay('2026-11-03', '08:10', '17:30'), ngay('2026-11-04', null, null, vp, '2026-11-04')], vp, '2026-11-04');
-    expect(t).toMatchObject({ muonLan: 2, muon10: 1, nghi: 0 });
+    expect(t).toMatchObject({ muonLan: 2, muonNang: 1, nghi: 0 });
   });
   it('ngày trong tháng dừng ở hôm nay', () => {
     expect(daysOf('2026-11', '2026-11-04')).toEqual(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04']);
@@ -141,5 +141,38 @@ describe('chấm công: góp ý CEO 04/11', () => {
     expect(tongNgay([{ loai: 'vao', at, trong: 1 }], vp, '2026-11-04', true)).toMatchObject({ muon: 15, canhBao: true });
     expect(tongNgay([{ loai: 'vao', at, trong: 1, ly_do_muon: 'Tắc đường' }], vp, '2026-11-04', true)).toMatchObject({ canhBao: false, lyDoMuon: 'Tắc đường' });
     expect(tongNgay([{ loai: 'vao', at: vn('2026-11-04', '08:08'), trong: 1 }], vp, '2026-11-04', true)).toMatchObject({ muon: 8, canhBao: false });
+  });
+});
+
+describe('chấm công: ca, nghỉ trưa, quy tắc điền được (CEO 04/11)', () => {
+  const s3 = normalizeSettings({
+    ca: [
+      { id: 'toi', ten: 'Ca tối', tu: '19:00', den: '23:00' },
+      { id: 'sai', ten: 'Qua đêm', tu: '22:00', den: '06:00' },
+    ],
+    quyTac: { mocLyDo: 15, mocNang: 20, ccLan: 3, ccNghi: 1 },
+  });
+  const live = s3.lich.find((l) => l.id === 'live') as Lich;
+  const toi = s3.ca[0];
+  it('bỏ ca qua đêm (chưa hỗ trợ), quy tắc lấy theo ô điền', () => {
+    expect(s3.ca.map((c) => c.id)).toEqual(['toi']);
+    expect(s3.quyTac).toMatchObject({ mocLyDo: 15, mocNang: 20, ccLan: 3, ccNghi: 1, tienCC: 200000 });
+  });
+  it('người làm ca: ngày không xếp ca là nghỉ; có ca thì tính muộn theo giờ ca, kể cả Chủ nhật', () => {
+    expect(dayRule(live, '2026-11-04').lam).toBe(false);
+    expect(dayRule(live, '2026-11-08', toi)).toEqual({ lam: true, vao: 1140, ra: 1380, tinh: true });
+    const d = tongNgay([{ loai: 'vao', at: vn('2026-11-08', '19:12'), trong: 1 }, { loai: 'ra', at: vn('2026-11-08', '23:00'), trong: 1 }], live, '2026-11-08', false, { ca: toi, q: s3.quyTac });
+    expect(d).toMatchObject({ muon: 12, ca: 'Ca tối', canhBao: false, phut: 228 });
+  });
+  it('mốc hỏi lý do và chuyên cần theo quy tắc điền', () => {
+    const d = tongNgay([{ loai: 'vao', at: vn('2026-11-04', '08:16'), trong: 1 }], vp, '2026-11-04', true, { q: s3.quyTac });
+    expect(d.canhBao).toBe(true);
+    const n = [ngay('2026-11-02', '08:30', '17:30'), ngay('2026-11-03', '08:30', '17:30'), ngay('2026-11-04', '08:30', '17:30')];
+    expect(tongThang(n, vp, '2026-11-30', s3.quyTac)).toMatchObject({ muonLan: 3, muonNang: 3, chuyenCan: true });
+  });
+  it('giờ làm trừ nghỉ trưa: văn phòng 8h–17h30 nghỉ 12h–13h30 là 8 giờ; xưởng 8h–17h nghỉ 12h–13h là 8 giờ', () => {
+    expect(ngay('2026-11-04', '08:00', '17:30').phut).toBe(480);
+    expect(ngay('2026-11-04', '08:00', '17:00', xuong).phut).toBe(480);
+    expect(ngay('2026-11-04', '08:00', '11:00').phut).toBe(180);
   });
 });

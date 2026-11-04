@@ -2,36 +2,69 @@
  * Chấm công trên điện thoại (chị Hoa duyệt 04/11/2026): nhân viên bấm Chấm vào / Chấm ra trên vanhanh,
  * máy chủ ghi giờ theo đồng hồ máy chủ (không tin giờ điện thoại) và khoảng cách tới điểm chấm gần nhất.
  * File này chỉ có hàm thuần (khoảng cách, giờ Việt Nam, đi muộn / về sớm, chuyên cần) để kiểm thử được; đọc ghi ở routes/chamCong.ts.
- * Quy định chuyên cần theo thông báo 01102026/TB-AILLA (khối văn phòng). Chưa đổ vào bảng lương.
+ * Mọi giờ giấc và quy tắc (lịch làm, nghỉ trưa, ca, mốc đi muộn, chuyên cần) là ô điền ở Nhân sự › Cài đặt chấm công
+ * (CEO 04/11: không cố định trong code). Giá trị mặc định lấy theo thông báo 01102026/TB-AILLA. Chưa đổ vào bảng lương.
  */
 
 export const CC_SETTINGS_KEY = 'cc_caidat';
 
 export type Diem = { id: string; ten: string; lat: number; lng: number; bk: number };
 /**
- * Lịch làm của một nhóm người. kieu: 'codinh' giờ cố định (tính đi muộn, về sớm, chuyên cần);
- * 'ca' làm theo ca (team live, chưa xếp ca nên chỉ ghi giờ vào ra); 'tudo' giờ linh hoạt (sale, chỉ ghi giờ).
+ * Lịch làm của một nhóm người. kieu: 'codinh' giờ cố định; 'ca' làm theo ca được xếp (Nhân sự › Xếp ca);
+ * 'tudo' giờ linh hoạt (chỉ ghi giờ vào ra).
  * thuBay: 'ca' làm cả ngày, 'nua' làm buổi sáng (ra theo gioRaT7), 'nghi' nghỉ hết,
- * 'nghi13' nghỉ thứ Bảy thứ 1 và thứ 3 của tháng, 'nghi24' nghỉ thứ Bảy thứ 2 và thứ 4. Chủ nhật luôn nghỉ.
- */
-export type ThuBay = 'ca' | 'nua' | 'nghi' | 'nghi13' | 'nghi24';
-/**
+ * 'nghi13' nghỉ thứ Bảy thứ 1 và thứ 3 của tháng, 'nghi24' nghỉ thứ Bảy thứ 2 và thứ 4. Chủ nhật nghỉ (trừ ngày được xếp ca).
+ * truaTu / truaDen: giờ nghỉ trưa, không cần chấm, không tính vào giờ làm ('' = không nghỉ trưa).
  * diem: các điểm chấm của lịch này (văn phòng, xưởng khác nhau); rỗng = mọi điểm.
  * ngoaiOk: được chấm ngoài phạm vi khi ghi lý do (CEO 04/11: chỉ Sale); lịch khác ngoài phạm vi là không chấm được.
  */
-export type Lich = { id: string; ten: string; kieu: 'codinh' | 'ca' | 'tudo'; gioVao: string; gioRa: string; anHan: number; thuBay: ThuBay; gioRaT7: string; chuyenCan: boolean; diem: string[]; ngoaiOk: boolean };
+export type ThuBay = 'ca' | 'nua' | 'nghi' | 'nghi13' | 'nghi24';
+export type Lich = {
+  id: string;
+  ten: string;
+  kieu: 'codinh' | 'ca' | 'tudo';
+  gioVao: string;
+  gioRa: string;
+  truaTu: string;
+  truaDen: string;
+  anHan: number;
+  thuBay: ThuBay;
+  gioRaT7: string;
+  chuyenCan: boolean;
+  diem: string[];
+  ngoaiOk: boolean;
+};
+/** Một ca làm (team live…): giờ bắt đầu, giờ kết thúc trong cùng một ngày. */
+export type Ca = { id: string; ten: string; tu: string; den: string };
+/**
+ * Quy tắc tính công dùng chung. mocLyDo: muộn quá số phút này thì hỏi lý do (không ghi thì cảnh báo);
+ * mocNang: mốc "muộn nặng" đếm riêng (thông báo 01102026: 10 phút); ccLan / ccNghi: tối đa số lần muộn + về sớm,
+ * số ngày nghỉ trong tháng để giữ chuyên cần; tienCC, tienTrua: số tiền để hiện trên bảng (chưa trừ vào lương).
+ */
+export type QuyTac = { mocLyDo: number; mocNang: number; ccLan: number; ccNghi: number; tienCC: number; tienTrua: number };
 /** pbLich: lịch theo phòng ban; nguoiLich: lịch riêng từng người (mã đăng nhập), ưu tiên hơn phòng ban; macDinh: còn lại. */
-export type CcSettings = { diem: Diem[]; lich: Lich[]; pbLich: Record<string, string>; nguoiLich: Record<string, string>; macDinh: string };
+export type CcSettings = {
+  diem: Diem[];
+  lich: Lich[];
+  ca: Ca[];
+  quyTac: QuyTac;
+  pbLich: Record<string, string>;
+  nguoiLich: Record<string, string>;
+  macDinh: string;
+};
 
-/** Theo thông báo 01102026/TB-AILLA và lời CEO 04/11: văn phòng 8h–17h30, quá 8h05 là muộn, nghỉ 2 thứ Bảy/tháng; xưởng làm thứ Bảy. */
+const BASE = { anHan: 5, gioRaT7: '12:00', diem: [] as string[] };
+/** Mặc định theo thông báo 01102026/TB-AILLA và lời CEO 04/11; CEO / HCNS sửa ở trang cài đặt. */
 export const CC_DEFAULT: CcSettings = {
   diem: [],
   lich: [
-    { id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'nghi24', gioRaT7: '12:00', chuyenCan: true, diem: [], ngoaiOk: false },
-    { id: 'xuong', ten: 'Xưởng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false, diem: [], ngoaiOk: false },
-    { id: 'live', ten: 'Live (theo ca)', kieu: 'ca', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false, diem: [], ngoaiOk: false },
-    { id: 'sale', ten: 'Sale (giờ linh hoạt)', kieu: 'tudo', gioVao: '08:00', gioRa: '17:30', anHan: 5, thuBay: 'ca', gioRaT7: '12:00', chuyenCan: false, diem: [], ngoaiOk: true },
+    { ...BASE, id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', truaTu: '12:00', truaDen: '13:30', thuBay: 'nghi24', chuyenCan: true, ngoaiOk: false },
+    { ...BASE, id: 'xuong', ten: 'Xưởng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:00', truaTu: '12:00', truaDen: '13:00', thuBay: 'ca', chuyenCan: false, ngoaiOk: false },
+    { ...BASE, id: 'live', ten: 'Live (theo ca)', kieu: 'ca', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: false },
+    { ...BASE, id: 'sale', ten: 'Sale (giờ linh hoạt)', kieu: 'tudo', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: true },
   ],
+  ca: [],
+  quyTac: { mocLyDo: 10, mocNang: 10, ccLan: 2, ccNghi: 2, tienCC: 200000, tienTrua: 25000 },
   pbLich: { SX: 'xuong', KV: 'xuong', B2B: 'sale', B2C: 'sale' },
   nguoiLich: {},
   macDinh: 'vp',
@@ -41,25 +74,49 @@ const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const THU_BAY: ThuBay[] = ['ca', 'nua', 'nghi', 'nghi13', 'nghi24'];
 const num = (v: unknown, lo: number, hi: number, d: number) => {
   const n = Number(v);
-  return Number.isFinite(n) && n >= lo && n <= hi ? n : d;
+  return v !== '' && v != null && Number.isFinite(n) && n >= lo && n <= hi ? n : d;
 };
 const hm = (v: unknown, def: string) => (typeof v === 'string' && HM.test(v) ? v : def);
+const hmOrEmpty = (v: unknown, def: string) => (v === '' ? '' : hm(v, def));
 
 function normLich(x: unknown, i: number): Lich {
   const o = (x ?? {}) as Record<string, unknown>;
-  const d = CC_DEFAULT.lich[0];
+  const d = CC_DEFAULT.lich.find((l) => l.id === o.id) ?? CC_DEFAULT.lich[0];
   return {
     id: String(o.id || 'l' + (i + 1)).slice(0, 40),
     ten: String(o.ten || 'Lịch ' + (i + 1)).slice(0, 80),
-    kieu: o.kieu === 'ca' || o.kieu === 'tudo' ? o.kieu : 'codinh',
+    kieu: o.kieu === 'ca' || o.kieu === 'tudo' || o.kieu === 'codinh' ? o.kieu : d.kieu,
     gioVao: hm(o.gioVao, d.gioVao),
     gioRa: hm(o.gioRa, d.gioRa),
+    truaTu: hmOrEmpty(o.truaTu, d.truaTu),
+    truaDen: hmOrEmpty(o.truaDen, d.truaDen),
     anHan: Math.round(num(o.anHan, 0, 120, d.anHan)),
     thuBay: THU_BAY.includes(o.thuBay as ThuBay) ? (o.thuBay as ThuBay) : d.thuBay,
     gioRaT7: hm(o.gioRaT7, d.gioRaT7),
-    chuyenCan: o.chuyenCan === undefined ? i === 0 : o.chuyenCan === true,
+    chuyenCan: typeof o.chuyenCan === 'boolean' ? o.chuyenCan : d.chuyenCan,
     diem: Array.isArray(o.diem) ? o.diem.map(String).slice(0, 10) : [],
-    ngoaiOk: o.ngoaiOk === undefined ? o.kieu === 'tudo' : o.ngoaiOk === true,
+    ngoaiOk: typeof o.ngoaiOk === 'boolean' ? o.ngoaiOk : o.kieu === 'tudo',
+  };
+}
+
+function normCa(x: unknown, i: number): Ca | null {
+  const o = (x ?? {}) as Record<string, unknown>;
+  const tu = hm(o.tu, '');
+  const den = hm(o.den, '');
+  if (!tu || !den || den <= tu) return null; // ca qua nửa đêm chưa hỗ trợ
+  return { id: String(o.id || 'ca' + (i + 1)).slice(0, 40), ten: String(o.ten || 'Ca ' + (i + 1)).slice(0, 60), tu, den };
+}
+
+function normQuyTac(x: unknown): QuyTac {
+  const o = (x ?? {}) as Record<string, unknown>;
+  const d = CC_DEFAULT.quyTac;
+  return {
+    mocLyDo: Math.round(num(o.mocLyDo, 0, 240, d.mocLyDo)),
+    mocNang: Math.round(num(o.mocNang, 0, 240, d.mocNang)),
+    ccLan: Math.round(num(o.ccLan, 0, 31, d.ccLan)),
+    ccNghi: Math.round(num(o.ccNghi, 0, 31, d.ccNghi)),
+    tienCC: Math.round(num(o.tienCC, 0, 100_000_000, d.tienCC)),
+    tienTrua: Math.round(num(o.tienTrua, 0, 10_000_000, d.tienTrua)),
   };
 }
 
@@ -83,7 +140,7 @@ export function normalizeSettings(v: unknown): CcSettings {
     })
     .filter((x): x is Diem => !!x)
     .slice(0, 10);
-  const lich = Array.isArray(o.lich) && o.lich.length ? o.lich.slice(0, 12).map(normLich) : CC_DEFAULT.lich.map((l) => ({ ...l }));
+  const lich = Array.isArray(o.lich) && o.lich.length ? o.lich.slice(0, 12).map(normLich) : CC_DEFAULT.lich.map((l) => ({ ...l, diem: [] }));
   const ids = new Set(lich.map((l) => l.id));
   const map = (x: unknown, def: Record<string, string>) => {
     const src = x && typeof x === 'object' ? (x as Record<string, unknown>) : def;
@@ -93,8 +150,9 @@ export function normalizeSettings(v: unknown): CcSettings {
   };
   const diemIds = new Set(diem.map((d) => d.id));
   for (const l of lich) l.diem = l.diem.filter((id) => diemIds.has(id));
+  const ca = (Array.isArray(o.ca) ? o.ca : []).slice(0, 20).map(normCa).filter((x): x is Ca => !!x);
   const macDinh = typeof o.macDinh === 'string' && ids.has(o.macDinh) ? o.macDinh : lich[0].id;
-  return { diem, lich, pbLich: map(o.pbLich, CC_DEFAULT.pbLich), nguoiLich: map(o.nguoiLich, {}), macDinh };
+  return { diem, lich, ca, quyTac: normQuyTac(o.quyTac), pbLich: map(o.pbLich, CC_DEFAULT.pbLich), nguoiLich: map(o.nguoiLich, {}), macDinh };
 }
 
 /** Lịch làm của một người: lịch riêng, rồi theo phòng ban, rồi lịch mặc định. */
@@ -139,34 +197,39 @@ export function weekday(ngay: string): number {
   return new Date(ngay + 'T00:00:00Z').getUTCDay();
 }
 
-/** Ngày đó có phải đi làm không, giờ vào giờ ra chuẩn (phút). */
-export function dayRule(l: Lich, ngay: string): { lam: boolean; vao: number; ra: number } {
+/**
+ * Ngày đó có phải đi làm không, giờ vào giờ ra chuẩn (phút), có tính đi muộn / về sớm không.
+ * Lịch theo ca: chỉ đi làm ngày được xếp ca, giờ theo ca. Giờ linh hoạt: không tính muộn.
+ */
+export function dayRule(l: Lich, ngay: string, ca?: Ca | null): { lam: boolean; vao: number; ra: number; tinh: boolean } {
+  if (l.kieu === 'ca') return ca ? { lam: true, vao: toMin(ca.tu), ra: toMin(ca.den), tinh: true } : { lam: false, vao: 0, ra: 0, tinh: false };
   const w = weekday(ngay);
   const vao = toMin(l.gioVao);
   const ra = toMin(l.gioRa);
-  if (w === 0) return { lam: false, vao, ra };
-  if (w !== 6) return { lam: true, vao, ra };
+  const tinh = l.kieu === 'codinh';
+  if (w === 0) return { lam: false, vao, ra, tinh: false };
+  if (w !== 6) return { lam: true, vao, ra, tinh };
   const thu = Math.ceil(Number(ngay.slice(8, 10)) / 7); // thứ Bảy thứ mấy trong tháng
   if (l.thuBay === 'nghi' || (l.thuBay === 'nghi13' && (thu === 1 || thu === 3)) || (l.thuBay === 'nghi24' && (thu === 2 || thu === 4)))
-    return { lam: false, vao, ra };
-  return { lam: true, vao, ra: l.thuBay === 'nua' ? toMin(l.gioRaT7) : ra };
+    return { lam: false, vao, ra, tinh: false };
+  return { lam: true, vao, ra: l.thuBay === 'nua' ? toMin(l.gioRaT7) : ra, tinh };
 }
 
 export type Luot = { loai: 'vao' | 'ra'; at: string; trong: number | null; ly_do_muon?: string | null };
-/** Đi muộn quá số phút này thì hiện ô lý do; không ghi thì cảnh báo (CEO 04/11). */
-export const MUON_LY_DO = 10;
 export type NgayCong = {
   vao: string | null;
   ra: string | null;
-  /** Phút đi muộn (tính đủ từ giờ vào chuẩn) khi vào trễ quá phút ân hạn; về sớm tương tự. Lịch theo ca / linh hoạt không tính. */
+  /** Phút đi muộn (tính đủ từ giờ vào chuẩn) khi vào trễ quá phút ân hạn; về sớm tương tự. Giờ linh hoạt không tính. */
   muon: number;
   som: number;
-  /** Số phút từ lượt vào tới lượt ra. */
+  /** Số phút làm từ lượt vào tới lượt ra, trừ giờ nghỉ trưa. */
   phut: number;
   quenRa: boolean;
   ngoai: boolean;
   lam: boolean;
-  /** Lý do đi muộn đã ghi; canhBao = muộn quá 10 phút mà chưa ghi lý do. */
+  /** Tên ca được xếp (lịch theo ca). */
+  ca: string | null;
+  /** Lý do đi muộn đã ghi; canhBao = muộn quá mốc hỏi lý do mà chưa ghi. */
   lyDoMuon: string | null;
   canhBao: boolean;
 };
@@ -175,22 +238,36 @@ export type NgayCong = {
  * Gộp các lượt chấm của một người trong một ngày: lấy lượt vào sớm nhất, lượt ra muộn nhất.
  * quenRa chỉ tính cho ngày đã qua (homNay = false).
  */
-export function tongNgay(luot: Luot[], l: Lich, ngay: string, homNay: boolean): NgayCong {
-  const rule = dayRule(l, ngay);
+export function tongNgay(
+  luot: Luot[],
+  l: Lich,
+  ngay: string,
+  homNay: boolean,
+  opt: { ca?: Ca | null; q?: QuyTac } = {},
+): NgayCong {
+  const q = opt.q ?? CC_DEFAULT.quyTac;
+  const rule = dayRule(l, ngay, opt.ca);
   const vaoL = luot.filter((x) => x.loai === 'vao').sort((a, b) => a.at.localeCompare(b.at))[0];
   const raL = luot.filter((x) => x.loai === 'ra').sort((a, b) => b.at.localeCompare(a.at))[0];
-  const tinh = rule.lam && l.kieu === 'codinh';
   let muon = 0;
   let som = 0;
-  if (tinh && vaoL) {
+  if (rule.tinh && vaoL) {
     const m = vnMinutes(vaoL.at) - rule.vao;
     if (m > l.anHan) muon = m;
   }
-  if (tinh && raL) {
+  if (rule.tinh && raL) {
     const m = rule.ra - vnMinutes(raL.at);
     if (m > l.anHan) som = m;
   }
-  const phut = vaoL && raL && raL.at > vaoL.at ? Math.round((Date.parse(raL.at) - Date.parse(vaoL.at)) / 60000) : 0;
+  let phut = 0;
+  if (vaoL && raL && raL.at > vaoL.at) {
+    phut = Math.round((Date.parse(raL.at) - Date.parse(vaoL.at)) / 60000);
+    if (l.kieu !== 'ca' && l.truaTu && l.truaDen) {
+      const a = Math.max(vnMinutes(vaoL.at), toMin(l.truaTu));
+      const b = Math.min(vnMinutes(raL.at), toMin(l.truaDen));
+      if (b > a) phut -= b - a;
+    }
+  }
   return {
     vao: vaoL?.at ?? null,
     ra: raL?.at ?? null,
@@ -200,8 +277,9 @@ export function tongNgay(luot: Luot[], l: Lich, ngay: string, homNay: boolean): 
     quenRa: !!vaoL && !raL && !homNay,
     ngoai: luot.some((x) => x.trong === 0),
     lam: rule.lam,
+    ca: opt.ca?.ten ?? null,
     lyDoMuon: vaoL?.ly_do_muon || null,
-    canhBao: muon > MUON_LY_DO && !vaoL?.ly_do_muon,
+    canhBao: muon > q.mocLyDo && !vaoL?.ly_do_muon,
   };
 }
 
@@ -210,22 +288,22 @@ export type TongThang = {
   lamChuan: number;
   muonLan: number;
   muonPhut: number;
-  /** Số lần muộn quá 10 phút (mốc 5 lần trừ 25% thưởng trong giai đoạn chuyển tiếp). */
-  muon10: number;
+  /** Số lần muộn quá mốc "muộn nặng" (thông báo 01102026: quá 10 phút, mốc 5 lần trừ 25% thưởng giai đoạn chuyển tiếp). */
+  muonNang: number;
   somLan: number;
   quenRa: number;
   ngoai: number;
-  /** Số lần muộn quá 10 phút mà không ghi lý do. */
+  /** Số lần muộn quá mốc hỏi lý do mà không ghi lý do. */
   canhBao: number;
   /** Ngày phải làm (đã qua) mà không chấm: tạm coi là nghỉ, chưa trừ ngày nghỉ có đơn, lễ tết. */
   nghi: number;
   phut: number;
-  /** Chuyên cần: muộn + về sớm không quá 2 lần và nghỉ không quá 2 ngày. null = lịch không tính chuyên cần (thông báo chỉ áp dụng khối văn phòng). */
+  /** Chuyên cần: muộn + về sớm không quá ccLan lần và nghỉ không quá ccNghi ngày. null = lịch không tính chuyên cần. */
   chuyenCan: boolean | null;
 };
 
 /** Cộng một tháng. homNay để không tính hôm nay là ngày nghỉ. */
-export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay: string): TongThang {
+export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay: string, q: QuyTac = CC_DEFAULT.quyTac): TongThang {
   const co = ngay.filter((x) => x.vao || x.ra);
   const muonLan = co.filter((x) => x.muon > 0).length;
   const somLan = co.filter((x) => x.som > 0).length;
@@ -235,14 +313,14 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
     lamChuan: ngay.filter((x) => x.lam).length,
     muonLan,
     muonPhut: co.reduce((t, x) => t + x.muon, 0),
-    muon10: co.filter((x) => x.muon > 10).length,
+    muonNang: co.filter((x) => x.muon > q.mocNang).length,
     somLan,
     quenRa: ngay.filter((x) => x.quenRa).length,
     ngoai: ngay.filter((x) => x.ngoai).length,
     canhBao: co.filter((x) => x.canhBao).length,
     nghi,
     phut: co.reduce((t, x) => t + x.phut, 0),
-    chuyenCan: l.kieu === 'codinh' && l.chuyenCan ? muonLan + somLan <= 2 && nghi <= 2 : null,
+    chuyenCan: l.kieu !== 'tudo' && l.chuyenCan ? muonLan + somLan <= q.ccLan && nghi <= q.ccNghi : null,
   };
 }
 
@@ -257,6 +335,16 @@ export function daysOf(thang: string, toiDa: string): string[] {
     out.push(k);
   }
   return out;
+}
+
+/** n ngày liên tiếp bắt đầu từ ngày 'YYYY-MM-DD'. */
+export function daysFrom(tu: string, n: number): string[] {
+  const t = Date.parse(tu + 'T00:00:00Z');
+  return Array.from({ length: n }, (_, i) => new Date(t + i * 864e5).toISOString().slice(0, 10));
+}
+/** Thứ Hai của tuần chứa ngày đó. */
+export function mondayOf(ngay: string): string {
+  return new Date(Date.parse(ngay + 'T00:00:00Z') - ((weekday(ngay) + 6) % 7) * 864e5).toISOString().slice(0, 10);
 }
 
 /** Ai xem được lượt chấm của ai: CEO, nhân sự xem hết; trưởng nhóm / trưởng phòng xem phòng mình; còn lại chỉ xem của mình. */
