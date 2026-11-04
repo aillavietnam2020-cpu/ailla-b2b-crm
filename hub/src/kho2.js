@@ -183,7 +183,8 @@ async function khoTdImport(){
    <p class="hint">Tải file mẫu: trang <b>NGUYEN_VAT_LIEU</b> kê sẵn toàn bộ nguyên vật liệu theo nhóm, trang <b>BTP_TP</b> để chọn / gõ tên bán thành phẩm, thành phẩm. Điền số vào các ô vàng rồi chọn file lên đây. Hệ thống cho xem trước, kiểm lại rồi mới ghi <b>một phiếu</b>.</p>
    ${docs.length?`<div class="note amb"><b>Đã có phiếu tồn đầu kỳ:</b> ${docs.map(d=>esc(d.no)+" ("+kDd(d.doc_date)+", "+d.n_lines+" dòng)").join("; ")}. Nạp thêm sẽ <b>cộng dồn</b> vào tồn. Muốn nạp lại từ đầu thì hủy phiếu cũ trước.<div class="row7">${docs.map(d=>`<button class="btn td-cx" data-id="${d.id}" data-no="${esc(d.no)}">Hủy phiếu ${esc(d.no)}</button>`).join(" ")}</div></div>`:""}
    <div class="row7"><button class="btn pri" id="td-tpl">Tải file mẫu (có sẵn danh mục)</button><label class="btn">Chọn file Excel đã điền<input type="file" id="td-f" accept=".xlsx,.xls,.csv" hidden></label>
-   <label class="field">Ngày chốt tồn<input type="date" id="td-d" value="${kToday()}"></label></div>
+   <label class="field">Ngày chốt tồn<input type="date" id="td-d" value="${kToday()}"></label>
+   <label class="inl"><input type="checkbox" id="td-moc"${typeof KTON!=="undefined"&&KTON.moc&&KTON.moc.moc?"":" checked"}> Đây là phiếu tồn chốt chung (mốc tồn): hàng nhập, xuất, bán sàn từ hôm sau mới tính; mã chưa có trong phiếu thì kế toán kho kiểm bổ sung sau</label></div>
    <div id="td-out"></div>`);
   document.querySelectorAll(".td-cx").forEach(b=>b.onclick=async()=>{
     const r=prompt("Lý do hủy phiếu "+b.dataset.no+" (bắt buộc):");if(!r||r.trim().length<3)return;
@@ -217,7 +218,7 @@ async function khoTdImport(){
         if(!confirm("Ghi 1 phiếu tồn đầu kỳ ngày "+kDd(d)+" gồm "+lines.length+" mã"+(docs.length?"\n\nĐã có phiếu tồn đầu kỳ khác, số này sẽ CỘNG DỒN.":"")+"?"))return;
         $("#td-ok").disabled=true;
         try{
-          const r=await kApi("/docs",{method:"POST",body:JSON.stringify({type:"TD",date:d,allow_more:docs.length>0,note:"Nạp từ file "+file.name,lines:lines.map(g=>({item:g.code,qty:g.qty,price:Number.isFinite(g.price)?g.price:undefined}))})});
+          const r=await kApi("/docs",{method:"POST",body:JSON.stringify({type:"TD",date:d,allow_more:docs.length>0,moc:!!($("#td-moc")&&$("#td-moc").checked),note:"Nạp từ file "+file.name,lines:lines.map(g=>({item:g.code,qty:g.qty,price:Number.isFinite(g.price)?g.price:undefined}))})});
           toast("Đã ghi phiếu "+r.no);KHO.at=0;KHO.list={};KHO.nxt=null;await khoLoad(true);khoTdImport()
         }catch(err){$("#td-ok").disabled=false;$("#td-msg").textContent=err.message}};
     }catch(err){out.innerHTML=`<div class="note red">Chưa đọc được file: ${esc(err.message)}</div>`}finally{e.target.value=""}

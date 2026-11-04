@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { canEditCombo } from './sanpham';
-import { nowIso } from '@shared/datetime';
+import { nowIso, vnDate } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
@@ -65,6 +65,11 @@ const ip = (c: { req: { header: (n: string) => string | undefined } }) => c.req.
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number.NaN);
 const isDate = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
+const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+/** Ngày mốc tồn chung (kho_cfg 'ton_moc'), null = chưa đặt. */
+async function khoMocChung(db: D1Database) {
+  return (await db.prepare("SELECT v FROM kho_cfg WHERE k = 'ton_moc'").first<{ v: string }>())?.v ?? null;
+}
 
 /* ---------- Danh mục & định mức ---------- */
 
@@ -1038,6 +1043,24 @@ export async function khoAlerts(db: D1Database) {
   return { low: low.map(pick), negative: neg.map(pick), variance: lech.results };
 }
 
+/** Mốc tồn: ngày phiếu tồn chốt chung và các mã đã có số kiểm từ mốc (tồn chốt hoặc kiểm bổ sung). */
+khoRoutes.get('/moc', async (c) => {
+  const moc = await khoMocChung(c.env.DB);
+  const cfg = await c.env.DB.prepare("SELECT k, v FROM kho_cfg WHERE k IN ('b2b_from', 'online_from')").all<{ k: string; v: string }>();
+  const counted = moc
+    ? (
+        await c.env.DB.prepare(
+          `SELECT m.item, MAX(d.doc_date) AS doc_date, MAX(d.no) AS no, MAX(CASE WHEN d.extra LIKE '%"bo_sung":true%' THEN 1 ELSE 0 END) AS bo_sung
+           FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
+           WHERE d.status = 'OK' AND d.type = 'TD' AND d.doc_date >= ? GROUP BY m.item`,
+        )
+          .bind(moc)
+          .all<{ item: string; doc_date: string; no: string; bo_sung: number }>()
+      ).results
+    : [];
+  return ok(c, { moc, today: vnDate(), cfg: Object.fromEntries((cfg.results ?? []).map((r) => [r.k, r.v])), counted });
+});
+
 /** Tồn mọi mã theo một cách tính (services/khoTon.ts): tồn thực tế, đã giữ, khả dụng, đang sản xuất, trạng thái. */
 khoRoutes.get('/ton', async (c) => {
   const asof = isDate(c.req.query('asof')) ? (c.req.query('asof') as string) : '9999-12-31';
@@ -1147,9 +1170,19 @@ khoRoutes.post('/docs', async (c) => {
   if (!b) throw badRequest('BAD_JSON', 'Dữ liệu gửi lên không đúng định dạng');
   const type = String(b.type ?? '') as DocType;
   if (!(DOC_TYPES as readonly string[]).includes(type)) throw badRequest('BAD_TYPE', 'Loại phiếu không đúng');
-  if (type === 'TD' && !isCeo(auth)) throw forbidden('Chỉ CEO nhập tồn đầu kỳ');
+  // Kiểm tồn bổ sung (chị Hoa chốt 04/11): mã chưa có trong phiếu tồn chốt chung thì kế toán kho kiểm sau, ngày phiếu = ngày kiểm thật.
+  // Sổ kho lấy ngày đó làm mốc riêng của mã (view kho_ledger, migration 0070).
+  const boSung = type === 'TD' && b.bo_sung === true;
+  if (type === 'TD' && !boSung && !isCeo(auth)) throw forbidden('Chỉ CEO nhập tồn đầu kỳ');
+  if (boSung && !isCeo(auth) && !auth.permissions.includes('sx.kiemke')) throw forbidden('Chỉ kế toán kho (quyền kiểm kê) hoặc CEO ghi kiểm tồn bổ sung');
   if (!isDate(b.date)) throw badRequest('BAD_DATE', 'Ngày phiếu không đúng');
   const date = b.date;
+  const mocChung = type === 'TD' ? await khoMocChung(c.env.DB) : null;
+  if (boSung) {
+    if (!mocChung) throw badRequest('NO_MOC', 'Chưa có phiếu tồn chốt chung (mốc tồn). CEO nạp phiếu chốt trước, sau đó mới kiểm bổ sung.');
+    if (!(date > mocChung)) throw badRequest('BAD_DATE', `Ngày kiểm bổ sung phải sau ngày mốc chung ${ddmm(mocChung)}`);
+    if (date > vnDate()) throw badRequest('BAD_DATE', 'Ngày kiểm không được sau hôm nay');
+  }
   const lines = Array.isArray(b.lines) ? (b.lines as Array<Record<string, unknown>>) : [];
 
   const items = new Map(
@@ -1180,7 +1213,7 @@ khoRoutes.post('/docs', async (c) => {
 
   if (type === 'PN' || type === 'TD') {
     if (!lines.length) throw badRequest('NO_LINES', 'Phiếu chưa có dòng hàng nào');
-    if (type === 'TD' && b.allow_more !== true) {
+    if (type === 'TD' && !boSung && b.allow_more !== true) {
       const had = await c.env.DB.prepare("SELECT no FROM kho_docs WHERE type = 'TD' AND status = 'OK' LIMIT 1").first<{ no: string }>();
       if (had) {
         throw conflict('TD_EXISTS', `Đã có phiếu tồn đầu kỳ ${had.no}. Nạp thêm sẽ CỘNG vào tồn hiện có; muốn nạp lại từ đầu thì hủy phiếu cũ trước.`);
@@ -1200,10 +1233,12 @@ khoRoutes.post('/docs', async (c) => {
       if (type === 'PN' && !['NVL', 'HH', 'CCDC'].includes(it.cls)) {
         warnings.push(`${code} (${it.name}) không phải nguyên vật liệu / hàng hóa mua về`);
       }
-      const price = num(l.price);
+      const price = boSung && !canPrice(auth) ? Number.NaN : num(l.price);
+      const q0 = num(l.qty);
+      if (boSung && !(q0 >= 0)) throw badRequest('BAD_QTY', `Số đếm ${code} phải là số từ 0 trở lên`);
       moves.push({
         item: code,
-        qty: positive(l.qty, `Số lượng ${code}`),
+        qty: boSung ? q0 : positive(l.qty, `Số lượng ${code}`),
         std_qty: null,
         price: Number.isFinite(price) && price >= 0 ? price : null,
         role: 'IN',
@@ -1215,6 +1250,27 @@ khoRoutes.post('/docs', async (c) => {
         moves.push({ item: code, qty: -(moves[moves.length - 1].qty), std_qty: null, price: null, role: 'OUT', note: 'Xuất dùng ngay: tài sản / công cụ, theo dõi ở sổ Tài sản & CCDC' });
         warnings.push(`${code} (${it.name}) là tài sản / công cụ: không vào tồn kho. Ghi tăng ở trang Tài sản cố định / Công cụ dụng cụ (lần sau nên lập Đơn mua tài sản / công cụ).`);
       }
+    }
+    if (boSung && mocChung) {
+      const codes = moves.map((m) => m.item);
+      const hit: Array<{ item: string; no: string; doc_date: string }> = [];
+      for (let i = 0; i < codes.length; i += 80) {
+        const part = codes.slice(i, i + 80);
+        const r = await c.env.DB.prepare(
+          `SELECT m.item, d.no, d.doc_date FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
+           WHERE d.status = 'OK' AND d.type = 'TD' AND d.doc_date >= ? AND m.item IN (${part.map(() => '?').join(',')})`,
+        )
+          .bind(mocChung, ...part)
+          .all<{ item: string; no: string; doc_date: string }>();
+        hit.push(...(r.results ?? []));
+      }
+      if (hit.length) {
+        throw conflict(
+          'DA_KIEM',
+          `Đã có số kiểm từ mốc ${ddmm(mocChung)}: ${hit.slice(0, 8).map((h) => `${h.item} (${h.no}, ${ddmm(h.doc_date)})`).join(', ')}${hit.length > 8 ? '…' : ''}. Không ghi kiểm lại; muốn đổi số thì lập phiếu điều chỉnh (Xuất khác để giảm, phiếu nhập để tăng) hoặc báo CEO.`,
+        );
+      }
+      extra.bo_sung = true;
     }
   } else if (type === 'PC') {
     const btp = String(b.btp ?? '');
@@ -1413,6 +1469,25 @@ khoRoutes.post('/docs', async (c) => {
       ip: ip(c),
     }),
   ]);
+  // CEO đánh dấu phiếu này là phiếu tồn chốt chung: đặt mốc tồn (ton_moc) = ngày phiếu; bán sàn bắt đầu trừ từ hôm sau nếu chưa đặt.
+  if (type === 'TD' && !boSung && b.moc === true && isCeo(auth)) {
+    const next = new Date(`${date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const onl = await c.env.DB.prepare("SELECT v FROM kho_cfg WHERE k = 'online_from'").first<{ v: string }>();
+    await c.env.DB.batch([
+      c.env.DB.prepare("INSERT INTO kho_cfg (k, v) VALUES ('ton_moc', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(date),
+      ...(onl ? [] : [c.env.DB.prepare("INSERT INTO kho_cfg (k, v) VALUES ('online_from', ?)").bind(next.toISOString().slice(0, 10))]),
+      auditStatement(c.env.DB, {
+        actorId: auth.user.id,
+        action: 'KHO_CFG',
+        entityType: 'KHO_CFG',
+        entityId: 'ton_moc',
+        after: { ton_moc: date, online_from: onl?.v ?? next.toISOString().slice(0, 10), doc: no },
+        requestId: c.get('requestId'),
+        ip: ip(c),
+      }),
+    ]);
+  }
   // Nhập nguyên vật liệu không có phiếu đặt nhưng có ghi nhà cung cấp (ví dụ vỏ can): tự tạo phiếu mua để Thảo nhập giá, kế toán theo dõi công nợ.
   if (!poRow && type === 'PN' && String(b.partner ?? '').trim().length >= 2 && moves.length) {
     const agg = new Map<string, { item: string; qty: number; price: number | null }>();

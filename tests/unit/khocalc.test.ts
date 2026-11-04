@@ -69,6 +69,9 @@ describe('Tồn kho: tổng hợp, giá trị, đối chiếu', () => {
     expect(C.khoDcLyDo({ ...r, nhap_truoc: 2 })).toContain('Chưa có tồn đầu kỳ');
     expect(C.khoDcLyDo({ ...r, nhap_truoc: 2, td: 1 })).toContain('thiếu phiếu nhập');
     expect(C.khoDcLyDo({ cuoi: 3 })).toBe('');
+    // Có mốc tồn (04/11): mã chưa kiểm và mã đã kiểm mà vẫn âm có lý do riêng.
+    expect(C.khoDcLyDo({ ...r, moc: '2026-10-31', da_kiem: false })).toContain('Chưa có số kiểm');
+    expect(C.khoDcLyDo({ ...r, moc: '2026-11-02', da_kiem: true })).toContain('sau ngày kiểm');
   });
 });
 

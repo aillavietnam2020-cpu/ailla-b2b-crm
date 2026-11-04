@@ -17,6 +17,8 @@ import { unpack } from '../lib/pack';
  *  - Giá trị tồn  = phần tồn thực tế dương × giá bình quân gia quyền (Mua hàng › Giá nguyên vật liệu); thành phẩm chưa có giá.
  *  - Âm kho       = tồn thực tế < 0 (tính cả mã đã ngừng dùng, vì sổ vẫn sai).
  *  - Sắp hết      = có định mức an toàn (kho_items.min_stock > 0), không âm, và tồn khả dụng < định mức.
+ *  - Mốc tồn      = kho_cfg 'ton_moc' (ngày phiếu tồn chốt chung, 31/10). Mã kiểm bổ sung sau đó lấy ngày kiểm làm mốc riêng.
+ *                   Sổ chỉ tính số kiểm ở ngày mốc + mọi dòng SAU ngày mốc của mã (view kho_ledger, migration 0070).
  *  - Nhóm         = Vỏ can, chai (nhóm "Vỏ can, chai, túi" hoặc có hồ sơ vỏ) · Nguyên vật liệu (NVL khác, công cụ) ·
  *                   Bán thành phẩm · Thành phẩm (thành phẩm, hàng hóa, combo).
  */
@@ -58,6 +60,24 @@ export interface KhoTonRow {
   so_dong: number;
   co_nhap: number;
   trang_thai: KhoTrangThai;
+  /** Ngày mốc tồn của mã (null = chưa đặt mốc chung). */
+  moc: string | null;
+  /** Mốc riêng do kiểm bổ sung / tồn chốt (true) hay đang theo mốc chung chưa kiểm (false). */
+  da_kiem: boolean;
+}
+
+/** Mốc tồn chung và mốc riêng từng mã (cùng luật với view kho_ledger). */
+export async function khoMocMap(db: D1Database): Promise<{ g: string | null; by: Map<string, string> }> {
+  const g = (await db.prepare("SELECT v FROM kho_cfg WHERE k = 'ton_moc'").first<{ v: string }>())?.v ?? null;
+  if (!g) return { g, by: new Map() };
+  const r = await db
+    .prepare(
+      `SELECT m.item, MAX(d.doc_date) AS d FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
+       WHERE d.status = 'OK' AND d.type = 'TD' AND d.doc_date >= ? GROUP BY m.item`,
+    )
+    .bind(g)
+    .all<{ item: string; d: string }>();
+  return { g, by: new Map((r.results ?? []).map((x) => [x.item, x.d])) };
 }
 
 interface SxLite {
@@ -105,7 +125,7 @@ export const GIU_SQL = `SELECT km.misa_code AS item, SUM(oi.qty * km.factor) AS 
 
 /** Tồn mọi mã đến hết ngày asof (mặc định: hôm nay trở đi, tức mọi dòng). */
 export async function khoTonRows(db: D1Database, asof = '9999-12-31'): Promise<KhoTonRow[]> {
-  const [items, led, giu, sx] = await Promise.all([
+  const [items, led, giu, sx, mm] = await Promise.all([
     db
       .prepare(
         `SELECT i.code, i.name, i.unit, i.cls, i.grp, i.min_stock, i.active, CASE WHEN v.code IS NULL THEN 0 ELSE 1 END AS is_vo
@@ -121,6 +141,7 @@ export async function khoTonRows(db: D1Database, asof = '9999-12-31'): Promise<K
       .all<{ item: string; q: number; n: number; nin: number }>(),
     db.prepare(GIU_SQL).all<{ item: string; q: number }>(),
     readSx(db),
+    khoMocMap(db),
   ]);
   const L = new Map((led.results ?? []).map((r) => [r.item, r]));
   const G = new Map((giu.results ?? []).map((r) => [r.item, r6(r.q)]));
@@ -147,6 +168,8 @@ export async function khoTonRows(db: D1Database, asof = '9999-12-31'): Promise<K
       so_dong: l?.n ?? 0,
       co_nhap: l?.nin ?? 0,
       trang_thai: khoTrangThai(ton, kd, min),
+      moc: mm.by.get(i.code) ?? mm.g,
+      da_kiem: mm.by.has(i.code),
     };
   });
 }
@@ -162,6 +185,8 @@ export interface KhoDcRow {
   am_tu: string | null;
   am_phieu: string | null;
   lech: number;
+  moc: string | null;
+  da_kiem: boolean;
 }
 
 /**
@@ -170,7 +195,7 @@ export interface KhoDcRow {
  * chạy xuống dưới 0), và số dòng lệch chứng từ (đơn xuất thực khác số trên đơn, kiểm kê khác số phiếu sản xuất).
  */
 export async function khoDoiChieu(db: D1Database, from: string, to: string): Promise<KhoDcRow[]> {
-  const [sum, lines, lech] = await Promise.all([
+  const [sum, lines, lech, mm] = await Promise.all([
     db
       .prepare(
         `SELECT item AS code,
@@ -210,12 +235,13 @@ export async function khoDoiChieu(db: D1Database, from: string, to: string): Pro
       )
       .bind(from, to)
       .all<{ item: string; n: number }>(),
+    khoMocMap(db),
   ]);
   const firstNeg = khoAmTu(lines.results ?? []);
   const LE = new Map((lech.results ?? []).map((r) => [r.item, r.n]));
   return (sum.results ?? []).map((r) => {
     const f = firstNeg.get(r.code);
-    return { ...r, am_tu: f?.doc_date ?? null, am_phieu: f?.doc_no ?? null, lech: LE.get(r.code) ?? 0 };
+    return { ...r, am_tu: f?.doc_date ?? null, am_phieu: f?.doc_no ?? null, lech: LE.get(r.code) ?? 0, moc: mm.by.get(r.code) ?? mm.g, da_kiem: mm.by.has(r.code) };
   });
 }
 

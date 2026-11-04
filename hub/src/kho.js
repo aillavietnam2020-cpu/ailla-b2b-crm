@@ -13,7 +13,9 @@ const KHO_TYPES={
   KS:{page:"sx_lo",name:"Phiếu kiểm kê đóng gói",who:["sx.kiemke"],hint:"Chúc kiểm kê sau khi đóng gói xong. Hệ thống tự trừ bán thành phẩm, vỏ, tem theo định mức."},
   XB:{page:"kho_xuat",name:"Phiếu xuất kho",who:["sx.kiemke"],hint:"Xuất ngoài bán hàng: gia công, bán nguyên liệu, hàng mẫu, hủy hỏng. Đơn Kênh phân phối ở tab Xuất Kênh phân phối, bán lẻ TikTok, Shopee, Facebook ở tab Xuất Kênh bán lẻ."},
   TL:{page:"kho_hoan",name:"Phiếu nhập hàng hoàn",who:["sx.kiemke"],hint:"Hàng hoàn về kho: chọn Bán tiếp (cộng tồn) hoặc Bỏ (chỉ ghi nhận)."},
-  TD:{page:"kho_ton",name:"Tồn đầu kỳ",who:[],hint:"Số kiểm kê tại ngày chốt. Chỉ CEO nhập."}};
+  TD:{page:"kho_ton",name:"Tồn đầu kỳ",who:[],hint:"Số kiểm kê tại ngày chốt. Chỉ CEO nhập."},
+  /* Kiểm tồn bổ sung (04/11): ghi thành phiếu TD, máy chủ lấy ngày kiểm làm mốc tồn riêng của mã (khoton.js, migration 0070). */
+  TB:{page:"kho_ton",name:"Kiểm tồn bổ sung",who:["sx.kiemke"],hint:"Mã chưa có trong phiếu tồn chốt chung thì đếm thực tế rồi ghi ở đây. Ngày phiếu = ngày đếm thật. Số đếm là số cuối ngày đó: hàng nhập, xuất, bán sàn trong và trước ngày kiểm đã nằm trong số đếm nên web không trừ lại. Mỗi mã chỉ kiểm một lần; đếm được 0 thì ghi 0."}};
 const KHO_CLS={NVL:"Nguyên vật liệu",BTP:"Bán thành phẩm",TP:"Thành phẩm",HH:"Hàng hóa",CCDC:"Công cụ",COMBO:"Combo"};
 const KHO_XK_KIND=["Gia công","Bán nguyên liệu","Hàng mẫu","Hủy hỏng","Khác"];
 const KHO={cat:null,items:new Map(),bom:new Map(),stock:new Map(),alerts:null,at:0,busy:false,err:"",f:{q:"",cls:"",low:false},list:{},nxt:null,cl:null,period:null};
@@ -139,16 +141,18 @@ function khoEditPN(d,moves){
     const h=document.querySelector("#drawer h2");if(h)h.insertAdjacentHTML("afterend",`<div class="note amb">Đang sửa phiếu <b>${esc(d.no)}</b>. Bấm Ghi phiếu thì web lập phiếu mới theo số dưới đây và tự hủy ${esc(d.no)}.</div>`)});
 }
 /* ---------- Form lập phiếu (mở trong ngăn bên, không mất khi trang tự làm mới) ---------- */
-const KHO_LINE_CLS={PN:["NVL","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null};
+const KHO_LINE_CLS={PN:["NVL","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null,TB:null};
 function khoForm(type,pre,clsO){
   KHO.edit=KHO.editNext||null;KHO.editNext=null; // chỉ là "sửa" khi mở từ nút Sửa phiếu
   const T=KHO_TYPES[type],price=KHO.cat.can_price;
-  const isPC=type==="PC",isKS=type==="KS",isOut=type==="XB",isTL=type==="TL",isPN=type==="PN"||type==="TD";
+  const isPC=type==="PC",isKS=type==="KS",isOut=type==="XB",isTL=type==="TL",isPN=type==="PN"||type==="TD"||type==="TB";
   const head=`<div class="row7"><label class="field">Ngày<input type="date" id="kf-d" value="${kToday()}" required></label>
    ${type==="PN"?`<label class="field grow">Thuộc phiếu mua<select id="kf-po"><option value="">Đang tải phiếu mua…</option></select></label><label class="field grow">Nhà cung cấp<input id="kf-p" placeholder="Tên nhà cung cấp"></label>`:""}
    ${isOut?`<label class="field">Loại<select id="kf-k"><option value="XB">Xuất bán: NPP, đại lý, gia công, bán nguyên liệu (XB)</option><option value="XK">Xuất khác: hàng mẫu, hủy hỏng (XK)</option></select></label><label class="field grow">Khách hàng / nơi nhận<input id="kf-p" required></label><label class="field">Mã đơn của sale<input id="kf-r"></label>`:""}
    ${isPC?`<label class="field grow">Bán thành phẩm<input id="kf-btp" placeholder="Gõ tên BTP rồi chọn" autocomplete="off" required></label><label class="field">Số lít thực tế<input id="kf-lit" type="number" step="any" min="0" required></label><label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label><label class="field">Số lít theo phiếu<input id="kf-rq" type="number" step="any" min="0"></label>`:""}
-   ${isKS?`<label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label>`:""}</div>`;
+   ${isKS?`<label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label>`:""}
+   ${type==="TD"?`<label class="inl"><input type="checkbox" id="kf-moc"> Đây là phiếu tồn chốt chung (mốc tồn): hàng nhập, xuất, bán sàn từ hôm sau mới tính</label>`:""}
+   ${type==="TB"&&typeof KTON!=="undefined"&&KTON.moc&&KTON.moc.moc?`<span class="hint">Mốc tồn chung ${kDd(KTON.moc.moc)} · đã kiểm ${KTON.moc.counted.length} mã (không kiểm lại được)</span>`:""}</div>`;
   const colHead=isPC?["Nguyên vật liệu","ĐVT","Định mức","Thực tế dùng","Tồn kho",""]:isKS?["Thành phẩm đếm được","ĐVT","Số lượng","Theo phiếu SX","Tồn",""]:isTL?["Mã hàng","ĐVT","Số lượng","Xử lý",""]:isPN?["Mã hàng","ĐVT","Số lượng",...(price&&type==="PN"?["Đơn giá"]:[]),"Tồn",""]:["Mã hàng","ĐVT","Số lượng","Tồn",""];
   openDrawerHTML(`<h2>${T.name}</h2><p class="hint">${T.hint}</p><form class="frm" id="kf">${head}
    <div class="tbl edit"><table><thead><tr>${colHead.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody id="kf-b"></tbody></table></div>
@@ -206,9 +210,10 @@ function khoForm(type,pre,clsO){
     if(isPC&&$("#kf-btp").dataset.code){const bt=KHO.items.get($("#kf-btp").dataset.code)||{};mv.unshift({item:bt.code,name:bt.name,unit:bt.unit,qty:0,std_qty:null,price:null,role:"PRODUCT",note:""})}
     khoPrintDoc({doc:{no:"(chưa ghi sổ)",type:tp,doc_date:dt,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",ref_qty:isPC&&$("#kf-rq")&&$("#kf-rq").value!==""?+$("#kf-rq").value:null,note:"",status:"OK"},moves:mv},Object.assign({},KHO_TYPES[tp]||T),false,{},true)};
   $("#kf").onsubmit=async e=>{e.preventDefault();const ok=$("#kf-ok");ok.disabled=true;$("#kf-msg").textContent="Đang ghi…";
-    try{const L=lines().filter(l=>l.item);const body={type:isOut?$("#kf-k").value:type,date:$("#kf-d").value,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",note:$("#kf-n").value,
+    try{const L=lines().filter(l=>l.item);const body={type:isOut?$("#kf-k").value:type==="TB"?"TD":type,date:$("#kf-d").value,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",note:$("#kf-n").value,
       lines:L.map(l=>({item:l.item,qty:l.qty===""?undefined:+l.qty,ref_qty:l.ref_qty===""?undefined:+l.ref_qty,verdict:l.verdict||undefined,price:l.price===""?undefined:+l.price,std_qty:l.std_qty}))};
       if($("#kf-po")&&$("#kf-po").value)body.po_id=$("#kf-po").value;
+      if(type==="TB")body.bo_sung=true;if(type==="TD"&&$("#kf-moc")&&$("#kf-moc").checked)body.moc=true;
       if(KHO.edit&&type==="PN")body.replace_doc_id=KHO.edit.id;
       if(isPC){body.btp=$("#kf-btp").dataset.code;body.liters=+$("#kf-lit").value;body.ref_qty=$("#kf-rq").value===""?undefined:+$("#kf-rq").value}
       if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");
@@ -321,13 +326,15 @@ function pKhoTon(m){
     const total=L.length;L=L.slice(0,300);
     return `<div class="grid kpis">${kpi("Mã đang có tồn",hasStock.length)}${kpi("Dưới mức tối thiểu",A.low.length)}${kpi("Tồn âm (cần kiểm tra)",A.negative.length)}${kpi("Tổng số mã",all.length)}</div>
     <section class="card flush"><div class="card-h pad"><div class="filters"><input id="kt-q" placeholder="Tìm theo mã hoặc tên" value="${esc(F.q)}"><select id="kt-c">${opt([["","Mọi loại hàng"],...Object.entries(KHO_CLS)],F.cls)}</select><label class="inl"><input type="checkbox" id="kt-l"${F.low?" checked":""}> Chỉ hàng cần chú ý</label></div>
-    ${ME.role==="admin"?`<span><button class="btn" id="kt-tdx">Nạp tồn đầu từ Excel</button> <button class="btn" id="kt-td">Nhập tồn đầu kỳ (gõ tay)</button></span>`:""}</div>
+    <span>${ME.role==="admin"?`<button class="btn" id="kt-tdx">Nạp tồn đầu từ Excel</button> <button class="btn" id="kt-td">Nhập tồn đầu kỳ (gõ tay)</button> `:""}${kCan("TB")&&typeof KTON!=="undefined"&&KTON.moc&&KTON.moc.moc?`<button class="btn pri" id="kt-tb">Kiểm tồn bổ sung</button>`:""}</span></div>
+    ${typeof KTON!=="undefined"&&KTON.moc?`<p class="hint pad" style="margin:0">${KTON.moc.moc?`Mốc tồn chung: <b>${kDd(KTON.moc.moc)}</b> (phiếu tồn chốt). ${nf(KTON.moc.counted.filter(x=>x.bo_sung).length)} mã đã kiểm bổ sung theo ngày kiểm riêng. Mã chưa có số kiểm thì đang tính từ mốc chung.`:`Chưa có phiếu tồn chốt chung (mốc tồn). CEO nạp phiếu tồn chốt và tích "phiếu tồn chốt chung" để đặt mốc.`}</p>`:""}
     ${khoRows(["Mã","Tên","ĐVT","Loại","Tồn kho","Tồn tối thiểu","Trạng thái"],L.map(i=>{const s=khoStock(i.code),kr=typeof ktonRow==="function"&&ktonRow(i.code),low=kr?kr.trang_thai==="SAP_HET":i.min_stock>0&&s<i.min_stock;return `<tr><td class="mono">${esc(i.code)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td>${esc(KHO_CLS[i.cls]||i.cls)}</td><td class="n"><b>${knum(s)}</b></td><td class="n">${ed?`<input class="kt-min n" data-c="${esc(i.code)}" type="number" min="0" step="any" value="${i.min_stock||""}" placeholder="—">`:knum(i.min_stock)}</td><td>${s<0?pill("Âm kho","red"):low?pill("Dưới tối thiểu","amb"):s>0?pill("Còn hàng","grn"):""}</td></tr>`}))}
     ${total>300?`<p class="hint pad">Đang hiện 300 / ${total} mã. Gõ vào ô tìm để thu hẹp.</p>`:""}</section>`})());
   const re=()=>{KHO.f.q=$("#kt-q").value;KHO.f.cls=$("#kt-c").value;KHO.f.low=$("#kt-l").checked;const p=$("#kt-q").selectionStart;renderMain();const q=$("#kt-q");if(q){q.focus();q.setSelectionRange(p,p)}};
   if($("#kt-q")){$("#kt-q").oninput=re;$("#kt-c").onchange=re;$("#kt-l").onchange=re;
     m.querySelectorAll(".kt-min").forEach(x=>x.onchange=async()=>{try{await kApi("/items/"+encodeURIComponent(x.dataset.c),{method:"PUT",body:JSON.stringify({min_stock:+x.value||0})});KHO.items.get(x.dataset.c).min_stock=+x.value||0;toast("Đã lưu tồn tối thiểu");KHO.at=0;khoLoad(true)}catch(e){toast(e.message)}});
     if($("#kt-td"))$("#kt-td").onclick=()=>khoForm("TD");
+    if($("#kt-tb"))$("#kt-tb").onclick=()=>khoForm("TB");
     if($("#kt-tdx"))$("#kt-tdx").onclick=()=>khoTdImport()}
 }
 
