@@ -3,6 +3,7 @@ import {
   ccViewer,
   dayRule,
   daysOf,
+  donNghiTheoNguoi,
   distanceM,
   lichOf,
   nearest,
@@ -174,5 +175,30 @@ describe('chấm công: ca, nghỉ trưa, quy tắc điền được (CEO 04/11)
     expect(ngay('2026-11-04', '08:00', '17:30').phut).toBe(480);
     expect(ngay('2026-11-04', '08:00', '17:00', xuong).phut).toBe(480);
     expect(ngay('2026-11-04', '08:00', '11:00').phut).toBe(180);
+  });
+});
+
+describe('chấm công: ngày nghỉ theo thông báo 01102026 (trừ nghỉ chế độ, lễ tết)', () => {
+  it('ngày lễ không phải ngày làm, không tính nghỉ', () => {
+    const d = tongNgay([], vp, '2026-11-04', false, { le: true });
+    expect(d).toMatchObject({ lam: false, le: true });
+  });
+  it('đơn phép năm, ốm đã duyệt không tính vào ngày nghỉ; nghỉ không lương vẫn tính', () => {
+    const don = donNghiTheoNguoi(
+      [{ crm: 'u1', maNS: 'NV01' }],
+      [
+        { ma: 'NV01', loai: 'Nghỉ phép năm', tu: '2026-11-02', den: '2026-11-03', tt: 'duyet' },
+        { ma: 'NV01', loai: 'Nghỉ không lương', tu: '2026-11-04', den: '2026-11-04', tt: 'duyet' },
+        { ma: 'NV01', loai: 'Nghỉ ốm', tu: '2026-11-05', den: '2026-11-05', tt: 'cho' },
+        { ma: 'NV01', loai: 'Làm thêm giờ (OT)', tu: '2026-11-06', tt: 'duyet' },
+      ],
+    ).get('u1')!;
+    expect([...don.entries()]).toEqual([
+      ['2026-11-02', 'Nghỉ phép năm'],
+      ['2026-11-03', 'Nghỉ phép năm'],
+      ['2026-11-04', 'Nghỉ không lương'],
+    ]);
+    const days = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'].map((n) => ({ ngay: n, ...tongNgay([], vp, n, false, { don: don.get(n) ?? null }) }));
+    expect(tongThang(days, vp, '2026-11-30')).toMatchObject({ nghi: 2, nghiPhep: 2, chuyenCan: true });
   });
 });

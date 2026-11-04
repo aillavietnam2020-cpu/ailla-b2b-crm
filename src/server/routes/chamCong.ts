@@ -4,12 +4,14 @@ import type { AppEnv, AuthContext } from '../env';
 import { auditStatement } from '../lib/audit';
 import { badRequest, forbidden, ok } from '../lib/http';
 import { canHr } from '../lib/hrAccess';
+import { unpack } from '../lib/pack';
 import { requirePermission } from '../middleware/rbac';
 import { loadMembers, type Members } from '../services/daoTao';
 import {
   CC_SETTINGS_KEY,
   ccViewer,
   dayRule,
+  donNghiTheoNguoi,
   daysFrom,
   daysOf,
   lichOf,
@@ -71,6 +73,25 @@ async function loadXep(db: D1Database, s: CcSettings, tu: string, den: string, u
   return out;
 }
 
+/** Đơn nghỉ đã duyệt theo người (đọc bản dữ liệu chung, giữ 60 giây trong máy chủ để khỏi đọc lại mỗi lần mở trang). */
+let DON_CACHE: { at: number; map: Map<string, Map<string, string>> } | null = null;
+async function loadDon(db: D1Database): Promise<Map<string, Map<string, string>>> {
+  if (DON_CACHE && Date.now() - DON_CACHE.at < 60_000) return DON_CACHE.map;
+  let map = new Map<string, Map<string, string>>();
+  try {
+    const row = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
+    if (row) {
+      const d = JSON.parse(await unpack(row.data)) as { users?: { crm?: string; maNS?: string }[]; hr?: { don?: [] } };
+      map = donNghiTheoNguoi(d.users, d.hr?.don);
+    }
+  } catch {
+    /* không đọc được đơn thì coi như không có đơn */
+  }
+  DON_CACHE = { at: Date.now(), map };
+  return map;
+}
+const leOf = (s: CcSettings, d: string) => s.ngayLe.some((x) => x.ngay === d);
+
 const vai = (v: CcViewer, hr: boolean) => ({ all: v.all, pb: v.pb, caiDat: v.all && hr });
 const THANG = /^\d{4}-\d{2}$/;
 const NGAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -93,9 +114,10 @@ chamCongRoutes.get('/me', async (c) => {
   const tuan = daysFrom(today, 7);
   const xep = lich.kieu === 'ca' ? await loadXep(db, s, thang + '-01', tuan[6], auth.user.id) : new Map<string, Ca>();
   const caOf = (d: string) => xep.get(auth.user.id + '|' + d) ?? null;
+  const myDon = (await loadDon(db)).get(auth.user.id);
   const ngay = daysOf(thang, today).map((d) => {
     const l = list.filter((r) => r.ngay === d);
-    return { ngay: d, ...tongNgay(l as Luot[], lich, d, d === today, { ca: caOf(d), q: s.quyTac }), luot: l.length };
+    return { ngay: d, ...tongNgay(l as Luot[], lich, d, d === today, { ca: caOf(d), q: s.quyTac, le: leOf(s, d), don: myDon?.get(d) ?? null }), luot: l.length };
   });
   return ok(c, {
     today,
@@ -103,7 +125,7 @@ chamCongRoutes.get('/me', async (c) => {
     thang,
     diem: (lich.diem.length ? s.diem.filter((d) => lich.diem.includes(d.id)) : s.diem).map((d) => ({ ten: d.ten, bk: d.bk })),
     lich,
-    rule: dayRule(lich, today, caOf(today)),
+    rule: dayRule(lich, today, caOf(today), leOf(s, today)),
     caHomNay: caOf(today),
     caTuan: lich.kieu === 'ca' ? tuan.map((d) => ({ ngay: d, ca: caOf(d) })) : [],
     quyTac: s.quyTac,
@@ -183,12 +205,12 @@ chamCongRoutes.get('/ngay', async (c) => {
   if (ids && !cx.v.pb) throw forbidden('Chỉ CEO, HCNS và trưởng nhóm xem được chấm công của người khác');
   const rows = (await db.prepare('SELECT id, user_id, ngay, loai, at, kc, diem, trong, ly_do, ly_do_muon, acc FROM cc_luot WHERE ngay = ? ORDER BY at').bind(ngay).all<Row>()).results ?? [];
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
-  const xep = await loadXep(db, s, ngay, ngay);
+  const [xep, don] = await Promise.all([loadXep(db, s, ngay, ngay), loadDon(db)]);
   const extra = [...new Set(rows.map((r) => r.user_id))].filter((id) => !cx.m.users[id] && !ids);
   const list = [...people.map(([id, u]) => ({ id, name: u.name, pb: u.pb })), ...extra.map((id) => ({ id, name: id, pb: '' }))].map((p) => {
     const l = rows.filter((r) => r.user_id === p.id);
     const lich = lichOf(s, p.id, p.pb);
-    return { ...p, lich: lich.ten, kieu: lich.kieu, ...tongNgay(l as Luot[], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc })) };
+    return { ...p, lich: lich.ten, kieu: lich.kieu, ...tongNgay(l as Luot[], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), don: don.get(p.id)?.get(ngay) ?? null }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc })) };
   });
   return ok(c, { ngay, today, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
 });
@@ -205,11 +227,11 @@ chamCongRoutes.get('/thang', async (c) => {
   const rows = (await db.prepare('SELECT user_id, ngay, loai, at, trong, ly_do_muon FROM cc_luot WHERE ngay LIKE ? ORDER BY at').bind(thang + '%').all<Row>()).results ?? [];
   const days = daysOf(thang, today);
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
-  const xep = days.length ? await loadXep(db, s, days[0], days[days.length - 1]) : new Map<string, Ca>();
+  const [xep, don] = await Promise.all([days.length ? loadXep(db, s, days[0], days[days.length - 1]) : new Map<string, Ca>(), loadDon(db)]);
   const list = people.map(([id, u]) => {
     const mine = rows.filter((r) => r.user_id === id);
     const lich = lichOf(s, id, u.pb);
-    const ngay = days.map((d) => ({ ngay: d, ...tongNgay(mine.filter((r) => r.ngay === d) as Luot[], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac }) }));
+    const ngay = days.map((d) => ({ ngay: d, ...tongNgay(mine.filter((r) => r.ngay === d) as Luot[], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac, le: leOf(s, d), don: don.get(id)?.get(d) ?? null }) }));
     return {
       id,
       name: u.name,
@@ -218,7 +240,7 @@ chamCongRoutes.get('/thang', async (c) => {
       kieu: lich.kieu,
       chuyenCanCo: lich.chuyenCan && lich.kieu !== 'tudo',
       ...tongThang(ngay, lich, today, s.quyTac),
-      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, lyDoMuon: x.lyDoMuon, canhBao: x.canhBao })),
+      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, lyDoMuon: x.lyDoMuon, canhBao: x.canhBao })),
     };
   });
   return ok(c, { thang, today, quyTac: s.quyTac, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });

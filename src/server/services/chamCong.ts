@@ -48,6 +48,8 @@ export type CcSettings = {
   lich: Lich[];
   ca: Ca[];
   quyTac: QuyTac;
+  /** Ngày lễ, tết công ty cho nghỉ: không tính là ngày phải làm (trừ người được xếp ca ngày đó). */
+  ngayLe: { ngay: string; ten: string }[];
   pbLich: Record<string, string>;
   nguoiLich: Record<string, string>;
   macDinh: string;
@@ -64,6 +66,7 @@ export const CC_DEFAULT: CcSettings = {
     { ...BASE, id: 'sale', ten: 'Sale (giờ linh hoạt)', kieu: 'tudo', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: true },
   ],
   ca: [],
+  ngayLe: [],
   quyTac: { mocLyDo: 10, mocNang: 10, ccLan: 2, ccNghi: 2, tienCC: 200000, tienTrua: 25000 },
   pbLich: { SX: 'xuong', KV: 'xuong', B2B: 'sale', B2C: 'sale' },
   nguoiLich: {},
@@ -152,7 +155,13 @@ export function normalizeSettings(v: unknown): CcSettings {
   for (const l of lich) l.diem = l.diem.filter((id) => diemIds.has(id));
   const ca = (Array.isArray(o.ca) ? o.ca : []).slice(0, 20).map(normCa).filter((x): x is Ca => !!x);
   const macDinh = typeof o.macDinh === 'string' && ids.has(o.macDinh) ? o.macDinh : lich[0].id;
-  return { diem, lich, ca, quyTac: normQuyTac(o.quyTac), pbLich: map(o.pbLich, CC_DEFAULT.pbLich), nguoiLich: map(o.nguoiLich, {}), macDinh };
+  const ngayLe = (Array.isArray(o.ngayLe) ? o.ngayLe : [])
+    .map((x) => (x ?? {}) as Record<string, unknown>)
+    .filter((x) => typeof x.ngay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.ngay))
+    .map((x) => ({ ngay: x.ngay as string, ten: String(x.ten ?? '').slice(0, 80) }))
+    .sort((a, b) => a.ngay.localeCompare(b.ngay))
+    .slice(0, 60);
+  return { diem, lich, ca, ngayLe, quyTac: normQuyTac(o.quyTac), pbLich: map(o.pbLich, CC_DEFAULT.pbLich), nguoiLich: map(o.nguoiLich, {}), macDinh };
 }
 
 /** Lịch làm của một người: lịch riêng, rồi theo phòng ban, rồi lịch mặc định. */
@@ -201,13 +210,13 @@ export function weekday(ngay: string): number {
  * Ngày đó có phải đi làm không, giờ vào giờ ra chuẩn (phút), có tính đi muộn / về sớm không.
  * Lịch theo ca: chỉ đi làm ngày được xếp ca, giờ theo ca. Giờ linh hoạt: không tính muộn.
  */
-export function dayRule(l: Lich, ngay: string, ca?: Ca | null): { lam: boolean; vao: number; ra: number; tinh: boolean } {
+export function dayRule(l: Lich, ngay: string, ca?: Ca | null, le = false): { lam: boolean; vao: number; ra: number; tinh: boolean } {
   if (l.kieu === 'ca') return ca ? { lam: true, vao: toMin(ca.tu), ra: toMin(ca.den), tinh: true } : { lam: false, vao: 0, ra: 0, tinh: false };
   const w = weekday(ngay);
   const vao = toMin(l.gioVao);
   const ra = toMin(l.gioRa);
   const tinh = l.kieu === 'codinh';
-  if (w === 0) return { lam: false, vao, ra, tinh: false };
+  if (w === 0 || le) return { lam: false, vao, ra, tinh: false };
   if (w !== 6) return { lam: true, vao, ra, tinh };
   const thu = Math.ceil(Number(ngay.slice(8, 10)) / 7); // thứ Bảy thứ mấy trong tháng
   if (l.thuBay === 'nghi' || (l.thuBay === 'nghi13' && (thu === 1 || thu === 3)) || (l.thuBay === 'nghi24' && (thu === 2 || thu === 4)))
@@ -229,6 +238,10 @@ export type NgayCong = {
   lam: boolean;
   /** Tên ca được xếp (lịch theo ca). */
   ca: string | null;
+  /** Ngày lễ công ty cho nghỉ. */
+  le: boolean;
+  /** Loại đơn nghỉ đã duyệt ngày đó ('Nghỉ phép năm', 'Nghỉ ốm', 'Nghỉ không lương'). */
+  don: string | null;
   /** Lý do đi muộn đã ghi; canhBao = muộn quá mốc hỏi lý do mà chưa ghi. */
   lyDoMuon: string | null;
   canhBao: boolean;
@@ -243,10 +256,10 @@ export function tongNgay(
   l: Lich,
   ngay: string,
   homNay: boolean,
-  opt: { ca?: Ca | null; q?: QuyTac } = {},
+  opt: { ca?: Ca | null; q?: QuyTac; le?: boolean; don?: string | null } = {},
 ): NgayCong {
   const q = opt.q ?? CC_DEFAULT.quyTac;
-  const rule = dayRule(l, ngay, opt.ca);
+  const rule = dayRule(l, ngay, opt.ca, opt.le);
   const vaoL = luot.filter((x) => x.loai === 'vao').sort((a, b) => a.at.localeCompare(b.at))[0];
   const raL = luot.filter((x) => x.loai === 'ra').sort((a, b) => b.at.localeCompare(a.at))[0];
   let muon = 0;
@@ -278,6 +291,8 @@ export function tongNgay(
     ngoai: luot.some((x) => x.trong === 0),
     lam: rule.lam,
     ca: opt.ca?.ten ?? null,
+    le: !!opt.le && l.kieu !== 'ca',
+    don: opt.don ?? null,
     lyDoMuon: vaoL?.ly_do_muon || null,
     canhBao: muon > q.mocLyDo && !vaoL?.ly_do_muon,
   };
@@ -295,8 +310,13 @@ export type TongThang = {
   ngoai: number;
   /** Số lần muộn quá mốc hỏi lý do mà không ghi lý do. */
   canhBao: number;
-  /** Ngày phải làm (đã qua) mà không chấm: tạm coi là nghỉ, chưa trừ ngày nghỉ có đơn, lễ tết. */
+  /**
+   * Ngày nghỉ tính chuyên cần (thông báo 01102026: không quá 2 ngày/tháng, trừ ngày nghỉ trong chế độ và lễ tết):
+   * ngày phải làm (đã qua) mà không chấm, trừ ngày có đơn nghỉ phép năm / nghỉ ốm đã duyệt. Nghỉ không lương vẫn tính.
+   */
   nghi: number;
+  /** Ngày nghỉ theo chế độ (đơn phép năm, ốm đã duyệt), không tính vào chuyên cần. */
+  nghiPhep: number;
   phut: number;
   /** Chuyên cần: muộn + về sớm không quá ccLan lần và nghỉ không quá ccNghi ngày. null = lịch không tính chuyên cần. */
   chuyenCan: boolean | null;
@@ -307,7 +327,9 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
   const co = ngay.filter((x) => x.vao || x.ra);
   const muonLan = co.filter((x) => x.muon > 0).length;
   const somLan = co.filter((x) => x.som > 0).length;
-  const nghi = ngay.filter((x) => x.lam && !x.vao && !x.ra && x.ngay < homNay).length;
+  const vang = ngay.filter((x) => x.lam && !x.vao && !x.ra && x.ngay < homNay);
+  const cheDo = (x: NgayCong) => !!x.don && x.don !== DON_KHONG_LUONG;
+  const nghi = vang.filter((x) => !cheDo(x)).length;
   return {
     cong: co.length,
     lamChuan: ngay.filter((x) => x.lam).length,
@@ -319,10 +341,37 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
     ngoai: ngay.filter((x) => x.ngoai).length,
     canhBao: co.filter((x) => x.canhBao).length,
     nghi,
+    nghiPhep: vang.filter(cheDo).length,
     phut: co.reduce((t, x) => t + x.phut, 0),
     chuyenCan: l.kieu !== 'tudo' && l.chuyenCan ? muonLan + somLan <= q.ccLan && nghi <= q.ccNghi : null,
   };
 }
+
+export const DON_KHONG_LUONG = 'Nghỉ không lương';
+const DON_NGHI = ['Nghỉ phép năm', 'Nghỉ ốm', DON_KHONG_LUONG];
+/**
+ * Ngày nghỉ có đơn đã duyệt của từng người (đơn ở Nhân sự › Đơn từ, hub_state.hr.don, nối tài khoản qua users.maNS).
+ * Trả về: mã đăng nhập → (ngày → loại đơn).
+ */
+export function donNghiTheoNguoi(
+  users: { crm?: string; maNS?: string }[] | undefined,
+  don: { ma?: string; loai?: string; tu?: string; den?: string; tt?: string }[] | undefined,
+): Map<string, Map<string, string>> {
+  const crmOf = new Map<string, string>();
+  for (const u of users ?? []) if (u?.crm && u.maNS) crmOf.set(u.maNS, u.crm);
+  const out = new Map<string, Map<string, string>>();
+  for (const d of don ?? []) {
+    if (!d || d.tt !== 'duyet' || !DON_NGHI.includes(d.loai ?? '') || !d.ma || !d.tu) continue;
+    const crm = crmOf.get(d.ma);
+    if (!crm || !/^\d{4}-\d{2}-\d{2}$/.test(d.tu)) continue;
+    const den = d.den && d.den >= d.tu ? d.den : d.tu;
+    const m = out.get(crm) ?? new Map<string, string>();
+    for (const n of daysFrom(d.tu, Math.min(62, daysBetweenIso(d.tu, den) + 1))) m.set(n, d.loai as string);
+    out.set(crm, m);
+  }
+  return out;
+}
+const daysBetweenIso = (a: string, b: string) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5);
 
 /** Các ngày trong tháng 'YYYY-MM', không quá ngày cuối (thường là hôm nay). */
 export function daysOf(thang: string, toiDa: string): string[] {
