@@ -950,6 +950,12 @@ function ktSyncTask(id){
 (function(){
   const W=n=>{const f=window[n];if(typeof f!=="function")return;window[n]=function(id){const r=f.apply(this,arguments);try{ktSyncTask(id)}catch(e){}return r}};
   ["tkApprove","tkReturn","tkSetSt"].forEach(W)})();
+/* mũi tên to hai bên khung chi tiết (gắn vào trang, tự gỡ khi đóng khung) */
+function ktSideNav(prev,next){document.querySelectorAll(".ktside").forEach(x=>x.remove());const box=document.querySelector("#drawerIn");if(!box)return;
+  const st=document.getElementById("ktside-css")||Object.assign(document.createElement("style"),{id:"ktside-css",textContent:".ktside{position:fixed;top:50%;transform:translateY(-50%);z-index:10001;width:48px;height:64px;border:0;border-radius:12px;background:rgba(255,255,255,.92);color:#334155;font-size:34px;line-height:1;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18)}.ktside:hover{background:#fff}.ktside:disabled{opacity:.35;cursor:default}"});document.head.appendChild(st);
+  const r=(box.closest(".drawer,#drawer,.modal")||box).getBoundingClientRect(),mk=(t,f,x)=>{const b=document.createElement("button");b.type="button";b.className="ktside";b.textContent=t;b.title=t==="‹"?"Video trước (phím ←)":"Video sau (phím →)";b.style.left=Math.max(4,x)+"px";if(f)b.onclick=f;else b.disabled=true;document.body.appendChild(b)};
+  mk("‹",prev,r.left-58);mk("›",next,Math.min(innerWidth-52,r.right+10));
+  const off=()=>{if(!document.querySelector("#drawerIn .ktnav")||!document.querySelector("#drawerIn")?.offsetParent){document.querySelectorAll(".ktside").forEach(x=>x.remove());clearInterval(window.__ktTm)}};clearInterval(window.__ktTm);window.__ktTm=setInterval(off,400)}
 /* video kế tiếp trong danh sách đang lọc (để duyệt liền mạch) */
 function ktNextOf(ma){const L=XV.ktList||[],i=L.indexOf(ma);return i>=0?(L[i+1]||L[i-1]||""):""}
 document.addEventListener("keydown",e=>{if(!/^Arrow(Left|Right)$/.test(e.key))return;const t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;const b=document.querySelector("#drawerIn "+(e.key==="ArrowLeft"?"#kt-prev":"#kt-next"));if(b&&!b.disabled){e.preventDefault();b.click()}});
@@ -986,11 +992,11 @@ function ktModal(ma){
   if(c)kenh2Bind(c.id,()=>ktModal(ma));
   const gb=q("#kt-gb");if(gb)gb.onclick=()=>{ktGan(ma,q("#kt-gk").value);renderMain();ktModal(ma)};
   const x=q("#kt-x");if(x)x.onclick=closeDrawer;
-  {const pv=q("#kt-prev"),nx=q("#kt-next");if(pv)pv.onclick=()=>{if(ni>0)ktModal(NL[ni-1])};if(nx)nx.onclick=()=>{if(ni<NL.length-1)ktModal(NL[ni+1])}}
-  const ok=q("#kt-ok");if(ok)ok.onclick=()=>{{const nx=ktNextOf(ma);ktDuyet(ma);renderMain();ktModal(nx||ma)}};
+  {const pv=q("#kt-prev"),nx=q("#kt-next");if(pv)pv.onclick=()=>{if(ni>0)ktModal(NL[ni-1])};if(nx)nx.onclick=()=>{if(ni<NL.length-1)ktModal(NL[ni+1])};ktSideNav(ni>0?()=>ktModal(NL[ni-1]):null,ni>=0&&ni<NL.length-1?()=>ktModal(NL[ni+1]):null)}
+  const ok=q("#kt-ok");if(ok)ok.onclick=()=>{ktDuyet(ma);renderMain();ktModal(ma)};
   const cs=q("#kt-cs");if(cs)cs.onclick=()=>ktCanSua(ma);
   const fbok=q("#kt-fbok");if(fbok)fbok.onclick=()=>{const note=(q("#kt-fb").value||"").trim(),u=q("#kt-fbu").value;if(!note){toast("Ghi cần sửa gì");return}if(!u){toast("Chọn người sửa");return}
-    DB.mutate(ME.name,"yêu cầu sửa video tồn "+ma,dt=>{const x=dt.kho.find(y=>y.ma===ma);if(x)ktApplySua(dt,x,note,u)});toast("Đã gửi góp ý cho "+userName(u));const nx=ktNextOf(ma);renderMain();ktModal(nx||ma)};
+    DB.mutate(ME.name,"yêu cầu sửa video tồn "+ma,dt=>{const x=dt.kho.find(y=>y.ma===ma);if(x)ktApplySua(dt,x,note,u)});toast("Đã gửi góp ý cho "+userName(u));renderMain();ktModal(ma)};
   const gl=q("#kt-gl");if(gl)gl.onclick=()=>{const l=(q("#kt-nl").value||"").trim();if(!l&&!confirm("Chưa dán link bản đã sửa. Vẫn gửi duyệt lại với link cũ?"))return;ktGuiLai(ma,l);renderMain();ktModal(ma)};
   const u=q("#kt-un");if(u)u.onclick=()=>{DB.mutate(ME.name,"bỏ chọn video tồn "+c.id,dt=>{const cc=dt.cards.find(y=>y.id===c.id);if(!cc)return;const kk=dt.kho.find(y=>y.ma===cc.khoMa);if(kk){kk.maDang="";kk.trangThai="Chưa dùng"}cc.khoMa="";cc.step="kb";cc.loai="";cc.nguon="Footage cũ";cc.nguoi=cc.giao||cc.nguoi;cc.day=0;cc.linkVideo=""});toast("Đã trả video về kho");closeDrawer();renderMain()};
   const dn=q("#kt-done");if(dn)dn.onclick=()=>{const l=(q("#kt-lb").value||"").trim();if(!l){toast("Dán link TikTok đã đăng trước");return}const fb=!chOf(c.kenh).needId,m2=l.match(/[0-9]{19}/);if(!fb&&!m2){toast("Link TikTok phải có dãy 19 số sau /video/");return}
