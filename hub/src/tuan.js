@@ -774,7 +774,7 @@ function bkImport(file,kenh0){
       const key=linkKey(lv),f=dupFind(lv,[]);if(f||seen.has(key)){dup.push("dòng "+n+(f?" trùng "+f.id:" trùng trong file"));return}seen.add(key);
       const kk=iK>=0?(CHANNELS.find(c=>bkFold(c.short)===bkFold(r[iK])||bkFold(c.k)===bkFold(r[iK]))||{}).k:"",
         sx=iN>=0?bkDate(r[iN]):"",cu=!!sx&&sx.slice(0,7)<mNow,ton=cu||iW>=0&&/ton/.test(bkFold(r[iW])),xong=iT>=0&&/da dang/.test(bkFold(r[iT])),
-        dv=iD<0||!String(r[iD]||"").trim()||/^da duyet/.test(bkFold(r[iD]));
+        dv=xvGive()&&(iD<0||!String(r[iD]||"").trim()||/^da duyet/.test(bkFold(r[iD]))); /* nhân sự nhập: luôn chờ Lead duyệt */
       ok.push({lv,sku,kenh:kk||kenh0,kk:kk||"",hook:iH>=0?String(r[iH]||"").trim():"",cap:iC>=0?String(r[iC]||"").trim():"",ton,cu,xong,dv:xong||dv,sx})});
     if(!ok.length){alert("Không có video nào để thêm.\n"+(dup.length?"Trùng: "+dup.length+" video ("+dup.slice(0,6).join("; ")+")\n":"")+(bad.length?"Lỗi: "+bad.slice(0,6).join("; "):""));return}
     const nT=ok.filter(v=>v.ton).length,nX=ok.filter(v=>v.xong).length,nCu=ok.filter(v=>v.cu).length,nCd=ok.filter(v=>!v.dv).length;
@@ -804,6 +804,7 @@ function openThemVideo(){
     <label class="field">Kênh đăng<select id="tv-k">${sel(CHANNELS.map(x=>[x.k,x.short]),CHANNELS[0].k)}</select></label>
     <label class="field">Thuộc kho nào<select id="tv-w">${sel([["ton","Video tồn (làm tháng trước)"],["sx","Video sản xuất trong tháng"]],XV.ks==="can"?"ton":"sx")}</select></label>
     <label class="field">Ngày sản xuất<input type="date" id="tv-sx" max="${dv(MONTH.ndays)}"></label>
+    <label class="field">Trạng thái duyệt<select id="tv-st">${sel(give?[["cd","Chờ Lead duyệt"],["ok","Đã duyệt (Lead / CEO chọn)"]]:[["cd","Chờ Lead duyệt"]],"cd")}</select></label>
     <label class="field full">Hook / tên video<input id="tv-h" placeholder="Ví dụ: Một lọ, tất cả…"></label>
     <label class="field full">Link video (Drive)<input id="tv-lv" placeholder="Dán link Drive…"></label>
     <label class="field">Người dựng<select id="tv-n">${sel([["","—"]].concat(team),ME.id)}</select></label>
@@ -819,16 +820,17 @@ function openThemVideo(){
     if(lv&&dupAlert(lv,[]))return;
     if(lb&&dupAlert(lb,[]))return;
     const fb=!chOf(kenh).needId,m2=lb.match(/[0-9]{19}/);if(lb&&!fb&&!m2){toast("Link TikTok phải có dãy 19 số sau /video/");return}
-    const wh=q("#tv-w").value,sxd=q("#tv-sx").value,inM=sxd.slice(0,7)===MONTH.year+"-"+p2(MONTH.mon);
+    const okD=xvGive()&&(q("#tv-st")||{}).value==="ok",wh=q("#tv-w").value,sxd=q("#tv-sx").value,inM=sxd.slice(0,7)===MONTH.year+"-"+p2(MONTH.mon);
     if(wh==="sx"&&sxd&&!inM){toast("Video làm từ tháng trước thì chọn Thuộc kho nào: Video tồn");return}
     if(wh==="ton"){let ma="";const ten=hook||"Video "+sk(sku).n+" nhập tay";
       DB.mutate(ME.name,"thêm video tồn nhập tay "+(hook||lv).slice(0,40),dt=>{let i=0;do{ma="KHO-NT-"+sku+"-"+String(Date.now()%100000+i++).padStart(5,"0")}while(dt.kho.some(k=>k.ma===ma));
-        const td=dt.settings.today,k={ma,skuText:sk(sku).n,sku,nguoi:nd?userName(nd):ME.name,tuyen:"",duyet:"Đã Duyệt",link:lv,ten,kenhDeXuat:kenh,lyDo:"Nhập tay",ghiChu:"",quyen:"Chưa kiểm",canSua:"Đăng nguyên",trangThai:"Chưa dùng",maDang:"",nguonFile:"Nhập tay",caption:cap,ngaySX:sxd,ngayDuKien:day||0};dt.kho.push(k);
+        const td=dt.settings.today,k={ma,skuText:sk(sku).n,sku,nguoi:nd?userName(nd):ME.name,tuyen:"",duyet:okD||lb?"Đã Duyệt":"Chưa duyệt",choDuyet:!(okD||lb),link:lv,ten,kenhDeXuat:kenh,lyDo:"Nhập tay",ghiChu:"",quyen:"Chưa kiểm",canSua:"Đăng nguyên",trangThai:"Chưa dùng",maDang:"",nguonFile:"Nhập tay",caption:cap,ngaySX:sxd,ngayDuKien:day||0};dt.kho.push(k);
         if(lb){const c=newCard(dt,{sku,kenh,day:day||td});Object.assign(c,{mix:"ton",loai:"kho",nguon:"Footage cũ",khoMa:ma,oneShot:false,dangVideo:"One shot",hookText:ten,linkVideo:lv,linkFinal:lv,caption:cap,nguoi:nd,nguoiEdit:nd,nguoiKB:nd,giao:nd,duyet:"Đã duyệt",ceo:"PASS",step:"xong",linkDang:lb,tiktokId:m2?m2[0]:"",ngayDang:day||td,nhapTay:true,tuan:weekOf(day||td)||1,batDau:td});dt.cards.push(c);Object.assign(k,{maDang:c.id,trangThai:"Đã lên lịch",linkBai:lb,ngayThucTe:day||td})}});
-      const pk=!lb&&ma&&ktPick(ma,kenh);
-      toast(lb?"Đã thêm vào Kho video tồn, trạng thái Đã đăng":pk?"Đã thêm vào Kho video tồn, chờ đăng ở "+chOf(kenh).short:"Đã thêm vào Kho video tồn");closeDrawer();XV.q="";XV.ks="can";renderMain();return}
-    DB.mutate(ME.name,"thêm video nhập tay "+(hook||lv).slice(0,40),dt=>{const c=newCard(dt,{sku,kenh,day});Object.assign(c,{mix:"oneshot",loai:"moi",oneShot:true,nguon:"Nhập tay",dangVideo:"One shot",hookText:hook||"Video "+sk(sku).n+" nhập tay",linkVideo:lv,linkFinal:lv,caption:cap,nguoi:nd,nguoiEdit:nd,nguoiKB:nd,giao:nd,duyet:"Đã duyệt",ceo:"PASS",step:lb?"xong":"dang",choDang:true,linkDang:lb,tiktokId:m2?m2[0]:"",ngayDang:lb?(day||dt.settings.today):"",day:day||(lb?dt.settings.today:0),nhapTay:true,tuan:weekOf(day||dt.settings.today)||1,batDau:dt.settings.today,ngaySX:sxd?+sxd.slice(8,10):0});dt.cards.push(c)});
-    toast(lb?"Đã thêm video, trạng thái Đã đăng":"Đã thêm video, trạng thái Chờ đăng");closeDrawer();XV.ks="sx";renderMain()}
+      const pk=!lb&&ma&&okD&&ktPick(ma,kenh);if(!okD&&!lb)DB.mutate(ME.name,"báo Lead video tồn mới chờ duyệt",dt=>{const leads=(dt.users||[]).filter(u=>u.active!==false&&u.role==="lead"&&(typeof teamOf!=="function"||teamOf(u)==="content")).map(u=>u.id);if(typeof notifyU==="function")notifyU(dt,leads,ME.name+" thêm video tồn "+ma+" ("+sk(sku).n+"), chờ Lead duyệt",ma)});
+      toast(lb?"Đã thêm vào Kho video tồn, trạng thái Đã đăng":pk?"Đã thêm vào Kho video tồn, chờ đăng ở "+chOf(kenh).short:okD?"Đã thêm vào Kho video tồn":"Đã thêm vào Kho video tồn, trạng thái Chờ Lead duyệt");closeDrawer();XV.q="";XV.ks="can";renderMain();return}
+    DB.mutate(ME.name,"thêm video nhập tay "+(hook||lv).slice(0,40),dt=>{const c=newCard(dt,{sku,kenh,day});Object.assign(c,{mix:"oneshot",loai:"moi",oneShot:true,nguon:"Nhập tay",dangVideo:"One shot",hookText:hook||"Video "+sk(sku).n+" nhập tay",linkVideo:lv,linkFinal:lv,caption:cap,nguoi:nd,nguoiEdit:nd,nguoiKB:nd,giao:nd,duyet:okD||lb?"Đã duyệt":"",ceo:okD||lb?"PASS":"",step:lb?"xong":okD?"dang":"dvd",choDang:okD||!!lb,linkDang:lb,tiktokId:m2?m2[0]:"",ngayDang:lb?(day||dt.settings.today):"",day:day||(lb?dt.settings.today:0),nhapTay:true,tuan:weekOf(day||dt.settings.today)||1,batDau:dt.settings.today,ngaySX:sxd?+sxd.slice(8,10):0});dt.cards.push(c)});
+    if(!okD&&!lb)DB.mutate(ME.name,"báo Lead video mới chờ duyệt",dt=>{const leads=(dt.users||[]).filter(u=>u.active!==false&&u.role==="lead"&&(typeof teamOf!=="function"||teamOf(u)==="content")).map(u=>u.id);if(typeof notifyU==="function")notifyU(dt,leads,ME.name+" thêm video "+sk(sku).n+" ("+chOf(kenh).short+"), chờ Lead duyệt","")});
+    toast(lb?"Đã thêm video, trạng thái Đã đăng":okD?"Đã thêm video, trạng thái Chờ đăng":"Đã thêm video, trạng thái Chờ Lead duyệt");closeDrawer();XV.ks="sx";renderMain()}
 }
 /* xuất danh sách ra Excel */
 function xlsExport(file,sheet,head,rows){if(typeof XLSX==="undefined"){toast("Cần mạng để xuất Excel");return}if(!rows.length){toast("Không có dòng nào để xuất");return}const ws=XLSX.utils.aoa_to_sheet([head].concat(rows)),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,String(sheet).slice(0,30));XLSX.writeFile(wb,file+"-T"+MONTH.mon+".xlsx")}
