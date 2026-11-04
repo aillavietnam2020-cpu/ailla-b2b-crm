@@ -108,7 +108,8 @@ const MKT_G=()=>[
    MI("lich_fb","Lịch đăng Fanpage",tm("content",u=>u.role==="admin"||u.role==="lead"||u.role==="content")),
    MI("kho_luutru","Kho lưu trữ video",tm("content",u=>u.role==="admin"||u.role==="lead"||u.role==="content"||u.role==="digital")),ADM_ITEM("win","Video win"),
    MI("order_c","Order từ Ads",tm("content",u=>can(u,"order.xem")||u.role==="content"||u.role==="lead"||u.role==="admin"),ordCnt),
-   MI("nhaplieu","Nhập báo cáo",tm("content",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead"))].filter(Boolean).map(CT)],
+   /* "Nhập báo cáo" chuyển về Cấu hình › Dữ liệu & sao lưu (Nhập dữ liệu MKT) bên web quản trị, ẩn ở menu Marketing (chị Hoa 04/11) */
+   MI("nhaplieu","Nhập dữ liệu MKT",u=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"&&(u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead"))].filter(Boolean).map(CT)],
  ["",[MI("xuongvideo","Sản xuất video",tm("content"))]],
  /* Chị Hoa 02/11: team Content (Lead Content sẽ vận hành cả Booking) xem được Booking KOC và Thư viện video ads của Digital. */
  ["",[MI("bc_koc","Booking KOC",u=>{const T=userTeam(u);return T==="content"||((!T||T==="all"||T==="koc")&&(tq(u)||u.role==="admin"||T==="koc"))})]],

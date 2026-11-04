@@ -48,7 +48,7 @@
       cfg:[["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
         ["Danh mục",[["spcombo","Sản phẩm & combo"],["sanpham","Sản phẩm"],["kenhban","Kênh bán & phí"],["chiphidm","Danh mục chi phí"],["cr_rcv","Tài khoản nhận tiền"]]],
         ["Chính sách bán hàng",[["cr_gia","Bảng giá"],["cr_dc","Giá điều chỉnh / khuyến mại"],["cr_thuong","Thưởng & xếp hạng NPP"],["cr_giagc","Bảng giá Kênh OEM"]]],
-        ["Dữ liệu & sao lưu",[["cr_import","Nhập dữ liệu CRM"],["caidat","Sao lưu dữ liệu"],["cr_audit","Nhật ký"]]],
+        ["Dữ liệu & sao lưu",[["nhaplieu","Nhập dữ liệu MKT"],["cr_import","Nhập dữ liệu CRM"],["caidat","Sao lưu dữ liệu"],["cr_audit","Nhật ký"]]],
         /* Bot phòng ban là cấu hình (ai duyệt đề xuất, bot làm được gì): chị Hoa 28/10 chuyển từ vận hành về đây. */
         ["Agent & bot AI",[["bots","Bot AI phòng ban"],["agents","Quyền agent"]]]],
       /* Chị Hoa 30/10: mục AI Agent giống bên vận hành (Điều hành agent, hội thoại, huấn luyện, Trợ lý AI). */
