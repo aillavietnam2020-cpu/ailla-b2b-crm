@@ -125,6 +125,28 @@ describe('Tin nhắn (/api/hub/chat)', () => {
     expect((await ctx.db.prepare("SELECT COUNT(*) AS n FROM agent_chat WHERE agent = 'ke-toan-truong-ailla'").first<{ n: number }>())!.n).toBe(0);
   });
 
+  it('trả lời, chuyển tiếp, ghim, thu hồi: chỉ người gửi hoặc CEO thu hồi được, tin còn dòng đã thu hồi', async () => {
+    const a = await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: 'Hook buổi quay mai' } });
+    const id = a.body.data.id;
+    const rp = await ctx.request('/api/hub/chat/msgs', { as: USERS.huyen, body: { room: 'g:content', body: 'Ok chị', ref: `q:${id}:buổi quay mai` } });
+    expect(rp.status).toBe(200);
+    expect(rp.body.data.ref).toBe(`q:${id}:buổi quay mai`);
+    expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.huyen, body: { room: 'g:content', body: 'x', ref: 'task:abc' } })).status).toBe(400);
+    expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.huyen, body: { room: 'g:content', body: 'Hook buổi quay mai', ref: 'fw:Thảo' } })).status).toBe(200);
+    expect((await ctx.request('/api/hub/chat/msgs', { as: USERS.huyen, body: { room: 'g:content', body: '', kind: 'pin', ref: `p:${id}` } })).status).toBe(200);
+    expect((await ctx.request(`/api/hub/chat/msgs/${id}/recall`, { as: USERS.huyen, body: {} })).status).toBe(403);
+    expect((await ctx.request(`/api/hub/chat/msgs/${id}/recall`, { as: USERS.thao, body: {} })).status).toBe(200);
+    const L = (await ctx.request('/api/hub/chat/msgs?room=g:content', { as: USERS.huyen })).body.data as { id: number; kind: string; body: string; ref: string }[];
+    const m = L.find((x) => x.id === id)!;
+    expect(m.kind).toBe('recall');
+    expect(m.body).toBe('');
+    expect(L.some((x) => x.kind === 'unsend' && x.ref === `x:${id}`)).toBe(true);
+    /* người ngoài phòng không thu hồi được, kể cả biết mã tin */
+    const dm = await ctx.request('/api/hub/chat/msgs', { as: USERS.ceo, body: { room: DM, body: 'riêng' } });
+    expect((await ctx.request(`/api/hub/chat/msgs/${dm.body.data.id}/recall`, { as: USERS.huyen, body: {} })).status).toBe(403);
+    expect((await ctx.request(`/api/hub/chat/msgs/${dm.body.data.id}/recall`, { as: USERS.ceo, body: {} })).status).toBe(200);
+  });
+
   it('thẻ giao việc: lưu loại tin và mã việc', async () => {
     const s = await ctx.request('/api/hub/chat/msgs', { as: USERS.ceo, body: { room: 'g:content', body: 'Làm 30 hook tinh dầu', kind: 'task', ref: 'task:cv_1' } });
     expect(s.body.data.kind).toBe('task');

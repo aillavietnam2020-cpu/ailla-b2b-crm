@@ -41,7 +41,7 @@ const tnOld=r=>{let k=r.startsWith("g:")?r.slice(2):"";if(r.startsWith("dm:")){c
 /* ---------- máy chủ ---------- */
 async function tnSummary(){if(!ME||typeof svApi!=="function")return;
   try{const r=await svApi("/api/hub/chat/summary");const old=new Map(TN.rooms.map(x=>[x.room,x.last&&x.last.id]));TN.rooms=r.rooms||[];
-    if(TN.sumAt)TN.rooms.forEach(x=>{if(!x.last||x.last.user_id===tnMe()||!x.unread||old.get(x.room)===x.last.id||x.last.kind==="react")return;if(TN.room===x.room&&(PAGE==="tinnhan"||TN.popRoom===x.room)&&!document.hidden)return;
+    if(TN.sumAt)TN.rooms.forEach(x=>{if(!x.last||x.last.user_id===tnMe()||!x.unread||old.get(x.room)===x.last.id||["react","unsend"].includes(x.last.kind))return;if(TN.room===x.room&&(PAGE==="tinnhan"||TN.popRoom===x.room)&&!document.hidden)return;
       /* mọi tin nhắn mới đều báo (chị Hoa 03/11), nhóm thì ghi tên nhóm, được gọi tên thì ghi rõ */
       const dm=x.room.startsWith("dm:");
       ntPush({key:"tn:"+x.last.id,type:"tin",text:(dm?"":(tnMentionsMe(x.last.body)?"Gọi bạn trong ":"")+tnName(x.room)+": ")+(x.last.kind==="task"?"📋 Giao việc: ":"")+x.last.body,by:tnUN(x.last.user_id),at:x.last.created_at,go:()=>openChat(x.room)})});
@@ -65,7 +65,7 @@ function tnListRows(){const q=TN.q.trim().toLowerCase(),by=new Map(TN.rooms.map(
   const base=["g:chung"].concat(tnMyTeam()?["g:"+tnMyTeam()]:[],tnMyPrj().map(p=>"p:"+p.id),(TN.groups||[]).map(g=>"n:"+g.id)),R=TN.rooms.slice();base.forEach(r=>{if(!by.has(r))R.push({room:r,last:null,unread:0})});
   return R.filter(r=>r.room.startsWith("dm:")||(r.room.startsWith("n:")?!!tnGrp(r.room):r.room.startsWith("p:")?!!tnPrj(r.room):TEAMS[r.room.slice(2)])).sort((a,b)=>(b.last?b.last.id:0)-(a.last?a.last.id:0))}
 function tnRowHtml(r){const g=/^(g|p|n):/.test(r.room),n=tnName(r.room),l=r.last,un=r.room===TN.room?0:r.unread;
-  const pv=l?(l.kind==="react"?(l.user_id===tnMe()?"Bạn":tnUN(l.user_id)||"")+(l.body?" đã thả "+l.body:" bỏ cảm xúc"):l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("n:")?"Nhóm phối hợp · chưa có tin":r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
+  const pv=l?(l.kind==="unsend"||l.kind==="recall"?(l.user_id===tnMe()?"Bạn":tnUN(l.user_id)||"")+" đã thu hồi một tin":l.kind==="pin"?"📌 "+(l.body?"Đã ghim: "+l.body:"Bỏ ghim tin"):l.kind==="react"?(l.user_id===tnMe()?"Bạn":tnUN(l.user_id)||"")+(l.body?" đã thả "+l.body:" bỏ cảm xúc"):l.kind==="task"?"📋 "+l.body:l.kind==="remind"?"⏰ "+l.body:(g&&l.user_id!==tnMe()?(tnUN(l.user_id)||"")+": ":l.user_id===tnMe()?"Bạn: ":"")+l.body):r.room.startsWith("n:")?"Nhóm phối hợp · chưa có tin":r.room.startsWith("p:")?"Nhóm dự án · chưa có tin":g?"Nhóm phòng · chưa có tin":"Bắt đầu nhắn riêng";
   return `<button class="tnrow${r.room===TN.room?" on":""}${un?" un":""}" data-tnr="${esc(r.room)}">${tnAv(g?r.room:tnOther(r.room),n,g)}<span class="tnrb"><span class="tnr1"><b>${esc(n)}</b>${l?`<small>${tnTime(l.created_at)}</small>`:""}</span><span class="tnr2"><span>${esc(String(pv).replace(/\s+/g," ").slice(0,70))}</span>${un?`<em>${un>99?"99+":un}</em>`:""}</span></span></button>`}
 function tnDrawList(){const el=$("#tnlist");if(!el)return;const R=tnListRows();
   el.innerHTML=(R.map(tnRowHtml).join("")||`<p class="hint" style="padding:14px">Không thấy nhóm hay người nào.</p>`)+tnAgentRows();

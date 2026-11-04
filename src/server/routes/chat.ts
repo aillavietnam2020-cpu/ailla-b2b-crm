@@ -116,7 +116,7 @@ chatRoutes.get('/summary', async (c) => {
   const unread = await db
     .prepare(
       `SELECT m.room, COUNT(*) AS n FROM chat_msgs m LEFT JOIN chat_reads r ON r.room = m.room AND r.user_id = ?1
-       WHERE ${mine} AND m.user_id <> ?1 AND m.id > COALESCE(r.last_id, 0) AND (r.last_id IS NOT NULL OR m.created_at > ?2)
+       WHERE ${mine} AND m.user_id <> ?1 AND m.kind NOT IN ('unsend', 'react') AND m.id > COALESCE(r.last_id, 0) AND (r.last_id IS NOT NULL OR m.created_at > ?2)
        GROUP BY m.room`,
     )
     .bind(me, since)
@@ -151,10 +151,14 @@ chatRoutes.post('/msgs', async (c) => {
   const b = (await c.req.json().catch(() => null)) as { room?: unknown; body?: unknown; kind?: unknown; ref?: unknown } | null;
   const room = await needRoom(b?.room, A);
   const body = String(b?.body ?? '').trim().slice(0, 4000);
-  const kind = ['', 'task', 'remind', 'file', 'react'].includes(String(b?.kind ?? '')) ? String(b?.kind ?? '') : '';
-  const ref = String(b?.ref ?? '').slice(0, 80);
+  const kind = ['', 'task', 'remind', 'file', 'react', 'pin'].includes(String(b?.kind ?? '')) ? String(b?.kind ?? '') : '';
+  /* ref tin thường: 'q:<mã tin>[:<đoạn trích>]' trả lời / trích dẫn · 'fw:<tên người gửi gốc>' chuyển tiếp */
+  const ref = String(b?.ref ?? '').slice(0, kind ? 80 : 300);
   if (!body && !ref) throw badRequest('EMPTY', 'Chưa có nội dung');
   if (kind === 'react' && !/^r:\d{1,12}$/.test(ref)) throw badRequest('BAD_REACT', 'Thả cảm xúc cho tin không hợp lệ');
+  if (kind === 'pin' && !/^p:\d{1,12}$/.test(ref)) throw badRequest('BAD_PIN', 'Ghim tin không hợp lệ');
+  if (!kind && ref && !/^(q:\d{1,12}(:[\s\S]*)?|fw:.{1,60})$/.test(ref)) throw badRequest('BAD_REF', 'Tin trả lời / chuyển tiếp không hợp lệ');
+  if (!kind && !body) throw badRequest('EMPTY', 'Chưa có nội dung');
   const at = nowIso();
   const r = await c.env.DB.prepare('INSERT INTO chat_msgs (room, user_id, body, kind, ref, created_at) VALUES (?, ?, ?, ?, ?, ?)')
     .bind(room, me, body, kind, ref, at)
@@ -167,6 +171,25 @@ chatRoutes.post('/msgs', async (c) => {
     .run();
   if (!kind && body.includes('@')) await callAgents(A, room, body, me).catch(() => undefined);
   return ok(c, { id, room, user_id: me, body, kind, ref, created_at: at });
+});
+
+/** Thu hồi tin (chị Hoa 04/11): người gửi (hoặc CEO) xóa tin với mọi người, còn dòng "Tin nhắn đã thu hồi".
+ *  Ghi thêm một dấu 'unsend' (ref 'x:<mã tin>') để máy đang mở phòng cập nhật ngay, không cần tải lại. */
+chatRoutes.post('/msgs/:id/recall', async (c) => {
+  const A = await access(c);
+  const id = Number(c.req.param('id'));
+  const row = await c.env.DB.prepare('SELECT id, room, user_id, kind FROM chat_msgs WHERE id = ?').bind(id).first<{ id: number; room: string; user_id: string; kind: string }>();
+  if (!row) throw notFound('Không tìm thấy tin');
+  await needRoom(row.room, A);
+  if (row.user_id !== A.id && !A.ceo) throw forbidden('Chỉ người gửi mới thu hồi được tin này');
+  if (['react', 'unsend', 'pin'].includes(row.kind)) throw badRequest('BAD_KIND', 'Không thu hồi được loại tin này');
+  if (row.kind === 'recall') return ok(c, { id, recalled: true });
+  const at = nowIso();
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE chat_msgs SET body = '', kind = 'recall', ref = '' WHERE id = ?").bind(id),
+    c.env.DB.prepare("INSERT INTO chat_msgs (room, user_id, body, kind, ref, created_at) VALUES (?, ?, '', 'unsend', ?, ?)").bind(row.room, A.id, 'x:' + id, at),
+  ]);
+  return ok(c, { id, recalled: true });
 });
 
 chatRoutes.post('/read', async (c) => {
