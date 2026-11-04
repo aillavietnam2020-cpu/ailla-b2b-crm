@@ -79,7 +79,7 @@
         ["Sản xuất",["sx_nc","sx_td","kho_pc","sx_lo","sx_bc"]],
         ["Thành phẩm & xuất",["kho_nhap_tp","sx_kho","kho_xuat_b2b","kho_online","kho_xuat","kho_hoan","kho_nxt","kho_cl"]],
         ["Danh mục",["kho_dm","kho_vo","kho_map","kho_combo"]]],
-      cv:[["",["cv_v","cv_pb","cv_da","cv_mt","hq"]]], /* chị Hoa 02/11: bỏ Quy chuẩn (bảng cũ từ Sheet); Quy tắc vận hành chỉ để ở quản trị › Cấu hình › Theo dõi */
+      cv:[["",["cv_ov","cv_v","cv_pbv","cv_pb","cv_da","cv_mt","cv_nk","hq"]]], /* chị Hoa 02/11: bỏ Quy chuẩn (bảng cũ từ Sheet); Quy tắc vận hành chỉ để ở quản trị › Cấu hình › Theo dõi */
       agt:[["",["agentchat","hoithoaiagent","huanluyenagent",["ai","Trợ lý AI"]]]]};
     /* Chuyển sang web quản trị (kế toán, chính sách): đã có sẵn ở đó.
        Kho bill, Phiếu chi vận chuyển ở CẢ hai web (chị Hoa chốt 26/10): sale nhập bill, chị Thảo lập phiếu chi bên vận hành;
@@ -92,7 +92,7 @@
     if(mkt)mkt.zone="";if(hr)hr.zone="";
     /* Chị Hoa 29/10: Công việc đưa lên ngay dưới Tổng quan vận hành. */
     NEW=[mod("exec","home","Tổng quan vận hành","",S.exec,["exec"],DROP),
-      mod("cv","task","Công việc","",S.cv,["cv","hq"],DROP,{tabs:true}),
+      mod("cv","task","Công việc","",S.cv,["cv","hq"],DROP), /* 04/11: các mục con hiện ở thanh bên như phân hệ khác (bỏ thanh tab trong trang) */
       mod("kd","bag","Kinh doanh","",S.kd,["b2c","b2blink","gc"],DROP),
       mkt,
       mod("sx","fac","Kho – Sản xuất","",S.sx,["sx","mhop"],DROP),
