@@ -79,6 +79,9 @@ function pdBuild(S,w){
     (S.hrDon||[]).filter(x=>x.tt==="cho").forEach(x=>add({k:"ns",id:"dn:"+x.id,ref:x.id,src:"hrDon",loai:x.loai||"Đơn nhân sự",nd:ten(x.ma),sub:[x.tu&&x.den&&x.den!==x.tu?x.tu+" → "+x.den:x.tu,x.ly].filter(Boolean).join(" · "),
       tien:x.loai==="Tạm ứng lương"?+x.sl||0:null,by:x.by||"",at:pdTs(x.at||x.gui),act:"",open:{page:"hr_nghi"}}));
     (S.hrTu||[]).filter(x=>x.tt==="cho").forEach(x=>add({k:"ns",id:"tu:"+x.id,ref:x.id,src:"hrTu",loai:"Tạm ứng lương",nd:ten(x.ma),sub:x.lyDo||"",tien:+x.tien||0,at:pdTs(x.ngay),act:"",open:{page:"hr_nghi"}}));
+    /* Đơn mới lưu trên máy chủ (nghiphep.js, 04/11): đơn chờ HCNS duyệt vòng 2 và tạm ứng chờ Kế toán. */
+    (S.nsDon||[]).filter(x=>x.st==="hcns").forEach(x=>add({k:"ns",id:"np:"+x.id,ref:x.id,src:"nsDon",loai:x.loaiTen||"Đơn nghỉ",nd:x.ten||"",sub:[x.tu&&x.den&&x.den!==x.tu?x.tu+" → "+x.den:x.tu,x.so_ngay?x.so_ngay+" ngày":"",x.ly_do].filter(Boolean).join(" · "),tien:null,by:"",at:pdTs(x.created_at),act:"",open:{page:"np_ql"}}));
+    (S.nsTu||[]).filter(x=>x.st==="kt").forEach(x=>add({k:"ns",id:"nt:"+x.id,ref:x.id,src:"nsTu",loai:"Tạm ứng lương",nd:x.ten||"",sub:x.ly_do||"",tien:+x.so_tien||0,at:pdTs(x.created_at),act:"",open:{page:"tu_ql"}}));
   }
   /* Combo mới trên đơn sàn kế toán chưa nhập: một dòng gộp, kho vẫn xuất, đơn chưa tính giá vốn. */
   const cb=S.combo||[];
