@@ -316,9 +316,10 @@ PAGES.cc_toi=pCcToi;PAGES.cc_ngay=pCcNgay;PAGES.cc_thang=pCcThang;PAGES.cc_xepca
     const rest=G0.map(([g,its])=>[g==="Chấm công & hiệu suất"?"Hiệu suất":g,its.filter(i=>!MOVED.includes(i[0]))]);
     const lead=u=>ccLead(u)&&!ccHr(u),cho=k=>()=>(typeof NP!=="undefined"&&NP.cho[k])||"";
     const ketoan=u=>ccHr(u)||(typeof npKetoan==="function"&&npKetoan());
-    return [["Nhóm của tôi",[MI("cc_ngay","Hôm nay",lead),MI("np_duyet","Duyệt nghỉ phép & tăng ca",lead,cho("lead")),MI("cc_xepca","Xếp ca",lead),MI("cc_thang","Bảng chấm công tháng",lead)]],
+    const hs=rest.filter(([g])=>g==="Hồ sơ"),other=rest.filter(([g])=>g!=="Hồ sơ"); // CEO 04/11: Hồ sơ lên đầu mục Nhân sự
+    return [...hs,["Nhóm của tôi",[MI("cc_ngay","Hôm nay",lead),MI("np_duyet","Duyệt nghỉ phép & tăng ca",lead,cho("lead")),MI("cc_xepca","Xếp ca",lead),MI("cc_thang","Bảng chấm công tháng",lead)]],
       ["Chấm công",[MI("cc_ngay","Hôm nay",ccHr),MI("cc_thang","Bảng chấm công tháng",ccHr),MI("cc_xepca","Xếp ca",ccHr),...(hrcc?[[hrcc[0],"Chốt công tháng",hrcc[2],hrcc[3]]]:[]),MI("cc_caidat","Cài đặt chấm công",ccHr)]],
       ["Nghỉ phép & tạm ứng",[MI("np_ql","Nghỉ phép & tăng ca",ccHr,cho("hcns")),MI("tu_ql","Tạm ứng lương",ketoan,cho("tu"))]],
-      ...rest]}}
+      ...other]}}
   const me=MODULES.find(x=>x.k==="me");if(me){const g0=me.groups;me.groups=()=>{const G=g0();if(G[0]&&!G[0][1].some(i=>i[0]==="cc_toi"))G[0][1].unshift(MI("cc_toi","Chấm công"));return G}}
 }
