@@ -923,12 +923,12 @@ function ktApplyLead(dt,k){k.duyet="Chờ CEO duyệt";k.choDuyet=true;k.sua=nul
 function ktBulkBar(L){const S=XV.ktSel||new Set(),sel=(D().kho||[]).filter(k=>S.has(k.ma));if(!sel.length)return "";
   const st=k=>ktState(k),nFree=sel.filter(k=>st(k)==="free").length,nDuyet=sel.filter(k=>(st(k)==="cd"&&xvGive())||(st(k)==="cceo"&&ME.role==="admin")).length;
   return `<div class="ktbulk"><b>Đã chọn ${sel.length} video</b>
-   <span>Phân bổ kênh <select id="ktb-k">${opt([["","— chọn kênh"]].concat(CHANNELS.map(c=>[c.k,c.short])),"")}</select> <button type="button" class="btn sm pri" id="ktb-go" ${nFree?"":"disabled"}>Phân bổ ${nFree} video</button></span>
+   <span style="display:inline-flex;align-items:center;gap:8px;white-space:nowrap">Phân bổ kênh <select id="ktb-k" style="width:auto;min-width:180px">${opt([["","— chọn kênh"]].concat(CHANNELS.map(c=>[c.k,c.short])),"")}</select> <button type="button" class="btn sm pri" id="ktb-go" ${nFree?"":"disabled"}>Phân bổ ${nFree} video</button></span>
    ${nDuyet?`<button type="button" class="btn sm" id="ktb-ok">✓ ${ME.role==="admin"?"CEO duyệt":"Duyệt"} ${nDuyet} video</button>`:""}
    <button type="button" class="lnk" id="ktb-x">Bỏ chọn</button>
    ${sel.length>nFree?`<small class="hint">Chỉ video đã duyệt xong, chưa có kênh mới phân bổ được (${nFree}/${sel.length})</small>`:""}</div>
-   <style>.ktbulk{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:8px 12px;padding:8px 12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--bg-surface-raised,#f8fafc)}.ktbulk select{height:30px}.ktck{width:34px;text-align:center}</style>`}
-function ktBulkBind(w){const q=i=>w.querySelector(i),S=XV.ktSel||new Set(),sel=()=>(D().kho||[]).filter(k=>S.has(k.ma));
+   <style>.card.flush:has(.ktbulk){overflow:visible}.ktbulk{position:sticky;top:var(--ktb-top,72px);z-index:30;box-shadow:0 6px 16px rgba(0,0,0,.10);display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:8px 12px;padding:8px 12px;border:1px solid var(--border-strong,#cbd5e1);border-radius:10px;background:var(--bg-surface-raised,#f8fafc)}.ktbulk select{height:30px}.ktck{width:34px;text-align:center}</style>`}
+function ktBulkBind(w){{const tb=document.querySelector(".topbar");document.documentElement.style.setProperty("--ktb-top",((tb&&getComputedStyle(tb).position!=="static"?tb.getBoundingClientRect().height:0)+6)+"px")}const q=i=>w.querySelector(i),S=XV.ktSel||new Set(),sel=()=>(D().kho||[]).filter(k=>S.has(k.ma));
   if(q("#ktb-x"))q("#ktb-x").onclick=()=>{S.clear();renderMain()};
   if(q("#ktb-go"))q("#ktb-go").onclick=()=>{const kenh=q("#ktb-k").value;if(!kenh){toast("Chọn kênh trước");q("#ktb-k").focus();return}
     const L=sel().filter(k=>ktState(k)==="free");let n=0;XV.ktQuiet=true;XV.ktQuietN={};try{L.forEach(k=>{if(ktPick(k.ma,kenh)){n++;S.delete(k.ma)}})}finally{XV.ktQuiet=false}

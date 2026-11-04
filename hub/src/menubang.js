@@ -14,6 +14,7 @@
   const pool=()=>{if(C)return C;const o={},src={};
     const L=ADMH?SRC.filter(m=>m.adm).concat(SRC.filter(m=>!m.adm)):SRC.filter(m=>!m.adm).concat(SRC.filter(m=>m.adm));
     L.forEach(m=>{try{m.groups().forEach(([,its])=>its.forEach(i=>{if(!i)return;if(!o[i[0]])o[i[0]]=i;(src[m.k]=src[m.k]||[]).push(i[0])}))}catch(e){}});
+    if(!o.nhaplieu&&typeof PAGES!=="undefined"&&PAGES.nhaplieu)o.nhaplieu=MI("nhaplieu","Nhập dữ liệu MKT",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead");
     if(!o.quytac&&typeof PAGES!=="undefined"&&PAGES.quytac)o.quytac=MI("quytac","Quy tắc vận hành & luồng việc",()=>typeof mhManage==="function"&&mhManage());
     C={o,src};Promise.resolve().then(()=>{C=null});return C};
   const it=(P,x)=>{const[id,nm]=Array.isArray(x)?x:[x];const i=P[id];return i?[i[0],nm||i[1],i[2],i[3]]:null};
