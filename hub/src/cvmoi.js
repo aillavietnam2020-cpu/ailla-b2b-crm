@@ -34,7 +34,7 @@ const CW_CSS=`.cwhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;marg
 .cwhd>.sp{flex:1}.cwhd>.kdstrip,.cwhd>.odcard{order:9;flex-basis:100%;margin:6px 0 0}
 .cwph{margin:0 0 6px}.cwtop>.cvbar.cwtopbar{margin:0 0 6px auto;padding:0;border:0;background:none;box-shadow:none;flex-wrap:wrap;justify-content:flex-end}.cwtop{display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
 .cwtop>.cwtabs{flex:1;min-width:0;border-bottom:0;margin:0}.cwtop>.cwhd{margin:0 0 6px;flex-wrap:nowrap}.cwtop>.cwhd .cwbar{flex-wrap:nowrap}
-.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.topbar .cwsrch-tb{margin-right:6px}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
+.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.topbar .cwsrch-tb{margin-right:6px}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
 .cwtop+.kdstrip,.cwtop+.odcard,.kdstrip+.odcard{margin:0 0 12px}
 svg.cwi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
 .cwbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cwbar .btn{display:inline-flex;align-items:center;gap:6px}
@@ -356,7 +356,7 @@ function cwMy(m){cwCss();PAGE="cv_v";
     const v=CW_MY.find(x=>x[0]===CWS.my);title="Việc của tôi";desc=CWS.my==="today"?cwToday()+" · "+CW_MYD.today:CW_MYD[CWS.my];
     body=CWS.kx==="list"?cwMyList(R,CWS.my):cwView(cwDaF(cwQ(v[3](R))))}
   const daChip=CWS.da?`<span class="cwchip">${cwI("fold")}Dự án: ${esc(prjN(CWS.da)||CWS.da)}<button type="button" data-cwdax="1" aria-label="Bỏ lọc dự án">${cwI("x",13)}</button></span>`:"";
-  m.innerHTML=cwHead(title,desc)+tabs+`<div class="cwtb">${daChip}<span class="sp"></span>${cwKxSel()}</div>`+body;
+  m.innerHTML=cwHead(title,desc)+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+body;
   cwTop(m);cwBind(m,R);
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-cwpd]").forEach(b=>b.onclick=()=>{if(typeof NAV_AN_MO!=="undefined")NAV_AN_MO.add("pheduyet");MOD="";PAGE="pheduyet";render();scrollTo(0,0)});
@@ -407,7 +407,7 @@ function cwPb(m){cwCss();if(!cwMgr()){PAGE="cv_pb";PAGES.cv_pb(m);return}PAGE="c
   const scopeN=w.who?userName(w.who):w.team?cwPhong(w.team):"Cả công ty";
   const daChip=CWS.da?`<span class="cwchip">${cwI("fold")}Dự án: ${esc(prjN(CWS.da)||CWS.da)}<button type="button" data-cwdax="1" aria-label="Bỏ lọc dự án">${cwI("x",13)}</button></span>`:"";
   m.innerHTML=cwHead("Phòng ban",`Việc của từng phòng ban và từng nhân sự · đang xem: ${esc(scopeN)}`)+cwPbTabs(S,date?"open":CWS.pb)+
-    `<div class="cwtb">${cwWhoSel("cw-pbt","cw-pbw",w.team,w.who)}${daChip}<span class="sp"></span>${cwKxSel()}</div>`+(CWS.kx==="list"?cwBulk(cwSort(L)):cwView(L));
+    `<div class="cwtb">${cwKxSel()}${cwWhoSel("cw-pbt","cw-pbw",w.team,w.who)}${daChip}<span class="sp"></span></div>`+(CWS.kx==="list"?cwBulk(cwSort(L)):cwView(L));
   cwTop(m);cwBind(m,R);
   m.querySelectorAll("[data-cwpb]").forEach(b=>b.onclick=()=>{const k=b.dataset.cwpb;CWS.sel.clear();if(k==="space"){cwGo("cv_pb");return}CWS.pb=k;if(PAGE!=="cv_pbv")cwGo("cv_pbv");else{renderMain();scrollTo(0,0)}});
   const a=m.querySelector("#cw-pbt");if(a)a.onchange=()=>{CWS.pbT=a.value;CWS.pbW="";CWS.sel.clear();renderMain()};
