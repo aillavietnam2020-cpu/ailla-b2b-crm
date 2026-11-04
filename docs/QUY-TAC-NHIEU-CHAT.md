@@ -43,6 +43,7 @@ File trong `migrations/` chạy theo số thứ tự tên file. Hai chat cùng t
 | Báo cáo sàn TikTok / Shopee (lãi lỗ tháng, hiệu suất theo ngày) | 0130–0139 |
 | Báo cáo sàn tải hằng tuần (Shopee 2 shop, nạp tự động) | 0180–0189 |
 | Task giao việc + Tin nhắn | 0250–0259 |
+| Nhân sự (chấm công, đơn nghỉ, phiếu lương) | 0260–0269 |
 | Chat khác (điện thoại, nhân sự...) | xin khối mới ở chị Hoa, ghi vào bảng này |
 
 - File đã chạy lên production thì KHÔNG đổi tên, KHÔNG sửa nội dung. Hiện cả hai file `0061_*` đều đã chạy.
