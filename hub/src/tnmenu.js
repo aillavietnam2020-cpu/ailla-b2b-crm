@@ -30,7 +30,8 @@ tnMsgHtml=function(m,prev){
   if(m.kind==="recall"){const me=m.user_id===tnMe();return `<div class="tnm${me?" me":""}" data-mid="${m.id}">${me?`<i class="tnav sp"></i>`:tnAv(m.user_id,tnUN(m.user_id))}<div class="tnmb"><div class="tnmh">${me?"":`<b>${esc(tnUN(m.user_id)||"")}</b>`}<small>${new Date(m.created_at).toTimeString().slice(0,5)}</small></div><div class="tnbub tnrec">🚫 Tin nhắn đã thu hồi</div></div></div>`}
   let h=_tnMsgHtmlM(m,prev);if(m.old)return h;
   if(!m.kind&&m.ref){const q=tnQuoteHtml(m);if(q)h=h.replace('<div class="tnbub">','<div class="tnbub">'+q)}
-  h=h.replace('<span class="tnma">','<span class="tnma">'+(String(TN.room).startsWith("ag:")?"":'<button title="Trả lời" data-tnmr="1">↩</button>')+'<button title="Thêm: trả lời, sao chép, ghim, chuyển tiếp, thu hồi…" data-tnmore="1">⋯</button>');
+  /* chị Hoa 04/11: rê chuột vào tin chỉ hiện nút ⋯, mọi việc (thả cảm xúc, trả lời, giao việc, nhắc…) nằm trong menu */
+  h=h.replace(/<span class="tnma">[\s\S]*?<\/span>/,'<span class="tnma"><button title="Thả cảm xúc, trả lời, sao chép, giao việc, nhắc, ghim, chuyển tiếp, thu hồi…" data-tnmore="1">⋯</button></span>');
   if(TNM.sel&&TNM.selRoom===TN.room)h=h.replace('<div class="tnm','<div class="tnm tnpick'+(TNM.sel.has(m.id)?" on":""));
   return h};
 const _tnDrawMsgsM=tnDrawMsgs;
