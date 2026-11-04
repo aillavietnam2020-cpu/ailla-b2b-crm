@@ -421,7 +421,11 @@ function cwPb(m){cwCss();if(!cwMgr()){PAGE="cv_pb";PAGES.cv_pb(m);return}PAGE="c
 /* trang "Thư mục công việc" (trang Không gian phòng cũ, khonggian.js): mục riêng ở thanh bên, dưới Dự án */
 function cwPbSpace(m,old){cwCss();
   m.innerHTML=cwHead("Thư mục công việc","",{btns:false})+'<div id="cw-body"></div>';cwTop(m);
-  old(m.querySelector("#cw-body"))}
+  if(typeof KPB!=="undefined"&&(!KPB.doc||KPB.doc==="tpl"))KPB.doc="sop";
+  const body=m.querySelector("#cw-body");old(body);
+  /* chỉ giữ Thư mục công việc (Drive) và Mẫu tài liệu & SOP; việc, người, dự án, trao đổi đã có ở mục khác */
+  body.querySelectorAll(".kgk,[data-kgdt=\"tpl\"]").forEach(x=>x.remove());
+  body.querySelectorAll("section.kgs").forEach(sc=>{const h=sc.querySelector("h3"),t=h?h.textContent:"";if(/Thư mục Drive/.test(t))h.textContent="📁 Thư mục công việc";else if(/Mẫu & SOP/.test(t))h.textContent="🧩 Mẫu tài liệu & SOP";else sc.remove()})}
 
 /* ---------- 4. DỰ ÁN (tab Dự án · Mục tiêu) ---------- */
 function cwDaFrame(m,tab,inner){cwCss();
