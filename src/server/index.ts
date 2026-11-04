@@ -1,4 +1,4 @@
-import { nhacNgayLe } from './services/nhacNgayLe';
+import { nhacNgayLe, nhacNgayVangChung } from './services/nhacNgayLe';
 import type { Env } from './env';
 import { createApp } from './app';
 import { loadConfig } from './lib/settings';
@@ -126,6 +126,11 @@ export default {
           console.info('[cron] nhac ngay le', JSON.stringify(await nhacNgayLe(env.DB)));
         } catch (error) {
           console.error('[cron] nhac ngay le loi', error);
+        }
+        try {
+          console.info('[cron] nhac ngay ca may vang', JSON.stringify(await nhacNgayVangChung(env.DB)));
+        } catch (error) {
+          console.error('[cron] nhac ngay ca may vang loi', error);
         }
       })(),
     );
