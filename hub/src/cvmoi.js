@@ -34,7 +34,7 @@ const CW_CSS=`.cwhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;marg
 .cwhd>.sp{flex:1}.cwhd>.kdstrip,.cwhd>.odcard{order:9;flex-basis:100%;margin:6px 0 0}
 .cwph{margin:0 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cwph h1{margin:0}.cwtop>.cvbar.cwtopbar{margin:0 0 6px auto;padding:0;border:0;background:none;box-shadow:none;flex-wrap:wrap;justify-content:flex-end}.cwtop{display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
 .cwtop>.cwtabs{flex:1;min-width:0;border-bottom:0;margin:0}.cwtop>.cwhd{margin:0 0 6px;flex-wrap:nowrap}.cwtop>.cwhd .cwbar{flex-wrap:nowrap}
-.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.topbar .cwsrch-tb{margin-right:6px}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
+.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.topbar .cwsrch-tb{margin-right:6px}.cwspace .kgg{display:flex!important;flex-direction:column;gap:14px}.cwspace .kgg>.kgc{display:contents!important}.cwspace .kgs{margin:0!important}.cwspace .kgs.kgdrv{order:-1}.cwspace .kgdir{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
 .cwtop+.kdstrip,.cwtop+.odcard,.kdstrip+.odcard{margin:0 0 12px}
 svg.cwi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
 .cwbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cwbar .btn{display:inline-flex;align-items:center;gap:6px}
@@ -425,7 +425,9 @@ function cwPbSpace(m,old){cwCss();
   const body=m.querySelector("#cw-body");old(body);
   /* chỉ giữ Thư mục công việc (Drive) và Mẫu tài liệu & SOP; việc, người, dự án, trao đổi đã có ở mục khác */
   body.querySelectorAll(".kgk,[data-kgdt=\"tpl\"]").forEach(x=>x.remove());
-  body.querySelectorAll("section.kgs").forEach(sc=>{const h=sc.querySelector("h3"),t=h?h.textContent:"";if(/Thư mục Drive/.test(t))h.textContent="📁 Thư mục công việc";else if(/Mẫu & SOP/.test(t))h.textContent="🧩 Mẫu tài liệu & SOP";else sc.remove()})}
+  body.querySelectorAll("section.kgs").forEach(sc=>{const h=sc.querySelector("h3"),t=h?h.textContent:"";if(/Thư mục Drive/.test(t)){h.textContent="📁 Thư mục công việc";sc.classList.add("kgdrv")}else if(/Mẫu & SOP/.test(t))h.textContent="🧩 Mẫu tài liệu & SOP";else sc.remove()});
+  /* dàn hàng ngang: Thư mục công việc trải hết bề ngang ở trên, Mẫu tài liệu & SOP ở dưới (chỉ đổi cách hiển thị, không dời khung) */
+  body.classList.add("cwspace")}
 
 /* ---------- 4. DỰ ÁN (tab Dự án · Mục tiêu) ---------- */
 function cwDaFrame(m,tab,inner){cwCss();
