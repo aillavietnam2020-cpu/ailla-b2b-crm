@@ -959,7 +959,7 @@ function ktSideNav(prev,next){document.querySelectorAll(".ktside").forEach(x=>x.
 /* video kế tiếp trong danh sách đang lọc (để duyệt liền mạch) */
 function ktNextOf(ma){const L=XV.ktList||[],i=L.indexOf(ma);return i>=0?(L[i+1]||L[i-1]||""):""}
 document.addEventListener("keydown",e=>{if(!/^Arrow(Left|Right)$/.test(e.key))return;const t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;const b=document.querySelector("#drawerIn "+(e.key==="ArrowLeft"?"#kt-prev":"#kt-next"));if(b&&!b.disabled){e.preventDefault();b.click()}});
-function ktModal(ma){
+function ktModal(ma,navK){
   const d=D(),k=(d.kho||[]).find(x=>x.ma===ma);if(!k)return;
   const c=k.maDang&&d.cards.find(y=>y.id===k.maDang),s=ktState(k),give=xvGive(),mk=!c||give||c.giao===ME.id||c.nguoi===ME.id||chanOwner(c.kenh)===ME.id,dis=mk?"":"disabled";
   const p2=n=>String(n).padStart(2,"0"),dv=n=>n?MONTH.year+"-"+p2(MONTH.mon)+"-"+p2(n):"",lkf=u=>/^https?:/.test(u||"")?u:(u?"https://"+u:"");
@@ -967,7 +967,9 @@ function ktModal(ma){
   const tuyen=(k.tuyen||"")+(k.ten?(k.tuyen?" · ":"")+k.ten:"")||k.skuText||"",p=d.products.find(x=>x.k===k.sku),ko=(p?pKenhs(p).map(e=>e.kenh):CHANNELS.map(x=>x.k));
   const stP=s==="cs"?pill("Cần sửa","red"):s==="cceo"?pill("Chờ CEO duyệt","amb"):s==="cd"?pill("Chờ Lead duyệt","amb"):s==="free"?pill("Chưa phân bổ","gry"):s==="cho"?pill("Chờ đăng","blu"):pill("Đã đăng","grn");
   const k2h=c?kenh2Html(c,dis):"";
-  const NL=XV.ktList||[],ni=NL.indexOf(ma),nav=ni>=0&&NL.length>1?`<span class="ktnav"><button type="button" class="btn sm" id="kt-prev" ${ni>0?"":"disabled"} title="Video trước (phím ←)">‹</button><small>${ni+1}/${NL.length}</small><button type="button" class="btn sm" id="kt-next" ${ni<NL.length-1?"":"disabled"} title="Video sau (phím →)">›</button></span>`:"";
+  /* mở từ video đang chờ duyệt / cần sửa thì mũi tên chỉ lật qua các video chờ duyệt (04/11) */
+  {const st0=ktState(k);if(!navK)XV.ktGrp=["cd","cceo","cs"].includes(st0)?"pend":"all"}
+  const NL=(XV.ktList||[]).filter(x=>XV.ktGrp!=="pend"||x===ma||["cd","cceo","cs"].includes(ktState((d.kho||[]).find(y=>y.ma===x)||{}))),ni=NL.indexOf(ma),nav=ni>=0&&NL.length>1?`<span class="ktnav"><button type="button" class="btn sm" id="kt-prev" ${ni>0?"":"disabled"} title="Video trước (phím ←)">‹</button><small>${ni+1}/${NL.length}</small><button type="button" class="btn sm" id="kt-next" ${ni<NL.length-1?"":"disabled"} title="Video sau (phím →)">›</button></span>`:"";
   openDrawerHTML(`<style>.ktnav{display:inline-flex;align-items:center;gap:6px;margin-left:12px;vertical-align:middle}.ktnav .btn{min-width:34px;font-size:18px;line-height:1;padding:4px 10px}.ktnav small{color:var(--text-muted,#6b7280);font-size:12.5px}</style><h2 class="dtitle">${esc(k.ma)}${nav}</h2><p class="hint">${swatch(k.sku)}${esc(sk(k.sku).n)} · ${esc(tuyen)} · ${stP}</p>
    <div class="frm kfrm">
     ${s==="cs"?`<div class="k2box full" style="border-color:var(--danger,#dc2626)"><b>Cần sửa</b> · ${esc(k.sua.byName||"")} · ${esc(k.sua.at||"")}<p style="margin:6px 0">${esc(k.sua.note)}</p><p class="hint">Người sửa: <b>${esc(userName(k.sua.nguoi)||"—")}</b></p>${xvGive()||k.sua.nguoi===ME.id?`<label class="field full">Link video đã sửa (Drive)<input id="kt-nl" placeholder="Dán link bản đã sửa…"></label><div class="acts"><button type="button" class="btn sm pri" id="kt-gl">Đã sửa, gửi duyệt lại</button></div>`:""}</div>`:""}${(k.suaLog||[]).length?`<details class="full"><summary class="hint">Lịch sử sửa (${k.suaLog.length})</summary>${k.suaLog.map(x=>`<div class="hint">• ${esc(x.at)} · ${esc(x.by)}: ${esc(x.note)} → ${esc(userName(x.nguoi)||"")}${x.xong?" · đã sửa "+esc(x.xong):""}</div>`).join("")}</details>`:""}
@@ -992,11 +994,11 @@ function ktModal(ma){
   if(c)kenh2Bind(c.id,()=>ktModal(ma));
   const gb=q("#kt-gb");if(gb)gb.onclick=()=>{ktGan(ma,q("#kt-gk").value);renderMain();ktModal(ma)};
   const x=q("#kt-x");if(x)x.onclick=closeDrawer;
-  {const pv=q("#kt-prev"),nx=q("#kt-next");if(pv)pv.onclick=()=>{if(ni>0)ktModal(NL[ni-1])};if(nx)nx.onclick=()=>{if(ni<NL.length-1)ktModal(NL[ni+1])};ktSideNav(ni>0?()=>ktModal(NL[ni-1]):null,ni>=0&&ni<NL.length-1?()=>ktModal(NL[ni+1]):null)}
-  const ok=q("#kt-ok");if(ok)ok.onclick=()=>{ktDuyet(ma);renderMain();ktModal(ma)};
+  {const pv=q("#kt-prev"),nx=q("#kt-next");if(pv)pv.onclick=()=>{if(ni>0)ktModal(NL[ni-1],1)};if(nx)nx.onclick=()=>{if(ni<NL.length-1)ktModal(NL[ni+1],1)};ktSideNav(ni>0?()=>ktModal(NL[ni-1],1):null,ni>=0&&ni<NL.length-1?()=>ktModal(NL[ni+1],1):null)}
+  const ok=q("#kt-ok");if(ok)ok.onclick=()=>{ktDuyet(ma);renderMain();ktModal(ma,1)};
   const cs=q("#kt-cs");if(cs)cs.onclick=()=>ktCanSua(ma);
   const fbok=q("#kt-fbok");if(fbok)fbok.onclick=()=>{const note=(q("#kt-fb").value||"").trim(),u=q("#kt-fbu").value;if(!note){toast("Ghi cần sửa gì");return}if(!u){toast("Chọn người sửa");return}
-    DB.mutate(ME.name,"yêu cầu sửa video tồn "+ma,dt=>{const x=dt.kho.find(y=>y.ma===ma);if(x)ktApplySua(dt,x,note,u)});toast("Đã gửi góp ý cho "+userName(u));renderMain();ktModal(ma)};
+    DB.mutate(ME.name,"yêu cầu sửa video tồn "+ma,dt=>{const x=dt.kho.find(y=>y.ma===ma);if(x)ktApplySua(dt,x,note,u)});toast("Đã gửi góp ý cho "+userName(u));renderMain();ktModal(ma,1)};
   const gl=q("#kt-gl");if(gl)gl.onclick=()=>{const l=(q("#kt-nl").value||"").trim();if(!l&&!confirm("Chưa dán link bản đã sửa. Vẫn gửi duyệt lại với link cũ?"))return;ktGuiLai(ma,l);renderMain();ktModal(ma)};
   const u=q("#kt-un");if(u)u.onclick=()=>{DB.mutate(ME.name,"bỏ chọn video tồn "+c.id,dt=>{const cc=dt.cards.find(y=>y.id===c.id);if(!cc)return;const kk=dt.kho.find(y=>y.ma===cc.khoMa);if(kk){kk.maDang="";kk.trangThai="Chưa dùng"}cc.khoMa="";cc.step="kb";cc.loai="";cc.nguon="Footage cũ";cc.nguoi=cc.giao||cc.nguoi;cc.day=0;cc.linkVideo=""});toast("Đã trả video về kho");closeDrawer();renderMain()};
   const dn=q("#kt-done");if(dn)dn.onclick=()=>{const l=(q("#kt-lb").value||"").trim();if(!l){toast("Dán link TikTok đã đăng trước");return}const fb=!chOf(c.kenh).needId,m2=l.match(/[0-9]{19}/);if(!fb&&!m2){toast("Link TikTok phải có dãy 19 số sau /video/");return}
