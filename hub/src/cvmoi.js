@@ -34,7 +34,7 @@ const CW_CSS=`.cwhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;marg
 .cwhd>.sp{flex:1}.cwhd>.kdstrip,.cwhd>.odcard{order:9;flex-basis:100%;margin:6px 0 0}
 .cwph{margin:0 0 6px}.cwtop>.cvbar.cwtopbar{margin:0 0 6px auto;padding:0;border:0;background:none;box-shadow:none;flex-wrap:wrap;justify-content:flex-end}.cwtop{display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
 .cwtop>.cwtabs{flex:1;min-width:0;border-bottom:0;margin:0}.cwtop>.cwhd{margin:0 0 6px;flex-wrap:nowrap}.cwtop>.cwhd .cwbar{flex-wrap:nowrap}
-.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.topbar .cwsrch-tb{margin-right:6px}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
+.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.topbar .cwsrch-tb{margin-right:6px}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
 .cwtop+.kdstrip,.cwtop+.odcard,.kdstrip+.odcard{margin:0 0 12px}
 svg.cwi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
 .cwbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cwbar .btn{display:inline-flex;align-items:center;gap:6px}
@@ -243,9 +243,9 @@ function cwTop(m){cwTbSearch(m);const hd=m.querySelector(":scope>.cwhd"),nv=m.qu
     if(tb&&bar){bar.classList.add("cwbar2");tb.append(bar);hd.remove()}else{w.after(hd);hd.classList.add("cwhdr")}}}
 /* ô Tìm việc nằm trên thanh trên cùng, thay chỗ ô chọn ngày (trang Công việc không dùng ô chọn ngày) */
 function cwTbSearch(m){const top=document.querySelector(".topbar");if(!top)return;top.querySelectorAll(".cwsrch").forEach(x=>x.remove());
-  const q=m.querySelector(".cwsrch"),pp=top.querySelector(".pp");if(!q){if(pp)pp.style.display="";return}
-  q.classList.add("cwsrch-tb");if(pp){pp.style.display="none";pp.before(q)}else{const sp=top.querySelector(".sp");if(sp)sp.after(q);else top.append(q)}}
-if(typeof renderMain==="function"){const _cwRM=renderMain;renderMain=function(){const r=_cwRM.apply(this,arguments);if(MOD!=="cv"){const top=document.querySelector(".topbar");if(top){top.querySelectorAll(".cwsrch-tb").forEach(x=>x.remove());const pp=top.querySelector(".pp");if(pp)pp.style.display=""}}return r}}
+  const q=m.querySelector(".cwsrch"),pp=top.querySelector(".pp");top.classList.toggle("cwsq",!!q);if(!q)return;
+  q.classList.add("cwsrch-tb");if(pp){pp.before(q)}else{const sp=top.querySelector(".sp");if(sp)sp.after(q);else top.append(q)}}
+if(typeof renderMain==="function"){const _cwRM=renderMain;renderMain=function(){const r=_cwRM.apply(this,arguments);if(MOD!=="cv"){const top=document.querySelector(".topbar");if(top){top.querySelectorAll(".cwsrch-tb").forEach(x=>x.remove());top.classList.remove("cwsq")}}return r}}
 const cwTabs=L=>`<nav class="cwtabs" role="tablist">${L.map(t=>`<button type="button" role="tab" class="${t.on?"on":""}" ${t.attr}>${t.ic?cwI(t.ic):""}${t.l}${t.n?`<span class="n${t.r?" r":""}">${t.n}</span>`:""}</button>`).join("")}</nav>`;
 const cwGo=(page)=>{PAGE=page;MOD="cv";try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)};
 function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const h=di.querySelector("h2");if(h)h.textContent="Thêm việc cho mình";
