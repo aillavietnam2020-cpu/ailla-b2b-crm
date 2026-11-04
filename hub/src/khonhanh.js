@@ -23,7 +23,7 @@ function kqInject(){
   if(KQ_ADM()||typeof ME==="undefined"||!ME)return;const nav=document.querySelector(".side nav");if(!nav||document.getElementById("kqside"))return;
   let ok=false;try{ok=KQ_LIST().length>0}catch(e){}if(!ok)return;
   const w=document.createElement("div");w.id="kqside";w.className="gnbox";
-  w.innerHTML=`<button type="button" class="gnbtn kqbtn kqs"><span>＋ Lập phiếu nhanh</span><span>▾</span></button>`;nav.before(w)}
+  w.innerHTML=`<button type="button" class="gnbtn kqbtn kqs"><span>＋ Tạo phiếu nhập kho</span><span>▾</span></button>`;nav.before(w)}
 {const _r=render;render=function(){const r=_r.apply(this,arguments);try{kqInject()}catch(e){}return r}}
 function kqClose(){const p=document.getElementById("kqpop");if(p)p.remove()}
 function kqOpen(btn){
