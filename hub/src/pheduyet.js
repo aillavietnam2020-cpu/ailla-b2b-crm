@@ -30,14 +30,15 @@ async function pdLoad(force){
     const ap=P("order.approve.normal")||P("order.approve.exception"),th=ceo||P("order.approve.normal");
     const months=[0,1,2].map(pdYm);
     const kt=P("order.accounting.confirm");
-    const [cs,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,...bon]=await Promise.all([svApi("/api/ceo-spend").catch(()=>null),ceo?get("/api/ceo-spend/pending"):[],
+    const mhOk=ceo||w.admin||P("order.approve.normal")||kt;
+    const [mhLech,cs,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,...bon]=await Promise.all([mhOk?get("/api/hub/kho/mh/lech"):[],svApi("/api/ceo-spend").catch(()=>null),ceo?get("/api/ceo-spend/pending"):[],
       ceo||kt?get("/api/work/queue/pay_confirm"):[],kt?get("/api/returns?status=DA_NHAN_KHO"):[],
       ap?get("/api/approvals?status=PENDING"):[],th?get("/api/orders/ship-edits"):[],get("/api/proposals?status=PENDING"),
       ...months.flatMap(m=>th?[get("/api/bonus/gifts?month="+m),get("/api/bonus/cash?month="+m)]:[])]);
     if(cs&&cs.threshold!=null)PD.th=+cs.threshold;
     const combo=ceo||kt||w.admin?await get("/api/hub/sanpham/unmapped"):[];
     const nsDon=w.ns?((await get("/api/hub/nghiphep/duyet")).list||[]):[],nsTu=w.ns||ceo?((await get("/api/hub/nghiphep/tamung")).list||[]):[];
-    PD.sv={combo,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
+    PD.sv={mhLech:Array.isArray(mhLech)?mhLech:[],combo,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
   catch(e){PD.err=e.message||"Không tải được"}
   PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();pdBadge()}
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */
@@ -48,16 +49,18 @@ function pdRows(){
 }
 /* CEO chỉ thấy việc của mình trong danh sách duyệt (chị Hoa 03/11); đề xuất agent đã gửi Kho / Sale / Kế toán là việc của phòng đó,
    gom ở mục "Đang chờ ở các phòng" để biết bộ phận nào, ai đang nghẽn. */
-const PD_ROUTE_N={KHO:"Kho",SALE:"Sale phụ trách khách",KE_TOAN:"Kế toán"};
+const PD_ROUTE_N={KHO:"Kho",SALE:"Sale phụ trách khách",KE_TOAN:"Kế toán",MUA:"Mua hàng"};
 const pdProp=r=>r&&r.src==="proposal"?(((PD.sv||{}).proposals||[]).find(p=>p.id===r.ref)||null):null;
-/* Việc của kế toán (tiền về chờ xác nhận, combo mới chờ nhập, duyệt combo Digital, combo chờ mã MISA): CEO chỉ theo dõi (chị Hoa 04/11). */
-const PD_KT_K=["tien","combo","cbdx"];
+/* Việc của kế toán (tiền về chờ xác nhận, combo mới chờ nhập, duyệt combo Digital, combo chờ mã MISA) và của người mua hàng
+   (hàng về lệch đơn mua): CEO chỉ theo dõi (chị Hoa 04/11). */
+const PD_KT_K=["tien","combo","cbdx","mh"];
 const pdOther=r=>{if(!(pdWho().role==="CEO"||pdWho().admin))return false;if(PD_KT_K.includes(r.k))return true;const p=pdProp(r);return !!p&&!!PD_ROUTE_N[p.route_to]};
 const pdMine=rows=>rows.filter(r=>!pdOther(r));
 const pdCnt=()=>{if(!PD.sv)return "";try{return pdMine(pdRows()).length||""}catch(e){return ""}};
 /* Mục Phê duyệt chỉ có một trang nên thanh bên không có dòng con: gắn số chờ vào nút mục. */
 function pdBadge(){const b=document.querySelector('.top[data-mod="q_pd"]');if(!b)return;const old=b.querySelector("b.pdn");if(old)old.remove();const n=pdCnt();if(n)b.querySelector("span").insertAdjacentHTML("afterend",`<b class="pdn">${n}</b>`)}
 function pdOpen(r){
+  if(r.src==="mhLech"&&typeof mhMoDon==="function"){PD.view=null;mhMoDon(r.open.po);return}
   if(r.src==="pcCho"){const x=((D().pcCho)||[]).find(y=>y.id===r.ref);if(x&&typeof scPhieu==="function"){scPhieu(x,true);return}}
   /* Trang gốc (đơn hàng, khách, nhân sự…) nhiều trang không nằm trong menu quản trị: mở ngay trong trang này, có nút quay lại. */
   PD.view={...(r.open||{}),t:r.loai+" · "+r.nd};renderMain();scrollTo(0,0)}
@@ -74,6 +77,7 @@ async function pdAct(r,ok){
     if(r.src==="pcCho"){if(ok){if(confirm("Duyệt phiếu chi \""+r.nd+"\" vào sổ?"))scDuyet(r.ref)}else if(confirm("Trả lại phiếu chi \""+r.nd+"\"?"))scTuChoi(r.ref);return}
     if(r.src==="costsCho"&&ok){if(confirm("Duyệt khoản \""+r.nd+"\" theo đề xuất của web ("+r.sub+")?"))cpApprove([r.ref]);return}
     if(r.src==="cbPhieu"&&typeof spcDuyetPhieu==="function"){if(ok){if(confirm("Duyệt phiếu combo \""+r.nd+"\"? Combo mới vào danh sách chạy, combo dừng tự hết hạn."))spcDuyetPhieu(r.ref,true)}else{const t=ask(true);if(t!==null)spcDuyetPhieu(r.ref,false,t)}return}
+    if(r.src==="mhLech"&&typeof mhLechForm==="function"){const x=((PD.sv||{}).mhLech||[]).find(z=>z.id===r.ref);if(x){if(!MH.orders)mhLoad();mhLechForm(x,()=>pdLoad(true))}return}
     if(r.src==="thuCho"&&ok&&typeof cptXacNhan==="function"){if(confirm("Xác nhận phiếu thu \""+r.nd+"\" ("+nf(r.tien)+" đ) vào Sổ thu?"))cptXacNhan(r.ref);return}
     return}
   if(r.src==="return"&&ok)return pdReturn(r);
@@ -113,7 +117,7 @@ function pPheDuyet(m){
   `<div class="filters">${chips.map(([k,n,x])=>`<button class="btn sm${PD.k===k?" pri":""}" data-pdk="${k}">${esc(n)} <b>${x}</b></button>`).join(" ")}<span class="sp"></span><button class="btn sm" id="pd-re">Tải lại</button></div>
   <style>.pd-t td{font-size:12.5px;font-weight:400;vertical-align:top}.pd-t .pill{font-size:11px;font-weight:500}.pd-nd{font-weight:500;line-height:1.35}.pd-sub{font-size:11.5px;font-weight:400;line-height:1.4;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}.pd-sub.on{display:block}.pd-t .btn.sm{font-size:12px}</style>
   <section class="card flush">${L.length?tbl(["Loại","Nội dung","Số tiền","Người đề xuất","Chờ",""],L.map((r,i)=>{const busy=PD.doing[r.id];
-    const noRej=["costsCho","thuCho","payment","return"].includes(r.src);
+    const noRej=["costsCho","thuCho","payment","return","mhLech"].includes(r.src);
     const btn=r.act?`<button class="btn sm pri" data-pdok="${i}"${busy?" disabled":""}>${esc(r.ok||"Duyệt")}</button>${noRej?"":` <button class="btn sm danger" data-pdno="${i}"${busy?" disabled":""}>Từ chối</button>`}`:`<span class="hint">duyệt ở trang gốc</span>`;
     const age=pdAge(r.at,now),old=r.at&&now-r.at>3*864e5;
     return `<tr><td>${pill(PD_KIND_N(r.k),"gry")}${r.ceoCho?" "+pill("chờ CEO","amb"):""}${r.loai!==PD_KIND_N(r.k)&&r.loai!=="Đề xuất agent"?`<div class="hint">${esc(r.loai)}</div>`:""}</td><td><div class="pd-nd">${esc(r.nd)}</div>${r.sub?`<div class="hint pd-sub" title="Bấm để xem đủ">${esc(r.sub)}</div>`:""}</td><td class="n">${money(r.tien)}</td><td>${esc(r.by||"—")}</td><td class="nowrap${old?" t-red":""}">${esc(age||"—")}</td>
@@ -143,7 +147,7 @@ MODULES.push({k:"pd_src",adm:true,hide:true,ic:"check",n:"Phê duyệt",zone:"",
 
 /* "Đang chờ ở các phòng" (CEO): bộ phận nào, ai đang giữ, chờ lâu nhất bao nhiêu ngày; chỉ xem, phòng đó tự xử lý */
 function pdOthersHtml(L,now){if(!L.length)return "";const by={};
-  L.forEach(r=>{const p=pdProp(r)||{route_to:"KE_TOAN"},dep=PD_ROUTE_N[p.route_to]||"Khác",u=p.owner_id?(D().users||[]).find(x=>x.crm===p.owner_id):null,who=p.route_to==="SALE"?(u&&u.name)||"Sale phụ trách":dep;
+  L.forEach(r=>{const p=pdProp(r)||{route_to:r.k==="mh"?"MUA":"KE_TOAN"},dep=PD_ROUTE_N[p.route_to]||"Khác",u=p.owner_id?(D().users||[]).find(x=>x.crm===p.owner_id):null,who=p.route_to==="SALE"?(u&&u.name)||"Sale phụ trách":dep;
     const g=by[dep]=by[dep]||{n:0,old:0,ppl:{},rows:[]};g.n++;g.old=Math.max(g.old,r.at?now-r.at:0);g.ppl[who]=(g.ppl[who]||0)+1;g.rows.push({r,who})});
   const dd2=ms=>ms>=864e5?Math.floor(ms/864e5)+" ngày":Math.max(1,Math.floor(ms/36e5))+" giờ";
   return `<details class="card pdoth" open><summary><b>Đang chờ ở các phòng</b> <span class="pill p-gry">${L.length}</span> <span class="hint">việc phòng khác tự xử lý · xem để biết chỗ nào đang nghẽn</span></summary>

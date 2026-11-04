@@ -483,3 +483,64 @@ describe('Điều khoản thanh toán nhà cung cấp và ảnh khoản chi', ()
   });
 });
 
+
+describe('Hàng về lệch đơn mua (04/11): báo người mua hàng, chốt tiền, giá lấy từ đơn', () => {
+  async function lechPo(qty: number, got: number) {
+    const sup = await ctx.request(`${BASE}/suppliers`, { as: USERS.ceo, body: { name: 'MAMA' } });
+    const po = await ctx.request(`${BASE}/orders`, { as: USERS.ceo, body: { supplier_id: sup.body.data.id, order_date: '2026-10-20', lines: [{ item: 'NVL1', qty, unit_price: 15000 }] } });
+    const r = await ctx.request(`${BASE}/orders/${po.body.data.id}/receipts`, { as: KT, body: { receipt_date: '2026-11-02', lines: [{ item: 'NVL1', qty: got }] } });
+    expect(r.status).toBe(200);
+    const lech = await ctx.request(`${BASE}/lech`, { as: USERS.ceo });
+    expect(lech.status).toBe(200);
+    return { supId: sup.body.data.id as string, poId: po.body.data.id as string, lech: lech.body.data as Array<{ id: string; diff: number; po_no: string; status: string }> };
+  }
+  const pending = async (supId: string) => (await ctx.request(`${BASE}/debts`, { as: USERS.ceo })).body.data.find((d: { id: string }) => d.id === supId).po_pending as number;
+  const movePrice = async () => (await ctx.db.prepare("SELECT price FROM kho_moves WHERE item = 'NVL1' AND role = 'IN' ORDER BY id DESC LIMIT 1").first<{ price: number }>())?.price;
+
+  it('nhận dư: tạo việc chờ chốt; phiếu nhập không giá lấy giá đơn; NCC tính tiền thì công nợ cộng phần dư theo giá đơn', async () => {
+    const { supId, lech } = await lechPo(2000, 2016);
+    expect(lech).toHaveLength(1);
+    expect(lech[0].diff).toBe(16);
+    expect(await movePrice()).toBe(15000);
+    expect(await pending(supId)).toBe(30000000);
+    const bad = await ctx.request(`${BASE}/lech/${lech[0].id}/resolve`, { as: USERS.ceo, body: { resolution: 'BU' } });
+    expect(bad.status).toBe(400);
+    const r = await ctx.request(`${BASE}/lech/${lech[0].id}/resolve`, { as: USERS.ceo, body: { resolution: 'TINH', note: 'MAMA tính tiền' } });
+    expect(r.status).toBe(200);
+    expect(await pending(supId)).toBe(30240000);
+    expect((await ctx.request(`${BASE}/lech`, { as: USERS.ceo })).body.data).toHaveLength(0);
+  });
+
+  it('NCC tặng phần dư: công nợ theo đơn, hàng tặng giá 0 hạ giá vốn; chứng từ tính tiền theo số đặt, không báo lệch', async () => {
+    const { supId, poId, lech } = await lechPo(2000, 2016);
+    await ctx.request(`${BASE}/lech/${lech[0].id}/resolve`, { as: USERS.ceo, body: { resolution: 'TANG' } });
+    expect(await pending(supId)).toBe(30000000);
+    expect(await movePrice()).toBeCloseTo(30000000 / 2016, 4);
+    const list = await ctx.request(`${BASE}/orders`, { as: USERS.ceo });
+    const rc = list.body.data.find((o: { id: string }) => o.id === poId).receipts[0];
+    const inv = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo, body: { supplier_id: supId, invoice_date: '2026-11-03', receipt_ids: [rc.id] } });
+    expect(inv.status).toBe(200);
+    expect(inv.body.data.total).toBe(30000000);
+    expect(inv.body.data.warnings).toEqual([]);
+  });
+
+  it('nhận thiếu, chốt theo số thực nhận: đơn đóng, công nợ trừ phần thiếu; kho không xem được danh sách lệch', async () => {
+    const { supId, poId, lech } = await lechPo(100, 90);
+    expect(lech[0].diff).toBe(-10);
+    expect((await ctx.request(`${BASE}/lech`, { as: KT })).status).toBe(403);
+    const st = async () => (await ctx.request(`${BASE}/orders`, { as: USERS.ceo })).body.data.find((o: { id: string }) => o.id === poId).status;
+    expect(await st()).toBe('DANG_GIAO');
+    await ctx.request(`${BASE}/lech/${lech[0].id}/resolve`, { as: USERS.ceo, body: { resolution: 'CHOT' } });
+    expect(await st()).toBe('DU');
+    expect(await pending(supId)).toBe(1350000);
+  });
+
+  it('chứng từ giá khác giá đơn mua thì báo lệch', async () => {
+    const { supId, poId, lech } = await lechPo(100, 100);
+    expect(lech).toHaveLength(0);
+    const rc = (await ctx.request(`${BASE}/orders`, { as: USERS.ceo })).body.data.find((o: { id: string }) => o.id === poId).receipts[0];
+    const inv = await ctx.request(`${BASE}/invoices`, { as: USERS.ceo, body: { supplier_id: supId, invoice_date: '2026-11-03', receipt_ids: [rc.id], prices: { [rc.lines[0].id]: 16000 } } });
+    expect(inv.status).toBe(200);
+    expect(inv.body.data.warnings.join(' ')).toMatch(/khác số đã chốt/);
+  });
+});

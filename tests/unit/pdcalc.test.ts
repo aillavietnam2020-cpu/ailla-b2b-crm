@@ -191,3 +191,17 @@ describe('Phê duyệt: phiếu combo Digital (thêm combo mới / dừng chạy
     expect(T.pdBuild(cb, { role: 'MANAGER', uid: 'u', perms: ['order.approve.normal'] })).toHaveLength(0);
   });
 });
+
+describe('hàng về lệch đơn mua (04/11)', () => {
+  const lech = [
+    { id: 'l1', po_id: 'po1', po_no: 'PM2609-001', supplier_name: 'MAMA', name: 'Sáp thơm hương đào', ordered: 2000, received: 2016, diff: 16, unit_price: 15000, status: 'CHO', kho_doc_no: 'PN2611-001', created_at: '2026-11-04T02:00:00Z' },
+    { id: 'l2', po_id: 'po1', diff: -5, ordered: 10, received: 5, status: 'XONG', created_at: '2026-11-04T02:00:00Z' },
+  ];
+  it('người mua hàng thấy dòng đang chờ chốt, tiền phần lệch theo giá đơn; kho không thấy', () => {
+    const rows = T.pdBuild({ mhLech: lech }, { role: 'MANAGER', perms: ['order.approve.normal'] });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ k: 'mh', src: 'mhLech', tien: 240000, act: 'fn', nd: 'PM2609-001 · MAMA' });
+    expect(rows[0].sub).toMatch(/đặt 2000, nhận 2016 \(dư 16\)/);
+    expect(T.pdBuild({ mhLech: lech }, { role: 'EMPLOYEE', perms: ['order.kho.process'] })).toHaveLength(0);
+  });
+});
