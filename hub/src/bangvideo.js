@@ -93,25 +93,32 @@ function bvCore(dt,order,act,P,none,val){
 function bvQuick(){
   const d=D(),team=xvTeam(),rows=bvRows(d),sel=rows.filter(c=>BV.sel.has(c.id)),tg=sel.length?sel:rows;
   if(!tg.length){toast("Không có dòng nào để cập nhật");return}
-  const Q={hook:new Set(),quay:new Set(),dung:new Set()},days=Array.from({length:MONTH.ndays},(_,i)=>[String(i+1),dd(i+1)]);
+  const QN={},Q={hook:new Set(),quay:new Set(),dung:new Set()},days=Array.from({length:MONTH.ndays},(_,i)=>[String(i+1),dd(i+1)]);
   const ST=[["hook","Người viết hook"],["quay","Người quay / làm mẫu"],["dung","Người edit / dựng"]],ov=document.createElement("div");ov.className="wpmodal";
   const hint=k=>{const s=Q[k];return s.has("__none")?"sẽ xóa người ở khâu này":s.size>1?"chia đều "+s.size+" người":s.size?"cùng một người":"không đổi"};
   const paint=()=>{ov.innerHTML=`<div class="wpmbox bvq"><div class="wpmh"><b>Cập nhật nhanh · ${tg.length} video${sel.length?" đã tích":""}</b><button type="button" class="lnk" data-q="x">✕ Đóng</button></div>
    <p class="hint">${sel.length?"Áp cho các dòng đã tích.":"Áp cho toàn bộ "+tg.length+" dòng đang lọc."} Khâu nào không chọn người thì giữ nguyên.</p>
-   ${ST.map(([k,l])=>`<div class="bvqr"><b>${l}</b><div class="bvqc">${team.map(u=>`<button type="button" class="gvchip${Q[k].has(u.id)?" on":""}" data-qp="${k}|${esc(u.id)}">${esc(u.name)}</button>`).join("")}<button type="button" class="gvchip${Q[k].has("__none")?" on":""}" data-qp="${k}|__none">— bỏ trống —</button></div><small>${hint(k)}</small></div>`).join("")}
+   ${ST.map(([k,l])=>`<div class="bvqr"><b>${l}</b><div class="bvqc">${team.map(u=>`<button type="button" class="gvchip${Q[k].has(u.id)?" on":""}" data-qp="${k}|${esc(u.id)}">${esc(u.name)}</button>`).join("")}<button type="button" class="gvchip${Q[k].has("__none")?" on":""}" data-qp="${k}|__none">— bỏ trống —</button></div><small>${hint(k)}</small>${k==="hook"&&Q.hook.size&&!Q.hook.has("__none")?`<div class="bvqn">Số hook mỗi người <small class="hint">(trống = chia đều ${tg.length} video)</small>${[...Q.hook].map(u=>`<label>${esc(userName(u)||"")}<input type="number" min="0" max="${tg.length}" data-qn="${esc(u)}" value="${QN[u]??""}"></label>`).join("")}</div>`:""}</div>`).join("")}
    <div class="bvqr two"><label>Trạng thái (chuyển bước)<select data-qv="st">${opt([["","— không đổi —"],["next","Chuyển sang bước kế tiếp của từng video"]].concat(STEPS.map(s=>[s.id,"Chuyển sang: "+bvStT(s.id)])),ov.dataset.st||"")}</select></label>${(can(ME,"viec.duyet")||ME.role==="admin")?`<label>Trạng thái duyệt<select data-qv="duyet">${opt([["","— không đổi —"]].concat(LISTS.duyet.map(x=>[x,x])),ov.dataset.duyet||"")}</select></label>`:""}${ME.role==="admin"?`<label>CEO check<select data-qv="ceo">${opt([["","— không đổi —"]].concat(LISTS.ceo.map(x=>[x,x])),ov.dataset.ceo||"")}</select></label>`:""}</div>
    <div class="bvqr two"><label>Tuần đăng<select data-qv="tuan">${opt([["","— không đổi —"],["plan","Chia theo kế hoạch tuần"]].concat([1,2,3,4,5].map(w=>[String(w),"Tuần "+w])),ov.dataset.tuan||"")}</select></label><label>Hạn<button type="button" class="bvhan wide" data-qhan="1">${ov.dataset.han?(ov.dataset.han==="auto"?"Tự tính theo tuần đăng":dd(+ov.dataset.han)):"— không đổi —"} ▾</button></label></div>
    <div class="acts"><button type="button" class="btn ghost" data-q="x">Hủy</button><button type="button" class="btn pri" data-q="ok">Áp dụng cho ${tg.length} dòng</button></div></div>`;
    ov.querySelectorAll("[data-q=x]").forEach(b=>b.onclick=()=>ov.remove());
    ov.querySelectorAll("[data-qp]").forEach(b=>b.onclick=()=>{const [k,u]=b.dataset.qp.split("|"),s=Q[k];if(u==="__none")Q[k]=s.has(u)?new Set():new Set([u]);else{s.delete("__none");s.has(u)?s.delete(u):s.add(u)}paint()});
    ov.querySelectorAll("[data-qv]").forEach(s=>s.onchange=()=>{ov.dataset[s.dataset.qv]=s.value});
+   ov.querySelectorAll("[data-qn]").forEach(i=>i.oninput=()=>{QN[i.dataset.qn]=i.value===""?undefined:Math.max(0,+i.value||0)});
    const qh=ov.querySelector("[data-qhan]");if(qh)qh.onclick=()=>bvCal(qh,+ov.dataset.han||0,v=>{ov.dataset.han=v==="0"?"":v;paint()},[["auto","Tự tính theo tuần đăng"],["0","Không đổi"]]);
    ov.querySelector("[data-q=ok]").onclick=()=>{
      const tuan=ov.dataset.tuan||"",han=ov.dataset.han||"",stp=ov.dataset.st||"",dy=ov.dataset.duyet||"",ce=ov.dataset.ceo||"",any=tuan||han||stp||dy||ce||ST.some(([k])=>Q[k].size);if(!any){toast("Chưa chọn gì để cập nhật");return}
      const ids=tg.map(c=>c.id),what=[];
      DB.mutate(ME.name,"cập nhật nhanh "+ids.length+" video",dt=>{
        if(tuan)bvCore(dt,ids,"tuan",[],false,tuan);
-       ST.forEach(([k])=>{const s=Q[k];if(!s.size)return;const none=s.has("__none"),P=[...s].filter(x=>x!=="__none");bvCore(dt,ids,k,P,none,"")});
+       ST.forEach(([k])=>{const s=Q[k];if(!s.size)return;const none=s.has("__none");let P=[...s].filter(x=>x!=="__none");
+         if(k==="hook"&&P.length&&P.some(u=>QN[u]!=null)){const fixed=P.reduce((z,u)=>z+(QN[u]||0),0),free=P.filter(u=>QN[u]==null),rest=Math.max(0,ids.length-fixed),ex=[];
+           P.forEach(u=>{const n=QN[u]!=null?QN[u]:Math.floor(rest/free.length)+(free.indexOf(u)<rest%free.length?1:0);for(let j=0;j<n;j++)ex.push(u)});P=ex.slice(0,ids.length);
+           if(P.length<ids.length){bvCore(dt,ids.slice(0,P.length),k,P.length?P:[],false,"");return}}
+         bvCore(dt,ids,k,P,none,"");
+         if(k==="hook"&&!none&&typeof notifyU==="function"){const per={};ids.forEach(id=>{const c=dt.cards.find(x=>x.id===id);if(c&&c.nguoiKB)(per[c.nguoiKB]=per[c.nguoiKB]||[]).push(c)});
+           Object.entries(per).forEach(([u,L])=>{const sk0=[...new Set(L.map(c=>sk(c.sku).n))].slice(0,2).join(", "),hn=L.map(c=>+c.han||0).filter(Boolean).sort((a,b)=>a-b)[0];notifyU(dt,[u],`✍️ ${ME.name} giao bạn viết ${L.length} hook · ${sk0}${hn?" · hạn "+dd(hn):""} · bấm Viết hook hàng loạt ở Công việc`,"page:cv_v")})}});
        if(han)bvCore(dt,ids,"han",[],false,han);
        if(dy||ce)dt.cards.forEach(c=>{if(ids.includes(c.id)){if(dy)c.duyet=dy;if(ce)c.ceo=ce}})});
      let moved=0;const errs={};
