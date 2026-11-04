@@ -73,12 +73,15 @@
         ["Kênh phân phối",[["cr_rp","Dashboard kênh phân phối"],"cr_kh","cr_dn","cr_cn","cr_ret",["cr_gia","Bảng giá"],
           "cr_s_hn","cr_s_kh","cr_s_dn",["cr_s_gia","Bảng giá"],"cr_s_cn","cr_s_ret","cr_s_kq"]],
         ["Kênh OEM",[["gc_tq","Tổng quan Kênh OEM"],["gc_kh","Khách hàng OEM"],["gc_don","Đơn OEM"],["gc_sx","Sản xuất OEM"],["gc_cn","Công nợ OEM"]]]],
+      /* Chị Hoa duyệt 04/11 (phương án C): chia theo đường đi của hàng, mỗi việc một chỗ, không còn hàng tab trong trang.
+         Mua hàng → Kho nguyên vật liệu → Sản xuất → Kho thành phẩm; Kiểm kê & đối chiếu soát cả hai kho. Lô, thùng, vị trí (sx_kho) mở từ Tồn kho thành phẩm. */
       sx:[["",["sx_tq"]],
-        ["Mua nguyên liệu",[["mh_po","Đơn mua hàng"],["sx_mh","Đơn mua hàng"],"mh_hd"]],
-        ["Nhập kho",["kho_nhap","kho_ton"]],
-        ["Sản xuất",["sx_nc","sx_td","kho_pc","sx_lo","sx_bc"]],
-        ["Thành phẩm & xuất",["kho_nhap_tp","sx_kho","kho_xuat_b2b","kho_online","kho_xuat","kho_hoan","kho_nxt","kho_cl"]],
-        ["Danh mục",["kho_dm","kho_vo","kho_map","kho_combo"]]],
+        ["Mua hàng",[["mh_po","Đơn mua hàng"],["sx_mh","Đơn mua hàng"],"mh_hd"]],
+        ["Kho nguyên vật liệu",[["kho_ton","Tồn kho nguyên vật liệu"],["kho_nhap","Nhập nguyên vật liệu"],["kho_xuat","Xuất nguyên vật liệu khác"]]],
+        ["Sản xuất",["sx_nc","sx_td",["kho_pc","Pha chế"],["sx_lo","Đóng gói & kiểm kê"],["sx_bc","Báo cáo sản xuất"]]],
+        ["Kho thành phẩm",[["kho_ton_tp","Tồn kho thành phẩm"],["kho_nhap_tp","Nhập hàng mua ngoài"],"kho_xuat_b2b","kho_online","kho_hoan",["kho_xuat_tp","Xuất thành phẩm khác"]]],
+        ["Kiểm kê & đối chiếu",[["kho_kk","Kiểm kê tồn"],"kho_nxt","kho_cl"]],
+        ["Danh mục",["kho_dm","kho_vo","kho_map","kho_combo","kho_boc"]]],
       cv:[["",["cv_ov","cv_v","cv_pbv","cv_pb","cv_da","cv_mt","cv_nk","hq"]]], /* chị Hoa 02/11: bỏ Quy chuẩn (bảng cũ từ Sheet); Quy tắc vận hành chỉ để ở quản trị › Cấu hình › Theo dõi */
       agt:[["",["agentchat","hoithoaiagent","huanluyenagent",["ai","Trợ lý AI"]]]]};
     /* Chuyển sang web quản trị (kế toán, chính sách): đã có sẵn ở đó.
@@ -86,7 +89,7 @@
        kế toán xác nhận, xem ở quản trị › Thu chi. Web quản trị chỉ mở cho CEO và tài khoản có quyền kế toán (serve.ts). */
     /* Chị Hoa 29/10: bỏ Kho bill giao dịch, Phiếu chi vận chuyển, Nhập dữ liệu CRM khỏi menu vận hành (bill gửi ngay trong đơn,
        phiếu chi ghi ở quản trị › Sổ chi phí, nhập CRM chỉ làm một lần). */
-    const DROP=["quytac","quychuan","bc_tong","cr_thuong","mh_no","mh_gianvl","bots","kho_qd","cr_bill","cr_s_bill","cr_vc","cr_s_vc","cr_im","cr_import"];
+    const DROP=["quytac","quychuan","bc_tong","cr_thuong","mh_no","mh_gianvl","bots","kho_qd","cr_bill","cr_s_bill","cr_vc","cr_s_vc","cr_im","cr_import","sx_kho","kho_ks"];
     USED=Object.values(S).flatMap(ids);
     const mkt=keep("mkt"),hr=keep("hr"),dt=keep("dt"),aiq=keep("aiq"),me=keep("me");
     if(mkt)mkt.zone="";if(hr)hr.zone="";
