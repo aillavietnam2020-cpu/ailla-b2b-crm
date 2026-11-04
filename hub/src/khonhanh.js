@@ -21,7 +21,12 @@ const KQ_LIST=()=>[
 function khoQuickBtn(){return ""}
 const kqRun=async it=>{document.body.classList.remove("menu-open");if(it[3]){if(!KHO.cat){try{await khoLoad()}catch(err){}}if(!KHO.cat){toast("Đang tải kho, bấm lại sau vài giây");return}}try{await it[2]()}catch(e){toast(e.message||"Chưa mở được")}};
 function kqInject(){
-  if(KQ_ADM()||typeof ME==="undefined"||!ME||document.getElementById("kqside"))return;
+  if(typeof ME==="undefined"||!ME)return;
+  /* Quản trị: Ghi nhanh sẵn có (admnav2.js) thêm 2 phiếu kho ở cuối: Lập phiếu nhập kho, Lập phiếu xuất kho (chị Hoa 04/11). */
+  if(KQ_ADM()){const gp=document.getElementById("gnp");if(!gp||gp.querySelector("[data-kqa]"))return;let K=[];try{K=KQ_LIST().filter(x=>x[3])}catch(e){}if(!K.length)return;
+    gp.insertAdjacentHTML("beforeend",K.map((x,i)=>`<button type="button" data-kqa="${i}"><b>${esc(x[0])}</b><small>${i===0?"Hàng mua về, chọn đơn mua để tự điền":"Xuất ngoài bán hàng: hàng mẫu, hủy hỏng, gia công"}</small></button>`).join(""));
+    gp.querySelectorAll("button[data-kqa]").forEach(b=>b.onclick=e=>{e.stopPropagation();gp.hidden=true;kqRun(K[+b.dataset.kqa])});return}
+  if(document.getElementById("kqside"))return;
   const top=document.querySelector('.side .top[data-mod="sx"]'),sub=top&&top.nextElementSibling;if(!sub||!sub.classList.contains("subnav"))return;
   let L=[];try{L=KQ_LIST()}catch(e){}if(!L.length)return;
   const w=document.createElement("div");w.id="kqside";w.className="gnbox kqin";
