@@ -968,7 +968,9 @@ function ktModal(ma,navK){
   const stP=s==="cs"?pill("Cần sửa","red"):s==="cceo"?pill("Chờ CEO duyệt","amb"):s==="cd"?pill("Chờ Lead duyệt","amb"):s==="free"?pill("Chưa phân bổ","gry"):s==="cho"?pill("Chờ đăng","blu"):pill("Đã đăng","grn");
   const k2h=c?kenh2Html(c,dis):"";
   /* mũi tên lật theo đúng danh sách đang lọc ở bảng (chị Hoa 04/11: lọc Chờ duyệt thì lật qua video chờ duyệt) */
-  const NL=(XV.ktList||[]).includes(ma)?XV.ktList:(XV.ktList||[]).concat([ma]),ni=NL.indexOf(ma),nav=ni>=0&&NL.length>1?`<span class="ktnav"><button type="button" class="btn sm" id="kt-prev" ${ni>0?"":"disabled"} title="Video trước (phím ←)">‹</button><small>${ni+1}/${NL.length}</small><button type="button" class="btn sm" id="kt-next" ${ni<NL.length-1?"":"disabled"} title="Video sau (phím →)">›</button></span>`:"";
+  if(!navK||!(XV.ktNav||[]).includes(ma))XV.ktNav=(XV.ktList||[]).includes(ma)?(XV.ktList||[]).slice():[ma].concat(XV.ktList||[]);
+  const SN=XV.ktNav,LV=new Set(XV.ktList||[]),i0=SN.indexOf(ma),prevMa=SN.slice(0,i0).reverse().find(x=>LV.has(x))||"",nextMa=SN.slice(i0+1).find(x=>LV.has(x))||"",cnt=SN.filter(x=>LV.has(x)),pos=cnt.indexOf(ma),
+    nav=SN.length>1?`<span class="ktnav"><button type="button" class="btn sm" id="kt-prev" ${prevMa?"":"disabled"} title="Video trước (phím ←)">‹</button><small>${pos>=0?(pos+1)+"/"+cnt.length:"còn "+cnt.length+" video"}</small><button type="button" class="btn sm" id="kt-next" ${nextMa?"":"disabled"} title="Video sau (phím →)">›</button></span>`:"";
   openDrawerHTML(`<style>.ktnav{display:inline-flex;align-items:center;gap:6px;margin-left:12px;vertical-align:middle}.ktnav .btn{min-width:34px;font-size:18px;line-height:1;padding:4px 10px}.ktnav small{color:var(--text-muted,#6b7280);font-size:12.5px}</style><h2 class="dtitle">${esc(k.ma)}${nav}</h2><p class="hint">${swatch(k.sku)}${esc(sk(k.sku).n)} · ${esc(tuyen)} · ${stP}</p>
    <div class="frm kfrm">
     ${s==="cs"?`<div class="k2box full" style="border-color:var(--danger,#dc2626)"><b>Cần sửa</b> · ${esc(k.sua.byName||"")} · ${esc(k.sua.at||"")}<p style="margin:6px 0">${esc(k.sua.note)}</p><p class="hint">Người sửa: <b>${esc(userName(k.sua.nguoi)||"—")}</b></p>${xvGive()||k.sua.nguoi===ME.id?`<label class="field full">Link video đã sửa (Drive)<input id="kt-nl" placeholder="Dán link bản đã sửa…"></label><div class="acts"><button type="button" class="btn sm pri" id="kt-gl">Đã sửa, gửi duyệt lại</button></div>`:""}</div>`:""}${(k.suaLog||[]).length?`<details class="full"><summary class="hint">Lịch sử sửa (${k.suaLog.length})</summary>${k.suaLog.map(x=>`<div class="hint">• ${esc(x.at)} · ${esc(x.by)}: ${esc(x.note)} → ${esc(userName(x.nguoi)||"")}${x.xong?" · đã sửa "+esc(x.xong):""}</div>`).join("")}</details>`:""}
@@ -993,7 +995,7 @@ function ktModal(ma,navK){
   if(c)kenh2Bind(c.id,()=>ktModal(ma));
   const gb=q("#kt-gb");if(gb)gb.onclick=()=>{ktGan(ma,q("#kt-gk").value);renderMain();ktModal(ma)};
   const x=q("#kt-x");if(x)x.onclick=closeDrawer;
-  {const pv=q("#kt-prev"),nx=q("#kt-next");if(pv)pv.onclick=()=>{if(ni>0)ktModal(NL[ni-1],1)};if(nx)nx.onclick=()=>{if(ni<NL.length-1)ktModal(NL[ni+1],1)};ktSideNav(ni>0?()=>ktModal(NL[ni-1],1):null,ni>=0&&ni<NL.length-1?()=>ktModal(NL[ni+1],1):null)}
+  {const pv=q("#kt-prev"),nx=q("#kt-next"),gp=prevMa?()=>ktModal(prevMa,1):null,gn=nextMa?()=>ktModal(nextMa,1):null;if(pv&&gp)pv.onclick=gp;if(nx&&gn)nx.onclick=gn;ktSideNav(gp,gn)}
   const ok=q("#kt-ok");if(ok)ok.onclick=()=>{ktDuyet(ma);renderMain();ktModal(ma,1)};
   const cs=q("#kt-cs");if(cs)cs.onclick=()=>ktCanSua(ma);
   const fbok=q("#kt-fbok");if(fbok)fbok.onclick=()=>{const note=(q("#kt-fb").value||"").trim(),u=q("#kt-fbu").value;if(!note){toast("Ghi cần sửa gì");return}if(!u){toast("Chọn người sửa");return}
