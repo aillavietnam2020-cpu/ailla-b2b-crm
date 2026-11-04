@@ -154,13 +154,14 @@ function pdOthersHtml(L,now){if(!L.length)return "";const by={};
 const pdViAt=s=>{const m=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s||""));if(!m)return 0;const t=/(\d{1,2}):(\d{2})/.exec(String(s));return new Date(+m[3],+m[2]-1,+m[1],t?+t[1]:0,t?+t[2]:0).getTime()};
 const pdAgeS=ms=>ms>=864e5?Math.floor(ms/864e5)+" ngày":Math.max(1,Math.floor(ms/36e5))+" giờ";
 function pdTeamData(){const d=D(),td=d.settings.today,now=Date.now(),day=864e5,T=d.tasks||[],out=[];
-  hsTeams().forEach(team=>{const {ppl,U,C,cOwn,per}=hsCalc(d,td,team,true);if(!ppl.length)return;
+  const N=k=>typeof cvTeamNorm==="function"?cvTeamNorm(k):k;[...new Set(hsTeams().map(N))].forEach(team=>{const {ppl:pp0,U,C,cOwn,per}=hsCalc(d,td,team,true),ppl=pp0.filter(u=>N(teamOf(u))===team);if(!ppl.length)return;
     const items=[];
     U.filter(x=>x.st!=="done").forEach(x=>{const t=T.find(y=>y.id===x.id)||{},rv=x.st==="review",late=x.han&&x.han<td?(td-x.han)*day:0,wait=rv?Math.max(0,now-(pdViAt(t.nopAt)||now)):0;
       items.push({ng:x.ng,ten:x.ten,rv,late,age:Math.max(late,wait),txt:rv?"chờ duyệt"+(wait?" "+pdAgeS(wait):""):late?"trễ "+pdAgeS(late):x.han?"hạn "+dd(x.han):"đang làm"})});
     C.filter(c=>!["dang","xong"].includes(c.step)).forEach(c=>{const rv=["dkb","dvd"].includes(c.step),h=(c.history||[]).slice(-1)[0],wait=rv&&h?Math.max(0,now-(pdViAt(h.t)||now)):0,lt=typeof isLate==="function"&&isLate(c)?Math.max(1,td-((c.han&&WORK_STEPS.includes(c.step))?c.han:c.day))*day:0;
       items.push({ng:cOwn(c),ten:(c.id+" · "+(c.hookText||c.yTuong||sk(c.sku).n)).slice(0,70),rv,late:lt,age:Math.max(lt,wait),txt:stepName(c.step)+(rv&&wait?" "+pdAgeS(wait):lt?" · trễ "+pdAgeS(lt):"")})});
     const kenh=Object.keys(d.kenhPT||{}),tag=u=>[tkLead(u)?"Lead":"",kenh.some(k=>chanOwner(k)===u.id)?"Giữ kênh":"",kenh.some(k=>chanHelp(k).includes(u.id))?"Hỗ trợ kênh":""].filter(Boolean);
+    const ok=new Set(ppl.map(u=>u.id));for(let i=items.length-1;i>=0;i--)if(!ok.has(items[i].ng))items.splice(i,1);
     const P=ppl.map(u=>{const p=per[u.id],L=items.filter(i=>i.ng===u.id).sort((a,b)=>b.age-a.age);return {u,tags:tag(u),doing:p.doing,late:p.late,rv:p.rv,mo:p.mo,old:L[0]?L[0].age:0,L}})
       .sort((a,b)=>(b.tags.includes("Lead")-a.tags.includes("Lead"))||b.late-a.late||b.old-a.old);
     const lead=P.filter(p=>p.tags.includes("Lead")).map(p=>p.u.name),rvL=items.filter(i=>i.rv).sort((a,b)=>b.age-a.age),lateN=items.filter(i=>i.late).length;
