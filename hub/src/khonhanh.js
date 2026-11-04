@@ -17,21 +17,27 @@ const KQ_LIST=()=>[
     ["Hàng hoàn",()=>kCan("TL")&&!!PAGES.kho_hoan,()=>KQ_GO("kho_hoan")]]],
   ["Kiểm kê",[["Kiểm tồn bổ sung",()=>kCan("TB")&&typeof KTON!=="undefined"&&KTON.moc&&!!KTON.moc.moc,()=>khoForm("TB")]]]]
   .map(([g,a])=>[g,a.filter(x=>{try{return x[1]()}catch(e){return false}})]).filter(g=>g[1].length);
-function khoQuickBtn(){if(KQ_ADM()||typeof ME==="undefined"||!ME)return "";try{if(!KQ_LIST().length)return ""}catch(e){return ""}
-  return `<button type="button" class="btn pri kqbtn">＋ Lập phiếu nhanh</button>`}
+/* Chị Hoa 04/11: nút đưa lên đầu thanh menu bên trái (giống "＋ Ghi nhanh" bên quản trị), không để trong từng trang nữa. */
+function khoQuickBtn(){return ""}
+function kqInject(){
+  if(KQ_ADM()||typeof ME==="undefined"||!ME)return;const nav=document.querySelector(".side nav");if(!nav||document.getElementById("kqside"))return;
+  let ok=false;try{ok=KQ_LIST().length>0}catch(e){}if(!ok)return;
+  const w=document.createElement("div");w.id="kqside";w.className="gnbox";
+  w.innerHTML=`<button type="button" class="gnbtn kqbtn kqs"><span>＋ Lập phiếu nhanh</span><span>▾</span></button>`;nav.before(w)}
+{const _r=render;render=function(){const r=_r.apply(this,arguments);try{kqInject()}catch(e){}return r}}
 function kqClose(){const p=document.getElementById("kqpop");if(p)p.remove()}
 function kqOpen(btn){
   kqClose();const L=KQ_LIST();if(!L.length)return;const r=btn.getBoundingClientRect();
   const p=document.createElement("div");p.id="kqpop";p.className="kqpop";
   p.innerHTML=L.map(([g,a],gi)=>`<div class="kqg"><h4>${esc(g)}</h4>${a.map(([t],i)=>`<button type="button" data-kq="${gi}.${i}">${esc(t)}</button>`).join("")}</div>`).join("")+`<p class="hint">Chỉ hiện loại phiếu bạn được làm.</p>`;
   document.body.appendChild(p);
-  const w=p.offsetWidth;p.style.top=(r.bottom+6)+"px";p.style.left=Math.max(8,Math.min(r.right-w,innerWidth-w-8))+"px";
-  p.querySelectorAll("[data-kq]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const [gi,i]=b.dataset.kq.split(".").map(Number),it=L[gi][1][i];kqClose();
+  const w=p.offsetWidth,side=btn.classList.contains("kqs");p.style.top=(r.bottom+6)+"px";p.style.left=Math.max(8,Math.min(side?r.left:r.right-w,innerWidth-w-8))+"px";
+  p.querySelectorAll("[data-kq]").forEach(b=>b.onclick=async e=>{e.stopPropagation();const [gi,i]=b.dataset.kq.split(".").map(Number),it=L[gi][1][i];kqClose();document.body.classList.remove("menu-open");
     if(!KHO.cat){try{await khoLoad()}catch(err){}}if(!KHO.cat){toast("Đang tải kho, bấm lại sau vài giây");return}it[2]()});
 }
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".kqbtn");if(b){e.preventDefault();e.stopPropagation();if(document.getElementById("kqpop"))kqClose();else kqOpen(b);return}
   if(!(e.target.closest&&e.target.closest("#kqpop")))kqClose()},true);
-addEventListener("scroll",kqClose,{passive:true});
+addEventListener("scroll",e=>{if(!(e.target&&e.target.closest&&e.target.closest("#kqpop")))kqClose()},{passive:true,capture:false});
 
 /* Trang Sản xuất (sxFrame: Tổng quan, Phiếu sản xuất, Tiến độ, Kiểm kê đóng gói, Báo cáo, Mua hàng): thêm nút vào ô thao tác. */
 if(typeof sxFrame==="function"){const _sf=sxFrame;sxFrame=function(m,key,title,sub,body,actions){return _sf.call(this,m,key,title,sub,body,(actions||"")+(/btn pri|id="/.test(actions||"")?"":khoQuickBtn()))}}
