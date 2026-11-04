@@ -953,8 +953,8 @@ function ktSyncTask(id){
 /* mũi tên to hai bên khung chi tiết (gắn vào trang, tự gỡ khi đóng khung) */
 function ktSideNav(prev,next){document.querySelectorAll(".ktside").forEach(x=>x.remove());const box=document.querySelector("#drawerIn");if(!box)return;
   const st=document.getElementById("ktside-css")||Object.assign(document.createElement("style"),{id:"ktside-css",textContent:".ktside{position:fixed;top:50%;transform:translateY(-50%);z-index:10001;width:48px;height:64px;border:0;border-radius:12px;background:rgba(255,255,255,.92);color:#334155;font-size:34px;line-height:1;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18)}.ktside:hover{background:#fff}.ktside:disabled{opacity:.35;cursor:default}"});document.head.appendChild(st);
-  const r=(box.closest(".drawer,#drawer,.modal")||box).getBoundingClientRect(),mk=(t,f,x)=>{const b=document.createElement("button");b.type="button";b.className="ktside";b.textContent=t;b.title=t==="‹"?"Video trước (phím ←)":"Video sau (phím →)";b.style.left=Math.max(4,x)+"px";if(f)b.onclick=f;else b.disabled=true;document.body.appendChild(b)};
-  mk("‹",prev,r.left-58);mk("›",next,Math.min(innerWidth-52,r.right+10));
+  let pe=box;for(let p=box.parentElement;p&&p!==document.body;p=p.parentElement){if(p.getBoundingClientRect().width>=innerWidth*0.97)break;pe=p}const r=pe.getBoundingClientRect(),mk=(t,f,x)=>{const b=document.createElement("button");b.type="button";b.className="ktside";b.textContent=t;b.title=t==="‹"?"Video trước (phím ←)":"Video sau (phím →)";b.style.left=Math.max(4,x)+"px";if(f)b.onclick=f;else b.disabled=true;document.body.appendChild(b)};
+  mk("‹",prev,r.left-24);mk("›",next,Math.min(innerWidth-52,r.right-24)); /* nằm ngay mép khung, nửa trong nửa ngoài */
   const off=()=>{if(!document.querySelector("#drawerIn .ktnav")||!document.querySelector("#drawerIn")?.offsetParent){document.querySelectorAll(".ktside").forEach(x=>x.remove());clearInterval(window.__ktTm)}};clearInterval(window.__ktTm);window.__ktTm=setInterval(off,400)}
 /* video kế tiếp trong danh sách đang lọc (để duyệt liền mạch) */
 function ktNextOf(ma){const L=XV.ktList||[],i=L.indexOf(ma);return i>=0?(L[i+1]||L[i-1]||""):""}
