@@ -34,7 +34,7 @@ const CW_CSS=`.cwhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;marg
 .cwhd>.sp{flex:1}.cwhd>.kdstrip,.cwhd>.odcard{order:9;flex-basis:100%;margin:6px 0 0}
 .cwph{margin:0 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cwph h1{margin:0}.cwtop>.cvbar.cwtopbar{margin:0 0 0 auto;padding:0;border:0;background:none;box-shadow:none;flex-wrap:wrap;justify-content:flex-end}.cwtop{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
 .cwtop>.cwtabs{flex:1;min-width:0;border-bottom:0;margin:0}.cwtop>.cwhd{margin:0;flex-wrap:nowrap}.cwtop>.cwhd .btn,.cwtop>.cvbar.cwtopbar .btn,.cwtop>.cvbar.cwtopbar select,.cwtop>.cvbar.cwtopbar input{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.cwtop>.cwhd .btn{display:inline-flex;align-items:center;gap:6px}.cwtop>.cwhd .cwbar{flex-wrap:nowrap}
-.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.topbar .cwsrch-tb{margin-right:6px}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
+.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.topbar .cwsrch-tb{margin-right:6px}#tkf2.cwself #t-cdw{display:none!important}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
 .cwtop+.kdstrip,.cwtop+.odcard,.kdstrip+.odcard{margin:0 0 12px}
 svg.cwi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
 .cwbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cwbar .btn{display:inline-flex;align-items:center;gap:6px}
@@ -254,8 +254,12 @@ function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const 
   /* tự thêm việc cho mình: tên, mô tả, hạn hoàn thành (ngày + giờ), ưu tiên, link đính kèm, các bước nhỏ — ẩn các ô giao việc khác */
   const f=di.querySelector("#tkf2"),keep=["t-ten","t-mo","t-han","t-gio","t-uu","t-dk","t-ck","t-ckn"],has=el=>keep.some(id=>el.querySelector("#"+id)||el.id===id);
   const prune=el=>[...el.children].forEach(c=>{if(c.matches(".acts,input[type=hidden],script"))return;if(!has(c)){c.hidden=true;c.style.display="none";return}if(!c.matches(".field"))prune(c)});
-  if(f)prune(f);
-  TK_AFTER_NEW=nid=>{DB.mutate(ME.name,"tự thêm việc",dt=>{const x=(dt.tasks||[]).find(y=>y.id===nid);if(x&&x.nguoi===ME.id&&x.tao===ME.id)x.tuThem=true})}}
+  if(f){prune(f);f.classList.add("cwself")}
+  /* không cần ai duyệt; muốn có người duyệt thì chọn ở "Đề xuất người duyệt" */
+  let duyet="";const uu=f&&f.querySelector("#t-uu"),fu=uu&&uu.closest(".field");
+  if(fu){const us=cwUsers().filter(u=>u.id!==ME.id).sort((a,b)=>a.name.localeCompare(b.name));fu.insertAdjacentHTML("afterend",`<label class="field">Đề xuất người duyệt <small class="hint">(không bắt buộc)</small><select id="cw-duyet">${opt([["","Không cần duyệt"]].concat(us.map(u=>[u.id,u.name])),"")}</select></label>`);
+    const sd=f.querySelector("#cw-duyet");if(sd)sd.onchange=()=>{duyet=sd.value}}
+  TK_AFTER_NEW=nid=>{DB.mutate(ME.name,"tự thêm việc",dt=>{const x=(dt.tasks||[]).find(y=>y.id===nid);if(x&&x.nguoi===ME.id&&x.tao===ME.id){x.tuThem=true;if(duyet)x.duyet=duyet}})}}
 /* thao tác dùng chung cho mọi trang trong mục */
 function cwBind(m,list){const by={};(list||cwRows()).forEach(r=>by[r.k]=r);const R=k=>by[k]||cwRows().find(r=>r.k===k);
   const q=m.querySelector("#cw-q")||document.querySelector(".topbar #cw-q");if(q){let tm=0;q.oninput=()=>{clearTimeout(tm);tm=setTimeout(()=>{CWS.q=q.value;renderMain();const q2=$("#cw-q");if(q2){q2.focus();const n=q2.value.length;try{q2.setSelectionRange(n,n)}catch(e){}}},300)}}
