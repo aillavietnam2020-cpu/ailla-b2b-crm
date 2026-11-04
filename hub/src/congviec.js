@@ -1108,9 +1108,8 @@ function hsChanHtml(d,td){
       <div class="hsw-sb">${seg(o.dang,base,"#2f9e44","Đã đăng")}${seg(o.cho,base,"#20c997","Duyệt, chờ đăng")}${seg(o.rv,base,"#f59f00","Chờ duyệt")}${seg(o.lam,base,"#4c6ef5","Đang làm")}${exp?`<em style="left:${exp/base*100}%" title="Đến hôm nay lẽ ra: ${exp}"></em>`:""}</div>
       <div class="hsw-cv"><b>${o.dang}</b><small>/${o.T||"—"} đã đăng${p!=null?` · ${p}%`:""}</small>${o.T?(lag>0?`<span class="pill p-red">chậm ${lag}</span>`:`<span class="pill p-grn">đúng tiến độ</span>`):""}</div></div>`}).join("")}</section>`}
 function hsTeams(){const ks=[];D().users.forEach(u=>{const k=teamOf(u);if(u.active&&u.role!=="admin"&&k&&k!=="all"&&!ks.includes(k))ks.push(k)});return ks}
-function pHsWork(m){
-  const d=D(),td=d.settings.today,boss=ME.role==="admin",tms=hsTeams();
-  let team=boss?(HSW.team||(tms.includes("content")?"content":tms[0]||"")):teamOf(ME);
+/* số từng người của Công việc › Tổng quan (dùng chung với Phê duyệt › Đang chờ ở các phòng để hai nơi không lệch) */
+function hsCalc(d,td,team,boss){
   const ppl=d.users.filter(u=>u.active&&u.role!=="admin"&&!CV_TEST.includes(u.id)&&(boss?cvTeamSee(team,teamOf(u))||teamOf(u)===team:tkSameTeam(ME,u)));
   const ids=ppl.map(u=>u.id);
   const a=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from?tkDay(PERIOD.from):1,b=typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.to?tkDay(PERIOD.to):MONTH.ndays;
@@ -1129,6 +1128,11 @@ function pHsWork(m){
   C.forEach(c=>{const p=per[cOwn(c)];if(!p)return;const day=c.day||0;if(day&&!inK(day)&&!["edit","kb","quay","worker","dkb","dvd","dceo"].includes(c.step))return;
     p.vGiao++;if(["dvd","dceo","dang","xong"].includes(c.step))p.vNop++;if(["dang","xong"].includes(c.step))p.vDuyet++;p.tra+=(c.gopy||[]).length;
     if(!["dang","xong"].includes(c.step)){if(typeof isLate==="function"&&isLate(c))p.late++;if(["dvd","dceo","dkb"].includes(c.step))p.rv++;else p.doing++;const k=(c.han||c.day||0)-td;if(k>=0&&k<7)p.load[k]++}});
+  return {ppl,ids,U,C,cOwn,per,inK}}
+function pHsWork(m){
+  const d=D(),td=d.settings.today,boss=ME.role==="admin",tms=hsTeams();
+  let team=boss?(HSW.team||(tms.includes("content")?"content":tms[0]||"")):teamOf(ME);
+  const {ppl,ids,U,C,cOwn,per,inK}=hsCalc(d,td,team,boss);
   const P=Object.values(per),S=k=>P.reduce((z,p)=>z+p[k],0),pct=(x,y)=>y?Math.round(x/y*100):null;
   const tot={mo:S("mo")+C.filter(c=>!["dang","xong"].includes(c.step)).length,rv:S("rv"),late:S("late"),dung:S("dung"),tre:S("tre"),vGiao:S("vGiao"),vNop:S("vNop"),vDuyet:S("vDuyet"),tra:S("tra")};
   const okP=pct(tot.dung,tot.dung+tot.tre+tot.late);

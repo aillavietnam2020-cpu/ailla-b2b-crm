@@ -175,7 +175,9 @@ const _bbTn=bellBadge;
 bellBadge=function(){_bbTn();const c=$("#chatbtn");if(!c)return;c.title="Tin nhắn";
   /* nút tin nhắn: biểu tượng nét xanh dương, viền xanh (chị Hoa 03/11) */
   if(!c.dataset.ic){c.dataset.ic="1";[...c.childNodes].forEach(n=>{if(n.nodeType===3)n.remove()});c.insertAdjacentHTML("afterbegin",'<svg class="chatic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg>')}const u=tnTotal();let t=c.querySelector("b");if(u){if(!t){t=document.createElement("b");c.appendChild(t)}t.textContent=u>99?"99+":u}else if(t)t.remove()};
-setInterval(()=>{if(!ME||document.hidden)return;
+setInterval(()=>{if(!ME)return;
+  /* tab đang ẩn (chị đang ở Zalo, web khác): vẫn hỏi tin mới 30 giây một lần để có số trên nút, chuông ting và thông báo Windows (chị Hoa 04/11) */
+  if(document.hidden){if(Date.now()-TN.sumAt>3e4)tnSummary();return}
   if((PAGE==="tinnhan"||TN.popRoom)&&TN.room&&TN.msgs[TN.room]){const r=TN.room;tnLoad(r).then(ch=>{if(ch&&TN.room===r&&(PAGE==="tinnhan"||TN.popRoom===r)){tnDrawMsgs(true);tnRead(r)}})}
   if(Date.now()-TN.sumAt>(PAGE==="tinnhan"?8e3:25e3))tnSummary()},4000);
 setInterval(tnDue,45e3);setTimeout(tnDue,8e3);
@@ -261,7 +263,7 @@ function tnGroupForm(g){const P=D().users.filter(u=>u.active&&u.name&&u.crm&&u.c
    Trình duyệt chỉ cho phát tiếng sau khi người dùng đã bấm vào trang một lần, nên tạo bộ phát tiếng ở lần bấm đầu tiên. */
 let TN_AC=null;
 ["pointerdown","keydown"].forEach(ev=>addEventListener(ev,()=>{if(!TN_AC)try{TN_AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}if(TN_AC&&TN_AC.state==="suspended")TN_AC.resume()},{capture:true,passive:true}));
-function tnTing(){try{if(typeof ntLS==="function"&&ntLS("am")===false)return;const ac=TN_AC;if(!ac)return;if(ac.state==="suspended")ac.resume();const t=ac.currentTime;
+function tnTing(){try{if(typeof ntLS==="function"&&ntLS("am")===false)return;if(!TN_AC)try{TN_AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}const ac=TN_AC;if(!ac)return;if(ac.state==="suspended")ac.resume();const t=ac.currentTime;
   [[1318.5,0],[1760,.12]].forEach(([f,d])=>{const o=ac.createOscillator(),g=ac.createGain();o.type="sine";o.frequency.value=f;g.gain.setValueAtTime(0,t+d);g.gain.linearRampToValueAtTime(.22,t+d+.01);g.gain.exponentialRampToValueAtTime(.001,t+d+.45);o.connect(g).connect(ac.destination);o.start(t+d);o.stop(t+d+.5)})}catch(e){}}
 if(typeof ntFlush==="function"){const _ntFlushTn=ntFlush;ntFlush=function(){const n=NT.batch.length;_ntFlushTn();if(n)tnTing()}}
 /* chưa bật thông báo Windows: nhắc lại mỗi ngày một lần (trước đây bấm ✕ một lần là không bao giờ hỏi lại) */

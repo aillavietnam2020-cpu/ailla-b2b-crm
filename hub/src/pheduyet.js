@@ -117,9 +117,10 @@ function pPheDuyet(m){
     const age=pdAge(r.at,now),old=r.at&&now-r.at>3*864e5;
     return `<tr><td>${pill(PD_KIND_N(r.k),"gry")}${r.ceoCho?" "+pill("chờ CEO","amb"):""}${r.loai!==PD_KIND_N(r.k)&&r.loai!=="Đề xuất agent"?`<div class="hint">${esc(r.loai)}</div>`:""}</td><td><div class="pd-nd">${esc(r.nd)}</div>${r.sub?`<div class="hint pd-sub" title="Bấm để xem đủ">${esc(r.sub)}</div>`:""}</td><td class="n">${money(r.tien)}</td><td>${esc(r.by||"—")}</td><td class="nowrap${old?" t-red":""}">${esc(age||"—")}</td>
     <td class="nowrap">${btn} <button class="btn sm" data-pdgo="${i}">Mở</button></td></tr>`}),"pd-t"):`<p class="empty pad">${all.length?"Không có việc nào thuộc loại này.":"Không có việc nào đang chờ bạn duyệt."}</p>`}</section>
-  ${pdOthersHtml(others,now)}
+  ${pdOthersHtml(others,now)}${pdTeamsHtml()}
   <p class="hint">Mỗi người chỉ thấy việc mình được duyệt (đúng quy tắc của trang gốc). Đơn nghỉ phép, OT, tạm ứng duyệt ở trang gốc (bấm Mở). Khoản chi từ ${nf(pdTh())} đ trở lên phải CEO duyệt (đổi mức ở Cấu hình › Ngưỡng cảnh báo).</p>`;
   m.querySelectorAll(".pd-sub").forEach(x=>x.onclick=()=>x.classList.toggle("on"));
+  m.querySelectorAll("[data-pdpp]").forEach(b=>b.onclick=()=>{const [t,u]=b.dataset.pdpp.split("|");pdPersonView(t,u)});
   m.querySelectorAll("[data-pdk]").forEach(b=>b.onclick=()=>{PD.k=b.dataset.pdk;renderMain()});
   $("#pd-re").onclick=()=>{PD.at=0;pdLoad(true)};
   m.querySelectorAll("[data-pdok]").forEach(b=>b.onclick=()=>pdAct(L[+b.dataset.pdok],true));
@@ -148,3 +149,31 @@ function pdOthersHtml(L,now){if(!L.length)return "";const by={};
    <div class="pdog">${Object.entries(by).sort((a,b)=>b[1].old-a[1].old).map(([dep,g])=>`<div class="pdoc${g.old>3*864e5?" late":""}"><div class="pdoh"><b>${esc(dep)}</b><span>${g.n} việc · chờ lâu nhất <b>${dd2(g.old)}</b></span></div>
      <div class="pdop">${Object.entries(g.ppl).sort((a,b)=>b[1]-a[1]).map(([w,n])=>`<span>${esc(w)} <b>${n}</b></span>`).join("")}</div>
      ${g.rows.sort((a,b)=>(a.r.at||0)-(b.r.at||0)).slice(0,6).map(({r,who})=>`<div class="pdor"><span>${esc(pdProp(r)?r.nd:r.loai+": "+r.nd)}</span><small>${esc(who)} · ${r.at?dd2(now-r.at):""}</small></div>`).join("")}${g.rows.length>6?`<div class="hint">+${g.rows.length-6} việc nữa</div>`:""}</div>`).join("")}</div></details>`}
+/* ---------- Việc từng phòng (chị Hoa 04/11): CEO xem các Lead và nhân sự chuyên trách đang làm thế nào ----------
+   Số lấy từ hsCalc (cùng nguồn Công việc › Tổng quan). Chỉ để xem, không báo chuông, không vào danh sách duyệt phía trên. */
+const pdViAt=s=>{const m=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s||""));if(!m)return 0;const t=/(\d{1,2}):(\d{2})/.exec(String(s));return new Date(+m[3],+m[2]-1,+m[1],t?+t[1]:0,t?+t[2]:0).getTime()};
+const pdAgeS=ms=>ms>=864e5?Math.floor(ms/864e5)+" ngày":Math.max(1,Math.floor(ms/36e5))+" giờ";
+function pdTeamData(){const d=D(),td=d.settings.today,now=Date.now(),day=864e5,T=d.tasks||[],out=[];
+  hsTeams().forEach(team=>{const {ppl,U,C,cOwn,per}=hsCalc(d,td,team,true);if(!ppl.length)return;
+    const items=[];
+    U.filter(x=>x.st!=="done").forEach(x=>{const t=T.find(y=>y.id===x.id)||{},rv=x.st==="review",late=x.han&&x.han<td?(td-x.han)*day:0,wait=rv?Math.max(0,now-(pdViAt(t.nopAt)||now)):0;
+      items.push({ng:x.ng,ten:x.ten,rv,late,age:Math.max(late,wait),txt:rv?"chờ duyệt"+(wait?" "+pdAgeS(wait):""):late?"trễ "+pdAgeS(late):x.han?"hạn "+dd(x.han):"đang làm"})});
+    C.filter(c=>!["dang","xong"].includes(c.step)).forEach(c=>{const rv=["dkb","dvd"].includes(c.step),h=(c.history||[]).slice(-1)[0],wait=rv&&h?Math.max(0,now-(pdViAt(h.t)||now)):0,lt=typeof isLate==="function"&&isLate(c)?Math.max(1,td-((c.han&&WORK_STEPS.includes(c.step))?c.han:c.day))*day:0;
+      items.push({ng:cOwn(c),ten:(c.id+" · "+(c.hookText||c.yTuong||sk(c.sku).n)).slice(0,70),rv,late:lt,age:Math.max(lt,wait),txt:stepName(c.step)+(rv&&wait?" "+pdAgeS(wait):lt?" · trễ "+pdAgeS(lt):"")})});
+    const kenh=Object.keys(d.kenhPT||{}),tag=u=>[tkLead(u)?"Lead":"",kenh.some(k=>chanOwner(k)===u.id)?"Giữ kênh":"",kenh.some(k=>chanHelp(k).includes(u.id))?"Hỗ trợ kênh":""].filter(Boolean);
+    const P=ppl.map(u=>{const p=per[u.id],L=items.filter(i=>i.ng===u.id).sort((a,b)=>b.age-a.age);return {u,tags:tag(u),doing:p.doing,late:p.late,rv:p.rv,mo:p.mo,old:L[0]?L[0].age:0,L}})
+      .sort((a,b)=>(b.tags.includes("Lead")-a.tags.includes("Lead"))||b.late-a.late||b.old-a.old);
+    const lead=P.filter(p=>p.tags.includes("Lead")).map(p=>p.u.name),rvL=items.filter(i=>i.rv).sort((a,b)=>b.age-a.age),lateN=items.filter(i=>i.late).length;
+    out.push({team,name:cvTeamName(team),lead,P,rvN:rvL.length,rvOld:rvL[0]?rvL[0].age:0,lateN,old:Math.max(0,...items.map(i=>i.age)),top:items.filter(i=>i.rv||i.late).sort((a,b)=>b.age-a.age).slice(0,3)})});
+  return out.sort((a,b)=>b.old-a.old)}
+function pdTeamsHtml(){if(ME.role!=="admin")return "";const R=pdTeamData();if(!R.length)return "";
+  return `<div class="pdtm"><div class="pdtmh"><b>Việc từng phòng</b><span class="hint">Lead và từng nhân sự chuyên trách · cùng số với Công việc › Tổng quan · bấm tên để xem việc của người đó</span></div>
+   <div class="pdog">${R.map(g=>`<div class="pdoc${g.old>3*864e5?" late":""}"><div class="pdoh"><b>${esc(g.name)}</b><span>${g.lead.length?"Lead: "+esc(g.lead.join(", ")):"chưa có Lead"}</span></div>
+     <div class="pdts"><span>Chờ Lead duyệt <b>${g.rvN}</b>${g.rvOld?` · lâu nhất <b>${pdAgeS(g.rvOld)}</b>`:""}</span><span${g.lateN?' class="t-red"':""}>Trễ hạn <b>${g.lateN}</b></span></div>
+     <table class="pdpt"><tr><th>Người</th><th title="Đang làm">Làm</th><th>Trễ</th><th title="Chờ duyệt">Chờ</th><th>Lâu nhất</th></tr>${g.P.map(p=>`<tr><td><button type="button" class="lnk" data-pdpp="${esc(g.team)}|${esc(p.u.id)}">${esc(p.u.name)}</button>${p.tags.map(t=>`<small class="pdtag">${t}</small>`).join("")}</td><td class="n">${p.doing||""}</td><td class="n">${p.late?`<span class="pill p-red">${p.late}</span>`:""}</td><td class="n">${p.rv?`<span class="pill p-amb">${p.rv}</span>`:""}</td><td class="n${p.old>3*864e5?" t-red":""}">${p.old?pdAgeS(p.old):""}</td></tr>`).join("")}</table>
+     ${g.top.map(i=>`<div class="pdor"><span>${esc(i.ten)}</span><small>${esc(userName(i.ng)||"")} · ${esc(i.txt)}</small></div>`).join("")}</div>`).join("")}</div></div>`}
+function pdPersonView(team,uid){const g=pdTeamData().find(x=>x.team===team),p=g&&g.P.find(x=>x.u.id===uid);if(!p)return;
+  openDrawerHTML(`<h2>${esc(p.u.name)} <small class="hint">${esc(g.name)}${p.tags.length?" · "+p.tags.join(", "):""}</small></h2>
+   <div class="pdts"><span>Đang mở <b>${p.L.length}</b></span><span>Đang làm <b>${p.doing}</b></span><span class="${p.late?"t-red":""}">Trễ <b>${p.late}</b></span><span>Chờ duyệt <b>${p.rv}</b></span></div>
+   ${p.L.length?`<div class="pdpl">${p.L.map(i=>`<div class="pdor"><span>${esc(i.ten)}</span><small class="${i.late?"t-red":""}">${esc(i.txt)}</small></div>`).join("")}</div>`:`<p class="hint">Không có việc đang mở.</p>`}
+   <p class="hint">Chỉ để xem. Muốn sửa việc thì vào Công việc.</p>`)}

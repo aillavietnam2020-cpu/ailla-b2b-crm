@@ -1030,3 +1030,10 @@ body:has(#tnpop) #ntpop{right:392px}
 .tnm.tnpick .tnma{display:none!important}
 .tnm.tnflash{animation:tnfl 1.6s}@keyframes tnfl{0%,40%{background:#ffe8a3}100%{background:transparent}}
 .tnfwbox .tnfwl{max-height:360px;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-top:8px}
+/* Phê duyệt › Việc từng phòng (chị Hoa 04/11) */
+.pdtm{margin:12px 0}.pdtmh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:2px}
+.pdts{display:flex;flex-wrap:wrap;gap:10px;font-size:12.5px;color:#475067;margin:6px 0}
+.pdpt{width:100%;border-collapse:collapse;font-size:12.5px;margin:4px 0}.pdpt th{font-weight:500;color:#98a2b3;font-size:11.5px;text-align:right;padding:2px 4px}.pdpt th:first-child,.pdpt td:first-child{text-align:left}
+.pdpt td{padding:3px 4px;border-top:1px solid #f0f1f5}.pdpt td.n{text-align:right;white-space:nowrap}
+.pdtag{display:inline-block;margin-left:4px;font-size:10.5px;background:#eef2ff;color:#3b5bdb;border-radius:6px;padding:0 5px}
+.pdpl{display:flex;flex-direction:column}
