@@ -55,6 +55,24 @@ describe('nhắc việc Task mỗi sáng', () => {
     expect(again).toMatchObject({ changed: 0 });
   });
 
+  it('đến hạn: báo Lead team; Lead tự làm thì không báo CEO; team chưa có Lead thì báo CEO', async () => {
+    const data = base();
+    data.users.push({ id: 'u_kt', name: 'Kế toán', role: 'nhanvien', active: true, phongBan: 'KT' } as never);
+    data.tasks = [
+      { id: 'a', ten: 'Việc Mây', nguoi: 'u_may', tao: 'u_may', han: 20, st: 'doing' },
+      { id: 'b', ten: 'Lead tự giao', nguoi: 'u_oanh', tao: 'u_oanh', han: 20, st: 'doing' },
+      { id: 'c', ten: 'Việc kế toán', nguoi: 'u_kt', tao: 'u_kt', han: 20, st: 'doing' },
+    ];
+    const db = await seed(data);
+    await taskReminders(db as unknown as D1Database, MORNING);
+    const { d } = await read(db);
+    const to = (id: string) => d.notifs.filter((n: { to: string }) => n.to === id).map((n: { text: string }) => n.text).join('|');
+    expect(to('u_oanh')).toContain('Việc Mây');
+    expect(to('u_chi')).not.toContain('Việc Mây');
+    expect(to('u_chi')).not.toContain('Lead tự giao');
+    expect(to('u_chi')).toContain('Việc kế toán');
+  });
+
   it('dữ liệu tháng khác thì bỏ qua', async () => {
     const data = base();
     data.cards = [{ thang: '2026-09' }];
