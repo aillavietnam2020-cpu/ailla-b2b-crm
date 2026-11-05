@@ -179,6 +179,8 @@
   .tqt .tqbar span{display:none!important}
   .tqt .tqbar,.tqt .tqbar em{display:block;position:static!important;text-align:right;font-style:normal}
   .tqt td small{display:block}
+  table.mlist .tqbar,table.mlist .tqbar em{text-align:left!important}
+  table.mlist td.ml-o[data-l]::before{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* thông báo: mỗi tin 2 dòng rồi "…", bấm mới xem đủ */
   .ntl .nti span{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
