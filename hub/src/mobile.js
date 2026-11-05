@@ -260,38 +260,49 @@
 })();
 
 /* ===== Điện thoại: giữ thanh dưới sát đáy màn hình thật.
-   Safari iPhone đôi khi "quên" cập nhật chiều cao màn hình sau khi bàn phím / thanh địa chỉ co lại, làm thanh dán-cố-định lơ lửng giữa màn hình.
-   Cách xử lý: đo vị trí thật của thanh so với đáy vùng nhìn thấy (visualViewport), lệch thì kéo xuống; còn ép trình duyệt tính lại bố cục. ===== */
+   Safari iPhone đôi khi "nhớ" chiều cao lúc còn bàn phím (khoảng 300px) dù bàn phím đã tắt, nên thanh dán-cố-định lơ lửng giữa màn hình.
+   Cách xử lý: khi KHÔNG có ô nhập nào đang mở mà vùng nhìn thấy ngắn hơn khung trang thì (1) nhích cuộn 1px để Safari tính lại, (2) kéo thanh xuống đáy bằng chiều cao khung trang. ===== */
 (function(){
   if(typeof window==="undefined"||!window.matchMedia)return;
   const narrow=window.matchMedia("(max-width:760px)");
-  let dy=0,t=0,raf=0;
-  const fix=()=>{
+  let dy=0,t=0,raf=0,lastNudge=0,note=null;
+  const typing=()=>{const a=document.activeElement;return !!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&!/^(checkbox|radio|button|submit)$/.test(a.type||""))};
+  const say=txt=>{ // chỉ cho chị Hoa (CEO) thấy 1 dòng nhỏ 6 giây khi thanh được chỉnh lại, để biết bản sửa có chạy
+    try{if(typeof ME==="undefined"||!ME||ME.role!=="admin")return}catch(e){return}
+    if(!note){note=document.createElement("div");note.style.cssText="position:fixed;left:8px;top:calc(env(safe-area-inset-top) + 2px);z-index:9999;font:10px/1.2 monospace;background:rgba(0,0,0,.65);color:#fff;padding:2px 6px;border-radius:6px;pointer-events:none";document.body.appendChild(note)}
+    note.textContent=txt;note.hidden=false;clearTimeout(note._t);note._t=setTimeout(()=>{note.hidden=true},6000)};
+  const reflow=()=>{const bar=document.getElementById("mobtab");if(!bar)return;bar.style.display="none";void bar.offsetHeight;bar.style.display=""};
+  const fix=(nudge)=>{
     raf=0;
     const bar=document.getElementById("mobtab");
     if(!bar||!narrow.matches||document.hidden)return;
     const v=window.visualViewport;
-    if(!v||v.scale>1.05)return; // đang phóng to bằng 2 ngón: để yên
+    if(v&&v.scale>1.05)return; // đang phóng to bằng 2 ngón: để yên
+    const ih=window.innerHeight,ch=document.documentElement.clientHeight,vh=v?v.height+v.offsetTop:ih;
     const r=bar.getBoundingClientRect();
-    const want=v.offsetTop+v.height;               // đáy vùng nhìn thấy (toạ độ của khung bố cục)
-    const diff=Math.round(want-(r.bottom-dy));      // lệch bao nhiêu nếu không kéo
-    if(Math.abs(diff)>2){dy=diff;bar.style.transform="translate3d(0,"+dy+"px,0)"}
-    else if(dy!==0){dy=0;bar.style.transform=""}
+    const natural=r.bottom-dy;                       // đáy thanh nếu không kéo
+    const frame=Math.max(ih,ch);                     // chiều cao khung trang (không bị ảnh hưởng bởi "nhớ bàn phím")
+    const stale=!typing()&&natural<frame-24;         // không gõ gì mà thanh vẫn cao hơn đáy khung → đang lơ lửng
+    if(stale){
+      const now=Date.now();
+      if(nudge!==false&&now-lastNudge>2500){lastNudge=now;const y=window.scrollY;window.scrollTo(window.scrollX,y+1);window.scrollTo(window.scrollX,y);reflow()}
+      const r2=bar.getBoundingClientRect(),nat2=r2.bottom-dy;
+      const want=Math.max(frame,vh);
+      const diff=Math.round(want-nat2);
+      if(diff>2){if(diff!==dy)say("chỉnh thanh dưới +"+diff+" ih="+ih+" vv="+Math.round(vh));dy=diff;bar.style.transform="translate3d(0,"+dy+"px,0)"}
+      else if(dy!==0){dy=0;bar.style.transform=""}
+    }else if(dy!==0&&!typing()){dy=0;bar.style.transform=""}
   };
-  const reflow=()=>{ // ép Safari tính lại vị trí của phần tử dán-cố-định
-    const bar=document.getElementById("mobtab");if(!bar)return;
-    bar.style.display="none";void bar.offsetHeight;bar.style.display="";
-  };
-  const soon=(ms)=>{clearTimeout(t);t=setTimeout(()=>{reflow();fix()},ms||120)};
-  const sched=()=>{if(!raf)raf=requestAnimationFrame(fix)};
+  const soon=ms=>{clearTimeout(t);t=setTimeout(()=>fix(),ms||120)};
+  const sched=()=>{if(!raf)raf=requestAnimationFrame(()=>fix(false))};
   if(window.visualViewport){visualViewport.addEventListener("resize",()=>soon(80));visualViewport.addEventListener("scroll",sched)}
   window.addEventListener("scroll",sched,{passive:true});
   window.addEventListener("resize",()=>soon(150));
   window.addEventListener("orientationchange",()=>soon(400));
-  document.addEventListener("focusout",()=>{soon(150);setTimeout(()=>{reflow();fix()},600)},true); // sau khi đóng bàn phím
+  document.addEventListener("focusout",()=>{soon(200);setTimeout(()=>fix(),700);setTimeout(()=>fix(),1500)},true); // sau khi đóng bàn phím
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)soon(200)});
   window.addEventListener("pageshow",()=>soon(200));
-  document.addEventListener("touchend",()=>{setTimeout(fix,250);setTimeout(fix,900)},{passive:true});
-  setInterval(fix,1500); // lưới an toàn: tự sửa nếu vẫn lệch
-  setTimeout(fix,600);
+  document.addEventListener("touchend",()=>{setTimeout(()=>fix(false),250);setTimeout(()=>fix(false),900)},{passive:true});
+  setInterval(()=>fix(),1500); // lưới an toàn
+  setTimeout(()=>fix(),600);
 })();
