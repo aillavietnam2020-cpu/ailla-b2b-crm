@@ -17,7 +17,9 @@
     if(!o.nhaplieu&&typeof PAGES!=="undefined"&&PAGES.nhaplieu)o.nhaplieu=MI("nhaplieu","Nhập dữ liệu MKT",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead");
     if(!o.quytac&&typeof PAGES!=="undefined"&&PAGES.quytac)o.quytac=MI("quytac","Quy tắc vận hành & luồng việc",()=>typeof mhManage==="function"&&mhManage());
     C={o,src};Promise.resolve().then(()=>{C=null});return C};
-  const it=(P,x)=>{const[id,nm]=Array.isArray(x)?x:[x];const i=P[id];return i?[i[0],nm||i[1],i[2],i[3]]:null};
+  /* sx_mh (Đơn mua hàng bản kho, không giá) chỉ cho người KHÔNG quản lý mua hàng; người quản lý (Thảo, kế toán, CEO) dùng mh_po. Tránh hiện hai dòng "Đơn mua hàng" (05/11). */
+  const MHX=u=>!(typeof mhManage==="function"&&mhManage());
+  const it=(P,x)=>{const[id,nm]=Array.isArray(x)?x:[x];const i=P[id];if(!i)return null;const p=id==="sx_mh"?(u=>MHX(u)&&i[2](u)):i[2];return [i[0],nm||i[1],p,i[3]]};
   /* spec: [[tên nhóm, [id | [id, tên mới]]]]; from: mục cũ để vét trang bảng chưa nhắc; drop: trang cố ý chuyển sang web kia. */
   const mod=(k,ic,n,zone,spec,from,drop,extra)=>Object.assign({k,ic,n,zone,sub:"",adm:ADMH||undefined,groups:()=>{const{o,src}=pool();
     const G=spec.map(([g,ids])=>[g,ids.map(x=>it(o,x)).filter(Boolean)]);
