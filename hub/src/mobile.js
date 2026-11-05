@@ -258,3 +258,40 @@
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)setTimeout(check,400)});
   window.addEventListener("pageshow",e=>{if(e.persisted)setTimeout(check,400)});
 })();
+
+/* ===== Điện thoại: giữ thanh dưới sát đáy màn hình thật.
+   Safari iPhone đôi khi "quên" cập nhật chiều cao màn hình sau khi bàn phím / thanh địa chỉ co lại, làm thanh dán-cố-định lơ lửng giữa màn hình.
+   Cách xử lý: đo vị trí thật của thanh so với đáy vùng nhìn thấy (visualViewport), lệch thì kéo xuống; còn ép trình duyệt tính lại bố cục. ===== */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  let dy=0,t=0,raf=0;
+  const fix=()=>{
+    raf=0;
+    const bar=document.getElementById("mobtab");
+    if(!bar||!narrow.matches||document.hidden)return;
+    const v=window.visualViewport;
+    if(!v||v.scale>1.05)return; // đang phóng to bằng 2 ngón: để yên
+    const r=bar.getBoundingClientRect();
+    const want=v.offsetTop+v.height;               // đáy vùng nhìn thấy (toạ độ của khung bố cục)
+    const diff=Math.round(want-(r.bottom-dy));      // lệch bao nhiêu nếu không kéo
+    if(Math.abs(diff)>2){dy=diff;bar.style.transform="translate3d(0,"+dy+"px,0)"}
+    else if(dy!==0){dy=0;bar.style.transform=""}
+  };
+  const reflow=()=>{ // ép Safari tính lại vị trí của phần tử dán-cố-định
+    const bar=document.getElementById("mobtab");if(!bar)return;
+    bar.style.display="none";void bar.offsetHeight;bar.style.display="";
+  };
+  const soon=(ms)=>{clearTimeout(t);t=setTimeout(()=>{reflow();fix()},ms||120)};
+  const sched=()=>{if(!raf)raf=requestAnimationFrame(fix)};
+  if(window.visualViewport){visualViewport.addEventListener("resize",()=>soon(80));visualViewport.addEventListener("scroll",sched)}
+  window.addEventListener("scroll",sched,{passive:true});
+  window.addEventListener("resize",()=>soon(150));
+  window.addEventListener("orientationchange",()=>soon(400));
+  document.addEventListener("focusout",()=>{soon(150);setTimeout(()=>{reflow();fix()},600)},true); // sau khi đóng bàn phím
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)soon(200)});
+  window.addEventListener("pageshow",()=>soon(200));
+  document.addEventListener("touchend",()=>{setTimeout(fix,250);setTimeout(fix,900)},{passive:true});
+  setInterval(fix,1500); // lưới an toàn: tự sửa nếu vẫn lệch
+  setTimeout(fix,600);
+})();
