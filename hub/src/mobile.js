@@ -16,12 +16,14 @@
     });
   };
   const centerTabs=root=>{
-    root.querySelectorAll(".settabs,.sxtabs,.modtabs,.kstab,.dptab,.dgtab").forEach(t=>{
+    root.querySelectorAll(".settabs,.sxtabs,.modtabs,.kstab,.dptab,.dgtab,.cwtabs").forEach(t=>{
       const on=t.querySelector(".on");
       if(on&&t.scrollWidth>t.clientWidth)t.scrollLeft=on.offsetLeft-(t.clientWidth-on.offsetWidth)/2;
     });
   };
-  const run=()=>{if(!narrow.matches)return;const m=document.getElementById("main");if(m){fixScan(m);centerTabs(m)}};
+  /* AI Agent: chữ gợi ý trong ô nhắn tin ngắn gọn để ô 1 dòng (kiểu Messenger) */
+  const chatPh=()=>{const t=document.getElementById("ac-text");if(t&&!t.dataset.mph){t.dataset.mph="1";t.title=t.placeholder;t.placeholder="Nhắn tin…"}};
+  const run=()=>{if(!narrow.matches)return;const m=document.getElementById("main");if(m){fixScan(m);centerTabs(m);chatPh()}};
   let t=0;
   new MutationObserver(()=>{clearTimeout(t);t=setTimeout(run,120)}).observe(document.body,{childList:true,subtree:true});
   window.addEventListener("resize",()=>{clearTimeout(t);t=setTimeout(run,200)});
@@ -101,7 +103,8 @@
     return items.slice(0,5);
   };
   /* Hàng nút tròn thao tác nhanh ở đầu trang chủ (kiểu Poscake) */
-  const QA_PAGES=["exec","cr_rp","cr_s_hn","cv_tq","mkt_tq","sx_tq"];
+  /* Chị Hoa 05/11: bỏ hàng nút tròn ở mọi trang, đã có thanh menu dưới (Ghi nhanh ở nút +). Để trống là không hiện ở trang nào. */
+  const QA_PAGES=[];
   const quick=()=>{
     const m=document.getElementById("main");
     if(!m||!narrow.matches){return}
@@ -222,4 +225,19 @@
   new MutationObserver(()=>{clearTimeout(t);t=setTimeout(run,130)}).observe(document.body,{childList:true,subtree:true});
   window.addEventListener("resize",()=>{clearTimeout(t);t=setTimeout(run,220)});
   run();
+})();
+
+/* ===== Điện thoại: thông báo mỗi tin 2 dòng rồi "…"; bấm lần 1 xem đủ, bấm lần 2 mới mở việc (chị Hoa 05/11) ===== */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  document.addEventListener("click",e=>{
+    if(!narrow.matches)return;
+    const b=e.target.closest&&e.target.closest(".nti");if(!b)return;
+    const sp=b.querySelector("span");if(!sp)return;
+    const cut=sp.scrollHeight>sp.clientHeight+2;
+    if(b.classList.contains("open")||!cut)return; // đã mở hoặc vốn ngắn: để web mở việc như cũ
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+    b.classList.add("open");
+  },true);
 })();

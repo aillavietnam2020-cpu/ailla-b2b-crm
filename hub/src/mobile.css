@@ -1,7 +1,8 @@
 /* ===== Giao diện điện thoại (≤ 760px) — nạp CUỐI CÙNG, chỉ chỉnh cho màn nhỏ, không đụng bản máy tính ===== */
 @media (max-width:760px){
   html{-webkit-text-size-adjust:100%}
-  body{overflow-x:hidden}
+  /* không đặt overflow-x lên body: Safari iPhone làm thanh dưới (fixed) bị trôi; chặn tràn ngang ở khung #app thay vào */
+  #app{overflow-x:clip;max-width:100vw}
   html,body{max-width:100%}
   .mainwrap,.mainwrap>main{min-width:0;max-width:100vw;overflow-x:clip}
   .crmembed{max-width:100%;overflow:hidden}
@@ -84,6 +85,8 @@
   .has-mobtab .ntpop{bottom:calc(132px + env(safe-area-inset-bottom))!important}
   .has-mobtab .crmembed{height:calc(100vh - 215px)}
   .menu-open #mobtab{display:none}
+  /* thanh dưới luôn dính đáy (Safari iPhone): nền trắng đặc, không làm mờ nền, lớp riêng để không trễ khi cuộn nhanh */
+  #mobtab{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;background:#fff!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;-webkit-transform:translateZ(0);transform:translateZ(0);padding-bottom:calc(6px + env(safe-area-inset-bottom))!important}
 
   /* ---- kiểu ứng dụng: bo tròn nhiều, đầu trang mềm, nút "+" nổi giữa thanh đáy ---- */
   .topbar{background:linear-gradient(180deg,#cfe0ff 0%,rgba(232,239,255,.92) 100%)!important;border-bottom:0;padding-bottom:12px}
@@ -139,6 +142,92 @@
   .tbl:has(table.mlist),.card>div:has(>table.mlist){overflow:visible;max-height:none}
   table.mlist,table.mlist>tbody{display:block!important;width:100%;overflow:visible}
   table.mlist>thead{display:none}
+  /* ô tích không bị kéo rộng hết dòng (làm chữ bên cạnh tràn ra ngoài) */
+  input[type=checkbox],input[type=radio]{width:auto!important;min-height:0!important;flex:none}
+  /* AI Agent: bảng tùy chọn "…" gọn trong màn, chữ xuống dòng */
+  .ac-optp{right:-6px!important;max-width:calc(100vw - 36px);white-space:normal!important}
+  .ac-optp label{display:flex;gap:8px;align-items:center;line-height:1.35}
+  .ac-send textarea,.ac-send input[type=text]{font-size:16px!important}
+  /* AI Agent: khung chat vừa một màn (trên thanh dưới), ô nhắn tin rộng hết dòng, các nút xuống hàng dưới */
+  .ac-box{height:calc(100vh - 300px)!important;height:calc(100dvh - 300px)!important;min-height:300px!important}
+  /* ô nhắn tin kiểu Messenger: 1 hàng — đính kèm, micro | ô chữ bo tròn | … , Gửi */
+  .ac-bar{flex-wrap:nowrap!important;align-items:flex-end!important;gap:4px!important}
+  .ac-bar #ac-text{flex:1 1 auto!important;width:auto!important;min-width:0;min-height:38px!important;height:38px;max-height:110px;border-radius:20px!important;padding:8px 14px!important;resize:none;line-height:1.35;background:var(--canvas,#f4f6fa)}
+  .ac-bar #ac-text:placeholder-shown{height:38px!important} /* ô trống: 1 dòng; gõ chữ thì tự cao lên tới 110px */
+  .ac-bar .ac-clip{width:32px!important;height:38px!important;border:0!important;background:none!important;box-shadow:none!important;font-size:19px;padding:0!important}
+  .ac-bar .ac-opt>button{width:30px;height:38px;min-height:38px;border:0!important;background:none!important;box-shadow:none!important;padding:0!important}
+  .ac-bar #ac-go{border-radius:20px!important;min-height:38px!important;padding:0 14px!important;flex:none}
+  .ac-send{padding:6px 10px!important}
+
+  /* Việc của tôi: tiêu đề 1 dòng, ô Tìm việc xuống hàng dưới; tab gọn cuộn ngang; dòng Chờ duyệt: nhãn nằm trên, không đè tên */
+  .tbslot{flex:1 1 auto;min-width:0}
+  .tbslot h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:17px!important;margin:0}
+  .topbar .cwsrch-tb{order:9;flex:1 1 100%;width:100%!important;max-width:none!important}
+  .cwtabs{scrollbar-width:none;gap:2px}
+  .cwtabs::-webkit-scrollbar{display:none}
+  .cwtabs button{padding:6px 9px!important;font-size:13px!important;flex:none;white-space:nowrap}
+  .cwrv{grid-template-columns:minmax(0,1fr)!important;gap:3px!important}
+  .cwrv>*{grid-column:1/-1!important}
+  .cwrvc{white-space:normal!important;justify-self:start;width:auto!important;max-width:100%;font-size:11.5px!important;padding:1px 8px!important}
+  /* chung: tiêu đề khối, nhãn không tràn khung */
+  .card h2,.card h3,.card-h h2{min-width:0;overflow-wrap:anywhere;white-space:normal}
+  .pill{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+  /* Tổng quan sản xuất: mỗi người chỉ thấy phần của vai trò mình (ẩn nút đổi vai trò); bảng "còn bán được bao lâu" bỏ thanh vẽ, giữ số */
+  .tqseg{display:none!important}
+  .tqt th{width:auto!important}
+  .tqt .tqbar span{display:none!important}
+  .tqt .tqbar,.tqt .tqbar em{display:block;position:static!important;text-align:right;font-style:normal}
+  .tqt td small{display:block}
+  table.mlist .tqbar,table.mlist .tqbar em{text-align:left!important}
+  table.mlist td.ml-o[data-l]::before{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* ===== Bố trí học từ TikTok Seller (05/11) ===== */
+  /* Trang chủ: ô số thành 1 thẻ, 3 số mỗi hàng, số ở trên, tên ở dưới, căn giữa */
+  section.xkstrip:not(.x6){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px 0;box-shadow:none!important}
+  section.xkstrip:not(.x6) .xk{display:flex!important;flex-direction:column!important;align-items:center!important;text-align:center;border:0!important;background:none!important;box-shadow:none!important;padding:8px 4px!important;min-height:0!important;gap:1px!important}
+  section.xkstrip:not(.x6) .xk .xkv{order:1;font-size:17px!important;font-weight:700}
+  section.xkstrip:not(.x6) .xk .xkh{order:2;justify-content:center}
+  section.xkstrip:not(.x6):has(>.xk:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  section.xkstrip:not(.x6):has(>.xk:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  section.xkstrip:not(.x6) .xk .xkl{font-size:11px;font-weight:500;color:var(--muted);white-space:normal;line-height:1.25}
+  section.xkstrip:not(.x6) .xk .kic,section.xkstrip:not(.x6) .xk .xkm{display:none!important}
+  section.xkstrip:not(.x6) .xk.mut{opacity:.55}
+  /* Việc cần xử lý: kiểu Nhiệm vụ — tên việc 1 dòng, dòng phụ nhỏ, nút chữ "Xử lý ›" bên phải */
+  .xattl .xai{display:grid!important;grid-template-columns:8px minmax(0,1fr) auto!important;gap:8px!important;align-items:center;padding:9px 12px!important}
+  .xattl .xai .xat b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px;font-weight:600}
+  .xattl .xai .xat small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+  .xattl .xai>.pill{display:none!important}
+  .xattl .xai>.btn{border:0!important;background:none!important;box-shadow:none!important;color:#3b6df0!important;padding:0 0 0 4px!important;min-height:0!important;font-size:12.5px!important;font-weight:600}
+  .xattl .xai>.btn::after{content:" ›"}
+  /* thẻ chờ duyệt / danh sách có nút: nút hành động gom về góc phải dưới */
+  .cwrv .ac{display:flex!important;justify-content:flex-end!important;gap:6px!important}
+  .cwrv .ac .btn{min-height:30px!important;padding:4px 12px!important;font-size:12.5px!important}
+
+  /* thông báo: mỗi tin 2 dòng rồi "…", bấm mới xem đủ */
+  .ntl .nti span{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
+  .ntl .nti.open span{-webkit-line-clamp:unset;display:block!important}
+  .ntl .nti{padding:8px 10px!important}
+  .ntl .nti small{font-size:11px}
+
+  /* dải doanh thu thực (chữ xanh): chỉ giữ dòng in đậm, ẩn đoạn giải thích nhỏ */
+  .dt-ban br,.dt-ban small{display:none!important}
+  .dt-ban{padding:9px 12px!important;font-size:13.5px}
+  /* ô số Tiến độ sản xuất (Tổng quan content): lưới 3 cột kẻ vạch kiểu Poscake */
+  .dqk{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px!important}
+  .dqk>div{border:0!important;border-right:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;box-shadow:none!important;padding:7px 9px!important;min-width:0;background:none!important}
+  .dqk>div:nth-child(3n){border-right:0!important}
+  .dqk small{font-size:11px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dqk b{font-size:16px!important;line-height:1.3!important}
+  .dqk i{font-size:10.5px!important;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Marketing › Kế hoạch tháng: bảng mục tiêu vừa màn (ẩn danh sách kênh nhỏ, ô chọn và ô số hẹp lại) */
+  .tbl:has(select[data-h]) table{min-width:0!important;width:100%}
+  .tbl:has(select[data-h]) td small{display:none}
+  .tbl:has(select[data-h]) th,.tbl:has(select[data-h]) td{padding:7px 5px!important;font-size:12.5px;white-space:normal}
+  .tbl:has(select[data-h]) td:first-child{min-width:96px}
+  .tbl:has(select[data-h]) select{width:auto!important;min-width:0;max-width:96px;min-height:34px!important;padding:2px 6px}
+  .tbl:has(select[data-h]) input.num{width:64px!important;min-height:34px!important;padding:2px 6px}
+
   /* Tổng quan trên điện thoại: bỏ khối Hoạt động mới nhất (chị Hoa 05/11) */
   #xal{display:none!important}
   /* tấm Ghi nhanh trượt từ dưới lên */
@@ -166,7 +255,7 @@
   table.mfit:not(.mlist){display:table!important;width:100%!important;min-width:0!important}
   table.mfit:not(.mlist) td,table.mfit:not(.mlist) th{font-size:12.5px}
   table.mfit:not(.mlist) th,table.mfit:not(.mlist) td{padding:7px 5px!important;font-size:12px;white-space:nowrap}
-  table.mfit:not(.mlist) th{font-size:11px}
+  table.mfit:not(.mlist) th{font-size:11px;white-space:normal!important;line-height:1.25}
   table.mfit:not(.mlist) td:first-child,table.mfit:not(.mlist) th:first-child{padding-left:8px!important;white-space:normal}
   table.mfit:not(.mlist) td:last-child,table.mfit:not(.mlist) th:last-child{padding-right:8px!important}
   table.mfit .ml-x{display:none!important}
