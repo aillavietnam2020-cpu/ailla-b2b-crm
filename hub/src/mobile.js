@@ -33,7 +33,11 @@
 (function(){
   if(typeof window==="undefined"||!window.matchMedia)return;
   const narrow=window.matchMedia("(max-width:760px)");
-  const IC={home:"M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",order:"M7 3h10a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V5a2 2 0 0 1 2-2zM9 8h6M9 12h6",plus:"M12 5v14M5 12h14",box:"M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10",more:"M4 7h16M4 12h16M4 17h16",task:"M5 4h14v16H5zM9 9l2 2 4-4M9 15h6",user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",chart:"M5 20V10M12 20V4M19 20v-7"};
+  const IC={home:"M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",order:"M7 3h10a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V5a2 2 0 0 1 2-2zM9 8h6M9 12h6",plus:"M12 5v14M5 12h14",box:"M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10",more:"M4 7h16M4 12h16M4 17h16",task:"M5 4h14v16H5zM9 9l2 2 4-4M9 15h6",user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",chart:"M5 20V10M12 20V4M19 20v-7",money:"M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"};
+  /* Lập phiếu chi: đúng quyền như nút "Lập phiếu chi" có sẵn trên web (khonhanh.js KQ_CHI) */
+  const canChi=()=>{try{return typeof KQ_CHI==="function"&&KQ_CHI()&&typeof spForm==="function"}catch(e){return false}};
+  const newChi=()=>{document.body.classList.remove("menu-open");try{spForm()}catch(e){if(typeof toast==="function")toast(e.message||"Chưa mở được phiếu chi")}};
+  const isCEO=()=>typeof ME!=="undefined"&&ME&&ME.role==="admin";
   const svg=d=>`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
   const pagesOf=()=>{const out=[];try{visibleMods().forEach(mo=>modGroups(mo).forEach(g=>g[1].forEach(it=>out.push({id:it[0],t:it[1],mod:mo.k}))))}catch(e){}return out};
   const goPage=id=>{PAGE=id;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}MOD="";render();scrollTo(0,0);document.body.classList.remove("menu-open")};
@@ -46,7 +50,9 @@
     const khach=first(["cr_kh","cr_s_kh"]);
     const crmHome=first(["cr_rp","cr_s_hn"]);
     const crmMode=CRMPAGES.includes(PAGE)&&!!crmHome;
-    const mid=don?{k:"tao",t:"",ic:"plus",big:1,go:()=>newOrder(don),pages:[]}:null;
+    /* nút + giữa: CEO là Lập phiếu chi (chị Hoa 05/11 không cần tạo đơn); người bán là Tạo đơn */
+    const chi=canChi();
+    const mid=(chi&&(isCEO()||!don))?{k:"chi",t:"",ic:"plus",big:1,go:newChi,pages:[]}:don?{k:"tao",t:"",ic:"plus",big:1,go:()=>newOrder(don),pages:[]}:null;
     if(crmMode){
       items.push({k:"home",t:"Trang chủ",ic:"home",go:()=>goPage(crmHome),pages:["cr_rp","cr_s_hn"]});
       if(don)items.push({k:"don",t:"Đơn hàng",ic:"order",go:()=>goPage(don),pages:["cr_dn","cr_s_dn"]});
@@ -87,7 +93,10 @@
     const A=[];
     if(has("cc_toi"))A.push(["Chấm công","user",()=>goPage("cc_toi")]); // chấm công trên điện thoại (chamcong.js)
     const cv=first(["cv_v","cv_nv","cv_tq"]);if(cv&&cv!==PAGE)A.push(["Việc","task",()=>goPage(cv)]);
-    if(don)A.push(["Tạo đơn","plus",()=>newOrder(don)]);
+    const chi=canChi();
+    if(chi&&isCEO())A.push(["Phiếu chi","money",newChi]);
+    else if(don)A.push(["Tạo đơn","plus",()=>newOrder(don)]);
+    if(chi&&!isCEO())A.push(["Phiếu chi","money",newChi]);
     const ton=first(["kho_ton_tp","kho_ton"]);if(ton)A.push(["Tồn kho","box",()=>goPage(ton)]);
     if(ret)A.push(["Hàng hoàn","box",()=>goPage(ret)]);
     if(don)A.push(["Đơn hàng","order",()=>goPage(don)]);
@@ -125,8 +134,8 @@
 (function(){
   if(typeof window==="undefined"||!window.matchMedia)return;
   const narrow=window.matchMedia("(max-width:760px)");
-  const TITLE=/^(tên|tên hàng|tên sản phẩm|sản phẩm|mặt hàng|hàng hóa|khách hàng|khách|tên khách|nhà cung cấp|nội dung|diễn giải|việc|công việc|tên việc|nhân viên|họ tên|họ và tên|người|tiêu đề|combo)$/i;
-  const KEY=/^(tồn kho|tồn|tồn cuối|tồn cuối kỳ|còn lại|còn|số lượng|sl|thành tiền|tổng tiền|tổng cộng|tổng|doanh thu|doanh số|số tiền|công nợ|còn nợ|phải thu|giá trị|lãi)$/i;
+  const TITLE=/^(tên|tên hàng|tên sản phẩm|sản phẩm|mặt hàng|hàng hóa|khách hàng|khách|tên khách|nhà cung cấp|nội dung|diễn giải|việc|công việc|tên việc|nhân viên|họ tên|họ và tên|tiêu đề|combo|kênh)(?=\s|$|\()/i;
+  const KEY=/^(tồn kho|tồn|tồn cuối|tồn cuối kỳ|còn lại|còn|số lượng|sl|thành tiền|tổng tiền|tổng cộng|tổng|doanh thu|doanh số|số tiền|công nợ|còn nợ|phải thu|giá trị|lãi)(?=\s|$|\()/i;
   const txt=el=>(el.textContent||"").replace(/\s+/g," ").trim();
   const list=root=>{
     root.querySelectorAll("table").forEach(t=>{
@@ -141,7 +150,7 @@
       if([...r0.cells].filter(c=>c.querySelector("input:not([type=checkbox]),select,textarea")).length>1)return; // bảng nhập liệu nhiều ô: giữ nguyên
       let ti=H.findIndex(h=>TITLE.test(h));if(ti<0)ti=0;
       const ki=H.findIndex((h,i)=>i!==ti&&KEY.test(h));
-      t.classList.add("mlist");t.dataset.ml="1";
+      t.classList.add("mlist");if(ki<0)t.classList.add("ml-nok");t.dataset.ml="1";
       [...t.tBodies[0].rows].forEach(r=>{
         if(r.cells.length!==H.length){r.classList.add("ml-full");return}
         [...r.cells].forEach((c,i)=>{
@@ -150,9 +159,11 @@
           else if(i===ki){c.classList.add("ml-k");c.dataset.l=H[i];if(/^[-−]\d/.test(v))c.classList.add("ml-neg")}
           else if(!H[i]&&hasBtn)c.classList.add("ml-a");
           else if(i===0&&ti>0)c.classList.add("ml-c");
-          else{c.classList.add("ml-o");if(H[i])c.dataset.l=H[i]}
+          else{c.classList.add("ml-o");if(H[i])c.dataset.l=H[i];if(v.length>26&&!c.querySelector("svg,input"))c.classList.add("ml-w")}
           if(!v&&!c.querySelector("button,input,img,svg")||v==="—"||v==="-")c.classList.add("ml-e");
         });
+        const O=[...r.cells].filter(c=>c.classList.contains("ml-o"));
+        if(O.length&&O.every(c=>c.classList.contains("ml-e")))r.classList.add("ml-noo"); // dòng không có số phụ: không chừa hàng trống
       });
     });
   };
