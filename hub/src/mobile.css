@@ -105,4 +105,55 @@
   #moqa button i{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#e8efff;color:#3b6df0}
   #moqa button span{text-align:center;line-height:1.2}
   .xk .xkh,.xk h3,.xk .t{white-space:normal}
+
+  /* ===== Cỡ gọn kiểu Pancake (05/11): chữ 13–14px, số chính 17px, viền mảnh, ít khoảng trống ===== */
+  main{font-size:13.5px;line-height:1.45;padding-left:10px;padding-right:10px}
+  .ph{margin-bottom:8px}.ph h1{font-size:17px}.ph p{font-size:12.5px}
+  .card,.cardp{padding-left:12px;padding-right:12px;border-radius:14px;box-shadow:none}
+  .card-h h2,.card h2{font-size:15px}
+  .kpis,.grid.kpis{gap:8px!important;margin-bottom:10px}
+  .kpi{padding:9px 10px;gap:8px;border-radius:12px!important;box-shadow:none;border-top-width:2px}
+  .kpi .ki{width:26px;height:26px;border-radius:8px}.kpi .ki .ic{width:15px;height:15px}
+  .kpi .l{font-size:11.5px!important;font-weight:600;letter-spacing:0;text-transform:none;line-height:1.3}
+  .kpi .v,.kpi b.v{font-size:17px!important;font-weight:700;line-height:1.3}
+  .kpi .h{font-size:11px!important;line-height:1.35}
+  .kpi.mkey{grid-column:1/-1}.kpi.mkey .v{font-size:20px!important}
+  .kpi.mut{opacity:.75}
+  .xkstrip .xk{padding:8px 10px!important}
+  .xkstrip .xk .xkv{font-size:17px!important}
+  .xkstrip .xk .xi{width:26px;height:26px;border-radius:8px}
+  .xkstrip .xk.mut{opacity:.7}
+  .btn,button.btn{font-size:13px;min-height:34px;padding:6px 12px;border-radius:10px}
+  .btn.sm,button.sm{min-height:30px;font-size:12px;padding:4px 10px}
+  .chip{min-height:30px}
+  .tbl td,.tbl th{padding:8px}
+  #moqa{padding:10px 2px 8px;margin:0 0 10px;border-radius:14px}
+  #moqa button{font-size:11px;font-weight:500;gap:5px}
+  #moqa button i{width:40px;height:40px}
+  #moqa button i svg{width:19px;height:19px}
+  #mobtab button{font-size:10px;font-weight:500;min-height:44px}
+  #mobtab button svg{width:21px;height:21px}
+  #mobtab button.big svg{width:50px;height:50px;padding:13px;top:-26px}
+
+  /* bảng nhiều cột thành danh sách: mỗi dòng = tên đậm + số chính bên phải, các cột khác thành dòng chữ nhỏ */
+  .tbl:has(table.mlist),.card>div:has(>table.mlist){overflow:visible;max-height:none}
+  table.mlist,table.mlist>tbody{display:block!important;width:100%;overflow:visible}
+  table.mlist>thead{display:none}
+  table.mlist>tbody>tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:9px 2px;border-bottom:1px solid var(--line);background:none}
+  table.mlist>tbody>tr:last-child{border-bottom:0}
+  table.mlist>tbody>tr>td{display:block;border:0!important;padding:0!important;font-size:12px;color:var(--muted);text-align:left!important;white-space:normal!important;max-width:100%;min-width:0;background:none!important}
+  table.mlist td.ml-t{order:1;flex:1 1 0;font-size:13.5px;font-weight:600;color:var(--ink)}
+  table.mlist td.ml-k{order:2;margin-left:auto;font-size:15px;font-weight:700;color:var(--ink);text-align:right!important}
+  table.mlist td.ml-k::after{content:" " attr(data-l);display:block;font-size:10.5px;font-weight:500;color:var(--muted)}
+  table.mlist td.ml-c{order:3;flex-basis:100%;font-size:11.5px;font-family:inherit}
+  table.mlist td.ml-o{order:4}
+  table.mlist td.ml-o[data-l]::before{content:attr(data-l) ": "}
+  table.mlist td.ml-o input{width:84px;min-height:32px!important;padding:2px 8px}
+  table.mlist td.ml-a{order:5;margin-left:auto;display:flex!important;gap:6px}
+  table.mlist td.ml-a .btn{min-height:28px;padding:3px 9px;font-size:12px}
+  table.mlist .pill{font-size:11px;padding:1px 7px}
+  .filters select,.filters input:not([type=checkbox]){min-height:38px}
+  table.mlist td.ml-k.ml-neg{color:var(--red)}
+  table.mlist td.ml-e{display:none!important}
+  table.mlist tr.ml-full>td{flex-basis:100%}
 }

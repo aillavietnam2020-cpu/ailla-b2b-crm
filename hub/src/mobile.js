@@ -57,13 +57,17 @@
     }
     const home=first(["exec","cv_tq","cr_s_hn","mkt_tq","sx_tq"])||(P[0]&&P[0].id);
     if(home)items.push({k:"home",t:"Trang chủ",ic:"home",go:()=>goPage(home),pages:[home]});
+    /* Mỗi nút chỉ hiện khi người đó có quyền mở trang (lấy từ menu đã lọc quyền). Thứ tự: Trang chủ · Đơn hàng hoặc Kho · nút + · Việc · Menu */
+    const kho=first(["kho_ton_tp","sx_kho","kho_ton","kho_hoan","sx_tq"]);
+    const cv=first(["cv_v","cv_nv","cv_tq","cv","congviec"]);
+    const KHOP=["sx_kho","kho_ton","kho_ton_tp","kho_kk","kho_xuat_tp","kho_hoan","kho_nhap","kho_nhap_tp","kho_xuat","kho_xuat_b2b","kho_online","kho_nxt","sx_tq"];
+    let khoUsed=false;
     if(don)items.push({k:"don",t:"Đơn hàng",ic:"order",go:()=>goPage(don),pages:["cr_dn","cr_s_dn"]});
+    else if(kho&&kho!==home){items.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:KHOP});khoUsed=true}
     else if(khach)items.push({k:"kh",t:"Khách",ic:"user",go:()=>goPage(khach),pages:["cr_kh","cr_s_kh"]});
     if(mid)items.push(mid);
-    const kho=first(["sx_kho","kho_ton","kho_hoan","sx_tq"]);
-    const cv=first(["cv_v","cv_nv","cv_tq","cv","congviec"]);
-    if(kho&&kho!==home)items.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:["sx_kho","kho_ton","kho_ton_tp","kho_kk","kho_xuat_tp","kho_hoan","kho_nhap","kho_nhap_tp","kho_xuat","kho_xuat_b2b","kho_online","kho_nxt","sx_tq"]});
-    else if(cv&&cv!==home)items.push({k:"cv",t:"Việc",ic:"task",go:()=>goPage(cv),pages:["cv_tq","cv_nv","cv","congviec","cv_kb"]});
+    if(cv&&cv!==home)items.push({k:"cv",t:"Việc",ic:"task",go:()=>goPage(cv),pages:["cv_v","cv_tq","cv_nv","cv","congviec","cv_kb"]});
+    else if(kho&&kho!==home&&!khoUsed)items.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:KHOP});
     if(items.length<4){visibleMods().forEach(mo=>{if(items.length>=4)return;const g=modGroups(mo)[0];const it=g&&g[1][0];if(!it||items.some(i=>i.pages.includes(it[0])))return;items.push({k:"m"+mo.k,t:(mo.n||it[1]).split(" ")[0],ic:"chart",go:()=>goPage(it[0]),pages:[it[0]]})})}
     items.push({k:"more",t:"Menu",ic:"more",go:()=>document.body.classList.add("menu-open"),pages:[]});
     return items.slice(0,5);
@@ -79,19 +83,21 @@
     if(old)old.remove();
     const P=pagesOf(),has=id=>P.some(x=>x.id===id),first=ids=>ids.find(has);
     const don=first(["cr_dn","cr_s_dn"]),ret=first(["kho_hoan"]),xuat=first(["kho_xuat_b2b","kho_xuat","sx_kho"]);
+    /* Chỉ trang người đó có quyền mở; lấy 4 nút theo thứ tự ưu tiên việc hằng ngày, nút thứ 5 luôn là Tất cả */
     const A=[];
     if(has("cc_toi"))A.push(["Chấm công","user",()=>goPage("cc_toi")]); // chấm công trên điện thoại (chamcong.js)
+    const cv=first(["cv_v","cv_nv","cv_tq"]);if(cv&&cv!==PAGE)A.push(["Việc","task",()=>goPage(cv)]);
     if(don)A.push(["Tạo đơn","plus",()=>newOrder(don)]);
-    if(don)A.push(["Đơn hàng","order",()=>goPage(don)]);
+    const ton=first(["kho_ton_tp","kho_ton"]);if(ton)A.push(["Tồn kho","box",()=>goPage(ton)]);
     if(ret)A.push(["Hàng hoàn","box",()=>goPage(ret)]);
+    if(don)A.push(["Đơn hàng","order",()=>goPage(don)]);
     if(xuat)A.push(["Xuất kho","box",()=>goPage(xuat)]);
     const cn=first(["cr_cn","cr_s_cn"]);if(cn)A.push(["Công nợ","chart",()=>goPage(cn)]);
-    const cv=first(["cv_tq","cv_nv"]);if(cv&&A.length<4)A.push(["Việc","task",()=>goPage(cv)]);
-    A.push(["Tất cả","more",()=>document.body.classList.add("menu-open")]);
-    if(A.length<2)return;
+    if(A.length<1)return;
+    const B=A.slice(0,4);B.push(["Tất cả","more",()=>document.body.classList.add("menu-open")]);
     const d=document.createElement("div");d.id="moqa";d.dataset.p=PAGE;
-    d.innerHTML=A.slice(0,5).map(a=>`<button type="button"><i>${svg(IC[a[1]])}</i><span>${a[0]}</span></button>`).join("");
-    d.querySelectorAll("button").forEach((b,i)=>b.onclick=A[i][2]);
+    d.innerHTML=B.map(a=>`<button type="button"><i>${svg(IC[a[1]])}</i><span>${a[0]}</span></button>`).join("");
+    d.querySelectorAll("button").forEach((b,i)=>b.onclick=B[i][2]);
     m.insertBefore(d,m.firstChild);
   };
   let sig="";
@@ -113,4 +119,63 @@
   new MutationObserver(()=>{clearTimeout(t);t=setTimeout(paintAll,100)}).observe(document.body,{childList:true,subtree:true});
   window.addEventListener("resize",()=>{clearTimeout(t);t=setTimeout(paintAll,200)});
   paintAll();
+})();
+
+/* ===== Điện thoại: bảng nhiều cột thành danh sách (mỗi dòng 1 hàng: tên + số chính bên phải), ô số cần chú ý lên đầu ===== */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const TITLE=/^(tên|tên hàng|tên sản phẩm|sản phẩm|mặt hàng|hàng hóa|khách hàng|khách|tên khách|nhà cung cấp|nội dung|diễn giải|việc|công việc|tên việc|nhân viên|họ tên|họ và tên|người|tiêu đề|combo)$/i;
+  const KEY=/^(tồn kho|tồn|tồn cuối|tồn cuối kỳ|còn lại|còn|số lượng|sl|thành tiền|tổng tiền|tổng cộng|tổng|doanh thu|doanh số|số tiền|công nợ|còn nợ|phải thu|giá trị|lãi)$/i;
+  const txt=el=>(el.textContent||"").replace(/\s+/g," ").trim();
+  const list=root=>{
+    root.querySelectorAll("table").forEach(t=>{
+      if(t.dataset.ml||t.closest(".edit,.sheet,.nomlist,.mlist")||t.classList.contains("nomlist"))return;
+      if(!t.offsetWidth)return; // đang ẩn: để lần sau
+      t.dataset.ml="0";
+      const box=t.parentElement;if(!box||(t.offsetWidth<=box.clientWidth+4&&t.scrollWidth<=t.clientWidth+4))return; // vừa màn hình: giữ bảng
+      const hr=t.tHead&&t.tHead.rows[0];if(!hr||!t.tBodies[0])return;
+      const H=[...hr.cells].map(txt);
+      if(H.length<4||H.length>10||[...hr.cells].some(c=>c.colSpan>1))return;
+      const r0=t.tBodies[0].rows[0];if(!r0)return;
+      if([...r0.cells].filter(c=>c.querySelector("input:not([type=checkbox]),select,textarea")).length>1)return; // bảng nhập liệu nhiều ô: giữ nguyên
+      let ti=H.findIndex(h=>TITLE.test(h));if(ti<0)ti=0;
+      const ki=H.findIndex((h,i)=>i!==ti&&KEY.test(h));
+      t.classList.add("mlist");t.dataset.ml="1";
+      [...t.tBodies[0].rows].forEach(r=>{
+        if(r.cells.length!==H.length){r.classList.add("ml-full");return}
+        [...r.cells].forEach((c,i)=>{
+          const v=txt(c),hasBtn=!!c.querySelector("button,a.btn");
+          if(i===ti)c.classList.add("ml-t");
+          else if(i===ki){c.classList.add("ml-k");c.dataset.l=H[i];if(/^[-−]\d/.test(v))c.classList.add("ml-neg")}
+          else if(!H[i]&&hasBtn)c.classList.add("ml-a");
+          else if(i===0&&ti>0)c.classList.add("ml-c");
+          else{c.classList.add("ml-o");if(H[i])c.dataset.l=H[i]}
+          if(!v&&!c.querySelector("button,input,img,svg")||v==="—"||v==="-")c.classList.add("ml-e");
+        });
+      });
+    });
+  };
+  /* ô số: ô báo đỏ có số khác 0 lên đầu, rộng cả hàng; ô bằng 0 xuống cuối */
+  const kpis=root=>{
+    root.querySelectorAll(".kpis").forEach(g=>{
+      if(g.dataset.mk)return;g.dataset.mk="1";
+      const K=[...g.children].filter(x=>x.classList.contains("kpi"));if(K.length<3)return;
+      const lab=x=>((x.querySelector(".l")||{}).textContent||"").toLowerCase();
+      const hot=K.filter(x=>!x.classList.contains("mut")&&(x.classList.contains("t-red")||/âm|quá hạn|trễ|cảnh báo|nguy hiểm|lệch/.test(lab(x))));
+      hot.reverse().forEach(x=>{x.classList.add("mkey");g.insertBefore(x,g.firstChild)});
+      K.filter(x=>x.classList.contains("mut")).forEach(x=>g.appendChild(x));
+    });
+    /* ô số trang tổng quan: ô chưa có số (—, 0) xuống cuối để ô có việc cần xử lý lên trước */
+    root.querySelectorAll(".xkstrip").forEach(g=>{
+      if(g.dataset.mk)return;g.dataset.mk="1";
+      const K=[...g.children].filter(x=>x.classList.contains("xk"));if(K.length<3)return;
+      K.filter(x=>{const v=((x.querySelector(".xkv")||{}).textContent||"").trim();return !v||v==="—"||v==="-"||/^0([.,]0+)?(đ|tr)?$/.test(v)}).forEach(x=>{x.classList.add("mut");g.appendChild(x)});
+    });
+  };
+  const run=()=>{if(!narrow.matches)return;const m=document.getElementById("main");if(m){try{list(m);kpis(m)}catch(e){}}};
+  let t=0;
+  new MutationObserver(()=>{clearTimeout(t);t=setTimeout(run,130)}).observe(document.body,{childList:true,subtree:true});
+  window.addEventListener("resize",()=>{clearTimeout(t);t=setTimeout(run,220)});
+  run();
 })();

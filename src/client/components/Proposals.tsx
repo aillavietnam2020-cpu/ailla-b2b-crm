@@ -36,6 +36,10 @@ export function ProposalsCard({
 }) {
   const toast = useToast();
   const [key, setKey] = useState(0);
+  // Điện thoại: khối đề xuất thu gọn còn 1 dòng để danh sách đơn hiện ngay, bấm "Xem" mới mở.
+  const [open, setOpen] = useState(
+    () => typeof window === 'undefined' || !window.matchMedia || !window.matchMedia('(max-width:760px)').matches,
+  );
   const qs = new URLSearchParams({ status: 'PENDING', _: String(key) });
   if (entityType) qs.set('entity_type', entityType);
   if (entityId) qs.set('entity_id', entityId);
@@ -56,7 +60,15 @@ export function ProposalsCard({
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <Card title={`Đề xuất của trợ lý AI (${items.length})`}>
+      <Card
+        title={`Đề xuất của trợ lý AI (${items.length})`}
+        action={
+          <button className="btn sm" onClick={() => setOpen((o) => !o)}>
+            {open ? 'Thu gọn' : 'Xem'}
+          </button>
+        }
+      >
+        {!open ? null : (
         <div className="timeline">
           {items.map((p) => (
             <div className="event" key={p.id}>
@@ -89,6 +101,7 @@ export function ProposalsCard({
             </div>
           ))}
         </div>
+        )}
       </Card>
     </div>
   );
