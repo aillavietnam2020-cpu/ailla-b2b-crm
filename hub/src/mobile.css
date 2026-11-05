@@ -142,6 +142,13 @@
   .tbl:has(table.mlist),.card>div:has(>table.mlist){overflow:visible;max-height:none}
   table.mlist,table.mlist>tbody{display:block!important;width:100%;overflow:visible}
   table.mlist>thead{display:none}
+  /* ô tích không bị kéo rộng hết dòng (làm chữ bên cạnh tràn ra ngoài) */
+  input[type=checkbox],input[type=radio]{width:auto!important;min-height:0!important;flex:none}
+  /* AI Agent: bảng tùy chọn "…" gọn trong màn, chữ xuống dòng */
+  .ac-optp{right:-6px!important;max-width:calc(100vw - 36px);white-space:normal!important}
+  .ac-optp label{display:flex;gap:8px;align-items:center;line-height:1.35}
+  .ac-send textarea,.ac-send input[type=text]{font-size:16px!important}
+
   /* Tổng quan trên điện thoại: bỏ khối Hoạt động mới nhất (chị Hoa 05/11) */
   #xal{display:none!important}
   /* tấm Ghi nhanh trượt từ dưới lên */
