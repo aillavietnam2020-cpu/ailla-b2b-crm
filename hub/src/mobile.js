@@ -101,7 +101,8 @@
     return items.slice(0,5);
   };
   /* Hàng nút tròn thao tác nhanh ở đầu trang chủ (kiểu Poscake) */
-  const QA_PAGES=["exec","cr_rp","cr_s_hn","cv_tq","mkt_tq","sx_tq"];
+  /* Chị Hoa 05/11: bỏ hàng nút tròn ở mọi trang, đã có thanh menu dưới (Ghi nhanh ở nút +). Để trống là không hiện ở trang nào. */
+  const QA_PAGES=[];
   const quick=()=>{
     const m=document.getElementById("main");
     if(!m||!narrow.matches){return}

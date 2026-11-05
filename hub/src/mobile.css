@@ -156,6 +156,24 @@
   .ac-bar #ac-go{margin-left:auto;min-height:34px}
   .ac-send{padding:6px 10px!important}
 
+  /* dải doanh thu thực (chữ xanh): chỉ giữ dòng in đậm, ẩn đoạn giải thích nhỏ */
+  .dt-ban br,.dt-ban small{display:none!important}
+  .dt-ban{padding:9px 12px!important;font-size:13.5px}
+  /* ô số Tiến độ sản xuất (Tổng quan content): lưới 3 cột kẻ vạch kiểu Poscake */
+  .dqk{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px!important}
+  .dqk>div{border:0!important;border-right:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;box-shadow:none!important;padding:7px 9px!important;min-width:0;background:none!important}
+  .dqk>div:nth-child(3n){border-right:0!important}
+  .dqk small{font-size:11px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dqk b{font-size:16px!important;line-height:1.3!important}
+  .dqk i{font-size:10.5px!important;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Marketing › Kế hoạch tháng: bảng mục tiêu vừa màn (ẩn danh sách kênh nhỏ, ô chọn và ô số hẹp lại) */
+  .tbl:has(select[data-h]) table{min-width:0!important;width:100%}
+  .tbl:has(select[data-h]) td small{display:none}
+  .tbl:has(select[data-h]) th,.tbl:has(select[data-h]) td{padding:7px 5px!important;font-size:12.5px;white-space:normal}
+  .tbl:has(select[data-h]) td:first-child{min-width:96px}
+  .tbl:has(select[data-h]) select{width:auto!important;min-width:0;max-width:96px;min-height:34px!important;padding:2px 6px}
+  .tbl:has(select[data-h]) input.num{width:64px!important;min-height:34px!important;padding:2px 6px}
+
   /* Tổng quan trên điện thoại: bỏ khối Hoạt động mới nhất (chị Hoa 05/11) */
   #xal{display:none!important}
   /* tấm Ghi nhanh trượt từ dưới lên */
