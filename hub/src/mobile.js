@@ -49,7 +49,10 @@
     const don=first(["cr_dn","cr_s_dn"]);
     const khach=first(["cr_kh","cr_s_kh"]);
     const crmHome=first(["cr_rp","cr_s_hn"]);
-    const crmMode=CRMPAGES.includes(PAGE)&&!!crmHome;
+    /* Chỉ người chỉ làm Kênh phân phối (không có trang tổng quan chung) mới đổi thanh dưới sang kiểu CRM.
+       CEO, quản lý: Trang chủ luôn về tổng quan của mình (chị Hoa 05/11). */
+    const ownHome=first(["exec","cv_tq","mkt_tq","sx_tq"]);
+    const crmMode=CRMPAGES.includes(PAGE)&&!!crmHome&&!ownHome;
     /* nút + giữa: CEO là Lập phiếu chi (chị Hoa 05/11 không cần tạo đơn); người bán là Tạo đơn */
     const chi=canChi();
     const mid=(chi&&(isCEO()||!don))?{k:"chi",t:"",ic:"plus",big:1,go:newChi,pages:[]}:don?{k:"tao",t:"",ic:"plus",big:1,go:()=>newOrder(don),pages:[]}:null;
