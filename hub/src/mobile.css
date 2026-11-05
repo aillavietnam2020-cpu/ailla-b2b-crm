@@ -148,6 +148,13 @@
   .ac-optp{right:-6px!important;max-width:calc(100vw - 36px);white-space:normal!important}
   .ac-optp label{display:flex;gap:8px;align-items:center;line-height:1.35}
   .ac-send textarea,.ac-send input[type=text]{font-size:16px!important}
+  /* AI Agent: khung chat vừa một màn (trên thanh dưới), ô nhắn tin rộng hết dòng, các nút xuống hàng dưới */
+  .ac-box{height:calc(100vh - 300px)!important;height:calc(100dvh - 300px)!important;min-height:300px!important}
+  .ac-bar{flex-wrap:wrap!important;gap:6px!important}
+  .ac-bar #ac-text{order:-1;flex:1 1 100%!important;width:100%!important;min-height:40px!important;max-height:96px}
+  .ac-bar .ac-clip{height:34px;width:34px}
+  .ac-bar #ac-go{margin-left:auto;min-height:34px}
+  .ac-send{padding:6px 10px!important}
 
   /* Tổng quan trên điện thoại: bỏ khối Hoạt động mới nhất (chị Hoa 05/11) */
   #xal{display:none!important}
