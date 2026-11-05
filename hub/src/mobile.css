@@ -182,6 +182,28 @@
   table.mlist .tqbar,table.mlist .tqbar em{text-align:left!important}
   table.mlist td.ml-o[data-l]::before{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
+  /* ===== Bố trí học từ TikTok Seller (05/11) ===== */
+  /* Trang chủ: ô số thành 1 thẻ, 3 số mỗi hàng, số ở trên, tên ở dưới, căn giữa */
+  section.xkstrip:not(.x6){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px 0;box-shadow:none!important}
+  section.xkstrip:not(.x6) .xk{display:flex!important;flex-direction:column!important;align-items:center!important;text-align:center;border:0!important;background:none!important;box-shadow:none!important;padding:8px 4px!important;min-height:0!important;gap:1px!important}
+  section.xkstrip:not(.x6) .xk .xkv{order:1;font-size:17px!important;font-weight:700}
+  section.xkstrip:not(.x6) .xk .xkh{order:2;justify-content:center}
+  section.xkstrip:not(.x6):has(>.xk:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  section.xkstrip:not(.x6):has(>.xk:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  section.xkstrip:not(.x6) .xk .xkl{font-size:11px;font-weight:500;color:var(--muted);white-space:normal;line-height:1.25}
+  section.xkstrip:not(.x6) .xk .kic,section.xkstrip:not(.x6) .xk .xkm{display:none!important}
+  section.xkstrip:not(.x6) .xk.mut{opacity:.55}
+  /* Việc cần xử lý: kiểu Nhiệm vụ — tên việc 1 dòng, dòng phụ nhỏ, nút chữ "Xử lý ›" bên phải */
+  .xattl .xai{display:grid!important;grid-template-columns:8px minmax(0,1fr) auto!important;gap:8px!important;align-items:center;padding:9px 12px!important}
+  .xattl .xai .xat b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px;font-weight:600}
+  .xattl .xai .xat small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+  .xattl .xai>.pill{display:none!important}
+  .xattl .xai>.btn{border:0!important;background:none!important;box-shadow:none!important;color:#3b6df0!important;padding:0 0 0 4px!important;min-height:0!important;font-size:12.5px!important;font-weight:600}
+  .xattl .xai>.btn::after{content:" ›"}
+  /* thẻ chờ duyệt / danh sách có nút: nút hành động gom về góc phải dưới */
+  .cwrv .ac{display:flex!important;justify-content:flex-end!important;gap:6px!important}
+  .cwrv .ac .btn{min-height:30px!important;padding:4px 12px!important;font-size:12.5px!important}
+
   /* thông báo: mỗi tin 2 dòng rồi "…", bấm mới xem đủ */
   .ntl .nti span{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
   .ntl .nti.open span{-webkit-line-clamp:unset;display:block!important}
