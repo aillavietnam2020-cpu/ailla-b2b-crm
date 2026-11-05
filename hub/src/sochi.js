@@ -175,7 +175,9 @@ function scDuyet(id){const p=scCho().find(x=>x.id===id);if(!p)return;
     toast("Đã duyệt "+p.ct+". Khoản từ ngưỡng chi nên chuyển CEO duyệt");closeDrawer();renderMain();return}
   DB.mutate(ME.name,"duyệt phiếu chi "+p.ct,dt=>{const i=(dt.pcCho||[]).findIndex(x=>x.id===id);if(i<0)return;const r=dt.pcCho.splice(i,1)[0];dt.fin=dt.fin||{};(dt.fin.nkc=dt.fin.nkc||[]).push({...r,st:"Ổn",duyet:ME.name,duyetAt:Date.now()});(dt.fin.cpRule=dt.fin.cpRule||{})[scKey(r.dg)]={g:r.g,k:r.k,st:"Ổn"}});
   toast("Đã duyệt "+p.ct);closeDrawer();renderMain()}
-function scTuChoi(id){const p=scCho().find(x=>x.id===id);if(!p)return;if(p.ceoCho&&!scIsCeo()){toast("Phiếu này đang chờ CEO duyệt");return}DB.mutate(ME.name,"trả lại phiếu chi "+p.ct,dt=>{dt.pcCho=(dt.pcCho||[]).filter(x=>x.id!==id)});toast("Đã trả lại "+p.ct);closeDrawer();renderMain()}
+function scTuChoi(id,ly){const p=scCho().find(x=>x.id===id);if(!p)return;if(p.ceoCho&&!scIsCeo()){toast("Phiếu này đang chờ CEO duyệt");return}DB.mutate(ME.name,"trả lại phiếu chi "+p.ct,dt=>{const r=(dt.pcCho||[]).find(x=>x.id===id);dt.pcCho=(dt.pcCho||[]).filter(x=>x.id!==id);
+    /* giữ lại phiếu bị trả để người lập thấy ở Công việc › Chờ duyệt › Tôi gửi (Cần sửa + lý do) */
+    if(r){dt.pcTra=(dt.pcTra||[]).filter(x=>x.id!==id);dt.pcTra.unshift({...r,st:"Cần sửa",traBy:ME.name,traAt:Date.now(),lyDo:ly||""});dt.pcTra=dt.pcTra.slice(0,100)}});toast("Đã trả lại "+p.ct);closeDrawer();renderMain()}
 function scPhieu(x,cho){
   spLoadFiles();const nf=(SOCP.files||{})[x.id]||0,ed=scCanDuyet()&&!cho;
   openDrawerHTML(`<h2>Phiếu chi ${esc(x.ct||"")}</h2><p class="hint">${esc(scDd(x.d))}/${esc(String(x.d).slice(0,4))} · ${esc(x.lct||"")}${x.by?" · ghi bởi "+esc(x.by):""}${x.duyet?" · duyệt: "+esc(x.duyet):""}</p>

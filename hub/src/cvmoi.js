@@ -34,7 +34,7 @@ const CW_CSS=`.cwhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;marg
 .cwhd>.sp{flex:1}.cwhd>.kdstrip,.cwhd>.odcard{order:9;flex-basis:100%;margin:6px 0 0}
 .cwph{margin:0 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cwph h1{margin:0}.cwtop>.cvbar.cwtopbar{margin:0 0 0 auto;padding:0;border:0;background:none;box-shadow:none;flex-wrap:wrap;justify-content:flex-end}.cwtop{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line,#e7e9f0);margin:0 0 12px;flex-wrap:wrap}
 .cwtop>.cwtabs{flex:1;min-width:0;border-bottom:0;margin:0}.cwtop>.cwhd{margin:0;flex-wrap:nowrap}.cwtop>.cwhd .btn,.cwtop>.cvbar.cwtopbar .btn,.cwtop>.cvbar.cwtopbar select,.cwtop>.cvbar.cwtopbar input{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.cwtop>.cwhd .btn{display:inline-flex;align-items:center;gap:6px}.cwtop>.cwhd .cwbar{flex-wrap:nowrap;margin:0!important}
-.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.topbar .cwsrch-tb{margin-right:6px}#tkf2.cwself #t-cdw{display:none!important}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
+.cwtb>.cwbar2{flex-wrap:nowrap;margin-left:4px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:34px;border-radius:9px;line-height:1.2}.topbar .cwsrch-tb{margin-right:6px}.cwrvseg{margin:0 0 12px}.cwrv{display:grid;grid-template-columns:118px minmax(0,1fr) 120px 150px 190px;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid #f0f1f5;cursor:pointer}.cwrv:hover{background:#fafbff}.cwrv .tt b{display:block;font-weight:600}.cwrv .tt small,.cwrv .who small{display:block;color:var(--muted,#6b7385);font-size:12px}.cwrv .who{font-size:13px}.cwrv .who .late{color:#d93a3a}.cwrv .mn{font-weight:700;text-align:right}.cwrv .mn.big{color:#d93a3a}.cwrv .ac{display:flex;gap:6px;justify-content:flex-end}.cwrvc{font-size:12px;font-weight:600;border-radius:7px;padding:3px 8px;text-align:center;white-space:nowrap;background:#eef0f5;color:#3a4256}.cwrvc.c-chi{background:#fdeeee;color:#b42323}.cwrvc.c-thu{background:#e7f6ed;color:#1f7a45}.cwrvc.c-tra{background:#fff4e0;color:#a86a12}.cwrvc.c-kho{background:#e8f1fc;color:#1d5fae}.cwrvc.c-cb{background:#eef7f7;color:#0e7c7c}.cwrvst{font-size:12.5px;font-weight:600;border-radius:7px;padding:4px 9px;white-space:nowrap}.cwrvst.cho{background:#fff4e0;color:#a86a12}.cwrvst.ok{background:#e7f6ed;color:#2f9e5b}.cwrvst.sua{background:#fdeeee;color:#d93a3a}@media(max-width:900px){.cwrv{grid-template-columns:96px minmax(0,1fr)}.cwrv .mn,.cwrv .who{grid-column:2;text-align:left}.cwrv .ac{grid-column:1/-1;justify-content:flex-start}}#tkf2.cwself #t-cdw{display:none!important}.topbar.cwsq .pp{display:none!important}.cwhd.cwhdr{justify-content:flex-end;flex-wrap:nowrap;margin:0 0 2px}.cwhd.cwhdr .cwbar{flex-wrap:nowrap}
 .cwtop+.kdstrip,.cwtop+.odcard,.kdstrip+.odcard{margin:0 0 12px}
 svg.cwi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
 .cwbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cwbar .btn{display:inline-flex;align-items:center;gap:6px}
@@ -341,8 +341,7 @@ function cwMyList(R,key){const v=CW_MY.find(x=>x[0]===key),L=cwDaF(cwQ(v[3](R)))
   if(key==="soon"){const b=(a,z)=>L.filter(r=>r.han>=a&&r.han<=z);return cwSec("Ngày mai · "+dd(td+1),b(td+1,td+1))+cwSec("Tuần này",b(td+2,Math.max(td+1,W.den)))+cwSec("Sau đó",b(Math.max(td+1,W.den)+1,99999))}
   if(key==="giao")return cwSec(`${cwI("alert")}Đang trễ`,L.filter(r=>r.late),{empty:"Không có việc nào trễ."})+cwSec("Đang làm / cần làm",L.filter(r=>!r.late));
   if(key==="lap")return cwSec(v[2],L,{empty:"Chưa có việc định kỳ nào đang chạy."})+(tkGiver()?'<div id="cw-tpl"></div>':"");
-  if(key==="rv"){const pd=typeof pdAny==="function"&&pdAny(),n=pd&&typeof pdCnt==="function"?pdCnt():0;
-    return (pd?`<section class="cwcard cwpd"><div class="cwpad" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${cwI("cc")}<b>Phiếu chi, tiền về, đơn hàng, phiếu kho chờ duyệt</b>${n?`<span class="pill p-amb">${n}</span>`:""}<span class="sp" style="flex:1"></span><button type="button" class="btn sm" data-cwpd="1">Mở danh sách</button></div></section>`:"")+cwSec("Việc, video, kịch bản chờ duyệt",L)}
+  if(key==="rv")return cwRvHtml(L);
   if(key==="done")return cwSec(v[2],L,{sort:X=>X.slice().sort((a,b)=>(b.xong||0)-(a.xong||0)),empty:"Chưa có việc nào xong trong tháng này."});
   return cwSec(v[2],L)}
 function cwMy(m){cwCss();PAGE="cv_v";
@@ -356,15 +355,15 @@ function cwMy(m){cwCss();PAGE="cv_v";
     tabs=cwTabs([["mine","Tôi làm"],["giao","Tôi giao"],["td","Tôi theo dõi"]].map(([k,l])=>({l,on:CWS.rl===k,attr:`data-cwrl="${k}"`})));
     title="Việc của tôi";
     desc=CWS.kx==="cal"?`Tháng ${MONTH.mon}/${MONTH.year} · việc xếp theo ngày hạn`:CWS.kx==="week"?"Tuần này · việc xếp theo ngày hạn":cwToday()+" · việc hôm nay xếp theo giờ";body=cwView(cwDaF(cwQ(base)))}
-  else{tabs=cwTabs(CW_MY.map(([k,ic,l,f])=>{const L=f(R);return {l,ic,n:L.length||"",r:L.some(r=>r.late),on:CWS.my===k,attr:`data-cwmy="${k}"`}}));
+  else{tabs=cwTabs(CW_MY.map(([k,ic,l,f])=>{const L=f(R),np=k==="rv"?cwPdRows().length:0;return {l,ic,n:(L.length+np)||"",r:L.some(r=>r.late),on:CWS.my===k,attr:`data-cwmy="${k}"`}}));
     const v=CW_MY.find(x=>x[0]===CWS.my);title="Việc của tôi";desc=CWS.my==="today"?cwToday()+" · "+CW_MYD.today:CW_MYD[CWS.my];
     body=CWS.kx==="list"?cwMyList(R,CWS.my):cwView(cwDaF(cwQ(v[3](R))))}
   const daChip=CWS.da?`<span class="cwchip">${cwI("fold")}Dự án: ${esc(prjN(CWS.da)||CWS.da)}<button type="button" data-cwdax="1" aria-label="Bỏ lọc dự án">${cwI("x",13)}</button></span>`:"";
   m.innerHTML=cwHead(title,desc)+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+body;
   cwTop(m);cwBind(m,R);
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
-  m.querySelectorAll("[data-cwpd]").forEach(b=>b.onclick=()=>{if(typeof NAV_AN_MO!=="undefined")NAV_AN_MO.add("pheduyet");MOD="";PAGE="pheduyet";render();scrollTo(0,0)});
-  if(CWS.my==="rv"&&typeof PD!=="undefined"&&!PD.at&&typeof pdLoad==="function"&&!CWS.pdL){CWS.pdL=1;pdLoad().then(()=>{if(PAGE==="cv_v"&&CWS.my==="rv")renderMain()}).catch(()=>{})}
+  if(CWS.my==="rv")cwRvBind(m);
+  if(typeof PD!=="undefined"&&!PD.at&&typeof pdLoad==="function"&&typeof pdAny==="function"&&pdAny()&&!CWS.pdL){CWS.pdL=1;pdLoad().catch(()=>{})}
   m.querySelectorAll("[data-cwrl]").forEach(b=>b.onclick=()=>{CWS.rl=b.dataset.cwrl;renderMain()});
   /* việc khác từ máy chủ (đơn hàng, kho, kế toán…) như "Việc khác đang chờ bạn" cũ */
   const ow=m.querySelector("#cw-wk");if(ow&&typeof wkEmbed==="function"){WK.noTask=true;try{wkEmbed(ow)}catch(e){console.error("việc khác",e)}finally{WK.noTask=false}
@@ -430,6 +429,39 @@ function cwPbSpace(m,old){cwCss();
   /* chỉ giữ Thư mục công việc (Drive) và Mẫu tài liệu & SOP; việc, người, dự án, trao đổi đã có ở mục khác */
   body.querySelectorAll(".kgk,[data-kgdt=\"tpl\"]").forEach(x=>x.remove());
   body.querySelectorAll("section.kgs").forEach(sc=>{const h=sc.querySelector("h3"),t=h?h.textContent:"";if(/Thư mục Drive/.test(t))h.textContent="📁 Thư mục công việc";else if(/Mẫu & SOP/.test(t))h.textContent="🧩 Mẫu tài liệu & SOP";else sc.remove()})}
+
+/* ---------- CHỜ DUYỆT: gộp việc, video và khoản của trang Phê duyệt (phiếu chi, tiền về, hàng trả, sửa phiếu kho, combo…) vào một tab ----------
+   Duyệt / Cần sửa gọi đúng hàm của pheduyet.js (pdAct), máy chủ vẫn kiểm quyền như cũ. Chị Hoa duyệt demo 05/11. */
+const cwPdRows=()=>{try{return typeof pdAny==="function"&&pdAny()&&typeof PD!=="undefined"&&PD.sv?pdMine(pdRows()):[]}catch(e){console.warn("phê duyệt",e);return []}};
+/* phiếu chi mình lập: đang chờ ai, bị trả lại vì sao, đã duyệt (7 ngày gần nhất) */
+function cwSent(){const d=D(),me=ME.name,wk=Date.now()-7*864e5,out=[];
+  (d.pcCho||[]).filter(x=>x.by===me).forEach(x=>out.push({x,st:"cho",lb:x.ceoCho?"Chờ CEO duyệt":"Chờ Kế toán trưởng duyệt",at:x.ktAt||x.at}));
+  (d.pcTra||[]).filter(x=>x.by===me&&(x.traAt||0)>wk).forEach(x=>out.push({x,st:"sua",lb:"Cần sửa",at:x.traAt,ly:(x.traBy||"")+(x.lyDo?": "+x.lyDo:"")}));
+  (((d.fin||{}).nkc)||[]).filter(x=>x.by===me&&x.duyet&&x.duyet!==me&&(x.duyetAt||0)>wk).forEach(x=>out.push({x,st:"ok",lb:"Đã duyệt",at:x.duyetAt,ly:x.duyet}));
+  return out.sort((a,b)=>(b.at||0)-(a.at||0))}
+function cwRvHtml(L){const P=cwPdRows(),S=cwSent(),now=Date.now(),th=typeof pdTh==="function"?pdTh():5e6;if(CWS.rvV==="gui"&&!S.length)CWS.rvV="can";
+  const n=P.length+L.length,seg=S.length?`<div class="cwseg cwrvseg"><button type="button" class="${CWS.rvV!=="gui"?"on":""}" data-cwrvv="can">Cần tôi duyệt (${n})</button><button type="button" class="${CWS.rvV==="gui"?"on":""}" data-cwrvv="gui">Tôi gửi (${S.length})</button></div>`:"";
+  const KC={chi:"c-chi",tien:"c-thu",thu:"c-thu",hoan:"c-tra",xuat:"c-kho",combo:"c-cb",cbdx:"c-cb",thuong:"c-chi",mh:"c-kho"};
+  const chip=(k,t)=>`<span class="cwrvc ${KC[k]||""}">${esc(t)}</span>`,money=v=>v?nf(v)+" đ":"";
+  if(CWS.rvV==="gui")return seg+`<section class="cwcard"><h3>${cwI("send")}Phiếu tôi đã gửi<span class="c">trạng thái tự cập nhật khi người duyệt bấm</span></h3>${S.map(o=>`<div class="cwrv" data-cwsent="${esc(o.x.id)}">${chip("chi","Phiếu chi")}<div class="tt"><b>${esc(o.x.dg||"")}</b><small>${esc([o.x.ct,o.ly].filter(Boolean).join(" · "))}</small></div><div class="mn${+o.x.t>=th?" big":""}">${money(+o.x.t)}</div><div class="who">${esc(pdAge(o.at,now)||"")}</div><div class="ac"><span class="cwrvst ${o.st}">${esc(o.lb)}</span></div></div>`).join("")}</section>`;
+  const busy=r=>typeof PD!=="undefined"&&PD.doing&&PD.doing[r.id];
+  const pd=P.length?`<section class="cwcard"><h3>💰 Tiền & chứng từ<span class="c">${P.length} khoản · bấm dòng để xem chứng từ gốc</span></h3>${P.map((r,i)=>{const noRej=["costsCho","thuCho","payment","return","mhLech"].includes(r.src),old=r.at&&now-r.at>3*864e5;
+    const btn=r.act?`<button type="button" class="btn sm pri" data-cwpdok="${i}"${busy(r)?" disabled":""}>${esc(r.ok||"Duyệt")}</button>${noRej?"":`<button type="button" class="btn sm" data-cwpdno="${i}"${busy(r)?" disabled":""}>Cần sửa</button>`}`:`<span class="hint">mở để duyệt</span>`;
+    return `<div class="cwrv" data-cwpdgo="${i}">${chip(r.k,PD_KIND_N(r.k))}<div class="tt"><b>${esc(r.nd||"")}</b><small>${esc([r.loai!==PD_KIND_N(r.k)?r.loai:"",r.sub].filter(Boolean).join(" · "))}</small></div><div class="mn${r.tien>=th&&r.k==="chi"?" big":""}">${money(r.tien)}</div><div class="who">${esc(r.by||"")}<small class="${old?"late":""}">${r.at?"chờ "+esc(pdAge(r.at,now)):""}</small></div><div class="ac">${btn}</div></div>`}).join("")}</section>`
+    :(typeof PD!=="undefined"&&typeof pdAny==="function"&&pdAny()&&!PD.sv?`<p class="hint">Đang tải phiếu chi, tiền về chờ duyệt…</p>`:"");
+  return seg+pd+cwSec(`${cwI("cc")}Việc, video, kịch bản`,L,{empty:"Không có việc nào chờ duyệt."})}
+function cwRvBind(m){const P=cwPdRows();
+  m.querySelectorAll("[data-cwrvv]").forEach(b=>b.onclick=()=>{CWS.rvV=b.dataset.cwrvv;renderMain()});
+  m.querySelectorAll("[data-cwpdok]").forEach(b=>b.onclick=e=>{e.stopPropagation();const r=P[+b.dataset.cwpdok];if(r)pdAct(r,true)});
+  m.querySelectorAll("[data-cwpdno]").forEach(b=>b.onclick=e=>{e.stopPropagation();const r=P[+b.dataset.cwpdno];if(r)pdAct(r,false)});
+  m.querySelectorAll(".cwrv[data-cwpdgo]").forEach(b=>b.onclick=()=>{const r=P[+b.dataset.cwpdgo];if(r)cwPdOpen(r)});
+  m.querySelectorAll("[data-cwsent]").forEach(b=>b.onclick=()=>{const id=b.dataset.cwsent,d=D(),x=(d.pcCho||[]).find(y=>y.id===id)||(d.pcTra||[]).find(y=>y.id===id)||(((d.fin||{}).nkc)||[]).find(y=>y.id===id);if(x&&typeof scPhieu==="function")scPhieu(x,true)})}
+/* mở chứng từ gốc: phiếu chi, hàng lệch mở ngay; trang gốc khác mở trong trang Phê duyệt với nút quay lại Chờ duyệt */
+function cwPdOpen(r){if(r.src==="pcCho"||r.src==="mhLech"){pdOpen(r);return}
+  PD.view={...(r.open||{}),t:r.loai+" · "+r.nd};CWS.pdFrom=1;if(typeof NAV_AN_MO!=="undefined")NAV_AN_MO.add("pheduyet");MOD="";PAGE="pheduyet";render();scrollTo(0,0)}
+if(typeof PAGES!=="undefined"&&PAGES.pheduyet){const _pd=PAGES.pheduyet;PAGES.pheduyet=m=>{_pd(m);if(CWS.pdFrom&&typeof PD!=="undefined"&&PD.view){const b=m.querySelector("#pd-back");if(b){b.textContent="← Về Chờ duyệt";b.onclick=()=>{PD.view=null;CWS.pdFrom=0;CWS.my="rv";cwGo("cv_v")}}}else CWS.pdFrom=0}}
+/* tải xong danh sách phê duyệt thì vẽ lại tab Chờ duyệt (pdLoad gốc chỉ vẽ lại trang Phê duyệt) */
+if(typeof pdLoad==="function"){const _pdL=pdLoad;pdLoad=async function(f){const r=await _pdL.apply(this,arguments);if(PAGE==="cv_v"&&MOD==="cv"&&CWS.my==="rv")renderMain();return r}}
 
 /* ---------- 4. DỰ ÁN (tab Dự án · Mục tiêu) ---------- */
 function cwDaFrame(m,tab,inner){cwCss();

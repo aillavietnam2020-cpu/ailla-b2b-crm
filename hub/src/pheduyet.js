@@ -74,7 +74,7 @@ async function pdAct(r,ok){
   const post=(p,b)=>svApi(p,{method:"POST",body:JSON.stringify(b||{})});
   const ask=(need)=>{const t=prompt(need?"Lý do từ chối (bắt buộc):":"Lý do từ chối (có thể bỏ trống):");if(t===null)return null;if(need&&t.trim().length<3){toast("Ghi lý do ít nhất vài chữ");return null}return t.trim()};
   if(r.act==="fn"){
-    if(r.src==="pcCho"){if(ok){if(confirm("Duyệt phiếu chi \""+r.nd+"\" vào sổ?"))scDuyet(r.ref)}else if(confirm("Trả lại phiếu chi \""+r.nd+"\"?"))scTuChoi(r.ref);return}
+    if(r.src==="pcCho"){if(ok){if(confirm("Duyệt phiếu chi \""+r.nd+"\" vào sổ?"))scDuyet(r.ref)}else{const t=ask(false);if(t!==null)scTuChoi(r.ref,t)}return}
     if(r.src==="costsCho"&&ok){if(confirm("Duyệt khoản \""+r.nd+"\" theo đề xuất của web ("+r.sub+")?"))cpApprove([r.ref]);return}
     if(r.src==="cbPhieu"&&typeof spcDuyetPhieu==="function"){if(ok){if(confirm("Duyệt phiếu combo \""+r.nd+"\"? Combo mới vào danh sách chạy, combo dừng tự hết hạn."))spcDuyetPhieu(r.ref,true)}else{const t=ask(true);if(t!==null)spcDuyetPhieu(r.ref,false,t)}return}
     if(r.src==="mhLech"&&typeof mhLechForm==="function"){const x=((PD.sv||{}).mhLech||[]).find(z=>z.id===r.ref);if(x){if(!MH.orders)mhLoad();mhLechForm(x,()=>pdLoad(true))}return}
