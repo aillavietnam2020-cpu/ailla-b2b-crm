@@ -89,8 +89,10 @@ async function ccLoadXep(force){
 function ccPos(){
   return new Promise((ok,bad)=>{
     if(!navigator.geolocation)return bad(new Error("Trình duyệt này không lấy được vị trí. Hãy mở bằng Chrome hoặc Safari trên điện thoại."));
+    const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent),chrome=/CriOS/i.test(navigator.userAgent);
     navigator.geolocation.getCurrentPosition(p=>ok(p.coords),e=>bad(new Error(e.code===1
-      ?"Trang web chưa được phép xem vị trí. Bấm biểu tượng ổ khóa cạnh địa chỉ web › Quyền › Vị trí › Cho phép, rồi bấm lại."
+      ?(ios?`iPhone chưa cho trang web xem vị trí. (1) Mở Cài đặt › Quyền riêng tư & Bảo mật › Dịch vụ định vị: bật, rồi chọn ${chrome?"Chrome":"Trang web Safari"} › Khi dùng ứng dụng, bật Vị trí chính xác. (2) ${chrome?"Trong Chrome":"Trong Safari, bấm biểu tượng cạnh ô địa chỉ"} › Cài đặt trang web › Vị trí › Cho phép. Tải lại trang rồi bấm lại.`
+        :"Trang web chưa được phép xem vị trí. Bấm biểu tượng ổ khóa cạnh địa chỉ web › Quyền › Vị trí › Cho phép, rồi bấm lại.")
       :"Chưa lấy được vị trí. Bật định vị (GPS) trên điện thoại, ra chỗ thoáng rồi bấm lại.")),{enableHighAccuracy:true,timeout:20000,maximumAge:0});
   });
 }
@@ -239,7 +241,7 @@ function pCcCaiDat(m){
   <section class="card"><div class="card-h"><h2>Điểm chấm công</h2><span class="hint">văn phòng, xưởng, kho</span></div>
     <p class="hint">Cách dễ nhất: đứng tại văn phòng hoặc xưởng, bấm "Thêm điểm tại chỗ tôi đang đứng". Hoặc mở Google Maps, bấm giữ vào vị trí, chép hai số tọa độ dán vào ô. Bán kính nên để 100–200 m vì định vị trong nhà hay lệch.</p>
     ${tbl(["Tên điểm","Tọa độ","Bán kính",""],s.diem.map(rowD))}
-    <div class="filters"><button class="btn" id="cc-here">Thêm điểm tại chỗ tôi đang đứng</button><button class="btn" id="cc-add">Thêm điểm (nhập tọa độ)</button></div>
+    <div class="filters"><button class="btn" id="cc-here">Thêm điểm tại chỗ tôi đang đứng</button><button class="btn" id="cc-add">Thêm điểm (nhập tọa độ)</button></div>${CC.hereErr?`<p class="cc-err" style="max-width:none">${esc(CC.hereErr)}</p>`:""}
   </section>
   <section class="card"><div class="card-h"><h2>Lịch làm</h2></div>
     ${tbl(["Tên lịch","Kiểu","Giờ vào – ra","Nghỉ trưa","Được trễ","Thứ Bảy","Ra thứ Bảy (buổi sáng)","Chấm ở điểm","Ngoài phạm vi","Tính chuyên cần"],s.lich.map(rowL))}
@@ -289,7 +291,7 @@ function pCcCaiDat(m){
   $("#cc-ova").onclick=()=>{const p=v("cc-ovp");if(!p){toast("Chọn người trước");return}pull();s.nguoiLich[p]=v("cc-ovl");renderMain()};
   $("#cc-caadd").onclick=()=>{pull();s.ca.push({id:"ca"+Date.now(),ten:"",tu:"",den:""});renderMain()};
   $("#cc-add").onclick=()=>{pull();s.diem.push({id:"d"+Date.now(),ten:"Điểm "+(s.diem.length+1),lat:"",lng:"",bk:150});renderMain()};
-  $("#cc-here").onclick=async()=>{pull();try{const c=await ccPos();s.diem.push({id:"d"+Date.now(),ten:s.diem.length?"Điểm "+(s.diem.length+1):"Văn phòng",lat:+c.latitude.toFixed(6),lng:+c.longitude.toFixed(6),bk:Math.max(100,Math.min(300,Math.round((c.accuracy||0)*2)))});renderMain();toast("Đã thêm điểm, sửa tên rồi bấm Lưu")}catch(e){toast(e.message)}};
+  $("#cc-here").onclick=async()=>{pull();try{const c=await ccPos();s.diem.push({id:"d"+Date.now(),ten:s.diem.length?"Điểm "+(s.diem.length+1):"Văn phòng",lat:+c.latitude.toFixed(6),lng:+c.longitude.toFixed(6),bk:Math.max(100,Math.min(300,Math.round((c.accuracy||0)*2)))});CC.hereErr="";renderMain();toast("Đã thêm điểm, sửa tên rồi bấm Lưu cài đặt")}catch(e){CC.hereErr=e.message;renderMain()}};
   $("#cc-save").onclick=async()=>{pull();
     const bad=s.diem.filter(d=>d.lat===""||!isFinite(d.lat)||!isFinite(d.lng));if(bad.length){toast("Có điểm chưa đúng tọa độ: "+bad.map(d=>d.ten).join(", "));return}
     const badLe=(s.ngayLe||[]).filter(x=>!x.ngay);if(badLe.length){toast("Có ngày lễ chưa chọn ngày");return}
