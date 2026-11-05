@@ -127,7 +127,7 @@ const MODULES=[
     Phòng ban gồm việc của phòng (cv_pbv) + Tài liệu & trao đổi (cv_pb); Dự án gồm Dự án (cv_da) + Mục tiêu (cv_mt). Nhân sự không quản lý: không có Phòng ban. */
  {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",groups:()=>[["",[MI("cv_ov","Tổng quan"),MI("cv_v","Việc của tôi",null,()=>{try{return typeof cwTodayN==="function"?cwTodayN()||"":wkCount()||""}catch(e){return ""}}),MI("cv_pbv","Phòng ban",()=>typeof cwMgr==="function"&&cwMgr()),MI("cv_da","Dự án"),MI("cv_pb","Thư mục công việc",()=>true),MI("cv_mt","Mục tiêu"),MI("cv_nk","Nhật ký")].filter(Boolean)]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
- {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("thongbao","Cài đặt thông báo"),MI("matkhau","Đổi mật khẩu")]]]},
+ {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("anhdaidien","Ảnh đại diện"),MI("thongbao","Cài đặt thông báo"),MI("matkhau","Đổi mật khẩu")]]]},
  {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Kênh bán lẻ",sub:"TikTok · Shopee · Facebook",groups:()=>[
    ["",[MI("bc_tong","Kết quả kinh doanh",tq),MI("bc_tiktok","TikTok",tq),MI("bc_shopee","Shopee",tq),MI("bc_fb","Facebook",tq),MI("fb_sale","Hoạt động team Sale",tq),MI("fb_cskh","Chăm sóc khách hàng",tq)]]]},
  {k:"b2b",zone:"Bán hàng",ic:"box",n:"Kênh phân phối",sub:"Đại lý · NPP · CRM",groups:()=>[

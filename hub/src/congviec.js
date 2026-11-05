@@ -99,7 +99,7 @@ function bindCvFilter(m){
 const prjN=id=>((D().projects||[]).find(p=>p.id===id)||{ten:""}).ten;
 const AV_C=[["#e7f0ff","#1c4fb8"],["#e3f5ea","#1f7a3d"],["#fff1dc","#9a5200"],["#f1e8ff","#6b2fb3"],["#dff5f5","#0b6e6e"],["#ffe9ee","#b4234a"],["#eef0f4","#3d4656"]];
 const avC=id=>{let h=0;for(const ch of String(id||""))h=(h*31+ch.charCodeAt(0))>>>0;return AV_C[h%AV_C.length]};
-const avatar=id=>{const n=userName(id);if(!n)return "";const [bg,fg]=avC(id);return `<i class="av" style="background:${bg};color:${fg}">${esc(n.trim().split(" ").pop()[0])}</i>`};
+const avatar=id=>{const n=userName(id);if(!n)return "";const [bg,fg]=avC(id);if(typeof avsLoad==="function")avsLoad();return `<i class="av" style="${typeof avsStyle==="function"?avsStyle(id,bg,fg):`background:${bg};color:${fg}`}">${esc(n.trim().split(" ").pop()[0])}</i>`};
 function cvCard(x){const ed=x.src==="task"&&(can(ME,"viec.giao")||x.nguoi===ME.id||x.phoi.includes(ME.id));return `<div class="cvc ${x.late?"late":x.st==="done"?"done":""}" data-cv="${x.id}" data-src="${x.src}"${x.n>1?` data-grp="${x.ids.join(",")}"`:""}>
   <div class="cvh">${x.src==="task"&&ed?`<select data-cvst="${x.id}" class="sts st-${x.st}">${opt(CV_ST.filter(s=>s[0]!=="cg").map(s=>[s[0],s[1]]),x.st)}</select>`:pill(cvStN(x.st),(CV_ST.find(s=>s[0]===x.st)||[])[2])}${pill(x.uu.toUpperCase(),x.uu==="Cao"?"red":x.uu==="Thấp"?"gry":"amb")}<span class="sp"></span><span class="hint">${esc(x.loai)}</span></div>
   <b class="cvt${x.st==="done"?" strike":""}">${esc(x.ten)}</b><div class="cvm">${esc(x.mo)}</div>${cvSegHtml(x)}

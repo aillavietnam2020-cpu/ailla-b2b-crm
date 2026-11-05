@@ -325,6 +325,53 @@ chatRoutes.get('/files/:id', async (c) => {
   });
 });
 
+/* ---------- Ảnh đại diện nhân sự (chị Hoa 05/11): lưu chung bảng chat_files, phòng 'avatar', mã 'av:<mã nhân sự trên web>' ---------- */
+const AVATAR_MAX = 200_000;
+async function avatarMe(c: Parameters<typeof access>[0]): Promise<string> {
+  const A = await access(c);
+  if (!A.hubId) throw badRequest('NO_PROFILE', 'Tài khoản này chưa gắn với hồ sơ nhân sự trên web');
+  return A.hubId;
+}
+chatRoutes.post('/avatar', async (c) => {
+  const hid = await avatarMe(c);
+  const form = await c.req.formData().catch(() => null);
+  const file = form?.get('file');
+  if (!file || typeof file === 'string') throw badRequest('MISSING', 'Chưa chọn ảnh');
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw badRequest('BAD_TYPE', 'Chỉ nhận ảnh JPG, PNG hoặc WebP');
+  if (file.size > AVATAR_MAX) throw badRequest('TOO_LARGE', 'Ảnh quá lớn, hãy chọn ảnh nhỏ hơn');
+  const id = 'av:' + hid;
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM chat_files WHERE id = ?').bind(id),
+    c.env.DB.prepare('INSERT INTO chat_files (id, room, name, mime, size, data, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, 'avatar', 'avatar', file.type, file.size, new Uint8Array(await file.arrayBuffer()), c.get('auth').user.id, nowIso()),
+  ]);
+  return ok(c, { id: hid });
+});
+chatRoutes.delete('/avatar', async (c) => {
+  const hid = await avatarMe(c);
+  await c.env.DB.prepare('DELETE FROM chat_files WHERE id = ?').bind('av:' + hid).run();
+  return ok(c, { id: hid });
+});
+/** Ai đã có ảnh đại diện (mã nhân sự → thời điểm đổi), để trình duyệt biết chỗ nào dùng ảnh. */
+chatRoutes.get('/avatars', async (c) => {
+  await access(c);
+  const rows = await c.env.DB.prepare("SELECT id, created_at FROM chat_files WHERE room = 'avatar'").all<{ id: string; created_at: string }>();
+  const m: Record<string, string> = {};
+  for (const r of rows.results ?? []) m[r.id.slice(3)] = r.created_at;
+  return ok(c, m);
+});
+chatRoutes.get('/avatar/:hid', async (c) => {
+  await access(c);
+  const row = await c.env.DB.prepare("SELECT mime, data FROM chat_files WHERE id = ? AND room = 'avatar'")
+    .bind('av:' + c.req.param('hid'))
+    .first<{ mime: string; data: unknown }>();
+  if (!row) throw notFound('Chưa có ảnh đại diện');
+  const d = row.data;
+  const bytes =
+    d instanceof Uint8Array ? d : d instanceof ArrayBuffer ? new Uint8Array(d) : Uint8Array.from((Array.isArray(d) ? d : Object.values(d as object)) as number[]);
+  return new Response(bytes as unknown as BodyInit, { headers: { 'content-type': row.mime, 'cache-control': 'private, max-age=86400' } });
+});
+
 /* ---------- Nhóm phối hợp tự tạo (ví dụ Team Content – Digital): chỉ thành viên thấy ---------- */
 chatRoutes.get('/groups', async (c) => {
   const A = await access(c);
