@@ -30,7 +30,9 @@ function chanRows(){
 function rSum(src,idx,from,to){const D0=DAYD[src]||{};let v=0,n=0;for(const k in D0)if(k>=from&&k<=to){v+=+D0[k][idx]||0;n++}return {v,n}}
 function rAds(idx,from,to){let v=0;for(const nv in DAYD.ads||{})for(const k in DAYD.ads[nv])if(k>=from&&k<=to)v+=+DAYD.ads[nv][k][idx]||0;return v}
 const fullMonth=(ym,from,to)=>{const [y,m]=ym.split("-").map(Number);return from<=`${ym}-01`&&to>=iso(new Date(y,m,0))};
-function prevRange(){const f=pdate(PERIOD.from),t=pdate(PERIOD.to),n=Math.round((t-f)/864e5)+1;return {from:iso(addD(f,-n)),to:iso(addD(f,-1)),n}}
+/* Kỳ đang chạy dở (vd. 01/11–30/11 mà mới 05/11): so với kỳ trước thì chỉ lấy đúng số ngày đã qua, không so cả tháng trước (chị Hoa 05/11: Facebook ▼99%). */
+const periodOpen=()=>PERIOD.to>iso(new Date());
+function prevRange(){const f=pdate(PERIOD.from),t=pdate(PERIOD.to),n=Math.round((t-f)/864e5)+1,ne=periodOpen()?Math.max(1,Math.min(n,Math.round((pdate(iso(new Date()))-f)/864e5)+1)):n,a=addD(f,-n);return {from:iso(a),to:iso(addD(a,ne-1)),n}}
 function execNums(from,to){
   const tt=rSum("tts",0,from,to).v,spDT=rSum("spe",0,from,to).v,fbDT=rSum("fb",6,from,to).v,fbGiao=rSum("fb",5,from,to).v,adsDT=rAds(3,from,to);
   const tFull=KDX.tts&&fullMonth("2026-07",from,to),sFull=KDX.spe&&fullMonth("2026-07",from,to);
@@ -41,7 +43,8 @@ function execNums(from,to){
 }
 function execTargets(){const d=D();if(!d.targets)d.targets={tong:0,tts:1.4e9,spe:0,fb:0,ads:sum(KDX.adsPeople||[],p=>p.kpi)};return d.targets}
 const chg=(a,b,na,nb)=>!b||(na!=null&&nb<na*0.8)?"":`<span class="chg ${a>=b?"up":"dn"}">${a>=b?"▲":"▼"} ${Math.abs((a-b)/b*100).toFixed(1)}%</span>`;
-const symOK=(N,P,s)=>{const a=N.n[s]||0,b=P.n[s]||0;return a>0&&b>0&&b>=a*.8&&a>=b*.8};
+/* Facebook chỉ tính đơn giao thành công nên đơn mới tạo gần đây chưa tới tay khách: kỳ còn chạy dở thì không so % (số luôn thấp hơn kỳ đã khép). */
+const symOK=(N,P,s)=>{if(s==="fb"&&periodOpen())return false;const a=N.n[s]||0,b=P.n[s]||0;return a>0&&b>0&&b>=a*.8&&a>=b*.8};
 const allOK=(N,P)=>["tts","spe","fb"].every(s=>!(N.n[s]||P.n[s])||symOK(N,P,s))&&["tts","spe","fb"].some(s=>symOK(N,P,s));
 /* ---------- Trung tâm điều hành (Navy Executive): dải KPI · doanh số theo kênh + việc cần xử lý · hai bảng ---------- */
 function execCost(N){const C=N.C;return [["Quảng cáo",[["Ads Facebook (sau thuế)",C.adsFB],["Ads TikTok (gồm thuế)",C.adsTT],["Shopee Ads",C.adsSPE]]],["Giá vốn",[["Facebook (đơn giao TC)",C.gvFB],["Shopee",C.gvSPE],["TikTok",C.gvTT]]],["Phí sàn",[["Shopee",C.phiSPE],["TikTok",C.phiTT]]],["Khác",[["TikTok: agency, KOC, live",C.khacTT]]]].map(([g,L])=>[g,L.filter(x=>x[1])]).filter(g=>g[1].length)}
