@@ -33,7 +33,20 @@
 (function(){
   if(typeof window==="undefined"||!window.matchMedia)return;
   const narrow=window.matchMedia("(max-width:760px)");
-  const IC={home:"M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",order:"M7 3h10a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V5a2 2 0 0 1 2-2zM9 8h6M9 12h6",plus:"M12 5v14M5 12h14",box:"M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10",more:"M4 7h16M4 12h16M4 17h16",task:"M5 4h14v16H5zM9 9l2 2 4-4M9 15h6",user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",chart:"M5 20V10M12 20V4M19 20v-7",money:"M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"};
+  const IC={home:"M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",order:"M7 3h10a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V5a2 2 0 0 1 2-2zM9 8h6M9 12h6",plus:"M12 5v14M5 12h14",box:"M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10",more:"M4 7h16M4 12h16M4 17h16",task:"M5 4h14v16H5zM9 9l2 2 4-4M9 15h6",user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",chart:"M5 20V10M12 20V4M19 20v-7",money:"M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",spark:"M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"};
+  /* Ghi nhanh (nút + giữa thanh dưới): đúng danh sách và quyền của "Ghi nhanh" có sẵn trên web (khonhanh.js KQ_LIST) */
+  const quickList=()=>{const L=[];try{if(typeof KQ_LIST==="function")KQ_LIST().forEach(x=>L.push([x[0],()=>kqRun(x)]))}catch(e){}
+    try{const P=pagesOf(),don=["cr_dn","cr_s_dn"].find(id=>P.some(x=>x.id===id));if(don&&!isCEO())L.unshift(["Tạo đơn hàng",()=>newOrder(don)])}catch(e){}
+    return L};
+  const openQuick=()=>{
+    const L=quickList();if(!L.length)return;
+    let bg=document.getElementById("moqs");if(bg)bg.remove();
+    bg=document.createElement("div");bg.id="moqs";
+    bg.innerHTML=`<div class="qs"><div class="grab"></div><b>Ghi nhanh</b>${L.map((x,i)=>`<button type="button" data-i="${i}">${svg(IC.plus)}<span>${x[0]}</span></button>`).join("")}</div>`;
+    bg.onclick=e=>{if(e.target===bg)bg.remove()};
+    bg.querySelectorAll("button[data-i]").forEach(b=>b.onclick=()=>{bg.remove();L[+b.dataset.i][1]()});
+    document.body.appendChild(bg);
+  };
   /* Lập phiếu chi: đúng quyền như nút "Lập phiếu chi" có sẵn trên web (khonhanh.js KQ_CHI) */
   const canChi=()=>{try{return typeof KQ_CHI==="function"&&KQ_CHI()&&typeof spForm==="function"}catch(e){return false}};
   const newChi=()=>{document.body.classList.remove("menu-open");try{spForm()}catch(e){if(typeof toast==="function")toast(e.message||"Chưa mở được phiếu chi")}};
@@ -66,17 +79,23 @@
     }
     const home=first(["exec","cv_tq","cr_s_hn","mkt_tq","sx_tq"])||(P[0]&&P[0].id);
     if(home)items.push({k:"home",t:"Trang chủ",ic:"home",go:()=>goPage(home),pages:[home]});
-    /* Mỗi nút chỉ hiện khi người đó có quyền mở trang (lấy từ menu đã lọc quyền). Thứ tự: Trang chủ · Đơn hàng hoặc Kho · nút + · Việc · Menu */
+    /* Chị Hoa 05/11: Trang chủ · Việc · dấu + (Ghi nhanh) · AI Agent · Menu. Mỗi nút chỉ hiện khi người đó có quyền mở trang
+       (lấy từ menu đã lọc quyền); thiếu nút nào thì thay bằng Đơn hàng / Kho / Khách theo quyền. */
     const kho=first(["kho_ton_tp","sx_kho","kho_ton","kho_hoan","sx_tq"]);
     const cv=first(["cv_v","cv_nv","cv_tq","cv","congviec"]);
+    const agent=first(["agentchat"]);
     const KHOP=["sx_kho","kho_ton","kho_ton_tp","kho_kk","kho_xuat_tp","kho_hoan","kho_nhap","kho_nhap_tp","kho_xuat","kho_xuat_b2b","kho_online","kho_nxt","sx_tq"];
-    let khoUsed=false;
-    if(don)items.push({k:"don",t:"Đơn hàng",ic:"order",go:()=>goPage(don),pages:["cr_dn","cr_s_dn"]});
-    else if(kho&&kho!==home){items.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:KHOP});khoUsed=true}
-    else if(khach)items.push({k:"kh",t:"Khách",ic:"user",go:()=>goPage(khach),pages:["cr_kh","cr_s_kh"]});
-    if(mid)items.push(mid);
+    const alt=[];
+    if(don)alt.push({k:"don",t:"Đơn hàng",ic:"order",go:()=>goPage(don),pages:["cr_dn","cr_s_dn"]});
+    if(kho&&kho!==home)alt.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:KHOP});
+    if(khach)alt.push({k:"kh",t:"Khách",ic:"user",go:()=>goPage(khach),pages:["cr_kh","cr_s_kh"]});
     if(cv&&cv!==home)items.push({k:"cv",t:"Việc",ic:"task",go:()=>goPage(cv),pages:["cv_v","cv_tq","cv_nv","cv","congviec","cv_kb"]});
-    else if(kho&&kho!==home&&!khoUsed)items.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:KHOP});
+    else if(alt.length)items.push(alt.shift());
+    const gn=quickList();
+    const plus=gn.length?{k:"gn",t:"",ic:"plus",big:1,go:openQuick,pages:[]}:mid;
+    if(plus)items.push(plus);
+    if(agent)items.push({k:"agent",t:"AI Agent",ic:"spark",go:()=>goPage(agent),pages:["agentchat","hoithoaiagent","huanluyenagent"]});
+    else if(alt.length)items.push(alt.shift());
     if(items.length<4){visibleMods().forEach(mo=>{if(items.length>=4)return;const g=modGroups(mo)[0];const it=g&&g[1][0];if(!it||items.some(i=>i.pages.includes(it[0])))return;items.push({k:"m"+mo.k,t:(mo.n||it[1]).split(" ")[0],ic:"chart",go:()=>goPage(it[0]),pages:[it[0]]})})}
     items.push({k:"more",t:"Menu",ic:"more",go:()=>document.body.classList.add("menu-open"),pages:[]});
     return items.slice(0,5);

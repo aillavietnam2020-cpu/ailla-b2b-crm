@@ -139,6 +139,16 @@
   .tbl:has(table.mlist),.card>div:has(>table.mlist){overflow:visible;max-height:none}
   table.mlist,table.mlist>tbody{display:block!important;width:100%;overflow:visible}
   table.mlist>thead{display:none}
+  /* Tổng quan trên điện thoại: bỏ khối Hoạt động mới nhất (chị Hoa 05/11) */
+  #xal{display:none!important}
+  /* tấm Ghi nhanh trượt từ dưới lên */
+  #moqs{position:fixed;inset:0;z-index:80;background:rgba(17,19,28,.35);display:flex;align-items:flex-end}
+  #moqs .qs{background:#fff;width:100%;border-radius:18px 18px 0 0;padding:8px 14px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+  #moqs .grab{width:36px;height:4px;border-radius:9px;background:#d5d8e2;margin:0 auto 10px}
+  #moqs b{font-size:15px;margin:0 2px 6px}
+  #moqs button{display:flex;align-items:center;gap:10px;border:0;border-top:1px solid var(--line);background:none;font:inherit;font-size:14px;padding:11px 2px;text-align:left;color:var(--ink)}
+  #moqs button svg{width:18px;height:18px;color:#3b6df0}
+
   /* menu trượt bên trái: gọn như Pancake (logo nhỏ, chữ 14px, dòng thấp) */
   .side{width:min(78vw,280px)}
   .side .logo{margin:12px 56px 4px 14px;padding:6px 10px;border-radius:12px}
