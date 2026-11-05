@@ -159,6 +159,12 @@
   .ac-bar #ac-go{border-radius:20px!important;min-height:38px!important;padding:0 14px!important;flex:none}
   .ac-send{padding:6px 10px!important}
 
+  /* thông báo: mỗi tin 2 dòng rồi "…", bấm mới xem đủ */
+  .ntl .nti span{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
+  .ntl .nti.open span{-webkit-line-clamp:unset;display:block!important}
+  .ntl .nti{padding:8px 10px!important}
+  .ntl .nti small{font-size:11px}
+
   /* dải doanh thu thực (chữ xanh): chỉ giữ dòng in đậm, ẩn đoạn giải thích nhỏ */
   .dt-ban br,.dt-ban small{display:none!important}
   .dt-ban{padding:9px 12px!important;font-size:13.5px}

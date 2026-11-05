@@ -226,3 +226,18 @@
   window.addEventListener("resize",()=>{clearTimeout(t);t=setTimeout(run,220)});
   run();
 })();
+
+/* ===== Điện thoại: thông báo mỗi tin 2 dòng rồi "…"; bấm lần 1 xem đủ, bấm lần 2 mới mở việc (chị Hoa 05/11) ===== */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  document.addEventListener("click",e=>{
+    if(!narrow.matches)return;
+    const b=e.target.closest&&e.target.closest(".nti");if(!b)return;
+    const sp=b.querySelector("span");if(!sp)return;
+    const cut=sp.scrollHeight>sp.clientHeight+2;
+    if(b.classList.contains("open")||!cut)return; // đã mở hoặc vốn ngắn: để web mở việc như cũ
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+    b.classList.add("open");
+  },true);
+})();
