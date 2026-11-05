@@ -163,7 +163,7 @@
   .side .me b{font-size:13.5px}
 
   /* bảng vừa màn sau khi thu gọn: giữ dạng bảng */
-  table.mfit:not(.mlist){width:100%!important;min-width:0!important}
+  table.mfit:not(.mlist){display:table!important;width:100%!important;min-width:0!important}
   table.mfit:not(.mlist) td,table.mfit:not(.mlist) th{font-size:12.5px}
   table.mfit:not(.mlist) th,table.mfit:not(.mlist) td{padding:7px 5px!important;font-size:12px;white-space:nowrap}
   table.mfit:not(.mlist) th{font-size:11px}
