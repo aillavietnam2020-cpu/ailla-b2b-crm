@@ -21,7 +21,9 @@
       if(on&&t.scrollWidth>t.clientWidth)t.scrollLeft=on.offsetLeft-(t.clientWidth-on.offsetWidth)/2;
     });
   };
-  const run=()=>{if(!narrow.matches)return;const m=document.getElementById("main");if(m){fixScan(m);centerTabs(m)}};
+  /* AI Agent: chữ gợi ý trong ô nhắn tin ngắn gọn để ô 1 dòng (kiểu Messenger) */
+  const chatPh=()=>{const t=document.getElementById("ac-text");if(t&&!t.dataset.mph){t.dataset.mph="1";t.title=t.placeholder;t.placeholder="Nhắn tin…"}};
+  const run=()=>{if(!narrow.matches)return;const m=document.getElementById("main");if(m){fixScan(m);centerTabs(m);chatPh()}};
   let t=0;
   new MutationObserver(()=>{clearTimeout(t);t=setTimeout(run,120)}).observe(document.body,{childList:true,subtree:true});
   window.addEventListener("resize",()=>{clearTimeout(t);t=setTimeout(run,200)});

@@ -150,10 +150,13 @@
   .ac-send textarea,.ac-send input[type=text]{font-size:16px!important}
   /* AI Agent: khung chat vừa một màn (trên thanh dưới), ô nhắn tin rộng hết dòng, các nút xuống hàng dưới */
   .ac-box{height:calc(100vh - 300px)!important;height:calc(100dvh - 300px)!important;min-height:300px!important}
-  .ac-bar{flex-wrap:wrap!important;gap:6px!important}
-  .ac-bar #ac-text{order:-1;flex:1 1 100%!important;width:100%!important;min-height:40px!important;max-height:96px}
-  .ac-bar .ac-clip{height:34px;width:34px}
-  .ac-bar #ac-go{margin-left:auto;min-height:34px}
+  /* ô nhắn tin kiểu Messenger: 1 hàng — đính kèm, micro | ô chữ bo tròn | … , Gửi */
+  .ac-bar{flex-wrap:nowrap!important;align-items:flex-end!important;gap:4px!important}
+  .ac-bar #ac-text{flex:1 1 auto!important;width:auto!important;min-width:0;min-height:38px!important;height:38px;max-height:110px;border-radius:20px!important;padding:8px 14px!important;resize:none;line-height:1.35;background:var(--canvas,#f4f6fa)}
+  .ac-bar #ac-text:placeholder-shown{height:38px!important} /* ô trống: 1 dòng; gõ chữ thì tự cao lên tới 110px */
+  .ac-bar .ac-clip{width:32px!important;height:38px!important;border:0!important;background:none!important;box-shadow:none!important;font-size:19px;padding:0!important}
+  .ac-bar .ac-opt>button{width:30px;height:38px;min-height:38px;border:0!important;background:none!important;box-shadow:none!important;padding:0!important}
+  .ac-bar #ac-go{border-radius:20px!important;min-height:38px!important;padding:0 14px!important;flex:none}
   .ac-send{padding:6px 10px!important}
 
   /* dải doanh thu thực (chữ xanh): chỉ giữ dòng in đậm, ẩn đoạn giải thích nhỏ */
