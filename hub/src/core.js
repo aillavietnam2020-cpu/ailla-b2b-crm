@@ -177,7 +177,7 @@ function canMove(u,c,to){
   if(c.step==="cg")return can(u,"viec.giao");
   if(["dkb","dvd"].includes(c.step))return can(u,"viec.duyet");
   if(c.step==="dceo")return u.role==="admin";
-  if(c.step==="dang"&&chanOwner(c.kenh)===u.id)return true;
+  if(c.step==="dang"&&(chanOwner(c.kenh)===u.id||(typeof chanHelp==="function"&&chanHelp(c.kenh).includes(u.id))))return true;
   if(c.step==="quay"&&can(u,"viec.giao"))return true;
   return canEditCard(u,c);
 }
