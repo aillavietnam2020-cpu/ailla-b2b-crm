@@ -901,6 +901,83 @@ khoRoutes.put('/items/:code', async (c) => {
   return ok(c, { code, min_stock: min });
 });
 
+/** Sửa một mã trong danh mục (chị Hoa 05/11, người phụ trách mua hàng cần sửa): tên, ĐVT, loại, và đổi mã.
+ * Đổi mã: tạo mã mới, chuyển mọi chỗ đang dùng mã cũ sang mã mới (sổ kho, định mức, đơn mua, nhận hàng, chứng từ,
+ * quy đổi Kênh phân phối, bán sàn, vỏ & đóng gói), rồi bỏ mã cũ. Sổ kho giữ nguyên số, chỉ đổi tên mã. Có nhật ký. */
+const ITEM_CODE_REFS = [
+  ['kho_bom', 'product'],
+  ['kho_bom', 'item'],
+  ['kho_moves', 'item'],
+  ['kho_map', 'misa_code'],
+  ['channel_out', 'item'],
+  ['channel_alias', 'item'],
+  ['kho_pack', 'product'],
+  ['kho_pack', 'vo'],
+  ['kho_pack', 'thung'],
+  ['kho_vo', 'code'],
+  ['kho_vo_img', 'code'],
+  ['kho_vo_ncc', 'code'],
+  ['po_lines', 'item'],
+  ['po_receipt_lines', 'item'],
+  ['po_invoice_lines', 'item'],
+  ['po_lech', 'item'],
+] as const;
+khoRoutes.post('/items/:code/edit', async (c) => {
+  const auth = c.get('auth');
+  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối, mua hàng hoặc kế toán mới sửa danh mục mã');
+  const old = c.req.param('code');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const db = c.env.DB;
+  const row = await db
+    .prepare('SELECT code, name, unit, cls, grp, min_stock, active, created_at FROM kho_items WHERE code = ?')
+    .bind(old)
+    .first<{ code: string; name: string; unit: string; cls: string; grp: string; min_stock: number; active: number; created_at: string }>();
+  if (!row) throw notFound('Không có mã này');
+  const next = b?.code == null ? old : String(b.code).trim();
+  const name = b?.name == null ? row.name : String(b.name).trim();
+  const unit = b?.unit == null ? row.unit : String(b.unit).trim();
+  const cls = b?.cls == null ? row.cls : String(b.cls);
+  if (!next || next.length > 80 || /[\r\n]/.test(next)) throw badRequest('BAD_CODE', 'Mã không được để trống, tối đa 80 ký tự');
+  if (!name || name.length > 200) throw badRequest('BAD_NAME', 'Tên không được để trống');
+  if (!['NVL', 'BTP', 'TP', 'HH', 'CCDC', 'COMBO'].includes(cls)) throw badRequest('BAD_CLS', 'Loại hàng không đúng');
+  if (next === old && name === row.name && unit === row.unit && cls === row.cls) return ok(c, { code: old, changed: false });
+  const stmts: D1PreparedStatement[] = [];
+  if (next !== old) {
+    const dup = await db.prepare('SELECT 1 AS x FROM kho_items WHERE code = ?').bind(next).first();
+    if (dup) throw conflict('DUP_CODE', 'Mã mới đã có trong danh mục. Chọn mã khác.');
+    stmts.push(
+      db
+        .prepare('INSERT INTO kho_items (code, name, unit, cls, grp, min_stock, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(next, name, unit, cls, row.grp, row.min_stock, row.active, row.created_at),
+    );
+    for (const [t, col] of ITEM_CODE_REFS) stmts.push(db.prepare(`UPDATE ${t} SET ${col} = ? WHERE ${col} = ?`).bind(next, old));
+    stmts.push(
+      db
+        .prepare(
+          "UPDATE channel_map SET item_label = ? || substr(item_label, length(?) + 1) WHERE substr(item_label, 1, length(?) + 3) = ? || ' - '",
+        )
+        .bind(next, old, old, old),
+    );
+    stmts.push(db.prepare('DELETE FROM kho_items WHERE code = ?').bind(old));
+  } else {
+    stmts.push(db.prepare('UPDATE kho_items SET name = ?, unit = ?, cls = ? WHERE code = ?').bind(name, unit, cls, old));
+  }
+  stmts.push(
+    auditStatement(db, {
+      actorId: auth.user.id,
+      action: 'KHO_ITEM_EDIT',
+      entityType: 'KHO_ITEM',
+      entityId: next,
+      before: { code: old, name: row.name, unit: row.unit, cls: row.cls },
+      after: { code: next, name, unit, cls },
+      requestId: c.get('requestId'),
+      ip: ip(c),
+    }),
+  );
+  await db.batch(stmts);
+  return ok(c, { code: next, changed: true });
+});
+
 /** Thay toàn bộ định mức của một sản phẩm (CEO, quản lý điều phối, kế toán). Phiếu đã ghi không đổi vì sổ lưu số đã trừ. */
 khoRoutes.put('/bom/:product', adminOnlyEndpoint, async (c) => {
   const auth = c.get('auth');
