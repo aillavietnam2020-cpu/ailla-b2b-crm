@@ -78,7 +78,7 @@
       /* Chị Hoa duyệt 04/11 (phương án C): chia theo đường đi của hàng, mỗi việc một chỗ, không còn hàng tab trong trang.
          Mua hàng → Kho nguyên vật liệu → Sản xuất → Kho thành phẩm; Kiểm kê & đối chiếu soát cả hai kho. Lô, thùng, vị trí (sx_kho) mở từ Tồn kho thành phẩm. */
       sx:[["",["sx_tq"]],
-        ["Mua hàng",[["mh_po","Đơn mua hàng"],["sx_mh","Đơn mua hàng"],"mh_hd"]],
+        ["Mua hàng",[["mh_po","Đơn mua hàng"],"mh_hd"]],
         ["Kho nguyên vật liệu",[["kho_ton","Tồn kho nguyên vật liệu"],["kho_nhap","Nhập nguyên vật liệu"],["kho_xuat","Phiếu xuất kho"]]],
         ["Sản xuất",["sx_nc","sx_td",["kho_pc","Pha chế"],["sx_lo","Đóng gói & kiểm kê"],["sx_bc","Báo cáo sản xuất"]]],
         ["Kho thành phẩm",[["kho_ton_tp","Tồn kho thành phẩm"],["kho_nhap_tp","Nhập hàng mua ngoài"],"kho_xuat_b2b","kho_online","kho_hoan",["kho_xuat_tp","Phiếu xuất kho"]]],
@@ -91,7 +91,7 @@
        kế toán xác nhận, xem ở quản trị › Thu chi. Web quản trị chỉ mở cho CEO và tài khoản có quyền kế toán (serve.ts). */
     /* Chị Hoa 29/10: bỏ Kho bill giao dịch, Phiếu chi vận chuyển, Nhập dữ liệu CRM khỏi menu vận hành (bill gửi ngay trong đơn,
        phiếu chi ghi ở quản trị › Sổ chi phí, nhập CRM chỉ làm một lần). */
-    const DROP=["quytac","quychuan","bc_tong","cr_thuong","mh_no","mh_gianvl","bots","kho_qd","cr_bill","cr_s_bill","cr_vc","cr_s_vc","cr_im","cr_import","sx_kho","kho_ks"];
+    const DROP=["quytac","quychuan","bc_tong","cr_thuong","mh_no","mh_gianvl","bots","kho_qd","cr_bill","cr_s_bill","cr_vc","cr_s_vc","cr_im","cr_import","sx_kho","kho_ks","sx_mh"];
     USED=Object.values(S).flatMap(ids);
     const mkt=keep("mkt"),hr=keep("hr"),dt=keep("dt"),aiq=keep("aiq"),me=keep("me");
     if(mkt)mkt.zone="";if(hr)hr.zone="";
