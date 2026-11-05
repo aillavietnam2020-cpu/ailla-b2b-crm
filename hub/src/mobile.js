@@ -165,6 +165,9 @@
         const O=[...r.cells].filter(c=>c.classList.contains("ml-o"));
         if(O.length&&O.every(c=>c.classList.contains("ml-e")))r.classList.add("ml-noo"); // dòng không có số phụ: không chừa hàng trống
       });
+      /* cột trống ở mọi dòng: bỏ hẳn, không chừa chỗ */
+      const R=[...t.tBodies[0].rows].filter(r=>!r.classList.contains("ml-full"));
+      H.forEach((h,i)=>{if(R.length&&R.every(r=>r.cells[i].classList.contains("ml-e")))R.forEach(r=>r.cells[i].classList.add("ml-x"))});
     });
   };
   /* ô số: ô báo đỏ có số khác 0 lên đầu, rộng cả hàng; ô bằng 0 xuống cuối */

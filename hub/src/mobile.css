@@ -172,6 +172,7 @@
   table.mlist td.ml-e{display:none!important}
   table.mlist td.ml-o.ml-e,table.mlist td.ml-k.ml-e{display:block!important;visibility:hidden}
   table.mlist.ml-nok td.ml-t{grid-column:1/-1}
-  table.mlist tr.ml-noo>td.ml-o{display:none!important}
+  table.mlist tr.ml-noo>td.ml-o,table.mlist td.ml-x{display:none!important}
+  table.mlist td.ml-c{grid-row:2}
   table.mlist tr.ml-full{display:block}
 }
