@@ -147,7 +147,7 @@ function cwRows(){if(CW_C)return CW_C;const d=D(),td=d.settings.today,T={},out=[
       theoDoi:t&&Array.isArray(t.theoDoi)?t.theoDoi:[],gap:!!t&&(t.gap===true||(t.gap===undefined&&cwGapT(t.ten)))})});
   /* việc làm video, đăng bài (thẻ video gom theo người · kênh · sản phẩm · hạn, như trang cũ) */
   try{[].concat(cvAutoMk(true)||[],cvAutoDg(true)||[]).forEach(g=>{if(CV_TEST.includes(g.nguoi))return;
-    out.push({k:g.kind+":"+g.key,src:g.kind,id:g.key,ag:g,ten:g.ten,mo:g.mo,nguoi:g.nguoi||"",tao:"",phoi:[],han:+g.han||0,gio:"",st:g.st,late:!!g.late,lateD:g.lateD||0,da:"",uu:"",ck:[],n:g.n,done:g.kind==="mk"?g.done:0,g:"",theoDoi:[],gap:false})})}catch(e){console.error("việc video",e)}
+    out.push({k:g.kind+":"+g.key,src:g.kind,id:g.key,ag:g,ten:g.ten,mo:g.mo,nguoi:g.nguoi||"",tao:"",phoi:[],han:+g.han||0,gio:"",st:g.st,late:!!g.late,lateD:g.lateD||0,da:"",uu:"",ck:[],n:g.n,done:g.done||0,g:"",theoDoi:[],gap:false})})}catch(e){console.error("việc video",e)}
   /* video, kịch bản chờ mình duyệt (chỉ hiện ở chỗ "của tôi", không tính vào việc của phòng để khỏi đếm hai lần) */
   try{if(typeof rvQueue==="function")rvQueue().forEach(c=>{if(CV_TEST.includes(c.nguoi))return;
     out.push({k:"card:"+c.id,src:"card",id:c.id,rvOnly:true,cardStep:c.step,ten:(c.step==="dkb"?"Duyệt kịch bản · ":"Duyệt video · ")+String(c.hookText||c.yTuong||c.tuyen||c.id),mo:c.id+" · "+chOf(c.kenh).short,

@@ -291,12 +291,12 @@ function pCcCaiDat(m){
   $("#cc-ova").onclick=()=>{const p=v("cc-ovp");if(!p){toast("Chọn người trước");return}pull();s.nguoiLich[p]=v("cc-ovl");renderMain()};
   $("#cc-caadd").onclick=()=>{pull();s.ca.push({id:"ca"+Date.now(),ten:"",tu:"",den:""});renderMain()};
   $("#cc-add").onclick=()=>{pull();s.diem.push({id:"d"+Date.now(),ten:"Điểm "+(s.diem.length+1),lat:"",lng:"",bk:150});renderMain()};
-  $("#cc-here").onclick=async()=>{pull();try{const c=await ccPos();s.diem.push({id:"d"+Date.now(),ten:s.diem.length?"Điểm "+(s.diem.length+1):"Văn phòng",lat:+c.latitude.toFixed(6),lng:+c.longitude.toFixed(6),bk:Math.max(100,Math.min(300,Math.round((c.accuracy||0)*2)))});CC.hereErr="";renderMain();toast("Đã thêm điểm, sửa tên rồi bấm Lưu cài đặt")}catch(e){CC.hereErr=e.message;renderMain()}};
+  $("#cc-here").onclick=async()=>{pull();try{const c=await ccPos();s.diem.push({id:"d"+Date.now(),ten:s.diem.length?"Điểm "+(s.diem.length+1):"Văn phòng",lat:+c.latitude.toFixed(6),lng:+c.longitude.toFixed(6),bk:Math.max(100,Math.min(300,Math.round((c.accuracy||0)*2)))});CC.hereErr="";renderMain();const b=$("#cc-save");if(b)b.click()}catch(e){CC.hereErr=e.message;renderMain()}}; // lấy được vị trí là lưu luôn, khỏi quên bấm Lưu
   $("#cc-save").onclick=async()=>{pull();
     const bad=s.diem.filter(d=>d.lat===""||!isFinite(d.lat)||!isFinite(d.lng));if(bad.length){toast("Có điểm chưa đúng tọa độ: "+bad.map(d=>d.ten).join(", "));return}
     const badLe=(s.ngayLe||[]).filter(x=>!x.ngay);if(badLe.length){toast("Có ngày lễ chưa chọn ngày");return}
     const badCa=s.ca.filter(c=>!c.ten||!c.tu||!c.den||c.den<=c.tu);if(badCa.length){toast("Ca chưa đủ tên hoặc giờ kết thúc phải sau giờ bắt đầu: "+badCa.map(c=>c.ten||"(chưa đặt tên)").join(", "));return}
-    try{const r=await svApi("/api/hub/chamcong/caidat",{method:"PUT",body:JSON.stringify(s)});CC.cfg={...r,people:s.people,deps:s.deps};CC.me=null;CC.day=null;CC.mon=null;CC.xep=null;toast("Đã lưu cài đặt chấm công");renderMain()}catch(e){toast(e.message)}};
+    try{const r=await svApi("/api/hub/chamcong/caidat",{method:"PUT",body:JSON.stringify(s)});CC.cfg={...r,people:s.people,deps:s.deps};CC.me=null;CC.day=null;CC.mon=null;CC.xep=null;toast("Đã lưu cài đặt chấm công. Đổi tên điểm thì sửa ô tên rồi bấm Lưu cài đặt.");renderMain()}catch(e){toast(e.message)}};
 }
 
 /* ---------- Nạp file máy chấm công (CEO, HCNS): đọc file "Chi tiết chấm công" xuất từ máy, ghép mã, lưu ---------- */
