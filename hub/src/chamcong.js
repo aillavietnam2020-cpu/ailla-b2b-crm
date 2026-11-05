@@ -32,6 +32,9 @@ tr.cc-det>td{background:var(--gray-soft);padding:8px}
 .cc-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .cc-chk{display:inline-flex;align-items:center;gap:4px;margin-right:10px;white-space:nowrap;font-size:13px}
 .cc-grid select{min-width:110px}
+.cc-savebar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:0 -4px 16px rgba(30,35,80,.08);margin-top:8px}
+.has-mobtab .cc-savebar{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.cc-savebar .btn{min-height:44px;padding-inline:22px}
 tr.cc-cu>td{background:var(--gray-soft);padding:8px 12px}.cc-curow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px}.cc-curow label{display:inline-flex;align-items:center;gap:6px}
 .cc-mon tr.cc-row>td:first-child{min-width:210px;white-space:normal}.cc-mon th,.cc-mon tr.cc-row>td{white-space:nowrap}
 .cc-grid th.we,.cc-grid td.we{background:var(--gray-soft)}
@@ -267,7 +270,7 @@ function pCcCaiDat(m){
     ${tbl(["Người","Lịch",""],ov.map(([id,l],i)=>`<tr><td>${esc((people.find(p=>p.id===id)||{name:id}).name)}</td><td>${lichSel("cc-ov-"+i,l)}</td><td><button class="btn sm danger" data-ovdel="${esc(id)}">Bỏ</button></td></tr>`))}
     <div class="filters"><select id="cc-ovp"><option value="">Chọn người…</option>${people.filter(p=>!s.nguoiLich[p.id]).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}${p.pb?" · "+esc(ccPbName2(deps,p.pb)):""}</option>`).join("")}</select>${lichSel("cc-ovl",(s.lich.find(l=>l.kieu==="ca")||s.lich[0]).id)}<button class="btn" id="cc-ova">Thêm</button></div>
   </section>
-  <div class="filters"><span class="sp"></span><button class="btn pri" id="cc-save">Lưu cài đặt</button></div>`;
+  <div class="cc-savebar"><span class="hint">Sửa xong bấm Lưu. Thêm điểm tại chỗ đứng thì web tự lưu.</span><button class="btn pri" id="cc-save">Lưu cài đặt</button></div>`;
   const v=id=>($("#"+id)||{}).value;
   const pull=()=>{
     s.diem=s.diem.map((d,i)=>{const ll=(v("cc-dl-"+i)||"").split(/[,\s]+/).filter(Boolean).map(Number);return {...d,ten:v("cc-dt-"+i)||d.ten,lat:ll.length===2?ll[0]:"",lng:ll.length===2?ll[1]:"",bk:Number(v("cc-db-"+i))||d.bk}});
