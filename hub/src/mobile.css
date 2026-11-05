@@ -86,7 +86,7 @@
   .has-mobtab .crmembed{height:calc(100vh - 215px)}
   .menu-open #mobtab{display:none}
   /* thanh dưới luôn dính đáy (Safari iPhone): nền trắng đặc, không làm mờ nền, lớp riêng để không trễ khi cuộn nhanh */
-  #mobtab{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;background:#fff!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;-webkit-transform:translateZ(0);transform:translateZ(0);padding-bottom:calc(6px + env(safe-area-inset-bottom))!important}
+  #mobtab{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;background:#fff!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;padding-bottom:calc(6px + env(safe-area-inset-bottom))!important}
 
   /* ---- kiểu ứng dụng: bo tròn nhiều, đầu trang mềm, nút "+" nổi giữa thanh đáy ---- */
   .topbar{background:linear-gradient(180deg,#cfe0ff 0%,rgba(232,239,255,.92) 100%)!important;border-bottom:0;padding-bottom:12px}
