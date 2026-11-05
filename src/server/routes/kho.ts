@@ -1120,6 +1120,42 @@ export async function khoAlerts(db: D1Database) {
   return { low: low.map(pick), negative: neg.map(pick), variance: lech.results };
 }
 
+/** Tổng quan sản xuất (chị Hoa duyệt 05/11): số bán 14 ngày theo kênh, bán trung bình 7 ngày từng mã, đơn mua chờ về, việc đang chờ.
+ * Chỉ đọc. Tồn kho lấy ở /ton (khoTonRows) như mọi trang khác. */
+khoRoutes.get('/tq-sx', async (c) => {
+  const db = c.env.DB;
+  const today = vnDate();
+  const d0 = new Date(`${today}T00:00:00Z`);
+  const back = (n: number) => new Date(d0.getTime() - n * 86400000).toISOString().slice(0, 10);
+  const from14 = back(13);
+  const from7 = back(6);
+  const [days, b2b, ban, po, cho, lech] = await Promise.all([
+    db.prepare('SELECT day, channel, ROUND(SUM(qty), 3) AS qty FROM channel_out WHERE day >= ? AND day <= ? GROUP BY day, channel').bind(from14, today).all<{ day: string; channel: string; qty: number }>(),
+    db.prepare("SELECT doc_date AS day, ROUND(-SUM(qty), 3) AS qty FROM kho_ledger WHERE doc_type = 'B2B' AND qty < 0 AND doc_date >= ? AND doc_date <= ? GROUP BY doc_date").bind(from14, today).all<{ day: string; qty: number }>(),
+    db.prepare("SELECT item, ROUND(-SUM(qty), 3) AS qty FROM kho_ledger WHERE qty < 0 AND doc_type IN ('ONLINE', 'B2B') AND doc_date >= ? AND doc_date <= ? GROUP BY item").bind(from7, today).all<{ item: string; qty: number }>(),
+    db.prepare(
+      `SELECT o.id, o.no, o.expected_date, o.status, s.name AS supplier,
+              (SELECT GROUP_CONCAT(COALESCE(i.name, l.item), ', ') FROM po_lines l LEFT JOIN kho_items i ON i.code = l.item WHERE l.po_id = o.id) AS items,
+              (SELECT GROUP_CONCAT(l.item, ',') FROM po_lines l WHERE l.po_id = o.id) AS codes
+       FROM po_orders o LEFT JOIN suppliers s ON s.id = o.supplier_id
+       WHERE o.status IN ('DAT', 'DANG_GIAO') ORDER BY COALESCE(o.expected_date, '9999'), o.no`,
+    ).all<Record<string, string | null>>(),
+    db.prepare("SELECT COUNT(*) AS n FROM orders o WHERE o.flow_on = 1 AND o.kho_status = 'CHO_XUAT' AND o.approval_status = 'APPROVED'").first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) AS n, SUM(CASE WHEN status = 'XONG' THEN 1 ELSE 0 END) AS xong FROM po_lech").first<{ n: number; xong: number }>(),
+  ]);
+  return ok(c, {
+    today,
+    from14,
+    from7,
+    days: days.results,
+    b2b: b2b.results,
+    ban7: ban.results,
+    po: po.results,
+    cho_xuat: cho?.n ?? 0,
+    lech: { cho: (lech?.n ?? 0) - (lech?.xong ?? 0), xong: lech?.xong ?? 0 },
+  });
+});
+
 /** Mốc tồn: ngày phiếu tồn chốt chung và các mã đã có số kiểm từ mốc (tồn chốt hoặc kiểm bổ sung). */
 khoRoutes.get('/moc', async (c) => {
   const moc = await khoMocChung(c.env.DB);
