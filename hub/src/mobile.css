@@ -159,6 +159,27 @@
   .ac-bar #ac-go{border-radius:20px!important;min-height:38px!important;padding:0 14px!important;flex:none}
   .ac-send{padding:6px 10px!important}
 
+  /* Việc của tôi: tiêu đề 1 dòng, ô Tìm việc xuống hàng dưới; tab gọn cuộn ngang; dòng Chờ duyệt: nhãn nằm trên, không đè tên */
+  .tbslot{flex:1 1 auto;min-width:0}
+  .tbslot h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:17px!important;margin:0}
+  .topbar .cwsrch-tb{order:9;flex:1 1 100%;width:100%!important;max-width:none!important}
+  .cwtabs{scrollbar-width:none;gap:2px}
+  .cwtabs::-webkit-scrollbar{display:none}
+  .cwtabs button{padding:6px 9px!important;font-size:13px!important;flex:none;white-space:nowrap}
+  .cwrv{grid-template-columns:minmax(0,1fr)!important;gap:3px!important}
+  .cwrv>*{grid-column:1/-1!important}
+  .cwrvc{white-space:normal!important;justify-self:start;width:auto!important;max-width:100%;font-size:11.5px!important;padding:1px 8px!important}
+  /* chung: tiêu đề khối, nhãn không tràn khung */
+  .card h2,.card h3,.card-h h2{min-width:0;overflow-wrap:anywhere;white-space:normal}
+  .pill{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+  /* Tổng quan sản xuất: mỗi người chỉ thấy phần của vai trò mình (ẩn nút đổi vai trò); bảng "còn bán được bao lâu" bỏ thanh vẽ, giữ số */
+  .tqseg{display:none!important}
+  .tqt th{width:auto!important}
+  .tqt .tqbar span{display:none!important}
+  .tqt .tqbar,.tqt .tqbar em{display:block;position:static!important;text-align:right;font-style:normal}
+  .tqt td small{display:block}
+
   /* thông báo: mỗi tin 2 dòng rồi "…", bấm mới xem đủ */
   .ntl .nti span{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
   .ntl .nti.open span{-webkit-line-clamp:unset;display:block!important}
@@ -210,7 +231,7 @@
   table.mfit:not(.mlist){display:table!important;width:100%!important;min-width:0!important}
   table.mfit:not(.mlist) td,table.mfit:not(.mlist) th{font-size:12.5px}
   table.mfit:not(.mlist) th,table.mfit:not(.mlist) td{padding:7px 5px!important;font-size:12px;white-space:nowrap}
-  table.mfit:not(.mlist) th{font-size:11px}
+  table.mfit:not(.mlist) th{font-size:11px;white-space:normal!important;line-height:1.25}
   table.mfit:not(.mlist) td:first-child,table.mfit:not(.mlist) th:first-child{padding-left:8px!important;white-space:normal}
   table.mfit:not(.mlist) td:last-child,table.mfit:not(.mlist) th:last-child{padding-right:8px!important}
   table.mfit .ml-x{display:none!important}

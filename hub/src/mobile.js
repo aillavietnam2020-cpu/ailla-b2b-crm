@@ -16,7 +16,7 @@
     });
   };
   const centerTabs=root=>{
-    root.querySelectorAll(".settabs,.sxtabs,.modtabs,.kstab,.dptab,.dgtab").forEach(t=>{
+    root.querySelectorAll(".settabs,.sxtabs,.modtabs,.kstab,.dptab,.dgtab,.cwtabs").forEach(t=>{
       const on=t.querySelector(".on");
       if(on&&t.scrollWidth>t.clientWidth)t.scrollLeft=on.offsetLeft-(t.clientWidth-on.offsetWidth)/2;
     });
