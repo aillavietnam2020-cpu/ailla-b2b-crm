@@ -242,7 +242,8 @@ export async function prepareOrder(
     }
 
     // Cấp "Khác" (lái xe, khách lẻ lẫn...): không có bảng giá, giá do người lập đơn nhập, không cảnh báo, không bắt duyệt.
-    if (freeTier || product.group_code === 'VAT_TU_BAN' || (customer.tier_code === 'NHAN_VIEN' && base === null)) {
+    // Hàng hóa / quà (nhóm QUA_TANG) chưa có giá ở bảng giá: vẫn bán được, giá do người lập đơn nhập (chị Hoa chốt 05/11).
+    if (freeTier || product.group_code === 'VAT_TU_BAN' || ((customer.tier_code === 'NHAN_VIEN' || product.group_code === 'QUA_TANG') && base === null)) {
       const typed = item.applied_price ?? 0;
       if (!(typed > 0)) {
         fieldErrors[`items.${index}.applied_price`] = `Nhập giá bán cho mã ${product.sku} (vật tư bán kèm / khách cấp "Khác" không có bảng giá, giá do thỏa thuận)`;
@@ -618,7 +619,7 @@ export async function submitOrder(
     // Dòng hàng tặng không có giá bán nên bỏ qua kiểm tra giá.
     if (item.is_gift) continue;
     // Giá do người lập đơn tự điền theo thỏa thuận (cấp Khác / Nhân viên, vật tư bán kèm): không có giá chuẩn để so, không cần duyệt giá.
-    if (item.base_price === null && (item.group_code === 'VAT_TU_BAN' || item.tier_code === 'KHAC' || item.tier_code === 'NHAN_VIEN')) continue;
+    if (item.base_price === null && (item.group_code === 'VAT_TU_BAN' || item.group_code === 'QUA_TANG' || item.tier_code === 'KHAC' || item.tier_code === 'NHAN_VIEN')) continue;
     if (item.base_price === null) {
       throw unprocessable(
         'MISSING_PRICE',

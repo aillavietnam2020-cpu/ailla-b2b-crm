@@ -8,6 +8,7 @@ import { accountantIds, taskStatements } from '../lib/notifyTasks';
 import { requirePermission } from '../middleware/rbac';
 import { CHANNELS, loadLookups, resolveLabel, type Channel } from '../services/channelOut';
 import { loadMapVersions, pickMap, recomputeDay } from '../services/poscake';
+import { approveKppCode, canApproveCode, createKppCode, suggestSku } from '../services/kppCode';
 
 /**
  * Quản trị › Cấu hình › Sản phẩm & combo (chị Hoa duyệt demo 28/10/2026).
@@ -304,9 +305,13 @@ sanphamRoutes.get('/products', async (c) => {
   const db = c.env.DB;
   const [items, maps] = await Promise.all([
     db.prepare("SELECT code, name, unit, cls, grp, active, created_at FROM kho_items WHERE cls IN ('TP', 'HH') ORDER BY code").all(),
-    db.prepare('SELECT crm_sku, misa_code, factor FROM kho_map').all(),
+    db
+      .prepare(
+        'SELECT km.crm_sku, km.misa_code, km.factor, p.id AS product_id, p.code_status FROM kho_map km LEFT JOIN products p ON p.sku = km.crm_sku AND p.deleted_at IS NULL',
+      )
+      .all(),
   ]);
-  return ok(c, { items: items.results ?? [], kho_map: maps.results ?? [], can_edit: canEditCombo(c.get('auth')) });
+  return ok(c, { items: items.results ?? [], kho_map: maps.results ?? [], can_edit: canEditCombo(c.get('auth')), can_code: canApproveCode(c.get('auth')) });
 });
 
 /** Thêm sản phẩm một bước: mã kho/MISA + (tuỳ chọn) mã bán Kênh phân phối cùng mã + nối mã hệ số 1. Giá vốn ghi ở trình duyệt (Giá vốn SKU). */
@@ -432,4 +437,65 @@ sanphamRoutes.get('/cost-history', async (c) => {
     .bind(code)
     .all();
   return ok(c, r.results ?? []);
+});
+
+/* ---------- Mã bán Kênh phân phối cho hàng hóa / quà (05/11): đề xuất, tạo, duyệt ---------- */
+sanphamRoutes.get('/kpp-code/suggest', async (c) => {
+  const code = String(c.req.query('code') ?? '').trim();
+  if (!code) throw badRequest('MISSING', 'Thiếu mã kho');
+  return ok(c, { sku: await suggestSku(c.env.DB, code) });
+});
+
+/** Mã bán đang chờ Trưởng phòng duyệt (sale tạo khi lên đơn). */
+sanphamRoutes.get('/kpp-code/pending', async (c) => {
+  const r = await c.env.DB
+    .prepare(
+      `SELECT p.id, p.sku, p.name, p.unit, p.created_at, km.misa_code AS kho, u.display_name AS by_name,
+         (SELECT COUNT(DISTINCT oi.order_id) FROM order_items oi WHERE oi.product_id = p.id) AS orders
+       FROM products p LEFT JOIN kho_map km ON km.crm_sku = p.sku LEFT JOIN users u ON u.id = p.code_by
+       WHERE p.code_status = 'CHO_DUYET' AND p.deleted_at IS NULL ORDER BY p.created_at`,
+    )
+    .all();
+  return ok(c, { rows: r.results ?? [], can_approve: canApproveCode(c.get('auth')) });
+});
+
+/** Tạo mã bán cho một hàng hóa / quà: Trưởng phòng / CEO tạo là duyệt luôn; kế toán tạo thì chờ duyệt. */
+sanphamRoutes.post('/kpp-code', async (c) => {
+  const auth = c.get('auth');
+  const approved = canApproveCode(auth);
+  if (!approved && !canEditCombo(auth)) throw forbidden('Chỉ Trưởng phòng, CEO hoặc kế toán tạo mã bán');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const code = String(b?.code ?? '').trim();
+  if (!code) throw badRequest('MISSING', 'Thiếu mã kho');
+  const r = await createKppCode(c.env.DB, auth, code, { sku: b?.sku ? String(b.sku) : undefined, approved, requestId: c.get('requestId'), ip: ip(c), source: 'san-pham-combo' });
+  return ok(c, r);
+});
+
+/** Trưởng phòng / CEO tạo mã hàng loạt cho các hàng hóa / quà đang chưa có mã bán. */
+sanphamRoutes.post('/kpp-code/bulk', async (c) => {
+  const auth = c.get('auth');
+  if (!canApproveCode(auth)) throw forbidden('Chỉ Trưởng phòng hoặc CEO duyệt mã hàng loạt');
+  const b = (await c.req.json().catch(() => null)) as { items?: unknown } | null;
+  const items = Array.isArray(b?.items) ? (b.items as Array<Record<string, unknown>>).slice(0, 100) : [];
+  if (!items.length) throw badRequest('MISSING', 'Chưa chọn mã nào');
+  const done: Array<{ code: string; sku?: string; error?: string }> = [];
+  for (const x of items) {
+    const code = String(x.code ?? '').trim();
+    try {
+      const r = await createKppCode(c.env.DB, auth, code, { sku: x.sku ? String(x.sku) : undefined, approved: true, requestId: c.get('requestId'), ip: ip(c), source: 'hang-loat' });
+      done.push({ code, sku: r.sku });
+    } catch (e) {
+      done.push({ code, error: e instanceof Error ? e.message : 'Lỗi' });
+    }
+  }
+  return ok(c, done);
+});
+
+sanphamRoutes.post('/kpp-code/approve', async (c) => {
+  const auth = c.get('auth');
+  if (!canApproveCode(auth)) throw forbidden('Chỉ Trưởng phòng hoặc CEO duyệt mã bán');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const id = String(b?.product_id ?? '').trim();
+  if (!id) throw badRequest('MISSING', 'Thiếu mã bán');
+  return ok(c, await approveKppCode(c.env.DB, auth, id, b?.sku ? String(b.sku) : undefined, { requestId: c.get('requestId'), ip: ip(c) }));
 });

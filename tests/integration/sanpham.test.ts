@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext, seedUsers, USERS, type TestContext } from '../helpers/app';
+import { createTestContext, seedBusinessData, seedUsers, USERS, type TestContext } from '../helpers/app';
 import { syncComboTasks, TASK_PREFIX } from '@server/routes/sanpham';
 
 let ctx: TestContext;
@@ -173,5 +173,70 @@ describe('Lưu vết giá vốn', () => {
     expect(JSON.parse(h.body.data[0].before_json)).toEqual({ ky: '2026-10', gia: 6000 });
     expect((await ctx.request('/api/hub/sanpham/cost-log', { as: USERS.manager, body: { code: 'TLG', ky: '2026-10', new: 1 } })).status).toBe(403);
     expect((await ctx.request('/api/hub/sanpham/cost-log', { as: USERS.ceo, body: { code: 'TLG', ky: '2026-10', new: -1 } })).status).toBe(400);
+  });
+});
+
+describe('Mã bán Kênh phân phối cho hàng hóa / quà (05/11)', () => {
+  beforeEach(async () => {
+    await ctx.db
+      .prepare("INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES ('user-manager', 'hub.access', 'user-ceo', ?)")
+      .bind(NOW)
+      .run();
+    for (const [code, name] of [
+      ['NOIDIEN', 'Nồi điện tặng sàn'],
+      ['QUA-BONOI3', 'Bộ nồi 3 mishu'],
+    ]) {
+      await ctx.db
+        .prepare("INSERT INTO kho_items (code, name, unit, cls, grp, created_at) VALUES (?, ?, 'Cái', 'HH', 'Hàng hóa', ?)")
+        .bind(code, name, NOW)
+        .run();
+    }
+  });
+
+  it('sale chọn quà chưa có mã: web tạo mã QUA-…, vẫn bán được, chờ Trưởng phòng duyệt (việc + Phê duyệt)', async () => {
+    const s = await ctx.request('/api/supplies?gift=1&q=noi', { as: USERS.huyen });
+    expect(s.status).toBe(200);
+    expect(s.body.data.map((x: { code: string }) => x.code).sort()).toEqual(['NOIDIEN', 'QUA-BONOI3']);
+    const r = await ctx.request('/api/supplies/ensure-gift', { as: USERS.huyen, body: { code: 'NOIDIEN' } });
+    expect(r.status).toBe(200);
+    expect(r.body.data).toMatchObject({ sku: 'QUA-NOIDIEN', code_status: 'CHO_DUYET', created: true });
+    expect(await ctx.db.prepare("SELECT misa_code, factor FROM kho_map WHERE crm_sku = 'QUA-NOIDIEN'").first()).toEqual({ misa_code: 'NOIDIEN', factor: 1 });
+    // Chọn lại không tạo trùng; mã đã có thì không còn trong danh sách quà chưa có mã.
+    const again = await ctx.request('/api/supplies/ensure-gift', { as: USERS.huyen, body: { code: 'NOIDIEN' } });
+    expect(again.body.data).toMatchObject({ sku: 'QUA-NOIDIEN', created: false });
+    expect((await ctx.request('/api/supplies?gift=1&q=noi', { as: USERS.huyen })).body.data.map((x: { code: string }) => x.code)).toEqual(['QUA-BONOI3']);
+    const task = await ctx.db.prepare("SELECT title FROM tasks WHERE assignee_id = 'user-manager' AND status = 'OPEN'").first<{ title: string }>();
+    expect(task?.title).toContain('QUA-NOIDIEN');
+    const pend = await ctx.request('/api/hub/sanpham/kpp-code/pending', { as: USERS.manager });
+    expect(pend.body.data.rows).toEqual([expect.objectContaining({ sku: 'QUA-NOIDIEN', kho: 'NOIDIEN' })]);
+    // Kế toán không duyệt được; Trưởng phòng sửa mã khi duyệt → đổi cả mã nối kho, việc tự đóng.
+    expect((await ctx.request('/api/hub/sanpham/kpp-code/approve', { as: USERS.thao, body: { product_id: r.body.data.id } })).status).toBe(403);
+    const ap = await ctx.request('/api/hub/sanpham/kpp-code/approve', { as: USERS.manager, body: { product_id: r.body.data.id, sku: 'QUA-NOI-DIEN' } });
+    expect(ap.status).toBe(200);
+    expect(await ctx.db.prepare("SELECT sku, code_status FROM products WHERE id = ?").bind(r.body.data.id).first()).toEqual({ sku: 'QUA-NOI-DIEN', code_status: '' });
+    expect(await ctx.db.prepare("SELECT misa_code FROM kho_map WHERE crm_sku = 'QUA-NOI-DIEN'").first()).toEqual({ misa_code: 'NOIDIEN' });
+    expect((await ctx.db.prepare("SELECT status FROM tasks WHERE assignee_id = 'user-manager'").first<{ status: string }>())?.status).toBe('DONE');
+  });
+
+  it('Trưởng phòng tạo hàng loạt: mã có hiệu lực ngay, mã kho QUA-… giữ nguyên; thành phẩm bị từ chối', async () => {
+    const r = await ctx.request('/api/hub/sanpham/kpp-code/bulk', { as: USERS.manager, body: { items: [{ code: 'NOIDIEN' }, { code: 'QUA-BONOI3' }, { code: 'TLG' }] } });
+    expect(r.status).toBe(200);
+    expect(r.body.data[0]).toEqual({ code: 'NOIDIEN', sku: 'QUA-NOIDIEN' });
+    expect(r.body.data[1]).toEqual({ code: 'QUA-BONOI3', sku: 'QUA-BONOI3' });
+    expect(r.body.data[2].error).toBeTruthy();
+    expect(await ctx.db.prepare("SELECT code_status FROM products WHERE sku = 'QUA-NOIDIEN'").first()).toEqual({ code_status: '' });
+    expect((await ctx.request('/api/hub/sanpham/kpp-code/bulk', { as: USERS.thao, body: { items: [{ code: 'NOIDIEN' }] } })).status).toBe(403);
+  });
+
+  it('đơn Kênh phân phối có quà vừa tạo mã: nhập giá tay vẫn lưu và gửi duyệt được, không bị chặn chưa có giá', async () => {
+    await seedBusinessData(ctx.db);
+    const g = await ctx.request('/api/supplies/ensure-gift', { as: USERS.thao, body: { code: 'NOIDIEN' } });
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', order_date: '2026-11-05', items: [{ product_id: 'prod-full', qty: 1 }, { product_id: g.body.data.id, qty: 2, applied_price: 150000 }] },
+    });
+    expect(created.status).toBeLessThan(300);
+    const sub = await ctx.request(`/api/orders/${created.body.data.id}/submit`, { as: USERS.thao, body: {} });
+    expect(sub.status).toBeLessThan(300);
   });
 });

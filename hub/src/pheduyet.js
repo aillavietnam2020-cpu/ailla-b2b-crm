@@ -37,8 +37,9 @@ async function pdLoad(force){
       ...months.flatMap(m=>th?[get("/api/bonus/gifts?month="+m),get("/api/bonus/cash?month="+m)]:[])]);
     if(cs&&cs.threshold!=null)PD.th=+cs.threshold;
     const combo=ceo||kt||w.admin?await get("/api/hub/sanpham/unmapped"):[];
+    const kppCode=ceo||P("order.approve.normal")?((await svApi("/api/hub/sanpham/kpp-code/pending").catch(()=>({rows:[]}))).rows||[]):[];
     const nsDon=w.ns?((await get("/api/hub/nghiphep/duyet")).list||[]):[],nsTu=w.ns||ceo?((await get("/api/hub/nghiphep/tamung")).list||[]):[];
-    PD.sv={mhLech:Array.isArray(mhLech)?mhLech:[],combo,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
+    PD.sv={kppCode,mhLech:Array.isArray(mhLech)?mhLech:[],combo,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
   catch(e){PD.err=e.message||"Không tải được"}
   PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();pdBadge()}
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */
@@ -74,6 +75,7 @@ async function pdAct(r,ok){
   const post=(p,b)=>svApi(p,{method:"POST",body:JSON.stringify(b||{})});
   const ask=(need)=>{const t=prompt(need?"Lý do từ chối (bắt buộc):":"Lý do từ chối (có thể bỏ trống):");if(t===null)return null;if(need&&t.trim().length<3){toast("Ghi lý do ít nhất vài chữ");return null}return t.trim()};
   if(r.act==="fn"){
+    if(r.src==="kppCode"&&typeof spcKppFromPd==="function"){if(ok)spcKppFromPd(()=>pdLoad(true));else toast("Mã đề xuất sai thì sửa mã trong hộp duyệt rồi bấm Duyệt");return}
     if(r.src==="pcCho"){if(ok){if(confirm("Duyệt phiếu chi \""+r.nd+"\" vào sổ?"))scDuyet(r.ref)}else{const t=ask(false);if(t!==null)scTuChoi(r.ref,t)}return}
     if(r.src==="costsCho"&&ok){if(confirm("Duyệt khoản \""+r.nd+"\" theo đề xuất của web ("+r.sub+")?"))cpApprove([r.ref]);return}
     if(r.src==="cbPhieu"&&typeof spcDuyetPhieu==="function"){if(ok){if(confirm("Duyệt phiếu combo \""+r.nd+"\"? Combo mới vào danh sách chạy, combo dừng tự hết hạn."))spcDuyetPhieu(r.ref,true)}else{const t=ask(true);if(t!==null)spcDuyetPhieu(r.ref,false,t)}return}

@@ -205,3 +205,13 @@ describe('hàng về lệch đơn mua (04/11)', () => {
     expect(T.pdBuild({ mhLech: lech }, { role: 'EMPLOYEE', perms: ['order.kho.process'] })).toHaveLength(0);
   });
 });
+
+describe('Mã bán Kênh phân phối chờ duyệt (05/11)', () => {
+  const kppCode = [{ id: 'p1', sku: 'QUA-NOIDIEN', name: 'Nồi điện', kho: 'NOIDIEN', by_name: 'Sale A', orders: 1, created_at: '2026-11-05T02:00:00Z' }];
+  it('Trưởng phòng (quyền duyệt đơn) và CEO thấy, bấm Duyệt mở hộp duyệt; kế toán không thấy', () => {
+    const r = T.pdBuild({ kppCode }, { role: 'MANAGER', uid: 'u', perms: ['order.approve.normal'] });
+    expect(r).toEqual([expect.objectContaining({ k: 'ma', src: 'kppCode', act: 'fn', nd: 'QUA-NOIDIEN · Nồi điện' })]);
+    expect(T.pdBuild({ kppCode }, { role: 'CEO', uid: 'u', perms: [] })).toHaveLength(1);
+    expect(T.pdBuild({ kppCode }, { role: 'EMPLOYEE', uid: 'u', perms: ['order.accounting.confirm'] })).toHaveLength(0);
+  });
+});

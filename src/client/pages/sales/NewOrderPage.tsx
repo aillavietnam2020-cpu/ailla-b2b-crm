@@ -287,6 +287,20 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
       toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được vật tư');
     }
   };
+  // Hàng hóa / quà chưa có mã bán Kênh phân phối: vẫn chọn vào đơn được, web tự tạo mã (QUA-…), Trưởng phòng duyệt mã sau.
+  const gifts = useApi<SupplyItem[]>(
+    !customPricing && customerId && debouncedQuery.trim() ? `/api/supplies?gift=1&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
+  );
+  const addGiftItem = async (it: SupplyItem) => {
+    try {
+      const r = await api.post<{ id: string; sku: string; name: string; unit: string | null; code_status: string }>('/api/supplies/ensure-gift', { code: it.code });
+      const p = r.data;
+      addLine({ id: p.id, sku: p.sku, name: p.name, unit: p.unit, pack_size: null, price: null }, true);
+      if (p.code_status === 'CHO_DUYET') toast.success(`Đã tạo mã bán ${p.sku}, chờ Trưởng phòng duyệt mã. Nhập giá hoặc đánh dấu tặng.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được hàng hóa / quà');
+    }
+  };
   const suggestLoading = customPricing ? ownCatalog.loading : catalog.loading;
   const suggestError = customPricing ? ownCatalog.error : catalog.error;
 
@@ -618,6 +632,22 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                 );
               })}
             </StateBlock>
+            {!customPricing && (gifts.data ?? []).length > 0 && (
+              <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
+                <div className="muted" style={{ fontSize: 12.5, padding: '0 4px 4px' }}>
+                  Hàng hóa / quà chưa có mã bán: chọn là web tự tạo mã, Trưởng phòng duyệt mã sau. Giá nhập tay hoặc đánh dấu tặng.
+                </div>
+                {(gifts.data ?? []).map((it) => (
+                  <button type="button" key={it.code} className="suggest-row" onClick={() => void addGiftItem(it)} disabled={!customerId}>
+                    <span>
+                      <strong>{it.code}</strong> · {it.name}
+                      <small className="muted"> {it.unit}{it.grp ? ` · ${it.grp}` : ''}</small>
+                    </span>
+                    <span className="muted">Tạo mã · nhập giá</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {customPricing && (supplies.data ?? []).length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
                 <div className="muted" style={{ fontSize: 12.5, padding: '0 4px 4px' }}>

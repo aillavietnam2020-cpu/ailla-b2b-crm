@@ -13,6 +13,7 @@ import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
 import { requirePermission } from '../middleware/rbac';
 import { adminOnlyEndpoint } from '../middleware/adminHost';
+import { canApproveCode, createKppCode } from '../services/kppCode';
 import { listPriceTable, setPrice } from '../services/pricing';
 
 export const catalogRoutes = new Hono<AppEnv>();
@@ -45,7 +46,11 @@ catalogRoutes.get('/supplies', async (c) => {
     throw badRequest('FORBIDDEN', 'Chỉ người lập đơn mới tìm vật tư bán kèm.');
   }
   const words = (c.req.query('q') ?? '').trim().split(/\s+/).filter((w) => w.length >= 1).slice(0, 5);
-  const where = ["i.active = 1", "i.cls NOT IN ('TP', 'COMBO', 'BTP')"];
+  // gift=1: hàng hóa / quà chưa có mã bán Kênh phân phối (đơn thường): chọn vào đơn thì web tự tạo mã, Trưởng phòng duyệt sau (05/11).
+  const gift = c.req.query('gift') === '1';
+  const where = gift
+    ? ["i.active = 1", "i.cls = 'HH'", "NOT EXISTS (SELECT 1 FROM kho_map km WHERE km.misa_code = i.code)"]
+    : ["i.active = 1", "i.cls NOT IN ('TP', 'COMBO', 'BTP')"];
   const params: unknown[] = [];
   for (const w of words) {
     where.push("(i.code LIKE ? OR i.name LIKE ? OR i.grp LIKE ?)");
@@ -59,6 +64,24 @@ catalogRoutes.get('/supplies', async (c) => {
     .bind(...params)
     .all<{ code: string; name: string; unit: string; grp: string; product_id: string | null }>();
   return ok(c, rows.results ?? []);
+});
+
+/** Sale chọn hàng hóa / quà chưa có mã bán vào đơn Kênh phân phối: web tạo mã đề xuất (QUA-…), vẫn bán được; Trưởng phòng duyệt mã sau. */
+catalogRoutes.post('/supplies/ensure-gift', async (c) => {
+  const auth = c.get('auth');
+  if (!auth.permissions.includes('order.create') && !auth.permissions.includes('order.create.team')) {
+    throw badRequest('FORBIDDEN', 'Chỉ người lập đơn mới thêm hàng hóa / quà vào đơn.');
+  }
+  const body = (await c.req.json().catch(() => null)) as { code?: unknown } | null;
+  const code = String(body?.code ?? '').trim();
+  if (!code) throw badRequest('MISSING', 'Thiếu mã kho');
+  const r = await createKppCode(c.env.DB, auth, code, {
+    approved: canApproveCode(auth),
+    requestId: c.get('requestId'),
+    ip: c.req.header('CF-Connecting-IP') ?? null,
+    source: 'len-don',
+  });
+  return ok(c, r);
 });
 
 catalogRoutes.post('/supplies/ensure', async (c) => {

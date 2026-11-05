@@ -18,7 +18,8 @@ async function spcLoad(force){
   try{
     const [cb,pr,un,cat,cost]=await Promise.all([spcApi("/combos"),spcApi("/products"),spcApi("/unmapped"),kApi("/catalog").catch(()=>({items:[]})),spcSeeCost()?kApi("/costs").catch(()=>[]):[]]);
     SPCB.rows=cb.rows||[];SPCB.sales=cb.sales||[];SPCB.can=!!cb.can_edit;SPCB.prods=pr.items||[];SPCB.khomap=pr.kho_map||[];SPCB.un=un||[];
-    SPCB.items=new Map(((cat&&cat.items)||[]).map(i=>[spcLow(i.code),i]));SPCB.cost=cost||[];SPCB.err="";
+    SPCB.items=new Map(((cat&&cat.items)||[]).map(i=>[spcLow(i.code),i]));SPCB.cost=cost||[];SPCB.err="";SPCB.canCode=!!pr.can_code;
+    try{SPCB.kpPend=(await spcApi("/kpp-code/pending")).rows||[]}catch(e){SPCB.kpPend=[]}
   }catch(e){SPCB.err=e.message||"Không tải được"}
   SPCB.busy=false;SPCB.at=Date.now();if(spcPage())renderMain();
 }
@@ -50,6 +51,8 @@ function pSpcombo(m){
     ${go("un",kpi("Mã chưa quy đổi",nf(U.codes),`${nf(U.orders)} đơn kho đã xuất, chưa tính giá vốn`,U.codes?"#b42318":""))}</div>`;
   const tabs=`<nav class="settabs">${[["combo","Combo theo kênh"],["sp","Sản phẩm gốc"],["un","Mã chưa quy đổi"+(U.codes?" ("+U.codes+")":"")]].map(([k,t])=>`<button class="${SPCB.tab===k?"on":""}" data-spct="${k}">${t}</button>`).join("")}</nav>`;
   const body=SPCB.tab==="sp"?spcProdView(C):SPCB.tab==="un"?spcUnView(C):spcComboView(C);
+  /* Có mã bán sale tạo đang chờ: Trưởng phòng mở trang là hiện hộp duyệt (một lần mỗi lần tải). */
+  if(SPCB.canCode&&(SPCB.kpPend||[]).length&&!SPCB.kpShown){SPCB.kpShown=1;setTimeout(()=>spcKppPending(),300)}
   m.innerHTML=H(T,S)+kp+tabs+body+(SPCB.can?"":`<p class="hint pad">Bạn chỉ xem. CEO và kế toán mới sửa được.</p>`);
   m.querySelectorAll("[data-spct]").forEach(b=>b.onclick=()=>{SPCB.tab=b.dataset.spct;renderMain()});
   spcBind(m,C);
@@ -105,16 +108,16 @@ async function spcSaveInline(c,parts,msg){
   catch(e){toast(e.message);renderMain()}
 }
 function spcProdView(C){
-  let L=SPCB.prods.map(p=>({...p,crm:SPCB.khomap.filter(k=>spcLow(k.misa_code)===spcLow(p.code)).map(k=>k.crm_sku),used:C.used[spcLow(p.code)]||0,gv:C.g&&C.g[spcLow(p.code)]}));
-  if(SPCB.pf==="on")L=L.filter(p=>p.active);else if(SPCB.pf==="combo")L=L.filter(p=>p.used);else if(SPCB.pf==="nogv")L=L.filter(p=>p.active&&!p.gv);else if(SPCB.pf==="off")L=L.filter(p=>!p.active);
+  let L=SPCB.prods.map(p=>{const crmRows=SPCB.khomap.filter(k=>spcLow(k.misa_code)===spcLow(p.code));return {...p,crmRows,crm:crmRows.map(k=>k.crm_sku),used:C.used[spcLow(p.code)]||0,gv:C.g&&C.g[spcLow(p.code)]}});
+  if(SPCB.pf==="on")L=L.filter(p=>p.active);else if(SPCB.pf==="combo")L=L.filter(p=>p.used);else if(SPCB.pf==="nogv")L=L.filter(p=>p.active&&!p.gv);else if(SPCB.pf==="off")L=L.filter(p=>!p.active);else if(SPCB.pf==="nokpp")L=L.filter(p=>p.active&&p.cls==="HH"&&!p.crm.length);else if(SPCB.pf==="kpwait")L=L.filter(p=>p.crmRows.some(k=>k.code_status==="CHO_DUYET"));
   const fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.pq||"").trim();
   if(q)L=L.filter(p=>q.split(/\s+/).every(w=>fold(p.code+" "+p.name+" "+p.crm.join(" ")).includes(w)));
   L.sort((a,b)=>b.used-a.used||a.code.localeCompare(b.code));
-  const fo=[["on","Đang dùng"],["combo","Đang nằm trong combo"]].concat(C.g?[["nogv","Chưa có giá vốn"]]:[],[["off","Ngừng dùng"]]);
+  const fo=[["on","Đang dùng"],["combo","Đang nằm trong combo"]].concat(C.g?[["nogv","Chưa có giá vốn"]]:[],[["nokpp","Hàng hóa / quà chưa có mã bán"],["kpwait","Mã bán chờ duyệt"],["off","Ngừng dùng"]]);
   return `<section class="card flush"><div class="card-h pad"><div class="filters"><select id="spc-pf">${opt(fo,SPCB.pf)}</select><input id="spc-pq" placeholder="Tìm mã, tên…" value="${esc(SPCB.pq)}" style="max-width:240px"><span class="hint">${nf(L.length)} mã</span></div>
     ${SPCB.can?`<button class="btn pri" data-spadd="1">+ Thêm sản phẩm</button>`:""}</div>
-   <p class="hint pad" style="padding-top:0">Sản phẩm gốc = mã kho/MISA (thành phẩm, hàng hóa, quà). Một mã dùng chung cho kho, Kênh phân phối và combo các sàn.${C.g?" Giá vốn lấy ở Giá vốn SKU, chưa có thì lấy giá nhập kho bình quân.":""}</p>
-   ${tbl(["Mã kho / MISA","Tên","ĐVT","Loại","Mã bán Kênh phân phối"].concat(C.g?["Giá vốn"]:[],["Trong combo",""]),L.slice(0,400).map(p=>`<tr${p.active?"":' style="opacity:.55"'}><td class="mono"><b>${esc(p.code)}</b></td><td>${esc(p.name)}${p.active?"":" <small class='hint'>(ngừng dùng)</small>"}</td><td>${esc(p.unit)}</td><td>${p.cls==="TP"?"Thành phẩm":"Hàng hóa / quà"}</td><td class="mono">${p.crm.map(esc).join(", ")||"—"}</td>
+   ${spcKpBanner()}<p class="hint pad" style="padding-top:0">Sản phẩm gốc = mã kho/MISA (thành phẩm, hàng hóa, quà). Một mã dùng chung cho kho, Kênh phân phối và combo các sàn.${C.g?" Giá vốn lấy ở Giá vốn SKU, chưa có thì lấy giá nhập kho bình quân.":""}</p>
+   ${tbl(["Mã kho / MISA","Tên","ĐVT","Loại","Mã bán Kênh phân phối"].concat(C.g?["Giá vốn"]:[],["Trong combo",""]),L.slice(0,400).map(p=>`<tr${p.active?"":' style="opacity:.55"'}><td class="mono"><b>${esc(p.code)}</b></td><td>${esc(p.name)}${p.active?"":" <small class='hint'>(ngừng dùng)</small>"}</td><td>${esc(p.unit)}</td><td>${p.cls==="TP"?"Thành phẩm":"Hàng hóa / quà"}</td><td>${spcKpCell(p)}</td>
      ${C.g?`<td class="n">${SPCB.can&&p.active?`<input class="spp-gvi n" inputmode="numeric" data-c="${esc(p.code)}" data-n="${esc(p.name)}" value="${p.gv&&/^Giá vốn SKU/.test(p.gv.src)?Math.round(p.gv.u):""}" placeholder="${p.gv?nf(p.gv.u):"chưa có"}" style="width:110px${p.gv?"":";border-color:#f79009"}">`:p.gv?nf(p.gv.u)+"đ":pill("chưa có","amb")}${p.gv?`<br><small style="color:#667085;font-weight:400">${esc(p.gv.src)}</small>`:""}</td>`:""}<td class="n">${p.used||""}</td><td>${SPCB.can?`<button class="btn sm" data-spp="${esc(p.code)}">Sửa</button>`:""}</td></tr>`))}
    ${L.length>400?`<p class="hint pad">Đang hiện 400 / ${nf(L.length)}. Gõ vào ô tìm để thu hẹp.</p>`:""}</section>`;
 }
@@ -137,6 +140,10 @@ function spcBind(m,C){
   m.querySelectorAll("[data-spnew]").forEach(b=>b.onclick=()=>spcbEdit(null,null));
   m.querySelectorAll("[data-spadd]").forEach(b=>b.onclick=()=>spcProd(null));
   m.querySelectorAll("[data-spp]").forEach(b=>b.onclick=()=>spcProd(SPCB.prods.find(p=>p.code===b.dataset.spp)));
+  m.querySelectorAll("[data-kpnew]").forEach(b=>b.onclick=()=>spcKppNew(b.dataset.kpnew));
+  m.querySelectorAll("[data-kpbulk]").forEach(b=>b.onclick=()=>spcKppBulk());
+  m.querySelectorAll("[data-kppend]").forEach(b=>b.onclick=()=>spcKppPending());
+  m.querySelectorAll("[data-kpok]").forEach(b=>b.onclick=async()=>{if(!confirm("Duyệt mã bán "+b.dataset.sku+"? (Muốn sửa mã thì bấm Duyệt mã ở dòng thông báo phía trên.)"))return;b.disabled=true;try{await spcApi("/kpp-code/approve",{method:"POST",body:JSON.stringify({product_id:b.dataset.kpok})});toast("Đã duyệt mã bán "+b.dataset.sku);spcLoad(true)}catch(e){toast(e.message);b.disabled=false}});
   m.querySelectorAll(".spp-gvi").forEach(x=>spcGvInput(x,renderMain));
   /* Sửa ngay trong bảng combo: lần sửa đầu chép combo ra nháp. */
   const cOf=k=>C.combos.find(x=>x.key===k),dr=c=>SPCB.dr[c.key]||(SPCB.dr[c.key]=c.parts.map(p=>({...p})));
@@ -271,6 +278,60 @@ function pKhoCombo(m){
      ${c.parts.filter(p=>p.kind!=="skip").map(p=>`<div style="padding:4px 0">☐ <b>${p.qty}</b> × ${esc(nm(p))} <small class="hint mono">${esc(p.code)}</small>${p.kind==="gift"?" "+pill("quà tặng","vio"):p.kind==="pack"?" "+pill("bao bì","gry"):""}</div>`).join("")||`<p class="hint">Mã này không trừ kho.</p>`}</section>`).join("")||`<p class="hint pad">Không thấy combo này. Báo kế toán nhập ở web quản trị.</p>`}`;
   const e=$("#spk-q");e.oninput=()=>{SPCB.kq=e.value;const p=e.selectionStart;renderMain();const x=$("#spk-q");if(x){x.focus();x.setSelectionRange(p,p)}};
 }
+/* ---------- Mã bán Kênh phân phối cho hàng hóa / quà (chị Hoa giao 05/11) ----------
+   Hàng hóa / quà chưa có mã bán: web đề xuất mã QUA-<mã kho>; Trưởng phòng / CEO bấm Duyệt là có mã ngay (một mã hoặc cả loạt).
+   Sale chọn quà chưa có mã khi lên đơn thì web tạo mã chờ duyệt: hiện hộp duyệt khi Trưởng phòng mở trang, và ở Phê duyệt. */
+const spcKpCell=p=>{
+  if(p.crmRows.length)return p.crmRows.map(k=>`<span class="mono">${esc(k.crm_sku)}</span>${k.code_status==="CHO_DUYET"?` ${pill("chờ duyệt mã","amb")}${SPCB.canCode&&k.product_id?` <button class="btn sm pri" data-kpok="${esc(k.product_id)}" data-sku="${esc(k.crm_sku)}">Duyệt</button>`:""}`:""}`).join("<br>");
+  if(p.cls==="HH"&&p.active&&(SPCB.canCode||SPCB.can))return `<button class="btn sm" data-kpnew="${esc(p.code)}" title="Web đề xuất mã, ${SPCB.canCode?"duyệt luôn":"Trưởng phòng duyệt"}">+ Tạo mã bán</button>`;
+  return "—";
+};
+function spcKpBanner(){
+  if(!SPCB.canCode&&!SPCB.can)return "";
+  const miss=SPCB.prods.filter(p=>p.cls==="HH"&&p.active&&!SPCB.khomap.some(k=>spcLow(k.misa_code)===spcLow(p.code))),pend=SPCB.kpPend||[];
+  if(!miss.length&&!pend.length)return "";
+  return `<div class="note amb" style="margin:0 0 10px">${miss.length?`<b>${nf(miss.length)} hàng hóa / quà chưa có mã bán Kênh phân phối</b> (sale chưa chọn được trong bảng giá). `:""}${miss.length&&SPCB.canCode?`<button class="btn sm pri" data-kpbulk="1">Tạo mã cho cả ${nf(miss.length)} mã</button> `:""}${pend.length?`<b>${nf(pend.length)} mã bán do sale tạo khi lên đơn đang chờ duyệt.</b> ${SPCB.canCode?`<button class="btn sm pri" data-kppend="1">Duyệt mã</button>`:"Trưởng phòng duyệt mã."}`:""}</div>`;
+}
+async function spcKppNew(code){
+  const it=SPCB.prods.find(p=>p.code===code);let sku="";
+  try{sku=(await spcApi("/kpp-code/suggest?code="+encodeURIComponent(code))).sku}catch(e){toast(e.message);return}
+  openDrawerHTML(`<h2>Tạo mã bán Kênh phân phối</h2>
+   <p>Hàng hóa / quà: <b class="mono">${esc(code)}</b> · ${esc(it?it.name:"")}</p>
+   <div class="filters"><label class="inl">Mã bán (web đề xuất, sửa được) <input id="kp-sku" class="mono" value="${esc(sku)}" style="width:200px"></label></div>
+   <p class="hint">Mã bán nối với mã kho ${esc(code)} (1 = 1): xuất kho, giá vốn, công nợ, báo cáo tính như mọi mã khác. Giá bán: sale nhập tay khi lên đơn, hoặc đặt ở Bảng giá.</p>
+   <div class="filters" style="margin-top:12px"><button class="btn pri" id="kp-go">${SPCB.canCode?"Duyệt mã":"Tạo mã (Trưởng phòng duyệt sau)"}</button></div>`);
+  $("#kp-go").onclick=async()=>{const b=$("#kp-go");b.disabled=true;
+    try{const r=await spcApi("/kpp-code",{method:"POST",body:JSON.stringify({code,sku:$("#kp-sku").value.trim()})});closeDrawer();
+      toast((r.code_status==="CHO_DUYET"?"Đã tạo mã "+r.sku+", chờ Trưởng phòng duyệt":"Đã duyệt mã bán "+r.sku)+" cho "+code);spcLoad(true)}
+    catch(e){toast(e.message);b.disabled=false}};
+}
+async function spcKppBulk(){
+  const miss=SPCB.prods.filter(p=>p.cls==="HH"&&p.active&&!SPCB.khomap.some(k=>spcLow(k.misa_code)===spcLow(p.code)));
+  const sug=c=>(/^QUA-/i.test(c)?c:"QUA-"+c).toUpperCase();
+  openDrawerHTML(`<h2>Tạo mã bán cho ${nf(miss.length)} hàng hóa / quà</h2>
+   <p class="hint">Web đề xuất mã theo quy ước QUA-<mã kho> (mã kho đã có QUA- thì giữ nguyên; trùng thì thêm số). Muốn đổi mã nào thì bấm "+ Tạo mã bán" ở dòng đó thay vì tạo cả loạt.</p>
+   ${tbl(["Mã kho","Tên","Mã bán đề xuất"],miss.slice(0,100).map(p=>`<tr><td class="mono">${esc(p.code)}</td><td>${esc(p.name)}</td><td class="mono">${esc(sug(p.code))}</td></tr>`))}
+   ${miss.length>100?`<p class="hint">Mỗi lần duyệt tối đa 100 mã.</p>`:""}
+   <div class="filters" style="margin-top:12px"><button class="btn pri" id="kp-bulk">Duyệt ${nf(Math.min(100,miss.length))} mã</button></div>`);
+  $("#kp-bulk").onclick=async()=>{const b=$("#kp-bulk");b.disabled=true;
+    try{const r=await spcApi("/kpp-code/bulk",{method:"POST",body:JSON.stringify({items:miss.slice(0,100).map(p=>({code:p.code}))})});const bad=r.filter(x=>x.error);
+      closeDrawer();toast("Đã duyệt "+(r.length-bad.length)+" mã bán"+(bad.length?" · "+bad.length+" mã chưa tạo được: "+bad.slice(0,3).map(x=>x.code+" ("+x.error+")").join("; "):""));spcLoad(true)}
+    catch(e){toast(e.message);b.disabled=false}};
+}
+/* Hộp duyệt mã sale tạo khi lên đơn (hiện tự động khi Trưởng phòng mở trang; cũng mở từ Phê duyệt). */
+function spcKppPending(onDone){
+  const L=SPCB.kpPend||[];if(!L.length){toast("Không còn mã bán nào chờ duyệt");return}
+  openDrawerHTML(`<h2>Duyệt mã bán Kênh phân phối</h2>
+   <p class="hint">Sale chọn hàng hóa / quà chưa có mã khi lên đơn nên web đã tự tạo mã; đơn vẫn chạy bình thường. Giữ mã đề xuất hoặc sửa rồi bấm Duyệt (đơn cũ tự theo mã mới).</p>
+   ${tbl(["Mã kho","Tên","Mã bán","Tạo bởi","Đơn",""],L.map((x,i)=>`<tr><td class="mono">${esc(x.kho||"")}</td><td>${esc(x.name)}</td><td><input class="mono kp-s" data-i="${i}" value="${esc(x.sku)}" style="width:170px"></td><td>${esc(x.by_name||"")}<br><small class="hint">${esc(spcAt(x.created_at))}</small></td><td class="n">${nf(x.orders)}</td><td><button class="btn sm pri" data-kpi="${i}">Duyệt</button></td></tr>`))}
+   ${L.length>1?`<div class="filters" style="margin-top:12px"><button class="btn pri" id="kp-all">Duyệt cả ${L.length} mã</button></div>`:""}`);
+  const dr=$("#drawerIn"),one=async i=>{const x=L[i],v=dr.querySelector(`.kp-s[data-i="${i}"]`).value.trim();await spcApi("/kpp-code/approve",{method:"POST",body:JSON.stringify({product_id:x.id,sku:v})});return v};
+  const fin=n=>{closeDrawer();toast("Đã duyệt "+n+" mã bán");spcLoad(true);if(onDone)onDone()};
+  dr.querySelectorAll("[data-kpi]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await one(+b.dataset.kpi);fin(1)}catch(e){toast(e.message);b.disabled=false}});
+  if($("#kp-all"))$("#kp-all").onclick=async()=>{let n=0;for(let i=0;i<L.length;i++){try{await one(i);n++}catch(e){toast(L[i].sku+": "+e.message)}}fin(n)};
+}
+/* Duyệt một mã từ trang Phê duyệt (cùng hộp duyệt). */
+async function spcKppFromPd(onDone){try{const r=await spcApi("/kpp-code/pending");SPCB.kpPend=r.rows||[];spcKppPending(onDone)}catch(e){toast(e.message)}}
 PAGES.spcombo=pSpcombo;
 PAGES.kho_combo=pKhoCombo;
 /* Quy đổi mã các sàn (trang cũ ở quản trị): mở thẳng Sản phẩm & combo; các nút "Mở Quy đổi mã các sàn" ở TikTok/Shopee về đây. */

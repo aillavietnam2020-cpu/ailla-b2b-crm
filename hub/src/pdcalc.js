@@ -16,11 +16,12 @@
            · admin hoặc kế toán (giống trang Sản phẩm và combo, spdangchay.js spcDuyetPhieu)
     mh     hàng về lệch đơn mua, chờ người phụ trách mua hàng chốt tiền (GET /api/hub/kho/mh/lech, chị Hoa duyệt 04/11)
            · như quyền Mua hàng: CEO, admin, order.approve.normal, order.accounting.confirm (purchasing.ts canManage)
+    ma     mã bán Kênh phân phối web tạo khi sale chọn hàng hóa / quà chưa có mã (GET /api/hub/sanpham/kpp-code/pending) · CEO hoặc order.approve.normal (Trưởng phòng); Duyệt mở hộp duyệt (05/11)
     combo  mã combo mới trên đơn sàn chưa nhập (GET /api/hub/sanpham/unmapped) · CEO hoặc kế toán; một dòng gộp, chỉ Mở trang (28/10)
    NGƯỠNG CHI PHẢI CEO DUYỆT (chị Hoa chốt 27/10/2026, mặc định 5.000.000đ, đổi ở Ngưỡng cảnh báo; cùng quy tắc src/shared/ceoSpend.ts):
     khoản chi từ ngưỡng mà người duyệt/lập không phải CEO thì chờ CEO. Dòng "chờ CEO" chỉ CEO thấy; người duyệt trước không thấy lại.
    ===================================================================== */
-const PD_KINDS=[["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"],["cbdx","Combo Digital"],["mh","Hàng về lệch đơn mua"]];
+const PD_KINDS=[["ma","Mã bán chờ duyệt"],["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"],["cbdx","Combo Digital"],["mh","Hàng về lệch đơn mua"]];
 /* Khoản chi này có phải chờ CEO duyệt không (giống needsCeo ở máy chủ). Ngưỡng 0 = tắt. */
 const pdNeedCeo=(amount,th,isCeo)=>!isCeo&&th>0&&amount>=th;
 const PD_KIND_N=k=>(PD_KINDS.find(x=>x[0]===k)||[k,k])[1];
@@ -100,6 +101,10 @@ function pdBuild(S,w){
     add({k:"mh",id:"ml:"+x.id,ref:x.id,src:"mhLech",loai:"Hàng về "+ty+" so với đơn",ok:"Xử lý",nd:[x.po_no,x.supplier_name].filter(Boolean).join(" · "),
       sub:(x.name||x.item||"")+": đặt "+q(+x.ordered||0)+", nhận "+q(+x.received||0)+" ("+ty+" "+q(Math.abs(d))+")"+(x.kho_doc_no?" · phiếu nhập "+x.kho_doc_no:""),
       tien:x.unit_price!=null?Math.round(Math.abs(d)*+x.unit_price):null,by:"Kho",at:pdTs(x.created_at),act:"fn",open:{page:"mh_po",po:x.po_id}})});
+  /* Mã bán Kênh phân phối sale tạo khi lên đơn, chờ Trưởng phòng duyệt (giữ hoặc sửa mã). */
+  const P=n=>((w&&w.perms)||[]).includes(n);
+  if(ceo||P("order.approve.normal"))(S.kppCode||[]).forEach(x=>add({k:"ma",id:"kp:"+x.id,ref:x.id,src:"kppCode",loai:"Mã bán Kênh phân phối · chờ duyệt",nd:x.sku+" · "+(x.name||""),
+    sub:"mã kho "+(x.kho||"")+(x.orders?" · đã có "+x.orders+" đơn":""),by:x.by_name||"",at:pdTs(x.created_at),act:"fn",ok:"Duyệt",open:{page:"spcombo"}}));
   return L.sort((a,b)=>(a.at||Infinity)-(b.at||Infinity));
 }
 /* Lọc theo loại ("" = tất cả) và đếm từng loại để hiện ở nút lọc. */
