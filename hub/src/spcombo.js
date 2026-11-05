@@ -290,7 +290,7 @@ function spcKpBanner(){
   if(!SPCB.canCode&&!SPCB.can)return "";
   const miss=SPCB.prods.filter(p=>p.cls==="HH"&&p.active&&!SPCB.khomap.some(k=>spcLow(k.misa_code)===spcLow(p.code))),pend=SPCB.kpPend||[];
   if(!miss.length&&!pend.length)return "";
-  return `<div class="note amb" style="margin:0 0 10px">${miss.length?`<b>${nf(miss.length)} hàng hóa / quà chưa có mã bán Kênh phân phối</b> (sale chưa chọn được trong bảng giá). `:""}${miss.length&&SPCB.canCode?`<button class="btn sm pri" data-kpbulk="1">Tạo mã cho cả ${nf(miss.length)} mã</button> `:""}${pend.length?`<b>${nf(pend.length)} mã bán do sale tạo khi lên đơn đang chờ duyệt.</b> ${SPCB.canCode?`<button class="btn sm pri" data-kppend="1">Duyệt mã</button>`:"Trưởng phòng duyệt mã."}`:""}</div>`;
+  return `<div class="note amb" style="margin:0 0 10px">${miss.length?`<b>${nf(miss.length)} hàng hóa / quà chưa có mã bán Kênh phân phối</b> (sale vẫn bán được: chọn khi lên đơn là web tự tạo mã, nhập giá bán như mã khác). `:""}${miss.length&&SPCB.canCode?`<button class="btn sm pri" data-kpbulk="1">Tạo mã cho cả ${nf(miss.length)} mã</button> `:""}${pend.length?`<b>${nf(pend.length)} mã bán do sale tạo khi lên đơn đang chờ duyệt.</b> ${SPCB.canCode?`<button class="btn sm pri" data-kppend="1">Duyệt mã</button>`:"Trưởng phòng duyệt mã."}`:""}</div>`;
 }
 async function spcKppNew(code){
   const it=SPCB.prods.find(p=>p.code===code);let sku="";

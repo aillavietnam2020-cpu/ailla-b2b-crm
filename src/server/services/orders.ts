@@ -242,7 +242,8 @@ export async function prepareOrder(
     }
 
     // Cấp "Khác" (lái xe, khách lẻ lẫn...): không có bảng giá, giá do người lập đơn nhập, không cảnh báo, không bắt duyệt.
-    // Hàng hóa / quà (nhóm QUA_TANG) chưa có giá ở bảng giá: vẫn bán được, giá do người lập đơn nhập (chị Hoa chốt 05/11).
+    // Hàng hóa nhóm QUA_TANG (mua về làm quà nhưng vẫn bán cho NPP như sản phẩm thường) chưa có giá ở bảng giá:
+    // vẫn bán được, giá bán do người lập đơn nhập, tính doanh thu bình thường (chị Hoa chốt 05/11).
     if (freeTier || product.group_code === 'VAT_TU_BAN' || ((customer.tier_code === 'NHAN_VIEN' || product.group_code === 'QUA_TANG') && base === null)) {
       const typed = item.applied_price ?? 0;
       if (!(typed > 0)) {

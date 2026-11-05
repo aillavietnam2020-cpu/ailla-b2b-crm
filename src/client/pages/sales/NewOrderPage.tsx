@@ -287,7 +287,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
       toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được vật tư');
     }
   };
-  // Hàng hóa / quà chưa có mã bán Kênh phân phối: vẫn chọn vào đơn được, web tự tạo mã (QUA-…), Trưởng phòng duyệt mã sau.
+  // Hàng hóa chưa có mã bán Kênh phân phối (mua về làm quà nhưng vẫn bán cho NPP, có giá và doanh thu): vẫn chọn vào đơn được, web tự tạo mã (QUA-…), Trưởng phòng duyệt mã sau.
   const gifts = useApi<SupplyItem[]>(
     !customPricing && customerId && debouncedQuery.trim() ? `/api/supplies?gift=1&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
   );
@@ -296,9 +296,9 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
       const r = await api.post<{ id: string; sku: string; name: string; unit: string | null; code_status: string }>('/api/supplies/ensure-gift', { code: it.code });
       const p = r.data;
       addLine({ id: p.id, sku: p.sku, name: p.name, unit: p.unit, pack_size: null, price: null }, true);
-      if (p.code_status === 'CHO_DUYET') toast.success(`Đã tạo mã bán ${p.sku}, chờ Trưởng phòng duyệt mã. Nhập giá hoặc đánh dấu tặng.`);
+      if (p.code_status === 'CHO_DUYET') toast.success(`Đã tạo mã bán ${p.sku}, chờ Trưởng phòng duyệt mã. Nhập giá bán cho dòng này.`);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được hàng hóa / quà');
+      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được hàng hóa');
     }
   };
   const suggestLoading = customPricing ? ownCatalog.loading : catalog.loading;
@@ -635,7 +635,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
             {!customPricing && (gifts.data ?? []).length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
                 <div className="muted" style={{ fontSize: 12.5, padding: '0 4px 4px' }}>
-                  Hàng hóa / quà chưa có mã bán: chọn là web tự tạo mã, Trưởng phòng duyệt mã sau. Giá nhập tay hoặc đánh dấu tặng.
+                  Hàng hóa chưa có mã bán Kênh phân phối: chọn là web tự tạo mã, Trưởng phòng duyệt mã sau. Nhập giá bán như mọi mã khác.
                 </div>
                 {(gifts.data ?? []).map((it) => (
                   <button type="button" key={it.code} className="suggest-row" onClick={() => void addGiftItem(it)} disabled={!customerId}>
