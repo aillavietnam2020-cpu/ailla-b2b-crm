@@ -152,6 +152,16 @@
   .side .me{padding:10px 16px 14px;font-size:13px}
   .side .me b{font-size:13.5px}
 
+  /* bảng vừa màn sau khi thu gọn: giữ dạng bảng */
+  table.mfit:not(.mlist){width:100%}
+  table.mfit:not(.mlist) th,table.mfit:not(.mlist) td{padding:7px 5px!important;font-size:12px;white-space:nowrap}
+  table.mfit:not(.mlist) th{font-size:11px}
+  table.mfit:not(.mlist) td:first-child,table.mfit:not(.mlist) th:first-child{padding-left:8px!important;white-space:normal}
+  table.mfit:not(.mlist) td:last-child,table.mfit:not(.mlist) th:last-child{padding-right:8px!important}
+  table.mfit .ml-x{display:none!important}
+  table.mfit:not(.mlist) svg:not(.ic){max-width:56px;height:auto}
+  table.mfit:not(.mlist) .pill,table.mfit:not(.mlist) .tag{font-size:10.5px;padding:0 6px}
+
   /* mỗi dòng: hàng 1 = tên (trái) + số chính (phải); hàng 2 = các số phụ xếp 3 cột thẳng hàng giữa các dòng */
   table.mlist>tbody>tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:4px 10px;padding:10px 2px;border-bottom:1px solid var(--line);background:none}
   table.mlist>tbody>tr:last-child{border-bottom:0}

@@ -148,6 +148,12 @@
       if(H.length<4||H.length>10||[...hr.cells].some(c=>c.colSpan>1))return;
       const r0=t.tBodies[0].rows[0];if(!r0)return;
       if([...r0.cells].filter(c=>c.querySelector("input:not([type=checkbox]),select,textarea")).length>1)return; // bảng nhập liệu nhiều ô: giữ nguyên
+      /* bước 1: giữ dạng bảng, thu gọn chữ và bỏ cột trống; vừa màn hình thì dừng ở đây */
+      const BR=[...t.tBodies[0].rows].filter(r=>r.cells.length===H.length);
+      const emp=c=>{const v=txt(c);return (!v||v==="—"||v==="-")&&!c.querySelector("button,input,img,svg")};
+      H.forEach((h,i)=>{if(BR.length&&BR.every(r=>emp(r.cells[i]))){hr.cells[i].classList.add("ml-x");BR.forEach(r=>r.cells[i].classList.add("ml-x"))}});
+      t.classList.add("mfit");
+      if(t.offsetWidth<=box.clientWidth+4&&t.scrollWidth<=t.clientWidth+4){t.dataset.ml="fit";return}
       let ti=H.findIndex(h=>TITLE.test(h));if(ti<0)ti=0;
       const ki=H.findIndex((h,i)=>i!==ti&&KEY.test(h));
       t.classList.add("mlist");if(ki<0)t.classList.add("ml-nok");t.dataset.ml="1";
