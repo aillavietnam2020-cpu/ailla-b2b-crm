@@ -159,6 +159,8 @@
   table.mfit:not(.mlist) td:first-child,table.mfit:not(.mlist) th:first-child{padding-left:8px!important;white-space:normal}
   table.mfit:not(.mlist) td:last-child,table.mfit:not(.mlist) th:last-child{padding-right:8px!important}
   table.mfit .ml-x{display:none!important}
+  table.ml-kenh td:first-child .pill,table.ml-kenh td:first-child .tag{display:none}
+  table.mfit:not(.mlist) th.n,table.mfit:not(.mlist) td.n{text-align:right}
   table.mfit:not(.mlist) svg:not(.ic){max-width:56px;height:auto}
   table.mfit:not(.mlist) .pill,table.mfit:not(.mlist) .tag{font-size:10.5px;padding:0 6px}
 

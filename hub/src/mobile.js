@@ -155,6 +155,8 @@
       const BR=[...t.tBodies[0].rows].filter(r=>r.cells.length===H.length);
       const emp=c=>{const v=txt(c);return (!v||v==="—"||v==="-")&&!c.querySelector("button,input,img,svg")};
       H.forEach((h,i)=>{if(BR.length&&BR.every(r=>emp(r.cells[i]))){hr.cells[i].classList.add("ml-x");BR.forEach(r=>r.cells[i].classList.add("ml-x"))}});
+      H.forEach((h,i)=>{if(/^(xu hướng|biểu đồ)/i.test(h)){hr.cells[i].classList.add("ml-x");BR.forEach(r=>r.cells[i].classList.add("ml-x"))}}); // điện thoại: bỏ biểu đồ nhỏ (chị Hoa 05/11)
+      if(/^kênh$/i.test(H[0]))t.classList.add("ml-kenh"); // bảng kênh: ẩn nhãn "Đang giảm"… để mỗi kênh 1 dòng; cột Kỳ trước đã báo tăng giảm
       t.classList.add("mfit");
       if(t.offsetWidth<=box.clientWidth+4&&t.scrollWidth<=t.clientWidth+4){t.dataset.ml="fit";return}
       let ti=H.findIndex(h=>TITLE.test(h));if(ti<0)ti=0;
