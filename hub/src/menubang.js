@@ -19,7 +19,7 @@
     C={o,src};Promise.resolve().then(()=>{C=null});return C};
   /* sx_mh (Đơn mua hàng bản kho, không giá) chỉ cho người KHÔNG quản lý mua hàng; người quản lý (Thảo, kế toán, CEO) dùng mh_po. Tránh hiện hai dòng "Đơn mua hàng" (05/11). */
   const MHX=u=>!(typeof mhManage==="function"&&mhManage());
-  const it=(P,x)=>{const[id,nm]=Array.isArray(x)?x:[x];const i=P[id];if(!i)return null;const p=id==="sx_mh"?(u=>MHX(u)&&i[2](u)):i[2];return [i[0],nm||i[1],p,i[3]]};
+  const it=(P,x)=>{const[id,nm]=Array.isArray(x)?x:[x];const i=P[id];if(!i)return null;const p=id==="sx_mh"?(u=>MHX(u)&&i[2](u)):id==="mh_po"?(u=>!MHX(u)&&i[2](u)):i[2];return [i[0],nm||i[1],p,i[3]]};
   /* spec: [[tên nhóm, [id | [id, tên mới]]]]; from: mục cũ để vét trang bảng chưa nhắc; drop: trang cố ý chuyển sang web kia. */
   const mod=(k,ic,n,zone,spec,from,drop,extra)=>Object.assign({k,ic,n,zone,sub:"",adm:ADMH||undefined,groups:()=>{const{o,src}=pool();
     const G=spec.map(([g,ids])=>[g,ids.map(x=>it(o,x)).filter(Boolean)]);
