@@ -1124,7 +1124,10 @@ export async function khoAlerts(db: D1Database) {
  * Chỉ đọc. Tồn kho lấy ở /ton (khoTonRows) như mọi trang khác. */
 khoRoutes.get('/tq-sx', async (c) => {
   const db = c.env.DB;
-  const today = vnDate();
+  // Số bán sàn nạp theo ngày (thường xong hôm sau): tính đến ngày gần nhất đã có số, để 7 ngày không bị kéo xuống bởi hôm nay còn trống.
+  const now = vnDate();
+  const last = (await db.prepare('SELECT MAX(day) AS d FROM channel_out WHERE day <= ?').bind(now).first<{ d: string | null }>())?.d;
+  const today = last && last >= new Date(new Date(`${now}T00:00:00Z`).getTime() - 3 * 86400000).toISOString().slice(0, 10) ? last : now;
   const d0 = new Date(`${today}T00:00:00Z`);
   const back = (n: number) => new Date(d0.getTime() - n * 86400000).toISOString().slice(0, 10);
   const from14 = back(13);
