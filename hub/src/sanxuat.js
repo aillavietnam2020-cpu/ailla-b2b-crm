@@ -256,7 +256,7 @@ function sxReqMulti(){
     btn.disabled=true;const base={uu:$("#ncm-uu").value,nguon:$("#ncm-ng").value,han:$("#ncm-han").value,ghiChu:$("#ncm-gc").value.trim(),taoLuc:$("#ncm-ngay").value||sxToday()},codes=[];
     sxMut(`tạo ${L.length} phiếu sản xuất`,s2=>{s2.cfg.cachLam=s2.cfg.cachLam||{};L.forEach(x=>{s2.cfg.cachLam[x.sp]=x.cachLam;const code=sxReqCode(s2,base.taoLuc);codes.push(code);
       s2.requests.push({id:code,...base,sp:x.sp,sl:x.sl,cachLam:x.cachLam,st:"CAN_LAM",tao:ME.name,batDau:"",lots:[],hist:[{at:sxNow(),by:ME.name,act:"Tạo phiếu sản xuất"}]})})});
-    closeDrawer();const kt=L.filter(x=>x.cachLam!=="CONG_NHAN").length;toast(`Đã tạo ${codes.length} phiếu sản xuất: ${codes.join(", ")}`+(kt?` · ${kt} phiếu pha chế chờ làm ở Pha chế (in phiếu đưa kỹ thuật)`:""));renderMain()};
+    closeDrawer();toast(`Đã tạo ${codes.length} phiếu sản xuất: ${codes.join(", ")}`);renderMain()};
 }
 function sxReqDetail(id){
   const s=SX(),r=s.requests.find(x=>x.id===id);if(!r)return;const lots=s.batches.filter(b=>r.lots.includes(b.id));
