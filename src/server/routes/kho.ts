@@ -1093,8 +1093,8 @@ khoRoutes.post('/items/:code/merge', async (c) => {
   return ok(c, { into, from: old, inactive: [old, ...offTem], as_goods: asGoods });
 });
 
-/** Phiếu sản xuất mới cần pha chế (chị Hoa 06/11): sinh việc + chuông cho kỹ thuật pha chế (quyền sx.kythuat).
- * Việc tự xong khi kỹ thuật ghi phiếu pha chế gắn phiếu sản xuất đó. */
+/** Yêu cầu pha chế mới (chị Hoa 06/11, pha theo bồn, riêng với phiếu sản xuất): sinh việc + chuông cho kỹ thuật pha chế.
+ * Việc tự xong khi kỹ thuật ghi phiếu pha chế gắn mã yêu cầu đó. */
 khoRoutes.post('/pc-notify', async (c) => {
   const auth = c.get('auth');
   const b = (await c.req.json().catch(() => null)) as { items?: Array<Record<string, unknown>> } | null;
@@ -1115,9 +1115,9 @@ khoRoutes.post('/pc-notify', async (c) => {
   for (const it of items) {
     const psx = String(it.psx ?? '').trim().slice(0, 40);
     if (!psx) continue;
-    const open = await c.env.DB.prepare("SELECT 1 FROM tasks WHERE status = 'OPEN' AND title LIKE ?").bind(`Pha chế theo phiếu sản xuất ${psx}:%`).first();
+    const open = await c.env.DB.prepare("SELECT 1 FROM tasks WHERE status = 'OPEN' AND title LIKE ?").bind(`Pha chế theo yêu cầu ${psx}:%`).first();
     if (open) continue;
-    const title = `Pha chế theo phiếu sản xuất ${psx}: ${String(it.name ?? '').slice(0, 120)}${it.sl ? ` · ${it.sl}` : ''}${it.han ? ` · hạn ${it.han}` : ''}. Pha xong vào Kho – Sản xuất › Pha chế, bấm Nhập số thực tế.`;
+    const title = `Pha chế theo yêu cầu ${psx}: ${String(it.name ?? '').slice(0, 120)}${it.sl ? ` · ${it.sl}` : ''}${it.han ? ` · hạn ${it.han}` : ''}. Pha xong vào Kho – Sản xuất › Pha chế, bấm Nhập số thực tế.`;
     const st = taskStatements(c.env.DB, ids, { title, createdBy: auth.user.id, now, priority: 'HIGH' });
     if (st.length) await c.env.DB.batch(st);
     await bellTo(c.env.DB, ids, title, 'kho_pc').catch(() => 0);
@@ -1871,7 +1871,7 @@ khoRoutes.post('/docs', async (c) => {
   if (replaced.length && type === 'PN') warnings.push(`Phiếu cũ ${replaced.map((d) => d.no).join(', ')} đã tự hủy, thay bằng ${no}.`);
   if (type === 'PC' && String(b.ref_no ?? '').trim()) {
     await c.env.DB.prepare("UPDATE tasks SET status = 'DONE', completed_at = ?, updated_at = ? WHERE status = 'OPEN' AND title LIKE ?")
-      .bind(nowIso(), nowIso(), `Pha chế theo phiếu sản xuất ${String(b.ref_no).trim()}:%`)
+      .bind(nowIso(), nowIso(), `Pha chế theo yêu cầu ${String(b.ref_no).trim()}:%`)
       .run()
       .catch(() => undefined);
   }
