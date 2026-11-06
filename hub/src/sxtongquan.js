@@ -79,12 +79,12 @@ function pSxTqx(m){
   const dl=C.wk-C.pw,cmp=C.pw?(Math.abs(dl)/C.pw<.03?`bằng 7 ngày trước (${tqxF(C.pw)})`:`${dl>0?"tăng":"giảm"} ${Math.round(Math.abs(dl)/C.pw*100)}% so với 7 ngày trước`):"",sp=tqxSpark(C.tot.slice(7));
   const nvlNoPo=C.NV.filter(r=>!C.poCodes.has(r.code)).length,poN=(C.D.po||[]).length,gap=C.cnt.crit+C.cnt.warn;
   const tasks=[
-    C.D.cho_xuat?["crit",`${C.D.cho_xuat} đơn Kênh phân phối chờ xuất kho`,"Kế toán kho","Xuất kho","kho_xuat_b2b",true,["kt","ceo"]]:null,
-    C.chuaKiem?["crit",`${C.chuaKiem} mã đang âm mà chưa có số kiểm`,"Kế toán kho · đếm rồi lập Phiếu kiểm tồn","Kiểm kê tồn","kho_kk",false,["kt","ceo"]]:null,
-    poN?["warn",`${poN} đơn mua chờ hàng về`,"Kế toán kho ghi phiếu nhập khi hàng tới","Phiếu nhập","kho_nhap",false,["kt","ceo"]]:null,
-    nvlNoPo?["crit",`${nvlNoPo} vật tư âm kho chưa có đơn mua`,"Phụ trách mua hàng","Đơn mua hàng","mh_po",false,["ceo","xg"]]:null,
-    C.D.lech.cho?["warn",`${C.D.lech.cho} dòng hàng về lệch đơn mua chờ chốt tiền`,"Phụ trách mua hàng","Phê duyệt","pheduyet",false,["ceo"]]:["good","Hàng về lệch đơn mua",`Mua hàng · 0 đang chờ, ${C.D.lech.xong} đã xử lý`,"","",false,["ceo"]],
-    C.choKiem.length?["warn",`${C.choKiem.length} lô chờ kế toán kiểm`,"Kế toán kho","Đóng gói & kiểm kê","sx_lo",false,["kt","xg","ceo"]]:null].filter(t=>t&&t[6].includes(role));
+    C.D.cho_xuat?["crit",`${C.D.cho_xuat} đơn Kênh phân phối chờ xuất kho`,"Kế toán kho","Xuất kho","kho_xuat_b2b",true,["kt","ceo"],"choxuat"]:null,
+    C.chuaKiem?["crit",`${C.chuaKiem} mã đang âm mà chưa có số kiểm`,"Kế toán kho · đếm rồi lập Phiếu kiểm tồn","Kiểm kê tồn","kho_kk",false,["kt","ceo"],"chuakiem"]:null,
+    poN?["warn",`${poN} đơn mua chờ hàng về`,"Kế toán kho ghi phiếu nhập khi hàng tới","Phiếu nhập","kho_nhap",false,["kt","ceo"],"po"]:null,
+    nvlNoPo?["crit",`${nvlNoPo} vật tư âm kho chưa có đơn mua`,"Phụ trách mua hàng","Đơn mua hàng","mh_po",false,["ceo","xg"],"nvlnopo"]:null,
+    C.D.lech.cho?["warn",`${C.D.lech.cho} dòng hàng về lệch đơn mua chờ chốt tiền`,"Phụ trách mua hàng","Phê duyệt","pheduyet",false,["ceo"],"lech"]:["good","Hàng về lệch đơn mua",`Mua hàng · 0 đang chờ, ${C.D.lech.xong} đã xử lý`,"","",false,["ceo"]],
+    C.choKiem.length?["warn",`${C.choKiem.length} lô chờ kế toán kiểm`,"Kế toán kho","Đóng gói & kiểm kê","sx_lo",false,["kt","xg","ceo"],"lo"]:null].filter(t=>t&&t[6].includes(role));
   const KP={
     ceo:[["Hàng bán ra 7 ngày",tqxF(C.wk),cmp,"#2a78d6",sp,"ban"],["Thành phẩm âm kho",C.amTP,"mã · bán vượt số đang có","#d03b3b","","tpam"],["Sắp hết hàng bán",C.cnt.warn,"mã · còn dưới 7 ngày","#fab219","","saphet"],["Vật tư âm kho",C.amNV,`mã · ${nvlNoPo} mã chưa có đơn mua`,"#d03b3b","","nvlam"],["Việc đang chờ",tasks.filter(t=>t[0]!=="good").length,"việc · bấm để xem","#4b54d1","","cho"]],
     kt:[["Đơn chờ xuất kho",C.D.cho_xuat,"đơn Kênh phân phối","#d03b3b","","go:kho_xuat_b2b"],["Hàng mua chờ về",poN,poN&&C.D.po[0].expected_date?`đơn · sớm nhất hẹn ${tqxDd(C.D.po[0].expected_date)}`:"đơn","#fab219","","po"],["Mã chưa có số kiểm",C.chuaKiem,"mã đang âm","#d03b3b","","chuakiem"],["Mã âm cần kiểm lại",C.am,`${C.amTP} thành phẩm · ${C.amNV} vật tư`,"#d03b3b","","am"],["Hàng bán ra 7 ngày",tqxF(C.wk),"trừ kho tự động","#2a78d6",sp,"ban"]],
@@ -103,13 +103,14 @@ function pSxTqx(m){
    <div class="tqg"><div class="tqc c7${dim("tp")}"><div class="tqh"><h3>Thành phẩm bán chạy: còn bán được bao lâu</h3><a class="tql" data-tqg="kho_ton_tp">Tồn kho thành phẩm ›</a></div>${cover}</div>
     <div class="tqc c5${dim("nvl")}"><div class="tqh"><h3>Vật tư đang âm kho</h3><a class="tql" data-tqg="kho_ton">Tồn kho nguyên vật liệu ›</a></div><div id="tq-nvl"></div>
      <div class="tqh" style="margin-top:14px"><h3>Đơn mua đang chờ về</h3><a class="tql" data-tqg="mh_po">Đơn mua hàng ›</a></div>${po}</div></div>
-   <div class="tqg"><div class="tqc c6${dim("cho")}"><div class="tqh"><h3>Việc đang chờ</h3><span>ai cần làm · bấm để tới đúng chỗ</span></div>${tasks.length?tasks.map(([k,t,who,btn,go,pri])=>`<div class="tqtask">${tqxPill(k,"")}<div class="t"><b>${t}</b><small>${who}</small></div>${btn?`<button class="btn sm${pri?" pri":""}" data-tqg="${go}">${btn}</button>`:tqxPill("good","Xong")}</div>`).join(""):`<p class="tqempty">Không có việc nào đang chờ.</p>`}</div>
+   <div class="tqg"><div class="tqc c6${dim("cho")}"><div class="tqh"><h3>Việc đang chờ</h3><span>ai cần làm · bấm để tới đúng chỗ</span></div>${tasks.length?tasks.map(([k,t,who,btn,go,pri,,dk])=>`<div class="tqtask${dk?" clk":""}"${dk?` data-tqd="${dk}" title="Bấm để xem danh sách"`:""}>${tqxPill(k,"")}<div class="t"><b>${t}</b><small>${who}</small></div>${btn?`<button class="btn sm${pri?" pri":""}" data-tqg="${go}">${btn}</button>`:tqxPill("good","Xong")}</div>`).join(""):`<p class="tqempty">Không có việc nào đang chờ.</p>`}</div>
     <div class="tqc c6${dim("xuong")}"><div class="tqh"><h3>Lệnh sản xuất & hao hụt</h3><a class="tql" data-tqg="sx_nc">Phiếu sản xuất ›</a></div>${xuong}${C.vari.length?`<p class="tqhint" style="margin-top:8px"><b style="color:#d03b3b">${C.vari.length} mẻ pha chế lệch định mức quá 5%</b> · xem ở Chênh lệch & cảnh báo.</p>`:""}</div></div>
   </div>`;
   head(body);
   m.querySelectorAll("[data-tqr]").forEach(b=>b.onclick=()=>{TQX.role=b.dataset.tqr;renderMain()});
   m.querySelectorAll("[data-tqk]").forEach(b=>b.onclick=()=>{const k=b.dataset.tqk;if(!k)return;if(k.startsWith("go:"))return tqxGo(k.slice(3));if(k==="cho"){const t=m.querySelector(".tqtask");if(t)t.closest(".tqc").scrollIntoView({behavior:"smooth",block:"center"});return}tqxDetail(k,C)});
-  m.querySelectorAll("[data-tqg]").forEach(b=>b.onclick=e=>{e.preventDefault();tqxGo(b.dataset.tqg)});
+  m.querySelectorAll("[data-tqg]").forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();tqxGo(b.dataset.tqg)});
+  m.querySelectorAll("[data-tqd]").forEach(r=>r.onclick=()=>tqxDetail(r.dataset.tqd,C));
   requestAnimationFrame(()=>{const a=$("#tq-sales"),d=$("#tq-dn"),n=$("#tq-nvl");if(a)tqxSales(a,C);if(d)tqxDonut(d,C);if(n)tqxNvl(n,C)});
 }
 /* Bấm ô chỉ số: ngăn bên hiện danh sách mã tạo nên con số; bấm một mã xem từng phiếu (Nhập – xuất – tồn). */
@@ -129,6 +130,14 @@ function tqxDetail(k,C){
   else if(k==="chuakiem"||k==="am"){const L=C.R.filter(r=>r.trang_thai==="AM"&&(k==="am"||!r.da_kiem)).sort((a,b)=>a.ton-b.ton);
     T=k==="am"?"Mã âm cần kiểm lại":"Mã đang âm, chưa có số kiểm";go="kho_kk";gl="Kiểm kê tồn";
     H=tbl(["Mã","Tồn","Bán / ngày","Số kiểm"],L.map(r=>row({r,b:C.ban.get(r.code)||0},r.da_kiem?tqxPill("good","Đã kiểm "+tqxDd(r.moc||"")):tqxPill("neu","Chưa có"))))}
+  else if(k==="choxuat"){T="Đơn Kênh phân phối chờ xuất kho";go="kho_xuat_b2b";gl="Xuất Kênh phân phối";
+    H=`<div class="tbl"><table class="tqt"><thead><tr><th>Đơn</th><th>Ngày đơn</th><th>Khách</th><th class="n">Tổng tiền</th></tr></thead><tbody>${(C.D.cho_xuat_list||[]).map(o=>`<tr><td>${esc(o.order_no)}</td><td>${tqxDd(o.order_date)}</td><td>${esc(o.customer||"")}</td><td class="n">${tqxF(o.total_amount||0)}</td></tr>`).join("")}</tbody></table></div>`}
+  else if(k==="lech"){T="Hàng về lệch đơn mua chờ chốt tiền";go="pheduyet";gl="Phê duyệt";
+    H=`<div class="tbl"><table class="tqt"><thead><tr><th>Đơn mua</th><th>Nhà cung cấp</th><th>Mã</th><th class="n">Đặt</th><th class="n">Nhận</th><th class="n">Lệch</th></tr></thead><tbody>${(C.D.lech_list||[]).map(x=>`<tr><td>${esc(x.no)}</td><td>${esc(x.supplier||"")}</td><td>${esc(x.name||x.item)}<small>${esc(x.item)}</small></td><td class="n">${tqxF(x.ordered)}</td><td class="n">${tqxF(x.received)}</td><td class="n ${x.diff<0?"neg":""}">${x.diff>0?"+":""}${tqxF(x.diff)}</td></tr>`).join("")}</tbody></table></div>`}
+  else if(k==="lo"){T="Lô chờ kế toán kiểm";go="sx_lo";gl="Đóng gói & kiểm kê";
+    H=`<div class="tbl"><table class="tqt"><thead><tr><th>Ngày SX</th><th>Sản phẩm</th><th class="n">Xưởng báo</th><th>Người báo</th></tr></thead><tbody>${C.choKiem.map(b=>`<tr><td>${tqxDd(b.ngay)}</td><td>${esc((typeof sxP==="function"?sxP(b.sp).ten:"")||b.sp)}<small>${esc(b.sp)}</small></td><td class="n">${tqxF(b.baoSL)}</td><td>${esc(b.baoBy||"")}</td></tr>`).join("")}</tbody></table></div>`}
+  else if(k==="nvlnopo"){T="Vật tư âm kho chưa có đơn mua";go="mh_po";gl="Đơn mua hàng";
+    H=tbl(["Mã","Tồn","Bán / ngày","Đơn mua"],C.NV.filter(r=>!C.poCodes.has(r.code)).map(r=>row({r,b:C.ban.get(r.code)||0},tqxPill("crit","Chưa có"))))}
   else if(k==="po"){T="Đơn mua đang chờ về";go="kho_nhap";gl="Lập phiếu nhập";
     H=tbl(["Đơn mua","Nhà cung cấp","Hàng","Hẹn về"],(C.D.po||[]).map(p=>`<tr><td>${esc(p.no)}</td><td>${esc(p.supplier||"")}</td><td>${esc(p.items||"")}</td><td>${p.expected_date?tqxDd(p.expected_date):"chưa hẹn"}</td></tr>`))}
   openDrawerHTML(`<h2>${T}</h2><p class="hint">Bấm một mã để xem từng phiếu làm nên số tồn.${go?` <a href="#" class="lnk" id="tqd-go">Mở ${gl} ›</a>`:""}</p>${H}`);

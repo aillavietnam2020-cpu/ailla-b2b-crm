@@ -1244,7 +1244,7 @@ khoRoutes.get('/tq-sx', async (c) => {
   const back = (n: number) => new Date(d0.getTime() - n * 86400000).toISOString().slice(0, 10);
   const from14 = back(13);
   const from7 = back(6);
-  const [days, b2b, ban, po, cho, lech] = await Promise.all([
+  const [days, b2b, ban, po, cho, lech, choList, lechList] = await Promise.all([
     db.prepare('SELECT day, channel, ROUND(SUM(qty), 3) AS qty FROM channel_out WHERE day >= ? AND day <= ? GROUP BY day, channel').bind(from14, today).all<{ day: string; channel: string; qty: number }>(),
     db.prepare("SELECT doc_date AS day, ROUND(-SUM(qty), 3) AS qty FROM kho_ledger WHERE doc_type = 'B2B' AND qty < 0 AND doc_date >= ? AND doc_date <= ? GROUP BY doc_date").bind(from14, today).all<{ day: string; qty: number }>(),
     db.prepare("SELECT item, ROUND(-SUM(qty), 3) AS qty FROM kho_ledger WHERE qty < 0 AND doc_type IN ('ONLINE', 'B2B') AND doc_date >= ? AND doc_date <= ? GROUP BY item").bind(from7, today).all<{ item: string; qty: number }>(),
@@ -1257,6 +1257,15 @@ khoRoutes.get('/tq-sx', async (c) => {
     ).all<Record<string, string | null>>(),
     db.prepare("SELECT COUNT(*) AS n FROM orders o WHERE o.flow_on = 1 AND o.kho_status = 'CHO_XUAT' AND o.approval_status = 'APPROVED'").first<{ n: number }>(),
     db.prepare("SELECT COUNT(*) AS n, SUM(CASE WHEN status = 'XONG' THEN 1 ELSE 0 END) AS xong FROM po_lech").first<{ n: number; xong: number }>(),
+    // Danh sách để bấm vào dòng việc xem chi tiết (06/11).
+    db.prepare(
+      `SELECT o.id, o.order_no, o.order_date, c.name AS customer, o.total_amount FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+       WHERE o.flow_on = 1 AND o.kho_status = 'CHO_XUAT' AND o.approval_status = 'APPROVED' ORDER BY o.order_date LIMIT 50`,
+    ).all<Record<string, unknown>>(),
+    db.prepare(
+      `SELECT po.no, s.name AS supplier, x.item, i.name, x.ordered, x.received, x.diff FROM po_lech x JOIN po_orders po ON po.id = x.po_id
+       LEFT JOIN suppliers s ON s.id = po.supplier_id LEFT JOIN kho_items i ON i.code = x.item WHERE x.status = 'CHO' ORDER BY x.created_at LIMIT 50`,
+    ).all<Record<string, unknown>>(),
   ]);
   return ok(c, {
     today,
@@ -1268,6 +1277,8 @@ khoRoutes.get('/tq-sx', async (c) => {
     po: po.results,
     cho_xuat: cho?.n ?? 0,
     lech: { cho: (lech?.n ?? 0) - (lech?.xong ?? 0), xong: lech?.xong ?? 0 },
+    cho_xuat_list: choList.results,
+    lech_list: lechList.results,
   });
 });
 

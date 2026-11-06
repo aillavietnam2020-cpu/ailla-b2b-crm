@@ -595,3 +595,4 @@ body.pop-open{overflow:hidden}
 #sdm .sdm-n:empty{display:none}
 #sdm .sdm-add{padding:2px 9px;min-height:0;height:28px}
 #sdm .sdm-x{padding:0 4px}
+.tqtask.clk{cursor:pointer;border-radius:8px}.tqtask.clk:hover{background:#f6f7fc}
