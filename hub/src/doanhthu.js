@@ -219,3 +219,26 @@ function pDtDoiChieu(m){
 PAGES.dt_dc=pDtDoiChieu;
 /* Đưa trang vào kho trang để menubang.js xếp vào Điều hành CEO › Kênh bán hàng. */
 MODULES.push({k:"q_dt",adm:true,zone:"Quản trị",ic:"chart",n:"Đối chiếu doanh thu",sub:"",groups:()=>[["",[MI("dt_dc","Đối chiếu doanh thu",()=>dtOk())]]]});
+
+/* ---------- Tổng quan web vận hành: doanh số theo đơn đã lên, thời gian thực (chị Hoa 06/11) ----------
+   "c theo dõi real time nên e cho c doanh thu tính theo đơn đã lên, thực tế giao cuối tháng chốt".
+   Chỉ trong lúc vẽ trang Tổng quan bên vận hành (DTS.don): execNums / execOrders trả số theo đơn, cùng nguồn trang Kinh doanh —
+   Facebook = doanh thu đơn chốt Pancake (đã trừ hủy), TikTok = GMV theo ngày đã nạp, Shopee = số theo ngày báo cáo đã tải (chưa có thì chỉ đếm đơn Poscake).
+   Không áp khi đang tính số chốt / phân bổ (DTS.live, DTS.inPB) và không tự chốt trong lúc đó: lãi lỗ, P&L, báo cáo tháng giữ doanh thu thực (quy tắc 25/10). */
+DTS.don=0;
+const dtDonOn=()=>DTS.don>0&&!DTS.live&&!DTS.inPB;
+{const _en=execNums;execNums=function(from,to){const N=_en.apply(this,arguments);if(!dtDonOn())return N;
+  const r=(s,i)=>rSum(s,i,from,to),tt=r("tts",0).v,fb=r("fb",6).v,sp=r("spe",0).v;
+  return {...N,tt,fbDT:fb,fbGiao:fb,spDT:sp,tong:tt+fb+sp,adsDT:N.adsDT,rev:null,L:{fb:null,spe:null,tts:null},don:true,
+    n:{tts:r("tts",0).n,spe:r("spe",0).n,fb:r("fb",6).n,ads:(N.n||{}).ads}}}}
+{const _eo=execOrders;execOrders=function(from,to){const O=_eo.apply(this,arguments);if(!dtDonOn())return O;
+  const r=(s,i)=>rSum(s,i,from,to).v,co=typeof tqCo==="function"?tqCo(from,to)||{}:{};return {tts:r("tts",1),fb:r("fb",1),spe:r("spe",4)||co.SHOPEE||0}}}
+{const _ac=dtAutoChot;dtAutoChot=function(){if(DTS.don)return;return _ac.apply(this,arguments)}}
+{const _ex=PAGES.exec;PAGES.exec=function(m){if(IS_ADMIN_HOST())return _ex.apply(this,arguments);
+  DTS.don++;let r;try{r=_ex.apply(this,arguments)}finally{DTS.don--}
+  try{const kl=[...m.querySelectorAll(".xkl")].find(x=>x.textContent.trim()==="Doanh số");if(kl)kl.textContent="Doanh số theo đơn đã lên";
+    const h=m.querySelector(".xkenh .card-h .hint")||m.querySelector(".xkenh .card-h");
+    const note=`<p class="hint pad dt-don" style="margin:0 0 6px">Theo đơn đã lên, đã trừ đơn hủy, cập nhật liên tục: Facebook là đơn chốt Pancake, TikTok là GMV các ngày đã nạp (chưa trừ hủy, hoàn), Shopee lấy từ báo cáo đã tải (chưa có thì chỉ đếm đơn xuất kho). Doanh thu thực chốt cuối tháng, khi đơn giao xong và có báo cáo sàn.</p>`;
+    const card=m.querySelector(".xkenh");if(card&&!card.querySelector(".dt-don")){const ch=card.querySelector(".card-h");if(ch)ch.insertAdjacentHTML("afterend",note)}
+    const th=card&&[...card.querySelectorAll("thead th")].find(x=>x.textContent.trim()==="Doanh thu");if(th)th.textContent="Doanh số theo đơn";void h}catch(e){}
+  return r}}
