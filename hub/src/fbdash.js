@@ -75,7 +75,7 @@ const fbdGrid=groups=>`<section class="fbd-pn">${groups.map(([n,L])=>`<div class
 const fbdTop=(cells,extra)=>`<section class="fbd-pn"><div class="fbd-gr big">${cells.map(fbdTile).join("")}</div>${extra||""}</section>`;
 const fbdN2=v=>v?v.toLocaleString("vi-VN",{maximumFractionDigits:2}):"—";
 /* ---- Kiểu Pancake: hàng chỉ số chọn được + biểu đồ đường so kỳ trước, bảng dày có mức tăng giảm xếp dưới số ---- */
-const FBM={};
+const FBDM={};
 const fbdFmt=(t,v)=>t==="m"?money(v):t==="p"?(v*100).toLocaleString("vi-VN",{maximumFractionDigits:1})+"%":t==="x"?fbdN2(v):t==="d"?nf(Math.round(v))+"đ":nf(Math.round(v));
 /* Mỗi chỉ số: {l nhãn, t kiểu số (m tiền, n đếm, p tỷ lệ, x hai số lẻ, d đồng), n(k) tử số theo ngày, d(k) mẫu số nếu là tỷ số, rev=true nếu tăng là xấu} */
 function fbdMetVal(df,ks){const n=sum(ks,k=>+df.n(k)||0);if(!df.d)return n;const d=sum(ks,k=>+df.d(k)||0);return d?n/d:0}
@@ -91,7 +91,7 @@ function fbdLine(cur,prev,labels,t){
   return '<svg class="pc-chart" viewBox="0 0 '+W+" "+Hh+'">'+grid+'<polygon points="'+x(0)+","+(pt+ih)+" "+pts(cur)+" "+x(n-1)+","+(pt+ih)+'" fill="#2457c5" opacity=".08"/><polyline points="'+pts(prev)+'" fill="none" stroke="#9aa3b5" stroke-width="1.6" stroke-dasharray="4 4"/><polyline points="'+pts(cur)+'" fill="none" stroke="#2457c5" stroke-width="2.2" stroke-linejoin="round"/>'+lbl+hit+"</svg>";
 }
 function fbdMetPanel(id,defs,days,pdays,title,side,nochart){
-  const sel=Math.min(FBM[id]||0,defs.length-1),df=defs[sel],labels=days.map(k=>k.slice(8)+"/"+k.slice(5,7));
+  const sel=Math.min(FBDM[id]||0,defs.length-1),df=defs[sel],labels=days.map(k=>k.slice(8)+"/"+k.slice(5,7));
   const cells=defs.map((d,i)=>{const c=fbdMetVal(d,days),p=fbdMetVal(d,pdays),bad=d.warn&&d.warn(c);return '<button type="button" class="pc-m'+(i===sel&&!nochart?" on":"")+(bad?" bad":"")+'"'+(nochart?' style="cursor:default"':' data-fbm="'+id+":"+i+'"')+'><span class="l">'+d.l+'</span><b>'+fbdFmt(d.t,c)+'</b><span class="s">'+(p?fbdDelta(c,p,d.rev):"&nbsp;")+"</span></button>"}).join("");
   const cur=days.map(k=>fbdMetDay(df,k)),prev=pdays.map(k=>fbdMetDay(df,k));
   if(nochart)return '<section class="pc-card pc-strip"><div class="pc-ms">'+cells+"</div></section>";
@@ -109,7 +109,7 @@ function fbdWfTable(C,A){
   return '<section class="pc-card"><div class="pc-h"><b>Doanh thu, vận chuyển và quảng cáo</b><span>đơn giao thành công, số thật theo đơn</span></div><div class="pc-tw"><table class="pc-t"><thead><tr><th>Khoản</th><th class="n">Số tiền</th><th class="n">% doanh thu</th></tr></thead><tbody>'+r("Doanh thu đơn giao thành công",dt)+(C.n?r("− Chi phí vận chuyển",ship):"")+(A.hasQc?r("− Chi phí quảng cáo sau thuế",qc):"")+(A.hasQc&&C.n?r("= Còn lại sau vận chuyển và quảng cáo",left,"pc-tot"):"")+'</tbody></table></div><p class="fbd-note" style="padding:6px 14px 8px">'+(C.n?"Tính cho "+C.n+" ngày có số trong Sheet Pancake (đến "+C.last.slice(8)+"/"+C.last.slice(5,7)+"). Đơn mới tạo chưa kịp giao nên các ngày gần đây doanh thu còn thấp. ":"")+"Giá vốn và các chi phí khác xem ở trang quản trị.</p></section>";
 }
 const fbdVN2=k=>k.slice(8)+"/"+k.slice(5,7);
-function fbdBindMet(m){m.querySelectorAll("[data-fbm]").forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.fbm.split(":");FBM[id]=+i;renderMain()})}
+function fbdBindMet(m){m.querySelectorAll("[data-fbm]").forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.fbm.split(":");FBDM[id]=+i;renderMain()})}
 /* Ô bảng: số ở trên, mức tăng giảm ngay dưới */
 const fbdTd=(v,c,p,rev)=>'<td class="n"><div class="pv">'+v+'</div><div class="pd">'+(p?fbdDelta(c,p,rev):"&nbsp;")+"</div></td>";
 function fbdSrcTable(days,pdays){
