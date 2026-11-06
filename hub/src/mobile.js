@@ -91,7 +91,7 @@
     if(don)alt.push({k:"don",t:"Đơn hàng",ic:"order",go:()=>goPage(don),pages:["cr_dn","cr_s_dn"]});
     if(kho&&kho!==home)alt.push({k:"kho",t:"Kho",ic:"box",go:()=>goPage(kho),pages:KHOP});
     if(khach)alt.push({k:"kh",t:"Khách",ic:"user",go:()=>goPage(khach),pages:["cr_kh","cr_s_kh"]});
-    if(cv&&cv!==home)items.push({k:"cv",t:"Việc",ic:"task",go:()=>goPage(cv),pages:["cv_v","cv_tq","cv_nv","cv","congviec","cv_kb"]});
+    if(cv&&cv!==home)items.push({k:"cv",t:"Công việc",ic:"task",go:()=>goPage(cv),pages:["cv_v","cv_tq","cv_nv","cv","congviec","cv_kb"]});
     else if(alt.length)items.push(alt.shift());
     const gn=quickList();
     const plus=gn.length?{k:"gn",t:"",ic:"plus",big:1,go:openQuick,pages:[]}:mid;
@@ -117,7 +117,7 @@
     /* Chỉ trang người đó có quyền mở; lấy 4 nút theo thứ tự ưu tiên việc hằng ngày, nút thứ 5 luôn là Tất cả */
     const A=[];
     if(has("cc_toi"))A.push(["Chấm công","user",()=>goPage("cc_toi")]); // chấm công trên điện thoại (chamcong.js)
-    const cv=first(["cv_v","cv_nv","cv_tq"]);if(cv&&cv!==PAGE)A.push(["Việc","task",()=>goPage(cv)]);
+    const cv=first(["cv_v","cv_nv","cv_tq"]);if(cv&&cv!==PAGE)A.push(["Công việc","task",()=>goPage(cv)]);
     const chi=canChi();
     if(chi&&isCEO())A.push(["Phiếu chi","money",newChi]);
     else if(don)A.push(["Tạo đơn","plus",()=>newOrder(don)]);
