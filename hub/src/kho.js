@@ -223,7 +223,7 @@ function khoForm(type,pre,clsO){
     const L=lines().filter(l=>l.item),dt=$("#kf-d").value,tp=isOut?$("#kf-k").value:type;
     const mv=L.map(l=>{const it=KHO.items.get(l.item)||{name:"",unit:""};return {item:l.item,name:it.name,unit:it.unit,qty:0,std_qty:l.std_qty!=null?l.std_qty:null,price:null,role:isPC?"USE":"IN",note:""}});
     if(isPC&&$("#kf-btp").dataset.code){const bt=KHO.items.get($("#kf-btp").dataset.code)||{};mv.unshift({item:bt.code,name:bt.name,unit:bt.unit,qty:0,std_qty:null,price:null,role:"PRODUCT",note:""})}
-    khoPrintDoc({doc:{no:"(chưa ghi sổ)",type:tp,doc_date:dt,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",ref_qty:isPC&&$("#kf-rq")&&$("#kf-rq").value!==""?kfNum($("#kf-rq").value):null,note:"",status:"OK"},moves:mv},Object.assign({},KHO_TYPES[tp]||T),false,{},true)};
+    khoPrintDoc({doc:{no:"(chưa ghi sổ)",type:tp,doc_date:dt,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",ref_qty:isPC&&$("#kf-rq")&&$("#kf-rq").value!==""?kfNum($("#kf-rq").value):null,note:"",status:"OK"},moves:mv},Object.assign({},KHO_TYPES[tp]||T),false,isPC?{liters:kfNum($("#kf-lit").value),nguoi:[...document.querySelectorAll("#kf .sdm-pn")].map(x=>x.value.trim()).filter(Boolean)}:{},true)};
   $("#kf").onsubmit=async e=>{e.preventDefault();const ok=$("#kf-ok");ok.disabled=true;$("#kf-msg").textContent="Đang ghi…";
     try{const L=lines().filter(l=>l.item);const body={type:isOut?$("#kf-k").value:type==="TB"?"TD":type,date:$("#kf-d").value,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",note:$("#kf-n").value,
       lines:L.map(l=>({item:l.item,qty:l.qty===""?undefined:+l.qty,ref_qty:l.ref_qty===""?undefined:+l.ref_qty,verdict:l.verdict||undefined,price:l.price===""?undefined:+l.price,std_qty:l.std_qty}))};
@@ -272,17 +272,17 @@ const KHO_ROLE={IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:"Thu được",AUTO
 function khoPrintDoc(r,T,price,ex,blank){
   const d=r.doc,isPC=d.type==="PC",isPN=d.type==="PN"&&price&&!blank,cancelled=!blank&&d.status==="HUY";
   const meta=[["Số phiếu",d.no],["Ngày",kDd(d.doc_date)],d.partner?[d.type==="PN"?"Nhà cung cấp":d.type==="XB"||d.type==="XK"?"Khách hàng / nơi nhận":"Đối tác",d.partner]:null,d.ref_no?[d.type==="PC"||d.type==="KS"?"Phiếu sản xuất / lô":"Tham chiếu",d.ref_no]:null,
-    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,isPC&&ex.bon>1?["Số bồn",knum(ex.bon)+" bồn × "+knum(ex.lit_bon||0)+" lít"]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
-  const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Định mức","Thực tế dùng","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
+    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&blank&&+ex.liters>0?["Số lít cần pha (1 bồn)",knum(ex.liters)+" lít"]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,isPC&&ex.bon>1?["Số bồn",knum(ex.bon)+" bồn × "+knum(ex.lit_bon||0)+" lít"]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
+  const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Định mức","Định lượng","Thực tế","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
   let tong=0;
   const body=r.moves.map((m,i)=>{const q=isPC?(m.role==="PRODUCT"?m.qty:-m.qty):Math.abs(m.qty);const qshow=d.type==="TL"&&m.role==="DROP"?knum(m.std_qty):knum(q);
     let cells=[i+1,m.item,m.name,m.unit];
-    if(isPC){const std=m.role==="USE"?m.std_qty:null,lech=std!=null&&std>0?q-std:null,pc=lech!=null?lech*100/std:0;cells=cells.concat([std!=null?knum(std):"—",qshow,lech==null?"—":(lech>0?"+":"")+knum(lech)+(Math.abs(pc)>=0.05?" ("+(pc>0?"+":"")+pc.toFixed(1)+"%)":"")])}
+    if(isPC){const std=m.role==="USE"?m.std_qty:null,lech=std!=null&&std>0?q-std:null,pc=lech!=null?lech*100/std:0,per=std!=null&&+ex.liters>0?Math.round(std/ex.liters*1e6)/1e6:null;cells=cells.concat([per!=null?knum(per):"—",std!=null?knum(std):"—",qshow,lech==null?"—":(lech>0?"+":"")+knum(lech)+(Math.abs(pc)>=0.05?" ("+(pc>0?"+":"")+pc.toFixed(1)+"%)":"")])}
     else cells.push(qshow);
     if(isPN){const th=(m.price||0)*q;tong+=th;cells=cells.concat([m.price!=null?nf(m.price):"—",m.price!=null?nf(th):"—"])}
     const nt=[KHO_ROLE[m.role]&&!["IN","OUT"].includes(m.role)?KHO_ROLE[m.role]:"",m.note].filter(Boolean).join(" · ");cells.push(nt);
-    if(blank){if(isPC){if(m.role==="PRODUCT")cells=cells.slice(0,4).concat(["—","",""]);else cells[5]="",cells[6]="";cells[7]=""}else{cells[4]="";cells[cells.length-1]=""}}
-    const fillIdx=blank?(isPC?[5,6,cells.length-1]:[4,cells.length-1]):[];const num=isPC?[4,5,6]:[4];const rowCls=m.role==="PRODUCT"?" class=\"pr\"":!blank&&isPC&&m.role==="USE"&&m.std_qty>0&&Math.abs(-m.qty-m.std_qty)*100/m.std_qty>5?" class=\"lech\"":"";
+    if(blank){if(isPC){if(m.role==="PRODUCT")cells=cells.slice(0,4).concat(["—","—","",""]);else cells[6]="",cells[7]="";cells[8]=""}else{cells[4]="";cells[cells.length-1]=""}}
+    const fillIdx=blank?(isPC?[6,7,cells.length-1]:[4,cells.length-1]):[];const num=isPC?[4,5,6,7]:[4];const rowCls=m.role==="PRODUCT"?" class=\"pr\"":!blank&&isPC&&m.role==="USE"&&m.std_qty>0&&Math.abs(-m.qty-m.std_qty)*100/m.std_qty>5?" class=\"lech\"":"";
     return "<tr"+rowCls+">"+cells.map((c,j)=>"<td class=\""+(num.includes(j)&&j>=4?"n ":"")+(j===0?"c ":"")+(fillIdx.includes(j)?"fill":"")+"\">"+esc(String(c))+"</td>").join("")+"</tr>"}).join("");
   const sign=d.type==="PN"?["Người giao hàng","Thủ kho","Kế toán"]:isPC?["Quản lý sản xuất","Kỹ thuật pha chế","Thủ kho"]:d.type==="KS"?["Quản lý sản xuất","Kế toán kho","Thủ kho"]:["Người nhận hàng","Thủ kho","Kế toán"];
   const w=khoPrintWin();
