@@ -4,6 +4,7 @@ import { AGENT_IDS, AGENT_ROSTER } from '@shared/agentRoster';
 import type { AppEnv } from '../env';
 import { forbidden, badRequest, notFound, ok, unauthorized } from '../lib/http';
 import { issueDelegation, issueTelegramDelegation } from '../lib/delegation';
+import { hubCtx } from './chat';
 
 /**
  * Nhắn agent ngay trên web.
@@ -385,6 +386,14 @@ agentRelayRoutes.post('/pull', async (c) => {
       .bind(now, r.id)
       .run();
     if (res.meta.changes) list.push(r);
+  }
+  // Lead / trưởng phòng trên web (vd. Lead Content) là nhân viên thường trong tài khoản: báo agent là quản lý để được hỏi việc cả team (06/11).
+  if (list.some((r) => r.who_role === 'EMPLOYEE')) {
+    const hub = await hubCtx(c.env.DB).catch(() => null);
+    for (const r of list) {
+      const hu = r.who_role === 'EMPLOYEE' && hub ? hub.users.find((u) => u.crm && u.crm === r.created_by) : null;
+      if (hu && ['lead', 'truongphong', 'admin'].includes(hu.role ?? '')) r.who_role = 'MANAGER';
+    }
   }
   // Kèm danh sách ảnh đính kèm của từng tin (cầu nối tải từng ảnh qua /file/:id).
   const withImgs = await withFiles(c.env.DB, list);

@@ -34,7 +34,7 @@ export function teamKey(u: HubU | null): string {
 }
 /* người + dự án trong dữ liệu chung: chỉ giải nén lại khi bản chung đổi phiên bản (bản chung nặng) */
 let HUB: { v: string; users: HubU[]; projects: HubP[]; agents: Record<string, string[]> } | null = null;
-async function hubCtx(db: D1Database, fresh = false) {
+export async function hubCtx(db: D1Database, fresh = false) {
   const vr = await db.prepare("SELECT version, updated_at FROM hub_state WHERE id = 'main'").first<{ version: number; updated_at: string }>();
   const v = vr ? vr.version + '|' + vr.updated_at : '';
   if (HUB && !fresh && HUB.v === v) return HUB;
