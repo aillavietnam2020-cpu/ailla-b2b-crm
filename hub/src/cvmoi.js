@@ -234,7 +234,7 @@ const cwView=L=>CWS.kx==="board"?cwBoard(L):CWS.kx==="cal"?cwCal(L):CWS.kx==="we
 /* ---------- khung trang: tiêu đề + mô tả, hàng tab, nội dung ---------- */
 /* tiêu đề trang: khối .ph được modTabs (setup.js) đưa lên thanh trên cùng, bên trái (như Tổng quan công ty); không còn dòng mô tả dưới tiêu đề.
    Nút thao tác (Tìm, Thêm việc, Giao việc, Phê duyệt, Order quản lý) nằm cùng hàng tab, bên phải (cwTop). */
-function cwHead(title,desc,o){o=o||{};return `<div class="ph cwph"><h1>${title}</h1></div><div class="cwhd">${o.btns===false?"":`<div class="cvvbar cwbar">${o.search===false?"":`<label class="cwsrch">${cwI("srch")}<input id="cw-q" placeholder="${PAGE==="cv_v"?"Tìm việc":"Tìm việc, tên người"}" value="${esc(CWS.q)}" autocomplete="off"></label>`}<button type="button" class="btn" data-cwadd="1">${cwI("plus")}Thêm việc</button>${tkGiver()?`<button type="button" class="btn pri" id="cv-new">${cwI("send")}Giao việc</button>`:""}</div>`}</div>`}
+function cwHead(title,desc,o){o=o||{};return `<div class="ph cwph"><h1>${title}</h1></div><div class="cwhd">${o.btns===false?"":`<div class="cvvbar cwbar">${o.search===false?"":`<label class="cwsrch">${cwI("srch")}<input id="cw-q" placeholder="${PAGE==="cv_v"?"Tìm việc":"Tìm việc, tên người"}" value="${esc(CWS.q)}" autocomplete="off"></label>`}<button type="button" class="btn" data-cwadd="1">${cwI("plus")}Thêm việc</button>${typeof bvNhapNhanh==="function"&&typeof teamOf==="function"&&teamOf(ME)==="content"?`<button type="button" class="btn" data-cwnhap="1" title="Dán một lượt link Drive của video làm xong: web tự xếp vào đúng dòng ở ② Điều phối và gửi Lead duyệt">⬆ Nhập link video</button>`:""}${tkGiver()?`<button type="button" class="btn pri" id="cv-new">${cwI("send")}Giao việc</button>`:""}</div>`}</div>`}
 /* gom hàng tab và nút thao tác vào một hàng */
 function cwTop(m){cwTbSearch(m);const hd=m.querySelector(":scope>.cwhd"),nv=m.querySelector(":scope>.cwtabs");if(!hd)return;if(!nv||!hd.children.length){if(!hd.children.length)hd.remove();return}
   const w=document.createElement("div");w.className="cwtop";nv.before(w);w.append(nv,hd);
@@ -264,6 +264,7 @@ function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const 
 function cwBind(m,list){const by={};(list||cwRows()).forEach(r=>by[r.k]=r);const R=k=>by[k]||cwRows().find(r=>r.k===k);
   const q=m.querySelector("#cw-q")||document.querySelector(".topbar #cw-q");if(q){let tm=0;q.oninput=()=>{clearTimeout(tm);tm=setTimeout(()=>{CWS.q=q.value;renderMain();const q2=$("#cw-q");if(q2){q2.focus();const n=q2.value.length;try{q2.setSelectionRange(n,n)}catch(e){}}},300)}}
   m.querySelectorAll("[data-cwadd]").forEach(b=>b.onclick=()=>cwAddSelf());
+  m.querySelectorAll("[data-cwnhap]").forEach(b=>b.onclick=()=>bvNhapNhanh(""));
   const nb=m.querySelector("#cv-new");if(nb)nb.onclick=()=>openTask(null);
   m.querySelectorAll("[data-cwkx]").forEach(b=>b.onclick=()=>{CWS.kx=b.dataset.cwkx;CWS.sel.clear();try{localStorage.setItem("ailla_cw_kx",CWS.kx)}catch(e){}renderMain()});
   m.querySelectorAll("[data-cwg]").forEach(r=>r.onclick=()=>{const k=r.dataset.cwg,s=m.querySelector(`[data-cwsub="${CSS.escape(k)}"]`);r.classList.toggle("open");if(s)s.classList.toggle("open");if(CWS.open.has(k))CWS.open.delete(k);else CWS.open.add(k)});

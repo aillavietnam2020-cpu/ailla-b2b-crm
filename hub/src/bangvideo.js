@@ -154,9 +154,10 @@ function bvRutDuyet(dt,c){if(!["dvd","dceo"].includes(c.step))return;const t=c.h
    của kênh đang xem (POST /api/hub/video-links, xem trước dry rồi lưu); lưu xong các dòng sang Chờ duyệt V1, Lead nhận một thông báo gộp.
    Agent Lead Content dùng chung đường này khi nhân sự nhắn link cho agent. */
 let BVN=null;
-async function bvNhapApi(dry,items){if(typeof svApi!=="function")throw new Error("Cần mở trên web thật");return svApi("/api/hub/video-links",{method:"POST",body:JSON.stringify({kenh:BV.k,dry,items})})}
-function bvNhapNhanh(){BVN={plan:[]};
-  openDrawerHTML(`<h2 class="dtitle">Nhập nhanh link video · ${esc(chOf(BV.k).short)}</h2><p class="hint">Dán link Google Drive của các video làm xong, mỗi dòng một link. Web đọc tên file để biết video của sản phẩm nào, rồi xếp vào dòng còn trống đầu tiên của sản phẩm đó ở kênh này. Kiểm tra bảng bên dưới rồi bấm lưu. Tên file nên có tên sản phẩm (ví dụ "Arila hook 1.mp4").</p>
+async function bvNhapApi(dry,items){if(typeof svApi!=="function")throw new Error("Cần mở trên web thật");return svApi("/api/hub/video-links",{method:"POST",body:JSON.stringify({kenh:BVN.kenh||"",dry,items})})}
+/* kenh: kênh đang xem ở Điều phối; "" = mọi kênh (mở từ Công việc) */
+function bvNhapNhanh(kenh){BVN={plan:[],kenh:typeof kenh==="string"?kenh:""};
+  openDrawerHTML(`<h2 class="dtitle">Nhập nhanh link video · ${BVN.kenh?esc(chOf(BVN.kenh).short):"mọi kênh"}</h2><p class="hint">Dán link Google Drive của các video làm xong, mỗi dòng một link. Web đọc tên file để biết video của sản phẩm nào, rồi xếp vào dòng còn trống đầu tiên của sản phẩm đó ${BVN.kenh?"ở kênh này":"(dòng giao cho bạn trước, rồi các kênh khác)"}. Kiểm tra bảng bên dưới rồi bấm lưu. Tên file nên có tên sản phẩm (ví dụ "Arila hook 1.mp4").</p>
    <textarea id="bvn-ta" rows="6" style="width:100%" placeholder="https://drive.google.com/file/d/...&#10;https://drive.google.com/file/d/..."></textarea>
    <div class="acts"><button type="button" class="btn pri" id="bvn-read">Đọc link</button></div><div id="bvn-prev"></div>`);
   const q=i=>document.querySelector("#drawerIn "+i);
@@ -172,7 +173,7 @@ function bvNhapDraw(){
   q("#bvn-prev").innerHTML=`<div class="bvscroll" style="overflow-x:auto;margin-top:12px"><table class="tbl"><thead><tr><th>Tên file trên Drive</th><th>Sản phẩm</th><th>Vào video</th><th></th></tr></thead><tbody>${P.map((p,i)=>`<tr>
      <td>${p.name?esc(p.name):'<i class="hint">không đọc được tên file</i>'}<br><small class="hint">${esc(p.url.replace(/^https?:\/\//,"").slice(0,52))}…</small></td>
      <td>${["dup","bad"].includes(p.st)?"—":`<select data-bvnsp="${i}">${opt([["","— chọn sản phẩm —"]].concat(prods),p.sku||"")}</select>`}</td>
-     <td>${p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnto="${i}">${opt([["","— không xếp —"]].concat(p.opts.map(id=>[id,id])),p.to||"")}</select>`:"—"}</td>
+     <td>${p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnto="${i}">${opt([["","— không xếp —"]].concat(p.opts.map(id=>{const c=D().cards.find(x=>x.id===id);return [id,id+(c&&!BVN.kenh?" · "+chOf(c.kenh).short:"")]})),p.to||"")}</select>`:"—"}</td>
      <td>${pill(lbl[p.st][0],lbl[p.st][1])}</td></tr>`).join("")}</tbody></table></div>
    <div class="k2box" style="margin-top:10px"><b>${okN}</b> video sẽ được điền link và chuyển <b>Chờ duyệt V1</b>${n("dup")?" · "+n("dup")+" link trùng bỏ qua":""}${n("nosku")?" · "+n("nosku")+" link cần chọn sản phẩm":""}${n("full")?" · "+n("full")+" link hết dòng trống (sản phẩm đã đủ video theo kế hoạch ở kênh này)":""}. Lead Content nhận một thông báo gộp.${BVN.drive===false?'<br><span class="t-red">Web chưa nối Google Drive nên không đọc được tên file, chọn sản phẩm tay.</span>':""}</div>
    <div class="acts"><button type="button" class="btn pri" id="bvn-save" ${okN?"":"disabled"}>Lưu ${okN} video, gửi Lead duyệt</button><button type="button" class="btn ghost" id="bvn-x">Hủy</button></div>`;
@@ -344,7 +345,7 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
   m.querySelectorAll("[data-bvhan]").forEach(b=>b.onclick=()=>{const id=b.dataset.bvhan,c=D().cards.find(x=>x.id===id);bvCal(b,c?+c.han||0:0,v=>{DB.mutate(ME.name,"sửa hạn "+id,dt=>{const k=dt.cards.find(x=>x.id===id);if(k)k.han=+v});bvRe()},[["0","Xóa hạn"]])});
   const qk=m.querySelector("[data-bvquick]");if(qk)qk.onclick=bvQuick;
   const gv=m.querySelector("[data-bvgiao]");if(gv)gv.onclick=bvGiaoViec;
-  const nh=m.querySelector("[data-bvnhap]");if(nh)nh.onclick=bvNhapNhanh;
+  const nh=m.querySelector("[data-bvnhap]");if(nh)nh.onclick=()=>bvNhapNhanh(BV.k);
   const dn=m.querySelector("[data-bvdon]");if(dn)dn.onclick=bvDon;
   const dl=m.querySelector("[data-bvdel]");if(dl)dl.onclick=()=>bvDelSel();
   m.querySelectorAll("[data-bvx]").forEach(b=>b.onclick=e=>{e.stopPropagation();bvDelSel(b.dataset.bvx)});
