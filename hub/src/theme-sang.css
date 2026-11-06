@@ -598,3 +598,7 @@ body.pop-open{overflow:hidden}
 .tqtask.clk{cursor:pointer;border-radius:8px}.tqtask.clk:hover{background:#f6f7fc}
 .sdmppl{display:flex;flex-wrap:wrap;gap:6px 10px;margin-bottom:6px}.sdmp{display:inline-flex;align-items:center;gap:4px}.sdmp .sdm-pn{width:170px;height:32px;padding:5px 8px;margin:0}.sdmp .sdm-padd{height:28px;padding:2px 9px;min-height:0}
 #ncm .tbl.edit td{padding:3px 6px;vertical-align:middle}#ncm .ncm-i,#ncm .ncm-q,#ncm .ncm-c{height:32px;padding:5px 8px;margin:0;font-size:14px}#ncm .ncm-n{display:block;font-size:11.5px;line-height:1.2}#ncm .ncm-n:empty{display:none}#ncm .ncm-add{height:28px;padding:2px 9px;min-height:0}
+/* Nút Ghi phiếu / Lưu luôn thấy ở đáy ngăn bên, kể cả phiếu dài nhiều dòng (chị Hoa 06/11: "không thấy nút lưu") */
+#kf .row7:has(#kf-ok),#ycf #yc-go,#sdm #sdm-go,#ncm #ncm-go{position:sticky;bottom:0;z-index:5}
+#kf .row7:has(#kf-ok){background:#fff;padding:10px 0;margin-bottom:0;box-shadow:0 -6px 12px -8px rgba(20,30,60,.25)}
+#ycf #yc-go,#sdm #sdm-go,#ncm #ncm-go{box-shadow:0 -4px 14px rgba(255,255,255,.95)}
