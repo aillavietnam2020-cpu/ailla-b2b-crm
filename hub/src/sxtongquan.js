@@ -80,7 +80,7 @@ function pSxTqx(m){
   const nvlNoPo=C.NV.filter(r=>!C.poCodes.has(r.code)).length,poN=(C.D.po||[]).length,gap=C.cnt.crit+C.cnt.warn;
   const tasks=[
     C.D.cho_xuat?["crit",`${C.D.cho_xuat} đơn Kênh phân phối chờ xuất kho`,"Kế toán kho","Xuất kho","kho_xuat_b2b",true,["kt","ceo"]]:null,
-    C.chuaKiem?["crit",`${C.chuaKiem} mã đang âm mà chưa có số kiểm`,"Kế toán kho · đếm rồi ghi Kiểm tồn bổ sung","Kiểm kê tồn","kho_kk",false,["kt","ceo"]]:null,
+    C.chuaKiem?["crit",`${C.chuaKiem} mã đang âm mà chưa có số kiểm`,"Kế toán kho · đếm rồi lập Phiếu kiểm tồn","Kiểm kê tồn","kho_kk",false,["kt","ceo"]]:null,
     poN?["warn",`${poN} đơn mua chờ hàng về`,"Kế toán kho ghi phiếu nhập khi hàng tới","Phiếu nhập","kho_nhap",false,["kt","ceo"]]:null,
     nvlNoPo?["crit",`${nvlNoPo} vật tư âm kho chưa có đơn mua`,"Phụ trách mua hàng","Đơn mua hàng","mh_po",false,["ceo","xg"]]:null,
     C.D.lech.cho?["warn",`${C.D.lech.cho} dòng hàng về lệch đơn mua chờ chốt tiền`,"Phụ trách mua hàng","Phê duyệt","pheduyet",false,["ceo"]]:["good","Hàng về lệch đơn mua",`Mua hàng · 0 đang chờ, ${C.D.lech.xong} đã xử lý`,"","",false,["ceo"]],

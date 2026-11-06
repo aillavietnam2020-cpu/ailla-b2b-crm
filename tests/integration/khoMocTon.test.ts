@@ -71,13 +71,15 @@ describe('mốc tồn 31/10 và kiểm bổ sung từng mã', () => {
     expect([c.opening, c.qty_in, c.qty_out, c.closing]).toEqual([0, 10, 4, 6]);
   });
 
-  it('không cho kiểm trùng: mã đã có trong phiếu chốt hoặc đã kiểm bổ sung; ngày phải sau mốc, không sau hôm nay', async () => {
+  it('kiểm lại được khi ngày đếm sau lần kiểm trước; trùng ngày thì chặn; ngày phải sau mốc, không sau hôm nay', async () => {
     await doc(USERS.ceo, { type: 'TD', moc: true, date: '2026-10-31', lines: [{ item: 'A', qty: 50 }] });
-    const dup = await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-11-02', lines: [{ item: 'A', qty: 40 }] });
+    // 06/11: phiếu kiểm tồn kiểm lại được mã đã kiểm, miễn là ngày đếm SAU lần kiểm trước (số mới thay sổ từ ngày đó).
+    expect((await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-11-02', lines: [{ item: 'A', qty: 40 }] })).status).toBe(200);
+    expect((await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-11-02', lines: [{ item: 'C', qty: 5 }] })).status).toBe(200);
+    const dup = await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-11-02', lines: [{ item: 'C', qty: 6 }] });
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe('DA_KIEM');
-    expect((await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-11-02', lines: [{ item: 'C', qty: 5 }] })).status).toBe(200);
-    expect((await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-11-03', lines: [{ item: 'C', qty: 6 }] })).status).toBe(409);
+    expect((await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-11-03', lines: [{ item: 'C', qty: 6 }] })).status).toBe(200);
     expect((await doc(CHUC, { type: 'TD', bo_sung: true, date: '2026-10-31', lines: [{ item: 'B', qty: 1 }] })).status).toBe(400);
     expect((await doc(CHUC, { type: 'TD', bo_sung: true, date: '2099-01-01', lines: [{ item: 'B', qty: 1 }] })).status).toBe(400);
     const m = await ctx.request('/api/hub/kho/moc', { as: CHUC });
