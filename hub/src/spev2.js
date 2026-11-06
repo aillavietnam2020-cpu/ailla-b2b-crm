@@ -85,7 +85,7 @@ function spbAdmBody(ky){
      ${tbl(["#","Sản phẩm","SL","Doanh thu","% kênh","Lãi gộp sau phí sàn","Biên","Đánh giá"],T.map((p,i)=>r(p,i)).concat(flag.map(p=>r(p,null))))}
      <div class="acts" style="justify-content:flex-end"><button class="btn sm" data-spbv="sp">Xem tất cả sản phẩm →</button></div></section>`})():`<section class="card"><p class="hint">Đang tải sản phẩm…</p></section>`;
   const side=`<aside class="tb-side"><section class="card"><div class="card-h"><h2>⚠️ Cảnh báo & đề xuất</h2></div>
-    <div class="chips" style="margin:0 0 8px"><button class="chip${SPB.al==="tuan"?" on":""}" data-spbal="tuan">${last2?`Tuần ${last2[1].a}–${last2[1].b}/${ky.slice(5)}`:"Tuần"}</button><button class="chip${SPB.al==="thang"?" on":""}" data-spbal="thang">Tháng ${ky.slice(5)}</button></div>
+    <div class="chips" style="margin:0 0 8px"><button class="chip${SPB.al==="tuan"?" on":""}" data-spbal="tuan">${last2?`7 ngày ${last2[1].a}–${last2[1].b}/${ky.slice(5)}`:"7 ngày gần nhất"}</button><button class="chip${SPB.al==="thang"?" on":""}" data-spbal="thang">Tháng ${ky.slice(5)}</button></div>
     ${AL.canh.length?`<h4>Cảnh báo</h4>${AL.canh.map(tbAl).join("")}`:`<p class="hint">${SPB.al==="tuan"&&!last2?"Chưa đủ 2 tuần số theo ngày để so.":"Không có cảnh báo."}</p>`}
     ${AL.de.length?`<h4>Đề xuất</h4>${AL.de.map(tbAl).join("")}`:""}</section></aside>`;
   return kp+`<div class="tb-lay"><div>${ss}${co}${CO.html}${top}</div>${side}</div>`;
@@ -98,20 +98,38 @@ function spbAllSp(ky){
    ${tbl(["#","Sản phẩm","Shop","SL","Doanh thu","Lãi gộp sau phí sàn","Biên","Đánh giá"],M.sp.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.n.slice(0,80))}</td><td class="hint">${Object.keys(p.by).map(s=>esc(speShopL(s))).join(", ")}</td><td class="n">${nf(p.q)}</td><td class="n">${tr(p.dt)}</td><td class="n">${p.bien==null?pill("chưa tính giá vốn","amb"):tsbRed(Math.round(p.lg))}</td><td class="n">${p.bien==null?"—":tbP(p.lg,p.dtK)}</td><td>${tsbDg(p.dg)}</td></tr>`))}</section>`;
 }
 
+/* Báo cáo Shopee agent tải hằng ngày (chị Hoa 06/11). Shopee chưa có số tiền theo đơn trên web (Poscake chỉ có số đơn xuất kho),
+   nên phần chưa có báo cáo chỉ hiện số đơn, doanh thu / phí / giá vốn / lãi để trống, không ước. */
+const spbDd=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"",spbAdd=(d,n)=>iso(addD(pdate(d),n));
+function spbDenNote(ky,S0){const t=iso(new Date()),end=tbKyEnd(ky)<t?tbKyEnd(ky):t,shops=speShopsAll(),L=[];let tre=false;
+  shops.forEach(sh=>{const s=S0.find(x=>x.shop===sh),den=s?(s.den||tbKyEnd(ky)):"";if(den>=end)return;
+    if(ky===t.slice(0,7)&&(!den||den<spbAdd(t,-2)))tre=true;L.push(`${speShopL(sh)} ${den?"có số đến ngày "+spbDd(den):"chưa có báo cáo tháng này"}`)});
+  if(!L.length)return "";const mn=S0.reduce((a,s)=>!a||(s.den||tbKyEnd(ky))<a?(s.den||tbKyEnd(ky)):a,""),st=mn?spbAdd(mn,1):ky+"-01",co=typeof tqCo==="function"&&st<=end?tqCo(st,end):null,n=co?co.SHOPEE||0:0;
+  return `<div class="note${tre?" red":""}">${L.join(" · ")}.${n?` Sau ngày đó tới hôm nay đã có ${nf(n)} đơn xuất kho (Poscake), chưa có số tiền nên chưa cộng.`:""}${tre?" Agent chưa tải báo cáo Shopee những ngày gần đây.":""}</div>`}
+function spbAdmDon(ky){const t=iso(new Date()),from=PERIOD.from.slice(0,7)===ky?PERIOD.from:ky+"-01",to0=PERIOD.to.slice(0,7)===ky?PERIOD.to:tbKyEnd(ky),to=to0>t?t:to0;
+  const co=typeof tqCo==="function"?tqCo(from,to):null,n=co?co.SHOPEE||0:null,last=(SPE.sums||[]).reduce((a,s)=>{const d=s.den||tbKyEnd(s.ky);return d>a?d:a},"");
+  const wait=l=>`<div style="opacity:.45">${kpi(l,"—","chờ tải báo cáo Shopee "+tsbKyL(ky))}</div>`;
+  return `<div class="note red">Tháng ${tsbKyL(ky)} chưa có báo cáo Shopee trên web${last?` (báo cáo mới nhất có số đến ngày ${spbDd(last)})`:""}. Agent chưa tải báo cáo tháng này. Số đơn dưới đây theo đơn đã xuất kho (Poscake), <b>chưa phải doanh thu thực</b>.</div>
+   <div class="grid kpis">${kpi("Số đơn theo đơn đã lên",n==null?"…":nf(n),"đơn xuất kho Poscake, "+spbDd(from)+"–"+spbDd(to))}${wait("Doanh thu")}${wait("Phí sàn")}${wait("Giá vốn")}${wait("Quảng cáo")}${wait("Lãi đóng góp kênh")}</div>
+   <section class="card"><p class="hint">Shopee chưa có số tiền theo đơn trên web, nên doanh thu, phí sàn, giá vốn, quảng cáo, lãi: <span class="hint">chờ tải báo cáo</span>. Web không ước số; có báo cáo (kể cả bản đến ngày X) là tự hiện.</p></section>`}
 function spbAdmPage(m){
   if(!SPE.sums){speLoad();m.innerHTML=H("Kênh Shopee","Đang tải…");return}
   const v=SUB.bc_shopee||"tong";
   const kys=[...new Set(SPE.sums.map(s=>s.ky))].sort(),now=plYmNow();
+  /* Đi theo bộ lọc ngày (chị Hoa 06/11): đổi kỳ thì về tháng của kỳ; tháng chưa có báo cáo thì xem theo đơn, không tự nhảy về tháng cũ. */
+  {const pk=PERIOD.from+"|"+PERIOD.to;if(SPB.pk!==pk){SPB.pk=pk;SPB.noRep=kys.includes(now)?"":now;SPB.ky=kys.includes(now)?now:(kys[kys.length-1]||"")}}
   if(!SPB.ky||!kys.includes(SPB.ky))SPB.ky=kys.includes(now)?now:(kys[kys.length-1]||"");
   const ky=SPB.ky,S0=SPE.sums.filter(s=>s.ky===ky),den=S0.reduce((a,s)=>s.den&&(!a||s.den<a)?s.den:a,null);
-  const head=H("Kênh Shopee",`Báo cáo quản trị${ky?" · "+tsbKyL(ky):""}${den?" · số đến "+speVn(den)+" · tạm tính":""} · chốt sổ sáng ngày 10 tháng sau`)
-   +`<div class="tb-acts">${spbChips()}<span style="width:12px"></span>${kys.map(k=>`<button class="chip${k===ky?" on":""}" data-spbky="${k}">${tsbKyL(k)}</button>`).join("")}<span style="flex:1"></span>
+  const NR=SPB.noRep&&v!=="up"?SPB.noRep:"";
+  const head=H("Kênh Shopee",`Báo cáo quản trị${NR?" · "+tsbKyL(NR)+" · theo đơn, chưa có báo cáo":(ky?" · "+tsbKyL(ky):"")+(den?" · số đến "+speVn(den)+" · tạm tính":"")} · chốt sổ sáng ngày 10 tháng sau`)
+   +`<div class="tb-acts">${spbChips()}<span style="width:12px"></span>${kys.map(k=>`<button class="chip${k===ky&&!NR?" on":""}" data-spbky="${k}">${tsbKyL(k)}</button>`).join("")}${NR?`<button class="chip on">${tsbKyL(NR)} · theo đơn</button>`:""}<span style="flex:1"></span>
      <button class="btn sm" data-spbv="up">Các tháng</button><button class="btn sm pri" data-spbv="up">⬆ Tải file</button></div>`;
   let body;
   if(v==="up"){m.innerHTML=H("Kênh Shopee","Tải báo cáo · các tháng đã lưu")+`<div class="tb-acts"><button class="btn sm" data-spbv="tong">← Tổng quan</button></div>`+speUpCard()+speSumCard();spbBind(m);
     tsbBindFiles("speup",speFiles);const sv=m.querySelector("#spe-save");if(sv)sv.onclick=speSave;const cl=m.querySelector("#spe-clr");if(cl)cl.onclick=()=>{SPE.prev=null;SPE.up={orders:[],fin:[],ads:[]};SPE.err="";renderMain()};return}
-  if(!ky)body=`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Tải file</b> để kế toán tải file của từng shop.</p></section>`;
-  else body=v==="sp"?`<div class="tb-acts"><button class="btn sm" data-spbv="tong">← Tổng quan</button></div>`+spbAllSp(ky):spbAdmBody(ky);
+  if(NR)body=spbAdmDon(NR);
+  else if(!ky)body=`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Tải file</b> để kế toán tải file của từng shop.</p></section>`;
+  else body=spbDenNote(ky,S0)+(v==="sp"?`<div class="tb-acts"><button class="btn sm" data-spbv="tong">← Tổng quan</button></div>`+spbAllSp(ky):spbAdmBody(ky));
   m.innerHTML=head+body+srcNote("File Shopee của từng shop: đơn hàng, Tài chính › Doanh thu, lịch sử giao dịch Dịch vụ Hiển thị (kế toán hoặc agent tải). Chi riêng khác và chi chung từ Sổ chi phí. Quy tắc: skill ailla-baocao-quantri-shopee.");
   spbBind(m);
 }
@@ -119,7 +137,7 @@ function spbBind(m){
   m.querySelectorAll("[data-spbv]").forEach(b=>b.onclick=()=>{SUB.bc_shopee=b.dataset.spbv;renderMain()});
   m.querySelectorAll("[data-spbal]").forEach(b=>b.onclick=()=>{SPB.al=b.dataset.spbal;renderMain()});
   m.querySelectorAll("[data-spbshop]").forEach(b=>b.onclick=()=>{SPB.shop=b.dataset.spbshop;renderMain()});
-  m.querySelectorAll("[data-spbky]").forEach(b=>b.onclick=()=>{SPB.ky=b.dataset.spbky;SUB.bc_shopee="tong";renderMain()});
+  m.querySelectorAll("[data-spbky]").forEach(b=>b.onclick=()=>{SPB.ky=b.dataset.spbky;SPB.noRep="";SUB.bc_shopee="tong";renderMain()});
   m.querySelectorAll("[data-tbtg]").forEach(tr=>tr.onclick=()=>{const k=tr.dataset.tbtg,L=m.querySelectorAll(`[data-tbs="${k}"]`),open=L.length&&L[0].style.display==="none";L.forEach(r=>r.style.display=open?"":"none");const c=m.querySelector(`[data-car="${k}"]`);if(c)c.textContent=open?"▾":"▸"});
 }
 

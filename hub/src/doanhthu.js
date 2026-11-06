@@ -68,9 +68,16 @@ function dtLabel(r,ch,from,to){
   else if(st==="chot"){const ly=r.frozen?[]:dtChuaDu(ch,ym);r.nhan=r.frozen?dtNhan(ym,t):ly.length?"dự kiến, chưa chốt: "+ly.join("; "):!DTS.rowsAt?"đã qua ngày chốt, đang tải số chốt":r.dt>0&&!r.tam&&!r.thieu?"đã qua ngày chốt, đang lưu số chốt":"đã qua ngày chốt, chưa đủ số để chốt"}
   else{r.dk=ch==="fb"&&r.dt!=null?dtDuKien(r.dt,r.dangDt||0,DT_HOAN_FB):r.dt;r.nhan=dtNhan(ym,t)+(ch==="fb"&&r.dangDt?` · dự kiến ${tr(r.dk)} khi ${nf(r.dang)} đơn đang giao có kết quả (hoàn dự kiến ${Math.round(DT_HOAN_FB*100)}%)`:"")}
   r.src=r.nhan+(r.src?" · "+r.src:"");return r}
+/* Facebook tháng chưa chốt: doanh thu thực chỉ là đơn đã giao, còn quảng cáo là cả tháng (gồm đơn đang giao) → lãi lệch rổ, âm giả (chị Hoa 06/11).
+   Lãi tính cho cùng rổ đơn đã giao: lãi tạm trên doanh thu dự kiến (giá vốn, phí theo tỷ lệ thật) nhân phần đã giao / dự kiến.
+   Không đổi doanh thu, giá vốn, quảng cáo (Sổ chi phí đọc quảng cáo ở đây); hết tháng chốt thì về số thật. Trang Facebook hiện bản dự kiến (fbv2.js). */
+function dtFbCungRo(f){if(!f||f.dk==null||f.chot==="chot"||!(f.dt>0)||!(f.dk>f.dt)||!(f.ads>0)||f.lai==null||f._ro)return;f._ro=1;
+  const tamLai=f.dk*(1-((f.gv||0)+(f.phi||0))/f.dt)-f.ads,lai=tamLai*f.dt/f.dk;
+  f.src=`lãi tạm tính cùng rổ đơn đã giao (trên doanh thu dự kiến ${tr(f.dk)} lãi ${tr(tamLai)}, quảng cáo cả tháng gồm đơn đang giao) · `+(f.src||"");f.lai=lai}
 {const _t=tqRevB2C;tqRevB2C=function(N,from,to){const out=_t.apply(this,arguments);if(DTS.live||!dtOk())return out;dtEnsure();
   try{if(out.fb&&out.fb.dt!=null){const d=dtFbDang(from,to);out.fb.dang=d.n;out.fb.dangDt=d.v}
-    ["tts","fb","spe"].forEach(k=>{const f=dtFrozen(k,from,to);if(f)out[k]={...out[k],...f,src:f.src,tam:false,dang:0,dangDt:0};dtLabel(out[k],k,from,to)})}catch(e){}
+    ["tts","fb","spe"].forEach(k=>{const f=dtFrozen(k,from,to);if(f)out[k]={...out[k],...f,src:f.src,tam:false,dang:0,dangDt:0};dtLabel(out[k],k,from,to)});
+    dtFbCungRo(out.fb)}catch(e){}
   return out}}
 if(typeof b2bChannel==="function"){const _b=b2bChannel;b2bChannel=function(ch){const X=_b.apply(this,arguments);if(!X||DTS.live||!dtOk())return X;
   const f=dtFrozen(ch==="GIA_CONG"?"gc":"b2b",PERIOD.from,PERIOD.to);if(!f)return X;const d=f.dt-(+X.net||0);return {...X,has:true,net:f.dt,orders:f.don!=null?f.don:X.orders,gross:(+X.gross||0)+d,frozen:true}}}
@@ -198,7 +205,7 @@ function pDtDoiChieu(m){
    <div class="acts pad"><button class="btn pri" id="dt-kt-save">Lưu số kế toán</button><span class="hint">Số kế toán: Kế toán nhập số đã chốt sổ của từng kênh (đ). Để trống ô nào thì xóa số ô đó. Bấm từng dòng để xem từng ngày / từng đơn tạo nên số web. Chênh lệch tô đỏ khi lệch trên 1% (tối thiểu 1 triệu).</span></div></section>
   ${open?`<section class="card flush"><div class="card-h pad"><h2>${open[1]} · tháng ${dtYmVN(ym)}: số web từng ngày / từng đơn</h2><button class="btn sm" id="dt-close">Đóng</button></div>${dtChiTiet(open[0],ym)}</section>`:""}
   <section class="card"><div class="card-h"><h2>Cách tính doanh thu thực (một cách cho mọi trang)</h2></div><ul class="lessons">
-   <li><b>TikTok Shop:</b> doanh thu thuần theo báo cáo quyết toán đã tải lên; tải báo cáo hàng tuần; ngày chưa có báo cáo thì để trống, ghi "chờ tải báo cáo" (không ước từ số đơn). Tháng chỉ chốt khi báo cáo phủ đủ cả tháng. GMV chỉ là chỉ số hiệu suất.</li>
+   <li><b>TikTok Shop:</b> doanh thu thuần theo báo cáo quyết toán đã tải lên; agent tải báo cáo mỗi ngày; ngày chưa có báo cáo thì để trống, ghi "chờ tải báo cáo" (không ước từ số đơn). Tháng chỉ chốt khi báo cáo phủ đủ cả tháng. GMV chỉ là chỉ số hiệu suất.</li>
    <li><b>Shopee:</b> doanh thu theo file báo cáo Shopee tải lên; chưa tải thì để trống.</li>
    <li><b>Facebook:</b> đơn giao thành công theo ngày tạo đơn (Pancake, cập nhật mỗi sáng). Doanh thu chốt đơn chỉ là chỉ số hiệu suất. Dự kiến = giao thành công + đơn đang giao × (1 − ${Math.round(DT_HOAN_FB*100)}% hoàn dự kiến).</li>
    <li><b>Kênh phân phối, Kênh OEM:</b> đơn đã duyệt trên CRM theo ngày đơn (sau chiết khấu, trừ thưởng).</li>

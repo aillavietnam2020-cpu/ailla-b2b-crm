@@ -11,7 +11,7 @@
    ===================================================================== */
 const TQ={co:{},coBusy:{}};
 /* Số đơn xuất kho Poscake theo kênh trong khoảng ngày (null khi chưa tải xong). */
-function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(["exec","bc_tong","pl","muctieu"].includes(PAGE))renderMain()})}return null}
+function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(["exec","bc_tong","pl","muctieu","bc_shopee"].includes(PAGE))renderMain()})}return null}
 const tqMonths=(from,to)=>{const ms=[];for(let d=pdate(from.slice(0,7)+"-01");iso(d)<=to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms};
 /* Doanh thu thực + lãi đóng góp từng kênh Kênh bán lẻ trong khoảng ngày. N = số gốc của execNums (trước khi đổi). */
 /* Quảng cáo Shopee Ads theo ngày: summary.days[ngày][5] của báo cáo Shopee tải lên (migration 0180), mọi shop. */

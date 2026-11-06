@@ -29,7 +29,12 @@ function fbvData(){
   const qcRaw=days.reduce((a,k)=>a+fbdQcRaw(k),0),qcT=days.reduce((a,k)=>a+fbdQc(k),0),lai=dt-gv-ship-shipRet-qcT;
   const RT=fbvRate(),dang=R&&R.dang!=null?{n:R.dang,v:R.dangDt||0}:(typeof dtFbDang==="function"?dtFbDang(PERIOD.from,PERIOD.to):{n:0,v:0});
   const ym=PERIOD.to.slice(0,7),chua=typeof dtTrangThai==="function"&&dtTrangThai(ym,dtToday())!=="chot",dk=chua&&dang.v>0?dt+dang.v*(1-RT.r):null;
-  return {days,A,R,dt,dk,dang,RT,gv,ship,shipRet,qcRaw,qcT,tax:qcRaw?qcT/qcRaw:1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1),lai,cov,unc,dtUnc,C,shipAll:(ship+shipRet)/(dt||1),
+  /* Tháng đang chạy (có doanh thu dự kiến): giá vốn, ship tính trên cùng rổ đơn dự kiến, không lấy riêng phần đã giao rồi trừ quảng cáo
+     cả tháng (chị Hoa 06/11: lãi −320%). Giá vốn theo đơn đã lên (đơn chốt Pancake: giá vốn chốt / doanh thu chốt) nếu có, không thì
+     tỷ lệ thật của phần đã giao; ship theo tỷ lệ thật phần đã giao. Quảng cáo giữ nguyên. Hết tháng về doanh thu thực. */
+  let tam=null;if(dk!=null&&dt>0){const dC=sumD(6),gC=sumD(7),gvR=dC>0&&gC>0?gC/dC:gv/dt,shR=ship/dt,rtR=shipRet/dt;
+    tam={base:dk,gv:dk*gvR,ship:dk*shR,shipRet:dk*rtR,gvSrc:dC>0&&gC>0?"theo đơn đã lên":"theo tỷ lệ phần đã giao"};tam.lai=dk-tam.gv-tam.ship-tam.shipRet-qcT}
+  return {days,A,R,dt,dk,dang,RT,gv,ship,shipRet,qcRaw,qcT,tam,tax:qcRaw?qcT/qcRaw:1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1),lai,cov,unc,dtUnc,C,shipAll:(ship+shipRet)/(dt||1),
     lastCov:cov[cov.length-1]||"",lastK,chua,nhan:R&&R.nhan?R.nhan:""};
 }
 function fbvProds(days){const F=FBC.raw;if(!F||!F.p||!F.sk)return [];const m={};
@@ -52,14 +57,14 @@ function fbvAlerts(X,L){
 /* ---------- Quản trị ---------- */
 function fbvAdm(m){
   adfLoad();fbsLoad();fbcLoad();adfMergeDays();
-  const X=fbvData(),dt=X.dt,ky=PERIOD.from.slice(0,7),oneMonth=ky===PERIOD.to.slice(0,7)&&PERIOD.from.slice(8)==="01"&&PERIOD.to===tbKyEnd(ky);
+  const X0=fbvData(),X=X0.tam?{...X0,gv:X0.tam.gv,ship:X0.tam.ship,shipRet:X0.tam.shipRet,lai:X0.tam.lai}:X0,dt=X0.tam?X0.tam.base:X0.dt,cs=X0.tam?"doanh thu dự kiến":"doanh thu thực",ky=PERIOD.from.slice(0,7),oneMonth=ky===PERIOD.to.slice(0,7)&&PERIOD.from.slice(8)==="01"&&PERIOD.to===tbKyEnd(ky);
   const head=H("Kênh Facebook",`Báo cáo quản trị · ${esc(pLabel())}${X.nhan?" · "+esc(X.nhan.replace(/ · dự kiến.*$/,"")):""}`)+fbvTabs();
   if(!X.days.length||!dt){m.innerHTML=head+`<section class="card"><p class="empty">Kỳ này chưa có số Facebook.</p></section>`;fbvBind(m);return}
   const L=fbvLines(X),AL=fbvAlerts(X,L),so=oneMonth?bcSoCP(ky,["Facebook"],"Facebook"):{rieng:null,chung:null,whyR:"Chọn đủ một tháng để lấy Sổ chi phí",whyC:"Chọn đủ một tháng để lấy Sổ chi phí"};
   const OP=typeof fbdOpex==="function"?fbdOpex(X.days):{has:false};if(OP.has)so.rieng=(so.rieng||[]).concat([{n:"Chi phí vận hành nhập ở tab Nhập chi phí",t:OP.amt}]);
   const sumL=a=>(a||[]).reduce((s,x)=>s+(+x.t||0),0),Rr=so.rieng?sumL(so.rieng):null,Cc=so.chung?sumL(so.chung):null,ln=Rr!=null&&Cc!=null?X.lai-Rr-Cc:null,adsMax=AL.adsMax,uoc=X.unc.length?` · ${nf(X.unc.length)} ngày cuối ước theo tỷ lệ (Sheet có tới ${fbvVn(X.lastCov)})`:"";
   const dtK=X.dk!=null?kpi("Doanh thu dự kiến",tr(X.dk),fbvDkTxt(X)):kpi("Doanh thu thực",tr(dt),nf(X.A.giao)+" đơn giao · TB "+tr(X.A.giao?dt/X.A.giao:0)+"/đơn");
-  const kp=`<div class="grid kpis">${dtK}${kpi("Giá vốn",tr(X.gv),tbP(X.gv,dt)+" doanh thu thực")}${kpi("Vận chuyển",tr(X.ship+X.shipRet),tbP(X.ship+X.shipRet,dt)+" · gồm ship hoàn "+tr(X.shipRet))}${kpi("Quảng cáo (gồm thuế)",tr(X.qcT),tbP(X.qcT,X.dk||dt)+(X.dk!=null?" doanh thu dự kiến":"")+" · ngưỡng "+tbP(adsMax,1),X.qcT/(X.dk||dt)>adsMax?"var(--red)":"")}${kpi("Lãi đóng góp kênh",tr(X.lai),tbP(X.lai,dt)+" · trước chi chung",X.lai<0?"var(--red)":"var(--green)")}${kpi("Lợi nhuận ròng kênh",ln==null?"—":tr(ln),ln==null?"chờ Sổ chi phí đủ số":tbP(ln,dt)+" · sau chi riêng, chi chung","var(--green)")}</div>`;
+  const kp=`<div class="grid kpis">${dtK}${kpi("Giá vốn",tr(X.gv),tbP(X.gv,dt)+" "+cs+(X0.tam?" · "+X0.tam.gvSrc:""))}${kpi("Vận chuyển",tr(X.ship+X.shipRet),tbP(X.ship+X.shipRet,dt)+" · gồm ship hoàn "+tr(X.shipRet))}${kpi("Quảng cáo (gồm thuế)",tr(X.qcT),tbP(X.qcT,X.dk||dt)+(X.dk!=null?" doanh thu dự kiến":"")+" · ngưỡng "+tbP(adsMax,1),X.qcT/(X.dk||dt)>adsMax?"var(--red)":"")}${kpi("Lãi đóng góp kênh",tr(X.lai),tbP(X.lai,dt)+(X0.tam?" · tạm tính trên doanh thu dự kiến, hết tháng về doanh thu thực":" · trước chi chung"),X.lai<0?"var(--red)":"var(--green)")}${kpi("Lợi nhuận ròng kênh",ln==null?"—":tr(ln),ln==null?"chờ Sổ chi phí đủ số":tbP(ln,dt)+" · sau chi riêng, chi chung","var(--green)")}</div>`;
   /* Cơ cấu doanh thu theo nguồn đơn (Pancake): quảng cáo chuyển đổi gán cho trang bán hàng, quảng cáo tin nhắn gán cho inbox. */
   const S=AL.src,sTot=S.reduce((a,x)=>a+x.rev,0),cw=AL.camps.filter(c=>c.typ!=="Tin nhắn").reduce((a,c)=>a+c.spend,0)*X.tax,ci=AL.camps.filter(c=>c.typ==="Tin nhắn").reduce((a,c)=>a+c.spend,0)*X.tax;
   const qcOf=x=>/webcake|trang b[áa]n/i.test(x.n)?{v:cw,n:"chuyển đổi"}:/inbox|tin nh[ắa]n|messenger/i.test(x.n)?{v:ci,n:"tin nhắn"}:null;
@@ -75,7 +80,7 @@ function fbvAdm(m){
      +(has?sub.map(x=>`<tr class="tb-sub" data-tbs="${k}" style="display:none"><td>${esc(x.n)}</td><td class="n">${tbF(x.t)}</td><td class="n">${tbP(x.t,dt)}</td><td class="hint">${esc(x.h||"")}</td></tr>`).join(""):"")};
   const qcT=L.lines.reduce((a,x)=>a+x.qcT,0)+L.unk.qcT,ciT=ci,cwT=cw;
   const bar=[["Giá vốn",X.gv,"#8a8799"],["Ship",X.ship+X.shipRet,"#e07a3f"],["Quảng cáo",X.qcT,"#e2494a"]].concat(Rr?[["Chi riêng",Rr,"#b06ab3"]]:[]).concat(Cc?[["Chi chung",Cc,"#5d6d8e"]]:[]).concat([[ln!=null?"Lợi nhuận ròng":"Lãi đóng góp",ln!=null?ln:X.lai,"#17804a"]]);
-  const cost=`<section class="card"><div class="card-h"><h2>Cơ cấu chi phí</h2><span class="hint">mọi khoản chi của kênh trên doanh thu thực ${tbF(dt)} đ${uoc}</span></div>
+  const cost=`<section class="card"><div class="card-h"><h2>Cơ cấu chi phí</h2><span class="hint">mọi khoản chi của kênh trên ${cs} ${tbF(dt)} đ${X0.tam?" (tạm tính, cùng rổ đơn)":""}${uoc}</span></div>
    <div class="tb-bar">${bar.filter(b=>b[1]>0).map(([n,t,c])=>{const ty=t/dt;return `<div style="width:${(ty*100).toFixed(2)}%;background:${c}" title="${esc(n)} ${tbF(t)}">${ty>=0.06?esc(n)+" "+tbP(t,dt):tbP(t,dt)}</div>`}).join("")}</div>
    ${tbl(["Khoản","Số tiền (đ)","% doanh thu","Ghi chú"],[
      row("gv","#8a8799","Giá vốn hàng bán",X.gv,X.unc.length?"giá vốn thật từng đơn (Sheet Pancake), ngày Sheet chưa có thì ước":"giá vốn thật từng đơn (Sheet Pancake)"),

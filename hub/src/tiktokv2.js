@@ -114,12 +114,30 @@ function tbAdmTong(ky,P){
       .concat((P.g1||[]).concat((P.g2||[]).slice().sort((a,b)=>b.dt-a.dt)).slice(0,3).map(r=>`<tr style="background:rgba(240,160,32,.08)"><td></td><td>${esc(String(r.pn).slice(0,60))}<br><small class="hint">${esc(r.vr||r.ss||"")}</small></td><td class="n">${nf(r.q)}</td><td class="n">${tr(r.dt)}</td><td class="n">${tbP(r.dt,dt)}</td><td class="n">${tsbRed(r.lg)}</td><td class="n">${tbP(r.lg,r.dt)}</td><td>${tsbDg(r.dg)}</td></tr>`)))}
     <div class="acts" style="justify-content:flex-end"><button class="btn sm" data-tbv="sp">Xem tất cả sản phẩm & SKU →</button></div></section>`;
   const side=`<aside class="tb-side"><section class="card"><div class="card-h"><h2>⚠️ Cảnh báo & đề xuất</h2></div>
-    <div class="chips" style="margin:0 0 8px"><button class="chip${TB.al==="tuan"?" on":""}" data-tbal="tuan">${last2?`Tuần ${last2[1].a}–${last2[1].b}/${ky.slice(5)}`:"Tuần"}</button><button class="chip${TB.al==="thang"?" on":""}" data-tbal="thang">Tháng ${ky.slice(5)}</button></div>
-    ${AL.canh.length?`<h4>Cảnh báo</h4>${AL.canh.map(tbAl).join("")}`:`<p class="hint">${TB.al==="tuan"&&!last2?"Chưa đủ 2 tuần số theo ngày để so.":"Không có cảnh báo."}</p>`}
+    <div class="chips" style="margin:0 0 8px"><button class="chip${TB.al==="tuan"?" on":""}" data-tbal="tuan">${last2?`7 ngày ${last2[1].a}–${last2[1].b}/${ky.slice(5)}`:"7 ngày gần nhất"}</button><button class="chip${TB.al==="thang"?" on":""}" data-tbal="thang">Tháng ${ky.slice(5)}</button></div>
+    ${AL.canh.length?`<h4>Cảnh báo</h4>${AL.canh.map(tbAl).join("")}`:`<p class="hint">${TB.al==="tuan"&&!last2?"Chưa đủ 14 ngày số theo ngày để so.":"Không có cảnh báo."}</p>`}
     ${AL.de.length?`<h4>Đề xuất</h4>${AL.de.map(tbAl).join("")}`:""}</section></aside>`;
   return kp+`<div class="tb-lay"><div>${co}${cost}${top}</div>${side}</div>`;
 }
 
+/* Tháng đang chạy tải hằng ngày (chị Hoa 06/11: agent Kế toán tải báo cáo mỗi ngày, cần số mới nhất).
+   tbDonSo: doanh số theo đơn đã lên (Key metrics GMV agent nạp theo ngày, cùng nguồn trang Kinh doanh) của một khoảng ngày. */
+function tbDonSo(from,to){const t=iso(new Date());if(to>t)to=t;const S=tsbOpsAgg(from,to),K=S.km||{},ds=Object.keys((TSB.all||{}).days||{}).filter(d=>d>=from&&d<=to&&TSB.all.days[d].km).sort();
+  return {gmv:K.gmv||0,don:K.don||0,mon:K.mon||0,ads:Math.round(((S.ads||{}).chi||0)*(1+TT_ADS_VAT)),n:ds.length,last:ds[ds.length-1]||"",from,to}}
+const tbDdmm=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"";
+const tbAddD=(d,n)=>iso(addD(pdate(d),n));
+/* Dòng "có số đến ngày X": phần sau ngày đó tới hôm nay hiện theo đơn; báo cáo trễ quá 2 ngày thì cảnh báo agent. */
+function tbDenNote(ky,den){if(!ky||!den)return "";const t=iso(new Date()),end=tbKyEnd(ky)<t?tbKyEnd(ky):t;if(den>=end)return "";
+  const D=tbDonSo(tbAddD(den,1),end),tre=den<tbAddD(t,-2)&&ky===t.slice(0,7);
+  return `<div class="note${tre?" red":""}">Báo cáo quyết toán có số đến ngày ${tbDdmm(den)}.${D.n?` Từ ${tbDdmm(D.from)} đến ${tbDdmm(D.last)} theo đơn đã lên: <b>${tr(D.gmv)}</b> GMV, ${nf(D.don)} đơn (theo đơn, chưa phải doanh thu thực, chưa cộng vào số bên dưới).`:""}${tre?` Agent chưa tải báo cáo ngày ${tbDdmm(tbAddD(den,1))}–${tbDdmm(tbAddD(t,-1))}.`:""}</div>`}
+/* Tháng chưa có báo cáo quyết toán: chỉ số theo đơn, phí sàn / giá vốn / lãi để trống (không ước, quy tắc 27/10). */
+function tbAdmDon(ky){const t=iso(new Date()),from=PERIOD.from.slice(0,7)===ky?PERIOD.from:ky+"-01",to=PERIOD.to.slice(0,7)===ky?PERIOD.to:tbKyEnd(ky),D=tbDonSo(from,to);
+  if(!TSB.all)tsbLoadAll();
+  const prev=(TSB.months||[]).filter(x=>x.ky<ky).pop(),pDen=prev&&prev.summary&&prev.summary.den,tre=D.last?D.last<tbAddD(t,-2):true,cho=`<span class="hint">chờ tải báo cáo</span>`;
+  const wait=v=>`<div style="opacity:.45">${kpi(v,"—","chờ tải báo cáo quyết toán "+tsbKyL(ky))}</div>`;
+  return `<div class="note">Tháng ${tsbKyL(ky)} chưa có báo cáo quyết toán TikTok trên web${pDen?` (báo cáo mới nhất có số đến ngày ${tbDdmm(pDen)})`:""}. Doanh số dưới đây <b>theo đơn đã lên</b> (GMV agent nạp theo ngày, cùng nguồn trang Kinh doanh), <b>chưa phải doanh thu thực</b>; chưa trừ hủy, hoàn.${tre?` <b>Agent chưa nạp số đơn ngày ${tbDdmm(D.last?tbAddD(D.last,1):from)}–${tbDdmm(tbAddD(t,-1))}.</b>`:""}</div>
+   <div class="grid kpis">${kpi("Doanh số theo đơn (GMV)",tr(D.gmv),D.n?`${nf(D.n)} ngày, đến ${tbDdmm(D.last)} · chưa phải doanh thu thực`:"chưa có số ngày nào")}${kpi("Số đơn",nf(D.don),D.don?"TB "+tr(D.gmv/D.don)+"/đơn":"")}${kpi("Quảng cáo (đã VAT)",tr(D.ads),D.gmv?tbP(D.ads,D.gmv)+" GMV":"")}${wait("Phí sàn")}${wait("Giá vốn")}${wait("Lãi đóng góp kênh")}</div>
+   <section class="card"><p class="hint">Phí sàn, giá vốn, lãi đóng góp và lợi nhuận: ${cho}. Web không ước số; có báo cáo quyết toán (kể cả bản đến ngày X) là tự hiện.</p></section>`}
 function tbAdmPage(m){
   const v=SUB.bc_tiktok;
   if(v&&v!=="tong"&&v!=="pl"){if(TB.pk)TSB.pk=PERIOD.from+"|"+PERIOD.to;tsbAdmPage(m);const tb=m.querySelector(".tabs");if(tb)tb.outerHTML=`<div class="tb-acts"><button class="btn sm" data-tbv="tong">← Tổng quan</button><b>${{sp:"Sản phẩm & SKU",cb:"Cảnh báo SKU",dl:"Kiểm dữ liệu",thang:"Các tháng",up:"Tải file tháng"}[v]||""}</b></div>`;tbBind(m);return}
@@ -129,14 +147,15 @@ function tbAdmPage(m){
   const ky=TSB.ky;if(ky)tsbLoadMonth(ky);if(!TSB.all)tsbLoadAll();
   const S=ky?TSB.data[ky]:null,P=S?tbNoUoc(S.pl):null,todo=S?(S.data.todo||ttTodo(S.pl)):null;
   const nViec=todo?todo.noMap.length+todo.miss.length+todo.pack.length:0,lock=S&&S.locked_at;
-  const head=H("Kênh TikTok Shop",`Báo cáo quản trị${ky?" · "+tsbKyL(ky):""}${S&&S.data.M&&S.data.M.den?" · số đến "+tsbVn(S.data.M.den):""} · chốt sổ ngày 10 tháng sau`)
-   +`<div class="tb-acts">${(TSB.months||[]).map(x=>`<button class="chip${x.ky===ky?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.locked_at?" ✓":""}</button>`).join("")}<span style="flex:1"></span>
+  const head=H("Kênh TikTok Shop",`Báo cáo quản trị${TB.noRep?" · "+tsbKyL(TB.noRep)+" · theo đơn, chưa có báo cáo quyết toán":ky?" · "+tsbKyL(ky):""}${S&&S.data.M&&S.data.M.den?" · số đến "+tsbVn(S.data.M.den):""} · chốt sổ ngày 10 tháng sau`)
+   +`<div class="tb-acts">${(TSB.months||[]).map(x=>`<button class="chip${x.ky===ky&&!TB.noRep?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.locked_at?" ✓":""}</button>`).join("")}${TB.noRep?`<button class="chip on">${tsbKyL(TB.noRep)} · theo đơn</button>`:""}<span style="flex:1"></span>
      <button class="btn sm" data-tbv="thang">Các tháng</button><button class="btn sm" data-tbv="dl">Kiểm dữ liệu${nViec?`<span class="tb-cnt">${nViec}</span>`:""}</button>
      ${S?(lock?(isCeo()?`<button class="btn sm" id="tsb-unlock">Mở khoá ${tsbKyL(ky)}</button>`:`<span class="hint">Đã khoá sổ</span>`):`<button class="btn sm" id="tsb-recalc">Tính lại giá vốn</button><button class="btn sm" id="tsb-lock">Khoá sổ ${tsbKyL(ky)}</button>`):""}
      <button class="btn sm pri" data-tbv="up">⬆ Tải file</button></div>`
-   +(TB.noRep?`<div class="note">Tháng ${tsbKyL(TB.noRep)} chưa tải báo cáo TikTok${ky?`, đang xem ${tsbKyL(ky)} (tháng gần nhất có số)`:""}. Bấm <b>Tải file</b> để tải báo cáo tuần này.</div>`:"");
+   +(TB.noRep?"":tbDenNote(ky,S&&S.data.M&&S.data.M.den));
   let body;
-  if(!ky)body=`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Tải file</b> để kế toán tải 3 file TikTok.</p></section>`;
+  if(TB.noRep)body=tbAdmDon(TB.noRep);
+  else if(!ky)body=`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Tải file</b> để kế toán tải 3 file TikTok.</p></section>`;
   else if(!P)body=`<section class="card"><p class="hint">Đang tải ${tsbKyL(ky)}…</p></section>`;
   else body=tbAdmTong(ky,P);
   m.innerHTML=head+body+srcNote("Báo cáo quyết toán TikTok do kế toán tải (OrderSKUList, income, Campaign overview); nguồn doanh thu từ Key metrics team TikTok tải; chi riêng khác và chi chung từ Sổ chi phí. Quy tắc: skill ailla-baocao-quantri-tiktok.");
