@@ -45,8 +45,8 @@ function tq2Viec(){if(typeof vcItems!=="function"||!mhManage())return null;if(!(
   return {G,cb,n:L.length-cb.length,leo:L.filter(x=>x.leo&&x.tag[0]!=="Cảnh báo").length,qh:L.filter(x=>x.over>0&&x.tag[0]!=="Cảnh báo").length}}
 /* Cảnh báo & đề xuất: mỗi cảnh báo kèm một việc nên làm, theo ngưỡng ở Ngưỡng cảnh báo & chỉ số. */
 function tq2Warn(N,V,D2,C,stk,HL){const W=[],ng=dhGet().nguong||{},qc=ng.qcMax||.4,T=N.T,P=N.P,nx=plYmAdd(N.ym,1).slice(5,7);
-  PLC_K.forEach(([k,n])=>{const c=N.A.cols[k];if(!c||!c.dt||!(c.ads/c.dt>qc))return;
-    W.push(["red",`Quảng cáo ${n} ăn ${Math.round(c.ads/c.dt*100)}% doanh thu`,`Chi ${tr(c.ads)}, doanh thu thực ${tr(c.dt)}, kênh còn lãi ${c.lai==null?"—":tq2P(c.lai/c.dt)+"%"}.`,`Đề xuất: đặt trần quảng cáo ${n} ≤ ${Math.round(qc*100)}% doanh thu, xem và tắt các combo, sản phẩm đang lỗ ở trang kênh.`,()=>tq2Go((N.A.by[k]||{}).go||"pl")])});
+  PLC_K.forEach(([k,n])=>{const c=N.A.cols[k];if(!c||!c.dt||!(c.ads/(c.qb||c.dt)>qc))return;
+    W.push(["red",`Quảng cáo ${n} ăn ${Math.round(c.ads/(c.qb||c.dt)*100)}% doanh thu${c.qb&&c.qb!==c.dt?" dự kiến":""}`,`Chi ${tr(c.ads)}, doanh thu ${c.qb&&c.qb!==c.dt?"dự kiến "+tr(c.qb):"thực "+tr(c.dt)}, kênh còn lãi ${c.lai==null?"—":tq2P(c.lai/c.dt)+"%"}.`,`Đề xuất: đặt trần quảng cáo ${n} ≤ ${Math.round(qc*100)}% doanh thu, xem và tắt các combo, sản phẩm đang lỗ ở trang kênh.`,()=>tq2Go((N.A.by[k]||{}).go||"pl")])});
   if(D2&&D2.debt){const late=D2.b90p+D2.old,nk=D2.rows.filter(r=>(+r.b90p||0)+(+r.old||0)>0);
     if(late>0)W.push(["red",`${tr(late)} nợ quá 90 ngày (${nk.length} khách)`,`Chiếm ${Math.round(late/D2.debt*100)}% công nợ Kênh phân phối${nk.length?", nhiều nhất "+nk.sort((a,b)=>(b.b90p+b.old)-(a.b90p+a.old)).slice(0,2).map(r=>r.customer_name).join(", "):""}.`,"Đề xuất: giao sale lịch đòi từng khách tuần này, tạm dừng giao hàng công nợ cho khách quá 90 ngày.",()=>tq2Go("phai_thu")])}
   if(T&&T.ln!=null){const it=P&&P.chung&&T.chung!=null&&T.chung<P.chung*.3;

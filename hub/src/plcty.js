@@ -141,7 +141,7 @@ function pPLCty(m){
   if(full&&T.chung==null)W.push(["amb","Chưa có chi phí chung","Sổ chi phí tháng này chưa có khoản chi chung nên chưa ra lợi nhuận hoạt động.",""]);
   if(T.chuaTinh)W.push(["amb",`${plcTr(T.chuaTinh)} doanh thu chưa có giá vốn`,"Để riêng, không tính lãi. Cần kế toán điền giá vốn các mã này.",`data-plcl="ngvw"`]);
   const qcMax=(dhGet().nguong||{}).qcMax||.4;
-  PLC_K.forEach(([k,n])=>{const c=A.cols[k];if(c&&c.dt&&c.ads/c.dt>qcMax&&(!KK||KK===k))W.push(["blu",`Quảng cáo ${n} ${plcPc(c.ads,c.dt,0)} doanh thu`,`Vượt ngưỡng ${Math.round(qcMax*100)}%. Lãi đóng góp kênh còn ${plcPc(c.lai,c.dt)}.`,`data-plck="${k}"`])});
+  PLC_K.forEach(([k,n])=>{const c=A.cols[k];if(c&&c.dt&&c.ads/(c.qb||c.dt)>qcMax&&(!KK||KK===k))W.push(["blu",`Quảng cáo ${n} ${plcPc(c.ads,c.qb||c.dt,0)} doanh thu${c.qb&&c.qb!==c.dt?" dự kiến":""}`,`Vượt ngưỡng ${Math.round(qcMax*100)}%. Lãi đóng góp kênh còn ${plcPc(c.lai,c.dt)}.`,`data-plck="${k}"`])});
   if(A.tot&&A.tot.tam)W.push(["blu","Có phần doanh thu tạm tính","Ngày chưa có báo cáo sàn, số sẽ chốt khi tải báo cáo tháng.",""]);
   const sel=(id,opts,v)=>`<select id="${id}">${opts.map(([k,t])=>`<option value="${k}" ${k===v?"selected":""}>${t}</option>`).join("")}</select>`;
   m.innerHTML=`<div class="plc">
