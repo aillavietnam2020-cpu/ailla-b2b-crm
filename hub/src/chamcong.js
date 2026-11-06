@@ -140,7 +140,8 @@ async function ccCham(loai){
     CC.reason=null;CC.out=null;toast((loai==="vao"?"Đã chấm vào lúc ":"Đã chấm ra lúc ")+ccHm(r.at)+(r.xn==="cho"?", chờ xác nhận":""));
     await ccLoadMe(true);
   }catch(e){
-    if(e.code==="NEED_OUT"){const s=ccShoots()[0];CC.out={...(CC.out&&CC.out.loai===loai?CC.out:{ly:s?"quay":"khach",shoot:s?s.id:"",note:"",anh:""}),loai,msg:e.message}}
+    if(e.code==="NEED_OUT"&&!ccPhone())CC.err=String(e.message||"").split(". ")[0]+". Đi quay, gặp khách thì chấm bằng điện thoại (chụp ảnh check-in). Máy tính chỉ chấm được khi ở văn phòng.";
+    else if(e.code==="NEED_OUT"){const s=ccShoots()[0];CC.out={...(CC.out&&CC.out.loai===loai?CC.out:{ly:s?"quay":"khach",shoot:s?s.id:"",note:"",anh:""}),loai,msg:e.message}}
     else if(e.code==="NEED_REASON")CC.reason={loai,msg:e.message};else CC.err=e.message||"Chưa chấm được";
   }
   CC.busy=false;ccRedraw();
@@ -188,6 +189,8 @@ function pCcToi(m){
 
 
 /* ---------- Chấm ngoài văn phòng (CEO 06/11): đi quay, gặp khách → lý do + ảnh check-in + gắn buổi quay, Lead xác nhận ---------- */
+/* Chấm ngoài chỉ làm trên điện thoại (CEO 06/11): máy tính chỉ xem. */
+const ccPhone=()=>{const u=navigator.userAgent||"";return /Android|iPhone|iPad|iPod|Mobile/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)};
 const CC_LY={quay:"Đi quay",khach:"Gặp khách",khac:"Việc khác"};
 /* Buổi quay hôm nay có tên mình (Lịch quay ở Marketing). */
 function ccShoots(){try{const d=D(),t=+String((CC.me||{}).today||"").slice(8);return (d.shoots||[]).filter(s=>s.day===t&&(s.nguoi||[]).includes(ME.id)&&s.trangThai!=="Đã hủy").sort((a,b)=>String(a.gio||"").localeCompare(String(b.gio||"")))}catch(e){return []}}
