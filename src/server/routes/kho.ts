@@ -1126,6 +1126,17 @@ khoRoutes.post('/pc-notify', async (c) => {
   return ok(c, { sent, no_kythuat: false });
 });
 
+/** Hủy yêu cầu pha chế thì việc của kỹ thuật cũng xong theo (06/11). */
+khoRoutes.post('/pc-task-close', async (c) => {
+  const b = (await c.req.json().catch(() => null)) as { id?: unknown } | null;
+  const id = String(b?.id ?? '').trim().slice(0, 40);
+  if (!id) throw badRequest('MISSING', 'Thiếu mã yêu cầu');
+  await c.env.DB.prepare("UPDATE tasks SET status = 'DONE', completed_at = ?, updated_at = ? WHERE status = 'OPEN' AND title LIKE ?")
+    .bind(nowIso(), nowIso(), `Pha chế theo yêu cầu ${id}:%`)
+    .run();
+  return ok(c, { id });
+});
+
 /** Thay toàn bộ định mức của một sản phẩm (CEO, quản lý điều phối, kế toán). Phiếu đã ghi không đổi vì sổ lưu số đã trừ. */
 khoRoutes.put('/bom/:product', adminOnlyEndpoint, async (c) => {
   const auth = c.get('auth');
