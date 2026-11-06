@@ -49,10 +49,12 @@ function dtFbDang(from,to){dtSyncFb();let v=0,n=0;for(const k in DTS.fbDay)if(k>
 if(typeof adfMergeDays==="function"){const _m=adfMergeDays;adfMergeDays=function(){const x=_m.apply(this,arguments);try{dtSyncFb()}catch(e){}return x}}
 if(typeof fbsLoad==="function"){const _l=fbsLoad;fbsLoad=async function(){const a=FBS.raw&&FBS.raw.at,x=await _l.apply(this,arguments);if((FBS.raw&&FBS.raw.at)!==a){dtSyncFb();dtRe()}return x}}
 /* P&L Facebook (quản trị): ô doanh thu cùng số với các trang khác trên cùng các ngày Sheet có chi phí. */
-if(typeof fbdCost==="function"){const _c=fbdCost;fbdCost=function(days){const o=_c.apply(this,arguments);try{dtSyncFb();const R=FBC.raw&&FBC.raw.days;if(R&&o.n){let d=0;days.forEach(k=>{if(R[k])d+=+((DAYD.fb||{})[k]||[])[5]||0});o.gop+=d-o.dt;o.dt=d}}catch(e){}return o}}
+if(typeof fbdCost==="function"){const _c=fbdCost;fbdCost=function(days){const o=_c.apply(this,arguments);try{dtSyncFb();const R=FBC.raw&&FBC.raw.days;if(R&&o.n){let d=0;days.forEach(k=>{if(R[k])d+=R[k].web?+R[k].g[1]||0:+((DAYD.fb||{})[k]||[])[5]||0});/* ngày web tự tính (fbv2.js fbmMerge): tiền hàng đúng rổ đơn đã gửi có giá vốn, giữ nguyên */o.gop+=d-o.dt;o.dt=d}}catch(e){}return o}}
 
 /* ---------- Nhãn chốt + số đã chốt áp vào từng dòng kênh ---------- */
 function dtEnsure(){dtLoadRows();
+  /* Giá vốn Facebook theo Sheet Pancake (fbvGvCa) cần FBC.raw: tải một lần rồi vẽ lại, để Lãi lỗ / Tổng quan không rơi về cột giá vốn đơn chốt còn thiếu. */
+  if(!DTS.fbc&&typeof fbcLoad==="function"&&typeof FBC!=="undefined"&&!FBC.raw){DTS.fbc=true;Promise.resolve(fbcLoad()).then(()=>{if(FBC.raw)dtRe()}).catch(()=>{})}
   /* Quảng cáo Facebook theo ngày (ads_fb) chỉ có khi đã tải và gộp vào DAYD.ads: mở thẳng Lãi lỗ / So sánh kênh mà chưa qua trang Facebook thì quảng cáo bằng 0, lãi bị đội. */
   if(!DTS.adf&&typeof adfLoad==="function"&&typeof ADF!=="undefined"){DTS.adf=true;Promise.resolve(ADF.raw||adfLoad()).then(()=>{try{adfMergeDays()}catch(e){}dtRe()}).catch(()=>{DTS.adf=false})}if(!DTS.tsb&&typeof TSB!=="undefined"&&!TSB.months&&typeof tsbLoadMonths==="function"){DTS.tsb=true;Promise.resolve(tsbLoadMonths()).then(dtRe).catch(()=>{})}}
 /* Lý do kênh sàn chưa tự chốt được tháng ym (dtChuaDuThang): Shopee xét từng shop, TikTok một báo cáo. Kênh khác: []. */
@@ -68,9 +70,16 @@ function dtLabel(r,ch,from,to){
   else if(st==="chot"){const ly=r.frozen?[]:dtChuaDu(ch,ym);r.nhan=r.frozen?dtNhan(ym,t):ly.length?"dự kiến, chưa chốt: "+ly.join("; "):!DTS.rowsAt?"đã qua ngày chốt, đang tải số chốt":r.dt>0&&!r.tam&&!r.thieu?"đã qua ngày chốt, đang lưu số chốt":"đã qua ngày chốt, chưa đủ số để chốt"}
   else{r.dk=ch==="fb"&&r.dt!=null?dtDuKien(r.dt,r.dangDt||0,DT_HOAN_FB):r.dt;r.nhan=dtNhan(ym,t)+(ch==="fb"&&r.dangDt?` · dự kiến ${tr(r.dk)} khi ${nf(r.dang)} đơn đang giao có kết quả (hoàn dự kiến ${Math.round(DT_HOAN_FB*100)}%)`:"")}
   r.src=r.nhan+(r.src?" · "+r.src:"");return r}
+/* Facebook tháng chưa chốt: doanh thu thực chỉ là đơn đã giao, còn quảng cáo là cả tháng (gồm đơn đang giao) → lãi lệch rổ, âm giả (chị Hoa 06/11).
+   Quảng cáo trên P&L / Tổng quan lấy phần của rổ đơn đã giao = quảng cáo cả tháng × đã giao / doanh thu dự kiến (cùng tỷ lệ quảng cáo / doanh thu
+   dự kiến của trang Facebook), giữ số cả tháng ở adsCa cho Sổ chi phí (execNums C.adsFB). Hết tháng chốt thì về số thật. */
+function dtFbCungRo(f){if(!f||f.dk==null||f.chot==="chot"||!(f.dt>0)||!(f.dk>f.dt)||!(f.ads>0)||f.lai==null||f._ro)return;f._ro=1;
+  const k=f.dt/f.dk,ad=f.ads*k;f.adsCa=f.ads;f.lai+=f.ads-ad;f.ads=ad;
+  f.src=`quảng cáo tạm tính phần của đơn đã giao ${tr(ad)} (cả tháng ${tr(f.adsCa)} gồm đơn đang giao, doanh thu dự kiến ${tr(f.dk)}) · `+(f.src||"")}
 {const _t=tqRevB2C;tqRevB2C=function(N,from,to){const out=_t.apply(this,arguments);if(DTS.live||!dtOk())return out;dtEnsure();
   try{if(out.fb&&out.fb.dt!=null){const d=dtFbDang(from,to);out.fb.dang=d.n;out.fb.dangDt=d.v}
-    ["tts","fb","spe"].forEach(k=>{const f=dtFrozen(k,from,to);if(f)out[k]={...out[k],...f,src:f.src,tam:false,dang:0,dangDt:0};dtLabel(out[k],k,from,to)})}catch(e){}
+    ["tts","fb","spe"].forEach(k=>{const f=dtFrozen(k,from,to);if(f)out[k]={...out[k],...f,src:f.src,tam:false,dang:0,dangDt:0};dtLabel(out[k],k,from,to)});
+    dtFbCungRo(out.fb)}catch(e){}
   return out}}
 if(typeof b2bChannel==="function"){const _b=b2bChannel;b2bChannel=function(ch){const X=_b.apply(this,arguments);if(!X||DTS.live||!dtOk())return X;
   const f=dtFrozen(ch==="GIA_CONG"?"gc":"b2b",PERIOD.from,PERIOD.to);if(!f)return X;const d=f.dt-(+X.net||0);return {...X,has:true,net:f.dt,orders:f.don!=null?f.don:X.orders,gross:(+X.gross||0)+d,frozen:true}}}
@@ -198,7 +207,7 @@ function pDtDoiChieu(m){
    <div class="acts pad"><button class="btn pri" id="dt-kt-save">Lưu số kế toán</button><span class="hint">Số kế toán: Kế toán nhập số đã chốt sổ của từng kênh (đ). Để trống ô nào thì xóa số ô đó. Bấm từng dòng để xem từng ngày / từng đơn tạo nên số web. Chênh lệch tô đỏ khi lệch trên 1% (tối thiểu 1 triệu).</span></div></section>
   ${open?`<section class="card flush"><div class="card-h pad"><h2>${open[1]} · tháng ${dtYmVN(ym)}: số web từng ngày / từng đơn</h2><button class="btn sm" id="dt-close">Đóng</button></div>${dtChiTiet(open[0],ym)}</section>`:""}
   <section class="card"><div class="card-h"><h2>Cách tính doanh thu thực (một cách cho mọi trang)</h2></div><ul class="lessons">
-   <li><b>TikTok Shop:</b> doanh thu thuần theo báo cáo quyết toán đã tải lên; tải báo cáo hàng tuần; ngày chưa có báo cáo thì để trống, ghi "chờ tải báo cáo" (không ước từ số đơn). Tháng chỉ chốt khi báo cáo phủ đủ cả tháng. GMV chỉ là chỉ số hiệu suất.</li>
+   <li><b>TikTok Shop:</b> doanh thu thuần theo báo cáo quyết toán đã tải lên; agent tải báo cáo mỗi ngày; ngày chưa có báo cáo thì để trống, ghi "chờ tải báo cáo" (không ước từ số đơn). Tháng chỉ chốt khi báo cáo phủ đủ cả tháng. GMV chỉ là chỉ số hiệu suất.</li>
    <li><b>Shopee:</b> doanh thu theo file báo cáo Shopee tải lên; chưa tải thì để trống.</li>
    <li><b>Facebook:</b> đơn giao thành công theo ngày tạo đơn (Pancake, cập nhật mỗi sáng). Doanh thu chốt đơn chỉ là chỉ số hiệu suất. Dự kiến = giao thành công + đơn đang giao × (1 − ${Math.round(DT_HOAN_FB*100)}% hoàn dự kiến).</li>
    <li><b>Kênh phân phối, Kênh OEM:</b> đơn đã duyệt trên CRM theo ngày đơn (sau chiết khấu, trừ thưởng).</li>
@@ -219,3 +228,33 @@ function pDtDoiChieu(m){
 PAGES.dt_dc=pDtDoiChieu;
 /* Đưa trang vào kho trang để menubang.js xếp vào Điều hành CEO › Kênh bán hàng. */
 MODULES.push({k:"q_dt",adm:true,zone:"Quản trị",ic:"chart",n:"Đối chiếu doanh thu",sub:"",groups:()=>[["",[MI("dt_dc","Đối chiếu doanh thu",()=>dtOk())]]]});
+
+/* ---------- Tổng quan web vận hành: doanh số theo đơn đã lên, thời gian thực (chị Hoa 06/11) ----------
+   "c theo dõi real time nên e cho c doanh thu tính theo đơn đã lên, thực tế giao cuối tháng chốt".
+   Chỉ trong lúc vẽ trang Tổng quan bên vận hành (DTS.don): execNums / execOrders trả số theo đơn, cùng nguồn trang Kinh doanh —
+   Facebook = doanh thu đơn chốt Pancake (đã trừ hủy), TikTok = GMV theo ngày đã nạp, Shopee = số theo ngày báo cáo đã tải (chưa có thì chỉ đếm đơn Poscake).
+   Không áp khi đang tính số chốt / phân bổ (DTS.live, DTS.inPB) và không tự chốt trong lúc đó: lãi lỗ, P&L, báo cáo tháng giữ doanh thu thực (quy tắc 25/10). */
+DTS.don=0;
+const dtDonOn=()=>DTS.don>0&&!DTS.live&&!DTS.inPB;
+/* Theo đơn: kỳ đang chạy tính tới hôm nay (khớp trang Kinh doanh, cập nhật liên tục); kỳ trước lấy đúng bấy nhiêu ngày
+   từ ngày 01 tháng trước (01–06/11 so 01–06/10), không lệch ngày khi tháng trước có 31 ngày. */
+const dtHomQua=()=>iso(new Date());
+{const _pr=prevRange;prevRange=function(){if(!dtDonOn())return _pr.apply(this,arguments);
+  const f=PERIOD.from,e=PERIOD.to>dtHomQua()?dtHomQua():PERIOD.to,n=Math.max(1,Math.round((pdate(e)-pdate(f))/864e5)+1);
+  let a;if(f.slice(8)==="01"){const d=pdate(f);a=new Date(d.getFullYear(),d.getMonth()-1,1)}else a=addD(pdate(f),-n);
+  return {from:iso(a),to:iso(addD(a,n-1)),n}}}
+{const _en=execNums;execNums=function(from,to){const N=_en.apply(this,arguments);if(!dtDonOn())return N;
+  const r=(s,i)=>rSum(s,i,from,to),tt=r("tts",0).v,fb=r("fb",6).v,sp=r("spe",0).v;
+  return {...N,tt,fbDT:fb,fbGiao:fb,spDT:sp,tong:tt+fb+sp,adsDT:N.adsDT,rev:null,L:{fb:null,spe:null,tts:null},don:true,
+    n:{tts:r("tts",0).n,spe:r("spe",0).n,fb:r("fb",6).n,ads:(N.n||{}).ads}}}}
+{const _eo=execOrders;execOrders=function(from,to){const O=_eo.apply(this,arguments);if(!dtDonOn())return O;
+  const r=(s,i)=>rSum(s,i,from,to).v,co=typeof tqCo==="function"?tqCo(from,to)||{}:{};return {tts:r("tts",1),fb:r("fb",1),spe:r("spe",4)||co.SHOPEE||0}}}
+{const _ac=dtAutoChot;dtAutoChot=function(){if(DTS.don)return;return _ac.apply(this,arguments)}}
+{const _ex=PAGES.exec;PAGES.exec=function(m){if(IS_ADMIN_HOST())return _ex.apply(this,arguments);
+  DTS.don++;let r;try{r=_ex.apply(this,arguments)}finally{DTS.don--}
+  try{const kl=[...m.querySelectorAll(".xkl")].find(x=>x.textContent.trim()==="Doanh số");if(kl)kl.textContent="Doanh số theo đơn";/* tên dài bị cắt trong ô (chị Hoa 06/11) */
+    const h=m.querySelector(".xkenh .card-h .hint")||m.querySelector(".xkenh .card-h");
+    const note=`<p class="hint pad dt-don" style="margin:0 0 6px">Theo đơn đã lên, đã trừ đơn hủy, so cùng số ngày từ đầu tháng trước: Facebook là đơn chốt Pancake, TikTok là GMV các ngày đã nạp (chưa trừ hủy, hoàn), Shopee lấy từ báo cáo đã tải (chưa có thì chỉ đếm đơn xuất kho). Doanh thu thực chốt cuối tháng, khi đơn giao xong và có báo cáo sàn.</p>`;
+    const card=m.querySelector(".xkenh");if(card&&!card.querySelector(".dt-don")){const ch=card.querySelector(".card-h");if(ch)ch.insertAdjacentHTML("afterend",note)}
+    const th=card&&[...card.querySelectorAll("thead th")].find(x=>x.textContent.trim()==="Doanh thu");if(th)th.textContent="Doanh số theo đơn";void h}catch(e){}
+  return r}}

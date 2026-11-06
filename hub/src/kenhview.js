@@ -16,7 +16,7 @@ tqTabKenh=function(){
   const chLai=withLai.length?qtBars(withLai.map(r=>{const b=bien(r);return {l:r.n.replace(" (NPP, đại lý)",""),v:Math.max(0,r.lai),t:tr(r.lai)+" · biên "+dhPct(b),c:b<0?"r":b<ng.bienKenh?"y":"g"}}))+`<p class="hint">Xanh: biên đạt mục tiêu ${dhPct(ng.bienKenh)} · vàng: dưới mục tiêu · đỏ: lỗ.</p>`:`<p class="hint">Chưa có kênh nào tính được lãi.</p>`;
   const chips=r=>{const w=[];
     if(r.dt&&r.ads/r.dt>ng.qcMax)w.push(pill("QC "+dhPct(r.ads/r.dt)+" doanh thu","red"));
-    if(r.dt&&r.lai!=null&&r.lai/r.dt<ng.bienKenh&&!(r.ads/r.dt>ng.qcMax))w.push(pill("biên thấp","amb"));
+    if(r.dt&&r.lai!=null&&r.lai/r.dt<ng.bienKenh&&!(r.ads/(r.qb||r.dt)>ng.qcMax))w.push(pill("biên thấp","amb"));
     if(r.tam)w.push(pill("tạm tính","blu"));
     if(r.dt==null)w.push(pill("chờ báo cáo","gry"));
     return w.length?`<div class="kvchips">${w.join(" ")}</div>`:""};

@@ -143,6 +143,12 @@ function khoEditPN(d,moves){
     const h=document.querySelector("#drawer h2");if(h)h.insertAdjacentHTML("afterend",`<div class="note amb">Đang sửa phiếu <b>${esc(d.no)}</b>. Bấm Ghi phiếu thì web lập phiếu mới theo số dưới đây và tự hủy ${esc(d.no)}.</div>`)});
 }
 /* ---------- Form lập phiếu (mở trong ngăn bên, không mất khi trang tự làm mới) ---------- */
+/* Số lượng trong phiếu (chị Hoa 06/11): gõ được 0.5, 12.67, 0,03 (dấu phẩy hay chấm đều được); chọn đơn vị kg / gam, lít / ml
+   ngay trên dòng, web tự đổi về đơn vị của mã khi ghi sổ. */
+const KF_U={"kg":[["kg",1],["gam",0.001]],"gam":[["gam",1],["kg",1000]],"g":[["g",1],["kg",1000]],"lít":[["lít",1],["ml",0.001]],"lit":[["lít",1],["ml",0.001]],"l":[["lít",1],["ml",0.001]],"ml":[["ml",1],["lít",1000]]};
+function kfNum(v){let x=String(v==null?"":v).replace(/\s/g,"");if(x==="")return NaN;if(x.includes(",")&&x.includes("."))x=x.replace(/\./g,"").replace(",",".");else x=x.replace(",",".");const n=+x;return isFinite(n)?n:NaN}
+function kfUnitCell(unit){const o=KF_U[String(unit||"").toLowerCase().trim()];return o?`<select class="kf-un">${o.map(([n,f])=>`<option value="${f}">${n}</option>`).join("")}</select>`:esc(unit||"")}
+const kfQty=tr=>{const q=tr.querySelector(".kf-q"),u=tr.querySelector(".kf-un"),n=kfNum(q.value);if(q.value.trim()==="")return "";if(!isFinite(n))return "x";return String(Math.round(n*(u?+u.value:1)*1e6)/1e6)};
 const KHO_LINE_CLS={PN:["NVL","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null,TB:null};
 function khoForm(type,pre,clsO){
   KHO.edit=KHO.editNext||null;KHO.editNext=null; // chỉ là "sửa" khi mở từ nút Sửa phiếu
@@ -151,33 +157,40 @@ function khoForm(type,pre,clsO){
   const head=`<div class="row7"><label class="field">Ngày<input type="date" id="kf-d" value="${kToday()}" required></label>
    ${type==="PN"?`<label class="field grow">Thuộc phiếu mua<select id="kf-po"><option value="">Đang tải phiếu mua…</option></select></label><label class="field grow">Nhà cung cấp<input id="kf-p" placeholder="Tên nhà cung cấp"></label>`:""}
    ${isOut?`<label class="field">Loại<select id="kf-k"><option value="XB">Xuất bán: NPP, đại lý, gia công, bán nguyên liệu (XB)</option><option value="XK">Xuất khác: hàng mẫu, hủy hỏng (XK)</option></select></label><label class="field grow">Khách hàng / nơi nhận<input id="kf-p" required></label><label class="field">Mã đơn của sale<input id="kf-r"></label>`:""}
-   ${isPC?`<label class="field grow">Bán thành phẩm<input id="kf-btp" placeholder="Gõ tên BTP rồi chọn" autocomplete="off" required></label><label class="field">Số lít thực tế<input id="kf-lit" type="number" step="any" min="0" required></label><label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label><label class="field">Số lít theo phiếu<input id="kf-rq" type="number" step="any" min="0"></label>`:""}
+   ${isPC?`<div class="field full" style="grid-column:1/-1"><span>Người sản xuất</span><div id="kf-ppl" class="sdmppl"></div><datalist id="kf-dl">${(()=>{let L=[];try{L=SX().people.filter(p=>!p.an).map(p=>p.ten)}catch(e){}if(!L.length)L=["Hội","Đức"];return L.map(t=>`<option value="${esc(t)}">`).join("")})()}</datalist></div>`:""}
+   ${isPC?`<label class="field grow">Bán thành phẩm<input id="kf-btp" placeholder="Gõ tên BTP rồi chọn" autocomplete="off" required></label><label class="field">Số lít (1 bồn)<input id="kf-lit" type="text" inputmode="decimal" autocomplete="off" required></label><label class="field">Mã yêu cầu pha chế<input id="kf-r" placeholder="YCPC… (nếu có)"></label><input id="kf-rq" type="hidden">`:""}
    ${isKS?`<label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label>`:""}
    ${type==="TD"?`<label class="inl"><input type="checkbox" id="kf-moc"> Đây là phiếu tồn chốt chung (mốc tồn): hàng nhập, xuất, bán sàn từ hôm sau mới tính</label>`:""}
    ${type==="TB"&&typeof KTON!=="undefined"&&KTON.moc&&KTON.moc.moc?`<span class="hint">Mốc tồn chung ${kDd(KTON.moc.moc)} · đã có số kiểm ${KTON.moc.counted.length} mã; kiểm lại được nếu ngày đếm sau lần trước</span>`:""}</div>`;
-  const colHead=isPC?["Nguyên vật liệu","ĐVT","Định mức","Thực tế dùng","Tồn kho",""]:isKS?["Thành phẩm đếm được","ĐVT","Số lượng","Theo phiếu SX","Tồn",""]:isTL?["Mã hàng","ĐVT","Số lượng","Xử lý",""]:isPN?["Mã hàng","ĐVT","Số lượng",...(price&&type==="PN"?["Đơn giá"]:[]),"Tồn",""]:["Mã hàng","ĐVT","Số lượng","Tồn",""];
+  const colHead=isPC?["Nguyên vật liệu","Định mức","Định lượng","Thực tế","ĐVT","Tồn kho",""]:isKS?["Thành phẩm đếm được","Số lượng","ĐVT","Theo phiếu SX","Tồn",""]:isTL?["Mã hàng","Số lượng","ĐVT","Xử lý",""]:isPN?["Mã hàng","Số lượng","ĐVT",...(price&&type==="PN"?["Đơn giá"]:[]),"Tồn",""]:["Mã hàng","Số lượng","ĐVT","Tồn",""];
   openDrawerHTML(`<h2>${T.name}</h2><p class="hint">${T.hint}</p><form class="frm" id="kf">${head}
    <div class="tbl edit"><table><thead><tr>${colHead.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody id="kf-b"></tbody></table></div>
    <div class="row7"><button type="button" class="btn" id="kf-add">+ Thêm dòng</button>${isOut?`<button type="button" class="btn" id="kf-box">+ Thêm vỏ thùng</button>`:""}<label class="field grow">Ghi chú<input id="kf-n"></label></div>
    ${isKS?`<div id="kf-prev"></div>`:""}<div id="kf-warn"></div>
    <div class="row7"><button class="btn pri" id="kf-ok">Ghi phiếu</button><button type="button" class="btn" id="kf-print">In bản điền tay</button><span class="hint" id="kf-msg"></span></div></form>`);
   const body=$("#kf-b"),cls=clsO||KHO_LINE_CLS[type];
+  if(isPC&&$("#kf-ppl")){const ppl=$("#kf-ppl"),dl=typeof SX==="function"&&SX().people?SX().people.filter(p=>!p.an).map(p=>p.ten):[];
+    const addP=(after,val)=>{const w=document.createElement("span");w.className="sdmp";w.innerHTML=`<input class="sdm-pn" list="kf-dl" placeholder="Tên người sản xuất" autocomplete="off" value="${esc(val||"")}"><button type="button" class="btn sm sdm-padd" title="Thêm người">+</button><button type="button" class="lnk sdm-px" title="Bỏ">✕</button>`;
+      if(after)after.after(w);else ppl.appendChild(w);
+      w.querySelector(".sdm-padd").onclick=()=>addP(w);w.querySelector(".sdm-px").onclick=()=>{if(ppl.children.length>1)ppl.removeChild(w)};
+      w.querySelector(".sdm-pn").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addP(w)}};return w};
+    addP(null,"")}
   const addLine=(o={})=>{const tr=document.createElement("tr");tr.innerHTML=
     `<td><input class="kf-i" autocomplete="off" placeholder="Gõ mã hoặc tên rồi chọn" value="${esc(o.item||"")}" data-code="${esc(o.item||"")}"${o.fixed?" readonly":""}><small class="kf-nm">${o.item&&KHO.items.get(o.item)?esc(KHO.items.get(o.item).name):""}</small></td>
-     <td class="kf-u">${o.item&&KHO.items.get(o.item)?esc(KHO.items.get(o.item).unit):""}</td>
-     ${isPC?`<td class="n kf-std">${o.std!=null?knum(o.std):"—"}</td>`:""}
-     <td><input class="kf-q n" type="number" step="any" min="0" value="${o.qty!=null?o.qty:""}"></td>
-     ${isKS?`<td><input class="kf-rq n" type="number" step="any" min="0"></td>`:""}
+     ${isPC?`<td class="n kf-per">${o.per!=null?knum(o.per):"—"}</td><td class="n kf-std"><b>${o.std!=null?knum(o.std):"—"}</b></td>`:""}
+     <td><input class="kf-q n" type="text" inputmode="decimal" autocomplete="off" value="${o.qty!=null?o.qty:""}"></td>
+     <td class="kf-u">${o.item&&KHO.items.get(o.item)?kfUnitCell(KHO.items.get(o.item).unit):""}</td>
+     ${isKS?`<td><input class="kf-rq n" type="text" inputmode="decimal" autocomplete="off"></td>`:""}
      ${isTL?`<td><select class="kf-v"><option value="">Chọn…</option><option value="ban_tiep">Bán tiếp</option><option value="bo">Bỏ</option></select></td>`:""}
      ${price&&type==="PN"?`<td><input class="kf-pr n" type="number" step="any" min="0"></td>`:""}
      ${!isTL?`<td class="n kf-st"></td>`:""}<td>${o.fixed?"":`<button type="button" class="lnk kf-x">✕</button>`}</td>`;
     body.appendChild(tr);const inp=tr.querySelector(".kf-i");
-    const upd=()=>{const c=inp.dataset.code,it=KHO.items.get(c);tr.querySelector(".kf-nm").textContent=it?it.name:"";tr.querySelector(".kf-u").textContent=it?it.unit:"";const st=tr.querySelector(".kf-st");if(st)st.textContent=it?knum(khoStock(c)):"";refresh()};
+    const upd=()=>{const c=inp.dataset.code,it=KHO.items.get(c);tr.querySelector(".kf-nm").textContent=it?it.name:"";tr.querySelector(".kf-u").innerHTML=it?kfUnitCell(it.unit):"";{const un=tr.querySelector(".kf-un");if(un)un.onchange=refresh}const st=tr.querySelector(".kf-st");if(st)st.textContent=it?knum(khoStock(c)):"";refresh()};
     if(!o.fixed)khoPick(inp,o.cls||cls,it=>{upd();tr.querySelector(".kf-q").focus()});
     tr.querySelector(".kf-q").oninput=refresh;if(tr.querySelector(".kf-rq"))tr.querySelector(".kf-rq").oninput=refresh;
     if(tr.querySelector(".kf-x"))tr.querySelector(".kf-x").onclick=()=>{tr.remove();refresh()};
     if(o.item)upd();return tr};
-  function lines(){return [...body.querySelectorAll("tr")].map(tr=>({item:tr.querySelector(".kf-i").dataset.code,qty:tr.querySelector(".kf-q").value,ref_qty:tr.querySelector(".kf-rq")?tr.querySelector(".kf-rq").value:"",verdict:tr.querySelector(".kf-v")?tr.querySelector(".kf-v").value:"",price:tr.querySelector(".kf-pr")?tr.querySelector(".kf-pr").value:"",std_qty:tr.dataset.std!=null?+tr.dataset.std:undefined,tr})).filter(l=>l.item||l.qty!=="")}
+  function lines(){return [...body.querySelectorAll("tr")].map(tr=>({item:tr.querySelector(".kf-i").dataset.code,qty:kfQty(tr),ref_qty:tr.querySelector(".kf-rq")&&tr.querySelector(".kf-rq").value.trim()!==""?String(kfNum(tr.querySelector(".kf-rq").value)):"",verdict:tr.querySelector(".kf-v")?tr.querySelector(".kf-v").value:"",price:tr.querySelector(".kf-pr")?tr.querySelector(".kf-pr").value:"",std_qty:tr.dataset.std!=null?+tr.dataset.std:undefined,tr})).filter(l=>l.item||l.qty!=="")}
   function refresh(){const w=[];
     if(isKS){const need=new Map();lines().forEach(l=>{const q=+l.qty;if(!l.item||!(q>0))return;(khoNeedRows(l.item,q,refresh)||[]).forEach(b=>need.set(b.item,(need.get(b.item)||0)+b.need));if(!khoHasBom(l.item))w.push(`${l.item} chưa có định mức, chưa tự trừ vỏ / tem / BTP.`)});
       $("#kf-prev").innerHTML=need.size?`<div class="card flush"><div class="card-h pad"><h3>Hệ thống sẽ tự trừ</h3></div>${tbl(["Vật tư","Cần","Tồn","Sau phiếu"],[...need].map(([c,q])=>{const it=KHO.items.get(c)||{},after=khoStock(c)-q;if(after<0)w.push(`${c} sẽ âm kho (còn ${knum(khoStock(c))}, cần ${knum(q)}).`);return `<tr><td>${esc(c)} <small>${esc(it.name||"")}</small></td><td class="n">${knum(q)} ${esc(it.unit||"")}</td><td class="n">${knum(khoStock(c))}</td><td class="n ${after<0?"t-red":""}">${knum(after)}</td></tr>`}))}</div>`:""}
@@ -186,13 +199,13 @@ function khoForm(type,pre,clsO){
     $("#kf-warn").innerHTML=w.length?`<div class="note amb">${w.map(esc).join("<br>")}<br><small>Vẫn ghi được; kiểm tra lại số trước khi bấm Ghi phiếu.</small></div>`:""}
   if(isPC){
     let fillTok=0;
-    const fill=async()=>{const c=$("#kf-btp").dataset.code,lit=+$("#kf-lit").value;if(!c||!(lit>0))return;const my=++fillTok;let B;
+    const fill=async()=>{const c=$("#kf-btp").dataset.code,lit=kfNum($("#kf-lit").value)*(kfNum($("#kf-bon")&&$("#kf-bon").value||"1")||1);if($("#kf-tong"))$("#kf-tong").value=lit>0?knum(Math.round(lit*1e6)/1e6):"";if(!c||!(lit>0))return;const my=++fillTok;let B;
       if(KHO.bomHidden){try{const [[,,rows]]=await khoExpand([[c,lit]]);B=rows.map(x=>({item:x.item,need:x.need}))}catch(e){toast(e.message);return}if(my!==fillTok)return}
       else B=KHO.bom.get(c)||[];
       body.innerHTML="";
-      B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),tr=addLine({item:b.item,qty:std,std,fixed:true});tr.dataset.std=std});
+      const lb=kfNum($("#kf-lit").value)||lit;B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),per=b.need!=null?b.need/lit:b.qty,tr=addLine({item:b.item,qty:std,std,per:Math.round(per*1e6)/1e6,perBon:kq(per*lb),fixed:true});tr.dataset.std=std});
       if(!B.length)$("#kf-warn").innerHTML=`<div class="note amb">${esc(c)} chưa có định mức. Thêm nguyên liệu bằng nút "+ Thêm dòng".</div>`;else refresh()};
-    khoPick($("#kf-btp"),["BTP"],fill);$("#kf-lit").oninput=fill;
+    khoPick($("#kf-btp"),["BTP"],fill);$("#kf-lit").oninput=fill;if($("#kf-bon"))$("#kf-bon").oninput=fill;
     $("#kf-add").onclick=()=>{const tr=addLine({});tr.dataset.std=0}}
   else{$("#kf-add").onclick=()=>addLine({});if(isOut)$("#kf-box").onclick=()=>addLine({cls:["NVL","HH","CCDC"]});addLine({})}
   if($("#kf-psx"))$("#kf-psx").onchange=()=>{if($("#kf-psx").value)khoFillFromPsx(type,$("#kf-psx").value,addLine)};
@@ -210,15 +223,15 @@ function khoForm(type,pre,clsO){
     const L=lines().filter(l=>l.item),dt=$("#kf-d").value,tp=isOut?$("#kf-k").value:type;
     const mv=L.map(l=>{const it=KHO.items.get(l.item)||{name:"",unit:""};return {item:l.item,name:it.name,unit:it.unit,qty:0,std_qty:l.std_qty!=null?l.std_qty:null,price:null,role:isPC?"USE":"IN",note:""}});
     if(isPC&&$("#kf-btp").dataset.code){const bt=KHO.items.get($("#kf-btp").dataset.code)||{};mv.unshift({item:bt.code,name:bt.name,unit:bt.unit,qty:0,std_qty:null,price:null,role:"PRODUCT",note:""})}
-    khoPrintDoc({doc:{no:"(chưa ghi sổ)",type:tp,doc_date:dt,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",ref_qty:isPC&&$("#kf-rq")&&$("#kf-rq").value!==""?+$("#kf-rq").value:null,note:"",status:"OK"},moves:mv},Object.assign({},KHO_TYPES[tp]||T),false,{},true)};
+    khoPrintDoc({doc:{no:"(chưa ghi sổ)",type:tp,doc_date:dt,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",ref_qty:isPC&&$("#kf-rq")&&$("#kf-rq").value!==""?kfNum($("#kf-rq").value):null,note:"",status:"OK"},moves:mv},Object.assign({},KHO_TYPES[tp]||T),false,isPC?{liters:kfNum($("#kf-lit").value),nguoi:[...document.querySelectorAll("#kf .sdm-pn")].map(x=>x.value.trim()).filter(Boolean)}:{},true)};
   $("#kf").onsubmit=async e=>{e.preventDefault();const ok=$("#kf-ok");ok.disabled=true;$("#kf-msg").textContent="Đang ghi…";
     try{const L=lines().filter(l=>l.item);const body={type:isOut?$("#kf-k").value:type==="TB"?"TD":type,date:$("#kf-d").value,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",note:$("#kf-n").value,
       lines:L.map(l=>({item:l.item,qty:l.qty===""?undefined:+l.qty,ref_qty:l.ref_qty===""?undefined:+l.ref_qty,verdict:l.verdict||undefined,price:l.price===""?undefined:+l.price,std_qty:l.std_qty}))};
       if($("#kf-po")&&$("#kf-po").value)body.po_id=$("#kf-po").value;
       if(type==="TB")body.bo_sung=true;if(type==="TD"&&$("#kf-moc")&&$("#kf-moc").checked)body.moc=true;
       if(KHO.edit&&type==="PN")body.replace_doc_id=KHO.edit.id;
-      if(isPC){body.btp=$("#kf-btp").dataset.code;body.liters=+$("#kf-lit").value;body.ref_qty=$("#kf-rq").value===""?undefined:+$("#kf-rq").value}
-      if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");
+      if(isPC){body.nguoi=[...new Set([...document.querySelectorAll("#kf .sdm-pn")].map(x=>x.value.trim()).filter(Boolean))];body.btp=$("#kf-btp").dataset.code;body.liters=kfNum($("#kf-lit").value)*(kfNum($("#kf-bon")&&$("#kf-bon").value||"1")||1);body.bon=kfNum($("#kf-bon")&&$("#kf-bon").value||"1")||1;body.lit_bon=kfNum($("#kf-lit").value);body.ref_qty=$("#kf-rq").value.trim()===""?undefined:kfNum($("#kf-rq").value)}
+      if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");if(L.some(l=>l.qty==="x"))throw new Error("Có số lượng gõ chưa đúng (ví dụ đúng: 0,5 · 12,67 · 0.03)");
       const r=await kApi("/docs",{method:"POST",body:JSON.stringify(body)});closeDrawer();KHO.at=0;KHO.list={};KHO.nxt=null;KHO.cl=null;KHO.mp=null;await khoLoad(true);renderMain();KHO.edit=null;if(typeof MH!=="undefined"&&typeof mhReload==="function")mhReload().catch(()=>{});toast("Đã ghi phiếu "+r.no);khoOpenDoc(r.id,r.warnings)}
     catch(err){$("#kf-msg").textContent="";$("#kf-warn").innerHTML=`<div class="note red">${esc(err.message)}</div>`;ok.disabled=false}};
 }
@@ -234,7 +247,7 @@ async function khoOpenDoc(id,warnings){
   const d=r.doc,price=KHO.cat&&KHO.cat.can_price,T=KHO_TYPES[d.type],cancelled=d.status==="HUY",ex=(()=>{try{return JSON.parse(d.extra||"{}")}catch(e){return {}}})();
   const rows=r.moves.map(m=>`<tr><td>${esc(m.item)}</td><td>${esc(m.name)}</td><td>${esc(m.unit)}</td><td class="n">${knum(m.qty)}</td>${d.type==="PC"?`<td class="n">${m.role==="USE"?knum(m.std_qty):"—"}</td>`:""}${price&&d.type==="PN"?`<td class="n">${m.price!=null?nf(m.price):"—"}</td>`:""}<td>${esc({IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:d.type==="PC"?"Thu được":"Thành phẩm",AUTO:"Tự trừ theo định mức",RETURN:"Bán tiếp",DROP:"Bỏ"}[m.role]||m.role)}${m.note?` · ${esc(m.note)}`:""}</td></tr>`).join("");
   const head=["Mã","Tên","ĐVT","Số lượng"].concat(d.type==="PC"?["Định mức"]:[]).concat(price&&d.type==="PN"?["Đơn giá"]:[]).concat(["Ghi chú"]);
-  openDrawerHTML(`<h2>${esc(d.no)} ${cancelled?pill("Đã hủy","gry"):pill("Hiệu lực","grn")}</h2><p>${esc(T.name)} · ngày ${kDd(d.doc_date)} · lập bởi ${esc(d.created_by_name||"—")}${d.partner?` · ${esc(d.partner)}`:""}${d.ref_no?` · tham chiếu ${esc(d.ref_no)}`:""}${d.ref_qty!=null?` · theo phiếu ${knum(d.ref_qty)}`:""}</p>
+  openDrawerHTML(`<h2>${esc(d.no)} ${cancelled?pill("Đã hủy","gry"):pill("Hiệu lực","grn")}</h2><p>${esc(T.name)} · ngày ${kDd(d.doc_date)} · lập bởi ${esc(d.created_by_name||"—")}${d.partner?` · ${esc(d.partner)}`:""}${d.ref_no?` · tham chiếu ${esc(d.ref_no)}`:""}${d.ref_qty!=null?` · theo phiếu ${knum(d.ref_qty)}`:""}${ex.nguoi&&ex.nguoi.length?` · người sản xuất ${esc(ex.nguoi.join(", "))}`:""}</p>
    ${d.note?`<p class="hint">${esc(d.note)}</p>`:""}${cancelled?`<div class="note red">Đã hủy bởi ${esc(d.cancelled_by_name||"—")} lúc ${esc(String(d.cancelled_at||"").slice(0,16).replace("T"," "))}. Lý do: ${esc(d.cancel_reason||"")}</div>`:""}
    ${warnings&&warnings.length?`<div class="note amb"><b>Cảnh báo khi ghi:</b><br>${warnings.map(esc).join("<br>")}</div>`:""}
    ${KHO_SPLIT[d.type]?(()=>{const sp=KHO_SPLIT[d.type],[nIn,nOut]=khoSubNos(d),mk=role=>r.moves.filter(m=>m.role===role).map(m=>`<tr><td>${esc(m.item)}</td><td>${esc(m.name)}</td><td>${esc(m.unit)}</td><td class="n">${knum(Math.abs(m.qty))}</td>${d.type==="PC"&&role==="USE"?`<td class="n">${m.std_qty!=null?knum(m.std_qty):"—"}</td>`:""}</tr>`).join("");
@@ -259,17 +272,17 @@ const KHO_ROLE={IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:"Thu được",AUTO
 function khoPrintDoc(r,T,price,ex,blank){
   const d=r.doc,isPC=d.type==="PC",isPN=d.type==="PN"&&price&&!blank,cancelled=!blank&&d.status==="HUY";
   const meta=[["Số phiếu",d.no],["Ngày",kDd(d.doc_date)],d.partner?[d.type==="PN"?"Nhà cung cấp":d.type==="XB"||d.type==="XK"?"Khách hàng / nơi nhận":"Đối tác",d.partner]:null,d.ref_no?[d.type==="PC"||d.type==="KS"?"Phiếu sản xuất / lô":"Tham chiếu",d.ref_no]:null,
-    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
-  const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Định mức","Thực tế dùng","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
+    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&blank&&+ex.liters>0?["Số lít cần pha (1 bồn)",knum(ex.liters)+" lít"]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,isPC&&ex.bon>1?["Số bồn",knum(ex.bon)+" bồn × "+knum(ex.lit_bon||0)+" lít"]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
+  const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Định mức","Định lượng","Thực tế","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
   let tong=0;
   const body=r.moves.map((m,i)=>{const q=isPC?(m.role==="PRODUCT"?m.qty:-m.qty):Math.abs(m.qty);const qshow=d.type==="TL"&&m.role==="DROP"?knum(m.std_qty):knum(q);
     let cells=[i+1,m.item,m.name,m.unit];
-    if(isPC){const std=m.role==="USE"?m.std_qty:null,lech=std!=null&&std>0?q-std:null,pc=lech!=null?lech*100/std:0;cells=cells.concat([std!=null?knum(std):"—",qshow,lech==null?"—":(lech>0?"+":"")+knum(lech)+(Math.abs(pc)>=0.05?" ("+(pc>0?"+":"")+pc.toFixed(1)+"%)":"")])}
+    if(isPC){const std=m.role==="USE"?m.std_qty:null,lech=std!=null&&std>0?q-std:null,pc=lech!=null?lech*100/std:0,per=std!=null&&+ex.liters>0?Math.round(std/ex.liters*1e6)/1e6:null;cells=cells.concat([per!=null?knum(per):"—",std!=null?knum(std):"—",qshow,lech==null?"—":(lech>0?"+":"")+knum(lech)+(Math.abs(pc)>=0.05?" ("+(pc>0?"+":"")+pc.toFixed(1)+"%)":"")])}
     else cells.push(qshow);
     if(isPN){const th=(m.price||0)*q;tong+=th;cells=cells.concat([m.price!=null?nf(m.price):"—",m.price!=null?nf(th):"—"])}
     const nt=[KHO_ROLE[m.role]&&!["IN","OUT"].includes(m.role)?KHO_ROLE[m.role]:"",m.note].filter(Boolean).join(" · ");cells.push(nt);
-    if(blank){if(isPC){if(m.role==="PRODUCT")cells=cells.slice(0,4).concat(["—","",""]);else cells[5]="",cells[6]="";cells[7]=""}else{cells[4]="";cells[cells.length-1]=""}}
-    const fillIdx=blank?(isPC?[5,6,cells.length-1]:[4,cells.length-1]):[];const num=isPC?[4,5,6]:[4];const rowCls=m.role==="PRODUCT"?" class=\"pr\"":!blank&&isPC&&m.role==="USE"&&m.std_qty>0&&Math.abs(-m.qty-m.std_qty)*100/m.std_qty>5?" class=\"lech\"":"";
+    if(blank){if(isPC){if(m.role==="PRODUCT")cells=cells.slice(0,4).concat(["—","—","",""]);else cells[6]="",cells[7]="";cells[8]=""}else{cells[4]="";cells[cells.length-1]=""}}
+    const fillIdx=blank?(isPC?[6,7,cells.length-1]:[4,cells.length-1]):[];const num=isPC?[4,5,6,7]:[4];const rowCls=m.role==="PRODUCT"?" class=\"pr\"":!blank&&isPC&&m.role==="USE"&&m.std_qty>0&&Math.abs(-m.qty-m.std_qty)*100/m.std_qty>5?" class=\"lech\"":"";
     return "<tr"+rowCls+">"+cells.map((c,j)=>"<td class=\""+(num.includes(j)&&j>=4?"n ":"")+(j===0?"c ":"")+(fillIdx.includes(j)?"fill":"")+"\">"+esc(String(c))+"</td>").join("")+"</tr>"}).join("");
   const sign=d.type==="PN"?["Người giao hàng","Thủ kho","Kế toán"]:isPC?["Quản lý sản xuất","Kỹ thuật pha chế","Thủ kho"]:d.type==="KS"?["Quản lý sản xuất","Kế toán kho","Thủ kho"]:["Người nhận hàng","Thủ kho","Kế toán"];
   const w=khoPrintWin();

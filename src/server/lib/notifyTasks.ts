@@ -27,7 +27,7 @@ export async function accountantIds(db: D1Database): Promise<string[]> {
 export function taskStatements(
   db: D1Database,
   userIds: string[],
-  opts: { title: string; customerId?: string | null; createdBy: string | null; now: string; priority?: 'NORMAL' | 'HIGH' },
+  opts: { title: string; customerId?: string | null; createdBy: string | null; now: string; priority?: 'NORMAL' | 'HIGH'; dueAt?: string },
 ): D1PreparedStatement[] {
   return [...new Set(userIds)]
     .filter((id) => id && id !== opts.createdBy)
@@ -37,6 +37,6 @@ export function taskStatements(
           `INSERT INTO tasks (id, customer_id, assignee_id, type, title, due_at, status, priority, created_by, created_at, updated_at)
            VALUES (?, ?, ?, 'FOLLOW_UP', ?, ?, 'OPEN', ?, ?, ?, ?)`,
         )
-        .bind(newId(), opts.customerId ?? null, id, opts.title.slice(0, 480), opts.now, opts.priority ?? 'HIGH', opts.createdBy, opts.now, opts.now),
+        .bind(newId(), opts.customerId ?? null, id, opts.title.slice(0, 480), opts.dueAt ?? opts.now, opts.priority ?? 'HIGH', opts.createdBy, opts.now, opts.now),
     );
 }

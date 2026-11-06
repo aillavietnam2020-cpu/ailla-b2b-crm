@@ -44,7 +44,7 @@ function execNums(from,to){
 function execTargets(){const d=D();if(!d.targets)d.targets={tong:0,tts:1.4e9,spe:0,fb:0,ads:sum(KDX.adsPeople||[],p=>p.kpi)};return d.targets}
 const chg=(a,b,na,nb)=>!b||(na!=null&&nb<na*0.8)?"":`<span class="chg ${a>=b?"up":"dn"}">${a>=b?"▲":"▼"} ${Math.abs((a-b)/b*100).toFixed(1)}%</span>`;
 /* Facebook chỉ tính đơn giao thành công nên đơn mới tạo gần đây chưa tới tay khách: kỳ còn chạy dở thì không so % (số luôn thấp hơn kỳ đã khép). */
-const symOK=(N,P,s)=>{if(s==="fb"&&periodOpen())return false;const a=N.n[s]||0,b=P.n[s]||0;return a>0&&b>0&&b>=a*.8&&a>=b*.8};
+const symOK=(N,P,s)=>{if(s==="fb"&&periodOpen()&&!N.don)return false;/* N.don: Tổng quan vận hành tính theo đơn đã lên (doanhthu.js), không bị thấp giả nên vẫn so % */const a=N.n[s]||0,b=P.n[s]||0;return a>0&&b>0&&b>=a*.8&&a>=b*.8};
 const allOK=(N,P)=>["tts","spe","fb"].every(s=>!(N.n[s]||P.n[s])||symOK(N,P,s))&&["tts","spe","fb"].some(s=>symOK(N,P,s));
 /* ---------- Trung tâm điều hành (Navy Executive): dải KPI · doanh số theo kênh + việc cần xử lý · hai bảng ---------- */
 function execCost(N){const C=N.C;return [["Quảng cáo",[["Ads Facebook (sau thuế)",C.adsFB],["Ads TikTok (gồm thuế)",C.adsTT],["Shopee Ads",C.adsSPE]]],["Giá vốn",[["Facebook (đơn giao TC)",C.gvFB],["Shopee",C.gvSPE],["TikTok",C.gvTT]]],["Phí sàn",[["Shopee",C.phiSPE],["TikTok",C.phiTT]]],["Khác",[["TikTok: agency, KOC, live",C.khacTT]]]].map(([g,L])=>[g,L.filter(x=>x[1])]).filter(g=>g[1].length)}

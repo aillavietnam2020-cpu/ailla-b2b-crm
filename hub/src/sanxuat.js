@@ -29,6 +29,8 @@ function sxShape(d){
   if(!s.products.length&&(d.skus||[]).length)s.products=d.skus.map(k=>({ma:k.ma,ten:k.ten,dvt:"sp",loai:SX_GIACONG.test(k.ten)?"Gia công":"Tự sản xuất",prefix:sxPrefix(k.ten),thung:0,toiThieu:0,active:true}));
   // Danh sách nhân sự thực hiện do chị Hoa chốt 06/10/2026 (thay danh sách lấy từ hồ sơ nhân sự).
   if(!s.cfg.peopleV2){s.people=["Nhi","Hiền","Vinh","Thanh","Việt","Huệ","Hội"].map(t=>({ten:t,hoTen:t,viTri:""}));s.cfg.peopleV2=true}
+  /* Chị Hoa 06/11: người thực hiện ở xưởng chỉ còn Hội và Đức; người cũ ẩn đi (lô cũ vẫn giữ tên), thêm lại bằng "+ Thêm nhân sự". */
+  if(!s.cfg.peopleV3){s.people.forEach(p=>{if(!["Hội","Đức"].includes(p.ten))p.an=true});if(!s.people.some(p=>p.ten==="Đức"))s.people.push({ten:"Đức",hoTen:"Đức",viTri:""});s.cfg.peopleV3=true}
   if(!s.people.length&&(d.staff||[]).length)s.people=d.staff.filter(x=>x.khoi==="Sản xuất & Kho"&&x.tt!=="Đã nghỉ").map(x=>({ten:x.ten.split(" ").pop(),hoTen:x.ten,viTri:x.viTri}));
   if(!s.seeded&&s.products.length){s.seeded=true;sxSeedDemo(s)}
   return d;
@@ -218,10 +220,45 @@ const sxCach=r=>r&&r.cachLam==="CONG_NHAN"?"CONG_NHAN":"KY_THUAT";
 const sxCachPill=r=>sxCach(r)==="CONG_NHAN"?pill("Công nhân tự làm","blu"):"";
 function sxReqForm(id){
   const s=SX(),r=id?s.requests.find(x=>x.id===id):null;
+  if(!r)return sxReqMulti();
   openDrawerHTML(`<h2>${r?"Sửa phiếu sản xuất "+r.id:"Tạo phiếu sản xuất"}</h2><form class="frm" id="ncf"><div class="row4"><label class="field">Ngày tạo phiếu<input id="nc-ngay" type="date" required value="${r&&r.taoLuc?r.taoLuc:sxToday()}"></label><span class="hint" style="align-self:end">${r?"Số phiếu "+r.id:"Số phiếu tự cấp theo ngày tạo: PSX + năm tháng + số thứ tự, ví dụ PSX"+sxToday().slice(2,4)+sxToday().slice(5,7)+"-001"}</span></div><label class="field">Sản phẩm<select id="nc-sp" required>${sxProdOpts(r?r.sp:"")}</select></label><label class="field">Cách làm<select id="nc-cl">${opt(SX_CACH,r?sxCach(r):((s.cfg.cachLam||{})[""]||"KY_THUAT"))}</select><small class="hint">Công nhân tự làm: bỏ bước Pha chế.</small></label><div class="row4"><label class="field">Số lượng đề nghị<input id="nc-sl" type="number" min="1" placeholder="để trống nếu chưa chốt" value="${r&&r.sl?r.sl:""}"></label><label class="field">Ưu tiên<select id="nc-uu">${opt(["Bình thường","Gấp"],r?r.uu:"Bình thường")}</select></label></div><div class="row4"><label class="field">Lý do sản xuất<select id="nc-ng">${opt(SX_NGUON,r?r.nguon:"Thiếu hàng")}</select></label><label class="field">Hạn cần hàng<input id="nc-han" type="date" value="${r?r.han:""}"></label></div><label class="field">Ghi chú cho xưởng<textarea id="nc-gc" rows="2">${esc(r?r.ghiChu:"")}</textarea></label><button class="btn pri big">${r?"Lưu":"Tạo phiếu sản xuất"}</button></form>`);
   if(!r)$("#nc-sp").onchange=()=>{const k=((SX().cfg.cachLam)||{})[$("#nc-sp").value];if(k)$("#nc-cl").value=k};
   $("#ncf").onsubmit=e=>{e.preventDefault();const v={cachLam:$("#nc-cl").value,sp:$("#nc-sp").value,sl:+$("#nc-sl").value||null,uu:$("#nc-uu").value,nguon:$("#nc-ng").value,han:$("#nc-han").value,ghiChu:$("#nc-gc").value.trim(),taoLuc:$("#nc-ngay").value||sxToday()};if(!v.sp){toast("Chọn sản phẩm");return}
     let code="";sxMut(r?`sửa phiếu sản xuất ${r.id}`:`tạo phiếu sản xuất ${sxP(v.sp).ten}`,s2=>{s2.cfg.cachLam=s2.cfg.cachLam||{};s2.cfg.cachLam[v.sp]=v.cachLam;if(r){Object.assign(s2.requests.find(x=>x.id===r.id),v);s2.requests.find(x=>x.id===r.id).hist.push({at:sxNow(),by:ME.name,act:"Sửa phiếu sản xuất"});return}code=sxReqCode(s2,v.taoLuc);s2.requests.push({id:code,...v,st:"CAN_LAM",tao:ME.name,batDau:"",lots:[],hist:[{at:sxNow(),by:ME.name,act:"Tạo phiếu sản xuất"}]})});closeDrawer();toast(r?"Đã lưu":"Đã tạo phiếu sản xuất "+code);renderMain()};
+}
+/* Tạo phiếu sản xuất nhiều sản phẩm (chị Hoa 06/11): bảng Sản phẩm · Số lượng đề nghị · Cách làm, nút + cuối dòng thêm dòng.
+   Mỗi dòng thành một phiếu sản xuất riêng (số phiếu liền nhau) để xưởng báo hoàn thành và kế toán kiểm theo từng sản phẩm. */
+function sxReqMulti(){
+  const s=SX(),cl0=(s.cfg.cachLam||{})[""]||"KY_THUAT";
+  openDrawerHTML(`<h2>Tạo phiếu sản xuất</h2><form class="frm" id="ncm">
+   <div class="row4"><label class="field">Ngày tạo phiếu<input id="ncm-ngay" type="date" required value="${sxToday()}"></label><span class="hint" style="align-self:end">Mỗi sản phẩm một số phiếu: PSX + năm tháng + số thứ tự, ví dụ PSX${sxToday().slice(2,4)}${sxToday().slice(5,7)}-001</span></div>
+   <label class="field">Sản phẩm</label>
+   <div class="tbl edit"><table><thead><tr><th>Sản phẩm (gõ hoặc dán tên, mã)</th><th style="width:150px">Số lượng đề nghị</th><th style="width:170px">Cách làm</th><th style="width:76px"></th></tr></thead><tbody id="ncm-b"></tbody></table></div>
+   <small class="hint">Công nhân tự làm: bỏ bước Pha chế. Số lượng để trống nếu chưa chốt.</small>
+   <div class="row4"><label class="field">Ưu tiên<select id="ncm-uu">${opt(["Bình thường","Gấp"],"Bình thường")}</select></label><label class="field">Lý do sản xuất<select id="ncm-ng">${opt(SX_NGUON,"Thiếu hàng")}</select></label></div>
+   <div class="row4"><label class="field">Hạn cần hàng<input id="ncm-han" type="date"></label></div>
+   <label class="field">Ghi chú cho xưởng<textarea id="ncm-gc" rows="2"></textarea></label><div id="ncm-e"></div>
+   <button class="btn pri big" id="ncm-go">Tạo phiếu sản xuất</button></form>`);
+  const body=$("#ncm-b");
+  const add=after=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="ncm-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="ncm-n hint"></small></td><td><input class="ncm-q n" type="text" inputmode="decimal" placeholder="chưa chốt"></td><td><select class="ncm-c">${opt(SX_CACH,cl0)}</select></td><td style="white-space:nowrap"><button type="button" class="btn sm ncm-add" title="Thêm dòng">+</button> <button type="button" class="lnk ncm-x" title="Bỏ dòng">✕</button></td>`;
+    if(after)after.after(tr);else body.appendChild(tr);
+    const inp=tr.querySelector(".ncm-i");
+    if(typeof khoPick==="function")khoPick(inp,["TP"],it=>{inp.dataset.code=it.code;tr.querySelector(".ncm-n").textContent=it.name;const k=((SX().cfg.cachLam)||{})[it.code];if(k)tr.querySelector(".ncm-c").value=k;tr.querySelector(".ncm-q").focus()});
+    tr.querySelector(".ncm-add").onclick=()=>add(tr);
+    tr.querySelector(".ncm-x").onclick=()=>{if(body.children.length>1)body.removeChild(tr)};
+    tr.querySelector(".ncm-q").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add(tr)}};
+    inp.focus();return tr};
+  add();
+  $("#ncm").onsubmit=e=>{e.preventDefault();const btn=$("#ncm-go");if(btn.disabled)return;
+    const L=[...body.querySelectorAll("tr")].map(tr=>{const i=tr.querySelector(".ncm-i"),v=i.value.trim(),q=tr.querySelector(".ncm-q").value.trim();return {sp:i.dataset.code||(KHO.items&&KHO.items.get(v)?v:""),raw:v,sl:q===""?null:(typeof kfNum==="function"?kfNum(q):+q.replace(",",".")),cachLam:tr.querySelector(".ncm-c").value}}).filter(x=>x.raw||x.sl);
+    const bad=L.filter(x=>!x.sp||(x.sl!=null&&!(x.sl>0)));
+    if(!L.length||bad.length){$("#ncm-e").innerHTML=`<div class="note red">${!L.length?"Chưa có sản phẩm nào.":"Dòng chưa chọn sản phẩm trong danh sách hoặc số lượng chưa đúng: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
+    btn.disabled=true;const base={uu:$("#ncm-uu").value,nguon:$("#ncm-ng").value,han:$("#ncm-han").value,ghiChu:$("#ncm-gc").value.trim(),taoLuc:$("#ncm-ngay").value||sxToday()},codes=[];
+    sxMut(`tạo ${L.length} phiếu sản xuất`,s2=>{s2.cfg.cachLam=s2.cfg.cachLam||{};L.forEach(x=>{s2.cfg.cachLam[x.sp]=x.cachLam;const code=sxReqCode(s2,base.taoLuc);codes.push(code);
+      s2.requests.push({id:code,...base,sp:x.sp,sl:x.sl,cachLam:x.cachLam,st:"CAN_LAM",tao:ME.name,batDau:"",lots:[],hist:[{at:sxNow(),by:ME.name,act:"Tạo phiếu sản xuất"}]})})});
+    closeDrawer();toast(`Đã tạo ${codes.length} phiếu sản xuất: ${codes.join(", ")}`);renderMain();
+    /* Thiếu vật tư theo định mức (bán thành phẩm, vỏ, tem; sản phẩm bột: nguyên vật liệu) thì cảnh báo + giao việc mua hàng (06/11). */
+    if(typeof kqShortCheck==="function")kqShortCheck(codes.join(", "),L.map(x=>[x.sp,x.sl]),null,`Đã tạo ${codes.length} phiếu sản xuất`)};
 }
 function sxReqDetail(id){
   const s=SX(),r=s.requests.find(x=>x.id===id);if(!r)return;const lots=s.batches.filter(b=>r.lots.includes(b.id));
@@ -234,11 +271,11 @@ function sxReqDetail(id){
   if($("#rq-x"))$("#rq-x").onclick=()=>{const ly=prompt("Lý do hủy phiếu sản xuất?");if(!ly)return;sxMut(`hủy phiếu sản xuất ${id}`,s2=>{const x=s2.requests.find(y=>y.id===id);x.st="HUY";x.hist.push({at:sxNow(),by:ME.name,act:"Hủy: "+ly})});closeDrawer();renderMain()};
 }
 /* Xưởng báo hoàn thành: số tổ tự báo chưa phải số nhập kho, chuyển sang Chờ kế toán kiểm. */
-function sxPeoplePick(sel=[]){return `<div class="phc">${SX().people.map(p=>`<label class="ck sm"><input type="checkbox" name="sxng" value="${esc(p.ten)}" ${sel.includes(p.ten)?"checked":""}> ${esc(p.ten)}<small class="muted"> ${esc(p.viTri||"")}</small></label>`).join("")||`<span class="hint">Chưa có nhân sự nào, bấm Thêm nhân sự.</span>`}<button type="button" class="lnk" data-sx-addp>+ Thêm nhân sự</button></div>`}
+function sxPeoplePick(sel=[]){return `<div class="phc">${SX().people.filter(p=>!p.an||sel.includes(p.ten)).map(p=>`<label class="ck sm"><input type="checkbox" name="sxng" value="${esc(p.ten)}" ${sel.includes(p.ten)?"checked":""}> ${esc(p.ten)}<small class="muted"> ${esc(p.viTri||"")}</small></label>`).join("")||`<span class="hint">Chưa có nhân sự nào, bấm Thêm nhân sự.</span>`}<button type="button" class="lnk" data-sx-addp>+ Thêm nhân sự</button></div>`}
 /* Thêm nhân sự mới: chỉ cần điền tên. Chức danh bổ sung sau khi phần Nhân sự làm xong. Giữ nguyên các ô đã tích. */
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-sx-addp]");if(!b)return;e.preventDefault();
   const t=(prompt("Tên nhân sự mới:")||"").trim();if(!t)return;
-  if(SX().people.some(p=>p.ten.toLowerCase()===t.toLowerCase())){toast("Đã có "+t+" trong danh sách");return}
+  {const old=SX().people.find(p=>p.ten.toLowerCase()===t.toLowerCase());if(old&&old.an){const box0=b.closest(".phc"),chk0=[...box0.querySelectorAll("[name=sxng]:checked")].map(x=>x.value).concat([old.ten]);sxMut("hiện lại nhân sự "+t,s2=>{const x=s2.people.find(p=>p.ten===old.ten);if(x)delete x.an});box0.outerHTML=sxPeoplePick(chk0);toast("Đã thêm lại "+old.ten);return}if(old){toast("Đã có "+t+" trong danh sách");return}}
   const box=b.closest(".phc"),chk=[...box.querySelectorAll("[name=sxng]:checked")].map(x=>x.value).concat([t]);
   sxMut("thêm nhân sự "+t,s2=>s2.people.push({ten:t,hoTen:t,viTri:""}));
   box.outerHTML=sxPeoplePick(chk);toast("Đã thêm "+t)});
@@ -257,12 +294,17 @@ function sxDoneForm(reqId){
 function sxDoneMulti(){
   openDrawerHTML(`<h2>Báo hoàn thành</h2><p class="hint">Số tổ tự báo chưa phải số nhập kho. Kế toán sẽ kiểm đếm lại.</p><form class="frm" id="sdm">
    <div class="row4"><label class="field">Ngày sản xuất<input id="sdm-ng" type="date" value="${sxToday()}" max="${sxToday()}" required></label></div>
-   <label class="field">Người thực hiện</label>${sxPeoplePick()}
+   <label class="field">Công nhân sản xuất</label><div id="sdm-ppl" class="sdmppl"></div><datalist id="sdm-dl">${SX().people.map(p=>`<option value="${esc(p.ten)}">`).join("")}</datalist>
    <label class="field" style="margin-top:10px">Sản phẩm</label>
    <div class="tbl edit"><table><thead><tr><th>Sản phẩm (gõ hoặc dán tên, mã)</th><th style="width:130px">Số lượng</th><th style="width:76px"></th></tr></thead><tbody id="sdm-b"></tbody></table></div>
    <label class="field">Ghi chú<input id="sdm-gc"></label>${sxCanCount()?`<label class="ck"><input type="checkbox" id="sdm-ok" checked> Số này là số đã kiểm đếm thực tế: ghi luôn vào kho (cộng thành phẩm, trừ bán thành phẩm, vỏ, tem theo định mức)</label>`:""}<div id="sdm-e"></div>
    <button class="btn pri big" id="sdm-go">Báo hoàn thành</button></form>`);
-  const body=$("#sdm-b");
+  const body=$("#sdm-b"),ppl=$("#sdm-ppl");
+  const addP=(after)=>{const w=document.createElement("span");w.className="sdmp";w.innerHTML=`<input class="sdm-pn" list="sdm-dl" placeholder="Tên công nhân" autocomplete="off"><button type="button" class="btn sm sdm-padd" title="Thêm người">+</button><button type="button" class="lnk sdm-px" title="Bỏ">✕</button>`;
+    if(after)after.after(w);else ppl.appendChild(w);
+    w.querySelector(".sdm-padd").onclick=()=>addP(w);w.querySelector(".sdm-px").onclick=()=>{if(ppl.children.length>1)ppl.removeChild(w)};
+    w.querySelector(".sdm-pn").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addP(w)}};if(after)w.querySelector(".sdm-pn").focus();return w};
+  addP();
   const add=(after)=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="sdm-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="sdm-n hint"></small></td><td><input class="sdm-q n" type="number" min="1" step="any"></td><td style="white-space:nowrap"><button type="button" class="btn sm sdm-add" title="Thêm dòng">+</button> <button type="button" class="lnk sdm-x" title="Bỏ dòng">✕</button></td>`;
     if(after)after.after(tr);else body.appendChild(tr);
     const inp=tr.querySelector(".sdm-i");
@@ -276,8 +318,8 @@ function sxDoneMulti(){
     const L=[...body.querySelectorAll("tr")].map(tr=>{const i=tr.querySelector(".sdm-i"),v=i.value.trim();return {sp:i.dataset.code||(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(v)?v:""),raw:v,sl:+tr.querySelector(".sdm-q").value}}).filter(x=>x.raw||x.sl);
     const bad=L.filter(x=>!x.sp||!(x.sl>0));
     if(!L.length||bad.length){$("#sdm-e").innerHTML=`<div class="note red">${!L.length?"Chưa có sản phẩm nào.":"Dòng chưa chọn sản phẩm trong danh sách hoặc chưa có số lượng: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
-    btn.disabled=true;const ng=[...$$("#sdm [name=sxng]:checked")].map(x=>x.value),day=$("#sdm-ng").value,gc=$("#sdm-gc").value.trim(),counted=!!($("#sdm-ok")&&$("#sdm-ok").checked),ids=[];
-    sxMut(`xưởng báo hoàn thành ${L.length} sản phẩm`,s2=>{L.forEach((x,k)=>{const id="B-"+Date.now().toString(36)+k+Math.floor(Math.random()*99);
+    btn.disabled=true;const ng=[...new Set([...$$("#sdm .sdm-pn")].map(x=>x.value.trim()).filter(Boolean))],day=$("#sdm-ng").value,gc=$("#sdm-gc").value.trim(),counted=!!($("#sdm-ok")&&$("#sdm-ok").checked),ids=[];
+    sxMut(`xưởng báo hoàn thành ${L.length} sản phẩm`,s2=>{ng.forEach(t=>{if(!s2.people.some(p=>p.ten.toLowerCase()===t.toLowerCase()))s2.people.push({ten:t,hoTen:t,viTri:""})});L.forEach((x,k)=>{const id="B-"+Date.now().toString(36)+k+Math.floor(Math.random()*99);
       ids.push(id);s2.batches.push({id,ma:"",req:"",sp:x.sp,ngay:day,nguoi:ng,baoSL:x.sl,baoLuc:sxNow(),baoBy:ME.name,tong:0,dat:0,loi:0,cho:0,ghiChu:gc,lechLyDo:"",kiemBy:"",kiemLuc:"",st:"CHO_KIEM",ver:1,containers:[],hist:[{at:sxNow(),by:ME.name,act:"Xưởng báo hoàn thành "+x.sl}],nvlTru:false,phatSinh:true})})});
     closeDrawer();if(counted){sxConfirmCounted(ids);return}toast(`Đã báo kế toán kiểm kê ${L.length} sản phẩm`);renderMain()};
 }
