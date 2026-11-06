@@ -53,6 +53,8 @@ if(typeof fbdCost==="function"){const _c=fbdCost;fbdCost=function(days){const o=
 
 /* ---------- Nhãn chốt + số đã chốt áp vào từng dòng kênh ---------- */
 function dtEnsure(){dtLoadRows();
+  /* Giá vốn Facebook theo Sheet Pancake (fbvGvCa) cần FBC.raw: tải một lần rồi vẽ lại, để Lãi lỗ / Tổng quan không rơi về cột giá vốn đơn chốt còn thiếu. */
+  if(!DTS.fbc&&typeof fbcLoad==="function"&&typeof FBC!=="undefined"&&!FBC.raw){DTS.fbc=true;Promise.resolve(fbcLoad()).then(()=>{if(FBC.raw)dtRe()}).catch(()=>{})}
   /* Quảng cáo Facebook theo ngày (ads_fb) chỉ có khi đã tải và gộp vào DAYD.ads: mở thẳng Lãi lỗ / So sánh kênh mà chưa qua trang Facebook thì quảng cáo bằng 0, lãi bị đội. */
   if(!DTS.adf&&typeof adfLoad==="function"&&typeof ADF!=="undefined"){DTS.adf=true;Promise.resolve(ADF.raw||adfLoad()).then(()=>{try{adfMergeDays()}catch(e){}dtRe()}).catch(()=>{DTS.adf=false})}if(!DTS.tsb&&typeof TSB!=="undefined"&&!TSB.months&&typeof tsbLoadMonths==="function"){DTS.tsb=true;Promise.resolve(tsbLoadMonths()).then(dtRe).catch(()=>{})}}
 /* Lý do kênh sàn chưa tự chốt được tháng ym (dtChuaDuThang): Shopee xét từng shop, TikTok một báo cáo. Kênh khác: []. */

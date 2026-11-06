@@ -59,13 +59,13 @@ function plcLinePop(f){const A=PLC_A,vn=plcVn(A.ym);
 
 function pPLCty(m){
   if(!dhOk()){m.innerHTML=H("Lãi lỗ P&L","")+`<div class="note">Trang này chỉ dành cho CEO và kế toán.</div>`;return}
-  dhLoad();const ym=plYmNow(),A=plMonth(ym),pym=plYmAdd(ym,-1),PA=plMonth(pym),KH=mtGet(ym),KK=PLC.k,full=!KK;PLC_A=A;
+  dhLoad();const ym=plYmNow(),A=plMonth(ym),pym=plYmAdd(ym,-1),pTo=A.R.partial?(()=>{const e=plYmEnd(pym),d=pym+"-"+A.R.to.slice(8,10);return d<e?d:e})():"",PA=A.R.partial?plMonth(pym,{from:pym+"-01",to:pTo,partial:true}):plMonth(pym),/* tháng đang chạy so cùng số ngày tháng trước (06/11: 6 ngày so cả tháng ra ▼98%) */KH=mtGet(ym),KK=PLC.k,full=!KK;PLC_A=A;
   const T=plcTot(A,KK),P=plcTot(PA,KK);
   if(!T){m.innerHTML=H("Báo cáo lãi lỗ (P&L)",plcVn(ym))+`<p class="hint pad">${A.loading?"Đang tải…":"Tháng này chưa có số kênh nào."}</p>`;return}
   const chot=ym<plYmAdd(iso(new Date()).slice(0,7),-1)||(ym===plYmAdd(iso(new Date()).slice(0,7),-1)&&+iso(new Date()).slice(8,10)>=10);
   const tag=chot?`<span class="plc-tag ok">Đã chốt</span>`:`<span class="plc-tag du">Dự kiến${A.R.partial?" · số đến "+A.R.to.slice(8,10)+"/"+A.R.to.slice(5,7):""} · chốt ngày 10/${plYmAdd(ym,1).slice(5,7)}</span>`;
   const sauP=P&&P.thieu&&P.thieu.length?` <span class="hint">· tháng trước thiếu ${esc(P.thieu.join(", "))}</span>`:"";
-  const vs=(a,b,lower)=>PLC.cmp==="kh"?`<span class="hint">kế hoạch chỉ đặt doanh thu</span>`:b==null?`<span class="hint">tháng trước chưa đủ số</span>`:`${plcChg(a,b,lower)} <span class="hint">so ${A.R.partial?"cả tháng trước":"tháng trước"}</span>`;
+  const vs=(a,b,lower)=>PLC.cmp!=="kh"&&T.thieu&&T.thieu.length?`<span class="hint">tháng này còn thiếu ${esc(T.thieu.join(", "))}, chưa so</span>`:PLC.cmp==="kh"?`<span class="hint">kế hoạch chỉ đặt doanh thu</span>`:b==null?`<span class="hint">tháng trước chưa đủ số</span>`:`${plcChg(a,b,lower)} <span class="hint">so ${A.R.partial?"01–"+pTo.slice(8,10)+"/"+pTo.slice(5,7):"tháng trước"}</span>`;
   const khK=KH?(KK?KH[{tts:"tts",spe:"spe",fb:"fb",b2b:"b2b",gc:"gc"}[KK]]:KH.tong):null;
   const vsDt=PLC.cmp==="kh"?(khK?`đạt <b>${plcPc(T.dt,khK,0)}</b> kế hoạch (${plcTr(khK)})`:`<span class="hint">chưa đặt kế hoạch</span>`):vs(T.dt,P&&P.dt)+sauP;
   /* 6 ô. Chị Hoa 29/10: bỏ ô Lãi gộp ở đầu trang (còn dòng trong bảng chi tiết), thay bằng Tổng chi phí. */

@@ -135,7 +135,7 @@ function plSum(cols,names){const ok=cols.filter(Boolean);if(!ok.length)return nu
   return {dt:s("dt"),gv:s("gv"),ngv:s("ngv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),cpk:s("cpk"),luong:s("luong"),lai:s("lai"),chia:s("chia"),thieuGv,tam:ok.some(c=>c.tam)}}
 function mtGet(ym){const t=D().targets,x=t&&t.thang&&t.thang[ym];if(!x)return null;const o={};let tong=0,co=false;PLK.forEach(([k])=>{const v=+x[k]||0;o[k]=v||null;if(v){tong+=v;co=true}});o.tong=co?tong:null;return co?o:null}
 function plChung(ym){try{if(typeof spChungTheoThang!=="function")return null;const v=spChungTheoThang(ym);return v!=null&&isFinite(+v)&&+v>0?+v:null}catch(e){return null}}
-function plMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
+function plMonth(ym,R0){const R=R0||plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
   const cols={};PLK.forEach(([k])=>cols[k]=plCol(by[k]));const tot=plSum(PLK.map(([k])=>cols[k]),PLK.map(x=>x[1])),chung=plChung(ym);
   let sx=0;try{const S=typeof dtSoCp==="function"?dtSoCp(R.from,R.to):null;sx=S?S.v.sx:0}catch(e){}
   /* Lương chưa gắn kênh trong bảng lương đã chốt (scPLKenh) không có trong spChungTheoThang nên cộng vào chi chung. Cột công ty: lãi sau phân bổ = tổng lãi đóng góp − tổng chi chung được chia, dòng chi chung chỉ còn phần chưa chia, nên Lợi nhuận hoạt động không đổi theo cách chia. */
