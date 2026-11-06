@@ -17,7 +17,7 @@ const tq2Go=(pg,sub)=>{if(sub){SUB.exec=sub;PAGE="exec"}else PAGE=pg;try{localSt
 /* Số của tháng đang xem (theo ô thời gian trên cùng), cùng nguồn với P&L công ty. */
 function tq2Nums(){const ym=plYmNow(),A=plMonth(ym),PA=plMonth(plYmAdd(ym,-1)),T=plcTot(A,""),P=plcTot(PA,"");
   const ch=ks=>{const cs=ks.map(k=>A.cols[k]).filter(Boolean),s=f=>cs.reduce((a,c)=>a+(c[f]||0),0);if(!cs.length)return null;
-    return {dt:s("dt"),cp:cs.reduce((a,c)=>a+(c.gv||0)+(c.phi||0)+(c.ads||0)+(c.cpk||0)+(c.luong||0),0),lai:cs.filter(c=>c.lai!=null).reduce((a,c)=>a+c.lai,0),ads:s("ads"),don:s("don"),thieu:ks.filter(k=>!A.cols[k])}};
+    return {dt:s("dt"),cp:cs.reduce((a,c)=>a+(c.gv||0)+(c.phi||0)+(c.ads||0)+(c.cpk||0)+(c.luong||0),0),lai:cs.filter(c=>c.lai!=null).reduce((a,c)=>a+c.lai,0),ads:s("ads"),adsCa:cs.reduce((a,c)=>a+(c.adsCa!=null?c.adsCa:(c.ads||0)),0),don:s("don"),thieu:ks.filter(k=>!A.cols[k])}};
   return {ym,A,PA,T,P,le:ch(["tts","fb","spe"]),pp:ch(["b2b"])}}
 function tq2Health(N){const T=N.T,P=N.P,ng=dhGet().nguong||{},out=[],add=(go,l,v,sub,st,sv)=>out.push({go,sv,l,v,sub,st});
   let SK=[];try{SK=typeof skTiles==="function"?skTiles():[]}catch(e){}const sk=l=>SK.find(x=>x.l===l);
@@ -76,7 +76,7 @@ function tq2Page(m){
   /* Kênh bán lẻ */
   const le=N.le,qc=(dhGet().nguong||{}).qcMax||.4;
   const worst=PLC_K.filter(([k])=>["tts","fb","spe"].includes(k)&&N.A.cols[k]&&N.A.cols[k].dt).map(([k,n])=>({n,c:N.A.cols[k]})).sort((a,b)=>b.c.ads/b.c.dt-a.c.ads/a.c.dt)[0];
-  const bLe=!le?`<p class="hint">Chưa có số.</p>`:kv("Doanh thu thực",tr(le.dt))+kv("Tổng chi phí",tr(le.cp)+mu(pc(le.cp,le.dt)))+kv("Lãi đóng góp",tr(le.lai)+mu(pc(le.lai,le.dt)))+kv("Quảng cáo · ROAS chung",tr(le.ads)+" · "+(le.ads?(le.dt/le.ads).toFixed(2).replace(".",","):"—"),le.dt&&le.ads/le.dt>qc?"t-red":"")+kv("Đơn hàng",nf(le.don))
+  const bLe=!le?`<p class="hint">Chưa có số.</p>`:kv("Doanh thu thực",tr(le.dt))+kv("Tổng chi phí",tr(le.cp)+mu(pc(le.cp,le.dt)))+kv("Lãi đóng góp",tr(le.lai)+mu(pc(le.lai,le.dt)))+kv(le.adsCa>le.ads+1?"Quảng cáo phần đơn đã giao · ROAS":"Quảng cáo · ROAS chung",tr(le.ads)+(le.adsCa>le.ads+1?` (cả tháng ${tr(le.adsCa)})`:"")+" · "+(le.ads?(le.dt/le.ads).toFixed(2).replace(".",","):"—"),le.dt&&le.ads/le.dt>qc?"t-red":"")+kv("Đơn hàng",nf(le.don))
     +(le.thieu.length?note("amb","Chưa có số "+le.thieu.map(k=>(PLC_K.find(x=>x[0]===k)||[])[1]).join(", ")):worst&&worst.c.ads/worst.c.dt>qc?note("red",`Quảng cáo ${worst.n} ${Math.round(worst.c.ads/worst.c.dt*100)}% doanh thu, kênh lãi ${pc(worst.c.lai,worst.c.dt)}`):note("grn","Quảng cáo các sàn trong ngưỡng"));
   /* Kênh phân phối */
   const pp=N.pp,reP=K&&K.buyers.length?K.re.length/K.buyers.length:null,preP=K&&K.pBuyers.length?K.pRe.length/K.pBuyers.length:null;

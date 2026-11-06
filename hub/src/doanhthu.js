@@ -252,7 +252,7 @@ const dtHomQua=()=>iso(new Date());
 {const _ac=dtAutoChot;dtAutoChot=function(){if(DTS.don)return;return _ac.apply(this,arguments)}}
 {const _ex=PAGES.exec;PAGES.exec=function(m){if(IS_ADMIN_HOST())return _ex.apply(this,arguments);
   DTS.don++;let r;try{r=_ex.apply(this,arguments)}finally{DTS.don--}
-  try{const kl=[...m.querySelectorAll(".xkl")].find(x=>x.textContent.trim()==="Doanh số");if(kl)kl.textContent="Doanh số theo đơn đã lên";
+  try{const kl=[...m.querySelectorAll(".xkl")].find(x=>x.textContent.trim()==="Doanh số");if(kl)kl.textContent="Doanh số theo đơn";/* tên dài bị cắt trong ô (chị Hoa 06/11) */
     const h=m.querySelector(".xkenh .card-h .hint")||m.querySelector(".xkenh .card-h");
     const note=`<p class="hint pad dt-don" style="margin:0 0 6px">Theo đơn đã lên, đã trừ đơn hủy, so cùng số ngày từ đầu tháng trước: Facebook là đơn chốt Pancake, TikTok là GMV các ngày đã nạp (chưa trừ hủy, hoàn), Shopee lấy từ báo cáo đã tải (chưa có thì chỉ đếm đơn xuất kho). Doanh thu thực chốt cuối tháng, khi đơn giao xong và có báo cáo sàn.</p>`;
     const card=m.querySelector(".xkenh");if(card&&!card.querySelector(".dt-don")){const ch=card.querySelector(".card-h");if(ch)ch.insertAdjacentHTML("afterend",note)}

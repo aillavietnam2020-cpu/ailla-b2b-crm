@@ -129,7 +129,7 @@ function plRowsFor(from,to){
 const plKey=r=>({tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"})[r.k];
 /* Một kênh → các dòng P&L. Phí sàn và vận chuyển = phần còn lại để các dòng cộng khớp lãi đóng góp. */
 function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,cpk:r.cpk||0,luong:r.luong||0,chia:r.chia||0,lai:r.lai==null?0:r.lai,ngv:0,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ngv=r.ngv||0,ads=r.ads||0,lai=r.lai,cpk=r.cpk||0,luong=r.luong||0,chia=r.chia||0;
-  const lg=gv==null?null:dt-gv-ngv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ngv-ads-cpk-luong-lai;return {dt,gv,ngv,lg,phi,ads,cpk,luong,lai,chia,lsp:lai==null?null:lai-chia,tam:!!r.tam,src:r.src,don:r.don,qb:r.qb||dt}}
+  const lg=gv==null?null:dt-gv-ngv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ngv-ads-cpk-luong-lai;return {dt,gv,ngv,lg,phi,ads,cpk,luong,lai,chia,lsp:lai==null?null:lai-chia,tam:!!r.tam,src:r.src,don:r.don,qb:r.qb||dt,adsCa:r.adsCa!=null?r.adsCa:ads}}
 function plSum(cols,names){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.reduce((a,c)=>a+(c[k]||0),0);
   const thieuGv=cols.map((c,i)=>c&&c.gv==null?names[i]:null).filter(Boolean);
   return {dt:s("dt"),gv:s("gv"),ngv:s("ngv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),cpk:s("cpk"),luong:s("luong"),lai:s("lai"),chia:s("chia"),thieuGv,tam:ok.some(c=>c.tam)}}
