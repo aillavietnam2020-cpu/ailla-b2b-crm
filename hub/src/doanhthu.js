@@ -49,7 +49,7 @@ function dtFbDang(from,to){dtSyncFb();let v=0,n=0;for(const k in DTS.fbDay)if(k>
 if(typeof adfMergeDays==="function"){const _m=adfMergeDays;adfMergeDays=function(){const x=_m.apply(this,arguments);try{dtSyncFb()}catch(e){}return x}}
 if(typeof fbsLoad==="function"){const _l=fbsLoad;fbsLoad=async function(){const a=FBS.raw&&FBS.raw.at,x=await _l.apply(this,arguments);if((FBS.raw&&FBS.raw.at)!==a){dtSyncFb();dtRe()}return x}}
 /* P&L Facebook (quản trị): ô doanh thu cùng số với các trang khác trên cùng các ngày Sheet có chi phí. */
-if(typeof fbdCost==="function"){const _c=fbdCost;fbdCost=function(days){const o=_c.apply(this,arguments);try{dtSyncFb();const R=FBC.raw&&FBC.raw.days;if(R&&o.n){let d=0;days.forEach(k=>{if(R[k])d+=+((DAYD.fb||{})[k]||[])[5]||0});o.gop+=d-o.dt;o.dt=d}}catch(e){}return o}}
+if(typeof fbdCost==="function"){const _c=fbdCost;fbdCost=function(days){const o=_c.apply(this,arguments);try{dtSyncFb();const R=FBC.raw&&FBC.raw.days;if(R&&o.n){let d=0;days.forEach(k=>{if(R[k])d+=R[k].web?+R[k].g[1]||0:+((DAYD.fb||{})[k]||[])[5]||0});/* ngày web tự tính (fbv2.js fbmMerge): tiền hàng đúng rổ đơn đã gửi có giá vốn, giữ nguyên */o.gop+=d-o.dt;o.dt=d}}catch(e){}return o}}
 
 /* ---------- Nhãn chốt + số đã chốt áp vào từng dòng kênh ---------- */
 function dtEnsure(){dtLoadRows();
