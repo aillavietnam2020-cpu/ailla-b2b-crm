@@ -11,10 +11,10 @@ const NP_PAGES=["np_toi","tu_toi","pl_toi","np_duyet","np_ql","tu_ql"];
 const npOn=()=>typeof PAGE!=="undefined"&&NP_PAGES.includes(PAGE);
 const npRedraw=()=>{if(npOn())renderMain()};
 const npDm=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"";
-const npWhen=x=>npDm(x.tu)+(x.den&&x.den!==x.tu?" – "+npDm(x.den):"")+(x.buoi==="sang"?" · sáng":x.buoi==="chieu"?" · chiều":"");
+const npWhen=x=>x.loai==="lambu"?`Bù cho ${npDm(x.bu_ngay)} · làm bù ${npDm(x.tu)}`:npDm(x.tu)+(x.den&&x.den!==x.tu?" – "+npDm(x.den):"")+(x.buoi==="sang"?" · sáng":x.buoi==="chieu"?" · chiều":"");
 const npTien=n=>Number(n||0).toLocaleString("vi-VN")+"đ";
 const npNghi=l=>["phep","om","khongluong"].includes(l);
-const npSL=x=>npNghi(x.loai)?String(x.so_ngay).replace(".",",")+" ngày":x.loai==="ot"?String(x.gio||0).replace(".",",")+" giờ":(x.ghi_chu||"");
+const npSL=x=>x.loai==="lambu"?(x.bu_kieu==="gio"?`Bù ${x.bu_phut||0} phút · ${x.ghi_chu||""}`:`Bù ${x.ghi_chu||"cả ngày"}`):npNghi(x.loai)?String(x.so_ngay).replace(".",",")+" ngày":x.loai==="ot"?String(x.gio||0).replace(".",",")+" giờ":(x.ghi_chu||"");
 const npSt=x=>x.st==="lead"?pill("Chờ Lead duyệt","amb"):x.st==="hcns"?(x.lead_id?pill("Lead đã duyệt","grn")+" ":"")+pill("Chờ HCNS duyệt","amb"):x.st==="xong"?pill("Đã duyệt","grn"):x.st==="huy"?pill("Đã rút","gry"):pill("Từ chối","red");
 const npTuSt=x=>x.st==="kt"?pill("Chờ Kế toán duyệt","amb"):x.st==="xong"?pill("Đã duyệt","grn"):x.st==="huy"?pill("Đã rút","gry"):pill("Từ chối","red");
 const npErr=(m,t,e)=>{m.innerHTML=H(t)+`<section class="card"><p class="empty">${esc(e)}</p></section>`};
@@ -31,7 +31,14 @@ function pNpToi(m){
   <div class="grid cols2"><section class="card"><div class="card-h"><h2>Gửi đơn</h2></div>
     <form class="frm" id="np-f">
       <label class="field">Loại đơn<select id="np-l">${Object.entries(R.loai).map(([k,t])=>`<option value="${k}">${esc(t)}</option>`).join("")}</select></label>
-      <div class="row4"><label class="field">Từ ngày<input type="date" id="np-tu" value="${R.today}"></label><label class="field" id="np-denw">Đến ngày<input type="date" id="np-den" value="${R.today}"></label>
+      <div id="np-buw" hidden class="np-bu">
+        ${(R.canBu||[]).length?`<label class="field">Bù cho<select id="np-bc">${R.canBu.map((x,i)=>`<option value="${i}">${typeof ccDow==="function"?ccDow(x.ngay):""} ${npDm(x.ngay)} · ${esc(x.mo)}</option>`).join("")}</select></label>
+        <label class="field">Làm bù vào ngày<input type="date" id="np-bn" min="${R.today}"></label>
+        <div class="field" id="np-bbw">Làm bù<div class="cc-chips" id="np-bb"><button type="button" class="cc-chip on" data-v="ca">Cả ngày</button><button type="button" class="cc-chip" data-v="sang">Buổi sáng</button><button type="button" class="cc-chip" data-v="chieu">Buổi chiều</button></div></div>
+        <div class="np-gio"><label class="field" id="np-btw" hidden>Từ giờ<input type="time" id="np-bt" value="${esc((R.lich||{}).gioRa||"17:30")}"></label><label class="field" id="np-bdw" hidden>Đến giờ<input type="time" id="np-bd"></label></div>`
+        :`<p class="empty">Không có ngày nào cần bù trong ${R.quyTac.hanBu||30} ngày qua (ngày không chấm công, nghỉ không lương, đi muộn, về sớm chưa có đơn xin phép).</p>`}
+      </div>
+      <div class="row4" id="np-thuong"><label class="field">Từ ngày<input type="date" id="np-tu" value="${R.today}"></label><label class="field" id="np-denw">Đến ngày<input type="date" id="np-den" value="${R.today}"></label>
       <label class="field" id="np-bw">Nghỉ<select id="np-b"><option value="ca">Cả ngày</option><option value="sang">Buổi sáng</option><option value="chieu">Buổi chiều</option></select></label>
       <label class="field" id="np-gw" hidden>Số giờ tăng ca<input type="number" id="np-g" min="0.5" max="16" step="0.5" value="2"></label>
       <label class="field" id="np-cw" hidden>Về lúc / đến lúc<input id="np-c" placeholder="Ví dụ: về lúc 16:30"></label></div>
@@ -40,12 +47,27 @@ function pNpToi(m){
       <button class="btn pri" id="np-go"${NP.busy?" disabled":""}>Gửi đơn</button>
     </form></section>
   <section class="card"><div class="card-h"><h2>Đơn đã gửi</h2></div>${R.don.length?R.don.map(x=>`<div class="np-item"><b>${esc(x.loaiTen)}</b><div class="hint">${npWhen(x)} · ${esc(npSL(x))}</div><div>${npSt(x)}</div>${x.tu_choi?`<div class="hint">Lý do từ chối: ${esc(x.tu_choi)}</div>`:""}${x.st==="lead"||x.st==="hcns"?`<div><button class="btn sm" data-huy="${x.id}">Rút đơn</button></div>`:""}</div>`).join(""):`<p class="empty">Chưa gửi đơn nào.</p>`}</section></div>`;
-  const hint=()=>{const l=$("#np-l").value,tu=$("#np-tu").value,den=$("#np-den").value,n=Math.round((Date.parse(den)-Date.parse(tu))/864e5)+1;
+  const BU=R.canBu||[];let buBuoi="ca";
+  const buCur=()=>BU[+(($("#np-bc")||{}).value||0)];
+  const addM=(hm,n)=>{const t=+hm.slice(0,2)*60+ +hm.slice(3,5)+n;return String(Math.floor(t/60)%24).padStart(2,"0")+":"+String(t%60).padStart(2,"0")};
+  const buHint=()=>{const c=buCur();if(!c){$("#np-h").textContent="";return}
+    const gio=c.kieu==="gio";$("#np-bbw").hidden=gio;$("#np-btw").hidden=!gio;$("#np-bdw").hidden=!gio;
+    if(c.buoi!=="ca")buBuoi=c.buoi;document.querySelectorAll("#np-bb .cc-chip").forEach(x=>{x.classList.toggle("on",x.dataset.v===buBuoi);x.disabled=c.buoi!=="ca"&&x.dataset.v!==c.buoi});
+    if(gio&&!$("#np-bn").value)$("#np-bn").value=R.today;
+    if(gio&&!$("#np-bd").value)$("#np-bd").value=addM($("#np-bt").value||"17:30",c.phut);
+    $("#np-h").textContent=gio?`Cần bù ${c.phut} phút. Làm bù ngoài giờ làm (đến sớm hoặc ở lại sau ${(R.lich||{}).gioRa||"giờ ra"}), chấm công vào, ra như thường. Lead duyệt.`
+      :`Chọn ngày nghỉ theo lịch (Chủ nhật, thứ Bảy được nghỉ), làm đủ giờ ${(R.lich||{}).gioVao||""}–${(R.lich||{}).gioRa||""}${buBuoi!=="ca"?" của nửa ngày":""}. Làm bù trong vòng ${R.quyTac.hanBu||30} ngày. Lead duyệt.`};
+  const hint=()=>{const l=$("#np-l").value,bu=l==="lambu";$("#np-buw").hidden=!bu;$("#np-thuong").hidden=bu;if(bu){buHint();return}tu=$("#np-tu").value,den=$("#np-den").value,n=Math.round((Date.parse(den)-Date.parse(tu))/864e5)+1;
     $("#np-denw").hidden=!npNghi(l);$("#np-bw").hidden=!npNghi(l);$("#np-gw").hidden=l!=="ot";$("#np-cw").hidden=l!=="vesom";
     $("#np-h").textContent=l==="ot"?"Lead duyệt. HCNS nhận thông báo khi đơn được duyệt.":l==="vesom"?"Lead duyệt. Được duyệt thì lần về sớm / đến muộn đó không tính vi phạm chuyên cần.":n>=R.quyTac.mocVong2?`Nghỉ từ ${R.quyTac.mocVong2} ngày: Lead duyệt, rồi HCNS duyệt vòng 2. Số ngày tính theo lịch làm (bỏ Chủ nhật, ngày nghỉ, lễ).`:"Nghỉ dưới "+R.quyTac.mocVong2+" ngày: Lead duyệt là xong."};
-  ["#np-l","#np-tu","#np-den"].forEach(s=>$(s).onchange=hint);hint();
-  $("#np-f").onsubmit=async e=>{e.preventDefault();if(NP.busy)return;const l=$("#np-l").value;NP.busy=true;
-    try{const r=await svApi("/api/hub/nghiphep/don",{method:"POST",body:JSON.stringify({loai:l,tu:$("#np-tu").value,den:$("#np-den").value,buoi:$("#np-b").value,gio:Number($("#np-g").value),ghiChu:$("#np-c").value,lyDo:$("#np-ly").value})});
+  ["#np-l","#np-tu","#np-den"].forEach(s=>$(s).onchange=hint);
+  if($("#np-bc")){$("#np-bc").onchange=()=>{const c=buCur();if(c&&c.buoi==="ca")buBuoi="ca";$("#np-bd").value="";buHint()};$("#np-bt").onchange=()=>{const c=buCur();if(c&&c.kieu==="gio")$("#np-bd").value=addM($("#np-bt").value,c.phut);buHint()};
+    document.querySelectorAll("#np-bb .cc-chip").forEach(x=>x.onclick=()=>{buBuoi=x.dataset.v;buHint()})}
+  hint();
+  $("#np-f").onsubmit=async e=>{e.preventDefault();if(NP.busy)return;const l=$("#np-l").value;
+    if(l==="lambu"&&!buCur()){toast("Không có ngày nào cần bù");return}
+    NP.busy=true;const c=l==="lambu"?buCur():null;
+    try{const r=await svApi("/api/hub/nghiphep/don",{method:"POST",body:JSON.stringify(c?{loai:l,buNgay:c.ngay,tu:$("#np-bn").value,buoi:buBuoi,buTu:$("#np-bt").value,buDen:$("#np-bd").value,lyDo:$("#np-ly").value}:{loai:l,tu:$("#np-tu").value,den:$("#np-den").value,buoi:$("#np-b").value,gio:Number($("#np-g").value),ghiChu:$("#np-c").value,lyDo:$("#np-ly").value})});
       toast(r.st==="lead"?"Đã gửi đơn. Lead của phòng nhận thông báo.":"Đã gửi đơn. HCNS nhận thông báo.");NP.busy=false;npLoad("me","/api/hub/nghiphep/me",true)}catch(err){NP.busy=false;toast(err.message)}};
   m.querySelectorAll("[data-huy]").forEach(b=>b.onclick=async()=>{try{await svApi("/api/hub/nghiphep/don/"+b.dataset.huy+"/huy",{method:"POST"});toast("Đã rút đơn");npLoad("me","/api/hub/nghiphep/me",true)}catch(e){toast(e.message)}});
 }
@@ -102,7 +124,7 @@ function pNpQl(m){
   const F=NP.f,L=R.list.filter(x=>!F||(F==="cho"?x.st==="lead"||x.st==="hcns":x.st===F));
   const nH=R.list.filter(x=>x.st==="hcns").length,nL=R.list.filter(x=>x.st==="lead").length,ot=R.list.filter(x=>x.loai==="ot"&&x.st==="xong").reduce((t,x)=>t+(x.gio||0),0);
   m.innerHTML=H("Nghỉ phép & tăng ca")+`<div class="grid kpis">${kpi("Chờ HCNS duyệt",nH)}${kpi("Đang chờ Lead",nL)}${kpi("Giờ tăng ca đã duyệt (2 tháng)",String(ot).replace(".",","))}</div>
-  <div class="filters"><select id="np-ff"><option value="">Tất cả đơn</option><option value="cho"${F==="cho"?" selected":""}>Đang chờ duyệt</option><option value="hcns"${F==="hcns"?" selected":""}>Chờ HCNS</option><option value="xong"${F==="xong"?" selected":""}>Đã duyệt</option><option value="tuchoi"${F==="tuchoi"?" selected":""}>Từ chối</option></select><span class="sp"></span><button class="btn" id="np-rl">Tải lại</button></div>
+  <div class="filters"><select id="np-ff"><option value="">Tất cả đơn</option><option value="cho"${F==="cho"?" selected":""}>Đang chờ duyệt</option><option value="hcns"${F==="hcns"?" selected":""}>Chờ HCNS</option><option value="xong"${F==="xong"?" selected":""}>Đã duyệt</option><option value="tuchoi"${F==="tuchoi"?" selected":""}>Từ chối</option></select><span class="sp"></span><button class="btn pri" data-npme="1">+ Gửi đơn của tôi</button><button class="btn" id="np-rl">Tải lại</button></div>
   <section class="card flush">${tbl(["Nhân viên","Loại","Ngày","Số lượng","Lý do","Trạng thái",""],L.map(x=>`<tr><td><b>${esc(x.ten)}</b><div class="hint">${esc(x.pbTen)}</div></td><td>${esc(x.loaiTen)}</td><td>${npWhen(x)}</td><td>${esc(npSL(x))}</td><td>${esc(x.ly_do)}</td><td>${npSt(x)}${x.leadTen?`<div class="hint">Lead: ${esc(x.leadTen)}</div>`:""}${x.tu_choi?`<div class="hint">${esc(x.tu_choi)}</div>`:""}</td><td>${npActs(x)}</td></tr>`))}</section>
   <section class="card"><div class="card-h"><h2>Quỹ phép năm ${new Date().getFullYear()}</h2><span class="hint">đã nghỉ = trước đây (hồ sơ) + đơn mới đã duyệt</span></div>${tbl(["Nhân viên","Phòng","Được hưởng","Đã nghỉ","Còn"],R.phep.filter(p=>p.ma).sort((a,b)=>a.con-b.con).map(p=>`<tr><td><b>${esc(p.ten)}</b><div class="hint">${esc(p.ma)}</div></td><td>${esc(p.pbTen)}</td><td class="n">${p.huong}</td><td class="n">${String(p.daCu+p.daMoi).replace(".",",")}</td><td class="n">${p.con<=1?pill(String(p.con).replace(".",","),"red"):String(p.con).replace(".",",")}</td></tr>`))}</section>
   <p class="hint">Đơn đã duyệt tự vào chấm công: nghỉ phép năm, nghỉ ốm không tính ngày nghỉ khi xét chuyên cần; xin về sớm / đến muộn không tính vi phạm; giờ tăng ca vào bảng chấm công tháng. Mốc duyệt vòng 2 sửa ở Cài đặt chấm công.</p>`;
@@ -136,8 +158,9 @@ async function npTuInject(){
     box.innerHTML=`<div class="card-h"><h2>Phiếu lương tháng ${ky.slice(5)}/${ky.slice(0,4)}: ${r.xem.length}/${n} người đã xem</h2></div>${r.hoi.length?r.hoi.map(q=>`<div class="np-item"><b>${esc(q.ten)}</b><div>${esc(q.noi_dung)}</div>${q.tra_loi?`<div class="hint">Đã trả lời: ${esc(q.tra_loi)}</div>`:`<div style="display:flex;gap:6px"><input id="pl-tl-${q.id}" placeholder="Trả lời" style="flex:1"><button class="btn sm pri" data-tl="${q.id}">Gửi</button></div>`}</div>`).join(""):`<p class="empty">Chưa có câu hỏi nào.</p>`}`;
     box.querySelectorAll("[data-tl]").forEach(b=>b.onclick=async()=>{try{await svApi("/api/hub/nghiphep/phieu-luong/hoi/"+b.dataset.tl+"/tra-loi",{method:"POST",body:JSON.stringify({traLoi:$("#pl-tl-"+b.dataset.tl).value})});toast("Đã trả lời");renderMain()}catch(e){toast(e.message)}})}).catch(()=>{box.remove()})}}
 
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-npme]");if(b){e.preventDefault();PAGE="np_toi";render()}});
 PAGES.np_toi=pNpToi;PAGES.tu_toi=pTuToi;PAGES.pl_toi=pPlToi;PAGES.np_duyet=pNpDuyet;PAGES.np_ql=pNpQl;PAGES.tu_ql=pTuQl;
-if(typeof document!=="undefined"&&!document.getElementById("np-css")){const st=document.createElement("style");st.id="np-css";st.textContent=`.np-item{display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}.np-item:last-child{border-bottom:0}`;document.head.appendChild(st)}
+if(typeof document!=="undefined"&&!document.getElementById("np-css")){const st=document.createElement("style");st.id="np-css";st.textContent=`.np-bu{display:grid;gap:10px}.np-bu .cc-chips{display:flex;gap:6px;margin-top:4px}.np-bu .cc-chip{flex:1;white-space:nowrap;text-align:center;padding:8px 6px}.np-gio{display:grid;grid-template-columns:1fr 1fr;gap:10px}.np-bu .cc-chip:disabled{opacity:.4}.np-item{display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}.np-item:last-child{border-bottom:0}`;document.head.appendChild(st)}
 if(typeof window!=="undefined"&&typeof SERVER!=="undefined"&&SERVER){setTimeout(npCho,1500);setInterval(npCho,120000)}
 
 /* Menu (chạy sau chamcong.js):

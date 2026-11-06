@@ -5,15 +5,16 @@
  * Phòng chưa có Lead, hoặc người gửi chính là Lead: đơn lên thẳng HCNS.
  * Tạm ứng: dưới mức tối đa (mặc định 3 triệu), Kế toán duyệt, cuối tháng trừ vào lương.
  */
-import { dayRule, daysFrom, type CcSettings, type Lich } from './chamCong';
+import { dayRule, daysFrom, type CcSettings, type Lich, type NgayCong } from './chamCong';
 
-export type LoaiDon = 'phep' | 'om' | 'khongluong' | 'vesom' | 'ot';
+export type LoaiDon = 'phep' | 'om' | 'khongluong' | 'vesom' | 'ot' | 'lambu';
 export const LOAI_DON: Record<LoaiDon, string> = {
   phep: 'Nghỉ phép năm',
   om: 'Nghỉ ốm',
   khongluong: 'Nghỉ không lương',
   vesom: 'Xin về sớm / đến muộn',
   ot: 'Làm thêm giờ (OT)',
+  lambu: 'Xin làm bù',
 };
 export const LOAI_NGHI: LoaiDon[] = ['phep', 'om', 'khongluong'];
 export type TrangThai = 'lead' | 'hcns' | 'xong' | 'tuchoi' | 'huy';
@@ -81,3 +82,49 @@ export function donTheoNgay(rows: { loai: LoaiDon; tu: string; den: string; buoi
 }
 
 export type { CcSettings };
+
+/**
+ * Ngày cần bù (CEO 06/11) trong các ngày đã qua: bù ngày cho ngày phải làm mà không chấm (không có đơn phép năm / ốm),
+ * nghỉ không lương cả ngày hoặc nửa ngày; bù giờ cho ngày đi muộn / về sớm chưa có đơn xin phép. Ngày đã có đơn bù thì bỏ.
+ */
+export type CanBu = { ngay: string; kieu: 'ngay' | 'gio'; buoi: Buoi; phut: number; mo: string };
+export function ngayCanBu(ngay: (NgayCong & { ngay: string })[], today: string): CanBu[] {
+  const out: CanBu[] = [];
+  const kl = (x: NgayCong) => !!x.don && x.don.startsWith(LOAI_DON.khongluong);
+  for (const x of ngay) {
+    if (x.ngay > today || x.bu) continue;
+    if (x.ngay < today && x.lam && !x.vao && !x.ra && (!x.don || kl(x)))
+      out.push({ ngay: x.ngay, kieu: 'ngay', buoi: 'ca', phut: 0, mo: kl(x) ? 'nghỉ không lương' : 'không chấm công' });
+    else if (x.ngay < today && kl(x) && (x.vao || x.ra) && /\((sáng|chiều)\)/.test(x.don ?? ''))
+      out.push({ ngay: x.ngay, kieu: 'ngay', buoi: x.don!.includes('sáng') ? 'sang' : 'chieu', phut: 0, mo: 'nghỉ không lương buổi ' + (x.don!.includes('sáng') ? 'sáng' : 'chiều') });
+    else if ((x.muon > 0 || x.som > 0) && !x.coPhep)
+      out.push({ ngay: x.ngay, kieu: 'gio', buoi: 'ca', phut: x.muon + x.som, mo: [x.muon ? 'đi muộn ' + x.muon + ' phút' : '', x.som ? 'về sớm ' + x.som + ' phút' : ''].filter(Boolean).join(', ') });
+  }
+  return out.reverse();
+}
+
+/** Kiểm đơn làm bù; trả lời câu báo lỗi dễ hiểu, hoặc null nếu hợp lệ. rule = giờ làm của ngày làm bù theo lịch. */
+export function kiemBu(
+  c: CanBu,
+  b: { ngay: string; buoi: Buoi; tu: string; den: string },
+  rule: { lam: boolean; vao: number; ra: number },
+  today: string,
+  hanBu: number,
+): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.ngay)) return 'Chọn ngày làm bù';
+  if (b.ngay < today) return 'Ngày làm bù phải từ hôm nay trở đi';
+  if (b.ngay <= c.ngay && c.kieu === 'ngay') return 'Ngày làm bù phải sau ngày được bù';
+  const cach = Math.round((Date.parse(b.ngay) - Date.parse(c.ngay)) / 864e5);
+  if (cach > hanBu) return `Phải làm bù trong vòng ${hanBu} ngày sau ngày ${c.ngay.slice(8)}/${c.ngay.slice(5, 7)}`;
+  if (c.kieu === 'ngay') {
+    if (rule.lam) return 'Ngày này đang là ngày đi làm theo lịch. Bù ngày thì chọn ngày nghỉ (Chủ nhật, thứ Bảy được nghỉ)';
+    return null;
+  }
+  const hm = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!hm.test(b.tu) || !hm.test(b.den) || b.den <= b.tu) return 'Ghi giờ làm bù: từ giờ phải trước đến giờ';
+  const m = (x: string) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3, 5));
+  const dai = m(b.den) - m(b.tu);
+  if (dai < c.phut) return `Cần bù ${c.phut} phút, giờ đăng ký mới được ${dai} phút`;
+  if (rule.lam && m(b.den) > rule.vao && m(b.tu) < rule.ra) return 'Giờ làm bù phải ngoài giờ làm (đến sớm trước giờ vào hoặc ở lại sau giờ ra)';
+  return null;
+}

@@ -11,6 +11,7 @@ import { taskReminders } from './services/taskReminders';
 import { taskRecurring } from './services/taskRecurring';
 import { publishDue } from './services/fpPublish';
 import { syncAllChannels } from './services/poscake';
+import { syncFbMoney } from './services/fbCost';
 import { syncComboTasks } from './routes/sanpham';
 import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
@@ -90,6 +91,8 @@ export default {
             console.info('[cron] don hoan', JSON.stringify(await syncReturns(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
             // Số bán hàng Facebook theo người xử lý đơn (Pancake analytics): 8 ngày gần nhất, vì đơn hoàn và đơn giao về chậm.
             console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6, 7].map(day), (u) => fetch(u))));
+            // Tiền đơn Facebook đã gửi hàng (giá vốn, ship Facebook trên trang quản trị): hôm qua, hôm kia.
+            console.info('[cron] fb money', JSON.stringify(await syncFbMoney(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
           }
         } catch (error) {
           console.error('[cron] poscake loi', error);

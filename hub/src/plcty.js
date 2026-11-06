@@ -59,13 +59,13 @@ function plcLinePop(f){const A=PLC_A,vn=plcVn(A.ym);
 
 function pPLCty(m){
   if(!dhOk()){m.innerHTML=H("Lãi lỗ P&L","")+`<div class="note">Trang này chỉ dành cho CEO và kế toán.</div>`;return}
-  dhLoad();const ym=plYmNow(),A=plMonth(ym),pym=plYmAdd(ym,-1),PA=plMonth(pym),KH=mtGet(ym),KK=PLC.k,full=!KK;PLC_A=A;
+  dhLoad();const ym=plYmNow(),A=plMonth(ym),pym=plYmAdd(ym,-1),pTo=A.R.partial?(()=>{const e=plYmEnd(pym),d=pym+"-"+A.R.to.slice(8,10);return d<e?d:e})():"",PA=A.R.partial?plMonth(pym,{from:pym+"-01",to:pTo,partial:true}):plMonth(pym),/* tháng đang chạy so cùng số ngày tháng trước (06/11: 6 ngày so cả tháng ra ▼98%) */KH=mtGet(ym),KK=PLC.k,full=!KK;PLC_A=A;
   const T=plcTot(A,KK),P=plcTot(PA,KK);
   if(!T){m.innerHTML=H("Báo cáo lãi lỗ (P&L)",plcVn(ym))+`<p class="hint pad">${A.loading?"Đang tải…":"Tháng này chưa có số kênh nào."}</p>`;return}
   const chot=ym<plYmAdd(iso(new Date()).slice(0,7),-1)||(ym===plYmAdd(iso(new Date()).slice(0,7),-1)&&+iso(new Date()).slice(8,10)>=10);
   const tag=chot?`<span class="plc-tag ok">Đã chốt</span>`:`<span class="plc-tag du">Dự kiến${A.R.partial?" · số đến "+A.R.to.slice(8,10)+"/"+A.R.to.slice(5,7):""} · chốt ngày 10/${plYmAdd(ym,1).slice(5,7)}</span>`;
   const sauP=P&&P.thieu&&P.thieu.length?` <span class="hint">· tháng trước thiếu ${esc(P.thieu.join(", "))}</span>`:"";
-  const vs=(a,b,lower)=>PLC.cmp==="kh"?`<span class="hint">kế hoạch chỉ đặt doanh thu</span>`:b==null?`<span class="hint">tháng trước chưa đủ số</span>`:`${plcChg(a,b,lower)} <span class="hint">so ${A.R.partial?"cả tháng trước":"tháng trước"}</span>`;
+  const vs=(a,b,lower)=>PLC.cmp!=="kh"&&T.thieu&&T.thieu.length?`<span class="hint">tháng này còn thiếu ${esc(T.thieu.join(", "))}, chưa so</span>`:PLC.cmp==="kh"?`<span class="hint">kế hoạch chỉ đặt doanh thu</span>`:b==null?`<span class="hint">tháng trước chưa đủ số</span>`:`${plcChg(a,b,lower)} <span class="hint">so ${A.R.partial?"01–"+pTo.slice(8,10)+"/"+pTo.slice(5,7):"tháng trước"}</span>`;
   const khK=KH?(KK?KH[{tts:"tts",spe:"spe",fb:"fb",b2b:"b2b",gc:"gc"}[KK]]:KH.tong):null;
   const vsDt=PLC.cmp==="kh"?(khK?`đạt <b>${plcPc(T.dt,khK,0)}</b> kế hoạch (${plcTr(khK)})`:`<span class="hint">chưa đặt kế hoạch</span>`):vs(T.dt,P&&P.dt)+sauP;
   /* 6 ô. Chị Hoa 29/10: bỏ ô Lãi gộp ở đầu trang (còn dòng trong bảng chi tiết), thay bằng Tổng chi phí. */
@@ -80,14 +80,14 @@ function pPLCty(m){
   const CT=plcTot(A,""),CP=plcTot(PA,"");
   const kenh=`<div class="tbl"><table class="plc-t"><thead><tr><th>Kênh</th><th class="n">Doanh thu thực</th><th class="n">Lãi gộp</th><th class="n">Lãi đóng góp</th><th class="n">Biên</th><th class="n">So th. trước</th><th class="n">Tỷ trọng</th></tr></thead><tbody>${PLC_K.map(([k,n,cl,ic])=>{const c=A.cols[k],p=PA.cols[k];
       return `<tr class="clk" data-plck="${k}"><td><span class="plc-chn"><span class="plc-lg" style="background:${cl}">${ic}</span>${esc(n)}</span></td>${!c?`<td class="n hint" colspan="6" style="text-align:left">chờ số · ${esc((A.by[k]&&A.by[k].src)||"chờ tải báo cáo")}</td>`:
-      `<td class="n">${plcNum(c.dt)}</td><td class="n">${c.gv==null?`<span class="hint">chưa có giá vốn</span>`:plcNum(c.lg)}</td><td class="n"><b>${c.lai==null?"—":plcNum(c.lai)}</b></td><td class="n">${plcPc(c.lai,c.dt)}</td><td class="n">${p?plcChg(c.dt,p.dt):`<span class="hint">—</span>`}</td><td class="n">${plcPc(c.dt,CT.dt)}<span class="plc-bar"><i style="width:${CT.dt?Math.max(0,c.dt/CT.dt*100):0}%;background:${cl}"></i></span></td>`}</tr>`}).join("")}
-    <tr class="plc-tot"><td>Tổng cộng</td><td class="n">${plcNum(CT.dt)}</td><td class="n">${plcNum(CT.lg)}</td><td class="n">${plcNum(CT.lai)}</td><td class="n">${plcPc(CT.lai,CT.dt)}</td><td class="n">${CP?plcChg(CT.dt,CP.dt):"—"}</td><td class="n">100%</td></tr></tbody></table></div>`;
+      `<td class="n">${plcNum(c.dt)}</td><td class="n">${c.gv==null?`<span class="hint">chưa có giá vốn</span>`:plcNum(c.lg)}</td><td class="n"><b>${c.lai==null?"—":plcNum(c.lai)}</b></td><td class="n">${plcPc(c.lai,c.dt)}</td><td class="n">${A.by[k]&&A.by[k].dangDt>0&&A.R.partial?`<span class="hint" title="đơn đang giao chưa thành doanh thu thực, so tháng trước sẽ thấp giả">còn đơn đang giao</span>`:p?plcChg(c.dt,p.dt):`<span class="hint">—</span>`}</td><td class="n">${plcPc(c.dt,CT.dt)}<span class="plc-bar"><i style="width:${CT.dt?Math.max(0,c.dt/CT.dt*100):0}%;background:${cl}"></i></span></td>`}</tr>`}).join("")}
+    <tr class="plc-tot"><td>Tổng cộng</td><td class="n">${plcNum(CT.dt)}</td><td class="n">${plcNum(CT.lg)}</td><td class="n">${plcNum(CT.lai)}</td><td class="n">${plcPc(CT.lai,CT.dt)}</td><td class="n">${CT.thieu&&CT.thieu.length?`<span class="hint">thiếu kênh, chưa so</span>`:CP?plcChg(CT.dt,CP.dt):"—"}</td><td class="n">100%</td></tr></tbody></table></div>`;
   /* Bảng P&L chi tiết. */
   const PM=PA,ytdMs=[];for(let i=-5;i<=0;i++){const k=plYmAdd(ym,i);if(k.slice(0,4)===ym.slice(0,4))ytdMs.push(k)}
   const MS=ytdMs.map(k=>({k,A:k===ym?A:k===pym?PA:plcOld(k)})).map(o=>({...o,T:plcTot(o.A,KK)}));
   const ytd=f=>{let s=0,ok=false;MS.forEach(o=>{if(o.T&&o.T[f]!=null){s+=o.T[f];ok=true}});return ok?s:null};
   const khC=`<span class="hint">${KH?"":"chưa đặt"}</span>`;
-  const row=(f,l,cls,o={})=>{const v=o.v!==undefined?o.v:T[f],pv=P?(P[f]!==undefined?P[f]:null):null,sg=o.neg?-1:1,show=x=>x==null?null:sg*x,N=o.neg?(x=>x==null?`<span class="hint">—</span>`:plcM(x)):plcNum,yv=o.noYtd?null:ytd(f),dd=v==null||pv==null?null:(v-pv)*sg;
+  const row=(f,l,cls,o={})=>{const v=o.v!==undefined?o.v:T[f],pv=P&&!(T.thieu&&T.thieu.length)?(P[f]!==undefined?P[f]:null):null,sg=o.neg?-1:1,show=x=>x==null?null:sg*x,N=o.neg?(x=>x==null?`<span class="hint">—</span>`:plcM(x)):plcNum,yv=o.noYtd?null:ytd(f),dd=v==null||pv==null?null:(v-pv)*sg;
     const kh=f==="dt"&&khK?`${plcM(khK)} <span class="hint">· đạt ${plcPc(T.dt,khK,0)}</span>`:khC;
     return `<tr class="${cls||""}${o.g?" plc-tg"+(PLC.open[o.g]?" open":""):""}" ${o.g?`data-plcg="${o.g}"`:""}><td>${o.g?`<span class="plc-ar">▶</span>`:""}${l}</td>${o.na?`<td class="n"><span class="hint"><i>${o.na}</i></span></td><td></td><td class="n hint">—</td><td></td><td></td>`:
       `<td class="n${o.ck?" plc-ck":""}" ${o.ck?`data-plcl="${o.ck}"`:""}>${N(show(v))}</td><td class="n hint">${plcPc(v,T.dt)}</td><td class="n">${pv==null?`<span class="hint">—</span>`:N(show(pv))}</td><td class="n">${dd==null?`<span class="hint">—</span>`:`<span class="${dd>=0?"plc-up":"plc-dn"}">${dd>=0?"+":""}${plcM(dd)}</span>`}</td><td class="n">${yv==null?`<span class="hint">—</span>`:N(show(yv))}</td>`}<td class="n">${kh}</td></tr>`};
@@ -141,7 +141,7 @@ function pPLCty(m){
   if(full&&T.chung==null)W.push(["amb","Chưa có chi phí chung","Sổ chi phí tháng này chưa có khoản chi chung nên chưa ra lợi nhuận hoạt động.",""]);
   if(T.chuaTinh)W.push(["amb",`${plcTr(T.chuaTinh)} doanh thu chưa có giá vốn`,"Để riêng, không tính lãi. Cần kế toán điền giá vốn các mã này.",`data-plcl="ngvw"`]);
   const qcMax=(dhGet().nguong||{}).qcMax||.4;
-  PLC_K.forEach(([k,n])=>{const c=A.cols[k];if(c&&c.dt&&c.ads/c.dt>qcMax&&(!KK||KK===k))W.push(["blu",`Quảng cáo ${n} ${plcPc(c.ads,c.dt,0)} doanh thu`,`Vượt ngưỡng ${Math.round(qcMax*100)}%. Lãi đóng góp kênh còn ${plcPc(c.lai,c.dt)}.`,`data-plck="${k}"`])});
+  PLC_K.forEach(([k,n])=>{const c=A.cols[k];if(c&&c.dt&&c.ads/(c.qb||c.dt)>qcMax&&(!KK||KK===k))W.push(["blu",`Quảng cáo ${n} ${plcPc(c.ads,c.qb||c.dt,0)} doanh thu${c.qb&&c.qb!==c.dt?" dự kiến":""}`,`Vượt ngưỡng ${Math.round(qcMax*100)}%. Lãi đóng góp kênh còn ${plcPc(c.lai,c.dt)}.`,`data-plck="${k}"`])});
   if(A.tot&&A.tot.tam)W.push(["blu","Có phần doanh thu tạm tính","Ngày chưa có báo cáo sàn, số sẽ chốt khi tải báo cáo tháng.",""]);
   const sel=(id,opts,v)=>`<select id="${id}">${opts.map(([k,t])=>`<option value="${k}" ${k===v?"selected":""}>${t}</option>`).join("")}</select>`;
   m.innerHTML=`<div class="plc">

@@ -158,7 +158,7 @@ function tsbUpAdmCard(){
   const U=TSB.up,st=k=>U[k]?pill("Đã nhận: "+U[k].name,"grn"):pill("Chưa có","gry");
   return `<section class="card"><div class="card-h"><h2>Tải file tháng (kế toán)</h2><span class="hint">đọc ngay trên máy, chỉ gửi lên web số tiền, mã sản phẩm, trạng thái, ngày</span></div>
    <ol class="lessons"><li><b>OrderSKUList</b>: TikTok Shop › Đơn hàng › Xuất, lọc theo ngày tạo đơn, từ ngày 01 của tháng (.csv hoặc .xlsx).</li><li><b>income</b>: Tài chính › Quyết toán › Chi tiết đơn hàng, <b>từ ngày 01 của tháng</b>.</li><li><b>Campaign overview</b>: Quảng cáo GMV Max › Tổng quan chiến dịch › theo ngày, từ ngày 01 của tháng.</li></ol>
-   <p class="hint"><b>Tải giữa tháng</b> (mỗi tuần hoặc mỗi ngày) được: xuất 3 file từ ngày 01 đến hôm nay, web tính doanh thu thực, phí sàn, quảng cáo <b>đến ngày đó</b>; đơn chưa quyết toán dùng phí ước tính. Tải lại thì bản mới thay bản cũ. <b>Chốt sổ</b>: sáng ngày 10 tháng sau, income xuất từ 01 tới hết ngày 09 tháng sau; bản này thay hết các bản giữa tháng. Số giữa tháng là <b>dự kiến</b>.</p>
+   <p class="hint"><b>Tải giữa tháng</b> (agent tải mỗi ngày): xuất 3 file từ ngày 01 đến hôm nay, web tính doanh thu thực, phí sàn, quảng cáo <b>đến ngày đó</b>; đơn chưa quyết toán dùng phí ước tính. Tải lại thì bản mới thay bản cũ. <b>Chốt sổ</b>: sáng ngày 10 tháng sau, income xuất từ 01 tới hết ngày 09 tháng sau; bản này thay hết các bản giữa tháng. Số giữa tháng là <b>dự kiến</b>.</p>
    ${tsbFileInput("tsbadm",true)}
    <div class="chips" style="margin-top:10px"><b>Đơn hàng</b>${st("orders")}<b>Quyết toán</b>${st("income")}<b>Quảng cáo</b>${st("camp")}</div>
    ${U.orders?`<div class="frm row4" style="margin-top:8px"><label class="field">Tháng báo cáo<input type="month" id="tsb-ky" value="${U.ky||""}"></label></div>`:""}
@@ -227,7 +227,7 @@ function tsbOpsBody(){
 function tsbUpOpsCard(){
   const last=(TSB.all&&TSB.all.last)||[],L=k=>{const x=last.find(r=>r.src===k);return x?`có tới ${tsbVn(x.day)}`:"chưa có"};
   const P=TSB.opsPrev;
-  return `<section class="card"><div class="card-h"><h2>Tải số liệu TikTok</h2><span class="hint">mỗi tuần một lần · tải lại thì ghi đè đúng ngày</span></div>
+  return `<section class="card"><div class="card-h"><h2>Tải số liệu TikTok</h2><span class="hint">agent tải mỗi ngày · tải lại thì ghi đè đúng ngày</span></div>
    <ol class="lessons"><li><b>Key metrics</b>: Phân tích › Tổng quan shop › Xuất (theo ngày) · ${L("km")}.</li><li><b>Live Performance Core Stats</b>: Phân tích › LIVE › Xuất · ${L("live")}.</li><li><b>Transaction Analysis</b> và <b>Creator List</b>: Tiếp thị liên kết › Phân tích › Xuất (giữ nguyên tên file TikTok đặt, trong tên có khoảng ngày).</li><li>Có thể tải thêm <b>Campaign overview</b> (Quảng cáo GMV Max theo ngày) để thấy ROAS sớm · ${L("ads")}.</li></ol>
    ${tsbFileInput("tsbops",true)}
    ${P&&P.length?`<h3>Xem trước</h3>${tbl(["File","Loại","Khoảng ngày","Nội dung",""],P.map((x,i)=>`<tr><td>${esc(x.name)}</td><td>${x.kind?esc(TT_KIND_NAME[x.kind]):pill("Không nhận ra","red")}</td><td>${x.range?esc(tsbVn(x.range.from)+" – "+tsbVn(x.range.to)):"—"}</td><td class="hint">${esc(x.note||x.err||"")}</td><td>${x.ok?pill("Sẵn sàng","grn"):pill("Bỏ qua","amb")}</td></tr>`))}<div class="acts"><button class="btn pri" id="tsb-opsave"${P.some(x=>x.ok)?"":" disabled"}>Lưu ${P.filter(x=>x.ok).length} file lên web</button><button class="btn" id="tsb-opcancel">Bỏ</button></div>`:""}

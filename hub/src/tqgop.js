@@ -11,7 +11,7 @@
    ===================================================================== */
 const TQ={co:{},coBusy:{}};
 /* Số đơn xuất kho Poscake theo kênh trong khoảng ngày (null khi chưa tải xong). */
-function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(["exec","bc_tong","pl","muctieu"].includes(PAGE))renderMain()})}return null}
+function tqCo(from,to){const k=from+"|"+to;if(TQ.co[k]!==undefined)return TQ.co[k];if(!TQ.coBusy[k]){TQ.coBusy[k]=1;svApi("/api/hub/dieuhanh/channel-orders?from="+from+"&to="+to).then(r=>{const o={};(r||[]).forEach(x=>{o[x.channel]=(o[x.channel]||0)+(+x.orders||0)});TQ.co[k]=o}).catch(()=>{TQ.co[k]={}}).finally(()=>{TQ.coBusy[k]=0;if(["exec","bc_tong","pl","muctieu","bc_shopee"].includes(PAGE))renderMain()})}return null}
 const tqMonths=(from,to)=>{const ms=[];for(let d=pdate(from.slice(0,7)+"-01");iso(d)<=to;d=new Date(d.getFullYear(),d.getMonth()+1,1))ms.push(iso(d).slice(0,7));return ms};
 /* Doanh thu thực + lãi đóng góp từng kênh Kênh bán lẻ trong khoảng ngày. N = số gốc của execNums (trước khi đổi). */
 /* Quảng cáo Shopee Ads theo ngày: summary.days[ngày][5] của báo cáo Shopee tải lên (migration 0180), mọi shop. */
@@ -39,8 +39,8 @@ function tqRevB2C(N,from,to){
    else out.tts={dt:null,lai:null,don:null,src:"chờ tải báo cáo TikTok"+(cho.length?" ngày "+cho.join(", "):"")+" (Tổng quan › Doanh thu › TikTok Shop › Tải file tháng)"}}
   /* Facebook: giao thành công */
   {const dtG=rs(5,"fb"),dtC=rs(6,"fb"),giao=rs(4,"fb"),chot=rs(1,"fb"),hoan=rs(3,"fb"),gvC=rs(7,"fb");
-   if(dtG>0){const Dd=(typeof KDX!=="undefined"&&KDX.fbDash)||{},pr=Dd.dt>0?(-(+Dd.vc||0)-(+Dd.hoan||0))/Dd.dt+0.015:0.015,gv=dtC?gvC*dtG/dtC:0,ads=rAds(0,from,to)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1)),phi=dtG*pr;
-     out.fb={dt:dtG,gv,phi,ads,khac:0,lai:dtG-gv-phi-ads,don:giao,dang:Math.max(0,chot-giao-hoan),dangDt:Math.max(0,dtC-dtG),src:`giao thành công · Pancake · phí ship và thuế ${(pr*100).toFixed(1).replace(".",",")}%`,tam:false}}
+   if(dtG>0){const Dd=(typeof KDX!=="undefined"&&KDX.fbDash)||{},pr=Dd.dt>0?(-(+Dd.vc||0)-(+Dd.hoan||0))/Dd.dt+0.015:0.015,GR=typeof fbvGvCa==='function'?fbvGvCa(from,to):null,gv=GR?GR.gv:dtC?gvC*dtG/dtC:0,/* GR.gv null: chưa có giá vốn thật, không ước */ads=rAds(0,from,to)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1)),phi=GR&&GR.ship!=null?GR.ship+dtG*0.015:dtG*pr;/* ship thật theo đơn đã gửi (phí hãng vận chuyển) + thuế 1,5% */
+     out.fb={dt:dtG,gv,phi,ads,khac:0,lai:gv==null?null:dtG-gv-phi-ads,don:giao,dang:Math.max(0,chot-giao-hoan),dangDt:Math.max(0,dtC-dtG),src:`giao thành công · Pancake · ${GR&&GR.ship!=null?"ship theo đơn đã gửi + thuế 1,5%":"phí ship và thuế "+(pr*100).toFixed(1).replace(".",",")+"%"}${GR&&GR.gv==null?" · chưa có giá vốn (đang chờ số đơn đã gửi)":GR&&GR.den?` · giá vốn theo đơn đã gửi × giá thành web, số tới ${GR.den.slice(8)}/${GR.den.slice(5,7)}`:""}`,tam:false}}
    else out.fb={dt:null,lai:null,don:null,src:"chờ dữ liệu Pancake"}}
   /* Shopee */
   {const dt=rs(0,"spe");if(dt>0){const gv=rs(2,"spe"),phi=-rs(1,"spe"),ads=tqSpeAds(from,to);out.spe={dt,gv,phi,ads,khac:0,lai:dt-gv-phi-ads,don:rs(4,"spe"),src:"doanh thu Shopee theo ngày"+(ads?" · quảng cáo Shopee Ads từ báo cáo tải lên":" (chưa có số Shopee Ads)"),tam:false}}
@@ -54,7 +54,7 @@ function tqRevB2C(N,from,to){
   try{const R=tqRevB2C(N,from,to);N.raw={tt:N.tt,fbDT:N.fbDT,spDT:N.spDT,tong:N.tong};N.rev=R;
     N.tt=R.tts.dt||0;N.fbDT=R.fb.dt||0;N.fbGiao=R.fb.dt||0;N.spDT=R.spe.dt||0;N.tong=N.tt+N.fbDT+N.spDT;
     N.L.tts=R.tts.lai;N.L.fb=R.fb.lai;N.L.spe=R.spe.lai;
-    N.C.gvTT=R.tts.gv||0;N.C.phiTT=R.tts.phi||0;N.C.adsTT=R.tts.ads||0;N.C.khacTT=R.tts.khac||0;N.C.gvFB=R.fb.gv||0;N.C.adsFB=R.fb.ads||0;N.C.phiFB=R.fb.phi||0;
+    N.C.gvTT=R.tts.gv||0;N.C.phiTT=R.tts.phi||0;N.C.adsTT=R.tts.ads||0;N.C.khacTT=R.tts.khac||0;N.C.gvFB=R.fb.gv||0;N.C.adsFB=(R.fb.adsCa!=null?R.fb.adsCa:R.fb.ads)||0;/* adsCa: quảng cáo cả tháng (Sổ chi phí), R.fb.ads có thể là phần đơn đã giao (dtFbCungRo) */N.C.phiFB=R.fb.phi||0;
     N.n.tts=R.tts.dt?1:0;N.n.fb=R.fb.dt?1:0;N.n.spe=R.spe.dt?1:0}catch(e){}
   return N}}
 {const _o=execOrders;execOrders=function(from,to){const O=_o(from,to);if(!dhOk())return O;try{const R=execNums(from,to).rev;if(R){O.tts=R.tts.don||0;O.fb=R.fb.don||0;O.spe=R.spe.don||0}}catch(e){}return O}}
@@ -74,7 +74,7 @@ function tqKenhRows(){
 function tqTot(rows){const has=rows.filter(r=>r.dt!=null);return {dt:has.reduce((a,r)=>a+r.dt,0),lai:has.filter(r=>r.lai!=null).reduce((a,r)=>a+r.lai,0),cp:has.reduce((a,r)=>a+(r.gv||0)+(r.phi||0)+(r.ads||0)+(r.khac||0),0),don:rows.reduce((a,r)=>a+(+r.don||0),0),tam:has.some(r=>r.tam),thieu:rows.filter(r=>r.dt==null).map(r=>r.n)}}
 function tqTabKenh(){
   const rows=tqKenhRows(),T=tqTot(rows),ng=dhGet().nguong;
-  const warn=r=>{const w=[];if(r.dt&&r.ads/r.dt>ng.qcMax)w.push(pill(`quảng cáo ${dhPct(r.ads/r.dt)} doanh thu`,"red"));if(r.dt&&r.lai!=null&&r.lai/r.dt<ng.bienKenh)w.push(pill("biên dưới "+dhPct(ng.bienKenh),"amb"));if(r.tam)w.push(pill("tạm tính","blu"));if(r.dt==null)w.push(pill("chờ tải báo cáo","gry"));return w.join(" ")};
+  const warn=r=>{const w=[];if(r.dt&&r.ads/(r.qb||r.dt)>ng.qcMax)w.push(pill(`quảng cáo ${dhPct(r.ads/(r.qb||r.dt))} doanh thu${r.qb?" dự kiến":""}`,"red"));if(r.dt&&r.lai!=null&&r.lai/r.dt<ng.bienKenh)w.push(pill("biên dưới "+dhPct(ng.bienKenh),"amb"));if(r.tam)w.push(pill("tạm tính","blu"));if(r.dt==null)w.push(pill("chờ tải báo cáo","gry"));return w.join(" ")};
   const row=r=>`<tr class="clk" data-go="${r.go}"><td><b>${r.n}</b><br><small class="hint">${esc(r.src||"")}</small>${r.dang?`<br><small class="hint">đang giao, chưa tính: ${nf(r.dang)} đơn · ${tr(r.dangDt)}</small>`:""}</td><td class="n">${r.dt==null?"—":r.dt===0?"0 đ":tr(r.dt)}</td><td class="n">${r.don?nf(r.don):r.dt===0?"0":"—"}</td><td class="n">${r.gv?tr(r.gv):"—"}</td><td class="n">${r.phi?tr(r.phi):"—"}</td><td class="n">${r.ads?tr(r.ads):"—"}</td><td class="n"><b class="${r.lai<0?"t-red":""}">${r.lai==null?"—":tr(r.lai)}</b></td><td class="n">${r.dt&&r.lai!=null?dhPct(r.lai/r.dt):"—"}</td><td>${warn(r)}</td></tr>`;
   const sub=(m)=>{const R=rows.filter(r=>r.mang===m),t=tqTot(R);return `<tr class="tot"><td>${m}</td><td class="n">${tr(t.dt)}</td><td class="n">${t.don?nf(t.don):"—"}</td><td></td><td></td><td></td><td class="n">${tr(t.lai)}</td><td class="n">${t.dt?dhPct(t.lai/t.dt):"—"}</td><td></td></tr>`};
   return `<section class="card flush"><div class="card-h pad"><h2>Lãi theo kênh</h2><span class="hint">${esc(pLabel())} · doanh thu thực · lãi đóng góp (chưa trừ lương, chi phí chung)</span></div>
@@ -129,13 +129,13 @@ function plRowsFor(from,to){
 const plKey=r=>({tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"})[r.k];
 /* Một kênh → các dòng P&L. Phí sàn và vận chuyển = phần còn lại để các dòng cộng khớp lãi đóng góp. */
 function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,cpk:r.cpk||0,luong:r.luong||0,chia:r.chia||0,lai:r.lai==null?0:r.lai,ngv:0,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ngv=r.ngv||0,ads=r.ads||0,lai=r.lai,cpk=r.cpk||0,luong=r.luong||0,chia=r.chia||0;
-  const lg=gv==null?null:dt-gv-ngv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ngv-ads-cpk-luong-lai;return {dt,gv,ngv,lg,phi,ads,cpk,luong,lai,chia,lsp:lai==null?null:lai-chia,tam:!!r.tam,src:r.src,don:r.don}}
+  const lg=gv==null?null:dt-gv-ngv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ngv-ads-cpk-luong-lai;return {dt,gv,ngv,lg,phi,ads,cpk,luong,lai,chia,lsp:lai==null?null:lai-chia,tam:!!r.tam,src:r.src,don:r.don,qb:r.qb||dt,adsCa:r.adsCa!=null?r.adsCa:ads}}
 function plSum(cols,names){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.reduce((a,c)=>a+(c[k]||0),0);
   const thieuGv=cols.map((c,i)=>c&&c.gv==null?names[i]:null).filter(Boolean);
   return {dt:s("dt"),gv:s("gv"),ngv:s("ngv"),lg:s("lg"),phi:s("phi"),ads:s("ads"),cpk:s("cpk"),luong:s("luong"),lai:s("lai"),chia:s("chia"),thieuGv,tam:ok.some(c=>c.tam)}}
 function mtGet(ym){const t=D().targets,x=t&&t.thang&&t.thang[ym];if(!x)return null;const o={};let tong=0,co=false;PLK.forEach(([k])=>{const v=+x[k]||0;o[k]=v||null;if(v){tong+=v;co=true}});o.tong=co?tong:null;return co?o:null}
 function plChung(ym){try{if(typeof spChungTheoThang!=="function")return null;const v=spChungTheoThang(ym);return v!=null&&isFinite(+v)&&+v>0?+v:null}catch(e){return null}}
-function plMonth(ym){const R=plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
+function plMonth(ym,R0){const R=R0||plRange(ym),rows=plRowsFor(R.from,R.to),by={};rows.forEach(r=>by[plKey(r)]=r);
   const cols={};PLK.forEach(([k])=>cols[k]=plCol(by[k]));const tot=plSum(PLK.map(([k])=>cols[k]),PLK.map(x=>x[1])),chung=plChung(ym);
   let sx=0;try{const S=typeof dtSoCp==="function"?dtSoCp(R.from,R.to):null;sx=S?S.v.sx:0}catch(e){}
   /* Lương chưa gắn kênh trong bảng lương đã chốt (scPLKenh) không có trong spChungTheoThang nên cộng vào chi chung. Cột công ty: lãi sau phân bổ = tổng lãi đóng góp − tổng chi chung được chia, dòng chi chung chỉ còn phần chưa chia, nên Lợi nhuận hoạt động không đổi theo cách chia. */

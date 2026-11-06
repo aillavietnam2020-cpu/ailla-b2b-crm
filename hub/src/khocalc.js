@@ -19,7 +19,7 @@
 const KHO_NHOM=[["NVL","Nguyên vật liệu"],["VO","Vỏ can, chai"],["BTP","Bán thành phẩm"],["TP","Thành phẩm"]];
 const KHO_TT={AM:["Âm kho","red"],SAP_HET:["Sắp hết","amb"],DU:["Đủ hàng","grn"]};
 const KHO_DN=[
-  ["Mốc tồn","Ngày phiếu tồn chốt chung (31/10). Mã chưa có trong phiếu chốt thì kế toán kho kiểm bổ sung, ngày kiểm là mốc riêng của mã. Số kiểm là số cuối ngày kiểm: hàng nhập, xuất, bán sàn trong và trước ngày đó đã nằm trong số đếm nên không trừ lại; từ hôm sau trừ bình thường."],
+  ["Mốc tồn","Ngày phiếu tồn chốt chung (31/10). Mã chưa có trong phiếu chốt (hoặc cần kiểm lại) thì lập Phiếu kiểm tồn, ngày kiểm là mốc riêng của mã. Số kiểm là số cuối ngày kiểm: hàng nhập, xuất, bán sàn trong và trước ngày đó đã nằm trong số đếm nên không trừ lại; từ hôm sau trừ bình thường."],
   ["Tồn thực tế","Tính từ mốc tồn của mã: số kiểm + cộng mọi dòng trong sổ kho đến hết ngày xem: tồn đầu kỳ, phiếu nhập, pha chế, kiểm kê đóng gói, xuất khác, nhập hàng hoàn, đơn Kênh phân phối đã xuất kho, hàng trả lại đã nhận, xuất bán lẻ các sàn theo ngày. Phiếu đã hủy không tính."],
   ["Đã giữ cho đơn","Số trên đơn Kênh phân phối đã duyệt, kho đã nhận lệnh xuất nhưng chưa xuất (quy đổi theo Đồng bộ mã Kênh phân phối)."],
   ["Tồn khả dụng","Tồn thực tế trừ hàng đã giữ cho đơn."],
@@ -45,7 +45,7 @@ const khoDcKhop=r=>Math.abs(kc6((+r.dau||0)+(+r.nhap||0)-(+r.xuat||0))-kc6(r.cuo
 function khoDcLyDo(r,ngay){
   if(!(kc6(r.cuoi)<0))return "";
   const tu=r.am_phieu?` Âm từ ngày ${ngay?ngay(r.am_tu):r.am_tu}, phiếu ${r.am_phieu}.`:"";
-  if(r.moc&&!r.da_kiem)return `Chưa có số kiểm (không có trong phiếu tồn chốt, chưa kiểm bổ sung): sổ chỉ có xuất từ mốc chung.${tu}`;
+  if(r.moc&&!r.da_kiem)return `Chưa có số kiểm (không có trong phiếu tồn chốt, chưa có phiếu kiểm tồn): sổ chỉ có xuất từ mốc chung.${tu}`;
   if(r.moc&&r.da_kiem)return `Xuất sau ngày kiểm nhiều hơn số đếm + nhập: thiếu phiếu nhập hoặc đếm thiếu.${tu}`;
   if(!(+r.nhap_truoc>0))return `Chưa có tồn đầu kỳ và chưa có phiếu nhập nào, sổ chỉ có phiếu xuất.${tu}`;
   if(!(+r.td>0))return `Chưa có tồn đầu kỳ; phiếu nhập ít hơn số đã xuất.${tu}`;

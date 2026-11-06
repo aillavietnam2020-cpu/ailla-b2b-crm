@@ -107,7 +107,7 @@ function speUpCard(){
   const P=SPE.prev||[];
   return `<section class="card"><div class="card-h"><h2>Tải báo cáo Shopee (kế toán)</h2><span class="hint">đọc ngay trên máy, chỉ gửi lên web số tiền, tên sản phẩm, ngày</span></div>
    <ol class="lessons"><li><b>Đơn hàng</b>: Kênh Người bán › Đơn hàng › Xuất, lọc theo ngày đặt hàng từ ngày 01 của tháng.</li><li><b>Tài chính</b>: Tài chính › Doanh thu › Xuất, <b>từ ngày 01 của tháng</b> đến hôm nay (chốt sổ: tới ngày 08 tháng sau).</li><li><b>Quảng cáo</b>: Kênh Marketing › Quảng cáo Shopee › Lịch sử giao dịch › Tải CSV (không bắt buộc, nên có).</li></ol>
-   <p class="hint">Mỗi shop 3 file; kéo file của cả hai shop vào một lần được, web tự ghép theo tên shop. Tải mỗi tuần: số "đến ngày X", bản mới thay bản cũ; đơn chưa quyết toán dùng phí ước tính.</p>
+   <p class="hint">Mỗi shop 3 file; kéo file của cả hai shop vào một lần được, web tự ghép theo tên shop. Agent tải mỗi ngày: số "đến ngày X", bản mới thay bản cũ; đơn chưa quyết toán dùng phí ước tính.</p>
    ${tsbFileInput("speup",true).replace("Kéo file TikTok","Kéo file Shopee")}
    <div class="chips" style="margin-top:10px">${chip("Đơn hàng",U.orders)}${chip("Tài chính",U.fin)}${chip("Quảng cáo",U.ads)}</div>
    ${SPE.busy?`<p class="note">${esc(SPE.busy)}</p>`:""}${SPE.err?`<div class="note red">${esc(SPE.err)}</div>`:""}

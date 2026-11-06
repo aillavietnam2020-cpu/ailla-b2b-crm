@@ -86,7 +86,7 @@ const ccCaTxt=c=>c?`${esc(c.ten)} ${c.tu}–${c.den}`:"Không có ca";
 const ccGio=m=>m?Math.floor(m/60)+"g"+String(m%60).padStart(2,"0"):"—";
 const ccPhut=m=>m>=60?Math.floor(m/60)+" giờ "+(m%60?m%60+" phút":""):m+" phút";
 /* Ghi chú một ngày công: đi muộn, về sớm, quên chấm ra, ngoài phạm vi, muộn chưa ghi lý do. */
-const ccNote=x=>{const a=[];if(x.le)a.push(pill("Nghỉ lễ","gry"));if(x.don)a.push(pill(x.don,x.don==="Nghỉ không lương"?"amb":"grn"));if(x.muon)a.push(pill("Muộn "+ccPhut(x.muon),"amb"));if(x.som)a.push(pill("Về sớm "+ccPhut(x.som),"amb"));if(x.quenRa)a.push(pill("Quên chấm ra","red"));if(x.ngoai)a.push(pill("Ngoài phạm vi","red"));if(x.canhBao)a.push(pill("Muộn chưa ghi lý do","red"));if(x.choXn)a.push(pill("Chấm ngoài chờ xác nhận","amb"));return a.join(" ")};
+const ccNote=x=>{const a=[];if(x.le)a.push(pill("Nghỉ lễ","gry"));if(x.don)a.push(pill(x.don,x.don==="Nghỉ không lương"?"amb":"grn"));if(x.muon)a.push(pill("Muộn "+ccPhut(x.muon),"amb"));if(x.som)a.push(pill("Về sớm "+ccPhut(x.som),"amb"));if(x.quenRa)a.push(pill("Quên chấm ra","red"));if(x.ngoai)a.push(pill("Ngoài phạm vi","red"));if(x.canhBao)a.push(pill("Muộn chưa ghi lý do","red"));if(x.choXn)a.push(pill("Chấm ngoài chờ xác nhận","amb"));if(x.chamNgoai)a.push(pill("Chấm ngoài · đã xác nhận","grn"));if(x.bu){const b=x.bu,d=ccDm(b.ngay);a.push(b.kq==="duyet"?pill("Xin bù "+d+" · chờ duyệt","amb"):b.kq==="cho"?pill("Chờ làm bù "+d,"amb"):b.kq==="du"?pill("Đã bù bằng "+d,"grn"):b.kq==="thieu"?pill("Bù chưa đủ ("+d+")","amb"):pill("Không đến làm bù "+d,"red"))}if(x.lamBu)a.push(pill("Làm bù cho "+ccDm(x.lamBu.cho),"blu"));return a.join(" ")};
 let CC_SKEW=0; // chênh giữa đồng hồ máy chủ và điện thoại, để biết đang muộn bao nhiêu phút
 const ccNowMin=()=>{const d=new Date(Date.now()+CC_SKEW+7*3600e3);return d.getUTCHours()*60+d.getUTCMinutes()};
 const ccMuonNay=()=>{const R=CC.me;if(!R||!R.rule||!R.rule.tinh)return 0;const m=ccNowMin()-R.rule.vao;return m>R.lich.anHan?m:0};
@@ -140,7 +140,8 @@ async function ccCham(loai){
     CC.reason=null;CC.out=null;toast((loai==="vao"?"Đã chấm vào lúc ":"Đã chấm ra lúc ")+ccHm(r.at)+(r.xn==="cho"?", chờ xác nhận":""));
     await ccLoadMe(true);
   }catch(e){
-    if(e.code==="NEED_OUT"){const s=ccShoots()[0];CC.out={...(CC.out&&CC.out.loai===loai?CC.out:{ly:s?"quay":"khach",shoot:s?s.id:"",note:"",anh:""}),loai,msg:e.message}}
+    if(e.code==="NEED_OUT"&&!ccPhone())CC.err="Bạn đang ở ngoài văn phòng. Tính năng chấm công ngoài văn phòng không khả dụng trên máy tính.";
+    else if(e.code==="NEED_OUT"){const s=ccShoots()[0];CC.out={...(CC.out&&CC.out.loai===loai?CC.out:{ly:s?"quay":"khach",shoot:s?s.id:"",note:"",anh:""}),loai,msg:e.message}}
     else if(e.code==="NEED_REASON")CC.reason={loai,msg:e.message};else CC.err=e.message||"Chưa chấm được";
   }
   CC.busy=false;ccRedraw();
@@ -188,6 +189,8 @@ function pCcToi(m){
 
 
 /* ---------- Chấm ngoài văn phòng (CEO 06/11): đi quay, gặp khách → lý do + ảnh check-in + gắn buổi quay, Lead xác nhận ---------- */
+/* Chấm ngoài chỉ làm trên điện thoại (CEO 06/11): máy tính chỉ xem. */
+const ccPhone=()=>{const u=navigator.userAgent||"";return /Android|iPhone|iPad|iPod|Mobile/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)};
 const CC_LY={quay:"Đi quay",khach:"Gặp khách",khac:"Việc khác"};
 /* Buổi quay hôm nay có tên mình (Lịch quay ở Marketing). */
 function ccShoots(){try{const d=D(),t=+String((CC.me||{}).today||"").slice(8);return (d.shoots||[]).filter(s=>s.day===t&&(s.nguoi||[]).includes(ME.id)&&s.trangThai!=="Đã hủy").sort((a,b)=>String(a.gio||"").localeCompare(String(b.gio||"")))}catch(e){return []}}
@@ -261,22 +264,23 @@ function pCcNgay(m){
   const R=CC.day;if(!R||R.loading){m.innerHTML=H("Chấm công hôm nay")+`<section class="card"><p class="empty">Đang tải…</p></section>`;ccLoadDay();return}
   if(R.err){m.innerHTML=H("Chấm công hôm nay")+`<section class="card"><p class="empty">${esc(R.err)}</p></section>`;return}
   const L=R.list.filter(x=>!CC.pb||x.pb===CC.pb),lam=L.some(x=>x.lam);
-  const co=L.filter(x=>x.vao),muon=L.filter(x=>x.muon),chua=L.filter(x=>!x.vao&&x.lam),ngoai=L.filter(x=>x.ngoai);
+  const co=L.filter(x=>x.vao),muon=L.filter(x=>x.muon),chua=L.filter(x=>!x.vao&&x.lam&&!x.choXn),ngoai=L.filter(x=>x.ngoai),cn=L.filter(x=>x.chamNgoai||x.choXn),cnCho=L.filter(x=>x.choXn);
   const pbs=[...new Set(R.list.map(x=>x.pb).filter(Boolean))];
   const rank=x=>x.canhBao?0:x.ngoai?1:x.muon?2:!x.vao&&x.lam?3:4;
   const rows=L.slice().sort((a,b)=>rank(a)-rank(b)||(a.vao||"z").localeCompare(b.vao||"z")).map(x=>{
     const ly=[...x.luot.filter(l=>l.ly_do).map(l=>`${l.loai==="vao"?"Vào":"Ra"}: ${esc(l.ly_do)}`),...(x.lyDoMuon?["Đi muộn: "+esc(x.lyDoMuon)]:[])].join("<br>");
-    const kc=x.luot.filter(l=>l.trong===0).map(l=>`${l.loai==="vao"?"Vào":"Ra"} cách ${esc(l.diem||"")} ${l.kc} m`).join("<br>");
+    const kc=x.luot.filter(l=>l.trong===0).map(l=>`${l.loai==="vao"?"Vào":"Ra"} ${ccHm(l.at)} cách ${esc(l.diem||"")} ${l.kc>=1000?(l.kc/1000).toFixed(1).replace(".",",")+" km":l.kc+" m"}${l.xn==="cho"?" · chờ xác nhận":l.xn==="khong"?" · không xác nhận":""}`).join("<br>");
     const extra=[kc,ly].filter(Boolean).join("<br>");
     return `<tr><td><b>${esc(x.name)}</b><div class="hint">${esc(ccPbName(x.pb))} · ${esc(x.lich)}${x.ca?" · "+esc(x.ca):""}</div></td><td class="mono">${ccHm(x.vao)} – ${ccHm(x.ra)}</td><td>${ccNote(x)||(x.vao?pill(x.kieu!=="tudo"?"Đúng giờ":"Đã chấm","grn"):x.lam?pill("Chưa chấm","gry"):pill(x.kieu==="ca"?"Không có ca":"Ngày nghỉ","gry"))}${extra?`<div class="hint">${extra}</div>`:""}</td></tr>`});
   m.innerHTML=H("Chấm công hôm nay",R.vai.all?"Cả công ty":"Phòng "+esc(ccPbName(R.vai.pb)))+`
   <div class="filters"><input type="date" id="cc-d" value="${R.ngay}" max="${R.today}">${R.vai.all&&pbs.length>1?`<select id="cc-pb"><option value="">Tất cả phòng</option>${pbs.map(p=>`<option value="${esc(p)}"${p===CC.pb?" selected":""}>${esc(ccPbName(p))}</option>`).join("")}</select>`:""}<span class="sp"></span><button class="btn" id="cc-rl">Tải lại</button></div>
   ${!lam?`<section class="card"><p class="hint">Ngày ${ccDm(R.ngay)} là ngày nghỉ theo lịch làm của mọi người.</p></section>`:""}
-  <div class="grid kpis">${kpi("Có mặt",co.length+"/"+L.filter(x=>x.lam||x.vao).length)}${kpi("Đi muộn",muon.length)}${kpi("Chưa chấm vào",chua.length)}${kpi("Ngoài phạm vi",ngoai.length)}</div>
+  <div class="grid kpis">${kpi("Có mặt",co.length+"/"+L.filter(x=>x.lam||x.vao).length)}${kpi("Đi muộn",muon.length)}${kpi("Chưa chấm vào",chua.length)}${kpi("Chấm ngoài văn phòng",cn.length,cnCho.length?`${cnCho.length} chờ xác nhận`:"")}${ngoai.length?kpi("Ngoài phạm vi",ngoai.length):""}</div>${cnCho.length&&(ccLead(ME)||ccHr(ME))?`<p class="hint"><a class="lnk" href="#" id="cc-goxn">Xem ảnh và xác nhận ${cnCho.length} lượt chấm ngoài →</a></p>`:""}
   <section class="card flush">${tbl(["Người","Vào – ra","Tình trạng"],rows)}</section>`;
   $("#cc-d").onchange=e=>{CC.ngay=e.target.value;ccLoadDay(true)};
   if($("#cc-pb"))$("#cc-pb").onchange=e=>{CC.pb=e.target.value;renderMain()};
   $("#cc-rl").onclick=()=>ccLoadDay(true);
+  if($("#cc-goxn"))$("#cc-goxn").onclick=e=>{e.preventDefault();CC.xn=null;ntPage("cc_xn")};
 }
 
 /* ---------- Bảng chấm công tháng ---------- */
@@ -288,10 +292,10 @@ function pCcThang(m){
   const rows=L.map(x=>{const o=CC.open[x.id];
     const cd=x.kieu!=="tudo",dash=v=>v||"—";
     const det=o?`<tr class="cc-det"><td colspan="11">${tbl(["Ngày","Vào","Ra","Giờ làm","Ghi chú"],x.ngay.slice().reverse().filter(d=>d.lam||d.vao||d.ra).map(d=>`<tr><td>${ccDow(d.n)} ${ccDm(d.n)}${d.ca?`<div class="hint">${esc(d.ca)}</div>`:""}</td><td class="mono">${ccHm(d.vao)}</td><td class="mono">${ccHm(d.ra)}</td><td class="mono">${ccGio(d.phut)}</td><td>${ccNote(d)||(!d.vao&&!d.ra&&d.n!==R.today?pill("Không chấm","gry"):"")}${d.lyDoMuon?`<div class="hint">Lý do muộn: ${esc(d.lyDoMuon)}</div>`:""}${d.nguon?`<div class="hint">${d.nguon==="ca hai"?"Máy và điện thoại":d.nguon==="may"?"Chỉ có ở máy chấm công":"Chỉ có ở điện thoại"}</div>`:""}</td></tr>`))}</td></tr>`:"";
-    return `<tr class="cc-row" data-id="${esc(x.id)}"><td><b>${esc(x.name)}</b> <span class="hint">${o?"▾":"▸"}</span><div class="hint">${esc(ccPbName(x.pb))} · ${esc(x.lich)}</div></td><td class="n">${x.cong}/${x.lamChuan}</td><td class="n">${cd?dash(x.muonLan):"·"}${x.muonNang?` <span class="hint">(${x.muonNang} lần quá ${Q.mocNang} phút)</span>`:""}${x.canhBao?" "+pill(x.canhBao+" lần chưa ghi lý do","red"):""}</td><td class="n">${cd?dash(x.somLan):"·"}</td><td class="n">${cd?dash(x.nghi):"·"}${x.nghiPhep?` <span class="hint">(+${x.nghiPhep} ngày phép)</span>`:""}</td><td class="n">${dash(x.quenRa)}</td><td class="n">${dash(x.ngoai)}</td><td class="n">${x.mayNgay||0} / ${x.dtNgay||0}${x.lech?" "+pill(x.lech+" ngày lệch","amb"):""}</td><td class="n mono">${ccGio(x.phut)}</td><td>${x.chuyenCan===null?`<span class="hint" title="Chuyên cần chỉ áp dụng khối văn phòng">Không áp dụng</span>`:x.chuyenCan?pill("Đạt","grn"):pill("Không đạt","red")}</td><td class="n">${x.cong}</td></tr>${det}`});
+    return `<tr class="cc-row" data-id="${esc(x.id)}"><td><b>${esc(x.name)}</b> <span class="hint">${o?"▾":"▸"}</span><div class="hint">${esc(ccPbName(x.pb))} · ${esc(x.lich)}</div></td><td class="n">${x.cong}/${x.lamChuan}</td><td class="n">${cd?dash(x.muonLan):"·"}${x.muonNang?` <span class="hint">(${x.muonNang} lần quá ${Q.mocNang} phút)</span>`:""}${x.canhBao?" "+pill(x.canhBao+" lần chưa ghi lý do","red"):""}</td><td class="n">${cd?dash(x.somLan):"·"}</td><td class="n">${cd?dash(x.nghi):"·"}${x.nghiPhep?` <span class="hint">(+${x.nghiPhep} ngày phép)</span>`:""}${x.daBu?` <span class="hint">(đã bù ${x.daBu})</span>`:""}</td><td class="n">${dash(x.quenRa)}</td><td class="n">${dash(x.chamNgoai)}${x.choXn?" "+pill(x.choXn+" chờ","amb"):""}${x.ngoai?" "+pill(x.ngoai+" ngoài phạm vi","red"):""}</td><td class="n">${x.mayNgay||0} / ${x.dtNgay||0}${x.lech?" "+pill(x.lech+" ngày lệch","amb"):""}</td><td class="n mono">${ccGio(x.phut)}</td><td>${x.chuyenCan===null?`<span class="hint" title="Chuyên cần chỉ áp dụng khối văn phòng">Không áp dụng</span>`:x.chuyenCan?pill("Đạt","grn"):pill("Không đạt","red")}</td><td class="n">${x.cong}</td></tr>${det}`});
   m.innerHTML=H("Bảng chấm công tháng",(R.vai.all?"Cả công ty":"Phòng "+esc(ccPbName(R.vai.pb)))+" · lấy từ máy chấm công và chấm điện thoại")+`
   <div class="filters">${ccMonthSel("cc-m")}${R.vai.all&&pbs.length>1?`<select id="cc-pb"><option value="">Tất cả phòng</option>${pbs.map(p=>`<option value="${esc(p)}"${p===CC.pb?" selected":""}>${esc(ccPbName(p))}</option>`).join("")}</select>`:""}<span class="sp"></span>${typeof XLSX!=="undefined"?`<button class="btn" id="cc-xl">Xuất Excel</button>`:""}</div>
-  <section class="card flush"><div class="tbl cc-mon"><table><thead><tr><th>Người</th><th class="n">Ngày có chấm / ngày làm</th><th class="n">Đi muộn (lần)</th><th class="n">Về sớm (lần)</th><th class="n">Ngày nghỉ</th><th class="n">Quên chấm ra</th><th class="n">Ngoài phạm vi</th><th class="n">Máy / điện thoại</th><th class="n">Tổng giờ</th><th>Chuyên cần</th><th class="n">Bữa trưa</th></tr></thead><tbody>${rows.join("")||`<tr><td colspan="11" class="empty">Chưa có dữ liệu.</td></tr>`}</tbody></table></div></section>
+  <section class="card flush"><div class="tbl cc-mon"><table><thead><tr><th>Người</th><th class="n">Ngày có chấm / ngày làm</th><th class="n">Đi muộn (lần)</th><th class="n">Về sớm (lần)</th><th class="n">Ngày nghỉ</th><th class="n">Quên chấm ra</th><th class="n">Chấm ngoài</th><th class="n">Máy / điện thoại</th><th class="n">Tổng giờ</th><th>Chuyên cần</th><th class="n">Bữa trưa</th></tr></thead><tbody>${rows.join("")||`<tr><td colspan="11" class="empty">Chưa có dữ liệu.</td></tr>`}</tbody></table></div></section>
   <p class="hint">Bấm vào tên để xem từng ngày. Chuyên cần (${ccTien(Q.tienCC)}): đi muộn + về sớm không quá ${Q.ccLan} lần và không nghỉ quá ${Q.ccNghi} ngày, chỉ tính cho lịch được bật "Tính chuyên cần". Ngày nghỉ = ngày phải làm mà không chấm, không tính ngày lễ (điền ở Cài đặt) và ngày có đơn nghỉ phép năm, nghỉ ốm đã duyệt; nghỉ không lương vẫn tính. Đây là số tạm tính: chưa trừ lần về sớm có phép; HCNS xem lại rồi chốt công ở Nhân sự › Chấm công như trước. Bữa trưa (${ccTien(Q.tienTrua)}/bữa) = số ngày có chấm. Dấu · là lịch giờ linh hoạt, không tính. Các mốc này sửa ở Nhân sự › Cài đặt chấm công.</p>`;
   m.querySelectorAll(".cc-row").forEach(r=>r.onclick=()=>{CC.open[r.dataset.id]=!CC.open[r.dataset.id];renderMain()});
   $("#cc-m").onchange=e=>{CC.thang=e.target.value;CC.mon=null;CC.me=null;ccLoadMon(true)};
@@ -358,7 +362,7 @@ function pCcCaiDat(m){
     <div class="filters"><button class="btn" id="cc-caadd">Thêm ca</button></div>
   </section>
   <section class="card"><div class="card-h"><h2>Quy tắc tính công</h2></div>
-    <div class="cc-form">${qIn("mocLyDo","Muộn quá bao nhiêu phút thì hỏi lý do",240)}${qIn("mocNang","Mốc muộn nặng, đếm riêng (phút)",240)}${qIn("ccLan","Chuyên cần: tối đa số lần muộn + về sớm / tháng",31)}${qIn("ccNghi","Chuyên cần: tối đa số ngày nghỉ / tháng",31)}${qIn("tienCC","Tiền chuyên cần (đồng / tháng)",100000000,1000)}${qIn("tienTrua","Hỗ trợ ăn trưa (đồng / bữa)",10000000,1000)}${qIn("mocVong2","Nghỉ từ bao nhiêu ngày thì HCNS duyệt vòng 2",60)}${qIn("tuMax","Tạm ứng mỗi lần phải dưới (đồng)",1000000000,100000)}</div>
+    <div class="cc-form">${qIn("mocLyDo","Muộn quá bao nhiêu phút thì hỏi lý do",240)}${qIn("mocNang","Mốc muộn nặng, đếm riêng (phút)",240)}${qIn("ccLan","Chuyên cần: tối đa số lần muộn + về sớm / tháng",31)}${qIn("ccNghi","Chuyên cần: tối đa số ngày nghỉ / tháng",31)}${qIn("tienCC","Tiền chuyên cần (đồng / tháng)",100000000,1000)}${qIn("tienTrua","Hỗ trợ ăn trưa (đồng / bữa)",10000000,1000)}${qIn("mocVong2","Nghỉ từ bao nhiêu ngày thì HCNS duyệt vòng 2",60)}${qIn("tuMax","Tạm ứng mỗi lần phải dưới (đồng)",1000000000,100000)}${qIn("hanBu","Làm bù trong vòng bao nhiêu ngày",120)}</div>
     <p class="hint">Mặc định theo thông báo 01102026: được trễ 5 phút (ô Được trễ của lịch), muộn quá 10 phút hỏi lý do và đếm riêng, chuyên cần 200.000đ khi muộn + về sớm không quá 2 lần và nghỉ không quá 2 ngày, ăn trưa 25.000đ/bữa. Chưa tự trừ vào lương.</p>
   </section>
   <section class="card"><div class="card-h"><h2>Ngày lễ, tết công ty cho nghỉ</h2></div>
@@ -492,7 +496,7 @@ PAGES.cc_xn=pCcXn;PAGES.cc_may=pCcMay;PAGES.cc_toi=pCcToi;PAGES.cc_ngay=pCcNgay;
     const hs=rest.filter(([g])=>g==="Hồ sơ"),other=rest.filter(([g])=>g!=="Hồ sơ"); // CEO 04/11: Hồ sơ lên đầu mục Nhân sự
     return [...hs,["Nhóm của tôi",[MI("cc_ngay","Hôm nay",lead),MI("np_duyet","Duyệt nghỉ phép & tăng ca",lead,cho("lead")),MI("cc_xepca","Xếp ca",lead),MI("cc_thang","Bảng chấm công tháng",lead),MI("cc_xn","Xác nhận chấm ngoài",lead,()=>CC.xnCho||"")]],
       ["Chấm công",[MI("cc_ngay","Hôm nay",ccHr),MI("cc_thang","Bảng chấm công tháng",ccHr),MI("cc_xn","Xác nhận chấm ngoài",ccHr,()=>CC.xnCho||""),MI("cc_may","Nạp file máy chấm công",ccHr),MI("cc_xepca","Xếp ca",ccHr),...(hrcc?[[hrcc[0],"Chốt công tháng",hrcc[2],hrcc[3]]]:[]),MI("cc_caidat","Cài đặt chấm công",ccHr)]],
-      ["Nghỉ phép & tạm ứng",[MI("np_ql","Nghỉ phép & tăng ca",ccHr,cho("hcns")),MI("tu_ql","Tạm ứng lương",ketoan,cho("tu"))]],
+      ["Nghỉ phép & tạm ứng",[MI("np_toi","Gửi đơn nghỉ, tăng ca"),MI("np_ql","Duyệt nghỉ phép & tăng ca",ccHr,cho("hcns")),MI("tu_ql","Tạm ứng lương",ketoan,cho("tu"))]],
       ...other]}}
   const me=MODULES.find(x=>x.k==="me");if(me){const g0=me.groups;me.groups=()=>{const G=g0();if(G[0]&&!G[0][1].some(i=>i[0]==="cc_toi"))G[0][1].unshift(MI("cc_toi","Chấm công"));return G}}
 }

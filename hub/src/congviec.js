@@ -395,6 +395,8 @@ function openTask(id){
     DB.mutate(ME.name,(t?"cập nhật việc: ":"giao việc: ")+v.ten+(v.nguoi?" → "+userName(v.nguoi):""),dt=>{let x;if(t){x=dt.tasks.find(y=>y.id===t.id);Object.assign(x,gv?v:{st:v.st,checklist:v.checklist,kq:v.kq,...(v.tre?{tre:v.tre}:{})})}else{x={id:nid,...v,files:bf,loai:"Việc",tao:ME.id};dt.tasks.push(x)}
       if(x.cd&&x.cd.length){tkSync(x);v.nguoi=x.nguoi;v.han=x.han;v.phoi=x.phoi}
       tkDoneDay(x,dt.settings.today);
+      /* đổi người làm khi việc đang có đơn xin từ chối: coi như đã chuyển người, khung xin từ chối không hiện nữa */
+      if(t&&x.tuChoi&&x.tuChoi.st==="cho"&&oldNg!==x.nguoi){x.tuChoi=Object.assign({},x.tuChoi,{st:"chuyen",sang:x.nguoi,duyet:ME.name,duyetAt:new Date().toLocaleString("vi-VN")})}
       tkLog(x,t?("Sửa việc"+(oldNg!==x.nguoi?" · người làm: "+(userName(oldNg)||"—")+" → "+(userName(x.nguoi)||"—"):"")+(oldHan&&oldHan!==x.han?" · hạn: "+dd(oldHan)+" → "+dd(x.han):"")):("Giao việc"+(x.nguoi?" cho "+userName(x.nguoi):"")+(x.han?" · hạn "+dd(x.han):"")));
       if(typeof notifyU==="function"&&gv){const ds=v.han?` · hạn ${dd(v.han)}`:"";const nw=[];if(v.nguoi&&v.nguoi!==oldNg)nw.push(v.nguoi);v.phoi.filter(p=>!oldPhoi.includes(p)).forEach(p=>nw.push(p));if(nw.length)notifyU(dt,nw,`${ME.name} giao bạn việc "${v.ten}"${ds}`,"task:"+x.id);else if(t&&t.han!==v.han&&v.nguoi)notifyU(dt,[v.nguoi],`${ME.name} đổi hạn việc "${v.ten}" thành ${dd(v.han)}`,"task:"+x.id);
         const nTd=(v.theoDoi||[]).filter(p=>!oldTd.includes(p)&&p!==v.nguoi&&!v.phoi.includes(p));if(nTd.length)notifyU(dt,nTd,`${ME.name} thêm bạn theo dõi việc "${v.ten}"${ds}`,"task:"+x.id)}});if(!t&&$("#t-lap")&&($("#t-lap").value||$("#t-tplsave").checked))tkTplSave(v,$("#t-lap").value,+$("#t-lapd").value||0);

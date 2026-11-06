@@ -3,6 +3,7 @@ import { vnDate } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
 import { auditStatement, nowIso } from '../lib/audit';
 import { badRequest, forbidden, ok } from '../lib/http';
+import { loadFbMoney, syncFbMoney } from '../services/fbCost';
 
 /**
  * Doanh thu thực theo kênh × tháng (trang quản trị › Đối chiếu doanh thu, chị Hoa chốt 26/10/2026).
@@ -136,4 +137,21 @@ doanhthuRoutes.get('/b2b-orders', async (c) => {
     .bind(ym, ch)
     .all();
   return ok(c, r.results ?? []);
+});
+
+/** Tiền đơn Facebook đã gửi hàng theo ngày (giá vốn, ship Facebook do trang tính, services/fbCost.ts). */
+doanhthuRoutes.get('/fb-money', async (c) => {
+  if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem');
+  return ok(c, await loadFbMoney(c.env.DB));
+});
+
+/** Kéo lại tiền đơn Facebook cho một khoảng ngày (tối đa 10 ngày mỗi lần), dùng khi nạp bù. Máy chủ tự kéo mỗi sáng 7 giờ. */
+doanhthuRoutes.post('/fb-money', async (c) => {
+  if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán kéo số');
+  const b = (await c.req.json().catch(() => ({}))) as { from?: string; to?: string };
+  const isD = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (!isD(b.from) || !isD(b.to) || b.from > b.to) throw badRequest('BAD_RANGE', 'Cần ngày bắt đầu và kết thúc (yyyy-mm-dd)');
+  const days: string[] = [];
+  for (let d = new Date(`${b.from}T00:00:00Z`); d.toISOString().slice(0, 10) <= b.to && days.length < 10; d.setUTCDate(d.getUTCDate() + 1)) days.push(d.toISOString().slice(0, 10));
+  return ok(c, await syncFbMoney(c.env.DB, c.env.INGEST_KEY, days, (u) => fetch(u)));
 });
