@@ -587,3 +587,11 @@ body.pop-open{overflow:hidden}
 @media (max-width:1000px){.tqkpis{grid-template-columns:repeat(2,minmax(0,1fr))}.tqg .c4,.tqg .c5,.tqg .c6,.tqg .c7,.tqg .c8{grid-column:span 12}}
 .tqk[data-tqk]:not([data-tqk=""]){cursor:pointer;transition:border-color .15s,box-shadow .15s}.tqk[data-tqk]:not([data-tqk=""]):hover{border-color:#4b54d1;box-shadow:0 4px 14px rgba(75,84,209,.12)}
 .kqsrch{width:100%;margin:0 0 6px;padding:8px 10px;border:1px solid #e3e6ef;border-radius:10px;font:inherit;font-size:14px}
+/* Báo hoàn thành nhiều sản phẩm: dòng gọn (chị Hoa 06/11 chê khoảng trắng nhiều) */
+#sdm .tbl.edit td{padding:3px 6px;vertical-align:middle}
+#sdm .tbl.edit th{padding:4px 6px}
+#sdm .sdm-i,#sdm .sdm-q{padding:5px 8px;min-height:0;height:32px;font-size:14px;margin:0}
+#sdm .sdm-n{display:block;font-size:11.5px;line-height:1.2;margin-top:1px}
+#sdm .sdm-n:empty{display:none}
+#sdm .sdm-add{padding:2px 9px;min-height:0;height:28px}
+#sdm .sdm-x{padding:0 4px}
