@@ -34,7 +34,7 @@ import {
   type Channel,
   type ChannelDay,
 } from '../services/channelOut';
-import { khoDoiChieu, khoTonRows, type KhoTonRow } from '../services/khoTon';
+import { khoDoiChieu, khoMocMap, khoTonRows, type KhoTonRow } from '../services/khoTon';
 
 /**
  * Kho sản xuất: nhập NVL → pha chế BTP → kiểm kê đóng gói → xuất kho → hàng hoàn.
@@ -976,6 +976,118 @@ khoRoutes.post('/items/:code/edit', async (c) => {
   );
   await db.batch(stmts);
   return ok(c, { code: next, changed: true });
+});
+
+/** Gộp mã (chị Hoa 06/11, sáp thơm có hai bộ mã lọ / hộp cho cùng một hàng): chuyển mọi chỗ đang dùng mã cũ sang mã chung
+ * (phiếu kho, đơn mua, nhận hàng, chứng từ, hàng lệch, số bán sàn, quy đổi Kênh phân phối, định mức, vỏ & đóng gói),
+ * rồi cho mã cũ ngừng dùng. Mỗi dòng sổ kho chỉ đổi tên mã nên tồn không bị cộng hay trừ hai lần;
+ * số bán sàn cùng kênh cùng ngày của hai mã thì cộng vào một dòng. Tuỳ chọn: mã chung là hàng hoá mua về bán
+ * (đổi loại thành Hàng hoá, bỏ định mức đóng gói). Có nhật ký. */
+khoRoutes.post('/items/:code/merge', async (c) => {
+  const auth = c.get('auth');
+  if (!canEditMap(auth)) throw forbidden('Chỉ CEO, quản lý điều phối, mua hàng hoặc kế toán mới gộp mã');
+  const old = c.req.param('code');
+  const b = (await c.req.json().catch(() => null)) as { into?: unknown; as_goods?: unknown } | null;
+  const into = String(b?.into ?? '').trim();
+  const asGoods = b?.as_goods === true;
+  const db = c.env.DB;
+  if (!into || into === old) throw badRequest('BAD_TARGET', 'Chọn mã chung khác với mã đang gộp');
+  const rows = (
+    await db.prepare('SELECT code, name, unit, cls, active FROM kho_items WHERE code IN (?, ?)').bind(old, into).all<{ code: string; name: string; unit: string; cls: string; active: number }>()
+  ).results;
+  const src = rows.find((r) => r.code === old);
+  const dst = rows.find((r) => r.code === into);
+  if (!src) throw notFound('Không có mã đang gộp');
+  if (!dst) throw notFound('Không có mã chung');
+  // Cả hai mã đều đã có số kiểm (tồn chốt / kiểm bổ sung) ở hai ngày khác nhau thì sổ không biết lấy số nào: kiểm lại trước.
+  const moc = await khoMocMap(db);
+  const ms = moc.g ? (moc.by.get(old) ?? null) : null;
+  const md = moc.g ? (moc.by.get(into) ?? null) : null;
+  if (ms && md && ms !== md)
+    throw conflict('BOTH_COUNTED', `Hai mã đều đã có số kiểm ở hai ngày khác nhau (${ms} và ${md}). Kiểm lại một lần cho mã chung rồi mới gộp.`);
+  const bomItems = (await db.prepare('SELECT item FROM kho_bom WHERE product IN (?, ?)').bind(old, into).all<{ item: string }>()).results.map((r) => r.item).filter((x) => x !== old && x !== into);
+  const S: D1PreparedStatement[] = [];
+  const up = (t: string, col: string) => S.push(db.prepare(`UPDATE ${t} SET ${col} = ? WHERE ${col} = ?`).bind(into, old));
+  for (const [t, col] of [
+    ['kho_moves', 'item'],
+    ['po_lines', 'item'],
+    ['po_receipt_lines', 'item'],
+    ['po_invoice_lines', 'item'],
+    ['po_lech', 'item'],
+    ['kho_map', 'misa_code'],
+    ['channel_alias', 'item'],
+    ['kho_pack', 'vo'],
+    ['kho_pack', 'thung'],
+    ['kho_vo_ncc', 'code'],
+  ] as const)
+    up(t, col);
+  // Số bán sàn: cùng kênh, cùng ngày thì cộng vào dòng của mã chung.
+  S.push(
+    db
+      .prepare(
+        `UPDATE channel_out SET qty = qty + (SELECT o.qty FROM channel_out o WHERE o.channel = channel_out.channel AND o.day = channel_out.day AND o.item = ?)
+         WHERE item = ? AND EXISTS (SELECT 1 FROM channel_out o WHERE o.channel = channel_out.channel AND o.day = channel_out.day AND o.item = ?)`,
+      )
+      .bind(old, into, old),
+    db
+      .prepare('DELETE FROM channel_out WHERE item = ? AND EXISTS (SELECT 1 FROM channel_out n WHERE n.channel = channel_out.channel AND n.day = channel_out.day AND n.item = ?)')
+      .bind(old, into),
+  );
+  up('channel_out', 'item');
+  S.push(
+    db
+      .prepare(
+        "UPDATE channel_map SET item_label = ? || substr(item_label, length(?) + 1) WHERE substr(item_label, 1, length(?) + 3) = ? || ' - '",
+      )
+      .bind(into, old, old, old),
+  );
+  // Định mức: mã cũ là nguyên liệu trong định mức → thay bằng mã chung (trùng thì bỏ dòng cũ); dòng tự trỏ vào chính nó thì bỏ.
+  S.push(db.prepare('UPDATE OR IGNORE kho_bom SET item = ? WHERE item = ?').bind(into, old));
+  S.push(db.prepare('DELETE FROM kho_bom WHERE item = ?').bind(old));
+  S.push(db.prepare('UPDATE OR IGNORE kho_bom SET product = ? WHERE product = ? AND NOT EXISTS (SELECT 1 FROM kho_bom x WHERE x.product = ?)').bind(into, old, into));
+  S.push(db.prepare('DELETE FROM kho_bom WHERE product = ?').bind(old));
+  S.push(db.prepare('DELETE FROM kho_bom WHERE product = item'));
+  for (const [t, col] of [
+    ['kho_pack', 'product'],
+    ['kho_vo', 'code'],
+    ['kho_vo_img', 'code'],
+  ] as const) {
+    S.push(db.prepare(`UPDATE OR IGNORE ${t} SET ${col} = ? WHERE ${col} = ?`).bind(into, old));
+    S.push(db.prepare(`DELETE FROM ${t} WHERE ${col} = ?`).bind(old));
+  }
+  if (asGoods) {
+    S.push(db.prepare('DELETE FROM kho_bom WHERE product = ?').bind(into));
+    S.push(db.prepare("UPDATE kho_items SET cls = 'HH' WHERE code = ?").bind(into));
+  }
+  S.push(db.prepare('UPDATE kho_items SET active = 0 WHERE code = ?').bind(old));
+  S.push(
+    auditStatement(db, {
+      actorId: auth.user.id,
+      action: 'KHO_ITEM_MERGE',
+      entityType: 'KHO_ITEM',
+      entityId: into,
+      before: { from: src, into: dst },
+      after: { into, from_inactive: true, as_goods: asGoods },
+      requestId: c.get('requestId'),
+      ip: ip(c),
+    }),
+  );
+  await db.batch(S);
+  // Tem / vỏ chỉ dùng cho định mức vừa bỏ, không còn phiếu, không còn trong định mức nào → ngừng dùng luôn.
+  let offTem: string[] = [];
+  if (asGoods) {
+    const r = await db
+      .prepare(
+        `SELECT i.code FROM kho_items i WHERE i.active = 1 AND i.code IN (SELECT value FROM json_each(?))
+           AND NOT EXISTS (SELECT 1 FROM kho_moves m WHERE m.item = i.code) AND NOT EXISTS (SELECT 1 FROM kho_bom b WHERE b.item = i.code)
+           AND NOT EXISTS (SELECT 1 FROM po_lines l WHERE l.item = i.code)`,
+      )
+      .bind(JSON.stringify(bomItems))
+      .all<{ code: string }>();
+    offTem = r.results.map((x) => x.code);
+    if (offTem.length) await db.prepare(`UPDATE kho_items SET active = 0 WHERE code IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(offTem)).run();
+  }
+  return ok(c, { into, from: old, inactive: [old, ...offTem], as_goods: asGoods });
 });
 
 /** Thay toàn bộ định mức của một sản phẩm (CEO, quản lý điều phối, kế toán). Phiếu đã ghi không đổi vì sổ lưu số đã trừ. */

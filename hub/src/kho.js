@@ -476,7 +476,19 @@ function khoEditItem(code){const it=KHO.items.get(code);if(!it)return;
   openDrawerHTML(`<h2>Sửa mã ${esc(code)}</h2><p class="hint">Đổi mã: mọi phiếu kho, định mức, đơn mua, chứng từ nhà cung cấp, quy đổi Kênh phân phối và số bán sàn của mã cũ đều chuyển sang mã mới; số tồn giữ nguyên. Nên đặt mã đúng như trong MISA.</p>
    <form class="frm" id="ei"><label class="field">Mã<input id="ei-c" value="${esc(it.code)}" required maxlength="80"></label><label class="field">Tên<input id="ei-n" value="${esc(it.name)}" required maxlength="200"></label>
    <div class="row7"><label class="field">Đơn vị tính<input id="ei-u" value="${esc(it.unit||"")}"></label><label class="field">Loại<select id="ei-k">${opt(Object.entries(KHO_CLS),it.cls)}</select></label></div>
-   <div id="ei-e"></div><div class="row7"><button class="btn pri">Lưu</button></div></form>`);
+   <div id="ei-e"></div><div class="row7"><button class="btn pri">Lưu</button></div></form>
+   <section class="card" style="margin-top:16px"><h3 style="margin:0 0 4px">Gộp mã này vào một mã khác</h3><p class="hint">Dùng khi cùng một hàng đang có hai mã (vd. mã lọ và mã hộp). Mọi phiếu kho, đơn mua, nhận hàng, chứng từ, số bán sàn, quy đổi Kênh phân phối và định mức của mã ${esc(code)} chuyển sang mã chung; tồn cộng vào mã chung, không cộng hay trừ hai lần. Mã ${esc(code)} chuyển sang ngừng dùng.</p>
+    <form class="frm" id="mg"><label class="field">Mã chung (mã của kế toán)<input id="mg-c" autocomplete="off" placeholder="Gõ mã hoặc tên rồi chọn"><small class="hint" id="mg-n"></small></label>
+    <label class="inl"><input type="checkbox" id="mg-hh"> Mã chung là hàng hóa mua về bán nguyên: đổi loại thành Hàng hóa, bỏ định mức đóng gói (tem, vỏ không dùng nữa thì ngừng dùng)</label>
+    <div id="mg-e"></div><div class="row7"><button class="btn">Gộp mã</button></div></form></section>`);
+  {const mi=$("#mg-c");khoPick(mi,null,p=>{$("#mg-n").textContent=p.name+" · "+(KHO_CLS[p.cls]||p.cls)+" · "+(p.unit||"")})}
+  $("#mg").onsubmit=async e=>{e.preventDefault();const to=($("#mg-c").dataset.code||$("#mg-c").value||"").trim(),t=KHO.items.get(to);
+    if(!t){$("#mg-e").innerHTML=`<div class="note red">Chọn mã chung trong danh sách.</div>`;return}
+    const hh=$("#mg-hh").checked;
+    if(!confirm("Gộp "+code+" ("+it.name+", "+(it.unit||"")+") vào "+to+" ("+t.name+", "+(t.unit||"")+")?\n\nTồn, phiếu, đơn mua, số bán sàn của "+code+" chuyển hết sang "+to+". "+code+" ngừng dùng."+(hh?" "+to+" đổi thành Hàng hóa, bỏ định mức đóng gói.":"")+(it.unit!==t.unit?"\n\nLưu ý: hai mã khác đơn vị ("+it.unit+" / "+t.unit+"). Gộp là coi 1 "+it.unit+" = 1 "+t.unit+".":"")))return;
+    try{const r=await kApi("/items/"+encodeURIComponent(code)+"/merge",{method:"POST",body:JSON.stringify({into:to,as_goods:hh})});
+      closeDrawer();toast("Đã gộp "+code+" vào "+to+(r.inactive.length>1?" · ngừng dùng: "+r.inactive.join(", "):""));if(KHO.dm)KHO.dm.sel=to;await khoLoad(true);renderMain()}
+    catch(err){$("#mg-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`}};
   $("#ei").onsubmit=async e=>{e.preventDefault();const nc=$("#ei-c").value.trim();
     if(nc!==code&&!confirm("Đổi mã "+code+" thành "+nc+"? Mọi phiếu kho, định mức, đơn mua, chứng từ đang dùng mã cũ sẽ chuyển sang mã mới. Phiếu sản xuất cũ (ngăn Sản xuất) vẫn ghi mã cũ."))return;
     try{const r=await kApi("/items/"+encodeURIComponent(code)+"/edit",{method:"POST",body:JSON.stringify({code:nc,name:$("#ei-n").value,unit:$("#ei-u").value,cls:$("#ei-k").value})});
