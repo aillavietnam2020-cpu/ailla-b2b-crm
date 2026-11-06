@@ -23,6 +23,8 @@ const ALLOW: Array<{ methods: string[]; re: RegExp }> = [
   { methods: ['GET', 'POST'], re: /^\/api\/shipping-vouchers(\/[^/]+\/cancel)?$/ },
   // Phiếu chi "Chi phí khác" của Sổ chi phí (vào hàng chờ chị Huệ duyệt), chị Hoa đồng ý 27/10/2026.
   { methods: ['POST'], re: /^\/api\/hub\/so-chi\/phieu-chi$/ },
+  // Nhập nhanh link video vào ② Điều phối (điền link + gửi Lead duyệt), chị Hoa đồng ý 06/11/2026: nhân sự Content nhắn link cho agent Lead Content.
+  { methods: ['POST'], re: /^\/api\/hub\/video-links\/?$/ },
 ];
 
 export function delegatedPathAllowed(method: string, path: string): boolean {

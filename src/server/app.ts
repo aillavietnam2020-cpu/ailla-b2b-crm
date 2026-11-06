@@ -34,6 +34,7 @@ import { financeRoutes } from './routes/finance';
 import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
+import { videoLinkRoutes } from './routes/videoLinks';
 import { driveRoutes } from './routes/drive';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
 import { fpPublishRoutes } from './routes/fpPublish';
@@ -150,6 +151,7 @@ export function createApp() {
   app.route('/api/hub/sanpham', sanphamRoutes);
   app.route('/api/hub/so-chi', soChiRoutes);
   app.route('/api/hub/tiktok', tiktokRoutes);
+  app.route('/api/hub/video-links', videoLinkRoutes);
   app.route('/api/hub/shopee', shopeeRoutes);
   app.route('/api/hub/dieuhanh', dieuhanhRoutes);
   app.route('/api/hub/soat', soatRoutes);
