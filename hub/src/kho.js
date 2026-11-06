@@ -151,6 +151,7 @@ function khoForm(type,pre,clsO){
   const head=`<div class="row7"><label class="field">Ngày<input type="date" id="kf-d" value="${kToday()}" required></label>
    ${type==="PN"?`<label class="field grow">Thuộc phiếu mua<select id="kf-po"><option value="">Đang tải phiếu mua…</option></select></label><label class="field grow">Nhà cung cấp<input id="kf-p" placeholder="Tên nhà cung cấp"></label>`:""}
    ${isOut?`<label class="field">Loại<select id="kf-k"><option value="XB">Xuất bán: NPP, đại lý, gia công, bán nguyên liệu (XB)</option><option value="XK">Xuất khác: hàng mẫu, hủy hỏng (XK)</option></select></label><label class="field grow">Khách hàng / nơi nhận<input id="kf-p" required></label><label class="field">Mã đơn của sale<input id="kf-r"></label>`:""}
+   ${isPC?`<div class="field full" style="grid-column:1/-1"><span>Người sản xuất</span><div id="kf-ppl" class="sdmppl"></div><datalist id="kf-dl">${(()=>{let L=[];try{L=SX().people.filter(p=>!p.an).map(p=>p.ten)}catch(e){}if(!L.length)L=["Hội","Đức"];return L.map(t=>`<option value="${esc(t)}">`).join("")})()}</datalist></div>`:""}
    ${isPC?`<label class="field grow">Bán thành phẩm<input id="kf-btp" placeholder="Gõ tên BTP rồi chọn" autocomplete="off" required></label><label class="field">Số lít thực tế<input id="kf-lit" type="number" step="any" min="0" required></label><label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label><label class="field">Số lít theo phiếu<input id="kf-rq" type="number" step="any" min="0"></label>`:""}
    ${isKS?`<label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label>`:""}
    ${type==="TD"?`<label class="inl"><input type="checkbox" id="kf-moc"> Đây là phiếu tồn chốt chung (mốc tồn): hàng nhập, xuất, bán sàn từ hôm sau mới tính</label>`:""}
@@ -162,6 +163,12 @@ function khoForm(type,pre,clsO){
    ${isKS?`<div id="kf-prev"></div>`:""}<div id="kf-warn"></div>
    <div class="row7"><button class="btn pri" id="kf-ok">Ghi phiếu</button><button type="button" class="btn" id="kf-print">In bản điền tay</button><span class="hint" id="kf-msg"></span></div></form>`);
   const body=$("#kf-b"),cls=clsO||KHO_LINE_CLS[type];
+  if(isPC&&$("#kf-ppl")){const ppl=$("#kf-ppl"),dl=typeof SX==="function"&&SX().people?SX().people.filter(p=>!p.an).map(p=>p.ten):[];
+    const addP=(after,val)=>{const w=document.createElement("span");w.className="sdmp";w.innerHTML=`<input class="sdm-pn" list="kf-dl" placeholder="Tên người sản xuất" autocomplete="off" value="${esc(val||"")}"><button type="button" class="btn sm sdm-padd" title="Thêm người">+</button><button type="button" class="lnk sdm-px" title="Bỏ">✕</button>`;
+      if(after)after.after(w);else ppl.appendChild(w);
+      w.querySelector(".sdm-padd").onclick=()=>addP(w);w.querySelector(".sdm-px").onclick=()=>{if(ppl.children.length>1)ppl.removeChild(w)};
+      w.querySelector(".sdm-pn").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addP(w)}};return w};
+    addP(null,"")}
   const addLine=(o={})=>{const tr=document.createElement("tr");tr.innerHTML=
     `<td><input class="kf-i" autocomplete="off" placeholder="Gõ mã hoặc tên rồi chọn" value="${esc(o.item||"")}" data-code="${esc(o.item||"")}"${o.fixed?" readonly":""}><small class="kf-nm">${o.item&&KHO.items.get(o.item)?esc(KHO.items.get(o.item).name):""}</small></td>
      <td class="kf-u">${o.item&&KHO.items.get(o.item)?esc(KHO.items.get(o.item).unit):""}</td>
@@ -217,7 +224,7 @@ function khoForm(type,pre,clsO){
       if($("#kf-po")&&$("#kf-po").value)body.po_id=$("#kf-po").value;
       if(type==="TB")body.bo_sung=true;if(type==="TD"&&$("#kf-moc")&&$("#kf-moc").checked)body.moc=true;
       if(KHO.edit&&type==="PN")body.replace_doc_id=KHO.edit.id;
-      if(isPC){body.btp=$("#kf-btp").dataset.code;body.liters=+$("#kf-lit").value;body.ref_qty=$("#kf-rq").value===""?undefined:+$("#kf-rq").value}
+      if(isPC){body.nguoi=[...new Set([...document.querySelectorAll("#kf .sdm-pn")].map(x=>x.value.trim()).filter(Boolean))];body.btp=$("#kf-btp").dataset.code;body.liters=+$("#kf-lit").value;body.ref_qty=$("#kf-rq").value===""?undefined:+$("#kf-rq").value}
       if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");
       const r=await kApi("/docs",{method:"POST",body:JSON.stringify(body)});closeDrawer();KHO.at=0;KHO.list={};KHO.nxt=null;KHO.cl=null;KHO.mp=null;await khoLoad(true);renderMain();KHO.edit=null;if(typeof MH!=="undefined"&&typeof mhReload==="function")mhReload().catch(()=>{});toast("Đã ghi phiếu "+r.no);khoOpenDoc(r.id,r.warnings)}
     catch(err){$("#kf-msg").textContent="";$("#kf-warn").innerHTML=`<div class="note red">${esc(err.message)}</div>`;ok.disabled=false}};
@@ -234,7 +241,7 @@ async function khoOpenDoc(id,warnings){
   const d=r.doc,price=KHO.cat&&KHO.cat.can_price,T=KHO_TYPES[d.type],cancelled=d.status==="HUY",ex=(()=>{try{return JSON.parse(d.extra||"{}")}catch(e){return {}}})();
   const rows=r.moves.map(m=>`<tr><td>${esc(m.item)}</td><td>${esc(m.name)}</td><td>${esc(m.unit)}</td><td class="n">${knum(m.qty)}</td>${d.type==="PC"?`<td class="n">${m.role==="USE"?knum(m.std_qty):"—"}</td>`:""}${price&&d.type==="PN"?`<td class="n">${m.price!=null?nf(m.price):"—"}</td>`:""}<td>${esc({IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:d.type==="PC"?"Thu được":"Thành phẩm",AUTO:"Tự trừ theo định mức",RETURN:"Bán tiếp",DROP:"Bỏ"}[m.role]||m.role)}${m.note?` · ${esc(m.note)}`:""}</td></tr>`).join("");
   const head=["Mã","Tên","ĐVT","Số lượng"].concat(d.type==="PC"?["Định mức"]:[]).concat(price&&d.type==="PN"?["Đơn giá"]:[]).concat(["Ghi chú"]);
-  openDrawerHTML(`<h2>${esc(d.no)} ${cancelled?pill("Đã hủy","gry"):pill("Hiệu lực","grn")}</h2><p>${esc(T.name)} · ngày ${kDd(d.doc_date)} · lập bởi ${esc(d.created_by_name||"—")}${d.partner?` · ${esc(d.partner)}`:""}${d.ref_no?` · tham chiếu ${esc(d.ref_no)}`:""}${d.ref_qty!=null?` · theo phiếu ${knum(d.ref_qty)}`:""}</p>
+  openDrawerHTML(`<h2>${esc(d.no)} ${cancelled?pill("Đã hủy","gry"):pill("Hiệu lực","grn")}</h2><p>${esc(T.name)} · ngày ${kDd(d.doc_date)} · lập bởi ${esc(d.created_by_name||"—")}${d.partner?` · ${esc(d.partner)}`:""}${d.ref_no?` · tham chiếu ${esc(d.ref_no)}`:""}${d.ref_qty!=null?` · theo phiếu ${knum(d.ref_qty)}`:""}${ex.nguoi&&ex.nguoi.length?` · người sản xuất ${esc(ex.nguoi.join(", "))}`:""}</p>
    ${d.note?`<p class="hint">${esc(d.note)}</p>`:""}${cancelled?`<div class="note red">Đã hủy bởi ${esc(d.cancelled_by_name||"—")} lúc ${esc(String(d.cancelled_at||"").slice(0,16).replace("T"," "))}. Lý do: ${esc(d.cancel_reason||"")}</div>`:""}
    ${warnings&&warnings.length?`<div class="note amb"><b>Cảnh báo khi ghi:</b><br>${warnings.map(esc).join("<br>")}</div>`:""}
    ${KHO_SPLIT[d.type]?(()=>{const sp=KHO_SPLIT[d.type],[nIn,nOut]=khoSubNos(d),mk=role=>r.moves.filter(m=>m.role===role).map(m=>`<tr><td>${esc(m.item)}</td><td>${esc(m.name)}</td><td>${esc(m.unit)}</td><td class="n">${knum(Math.abs(m.qty))}</td>${d.type==="PC"&&role==="USE"?`<td class="n">${m.std_qty!=null?knum(m.std_qty):"—"}</td>`:""}</tr>`).join("");
@@ -259,7 +266,7 @@ const KHO_ROLE={IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:"Thu được",AUTO
 function khoPrintDoc(r,T,price,ex,blank){
   const d=r.doc,isPC=d.type==="PC",isPN=d.type==="PN"&&price&&!blank,cancelled=!blank&&d.status==="HUY";
   const meta=[["Số phiếu",d.no],["Ngày",kDd(d.doc_date)],d.partner?[d.type==="PN"?"Nhà cung cấp":d.type==="XB"||d.type==="XK"?"Khách hàng / nơi nhận":"Đối tác",d.partner]:null,d.ref_no?[d.type==="PC"||d.type==="KS"?"Phiếu sản xuất / lô":"Tham chiếu",d.ref_no]:null,
-    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
+    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
   const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Định mức","Thực tế dùng","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
   let tong=0;
   const body=r.moves.map((m,i)=>{const q=isPC?(m.role==="PRODUCT"?m.qty:-m.qty):Math.abs(m.qty);const qshow=d.type==="TL"&&m.role==="DROP"?knum(m.std_qty):knum(q);

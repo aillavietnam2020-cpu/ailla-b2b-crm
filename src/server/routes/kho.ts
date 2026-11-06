@@ -1579,6 +1579,8 @@ khoRoutes.post('/docs', async (c) => {
     const liters = positive(b.liters, 'Số lít thực tế');
     if (!lines.length) throw badRequest('NO_LINES', 'Cần ghi số thực tế của từng nguyên vật liệu đã dùng');
     extra.btp = btp;
+    // Người sản xuất (pha chế) – chị Hoa 06/11.
+    if (Array.isArray(b.nguoi)) extra.nguoi = (b.nguoi as unknown[]).map((x) => String(x).trim().slice(0, 60)).filter(Boolean).slice(0, 20);
     extra.liters = liters;
     refQty = Number.isFinite(num(b.ref_qty)) ? num(b.ref_qty) : null;
     moves.push({ item: btp, qty: liters, std_qty: null, price: null, role: 'PRODUCT', note: '' });
