@@ -101,6 +101,12 @@ function kqPcAll(){
   const rows=(KHO.list&&KHO.list.PC&&KHO.list.PC.rows)||[],doc=new Map(rows.filter(d=>d.status==="OK"&&d.ref_no).map(d=>[d.ref_no,d]));
   return L.map(r=>({...r,doc:doc.get(r.id)||null,tt:r.st==="HUY"?"HUY":doc.get(r.id)?"XONG":"CHO"})).sort((a,b)=>(a.tt==="CHO"?0:1)-(b.tt==="CHO"?0:1)||String(b.id).localeCompare(a.id));
 }
+/* Người làm = người sản xuất ghi trong phiếu pha chế (nếu có), không thì người ghi phiếu. */
+function kqPcWho(d){try{const ex=JSON.parse(d.extra||"{}");if(ex.nguoi&&ex.nguoi.length)return ex.nguoi.join(", ")}catch(e){}return d.created_by_name||""}
+/* Hạn: đã pha thì so ngày làm với hạn (trước / đúng / trễ hạn); chưa làm thì báo quá hạn / hạn hôm nay. */
+function kqHanPill(x){if(!x.han||x.tt==="HUY")return "";const t=kToday();
+  if(x.tt==="XONG"){const d=x.doc.doc_date;return " "+(d<x.han?pill("Trước hạn","grn"):d===x.han?pill("Đúng hạn","blu"):pill("Trễ hạn","red"))}
+  return t>x.han?" "+pill("Quá hạn","red"):t===x.han?" "+pill("Hạn hôm nay","amb"):""}
 function kqPcPending(){
   let L=[];try{L=(SX().pcReq||[]).filter(r=>r.st!=="HUY")}catch(e){}
   const rows=(KHO.list&&KHO.list.PC&&KHO.list.PC.rows)||[],done=new Set(rows.filter(d=>d.status==="OK"&&d.ref_no).map(d=>d.ref_no));
@@ -134,24 +140,29 @@ function kqYcForm(copy){
     if(!L.length||bad.length){$("#yc-e").innerHTML=`<div class="note red">${!L.length?"Chưa có bán thành phẩm nào.":"Dòng chưa chọn bán thành phẩm trong danh sách hoặc chưa có số lít: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
     btn.disabled=true;const ng=$("#yc-ng").value,han=$("#yc-han").value,gc=$("#yc-gc").value.trim(),codes=[];
     sxMut(`tạo ${L.length} yêu cầu pha chế`,s2=>{s2.pcReq=s2.pcReq||[];L.forEach(x=>{const id=kqYcCode(s2,ng);codes.push(id);s2.pcReq.push({id,btp:x.btp,lit:x.lit,litBon:x.litBon,bon:x.bon,han,ghiChu:gc,taoLuc:ng,tao:ME.name,st:"CHO_LAM",at:typeof sxNow==="function"?sxNow():new Date().toISOString()})})});
-    let note="";try{const r=await kApi("/pc-notify",{method:"POST",body:JSON.stringify({items:L.map((x,k)=>({psx:codes[k],name:(KHO.items.get(x.btp)||{}).name||x.btp,sl:(x.bon>1?knum(x.bon)+" bồn × "+knum(x.litBon)+" = ":"")+knum(x.lit)+" lít",han:han?kDd(han):""}))})});note=r.no_kythuat?"Chưa có tài khoản riêng của kỹ thuật pha chế nên chưa giao việc được. In phiếu đưa kỹ thuật ở nút bên dưới.":`Đã giao việc và báo chuông cho kỹ thuật (${r.sent} yêu cầu).`}catch(err){note="Chưa báo được kỹ thuật: "+err.message}
+    let note="";try{const r=await kApi("/pc-notify",{method:"POST",body:JSON.stringify({items:L.map((x,k)=>({psx:codes[k],name:(KHO.items.get(x.btp)||{}).name||x.btp,sl:(x.bon>1?knum(x.bon)+" bồn × "+knum(x.litBon)+" = ":"")+knum(x.lit)+" lít",han:han?kDd(han):"",han_iso:han||""}))})});note=r.no_kythuat?"Chưa có tài khoản riêng của kỹ thuật pha chế nên chưa giao việc được. In phiếu đưa kỹ thuật ở nút bên dưới.":`Đã giao việc và báo chuông cho kỹ thuật (${r.sent} yêu cầu).`}catch(err){note="Chưa báo được kỹ thuật: "+err.message}
     renderMain();
-    openDrawerHTML(`<h2>Đã tạo ${codes.length} yêu cầu pha chế</h2><div class="note ${/Chưa/.test(note)?"amb":"grn"}">${esc(note)}</div>${tbl(["Yêu cầu","Bán thành phẩm","Số lít",""],L.map((x,k)=>`<tr><td class="mono">${esc(codes[k])}</td><td>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</td><td class="n">${knum(x.lit)}</td><td><button class="btn sm pri" data-ycp="${esc(codes[k])}">In phiếu pha chế</button></td></tr>`))}`);
-    document.querySelectorAll("#drawer [data-ycp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.ycp,true))};
+    openDrawerHTML(`<h2>Đã tạo ${codes.length} yêu cầu pha chế</h2><div id="yc-short"></div><div class="note ${/Chưa/.test(note)?"amb":"grn"}">${esc(note)}</div>${tbl(["Yêu cầu","Bán thành phẩm","Số lít",""],L.map((x,k)=>`<tr><td class="mono">${esc(codes[k])}</td><td>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</td><td class="n">${knum(x.lit)}</td><td><button class="btn sm pri" data-ycp="${esc(codes[k])}">In phiếu pha chế</button></td></tr>`))}`);
+    document.querySelectorAll("#drawer [data-ycp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.ycp,true));
+    kqShortCheck(codes.join(", "),L.map(x=>[x.btp,x.lit]),"yc-short")};
 }
 {const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){const r=_pc.apply(this,arguments);try{
-  if(KQ_ADM())return r;{const kn=m.querySelector("#kho-new");if(kn){kn.textContent="+ Phiếu pha không theo yêu cầu";kn.title="Kỹ thuật tự pha (không có yêu cầu pha chế): ghi số thực tế, trừ nguyên vật liệu, cộng bán thành phẩm"}}const P=kqPcPending(),ALL=kqPcAll();
+  if(KQ_ADM())return r;{const kn=m.querySelector("#kho-new");if(kn&&kqYcCan()&&!m.querySelector("#yc-new"))kn.insertAdjacentHTML("beforebegin",`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button> `);if(!kn&&kqYcCan()){const a=m.querySelector(".stepact,.kact,.sxact");if(a&&!m.querySelector("#yc-new"))a.insertAdjacentHTML("afterbegin",`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`)}if(kn){kn.classList.remove("pri");kn.textContent="+ Phiếu pha không theo yêu cầu";kn.title="Kỹ thuật tự pha (không có yêu cầu pha chế): ghi số thực tế, trừ nguyên vật liệu, cộng bán thành phẩm"}}const P=kqPcPending(),ALL=kqPcAll();
   const card=document.createElement("section");card.className="card flush";card.style.marginBottom="12px";
-  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế · ${P.length} chờ làm</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span>${kqYcCan()?`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`:""}</div>`+(ALL.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","Trạng thái","","",""],ALL.map(x=>{const cho=x.tt==="CHO";return `<tr${x.tt==="HUY"?' style="opacity:.6"':""}><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}${x.bon>1?`<small class="hint" style="display:block">${knum(x.bon)} bồn × ${knum(x.litBon)}</small>`:""}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td>${x.tt==="HUY"?pill("Đã hủy","gry")+`<small class="hint" style="display:block">${esc(x.huyBy||"")}${x.lyDoHuy?": "+esc(x.lyDoHuy):""}</small>`:x.tt==="XONG"?pill("Đã pha","grn")+`<small class="hint" style="display:block"><a href="#" class="lnk" data-pcd="${x.doc.id}">${esc(x.doc.no)}</a> · ${esc(x.doc.created_by_name||"")}</small>`:pill("Chờ làm","amb")}</td><td>${cho?`<button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button>`:""}</td><td>${cho?`<button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button>`:""}</td><td>${kqYcCan()?`${cho?`<button class="lnk" data-yce="${esc(x.id)}">Sửa</button> `:""}<button class="lnk" data-ycc="${esc(x.id)}">Sao chép</button>${cho?` <button class="lnk" data-ycx="${esc(x.id)}">Hủy yêu cầu</button>`:""}`:""}</td></tr>`})):`<p class="hint pad">Chưa có yêu cầu pha chế nào.</p>`);
+  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế · ${P.length} chờ làm</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span></div>`+(ALL.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","Người làm","Ngày làm","Trạng thái","","",""],ALL.map(x=>{const cho=x.tt==="CHO";return `<tr data-rm="1" class="clk" data-ycd="${esc(x.id)}" title="Bấm để xem chi tiết"${x.tt==="HUY"?' style="opacity:.6"':""}><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}${x.bon>1?`<small class="hint" style="display:block">${knum(x.bon)} bồn × ${knum(x.litBon)}</small>`:""}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td>${x.doc?esc(kqPcWho(x.doc)):"—"}</td><td>${x.doc?kDd(x.doc.doc_date):"—"}</td><td>${x.tt==="HUY"?pill("Đã hủy","gry"):x.tt==="XONG"?pill("Đã pha","grn")+kqHanPill(x)+`<small class="hint" style="display:block"><a href="#" class="lnk" data-pcd="${x.doc.id}">${esc(x.doc.no)}</a> · ${esc(x.doc.created_by_name||"")}</small>`:pill("Chờ làm","amb")+kqHanPill(x)}</td><td>${cho?`<button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button>`:""}</td><td>${cho?`<button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button>`:""}</td><td>${kqYcCan()?`<button type="button" class="btn sm" data-ycm="${esc(x.id)}" data-cho="${cho?1:0}" title="Sửa, sao chép, hủy">⋯</button>`:""}</td></tr>`})):`<p class="hint pad">Chưa có yêu cầu pha chế nào.</p>`);
   const first=m.querySelector("section.card");if(first)first.before(card);else m.appendChild(card);
   card.querySelectorAll("[data-pcp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcp,true));
   card.querySelectorAll("[data-pcd]").forEach(a=>a.onclick=e=>{e.preventDefault();khoOpenDoc(+a.dataset.pcd)});
   card.querySelectorAll("[data-pcn]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcn,false));
   if($("#yc-new"))$("#yc-new").onclick=()=>kqYcForm();
-  card.querySelectorAll("[data-yce]").forEach(b=>b.onclick=()=>kqYcEdit(b.dataset.yce));
-  card.querySelectorAll("[data-ycx]").forEach(b=>b.onclick=()=>kqYcCancel(b.dataset.ycx));
-  card.querySelectorAll("[data-ycc]").forEach(b=>b.onclick=()=>{const x=(SX().pcReq||[]).find(y=>y.id===b.dataset.ycc);if(x)kqYcForm(x)});
-  if(typeof rowMenus==="function")rowMenus(card);
+  card.querySelectorAll("tr[data-ycd]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("button,a"))return;kqYcDetail(tr.dataset.ycd)});
+  /* Nút ⋯ gom Sửa, Sao chép, Hủy yêu cầu vào một menu (chị Hoa 06/11). */
+  card.querySelectorAll("[data-ycm]").forEach(b=>b.onclick=e=>{e.stopPropagation();const old=document.querySelector(".rmpop"),mine=old&&old._src===b;if(old)old.remove();if(mine)return;
+    const id=b.dataset.ycm,cho=b.dataset.cho==="1",r=b.getBoundingClientRect(),pop=document.createElement("div");pop.className="rmpop";pop._src=b;
+    const items=[cho?["Sửa",()=>kqYcEdit(id)]:null,["Sao chép",()=>{const x=(SX().pcReq||[]).find(y=>y.id===id);if(x)kqYcForm(x)}],cho?["Hủy yêu cầu",()=>kqYcCancel(id),"dg"]:null].filter(Boolean);
+    items.forEach(([t,f,c])=>{const it=document.createElement("button");it.type="button";it.textContent=t;if(c)it.className=c;it.onclick=ev=>{ev.stopPropagation();pop.remove();f()};pop.appendChild(it)});
+    pop.style.top=Math.min(r.bottom+4,innerHeight-(items.length*38+16))+"px";pop.style.right=Math.max(8,innerWidth-r.right)+"px";document.body.appendChild(pop);
+    setTimeout(()=>document.addEventListener("click",()=>{if(pop.isConnected)pop.remove()},{once:true}),0)});
 }catch(e){}return r}}
 
 /* Sửa / hủy yêu cầu pha chế chưa làm (chị Hoa 06/11). Hủy thì việc của kỹ thuật cũng xong theo. */
@@ -173,3 +184,27 @@ function kqYcCancel(id){
   kApi("/pc-task-close",{method:"POST",body:JSON.stringify({id})}).catch(()=>{});
   toast("Đã hủy "+id);renderMain();
 }
+
+/* Bấm một dòng: xem chi tiết yêu cầu pha chế (ai tạo, ai làm, ngày, hạn, trạng thái, lý do hủy, phiếu pha chế). */
+function kqYcDetail(id){
+  const x=kqPcAll().find(y=>y.id===id);if(!x)return;const it=KHO.items.get(x.btp)||{};
+  const st=x.tt==="HUY"?pill("Đã hủy","gry"):x.tt==="XONG"?pill("Đã pha","grn"):pill("Chờ làm","amb");
+  const rows=[["Bán thành phẩm",esc(it.name||x.btp)+` <small class="hint mono">${esc(x.btp)}</small>`],["Số lít (1 bồn)",knum(x.litBon||x.lit)+(x.bon>1?` <small class="hint">(${knum(x.bon)} bồn = ${knum(x.lit)} lít)</small>`:"")],["Ngày tạo",kDd(x.taoLuc)],["Hạn cần",x.han?kDd(x.han):"—"],["Người tạo",esc(x.tao||"")],["Ghi chú",esc(x.ghiChu||"—")],["Trạng thái",st+kqHanPill(x)]];
+  if(x.tt==="HUY")rows.push(["Người hủy",esc(x.huyBy||"—")],["Lý do hủy",esc(x.lyDoHuy||"—")]);
+  if(x.doc)rows.push(["Phiếu pha chế",`<a href="#" class="lnk" id="ycd-doc">${esc(x.doc.no)}</a>`],["Người làm",esc(kqPcWho(x.doc))],["Ngày làm",kDd(x.doc.doc_date)]);
+  openDrawerHTML(`<h2>Yêu cầu pha chế ${esc(id)}</h2>${tbl(["",""],rows.map(([a,b])=>`<tr><td style="width:150px;color:#7a8199">${a}</td><td>${b}</td></tr>`))}`);
+  const d=document.getElementById("ycd-doc");if(d)d.onclick=e=>{e.preventDefault();khoOpenDoc(x.doc.id)};
+}
+
+/* Kiểm vật tư đủ chưa khi tạo yêu cầu pha chế / phiếu sản xuất (chị Hoa 06/11): định mức × số lượng so với tồn hiện tại.
+   Thiếu thì hiện cảnh báo ngay và giao việc cho người phụ trách mua hàng. */
+async function kqShortage(pairs){
+  pairs=pairs.filter(([c,q])=>c&&q>0);if(!pairs.length)return [];const need=new Map();
+  (await khoExpand(pairs)).forEach(([,,rows])=>(rows||[]).forEach(b=>need.set(b.item,(need.get(b.item)||0)+(+b.need||0))));
+  return [...need].map(([c,n])=>{const it=KHO.items.get(c)||{},t=khoStock(c);return {item:c,name:it.name||c,unit:it.unit||"",need:Math.round(n*1e6)/1e6,ton:t,thieu:Math.round((n-Math.max(t,0))*1e6)/1e6}}).filter(x=>x.thieu>1e-9);
+}
+function kqShortHtml(sh){return sh.length?`<div class="note red"><b>Tồn kho không đủ vật tư:</b>${tbl(["Vật tư","Cần","Tồn","Thiếu"],sh.map(x=>`<tr><td>${esc(x.name)}<small class="hint mono" style="display:block">${esc(x.item)}</small></td><td class="n">${knum(x.need)} ${esc(x.unit)}</td><td class="n">${knum(x.ton)}</td><td class="n"><b>${knum(x.thieu)}</b></td></tr>`))}<small>Đã giao việc cho phụ trách mua hàng: đặt hàng hoặc kiểm tra tồn lệch ở đâu.</small></div>`:""}
+/* Sau khi tạo: tính thiếu, có thiếu thì hiện cảnh báo (vào ô có sẵn hoặc mở khung mới) và giao việc. */
+async function kqShortCheck(ref,pairs,slot,title){try{const sh=await kqShortage(pairs);if(!sh.length)return;kqShortTask(ref,sh);
+  const el=slot&&document.getElementById(slot);if(el)el.innerHTML=kqShortHtml(sh);else openDrawerHTML(`<h2>${esc(title||"Thiếu vật tư")}</h2>${kqShortHtml(sh)}`)}catch(e){}}
+function kqShortTask(ref,sh){kApi("/shortage-task",{method:"POST",body:JSON.stringify({ref,lines:sh.map(x=>({item:x.item,name:x.name,unit:x.unit,thieu:x.thieu}))})}).catch(()=>{})}
