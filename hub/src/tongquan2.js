@@ -27,10 +27,15 @@ function tq2Nums(){const ym=plYmNow(),A=plMonth(ym),PA=plMonth(plYmAdd(ym,-1)),T
 function tq2Health(N){const T=N.T,P=N.P,ng=dhGet().nguong||{},out=[],add=(go,l,v,sub,st,sv)=>out.push({go,sv,l,v,sub,st});
   let SK=[];try{SK=typeof skTiles==="function"?skTiles():[]}catch(e){}const sk=l=>SK.find(x=>x.l===l);
   if(!T){add("pl","Doanh thu thực","—","đang tải","gry");return out}
-  const KH=mtGet(N.ym);add("pl","Doanh thu thực",tr(T.dt),KH&&KH.tong?"đạt "+Math.round(T.dt/KH.tong*100)+"% kế hoạch ("+tr(KH.tong)+")":"chưa đặt kế hoạch tháng",KH&&KH.tong?(T.dt/KH.tong>=.95?"grn":T.dt/KH.tong>=.8?"amb":"red"):"gry");
+  const KH=mtGet(N.ym),run=N.A.R.partial;
+  /* Tháng đang chạy: ô đầu theo đơn đã lên, cập nhật liên tục (chị Hoa 06/11), mọi kênh = bán lẻ theo đơn + Kênh phân phối, OEM (đơn đã duyệt).
+     Doanh thu thực (P&L) ghi dòng dưới; tháng đã qua giữ doanh thu thực. */
+  if(run){const LD=tq2Don(N.A.R.from,N.A.R.to),b=((N.A.cols.b2b||{}).dt||0)+((N.A.cols.gc||{}).dt||0),v=LD.dt+b;
+    add("pl","Doanh số theo đơn",tr(v),(KH&&KH.tong?"đạt "+Math.round(v/KH.tong*100)+"% kế hoạch · ":"")+"doanh thu thực đã giao "+tr(T.dt)+", chốt cuối tháng",KH&&KH.tong?(v/KH.tong>=.95?"grn":v/KH.tong>=.8?"amb":"red"):"gry")}
+  else add("pl","Doanh thu thực",tr(T.dt),KH&&KH.tong?"đạt "+Math.round(T.dt/KH.tong*100)+"% kế hoạch ("+tr(KH.tong)+")":"chưa đặt kế hoạch tháng",KH&&KH.tong?(T.dt/KH.tong>=.95?"grn":T.dt/KH.tong>=.8?"amb":"red"):"gry");
   const parts=[["quảng cáo",T.ads],["giá vốn",T.gv],["phí sàn, ship",T.phi],["chi phí chung",T.chung||0]].sort((a,b)=>b[1]-a[1]);
   add("pl","Tổng chi phí",T.cp==null?"—":tr(T.cp),T.cp==null?"chưa có chi phí chung":tq2P(T.cp/T.dt)+"% doanh thu · "+parts[0][0]+" "+tr(parts[0][1])+" là khoản lớn nhất",T.cp==null?"gry":"amb");
-  const m=T.dt?T.lai/T.dt:0;add("pl","Lãi đóng góp",tr(T.lai),tq2P(m)+"% doanh thu · trước chi phí chung",m<.1?"red":m<.2?"amb":"grn");
+  const m=T.dt?T.lai/T.dt:0;add("pl",run?"Lãi đóng góp (tạm tính)":"Lãi đóng góp",tr(T.lai),tq2P(m)+"% doanh thu"+(run?" thực đã giao":"")+" · trước chi phí chung",m<.1?"red":m<.2?"amb":"grn");
   if(T.ln==null)add("pl","Lợi nhuận ròng","—","chưa có chi phí chung tháng này","gry");
   else{const thieu=[];if(!T.luong)thieu.push("chưa trừ lương");thieu.push("chưa trừ thuế");const it=P&&P.chung&&T.chung!=null&&T.chung<P.chung*.3;
     add("pl","Lợi nhuận ròng",tr(T.ln),tq2P(T.ln/T.dt)+"% · "+thieu.join(", ")+(it?" · chi chung mới ghi "+tr(T.chung):""),T.ln<0?"red":(!T.luong||it)?"amb":"grn")}
