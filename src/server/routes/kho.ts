@@ -1613,6 +1613,9 @@ khoRoutes.post('/docs', async (c) => {
     const liters = positive(b.liters, 'Số lít thực tế');
     if (!lines.length) throw badRequest('NO_LINES', 'Cần ghi số thực tế của từng nguyên vật liệu đã dùng');
     extra.btp = btp;
+    // Số bồn × số lít / bồn (chị Hoa 06/11): liters là tổng, ghi kèm để in phiếu.
+    if (num(b.bon) > 0) extra.bon = num(b.bon);
+    if (num(b.lit_bon) > 0) extra.lit_bon = num(b.lit_bon);
     // Người sản xuất (pha chế) – chị Hoa 06/11.
     if (Array.isArray(b.nguoi)) extra.nguoi = (b.nguoi as unknown[]).map((x) => String(x).trim().slice(0, 60)).filter(Boolean).slice(0, 20);
     extra.liters = liters;

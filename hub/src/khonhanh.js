@@ -104,30 +104,31 @@ async function kqPcOpen(id,print){
   if(!KHO.cat){try{await khoLoad()}catch(e){}}
   const r=(SX().pcReq||[]).find(x=>x.id===id);if(!r){toast("Không tìm thấy yêu cầu "+id);return}
   khoForm("PC");const b=$("#kf-btp"),l=$("#kf-lit"),rr=$("#kf-r"),rq=$("#kf-rq");if(!b)return;
-  const it=KHO.items.get(r.btp);b.value=it?it.code:r.btp;b.dataset.code=r.btp;if(rr)rr.value=r.id;if(rq&&r.lit)rq.value=r.lit;if(l&&r.lit){l.value=r.lit;l.dispatchEvent(new Event("input"))}
+  const it=KHO.items.get(r.btp);b.value=it?it.code:r.btp;b.dataset.code=r.btp;if(rr)rr.value=r.id;if(rq&&r.lit)rq.value=r.lit;const bo=$("#kf-bon");if(bo)bo.value=r.bon||1;if(l&&r.lit){l.value=r.litBon||r.lit;l.dispatchEvent(new Event("input"))}
   if(print)setTimeout(()=>{const p=$("#kf-print");if(p)p.click()},900);
 }
 function kqYcForm(){
   const today=typeof sxToday==="function"?sxToday():new Date().toISOString().slice(0,10);
   openDrawerHTML(`<h2>Yêu cầu pha chế</h2><p class="hint">Giao kỹ thuật pha bán thành phẩm theo bồn. Kỹ thuật pha xong nhập số thực tế: trừ nguyên vật liệu, cộng bán thành phẩm.</p><form class="frm" id="ycf">
    <div class="row4"><label class="field">Ngày<input id="yc-ng" type="date" value="${today}" required></label><label class="field">Hạn cần<input id="yc-han" type="date"></label></div>
-   <div class="tbl edit"><table><thead><tr><th>Bán thành phẩm (gõ hoặc dán tên, mã)</th><th style="width:150px">Số lít cần pha</th><th style="width:76px"></th></tr></thead><tbody id="yc-b"></tbody></table></div>
+   <div class="tbl edit"><table><thead><tr><th>Bán thành phẩm (gõ hoặc dán tên, mã)</th><th style="width:130px">Số lít / bồn</th><th style="width:100px">Số bồn</th><th style="width:110px">Tổng lít</th><th style="width:76px"></th></tr></thead><tbody id="yc-b"></tbody></table></div>
    <label class="field">Ghi chú cho kỹ thuật<input id="yc-gc"></label><div id="yc-e"></div>
    <button class="btn pri big" id="yc-go">Tạo yêu cầu và báo kỹ thuật</button></form>`);
   const body=$("#yc-b");
-  const add=after=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="yc-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="yc-n hint"></small></td><td><input class="yc-l n" type="text" inputmode="decimal"></td><td style="white-space:nowrap"><button type="button" class="btn sm yc-add">+</button> <button type="button" class="lnk yc-x">✕</button></td>`;
+  const add=after=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="yc-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="yc-n hint"></small></td><td><input class="yc-l n" type="text" inputmode="decimal"></td><td><input class="yc-bo n" type="text" inputmode="decimal" value="1"></td><td class="n yc-t"></td><td style="white-space:nowrap"><button type="button" class="btn sm yc-add">+</button> <button type="button" class="lnk yc-x">✕</button></td>`;
     if(after)after.after(tr);else body.appendChild(tr);const inp=tr.querySelector(".yc-i");
     khoPick(inp,["BTP"],it=>{inp.dataset.code=it.code;tr.querySelector(".yc-n").textContent=it.name;tr.querySelector(".yc-l").focus()});
     tr.querySelector(".yc-add").onclick=()=>add(tr);tr.querySelector(".yc-x").onclick=()=>{if(body.children.length>1)body.removeChild(tr)};
+    const tot=()=>{const v=kfNum(tr.querySelector(".yc-l").value)*(kfNum(tr.querySelector(".yc-bo").value)||1);tr.querySelector(".yc-t").textContent=v>0?knum(Math.round(v*1e6)/1e6):""};tr.querySelector(".yc-l").oninput=tot;tr.querySelector(".yc-bo").oninput=tot;
     tr.querySelector(".yc-l").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add(tr)}};inp.focus()};
   add();
   $("#ycf").onsubmit=async e=>{e.preventDefault();const btn=$("#yc-go");if(btn.disabled)return;
-    const L=[...body.querySelectorAll("tr")].map(tr=>({btp:tr.querySelector(".yc-i").dataset.code||"",raw:tr.querySelector(".yc-i").value.trim(),lit:kfNum(tr.querySelector(".yc-l").value)})).filter(x=>x.raw||isFinite(x.lit));
+    const L=[...body.querySelectorAll("tr")].map(tr=>{const lb=kfNum(tr.querySelector(".yc-l").value),bo=kfNum(tr.querySelector(".yc-bo").value)||1;return {btp:tr.querySelector(".yc-i").dataset.code||"",raw:tr.querySelector(".yc-i").value.trim(),litBon:lb,bon:bo,lit:Math.round(lb*bo*1e6)/1e6}}).filter(x=>x.raw||isFinite(x.lit));
     const bad=L.filter(x=>!x.btp||!(x.lit>0));
     if(!L.length||bad.length){$("#yc-e").innerHTML=`<div class="note red">${!L.length?"Chưa có bán thành phẩm nào.":"Dòng chưa chọn bán thành phẩm trong danh sách hoặc chưa có số lít: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
     btn.disabled=true;const ng=$("#yc-ng").value,han=$("#yc-han").value,gc=$("#yc-gc").value.trim(),codes=[];
-    sxMut(`tạo ${L.length} yêu cầu pha chế`,s2=>{s2.pcReq=s2.pcReq||[];L.forEach(x=>{const id=kqYcCode(s2,ng);codes.push(id);s2.pcReq.push({id,btp:x.btp,lit:x.lit,han,ghiChu:gc,taoLuc:ng,tao:ME.name,st:"CHO_LAM",at:typeof sxNow==="function"?sxNow():new Date().toISOString()})})});
-    let note="";try{const r=await kApi("/pc-notify",{method:"POST",body:JSON.stringify({items:L.map((x,k)=>({psx:codes[k],name:(KHO.items.get(x.btp)||{}).name||x.btp,sl:knum(x.lit)+" lít",han:han?kDd(han):""}))})});note=r.no_kythuat?"Chưa có tài khoản riêng của kỹ thuật pha chế nên chưa giao việc được. In phiếu đưa kỹ thuật ở nút bên dưới.":`Đã giao việc và báo chuông cho kỹ thuật (${r.sent} yêu cầu).`}catch(err){note="Chưa báo được kỹ thuật: "+err.message}
+    sxMut(`tạo ${L.length} yêu cầu pha chế`,s2=>{s2.pcReq=s2.pcReq||[];L.forEach(x=>{const id=kqYcCode(s2,ng);codes.push(id);s2.pcReq.push({id,btp:x.btp,lit:x.lit,litBon:x.litBon,bon:x.bon,han,ghiChu:gc,taoLuc:ng,tao:ME.name,st:"CHO_LAM",at:typeof sxNow==="function"?sxNow():new Date().toISOString()})})});
+    let note="";try{const r=await kApi("/pc-notify",{method:"POST",body:JSON.stringify({items:L.map((x,k)=>({psx:codes[k],name:(KHO.items.get(x.btp)||{}).name||x.btp,sl:(x.bon>1?knum(x.bon)+" bồn × "+knum(x.litBon)+" = ":"")+knum(x.lit)+" lít",han:han?kDd(han):""}))})});note=r.no_kythuat?"Chưa có tài khoản riêng của kỹ thuật pha chế nên chưa giao việc được. In phiếu đưa kỹ thuật ở nút bên dưới.":`Đã giao việc và báo chuông cho kỹ thuật (${r.sent} yêu cầu).`}catch(err){note="Chưa báo được kỹ thuật: "+err.message}
     renderMain();
     openDrawerHTML(`<h2>Đã tạo ${codes.length} yêu cầu pha chế</h2><div class="note ${/Chưa/.test(note)?"amb":"grn"}">${esc(note)}</div>${tbl(["Yêu cầu","Bán thành phẩm","Số lít",""],L.map((x,k)=>`<tr><td class="mono">${esc(codes[k])}</td><td>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</td><td class="n">${knum(x.lit)}</td><td><button class="btn sm pri" data-ycp="${esc(codes[k])}">In phiếu pha chế</button></td></tr>`))}`);
     document.querySelectorAll("#drawer [data-ycp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.ycp,true))};
@@ -135,7 +136,7 @@ function kqYcForm(){
 {const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){const r=_pc.apply(this,arguments);try{
   if(KQ_ADM())return r;const P=kqPcPending();
   const card=document.createElement("section");card.className="card flush";card.style.marginBottom="12px";
-  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế chờ làm (${P.length})</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span>${kqYcCan()?`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`:""}</div>`+(P.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","",""],P.map(x=>`<tr><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td><button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button></td><td><button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button></td></tr>`)):`<p class="hint pad">Không có yêu cầu nào đang chờ.</p>`);
+  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế chờ làm (${P.length})</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span>${kqYcCan()?`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`:""}</div>`+(P.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","",""],P.map(x=>`<tr><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}${x.bon>1?`<small class="hint" style="display:block">${knum(x.bon)} bồn × ${knum(x.litBon)}</small>`:""}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td><button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button></td><td><button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button></td></tr>`)):`<p class="hint pad">Không có yêu cầu nào đang chờ.</p>`);
   const first=m.querySelector("section.card");if(first)first.before(card);else m.appendChild(card);
   card.querySelectorAll("[data-pcp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcp,true));
   card.querySelectorAll("[data-pcn]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcn,false));
