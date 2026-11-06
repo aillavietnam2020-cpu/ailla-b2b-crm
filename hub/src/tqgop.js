@@ -39,8 +39,8 @@ function tqRevB2C(N,from,to){
    else out.tts={dt:null,lai:null,don:null,src:"chờ tải báo cáo TikTok"+(cho.length?" ngày "+cho.join(", "):"")+" (Tổng quan › Doanh thu › TikTok Shop › Tải file tháng)"}}
   /* Facebook: giao thành công */
   {const dtG=rs(5,"fb"),dtC=rs(6,"fb"),giao=rs(4,"fb"),chot=rs(1,"fb"),hoan=rs(3,"fb"),gvC=rs(7,"fb");
-   if(dtG>0){const Dd=(typeof KDX!=="undefined"&&KDX.fbDash)||{},pr=Dd.dt>0?(-(+Dd.vc||0)-(+Dd.hoan||0))/Dd.dt+0.015:0.015,gv=dtC?gvC*dtG/dtC:0,ads=rAds(0,from,to)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1)),phi=dtG*pr;
-     out.fb={dt:dtG,gv,phi,ads,khac:0,lai:dtG-gv-phi-ads,don:giao,dang:Math.max(0,chot-giao-hoan),dangDt:Math.max(0,dtC-dtG),src:`giao thành công · Pancake · phí ship và thuế ${(pr*100).toFixed(1).replace(".",",")}%`,tam:false}}
+   if(dtG>0){const Dd=(typeof KDX!=="undefined"&&KDX.fbDash)||{},pr=Dd.dt>0?(-(+Dd.vc||0)-(+Dd.hoan||0))/Dd.dt+0.015:0.015,GR=typeof fbvGvCa==='function'?fbvGvCa(from,to):null,gv=GR?GR.gv:dtC?gvC*dtG/dtC:0,ads=rAds(0,from,to)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1)),phi=dtG*pr;
+     out.fb={dt:dtG,gv,phi,ads,khac:0,lai:dtG-gv-phi-ads,don:giao,dang:Math.max(0,chot-giao-hoan),dangDt:Math.max(0,dtC-dtG),src:`giao thành công · Pancake · phí ship và thuế ${(pr*100).toFixed(1).replace(".",",")}%${GR&&GR.uoc?` · giá vốn ${GR.uoc} ngày Sheet Pancake chưa có ước theo tỷ lệ ${(GR.r*100).toFixed(1).replace(".",",")}%`:""}`,tam:false}}
    else out.fb={dt:null,lai:null,don:null,src:"chờ dữ liệu Pancake"}}
   /* Shopee */
   {const dt=rs(0,"spe");if(dt>0){const gv=rs(2,"spe"),phi=-rs(1,"spe"),ads=tqSpeAds(from,to);out.spe={dt,gv,phi,ads,khac:0,lai:dt-gv-phi-ads,don:rs(4,"spe"),src:"doanh thu Shopee theo ngày"+(ads?" · quảng cáo Shopee Ads từ báo cáo tải lên":" (chưa có số Shopee Ads)"),tam:false}}
