@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { nowIso, vnDate } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
 import { auditStatement } from '../lib/audit';
@@ -7,9 +7,11 @@ import { bellTo, hrPrivate, hubPeople } from '../lib/hubBell';
 import { canHr } from '../lib/hrAccess';
 import { requirePermission } from '../middleware/rbac';
 import { loadMembers, type Members } from '../services/daoTao';
-import { lichOf } from '../services/chamCong';
+import { dayRule, lichOf } from '../services/chamCong';
 import {
   coTheDuyet,
+  kiemBu,
+  ngayCanBu,
   kyTamUng,
   LOAI_DON,
   LOAI_NGHI,
@@ -21,7 +23,7 @@ import {
   type LoaiDon,
   type TrangThai,
 } from '../services/nghiPhep';
-import { loadSettings, resetDonCache } from './chamCong';
+import { loadSettings, ngayCongCua, resetDonCache } from './chamCong';
 
 /**
  * Nghỉ phép & tăng ca, tạm ứng lương, phiếu lương của tôi (hub/src/nghiphep.js). Quy tắc ở services/nghiPhep.ts.
@@ -35,6 +37,7 @@ type DonRow = {
   id: string; user_id: string; pb: string | null; loai: LoaiDon; tu: string; den: string; buoi: Buoi; so_ngay: number; gio: number | null;
   ghi_chu: string | null; ly_do: string; st: TrangThai; lead_id: string | null; lead_at: string | null; hcns_id: string | null; hcns_at: string | null;
   tu_choi: string | null; created_at: string; updated_at: string;
+  bu_ngay?: string | null; bu_kieu?: string | null; bu_tu?: string | null; bu_den?: string | null; bu_phut?: number | null;
 };
 type TuRow = { id: string; user_id: string; so_tien: number; ly_do: string; ky: string; st: 'kt' | 'xong' | 'tuchoi' | 'huy'; kt_id: string | null; kt_at: string | null; tu_choi: string | null; created_at: string };
 const NGAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -108,10 +111,13 @@ nghiPhepRoutes.get('/me', async (c) => {
     quyPhep(db, [auth.user.id], today.slice(0, 4)),
   ]);
   const m = await loadMembers(db, auth.user.id);
+  const nc = await ngayCongCua(db, auth.user.id, m.users[auth.user.id]?.pb, vnDate(new Date(Date.now() - s.quyTac.hanBu * 864e5)), today);
   return ok(c, {
     today,
     phep: qp[0],
-    quyTac: { mocVong2: s.quyTac.mocVong2, tuMax: s.quyTac.tuMax },
+    quyTac: { mocVong2: s.quyTac.mocVong2, tuMax: s.quyTac.tuMax, hanBu: s.quyTac.hanBu },
+    canBu: ngayCanBu(nc.ngay, today),
+    lich: { ten: nc.lich.ten, gioVao: nc.lich.gioVao, gioRa: nc.lich.gioRa },
     loai: LOAI_DON,
     don: (don.results ?? []).map((d) => donView(m, d)),
     tamung: tu.results ?? [],
@@ -124,6 +130,7 @@ nghiPhepRoutes.post('/don', async (c) => {
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const loai = String(b.loai ?? '') as LoaiDon;
   if (!LOAI_DON[loai]) throw badRequest('LOAI', 'Chọn loại đơn');
+  if (loai === 'lambu') return guiLamBu(c, b);
   const tu = String(b.tu ?? '');
   const den = loai === 'vesom' || loai === 'ot' ? tu : String(b.den ?? tu);
   if (!NGAY.test(tu) || !NGAY.test(den) || den < tu) throw badRequest('NGAY', 'Ngày chưa đúng: đến ngày phải từ ngày trở đi');
@@ -159,6 +166,50 @@ nghiPhepRoutes.post('/don', async (c) => {
   return ok(c, { id, st, soNgay });
 });
 
+/** Đơn xin làm bù (CEO 06/11): bù ngày hoặc bù giờ, Lead duyệt (Lead gửi thì HCNS). */
+async function guiLamBu(c: Context<AppEnv>, b: Record<string, unknown>) {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const today = vnDate();
+  const buNgay = String(b.buNgay ?? '');
+  const lyDo = String(b.lyDo ?? '').trim().slice(0, 400);
+  if (!NGAY.test(buNgay)) throw badRequest('BU', 'Chọn ngày cần bù');
+  if (!lyDo) throw badRequest('LY_DO', 'Ghi lý do');
+  const m = await loadMembers(db, auth.user.id);
+  const me = m.users[auth.user.id];
+  const pb = me?.pb ?? '';
+  const s = await loadSettings(db);
+  const nc = await ngayCongCua(db, auth.user.id, pb, vnDate(new Date(Date.now() - s.quyTac.hanBu * 864e5)), today);
+  const can = ngayCanBu(nc.ngay, today).find((x) => x.ngay === buNgay);
+  if (!can) throw badRequest('BU', 'Ngày này không cần bù, hoặc đã có đơn làm bù');
+  const ngay = String(b.tu ?? '');
+  const buoi: Buoi = can.buoi !== 'ca' ? can.buoi : b.buoi === 'sang' || b.buoi === 'chieu' ? b.buoi : 'ca';
+  const buTu = String(b.buTu ?? '');
+  const buDen = String(b.buDen ?? '');
+  const rule = NGAY.test(ngay) ? dayRule(nc.lich, ngay, null, s.ngayLe.some((x) => x.ngay === ngay)) : { lam: false, vao: 0, ra: 0 };
+  const err = kiemBu(can, { ngay, buoi, tu: buTu, den: buDen }, rule, today, s.quyTac.hanBu);
+  if (err) throw badRequest('BU', err);
+  const gio = can.kieu === 'gio';
+  const leads = leadsCuaPhong(m.users, pb, auth.user.id);
+  const st = trangThaiDau(leads.length > 0);
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  const dm = (d: string) => `${d.slice(8)}/${d.slice(5, 7)}`;
+  const ghiChu = gio ? `${buTu}–${buDen}` : buoi === 'sang' ? 'buổi sáng' : buoi === 'chieu' ? 'buổi chiều' : 'cả ngày';
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO ns_don (id, user_id, pb, loai, tu, den, buoi, so_ngay, gio, ghi_chu, ly_do, st, created_at, updated_at, bu_ngay, bu_kieu, bu_tu, bu_den, bu_phut)
+         VALUES (?, ?, ?, 'lambu', ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(id, auth.user.id, pb || null, ngay, ngay, buoi, gio ? 0 : buoi === 'ca' ? 1 : 0.5, ghiChu, lyDo, st, now, now, buNgay, can.kieu, gio ? buTu : null, gio ? buDen : null, gio ? can.phut : null),
+    auditStatement(db, { actorId: auth.user.id, action: 'NS_DON_GUI', entityType: 'NS_DON', entityId: id, after: { loai: 'lambu', buNgay, ngay, kieu: can.kieu, st } }),
+  ]);
+  resetDonCache();
+  await bellTo(db, st === 'lead' ? leads : hcnsIds(m), `${me?.name || auth.user.id} xin làm bù cho ngày ${dm(buNgay)} (${can.mo}) vào ${dm(ngay)} ${ghiChu}, chờ bạn duyệt`, st === 'lead' ? 'page:np_duyet' : 'page:np_ql');
+  return ok(c, { id, st, soNgay: 0 });
+}
+
 nghiPhepRoutes.post('/don/:id/huy', async (c) => {
   const auth = c.get('auth');
   const db = c.env.DB;
@@ -167,6 +218,7 @@ nghiPhepRoutes.post('/don/:id/huy', async (c) => {
     .bind(nowIso(), c.req.param('id'), auth.user.id)
     .run();
   if (!res.meta.changes) throw badRequest('HUY', 'Đơn đã được duyệt hoặc không còn, không rút lại được');
+  resetDonCache();
   return ok(c, { id: c.req.param('id') });
 });
 
@@ -227,6 +279,8 @@ nghiPhepRoutes.post('/don/:id/duyet', async (c) => {
     await bellTo(db, [d.user_id], `Lead đã duyệt đơn ${loai} ngày ${ngay} của bạn, đang chờ HCNS duyệt tiếp`, 'page:np_toi');
   } else {
     await bellTo(db, [d.user_id], st === 'xong' ? `Đơn ${loai} ngày ${ngay} của bạn đã được duyệt` : `Đơn ${loai} ngày ${ngay} của bạn bị từ chối: ${note}`, 'page:np_toi');
+    if (st === 'xong' && d.loai === 'lambu')
+      await bellTo(db, [d.user_id], `Nhớ chấm công vào, ra ngày ${ngay} khi làm bù (${d.ghi_chu ?? ''}). Làm đủ thì ngày ${d.bu_ngay ? d.bu_ngay.slice(8) + '/' + d.bu_ngay.slice(5, 7) : ''} được tính bù`, 'page:cc_toi');
     if (st === 'xong' && d.loai === 'ot' && !v.hcns)
       await bellTo(db, hcnsIds(v.m), `Đã duyệt tăng ca ${d.gio ?? ''} giờ ngày ${ngay} cho ${nameOf(v.m, d.user_id)}`, 'page:np_ql');
   }

@@ -71,7 +71,7 @@ export type Ca = { id: string; ten: string; tu: string; den: string };
  * số ngày nghỉ trong tháng để giữ chuyên cần; tienCC, tienTrua: số tiền để hiện trên bảng (chưa trừ vào lương);
  * mocVong2: đơn nghỉ từ số ngày này phải HCNS duyệt vòng 2; tuMax: tạm ứng mỗi lần phải dưới số tiền này.
  */
-export type QuyTac = { mocLyDo: number; mocNang: number; ccLan: number; ccNghi: number; tienCC: number; tienTrua: number; mocVong2: number; tuMax: number };
+export type QuyTac = { mocLyDo: number; mocNang: number; ccLan: number; ccNghi: number; tienCC: number; tienTrua: number; mocVong2: number; tuMax: number; hanBu: number };
 /** pbLich: lịch theo phòng ban; nguoiLich: lịch riêng từng người (mã đăng nhập), ưu tiên hơn phòng ban; macDinh: còn lại. */
 export type CcSettings = {
   diem: Diem[];
@@ -98,7 +98,7 @@ export const CC_DEFAULT: CcSettings = {
   ],
   ca: [],
   ngayLe: [],
-  quyTac: { mocLyDo: 10, mocNang: 10, ccLan: 2, ccNghi: 2, tienCC: 200000, tienTrua: 25000, mocVong2: 3, tuMax: 3000000 },
+  quyTac: { mocLyDo: 10, mocNang: 10, ccLan: 2, ccNghi: 2, tienCC: 200000, tienTrua: 25000, mocVong2: 3, tuMax: 3000000, hanBu: 30 },
   pbLich: { SX: 'xuong', KV: 'xuong', B2B: 'sale', B2C: 'sale' },
   nguoiLich: {},
   macDinh: 'vp',
@@ -181,6 +181,7 @@ function normQuyTac(x: unknown): QuyTac {
     tienTrua: Math.round(num(o.tienTrua, 0, 10_000_000, d.tienTrua)),
     mocVong2: Math.round(num(o.mocVong2, 1, 60, d.mocVong2)),
     tuMax: Math.round(num(o.tuMax, 0, 1_000_000_000, d.tuMax)),
+    hanBu: Math.round(num(o.hanBu, 1, 120, d.hanBu)),
   };
 }
 
@@ -318,7 +319,45 @@ export type NgayCong = {
   choXn: boolean;
   /** Có lượt chấm ngoài văn phòng đã được xác nhận (đi quay, gặp khách): tính công bình thường, không coi là ngoài phạm vi. */
   chamNgoai: boolean;
+  /** Ngày này được xin bù (đơn làm bù): ngày làm bù và kết quả. */
+  bu: BuKq | null;
+  /** Ngày này là ngày đi làm bù cho ngày khác. */
+  lamBu: { cho: string; kieu: BuKieu } | null;
 };
+
+/** Đơn làm bù (CEO 06/11): bù ngày (không chấm, nghỉ không lương) hoặc bù giờ (đi muộn, về sớm). */
+export type BuKieu = 'ngay' | 'gio';
+/** duyet: đơn chờ duyệt; cho: đã duyệt, chưa tới / chưa xong ngày làm bù; du / thieu: làm đủ / chưa đủ; khong: không đến làm bù. */
+export type BuKq = { kq: 'duyet' | 'cho' | 'du' | 'thieu' | 'khong'; ngay: string; kieu: BuKieu };
+/** Số phút làm chuẩn một ngày của lịch (giờ vào tới giờ ra, trừ nghỉ trưa). */
+export function phutChuan(l: Lich): number {
+  let p = toMin(l.gioRa) - toMin(l.gioVao);
+  if (l.truaTu && l.truaDen) p -= Math.max(0, Math.min(toMin(l.gioRa), toMin(l.truaDen)) - Math.max(toMin(l.gioVao), toMin(l.truaTu)));
+  return Math.max(0, p);
+}
+/**
+ * Kết quả ngày làm bù từ giờ chấm của ngày đó. Bù giờ: vào không muộn hơn giờ đăng ký và ra không sớm hơn giờ đăng ký (trừ phút được trễ).
+ * Bù ngày: số phút làm đủ một ngày chuẩn của lịch (nửa ngày thì một nửa).
+ */
+export function ketQuaBu(
+  d: { kieu: BuKieu; buoi: 'ca' | 'sang' | 'chieu'; tu: string | null; den: string | null },
+  b: { vao: string | null; ra: string | null; phut: number },
+  l0: Lich,
+  ngayB: string,
+  today: string,
+): 'cho' | 'du' | 'thieu' | 'khong' {
+  if (ngayB > today) return 'cho';
+  if (!b.vao) return ngayB === today ? 'cho' : 'khong';
+  if (!b.ra) return ngayB === today ? 'cho' : 'thieu';
+  const l = lichNgay(l0, ngayB);
+  const tol = Math.max(5, l.anHan || 0);
+  if (d.kieu === 'gio') {
+    if (!d.tu || !d.den) return 'thieu';
+    return vnMinutes(b.vao) <= toMin(d.tu) + tol && vnMinutes(b.ra) >= toMin(d.den) - tol ? 'du' : 'thieu';
+  }
+  const can = phutChuan(l) * (d.buoi === 'ca' ? 1 : 0.5);
+  return b.phut >= can - tol ? 'du' : 'thieu';
+}
 
 /**
  * Gộp các lượt chấm của một người trong một ngày: lấy lượt vào sớm nhất, lượt ra muộn nhất.
@@ -329,7 +368,7 @@ export function tongNgay(
   l0: Lich,
   ngay: string,
   homNay: boolean,
-  opt: { ca?: Ca | null; q?: QuyTac; le?: boolean; don?: string | null; coPhep?: boolean; ot?: number } = {},
+  opt: { ca?: Ca | null; q?: QuyTac; le?: boolean; don?: string | null; coPhep?: boolean; ot?: number; bu?: BuKq | null; lamBu?: { cho: string; kieu: BuKieu } | null } = {},
 ): NgayCong {
   const l = lichNgay(l0, ngay);
   const q = opt.q ?? CC_DEFAULT.quyTac;
@@ -371,12 +410,15 @@ export function tongNgay(
     ca: opt.ca?.ten ?? null,
     le: !!opt.le && l.kieu !== 'ca',
     don: opt.don ?? null,
-    coPhep: !!opt.coPhep,
+    // Bù giờ đủ: lần đi muộn / về sớm đó không tính vi phạm chuyên cần, như có đơn xin phép.
+    coPhep: !!opt.coPhep || (opt.bu?.kq === 'du' && opt.bu.kieu === 'gio'),
     ot: opt.ot ?? 0,
     lyDoMuon: vaoL?.ly_do_muon || null,
     canhBao: muon > q.mocLyDo && !vaoL?.ly_do_muon,
     choXn,
     chamNgoai: luot.some((x) => x.xn === 'ok'),
+    bu: opt.bu ?? null,
+    lamBu: opt.lamBu ?? null,
   };
 }
 
@@ -393,6 +435,9 @@ export type TongThang = {
   /** Số ngày chấm ngoài văn phòng đã xác nhận / đang chờ xác nhận. */
   chamNgoai: number;
   choXn: number;
+  /** Số ngày đã bù đủ (bù ngày) và số ngày đi làm bù. */
+  daBu: number;
+  lamBu: number;
   /** Số lần muộn quá mốc hỏi lý do mà không ghi lý do. */
   canhBao: number;
   /** Số lần đi muộn / về sớm KHÔNG có đơn xin phép đã duyệt: dùng để xét chuyên cần. */
@@ -414,14 +459,17 @@ export type TongThang = {
 /** Cộng một tháng. homNay để không tính hôm nay là ngày nghỉ. */
 export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay: string, q: QuyTac = CC_DEFAULT.quyTac): TongThang {
   const co = ngay.filter((x) => x.vao || x.ra);
+  // Bù ngày đủ: ngày được bù tính là có công, ngày đi làm bù không cộng thêm công (đã chuyển sang ngày kia).
+  const buNgay = (x: NgayCong) => x.bu?.kq === 'du' && x.bu.kieu === 'ngay';
+  const cong = co.filter((x) => !(x.lamBu?.kieu === 'ngay')).length + ngay.filter((x) => buNgay(x) && !x.vao && !x.ra).length;
   const muonLan = co.filter((x) => x.muon > 0).length;
   const somLan = co.filter((x) => x.som > 0).length;
   const viPham = co.filter((x) => !x.coPhep).reduce((t, x) => t + (x.muon > 0 ? 1 : 0) + (x.som > 0 ? 1 : 0), 0);
-  const vang = ngay.filter((x) => x.lam && !x.vao && !x.ra && x.ngay < homNay);
+  const vang = ngay.filter((x) => x.lam && !x.vao && !x.ra && x.ngay < homNay && !buNgay(x));
   const cheDo = (x: NgayCong) => !!x.don && x.don !== DON_KHONG_LUONG;
   const nghi = vang.filter((x) => !cheDo(x)).length;
   return {
-    cong: co.length,
+    cong,
     lamChuan: ngay.filter((x) => x.lam).length,
     muonLan,
     muonPhut: co.reduce((t, x) => t + x.muon, 0),
@@ -431,6 +479,8 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
     ngoai: ngay.filter((x) => x.ngoai).length,
     chamNgoai: ngay.filter((x) => x.chamNgoai).length,
     choXn: ngay.filter((x) => x.choXn).length,
+    daBu: ngay.filter(buNgay).length,
+    lamBu: ngay.filter((x) => x.lamBu).length,
     canhBao: co.filter((x) => x.canhBao).length,
     viPham,
     ot: ngay.reduce((t, x) => t + (x.ot || 0), 0),
