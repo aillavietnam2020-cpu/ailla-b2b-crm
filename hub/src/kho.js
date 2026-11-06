@@ -203,7 +203,7 @@ function khoForm(type,pre,clsO){
       if(KHO.bomHidden){try{const [[,,rows]]=await khoExpand([[c,lit]]);B=rows.map(x=>({item:x.item,need:x.need}))}catch(e){toast(e.message);return}if(my!==fillTok)return}
       else B=KHO.bom.get(c)||[];
       body.innerHTML="";
-      B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),tr=addLine({item:b.item,qty:std,std,fixed:true});tr.dataset.std=std});
+      B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),tr=addLine({item:b.item,qty:std,std,fixed:true});tr.dataset.std=std;const per=b.need!=null?b.need/lit:b.qty,sc=tr.querySelector(".kf-std");if(sc&&per)sc.innerHTML+=`<small class="hint" style="display:block">${knum(Math.round(per*1e6)/1e6)} × ${knum(lit)} lít</small>`});{const th=[...document.querySelectorAll("#kf thead th")].find(x=>/^Định mức/.test(x.textContent));if(th)th.textContent="Định mức cho "+knum(lit)+" lít"}
       if(!B.length)$("#kf-warn").innerHTML=`<div class="note amb">${esc(c)} chưa có định mức. Thêm nguyên liệu bằng nút "+ Thêm dòng".</div>`;else refresh()};
     khoPick($("#kf-btp"),["BTP"],fill);$("#kf-lit").oninput=fill;
     $("#kf-add").onclick=()=>{const tr=addLine({});tr.dataset.std=0}}
