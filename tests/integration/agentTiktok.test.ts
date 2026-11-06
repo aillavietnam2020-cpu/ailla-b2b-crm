@@ -114,3 +114,61 @@ describe('Agent nạp báo cáo Shopee', () => {
     expect(log.results[0]).toMatchObject({ actor_type: 'AGENT', source: 'agent-shopee' });
   });
 });
+
+describe('Agent đọc lại số TikTok (chỉ đọc)', () => {
+  const put = (t: string, p: string, b: unknown) => agentCall(t, p, 'PUT', b);
+  it('cần phạm vi doc_tiktok; quyền nạp không đủ để đọc, quyền đọc không đủ để nạp', async () => {
+    const nap = await makeAgent('Chỉ nạp', ['baocao_san']);
+    const doc = await makeAgent('Chỉ đọc', ['doc_tiktok']);
+    expect((await agentCall(nap.token, '/api/agent/tiktok/read?from=2026-11-03&to=2026-11-05')).status).toBe(403);
+    expect((await agentCall(doc.token, '/api/agent/tiktok/read?from=2026-11-03&to=2026-11-05')).status).toBe(200);
+    expect((await put(doc.token, '/api/agent/tiktok/days', { src: 'ads', days: { '2026-11-03': { chi: 1 } } })).status).toBe(403);
+    expect((await put(doc.token, '/api/agent/tiktok/range', { kind: 'koc', from: '2026-11-03', to: '2026-11-03', data: {} })).status).toBe(403);
+    expect((await agentCall(doc.token, '/api/agent/tiktok/months')).status).toBe(403);
+    expect((await agentCall(doc.token, '/api/agent/tiktok/read?from=bad&to=2026-11-05')).status).toBe(400);
+    expect((await agentCall(doc.token, '/api/agent/tiktok/read?from=2026-11-03&to=2026-11-05&kind=zzz')).status).toBe(400);
+  });
+
+  it('trả số theo ngày kèm ngày còn thiếu, và gộp khoảng: dài chứa ngắn lấy dài, không chồng thì cộng', async () => {
+    const nap = await makeAgent('KTT nạp', ['baocao_san']);
+    const doc = await makeAgent('Lead đọc', ['doc_tiktok']);
+    await put(nap.token, '/api/agent/tiktok/days', { src: 'ads', days: { '2026-11-03': { chi: 100 }, '2026-11-04': { chi: 200 } } });
+    await put(nap.token, '/api/agent/tiktok/days', { src: 'km', days: { '2026-11-03': { gmv: 5 } } });
+    const vid = (id: string, gmv: number) => ({ n: 1, nCoDon: 1, gmv, top: [{ id, t: 'Video ' + id, post: '2026-11-01', sp: 'SP', gmv, don: 1 }] });
+    await put(nap.token, '/api/agent/tiktok/range', { kind: 'videos', from: '2026-11-03', to: '2026-11-03', data: vid('1', 10) });
+    await put(nap.token, '/api/agent/tiktok/range', { kind: 'videos', from: '2026-11-01', to: '2026-11-04', data: vid('2', 40) });
+    await put(nap.token, '/api/agent/tiktok/range', { kind: 'koc', from: '2026-11-03', to: '2026-11-03', data: { gmv: 7 } });
+    await put(nap.token, '/api/agent/tiktok/range', { kind: 'koc', from: '2026-11-05', to: '2026-11-05', data: { gmv: 3 } });
+    const r = await agentCall(doc.token, '/api/agent/tiktok/read?from=2026-11-03&to=2026-11-05');
+    expect(r.status).toBe(200);
+    const d = r.body.data;
+    expect(d.days['2026-11-04'].ads).toEqual({ chi: 200 });
+    expect(d.missing.ads).toEqual(['2026-11-05']);
+    expect(d.missing.km).toEqual(['2026-11-04', '2026-11-05']);
+    expect(d.updatedAt.ads).toBeTruthy();
+    expect(d.lastDay.ads).toBe('2026-11-04');
+    // khoảng 01–04 chỉ giao kỳ (không nằm trọn) nên chỉ dùng khi không có khoảng nằm trọn trong kỳ
+    expect(d.ranges.videos.parts).toEqual([expect.objectContaining({ from: '2026-11-03', to: '2026-11-03' })]);
+    expect(d.ranges.koc.data.gmv).toBe(10);
+    expect(d.ranges.koc.parts).toHaveLength(2);
+    expect(d.ranges.creators).toBeNull();
+    const w = await agentCall(doc.token, '/api/agent/tiktok/read?from=2026-11-01&to=2026-11-04&kind=videos');
+    expect(w.body.data.ranges.videos.parts).toEqual([expect.objectContaining({ from: '2026-11-01', to: '2026-11-04' })]);
+    expect(w.body.data.ranges.videos.data.top.map((v: any) => v.id)).toEqual(['2']);
+    expect(w.body.data.days).toBeUndefined();
+    const only = await agentCall(doc.token, '/api/agent/tiktok/read?from=2026-11-03&to=2026-11-05&kind=days');
+    expect(only.body.data.ranges).toBeUndefined();
+  });
+
+  it('migration 0085 cấp phạm vi đọc cho đúng 4 agent theo tên chat, không cấp cho agent khác', async () => {
+    const a = await makeAgent('Agent Content', []);
+    const b = await makeAgent('Agent khác', []);
+    const ceo = await ctx.db.prepare('SELECT id FROM users WHERE email = ?').bind(USERS.ceo).first<{ id: string }>();
+    const ins = "INSERT INTO agent_delegators (agent_id, user_id, chat_agent, created_at) VALUES (?, ?, ?, '2026-11-06T00:00:00Z')";
+    await ctx.db.prepare(ins).bind(a.id, ceo!.id, 'lead-content-ailla').run();
+    await ctx.db.prepare(ins).bind(b.id, ceo!.id, 'ke-toan-truong-ailla').run();
+    await ctx.db.exec(readFileSync('migrations/0085_agent_doc_tiktok.sql', 'utf8').split('\n').filter((l) => !l.startsWith('--')).join(' '));
+    expect((await agentCall(a.token, '/api/agent/tiktok/read?from=2026-11-03&to=2026-11-03')).status).toBe(200);
+    expect((await agentCall(b.token, '/api/agent/tiktok/read?from=2026-11-03&to=2026-11-03')).status).toBe(403);
+  });
+});

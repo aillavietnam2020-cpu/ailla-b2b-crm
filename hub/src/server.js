@@ -205,7 +205,7 @@ PAGES.cr_import=m=>{m.innerHTML=H("Nhập dữ liệu CRM Kênh phân phối","T
 /* Agent AI: tài khoản + khóa riêng cho agent (chỉ CEO). Agent chỉ đọc và ghi ĐỀ XUẤT qua /api/agent, không tự đổi dữ liệu. */
 let SV_AGENTS=null,SV_AGENT_TOKEN=null;
 /* Phạm vi đọc của agent theo vai (khớp AGENT_SCOPES ở máy chủ). Chị tích/bỏ tích rồi bấm Lưu. */
-const AG_SCOPES=[["orders","Đơn hàng"],["orders_kho","Đơn chờ kho"],["debts","Khách và công nợ"],["kho","Kho, hóa chất, pha chế"],["mkt_content","Marketing: Content"],["mkt_digital","Marketing: Digital"],["xuong","Công xưởng SX video"],["baocao_san","Nạp báo cáo sàn TikTok"]];
+const AG_SCOPES=[["orders","Đơn hàng"],["orders_kho","Đơn chờ kho"],["debts","Khách và công nợ"],["kho","Kho, hóa chất, pha chế"],["mkt_content","Marketing: Content"],["mkt_digital","Marketing: Digital"],["xuong","Công xưởng SX video"],["baocao_san","Nạp báo cáo sàn TikTok"],["doc_tiktok","Đọc số TikTok đã nạp (chỉ xem)"]];
 let SV_AGDEL=[];
 function svLoadAgents(){return Promise.all([svApi("/api/admin/agents"),svApi("/api/admin/agents/delegator-candidates").catch(()=>[])]).then(([r,d])=>{SV_AGENTS=r||[];SV_AGDEL=d||[];if(PAGE==="agents")renderMain()}).catch(()=>{SV_AGENTS=SV_AGENTS||[]})}
 /* Công tắc lập phiếu chi (chị Hoa đồng ý 27/10/2026): agent ghi phiếu chi khi người được chỉ định ra lệnh; khoản từ ngưỡng vẫn chờ chị duyệt, phiếu trùng bị chặn. */

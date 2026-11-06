@@ -16,6 +16,8 @@ import { requirePermission } from '../middleware/rbac';
  */
 export const agentTiktokRoutes = new Hono<AppEnv>();
 agentTiktokRoutes.use('*', requirePermission('agent.read'));
+// Đường chỉ đọc (phạm vi riêng 'doc_tiktok'), đặt TRƯỚC cổng nạp bên dưới để không bị đòi quyền nạp.
+agentTiktokRoutes.get('/read', readTiktok);
 agentTiktokRoutes.use('*', async (c, next) => {
   if (!c.get('auth').permissions.includes(AGENT_SCOPE_PREFIX + 'baocao_san')) throw forbidden('Agent này chưa được phép nạp báo cáo sàn');
   await next();
@@ -24,6 +26,7 @@ agentTiktokRoutes.use('*', async (c, next) => {
 const KY = /^\d{4}-\d{2}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 import { DAY_SRC, RANGE_KIND, cleanRange } from './tiktok';
+import { readTiktok } from './agentTiktokRead';
 const MAX_MONTH = 3 * 1024 * 1024;
 const ip = (c: { req: { header: (n: string) => string | undefined } }) => c.req.header('CF-Connecting-IP') ?? null;
 
