@@ -316,6 +316,8 @@ export type NgayCong = {
   canhBao: boolean;
   /** Có lượt chấm ngoài văn phòng đang chờ Lead xác nhận (chưa tính công). */
   choXn: boolean;
+  /** Có lượt chấm ngoài văn phòng đã được xác nhận (đi quay, gặp khách): tính công bình thường, không coi là ngoài phạm vi. */
+  chamNgoai: boolean;
 };
 
 /**
@@ -364,7 +366,7 @@ export function tongNgay(
     som,
     phut,
     quenRa: !!vaoL && !raL && !homNay,
-    ngoai: luot.some((x) => x.trong === 0),
+    ngoai: luot.some((x) => x.trong === 0 && x.xn !== 'ok'),
     lam: rule.lam,
     ca: opt.ca?.ten ?? null,
     le: !!opt.le && l.kieu !== 'ca',
@@ -374,6 +376,7 @@ export function tongNgay(
     lyDoMuon: vaoL?.ly_do_muon || null,
     canhBao: muon > q.mocLyDo && !vaoL?.ly_do_muon,
     choXn,
+    chamNgoai: luot.some((x) => x.xn === 'ok'),
   };
 }
 
@@ -387,6 +390,9 @@ export type TongThang = {
   somLan: number;
   quenRa: number;
   ngoai: number;
+  /** Số ngày chấm ngoài văn phòng đã xác nhận / đang chờ xác nhận. */
+  chamNgoai: number;
+  choXn: number;
   /** Số lần muộn quá mốc hỏi lý do mà không ghi lý do. */
   canhBao: number;
   /** Số lần đi muộn / về sớm KHÔNG có đơn xin phép đã duyệt: dùng để xét chuyên cần. */
@@ -423,6 +429,8 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
     somLan,
     quenRa: ngay.filter((x) => x.quenRa).length,
     ngoai: ngay.filter((x) => x.ngoai).length,
+    chamNgoai: ngay.filter((x) => x.chamNgoai).length,
+    choXn: ngay.filter((x) => x.choXn).length,
     canhBao: co.filter((x) => x.canhBao).length,
     viPham,
     ot: ngay.reduce((t, x) => t + (x.ot || 0), 0),

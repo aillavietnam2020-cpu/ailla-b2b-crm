@@ -425,7 +425,7 @@ chamCongRoutes.get('/thang', async (c) => {
       // Lệch chỉ tính khi người đó dùng cả máy lẫn điện thoại trong tháng (giai đoạn chạy song song).
       lech: [...src.values()].some((v) => v === 'may' || v === 'ca hai') && [...src.values()].some((v) => v === 'dt' || v === 'ca hai') ? [...src.values()].filter((v) => v === 'may' || v === 'dt').length : 0,
       ...tongThang(ngay, lich, today, s.quyTac),
-      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, coPhep: x.coPhep, ot: x.ot, nguon: src.get(x.ngay) ?? '', lyDoMuon: x.lyDoMuon, canhBao: x.canhBao })),
+      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, coPhep: x.coPhep, ot: x.ot, nguon: src.get(x.ngay) ?? '', lyDoMuon: x.lyDoMuon, canhBao: x.canhBao, choXn: x.choXn, chamNgoai: x.chamNgoai })),
     };
   });
   return ok(c, { thang, today, quyTac: s.quyTac, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
