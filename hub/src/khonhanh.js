@@ -113,23 +113,23 @@ async function kqPcOpen(id,print){
   const it=KHO.items.get(r.btp);b.value=it?it.code:r.btp;b.dataset.code=r.btp;if(rr)rr.value=r.id;if(rq&&r.lit)rq.value=r.lit;const bo=$("#kf-bon");if(bo)bo.value=r.bon||1;if(l&&r.lit){l.value=r.litBon||r.lit;l.dispatchEvent(new Event("input"))}
   if(print)setTimeout(()=>{const p=$("#kf-print");if(p)p.click()},900);
 }
-function kqYcForm(){
+function kqYcForm(copy){
   const today=typeof sxToday==="function"?sxToday():new Date().toISOString().slice(0,10);
   openDrawerHTML(`<h2>Yêu cầu pha chế</h2><p class="hint">Giao kỹ thuật pha bán thành phẩm theo bồn. Kỹ thuật pha xong nhập số thực tế: trừ nguyên vật liệu, cộng bán thành phẩm.</p><form class="frm" id="ycf">
    <div class="row4"><label class="field">Ngày<input id="yc-ng" type="date" value="${today}" required></label><label class="field">Hạn cần<input id="yc-han" type="date"></label></div>
-   <div class="tbl edit"><table><thead><tr><th>Bán thành phẩm (gõ hoặc dán tên, mã)</th><th style="width:130px">Số lít / bồn</th><th style="width:100px">Số bồn</th><th style="width:110px">Tổng lít</th><th style="width:76px"></th></tr></thead><tbody id="yc-b"></tbody></table></div>
+   <div class="tbl edit"><table><thead><tr><th>Bán thành phẩm (gõ hoặc dán tên, mã)</th><th style="width:150px">Số lít (1 bồn)</th><th style="width:76px"></th></tr></thead><tbody id="yc-b"></tbody></table></div>
    <label class="field">Ghi chú cho kỹ thuật<input id="yc-gc"></label><div id="yc-e"></div>
    <button class="btn pri big" id="yc-go">Tạo yêu cầu và báo kỹ thuật</button></form>`);
   const body=$("#yc-b");
-  const add=after=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="yc-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="yc-n hint"></small></td><td><input class="yc-l n" type="text" inputmode="decimal"></td><td><input class="yc-bo n" type="text" inputmode="decimal" value="1"></td><td class="n yc-t"></td><td style="white-space:nowrap"><button type="button" class="btn sm yc-add">+</button> <button type="button" class="lnk yc-x">✕</button></td>`;
+  const add=after=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="yc-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="yc-n hint"></small></td><td><input class="yc-l n" type="text" inputmode="decimal"></td><td style="white-space:nowrap"><button type="button" class="btn sm yc-add">+</button> <button type="button" class="lnk yc-x">✕</button></td>`;
     if(after)after.after(tr);else body.appendChild(tr);const inp=tr.querySelector(".yc-i");
     khoPick(inp,["BTP"],it=>{inp.dataset.code=it.code;tr.querySelector(".yc-n").textContent=it.name;tr.querySelector(".yc-l").focus()});
     tr.querySelector(".yc-add").onclick=()=>add(tr);tr.querySelector(".yc-x").onclick=()=>{if(body.children.length>1)body.removeChild(tr)};
-    const tot=()=>{const v=kfNum(tr.querySelector(".yc-l").value)*(kfNum(tr.querySelector(".yc-bo").value)||1);tr.querySelector(".yc-t").textContent=v>0?knum(Math.round(v*1e6)/1e6):""};tr.querySelector(".yc-l").oninput=tot;tr.querySelector(".yc-bo").oninput=tot;
     tr.querySelector(".yc-l").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add(tr)}};inp.focus()};
   add();
+  if(copy){const tr=body.querySelector("tr"),it=KHO.items.get(copy.btp)||{};const i=tr.querySelector(".yc-i");i.value=copy.btp;i.dataset.code=copy.btp;tr.querySelector(".yc-n").textContent=it.name||"";tr.querySelector(".yc-l").value=copy.litBon||copy.lit;if(copy.ghiChu)$("#yc-gc").value=copy.ghiChu}
   $("#ycf").onsubmit=async e=>{e.preventDefault();const btn=$("#yc-go");if(btn.disabled)return;
-    const L=[...body.querySelectorAll("tr")].map(tr=>{const lb=kfNum(tr.querySelector(".yc-l").value),bo=kfNum(tr.querySelector(".yc-bo").value)||1;return {btp:tr.querySelector(".yc-i").dataset.code||"",raw:tr.querySelector(".yc-i").value.trim(),litBon:lb,bon:bo,lit:Math.round(lb*bo*1e6)/1e6}}).filter(x=>x.raw||isFinite(x.lit));
+    const L=[...body.querySelectorAll("tr")].map(tr=>{const lb=kfNum(tr.querySelector(".yc-l").value),bo=1;return {btp:tr.querySelector(".yc-i").dataset.code||"",raw:tr.querySelector(".yc-i").value.trim(),litBon:lb,bon:bo,lit:Math.round(lb*bo*1e6)/1e6}}).filter(x=>x.raw||isFinite(x.lit));
     const bad=L.filter(x=>!x.btp||!(x.lit>0));
     if(!L.length||bad.length){$("#yc-e").innerHTML=`<div class="note red">${!L.length?"Chưa có bán thành phẩm nào.":"Dòng chưa chọn bán thành phẩm trong danh sách hoặc chưa có số lít: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
     btn.disabled=true;const ng=$("#yc-ng").value,han=$("#yc-han").value,gc=$("#yc-gc").value.trim(),codes=[];
@@ -142,7 +142,7 @@ function kqYcForm(){
 {const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){const r=_pc.apply(this,arguments);try{
   if(KQ_ADM())return r;{const kn=m.querySelector("#kho-new");if(kn){kn.textContent="+ Phiếu pha không theo yêu cầu";kn.title="Kỹ thuật tự pha (không có yêu cầu pha chế): ghi số thực tế, trừ nguyên vật liệu, cộng bán thành phẩm"}}const P=kqPcPending(),ALL=kqPcAll();
   const card=document.createElement("section");card.className="card flush";card.style.marginBottom="12px";
-  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế · ${P.length} chờ làm</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span>${kqYcCan()?`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`:""}</div>`+(ALL.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","Trạng thái","","",""],ALL.map(x=>{const cho=x.tt==="CHO";return `<tr${x.tt==="HUY"?' style="opacity:.6"':""}><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}${x.bon>1?`<small class="hint" style="display:block">${knum(x.bon)} bồn × ${knum(x.litBon)}</small>`:""}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td>${x.tt==="HUY"?pill("Đã hủy","gry")+`<small class="hint" style="display:block">${esc(x.huyBy||"")}${x.lyDoHuy?": "+esc(x.lyDoHuy):""}</small>`:x.tt==="XONG"?pill("Đã pha","grn")+`<small class="hint" style="display:block"><a href="#" class="lnk" data-pcd="${x.doc.id}">${esc(x.doc.no)}</a> · ${esc(x.doc.created_by_name||"")}</small>`:pill("Chờ làm","amb")}</td><td>${cho?`<button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button>`:""}</td><td>${cho?`<button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button>`:""}</td><td>${cho&&kqYcCan()?`<button class="lnk" data-yce="${esc(x.id)}">Sửa</button> <button class="lnk" data-ycx="${esc(x.id)}">Hủy yêu cầu</button>`:""}</td></tr>`})):`<p class="hint pad">Chưa có yêu cầu pha chế nào.</p>`);
+  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế · ${P.length} chờ làm</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span>${kqYcCan()?`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`:""}</div>`+(ALL.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","Trạng thái","","",""],ALL.map(x=>{const cho=x.tt==="CHO";return `<tr${x.tt==="HUY"?' style="opacity:.6"':""}><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}${x.bon>1?`<small class="hint" style="display:block">${knum(x.bon)} bồn × ${knum(x.litBon)}</small>`:""}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td>${x.tt==="HUY"?pill("Đã hủy","gry")+`<small class="hint" style="display:block">${esc(x.huyBy||"")}${x.lyDoHuy?": "+esc(x.lyDoHuy):""}</small>`:x.tt==="XONG"?pill("Đã pha","grn")+`<small class="hint" style="display:block"><a href="#" class="lnk" data-pcd="${x.doc.id}">${esc(x.doc.no)}</a> · ${esc(x.doc.created_by_name||"")}</small>`:pill("Chờ làm","amb")}</td><td>${cho?`<button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button>`:""}</td><td>${cho?`<button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button>`:""}</td><td>${kqYcCan()?`${cho?`<button class="lnk" data-yce="${esc(x.id)}">Sửa</button> `:""}<button class="lnk" data-ycc="${esc(x.id)}">Sao chép</button>${cho?` <button class="lnk" data-ycx="${esc(x.id)}">Hủy yêu cầu</button>`:""}`:""}</td></tr>`})):`<p class="hint pad">Chưa có yêu cầu pha chế nào.</p>`);
   const first=m.querySelector("section.card");if(first)first.before(card);else m.appendChild(card);
   card.querySelectorAll("[data-pcp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcp,true));
   card.querySelectorAll("[data-pcd]").forEach(a=>a.onclick=e=>{e.preventDefault();khoOpenDoc(+a.dataset.pcd)});
@@ -150,6 +150,7 @@ function kqYcForm(){
   if($("#yc-new"))$("#yc-new").onclick=()=>kqYcForm();
   card.querySelectorAll("[data-yce]").forEach(b=>b.onclick=()=>kqYcEdit(b.dataset.yce));
   card.querySelectorAll("[data-ycx]").forEach(b=>b.onclick=()=>kqYcCancel(b.dataset.ycx));
+  card.querySelectorAll("[data-ycc]").forEach(b=>b.onclick=()=>{const x=(SX().pcReq||[]).find(y=>y.id===b.dataset.ycc);if(x)kqYcForm(x)});
   if(typeof rowMenus==="function")rowMenus(card);
 }catch(e){}return r}}
 
@@ -157,11 +158,11 @@ function kqYcForm(){
 function kqYcEdit(id){
   const r=(SX().pcReq||[]).find(x=>x.id===id);if(!r)return;const it=KHO.items.get(r.btp)||{};
   openDrawerHTML(`<h2>Sửa yêu cầu ${esc(id)}</h2><form class="frm" id="yce"><label class="field">Bán thành phẩm<input id="yce-b" value="${esc(r.btp)}" data-code="${esc(r.btp)}" autocomplete="off"><small class="hint" id="yce-n">${esc(it.name||"")}</small></label>
-   <div class="row4"><label class="field">Số lít / bồn<input id="yce-l" inputmode="decimal" value="${esc(String(r.litBon||r.lit))}"></label><label class="field">Số bồn<input id="yce-bo" inputmode="decimal" value="${esc(String(r.bon||1))}"></label></div>
+   <div class="row4"><label class="field">Số lít (1 bồn)<input id="yce-l" inputmode="decimal" value="${esc(String(r.litBon||r.lit))}"></label></div>
    <div class="row4"><label class="field">Hạn cần<input id="yce-h" type="date" value="${esc(r.han||"")}"></label></div>
    <label class="field">Ghi chú cho kỹ thuật<input id="yce-g" value="${esc(r.ghiChu||"")}"></label><div id="yce-e"></div><button class="btn pri">Lưu</button></form>`);
   khoPick($("#yce-b"),["BTP"],p=>{$("#yce-b").dataset.code=p.code;$("#yce-n").textContent=p.name});
-  $("#yce").onsubmit=e=>{e.preventDefault();const btp=$("#yce-b").dataset.code,lb=kfNum($("#yce-l").value),bo=kfNum($("#yce-bo").value)||1;
+  $("#yce").onsubmit=e=>{e.preventDefault();const btp=$("#yce-b").dataset.code,lb=kfNum($("#yce-l").value),bo=1;
     if(!btp||!(lb>0)){$("#yce-e").innerHTML=`<div class="note red">Chọn bán thành phẩm và số lít / bồn.</div>`;return}
     sxMut("sửa yêu cầu pha chế "+id,s2=>{const x=(s2.pcReq||[]).find(y=>y.id===id);if(!x)return;Object.assign(x,{btp,litBon:lb,bon:bo,lit:Math.round(lb*bo*1e6)/1e6,han:$("#yce-h").value,ghiChu:$("#yce-g").value.trim()})});
     closeDrawer();toast("Đã lưu "+id);renderMain()};
