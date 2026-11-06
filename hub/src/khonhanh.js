@@ -87,3 +87,30 @@ function kqSearchSelect(sel){
     sel.dispatchEvent(new Event("change",{bubbles:true}))};
 }
 new MutationObserver(()=>{document.querySelectorAll("select").forEach(s=>{const o=s.options[0];if(o&&!s.dataset.kqs&&/^— chọn sản phẩm/.test(o.textContent)&&s.options.length>8)kqSearchSelect(s)})}).observe(document.documentElement,{childList:true,subtree:true});
+
+/* Phiếu pha chế đi theo phiếu sản xuất (chị Hoa 06/11): Thảo tạo phiếu sản xuất (cách làm Kỹ thuật pha chế) thì ở trang Pha chế
+   hiện ngay "Phiếu pha chế chờ làm" của phiếu đó: In phiếu (bản điền tay đã tính sẵn số cân theo định mức) đưa kỹ thuật;
+   pha xong bấm "Nhập số thực tế" → form pha chế đã gắn phiếu sản xuất, sửa số thực cân rồi Ghi phiếu (trừ nguyên vật liệu, cộng bán thành phẩm).
+   Không có phiếu sản xuất thì kỹ thuật tự lập phiếu pha chế như cũ. Sản phẩm công nhân tự làm (bột phối trộn) không cần phiếu pha chế:
+   báo hoàn thành / kiểm kê là tự trừ nguyên vật liệu theo định mức. */
+function kqPcPending(){
+  const L=typeof khoPsxList==="function"?khoPsxList("PC"):[],rows=(KHO.list&&KHO.list.PC&&KHO.list.PC.rows)||[];
+  const done=new Set(rows.filter(d=>d.status==="OK"&&d.ref_no).map(d=>d.ref_no));
+  return L.filter(r=>!done.has(r.id));
+}
+async function kqPcOpen(psx,print){
+  if(!KHO.cat){try{await khoLoad()}catch(e){}}
+  khoForm("PC");const sel=$("#kf-psx");if(!sel)return;
+  if(![...sel.options].some(o=>o.value===psx)){toast("Phiếu "+psx+" không còn mở");return}
+  sel.value=psx;sel.dispatchEvent(new Event("change"));
+  if(print)setTimeout(()=>{const b=$("#kf-print");if(b)b.click()},900);
+}
+{const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){const r=_pc.apply(this,arguments);try{
+  if(KQ_ADM())return r;const P=kqPcPending();if(!P.length)return r;
+  const nm=c=>typeof sxP==="function"?sxP(c).ten:c;
+  const card=document.createElement("section");card.className="card flush";card.style.marginBottom="12px";
+  card.innerHTML=`<div class="card-h pad"><h2>Phiếu pha chế chờ làm (${P.length})</h2><span class="hint">từ phiếu sản xuất · In phiếu đưa kỹ thuật, pha xong bấm Nhập số thực tế</span></div>`+tbl(["Phiếu sản xuất","Ngày","Sản phẩm","Số lượng","Hạn","",""],P.map(x=>`<tr><td class="mono">${esc(x.id)}</td><td>${typeof sxDd==="function"?sxDd(x.taoLuc):esc(x.taoLuc||"")}</td><td><b>${esc(nm(x.sp))}</b></td><td class="n">${x.sl?knum(x.sl):"chưa chốt"}</td><td>${x.han&&typeof sxDd==="function"?sxDd(x.han):"—"}</td><td><button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button></td><td><button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button></td></tr>`));
+  const first=m.querySelector("section.card");if(first)first.before(card);else m.appendChild(card);
+  card.querySelectorAll("[data-pcp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcp,true));
+  card.querySelectorAll("[data-pcn]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcn,false));
+}catch(e){}return r}}
