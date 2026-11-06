@@ -218,3 +218,19 @@ describe('chấm công: quy định đổi theo thời gian (CEO 04/11)', () => 
     expect(s3.lich[0].tuNgay).toBe('2026-10-01');
   });
 });
+
+import { ipKey, diemByIp } from '../../src/server/services/chamCong';
+describe('mạng wifi điểm chấm', () => {
+  it('IPv4 giữ nguyên, IPv6 lấy 4 nhóm đầu', () => {
+    expect(ipKey('113.190.1.2')).toBe('113.190.1.2');
+    expect(ipKey('2402:800:6314:abcd:1111:2222:3333:4444')).toBe('2402:800:6314:abcd::/64');
+    expect(ipKey('2402:0800:6314::1')).toBe('2402:800:6314:0::/64');
+    expect(ipKey('rác')).toBe('');
+  });
+  it('chấm từ mạng của điểm thì nhận ra điểm', () => {
+    const s = normalizeSettings({ diem: [{ id: 'vp', ten: 'Văn phòng', lat: 21, lng: 105, bk: 100, ip: ['113.190.1.2', '2402:800:6314:abcd:9::1'] }] });
+    expect(s.diem[0].ip).toEqual(['113.190.1.2', '2402:800:6314:abcd::/64']);
+    expect(diemByIp(s, ipKey('2402:800:6314:abcd:5:6:7:8'))?.id).toBe('vp');
+    expect(diemByIp(s, ipKey('1.1.1.1'))).toBeNull();
+  });
+});
