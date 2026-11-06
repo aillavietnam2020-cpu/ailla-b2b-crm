@@ -320,6 +320,7 @@
 /* ===== Trang "Cá nhân" (điện thoại): gom mục "Của tôi" — chấm công, nghỉ phép, tạm ứng, phiếu lương, KPI… Mọi tài khoản đều có, chỉ xem của chính mình. ===== */
 (function(){
   if(typeof PAGES==="undefined")return;
+  if(typeof NAV_AN_MO!=="undefined")NAV_AN_MO.add("canhan"); // trang ẩn khỏi menu trái nhưng mở được (không bị đẩy về trang chủ)
   PAGES.canhan=function(m){
     let L=[];
     try{const me=MODULES.find(x=>x.k==="me");if(me)me.groups().forEach(g=>g[1].forEach(it=>{if(!it[2]||it[2](ME))L.push(it)}))}catch(e){}
@@ -330,6 +331,6 @@
     m.innerHTML=(typeof H==="function"?H("Cá nhân"):"<div class=\"ph\"><h1>Cá nhân</h1></div>")+
       `<section class="card"><div style="display:flex;gap:10px;align-items:center"><span style="width:40px;height:40px;border-radius:50%;background:#e7357b;color:#fff;display:grid;place-items:center;font-weight:700">${esc((nm||"?").trim().charAt(0).toUpperCase())}</span><div style="min-width:0"><b style="display:block">${esc(nm)}</b><small class="hint">Chỉ xem được thông tin của chính mình</small></div></div></section>`+
       `<section class="card"><div class="cnl">${L.map(i=>`<button type="button" class="cni" data-cn="${esc(i[0])}"><span><b>${esc(i[1])}</b>${sub[i[0]]?`<small>${sub[i[0]]}</small>`:""}</span><i>›</i></button>`).join("")}</div></section>`;
-    m.querySelectorAll("[data-cn]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.cn;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)});
+    m.querySelectorAll("[data-cn]").forEach(b=>b.onclick=()=>{MOD="me";PAGE=b.dataset.cn;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}); /* như menu ảnh đại diện: mục Của tôi */
   };
 })();
