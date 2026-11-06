@@ -259,16 +259,21 @@ function sxDoneForm(reqId){
 function sxDoneMulti(){
   openDrawerHTML(`<h2>Báo hoàn thành</h2><p class="hint">Số tổ tự báo chưa phải số nhập kho. Kế toán sẽ kiểm đếm lại.</p><form class="frm" id="sdm">
    <div class="row4"><label class="field">Ngày sản xuất<input id="sdm-ng" type="date" value="${sxToday()}" max="${sxToday()}" required></label></div>
-   <label class="field">Người thực hiện</label>${sxPeoplePick()}
+   <label class="field">Công nhân sản xuất</label><div id="sdm-ppl" class="sdmppl"></div><datalist id="sdm-dl">${SX().people.map(p=>`<option value="${esc(p.ten)}">`).join("")}</datalist>
    <label class="field" style="margin-top:10px">Sản phẩm</label>
    <div class="tbl edit"><table><thead><tr><th>Sản phẩm (gõ hoặc dán tên, mã)</th><th style="width:130px">Số lượng</th><th style="width:76px"></th></tr></thead><tbody id="sdm-b"></tbody></table></div>
    <label class="field">Ghi chú<input id="sdm-gc"></label>${sxCanCount()?`<label class="ck"><input type="checkbox" id="sdm-ok" checked> Số này là số đã kiểm đếm thực tế: ghi luôn vào kho (cộng thành phẩm, trừ bán thành phẩm, vỏ, tem theo định mức)</label>`:""}<div id="sdm-e"></div>
    <button class="btn pri big" id="sdm-go">Báo hoàn thành</button></form>`);
-  const body=$("#sdm-b");
+  const body=$("#sdm-b"),ppl=$("#sdm-ppl");
+  const addP=(after)=>{const w=document.createElement("span");w.className="sdmp";w.innerHTML=`<input class="sdm-pn" list="sdm-dl" placeholder="Tên công nhân" autocomplete="off"><button type="button" class="btn sm sdm-padd" title="Thêm người">+</button><button type="button" class="lnk sdm-px" title="Bỏ">✕</button>`;
+    if(after)after.after(w);else ppl.appendChild(w);
+    w.querySelector(".sdm-padd").onclick=()=>addP(w);w.querySelector(".sdm-px").onclick=()=>{if(ppl.children.length>1)ppl.removeChild(w)};
+    w.querySelector(".sdm-pn").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addP(w)}};if(after)w.querySelector(".sdm-pn").focus();return w};
+  addP();
   const add=(after)=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="sdm-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="sdm-n hint"></small></td><td><input class="sdm-q n" type="number" min="1" step="any"></td><td style="white-space:nowrap"><button type="button" class="btn sm sdm-add" title="Thêm dòng">+</button> <button type="button" class="lnk sdm-x" title="Bỏ dòng">✕</button></td>`;
     if(after)after.after(tr);else body.appendChild(tr);
     const inp=tr.querySelector(".sdm-i");
-    if(typeof khoPick==="function")khoPick(inp,null,it=>{inp.dataset.code=it.code;tr.querySelector(".sdm-n").textContent=it.name;tr.querySelector(".sdm-q").focus()});
+    if(typeof khoPick==="function")khoPick(inp,["TP"],it=>{inp.dataset.code=it.code;tr.querySelector(".sdm-n").textContent=it.name;tr.querySelector(".sdm-q").focus()});
     tr.querySelector(".sdm-add").onclick=()=>add(tr);
     tr.querySelector(".sdm-x").onclick=()=>{if(body.children.length>1)body.removeChild(tr)};
     tr.querySelector(".sdm-q").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add(tr)}};
@@ -278,8 +283,8 @@ function sxDoneMulti(){
     const L=[...body.querySelectorAll("tr")].map(tr=>{const i=tr.querySelector(".sdm-i"),v=i.value.trim();return {sp:i.dataset.code||(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(v)?v:""),raw:v,sl:+tr.querySelector(".sdm-q").value}}).filter(x=>x.raw||x.sl);
     const bad=L.filter(x=>!x.sp||!(x.sl>0));
     if(!L.length||bad.length){$("#sdm-e").innerHTML=`<div class="note red">${!L.length?"Chưa có sản phẩm nào.":"Dòng chưa chọn sản phẩm trong danh sách hoặc chưa có số lượng: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
-    btn.disabled=true;const ng=[...$$("#sdm [name=sxng]:checked")].map(x=>x.value),day=$("#sdm-ng").value,gc=$("#sdm-gc").value.trim(),counted=!!($("#sdm-ok")&&$("#sdm-ok").checked),ids=[];
-    sxMut(`xưởng báo hoàn thành ${L.length} sản phẩm`,s2=>{L.forEach((x,k)=>{const id="B-"+Date.now().toString(36)+k+Math.floor(Math.random()*99);
+    btn.disabled=true;const ng=[...new Set([...$$("#sdm .sdm-pn")].map(x=>x.value.trim()).filter(Boolean))],day=$("#sdm-ng").value,gc=$("#sdm-gc").value.trim(),counted=!!($("#sdm-ok")&&$("#sdm-ok").checked),ids=[];
+    sxMut(`xưởng báo hoàn thành ${L.length} sản phẩm`,s2=>{ng.forEach(t=>{if(!s2.people.some(p=>p.ten.toLowerCase()===t.toLowerCase()))s2.people.push({ten:t,hoTen:t,viTri:""})});L.forEach((x,k)=>{const id="B-"+Date.now().toString(36)+k+Math.floor(Math.random()*99);
       ids.push(id);s2.batches.push({id,ma:"",req:"",sp:x.sp,ngay:day,nguoi:ng,baoSL:x.sl,baoLuc:sxNow(),baoBy:ME.name,tong:0,dat:0,loi:0,cho:0,ghiChu:gc,lechLyDo:"",kiemBy:"",kiemLuc:"",st:"CHO_KIEM",ver:1,containers:[],hist:[{at:sxNow(),by:ME.name,act:"Xưởng báo hoàn thành "+x.sl}],nvlTru:false,phatSinh:true})})});
     closeDrawer();if(counted){sxConfirmCounted(ids);return}toast(`Đã báo kế toán kiểm kê ${L.length} sản phẩm`);renderMain()};
 }

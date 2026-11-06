@@ -596,3 +596,4 @@ body.pop-open{overflow:hidden}
 #sdm .sdm-add{padding:2px 9px;min-height:0;height:28px}
 #sdm .sdm-x{padding:0 4px}
 .tqtask.clk{cursor:pointer;border-radius:8px}.tqtask.clk:hover{background:#f6f7fc}
+.sdmppl{display:flex;flex-wrap:wrap;gap:6px 10px;margin-bottom:6px}.sdmp{display:inline-flex;align-items:center;gap:4px}.sdmp .sdm-pn{width:170px;height:32px;padding:5px 8px;margin:0}.sdmp .sdm-padd{height:28px;padding:2px 9px;min-height:0}
