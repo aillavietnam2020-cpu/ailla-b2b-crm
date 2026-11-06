@@ -18,29 +18,58 @@ function fbvRate(){
 }
 {const _t=tqRevB2C;tqRevB2C=function(){try{if(typeof DT_HOAN_FB!=="undefined")DT_HOAN_FB=fbvRate().r}catch(e){}return _t.apply(this,arguments)}}
 
-/* Tỷ lệ giá vốn / doanh thu đơn giao thật theo Sheet Pancake (fb_cost_days) của 31 ngày gần nhất Sheet có số, dùng cho ngày Sheet chưa có.
-   Không dùng cột giá vốn đơn chốt (DAYD.fb[7]) cho tháng đang chạy: 06/11 cột này mới 1,8% doanh thu chốt (thiếu đơn), làm giá vốn và lãi sai. */
-function fbvGvRate(){const R=FBC.raw&&FBC.raw.days;if(!R)return null;const ks=Object.keys(R).sort().slice(-31);if(!ks.length)return null;const C=fbdCost(ks);return C.dt>0?{r:C.gv/C.dt,den:ks[ks.length-1]}:null}
-/* Giá vốn đơn giao của một khoảng ngày cho Lãi lỗ / Tổng quan (tqgop.js): ngày Sheet có thì số thật, ngày chưa có thì theo tỷ lệ fbvGvRate. */
-function fbvGvCa(from,to){if(typeof FBC==="undefined"||!FBC.raw||!FBC.raw.days)return null;const ks=Object.keys(DAYD.fb||{}).filter(k=>k>=from&&k<=to),FR=FBC.raw.days,cov=ks.filter(k=>FR[k]),unc=ks.filter(k=>!FR[k]);
-  const C=fbdCost(cov),dtU=unc.reduce((a,k)=>a+(+DAYD.fb[k][5]||0),0);if(!dtU)return {gv:C.gv,uoc:0};const GR=fbvGvRate();return GR?{gv:C.gv+dtU*GR.r,uoc:unc.length,r:GR.r}:null}
+/* ---------- Giá vốn, ship Facebook do web tự tính (chị Hoa duyệt 06/11/2026, không ước tỷ lệ) ----------
+   Máy chủ kéo tiền đơn đã gửi hàng mỗi sáng 7 giờ (services/fbCost.ts → /api/hub/dieuhanh/doanhthu/fb-money: tiền hàng, phí hãng vận chuyển).
+   Dòng đơn (channel_order_lines FACEBOOK, /online/sheet) × giá thành trên web (Quy đổi mã các sàn kênh Facebook + giá vốn SKU / giá kho, như Shopee).
+   Đơn có mã chưa có giá thành: không tính vào rổ giá vốn, liệt kê ở FBM.miss. Ngày có số web thì thay ngày cùng tên của bản nạp tay cũ (fb_cost_days).
+   Giá vốn, ship trên trang = doanh thu × (giá vốn / tiền hàng) của các đơn đã gửi trong kỳ (cùng rổ đơn, số thật). */
+const FBM={raw:null,at:0,busy:0,lines:null,lk:"",cost:null,days:null,miss:[],ver:0};
+const FBM_FROM="2026-10-22";
+async function fbmLoad(){if(FBM.busy||(FBM.raw&&Date.now()-FBM.at<600000)||typeof svApi!=="function")return;FBM.busy=1;
+  try{const t=iso(new Date()),k=FBM_FROM+"|"+t;
+    const [raw,sh]=await Promise.all([svApi("/api/hub/dieuhanh/doanhthu/fb-money").catch(()=>null),FBM.lk===k&&FBM.lines?FBM.lines:kApi(`/online/sheet?channel=FACEBOOK&from=${FBM_FROM}&to=${t}`).then(r=>r.lines||[]).catch(()=>null)]);
+    if(!FBM.cost){const [map,cat,costs,on]=await Promise.all([kApi("/online/map?channel=FACEBOOK").catch(()=>[]),kApi("/catalog").catch(()=>null),kApi("/costs").catch(()=>[]),kApi("/online").catch(()=>null)]);
+      const items=new Map(((cat&&cat.items)||[]).map(i=>[String(i.code).toLowerCase(),i])),isPack=code=>{const it=items.get(String(code).toLowerCase());return !!it&&/đóng gói|hộp|thùng|bao bì/i.test((it.grp||"")+" "+(it.name||""))&&it.cls==="NVL"};
+      FBM.cost={map:Array.isArray(map)?map:[],kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg])),alias:(on&&on.aliases)||[],isPack}}
+    FBM.raw=raw;FBM.lines=sh;FBM.lk=k;FBM.at=Date.now();fbmCalc()}catch(e){console.warn("giá vốn Facebook",e)}finally{FBM.busy=0}
+  if(["bc_fb","pl","exec","bc_tong"].includes(PAGE)&&!(typeof svTyping==="function"&&svTyping()))renderMain()}
+function fbmCalc(){const R=FBM.raw,L=FBM.lines,C=FBM.cost;if(!R||!R.o||!L||!C)return;
+  const ky=iso(new Date()).slice(0,7),cf=ttMakeCostOf({ky,mapRows:C.map,skus:D().skus||[],khoCost:C.kho,isPack:C.isPack,alias:C.alias}),by={};
+  L.forEach(l=>{(by[l.order_id]=by[l.order_id]||[]).push(l)});
+  const days={},miss={};
+  Object.entries(R.o).forEach(([id,[d,dt,ship]])=>{if(d<FBM_FROM)return;const ls=by[id]||[],o=days[d]||(days[d]={n:0,dt:0,gv:0,ship:0,nAll:0,nMiss:0,dtMiss:0});o.nAll++;
+    let gv=0,ok=ls.length>0;ls.forEach(l=>{const c=cf(l.sku,null,l.variant);if(c.u==null){ok=false;const k=l.sku+(l.variant?" · "+l.variant:"");const m=miss[k]||(miss[k]={n:k,q:0,why:c.why});m.q+=+l.qty||0}else gv+=c.u*(+l.qty||0)});
+    if(!ok){o.nMiss++;o.dtMiss+=dt;return}o.n++;o.dt+=dt;o.gv+=gv;o.ship+=ship});
+  FBM.days=days;FBM.miss=Object.values(miss).sort((a,b)=>b.q-a.q);FBM.ver++;fbmMerge()}
+/* Ghép số web vào FBC.raw.days (thay ngày cùng tên của bản nạp tay cũ): g = [số đơn, tiền hàng, giá vốn, ship], h (ship hoàn) chưa có = 0. */
+function fbmMerge(){if(typeof FBC==="undefined"||!FBM.days)return;if(!FBC.raw)FBC.raw={days:{}};if(!FBC.raw.days)FBC.raw.days={};if(FBC.raw._web===FBM.ver)return;
+  Object.entries(FBM.days).forEach(([d,o])=>{if(o.n)FBC.raw.days[d]={g:[o.n,o.dt,o.gv,o.ship],h:[0,0],web:1};else delete FBC.raw.days[d]});FBC.raw._web=FBM.ver}
+{const _l=fbcLoad;fbcLoad=async function(){const r=await _l.apply(this,arguments);try{FBC.raw&&delete FBC.raw._web;fbmMerge()}catch(e){}return r}}
+/* Giá vốn, ship cùng rổ: tỷ lệ trên tiền hàng các ngày có số trong khoảng (đơn đã gửi). Không có ngày nào có số thì null (không ước). */
+function fbvTyLe(from,to){fbmLoad();fbmMerge();const R=FBC.raw&&FBC.raw.days;if(!R)return null;const ks=Object.keys(R).filter(k=>k>=from&&k<=to).sort();if(!ks.length)return null;const C=fbdCost(ks);
+  return C.dt>0?{gv:C.gv/C.dt,ship:C.ship/C.dt,ret:C.shipRet/C.dt,n:ks.length,den:ks[ks.length-1],C}:null}
+/* Giá vốn đơn giao của một khoảng ngày cho Lãi lỗ / Tổng quan (tqgop.js): doanh thu giao × tỷ lệ thật trong khoảng; chưa có số thì null. */
+/* Ghi chú nguồn + mã chưa có giá thành (để trống, không ước). */
+function fbmNote(){const M=FBM.miss||[],D2=FBM.days||{},nm=Object.values(D2).reduce((a,o)=>a+o.nMiss,0);return (FBM.raw&&FBM.raw.at?` · số đơn đã gửi kéo lúc ${FBM.raw.at.slice(11,16)} ${FBM.raw.at.slice(8,10)}/${FBM.raw.at.slice(5,7)}`:" · đang tải số đơn Facebook")+(nm?` · ${nf(nm)} đơn có mã chưa có giá thành, chưa tính: ${M.slice(0,5).map(x=>x.n).join("; ")}${M.length>5?"…":""}`:"")}
+function fbvGvCa(from,to){if(typeof FBC==="undefined")return null;const T=fbvTyLe(from,to),dtG=Object.keys(DAYD.fb||{}).filter(k=>k>=from&&k<=to).reduce((a,k)=>a+(+DAYD.fb[k][5]||0),0);
+  return T?{gv:dtG*T.gv,ship:dtG*(T.ship+T.ret),r:T.gv,den:T.den}:{gv:null,ship:null}}
 /* Số kỳ đang chọn: doanh thu cùng nguồn các trang khác; chi phí thật theo Sheet, ngày Sheet chưa có thì ước. */
 function fbvData(){
   const all=fbdRange(PERIOD.from,PERIOD.to),lastK=all.filter(k=>(DAYD.fb||{})[k]).pop()||PERIOD.to,days=all.filter(k=>k<=lastK),A=fbdAgg(days);
   let R=null;try{R=tqRevB2C({},PERIOD.from,PERIOD.to).fb}catch(e){}
   const sumD=i=>days.reduce((a,k)=>a+(+((DAYD.fb||{})[k]||[])[i]||0),0);
   const dt=R&&R.dt!=null?R.dt:sumD(5),FR=(FBC.raw&&FBC.raw.days)||{},cov=days.filter(k=>FR[k]),unc=days.filter(k=>!FR[k]);
-  const C=fbdCost(cov),dtCov=C.dt,dtUnc=unc.reduce((a,k)=>a+(+((DAYD.fb||{})[k]||[])[5]||0),0),shipRate=dtCov?C.ship/dtCov:FBD_SHIP,retRate=dtCov?C.shipRet/dtCov:0;
-  const GR=dtCov?{r:C.gv/dtCov,den:cov[cov.length-1]}:fbvGvRate(),gvRate=GR?GR.r:null,gv=C.gv+(gvRate!=null?dtUnc*gvRate:unc.reduce((a,k)=>a+(+((DAYD.fb||{})[k]||[])[7]||0),0)),ship=C.ship+dtUnc*shipRate,shipRet=C.shipRet+dtUnc*retRate;
-  const qcRaw=days.reduce((a,k)=>a+fbdQcRaw(k),0),qcT=days.reduce((a,k)=>a+fbdQc(k),0),lai=dt-gv-ship-shipRet-qcT;
+  const TL=fbvTyLe(PERIOD.from,PERIOD.to),C=TL?TL.C:fbdCost([]),dtCov=C.dt,dtUnc=unc.reduce((a,k)=>a+(+((DAYD.fb||{})[k]||[])[5]||0),0);
+  const gv=TL?dt*TL.gv:null,ship=TL?dt*TL.ship:null,shipRet=TL?dt*TL.ret:0,GR=TL?{r:TL.gv,den:TL.den}:null;
+  const qcRaw=days.reduce((a,k)=>a+fbdQcRaw(k),0),qcT=days.reduce((a,k)=>a+fbdQc(k),0),lai=gv==null?null:dt-gv-ship-shipRet-qcT;
   const RT=fbvRate(),dang=R&&R.dang!=null?{n:R.dang,v:R.dangDt||0}:(typeof dtFbDang==="function"?dtFbDang(PERIOD.from,PERIOD.to):{n:0,v:0});
   const ym=PERIOD.to.slice(0,7),chua=typeof dtTrangThai==="function"&&dtTrangThai(ym,dtToday())!=="chot",dk=chua&&dang.v>0?dt+dang.v*(1-RT.r):null;
   /* Tháng đang chạy (có doanh thu dự kiến): giá vốn, ship tính trên cùng rổ đơn dự kiến, không lấy riêng phần đã giao rồi trừ quảng cáo
      cả tháng (chị Hoa 06/11: lãi −320%). Giá vốn theo đơn đã lên (đơn chốt Pancake: giá vốn chốt / doanh thu chốt) nếu có, không thì
      tỷ lệ thật của phần đã giao; ship theo tỷ lệ thật phần đã giao. Quảng cáo giữ nguyên. Hết tháng về doanh thu thực. */
-  let tam=null;if(dk!=null&&dt>0){const gvR=gv/dt,shR=ship/dt,rtR=shipRet/dt;/* giá vốn đơn chốt Pancake (cột 7) tháng đang chạy còn thiếu nhiều đơn (06/11: 1,8%) nên lấy tỷ lệ thật phần đã giao */
-    tam={base:dk,gv:dk*gvR,ship:dk*shR,shipRet:dk*rtR,gvSrc:unc.length&&GR?`ước theo tỷ lệ giá vốn Sheet Pancake ${tbP(GR.r,1)} (Sheet có số tới ${GR.den.slice(8)}/${GR.den.slice(5,7)})`:"theo Sheet Pancake"};tam.lai=dk-tam.gv-tam.ship-tam.shipRet-qcT}
-  return {days,A,R,dt,dk,dang,RT,gv,ship,shipRet,qcRaw,qcT,tam,tax:qcRaw?qcT/qcRaw:1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1),lai,cov,unc,dtUnc,C,shipAll:(ship+shipRet)/(dt||1),
+  let tam=null;if(dk!=null&&dt>0&&TL){/* tỷ lệ thật trên tiền hàng các đơn đã gửi trong kỳ (giá thành web), không ước */
+    tam={base:dk,gv:dk*TL.gv,ship:dk*TL.ship,shipRet:dk*TL.ret,gvSrc:`theo đơn đã gửi, giá thành trên web (số tới ${TL.den.slice(8)}/${TL.den.slice(5,7)})`};tam.lai=dk-tam.gv-tam.ship-tam.shipRet-qcT}
+  return {days,A,R,dt,dk,dang,RT,gv,ship,shipRet,qcRaw,qcT,tam,tax:qcRaw?qcT/qcRaw:1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1),lai,cov,unc,dtUnc,C,shipAll:TL?TL.ship+TL.ret:0,
     lastCov:cov[cov.length-1]||"",lastK,chua,nhan:R&&R.nhan?R.nhan:""};
 }
 function fbvProds(days){const F=FBC.raw;if(!F||!F.p||!F.sk)return [];const m={};
@@ -68,7 +97,7 @@ function fbvAdm(m){
   if(!X.days.length||!dt){m.innerHTML=head+`<section class="card"><p class="empty">Kỳ này chưa có số Facebook.</p></section>`;fbvBind(m);return}
   const L=fbvLines(X),AL=fbvAlerts(X,L),so=oneMonth?bcSoCP(ky,["Facebook"],"Facebook"):{rieng:null,chung:null,whyR:"Chọn đủ một tháng để lấy Sổ chi phí",whyC:"Chọn đủ một tháng để lấy Sổ chi phí"};
   const OP=typeof fbdOpex==="function"?fbdOpex(X.days):{has:false};if(OP.has)so.rieng=(so.rieng||[]).concat([{n:"Chi phí vận hành nhập ở tab Nhập chi phí",t:OP.amt}]);
-  const sumL=a=>(a||[]).reduce((s,x)=>s+(+x.t||0),0),Rr=so.rieng?sumL(so.rieng):null,Cc=so.chung?sumL(so.chung):null,ln=Rr!=null&&Cc!=null?X.lai-Rr-Cc:null,adsMax=AL.adsMax,uoc=X.unc.length?` · ${nf(X.unc.length)} ngày cuối ước theo tỷ lệ (Sheet có tới ${fbvVn(X.lastCov)})`:"";
+  const sumL=a=>(a||[]).reduce((s,x)=>s+(+x.t||0),0),Rr=so.rieng?sumL(so.rieng):null,Cc=so.chung?sumL(so.chung):null,ln=Rr!=null&&Cc!=null?X.lai-Rr-Cc:null,adsMax=AL.adsMax,uoc=fbmNote();
   const dtK=X.dk!=null?kpi("Doanh thu dự kiến",tr(X.dk),fbvDkTxt(X)):kpi("Doanh thu thực",tr(dt),nf(X.A.giao)+" đơn giao · TB "+tr(X.A.giao?dt/X.A.giao:0)+"/đơn");
   const kp=`<div class="grid kpis">${dtK}${kpi("Giá vốn",tr(X.gv),tbP(X.gv,dt)+" "+cs+(X0.tam?" · "+X0.tam.gvSrc:""))}${kpi("Vận chuyển",tr(X.ship+X.shipRet),tbP(X.ship+X.shipRet,dt)+" · gồm ship hoàn "+tr(X.shipRet))}${kpi("Quảng cáo (gồm thuế)",tr(X.qcT),tbP(X.qcT,X.dk||dt)+(X.dk!=null?" doanh thu dự kiến":"")+" · ngưỡng "+tbP(adsMax,1),X.qcT/(X.dk||dt)>adsMax?"var(--red)":"")}${kpi("Lãi đóng góp kênh",tr(X.lai),tbP(X.lai,dt)+(X0.tam?" · tạm tính trên doanh thu dự kiến, hết tháng về doanh thu thực":" · trước chi chung"),X.lai<0?"var(--red)":"var(--green)")}${kpi("Lợi nhuận ròng kênh",ln==null?"—":tr(ln),ln==null?"chờ Sổ chi phí đủ số":tbP(ln,dt)+" · sau chi riêng, chi chung","var(--green)")}</div>`;
   /* Cơ cấu doanh thu theo nguồn đơn (Pancake): quảng cáo chuyển đổi gán cho trang bán hàng, quảng cáo tin nhắn gán cho inbox. */
@@ -89,7 +118,7 @@ function fbvAdm(m){
   const cost=`<section class="card"><div class="card-h"><h2>Cơ cấu chi phí</h2><span class="hint">mọi khoản chi của kênh trên ${cs} ${tbF(dt)} đ${X0.tam?" (tạm tính, cùng rổ đơn)":""}${uoc}</span></div>
    <div class="tb-bar">${bar.filter(b=>b[1]>0).map(([n,t,c])=>{const ty=t/dt;return `<div style="width:${(ty*100).toFixed(2)}%;background:${c}" title="${esc(n)} ${tbF(t)}">${ty>=0.06?esc(n)+" "+tbP(t,dt):tbP(t,dt)}</div>`}).join("")}</div>
    ${tbl(["Khoản","Số tiền (đ)","% doanh thu","Ghi chú"],[
-     row("gv","#8a8799","Giá vốn hàng bán",X.gv,X.unc.length?"giá vốn thật từng đơn (Sheet Pancake), ngày Sheet chưa có thì ước":"giá vốn thật từng đơn (Sheet Pancake)"),
+     row("gv","#8a8799","Giá vốn hàng bán",X.gv,"số lượng từng đơn đã gửi × giá thành trên web, theo tỷ lệ trên tiền hàng"||"giá vốn thật từng đơn (Sheet Pancake)"),
      row("vc","#e07a3f","Vận chuyển",X.ship+X.shipRet,"bấm để xem",[{n:"Phí ship đơn giao",t:X.ship},{n:`Ship đơn hoàn hai chiều (${nf(X.A.hoan)} đơn)`,t:X.shipRet,h:"mất thêm vì hoàn"}]),
      row("qc","#e2494a","Quảng cáo Facebook (gồm thuế)",X.qcT,"bấm để xem theo loại",[{n:"Chiến dịch chuyển đổi (trang bán hàng)",t:cwT},{n:"Chiến dịch tin nhắn (inbox)",t:ciT},...(L.unk.qcT?[{n:"Trong đó chưa gán được nhóm hàng (tên chiến dịch không theo mã)",t:L.unk.qcT}]:[])].filter(x=>Math.round(x.t))),
      `<tr class="tb-sum"><td><span class="tb-car"></span>Lãi đóng góp kênh</td><td class="n">${tbF(X.lai)}</td><td class="n">${tbP(X.lai,dt)}</td><td class="hint">trước chi riêng khác và chi chung</td></tr>`,

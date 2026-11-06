@@ -88,7 +88,12 @@ interface PosOrder {
   time_send_partner?: string;
   status_history?: Array<{ status?: number; updated_at?: string }>;
   items?: Array<{ quantity?: number; variation_info?: { name?: string; detail?: string } }>;
+  /** Tiền đơn (Facebook giá vốn / ship, fbCost.ts): tổng tiền hàng sau giảm giá, phí trả hãng vận chuyển. */
+  total_price?: number;
+  total_price_after_sub_discount?: number;
+  partner_fee?: number;
 }
+export type { PosOrder };
 
 /** Giờ đơn rời kho. Shopee, Facebook: lần gần nhất sang "Đã gửi hàng". TikTok: lần đầu sang một trạng thái rời kho. */
 function shippedAt(o: PosOrder, channel: string): number | null {
@@ -127,6 +132,7 @@ export async function fetchShippedLines(
   apiKey: string,
   day: string,
   shopNames: Record<string, string>,
+  onOrder?: (orderId: string, o: PosOrder) => void,
 ): Promise<{ lines: FetchedLine[]; pages: number }> {
   const { start, end } = vnBounds(day);
   const startSec = Math.floor(start / 1000);
@@ -170,6 +176,7 @@ export async function fetchShippedLines(
         const t = shippedAt(o, channel);
         if (t === null || t < start || t >= end) continue;
         seen.add(oid);
+        if (onOrder) onOrder(oid, o);
         const acc = String(o.account ?? '');
         const shop =
           channel === 'FACEBOOK'
