@@ -1402,7 +1402,8 @@ khoRoutes.post('/docs', async (c) => {
   // Sổ kho lấy ngày đó làm mốc riêng của mã (view kho_ledger, migration 0070).
   const boSung = type === 'TD' && b.bo_sung === true;
   if (type === 'TD' && !boSung && !isCeo(auth)) throw forbidden('Chỉ CEO nhập tồn đầu kỳ');
-  if (boSung && !isCeo(auth) && !auth.permissions.includes('sx.kiemke')) throw forbidden('Chỉ kế toán kho (quyền kiểm kê) hoặc CEO ghi kiểm tồn bổ sung');
+  // Phiếu kiểm tồn (chị Hoa 06/11): kế toán kho, mua hàng (Thảo), kế toán (Huệ), CEO. Có số phiếu, ngày đếm, người lập.
+  if (boSung && !isCeo(auth) && !auth.permissions.includes('sx.kiemke') && !canEditMap(auth)) throw forbidden('Chỉ kế toán kho, mua hàng, kế toán hoặc CEO lập phiếu kiểm tồn');
   if (!isDate(b.date)) throw badRequest('BAD_DATE', 'Ngày phiếu không đúng');
   const date = b.date;
   const mocChung = type === 'TD' ? await khoMocChung(c.env.DB) : null;
@@ -1488,14 +1489,14 @@ khoRoutes.post('/docs', async (c) => {
           `SELECT m.item, d.no, d.doc_date FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
            WHERE d.status = 'OK' AND d.type = 'TD' AND d.doc_date >= ? AND m.item IN (${part.map(() => '?').join(',')})`,
         )
-          .bind(mocChung, ...part)
+          .bind(date, ...part)
           .all<{ item: string; no: string; doc_date: string }>();
         hit.push(...(r.results ?? []));
       }
       if (hit.length) {
         throw conflict(
           'DA_KIEM',
-          `Đã có số kiểm từ mốc ${ddmm(mocChung)}: ${hit.slice(0, 8).map((h) => `${h.item} (${h.no}, ${ddmm(h.doc_date)})`).join(', ')}${hit.length > 8 ? '…' : ''}. Không ghi kiểm lại; muốn đổi số thì lập phiếu điều chỉnh (Xuất khác để giảm, phiếu nhập để tăng) hoặc báo CEO.`,
+          `Đã có phiếu kiểm cùng ngày hoặc sau ngày ${ddmm(date)}: ${hit.slice(0, 8).map((h) => `${h.item} (${h.no}, ${ddmm(h.doc_date)})`).join(', ')}${hit.length > 8 ? '…' : ''}. Muốn sửa số thì hủy phiếu kiểm đó rồi lập lại.`,
         );
       }
       extra.bo_sung = true;
