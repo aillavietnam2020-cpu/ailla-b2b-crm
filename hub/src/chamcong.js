@@ -35,11 +35,23 @@ tr.cc-det>td{background:var(--gray-soft);padding:8px}
 .cc-savebar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:0 -4px 16px rgba(30,35,80,.08);margin-top:8px}
 .has-mobtab .cc-savebar{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 .cc-savebar .btn{min-height:44px;padding-inline:22px}
+.cc-out{display:grid;gap:10px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;margin:4px 0}
+.cc-outw{margin:0;background:#fff1dc;color:#8a4b00;border-radius:12px;padding:10px 12px;font-size:14px}
+.cc-outl{font-weight:600;font-size:13.5px}
+.cc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cc-chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+.cc-chip.on{background:linear-gradient(120deg,#4b54d1,#7253e0);color:#fff;border-color:transparent}
+.cc-shoot{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;font-size:14px}
+.cc-shoot.on{border-color:#4b54d1;background:#f6f5ff}
+.cc-out textarea{width:100%;box-sizing:border-box}
+.cc-outimg{width:100%;border-radius:12px;display:block}
+.cc-cam{text-align:center;cursor:pointer}
+.cc-xnimg{width:84px;height:63px;object-fit:cover;border-radius:10px;display:block}
 tr.cc-cu>td{background:var(--gray-soft);padding:8px 12px}.cc-curow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px}.cc-curow label{display:inline-flex;align-items:center;gap:6px}
 .cc-mon tr.cc-row>td:first-child{min-width:210px;white-space:normal}.cc-mon th,.cc-mon tr.cc-row>td{white-space:nowrap}
 .cc-grid th.we,.cc-grid td.we{background:var(--gray-soft)}
 `;document.head.appendChild(st)}
-const CC_PAGES=["cc_toi","cc_ngay","cc_thang","cc_xepca","cc_caidat","cc_may"];
+const CC_PAGES=["cc_toi","cc_ngay","cc_thang","cc_xepca","cc_caidat","cc_may","cc_xn"];
 const ccOn=()=>typeof PAGE!=="undefined"&&CC_PAGES.includes(PAGE);
 const ccRedraw=()=>{if(ccOn())renderMain()};
 const ccLead=u=>!!u&&["lead","truongphong"].includes(u.role);
@@ -62,7 +74,7 @@ const ccCaTxt=c=>c?`${esc(c.ten)} ${c.tu}–${c.den}`:"Không có ca";
 const ccGio=m=>m?Math.floor(m/60)+"g"+String(m%60).padStart(2,"0"):"—";
 const ccPhut=m=>m>=60?Math.floor(m/60)+" giờ "+(m%60?m%60+" phút":""):m+" phút";
 /* Ghi chú một ngày công: đi muộn, về sớm, quên chấm ra, ngoài phạm vi, muộn chưa ghi lý do. */
-const ccNote=x=>{const a=[];if(x.le)a.push(pill("Nghỉ lễ","gry"));if(x.don)a.push(pill(x.don,x.don==="Nghỉ không lương"?"amb":"grn"));if(x.muon)a.push(pill("Muộn "+ccPhut(x.muon),"amb"));if(x.som)a.push(pill("Về sớm "+ccPhut(x.som),"amb"));if(x.quenRa)a.push(pill("Quên chấm ra","red"));if(x.ngoai)a.push(pill("Ngoài phạm vi","red"));if(x.canhBao)a.push(pill("Muộn chưa ghi lý do","red"));return a.join(" ")};
+const ccNote=x=>{const a=[];if(x.le)a.push(pill("Nghỉ lễ","gry"));if(x.don)a.push(pill(x.don,x.don==="Nghỉ không lương"?"amb":"grn"));if(x.muon)a.push(pill("Muộn "+ccPhut(x.muon),"amb"));if(x.som)a.push(pill("Về sớm "+ccPhut(x.som),"amb"));if(x.quenRa)a.push(pill("Quên chấm ra","red"));if(x.ngoai)a.push(pill("Ngoài phạm vi","red"));if(x.canhBao)a.push(pill("Muộn chưa ghi lý do","red"));if(x.choXn)a.push(pill("Chấm ngoài chờ xác nhận","amb"));return a.join(" ")};
 let CC_SKEW=0; // chênh giữa đồng hồ máy chủ và điện thoại, để biết đang muộn bao nhiêu phút
 const ccNowMin=()=>{const d=new Date(Date.now()+CC_SKEW+7*3600e3);return d.getUTCHours()*60+d.getUTCMinutes()};
 const ccMuonNay=()=>{const R=CC.me;if(!R||!R.rule||!R.rule.tinh)return 0;const m=ccNowMin()-R.rule.vao;return m>R.lich.anHan?m:0};
@@ -101,16 +113,23 @@ function ccPos(){
 }
 async function ccCham(loai){
   if(CC.busy)return;
-  const lyDo=CC.reason&&CC.reason.loai===loai?(($("#cc-lydo")||{}).value||"").trim():"";
+  const O=CC.out&&CC.out.loai===loai?CC.out:null;
+  if(O){const t=$("#cc-outnote");if(t)O.note=t.value;
+    if(O.ly==="quay"&&!O.shoot&&!(O.note||"").trim()){toast("Ghi quay ở đâu, hoặc chọn buổi quay");return}
+    if(O.ly!=="quay"&&!(O.note||"").trim()){toast(O.ly==="khach"?"Ghi gặp khách nào, ở đâu":"Ghi rõ việc gì");return}
+    if(!O.anh){toast("Chụp ảnh check-in trước khi chấm");return}}
+  const sh=O&&O.ly==="quay"?ccShoots().find(s=>s.id===O.shoot):null;
+  const lyDo=O?(CC_LY[O.ly]+((O.note||"").trim()?": "+O.note.trim():"")).slice(0,300):"";
   const lyDoMuon=loai==="vao"?(($("#cc-lymuon")||{}).value||"").trim():"";
   CC.busy=true;CC.err="";ccRedraw();
   try{
     let c=null,posErr=null;try{c=await ccPos()}catch(e){posErr=e}
-    let r;try{r=await svApi("/api/hub/chamcong/cham",{method:"POST",body:JSON.stringify({loai,lat:c?c.latitude:null,lng:c?c.longitude:null,acc:c?c.accuracy:null,lyDo,lyDoMuon})})}catch(e){if(posErr&&e.code==="NO_LOCATION")throw posErr;throw e}
-    CC.reason=null;toast((loai==="vao"?"Đã chấm vào lúc ":"Đã chấm ra lúc ")+ccHm(r.at));
+    let r;try{r=await svApi("/api/hub/chamcong/cham",{method:"POST",body:JSON.stringify({loai,lat:c?c.latitude:null,lng:c?c.longitude:null,acc:c?c.accuracy:null,lyDo,lyDoMuon,anh:O?O.anh:undefined,quay:sh?{id:sh.id,gio:sh.gio||"",diaDiem:sh.diaDiem||"",ghiChu:sh.ghiChu||""}:undefined})})}catch(e){if(posErr&&e.code==="NO_LOCATION")throw posErr;throw e}
+    CC.reason=null;CC.out=null;toast((loai==="vao"?"Đã chấm vào lúc ":"Đã chấm ra lúc ")+ccHm(r.at)+(r.xn==="cho"?", chờ xác nhận":""));
     await ccLoadMe(true);
   }catch(e){
-    if(e.code==="NEED_REASON")CC.reason={loai,msg:e.message};else CC.err=e.message||"Chưa chấm được";
+    if(e.code==="NEED_OUT"){const s=ccShoots()[0];CC.out={...(CC.out&&CC.out.loai===loai?CC.out:{ly:s?"quay":"khach",shoot:s?s.id:"",note:"",anh:""}),loai,msg:e.message}}
+    else if(e.code==="NEED_REASON")CC.reason={loai,msg:e.message};else CC.err=e.message||"Chưa chấm được";
   }
   CC.busy=false;ccRedraw();
 }
@@ -124,22 +143,23 @@ function pCcToi(m){
   const R=CC.me,L7=R.lich,T=R.tong,Q=R.quyTac,hn=R.homNay||[],vao=hn.find(x=>x.loai==="vao"),ra=hn.filter(x=>x.loai==="ra").pop(),today=R.today;
   const loai=vao?"ra":"vao",tdy=(R.ngay||[]).find(x=>x.ngay===today)||{},isCa=L7.kieu==="ca",ccCo=L7.chuyenCan&&L7.kieu!=="tudo";
   const D7=ccVnNow(),dstr=`${ccDow(today)}, ${ccDm(today)}/${today.slice(0,4)}`;
-  const where=x=>x.diem?`${esc(x.diem)}${x.kc!=null?" · cách "+x.kc+" m":""}`:"Chưa cài điểm chấm";
+  const xnP=x=>x.xn==="cho"?" "+pill("Chờ xác nhận","amb"):x.xn==="ok"?" "+pill("Đã xác nhận","grn"):x.xn==="khong"?" "+pill("Không xác nhận","red"):"";
+  const where=x=>x.trong===0?`ngoài VP${x.ly_do?" · "+esc(x.ly_do):""}`:x.diem?`${esc(x.diem)}${x.kc!=null?" · cách "+x.kc+" m":""}`:"Chưa cài điểm chấm";
   const st=!vao&&!ra?`<p class="cc-st">Hôm nay chưa chấm công.</p>`
-    :`<div class="cc-st">${vao?`<div><b>Vào ${ccHm(vao.at)}</b> <span class="hint">${where(vao)}</span> ${tdy.muon?pill("Muộn "+ccPhut(tdy.muon),"amb"):""}${vao.trong===0?" "+pill("Ngoài phạm vi","red"):""}</div>`:`<div>${pill("Chưa chấm vào","amb")}</div>`}
-      ${ra?`<div><b>Ra ${ccHm(ra.at)}</b> <span class="hint">${where(ra)}</span>${ra.trong===0?" "+pill("Ngoài phạm vi","red"):""}</div>`:""}</div>`;
+    :`<div class="cc-st">${vao?`<div><b>Vào ${ccHm(vao.at)}</b> <span class="hint">${where(vao)}</span> ${tdy.muon?pill("Muộn "+ccPhut(tdy.muon),"amb"):""}${xnP(vao)}</div>`:`<div>${pill("Chưa chấm vào","amb")}</div>`}
+      ${ra?`<div><b>Ra ${ccHm(ra.at)}</b> <span class="hint">${where(ra)}</span>${xnP(ra)}</div>`:""}</div>`;
   const caLine=isCa?`<div class="cc-ca">Ca hôm nay: <b>${ccCaTxt(R.caHomNay)}</b></div>`:"";
   const rs=CC.reason&&CC.reason.loai===loai?`<div class="cc-reason"><p>${esc(CC.reason.msg)}</p><textarea id="cc-lydo" rows="2" placeholder="Ví dụ: gặp khách ở Hải Phòng"></textarea></div>`:"";
   const days=(R.ngay||[]).slice().reverse(),mn=loai==="vao"?ccMuonNay():0;
-  const askMuon=loai==="vao"&&mn>Q.mocLyDo?`<div class="cc-reason"><p>Bạn đang muộn ${ccPhut(mn)}. Ghi lý do đi muộn (không bắt buộc, bỏ trống thì HCNS thấy cảnh báo).</p><textarea id="cc-lymuon" rows="2" placeholder="Ví dụ: tắc đường"></textarea></div>`:"";
+  const askMuon=loai==="vao"&&mn>Q.mocLyDo&&!(CC.out&&CC.out.loai===loai)?`<div class="cc-reason"><p>Bạn đang muộn ${ccPhut(mn)}. Ghi lý do đi muộn (không bắt buộc, bỏ trống thì HCNS thấy cảnh báo).</p><textarea id="cc-lymuon" rows="2" placeholder="Ví dụ: tắc đường"></textarea></div>`:"";
   const warn=vao&&tdy.canhBao?`<div class="cc-reason cc-warn"><p><b>Bạn đi muộn ${ccPhut(tdy.muon)} nhưng chưa ghi lý do.</b> HCNS và Lead sẽ thấy cảnh báo này.</p><textarea id="cc-lymuon2" rows="2" placeholder="Ghi lý do đi muộn"></textarea><button class="btn sm" id="cc-lymuon-ok">Lưu lý do</button></div>`:(vao&&tdy.lyDoMuon?`<p class="hint">Lý do đi muộn: ${esc(tdy.lyDoMuon)}</p>`:"");
   const tuan=isCa&&R.caTuan.length?`<section class="card"><div class="card-h"><h2>Ca 7 ngày tới</h2></div>${tbl(["Ngày","Ca"],R.caTuan.map(x=>`<tr${x.ngay===today?' class="cc-today"':""}><td>${ccDow(x.ngay)} ${ccDm(x.ngay)}</td><td>${x.ca?ccCaTxt(x.ca):'<span class="hint">Nghỉ</span>'}</td></tr>`))}</section>`:"";
   m.innerHTML=H("Chấm công",`Lịch ${esc(L7.ten)}: ${ccLichTxt(L7)}`)+`
   <section class="card cc-main">
     <div class="cc-date">${dstr} · Lịch ${esc(L7.ten)}</div>
     <div class="cc-clock" id="cc-clock">${[D7.getUTCHours(),D7.getUTCMinutes(),D7.getUTCSeconds()].map(n=>String(n).padStart(2,"0")).join(":")}</div>
-    ${caLine}${st}${warn}${rs}${askMuon}
-    <button class="btn pri big cc-btn${loai==="ra"?" ra":""}" id="cc-go"${CC.busy?" disabled":""}>${CC.busy?"Đang lấy vị trí…":loai==="vao"?"Chấm vào":(ra?"Chấm ra lại":"Chấm ra")}</button>
+    ${caLine}${st}${warn}${rs}${askMuon}${ccOutHtml(loai)}
+    <button class="btn pri big cc-btn${loai==="ra"?" ra":""}" id="cc-go"${CC.busy?" disabled":""}>${CC.busy?"Đang lấy vị trí…":(loai==="vao"?"Chấm vào":(ra?"Chấm ra lại":"Chấm ra"))+(CC.out&&CC.out.loai===loai?" · gửi xác nhận":"")}</button>
     ${CC.err?`<p class="cc-err">${esc(CC.err)}</p>`:""}
     <p class="hint">${ccLichTxt(L7)}.</p>
     <p class="hint">Bấm nút, điện thoại sẽ hỏi cho phép xem vị trí: chọn Cho phép. Giờ chấm lấy theo đồng hồ máy chủ.${R.diem.length?" Chấm ở: "+R.diem.map(d=>esc(d.ten)).join(", ")+".":" CEO / HCNS chưa cài điểm chấm nên chưa kiểm được vị trí."}</p>
@@ -147,11 +167,71 @@ function pCcToi(m){
   <div class="filters">${ccMonthSel("cc-m")}</div>
   <div class="grid kpis">${kpi("Ngày có chấm công",T.cong+"/"+T.lamChuan)}${ccCo?kpi("Đi muộn + về sớm",T.muonLan+T.somLan,`tối đa ${Q.ccLan} lần để giữ chuyên cần`)+kpi("Chuyên cần tạm tính",T.chuyenCan?"Đạt":"Chưa đạt",T.nghi?`${T.nghi} ngày nghỉ`:(T.nghiPhep?`${T.nghiPhep} ngày phép không tính`:"")):kpi("Tổng giờ làm",ccGio(T.phut))}${kpi("Quên chấm ra",T.quenRa)}</div>
   <section class="card flush">${tbl(["Ngày","Vào – ra","Ghi chú"],days.filter(x=>x.lam||x.vao||x.ra||x.don||x.le).map(x=>`<tr${x.ngay===today?' class="cc-today"':""}><td>${ccDow(x.ngay)} ${ccDm(x.ngay)}${x.ca?`<div class="hint">${esc(x.ca)}</div>`:""}</td><td class="mono">${ccHm(x.vao)} – ${ccHm(x.ra)}${x.phut?`<div class="hint">${ccGio(x.phut)}</div>`:""}</td><td>${ccNote(x)||(!x.vao&&!x.ra&&x.ngay!==today?pill("Không chấm","gry"):"")}</td></tr>`))}</section>`;
-  $("#cc-go").onclick=()=>ccCham(loai);
+  $("#cc-go").onclick=()=>ccCham(loai);ccOutBind();
   if($("#cc-lymuon-ok"))$("#cc-lymuon-ok").onclick=async()=>{const v=($("#cc-lymuon2").value||"").trim();if(!v){toast("Ghi lý do trước khi lưu");return}
     try{await svApi("/api/hub/chamcong/ly-do-muon",{method:"POST",body:JSON.stringify({lyDo:v})});toast("Đã lưu lý do đi muộn");await ccLoadMe(true)}catch(e){toast(e.message)}};
   $("#cc-m").onchange=e=>{CC.thang=e.target.value;CC.me=null;ccLoadMe(true)};
   ccClock();
+}
+
+
+/* ---------- Chấm ngoài văn phòng (CEO 06/11): đi quay, gặp khách → lý do + ảnh check-in + gắn buổi quay, Lead xác nhận ---------- */
+const CC_LY={quay:"Đi quay",khach:"Gặp khách",khac:"Việc khác"};
+/* Buổi quay hôm nay có tên mình (Lịch quay ở Marketing). */
+function ccShoots(){try{const d=D(),t=+String((CC.me||{}).today||"").slice(8);return (d.shoots||[]).filter(s=>s.day===t&&(s.nguoi||[]).includes(ME.id)&&s.trangThai!=="Đã hủy").sort((a,b)=>String(a.gio||"").localeCompare(String(b.gio||"")))}catch(e){return []}}
+function ccOutHtml(loai){
+  const O=CC.out;if(!O||O.loai!==loai)return "";
+  const sh=ccShoots(),cur=sh.find(s=>s.id===O.shoot);
+  return `<div class="cc-out"><p class="cc-outw">${esc(O.msg)}</p>
+    <div class="cc-outl">Lý do</div><div class="cc-chips">${Object.entries(CC_LY).map(([k,t])=>`<button type="button" class="cc-chip${O.ly===k?" on":""}" data-ccly="${k}">${t}</button>`).join("")}</div>
+    ${O.ly==="quay"?(sh.length?`<div class="cc-outl">Buổi quay hôm nay</div>${sh.map(s=>`<label class="cc-shoot${O.shoot===s.id?" on":""}"><input type="radio" name="cc-sq" value="${esc(s.id)}"${O.shoot===s.id?" checked":""}> <span><b>${esc(s.gio||"")}${s.buoi?" · "+esc(s.buoi):""} · ${esc(s.diaDiem||"chưa ghi địa điểm")}</b>${s.ghiChu?`<br><small>${esc(s.ghiChu)}</small>`:""}</span></label>`).join("")}`:`<p class="hint">Hôm nay chưa có buổi quay nào có tên bạn trong Lịch quay. Ghi rõ quay ở đâu vào ô dưới.</p>`):""}
+    <textarea id="cc-outnote" rows="2" placeholder="${O.ly==="khach"?"Gặp khách nào, ở đâu":O.ly==="quay"?"Quay gì, ở đâu":"Ghi rõ việc gì"}">${esc(O.note||"")}</textarea>
+    <div class="cc-outl">Ảnh check-in <span class="hint">(bắt buộc, chụp trực tiếp)</span></div>
+    ${O.anh?`<img class="cc-outimg" src="${O.anh}" alt="Ảnh check-in">`:""}
+    <label class="btn${O.anh?"":" pri"} cc-cam">${O.anh?"Chụp lại":"Mở camera chụp ảnh"}<input type="file" id="cc-cam" accept="image/*" capture="environment" hidden></label>
+    ${cur?`<p class="hint">Gắn buổi quay ${esc(cur.gio||"")} · ${esc(cur.diaDiem||"")}. Đi muộn tính theo giờ quay.</p>`:""}
+  </div>`;
+}
+/* Thu nhỏ ảnh và đóng dấu giờ (đồng hồ máy chủ), ngày, tên, nơi chấm. */
+function ccStamp(file){return new Promise((ok,bad)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{try{
+  const W=Math.min(900,im.width),H0=Math.round(im.height*W/im.width),c=document.createElement("canvas");c.width=W;c.height=H0;const g=c.getContext("2d");g.drawImage(im,0,0,W,H0);
+  const d=ccVnNow(),p=n=>String(n).padStart(2,"0"),O=CC.out||{},sh=ccShoots().find(s=>s.id===O.shoot);
+  const l1=`${p(d.getUTCHours())}:${p(d.getUTCMinutes())} · ${p(d.getUTCDate())}/${p(d.getUTCMonth()+1)}/${d.getUTCFullYear()}`;
+  const l2=[(typeof ME!=="undefined"&&ME?ME.name:""),CC_LY[O.ly]||"",sh?sh.diaDiem||"":""].filter(Boolean).join(" · ");
+  const fs=Math.max(16,Math.round(W/26)),bh=Math.round(fs*3.1);g.fillStyle="rgba(0,0,0,.55)";g.fillRect(0,H0-bh,W,bh);
+  g.fillStyle="#fff";g.font=`700 ${Math.round(fs*1.15)}px sans-serif`;g.fillText(l1,fs*.7,H0-bh+fs*1.35);g.font=`500 ${fs}px sans-serif`;g.fillText(l2.slice(0,60),fs*.7,H0-fs*.6);
+  URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",.62))}catch(e){bad(e)}};im.onerror=()=>bad(new Error("Không đọc được ảnh, chụp lại giúp em"));im.src=u})}
+function ccOutBind(){
+  const O=CC.out;if(!O)return;const keep=()=>{const t=$("#cc-outnote");if(t)O.note=t.value};
+  document.querySelectorAll("[data-ccly]").forEach(b=>b.onclick=()=>{keep();O.ly=b.dataset.ccly;if(O.ly==="quay"&&!O.shoot){const s=ccShoots()[0];if(s)O.shoot=s.id}renderMain()});
+  document.querySelectorAll('input[name="cc-sq"]').forEach(r=>r.onchange=()=>{keep();O.shoot=r.value;renderMain()});
+  const cam=$("#cc-cam");if(cam)cam.onchange=async()=>{const f=cam.files&&cam.files[0];if(!f)return;keep();try{O.anh=await ccStamp(f)}catch(e){toast(e.message)}renderMain()};
+}
+
+/* ---------- Xác nhận chấm ngoài văn phòng (Lead: phòng mình; Lead tự chấm ngoài thì CEO, HCNS) ---------- */
+async function ccXnLoad(force){if(CC.xn&&!force&&!CC.xn.err)return;try{const r=await svApi("/api/hub/chamcong/xac-nhan");CC.xn=r;CC.xnCho=r.cho||0}catch(e){CC.xn={err:e.message,list:[]}}if(PAGE==="cc_xn"||(typeof PD!=="undefined"&&PD.view&&PD.view.page==="cc_xn"))renderMain()}
+async function ccXnCount(){try{if(typeof ME==="undefined"||!ME||!(ccLead(ME)||ccHr(ME)))return;const r=await svApi("/api/hub/chamcong/xac-nhan");const ch=(r.cho||0)!==(CC.xnCho||0);CC.xn=r;CC.xnCho=r.cho||0;if(ch&&typeof render==="function")render()}catch(e){}}
+if(typeof window!=="undefined"&&typeof SERVER!=="undefined"&&SERVER){setTimeout(ccXnCount,2500);setInterval(ccXnCount,180000)}
+function pCcXn(m){
+  const R=CC.xn;if(!R){m.innerHTML=H("Xác nhận chấm ngoài văn phòng")+`<section class="card"><p class="empty">Đang tải…</p></section>`;ccXnLoad();return}
+  if(R.err){m.innerHTML=H("Xác nhận chấm ngoài văn phòng")+`<section class="card"><p class="empty">${esc(R.err)}</p></section>`;return}
+  const tab=CC.xnTab||"cho",L=(R.list||[]).filter(x=>tab==="cho"?x.xn==="cho":x.xn!=="cho");
+  const km=x=>x.kc==null?"":x.kc>=1000?(x.kc/1000).toFixed(1).replace(".",",")+" km":x.kc+" m";
+  const row=x=>{let q=null;try{q=x.quay?JSON.parse(x.quay):null}catch(e){}
+    const muon=q&&x.gio_quay&&x.loai==="vao"?Math.round((Date.parse(x.at)+7*36e5)%864e5/6e4)-(+x.gio_quay.slice(0,2)*60+ +x.gio_quay.slice(3,5)):null;
+    const anh=x.anh_id?`<a href="/api/hub/chamcong/anh/${esc(x.anh_id)}" target="_blank" rel="noopener"><img class="cc-xnimg" src="/api/hub/chamcong/anh/${esc(x.anh_id)}" alt="Ảnh check-in" loading="lazy"></a>`:'<span class="hint">không ảnh</span>';
+    const act=x.xn==="cho"?`<div class="acts"><button class="btn sm pri" data-xn="${esc(x.id)}" data-ok="1">Xác nhận</button><button class="btn sm danger" data-xn="${esc(x.id)}" data-ok="0">Không xác nhận</button></div>`
+      :`${x.xn==="ok"?pill("Đã xác nhận","grn"):pill("Không xác nhận","red")}<div class="hint">${esc(x.xnTen||"")}</div>`;
+    return `<tr><td>${anh}</td><td><b>${esc(x.ten)}</b><div class="hint">${esc(ccPbName(x.pb))}</div></td><td>${x.loai==="vao"?"Vào":"Ra"} <b>${ccHm(x.at)}</b><div class="hint">${ccDow(x.ngay)} ${ccDm(x.ngay)}</div></td><td>${esc(x.ly_do||"")}</td>
+      <td>${q?`${q.gio?esc(q.gio)+" · ":""}${esc(q.diaDiem||"")}${muon!=null?`<div>${muon>5?pill("Muộn "+ccPhut(muon)+" so với giờ quay","amb"):pill("Khớp giờ quay","grn")}</div>`:""}`:'<span class="hint">không có</span>'}</td>
+      <td>${x.kc!=null?"cách "+esc(x.diem||"VP")+" "+km(x)+"<br>":""}${x.lat!=null?`<a class="lnk" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${x.lat},${x.lng}">Xem bản đồ</a>`:""}</td><td>${act}</td></tr>`};
+  m.innerHTML=H("Xác nhận chấm ngoài văn phòng","Đi quay, gặp khách: xem ảnh check-in và vị trí rồi xác nhận. Chưa xác nhận thì ngày đó chưa tính công; không xác nhận thì coi như không chấm.")+`
+  <div class="filters"><div class="cc-chips"><button class="cc-chip${tab==="cho"?" on":""}" data-xntab="cho">Chờ xác nhận (${(R.list||[]).filter(x=>x.xn==="cho").length})</button><button class="cc-chip${tab==="xong"?" on":""}" data-xntab="xong">Đã xử lý 7 ngày</button></div><span class="sp"></span><button class="btn" id="cc-xnrl">Tải lại</button></div>
+  <section class="card flush">${L.length?tbl(["Ảnh","Người","Lượt","Lý do","Lịch quay","Vị trí",""],L.map(row)):`<p class="empty">${tab==="cho"?"Không có lượt nào chờ xác nhận.":"Chưa có lượt nào trong 7 ngày."}</p>`}</section>`;
+  m.querySelectorAll("[data-xntab]").forEach(b=>b.onclick=()=>{CC.xnTab=b.dataset.xntab;renderMain()});
+  $("#cc-xnrl").onclick=()=>{CC.xn=null;renderMain()};
+  m.querySelectorAll("[data-xn]").forEach(b=>b.onclick=async()=>{const okk=b.dataset.ok==="1";b.disabled=true;
+    try{await svApi("/api/hub/chamcong/xac-nhan",{method:"POST",body:JSON.stringify({id:b.dataset.xn,ok:okk})});toast(okk?"Đã xác nhận, ngày đó được tính công":"Đã ghi không xác nhận");await ccXnLoad(true);if(typeof PD!=="undefined")PD.at=0}catch(e){toast(e.message);b.disabled=false}});
 }
 
 /* ---------- Hôm nay (trưởng nhóm: phòng mình; CEO, HCNS: cả công ty) ---------- */
@@ -373,7 +453,7 @@ async function ccLuongLoad(thang){
 function ccLuong(ma,thang){const L=CCL[thang]||{},q=L.q||{tienTrua:25000,tienCC:200000},e=(L.by||{})[ma]||{};return {bua:e.bua??null,giaBua:q.tienTrua,cc:e.cc??null,tienCC:q.tienCC,ot:e.ot||0,otCN:e.otCN||0}}
 {const o=PAGES.hr_bl;if(o)PAGES.hr_bl=m=>{o(m);if(typeof HRM!=="undefined"&&HRM)ccLuongLoad(HRM).then(ch=>{if(ch&&PAGE==="hr_bl")renderMain()});const h=m.querySelector(".card.flush");if(h)h.insertAdjacentHTML("afterend",`<p class="hint">Ăn trưa = số bữa (ngày có chấm công điện thoại, chưa dùng điện thoại thì theo ngày công) × đơn giá; chuyên cần, giờ tăng ca đã duyệt lấy từ chấm công điện thoại. Đơn giá, tiền chuyên cần sửa ở Nhân sự › Cài đặt chấm công.</p>`)}}
 
-PAGES.cc_may=pCcMay;PAGES.cc_toi=pCcToi;PAGES.cc_ngay=pCcNgay;PAGES.cc_thang=pCcThang;PAGES.cc_xepca=pCcXepCa;PAGES.cc_caidat=pCcCaiDat;
+PAGES.cc_xn=pCcXn;PAGES.cc_may=pCcMay;PAGES.cc_toi=pCcToi;PAGES.cc_ngay=pCcNgay;PAGES.cc_thang=pCcThang;PAGES.cc_xepca=pCcXepCa;PAGES.cc_caidat=pCcCaiDat;
 
 /* Menu (chạy sau menubang.js). CEO 04/11: mọi thứ nằm trong mục Nhân sự; nhân viên dùng Của tôi.
    - Nhân sự (CEO, HCNS): Chấm công (Hôm nay, Bảng chấm công tháng, Xếp ca, Chốt công tháng, Cài đặt chấm công),
@@ -388,8 +468,8 @@ PAGES.cc_may=pCcMay;PAGES.cc_toi=pCcToi;PAGES.cc_ngay=pCcNgay;PAGES.cc_thang=pCc
     const lead=u=>ccLead(u)&&!ccHr(u),cho=k=>()=>(typeof NP!=="undefined"&&NP.cho[k])||"";
     const ketoan=u=>ccHr(u)||(typeof npKetoan==="function"&&npKetoan());
     const hs=rest.filter(([g])=>g==="Hồ sơ"),other=rest.filter(([g])=>g!=="Hồ sơ"); // CEO 04/11: Hồ sơ lên đầu mục Nhân sự
-    return [...hs,["Nhóm của tôi",[MI("cc_ngay","Hôm nay",lead),MI("np_duyet","Duyệt nghỉ phép & tăng ca",lead,cho("lead")),MI("cc_xepca","Xếp ca",lead),MI("cc_thang","Bảng chấm công tháng",lead)]],
-      ["Chấm công",[MI("cc_ngay","Hôm nay",ccHr),MI("cc_thang","Bảng chấm công tháng",ccHr),MI("cc_may","Nạp file máy chấm công",ccHr),MI("cc_xepca","Xếp ca",ccHr),...(hrcc?[[hrcc[0],"Chốt công tháng",hrcc[2],hrcc[3]]]:[]),MI("cc_caidat","Cài đặt chấm công",ccHr)]],
+    return [...hs,["Nhóm của tôi",[MI("cc_ngay","Hôm nay",lead),MI("np_duyet","Duyệt nghỉ phép & tăng ca",lead,cho("lead")),MI("cc_xepca","Xếp ca",lead),MI("cc_thang","Bảng chấm công tháng",lead),MI("cc_xn","Xác nhận chấm ngoài",lead,()=>CC.xnCho||"")]],
+      ["Chấm công",[MI("cc_ngay","Hôm nay",ccHr),MI("cc_thang","Bảng chấm công tháng",ccHr),MI("cc_xn","Xác nhận chấm ngoài",ccHr,()=>CC.xnCho||""),MI("cc_may","Nạp file máy chấm công",ccHr),MI("cc_xepca","Xếp ca",ccHr),...(hrcc?[[hrcc[0],"Chốt công tháng",hrcc[2],hrcc[3]]]:[]),MI("cc_caidat","Cài đặt chấm công",ccHr)]],
       ["Nghỉ phép & tạm ứng",[MI("np_ql","Nghỉ phép & tăng ca",ccHr,cho("hcns")),MI("tu_ql","Tạm ứng lương",ketoan,cho("tu"))]],
       ...other]}}
   const me=MODULES.find(x=>x.k==="me");if(me){const g0=me.groups;me.groups=()=>{const G=g0();if(G[0]&&!G[0][1].some(i=>i[0]==="cc_toi"))G[0][1].unshift(MI("cc_toi","Chấm công"));return G}}

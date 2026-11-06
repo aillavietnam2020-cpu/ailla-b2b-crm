@@ -8,6 +8,7 @@ import { unpack } from '../lib/pack';
 import { requirePermission } from '../middleware/rbac';
 import { donTheoNgay, LOAI_DON, type Buoi, type LoaiDon } from '../services/nghiPhep';
 import { loadMembers, type Members } from '../services/daoTao';
+import { bellTo } from '../lib/hubBell';
 import {
   CC_SETTINGS_KEY,
   ccViewer,
@@ -37,7 +38,8 @@ import {
 export const chamCongRoutes = new Hono<AppEnv>();
 chamCongRoutes.use('*', requirePermission('hub.access'));
 
-type Row = { id: string; user_id: string; ngay: string; loai: 'vao' | 'ra'; at: string; kc: number | null; diem: string | null; trong: number | null; ly_do: string | null; ly_do_muon: string | null; acc: number | null };
+type Row = { id: string; user_id: string; ngay: string; loai: 'vao' | 'ra'; at: string; kc: number | null; diem: string | null; trong: number | null; ly_do: string | null; ly_do_muon: string | null; acc: number | null; xn?: string | null; gio_quay?: string | null; quay?: string | null; anh_id?: string | null };
+const COLS = 'id, user_id, ngay, loai, at, kc, diem, trong, ly_do, ly_do_muon, acc, xn, gio_quay, quay, anh_id';
 
 export async function loadSettings(db: D1Database): Promise<CcSettings> {
   const row = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(CC_SETTINGS_KEY).first<{ data: string }>();
@@ -167,7 +169,7 @@ chamCongRoutes.get('/me', async (c) => {
     loadSettings(db),
     ctx(db, auth),
     db
-      .prepare('SELECT id, user_id, ngay, loai, at, kc, diem, trong, ly_do, ly_do_muon, acc FROM cc_luot WHERE user_id = ? AND ngay LIKE ? ORDER BY at')
+      .prepare(`SELECT ${COLS} FROM cc_luot WHERE user_id = ? AND ngay LIKE ? ORDER BY at`)
       .bind(auth.user.id, thang + '%')
       .all<Row>(),
   ]);
@@ -230,10 +232,15 @@ chamCongRoutes.post('/cham', async (c) => {
     throw badRequest('NO_LOCATION', 'Chưa lấy được vị trí. Hãy bật định vị và cho phép trang web xem vị trí rồi bấm lại.');
   let near = coViTri ? nearest(s, lat!, lng!, lich) : { diem: null, kc: null, trong: null as boolean | null };
   if (quaMang && near.trong !== true) near = { diem: { ...quaMang, ten: quaMang.ten + ' (wifi)' }, kc: null, trong: true };
-  if (near.trong === false && !lich.ngoaiOk)
-    throw badRequest('NGOAI', `Bạn đang cách ${near.diem!.ten} khoảng ${near.kc} m, ngoài phạm vi ${near.diem!.bk} m nên chưa chấm được. Đến ${near.diem!.ten} rồi bấm lại.`);
-  if (near.trong === false && !lyDo)
-    throw badRequest('NEED_REASON', `Bạn đang cách ${near.diem!.ten} khoảng ${near.kc} m, ngoài phạm vi ${near.diem!.bk} m. Ghi lý do (gặp khách, giao hàng…) để chấm.`);
+  // Ngoài phạm vi (đi quay, gặp khách — CEO 06/11): ai cũng chấm được nhưng phải có lý do + ảnh check-in, chờ xác nhận mới tính công.
+  const ngoai = near.trong === false;
+  const anh = ngoai ? String(b.anh ?? '') : '';
+  if (ngoai && (!lyDo || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(anh)))
+    throw badRequest('NEED_OUT', `Bạn đang cách ${near.diem!.ten} khoảng ${fmtKc(near.kc!)}, ngoài phạm vi ${near.diem!.bk} m. Đi quay, gặp khách thì chọn lý do và chụp ảnh check-in để Lead xác nhận.`);
+  if (anh.length > 1_200_000) throw badRequest('ANH_TO', 'Ảnh quá lớn, chụp lại giúp em');
+  const q0 = ngoai && b.quay && typeof b.quay === 'object' ? (b.quay as Record<string, unknown>) : null;
+  const quay = q0 ? { id: String(q0.id ?? '').slice(0, 40), gio: String(q0.gio ?? '').slice(0, 5), diaDiem: String(q0.diaDiem ?? '').slice(0, 120), ghiChu: String(q0.ghiChu ?? '').slice(0, 200) } : null;
+  const gioQuay = quay && /^\d{1,2}:\d{2}$/.test(quay.gio) ? quay.gio.padStart(5, '0') : null;
   if (loai === 'vao') {
     const had = await db
       .prepare("SELECT at FROM cc_luot WHERE user_id = ? AND ngay = ? AND loai = 'vao' LIMIT 1")
@@ -243,15 +250,102 @@ chamCongRoutes.post('/cham', async (c) => {
   }
   const id = crypto.randomUUID();
   const trong = near.trong === null ? null : near.trong ? 1 : 0;
+  const anhId = ngoai ? crypto.randomUUID() : null;
   await db.batch([
+    ...(anhId ? [db.prepare('INSERT INTO cc_anh (id, user_id, data, created_at) VALUES (?, ?, ?, ?)').bind(anhId, auth.user.id, anh, now)] : []),
     db
       .prepare(
-        'INSERT INTO cc_luot (id, user_id, ngay, loai, at, lat, lng, acc, kc, diem, trong, ly_do, ly_do_muon, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO cc_luot (id, user_id, ngay, loai, at, lat, lng, acc, kc, diem, trong, ly_do, ly_do_muon, created_at, anh_id, xn, quay, gio_quay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
-      .bind(id, auth.user.id, today, loai, now, lat, lng, acc, near.kc, near.diem?.ten ?? null, trong, lyDo || null, lyDoMuon || null, now),
+      .bind(id, auth.user.id, today, loai, now, lat, lng, acc, near.kc, near.diem?.ten ?? null, trong, lyDo || null, lyDoMuon || null, now, anhId, ngoai ? 'cho' : null, quay ? JSON.stringify(quay) : null, gioQuay),
     auditStatement(db, { actorId: auth.user.id, action: 'CC_CHAM', entityType: 'CHAM_CONG', entityId: id, after: { loai, ngay: today, kc: near.kc, trong } }),
   ]);
-  return ok(c, { id, loai, at: now, ngay: today, kc: near.kc, diem: near.diem?.ten ?? null, trong });
+  if (ngoai) {
+    const m = await loadMembers(db, auth.user.id);
+    const ten = m.users[auth.user.id]?.name ?? 'Nhân viên';
+    await bellTo(db, nguoiXacNhan(m, auth.user.id), `${ten} chấm ${loai === 'vao' ? 'vào' : 'ra'} ngoài văn phòng (${lyDo}), chờ xác nhận`, 'page:cc_xn').catch(() => 0);
+  }
+  return ok(c, { id, loai, at: now, ngay: today, kc: near.kc, diem: near.diem?.ten ?? null, trong, xn: ngoai ? 'cho' : null });
+});
+
+const fmtKc = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${m} m`);
+
+/** Ai xác nhận lượt chấm ngoài của một người: Lead cùng phòng; người đó là Lead hoặc phòng không có Lead thì CEO, HCNS. */
+function nguoiXacNhan(m: Members, uid: string): string[] {
+  const me = m.users[uid];
+  const isLead = (u?: { role: string }) => !!u && ['lead', 'truongphong'].includes(u.role);
+  const leads = me && !isLead(me) && me.pb ? Object.entries(m.users).filter(([id, u]) => id !== uid && u.pb === me.pb && isLead(u)).map(([id]) => id) : [];
+  if (leads.length) return leads;
+  return Object.entries(m.users).filter(([id, u]) => id !== uid && u.hr).map(([id]) => id);
+}
+/** 'lead' khi có Lead cùng phòng xác nhận; 'hcns' khi lượt này lên CEO, HCNS (người chấm là Lead hoặc phòng không có Lead). */
+function capXn(m: Members, uid: string): 'lead' | 'hcns' {
+  const me = m.users[uid];
+  const isLead = (u?: { role: string }) => !!u && ['lead', 'truongphong'].includes(u.role);
+  return me && !isLead(me) && me.pb && Object.entries(m.users).some(([id, u]) => id !== uid && u.pb === me.pb && isLead(u)) ? 'lead' : 'hcns';
+}
+/** Người xem có được xác nhận lượt của uid không (không ai tự xác nhận cho mình). */
+function duocXacNhan(v: CcViewer, m: Members, uid: string): boolean {
+  if (uid === v.id) return false;
+  if (v.all) return true;
+  const u = m.users[uid];
+  return !!v.pb && !!u && u.pb === v.pb && !['lead', 'truongphong'].includes(u.role);
+}
+
+/** Lượt chấm ngoài văn phòng chờ xác nhận (và đã xử lý 7 ngày gần đây) trong phạm vi người xem. */
+chamCongRoutes.get('/xac-nhan', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const cx = await ctx(db, auth);
+  const tu = new Date(Date.now() + 7 * 3600e3 - 35 * 864e5).toISOString().slice(0, 10);
+  const rows =
+    (
+      await db
+        .prepare(`SELECT ${COLS}, xn_by, xn_at, lat, lng FROM cc_luot WHERE xn IS NOT NULL AND ngay >= ? ORDER BY at DESC LIMIT 400`)
+        .bind(tu)
+        .all<Row & { xn_by: string | null; xn_at: string | null; lat: number | null; lng: number | null }>()
+    ).results ?? [];
+  const tu7 = new Date(Date.now() + 7 * 3600e3 - 7 * 864e5).toISOString().slice(0, 10);
+  const list = rows
+    .filter((r) => duocXacNhan(cx.v, cx.m, r.user_id) && (r.xn === 'cho' || r.ngay >= tu7))
+    .map((r) => ({ ...r, ten: cx.m.users[r.user_id]?.name ?? r.user_id, pb: cx.m.users[r.user_id]?.pb ?? '', xnTen: r.xn_by ? (cx.m.users[r.xn_by]?.name ?? r.xn_by) : '', cap: capXn(cx.m, r.user_id) }));
+  return ok(c, { list, cho: list.filter((r) => r.xn === 'cho').length });
+});
+
+chamCongRoutes.post('/xac-nhan', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const id = String(b.id ?? '');
+  const dongY = b.ok === true;
+  const cx = await ctx(db, auth);
+  const r = await db.prepare('SELECT id, user_id, loai, at, xn FROM cc_luot WHERE id = ?').bind(id).first<{ id: string; user_id: string; loai: string; at: string; xn: string | null }>();
+  if (!r || !r.xn) throw badRequest('NOT_FOUND', 'Không tìm thấy lượt chấm này');
+  if (!duocXacNhan(cx.v, cx.m, r.user_id)) throw forbidden('Bạn không xác nhận được lượt chấm này');
+  const now = nowIso();
+  await db.batch([
+    db.prepare('UPDATE cc_luot SET xn = ?, xn_by = ?, xn_at = ? WHERE id = ?').bind(dongY ? 'ok' : 'khong', auth.user.id, now, id),
+    auditStatement(db, { actorId: auth.user.id, action: 'CC_XAC_NHAN', entityType: 'CHAM_CONG', entityId: id, after: { xn: dongY ? 'ok' : 'khong' } }),
+  ]);
+  const gio = new Date(Date.parse(r.at) + 7 * 3600e3).toISOString().slice(11, 16);
+  await bellTo(db, [r.user_id], `Lượt chấm ${r.loai === 'vao' ? 'vào' : 'ra'} ngoài văn phòng lúc ${gio} ${dongY ? 'đã được xác nhận' : 'không được xác nhận (không tính công)'}`, 'page:cc_toi').catch(() => 0);
+  return ok(c, { id, xn: dongY ? 'ok' : 'khong' });
+});
+
+/** Ảnh check-in: chủ lượt chấm hoặc người được xác nhận lượt đó mới xem được. */
+chamCongRoutes.get('/anh/:id', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const row = await db.prepare('SELECT user_id, data FROM cc_anh WHERE id = ?').bind(c.req.param('id')).first<{ user_id: string; data: string }>();
+  if (!row) return c.text('Không có ảnh', 404);
+  if (row.user_id !== auth.user.id) {
+    const cx = await ctx(db, auth);
+    if (!cx.v.all && !duocXacNhan(cx.v, cx.m, row.user_id)) throw forbidden('Không xem được ảnh này');
+  }
+  const bin = atob(row.data.slice(row.data.indexOf(',') + 1));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Response(bytes, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400' } });
 });
 
 /** Ghi (hoặc sửa) lý do đi muộn cho lượt vào hôm nay của chính mình, khi lúc chấm chưa ghi. */
@@ -279,7 +373,7 @@ chamCongRoutes.get('/ngay', async (c) => {
   const [s, cx] = await Promise.all([loadSettings(db), ctx(db, auth)]);
   const ids = scope(cx.v, cx.m);
   if (ids && !cx.v.pb) throw forbidden('Chỉ CEO, HCNS và trưởng nhóm xem được chấm công của người khác');
-  const rows = (await db.prepare('SELECT id, user_id, ngay, loai, at, kc, diem, trong, ly_do, ly_do_muon, acc FROM cc_luot WHERE ngay = ? ORDER BY at').bind(ngay).all<Row>()).results ?? [];
+  const rows = (await db.prepare(`SELECT ${COLS} FROM cc_luot WHERE ngay = ? ORDER BY at`).bind(ngay).all<Row>()).results ?? [];
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
   const [xep, don, may] = await Promise.all([loadXep(db, s, ngay, ngay), loadDon(db), loadMay(db, ngay, ngay)]);
   const extra = [...new Set(rows.map((r) => r.user_id))].filter((id) => !cx.m.users[id] && !ids);
@@ -287,7 +381,7 @@ chamCongRoutes.get('/ngay', async (c) => {
     const l = rows.filter((r) => r.user_id === p.id);
     const lich = lichOf(s, p.id, p.pb);
     const mm = may.get(p.id + '|' + ngay) ?? [];
-    return { ...p, lich: lich.ten, kieu: lich.kieu, nguon: nguon(l as Luot[], mm), ...tongNgay([...(l as Luot[]), ...mm], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), ...donOpt(don.get(p.id)?.get(ngay)) }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc })) };
+    return { ...p, lich: lich.ten, kieu: lich.kieu, nguon: nguon(l as Luot[], mm), ...tongNgay([...(l as Luot[]), ...mm], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), ...donOpt(don.get(p.id)?.get(ngay)) }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc, xn: r.xn ?? null, quay: r.quay ?? null })) };
   });
   return ok(c, { ngay, today, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
 });
@@ -301,7 +395,7 @@ chamCongRoutes.get('/thang', async (c) => {
   const [s, cx] = await Promise.all([loadSettings(db), ctx(db, auth)]);
   const ids = scope(cx.v, cx.m);
   if (ids && !cx.v.pb) throw forbidden('Chỉ CEO, HCNS và trưởng nhóm xem được bảng chấm công');
-  const rows = (await db.prepare('SELECT user_id, ngay, loai, at, trong, ly_do_muon FROM cc_luot WHERE ngay LIKE ? ORDER BY at').bind(thang + '%').all<Row>()).results ?? [];
+  const rows = (await db.prepare('SELECT user_id, ngay, loai, at, trong, ly_do_muon, xn, gio_quay FROM cc_luot WHERE ngay LIKE ? ORDER BY at').bind(thang + '%').all<Row>()).results ?? [];
   const days = daysOf(thang, today);
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
   const [xep, don, may] = await Promise.all([

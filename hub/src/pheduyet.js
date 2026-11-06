@@ -38,8 +38,9 @@ async function pdLoad(force){
     if(cs&&cs.threshold!=null)PD.th=+cs.threshold;
     const combo=ceo||kt||w.admin?await get("/api/hub/sanpham/unmapped"):[];
     const kppCode=ceo||P("order.approve.normal")?((await svApi("/api/hub/sanpham/kpp-code/pending").catch(()=>({rows:[]}))).rows||[]):[];
+    const ccXn=w.ns||ceo?((await get("/api/hub/chamcong/xac-nhan")).list||[]):[];
     const nsDon=w.ns?((await get("/api/hub/nghiphep/duyet")).list||[]):[],nsTu=w.ns||ceo?((await get("/api/hub/nghiphep/tamung")).list||[]):[];
-    PD.sv={kppCode,mhLech:Array.isArray(mhLech)?mhLech:[],combo,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
+    PD.sv={kppCode,mhLech:Array.isArray(mhLech)?mhLech:[],combo,ccXn,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
   catch(e){PD.err=e.message||"Không tải được"}
   PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();pdBadge()}
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */

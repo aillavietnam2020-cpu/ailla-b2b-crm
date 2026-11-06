@@ -84,6 +84,8 @@ function pdBuild(S,w){
       tien:x.loai==="Tạm ứng lương"?+x.sl||0:null,by:x.by||"",at:pdTs(x.at||x.gui),act:"",open:{page:"hr_nghi"}}));
     (S.hrTu||[]).filter(x=>x.tt==="cho").forEach(x=>add({k:"ns",id:"tu:"+x.id,ref:x.id,src:"hrTu",loai:"Tạm ứng lương",nd:ten(x.ma),sub:x.lyDo||"",tien:+x.tien||0,at:pdTs(x.ngay),act:"",open:{page:"hr_nghi"}}));
     /* Đơn mới lưu trên máy chủ (nghiphep.js, 04/11): đơn chờ HCNS duyệt vòng 2 và tạm ứng chờ Kế toán. */
+    /* Chấm ngoài văn phòng của Lead (hoặc phòng không có Lead): CEO, HCNS xác nhận. Lượt của nhân viên thường do Lead xác nhận ở Nhân sự. */
+    (S.ccXn||[]).filter(x=>x.xn==="cho"&&x.cap==="hcns").forEach(x=>add({k:"ns",id:"ccxn:"+x.id,ref:x.id,src:"ccXn",loai:"Chấm ngoài văn phòng",nd:x.ten||"",sub:[(x.loai==="vao"?"Vào ":"Ra ")+new Date(Date.parse(x.at)+7*36e5).toISOString().slice(11,16),x.ly_do].filter(Boolean).join(" · "),tien:null,by:"",at:pdTs(x.at),act:"",open:{page:"cc_xn"}}));
     (S.nsDon||[]).filter(x=>x.st==="hcns").forEach(x=>add({k:"ns",id:"np:"+x.id,ref:x.id,src:"nsDon",loai:x.loaiTen||"Đơn nghỉ",nd:x.ten||"",sub:[x.tu&&x.den&&x.den!==x.tu?x.tu+" → "+x.den:x.tu,x.so_ngay?x.so_ngay+" ngày":"",x.ly_do].filter(Boolean).join(" · "),tien:null,by:"",at:pdTs(x.created_at),act:"",open:{page:"np_ql"}}));
     (S.nsTu||[]).filter(x=>x.st==="kt").forEach(x=>add({k:"ns",id:"nt:"+x.id,ref:x.id,src:"nsTu",loai:"Tạm ứng lương",nd:x.ten||"",sub:x.ly_do||"",tien:+x.so_tien||0,at:pdTs(x.created_at),act:"",open:{page:"tu_ql"}}));
   }

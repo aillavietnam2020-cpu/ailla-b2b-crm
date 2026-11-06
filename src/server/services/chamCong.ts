@@ -288,7 +288,8 @@ export function dayRule(l0: Lich, ngay: string, ca?: Ca | null, le = false): { l
 }
 
 /** Một lượt chấm; may = lấy từ file máy chấm công (không phải bấm trên điện thoại). */
-export type Luot = { loai: 'vao' | 'ra'; at: string; trong: number | null; ly_do_muon?: string | null; may?: boolean };
+/** xn: lượt chấm ngoài văn phòng chờ / đã / không được xác nhận; gio_quay: giờ buổi quay gắn kèm (đi muộn so với giờ này). */
+export type Luot = { loai: 'vao' | 'ra'; at: string; trong: number | null; ly_do_muon?: string | null; may?: boolean; xn?: string | null; gio_quay?: string | null };
 export type NgayCong = {
   vao: string | null;
   ra: string | null;
@@ -313,6 +314,8 @@ export type NgayCong = {
   /** Lý do đi muộn đã ghi; canhBao = muộn quá mốc hỏi lý do mà chưa ghi. */
   lyDoMuon: string | null;
   canhBao: boolean;
+  /** Có lượt chấm ngoài văn phòng đang chờ Lead xác nhận (chưa tính công). */
+  choXn: boolean;
 };
 
 /**
@@ -320,7 +323,7 @@ export type NgayCong = {
  * quenRa chỉ tính cho ngày đã qua (homNay = false).
  */
 export function tongNgay(
-  luot: Luot[],
+  luot0: Luot[],
   l0: Lich,
   ngay: string,
   homNay: boolean,
@@ -329,12 +332,16 @@ export function tongNgay(
   const l = lichNgay(l0, ngay);
   const q = opt.q ?? CC_DEFAULT.quyTac;
   const rule = dayRule(l, ngay, opt.ca, opt.le);
+  // Lượt chấm ngoài chưa được xác nhận hoặc bị từ chối thì chưa tính công.
+  const choXn = luot0.some((x) => x.xn === 'cho');
+  const luot = luot0.filter((x) => x.xn !== 'cho' && x.xn !== 'khong');
   const vaoL = luot.filter((x) => x.loai === 'vao').sort((a, b) => a.at.localeCompare(b.at))[0];
   const raL = luot.filter((x) => x.loai === 'ra').sort((a, b) => b.at.localeCompare(a.at))[0];
   let muon = 0;
   let som = 0;
   if (rule.tinh && vaoL) {
-    const m = vnMinutes(vaoL.at) - rule.vao;
+    // Đi quay: so với giờ buổi quay thay vì giờ vào văn phòng.
+    const m = vnMinutes(vaoL.at) - (vaoL.gio_quay && /^\d{1,2}:\d{2}$/.test(vaoL.gio_quay) ? toMin(vaoL.gio_quay) : rule.vao);
     if (m > l.anHan) muon = m;
   }
   if (rule.tinh && raL) {
@@ -366,6 +373,7 @@ export function tongNgay(
     ot: opt.ot ?? 0,
     lyDoMuon: vaoL?.ly_do_muon || null,
     canhBao: muon > q.mocLyDo && !vaoL?.ly_do_muon,
+    choXn,
   };
 }
 

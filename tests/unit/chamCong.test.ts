@@ -234,3 +234,21 @@ describe('mạng wifi điểm chấm', () => {
     expect(diemByIp(s, ipKey('1.1.1.1'))).toBeNull();
   });
 });
+
+describe('chấm ngoài văn phòng chờ xác nhận', () => {
+  const vp1 = normalizeSettings(null).lich.find((x) => x.id === 'vp')!;
+  const at = (hm: string) => `2026-11-04T${String(+hm.slice(0, 2) - 7).padStart(2, '0')}:${hm.slice(3)}:00.000Z`;
+  it('lượt chờ xác nhận hoặc không xác nhận thì chưa tính công', () => {
+    const cho = tongNgay([{ loai: 'vao', at: at('08:00'), trong: 0, xn: 'cho' }], vp1, '2026-11-04', false);
+    expect(cho).toMatchObject({ vao: null, choXn: true });
+    const khong = tongNgay([{ loai: 'vao', at: at('08:00'), trong: 0, xn: 'khong' }], vp1, '2026-11-04', false);
+    expect(khong).toMatchObject({ vao: null, choXn: false });
+  });
+  it('đã xác nhận thì tính, đi muộn so với giờ quay', () => {
+    const r = tongNgay([{ loai: 'vao', at: at('08:40'), trong: 0, xn: 'ok', gio_quay: '08:30' }], vp1, '2026-11-04', true);
+    expect(r.vao).not.toBeNull();
+    expect(r.muon).toBe(10);
+    const dung = tongNgay([{ loai: 'vao', at: at('09:05'), trong: 0, xn: 'ok', gio_quay: '09:00' }], vp1, '2026-11-04', true);
+    expect(dung.muon).toBe(0);
+  });
+});
