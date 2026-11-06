@@ -310,6 +310,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
     if (!o || loadedRef.current) return;
     loadedRef.current = true;
     setCustomerId(o.customer_id);
+    if (o.order_date) setOrderDate(o.order_date);
     setLines(o.items.map(lineFromItem));
     setFees({
       discount_amount: o.discount_amount ?? 0,
@@ -378,6 +379,10 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
     setFieldErrors({});
     try {
       if (editing && editId) {
+        // Sửa ngày đặt đơn (tạo nhầm ngày): ghi riêng, có nhật ký, trước khi lưu phần hàng.
+        if (existing.data?.order_date && orderDate !== existing.data.order_date) {
+          await api.post(`/api/orders/${editId}/order-date`, { order_date: orderDate, reason: reason.trim() || null });
+        }
         const result = await api.put<{
           status: string;
           total_before: number;
@@ -495,9 +500,13 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
             />
             <label style={{ marginTop: 10 }}>Ngày đơn</label>
             {editing ? (
-              <span>
-                {existing.data?.order_date ? formatVnDate(existing.data.order_date) : '—'}
-              </span>
+              <input
+                type="date"
+                value={orderDate}
+                max={vnDate()}
+                onChange={(e) => setOrderDate(e.target.value || existing.data?.order_date || vnDate())}
+                title="Sửa ngày đặt đơn nếu tạo nhầm ngày. Số đơn giữ nguyên."
+              />
             ) : (
               <input
                 type="date"
@@ -506,6 +515,9 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                 onChange={(e) => setOrderDate(e.target.value || vnDate())}
                 title="Nhập đơn của ngày trước thì chọn đúng ngày đơn được đặt"
               />
+            )}
+            {editing && existing.data?.order_date && orderDate !== existing.data.order_date && (
+              <span className="muted">Ngày đơn đổi từ {formatVnDate(existing.data.order_date)} sang {formatVnDate(orderDate)} khi bấm Lưu.</span>
             )}
             {!editing && orderDate !== vnDate() && (
               <span className="muted">Đơn nhập lại cho ngày {formatVnDate(orderDate)}.</span>
