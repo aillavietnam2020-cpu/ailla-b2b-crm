@@ -34,7 +34,9 @@ function tq2Health(N){const T=N.T,P=N.P,ng=dhGet().nguong||{},out=[],add=(go,l,v
     add("pl","Doanh số theo đơn",tr(v),(KH&&KH.tong?"đạt "+Math.round(v/KH.tong*100)+"% kế hoạch · ":"")+"doanh thu thực đã giao "+tr(T.dt)+", chốt cuối tháng",KH&&KH.tong?(v/KH.tong>=.95?"grn":v/KH.tong>=.8?"amb":"red"):"gry")}
   else add("pl","Doanh thu thực",tr(T.dt),KH&&KH.tong?"đạt "+Math.round(T.dt/KH.tong*100)+"% kế hoạch ("+tr(KH.tong)+")":"chưa đặt kế hoạch tháng",KH&&KH.tong?(T.dt/KH.tong>=.95?"grn":T.dt/KH.tong>=.8?"amb":"red"):"gry");
   const parts=[["quảng cáo",T.ads],["giá vốn",T.gv],["phí sàn, ship",T.phi],["chi phí chung",T.chung||0]].sort((a,b)=>b[1]-a[1]);
-  add("pl","Tổng chi phí",T.cp==null?"—":tr(T.cp),T.cp==null?"chưa có chi phí chung":tq2P(T.cp/T.dt)+"% doanh thu · "+parts[0][0]+" "+tr(parts[0][1])+" là khoản lớn nhất",T.cp==null?"gry":"amb");
+  /* Chưa có chi phí chung (Sổ chi phí tháng chưa ghi) vẫn hiện các khoản đã có: giá vốn, phí, quảng cáo, chi kênh, lương kênh (chị Hoa 06/11). */
+  const cpK=T.cp!=null?T.cp:(T.gv||0)+(T.phi||0)+(T.ads||0)+(T.cpk||0)+(T.luong||0)+(T.sx||0),adsCa=N.le&&N.le.adsCa>N.le.ads+1?N.le.adsCa-N.le.ads+(T.ads||0):0;
+  add("pl","Tổng chi phí",cpK?tr(cpK):"—",!cpK?"chưa có số":(T.cp==null?"chưa gồm chi phí chung (Sổ chi phí tháng này chưa ghi) · ":tq2P(cpK/T.dt)+"% doanh thu · ")+parts[0][0]+" "+tr(parts[0][1])+" là khoản lớn nhất"+(adsCa?` (phần đơn đã giao; quảng cáo cả tháng ${tr(adsCa)})`:""),T.cp==null?"amb":"amb");
   const m=T.dt?T.lai/T.dt:0;add("pl",run?"Lãi đóng góp (tạm tính)":"Lãi đóng góp",tr(T.lai),tq2P(m)+"% doanh thu"+(run?" thực đã giao":"")+" · trước chi phí chung",m<.1?"red":m<.2?"amb":"grn");
   if(T.ln==null)add("pl","Lợi nhuận ròng","—","chưa có chi phí chung tháng này","gry");
   else{const thieu=[];if(!T.luong)thieu.push("chưa trừ lương");thieu.push("chưa trừ thuế");const it=P&&P.chung&&T.chung!=null&&T.chung<P.chung*.3;
