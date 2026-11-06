@@ -21,7 +21,7 @@ function skTiles(){
       add("bc_tong","Lãi đóng góp",tr(lai),Math.round(m*100)+"% doanh thu · chưa trừ lương, kho",m<.1?"red":m<.2?"amb":"grn")}
     else add("bc_tong","Lãi đóng góp","—","chưa có số","gry")}catch(e){}
   /* 3 quảng cáo */
-  try{if(N&&N.tong){const C=N.C||{},ads=(C.adsFB||0)+(C.adsTT||0)+(C.adsSPE||0),fq=N.rev&&N.rev.fb&&N.rev.fb.qb,r=ads/(N.tong+(fq?fq-(N.fbDT||0):0));/* Facebook tháng chưa chốt: quảng cáo cả tháng chia doanh thu dự kiến (cùng rổ đơn) */
+  try{if(N&&N.tong){const C=N.C||{},ads=(C.adsFB||0)+(C.adsTT||0)+(C.adsSPE||0),fq=N.rev&&N.rev.fb&&N.rev.fb.adsCa!=null&&N.rev.fb.dk,r=ads/(N.tong+(fq?fq-(N.fbDT||0):0));/* Facebook tháng chưa chốt: quảng cáo cả tháng chia doanh thu dự kiến (cùng rổ đơn) */
       add("so_cp","Quảng cáo / doanh thu bán lẻ",Math.round(r*100)+"%","ngưỡng báo đỏ "+Math.round(ng.qcMax*100)+"% · "+tr(ads),r>ng.qcMax?"red":r>ng.qcMax*.85?"amb":"grn")}
     else add("so_cp","Quảng cáo / doanh thu bán lẻ","—","chưa có doanh thu sàn","gry")}catch(e){}
   /* 4 tiền */

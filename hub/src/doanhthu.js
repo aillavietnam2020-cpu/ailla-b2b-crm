@@ -71,11 +71,11 @@ function dtLabel(r,ch,from,to){
   else{r.dk=ch==="fb"&&r.dt!=null?dtDuKien(r.dt,r.dangDt||0,DT_HOAN_FB):r.dt;r.nhan=dtNhan(ym,t)+(ch==="fb"&&r.dangDt?` · dự kiến ${tr(r.dk)} khi ${nf(r.dang)} đơn đang giao có kết quả (hoàn dự kiến ${Math.round(DT_HOAN_FB*100)}%)`:"")}
   r.src=r.nhan+(r.src?" · "+r.src:"");return r}
 /* Facebook tháng chưa chốt: doanh thu thực chỉ là đơn đã giao, còn quảng cáo là cả tháng (gồm đơn đang giao) → lãi lệch rổ, âm giả (chị Hoa 06/11).
-   Lãi tính cho cùng rổ đơn đã giao: lãi tạm trên doanh thu dự kiến (giá vốn, phí theo tỷ lệ thật) nhân phần đã giao / dự kiến.
-   Không đổi doanh thu, giá vốn, quảng cáo (Sổ chi phí đọc quảng cáo ở đây); hết tháng chốt thì về số thật. Trang Facebook hiện bản dự kiến (fbv2.js). */
+   Quảng cáo trên P&L / Tổng quan lấy phần của rổ đơn đã giao = quảng cáo cả tháng × đã giao / doanh thu dự kiến (cùng tỷ lệ quảng cáo / doanh thu
+   dự kiến của trang Facebook), giữ số cả tháng ở adsCa cho Sổ chi phí (execNums C.adsFB). Hết tháng chốt thì về số thật. */
 function dtFbCungRo(f){if(!f||f.dk==null||f.chot==="chot"||!(f.dt>0)||!(f.dk>f.dt)||!(f.ads>0)||f.lai==null||f._ro)return;f._ro=1;
-  const tamLai=f.dk*(1-((f.gv||0)+(f.phi||0))/f.dt)-f.ads,lai=tamLai*f.dt/f.dk;
-  f.qb=f.dk;f.src=`lãi tạm tính cùng rổ đơn đã giao (trên doanh thu dự kiến ${tr(f.dk)} lãi ${tr(tamLai)}, quảng cáo cả tháng gồm đơn đang giao) · `+(f.src||"");f.lai=lai}
+  const k=f.dt/f.dk,ad=f.ads*k;f.adsCa=f.ads;f.lai+=f.ads-ad;f.ads=ad;
+  f.src=`quảng cáo tạm tính phần của đơn đã giao ${tr(ad)} (cả tháng ${tr(f.adsCa)} gồm đơn đang giao, doanh thu dự kiến ${tr(f.dk)}) · `+(f.src||"")}
 {const _t=tqRevB2C;tqRevB2C=function(N,from,to){const out=_t.apply(this,arguments);if(DTS.live||!dtOk())return out;dtEnsure();
   try{if(out.fb&&out.fb.dt!=null){const d=dtFbDang(from,to);out.fb.dang=d.n;out.fb.dangDt=d.v}
     ["tts","fb","spe"].forEach(k=>{const f=dtFrozen(k,from,to);if(f)out[k]={...out[k],...f,src:f.src,tam:false,dang:0,dangDt:0};dtLabel(out[k],k,from,to)});
