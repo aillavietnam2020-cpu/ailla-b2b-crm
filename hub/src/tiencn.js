@@ -32,6 +32,10 @@ function tcnDongTienWeb(from,to){const k=from+"|"+to,c=TCN.dt[k];if(c)return c.b
 function tcnDocsSo(from,to,accts){const d=D(),f=d.fin||{},o=[];
   (d.thuTay||[]).forEach(x=>{const n=x.ngay||"";if(n>=from&&n<=to)o.push({date:n,loai:"THU_SO",ref:"Sổ thu",party:x.note||"",amount:+x.tien||0,acct:tcnAcctOf(x.acct,accts),acct_text:x.acct||"",ceo:"",nguon:x.nguon||"khac"})});
   (f.nkc||[]).forEach(x=>{const n=String(x.d||"");if(n<from||n>to||!/^11[12]/.test(String(x.tk)))return;o.push({date:n,loai:"CHI_SO",ref:x.ct||"Sổ chi phí",party:x.dg||"",amount:-(+x.t||0),acct:tcnAcctOf(x.tkc,accts,x.tk),acct_text:x.tkc||(String(x.tk).startsWith("111")?"Tiền mặt":"Ngân hàng (sổ không ghi tài khoản)"),ceo:"",g:x.g||""})});
+  /* Chi lương bằng QR (Nhân sự › Chi lương bằng QR): mỗi người đã chi là một khoản tiền ra, trừ tháng nào Sổ chi phí đã ghi lương trả bằng tiền (G07/G08, TK 111/112) để không tính hai lần. */
+  try{const soLg=new Set((f.nkc||[]).filter(x=>/^G0[78]$/.test(String(x.g||""))&&/^11[12]/.test(String(x.tk))).map(x=>String(x.d||"").slice(0,7)));
+    Object.entries(((d.hr||{}).payroll)||{}).forEach(([ky,p])=>{const L=((p||{}).chi||{}).list||{};Object.entries(L).forEach(([ma,c])=>{if(!c||c.st!=="da")return;const n=String(c.at||"").slice(0,10);if(n<from||n>to||soLg.has(n.slice(0,7)))return;
+      const r=(p.rows||[]).find(x=>x.ma===ma)||{};o.push({date:n,loai:"CHI_LUONG",ref:"Lương "+ky.slice(5)+"/"+ky.slice(0,4),party:r.ten||ma,amount:-(+c.tien||0),acct:(accts||[]).some(z=>String(z.id)===String(c.acct))?c.acct:tcnAcctOf(c.acct,accts),acct_text:tcnAcctTen(c.acct||"")||"Ngân hàng",ceo:""})})})}catch(e){}
   /* Phiếu chuyển tiền nội bộ (Dòng tiền › Số dư tài khoản): ngân hàng ↔ tiền mặt, ví sàn rút về. */
   o.push(...tcnCkDocs(f.ck,from,to,tcnAcctTen));
   /* Thanh lý tài sản có thu tiền (Tài sản & CCDC › ghi giảm). */
@@ -42,7 +46,7 @@ function tcnAcctTen(k){if(k==="TIEN_MAT")return "Tiền mặt tại công ty";if
   const a=(typeof MH!=="undefined"&&MH.accts||[]).find(x=>x.id===k);return a?[a.bank,a.account_no].filter(Boolean).join(" · "):k}
 /* Mọi chứng từ tiền trong khoảng ngày (null = đang tải). */
 function tcnDongTien(from,to){const w=tcnDongTienWeb(from,to);if(!w)return null;const docs=w.docs.concat(tcnDocsSo(from,to,w.accounts)).sort((a,b)=>a.date.localeCompare(b.date));return {accounts:w.accounts,docs,err:w.err}}
-const TCN_LOAI={SAN_RUT:"Tiền ví sàn rút về",CK_VAO:"Chuyển tiền nội bộ (nhận)",CK_RA:"Chuyển tiền nội bộ (chuyển đi)",TS_TL:"Thanh lý tài sản",THU:"Tiền khách trả (đã xác nhận)",THU_SO:"Phiếu thu Sổ thu",HOAN:"Bút toán đảo / hoàn tiền khách",CHI_NCC:"Phiếu chi nhà cung cấp",CHI_VC:"Phiếu chi vận chuyển",CHI_THUONG:"Phiếu chi thưởng NPP",CHI_SO:"Sổ chi phí (tiền thật)"};
+const TCN_LOAI={CHI_LUONG:"Chi lương (QR)",SAN_RUT:"Tiền ví sàn rút về",CK_VAO:"Chuyển tiền nội bộ (nhận)",CK_RA:"Chuyển tiền nội bộ (chuyển đi)",TS_TL:"Thanh lý tài sản",THU:"Tiền khách trả (đã xác nhận)",THU_SO:"Phiếu thu Sổ thu",HOAN:"Bút toán đảo / hoàn tiền khách",CHI_NCC:"Phiếu chi nhà cung cấp",CHI_VC:"Phiếu chi vận chuyển",CHI_THUONG:"Phiếu chi thưởng NPP",CHI_SO:"Sổ chi phí (tiền thật)"};
 /* noibo: cộng cả chuyển tiền nội bộ (khi xem từng tài khoản); xem cả công ty thì bỏ vì không phải tiền vào / ra. */
 function tcnTongTien(docs,noibo){const by={};let thu=0,chi=0,choCeo=0;(docs||[]).forEach(d=>{if(!noibo&&(d.loai==="CK_VAO"||d.loai==="CK_RA"))return;by[d.loai]=(by[d.loai]||0)+d.amount;if(d.amount>0)thu+=d.amount;else chi-=d.amount;if(d.ceo==="CHO")choCeo-=d.amount});return {thu,chi,thuan:thu-chi,by,choCeo}}
 

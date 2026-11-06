@@ -117,7 +117,8 @@ function tlTabDb(X){
   /* Lương trả ngày 10: bảng lương đã chốt của tháng trước ngày 10 đó. */
   const lg=[0,0,0,0];let lgNote="",lgOk=false;
   wk.forEach((w,i)=>{for(let d=new Date(w.tu+"T00:00:00Z");d.toISOString().slice(0,10)<=w.den;d.setUTCDate(d.getUTCDate()+1)){if(d.getUTCDate()!==10)continue;const pm=tlYmAdd(d.toISOString().slice(0,7),-1);
-    try{const R=typeof cpLgRows==="function"?cpLgRows(pm):null;if(R&&R.ok&&R.chot){lg[i]+=R.rows.reduce((t,r)=>t+(+r.tong||0),0);lgOk=true;lgNote="bảng lương "+pm.slice(5)+"/"+pm.slice(0,4)+" đã chốt, trả ngày 10"}else lgNote="bảng lương "+pm.slice(5)+"/"+pm.slice(0,4)+" chưa chốt"}catch(e){lgNote="chưa đọc được bảng lương"}}});
+    try{const R=typeof cpLgRows==="function"?cpLgRows(pm):null;if(R&&R.ok&&R.chot){const daChi=Object.values(((((D().hr||{}).payroll||{})[pm]||{}).chi||{}).list||{}).filter(c=>c&&c.st==="da").reduce((t,c)=>t+(+c.tien||0),0);/* phần đã chi lương bằng QR không còn phải chi */
+      lg[i]+=Math.max(0,R.rows.reduce((t,r)=>t+(+r.tong||0),0)-daChi);lgOk=true;lgNote="bảng lương "+pm.slice(5)+"/"+pm.slice(0,4)+" đã chốt, trả ngày 10"}else lgNote="bảng lương "+pm.slice(5)+"/"+pm.slice(0,4)+" chưa chốt"}catch(e){lgNote="chưa đọc được bảng lương"}}});
   const thu=[{n:"Khách Kênh phân phối, Kênh OEM trả nợ đến hạn",v:null,s:"chưa có: chưa chốt số ngày khách được nợ nên chưa có hạn"},
     {n:"Tiền ví sàn chờ rút (TikTok, Shopee)",v:vi.length?[viT,0,0,0]:null,s:vi.length?"số dư ví kế toán nhập; ngày sàn trả chưa biết, xếp tuần 1":"chưa nhập số dư ví sàn"},
     {n:"COD Facebook về",v:null,s:"chưa có chứng từ tiền COD về tài khoản"}];

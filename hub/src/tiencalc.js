@@ -95,7 +95,7 @@ function tcnLcKey(d){
     /* Chuyển tiền nội bộ giữa ngân hàng và tiền mặt: không phải tiền vào / ra công ty. Ví sàn rút về tài khoản: tiền vào. */
     case "CK_VAO":case "CK_RA":return "noibo";
     case "SAN_RUT":return d.san==="VI_SPE"?"spe":"tts";
-    case "HOAN":return "hoan";case "CHI_NCC":return "ncc";case "CHI_VC":return "vc";case "CHI_THUONG":return "thuong";case "TS_TL":return "thanh_ly";
+    case "HOAN":return "hoan";case "CHI_NCC":return "ncc";case "CHI_VC":return "vc";case "CHI_THUONG":return "thuong";case "CHI_LUONG":return "luong";case "TS_TL":return "thanh_ly";
     case "THU_SO":return d.nguon==="sanrut"?"sanrut":d.nguon==="gc"?"oem":d.nguon==="npp"?"kpp":"thukhac";
     case "CHI_SO":{const g=String(d.g||"");return /^G0[123]$/.test(g)?"qc":/^G0[59]$/.test(g)?"vc":/^G0[78]$/.test(g)?"luong":g==="G28"?"mua_ts":"khac"}}
   return d.amount>=0?"thukhac":"khac"}

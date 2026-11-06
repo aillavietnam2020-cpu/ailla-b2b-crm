@@ -381,7 +381,11 @@ nghiPhepRoutes.get('/phieu-luong', async (c) => {
     ? []
     : Object.entries(hr.payroll ?? {})
         .filter(([, p]) => p?.st === 'phathanh')
-        .map(([ky, p]) => ({ ky, ph: p.ph ?? '', row: (p.rows ?? []).find((r) => r?.ma === ma) ?? null, xem: seen.get(ky) ?? null }))
+        .map(([ky, p]) => {
+          // Chi lương bằng QR (hub/src/chiluong.js): ngày công ty đã chuyển lương cho người này.
+          const chi = (p as { chi?: { list?: Record<string, { st?: string; at?: string }> } }).chi?.list?.[ma];
+          return { ky, ph: p.ph ?? '', row: (p.rows ?? []).find((r) => r?.ma === ma) ?? null, xem: seen.get(ky) ?? null, daNhan: chi?.st === 'da' ? (chi.at ?? '').slice(0, 10) : null };
+        })
         .filter((x) => x.row)
         .sort((a, b) => b.ky.localeCompare(a.ky));
   return ok(c, { ma, list });
