@@ -162,7 +162,7 @@ function khoForm(type,pre,clsO){
    ${isKS?`<label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label>`:""}
    ${type==="TD"?`<label class="inl"><input type="checkbox" id="kf-moc"> Đây là phiếu tồn chốt chung (mốc tồn): hàng nhập, xuất, bán sàn từ hôm sau mới tính</label>`:""}
    ${type==="TB"&&typeof KTON!=="undefined"&&KTON.moc&&KTON.moc.moc?`<span class="hint">Mốc tồn chung ${kDd(KTON.moc.moc)} · đã có số kiểm ${KTON.moc.counted.length} mã; kiểm lại được nếu ngày đếm sau lần trước</span>`:""}</div>`;
-  const colHead=isPC?["Nguyên vật liệu","ĐVT","Định mức","Thực tế dùng","Tồn kho",""]:isKS?["Thành phẩm đếm được","ĐVT","Số lượng","Theo phiếu SX","Tồn",""]:isTL?["Mã hàng","ĐVT","Số lượng","Xử lý",""]:isPN?["Mã hàng","ĐVT","Số lượng",...(price&&type==="PN"?["Đơn giá"]:[]),"Tồn",""]:["Mã hàng","ĐVT","Số lượng","Tồn",""];
+  const colHead=isPC?["Nguyên vật liệu","Định mức","Thực tế dùng","ĐVT","Tồn kho",""]:isKS?["Thành phẩm đếm được","Số lượng","ĐVT","Theo phiếu SX","Tồn",""]:isTL?["Mã hàng","Số lượng","ĐVT","Xử lý",""]:isPN?["Mã hàng","Số lượng","ĐVT",...(price&&type==="PN"?["Đơn giá"]:[]),"Tồn",""]:["Mã hàng","Số lượng","ĐVT","Tồn",""];
   openDrawerHTML(`<h2>${T.name}</h2><p class="hint">${T.hint}</p><form class="frm" id="kf">${head}
    <div class="tbl edit"><table><thead><tr>${colHead.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody id="kf-b"></tbody></table></div>
    <div class="row7"><button type="button" class="btn" id="kf-add">+ Thêm dòng</button>${isOut?`<button type="button" class="btn" id="kf-box">+ Thêm vỏ thùng</button>`:""}<label class="field grow">Ghi chú<input id="kf-n"></label></div>
@@ -177,9 +177,9 @@ function khoForm(type,pre,clsO){
     addP(null,"")}
   const addLine=(o={})=>{const tr=document.createElement("tr");tr.innerHTML=
     `<td><input class="kf-i" autocomplete="off" placeholder="Gõ mã hoặc tên rồi chọn" value="${esc(o.item||"")}" data-code="${esc(o.item||"")}"${o.fixed?" readonly":""}><small class="kf-nm">${o.item&&KHO.items.get(o.item)?esc(KHO.items.get(o.item).name):""}</small></td>
-     <td class="kf-u">${o.item&&KHO.items.get(o.item)?kfUnitCell(KHO.items.get(o.item).unit):""}</td>
      ${isPC?`<td class="n kf-std">${o.std!=null?knum(o.std):"—"}</td>`:""}
      <td><input class="kf-q n" type="text" inputmode="decimal" autocomplete="off" value="${o.qty!=null?o.qty:""}"></td>
+     <td class="kf-u">${o.item&&KHO.items.get(o.item)?kfUnitCell(KHO.items.get(o.item).unit):""}</td>
      ${isKS?`<td><input class="kf-rq n" type="text" inputmode="decimal" autocomplete="off"></td>`:""}
      ${isTL?`<td><select class="kf-v"><option value="">Chọn…</option><option value="ban_tiep">Bán tiếp</option><option value="bo">Bỏ</option></select></td>`:""}
      ${price&&type==="PN"?`<td><input class="kf-pr n" type="number" step="any" min="0"></td>`:""}
@@ -203,7 +203,7 @@ function khoForm(type,pre,clsO){
       if(KHO.bomHidden){try{const [[,,rows]]=await khoExpand([[c,lit]]);B=rows.map(x=>({item:x.item,need:x.need}))}catch(e){toast(e.message);return}if(my!==fillTok)return}
       else B=KHO.bom.get(c)||[];
       body.innerHTML="";
-      B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),tr=addLine({item:b.item,qty:std,std,fixed:true});tr.dataset.std=std;const per=b.need!=null?b.need/lit:b.qty,sc=tr.querySelector(".kf-std");if(sc&&per)sc.innerHTML+=`<small class="hint" style="display:block">${knum(Math.round(per*1e6)/1e6)} × ${knum(lit)} lít</small>`});{const th=[...document.querySelectorAll("#kf thead th")].find(x=>/^Định mức/.test(x.textContent));if(th)th.textContent="Định mức cho "+knum(lit)+" lít"}
+      B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),tr=addLine({item:b.item,qty:std,std,fixed:true});tr.dataset.std=std});
       if(!B.length)$("#kf-warn").innerHTML=`<div class="note amb">${esc(c)} chưa có định mức. Thêm nguyên liệu bằng nút "+ Thêm dòng".</div>`;else refresh()};
     khoPick($("#kf-btp"),["BTP"],fill);$("#kf-lit").oninput=fill;
     $("#kf-add").onclick=()=>{const tr=addLine({});tr.dataset.std=0}}

@@ -220,10 +220,43 @@ const sxCach=r=>r&&r.cachLam==="CONG_NHAN"?"CONG_NHAN":"KY_THUAT";
 const sxCachPill=r=>sxCach(r)==="CONG_NHAN"?pill("Công nhân tự làm","blu"):"";
 function sxReqForm(id){
   const s=SX(),r=id?s.requests.find(x=>x.id===id):null;
+  if(!r)return sxReqMulti();
   openDrawerHTML(`<h2>${r?"Sửa phiếu sản xuất "+r.id:"Tạo phiếu sản xuất"}</h2><form class="frm" id="ncf"><div class="row4"><label class="field">Ngày tạo phiếu<input id="nc-ngay" type="date" required value="${r&&r.taoLuc?r.taoLuc:sxToday()}"></label><span class="hint" style="align-self:end">${r?"Số phiếu "+r.id:"Số phiếu tự cấp theo ngày tạo: PSX + năm tháng + số thứ tự, ví dụ PSX"+sxToday().slice(2,4)+sxToday().slice(5,7)+"-001"}</span></div><label class="field">Sản phẩm<select id="nc-sp" required>${sxProdOpts(r?r.sp:"")}</select></label><label class="field">Cách làm<select id="nc-cl">${opt(SX_CACH,r?sxCach(r):((s.cfg.cachLam||{})[""]||"KY_THUAT"))}</select><small class="hint">Công nhân tự làm: bỏ bước Pha chế.</small></label><div class="row4"><label class="field">Số lượng đề nghị<input id="nc-sl" type="number" min="1" placeholder="để trống nếu chưa chốt" value="${r&&r.sl?r.sl:""}"></label><label class="field">Ưu tiên<select id="nc-uu">${opt(["Bình thường","Gấp"],r?r.uu:"Bình thường")}</select></label></div><div class="row4"><label class="field">Lý do sản xuất<select id="nc-ng">${opt(SX_NGUON,r?r.nguon:"Thiếu hàng")}</select></label><label class="field">Hạn cần hàng<input id="nc-han" type="date" value="${r?r.han:""}"></label></div><label class="field">Ghi chú cho xưởng<textarea id="nc-gc" rows="2">${esc(r?r.ghiChu:"")}</textarea></label><button class="btn pri big">${r?"Lưu":"Tạo phiếu sản xuất"}</button></form>`);
   if(!r)$("#nc-sp").onchange=()=>{const k=((SX().cfg.cachLam)||{})[$("#nc-sp").value];if(k)$("#nc-cl").value=k};
   $("#ncf").onsubmit=e=>{e.preventDefault();const v={cachLam:$("#nc-cl").value,sp:$("#nc-sp").value,sl:+$("#nc-sl").value||null,uu:$("#nc-uu").value,nguon:$("#nc-ng").value,han:$("#nc-han").value,ghiChu:$("#nc-gc").value.trim(),taoLuc:$("#nc-ngay").value||sxToday()};if(!v.sp){toast("Chọn sản phẩm");return}
     let code="";sxMut(r?`sửa phiếu sản xuất ${r.id}`:`tạo phiếu sản xuất ${sxP(v.sp).ten}`,s2=>{s2.cfg.cachLam=s2.cfg.cachLam||{};s2.cfg.cachLam[v.sp]=v.cachLam;if(r){Object.assign(s2.requests.find(x=>x.id===r.id),v);s2.requests.find(x=>x.id===r.id).hist.push({at:sxNow(),by:ME.name,act:"Sửa phiếu sản xuất"});return}code=sxReqCode(s2,v.taoLuc);s2.requests.push({id:code,...v,st:"CAN_LAM",tao:ME.name,batDau:"",lots:[],hist:[{at:sxNow(),by:ME.name,act:"Tạo phiếu sản xuất"}]})});closeDrawer();toast(r?"Đã lưu":"Đã tạo phiếu sản xuất "+code);renderMain()};
+}
+/* Tạo phiếu sản xuất nhiều sản phẩm (chị Hoa 06/11): bảng Sản phẩm · Số lượng đề nghị · Cách làm, nút + cuối dòng thêm dòng.
+   Mỗi dòng thành một phiếu sản xuất riêng (số phiếu liền nhau) để xưởng báo hoàn thành và kế toán kiểm theo từng sản phẩm. */
+function sxReqMulti(){
+  const s=SX(),cl0=(s.cfg.cachLam||{})[""]||"KY_THUAT";
+  openDrawerHTML(`<h2>Tạo phiếu sản xuất</h2><form class="frm" id="ncm">
+   <div class="row4"><label class="field">Ngày tạo phiếu<input id="ncm-ngay" type="date" required value="${sxToday()}"></label><span class="hint" style="align-self:end">Mỗi sản phẩm một số phiếu: PSX + năm tháng + số thứ tự, ví dụ PSX${sxToday().slice(2,4)}${sxToday().slice(5,7)}-001</span></div>
+   <label class="field">Sản phẩm</label>
+   <div class="tbl edit"><table><thead><tr><th>Sản phẩm (gõ hoặc dán tên, mã)</th><th style="width:150px">Số lượng đề nghị</th><th style="width:170px">Cách làm</th><th style="width:76px"></th></tr></thead><tbody id="ncm-b"></tbody></table></div>
+   <small class="hint">Công nhân tự làm: bỏ bước Pha chế. Số lượng để trống nếu chưa chốt.</small>
+   <div class="row4"><label class="field">Ưu tiên<select id="ncm-uu">${opt(["Bình thường","Gấp"],"Bình thường")}</select></label><label class="field">Lý do sản xuất<select id="ncm-ng">${opt(SX_NGUON,"Thiếu hàng")}</select></label></div>
+   <div class="row4"><label class="field">Hạn cần hàng<input id="ncm-han" type="date"></label></div>
+   <label class="field">Ghi chú cho xưởng<textarea id="ncm-gc" rows="2"></textarea></label><div id="ncm-e"></div>
+   <button class="btn pri big" id="ncm-go">Tạo phiếu sản xuất</button></form>`);
+  const body=$("#ncm-b");
+  const add=after=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="ncm-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="ncm-n hint"></small></td><td><input class="ncm-q n" type="text" inputmode="decimal" placeholder="chưa chốt"></td><td><select class="ncm-c">${opt(SX_CACH,cl0)}</select></td><td style="white-space:nowrap"><button type="button" class="btn sm ncm-add" title="Thêm dòng">+</button> <button type="button" class="lnk ncm-x" title="Bỏ dòng">✕</button></td>`;
+    if(after)after.after(tr);else body.appendChild(tr);
+    const inp=tr.querySelector(".ncm-i");
+    if(typeof khoPick==="function")khoPick(inp,["TP"],it=>{inp.dataset.code=it.code;tr.querySelector(".ncm-n").textContent=it.name;const k=((SX().cfg.cachLam)||{})[it.code];if(k)tr.querySelector(".ncm-c").value=k;tr.querySelector(".ncm-q").focus()});
+    tr.querySelector(".ncm-add").onclick=()=>add(tr);
+    tr.querySelector(".ncm-x").onclick=()=>{if(body.children.length>1)body.removeChild(tr)};
+    tr.querySelector(".ncm-q").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add(tr)}};
+    inp.focus();return tr};
+  add();
+  $("#ncm").onsubmit=e=>{e.preventDefault();const btn=$("#ncm-go");if(btn.disabled)return;
+    const L=[...body.querySelectorAll("tr")].map(tr=>{const i=tr.querySelector(".ncm-i"),v=i.value.trim(),q=tr.querySelector(".ncm-q").value.trim();return {sp:i.dataset.code||(KHO.items&&KHO.items.get(v)?v:""),raw:v,sl:q===""?null:(typeof kfNum==="function"?kfNum(q):+q.replace(",",".")),cachLam:tr.querySelector(".ncm-c").value}}).filter(x=>x.raw||x.sl);
+    const bad=L.filter(x=>!x.sp||(x.sl!=null&&!(x.sl>0)));
+    if(!L.length||bad.length){$("#ncm-e").innerHTML=`<div class="note red">${!L.length?"Chưa có sản phẩm nào.":"Dòng chưa chọn sản phẩm trong danh sách hoặc số lượng chưa đúng: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
+    btn.disabled=true;const base={uu:$("#ncm-uu").value,nguon:$("#ncm-ng").value,han:$("#ncm-han").value,ghiChu:$("#ncm-gc").value.trim(),taoLuc:$("#ncm-ngay").value||sxToday()},codes=[];
+    sxMut(`tạo ${L.length} phiếu sản xuất`,s2=>{s2.cfg.cachLam=s2.cfg.cachLam||{};L.forEach(x=>{s2.cfg.cachLam[x.sp]=x.cachLam;const code=sxReqCode(s2,base.taoLuc);codes.push(code);
+      s2.requests.push({id:code,...base,sp:x.sp,sl:x.sl,cachLam:x.cachLam,st:"CAN_LAM",tao:ME.name,batDau:"",lots:[],hist:[{at:sxNow(),by:ME.name,act:"Tạo phiếu sản xuất"}]})})});
+    closeDrawer();toast(`Đã tạo ${codes.length} phiếu sản xuất: ${codes.join(", ")}`);renderMain()};
 }
 function sxReqDetail(id){
   const s=SX(),r=s.requests.find(x=>x.id===id);if(!r)return;const lots=s.batches.filter(b=>r.lots.includes(b.id));
