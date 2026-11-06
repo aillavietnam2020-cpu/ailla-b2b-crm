@@ -239,11 +239,42 @@ document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest
   box.outerHTML=sxPeoplePick(chk);toast("Đã thêm "+t)});
 function sxDoneForm(reqId){
   const s=SX(),r=reqId?s.requests.find(x=>x.id===reqId):null;
+  if(!r)return sxDoneMulti();
   openDrawerHTML(`<h2>Báo hoàn thành${r?" · "+esc(sxP(r.sp).ten):""}</h2><p class="hint">Số tổ tự báo chưa phải số nhập kho. Kế toán sẽ kiểm đếm lại.</p><form class="frm" id="sdf">${r?"":`<label class="field">Sản phẩm<select id="sd-sp" required>${sxProdOpts("")}</select></label>`}<div class="row4"><label class="field">Ngày sản xuất<input id="sd-ng" type="date" value="${sxToday()}" required></label><label class="field">Số lượng tổ báo<input id="sd-sl" type="number" min="1" required value="${r&&r.sl?r.sl:""}"></label></div><label class="field">Nhân sự thực hiện</label>${sxPeoplePick()}<label class="field">Ghi chú<input id="sd-gc"></label>${r?`<label class="ck"><input type="checkbox" id="sd-con"> Phiếu sản xuất này còn làm tiếp (chưa xong hết)</label>`:""}<button class="btn pri big" id="sd-go">Báo hoàn thành</button></form>`);
   $("#sdf").onsubmit=e=>{e.preventDefault();const btn=$("#sd-go");if(btn.disabled)return;btn.disabled=true;const ng=[...$$("#sdf [name=sxng]:checked")].map(x=>x.value),sp=r?r.sp:$("#sd-sp").value,sl=+$("#sd-sl").value;if(!sp||!sl){toast("Thiếu sản phẩm hoặc số lượng");btn.disabled=false;return}
     const id="B-"+Date.now().toString(36)+Math.floor(Math.random()*99);const con=$("#sd-con")&&$("#sd-con").checked;
     sxMut(`xưởng báo hoàn thành ${sxP(sp).ten}: ${sl}`,s2=>{s2.batches.push({id,ma:"",req:r?r.id:"",sp,ngay:$("#sd-ng").value,nguoi:ng,baoSL:sl,baoLuc:sxNow(),baoBy:ME.name,tong:0,dat:0,loi:0,cho:0,ghiChu:$("#sd-gc").value.trim(),lechLyDo:"",kiemBy:"",kiemLuc:"",st:"CHO_KIEM",ver:1,containers:[],hist:[{at:sxNow(),by:ME.name,act:"Xưởng báo hoàn thành "+sl}],nvlTru:false,phatSinh:!r});if(r){const x=s2.requests.find(y=>y.id===r.id);x.lots.push(id);x.st=con?"DANG_LAM":"CHO_KIEM";x.hist.push({at:sxNow(),by:ME.name,act:`Báo hoàn thành ${sl}${con?" (còn làm tiếp)":""}`})}});
     closeDrawer();toast("Đã báo kế toán kiểm kê");renderMain()};
+}
+
+/* Báo hoàn thành không có phiếu sản xuất (chị Hoa 06/11): Ngày · Người thực hiện · bảng nhiều sản phẩm (tên, số lượng),
+   cuối mỗi dòng có nút + để thêm dòng. Mỗi dòng thành một lô chờ kế toán kiểm như trước. */
+function sxDoneMulti(){
+  openDrawerHTML(`<h2>Báo hoàn thành</h2><p class="hint">Số tổ tự báo chưa phải số nhập kho. Kế toán sẽ kiểm đếm lại.</p><form class="frm" id="sdm">
+   <div class="row4"><label class="field">Ngày sản xuất<input id="sdm-ng" type="date" value="${sxToday()}" max="${sxToday()}" required></label></div>
+   <label class="field">Người thực hiện</label>${sxPeoplePick()}
+   <label class="field" style="margin-top:10px">Sản phẩm</label>
+   <div class="tbl edit"><table><thead><tr><th>Sản phẩm (gõ hoặc dán tên, mã)</th><th style="width:130px">Số lượng</th><th style="width:76px"></th></tr></thead><tbody id="sdm-b"></tbody></table></div>
+   <label class="field">Ghi chú<input id="sdm-gc"></label><div id="sdm-e"></div>
+   <button class="btn pri big" id="sdm-go">Báo hoàn thành</button></form>`);
+  const body=$("#sdm-b");
+  const add=(after)=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="sdm-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="sdm-n hint"></small></td><td><input class="sdm-q n" type="number" min="1" step="any"></td><td style="white-space:nowrap"><button type="button" class="btn sm sdm-add" title="Thêm dòng">+</button> <button type="button" class="lnk sdm-x" title="Bỏ dòng">✕</button></td>`;
+    if(after)after.after(tr);else body.appendChild(tr);
+    const inp=tr.querySelector(".sdm-i");
+    if(typeof khoPick==="function")khoPick(inp,["TP"],it=>{inp.dataset.code=it.code;tr.querySelector(".sdm-n").textContent=it.name;tr.querySelector(".sdm-q").focus()});
+    tr.querySelector(".sdm-add").onclick=()=>add(tr);
+    tr.querySelector(".sdm-x").onclick=()=>{if(body.children.length>1)body.removeChild(tr)};
+    tr.querySelector(".sdm-q").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add(tr)}};
+    inp.focus();return tr};
+  add();
+  $("#sdm").onsubmit=e=>{e.preventDefault();const btn=$("#sdm-go");if(btn.disabled)return;
+    const L=[...body.querySelectorAll("tr")].map(tr=>{const i=tr.querySelector(".sdm-i"),v=i.value.trim();return {sp:i.dataset.code||(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(v)?v:""),raw:v,sl:+tr.querySelector(".sdm-q").value}}).filter(x=>x.raw||x.sl);
+    const bad=L.filter(x=>!x.sp||!(x.sl>0));
+    if(!L.length||bad.length){$("#sdm-e").innerHTML=`<div class="note red">${!L.length?"Chưa có sản phẩm nào.":"Dòng chưa chọn sản phẩm trong danh sách hoặc chưa có số lượng: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
+    btn.disabled=true;const ng=[...$$("#sdm [name=sxng]:checked")].map(x=>x.value),day=$("#sdm-ng").value,gc=$("#sdm-gc").value.trim();
+    sxMut(`xưởng báo hoàn thành ${L.length} sản phẩm`,s2=>{L.forEach((x,k)=>{const id="B-"+Date.now().toString(36)+k+Math.floor(Math.random()*99);
+      s2.batches.push({id,ma:"",req:"",sp:x.sp,ngay:day,nguoi:ng,baoSL:x.sl,baoLuc:sxNow(),baoBy:ME.name,tong:0,dat:0,loi:0,cho:0,ghiChu:gc,lechLyDo:"",kiemBy:"",kiemLuc:"",st:"CHO_KIEM",ver:1,containers:[],hist:[{at:sxNow(),by:ME.name,act:"Xưởng báo hoàn thành "+x.sl}],nvlTru:false,phatSinh:true})})});
+    closeDrawer();toast(`Đã báo kế toán kiểm kê ${L.length} sản phẩm`);renderMain()};
 }
 
 /* ---------- 3. TIẾN ĐỘ XƯỞNG (Kanban) ---------- */
