@@ -29,6 +29,8 @@ function sxShape(d){
   if(!s.products.length&&(d.skus||[]).length)s.products=d.skus.map(k=>({ma:k.ma,ten:k.ten,dvt:"sp",loai:SX_GIACONG.test(k.ten)?"Gia công":"Tự sản xuất",prefix:sxPrefix(k.ten),thung:0,toiThieu:0,active:true}));
   // Danh sách nhân sự thực hiện do chị Hoa chốt 06/10/2026 (thay danh sách lấy từ hồ sơ nhân sự).
   if(!s.cfg.peopleV2){s.people=["Nhi","Hiền","Vinh","Thanh","Việt","Huệ","Hội"].map(t=>({ten:t,hoTen:t,viTri:""}));s.cfg.peopleV2=true}
+  /* Chị Hoa 06/11: người thực hiện ở xưởng chỉ còn Hội và Đức; người cũ ẩn đi (lô cũ vẫn giữ tên), thêm lại bằng "+ Thêm nhân sự". */
+  if(!s.cfg.peopleV3){s.people.forEach(p=>{if(!["Hội","Đức"].includes(p.ten))p.an=true});if(!s.people.some(p=>p.ten==="Đức"))s.people.push({ten:"Đức",hoTen:"Đức",viTri:""});s.cfg.peopleV3=true}
   if(!s.people.length&&(d.staff||[]).length)s.people=d.staff.filter(x=>x.khoi==="Sản xuất & Kho"&&x.tt!=="Đã nghỉ").map(x=>({ten:x.ten.split(" ").pop(),hoTen:x.ten,viTri:x.viTri}));
   if(!s.seeded&&s.products.length){s.seeded=true;sxSeedDemo(s)}
   return d;
@@ -234,11 +236,11 @@ function sxReqDetail(id){
   if($("#rq-x"))$("#rq-x").onclick=()=>{const ly=prompt("Lý do hủy phiếu sản xuất?");if(!ly)return;sxMut(`hủy phiếu sản xuất ${id}`,s2=>{const x=s2.requests.find(y=>y.id===id);x.st="HUY";x.hist.push({at:sxNow(),by:ME.name,act:"Hủy: "+ly})});closeDrawer();renderMain()};
 }
 /* Xưởng báo hoàn thành: số tổ tự báo chưa phải số nhập kho, chuyển sang Chờ kế toán kiểm. */
-function sxPeoplePick(sel=[]){return `<div class="phc">${SX().people.map(p=>`<label class="ck sm"><input type="checkbox" name="sxng" value="${esc(p.ten)}" ${sel.includes(p.ten)?"checked":""}> ${esc(p.ten)}<small class="muted"> ${esc(p.viTri||"")}</small></label>`).join("")||`<span class="hint">Chưa có nhân sự nào, bấm Thêm nhân sự.</span>`}<button type="button" class="lnk" data-sx-addp>+ Thêm nhân sự</button></div>`}
+function sxPeoplePick(sel=[]){return `<div class="phc">${SX().people.filter(p=>!p.an||sel.includes(p.ten)).map(p=>`<label class="ck sm"><input type="checkbox" name="sxng" value="${esc(p.ten)}" ${sel.includes(p.ten)?"checked":""}> ${esc(p.ten)}<small class="muted"> ${esc(p.viTri||"")}</small></label>`).join("")||`<span class="hint">Chưa có nhân sự nào, bấm Thêm nhân sự.</span>`}<button type="button" class="lnk" data-sx-addp>+ Thêm nhân sự</button></div>`}
 /* Thêm nhân sự mới: chỉ cần điền tên. Chức danh bổ sung sau khi phần Nhân sự làm xong. Giữ nguyên các ô đã tích. */
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-sx-addp]");if(!b)return;e.preventDefault();
   const t=(prompt("Tên nhân sự mới:")||"").trim();if(!t)return;
-  if(SX().people.some(p=>p.ten.toLowerCase()===t.toLowerCase())){toast("Đã có "+t+" trong danh sách");return}
+  {const old=SX().people.find(p=>p.ten.toLowerCase()===t.toLowerCase());if(old&&old.an){const box0=b.closest(".phc"),chk0=[...box0.querySelectorAll("[name=sxng]:checked")].map(x=>x.value).concat([old.ten]);sxMut("hiện lại nhân sự "+t,s2=>{const x=s2.people.find(p=>p.ten===old.ten);if(x)delete x.an});box0.outerHTML=sxPeoplePick(chk0);toast("Đã thêm lại "+old.ten);return}if(old){toast("Đã có "+t+" trong danh sách");return}}
   const box=b.closest(".phc"),chk=[...box.querySelectorAll("[name=sxng]:checked")].map(x=>x.value).concat([t]);
   sxMut("thêm nhân sự "+t,s2=>s2.people.push({ten:t,hoTen:t,viTri:""}));
   box.outerHTML=sxPeoplePick(chk);toast("Đã thêm "+t)});
