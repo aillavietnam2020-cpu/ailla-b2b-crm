@@ -190,12 +190,14 @@ function pSxNc(m){
   <section class="card flush">${tbl(["Số phiếu","Ngày tạo","Sản phẩm","SL đề nghị","Lý do","Ưu tiên","Hạn cần","Người tạo","Lô đã làm","Trạng thái",""],L.map(r=>`<tr data-sxr="${r.id}" class="clk"><td class="mono">${r.id}</td><td>${sxDd(r.taoLuc)}</td><td><b>${esc(sxP(r.sp).ten)}</b> ${sxCachPill(r)}${r.ghiChu?`<small>${esc(r.ghiChu)}</small>`:""}</td><td class="n">${r.sl?nf(r.sl):"<i class='muted'>chưa chốt</i>"}</td><td>${esc(r.nguon)}</td><td>${r.uu==="Gấp"?pill("Gấp","red"):esc(r.uu)}</td><td>${sxDd(r.han)}</td><td>${esc(r.tao)}</td><td class="n">${r.lots.length}</td><td>${sxStPill(SX_REQ_ST,r.st)}</td><td>${sxReqBtns(r)}</td></tr>`))}</section>
   ${(()=>{/* 06/11: hàng xưởng báo hoàn thành không theo phiếu cũng hiện ở đây (trước chỉ thấy ở Tiến độ xưởng, Đóng gói & kiểm kê) */
     const B=s.batches.filter(b=>!b.req&&b.st!=="HUY"&&(!SXF.q||(b.sp+" "+sxP(b.sp).ten).toLowerCase().includes(SXF.q.toLowerCase()))).slice().reverse();
-    return B.length?`<section class="card flush" style="margin-top:12px"><div class="card-h pad"><h2>Hàng làm không theo phiếu (${B.length})</h2><span class="hint">xưởng báo hoàn thành, chờ kế toán kho kiểm ở Đóng gói & kiểm kê</span></div>${tbl(["Ngày SX","Sản phẩm","Người thực hiện","Xưởng báo","Người báo","Trạng thái"],B.map(b=>`<tr class="clk" data-sxt="sx_lo"><td>${sxDd(b.ngay)}</td><td><b>${esc(sxP(b.sp).ten)}</b><small class="mono">${esc(b.sp)}</small></td><td>${esc(sxNames(b))}</td><td class="n">${nf(b.baoSL)}</td><td>${esc(b.baoBy||"")}</td><td>${sxStPill(SX_LOT_ST,b.st)}</td></tr>`))}</section>`:""})()}`,
+    return B.length?`<section class="card flush" style="margin-top:12px"><div class="card-h pad"><h2>Hàng làm không theo phiếu (${B.length})</h2><span class="hint">xưởng báo hoàn thành, chờ kế toán kho kiểm ở Đóng gói & kiểm kê</span>${sxCanCount()&&B.some(b=>b.st==="CHO_KIEM")?`<button class="btn pri" id="nc-cc">Số đã kiểm đếm: ghi kho ${B.filter(b=>b.st==="CHO_KIEM").length} dòng chờ kiểm</button>`:""}</div>${tbl(["Ngày SX","Sản phẩm","Người thực hiện","Xưởng báo","Người báo","Trạng thái"],B.map(b=>`<tr class="clk" data-sxt="sx_lo"><td>${sxDd(b.ngay)}</td><td><b>${esc(sxP(b.sp).ten)}</b><small class="mono">${esc(b.sp)}</small></td><td>${esc(sxNames(b))}</td><td class="n">${nf(b.baoSL)}</td><td>${esc(b.baoBy||"")}</td><td>${sxStPill(SX_LOT_ST,b.st)}</td></tr>`))}</section>`:""})()}`,
   "");
   sxBindCommon(m);sxBindReqBtns(m);
   $("#nc-st").onchange=e=>{SXF.st=e.target.value;renderMain()};$("#nc-q").onchange=e=>{SXF.q=e.target.value;renderMain()};
   if($("#sx-new"))$("#sx-new").onclick=()=>sxReqForm();
   if($("#sx-done0"))$("#sx-done0").onclick=()=>sxDoneForm(null);
+  if($("#nc-cc"))$("#nc-cc").onclick=()=>{const L=SX().batches.filter(b=>!b.req&&b.st==="CHO_KIEM");if(!L.length)return;
+    if(!confirm(`Xác nhận ${L.length} dòng là số đã kiểm đếm thực tế?\n\n${L.map(b=>"• "+sxP(b.sp).ten+": "+nf(b.baoSL)).join("\n")}\n\nWeb tạo lô và ghi phiếu kiểm kê đóng gói vào kho theo ngày sản xuất: cộng thành phẩm, trừ bán thành phẩm, vỏ, tem theo định mức.`))return;sxConfirmCounted(L.map(b=>b.id))};
 }
 function sxReqBtns(r){const x=[];if(r.st==="CAN_LAM"&&(sxCan("sx.xuong")||sxCan("sx.dieuphoi")))x.push(`<button class="btn sm" data-rs="${r.id}">Bắt đầu</button>`);if((r.st==="DANG_LAM"||r.st==="CAN_LAM")&&(sxCan("sx.xuong")||sxCan("sx.dieuphoi")))x.push(`<button class="btn sm pri" data-rd="${r.id}">Báo hoàn thành</button>`);return x.join(" ")}
 function sxBindReqBtns(m){
@@ -258,7 +260,7 @@ function sxDoneMulti(){
    <label class="field">Người thực hiện</label>${sxPeoplePick()}
    <label class="field" style="margin-top:10px">Sản phẩm</label>
    <div class="tbl edit"><table><thead><tr><th>Sản phẩm (gõ hoặc dán tên, mã)</th><th style="width:130px">Số lượng</th><th style="width:76px"></th></tr></thead><tbody id="sdm-b"></tbody></table></div>
-   <label class="field">Ghi chú<input id="sdm-gc"></label><div id="sdm-e"></div>
+   <label class="field">Ghi chú<input id="sdm-gc"></label>${sxCanCount()?`<label class="ck"><input type="checkbox" id="sdm-ok" checked> Số này là số đã kiểm đếm thực tế: ghi luôn vào kho (cộng thành phẩm, trừ bán thành phẩm, vỏ, tem theo định mức)</label>`:""}<div id="sdm-e"></div>
    <button class="btn pri big" id="sdm-go">Báo hoàn thành</button></form>`);
   const body=$("#sdm-b");
   const add=(after)=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="sdm-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="sdm-n hint"></small></td><td><input class="sdm-q n" type="number" min="1" step="any"></td><td style="white-space:nowrap"><button type="button" class="btn sm sdm-add" title="Thêm dòng">+</button> <button type="button" class="lnk sdm-x" title="Bỏ dòng">✕</button></td>`;
@@ -274,11 +276,23 @@ function sxDoneMulti(){
     const L=[...body.querySelectorAll("tr")].map(tr=>{const i=tr.querySelector(".sdm-i"),v=i.value.trim();return {sp:i.dataset.code||(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(v)?v:""),raw:v,sl:+tr.querySelector(".sdm-q").value}}).filter(x=>x.raw||x.sl);
     const bad=L.filter(x=>!x.sp||!(x.sl>0));
     if(!L.length||bad.length){$("#sdm-e").innerHTML=`<div class="note red">${!L.length?"Chưa có sản phẩm nào.":"Dòng chưa chọn sản phẩm trong danh sách hoặc chưa có số lượng: "+bad.map(x=>esc(x.raw||"(trống)")).join(", ")}</div>`;return}
-    btn.disabled=true;const ng=[...$$("#sdm [name=sxng]:checked")].map(x=>x.value),day=$("#sdm-ng").value,gc=$("#sdm-gc").value.trim();
+    btn.disabled=true;const ng=[...$$("#sdm [name=sxng]:checked")].map(x=>x.value),day=$("#sdm-ng").value,gc=$("#sdm-gc").value.trim(),counted=!!($("#sdm-ok")&&$("#sdm-ok").checked),ids=[];
     sxMut(`xưởng báo hoàn thành ${L.length} sản phẩm`,s2=>{L.forEach((x,k)=>{const id="B-"+Date.now().toString(36)+k+Math.floor(Math.random()*99);
-      s2.batches.push({id,ma:"",req:"",sp:x.sp,ngay:day,nguoi:ng,baoSL:x.sl,baoLuc:sxNow(),baoBy:ME.name,tong:0,dat:0,loi:0,cho:0,ghiChu:gc,lechLyDo:"",kiemBy:"",kiemLuc:"",st:"CHO_KIEM",ver:1,containers:[],hist:[{at:sxNow(),by:ME.name,act:"Xưởng báo hoàn thành "+x.sl}],nvlTru:false,phatSinh:true})})});
-    closeDrawer();toast(`Đã báo kế toán kiểm kê ${L.length} sản phẩm`);renderMain()};
+      ids.push(id);s2.batches.push({id,ma:"",req:"",sp:x.sp,ngay:day,nguoi:ng,baoSL:x.sl,baoLuc:sxNow(),baoBy:ME.name,tong:0,dat:0,loi:0,cho:0,ghiChu:gc,lechLyDo:"",kiemBy:"",kiemLuc:"",st:"CHO_KIEM",ver:1,containers:[],hist:[{at:sxNow(),by:ME.name,act:"Xưởng báo hoàn thành "+x.sl}],nvlTru:false,phatSinh:true})})});
+    closeDrawer();if(counted){sxConfirmCounted(ids);return}toast(`Đã báo kế toán kiểm kê ${L.length} sản phẩm`);renderMain()};
 }
+/* Số báo hoàn thành là số đã kiểm đếm (chị Hoa 06/11): người có quyền kiểm kê (kế toán kho, mua hàng, CEO) xác nhận luôn,
+   web tạo lô (Đạt = số báo) và ghi phiếu kiểm kê đóng gói vào kho: cộng thành phẩm, trừ bán thành phẩm, vỏ, tem theo định mức. */
+const sxCanCount=()=>ME&&(ME.role==="admin"||sxCan("sx.kiemke")||(typeof mhManage==="function"&&mhManage()));
+async function sxConfirmCounted(ids){
+  const now=sxNow(),codes=[];
+  sxMut(`xác nhận ${ids.length} lô đã kiểm đếm`,s2=>{ids.forEach(id=>{const x=s2.batches.find(y=>y.id===id);if(!x||x.st!=="CHO_KIEM"||!(x.baoSL>0))return;
+    Object.assign(x,{tong:x.baoSL,dat:x.baoSL,loi:0,cho:0,kiemBy:ME.name,kiemLuc:now,st:"DA_KIEM"});if(!x.ma)x.ma=sxLotCode(s2,x.sp,x.ngay);codes.push(x.id);
+    x.hist.push({at:now,by:ME.name,act:`Xác nhận số đã kiểm đếm ${x.baoSL} (đạt), tạo lô ${x.ma}`})})});
+  let ok=0;for(const id of codes){if(typeof khoPostLot==="function"){await khoPostLot(id,"");ok++}}
+  toast(`Đã ghi kho ${ok} lô`);renderMain();
+}
+
 
 /* ---------- 3. TIẾN ĐỘ XƯỞNG (Kanban) ---------- */
 function pSxTd(m){
