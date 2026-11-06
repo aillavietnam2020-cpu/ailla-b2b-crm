@@ -8,7 +8,29 @@
 
 export const CC_SETTINGS_KEY = 'cc_caidat';
 
-export type Diem = { id: string; ten: string; lat: number; lng: number; bk: number };
+/** ip: mạng wifi của điểm (IPv4 đủ, IPv6 lấy 4 nhóm đầu): máy tính không có GPS, chấm từ mạng này coi như ở điểm. */
+export type Diem = { id: string; ten: string; lat: number; lng: number; bk: number; ip: string[] };
+
+/** Khóa so mạng: IPv4 giữ nguyên; IPv6 lấy 4 nhóm đầu (cùng một modem, mỗi máy một đuôi khác nhau). */
+export function ipKey(ip: unknown): string {
+  const s = String(ip ?? '').trim().toLowerCase();
+  if (!s) return '';
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) return s;
+  if (!s.includes(':') || !/^[0-9a-f:]+$/.test(s)) return '';
+  const [a, b = ''] = s.split('::');
+  const head = a ? a.split(':') : [];
+  const tail = s.includes('::') ? (b ? b.split(':') : []) : [];
+  const full = s.includes('::') ? [...head, ...Array(Math.max(0, 8 - head.length - tail.length)).fill('0'), ...tail] : head;
+  if (full.length !== 8) return '';
+  return full.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+
+/** Điểm (trong các điểm của lịch) có mạng wifi khớp với mạng người đang chấm. */
+export function diemByIp(s: CcSettings, ip: string, l?: Lich): Diem | null {
+  if (!ip) return null;
+  const pts = l && l.diem.length ? s.diem.filter((d) => l.diem.includes(d.id)) : s.diem;
+  return pts.find((d) => d.ip.includes(ip)) ?? null;
+}
 /**
  * Lịch làm của một nhóm người. kieu: 'codinh' giờ cố định; 'ca' làm theo ca được xếp (Nhân sự › Xếp ca);
  * 'tudo' giờ linh hoạt (chỉ ghi giờ vào ra).
@@ -178,6 +200,7 @@ export function normalizeSettings(v: unknown): CcSettings {
         lat,
         lng,
         bk: Math.round(num(d.bk, 30, 2000, 150)),
+        ip: [...new Set((Array.isArray(d.ip) ? d.ip : String(d.ip ?? '').split(/[,\s]+/)).map((x) => (String(x).endsWith('/64') ? String(x) : ipKey(x))).filter(Boolean))].slice(0, 10),
       };
     })
     .filter((x): x is Diem => !!x)

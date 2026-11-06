@@ -33,7 +33,8 @@ function tqxCalc(){
   const chuaKiem=R.filter(r=>r.trang_thai==="AM"&&!r.da_kiem).length,am=R.filter(r=>r.trang_thai==="AM").length;
   const sx=typeof SX==="function"?SX():{requests:[],batches:[]},run=(sx.requests||[]).filter(r=>r.st==="CAN_LAM"||r.st==="DANG_LAM"),choKiem=(sx.batches||[]).filter(b=>b.st==="CHO_KIEM");
   const vari=(KHO.alerts&&KHO.alerts.variance)||[];
-  return {days,S,tot,wk,pw,cnt,cover,NV,poCodes,chuaKiem,am,amTP:cnt.crit,amNV:NV.length,run,choKiem,vari,D,ban};
+  const TPS=TP.map(r=>({r,st:stOf(r),b:ban.get(r.code)||0})).filter(x=>x.st);
+  return {TPS,R,days,S,tot,wk,pw,cnt,cover,NV,poCodes,chuaKiem,am,amTP:cnt.crit,amNV:NV.length,run,choKiem,vari,D,ban};
 }
 
 /* ---------- Vẽ ---------- */
@@ -85,18 +86,18 @@ function pSxTqx(m){
     C.D.lech.cho?["warn",`${C.D.lech.cho} dòng hàng về lệch đơn mua chờ chốt tiền`,"Phụ trách mua hàng","Phê duyệt","pheduyet",false,["ceo"]]:["good","Hàng về lệch đơn mua",`Mua hàng · 0 đang chờ, ${C.D.lech.xong} đã xử lý`,"","",false,["ceo"]],
     C.choKiem.length?["warn",`${C.choKiem.length} lô chờ kế toán kiểm`,"Kế toán kho","Đóng gói & kiểm kê","sx_lo",false,["kt","xg","ceo"]]:null].filter(t=>t&&t[6].includes(role));
   const KP={
-    ceo:[["Hàng bán ra 7 ngày",tqxF(C.wk),cmp,"#2a78d6",sp],["Thành phẩm âm kho",C.amTP,"mã · bán vượt số đang có","#d03b3b"],["Sắp hết hàng bán",C.cnt.warn,"mã · còn dưới 7 ngày","#fab219"],["Vật tư âm kho",C.amNV,`mã · ${nvlNoPo} mã chưa có đơn mua`,"#d03b3b"],["Việc đang chờ",tasks.filter(t=>t[0]!=="good").length,"việc · xem bảng bên dưới","#4b54d1"]],
-    kt:[["Đơn chờ xuất kho",C.D.cho_xuat,"đơn Kênh phân phối","#d03b3b"],["Hàng mua chờ về",poN,poN&&C.D.po[0].expected_date?`đơn · sớm nhất hẹn ${tqxDd(C.D.po[0].expected_date)}`:"đơn","#fab219"],["Mã chưa có số kiểm",C.chuaKiem,"mã đang âm","#d03b3b"],["Mã âm cần kiểm lại",C.am,`${C.amTP} thành phẩm · ${C.amNV} vật tư`,"#d03b3b"],["Hàng bán ra 7 ngày",tqxF(C.wk),"trừ kho tự động","#2a78d6",sp]],
-    xg:[["Lệnh đang chạy",C.run.length,C.run.length?"lệnh cần làm / đang làm":"chưa có lệnh trên web","#c3c7d4"],["Lô chờ kiểm",C.choKiem.length,"lô","#c3c7d4"],["Thành phẩm cần làm gấp",gap,`${C.cnt.crit} âm + ${C.cnt.warn} sắp hết`,"#d03b3b"],["Vật tư đang thiếu",C.amNV,"mã âm kho","#d03b3b"],["Hao hụt quá 5%",C.vari.length||"–",C.vari.length?"mẻ pha chế lệch định mức":"chưa có mẻ lệch","#c3c7d4"]]}[role];
+    ceo:[["Hàng bán ra 7 ngày",tqxF(C.wk),cmp,"#2a78d6",sp,"ban"],["Thành phẩm âm kho",C.amTP,"mã · bán vượt số đang có","#d03b3b","","tpam"],["Sắp hết hàng bán",C.cnt.warn,"mã · còn dưới 7 ngày","#fab219","","saphet"],["Vật tư âm kho",C.amNV,`mã · ${nvlNoPo} mã chưa có đơn mua`,"#d03b3b","","nvlam"],["Việc đang chờ",tasks.filter(t=>t[0]!=="good").length,"việc · bấm để xem","#4b54d1","","cho"]],
+    kt:[["Đơn chờ xuất kho",C.D.cho_xuat,"đơn Kênh phân phối","#d03b3b","","go:kho_xuat_b2b"],["Hàng mua chờ về",poN,poN&&C.D.po[0].expected_date?`đơn · sớm nhất hẹn ${tqxDd(C.D.po[0].expected_date)}`:"đơn","#fab219","","po"],["Mã chưa có số kiểm",C.chuaKiem,"mã đang âm","#d03b3b","","chuakiem"],["Mã âm cần kiểm lại",C.am,`${C.amTP} thành phẩm · ${C.amNV} vật tư`,"#d03b3b","","am"],["Hàng bán ra 7 ngày",tqxF(C.wk),"trừ kho tự động","#2a78d6",sp,"ban"]],
+    xg:[["Lệnh đang chạy",C.run.length,C.run.length?"lệnh cần làm / đang làm":"chưa có lệnh trên web","#c3c7d4","","go:sx_nc"],["Lô chờ kiểm",C.choKiem.length,"lô","#c3c7d4","","go:sx_lo"],["Thành phẩm cần làm gấp",gap,`${C.cnt.crit} âm + ${C.cnt.warn} sắp hết`,"#d03b3b","","gap"],["Vật tư đang thiếu",C.amNV,"mã âm kho","#d03b3b","","nvlam"],["Hao hụt quá 5%",C.vari.length||"–",C.vari.length?"mẻ pha chế lệch định mức":"chưa có mẻ lệch","#c3c7d4","","go:kho_cl"]]}[role];
   const dim=k=>RO[role][1].includes(k)?"":" dim";
-  const cover=C.cover.length?`<table class="tqt"><thead><tr><th>Thành phẩm</th><th class="n">Tồn</th><th style="width:34%">Bán trung bình / ngày</th><th>Còn bán được</th></tr></thead><tbody>${(()=>{const mx=Math.max(...C.cover.map(x=>x.b));return C.cover.map(({r,b,st})=>{const d=r.ton/b,lb=st==="crit"?"Âm kho":d<1?"Dưới 1 ngày":Math.round(d)+" ngày";
+  const cover=C.cover.length?`<table class="tqt"><thead><tr><th>Thành phẩm</th><th class="n">Tồn</th><th style="width:34%">Bán trung bình / ngày</th><th>Còn bán được</th></tr></thead><tbody>${(()=>{const mx=Math.max(...C.cover.map(x=>x.b));return C.cover.map(({r,b,st})=>{const d=r.ton/b,lb=st==="crit"?"Âm kho":r.ton<=0?"Hết hàng":d<1?"Dưới 1 ngày":Math.round(d)+" ngày";
       return `<tr><td>${esc(r.name||r.code)}<small>${esc(r.code)}</small></td><td class="n${r.ton<0?" neg":""}">${tqxF(r.ton)}</td><td><div class="tqbar"><span style="width:calc(${b/mx*100}% - 46px)"></span><em>${b.toLocaleString("vi-VN",{maximumFractionDigits:1})}</em></div></td><td>${tqxPill(st,lb)}</td></tr>`}).join("")})()}</tbody></table>`:`<p class="tqempty">7 ngày qua chưa có thành phẩm nào bán ra.</p>`;
   const po=(C.D.po||[]).length?`<table class="tqt"><thead><tr><th>Đơn mua</th><th>Nhà cung cấp</th><th>Hàng</th><th>Hẹn về</th></tr></thead><tbody>${C.D.po.slice(0,5).map(p=>{const late=p.expected_date&&p.expected_date<C.D.today;return `<tr><td>${esc(p.no)}</td><td>${esc(p.supplier||"")}</td><td><span class="tqclip" title="${esc(p.items||"")}">${esc(p.items||"")}</span></td><td>${p.expected_date?tqxPill(late?"crit":"warn",(late?"Trễ · ":"")+tqxDd(p.expected_date)):tqxPill("neu","chưa hẹn")}</td></tr>`}).join("")}</tbody></table>`:`<p class="tqempty">Không có đơn mua nào đang chờ về.</p>`;
   const xuong=C.run.length?`<table class="tqt"><thead><tr><th>Thành phẩm</th><th class="n">Số lượng</th><th>Hạn</th><th>Đang ở</th></tr></thead><tbody>${C.run.slice(0,6).map(r=>`<tr><td>${esc((typeof sxP==="function"?sxP(r.sp).ten:"")||r.sp)}</td><td class="n">${r.sl?tqxF(r.sl):"—"}</td><td>${r.han?tqxDd(r.han):"—"}</td><td>${tqxPill(r.st==="DANG_LAM"?"good":"warn",r.st==="DANG_LAM"?"Đang làm":"Cần làm")}</td></tr>`).join("")}</tbody></table>`
     :`<div class="tqempty big"><div><b>Chưa có lệnh sản xuất nào ghi trên web.</b><br>Khi Phụ trách kế hoạch lập lệnh ở Phiếu sản xuất, ô này hiện lệnh đang chạy, đang ở bước nào và mẻ nào hao hụt quá 5% so với định mức.</div></div>`;
   const body=`<div class="tqx">
    <div class="tqbar0"><span class="tqmeta">Tồn kho tính đến hôm nay · số bán các kênh đến hết ${tqxDd(C.D.today)} (7 ngày từ ${tqxDd(C.D.from7)})</span><span class="tqsp"></span><div class="tqseg">${Object.entries(RO).map(([k,[t]])=>`<button class="${k===role?"on":""}" data-tqr="${k}">${t}</button>`).join("")}</div></div>
-   <div class="tqkpis">${KP.map(([l,v,d,c,s])=>`<div class="tqc tqk"><div class="l"><i class="tqdot" style="background:${c}"></i>${l}</div><div class="v">${v}</div><div class="f"><span>${d}</span>${s||""}</div></div>`).join("")}</div>
+   <div class="tqkpis">${KP.map(([l,v,d,c,s,k])=>`<div class="tqc tqk" data-tqk="${k||""}" title="Bấm để xem chi tiết"><div class="l"><i class="tqdot" style="background:${c}"></i>${l}</div><div class="v">${v}</div><div class="f"><span>${d}</span>${s||""}</div></div>`).join("")}</div>
    <div class="tqg"><div class="tqc c8${dim("ban")}"><div class="tqh"><h3>Hàng bán ra theo ngày, theo kênh</h3><span>đơn vị kho · 14 ngày</span></div><div id="tq-sales"></div><div class="tqleg">${TQX_SER.map(([,n,c])=>`<span><i class="tqdot" style="background:${c}"></i>${n}</span>`).join("")}</div></div>
     <div class="tqc c4${dim("tp")}" id="tq-dn"><div class="tqh"><h3>Tình trạng tồn thành phẩm</h3><span>thành phẩm, hàng hóa đang dùng</span></div><div class="tqdw"><div class="tqdn"></div><div class="tqdl"></div></div></div></div>
    <div class="tqg"><div class="tqc c7${dim("tp")}"><div class="tqh"><h3>Thành phẩm bán chạy: còn bán được bao lâu</h3><a class="tql" data-tqg="kho_ton_tp">Tồn kho thành phẩm ›</a></div>${cover}</div>
@@ -107,8 +108,32 @@ function pSxTqx(m){
   </div>`;
   head(body);
   m.querySelectorAll("[data-tqr]").forEach(b=>b.onclick=()=>{TQX.role=b.dataset.tqr;renderMain()});
+  m.querySelectorAll("[data-tqk]").forEach(b=>b.onclick=()=>{const k=b.dataset.tqk;if(!k)return;if(k.startsWith("go:"))return tqxGo(k.slice(3));if(k==="cho"){const t=m.querySelector(".tqtask");if(t)t.closest(".tqc").scrollIntoView({behavior:"smooth",block:"center"});return}tqxDetail(k,C)});
   m.querySelectorAll("[data-tqg]").forEach(b=>b.onclick=e=>{e.preventDefault();tqxGo(b.dataset.tqg)});
   requestAnimationFrame(()=>{const a=$("#tq-sales"),d=$("#tq-dn"),n=$("#tq-nvl");if(a)tqxSales(a,C);if(d)tqxDonut(d,C);if(n)tqxNvl(n,C)});
+}
+/* Bấm ô chỉ số: ngăn bên hiện danh sách mã tạo nên con số; bấm một mã xem từng phiếu (Nhập – xuất – tồn). */
+function tqxDetail(k,C){
+  const nm=r=>`${esc(r.name||r.code)}<small>${esc(r.code)}</small>`,bq=b=>b?b.toLocaleString("vi-VN",{maximumFractionDigits:1}):"—";
+  const tbl=(h,rows)=>rows.length?`<div class="tbl"><table class="tqt"><thead><tr>${h.map(x=>`<th${/Tồn|Bán|Còn|Tổng|TikTok|Facebook|Shopee|phân phối/.test(x)?' class="n"':""}>${x}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`:`<p class="tqempty">Không có mã nào.</p>`;
+  const row=(x,extra)=>`<tr class="clk" data-tqc="${esc(x.r.code)}"><td>${nm(x.r)}</td><td class="n${x.r.ton<0?" neg":""}">${tqxF(x.r.ton)}</td><td class="n">${bq(x.b)}</td><td>${extra||""}</td></tr>`;
+  let T="",H="",go="",gl="";
+  if(k==="ban"){T="Hàng bán ra theo ngày";
+    H=tbl(["Ngày",...TQX_SER.map(x=>x[1]),"Tổng"],C.days.map((d,i)=>`<tr><td>${tqxDd(d)}</td>${TQX_SER.map(([s])=>`<td class="n">${tqxF(C.S[s][i])}</td>`).join("")}<td class="n"><b>${tqxF(C.tot[i])}</b></td></tr>`).reverse())
+     +`<h3 style="margin:16px 0 6px">Mã bán nhiều nhất 7 ngày</h3>`+tbl(["Mã","Tồn","Bán / ngày","Tình trạng"],[...C.ban].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([c,b])=>{const r=C.R.find(x=>x.code===c)||{code:c,name:c,ton:0};const x=C.TPS.find(y=>y.r.code===c);return row({r,b},x?tqxPill(x.st,{crit:"Âm kho",warn:"Sắp hết",good:"Đủ bán",neu:"—"}[x.st]):"")}))}
+  else if(k==="tpam"||k==="saphet"||k==="gap"){const L=C.TPS.filter(x=>k==="tpam"?x.st==="crit":k==="saphet"?x.st==="warn":x.st==="crit"||x.st==="warn").sort((a,b)=>a.r.ton-b.r.ton);
+    T=k==="tpam"?"Thành phẩm âm kho":k==="saphet"?"Sắp hết hàng bán (dưới 7 ngày)":"Thành phẩm cần làm gấp";go="kho_ton_tp";gl="Tồn kho thành phẩm";
+    H=tbl(["Mã","Tồn","Bán / ngày","Ghi chú"],L.map(x=>row(x,x.st==="warn"?tqxPill("warn",x.r.ton<=0?"Hết hàng":x.r.ton/x.b<1?"Dưới 1 ngày":Math.round(x.r.ton/x.b)+" ngày"):x.r.da_kiem?tqxPill("crit","Âm sau kiểm"):tqxPill("neu","Chưa có số kiểm"))))}
+  else if(k==="nvlam"){T="Vật tư âm kho";go="kho_ton";gl="Tồn kho nguyên vật liệu";
+    H=tbl(["Mã","Tồn","Bán / ngày","Đơn mua"],C.NV.map(r=>row({r,b:C.ban.get(r.code)||0},C.poCodes.has(r.code)?tqxPill("warn","Đang chờ về"):tqxPill("crit","Chưa có"))))}
+  else if(k==="chuakiem"||k==="am"){const L=C.R.filter(r=>r.trang_thai==="AM"&&(k==="am"||!r.da_kiem)).sort((a,b)=>a.ton-b.ton);
+    T=k==="am"?"Mã âm cần kiểm lại":"Mã đang âm, chưa có số kiểm";go="kho_kk";gl="Kiểm kê tồn";
+    H=tbl(["Mã","Tồn","Bán / ngày","Số kiểm"],L.map(r=>row({r,b:C.ban.get(r.code)||0},r.da_kiem?tqxPill("good","Đã kiểm "+tqxDd(r.moc||"")):tqxPill("neu","Chưa có"))))}
+  else if(k==="po"){T="Đơn mua đang chờ về";go="kho_nhap";gl="Lập phiếu nhập";
+    H=tbl(["Đơn mua","Nhà cung cấp","Hàng","Hẹn về"],(C.D.po||[]).map(p=>`<tr><td>${esc(p.no)}</td><td>${esc(p.supplier||"")}</td><td>${esc(p.items||"")}</td><td>${p.expected_date?tqxDd(p.expected_date):"chưa hẹn"}</td></tr>`))}
+  openDrawerHTML(`<h2>${T}</h2><p class="hint">Bấm một mã để xem từng phiếu làm nên số tồn.${go?` <a href="#" class="lnk" id="tqd-go">Mở ${gl} ›</a>`:""}</p>${H}`);
+  document.querySelectorAll("#drawer [data-tqc]").forEach(tr=>tr.onclick=()=>{if(typeof khoNxtDetail==="function")khoNxtDetail(tr.dataset.tqc)});
+  const g=document.getElementById("tqd-go");if(g)g.onclick=e=>{e.preventDefault();closeDrawer();tqxGo(go)};
 }
 {const w=typeof sxInit==="function"?sxInit(pSxTqx):pSxTqx;PAGES.sx_tq=w;PAGES.sx=w}
 addEventListener("resize",()=>{if(PAGE==="sx_tq"&&TQX.d){const a=$("#tq-sales"),n=$("#tq-nvl");if(a||n){const C=tqxCalc();if(a)tqxSales(a,C);if(n)tqxNvl(n,C)}}});

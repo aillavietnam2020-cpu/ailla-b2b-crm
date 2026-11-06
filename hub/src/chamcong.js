@@ -105,8 +105,8 @@ async function ccCham(loai){
   const lyDoMuon=loai==="vao"?(($("#cc-lymuon")||{}).value||"").trim():"";
   CC.busy=true;CC.err="";ccRedraw();
   try{
-    const c=await ccPos();
-    const r=await svApi("/api/hub/chamcong/cham",{method:"POST",body:JSON.stringify({loai,lat:c.latitude,lng:c.longitude,acc:c.accuracy,lyDo,lyDoMuon})});
+    let c=null,posErr=null;try{c=await ccPos()}catch(e){posErr=e}
+    let r;try{r=await svApi("/api/hub/chamcong/cham",{method:"POST",body:JSON.stringify({loai,lat:c?c.latitude:null,lng:c?c.longitude:null,acc:c?c.accuracy:null,lyDo,lyDoMuon})})}catch(e){if(posErr&&e.code==="NO_LOCATION")throw posErr;throw e}
     CC.reason=null;toast((loai==="vao"?"Đã chấm vào lúc ":"Đã chấm ra lúc ")+ccHm(r.at));
     await ccLoadMe(true);
   }catch(e){
@@ -230,7 +230,7 @@ function pCcCaiDat(m){
     svApi("/api/hub/chamcong/caidat").then(s=>{CC.cfg=JSON.parse(JSON.stringify(s));ccRedraw()}).catch(e=>{m.innerHTML=H("Cài đặt chấm công")+`<section class="card"><p class="empty">${esc(e.message)}</p></section>`});return}
   const s=CC.cfg,Q=s.quyTac,deps=s.deps||[],people=(s.people||[]).slice().sort((a,b)=>a.pb.localeCompare(b.pb)||a.name.localeCompare(b.name));
   const lichSel=(id,val,blank)=>`<select id="${id}">${blank?`<option value="">${blank}</option>`:""}${s.lich.map(l=>`<option value="${esc(l.id)}"${l.id===val?" selected":""}>${esc(l.ten)}</option>`).join("")}</select>`;
-  const rowD=(d,i)=>`<tr><td><input id="cc-dt-${i}" value="${esc(d.ten)}"></td><td><input id="cc-dl-${i}" value="${d.lat===""?"":d.lat+", "+d.lng}" placeholder="21.02851, 105.85416"></td><td><input id="cc-db-${i}" class="num s" type="number" min="30" max="2000" value="${d.bk}"> m</td><td>${d.lat!==""?`<a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${d.lat},${d.lng}">Xem bản đồ</a> `:""}<button class="btn sm danger" data-del="${i}">Xóa</button></td></tr>`;
+  const rowD=(d,i)=>`<tr><td><input id="cc-dt-${i}" value="${esc(d.ten)}"></td><td><input id="cc-dl-${i}" value="${d.lat===""?"":d.lat+", "+d.lng}" placeholder="21.02851, 105.85416"></td><td><input id="cc-db-${i}" class="num s" type="number" min="30" max="2000" value="${d.bk}"> m</td><td><input id="cc-di-${i}" value="${esc((d.ip||[]).join(", "))}" placeholder="chưa có" style="min-width:150px"> <button class="btn sm" data-ipadd="${i}">Lấy mạng đang dùng</button></td><td>${d.lat!==""?`<a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${d.lat},${d.lng}">Xem bản đồ</a> `:""}<button class="btn sm danger" data-del="${i}">Xóa</button></td></tr>`;
   const t7=(i,v)=>`<select id="cc-l7-${i}">${Object.entries(CC_T7).map(([k,t])=>`<option value="${k}"${k===v?" selected":""}>${t[0].toUpperCase()+t.slice(1)}</option>`).join("")}</select>`;
   const rowL=(l,i)=>`<tr><td><input id="cc-ln-${i}" value="${esc(l.ten)}"></td><td><select id="cc-lk-${i}">${Object.entries(CC_KIEU).map(([k,t])=>`<option value="${k}"${k===l.kieu?" selected":""}>${t}</option>`).join("")}</select></td><td><input type="time" id="cc-lv-${i}" value="${l.gioVao}"> – <input type="time" id="cc-lr-${i}" value="${l.gioRa}"></td><td><input type="time" id="cc-lt1-${i}" value="${l.truaTu}"> – <input type="time" id="cc-lt2-${i}" value="${l.truaDen}"></td><td><input type="number" class="num s" id="cc-la-${i}" min="0" max="120" value="${l.anHan}"> phút</td><td>${t7(i,l.thuBay)}</td><td><input type="time" id="cc-l8-${i}" value="${l.gioRaT7}"></td><td>${s.diem.length?s.diem.map(d=>`<label class="cc-chk"><input type="checkbox" data-ld="${i}" value="${esc(d.id)}"${(l.diem||[]).includes(d.id)?" checked":""}> ${esc(d.ten)}</label>`).join(""):'<span class="hint">chưa có điểm</span>'}</td><td><select id="cc-lo-${i}"><option value="0"${l.ngoaiOk?"":" selected"}>Không cho chấm</option><option value="1"${l.ngoaiOk?" selected":""}>Cho chấm, phải ghi lý do</option></select></td><td><label class="cc-chk"><input type="checkbox" id="cc-lc-${i}"${l.chuyenCan?" checked":""}> Có</label></td></tr>`+(l.kieu==="codinh"?ccCuRow(l,i):"");
   /* Quy định đổi theo thời gian (CEO 04/11): giờ ở dòng trên áp dụng từ ngày này; trước ngày đó tính theo giờ cũ ở đây. */
@@ -243,7 +243,8 @@ function pCcCaiDat(m){
   m.innerHTML=H("Cài đặt chấm công","Điểm chấm, lịch làm, ca, quy tắc tính công, ai theo lịch nào. Sửa xong bấm Lưu cài đặt ở cuối trang.")+`
   <section class="card"><div class="card-h"><h2>Điểm chấm công</h2><span class="hint">văn phòng, xưởng, kho</span></div>
     <p class="hint">Cách dễ nhất: đứng tại văn phòng hoặc xưởng, bấm "Thêm điểm tại chỗ tôi đang đứng". Hoặc mở Google Maps, bấm giữ vào vị trí, chép hai số tọa độ dán vào ô. Bán kính nên để 100–200 m vì định vị trong nhà hay lệch.</p>
-    ${tbl(["Tên điểm","Tọa độ","Bán kính",""],s.diem.map(rowD))}
+    <p class="hint"><b>Mạng wifi:</b> máy tính không có GPS nên vị trí hay lệch cả cây số. Đứng ở văn phòng, nối wifi văn phòng, bấm "Lấy mạng đang dùng" rồi Lưu: ai chấm từ wifi này đều được tính là ở văn phòng. Nên bấm ở cả máy tính và điện thoại.</p>
+    ${tbl(["Tên điểm","Tọa độ","Bán kính","Mạng wifi",""],s.diem.map(rowD))}
     <div class="filters"><button class="btn" id="cc-here">Thêm điểm tại chỗ tôi đang đứng</button><button class="btn" id="cc-add">Thêm điểm (nhập tọa độ)</button></div>${CC.hereErr?`<p class="cc-err" style="max-width:none">${esc(CC.hereErr)}</p>`:""}
   </section>
   <section class="card"><div class="card-h"><h2>Lịch làm</h2></div>
@@ -273,7 +274,7 @@ function pCcCaiDat(m){
   <div class="cc-savebar"><span class="hint">Sửa xong bấm Lưu. Thêm điểm tại chỗ đứng thì web tự lưu.</span><button class="btn pri" id="cc-save">Lưu cài đặt</button></div>`;
   const v=id=>($("#"+id)||{}).value;
   const pull=()=>{
-    s.diem=s.diem.map((d,i)=>{const ll=(v("cc-dl-"+i)||"").split(/[,\s]+/).filter(Boolean).map(Number);return {...d,ten:v("cc-dt-"+i)||d.ten,lat:ll.length===2?ll[0]:"",lng:ll.length===2?ll[1]:"",bk:Number(v("cc-db-"+i))||d.bk}});
+    s.diem=s.diem.map((d,i)=>{const ll=(v("cc-dl-"+i)||"").split(/[,\s]+/).filter(Boolean).map(Number);return {...d,ip:(v("cc-di-"+i)||"").split(/[,\s]+/).filter(Boolean),ten:v("cc-dt-"+i)||d.ten,lat:ll.length===2?ll[0]:"",lng:ll.length===2?ll[1]:"",bk:Number(v("cc-db-"+i))||d.bk}});
     s.lich=s.lich.map((l,i)=>({...l,ten:v("cc-ln-"+i)||l.ten,kieu:v("cc-lk-"+i)||l.kieu,gioVao:v("cc-lv-"+i)||l.gioVao,gioRa:v("cc-lr-"+i)||l.gioRa,truaTu:v("cc-lt1-"+i)??l.truaTu,truaDen:v("cc-lt2-"+i)??l.truaDen,anHan:Number(v("cc-la-"+i))||0,thuBay:v("cc-l7-"+i)||l.thuBay,gioRaT7:v("cc-l8-"+i)||l.gioRaT7,ngoaiOk:v("cc-lo-"+i)==="1",chuyenCan:!!($("#cc-lc-"+i)||{}).checked,diem:[...m.querySelectorAll(`[data-ld="${i}"]:checked`)].map(x=>x.value)}));
     s.lich=s.lich.map((l,i)=>{const tn=$("#cc-ltn-"+i);if(!tn)return l;const t=tn.value||"";const b=l.cu||l;
       return {...l,tuNgay:t,cu:t?{gioVao:v("cc-cv-"+i)||b.gioVao,gioRa:v("cc-cr-"+i)||b.gioRa,truaTu:b.truaTu??l.truaTu,truaDen:b.truaDen??l.truaDen,anHan:Number(v("cc-ca-"+i))||0,thuBay:v("cc-c7-"+i)||b.thuBay,gioRaT7:v("cc-c8-"+i)||b.gioRaT7}:null}});
@@ -283,6 +284,7 @@ function pCcCaiDat(m){
     const pl={};deps.forEach((d,i)=>{const x=v("cc-pb-"+i);if(x)pl[d.k]=x});s.pbLich=pl;s.macDinh=v("cc-md")||s.macDinh;
     ov.forEach(([id],i)=>{const x=v("cc-ov-"+i);if(x)s.nguoiLich[id]=x});
   };
+  m.querySelectorAll("[data-ipadd]").forEach(b=>b.onclick=async()=>{pull();try{const r=await svApi("/api/hub/chamcong/ip");const d=s.diem[Number(b.dataset.ipadd)];if(!r.key){toast("Chưa đọc được mạng đang dùng");return}if(!(d.ip||[]).includes(r.key))d.ip=[...(d.ip||[]),r.key];renderMain();const sv=$("#cc-save");if(sv)sv.click()}catch(e){toast(e.message)}});
   m.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{pull();s.diem.splice(Number(b.dataset.del),1);renderMain()});
   m.querySelectorAll("[data-ledel]").forEach(b=>b.onclick=()=>{pull();s.ngayLe.splice(Number(b.dataset.ledel),1);renderMain()});
   $("#cc-leadd").onclick=()=>{pull();(s.ngayLe=s.ngayLe||[]).push({ngay:"",ten:""});renderMain()};

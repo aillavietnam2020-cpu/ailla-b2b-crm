@@ -25,6 +25,8 @@ import {
   type CcSettings,
   type CcViewer,
   type Luot,
+  diemByIp,
+  ipKey,
 } from '../services/chamCong';
 
 /**
@@ -198,24 +200,36 @@ chamCongRoutes.get('/me', async (c) => {
   });
 });
 
+/** Mạng đang dùng của người hỏi (để cài mạng wifi cho điểm chấm). */
+chamCongRoutes.get('/ip', (c) => {
+  const ip = c.req.header('cf-connecting-ip') ?? '';
+  return ok(c, { ip, key: ipKey(ip) });
+});
+
 chamCongRoutes.post('/cham', async (c) => {
   const auth = c.get('auth');
   const db = c.env.DB;
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const loai = b.loai === 'ra' ? 'ra' : b.loai === 'vao' ? 'vao' : null;
   if (!loai) throw badRequest('LOAI', 'Chọn Chấm vào hoặc Chấm ra');
-  const lat = Number(b.lat);
-  const lng = Number(b.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180)
-    throw badRequest('NO_LOCATION', 'Chưa lấy được vị trí. Hãy bật định vị và cho phép trang web xem vị trí rồi bấm lại.');
-  const acc = Number.isFinite(Number(b.acc)) ? Math.round(Number(b.acc)) : null;
+  const latN = b.lat == null || b.lat === '' ? NaN : Number(b.lat);
+  const lngN = b.lng == null || b.lng === '' ? NaN : Number(b.lng);
+  const coViTri = Number.isFinite(latN) && Number.isFinite(lngN) && Math.abs(latN) <= 90 && Math.abs(lngN) <= 180;
+  const lat = coViTri ? latN : null;
+  const lng = coViTri ? lngN : null;
+  const acc = coViTri && Number.isFinite(Number(b.acc)) ? Math.round(Number(b.acc)) : null;
   const lyDo = String(b.lyDo ?? '').trim().slice(0, 300);
   const lyDoMuon = loai === 'vao' ? String(b.lyDoMuon ?? '').trim().slice(0, 300) : '';
   const now = nowIso();
   const today = vnDate(now);
   const [s, m] = await Promise.all([loadSettings(db), loadMembers(db, auth.user.id)]);
   const lich = lichOf(s, auth.user.id, m.users[auth.user.id]?.pb);
-  const near = nearest(s, lat, lng, lich);
+  // Máy tính không có GPS nên vị trí đoán lệch cả cây số: đang dùng đúng mạng wifi của điểm thì coi như ở điểm.
+  const quaMang = diemByIp(s, ipKey(c.req.header('cf-connecting-ip')), lich);
+  if (!coViTri && !quaMang)
+    throw badRequest('NO_LOCATION', 'Chưa lấy được vị trí. Hãy bật định vị và cho phép trang web xem vị trí rồi bấm lại.');
+  let near = coViTri ? nearest(s, lat!, lng!, lich) : { diem: null, kc: null, trong: null as boolean | null };
+  if (quaMang && near.trong !== true) near = { diem: { ...quaMang, ten: quaMang.ten + ' (wifi)' }, kc: null, trong: true };
   if (near.trong === false && !lich.ngoaiOk)
     throw badRequest('NGOAI', `Bạn đang cách ${near.diem!.ten} khoảng ${near.kc} m, ngoài phạm vi ${near.diem!.bk} m nên chưa chấm được. Đến ${near.diem!.ten} rồi bấm lại.`);
   if (near.trong === false && !lyDo)

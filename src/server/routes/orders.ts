@@ -448,6 +448,43 @@ orderRoutes.post('/:id/ship-info', async (c) => {
   return ok(c, { id, ship_day: input.ship_day });
 });
 
+/** Sửa ngày đặt đơn (chị Hoa 06/11: sale tạo đơn nhầm ngày). Ngày không được sau hôm nay. Đơn đã huỷ hoặc kế toán
+ * đã xác nhận bằng tay thì khoá như Sửa đơn. Số đơn giữ nguyên; doanh thu, thưởng theo tháng tự tính theo ngày mới. Có nhật ký. */
+orderRoutes.post('/:id/order-date', requirePermission('order.create', 'order.create.team'), async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const b = (await c.req.json().catch(() => null)) as { order_date?: unknown; reason?: unknown } | null;
+  const d = String(b?.order_date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw unprocessable('BAD_DATE', 'Ngày đơn không hợp lệ');
+  if (d > vnDate()) throw unprocessable('FUTURE_DATE', 'Ngày đơn không được sau hôm nay');
+  const o = await c.env.DB.prepare(
+    'SELECT id, owner_id, order_date, approval_status, accounting_status, accounting_auto FROM orders WHERE id = ? AND deleted_at IS NULL',
+  )
+    .bind(id)
+    .first<{ id: string; owner_id: string; order_date: string; approval_status: string; accounting_status: string; accounting_auto: number | null }>();
+  if (!o || (auth.scope === 'OWN' && o.owner_id !== auth.user.id)) throw notFound('Không tìm thấy đơn hàng');
+  if (o.approval_status === 'CANCELLED') throw unprocessable('ORDER_CANCELLED', 'Đơn đã huỷ nên không sửa được.');
+  if (o.accounting_status === 'DA_XAC_NHAN' && Number(o.accounting_auto ?? 0) !== 1)
+    throw unprocessable('ORDER_ACCOUNTING_LOCKED', 'Kế toán đã xác nhận đơn này nên không sửa ngày được. Nhờ kế toán mở lại.');
+  if (o.order_date === d) return ok(c, { id, order_date: d, changed: false });
+  const now = nowIso();
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE orders SET order_date = ?, updated_at = ? WHERE id = ?').bind(d, now, id),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'ORDER_DATE_EDITED',
+      entityType: 'ORDER',
+      entityId: id,
+      before: { order_date: o.order_date },
+      after: { order_date: d },
+      reason: typeof b?.reason === 'string' ? b.reason.slice(0, 300) : null,
+      requestId: c.get('requestId'),
+      ip: clientIp(c.req.raw.headers),
+    }),
+  ]);
+  return ok(c, { id, order_date: d, changed: true });
+});
+
 /** Kế toán xác nhận / bỏ xác nhận đơn (mốc ghi công nợ chính thức). */
 orderRoutes.post('/:id/accounting', requirePermission('order.accounting.confirm'), async (c) => {
   const auth = c.get('auth');
