@@ -37,6 +37,7 @@ import {
 import { khoDoiChieu, khoMocMap, khoTonRows, type KhoTonRow } from '../services/khoTon';
 import { accountantIds, taskStatements } from '../lib/notifyTasks';
 import { bellTo } from '../lib/hubBell';
+import { unpack } from '../lib/pack';
 
 /**
  * Kho sản xuất: nhập NVL → pha chế BTP → kiểm kê đóng gói → xuất kho → hàng hoàn.
@@ -1092,6 +1093,39 @@ khoRoutes.post('/items/:code/merge', async (c) => {
   return ok(c, { into, from: old, inactive: [old, ...offTem], as_goods: asGoods });
 });
 
+/** Phiếu sản xuất mới cần pha chế (chị Hoa 06/11): sinh việc + chuông cho kỹ thuật pha chế (quyền sx.kythuat).
+ * Việc tự xong khi kỹ thuật ghi phiếu pha chế gắn phiếu sản xuất đó. */
+khoRoutes.post('/pc-notify', async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => null)) as { items?: Array<Record<string, unknown>> } | null;
+  const items = (Array.isArray(b?.items) ? b!.items : []).slice(0, 50);
+  // Người nhận: tài khoản chỉ làm kỹ thuật (có sx.kythuat, không phải điều phối / kế toán kho, vì quyền mặc định của CEO, kế toán cũng có sx.kythuat).
+  // Quyền "Kỹ thuật pha chế" (sx.kythuat) đặt ở hồ sơ người dùng web chung (hub_state main, users[].perms), nối tài khoản qua users[].crm.
+  let ids: string[] = [];
+  try {
+    const row = await c.env.DB.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
+    const d = row ? (JSON.parse(await unpack(row.data)) as { users?: Array<{ crm?: string; perms?: string[]; active?: boolean }> }) : {};
+    ids = [...new Set((d.users ?? []).filter((u) => u.active !== false && u.crm && (u.perms ?? []).includes('sx.kythuat') && !(u.perms ?? []).includes('sx.dieuphoi') && !(u.perms ?? []).includes('sx.kiemke')).map((u) => u.crm as string))];
+  } catch {
+    ids = [];
+  }
+  if (!ids.length) return ok(c, { sent: 0, no_kythuat: true });
+  const now = nowIso();
+  let sent = 0;
+  for (const it of items) {
+    const psx = String(it.psx ?? '').trim().slice(0, 40);
+    if (!psx) continue;
+    const open = await c.env.DB.prepare("SELECT 1 FROM tasks WHERE status = 'OPEN' AND title LIKE ?").bind(`Pha chế theo phiếu sản xuất ${psx}:%`).first();
+    if (open) continue;
+    const title = `Pha chế theo phiếu sản xuất ${psx}: ${String(it.name ?? '').slice(0, 120)}${it.sl ? ` · ${it.sl}` : ''}${it.han ? ` · hạn ${it.han}` : ''}. Pha xong vào Kho – Sản xuất › Pha chế, bấm Nhập số thực tế.`;
+    const st = taskStatements(c.env.DB, ids, { title, createdBy: auth.user.id, now, priority: 'HIGH' });
+    if (st.length) await c.env.DB.batch(st);
+    await bellTo(c.env.DB, ids, title, 'kho_pc').catch(() => 0);
+    sent++;
+  }
+  return ok(c, { sent, no_kythuat: false });
+});
+
 /** Thay toàn bộ định mức của một sản phẩm (CEO, quản lý điều phối, kế toán). Phiếu đã ghi không đổi vì sổ lưu số đã trừ. */
 khoRoutes.put('/bom/:product', adminOnlyEndpoint, async (c) => {
   const auth = c.get('auth');
@@ -1835,6 +1869,12 @@ khoRoutes.post('/docs', async (c) => {
   }
   for (const po of new Set(replacedReceipts.map((r) => r.po_id))) if (po !== poRow?.id) await poStatus(c.env.DB, po);
   if (replaced.length && type === 'PN') warnings.push(`Phiếu cũ ${replaced.map((d) => d.no).join(', ')} đã tự hủy, thay bằng ${no}.`);
+  if (type === 'PC' && String(b.ref_no ?? '').trim()) {
+    await c.env.DB.prepare("UPDATE tasks SET status = 'DONE', completed_at = ?, updated_at = ? WHERE status = 'OPEN' AND title LIKE ?")
+      .bind(nowIso(), nowIso(), `Pha chế theo phiếu sản xuất ${String(b.ref_no).trim()}:%`)
+      .run()
+      .catch(() => undefined);
+  }
   if (type === 'KS' && Array.isArray(extra.no_bom) && extra.no_bom.length) {
     try {
       const ids = await accountantIds(c.env.DB);

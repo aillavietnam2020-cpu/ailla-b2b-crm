@@ -256,7 +256,12 @@ function sxReqMulti(){
     btn.disabled=true;const base={uu:$("#ncm-uu").value,nguon:$("#ncm-ng").value,han:$("#ncm-han").value,ghiChu:$("#ncm-gc").value.trim(),taoLuc:$("#ncm-ngay").value||sxToday()},codes=[];
     sxMut(`tạo ${L.length} phiếu sản xuất`,s2=>{s2.cfg.cachLam=s2.cfg.cachLam||{};L.forEach(x=>{s2.cfg.cachLam[x.sp]=x.cachLam;const code=sxReqCode(s2,base.taoLuc);codes.push(code);
       s2.requests.push({id:code,...base,sp:x.sp,sl:x.sl,cachLam:x.cachLam,st:"CAN_LAM",tao:ME.name,batDau:"",lots:[],hist:[{at:sxNow(),by:ME.name,act:"Tạo phiếu sản xuất"}]})})});
-    closeDrawer();const kt=L.filter(x=>x.cachLam!=="CONG_NHAN").length;toast(`Đã tạo ${codes.length} phiếu sản xuất: ${codes.join(", ")}`+(kt?` · ${kt} phiếu pha chế chờ làm ở Pha chế (in phiếu đưa kỹ thuật)`:""));renderMain()};
+    const ktL=L.map((x,k)=>({...x,psx:codes[k]})).filter(x=>x.cachLam!=="CONG_NHAN");
+    renderMain();
+    /* Sinh việc + chuông cho kỹ thuật pha chế, rồi mở bảng để Thảo in phiếu pha chế đưa kỹ thuật ngay (06/11). */
+    (async()=>{let note="";if(ktL.length){try{const r=await kApi("/pc-notify",{method:"POST",body:JSON.stringify({items:ktL.map(x=>({psx:x.psx,name:sxP(x.sp).ten,sl:x.sl,han:x.han?sxDd(x.han):""}))})});note=r.no_kythuat?"Chưa có tài khoản riêng của kỹ thuật pha chế nên chưa giao việc được. In phiếu pha chế đưa kỹ thuật ở nút bên dưới.":`Đã giao việc và báo chuông cho kỹ thuật pha chế (${r.sent} phiếu).`}catch(e){note="Chưa báo được kỹ thuật: "+e.message}}
+      openDrawerHTML(`<h2>Đã tạo ${codes.length} phiếu sản xuất</h2>${note?`<div class="note ${/Chưa/.test(note)?"amb":"grn"}">${esc(note)}</div>`:""}${tbl(["Phiếu","Sản phẩm","Số lượng","Cách làm",""],L.map((x,k)=>`<tr><td class="mono">${esc(codes[k])}</td><td>${esc(sxP(x.sp).ten)}</td><td class="n">${x.sl?nf(x.sl):"chưa chốt"}</td><td>${x.cachLam==="CONG_NHAN"?"Công nhân tự làm":"Kỹ thuật pha chế"}</td><td>${x.cachLam==="CONG_NHAN"?"":`<button class="btn sm pri" data-pcpr="${esc(codes[k])}">In phiếu pha chế</button>`}</td></tr>`))}<p class="hint">Phiếu pha chế cũng nằm ở Kho – Sản xuất › Pha chế, mục Phiếu pha chế chờ làm.</p>`);
+      document.querySelectorAll("#drawer [data-pcpr]").forEach(b=>b.onclick=()=>{if(typeof kqPcOpen==="function")kqPcOpen(b.dataset.pcpr,true)})})()};
 }
 function sxReqDetail(id){
   const s=SX(),r=s.requests.find(x=>x.id===id);if(!r)return;const lots=s.batches.filter(b=>r.lots.includes(b.id));
