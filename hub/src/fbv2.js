@@ -49,6 +49,8 @@ function fbmMerge(){if(typeof FBC==="undefined"||!FBM.days)return;if(!FBC.raw)FB
 function fbvTyLe(from,to){fbmLoad();fbmMerge();const R=FBC.raw&&FBC.raw.days;if(!R)return null;const ks=Object.keys(R).filter(k=>k>=from&&k<=to).sort();if(!ks.length)return null;const C=fbdCost(ks);
   return C.dt>0?{gv:C.gv/C.dt,ship:C.ship/C.dt,ret:C.shipRet/C.dt,n:ks.length,den:ks[ks.length-1],C}:null}
 /* Giá vốn đơn giao của một khoảng ngày cho Lãi lỗ / Tổng quan (tqgop.js): doanh thu giao × tỷ lệ thật trong khoảng; chưa có số thì null. */
+/* Giá vốn + ship Facebook của các đơn đã gửi trong khoảng ngày (số thật, cho ô Tổng chi phí tháng). */
+function fbmSum(from,to){fbmLoad();const o={gv:0,ship:0,n:0,days:0};Object.entries(FBM.days||{}).forEach(([d,x])=>{if(d<from||d>to)return;o.gv+=x.gv;o.ship+=x.ship;o.n+=x.n;o.days++});return o}
 /* Ghi chú nguồn + mã chưa có giá thành (để trống, không ước). */
 function fbmNote(){const M=FBM.miss||[],D2=FBM.days||{},nm=Object.values(D2).reduce((a,o)=>a+o.nMiss,0);return (FBM.raw&&FBM.raw.at?` · số đơn đã gửi kéo lúc ${FBM.raw.at.slice(11,16)} ${FBM.raw.at.slice(8,10)}/${FBM.raw.at.slice(5,7)}`:" · đang tải số đơn Facebook")+(nm?` · ${nf(nm)} đơn có mã chưa có giá thành, chưa tính: ${M.slice(0,5).map(x=>x.n).join("; ")}${M.length>5?"…":""}`:"")}
 function fbvGvCa(from,to){if(typeof FBC==="undefined")return null;const T=fbvTyLe(from,to),dtG=Object.keys(DAYD.fb||{}).filter(k=>k>=from&&k<=to).reduce((a,k)=>a+(+DAYD.fb[k][5]||0),0);

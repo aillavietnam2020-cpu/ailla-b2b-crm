@@ -34,9 +34,17 @@ function tq2Health(N){const T=N.T,P=N.P,ng=dhGet().nguong||{},out=[],add=(go,l,v
     add("pl","Doanh số theo đơn",tr(v),(KH&&KH.tong?"đạt "+Math.round(v/KH.tong*100)+"% kế hoạch · ":"")+"doanh thu thực đã giao "+tr(T.dt)+", chốt cuối tháng",KH&&KH.tong?(v/KH.tong>=.95?"grn":v/KH.tong>=.8?"amb":"red"):"gry")}
   else add("pl","Doanh thu thực",tr(T.dt),KH&&KH.tong?"đạt "+Math.round(T.dt/KH.tong*100)+"% kế hoạch ("+tr(KH.tong)+")":"chưa đặt kế hoạch tháng",KH&&KH.tong?(T.dt/KH.tong>=.95?"grn":T.dt/KH.tong>=.8?"amb":"red"):"gry");
   const parts=[["quảng cáo",T.ads],["giá vốn",T.gv],["phí sàn, ship",T.phi],["chi phí chung",T.chung||0]].sort((a,b)=>b[1]-a[1]);
-  /* Chưa có chi phí chung (Sổ chi phí tháng chưa ghi) vẫn hiện các khoản đã có: giá vốn, phí, quảng cáo, chi kênh, lương kênh (chị Hoa 06/11). */
-  const cpK=T.cp!=null?T.cp:(T.gv||0)+(T.phi||0)+(T.ads||0)+(T.cpk||0)+(T.luong||0)+(T.sx||0),adsCa=N.le&&N.le.adsCa>N.le.ads+1?N.le.adsCa-N.le.ads+(T.ads||0):0;
-  add("pl","Tổng chi phí",cpK?tr(cpK):"—",!cpK?"chưa có số":(T.cp==null?"chưa gồm chi phí chung (Sổ chi phí tháng này chưa ghi) · ":tq2P(cpK/T.dt)+"% doanh thu · ")+parts[0][0]+" "+tr(parts[0][1])+" là khoản lớn nhất"+(adsCa?` (phần đơn đã giao; quảng cáo cả tháng ${tr(adsCa)})`:""),T.cp==null?"amb":"amb");
+  /* Tổng chi phí = mọi chi phí của tháng (chị Hoa 06/11). Tháng đang chạy, cùng rổ với Doanh số theo đơn: quảng cáo cả tháng mọi kênh,
+     giá vốn + ship Facebook theo đơn đã gửi (số thật), Kênh phân phối / OEM (giá vốn, chi kênh, lương), TikTok / Shopee theo báo cáo đã có,
+     Sổ chi phí (chi chung, sản xuất). Khoản chưa có số thì ghi rõ, không ước. Tháng đã qua: theo P&L. */
+  if(run){const R=N.A.R,LD=tq2Don(R.from,R.to),FM=typeof fbmSum==="function"?fbmSum(R.from,R.to):{gv:0,ship:0,days:0},col=k=>N.A.cols[k]||{},thieu=[];
+    const san=["tts","spe"].reduce((a,k)=>{const c=N.A.cols[k];if(!c){thieu.push((PLC_K.find(x=>x[0]===k)||[])[1]+" (giá vốn, phí sàn chờ báo cáo)");return a}return a+(c.gv||0)+(c.phi||0)+(c.cpk||0)+(c.luong||0)},0);
+    const kpp=["b2b","gc"].reduce((a,k)=>{const c=col(k);return a+(c.gv||0)+(c.phi||0)+(c.cpk||0)+(c.luong||0)},0),fbk=(col("fb").cpk||0)+(col("fb").luong||0);
+    const parts2=[["quảng cáo cả tháng",LD.ads],["giá vốn, ship Facebook (đơn đã gửi)",FM.gv+FM.ship],["Kênh phân phối, OEM",kpp],["TikTok, Shopee",san],["Sổ chi phí (chi chung, sản xuất, chi kênh)",(T.chung||0)+(T.sx||0)+fbk]].filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+    const tot=parts2.reduce((a,x)=>a+x[1],0),vD=LD.dt+((N.A.cols.b2b||{}).dt||0)+((N.A.cols.gc||{}).dt||0);
+    if(!FM.days)thieu.push("giá vốn Facebook (đang tải)");if(T.chung==null)thieu.push("chi phí chung (Sổ chi phí chưa ghi)");
+    add("pl","Tổng chi phí",tot?tr(tot):"—",!tot?"chưa có số":(vD?tq2P(tot/vD)+"% doanh số theo đơn · ":"")+parts2.slice(0,2).map(x=>x[0]+" "+tr(x[1])).join(", ")+(thieu.length?" · chưa có: "+thieu.join(", "):""),thieu.length?"amb":"grn")}
+  else add("pl","Tổng chi phí",T.cp==null?"—":tr(T.cp),T.cp==null?"chưa có chi phí chung":tq2P(T.cp/T.dt)+"% doanh thu · "+parts[0][0]+" "+tr(parts[0][1])+" là khoản lớn nhất","amb");
   const m=T.dt?T.lai/T.dt:0;add("pl",run?"Lãi đóng góp (tạm tính)":"Lãi đóng góp",tr(T.lai),tq2P(m)+"% doanh thu"+(run?" thực đã giao":"")+" · trước chi phí chung",m<.1?"red":m<.2?"amb":"grn");
   if(T.ln==null)add("pl","Lợi nhuận ròng","—","chưa có chi phí chung tháng này","gry");
   else{const thieu=[];if(!T.luong)thieu.push("chưa trừ lương");thieu.push("chưa trừ thuế");const it=P&&P.chung&&T.chung!=null&&T.chung<P.chung*.3;
