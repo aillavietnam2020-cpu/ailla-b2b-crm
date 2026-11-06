@@ -22,6 +22,9 @@ import {
   normalizeSettings,
   tongNgay,
   tongThang,
+  ketQuaBu,
+  type BuKq,
+  type BuKieu,
   type Ca,
   type CcSettings,
   type CcViewer,
@@ -86,6 +89,81 @@ export type DonNgay = { don?: string; coPhep?: boolean; ot?: number };
 let DON_CACHE: { at: number; map: Map<string, Map<string, DonNgay>> } | null = null;
 export function resetDonCache() {
   DON_CACHE = null;
+  BU_CACHE = null;
+}
+
+/**
+ * Đơn làm bù (CEO 06/11) theo 'người|ngày': t = ngày được bù (kết quả bù), b = ngày đi làm bù.
+ * Kết quả tính từ giờ chấm của ngày làm bù (điện thoại + máy chấm công). Giữ 60 giây như đơn nghỉ.
+ */
+type BuMaps = { t: Map<string, BuKq>; b: Map<string, { cho: string; kieu: BuKieu }> };
+let BU_CACHE: { at: number; map: BuMaps } | null = null;
+async function loadBu(db: D1Database, s: CcSettings, pbOf: (id: string) => string | undefined): Promise<BuMaps> {
+  if (BU_CACHE && Date.now() - BU_CACHE.at < 60_000) return BU_CACHE.map;
+  const today = vnDate();
+  const map: BuMaps = { t: new Map(), b: new Map() };
+  const rows =
+    (
+      await db
+        .prepare("SELECT user_id, tu, buoi, st, bu_ngay, bu_kieu, bu_tu, bu_den FROM ns_don WHERE loai = 'lambu' AND st IN ('lead', 'hcns', 'xong') AND tu >= ?")
+        .bind(vnDate(new Date(Date.now() - 180 * 864e5)))
+        .all<{ user_id: string; tu: string; buoi: Buoi; st: string; bu_ngay: string; bu_kieu: BuKieu; bu_tu: string | null; bu_den: string | null }>()
+    ).results ?? [];
+  const xong = rows.filter((r) => r.st === 'xong' && r.tu <= today);
+  const ngays = [...new Set(xong.map((r) => r.tu))];
+  const luot = new Map<string, Luot[]>();
+  if (ngays.length) {
+    const q = (await db.prepare(`SELECT user_id, ngay, loai, at, trong, xn, gio_quay FROM cc_luot WHERE ngay IN (${ngays.map(() => '?').join(',')})`).bind(...ngays).all<Row>()).results ?? [];
+    for (const r of q) luot.set(r.user_id + '|' + r.ngay, [...(luot.get(r.user_id + '|' + r.ngay) ?? []), r as Luot]);
+    const sorted = ngays.slice().sort();
+    const may = await loadMay(db, sorted[0], sorted[sorted.length - 1]);
+    for (const [k, v] of may) if (luot.has(k) || ngays.includes(k.split('|')[1])) luot.set(k, [...(luot.get(k) ?? []), ...v]);
+  }
+  for (const r of rows) {
+    if (!r.bu_ngay) continue;
+    let kq: BuKq['kq'] = 'duyet';
+    if (r.st === 'xong') {
+      const lich = lichOf(s, r.user_id, pbOf(r.user_id));
+      const n = tongNgay(luot.get(r.user_id + '|' + r.tu) ?? [], lich, r.tu, r.tu === today, { q: s.quyTac, le: leOf(s, r.tu) });
+      kq = ketQuaBu({ kieu: r.bu_kieu, buoi: r.buoi, tu: r.bu_tu, den: r.bu_den }, n, lich, r.tu, today);
+    }
+    map.t.set(r.user_id + '|' + r.bu_ngay, { kq, ngay: r.tu, kieu: r.bu_kieu });
+    if (r.st === 'xong') map.b.set(r.user_id + '|' + r.tu, { cho: r.bu_ngay, kieu: r.bu_kieu });
+  }
+  BU_CACHE = { at: Date.now(), map };
+  return map;
+}
+const buOpt = (bu: BuMaps, id: string, d: string) => ({ bu: bu.t.get(id + '|' + d) ?? null, lamBu: bu.b.get(id + '|' + d) ?? null });
+
+/** Từng ngày công của một người trong khoảng ngày (dùng cho đơn làm bù: tìm ngày cần bù). */
+export async function ngayCongCua(db: D1Database, userId: string, pb: string | undefined, tu: string, den: string) {
+  const today = vnDate();
+  const s = await loadSettings(db);
+  const lich = lichOf(s, userId, pb);
+  const days = daysFrom(tu, Math.round((Date.parse(den) - Date.parse(tu)) / 864e5) + 1);
+  const [rows, xep, don, may, bu] = await Promise.all([
+    db.prepare(`SELECT ${COLS} FROM cc_luot WHERE user_id = ? AND ngay BETWEEN ? AND ? ORDER BY at`).bind(userId, tu, den).all<Row>(),
+    lich.kieu === 'ca' ? loadXep(db, s, tu, den, userId) : Promise.resolve(new Map<string, Ca>()),
+    loadDon(db),
+    loadMay(db, tu, den, userId),
+    loadBu(db, s, () => pb),
+  ]);
+  const list = rows.results ?? [];
+  return {
+    s,
+    lich,
+    xep,
+    ngay: days.map((d) => ({
+      ngay: d,
+      ...tongNgay([...(list.filter((r) => r.ngay === d) as Luot[]), ...(may.get(userId + '|' + d) ?? [])], lich, d, d === today, {
+        ca: xep.get(userId + '|' + d) ?? null,
+        q: s.quyTac,
+        le: leOf(s, d),
+        ...donOpt(don.get(userId)?.get(d)),
+        ...buOpt(bu, userId, d),
+      }),
+    })),
+  };
 }
 async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>>> {
   if (DON_CACHE && Date.now() - DON_CACHE.at < 60_000) return DON_CACHE.map;
@@ -107,7 +185,7 @@ async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>
     /* không đọc được đơn cũ thì bỏ qua */
   }
   const tu = vnDate(new Date(Date.now() - 400 * 864e5));
-  const rows = (await db.prepare("SELECT user_id, loai, tu, den, buoi, gio FROM ns_don WHERE st = 'xong' AND den >= ?").bind(tu).all<{ user_id: string; loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null }>()).results ?? [];
+  const rows = (await db.prepare("SELECT user_id, loai, tu, den, buoi, gio FROM ns_don WHERE st = 'xong' AND loai <> 'lambu' AND den >= ?").bind(tu).all<{ user_id: string; loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null }>()).results ?? [];
   const byUser = new Map<string, typeof rows>();
   for (const r of rows) byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), r]);
   for (const [u, list] of byUser)
@@ -179,11 +257,12 @@ chamCongRoutes.get('/me', async (c) => {
   const xep = lich.kieu === 'ca' ? await loadXep(db, s, thang + '-01', tuan[6], auth.user.id) : new Map<string, Ca>();
   const caOf = (d: string) => xep.get(auth.user.id + '|' + d) ?? null;
   const myDon = (await loadDon(db)).get(auth.user.id);
+  const bu = await loadBu(db, s, (id) => cx.m.users[id]?.pb);
   const may = await loadMay(db, thang + '-01', thang + '-31', auth.user.id);
   const ngay = daysOf(thang, today).map((d) => {
     const l = list.filter((r) => r.ngay === d) as Luot[];
     const m = may.get(auth.user.id + '|' + d) ?? [];
-    return { ngay: d, ...tongNgay([...l, ...m], lich, d, d === today, { ca: caOf(d), q: s.quyTac, le: leOf(s, d), ...donOpt(myDon?.get(d)) }), luot: l.length, nguon: nguon(l, m) };
+    return { ngay: d, ...tongNgay([...l, ...m], lich, d, d === today, { ca: caOf(d), q: s.quyTac, le: leOf(s, d), ...donOpt(myDon?.get(d)), ...buOpt(bu, auth.user.id, d) }), luot: l.length, nguon: nguon(l, m) };
   });
   return ok(c, {
     today,
@@ -375,13 +454,13 @@ chamCongRoutes.get('/ngay', async (c) => {
   if (ids && !cx.v.pb) throw forbidden('Chỉ CEO, HCNS và trưởng nhóm xem được chấm công của người khác');
   const rows = (await db.prepare(`SELECT ${COLS} FROM cc_luot WHERE ngay = ? ORDER BY at`).bind(ngay).all<Row>()).results ?? [];
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
-  const [xep, don, may] = await Promise.all([loadXep(db, s, ngay, ngay), loadDon(db), loadMay(db, ngay, ngay)]);
+  const [xep, don, may, bu] = await Promise.all([loadXep(db, s, ngay, ngay), loadDon(db), loadMay(db, ngay, ngay), loadBu(db, s, (id) => cx.m.users[id]?.pb)]);
   const extra = [...new Set(rows.map((r) => r.user_id))].filter((id) => !cx.m.users[id] && !ids);
   const list = [...people.map(([id, u]) => ({ id, name: u.name, pb: u.pb })), ...extra.map((id) => ({ id, name: id, pb: '' }))].map((p) => {
     const l = rows.filter((r) => r.user_id === p.id);
     const lich = lichOf(s, p.id, p.pb);
     const mm = may.get(p.id + '|' + ngay) ?? [];
-    return { ...p, lich: lich.ten, kieu: lich.kieu, nguon: nguon(l as Luot[], mm), ...tongNgay([...(l as Luot[]), ...mm], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), ...donOpt(don.get(p.id)?.get(ngay)) }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc, xn: r.xn ?? null, quay: r.quay ?? null })) };
+    return { ...p, lich: lich.ten, kieu: lich.kieu, nguon: nguon(l as Luot[], mm), ...tongNgay([...(l as Luot[]), ...mm], lich, ngay, ngay === today, { ca: xep.get(p.id + '|' + ngay) ?? null, q: s.quyTac, le: leOf(s, ngay), ...donOpt(don.get(p.id)?.get(ngay)), ...buOpt(bu, p.id, ngay) }), luot: l.map((r) => ({ loai: r.loai, at: r.at, kc: r.kc, diem: r.diem, trong: r.trong, ly_do: r.ly_do, acc: r.acc, xn: r.xn ?? null, quay: r.quay ?? null })) };
   });
   return ok(c, { ngay, today, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
 });
@@ -398,10 +477,11 @@ chamCongRoutes.get('/thang', async (c) => {
   const rows = (await db.prepare('SELECT user_id, ngay, loai, at, trong, ly_do_muon, xn, gio_quay FROM cc_luot WHERE ngay LIKE ? ORDER BY at').bind(thang + '%').all<Row>()).results ?? [];
   const days = daysOf(thang, today);
   const people = Object.entries(cx.m.users).filter(([id]) => !ids || ids.includes(id));
-  const [xep, don, may] = await Promise.all([
+  const [xep, don, may, bu] = await Promise.all([
     days.length ? loadXep(db, s, days[0], days[days.length - 1]) : new Map<string, Ca>(),
     loadDon(db),
     days.length ? loadMay(db, days[0], days[days.length - 1]) : new Map<string, Luot[]>(),
+    loadBu(db, s, (id) => cx.m.users[id]?.pb),
   ]);
   const list = people.map(([id, u]) => {
     const mine = rows.filter((r) => r.user_id === id);
@@ -411,7 +491,7 @@ chamCongRoutes.get('/thang', async (c) => {
       const l = mine.filter((r) => r.ngay === d) as Luot[];
       const mm = may.get(id + '|' + d) ?? [];
       src.set(d, nguon(l, mm));
-      return { ngay: d, ...tongNgay([...l, ...mm], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac, le: leOf(s, d), ...donOpt(don.get(id)?.get(d)) }) };
+      return { ngay: d, ...tongNgay([...l, ...mm], lich, d, d === today, { ca: xep.get(id + '|' + d) ?? null, q: s.quyTac, le: leOf(s, d), ...donOpt(don.get(id)?.get(d)), ...buOpt(bu, id, d) }) };
     });
     return {
       id,
@@ -425,7 +505,7 @@ chamCongRoutes.get('/thang', async (c) => {
       // Lệch chỉ tính khi người đó dùng cả máy lẫn điện thoại trong tháng (giai đoạn chạy song song).
       lech: [...src.values()].some((v) => v === 'may' || v === 'ca hai') && [...src.values()].some((v) => v === 'dt' || v === 'ca hai') ? [...src.values()].filter((v) => v === 'may' || v === 'dt').length : 0,
       ...tongThang(ngay, lich, today, s.quyTac),
-      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, coPhep: x.coPhep, ot: x.ot, nguon: src.get(x.ngay) ?? '', lyDoMuon: x.lyDoMuon, canhBao: x.canhBao, choXn: x.choXn, chamNgoai: x.chamNgoai })),
+      ngay: ngay.map((x) => ({ n: x.ngay, vao: x.vao, ra: x.ra, muon: x.muon, som: x.som, phut: x.phut, quenRa: x.quenRa, ngoai: x.ngoai, lam: x.lam, ca: x.ca, le: x.le, don: x.don, coPhep: x.coPhep, ot: x.ot, nguon: src.get(x.ngay) ?? '', lyDoMuon: x.lyDoMuon, canhBao: x.canhBao, choXn: x.choXn, chamNgoai: x.chamNgoai, bu: x.bu, lamBu: x.lamBu })),
     };
   });
   return ok(c, { thang, today, quyTac: s.quyTac, vai: vai(cx.v, cx.hr), deps: cx.m.deps, list });
