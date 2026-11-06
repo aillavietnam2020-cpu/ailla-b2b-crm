@@ -35,7 +35,7 @@ import {
   type ChannelDay,
 } from '../services/channelOut';
 import { khoDoiChieu, khoMocMap, khoTonRows, type KhoTonRow } from '../services/khoTon';
-import { accountantIds, taskStatements } from '../lib/notifyTasks';
+import { accountantIds, approverIds, taskStatements } from '../lib/notifyTasks';
 import { bellTo } from '../lib/hubBell';
 import { unpack } from '../lib/pack';
 
@@ -1126,6 +1126,30 @@ khoRoutes.post('/pc-notify', async (c) => {
     sent++;
   }
   return ok(c, { sent, no_kythuat: false });
+});
+
+/** Thiếu vật tư khi tạo yêu cầu pha chế / phiếu sản xuất (chị Hoa 06/11): sinh việc + chuông cho người phụ trách mua hàng
+ * (Trưởng phòng, quản lý duyệt đơn) để đặt hàng hoặc tra xem tồn lệch ở đâu. */
+khoRoutes.post('/shortage-task', async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => null)) as { ref?: unknown; lines?: Array<Record<string, unknown>> } | null;
+  const ref = String(b?.ref ?? '').trim().slice(0, 120);
+  const lines = (Array.isArray(b?.lines) ? b!.lines : []).slice(0, 30);
+  if (!ref || !lines.length) throw badRequest('MISSING', 'Thiếu thông tin');
+  // Người nhận: quản lý phụ trách mua hàng; không giao CEO (chị Hoa chỉ muốn việc tới người đặt hàng). Không có ai thì mới về CEO.
+  const all = await approverIds(c.env.DB);
+  const ceo = new Set(
+    ((await c.env.DB.prepare("SELECT id FROM users WHERE role = 'CEO'").all<{ id: string }>()).results ?? []).map((x) => x.id),
+  );
+  const ids = all.filter((x) => !ceo.has(x)).length ? all.filter((x) => !ceo.has(x)) : all;
+  const txt = lines
+    .map((l) => `${String(l.name ?? l.item).slice(0, 60)} thiếu ${Number(l.thieu ?? 0).toLocaleString('vi-VN')} ${String(l.unit ?? '')}`.trim())
+    .join('; ');
+  const title = `Thiếu vật tư cho ${ref}: ${txt}. Đặt hàng hoặc kiểm tra tồn lệch ở đâu (Kho – Sản xuất › Tồn kho nguyên vật liệu).`;
+  const st = taskStatements(c.env.DB, ids, { title, createdBy: auth.user.id, now: nowIso(), priority: 'HIGH' });
+  if (st.length) await c.env.DB.batch(st);
+  await bellTo(c.env.DB, ids, title, 'kho_ton').catch(() => 0);
+  return ok(c, { sent: st.length });
 });
 
 /** Hủy yêu cầu pha chế thì việc của kỹ thuật cũng xong theo (06/11). */
