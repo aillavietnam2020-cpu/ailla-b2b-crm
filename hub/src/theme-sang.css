@@ -586,3 +586,4 @@ body.pop-open{overflow:hidden}
 .tqtip b{display:block;margin-bottom:4px}.tqtip div{display:flex;justify-content:space-between;gap:14px}.tqtip .tqtot{border-top:1px solid #e7e9f0;margin-top:4px;padding-top:4px}.tqtip .tqtot b{margin:0}
 @media (max-width:1000px){.tqkpis{grid-template-columns:repeat(2,minmax(0,1fr))}.tqg .c4,.tqg .c5,.tqg .c6,.tqg .c7,.tqg .c8{grid-column:span 12}}
 .tqk[data-tqk]:not([data-tqk=""]){cursor:pointer;transition:border-color .15s,box-shadow .15s}.tqk[data-tqk]:not([data-tqk=""]):hover{border-color:#4b54d1;box-shadow:0 4px 14px rgba(75,84,209,.12)}
+.kqsrch{width:100%;margin:0 0 6px;padding:8px 10px;border:1px solid #e3e6ef;border-radius:10px;font:inherit;font-size:14px}

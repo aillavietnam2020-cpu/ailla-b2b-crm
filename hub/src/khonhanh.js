@@ -70,3 +70,20 @@ if(typeof khoForm==="function"){const _kf=khoForm;khoForm=function(type,pre,clsO
     toast(`Đã thêm ${n} dòng`+(bad.length?` · không tìm thấy mã: ${bad.slice(0,5).join(", ")}${bad.length>5?"…":""}`:""))});
   const tip=document.querySelector("#kf .row7 .field.grow input#kf-n");if(tip&&type!=="PC"){const h=document.createElement("p");h.className="hint";h.textContent="Mẹo: dán nhiều dòng từ Excel (cột mã, cột số lượng) vào ô mã hàng, web tự thêm từng dòng.";const t=document.querySelector("#kf .tbl.edit");if(t)t.after(h)}
 }}
+
+/* Ô chọn sản phẩm dạng danh sách thả xuống (phiếu sản xuất, báo hoàn thành, kiểm kê phát sinh): không dán tên để tìm được.
+   Thêm một ô gõ / dán ngay trên: gõ hoặc dán tên, mã → danh sách chỉ còn mã khớp và tự chọn mã đầu tiên (chị Hoa 06/11). */
+function kqSearchSelect(sel){
+  if(sel.dataset.kqs)return;sel.dataset.kqs="1";
+  const all=[...sel.options].map(o=>({v:o.value,t:o.textContent}));
+  const inp=document.createElement("input");inp.type="search";inp.placeholder="Gõ hoặc dán tên / mã sản phẩm để tìm";inp.className="kqsrch";inp.autocomplete="off";
+  sel.parentNode.insertBefore(inp,sel);
+  const fold=s=>(typeof kfold==="function"?kfold(s):String(s).toLowerCase());
+  inp.oninput=()=>{const q=fold(inp.value).trim(),ws=q.split(/\s+/).filter(Boolean),cur=sel.value;
+    const L=all.filter((o,i)=>i===0||!ws.length||ws.every(w=>fold(o.t+" "+o.v).includes(w)));
+    sel.innerHTML=L.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join("");
+    const keep=L.find(o=>o.v===cur&&o.v);sel.value=keep?cur:(ws.length&&L[1]?L[1].v:"");
+    if(sel.options[0])sel.options[0].textContent=ws.length?(L.length>1?`— ${L.length-1} mã khớp, chọn trong danh sách`:"— không có mã nào khớp"):all[0].t;
+    sel.dispatchEvent(new Event("change",{bubbles:true}))};
+}
+new MutationObserver(()=>{document.querySelectorAll("select").forEach(s=>{const o=s.options[0];if(o&&!s.dataset.kqs&&/^— chọn sản phẩm/.test(o.textContent)&&s.options.length>8)kqSearchSelect(s)})}).observe(document.documentElement,{childList:true,subtree:true});
