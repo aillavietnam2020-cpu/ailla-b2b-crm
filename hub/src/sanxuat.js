@@ -268,7 +268,7 @@ function sxDoneMulti(){
   const add=(after)=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="sdm-i" autocomplete="off" placeholder="Gõ hoặc dán tên, mã rồi chọn"><small class="sdm-n hint"></small></td><td><input class="sdm-q n" type="number" min="1" step="any"></td><td style="white-space:nowrap"><button type="button" class="btn sm sdm-add" title="Thêm dòng">+</button> <button type="button" class="lnk sdm-x" title="Bỏ dòng">✕</button></td>`;
     if(after)after.after(tr);else body.appendChild(tr);
     const inp=tr.querySelector(".sdm-i");
-    if(typeof khoPick==="function")khoPick(inp,["TP"],it=>{inp.dataset.code=it.code;tr.querySelector(".sdm-n").textContent=it.name;tr.querySelector(".sdm-q").focus()});
+    if(typeof khoPick==="function")khoPick(inp,null,it=>{inp.dataset.code=it.code;tr.querySelector(".sdm-n").textContent=it.name;tr.querySelector(".sdm-q").focus()});
     tr.querySelector(".sdm-add").onclick=()=>add(tr);
     tr.querySelector(".sdm-x").onclick=()=>{if(body.children.length>1)body.removeChild(tr)};
     tr.querySelector(".sdm-q").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add(tr)}};
