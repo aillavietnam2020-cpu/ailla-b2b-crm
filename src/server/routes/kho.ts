@@ -35,6 +35,8 @@ import {
   type ChannelDay,
 } from '../services/channelOut';
 import { khoDoiChieu, khoMocMap, khoTonRows, type KhoTonRow } from '../services/khoTon';
+import { accountantIds, taskStatements } from '../lib/notifyTasks';
+import { bellTo } from '../lib/hubBell';
 
 /**
  * Kho sản xuất: nhập NVL → pha chế BTP → kiểm kê đóng gói → xuất kho → hàng hoàn.
@@ -1132,7 +1134,50 @@ khoRoutes.put('/bom/:product', adminOnlyEndpoint, async (c) => {
       ip: ip(c),
     }),
   ]);
-  return ok(c, { product, lines: lines.length });
+  // Trừ bù vật tư cho các phiếu kiểm kê đóng gói đã ghi khi mã này chưa có định mức (06/11): thêm dòng tự trừ vào đúng phiếu cũ,
+  // theo ngày sản xuất của phiếu đó. Mỗi phiếu chỉ trừ bù một lần (ghi lại ở extra.bom_done).
+  let backfilled = 0;
+  if (lines.length) {
+    const docs = (
+      await c.env.DB.prepare(
+        "SELECT id, no, extra FROM kho_docs WHERE status = 'OK' AND type = 'KS' AND extra LIKE ?",
+      )
+        .bind(`%"code":"${product.replace(/"/g, '')}"%`)
+        .all<{ id: number; no: string; extra: string }>()
+    ).results;
+    for (const d of docs) {
+      let ex: { no_bom?: Array<{ code: string; qty: number }>; bom_done?: string[] } = {};
+      try {
+        ex = JSON.parse(d.extra || '{}');
+      } catch {
+        continue;
+      }
+      const hit = (ex.no_bom ?? []).find((x) => x.code === product);
+      if (!hit || (ex.bom_done ?? []).includes(product)) continue;
+      const total = Number(hit.qty) || 0;
+      if (!(total > 0)) continue;
+      ex.bom_done = [...(ex.bom_done ?? []), product];
+      await c.env.DB.batch([
+        ...lines.map((l) => {
+          const use = Math.round(num(l.qty) * total * 1e6) / 1e6;
+          return c.env.DB.prepare("INSERT INTO kho_moves (doc_id, item, qty, std_qty, price, role, note) VALUES (?, ?, ?, ?, NULL, 'AUTO', ?)").bind(
+            d.id,
+            String(l.item),
+            -use,
+            use,
+            `ĐM ${num(l.qty)} × ${total} (trừ bù khi khai định mức ${product})`,
+          );
+        }),
+        c.env.DB.prepare('UPDATE kho_docs SET extra = ? WHERE id = ?').bind(JSON.stringify(ex), d.id),
+      ]);
+      backfilled++;
+    }
+    await c.env.DB.prepare("UPDATE tasks SET status = 'DONE', completed_at = ?, updated_at = ? WHERE status = 'OPEN' AND title LIKE ?")
+      .bind(nowIso(), nowIso(), `Khai định mức cho % (${product}):%`)
+      .run()
+      .catch(() => undefined);
+  }
+  return ok(c, { product, lines: lines.length, backfilled });
 });
 
 /* ---------- Tồn kho, NXT, chênh lệch, cảnh báo ---------- */
@@ -1278,6 +1323,21 @@ khoRoutes.get('/tq-sx', async (c) => {
     cho_xuat: cho?.n ?? 0,
     lech: { cho: (lech?.n ?? 0) - (lech?.xong ?? 0), xong: lech?.xong ?? 0 },
     cho_xuat_list: choList.results,
+    no_bom: await (async () => {
+      // Thành phẩm đã ghi kho khi chưa có định mức, nay vẫn chưa khai (06/11).
+      const r = (await db.prepare("SELECT no, doc_date, extra FROM kho_docs WHERE status = 'OK' AND type = 'KS' AND extra LIKE '%no_bom%'").all<{ no: string; doc_date: string; extra: string }>()).results;
+      const has = new Set((await db.prepare('SELECT DISTINCT product FROM kho_bom').all<{ product: string }>()).results.map((x) => x.product));
+      const out: Array<{ code: string; no: string; doc_date: string; qty: number }> = [];
+      for (const d of r) {
+        try {
+          const ex = JSON.parse(d.extra || '{}') as { no_bom?: Array<{ code: string; qty: number }> };
+          for (const x of ex.no_bom ?? []) if (!has.has(x.code)) out.push({ code: x.code, no: d.no, doc_date: d.doc_date, qty: x.qty });
+        } catch {
+          /* bỏ qua phiếu hỏng */
+        }
+      }
+      return out;
+    })(),
     lech_list: lechList.results,
   });
 });
@@ -1561,13 +1621,19 @@ khoRoutes.post('/docs', async (c) => {
         anyRef = true;
       }
       // Thành phẩm chỉ cộng phần ĐẠT; vỏ, tem, BTP trừ theo TỔNG đã đóng (hàng lỗi vẫn tốn vật tư).
-      if (good > 0) moves.push({ item: code, qty: good, std_qty: null, price: null, role: 'PRODUCT', note: String(l.note ?? '') });
+      if (good > 0) moves.push({ item: code, qty: good, std_qty: qty, price: null, role: 'PRODUCT', note: String(l.note ?? '') });
       const bom = (
         await c.env.DB.prepare('SELECT item, qty FROM kho_bom WHERE product = ? ORDER BY sort')
           .bind(code)
           .all<{ item: string; qty: number }>()
       ).results;
-      if (!bom.length) warnings.push(`${code} (${it.name}) chưa có định mức nên chưa tự trừ vỏ, tem, BTP.`);
+      if (!bom.length) {
+        warnings.push(`${code} (${it.name}) chưa có định mức nên chưa tự trừ vỏ, tem, BTP. Đã báo kế toán khai định mức; khai xong web tự trừ bù cho lô này.`);
+        // 06/11 chị Hoa: chưa có định mức thì báo kế toán (việc + chuông); khai xong định mức thì trừ bù vật tư cho lô này.
+        const nb = (extra.no_bom as Array<{ code: string; qty: number }> | undefined) ?? [];
+        nb.push({ code, qty });
+        extra.no_bom = nb;
+      }
       for (const r2 of bom) {
         const use = round(r2.qty * qty);
         moves.push({ item: r2.item, qty: -use, std_qty: use, price: null, role: 'AUTO', note: `ĐM ${r2.qty} × ${qty}` });
@@ -1767,6 +1833,24 @@ khoRoutes.post('/docs', async (c) => {
   }
   for (const po of new Set(replacedReceipts.map((r) => r.po_id))) if (po !== poRow?.id) await poStatus(c.env.DB, po);
   if (replaced.length && type === 'PN') warnings.push(`Phiếu cũ ${replaced.map((d) => d.no).join(', ')} đã tự hủy, thay bằng ${no}.`);
+  if (type === 'KS' && Array.isArray(extra.no_bom) && extra.no_bom.length) {
+    try {
+      const ids = await accountantIds(c.env.DB);
+      const now = nowIso();
+      for (const x of extra.no_bom as Array<{ code: string }>) {
+        const nm = items.get(x.code)?.name ?? x.code;
+        const title = `Khai định mức cho ${nm} (${x.code}): đã sản xuất phiếu ${no} nhưng chưa có định mức nên chưa trừ vật tư. Khai xong web tự trừ bù. Kho – Sản xuất › Danh mục mã`;
+        const open = await c.env.DB.prepare("SELECT 1 FROM tasks WHERE status = 'OPEN' AND title LIKE ?").bind(`Khai định mức cho % (${x.code}):%`).first();
+        if (!open) {
+          const st = taskStatements(c.env.DB, ids, { title, createdBy: auth.user.id, now, priority: 'HIGH' });
+          if (st.length) await c.env.DB.batch(st);
+          await bellTo(c.env.DB, ids, title, 'kho_dm').catch(() => 0);
+        }
+      }
+    } catch {
+      /* báo là phụ, không chặn ghi kho */
+    }
+  }
   return ok(c, { id: docId, no, warnings });
 });
 
