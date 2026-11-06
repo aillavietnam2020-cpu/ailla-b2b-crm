@@ -14,6 +14,11 @@ try{for(let i=TQ_TABS.length-1;i>=0;i--){if(TQ_TABS[i][0]==="kenh"||TQ_TABS[i][0
 const tq2P=v=>(Math.round(v*1000)/10).toLocaleString("vi-VN");
 const tq2Strip=s=>String(s==null?"":s).replace(/<[^>]+>/g,"");
 const tq2Go=(pg,sub)=>{if(sub){SUB.exec=sub;PAGE="exec"}else PAGE=pg;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}renderMain();scrollTo(0,0)};
+/* Kênh bán lẻ theo đơn đã lên trong khoảng ngày: Facebook doanh thu đơn chốt (Pancake), TikTok GMV (Key metrics agent nạp), Shopee báo cáo theo ngày
+   (chưa có thì đếm đơn xuất kho Poscake). Quảng cáo: Facebook cả kỳ gồm thuế, TikTok GMV Max gồm VAT, Shopee Ads theo báo cáo. */
+function tq2Don(from,to){const r=(s,i)=>rSum(s,i,from,to).v,co=typeof tqCo==="function"?tqCo(from,to)||{}:{},spe=r("spe",0),adsSpe=typeof tqSpeAds==="function"?tqSpeAds(from,to):0;
+  const adsFb=rAds(0,from,to)*(1+(typeof FB_ADS_TAX!=="undefined"?FB_ADS_TAX:0.1)),adsTt=r("tts",10);
+  return {dt:r("fb",6)+r("tts",0)+spe,don:r("fb",1)+r("tts",1)+(r("spe",4)||co.SHOPEE||0),ads:adsFb+adsTt+adsSpe,spe,adsSpe}}
 /* Số của tháng đang xem (theo ô thời gian trên cùng), cùng nguồn với P&L công ty. */
 function tq2Nums(){const ym=plYmNow(),A=plMonth(ym),PA=plMonth(plYmAdd(ym,-1)),T=plcTot(A,""),P=plcTot(PA,"");
   const ch=ks=>{const cs=ks.map(k=>A.cols[k]).filter(Boolean),s=f=>cs.reduce((a,c)=>a+(c[f]||0),0);if(!cs.length)return null;
@@ -76,8 +81,12 @@ function tq2Page(m){
   /* Kênh bán lẻ */
   const le=N.le,qc=(dhGet().nguong||{}).qcMax||.4;
   const worst=PLC_K.filter(([k])=>["tts","fb","spe"].includes(k)&&N.A.cols[k]&&N.A.cols[k].dt).map(([k,n])=>({n,c:N.A.cols[k]})).sort((a,b)=>b.c.ads/b.c.dt-a.c.ads/a.c.dt)[0];
-  const bLe=!le?`<p class="hint">Chưa có số.</p>`:kv("Doanh thu thực",tr(le.dt))+kv("Tổng chi phí",tr(le.cp)+mu(pc(le.cp,le.dt)))+kv("Lãi đóng góp",tr(le.lai)+mu(pc(le.lai,le.dt)))+kv(le.adsCa>le.ads+1?"Quảng cáo phần đơn đã giao · ROAS":"Quảng cáo · ROAS chung",tr(le.ads)+(le.adsCa>le.ads+1?` (cả tháng ${tr(le.adsCa)})`:"")+" · "+(le.ads?(le.dt/le.ads).toFixed(2).replace(".",","):"—"),le.dt&&le.ads/le.dt>qc?"t-red":"")+kv("Đơn hàng",nf(le.don))
-    +(le.thieu.length?note("amb","Chưa có số "+le.thieu.map(k=>(PLC_K.find(x=>x[0]===k)||[])[1]).join(", ")):worst&&worst.c.ads/worst.c.dt>qc?note("red",`Quảng cáo ${worst.n} ${Math.round(worst.c.ads/worst.c.dt*100)}% doanh thu, kênh lãi ${pc(worst.c.lai,worst.c.dt)}`):note("grn","Quảng cáo các sàn trong ngưỡng"));
+  /* Kênh bán lẻ theo đơn đã lên, cập nhật liên tục (chị Hoa 06/11 chọn): cùng nguồn Tổng quan vận hành / trang Kinh doanh.
+     Quảng cáo chia cho doanh số theo đơn (cùng rổ mọi đơn đã lên). Doanh thu thực đã giao + lãi đóng góp (P&L) ghi dòng dưới. */
+  const LD=tq2Don(N.A.R.from,N.A.R.to),rq=LD.dt&&LD.ads?LD.ads/LD.dt:null;
+  const bLe=!LD.dt&&!le?`<p class="hint">Chưa có số.</p>`:kv("Doanh số theo đơn",tr(LD.dt))+kv("Đơn hàng",nf(LD.don))+kv("Quảng cáo · % doanh số",tr(LD.ads)+(rq!=null?mu(pc(LD.ads,LD.dt)):""),rq>qc?"t-red":"")
+    +(le?kv("Doanh thu thực đã giao",tr(le.dt))+kv("Lãi đóng góp (P&L, tạm tính)",tr(le.lai)+mu(pc(le.lai,le.dt))):"")
+    +note(rq>qc?"red":"amb",`Theo đơn đã lên: Facebook đơn chốt Pancake, TikTok GMV ngày đã nạp, Shopee ${LD.spe?"theo báo cáo":"mới đếm đơn (chưa có số tiền)"}. Quảng cáo ${LD.adsSpe?"":"chưa gồm Shopee"}. Doanh thu thực chốt cuối tháng.`);
   /* Kênh phân phối */
   const pp=N.pp,reP=K&&K.buyers.length?K.re.length/K.buyers.length:null,preP=K&&K.pBuyers.length?K.pRe.length/K.pBuyers.length:null;
   const bPp=(!pp?kv("Doanh thu thực","—"):kv("Doanh thu thực",tr(pp.dt))+kv("Tổng chi phí",tr(pp.cp)+mu(pc(pp.cp,pp.dt)))+kv("Lãi đóng góp",tr(pp.lai)+mu(pc(pp.lai,pp.dt))))
