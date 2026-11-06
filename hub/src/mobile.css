@@ -210,7 +210,7 @@
   table.bvtab,table.bvtab>tbody{display:block!important;width:100%!important;min-width:0!important}
   table.bvtab>thead{display:none!important}
   table.bvtab>tbody>tr{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"sp st" "ma ma" "hook hook" "link link" "dy ceo";gap:5px 8px;padding:10px 4px;border-bottom:1px solid var(--line)}
-  table.bvtab>tbody>tr>td{display:none!important;border:0!important;padding:0!important;min-width:0;background:none!important}
+  table.bvtab>tbody>tr>td{display:none!important;border:0!important;padding:0!important;min-width:0;background:none!important;position:static!important;left:auto!important;box-shadow:none!important}
   table.bvtab td:has(>i.sw){display:block!important;grid-area:sp;font-weight:600;font-size:13.5px;align-self:center;text-align:left!important}
   table.bvtab td.mono,table.bvtab td.bvlk{text-align:left!important}
   table.bvtab td.bvstc{display:block!important;grid-area:st;justify-self:end;align-self:center}
