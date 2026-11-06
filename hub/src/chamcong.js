@@ -47,6 +47,18 @@ tr.cc-det>td{background:var(--gray-soft);padding:8px}
 .cc-outimg{width:100%;border-radius:12px;display:block}
 .cc-cam{text-align:center;cursor:pointer}
 .cc-xnimg{width:84px;height:63px;object-fit:cover;border-radius:10px;display:block}
+.cc-xnc{display:none}
+@media (max-width:760px){
+.cc-xnt{display:none}.cc-xnc{display:grid;gap:12px}
+.cc-xnk{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:8px}
+.cc-xnh{display:flex;gap:10px;align-items:flex-start}.cc-xnh .cc-xnimg{width:96px;height:72px;flex:none}
+.cc-xnh b{font-size:15px}.cc-xnr{font-size:13.5px;line-height:1.45}.cc-xnr span{color:var(--muted)}
+.cc-xnk .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cc-xnk .acts .btn{min-height:44px;font-size:14.5px;justify-content:center}
+.cc-xnf{flex-wrap:wrap;gap:8px}.cc-xnf .cc-chips{width:100%}.cc-xnf .cc-chip{flex:1;text-align:center;padding:9px 8px}.cc-xnf #cc-xnrl{display:none}
+.cc-out{padding:12px;border-radius:14px}.cc-out .cc-chip{flex:1;text-align:center;min-height:44px;white-space:nowrap;padding:8px 6px}
+.cc-cam{min-height:50px;display:flex!important;align-items:center;justify-content:center;font-size:16px}
+.cc-out textarea{font-size:16px}.cc-shoot{padding:12px}
+}
 tr.cc-cu>td{background:var(--gray-soft);padding:8px 12px}.cc-curow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px}.cc-curow label{display:inline-flex;align-items:center;gap:6px}
 .cc-mon tr.cc-row>td:first-child{min-width:210px;white-space:normal}.cc-mon th,.cc-mon tr.cc-row>td{white-space:nowrap}
 .cc-grid th.we,.cc-grid td.we{background:var(--gray-soft)}
@@ -225,9 +237,19 @@ function pCcXn(m){
     return `<tr><td>${anh}</td><td><b>${esc(x.ten)}</b><div class="hint">${esc(ccPbName(x.pb))}</div></td><td>${x.loai==="vao"?"Vào":"Ra"} <b>${ccHm(x.at)}</b><div class="hint">${ccDow(x.ngay)} ${ccDm(x.ngay)}</div></td><td>${esc(x.ly_do||"")}</td>
       <td>${q?`${q.gio?esc(q.gio)+" · ":""}${esc(q.diaDiem||"")}${muon!=null?`<div>${muon>5?pill("Muộn "+ccPhut(muon)+" so với giờ quay","amb"):pill("Khớp giờ quay","grn")}</div>`:""}`:'<span class="hint">không có</span>'}</td>
       <td>${x.kc!=null?"cách "+esc(x.diem||"VP")+" "+km(x)+"<br>":""}${x.lat!=null?`<a class="lnk" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${x.lat},${x.lng}">Xem bản đồ</a>`:""}</td><td>${act}</td></tr>`};
+  const card=x=>{let q=null;try{q=x.quay?JSON.parse(x.quay):null}catch(e){}
+    const muon=q&&x.gio_quay&&x.loai==="vao"?Math.round((Date.parse(x.at)+7*36e5)%864e5/6e4)-(+x.gio_quay.slice(0,2)*60+ +x.gio_quay.slice(3,5)):null;
+    const anh=x.anh_id?`<a href="/api/hub/chamcong/anh/${esc(x.anh_id)}" target="_blank" rel="noopener"><img class="cc-xnimg" src="/api/hub/chamcong/anh/${esc(x.anh_id)}" alt="Ảnh check-in" loading="lazy"></a>`:"";
+    const act=x.xn==="cho"?`<div class="acts"><button class="btn danger" data-xn="${esc(x.id)}" data-ok="0">Không xác nhận</button><button class="btn pri" data-xn="${esc(x.id)}" data-ok="1">Xác nhận</button></div>`
+      :`<div>${x.xn==="ok"?pill("Đã xác nhận","grn"):pill("Không xác nhận","red")} <span class="hint">${esc(x.xnTen||"")}</span></div>`;
+    return `<div class="cc-xnk"><div class="cc-xnh">${anh}<div><b>${esc(x.ten)}</b><div class="hint">${esc(ccPbName(x.pb))}</div><div>${x.loai==="vao"?"Vào":"Ra"} <b>${ccHm(x.at)}</b> · ${ccDow(x.ngay)} ${ccDm(x.ngay)}</div></div></div>
+      ${x.ly_do?`<div class="cc-xnr"><span>Lý do:</span> ${esc(x.ly_do)}</div>`:""}
+      ${q?`<div class="cc-xnr"><span>Buổi quay:</span> ${q.gio?esc(q.gio)+" · ":""}${esc(q.diaDiem||"")} ${muon!=null?(muon>5?pill("Muộn "+ccPhut(muon),"amb"):pill("Khớp giờ quay","grn")):""}</div>`:""}
+      <div class="cc-xnr">${x.kc!=null?`<span>Cách ${esc(x.diem||"VP")}</span> ${km(x)} · `:""}${x.lat!=null?`<a class="lnk" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${x.lat},${x.lng}">Xem bản đồ</a>`:""}</div>
+      ${act}</div>`};
   m.innerHTML=H("Xác nhận chấm ngoài văn phòng","Đi quay, gặp khách: xem ảnh check-in và vị trí rồi xác nhận. Chưa xác nhận thì ngày đó chưa tính công; không xác nhận thì coi như không chấm.")+`
-  <div class="filters"><div class="cc-chips"><button class="cc-chip${tab==="cho"?" on":""}" data-xntab="cho">Chờ xác nhận (${(R.list||[]).filter(x=>x.xn==="cho").length})</button><button class="cc-chip${tab==="xong"?" on":""}" data-xntab="xong">Đã xử lý 7 ngày</button></div><span class="sp"></span><button class="btn" id="cc-xnrl">Tải lại</button></div>
-  <section class="card flush">${L.length?tbl(["Ảnh","Người","Lượt","Lý do","Lịch quay","Vị trí",""],L.map(row)):`<p class="empty">${tab==="cho"?"Không có lượt nào chờ xác nhận.":"Chưa có lượt nào trong 7 ngày."}</p>`}</section>`;
+  <div class="filters cc-xnf"><div class="cc-chips"><button class="cc-chip${tab==="cho"?" on":""}" data-xntab="cho">Chờ xác nhận (${(R.list||[]).filter(x=>x.xn==="cho").length})</button><button class="cc-chip${tab==="xong"?" on":""}" data-xntab="xong">Đã xử lý 7 ngày</button></div><span class="sp"></span><button class="btn" id="cc-xnrl">Tải lại</button></div>
+  ${L.length?`<section class="card flush cc-xnt nomlist">${tbl(["Ảnh","Người","Lượt","Lý do","Lịch quay","Vị trí",""],L.map(row))}</section><div class="cc-xnc">${L.map(card).join("")}</div>`:`<section class="card"><p class="empty">${tab==="cho"?"Không có lượt nào chờ xác nhận.":"Chưa có lượt nào trong 7 ngày."}</p></section>`}`;
   m.querySelectorAll("[data-xntab]").forEach(b=>b.onclick=()=>{CC.xnTab=b.dataset.xntab;renderMain()});
   $("#cc-xnrl").onclick=()=>{CC.xn=null;renderMain()};
   m.querySelectorAll("[data-xn]").forEach(b=>b.onclick=async()=>{const okk=b.dataset.ok==="1";b.disabled=true;

@@ -204,6 +204,28 @@
   .cwrv .ac{display:flex!important;justify-content:flex-end!important;gap:6px!important}
   .cwrv .ac .btn{min-height:30px!important;padding:4px 12px!important;font-size:12.5px!important}
 
+  /* Marketing › Điều phối (bảng video 13 cột): bản rút gọn để duyệt nhanh trên điện thoại.
+     Mỗi video 1 thẻ: Sản phẩm + trạng thái · mã · hook 1 dòng · nút Xem video · ô Duyệt + CEO check. Cột khác ẩn (máy tính giữ nguyên). */
+  .tbl.bvscroll{overflow:visible!important;max-height:none!important}
+  table.bvtab,table.bvtab>tbody{display:block!important;width:100%!important;min-width:0!important}
+  table.bvtab>thead{display:none!important}
+  table.bvtab>tbody>tr{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"sp st" "ma ma" "hook hook" "link link" "dy ceo";gap:5px 8px;padding:10px 4px;border-bottom:1px solid var(--line)}
+  table.bvtab>tbody>tr>td{display:none!important;border:0!important;padding:0!important;min-width:0;background:none!important}
+  table.bvtab td:has(>i.sw){display:block!important;grid-area:sp;font-weight:600;font-size:13.5px;align-self:center;text-align:left!important}
+  table.bvtab td.mono,table.bvtab td.bvlk{text-align:left!important}
+  table.bvtab td.bvstc{display:block!important;grid-area:st;justify-self:end;align-self:center}
+  table.bvtab td.mono{display:block!important;grid-area:ma;font-size:11.5px;color:var(--muted)}
+  table.bvtab td:has(>input[data-bvc$="|hook"]){display:block!important;grid-area:hook}
+  table.bvtab td:has(>input[data-bvc$="|hook"]) input{border:0!important;background:none!important;padding:0!important;min-height:0!important;font-size:12.5px!important;color:var(--ink);width:100%;text-overflow:ellipsis}
+  table.bvtab td.bvlk{display:flex!important;grid-area:link;gap:6px;align-items:center}
+  table.bvtab td.bvlk input:not([value=""]){display:none}
+  table.bvtab td.bvlk input{flex:1;min-height:36px!important;font-size:16px!important}
+  table.bvtab td.bvlk a{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:10px;padding:6px 14px;font-size:13px;font-weight:600;color:#3b6df0;text-decoration:none;background:#f5f7ff}
+  table.bvtab td.bvlk a::before{content:"▶ Xem video "}
+  table.bvtab td:has(>select[data-bvd$="|duyet"]){display:block!important;grid-area:dy}
+  table.bvtab td:has(>select[data-bvd$="|ceo"]){display:block!important;grid-area:ceo}
+  table.bvtab select.bvdy{width:100%!important;min-height:38px!important;border-radius:10px}
+
   /* thông báo: mỗi tin 2 dòng rồi "…", bấm mới xem đủ */
   .ntl .nti span{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
   .ntl .nti.open span{-webkit-line-clamp:unset;display:block!important}
