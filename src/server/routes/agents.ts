@@ -12,6 +12,7 @@ import { generateAgentToken, hashAgentToken, tokenHint } from '../lib/agentToken
 import { forbidden, notFound, ok, unprocessable } from '../lib/http';
 import { newId } from '../lib/ids';
 import { requirePermission } from '../middleware/rbac';
+import { hubPeople } from '../lib/hubBell';
 
 /**
  * Quản lý tài khoản agent (chỉ CEO, trên địa chỉ quản trị): tạo agent, đổi khóa, khóa/mở.
@@ -221,7 +222,17 @@ function rosterIdByName(name: string): string | null {
 }
 
 /** Người có thể được chỉ định ra lệnh ghi cho agent: nhân sự đang làm, có vai kế toán / điều phối (khớp rào ở agentSpend). */
+/** Người được chọn ra lệnh: kế toán / điều phối (kind 'ketoan', mọi agent) + nhân sự team Content / Digital trên web Marketing
+ *  (kind 'content' / 'digital', chỉ cho agent có phạm vi Marketing tương ứng). */
 async function delegatorCandidates(db: D1Database) {
+  const hub = await hubPeople(db).catch(() => new Map<string, { role: string; pb: string }>());
+  const mkt = (id: string): 'content' | 'digital' | '' => {
+    const p = hub.get(id);
+    if (!p) return '';
+    if (['content', 'lead'].includes(p.role) || (p.role === 'nhanvien' && /content/i.test(p.pb))) return 'content';
+    if (p.role === 'digital' || (p.role === 'nhanvien' && /digital/i.test(p.pb))) return 'digital';
+    return '';
+  };
   const rows = await db
     .prepare(
       `SELECT u.id, u.display_name, u.role, (SELECT group_concat(p.permission, ',') FROM user_permissions p WHERE p.user_id = u.id) AS extra
@@ -229,12 +240,15 @@ async function delegatorCandidates(db: D1Database) {
     )
     .all<{ id: string; display_name: string; role: Role; extra: string | null }>();
   return (rows.results ?? [])
-    .filter((u) => {
+    .map((u) => {
       const p = effectivePermissions(u.role, u.extra ? u.extra.split(',') : []);
-      return p.includes('order.accounting.confirm') || p.includes('order.approve.normal');
+      const kind = p.includes('order.accounting.confirm') || p.includes('order.approve.normal') ? 'ketoan' : mkt(u.id);
+      return { id: u.id, display_name: u.display_name, kind };
     })
-    .map((u) => ({ id: u.id, display_name: u.display_name }));
+    .filter((u) => !!u.kind);
 }
+const fitsAgent = (kind: string, scopes: string[]) =>
+  kind === 'ketoan' || (kind === 'content' && scopes.includes('mkt_content')) || (kind === 'digital' && scopes.includes('mkt_digital'));
 
 agentAdminRoutes.get('/delegator-candidates', async (c) => ok(c, await delegatorCandidates(c.env.DB)));
 
@@ -252,14 +266,20 @@ agentAdminRoutes.put('/:id/delegators', async (c) => {
   const nm = await c.env.DB.prepare('SELECT name FROM agents WHERE id = ?').bind(id).first<{ name: string }>();
   const chatAgent = cur?.chat_agent ?? (String(b.chat_agent ?? '') || rosterIdByName(nm?.name ?? '') || '');
   if (!AGENT_IDS.includes(chatAgent)) throw unprocessable('NEED_CHAT_AGENT', 'Chọn agent trên trang Điều hành agent ứng với tài khoản này', { chat_agent: 'Bắt buộc' });
-  const allowed = new Set((await delegatorCandidates(c.env.DB)).map((u) => u.id));
+  const sc = await c.env.DB.prepare('SELECT permission FROM user_permissions WHERE user_id = ? AND permission LIKE ?').bind(id, AGENT_SCOPE_PREFIX + '%').all<{ permission: string }>();
+  const scopes = (sc.results ?? []).map((r) => r.permission.slice(AGENT_SCOPE_PREFIX.length));
+  const allowed = new Set((await delegatorCandidates(c.env.DB)).filter((u) => fitsAgent(u.kind, scopes)).map((u) => u.id));
   const want = [...new Set((b.user_ids ?? []).map(String))];
   const bad = want.filter((u) => !allowed.has(u));
-  if (bad.length) throw unprocessable('NOT_ACCOUNTANT', 'Chỉ chọn được người có vai kế toán hoặc điều phối', { user_ids: bad.join(',') });
+  if (bad.length) throw unprocessable('NOT_ACCOUNTANT', 'Chỉ chọn được người có vai kế toán / điều phối, hoặc nhân sự Marketing khi agent có phạm vi Marketing', { user_ids: bad.join(',') });
   const now = nowIso();
   const keep = want.length ? `AND user_id NOT IN (${want.map(() => '?').join(',')})` : '';
   await c.env.DB.batch([
     c.env.DB.prepare(`DELETE FROM agent_delegators WHERE agent_id = ? ${keep}`).bind(id, ...want),
+    // có người ra lệnh thì agent được ghi thay đúng người đó (giấy ủy quyền, lib/delegation.ts); không còn ai thì thôi ghi
+    want.length
+      ? c.env.DB.prepare('INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(id, 'agent.act', auth.user.id, now)
+      : c.env.DB.prepare('DELETE FROM user_permissions WHERE user_id = ? AND permission = ?').bind(id, 'agent.act'),
     ...want.flatMap((u) => [
       c.env.DB.prepare('INSERT OR IGNORE INTO agent_delegators (agent_id, chat_agent, user_id, granted_by, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, chatAgent, u, auth.user.id, now),
       c.env.DB.prepare('INSERT OR IGNORE INTO agent_chat_access (user_id, agent, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(u, chatAgent, auth.user.id, now),

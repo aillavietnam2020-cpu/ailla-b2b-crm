@@ -116,9 +116,13 @@ describe('Nhập nhanh link video', () => {
     const agent = made.body.data as { id: string; token: string };
     const ceo = await uid(USERS.ceo);
     const mgr = await uid(USERS.manager);
-    await ctx.db.prepare('INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(agent.id, 'agent.act', ceo, T0).run();
-    await ctx.db.prepare('INSERT INTO agent_delegators (agent_id, chat_agent, user_id, granted_by, created_at) VALUES (?, ?, ?, ?, ?)').bind(agent.id, CHAT_AGENT, mgr, ceo, T0).run();
-    await ctx.db.prepare('INSERT INTO agent_chat_access (user_id, agent, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(mgr, CHAT_AGENT, ceo, T0).run();
+    // CEO chọn nhân sự Content làm người ra lệnh ở Quyền agent: agent tự được ghi thay (agent.act)
+    const cand = await ctx.request('/api/admin/agents/delegator-candidates', { as: USERS.ceo });
+    expect(cand.body.data.find((u: any) => u.id === mgr)).toBeTruthy();
+    const put = await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [mgr], chat_agent: CHAT_AGENT } });
+    expect(put.status).toBe(200);
+    expect(await ctx.db.prepare("SELECT 1 AS x FROM user_permissions WHERE user_id = ? AND permission = 'agent.act'").bind(agent.id).first()).toBeTruthy();
+    void ceo;
     await ctx.request('/api/agent-chat', { as: USERS.manager, body: { agent: CHAT_AGENT, body: 'nhập link video hôm nay' } });
     const pr = await ctx.app.fetch(new Request('http://x/api/agent-relay/pull', { method: 'POST', headers: { 'X-Relay-Key': RELAY, 'Content-Type': 'application/json' }, body: '{}' }), ctx.env);
     const dlg = ((await pr.json()) as any).data[0].delegation as string;
