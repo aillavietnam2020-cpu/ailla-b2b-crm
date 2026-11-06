@@ -95,6 +95,12 @@ new MutationObserver(()=>{document.querySelectorAll("select").forEach(s=>{const 
    Lưu trong ngăn Sản xuất (SX().pcReq). */
 const kqYcCan=()=>ME&&(ME.role==="admin"||(typeof mhManage==="function"&&mhManage())||(typeof sxCan==="function"&&sxCan("sx.dieuphoi")));
 function kqYcCode(s,ngay){const d=ngay||(typeof sxToday==="function"?sxToday():new Date().toISOString().slice(0,10)),base="YCPC"+d.slice(2,4)+d.slice(5,7)+"-";let n=1;while((s.pcReq||[]).some(r=>r.id===base+String(n).padStart(3,"0")))n++;return base+String(n).padStart(3,"0")}
+/* Mọi yêu cầu (chờ làm, đã làm, đã hủy) để danh sách giữ dấu vết; đã làm = có phiếu pha chế hiệu lực gắn mã yêu cầu. */
+function kqPcAll(){
+  let L=[];try{L=(SX().pcReq||[]).slice()}catch(e){}
+  const rows=(KHO.list&&KHO.list.PC&&KHO.list.PC.rows)||[],doc=new Map(rows.filter(d=>d.status==="OK"&&d.ref_no).map(d=>[d.ref_no,d]));
+  return L.map(r=>({...r,doc:doc.get(r.id)||null,tt:r.st==="HUY"?"HUY":doc.get(r.id)?"XONG":"CHO"})).sort((a,b)=>(a.tt==="CHO"?0:1)-(b.tt==="CHO"?0:1)||String(b.id).localeCompare(a.id));
+}
 function kqPcPending(){
   let L=[];try{L=(SX().pcReq||[]).filter(r=>r.st!=="HUY")}catch(e){}
   const rows=(KHO.list&&KHO.list.PC&&KHO.list.PC.rows)||[],done=new Set(rows.filter(d=>d.status==="OK"&&d.ref_no).map(d=>d.ref_no));
@@ -134,11 +140,12 @@ function kqYcForm(){
     document.querySelectorAll("#drawer [data-ycp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.ycp,true))};
 }
 {const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){const r=_pc.apply(this,arguments);try{
-  if(KQ_ADM())return r;{const kn=m.querySelector("#kho-new");if(kn){kn.textContent="+ Phiếu pha không theo yêu cầu";kn.title="Kỹ thuật tự pha (không có yêu cầu pha chế): ghi số thực tế, trừ nguyên vật liệu, cộng bán thành phẩm"}}const P=kqPcPending();
+  if(KQ_ADM())return r;{const kn=m.querySelector("#kho-new");if(kn){kn.textContent="+ Phiếu pha không theo yêu cầu";kn.title="Kỹ thuật tự pha (không có yêu cầu pha chế): ghi số thực tế, trừ nguyên vật liệu, cộng bán thành phẩm"}}const P=kqPcPending(),ALL=kqPcAll();
   const card=document.createElement("section");card.className="card flush";card.style.marginBottom="12px";
-  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế chờ làm (${P.length})</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span>${kqYcCan()?`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`:""}</div>`+(P.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","","",""],P.map(x=>`<tr><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}${x.bon>1?`<small class="hint" style="display:block">${knum(x.bon)} bồn × ${knum(x.litBon)}</small>`:""}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td><button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button></td><td><button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button></td><td>${kqYcCan()?`<button class="lnk" data-yce="${esc(x.id)}">Sửa</button> <button class="lnk" data-ycx="${esc(x.id)}">Hủy yêu cầu</button>`:""}</td></tr>`)):`<p class="hint pad">Không có yêu cầu nào đang chờ.</p>`);
+  card.innerHTML=`<div class="card-h pad"><h2>Yêu cầu pha chế · ${P.length} chờ làm</h2><span class="hint">Thảo tạo yêu cầu → kỹ thuật pha → nhập số thực tế</span>${kqYcCan()?`<button class="btn pri" id="yc-new">+ Yêu cầu pha chế</button>`:""}</div>`+(ALL.length?tbl(["Yêu cầu","Ngày","Bán thành phẩm","Số lít","Hạn","Người tạo","Trạng thái","","",""],ALL.map(x=>{const cho=x.tt==="CHO";return `<tr${x.tt==="HUY"?' style="opacity:.6"':""}><td class="mono">${esc(x.id)}</td><td>${kDd(x.taoLuc)}</td><td><b>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</b>${x.ghiChu?`<small class="hint" style="display:block">${esc(x.ghiChu)}</small>`:""}</td><td class="n">${knum(x.lit)}${x.bon>1?`<small class="hint" style="display:block">${knum(x.bon)} bồn × ${knum(x.litBon)}</small>`:""}</td><td>${x.han?kDd(x.han):"—"}</td><td>${esc(x.tao||"")}</td><td>${x.tt==="HUY"?pill("Đã hủy","gry")+`<small class="hint" style="display:block">${esc(x.huyBy||"")}${x.lyDoHuy?": "+esc(x.lyDoHuy):""}</small>`:x.tt==="XONG"?pill("Đã pha","grn")+`<small class="hint" style="display:block"><a href="#" class="lnk" data-pcd="${x.doc.id}">${esc(x.doc.no)}</a> · ${esc(x.doc.created_by_name||"")}</small>`:pill("Chờ làm","amb")}</td><td>${cho?`<button class="btn sm" data-pcp="${esc(x.id)}">In phiếu</button>`:""}</td><td>${cho?`<button class="btn sm pri" data-pcn="${esc(x.id)}">Nhập số thực tế</button>`:""}</td><td>${cho&&kqYcCan()?`<button class="lnk" data-yce="${esc(x.id)}">Sửa</button> <button class="lnk" data-ycx="${esc(x.id)}">Hủy yêu cầu</button>`:""}</td></tr>`})):`<p class="hint pad">Chưa có yêu cầu pha chế nào.</p>`);
   const first=m.querySelector("section.card");if(first)first.before(card);else m.appendChild(card);
   card.querySelectorAll("[data-pcp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcp,true));
+  card.querySelectorAll("[data-pcd]").forEach(a=>a.onclick=e=>{e.preventDefault();khoOpenDoc(+a.dataset.pcd)});
   card.querySelectorAll("[data-pcn]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pcn,false));
   if($("#yc-new"))$("#yc-new").onclick=()=>kqYcForm();
   card.querySelectorAll("[data-yce]").forEach(b=>b.onclick=()=>kqYcEdit(b.dataset.yce));
