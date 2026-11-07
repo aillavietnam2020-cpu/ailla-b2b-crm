@@ -12,9 +12,9 @@ beforeEach(async () => {
   await seedBusinessData(ctx.db);
 });
 
-const relay = async (body: unknown, key = 'relay-test-key-123') => {
+const relay = async (body: unknown, key = 'relay-test-key-123', path = '/status') => {
   const r = await ctx.app.fetch(
-    new Request('http://x/api/agent-relay-ops/status', {
+    new Request('http://x/api/agent-relay-ops' + path, {
       method: 'POST',
       headers: { 'X-Relay-Key': key, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -95,6 +95,35 @@ describe('Điều hành agent: sơ đồ tổ chức + bộ não phòng ban', ()
     expect(d.agents.find((a: any) => a.id === 'sale-b2b-ailla').dept).toBe('cskh');
     // nhân viên không sửa được
     expect((await ctx.request('/api/agent-ops/note', { as: USERS.thao, body: { dept: 'mk', kind: 'kn', title: 'x' } })).status).toBe(403);
+  });
+
+  it('máy chủ gửi nội dung skill / kiến thức → CEO mở xem; nhân viên không xem được', async () => {
+    expect((await relay({ agent: 'main', docs: [] }, 'sai', '/docs')).status).toBe(401);
+    const up = await relay(
+      {
+        agent: 'main',
+        docs: [
+          { kind: 'skill', name: 'hoi-agent', description: 'Hỏi agent khác', path: '/root/.openclaw/workspace/skills/hoi-agent/SKILL.md', body: '# Hỏi agent - Các bước...' },
+          { kind: 'kn', name: 'AGENTS.md', path: '/root/.openclaw/workspace/AGENTS.md', body: 'Nội quy' },
+          { kind: 'skill', name: '../etc/passwd', body: 'x' },
+          { kind: 'lạ', name: 'x' },
+        ],
+      },
+      'relay-test-key-123',
+      '/docs',
+    );
+    expect(up.body.data.saved).toBe(2);
+    const d = (await ctx.request('/api/agent-ops', { as: USERS.ceo })).body.data;
+    const main = d.agents.find((a: any) => a.id === 'main');
+    expect(main.docs.find((x: any) => x.name === 'hoi-agent')).toMatchObject({ kind: 'skill', description: 'Hỏi agent khác', has_body: true });
+    const doc = await ctx.request('/api/agent-ops/doc?agent=main&kind=skill&name=hoi-agent', { as: USERS.ceo });
+    expect(doc.body.data.body).toContain('Hỏi agent');
+    expect((await ctx.request('/api/agent-ops/doc?agent=main&kind=skill&name=khong-co', { as: USERS.ceo })).status).toBe(404);
+    expect((await ctx.request('/api/agent-ops/doc?agent=main&kind=skill&name=hoi-agent', { as: USERS.thao })).status).toBe(403);
+    // replace: gửi lại chỉ còn 1 tài liệu thì tài liệu kia bị xoá
+    await relay({ agent: 'main', replace: true, docs: [{ kind: 'kn', name: 'AGENTS.md', body: 'Nội quy mới' }] }, 'relay-test-key-123', '/docs');
+    const d2 = (await ctx.request('/api/agent-ops', { as: USERS.ceo })).body.data;
+    expect(d2.agents.find((a: any) => a.id === 'main').docs.map((x: any) => x.name)).toEqual(['AGENTS.md']);
   });
 
   it('chuẩn hoá dữ liệu máy chủ gửi', () => {

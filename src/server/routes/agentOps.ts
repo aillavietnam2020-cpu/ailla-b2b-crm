@@ -16,6 +16,8 @@ export const STATES = ['work', 'wait', 'stuck', 'err', 'idle', 'off'] as const;
 const AGENT_RE = /^[a-z0-9][a-z0-9-]{1,59}$/;
 const DEPT_RE = /^[a-z0-9-]{1,24}$/;
 const LOG_DAYS = 14;
+export const DOC_KINDS = ['skill', 'kn'];
+const DOC_MAX = 300_000; // ký tự, D1 giới hạn khoảng 2 MB một giá trị
 const STALE_MS = 20 * 60_000; // máy chủ không gửi trạng thái quá 20 phút thì coi như chưa rõ
 
 const str = (v: unknown, max: number) => (v == null ? null : String(v).trim().slice(0, max) || null);
@@ -72,7 +74,7 @@ agentOpsRoutes.use('*', async (c, next) => {
 agentOpsRoutes.get('/', async (c) => {
   const db = c.env.DB;
   const since = new Date(Date.now() - 2 * 86_400_000).toISOString();
-  const [st, pf, depts, mem, notes, logs, seen, chat] = await Promise.all([
+  const [st, pf, depts, mem, notes, logs, seen, chat, docs] = await Promise.all([
     db.prepare('SELECT * FROM agent_ops_status').all<Record<string, unknown>>(),
     db.prepare('SELECT agent, skills_json, knowledge_json, crons_json, updated_at FROM agent_ops_profile').all<Record<string, string>>(),
     db.prepare('SELECT * FROM agent_dept ORDER BY sort, id').all(),
@@ -87,7 +89,12 @@ agentOpsRoutes.get('/', async (c) => {
       )
       .bind(c.get('auth').user.id)
       .all<{ agent: string; pending: number; last_at: string }>(),
+    db
+      .prepare('SELECT agent, kind, name, description, path, size, file_at, CASE WHEN body IS NULL THEN 0 ELSE 1 END AS has_body FROM agent_ops_doc')
+      .all<{ agent: string; kind: string; name: string; description: string | null; path: string | null; size: number | null; file_at: string | null; has_body: number }>(),
   ]);
+  const docBy = new Map<string, Record<string, unknown>[]>();
+  for (const d of docs.results ?? []) (docBy.get(d.agent) ?? docBy.set(d.agent, []).get(d.agent)!).push({ kind: d.kind, name: d.name, description: d.description, path: d.path, size: d.size, file_at: d.file_at, has_body: !!d.has_body });
   const stBy = new Map((st.results ?? []).map((r) => [String(r.agent), r]));
   const pfBy = new Map((pf.results ?? []).map((r) => [r.agent, r]));
   const chBy = new Map((chat.results ?? []).map((r) => [r.agent, r]));
@@ -131,6 +138,7 @@ agentOpsRoutes.get('/', async (c) => {
       knowledge: safeJson<string[]>(p?.knowledge_json, []),
       crons: safeJson<unknown[]>(p?.crons_json, []),
       profile_at: p?.updated_at ?? null,
+      docs: docBy.get(id) ?? [],
     };
   });
   return ok(c, {
@@ -141,6 +149,19 @@ agentOpsRoutes.get('/', async (c) => {
     notes: notes.results ?? [],
     logs: logs.results ?? [],
   });
+});
+
+/** Mở xem nội dung một skill / file kiến thức. */
+agentOpsRoutes.get('/doc', async (c) => {
+  const agent = c.req.query('agent') ?? '';
+  const kind = c.req.query('kind') ?? '';
+  const name = c.req.query('name') ?? '';
+  if (!AGENT_RE.test(agent) || !DOC_KINDS.includes(kind) || !name) throw badRequest('BAD_DOC', 'Thiếu thông tin tài liệu');
+  const r = await c.env.DB.prepare('SELECT agent, kind, name, description, path, body, size, file_at, updated_at FROM agent_ops_doc WHERE agent = ? AND kind = ? AND name = ?')
+    .bind(agent, kind, name)
+    .first();
+  if (!r) throw notFound('Máy chủ agent chưa gửi nội dung tài liệu này');
+  return ok(c, r);
 });
 
 /** Sửa phòng ban (tên, biểu tượng, trưởng phòng, agent trưởng, mục tiêu) hoặc thêm phòng mới. */
@@ -289,4 +310,45 @@ agentRelayOpsRoutes.post('/status', async (c) => {
   );
   await db.batch(stmts);
   return ok(c, { agents: (b.agents ?? []).length, profiles: (b.profiles ?? []).length, logs });
+});
+
+/**
+ * Gửi nội dung skill / file kiến thức (khi đổi, hoặc mỗi giờ).
+ * { agent, docs:[{kind:'skill'|'kn', name, description, path, body, file_at}], replace?: true }
+ * replace=true: xoá các tài liệu cũ của agent không còn trong danh sách gửi lên.
+ */
+agentRelayOpsRoutes.post('/docs', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { agent?: string; docs?: unknown[]; replace?: boolean };
+  const agent = String(b.agent ?? '');
+  if (!AGENT_RE.test(agent)) throw badRequest('BAD_AGENT', 'Mã agent không hợp lệ');
+  const db = c.env.DB;
+  const now = nowIso();
+  const keep: string[] = [];
+  const stmts: D1PreparedStatement[] = [];
+  for (const x of (b.docs ?? []).slice(0, 120)) {
+    const d = (x ?? {}) as Record<string, unknown>;
+    const kind = String(d.kind ?? '');
+    const name = String(d.name ?? '').trim().slice(0, 160);
+    if (!DOC_KINDS.includes(kind) || !name || name.includes('..')) continue;
+    const body = d.body == null ? null : String(d.body).slice(0, DOC_MAX);
+    keep.push(kind + '|' + name);
+    stmts.push(
+      db
+        .prepare(
+          `INSERT INTO agent_ops_doc (agent, kind, name, description, path, body, size, file_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (agent, kind, name) DO UPDATE SET description = excluded.description, path = excluded.path, body = excluded.body,
+             size = excluded.size, file_at = excluded.file_at, updated_at = excluded.updated_at`,
+        )
+        .bind(agent, kind, name, str(d.description, 600), str(d.path, 300), body, body == null ? null : body.length, str(d.file_at, 40), now),
+    );
+  }
+  if (b.replace) {
+    const old = await db.prepare('SELECT kind, name FROM agent_ops_doc WHERE agent = ?').bind(agent).all<{ kind: string; name: string }>();
+    for (const o of old.results ?? []) {
+      if (!keep.includes(o.kind + '|' + o.name)) stmts.push(db.prepare('DELETE FROM agent_ops_doc WHERE agent = ? AND kind = ? AND name = ?').bind(agent, o.kind, o.name));
+    }
+  }
+  // Gửi theo lô nhỏ để không vượt giới hạn một lần ghi của D1.
+  for (let i = 0; i < stmts.length; i += 20) await db.batch(stmts.slice(i, i + 20));
+  return ok(c, { agent, saved: keep.length });
 });
