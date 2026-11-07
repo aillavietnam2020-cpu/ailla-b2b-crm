@@ -1120,13 +1120,11 @@ khoRoutes.post('/pc-notify', async (c) => {
   for (const it of items) {
     const psx = String(it.psx ?? '').trim().slice(0, 40);
     if (!psx) continue;
-    const open = await c.env.DB.prepare("SELECT 1 FROM tasks WHERE status = 'OPEN' AND title LIKE ?").bind(`Pha chế theo yêu cầu ${psx}:%`).first();
-    if (open) continue;
-    const title = `Pha chế theo yêu cầu ${psx}: ${String(it.name ?? '').slice(0, 120)}${it.sl ? ` · ${it.sl}` : ''}${it.han ? ` · hạn ${it.han}` : ''}. Pha xong vào Kho – Sản xuất › Pha chế, bấm Nhập số thực tế.`;
-    // Hạn của việc = hạn cần của yêu cầu (17:00 giờ VN) để việc nhắc và báo trễ đúng ngày.
-    const due = /^\d{4}-\d{2}-\d{2}$/.test(String(it.han_iso ?? '')) ? `${String(it.han_iso)}T10:00:00.000Z` : now;
-    const st = taskStatements(c.env.DB, ids, { title, createdBy: auth.user.id, now, priority: 'HIGH', dueAt: due });
-    if (st.length) await c.env.DB.batch(st);
+    const title = `Pha chế theo yêu cầu ${psx}: ${String(it.name ?? '').slice(0, 120)}${it.sl ? ` · ${it.sl}` : ''}${it.han ? ` · hạn ${it.han}` : ''}. Mở Công việc, pha xong bấm Ghi số thực tế.`;
+    // 07/11 chị Hoa: việc pha chế giao vào Công việc (trình duyệt người tạo yêu cầu ghi vào bản chung), không tạo việc CRM nữa
+    // vì việc CRM hiện thành "việc chăm sóc khách". Ở đây chỉ báo chuông.
+    void now;
+    void auth;
     await bellTo(c.env.DB, ids, title, 'kho_pc').catch(() => 0);
     sent++;
   }
@@ -1658,6 +1656,9 @@ khoRoutes.post('/docs', async (c) => {
     const btp = String(b.btp ?? '');
     const it = need(btp);
     if (it.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp} không phải bán thành phẩm`);
+    // 07/11 chị Hoa: phiếu pha chế chỉ theo công thức của Kỹ thuật (Pha chế › Công thức), không theo định mức. Chưa có công thức thì phải nhập trước.
+    const ct = await c.env.DB.prepare("SELECT 1 FROM pc_recipe WHERE btp = ? AND status = 'OK'").bind(btp).first();
+    if (!ct) throw badRequest('NO_CT', `${it.name} chưa có công thức pha. Nhập công thức ở Pha chế › Công thức rồi mới ghi phiếu pha chế.`);
     const liters = positive(b.liters, 'Số lít thực tế');
     if (!lines.length) throw badRequest('NO_LINES', 'Cần ghi số thực tế của từng nguyên vật liệu đã dùng');
     extra.btp = btp;

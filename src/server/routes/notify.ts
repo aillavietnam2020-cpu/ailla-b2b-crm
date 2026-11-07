@@ -115,7 +115,7 @@ async function collect(db: D1Database, auth: AuthContext, since: string, after: 
 
   // Việc CRM giao cho tôi (chăm sóc khách, nhắc nợ, tái nhập…).
   out.crmTasks = await all(
-    `SELECT t.id, t.title, t.type, t.due_at, t.priority, t.created_at, u.display_name AS created_by_name
+    `SELECT t.id, t.title, t.type, t.customer_id, t.due_at, t.priority, t.created_at, u.display_name AS created_by_name
      FROM tasks t LEFT JOIN users u ON u.id = t.created_by
      WHERE t.assignee_id = ? AND t.status = 'OPEN' AND t.created_at > ? AND COALESCE(t.created_by, '') <> ? ORDER BY t.created_at DESC LIMIT ${LIMIT}`,
     auth.user.id, since, auth.user.id,

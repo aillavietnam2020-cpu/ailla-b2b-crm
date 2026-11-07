@@ -18,7 +18,7 @@ async function wkLoad(force){
 }
 /* Chị (CEO): việc của kế toán, kho, chăm sóc khách (sale phụ trách, chị Hoa 04/11) đã có người phụ trách, xem ở "Toàn cảnh". Ở đây chỉ việc chính chị phải quyết hoặc làm. */
 const wkCeo=()=>!!ME&&ME.role==="admin";
-const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho","Chăm sóc khách"].includes(x.group))).filter(x=>!(WK.noTask&&typeof pdAny==="function"&&pdAny()&&["pay_confirm","return_confirm","ship_edit","approve"].includes(x.key)));/* trong Công việc: khoản đã có ở tab Chờ duyệt thì không nhắc lại */const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Cần phân công / theo dõi","Đã nộp, chờ duyệt","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
+const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho","Chăm sóc khách","Việc được giao"].includes(x.group))).filter(x=>!(WK.noTask&&typeof pdAny==="function"&&pdAny()&&["pay_confirm","return_confirm","ship_edit","approve"].includes(x.key)));/* trong Công việc: khoản đã có ở tab Chờ duyệt thì không nhắc lại */const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Cần phân công / theo dõi","Đã nộp, chờ duyệt","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
 /* dòng nhắc gộp (vd "90 thẻ video chưa giao người") là MỘT việc của người xem, không phải 90 việc (chị Hoa 04/11: "Của tôi 94" mà bấm vào không thấy) */
 const wkN=x=>x.group==="Cần phân công / theo dõi"?1:(x.count||1);
 const wkCount=()=>wkMine().reduce((n,x)=>n+wkN(x),0);

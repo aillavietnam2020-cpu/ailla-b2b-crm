@@ -137,7 +137,9 @@ describe('Nhập nhanh link video', () => {
     );
     expect(res.status).toBe(200);
     const d = await hub();
-    expect(d.cards.find((x: any) => x.id === 'TT-0771')).toMatchObject({ step: 'dvd', linkVideo: L('1newNEWnew09') });
+    // Không chọn kênh (chị Hoa 07/11): không tự xếp kênh, vào Kho video · Chưa phân bổ, chờ duyệt V1.
+    expect(d.cards.find((x: any) => x.id === 'TT-0771').linkVideo).toBeFalsy();
+    expect(d.kho.find((k: any) => k.link === L('1newNEWnew09'))).toMatchObject({ sku: 'AR', choDuyet: true, trangThai: 'Chưa dùng' });
     expect(d.notifs[0].text).toMatch(/(qua .*Lead Content)/);
   });
 });
