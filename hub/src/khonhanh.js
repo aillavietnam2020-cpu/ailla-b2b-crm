@@ -139,7 +139,7 @@ function kqYcForm(copy){
     catch(err){btn.disabled=false;$("#yc-e").innerHTML=`<div class="note red">${esc(err.message)}</div>`;return}
     let note="";try{const n=pchYcTasks(codes.map((id,k)=>({id,btp:L[k].btp,lit:L[k].lit,han,ghi_chu:gc})));const r=await kApi("/pc-notify",{method:"POST",body:JSON.stringify({items:L.map((x,k)=>({psx:codes[k],name:(KHO.items.get(x.btp)||{}).name||x.btp,sl:knum(x.lit)+" lít",han:han?kDd(han):"",han_iso:han||""}))})});note=n?`Đã giao việc vào Công việc của kỹ thuật pha chế (${n} việc) và báo chuông.`:"Chưa có tài khoản riêng của kỹ thuật pha chế (quyền Kỹ thuật pha chế) nên chưa giao việc được. In phiếu đưa kỹ thuật ở nút bên dưới.";void r}catch(err){note="Chưa báo được kỹ thuật: "+err.message}
     renderMain();
-    openDrawerHTML(`<h2>Đã tạo ${codes.length} yêu cầu pha chế</h2><div id="yc-short"></div><div class="note ${/Chưa/.test(note)?"amb":"grn"}">${esc(note)}</div>${tbl(["Yêu cầu","Bán thành phẩm","Số lít",""],L.map((x,k)=>`<tr><td class="mono">${esc(codes[k])}</td><td>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</td><td class="n">${knum(x.lit)}</td><td><button class="btn sm pri" data-ycp="${esc(codes[k])}">In phiếu pha chế</button></td></tr>`))}`);
+    openDrawerHTML(`<h2>Đã tạo ${codes.length} yêu cầu pha chế</h2>${typeof pchNoCtNote==="function"?pchNoCtNote(L.map(x=>x.btp)):""}<div id="yc-short"></div><div class="note ${/Chưa/.test(note)?"amb":"grn"}">${esc(note)}</div>${tbl(["Yêu cầu","Bán thành phẩm","Số lít",""],L.map((x,k)=>`<tr><td class="mono">${esc(codes[k])}</td><td>${esc((KHO.items.get(x.btp)||{}).name||x.btp)}</td><td class="n">${knum(x.lit)}</td><td><button class="btn sm pri" data-ycp="${esc(codes[k])}">In phiếu pha chế</button></td></tr>`))}`);
     document.querySelectorAll("#drawer [data-ycp]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.ycp,true));
     kqShortCheck(codes.join(", "),L.map(x=>[x.btp,x.lit]),"yc-short")};
 }
@@ -199,7 +199,7 @@ function kqYcDetail(id){
 async function kqShortage(pairs){
   pairs=pairs.filter(([c,q])=>c&&q>0);if(!pairs.length)return [];const need=new Map();
   /* 07/11: bán thành phẩm đã có công thức của Kỹ thuật thì tính theo công thức (phache.js), chưa có mới theo định mức. */
-  const rest=[];pairs.forEach(p=>{const R=typeof pchCt==="function"?pchCt(p[0]):null;if(R)R.lines.forEach(l=>need.set(l.item,(need.get(l.item)||0)+l.qty*p[1]));else rest.push(p)});
+  const rest=[];pairs.forEach(p=>{const R=typeof pchCt==="function"?pchCt(p[0]):null;if(R)R.lines.forEach(l=>need.set(l.item,(need.get(l.item)||0)+l.qty*p[1]));else if((KHO.items.get(p[0])||{}).cls!=="BTP")rest.push(p)});
   if(rest.length)(await khoExpand(rest)).forEach(([,,rows])=>(rows||[]).forEach(b=>need.set(b.item,(need.get(b.item)||0)+(+b.need||0))));
   return [...need].map(([c,n])=>{const it=KHO.items.get(c)||{},t=khoStock(c);return {item:c,name:it.name||c,unit:it.unit||"",need:Math.round(n*1e6)/1e6,ton:t,thieu:Math.round((n-Math.max(t,0))*1e6)/1e6}}).filter(x=>x.thieu>1e-9);
 }

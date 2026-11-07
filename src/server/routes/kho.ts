@@ -1656,6 +1656,9 @@ khoRoutes.post('/docs', async (c) => {
     const btp = String(b.btp ?? '');
     const it = need(btp);
     if (it.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp} không phải bán thành phẩm`);
+    // 07/11 chị Hoa: phiếu pha chế chỉ theo công thức của Kỹ thuật (Pha chế › Công thức), không theo định mức. Chưa có công thức thì phải nhập trước.
+    const ct = await c.env.DB.prepare("SELECT 1 FROM pc_recipe WHERE btp = ? AND status = 'OK'").bind(btp).first();
+    if (!ct) throw badRequest('NO_CT', `${it.name} chưa có công thức pha. Nhập công thức ở Pha chế › Công thức rồi mới ghi phiếu pha chế.`);
     const liters = positive(b.liters, 'Số lít thực tế');
     if (!lines.length) throw badRequest('NO_LINES', 'Cần ghi số thực tế của từng nguyên vật liệu đã dùng');
     extra.btp = btp;

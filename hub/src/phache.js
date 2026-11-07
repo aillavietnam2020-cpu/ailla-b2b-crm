@@ -39,6 +39,8 @@ function pchYcRows(){
     return {id:r.id,btp:r.btp,lit:r.lit,litBon:r.lit_bon||r.lit,bon:r.bon||1,han:r.han||"",ghiChu:r.ghi_chu||"",taoLuc:r.ngay,tao:r.created_by_name,st:r.status==="HUY"?"HUY":"CHO_LAM",lyDoHuy:r.ly_do_huy,huyBy:r.huy_by_name,doc,tt:r.status==="HUY"?"HUY":doc?"XONG":"CHO"}});
 }
 async function pchYcCreate(b){const r=await pApi("/yc",{method:"POST",body:JSON.stringify(b)});await pchLoadYc(true).catch(()=>{});return r}
+/* Bán thành phẩm chưa có công thức (07/11: phiếu pha chế bắt buộc theo công thức). */
+function pchNoCtNote(btps){const L=[...new Set(btps)].filter(b=>b&&!pchCt(b));return L.length?`<div class="note red"><b>Chưa có công thức pha:</b> ${L.map(b=>esc(pchName(b))).join(", ")}. Kỹ thuật pha chế phải nhập công thức (Pha chế › Công thức) trước khi ghi phiếu.</div>`:""}
 /* Công thức đang dùng của một bán thành phẩm (null nếu chưa có). */
 function pchCt(btp){return (PCH.ct||[]).find(r=>r.btp===btp&&r.status==="OK")||null}
 
@@ -69,7 +71,7 @@ function pchTaskDone(pred,note){pchOpenTasks(pred).forEach(t=>{if(typeof tkSetSt
 function pchYcTasks(list){
   const K=pchKyThuat();if(!K.length||!list.length)return 0;const [a,...rest]=K;
   DB.mutate(ME.name,"giao "+list.length+" việc pha chế",dt=>list.forEach(y=>{const nm=pchName(y.btp);
-    pchNewTask(dt,{ten:`Pha ${nm} · ${knum(y.lit)} lít`,moTa:`Yêu cầu pha chế ${y.id}${y.han?" · hạn "+kDd(y.han):""}${y.ghi_chu?"\nGhi chú: "+y.ghi_chu:""}\nPha xong bấm "Ghi số thực tế" ngay trong việc này.`,
+    pchNewTask(dt,{ten:`Pha ${nm} · ${knum(y.lit)} lít`,moTa:`Yêu cầu pha chế ${y.id}${y.han?" · hạn "+kDd(y.han):""}${y.ghi_chu?"\nGhi chú: "+y.ghi_chu:""}${pchCt(y.btp)?"":"\nChưa có công thức pha: bấm Nhập công thức trong việc này trước khi pha."}\nPha xong bấm "Ghi số thực tế" ngay trong việc này.`,
       nguoi:a.id,phoi:rest.map(u=>u.id),han:pchHan(y.han),extra:{pcYc:y.id},log:"giao việc pha chế "+y.id,bell:`Việc pha chế mới: ${nm} · ${knum(y.lit)} lít${y.han?" · hạn "+kDd(y.han):""}`})}));
   return list.length;
 }
@@ -89,8 +91,9 @@ function pchTaskBox(t){
     if(!x)return `<div class="note">Yêu cầu pha chế <b>${esc(t.pcYc)}</b>. <span class="hint">Đang tải…</span></div>`;
     if(x.tt==="HUY")return `<div class="note">Yêu cầu <b>${esc(x.id)}</b> đã hủy${x.lyDoHuy?": "+esc(x.lyDoHuy):""}.</div>`;
     if(x.tt==="XONG")return `<div class="note grn">Đã pha: phiếu <a href="#" class="lnk" data-pchdoc="${x.doc.id}">${esc(x.doc.no)}</a> ngày ${kDd(x.doc.doc_date)}.</div>`;
-    const R=pchCt(x.btp);
-    return `<div class="note amb"><b>Pha ${esc(pchName(x.btp))} · ${knum(x.lit)} lít</b><br>Yêu cầu ${esc(x.id)}${x.han?" · hạn "+kDd(x.han):""}${x.ghiChu?" · "+esc(x.ghiChu):""}<br>${R?`Theo công thức bản ${R.version}.`:`<span class="t-red">Chưa có công thức của Kỹ thuật, định lượng tạm theo định mức kế toán.</span>`}
+    const R=pchCt(x.btp),pend=(PCH.ct||[]).some(r=>r.btp===x.btp&&r.status==="CHO");
+    if(!R)return `<div class="note red"><b>Pha ${esc(pchName(x.btp))} · ${knum(x.lit)} lít</b><br>Yêu cầu ${esc(x.id)}${x.han?" · hạn "+kDd(x.han):""}<br><b>Chưa có công thức pha.</b> ${pend?"Công thức đang chờ Trưởng kỹ thuật duyệt, duyệt xong mới ghi phiếu được.":"Phải nhập công thức trước rồi mới ghi phiếu pha chế."}${!pend&&pchCanCt()?`<div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchctb="${esc(x.btp)}">Nhập công thức</button></div>`:""}</div>`;
+    return `<div class="note amb"><b>Pha ${esc(pchName(x.btp))} · ${knum(x.lit)} lít</b><br>Yêu cầu ${esc(x.id)}${x.han?" · hạn "+kDd(x.han):""}${x.ghiChu?" · "+esc(x.ghiChu):""}<br>Theo công thức bản ${R.version}.
       <div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchghi="${esc(x.id)}">Ghi số thực tế</button> <button type="button" class="btn" data-pchin="${esc(x.id)}">In phiếu</button>${R&&R.huong_dan?` <button type="button" class="btn" data-pchhd="${esc(x.btp)}">Hướng dẫn pha</button>`:""}</div></div>`}
   if(t.pcCt){const r=(PCH.ct||[]).find(y=>y.id===t.pcCt);if(!r)return `<div class="note">Phiếu điều chỉnh công thức. <span class="hint">Đang tải…</span></div>`;
     return `<div class="note ${r.status==="CHO"?"amb":""}">${pchCtCompare(r)}${r.status==="CHO"&&PCH.ctOk?`<div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchok="${r.id}">Duyệt, dùng từ hôm nay</button> <button type="button" class="btn" data-pchtra="${r.id}">Trả lại</button></div>`:r.status==="CHO"?`<p class="hint">Chờ Trưởng kỹ thuật duyệt.</p>`:`<p class="hint">${r.status==="TRA"?"Đã trả lại: "+esc(r.tra_ly_do||""):"Đã duyệt, đang dùng."}</p>`}</div>`}
@@ -102,6 +105,7 @@ function pchBindBox(root){
   root.querySelectorAll("[data-pchghi]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pchghi,false));
   root.querySelectorAll("[data-pchin]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pchin,true));
   root.querySelectorAll("[data-pchdoc]").forEach(a=>a.onclick=e=>{e.preventDefault();khoOpenDoc(+a.dataset.pchdoc)});
+  root.querySelectorAll("[data-pchctb]").forEach(b=>b.onclick=()=>pchCtForm(b.dataset.pchctb));
   root.querySelectorAll("[data-pchhd]").forEach(b=>b.onclick=()=>pchHdShow(b.dataset.pchhd));
   root.querySelectorAll("[data-pchok]").forEach(b=>b.onclick=()=>pchCtApprove(+b.dataset.pchok));
   root.querySelectorAll("[data-pchtra]").forEach(b=>b.onclick=()=>pchCtReturn(+b.dataset.pchtra));
@@ -159,8 +163,8 @@ function pchViewCt(){
      ${R?`<div class="hint">Dùng từ ${kDd(String(R.effective_at||R.created_at).slice(0,10))} · ${esc(R.created_by_name)} lập · ${R.tu_duyet?"người duyệt tự lập, dùng ngay":"duyệt: "+esc(R.approved_by_name||"")}</div><div class="hint">Lý do: ${esc(R.ly_do)}</div>${pchLinesTbl(R.lines)}${R.huong_dan?`<div style="margin-top:6px"><b>Hướng dẫn pha</b>${pchHdHtml(R.huong_dan)}</div>`:""}`:""}
      ${pend?`<div class="note amb" style="margin-top:6px">Phiếu điều chỉnh bản ${pend.version} đang chờ duyệt.${R?" Pha vẫn theo bản "+R.version+".":""}</div>`:""}
      ${his.length?`<details style="margin-top:6px"><summary class="hint">Lịch sử ${his.length} bản cũ / trả lại</summary>${tbl(["Bản","Ngày","Lý do","Người"],his.map(x=>`<tr data-pchv="${x.id}" class="clk"><td>${x.version}${x.status==="TRA"?" "+pill("Trả lại","red"):""}</td><td>${kDd(String(x.created_at).slice(0,10))}</td><td>${esc(x.ly_do)}${x.tra_ly_do?`<small class="hint" style="display:block">Trả lại: ${esc(x.tra_ly_do)}</small>`:""}</td><td>${esc(x.created_by_name)}${x.approved_by_name?`<small class="hint" style="display:block">${esc(x.approved_by_name)}</small>`:""}</td></tr>`))}</details>`:""}
-     ${pchCanCt()&&!pend?`<div class="acts" style="margin-top:8px"><button type="button" class="btn" data-pchdc="${esc(b)}">${R?"Điều chỉnh công thức":"Lập lại công thức"}</button></div>`:""}</div>`}).join("")}</div>`:`<p class="hint">${btps.length?"Không có công thức nào khớp.":"Chưa có công thức nào. Bấm \"+ Thêm công thức\"."}</p>`;
-  if(noCt.length)h+=`<details style="margin-top:12px"><summary class="hint">${noCt.length} bán thành phẩm chưa có công thức (phiếu pha đang tạm theo định mức kế toán)</summary><p>${noCt.map(i=>`${pchCanCt()?`<a href="#" class="lnk" data-pchnewb="${esc(i.code)}">${esc(i.name)}</a>`:esc(i.name)}`).join(" · ")}</p></details>`;
+     ${pchCanCt()&&!pend?`<div class="acts" style="margin-top:8px"><button type="button" class="btn" data-pchdc="${esc(b)}">${R?"Điều chỉnh công thức":"Lập lại công thức"}</button></div>`:""}</div>`}).join("")}</div>`:`<p class="hint">${btps.length?"Không có công thức nào khớp.":"Chưa có công thức nào. Bấm \"+ Thêm công thức\". Chưa có công thức thì không ghi được phiếu pha chế."}</p>`;
+  if(noCt.length)h+=`<details style="margin-top:12px"><summary class="hint">${noCt.length} bán thành phẩm chưa có công thức (chưa ghi được phiếu pha chế)</summary><p>${noCt.map(i=>`${pchCanCt()?`<a href="#" class="lnk" data-pchnewb="${esc(i.code)}">${esc(i.name)}</a>`:esc(i.name)}`).join(" · ")}</p></details>`;
   return h;
 }
 function pchHdShow(btp){const R=pchCt(btp);if(!R)return;openDrawerHTML(`<h2>Hướng dẫn pha ${esc(pchName(btp))}</h2><p class="hint">Công thức bản ${R.version}</p><div style="white-space:pre-wrap">${esc(R.huong_dan)}</div>`)}

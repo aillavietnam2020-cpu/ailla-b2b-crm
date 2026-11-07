@@ -43,6 +43,9 @@ describe('yêu cầu pha chế ở sổ riêng', () => {
 
     expect((await req('/yc/YCPC2611-002', USERS.ceo, { btp: 'BTP1', lit_bon: 300, han: '2026-11-10' }, 'PATCH')).status).toBe(200);
     // Kỹ thuật ghi phiếu pha chế gắn mã yêu cầu → đã pha, không sửa hay hủy được nữa.
+    const noCt = await ctx.request('/api/hub/kho/docs', { as: USERS.ceo, body: { type: 'PC', date: '2026-11-07', btp: 'BTP1', liters: 300, lines: [{ item: 'SLES', qty: 36, std_qty: 36 }] } });
+    expect(noCt.body.error.code).toBe('NO_CT'); // chưa có công thức thì không ghi được phiếu pha chế
+    expect((await req('/ct', USERS.ceo, { btp: 'BTP1', lines: [{ item: 'SLES', qty: 0.12 }], ly_do: 'Công thức đầu' })).status).toBe(200);
     const pc = await ctx.request('/api/hub/kho/docs', { as: USERS.ceo, body: { type: 'PC', date: '2026-11-07', btp: 'BTP1', liters: 300, ref_no: 'YCPC2611-002', lines: [{ item: 'SLES', qty: 36, std_qty: 36 }] } });
     expect(pc.status).toBe(200);
     r = await req('/yc', USERS.ceo);
@@ -107,6 +110,7 @@ describe('báo tồn tại xưởng', () => {
 
 describe('hao hụt', () => {
   it('trả các mẻ pha trong kỳ với số theo công thức, thực tế, lý do lệch', async () => {
+    await req('/ct', USERS.ceo, { btp: 'BTP1', lines: [{ item: 'SLES', qty: 0.12 }, { item: 'RO', qty: 0.8 }], ly_do: 'Công thức đầu' });
     await ctx.request('/api/hub/kho/docs', { as: USERS.ceo, body: { type: 'PC', date: '2026-11-05', btp: 'BTP1', liters: 100, nguoi: ['Kỹ thuật A'], lines: [{ item: 'SLES', qty: 13, std_qty: 12, note: 'SLES đặc' }, { item: 'RO', qty: 80, std_qty: 80 }] } });
     const r = await req('/haohut?from=2026-11-01&to=2026-11-30', USERS.ceo);
     expect(r.status).toBe(200);

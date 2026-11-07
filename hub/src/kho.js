@@ -202,14 +202,16 @@ function khoForm(type,pre,clsO){
     const fill=async()=>{const c=$("#kf-btp").dataset.code,lit=kfNum($("#kf-lit").value)*(kfNum($("#kf-bon")&&$("#kf-bon").value||"1")||1);if($("#kf-tong"))$("#kf-tong").value=lit>0?knum(Math.round(lit*1e6)/1e6):"";if(!c||!(lit>0))return;const my=++fillTok;let B;
       if(typeof pchLoadCt==="function"){try{await pchLoadCt()}catch(e){}if(my!==fillTok)return}
       const RC=typeof pchCt==="function"?pchCt(c):null;
-      if(RC)B=RC.lines.map(l=>({item:l.item,need:l.qty*lit}));
-      else if(KHO.bomHidden){try{const [[,,rows]]=await khoExpand([[c,lit]]);B=rows.map(x=>({item:x.item,need:x.need}))}catch(e){toast(e.message);return}if(my!==fillTok)return}
-      else B=KHO.bom.get(c)||[];
-      if($("#kf-ctn"))$("#kf-ctn").innerHTML=RC?`<div class="note grn">Định lượng theo <b>công thức bản ${RC.version}</b> (dùng từ ${kDd(String(RC.effective_at||RC.created_at).slice(0,10))}).${RC.huong_dan?` <a href="#" class="lnk" id="kf-hd">Xem hướng dẫn pha</a>`:""}</div>`:`<div class="note amb">${esc(c)} chưa có công thức của Kỹ thuật: định lượng đang tạm theo định mức của kế toán. Thêm công thức ở Pha chế › Công thức.</div>`;
-      if(RC&&$("#kf-hd"))$("#kf-hd").onclick=e=>{e.preventDefault();alert(RC.huong_dan)};
-      body.innerHTML="";
+      /* 07/11 chị Hoa: phiếu pha chế chỉ theo công thức của Kỹ thuật, không theo định mức. Chưa có công thức thì bắt nhập công thức trước. */
+      body.innerHTML="";const okBtn=$("#kf-ok");
+      if(!RC){if(okBtn)okBtn.disabled=true;
+        if($("#kf-ctn"))$("#kf-ctn").innerHTML=`<div class="note red"><b>${esc((KHO.items.get(c)||{}).name||c)} chưa có công thức pha.</b> Phải nhập công thức trước rồi mới ghi phiếu pha chế.${typeof pchCanCt==="function"&&pchCanCt()?` <button type="button" class="btn sm pri" id="kf-ctnew">Nhập công thức</button>`:" Báo Kỹ thuật pha chế nhập công thức ở Pha chế › Công thức."}</div>`;
+        if($("#kf-ctnew"))$("#kf-ctnew").onclick=()=>pchCtForm(c);return}
+      if(okBtn)okBtn.disabled=false;B=RC.lines.map(l=>({item:l.item,need:l.qty*lit}));
+      if($("#kf-ctn"))$("#kf-ctn").innerHTML=`<div class="note grn">Định lượng theo <b>công thức bản ${RC.version}</b> (dùng từ ${kDd(String(RC.effective_at||RC.created_at).slice(0,10))}).${RC.huong_dan?` <a href="#" class="lnk" id="kf-hd">Xem hướng dẫn pha</a>`:""}</div>`;
+      if($("#kf-hd"))$("#kf-hd").onclick=e=>{e.preventDefault();alert(RC.huong_dan)};
       const lb=kfNum($("#kf-lit").value)||lit;B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),per=b.need!=null?b.need/lit:b.qty,tr=addLine({item:b.item,qty:std,std,per:Math.round(per*1e6)/1e6,perBon:kq(per*lb),fixed:true});tr.dataset.std=std});
-      if(!B.length)$("#kf-warn").innerHTML=`<div class="note amb">${esc(c)} chưa có định mức. Thêm nguyên liệu bằng nút "+ Thêm dòng".</div>`;else refresh()};
+      refresh()};
     khoPick($("#kf-btp"),["BTP"],fill);$("#kf-lit").oninput=fill;if($("#kf-bon"))$("#kf-bon").oninput=fill;
     $("#kf-add").onclick=()=>{const tr=addLine({});tr.dataset.std=0}}
   else{$("#kf-add").onclick=()=>addLine({});if(isOut)$("#kf-box").onclick=()=>addLine({cls:["NVL","HH","CCDC"]});addLine({})}
