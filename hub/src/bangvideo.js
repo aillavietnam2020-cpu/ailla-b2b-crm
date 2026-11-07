@@ -154,10 +154,10 @@ function bvRutDuyet(dt,c){if(!["dvd","dceo"].includes(c.step))return;const t=c.h
    của kênh đang xem (POST /api/hub/video-links, xem trước dry rồi lưu); lưu xong các dòng sang Chờ duyệt V1, Lead nhận một thông báo gộp.
    Agent Lead Content dùng chung đường này khi nhân sự nhắn link cho agent. */
 let BVN=null;
-async function bvNhapApi(dry,items){if(typeof svApi!=="function")throw new Error("Cần mở trên web thật");return svApi("/api/hub/video-links",{method:"POST",body:JSON.stringify({kenh:BVN.kenh||"",dry,items})})}
+async function bvNhapApi(dry,items){if(typeof svApi!=="function")throw new Error("Cần mở trên web thật");return svApi("/api/hub/video-links",{method:"POST",body:JSON.stringify({kenh:"",dry,items})})}
 /* kenh: kênh đang xem ở Điều phối; "" = mọi kênh (mở từ Công việc) */
 function bvNhapNhanh(kenh){BVN={plan:[],kenh:typeof kenh==="string"?kenh:""};
-  openDrawerHTML(`<h2 class="dtitle">Nhập nhanh link video · ${BVN.kenh?esc(chOf(BVN.kenh).short):"mọi kênh"}</h2><p class="hint">Dán link Google Drive của các video làm xong, mỗi dòng một link. Web đọc tên file để biết video của sản phẩm nào, rồi xếp vào dòng còn trống đầu tiên của sản phẩm đó ${BVN.kenh?"ở kênh này":"(dòng giao cho bạn trước, rồi các kênh khác)"}. Kiểm tra bảng bên dưới rồi bấm lưu. Tên file nên có tên sản phẩm (ví dụ "Arila hook 1.mp4").</p>
+  openDrawerHTML(`<h2 class="dtitle">Nhập nhanh link video · ${BVN.kenh?esc(chOf(BVN.kenh).short):"mọi kênh"}</h2><p class="hint">Dán link Google Drive của các video làm xong, mỗi dòng một link. Web đọc tên file để biết video của sản phẩm nào, rồi xếp vào dòng còn trống đầu tiên của sản phẩm đó ${BVN.kenh?"ở kênh này":"(dòng giao cho bạn trước, rồi các kênh khác)"}. Cột <b>Kênh</b>: chọn kênh thì video vào dòng trống của kênh đó; để <b>Chưa phân bổ</b> thì video vào Kho video · Chưa phân bổ, phân bổ kênh sau. Kiểm tra bảng bên dưới rồi bấm lưu. Tên file nên có tên sản phẩm (ví dụ "Arila hook 1.mp4").</p>
    <textarea id="bvn-ta" rows="6" style="width:100%" placeholder="https://drive.google.com/file/d/...&#10;https://drive.google.com/file/d/..."></textarea>
    <div class="acts"><button type="button" class="btn pri" id="bvn-read">Đọc link</button></div><div id="bvn-prev"></div>`);
   const q=i=>document.querySelector("#drawerIn "+i);
@@ -167,16 +167,16 @@ function bvNhapNhanh(kenh){BVN={plan:[],kenh:typeof kenh==="string"?kenh:""};
 }
 async function bvNhapRe(){const q=i=>document.querySelector("#drawerIn "+i);try{const r=await bvNhapApi(true,BVN.plan.map(p=>({url:p.url,sp:p.sku||"",to:p.to||"",kenh:p.kenhSel||""})));BVN.plan=r.plan;bvNhapDraw()}catch(e){toast(e.message||String(e))}}
 function bvNhapDraw(){
-  const q=i=>document.querySelector("#drawerIn "+i),P=BVN.plan,okN=P.filter(p=>p.st==="ok").length,n=k=>P.filter(p=>p.st===k).length;
-  const lbl={ok:["Sẵn sàng","grn"],dup:["Trùng, bỏ qua","red"],nosku:["Chọn sản phẩm","amb"],full:["Hết dòng trống","amb"],bad:["Không phải link Drive","red"]};
+  const q=i=>document.querySelector("#drawerIn "+i),P=BVN.plan,okN=P.filter(p=>p.st==="ok"||p.st==="kho").length,n=k=>P.filter(p=>p.st===k).length;
+  const lbl={kho:["Vào Chưa phân bổ","blu"],ok:["Sẵn sàng","grn"],dup:["Trùng, bỏ qua","red"],nosku:["Chọn sản phẩm","amb"],full:["Hết dòng trống","amb"],bad:["Không phải link Drive","red"]};
   const prods=D().products.map(p=>[p.k,p.n]);
   q("#bvn-prev").innerHTML=`<div class="bvscroll" style="overflow-x:auto;margin-top:12px"><table class="tbl"><thead><tr><th>Tên file trên Drive</th><th>Sản phẩm</th><th>Kênh</th><th>Vào video</th><th></th></tr></thead><tbody>${P.map((p,i)=>`<tr>
      <td>${p.name?esc(p.name):'<i class="hint">không đọc được tên file</i>'}<br><small class="hint">${esc(p.url.replace(/^https?:\/\//,"").slice(0,52))}…</small></td>
      <td>${["dup","bad"].includes(p.st)?"—":`<select data-bvnsp="${i}">${opt([["","— chọn sản phẩm —"]].concat(prods),p.sku||"")}</select>`}</td>
-     <td>${p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnkn="${i}">${opt([["",BVN.kenh?chOf(BVN.kenh).short:"— mọi kênh —"]].concat(CHANNELS.filter(c=>(p.kenhs||[]).includes(c.k)||c.k===p.kenhSel).map(c=>[c.k,c.short])),p.kenhSel||"")}</select>`:"—"}</td>
-     <td>${p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnto="${i}">${opt([["","— không xếp —"]].concat(p.opts.map(id=>{const c=D().cards.find(x=>x.id===id);return [id,id+(c&&!BVN.kenh?" · "+chOf(c.kenh).short:"")]})),p.to||"")}</select>`:"—"}</td>
+     <td>${p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnkn="${i}">${opt([["","Chưa phân bổ"]].concat(CHANNELS.filter(c=>(p.kenhs||[]).includes(c.k)||c.k===p.kenhSel).map(c=>[c.k,c.short])),p.kenhSel||"")}</select>`:"—"}</td>
+     <td>${p.st==="kho"?'<span class="hint">Kho video · Chưa phân bổ</span>':p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnto="${i}">${opt([["","— không xếp —"]].concat(p.opts.map(id=>{const c=D().cards.find(x=>x.id===id);return [id,id+(c&&!BVN.kenh?" · "+chOf(c.kenh).short:"")]})),p.to||"")}</select>`:"—"}</td>
      <td>${pill(lbl[p.st][0],lbl[p.st][1])}</td></tr>`).join("")}</tbody></table></div>
-   <div class="k2box" style="margin-top:10px"><b>${okN}</b> video sẽ được điền link và chuyển <b>Chờ duyệt V1</b>${n("dup")?" · "+n("dup")+" link trùng bỏ qua":""}${n("nosku")?" · "+n("nosku")+" link cần chọn sản phẩm":""}${n("full")?" · "+n("full")+" link hết dòng trống (sản phẩm đã đủ video theo kế hoạch ở kênh này)":""}. Lead Content nhận một thông báo gộp.${BVN.drive===false?'<br><span class="t-red">Web chưa nối Google Drive nên không đọc được tên file, chọn sản phẩm tay.</span>':""}</div>
+   <div class="k2box" style="margin-top:10px"><b>${okN}</b> video gửi <b>Chờ duyệt V1</b>${n("kho")?" ("+n("kho")+" chưa chọn kênh → Kho video · Chưa phân bổ)":""}${n("dup")?" · "+n("dup")+" link trùng bỏ qua":""}${n("nosku")?" · "+n("nosku")+" link cần chọn sản phẩm":""}${n("full")?" · "+n("full")+" link hết dòng trống (sản phẩm đã đủ video theo kế hoạch ở kênh này)":""}. Lead Content nhận một thông báo gộp.${BVN.drive===false?'<br><span class="t-red">Web chưa nối Google Drive nên không đọc được tên file, chọn sản phẩm tay.</span>':""}</div>
    <div class="acts"><button type="button" class="btn pri" id="bvn-save" ${okN?"":"disabled"}>Lưu ${okN} video, gửi Lead duyệt</button><button type="button" class="btn ghost" id="bvn-x">Hủy</button></div>`;
   document.querySelectorAll("[data-bvnsp]").forEach(x=>x.onchange=()=>{const p=P[+x.dataset.bvnsp];p.sku=x.value;p.to="";bvNhapRe()});
   document.querySelectorAll("[data-bvnkn]").forEach(x=>x.onchange=()=>{const p=P[+x.dataset.bvnkn];p.kenhSel=x.value;p.to="";bvNhapRe()});

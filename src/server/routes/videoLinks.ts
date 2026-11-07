@@ -37,7 +37,7 @@ const schema = z.object({
 
 type Card = Record<string, unknown> & { id: string; sku?: string; kenh?: string; step?: string; linkVideo?: string; linkFinal?: string; linkDang?: string; nguoi?: string; nguoiEdit?: string; fpId?: string; mix?: string; history?: unknown[] };
 type User = { id?: string; crm?: string; name?: string; role?: string; active?: boolean; phongBan?: string };
-type Hub = { cards?: Card[]; users?: User[]; products?: { k: string; n: string }[]; kho?: { link?: string }[]; notifs?: unknown[]; activity?: unknown[] } & Record<string, unknown>;
+type Hub = { cards?: Card[]; users?: User[]; products?: { k: string; n: string }[]; kho?: ({ link?: string; ma?: string } & Record<string, unknown>)[]; notifs?: unknown[]; activity?: unknown[] } & Record<string, unknown>;
 
 /** Bước chưa nộp video: dán link là gửi duyệt (giống ô link ở Điều phối, hub/src/bangvideo.js bvGuiDuyet). */
 const OPEN = ['cg', 'kb', 'dkb', 'quay', 'edit'];
@@ -108,8 +108,9 @@ videoLinkRoutes.post('/', async (c) => {
         : seen.has(id) || cards.some((x) => has(x.linkVideo, id) || has(x.linkFinal, id)) || (d.kho ?? []).some((k) => has(k.link, id));
       if (id) seen.add(id);
       const sku = dup ? '' : (it.sp && (prods.find((p) => p.k === it.sp)?.k || guessSku(it.sp, prods))) || guessSku(name, prods);
-      // Kênh chọn riêng từng link (Quỳnh 07/11) > kênh đang xem ở Điều phối > mọi kênh.
-      const kn = it.kenh || b.kenh;
+      /* Kênh chọn riêng từng link (chị Hoa 07/11): chọn kênh thì điền vào dòng trống của kênh đó; KHÔNG chọn thì
+         không tự xếp kênh nữa, video vào Kho video › Chưa phân bổ (chờ Lead duyệt V1, phân bổ kênh sau). */
+      const kn = it.kenh || b.kenh; // kenh chung chỉ khi người gọi chọn sẵn (agent); trang web gửi kenh chung rỗng
       const free0 = (x: Card) =>
         x.sku === sku && OPEN.includes(x.step ?? '') && !x.linkVideo && !x.linkFinal && !x.fpId && x.mix !== 'ton';
       const free = (x: Card) => free0(x) && (!kn || x.kenh === kn);
@@ -121,6 +122,10 @@ videoLinkRoutes.post('/', async (c) => {
             .sort((x, y) => Number(![x.nguoi, x.nguoiEdit].includes(me.id)) - Number(![y.nguoi, y.nguoiEdit].includes(me.id)) || String(x.id).localeCompare(String(y.id)))
         : [];
       let to = '';
+      if (!kn) {
+        const st = !id ? 'bad' : dup ? 'dup' : !sku ? 'nosku' : 'kho';
+        return { url: it.url, name, sku, sp: sku ? prods.find((p) => p.k === sku)?.n ?? sku : '', to: '', kenh: '', kenhSel: '', kenhs, st, opts: [] as string[] };
+      }
       if (it.to) {
         if (opts.some((x) => x.id === it.to) && !used.has(it.to)) to = it.to;
       } else to = opts.find((x) => !used.has(x.id))?.id ?? '';
@@ -128,7 +133,7 @@ videoLinkRoutes.post('/', async (c) => {
       const st = !id ? 'bad' : dup ? 'dup' : !sku ? 'nosku' : !to ? 'full' : 'ok';
       return { url: it.url, name, sku, sp: sku ? prods.find((p) => p.k === sku)?.n ?? sku : '', to, kenh: to ? cards.find((x) => x.id === to)?.kenh ?? '' : '', kenhSel: it.kenh, kenhs, st, opts: opts.map((x) => x.id) };
     });
-    const go = plan.filter((p) => p.st === 'ok');
+    const go = plan.filter((p) => p.st === 'ok' || p.st === 'kho');
     if (b.dry || !go.length) return ok(c, { plan, saved: 0, drive: !!key });
 
     const at = nowIso();
@@ -137,7 +142,17 @@ videoLinkRoutes.post('/', async (c) => {
     const by = me.name || auth.user.display_name;
     const viaAgent = auth.delegation ? ` (qua ${auth.delegation.agentName})` : '';
     const count: Record<string, number> = {};
+    d.kho = d.kho ?? [];
+    const ymd = vn.slice(0, 10);
     for (const p of go) {
+      if (p.st === 'kho') {
+        let ma = '';
+        do ma = 'KHO-NL-' + p.sku + '-' + String(Math.floor(Math.random() * 1e5)).padStart(5, '0');
+        while (d.kho.some((k) => k.ma === ma));
+        d.kho.push({ ma, skuText: p.sp, sku: p.sku, nguoi: by, tuyen: '', duyet: 'Chưa duyệt', choDuyet: true, link: p.url, ten: (p.name || 'Video ' + p.sp).replace(/\.(mp4|mov|m4v)$/i, ''), kenhDeXuat: '', lyDo: 'Nhập nhanh link (chưa chọn kênh)' + viaAgent, ghiChu: '', quyen: 'Chưa kiểm', canSua: 'Đăng nguyên', trangThai: 'Chưa dùng', maDang: '', nguonFile: 'Nhập nhanh link', caption: '', ngaySX: ymd });
+        count[p.sp] = (count[p.sp] ?? 0) + 1;
+        continue;
+      }
       const x = cards.find((y) => y.id === p.to);
       if (!x) continue;
       x.linkVideo = p.url;
@@ -153,7 +168,7 @@ videoLinkRoutes.post('/', async (c) => {
     d.notifs = d.notifs ?? [];
     for (const to of leads)
       if (to !== me.id)
-        d.notifs.push({ id: 'nt' + Date.now().toString(36).slice(-5) + Math.floor(Math.random() * 1e4).toString(36), to, text: `${by} gửi duyệt ${go.length} video (${sum})${viaAgent}`, at, ref: go[0].to, by, read: false });
+        d.notifs.push({ id: 'nt' + Date.now().toString(36).slice(-5) + Math.floor(Math.random() * 1e4).toString(36), to, text: `${by} gửi duyệt ${go.length} video (${sum})${viaAgent}`, at, ref: go[0].to || 'kho', by, read: false });
     if (d.notifs.length > 600) d.notifs = d.notifs.slice(-600);
     d.activity = [{ t: hm, d: `${vn.slice(8, 10)}/${vn.slice(5, 7)}/${vn.slice(0, 4)}`, who: by, msg: `nhập nhanh ${go.length} link video, gửi Lead duyệt${viaAgent}` }, ...(d.activity ?? [])].slice(0, 400);
     const res = await c.env.DB.prepare('UPDATE hub_state SET version = version + 1, data = ?, updated_at = ?, updated_by = ? WHERE id = ? AND version = ?')
@@ -165,7 +180,7 @@ videoLinkRoutes.post('/', async (c) => {
       actorType: auth.delegation ? 'AGENT' : undefined,
       action: 'VIDEO_LINKS_SUBMITTED',
       entityType: 'HUB_CARD',
-      entityId: go.map((p) => p.to).join(',').slice(0, 200),
+      entityId: go.map((p) => p.to || 'kho').join(',').slice(0, 200),
       after: { count: go.length, on_behalf_of: auth.delegation ? by : undefined },
       requestId: c.get('requestId'),
       ip: clientIp(c.req.raw.headers),
