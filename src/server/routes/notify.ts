@@ -128,6 +128,20 @@ notifyRoutes.get('/mine', async (c) => {
   const since = clampSince(c.req.query('since'));
   // Chưa có mốc tin agent (lần đầu) thì -1: chỉ trả mốc mới nhất, không báo dồn tin cũ.
   const a = c.req.query('after');
-  const after = a == null || a === '' ? -1 : Math.max(0, Math.floor(Number(a)) || 0);
-  return ok(c, { now, since, ...(await collect(c.env.DB, c.get('auth'), since, after)) });
+  let after = a == null || a === '' ? -1 : Math.max(0, Math.floor(Number(a)) || 0);
+  /* Tin agent đã báo ở một trình duyệt/trang thì không báo lại ở trang kia (quantri, vanhanh, qt, điện thoại mỗi nơi
+     nhớ riêng nên chị Hoa xem rồi vẫn hiện, 07/11). Máy chủ nhớ mốc tin đã báo cho từng người trong hub_blobs. */
+  const db = c.env.DB, auth = c.get('auth'), key = 'nt_ag:' + auth.user.id;
+  let mark = 0;
+  try { const r = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(key).first<{ data: string }>(); mark = Math.max(0, Number(r?.data) || 0); } catch { /* chưa có mốc */ }
+  if (after >= 0) after = Math.max(after, mark);
+  const out = await collect(db, auth, since, after);
+  const top = Math.max(0, ...(((out as Record<string, unknown>).agent as { id: number }[] | undefined) ?? []).map((m) => Number(m.id) || 0));
+  if (top > mark) {
+    try {
+      await db.prepare(`INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`).bind(key, String(top), now, auth.user.id).run();
+    } catch { /* không ghi được thì chỉ báo trùng, không hỏng */ }
+  }
+  return ok(c, { now, since, ...out });
 });
