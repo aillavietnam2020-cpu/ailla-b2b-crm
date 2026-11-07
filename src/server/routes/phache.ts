@@ -14,7 +14,7 @@ import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { requirePermission } from '../middleware/rbac';
 import { unpack } from '../lib/pack';
 import { khoTonRows } from '../services/khoTon';
-import { approverIds } from '../lib/notifyTasks';
+import { accountantIds, approverIds } from '../lib/notifyTasks';
 
 export const phacheRoutes = new Hono<AppEnv>();
 phacheRoutes.use('*', requirePermission('hub.access'));
@@ -50,7 +50,7 @@ phacheRoutes.get('/nguoi', async (c) => {
   const all = await approverIds(c.env.DB);
   const ceo = new Set(((await c.env.DB.prepare("SELECT id FROM users WHERE role = 'CEO'").all<{ id: string }>()).results ?? []).map((x) => x.id));
   const mua = all.filter((x) => !ceo.has(x));
-  return ok(c, { mua_hang: mua.length ? mua : all });
+  return ok(c, { mua_hang: mua.length ? mua : all, ke_toan: await accountantIds(c.env.DB) });
 });
 
 /* ---------------- Yêu cầu pha chế ---------------- */
@@ -183,9 +183,16 @@ phacheRoutes.get('/ct', async (c) => {
 phacheRoutes.post('/ct', async (c) => {
   const auth = c.get('auth');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
-  const btp = str(b?.btp, 60);
-  const it = await c.env.DB.prepare('SELECT cls FROM kho_items WHERE code = ?').bind(btp).first<{ cls: string }>();
-  if (it?.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp || '(trống)'} không phải bán thành phẩm`);
+  // Bán thành phẩm mới chưa có mã trên hệ thống (07/11): lưu tạm "MOI:<tên>", kế toán thêm mã rồi gán (POST /ct/gan-ma).
+  const tenMoi = str(b?.new_name, 100);
+  const btp = tenMoi ? `MOI:${tenMoi}` : str(b?.btp, 60);
+  if (!tenMoi) {
+    const it = await c.env.DB.prepare('SELECT cls FROM kho_items WHERE code = ?').bind(btp).first<{ cls: string }>();
+    if (it?.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp || '(trống)'} không phải bán thành phẩm`);
+  } else {
+    const dup = await c.env.DB.prepare("SELECT code FROM kho_items WHERE cls = 'BTP' AND lower(name) = lower(?)").bind(tenMoi).first<{ code: string }>();
+    if (dup) throw badRequest('DA_CO_MA', `Đã có bán thành phẩm "${tenMoi}" (mã ${dup.code}). Chọn trong danh sách thay vì thêm mới.`);
+  }
   const ly = str(b?.ly_do);
   if (!ly) throw badRequest('NO_REASON', 'Cần ghi lý do thêm / điều chỉnh công thức');
   const raw = Array.isArray(b?.lines) ? (b!.lines as Array<Record<string, unknown>>) : [];
@@ -240,6 +247,24 @@ phacheRoutes.post('/ct/:id/tra', async (c) => {
   if (r.status !== 'CHO') throw badRequest('KHONG_CHO', 'Phiếu này không còn chờ duyệt');
   await c.env.DB.prepare("UPDATE pc_recipe SET status = 'TRA', tra_ly_do = ?, approved_by_name = ?, approved_at = ? WHERE id = ?").bind(ly, auth.user.display_name, nowIso(), id).run();
   return ok(c, { id });
+});
+
+/** Kế toán thêm mã cho bán thành phẩm mới rồi gán vào công thức đang lưu tạm "MOI:<tên>". */
+phacheRoutes.post('/ct/gan-ma', async (c) => {
+  const auth = c.get('auth');
+  if (!(auth.user.role === 'CEO' || auth.permissions.includes('order.approve.normal') || auth.permissions.includes('order.accounting.confirm')))
+    throw forbidden('Chỉ CEO, quản lý hoặc kế toán gán mã bán thành phẩm');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const moi = str(b?.moi, 110);
+  const code = str(b?.code, 60);
+  if (!moi.startsWith('MOI:')) throw badRequest('BAD_MOI', 'Không phải bán thành phẩm mới');
+  const it = await c.env.DB.prepare('SELECT cls, name FROM kho_items WHERE code = ?').bind(code).first<{ cls: string; name: string }>();
+  if (it?.cls !== 'BTP') throw badRequest('NOT_BTP', `${code || '(trống)'} không phải bán thành phẩm`);
+  const has = await c.env.DB.prepare('SELECT 1 FROM pc_recipe WHERE btp = ?').bind(code).first();
+  if (has) throw badRequest('DA_CO_CT', `Mã ${code} đã có công thức, không gán thêm được`);
+  const r = await c.env.DB.prepare('UPDATE pc_recipe SET btp = ? WHERE btp = ?').bind(code, moi).run();
+  if (!r.meta.changes) throw notFound('Không còn công thức nào chờ gán mã này');
+  return ok(c, { code, name: it.name, rows: r.meta.changes });
 });
 
 /* ---------------- Báo tồn tại xưởng ---------------- */

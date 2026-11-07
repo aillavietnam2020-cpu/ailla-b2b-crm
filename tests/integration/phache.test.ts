@@ -121,3 +121,19 @@ describe('hao hụt', () => {
     expect((await req('/haohut?from=2026-11-01&to=2026-11-30', KT)).body.data.price).toBeNull();
   });
 });
+
+describe('bán thành phẩm mới chưa có mã', () => {
+  it('lập công thức với tên mới, kế toán tạo mã rồi gán; trùng tên có sẵn thì báo', async () => {
+    expect((await req('/ct', KT, { new_name: 'BTP nước giặt', lines: [{ item: 'SLES', qty: 0.1 }], ly_do: 'mới' })).body.error.code).toBe('DA_CO_MA');
+    const r = await req('/ct', KT, { new_name: 'BTP nước lau sàn mới', lines: [{ item: 'SLES', qty: 0.1 }], ly_do: 'Sản phẩm mới' });
+    expect(r.body.data).toMatchObject({ btp: 'MOI:BTP nước lau sàn mới', status: 'CHO' });
+    expect((await req('/nguoi', KT)).body.data.ke_toan).toBeDefined();
+    expect((await req('/ct/gan-ma', KT, { moi: 'MOI:BTP nước lau sàn mới', code: 'BTP2' })).status).toBe(403);
+    expect((await req('/ct/gan-ma', USERS.ceo, { moi: 'MOI:BTP nước lau sàn mới', code: 'BTP2' })).body.error.code).toBe('NOT_BTP');
+    await ctx.db.prepare("INSERT INTO kho_items (code, name, unit, cls, grp, min_stock, active, created_at) VALUES ('BTP2', 'BTP nước lau sàn mới', 'lít', 'BTP', '', 0, 1, ?)").bind(NOW).run();
+    expect((await req('/ct/gan-ma', USERS.ceo, { moi: 'MOI:BTP nước lau sàn mới', code: 'BTP2' })).status).toBe(200);
+    expect((await req(`/ct/${r.body.data.id}/duyet`, TKT, {})).status).toBe(200);
+    const rows = (await req('/ct', KT)).body.data.rows as Array<{ btp: string; status: string }>;
+    expect(rows.find((x) => x.btp === 'BTP2')!.status).toBe('OK');
+  });
+});

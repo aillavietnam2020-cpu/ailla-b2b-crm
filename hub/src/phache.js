@@ -15,7 +15,8 @@ const pApi=(p,o)=>svApi("/api/hub/phache"+p,o);
 const PCH={yc:null,ycAt:0,ycBusy:null,ct:null,ctAt:0,ctOk:false,ctBusy:null,tab:"yc",dem:{},q:"",all:false,kq:null,ton:null,tonBusy:false,hh:null,hhKey:"",hhView:"me",kiemDay:"",err:""};
 const PCH_TOL=5;
 function pchRerender(){if(typeof svTyping==="function"&&svTyping())return;if(document.querySelector("#drawer:not([hidden])"))return;if(typeof renderMain==="function")renderMain()}
-const pchName=c=>(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(c)||{}).name||c;
+const pchName=c=>String(c||"").startsWith("MOI:")?String(c).slice(4)+" (chưa có mã)":(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(c)||{}).name||c;
+const pchIsMoi=c=>String(c||"").startsWith("MOI:");
 const pchUnit=c=>(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(c)||{}).unit||"";
 const pchAdm=()=>!!ME&&ME.role==="admin";
 
@@ -52,6 +53,7 @@ function pchTruongKT(){const L=pchUsers().filter(u=>u.role!=="admin"&&can(u,"sx.
 /* Quản lý mua hàng: người duyệt đơn / mua hàng ở máy chủ (không tính CEO), đổi sang người dùng web chung qua users[].crm. Chưa có ai thì về CEO. */
 function pchLoadNguoi(){if(PCH.ng)return Promise.resolve(PCH.ng);return pApi("/nguoi").then(r=>{PCH.ng=r||{};return PCH.ng})}
 function pchMuaHang(){const ids=new Set((PCH.ng&&PCH.ng.mua_hang)||[]);const L=pchUsers().filter(u=>u.role!=="admin"&&u.crm&&ids.has(u.crm));return L.length?L:pchUsers().filter(u=>u.role==="admin")}
+function pchKeToan(){const ids=new Set((PCH.ng&&PCH.ng.ke_toan)||[]);const L=pchUsers().filter(u=>u.role!=="admin"&&u.crm&&ids.has(u.crm));return L.length?L:pchUsers().filter(u=>u.role==="admin")}
 const pchMeKT=()=>!!ME&&(can(ME,"sx.kythuat")||can(ME,"sx.congthuc"))&&ME.role!=="admin";
 /* Hạn của việc trong Công việc là số ngày trong tháng đang mở. Hạn sang tháng sau thì để cuối tháng. */
 function pchHan(iso){const td=D().settings.today;if(!iso)return td;const k=iso.slice(0,7);if(k===MONTH.key)return +iso.slice(8,10);return k<MONTH.key?td:MONTH.ndays}
@@ -97,6 +99,7 @@ function pchTaskBox(t){
       <div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchghi="${esc(x.id)}">Ghi số thực tế</button> <button type="button" class="btn" data-pchin="${esc(x.id)}">In phiếu</button>${R&&R.huong_dan?` <button type="button" class="btn" data-pchhd="${esc(x.btp)}">Hướng dẫn pha</button>`:""}</div></div>`}
   if(t.pcCt){const r=(PCH.ct||[]).find(y=>y.id===t.pcCt);if(!r)return `<div class="note">Phiếu điều chỉnh công thức. <span class="hint">Đang tải…</span></div>`;
     return `<div class="note ${r.status==="CHO"?"amb":""}">${pchCtCompare(r)}${r.status==="CHO"&&PCH.ctOk?`<div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchok="${r.id}">Duyệt, dùng từ hôm nay</button> <button type="button" class="btn" data-pchtra="${r.id}">Trả lại</button></div>`:r.status==="CHO"?`<p class="hint">Chờ Trưởng kỹ thuật duyệt.</p>`:`<p class="hint">${r.status==="TRA"?"Đã trả lại: "+esc(r.tra_ly_do||""):"Đã duyệt, đang dùng."}</p>`}</div>`}
+  if(t.pcMa){const left=(PCH.ct||[]).some(r=>r.btp===t.pcMa);return left?pchGanHtml(t.pcMa):`<div class="note grn">Đã gán mã cho bán thành phẩm này.</div>`}
   if(t.pcKiem||t.pcDat||t.pcLech||t.pcOrder)return `<div class="note amb">${t.pcKiem?"Đếm các nguyên liệu này ở xưởng rồi báo tồn: web tự báo Quản lý mua hàng đặt nếu hết thật.":t.pcOrder?"Kỹ thuật order đặt hàng các nguyên liệu trong mô tả việc. Lập đơn mua.":t.pcDat?"Kỹ thuật đã đếm: các mã dưới đây còn dưới mức đặt mua. Lập đơn mua.":"Số đếm ở xưởng khác số trên web. Tìm phiếu nhập / xuất bị sót hoặc ghi sai, rồi báo kế toán kho lập phiếu kiểm kê."}
     <div class="acts" style="margin-top:8px">${t.pcKiem?`<button type="button" class="btn pri" data-pchgo="ton">Đếm và báo tồn</button>`:`<button type="button" class="btn pri" data-pchgo="kho_ton">Xem tồn kho nguyên vật liệu</button>`}</div></div>`;
   return "";
@@ -105,6 +108,7 @@ function pchBindBox(root){
   root.querySelectorAll("[data-pchghi]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pchghi,false));
   root.querySelectorAll("[data-pchin]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pchin,true));
   root.querySelectorAll("[data-pchdoc]").forEach(a=>a.onclick=e=>{e.preventDefault();khoOpenDoc(+a.dataset.pchdoc)});
+  root.querySelectorAll("[data-pchgan]").forEach(w=>pchGanBind(w));
   root.querySelectorAll("[data-pchctb]").forEach(b=>b.onclick=()=>pchCtForm(b.dataset.pchctb));
   root.querySelectorAll("[data-pchhd]").forEach(b=>b.onclick=()=>pchHdShow(b.dataset.pchhd));
   root.querySelectorAll("[data-pchok]").forEach(b=>b.onclick=()=>pchCtApprove(+b.dataset.pchok));
@@ -112,9 +116,9 @@ function pchBindBox(root){
   root.querySelectorAll("[data-pchgo]").forEach(b=>b.onclick=()=>{closeDrawer();b.dataset.pchgo==="kho_ton"?pchGo("kho_ton"):pchGo("kho_pc",b.dataset.pchgo)});
 }
 if(typeof openTask==="function"){const _ot=openTask;openTask=function(id){const r=_ot.apply(this,arguments);try{
-  const t=id&&D().tasks.find(x=>x.id===id);if(!t||!(t.pcYc||t.pcCt||t.pcKiem||t.pcDat||t.pcLech||t.pcOrder))return r;
+  const t=id&&D().tasks.find(x=>x.id===id);if(!t||!(t.pcYc||t.pcCt||t.pcKiem||t.pcDat||t.pcLech||t.pcOrder||t.pcMa))return r;
   const draw=()=>{const h=document.querySelector("#drawerIn h2");if(!h)return;let box=document.getElementById("pch-box");if(!box){box=document.createElement("div");box.id="pch-box";h.after(box)}box.innerHTML=pchTaskBox(t);pchBindBox(box)};
-  draw();if(t.pcYc&&!PCH.yc)pchLoadYc().then(draw).catch(()=>{});if((t.pcYc||t.pcCt)&&!PCH.ct)pchLoadCt().then(draw).catch(()=>{});
+  draw();if(t.pcYc&&!PCH.yc)pchLoadYc().then(draw).catch(()=>{});if((t.pcYc||t.pcCt||t.pcMa)&&!PCH.ct)pchLoadCt().then(draw).catch(()=>{});
   if(typeof KHO!=="undefined"&&!KHO.cat&&typeof khoLoad==="function")khoLoad();
 }catch(e){}return r}}
 function pchGo(page,tab){if(tab)PCH.tab=tab;PAGE=page;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}if(typeof MOD!=="undefined")MOD="";if(typeof render==="function")render();else renderMain();scrollTo(0,0)}
@@ -159,7 +163,7 @@ function pchViewCt(){
   const list=btps.filter(b=>!q||fold(b+" "+pchName(b)).includes(fold(q)));
   h+=`<h3 style="margin-top:12px">Công thức · ${btps.length} bán thành phẩm</h3>`;
   h+=list.length?`<div class="pchgrid">${list.map(b=>{const all=PCH.ct.filter(r=>r.btp===b),R=all.find(r=>r.status==="OK"),pend=all.find(r=>r.status==="CHO"),his=all.filter(r=>r!==R&&r.status!=="CHO");
-    return `<div class="pchcard"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(pchName(b))}</h3>${R?pill("Bản "+R.version,"blu"):pill("Chưa duyệt","amb")}</div><small class="hint mono">${esc(b)}</small>
+    return `<div class="pchcard"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(pchName(b))}</h3>${pchIsMoi(b)?pill("Chờ kế toán thêm mã","red")+" ":""}${R?pill("Bản "+R.version,"blu"):pill("Chưa duyệt","amb")}</div>${pchIsMoi(b)&&typeof khoCanMisa==="function"&&khoCanMisa()?pchGanHtml(b):""}<small class="hint mono">${esc(b)}</small>
      ${R?`<div class="hint">Dùng từ ${kDd(String(R.effective_at||R.created_at).slice(0,10))} · ${esc(R.created_by_name)} lập · ${R.tu_duyet?"người duyệt tự lập, dùng ngay":"duyệt: "+esc(R.approved_by_name||"")}</div><div class="hint">Lý do: ${esc(R.ly_do)}</div>${pchLinesTbl(R.lines)}${R.huong_dan?`<div style="margin-top:6px"><b>Hướng dẫn pha</b>${pchHdHtml(R.huong_dan)}</div>`:""}`:""}
      ${pend?`<div class="note amb" style="margin-top:6px">Phiếu điều chỉnh bản ${pend.version} đang chờ duyệt.${R?" Pha vẫn theo bản "+R.version+".":""}</div>`:""}
      ${his.length?`<details style="margin-top:6px"><summary class="hint">Lịch sử ${his.length} bản cũ / trả lại</summary>${tbl(["Bản","Ngày","Lý do","Người"],his.map(x=>`<tr data-pchv="${x.id}" class="clk"><td>${x.version}${x.status==="TRA"?" "+pill("Trả lại","red"):""}</td><td>${kDd(String(x.created_at).slice(0,10))}</td><td>${esc(x.ly_do)}${x.tra_ly_do?`<small class="hint" style="display:block">Trả lại: ${esc(x.tra_ly_do)}</small>`:""}</td><td>${esc(x.created_by_name)}${x.approved_by_name?`<small class="hint" style="display:block">${esc(x.approved_by_name)}</small>`:""}</td></tr>`))}</details>`:""}
@@ -174,6 +178,8 @@ function pchCtForm(btp){
   const self=PCH.ctOk;
   openDrawerHTML(`<h2>${R?"Phiếu điều chỉnh công thức":"Thêm công thức pha"}</h2><form class="frm" id="pchf">
     <label class="field">Bán thành phẩm<input id="pchf-b" autocomplete="off" placeholder="Gõ tên bán thành phẩm rồi chọn" value="${esc(btp||"")}" data-code="${esc(btp||"")}" ${R?"readonly":""}><small class="hint" id="pchf-bn">${btp?esc(pchName(btp))+(R?" · bản "+R.version+" → "+(Math.max(...PCH.ct.filter(r=>r.btp===btp).map(r=>r.version))+1):""):""}</small></label>
+    ${R?"":`<div style="margin:-4px 0 8px"><button type="button" class="btn sm pri" id="pchf-newb">＋ Bán thành phẩm mới</button> <small class="hint">bán thành phẩm chưa có mã trên hệ thống</small></div>
+    <div id="pchf-neww" hidden class="note"><label class="field">Tên bán thành phẩm mới<input id="pchf-new" placeholder="Ví dụ: BTP nước giặt hương mới"></label><small class="hint">Lưu xong, kế toán nhận việc thêm mã cho bán thành phẩm này. Có mã rồi mới tạo yêu cầu và ghi phiếu pha chế được.</small> <a href="#" class="lnk" id="pchf-newx">Bỏ, chọn bán thành phẩm có sẵn</a></div>`}
     <p class="hint">Số cho <b>1 lít</b> bán thành phẩm. Dấu phẩy hay chấm đều được (0,12 · 0.004).${!R&&base.length?" Đã điền sẵn theo định mức kế toán, sửa lại theo công thức thực tế.":""}</p>
     <div class="tbl edit"><table><thead><tr><th>Nguyên liệu</th>${R?"<th>Đang dùng</th>":""}<th style="width:130px">Số / 1 lít</th><th>ĐVT</th><th></th></tr></thead><tbody id="pchf-l"></tbody></table></div>
     <button type="button" class="btn sm" id="pchf-add">+ Thêm nguyên liệu</button>
@@ -188,16 +194,19 @@ function pchCtForm(btp){
   (base.length?base:[null]).forEach(add);$("#pchf-add").onclick=()=>add(null);
   if(!R)khoPick($("#pchf-b"),["BTP"],it=>{$("#pchf-b").dataset.code=it.code;$("#pchf-bn").textContent=it.name;if(pchCt(it.code)){closeDrawer();pchCtForm(it.code);return}
     if(!body.querySelector(".pchf-i[data-code]:not([data-code=''])")&&typeof KHO!=="undefined"&&KHO.bom&&!KHO.bomHidden){body.innerHTML="";const B=KHO.bom.get(it.code)||[];(B.length?B.map(b=>({item:b.item,qty:b.qty})):[null]).forEach(add)}});
+  if($("#pchf-newb"))$("#pchf-newb").onclick=e=>{e.preventDefault();$("#pchf-neww").hidden=false;$("#pchf-newb").parentElement.hidden=true;$("#pchf-b").closest("label").hidden=true;$("#pchf-new").focus()};
+  if($("#pchf-newx"))$("#pchf-newx").onclick=e=>{e.preventDefault();$("#pchf-neww").hidden=true;$("#pchf-newb").parentElement.hidden=false;$("#pchf-b").closest("label").hidden=false};
   if(typeof khoNoEnter==="function")khoNoEnter($("#pchf"));
   $("#pchf").onsubmit=async e=>{e.preventDefault();const ok=$("#pchf-ok");if(ok.disabled)return;
-    const b=$("#pchf-b").dataset.code,ly=$("#pchf-ly").value.trim();
+    const nw=$("#pchf-neww")&&!$("#pchf-neww").hidden?$("#pchf-new").value.trim():"",b=nw?"":$("#pchf-b").dataset.code,ly=$("#pchf-ly").value.trim();
     const L=[...body.querySelectorAll("tr")].map(tr=>({item:tr.querySelector(".pchf-i").dataset.code||"",raw:tr.querySelector(".pchf-i").value.trim(),qty:kfNum(tr.querySelector(".pchf-q").value)})).filter(l=>l.raw||isFinite(l.qty));
-    const err=!b?"Chưa chọn bán thành phẩm.":!L.length?"Chưa có nguyên liệu nào.":L.some(l=>!l.item)?"Có dòng chưa chọn nguyên liệu trong danh sách: "+L.filter(l=>!l.item).map(l=>l.raw).join(", "):L.some(l=>!(l.qty>=0))?"Có dòng chưa có số hoặc gõ sai số.":!ly?"Chưa ghi lý do.":"";
+    const err=!b&&!nw?"Chưa chọn bán thành phẩm (hoặc gõ tên bán thành phẩm mới).":!L.length?"Chưa có nguyên liệu nào.":L.some(l=>!l.item)?"Có dòng chưa chọn nguyên liệu trong danh sách: "+L.filter(l=>!l.item).map(l=>l.raw).join(", "):L.some(l=>!(l.qty>=0))?"Có dòng chưa có số hoặc gõ sai số.":!ly?"Chưa ghi lý do.":"";
     if(err){$("#pchf-e").innerHTML=`<div class="note red">${esc(err)}</div>`;return}
     ok.disabled=true;
-    try{const r=await pApi("/ct",{method:"POST",body:JSON.stringify({btp:b,lines:L.map(l=>({item:l.item,qty:l.qty})),huong_dan:$("#pchf-hd").value,ly_do:ly})});
+    try{const r=await pApi("/ct",{method:"POST",body:JSON.stringify({btp:b,new_name:nw||undefined,lines:L.map(l=>({item:l.item,qty:l.qty})),huong_dan:$("#pchf-hd").value,ly_do:ly})});
+      if(nw){await pchLoadNguoi().catch(()=>{});const K=pchKeToan();if(K.length)DB.mutate(ME.name,"báo kế toán thêm mã bán thành phẩm mới",dt=>pchNewTask(dt,{ten:`Thêm mã bán thành phẩm mới: ${nw}`,moTa:`${ME.name} lập công thức cho bán thành phẩm mới chưa có mã trên hệ thống.\nTạo mã (theo MISA) ngay trong việc này, web tự gán mã vào công thức.`,nguoi:K[0].id,phoi:K.slice(1).map(u=>u.id),han:D().settings.today,loai:"Thêm mã",extra:{pcMa:r.btp},log:"báo thêm mã bán thành phẩm mới",bell:`Bán thành phẩm mới cần thêm mã: ${nw}`}))}
       await pchLoadCt(true);
-      if(r.status==="CHO"){const T=pchTruongKT();if(T.length)DB.mutate(ME.name,"gửi duyệt công thức "+b,dt=>pchNewTask(dt,{ten:`Duyệt công thức ${pchName(b)} bản ${r.version}`,moTa:`${ME.name} lập phiếu điều chỉnh công thức.\nLý do: ${ly}\nMở việc này để xem số cũ / mới và duyệt hoặc trả lại.`,nguoi:T[0].id,phoi:T.slice(1).map(u=>u.id),han:D().settings.today,loai:"Duyệt công thức",extra:{pcCt:r.id},log:"gửi duyệt công thức",bell:`${ME.name} gửi duyệt công thức ${pchName(b)}`}))}
+      if(r.status==="CHO"){const T=pchTruongKT();if(T.length)DB.mutate(ME.name,"gửi duyệt công thức "+(b||nw),dt=>pchNewTask(dt,{ten:`Duyệt công thức ${pchName(r.btp)} bản ${r.version}`,moTa:`${ME.name} lập phiếu điều chỉnh công thức.\nLý do: ${ly}\nMở việc này để xem số cũ / mới và duyệt hoặc trả lại.`,nguoi:T[0].id,phoi:T.slice(1).map(u=>u.id),han:D().settings.today,loai:"Duyệt công thức",extra:{pcCt:r.id},log:"gửi duyệt công thức",bell:`${ME.name} gửi duyệt công thức ${pchName(r.btp)}`}))}
       closeDrawer();toast(r.status==="OK"?"Đã lưu, từ giờ pha theo công thức bản "+r.version:"Đã gửi Trưởng kỹ thuật duyệt");PCH.tab="ct";renderMain()}
     catch(er){ok.disabled=false;$("#pchf-e").innerHTML=`<div class="note red">${esc(er.message)}</div>`}};
 }
@@ -372,4 +381,20 @@ function pchOrderForm(){
     const mo=L.map(l=>`• ${pchName(l.item)} (${l.item}): cần ${knum(l.qty)} ${pchUnit(l.item)} · tồn web ${knum(pchTonRow(l.item).ton)}`).join("\n");
     DB.mutate(ME.name,"order đặt hàng nguyên liệu",dt=>pchNewTask(dt,{ten:`Đặt hàng ${L.length} nguyên liệu: ${L.slice(0,3).map(l=>pchName(l.item)).join(", ")}${L.length>3?"…":""}`,moTa:`${ME.name} order đặt hàng:\n${mo}${han?"\nCần có trước "+kDd(han):""}${gc?"\nGhi chú: "+gc:""}`,nguoi:MH[0].id,phoi:MH.slice(1).map(u=>u.id),han:pchHan(han),loai:"Mua hàng",extra:{pcOrder:true},log:"order đặt hàng",bell:`${ME.name} order đặt ${L.length} nguyên liệu${han?" · cần trước "+kDd(han):""}`}));
     closeDrawer();toast("Đã gửi order cho "+MH[0].name)};
+}
+
+/* ---------- Bán thành phẩm mới: kế toán tạo mã rồi gán vào công thức (07/11) ---------- */
+function pchGanHtml(moi){const nm=String(moi).slice(4);
+  return `<div class="note amb" data-pchgan="${esc(moi)}"><b>Thêm mã cho "${esc(nm)}"</b>
+   <div class="row4" style="margin-top:6px"><label class="field">Mã mới (theo MISA)<input class="pg-c" autocomplete="off"></label><label class="field">Tên<input class="pg-n" value="${esc(nm)}"></label><label class="field">ĐVT<input class="pg-u" value="lít"></label></div>
+   <div class="acts"><button type="button" class="btn sm pri pg-new">Tạo mã và gán</button></div>
+   <div class="hint" style="margin-top:6px">Hoặc mã đã có sẵn trên hệ thống:</div><div class="row4"><label class="field grow"><input class="pg-old" autocomplete="off" placeholder="Gõ tên hoặc mã bán thành phẩm rồi chọn"></label><button type="button" class="btn sm pg-ok">Gán mã này</button></div><div class="pg-e"></div></div>`}
+function pchGanBind(w){const moi=w.dataset.pchgan,q=c=>w.querySelector(c),err=m=>{q(".pg-e").innerHTML=`<div class="note red">${esc(m)}</div>`};
+  if(typeof khoPick==="function")khoPick(q(".pg-old"),["BTP"],it=>{q(".pg-old").dataset.code=it.code});
+  const done=async code=>{const r=await pApi("/ct/gan-ma",{method:"POST",body:JSON.stringify({moi,code})});await pchLoadCt(true);
+    pchTaskDone(t=>t.pcMa===moi,"Đã gán mã "+code);const row=(PCH.ct||[]).find(x=>x.btp===code);if(row)pchTellMaker(row.id,`Bán thành phẩm "${r.name}" đã có mã ${code}. Từ giờ tạo yêu cầu và ghi phiếu pha chế được.`);
+    closeDrawer();toast("Đã gán mã "+code+" cho "+r.name);PCH.tab="ct";renderMain()};
+  q(".pg-new").onclick=async()=>{const code=q(".pg-c").value.trim(),name=q(".pg-n").value.trim(),unit=q(".pg-u").value.trim()||"lít";if(!code||!name){err("Cần mã và tên.");return}
+    q(".pg-new").disabled=true;try{await kApi("/items",{method:"POST",body:JSON.stringify({code,name,unit,cls:"BTP"})});if(typeof khoLoad==="function"){KHO.at=0;await khoLoad(true).catch(()=>{})}await done(code)}catch(e){q(".pg-new").disabled=false;err(e.message)}};
+  q(".pg-ok").onclick=async()=>{const code=q(".pg-old").dataset.code;if(!code){err("Chọn mã bán thành phẩm trong danh sách.");return}try{await done(code)}catch(e){err(e.message)}};
 }
