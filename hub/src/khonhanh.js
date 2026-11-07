@@ -198,7 +198,9 @@ function kqYcDetail(id){
    Thiếu thì hiện cảnh báo ngay và giao việc cho người phụ trách mua hàng. */
 async function kqShortage(pairs){
   pairs=pairs.filter(([c,q])=>c&&q>0);if(!pairs.length)return [];const need=new Map();
-  (await khoExpand(pairs)).forEach(([,,rows])=>(rows||[]).forEach(b=>need.set(b.item,(need.get(b.item)||0)+(+b.need||0))));
+  /* 07/11: bán thành phẩm đã có công thức của Kỹ thuật thì tính theo công thức (phache.js), chưa có mới theo định mức. */
+  const rest=[];pairs.forEach(p=>{const R=typeof pchCt==="function"?pchCt(p[0]):null;if(R)R.lines.forEach(l=>need.set(l.item,(need.get(l.item)||0)+l.qty*p[1]));else rest.push(p)});
+  if(rest.length)(await khoExpand(rest)).forEach(([,,rows])=>(rows||[]).forEach(b=>need.set(b.item,(need.get(b.item)||0)+(+b.need||0))));
   return [...need].map(([c,n])=>{const it=KHO.items.get(c)||{},t=khoStock(c);return {item:c,name:it.name||c,unit:it.unit||"",need:Math.round(n*1e6)/1e6,ton:t,thieu:Math.round((n-Math.max(t,0))*1e6)/1e6}}).filter(x=>x.thieu>1e-9);
 }
 function kqShortHtml(sh){return sh.length?`<div class="note red"><b>Tồn kho không đủ vật tư:</b>${tbl(["Vật tư","Cần","Tồn","Thiếu"],sh.map(x=>`<tr><td>${esc(x.name)}<small class="hint mono" style="display:block">${esc(x.item)}</small></td><td class="n">${knum(x.need)} ${esc(x.unit)}</td><td class="n">${knum(x.ton)}</td><td class="n"><b>${knum(x.thieu)}</b></td></tr>`))}<small>Đã giao việc cho phụ trách mua hàng (đặt hàng hoặc kiểm tra tồn lệch ở đâu) và nhắc kỹ thuật pha chế.</small></div>`:""}

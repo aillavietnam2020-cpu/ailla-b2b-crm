@@ -104,7 +104,7 @@ const PERMS=[
 const ALL_PERMS=PERMS.flatMap(g=>g[1].map(p=>p[0]));
 const ROLE_PRESET={
  admin:ALL_PERMS,
- lead:ALL_PERMS.filter(p=>!["nhansu.quanly","caidat.quanly","kehoach.duyet","sanpham.quanly","thietlap.quanly","gia.xem_von","chiphi.xem","chiphi.nhap","pl.xem","luong.quanly"].includes(p)),
+ lead:ALL_PERMS.filter(p=>!["nhansu.quanly","caidat.quanly","kehoach.duyet","sanpham.quanly","thietlap.quanly","gia.xem_von","chiphi.xem","chiphi.nhap","pl.xem","luong.quanly","sx.congthuc"].includes(p)),
  content:["cv.xem","kehoach.xem","research.xem","research.sua","lich.xem","lich.sua_cua_minh","win.xem","order.xem","kho.xem"],
  digital:["cv.xem","research.xem","lich.xem","win.xem","order.xem","order.tao","order.sua","baocao.ads"],
  // Phòng ban khác (Sale, Sản xuất, Kế toán, HCNS...): thấy phân hệ của phòng mình + giao việc.

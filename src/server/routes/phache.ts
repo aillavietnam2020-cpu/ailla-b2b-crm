@@ -14,6 +14,7 @@ import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { requirePermission } from '../middleware/rbac';
 import { unpack } from '../lib/pack';
 import { khoTonRows } from '../services/khoTon';
+import { approverIds } from '../lib/notifyTasks';
 
 export const phacheRoutes = new Hono<AppEnv>();
 phacheRoutes.use('*', requirePermission('hub.access'));
@@ -42,6 +43,15 @@ async function canApproveRecipe(db: D1Database, auth: AuthContext): Promise<bool
   const me = (await hubUsers(db)).find((u) => u.crm && u.crm === auth.user.id);
   return !!me && (me.perms ?? []).includes('sx.congthuc');
 }
+
+/** Người nhận việc (mã tài khoản CRM): Quản lý mua hàng = người duyệt đơn / mua hàng (không tính CEO, như việc thiếu vật tư);
+ * trình duyệt đổi sang người dùng web chung qua users[].crm. */
+phacheRoutes.get('/nguoi', async (c) => {
+  const all = await approverIds(c.env.DB);
+  const ceo = new Set(((await c.env.DB.prepare("SELECT id FROM users WHERE role = 'CEO'").all<{ id: string }>()).results ?? []).map((x) => x.id));
+  const mua = all.filter((x) => !ceo.has(x));
+  return ok(c, { mua_hang: mua.length ? mua : all });
+});
 
 /* ---------------- Yêu cầu pha chế ---------------- */
 type ReqRow = { id: string; btp: string; lit: number; lit_bon: number | null; bon: number; ngay: string; han: string | null; ghi_chu: string; status: string; created_by_name: string; created_at: string; huy_by_name: string | null; ly_do_huy: string | null; huy_at: string | null };
