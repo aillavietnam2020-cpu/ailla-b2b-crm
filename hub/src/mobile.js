@@ -360,7 +360,7 @@
     "td[data-k=gc].v{display:block!important;grid-column:1/-1;font-size:12px;color:#667085}"+
     "tr.pr{background:#fff0f6!important;border-radius:8px;padding:8px!important}tr.lech td[data-k=cl]{color:#b54708;font-weight:700}"+
     "tfoot tr td.n{display:block!important;grid-column:2;font-weight:700}"+
-    ".note,.can{font-size:13px}.sig{display:none!important}.foot{margin-top:10px!important}}</style>";
+    "tr.em{display:none!important}"+".note,.can{font-size:13px}.sig{display:none!important}.foot{margin-top:10px!important}}</style>";
   const label=doc=>{doc.querySelectorAll("table").forEach(t=>{const hr=t.tHead&&t.tHead.rows[0];if(!hr)return;const H=[...hr.cells].map(c=>c.textContent.trim());
     const K={"Tên hàng":"nm","Nguyên vật liệu":"nm","Sản phẩm":"nm","Tên":"nm","Mã hàng":"ma","Mã":"ma","Định lượng":"q","Số lượng":"q","Cần dùng":"q","Thực tế":"tt","Chênh lệch":"cl","Ghi chú":"gc","ĐVT":"u","Định mức":"dm"};
     const hasDl=H.includes("Định lượng");
@@ -369,6 +369,7 @@
       if(C.q)C.q.setAttribute("data-u",u);if(C.tt)C.tt.setAttribute("data-u",u);
       if(C.ma&&C.dm&&val(C.dm))C.ma.setAttribute("data-dm"," · định mức "+C.dm.textContent.trim()+(hasDl?"/lít":""));
       ["tt","cl","gc"].forEach(k=>{if(C[k]&&val(C[k])&&!C[k].classList.contains("fill"))C[k].classList.add("v")});
+      if(!C.nm||!(C.nm.textContent||"").trim())r.classList.add("em"); // dòng trống để ghi tay: ẩn trên màn điện thoại
       if(!C.q&&C.nm){const q=[...r.cells].find(c=>c.classList.contains("n")&&val(c));if(q){q.setAttribute("data-k","q");q.setAttribute("data-u",u)}}
     })})};
   const nameOf=html=>{const m=/<title>([^<]*)<\/title>/i.exec(html);return ((m&&m[1])||"phieu").replace(/[\\/:*?"<>|]+/g,"-").trim()||"phieu"};
