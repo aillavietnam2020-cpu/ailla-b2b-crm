@@ -165,24 +165,26 @@ function bvNhapNhanh(kenh){BVN={plan:[],kenh:typeof kenh==="string"?kenh:""};
     q("#bvn-prev").innerHTML='<p class="hint">Đang đọc tên file trên Drive…</p>';
     try{const r=await bvNhapApi(true,L.map(url=>({url})));BVN.plan=r.plan.map(p=>Object.assign({},p,{sp0:p.sku}));BVN.drive=r.drive;bvNhapDraw()}catch(e){q("#bvn-prev").innerHTML='<p class="t-red">'+esc(e.message||String(e))+'</p>'}};
 }
-async function bvNhapRe(){const q=i=>document.querySelector("#drawerIn "+i);try{const r=await bvNhapApi(true,BVN.plan.map(p=>({url:p.url,sp:p.sku||"",to:p.to||""})));BVN.plan=r.plan;bvNhapDraw()}catch(e){toast(e.message||String(e))}}
+async function bvNhapRe(){const q=i=>document.querySelector("#drawerIn "+i);try{const r=await bvNhapApi(true,BVN.plan.map(p=>({url:p.url,sp:p.sku||"",to:p.to||"",kenh:p.kenhSel||""})));BVN.plan=r.plan;bvNhapDraw()}catch(e){toast(e.message||String(e))}}
 function bvNhapDraw(){
   const q=i=>document.querySelector("#drawerIn "+i),P=BVN.plan,okN=P.filter(p=>p.st==="ok").length,n=k=>P.filter(p=>p.st===k).length;
   const lbl={ok:["Sẵn sàng","grn"],dup:["Trùng, bỏ qua","red"],nosku:["Chọn sản phẩm","amb"],full:["Hết dòng trống","amb"],bad:["Không phải link Drive","red"]};
   const prods=D().products.map(p=>[p.k,p.n]);
-  q("#bvn-prev").innerHTML=`<div class="bvscroll" style="overflow-x:auto;margin-top:12px"><table class="tbl"><thead><tr><th>Tên file trên Drive</th><th>Sản phẩm</th><th>Vào video</th><th></th></tr></thead><tbody>${P.map((p,i)=>`<tr>
+  q("#bvn-prev").innerHTML=`<div class="bvscroll" style="overflow-x:auto;margin-top:12px"><table class="tbl"><thead><tr><th>Tên file trên Drive</th><th>Sản phẩm</th><th>Kênh</th><th>Vào video</th><th></th></tr></thead><tbody>${P.map((p,i)=>`<tr>
      <td>${p.name?esc(p.name):'<i class="hint">không đọc được tên file</i>'}<br><small class="hint">${esc(p.url.replace(/^https?:\/\//,"").slice(0,52))}…</small></td>
      <td>${["dup","bad"].includes(p.st)?"—":`<select data-bvnsp="${i}">${opt([["","— chọn sản phẩm —"]].concat(prods),p.sku||"")}</select>`}</td>
+     <td>${p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnkn="${i}">${opt([["",BVN.kenh?chOf(BVN.kenh).short:"— mọi kênh —"]].concat(CHANNELS.filter(c=>(p.kenhs||[]).includes(c.k)||c.k===p.kenhSel).map(c=>[c.k,c.short])),p.kenhSel||"")}</select>`:"—"}</td>
      <td>${p.sku&&!["dup","bad"].includes(p.st)?`<select data-bvnto="${i}">${opt([["","— không xếp —"]].concat(p.opts.map(id=>{const c=D().cards.find(x=>x.id===id);return [id,id+(c&&!BVN.kenh?" · "+chOf(c.kenh).short:"")]})),p.to||"")}</select>`:"—"}</td>
      <td>${pill(lbl[p.st][0],lbl[p.st][1])}</td></tr>`).join("")}</tbody></table></div>
    <div class="k2box" style="margin-top:10px"><b>${okN}</b> video sẽ được điền link và chuyển <b>Chờ duyệt V1</b>${n("dup")?" · "+n("dup")+" link trùng bỏ qua":""}${n("nosku")?" · "+n("nosku")+" link cần chọn sản phẩm":""}${n("full")?" · "+n("full")+" link hết dòng trống (sản phẩm đã đủ video theo kế hoạch ở kênh này)":""}. Lead Content nhận một thông báo gộp.${BVN.drive===false?'<br><span class="t-red">Web chưa nối Google Drive nên không đọc được tên file, chọn sản phẩm tay.</span>':""}</div>
    <div class="acts"><button type="button" class="btn pri" id="bvn-save" ${okN?"":"disabled"}>Lưu ${okN} video, gửi Lead duyệt</button><button type="button" class="btn ghost" id="bvn-x">Hủy</button></div>`;
   document.querySelectorAll("[data-bvnsp]").forEach(x=>x.onchange=()=>{const p=P[+x.dataset.bvnsp];p.sku=x.value;p.to="";bvNhapRe()});
+  document.querySelectorAll("[data-bvnkn]").forEach(x=>x.onchange=()=>{const p=P[+x.dataset.bvnkn];p.kenhSel=x.value;p.to="";bvNhapRe()});
   document.querySelectorAll("[data-bvnto]").forEach(x=>x.onchange=()=>{const p=P[+x.dataset.bvnto];P.forEach(o=>{if(o!==p&&o.to===x.value)o.to=""});p.to=x.value;bvNhapRe()});
   q("#bvn-x").onclick=closeDrawer;
   q("#bvn-save").onclick=async()=>{const b=q("#bvn-save");b.disabled=true;b.textContent="Đang lưu…";
     try{if(typeof svFlush==="function")await svFlush();
-      const r=await bvNhapApi(false,P.filter(p=>!["dup","bad"].includes(p.st)).map(p=>({url:p.url,sp:p.sku||"",to:p.to||""})));
+      const r=await bvNhapApi(false,P.filter(p=>!["dup","bad"].includes(p.st)).map(p=>({url:p.url,sp:p.sku||"",to:p.to||"",kenh:p.kenhSel||""})));
       closeDrawer();toast("Đã gửi Lead duyệt "+r.saved+" video");if(typeof svPoll==="function"){svLastPoll=0;svActive=Date.now();await svPoll()}renderMain()}
     catch(e){b.disabled=false;b.textContent="Lưu, gửi Lead duyệt";toast(e.message||String(e))}};
 }

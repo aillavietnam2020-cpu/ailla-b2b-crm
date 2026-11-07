@@ -28,6 +28,7 @@ const schema = z.object({
         url: z.string().trim().min(8).max(600),
         sp: z.string().trim().max(120).optional().default(''),
         to: z.string().trim().max(40).optional().default(''),
+        kenh: z.string().trim().max(80).optional().default(''),
       }),
     )
     .min(1, 'Chưa có link nào')
@@ -107,8 +108,12 @@ videoLinkRoutes.post('/', async (c) => {
         : seen.has(id) || cards.some((x) => has(x.linkVideo, id) || has(x.linkFinal, id)) || (d.kho ?? []).some((k) => has(k.link, id));
       if (id) seen.add(id);
       const sku = dup ? '' : (it.sp && (prods.find((p) => p.k === it.sp)?.k || guessSku(it.sp, prods))) || guessSku(name, prods);
-      const free = (x: Card) =>
-        x.sku === sku && (!b.kenh || x.kenh === b.kenh) && OPEN.includes(x.step ?? '') && !x.linkVideo && !x.linkFinal && !x.fpId && x.mix !== 'ton';
+      // Kênh chọn riêng từng link (Quỳnh 07/11) > kênh đang xem ở Điều phối > mọi kênh.
+      const kn = it.kenh || b.kenh;
+      const free0 = (x: Card) =>
+        x.sku === sku && OPEN.includes(x.step ?? '') && !x.linkVideo && !x.linkFinal && !x.fpId && x.mix !== 'ton';
+      const free = (x: Card) => free0(x) && (!kn || x.kenh === kn);
+      const kenhs = sku ? [...new Set(cards.filter(free0).map((x) => String(x.kenh ?? '')).filter(Boolean))] : [];
       // dòng giao cho chính người nộp trước, rồi theo mã
       const opts = sku
         ? cards
@@ -121,7 +126,7 @@ videoLinkRoutes.post('/', async (c) => {
       } else to = opts.find((x) => !used.has(x.id))?.id ?? '';
       if (to) used.add(to);
       const st = !id ? 'bad' : dup ? 'dup' : !sku ? 'nosku' : !to ? 'full' : 'ok';
-      return { url: it.url, name, sku, sp: sku ? prods.find((p) => p.k === sku)?.n ?? sku : '', to, kenh: to ? cards.find((x) => x.id === to)?.kenh ?? '' : '', st, opts: opts.map((x) => x.id) };
+      return { url: it.url, name, sku, sp: sku ? prods.find((p) => p.k === sku)?.n ?? sku : '', to, kenh: to ? cards.find((x) => x.id === to)?.kenh ?? '' : '', kenhSel: it.kenh, kenhs, st, opts: opts.map((x) => x.id) };
     });
     const go = plan.filter((p) => p.st === 'ok');
     if (b.dry || !go.length) return ok(c, { plan, saved: 0, drive: !!key });
