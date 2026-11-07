@@ -42,6 +42,9 @@ describe('Điều hành agent: sơ đồ tổ chức + bộ não phòng ban', ()
 
   it('cầu nối sai khoá bị từ chối', async () => {
     expect((await relay({ agents: [] }, 'sai-khoa')).status).toBe(401);
+    expect((await relay({}, 'sai-khoa')).status).toBe(401);
+    expect((await relay({}, '')).status).toBe(401);
+    expect((await relay({}, 'relay-test-key-12X')).status).toBe(401);
   });
 
   it('máy chủ gửi trạng thái, năng lực, nhật ký → CEO thấy', async () => {
