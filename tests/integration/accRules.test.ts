@@ -30,3 +30,13 @@ describe('quy tắc kế toán', () => {
     expect((await xuat('2026-11-04')).status).toBe(200);
   });
 });
+
+describe('ai sửa được quy tắc kế toán', () => {
+  it('nhân viên thường không sửa được; có quyền xác nhận kế toán hoặc quyền riêng thì sửa được', async () => {
+    expect((await ctx.request('/api/acc-rules', { as: USERS.huyen, method: 'PUT', body: { allow_negative: false } })).status).toBe(403);
+    await ctx.db.prepare("INSERT INTO user_permissions (user_id, permission, created_at) VALUES ('user-huyen', 'order.accounting.confirm', '2026-11-07T00:00:00.000Z')").run();
+    expect((await ctx.request('/api/acc-rules', { as: USERS.huyen, method: 'PUT', body: { allow_negative: false } })).status).toBe(200);
+    await ctx.db.prepare("INSERT INTO user_permissions (user_id, permission, created_at) VALUES ('user-thao', 'accounting.rules.edit', '2026-11-07T00:00:00.000Z')").run();
+    expect((await ctx.request('/api/acc-rules', { as: USERS.thao, method: 'PUT', body: { allow_negative: true } })).status).toBe(200);
+  });
+});

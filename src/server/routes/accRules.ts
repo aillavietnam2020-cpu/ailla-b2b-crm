@@ -7,7 +7,7 @@ import { badRequest, forbidden, ok } from '../lib/http';
 /**
  * Quy tắc kế toán (chị Hoa giao 07/11/2026): một chỗ đặt các luật kế toán, trang quản trị › Cấu hình › Quy tắc kế toán.
  * "giai đoạn này cho xuất âm kho … sau này khi chị muốn không cho xuất âm kho là không xuất được âm".
- * Chỉ CEO và Kế toán sửa; mỗi lần đổi ghi nhật ký (audit_logs, entity_type ACC_RULES).
+ * Chỉ CEO, Kế toán, Quản lý mua hàng / kho sửa; mỗi lần đổi ghi nhật ký (audit_logs, entity_type ACC_RULES).
  * Luật đã có chỗ đặt riêng (ngưỡng chi CEO duyệt, ngưỡng quảng cáo/doanh thu) không lưu ở đây, trang chỉ hiện số và trỏ link.
  */
 export const ACC_RULES_KEY = 'acc.rules';
@@ -35,10 +35,13 @@ export async function loadAccRules(db: D1Database): Promise<AccRules> {
   };
 }
 
-/** CEO và Kế toán (quyền xác nhận kế toán, không tính quản lý). */
+/**
+ * Ai sửa được (chị Hoa 07/11): CEO, Kế toán, Quản lý mua hàng / kho. Gắn theo quyền, không theo tên:
+ * quyền xác nhận kế toán (order.accounting.confirm: kế toán, quản lý mua hàng) hoặc quyền riêng accounting.rules.edit.
+ */
 export function canEditAccRules(auth: AuthContext): boolean {
   if (auth.user.role === 'CEO') return true;
-  return auth.permissions.includes('order.accounting.confirm') && auth.user.role !== 'MANAGER';
+  return auth.permissions.includes('accounting.rules.edit') || auth.permissions.includes('order.accounting.confirm');
 }
 
 export const accRulesRoutes = new Hono<AppEnv>();
@@ -59,7 +62,7 @@ accRulesRoutes.get('/', async (c) => {
 
 accRulesRoutes.put('/', async (c) => {
   const auth = c.get('auth');
-  if (!canEditAccRules(auth)) throw forbidden('Chỉ CEO và Kế toán sửa quy tắc kế toán');
+  if (!canEditAccRules(auth)) throw forbidden('Chỉ CEO, Kế toán, Quản lý mua hàng / kho sửa quy tắc kế toán');
   const b = (await c.req.json().catch(() => null)) as Partial<AccRules> | null;
   if (!b) throw badRequest('BAD_JSON', 'Dữ liệu gửi lên không đúng định dạng');
   const before = await loadAccRules(c.env.DB);

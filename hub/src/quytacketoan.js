@@ -28,7 +28,7 @@ function pQtKt(m){
   const log=(QTK.d.log||[]).map(x=>{let a={},b={};try{a=JSON.parse(x.after_json||"{}");b=JSON.parse(x.before_json||"{}")}catch(e){}
     const t=Object.keys(a).map(k=>k==="allow_negative"?`Xuất âm kho: ${b[k]?"bật":"tắt"} → <b>${a[k]?"bật":"tắt"}</b>`:k==="lock_date"?`Khóa sổ: ${b[k]?kDd(b[k]):"chưa khóa"} → <b>${a[k]?kDd(a[k]):"mở khóa"}</b>`:esc(k)).join("; ");
     return `<tr><td style="white-space:nowrap">${esc(new Date(x.created_at).toLocaleString("vi-VN"))}</td><td>${esc(x.who||"")}</td><td>${t}</td></tr>`});
-  m.innerHTML=H(T,S)+`${ed?"":`<div class="note amb">Chỉ CEO và Kế toán sửa được quy tắc. Tài khoản này chỉ xem.</div>`}
+  m.innerHTML=H(T,S)+`${ed?"":`<div class="note amb">Chỉ CEO, Kế toán và Quản lý mua hàng / kho sửa được quy tắc. Tài khoản này chỉ xem.</div>`}
    <section class="card flush" style="margin-bottom:12px">${tbl(["Quy tắc","Đang làm gì","Đặt"],rows)}</section>
    <section class="card flush"><div class="card-h pad"><h3>Nhật ký thay đổi</h3></div>${tbl(["Lúc","Người đổi","Đổi gì"],log)}</section>`;
   const save=async(body,msg)=>{try{const r=await svApi("/api/acc-rules",{method:"PUT",body:JSON.stringify(body)});toast(r.changed?msg:"Không có gì thay đổi");QTK.d=null;qtkLoad(true)}catch(e){toast(e.message);QTK.d=null;qtkLoad(true)}};

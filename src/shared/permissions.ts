@@ -28,6 +28,8 @@ export const PERMISSIONS = [
   'order.approve.exception',
   'order.delivery.update',
   'order.accounting.confirm',
+  /** Sửa trang Quy tắc kế toán (07/11); kế toán và quản lý mua hàng sửa được qua quyền xác nhận kế toán. */
+  'accounting.rules.edit',
   'debt.read.own',
   'debt.read.team',
   'debt.read.all',
