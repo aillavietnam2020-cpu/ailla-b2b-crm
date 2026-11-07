@@ -6,7 +6,8 @@ import type { AppEnv } from '../env';
 import { auditStatement, clientIp } from '../lib/audit';
 import { badRequest, conflict, forbidden, ok, unprocessable } from '../lib/http';
 import { pack, unpack } from '../lib/pack';
-import { fileInfo, saKey } from '../services/gdrive';
+import { children, fileInfo, saKey } from '../services/gdrive';
+import { folderIdFrom } from '../lib/driveAccess';
 import { requirePermission } from '../middleware/rbac';
 
 /**
@@ -195,4 +196,52 @@ videoLinkRoutes.post('/', async (c) => {
     return ok(c, { plan, saved: go.length, drive: !!key });
   }
   throw conflict('BUSY', 'Dữ liệu đang được sửa liên tục, thử lại sau vài giây');
+});
+
+/* ---------- Thư mục "Kho video agency" (chị Hoa 07/11): lưu một link thư mục Drive; bấm "Lấy video mới" là web liệt kê
+   video trong thư mục (và thư mục con một tầng) chưa có trên web, điền sẵn vào Nhập nhanh với nguồn Agency.
+   Agent Lead Content dùng cùng đường: GET /agency rồi POST / với nguon "Agency". ---------- */
+const AG_KEY = 'video_agency_folder';
+async function agFolder(db: D1Database): Promise<string> {
+  const r = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(AG_KEY).first<{ data: string }>();
+  return r?.data ?? '';
+}
+videoLinkRoutes.get('/agency', async (c) => {
+  const folder = await agFolder(c.env.DB);
+  if (!folder) return ok(c, { folder: '', files: [] });
+  const key = saKey(c.env.GDRIVE_SA_JSON);
+  if (!key) return ok(c, { folder, files: [], err: 'Web chưa nối Google Drive' });
+  const isVid = (f: { mimeType?: string; name?: string }) => /^video\//.test(f.mimeType ?? '') || /\.(mp4|mov|m4v|webm)$/i.test(f.name ?? '');
+  let all: { id: string; name: string; mimeType?: string; modifiedTime?: string }[] = [];
+  try {
+    const top = await children(key, folder);
+    all = top.filter(isVid);
+    for (const sub of top.filter((f) => f.mimeType === 'application/vnd.google-apps.folder').slice(0, 30))
+      all = all.concat((await children(key, sub.id)).filter(isVid));
+  } catch {
+    return ok(c, { folder, files: [], err: 'Web chưa mở được thư mục. Chia sẻ thư mục cho tài khoản của web (như Thư mục làm việc).' });
+  }
+  const row = await c.env.DB.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
+  const d = row ? (JSON.parse(await unpack(row.data)) as Hub) : ({} as Hub);
+  const has = (s: unknown, id: string) => String(s ?? '').includes(id);
+  const seen = (id: string) => (d.cards ?? []).some((x) => has(x.linkVideo, id) || has(x.linkFinal, id)) || (d.kho ?? []).some((k) => has(k.link, id));
+  const files = all
+    .filter((f) => !seen(f.id))
+    .sort((a, b) => String(b.modifiedTime ?? '').localeCompare(String(a.modifiedTime ?? '')))
+    .slice(0, 60)
+    .map((f) => ({ url: `https://drive.google.com/file/d/${f.id}/view`, name: f.name }));
+  return ok(c, { folder, files, total: all.length });
+});
+videoLinkRoutes.post('/agency', async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => null)) as { link?: string } | null;
+  const id = folderIdFrom(String(b?.link ?? ''));
+  if (!id) throw unprocessable('VALIDATION', 'Dán link thư mục Google Drive (có /folders/…)', {});
+  const row = await c.env.DB.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
+  const d = row ? (JSON.parse(await unpack(row.data)) as Hub) : ({} as Hub);
+  const me = (d.users ?? []).find((u) => u.crm && u.crm === auth.user.id && u.active !== false);
+  if (!(auth.user.role === 'CEO' || ['lead', 'admin', 'truongphong'].includes(me?.role ?? ''))) throw forbidden('Chỉ CEO hoặc Lead đổi thư mục video agency');
+  await c.env.DB.prepare(`INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 0, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`).bind(AG_KEY, id, nowIso(), auth.user.id).run();
+  return ok(c, { folder: id });
 });

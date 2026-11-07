@@ -159,12 +159,25 @@ async function bvNhapApi(dry,items){if(typeof svApi!=="function")throw new Error
 function bvNhapNhanh(kenh){BVN={plan:[],kenh:typeof kenh==="string"?kenh:""};
   openDrawerHTML(`<h2 class="dtitle">Nhập nhanh link video · ${BVN.kenh?esc(chOf(BVN.kenh).short):"mọi kênh"}</h2><p class="hint">Dán link Google Drive của các video làm xong, mỗi dòng một link. Web đọc tên file để biết video của sản phẩm nào, rồi xếp vào dòng còn trống đầu tiên của sản phẩm đó ${BVN.kenh?"ở kênh này":"(dòng giao cho bạn trước, rồi các kênh khác)"}. Cột <b>Kênh</b>: chọn kênh thì video vào dòng trống của kênh đó; để <b>Chưa phân bổ</b> thì video vào Kho video · Chưa phân bổ, phân bổ kênh sau. Kiểm tra bảng bên dưới rồi bấm lưu. Tên file nên có tên sản phẩm (ví dụ "Arila hook 1.mp4").</p>
    <textarea id="bvn-ta" rows="6" style="width:100%" placeholder="https://drive.google.com/file/d/...&#10;https://drive.google.com/file/d/..."></textarea>
-   <div class="acts"><button type="button" class="btn pri" id="bvn-read">Đọc link</button></div><div id="bvn-prev"></div>`);
+   <div class="acts"><button type="button" class="btn pri" id="bvn-read">Đọc link</button></div>
+   <div class="k2box" id="bvn-ag" style="margin-top:10px"><b>Kho video agency</b> <span class="hint">đang tải…</span></div><div id="bvn-prev"></div>`);
+  bvAgBox();
   const q=i=>document.querySelector("#drawerIn "+i);
   q("#bvn-read").onclick=async()=>{const L=[...new Set(q("#bvn-ta").value.split(/\s+/).map(x=>x.trim()).filter(x=>/^https?:\/\//.test(x)))];if(!L.length){toast("Chưa có link nào");return}
     q("#bvn-prev").innerHTML='<p class="hint">Đang đọc tên file trên Drive…</p>';
     try{const r=await bvNhapApi(true,L.map(url=>({url})));BVN.plan=r.plan.map(p=>Object.assign({},p,{sp0:p.sku}));BVN.drive=r.drive;bvNhapDraw()}catch(e){q("#bvn-prev").innerHTML='<p class="t-red">'+esc(e.message||String(e))+'</p>'}};
 }
+/* Thư mục Drive "Kho video agency": mở thư mục, lấy video mới chưa có trên web (nguồn Agency, đã duyệt). CEO/Lead đổi link. */
+async function bvAgBox(){const box=document.querySelector("#drawerIn #bvn-ag");if(!box)return;let r;
+  try{r=await svApi("/api/hub/video-links/agency")}catch(e){box.innerHTML='<b>Kho video agency</b> <span class="t-red">'+esc(e.message||"")+'</span>';return}
+  const may=ME.role==="admin"||["lead","truongphong"].includes(ME.role),url=r.folder?"https://drive.google.com/drive/folders/"+r.folder:"";
+  box.innerHTML=`<b>Kho video agency</b> ${url?`<a class="lnk" href="${url}" target="_blank" rel="noopener">Mở thư mục ↗</a>`:'<span class="hint">chưa lưu link thư mục</span>'}
+    ${url?`<button type="button" class="btn sm pri" id="bvn-agget" ${r.files&&r.files.length?"":"disabled"}>Lấy ${r.files?r.files.length:0} video mới</button>`:""}${r.err?`<div class="t-red">${esc(r.err)}</div>`:""}
+    ${may?`<div class="row7" style="margin-top:6px"><input id="bvn-aglink" placeholder="Dán link thư mục Drive video agency" style="flex:1" value="${esc(url)}"><button type="button" class="btn sm" id="bvn-agsave">Lưu link</button></div>`:""}
+    <p class="hint">Agency gửi video mới vào thư mục này. Bấm Lấy video mới: web điền sẵn các video chưa có trên web, nguồn Agency (đã duyệt).</p>`;
+  const sv=box.querySelector("#bvn-agsave");if(sv)sv.onclick=async()=>{try{await svApi("/api/hub/video-links/agency",{method:"POST",body:JSON.stringify({link:box.querySelector("#bvn-aglink").value})});toast("Đã lưu thư mục video agency");bvAgBox()}catch(e){toast(e.message||String(e))}};
+  const gb=box.querySelector("#bvn-agget");if(gb)gb.onclick=async()=>{gb.disabled=true;gb.textContent="Đang đọc…";const q=i=>document.querySelector("#drawerIn "+i);
+    try{const L=r.files.map(f=>f.url);q("#bvn-ta").value=L.join(String.fromCharCode(10));const x=await bvNhapApi(true,L.map(url=>({url,nguon:"Agency"})));BVN.plan=x.plan.map(p=>Object.assign({},p,{sp0:p.sku,nguon:"Agency"}));BVN.drive=x.drive;bvNhapDraw()}catch(e){toast(e.message||String(e))}gb.textContent="Đã lấy"}}
 async function bvNhapRe(){const q=i=>document.querySelector("#drawerIn "+i);try{const r=await bvNhapApi(true,BVN.plan.map(p=>({url:p.url,sp:p.sku||"",to:p.to||"",kenh:p.kenhSel||"",nguon:p.nguon||""})));BVN.plan=r.plan;bvNhapDraw()}catch(e){toast(e.message||String(e))}}
 function bvNhapDraw(){
   const q=i=>document.querySelector("#drawerIn "+i),P=BVN.plan,okN=P.filter(p=>p.st==="ok"||p.st==="kho").length,n=k=>P.filter(p=>p.st===k).length;
