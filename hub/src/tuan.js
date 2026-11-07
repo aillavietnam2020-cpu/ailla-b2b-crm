@@ -776,7 +776,8 @@ function bkImport(file,kenh0){
       const kk=iK>=0?(CHANNELS.find(c=>bkFold(c.short)===bkFold(r[iK])||bkFold(c.k)===bkFold(r[iK]))||{}).k:"",
         sx=iN>=0?bkDate(r[iN]):"",cu=!!sx&&sx.slice(0,7)<mNow,ton=cu||iW>=0&&/ton/.test(bkFold(r[iW]))||!kk,/* không ghi kênh: không tự xếp kênh, vào Kho video · Chưa phân bổ (chị Hoa 07/11) */xong=iT>=0&&/da dang/.test(bkFold(r[iT])),
         sv=iD>=0?bkFold(r[iD]):"",dv=/^da duyet/.test(sv),cw=/ceo/.test(sv),cs=/can sua/.test(sv),un=iU>=0?String(r[iU]||"").trim():"",uu=un&&d.users.find(u=>bkFold(u.name)===bkFold(un)||bkFold(u.name).endsWith(" "+bkFold(un)));
-      ok.push({ag,cw,cs:cs&&!xong,noSt:iD>=0&&!sv&&!xong,un,uid:uu?uu.id:"",note:iF>=0?String(r[iF]||"").trim():"",lv,sku,kenh:kk||kenh0,kk:kk||"",hook:iH>=0?String(r[iH]||"").trim():"",cap:iC>=0?String(r[iC]||"").trim():"",ton,cu,xong,dv:xong||dv,sx})});
+      /* Video agency giao là đã duyệt, không bắt Lead/CEO duyệt lại (chị Hoa 07/11). */
+      ok.push({ag,cw:cw&&!ag,cs:cs&&!xong&&!ag,noSt:iD>=0&&!sv&&!xong&&!ag,un,uid:uu?uu.id:"",note:iF>=0?String(r[iF]||"").trim():"",lv,sku,kenh:kk||kenh0,kk:kk||"",hook:iH>=0?String(r[iH]||"").trim():"",cap:iC>=0?String(r[iC]||"").trim():"",ton,cu,xong,dv:xong||dv||!!ag,sx})});
     if(!ok.length){alert("Không có video nào để thêm.\n"+(dup.length?"Trùng: "+dup.length+" video ("+dup.slice(0,6).join("; ")+")\n":"")+(bad.length?"Lỗi: "+bad.slice(0,6).join("; "):""));return}
     const nT=ok.filter(v=>v.ton).length,nX=ok.filter(v=>v.xong).length,nCu=ok.filter(v=>v.cu).length,nCd=ok.filter(v=>!v.dv).length;
     const msg="Thêm "+ok.length+" video mới: "+nT+" vào Kho video tồn, "+(ok.length-nT)+" vào Video sản xuất trong tháng; "+nX+" video đã đăng, "+(ok.length-nX)+" chưa đăng\n"+(dup.length?"BỎ QUA "+dup.length+" video trùng link: "+dup.slice(0,8).join("; ")+(dup.length>8?"…":"")+"\n":"")+(bad.length?"Bỏ qua "+bad.length+" dòng lỗi: "+bad.slice(0,5).join("; ")+(bad.length>5?"…":"")+"\n":"")+(nCu?"• "+nCu+" video có ngày sản xuất trước tháng "+MONTH.mon+" nên vào Kho video tồn\n":"")+(nCd?"• "+nCd+" video chưa duyệt: vào trạng thái Chờ duyệt\n":"")+"\nTiếp tục?";
@@ -827,7 +828,7 @@ function openThemVideo(){
     <label class="field full">Link bài đã đăng (chỉ điền nếu video đã đăng rồi)<input id="tv-lb" placeholder="Dán link TikTok…"></label>
    </div><div class="acts"><button class="btn pri" id="tv-ok">Lưu video</button><button class="btn ghost" id="tv-x">Hủy</button></div>`);
   const q=i=>document.querySelector("#drawerIn "+i);q("#tv-x").onclick=closeDrawer;
-  const g0=q("#tv-g");g0.onchange=()=>{q("#tv-agw").hidden=g0.value!=="Agency"};const st0=q("#tv-st");st0.onchange=()=>{q("#tv-fbw").hidden=st0.value!=="cs"};
+  const g0=q("#tv-g");g0.onchange=()=>{q("#tv-agw").hidden=g0.value!=="Agency";if(g0.value==="Agency"){q("#tv-st").value="ok";q("#tv-fbw").hidden=true}};const st0=q("#tv-st");st0.onchange=()=>{q("#tv-fbw").hidden=st0.value!=="cs"};
   const bf=q("#tv-bf");if(bf)bf.onchange=()=>{const f=bf.files[0];bf.value="";if(f)bkImport(f,q("#tv-bk").value)};const bt=q("#tv-bt");if(bt)bt.onclick=bkTemplate;
   q("#tv-ok").onclick=()=>{
     const sku=q("#tv-sp").value,kenh=q("#tv-k").value,hook=q("#tv-h").value.trim(),lv=q("#tv-lv").value.trim(),lb=q("#tv-lb").value.trim(),cap=q("#tv-c").value.trim(),nd=q("#tv-n").value,dy=q("#tv-d").value,day=dy?+dy.slice(8,10):0;
@@ -836,6 +837,7 @@ function openThemVideo(){
     if(lb&&dupAlert(lb,[]))return;
     const fb=!chOf(kenh).needId,m2=lb.match(/[0-9]{19}/);if(lb&&!fb&&!m2){toast("Link TikTok phải có dãy 19 số sau /video/");return}
     const again=()=>q("#tv-ok")&&q("#tv-ok").click();
+    if(!lb&&!q("#tv-st").value&&q("#tv-g").value==="Agency"){q("#tv-st").value="ok"}
     if(!lb&&!q("#tv-st").value){tvAsk("Video này đang ở trạng thái duyệt nào?",`<select class="tvask-v">${opt(TV_ST,"")}</select>`,v=>{q("#tv-st").value=v;q("#tv-st").onchange();again()});return}
     if(!nd){tvAsk("Ai làm video này?",`<select class="tvask-v">${opt([["","— chọn người làm —"]].concat(team),"")}</select>`,v=>{q("#tv-n").value=v;again()});return}
     const stV=lb?"ok":q("#tv-st").value,okD=stV==="ok",ceoW=stV==="cceo",csV=stV==="cs",note=(q("#tv-fb").value||"").trim();
