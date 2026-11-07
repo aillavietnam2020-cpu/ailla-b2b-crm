@@ -94,7 +94,7 @@ function pchTaskBox(t){
       <div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchghi="${esc(x.id)}">Ghi số thực tế</button> <button type="button" class="btn" data-pchin="${esc(x.id)}">In phiếu</button>${R&&R.huong_dan?` <button type="button" class="btn" data-pchhd="${esc(x.btp)}">Hướng dẫn pha</button>`:""}</div></div>`}
   if(t.pcCt){const r=(PCH.ct||[]).find(y=>y.id===t.pcCt);if(!r)return `<div class="note">Phiếu điều chỉnh công thức. <span class="hint">Đang tải…</span></div>`;
     return `<div class="note ${r.status==="CHO"?"amb":""}">${pchCtCompare(r)}${r.status==="CHO"&&PCH.ctOk?`<div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchok="${r.id}">Duyệt, dùng từ hôm nay</button> <button type="button" class="btn" data-pchtra="${r.id}">Trả lại</button></div>`:r.status==="CHO"?`<p class="hint">Chờ Trưởng kỹ thuật duyệt.</p>`:`<p class="hint">${r.status==="TRA"?"Đã trả lại: "+esc(r.tra_ly_do||""):"Đã duyệt, đang dùng."}</p>`}</div>`}
-  if(t.pcKiem||t.pcDat||t.pcLech)return `<div class="note amb">${t.pcKiem?"Đếm các nguyên liệu này ở xưởng rồi báo tồn: web tự báo Quản lý mua hàng đặt nếu hết thật.":t.pcDat?"Kỹ thuật đã đếm: các mã dưới đây còn dưới mức đặt mua. Lập đơn mua.":"Số đếm ở xưởng khác số trên web. Tìm phiếu nhập / xuất bị sót hoặc ghi sai, rồi báo kế toán kho lập phiếu kiểm kê."}
+  if(t.pcKiem||t.pcDat||t.pcLech||t.pcOrder)return `<div class="note amb">${t.pcKiem?"Đếm các nguyên liệu này ở xưởng rồi báo tồn: web tự báo Quản lý mua hàng đặt nếu hết thật.":t.pcOrder?"Kỹ thuật order đặt hàng các nguyên liệu trong mô tả việc. Lập đơn mua.":t.pcDat?"Kỹ thuật đã đếm: các mã dưới đây còn dưới mức đặt mua. Lập đơn mua.":"Số đếm ở xưởng khác số trên web. Tìm phiếu nhập / xuất bị sót hoặc ghi sai, rồi báo kế toán kho lập phiếu kiểm kê."}
     <div class="acts" style="margin-top:8px">${t.pcKiem?`<button type="button" class="btn pri" data-pchgo="ton">Đếm và báo tồn</button>`:`<button type="button" class="btn pri" data-pchgo="kho_ton">Xem tồn kho nguyên vật liệu</button>`}</div></div>`;
   return "";
 }
@@ -108,7 +108,7 @@ function pchBindBox(root){
   root.querySelectorAll("[data-pchgo]").forEach(b=>b.onclick=()=>{closeDrawer();b.dataset.pchgo==="kho_ton"?pchGo("kho_ton"):pchGo("kho_pc",b.dataset.pchgo)});
 }
 if(typeof openTask==="function"){const _ot=openTask;openTask=function(id){const r=_ot.apply(this,arguments);try{
-  const t=id&&D().tasks.find(x=>x.id===id);if(!t||!(t.pcYc||t.pcCt||t.pcKiem||t.pcDat||t.pcLech))return r;
+  const t=id&&D().tasks.find(x=>x.id===id);if(!t||!(t.pcYc||t.pcCt||t.pcKiem||t.pcDat||t.pcLech||t.pcOrder))return r;
   const draw=()=>{const h=document.querySelector("#drawerIn h2");if(!h)return;let box=document.getElementById("pch-box");if(!box){box=document.createElement("div");box.id="pch-box";h.after(box)}box.innerHTML=pchTaskBox(t);pchBindBox(box)};
   draw();if(t.pcYc&&!PCH.yc)pchLoadYc().then(draw).catch(()=>{});if((t.pcYc||t.pcCt)&&!PCH.ct)pchLoadCt().then(draw).catch(()=>{});
   if(typeof KHO!=="undefined"&&!KHO.cat&&typeof khoLoad==="function")khoLoad();
@@ -116,7 +116,7 @@ if(typeof openTask==="function"){const _ot=openTask;openTask=function(id){const 
 function pchGo(page,tab){if(tab)PCH.tab=tab;PAGE=page;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}if(typeof MOD!=="undefined")MOD="";if(typeof render==="function")render();else renderMain();scrollTo(0,0)}
 
 /* ---------- Trang Pha chế: thanh tab ---------- */
-const PCH_TABS=[["yc","Yêu cầu & phiếu"],["ct","Công thức"],["ton","Báo tồn"],["hh","Hao hụt"]];
+const PCH_TABS=[["yc","Yêu cầu & phiếu"],["ct","Công thức"],["ton","Báo tồn & đặt hàng"],["hh","Hao hụt"]];
 function pchTabBar(){return `<nav class="pchtabs pchmain">${PCH_TABS.map(([k,t])=>`<button type="button" class="${PCH.tab===k?"on":""}" data-pcht="${k}">${t}${k==="ct"&&(PCH.ct||[]).some(r=>r.status==="CHO")?` <span class="pill p-amb">${(PCH.ct||[]).filter(r=>r.status==="CHO").length}</span>`:""}</button>`).join("")}</nav>`}
 function pchCss(){if(document.getElementById("pch-css"))return;const s=document.createElement("style");s.id="pch-css";s.textContent=
   `.pchtabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}.pchtabs button{border:1px solid #d9deea;background:#fff;border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}.pchtabs button.on{background:#fff0f6;border-color:#e7357b;color:#e7357b;font-weight:600}
@@ -229,7 +229,8 @@ function pchViewTon(){
   if(typeof ktonLoad==="function")ktonLoad();
   if(PCH.kq)return pchViewKq();
   const L=pchTonItems(),low=L.filter(i=>pchLow(i.code)),noMin=L.filter(i=>!pchTonRow(i.code).min).length,cm=pchCanMin();
-  let h=`<div class="row7" style="margin-bottom:8px"><label class="field grow"><input id="pch-q" placeholder="Tìm nguyên liệu (tên hoặc mã)" value="${esc(PCH.q)}"></label><label class="inl"><input type="checkbox" id="pch-all"${PCH.all?" checked":""}> Hiện mọi nguyên vật liệu</label></div>
+  let h=`<div class="note" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px"><b>Cần mua nguyên liệu?</b> Không cần đếm: bấm Order đặt hàng, chọn nguyên liệu và số cần, Quản lý mua hàng nhận việc đặt ngay.</span><button type="button" class="btn pri" id="pch-order">+ Order đặt hàng</button></div>
+  <div class="row7" style="margin-bottom:8px"><label class="field grow"><input id="pch-q" placeholder="Tìm nguyên liệu (tên hoặc mã)" value="${esc(PCH.q)}"></label><label class="inl"><input type="checkbox" id="pch-all"${PCH.all?" checked":""}> Hiện mọi nguyên vật liệu</label></div>
     <p class="hint">Đếm nguyên liệu ở xưởng, gõ số đếm được rồi bấm <b>Xem kết quả</b>. Mã chưa đếm để trống. ${PCH.all||!(PCH.ct||[]).length?"":"Đang hiện các nguyên liệu có trong công thức."}</p>`;
   if(low.length)h+=`<div class="note red"><b>Web báo sắp hết, cần đếm:</b> ${low.map(i=>esc(i.name)).join(", ")}</div>`;
   if(noMin)h+=`<div class="note amb">${noMin} mã chưa có <b>mức đặt mua</b> nên web chưa báo hết hàng được.${cm?" Gõ mức ở cột \"Đặt mua khi dưới\" (tự lưu).":" Quản lý mua hàng / kế toán kho đặt mức này (cột Tồn tối thiểu ở Kho nguyên vật liệu)."}</div>`;
@@ -334,6 +335,7 @@ function pchBind(m){
     if(!L.length){$("#pch-e").innerHTML=`<div class="note red">Chưa gõ số đếm mã nào.</div>`;return}
     const bad=L.filter(l=>!(l.dem>=0));if(bad.length){$("#pch-e").innerHTML=`<div class="note red">Số đếm gõ chưa đúng: ${bad.map(l=>esc(pchName(l.item))).join(", ")}</div>`;return}
     xem.disabled=true;try{PCH.kq=await pApi("/ton",{method:"POST",body:JSON.stringify({preview:true,lines:L})});renderMain();scrollTo(0,0)}catch(e){xem.disabled=false;$("#pch-e").innerHTML=`<div class="note red">${esc(e.message)}</div>`}};
+  const od=m.querySelector("#pch-order");if(od)od.onclick=()=>pchOrderForm();
   const xoa=m.querySelector("#pch-xoa");if(xoa)xoa.onclick=()=>{if(confirm("Xóa hết số đã gõ?")){PCH.dem={};renderMain()}};
   const gui=m.querySelector("#pch-gui");if(gui)gui.onclick=pchTonSend;
   const sua=m.querySelector("#pch-sua");if(sua)sua.onclick=()=>{PCH.kq=null;renderMain()};
@@ -342,3 +344,28 @@ function pchBind(m){
 }
 /* Vào web: người làm pha chế / mua hàng thì kiểm một lần xem có nguyên liệu sắp hết cần nhắc kiểm không. */
 setTimeout(()=>{try{if(!ME||!(pchMeKT()||pchCanMin()))return;if(typeof ktonLoad==="function")ktonLoad();pchLoadCt().then(()=>{let n=0;const w=()=>{if(typeof KTON!=="undefined"&&KTON.rows)pchKiemCheck();else if(++n<20)setTimeout(w,3000)};w()}).catch(()=>{})}catch(e){}},6000);
+
+/* ---------- Order đặt hàng (chị Hoa 07/11): Kỹ thuật không cần đếm, chọn nguyên liệu + số cần → việc "Đặt hàng" cho Quản lý mua hàng. ---------- */
+function pchOrderForm(){
+  openDrawerHTML(`<h2>Order đặt hàng nguyên liệu</h2><p class="hint">Chọn nguyên liệu cần mua và số lượng. Gửi xong Quản lý mua hàng nhận việc đặt hàng trong Công việc.</p><form class="frm" id="pco">
+   <div class="tbl edit"><table><thead><tr><th>Nguyên liệu</th><th style="width:120px">Số cần đặt</th><th>ĐVT</th><th class="n">Tồn web</th><th></th></tr></thead><tbody id="pco-l"></tbody></table></div>
+   <button type="button" class="btn sm" id="pco-add">+ Thêm nguyên liệu</button>
+   <div class="row4"><label class="field">Cần có trước ngày<input type="date" id="pco-h"></label></div>
+   <label class="field">Ghi chú cho Quản lý mua hàng<input id="pco-g" placeholder="Ví dụ: hãng cũ, giao trước thứ Hai"></label>
+   <div id="pco-e"></div><button class="btn pri" id="pco-ok">Gửi order đặt hàng</button></form>`);
+  const body=$("#pco-l");
+  const add=()=>{const tr=document.createElement("tr");tr.innerHTML=`<td><input class="pco-i" autocomplete="off" placeholder="Gõ tên hoặc mã rồi chọn"><small class="hint pco-n"></small></td><td><input class="pco-q n" inputmode="decimal"></td><td class="pco-u"></td><td class="n pco-t"></td><td><button type="button" class="lnk pco-x">✕</button></td>`;
+    body.appendChild(tr);const inp=tr.querySelector(".pco-i");khoPick(inp,["NVL","CCDC"],it=>{inp.dataset.code=it.code;tr.querySelector(".pco-n").textContent=it.name;tr.querySelector(".pco-u").textContent=it.unit||"";tr.querySelector(".pco-t").textContent=knum(pchTonRow(it.code).ton);tr.querySelector(".pco-q").focus()});
+    tr.querySelector(".pco-x").onclick=()=>{if(body.children.length>1)tr.remove()};return tr};
+  add();$("#pco-add").onclick=add;if(typeof khoNoEnter==="function")khoNoEnter($("#pco"));
+  $("#pco").onsubmit=async e=>{e.preventDefault();const ok=$("#pco-ok");if(ok.disabled)return;
+    const L=[...body.querySelectorAll("tr")].map(tr=>({item:tr.querySelector(".pco-i").dataset.code||"",raw:tr.querySelector(".pco-i").value.trim(),qty:kfNum(tr.querySelector(".pco-q").value)})).filter(l=>l.raw||isFinite(l.qty));
+    const err=!L.length?"Chưa có nguyên liệu nào.":L.some(l=>!l.item)?"Có dòng chưa chọn nguyên liệu trong danh sách: "+L.filter(l=>!l.item).map(l=>l.raw).join(", "):L.some(l=>!(l.qty>0))?"Có dòng chưa có số cần đặt.":"";
+    if(err){$("#pco-e").innerHTML=`<div class="note red">${esc(err)}</div>`;return}
+    ok.disabled=true;await pchLoadNguoi().catch(()=>{});const MH=pchMuaHang();
+    if(!MH.length){ok.disabled=false;$("#pco-e").innerHTML=`<div class="note red">Chưa có tài khoản Quản lý mua hàng để giao việc.</div>`;return}
+    const han=$("#pco-h").value,gc=$("#pco-g").value.trim();
+    const mo=L.map(l=>`• ${pchName(l.item)} (${l.item}): cần ${knum(l.qty)} ${pchUnit(l.item)} · tồn web ${knum(pchTonRow(l.item).ton)}`).join("\n");
+    DB.mutate(ME.name,"order đặt hàng nguyên liệu",dt=>pchNewTask(dt,{ten:`Đặt hàng ${L.length} nguyên liệu: ${L.slice(0,3).map(l=>pchName(l.item)).join(", ")}${L.length>3?"…":""}`,moTa:`${ME.name} order đặt hàng:\n${mo}${han?"\nCần có trước "+kDd(han):""}${gc?"\nGhi chú: "+gc:""}`,nguoi:MH[0].id,phoi:MH.slice(1).map(u=>u.id),han:pchHan(han),loai:"Mua hàng",extra:{pcOrder:true},log:"order đặt hàng",bell:`${ME.name} order đặt ${L.length} nguyên liệu${han?" · cần trước "+kDd(han):""}`}));
+    closeDrawer();toast("Đã gửi order cho "+MH[0].name)};
+}
