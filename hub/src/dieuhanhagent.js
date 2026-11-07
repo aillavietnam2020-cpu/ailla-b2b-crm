@@ -14,7 +14,7 @@ const AC_CSS=`<style id="ac-css">
 .ac-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .ac-pc{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 14px 12px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:6px;font:inherit;color:var(--ink);transition:transform .12s,box-shadow .12s}
 .ac-pc:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(20,30,60,.14)}
-.ac-pc .ph{display:flex;gap:12px;align-items:center}
+.ac-pc .ph{display:flex;gap:12px;align-items:center;flex-wrap:nowrap;margin:0}.ac-pc .ph>div{min-width:0} /* .ph trùng lớp tiêu đề trang (có xuống hàng): giữ ảnh và tên trên một hàng */
 .ac-photo{width:72px;height:72px;border-radius:50%;object-fit:cover;flex:none;border:3px solid var(--ac,#e2e8f0);background:#f1f5f9}
 .ac-av{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;font-size:34px;flex:none;background:color-mix(in srgb,var(--ac) 16%,#fff);border:3px solid var(--ac)}
 .ac-pc b{font-size:15px;line-height:1.2;display:block}
@@ -24,7 +24,7 @@ const AC_CSS=`<style id="ac-css">
 .ac-st.busy{background:#ffedd5;color:#c2410c}.ac-st.off{background:#f1f5f9;color:#64748b}
 .ac-mini{display:flex;gap:8px;margin-top:6px}
 .ac-mini div{flex:1;background:var(--gray-soft);border-radius:10px;padding:6px 4px;text-align:center}
-.ac-mini b{font-size:15px}.ac-mini span{font-size:10.5px;color:var(--muted)}
+.ac-mini b{font-size:15px;white-space:nowrap;display:block}.ac-mini b[style]{font-size:11.5px!important}.ac-mini span{font-size:10.5px;color:var(--muted)}
 .ac-q{margin-top:4px;font-size:11.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}
 .ac-chat{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:14px;align-items:start}
 .ac-stripwrap{display:flex;gap:8px;align-items:center;margin-bottom:12px}
