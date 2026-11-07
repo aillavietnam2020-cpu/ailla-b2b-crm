@@ -11,7 +11,7 @@ async function wkLoad(force){
   try{
     const before=WK.items?wkCount():null;
     WK.items=await svApi("/api/work/mine");WK.err="";WK.at=Date.now();
-    if(before!==null&&wkCount()!==before&&!/^cv_v$/.test(PAGE)){const ae=document.activeElement,typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);if(!typing&&!document.querySelector(".modal,.mdl,[role=dialog],#drawer:not([hidden])"))try{render()}catch(x){}}}
+    if(before!==null&&wkCount()!==before&&!/^cv_v$/.test(PAGE)){const ae=document.activeElement,typing=(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))||(typeof svTyping==="function"&&svTyping());if(!typing&&!document.querySelector(".modal,.mdl,[role=dialog],#drawer:not([hidden])"))try{render()}catch(x){}}}
   catch(e){WK.err=e.message||"Không tải được"}
   WK.busy=false;
   if(PAGE==="cv_v"&&CVV.view==="list"&&CVV.scope==="mine")renderMain();

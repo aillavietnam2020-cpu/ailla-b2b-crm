@@ -66,10 +66,14 @@ function svRefreshMe(){if(!ME)return;const u=D().users.find(x=>x.id===ME.id);if(
 const SVD={els:new Set()};
 const svIsFind=t=>t.id==="qs"||t.type==="search"||/(^|[-_])(q|search|tim|loc)$/i.test(t.id||"")||/tìm|lọc|search/i.test(t.placeholder||"");
 if(typeof document!=="undefined"){const mark=e=>{const t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)&&t.type!=="file"&&!svIsFind(t))SVD.els.add(t)};
-  document.addEventListener("input",mark,true);document.addEventListener("change",mark,true)}
+  document.addEventListener("input",mark,true);document.addEventListener("change",mark,true);
+  /* Chọn hàng bằng nút/ô gợi ý không phát sự kiện nhập (07/11 Thảo vẫn mất phiếu): đang thao tác trong 2 phút gần nhất ở trang có ô nhập thì cũng coi là dở. */
+  const act=e=>{const t=e.target;if(t&&t.closest&&t.closest("#main,#drawer,[id$='-modal-root'],dialog"))SVD.act=Date.now()};
+  document.addEventListener("pointerdown",act,true);document.addEventListener("keydown",act,true)}
 function svDirty(){for(const el of SVD.els)if(!el.isConnected)SVD.els.delete(el);if(SVD.els.size)return true;
   const dr=document.getElementById("drawer");if(dr&&!dr.hidden&&!(typeof OPENED!=="undefined"&&OPENED)&&dr.querySelector("input:not([type=search]),textarea,select"))return true;
-  return [...document.querySelectorAll('[id$="-modal-root"],dialog[open]')].some(r=>r.querySelector("input,textarea,select"))}
+  if([...document.querySelectorAll('[id$="-modal-root"],dialog[open]')].some(r=>r.querySelector("input,textarea,select")))return true;
+  return Date.now()-(SVD.act||0)<120000&&!!document.querySelector("#main input:not([type=search]):not([type=checkbox]):not([type=radio]),#main textarea,#main select,#drawer:not([hidden]) input")}
 const svTyping=()=>{const a=document.activeElement;return !!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.id!=="qs")||svDirty()};
 // Đang thao tác thì 5 giây hỏi một lần; để máy không đụng tới quá 2 phút thì 30 giây (đỡ tốn lượt gọi máy chủ).
 let svActive=Date.now(),svLastPoll=0;["mousemove","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,()=>{svActive=Date.now()},{passive:true}));

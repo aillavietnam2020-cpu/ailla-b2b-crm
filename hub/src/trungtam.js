@@ -22,11 +22,11 @@ async function ttLoad(force){
     TTX.pend=r[0]||[];TTX.ship=r[1]||[];TTX.low=r[2]||null;TTX.out=r[3]||null;TTX.err=r[0]?"":"Không tải được đơn chờ xuất";TTX.at=Date.now();
     /* Đơn vừa được duyệt (số đơn chờ xuất tăng): báo cho kho, và cập nhật chấm đỏ trên menu. */
     if(prevN!==null&&ttKho()&&TTX.pend.length>prevN)toast("Có "+(TTX.pend.length-prevN)+" đơn mới được duyệt, chờ xuất kho");
-    if(prevC!==null&&ttCount()!==prevC){const ae=document.activeElement,typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName),modal=document.querySelector(".modal,.mdl,[role=dialog]");
+    if(prevC!==null&&ttCount()!==prevC){const ae=document.activeElement,typing=(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))||(typeof svTyping==="function"&&svTyping()),modal=document.querySelector(".modal,.mdl,[role=dialog]");
       if(!typing&&!modal&&typeof render==="function")try{render()}catch(x){}}}
   catch(e){TTX.err=e.message||"Không tải được"}
   TTX.busy=false;
-  if(/^tt_/.test(PAGE))renderMain();
+  if(/^tt_/.test(PAGE)&&!(typeof svTyping==="function"&&svTyping()))renderMain();
 }
 /* ---------- Số liệu ---------- */
 function ttSx(){try{sxShape(D());return SX()}catch(e){return null}}
