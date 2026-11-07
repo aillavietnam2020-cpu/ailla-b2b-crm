@@ -11,7 +11,7 @@ const KHO_GRP=[["Tồn kho",["kho_ton"]],["Nhập kho",["kho_nhap","kho_nhap_tp"
 const khoNav=key=>{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")return "";return `<nav class="kgtabs kgbar"></nav>`};
 const KHO_TYPES={
   PN:{page:"kho_nhap",name:"Phiếu nhập kho",who:["sx.kiemke"],hint:"Hàng mua về: nguyên vật liệu, vỏ, tem, hàng hóa. Kế toán kho ghi theo số thực nhận."},
-  PC:{page:"kho_pc",name:"Phiếu pha chế",who:["sx.kythuat","sx.kiemke"],hint:"Mỗi mẻ pha một phiếu, pha theo yêu cầu pha chế của Quản lý mua hàng (tự pha không có yêu cầu thì bấm "+ Phiếu pha không theo yêu cầu"). Ghi số lít thực tế và số thực tế từng nguyên liệu (nguyên liệu không dùng ghi 0)."},
+  PC:{page:"kho_pc",name:"Phiếu pha chế",who:["sx.kythuat","sx.kiemke"],hint:"Mỗi mẻ pha một phiếu, pha theo yêu cầu pha chế của Quản lý mua hàng (tự pha không có yêu cầu thì bấm “+ Phiếu pha không theo yêu cầu”). Ghi số lít thực tế và số thực tế từng nguyên liệu (nguyên liệu không dùng ghi 0)."},
   KS:{page:"sx_lo",name:"Phiếu kiểm kê đóng gói",who:["sx.kiemke"],hint:"Chúc kiểm kê sau khi đóng gói xong. Hệ thống tự trừ bán thành phẩm, vỏ, tem theo định mức."},
   XB:{page:"kho_xuat",name:"Phiếu xuất kho",who:["sx.kiemke"],hint:"Xuất ngoài bán hàng: gia công, bán nguyên liệu, hàng mẫu, hủy hỏng. Đơn Kênh phân phối ở mục Xuất Kênh phân phối; bán lẻ TikTok, Shopee, Facebook ở mục Xuất Kênh bán lẻ."},
   TL:{page:"kho_hoan",name:"Phiếu nhập hàng hoàn",who:["sx.kiemke"],hint:"Hàng hoàn về kho: chọn Bán tiếp (cộng tồn) hoặc Bỏ (chỉ ghi nhận)."},
