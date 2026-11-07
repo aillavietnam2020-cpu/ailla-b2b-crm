@@ -273,6 +273,7 @@ function acStatus(a){return !AC.relay?["off","Chưa nối"]:a.pending?["busy","�
 function acRoot(){return $("#ac-root")}
 /* ----- Màn tổng: thẻ nhân sự ----- */
 function acGrid(){
+  if(AC.isCeo&&typeof aopRender==="function"){aopRender(true);return} /* CEO: sơ đồ tổ chức + bộ não phòng ban (dhops.js) */
   const R=acRoot();if(!R)return;const L=AC.agents||[];
   const tot=L.length,on=AC.relay?tot:0,today=L.reduce((s,a)=>s+(a.today||0),0),pend=L.reduce((s,a)=>s+(a.pending||0),0);
   const show=L.filter(a=>AC.filter==="all"||(AC.filter==="busy"&&a.pending>0));
