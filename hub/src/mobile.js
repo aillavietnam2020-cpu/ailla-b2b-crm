@@ -257,7 +257,7 @@
 (function(){
   if(typeof window==="undefined"||!window.matchMedia)return;
   let busy=false;
-  const editing=()=>{const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&(a.value||"").length>0)return true;
+  const editing=()=>{if(typeof svTyping==="function"&&svTyping())return true;const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&(a.value||"").length>0)return true;
     return [...document.querySelectorAll("textarea")].some(t=>(t.value||"").trim().length>2)};
   const check=async()=>{
     if(busy||document.hidden||typeof BUILD_ID==="undefined")return;busy=true;

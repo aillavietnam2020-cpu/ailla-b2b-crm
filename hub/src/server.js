@@ -60,11 +60,23 @@ async function svFlush(){
   finally{SV.busy=false;if(SV.pending.length)svSchedule()}
 }
 function svRefreshMe(){if(!ME)return;const u=D().users.find(x=>x.id===ME.id);if(u)ME=u}
-const svTyping=()=>{const a=document.activeElement;return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.id!=="qs"};
+/* Đang nhập dở (chị Hoa 07/11: Thảo đang lập phiếu, có người khác lưu là web vẽ lại, mất phiếu).
+   Ngoài ô đang trỏ chuột, còn tính: ô đã gõ/chọn mà chưa lưu (ô còn trên trang), và khung nhập đang mở (ngăn bên phải, hộp nổi).
+   Ô tìm kiếm/lọc không tính. Lưu xong trang tự vẽ lại → ô cũ biến mất → hết "dở", số mới hiện ngay sau đó. */
+const SVD={els:new Set()};
+const svIsFind=t=>t.id==="qs"||t.type==="search"||/(^|[-_])(q|search|tim|loc)$/i.test(t.id||"")||/tìm|lọc|search/i.test(t.placeholder||"");
+if(typeof document!=="undefined"){const mark=e=>{const t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)&&t.type!=="file"&&!svIsFind(t))SVD.els.add(t)};
+  document.addEventListener("input",mark,true);document.addEventListener("change",mark,true)}
+function svDirty(){for(const el of SVD.els)if(!el.isConnected)SVD.els.delete(el);if(SVD.els.size)return true;
+  const dr=document.getElementById("drawer");if(dr&&!dr.hidden&&!(typeof OPENED!=="undefined"&&OPENED)&&dr.querySelector("input:not([type=search]),textarea,select"))return true;
+  return [...document.querySelectorAll('[id$="-modal-root"],dialog[open]')].some(r=>r.querySelector("input,textarea,select"))}
+const svTyping=()=>{const a=document.activeElement;return !!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.id!=="qs")||svDirty()};
 // Đang thao tác thì 5 giây hỏi một lần; để máy không đụng tới quá 2 phút thì 30 giây (đỡ tốn lượt gọi máy chủ).
 let svActive=Date.now(),svLastPoll=0;["mousemove","keydown","touchstart","scroll"].forEach(e=>addEventListener(e,()=>{svActive=Date.now()},{passive:true}));
 async function svPoll(){
   try{
+    // Lúc nãy hoãn vẽ lại vì đang nhập dở; giờ đã lưu/đóng phiếu thì vẽ lại để thấy số mới.
+    if(SV.deferRemote&&!svTyping()&&DB.data&&typeof onRemoteChange==="function"){SV.deferRemote=false;onRemoteChange()}
     // Đang ở tab khác / thu nhỏ: một phút hỏi một lần để vẫn báo kịp (thông báo của Windows, thongbao.js).
     if(SV.busy||SV.pending.length||(document.hidden&&Date.now()-svLastPoll<60000))return;
     if(Date.now()-svActive>120000&&Date.now()-svLastPoll<30000)return;svLastPoll=Date.now();

@@ -144,6 +144,8 @@ function bindCommon(m){
 function onRemoteChange(){if(!ME)return;const u=D().users.find(x=>x.id===ME.id);if(!u||!u.active){ME=null;render();return}ME=u;
   // Đang mở trang nhúng (tạo đơn, khách, công nợ...): vẽ lại sẽ nạp lại khung đó, mất đơn đang gõ dở. Chỉ nhận dữ liệu mới, sang trang khác mới vẽ.
   if($("#crmfr"))return;
+  // Đang lập phiếu/nhập dở: không vẽ lại (mất phiếu). Số mới hiện khi lưu xong hoặc sang trang khác.
+  if(typeof svTyping==="function"&&svTyping()){if(typeof SV!=="undefined")SV.deferRemote=true;return}
   const open=!$("#drawer").hidden;render();if(open&&OPENED)openCard(OPENED);toast("Có cập nhật mới")}
 async function renderLogin(){
   $("#app").innerHTML=`<div class="loginwrap"><form class="login" id="lf"><img src="data:image/png;base64,${LOGO}" alt="Ailla" class="llogo"><h1>MKT Hub</h1><p>${APP_MODE==="admin"?"Trang quản trị Content & Digital":"Bàn làm việc Content & Digital"}</p>
