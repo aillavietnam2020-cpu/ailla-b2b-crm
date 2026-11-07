@@ -274,6 +274,24 @@
   .tbl.edit:has(.kf-std) .kf-st::before{content:"Tồn sổ "}
   .tbl.edit:has(.kf-std) td:last-child{grid-area:x;justify-self:end}
 
+  /* Màn xem phiếu trên điện thoại (thay cho mở trang A4 + hộp in) */
+  #mpv{position:fixed;inset:0;z-index:300;background:#fff;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+  #mpv .mpvbar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);background:#fff;flex:none}
+  #mpv .mpvbar b{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mpv .mpvbar button{border:1px solid var(--line);background:#fff;border-radius:10px;font:inherit;font-size:13px;font-weight:600;padding:7px 11px;color:var(--ink);white-space:nowrap}
+  #mpv .mpvbar button[data-a=x]{border:0;font-size:18px;padding:4px 8px}
+  #mpv .mpvbar button[data-a=dl]{background:#4b54d1;border-color:#4b54d1;color:#fff}
+  #mpv iframe{flex:1;width:100%;border:0;background:#fff}
+  .mpv-open #mobtab{display:none!important}
+  /* Form phiếu pha chế: không tràn ngang, ô đơn vị co theo cột, thanh nút có nền trắng không đè chữ */
+  .drawer .in:has(#kf){overflow-x:hidden!important}
+  #kf .kf-un{width:100%!important;min-width:0!important;max-width:100%!important}
+  #kf .kf-q{font-size:16px!important}
+  #kf input,#kf select{min-width:0;max-width:100%}
+  #kf .sdmp{display:flex;gap:6px;align-items:center;width:100%}
+  #kf .sdmp .sdm-pn{flex:1;min-width:0}
+  #kf>.row7:last-of-type{position:sticky;bottom:0;z-index:3;background:#fff;margin:6px -4px 0;padding:8px 4px calc(8px + env(safe-area-inset-bottom));box-shadow:0 -6px 14px rgba(16,24,40,.08)}
+
   /* thông báo: mỗi tin 2 dòng rồi "…", bấm mới xem đủ */
   .ntl .nti span{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4}
   .ntl .nti.open span{-webkit-line-clamp:unset;display:block!important}

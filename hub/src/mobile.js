@@ -334,3 +334,54 @@
     m.querySelectorAll("[data-cn]").forEach(b=>b.onclick=()=>{MOD="me";PAGE=b.dataset.cn;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}); /* như menu ảnh đại diện: mục Của tôi */
   };
 })();
+
+/* ===== Điện thoại: xem / in / tải phiếu kho (phiếu pha chế, phiếu sản xuất, phiếu nhập xuất…) — chị Hoa 07/11.
+   Máy tính giữ như cũ (mở trang A4 rồi in). Điện thoại: mở màn xem phiếu ngay trong web, chữ to, mỗi dòng hàng thành 1 thẻ;
+   thanh trên có "Tải về máy" (lưu file phiếu để mở lại trên điện thoại) và "In / lưu PDF". ===== */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia||typeof khoShowPrint!=="function")return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const MCSS="<style id=\"mpvcss\">@media screen and (max-width:760px){html{background:#fff!important}body{max-width:none!important;margin:0!important;padding:12px 12px 28px!important;box-shadow:none!important;font-size:14px!important}"+
+    ".top{gap:8px!important;padding-bottom:8px!important}.top img{height:34px!important}.co b{font-size:10.5px!important}.co span{font-size:10px!important}.no b{font-size:13px!important}"+
+    "h1{font-size:17px!important;margin:10px 0 4px!important}.meta{grid-template-columns:1fr!important}.meta div{padding:6px 10px!important}.meta label{min-width:118px!important}"+
+    "table,thead,tbody,tfoot,tr,td,th{display:block!important;width:auto!important}thead{display:none!important}"+
+    "tbody tr,tfoot tr{display:flex!important;flex-direction:column;border:1px solid #c9d1ea;border-radius:10px;margin:0 0 8px;padding:6px 10px;background:#fff}"+
+    "tbody tr td,tfoot tr td{background:none!important;border:0!important;padding:3px 0!important;display:flex!important;justify-content:space-between;gap:12px;text-align:right!important;height:auto!important;min-height:0!important;min-width:0!important}"+
+    "td::before{content:attr(data-l);color:#667085;text-align:left;font-weight:400;flex:none}td[data-l=\"\"]::before,td:not([data-l])::before{content:none}"+
+    "td.c{display:none!important}td[data-l=\"Tên hàng\"],td[data-l=\"Nguyên vật liệu\"],td[data-l=\"Sản phẩm\"],td[data-l=\"Tên\"]{order:-1;font-weight:700;font-size:14.5px;text-align:left!important}td[data-l=\"Tên hàng\"]::before,td[data-l=\"Nguyên vật liệu\"]::before,td[data-l=\"Sản phẩm\"]::before,td[data-l=\"Tên\"]::before{content:none}"+
+    "td.fill{border-bottom:1px dashed #c9a400!important;min-height:26px!important}tr.pr{background:#fff0f6!important}tr.lech{background:#fff4e0!important}"+
+    ".sig{grid-template-columns:repeat(3,1fr)!important;gap:8px!important;margin-top:18px!important}.sig b{font-size:11px!important}.sig span{font-size:9.5px!important}}</style>";
+  const label=doc=>{doc.querySelectorAll("table").forEach(t=>{const hr=t.tHead&&t.tHead.rows[0];if(!hr)return;const H=[...hr.cells].map(c=>c.textContent.trim());
+    [...t.querySelectorAll("tbody tr,tfoot tr")].forEach(r=>{let i=0;[...r.cells].forEach(c=>{if(!c.hasAttribute("data-l"))c.setAttribute("data-l",H[i]||"");i+=c.colSpan||1})})})};
+  const nameOf=html=>{const m=/<title>([^<]*)<\/title>/i.exec(html);return ((m&&m[1])||"phieu").replace(/[\\/:*?"<>|]+/g,"-").trim()||"phieu"};
+  const close=()=>{const o=document.getElementById("mpv");if(o)o.remove();document.body.classList.remove("mpv-open")};
+  function view(html){
+    const h2=/<\/head>/i.test(html)?html.replace(/<\/head>/i,MCSS+"</head>"):MCSS+html;
+    close();
+    const o=document.createElement("div");o.id="mpv";
+    o.innerHTML=`<div class="mpvbar"><button type="button" data-a="x" aria-label="Đóng">✕</button><b>${esc(nameOf(html))}</b><button type="button" data-a="dl">Tải về máy</button><button type="button" data-a="pr">In / PDF</button></div><iframe title="Phiếu"></iframe>`;
+    document.body.appendChild(o);document.body.classList.add("mpv-open");
+    const f=o.querySelector("iframe");
+    f.onload=()=>{try{label(f.contentDocument)}catch(e){}};
+    f.srcdoc=h2;
+    o.querySelector("[data-a=x]").onclick=close;
+    o.querySelector("[data-a=pr]").onclick=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){toast("Chưa in được, thử bấm lại")}};
+    o.querySelector("[data-a=dl]").onclick=()=>{
+      let out=h2;try{label(f.contentDocument);out="<!doctype html>\n"+f.contentDocument.documentElement.outerHTML}catch(e){}
+      try{const b=new Blob([out],{type:"text/html;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=nameOf(html)+".html";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},4000);toast("Đã tải phiếu về máy. Mở trong mục Tệp / Tải về để xem.")}catch(e){toast("Chưa tải được, thử lại")}
+    };
+  }
+  const orig=khoShowPrint;
+  khoShowPrint=function(html){if(!narrow.matches)return orig(html);view(html)};
+})();
+/* Phiếu pha chế trên điện thoại: hiện tên bán thành phẩm dưới ô mã (ô chỉ hiện mã, khó nhận ra) */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const fix=()=>{if(!narrow.matches)return;const b=document.getElementById("kf-btp");if(!b)return;
+    let n=document.getElementById("kf-btpnm");const c=b.dataset.code||b.value;const it=(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(c))||null;
+    const t=it?it.name:"";if(!n){n=document.createElement("small");n.id="kf-btpnm";n.className="hint";n.style.cssText="display:block;margin-top:3px;font-weight:600;color:var(--ink)";b.insertAdjacentElement("afterend",n)}
+    if(n.textContent!==t)n.textContent=t};
+  let t=0;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(fix,150)}).observe(document.body,{childList:true,subtree:true});
+  document.addEventListener("input",e=>{if(e.target&&e.target.id==="kf-btp")setTimeout(fix,200)},true);
+})();
