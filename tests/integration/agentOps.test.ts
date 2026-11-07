@@ -126,6 +126,40 @@ describe('Điều hành agent: sơ đồ tổ chức + bộ não phòng ban', ()
     expect(d2.agents.find((a: any) => a.id === 'main').docs.map((x: any) => x.name)).toEqual(['AGENTS.md']);
   });
 
+  it('thêm agent: CEO tạo yêu cầu → máy chủ dựng (tắt) → CEO bật', async () => {
+    const body = { agent: 'cskh-shopee', name: 'CSKH Shopee', title: 'Chăm sóc khách Shopee', dept: 'kd', parent: 'lead-sale-ailla', template: 'lead-sale-ailla', skills: ['abos-web'], duty: 'Trả lời khách Shopee', crons: [{ when: 'mỗi 30 phút 8h–21h', task: 'Đọc tin chưa trả lời' }] };
+    expect((await ctx.request('/api/agent-ops/agent-req', { as: USERS.thao, body })).status).toBe(403);
+    expect((await ctx.request('/api/agent-ops/agent-req', { as: USERS.ceo, body: { ...body, agent: 'Sai Mã' } })).status).toBe(400);
+    expect((await ctx.request('/api/agent-ops/agent-req', { as: USERS.ceo, body: { ...body, agent: 'main' } })).status).toBe(400);
+    const made = await ctx.request('/api/agent-ops/agent-req', { as: USERS.ceo, body });
+    expect(made.status).toBe(200);
+    const id = made.body.data.id;
+    // trùng mã thì chặn
+    expect((await ctx.request('/api/agent-ops/agent-req', { as: USERS.ceo, body })).status).toBe(400);
+    let d = (await ctx.request('/api/agent-ops', { as: USERS.ceo })).body.data;
+    expect(d.agents.find((a: any) => a.id === 'cskh-shopee')).toMatchObject({ name: 'CSKH Shopee', dept: 'kd', parent: 'lead-sale-ailla' });
+    expect(d.reqs[0]).toMatchObject({ agent: 'cskh-shopee', status: 'pending', skills: ['abos-web'] });
+    // chưa dựng thì không bật được
+    expect((await ctx.request(`/api/agent-ops/agent-req/${id}/enable`, { as: USERS.ceo, method: 'POST' })).status).toBe(400);
+    const get = async () => {
+      const r = await ctx.app.fetch(new Request('http://x/api/agent-relay-ops/requests', { headers: { 'X-Relay-Key': 'relay-test-key-123' } }), ctx.env);
+      return ((await r.json()) as any).data;
+    };
+    expect((await get())[0]).toMatchObject({ id, agent: 'cskh-shopee', status: 'pending' });
+    expect((await relay({ status: 'created', note: 'đã dựng, đang tắt' }, 'relay-test-key-123', `/requests/${id}`)).status).toBe(200);
+    expect(await get()).toHaveLength(0);
+    expect((await ctx.request(`/api/agent-ops/agent-req/${id}/enable`, { as: USERS.ceo, method: 'POST' })).status).toBe(200);
+    expect((await get())[0]).toMatchObject({ id, status: 'enable' });
+    await relay({ status: 'enabled' }, 'relay-test-key-123', `/requests/${id}`);
+    d = (await ctx.request('/api/agent-ops', { as: USERS.ceo })).body.data;
+    expect(d.reqs[0].status).toBe('enabled');
+    // huỷ: chỉ khi còn chờ
+    const b2 = await ctx.request('/api/agent-ops/agent-req', { as: USERS.ceo, body: { ...body, agent: 'thu-huy' } });
+    expect((await ctx.request(`/api/agent-ops/agent-req/${b2.body.data.id}/cancel`, { as: USERS.ceo, method: 'POST' })).status).toBe(200);
+    d = (await ctx.request('/api/agent-ops', { as: USERS.ceo })).body.data;
+    expect(d.agents.some((a: any) => a.id === 'thu-huy')).toBe(false);
+  });
+
   it('chuẩn hoá dữ liệu máy chủ gửi', () => {
     expect(cleanStatus({ id: 'main', state: 'err', task: 'x'.repeat(500) })?.task).toHaveLength(300);
     expect(cleanStatus({ id: '../etc' })).toBeNull();

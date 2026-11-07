@@ -95,6 +95,12 @@ agentOpsRoutes.get('/', async (c) => {
       .all<{ agent: string; kind: string; name: string; description: string | null; path: string | null; size: number | null; file_at: string | null; has_body: number }>()
       .catch(() => ({ results: [] as { agent: string; kind: string; name: string; description: string | null; path: string | null; size: number | null; file_at: string | null; has_body: number }[] })),
   ]);
+  // Yêu cầu thêm agent (0088) có thể chưa tạo bảng: thiếu thì coi như không có.
+  const reqs = await db
+    .prepare(`SELECT id, agent, name, title, emoji, dept, parent, template, skills_json, duty, crons_json, combo, status, note, created_at, updated_at
+              FROM agent_ops_req WHERE status <> 'cancelled' ORDER BY id DESC LIMIT 50`)
+    .all<Record<string, unknown>>()
+    .catch(() => ({ results: [] as Record<string, unknown>[] }));
   const docBy = new Map<string, Record<string, unknown>[]>();
   for (const d of docs.results ?? []) (docBy.get(d.agent) ?? docBy.set(d.agent, []).get(d.agent)!).push({ kind: d.kind, name: d.name, description: d.description, path: d.path, size: d.size, file_at: d.file_at, has_body: !!d.has_body });
   const stBy = new Map((st.results ?? []).map((r) => [String(r.agent), r]));
@@ -150,6 +156,7 @@ agentOpsRoutes.get('/', async (c) => {
     depts: depts.results ?? [],
     notes: notes.results ?? [],
     logs: logs.results ?? [],
+    reqs: (reqs.results ?? []).map((r) => ({ ...r, skills: safeJson<string[]>(r.skills_json as string, []), crons: safeJson<unknown[]>(r.crons_json as string, []) })),
   });
 });
 
@@ -165,6 +172,65 @@ agentOpsRoutes.get('/doc', async (c) => {
     .catch(() => null);
   if (!r) throw notFound('Máy chủ agent chưa gửi nội dung tài liệu này');
   return ok(c, r);
+});
+
+/** CEO tạo yêu cầu thêm agent. Máy chủ agent dựng ở trạng thái TẮT; CEO bấm Bật là bước riêng. */
+agentOpsRoutes.post('/agent-req', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const agent = String(b.agent ?? '').trim();
+  const name = str(b.name, 60);
+  if (!AGENT_RE.test(agent)) throw badRequest('BAD_AGENT', 'Mã agent chỉ gồm chữ thường không dấu, số, gạch ngang (3–60 ký tự)');
+  if (!name) throw badRequest('NO_NAME', 'Thiếu tên agent');
+  const db = c.env.DB;
+  const taken =
+    AGENT_ROSTER.some((a) => a.id === agent) ||
+    !!(await db.prepare('SELECT 1 FROM agent_dept_member WHERE agent = ?').bind(agent).first()) ||
+    !!(await db.prepare(`SELECT 1 FROM agent_ops_req WHERE agent = ? AND status NOT IN ('cancelled','error')`).bind(agent).first());
+  if (taken) throw badRequest('AGENT_EXISTS', 'Mã agent này đã có, chọn mã khác');
+  const dept = String(b.dept ?? '');
+  if (!(await db.prepare('SELECT 1 FROM agent_dept WHERE id = ?').bind(dept).first())) throw notFound('Không có phòng này');
+  const parent = str(b.parent, 60);
+  const template = str(b.template, 60);
+  if ((parent && !AGENT_RE.test(parent)) || (template && !AGENT_RE.test(template))) throw badRequest('BAD_AGENT', 'Cấp trên / agent mẫu không hợp lệ');
+  const crons = Array.isArray(b.crons)
+    ? (b.crons as Record<string, unknown>[]).slice(0, 10).map((x) => ({ when: String(x?.when ?? '').slice(0, 80), task: String(x?.task ?? '').slice(0, 500) })).filter((x) => x.when && x.task)
+    : [];
+  const now = nowIso();
+  const r = await db
+    .prepare(
+      `INSERT INTO agent_ops_req (agent, name, title, emoji, dept, parent, template, skills_json, duty, crons_json, combo, status, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    )
+    .bind(agent, name, str(b.title, 80), str(b.emoji, 8), dept, parent, template, JSON.stringify(strList(b.skills, 60, 80)), str(b.duty, 3000), JSON.stringify(crons), str(b.combo, 60) ?? 'template', c.get('auth').user.id, now, now)
+    .run();
+  await db
+    .prepare(
+      `INSERT INTO agent_dept_member (agent, dept, parent, sort, name, title, emoji, color, updated_at) VALUES (?, ?, ?, 90, ?, ?, ?, '#64748b', ?)
+       ON CONFLICT (agent) DO UPDATE SET dept = excluded.dept, parent = excluded.parent, name = excluded.name, title = excluded.title, emoji = excluded.emoji, updated_at = excluded.updated_at`,
+    )
+    .bind(agent, dept, parent, name, str(b.title, 80), str(b.emoji, 8) ?? '🤖', now)
+    .run();
+  return ok(c, { id: Number(r.meta.last_row_id), agent });
+});
+
+/** CEO bấm Bật (agent đã dựng xong) hoặc Huỷ (khi máy chủ chưa dựng). */
+agentOpsRoutes.post('/agent-req/:id/:action', async (c) => {
+  const id = Number(c.req.param('id'));
+  const action = c.req.param('action');
+  const r = await c.env.DB.prepare('SELECT id, agent, status FROM agent_ops_req WHERE id = ?').bind(id).first<{ id: number; agent: string; status: string }>();
+  if (!r) throw notFound('Không có yêu cầu này');
+  const now = nowIso();
+  if (action === 'enable') {
+    if (r.status !== 'created') throw badRequest('NOT_READY', 'Máy chủ chưa dựng xong agent này');
+    await c.env.DB.prepare(`UPDATE agent_ops_req SET status = 'enable', updated_at = ? WHERE id = ?`).bind(now, id).run();
+  } else if (action === 'cancel') {
+    if (!['pending', 'error'].includes(r.status)) throw badRequest('CANNOT_CANCEL', 'Máy chủ đã nhận yêu cầu, không huỷ được ở đây');
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE agent_ops_req SET status = 'cancelled', updated_at = ? WHERE id = ?`).bind(now, id),
+      c.env.DB.prepare('DELETE FROM agent_dept_member WHERE agent = ?').bind(r.agent),
+    ]);
+  } else throw badRequest('BAD_ACTION', 'Thao tác không hợp lệ');
+  return ok(c, { id, action });
 });
 
 /** Sửa phòng ban (tên, biểu tượng, trưởng phòng, agent trưởng, mục tiêu) hoặc thêm phòng mới. */
@@ -354,4 +420,29 @@ agentRelayOpsRoutes.post('/docs', async (c) => {
   // Gửi theo lô nhỏ để không vượt giới hạn một lần ghi của D1.
   for (let i = 0; i < stmts.length; i += 20) await db.batch(stmts.slice(i, i + 20));
   return ok(c, { agent, saved: keep.length });
+});
+
+/** Máy chủ agent lấy việc: yêu cầu thêm agent mới (pending) và yêu cầu bật (enable). */
+agentRelayOpsRoutes.get('/requests', async (c) => {
+  const r = await c.env.DB.prepare(
+    `SELECT id, agent, name, title, emoji, dept, parent, template, skills_json, duty, crons_json, combo, status
+     FROM agent_ops_req WHERE status IN ('pending','enable') ORDER BY id LIMIT 10`,
+  ).all<Record<string, unknown>>();
+  return ok(
+    c,
+    (r.results ?? []).map((x) => ({ ...x, skills: safeJson<string[]>(x.skills_json as string, []), crons: safeJson<unknown[]>(x.crons_json as string, []) })),
+  );
+});
+
+/** Máy chủ báo tiến độ: creating → created (đã dựng, đang TẮT) → enabled; hoặc error kèm ghi chú. */
+agentRelayOpsRoutes.post('/requests/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  const b = (await c.req.json().catch(() => ({}))) as { status?: string; note?: string };
+  const st = String(b.status ?? '');
+  if (!['creating', 'created', 'enabled', 'error'].includes(st)) throw badRequest('BAD_STATUS', 'Trạng thái không hợp lệ');
+  const r = await c.env.DB.prepare('UPDATE agent_ops_req SET status = ?, note = ?, updated_at = ? WHERE id = ?')
+    .bind(st, str(b.note, 1000), nowIso(), id)
+    .run();
+  if (!r.meta.changes) throw notFound('Không có yêu cầu này');
+  return ok(c, { id, status: st });
 });

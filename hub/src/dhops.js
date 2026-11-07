@@ -56,6 +56,7 @@ const AOP_CSS=`<style id="aop-css">
 .aoc-doc{width:100%;text-align:left;background:#fff;cursor:pointer;font:inherit;color:inherit}.aoc-doc:hover{border-color:#a5b4fc;background:#fafaff}.aoc-doc code{font-size:11.5px;color:var(--muted);word-break:break-all}.aoc-doc em{font-style:normal;font-size:12px;color:#4b54d1;font-weight:600}
 .aoc-md{font-size:14px;line-height:1.6;min-width:0}.aoc-md h2,.aoc-md h3,.aoc-md h4{margin:14px 0 6px}.aoc-md p{margin:6px 0}.aoc-md code{background:var(--gray-soft);border-radius:4px;padding:0 4px;font-size:13px}.aoc-pre{background:#1e1e24;color:#e4e4e7;border-radius:10px;padding:10px 12px;overflow-x:auto;font-size:12.5px;white-space:pre}
 .aoc-ph{object-fit:cover;padding:0}.og-n .aoc-av{width:38px;height:38px}
+.aoc-form label{display:grid;gap:4px;font-size:13px;color:var(--muted)}.aoc-form{display:grid;gap:10px}
 @media(max-width:1100px){.aov{grid-template-columns:1fr}.aov-r{border-left:0;border-top:1px solid var(--line)}.aoc-kp{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 </style>`;
 const aopA=id=>(AOP.data&&AOP.data.agents||[]).find(a=>a.id===id);
@@ -98,12 +99,14 @@ function aopRender(auto){
   const tabs=AOP_TABS;
   const d=AOP.data;
   R.innerHTML=`${AOP.err?`<div class="err box">Chưa tải được: ${esc(AOP.err)}</div>`:""}${d.status_fresh?"":`<div class="warn aoc-banner">${d.status_at?`Máy chủ agent gửi trạng thái lần cuối lúc ${esc(aopTime(d.status_at))} (${esc(acAgo(d.status_at))}). Trang đang hiện số của lần đó; máy chủ gửi lại thì tự cập nhật.`:"Máy chủ agent chưa gửi trạng thái lần nào. Sơ đồ, phòng ban và skill vẫn xem được."}</div>`}
-   <div class="tabs">${tabs.map(t=>`<button data-dht="${t[0]}" class="${AOP.tab===t[0]?"on":""}">${t[1]}</button>`).join("")}<span style="flex:1"></span><button class="btn sm" id="dh-reload">↻ Cập nhật</button></div>
+   <div class="tabs">${tabs.map(t=>`<button data-dht="${t[0]}" class="${AOP.tab===t[0]?"on":""}">${t[1]}</button>`).join("")}<span style="flex:1"></span><button class="btn sm pri" id="aop-add">+ Thêm agent</button> <button class="btn sm" id="dh-reload">↻ Cập nhật</button></div>
    <div id="dh-body">${AOP.tab==="org"?aopOrg():AOP.tab==="brain"?aopBrain():AOP.tab==="cap"?aopCap():'<div id="ac-access"></div>'}</div>`;
   aopBindTabs(R);
+  $("#aop-add").onclick=()=>aopAddForm();
   $("#dh-reload").onclick=()=>aopLoad(true).then(()=>aopRender());
   R.querySelectorAll("[data-dha]").forEach(b=>b.onclick=e=>{e.stopPropagation();aopOpen(b.dataset.dha)});
   R.querySelectorAll("[data-dhd]").forEach(b=>b.onclick=()=>{AOP.dept=b.dataset.dhd;AOP.tab="brain";aopRender();scrollTo(0,0)});
+  R.querySelectorAll("[data-aoprq]").forEach(b=>b.onclick=async()=>{const[id,act]=b.dataset.aoprq.split(":");if(act==="cancel"&&b.dataset.ok!=="1"){b.dataset.ok="1";b.textContent="Bấm lần nữa để huỷ";return}b.disabled=true;try{await svApi(`/api/agent-ops/agent-req/${id}/${act}`,{method:"POST"});toast(act==="enable"?"Đã gửi lệnh bật, máy chủ sẽ bật trong vài phút":"Đã huỷ");await aopLoad(true);aopRender()}catch(e){toast(e.message);b.disabled=false}});
   if(AOP.tab==="org")requestAnimationFrame(aopWires);
   if(AOP.tab==="brain")aopBindBrain();
   if(AOP.tab==="perm")acAccess();
@@ -114,6 +117,7 @@ function aopKpi(){const L=AOP.data.agents,n=s=>L.filter(a=>aopSt(a)===s).length,
 function aopNode(a,big){
   if(a==="ceo")return `<div class="og-n og-ceo" id="${aopId("ceo")}"><span class="aoc-av" style="--c:#e7357b">👩‍💼</span><div><b>CEO</b><small>Giao việc, duyệt, chốt quyết định</small></div></div>`;
   if(typeof a==="string")return `<div class="og-n og-p" id="${aopId("p:"+a)}"><span class="aoc-av" style="--c:#c4b5fd">👤</span><div><b>${esc(a)}</b><small>người thật</small></div></div>`;
+  const rq=aopReq(a.id);if(rq)return `<button class="og-n" id="${aopId(a.id)}" data-dha="${esc(a.id)}" style="--s:#a5b4fc;border-style:dashed">${aopAv(a)}<div style="min-width:0"><b>${esc(a.name)}</b> <span class="pill p-vio">${AOP_RQ[rq.status]||rq.status}</span><small>${esc(a.title||"Agent mới")}</small></div></button>`;
   const s=aopSt(a),w=a.status&&AOP.data.status_fresh?a.status.wait_for:"";
   return `<button class="og-n ${s}${big?" big":""}" id="${aopId(a.id)}" data-dha="${esc(a.id)}" style="--s:${AOP_ST[s][2]}">${aopAv(a)}<div style="min-width:0"><b>${esc(a.name)}</b> ${aopPill(s)}<small>${esc(aopTask(a))}</small>${!AOP.data.status_fresh&&a.status&&a.status.updated_at?`<small>số lúc ${esc(aopTime(a.status.updated_at))}</small>`:""}${w?`<em>⏳ chờ ${esc(aopName(w))}${a.status.since?" · từ "+esc(a.status.since):""}</em>`:""}</div></button>`;
 }
@@ -121,7 +125,7 @@ function aopTree(d){const M=aopMembers(d),top=M.filter(a=>!a.parent||!M.some(x=>
   return top.map(t=>`<div class="og-col">${aopNode(t,1)}<div class="og-subs">${M.filter(a=>a.parent===t.id).map(a=>aopNode(a)).join("")}</div></div>`).join("")}
 function aopOrg(){
   const D=aopDepts(),top=D[0],rest=D.slice(1),lost=AOP.data.agents.filter(a=>!a.dept);
-  return `${aopKpi()}<section class="card og-wrap" id="og"><div class="og-row">${aopNode("ceo")}</div>
+  return `${aopKpi()}${aopReqStrip()}<section class="card og-wrap" id="og"><div class="og-row">${aopNode("ceo")}</div>
    ${top?`<div class="og-row" id="${aopId("d-"+top.id)}">${aopMembers(top.id).map(a=>aopNode(a,1)).join("")}</div>`:""}
    <div class="og-depts" style="grid-template-columns:${rest.map(d=>{const M=aopMembers(d.id);return Math.max(1,M.filter(x=>!x.parent||!M.some(y=>y.id===x.parent)).length)+"fr"}).join(" ")};min-width:${Math.max(860,rest.reduce((t,d)=>{const M=aopMembers(d.id);return t+250*Math.max(1,M.filter(x=>!x.parent||!M.some(y=>y.id===x.parent)).length)},0))}px">${rest.map(d=>{const M=aopMembers(d.id),bad=M.filter(a=>["err","stuck","wait"].includes(aopSt(a))).length,P=aopNotes(d.id,"person");
      return `<div class="og-dept" id="${aopId("d-"+d.id)}"><button class="og-dh" data-dhd="${esc(d.id)}"><span>${esc(d.icon||"📁")} Phòng ${esc(d.name)}</span>${bad?`<span class="pill p-amb">${bad} cần để ý</span>`:`<span class="pill p-grn">ổn</span>`}<span class="og-open">Mở bộ não ›</span></button>
@@ -289,5 +293,50 @@ async function aopDocView(agent,kind,name){
 
 /* ---------- Thanh tab dùng chung (cả màn Nhắn agent kiểu thẻ cũ) ---------- */
 const AOP_TABS=[["org","Sơ đồ tổ chức"],["chat","💬 Nhắn agent"],["brain","Bộ não phòng ban"],["cap","Năng lực agent"],["perm","Quyền nhắn agent"]];
-function aopTabsBar(){return `<div class="tabs" id="aop-tabs">${AOP_TABS.map(t=>`<button data-dht="${t[0]}" class="${AOP.tab===t[0]?"on":""}">${t[1]}</button>`).join("")}</div>`}
-function aopBindTabs(R){(R||document).querySelectorAll("[data-dht]").forEach(b=>b.onclick=()=>{AOP.tab=b.dataset.dht;try{localStorage.setItem("aop_tab",AOP.tab)}catch(e){}acGrid()})}
+function aopTabsBar(){return `<div class="tabs" id="aop-tabs">${AOP_TABS.map(t=>`<button data-dht="${t[0]}" class="${AOP.tab===t[0]?"on":""}">${t[1]}</button>`).join("")}<span style="flex:1"></span><button class="btn sm pri" data-aopadd="1">+ Thêm agent</button></div>`}
+function aopBindTabs(R){(R||document).querySelectorAll("[data-aopadd]").forEach(b=>b.onclick=()=>{if(AOP.data)aopAddForm();else aopLoad(true).then(()=>AOP.data&&aopAddForm())});(R||document).querySelectorAll("[data-dht]").forEach(b=>b.onclick=()=>{AOP.tab=b.dataset.dht;try{localStorage.setItem("aop_tab",AOP.tab)}catch(e){}acGrid()})}
+
+/* ---------- Thêm agent (CEO duyệt bản demo 5 bước; máy chủ dựng ở trạng thái TẮT, CEO bấm Bật) ---------- */
+const AOP_RQ={pending:"Chờ máy chủ dựng",creating:"Đang dựng",created:"Đã dựng · chờ bật",enable:"Đang bật",error:"Dựng lỗi"};
+const aopReq=id=>((AOP.data&&AOP.data.reqs)||[]).find(r=>r.agent===id&&AOP_RQ[r.status]);
+function aopReqStrip(){
+  const L=((AOP.data&&AOP.data.reqs)||[]).filter(r=>AOP_RQ[r.status]);if(!L.length)return "";
+  return `<section class="card"><div class="card-h"><h2>Agent đang thêm</h2><span class="hint">máy chủ dựng xong để ở trạng thái tắt; CEO bấm Bật thì agent mới chạy</span></div>${L.map(r=>`<div class="aoc-log" style="align-items:center"><span style="flex:1"><b>${esc(r.emoji||"🤖")} ${esc(r.name)}</b> <span class="hint">· ${esc(r.agent)} · phòng ${esc(((AOP.data.depts||[]).find(d=>d.id===r.dept)||{}).name||r.dept||"")}</span> <span class="pill p-vio">${AOP_RQ[r.status]}</span>${r.note?`<br><span class="hint">${esc(r.note)}</span>`:""}</span>${r.status==="created"?`<button class="btn sm pri" data-aoprq="${r.id}:enable">Bật agent</button>`:""}${["pending","error"].includes(r.status)?`<button class="btn sm" data-aoprq="${r.id}:cancel">Huỷ</button>`:""}</div>`).join("")}</section>`;
+}
+/* Tên tiếng Việt → mã agent: bỏ dấu, chữ thường, gạch ngang. */
+function aopSlug(t){return String(t||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/g,"d").replace(/Đ/g,"d").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40)}
+function aopAddForm(){
+  const D=aopDepts(),A=AOP.data.agents,all=[...new Set(A.flatMap(a=>a.skills||[]))].sort();
+  const dept0=AOP.tab==="brain"?AOP.dept:(D[1]||D[0]||{}).id;
+  openDrawerHTML(`<h2 style="margin:0">Thêm agent</h2><p class="hint" style="margin:2px 0 6px">Điền xong bấm <b>Tạo agent</b>. Máy chủ agent tự dựng agent mới trong vài phút và để ở trạng thái <b>tắt</b>; CEO bấm <b>Bật agent</b> thì mới chạy. Bot Telegram riêng và đăng nhập tài khoản sàn vẫn do kỹ thuật làm tay.</p>
+   <div class="aoc-form">
+    <label>Tên agent<input id="aq-name" maxlength="60" placeholder="Ví dụ: CSKH Shopee"></label>
+    <label>Mã agent (tự tạo từ tên, sửa được)<input id="aq-id" maxlength="60" placeholder="cskh-shopee"></label>
+    <label>Chức danh<input id="aq-title" maxlength="80" placeholder="Chăm sóc khách Shopee"></label>
+    <label>Biểu tượng<input id="aq-emoji" maxlength="4" value="🤖"></label>
+    <label>Phòng<select id="aq-dept">${D.map(d=>`<option value="${esc(d.id)}"${d.id===dept0?" selected":""}>${esc(d.name)}</option>`).join("")}</select></label>
+    <label>Cấp trên<select id="aq-parent"></select></label>
+    <label>Làm theo mẫu agent (chép nội quy, quyền, gói AI)<select id="aq-tpl">${A.filter(a=>!aopReq(a.id)).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("")}</select></label>
+    <label>Mô tả việc (agent đọc để hiểu vai trò)<textarea id="aq-duty" rows="4" maxlength="3000" placeholder="Trả lời tin nhắn khách Shopee về đơn hàng, giao hàng, cách dùng sản phẩm. Câu khó chuyển Lead Sale (người)."></textarea></label>
+    <div><div class="hint" style="margin-bottom:4px">Skill (đã chép theo agent mẫu, tích thêm hoặc bỏ bớt)</div><div id="aq-skills" style="display:flex;flex-wrap:wrap;gap:4px 14px;max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px">${all.map(k=>`<label style="display:inline-flex;gap:5px;align-items:center;font-size:13px;color:var(--ink)"><input type="checkbox" value="${esc(k)}" style="width:auto">${esc(k)}</label>`).join("")}</div></div>
+    <label>Lịch chạy (mỗi dòng: giờ | việc; để trống = chỉ làm khi được nhắn)<textarea id="aq-cron" rows="3" placeholder="mỗi 30 phút, 8h–21h | Đọc tin chưa trả lời trên Shopee và trả lời theo sổ tay"></textarea></label>
+    <label>Gói AI<select id="aq-combo"><option value="template">Dùng chung gói của agent mẫu</option></select></label>
+    <div class="err" id="aq-err"></div>
+    <button class="btn pri" id="aq-go">Tạo agent</button></div>`);
+  const fillParent=()=>{const M=aopMembers($("#aq-dept").value).filter(a=>!aopReq(a.id));$("#aq-parent").innerHTML=`<option value="">— đứng đầu phòng —</option>`+M.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");const lead=M.find(a=>!a.parent);if(lead){$("#aq-parent").value=lead.id;$("#aq-tpl").value=lead.id;fillSkills()}};
+  const fillSkills=()=>{const t=aopA($("#aq-tpl").value),S=new Set(t&&t.skills||[]);$$("#aq-skills input").forEach(x=>x.checked=S.has(x.value))};
+  let idTouched=false;
+  $("#aq-name").oninput=()=>{if(!idTouched){const v=aopSlug($("#aq-name").value);$("#aq-id").value=v?v+"-agent":""}};
+  $("#aq-id").oninput=()=>{idTouched=true};
+  $("#aq-dept").onchange=fillParent;$("#aq-tpl").onchange=fillSkills;fillParent();
+  $("#aq-go").onclick=async()=>{
+    const er=$("#aq-err");er.textContent="";
+    const body={agent:$("#aq-id").value.trim(),name:$("#aq-name").value.trim(),title:$("#aq-title").value.trim(),emoji:$("#aq-emoji").value.trim(),dept:$("#aq-dept").value,parent:$("#aq-parent").value,template:$("#aq-tpl").value,
+      skills:$$("#aq-skills input").filter(x=>x.checked).map(x=>x.value),duty:$("#aq-duty").value.trim(),combo:$("#aq-combo").value,
+      crons:$("#aq-cron").value.split("\n").map(l=>l.split("|")).filter(p=>p.length>=2&&p[0].trim()&&p[1].trim()).map(p=>({when:p[0].trim(),task:p.slice(1).join("|").trim()}))};
+    if(!body.name){er.textContent="Nhập tên agent";return}
+    if(!/^[a-z0-9][a-z0-9-]{2,59}$/.test(body.agent)){er.textContent="Mã agent chỉ gồm chữ thường không dấu, số, gạch ngang";return}
+    const b=$("#aq-go");b.disabled=true;
+    try{await svApi("/api/agent-ops/agent-req",{method:"POST",body:JSON.stringify(body)});closeDrawer();toast("Đã gửi yêu cầu. Máy chủ agent dựng xong sẽ hiện nút Bật agent.");AOP.tab="org";await aopLoad(true);acGrid()}catch(e){er.textContent=e.message;b.disabled=false}
+  };
+}
