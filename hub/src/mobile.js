@@ -286,6 +286,7 @@
     raf=0;
     const bar=document.getElementById("mobtab");
     if(!bar||!narrow.matches||document.hidden)return;
+    if(!bar.offsetHeight||getComputedStyle(bar).display==="none"){if(dy){dy=0;bar.style.transform=""}return} // thanh đang ẩn (mở menu, xem phiếu): không đo
     const v=window.visualViewport;
     if(v&&v.scale>1.05)return; // đang phóng to bằng 2 ngón: để yên
     const ih=window.innerHeight,ch=document.documentElement.clientHeight,vh=v?v.height+v.offsetTop:ih;
