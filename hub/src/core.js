@@ -98,7 +98,7 @@ const PERMS=[
  ["Báo cáo",[["baocao.tiktok","Nhập báo cáo TikTok"],["baocao.ads","Nhập báo cáo Ads Facebook"]]],
  ["Nhân sự & lương",[["nhansu.duyet","Duyệt nghỉ phép, OT, tạm ứng, KPI"],["luong.quanly","Xem và làm bảng lương, phiếu lương"]]],
  ["Thiết lập & Tài chính",[["thietlap.quanly","Sửa dữ liệu gốc: phòng ban, kênh bán, danh mục chi phí, SKU"],["gia.xem_von","Xem giá vốn SKU"],["chiphi.xem","Xem chi phí theo tháng"],["chiphi.nhap","Nhập chi phí"],["pl.xem","Xem báo cáo P&L"]]],
- ["Sản xuất",[["sx.dieuphoi","Tạo nhu cầu sản xuất, đề nghị mua hàng (điều phối)"],["sx.xuong","Bắt đầu việc, báo hoàn thành (tổ trưởng xưởng)"],["sx.kiemke","Kiểm kê, tạo lô, in tem, nhập kho (kế toán kho)"],["sx.kythuat","Báo nguyên vật liệu thực tế (kỹ thuật)"]]],
+ ["Sản xuất",[["sx.dieuphoi","Tạo nhu cầu sản xuất, đề nghị mua hàng (điều phối)"],["sx.xuong","Bắt đầu việc, báo hoàn thành (tổ trưởng xưởng)"],["sx.kiemke","Kiểm kê, tạo lô, in tem, nhập kho (kế toán kho)"],["sx.kythuat","Kỹ thuật pha chế: nhận việc pha, ghi phiếu pha, báo tồn"],["sx.congthuc","Duyệt công thức pha chế (Trưởng kỹ thuật)"]]],
  ["Hệ thống",[["sanpham.quanly","Quản lý danh mục sản phẩm"],["nhansu.quanly","Quản lý nhân sự, mật khẩu, phân quyền"],["quychuan.sua","Sửa quy chuẩn"],["caidat.quanly","Cài đặt, sao lưu, xóa dữ liệu"]]],
 ];
 const ALL_PERMS=PERMS.flatMap(g=>g[1].map(p=>p[0]));

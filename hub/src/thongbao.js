@@ -114,7 +114,7 @@ async function ntTick(){
     if(after!=null)(r.agent||[]).forEach(m=>{if(PAGE==="agentchat"&&typeof AC!=="undefined"&&AC.cur===m.agent&&!document.hidden)return ntSeen("ag:"+m.id);
       ntPush({key:"ag:"+m.id,type:"agent",text:String(m.body||"").replace(/\s+/g," ").slice(0,160),by:m.agent_name,at:m.created_at,go:()=>ntOpenAgent(m.agent)})});
     if(typeof pdBuild==="function")ntFromPd(pdBuild({approvals:r.approvals,shipEdits:r.shipEdits,proposals:r.proposals,gifts:r.gifts,cash:r.cash,ceoSpend:r.ceoSpend,payConfirm:r.payConfirm,returns:r.returns,th:typeof pdTh==="function"?pdTh():5e6},pdWho()));
-    (r.crmTasks||[]).forEach(t=>ntPush({key:"ct:"+t.id,type:"giao",text:"Việc chăm sóc khách: "+t.title+(t.due_at?" · hạn "+String(t.due_at).slice(8,10)+"/"+String(t.due_at).slice(5,7):""),by:t.created_by_name||"",at:t.created_at,go:()=>ntPage("viectoi")}));
+    (r.crmTasks||[]).forEach(t=>ntPush({key:"ct:"+t.id,type:"giao",text:(t.customer_id?"Việc chăm sóc khách: ":"Việc được giao: ")+t.title+(t.due_at?" · hạn "+String(t.due_at).slice(8,10)+"/"+String(t.due_at).slice(5,7):""),by:t.created_by_name||"",at:t.created_at,go:()=>ntPage("viectoi")}));
   }catch(e){}finally{NT.busy=false}
   ntCombo();
 }
