@@ -342,18 +342,35 @@
 (function(){
   if(typeof window==="undefined"||!window.matchMedia||typeof khoShowPrint!=="function")return;
   const narrow=window.matchMedia("(max-width:760px)");
-  const MCSS="<style id=\"mpvcss\">@media screen and (max-width:760px){html{background:#fff!important}body{max-width:none!important;margin:0!important;padding:12px 12px 28px!important;box-shadow:none!important;font-size:14px!important}"+
-    ".top{gap:8px!important;padding-bottom:8px!important}.top img{height:34px!important}.co b{font-size:10.5px!important}.co span{font-size:10px!important}.no b{font-size:13px!important}"+
-    "h1{font-size:17px!important;margin:10px 0 4px!important}.meta{grid-template-columns:1fr!important}.meta div{padding:6px 10px!important}.meta label{min-width:118px!important}"+
-    "table,thead,tbody,tfoot,tr,td,th{display:block!important;width:auto!important}thead{display:none!important}"+
-    "tbody tr,tfoot tr{display:flex!important;flex-direction:column;border:1px solid #c9d1ea;border-radius:10px;margin:0 0 8px;padding:6px 10px;background:#fff}"+
-    "tbody tr td,tfoot tr td{background:none!important;border:0!important;padding:3px 0!important;display:flex!important;justify-content:space-between;gap:12px;text-align:right!important;height:auto!important;min-height:0!important;min-width:0!important}"+
-    "td::before{content:attr(data-l);color:#667085;text-align:left;font-weight:400;flex:none}td[data-l=\"\"]::before,td:not([data-l])::before{content:none}"+
-    "td.c{display:none!important}td[data-l=\"Tên hàng\"],td[data-l=\"Nguyên vật liệu\"],td[data-l=\"Sản phẩm\"],td[data-l=\"Tên\"]{order:-1;font-weight:700;font-size:14.5px;text-align:left!important}td[data-l=\"Tên hàng\"]::before,td[data-l=\"Nguyên vật liệu\"]::before,td[data-l=\"Sản phẩm\"]::before,td[data-l=\"Tên\"]::before{content:none}"+
-    "td.fill{border-bottom:1px dashed #c9a400!important;min-height:26px!important}tr.pr{background:#fff0f6!important}tr.lech{background:#fff4e0!important}"+
-    ".sig{grid-template-columns:repeat(3,1fr)!important;gap:8px!important;margin-top:18px!important}.sig b{font-size:11px!important}.sig span{font-size:9.5px!important}}</style>";
+  /* Bản rút gọn trên màn điện thoại (chị Hoa 07/11): mỗi dòng hàng 2 dòng — tên đậm + số chính (kèm đơn vị) bên phải; dòng nhỏ mã · định mức;
+     thực tế / chênh lệch chỉ hiện khi có số. Chỉ áp cho màn hình hẹp; in A4 / PDF vẫn đủ cột như cũ (không đổi chữ trong phiếu, chỉ thêm thuộc tính). */
+  const MCSS="<style id=\"mpvcss\">@media screen and (max-width:760px){html{background:#fff!important}body{max-width:none!important;margin:0!important;padding:10px 10px 24px!important;box-shadow:none!important;font-size:14px!important}"+
+    ".top{gap:8px!important;padding-bottom:6px!important;border-bottom-width:2px!important}.top img{height:28px!important}.co b{font-size:10px!important}.co span{display:none}.no b{font-size:12.5px!important}.no span{font-size:10px!important}"+
+    "h1{font-size:16px!important;margin:8px 0 2px!important}.st{margin:0 0 8px!important}.st i{font-size:10.5px!important}"+
+    ".meta{grid-template-columns:1fr!important;margin-bottom:10px!important}.meta div{padding:4px 10px!important;font-size:13px}.meta label{min-width:0!important;flex:1}.meta b{text-align:right}"+
+    "table,thead,tbody,tfoot{display:block!important;width:auto!important}thead{display:none!important}"+
+    "tbody tr,tfoot tr{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:1px 10px;border:0;border-bottom:1px solid #e4e8f5;padding:8px 2px;background:none!important}"+
+    "tbody tr td,tfoot tr td{display:none!important;border:0!important;padding:0!important;background:none!important;height:auto!important;min-height:0!important;min-width:0!important}"+
+    "td[data-k=nm]{display:block!important;grid-column:1;grid-row:1;font-weight:700;font-size:14px}"+
+    "td[data-k=q]{display:block!important;grid-column:2;grid-row:1;font-weight:700;text-align:right!important;white-space:nowrap}"+
+    "td[data-k=q]::after,td[data-k=tt]::after{content:\" \" attr(data-u);font-weight:400;color:#667085;font-size:12px}"+
+    "td[data-k=ma]{display:block!important;grid-column:1/-1;grid-row:2;font-size:11.5px;color:#667085}td[data-k=ma]::after{content:attr(data-dm)}"+
+    "td[data-k=tt].v,td[data-k=cl].v{display:block!important;grid-row:3;font-size:12.5px}td[data-k=tt].v{grid-column:1}td[data-k=cl].v{grid-column:2;text-align:right!important}"+
+    "td[data-k=tt].v::before{content:\"Thực tế \";color:#667085}td[data-k=cl].v::before{content:\"Lệch \";color:#667085}"+
+    "td[data-k=gc].v{display:block!important;grid-column:1/-1;font-size:12px;color:#667085}"+
+    "tr.pr{background:#fff0f6!important;border-radius:8px;padding:8px!important}tr.lech td[data-k=cl]{color:#b54708;font-weight:700}"+
+    "tfoot tr td.n{display:block!important;grid-column:2;font-weight:700}"+
+    ".note,.can{font-size:13px}.sig{display:none!important}.foot{margin-top:10px!important}}</style>";
   const label=doc=>{doc.querySelectorAll("table").forEach(t=>{const hr=t.tHead&&t.tHead.rows[0];if(!hr)return;const H=[...hr.cells].map(c=>c.textContent.trim());
-    [...t.querySelectorAll("tbody tr,tfoot tr")].forEach(r=>{let i=0;[...r.cells].forEach(c=>{if(!c.hasAttribute("data-l"))c.setAttribute("data-l",H[i]||"");i+=c.colSpan||1})})})};
+    const K={"Tên hàng":"nm","Nguyên vật liệu":"nm","Sản phẩm":"nm","Tên":"nm","Mã hàng":"ma","Mã":"ma","Định lượng":"q","Số lượng":"q","Cần dùng":"q","Thực tế":"tt","Chênh lệch":"cl","Ghi chú":"gc","ĐVT":"u","Định mức":"dm"};
+    const hasDl=H.includes("Định lượng");
+    [...t.querySelectorAll("tbody tr,tfoot tr")].forEach(r=>{let i=0;const C={};[...r.cells].forEach(c=>{const h=H[i]||"";c.setAttribute("data-l",h);let k=K[h]||"";if(k==="q"&&h==="Số lượng"&&hasDl)k="";if(k){c.setAttribute("data-k",k);C[k]=c}i+=c.colSpan||1});
+      const u=C.u?C.u.textContent.trim():"";const val=c=>{const v=(c&&c.textContent||"").trim();return v&&v!=="—"&&v!=="-"};
+      if(C.q)C.q.setAttribute("data-u",u);if(C.tt)C.tt.setAttribute("data-u",u);
+      if(C.ma&&C.dm&&val(C.dm))C.ma.setAttribute("data-dm"," · định mức "+C.dm.textContent.trim()+(hasDl?"/lít":""));
+      ["tt","cl","gc"].forEach(k=>{if(C[k]&&val(C[k])&&!C[k].classList.contains("fill"))C[k].classList.add("v")});
+      if(!C.q&&C.nm){const q=[...r.cells].find(c=>c.classList.contains("n")&&val(c));if(q){q.setAttribute("data-k","q");q.setAttribute("data-u",u)}}
+    })})};
   const nameOf=html=>{const m=/<title>([^<]*)<\/title>/i.exec(html);return ((m&&m[1])||"phieu").replace(/[\\/:*?"<>|]+/g,"-").trim()||"phieu"};
   const close=()=>{const o=document.getElementById("mpv");if(o)o.remove();document.body.classList.remove("mpv-open")};
   function view(html){
