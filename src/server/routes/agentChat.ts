@@ -324,7 +324,8 @@ agentChatRoutes.put('/access/:userId', async (c) => {
 /* ---------- Cầu nối trên VPS gọi ---------- */
 export const agentRelayRoutes = new Hono<AppEnv>();
 
-agentRelayRoutes.use('*', async (c, next) => {
+/** Kiểm khoá cầu nối (dùng chung cho /api/agent-relay và /api/agent-relay-ops). */
+export const relayAuth = async (c: { req: { header: (k: string) => string | undefined }; env: { AGENT_RELAY_KEY?: string } }, next: () => Promise<void>) => {
   const key = c.req.header('X-Relay-Key') ?? '';
   const expected = (c.env.AGENT_RELAY_KEY ?? '').trim(); // secret đặt từ PowerShell có thể dính ký tự xuống dòng
   if (!expected || key.length !== expected.length) throw unauthorized('Sai khoá cầu nối');
@@ -332,7 +333,8 @@ agentRelayRoutes.use('*', async (c, next) => {
   for (let i = 0; i < key.length; i++) diff |= key.charCodeAt(i) ^ expected.charCodeAt(i);
   if (diff !== 0) throw unauthorized('Sai khoá cầu nối');
   await next();
-});
+};
+agentRelayRoutes.use('*', relayAuth);
 
 /** Lấy tin mới (tối đa 3), đánh dấu đã nhận để không ai lấy trùng. Cũng là tín hiệu "cầu nối đang sống". */
 agentRelayRoutes.post('/pull', async (c) => {

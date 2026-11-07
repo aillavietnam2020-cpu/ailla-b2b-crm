@@ -26,6 +26,7 @@ import { agentTiktokRoutes } from './routes/agentTiktok';
 import { agentShopeeRoutes } from './routes/agentShopee';
 import { agentAdminRoutes } from './routes/agents';
 import { agentChatRoutes, agentRelayRoutes } from './routes/agentChat';
+import { agentOpsRoutes, agentRelayOpsRoutes } from './routes/agentOps';
 import { agentTrainRoutes, agentTrainRelayRoutes } from './routes/agentTrain';
 import { proposalRoutes } from './routes/proposals';
 import { receivingAccountRoutes } from './routes/receivingAccounts';
@@ -103,6 +104,7 @@ export function createApp() {
   app.route('/api/stt-worker', sttWorkerRoutes);
   // Cầu nối trên VPS (nhắn agent trên web) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/agent-relay', agentRelayRoutes);
+  app.route('/api/agent-relay-ops', agentRelayOpsRoutes);
   app.route('/api/agent-train-relay', agentTrainRelayRoutes);
   // Agent Fanpage (OpenClaw trên VPS) tự gọi bằng khoá riêng FP_KEY.
   app.route('/api/fp', fpAgentRoutes);
@@ -137,6 +139,8 @@ export function createApp() {
   // Nhắn agent trên web: chạy được cả ở trang vận hành, vẫn chỉ CEO.
   app.route('/api/agent-chat/stt', sttRoutes);
   app.route('/api/agent-chat', agentChatRoutes);
+  // Điều hành agent: sơ đồ tổ chức + bộ não phòng ban (chỉ CEO).
+  app.route('/api/agent-ops', agentOpsRoutes);
   app.route('/api/agent-train', agentTrainRoutes);
   app.route('/api/proposals', proposalRoutes);
   app.route('/api/receiving-accounts', receivingAccountRoutes);
