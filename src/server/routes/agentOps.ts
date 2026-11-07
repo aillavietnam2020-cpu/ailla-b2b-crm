@@ -89,9 +89,11 @@ agentOpsRoutes.get('/', async (c) => {
       )
       .bind(c.get('auth').user.id)
       .all<{ agent: string; pending: number; last_at: string }>(),
+    // Bảng nội dung tài liệu (0087) có thể chưa tạo: thiếu thì coi như chưa có tài liệu, trang vẫn chạy.
     db
       .prepare('SELECT agent, kind, name, description, path, size, file_at, CASE WHEN body IS NULL THEN 0 ELSE 1 END AS has_body FROM agent_ops_doc')
-      .all<{ agent: string; kind: string; name: string; description: string | null; path: string | null; size: number | null; file_at: string | null; has_body: number }>(),
+      .all<{ agent: string; kind: string; name: string; description: string | null; path: string | null; size: number | null; file_at: string | null; has_body: number }>()
+      .catch(() => ({ results: [] as { agent: string; kind: string; name: string; description: string | null; path: string | null; size: number | null; file_at: string | null; has_body: number }[] })),
   ]);
   const docBy = new Map<string, Record<string, unknown>[]>();
   for (const d of docs.results ?? []) (docBy.get(d.agent) ?? docBy.set(d.agent, []).get(d.agent)!).push({ kind: d.kind, name: d.name, description: d.description, path: d.path, size: d.size, file_at: d.file_at, has_body: !!d.has_body });
@@ -159,7 +161,8 @@ agentOpsRoutes.get('/doc', async (c) => {
   if (!AGENT_RE.test(agent) || !DOC_KINDS.includes(kind) || !name) throw badRequest('BAD_DOC', 'Thiếu thông tin tài liệu');
   const r = await c.env.DB.prepare('SELECT agent, kind, name, description, path, body, size, file_at, updated_at FROM agent_ops_doc WHERE agent = ? AND kind = ? AND name = ?')
     .bind(agent, kind, name)
-    .first();
+    .first()
+    .catch(() => null);
   if (!r) throw notFound('Máy chủ agent chưa gửi nội dung tài liệu này');
   return ok(c, r);
 });

@@ -2,7 +2,7 @@
    Chỉ CEO thấy. Nhân viên được cấp quyền vẫn thấy màn thẻ agent cũ để nhắn tin.
    Dữ liệu: /api/agent-ops (trạng thái máy chủ agent gửi lên mỗi 5 phút, phòng ban, ghi chú phòng, nhật ký, skill).
    Tab: Sơ đồ tổ chức · Bộ não phòng ban · Năng lực agent · Quyền nhắn agent. Bấm agent mở hồ sơ; nút Nhắn mở khung chat cũ. */
-const AOP={tab:"org",dept:"mk",data:null,at:0,busy:false,err:"",dtab:"now"};
+const AOP={tab:(()=>{try{return localStorage.getItem("aop_tab")||"org"}catch(e){return "org"}})(),dept:"mk",data:null,at:0,busy:false,err:"",dtab:"now"};
 const AOP_ST={work:["p-grn","Đang làm","#16a34a"],wait:["p-amb","Đang chờ","#d97706"],stuck:["p-red","Đang kẹt","#ea580c"],err:["p-red","Bị lỗi","#dc2626"],idle:["p-blu","Rảnh","#3b82f6"],off:["p-gry","Đang tắt","#cbd5e1"],unk:["p-gry","Chưa rõ","#d0d5dd"]};
 const AOP_CSS=`<style id="aop-css">
 .aoc-banner{margin-bottom:12px}
@@ -55,6 +55,7 @@ const AOP_CSS=`<style id="aop-css">
 .aoc-form{display:grid;gap:10px}.aoc-form label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .aoc-doc{width:100%;text-align:left;background:#fff;cursor:pointer;font:inherit;color:inherit}.aoc-doc:hover{border-color:#a5b4fc;background:#fafaff}.aoc-doc code{font-size:11.5px;color:var(--muted);word-break:break-all}.aoc-doc em{font-style:normal;font-size:12px;color:#4b54d1;font-weight:600}
 .aoc-md{font-size:14px;line-height:1.6;min-width:0}.aoc-md h2,.aoc-md h3,.aoc-md h4{margin:14px 0 6px}.aoc-md p{margin:6px 0}.aoc-md code{background:var(--gray-soft);border-radius:4px;padding:0 4px;font-size:13px}.aoc-pre{background:#1e1e24;color:#e4e4e7;border-radius:10px;padding:10px 12px;overflow-x:auto;font-size:12.5px;white-space:pre}
+.aoc-ph{object-fit:cover;padding:0}.og-n .aoc-av{width:38px;height:38px}
 @media(max-width:1100px){.aov{grid-template-columns:1fr}.aov-r{border-left:0;border-top:1px solid var(--line)}.aoc-kp{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 </style>`;
 const aopA=id=>(AOP.data&&AOP.data.agents||[]).find(a=>a.id===id);
@@ -72,7 +73,7 @@ function aopJob(t){let x=String(t||"");for(const [r,v] of AOP_JOB)x=x.replace(r,
 function aopErr(t){const x=String(t||"");if(!x)return "";const job=x.includes(":")?aopJob(x.slice(0,x.indexOf(":"))).trim():"";const hit=AOP_ERR.find(([r])=>r.test(x));const msg=hit?hit[1]:"Lỗi kỹ thuật";return job&&job.length<80?job+": "+msg:msg}
 const aopSt=a=>{if(!a)return"unk";const s=a.status;if(s)return s.state||"idle";return a.pending>0?"work":"unk"}; /* số cũ vẫn hiện trạng thái lần gần nhất, kèm giờ */
 const aopPill=s=>`<span class="pill ${AOP_ST[s][0]}">${AOP_ST[s][1]}</span>`;
-const aopAv=a=>`<span class="aoc-av" style="--c:${esc(a.color||"#64748b")}">${esc(a.emoji||"🤖")}</span>`;
+const aopAv=a=>typeof AC_AV!=="undefined"&&AC_AV[a.id]?`<img class="aoc-av aoc-ph" style="--c:${esc(a.color||"#64748b")}" src="${AC_AV[a.id]}" alt="${esc(a.name)}">`:`<span class="aoc-av" style="--c:${esc(a.color||"#64748b")}">${esc(a.emoji||"🤖")}</span>`;
 const aopTask=a=>{const s=a.status;if(s&&s.task)return s.task;if(a.pending>0)return `Đang trả lời ${a.pending} tin nhắn trên web`;if(!s)return "Chưa có tin từ máy chủ";if(s.state==="off")return "Đang tắt";if(s.state==="err")return s.last_error?aopErr(s.last_error):"Lượt chạy gần nhất bị lỗi";return s.next_run?"Rảnh · lượt tới "+aopJob(s.next_run):"Không có việc"};
 const aopName=x=>{const a=aopA(x);return a?a.name:x};
 const aopDepts=()=>(AOP.data.depts||[]).slice().sort((a,b)=>(a.sort||0)-(b.sort||0));
@@ -94,12 +95,12 @@ function aopRender(auto){
   if(!AOP.data){if(AOP.err){R.innerHTML=`<div class="err box">Chưa tải được sơ đồ agent: ${esc(AOP.err)} <button class="btn sm" id="aop-retry">Thử lại</button></div>`;$("#aop-retry").onclick=()=>{AOP.err="";aopRender(false)};return}
     R.innerHTML='<div class="hint">Đang tải sơ đồ agent…</div>';aopLoad(true).then(()=>setTimeout(()=>{if(!AC.cur&&PAGE==="agentchat"&&acRoot())aopRender(true)},0));return}
   if(auto&&R.querySelector(".aov-add:not([hidden])"))return; // đang gõ ghi chú thì không vẽ lại
-  const tabs=[["org","Sơ đồ tổ chức"],["brain","Bộ não phòng ban"],["cap","Năng lực agent"],["perm","Quyền nhắn agent"]];
+  const tabs=AOP_TABS;
   const d=AOP.data;
   R.innerHTML=`${AOP.err?`<div class="err box">Chưa tải được: ${esc(AOP.err)}</div>`:""}${d.status_fresh?"":`<div class="warn aoc-banner">${d.status_at?`Máy chủ agent gửi trạng thái lần cuối lúc ${esc(aopTime(d.status_at))} (${esc(acAgo(d.status_at))}). Trang đang hiện số của lần đó; máy chủ gửi lại thì tự cập nhật.`:"Máy chủ agent chưa gửi trạng thái lần nào. Sơ đồ, phòng ban và skill vẫn xem được."}</div>`}
    <div class="tabs">${tabs.map(t=>`<button data-dht="${t[0]}" class="${AOP.tab===t[0]?"on":""}">${t[1]}</button>`).join("")}<span style="flex:1"></span><button class="btn sm" id="dh-reload">↻ Cập nhật</button></div>
    <div id="dh-body">${AOP.tab==="org"?aopOrg():AOP.tab==="brain"?aopBrain():AOP.tab==="cap"?aopCap():'<div id="ac-access"></div>'}</div>`;
-  R.querySelectorAll("[data-dht]").forEach(b=>b.onclick=()=>{AOP.tab=b.dataset.dht;aopRender()});
+  aopBindTabs(R);
   $("#dh-reload").onclick=()=>aopLoad(true).then(()=>aopRender());
   R.querySelectorAll("[data-dha]").forEach(b=>b.onclick=e=>{e.stopPropagation();aopOpen(b.dataset.dha)});
   R.querySelectorAll("[data-dhd]").forEach(b=>b.onclick=()=>{AOP.dept=b.dataset.dhd;AOP.tab="brain";aopRender();scrollTo(0,0)});
@@ -285,3 +286,8 @@ async function aopDocView(agent,kind,name){
     $("#aop-copy").onclick=()=>{try{navigator.clipboard.writeText(d.body||"").then(()=>toast("Đã chép"),()=>toast("Không chép được"))}catch(e){toast("Không chép được")}};
   }catch(e){const box=$("#aop-docbody");if(box)box.innerHTML=`<div class="warn">${esc(e.message)}. Khi máy chủ agent gửi nội dung lên, bấm lại là xem được.</div>`}
 }
+
+/* ---------- Thanh tab dùng chung (cả màn Nhắn agent kiểu thẻ cũ) ---------- */
+const AOP_TABS=[["org","Sơ đồ tổ chức"],["chat","💬 Nhắn agent"],["brain","Bộ não phòng ban"],["cap","Năng lực agent"],["perm","Quyền nhắn agent"]];
+function aopTabsBar(){return `<div class="tabs" id="aop-tabs">${AOP_TABS.map(t=>`<button data-dht="${t[0]}" class="${AOP.tab===t[0]?"on":""}">${t[1]}</button>`).join("")}</div>`}
+function aopBindTabs(R){(R||document).querySelectorAll("[data-dht]").forEach(b=>b.onclick=()=>{AOP.tab=b.dataset.dht;try{localStorage.setItem("aop_tab",AOP.tab)}catch(e){}acGrid()})}

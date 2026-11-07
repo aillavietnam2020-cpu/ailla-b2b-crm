@@ -273,7 +273,7 @@ function acStatus(a){return !AC.relay?["off","Chưa nối"]:a.pending?["busy","�
 function acRoot(){return $("#ac-root")}
 /* ----- Màn tổng: thẻ nhân sự ----- */
 function acGrid(){
-  if(AC.isCeo&&typeof aopRender==="function"){aopRender(true);return} /* CEO: sơ đồ tổ chức + bộ não phòng ban (dhops.js) */
+  if(AC.isCeo&&typeof aopRender==="function"&&AOP.tab!=="chat"){aopRender(true);return} /* CEO: sơ đồ tổ chức + bộ não phòng ban (dhops.js) */
   const R=acRoot();if(!R)return;const L=AC.agents||[];
   const tot=L.length,on=AC.relay?tot:0,today=L.reduce((s,a)=>s+(a.today||0),0),pend=L.reduce((s,a)=>s+(a.pending||0),0);
   const show=L.filter(a=>AC.filter==="all"||(AC.filter==="busy"&&a.pending>0));
@@ -286,6 +286,7 @@ function acGrid(){
    <div class="ac-grid">${(show.length?show:[]).map(a=>{const[s,t]=acStatus(a);return `<button class="ac-pc" data-ac="${esc(a.id)}" style="--ac:${esc(a.color||"#64748b")}"><div class="ph">${acAv(a)}<div><span class="ac-st ${s}">${t}</span><b>${esc(a.name)}</b><small>${esc(a.title||"")}</small></div></div>
      <div class="ac-mini"><div><b>${a.today||0}</b><span>Tin hôm nay</span></div><div><b>${a.pending||0}</b><span>Đang chờ</span></div><div><b style="font-size:12px;line-height:20px">${acAgo(a.last_at)}</b><span>Hoạt động</span></div></div>
      <div class="ac-q">Được đọc: ${esc(a.quyen||"")}</div></button>`}).join("")||'<div class="hint">Bạn chưa được cấp quyền nhắn agent nào. Nhờ CEO cấp quyền.</div>'}</div><div id="ac-access"></div>`;
+  if(AC.isCeo&&typeof aopTabsBar==="function"){R.insertAdjacentHTML("afterbegin",aopTabsBar());aopBindTabs(R)} /* CEO: tab Nhắn agent nằm cùng thanh với Sơ đồ tổ chức */
   if(AC.isCeo)acAccess();
   R.querySelectorAll("[data-ac]").forEach(b=>b.onclick=()=>acPick(b.dataset.ac));
   R.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{AC.filter=b.dataset.f;acGrid()});
