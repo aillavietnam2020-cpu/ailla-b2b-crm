@@ -245,6 +245,7 @@ function tkResultBox(t){
   const tcNo=t.tuChoi&&t.tuChoi.st==="khong"&&t.st!=="done"?`<div class="note amb">Xin từ chối không được duyệt${t.tuChoi.note?": "+esc(t.tuChoi.note):""}. Việc vẫn cần làm.</div>`:"";
   if(t.tuThem&&t.tao===t.nguoi&&!t.duyet&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}${tkReopenOk(t)?`<div class="acts"><button type="button" class="btn sm" id="t-reopen">↺ Mở lại việc</button><span class="hint">bấm nhầm hoàn thành thì mở lại</span></div>`:""}</div>`;
+  if(t.st==="review"&&mg&&!(t.nopAt||t.kq||t.kqNote||(t.kqFiles||[]).length))return `<div class="tkres rv"><b>Người làm chưa nộp kết quả</b> <span class="hint">việc đang ở Chờ duyệt nhưng chưa có gì để duyệt</span><div class="acts"><button type="button" class="btn sm pri" id="t-backtodo">Trả về Cần làm</button></div></div>`;
   if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Cần sửa</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt</button></div></div>`
     :`<div class="tkres rv"><b>Đã nộp, đang chờ ${esc(tkMgrNames(t))} duyệt${tkV2(t)?(t.vong===2?" vòng 2":" vòng 1"):""}</b>${sub}</div>`;
   if(doer){const need=!!tkDoneErr(t);
@@ -356,6 +357,7 @@ function openTask(id){
     DB.mutate(ME.name,"nhắc việc "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.nhac=(x.nhac||[]).concat({at:new Date().toLocaleString("vi-VN"),by:ME.name,msg}).slice(-20);const n=x.nhac.length,lt=x.han&&x.han<dt.settings.today;
       tkLog(x,"Nhắc lần "+n+(msg?": "+msg:""));if(typeof notifyU==="function")notifyU(dt,[x.nguoi],`🔔 ${ME.name} nhắc${n>1?" lần "+n:""}: việc "${x.ten}"${lt?" đã trễ hạn "+dd(x.han):x.han?" · hạn "+dd(x.han):""}${msg?" · "+msg:""}`,"task:"+x.id)});
     toast("Đã nhắc "+(userName(t.nguoi)||""));openTask(t.id);renderMain()};
+  if($("#t-backtodo"))$("#t-backtodo").onclick=()=>tkBackTodo(t);
   if($("#t-reopen"))$("#t-reopen").onclick=()=>{const to=tkReopenTo(t);if(!confirm("Mở lại việc này về \""+cvStN(to)+"\"?"))return;
     DB.mutate(ME.name,"mở lại việc "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.st=to;x.vong=to==="review"?1:0;delete x.stTruoc;delete x.xongNgay;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkLog(x,"Mở lại việc (Hoàn thành → "+cvStN(to)+")");if(typeof notifyU==="function"&&x.nguoi!==ME.id)notifyU(dt,[x.nguoi],`${ME.name} mở lại việc "${x.ten}"`,"task:"+x.id)});toast("Đã mở lại việc");openTask(t.id);renderMain()};
   if($("#t-tcok"))$("#t-tcok").onclick=()=>{if(!confirm("Hủy việc này? Việc không cần làm nữa."))return;tkTuChoi(t.id,"ok");toast("Đã hủy việc");closeDrawer();renderMain()};
@@ -415,6 +417,10 @@ function openTask(id){
 }
 /* Từ chối việc: người duyệt là người giao (CEO / Lead cũng duyệt được). Đồng ý thì việc chuyển sang lưu trữ (dt.tasksHuy), không tính vào số liệu. */
 /* mở lại việc đã hoàn thành (bấm nhầm): người giao, người duyệt, CEO; việc tự thêm thì chính người làm */
+/* đưa việc chưa nộp mà đang nằm ở Chờ duyệt về lại Cần làm, báo người làm */
+function tkBackTodo(t){if(!confirm("Trả việc \""+t.ten+"\" về Cần làm?"))return;
+  DB.mutate(ME.name,"trả về Cần làm: "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.st="todo";x.vong=0;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkLog(x,"Trả về Cần làm (chưa nộp kết quả)");if(typeof notifyU==="function"&&x.nguoi!==ME.id)notifyU(dt,[x.nguoi],`${ME.name}: việc "${x.ten}" vẫn cần làm`,"task:"+x.id)});
+  toast("Đã trả về Cần làm");if(typeof closeDrawer==="function")closeDrawer();renderMain()}
 const tkReopenTo=t=>t.stTruoc&&t.stTruoc!=="done"?t.stTruoc:((t.nopAt||t.kq||t.kqNote)?"review":"todo");
 const tkReopenOk=t=>!!ME&&t.st==="done"&&(ME.role==="admin"||t.tao===ME.id||t.duyet===ME.id||tkMgr(t)||(t.nguoi===ME.id&&t.tao===ME.id));
 const tkTcCan=t=>!!ME&&ME.id!==t.nguoi&&(t.tao===ME.id||ME.role==="admin"||(typeof tkLeadOf==="function"&&(tkLeadOf(t)||{}).id===ME.id));

@@ -183,7 +183,9 @@ function cwMeta(r,sub){const a=[];
   if(r.tl&&r.st!=="done"&&r.st!=="review")a.push('<span class="r">bị trả lại, cần sửa</span>');
   return a.join("")}
 const cwUu=r=>r.gap?`<span class="cwgap" title="Việc gấp">${cwI("flag",11)}GẤP</span>`:r.uu==="Cao"?`<span class="t-red" title="Ưu tiên cao" style="display:inline-flex;margin-right:4px;vertical-align:-2px">${cwI("flag",13)}</span>`:"";
-const cwAct=r=>{if(!r.rv)return "<div></div>";return `<div class="cwact"><button type="button" class="btn sm pri" data-cwok="${esc(r.k)}">Duyệt</button><button type="button" class="btn sm" data-cwfix="${esc(r.k)}">Cần sửa</button></div>`};
+/* việc đang "Chờ duyệt" nhưng người làm chưa nộp gì (vd. bấm nhầm): không có nút Duyệt, chỉ trả về Cần làm */
+const cwChuaNop=r=>{const t=cwTask(r);return !!t&&t.st==="review"&&!(t.nopAt||t.kq||t.kqNote||(t.kqFiles||[]).length)};
+const cwAct=r=>{if(!r.rv)return "<div></div>";if(cwChuaNop(r))return `<div class="cwact"><button type="button" class="btn sm" data-cwback="${esc(r.k)}">Trả về Cần làm</button></div>`;return `<div class="cwact"><button type="button" class="btn sm pri" data-cwok="${esc(r.k)}">Duyệt</button><button type="button" class="btn sm" data-cwfix="${esc(r.k)}">Cần sửa</button></div>`};
 function cwRow(r,o){o=o||{};const done=r.st==="done";
   const lead=o.sel?(r.src==="task"?`<input type="checkbox" class="cwsel" data-cwsel="${esc(r.k)}"${CWS.sel.has(r.k)?" checked":""} aria-label="Chọn việc">`:`<span class="cwdot">${cwI(r.src==="order"?"inbox":"video")}</span>`)
     :(r.src==="task"&&cwCanDo(r)?`<button type="button" class="cwck" data-cwck="${esc(r.k)}" title="${done?"Bỏ đánh dấu xong":"Bấm là xong"}" aria-label="${done?"Bỏ đánh dấu xong":"Đánh dấu xong"}"></button>`
@@ -271,6 +273,7 @@ function cwBind(m,list){const by={};(list||cwRows()).forEach(r=>by[r.k]=r);const
   m.querySelectorAll("[data-cwg]").forEach(r=>r.onclick=()=>{const k=r.dataset.cwg,s=m.querySelector(`[data-cwsub="${CSS.escape(k)}"]`);r.classList.toggle("open");if(s)s.classList.toggle("open");if(CWS.open.has(k))CWS.open.delete(k);else CWS.open.add(k)});
   m.querySelectorAll("[data-cwo]").forEach(e=>e.onclick=ev=>{if(ev.target.closest("button,input,select,a"))return;ev.stopPropagation();cwOpenRow(R(e.dataset.cwo))});
   m.querySelectorAll("[data-cwck]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();cwToggleDone(R(b.dataset.cwck))});
+  m.querySelectorAll("[data-cwback]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();const t=cwTask(R(b.dataset.cwback));if(t)tkBackTodo(t)});
   m.querySelectorAll("[data-cwok]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();const r=R(b.dataset.cwok);if(!r)return;if(r.src==="card"){openCard(r.id);return}
     const v=tkApprove(r.id);if(v!==false||!(cwTask(r)||{}).cd){toast(v?"Đã duyệt vòng 1, chuyển CEO duyệt V2":"Đã duyệt");renderMain()}});
   m.querySelectorAll("[data-cwfix]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();const r=R(b.dataset.cwfix);if(!r)return;if(r.src==="card"){openCard(r.id);return}const t=cwTask(r);if(t&&t.cd&&t.cd.length){openTask(t.id);return}
