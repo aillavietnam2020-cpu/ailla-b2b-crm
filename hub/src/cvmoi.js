@@ -149,7 +149,8 @@ function cwRows(){if(CW_C)return CW_C;const d=D(),td=d.settings.today,T={},out=[
   try{[].concat(cvAutoMk(true)||[],cvAutoDg(true)||[]).forEach(g=>{if(CV_TEST.includes(g.nguoi))return;
     out.push({k:g.kind+":"+g.key,src:g.kind,id:g.key,ag:g,ten:g.ten,mo:g.mo,nguoi:g.nguoi||"",tao:"",phoi:[],han:+g.han||0,gio:"",st:g.st,late:!!g.late,lateD:g.lateD||0,da:"",uu:"",ck:[],n:g.n,done:g.done||0,g:"",theoDoi:[],gap:false})})}catch(e){console.error("việc video",e)}
   /* video, kịch bản chờ mình duyệt (chỉ hiện ở chỗ "của tôi", không tính vào việc của phòng để khỏi đếm hai lần) */
-  try{if(typeof rvQueue==="function")rvQueue().forEach(c=>{if(CV_TEST.includes(c.nguoi))return;
+  /* Duyệt V1 (kịch bản, video) là việc của Lead Content; CEO chỉ duyệt V2 (chị Hoa 07/11) */
+  try{if(typeof rvQueue==="function")rvQueue().filter(c=>!(ME.role==="admin"&&(c.step==="dkb"||c.step==="dvd"))).forEach(c=>{if(CV_TEST.includes(c.nguoi))return;
     out.push({k:"card:"+c.id,src:"card",id:c.id,rvOnly:true,cardStep:c.step,ten:(c.step==="dkb"?"Duyệt kịch bản · ":"Duyệt video · ")+String(c.hookText||c.yTuong||c.tuyen||c.id),mo:c.id+" · "+chOf(c.kenh).short,
       nguoi:c.nguoi||"",tao:"",phoi:[],han:+((c.han&&WORK_STEPS.includes(c.step))?c.han:c.day)||0,gio:"",st:"review",late:false,lateD:0,da:"",uu:c.uuTien||"",ck:[],rv:true,g:c.step==="dkb"?"Duyệt kịch bản":"Duyệt video",theoDoi:[],gap:false})})}catch(e){console.error("video chờ duyệt",e)}
   CW_C=out;Promise.resolve().then(()=>{CW_C=null});return out}
