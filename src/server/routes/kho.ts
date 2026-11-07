@@ -1096,20 +1096,24 @@ khoRoutes.post('/items/:code/merge', async (c) => {
 
 /** Yêu cầu pha chế mới (chị Hoa 06/11, pha theo bồn, riêng với phiếu sản xuất): sinh việc + chuông cho kỹ thuật pha chế.
  * Việc tự xong khi kỹ thuật ghi phiếu pha chế gắn mã yêu cầu đó. */
+/** Tài khoản kỹ thuật pha chế (anh Hội): việc về pha chế, kỹ thuật, nguyên vật liệu đều nhắc người này (chị Hoa 07/11). */
+async function kyThuatIds(db: D1Database): Promise<string[]> {
+  try {
+    const row = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
+    const d = row ? (JSON.parse(await unpack(row.data)) as { users?: Array<{ crm?: string; perms?: string[]; active?: boolean }> }) : {};
+    return [...new Set((d.users ?? []).filter((u) => u.active !== false && u.crm && (u.perms ?? []).includes('sx.kythuat') && !(u.perms ?? []).includes('sx.dieuphoi') && !(u.perms ?? []).includes('sx.kiemke')).map((u) => u.crm as string))];
+  } catch {
+    return [];
+  }
+}
+
 khoRoutes.post('/pc-notify', async (c) => {
   const auth = c.get('auth');
   const b = (await c.req.json().catch(() => null)) as { items?: Array<Record<string, unknown>> } | null;
   const items = (Array.isArray(b?.items) ? b!.items : []).slice(0, 50);
   // Người nhận: tài khoản chỉ làm kỹ thuật (có sx.kythuat, không phải điều phối / kế toán kho, vì quyền mặc định của CEO, kế toán cũng có sx.kythuat).
   // Quyền "Kỹ thuật pha chế" (sx.kythuat) đặt ở hồ sơ người dùng web chung (hub_state main, users[].perms), nối tài khoản qua users[].crm.
-  let ids: string[] = [];
-  try {
-    const row = await c.env.DB.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
-    const d = row ? (JSON.parse(await unpack(row.data)) as { users?: Array<{ crm?: string; perms?: string[]; active?: boolean }> }) : {};
-    ids = [...new Set((d.users ?? []).filter((u) => u.active !== false && u.crm && (u.perms ?? []).includes('sx.kythuat') && !(u.perms ?? []).includes('sx.dieuphoi') && !(u.perms ?? []).includes('sx.kiemke')).map((u) => u.crm as string))];
-  } catch {
-    ids = [];
-  }
+  const ids = await kyThuatIds(c.env.DB);
   if (!ids.length) return ok(c, { sent: 0, no_kythuat: true });
   const now = nowIso();
   let sent = 0;
@@ -1127,7 +1131,7 @@ khoRoutes.post('/pc-notify', async (c) => {
   return ok(c, { sent, no_kythuat: false });
 });
 
-/** Thiếu vật tư khi tạo yêu cầu pha chế / phiếu sản xuất (chị Hoa 06/11): sinh việc + chuông cho người phụ trách mua hàng
+/** Thiếu vật tư khi tạo yêu cầu pha chế / phiếu sản xuất (chị Hoa 06/11): sinh việc + chuông cho người phụ trách mua hàng và kỹ thuật pha chế
  * (Trưởng phòng, quản lý duyệt đơn) để đặt hàng hoặc tra xem tồn lệch ở đâu. */
 khoRoutes.post('/shortage-task', async (c) => {
   const auth = c.get('auth');
@@ -1140,7 +1144,9 @@ khoRoutes.post('/shortage-task', async (c) => {
   const ceo = new Set(
     ((await c.env.DB.prepare("SELECT id FROM users WHERE role = 'CEO'").all<{ id: string }>()).results ?? []).map((x) => x.id),
   );
-  const ids = all.filter((x) => !ceo.has(x)).length ? all.filter((x) => !ceo.has(x)) : all;
+  const mua = all.filter((x) => !ceo.has(x)).length ? all.filter((x) => !ceo.has(x)) : all;
+  // Thiếu nguyên vật liệu: nhắc cả kỹ thuật pha chế (chị Hoa 07/11: việc pha chế, kỹ thuật, nguyên vật liệu thì nhắc anh Hội).
+  const ids = [...new Set([...mua, ...(await kyThuatIds(c.env.DB))])];
   const txt = lines
     .map((l) => `${String(l.name ?? l.item).slice(0, 60)} thiếu ${Number(l.thieu ?? 0).toLocaleString('vi-VN')} ${String(l.unit ?? '')}`.trim())
     .join('; ');
@@ -1922,7 +1928,8 @@ khoRoutes.post('/docs', async (c) => {
   }
   if (type === 'KS' && Array.isArray(extra.no_bom) && extra.no_bom.length) {
     try {
-      const ids = await accountantIds(c.env.DB);
+      // Kế toán khai định mức (chị Hoa 06/11) + nhắc kỹ thuật pha chế vì định mức là việc kỹ thuật (07/11).
+      const ids = [...new Set([...(await accountantIds(c.env.DB)), ...(await kyThuatIds(c.env.DB))])];
       const now = nowIso();
       for (const x of extra.no_bom as Array<{ code: string }>) {
         const nm = items.get(x.code)?.name ?? x.code;

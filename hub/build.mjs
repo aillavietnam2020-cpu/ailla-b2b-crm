@@ -62,6 +62,19 @@ ${header}
 ${JS_ORDER.map((f) => esc(read(f))).join('\n')}
 </script></body></html>`;
 
+/* Chặn đưa lên web khi code hỏng cú pháp (07/11: một dấu " trong chữ hướng dẫn làm cả web trắng trang "Đang tải…"). */
+{
+  const re = /<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g;
+  let m;
+  while ((m = re.exec(html))) {
+    try { new Function(m[1]); } catch (e) {
+      // Tìm file gây lỗi để báo rõ.
+      const bad = JS_ORDER.filter((f) => { try { new Function(read(f)); return false; } catch { return true; } });
+      console.error(`[hub] LỖI CÚ PHÁP: ${e.message}${bad.length ? ' — trong ' + bad.join(', ') : ''}. Không build, không deploy.`);
+      process.exit(1);
+    }
+  }
+}
 mkdirSync(path.dirname(OUT), { recursive: true });
 writeFileSync(OUT, html);
 console.info(`[hub] ${path.relative(process.cwd(), OUT)} ${Math.round(html.length / 1024)} KB`);
