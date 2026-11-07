@@ -11,7 +11,7 @@ const KHO_GRP=[["Tồn kho",["kho_ton"]],["Nhập kho",["kho_nhap","kho_nhap_tp"
 const khoNav=key=>{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")return "";return `<nav class="kgtabs kgbar"></nav>`};
 const KHO_TYPES={
   PN:{page:"kho_nhap",name:"Phiếu nhập kho",who:["sx.kiemke"],hint:"Hàng mua về: nguyên vật liệu, vỏ, tem, hàng hóa. Kế toán kho ghi theo số thực nhận."},
-  PC:{page:"kho_pc",name:"Phiếu pha chế",who:["sx.kythuat","sx.kiemke"],hint:"Mỗi mẻ pha một phiếu, pha theo phiếu sản xuất của Thảo. Ghi số lít thực tế và số thực tế từng nguyên liệu (nguyên liệu không dùng ghi 0)."},
+  PC:{page:"kho_pc",name:"Phiếu pha chế",who:["sx.kythuat","sx.kiemke"],hint:"Mỗi mẻ pha một phiếu, pha theo yêu cầu pha chế của Quản lý mua hàng (tự pha không có yêu cầu thì bấm "+ Phiếu pha không theo yêu cầu"). Ghi số lít thực tế và số thực tế từng nguyên liệu (nguyên liệu không dùng ghi 0)."},
   KS:{page:"sx_lo",name:"Phiếu kiểm kê đóng gói",who:["sx.kiemke"],hint:"Chúc kiểm kê sau khi đóng gói xong. Hệ thống tự trừ bán thành phẩm, vỏ, tem theo định mức."},
   XB:{page:"kho_xuat",name:"Phiếu xuất kho",who:["sx.kiemke"],hint:"Xuất ngoài bán hàng: gia công, bán nguyên liệu, hàng mẫu, hủy hỏng. Đơn Kênh phân phối ở mục Xuất Kênh phân phối; bán lẻ TikTok, Shopee, Facebook ở mục Xuất Kênh bán lẻ."},
   TL:{page:"kho_hoan",name:"Phiếu nhập hàng hoàn",who:["sx.kiemke"],hint:"Hàng hoàn về kho: chọn Bán tiếp (cộng tồn) hoặc Bỏ (chỉ ghi nhận)."},
@@ -271,8 +271,8 @@ const KHO_ROLE={IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:"Thu được",AUTO
 /* blank=true: bản ĐIỀN TAY — giữ mã, tên, ĐVT, định mức; để trống ô số thực tế (nền vàng) và thêm vài dòng trống để ghi thêm. */
 function khoPrintDoc(r,T,price,ex,blank){
   const d=r.doc,isPC=d.type==="PC",isPN=d.type==="PN"&&price&&!blank,cancelled=!blank&&d.status==="HUY";
-  const meta=[["Số phiếu",d.no],["Ngày",kDd(d.doc_date)],d.partner?[d.type==="PN"?"Nhà cung cấp":d.type==="XB"||d.type==="XK"?"Khách hàng / nơi nhận":"Đối tác",d.partner]:null,d.ref_no?[d.type==="PC"||d.type==="KS"?"Phiếu sản xuất / lô":"Tham chiếu",d.ref_no]:null,
-    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&blank&&+ex.liters>0?["Số lít cần pha (1 bồn)",knum(ex.liters)+" lít"]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,isPC&&ex.bon>1?["Số bồn",knum(ex.bon)+" bồn × "+knum(ex.lit_bon||0)+" lít"]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
+  const meta=[["Số phiếu",d.no],["Ngày",kDd(d.doc_date)],d.partner?[d.type==="PN"?"Nhà cung cấp":d.type==="XB"||d.type==="XK"?"Khách hàng / nơi nhận":"Đối tác",d.partner]:null,d.ref_no?[d.type==="PC"?(/^YCPC/.test(d.ref_no)?"Yêu cầu pha chế":"Phiếu sản xuất / lô"):d.type==="KS"?"Phiếu sản xuất / lô":"Tham chiếu",d.ref_no]:null,
+    d.ref_qty!=null?[isPC&&/^YCPC/.test(d.ref_no||"")?"Số lít theo yêu cầu":"Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&blank&&+ex.liters>0?["Số lít cần pha (1 bồn)",knum(ex.liters)+" lít"]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,isPC&&ex.bon>1?["Số bồn",knum(ex.bon)+" bồn × "+knum(ex.lit_bon||0)+" lít"]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
   const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Định mức","Định lượng","Thực tế","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
   let tong=0;
   const body=r.moves.map((m,i)=>{const q=isPC?(m.role==="PRODUCT"?m.qty:-m.qty):Math.abs(m.qty);const qshow=d.type==="TL"&&m.role==="DROP"?knum(m.std_qty):knum(q);
