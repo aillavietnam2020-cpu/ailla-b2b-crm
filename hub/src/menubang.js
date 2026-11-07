@@ -15,6 +15,7 @@
     const L=ADMH?SRC.filter(m=>m.adm).concat(SRC.filter(m=>!m.adm)):SRC.filter(m=>!m.adm).concat(SRC.filter(m=>m.adm));
     L.forEach(m=>{try{m.groups().forEach(([,its])=>its.forEach(i=>{if(!i)return;if(!o[i[0]])o[i[0]]=i;(src[m.k]=src[m.k]||[]).push(i[0])}))}catch(e){}});
     if(!o.nhaplieu&&typeof PAGES!=="undefined"&&PAGES.nhaplieu)o.nhaplieu=MI("nhaplieu","Nhập dữ liệu MKT",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead");
+    if(!o.qt_kt&&typeof PAGES!=="undefined"&&PAGES.qt_kt)o.qt_kt=MI("qt_kt","Quy tắc kế toán",u=>u.role==="admin"||can(u,"chiphi.xem")||(typeof mhManage==="function"&&mhManage()));
     if(!o.quytac&&typeof PAGES!=="undefined"&&PAGES.quytac)o.quytac=MI("quytac","Quy tắc vận hành & luồng việc",()=>typeof mhManage==="function"&&mhManage());
     C={o,src};Promise.resolve().then(()=>{C=null});return C};
   /* sx_mh (Đơn mua hàng bản kho, không giá) chỉ cho người KHÔNG quản lý mua hàng; người quản lý (Thảo, kế toán, CEO) dùng mh_po. Tránh hiện hai dòng "Đơn mua hàng" (05/11). */
@@ -48,7 +49,8 @@
         ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã Kênh phân phối"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
       pd:[["",[["pheduyet","Phê duyệt"]]]],
-      cfg:[["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
+      cfg:[["Quy tắc",[["qt_kt","Quy tắc kế toán"]]], /* chị Hoa 07/11: luật kế toán đặt một chỗ (quytacketoan.js) */
+        ["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
         ["Danh mục",[["spcombo","Sản phẩm & combo"],["sanpham","Sản phẩm"],["kenhban","Kênh bán & phí"],["chiphidm","Danh mục chi phí"],["cr_rcv","Tài khoản nhận tiền"]]],
         ["Chính sách bán hàng",[["cr_gia","Bảng giá"],["cr_dc","Giá điều chỉnh / khuyến mại"],["cr_thuong","Thưởng & xếp hạng NPP"],["cr_giagc","Bảng giá Kênh OEM"]]],
         ["Dữ liệu & sao lưu",[["nhaplieu","Nhập dữ liệu MKT"],["cr_import","Nhập dữ liệu CRM"],["caidat","Sao lưu dữ liệu"],["cr_audit","Nhật ký"]]],

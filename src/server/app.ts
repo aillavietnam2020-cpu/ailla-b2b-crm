@@ -53,6 +53,7 @@ import { nghiPhepRoutes } from './routes/nghiPhep';
 import { taskFileRoutes } from './routes/taskFiles';
 import { chatRoutes } from './routes/chat';
 import { ceoSpendRoutes } from './routes/ceoSpend';
+import { accRulesRoutes } from './routes/accRules';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -130,6 +131,7 @@ export function createApp() {
   app.route('/api/price-adjustments', priceAdjustmentRoutes);
   app.route('/api/shipping-vouchers', shippingVoucherRoutes);
   app.route('/api/ceo-spend', ceoSpendRoutes);
+  app.route('/api/acc-rules', accRulesRoutes);
   app.route('/api/work', workRoutes);
   app.route('/api/notify', notifyRoutes);
   app.route('/api/staff-purchases', staffPurchaseRoutes);

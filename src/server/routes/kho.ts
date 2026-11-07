@@ -37,6 +37,7 @@ import {
 import { khoDoiChieu, khoMocMap, khoTonRows, type KhoTonRow } from '../services/khoTon';
 import { accountantIds, approverIds, taskStatements } from '../lib/notifyTasks';
 import { bellTo } from '../lib/hubBell';
+import { loadAccRules } from './accRules';
 import { unpack } from '../lib/pack';
 
 /**
@@ -1548,6 +1549,10 @@ khoRoutes.post('/docs', async (c) => {
   if (boSung && !isCeo(auth) && !auth.permissions.includes('sx.kiemke') && !canEditMap(auth)) throw forbidden('Chỉ kế toán kho, mua hàng, kế toán hoặc CEO lập phiếu kiểm tồn');
   if (!isDate(b.date)) throw badRequest('BAD_DATE', 'Ngày phiếu không đúng');
   const date = b.date;
+  // Quy tắc kế toán (quản trị › Cấu hình › Quy tắc kế toán, 07/11): khóa sổ, cho / không cho xuất âm kho.
+  const accRules = await loadAccRules(c.env.DB);
+  if (accRules.lock_date && date <= accRules.lock_date)
+    throw conflict('SO_DA_KHOA', `Sổ kho đã khóa đến hết ngày ${ddmm(accRules.lock_date)}. Phiếu phải có ngày sau ngày khóa sổ (CEO hoặc Kế toán mở khóa ở Quy tắc kế toán).`);
   const mocChung = type === 'TD' ? await khoMocChung(c.env.DB) : null;
   if (boSung) {
     if (!mocChung) throw badRequest('NO_MOC', 'Chưa có phiếu tồn chốt chung (mốc tồn). CEO nạp phiếu chốt trước, sau đó mới kiểm bổ sung.');
@@ -1771,6 +1776,8 @@ khoRoutes.post('/docs', async (c) => {
       const after = round((have.get(code) ?? 0) + moves.filter((m) => m.item === code).reduce((s, m) => s + m.qty, 0));
       if (after < 0) warnings.push(`${code} (${items.get(code)?.name}) sẽ âm kho: còn ${have.get(code) ?? 0}, sau phiếu này ${after}.`);
     }
+    const amWarn = warnings.filter((w) => w.includes('sẽ âm kho'));
+    if (amWarn.length && !accRules.allow_negative) throw conflict('AM_KHO', `Quy tắc kế toán đang không cho xuất âm kho. ${amWarn.join(' ')}`);
   }
 
   // Sửa phiếu nhập (chị Hoa 02/11: kế toán kho lỡ lưu khi chưa nhập đủ, không có nút sửa): ghi phiếu mới, phiếu cũ tự hủy cùng lúc,
@@ -1946,6 +1953,11 @@ khoRoutes.post('/docs/:id/cancel', async (c) => {
   if (!doc) throw notFound('Không tìm thấy phiếu');
   if (doc.status !== 'OK') throw conflict('ALREADY', 'Phiếu này đã hủy rồi');
   if (doc.type === 'TD' && !isCeo(auth)) throw forbidden('Chỉ CEO hủy phiếu tồn đầu kỳ');
+  {
+    const lk = (await loadAccRules(c.env.DB)).lock_date;
+    const dd = lk ? (await c.env.DB.prepare('SELECT doc_date FROM kho_docs WHERE id = ?').bind(id).first<{ doc_date: string }>())?.doc_date : null;
+    if (lk && dd && dd <= lk) throw conflict('SO_DA_KHOA', `Sổ kho đã khóa đến hết ngày ${ddmm(lk)}, không hủy được phiếu ngày ${ddmm(dd)}.`);
+  }
   // Phiếu nhập đã gắn phiếu mua: hủy thì phiếu mua trả về chưa nhận (trừ khi đã vào hóa đơn nhà cung cấp).
   const linked = doc.type === 'PN'
     ? (await c.env.DB.prepare("SELECT id, po_id FROM po_receipts WHERE kho_doc_id = ? AND status = 'OK'").bind(id).all<{ id: string; po_id: string }>()).results
