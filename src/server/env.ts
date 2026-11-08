@@ -35,6 +35,8 @@ export interface Env {
   /** Khóa riêng VAPID (JWK P-256) để gửi thông báo đẩy về điện thoại. Đặt bằng `wrangler secret put VAPID_JWK`. */
   VAPID_JWK?: string;
   OPS_HOST?: string;
+  /** Địa chỉ gốc cho link đơn gửi khách (/d/...), phải là địa chỉ khách mở được không cần đăng nhập. */
+  SHARE_BASE_URL?: string;
   ADMIN_HOST?: string;
 }
 

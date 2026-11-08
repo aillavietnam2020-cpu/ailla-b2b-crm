@@ -194,11 +194,11 @@ function newToken(): string {
 
 const SHARE_OK = new Set(['APPROVED']);
 
-/** Link luôn ở trang vận hành (khách mở được), kể cả khi sale đang ở trang quản trị. */
+/** Link ở địa chỉ khách mở được không cần đăng nhập (SHARE_BASE_URL), kể cả khi sale đang ở trang quản trị. */
 function shareUrl(c: { req: { url: string }; env: AppEnv['Bindings'] }, token: string) {
+  if (c.env.SHARE_BASE_URL) return `${c.env.SHARE_BASE_URL.replace(/\/$/, '')}/d/${token}`;
   const u = new URL(c.req.url);
-  const host = c.env.OPS_HOST || u.host;
-  return `${u.protocol}//${host}/d/${token}`;
+  return `${u.protocol}//${u.host}/d/${token}`;
 }
 
 type ShareRow = { token: string; created_at: string; expires_at: string; first_viewed_at: string | null; view_count: number; confirmed_at: string | null; change_note: string | null; change_at: string | null };
