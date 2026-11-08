@@ -3,6 +3,8 @@ import { formatVnDateTime } from '@shared/datetime';
 import { ApiError, api } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { useToast } from './ui';
+import type { OrderDetail } from '@shared/types';
+import { drawOrderImage, shareImage } from './orderImage';
 
 /**
  * Trên trang chi tiết đơn:
@@ -39,8 +41,21 @@ async function copy(text: string): Promise<boolean> {
   }
 }
 
-export function OrderZaloShare({ orderId, canCreate }: { orderId: string; canCreate: boolean }) {
+export function OrderZaloShare({ order, canCreate }: { order: OrderDetail; canCreate: boolean }) {
+  const orderId = order.id;
   const toast = useToast();
+  const [img, setImg] = useState<string | null>(null);
+  const makeImage = () => {
+    try {
+      setImg(drawOrderImage(order));
+    } catch {
+      toast.error('Máy chưa vẽ được ảnh, thử lại.');
+    }
+  };
+  const sendImage = async () => {
+    if (!img) return;
+    if (!(await shareImage(img, order.order_no))) toast.success('Bấm giữ ảnh để lưu hoặc chia sẻ, hoặc bấm "Lưu ảnh".');
+  };
   const intakes = useApi<IntakeRow[]>(`/api/order-intake/by-order/${orderId}`);
   const share = useApi<{ can_share: boolean; link: ShareLink | null }>(`/api/order-intake/share/${orderId}`);
   const zsend = useApi<{
@@ -112,7 +127,28 @@ export function OrderZaloShare({ orderId, canCreate }: { orderId: string; canCre
 
       {(share.data?.can_share || link) && (
         <div style={{ display: 'grid', gap: 8 }}>
-          <strong>Gửi khách xác nhận</strong>
+          <strong>Gửi đơn cho khách</strong>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="btn primary" onClick={makeImage}>
+              {img ? 'Vẽ lại ảnh đơn' : 'Tạo ảnh đơn'}
+            </button>
+            {img && (
+              <>
+                <button type="button" className="btn primary" onClick={() => void sendImage()}>
+                  Gửi ảnh qua Zalo
+                </button>
+                <a className="btn" href={img} download={`${order.order_no}.png`}>
+                  Lưu ảnh
+                </a>
+              </>
+            )}
+          </div>
+          {img && (
+            <img src={img} alt={`Ảnh đơn ${order.order_no}`} style={{ width: '100%', maxWidth: 420, border: '1px solid #ddd', borderRadius: 8 }} />
+          )}
+          <div className="muted" style={{ fontSize: 12.5 }}>
+            Ảnh chỉ có tên khách, hàng, số lượng và tiền. Không có công nợ hay ghi chú nội bộ.
+          </div>
           {zsend.data?.thread && canCreate && (
             <div style={{ display: 'grid', gap: 6 }}>
               <button type="button" className="btn primary" disabled={busy || zsend.data.last?.status === 'PENDING'} onClick={() => void sendZalo()}>
@@ -133,11 +169,11 @@ export function OrderZaloShare({ orderId, canCreate }: { orderId: string; canCre
           {!link && (
             <>
               <div className="muted" style={{ fontSize: 13 }}>
-                Web tạo một link xem đơn (khách mở được ngay trong Zalo, không cần đăng nhập) và lời nhắn có tóm tắt đơn. Sale dán vào Zalo của khách. Khách bấm "Đúng, chốt đơn" thì web ghi lại giờ.
+                Muốn khách bấm chốt để web ghi lại giờ khách đồng ý: gửi thêm link (khách mở ngay trong Zalo, không cần đăng nhập).
               </div>
               {canCreate && (
-                <button type="button" className="btn primary" disabled={busy} onClick={() => void make()}>
-                  {busy ? 'Đang tạo…' : 'Tạo link và chép lời nhắn'}
+                <button type="button" className="btn" disabled={busy} onClick={() => void make()}>
+                  {busy ? 'Đang tạo…' : 'Gửi thêm link để khách bấm chốt (không bắt buộc)'}
                 </button>
               )}
             </>
