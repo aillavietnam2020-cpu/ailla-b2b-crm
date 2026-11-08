@@ -146,7 +146,8 @@ function khoEditPN(d,moves){
 /* Số lượng trong phiếu (chị Hoa 06/11): gõ được 0.5, 12.67, 0,03 (dấu phẩy hay chấm đều được); chọn đơn vị kg / gam, lít / ml
    ngay trên dòng, web tự đổi về đơn vị của mã khi ghi sổ. */
 const KF_U={"kg":[["kg",1],["gam",0.001]],"gam":[["gam",1],["kg",1000]],"g":[["g",1],["kg",1000]],"lít":[["lít",1],["ml",0.001]],"lit":[["lít",1],["ml",0.001]],"l":[["lít",1],["ml",0.001]],"ml":[["ml",1],["lít",1000]]};
-function kfNum(v){let x=String(v==null?"":v).replace(/\s/g,"");if(x==="")return NaN;if(x.includes(",")&&x.includes("."))x=x.replace(/\./g,"").replace(",",".");else x=x.replace(",",".");const n=+x;return isFinite(n)?n:NaN}
+/* Kiểu Việt Nam: dấu phẩy là thập phân; nhiều dấu chấm (1.234.567) là phân cách nghìn (08/11). Dùng chung cho mọi ô số lượng / định mức (nhapso.js). */
+function kfNum(v){if(typeof v==="number")return v;let x=String(v==null?"":v).replace(/\s/g,"");if(x==="")return NaN;if(x.includes(",")&&x.includes("."))x=x.replace(/\./g,"").replace(",",".");else if((x.match(/\./g)||[]).length>1)x=x.replace(/\./g,"");else if((x.match(/,/g)||[]).length>1)x=x.replace(/,/g,"");else x=x.replace(",",".");const n=+x;return isFinite(n)?n:NaN}
 function kfUnitCell(unit){const o=KF_U[String(unit||"").toLowerCase().trim()];return o?`<select class="kf-un">${o.map(([n,f])=>`<option value="${f}">${n}</option>`).join("")}</select>`:esc(unit||"")}
 const kfQty=tr=>{const q=tr.querySelector(".kf-q"),u=tr.querySelector(".kf-un"),n=kfNum(q.value);if(q.value.trim()==="")return "";if(!isFinite(n))return "x";return String(Math.round(n*(u?+u.value:1)*1e6)/1e6)};
 const KHO_LINE_CLS={PN:["NVL","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null,TB:null};
