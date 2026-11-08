@@ -272,7 +272,7 @@ const cwGo=(page)=>{PAGE=page;MOD="cv";try{localStorage.setItem(SKEY+"_p",PAGE)}
 function cwDaSel(){const P=(D().projects||[]).filter(p=>p.id===CWS.da||p.st!=="done");if(!P.length&&!CWS.da)return "";
   return `<label class="cwdasel${CWS.da?" on":""}">${cwI("fold")}<select data-cwda aria-label="Xem việc theo dự án">${opt([["","Mọi dự án"]].concat(P.map(p=>[p.id,"Dự án: "+p.ten])),CWS.da)}</select></label>`}
 /* Giao việc khi đang xem một dự án: điền sẵn dự án đó */
-if(typeof openTask==="function"){const _cwOT=openTask;openTask=function(id){const r=_cwOT.apply(this,arguments);try{if(!id&&MOD==="cv"&&CWS.da){const da=document.querySelector("#tkf2 #t-da");if(da&&!da.value&&[...da.options].some(o=>o.value===CWS.da))da.value=CWS.da}}catch(e){}return r}}
+if(typeof openTask==="function"){const _cwOT=openTask;openTask=function(id){const r=_cwOT.apply(this,arguments);try{if(!id&&MOD==="cv"&&CWS.da){const da=document.querySelector("#tkf2 #t-da");if(da&&!da.value&&[...da.options].some(o=>o.value===CWS.da)){da.value=CWS.da;da.dispatchEvent(new Event("change"))}}}catch(e){}return r}}
 function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const h=di.querySelector("h2");if(h)h.textContent="Thêm việc cho mình";
   const ng=$("#t-ng");if(ng&&[...ng.options].some(o=>o.value===ME.id))ng.value=ME.id;const hn=$("#t-han");if(hn)hn.value=tkIso(cwTd());
   const b=di.querySelector("#tkf2 .acts .btn.pri");if(b)b.textContent="Thêm việc";
