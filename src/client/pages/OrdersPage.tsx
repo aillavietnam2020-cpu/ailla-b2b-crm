@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../components/AuthProvider';
 import { OrderFlowPanel } from '../components/OrderFlow';
 import { ProposalsCard } from '../components/Proposals';
+import { OrderZaloShare } from '../components/OrderZaloShare';
 import { PaymentForm } from '../components/PaymentForm';
 import { ShipInfoModal } from '../components/ShipInfoModal';
 import { KHO_LABELS, KHO_WAITING, type KhoStatus } from '@shared/flow';
@@ -866,6 +867,7 @@ export function OrderDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
       <ProposalsCard entityType="ORDER" entityId={o.id} mode={mode} />
 
       <OrderFlowPanel order={o} mode={mode} onChanged={order.reload} />
+      <OrderZaloShare orderId={o.id} canCreate={can('order.create') || can('order.create.team')} />
       {lockedByAccounting && (
         <div className="alert-box warn" style={{ marginBottom: 16 }}>
           Đơn này kế toán đã xác nhận ghi nợ nên đang khoá, không sửa được. Cần sửa (khách đổi, kho

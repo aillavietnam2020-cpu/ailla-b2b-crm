@@ -27,7 +27,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname.startsWith('/api')) {
+    if (url.pathname.startsWith('/api') || url.pathname.startsWith('/d/')) {
       return app.fetch(request, env, ctx);
     }
 

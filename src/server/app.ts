@@ -56,6 +56,8 @@ import { taskFileRoutes } from './routes/taskFiles';
 import { chatRoutes } from './routes/chat';
 import { ceoSpendRoutes } from './routes/ceoSpend';
 import { accRulesRoutes } from './routes/accRules';
+import { orderIntakeRoutes } from './routes/orderIntake';
+import { publicOrderRoutes } from './routes/publicOrder';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -115,6 +117,9 @@ export function createApp() {
   app.route('/api/ingest', ingestRoutes);
 
   // Mọi endpoint /api còn lại đều phải qua xác thực + RBAC ở backend.
+  // Trang khách xem + chốt đơn qua link gửi Zalo (không đăng nhập, link khó đoán).
+  app.route('/d', publicOrderRoutes);
+
   app.use('/api/*', authMiddleware);
   // Trên địa chỉ quản trị chỉ CEO và kế toán; thao tác phân quyền chỉ làm ở địa chỉ quản trị.
   app.use('/api/*', adminHostGate);
@@ -149,6 +154,7 @@ export function createApp() {
   app.route('/api/agent-train', agentTrainRoutes);
   app.route('/api/proposals', proposalRoutes);
   app.route('/api/receiving-accounts', receivingAccountRoutes);
+  app.route('/api/order-intake', orderIntakeRoutes);
   app.route('/api/orders', orderRoutes);
   app.route('/api/approvals', approvalRoutes);
   app.route('/api', financeRoutes);

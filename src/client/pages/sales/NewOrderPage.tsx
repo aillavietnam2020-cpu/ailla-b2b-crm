@@ -15,6 +15,7 @@ import { ApiError, api, newIdempotencyKey } from '../../lib/api';
 import { useApi, useDebounced } from '../../lib/hooks';
 import { Card, ErrorBox, StateBlock, useToast } from '../../components/ui';
 import { useAuth } from '../../components/AuthProvider';
+import { ZaloIntake, type IntakePick } from '../../components/ZaloIntake';
 
 /** Một gợi ý sản phẩm khi gõ mã: giá đã quy theo cách tính giá của khách. */
 interface Suggest {
@@ -177,6 +178,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
   const [promotion, setPromotion] = useState({ code: '', note: '' });
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  /** Ảnh / tin đơn từ Zalo đã đọc: lưu đơn xong thì gắn ảnh gốc vào đơn. */
+  const [intakeId, setIntakeId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey());
@@ -369,6 +372,58 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
     setProductQuery('');
   };
 
+  /** Dòng máy đọc từ đơn Zalo: giá lấy theo cấp / bảng giá riêng của khách, giống lúc chọn tay. */
+  const addFromIntake = async (picks: IntakePick[], meta: { intakeId: string; note: string | null }) => {
+    let priceOf: (productId: string) => number | null = () => null;
+    try {
+      if (customPricing) {
+        const r = await api.get<CustomerPriceItem[]>(`/api/customer-prices/${customerId}`);
+        const m = new Map(r.data.map((p) => [p.product_id, p.amount]));
+        priceOf = (id) => m.get(id) ?? null;
+      } else {
+        const r = await api.get<{ products: ProductItem[] }>('/api/prices?limit=1000&scope=TIER');
+        const m = new Map(r.data.products.map((p) => [p.id, p]));
+        priceOf = (id) => {
+          const p = m.get(id);
+          return p ? priceForTier(p) : null;
+        };
+      }
+    } catch {
+      toast.error('Chưa tải được bảng giá. Dòng nào thiếu giá thì chọn lại mã.');
+    }
+    const have = new Set(lines.filter((l) => !l.is_gift).map((l) => l.product_id));
+    const add: Line[] = [];
+    let skipped = 0;
+    for (const pk of picks) {
+      if (have.has(pk.product.id)) {
+        skipped++;
+        continue;
+      }
+      have.add(pk.product.id);
+      const carton = isCartonUnit(pk.product.unit);
+      const pack = parsePackSize(pk.product.pack_size);
+      add.push({
+        product_id: pk.product.id,
+        sku: pk.product.sku,
+        name: pk.product.name,
+        unit: carton ? 'Thùng' : retailUnit(pk.product.unit),
+        pack_size: pack,
+        pack_mode: pk.as_carton && pack > 1 ? 'THUNG' : 'LE',
+        qty: pk.qty,
+        base_price: priceOf(pk.product.id),
+        applied_price: null,
+        is_gift: false,
+        carton_sku: carton,
+      });
+    }
+    setLines((cur) => [...cur, ...add]);
+    setIntakeId(meta.intakeId);
+    if (meta.note && !note.trim()) setNote(meta.note);
+    toast.success(
+      `Đã đưa ${add.length} dòng vào đơn${skipped ? `, bỏ ${skipped} dòng trùng mã đã có` : ''}. Kiểm tra số lượng, thùng/lẻ và giá trước khi lưu.`,
+    );
+  };
+
   const updateLine = (index: number, patch: Partial<Line>) => {
     setLines(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   };
@@ -439,6 +494,11 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
         },
         idempotencyKey,
       );
+      if (intakeId) {
+        await api.post(`/api/order-intake/${intakeId}/attach`, { order_id: result.data.id }).catch(() => {
+          toast.error('Đơn đã lưu nhưng chưa gắn được ảnh gốc của khách.');
+        });
+      }
       if (mayAutoSend && sendNow) {
         try {
           await api.post(`/api/orders/${result.data.id}/submit`, {});
@@ -592,6 +652,18 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
       </Card>
 
       <div style={{ height: 16 }} />
+
+      {!editing && (
+        <>
+          <ZaloIntake
+            customerId={customerId}
+            customers={(customers.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
+            onPickCustomer={setCustomerId}
+            onApply={(picks, meta) => void addFromIntake(picks, meta)}
+          />
+          <div style={{ height: 16 }} />
+        </>
+      )}
 
       {/* Khối 2: dòng hàng chiếm hết chiều ngang, không phải kéo qua lại */}
       <Card
