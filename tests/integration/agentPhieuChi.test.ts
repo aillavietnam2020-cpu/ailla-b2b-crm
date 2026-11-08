@@ -196,9 +196,16 @@ describe('Chị Hoa chọn thêm người ra lệnh cho agent (chị Huệ như 
     expect(v.status).toBe(200);
   });
 
-  it('không chọn được người không làm kế toán; bỏ chọn thì mất quyền; chỉ CEO được đổi', async () => {
+  it('chọn được bất kỳ nhân sự đang làm (chị Hoa 08/11), kèm số Telegram; người đã nghỉ thì không; bỏ chọn thì mất quyền; chỉ CEO được đổi', async () => {
     const { agent } = await setup();
     const huyen = await uid(USERS.huyen);
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [huyen], telegram: { [huyen]: 'abc' } } })).status).toBe(422);
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [huyen], telegram: { [huyen]: '123456789' } } })).status).toBe(200);
+    const row = await ctx.db.prepare('SELECT telegram_id FROM agent_delegators WHERE agent_id = ? AND user_id = ?').bind(agent.id, huyen).first<{ telegram_id: string }>();
+    expect(row?.telegram_id).toBe('123456789');
+    const list = await ctx.request('/api/admin/agents', { as: USERS.ceo });
+    expect(list.body.data.find((a: any) => a.id === agent.id).delegator_tg[huyen]).toBe('123456789');
+    await ctx.db.prepare("UPDATE users SET status = 'DISABLED' WHERE id = ?").bind(huyen).run();
     expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [huyen] } })).status).toBe(422);
     expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.manager, method: 'PUT', body: { user_ids: [] } })).status).toBe(403);
     expect((await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { as: USERS.ceo, method: 'PUT', body: { user_ids: [] } })).status).toBe(200);
