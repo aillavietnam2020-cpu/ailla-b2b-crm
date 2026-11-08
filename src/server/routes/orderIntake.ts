@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { nowIso } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
 import { badRequest, forbidden, notFound, ok, unprocessable } from '../lib/http';
@@ -246,12 +246,8 @@ orderIntakeRoutes.get('/share/:orderId', async (c) => {
   });
 });
 
-/** Tạo (hoặc lấy lại) link gửi khách. Chỉ đơn đã duyệt. */
-orderIntakeRoutes.post('/share/:orderId', requirePermission('order.create', 'order.create.team'), async (c) => {
-  const auth = c.get('auth');
-  const orderId = c.req.param('orderId');
-  const o = await getOrderDetail(c.env.DB, auth, orderId);
-  if (!SHARE_OK.has(o.approval_status)) throw unprocessable('NOT_APPROVED', 'Đơn chưa được duyệt nên chưa gửi khách được.');
+/** Lấy link còn hạn của đơn, chưa có thì tạo (ghi nhật ký). */
+async function ensureShare(c: Context<AppEnv>, auth: AuthContext, orderId: string) {
   let s = await currentShare(c.env.DB, orderId);
   if (!s || s.expires_at < nowIso()) {
     const token = newToken();
@@ -271,6 +267,168 @@ orderIntakeRoutes.post('/share/:orderId', requirePermission('order.create', 'ord
     ]);
     s = await currentShare(c.env.DB, orderId);
   }
-  const url = shareUrl(c, s!.token);
-  return ok(c, { link: { ...s!, url, message: shareMessage(o, url) } });
+  return s!;
+}
+
+/** Tạo (hoặc lấy lại) link gửi khách. Chỉ đơn đã duyệt. */
+orderIntakeRoutes.post('/share/:orderId', requirePermission('order.create', 'order.create.team'), async (c) => {
+  const auth = c.get('auth');
+  const orderId = c.req.param('orderId');
+  const o = await getOrderDetail(c.env.DB, auth, orderId);
+  if (!SHARE_OK.has(o.approval_status)) throw unprocessable('NOT_APPROVED', 'Đơn chưa được duyệt nên chưa gửi khách được.');
+  const s = await ensureShare(c, auth, orderId);
+  const url = shareUrl(c, s.token);
+  return ok(c, { link: { ...s, url, message: shareMessage(o, url) } });
+});
+
+/* ------------------------------------------------------------------ */
+/* Phương án 1: trợ lý đọc đơn trong nhóm Zalo                          */
+/* ------------------------------------------------------------------ */
+
+/** Nhóm Zalo mà đơn này đến từ (đơn trợ lý nhận trong nhóm). */
+async function threadOfOrder(db: D1Database, orderId: string) {
+  return db
+    .prepare(
+      `SELECT i.zalo_thread_id AS thread_id, COALESCE(t.name, i.zalo_thread_name) AS name FROM order_intakes i
+       LEFT JOIN zalo_threads t ON t.thread_id = i.zalo_thread_id
+       WHERE i.order_id = ? AND i.source = 'ZALO_GROUP' AND i.zalo_thread_id IS NOT NULL ORDER BY i.created_at DESC LIMIT 1`,
+    )
+    .bind(orderId)
+    .first<{ thread_id: string; name: string | null }>();
+}
+
+orderIntakeRoutes.get('/zalo-send/:orderId', async (c) => {
+  const auth = c.get('auth');
+  const orderId = c.req.param('orderId');
+  await getOrderDetail(c.env.DB, auth, orderId);
+  const th = await threadOfOrder(c.env.DB, orderId);
+  const last = await c.env.DB.prepare('SELECT status, error, created_at, sent_at FROM zalo_outbox WHERE order_id = ? ORDER BY created_at DESC LIMIT 1')
+    .bind(orderId)
+    .first<{ status: string; error: string | null; created_at: string; sent_at: string | null }>();
+  return ok(c, { thread: th ?? null, last: last ?? null });
+});
+
+/** Đơn đã duyệt: nhờ trợ lý gửi lời nhắn + link xác nhận vào đúng nhóm Zalo khách đã gửi đơn. */
+orderIntakeRoutes.post('/zalo-send/:orderId', requirePermission('order.create', 'order.create.team'), async (c) => {
+  const auth = c.get('auth');
+  const orderId = c.req.param('orderId');
+  const o = await getOrderDetail(c.env.DB, auth, orderId);
+  if (!SHARE_OK.has(o.approval_status)) throw unprocessable('NOT_APPROVED', 'Đơn chưa được duyệt nên chưa gửi khách được.');
+  const th = await threadOfOrder(c.env.DB, orderId);
+  if (!th) throw unprocessable('NO_THREAD', 'Đơn này không đến từ nhóm Zalo nên trợ lý không biết gửi vào đâu. Chép lời nhắn và gửi tay.');
+  const pending = await c.env.DB.prepare("SELECT id FROM zalo_outbox WHERE order_id = ? AND status = 'PENDING'").bind(orderId).first();
+  if (pending) throw unprocessable('PENDING', 'Tin của đơn này đang chờ trợ lý gửi.');
+  const s = await ensureShare(c, auth, orderId);
+  const url = shareUrl(c, s.token);
+  await c.env.DB.batch([
+    c.env.DB.prepare("INSERT INTO zalo_outbox (id, thread_id, text, order_id, status, created_by, created_at) VALUES (?, ?, ?, ?, 'PENDING', ?, ?)").bind(
+      newId(),
+      th.thread_id,
+      shareMessage(o, url),
+      orderId,
+      auth.user.id,
+      nowIso(),
+    ),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'ORDER_ZALO_SEND', entityType: 'ORDER', entityId: orderId, after: { thread: th.name }, requestId: c.get('requestId') }),
+  ]);
+  return ok(c, { ok: true, thread: th });
+});
+
+/** Đơn trợ lý nhận trong nhóm Zalo, chưa ai lập đơn (14 ngày gần nhất). */
+orderIntakeRoutes.get('/pending', requirePermission('order.create', 'order.create.team'), async (c) => {
+  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+  const r = await c.env.DB.prepare(
+    `SELECT i.id, i.customer_id, cu.name AS customer_name, COALESCE(t.name, i.zalo_thread_name) AS thread_name, i.zalo_sender, i.raw_text,
+            i.image_mime IS NOT NULL AS has_image, i.result_json, i.created_at
+     FROM order_intakes i LEFT JOIN customers cu ON cu.id = i.customer_id LEFT JOIN zalo_threads t ON t.thread_id = i.zalo_thread_id
+     WHERE i.source = 'ZALO_GROUP' AND i.status = 'READ' AND i.order_id IS NULL AND i.created_at >= ?
+     ORDER BY i.created_at DESC LIMIT 50`,
+  )
+    .bind(since)
+    .all<{ id: string; result_json: string | null } & Record<string, unknown>>();
+  return ok(
+    c,
+    (r.results ?? []).map(({ result_json, ...x }) => {
+      let n = 0;
+      try {
+        n = (JSON.parse(result_json ?? '{}') as ReadResult).lines?.length ?? 0;
+      } catch {
+        n = 0;
+      }
+      return { ...x, line_count: n };
+    }),
+  );
+});
+
+/** Danh sách nhóm Zalo trợ lý đang ở trong. Điều phối bật nhóm nào thì trợ lý mới đọc đơn nhóm đó. */
+orderIntakeRoutes.get('/zalo/threads', requirePermission('order.approve.normal'), async (c) => {
+  const r = await c.env.DB.prepare(
+    `SELECT t.thread_id, t.name, t.customer_id, cu.name AS customer_name, t.enabled, t.last_msg_at FROM zalo_threads t
+     LEFT JOIN customers cu ON cu.id = t.customer_id ORDER BY t.enabled DESC, t.last_msg_at DESC LIMIT 300`,
+  ).all();
+  return ok(c, r.results ?? []);
+});
+
+orderIntakeRoutes.put('/zalo/threads/:threadId', requirePermission('order.approve.normal'), async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => ({}))) as { enabled?: boolean; customer_id?: string | null };
+  const id = c.req.param('threadId');
+  const t = await c.env.DB.prepare('SELECT thread_id, enabled, customer_id FROM zalo_threads WHERE thread_id = ?')
+    .bind(id)
+    .first<{ thread_id: string; enabled: number; customer_id: string | null }>();
+  if (!t) throw notFound('Không có nhóm này');
+  const customerId = b.customer_id === undefined ? t.customer_id : b.customer_id || null;
+  if (customerId) {
+    const cu = await c.env.DB.prepare('SELECT id FROM customers WHERE id = ? AND deleted_at IS NULL').bind(customerId).first();
+    if (!cu) throw badRequest('BAD_CUSTOMER', 'Khách không có');
+  }
+  const enabled = b.enabled === undefined ? t.enabled : b.enabled ? 1 : 0;
+  if (enabled && !customerId) throw unprocessable('NEED_CUSTOMER', 'Gắn nhóm với một khách trước rồi mới bật trợ lý đọc đơn.');
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE zalo_threads SET enabled = ?, customer_id = ?, updated_at = ? WHERE thread_id = ?').bind(enabled, customerId, nowIso(), id),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'ZALO_THREAD_SET',
+      entityType: 'ZALO_THREAD',
+      entityId: id,
+      before: { enabled: t.enabled, customer_id: t.customer_id },
+      after: { enabled, customer_id: customerId },
+      requestId: c.get('requestId'),
+    }),
+  ]);
+  return ok(c, { ok: true });
+});
+
+/** Mở một đơn trợ lý đã đọc để điền vào trang tạo đơn. */
+orderIntakeRoutes.get('/:id', requirePermission('order.create', 'order.create.team'), async (c) => {
+  const auth = c.get('auth');
+  const row = await loadIntake(c.env.DB, c.req.param('id'));
+  if (!row) throw notFound('Không có đơn này');
+  if (!(await canSeeIntake(c.env.DB, auth, row))) throw forbidden();
+  let read: ReadResult = { customer_hint: null, delivery_note: null, note: null, lines: [] };
+  try {
+    read = JSON.parse(row.result_json ?? '') as ReadResult;
+  } catch {
+    /* chưa đọc được */
+  }
+  const catalog = await loadCatalog(c.env.DB, row.customer_id);
+  return ok(c, {
+    id: row.id,
+    customer_id: row.customer_id,
+    thread_name: row.zalo_thread_name,
+    sender: row.zalo_sender,
+    raw_text: row.raw_text,
+    has_image: !!row.image_mime,
+    ...withProducts(read, catalog),
+  });
+});
+
+/** Tin trong nhóm không phải đơn, hoặc đơn đã lập tay: bỏ khỏi danh sách chờ. */
+orderIntakeRoutes.post('/:id/dismiss', requirePermission('order.create', 'order.create.team'), async (c) => {
+  const auth = c.get('auth');
+  const row = await loadIntake(c.env.DB, c.req.param('id'));
+  if (!row) throw notFound('Không có đơn này');
+  if (!(await canSeeIntake(c.env.DB, auth, row))) throw forbidden();
+  await c.env.DB.prepare("UPDATE order_intakes SET status = 'DISMISSED', updated_at = ? WHERE id = ? AND order_id IS NULL").bind(nowIso(), row.id).run();
+  return ok(c, { ok: true });
 });

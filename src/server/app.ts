@@ -58,6 +58,7 @@ import { ceoSpendRoutes } from './routes/ceoSpend';
 import { accRulesRoutes } from './routes/accRules';
 import { orderIntakeRoutes } from './routes/orderIntake';
 import { publicOrderRoutes } from './routes/publicOrder';
+import { zaloRelayRoutes } from './routes/zaloRelay';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -109,6 +110,7 @@ export function createApp() {
   app.route('/api/stt-worker', sttWorkerRoutes);
   // Cầu nối trên VPS (nhắn agent trên web) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/agent-relay', agentRelayRoutes);
+  app.route('/api/zalo-relay', zaloRelayRoutes);
   app.route('/api/agent-relay-ops', agentRelayOpsRoutes);
   app.route('/api/agent-train-relay', agentTrainRelayRoutes);
   // Agent Fanpage (OpenClaw trên VPS) tự gọi bằng khoá riêng FP_KEY.

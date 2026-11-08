@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react';
 import { ApiError, api } from '../lib/api';
+import { useApi } from '../lib/hooks';
+import { useAuth } from './AuthProvider';
+import { CustomerSelect } from './CustomerSelect';
 
 /**
  * Ô "Đơn từ Zalo" trên trang tạo đơn: sale chọn ảnh đơn của khách (lưu từ Zalo) hoặc dán ảnh / tin nhắn,
@@ -26,11 +29,33 @@ interface IntakeLine {
 
 interface ReadResponse {
   id: string;
+  customer_id?: string | null;
+  thread_name?: string | null;
+  sender?: string | null;
+  raw_text?: string | null;
+  has_image?: boolean;
   customer_hint: string | null;
   delivery_note: string | null;
   note: string | null;
   lines: IntakeLine[];
 }
+
+interface QueueRow {
+  id: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  thread_name: string | null;
+  zalo_sender: string | null;
+  raw_text: string | null;
+  has_image: number;
+  line_count: number;
+  created_at: string;
+}
+
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 export interface IntakePick {
   product: IntakeProduct;
@@ -103,6 +128,55 @@ export function ZaloIntake({
   const [work, setWork] = useState<Work[]>([]);
   const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { can } = useAuth();
+  /** Đơn trợ lý đã nhận trong nhóm Zalo, chờ sale lập đơn. */
+  const queue = useApi<QueueRow[]>('/api/order-intake/pending');
+  const [fromZalo, setFromZalo] = useState<{ thread: string | null; sender: string | null } | null>(null);
+
+  const loadResult = (data: ReadResponse) => {
+    setRes(data);
+    setWork(
+      data.lines.map((l) => ({
+        ...l,
+        pick: l.status === 'OK' ? (l.candidates[0] ?? null) : null,
+        qtyEdit: l.qty ? String(l.qty) : '',
+        drop: false,
+      })),
+    );
+  };
+
+  const openQueued = async (id: string) => {
+    setBusy(true);
+    setErr(null);
+    setDone(false);
+    try {
+      const r = await api.get<ReadResponse>(`/api/order-intake/${id}`);
+      if (r.data.customer_id && r.data.customer_id !== customerId) onPickCustomer(r.data.customer_id);
+      setImage(r.data.has_image ? { b64: '', mime: '', url: `/api/order-intake/${id}/image` } : null);
+      setText(r.data.raw_text ?? '');
+      setFromZalo({ thread: r.data.thread_name ?? null, sender: r.data.sender ?? null });
+      loadResult(r.data);
+      setOpen(true);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Chưa mở được đơn này');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dismiss = async (id: string) => {
+    try {
+      await api.post(`/api/order-intake/${id}/dismiss`, {});
+      queue.reload();
+      if (res?.id === id) {
+        setRes(null);
+        setWork([]);
+        setFromZalo(null);
+      }
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Chưa bỏ được');
+    }
+  };
 
   const takeFile = async (f: Blob | null | undefined) => {
     if (!f) return;
@@ -113,6 +187,7 @@ export function ZaloIntake({
     try {
       setErr(null);
       setImage(await shrink(f));
+      setFromZalo(null);
       setRes(null);
       setDone(false);
     } catch (e) {
@@ -136,19 +211,12 @@ export function ZaloIntake({
     try {
       const r = await api.post<ReadResponse>('/api/order-intake/read', {
         text: text.trim() || undefined,
-        image_b64: image?.b64,
-        mime: image?.mime,
+        image_b64: image?.b64 || undefined,
+        mime: image?.b64 ? image.mime : undefined,
         customer_id: customerId || undefined,
       });
-      setRes(r.data);
-      setWork(
-        r.data.lines.map((l) => ({
-          ...l,
-          pick: l.status === 'OK' ? (l.candidates[0] ?? null) : null,
-          qtyEdit: l.qty ? String(l.qty) : '',
-          drop: false,
-        })),
-      );
+      setFromZalo(null);
+      loadResult(r.data);
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Máy chưa đọc được đơn này. Thử lại hoặc lập đơn tay.');
     } finally {
@@ -169,6 +237,7 @@ export function ZaloIntake({
     const note = [res.delivery_note, res.note].filter(Boolean).join('. ') || null;
     onApply(picks, { intakeId: res.id, note });
     setDone(true);
+    queue.reload();
   };
 
   const hintMatch =
@@ -181,6 +250,30 @@ export function ZaloIntake({
         })
       : undefined;
 
+  const rows = queue.data ?? [];
+  const queueBox = rows.length > 0 && (
+    <div style={{ display: 'grid', gap: 6, width: '100%' }}>
+      <div style={{ fontWeight: 600, fontSize: 14 }}>Trợ lý nhận trong nhóm Zalo ({rows.length} đơn chờ lập)</div>
+      {rows.map((q) => (
+        <div key={q.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #ddd', borderRadius: 8, padding: '6px 10px', background: res?.id === q.id ? 'rgba(31,122,85,.08)' : undefined }}>
+          <div style={{ flex: 1, minWidth: 200, fontSize: 13 }}>
+            <b>{q.customer_name ?? q.thread_name ?? 'Nhóm Zalo'}</b> · {q.line_count} dòng{q.has_image ? ' · có ảnh' : ''}
+            <div className="muted">
+              {q.thread_name ? `Nhóm "${q.thread_name}"` : ''}
+              {q.zalo_sender ? ` · ${q.zalo_sender}` : ''} · {hhmm(q.created_at)}
+            </div>
+          </div>
+          <button type="button" className="btn sm primary" disabled={busy} onClick={() => void openQueued(q.id)}>
+            Mở
+          </button>
+          <button type="button" className="btn sm" onClick={() => void dismiss(q.id)} title="Không phải đơn, hoặc đã lập tay">
+            Bỏ qua
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
   if (!open) {
     return (
       <section className="card" style={{ padding: 14, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -191,6 +284,8 @@ export function ZaloIntake({
         <button type="button" className="btn primary" onClick={() => setOpen(true)}>
           Đọc đơn từ ảnh / tin nhắn
         </button>
+        {queueBox}
+        {err && <div className="alert-box" style={{ width: '100%' }}>{err}</div>}
       </section>
     );
   }
@@ -205,6 +300,12 @@ export function ZaloIntake({
           Thu gọn
         </button>
       </div>
+      {queueBox}
+      {fromZalo && (
+        <div className="note">
+          Đơn trợ lý nhận trong nhóm Zalo{fromZalo.thread ? ` "${fromZalo.thread}"` : ''}{fromZalo.sender ? `, người gửi ${fromZalo.sender}` : ''}. Kiểm từng dòng rồi bấm "Đưa vào đơn".
+        </div>
+      )}
       {!customerId && <div className="note">Chọn khách ở khung trên trước để máy chọn đúng bảng giá của khách.</div>}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ display: 'grid', gap: 8, width: 160 }}>
@@ -235,7 +336,7 @@ export function ZaloIntake({
           <div className="muted" style={{ fontSize: 12.5 }}>
             Trên điện thoại: trong Zalo bấm giữ ảnh đơn → Lưu ảnh, rồi bấm "Chọn ảnh đơn". Tin nhắn chữ: bấm giữ → Sao chép, rồi dán vào ô trên.
           </div>
-          <button type="button" className="btn primary" disabled={busy || (!image && !text.trim())} onClick={() => void read()}>
+          <button type="button" className="btn primary" disabled={busy || (!image?.b64 && !text.trim())} onClick={() => void read()}>
             {busy ? 'Máy đang đọc đơn… (khoảng 10–30 giây)' : 'Đọc đơn'}
           </button>
         </div>
@@ -312,6 +413,68 @@ export function ZaloIntake({
           )}
         </div>
       )}
+      {can('order.approve.normal') && <ZaloThreads customers={customers} />}
     </section>
+  );
+}
+
+interface ThreadRow {
+  thread_id: string;
+  name: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  enabled: number;
+  last_msg_at: string | null;
+}
+
+/** Điều phối: các nhóm Zalo số Zalo trợ lý đang ở trong. Gắn nhóm với khách rồi bật thì trợ lý mới đọc đơn nhóm đó. */
+function ZaloThreads({ customers }: { customers: Array<{ id: string; name: string }> }) {
+  const [show, setShow] = useState(false);
+  const list = useApi<ThreadRow[]>(show ? '/api/order-intake/zalo/threads' : null);
+  const [err, setErr] = useState<string | null>(null);
+  const save = async (t: ThreadRow, patch: { enabled?: boolean; customer_id?: string | null }) => {
+    setErr(null);
+    try {
+      await api.put(`/api/order-intake/zalo/threads/${encodeURIComponent(t.thread_id)}`, patch);
+      list.reload();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Chưa lưu được');
+    }
+  };
+  return (
+    <div style={{ borderTop: '1px solid #ddd', paddingTop: 10, display: 'grid', gap: 8 }}>
+      <button type="button" className="btn sm" style={{ justifySelf: 'start' }} onClick={() => setShow((v) => !v)}>
+        {show ? 'Ẩn nhóm Zalo của trợ lý' : 'Nhóm Zalo trợ lý đọc đơn (Điều phối)'}
+      </button>
+      {show && (
+        <>
+          <div className="muted" style={{ fontSize: 13 }}>
+            Thêm số Zalo trợ lý vào nhóm của khách, nhắn một tin bất kỳ trong nhóm, nhóm sẽ hiện ở đây. Gắn đúng khách rồi bật. Nhóm chưa bật thì trợ lý không đọc, không trả lời.
+          </div>
+          {err && <div className="alert-box">{err}</div>}
+          {list.loading && <div className="muted">Đang tải…</div>}
+          {(list.data ?? []).length === 0 && !list.loading && <div className="muted">Chưa có nhóm nào.</div>}
+          {(list.data ?? []).map((t) => (
+            <div key={t.thread_id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #ddd', borderRadius: 8, padding: '6px 10px' }}>
+              <div style={{ flex: 1, minWidth: 160, fontSize: 13 }}>
+                <b>{t.name ?? t.thread_id}</b>
+                <div className="muted">{t.last_msg_at ? `Tin gần nhất ${hhmm(t.last_msg_at)}` : ''}</div>
+              </div>
+              <div style={{ minWidth: 200, flex: 1 }}>
+                <CustomerSelect
+                  value={t.customer_id ?? ''}
+                  onChange={(id) => void save(t, { customer_id: id || null })}
+                  placeholder="Gắn với khách…"
+                  options={customers.map((c) => ({ id: c.id, name: c.name }))}
+                />
+              </div>
+              <button type="button" className={`btn sm${t.enabled ? ' primary' : ''}`} onClick={() => void save(t, { enabled: !t.enabled })}>
+                {t.enabled ? 'Đang bật · bấm để tắt' : 'Đang tắt · bấm để bật'}
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
   );
 }

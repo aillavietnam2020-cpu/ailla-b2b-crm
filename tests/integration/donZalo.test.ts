@@ -146,3 +146,86 @@ describe('link khách xác nhận', () => {
     expect([403, 404]).toContain(r.status);
   });
 });
+
+describe('trợ lý nhóm Zalo (phương án 1)', () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const relay = async (path: string, body?: unknown, key = 'khoa-thu'): Promise<{ status: number; json: () => Promise<any> }> =>
+    ctx.app.fetch(
+      new Request(`http://localhost/api/zalo-relay${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: { 'X-Relay-Key': key, 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+      ctx.env,
+      { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext,
+    );
+  const fakeAi = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ choices: [{ message: { content: '{"lines":[{"raw":"nước giặt 5L 10","qty":10,"candidates":["TEST-FULL"],"sure":true}]}' } }] })),
+      ),
+    );
+
+  beforeEach(() => {
+    ctx.env.AGENT_RELAY_KEY = 'khoa-thu';
+    ctx.env.AI_BASE_URL = 'https://ai.test';
+    ctx.env.AI_API_KEY = 'k';
+  });
+
+  it('sai khoá thì từ chối; nhóm chưa bật thì chỉ ghi tên, không đọc', async () => {
+    expect((await relay('/message', { thread_id: 'g1' }, 'sai')).status).toBe(401);
+    const r = await relay('/message', { thread_id: 'g1', thread_name: 'AILLA - NPP Hà Nam', text: 'nước giặt 5L 10 can' });
+    expect((await r.json()).data.action).toBe('none');
+    const t = await ctx.db.prepare("SELECT name, enabled FROM zalo_threads WHERE thread_id = 'g1'").first<{ name: string; enabled: number }>();
+    expect(t).toEqual({ name: 'AILLA - NPP Hà Nam', enabled: 0 });
+    const n = await ctx.db.prepare('SELECT COUNT(*) AS n FROM order_intakes').first<{ n: number }>();
+    expect(n?.n).toBe(0);
+  });
+
+  it('nhóm đã bật: đọc đơn, trả lời đã nhận 1 lần, đơn chờ hiện cho sale; duyệt xong trợ lý gửi vào nhóm', async () => {
+    await relay('/message', { thread_id: 'g1', thread_name: 'Nhóm NPP', text: 'chào shop' });
+    // Bật nhóm cần gắn khách trước
+    expect((await ctx.request('/api/order-intake/zalo/threads/g1', { method: 'PUT', as: USERS.manager, body: { enabled: true } })).status).toBe(422);
+    expect((await ctx.request('/api/order-intake/zalo/threads/g1', { method: 'PUT', as: USERS.manager, body: { enabled: true, customer_id: 'cus-thao-1' } })).status).toBe(200);
+    // Nhân viên thường không bật được
+    expect((await ctx.request('/api/order-intake/zalo/threads/g1', { method: 'PUT', as: USERS.thao, body: { enabled: false } })).status).toBe(403);
+
+    fakeAi();
+    const small = await (await relay('/message', { thread_id: 'g1', text: 'cảm ơn ạ' })).json();
+    expect(small.data.reason).toBe('not_order');
+    const r1 = await (await relay('/message', { thread_id: 'g1', msg_id: 'm1', sender_name: 'Chủ đại lý', text: 'nước giặt 5L 10 can' })).json();
+    expect(r1.data.action).toBe('reply');
+    expect(r1.data.text).not.toMatch(/chị|em /);
+    const dup = await (await relay('/message', { thread_id: 'g1', msg_id: 'm1', text: 'nước giặt 5L 10 can' })).json();
+    expect(dup.data.reason).toBe('duplicate');
+    const r2 = await (await relay('/message', { thread_id: 'g1', msg_id: 'm2', text: 'thêm nước giặt 5L 2 can' })).json();
+    expect(r2.data.action).toBe('none'); // vừa trả lời rồi, không nhắn liên tục
+
+    const q = await ctx.request('/api/order-intake/pending', { as: USERS.thao });
+    expect(q.body.data).toHaveLength(2);
+    const one = await ctx.request(`/api/order-intake/${r1.data.intake_id}`, { as: USERS.thao });
+    expect(one.body.data.customer_id).toBe('cus-thao-1');
+    expect(one.body.data.lines[0].products[0].id).toBe('prod-full');
+    expect((await ctx.request(`/api/order-intake/${r2.data.intake_id}/dismiss`, { as: USERS.thao, body: {} })).status).toBe(200);
+
+    const created = await ctx.request('/api/orders', { as: USERS.thao, body: { customer_id: 'cus-thao-1', items: [{ product_id: 'prod-full', qty: 10 }] } });
+    const id = created.body.data.id;
+    await ctx.request(`/api/order-intake/${r1.data.intake_id}/attach`, { as: USERS.thao, body: { order_id: id } });
+    expect((await ctx.request('/api/order-intake/pending', { as: USERS.thao })).body.data).toHaveLength(0);
+    // Chưa duyệt thì không gửi
+    expect((await ctx.request(`/api/order-intake/zalo-send/${id}`, { as: USERS.thao, body: {} })).status).toBe(422);
+    await ctx.db.prepare("UPDATE orders SET approval_status = 'APPROVED' WHERE id = ?").bind(id).run();
+    expect((await ctx.request(`/api/order-intake/zalo-send/${id}`, { as: USERS.thao, body: {} })).status).toBe(200);
+    expect((await ctx.request(`/api/order-intake/zalo-send/${id}`, { as: USERS.thao, body: {} })).status).toBe(422);
+
+    const box = await (await relay('/outbox')).json();
+    expect(box.data).toHaveLength(1);
+    expect(box.data[0].thread_id).toBe('g1');
+    expect(box.data[0].text).toContain('/d/');
+    await relay(`/outbox/${box.data[0].id}/done`, { ok: true });
+    expect((await (await relay('/outbox')).json()).data).toHaveLength(0);
+    const st = await ctx.request(`/api/order-intake/zalo-send/${id}`, { as: USERS.thao });
+    expect(st.body.data.last.status).toBe('SENT');
+  });
+});

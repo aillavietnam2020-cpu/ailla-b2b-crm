@@ -43,7 +43,25 @@ export function OrderZaloShare({ orderId, canCreate }: { orderId: string; canCre
   const toast = useToast();
   const intakes = useApi<IntakeRow[]>(`/api/order-intake/by-order/${orderId}`);
   const share = useApi<{ can_share: boolean; link: ShareLink | null }>(`/api/order-intake/share/${orderId}`);
+  const zsend = useApi<{
+    thread: { thread_id: string; name: string | null } | null;
+    last: { status: string; error: string | null; created_at: string; sent_at: string | null } | null;
+  }>(`/api/order-intake/zalo-send/${orderId}`);
   const [busy, setBusy] = useState(false);
+
+  const sendZalo = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/api/order-intake/zalo-send/${orderId}`, {});
+      toast.success('Trợ lý sẽ gửi đơn vào nhóm Zalo trong ít phút.');
+      zsend.reload();
+      share.reload();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Chưa gửi được');
+    } finally {
+      setBusy(false);
+    }
+  };
   const [big, setBig] = useState<string | null>(null);
 
   const make = async () => {
@@ -95,6 +113,23 @@ export function OrderZaloShare({ orderId, canCreate }: { orderId: string; canCre
       {(share.data?.can_share || link) && (
         <div style={{ display: 'grid', gap: 8 }}>
           <strong>Gửi khách xác nhận</strong>
+          {zsend.data?.thread && canCreate && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              <button type="button" className="btn primary" disabled={busy || zsend.data.last?.status === 'PENDING'} onClick={() => void sendZalo()}>
+                {zsend.data.last?.status === 'PENDING'
+                  ? 'Đang chờ trợ lý gửi vào nhóm…'
+                  : `Trợ lý gửi đơn vào nhóm "${zsend.data.thread.name ?? 'Zalo'}"`}
+              </button>
+              {zsend.data.last?.status === 'SENT' && zsend.data.last.sent_at && (
+                <span className="muted" style={{ fontSize: 13 }}>
+                  Trợ lý đã gửi vào nhóm lúc {formatVnDateTime(zsend.data.last.sent_at)}.
+                </span>
+              )}
+              {zsend.data.last?.status === 'FAILED' && (
+                <div className="alert-box warn">Trợ lý chưa gửi được ({zsend.data.last.error}). Chép lời nhắn bên dưới và gửi tay.</div>
+              )}
+            </div>
+          )}
           {!link && (
             <>
               <div className="muted" style={{ fontSize: 13 }}>
