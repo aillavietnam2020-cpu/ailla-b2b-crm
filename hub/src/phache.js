@@ -14,6 +14,7 @@
 const pApi=(p,o)=>svApi("/api/hub/phache"+p,o);
 const PCH={yc:null,ycAt:0,ycBusy:null,ct:null,ctAt:0,ctOk:false,ctBusy:null,tab:"yc",dem:{},q:"",all:false,kq:null,ton:null,tonBusy:false,hh:null,hhKey:"",hhView:"me",kiemDay:"",err:""};
 const PCH_TOL=5;
+try{PCH.ctView=localStorage.getItem("pch_ctview")||"bang"}catch(e){PCH.ctView="bang"}
 function pchRerender(){if(typeof svTyping==="function"&&svTyping())return;if(document.querySelector("#drawer:not([hidden])"))return;if(typeof renderMain==="function")renderMain()}
 const pchName=c=>String(c||"").startsWith("MOI:")?String(c).slice(4)+" (chưa có mã)":(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(c)||{}).name||c;
 const pchIsMoi=c=>String(c||"").startsWith("MOI:");
@@ -130,7 +131,7 @@ function pchCss(){if(document.getElementById("pch-css"))return;const s=document.
   `.pchtabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}.pchtabs button{border:1px solid #d9deea;background:#fff;border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}.pchtabs button.on{background:#fff0f6;border-color:#e7357b;color:#e7357b;font-weight:600}
   .pchhd{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;background:#f7f8fc;border-radius:8px;padding:8px 10px;margin-top:6px}.pchhd.open{display:block;-webkit-line-clamp:unset}
   .pchhd::after{content:""}.pchmore{font-size:12px;color:#e7357b;cursor:pointer}.pchcard{border:1px solid #e4e8f2;border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff}
-  .pchcard h3{margin:0 0 4px;font-size:15px}.pchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+  .pchcard h3{margin:0 0 4px;font-size:15px}.pchview{display:inline-flex;border:1px solid #d9deea;border-radius:8px;overflow:hidden}.pchview button{border:0;background:#fff;padding:6px 12px;font:inherit;cursor:pointer}.pchview button.on{background:#2b3a8c;color:#fff}.pchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
   tr.pchlech td{background:#fff4e0}input.pchdem{width:100px;text-align:right}input.pchmin{width:90px;text-align:right}
   @media(max-width:700px){.pchgrid{grid-template-columns:1fr}input.pchdem{width:72px}input.pchmin{width:64px}}`;document.head.appendChild(s)}
 {const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){
@@ -157,17 +158,22 @@ function pchViewCt(){
   const btps=[...new Set(PCH.ct.map(r=>r.btp))],cho=PCH.ct.filter(r=>r.status==="CHO");
   const allBtp=typeof KHO!=="undefined"&&KHO.items?[...KHO.items.values()].filter(i=>i.cls==="BTP"&&i.active!==0):[];
   const noCt=allBtp.filter(i=>!btps.includes(i.code));
-  let h=`<div class="row7" style="margin-bottom:10px">${pchCanCt()?`<button type="button" class="btn pri" data-pchnew="1">+ Thêm công thức</button>`:""}<label class="field grow"><input id="pch-q" placeholder="Tìm bán thành phẩm" value="${esc(PCH.q)}"></label></div>`;
+  let h=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input id="pch-q" placeholder="Tìm bán thành phẩm" value="${esc(PCH.q)}" style="flex:1;min-width:0">${pchCanCt()?`<button type="button" class="btn sm pri" data-pchnew="1" style="white-space:nowrap">＋ Thêm công thức</button>`:""}</div>`;
   h+=`<p class="hint">Số trong công thức là cho <b>1 lít</b> bán thành phẩm. ${PCH.ctOk?"Bạn là người duyệt công thức: lập hay điều chỉnh là dùng ngay.":"Kỹ thuật lập hoặc điều chỉnh thì chờ Trưởng kỹ thuật duyệt; chưa duyệt vẫn pha theo bản cũ."}</p>`;
   if(cho.length)h+=`<h3>Chờ Trưởng kỹ thuật duyệt · ${cho.length}</h3><div class="pchgrid">${cho.map(r=>`<div class="pchcard">${pchCtCompare(r)}<div class="acts" style="margin-top:8px">${PCH.ctOk?`<button type="button" class="btn pri" data-pchok="${r.id}">Duyệt, dùng từ hôm nay</button> <button type="button" class="btn" data-pchtra="${r.id}">Trả lại</button>`:`<span class="hint">Chờ duyệt</span>`}</div></div>`).join("")}</div>`;
   const list=btps.filter(b=>!q||fold(b+" "+pchName(b)).includes(fold(q)));
-  h+=`<h3 style="margin-top:12px">Công thức · ${btps.length} bán thành phẩm</h3>`;
-  h+=list.length?`<div class="pchgrid">${list.map(b=>{const all=PCH.ct.filter(r=>r.btp===b),R=all.find(r=>r.status==="OK"),pend=all.find(r=>r.status==="CHO"),his=all.filter(r=>r!==R&&r.status!=="CHO");
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px"><h3 style="margin:0">Công thức · ${btps.length} bán thành phẩm</h3><span class="pchview">${[["bang","Bảng"],["ds","Danh sách"]].map(([k,t])=>`<button type="button" class="${(PCH.ctView||"bang")===k?"on":""}" data-pchview="${k}">${t}</button>`).join("")}</span></div>`;
+  const card=b=>{const all=PCH.ct.filter(r=>r.btp===b),R=all.find(r=>r.status==="OK"),pend=all.find(r=>r.status==="CHO"),his=all.filter(r=>r!==R&&r.status!=="CHO");
     return `<div class="pchcard"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(pchName(b))}</h3>${pchIsMoi(b)?pill("Chờ kế toán thêm mã","red")+" ":""}${R?pill("Bản "+R.version,"blu"):pill("Chưa duyệt","amb")}</div>${pchIsMoi(b)&&typeof khoCanMisa==="function"&&khoCanMisa()?pchGanHtml(b):""}<small class="hint mono">${esc(b)}</small>
      ${R?`<div class="hint">Dùng từ ${kDd(String(R.effective_at||R.created_at).slice(0,10))} · ${esc(R.created_by_name)} lập · ${R.tu_duyet?"người duyệt tự lập, dùng ngay":"duyệt: "+esc(R.approved_by_name||"")}</div><div class="hint">Lý do: ${esc(R.ly_do)}</div>${pchLinesTbl(R.lines)}${R.huong_dan?`<div style="margin-top:6px"><b>Hướng dẫn pha</b>${pchHdHtml(R.huong_dan)}</div>`:""}`:""}
      ${pend?`<div class="note amb" style="margin-top:6px">Phiếu điều chỉnh bản ${pend.version} đang chờ duyệt.${R?" Pha vẫn theo bản "+R.version+".":""}</div>`:""}
      ${his.length?`<details style="margin-top:6px"><summary class="hint">Lịch sử ${his.length} bản cũ / trả lại</summary>${tbl(["Bản","Ngày","Lý do","Người"],his.map(x=>`<tr data-pchv="${x.id}" class="clk"><td>${x.version}${x.status==="TRA"?" "+pill("Trả lại","red"):""}</td><td>${kDd(String(x.created_at).slice(0,10))}</td><td>${esc(x.ly_do)}${x.tra_ly_do?`<small class="hint" style="display:block">Trả lại: ${esc(x.tra_ly_do)}</small>`:""}</td><td>${esc(x.created_by_name)}${x.approved_by_name?`<small class="hint" style="display:block">${esc(x.approved_by_name)}</small>`:""}</td></tr>`))}</details>`:""}
-     ${pchCanCt()&&!pend?`<div class="acts" style="margin-top:8px"><button type="button" class="btn" data-pchdc="${esc(b)}">${R?"Điều chỉnh công thức":"Lập lại công thức"}</button></div>`:""}</div>`}).join("")}</div>`:`<p class="hint">${btps.length?"Không có công thức nào khớp.":"Chưa có công thức nào. Bấm \"+ Thêm công thức\". Chưa có công thức thì không ghi được phiếu pha chế."}</p>`;
+     ${pchCanCt()&&!pend?`<div class="acts" style="margin-top:8px"><button type="button" class="btn" data-pchdc="${esc(b)}">${R?"Điều chỉnh công thức":"Lập lại công thức"}</button></div>`:""}</div>`};
+  PCH.ctCard=card;
+  const empty=`<p class="hint">${btps.length?"Không có công thức nào khớp.":"Chưa có công thức nào. Bấm \"+ Thêm công thức\". Chưa có công thức thì không ghi được phiếu pha chế."}</p>`;
+  const ds=PCH.ctView==="ds";
+  h+=!list.length?empty:!ds?`<div class="pchgrid">${list.map(card).join("")}</div>`:`<div class="card flush">${tbl(["Bán thành phẩm","Bản","Số nguyên liệu","Dùng từ","Người lập · duyệt","Lý do",""],list.map(b=>{const all=PCH.ct.filter(r=>r.btp===b),R=all.find(r=>r.status==="OK"),pend=all.find(r=>r.status==="CHO");
+    return `<tr class="clk" data-pchrow="${esc(b)}" title="Bấm để xem công thức"><td><b>${esc(pchName(b))}</b><small class="hint mono" style="display:block">${esc(b)}</small></td><td>${R?pill("Bản "+R.version,"blu"):pill("Chưa duyệt","amb")}${pend?" "+pill("Chờ duyệt bản "+pend.version,"amb"):""}${pchIsMoi(b)?" "+pill("Chờ kế toán thêm mã","red"):""}</td><td class="n">${R?R.lines.length:"—"}</td><td>${R?kDd(String(R.effective_at||R.created_at).slice(0,10)):"—"}</td><td>${R?esc(R.created_by_name)+(R.tu_duyet?"":" · "+esc(R.approved_by_name||"")):"—"}</td><td>${R?esc(R.ly_do):""}</td><td class="nowrap">${pchCanCt()&&!pend?`<button type="button" class="btn sm" data-pchdc="${esc(b)}">Điều chỉnh</button>`:""}</td></tr>`}))}</div>`;
   if(noCt.length)h+=`<details style="margin-top:12px"><summary class="hint">${noCt.length} bán thành phẩm chưa có công thức (chưa ghi được phiếu pha chế)</summary><p>${noCt.map(i=>`${pchCanCt()?`<a href="#" class="lnk" data-pchnewb="${esc(i.code)}">${esc(i.name)}</a>`:esc(i.name)}`).join(" · ")}</p></details>`;
   return h;
 }
@@ -338,7 +344,9 @@ function pchBind(m){
   const al=m.querySelector("#pch-all");if(al)al.onchange=()=>{PCH.all=al.checked;renderMain()};
   m.querySelectorAll("[data-pchnew]").forEach(b=>b.onclick=()=>pchCtForm(""));
   m.querySelectorAll("[data-pchnewb]").forEach(a=>a.onclick=e=>{e.preventDefault();pchCtForm(a.dataset.pchnewb)});
-  m.querySelectorAll("[data-pchdc]").forEach(b=>b.onclick=()=>pchCtForm(b.dataset.pchdc));
+  m.querySelectorAll("[data-pchdc]").forEach(b=>b.onclick=e=>{e.stopPropagation();pchCtForm(b.dataset.pchdc)});
+  m.querySelectorAll("[data-pchview]").forEach(b=>b.onclick=()=>{PCH.ctView=b.dataset.pchview;try{localStorage.setItem("pch_ctview",PCH.ctView)}catch(e){}renderMain()});
+  m.querySelectorAll("tr[data-pchrow]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("button,a"))return;const b=tr.dataset.pchrow;if(!PCH.ctCard)return;openDrawerHTML(`<h2>Công thức ${esc(pchName(b))}</h2>${PCH.ctCard(b)}`);pchBind(document.getElementById("drawerIn"))});
   m.querySelectorAll(".pchhd").forEach(d=>{const t=()=>{d.classList.toggle("open");const s=d.nextElementSibling;if(s&&s.classList.contains("pchmore"))s.textContent=d.classList.contains("open")?"Thu gọn":"Bấm vào để xem toàn bộ hướng dẫn"};d.onclick=t;const s=d.nextElementSibling;if(s&&s.classList.contains("pchmore"))s.onclick=t});
   m.querySelectorAll("tr[data-pchv]").forEach(tr=>tr.onclick=()=>{const r=PCH.ct.find(x=>x.id===+tr.dataset.pchv);if(r)openDrawerHTML(`<h2>Công thức ${esc(pchName(r.btp))} · bản ${r.version}</h2>${pchCtCompare(r)}`)});
   m.querySelectorAll("[data-pchdem]").forEach(i=>i.oninput=()=>{const v=i.value.trim();if(v==="")delete PCH.dem[i.dataset.pchdem];else PCH.dem[i.dataset.pchdem]=v});
