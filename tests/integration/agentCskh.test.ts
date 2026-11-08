@@ -104,3 +104,37 @@ describe('Agent CSKH B2B', () => {
     expect((await call(agent.token, 'POST', `/api/orders/${id}/submit`, {}, dlg)).status).toBeLessThan(403);
   });
 });
+
+describe('Quyền ghi chia nhỏ + mẫu theo vị trí (08/11)', () => {
+  it('tạo agent kèm mẫu quyền; chỉ ghi được đúng mục đã tick; đổi quyền có nhật ký trước/sau', async () => {
+    const made = await ctx.request('/api/admin/agents', {
+      as: USERS.ceo,
+      body: { name: 'Sale B2B', scopes: ['orders', 'debts'], writes: ['agent.w.order', 'agent.propose'] },
+    });
+    const agent = made.body.data as { id: string; token: string };
+    const mgr = await uid(USERS.manager);
+    const ceo = await uid(USERS.ceo);
+    await ctx.db.prepare('INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(mgr, 'order.approve.normal', ceo, '2026-11-08T00:00:00Z').run();
+    const list = await ctx.request('/api/admin/agents', { as: USERS.ceo });
+    const row = list.body.data.find((a: any) => a.id === agent.id);
+    expect(row.writes.sort()).toEqual(['agent.propose', 'agent.w.order']);
+
+    await ctx.request(`/api/admin/agents/${agent.id}/delegators`, { method: 'PUT', as: USERS.ceo, body: { user_ids: [mgr] } });
+    await ctx.request('/api/agent-chat', { as: USERS.manager, body: { agent: 'sale-b2b-ailla', body: 'lên đơn' } });
+    const dlg = (await pull())[0].delegation as string;
+    const order = { customer_id: 'cus-thao-1', items: [{ product_id: 'prod-full', qty: 5 }] };
+    const made2 = await call(agent.token, 'POST', '/api/orders', order, dlg);
+    expect(made2.status).toBe(201);
+    // Chưa tick "Gửi đơn đi duyệt" thì không gửi được
+    expect((await call(agent.token, 'POST', `/api/orders/${made2.body.data.id}/submit`, {}, dlg)).status).toBe(403);
+    expect((await call(agent.token, 'POST', '/api/payments', { customer_id: 'cus-thao-1', amount: 1000 }, dlg)).status).toBe(403);
+
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/writes`, { method: 'PUT', as: USERS.ceo, body: { writes: ['agent.xoa'] } })).status).toBe(422);
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/writes`, { method: 'PUT', as: USERS.manager, body: { writes: [] } })).status).toBe(403);
+    expect((await ctx.request(`/api/admin/agents/${agent.id}/writes`, { method: 'PUT', as: USERS.ceo, body: { writes: ['agent.w.order', 'agent.w.submit'] } })).status).toBe(200);
+    expect((await call(agent.token, 'POST', `/api/orders/${made2.body.data.id}/submit`, {}, dlg)).status).toBeLessThan(403);
+    const log = await ctx.db.prepare("SELECT before_json, after_json FROM audit_logs WHERE action = 'AGENT_WRITES_SET'").first<{ before_json: string; after_json: string }>();
+    expect(log?.before_json).toContain('agent.w.order');
+    expect(log?.after_json).toContain('agent.w.submit');
+  });
+});

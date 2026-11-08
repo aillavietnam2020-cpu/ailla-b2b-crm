@@ -6,7 +6,44 @@
 /** Quyền riêng của agent ('agent.act' = được ghi thay người, chỉ khi có giấy ủy quyền của người ra lệnh; 'agent.phieuchi' = được lập phiếu chi khi ghi thay). Chỉ các quyền này; agent không nhận quyền theo vai trò. */
 /** Công tắc lập phiếu chi của agent (Cấu hình › Quyền agent). */
 export const AGENT_PHIEU_CHI = 'agent.phieuchi';
-export const AGENT_PERMISSIONS = ['agent.read', 'agent.propose', 'agent.act', 'agent.readall', 'agent.phieuchi'] as const;
+/**
+ * Quyền GHI chia nhỏ (chị Hoa 08/11). Chỉ dùng khi người được chỉ định ra lệnh (giấy ủy quyền), và chỉ trong quyền của chính người đó.
+ * Agent chưa được tick quyền ghi nào mà đã có người ra lệnh: chạy theo cách cũ (mọi mục ghi cho phép ở lib/delegation.ts).
+ */
+export const AGENT_WRITES = [
+  { key: 'agent.w.order', label: 'Lập đơn nháp (tính giá, tạo đơn)', sensitive: false },
+  { key: 'agent.w.submit', label: 'Gửi đơn đi duyệt', sensitive: false },
+  { key: 'agent.w.order_edit', label: 'Sửa đơn, chuyển bước, hủy đơn', sensitive: true },
+  { key: 'agent.w.payment', label: 'Ghi tiền khách trả', sensitive: true },
+  { key: 'agent.w.kho', label: 'Mua hàng, phiếu kho, vật tư', sensitive: true },
+  { key: 'agent.phieuchi', label: 'Lập phiếu chi', sensitive: true },
+  { key: 'agent.propose', label: 'Ghi đề xuất (người có quyền bấm duyệt)', sensitive: false },
+] as const;
+export const AGENT_WRITE_KEYS: string[] = AGENT_WRITES.map((w) => w.key);
+
+/** Lệnh ghi thay người này cần quyền ghi nào. null = không thuộc nhóm nào (bị chặn khi agent đã dùng quyền ghi chia nhỏ). */
+export function writeNeedFor(method: string, path: string): string | null {
+  if (method === 'GET') return null;
+  if (method === 'POST' && (/^\/api\/orders$/.test(path) || /^\/api\/orders\/preview$/.test(path))) return 'agent.w.order';
+  if (method === 'POST' && /^\/api\/orders\/[^/]+\/submit$/.test(path)) return 'agent.w.submit';
+  if (/^\/api\/orders(\/|$)/.test(path)) return 'agent.w.order_edit';
+  if (/^\/api\/payments(\/|$)/.test(path)) return 'agent.w.payment';
+  if (/^\/api\/hub\/kho\//.test(path)) return 'agent.w.kho';
+  return null;
+}
+
+export const AGENT_PERMISSIONS = [
+  'agent.read',
+  'agent.propose',
+  'agent.act',
+  'agent.readall',
+  'agent.phieuchi',
+  'agent.w.order',
+  'agent.w.submit',
+  'agent.w.order_edit',
+  'agent.w.payment',
+  'agent.w.kho',
+] as const;
 
 /**
  * Phạm vi đọc của từng agent (cấp riêng, theo vai). Lưu trong user_permissions dạng 'agent.scope.<tên>'.

@@ -4,7 +4,7 @@ import type { AppEnv, AuthContext, AuthUser, Env } from '../env';
 import { customerScope, effectivePermissions } from '@shared/permissions';
 import { forbidden, unauthorized } from '../lib/http';
 import { readSessionCookie, resolveSession } from '../lib/session';
-import { AGENT_PERMISSIONS, AGENT_SCOPE_PERMISSIONS, AGENT_SCOPE_PREFIX, CSKH_B2B_WRITE } from '@shared/agent';
+import { AGENT_PERMISSIONS, AGENT_SCOPE_PERMISSIONS, AGENT_SCOPE_PREFIX, CSKH_B2B_WRITE, writeNeedFor } from '@shared/agent';
 import { AGENT_TOKEN_PREFIX, hashAgentToken } from '../lib/agentToken';
 import { delegatedPathAllowed, loadDelegation } from '../lib/delegation';
 import { auditStatement } from '../lib/audit';
@@ -202,6 +202,12 @@ async function resolveDelegated(
   // Agent CSKH B2B: ghi thay chỉ để lập đơn mới, không sửa / hủy đơn, không ghi tiền, kho.
   if (method !== 'GET' && own.includes(AGENT_SCOPE_PREFIX + 'cskh_b2b') && !CSKH_B2B_WRITE.some((w) => w.method === method && w.re.test(path)))
     throw forbidden('Agent CSKH B2B chỉ được lập đơn mới, không được sửa, hủy đơn hay ghi tiền');
+  // Quyền ghi chia nhỏ (Cấu hình › Quyền agent): đã tick thì chỉ được đúng mục đã tick.
+  const writes = own.filter((p) => p.startsWith('agent.w.'));
+  if (method !== 'GET' && writes.length) {
+    const need = writeNeedFor(method, path);
+    if (!need || !writes.includes(need)) throw forbidden('Agent chưa được cấp quyền ghi mục này (Cấu hình › Quyền agent)');
+  }
   if (method !== 'GET') {
     const r = await c.env.DB.prepare('UPDATE agent_delegations SET uses = uses + 1 WHERE token_hash = ? AND uses < max_uses AND expires_at > ?')
       .bind(d.token_hash, new Date().toISOString())

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { nowIso } from '@shared/datetime';
 import { zodFieldErrors } from '@shared/schemas';
-import { AGENT_PHIEU_CHI, AGENT_SCOPES, AGENT_SCOPE_LABELS, AGENT_SCOPE_PREFIX } from '@shared/agent';
+import { AGENT_PHIEU_CHI, AGENT_SCOPES, AGENT_SCOPE_LABELS, AGENT_SCOPE_PREFIX, AGENT_WRITES, AGENT_WRITE_KEYS } from '@shared/agent';
 import { AGENT_IDS, AGENT_ROSTER } from '@shared/agentRoster';
 import type { Role } from '@shared/enums';
 import type { AppEnv } from '../env';
@@ -35,7 +35,9 @@ agentAdminRoutes.get('/', async (c) => {
             (SELECT group_concat(g.user_id || ':' || g.telegram_id, ',') FROM agent_delegators g WHERE g.agent_id = a.id AND g.telegram_id IS NOT NULL) AS delegator_tg,
             (SELECT g.chat_agent FROM agent_delegators g WHERE g.agent_id = a.id LIMIT 1) AS chat_agent,
             (SELECT group_concat(substr(up.permission, ${AGENT_SCOPE_PREFIX.length + 1}), ',') FROM user_permissions up
-              WHERE up.user_id = a.id AND up.permission LIKE '${AGENT_SCOPE_PREFIX}%') AS scopes
+              WHERE up.user_id = a.id AND up.permission LIKE '${AGENT_SCOPE_PREFIX}%') AS scopes,
+            (SELECT group_concat(up.permission, ',') FROM user_permissions up
+              WHERE up.user_id = a.id AND (up.permission LIKE 'agent.w.%' OR up.permission IN ('agent.propose', '${AGENT_PHIEU_CHI}'))) AS writes
      FROM agents a ORDER BY a.created_at DESC`,
   ).all<Record<string, unknown>>();
   return ok(
@@ -44,13 +46,14 @@ agentAdminRoutes.get('/', async (c) => {
       ...r,
       chat_agent: r.chat_agent ?? rosterIdByName(String(r.name ?? '')),
       scopes: r.scopes ? String(r.scopes).split(',') : [],
+      writes: r.writes ? String(r.writes).split(',') : [],
       delegator_ids: r.delegator_ids ? String(r.delegator_ids).split(',') : [],
       // người ra lệnh đã nối Telegram: { user_id: số Telegram }
       delegator_tg: Object.fromEntries(
         (r.delegator_tg ? String(r.delegator_tg).split(',') : []).map((x) => [x.slice(0, x.indexOf(':')), x.slice(x.indexOf(':') + 1)]),
       ),
     })),
-    { all_scopes: AGENT_SCOPES, scope_labels: AGENT_SCOPE_LABELS },
+    { all_scopes: AGENT_SCOPES, scope_labels: AGENT_SCOPE_LABELS, writes: AGENT_WRITES },
   );
 });
 
@@ -59,6 +62,7 @@ const createSchema = z.object({
   purpose: z.string().trim().max(300).optional().nullable(),
   can_propose: z.boolean().optional(),
   scopes: z.array(z.enum(AGENT_SCOPES)).optional(),
+  writes: z.array(z.string()).optional(),
 });
 
 agentAdminRoutes.post('/', async (c) => {
@@ -85,7 +89,13 @@ agentAdminRoutes.post('/', async (c) => {
       `INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, 'agent.read', ?, ?)`,
     ).bind(id, auth.user.id, now),
   ];
-  if (input.can_propose !== false) {
+  const writes = new Set((input.writes ?? []).filter((w) => AGENT_WRITE_KEYS.includes(w) && w !== 'agent.propose'));
+  for (const w of writes) {
+    statements.push(
+      c.env.DB.prepare('INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(id, w, auth.user.id, now),
+    );
+  }
+  if (input.can_propose !== false && (!input.writes || input.writes.includes('agent.propose'))) {
     statements.push(
       c.env.DB.prepare(
         `INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, 'agent.propose', ?, ?)`,
@@ -105,13 +115,44 @@ agentAdminRoutes.post('/', async (c) => {
       action: 'AGENT_CREATED',
       entityType: 'AGENT',
       entityId: id,
-      after: { name: input.name, can_propose: input.can_propose !== false },
+      after: { name: input.name, scopes: input.scopes ?? [], writes: input.writes ?? null },
       requestId: c.get('requestId'),
       ip: c.req.header('CF-Connecting-IP') ?? null,
     }),
   );
   await c.env.DB.batch(statements);
   return ok(c, { id, name: input.name, token }, undefined, 201);
+});
+
+/** Quyền ghi của agent (thay hết bộ cũ). Ghi nhật ký trước / sau. */
+agentAdminRoutes.put('/:id/writes', async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const b = (await c.req.json().catch(() => ({}))) as { writes?: unknown };
+  if (!Array.isArray(b.writes)) throw unprocessable('VALIDATION_FAILED', 'Thiếu danh sách quyền ghi');
+  const bad = b.writes.map(String).filter((w) => !AGENT_WRITE_KEYS.includes(w));
+  if (bad.length) throw unprocessable('BAD_WRITE', 'Quyền ghi không có', { writes: bad.join(',') });
+  const exists = await c.env.DB.prepare('SELECT id FROM agents WHERE id = ?').bind(id).first();
+  if (!exists) throw notFound('Không tìm thấy agent');
+  const keep = [...new Set(b.writes.map(String))];
+  const marks = AGENT_WRITE_KEYS.map(() => '?').join(',');
+  const before = await c.env.DB.prepare(`SELECT permission FROM user_permissions WHERE user_id = ? AND permission IN (${marks})`).bind(id, ...AGENT_WRITE_KEYS).all<{ permission: string }>();
+  const now = nowIso();
+  await c.env.DB.batch([
+    c.env.DB.prepare(`DELETE FROM user_permissions WHERE user_id = ? AND permission IN (${marks})`).bind(id, ...AGENT_WRITE_KEYS),
+    ...keep.map((w) => c.env.DB.prepare('INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(id, w, auth.user.id, now)),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'AGENT_WRITES_SET',
+      entityType: 'AGENT',
+      entityId: id,
+      before: { writes: (before.results ?? []).map((r) => r.permission) },
+      after: { writes: keep },
+      requestId: c.get('requestId'),
+      ip: c.req.header('CF-Connecting-IP') ?? null,
+    }),
+  ]);
+  return ok(c, { id, writes: keep });
 });
 
 agentAdminRoutes.post('/:id/rotate', async (c) => {
@@ -174,6 +215,7 @@ agentAdminRoutes.put('/:id/scopes', async (c) => {
   if (!exists) throw notFound('Không tìm thấy agent');
   const now = nowIso();
   const keep = [...new Set(parsed.data.scopes)];
+  const before = await c.env.DB.prepare(`SELECT permission FROM user_permissions WHERE user_id = ? AND permission LIKE '${AGENT_SCOPE_PREFIX}%'`).bind(id).all<{ permission: string }>();
   await c.env.DB.batch([
     c.env.DB.prepare(`DELETE FROM user_permissions WHERE user_id = ? AND permission LIKE '${AGENT_SCOPE_PREFIX}%'`).bind(id),
     ...keep.map((sc) =>
@@ -186,6 +228,7 @@ agentAdminRoutes.put('/:id/scopes', async (c) => {
       action: 'AGENT_SCOPES_SET',
       entityType: 'AGENT',
       entityId: id,
+      before: { scopes: (before.results ?? []).map((r) => r.permission.slice(AGENT_SCOPE_PREFIX.length)) },
       after: { scopes: keep },
       requestId: c.get('requestId'),
       ip: c.req.header('CF-Connecting-IP') ?? null,
