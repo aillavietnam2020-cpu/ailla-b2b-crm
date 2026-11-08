@@ -54,7 +54,7 @@ function khoParseMapFile(wb){
   const cC=ix(/^m[ãa] crm/),cM=ix(/^m[ãa] misa/),cF=ix(/^h[ệe] s[ốo]/),cN=ix(/ghi ch/);
   if(cC<0||cM<0||cF<0)throw new Error("Thiếu cột Mã CRM / MÃ MISA / Hệ số");
   // Hệ số trong file có dạng "28." hoặc "0.04" hoặc "1,6": bỏ dấu chấm cuối, đổi phẩy thành chấm.
-  const num=v=>typeof v==="number"?v:+String(v).trim().replace(/\.$/,"").replace(",",".");
+  const num=v=>kfNum(v); // 08/11: đọc số kiểu Việt Nam dùng chung
   const rows=[],skip=[];
   A.slice(hi+1).forEach(r=>{const sku=String(r[cC]).trim(),code=String(r[cM]).trim();if(!sku)return;const f=num(r[cF]);
     if(!code||!(f>0)){skip.push(sku+(code?"":" (chưa có mã MISA)"));return}
@@ -159,7 +159,7 @@ function khoTdResolve(text){
   L.sort((a,b)=>a.name.length-b.name.length);return {code:"",cands:L.slice(0,12)};
 }
 function khoParseTdFile(wb){
-  const num=v=>{if(typeof v==="number")return v;const t=String(v).trim();if(!t)return NaN;return +t.replace(/\s/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",",".")};
+  const num=v=>kfNum(v); // 08/11: trước bỏ dấu chấm trước 3 chữ số nên "0.015" thành 15
   const isCode=c=>/^(m[ãa]( (misa|h[àa]ng|v[ậa]t t[ưu]|nvl|sp|kho))?( ho[ặa]c t[êe]n.*)?|code|sku|t[êe]n g[ợo]i nh[ớo].*)$/i.test(String(c).trim());
   const out=[];let found=false;
   wb.SheetNames.forEach(sn=>{
@@ -249,7 +249,7 @@ function khoParseOnline(A){
     if(typeof v==="number"&&v>30000){const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5);return d.toISOString().slice(0,10)}
     const s=String(v).trim();let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
     m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[0]:null};
-  const num=v=>typeof v==="number"?v:parseFloat(String(v).trim().replace(",","."));
+  const num=v=>kfNum(v);
   const days=new Map();let skipped=0;
   A.slice(hi+1).forEach(r=>{
     const day=toDay(r[cD]),label=String(r[cL]||"").trim(),qty=num(r[cQ]);
@@ -270,7 +270,7 @@ function khoParseLines(A){
   if(cD<0||cO<0||cK<0||cQ<0)throw new Error("Thiếu cột Ngày gửi / Mã đơn / Mã SKU / Số lượng");
   const toDay=v=>{const s=String(v||"").trim();let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[0]:""};
   const by=new Map();
-  A.slice(hi+1).forEach(r=>{const day=toDay(r[cD]),oid=String(r[cO]||"").trim(),sku=String(r[cK]||"").trim(),q=parseFloat(String(r[cQ]||"").replace(",","."));
+  A.slice(hi+1).forEach(r=>{const day=toDay(r[cD]),oid=String(r[cO]||"").trim(),sku=String(r[cK]||"").trim(),q=kfNum(r[cQ]||"");
     if(!day||!oid||!sku||!(q>0))return;
     const t=cT>=0?String(r[cT]||"").trim():"";
     const L=by.get(day)||[];L.push({order_id:oid,shipped_at:/^\d{1,2}:\d{2}$/.test(t)?day+"T"+t.padStart(5,"0")+":00+07:00":"",shop:cS>=0?String(r[cS]||"").trim():"",sku,variant:cV>=0?String(r[cV]||"").trim():"",name:cN>=0?String(r[cN]||"").trim():sku,qty:q});by.set(day,L)});
@@ -288,7 +288,7 @@ function khoParseMap(A){
     if(s){lastS=s;lastV=v}
     const sku=s||lastS,variant=s?v:lastV;
     if(!sku||!item)return;
-    const q=parseFloat(String(cQ>=0?r[cQ]:1).replace(",","."));
+    const q=kfNum(cQ>=0?r[cQ]:1);
     rows.push({sku,variant,item_label:item,qty:q>0?q:1,note:cN>=0?String(r[cN]||"").replace(/^Nháp[^.]*\.?\s*/,""):""});
   });
   return rows;
