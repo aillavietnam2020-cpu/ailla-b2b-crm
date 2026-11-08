@@ -227,7 +227,7 @@ bonusRoutes.post('/gifts', async (c) => {
 
   const ym = month.slice(2, 4) + month.slice(5, 7);
   const n = (
-    await c.env.DB.prepare('SELECT COUNT(*) AS n FROM bonus_gift_vouchers WHERE voucher_no LIKE ?').bind(`PQT${ym}-%`).first<{ n: number }>()
+    await c.env.DB.prepare('SELECT MAX(CAST(substr(voucher_no, instr(voucher_no, char(45)) + 1) AS INTEGER)) AS n FROM bonus_gift_vouchers WHERE voucher_no LIKE ?').bind(`PQT${ym}-%`).first<{ n: number }>()
   )?.n ?? 0;
   const no = `PQT${ym}-${String(n + 1).padStart(3, '0')}`;
   const id = newId();
@@ -272,7 +272,7 @@ bonusRoutes.post('/gifts/:id/approve', async (c) => {
   let docNo = '';
   let docId = 0;
   for (let attempt = 0; attempt < 4 && !docId; attempt++) {
-    const row = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM kho_docs WHERE type = ? AND no LIKE ?')
+    const row = await c.env.DB.prepare('SELECT MAX(CAST(substr(no, instr(no, char(45)) + 1) AS INTEGER)) AS n FROM kho_docs WHERE type = ? AND no LIKE ?')
       .bind('XK', `XK${ym}-%`)
       .first<{ n: number }>();
     docNo = `XK${ym}-${String((row?.n ?? 0) + 1 + attempt).padStart(3, '0')}`;
@@ -409,7 +409,7 @@ bonusRoutes.post('/cash', async (c) => {
   const ym = d.month.slice(2, 4) + d.month.slice(5, 7);
   const id = newId();
   for (let attempt = 0; attempt < 4; attempt++) {
-    const n = (await c.env.DB.prepare('SELECT COUNT(*) AS n FROM bonus_cash_vouchers WHERE voucher_no LIKE ?').bind(`PCT${ym}-%`).first<{ n: number }>())?.n ?? 0;
+    const n = (await c.env.DB.prepare('SELECT MAX(CAST(substr(voucher_no, instr(voucher_no, char(45)) + 1) AS INTEGER)) AS n FROM bonus_cash_vouchers WHERE voucher_no LIKE ?').bind(`PCT${ym}-%`).first<{ n: number }>())?.n ?? 0;
     const no = `PCT${ym}-${String(n + 1 + attempt).padStart(3, '0')}`;
     try {
       await c.env.DB.batch([

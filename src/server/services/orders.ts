@@ -416,10 +416,12 @@ export async function createOrder(
     .first<{ v: string }>();
   const flowOn = flowCfg?.v === '1' ? 1 : 0;
 
+  // Số đơn = số lớn nhất đã dùng trong tháng + 1 (không đếm số đơn: đơn bị xóa làm hụt số, đếm lại sẽ trùng số cũ).
+  const prefix = generateOrderNo(0, new Date(`${orderDate}T00:00:00.000Z`)).slice(0, -4);
   const seqRow = await db
-    .prepare(`SELECT COUNT(*) AS n FROM orders WHERE substr(order_date, 1, 7) = ?`)
-    .bind(orderDate.slice(0, 7))
-    .first<{ n: number }>();
+    .prepare(`SELECT MAX(CAST(substr(order_no, ?) AS INTEGER)) AS n FROM orders WHERE order_no LIKE ?`)
+    .bind(prefix.length + 1, `${prefix}%`)
+    .first<{ n: number | null }>();
   const orderNo = generateOrderNo((seqRow?.n ?? 0) + 1, new Date(`${orderDate}T00:00:00.000Z`));
 
   const statements: D1PreparedStatement[] = [

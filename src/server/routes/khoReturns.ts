@@ -232,7 +232,7 @@ async function createReturnDoc(
   const ym = day.slice(2, 4) + day.slice(5, 7);
   const now = nowIso();
   for (let attempt = 0; attempt < 4; attempt++) {
-    const cnt = await db.prepare("SELECT COUNT(*) AS n FROM kho_docs WHERE type = 'TL' AND no LIKE ?").bind(`TL${ym}-%`).first<{ n: number }>();
+    const cnt = await db.prepare("SELECT MAX(CAST(substr(no, instr(no, char(45)) + 1) AS INTEGER)) AS n FROM kho_docs WHERE type = 'TL' AND no LIKE ?").bind(`TL${ym}-%`).first<{ n: number }>();
     const no = `TL${ym}-${String((cnt?.n ?? 0) + 1 + attempt).padStart(3, '0')}`;
     try {
       await db

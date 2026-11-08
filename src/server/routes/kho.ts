@@ -1823,7 +1823,7 @@ khoRoutes.post('/docs', async (c) => {
   let no = '';
   for (let attempt = 0; attempt < 4 && !docId; attempt++) {
     const row = await c.env.DB.prepare(
-      'SELECT COUNT(*) AS n FROM kho_docs WHERE type = ? AND no LIKE ?',
+      'SELECT MAX(CAST(substr(no, instr(no, char(45)) + 1) AS INTEGER)) AS n FROM kho_docs WHERE type = ? AND no LIKE ?',
     )
       .bind(type, `${type}${ym}-%`)
       .first<{ n: number }>();
