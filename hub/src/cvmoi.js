@@ -277,7 +277,7 @@ function cwAddSelf(){openTask(null);const di=$("#drawerIn");if(!di)return;const 
   if(f){prune(f);f.classList.add("cwself")}
   /* không cần ai duyệt; muốn có người duyệt thì chọn ở "Đề xuất người duyệt" */
   let duyet="";const uu=f&&f.querySelector("#t-uu"),fu=uu&&uu.closest(".field");
-  if(fu){const us=cwUsers().filter(u=>u.id!==ME.id).sort((a,b)=>a.name.localeCompare(b.name));fu.insertAdjacentHTML("afterend",`<label class="field">Đề xuất người duyệt <small class="hint">(không bắt buộc)</small><select id="cw-duyet">${opt([["","Không cần duyệt"]].concat(us.map(u=>[u.id,u.name])),"")}</select></label>`);
+  if(fu){const ceo=D().users.filter(u=>u.active!==false&&u.role==="admin"&&u.id!==ME.id),us=cwUsers().filter(u=>u.id!==ME.id&&u.role!=="admin").sort((a,b)=>a.name.localeCompare(b.name));fu.insertAdjacentHTML("afterend",`<label class="field">Đề xuất người duyệt <small class="hint">(không bắt buộc)</small><select id="cw-duyet">${opt([["","Không cần duyệt"]].concat(ceo.map(u=>[u.id,"CEO · "+u.name]),us.map(u=>[u.id,u.name])),"")}</select></label>`);
     const sd=f.querySelector("#cw-duyet");if(sd)sd.onchange=()=>{duyet=sd.value}}
   TK_AFTER_NEW=nid=>{DB.mutate(ME.name,"tự thêm việc",dt=>{const x=(dt.tasks||[]).find(y=>y.id===nid);if(x&&x.nguoi===ME.id&&x.tao===ME.id){x.tuThem=true;if(duyet)x.duyet=duyet}})}}
 /* thao tác dùng chung cho mọi trang trong mục */

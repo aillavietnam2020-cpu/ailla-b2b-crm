@@ -603,7 +603,7 @@ function openProject(id){
   openDrawerHTML(`<h2>${p?"Sửa dự án":"Thêm dự án"}</h2><form class="frm" id="pjf2"><label class="field">Tên dự án<input id="pf-t" required value="${esc(p?p.ten:"")}"></label><label class="field">Mô tả<textarea id="pf-m" rows="2">${esc(p?p.moTa||"":"")}</textarea></label>
    <div class="row4"><label class="field">Thuộc phòng<select id="pf-team">${opt(Object.entries(TEAMS).filter(([k])=>k!=="chung").concat([["lien","Liên phòng ban"],["chung","Toàn công ty · việc chung"]]),p?(p.lien||(p.teams||[]).length?"lien":p.team):"content")}</select></label><label class="field">Phụ trách<select id="pf-o">${opt(users.map(u=>[u.id,u.name]),p?p.owner:ME.id)}</select></label></div>
    <div class="row4"><label class="field">Bắt đầu${tkDate("pf-b",p?p.batDau||0:0)}</label><label class="field">Hạn${tkDate("pf-h",p?p.han:MONTH.ndays,"required")}</label><label class="field">Ưu tiên<select id="pf-u">${opt(UU,p?p.uu||"Trung bình":"Trung bình")}</select></label></div>
-   <div class="field">Video của dự án <small class="hint">(lấy theo sản phẩm, kênh)</small>
+   <div class="field" id="pf-vidw">Video của dự án <small class="hint">(chỉ dự án có phòng Marketing; lấy video theo sản phẩm, kênh)</small>
     <div class="phc">${prods().map(s=>`<label class="ck sm"><input type="checkbox" name="pf-sku" value="${esc(s.k)}" ${p&&p.loc&&(p.loc.sku||[]).includes(s.k)?"checked":""}> ${esc(s.n)}</label>`).join("")}</div>
     <div class="phc">${CHANNELS.map(ch=>`<label class="ck sm"><input type="checkbox" name="pf-kenh" value="${esc(ch.k)}" ${p&&p.loc&&!p.loc.none&&(p.loc.kenh||[]).includes(ch.k)?"checked":""}> ${esc(ch.short||ch.k)}</label>`).join("")}</div></div>
    <div class="field" id="pf-teamsw">Phòng tham gia <small class="hint">(chọn từ 2 phòng trở lên; các phòng này cùng thấy dự án, nhóm chat dự án và thư mục dự án)</small><div class="phc">${Object.entries(TEAMS).filter(([k])=>k!=="chung").map(([k,n])=>`<label class="ck sm"><input type="checkbox" name="pf-teams" value="${k}" ${p&&(p.team===k&&(p.lien||(p.teams||[]).length)||(p.teams||[]).includes(k))?"checked":""}> ${esc(n)}</label>`).join("")}</div></div>
@@ -611,7 +611,9 @@ function openProject(id){
    <div class="field">Thành viên<div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="pf-tv" value="${u.id}" ${p&&(p.tv||[]).includes(u.id)?"checked":""}> ${esc(u.name)}</label>`).join("")}</div></div>
    <div class="acts"><button class="btn pri">${p?"Lưu":"Thêm dự án"}</button>${p&&ME.role==="admin"?`<button type="button" class="btn danger" id="pf-del">Xóa</button>`:""}</div></form>`);
   /* Thuộc phòng (chị Hoa 08/11): một phòng · Liên phòng ban (chọn các phòng tham gia, phòng đầu là phòng chính) · Toàn công ty (mọi người cùng thấy) */
-  const pfTw=()=>{$("#pf-teamsw").hidden=$("#pf-team").value!=="lien"};$("#pf-team").onchange=pfTw;pfTw();
+  const pfMkt=["content","digital","koc"],pfTw=()=>{const v=$("#pf-team").value,ck=[...document.querySelectorAll("[name=pf-teams]:checked")].map(x=>x.value);$("#pf-teamsw").hidden=v!=="lien";
+    const show=pfMkt.includes(v)||(v==="lien"&&ck.some(k=>pfMkt.includes(k)));$("#pf-vidw").hidden=!show;if(!show)document.querySelectorAll("[name=pf-sku],[name=pf-kenh]").forEach(x=>x.checked=false)};
+  $("#pf-team").onchange=pfTw;document.querySelectorAll("[name=pf-teams]").forEach(x=>x.onchange=pfTw);pfTw();
   $("#pjf2").onsubmit=e=>{e.preventDefault();const tk=$("#pf-team").value,ck=[...document.querySelectorAll("[name=pf-teams]:checked")].map(x=>x.value);
     if(tk==="lien"&&ck.length<2){toast("Liên phòng ban: chọn ít nhất 2 phòng tham gia");return}
     const han=tkDay($("#pf-h").value),bd=tkDay($("#pf-b").value);if(!han){toast("Chọn hạn dự án");return}if(bd&&bd>han){toast("Ngày bắt đầu đang sau hạn");return}
