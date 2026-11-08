@@ -32,20 +32,22 @@ export function hubBuildId(html: string): string {
 /** Trang đã thay tên/HOST_MODE, giữ lại theo từng địa chỉ để không phải ghép lại chuỗi 4 MB mỗi lần mở. */
 const pageCache = new Map<string, string>();
 
-export async function serveHub(request: Request, env: Env, html: string): Promise<Response> {
+export async function serveHub(request: Request, env: Env, html: string, chat = false): Promise<Response> {
   const url = new URL(request.url);
+  /** Ailla Chat (chị Hoa duyệt demo 08/11): cùng trang, cùng đăng nhập, mở thẳng Tin nhắn toàn màn hình, tên + biểu tượng riêng để thêm ra màn hình chính. */
+  const home = chat ? '/chat/' : '/hub/';
   // Trang đang mở hỏi "có bản web mới chưa" bằng số bản dựng (vài byte) thay vì tải lại cả trang.
   if (url.pathname === '/hub/build') {
     return new Response(JSON.stringify({ build: hubBuildId(html) }), {
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
     });
   }
-  if (url.pathname !== '/hub/') return Response.redirect(new URL('/hub/', url).toString(), 302);
+  if (url.pathname !== home) return Response.redirect(new URL(home, url).toString(), 302);
 
   const token = readSessionCookie(request.headers);
   const session = token ? await resolveSession(env.DB, token) : null;
   if (!session || session.status !== 'ACTIVE') {
-    return Response.redirect(new URL('/?next=/hub/', url).toString(), 302);
+    return Response.redirect(new URL('/?next=' + home, url).toString(), 302);
   }
   if (session.must_change_password === 1) return Response.redirect(new URL('/', url).toString(), 302);
   const permissions = effectivePermissions(
@@ -70,7 +72,7 @@ export async function serveHub(request: Request, env: Env, html: string): Promis
   const siteTitle = !env.ADMIN_HOST ? "Trang quản trị Ailla" : adminMode ? "Ailla Quản trị" : "Ailla Vận hành";
   // Trình duyệt giữ trang (khoảng 1,3 MB) và mỗi lần mở chỉ hỏi lại: cùng bản dựng thì trả 304, không tải lại.
   // Vẫn kiểm tra đăng nhập/quyền ở trên trước khi trả 304; trang không chứa số liệu, chỉ khác nhau theo địa chỉ.
-  const etag = '"' + hubBuildId(html) + '-' + (adminMode ? 'a' : 'o') + '"';
+  const etag = '"' + hubBuildId(html) + '-' + (adminMode ? 'a' : 'o') + (chat ? 'c' : '') + '"';
   const sent = (request.headers.get('If-None-Match') ?? '').split(',').map((t) => t.trim().replace(/^W\//, ''));
   const headers = {
     'Cache-Control': 'private, no-cache',
@@ -89,6 +91,15 @@ export async function serveHub(request: Request, env: Env, html: string): Promis
       'let HOST_MODE="ops";let OPS_URL="";let ADMIN_URL="";',
       'let HOST_MODE=' + JSON.stringify(adminMode ? 'admin' : 'ops') + ';let OPS_URL=' + JSON.stringify(opsUrl) + ';let ADMIN_URL=' + JSON.stringify(adminUrl) + ';',
     );
+    if (chat) {
+      page = page
+        .replace('<head>', '<head><script>window.CHAT_APP=1</script>')
+        .replace('href="/manifest.webmanifest"', 'href="/chat.webmanifest"')
+        .replace('<meta name="theme-color" content="#0f1b3d">', '<meta name="theme-color" content="#ffffff">')
+        .replace('content="Ailla"', 'content="Ailla Chat"')
+        .replace('href="/apple-touch-icon.png"', 'href="/chat-icon-180.png"')
+        .replace(/<title>[^<]*<\/title>/, '<title>Ailla Chat</title>');
+    }
     if (pageCache.size > 8) pageCache.clear();
     pageCache.set(key, page);
   }

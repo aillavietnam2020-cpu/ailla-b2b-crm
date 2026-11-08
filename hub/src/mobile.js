@@ -404,3 +404,67 @@
   let t=0;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(fix,150)}).observe(document.body,{childList:true,subtree:true});
   document.addEventListener("input",e=>{if(e.target&&e.target.id==="kf-btp")setTimeout(fix,200)},true);
 })();
+/* Ailla Chat (chị Hoa duyệt demo 08/11): địa chỉ /chat/ mở thẳng Tin nhắn toàn màn hình như Messenger, có biểu tượng riêng ngoài màn hình chính (không lên store).
+   Trên web vanhanh ở điện thoại: bấm 💬 hay mở Tin nhắn thì sang /chat/ (Android đã cài thì mở trong ứng dụng). */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const standalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+  /* chữ gợi ý ngắn như Messenger: chữ dài làm ô nhập cao 5 dòng trên điện thoại */
+  const ph=()=>{if(!narrow.matches)return;const i=document.getElementById("tnin");if(i&&i.placeholder!=="Nhắn tin"){i.placeholder="Nhắn tin";i.style.height="auto";i.style.height=Math.min(i.scrollHeight,140)+"px"}const q=document.getElementById("tnq");if(q)q.placeholder="Tìm kiếm"};
+  {const _rm=renderMain;renderMain=function(){const r=_rm.apply(this,arguments);try{ph();if(window.CHAT_APP)chatDress()}catch(e){}return r}}
+  if(!window.CHAT_APP){
+    /* web thường trên điện thoại: chuyển Tin nhắn sang Ailla Chat */
+    let first=true,prev="";
+    const go=()=>{try{location.href="/chat/"}catch(e){}};
+    document.addEventListener("click",e=>{const c=e.target&&e.target.closest&&e.target.closest("#chatbtn");if(c&&narrow.matches&&ME){e.preventDefault();e.stopImmediatePropagation();go()}},true);
+    const _r=render;render=function(){
+      if(narrow.matches&&ME&&PAGE==="tinnhan"&&!first&&prev!=="tinnhan"){prev=PAGE;go();return}
+      first=false;prev=PAGE;const r=_r.apply(this,arguments);try{ph()}catch(e){}return r};
+    return;
+  }
+  document.documentElement.classList.add("chatapp");document.body.classList.add("chatapp");
+  /* không ghi "đang ở Tin nhắn" vào bộ nhớ của tab: bấm về web không bị mở lại Tin nhắn */
+  try{if(typeof VIEW_KEY!=="undefined")sessionStorage.removeItem(VIEW_KEY)}catch(e){}
+  if(typeof saveView==="function")saveView=function(){};
+  let started=false;
+  const _r=render;render=function(){
+    if(ME&&PAGE!=="tinnhan"){
+      /* đang ở Ailla Chat mà mở trang khác (thẻ việc, thông báo…): sang web vanhanh đúng trang đó */
+      if(started&&PAGE){const p=PAGE;PAGE="tinnhan";location.href="/hub/#go="+encodeURIComponent(p);return}
+      PAGE="tinnhan";MOD="";
+    }
+    started=!!ME;const r=_r.apply(this,arguments);try{ph();chatDress()}catch(e){}return r};
+  /* nút quay lại của điện thoại: đang trong cuộc chat thì về danh sách, không thoát ứng dụng */
+  const _open=tnOpen;tnOpen=function(room){const wasOpen=TN.mob&&document.querySelector(".tn.open");const r=_open.apply(this,arguments);if(!wasOpen)try{history.pushState({tnc:1},"")}catch(e){}return r};
+  window.addEventListener("popstate",()=>{const t=document.querySelector(".tn.open");if(t){TN.mob=false;t.classList.remove("open")}});
+  let BIP=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();BIP=e;try{chatDress()}catch(er){}});
+  window.addEventListener("appinstalled",()=>{BIP=null;try{localStorage.setItem("chat_inst","1")}catch(e){}const b=document.getElementById("chinst");if(b)b.remove()});
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent),xiaomi=/Redmi|Xiaomi|MIUI|HyperOS|\bM2\d{3}/i.test(navigator.userAgent);
+  function guide(){
+    const o=document.createElement("div");o.id="chguide";
+    const step=(n,t)=>`<li><i>${n}</i><span>${t}</span></li>`;
+    o.innerHTML=`<div class="chgbox"><div class="chgh"><img src="/chat-icon-192.png" alt=""><div><b>Cài Ailla Chat</b><small>Thêm biểu tượng ra màn hình chính, bấm là vào thẳng tin nhắn</small></div><button type="button" data-x aria-label="Đóng">✕</button></div>
+      ${ios?`<p class="chgt">iPhone (mở bằng Safari)</p><ol>${step(1,"Bấm nút <b>Chia sẻ</b> (ô vuông có mũi tên lên) ở thanh dưới Safari")}${step(2,"Kéo xuống, chọn <b>Thêm vào MH chính</b>")}${step(3,"Bấm <b>Thêm</b>. Biểu tượng Ailla Chat hiện ngoài màn hình")}${step(4,"Mở Ailla Chat từ biểu tượng đó, đăng nhập một lần là xong")}</ol><p class="hint">Nếu đang mở bằng Chrome hay Zalo trên iPhone: chép địa chỉ <b>${esc(location.host)}/chat/</b> sang Safari rồi làm như trên.</p>`
+      :`<p class="chgt">Android (Chrome)</p><ol>${step(1,"Bấm nút <b>⋮</b> góc trên bên phải Chrome")}${step(2,"Chọn <b>Thêm vào màn hình chính</b> (hoặc <b>Cài đặt ứng dụng</b>)")}${step(3,"Bấm <b>Cài đặt</b> / <b>Thêm</b>")}</ol>
+        ${xiaomi?`<p class="chgt">Máy Redmi / Xiaomi: nếu không thấy biểu tượng</p><ol>${step(1,"Mở <b>Cài đặt</b> › <b>Ứng dụng</b> › <b>Chrome</b> › <b>Quyền khác</b>")}${step(2,"Bật <b>Lối tắt trên màn hình chính</b> rồi cài lại")}${step(3,"Để nhận báo tin nhắn: Chrome › <b>Tiết kiệm pin</b> › chọn <b>Không giới hạn</b>")}</ol>`:""}`}
+    </div>`;
+    o.onclick=e=>{if(e.target===o||e.target.closest("[data-x]"))o.remove()};document.body.appendChild(o)}
+  function chatDress(){
+    const sh=document.querySelector(".tn .tnsh");if(!sh)return;
+    if(!sh.querySelector(".chweb")){sh.insertAdjacentHTML("afterbegin",`<a class="chweb" href="/hub/" title="Về web vận hành" aria-label="Về web vận hành"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>`);const b=sh.querySelector("b");if(b)b.textContent="Đoạn chat"}
+    let hid=false;try{hid=localStorage.getItem("chat_inst")==="1"||localStorage.getItem("chat_inst_x")===String(new Date().toDateString())}catch(e){}
+    const side=document.querySelector(".tn .tnside");
+    if(!standalone()&&!hid&&side&&!document.getElementById("chinst")){
+      side.querySelector(".tnq").insertAdjacentHTML("afterend",`<div id="chinst"><img src="/chat-icon-192.png" alt=""><span><b>Cài Ailla Chat</b><small>Biểu tượng riêng ngoài màn hình chính</small></span><button type="button" class="btn pri sm" data-i>Cài</button><button type="button" class="chx" data-x aria-label="Ẩn">✕</button></div>`);
+      const c=document.getElementById("chinst");
+      c.querySelector("[data-i]").onclick=async()=>{if(BIP){try{BIP.prompt();const r=await BIP.userChoice;if(r&&r.outcome==="accepted"){try{localStorage.setItem("chat_inst","1")}catch(e){}c.remove()}}catch(e){guide()}BIP=null}else guide()};
+      c.querySelector("[data-x]").onclick=()=>{try{localStorage.setItem("chat_inst_x",new Date().toDateString())}catch(e){}c.remove()};
+    }
+    const tb=document.getElementById("tnback");if(tb&&!tb.dataset.ch){tb.dataset.ch="1";tb.addEventListener("click",()=>{try{if(history.state&&history.state.tnc)history.back()}catch(e){}})}
+  }
+  /* số chưa đọc trên biểu tượng + tiêu đề tab */
+  let lastN=-1;setInterval(()=>{if(!ME||typeof tnTotal!=="function")return;const n=TN.rooms.reduce((a,r)=>a+(r.room===TN.room&&TN.mob&&!document.hidden?0:r.unread||0),0);if(n===lastN)return;lastN=n;
+    document.title=(n?"("+(n>99?"99+":n)+") ":"")+"Ailla Chat";
+    try{if(navigator.setAppBadge){n?navigator.setAppBadge(n):navigator.clearAppBadge()}}catch(e){}},3000);
+})();

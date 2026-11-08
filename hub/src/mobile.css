@@ -376,3 +376,62 @@
   table.mlist td.ml-c{grid-row:2}
   table.mlist tr.ml-full{display:block}
 }
+/* Ailla Chat (/chat/): chỉ có Tin nhắn, toàn màn hình */
+.chatapp .side,.chatapp .topbar,.chatapp #mobtab,.chatapp .aibtn,.chatapp #xal,.chatapp .tnpop{display:none!important}
+.chatapp,.chatapp body{background:#fff}
+.chatapp .mainwrap{margin:0!important;padding:0!important}
+.chatapp .mainwrap>main,.chatapp #main{padding:0!important;max-width:none!important}
+.chatapp .tn{height:100vh;height:100dvh;border:0;border-radius:0;min-height:0}
+.chweb{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;color:#344054;flex:none;margin-right:2px}
+.chweb svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.chatapp .tnsh{justify-content:flex-start;gap:6px}.chatapp .tnsh>b{flex:1}
+#chinst{display:flex;align-items:center;gap:10px;margin:0 12px 8px;padding:9px 10px;border-radius:14px;background:#f1f0ff;border:1px solid #e2defe}
+#chinst img{width:38px;height:38px;border-radius:10px;flex:none}#chinst span{flex:1;min-width:0;display:flex;flex-direction:column}#chinst b{font-size:14px}#chinst small{font-size:12px;color:#667085}
+#chinst .chx{border:0;background:none;color:#98a2b3;font-size:14px;padding:4px;cursor:pointer}
+#chguide{position:fixed;inset:0;z-index:200;background:rgba(16,24,40,.45);display:flex;align-items:flex-end;justify-content:center}
+.chgbox{background:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto}
+.chgh{display:flex;gap:12px;align-items:center;margin-bottom:6px}.chgh img{width:48px;height:48px;border-radius:12px}.chgh div{flex:1;display:flex;flex-direction:column}.chgh b{font-size:17px}.chgh small{color:#667085;font-size:12.5px}
+.chgh button{border:0;background:#f2f4f7;border-radius:50%;width:32px;height:32px;cursor:pointer}
+.chgt{font-weight:700;margin:14px 0 6px;font-size:14px}
+.chgbox ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.chgbox li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45}
+.chgbox li i{flex:none;width:24px;height:24px;border-radius:50%;background:#4b54d1;color:#fff;font-style:normal;font-weight:700;font-size:12.5px;display:grid;place-items:center}
+/* Tin nhắn trên điện thoại: bày như Messenger (danh sách to, bong bóng tròn, ô nhập 1 hàng) */
+@media (max-width:760px){
+  .tn .tnside{background:#fff;border:0}
+  .tn .tnsh{padding:10px 12px 6px}.tn .tnsh>b{font-size:24px;font-weight:800;letter-spacing:-.3px}
+  .tn .tnsh .btn{border-radius:18px;background:#f2f4f7;border:0}
+  .tn .tnside .tnq{background:#f0f2f5;border:0;border-radius:20px;padding:9px 14px;font-size:15px;margin:2px 12px 10px}
+  .tn .tnlist{padding:0 4px}
+  .tn .tnrow{padding:8px 10px;gap:12px;border-radius:12px}.tn .tnrow.on{background:none}
+  .tn .tnrow .tnav{width:50px;height:50px;font-size:16px}.tn .tnrow .tnav.g{border-radius:50%;font-size:19px}
+  .tn .tnr1 b{font-size:15.5px;font-weight:600}.tn .tnr2 span{font-size:13.5px}.tn .tnr1 small{font-size:12px}
+  .tn .tnrow.un .tnr1 b,.tn .tnrow.un .tnr2 span{font-weight:800}
+  .tn .tnr2 em{background:#4b54d1;font-size:11px;padding:2px 7px;border-radius:10px}
+  .tn .tnmain{background:#fff}
+  .tn .tnhd{padding:8px 8px 8px 4px;gap:8px;box-shadow:0 1px 0 #eceef3,0 2px 8px rgba(16,24,40,.04);border:0;position:relative;z-index:2}
+  .tn .tnback{font-size:32px;color:#4b54d1;padding:0 6px}
+  .tn .tnhd .tnav{width:38px;height:38px}.tn .tnhn b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tn .tnhn small{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tn .tnhb{gap:2px}.tn .tnhb .btn{border:0;background:none;padding:6px!important;font-size:0;min-width:34px}
+  .tn .tnhb #tngiao::before{content:"📋";font-size:19px}.tn .tnhb #tnnhac::before{content:"⏰";font-size:19px}.tn .tnhb #tnagbtn::before{content:"🤖";font-size:19px}.tn .tnhb #tninfo{font-size:20px;color:#4b54d1}
+  .tn .tnmsgs{background:#fff;padding:8px 10px 10px}
+  .tn .tnm{gap:6px;margin-top:8px}.tn .tnm.cont{margin-top:2px}
+  .tn .tnm .tnav{width:28px;height:28px;font-size:10.5px;align-self:flex-end}
+  .tn .tnmb{max-width:78%}
+  .tn .tnmh b{font-size:12px;color:#667085;font-weight:600}.tn .tnmh small{font-size:10.5px}
+  .tn .tnbub{background:#f0f0f0;border:0;border-radius:18px;padding:8px 12px;font-size:15px;line-height:1.4;color:#101828}
+  .tn .tnm.me .tnbub{background:#4b54d1;color:#fff;border-radius:18px}
+  .tn .tnm.me .tnbub a,.tn .tnm.me .tnbub .tnat{color:#fff;text-decoration:underline}
+  .tn .tnm.cont:not(.me) .tnbub{border-top-left-radius:6px}.tn .tnm.me.cont .tnbub{border-top-right-radius:6px}
+  .tn .tnma{display:none!important}
+  .tn .tntask{min-width:0;width:240px;max-width:100%;border-radius:16px}
+  .tn .tnday{margin:12px 0 6px}.tn .tnday span{background:none;color:#98a2b3;font-weight:600}
+  .tn .tnf{padding:6px 8px calc(6px + env(safe-area-inset-bottom))!important;gap:2px;border-top:0;align-items:center}
+  .tn .tnf .tnatt{width:36px;height:36px;color:#4b54d1;flex:none}.tn .tnf .tnatt svg{width:23px;height:23px}
+  .tn .tnf textarea{background:#f0f2f5;border:0;border-radius:20px;padding:9px 14px;font-size:16px;min-width:0;margin-left:2px}
+  .tn .tnf #tnsend{border-radius:50%;width:38px;height:38px;padding:0;font-size:0;flex:none;background:#4b54d1;border:0;position:relative;margin-left:4px}
+  .tn .tnf #tnsend::before{content:"";position:absolute;inset:0;margin:auto;width:18px;height:18px;background:#fff;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 11.5 21 3l-8.5 18-2.2-7.3z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 11.5 21 3l-8.5 18-2.2-7.3z'/%3E%3C/svg%3E") center/contain no-repeat}
+  .tn,.chatapp .tn{grid-template-columns:minmax(0,1fr)!important}.tn .tnside,.tn .tnmain{min-width:0}
+  .tn .tnsh>span{flex:none}.tn .tnsh #tnrem{font-size:0;width:34px;height:34px;padding:0}.tn .tnsh #tnrem::before{content:"⏰";font-size:17px}
+  .tn .tnrb{min-width:0;flex:1}
+}

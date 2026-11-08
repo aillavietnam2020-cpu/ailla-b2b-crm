@@ -35,6 +35,10 @@ export default {
     if (url.pathname === '/hub' || url.pathname.startsWith('/hub/')) {
       return serveHub(request, env, HUB_HTML);
     }
+    // Ailla Chat: phần Tin nhắn dùng như ứng dụng riêng ngoài màn hình chính (không lên store).
+    if (url.pathname === '/chat' || url.pathname === '/chat/') {
+      return serveHub(request, env, HUB_HTML, true);
+    }
 
     // Địa chỉ quản trị: đã đăng nhập thì mở gốc là vào luôn trang quản trị (không hiện giao diện CRM B2B).
     if (url.pathname === '/' && !url.searchParams.has('next') && isAdminHost(env, request)) {
