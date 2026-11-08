@@ -468,3 +468,52 @@
     document.title=(n?"("+(n>99?"99+":n)+") ":"")+"Ailla Chat";
     try{if(navigator.setAppBadge){n?navigator.setAppBadge(n):navigator.clearAppBadge()}}catch(e){}},3000);
 })();
+/* Ailla Chat đợt 2 (08/11): tin thoại kiểu Messenger + giữ lâu một tin để mở menu (giao việc, nhắc, trả lời…) — chỉ trên điện thoại */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const fmt=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+  /* --- tin thoại: nút phát + sóng âm + thời lượng thay cho trình phát mặc định --- */
+  const wave=seed=>{let h=0;for(const c of String(seed))h=(h*31+c.charCodeAt(0))>>>0;let o="";for(let i=0;i<26;i++){h=(h*1103515245+12345)>>>0;const v=0.25+((h>>>16)%100)/100*0.75;o+=`<i style="height:${Math.round(v*100)}%"></i>`}return o};
+  const _fh=tnFileHtml;tnFileHtml=function(m){const html=_fh.apply(this,arguments);if(!narrow.matches||html.indexOf('class="tnaud"')<0)return html;
+    const src=(html.match(/src="([^"]+)"/)||[])[1]||"",d=(String(m.body||"").match(/(\d+):(\d\d)/)||[]),len=d.length?(+d[1])*60+(+d[2]):0;
+    return `<div class="tnvo" data-src="${src}" data-len="${len}"><button type="button" class="tnvp" aria-label="Nghe"><svg viewBox="0 0 24 24"><path class="pl" d="M8 5l11 7-11 7z"/><path class="pa" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button><span class="tnvw">${wave(src)}</span><small>${len?fmt(len):"0:00"}</small></div>`};
+  let AU=null,cur=null;
+  const stopCur=()=>{if(cur){cur.classList.remove("on");cur.style.setProperty("--p","0");const s=cur.querySelector("small");if(s)s.textContent=fmt(+cur.dataset.len||0)}cur=null};
+  document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".tnvp");if(!b)return;e.preventDefault();e.stopPropagation();const v=b.closest(".tnvo");
+    if(cur===v&&AU){if(AU.paused){AU.play();v.classList.add("on")}else{AU.pause();v.classList.remove("on")}return}
+    if(AU){AU.pause();stopCur()}AU=new Audio(v.dataset.src);cur=v;v.classList.add("on");
+    AU.ontimeupdate=()=>{if(cur!==v)return;const L=isFinite(AU.duration)&&AU.duration>0?AU.duration:(+v.dataset.len||1);v.style.setProperty("--p",String(Math.min(1,AU.currentTime/L)));const s=v.querySelector("small");if(s)s.textContent=fmt(AU.currentTime)};
+    AU.onended=()=>{if(cur===v)stopCur()};AU.play().catch(()=>{toast("Chưa phát được tin thoại này");stopCur()})},true);
+  /* --- ghi âm: bấm micro → thanh ghi âm (✕ hủy · thời gian · ➤ gửi luôn), không phải qua khay chờ --- */
+  const _rt=tnRecToggle;
+  tnRecToggle=async function(room,btn){if(!narrow.matches)return _rt.apply(this,arguments);
+    if(TN_REC)return;
+    if(!navigator.mediaDevices||!window.MediaRecorder){toast("Máy này chưa ghi âm được trên trình duyệt");return}
+    let st;try{st=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){toast("Chưa cho phép dùng micro. Vào cài đặt trình duyệt › Quyền trang web › Micro › Cho phép");return}
+    const type=["audio/webm;codecs=opus","audio/ogg;codecs=opus","audio/mp4"].find(t=>MediaRecorder.isTypeSupported(t))||"";
+    const rec=new MediaRecorder(st,type?{mimeType:type,audioBitsPerSecond:24000}:{}),parts=[],t0=Date.now();let send=false;
+    const f=document.getElementById("tnf");const bar=document.createElement("div");bar.id="tnrecbar";
+    bar.innerHTML=`<button type="button" class="x" aria-label="Hủy ghi âm">✕</button><span class="rb"><i></i><b>0:00</b><small>Đang ghi âm…</small></span><button type="button" class="s" aria-label="Gửi tin thoại"><svg viewBox="0 0 24 24"><path d="M3 11.5 21 3l-8.5 18-2.2-7.3z"/></svg></button>`;
+    if(f)f.appendChild(bar);
+    rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+    const tick=setInterval(()=>{const s=(Date.now()-t0)/1000;const b=bar.querySelector("b");if(b)b.textContent=fmt(s);if(s>=300){send=true;rec.stop()}},300);
+    rec.onstop=async()=>{clearInterval(tick);st.getTracks().forEach(t=>t.stop());bar.remove();TN_REC=null;
+      const s=Math.max(1,Math.round((Date.now()-t0)/1000));if(!send||!parts.length)return;
+      const base=(rec.mimeType||type||"audio/webm").split(";")[0],ext=base.includes("ogg")?"ogg":base.includes("mp4")?"m4a":"webm";
+      const file=new File(parts,`Ghi âm ${fmt(s)}.${ext}`,{type:base});
+      try{await tnUpload(room,[file]);if(TN.room===room){tnDrawMsgs();tnDrawList()}}catch(e){toast("Chưa gửi được tin thoại, thử lại")}};
+    bar.querySelector(".x").onclick=()=>{send=false;rec.stop()};
+    bar.querySelector(".s").onclick=()=>{send=true;rec.stop()};
+    rec.start(1000);TN_REC=rec};
+  /* --- giữ lâu một tin (iPhone không có chuột phải): mở menu tin như máy tính --- */
+  let lp=null,lpAt=0;
+  document.addEventListener("touchstart",e=>{if(!narrow.matches||e.touches.length>1)return;const x=e.target.closest&&e.target.closest("#tnmsgs .tnm[data-mid]");if(!x||e.target.closest("a,button,audio,.tnvo"))return;
+    const t=e.touches[0],id=+x.dataset.mid;if(!id||typeof tnMenu!=="function"||(typeof TNM!=="undefined"&&TNM.sel))return;
+    lp={x:t.clientX,y:t.clientY,tm:setTimeout(()=>{const p=lp;lp=null;lpAt=Date.now();x.classList.add("tnhold");setTimeout(()=>x.classList.remove("tnhold"),300);try{navigator.vibrate&&navigator.vibrate(15)}catch(er){}tnMenu(id,p?p.x:t.clientX,p?p.y:t.clientY)},450)}},{passive:true});
+  const cancel=()=>{if(lp){clearTimeout(lp.tm);lp=null}};
+  document.addEventListener("touchmove",e=>{if(!lp)return;const t=e.touches[0];if(Math.abs(t.clientX-lp.x)>10||Math.abs(t.clientY-lp.y)>10)cancel()},{passive:true});
+  document.addEventListener("touchend",e=>{if(lp){cancel();return}if(Date.now()-lpAt<700&&e.target.closest&&e.target.closest("#tnmsgs"))e.preventDefault()},{passive:false});
+  /* Android tự bắn "chuột phải" khi giữ lâu: menu đã mở rồi thì bỏ qua để không mở hai lần */
+  document.addEventListener("contextmenu",e=>{if(narrow.matches&&Date.now()-lpAt<1500&&e.target.closest&&e.target.closest("#tnmsgs")){e.preventDefault();e.stopPropagation()}},true);
+})();
