@@ -1,6 +1,6 @@
 ---
 name: nap-bao-cao-tiktok
-description: Kéo báo cáo TikTok Shop (đơn hàng, quyết toán income, quảng cáo GMV Max, file team) và Shopee 2 shop (đơn, Doanh thu, quảng cáo) THẲNG VỀ VPS (không lưu xuống máy chị Hoa) và nạp số lãi lỗ tháng lên web ABOS. Sáng thứ Hai hằng tuần + 7h sáng ngày 10 chốt sổ. CHỈ agent Kế toán trưởng dùng.
+description: Kéo báo cáo TikTok Shop (đơn hàng, quyết toán income, quảng cáo GMV Max, file team) và Shopee 2 shop (đơn, Doanh thu, quảng cáo) THẲNG VỀ VPS (không lưu xuống máy chị Hoa) và nạp số lãi lỗ tháng lên web ABOS. TikTok tải HẰNG NGÀY bằng script tai-tiktok-ngay.mjs (không qua AI, từ 06/11); Shopee vẫn do agent Kế toán trưởng làm sáng thứ Hai + 7h ngày 10. CHỈ agent Kế toán trưởng dùng phần nạp.
 ---
 
 # nap-bao-cao-tiktok — kéo báo cáo TikTok Shop và nạp lên web ABOS
@@ -9,7 +9,18 @@ Chị Hoa giao cho **Agent · Kế toán trưởng** (duyệt 25/10, sửa 28/10
 
 Cách đi chuột trên Seller Center (menu nào, nút nào, bẫy lịch) xem thêm skill **ailla-tai-bao-cao-tiktok** của chị. Riêng **chỗ lưu file thì làm theo skill này**: không lưu xuống máy chị, không cất ổ F.
 
-## Lịch chạy (chị chốt 27/10)
+## TikTok hằng ngày bằng script (chị Hoa chốt 06/11/2026) — thay cho lịch tuần bên dưới
+Agent Kế toán trưởng **không còn tự lái trình duyệt tải TikTok**. Script `tai-tiktok-ngay.mjs` (cron, không gọi AI) tải rồi nạp; agent chỉ nhận tin chị / bất thường (tin "Chị ơi, em đang tải… TikTok bắt đăng nhập lại" do script gửi) và chạy lại khi chị nhắn "kéo lại TikTok": `node tai-tiktok-ngay.mjs --ep`.
+- Chạy: `node tai-tiktok-ngay.mjs` (thật) · `--thu` (tải thật, chỉ tính số, không ghi web) · `--ke-hoach` (in việc hôm nay) · `--kham <url>` (in chữ + nút của trang để chỉnh bước bấm). Nhật ký: `/root/bao-cao-san/tt-ngay/nhat-ky.log`.
+- Việc mỗi ngày: tháng đang chạy 01 → hết hôm qua (đơn, quyết toán, quảng cáo + Key metrics, Video › Hiệu suất nếu bấm được). Ngày 01 và 05: thêm tháng trước (giữa tháng). **Ngày 10: tháng trước BẢN ĐỦ THÁNG** (đơn + quảng cáo trọn tháng, income 01 → hết ngày 09) rồi tháng đang chạy tới ngày 09. Từ ngày 11 chỉ tháng đang chạy.
+- Chống trùng: đọc các tháng đã có trên web trước, bỏ tháng đã khoá / đã đủ tháng / đã có số tới đúng ngày đó; chạy thử trước khi nạp, số thấp hơn bản đang có quá 10% thì KHÔNG nạp và ghi vào `/root/bao-loi-web/LOI-WEB.md`. Mỗi lượt có khoá, lịch khác tới lúc đang chạy thì bỏ.
+- Gặp đăng nhập lại / hộp xác minh: dừng, nhắn chị (nhan-chi.sh), không tự nhập; mỗi loại lỗi nhắn tối đa 1 lần/ngày. Lỗi kỹ thuật (trang đổi giao diện): ghi sổ lỗi, 3 ngày liền mới nhắn chị.
+- Xoá file khách sau khi nạp: thư mục làm việc riêng `/root/bao-cao-san/tt-ngay/<tháng>/` (không đụng thư mục Shopee `/root/bao-cao-san/<tháng>/spe/`).
+- Lịch (cron root, **chỉ thêm khi chị Hoa đồng ý**): `30 6 * * *  cd /root/.openclaw/workspace*/skills/nap-bao-cao-tiktok && node tai-tiktok-ngay.mjs >> /root/bao-cao-san/tt-ngay/cron.log 2>&1` (6h30 mỗi ngày, trước khung cấm; script tự bỏ lượt nếu rơi vào 7h00–8h30 thứ Hai/ngày 10). Không restart OpenClaw gateway trong 7h–8h30 thứ Hai và ngày 10.
+- Trình duyệt dùng: **Chrome của chị Hoa qua đường nối OpenClaw** (profile `chrome`, có quyền Tài chính). Trình duyệt TikTok riêng trên VPS (`tt`, cổng 18802) đang đăng nhập bằng tài khoản phụ không có quyền Tài chính, nên chưa tải được quyết toán; có tài khoản chính ở đó thì chạy `--profile tiktok`.
+- Nội dung "Lịch chạy" bên dưới giờ chỉ còn áp dụng cho **Shopee**; quy định ngày 10 vẫn như cũ.
+
+## Lịch chạy (chị chốt 27/10) — từ 06/11 TikTok do script, phần này dùng cho Shopee
 - **Sáng thứ Hai 7h** — bản **giữa tháng (dự kiến)**:
   - Tháng đang chạy: đơn + quảng cáo từ 01 đến **Chủ nhật hôm qua**; income từ 01 đến Chủ nhật hôm qua.
   - Nếu hôm nay là ngày 01–09: làm thêm **tháng trước** (đơn + quảng cáo trọn tháng, income từ 01 tháng trước đến hôm qua). Tháng trước vẫn là bản giữa tháng tới ngày 10.
