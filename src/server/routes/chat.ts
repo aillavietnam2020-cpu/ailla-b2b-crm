@@ -5,6 +5,7 @@ import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { AGENT_ROSTER } from '@shared/agentRoster';
 import { unpack } from '../lib/pack';
 import { requirePermission } from '../middleware/rbac';
+import { pushChat } from '../services/pushDispatch';
 
 /**
  * Tin nhắn kiểu Lark (hub/src/tinnhan.js, chị Hoa 02–03/11/2026). Máy chủ chặn quyền, không chỉ ẩn trên màn hình:
@@ -170,6 +171,13 @@ chatRoutes.post('/msgs', async (c) => {
     .bind(me, room, id)
     .run();
   if (!kind && body.includes('@')) await callAgents(A, room, body, me).catch(() => undefined);
+  // Thông báo đẩy về điện thoại người nhận (chạy nền).
+  const job = pushChat(c.env, room, me, body, kind).catch((e) => console.error('[push] tin nhan', e));
+  try {
+    c.executionCtx.waitUntil(job);
+  } catch {
+    /* chạy thử không có executionCtx */
+  }
   return ok(c, { id, room, user_id: me, body, kind, ref, created_at: at });
 });
 

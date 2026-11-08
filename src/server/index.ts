@@ -8,6 +8,7 @@ import { serveHub } from './hub/serve';
 import HUB_HTML from './hub/hub.html';
 import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
+import { pushCron } from './services/pushDispatch';
 import { taskRecurring } from './services/taskRecurring';
 import { publishDue } from './services/fpPublish';
 import { syncAllChannels } from './services/poscake';
@@ -68,6 +69,12 @@ export default {
           console.info('[cron] cua vao', JSON.stringify(await syncAccessEmails(env)));
         } catch (error) {
           console.error('[cron] cua vao loi', error);
+        }
+        // Thông báo đẩy về điện thoại: chuông do máy chủ ghi, báo gộp việc chờ duyệt / sau giờ yên lặng.
+        try {
+          await pushCron(env);
+        } catch (error) {
+          console.error('[cron] thong bao day loi', error);
         }
         if (new Date(event.scheduledTime).getUTCMinutes() >= 15) return;
         const config = await loadConfig(env.DB);

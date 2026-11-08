@@ -32,6 +32,8 @@ export interface Env {
   /** Địa chỉ trang vận hành (qt.ailla.vn) và trang quản trị (quantri.ailla.vn). Trống thì không tách. */
   /** Tài khoản máy Google (service account, khóa JSON) để web xem thư mục Drive các phòng ban, chỉ đọc. Đặt bằng `wrangler secret put`. */
   GDRIVE_SA_JSON?: string;
+  /** Khóa riêng VAPID (JWK P-256) để gửi thông báo đẩy về điện thoại. Đặt bằng `wrangler secret put VAPID_JWK`. */
+  VAPID_JWK?: string;
   OPS_HOST?: string;
   ADMIN_HOST?: string;
 }

@@ -414,3 +414,7 @@ PAGES.nhansu=pNhanSuSV;
 askClaude=async function(system,user){const r=await svApi("/api/hub/ai",{method:"POST",body:JSON.stringify({system,user,model:aiCombo()})});return {text:r.text,model:r.model+" (9router)",trunc:false}};
 clConnectCard=function(){return `<section class="card"><div class="card-h"><h2>Kết nối AI</h2>${pill("Chạy trên máy chủ","grn")}</div><p class="hint">Máy chủ gọi 9router trên VPS (gói tháng có sẵn). Khoá nằm trên máy chủ, trình duyệt không giữ khoá.</p>${isCeo()?`<div class="row4"><label class="field grow">Combo AI trong 9router<input id="cl-combo" value="${esc(aiCombo())}" placeholder="Combo_Content"></label></div><div class="acts"><button class="btn pri" id="cl-save">Lưu</button></div>`:""}</section>`};
 bindClConnect=function(){if($("#cl-save"))$("#cl-save").onclick=()=>{try{localStorage.setItem(CL_COMBO,$("#cl-combo").value.trim()||"Combo_Content")}catch(e){}toast("Đã lưu");renderMain()}};
+
+/* Ô ngày (chị Hoa 08/11): gõ năm "2026" thì vừa gõ số "2" trình duyệt đã báo đổi thành năm 0002, web lưu luôn và hiện 1902.
+   Năm chưa gõ đủ (trước 2000) thì chặn tin báo đổi, chờ gõ xong mới lưu. Chặn ở pha bắt sớm nên mọi ô ngày đều được. */
+["input","change"].forEach(ev=>addEventListener(ev,e=>{const x=e.target;if(x&&x.type==="date"&&x.value&&+x.value.slice(0,4)<2000)e.stopImmediatePropagation()},true));

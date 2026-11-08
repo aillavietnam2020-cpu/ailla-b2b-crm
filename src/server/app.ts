@@ -18,6 +18,7 @@ import { bonusRoutes } from './routes/bonus';
 import { priceAdjustmentRoutes } from './routes/priceAdjustments';
 import { workRoutes } from './routes/work';
 import { notifyRoutes } from './routes/notify';
+import { pushRoutes } from './routes/push';
 import { staffPurchaseRoutes } from './routes/staffPurchases';
 import { shippingVoucherRoutes } from './routes/shippingVouchers';
 import { soChiRoutes } from './routes/soChi';
@@ -135,6 +136,7 @@ export function createApp() {
   app.route('/api/acc-rules', accRulesRoutes);
   app.route('/api/work', workRoutes);
   app.route('/api/notify', notifyRoutes);
+  app.route('/api/push', pushRoutes);
   app.route('/api/staff-purchases', staffPurchaseRoutes);
   app.route('/api/agent/tiktok', agentTiktokRoutes);
   app.route('/api/agent/shopee', agentShopeeRoutes);

@@ -150,3 +150,73 @@ PAGES.thongbao=m=>{const p=ntPrefs(),has="Notification" in window,perm=has?Notif
   $("#nt-test").onclick=()=>{const it={key:"test:"+Date.now(),type:"tin",text:"Thông báo thử: thông báo đang chạy tốt trên máy này.",by:"",t:Date.now()};ntCard(it);
     if(has&&Notification.permission==="granted")try{new Notification("💬 AILLA · thông báo thử",{body:"Thông báo của Windows đang chạy tốt trên máy này.",tag:"ailla-thu"})}catch(e){}};
   $("#nt-rec").onclick=ntList};
+
+/* ---------- Thông báo đẩy về điện thoại / máy tính, báo cả khi đã tắt web (chị Hoa duyệt demo 08/11) ----------
+   Máy chủ: src/server/routes/push.ts + services/pushDispatch.ts. Máy: public/sw.js nhận và hiện thông báo.
+   Bấm thông báo → /hub/#nt=<mã chuông>~<ref> → mở đúng việc (pzOpen). */
+const PZU={me:null,busy:false};
+const pzIos=()=>/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const pzApp=()=>(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true;
+const pzOk=()=>"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window;
+const pzDev=()=>{const u=navigator.userAgent,os=/iPhone/.test(u)?"iPhone":/iPad/.test(u)||pzIos()?"iPad":/Android/.test(u)?"Điện thoại Android":/Macintosh/.test(u)?"Máy Mac":/Windows/.test(u)?"Máy tính Windows":"Máy";
+  const br=/Edg\//.test(u)?"Edge":/CriOS|Chrome\//.test(u)?"Chrome":/Firefox|FxiOS/.test(u)?"Firefox":/Safari/.test(u)?"Safari":"";return os+(br?" · "+br:"")};
+const pzU8=s=>{const t=s.replace(/-/g,"+").replace(/_/g,"/"),b=atob(t+"=".repeat((4-t.length%4)%4));return Uint8Array.from(b,c=>c.charCodeAt(0))};
+async function pzReg(){if(!("serviceWorker" in navigator))return null;try{await navigator.serviceWorker.register("/sw.js");return await navigator.serviceWorker.ready}catch(e){return null}}
+async function pzSub(){const r=await pzReg();try{return r&&r.pushManager?await r.pushManager.getSubscription():null}catch(e){return null}}
+const pzSend=s=>{const j=s.toJSON();return svApi("/api/push/subscribe",{method:"POST",body:JSON.stringify({endpoint:j.endpoint,keys:j.keys,device:pzDev()})})};
+async function pzOn(){if(PZU.busy||!PZU.me)return;PZU.busy=true;
+  try{const p=await Notification.requestPermission();if(p!=="granted"){toast("Máy chưa cho phép thông báo");return}
+    const r=await pzReg();if(!r){toast("Trình duyệt này chưa bật được thông báo");return}
+    let s=await r.pushManager.getSubscription();
+    try{if(!s)s=await r.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pzU8(PZU.me.key)})}
+    catch(e){if(s)await s.unsubscribe().catch(()=>{});s=await r.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pzU8(PZU.me.key)})}
+    await pzSend(s);try{localStorage.setItem("ailla_np_at",String(Date.now()))}catch(e){}
+    toast("Máy này đã bật thông báo");await svApi("/api/push/test",{method:"POST",body:"{}"}).catch(()=>{});
+  }catch(e){toast("Chưa bật được: "+(e.message||e))}finally{PZU.busy=false;renderMain()}}
+async function pzOff(ep){const s=await pzSub();if(s&&(!ep||s.endpoint===ep))await s.unsubscribe().catch(()=>{});
+  await svApi("/api/push/unsubscribe",{method:"POST",body:JSON.stringify({endpoint:ep||(s&&s.endpoint)||""})}).catch(()=>{});toast("Đã tắt thông báo trên máy đó");renderMain()}
+const PZ_TYPES=[["giao","📋","Được giao việc","Việc mới, đổi hạn, chuyển việc sang mình, xin gia hạn"],["nhac","🔔","Bị nhắc việc","Người giao bấm Nhắc, nhắc việc trễ hạn"],["sua","✏️","Việc bị trả về Cần sửa","Kèm lời ghi cần sửa gì"],["tin","💬","Tin nhắn mới","Nhắn riêng, nhóm có mình; nhóm chung chỉ khi được gọi @tên"],["duyet","✅","Việc chờ mình duyệt","Gộp lại, tối đa 1 thông báo mỗi giờ"]];
+const pzHr=(id,v)=>`<select id="${id}">${Array.from({length:24},(_,h)=>`<option value="${h}"${h===v?" selected":""}>${String(h).padStart(2,"0")}:00</option>`).join("")}</select>`;
+const pzDd=s=>{s=String(s||"");return s.length>=10?s.slice(8,10)+"/"+s.slice(5,7):""};
+async function pzSection(box){
+  let me;try{me=await svApi("/api/push/me")}catch(e){box.innerHTML=`<p class="hint">Chưa tải được phần thông báo về điện thoại.</p>`;return}
+  PZU.me=me;const cur=await pzSub(),perm="Notification" in window?Notification.permission:"unsupported",P=me.prefs;
+  const here=!!cur&&me.devices.some(d=>d.endpoint===cur.endpoint);
+  const st=!me.ready?`<p class="hint">Máy chủ chưa bật gửi thông báo, nhờ quản trị kiểm tra.</p>`
+    :pzIos()&&!pzApp()?`<div class="npios"><b>iPhone cần làm 1 lần:</b><ol><li>Mở <b>Safari</b>, vào trang web này (Chrome trên iPhone không làm được bước 2).</li><li>Bấm nút <b>Chia sẻ ⬆︎</b> ở dưới, chọn <b>"Thêm vào MH chính"</b>, bấm <b>Thêm</b>.</li><li>Mở web bằng <b>biểu tượng Ailla</b> mới trên màn hình chính.</li><li>Vào lại trang này, bấm <b>"Bật thông báo trên máy này"</b>, chọn <b>Cho phép</b>.</li></ol></div>`
+    :!pzOk()?`<p class="hint">Trình duyệt này không hỗ trợ thông báo đẩy. Dùng Chrome (máy tính, Android) hoặc Safari (iPhone).</p>`
+    :perm==="denied"?`<p class="hint">Máy này đang chặn thông báo của web. Mở cài đặt trang web của trình duyệt (biểu tượng bên trái địa chỉ web), chọn <b>Thông báo → Cho phép</b>, rồi tải lại trang.</p>`
+    :here?`<div class="npok">✓ Máy này đã bật thông báo <button class="lnk" id="np-off">Tắt trên máy này</button></div>`
+    :`<p><button class="btn pri" id="np-on">🔔 Bật thông báo trên máy này</button></p><p class="hint">Máy sẽ hỏi một lần, bấm <b>Cho phép</b>.</p>`;
+  const devs=me.devices.map(d=>`<div class="npdev"><span>${/iPhone|iPad|Android/.test(d.device)?"📱":"💻"}</span><div><b>${esc(d.device)}${cur&&d.endpoint===cur.endpoint?" · máy này":""}</b><small>Bật từ ${esc(pzDd(d.created_at))}${d.last_ok_at?" · nhận lần cuối "+esc(String(d.last_ok_at).slice(11,16)+" "+pzDd(d.last_ok_at)):""}</small></div><button class="lnk" data-npx="${esc(d.endpoint)}">Gỡ</button></div>`).join("");
+  box.innerHTML=`<h3>📱 Thông báo về điện thoại, máy tính</h3><p class="hint">Báo cả khi đã tắt web, khóa màn hình. Bấm vào thông báo là mở đúng việc. Mỗi máy bật một lần.</p>${st}
+    <h4 class="nph">Máy đang nhận (${me.devices.length})</h4>${devs||`<p class="hint">Chưa có máy nào.</p>`}
+    ${me.devices.length?`<p><button class="btn" id="np-test">Gửi thử một thông báo</button></p>`:""}
+    <h4 class="nph">Loại gửi về máy</h4>${PZ_TYPES.map(([k,ic,lb,ds])=>`<label class="nttog"><input type="checkbox" data-npk="${k}"${P[k]?" checked":""}><span><b>${ic} ${lb}</b><small>${ds}</small></span></label>`).join("")}
+    <h4 class="nph">Giờ yên lặng</h4><label class="nttog"><input type="checkbox" data-npk="quiet"${P.quiet?" checked":""}><span><b>🌙 Không báo ban đêm</b><small>Việc gấp vẫn báo ngay; thông báo khác gộp lại, báo khi hết giờ yên lặng</small></span></label>
+    <div class="npq">Từ ${pzHr("np-qf",P.qFrom)} đến ${pzHr("np-qt",P.qTo)}</div>`;
+  const save=()=>{const q={...PZU.me.prefs};box.querySelectorAll("[data-npk]").forEach(x=>q[x.dataset.npk]=x.checked);q.qFrom=+box.querySelector("#np-qf").value;q.qTo=+box.querySelector("#np-qt").value;
+    svApi("/api/push/prefs",{method:"PUT",body:JSON.stringify(q)}).then(r=>{PZU.me.prefs=(r&&r.prefs)||q;toast("Đã lưu")}).catch(e=>toast(e.message||"Chưa lưu được"))};
+  box.querySelectorAll("[data-npk]").forEach(x=>x.onchange=save);box.querySelectorAll("#np-qf,#np-qt").forEach(x=>x.onchange=save);
+  const on=box.querySelector("#np-on");if(on)on.onclick=pzOn;
+  const off=box.querySelector("#np-off");if(off)off.onclick=()=>pzOff(cur.endpoint);
+  box.querySelectorAll("[data-npx]").forEach(b=>b.onclick=()=>{if(confirm("Gỡ máy này khỏi danh sách nhận thông báo?"))pzOff(b.dataset.npx)});
+  const t=box.querySelector("#np-test");if(t)t.onclick=async()=>{try{const r=await svApi("/api/push/test",{method:"POST",body:"{}"});toast(r&&r.sent?"Đã gửi tới "+r.sent+" máy":"Chưa máy nào nhận được, thử bật lại")}catch(e){toast(e.message||"Chưa gửi được")}};
+}
+const _pzPageOld=PAGES.thongbao;
+PAGES.thongbao=m=>{_pzPageOld(m);const old=m.querySelector("section.card");if(old){const h=document.createElement("h3");h.textContent="Khi đang mở web";old.prepend(h)}
+  const box=document.createElement("section");box.className="card narrow npbox";box.innerHTML=`<p class="hint">Đang tải…</p>`;if(old)old.before(box);else m.appendChild(box);pzSection(box)};
+if(typeof document!=="undefined"&&!document.getElementById("np-css")){const s=document.createElement("style");s.id="np-css";s.textContent=`.npbox{margin-bottom:14px}.npbox h3{margin:0 0 4px}.nph{margin:16px 0 6px;font-size:13.5px}.npok{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eaf7f0;color:#14724a;border-radius:10px;padding:9px 12px;font-weight:600}.npdev{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}.npdev div{flex:1;min-width:0}.npdev b{display:block;font-size:13px}.npdev small{color:var(--muted);font-size:12px}.npq{display:flex;gap:6px;align-items:center;margin:6px 0 0 26px;font-size:13px}.npq select{width:auto}.npios{background:#fff7e6;border:1px solid #f2d79c;border-radius:10px;padding:10px 12px;font-size:13px}.npios ol{margin:6px 0 0;padding-left:20px;line-height:1.6}`;document.head.appendChild(s)}
+
+/* Mở đúng việc khi bấm thông báo: lúc mở web từ thông báo (#nt=…) hoặc web đang mở sẵn (sw.js gửi tin nhắn). */
+function pzOpen(url){const m=String(url||"").match(/#nt=([^~]*)~(.*)$/);if(!m)return;const id=decodeURIComponent(m[1]),ref=decodeURIComponent(m[2]);
+  const go=()=>{try{if(location.hash.startsWith("#nt="))history.replaceState(null,"",location.pathname+location.search);
+    if(ref==="cvrv"){MOD="cv";PAGE="cv_v";CWS.my="rv";render();return}
+    if(ref.startsWith("tn:")){ntGo({id:"",ref:"page:tinnhan"});setTimeout(()=>{try{tnOpen(ref.slice(3))}catch(e){}},400);return}
+    ntGo({id,ref})}catch(e){console.error("mở thông báo",e)}};
+  let n=0;const w=()=>{if(typeof D==="function"&&D()&&D().users&&typeof ME!=="undefined"&&ME&&document.getElementById("main"))setTimeout(go,500);else if(n++<120)setTimeout(w,250)};w()}
+if(typeof location!=="undefined"&&location.hash.startsWith("#nt="))pzOpen(location.hash);
+if(typeof navigator!=="undefined"&&"serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",e=>{if(e.data&&e.data.ntUrl)pzOpen(e.data.ntUrl)});
+  /* máy đã bật: mỗi ngày báo lại máy chủ một lần (phòng khi trình duyệt đổi địa chỉ nhận) */
+  setTimeout(async()=>{try{if(!("Notification" in window)||Notification.permission!=="granted")return;const last=+localStorage.getItem("ailla_np_at")||0;if(Date.now()-last<86400000)return;
+    const s=await pzSub();if(s){await pzSend(s);localStorage.setItem("ailla_np_at",String(Date.now()))}}catch(e){}},8000)}

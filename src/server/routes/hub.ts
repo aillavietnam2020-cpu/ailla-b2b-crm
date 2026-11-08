@@ -11,6 +11,7 @@ import { membersFromHub, saveMembers } from '../services/daoTao';
 import { accountChanges, neutralizeTags, protectStaff, protectUsers, type GuardUser } from '../lib/stateGuard';
 import { revokeAllSessions } from '../lib/session';
 import { syncAccessEmails } from '../lib/access-sync';
+import { pushFromHub } from '../services/pushDispatch';
 
 /**
  * Khu Marketing & công việc (trang tĩnh /hub/).
@@ -261,6 +262,13 @@ hubRoutes.put('/state', async (c) => {
   if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
   await saveDtMembers();
   await syncAccounts();
+  // Thông báo đẩy về điện thoại cho các dòng chuông mới (chạy nền, không làm chậm lần lưu).
+  const job = pushFromHub(c.env, data as never).catch((e) => console.error('[push] luu', e));
+  try {
+    c.executionCtx.waitUntil(job);
+  } catch {
+    /* chạy thử không có executionCtx */
+  }
   return ok(c, { version: base + 1, updated_at: now });
 });
 
