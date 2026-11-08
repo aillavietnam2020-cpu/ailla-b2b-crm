@@ -13,7 +13,7 @@ import {
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
-import { children, download, meta, recentFiles, saKey, thumbnail, type DriveFile } from '../services/gdrive';
+import { children, download, meta, recentFiles, saKey, streamVideo, thumbnail, type DriveFile } from '../services/gdrive';
 import { setSyncPaused, syncDrivePermissions, syncPaused } from '../services/driveSync';
 
 /**
@@ -30,18 +30,24 @@ type HubUser = DriveUser & { id?: string; crm?: string; name?: string };
 type Dept = { k: string; n: string };
 
 /* Danh sách người + phòng ban của khu chung, giữ 60 giây trong máy chủ (bản chung nặng, không giải nén mỗi lượt bấm). */
-let HUB: { at: number; users: HubUser[]; depts: Dept[] } | null = null;
-async function hubPeople(db: D1Database) {
-  if (HUB && Date.now() - HUB.at < 60_000) return HUB;
+let HUB: { at: number; users: HubUser[]; depts: Dept[]; vids: Set<string> } | null = null;
+async function hubPeople(db: D1Database, fresh = false) {
+  if (HUB && !fresh && Date.now() - HUB.at < 60_000) return HUB;
   const row = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
   let users: HubUser[] = [];
   let depts: Dept[] = [];
+  const vids = new Set<string>();
   if (row) {
-    const d = JSON.parse(await unpack(row.data)) as { users?: HubUser[]; departments?: Dept[] };
+    const d = JSON.parse(await unpack(row.data)) as { users?: HubUser[]; departments?: Dept[]; cards?: { linkVideo?: string; linkFinal?: string }[] };
+    for (const cd of Array.isArray(d.cards) ? d.cards : [])
+      for (const l of [cd?.linkVideo, cd?.linkFinal]) {
+        const m = String(l ?? '').match(/\/d\/([A-Za-z0-9_-]{10,})/) ?? String(l ?? '').match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+        if (m) vids.add(m[1]);
+      }
     users = Array.isArray(d.users) ? d.users : [];
     depts = Array.isArray(d.departments) ? d.departments.map((p) => ({ k: String(p.k), n: String(p.n) })) : [];
   }
-  HUB = { at: Date.now(), users, depts };
+  HUB = { at: Date.now(), users, depts, vids };
   return HUB;
 }
 
@@ -203,6 +209,22 @@ driveRoutes.get('/thumb/:id', async (c) => {
   return new Response(img.body, {
     headers: { 'Content-Type': img.headers.get('Content-Type') ?? 'image/jpeg', 'Cache-Control': 'private, max-age=3600' },
   });
+});
+
+/**
+ * Xem video ngay trên web (nút "Xem" ở Duyệt video): người có tài khoản web được xem video đã gắn vào một dòng video
+ * của Marketing (link video / link thành phẩm). File không gắn vào dòng nào thì không mở qua đường này.
+ */
+driveRoutes.get('/video/:id', async (c) => {
+  const key = needKey(c.env);
+  const { me } = await who(c);
+  if (!me || me.active === false) throw forbidden('Bạn chưa có tài khoản khu chung.');
+  const id = folderIdFrom(c.req.param('id'));
+  if (!id) throw notFound();
+  if (!(await hubPeople(c.env.DB)).vids.has(id) && !(await hubPeople(c.env.DB, true)).vids.has(id)) throw forbidden('Video này chưa gắn vào dòng video nào.');
+  const r = await streamVideo(key, id, c.req.header('Range') ?? null);
+  if (!r) throw notFound('Web chưa đọc được video này (tài khoản Drive của web chưa được chia sẻ thư mục chứa video).');
+  return r;
 });
 
 /** Tải file gốc về máy: cùng quy tắc quyền với /list; chuyển thẳng dữ liệu từ Drive, không lưu lại trên web. */

@@ -196,6 +196,28 @@ export async function thumbnail(key: SaKey, fileId: string, size = 400): Promise
   return r.ok ? r : null;
 }
 
+/**
+ * Phát video ngay trên web (nút "Xem" ở Duyệt video, chị Hoa 07/11/2026): chuyển tiếp dữ liệu từ Drive, giữ yêu cầu
+ * "Range" để trình duyệt tua được. Chỉ nhận file video; file khác trả null.
+ */
+export async function streamVideo(key: SaKey, fileId: string, range: string | null): Promise<Response | null> {
+  const f = await get<{ mimeType: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=mimeType&${COMMON}`);
+  if (!f || !f.mimeType.startsWith('video/')) return null;
+  const h: Record<string, string> = { Authorization: `Bearer ${await accessToken(key)}` };
+  if (range && /^bytes=\d*-\d*$/.test(range)) h.Range = range;
+  const r = await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, { headers: h });
+  if (!r.ok && r.status !== 206) {
+    console.error('[drive] video', r.status);
+    return null;
+  }
+  const out = new Headers({ 'Content-Type': f.mimeType, 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=600', 'Content-Disposition': 'inline' });
+  for (const k of ['Content-Length', 'Content-Range']) {
+    const v = r.headers.get(k);
+    if (v) out.set(k, v);
+  }
+  return new Response(r.body, { status: r.status, headers: out });
+}
+
 /** Tải file gốc (đúng độ phân giải, đúng dung lượng như trên Drive). File Google Docs / Sheets / Slides không có bản gốc để tải: trả null. */
 export async function download(key: SaKey, fileId: string): Promise<{ body: ReadableStream | null; name: string; mime: string; size: string | null } | null> {
   const f = await get<{ name: string; mimeType: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=name,mimeType&${COMMON}`);
