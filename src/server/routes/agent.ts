@@ -15,6 +15,7 @@ import { listPayments } from '../services/payments';
 import { createProposal } from '../services/proposals';
 import { khoAlerts } from './kho';
 import { unpack } from '../lib/pack';
+import { loadTiers as loadBonusTiers } from '../services/bonus';
 
 /**
  * Cổng riêng cho AI agent. Agent chỉ có hai quyền: agent.read (đọc) và agent.propose (ghi đề xuất).
@@ -36,6 +37,14 @@ const scopesOf = (c: { get: (k: 'auth') => { permissions: string[] } }): string[
 const hasScope = (c: Parameters<typeof scopesOf>[0], ...need: string[]) => scopesOf(c).some((x) => need.includes(x));
 function needScope(c: Parameters<typeof scopesOf>[0], ...need: string[]) {
   if (!hasScope(c, ...need)) throw forbidden('Agent này chưa được phép đọc mục này');
+}
+/** Agent CSKH B2B (không có phạm vi đơn/công nợ đầy đủ): chỉ khách Kênh phân phối + OEM, không thấy khách là nhân viên mua hàng. */
+const b2bOnly = (c: Parameters<typeof scopesOf>[0]) => hasScope(c, 'cskh_b2b') && !hasScope(c, 'orders', 'debts');
+const NOT_STAFF = "COALESCE(c.tier_id, '') NOT IN (SELECT id FROM price_tiers WHERE code = 'NHAN_VIEN')";
+async function assertB2bCustomer(c: Parameters<typeof scopesOf>[0] & { env: AppEnv['Bindings'] }, customerId: string) {
+  if (!b2bOnly(c)) return;
+  const r = await c.env.DB.prepare(`SELECT c.id FROM customers c WHERE c.id = ? AND ${NOT_STAFF}`).bind(customerId).first();
+  if (!r) throw notFound('Không tìm thấy khách hàng');
 }
 
 agentRoutes.get('/me', requirePermission('agent.read'), (c) => {
@@ -61,13 +70,14 @@ const LIMIT = 200;
 
 /** Đơn đang trong luồng kèm tuổi của bước hiện tại và người đang phải làm bước kế tiếp. */
 agentRoutes.get('/orders', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'orders', 'orders_kho');
+  needScope(c, 'orders', 'orders_kho', 'cskh_b2b');
   const where = ["o.deleted_at IS NULL", "o.approval_status <> 'CANCELLED'", "o.accounting_status <> 'DA_XAC_NHAN'"];
   const params: unknown[] = [];
   // Vai kế toán kho: chỉ đơn đang chờ kho (kiểm kho, chờ xuất, giữ chờ hàng, thiếu hàng).
-  if (!hasScope(c, 'orders')) {
+  if (!hasScope(c, 'orders', 'cskh_b2b')) {
     where.push("o.flow_on = 1 AND o.kho_status IN ('CHO_KIEM_KHO', 'CHO_XUAT', 'CHO_HANG', 'THIEU_HANG')");
   }
+  if (b2bOnly(c)) where.push(NOT_STAFF);
   const khoStatus = c.req.query('kho_status');
   if (khoStatus) {
     where.push('o.flow_on = 1 AND o.kho_status = ?');
@@ -96,7 +106,7 @@ agentRoutes.get('/orders', requirePermission('agent.read'), async (c) => {
   )
     .bind(...params, Math.min(Number(c.req.query('limit') ?? LIMIT), LIMIT))
     .all<Record<string, unknown>>();
-  const fullOrders = hasScope(c, 'orders');
+  const fullOrders = hasScope(c, 'orders', 'cskh_b2b');
   return ok(
     c,
     (rows.results ?? []).map((r) => {
@@ -117,10 +127,11 @@ agentRoutes.get('/orders', requirePermission('agent.read'), async (c) => {
 
 /** Hồ sơ một đơn: dòng hàng, trạng thái, lịch sử bước, kiểm tồn từng dòng, bill (chỉ thông tin, không ảnh). */
 agentRoutes.get('/orders/:id', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'orders');
+  needScope(c, 'orders', 'cskh_b2b');
   const auth = c.get('auth');
   const id = c.req.param('id');
   const order = await getOrderDetail(c.env.DB, auth, id);
+  await assertB2bCustomer(c, order.customer_id);
   const check = order.flow_on ? await khoCheck(c.env.DB, auth, id) : null;
   const bills = await c.env.DB.prepare(
     `SELECT id, amount, paid_at, method, payment_id, created_at FROM bills
@@ -133,8 +144,9 @@ agentRoutes.get('/orders/:id', requirePermission('agent.read'), async (c) => {
 
 /** Hồ sơ khách theo ID: thông tin chính, công nợ, đơn gần đây, việc đang mở. */
 agentRoutes.get('/customers/:id', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'debts');
+  needScope(c, 'debts', 'cskh_b2b');
   const id = c.req.param('id');
+  await assertB2bCustomer(c, id);
   const customer = await c.env.DB.prepare(
     `SELECT c.id, c.name, c.owner_id, c.stage, c.price_mode, c.tier_id, c.last_order_date,
             c.reorder_cycle_days, c.credit_limit
@@ -165,14 +177,14 @@ agentRoutes.get('/customers/:id', requirePermission('agent.read'), async (c) => 
 
 /** Tìm khách theo tên hoặc mã. ?q=tên&limit=30 */
 agentRoutes.get('/customers', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'debts');
+  needScope(c, 'debts', 'cskh_b2b');
   const q = (c.req.query('q') ?? '').trim();
   const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 30)) || 30), 100);
   const like = `%${q.replace(/[%_]/g, '')}%`;
   const rows = await c.env.DB.prepare(
     `SELECT c.id, c.name, u.display_name AS owner_name, c.stage, c.tier_id, c.credit_limit, c.last_order_date, c.reorder_cycle_days
      FROM customers c LEFT JOIN users u ON u.id = c.owner_id
-     WHERE c.deleted_at IS NULL AND (? = '' OR c.name LIKE ? OR c.id = ?)
+     WHERE c.deleted_at IS NULL AND (? = '' OR c.name LIKE ? OR c.id = ?)${b2bOnly(c) ? ` AND ${NOT_STAFF}` : ''}
      ORDER BY c.name COLLATE NOCASE LIMIT ?`,
   )
     .bind(q, like, q, limit)
@@ -185,7 +197,7 @@ agentRoutes.get('/customers', requirePermission('agent.read'), async (c) => {
  * ?customer=<tên hoặc mã khách> &from=YYYY-MM-DD &to=YYYY-MM-DD. Cần quyền Đơn hàng (có tiền).
  */
 agentRoutes.get('/sales', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'orders');
+  needScope(c, 'orders', 'cskh_b2b');
   const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
   const from = c.req.query('from');
   const to = c.req.query('to');
@@ -219,7 +231,7 @@ agentRoutes.get('/sales', requirePermission('agent.read'), async (c) => {
 
 /** Tra sản phẩm theo tên hoặc mã (để lên đơn không phải đoán mã). ?q=chữ &tier=<mã cấp giá> (có thì kèm đơn giá hiện hành của cấp đó). */
 agentRoutes.get('/products', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'orders');
+  needScope(c, 'orders', 'cskh_b2b');
   const q = (c.req.query('q') ?? '').trim().replace(/[%_]/g, '').slice(0, 60);
   const tier = (c.req.query('tier') ?? '').trim();
   const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 30)) || 30), 100);
@@ -238,9 +250,48 @@ agentRoutes.get('/products', requirePermission('agent.read'), async (c) => {
   return ok(c, rows.results ?? []);
 });
 
+/** Các cấp giá (Kênh phân phối) và mức đơn tối thiểu để lên cấp. Đơn giá từng mã: /products?tier=<id cấp>. */
+agentRoutes.get('/tiers', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'orders', 'cskh_b2b');
+  const r = await c.env.DB.prepare(
+    `SELECT t.id, t.code, t.name, t.rank, r.min_order_amount FROM price_tiers t LEFT JOIN tier_upgrade_rules r ON r.tier_id = t.id
+     ${b2bOnly(c) ? "WHERE t.code <> 'NHAN_VIEN'" : ''} ORDER BY t.rank`,
+  ).all();
+  return ok(c, r.results ?? []);
+});
+
+/** Bảng giá riêng của khách OEM (gia công). */
+agentRoutes.get('/customer-prices/:id', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'orders', 'cskh_b2b');
+  const id = c.req.param('id');
+  await assertB2bCustomer(c, id);
+  const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  const r = await c.env.DB.prepare(
+    `SELECT p.id AS product_id, p.sku, p.name, p.unit, p.pack_size, cp.amount, cp.valid_from FROM customer_prices cp JOIN products p ON p.id = cp.product_id
+     WHERE cp.customer_id = ?1 AND cp.valid_from <= ?2 AND (cp.valid_to IS NULL OR cp.valid_to >= ?2) AND p.deleted_at IS NULL ORDER BY p.sku`,
+  )
+    .bind(id, today)
+    .all();
+  return ok(c, r.results ?? []);
+});
+
+/** Cơ chế thưởng tháng / năm của NPP: mốc chung và mốc riêng từng khách (chỉ đọc). */
+agentRoutes.get('/bonus-policy', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'debts', 'cskh_b2b');
+  const tiers = await loadBonusTiers(c.env.DB);
+  const names = new Map(
+    ((await c.env.DB.prepare('SELECT id, name FROM customers WHERE deleted_at IS NULL').all<{ id: string; name: string }>()).results ?? []).map((n) => [n.id, n.name]),
+  );
+  const general = tiers.get('') ?? { MONTH: [], YEAR: [] };
+  const overrides = [...tiers.entries()]
+    .filter(([id]) => id !== '')
+    .map(([id, t]) => ({ customer_id: id, customer_name: names.get(id) ?? id, MONTH: t.MONTH, YEAR: t.YEAR }));
+  return ok(c, { general, overrides });
+});
+
 /** Công nợ toàn công ty: ?loc=vuot (vượt hạn mức) | co-no (đang nợ). Kèm tổng. */
 agentRoutes.get('/debts', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'debts');
+  needScope(c, 'debts', 'cskh_b2b');
   const loc = c.req.query('loc');
   const list = await listDebts(c.env.DB, '1=1', [], { onlyExceeded: loc === 'vuot', onlyWithDebt: loc === 'co-no' });
   const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 50)) || 50), 200);
@@ -249,7 +300,7 @@ agentRoutes.get('/debts', requirePermission('agent.read'), async (c) => {
 
 /** Phiếu thu tiền khách. ?pending=1 (chưa kế toán xác nhận) &customer_id=...&limit=... */
 agentRoutes.get('/payments', requirePermission('agent.read'), async (c) => {
-  needScope(c, 'debts');
+  needScope(c, 'debts', 'cskh_b2b');
   const items = await listPayments(c.env.DB, '1=1', [], {
     customerId: c.req.query('customer_id') ?? undefined,
     pendingOnly: c.req.query('pending') === '1',

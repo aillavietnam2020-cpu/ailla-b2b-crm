@@ -15,7 +15,7 @@ export const AGENT_PERMISSIONS = ['agent.read', 'agent.propose', 'agent.act', 'a
  *  xuong = Công xưởng SX video
  */
 export const AGENT_SCOPE_PREFIX = 'agent.scope.';
-export const AGENT_SCOPES = ['orders', 'orders_kho', 'debts', 'kho', 'mkt_content', 'mkt_digital', 'xuong', 'baocao_san', 'doc_tiktok'] as const;
+export const AGENT_SCOPES = ['orders', 'orders_kho', 'debts', 'kho', 'mkt_content', 'mkt_digital', 'xuong', 'baocao_san', 'doc_tiktok', 'cskh_b2b'] as const;
 export type AgentScope = (typeof AGENT_SCOPES)[number];
 export const AGENT_SCOPE_LABELS: Record<AgentScope, string> = {
   orders: 'Đơn hàng',
@@ -27,7 +27,15 @@ export const AGENT_SCOPE_LABELS: Record<AgentScope, string> = {
   xuong: 'Công xưởng SX video',
   baocao_san: 'Nạp báo cáo sàn TikTok (số tháng, quảng cáo theo ngày)',
   doc_tiktok: 'Đọc số TikTok đã nạp trên web (chỉ xem)',
+  cskh_b2b: 'CSKH B2B: đơn, khách sỉ, công nợ, bảng giá, thưởng của Kênh phân phối và Kênh OEM; chỉ được lập đơn mới khi người được chỉ định ra lệnh',
 };
+
+/** Agent CSKH B2B ghi thay người: chỉ lập đơn mới (tính thử giá, tạo đơn, gửi duyệt). Không sửa, hủy, xóa đơn; không đụng giá, công nợ, thưởng, tiền. */
+export const CSKH_B2B_WRITE: Array<{ method: string; re: RegExp }> = [
+  { method: 'POST', re: /^\/api\/orders\/preview$/ },
+  { method: 'POST', re: /^\/api\/orders$/ },
+  { method: 'POST', re: /^\/api\/orders\/[^/]+\/submit$/ },
+];
 export const AGENT_SCOPE_PERMISSIONS: string[] = AGENT_SCOPES.map((s) => AGENT_SCOPE_PREFIX + s);
 
 export const PROPOSAL_KINDS = [

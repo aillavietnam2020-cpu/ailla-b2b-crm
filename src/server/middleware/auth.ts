@@ -4,7 +4,7 @@ import type { AppEnv, AuthContext, AuthUser, Env } from '../env';
 import { customerScope, effectivePermissions } from '@shared/permissions';
 import { forbidden, unauthorized } from '../lib/http';
 import { readSessionCookie, resolveSession } from '../lib/session';
-import { AGENT_PERMISSIONS, AGENT_SCOPE_PERMISSIONS } from '@shared/agent';
+import { AGENT_PERMISSIONS, AGENT_SCOPE_PERMISSIONS, AGENT_SCOPE_PREFIX, CSKH_B2B_WRITE } from '@shared/agent';
 import { AGENT_TOKEN_PREFIX, hashAgentToken } from '../lib/agentToken';
 import { delegatedPathAllowed, loadDelegation } from '../lib/delegation';
 import { auditStatement } from '../lib/audit';
@@ -199,6 +199,9 @@ async function resolveDelegated(
   const d = await loadDelegation(c.env.DB, token, agent.id);
   if (!d) throw forbidden('Không có lệnh của người được chỉ định (hoặc đã hết hạn). Chỉ ghi được khi người đó vừa nhắn agent trên web Điều hành agent.');
   if (!delegatedPathAllowed(method, path)) throw forbidden('Agent chưa được phép thao tác này');
+  // Agent CSKH B2B: ghi thay chỉ để lập đơn mới, không sửa / hủy đơn, không ghi tiền, kho.
+  if (method !== 'GET' && own.includes(AGENT_SCOPE_PREFIX + 'cskh_b2b') && !CSKH_B2B_WRITE.some((w) => w.method === method && w.re.test(path)))
+    throw forbidden('Agent CSKH B2B chỉ được lập đơn mới, không được sửa, hủy đơn hay ghi tiền');
   if (method !== 'GET') {
     const r = await c.env.DB.prepare('UPDATE agent_delegations SET uses = uses + 1 WHERE token_hash = ? AND uses < max_uses AND expires_at > ?')
       .bind(d.token_hash, new Date().toISOString())

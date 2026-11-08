@@ -236,18 +236,20 @@ async function delegatorCandidates(db: D1Database) {
   const rows = await db
     .prepare(
       `SELECT u.id, u.display_name, u.role, (SELECT group_concat(p.permission, ',') FROM user_permissions p WHERE p.user_id = u.id) AS extra
-       FROM users u WHERE u.kind = 'HUMAN' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.role <> 'CEO' ORDER BY u.display_name`,
+       FROM users u WHERE u.kind = 'HUMAN' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL ORDER BY u.display_name`,
     )
     .all<{ id: string; display_name: string; role: Role; extra: string | null }>();
   return (rows.results ?? [])
     .map((u) => {
       const p = effectivePermissions(u.role, u.extra ? u.extra.split(',') : []);
-      const kind = p.includes('order.accounting.confirm') || p.includes('order.approve.normal') ? 'ketoan' : mkt(u.id);
+      // CEO chỉ ra lệnh ghi cho agent CSKH B2B (lập đơn); các agent khác giữ như cũ.
+      const kind = u.role === 'CEO' ? 'ceo' : p.includes('order.accounting.confirm') || p.includes('order.approve.normal') ? 'ketoan' : mkt(u.id);
       return { id: u.id, display_name: u.display_name, kind };
     })
     .filter((u) => !!u.kind);
 }
 const fitsAgent = (kind: string, scopes: string[]) =>
+  (kind === 'ceo' && scopes.includes('cskh_b2b')) ||
   kind === 'ketoan' || (kind === 'content' && scopes.includes('mkt_content')) || (kind === 'digital' && scopes.includes('mkt_digital'));
 
 agentAdminRoutes.get('/delegator-candidates', async (c) => ok(c, await delegatorCandidates(c.env.DB)));
@@ -281,7 +283,10 @@ agentAdminRoutes.put('/:id/delegators', async (c) => {
       ? c.env.DB.prepare('INSERT OR IGNORE INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(id, 'agent.act', auth.user.id, now)
       : c.env.DB.prepare('DELETE FROM user_permissions WHERE user_id = ? AND permission = ?').bind(id, 'agent.act'),
     ...want.flatMap((u) => [
-      c.env.DB.prepare('INSERT OR IGNORE INTO agent_delegators (agent_id, chat_agent, user_id, granted_by, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, chatAgent, u, auth.user.id, now),
+      c.env.DB.prepare(
+        `INSERT OR IGNORE INTO agent_delegators (agent_id, chat_agent, user_id, granted_by, created_at, telegram_id)
+         VALUES (?, ?, ?, ?, ?, (SELECT telegram_id FROM agent_delegators WHERE user_id = ? AND telegram_id IS NOT NULL LIMIT 1))`,
+      ).bind(id, chatAgent, u, auth.user.id, now, u),
       c.env.DB.prepare('INSERT OR IGNORE INTO agent_chat_access (user_id, agent, granted_by, created_at) VALUES (?, ?, ?, ?)').bind(u, chatAgent, auth.user.id, now),
     ]),
     auditStatement(c.env.DB, {
