@@ -22,7 +22,7 @@ const tnDm=id=>"dm:"+[tnMe(),id].sort().join("~");
 const tnOther=r=>r.startsWith("ag:")?"agent:"+r.slice(3):r.startsWith("dm:")?r.slice(3).split("~").find(x=>x!==tnMe())||tnMe():"";
 const tnPrj=r=>(D().projects||[]).find(p=>"p:"+p.id===r);
 /* dự án tôi được vào nhóm chat: phụ trách, thành viên, hoặc phòng tôi tham gia dự án (khớp quyền máy chủ chat.ts) */
-const tnMyPrj=()=>(D().projects||[]).filter(p=>ME.role==="admin"||p.owner===ME.id||(p.tv||[]).includes(ME.id)||[p.team].concat(p.teams||[]).includes(tnMyTeam()));
+const tnMyPrj=()=>(D().projects||[]).filter(p=>ME.role==="admin"||p.team==="chung"||p.owner===ME.id||(p.tv||[]).includes(ME.id)||[p.team].concat(p.teams||[]).includes(tnMyTeam()));
 const tnGrp=r=>(TN.groups||[]).find(g=>"n:"+g.id===r);
 const tnBoss=()=>!!ME&&(ME.role==="admin"||ME.role==="lead"||ME.role==="truongphong");
 const tnName=r=>r.startsWith("ag:")?((tnAg("agent:"+r.slice(3))||{}).name||"Agent"):r.startsWith("n:")?((tnGrp(r)||{}).name||"Nhóm"):r.startsWith("p:")?((tnPrj(r)||{}).ten||"Dự án "+r.slice(2)):r.startsWith("g:")?(r==="g:chung"?"Chung toàn công ty":TEAMS[r.slice(2)]||r.slice(2)):tnUN(tnOther(r))||"Nhắn riêng";

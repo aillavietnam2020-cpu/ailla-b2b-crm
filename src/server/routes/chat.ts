@@ -86,7 +86,7 @@ export async function canRoom(room: string, A: Acc): Promise<boolean> {
     let p = (await hubCtx(A.db)).projects.find((x) => x.id === id);
     if (!p) p = (await hubCtx(A.db, true)).projects.find((x) => x.id === id); // dự án vừa tạo
     if (!p) return false;
-    return p.owner === A.hubId || (p.tv ?? []).includes(A.hubId) || (!!A.team && [p.team, ...(p.teams ?? [])].includes(A.team));
+    return p.team === 'chung' || p.owner === A.hubId || (p.tv ?? []).includes(A.hubId) || (!!A.team && [p.team, ...(p.teams ?? [])].includes(A.team));
   }
   const g = await A.db.prepare('SELECT members FROM chat_groups WHERE id = ?').bind(room.slice(2)).first<{ members: string }>();
   return !!g && parseMembers(g.members).includes(A.id);
