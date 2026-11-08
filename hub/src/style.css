@@ -1011,7 +1011,7 @@ body:has(#tnpop) #ntpop{right:392px}
 @media(max-width:700px){.tkcdrow{flex-direction:column}.tkcdrow>.tklapc{width:auto}}
 /* chị Hoa 03/11: bỏ ô Trạng thái trong khung việc (việc mới là Cần làm; tiến độ ở thanh bước trên đầu) */
 #drawerIn #t-stw{display:none!important}
-.tkattl{display:flex;gap:8px;align-items:center}.tkattl input{flex:1;min-width:0}.tkattl .tkup{flex:none;white-space:nowrap}
+.tkattl{display:flex;gap:8px;align-items:center}.tkattl input,.tkattl textarea{flex:1;min-width:0}.tkattl{align-items:flex-start}.tkattl textarea{resize:vertical;min-height:38px;line-height:1.45}.tkdkl{display:inline-flex;flex-direction:column;gap:3px;vertical-align:top}.tkattl .tkup{flex:none;white-space:nowrap}
 /* Cập nhật nhanh: số hook mỗi người · ô hook theo task ở Điều phối */
 .bvqn{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:12.5px}.bvqn label{display:flex;align-items:center;gap:4px;background:#f6f7fb;border-radius:8px;padding:3px 8px}.bvqn input{width:64px}
 
