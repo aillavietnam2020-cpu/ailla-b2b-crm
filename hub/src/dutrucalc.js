@@ -2,7 +2,7 @@
    DỰ TRÙ GIÁ BÁN TikTok & Facebook (Quản trị › Lãi lỗ › Dự trù giá bán): hàm thuần, không gọi máy chủ, không vẽ.
    Công thức theo Google Sheet mẫu chị Hoa đưa ("AILLA - Dự trù giá bán TikTok & Facebook", tab DU_TRU_GIA).
    Trang dutru.js tải dữ liệu rồi đưa vào đây. Test: tests/unit/dutrucalc.test.ts.
-     Dòng (r): {ten, kenh:"tiktok"|"facebook", gia, gvSp, gvQua, aff, booking, cpqc}   (gia = giá bán thực thu; aff, cpqc tính %)
+     Dòng (r): {ten, kenh:"tiktok"|"facebook", gia, gvSp, gvQua, aff, booking, cpqc, cpk (chi phí khác riêng của dòng, %)}   (gia = giá bán thực thu; aff, cpqc tính %)
      gvSp / gvQua = null nghĩa là CHƯA CÓ GIÁ VỐN → không tính lãi, không ước số.
      Giả định (A): {bienMT, tiktok:{cpvc,phiSan,voucher,thue,hhAgency,luong,agency,ql,xuLy}, facebook:{…}}  (% trừ xuLy là đồng/đơn)
    ===================================================================== */
@@ -31,22 +31,22 @@ const dzFixedPct=(c)=>DZ_PCT.reduce((s,[f])=>s+dzN(c&&c[f]),0);
 
 /* Tính một dòng. */
 function dzCalc(r,A0){
-  const A=dzAssume(A0),c=A[r.kenh]||A.tiktok,gia=dzN(r.gia),aff=dzN(r.aff),bk=dzN(r.booking),cpqc=dzN(r.cpqc);
+  const A=dzAssume(A0),c=A[r.kenh]||A.tiktok,gia=dzN(r.gia),aff=dzN(r.aff),bk=dzN(r.booking),cpqc=dzN(r.cpqc),cpk=dzN(r.cpk);
   const miss=[];if(r.gvSp==null||r.gvSp==="")miss.push("sp");
   if(gia<=0)return {ok:false,why:"Nhập giá bán",miss};
   if(miss.length)return {ok:false,why:"Chưa có giá vốn",miss};
   const gvSp=dzN(r.gvSp),gvQua=r.gvQua==null||r.gvQua===""?0:dzN(r.gvQua);
-  const pct=dzFixedPct(c)+aff+bk+cpqc,pctD=pct/100*gia,xuLy=dzN(c.xuLy);
+  const pct=dzFixedPct(c)+aff+bk+cpqc+cpk,pctD=pct/100*gia,xuLy=dzN(c.xuLy);
   const tong=pctD+gvSp+gvQua+xuLy,ln=gia-tong,bien=ln/gia*100;
   const hoaVon=cpqc+bien,tran=hoaVon-A.bienMT;
   const roas=x=>x>0?100/x:null;
   const tt=ln<0?"lo":bien<A.bienMT?"thap":"dat";
-  return {ok:true,gia,gvSp,gvQua,xuLy,aff,bk,pct,pctD,tong,ln,bien,hoaVon,tran,roasHV:roas(hoaVon),roasTran:roas(tran),tt,bienMT:A.bienMT};
+  return {ok:true,gia,gvSp,gvQua,xuLy,aff,bk,cpk,pct,pctD,tong,ln,bien,hoaVon,tran,roasHV:roas(hoaVon),roasTran:roas(tran),tt,bienMT:A.bienMT};
 }
 /* Mức giá / quà còn đạt biên mục tiêu (giữ nguyên các % và CPQC của dòng). */
 function dzMax(r,A0){
   const A=dzAssume(A0),c=A[r.kenh]||A.tiktok,x=dzCalc(r,A0);if(!x.ok)return null;
-  const den=1-(dzFixedPct(c)+dzN(r.aff)+dzN(r.booking)+dzN(r.cpqc))/100-A.bienMT/100,fixed=x.gvSp+x.gvQua+x.xuLy;
+  const den=1-(dzFixedPct(c)+dzN(r.aff)+dzN(r.booking)+dzN(r.cpqc)+dzN(r.cpk))/100-A.bienMT/100,fixed=x.gvSp+x.gvQua+x.xuLy;
   if(den<=0)return {kho:true,why:"Tổng % chi phí đã quá cao: không mức giá nào đạt biên mục tiêu, cần giảm CPQC/AFF"};
   const pmin=fixed/den,giamD=Math.max(0,x.gia-pmin);
   return {kho:false,pmin,giamD,giamPct:giamD/x.gia*100,quaMax:Math.max(0,x.gia*den-fixed),daDat:x.bien>=A.bienMT};
