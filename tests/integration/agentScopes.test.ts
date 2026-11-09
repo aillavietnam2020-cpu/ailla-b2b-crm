@@ -204,6 +204,17 @@ describe('Phạm vi đọc của agent theo vai', () => {
     const it = await agentCall(a.token, '/api/agent/kho/online/chi-tiet?item=TP7&channel=SHOPEE');
     expect(it.body.data.dong).toEqual([]);
     expect(await status(a.token, '/api/agent/kho/online/chi-tiet?channel=ZZ')).toBe(400);
+    for (const [oid, ln, shop, sku, q] of [['O1', 1, 'Ailla VN', 'SKU-A', 2], ['O1', 2, 'Ailla VN', 'SKU-B', 1], ['O2', 1, 'Ailla Việt Nam', 'SKU-A', 3]] as const) {
+      await db.prepare('INSERT INTO channel_order_lines (channel, order_id, line_no, day, shop, sku, variant, name, qty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind('SHOPEE', oid, ln, '2026-10-09', shop, sku, '', 'Tên ' + sku, q).run();
+    }
+    const dl = await agentCall(a.token, '/api/agent/kho/online/don-le?channel=SHOPEE&from=2026-10-01&to=2026-10-31');
+    expect(dl.status).toBe(200);
+    expect(dl.body.data.pham_vi).toMatchObject({ tu_ngay: '2026-10-09', so_don: 2, tong_so_luong: 6 });
+    expect(dl.body.data.dong.find((x: any) => x.shop === 'Ailla VN' && x.sku === 'SKU-A')).toMatchObject({ so_luong: 2, so_don: 1 });
+    const dn = await agentCall(a.token, '/api/agent/kho/online/don-le?group=don&shop=Việt Nam');
+    expect(dn.body.data.dong.length).toBe(1);
+    expect(await status(a.token, '/api/agent/kho/online/don-le?group=zz')).toBe(400);
+    expect(await status(none.token, '/api/agent/kho/online/don-le')).toBe(403);
     expect(await status(none.token, '/api/agent/kho/online/chi-tiet')).toBe(403);
   });
 
