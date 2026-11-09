@@ -898,7 +898,7 @@ function ktGan(ma,kenh){
   DB.mutate(ME.name,"gắn video đã đăng "+ma+" vào kênh "+kenh,dt=>{const kk=dt.kho.find(x=>x.ma===ma);if(!kk)return;const td=dt.settings.today,cc=newCard(dt,{sku:kk.sku,kenh,day:td});Object.assign(cc,{mix:"ton",loai:"kho",nguon:"Footage cũ",khoMa:ma,oneShot:false,hookText:kk.ten||kk.tuyen||"Video "+sk(kk.sku).n,linkVideo:kk.link||"",linkFinal:kk.link||"",caption:kk.caption||"",nguoi:ME.id,nguoiEdit:ME.id,nguoiKB:ME.id,giao:ME.id,duyet:"Đã duyệt",ceo:"PASS",step:"xong",ngayDang:td,nhapTay:true,tuan:weekOf(td)||1,batDau:td});dt.cards.push(cc);kk.maDang=cc.id;kk.trangThai="Đã lên lịch"});
   toast("Đã gắn "+ma+" vào "+chOf(kenh).short)
 }
-function ktNotiKenh(label,kenh,ref){if(XV.ktQuiet){(XV.ktQuietN=XV.ktQuietN||{})[kenh]=(XV.ktQuietN[kenh]||0)+1;return}const to=[chanOwner(kenh)].concat(chanHelp(kenh)).filter(Boolean);if(!to.length||typeof notifyU!=="function")return;
+function ktNotiKenh(label,kenh,ref){if(XV.ktQuiet){(XV.ktQuietN=XV.ktQuietN||{})[kenh]=(XV.ktQuietN[kenh]||0)+1;return}const to=[chanOwner(kenh)].filter(x=>x&&x!==ME.id);if(!to.length||typeof notifyU!=="function")return;
   DB.mutate(ME.name,"báo kênh "+kenh+" có video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp video ${label} vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,ref||""))}
 function ktPick(ma,kenh){
   const k0=(D().kho||[]).find(y=>y.ma===ma);if(!k0||!kenh)return false;if(!k0.maDang&&!khoOk(k0)){toast("Video "+ma+" chưa duyệt, Lead duyệt xong mới phân bổ kênh được");return false}
@@ -956,7 +956,7 @@ function ktBulkBind(w){{const tb=document.querySelector(".topbar");document.docu
   if(q("#ktb-x"))q("#ktb-x").onclick=()=>{S.clear();renderMain()};
   if(q("#ktb-go"))q("#ktb-go").onclick=()=>{const kenh=q("#ktb-k").value;if(!kenh){toast("Chọn kênh trước");q("#ktb-k").focus();return}
     const L=sel().filter(k=>ktState(k)==="free");let n=0;XV.ktQuiet=true;XV.ktQuietN={};try{L.forEach(k=>{if(ktPick(k.ma,kenh)){n++;S.delete(k.ma)}})}finally{XV.ktQuiet=false}
-    if(n){const to=[chanOwner(kenh)].concat(chanHelp(kenh)).filter(Boolean);if(to.length&&typeof notifyU==="function")DB.mutate(ME.name,"báo kênh "+kenh+" có "+n+" video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp ${n} video tồn vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,""))}
+    if(n){const to=[chanOwner(kenh)].filter(x=>x&&x!==ME.id);if(to.length&&typeof notifyU==="function")DB.mutate(ME.name,"báo kênh "+kenh+" có "+n+" video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp ${n} video tồn vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,""))}
     toast(n?"Đã phân bổ "+n+" video vào "+chOf(kenh).short+": Chờ đăng":"Không phân bổ được video nào");renderMain()};
   if(q("#ktb-ok"))q("#ktb-ok").onclick=()=>{const L=sel().filter(k=>(ktState(k)==="cd"&&xvGive())||(ktState(k)==="cceo"&&ME.role==="admin"));if(!L.length)return;
     if(!confirm((ME.role==="admin"?"CEO duyệt ":"Duyệt ")+L.length+" video đã chọn?"))return;
