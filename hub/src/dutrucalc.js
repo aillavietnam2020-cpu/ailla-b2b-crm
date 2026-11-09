@@ -15,8 +15,9 @@ const DZ_PCT=[["phiSan","Phí sàn (gộp tất cả phí sàn / nền tảng)"]
    Facebook phí nền tảng = CPVC 9,2; nhân sự = lương 8,1 + quản lý 1,3. */
 const DZ_DEF={
   bienMT:18.5,
-  tiktok:{phiSan:22.8,thue:1.5,nhanSu:6,xuLy:3000},
-  facebook:{phiSan:9.2,thue:1.5,nhanSu:9.4,xuLy:0}};
+  /* aff / booking / cpqc = số điền sẵn cho dòng mới (sửa được). TikTok theo báo cáo thực tế chị Hoa gửi: affiliate/KOC 3,4% doanh thu, GMV Max 27,2% (đã VAT). Facebook chưa có số thực nên để 0. */
+  tiktok:{phiSan:22.8,thue:1.5,nhanSu:6,xuLy:3000,aff:3.4,booking:0,cpqc:27.2},
+  facebook:{phiSan:9.2,thue:1.5,nhanSu:9.4,xuLy:0,aff:0,booking:0,cpqc:0}};
 const dzN=v=>{const x=+v;return isFinite(x)?x:0};
 const dzLow=s=>String(s||"").trim().toLowerCase();
 /* Giả định đầy đủ: chỗ nào thiếu thì lấy mặc định. */
