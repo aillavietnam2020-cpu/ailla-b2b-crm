@@ -110,6 +110,7 @@ function pDqContent(m){
   dqDropBind(m);
   m.querySelectorAll("[data-dqwin]").forEach(r=>r.onclick=e=>{if(e.target.closest("a"))return;dqWinGo(r.dataset.dqwin)});
   m.querySelectorAll("[data-dqpp]").forEach(r=>r.onclick=()=>{const k=r.dataset.dqpp,ch=m.querySelectorAll(`[data-dqppc="${k}"]`),op=ch.length&&ch[0].hidden;ch.forEach(x=>x.hidden=!op);const a=r.querySelector(".dqar");if(a)a.textContent=op?"▾":"▸"});
+  m.querySelectorAll("[data-dqsub]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqhsub",b.dataset.dqsub)}catch(e){}renderMain()});
   m.querySelectorAll("[data-dqtab]").forEach(b=>b.onclick=()=>{try{localStorage.setItem("ailla_dqtab",b.dataset.dqtab)}catch(e){}renderMain()});
   m.querySelectorAll("[data-dqsku]").forEach(r=>r.onclick=()=>{if(typeof bvGo==="function"){const s=r.dataset.dqsku,kn=(C.find(c=>c.sku===s)||{}).kenh||(ptPairs().find(x=>x.sku===s)||{}).kenh||"TikTok chính";bvGo(kn,s,"")}});
   m.querySelectorAll("[data-dqch]").forEach(e=>e.onclick=()=>{const r=chRows.find(x=>x.ch.k===e.dataset.dqch);if(r)dqChOpen(r,C.filter(c=>c.kenh===r.ch.k),past,M)});
@@ -139,7 +140,37 @@ function dqWinGo(go){const [g,ref]=String(go).split("|");PAGE="win";if(typeof mo
   if(ref&&typeof hyWin==="function")setTimeout(()=>hyWin(ref),150);else if(g==="koc")toast("Video KOC này chưa duyệt vào kho win: vào KOC / Affiliate bấm “✓ Vào kho win” để nhân bản")}
 /* Hiệu quả kênh (chị Hoa duyệt 02/11): bán được gì, video có được xem không, xem rồi có mua không, video win.
    Số view / click / đơn / GMV của từng video lấy từ báo cáo TikTok nhập hằng tuần; video chưa có báo cáo không tính vào view. */
+/* Hiệu quả kênh TikTok cả kênh (chị Hoa duyệt demo 09/11): Tổng quan cộng mọi hạng mục, bấm từng hạng mục xem chi tiết.
+   Số GMV theo hạng mục lấy từ Key metrics (tsbOpsAgg), LIVE từ file LIVE, KOC từ Creator List / Transaction Analysis. KOC gồm cả LIVE của KOC. */
+const DQ_SUBS=[["tq","Tổng quan"],["vi","Video inhouse"],["koc","KOC / Affiliate"],["the","Thẻ sản phẩm"],["live","Livestream"]];
 function dqHieuQua(C,past,M,set){
+  let sub="tq";try{sub=localStorage.getItem("ailla_dqhsub")||"tq"}catch(e){}if(!DQ_SUBS.some(x=>x[0]===sub))sub="tq";
+  const tabs=`<div class="seg ptk dqtabs" style="margin-bottom:12px">${DQ_SUBS.map(([k,t])=>`<button type="button" data-dqsub="${k}" class="${sub===k?"on":""}">${t}</button>`).join("")}</div>`;
+  if(sub==="vi")return tabs+dqHieuQuaVideo(C,past,M,set);
+  if(typeof ttsEnsure==="function")ttsEnsure();
+  const yr=M.mon>MONTH.mon?MONTH.year-1:MONTH.year,ym=yr+"-"+String(M.mon).padStart(2,"0"),[f,t]=ttsPer(ym,yr,M.mon);
+  if(typeof TSB==="undefined"||!TSB.all)return tabs+`<div class="card dqc"><p class="empty">Đang tải số TikTok…</p></div>`;
+  const S=tsbOpsAgg(f,t),K=S.km,vat=typeof TT_ADS_VAT==="number"?TT_ADS_VAT:0.1,ads=Math.round((S.ads.chi||0)*(1+vat)),
+    LN=[["vi","Video inhouse","#5b4bdb",+K.vInh||0],["koc","KOC / Affiliate","#e0607e",(+K.vKoc||0)+(+K.lKoc||0)],["the","Thẻ sản phẩm","#f0a020",+K.the||0],["live","Livestream","#2a9d8f",+K.lShop||0]],
+    tot=LN.reduce((a,x)=>a+x[3],0),gmv=+K.gmv||tot,pc=v=>gmv?Math.round(v/gmv*100)+"%":"—",
+    kk=(cl,ic,lb,v,sub2)=>`<div class="${cl}"><small>${ic} ${lb}</small><b>${v}</b><i>${sub2||""}</i></div>`,
+    ky=`<small class="mut">${S.nKm?"Key metrics "+S.nKm+" ngày · "+esc(ttsVn(f))+"–"+esc(ttsVn(t))+" · GMV là số đo hiệu suất, chưa trừ hủy, hoàn":"Kỳ này chưa có số Key metrics, chờ tải báo cáo TikTok"}</small>`;
+  if(!S.nKm)return tabs+`<div class="card dqc"><h2 class="dqh">💹 Hiệu quả kênh TikTok</h2><p class="empty">Chưa có số Key metrics cho kỳ này. Số lên sau khi tải báo cáo TikTok (Marketing › Nhập báo cáo).</p></div>`;
+  if(sub==="tq"){
+    return tabs+`<div class="dqk">${kk("g","💰","GMV cả kênh",money(gmv),"4 hạng mục cộng lại")}${kk("b","🛒","Đơn",nf(K.don||0),"")}${kk("","💵","GMV / đơn",K.don?money(gmv/K.don):"—","")}${kk("a","📣","Chi quảng cáo",ads?money(ads):"—","đã gồm thuế")}${kk("p","📈","ROAS",ads&&gmv?(gmv/ads).toFixed(2).replace(".",","):"—","GMV / quảng cáo")}</div>
+    <div class="card dqc"><h2 class="dqh">Cơ cấu GMV theo hạng mục <small>bấm một dòng để xem chi tiết</small></h2>${ky}
+    ${LN.map(([k,n,c,g])=>`<div data-dqsub="${k}" style="display:grid;grid-template-columns:150px 1fr 100px 50px 60px;gap:10px;align-items:center;padding:9px 6px;border-radius:12px;cursor:pointer"><b>${n}</b><div style="height:14px;border-radius:7px;background:#eceefa;overflow:hidden"><i style="display:block;height:100%;width:${gmv?Math.min(100,g/gmv*100):0}%;background:${c}"></i></div><span>${g?money(g):"—"}</span><span>${pc(g)}</span><span style="color:#4b54d1;font-size:12px">Xem ›</span></div>`).join("")}
+    ${gmv-tot>gmv*0.02?`<p class="hint">Còn ${money(gmv-tot)} chưa xếp được vào hạng mục nào.</p>`:""}</div>`}
+  const back=`<button type="button" data-dqsub="tq" style="border:0;background:none;color:#4b54d1;cursor:pointer;padding:0;margin-bottom:8px">‹ Về Tổng quan</button>`;
+  if(sub==="koc"){
+    const X=typeof ttsKoc==="function"?ttsKoc(f,t):null,Mk=X?X.M:{};
+    return tabs+back+`<div class="dqk">${kk("g","💰","GMV nhờ KOC",money(LN[1][3]),pc(LN[1][3])+" GMV kênh · video "+money(K.vKoc||0)+" · LIVE "+money(K.lKoc||0))}${kk("b","🤝","KOC có doanh số",X&&X.K.length?nf(Mk["Nhà sáng tạo có doanh số"]||0):"—","")}${kk("p","🎞️","Video KOC có doanh số",X&&X.K.length?nf(Mk["Video có doanh số"]||0):"—","")}${kk("a","💸","Hoa hồng ước tính",X&&X.K.length&&Mk["Hoa hồng ước tính"]?money(Mk["Hoa hồng ước tính"]):"—","số thật theo quyết toán")}</div>`+(typeof ttsKocHtml==="function"?ttsKocHtml(f,t):"")}
+  if(sub==="the"){
+    const days=Object.entries(TSB.all.days||{}).filter(([d,x])=>d>=f&&d<=t&&x.km).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14);
+    return tabs+back+`<div class="dqk">${kk("g","💰","GMV thẻ sản phẩm",money(LN[2][3]),pc(LN[2][3])+" GMV kênh")}</div><div class="card dqc"><h2 class="dqh">Theo ngày <small>14 ngày gần nhất có số</small></h2><table class="dqt"><tr><th>Ngày</th><th>GMV thẻ sản phẩm</th><th>Cả kênh</th></tr>${days.map(([d,x])=>`<tr><td>${esc(ttsVn(d))}</td><td>${money(x.km.the||0)}</td><td>${money(x.km.gmv||0)}</td></tr>`).join("")}</table><p class="hint">Báo cáo TikTok chỉ cho GMV thẻ theo ngày, chưa có bảng theo từng sản phẩm.</p></div>`}
+  const Lv=S.nLive?S.live:null;
+  return tabs+back+`<div class="dqk">${kk("g","💰","GMV LIVE của shop",money(LN[3][3]),pc(LN[3][3])+" GMV kênh · LIVE của KOC tính ở KOC / Affiliate")}${kk("b","📺","Số buổi LIVE",Lv?nf(Lv.phien||0):"—",Lv?nf(Lv.phienGmv||0)+" buổi có GMV":"chờ tải file LIVE")}${kk("","🛒","Đơn từ LIVE",Lv?nf(Lv.don||0):"—","")}${kk("p","👁️","Lượt xem",Lv?nf(Lv.xem||0):"—","")}${kk("a","⚡","GMV / 1.000 lượt xem",Lv&&Lv.xem?money(Lv.gmv/Lv.xem*1000):"—","")}</div>`}
+function dqHieuQuaVideo(C,past,M,set){
   const d=D(),wOrd=+set.winnerOrders||100,pot=+set.potential||30,chs=CHANNELS.filter(ch=>ch.needId);
   let hk="";try{hk=localStorage.getItem("ailla_dqhk")||""}catch(e){}if(hk&&!chs.some(ch=>ch.k===hk))hk="";
   const yr=M.mon>MONTH.mon?MONTH.year-1:MONTH.year,ym=yr+"-"+String(M.mon).padStart(2,"0");
