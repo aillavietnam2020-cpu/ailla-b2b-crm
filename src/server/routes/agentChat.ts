@@ -587,3 +587,65 @@ agentRelayRoutes.post('/sync', async (c) => {
   }
   return ok(c, { added });
 });
+
+/**
+ * Agent TỰ đăng tin chủ động (báo cáo ngày/tuần...) vào hộp thoại web của một hoặc nhiều người.
+ * Mặc định gửi cho chị Hoa (CEO) và mọi người được cấp quyền nhắn agent đó. Mỗi người một bản tin riêng
+ * (owner_id riêng) nên ai cũng thấy, đếm chưa đọc và thông báo như tin agent khác. ext_id chống trùng khi gửi lại.
+ * Tin chỉ để HIỆN, không vào hàng đợi cho agent.
+ */
+agentRelayRoutes.post('/announce', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as {
+    agent?: string;
+    body?: string;
+    ext_id?: string;
+    user_ids?: string[];
+    files?: Array<{ name?: string; mime?: string; b64?: string }>;
+  };
+  const agent = String(b.agent ?? '');
+  if (!AGENT_IDS.includes(agent)) throw badRequest('BAD_AGENT', 'Agent không có trong danh sách');
+  const body = String(b.body ?? '').trim().slice(0, 20000);
+  const ext = String(b.ext_id ?? '').trim().slice(0, 100);
+  if (!body) throw badRequest('NO_BODY', 'Thiếu nội dung');
+  if (!ext) throw badRequest('NO_EXT', 'Thiếu mã chống trùng (ext_id)');
+  let owners: string[];
+  if (Array.isArray(b.user_ids) && b.user_ids.length) {
+    const ids = b.user_ids.map(String).slice(0, 20);
+    const rs = await c.env.DB.prepare(`SELECT id FROM users WHERE kind = 'HUMAN' AND status = 'ACTIVE' AND deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`)
+      .bind(...ids)
+      .all<{ id: string }>();
+    owners = (rs.results ?? []).map((r) => r.id);
+  } else {
+    const rs = await c.env.DB.prepare(
+      `SELECT id FROM users WHERE kind = 'HUMAN' AND status = 'ACTIVE' AND deleted_at IS NULL
+         AND (role = 'CEO' OR id IN (SELECT user_id FROM agent_chat_access WHERE agent = ?))`,
+    )
+      .bind(agent)
+      .all<{ id: string }>();
+    owners = (rs.results ?? []).map((r) => r.id);
+  }
+  if (!owners.length) throw badRequest('NO_OWNER', 'Chưa có người nhận');
+  const files = (b.files ?? [])
+    .slice(0, 4)
+    .filter((f) => f && IMAGE_MIMES.includes(String(f.mime)) && typeof f.b64 === 'string' && f.b64.length > 0 && f.b64.length <= MAX_FILE_B64 && /^[A-Za-z0-9+/=]+$/.test(f.b64));
+  const now = nowIso();
+  let added = 0;
+  for (const owner of owners) {
+    const extId = `push:${ext}:${owner}`;
+    const res = await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO agent_chat (agent, role, body, status, source, ext_id, owner_id, created_at, updated_at)
+       VALUES (?, 'AGENT', ?, 'done', 'AGENT_PUSH', ?, ?, ?, ?)`,
+    )
+      .bind(agent, body, extId, owner, now, now)
+      .run();
+    if (!res.meta.changes) continue;
+    added++;
+    const row = await c.env.DB.prepare('SELECT id FROM agent_chat WHERE ext_id = ?').bind(extId).first<{ id: number }>();
+    for (const f of files) {
+      await c.env.DB.prepare('INSERT INTO agent_chat_files (chat_id, name, mime, data, created_at) VALUES (?, ?, ?, ?, ?)')
+        .bind(row?.id ?? 0, String(f.name ?? 'anh').slice(0, 120), f.mime, f.b64, now)
+        .run();
+    }
+  }
+  return ok(c, { added, recipients: owners.length });
+});
