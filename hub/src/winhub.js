@@ -24,8 +24,8 @@ function hyWinPaint(first){const id=HYW.win;if(!id)return;
   else{if(svTyping())return;$("#hyw").innerHTML=hyHypitHtml(id)}
   hyBind($("#hyw"))}
 const hyCan=()=>can(ME,"win.sua")||ME.role==="admin";
-/* Người duyệt video nhân bản: Lead Content & Media (trưởng nhóm Content). CEO luôn duyệt được. */
-const hyApprover=()=>D().users.find(u=>u.active&&u.role==="lead"&&/oanh/i.test(foldName(u.name)))||D().users.find(u=>u.active&&u.role==="lead");
+/* Người duyệt video nhân bản: Lead có quyền duyệt (Uyên), không lấy lead không có quyền duyệt. CEO luôn duyệt được. */
+const hyApprover=()=>{const L=D().users.filter(u=>u.active&&u.role==="lead"),P=L.filter(u=>can(u,"viec.duyet"));return P.find(u=>/uyen/i.test(foldName(u.name)))||P[0]||L.find(u=>/oanh/i.test(foldName(u.name)))||L[0]};
 const hyIsApprover=()=>ME.role==="admin";
 const hyIsOanh=()=>ME.role!=="admin"&&(hyApprover()||{}).id===ME.id;
 const hyTaskOf=id=>(D().tasks||[]).find(x=>x.hy===id);
