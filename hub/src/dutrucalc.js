@@ -2,19 +2,21 @@
    DỰ TRÙ GIÁ BÁN TikTok & Facebook (Quản trị › Lãi lỗ › Dự trù giá bán): hàm thuần, không gọi máy chủ, không vẽ.
    Công thức theo Google Sheet mẫu chị Hoa đưa ("AILLA - Dự trù giá bán TikTok & Facebook", tab DU_TRU_GIA).
    Trang dutru.js tải dữ liệu rồi đưa vào đây. Test: tests/unit/dutrucalc.test.ts.
-     Dòng (r): {ten, kenh:"tiktok"|"facebook", gia, gvSp, gvQua, aff, cpqc}   (gia = giá bán thực thu; aff, cpqc tính %)
+     Dòng (r): {ten, kenh:"tiktok"|"facebook", gia, gvSp, gvQua, aff, booking, cpqc}   (gia = giá bán thực thu; aff, cpqc tính %)
      gvSp / gvQua = null nghĩa là CHƯA CÓ GIÁ VỐN → không tính lãi, không ước số.
      Giả định (A): {bienMT, tiktok:{cpvc,phiSan,voucher,thue,hhAgency,luong,agency,ql,xuLy}, facebook:{…}}  (% trừ xuLy là đồng/đơn)
    ===================================================================== */
 const DZ_MAX_ROWS=30;
 const DZ_KENH=[["tiktok","TikTok Shop"],["facebook","Facebook"]];
 /* Các khoản tỷ lệ % theo kênh (cộng vào Tổng CP tỷ lệ). */
-const DZ_PCT=[["cpvc","CP video (CPVC)"],["phiSan","Phí sàn / app"],["voucher","Voucher / Xtra"],["thue","Thuế"],["hhAgency","Hoa hồng agency"],["luong","Lương in-house"],["agency","Agency cố định"],["ql","CP quản lý"]];
-/* Nguồn: bảng kế toán T7/2026. Lương TikTok = 20tr ÷ doanh thu dự kiến 800tr = 2,5%; agency cố định = 12tr ÷ 800tr = 1,5%. */
+/* Chị Hoa 09/11: gọn lại. Phí sàn gộp một số (hoa hồng sàn, giao dịch, dịch vụ, voucher/Xtra, CPVC...), chỉ tách riêng Affiliate, Booking và CPQC ở từng dòng. */
+const DZ_PCT=[["phiSan","Phí sàn (gộp tất cả phí sàn / nền tảng)"],["thue","Thuế"],["nhanSu","Nhân sự & quản lý"]];
+/* Nguồn: bảng kế toán T7/2026. TikTok phí sàn gộp = phí sàn 17 + voucher/Xtra 4,7 + CPVC 1,1; nhân sự = lương 2,5 (20tr ÷ 800tr) + agency cố định 1,5 (12tr ÷ 800tr) + hoa hồng agency 2.
+   Facebook phí nền tảng = CPVC 9,2; nhân sự = lương 8,1 + quản lý 1,3. */
 const DZ_DEF={
   bienMT:18.5,
-  tiktok:{cpvc:1.1,phiSan:17,voucher:4.7,thue:1.5,hhAgency:2,luong:2.5,agency:1.5,ql:0,xuLy:3000},
-  facebook:{cpvc:9.2,phiSan:0,voucher:0,thue:1.5,hhAgency:0,luong:8.1,agency:0,ql:1.3,xuLy:0}};
+  tiktok:{phiSan:22.8,thue:1.5,nhanSu:6,xuLy:3000},
+  facebook:{phiSan:9.2,thue:1.5,nhanSu:9.4,xuLy:0}};
 const dzN=v=>{const x=+v;return isFinite(x)?x:0};
 const dzLow=s=>String(s||"").trim().toLowerCase();
 /* Giả định đầy đủ: chỗ nào thiếu thì lấy mặc định. */
@@ -28,22 +30,22 @@ const dzFixedPct=(c)=>DZ_PCT.reduce((s,[f])=>s+dzN(c&&c[f]),0);
 
 /* Tính một dòng. */
 function dzCalc(r,A0){
-  const A=dzAssume(A0),c=A[r.kenh]||A.tiktok,gia=dzN(r.gia),aff=dzN(r.aff),cpqc=dzN(r.cpqc);
+  const A=dzAssume(A0),c=A[r.kenh]||A.tiktok,gia=dzN(r.gia),aff=dzN(r.aff),bk=dzN(r.booking),cpqc=dzN(r.cpqc);
   const miss=[];if(r.gvSp==null||r.gvSp==="")miss.push("sp");
   if(gia<=0)return {ok:false,why:"Nhập giá bán",miss};
   if(miss.length)return {ok:false,why:"Chưa có giá vốn",miss};
   const gvSp=dzN(r.gvSp),gvQua=r.gvQua==null||r.gvQua===""?0:dzN(r.gvQua);
-  const pct=dzFixedPct(c)+aff+cpqc,pctD=pct/100*gia,xuLy=dzN(c.xuLy);
+  const pct=dzFixedPct(c)+aff+bk+cpqc,pctD=pct/100*gia,xuLy=dzN(c.xuLy);
   const tong=pctD+gvSp+gvQua+xuLy,ln=gia-tong,bien=ln/gia*100;
   const hoaVon=cpqc+bien,tran=hoaVon-A.bienMT;
   const roas=x=>x>0?100/x:null;
   const tt=ln<0?"lo":bien<A.bienMT?"thap":"dat";
-  return {ok:true,gia,gvSp,gvQua,xuLy,pct,pctD,tong,ln,bien,hoaVon,tran,roasHV:roas(hoaVon),roasTran:roas(tran),tt,bienMT:A.bienMT};
+  return {ok:true,gia,gvSp,gvQua,xuLy,aff,bk,pct,pctD,tong,ln,bien,hoaVon,tran,roasHV:roas(hoaVon),roasTran:roas(tran),tt,bienMT:A.bienMT};
 }
 /* Mức giá / quà còn đạt biên mục tiêu (giữ nguyên các % và CPQC của dòng). */
 function dzMax(r,A0){
   const A=dzAssume(A0),c=A[r.kenh]||A.tiktok,x=dzCalc(r,A0);if(!x.ok)return null;
-  const den=1-(dzFixedPct(c)+dzN(r.aff)+dzN(r.cpqc))/100-A.bienMT/100,fixed=x.gvSp+x.gvQua+x.xuLy;
+  const den=1-(dzFixedPct(c)+dzN(r.aff)+dzN(r.booking)+dzN(r.cpqc))/100-A.bienMT/100,fixed=x.gvSp+x.gvQua+x.xuLy;
   if(den<=0)return {kho:true,why:"Tổng % chi phí đã quá cao: không mức giá nào đạt biên mục tiêu, cần giảm CPQC/AFF"};
   const pmin=fixed/den,giamD=Math.max(0,x.gia-pmin);
   return {kho:false,pmin,giamD,giamPct:giamD/x.gia*100,quaMax:Math.max(0,x.gia*den-fixed),daDat:x.bien>=A.bienMT};

@@ -38,7 +38,7 @@ describe('dutrucalc', () => {
   });
   it('giả định sửa được', () => {
     const x = T.dzCalc(sap, { tiktok: { phiSan: 10 } });
-    expect(x.pct).toBeCloseTo(48.3, 5);
+    expect(x.pct).toBeCloseTo(42.5, 5);
   });
   it('mức giá tối thiểu đạt biên mục tiêu', () => {
     const m = T.dzMax(sap);
@@ -100,5 +100,18 @@ describe('dutrucalc giá thành MISA', () => {
     const m2 = P.dzMergeGiaThanh({}, f, {});
     expect(m2.aillasap.u).toBe(100);
     expect(m2.aillasap.src).toContain('09/2026');
+  });
+});
+
+describe('dutrucalc booking', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const B: any = new Function(`${readFileSync('hub/src/dutrucalc.js', 'utf8')} return {dzCalc,dzMax};`)();
+  it('booking cộng vào tổng % và làm CPQC trần giảm đúng bằng booking', () => {
+    const r = { kenh: 'tiktok', gia: 100000, gvSp: 20000, gvQua: 0, aff: 5, cpqc: 10, booking: 0 };
+    const a = B.dzCalc(r);
+    const b = B.dzCalc({ ...r, booking: 4 });
+    expect(b.pct).toBeCloseTo(a.pct + 4, 6);
+    expect(b.tran).toBeCloseTo(a.tran - 4, 6);
+    expect(B.dzMax({ ...r, booking: 4 }).pmin).toBeGreaterThan(B.dzMax(r).pmin);
   });
 });
