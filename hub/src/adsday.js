@@ -119,6 +119,7 @@ function adfParse(name,account){
   else if(tk[0]==="TD"&&/^T[ĐD]\s*-\s/i.test(raw)){owner="Thảo";rest=tk.slice(1)}
   else if(tk[0]==="THAO"){owner="Thảo";rest=tk.slice(1)}
   else if(tk.includes("DUAN"))owner="Duẩn";
+  else if(tk[0]==="MESS"&&tk.includes("BI")&&tk.includes("ANH"))owner="Việt Anh";/* tài khoản BI 3 PAGE dùng chung Việt Anh + Duẩn; chiến dịch "BI - ANH" là của Việt Anh (chị Hoa 09/11) */
   if(!owner)owner=ADF_ACC[account]||"Chưa rõ người";
   const has=f=>rest.some(f);let prod="";
   if(has(t=>t==="TLAI"))prod="TLAI";else if(has(t=>t.includes("AIBIO")))prod="AIBIO";else if(has(t=>t==="TLG"||t.startsWith("TLG")))prod="TLG";
