@@ -37,7 +37,7 @@
         ["Kênh bán hàng",[["bc_tiktok","TikTok Shop"],["bc_shopee","Shopee"],["bc_fb","Facebook"],["cskh_cu","CSKH cũ"],["bc_b2b","Kênh phân phối"],["bc_gc","Kênh OEM"],["bc_tong","So sánh kênh"],["dt_dc","Đối chiếu doanh thu"]]],
         ["Kế hoạch & KPI",[["muctieu","Kế hoạch doanh thu"]]],
         ["Cảnh báo",[["soat_sl","Máy soát số liệu"],["nguong","Ngưỡng cảnh báo & chỉ số"]]]],
-      tc:[["Lãi lỗ",[["pl","P&L công ty"]]],
+      tc:[["Lãi lỗ",[["pl","P&L công ty"],["dutru","Dự trù giá bán"]]],
         /* Chị Hoa 28/10: Mua hàng về lại kế toán, trong Thu chi. Trang mh_po gồm đơn mua, nhận hàng, chứng từ, trả tiền NCC (bấm vào từng đơn). */
         ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["mh_po","Mua hàng"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"]]],
         ["Dòng tiền",[["tien_lich","Dòng tiền"]]],
