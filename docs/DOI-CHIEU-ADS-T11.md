@@ -45,3 +45,6 @@ Chị Hoa xác nhận tài khoản "BI 3 PAGE" do Việt Anh và Duẩn cùng ch
 
 ## 6. Page của Thảo (09/11)
 Chị Hoa: page của Thảo là "AILLA VIỆT NAM" (111142935203280), khác "Ailla Việt Nam Store" (105017945992971, của Việt Anh). Đã thêm Thảo vào ADF_PAGE_OWNER và ADF_MESS (sản phẩm TLG, TLG125). Đơn page này 1-8/11 tổng 2,66tr, riêng TLG ~1,54tr; phần còn lại (xịt muỗi/ruồi, tẩy mốc...) chưa tính cho Thảo vì web chỉ cộng doanh số tin nhắn theo sản phẩm đang chạy.
+
+Cập nhật: chị Hoa chốt mọi đơn page AILLA VIỆT NAM đều của Thảo; web cộng hết mọi sản phẩm (ngoài TLG ghi vào "đơn chốt qua inbox"). Thảo 1-8/11 ≈ 120,16tr + 2,66tr = 122,8tr so với Sheet 122,2tr (lệch +0,5
+Cập nhật: chị Hoa chốt mọi đơn page AILLA VIỆT NAM đều của Thảo; web cộng hết mọi sản phẩm (ngoài TLG ghi vào "đơn chốt qua inbox"). Thảo 1-8/11 ≈ 120,16tr + 2,66tr = 122,8tr so với Sheet 122,2tr (lệch +0,5%).
