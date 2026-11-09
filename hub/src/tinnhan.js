@@ -32,10 +32,17 @@ const tnInit=n=>{const w=String(n||"?").trim().split(/\s+/);return (w.length>1?w
 const tnAv=(id,name,grp)=>{const ag=tnAg(id);if(ag)return `<i class="tnav tnavag" style="background:${ag.color}1a;border:1.5px solid ${ag.color}">${ag.emoji||"🤖"}</i>`;const c=avC(id);return `<i class="tnav${grp?" g":""}" style="background:${c[0]};color:${c[1]}">${grp?"#":esc(tnInit(name))}</i>`};
 const tnPeople=()=>D().users.filter(u=>u.active&&u.name&&u.crm&&u.crm!==tnMe());
 const tnTotal=()=>TN.rooms.reduce((a,r)=>a+(r.room===TN.room&&PAGE==="tinnhan"?0:r.unread||0),0);
-const tnLink=t=>esc(t).replace(/@(all|tất cả)(?![\p{L}\d])/giu,'<b class="tnat">@$1</b>').replace(/https?:\/\/[^\s<]+/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m.length>56?m.slice(0,56)+"…":m}</a>`)
-  .replace(/@([\p{L}\d][\p{L}\d ]{0,30}?)(?=[\s,.!?:]|$)/gu,(m,n)=>tnPeople().concat([ME]).some(u=>u.name.toLowerCase()===n.toLowerCase())?`<b class="tnat">${m}</b>`:m).replace(/\n/g,"<br>");
-const TN_ALL=/@(all|tất cả|tatca)(?![\p{L}\d])/iu;
-const tnMentionsMe=b=>!!ME&&TN_ALL.test(b||"")||!!ME&&new RegExp("@"+ME.name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?![\\p{L}\\d])","iu").test(b||"");
+/* gọi tên @: bỏ dấu + không phân biệt hoa thường; tên có khoảng trắng ("Lead Content") khớp theo cụm dài nhất; @ phải đứng đầu dòng hoặc sau khoảng trắng (không bắt email) */
+const tnNorm=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/gi,"d").toLowerCase().trim();
+const TN_ALLW=["all","tat ca","tatca"];
+const tnAtNames=()=>tnPeople().concat(ME?[ME]:[]).concat(TN.agents||[]).map(u=>tnNorm(u.name)).filter(Boolean);
+function tnAtFind(str){const names=new Set(tnAtNames()),out=[],re=/(^|[\s(])@([\p{L}\d][\p{L}\d ]{0,40})/gu;let m;
+  while((m=re.exec(str))){re.lastIndex=m.index+m[1].length+1;const w=m[2].split(" ");for(let k=w.length;k>0;k--){const c=w.slice(0,k).join(" "),n=tnNorm(c);if(!n)continue;
+    if(TN_ALLW.includes(n)||names.has(n)){out.push({i:m.index+m[1].length,len:1+c.length,all:TN_ALLW.includes(n),n});break}}}
+  return out}
+const tnLink=t=>{let h=esc(t);const F=tnAtFind(h);for(let k=F.length-1;k>=0;k--){const f=F[k];h=h.slice(0,f.i)+'<b class="tnat">'+h.slice(f.i,f.i+f.len)+'</b>'+h.slice(f.i+f.len)}
+  return h.replace(/https?:\/\/[^\s<]+/g,m=>`<a href="${m}" target="_blank" rel="noopener">${m.length>56?m.slice(0,56)+"…":m}</a>`).replace(/\n/g,"<br>")};
+const tnMentionsMe=b=>!!ME&&tnAtFind(b||"").some(f=>f.all||f.n===tnNorm(ME.name));
 /* tin của khung trao đổi cũ (dữ liệu chung) */
 const tnOld=r=>{let k=r.startsWith("g:")?r.slice(2):"";if(r.startsWith("dm:")){const o=tnU(tnOther(r));if(!o)return [];k="dm:"+[ME.id,o.id].sort().join("~")}
   return ((D().chat||{})[k]||[]).slice(-80).map(m=>({id:0,old:true,user_id:(tnU(m.by)||{}).crm||m.by,body:m.text,kind:"",created_at:m.t}))};
@@ -126,14 +133,7 @@ PAGES.tinnhan=m=>{if(TN.popOn)tnPopClose();
   const send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;tnAgentWait(room,v);inp.value="";TN.draft[room]="";fit();sug.hidden=true;
     if(P.length){TN.pend[room]=[];tnDrawPend(room);await tnUpload(room,P)}
     if(v)try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;TN.draft[room]=v;toast(e.message||"Chưa gửi được")}};
-  const atQ=()=>{const s=inp.value.slice(0,inp.selectionStart),mm=s.match(/@([\p{L}\d ]{0,20})$/u);return mm?mm[1]:null};
-  const drawSug=()=>{const a=atQ();if(a===null){sug.hidden=true;return}const L=tnPeople().filter(u=>u.name.toLowerCase().includes(a.toLowerCase())).slice(0,6);
-    const all=g&&"all tất cả".includes(a.toLowerCase()),AG=tnRoomAgents(room).filter(x=>x.name.toLowerCase().includes(a.toLowerCase()));
-    if(!L.length&&!all&&!AG.length){sug.hidden=true;return}sug.hidden=false;sug.innerHTML=(all?`<button type="button" data-at="all"><i class="tnav g">@</i>all<small>gọi cả nhóm</small></button>`:"")+AG.map(x=>`<button type="button" data-at="${esc(x.name)}">${tnAv("agent:"+x.id,x.name)}${esc(x.name)}<small>agent</small></button>`).join("")+L.map(u=>`<button type="button" data-at="${esc(u.name)}">${tnAv(u.crm,u.name)}${esc(u.name)}<small>${esc(TEAMS[teamOf(u)]||"")}</small></button>`).join("");
-    sug.querySelectorAll("[data-at]").forEach(b=>b.onmousedown=e=>{e.preventDefault();const p=inp.selectionStart,s=inp.value.slice(0,p).replace(/@([\p{L}\d ]{0,20})$/u,"@"+b.dataset.at+" ");inp.value=s+inp.value.slice(p);inp.setSelectionRange(s.length,s.length);TN.draft[room]=inp.value;sug.hidden=true;inp.focus()})};
-  inp.oninput=()=>{TN.draft[room]=inp.value;fit();drawSug()};
-  inp.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();const b=sug.hidden?null:sug.querySelector("[data-at]");if(b)b.onmousedown(e);else send()}else if(e.key==="Escape")sug.hidden=true};
-  inp.onblur=()=>setTimeout(()=>sug.hidden=true,150);
+  tnBindAt(inp,sug,room,g,send,fit);
   $("#tnf").onsubmit=e=>{e.preventDefault();send()};
   if(matchMedia("(min-width:761px)").matches)setTimeout(()=>{if(document.activeElement===document.body||!document.activeElement)inp.focus()},0);
 };
@@ -292,6 +292,29 @@ function tnBindEmo(){const b=$("#tnemo"),inp=$("#tnin");if(!b||!inp)return;b.onc
   p.querySelectorAll("button").forEach(x=>x.onmousedown=e=>{e.preventDefault();const s=inp.selectionStart??inp.value.length,v=inp.value;inp.value=v.slice(0,s)+x.textContent+v.slice(inp.selectionEnd??s);const c=s+x.textContent.length;inp.setSelectionRange(c,c);TN.draft[TN.room]=inp.value;inp.focus()});
   setTimeout(()=>document.addEventListener("click",function f(e){if(!p.contains(e.target)&&e.target!==b){p.remove();document.removeEventListener("click",f)}}),0)}}
 
+/* gợi ý @tên / @all dưới ô soạn tin: dùng chung cho trang Tin nhắn và khung nổi; ↑↓ chọn, Enter/Tab chèn, bấm hoặc chạm cũng chèn */
+function tnBindAt(inp,sug,room,g,send,fit){let act=0,items=[];
+  const RE=/(^|[\s(])@([\p{L}\d ]{0,40})$/u;
+  const atQ=()=>{const m=inp.value.slice(0,inp.selectionStart).match(RE);return m?m[1]:null};
+  const pick=v=>{const p=inp.selectionStart,s=inp.value.slice(0,p).replace(RE,(m,a)=>a+"@"+v+" ");inp.value=s+inp.value.slice(p);inp.setSelectionRange(s.length,s.length);TN.draft[room]=inp.value;sug.hidden=true;if(fit)fit();inp.focus()};
+  const mark=()=>[...sug.children].forEach((b,i)=>{b.classList.toggle("on",i===act);if(i===act)b.scrollIntoView({block:"nearest"})});
+  const draw=()=>{const a=atQ();if(a===null){sug.hidden=true;items=[];return}const q=tnNorm(a);
+    const rank=u=>{const n=tnNorm(u.name);return n.startsWith(q)||n.split(" ").some(w=>w.startsWith(q))?0:1};
+    const L=tnPeople().filter(u=>tnNorm(u.name).includes(q)).sort((x,y)=>rank(x)-rank(y)).slice(0,8),
+      all=g&&TN_ALLW.some(w=>w.startsWith(q)),AG=tnRoomAgents(room).filter(x=>tnNorm(x.name).includes(q));
+    if(!L.length&&!all&&!AG.length){sug.hidden=true;items=[];return}sug.hidden=false;act=0;
+    items=(all?[["all",`<i class="tnav g">@</i>all<small>gọi cả nhóm</small>`]]:[]).concat(AG.map(x=>[x.name,`${tnAv("agent:"+x.id,x.name)}${esc(x.name)}<small>agent</small>`]),L.map(u=>[u.name,`${tnAv(u.crm,u.name)}${esc(u.name)}<small>${esc(TEAMS[teamOf(u)]||"")}</small>`]));
+    sug.innerHTML=items.map((it,i)=>`<button type="button" data-i="${i}">${it[1]}</button>`).join("");
+    sug.querySelectorAll("button").forEach(b=>{b.onpointerdown=e=>{e.preventDefault();pick(items[+b.dataset.i][0])}});mark()};
+  inp.oninput=()=>{TN.draft[room]=inp.value;if(fit)fit();draw()};
+  inp.onclick=inp.onkeyup=e=>{if(e&&e.type==="keyup"&&["ArrowUp","ArrowDown","Enter","Tab","Escape"].includes(e.key))return;draw()};
+  inp.onkeydown=e=>{const open=!sug.hidden&&items.length;
+    if(open&&(e.key==="ArrowDown"||e.key==="ArrowUp")){e.preventDefault();act=(act+(e.key==="ArrowDown"?1:items.length-1))%items.length;mark()}
+    else if(open&&(e.key==="Tab"||(e.key==="Enter"&&!e.shiftKey&&!e.isComposing))){e.preventDefault();pick(items[act][0])}
+    else if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}
+    else if(e.key==="Escape")sug.hidden=true};
+  inp.onblur=()=>setTimeout(()=>sug.hidden=true,150)}
+
 /* ---------- cửa sổ chat nhỏ góc dưới phải (kiểu Messenger) ---------- */
 function tnPopClose(){const p=$("#tnpop");if(p)p.remove();TN.popOn=false;TN.popRoom=""}
 async function tnPop(room){let p=$("#tnpop");if(!p){p=document.createElement("div");p.id="tnpop";p.className="tnpop";document.body.appendChild(p)}TN.popOn=true;TN.popRoom=room||"";
@@ -302,13 +325,13 @@ async function tnPop(room){let p=$("#tnpop");if(!p){p=document.createElement("di
   else{TN.room=room;const g=/^(g|p|n):/.test(room),n=tnName(room);
     p.innerHTML=`<div class="tnph"><button type="button" class="tnpx" id="tnp-back" title="Danh sách">‹</button>${tnAv(g?room:tnOther(room),n,g)}<b class="tnpn">${esc(n)}</b><span class="sp"></span>${full}</div>
      <div class="tnmain tnpm"><div class="tnmsgs" id="tnmsgs"><p class="hint tnempty">Đang tải…</p></div><div class="tnpend" id="tnpend" hidden></div>
-     <form class="tnf" id="tnf"><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><button type="button" class="tnatt" id="tnmic" title="Ghi âm tin nhắn thoại" aria-label="Ghi âm"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><input type="file" id="tnfi" hidden multiple>
-      <textarea id="tnin" rows="1" placeholder="Nhắn ${esc(n)}…">${esc(TN.draft[room]||"")}</textarea><button class="btn sm pri">Gửi</button></form></div>`;
+     <form class="tnf" id="tnf"><div class="tnsug" id="tnsug" hidden></div><button type="button" class="tnatt" id="tnemo" title="Biểu tượng cảm xúc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button><button type="button" class="tnatt" id="tnimg" title="Gửi ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button><button type="button" class="tnatt" id="tnfile" title="Gửi tệp"><svg viewBox="0 0 24 24"><path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.7a1.7 1.7 0 0 1-2.4-2.4L15 7.6"/></svg></button><button type="button" class="tnatt" id="tnmic" title="Ghi âm tin nhắn thoại" aria-label="Ghi âm"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><input type="file" id="tnfi" hidden multiple>
+      <textarea id="tnin" rows="1" placeholder="Nhắn ${esc(n)}…${g?" (@ gọi tên)":""}">${esc(TN.draft[room]||"")}</textarea><button class="btn sm pri">Gửi</button></form></div>`;
     $("#tnp-back").onclick=()=>tnPop("");
     const inp=$("#tnin"),send=async()=>{const v=inp.value.trim(),P=(TN.pend[room]||[]).slice();if(!v&&!P.length)return;tnAgentWait(room,v);inp.value="";TN.draft[room]="";
       if(P.length){TN.pend[room]=[];tnDrawPend(room);await tnUpload(room,P)}
       if(v)try{await tnSend(room,v);tnDrawMsgs();tnDrawList()}catch(e){inp.value=v;toast(e.message||"Chưa gửi được")}};
-    $("#tnf").onsubmit=e=>{e.preventDefault();send()};inp.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}};inp.oninput=()=>{TN.draft[room]=inp.value};
+    $("#tnf").onsubmit=e=>{e.preventDefault();send()};tnBindAt(inp,$("#tnsug"),room,g,send);
     tnBindAtt(room);tnBindEmo();setTimeout(()=>inp.focus(),0);
     if(!TN.files[room])tnLoadFiles(room);
     if(!TN.msgs[room])await tnLoad(room);else tnLoad(room);if(TN.popRoom===room){tnDrawMsgs();tnRead(room)}}
@@ -345,7 +368,7 @@ function tnAgentForm(room){const cur=new Set((D().chatAgents||{})[room]||[]);
     DB.mutate(ME.name,"agent trong nhóm chat "+tnName(room),dt=>{dt.chatAgents=dt.chatAgents||{};if(ids.length)dt.chatAgents[room]=ids;else delete dt.chatAgents[room]});
     toast(ids.length?"Đã thêm "+ids.length+" agent vào nhóm":"Đã bỏ agent khỏi nhóm");closeDrawer();renderMain()}}
 /* gửi tin có gọi @agent: hiện "đang trả lời…" tới khi agent trả lời (tối đa 15 phút) */
-function tnAgentWait(room,v){const A=tnRoomAgents(room).filter(a=>(v||"").toLowerCase().includes("@"+a.name.toLowerCase()));if(!A.length)return;
+function tnAgentWait(room,v){const A=tnRoomAgents(room).filter(a=>tnNorm(v).includes("@"+tnNorm(a.name)));if(!A.length)return;
   TN.agWait=TN.agWait||{};TN.agWait[room]=(TN.agWait[room]||[]).concat(A.map(a=>({id:a.id,at:Date.now()})))}
 function tnAgentWaitHtml(room,L){const W=((TN.agWait||{})[room]||[]).filter(w=>Date.now()-w.at<15*60e3&&!L.some(m=>m.user_id==="agent:"+w.id&&Date.parse(m.created_at)>=w.at-5e3));
   if(TN.agWait)TN.agWait[room]=W;return W.map(w=>{const a=(TN.agents||[]).find(x=>x.id===w.id)||{name:"Agent"};return `<div class="tnsys tnagwait">${esc(a.emoji||"🤖")} ${esc(a.name)} đang đọc nhóm và trả lời…</div>`}).join("")}
