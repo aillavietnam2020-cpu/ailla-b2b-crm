@@ -42,3 +42,6 @@ ROAS: Sheet 2,61 = 355,9 / 136,2. Web (Pancake/Facebook) ≈ 337,7 / 135,5 = 2,4
 
 ## 5. Đã xử lý (09/11)
 Chị Hoa xác nhận tài khoản "BI 3 PAGE" do Việt Anh và Duẩn cùng chạy, tên chiến dịch phân biệt người. Các chiến dịch tháng 11 dạng `MESS - … BI - ANH - …` gán cho Việt Anh (`adfParse` trong `hub/src/adsday.js`). Web: Việt Anh 1–8/11 ≈ 60,2tr (Sheet 52,0tr, thiếu ~8tr nghi do chưa nhập chiến dịch BI). Chiến dịch BI tháng 10 (`BITTN`) không ghi người, vẫn "chưa rõ người".
+
+## 6. Page của Thảo (09/11)
+Chị Hoa: page của Thảo là "AILLA VIỆT NAM" (111142935203280), khác "Ailla Việt Nam Store" (105017945992971, của Việt Anh). Đã thêm Thảo vào ADF_PAGE_OWNER và ADF_MESS (sản phẩm TLG, TLG125). Đơn page này 1-8/11 tổng 2,66tr, riêng TLG ~1,54tr; phần còn lại (xịt muỗi/ruồi, tẩy mốc...) chưa tính cho Thảo vì web chỉ cộng doanh số tin nhắn theo sản phẩm đang chạy.

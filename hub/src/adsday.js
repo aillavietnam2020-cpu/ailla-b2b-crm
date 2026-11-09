@@ -144,11 +144,11 @@ const adfPeriod=(D,per)=>{
 };
 /* Doanh số, đơn của quảng cáo TIN NHẮN: lấy theo số sale nhập trong file BÁO CÁO DIGITAL (web đọc lại mỗi sáng). Tin nhắn chốt qua inbox không mang mã chiến dịch nên Pancake không tách được. */
 const adfSheetProd=id=>{id=String(id||"").toUpperCase();return id.startsWith("RUOI")?"RUOI":id.startsWith("MUOI")?"MUOI":id.startsWith("AIBIO")?"AIBIO":id.startsWith("TLG")?"TLG":/^(TD|TINH)/.test(id)?"TINHDAU":/^(LS|LAU)/.test(id)?"LS":""};
-const ADF_PAGE_OWNER={"105017945992971":"Việt Anh","61585541043585":"Việt Anh","100089661122548":"Thảo","61592606507215":"Duẩn","61566319940808":"Duẩn","61577468900810":"Duẩn"};
+const ADF_PAGE_OWNER={"105017945992971":"Việt Anh","61585541043585":"Việt Anh","100089661122548":"Thảo","111142935203280":"Thảo","61592606507215":"Duẩn","61566319940808":"Duẩn","61577468900810":"Duẩn"};
 /* Tên nguồn đơn Pancake (ví dụ "Thảo-TLG-Aibio", "Việt Anh-Muỗi", "TLG Aibio Duẩn") -> người chạy */
 const adfLinkWho=n=>{n=String(n||"").toLowerCase();return /vi[eệ]t anh/.test(n)?"Việt Anh":/th[aả]o/.test(n)?"Thảo":/du[aẩ]n/.test(n)?"Duẩn":""};
-const ADF_MESS={"Việt Anh":{pages:["105017945992971","61585541043585"],prods:["TLG"]}};
-const ADF_MESS_PROD={TLG:"TLG"};
+const ADF_MESS={"Việt Anh":{pages:["105017945992971","61585541043585"],prods:["TLG"]},"Thảo":{pages:["111142935203280"],prods:["TLG","TLG125"]}};/* page AILLA VIỆT NAM (111142935203280) là của Thảo; Ailla Việt Nam Store (105017945992971) là của Việt Anh (chị Hoa 09/11) */
+const ADF_MESS_PROD={TLG:"TLG",TLG125:"TLG"};
 const adfWho=n=>{n=String(n||"").toLowerCase();return /vi[eệ]t anh/.test(n)?"Việt Anh":/th[aả]o/.test(n)?"Thảo":/du[aẩ]n/.test(n)?"Duẩn":"Chưa rõ người"};
 function adfSheetMess(){
   if(typeof adlLoad!=="function")return null;adlLoad();const S=adlData();if(!S)return null;
