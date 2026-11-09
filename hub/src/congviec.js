@@ -733,7 +733,7 @@ function cvAutoDg(raw){
   return out.map(g=>{g.n=g.ids.length;g.done=g.ids.filter(id=>byId[id].step==="xong").length;const sh=chOf(g.kenh).short,u=(g.fp||/Fanpage/i.test(g.kenh))?"bài":"video";
     g.ten=(g.day?`Đăng ${sh}: `:`Lên lịch đăng ${sh}: `)+`đã đăng ${g.done}/${g.n} ${u}`;
     g.mo=(g.day?(g.late?`lẽ ra đăng ${dd(g.day)}, trễ ${g.lateD} ngày`:"đăng hôm nay"):"chưa chọn ngày đăng");
-    const a=cvAutoSt()[g.key];g.st=a&&a.st==="doing"?"doing":"todo";return g}).filter(g=>g.n-g.done>0)
+    const a=cvAutoSt()[g.key];g.st=a&&a.st==="doing"?"doing":"todo";return g}).filter(g=>g.n-g.done>0&&!(((cvAutoSt()[g.key]||{}).st==="done")&&(cvAutoSt()[g.key].d===td)))
 }
 /* việc của lead: tự sinh theo số đang chờ */
 function cvLeadLines(){
@@ -787,25 +787,15 @@ function cvOpenMk(g){
   document.querySelectorAll("[data-vtra]").forEach(b=>b.onclick=()=>{const id=b.dataset.vtra,n=((document.querySelector(`[data-vfb="${id}"]`)||{}).value||"").trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}sendBack(ME,id,n);toast("Đã trả lại "+id);re()})
 }
 function cvOpenDg(g){
-  const d=D(),td=d.settings.today,cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean),days=[[0,"Chưa chọn ngày"]].concat(Array.from({length:Math.max(0,MONTH.ndays-td+1)},(_,i)=>[td+i,dayLbl(td+i)]));
-  const nd=cs.filter(c=>c.step==="xong").length,tk=chOf(g.kenh).needId;
-  openDrawerHTML(`<h2>${esc(g.ten)}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa có người phụ trách kênh")} · dán link bài${tk?" TikTok":""} rồi bấm Đã đăng; video chưa có link là chưa đăng</p>
-   ${cs.map(c=>{if(c.step==="xong")return `<section class="card pad"><b class="mono">${esc(c.id)}</b> ${esc(cvShort(c.hookText||c.yTuong||c.tuyen,90))} ${pill("✓ Đã đăng","grn")}<div class="hint">${c.linkDang?`<a href="${esc(/^https?:/i.test(c.linkDang)?c.linkDang:"https://"+c.linkDang)}" target="_blank" rel="noopener">${esc(cvShort(c.linkDang,70))}</a>`:""}</div></section>`;const lk=c.linkFinal||c.linkVideo||c.linkAnh||"",cap=c.caption||c.noiDung||"";return `<section class="card pad" data-dgc="${esc(c.id)}"><b class="mono">${esc(c.id)}</b> ${esc(cvShort(c.hookText||c.yTuong||c.tuyen,90))}
-    <div class="acts">${lk?`<a class="btn sm" href="${esc(/^https?:/i.test(lk)?lk:"https://"+lk)}" target="_blank" rel="noopener">Mở video / ảnh</a>`:`<span class="hint">chưa có link video</span>`}<button type="button" class="btn sm ghost" data-opc="${esc(c.id)}">Chi tiết thẻ</button></div>
-    ${cap?`<label class="field">Caption<textarea rows="3" readonly>${esc(cap)}</textarea></label><button type="button" class="btn sm ghost" data-cpc="${esc(c.id)}">Sao chép caption</button>`:""}
-    <label class="field">Ngày đăng<select data-dgday="${esc(c.id)}">${opt(days,+c.day||0)}</select></label>
-    <label class="field">Link bài đã đăng<input data-dgl="${esc(c.id)}" placeholder="${tk?"Dán link TikTok, ví dụ https://www.tiktok.com/@ailla/video/7…":"Dán link bài sau khi đăng"}" value="${esc(c.linkDang||"")}"></label>
-    <button type="button" class="btn sm pri" data-dgok="${esc(c.id)}">Đã đăng</button></section>`}).join("")}`);
-  document.querySelectorAll("[data-opc]").forEach(b=>b.onclick=()=>{closeDrawer();openCard(b.dataset.opc)});
-  document.querySelectorAll("[data-cpc]").forEach(b=>b.onclick=()=>{const c=d.cards.find(x=>x.id===b.dataset.cpc),t=(c&&(c.caption||c.noiDung))||"";try{navigator.clipboard.writeText(t);toast("Đã sao chép caption")}catch(e){toast("Không sao chép được, bôi đen rồi sao chép tay")}});
-  document.querySelectorAll("[data-dgday]").forEach(s=>s.onchange=()=>{const id=s.dataset.dgday,v=+s.value||0;DB.mutate(ME.name,"chọn ngày đăng "+id,dt=>{const x=dt.cards.find(y=>y.id===id);if(x)x.day=v});toast(v?"Đã đặt ngày đăng "+dd(v):"Đã bỏ ngày đăng");closeDrawer();renderMain()});
-  document.querySelectorAll("[data-dgok]").forEach(b=>b.onclick=()=>{const id=b.dataset.dgok,inp=document.querySelector(`[data-dgl="${id}"]`),link=inp?inp.value.trim():"",c0=d.cards.find(x=>x.id===id);if(!link){toast("Dán link bài đã đăng rồi bấm Đã đăng");return}
-    const m2=link.match(/[0-9]{19}/);if(c0&&chOf(c0.kenh).needId&&!m2){alert("Link này chưa có mã video TikTok (dãy 19 số sau /video/).\n\nNếu là link rút gọn (vt.tiktok.com/…): mở link đó trên trình duyệt, chờ hiện video rồi sao chép lại link trên thanh địa chỉ và dán vào đây.");return}
-    if(typeof dupAlert==="function"&&dupAlert(link,[id]))return;
-    const e=moveCard(ME,id,"xong",m2?{linkDang:link,tiktokId:m2[0]}:{linkDang:link});if(e){toast(e);return}
-    DB.mutate(ME.name,"đã đăng "+id,dt=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;x.dgKey=g.key;x.ngayDang=td;if(!x.day)x.day=td;
-      const k=x.khoMa&&(dt.kho||[]).find(y=>y.ma===x.khoMa);if(k){k.linkBai=link;k.ngayThucTe=td;k.maDang=k.maDang||x.id;k.trangThai="Đã lên lịch"}});
-    toast("Đã lưu link, "+id+" chuyển sang Đã đăng");renderMain();const g2=cvAutoDg(true).find(z=>z.key===g.key);if(g2)cvOpenDg(g2);else{closeDrawer();toast("Xong việc đăng: đã đăng đủ "+cs.length+"/"+cs.length)}})
+  /* Chỉ nhắc lịch đăng (mọi người chốt 09/11): đăng thật làm ở Điều phối, xong thì bấm Hoàn thành ở đây; web không đăng hộ để tránh nhầm video */
+  const d=D(),td=d.settings.today,cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean),nd=cs.filter(c=>c.step==="xong").length;
+  openDrawerHTML(`<h2>${esc(g.ten)}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa có người phụ trách kênh")}</p>
+   <section class="card pad"><b>Việc cần làm</b><p>Vào <b>Điều phối</b> để xếp ngày và đăng từng video của kênh ${esc(chOf(g.kenh).short)}. Đăng xong hết thì quay lại đây bấm <b>Hoàn thành</b>.</p>
+   <div class="acts"><button type="button" class="btn" id="dg-go">Mở Điều phối</button><button type="button" class="btn pri" id="dg-ok">✓ Hoàn thành</button></div>
+   <small class="hint">Đã đăng ${nd}/${cs.length} video (tính theo Điều phối).</small></section>
+   <details class="card pad"><summary>${cs.length} video của nhóm này</summary>${cs.map(c=>`<div class="hint"><span class="mono">${esc(c.id)}</span> ${esc(cvShort(c.hookText||c.yTuong||c.tuyen,80))} ${c.step==="xong"?"✓ đã đăng":""}</div>`).join("")}</details>`);
+  document.querySelector("#dg-go").onclick=()=>{closeDrawer();PAGE="dieuphoi";MOD="";render();scrollTo(0,0)};
+  document.querySelector("#dg-ok").onclick=()=>{DB.mutate(ME.name,"hoàn thành nhắc đăng bài",dt=>{dt.autoSt=dt.autoSt||{};dt.autoSt[g.key]={st:"done",d:td,by:ME.name,at:new Date().toLocaleString("vi-VN")}});toast("Đã hoàn thành nhắc đăng bài");closeDrawer();renderMain()}
 }
 function pCvNv2(m){
   const d=D(),td=d.settings.today,sm=cvSummaryOnly(),mk=sm?[]:cvAutoMk(),dg=sm?[]:cvAutoDg(),lead=(CVF.st||sm)?[]:cvLeadLines(),warn=sm?[]:cvWarn();
