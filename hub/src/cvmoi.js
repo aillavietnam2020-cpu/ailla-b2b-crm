@@ -372,10 +372,26 @@ const cwToday=()=>{const td=cwTd();return CW_THU[cwWd(td)]+" "+dd(td)};
 function cwPins(){const T=D().tasks||[],pin=(((D().taskPins||{})[ME.id])||[]).map(id=>T.find(t=>t.id===id)).filter(Boolean);if(!pin.length)return "";
   return `<div class="cwpins">${cwI("pin")}<span>Đã ghim</span>${pin.map(t=>`<button type="button" data-cwpin="${esc(t.id)}" title="${esc(t.ten)}">${esc(cvShort(t.ten,34))}</button>`).join("")}</div>`}
 /* Video tồn chờ duyệt (V1 cho Lead, V2 cho CEO): hiện đầu Cần làm, bấm mở thẳng Kho video tồn đã lọc */
-function cwKhoN(){try{if(typeof ktState!=="function"||!ME)return 0;const w=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";return w?(D().kho||[]).filter(k=>ktState(k)===w).length:0}catch(e){return 0}}
-function cwKhoBox(){try{if(typeof ktState!=="function"||!ME)return "";const w=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";if(!w)return "";
-  const all=(D().kho||[]).filter(k=>ktState(k)===w);if(!all.length)return "";const L=all.slice(0,40),sk=k=>typeof skS==="function"?skS(k.sku):(k.sku||"");
-  return `<section class="cwcard"><h3>🎬 Video tồn chờ ${w==="cceo"?"bạn duyệt V2":"duyệt V1"}<span class="c">${all.length} video · bấm Xem để xem video, Duyệt hoặc Cần sửa ngay tại đây</span></h3>${L.map(k=>`<div class="cwrv" data-cwkx="${esc(k.ma)}"><div class="tt"><b>${esc(k.ma)}</b><small>${esc([sk(k),((k.tuyen||"")+" "+(k.ten||"")).trim(),typeof khoEditor==="function"?khoEditor(k):""].filter(Boolean).join(" · "))}</small></div><div class="ac"><button type="button" class="btn sm" data-cwkv="${esc(k.ma)}">Xem</button><button type="button" class="btn sm pri" data-cwkok="${esc(k.ma)}">Duyệt</button><button type="button" class="btn sm" data-cwksua="${esc(k.ma)}">Cần sửa</button></div></div>`).join("")}${all.length>L.length?`<div class="cwpad"><button type="button" class="btn" data-cwkho="${w}">Còn ${all.length-L.length} video nữa · mở Kho video tồn</button></div>`:""}</section>`}catch(e){return ""}}
+function cwKhoN(){try{return cwKhoList().length}catch(e){return 0}}
+function cwKhoWho(){return ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":""}
+function cwKhoList(){const w=cwKhoWho();return w&&typeof ktState==="function"?(D().kho||[]).filter(k=>ktState(k)===w).map(k=>k.ma):[]}
+/* Xem nhanh một video tồn chờ duyệt: video hiện ngay, xem xong bấm Duyệt hoặc ghi góp ý rồi bấm Cần sửa; xong tự nhảy sang video kế */
+function cwKhoQuick(ma){const d=D(),k=(d.kho||[]).find(x=>x.ma===ma);if(!k){closeDrawer();renderMain();return}
+  const Ls=cwKhoList(),pos=Ls.indexOf(ma),nx=Ls[pos+1]||Ls[pos-1]||"",lk=k.link?(/^https?:/.test(k.link)?k.link:"https://"+k.link):"",m=lk.match(/\/file\/d\/([^/?#]+)/)||lk.match(/[?&]id=([^&#]+)/),emb=m?"https://drive.google.com/file/d/"+m[1]+"/preview":"";
+  const team=(d.users||[]).filter(u=>u.active!==false&&["lead","content","nhanvien","truongphong"].includes(u.role)),t0=typeof ktTaskOf==="function"?ktTaskOf(d,k):null,cur=(t0&&t0.nguoi)||(team.find(u=>u.id===k.nguoi||u.name===k.nguoi)||{}).id||"";
+  openDrawerHTML(`<h2 class="dtitle">${esc(k.ma)} <small class="hint">${pos>=0?(pos+1)+"/"+Ls.length:""}</small></h2><p class="hint">${esc([typeof skS==="function"?skS(k.sku):"",((k.tuyen||"")+" "+(k.ten||"")).trim(),typeof khoEditor==="function"?khoEditor(k):""].filter(Boolean).join(" · "))}</p>
+   ${emb?`<iframe src="${esc(emb)}" allow="autoplay" allowfullscreen style="width:100%;aspect-ratio:9/12;max-height:56vh;border:0;border-radius:10px;background:#000"></iframe>`:""}${lk?`<p><a class="btn" href="${esc(lk)}" target="_blank" rel="noopener">▶ Mở video${emb?" ở tab mới":""}</a></p>`:`<p class="hint">Video chưa có link.</p>`}
+   <label class="field full">Góp ý (chỉ cần khi bấm Cần sửa)<textarea id="cwk-n" rows="3" placeholder="Ví dụ: cắt bớt 3 giây đầu, đổi hook thành …"></textarea></label>
+   <label class="field">Người sửa<select id="cwk-u">${opt([["","— chọn người sửa"]].concat(team.map(u=>[u.id,u.name])),cur)}</select></label>
+   <div class="acts"><button class="btn pri" id="cwk-ok">✓ Duyệt</button><button class="btn" id="cwk-sua">Cần sửa</button><button class="btn ghost" id="cwk-x">Đóng</button></div>`);
+  const q=i=>document.querySelector("#drawerIn "+i),go=()=>{if(nx)cwKhoQuick(nx);else{closeDrawer();renderMain()}};
+  q("#cwk-x").onclick=()=>{closeDrawer()};
+  q("#cwk-ok").onclick=()=>{ktDuyet(ma);go()};
+  q("#cwk-sua").onclick=()=>{const note=q("#cwk-n").value.trim(),u=q("#cwk-u").value;if(!note){toast("Ghi góp ý trước khi bấm Cần sửa");return}if(!u){toast("Chọn người sửa");return}
+    DB.mutate(ME.name,"yêu cầu sửa video tồn "+ma,dt=>{const x=dt.kho.find(y=>y.ma===ma);if(x)ktApplySua(dt,x,note,u)});toast("Đã gửi yêu cầu sửa cho "+userName(u));go()}}
+function cwKhoBox(){try{const w=cwKhoWho();if(!w||typeof ktState!=="function")return "";
+  const all=cwKhoList();if(!all.length)return "";const L=all.slice(0,40).map(ma=>(D().kho||[]).find(k=>k.ma===ma)),sk=k=>typeof skS==="function"?skS(k.sku):(k.sku||"");
+  return `<section class="cwcard"><h3>🎬 Video tồn chờ ${w==="cceo"?"bạn duyệt V2":"duyệt V1"}<span class="c">${all.length} video · bấm một dòng để xem video rồi Duyệt hoặc Cần sửa</span></h3>${L.map(k=>`<div data-cwkv="${esc(k.ma)}" style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-top:1px solid var(--line,#e6e8ef);cursor:pointer"><b class="mono" style="font-size:12.5px;white-space:nowrap">${esc(k.ma)}</b><span class="hint" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc([sk(k),((k.tuyen||"")+" "+(k.ten||"")).trim()].filter(Boolean).join(" · "))}</span><button type="button" class="btn sm pri" data-cwkv="${esc(k.ma)}">Xem &amp; duyệt</button></div>`).join("")}${all.length>L.length?`<div class="cwpad"><button type="button" class="btn" data-cwkho="${w}">Còn ${all.length-L.length} video nữa · mở Kho video tồn</button></div>`:""}</section>`}catch(e){return ""}}
 function cwMyList(R,key){const v=CW_MY.find(x=>x[0]===key),L=cwDaF(cwQ(v[3](R))),td=cwTd(),W=WEEKS.find(w=>td>=w.tu&&td<=w.den)||WEEKS[0];
   if(key==="today"){const T0=cwDaF(cwQ(cwTodayL(R))),S0=cwDaF(cwQ(cwSoonL(R))),rv=T0.filter(r=>r.rv),lt=T0.filter(r=>r.late&&!r.rv),ltM=lt.filter(r=>cwMine(r)),ltG=lt.filter(r=>!cwMine(r)),tod=T0.filter(r=>!r.late&&!r.rv),nl=tod.filter(r=>r.tpl).length;
     const sb=(a,z)=>S0.filter(r=>r.han>=a&&r.han<=z),soon=S0.length?`<h4 class="cwsoonh">${cwI("cal")}Sắp tới <span>${S0.length} việc</span></h4>`+[["Ngày mai · "+dd(td+1),sb(td+1,td+1)],["Tuần này",sb(td+2,Math.max(td+1,W.den))],["Sau đó",sb(Math.max(td+1,W.den)+1,99999)]].filter(x=>x[1].length).map(x=>cwSec(x[0],x[1])).join(""):"";
@@ -404,10 +420,7 @@ function cwMy(m){cwCss();PAGE="cv_v";
   const daChip=cwDaSel();
   m.innerHTML=cwHead(title,desc)+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+body;
   cwTop(m);cwBind(m,R);
-  m.querySelectorAll("[data-cwkv]").forEach(b=>b.onclick=e=>{e.stopPropagation();ktModal(b.dataset.cwkv)});
-  m.querySelectorAll("[data-cwkx]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;ktModal(r.dataset.cwkx)});
-  m.querySelectorAll("[data-cwkok]").forEach(b=>b.onclick=e=>{e.stopPropagation();ktDuyet(b.dataset.cwkok);renderMain()});
-  m.querySelectorAll("[data-cwksua]").forEach(b=>b.onclick=e=>{e.stopPropagation();ktCanSua(b.dataset.cwksua)});
+  m.querySelectorAll("[data-cwkv]").forEach(b=>b.onclick=e=>{e.stopPropagation();if(b.tagName==="DIV"&&e.target.closest("button"))return;cwKhoQuick(b.dataset.cwkv)});
   m.querySelectorAll("[data-cwkho]").forEach(b=>b.onclick=()=>{MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt=b.dataset.cwkho;XV.ktK="";XV.q="";render();scrollTo(0,0)});
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
   if(CWS.my==="rv")cwRvBind(m);
