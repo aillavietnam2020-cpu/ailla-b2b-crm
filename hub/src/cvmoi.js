@@ -62,6 +62,8 @@ svg.cwi{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;st
 .cwrow.done .cwtt b{text-decoration:line-through;color:var(--muted,#6b7385)}.cwdot{color:#9aa0ae;display:grid;place-items:center}
 .cwarr{color:var(--muted,#6b7385);display:grid;place-items:center;transition:.15s}.cwgrp.open .cwarr{transform:rotate(90deg)}
 .cwsub{display:none;background:#fbfbfe}.cwsub.open{display:block}.cwsub .cwrow{background:#fbfbfe}.cwsub .cwtt{padding-left:12px;border-left:2px solid #e3defd}
+.cwrow{padding:5px 12px;column-gap:8px}.cwtt b{font-size:13.5px;line-height:1.3}.cwtt small{font-size:11px;line-height:1.25;gap:8px}.cwwho,.cwdue{font-size:12px}.cwst .pill{font-size:11px;padding:1px 8px}.cwck{width:16px;height:16px}.cwwho i.av{width:20px;height:20px;font-size:9px}.cwcard>h3,.cwcard h3{padding-top:8px;padding-bottom:8px}
+@media(min-width:1100px){.cwtb{flex-wrap:nowrap}.cwtb .cwkx button{padding:6px 8px;font-size:12.5px;gap:4px}.cwtb .cwdasel select{max-width:128px;font-size:12.5px}.cwtb>.cwbar2 .btn,.cwtb>.cwbar2 button{padding:6px 9px;font-size:12.5px;white-space:nowrap}}
 .cwsel{width:16px;height:16px;margin:0}
 .cwempty{padding:14px;color:var(--muted,#6b7385);margin:0}
 .cwbulk{background:var(--nv-active,#4b54d1);color:#fff;padding:8px 14px;gap:6px;align-items:center;flex-wrap:wrap;display:flex}
@@ -140,7 +142,7 @@ function cwGKey(x){if(x.src!=="task")return "";const lo=String(x.loai||"");if(lo
   return o.length>=2&&o.length<w.length?o.join(" "):""}
 let CW_C=null;
 function cwRows(){if(CW_C)return CW_C;const d=D(),td=d.settings.today,T={},out=[];(d.tasks||[]).forEach(t=>T[t.id]=t);
-  cvItems().filter(x=>x.src!=="card"&&!CV_TEST.includes(x.nguoi)).forEach(x=>{const t=x.src==="task"?T[x.id]:null,han=+x.han||0,late=x.st!=="done"&&!!han&&han<td;
+  cvItems().filter(x=>x.src!=="card"&&!CV_TEST.includes(x.nguoi)).forEach(x=>{const t=x.src==="task"?T[x.id]:null,han=+x.han||0,late=x.st!=="done"&&x.st!=="review"&&!!han&&han<td;
     out.push({k:x.src+":"+x.id,src:x.src,id:x.id,ten:String(x.ten||""),mo:x.src==="order"?x.mo:"",loai:x.loai,nguoi:x.nguoi||"",tao:x.tao||"",phoi:x.phoi||[],han,gio:x.gio||"",st:x.st,late,lateD:late?td-han:0,da:x.da||"",uu:x.uu||"",
       ck:x.ck||[],cd:t&&t.cd&&t.cd.length?t.cd:null,tl:!!(t&&t.tlNote),vong:t?+t.vong||0:0,tpl:t?t.tpl||"":"",tu:!!t&&(!!t.tuThem||(!!t.tao&&t.tao===t.nguoi)),xong:t?+t.xongNgay||0:0,
       tc:!!(t&&t.tuChoi&&t.tuChoi.st==="cho"),rv:!!t&&((typeof tkMyTurn==="function"&&tkMyTurn(t))||(!!t.tuChoi&&t.tuChoi.st==="cho"&&typeof tkTcCan==="function"&&tkTcCan(t))),v2:!!t&&typeof tkV2==="function"&&tkV2(t),g:cwGKey(x),
@@ -186,7 +188,7 @@ const cwUu=r=>r.gap?`<span class="cwgap" title="Việc gấp">${cwI("flag",11)}G
 /* việc đang "Chờ duyệt" nhưng người làm chưa nộp gì (vd. bấm nhầm): không có nút Duyệt, chỉ trả về Cần làm */
 const cwChuaNop=r=>{const t=cwTask(r);return !!t&&t.st==="review"&&!(t.nopAt||t.kq||t.kqNote||(t.kqFiles||[]).length)};
 /* link video của thẻ đang chờ duyệt */
-const cwVidLk=r=>{if(!r||r.src!=="card")return "";const c=(D().cards||[]).find(x=>x.id===r.id);return c?String(c.linkFinal||c.linkVideo||"").trim():""};
+const cwVidLk=r=>{if(r&&r.src==="task"){const t=(D().tasks||[]).find(x=>x.id===r.id);if(!t)return "";const u=String(t.kq||"").trim(),k=t.khoMa&&(D().kho||[]).find(y=>y.ma===t.khoMa),l=/(https?:\/\/|drive\.google|youtu)/i.test(u)?u:(k&&k.link?String(k.link).trim():"");return l&&!/^https?:/i.test(l)?"https://"+l:l}if(!r||r.src!=="card")return "";const c=(D().cards||[]).find(x=>x.id===r.id);return c?String(c.linkFinal||c.linkVideo||"").trim():""};
 /* mở video ngay trên trang: Drive dùng khung xem trước, link nội bộ / link khác mở trong khung */
 /* duyệt / trả sửa thẻ video ngay tại chỗ, không mở cửa sổ thẻ (chị Hoa 07/11) */
 function cwCardOk(id){const c=(D().cards||[]).find(x=>x.id===id);if(!c)return false;const nx=typeof nextAct==="function"?nextAct(c):null;const e=nx?moveCard(ME,c.id,nx[1]):"Không chuyển được";if(e){toast(e);return false}toast("Đã duyệt "+c.id);renderMain();return true}
@@ -201,14 +203,14 @@ function cwPlay(lk,ten,cid){if(!lk)return;const m=lk.match(/[/]d[/]([A-Za-z0-9_-
   o.onclick=e=>{if(e.target===o||e.target.closest("[data-x]"))close();else if(e.target.closest("[data-ok]")){if(cwCardOk(cid))close()}else if(e.target.closest("[data-fix]")){const n=o.querySelector(".cwfixin");if(cwCardFix(cid,n.value.trim()))close();else n.focus()}};
   const fi=o.querySelector(".cwfixin");if(fi)fi.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();if(cwCardFix(cid,fi.value.trim()))close()}};
   document.addEventListener("keydown",k);document.body.appendChild(o)}
-const cwXemB=r=>r.cardStep&&r.cardStep!=="dkb"&&cwVidLk(r)?`<button type="button" class="btn sm" data-cwxem="${esc(r.k)}">▶ Xem</button>`:"";
+const cwXemB=r=>((r.cardStep&&r.cardStep!=="dkb")||r.src==="task")&&cwVidLk(r)?`<button type="button" class="btn sm" data-cwxem="${esc(r.k)}">▶ Xem</button>`:"";
 const cwAct=r=>{if(!r.rv)return "<div></div>";if(r.tc)return `<div class="cwact"><button type="button" class="btn sm pri" data-cwtc="${esc(r.k)}">Xử lý</button></div>`;if(cwChuaNop(r))return `<div class="cwact"><button type="button" class="btn sm" data-cwback="${esc(r.k)}">Trả về Cần làm</button></div>`;return `<div class="cwact">${cwXemB(r)}<button type="button" class="btn sm pri" data-cwok="${esc(r.k)}">Duyệt</button><button type="button" class="btn sm" data-cwfix="${esc(r.k)}">Cần sửa</button></div>`};
 function cwRow(r,o){o=o||{};const done=r.st==="done";
   const lead=o.sel?(r.src==="task"?`<input type="checkbox" class="cwsel" data-cwsel="${esc(r.k)}"${CWS.sel.has(r.k)?" checked":""} aria-label="Chọn việc">`:`<span class="cwdot">${cwI(r.src==="order"?"inbox":"video")}</span>`)
     :(r.src==="task"&&cwCanDo(r)?`<button type="button" class="cwck" data-cwck="${esc(r.k)}" title="${done?"Bỏ đánh dấu xong":"Bấm là xong"}" aria-label="${done?"Bỏ đánh dấu xong":"Đánh dấu xong"}"></button>`
     :`<span class="cwdot">${cwI(r.src==="mk"?"video":r.src==="dg"?"send":r.src==="order"?"inbox":r.src==="card"?"cc":"task")}</span>`);
   return `<div class="cwrow${done?" done":""}" data-cwo="${esc(r.k)}" data-cwrk="${esc(r.k)}">${o.ord?cwGrip(r.k):o.ordSp?"<span></span>":""}${lead}<div class="cwtt"><b>${cwUu(r)}${esc(r.ten)}</b><small>${cwMeta(r,o.sub)}</small></div>
-   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${r.late?" r":""}">${cwDue(r)}</div><div class="cwst">${cwStPill(r)}</div>${o.act?cwAct(r):""}</div>`}
+   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${r.late||!r.han?" r":""}">${cwDue(r)}</div><div class="cwst">${cwStPill(r)}</div>${o.act?cwAct(r):""}</div>`}
 function cwGrow(G,o){o=o||{};const n=G.a.length,ok=G.a.filter(r=>r.st==="done").length,lt=G.a.some(r=>r.late),hs=G.a.filter(r=>r.st!=="done"&&r.han).map(r=>r.han),h=hs.length?Math.min(...hs):0,op=CWS.open.has(G.k);
   return `<div class="cwrow cwgrp${op?" open":""}" data-cwg="${esc(G.k)}" data-cwrk="g:${esc(G.k)}">${o.ord?cwGrip("g:"+G.k):""}<span class="cwarr">${cwI("arr")}</span><div class="cwtt"><b>${esc(G.ten)} · ${n} việc</b><small><span>Bấm để xem từng việc</span></small></div>
    <div class="cwwho">${G.nguoi?avatar(G.nguoi)+esc(userName(G.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${lt?" r":""}">${h?cwDueN(h):"—"}</div><div class="cwst">${pill(ok+"/"+n+" xong",lt?"red":ok===n?"grn":"gry")}</div>${o.act?"<div></div>":""}</div>
@@ -362,15 +364,41 @@ const CW_MY=[
 const CW_MYD={today:"việc cần làm ngay",soon:"Việc của bạn chia theo ngày mai, tuần này, sau đó",giao:"Việc bạn giao cho người khác, việc trễ lên đầu",rv:"Bấm Duyệt hoặc Cần sửa ngay tại dòng",
   td:"Việc người khác làm mà bạn được thêm vào ô Người theo dõi, để biết tiến độ",nodue:"Việc để dành, khi nào làm thì đặt hạn",lap:"Việc tự giao theo mẫu lặp lại hằng ngày, mỗi tuần, mỗi tháng",done:"Việc đã hoàn thành trong tháng này"};
 function cwTodayL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&(cwMine(r)||r.rv||(cwGiao(r)&&r.late))&&(r.late||r.han===td||r.st==="doing"||r.rv))}
+/* việc của mình chưa đặt hạn: hiện ngay ở Cần làm, nhãn đỏ, để không bị bỏ sót */
+function cwNoDueL(R){return R.filter(r=>cwOpen(r)&&!r.han&&!r.rv&&cwMine(r))}
 function cwSoonL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&cwMine(r)&&r.han>td&&r.st!=="doing"&&!r.rv&&!r.late)}
-const cwTodayN=()=>{try{return cwTodayL(cwRows()).length}catch(e){return 0}};
+const cwTodayN=()=>{try{const R=cwRows();return cwTodayL(R).length+cwNoDueL(R).length}catch(e){return 0}};
 const cwToday=()=>{const td=cwTd();return CW_THU[cwWd(td)]+" "+dd(td)};
 function cwPins(){const T=D().tasks||[],pin=(((D().taskPins||{})[ME.id])||[]).map(id=>T.find(t=>t.id===id)).filter(Boolean);if(!pin.length)return "";
   return `<div class="cwpins">${cwI("pin")}<span>Đã ghim</span>${pin.map(t=>`<button type="button" data-cwpin="${esc(t.id)}" title="${esc(t.ten)}">${esc(cvShort(t.ten,34))}</button>`).join("")}</div>`}
+/* Video tồn chờ duyệt (V1 cho Lead, V2 cho CEO): hiện đầu Cần làm, bấm mở thẳng Kho video tồn đã lọc */
+function cwKhoN(){try{return cwKhoList().length}catch(e){return 0}}
+function cwKhoWho(){return ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":""}
+function cwKhoList(){const w=cwKhoWho();return w&&typeof ktState==="function"?(D().kho||[]).filter(k=>ktState(k)===w).map(k=>k.ma):[]}
+/* Xem nhanh một video tồn chờ duyệt: video hiện ngay, xem xong bấm Duyệt hoặc ghi góp ý rồi bấm Cần sửa; xong tự nhảy sang video kế */
+function cwKhoQuick(ma){const d=D(),k=(d.kho||[]).find(x=>x.ma===ma);if(!k){closeDrawer();renderMain();return}
+  const Ls=cwKhoList(),pos=Ls.indexOf(ma),nx=Ls[pos+1]||Ls[pos-1]||"",lk=k.link?(/^https?:/.test(k.link)?k.link:"https://"+k.link):"",m=lk.match(/\/file\/d\/([^/?#]+)/)||lk.match(/[?&]id=([^&#]+)/),emb=m?"https://drive.google.com/file/d/"+m[1]+"/preview":"";
+  const team=(d.users||[]).filter(u=>u.active!==false&&["lead","content","nhanvien","truongphong"].includes(u.role)),t0=typeof ktTaskOf==="function"?ktTaskOf(d,k):null,cur=(t0&&t0.nguoi)||(team.find(u=>u.id===k.nguoi||u.name===k.nguoi)||{}).id||"";
+  openDrawerHTML(`<h2 class="dtitle">${esc(k.ma)} <span style="display:inline-flex;align-items:center;gap:6px;margin-left:12px;vertical-align:middle"><button type="button" class="btn sm" id="cwk-pv" ${pos>0?"":"disabled"} title="Video trước (phím ←)" style="font-size:18px;padding:4px 10px">‹</button><small class="hint">${pos>=0?(pos+1)+"/"+Ls.length:""}</small><button type="button" class="btn sm" id="cwk-nx" ${pos>=0&&pos<Ls.length-1?"":"disabled"} title="Video sau (phím →)" style="font-size:18px;padding:4px 10px">›</button></span></h2><p class="hint">${esc([typeof skS==="function"?skS(k.sku):"",((k.tuyen||"")+" "+(k.ten||"")).trim(),typeof khoEditor==="function"?khoEditor(k):""].filter(Boolean).join(" · "))}</p>
+   ${emb?`<iframe src="${esc(emb)}" allow="autoplay" allowfullscreen style="width:100%;aspect-ratio:9/12;max-height:56vh;border:0;border-radius:10px;background:#000"></iframe>`:""}${lk?`<p><a class="btn" href="${esc(lk)}" target="_blank" rel="noopener">▶ Mở video${emb?" ở tab mới":""}</a></p>`:`<p class="hint">Video chưa có link.</p>`}
+   ${(()=>{const h=[];(k.suaLog||[]).slice(-2).forEach(x=>h.push(`${x.by||""}: ${x.note||""}`));(t0&&t0.chat||[]).filter(c=>["tra","ok1"].includes(c.kind)||c.text).slice(-3).forEach(c=>{if(c.text)h.push(`${c.by||""}: ${c.text}`)});if(k.leadOk)h.push(`${k.leadOk.by||"Lead"} đã duyệt V1 lúc ${k.leadOk.at||""}`);return h.length?`<div class="note amb" style="margin:8px 0"><b>Góp ý / duyệt trước đó</b><br>${[...new Set(h)].map(esc).join("<br>")}</div>`:""})()}
+   <label class="field full">Góp ý (chỉ cần khi bấm Cần sửa)<textarea id="cwk-n" rows="3" placeholder="Ví dụ: cắt bớt 3 giây đầu, đổi hook thành …"></textarea></label>
+   <label class="field">Người sửa<select id="cwk-u">${opt([["","— chọn người sửa"]].concat(team.map(u=>[u.id,u.name])),cur)}</select></label>
+   <div class="acts"><button class="btn pri" id="cwk-ok">✓ Duyệt</button><button class="btn" id="cwk-sua">Cần sửa</button><button class="btn ghost" id="cwk-x">Đóng</button></div>`);
+  const q=i=>document.querySelector("#drawerIn "+i),go=()=>{if(nx)cwKhoQuick(nx);else{closeDrawer();renderMain()}};
+  q("#cwk-x").onclick=()=>{closeDrawer()};
+  q("#cwk-pv").onclick=()=>{if(pos>0)cwKhoQuick(Ls[pos-1])};q("#cwk-nx").onclick=()=>{if(pos>=0&&pos<Ls.length-1)cwKhoQuick(Ls[pos+1])};
+  q("#cwk-ok").onclick=()=>{ktDuyet(ma);go()};
+  q("#cwk-sua").onclick=()=>{const note=q("#cwk-n").value.trim(),u=q("#cwk-u").value;if(!note){toast("Ghi góp ý trước khi bấm Cần sửa");return}if(!u){toast("Chọn người sửa");return}
+    DB.mutate(ME.name,"yêu cầu sửa video tồn "+ma,dt=>{const x=dt.kho.find(y=>y.ma===ma);if(x)ktApplySua(dt,x,note,u)});toast("Đã gửi yêu cầu sửa cho "+userName(u));go()}}
+function cwKhoBox(){try{const w=cwKhoWho();if(!w||typeof ktState!=="function")return "";
+  const all=cwKhoList();if(!all.length)return "";const L=all.slice(0,40).map(ma=>(D().kho||[]).find(k=>k.ma===ma)),sk=k=>typeof skS==="function"?skS(k.sku):(k.sku||"");
+  return `<section class="cwcard"><h3>🎬 Video tồn chờ ${w==="cceo"?"bạn duyệt V2":"duyệt V1"}<span class="c">${all.length} video · bấm một dòng để xem video rồi Duyệt hoặc Cần sửa</span></h3>${L.map(k=>`<div data-cwkv="${esc(k.ma)}" style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-top:1px solid var(--line,#e6e8ef);cursor:pointer"><b class="mono" style="font-size:12.5px;white-space:nowrap">${esc(k.ma)}</b><span class="hint" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc([sk(k),((k.tuyen||"")+" "+(k.ten||"")).trim()].filter(Boolean).join(" · "))}</span><button type="button" class="btn sm pri" data-cwkv="${esc(k.ma)}">Xem &amp; duyệt</button></div>`).join("")}${all.length>L.length?`<div class="cwpad"><button type="button" class="btn" data-cwkho="${w}">Còn ${all.length-L.length} video nữa · mở Kho video tồn</button></div>`:""}</section>`}catch(e){return ""}}
 function cwMyList(R,key){const v=CW_MY.find(x=>x[0]===key),L=cwDaF(cwQ(v[3](R))),td=cwTd(),W=WEEKS.find(w=>td>=w.tu&&td<=w.den)||WEEKS[0];
-  if(key==="today"){const T0=cwDaF(cwQ(cwTodayL(R))),S0=cwDaF(cwQ(cwSoonL(R))),rv=T0.filter(r=>r.rv),lt=T0.filter(r=>r.late&&!r.rv),tod=T0.filter(r=>!r.late&&!r.rv),nl=tod.filter(r=>r.tpl).length;
+  if(key==="today"){const T0=cwDaF(cwQ(cwTodayL(R))),S0=cwDaF(cwQ(cwSoonL(R))),rv=T0.filter(r=>r.rv),lt=T0.filter(r=>r.late&&!r.rv),ltM=lt.filter(r=>cwMine(r)),ltG=lt.filter(r=>!cwMine(r)),tod=T0.filter(r=>!r.late&&!r.rv),nl=tod.filter(r=>r.tpl).length;
     const sb=(a,z)=>S0.filter(r=>r.han>=a&&r.han<=z),soon=S0.length?`<h4 class="cwsoonh">${cwI("cal")}Sắp tới <span>${S0.length} việc</span></h4>`+[["Ngày mai · "+dd(td+1),sb(td+1,td+1)],["Tuần này",sb(td+2,Math.max(td+1,W.den))],["Sau đó",sb(Math.max(td+1,W.den)+1,99999)]].filter(x=>x[1].length).map(x=>cwSec(x[0],x[1])).join(""):"";
-    return cwPins()+(lt.length?cwSec(`${cwI("alert")}Quá hạn`,lt):"")+(rv.length?cwSec(`${cwI("cc")}Chờ bạn duyệt`,rv):"")+cwSec(`${cwI("sun")}Hôm nay · đang làm`,tod,{c:`${tod.length} việc${nl?" · "+nl+" việc định kỳ":""}${tod.length>1?" · giữ ⋮⋮ để kéo xếp thứ tự":""}`,empty:"Hôm nay không còn việc nào.",ord:1})+soon+
+    const nd=cwDaF(cwQ(cwNoDueL(R)));
+    return cwPins()+(ltM.length?cwSec(`${cwI("alert")}Quá hạn · việc của tôi`,ltM):"")+(ltG.length?cwSec(`${cwI("send")}Việc tôi giao đang trễ`,ltG,{c:ltG.length+" việc · người khác làm"}):"")+(nd.length?cwSec(`${cwI("alert")}<span class="t-red">Chưa có hạn</span>`,nd,{c:nd.length+" việc · bấm vào để đặt hạn"}):"")+(rv.length?cwSec(`${cwI("cc")}Chờ bạn duyệt`,rv):"")+cwSec(`${cwI("sun")}Hôm nay · đang làm`,tod,{c:`${tod.length} việc${nl?" · "+nl+" việc định kỳ":""}${tod.length>1?" · giữ ⋮⋮ để kéo xếp thứ tự":""}`,empty:"Hôm nay không còn việc nào.",ord:1})+soon+
       `<details class="cwcard cwother" id="cw-other"><summary>${cwI("inbox")}Việc khác đang chờ bạn <small>đơn hàng, kho, kế toán, duyệt video… · bấm để mở</small></summary><div id="cw-wk" class="cwpad"></div></details>`}
   if(key==="giao")return cwSec(`${cwI("alert")}Đang trễ`,L.filter(r=>r.late),{empty:"Không có việc nào trễ."})+cwSec("Đang làm / cần làm",L.filter(r=>!r.late));
   if(key==="lap")return cwSec(v[2],L,{empty:"Chưa có việc định kỳ nào đang chạy."})+(tkGiver()?'<div id="cw-tpl"></div>':"");
@@ -388,12 +416,14 @@ function cwMy(m){cwCss();PAGE="cv_v";
     tabs=cwTabs([["mine","Tôi làm"],["giao","Tôi giao"],["td","Tôi theo dõi"]].map(([k,l])=>({l,on:CWS.rl===k,attr:`data-cwrl="${k}"`})));
     title="Việc của tôi";
     desc=CWS.kx==="cal"?`Tháng ${MONTH.mon}/${MONTH.year} · việc xếp theo ngày hạn`:CWS.kx==="week"?"Tuần này · việc xếp theo ngày hạn":cwToday()+" · việc hôm nay xếp theo giờ";body=cwView(cwDaF(cwQ(base)))}
-  else{tabs=cwTabs(CW_MY.map(([k,ic,l,f])=>{const L=f(R),np=k==="rv"?cwPdRows().length:0;return {l,ic,n:(k==="today"?cwTodayL(R).length:L.length+np)||"",r:L.some(r=>r.late),on:CWS.my===k,attr:`data-cwmy="${k}"`}}));
+  else{tabs=cwTabs(CW_MY.map(([k,ic,l,f])=>{const L=f(R),np=k==="rv"?cwPdRows().length+(cwKhoN()?1:0):0;return {l,ic,n:(k==="today"?cwTodayL(R).length:L.length+np)||"",r:L.some(r=>r.late),on:CWS.my===k,attr:`data-cwmy="${k}"`}}));
     const v=CW_MY.find(x=>x[0]===CWS.my);title="Việc của tôi";desc=CWS.my==="today"?cwToday()+" · "+CW_MYD.today:CW_MYD[CWS.my];
     body=CWS.kx==="list"?cwMyList(R,CWS.my):cwView(cwDaF(cwQ(v[3](R))))}
   const daChip=cwDaSel();
   m.innerHTML=cwHead(title,desc)+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+body;
   cwTop(m);cwBind(m,R);
+  m.querySelectorAll("[data-cwkv]").forEach(b=>b.onclick=e=>{e.stopPropagation();if(b.tagName==="DIV"&&e.target.closest("button"))return;cwKhoQuick(b.dataset.cwkv)});
+  m.querySelectorAll("[data-cwkho]").forEach(b=>b.onclick=()=>{MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt=b.dataset.cwkho;XV.ktK="";XV.q="";render();scrollTo(0,0)});
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
   if(CWS.my==="rv")cwRvBind(m);
   if(typeof PD!=="undefined"&&!PD.at&&typeof pdLoad==="function"&&typeof pdAny==="function"&&pdAny()&&!CWS.pdL){CWS.pdL=1;pdLoad().catch(()=>{})}
@@ -495,7 +525,7 @@ function cwRvHtml(L){const P=cwPdRows(),S=cwSent(),now=Date.now(),th=typeof pdTh
     const btn=r.act?`<button type="button" class="btn sm pri" data-cwpdok="${i}"${busy(r)?" disabled":""}>${esc(r.ok||"Duyệt")}</button>${noRej?"":`<button type="button" class="btn sm" data-cwpdno="${i}"${busy(r)?" disabled":""}>Cần sửa</button>`}`:`<span class="hint">mở để duyệt</span>`;
     return `<div class="cwrv" data-cwpdgo="${i}">${chip(r.k,PD_KIND_N(r.k))}<div class="tt"><b>${esc(r.nd||"")}</b><small>${esc([r.loai!==PD_KIND_N(r.k)?r.loai:"",r.sub].filter(Boolean).join(" · "))}</small></div><div class="mn${r.tien>=th&&r.k==="chi"?" big":""}">${money(r.tien)}</div><div class="who">${esc(r.by||"")}<small class="${old?"late":""}">${r.at?"chờ "+esc(pdAge(r.at,now)):""}</small></div><div class="ac">${btn}</div></div>`}).join("")}</section>`
     :(typeof PD!=="undefined"&&typeof pdAny==="function"&&pdAny()&&!PD.sv?`<p class="hint">Đang tải phiếu chi, tiền về chờ duyệt…</p>`:"");
-  return seg+pd+cwSec(`${cwI("cc")}Việc, video, kịch bản`,L,{empty:"Không có việc nào chờ duyệt."})}
+  return seg+cwKhoBox()+pd+cwSec(`${cwI("cc")}Việc, video, kịch bản`,L,{empty:"Không có việc nào chờ duyệt."})}
 function cwRvBind(m){const P=cwPdRows();
   m.querySelectorAll("[data-cwrvv]").forEach(b=>b.onclick=()=>{CWS.rvV=b.dataset.cwrvv;renderMain()});
   m.querySelectorAll("[data-cwpdok]").forEach(b=>b.onclick=e=>{e.stopPropagation();const r=P[+b.dataset.cwpdok];if(r)pdAct(r,true)});

@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+"""tt-xy X Y — bấm chuột thật tại toạ độ (X, Y) của trang trong trình duyệt TikTok VPS (dùng cho hộp lịch không bấm được bằng ref)."""
+import importlib.machinery, importlib.util, sys
+l = importlib.machinery.SourceFileLoader("tt", "/root/.openclaw/tiktok/bin/tt")
+m = importlib.util.module_from_spec(importlib.util.spec_from_loader("tt", l)); l.exec_module(m)
+if len(sys.argv) != 3: m.chet(__doc__.strip(), 0)
+m.act({"kind": "clickCoords", "x": int(sys.argv[1]), "y": int(sys.argv[2])}); print("ok")
