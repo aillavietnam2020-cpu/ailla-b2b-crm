@@ -295,7 +295,7 @@ function tnBindEmo(){const b=$("#tnemo"),inp=$("#tnin");if(!b||!inp)return;b.onc
 /* gợi ý @tên / @all dưới ô soạn tin: dùng chung cho trang Tin nhắn và khung nổi; ↑↓ chọn, Enter/Tab chèn, bấm hoặc chạm cũng chèn */
 function tnBindAt(inp,sug,room,g,send,fit){let act=0,items=[];
   const RE=/(^|[\s(])@([\p{L}\d ]{0,40})$/u;
-  const atQ=()=>{const m=inp.value.slice(0,inp.selectionStart).match(RE);return m?m[1]:null};
+  const atQ=()=>{const m=inp.value.slice(0,inp.selectionStart).match(RE);return m?m[2]:null};
   const pick=v=>{const p=inp.selectionStart,s=inp.value.slice(0,p).replace(RE,(m,a)=>a+"@"+v+" ");inp.value=s+inp.value.slice(p);inp.setSelectionRange(s.length,s.length);TN.draft[room]=inp.value;sug.hidden=true;if(fit)fit();inp.focus()};
   const mark=()=>[...sug.children].forEach((b,i)=>{b.classList.toggle("on",i===act);if(i===act)b.scrollIntoView({block:"nearest"})});
   const draw=()=>{const a=atQ();if(a===null){sug.hidden=true;items=[];return}const q=tnNorm(a);
