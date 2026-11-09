@@ -193,6 +193,18 @@ describe('Phạm vi đọc của agent theo vai', () => {
     expect(await status(a.token, '/api/agent/kho/online?channel=ZZ')).toBe(400);
     const none = await makeAgent('Không kho online', ['orders']);
     expect(await status(none.token, '/api/agent/kho/online')).toBe(403);
+    const ct = await agentCall(a.token, '/api/agent/kho/online/chi-tiet?from=2026-10-09&to=2026-10-09');
+    expect(ct.status).toBe(200);
+    const dong = ct.body.data.dong;
+    expect(dong.find((x: any) => x.ma === 'TP7')).toMatchObject({ channel: 'TIKTOK', day: '2026-10-09', ten: 'Tẩy lồng', don_vi: 'Gói', so_luong: 30, co_ma_vat_tu: true });
+    expect(dong.find((x: any) => x.ten === 'Quà lạ')).toMatchObject({ ma: null, so_luong: 3, co_ma_vat_tu: false });
+    const lim = await agentCall(a.token, '/api/agent/kho/online/chi-tiet?limit=1');
+    expect(lim.body.data.dong.length).toBe(1);
+    expect(lim.body.data.con_nua).toBe(true);
+    const it = await agentCall(a.token, '/api/agent/kho/online/chi-tiet?item=TP7&channel=SHOPEE');
+    expect(it.body.data.dong).toEqual([]);
+    expect(await status(a.token, '/api/agent/kho/online/chi-tiet?channel=ZZ')).toBe(400);
+    expect(await status(none.token, '/api/agent/kho/online/chi-tiet')).toBe(403);
   });
 
 
