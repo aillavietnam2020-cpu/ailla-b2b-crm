@@ -600,6 +600,7 @@ agentRelayRoutes.post('/announce', async (c) => {
     body?: string;
     ext_id?: string;
     user_ids?: string[];
+    names?: string[];
     files?: Array<{ name?: string; mime?: string; b64?: string }>;
   };
   const agent = String(b.agent ?? '');
@@ -615,6 +616,16 @@ agentRelayRoutes.post('/announce', async (c) => {
       .bind(...ids)
       .all<{ id: string }>();
     owners = (rs.results ?? []).map((r) => r.id);
+  } else if (Array.isArray(b.names) && b.names.length) {
+    // Chỉ người CÓ quyền agent này và tên chứa một trong các chuỗi (vd. "Uyên")
+    const nm = b.names.map((n) => String(n).trim().toLowerCase()).filter(Boolean).slice(0, 10);
+    const rs = await c.env.DB.prepare(
+      `SELECT id, display_name FROM users WHERE kind = 'HUMAN' AND status = 'ACTIVE' AND deleted_at IS NULL
+         AND id IN (SELECT user_id FROM agent_chat_access WHERE agent = ?)`,
+    )
+      .bind(agent)
+      .all<{ id: string; display_name: string }>();
+    owners = (rs.results ?? []).filter((u) => nm.some((n) => u.display_name.toLowerCase().includes(n))).map((u) => u.id);
   } else {
     const rs = await c.env.DB.prepare(
       `SELECT id FROM users WHERE kind = 'HUMAN' AND status = 'ACTIVE' AND deleted_at IS NULL
