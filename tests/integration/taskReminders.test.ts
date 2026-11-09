@@ -73,6 +73,18 @@ describe('nhắc việc Task mỗi sáng', () => {
     expect(to('u_chi')).toContain('Việc kế toán');
   });
 
+  it('việc đã nộp chờ duyệt dù quá hạn: không tính trễ, không nhắc người làm; người giao vẫn nhận báo chờ duyệt', async () => {
+    const d = base();
+    d.tasks = [{ id: 'cv9', ten: 'Danh sách video', nguoi: 'u_may', tao: 'u_chi', han: 14, st: 'review' } as never];
+    const db = await seed(d);
+    const r = await taskReminders(db as unknown as D1Database, MORNING);
+    expect(r).toMatchObject({ late: 0, review: 1 });
+    const { d: out } = await read(db);
+    const to = (id: string) => out.notifs.filter((n: { to: string }) => n.to === id).map((n: { text: string }) => n.text);
+    expect(to('u_chi').some((t: string) => t.includes('đang chờ bạn duyệt'))).toBe(true);
+    expect(to('u_may').some((t: string) => t.includes('Trễ'))).toBe(false);
+  });
+
   it('dữ liệu tháng khác thì bỏ qua', async () => {
     const data = base();
     data.cards = [{ thang: '2026-09' }];

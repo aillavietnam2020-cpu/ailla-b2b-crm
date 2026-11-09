@@ -119,6 +119,7 @@ function adfParse(name,account){
   else if(tk[0]==="TD"&&/^T[ĐD]\s*-\s/i.test(raw)){owner="Thảo";rest=tk.slice(1)}
   else if(tk[0]==="THAO"){owner="Thảo";rest=tk.slice(1)}
   else if(tk.includes("DUAN"))owner="Duẩn";
+  else if(tk[0]==="MESS"&&tk.includes("BI")&&tk.includes("ANH"))owner="Việt Anh";/* tài khoản BI 3 PAGE dùng chung Việt Anh + Duẩn; chiến dịch "BI - ANH" là của Việt Anh (chị Hoa 09/11) */
   if(!owner)owner=ADF_ACC[account]||"Chưa rõ người";
   const has=f=>rest.some(f);let prod="";
   if(has(t=>t==="TLAI"))prod="TLAI";else if(has(t=>t.includes("AIBIO")))prod="AIBIO";else if(has(t=>t==="TLG"||t.startsWith("TLG")))prod="TLG";
@@ -143,11 +144,11 @@ const adfPeriod=(D,per)=>{
 };
 /* Doanh số, đơn của quảng cáo TIN NHẮN: lấy theo số sale nhập trong file BÁO CÁO DIGITAL (web đọc lại mỗi sáng). Tin nhắn chốt qua inbox không mang mã chiến dịch nên Pancake không tách được. */
 const adfSheetProd=id=>{id=String(id||"").toUpperCase();return id.startsWith("RUOI")?"RUOI":id.startsWith("MUOI")?"MUOI":id.startsWith("AIBIO")?"AIBIO":id.startsWith("TLG")?"TLG":/^(TD|TINH)/.test(id)?"TINHDAU":/^(LS|LAU)/.test(id)?"LS":""};
-const ADF_PAGE_OWNER={"105017945992971":"Việt Anh","61585541043585":"Việt Anh","100089661122548":"Thảo","61592606507215":"Duẩn","61566319940808":"Duẩn","61577468900810":"Duẩn"};
+const ADF_PAGE_OWNER={"105017945992971":"Việt Anh","61585541043585":"Việt Anh","100089661122548":"Thảo","111142935203280":"Thảo","61592606507215":"Duẩn","61566319940808":"Duẩn","61577468900810":"Duẩn"};
 /* Tên nguồn đơn Pancake (ví dụ "Thảo-TLG-Aibio", "Việt Anh-Muỗi", "TLG Aibio Duẩn") -> người chạy */
 const adfLinkWho=n=>{n=String(n||"").toLowerCase();return /vi[eệ]t anh/.test(n)?"Việt Anh":/th[aả]o/.test(n)?"Thảo":/du[aẩ]n/.test(n)?"Duẩn":""};
-const ADF_MESS={"Việt Anh":{pages:["105017945992971","61585541043585"],prods:["TLG"]}};
-const ADF_MESS_PROD={TLG:"TLG"};
+const ADF_MESS={"Việt Anh":{pages:["105017945992971","61585541043585"],prods:["TLG"]},"Thảo":{pages:["111142935203280"],prods:[],all:true}};/* page AILLA VIỆT NAM (111142935203280) là của Thảo; Ailla Việt Nam Store (105017945992971) là của Việt Anh (chị Hoa 09/11) */
+const ADF_MESS_PROD={TLG:"TLG",TLG125:"TLG"};
 const adfWho=n=>{n=String(n||"").toLowerCase();return /vi[eệ]t anh/.test(n)?"Việt Anh":/th[aả]o/.test(n)?"Thảo":/du[aẩ]n/.test(n)?"Duẩn":"Chưa rõ người"};
 function adfSheetMess(){
   if(typeof adlLoad!=="function")return null;adlLoad();const S=adlData();if(!S)return null;
@@ -163,7 +164,7 @@ function adfAgg(D,days){
   const SH=adfSheetMess();
   /* Doanh số tin nhắn: đơn nguồn Facebook, đúng page của người chạy, đúng sản phẩm chạy quảng cáo tin nhắn (quy ước chị Hoa 21/10). */
   let attRev=0,attOrd=0;
-  days.forEach(k=>{const rows=(D.days[k]||{}).fbp;if(!Array.isArray(rows))return;rows.forEach(r=>{Object.entries(ADF_MESS).forEach(([who,cf])=>{if(!cf.pages.includes(r.page)||!cf.prods.includes(String(r.code).toUpperCase()))return;const prod=ADF_MESS_PROD[String(r.code).toUpperCase()]||String(r.code).toUpperCase(),id="__mess_"+who+"_"+prod,x=C[id]||(C[id]={id,name:"Doanh số tin nhắn của "+who+" (Pancake: đơn từ page của "+who+", sản phẩm "+(r.name||r.code)+")",account:"",owner:who,prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=r.orders||0;x.rev+=r.revenue||0;attRev+=r.revenue||0;attOrd+=r.orders||0})})});
+  days.forEach(k=>{const rows=(D.days[k]||{}).fbp;if(!Array.isArray(rows))return;rows.forEach(r=>{Object.entries(ADF_MESS).forEach(([who,cf])=>{const cu=String(r.code).toUpperCase();if(!cf.pages.includes(r.page)||!(cf.all||cf.prods.includes(cu)))return;const prod=ADF_MESS_PROD[cu]||(cf.all?"INBOX":cu),id="__mess_"+who+"_"+prod,x=C[id]||(C[id]={id,name:"Doanh số tin nhắn của "+who+" (Pancake: đơn từ page của "+who+", sản phẩm "+(r.name||r.code)+")",account:"",owner:who,prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=r.orders||0;x.rev+=r.revenue||0;attRev+=r.revenue||0;attOrd+=r.orders||0})})});
   if(attRev||attOrd){unmatched=Math.max(0,unmatched-attRev);unOrders=Math.max(0,unOrders-attOrd);if(US.Facebook){US.Facebook.rev=Math.max(0,US.Facebook.rev-attRev);US.Facebook.orders=Math.max(0,US.Facebook.orders-attOrd);if(!US.Facebook.rev&&!US.Facebook.orders)delete US.Facebook}}
   if(SH)days.forEach(k=>{if(Array.isArray((D.days[k]||{}).fbp))return;if(k.slice(0,7)!==SH.mo)return;const di=+k.slice(8)-1;SH.rows.forEach(r=>{const o=r.orders[di]||0,v=r.rev[di]||0;if(!o&&!v)return;const id="__sheet_"+r.who+"_"+r.prod;const x=C[id]||(C[id]={id,name:"Doanh số tin nhắn theo báo cáo Sheet ("+(ADF_PROD[r.prod]||"chưa rõ sản phẩm")+")",account:"",owner:r.who,prod:r.prod,typ:"Tin nhắn",spend:0,msgs:0,orders:0,rev:0});x.orders+=o;x.rev+=v})});
   /* Đơn từ trang bán hàng không mang mã chiến dịch: Pancake vẫn biết trang đó của ai (tên nguồn đơn). Phần chênh giữa doanh số theo trang và doanh số đã gắn chiến dịch của người đó được tính cho người đó. */
