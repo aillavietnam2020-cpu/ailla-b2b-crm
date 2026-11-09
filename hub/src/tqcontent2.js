@@ -158,6 +158,7 @@ function dqHieuQua(C,past,M,set){
   if(!S.nKm)return tabs+`<div class="card dqc"><h2 class="dqh">💹 Hiệu quả kênh TikTok</h2><p class="empty">Chưa có số Key metrics cho kỳ này. Số lên sau khi tải báo cáo TikTok (Marketing › Nhập báo cáo).</p></div>`;
   if(sub==="tq"){
     return tabs+`<div class="dqk">${kk("g","💰","GMV cả kênh",money(gmv),"4 hạng mục cộng lại")}${kk("b","🛒","Đơn",nf(K.don||0),"")}${kk("","💵","GMV / đơn",K.don?money(gmv/K.don):"—","")}${kk("a","📣","Chi quảng cáo",ads?money(ads):"—","đã gồm thuế")}${kk("p","📈","ROAS",ads&&gmv?(gmv/ads).toFixed(2).replace(".",","):"—","GMV / quảng cáo")}</div>
+    <h2 class="dqh" style="margin:6px 0 8px">🎞️ Chỉ số video <small>tính trên các video có số trong kỳ, ngoài ra các hạng mục khác chưa có view / click</small></h2>${dqHieuQuaVideo(C,past,M,set,true)}
     <div class="card dqc"><h2 class="dqh">Cơ cấu GMV theo hạng mục <small>bấm một dòng để xem chi tiết</small></h2>${ky}
     ${LN.map(([k,n,c,g])=>`<div data-dqsub="${k}" style="display:grid;grid-template-columns:150px 1fr 100px 50px 60px;gap:10px;align-items:center;padding:9px 6px;border-radius:12px;cursor:pointer"><b>${n}</b><div style="height:14px;border-radius:7px;background:#eceefa;overflow:hidden"><i style="display:block;height:100%;width:${gmv?Math.min(100,g/gmv*100):0}%;background:${c}"></i></div><span>${g?money(g):"—"}</span><span>${pc(g)}</span><span style="color:#4b54d1;font-size:12px">Xem ›</span></div>`).join("")}
     ${gmv-tot>gmv*0.02?`<p class="hint">Còn ${money(gmv-tot)} chưa xếp được vào hạng mục nào.</p>`:""}</div>`}
@@ -170,7 +171,7 @@ function dqHieuQua(C,past,M,set){
     return tabs+back+`<div class="dqk">${kk("g","💰","GMV thẻ sản phẩm",money(LN[2][3]),pc(LN[2][3])+" GMV kênh")}</div><div class="card dqc"><h2 class="dqh">Theo ngày <small>14 ngày gần nhất có số</small></h2><table class="dqt"><tr><th>Ngày</th><th>GMV thẻ sản phẩm</th><th>Cả kênh</th></tr>${days.map(([d,x])=>`<tr><td>${esc(ttsVn(d))}</td><td>${money(x.km.the||0)}</td><td>${money(x.km.gmv||0)}</td></tr>`).join("")}</table><p class="hint">Báo cáo TikTok chỉ cho GMV thẻ theo ngày, chưa có bảng theo từng sản phẩm.</p></div>`}
   const Lv=S.nLive?S.live:null;
   return tabs+back+`<div class="dqk">${kk("g","💰","GMV LIVE của shop",money(LN[3][3]),pc(LN[3][3])+" GMV kênh · LIVE của KOC tính ở KOC / Affiliate")}${kk("b","📺","Số buổi LIVE",Lv?nf(Lv.phien||0):"—",Lv?nf(Lv.phienGmv||0)+" buổi có GMV":"chờ tải file LIVE")}${kk("","🛒","Đơn từ LIVE",Lv?nf(Lv.don||0):"—","")}${kk("p","👁️","Lượt xem",Lv?nf(Lv.xem||0):"—","")}${kk("a","⚡","GMV / 1.000 lượt xem",Lv&&Lv.xem?money(Lv.gmv/Lv.xem*1000):"—","")}</div>`}
-function dqHieuQuaVideo(C,past,M,set){
+function dqHieuQuaVideo(C,past,M,set,onlyHead){
   const d=D(),wOrd=+set.winnerOrders||100,pot=+set.potential||30,chs=CHANNELS.filter(ch=>ch.needId);
   let hk="";try{hk=localStorage.getItem("ailla_dqhk")||""}catch(e){}if(hk&&!chs.some(ch=>ch.k===hk))hk="";
   const yr=M.mon>MONTH.mon?MONTH.year-1:MONTH.year,ym=yr+"-"+String(M.mon).padStart(2,"0");
@@ -218,6 +219,7 @@ function dqHieuQuaVideo(C,past,M,set){
    ${KV.rows.length?`<table class="dqt"><tr><th>#</th><th>Video</th><th>KOC</th><th>Sản phẩm</th><th>View</th><th>Đơn</th><th>GMV</th></tr>${KV.rows.slice(0,5).map((v,i)=>`<tr><td>${i+1}</td><td style="text-align:left;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(v.t||"")} · ID ${esc(v.id)}">${esc(String(v.t||v.id).slice(0,48))}</td><td>${v.u?"@"+esc(v.u):"—"}</td><td>${v.sku?esc(sk(v.sku).n):esc(String(v.sp||"").slice(0,30))}</td><td>${nf(v.vv)}</td><td>${nf(v.don)}</td><td>${money(v.gmv)}</td></tr>`).join("")}</table>`:""}</div>`:"";
   /* ô chọn kênh đặt trên đầu khu Hiệu quả kênh */
   const pick=`<div class="dqhk" style="display:flex;align-items:center;gap:10px;margin:0 0 12px">${dqDrop("ailla_dqhk","Kênh",[["","Tất cả kênh"]].concat(chs.map(ch=>[ch.k,ch.short])),hk)}<small class="mut">${hk?"đang xem riêng "+esc(chOf(hk).short)+" (giữ kênh: "+esc(userName(chanOwner(hk))||"chưa đặt")+")":"cộng tất cả kênh TikTok"}</small></div>`;
+  if(onlyHead)return head;
   return pick+head+tbl+(hk?"":kocBlk)+spHtml+topHtml}
 /* Bấm thẻ kênh (chị Hoa 02/11): cửa sổ chi tiết — số tổng, theo sản phẩm, theo người, danh sách video chưa đăng (bấm mở thẻ Điều phối) */
 const DQ_ST=[["chua","Chưa làm"],["lam","Đang làm"],["sua","Cần sửa"],["dkb","Chờ duyệt kịch bản"],["dvd","Chờ duyệt video"],["cho","Duyệt xong, chờ đăng"],["dang","Đã đăng"]];
