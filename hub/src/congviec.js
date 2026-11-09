@@ -207,7 +207,7 @@ function tkChatHtml(t){const L=t.chat||[];
 function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;if(t0.cd&&t0.cd.length){openTask(id);return false}const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
   DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
-    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);cwTdNotify(dt,x,`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
+    if(r2){x.vong=2;x.st="review";tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);cwTdNotify(dt,x,`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
     else{tkLog(x,"Duyệt hoàn thành");x.stTruoc=x.st;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`);cwTdNotify(dt,x,`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
   return r2}
 function tkReturn(id,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
@@ -254,6 +254,7 @@ function tkResultBox(t){
       <input id="t-kql" placeholder="Link kết quả (Drive, bài đăng, video…) nếu có" value="${esc(t.kq||"")}">
       <div id="t-kqfl"></div><label class="btn sm tkup">📎 Thêm ảnh / file<input type="file" id="t-kqf" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label>
       <div class="acts"><button type="button" class="btn pri" id="t-nop">${need?"Nộp kết quả để duyệt":"Nộp kết quả, xong việc"}</button></div>${need?`<small class="hint">Nộp xong, ${esc(tkMgrNames(t))} duyệt ngay trong việc này.</small>`:""}</div>`}
+  if(mg&&!t.tlNote&&t.nopAt&&(t.kq||t.kqNote||(t.kqFiles||[]).length))return `<div class="tkres rv"><b>Kết quả chờ duyệt</b> <small class="hint">${esc(t.nopBy||userName(t.nguoi)||"")} nộp lúc ${esc(t.nopAt)} (trạng thái đang là ${esc(cvStN(t.st))})</small>${sub}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Cần sửa</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt</button></div></div>`;
   return mg?`<div class="tkres"><b>Chưa nộp kết quả</b>${sub}</div>`:"";
 }
 /* đổi trạng thái một việc + báo chuông đúng người: gửi duyệt → người giao/quản lý · duyệt xong, trả lại → người làm */
@@ -415,7 +416,7 @@ function openTask(id){
     toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+({ngay:"hằng ngày",tuan:"mỗi tuần",thang:"mỗi tháng"}[$("#t-lap").value]||""):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
   try{tkFormRow()}catch(e){console.error("bố cục form giao việc",e)}
-  if(t)try{tkLayout(t,gv)}catch(e){console.error("bố cục chi tiết việc",e)}
+  if(t)try{tkLayout(t,gv);tkTidy(t)}catch(e){console.error("bố cục chi tiết việc",e)}
 }
 /* Từ chối việc: người duyệt là người giao (CEO / Lead cũng duyệt được). Đồng ý thì việc chuyển sang lưu trữ (dt.tasksHuy), không tính vào số liệu. */
 /* mở lại việc đã hoàn thành (bấm nhầm): người giao, người duyệt, CEO; việc tự thêm thì chính người làm */
@@ -460,7 +461,12 @@ function tkFormRow(){const team=$("#t-team"),row=team&&team.closest(".row4"),ph=
 /* Bố cục khung Chi tiết việc (chị Hoa 03/11): nội dung việc lên đầu (tên, người giao / làm, hạn, mô tả, link, file);
    góc phải đầu khung có nút 💬 Trao đổi và ⏰ Xin gia hạn (bấm mới mở); các ô sửa thông tin gom vào "Sửa thông tin việc".
    Chỉ dời chỗ các phần đã vẽ (giữ nguyên ô nhập và nút đã gắn việc) nên mọi thao tác cũ vẫn chạy. */
-function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.querySelector("h2"),td=D().settings.today,late=t.st!=="done"&&t.han&&t.han<td;
+/* Việc đã nộp / đã xong: chỉ giữ kết quả, trao đổi và nút duyệt; ẩn ô sửa, công đoạn, bước nhỏ, nút nhắc (chị Hoa 09/11) */
+function tkTidy(t){if(!t||!["review","done"].includes(t.st))return;const di=$("#drawerIn");if(!di)return;
+  const hide=e=>{if(e)e.remove()};hide(di.querySelector(".tknhac"));hide(di.querySelector("details.tkedit"));
+  if(!(t.cd&&t.cd.length)){const w=di.querySelector(".tkcdrow");if(w)w.remove();else hide(di.querySelector("#t-cdw"))}
+  const ck=di.querySelector("#t-ck");if(ck&&!(t.checklist||[]).length)hide(ck.closest(".field"))}
+function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.querySelector("h2"),td=D().settings.today,late=t.st!=="done"&&t.st!=="review"&&t.han&&t.han<td;
   const link=u=>/^https?:\/\//.test(u)?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.length>70?u.slice(0,70)+"…":u)}</a>`:esc(u);
   const ppl=[t.nguoi].concat(t.phoi||[]).filter(Boolean).map(userName).filter(Boolean);
   const brief=document.createElement("div");brief.className="tkbrief";
