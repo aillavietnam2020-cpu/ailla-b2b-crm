@@ -1129,6 +1129,9 @@ function cvMyItems(){
     if(n("id"))add({key:"k_id",group:G4,title:`${n("id")} bài đã đăng nhưng thiếu link / ID`,detail:"Nhờ người đăng bổ sung",count:n("id"),go:"cv"});
   }
   const vid=d.cards.filter(c=>ok(c)&&["dkb","dvd","dceo"].includes(c.step)&&(ME.role==="admin"||can(ME,"viec.duyet"))&&(c.step!=="dceo"||ME.role==="admin")).length;
+  if(typeof ktState==="function"){const want=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";
+    if(want){const nk=(d.kho||[]).filter(k=>{try{return ktState(k)===want}catch(e){return false}}).length;
+      if(nk)add({key:"kho_"+want,group:G2,title:want==="cceo"?"Video tồn chờ chị duyệt V2":"Video tồn chờ duyệt V1",detail:"Bấm để mở Kho video tồn, duyệt từng video hoặc tích chọn nhiều video rồi duyệt một lần",count:nk,go:"kehoach",mod:"mkt",xv:want,btn:"Mở kho"})}}
   if(vid)add({key:"v_vid",group:G2,title:"Video, kịch bản chờ duyệt",detail:"Duyệt xong thì video đi tiếp",count:vid,go:"cv"});
   return L;
 }
