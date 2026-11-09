@@ -342,6 +342,97 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
     existing.data.approval_status !== 'DRAFT' &&
     existing.data.approval_status !== 'REJECTED';
 
+  // ── Tự lưu nháp ──────────────────────────────────────────────────────────
+  // Khách + ít nhất một dòng hợp lệ thì đơn tự được ghi thành đơn Nháp (hiện trong danh sách đơn),
+  // sau đó mỗi lần sửa tự lưu lại sau ~2 giây. Tải lại trang / mất mạng vẫn còn đơn, mở lại làm tiếp.
+  const draftIdRef = useRef<string | null>(null);
+  const draftDateRef = useRef<string | null>(null);
+  const createKeyRef = useRef({ body: '', key: newIdempotencyKey() });
+  const lastSavedRef = useRef('');
+  const inflightRef = useRef(false);
+  const attachedRef = useRef(false);
+  const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null);
+  const [autoSaveFailed, setAutoSaveFailed] = useState(false);
+  const orderItemsBody = () =>
+    lines.map((line) => ({
+      product_id: line.product_id,
+      qty: unitQty(line),
+      applied_price:
+        line.is_gift || line.applied_price === null ? undefined : Math.round(line.applied_price / factorOf(line)),
+      is_gift: line.is_gift,
+    }));
+  const draftKey = JSON.stringify([customerId, orderDate, orderItemsBody(), fees, promotion, note]);
+  const canAutosave =
+    !saving &&
+    Boolean(customerId) &&
+    lines.length > 0 &&
+    blockedLines.length === 0 &&
+    !tierPick &&
+    lines.every((l) => unitQty(l) > 0) &&
+    (!editing || (loadedRef.current && existing.data?.approval_status === 'DRAFT'));
+  useEffect(() => {
+    if (!canAutosave) return;
+    if (editing && lastSavedRef.current === '') {
+      lastSavedRef.current = draftKey; // vừa nạp đơn nháp: chưa có gì mới để lưu
+      return;
+    }
+    if (draftKey === lastSavedRef.current) return;
+    const timer = window.setTimeout(async () => {
+      if (inflightRef.current) return;
+      inflightRef.current = true;
+      const id = editId ?? draftIdRef.current;
+      try {
+        if (!id) {
+          // Cùng nội dung thì dùng lại khóa (mất mạng gửi lại không sinh đơn trùng); nội dung khác thì khóa mới.
+          if (createKeyRef.current.body !== draftKey) createKeyRef.current = { body: draftKey, key: newIdempotencyKey() };
+          const r = await api.post<{ id: string }>(
+            '/api/orders',
+            {
+              customer_id: customerId,
+              order_date: orderDate,
+              items: orderItemsBody(),
+              ...fees,
+              promotion_code: promotion.code || null,
+              promotion_note: promotion.note || null,
+              note: note || null,
+            },
+            createKeyRef.current.key,
+          );
+          draftIdRef.current = r.data.id;
+          draftDateRef.current = orderDate;
+          // Tải lại trang thì vào thẳng đơn nháp này (không về form trống).
+          window.history.replaceState(window.history.state, '', `/${mode}/orders/${r.data.id}/edit`);
+          if (intakeId && !attachedRef.current) {
+            attachedRef.current = true;
+            await api.post(`/api/order-intake/${intakeId}/attach`, { order_id: r.data.id }).catch(() => undefined);
+          }
+        } else {
+          if (!editing && draftDateRef.current && orderDate !== draftDateRef.current) {
+            await api.post(`/api/orders/${id}/order-date`, { order_date: orderDate, reason: null });
+            draftDateRef.current = orderDate;
+          }
+          await api.put(`/api/orders/${id}`, {
+            items: orderItemsBody(),
+            ...fees,
+            promotion_code: promotion.code || null,
+            promotion_note: promotion.note || null,
+            note: note || null,
+            autosave: true,
+          });
+        }
+        lastSavedRef.current = draftKey;
+        setAutoSaveFailed(false);
+        setAutoSavedAt(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }));
+      } catch {
+        setAutoSaveFailed(true); // mất mạng / lỗi: lần sửa sau sẽ thử lại, nút Lưu đơn vẫn dùng bình thường
+      } finally {
+        inflightRef.current = false;
+      }
+    }, 2000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, canAutosave]);
+
   const addLine = (product: Suggest, supply = false) => {
     const same = lines.filter((l) => l.product_id === product.id);
     // Cùng sản phẩm được có hai dòng: một dòng bán, một dòng tặng.
@@ -468,6 +559,39 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
             : `Đã lưu. Tổng tiền: ${formatVnd(r.total_before)} → ${formatVnd(r.total_after)}`,
         );
         navigate(`/${mode}/orders/${editId}`);
+        return;
+      }
+      // Chờ lần tự lưu đang chạy (nếu có) xong rồi mới lưu chính thức.
+      for (let i = 0; i < 50 && inflightRef.current; i++) await new Promise((r) => setTimeout(r, 100));
+      const draftId = draftIdRef.current;
+      if (draftId) {
+        if (draftDateRef.current && orderDate !== draftDateRef.current) {
+          await api.post(`/api/orders/${draftId}/order-date`, { order_date: orderDate, reason: null });
+        }
+        await api.put(`/api/orders/${draftId}`, {
+          items: orderItemsBody(),
+          ...fees,
+          promotion_code: promotion.code || null,
+          promotion_note: promotion.note || null,
+          customer_tier_id: tierPick || null,
+          note: note || null,
+        });
+        if (intakeId && !attachedRef.current) {
+          await api.post(`/api/order-intake/${intakeId}/attach`, { order_id: draftId }).catch(() => {
+            toast.error('Đơn đã lưu nhưng chưa gắn được ảnh gốc của khách.');
+          });
+        }
+        if (mayAutoSend && sendNow) {
+          try {
+            await api.post(`/api/orders/${draftId}/submit`, {});
+            toast.success('Đã tạo đơn và gửi đi.');
+          } catch (e) {
+            toast.error(`Đã lưu đơn nhưng chưa gửi được: ${e instanceof ApiError ? e.message : 'thử lại'}. Mở đơn để gửi.`);
+          }
+        } else {
+          toast.success('Đã tạo đơn. Kiểm tra lại rồi gửi duyệt.');
+        }
+        navigate(`/sales/orders/${draftId}`);
         return;
       }
       const result = await api.post<{ id: string; tier_request?: boolean }>(
@@ -1161,6 +1285,11 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
           </div>
 
           <div className="modal-foot" style={{ paddingRight: 0 }}>
+            {(autoSavedAt || autoSaveFailed) && (
+              <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
+                {autoSaveFailed ? 'Chưa tự lưu được nháp, sẽ thử lại khi sửa tiếp' : `Đã tự lưu nháp lúc ${autoSavedAt}`}
+              </span>
+            )}
             {!editing && mayAutoSend && (
               <label style={{ marginRight: 12 }}>
                 <input
