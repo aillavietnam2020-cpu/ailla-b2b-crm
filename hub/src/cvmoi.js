@@ -374,8 +374,8 @@ function cwPins(){const T=D().tasks||[],pin=(((D().taskPins||{})[ME.id])||[]).ma
 /* Video tồn chờ duyệt (V1 cho Lead, V2 cho CEO): hiện đầu Cần làm, bấm mở thẳng Kho video tồn đã lọc */
 function cwKhoN(){try{if(typeof ktState!=="function"||!ME)return 0;const w=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";return w?(D().kho||[]).filter(k=>ktState(k)===w).length:0}catch(e){return 0}}
 function cwKhoBox(){try{if(typeof ktState!=="function"||!ME)return "";const w=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";if(!w)return "";
-  const n=(D().kho||[]).filter(k=>ktState(k)===w).length;if(!n)return "";
-  return `<section class="cwcard"><div class="cwpad" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>🎬 ${n} video tồn chờ ${w==="cceo"?"bạn duyệt V2":"duyệt V1"}</b><span class="hint" style="flex:1">Duyệt từng video hoặc tích chọn nhiều video rồi duyệt một lần</span><button type="button" class="btn pri" data-cwkho="${w}">Mở Kho video tồn</button></div></section>`}catch(e){return ""}}
+  const all=(D().kho||[]).filter(k=>ktState(k)===w);if(!all.length)return "";const L=all.slice(0,40),sk=k=>typeof skS==="function"?skS(k.sku):(k.sku||"");
+  return `<section class="cwcard"><h3>🎬 Video tồn chờ ${w==="cceo"?"bạn duyệt V2":"duyệt V1"}<span class="c">${all.length} video · bấm Xem để xem video, Duyệt hoặc Cần sửa ngay tại đây</span></h3>${L.map(k=>`<div class="cwrv" data-cwkx="${esc(k.ma)}"><div class="tt"><b>${esc(k.ma)}</b><small>${esc([sk(k),((k.tuyen||"")+" "+(k.ten||"")).trim(),typeof khoEditor==="function"?khoEditor(k):""].filter(Boolean).join(" · "))}</small></div><div class="ac"><button type="button" class="btn sm" data-cwkv="${esc(k.ma)}">Xem</button><button type="button" class="btn sm pri" data-cwkok="${esc(k.ma)}">Duyệt</button><button type="button" class="btn sm" data-cwksua="${esc(k.ma)}">Cần sửa</button></div></div>`).join("")}${all.length>L.length?`<div class="cwpad"><button type="button" class="btn" data-cwkho="${w}">Còn ${all.length-L.length} video nữa · mở Kho video tồn</button></div>`:""}</section>`}catch(e){return ""}}
 function cwMyList(R,key){const v=CW_MY.find(x=>x[0]===key),L=cwDaF(cwQ(v[3](R))),td=cwTd(),W=WEEKS.find(w=>td>=w.tu&&td<=w.den)||WEEKS[0];
   if(key==="today"){const T0=cwDaF(cwQ(cwTodayL(R))),S0=cwDaF(cwQ(cwSoonL(R))),rv=T0.filter(r=>r.rv),lt=T0.filter(r=>r.late&&!r.rv),ltM=lt.filter(r=>cwMine(r)),ltG=lt.filter(r=>!cwMine(r)),tod=T0.filter(r=>!r.late&&!r.rv),nl=tod.filter(r=>r.tpl).length;
     const sb=(a,z)=>S0.filter(r=>r.han>=a&&r.han<=z),soon=S0.length?`<h4 class="cwsoonh">${cwI("cal")}Sắp tới <span>${S0.length} việc</span></h4>`+[["Ngày mai · "+dd(td+1),sb(td+1,td+1)],["Tuần này",sb(td+2,Math.max(td+1,W.den))],["Sau đó",sb(Math.max(td+1,W.den)+1,99999)]].filter(x=>x[1].length).map(x=>cwSec(x[0],x[1])).join(""):"";
@@ -404,6 +404,10 @@ function cwMy(m){cwCss();PAGE="cv_v";
   const daChip=cwDaSel();
   m.innerHTML=cwHead(title,desc)+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+body;
   cwTop(m);cwBind(m,R);
+  m.querySelectorAll("[data-cwkv]").forEach(b=>b.onclick=e=>{e.stopPropagation();ktModal(b.dataset.cwkv)});
+  m.querySelectorAll("[data-cwkx]").forEach(r=>r.onclick=e=>{if(e.target.closest("button"))return;ktModal(r.dataset.cwkx)});
+  m.querySelectorAll("[data-cwkok]").forEach(b=>b.onclick=e=>{e.stopPropagation();ktDuyet(b.dataset.cwkok);renderMain()});
+  m.querySelectorAll("[data-cwksua]").forEach(b=>b.onclick=e=>{e.stopPropagation();ktCanSua(b.dataset.cwksua)});
   m.querySelectorAll("[data-cwkho]").forEach(b=>b.onclick=()=>{MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt=b.dataset.cwkho;XV.ktK="";XV.q="";render();scrollTo(0,0)});
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
   if(CWS.my==="rv")cwRvBind(m);
