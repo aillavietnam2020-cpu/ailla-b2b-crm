@@ -208,7 +208,7 @@ function cwRow(r,o){o=o||{};const done=r.st==="done";
     :(r.src==="task"&&cwCanDo(r)?`<button type="button" class="cwck" data-cwck="${esc(r.k)}" title="${done?"Bỏ đánh dấu xong":"Bấm là xong"}" aria-label="${done?"Bỏ đánh dấu xong":"Đánh dấu xong"}"></button>`
     :`<span class="cwdot">${cwI(r.src==="mk"?"video":r.src==="dg"?"send":r.src==="order"?"inbox":r.src==="card"?"cc":"task")}</span>`);
   return `<div class="cwrow${done?" done":""}" data-cwo="${esc(r.k)}" data-cwrk="${esc(r.k)}">${o.ord?cwGrip(r.k):o.ordSp?"<span></span>":""}${lead}<div class="cwtt"><b>${cwUu(r)}${esc(r.ten)}</b><small>${cwMeta(r,o.sub)}</small></div>
-   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${r.late?" r":""}">${cwDue(r)}</div><div class="cwst">${cwStPill(r)}</div>${o.act?cwAct(r):""}</div>`}
+   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${r.late||!r.han?" r":""}">${cwDue(r)}</div><div class="cwst">${cwStPill(r)}</div>${o.act?cwAct(r):""}</div>`}
 function cwGrow(G,o){o=o||{};const n=G.a.length,ok=G.a.filter(r=>r.st==="done").length,lt=G.a.some(r=>r.late),hs=G.a.filter(r=>r.st!=="done"&&r.han).map(r=>r.han),h=hs.length?Math.min(...hs):0,op=CWS.open.has(G.k);
   return `<div class="cwrow cwgrp${op?" open":""}" data-cwg="${esc(G.k)}" data-cwrk="g:${esc(G.k)}">${o.ord?cwGrip("g:"+G.k):""}<span class="cwarr">${cwI("arr")}</span><div class="cwtt"><b>${esc(G.ten)} · ${n} việc</b><small><span>Bấm để xem từng việc</span></small></div>
    <div class="cwwho">${G.nguoi?avatar(G.nguoi)+esc(userName(G.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${lt?" r":""}">${h?cwDueN(h):"—"}</div><div class="cwst">${pill(ok+"/"+n+" xong",lt?"red":ok===n?"grn":"gry")}</div>${o.act?"<div></div>":""}</div>
@@ -362,15 +362,18 @@ const CW_MY=[
 const CW_MYD={today:"việc cần làm ngay",soon:"Việc của bạn chia theo ngày mai, tuần này, sau đó",giao:"Việc bạn giao cho người khác, việc trễ lên đầu",rv:"Bấm Duyệt hoặc Cần sửa ngay tại dòng",
   td:"Việc người khác làm mà bạn được thêm vào ô Người theo dõi, để biết tiến độ",nodue:"Việc để dành, khi nào làm thì đặt hạn",lap:"Việc tự giao theo mẫu lặp lại hằng ngày, mỗi tuần, mỗi tháng",done:"Việc đã hoàn thành trong tháng này"};
 function cwTodayL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&(cwMine(r)||r.rv||(cwGiao(r)&&r.late))&&(r.late||r.han===td||r.st==="doing"||r.rv))}
+/* việc của mình chưa đặt hạn: hiện ngay ở Cần làm, nhãn đỏ, để không bị bỏ sót */
+function cwNoDueL(R){return R.filter(r=>cwOpen(r)&&!r.han&&!r.rv&&cwMine(r))}
 function cwSoonL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&cwMine(r)&&r.han>td&&r.st!=="doing"&&!r.rv&&!r.late)}
-const cwTodayN=()=>{try{return cwTodayL(cwRows()).length}catch(e){return 0}};
+const cwTodayN=()=>{try{const R=cwRows();return cwTodayL(R).length+cwNoDueL(R).length}catch(e){return 0}};
 const cwToday=()=>{const td=cwTd();return CW_THU[cwWd(td)]+" "+dd(td)};
 function cwPins(){const T=D().tasks||[],pin=(((D().taskPins||{})[ME.id])||[]).map(id=>T.find(t=>t.id===id)).filter(Boolean);if(!pin.length)return "";
   return `<div class="cwpins">${cwI("pin")}<span>Đã ghim</span>${pin.map(t=>`<button type="button" data-cwpin="${esc(t.id)}" title="${esc(t.ten)}">${esc(cvShort(t.ten,34))}</button>`).join("")}</div>`}
 function cwMyList(R,key){const v=CW_MY.find(x=>x[0]===key),L=cwDaF(cwQ(v[3](R))),td=cwTd(),W=WEEKS.find(w=>td>=w.tu&&td<=w.den)||WEEKS[0];
   if(key==="today"){const T0=cwDaF(cwQ(cwTodayL(R))),S0=cwDaF(cwQ(cwSoonL(R))),rv=T0.filter(r=>r.rv),lt=T0.filter(r=>r.late&&!r.rv),tod=T0.filter(r=>!r.late&&!r.rv),nl=tod.filter(r=>r.tpl).length;
     const sb=(a,z)=>S0.filter(r=>r.han>=a&&r.han<=z),soon=S0.length?`<h4 class="cwsoonh">${cwI("cal")}Sắp tới <span>${S0.length} việc</span></h4>`+[["Ngày mai · "+dd(td+1),sb(td+1,td+1)],["Tuần này",sb(td+2,Math.max(td+1,W.den))],["Sau đó",sb(Math.max(td+1,W.den)+1,99999)]].filter(x=>x[1].length).map(x=>cwSec(x[0],x[1])).join(""):"";
-    return cwPins()+(lt.length?cwSec(`${cwI("alert")}Quá hạn`,lt):"")+(rv.length?cwSec(`${cwI("cc")}Chờ bạn duyệt`,rv):"")+cwSec(`${cwI("sun")}Hôm nay · đang làm`,tod,{c:`${tod.length} việc${nl?" · "+nl+" việc định kỳ":""}${tod.length>1?" · giữ ⋮⋮ để kéo xếp thứ tự":""}`,empty:"Hôm nay không còn việc nào.",ord:1})+soon+
+    const nd=cwDaF(cwQ(cwNoDueL(R)));
+    return cwPins()+(lt.length?cwSec(`${cwI("alert")}Quá hạn`,lt):"")+(nd.length?cwSec(`${cwI("alert")}<span class="t-red">Chưa có hạn</span>`,nd,{c:nd.length+" việc · bấm vào để đặt hạn"}):"")+(rv.length?cwSec(`${cwI("cc")}Chờ bạn duyệt`,rv):"")+cwSec(`${cwI("sun")}Hôm nay · đang làm`,tod,{c:`${tod.length} việc${nl?" · "+nl+" việc định kỳ":""}${tod.length>1?" · giữ ⋮⋮ để kéo xếp thứ tự":""}`,empty:"Hôm nay không còn việc nào.",ord:1})+soon+
       `<details class="cwcard cwother" id="cw-other"><summary>${cwI("inbox")}Việc khác đang chờ bạn <small>đơn hàng, kho, kế toán, duyệt video… · bấm để mở</small></summary><div id="cw-wk" class="cwpad"></div></details>`}
   if(key==="giao")return cwSec(`${cwI("alert")}Đang trễ`,L.filter(r=>r.late),{empty:"Không có việc nào trễ."})+cwSec("Đang làm / cần làm",L.filter(r=>!r.late));
   if(key==="lap")return cwSec(v[2],L,{empty:"Chưa có việc định kỳ nào đang chạy."})+(tkGiver()?'<div id="cw-tpl"></div>':"");
