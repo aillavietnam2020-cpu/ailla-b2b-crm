@@ -49,7 +49,16 @@ Trong thư mục skill này:
 4. **Xoá thư mục file** sau khi nạp xong (file đơn có tên, số điện thoại, địa chỉ khách): `rm -rf /root/bao-cao-san/<YYYY-MM>`.
 5. Nhắn chị Thảo 2–3 dòng: tháng nào, số đến ngày nào (hoặc "đủ tháng, chờ khoá sổ"), doanh thu thực, lãi kênh.
 
-## Shopee (2 shop: aillavn1 thường, aillavn Mall) — cùng lịch, cùng lượt chạy (chị Hoa giao 28/10)
+## Shopee chạy bằng SCRIPT hằng ngày (chị Hoa chốt 09/11) — agent KHÔNG tải Shopee nữa
+Script `tai-shopee-ngay.mjs` (không gọi AI) tải 3 file mỗi shop (Đơn hàng, Doanh thu, Quảng cáo) bằng **trình duyệt riêng của máy chủ**, không dùng Chrome máy chị, rồi tự chạy `nap-shopee.mjs --thu`, đúng shop mới nạp thật, rồi **xóa file khách**. Tháng đang chạy: 01 → hết hôm qua. Ngày 10: bản **đủ tháng** của tháng trước (mỗi shop 2 file Doanh thu nối liền; ngày 1 và 5 cũng cắt 2 file nếu quá 31 ngày). Xem hôm nay tải gì mà không đụng mạng: `node tai-shopee-ngay.mjs --lap-viec [--ngay YYYY-MM-DD]`.
+- Chạy thử: `node tai-shopee-ngay.mjs --thu` (tải + tính, không ghi lên web, vẫn xóa file khách). Chạy thật: bỏ `--thu`. Đăng nhập một lần: `--dang-nhap` (mở trình duyệt có màn hình, đăng nhập xong thì đóng; phiên giữ trong `TAI_SHOPEE_PROFILE`).
+- **Không bao giờ** tự nhập mật khẩu, tự kéo hình, tải lại trang cho qua hộp kiểm tra. Gặp mật khẩu / hộp kéo hình / đăng nhập lại: script nhắn chị bằng `nhan-chi.sh`, chỉ nhìn (mỗi phút), chờ tối đa 30 phút; chị xử lý xong thì tự làm tiếp, quá 30 phút thì bỏ shop đó, nhắn chị, giữ file đã tải cho lượt sau tải bù. Chỉ nạp shop đủ file.
+- Bấm bằng chuột thật, đợi 3–5 giây sau mỗi bước, mỗi shop chỉ chuyển một lần. Mỗi lần chỉ một phiên (khóa file); bỏ lượt nếu rơi vào khung cấm 7h–8h30 thứ Hai và ngày 10 của hàng chờ trình duyệt.
+- **Lịch (chờ chị Hoa đồng ý mới thêm vào cron):** đề nghị `15 3 * * *` (3h15 sáng giờ VN): sau `tai-ads-km` 1h50, xa khung cấm. Không restart OpenClaw gateway trong khung cấm.
+- Việc của agent Kế toán trưởng với Shopee giờ chỉ là **nhận tin bất thường** (shop bị bỏ, chị nhắn "kéo lại Shopee" thì chạy `node tai-shopee-ngay.mjs --shop <shop>`). Các bước tay bên dưới là cách cũ, chỉ dùng khi script hỏng và người làm web dặn.
+- Cài lần đầu trên máy chủ: `npm install` (có `playwright-core`), một trình duyệt Chrome/Chromium, và chỗ để chị thấy màn hình trình duyệt khi cần kéo hình / nhập mật khẩu (`TAI_SHOPEE_XEM`). Các nút bấm và ô ngày chưa thử trên trang Shopee thật khi viết, lần chạy `--thu` đầu tiên trên máy chủ phải xem kỹ.
+
+## Shopee — cách tay cũ bằng agent (chị Hoa giao 28/10)
 Làm SAU TikTok, cùng khoảng ngày (đơn + quảng cáo: 01 → ngày cuối; Doanh thu (Tài chính): 01 → ngày cuối). **Ngày chốt sổ (ngày 10)**: Shopee chỉ cho xuất Doanh thu tối đa 31 ngày, nên mỗi shop tải **2 file Doanh thu**: `01 → cuối tháng trước` và `01 → 09 tháng này` (vd 20260901-20260930 và 20261001-20261009). Hai file phải nối liền, không chồng ngày; công cụ tự gộp, đơn quyết toán tới ngày 09 lấy phí thật, bản lưu là **đủ tháng**. Đơn hàng + quảng cáo vẫn 01 → cuối tháng trước.
 **Shopee tạo file ngay trong trình duyệt (blob), nên dùng bộ gài bẫy riêng:** `bash bat-tai-blob.sh <tab>` trước mỗi lần bấm tải, rồi `bash lay-blob.sh <tab> <file>`. Không dùng bat-tai.sh / lay-file.sh của TikTok cho Shopee.
 Thứ tự: shop **aillavn1** trước, rồi **aillavn (Mall)**. Chuyển shop: `https://banhang.shopee.vn/portal/shop` → bấm **Chi tiết** ở dòng shop cần (không đăng xuất).
