@@ -204,14 +204,21 @@ const tkMention=txt=>{let h=esc(txt);tkNamesDesc().forEach(u=>{const k="@"+esc(u
 function tkChatHtml(t){const L=t.chat||[];
   return `<div class="tkchat"><div class="tkch"><b>Trao đổi</b><small class="hint">hỏi lại, góp ý, gọi người bằng @tên</small></div>${L.length?`<div class="tkcl">${L.map(c=>`<div class="tkc${c.byId===ME.id?" me":""}${c.kind==="tra"?" tra":c.kind?" ok":""}"><small><b>${esc(c.by)}</b> · ${esc(c.at)}${TK_KIND[c.kind]?" · "+TK_KIND[c.kind]:""}</small>${c.text?`<div>${tkMention(c.text)}</div>`:""}</div>`).join("")}</div>`:""}
    <div class="tkcin"><textarea id="t-cm" rows="1" placeholder="Viết trao đổi… gõ @ để gọi người"></textarea><button type="button" class="btn sm" id="t-cmok">Gửi</button></div><div id="t-cmat" class="tkatl" hidden></div></div>`}
+/* việc "Sửa video tồn" gắn video kho (khoMa): duyệt / trả lại ở việc phải đổi cả trạng thái video kho, không thì video và việc lệch nhau */
+function tkKhoSync(dt,x,kind,note){const k=x.khoMa&&(dt.kho||[]).find(y=>y.ma===x.khoMa);if(!k)return;const at=new Date().toLocaleString("vi-VN");
+  if(kind==="lead"){k.duyet="Chờ CEO duyệt";k.choDuyet=true;k.sua=null;k.leadOk={by:ME.name,at}}
+  else if(kind==="ok"&&typeof ktApplyDuyet==="function"){ktApplyDuyet(dt,k,"Duyệt ở việc")}
+  else if(kind==="tra"){k.sua={note,nguoi:x.nguoi,by:ME.id,byName:ME.name,at};k.suaLog=(k.suaLog||[]).concat([{note,nguoi:x.nguoi,by:ME.name,at}]);k.duyet="Chưa duyệt";k.choDuyet=true}
+  else if(kind==="nop"&&/(https?:\/\/|drive\.google)/i.test(String(x.kq||""))&&x.kq!==k.link){k.link=String(x.kq).trim();if(k.sua)tkKhoSync(dt,x,"nop2")}
+  else if((kind==="nop"||kind==="nop2")&&k.sua){const L=k.suaLog||[];if(L.length&&!L[L.length-1].xong)L[L.length-1].xong=at+" · "+ME.name;k.suaLog=L;k.sua=null;k.duyet="Chưa duyệt";k.choDuyet=true}}
 function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;if(t0.cd&&t0.cd.length){openTask(id);return false}const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
   DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
-    if(r2){x.vong=2;x.st="review";tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);cwTdNotify(dt,x,`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
-    else{tkLog(x,"Duyệt hoàn thành");x.stTruoc=x.st;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`);cwTdNotify(dt,x,`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
+    if(r2){x.vong=2;x.st="review";tkKhoSync(dt,x,"lead");tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);cwTdNotify(dt,x,`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
+    else{tkLog(x,"Duyệt hoàn thành");x.stTruoc=x.st;tkKhoSync(dt,x,"ok");x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`);cwTdNotify(dt,x,`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
   return r2}
 function tkReturn(id,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
-  DB.mutate(ME.name,`trả lại "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"tra",note,x.vong||1);tkLog(x,"Trả lại: "+note);x.st="doing";x.tlNote=note;x.vong=0;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);
+  DB.mutate(ME.name,`trả lại "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"tra",note,x.vong||1);tkLog(x,"Trả lại: "+note);tkKhoSync(dt,x,"tra",note);x.st="doing";x.tlNote=note;x.vong=0;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);
     if(typeof notifyU==="function")notifyU(dt,[x.nguoi,...(x.phoi||[])],`${ME.name} trả lại việc "${x.ten}": ${note}`,"task:"+x.id);cwTdNotify(dt,x,`${ME.name} trả lại việc "${x.ten}" để sửa`)})}
 function tkComment(id,text){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
   DB.mutate(ME.name,`trao đổi ở "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"",text,x.vong||0);
@@ -268,6 +275,7 @@ function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)r
   DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));if(k==="done"&&old!=="done")x.stTruoc=old;x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});if(k==="review"&&old!=="review")x.vong=1;if(x.__chat){tkChatAdd(x,x.__chat[0],x.__chat[1],1);delete x.__chat}tkDoneDay(x,dt.settings.today);if(k==="review"&&old!=="review")x.nopNgay=dt.settings.today;
     if(old===k||typeof notifyU!=="function")return;
     cwTdNotify(dt,x,k==="review"?`${ME.name} nộp kết quả việc "${x.ten}", đang chờ duyệt`:`${ME.name} chuyển việc "${x.ten}" sang ${cvStN(k)}`);
+    if(k==="review")tkKhoSync(dt,x,"nop");else if(k==="done"&&ME.id!==x.nguoi)tkKhoSync(dt,x,"ok");
     if(k==="review"){const ap=tkAppr(x);notifyU(dt,ap,`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
       const gv=x.tao&&x.tao!==x.nguoi&&!ap.includes(x.tao)?[x.tao]:[];if(gv.length)notifyU(dt,gv,`${ME.name} đã nộp kết quả việc "${x.ten}", đang chờ ${tkMgrNames(x)||"người duyệt"} duyệt (chưa đến lượt bạn)`,ref)}
     else if(k==="done"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} đã duyệt xong việc "${x.ten}"`,ref);
@@ -388,7 +396,7 @@ function openTask(id){
   const now=()=>new Date().toLocaleString("vi-VN");
   if($("#t-trego"))$("#t-trego").onclick=()=>{const v=$("#t-tre").value.trim();if(!v){toast("Ghi lý do trễ");return}
     DB.mutate(ME.name,`lý do trễ "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;const hm=$("#t-hm")?tkDay($("#t-hm").value):0,lt=x.han<dt.settings.today;tkLog(x,(lt?"Báo trễ":"Xin gia hạn")+": "+v.slice(0,120)+(hm?" · xin đến "+dd(hm):""));x.treReq={lyDo:v,at:now(),by:ME.name,st:"cho",hanMoi:hm};x.tre={lyDo:v,at:now(),by:ME.name};if(typeof notifyU==="function")notifyU(dt,[x.tao,...tkMgrIds(x)],`${lt?"⚠ "+ME.name+" báo trễ":ME.name+" xin gia hạn"} việc "${x.ten}"${hm?" đến "+dd(hm):""}: ${v.slice(0,100)}`,"task:"+x.id)});toast("Đã gửi quản lý");openTask(t.id)};
-  if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển CEO duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
+  if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim()&&!confirm("Bạn vừa ghi góp ý nhưng bấm Duyệt: việc sẽ được DUYỆT, không trả lại cho người làm.\n\nMuốn người làm sửa thì bấm Hủy rồi bấm nút Cần sửa.\n\nVẫn duyệt?"))return;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển CEO duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
   if($("#t-tlok"))$("#t-tlok").onclick=()=>{const n=$("#t-tl").value.trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}tkReturn(t.id,n);toast("Đã trả lại cho "+(userName(t.nguoi)||"người làm"));openTask(t.id);renderMain()};
   if($("#t-selfgh"))$("#t-selfgh").onclick=()=>{const v=($("#t-tre").value||"").trim(),h=tkDay($("#t-gh").value);if(!v){toast("Nhập lý do gia hạn");return}if(!h){toast("Chọn ngày gia hạn");return}
     DB.mutate(ME.name,`tự gia hạn "${t.ten}" đến ${dd(h)}`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.hanCu=x.hanCu||x.han;tkLog(x,"Tự gia hạn đến "+dd(h)+": "+v.slice(0,160));x.han=h;x.treReq={st:"giahan",tu:true,lyDo:v,by:ME.name,at:now(),xl:ME.name,xlAt:now(),hanMoi:h}});toast("Đã gia hạn đến "+dd(h));openTask(t.id);renderMain()};
@@ -481,6 +489,11 @@ function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.queryS
   const tools=document.createElement("span");tools.className="tktools";
   if(chat)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm" id="tk-chatbtn" title="Trao đổi về việc này">💬 Trao đổi${nChat?` <b>${nChat}</b>`:""}</button>`);
   if(lateBox)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm${late?" danger":""}" id="tk-ghbtn" title="${late?"Báo lý do trễ / xin gia hạn":"Xin gia hạn"}">⏰ ${late?"Trễ hạn":"Xin gia hạn"}</button>`);
+  {const cdw=$("#t-cdw"),ckl=$("#t-ck"),ckw=ckl&&(ckl.closest(".field")||ckl.parentElement);
+    if((cdw||ckw)&&t.st!=="done"){const has=(t.cd&&t.cd.length)||(t.checklist||[]).length,n=(t.cd||[]).length+(t.checklist||[]).length;
+      [cdw,ckw].forEach(e=>{if(e)e.hidden=!has});
+      tools.insertAdjacentHTML("afterbegin",`<button type="button" class="btn sm" id="tk-splitbtn" title="Chia việc thành công đoạn (nhiều người) hoặc các bước nhỏ">＋ Công đoạn / bước nhỏ${n?` <b>${n}</b>`:""}</button>`);
+      setTimeout(()=>{const b=$("#tk-splitbtn");if(b)b.onclick=()=>{const hide=!!(cdw&&!cdw.hidden||ckw&&!ckw.hidden);[cdw,ckw].forEach(e=>{if(e)e.hidden=hide});if(!hide){const e=cdw||ckw;e.scrollIntoView({block:"nearest"})}}},0)}}
   if(h2){h2.classList.add("tkh2");h2.appendChild(tools);h2.after(brief)}
   di.querySelectorAll("p.hint").forEach(p=>{if(/^Người giao:/.test(p.textContent.trim()))p.remove()});
   {const ok=$("#t-selfok");if(ok)ok.onclick=()=>{DB.mutate(ME.name,"xong việc tự thêm: "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.stTruoc=x.st;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);tkLog(x,"Xong (việc tự thêm)");cwTdNotify(dt,x,`${ME.name} đã xong việc "${x.ten}"`)});toast("Đã xong");closeDrawer();renderMain()}}
