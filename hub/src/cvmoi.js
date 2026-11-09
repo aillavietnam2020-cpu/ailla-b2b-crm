@@ -372,6 +372,7 @@ const cwToday=()=>{const td=cwTd();return CW_THU[cwWd(td)]+" "+dd(td)};
 function cwPins(){const T=D().tasks||[],pin=(((D().taskPins||{})[ME.id])||[]).map(id=>T.find(t=>t.id===id)).filter(Boolean);if(!pin.length)return "";
   return `<div class="cwpins">${cwI("pin")}<span>Đã ghim</span>${pin.map(t=>`<button type="button" data-cwpin="${esc(t.id)}" title="${esc(t.ten)}">${esc(cvShort(t.ten,34))}</button>`).join("")}</div>`}
 /* Video tồn chờ duyệt (V1 cho Lead, V2 cho CEO): hiện đầu Cần làm, bấm mở thẳng Kho video tồn đã lọc */
+function cwKhoN(){try{if(typeof ktState!=="function"||!ME)return 0;const w=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";return w?(D().kho||[]).filter(k=>ktState(k)===w).length:0}catch(e){return 0}}
 function cwKhoBox(){try{if(typeof ktState!=="function"||!ME)return "";const w=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";if(!w)return "";
   const n=(D().kho||[]).filter(k=>ktState(k)===w).length;if(!n)return "";
   return `<section class="cwcard"><div class="cwpad" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>🎬 ${n} video tồn chờ ${w==="cceo"?"bạn duyệt V2":"duyệt V1"}</b><span class="hint" style="flex:1">Duyệt từng video hoặc tích chọn nhiều video rồi duyệt một lần</span><button type="button" class="btn pri" data-cwkho="${w}">Mở Kho video tồn</button></div></section>`}catch(e){return ""}}
@@ -379,7 +380,7 @@ function cwMyList(R,key){const v=CW_MY.find(x=>x[0]===key),L=cwDaF(cwQ(v[3](R)))
   if(key==="today"){const T0=cwDaF(cwQ(cwTodayL(R))),S0=cwDaF(cwQ(cwSoonL(R))),rv=T0.filter(r=>r.rv),lt=T0.filter(r=>r.late&&!r.rv),ltM=lt.filter(r=>cwMine(r)),ltG=lt.filter(r=>!cwMine(r)),tod=T0.filter(r=>!r.late&&!r.rv),nl=tod.filter(r=>r.tpl).length;
     const sb=(a,z)=>S0.filter(r=>r.han>=a&&r.han<=z),soon=S0.length?`<h4 class="cwsoonh">${cwI("cal")}Sắp tới <span>${S0.length} việc</span></h4>`+[["Ngày mai · "+dd(td+1),sb(td+1,td+1)],["Tuần này",sb(td+2,Math.max(td+1,W.den))],["Sau đó",sb(Math.max(td+1,W.den)+1,99999)]].filter(x=>x[1].length).map(x=>cwSec(x[0],x[1])).join(""):"";
     const nd=cwDaF(cwQ(cwNoDueL(R)));
-    return cwPins()+cwKhoBox()+(ltM.length?cwSec(`${cwI("alert")}Quá hạn · việc của tôi`,ltM):"")+(ltG.length?cwSec(`${cwI("send")}Việc tôi giao đang trễ`,ltG,{c:ltG.length+" việc · người khác làm"}):"")+(nd.length?cwSec(`${cwI("alert")}<span class="t-red">Chưa có hạn</span>`,nd,{c:nd.length+" việc · bấm vào để đặt hạn"}):"")+(rv.length?cwSec(`${cwI("cc")}Chờ bạn duyệt`,rv):"")+cwSec(`${cwI("sun")}Hôm nay · đang làm`,tod,{c:`${tod.length} việc${nl?" · "+nl+" việc định kỳ":""}${tod.length>1?" · giữ ⋮⋮ để kéo xếp thứ tự":""}`,empty:"Hôm nay không còn việc nào.",ord:1})+soon+
+    return cwPins()+(ltM.length?cwSec(`${cwI("alert")}Quá hạn · việc của tôi`,ltM):"")+(ltG.length?cwSec(`${cwI("send")}Việc tôi giao đang trễ`,ltG,{c:ltG.length+" việc · người khác làm"}):"")+(nd.length?cwSec(`${cwI("alert")}<span class="t-red">Chưa có hạn</span>`,nd,{c:nd.length+" việc · bấm vào để đặt hạn"}):"")+(rv.length?cwSec(`${cwI("cc")}Chờ bạn duyệt`,rv):"")+cwSec(`${cwI("sun")}Hôm nay · đang làm`,tod,{c:`${tod.length} việc${nl?" · "+nl+" việc định kỳ":""}${tod.length>1?" · giữ ⋮⋮ để kéo xếp thứ tự":""}`,empty:"Hôm nay không còn việc nào.",ord:1})+soon+
       `<details class="cwcard cwother" id="cw-other"><summary>${cwI("inbox")}Việc khác đang chờ bạn <small>đơn hàng, kho, kế toán, duyệt video… · bấm để mở</small></summary><div id="cw-wk" class="cwpad"></div></details>`}
   if(key==="giao")return cwSec(`${cwI("alert")}Đang trễ`,L.filter(r=>r.late),{empty:"Không có việc nào trễ."})+cwSec("Đang làm / cần làm",L.filter(r=>!r.late));
   if(key==="lap")return cwSec(v[2],L,{empty:"Chưa có việc định kỳ nào đang chạy."})+(tkGiver()?'<div id="cw-tpl"></div>':"");
@@ -397,7 +398,7 @@ function cwMy(m){cwCss();PAGE="cv_v";
     tabs=cwTabs([["mine","Tôi làm"],["giao","Tôi giao"],["td","Tôi theo dõi"]].map(([k,l])=>({l,on:CWS.rl===k,attr:`data-cwrl="${k}"`})));
     title="Việc của tôi";
     desc=CWS.kx==="cal"?`Tháng ${MONTH.mon}/${MONTH.year} · việc xếp theo ngày hạn`:CWS.kx==="week"?"Tuần này · việc xếp theo ngày hạn":cwToday()+" · việc hôm nay xếp theo giờ";body=cwView(cwDaF(cwQ(base)))}
-  else{tabs=cwTabs(CW_MY.map(([k,ic,l,f])=>{const L=f(R),np=k==="rv"?cwPdRows().length:0;return {l,ic,n:(k==="today"?cwTodayL(R).length:L.length+np)||"",r:L.some(r=>r.late),on:CWS.my===k,attr:`data-cwmy="${k}"`}}));
+  else{tabs=cwTabs(CW_MY.map(([k,ic,l,f])=>{const L=f(R),np=k==="rv"?cwPdRows().length+(cwKhoN()?1:0):0;return {l,ic,n:(k==="today"?cwTodayL(R).length:L.length+np)||"",r:L.some(r=>r.late),on:CWS.my===k,attr:`data-cwmy="${k}"`}}));
     const v=CW_MY.find(x=>x[0]===CWS.my);title="Việc của tôi";desc=CWS.my==="today"?cwToday()+" · "+CW_MYD.today:CW_MYD[CWS.my];
     body=CWS.kx==="list"?cwMyList(R,CWS.my):cwView(cwDaF(cwQ(v[3](R))))}
   const daChip=cwDaSel();
@@ -505,7 +506,7 @@ function cwRvHtml(L){const P=cwPdRows(),S=cwSent(),now=Date.now(),th=typeof pdTh
     const btn=r.act?`<button type="button" class="btn sm pri" data-cwpdok="${i}"${busy(r)?" disabled":""}>${esc(r.ok||"Duyệt")}</button>${noRej?"":`<button type="button" class="btn sm" data-cwpdno="${i}"${busy(r)?" disabled":""}>Cần sửa</button>`}`:`<span class="hint">mở để duyệt</span>`;
     return `<div class="cwrv" data-cwpdgo="${i}">${chip(r.k,PD_KIND_N(r.k))}<div class="tt"><b>${esc(r.nd||"")}</b><small>${esc([r.loai!==PD_KIND_N(r.k)?r.loai:"",r.sub].filter(Boolean).join(" · "))}</small></div><div class="mn${r.tien>=th&&r.k==="chi"?" big":""}">${money(r.tien)}</div><div class="who">${esc(r.by||"")}<small class="${old?"late":""}">${r.at?"chờ "+esc(pdAge(r.at,now)):""}</small></div><div class="ac">${btn}</div></div>`}).join("")}</section>`
     :(typeof PD!=="undefined"&&typeof pdAny==="function"&&pdAny()&&!PD.sv?`<p class="hint">Đang tải phiếu chi, tiền về chờ duyệt…</p>`:"");
-  return seg+pd+cwSec(`${cwI("cc")}Việc, video, kịch bản`,L,{empty:"Không có việc nào chờ duyệt."})}
+  return seg+cwKhoBox()+pd+cwSec(`${cwI("cc")}Việc, video, kịch bản`,L,{empty:"Không có việc nào chờ duyệt."})}
 function cwRvBind(m){const P=cwPdRows();
   m.querySelectorAll("[data-cwrvv]").forEach(b=>b.onclick=()=>{CWS.rvV=b.dataset.cwrvv;renderMain()});
   m.querySelectorAll("[data-cwpdok]").forEach(b=>b.onclick=e=>{e.stopPropagation();const r=P[+b.dataset.cwpdok];if(r)pdAct(r,true)});
