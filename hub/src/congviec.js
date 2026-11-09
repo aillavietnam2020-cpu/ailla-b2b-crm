@@ -483,6 +483,7 @@ function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.queryS
    <div class="tkbm"><span><small>Người giao</small>${esc(userName(t.tao)||"—")}</span><span><small>Người làm</small>${esc(ppl.join(", ")||"chưa giao")}</span><span class="${late?"t-red":""}"><small>Hạn</small>${t.han?dd(t.han)+(t.gio?" · "+t.gio:"")+(late?` · trễ ${td-t.han} ngày`:""):"—"}</span><span><small>Ưu tiên</small>${t.gap?'<b class="t-red">GẤP</b> · ':""}${esc(t.uu||"Trung bình")}</span>${(t.theoDoi||[]).length?`<span><small>Người theo dõi</small>${esc((t.theoDoi||[]).map(userName).filter(Boolean).join(", "))}</span>`:""}${t.da?`<span><small>Dự án</small>${esc(prjN(t.da))}</span>`:""}</div>
    ${t.moTa?`<div class="tkbd">${esc(t.moTa).replace(/https?:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`).replace(/\n/g,"<br>")}</div>`:`<div class="tkbd hint">Chưa có mô tả / yêu cầu.</div>`}
    ${t.dk||(t.files||[]).length?`<div class="tkbl">📎 ${t.dk?tkDkLinks(t.dk):""}${typeof tkFilesHtml==="function"?tkFilesHtml(t.files||[]):""}</div>`:""}
+   ${(()=>{const k=t.khoMa&&(D().kho||[]).find(y=>y.ma===t.khoMa);if(!k)return "";const lk=k.link?(/^https?:/.test(k.link)?k.link:"https://"+k.link):"",sua=k.sua&&k.sua.note;return `<div class="tkbl">🎬 Video cần sửa ${esc(k.ma)}: ${lk?`<a href="${esc(lk)}" target="_blank" rel="noopener">▶ Mở video hiện tại</a>`:"chưa có link"}${sua?`<br><b>Góp ý của ${esc(k.sua.byName||"người duyệt")}:</b> ${esc(sua)}`:""}<br><small class="hint">Sửa xong: dán link bản mới vào ô "Link kết quả" bên dưới rồi bấm Nộp, không cần tải file.</small></div>`})()}
    ${(t.checklist||[]).length?`<div class="tkbc hint">Việc nhỏ: ${(t.checklist||[]).filter(c=>c.x).length}/${(t.checklist||[]).length} đã xong</div>`:""}`;
   /* nút góc phải */
   const chat=di.querySelector(".tkchat"),lateBox=di.querySelector(".tklate"),nChat=(t.chat||[]).length;
@@ -782,6 +783,7 @@ function cvWarn(){
   return out
 }
 function cvOpenMk(g){
+  {const fx=(g.ids||[]).filter(id=>{const c=D().cards.find(y=>y.id===id);return c&&["edit","worker"].includes(c.step)&&(c.gopy||[]).length});if(fx.length&&typeof cwVidFix==="function"){cwVidFix(fx[0],fx);return}}
   const d=D(),cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean);
   const href=l=>/^https?:\/\//.test(l)?l:"https://"+l,fb=c=>`<input data-vfb="${c.id}" placeholder="Góp ý / cần sửa gì"><button type="button" class="btn sm" data-vtra="${c.id}">Cần sửa</button>`;
   const act=c=>{const st=c.step,lk=c.linkFinal||c.linkVideo||"";
@@ -790,8 +792,8 @@ function cvOpenMk(g){
     if(st==="dvd"&&canMove(ME,c,"dceo"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dceo">✓ Duyệt</button>${fb(c)}`;
     if(st==="dceo"&&canMove(ME,c,"dang"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dang">✓ Duyệt</button>${fb(c)}`;
     return ""};
-  const row=c=>{const lk=c.linkFinal||c.linkVideo||"",gy=(c.gopy||[]).slice(-3),a=act(c);
-    return `<div class="vrow"><div class="vrt"><b class="mono">${esc(c.id)}</b><span class="xmt">${esc(cvShort(c.hookText||c.yTuong||c.tuyen,60))}</span>${pill(stepName(c.step),["dang","xong"].includes(c.step)?"grn":["dvd","dceo","dkb"].includes(c.step)?"amb":"gry")}${lk?`<a href="${esc(href(lk))}" target="_blank" rel="noopener">▶ Xem video</a>`:""}<button type="button" class="lnk" data-opc="${esc(c.id)}">Mở thẻ</button></div>${gy.length?`<div class="vgy">${gy.map(x=>`↩ <b>${esc(x.who)}</b> (${esc(x.t)}): ${esc(x.note)}`).join("<br>")}</div>`:""}${a?`<div class="vact">${a}</div>`:""}</div>`};
+  const row=c=>{const lk=c.linkFinal||c.linkVideo||"",gy=(c.gopy||[]).slice(-3),old=[...(c.gopy||[])].reverse().map(x=>x.link).find(Boolean)||c.linkCu||"",a=act(c);
+    return `<div class="vrow"><div class="vrt"><b class="mono">${esc(c.id)}</b><span class="xmt">${esc(cvShort(c.hookText||c.yTuong||c.tuyen,60))}</span>${pill(stepName(c.step),["dang","xong"].includes(c.step)?"grn":["dvd","dceo","dkb"].includes(c.step)?"amb":"gry")}${lk?`<a href="${esc(href(lk))}" target="_blank" rel="noopener">▶ Xem video</a>`:old?`<a href="${esc(href(old))}" target="_blank" rel="noopener">▶ Xem bản cần sửa</a>`:`<span class="hint t-amb">chưa có link video, dán link bản edit vào ô dưới</span>`}<button type="button" class="lnk" data-opc="${esc(c.id)}">Mở thẻ</button></div>${gy.length?`<div class="vgy">${gy.map(x=>`↩ <b>${esc(x.who)}</b> (${esc(x.t)}): ${esc(x.note)}${x.link?` · <a href="${esc(href(x.link))}" target="_blank" rel="noopener">▶ video bị góp ý</a>`:""}`).join("<br>")}</div>`:""}${a?`<div class="vact">${a}</div>`:""}</div>`};
   openDrawerHTML(`<h2>${esc(g.ten)} · ${g.done}/${g.n}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa giao")} · Nộp link, lead duyệt, CEO duyệt vòng 2 ngay tại đây; link và góp ý tự ghi vào thẻ ở Content › Điều phối.</p>
    <div class="vlist">${cs.map(row).join("")}</div>`);
   const re=()=>{cvOpenMk(g);renderMain()};

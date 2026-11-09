@@ -898,7 +898,7 @@ function ktGan(ma,kenh){
   DB.mutate(ME.name,"gắn video đã đăng "+ma+" vào kênh "+kenh,dt=>{const kk=dt.kho.find(x=>x.ma===ma);if(!kk)return;const td=dt.settings.today,cc=newCard(dt,{sku:kk.sku,kenh,day:td});Object.assign(cc,{mix:"ton",loai:"kho",nguon:"Footage cũ",khoMa:ma,oneShot:false,hookText:kk.ten||kk.tuyen||"Video "+sk(kk.sku).n,linkVideo:kk.link||"",linkFinal:kk.link||"",caption:kk.caption||"",nguoi:ME.id,nguoiEdit:ME.id,nguoiKB:ME.id,giao:ME.id,duyet:"Đã duyệt",ceo:"PASS",step:"xong",ngayDang:td,nhapTay:true,tuan:weekOf(td)||1,batDau:td});dt.cards.push(cc);kk.maDang=cc.id;kk.trangThai="Đã lên lịch"});
   toast("Đã gắn "+ma+" vào "+chOf(kenh).short)
 }
-function ktNotiKenh(label,kenh,ref){if(XV.ktQuiet){(XV.ktQuietN=XV.ktQuietN||{})[kenh]=(XV.ktQuietN[kenh]||0)+1;return}const to=[chanOwner(kenh)].concat(chanHelp(kenh)).filter(Boolean);if(!to.length||typeof notifyU!=="function")return;
+function ktNotiKenh(label,kenh,ref){if(XV.ktQuiet){(XV.ktQuietN=XV.ktQuietN||{})[kenh]=(XV.ktQuietN[kenh]||0)+1;return}const to=[chanOwner(kenh)].filter(x=>x&&x!==ME.id);if(!to.length||typeof notifyU!=="function")return;
   DB.mutate(ME.name,"báo kênh "+kenh+" có video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp video ${label} vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,ref||""))}
 function ktPick(ma,kenh){
   const k0=(D().kho||[]).find(y=>y.ma===ma);if(!k0||!kenh)return false;if(!k0.maDang&&!khoOk(k0)){toast("Video "+ma+" chưa duyệt, Lead duyệt xong mới phân bổ kênh được");return false}
@@ -956,7 +956,7 @@ function ktBulkBind(w){{const tb=document.querySelector(".topbar");document.docu
   if(q("#ktb-x"))q("#ktb-x").onclick=()=>{S.clear();renderMain()};
   if(q("#ktb-go"))q("#ktb-go").onclick=()=>{const kenh=q("#ktb-k").value;if(!kenh){toast("Chọn kênh trước");q("#ktb-k").focus();return}
     const L=sel().filter(k=>ktState(k)==="free");let n=0;XV.ktQuiet=true;XV.ktQuietN={};try{L.forEach(k=>{if(ktPick(k.ma,kenh)){n++;S.delete(k.ma)}})}finally{XV.ktQuiet=false}
-    if(n){const to=[chanOwner(kenh)].concat(chanHelp(kenh)).filter(Boolean);if(to.length&&typeof notifyU==="function")DB.mutate(ME.name,"báo kênh "+kenh+" có "+n+" video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp ${n} video tồn vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,""))}
+    if(n){const to=[chanOwner(kenh)].filter(x=>x&&x!==ME.id);if(to.length&&typeof notifyU==="function")DB.mutate(ME.name,"báo kênh "+kenh+" có "+n+" video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp ${n} video tồn vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,""))}
     toast(n?"Đã phân bổ "+n+" video vào "+chOf(kenh).short+": Chờ đăng":"Không phân bổ được video nào");renderMain()};
   if(q("#ktb-ok"))q("#ktb-ok").onclick=()=>{const L=sel().filter(k=>(ktState(k)==="cd"&&xvGive())||(ktState(k)==="cceo"&&ME.role==="admin"));if(!L.length)return;
     if(!confirm((ME.role==="admin"?"CEO duyệt ":"Duyệt ")+L.length+" video đã chọn?"))return;
@@ -1649,7 +1649,7 @@ async function wtSync(){if(WT_BUSY||Date.now()-WT_AT<20000||!DB.data)return;cons
   try{const L=await svApi("/api/hub/worker-tasks?kind=card"),by={};(L||[]).forEach(t=>by[t.id]=t);const ch=[];
     C.forEach(c=>{const t=by[c.wt];if(!t)return;const r=t.result||{},u={wStatus:t.status,wProg:t.progress||0,wDetail:t.detail||"",wJob:t.worker_job||c.wJob||"",wStage:r.stage||"",wScript:r.script||"",wHadScr:c.wHadScr||!!r.script};
       const fresh=!c.wFixAt||String(t.updated_at||"")>c.wFixAt;if(!fresh){u.wStatus="running";u.wDetail=c.wDetail;u.wStage=""}
-      if(fresh&&t.status==="running"&&["dvd","dceo"].includes(c.step)){u.step="worker";u.linkFinal=""} // dựng lại từ Telegram / trang Worker: về Đang làm
+      if(fresh&&t.status==="running"&&["dvd","dceo"].includes(c.step)){u.step="worker";u.linkCu=u.linkFinal||u.linkCu||"";u.linkFinal=""} // dựng lại từ Telegram / trang Worker: về Đang làm
       if(fresh&&t.status==="review"&&r.stage==="video"&&c.step==="worker"){u.linkFinal="/api/hub/worker-tasks/preview/"+u.wJob} // bản nháp: người phụ trách xem, bấm Duyệt thì mới sang Lead Content & Media
       if(t.status==="done"&&r.drive_url){u.linkFinal=r.drive_url;u.wDone=true}
       if(Object.keys(u).some(k=>String(c[k]??"")!==String(u[k]??"")))ch.push([c.id,u])});
@@ -1670,7 +1670,7 @@ async function wkRedo(id,btn){
   for(let i=0;i<16;i++){await new Promise(r=>setTimeout(r,5000));let t;try{t=((await svApi("/api/hub/worker-tasks?kind=card"))||[]).find(x=>x.id===tid)}catch(e){continue}
     if(!t)continue;
     if(t.status==="error"){toast("Worker không làm lại được: "+(t.detail||"không rõ lý do"));renderMain();return}
-    if(t.status==="done"){DB.mutate(ME.name,"Worker làm lại "+c.wJob,dt=>{const y=dt.cards.find(z=>z.id===id);if(!y)return;y.step="worker";y.wStatus="running";y.wStage="";y.linkFinal="";y.wDetail=t.detail||"Worker đang làm lại từ đầu";y.wFixAt=new Date().toISOString()});toast(t.detail||"Worker đang làm lại");WT_AT=0;renderMain();return}}
+    if(t.status==="done"){DB.mutate(ME.name,"Worker làm lại "+c.wJob,dt=>{const y=dt.cards.find(z=>z.id===id);if(!y)return;y.linkCu=y.linkFinal||y.linkCu||"";y.step="worker";y.wStatus="running";y.wStage="";y.linkFinal="";y.wDetail=t.detail||"Worker đang làm lại từ đầu";y.wFixAt=new Date().toISOString()});toast(t.detail||"Worker đang làm lại");WT_AT=0;renderMain();return}}
   toast("Máy văn phòng chưa nhận việc làm lại. Kiểm tra máy có bật không, việc vẫn nằm chờ và sẽ chạy khi máy bật.");renderMain()}
 
 
