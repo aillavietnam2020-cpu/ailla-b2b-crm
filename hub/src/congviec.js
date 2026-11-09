@@ -783,6 +783,7 @@ function cvWarn(){
   return out
 }
 function cvOpenMk(g){
+  {const fx=(g.ids||[]).filter(id=>{const c=D().cards.find(y=>y.id===id);return c&&["edit","worker"].includes(c.step)&&(c.gopy||[]).length});if(fx.length&&typeof cwVidFix==="function"){cwVidFix(fx[0],fx);return}}
   const d=D(),cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean);
   const href=l=>/^https?:\/\//.test(l)?l:"https://"+l,fb=c=>`<input data-vfb="${c.id}" placeholder="Góp ý / cần sửa gì"><button type="button" class="btn sm" data-vtra="${c.id}">Cần sửa</button>`;
   const act=c=>{const st=c.step,lk=c.linkFinal||c.linkVideo||"";
