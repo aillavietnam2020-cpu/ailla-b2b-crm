@@ -179,14 +179,14 @@ function srcHtml(s,can2){
 }
 /* ---------- ③ Buổi quay & hook ---------- */
 function xvQuay2(b,o){
-  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>(s.day>=W.tu&&s.day<=W.den)||!["Đã quay","Đã hủy"].includes(s.trangThai)).sort((a,c)=>a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
+  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>(s.day>=W.tu&&s.day<=W.den)||!["Đã quay","Đã hủy"].includes(s.trangThai)).sort((a,c)=>((c.nguoi||[]).includes(ME.id)-(a.nguoi||[]).includes(ME.id))||a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
   const qDef=team.find(u=>/quỳnh/i.test(u.name)),w=weekOf(W.tu)||1,wp=wpOf(d,w);
   const tOpts=()=>{const g=xvGroupBy(d.tuyen.slice(),t=>sk(t.sku).n+" · "+chOf(t.kenh).short);return g.map(([n,L])=>`<optgroup label="${esc(n)}">${L.map(t=>`<option value="${esc(t.ma)}">${esc(t.tuyen)}${t.vaiTro?" · "+esc(t.vaiTro):""}</option>`).join("")}</optgroup>`).join("")};
   const wait=d.cards.filter(c=>c.step==="quay"&&!c.buoiQuay);
   const sess=s=>{const I=d.cards.filter(c=>c.buoiQuay===s.id),chua=I.filter(c=>c.step==="dkb"),kb=I.filter(c=>c.step==="kb"),ok=I.filter(c=>c.step==="quay"),done=I.filter(c=>!["dkb","kb","quay","cg"].includes(c.step)),ps=I.filter(c=>c.phatSinh).length;
     const bySku=xvGroupBy(I,c=>c.sku+"|"+c.kenh);
-    return `<div class="sqitem xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${pill(SQ_LB[SQ_ST(s)][0],SQ_LB[SQ_ST(s)][1])}</div>
-     ${sqBox(s,give,dv)}<div class="xsum">${I.length} hook / kịch bản xếp vào buổi quay · <b class="${ok.length?"t-grn":""}">${ok.length} đã duyệt, sẵn sàng quay</b>${chua.length?` · <b class="t-amb">${chua.length} chờ duyệt</b>`:""}${kb.length?` · <b class="t-red">${kb.length} cần sửa</b>`:""} · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}${bySku.length?`<span class="sqsk">${bySku.map(([k,L])=>`${swatch(k.split("|")[0])} ${esc(sk(k.split("|")[0]).n)} (${esc(chOf(k.split("|")[1]).short)}): ${L.length}`).join(" · ")}</span>`:""}</div>
+    return `<div class="sqitem xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${(s.nguoi||[]).includes(ME.id)&&!give?pill("Việc của bạn","blu"):""}${pill(SQ_LB[SQ_ST(s)][0],SQ_LB[SQ_ST(s)][1])}</div>
+     ${sqBox(s,give,dv,ok.length)}<div class="xsum">${I.length} hook / kịch bản xếp vào buổi quay · <b class="${ok.length?"t-grn":""}">${ok.length} đã duyệt, sẵn sàng quay</b>${chua.length?` · <b class="t-amb">${chua.length} chờ duyệt</b>`:""}${kb.length?` · <b class="t-red">${kb.length} cần sửa</b>`:""} · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}${bySku.length?`<span class="sqsk">${bySku.map(([k,L])=>`${swatch(k.split("|")[0])} ${esc(sk(k.split("|")[0]).n)} (${esc(chOf(k.split("|")[1]).short)}): ${L.length}`).join(" · ")}</span>`:""}</div>
      ${SQ_ST(s)!=="xong"&&SQ_ST(s)!=="huy"&&I.length&&(chua.length||kb.length)&&s.day-D().settings.today<=1?`<p class="sqwarn">⚠ Sắp tới buổi quay mà còn ${chua.length+kb.length} hook / kịch bản chưa được duyệt.</p>`:""}
 
      
@@ -1111,11 +1111,12 @@ function hkMine(c){return xvGive()||c.nguoi===ME.id||c.giao===ME.id}
 /* Buổi quay: mục tiêu lead tự viết, link file hook & kịch bản trên Drive, trạng thái, trễ hạn */
 const SQ_ST=s=>{const x=s.trangThai;if(x==="Đã quay")return "xong";if(x==="Đã hủy")return "huy";if(s.day<D().settings.today)return "tre";return x==="Đang quay"?"dang":"chua"};
 const SQ_LB={chua:["Chưa làm","gry"],dang:["Đang làm","blu"],tre:["Trễ hạn","red"],xong:["Đã quay","grn"],huy:["Đã hủy","gry"]};
-function sqBox(s,give,dv){
+function sqBox(s,give,dv,nOk){
   const st=SQ_ST(s),may=give||(s.nguoi||[]).includes(ME.id),lnk=v=>/^https?:/.test(v)?v:"https://"+v,today=D().settings.today;
   const days=Array.from({length:MONTH.ndays-today+1},(_,i)=>today+i);
   const tre=st==="tre"?`<div class="sqtre"><b class="t-red">Buổi quay trễ so với lịch (${dd(s.day)})</b>${s.treLyDo?` · Lý do: ${esc(s.treLyDo)} <small>(${esc(s.treBy||"")})</small>`:may?`<div class="xrow"><input class="hkin" data-sqtre="${s.id}" placeholder="Điền lý do trễ…"><button class="btn sm pri" data-sqtres="${s.id}">Gửi lý do</button></div>`:" · chưa có lý do"}${dv?`<div class="xrow"><label>Dời sang ngày<select data-sqnew="${s.id}">${opt(days.map(x=>[x,dayLbl(x)]),today)}</select></label><button class="btn sm" data-sqmove="${s.id}">Dời lịch quay</button><button class="btn sm danger" data-sqcancel="${s.id}">Hủy buổi quay</button></div>`:""}</div>`:"";
-  const act="";
+  /* người quay (hoặc người giao) luôn có nút chốt, kể cả khi trễ hạn hoặc chưa có hook nào được duyệt */
+  const act=may&&!give||may&&give&&!nOk?(!give||!nOk)&&!(["Đã quay","Đã hủy"].includes(s.trangThai))?`<div class="xrow"><button class="btn pri" data-hkdone="${s.id}">✓ Đã quay xong buổi này</button></div>`:"":"";
   return `<div class="sqbox"><div class="sqtop"><label class="field full">Mục tiêu buổi quay (lead tự viết)<textarea rows="2" data-sqmt="${s.id}" ${dv||give?"":"disabled"} placeholder="Ví dụ: 5/10 quay 50 video tinh dầu · 6/10 quay thêm cảnh trám tinh dầu và 20 video bột tẩy">${esc(s.mucTieu||"")}</textarea>${dv||give?`<small><button type="button" class="lnk" data-qfill="${s.id}">↳ điền gợi ý "cần quay thêm" từ phân bổ tuần vào mục tiêu</button></small>`:""}</label>${sqEditHtml(s,dv||give)}</div>
    ${act}${tre}</div>`}
 function sqEditHtml(s,can){
