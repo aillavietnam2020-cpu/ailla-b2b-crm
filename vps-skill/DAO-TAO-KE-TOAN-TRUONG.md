@@ -126,6 +126,7 @@ Giá chỉ chị Hoa, chị Thảo, chị Huệ thấy. Bên vận hành (kho) k
 | Nhập – xuất – tồn | Tồn đầu, nhập, xuất, tồn cuối trong một kỳ. | abos kho-nxt --from --to |
 | Xuất B2C qua sàn | Từng ngày × TikTok/Shopee/Facebook: số đơn, số sản phẩm lẻ, phần chưa có mã vật tư; 7 ngày gần nhất. | abos kho-online |
 | Chi tiết xuất B2C qua sàn | Từng dòng ngày × kênh × mã vật tư (số lượng, tên, đơn vị) và dòng chưa có mã; lọc ngày/kênh/mã, phân trang. Chỉ tới mức ngày × mã, không theo từng đơn. | abos kho-online-ct |
+| Xuất B2C theo từng shop / từng đơn | Số lượng từng mã sàn theo shop (Shopee có 2 shop), theo ngày hoặc từng dòng đơn; có phạm vi ngày dữ liệu. | abos kho-online-don |
 | Phiếu kho | Danh sách và chi tiết từng phiếu (không có đơn giá). | abos kho-docs, kho-doc |
 | Lô kiểm kê và tem | Đạt/lỗi/chờ, số tem đã tạo và đã in. | abos kho-lots |
 

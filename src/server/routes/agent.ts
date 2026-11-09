@@ -578,6 +578,60 @@ agentRoutes.get('/kho/online/chi-tiet', requirePermission('agent.read'), async (
   });
 });
 
+/**
+ * Dòng đơn đã gửi hàng của sàn (bảng channel_order_lines, có tên shop): gom theo shop × mã sàn (sku) × phân loại,
+ * hoặc theo ngày (group=ngay) / từng dòng đơn (group=don, có giới hạn). Lọc from/to/channel/shop/item. Không có tiền, không có tên khách.
+ */
+agentRoutes.get('/kho/online/don-le', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  const channel = (c.req.query('channel') ?? '').toUpperCase();
+  const shop = (c.req.query('shop') ?? '').trim().slice(0, 80);
+  const item = (c.req.query('item') ?? '').trim().slice(0, 80);
+  const group = c.req.query('group') ?? 'shop';
+  if (channel && !['TIKTOK', 'SHOPEE', 'FACEBOOK'].includes(channel)) throw badRequest('BAD_CHANNEL', 'Kênh phải là TIKTOK, SHOPEE hoặc FACEBOOK');
+  if ((from && !isDay(from)) || (to && !isDay(to))) throw badRequest('BAD_DAY', 'Ngày phải dạng YYYY-MM-DD');
+  if (!['shop', 'ngay', 'don'].includes(group)) throw badRequest('BAD_GROUP', 'group phải là shop, ngay hoặc don');
+  const limit = Math.min(Math.max(1, Math.floor(Number(c.req.query('limit') ?? 200)) || 200), 500);
+  const offset = Math.max(0, Math.floor(Number(c.req.query('offset') ?? 0)) || 0);
+  const w: string[] = [];
+  const p: unknown[] = [];
+  if (channel) { w.push('channel = ?'); p.push(channel); }
+  if (from) { w.push('day >= ?'); p.push(from); }
+  if (to) { w.push('day <= ?'); p.push(to); }
+  if (shop) { w.push('shop LIKE ?'); p.push(`%${shop}%`); }
+  if (item) { w.push('(sku LIKE ? OR name LIKE ?)'); p.push(`%${item}%`, `%${item}%`); }
+  const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
+  const db = c.env.DB;
+  const range = await db
+    .prepare(`SELECT MIN(day) AS tu_ngay, MAX(day) AS den_ngay, COUNT(DISTINCT day) AS so_ngay_co_du_lieu, COUNT(DISTINCT order_id) AS so_don, SUM(qty) AS tong_so_luong FROM channel_order_lines ${where}`)
+    .bind(...p)
+    .first<Record<string, unknown>>();
+  let sql: string;
+  if (group === 'don') {
+    sql = `SELECT day, channel, shop, order_id, line_no, sku, variant, name, qty AS so_luong FROM channel_order_lines ${where} ORDER BY day DESC, order_id, line_no LIMIT ? OFFSET ?`;
+  } else if (group === 'ngay') {
+    sql = `SELECT day, channel, COALESCE(shop, '') AS shop, sku, variant, MAX(name) AS name, COUNT(DISTINCT order_id) AS so_don, SUM(qty) AS so_luong
+           FROM channel_order_lines ${where} GROUP BY day, channel, shop, sku, variant ORDER BY day DESC, channel, shop, so_luong DESC LIMIT ? OFFSET ?`;
+  } else {
+    sql = `SELECT channel, COALESCE(shop, '') AS shop, sku, variant, MAX(name) AS name, COUNT(DISTINCT order_id) AS so_don, SUM(qty) AS so_luong
+           FROM channel_order_lines ${where} GROUP BY channel, shop, sku, variant ORDER BY channel, shop, so_luong DESC LIMIT ? OFFSET ?`;
+  }
+  const rows = await db.prepare(sql).bind(...p, limit + 1, offset).all<Record<string, unknown>>();
+  const list = rows.results ?? [];
+  return ok(c, {
+    ghi_chu: 'Mã là mã trên sàn (sku, phân loại), chưa tách combo ra mã kho; dòng đơn đã gửi hàng. Ngày không có dòng = chưa có dữ liệu hoặc không có đơn.',
+    group,
+    pham_vi: range,
+    limit,
+    offset,
+    con_nua: list.length > limit,
+    dong: list.slice(0, limit),
+  });
+});
+
 /** Lô kiểm kê đóng gói và tem (module Sản xuất): trạng thái, số đạt/lỗi/chờ, số tem đã tạo và đã in. Chỉ đọc. */
 const LOT_STATUS: Record<string, string> = {
   CHO_KIEM: 'Chờ kiểm kê',
