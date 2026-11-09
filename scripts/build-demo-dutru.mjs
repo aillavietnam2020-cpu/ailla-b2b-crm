@@ -23,8 +23,8 @@ function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeou
 function openDrawerHTML(h){const dr=$("#drawer");$("#drawerIn").innerHTML='<button class="x" id="dx">✕</button>'+h;dr.hidden=false;$("#dx").onclick=closeDrawer}
 function closeDrawer(){$("#drawer").hidden=true}
 const ME={name:"Chị Hoa"};
-const _D={skus:[],dutru:null};const DB={data:_D,mutate(w,m,fn){fn(_D);try{localStorage.setItem("dutru_demo5",JSON.stringify(_D.dutru))}catch(e){}}};
-try{const s=JSON.parse(localStorage.getItem("dutru_demo5")||"null");if(s)_D.dutru=s}catch(e){}
+const _D={skus:[],dutru:null};const DB={data:_D,mutate(w,m,fn){fn(_D);try{localStorage.setItem("dutru_demo6",JSON.stringify(_D.dutru))}catch(e){}}};
+try{const s=JSON.parse(localStorage.getItem("dutru_demo6")||"null");if(s)_D.dutru=s}catch(e){}
 const D=()=>_D;
 const PAGES={},MODULES=[],MI=(k,t,p)=>[k,t,p];
 let PAGE="dutru";
@@ -49,7 +49,7 @@ const boot0=`if(!D().dutru){D().dutru={A:null,gvFile:dzParseGiaThanh(${JSON.stri
  {id:"m4",ten:"Nước xả vải 1L (mã chưa có giá vốn)",kenh:"tiktok",gia:79000,gvSp:null,gvQua:null,aff:5,booking:0,cpqc:15,parts:[{code:"AILLA-NX1L",qty:1,kind:"sp"}],mSp:false,mQua:false}]}}
 `;
 const boot = boot0 + `
-document.getElementById("dz-reset").onclick=()=>{try{localStorage.removeItem("dutru_demo5")}catch(e){}location.reload()};
+document.getElementById("dz-reset").onclick=()=>{try{localStorage.removeItem("dutru_demo6")}catch(e){}location.reload()};
 pDutru($("#main"));
 `;
 const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Dự trù giá bán</title><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
