@@ -13,6 +13,7 @@ const CSP = [
   "img-src 'self' data: blob: https:",
   "connect-src 'self'",
   "object-src 'none'",
+  "frame-src 'self' https://drive.google.com https://www.youtube.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
