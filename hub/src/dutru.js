@@ -80,7 +80,8 @@ function dzRowHTML(r,i,A,g){
    <td><input class="dz-in n s" data-id="${r.id}" data-f="giam" value="${dzGiamTxt(r)}" placeholder="10% hay 5000" title="Giảm giá cho khách: gõ 10% hoặc số tiền 5000"></td>
    <td class="n dzo">${O[0]}</td>
    <td><input class="dz-in n" data-id="${r.id}" data-f="gvSp" data-m="1" value="${r.gvSp==null?"":dzMoney(r.gvSp)}" placeholder="${r.parts?"chưa có giá vốn":"0"}" inputmode="numeric"></td>
-   <td><input class="dz-in n" data-id="${r.id}" data-f="gvQua" data-m="1" value="${r.gvQua==null?"":dzMoney(r.gvQua)}" placeholder="0" inputmode="numeric" title="Giá vốn quà tặng kèm (không tính giá lẻ)"></td>
+   <td><input class="dz-in n" data-id="${r.id}" data-f="gvQua" data-m="1" value="${r.gvQua==null?"":dzMoney(r.gvQua)}" placeholder="0" inputmode="numeric" title="Giá vốn quà tặng kèm (không tính giá lẻ)">
+     <div class="dz-gf">${(r.parts||[]).map((p,k)=>p.kind==="gift"?`<span class="pill p-vio">🎁 ${esc(p.code)} ×<input class="dz-gq" data-gid="${r.id}" data-gk="${k}" value="${p.qty}" inputmode="numeric"><a data-gx="${r.id}.${k}" title="Bỏ quà này">✕</a></span>`:"").join("")}<button class="btn sm ghost" data-gift="${r.id}" title="Chọn quà từ danh mục, giá vốn quà tự nhảy">+ Chọn quà</button></div></td>
    ${pc("aff")}${pc("booking")}${pc("cpqc")}
    ${O.slice(1).map(h=>`<td class="n dzo">${h}</td>`).join("")}
    <td class="dz-act"><button class="btn sm ghost" data-dup="${r.id}" title="Nhân đôi dòng để thử một chương trình khác">Nhân đôi</button><button class="btn sm ghost" data-del="${r.id}" title="Xóa dòng">✕</button></td></tr>`;
@@ -126,15 +127,16 @@ function dzPickItems(g){
   const prods=(SPCB.prods||[]).filter(p=>p.active).map(p=>{const parts=[{code:p.code,qty:1,kind:"sp"}];return {key:"p:"+p.code,name:p.name||p.code,code:p.code,parts,cs:dzCostParts(parts,g)}});
   return {combos,prods};
 }
-function dzPicker(id){
-  DZB.pk=id;DZB.ptab=DZB.ptab||"combo";DZB.pq="";
-  openDrawerHTML(`<h2 class="dtitle">Chọn từ danh mục</h2><p class="hint">Chọn combo hoặc sản phẩm để tự điền giá vốn sản phẩm chính và giá vốn quà. Mã chưa có giá vốn sẽ báo rõ, không tự ước.</p>
+function dzPicker(id,mode){
+  DZB.pk=id;DZB.pm=mode||"";DZB.ptab=mode==="gift"?"sp":(DZB.ptab||"combo");DZB.pq="";
+  openDrawerHTML(`<h2 class="dtitle">${mode==="gift"?"Chọn quà tặng":"Chọn từ danh mục"}</h2>${mode==="gift"?`<p class="hint">Chọn quà từ danh mục: giá vốn quà tự nhảy vào ô “Giá vốn quà tặng” (giá vốn, không phải giá lẻ).</p>`:""}<p class="hint">Chọn combo hoặc sản phẩm để tự điền giá vốn sản phẩm chính và giá vốn quà. Mã chưa có giá vốn sẽ báo rõ, không tự ước.</p>
    <nav class="settabs" id="dz-ptabs"></nav><input id="dz-pq" class="dz-in" placeholder="Gõ tên hoặc mã để tìm…" style="width:100%;margin:8px 0"><div id="dz-plist"></div>`);
   const q=document.getElementById("dz-pq");q.oninput=()=>{DZB.pq=q.value;dzPickDraw()};dzPickDraw();setTimeout(()=>q.focus(),50);
 }
 function dzPickDraw(){
   const g=dzCostMap(),P=dzPickItems(g),fold=typeof kfold==="function"?kfold:dzLow,w=fold(DZB.pq||"").trim().split(/\s+/).filter(Boolean);
-  document.getElementById("dz-ptabs").innerHTML=[["combo","Combo ("+P.combos.length+")"],["sp","Sản phẩm ("+P.prods.length+")"]].map(([k,t])=>`<button class="${DZB.ptab===k?"on":""}" data-pt="${k}">${t}</button>`).join("");
+  if(DZB.pm==="gift")DZB.ptab="sp";
+  document.getElementById("dz-ptabs").innerHTML=DZB.pm==="gift"?"":[["combo","Combo ("+P.combos.length+")"],["sp","Sản phẩm ("+P.prods.length+")"]].map(([k,t])=>`<button class="${DZB.ptab===k?"on":""}" data-pt="${k}">${t}</button>`).join("");
   document.querySelectorAll("[data-pt]").forEach(b=>b.onclick=()=>{DZB.ptab=b.dataset.pt;dzPickDraw()});
   let L=DZB.ptab==="sp"?P.prods:P.combos;
   if(w.length)L=L.filter(x=>w.every(t=>fold(x.name+" "+(x.desc||"")+" "+(x.code||"")).includes(t)));
@@ -145,6 +147,11 @@ function dzPickDraw(){
    :`<p class="hint pad">Không có mục nào khớp.</p>`;
   document.querySelectorAll("[data-pi]").forEach(el=>el.onclick=()=>{
     const x=L[+el.dataset.pi],r=DZB.rows.find(y=>y.id===DZB.pk);if(!r)return;
+    if(DZB.pm==="gift"){
+      if(!r.parts){r.parts=[];r.mSp=true}/* dòng gõ tay giá vốn SP: giữ nguyên số đã gõ */
+      const o=r.parts.find(p=>p.kind==="gift"&&dzLow(p.code)===dzLow(x.code));if(o)o.qty=(+o.qty||1)+1;else r.parts.push({code:x.code,qty:1,kind:"gift"});
+      r.mQua=false;dzSave();closeDrawer();renderMain();
+      if(x.cs.gvSp==null)toast("Quà này chưa có giá vốn: nhập ở Sản phẩm & combo hoặc Giá vốn SKU");return}
     r.parts=x.parts;r.mSp=false;r.mQua=false;if(!r.ten)r.ten=x.name;
     if(x.ch==="TIKTOK")r.kenh="tiktok";else if(x.ch==="FACEBOOK")r.kenh="facebook";
     dzSave();closeDrawer();renderMain();
@@ -181,6 +188,9 @@ function dzBind(m){
       if(f==="aff"||f==="cpqc"||f==="booking")el.value=dzIn(r[f]);else if(el.dataset.m)el.value=r[f]==null?"":dzMoney(r[f])}
     dzSave();dzRefreshRow(r)});
   m.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>dzPicker(b.dataset.pick));
+  m.querySelectorAll("[data-gift]").forEach(b=>b.onclick=()=>dzPicker(b.dataset.gift,"gift"));
+  m.querySelectorAll("[data-gx]").forEach(a=>a.onclick=()=>{const [id,k]=a.dataset.gx.split("."),r=DZB.rows.find(x=>x.id===id);if(!r)return;r.parts.splice(+k,1);r.mQua=false;dzSave();renderMain()});
+  m.querySelectorAll("[data-gid]").forEach(el=>el.onchange=()=>{const r=DZB.rows.find(x=>x.id===el.dataset.gid),p=r&&r.parts[+el.dataset.gk];if(!p)return;const v=dzParse(el.value,true);p.qty=v>0?v:1;r.mQua=false;dzSave();renderMain()});
   m.querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>{
     if(DZB.rows.length>=DZ_MAX_ROWS){toast("Tối đa "+DZ_MAX_ROWS+" dòng");return}
     const i=DZB.rows.findIndex(x=>x.id===b.dataset.dup),r=DZB.rows[i];DZB.rows.splice(i+1,0,Object.assign({},r,{id:dzId(),ten:(r.ten||"")+" (bản sao)",parts:r.parts?r.parts.slice():null}));dzSave();renderMain()});
@@ -233,7 +243,7 @@ MODULES.push({k:"q_dutru",adm:true,zone:"Quản trị",ic:"spark",n:"Dự trù g
 
 /* Kiểu hiển thị riêng của trang (tiền tố dz-). */
 (function(){if(typeof document==="undefined"||document.getElementById("dz-css"))return;const s=document.createElement("style");s.id="dz-css";s.textContent=`
-.dz-wrap{overflow-x:auto}.dz-t{min-width:1450px}.dz-hn{max-width:340px}.dz-hl{text-align:left!important;line-height:1.35}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
+.dz-wrap{overflow-x:auto}.dz-t{min-width:1450px}.dz-hn{max-width:340px}.dz-gf{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}.dz-gq{width:26px;border:0;background:transparent;font:inherit;font-weight:600;color:inherit;text-align:center;padding:0}.dz-gf a{cursor:pointer;margin-left:4px;opacity:.7}.dz-hl{text-align:left!important;line-height:1.35}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
 .dz-in{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13.5px;background:#fff;color:inherit;min-width:0;box-sizing:border-box}.dz-in.n{text-align:right;width:100%;min-width:92px}.dz-in.s{width:66px;min-width:66px}
 .dz-t td:nth-child(2){min-width:290px}.dz-nm{display:flex;gap:6px;align-items:center}.dz-nm .dz-in{flex:1;min-width:140px}.dz-nm .btn{white-space:nowrap}
 .dz-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;text-align:right}.dz-no{color:var(--muted)}.dz-ms{color:var(--red);font-weight:600;font-size:12.5px}
