@@ -22,6 +22,7 @@ function dzInit(){
   DZB.rows=s&&Array.isArray(s.rows)?JSON.parse(JSON.stringify(s.rows)):[];
   DZB.A=dzAssume(s&&s.A);
   /* Dòng cũ chưa điền gì ở 3 ô Affiliate / Booking / CPQC thì điền sẵn số mặc định của kênh. */
+  DZB.rows.forEach(r=>(r.parts||[]).forEach(p=>{if(p.kind==="gift"&&p.gia==null)p.gia=0}));
   DZB.rows.forEach(r=>{if(!r.aff&&!r.booking&&!r.cpqc){r.aff=dzDef(r.kenh,"aff");r.booking=dzDef(r.kenh,"booking");r.cpqc=dzDef(r.kenh,"cpqc")}});
   if(!DZB.rows.length)DZB.rows.push(dzBlank());
 }
@@ -40,14 +41,23 @@ function dzCostMap(){
   /* Thứ tự ưu tiên: Giá vốn SKU kế toán nhập > Giá thành MISA đã nạp > giá nhập kho bình quân. */
   return Object.assign({},gKho,file&&file.rows?dzMergeGiaThanh({},file,gSku):{},gSku);
 }
-/* Điền lại giá vốn tự động cho dòng đã gắn với danh mục (trừ ô đã gõ tay). Trả về danh sách mã thiếu. */
+/* Combo gồm nhiều món (r.parts): món có giá bán > 0 là món tính tiền, giá bán 0đ là quà tặng, "pack" là bao bì (chỉ tính vốn nếu có giá).
+   Giá bán combo = tổng SL × giá bán từng món; giá vốn SP = vốn các món tính tiền; giá vốn quà = vốn các món 0đ. */
+const dzHasItems=r=>!!(r.parts&&r.parts.length);
+const dzItems=r=>(r.parts||[]).map(p=>p.kind==="pack"||p.kind==="skip"?p:Object.assign({},p,{kind:p.gia===0?"gift":"sp"}));
+const dzNameOf=code=>{const p=typeof SPCB!=="undefined"&&(SPCB.prods||[]).find(x=>dzLow(x.code)===dzLow(code));return p&&p.name?p.name:code};
+const dzItemName=p=>p.name||dzNameOf(p.code);
 function dzAuto(r,g){
-  if(!r.parts||!g)return [];
-  const c=dzCostParts(r.parts,g);
-  if(!r.mSp)r.gvSp=c.gvSp;
-  if(!r.mQua)r.gvQua=c.gvQua;
-  return c.miss;
+  if(!dzHasItems(r))return [];
+  const pay=r.parts.filter(p=>p.kind!=="pack"&&p.kind!=="skip");
+  if(pay.length)r.gia=pay.every(p=>p.gia!=null)?pay.reduce((s,p)=>s+(+p.qty||1)*p.gia,0):null;
+  if(!g)return [];
+  const c=dzCostParts(dzItems(r),g);
+  r.gvSp=c.gvSp;r.gvQua=c.gvQua;return c.miss;
 }
+const dzGiaCell=r=>r.gia==null?`<span class="dz-ms">nhập giá từng món</span>`:nf(r.gia);
+const dzItemTT=p=>p.kind==="pack"||p.kind==="skip"?"—":p.gia==null?"—":p.gia===0?dzTag("Tặng 0đ","vio"):nf((+p.qty||1)*p.gia);
+const dzItemCost=(p,g)=>{const c=g&&g[dzLow(p.code)];return c?nf(c.u*(+p.qty||1)):(p.kind==="pack"||p.kind==="skip"?"—":dzTag("chưa có giá vốn","red"))};
 const dzName=n=>n&&n.length>46?n.slice(0,45)+"…":n;
 const dzTag=(t,c)=>`<span class="pill p-${c}">${t}</span>`;
 
@@ -73,22 +83,35 @@ function dzHint(r,A){
   if(x.bien<A.bienMT)return `<small class="dz-s dz-hl" style="color:var(--orange)">Chưa đạt biên ${dzFmtPct(A.bienMT)}: cần khách trả từ ${nf(m.pmin)}đ, hoặc cắt ${lab} từ ${dzFmtPct(mk)} xuống ${dzFmtPct(mkMax)}.</small>`;
   return `<small class="dz-s dz-hl" style="color:var(--green)">Còn đạt biên ${dzFmtPct(A.bienMT)} nếu: giảm tối đa ${dzFmtPct(g)} (khách trả ≥ ${nf(m.pmin)}đ) · tặng thêm quà ≤ ${nf(m.quaMax)}đ · ${lab} ≤ ${dzFmtPct(mkMax)}.</small>`;
 }
+function dzSubHTML(r,g,cols){
+  const items=r.parts||[];
+  const rows=items.map((p,k)=>{const pk=p.kind==="pack"||p.kind==="skip",id=r.id+"."+k;
+    return `<tr><td>${esc(dzItemName(p))} <small class="hint">${esc(p.code)}</small>${pk?` <span class="pill p-gry">bao bì</span>`:""}</td>
+     <td class="n"><input class="dz-in n s" data-it="${id}.q" value="${dzIn(p.qty)}" inputmode="decimal"></td>
+     <td class="n">${pk?"—":`<input class="dz-in n" data-it="${id}.g" value="${p.gia==null?"":dzMoney(p.gia)}" placeholder="giá bán / món" inputmode="numeric">`}</td>
+     <td class="n" data-itt="${id}">${dzItemTT(p)}</td><td class="n" data-itc="${id}">${dzItemCost(p,g)}</td>
+     <td><a class="dz-x" data-itx="${id}" title="Bỏ món này">✕</a></td></tr>`}).join("");
+  return `<tr class="dz-sub" data-sub="${r.id}"><td></td><td colspan="${cols-1}"><div class="dz-itw">
+   ${items.length?`<table class="dz-itt"><thead><tr><th>Sản phẩm trong combo</th><th class="n">SL</th><th class="n">Giá bán / món (0đ = tặng)</th><th class="n">Thành tiền</th><th class="n">Giá vốn</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+   :`<small class="hint">Chưa có sản phẩm. Bấm “+ Thêm sản phẩm” để lập combo: món tính tiền ghi giá bán, món tặng ghi 0đ. Hoặc gõ thẳng giá bán và giá vốn ở dòng trên.</small>`}
+   <div class="dz-ita"><button class="btn sm" data-additem="${r.id}">+ Thêm sản phẩm</button><button class="btn sm ghost" data-pick="${r.id}" title="Lấy sẵn các món của một combo đã có trong Sản phẩm & combo">Lấy combo có sẵn</button></div></div></td></tr>`;
+}
 function dzRowHTML(r,i,A,g){
-  const miss=dzAuto(r,g),O=dzOutCells(r,A),x=dzCalc(dzEff(r),A),tone=dzTone(x);
+  const miss=dzAuto(r,g),O=dzOutCells(r,A),x=dzCalc(dzEff(r),A),tone=dzTone(x),it=dzHasItems(r),cols=r.kenh==="facebook"?16:17;
   const pc=f=>`<td><input class="dz-in n s" data-id="${r.id}" data-f="${f}" value="${dzIn(r[f])}" inputmode="decimal"></td>`;
+  const money=(f,ph)=>it?`<td class="n dz-ro" data-cell="${f}">${f==="gia"?dzGiaCell(r):r[f]==null?`<span class="dz-ms">chưa có giá vốn</span>`:nf(r[f])}</td>`
+    :`<td><input class="dz-in n" data-id="${r.id}" data-f="${f}" data-m="1" value="${r[f]==null?"":dzMoney(r[f])}" placeholder="${ph}" inputmode="numeric"></td>`;
   return `<tr class="dz-r dz-${tone}" data-rid="${r.id}"><td class="dz-no">${i+1}</td>
-   <td><div class="dz-nm"><input class="dz-in" data-id="${r.id}" data-f="ten" value="${esc(r.ten||"")}" placeholder="Tên combo / chương trình"><button class="btn sm ghost" data-pick="${r.id}" title="Chọn sản phẩm hoặc combo từ danh mục để tự điền giá vốn">Chọn</button></div>
+   <td><input class="dz-in" data-id="${r.id}" data-f="ten" value="${esc(r.ten||"")}" placeholder="Tên combo / chương trình">
      <div class="dz-hn">${miss.length?`<small class="dz-s" style="color:var(--red)">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:dzHint(r,A)}</div></td>
-   <td><input class="dz-in n" data-id="${r.id}" data-f="gia" data-m="1" value="${r.gia==null?"":dzMoney(r.gia)}" placeholder="0" inputmode="numeric"></td>
+   ${money("gia","0")}
    <td><input class="dz-in n s" data-id="${r.id}" data-f="giam" value="${dzGiamTxt(r)}" placeholder="10% hay 5000" title="Giảm giá cho khách: gõ 10% hoặc số tiền 5000"></td>
    <td class="n dzo">${O[0]}</td>
-   <td><input class="dz-in n" data-id="${r.id}" data-f="gvSp" data-m="1" value="${r.gvSp==null?"":dzMoney(r.gvSp)}" placeholder="${r.parts?"chưa có giá vốn":"0"}" inputmode="numeric"></td>
-   <td><input class="dz-in n" data-id="${r.id}" data-f="gvQua" data-m="1" value="${r.gvQua==null?"":dzMoney(r.gvQua)}" placeholder="0" inputmode="numeric" title="Giá vốn quà tặng kèm (không tính giá lẻ)">
-     <div class="dz-gf">${(r.parts||[]).map((p,k)=>p.kind==="gift"?`<span class="pill p-vio">🎁 ${esc(p.code)} ×<input class="dz-gq" data-gid="${r.id}" data-gk="${k}" value="${p.qty}" inputmode="numeric"><a data-gx="${r.id}.${k}" title="Bỏ quà này">✕</a></span>`:"").join("")}<button class="btn sm ghost" data-gift="${r.id}" title="Chọn quà từ danh mục, giá vốn quà tự nhảy">+ Chọn quà</button></div></td>
+   ${money("gvSp","0")}${money("gvQua","0")}
    ${r.kenh==="facebook"?"":pc("aff")}${pc("booking")}${pc("cpqc")}
    <td class="n dz-fx" title="Tự lấy từ chi phí của kênh">${dzFmtPct(A[r.kenh].phiSan)}</td><td class="n dz-fx" title="Thuế + nhân sự, tự lấy từ chi phí của kênh">${dzFmtPct(A[r.kenh].thue+A[r.kenh].nhanSu)}</td>
    ${O.slice(1).map(h=>`<td class="n dzo">${h}</td>`).join("")}
-   <td class="dz-act"><button class="btn sm ghost" data-dup="${r.id}" title="Nhân đôi dòng để thử một chương trình khác">Nhân đôi</button><button class="btn sm ghost" data-del="${r.id}" title="Xóa dòng">✕</button></td></tr>`;
+   <td class="dz-act"><button class="btn sm ghost" data-dup="${r.id}" title="Nhân đôi dòng để thử một chương trình khác">Nhân đôi</button><button class="btn sm ghost" data-del="${r.id}" title="Xóa dòng">✕</button></td></tr>${dzSubHTML(r,g,cols)}`;
 }
 /* Cập nhật tại chỗ ô kết quả của một dòng (không vẽ lại cả bảng để không mất con trỏ khi Tab). */
 function dzRefreshRow(r){
@@ -96,7 +119,11 @@ function dzRefreshRow(r){
   const g=dzCostMap(),miss=dzAuto(r,g),x=dzCalc(dzEff(r),DZB.A);
   tr.className="dz-r dz-"+dzTone(x);
   const O=dzOutCells(r,DZB.A);tr.querySelectorAll(".dzo").forEach((td,i)=>td.innerHTML=O[i]);
-  ["gvSp","gvQua"].forEach(f=>{const el=tr.querySelector(`[data-f="${f}"]`);if(el&&document.activeElement!==el)el.value=r[f]==null?"":dzMoney(r[f])});
+  if(dzHasItems(r)){
+    const set=(f,h)=>{const c=tr.querySelector(`[data-cell="${f}"]`);if(c)c.innerHTML=h};
+    set("gia",dzGiaCell(r));set("gvSp",r.gvSp==null?`<span class="dz-ms">chưa có giá vốn</span>`:nf(r.gvSp));set("gvQua",r.gvQua==null?`<span class="dz-ms">chưa có giá vốn</span>`:nf(r.gvQua));
+    r.parts.forEach((p,k)=>{const id=r.id+"."+k,a=document.querySelector(`[data-itt="${id}"]`),b=document.querySelector(`[data-itc="${id}"]`);if(a)a.innerHTML=dzItemTT(p);if(b)b.innerHTML=dzItemCost(p,g)});
+  }else["gvSp","gvQua"].forEach(f=>{const el=tr.querySelector(`[data-f="${f}"]`);if(el&&document.activeElement!==el)el.value=r[f]==null?"":dzMoney(r[f])});
   const hn=tr.querySelector(".dz-hn");if(hn)hn.innerHTML=miss.length?`<small class="dz-s" style="color:var(--red)">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:dzHint(r,DZB.A);
   dzRefreshKpi();
 }
@@ -137,16 +164,16 @@ function dzPickItems(g){
 }
 function dzPicker(id,mode){
   if(typeof spcLoad==="function"&&(typeof SPCB==="undefined"||!SPCB.rows)){try{spcLoad(true)}catch(e){}let n=0;const w=setInterval(()=>{n++;if(!document.getElementById("dz-plist")||n>40){clearInterval(w);return}if(SPCB.rows){clearInterval(w);dzPickDraw()}},500)}
-  DZB.pk=id;DZB.pm=mode||"";DZB.ptab=mode==="gift"?"sp":(DZB.ptab||"combo");DZB.pq="";
-  openDrawerHTML(`<h2 class="dtitle">${mode==="gift"?"Chọn quà tặng":"Chọn từ danh mục"}</h2>${mode==="gift"?`<p class="hint">Chọn quà từ danh mục: giá vốn quà tự nhảy vào ô “Giá vốn quà tặng” (giá vốn, không phải giá lẻ).</p>`:""}<p class="hint">Chọn combo hoặc sản phẩm để tự điền giá vốn sản phẩm chính và giá vốn quà. Mã chưa có giá vốn sẽ báo rõ, không tự ước.</p>
+  DZB.pk=id;DZB.pm=mode||"";DZB.ptab=mode==="item"?"sp":(DZB.ptab||"combo");DZB.pq="";
+  openDrawerHTML(`<h2 class="dtitle">${mode==="item"?"Thêm sản phẩm vào combo":"Chọn từ danh mục"}</h2>${mode==="item"?`<p class="hint">Chọn sản phẩm để thêm vào combo. Sau đó ghi giá bán của món đó: món tính tiền ghi giá, món tặng ghi 0đ (giá vốn tự điền).</p>`:""}<p class="hint">Chọn combo hoặc sản phẩm để tự điền giá vốn sản phẩm chính và giá vốn quà. Mã chưa có giá vốn sẽ báo rõ, không tự ước.</p>
    <nav class="settabs" id="dz-ptabs"></nav><input id="dz-pq" class="dz-in" placeholder="Gõ tên hoặc mã để tìm…" style="width:100%;margin:8px 0"><div id="dz-plist"></div>`);
   const q=document.getElementById("dz-pq");q.oninput=()=>{DZB.pq=q.value;dzPickDraw()};dzPickDraw();setTimeout(()=>q.focus(),50);
 }
 function dzPickDraw(){
   if(typeof SPCB==="undefined"||!SPCB.rows){const pl=document.getElementById("dz-plist");if(pl)pl.innerHTML=`<p class="hint pad">${typeof SPCB!=="undefined"&&SPCB.err?esc(SPCB.err):"Đang tải danh mục sản phẩm…"}</p>`;return}
   const g=dzCostMap(),P=dzPickItems(g),fold=typeof kfold==="function"?kfold:dzLow,w=fold(DZB.pq||"").trim().split(/\s+/).filter(Boolean);
-  if(DZB.pm==="gift")DZB.ptab="sp";
-  document.getElementById("dz-ptabs").innerHTML=DZB.pm==="gift"?"":[["combo","Combo ("+P.combos.length+")"],["sp","Sản phẩm ("+P.prods.length+")"]].map(([k,t])=>`<button class="${DZB.ptab===k?"on":""}" data-pt="${k}">${t}</button>`).join("");
+  if(DZB.pm==="item")DZB.ptab="sp";
+  document.getElementById("dz-ptabs").innerHTML=DZB.pm==="item"?"":[["combo","Combo ("+P.combos.length+")"],["sp","Sản phẩm ("+P.prods.length+")"]].map(([k,t])=>`<button class="${DZB.ptab===k?"on":""}" data-pt="${k}">${t}</button>`).join("");
   document.querySelectorAll("[data-pt]").forEach(b=>b.onclick=()=>{DZB.ptab=b.dataset.pt;dzPickDraw()});
   let L=DZB.ptab==="sp"?P.prods:P.combos;
   if(w.length)L=L.filter(x=>w.every(t=>fold(x.name+" "+(x.desc||"")+" "+(x.code||"")).includes(t)));
@@ -157,12 +184,12 @@ function dzPickDraw(){
    :`<p class="hint pad">Không có mục nào khớp.</p>`;
   document.querySelectorAll("[data-pi]").forEach(el=>el.onclick=()=>{
     const x=L[+el.dataset.pi],r=DZB.rows.find(y=>y.id===DZB.pk);if(!r)return;
-    if(DZB.pm==="gift"){
-      if(!r.parts){r.parts=[];r.mSp=true}/* dòng gõ tay giá vốn SP: giữ nguyên số đã gõ */
-      const o=r.parts.find(p=>p.kind==="gift"&&dzLow(p.code)===dzLow(x.code));if(o)o.qty=(+o.qty||1)+1;else r.parts.push({code:x.code,qty:1,kind:"gift"});
-      r.mQua=false;dzSave();closeDrawer();renderMain();
-      if(x.cs.gvSp==null)toast("Quà này chưa có giá vốn: nhập ở Sản phẩm & combo hoặc Giá vốn SKU");return}
-    r.parts=x.parts;r.mSp=false;r.mQua=false;if(!r.ten)r.ten=x.name;
+    if(DZB.pm==="item"){
+      if(!r.parts)r.parts=[];
+      const o=r.parts.find(p=>p.kind!=="pack"&&dzLow(p.code)===dzLow(x.code));if(o)o.qty=(+o.qty||1)+1;else r.parts.push({code:x.code,name:x.name,qty:1,gia:null,kind:"sp"});
+      dzSave();closeDrawer();renderMain();
+      if(x.cs.gvSp==null)toast("Sản phẩm này chưa có giá vốn: nhập ở Sản phẩm & combo hoặc Giá vốn SKU");return}
+    r.parts=x.parts.map(p=>p.kind==="pack"||p.kind==="skip"?Object.assign({},p):{code:p.code,name:dzNameOf(p.code),qty:p.qty,gia:p.kind==="gift"?0:null,kind:p.kind});r.mSp=false;r.mQua=false;if(!r.ten)r.ten=x.name;
     dzSave();closeDrawer();renderMain();
     if(x.cs.gvSp==null)toast("Mã này chưa có giá vốn: nhập ở Sản phẩm & combo hoặc Giá vốn SKU")});
 }
@@ -201,12 +228,14 @@ function dzBind(m){
       if(f==="aff"||f==="cpqc"||f==="booking")el.value=dzIn(r[f]);else if(el.dataset.m)el.value=r[f]==null?"":dzMoney(r[f])}
     dzSave();dzRefreshRow(r)});
   m.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>dzPicker(b.dataset.pick));
-  m.querySelectorAll("[data-gift]").forEach(b=>b.onclick=()=>dzPicker(b.dataset.gift,"gift"));
-  m.querySelectorAll("[data-gx]").forEach(a=>a.onclick=()=>{const [id,k]=a.dataset.gx.split("."),r=DZB.rows.find(x=>x.id===id);if(!r)return;r.parts.splice(+k,1);r.mQua=false;dzSave();renderMain()});
-  m.querySelectorAll("[data-gid]").forEach(el=>el.onchange=()=>{const r=DZB.rows.find(x=>x.id===el.dataset.gid),p=r&&r.parts[+el.dataset.gk];if(!p)return;const v=dzParse(el.value,true);p.qty=v>0?v:1;r.mQua=false;dzSave();renderMain()});
+  m.querySelectorAll("[data-additem]").forEach(b=>b.onclick=()=>dzPicker(b.dataset.additem,"item"));
+  m.querySelectorAll("[data-itx]").forEach(a=>a.onclick=()=>{const [id,k]=a.dataset.itx.split("."),r=DZB.rows.find(x=>x.id===id);if(!r)return;r.parts.splice(+k,1);dzSave();renderMain()});
+  m.querySelectorAll("input[data-it]").forEach(el=>el.onchange=()=>{const [id,k,f]=el.dataset.it.split("."),r=DZB.rows.find(x=>x.id===id),p=r&&r.parts[+k];if(!p)return;
+    if(f==="q"){const v=dzParse(el.value,false);p.qty=v>0?v:1;el.value=dzIn(p.qty)}else{const v=dzParse(el.value,true);p.gia=v;el.value=v==null?"":dzMoney(v)}
+    dzSave();dzRefreshRow(r)});
   m.querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>{
     if(dzRowsK().length>=DZ_MAX_ROWS){toast("Tối đa "+DZ_MAX_ROWS+" dòng mỗi kênh");return}
-    const i=DZB.rows.findIndex(x=>x.id===b.dataset.dup),r=DZB.rows[i];DZB.rows.splice(i+1,0,Object.assign({},r,{id:dzId(),ten:(r.ten||"")+" (bản sao)",parts:r.parts?r.parts.slice():null}));dzSave();renderMain()});
+    const i=DZB.rows.findIndex(x=>x.id===b.dataset.dup),r=DZB.rows[i];DZB.rows.splice(i+1,0,Object.assign({},r,{id:dzId(),ten:(r.ten||"")+" (bản sao)",parts:r.parts?r.parts.map(p=>Object.assign({},p)):null}));dzSave();renderMain()});
   m.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
     if(DZB.rows.length>1&&!confirm("Xóa dòng này?"))return;
     DZB.rows=DZB.rows.filter(x=>x.id!==b.dataset.del);if(!dzRowsK().length)DZB.rows.push(dzBlank());if(DZB.pr&&!DZB.rows.some(x=>x.id===DZB.pr))DZB.pr=null;dzSave();renderMain()});
@@ -256,7 +285,7 @@ MODULES.push({k:"q_dutru",adm:true,zone:"Quản trị",ic:"spark",n:"Dự trù g
 
 /* Kiểu hiển thị riêng của trang (tiền tố dz-). */
 (function(){if(typeof document==="undefined"||document.getElementById("dz-css"))return;const s=document.createElement("style");s.id="dz-css";s.textContent=`
-.dz-wrap{overflow-x:auto}.dz-t{min-width:1450px}.dz-hn{max-width:340px}.dz-fx{color:var(--muted);background:#f8fafc}.dz-gf{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}.dz-gq{width:26px;border:0;background:transparent;font:inherit;font-weight:600;color:inherit;text-align:center;padding:0}.dz-gf a{cursor:pointer;margin-left:4px;opacity:.7}.dz-hl{text-align:left!important;line-height:1.35}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
+.dz-wrap{overflow-x:auto}.dz-t{min-width:1450px}.dz-hn{max-width:340px}.dz-ro{background:#f8fafc;font-weight:600}.dz-sub>td{background:#f8fafc;border-bottom:2px solid var(--line)}.dz-itw{padding:2px 0 6px}.dz-itt{border-collapse:collapse;min-width:640px}.dz-itt th{font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;text-align:left}.dz-itt th.n{text-align:right}.dz-itt td{padding:4px 8px;border-top:1px solid var(--line)}.dz-itt td.n{text-align:right;white-space:nowrap}.dz-ita{margin-top:6px;display:flex;gap:8px}.dz-x{cursor:pointer;opacity:.7}.dz-fx{color:var(--muted);background:#f8fafc}.dz-gf{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}.dz-gq{width:26px;border:0;background:transparent;font:inherit;font-weight:600;color:inherit;text-align:center;padding:0}.dz-gf a{cursor:pointer;margin-left:4px;opacity:.7}.dz-hl{text-align:left!important;line-height:1.35}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
 .dz-in{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13.5px;background:#fff;color:inherit;min-width:0;box-sizing:border-box}.dz-in.n{text-align:right;width:100%;min-width:92px}.dz-in.s{width:66px;min-width:66px}
 .dz-t td:nth-child(2){min-width:290px}.dz-nm{display:flex;gap:6px;align-items:center}.dz-nm .dz-in{flex:1;min-width:140px}.dz-nm .btn{white-space:nowrap}
 .dz-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;text-align:right}.dz-no{color:var(--muted)}.dz-ms{color:var(--red);font-weight:600;font-size:12.5px}

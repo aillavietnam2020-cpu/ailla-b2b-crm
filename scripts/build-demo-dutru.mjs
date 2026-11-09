@@ -23,8 +23,8 @@ function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeou
 function openDrawerHTML(h){const dr=$("#drawer");$("#drawerIn").innerHTML='<button class="x" id="dx">✕</button>'+h;dr.hidden=false;$("#dx").onclick=closeDrawer}
 function closeDrawer(){$("#drawer").hidden=true}
 const ME={name:"Chị Hoa"};
-const _D={skus:[],dutru:null};const DB={data:_D,mutate(w,m,fn){fn(_D);try{localStorage.setItem("dutru_demo7",JSON.stringify(_D.dutru))}catch(e){}}};
-try{const s=JSON.parse(localStorage.getItem("dutru_demo7")||"null");if(s)_D.dutru=s}catch(e){}
+const _D={skus:[],dutru:null};const DB={data:_D,mutate(w,m,fn){fn(_D);try{localStorage.setItem("dutru_demo8",JSON.stringify(_D.dutru))}catch(e){}}};
+try{const s=JSON.parse(localStorage.getItem("dutru_demo8")||"null");if(s)_D.dutru=s}catch(e){}
 const D=()=>_D;
 const PAGES={},MODULES=[],MI=(k,t,p)=>[k,t,p];
 let PAGE="dutru";
@@ -43,13 +43,13 @@ function spcCtx(){const combos=spcGroup(SPCB.rows,SPCB.sales,spcToday());return 
 function renderMain(){pDutru($("#main"))}
 `;
 const boot0=`if(!D().dutru){D().dutru={A:null,gvFile:dzParseGiaThanh(${JSON.stringify(gtAoa)}),rows:[
- {id:"m1",ten:"Sáp thơm dứa (như ví dụ Google Sheet)",kenh:"tiktok",gia:55000,gvSp:null,gvQua:null,giam:0,giamK:"%",aff:5,booking:3,cpqc:15,parts:[{code:"AILLASAPTHOMDUA",qty:1,kind:"sp"}],mSp:false,mQua:false},
- {id:"m2",ten:"Tẩy vạn năng bộ 2 + chổi",kenh:"tiktok",gia:79000,gvSp:null,gvQua:null,aff:5,booking:2,cpqc:8,parts:[{code:"AILLATVN250",qty:2,kind:"sp"},{code:"QUA-CHOI",qty:1,kind:"gift"},{code:"HOP-GIAY",qty:1,kind:"pack"}],mSp:false,mQua:false},
- {id:"m3",ten:"Tinh dầu giặt sấy combo 2 chai + khăn",kenh:"facebook",gia:129000,gvSp:null,gvQua:null,aff:0,booking:5,cpqc:15,parts:[{code:"AILLATDGS80CFT",qty:2,kind:"sp"},{code:"QUA-KHAN",qty:1,kind:"gift"}],mSp:false,mQua:false},
- {id:"m4",ten:"Nước xả vải 1L (mã chưa có giá vốn)",kenh:"tiktok",gia:79000,gvSp:null,gvQua:null,aff:5,booking:0,cpqc:15,parts:[{code:"AILLA-NX1L",qty:1,kind:"sp"}],mSp:false,mQua:false}]}}
+ {id:"m1",ten:"Sáp thơm dứa (như ví dụ Google Sheet)",kenh:"tiktok",gia:null,giam:0,giamK:"%",gvSp:null,gvQua:null,aff:3.4,booking:3,cpqc:15,parts:[{code:"AILLASAPTHOMDUA",name:"Sáp thơm dứa Ailla",qty:1,gia:55000,kind:"sp"}],mSp:false,mQua:false},
+ {id:"m2",ten:"Tẩy vạn năng bộ 2 + chổi tặng",kenh:"tiktok",gia:null,giam:0,giamK:"%",gvSp:null,gvQua:null,aff:3.4,booking:2,cpqc:8,parts:[{code:"AILLATVN250",name:"Tẩy vạn năng Ailla 250g",qty:2,gia:39500,kind:"sp"},{code:"QUA-CHOI",name:"Chổi cọ (quà)",qty:1,gia:0,kind:"gift"},{code:"HOP-GIAY",qty:1,kind:"pack"}],mSp:false,mQua:false},
+ {id:"m3",ten:"Tinh dầu giặt sấy combo 2 chai + khăn tặng",kenh:"facebook",gia:null,giam:0,giamK:"%",gvSp:null,gvQua:null,aff:0,booking:5,cpqc:15,parts:[{code:"AILLATDGS80CFT",name:"Tinh dầu giặt sấy 80ml CFT",qty:2,gia:64500,kind:"sp"},{code:"QUA-KHAN",name:"Khăn lau (quà)",qty:1,gia:0,kind:"gift"}],mSp:false,mQua:false},
+ {id:"m4",ten:"Nước xả vải 1L (mã chưa có giá vốn)",kenh:"tiktok",gia:null,giam:0,giamK:"%",gvSp:null,gvQua:null,aff:3.4,booking:0,cpqc:15,parts:[{code:"AILLA-NX1L",name:"Nước xả vải 1L",qty:1,gia:79000,kind:"sp"}],mSp:false,mQua:false}]}}
 `;
 const boot = boot0 + `
-document.getElementById("dz-reset").onclick=()=>{try{localStorage.removeItem("dutru_demo7")}catch(e){}location.reload()};
+document.getElementById("dz-reset").onclick=()=>{try{localStorage.removeItem("dutru_demo8")}catch(e){}location.reload()};
 pDutru($("#main"));
 `;
 const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Dự trù giá bán</title><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
