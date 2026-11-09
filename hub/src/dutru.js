@@ -1,6 +1,6 @@
 /* =====================================================================
    DỰ TRÙ GIÁ BÁN (Quản trị › Lãi lỗ › Dự trù giá bán): tính giá bán, lãi và ngưỡng quảng cáo cho combo trên TikTok / Facebook,
-   thử chương trình khuyến mại. Theo Google Sheet mẫu chị Hoa ("AILLA - Dự trù giá bán TikTok & Facebook").
+   so chương trình khuyến mại bằng cách nhân đôi dòng. Theo Google Sheet mẫu chị Hoa ("AILLA - Dự trù giá bán TikTok & Facebook").
    Hàm tính: dutrucalc.js (test: tests/unit/dutrucalc.test.ts). Giá vốn lấy từ Sản phẩm & combo + Giá vốn SKU + giá nhập kho (spcombo.js),
    mã nào chưa có giá vốn thì ghi rõ "chưa có giá vốn", không ước số. Giả định chi phí và các dòng phương án lưu ở D().dutru (hub_state), không cần bảng mới.
    Chỉ CEO / kế toán xem (cùng quyền xem giá vốn): tài khoản vận hành không thấy lãi.
@@ -23,7 +23,7 @@ function dzInit(){
   DZB.A=dzAssume(s&&s.A);
   if(!DZB.rows.length)DZB.rows.push(dzBlank());
 }
-const dzBlank=(o)=>Object.assign({id:dzId(),ten:"",kenh:"tiktok",gia:null,gvSp:null,gvQua:null,aff:0,booking:0,cpqc:0,parts:null,mSp:false,mQua:false},o||{});
+const dzBlank=(o)=>Object.assign({id:dzId(),ten:"",kenh:"tiktok",gia:null,giam:0,giamK:"%",gvSp:null,gvQua:null,aff:0,booking:0,cpqc:0,parts:null,mSp:false,mQua:false},o||{});
 function dzSave(){
   const snap=JSON.parse(JSON.stringify({A:DZB.A,rows:DZB.rows,gvFile:DZB.file()}));
   try{DB.mutate(ME&&ME.name||"",  "dự trù giá bán",d=>{d.dutru=snap})}catch(e){}
@@ -47,40 +47,57 @@ function dzAuto(r,g){
 const dzName=n=>n&&n.length>46?n.slice(0,45)+"…":n;
 const dzTag=(t,c)=>`<span class="pill p-${c}">${t}</span>`;
 
-/* Các ô kết quả của một dòng (4 cột: lãi, biên, CPQC trần, ROAS trần). */
+/* Giá khách thực trả sau giảm (giảm nhập "10%" hoặc "5000"). Mọi kiểu khuyến mại quy về hai thứ: giá khách trả và quà tặng thêm. */
+const dzEffGia=r=>{const g=dzN(r.gia),v=dzN(r.giam);return Math.max(0,r.giamK==="%"?g*(1-v/100):g-v)};
+const dzEff=r=>Object.assign({},r,{gia:dzEffGia(r)});
+const dzGiamTxt=r=>!dzN(r.giam)?"":r.giamK==="%"?dzIn(r.giam)+"%":nf(r.giam);
+/* Các ô kết quả của một dòng (5 cột: khách trả, lãi, biên, CPQC trần, ROAS cần đạt). */
 function dzOutCells(r,A){
-  const x=dzCalc(r,A);
-  if(!x.ok)return [`<span class="dz-ms">${esc(x.why)}</span>`,"—","—","—"];
+  const e=dzEff(r),x=dzCalc(e,A),gk=dzN(r.giam)?`<b>${nf(e.gia)}</b>`:`<span style="color:var(--muted)">${nf(e.gia)}</span>`;
+  if(!x.ok)return [r.gia==null?"—":gk,`<span class="dz-ms">${esc(x.why)}</span>`,"—","—","—"];
   const tone=dzTone(x),col=tone==="red"?"var(--red)":tone==="amb"?"var(--orange)":"var(--green)";
-  return [`<b style="color:${col}">${nf(x.ln)}</b>`,`<b style="color:${col}">${dzFmtPct(x.bien)}</b>`,
+  return [gk,`<b style="color:${col}">${nf(x.ln)}</b>`,`<b style="color:${col}">${dzFmtPct(x.bien)}</b>`,
     x.tran>0?`<b>${dzFmtPct(x.tran)}</b>`:`<span style="color:var(--red)">${dzFmtPct(x.tran)}</span>`,x.roasTran==null?`<span style="color:var(--red)">không có</span>`:`<b>${dzFmtRoas(x.roasTran)}</b>`];
 }
-const dzGvTotal=r=>r.gvSp==null?null:r.gvSp+(r.gvQua==null?0:r.gvQua);
+/* Dòng gợi ý dưới tên: giảm tối đa, quà tối đa, ngân sách marketing còn lại để giữ biên mục tiêu. */
+function dzHint(r,A){
+  const e=dzEff(r),x=dzCalc(e,A);if(!x.ok)return "";
+  const m=dzMax(e,A);if(!m)return "";
+  if(m.kho)return `<small class="dz-s dz-hl" style="color:var(--red)">Chi phí tỷ lệ quá cao, không giá nào đạt biên mục tiêu: giảm Affiliate / Booking / CPQC.</small>`;
+  const mk=x.aff+x.bk+dzN(r.cpqc),mkMax=Math.max(0,mk+x.bien-A.bienMT);
+  const g=dzN(r.gia)?Math.max(0,(dzN(r.gia)-m.pmin)/dzN(r.gia)*100):0;
+  if(x.bien<A.bienMT)return `<small class="dz-s dz-hl" style="color:var(--orange)">Chưa đạt biên ${dzFmtPct(A.bienMT)}: cần khách trả từ ${nf(m.pmin)}đ, hoặc cắt Affiliate + Booking + CPQC từ ${dzFmtPct(mk)} xuống ${dzFmtPct(mkMax)}.</small>`;
+  return `<small class="dz-s dz-hl" style="color:var(--green)">Còn đạt biên ${dzFmtPct(A.bienMT)} nếu: giảm tối đa ${dzFmtPct(g)} (khách trả ≥ ${nf(m.pmin)}đ) · tặng thêm quà ≤ ${nf(m.quaMax)}đ · Affiliate + Booking + CPQC ≤ ${dzFmtPct(mkMax)}.</small>`;
+}
 function dzRowHTML(r,i,A,g){
-  const miss=dzAuto(r,g),O=dzOutCells(r,A),x=dzCalc(r,A),tone=dzTone(x),tot=dzGvTotal(r),sub=r.parts&&r.gvSp!=null&&r.gvQua?`SP ${nf(r.gvSp)} + quà ${nf(r.gvQua)}`:r.parts&&r.mSp?"gõ tay":r.parts?"tự điền":"";
+  const miss=dzAuto(r,g),O=dzOutCells(r,A),x=dzCalc(dzEff(r),A),tone=dzTone(x);
   const pc=f=>`<td><input class="dz-in n s" data-id="${r.id}" data-f="${f}" value="${dzIn(r[f])}" inputmode="decimal"></td>`;
   return `<tr class="dz-r dz-${tone}" data-rid="${r.id}"><td class="dz-no">${i+1}</td>
-   <td><div class="dz-nm"><input class="dz-in" data-id="${r.id}" data-f="ten" value="${esc(r.ten||"")}" placeholder="Tên combo / phương án"><button class="btn sm ghost" data-pick="${r.id}" title="Chọn sản phẩm hoặc combo từ danh mục để tự điền giá vốn">Chọn</button></div>
-     ${miss.length?`<small class="dz-s" style="color:var(--red);text-align:left">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:""}</td>
+   <td><div class="dz-nm"><input class="dz-in" data-id="${r.id}" data-f="ten" value="${esc(r.ten||"")}" placeholder="Tên combo / chương trình"><button class="btn sm ghost" data-pick="${r.id}" title="Chọn sản phẩm hoặc combo từ danh mục để tự điền giá vốn">Chọn</button></div>
+     <div class="dz-hn">${miss.length?`<small class="dz-s" style="color:var(--red)">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:dzHint(r,A)}</div></td>
    <td><select class="dz-in" data-id="${r.id}" data-f="kenh">${opt(DZ_KENH,r.kenh)}</select></td>
    <td><input class="dz-in n" data-id="${r.id}" data-f="gia" data-m="1" value="${r.gia==null?"":dzMoney(r.gia)}" placeholder="0" inputmode="numeric"></td>
-   <td><input class="dz-in n" data-id="${r.id}" data-f="gv" data-m="1" value="${tot==null?"":dzMoney(tot)}" placeholder="${r.parts?"chưa có giá vốn":"0"}" inputmode="numeric"><small class="dz-s">${sub}</small></td>
+   <td><input class="dz-in n s" data-id="${r.id}" data-f="giam" value="${dzGiamTxt(r)}" placeholder="10% hay 5000" title="Giảm giá cho khách: gõ 10% hoặc số tiền 5000"></td>
+   <td class="n dzo">${O[0]}</td>
+   <td><input class="dz-in n" data-id="${r.id}" data-f="gvSp" data-m="1" value="${r.gvSp==null?"":dzMoney(r.gvSp)}" placeholder="${r.parts?"chưa có giá vốn":"0"}" inputmode="numeric"></td>
+   <td><input class="dz-in n" data-id="${r.id}" data-f="gvQua" data-m="1" value="${r.gvQua==null?"":dzMoney(r.gvQua)}" placeholder="0" inputmode="numeric" title="Giá vốn quà tặng kèm (không tính giá lẻ)"></td>
    ${pc("aff")}${pc("booking")}${pc("cpqc")}
-   ${O.map(h=>`<td class="n dzo">${h}</td>`).join("")}
-   <td class="dz-act"><button class="btn sm" data-km="${r.id}" title="Thử chương trình khuyến mại">Thử KM</button><button class="btn sm ghost" data-dup="${r.id}" title="Nhân đôi dòng">⧉</button><button class="btn sm ghost" data-del="${r.id}" title="Xóa dòng">✕</button></td></tr>`;
+   ${O.slice(1).map(h=>`<td class="n dzo">${h}</td>`).join("")}
+   <td class="dz-act"><button class="btn sm ghost" data-dup="${r.id}" title="Nhân đôi dòng để thử một chương trình khác">Nhân đôi</button><button class="btn sm ghost" data-del="${r.id}" title="Xóa dòng">✕</button></td></tr>`;
 }
 /* Cập nhật tại chỗ ô kết quả của một dòng (không vẽ lại cả bảng để không mất con trỏ khi Tab). */
 function dzRefreshRow(r){
   const tr=document.querySelector(`tr[data-rid="${r.id}"]`);if(!tr)return;
-  const g=dzCostMap(),miss=dzAuto(r,g),x=dzCalc(r,DZB.A);
+  const g=dzCostMap(),miss=dzAuto(r,g),x=dzCalc(dzEff(r),DZB.A);
   tr.className="dz-r dz-"+dzTone(x);
-  const O=dzOutCells(r,DZB.A);tr.querySelectorAll(".dto").forEach((td,i)=>td.innerHTML=O[i]);
-  {const el=tr.querySelector('[data-f="gv"]'),t=dzGvTotal(r);if(el&&document.activeElement!==el)el.value=t==null?"":dzMoney(t)}
-  dzRefreshKpi();if(DZB.pr===r.id)dzPromoDraw();
+  const O=dzOutCells(r,DZB.A);tr.querySelectorAll(".dzo").forEach((td,i)=>td.innerHTML=O[i]);
+  ["gvSp","gvQua"].forEach(f=>{const el=tr.querySelector(`[data-f="${f}"]`);if(el&&document.activeElement!==el)el.value=r[f]==null?"":dzMoney(r[f])});
+  const hn=tr.querySelector(".dz-hn");if(hn)hn.innerHTML=miss.length?`<small class="dz-s" style="color:var(--red)">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:dzHint(r,DZB.A);
+  dzRefreshKpi();
 }
 function dzRefreshKpi(){const k=document.getElementById("dz-kpi");if(k)k.innerHTML=dzKpiHTML()}
 function dzKpiHTML(){
-  const R=DZB.rows.map(r=>({r,x:dzCalc(r,DZB.A)})),ok=R.filter(o=>o.x.ok),lo=ok.filter(o=>o.x.tt==="lo").length,th=ok.filter(o=>o.x.tt==="thap").length;
+  const R=DZB.rows.map(r=>({r,x:dzCalc(dzEff(r),DZB.A)})),ok=R.filter(o=>o.x.ok),lo=ok.filter(o=>o.x.tt==="lo").length,th=ok.filter(o=>o.x.tt==="thap").length;
   const best=ok.slice().sort((a,b)=>b.x.bien-a.x.bien)[0],nm=R.filter(o=>!o.x.ok&&o.x.why==="Chưa có giá vốn").length;
   return kpi("Phương án đang so",nf(DZB.rows.length),`tối đa ${DZ_MAX_ROWS} dòng · biên mục tiêu ${dzFmtPct(DZB.A.bienMT)}`)
    +kpi("Đạt biên mục tiêu",nf(ok.length-lo-th),`${nf(th)} dưới mục tiêu`,th?"#b54708":"")
@@ -99,63 +116,6 @@ function dzAssumeHTML(){
    <tr class="dz-tot"><td><b>Tổng % cố định</b> (chưa gồm Affiliate, Booking, CPQC)</td><td class="n"><b>${dzFmtPct(dzFixedPct(A.tiktok))}</b></td><td class="n"><b>${dzFmtPct(dzFixedPct(A.facebook))}</b></td><td></td></tr>
    <tr><td>Biên lãi mục tiêu</td><td colspan="2"><input class="dz-in n s" data-a="bienMT" value="${dzIn(A.bienMT)}" inputmode="decimal"> %</td><td class="hint">Dưới mức này thì tô cảnh báo; dùng để tính CPQC trần, ROAS cần đạt và mức giảm giá tối đa</td></tr>
    </tbody></table></div></div>`;
-}
-/* ---------- Thử khuyến mại ---------- */
-function dzPP(r){
-  let p=DZB.pp[r.id];
-  if(!p)p=DZB.pp[r.id]={pct:10,tien:5000,vc:10,vcmax:10000,qua:3000,flash:Math.round((+r.gia||0)*0.85/1000)*1000};
-  return p;
-}
-function dzPromoHTML(r){
-  const p=dzPP(r),A=DZB.A,m=dzMax(r,A),T=dzCalc(r,A);
-  const sc=[{k:"pct",v:p.pct},{k:"tien",v:p.tien},{k:"voucher",v:p.vc,max:p.vcmax},{k:"qua",v:p.qua},{k:"flash",v:p.flash}];
-  const C=sc.map(s=>dzPromoCmp(r,s,A));
-  const head=`<th></th><th class="n">Chưa khuyến mại</th>`+DZ_PROMO.map(x=>`<th class="n">${x[1]}</th>`).join("");
-  const inp=(f,u,mx)=>`<input class="dz-in n s" data-pp="${f}" value="${f==="vcmax"||f==="tien"||f==="qua"||f==="flash"?dzMoney(p[f]):dzIn(p[f])}" inputmode="decimal"> ${u}`;
-  const inRow=`<tr class="dz-prin"><td>Mức thử</td><td class="n">—</td><td class="n">${inp("pct","%")}</td><td class="n">${inp("tien","đ")}</td><td class="n">${inp("vc","%")}<br><small class="hint">tối đa</small> ${inp("vcmax","đ")}</td><td class="n">${inp("qua","đ")}<br><small class="hint">giá vốn quà</small></td><td class="n">${inp("flash","đ")}</td></tr>`;
-  const cell=(f,fmt)=>`<td class="n">${fmt(T)}</td>`+C.map(c=>`<td class="n">${c.sau.ok?fmt(c.sau,c):"—"}</td>`).join("");
-  const col=x=>x.tt==="lo"?"var(--red)":x.tt==="thap"?"var(--orange)":"var(--green)";
-  const rows=T.ok?[
-    ["Giá bán thực thu",x=>nf(x.gia)],
-    ["Khách được giảm",(x,c)=>c?nf(c.giam):"—"],
-    ["Lợi nhuận mỗi đơn",x=>`<b style="color:${col(x)}">${nf(x.ln)}</b>`],
-    ["Biên lợi nhuận",x=>`<b style="color:${col(x)}">${dzFmtPct(x.bien)}</b>`],
-    ["CPQC trần",x=>x.tran>0?dzFmtPct(x.tran):`<span style="color:var(--red)">${dzFmtPct(x.tran)}</span>`],
-    ["ROAS trần",x=>x.roasTran==null?`<span style="color:var(--red)">không có</span>`:dzFmtRoas(x.roasTran)]].map(([n,f])=>`<tr><td>${n}</td>${cell(0,f)}</tr>`).join("")
-   +`<tr><td>Biên đổi so với trước</td><td class="n">—</td>${C.map(c=>`<td class="n">${c.sau.ok?(c.dBien>=0?"+":"")+(Math.round(c.dBien*10)/10).toLocaleString("vi-VN")+" điểm":"—"}</td>`).join("")}</tr>
-    <tr><td>Cảnh báo</td><td class="n">${T.tt==="lo"?dzTag("Đang lỗ","red"):T.tt==="thap"?dzTag("Dưới mục tiêu","amb"):dzTag("Đạt","grn")}</td>${C.map(c=>`<td class="n">${!c.sau.ok?"":c.sau.tt==="lo"?dzTag("LỖ "+nf(-c.sau.ln)+"đ/đơn","red"):c.sau.tt==="thap"?dzTag("Dưới mục tiêu","amb"):dzTag("Đạt","grn")}</td>`).join("")}</tr>
-    <tr><td></td><td></td>${C.map((c,i)=>`<td class="n"><button class="btn sm ghost" data-addp="${i}" title="Thêm phương án này thành một dòng trong bảng để so sánh">+ Thêm vào bảng</button></td>`).join("")}</tr>`
-   :`<tr><td colspan="7" class="empty">${esc(T.why||"")}: nhập giá bán và giá vốn ở dòng này trước.</td></tr>`;
-  let gy="";
-  if(T.ok&&m){
-    gy=m.kho?`<div class="note red">${esc(m.why)}.</div>`
-     :m.daDat?`<div class="note grn">Gợi ý: còn đạt biên mục tiêu ${dzFmtPct(A.bienMT)} nếu <b>giảm tối đa ${dzFmtPct(m.giamPct)} (${nf(m.giamD)}đ)</b>, tức giá thực thu không dưới <b>${nf(m.pmin)}đ</b>. Hoặc tặng quà có giá vốn tối đa <b>${nf(m.quaMax)}đ</b>.</div>`
-     :`<div class="note amb">Hiện biên ${dzFmtPct(T.bien)} đã dưới mục tiêu ${dzFmtPct(A.bienMT)}, chưa còn chỗ để khuyến mại. Muốn đạt mục tiêu cần giá thực thu từ <b>${nf(m.pmin)}đ</b> hoặc giảm CPQC / AFF.</div>`;
-  }
-  if(T.ok){const mk=T.aff+T.bk+dzN(r.cpqc),mkMax=mk+T.bien-A.bienMT;
-    gy+=`<div class="note ${mkMax>=mk?"grn":"amb"}" style="margin-top:8px"><b>Khống chế chi phí:</b> để giữ biên ${dzFmtPct(A.bienMT)}, tổng <b>Affiliate + Booking + CPQC tối đa ${dzFmtPct(Math.max(0,mkMax))}</b> giá bán (${nf(Math.max(0,mkMax)/100*T.gia)}đ mỗi đơn). Hiện đang ${dzFmtPct(mk)}${mkMax<mk?`, <b>vượt ${dzFmtPct(mk-Math.max(0,mkMax))}</b>`:""}. CPQC chịu được tối đa ${dzFmtPct(Math.max(0,T.tran))} (ROAS cần đạt ${dzFmtRoas(T.roasTran)}).</div>`}
-  return `<div class="card" id="dz-promo"><div class="card-h"><b>Thử khuyến mại: ${esc(r.ten||"(chưa đặt tên)")}</b><span class="hint">Sửa mức thử, số bên dưới tự tính lại. Bấm “+ Thêm vào bảng” để đưa phương án vào so sánh.</span>
-    <button class="btn sm ghost" id="dz-pclose" style="margin-left:auto">Đóng</button></div>${gy}
-    <div class="tbl"><table class="dz-pt"><thead><tr>${head}</tr></thead><tbody>${inRow}${rows}</tbody></table></div></div>`;
-}
-function dzPromoDraw(){
-  const w=document.getElementById("dz-promo-w");if(!w)return;
-  const r=DZB.rows.find(x=>x.id===DZB.pr);if(!r){w.innerHTML="";return}
-  const keep=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.pp;
-  w.innerHTML=dzPromoHTML(r);dzBindPromo(r);
-  if(keep){const el=w.querySelector(`[data-pp="${keep}"]`);if(el)el.focus()}
-}
-function dzBindPromo(r){
-  const w=document.getElementById("dz-promo-w");if(!w)return;
-  const p=dzPP(r),money={tien:1,vcmax:1,qua:1,flash:1};
-  w.querySelectorAll("[data-pp]").forEach(el=>el.onchange=()=>{const f=el.dataset.pp,v=dzParse(el.value,!!money[f]);p[f]=v==null?0:v;dzPromoDraw()});
-  const c=w.querySelector("#dz-pclose");if(c)c.onclick=()=>{DZB.pr=null;dzPromoDraw()};
-  w.querySelectorAll("[data-addp]").forEach(b=>b.onclick=()=>{
-    if(DZB.rows.length>=DZ_MAX_ROWS){toast("Tối đa "+DZ_MAX_ROWS+" dòng");return}
-    const i=+b.dataset.addp,s=[{k:"pct",v:p.pct},{k:"tien",v:p.tien},{k:"voucher",v:p.vc,max:p.vcmax},{k:"qua",v:p.qua},{k:"flash",v:p.flash}][i];
-    const cmp=dzPromoCmp(r,s,DZB.A),lab=["giảm "+dzFmtPct(p.pct),"giảm "+nf(p.tien)+"đ","voucher "+dzFmtPct(p.vc),"tặng quà "+nf(p.qua)+"đ","flash sale "+nf(p.flash)+"đ"][i];
-    const n=dzBlank({ten:(r.ten||"Phương án")+" · "+lab,kenh:r.kenh,gia:cmp.r2.gia,gvSp:r.gvSp,gvQua:cmp.r2.gvQua,aff:r.aff,booking:r.booking,cpqc:r.cpqc,parts:r.parts?r.parts.slice():null,mSp:r.mSp,mQua:true});
-    DZB.rows.splice(DZB.rows.findIndex(x=>x.id===r.id)+1,0,n);dzSave();DZB.pr=null;renderMain();toast("Đã thêm phương án vào bảng")});
 }
 /* ---------- Chọn từ danh mục ---------- */
 function dzPickItems(g){
@@ -200,29 +160,27 @@ function pDutru(m){
   const body=DZB.rows.map((r,i)=>dzRowHTML(r,i,A,g)).join("");
   m.innerHTML=H(T,S)+(typeof SPCB!=="undefined"&&SPCB.err?`<div class="note red">${esc(SPCB.err)}</div>`:"")+(loading?`<p class="hint">Đang tải giá vốn…</p>`:"")
    +`<div class="grid kpis" id="dz-kpi">${dzKpiHTML()}</div>
-   <div class="card flush"><div class="card-h" style="padding:14px 16px 0"><b>So sánh phương án</b><span class="hint">Nhập giá bán thực thu, Affiliate %, Booking %, CPQC % cho từng dòng. Giá vốn (gồm cả quà) tự điền khi bấm “Chọn”.</span>
+   <div class="card flush"><div class="card-h" style="padding:14px 16px 0"><b>So sánh phương án</b><span class="hint">Mỗi dòng là một chương trình: nhập giá gốc, giảm giá (10% hoặc 5000), quà tặng, Affiliate, Booking, CPQC. Muốn thử chương trình khác thì bấm “Nhân đôi” rồi sửa, các dòng nằm cạnh nhau để so.</span>
     <span style="margin-left:auto;display:flex;gap:8px"><button class="btn sm ghost" id="dz-ass">${DZB.showA?"Ẩn":"Xem / sửa"} giả định chi phí</button><button class="btn sm pri" id="dz-add">+ Thêm dòng</button></span></div>
-    <div class="tbl dz-wrap"><table class="dz-t"><thead><tr><th>#</th><th>Combo / phương án</th><th>Kênh</th><th class="n">Giá bán thực thu</th><th class="n">Giá vốn</th><th class="n">Affiliate %</th><th class="n">Booking %</th><th class="n">CPQC %</th>
+    <div class="tbl dz-wrap"><table class="dz-t"><thead><tr><th>#</th><th>Combo / chương trình</th><th>Kênh</th><th class="n">Giá bán gốc</th><th class="n" title="Giảm cho khách: gõ 10% hoặc 5000">Giảm giá</th><th class="n">Khách trả</th><th class="n">Giá vốn SP</th><th class="n">Giá vốn quà tặng</th><th class="n">Affiliate %</th><th class="n">Booking %</th><th class="n">CPQC %</th>
     <th class="n">Lãi / đơn</th><th class="n">Biên lãi</th><th class="n" title="CPQC tối đa mà biên vẫn đạt mục tiêu">CPQC trần %</th><th class="n" title="ROAS tối thiểu cần đạt = 1 ÷ CPQC trần">ROAS cần đạt</th><th></th></tr></thead><tbody>${body}</tbody></table></div></div>
-   <div id="dz-promo-w"></div>
    ${dzFileHTML()}
    ${DZB.showA?dzAssumeHTML():""}
    <p class="hint pad">CPQC trần = mức quảng cáo tối đa trên doanh thu mà biên vẫn đạt mục tiêu; ROAS cần đạt = 1 ÷ CPQC trần. Màu đỏ: đang lỗ; màu cam: biên dưới mục tiêu. Phí sàn gộp một số, chỉ tách riêng Affiliate và Booking.</p>`;
   dzBind(m);
-  if(DZB.pr)dzPromoDraw();
 }
 function dzBind(m){
   m.querySelectorAll("input.dz-in[data-f],select.dz-in[data-f]").forEach(el=>el.onchange=()=>{
     const r=DZB.rows.find(x=>x.id===el.dataset.id);if(!r)return;const f=el.dataset.f;
     if(f==="ten")r.ten=el.value.trim();
+    else if(f==="giam"){const t=el.value,v=dzParse(t,!/%/.test(t));r.giamK=/%/.test(t)?"%":"d";r.giam=v==null?0:v;el.value=dzGiamTxt(r)}
     else if(f==="kenh")r.kenh=el.value;
     else{const v=dzParse(el.value,!!el.dataset.m);
-      if(f==="gv"){if(v==null){r.mSp=false;r.mQua=false}else{r.gvSp=v;r.gvQua=0;r.mSp=true;r.mQua=true}}
+      if(f==="gvSp"||f==="gvQua"){r[f]=v;const flag=f==="gvSp"?"mSp":"mQua";r[flag]=v!=null}
       else r[f]=v==null?(f==="gia"?null:0):v;
       if(f==="aff"||f==="cpqc"||f==="booking")el.value=dzIn(r[f]);else if(el.dataset.m)el.value=r[f]==null?"":dzMoney(r[f])}
     dzSave();dzRefreshRow(r)});
   m.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>dzPicker(b.dataset.pick));
-  m.querySelectorAll("[data-km]").forEach(b=>b.onclick=()=>{DZB.pr=DZB.pr===b.dataset.km?null:b.dataset.km;dzPromoDraw();if(DZB.pr){const w=document.getElementById("dz-promo-w");if(w)w.scrollIntoView({behavior:"smooth",block:"nearest"})}});
   m.querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>{
     if(DZB.rows.length>=DZ_MAX_ROWS){toast("Tối đa "+DZ_MAX_ROWS+" dòng");return}
     const i=DZB.rows.findIndex(x=>x.id===b.dataset.dup),r=DZB.rows[i];DZB.rows.splice(i+1,0,Object.assign({},r,{id:dzId(),ten:(r.ten||"")+" (bản sao)",parts:r.parts?r.parts.slice():null}));dzSave();renderMain()});
@@ -275,7 +233,7 @@ MODULES.push({k:"q_dutru",adm:true,zone:"Quản trị",ic:"spark",n:"Dự trù g
 
 /* Kiểu hiển thị riêng của trang (tiền tố dz-). */
 (function(){if(typeof document==="undefined"||document.getElementById("dz-css"))return;const s=document.createElement("style");s.id="dz-css";s.textContent=`
-.dz-wrap{overflow-x:auto}.dz-t{min-width:1100px}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
+.dz-wrap{overflow-x:auto}.dz-t{min-width:1450px}.dz-hn{max-width:340px}.dz-hl{text-align:left!important;line-height:1.35}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
 .dz-in{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13.5px;background:#fff;color:inherit;min-width:0;box-sizing:border-box}.dz-in.n{text-align:right;width:100%;min-width:92px}.dz-in.s{width:66px;min-width:66px}
 .dz-t td:nth-child(2){min-width:290px}.dz-nm{display:flex;gap:6px;align-items:center}.dz-nm .dz-in{flex:1;min-width:140px}.dz-nm .btn{white-space:nowrap}
 .dz-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;text-align:right}.dz-no{color:var(--muted)}.dz-ms{color:var(--red);font-weight:600;font-size:12.5px}

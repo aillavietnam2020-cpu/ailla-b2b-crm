@@ -2801,8 +2801,8 @@ function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeou
 function openDrawerHTML(h){const dr=$("#drawer");$("#drawerIn").innerHTML='<button class="x" id="dx">✕</button>'+h;dr.hidden=false;$("#dx").onclick=closeDrawer}
 function closeDrawer(){$("#drawer").hidden=true}
 const ME={name:"Chị Hoa"};
-const _D={skus:[],dutru:null};const DB={data:_D,mutate(w,m,fn){fn(_D);try{localStorage.setItem("dutru_demo3",JSON.stringify(_D.dutru))}catch(e){}}};
-try{const s=JSON.parse(localStorage.getItem("dutru_demo3")||"null");if(s)_D.dutru=s}catch(e){}
+const _D={skus:[],dutru:null};const DB={data:_D,mutate(w,m,fn){fn(_D);try{localStorage.setItem("dutru_demo4",JSON.stringify(_D.dutru))}catch(e){}}};
+try{const s=JSON.parse(localStorage.getItem("dutru_demo4")||"null");if(s)_D.dutru=s}catch(e){}
 const D=()=>_D;
 const PAGES={},MODULES=[],MI=(k,t,p)=>[k,t,p];
 let PAGE="dutru";
@@ -3002,7 +3002,7 @@ function dzMergeGiaThanh(g,file,keepKeys){
 
 /* =====================================================================
    DỰ TRÙ GIÁ BÁN (Quản trị › Lãi lỗ › Dự trù giá bán): tính giá bán, lãi và ngưỡng quảng cáo cho combo trên TikTok / Facebook,
-   thử chương trình khuyến mại. Theo Google Sheet mẫu chị Hoa ("AILLA - Dự trù giá bán TikTok & Facebook").
+   so chương trình khuyến mại bằng cách nhân đôi dòng. Theo Google Sheet mẫu chị Hoa ("AILLA - Dự trù giá bán TikTok & Facebook").
    Hàm tính: dutrucalc.js (test: tests/unit/dutrucalc.test.ts). Giá vốn lấy từ Sản phẩm & combo + Giá vốn SKU + giá nhập kho (spcombo.js),
    mã nào chưa có giá vốn thì ghi rõ "chưa có giá vốn", không ước số. Giả định chi phí và các dòng phương án lưu ở D().dutru (hub_state), không cần bảng mới.
    Chỉ CEO / kế toán xem (cùng quyền xem giá vốn): tài khoản vận hành không thấy lãi.
@@ -3025,7 +3025,7 @@ function dzInit(){
   DZB.A=dzAssume(s&&s.A);
   if(!DZB.rows.length)DZB.rows.push(dzBlank());
 }
-const dzBlank=(o)=>Object.assign({id:dzId(),ten:"",kenh:"tiktok",gia:null,gvSp:null,gvQua:null,aff:0,booking:0,cpqc:0,parts:null,mSp:false,mQua:false},o||{});
+const dzBlank=(o)=>Object.assign({id:dzId(),ten:"",kenh:"tiktok",gia:null,giam:0,giamK:"%",gvSp:null,gvQua:null,aff:0,booking:0,cpqc:0,parts:null,mSp:false,mQua:false},o||{});
 function dzSave(){
   const snap=JSON.parse(JSON.stringify({A:DZB.A,rows:DZB.rows,gvFile:DZB.file()}));
   try{DB.mutate(ME&&ME.name||"",  "dự trù giá bán",d=>{d.dutru=snap})}catch(e){}
@@ -3049,40 +3049,57 @@ function dzAuto(r,g){
 const dzName=n=>n&&n.length>46?n.slice(0,45)+"…":n;
 const dzTag=(t,c)=>`<span class="pill p-${c}">${t}</span>`;
 
-/* Các ô kết quả của một dòng (4 cột: lãi, biên, CPQC trần, ROAS trần). */
+/* Giá khách thực trả sau giảm (giảm nhập "10%" hoặc "5000"). Mọi kiểu khuyến mại quy về hai thứ: giá khách trả và quà tặng thêm. */
+const dzEffGia=r=>{const g=dzN(r.gia),v=dzN(r.giam);return Math.max(0,r.giamK==="%"?g*(1-v/100):g-v)};
+const dzEff=r=>Object.assign({},r,{gia:dzEffGia(r)});
+const dzGiamTxt=r=>!dzN(r.giam)?"":r.giamK==="%"?dzIn(r.giam)+"%":nf(r.giam);
+/* Các ô kết quả của một dòng (5 cột: khách trả, lãi, biên, CPQC trần, ROAS cần đạt). */
 function dzOutCells(r,A){
-  const x=dzCalc(r,A);
-  if(!x.ok)return [`<span class="dz-ms">${esc(x.why)}</span>`,"—","—","—"];
+  const e=dzEff(r),x=dzCalc(e,A),gk=dzN(r.giam)?`<b>${nf(e.gia)}</b>`:`<span style="color:var(--muted)">${nf(e.gia)}</span>`;
+  if(!x.ok)return [r.gia==null?"—":gk,`<span class="dz-ms">${esc(x.why)}</span>`,"—","—","—"];
   const tone=dzTone(x),col=tone==="red"?"var(--red)":tone==="amb"?"var(--orange)":"var(--green)";
-  return [`<b style="color:${col}">${nf(x.ln)}</b>`,`<b style="color:${col}">${dzFmtPct(x.bien)}</b>`,
+  return [gk,`<b style="color:${col}">${nf(x.ln)}</b>`,`<b style="color:${col}">${dzFmtPct(x.bien)}</b>`,
     x.tran>0?`<b>${dzFmtPct(x.tran)}</b>`:`<span style="color:var(--red)">${dzFmtPct(x.tran)}</span>`,x.roasTran==null?`<span style="color:var(--red)">không có</span>`:`<b>${dzFmtRoas(x.roasTran)}</b>`];
 }
-const dzGvTotal=r=>r.gvSp==null?null:r.gvSp+(r.gvQua==null?0:r.gvQua);
+/* Dòng gợi ý dưới tên: giảm tối đa, quà tối đa, ngân sách marketing còn lại để giữ biên mục tiêu. */
+function dzHint(r,A){
+  const e=dzEff(r),x=dzCalc(e,A);if(!x.ok)return "";
+  const m=dzMax(e,A);if(!m)return "";
+  if(m.kho)return `<small class="dz-s dz-hl" style="color:var(--red)">Chi phí tỷ lệ quá cao, không giá nào đạt biên mục tiêu: giảm Affiliate / Booking / CPQC.</small>`;
+  const mk=x.aff+x.bk+dzN(r.cpqc),mkMax=Math.max(0,mk+x.bien-A.bienMT);
+  const g=dzN(r.gia)?Math.max(0,(dzN(r.gia)-m.pmin)/dzN(r.gia)*100):0;
+  if(x.bien<A.bienMT)return `<small class="dz-s dz-hl" style="color:var(--orange)">Chưa đạt biên ${dzFmtPct(A.bienMT)}: cần khách trả từ ${nf(m.pmin)}đ, hoặc cắt Affiliate + Booking + CPQC từ ${dzFmtPct(mk)} xuống ${dzFmtPct(mkMax)}.</small>`;
+  return `<small class="dz-s dz-hl" style="color:var(--green)">Còn đạt biên ${dzFmtPct(A.bienMT)} nếu: giảm tối đa ${dzFmtPct(g)} (khách trả ≥ ${nf(m.pmin)}đ) · tặng thêm quà ≤ ${nf(m.quaMax)}đ · Affiliate + Booking + CPQC ≤ ${dzFmtPct(mkMax)}.</small>`;
+}
 function dzRowHTML(r,i,A,g){
-  const miss=dzAuto(r,g),O=dzOutCells(r,A),x=dzCalc(r,A),tone=dzTone(x),tot=dzGvTotal(r),sub=r.parts&&r.gvSp!=null&&r.gvQua?`SP ${nf(r.gvSp)} + quà ${nf(r.gvQua)}`:r.parts&&r.mSp?"gõ tay":r.parts?"tự điền":"";
+  const miss=dzAuto(r,g),O=dzOutCells(r,A),x=dzCalc(dzEff(r),A),tone=dzTone(x);
   const pc=f=>`<td><input class="dz-in n s" data-id="${r.id}" data-f="${f}" value="${dzIn(r[f])}" inputmode="decimal"></td>`;
   return `<tr class="dz-r dz-${tone}" data-rid="${r.id}"><td class="dz-no">${i+1}</td>
-   <td><div class="dz-nm"><input class="dz-in" data-id="${r.id}" data-f="ten" value="${esc(r.ten||"")}" placeholder="Tên combo / phương án"><button class="btn sm ghost" data-pick="${r.id}" title="Chọn sản phẩm hoặc combo từ danh mục để tự điền giá vốn">Chọn</button></div>
-     ${miss.length?`<small class="dz-s" style="color:var(--red);text-align:left">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:""}</td>
+   <td><div class="dz-nm"><input class="dz-in" data-id="${r.id}" data-f="ten" value="${esc(r.ten||"")}" placeholder="Tên combo / chương trình"><button class="btn sm ghost" data-pick="${r.id}" title="Chọn sản phẩm hoặc combo từ danh mục để tự điền giá vốn">Chọn</button></div>
+     <div class="dz-hn">${miss.length?`<small class="dz-s" style="color:var(--red)">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:dzHint(r,A)}</div></td>
    <td><select class="dz-in" data-id="${r.id}" data-f="kenh">${opt(DZ_KENH,r.kenh)}</select></td>
    <td><input class="dz-in n" data-id="${r.id}" data-f="gia" data-m="1" value="${r.gia==null?"":dzMoney(r.gia)}" placeholder="0" inputmode="numeric"></td>
-   <td><input class="dz-in n" data-id="${r.id}" data-f="gv" data-m="1" value="${tot==null?"":dzMoney(tot)}" placeholder="${r.parts?"chưa có giá vốn":"0"}" inputmode="numeric"><small class="dz-s">${sub}</small></td>
+   <td><input class="dz-in n s" data-id="${r.id}" data-f="giam" value="${dzGiamTxt(r)}" placeholder="10% hay 5000" title="Giảm giá cho khách: gõ 10% hoặc số tiền 5000"></td>
+   <td class="n dzo">${O[0]}</td>
+   <td><input class="dz-in n" data-id="${r.id}" data-f="gvSp" data-m="1" value="${r.gvSp==null?"":dzMoney(r.gvSp)}" placeholder="${r.parts?"chưa có giá vốn":"0"}" inputmode="numeric"></td>
+   <td><input class="dz-in n" data-id="${r.id}" data-f="gvQua" data-m="1" value="${r.gvQua==null?"":dzMoney(r.gvQua)}" placeholder="0" inputmode="numeric" title="Giá vốn quà tặng kèm (không tính giá lẻ)"></td>
    ${pc("aff")}${pc("booking")}${pc("cpqc")}
-   ${O.map(h=>`<td class="n dzo">${h}</td>`).join("")}
-   <td class="dz-act"><button class="btn sm" data-km="${r.id}" title="Thử chương trình khuyến mại">Thử KM</button><button class="btn sm ghost" data-dup="${r.id}" title="Nhân đôi dòng">⧉</button><button class="btn sm ghost" data-del="${r.id}" title="Xóa dòng">✕</button></td></tr>`;
+   ${O.slice(1).map(h=>`<td class="n dzo">${h}</td>`).join("")}
+   <td class="dz-act"><button class="btn sm ghost" data-dup="${r.id}" title="Nhân đôi dòng để thử một chương trình khác">Nhân đôi</button><button class="btn sm ghost" data-del="${r.id}" title="Xóa dòng">✕</button></td></tr>`;
 }
 /* Cập nhật tại chỗ ô kết quả của một dòng (không vẽ lại cả bảng để không mất con trỏ khi Tab). */
 function dzRefreshRow(r){
   const tr=document.querySelector(`tr[data-rid="${r.id}"]`);if(!tr)return;
-  const g=dzCostMap(),miss=dzAuto(r,g),x=dzCalc(r,DZB.A);
+  const g=dzCostMap(),miss=dzAuto(r,g),x=dzCalc(dzEff(r),DZB.A);
   tr.className="dz-r dz-"+dzTone(x);
-  const O=dzOutCells(r,DZB.A);tr.querySelectorAll(".dto").forEach((td,i)=>td.innerHTML=O[i]);
-  {const el=tr.querySelector('[data-f="gv"]'),t=dzGvTotal(r);if(el&&document.activeElement!==el)el.value=t==null?"":dzMoney(t)}
-  dzRefreshKpi();if(DZB.pr===r.id)dzPromoDraw();
+  const O=dzOutCells(r,DZB.A);tr.querySelectorAll(".dzo").forEach((td,i)=>td.innerHTML=O[i]);
+  ["gvSp","gvQua"].forEach(f=>{const el=tr.querySelector(`[data-f="${f}"]`);if(el&&document.activeElement!==el)el.value=r[f]==null?"":dzMoney(r[f])});
+  const hn=tr.querySelector(".dz-hn");if(hn)hn.innerHTML=miss.length?`<small class="dz-s" style="color:var(--red)">Chưa có giá vốn: ${esc(miss.join(", "))}</small>`:dzHint(r,DZB.A);
+  dzRefreshKpi();
 }
 function dzRefreshKpi(){const k=document.getElementById("dz-kpi");if(k)k.innerHTML=dzKpiHTML()}
 function dzKpiHTML(){
-  const R=DZB.rows.map(r=>({r,x:dzCalc(r,DZB.A)})),ok=R.filter(o=>o.x.ok),lo=ok.filter(o=>o.x.tt==="lo").length,th=ok.filter(o=>o.x.tt==="thap").length;
+  const R=DZB.rows.map(r=>({r,x:dzCalc(dzEff(r),DZB.A)})),ok=R.filter(o=>o.x.ok),lo=ok.filter(o=>o.x.tt==="lo").length,th=ok.filter(o=>o.x.tt==="thap").length;
   const best=ok.slice().sort((a,b)=>b.x.bien-a.x.bien)[0],nm=R.filter(o=>!o.x.ok&&o.x.why==="Chưa có giá vốn").length;
   return kpi("Phương án đang so",nf(DZB.rows.length),`tối đa ${DZ_MAX_ROWS} dòng · biên mục tiêu ${dzFmtPct(DZB.A.bienMT)}`)
    +kpi("Đạt biên mục tiêu",nf(ok.length-lo-th),`${nf(th)} dưới mục tiêu`,th?"#b54708":"")
@@ -3101,63 +3118,6 @@ function dzAssumeHTML(){
    <tr class="dz-tot"><td><b>Tổng % cố định</b> (chưa gồm Affiliate, Booking, CPQC)</td><td class="n"><b>${dzFmtPct(dzFixedPct(A.tiktok))}</b></td><td class="n"><b>${dzFmtPct(dzFixedPct(A.facebook))}</b></td><td></td></tr>
    <tr><td>Biên lãi mục tiêu</td><td colspan="2"><input class="dz-in n s" data-a="bienMT" value="${dzIn(A.bienMT)}" inputmode="decimal"> %</td><td class="hint">Dưới mức này thì tô cảnh báo; dùng để tính CPQC trần, ROAS cần đạt và mức giảm giá tối đa</td></tr>
    </tbody></table></div></div>`;
-}
-/* ---------- Thử khuyến mại ---------- */
-function dzPP(r){
-  let p=DZB.pp[r.id];
-  if(!p)p=DZB.pp[r.id]={pct:10,tien:5000,vc:10,vcmax:10000,qua:3000,flash:Math.round((+r.gia||0)*0.85/1000)*1000};
-  return p;
-}
-function dzPromoHTML(r){
-  const p=dzPP(r),A=DZB.A,m=dzMax(r,A),T=dzCalc(r,A);
-  const sc=[{k:"pct",v:p.pct},{k:"tien",v:p.tien},{k:"voucher",v:p.vc,max:p.vcmax},{k:"qua",v:p.qua},{k:"flash",v:p.flash}];
-  const C=sc.map(s=>dzPromoCmp(r,s,A));
-  const head=`<th></th><th class="n">Chưa khuyến mại</th>`+DZ_PROMO.map(x=>`<th class="n">${x[1]}</th>`).join("");
-  const inp=(f,u,mx)=>`<input class="dz-in n s" data-pp="${f}" value="${f==="vcmax"||f==="tien"||f==="qua"||f==="flash"?dzMoney(p[f]):dzIn(p[f])}" inputmode="decimal"> ${u}`;
-  const inRow=`<tr class="dz-prin"><td>Mức thử</td><td class="n">—</td><td class="n">${inp("pct","%")}</td><td class="n">${inp("tien","đ")}</td><td class="n">${inp("vc","%")}<br><small class="hint">tối đa</small> ${inp("vcmax","đ")}</td><td class="n">${inp("qua","đ")}<br><small class="hint">giá vốn quà</small></td><td class="n">${inp("flash","đ")}</td></tr>`;
-  const cell=(f,fmt)=>`<td class="n">${fmt(T)}</td>`+C.map(c=>`<td class="n">${c.sau.ok?fmt(c.sau,c):"—"}</td>`).join("");
-  const col=x=>x.tt==="lo"?"var(--red)":x.tt==="thap"?"var(--orange)":"var(--green)";
-  const rows=T.ok?[
-    ["Giá bán thực thu",x=>nf(x.gia)],
-    ["Khách được giảm",(x,c)=>c?nf(c.giam):"—"],
-    ["Lợi nhuận mỗi đơn",x=>`<b style="color:${col(x)}">${nf(x.ln)}</b>`],
-    ["Biên lợi nhuận",x=>`<b style="color:${col(x)}">${dzFmtPct(x.bien)}</b>`],
-    ["CPQC trần",x=>x.tran>0?dzFmtPct(x.tran):`<span style="color:var(--red)">${dzFmtPct(x.tran)}</span>`],
-    ["ROAS trần",x=>x.roasTran==null?`<span style="color:var(--red)">không có</span>`:dzFmtRoas(x.roasTran)]].map(([n,f])=>`<tr><td>${n}</td>${cell(0,f)}</tr>`).join("")
-   +`<tr><td>Biên đổi so với trước</td><td class="n">—</td>${C.map(c=>`<td class="n">${c.sau.ok?(c.dBien>=0?"+":"")+(Math.round(c.dBien*10)/10).toLocaleString("vi-VN")+" điểm":"—"}</td>`).join("")}</tr>
-    <tr><td>Cảnh báo</td><td class="n">${T.tt==="lo"?dzTag("Đang lỗ","red"):T.tt==="thap"?dzTag("Dưới mục tiêu","amb"):dzTag("Đạt","grn")}</td>${C.map(c=>`<td class="n">${!c.sau.ok?"":c.sau.tt==="lo"?dzTag("LỖ "+nf(-c.sau.ln)+"đ/đơn","red"):c.sau.tt==="thap"?dzTag("Dưới mục tiêu","amb"):dzTag("Đạt","grn")}</td>`).join("")}</tr>
-    <tr><td></td><td></td>${C.map((c,i)=>`<td class="n"><button class="btn sm ghost" data-addp="${i}" title="Thêm phương án này thành một dòng trong bảng để so sánh">+ Thêm vào bảng</button></td>`).join("")}</tr>`
-   :`<tr><td colspan="7" class="empty">${esc(T.why||"")}: nhập giá bán và giá vốn ở dòng này trước.</td></tr>`;
-  let gy="";
-  if(T.ok&&m){
-    gy=m.kho?`<div class="note red">${esc(m.why)}.</div>`
-     :m.daDat?`<div class="note grn">Gợi ý: còn đạt biên mục tiêu ${dzFmtPct(A.bienMT)} nếu <b>giảm tối đa ${dzFmtPct(m.giamPct)} (${nf(m.giamD)}đ)</b>, tức giá thực thu không dưới <b>${nf(m.pmin)}đ</b>. Hoặc tặng quà có giá vốn tối đa <b>${nf(m.quaMax)}đ</b>.</div>`
-     :`<div class="note amb">Hiện biên ${dzFmtPct(T.bien)} đã dưới mục tiêu ${dzFmtPct(A.bienMT)}, chưa còn chỗ để khuyến mại. Muốn đạt mục tiêu cần giá thực thu từ <b>${nf(m.pmin)}đ</b> hoặc giảm CPQC / AFF.</div>`;
-  }
-  if(T.ok){const mk=T.aff+T.bk+dzN(r.cpqc),mkMax=mk+T.bien-A.bienMT;
-    gy+=`<div class="note ${mkMax>=mk?"grn":"amb"}" style="margin-top:8px"><b>Khống chế chi phí:</b> để giữ biên ${dzFmtPct(A.bienMT)}, tổng <b>Affiliate + Booking + CPQC tối đa ${dzFmtPct(Math.max(0,mkMax))}</b> giá bán (${nf(Math.max(0,mkMax)/100*T.gia)}đ mỗi đơn). Hiện đang ${dzFmtPct(mk)}${mkMax<mk?`, <b>vượt ${dzFmtPct(mk-Math.max(0,mkMax))}</b>`:""}. CPQC chịu được tối đa ${dzFmtPct(Math.max(0,T.tran))} (ROAS cần đạt ${dzFmtRoas(T.roasTran)}).</div>`}
-  return `<div class="card" id="dz-promo"><div class="card-h"><b>Thử khuyến mại: ${esc(r.ten||"(chưa đặt tên)")}</b><span class="hint">Sửa mức thử, số bên dưới tự tính lại. Bấm “+ Thêm vào bảng” để đưa phương án vào so sánh.</span>
-    <button class="btn sm ghost" id="dz-pclose" style="margin-left:auto">Đóng</button></div>${gy}
-    <div class="tbl"><table class="dz-pt"><thead><tr>${head}</tr></thead><tbody>${inRow}${rows}</tbody></table></div></div>`;
-}
-function dzPromoDraw(){
-  const w=document.getElementById("dz-promo-w");if(!w)return;
-  const r=DZB.rows.find(x=>x.id===DZB.pr);if(!r){w.innerHTML="";return}
-  const keep=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.pp;
-  w.innerHTML=dzPromoHTML(r);dzBindPromo(r);
-  if(keep){const el=w.querySelector(`[data-pp="${keep}"]`);if(el)el.focus()}
-}
-function dzBindPromo(r){
-  const w=document.getElementById("dz-promo-w");if(!w)return;
-  const p=dzPP(r),money={tien:1,vcmax:1,qua:1,flash:1};
-  w.querySelectorAll("[data-pp]").forEach(el=>el.onchange=()=>{const f=el.dataset.pp,v=dzParse(el.value,!!money[f]);p[f]=v==null?0:v;dzPromoDraw()});
-  const c=w.querySelector("#dz-pclose");if(c)c.onclick=()=>{DZB.pr=null;dzPromoDraw()};
-  w.querySelectorAll("[data-addp]").forEach(b=>b.onclick=()=>{
-    if(DZB.rows.length>=DZ_MAX_ROWS){toast("Tối đa "+DZ_MAX_ROWS+" dòng");return}
-    const i=+b.dataset.addp,s=[{k:"pct",v:p.pct},{k:"tien",v:p.tien},{k:"voucher",v:p.vc,max:p.vcmax},{k:"qua",v:p.qua},{k:"flash",v:p.flash}][i];
-    const cmp=dzPromoCmp(r,s,DZB.A),lab=["giảm "+dzFmtPct(p.pct),"giảm "+nf(p.tien)+"đ","voucher "+dzFmtPct(p.vc),"tặng quà "+nf(p.qua)+"đ","flash sale "+nf(p.flash)+"đ"][i];
-    const n=dzBlank({ten:(r.ten||"Phương án")+" · "+lab,kenh:r.kenh,gia:cmp.r2.gia,gvSp:r.gvSp,gvQua:cmp.r2.gvQua,aff:r.aff,booking:r.booking,cpqc:r.cpqc,parts:r.parts?r.parts.slice():null,mSp:r.mSp,mQua:true});
-    DZB.rows.splice(DZB.rows.findIndex(x=>x.id===r.id)+1,0,n);dzSave();DZB.pr=null;renderMain();toast("Đã thêm phương án vào bảng")});
 }
 /* ---------- Chọn từ danh mục ---------- */
 function dzPickItems(g){
@@ -3202,29 +3162,27 @@ function pDutru(m){
   const body=DZB.rows.map((r,i)=>dzRowHTML(r,i,A,g)).join("");
   m.innerHTML=H(T,S)+(typeof SPCB!=="undefined"&&SPCB.err?`<div class="note red">${esc(SPCB.err)}</div>`:"")+(loading?`<p class="hint">Đang tải giá vốn…</p>`:"")
    +`<div class="grid kpis" id="dz-kpi">${dzKpiHTML()}</div>
-   <div class="card flush"><div class="card-h" style="padding:14px 16px 0"><b>So sánh phương án</b><span class="hint">Nhập giá bán thực thu, Affiliate %, Booking %, CPQC % cho từng dòng. Giá vốn (gồm cả quà) tự điền khi bấm “Chọn”.</span>
+   <div class="card flush"><div class="card-h" style="padding:14px 16px 0"><b>So sánh phương án</b><span class="hint">Mỗi dòng là một chương trình: nhập giá gốc, giảm giá (10% hoặc 5000), quà tặng, Affiliate, Booking, CPQC. Muốn thử chương trình khác thì bấm “Nhân đôi” rồi sửa, các dòng nằm cạnh nhau để so.</span>
     <span style="margin-left:auto;display:flex;gap:8px"><button class="btn sm ghost" id="dz-ass">${DZB.showA?"Ẩn":"Xem / sửa"} giả định chi phí</button><button class="btn sm pri" id="dz-add">+ Thêm dòng</button></span></div>
-    <div class="tbl dz-wrap"><table class="dz-t"><thead><tr><th>#</th><th>Combo / phương án</th><th>Kênh</th><th class="n">Giá bán thực thu</th><th class="n">Giá vốn</th><th class="n">Affiliate %</th><th class="n">Booking %</th><th class="n">CPQC %</th>
+    <div class="tbl dz-wrap"><table class="dz-t"><thead><tr><th>#</th><th>Combo / chương trình</th><th>Kênh</th><th class="n">Giá bán gốc</th><th class="n" title="Giảm cho khách: gõ 10% hoặc 5000">Giảm giá</th><th class="n">Khách trả</th><th class="n">Giá vốn SP</th><th class="n">Giá vốn quà tặng</th><th class="n">Affiliate %</th><th class="n">Booking %</th><th class="n">CPQC %</th>
     <th class="n">Lãi / đơn</th><th class="n">Biên lãi</th><th class="n" title="CPQC tối đa mà biên vẫn đạt mục tiêu">CPQC trần %</th><th class="n" title="ROAS tối thiểu cần đạt = 1 ÷ CPQC trần">ROAS cần đạt</th><th></th></tr></thead><tbody>${body}</tbody></table></div></div>
-   <div id="dz-promo-w"></div>
    ${dzFileHTML()}
    ${DZB.showA?dzAssumeHTML():""}
    <p class="hint pad">CPQC trần = mức quảng cáo tối đa trên doanh thu mà biên vẫn đạt mục tiêu; ROAS cần đạt = 1 ÷ CPQC trần. Màu đỏ: đang lỗ; màu cam: biên dưới mục tiêu. Phí sàn gộp một số, chỉ tách riêng Affiliate và Booking.</p>`;
   dzBind(m);
-  if(DZB.pr)dzPromoDraw();
 }
 function dzBind(m){
   m.querySelectorAll("input.dz-in[data-f],select.dz-in[data-f]").forEach(el=>el.onchange=()=>{
     const r=DZB.rows.find(x=>x.id===el.dataset.id);if(!r)return;const f=el.dataset.f;
     if(f==="ten")r.ten=el.value.trim();
+    else if(f==="giam"){const t=el.value,v=dzParse(t,!/%/.test(t));r.giamK=/%/.test(t)?"%":"d";r.giam=v==null?0:v;el.value=dzGiamTxt(r)}
     else if(f==="kenh")r.kenh=el.value;
     else{const v=dzParse(el.value,!!el.dataset.m);
-      if(f==="gv"){if(v==null){r.mSp=false;r.mQua=false}else{r.gvSp=v;r.gvQua=0;r.mSp=true;r.mQua=true}}
+      if(f==="gvSp"||f==="gvQua"){r[f]=v;const flag=f==="gvSp"?"mSp":"mQua";r[flag]=v!=null}
       else r[f]=v==null?(f==="gia"?null:0):v;
       if(f==="aff"||f==="cpqc"||f==="booking")el.value=dzIn(r[f]);else if(el.dataset.m)el.value=r[f]==null?"":dzMoney(r[f])}
     dzSave();dzRefreshRow(r)});
   m.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>dzPicker(b.dataset.pick));
-  m.querySelectorAll("[data-km]").forEach(b=>b.onclick=()=>{DZB.pr=DZB.pr===b.dataset.km?null:b.dataset.km;dzPromoDraw();if(DZB.pr){const w=document.getElementById("dz-promo-w");if(w)w.scrollIntoView({behavior:"smooth",block:"nearest"})}});
   m.querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>{
     if(DZB.rows.length>=DZ_MAX_ROWS){toast("Tối đa "+DZ_MAX_ROWS+" dòng");return}
     const i=DZB.rows.findIndex(x=>x.id===b.dataset.dup),r=DZB.rows[i];DZB.rows.splice(i+1,0,Object.assign({},r,{id:dzId(),ten:(r.ten||"")+" (bản sao)",parts:r.parts?r.parts.slice():null}));dzSave();renderMain()});
@@ -3277,7 +3235,7 @@ MODULES.push({k:"q_dutru",adm:true,zone:"Quản trị",ic:"spark",n:"Dự trù g
 
 /* Kiểu hiển thị riêng của trang (tiền tố dz-). */
 (function(){if(typeof document==="undefined"||document.getElementById("dz-css"))return;const s=document.createElement("style");s.id="dz-css";s.textContent=`
-.dz-wrap{overflow-x:auto}.dz-t{min-width:1100px}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
+.dz-wrap{overflow-x:auto}.dz-t{min-width:1450px}.dz-hn{max-width:340px}.dz-hl{text-align:left!important;line-height:1.35}.dz-t th,.dz-t td{padding:7px 8px;vertical-align:middle}.dz-t td.n,.dz-t th.n{text-align:right;white-space:nowrap}
 .dz-in{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13.5px;background:#fff;color:inherit;min-width:0;box-sizing:border-box}.dz-in.n{text-align:right;width:100%;min-width:92px}.dz-in.s{width:66px;min-width:66px}
 .dz-t td:nth-child(2){min-width:290px}.dz-nm{display:flex;gap:6px;align-items:center}.dz-nm .dz-in{flex:1;min-width:140px}.dz-nm .btn{white-space:nowrap}
 .dz-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;text-align:right}.dz-no{color:var(--muted)}.dz-ms{color:var(--red);font-weight:600;font-size:12.5px}
@@ -3290,12 +3248,12 @@ tr.dz-lo>td{background:#fff1f0}tr.dz-thap>td{background:#fff7e6}tr.dz-gry>td{bac
 `;document.head.appendChild(s)})();
 
 if(!D().dutru){D().dutru={A:null,gvFile:dzParseGiaThanh([["BẢNG TÍNH GIÁ THÀNH","","","","","","","","","","","",""],["Kỳ tính giá thành: Tính giá thành phẩm tháng 09.2026","","","","","","","","","","","",""],["Mã thành phẩm","Tên thành phẩm","Tên đối tượng THCP","Giá thành","","","","","","","","Số lượng thành phẩm","Giá thành đơn vị"],["","","","NVL trực tiếp","NVL gián tiếp","Nhân công trực tiếp","Nhân công gián tiếp","Khấu hao","Chi phí mua ngoài","Chi phí khác","Tổng","",""],["AILANG10NANGMOI","NUOC GIAT AILLA 10KG NANG MOI","NUOC GIAT AILLA 10KG NANG MOI",1433570,0,0,0,0,0,0,1433570,19,75451.0526],["AILANG2NANGMOI","NUOC GIAT 2KG NANG MOI","NUOC GIAT 2KG NANG MOI",410781,0,0,0,0,0,0,410781,20,20539.05],["AILLA10189","Nước giặt Ailla 10kg hương cá ngựa (189)","Nước giặt Ailla 10kg hương cá ngựa (189)",22301367,0,0,0,0,0,0,22301367,185,120547.9297],["AILLA10CFT","Nước giặt Ailla 10kg hương hoa nắng (CFT)","Nước giặt Ailla 10kg hương hoa nắng (CFT)",7075815,0,0,0,0,0,0,7075815,56,126353.8393],["Ailla10hygien","Nước giặt Ailla 10kg hương Hygien","Nước giặt Ailla 10kg hương Hygien",16094149,0,0,0,0,0,0,16094149,125,128753.192],["Ailla10vital","Nước giặt Ailla 10kg Hương nắng xuân","Nước giặt Ailla 10kg Hương nắng xuân",5729879,0,0,0,0,0,0,5729879,45,127330.6444],["Ailla2hygien","Nước giặt Ailla hygien 2 kg","Nước giặt Ailla hygien 2 kg",342883,0,0,0,0,0,0,342883,11,31171.1818],["AILLA2VITAL","Nước giặt Ailla 2kg hương nắng xuânl (túi)","Nước giặt Ailla 2kg hương nắng xuânl (túi)",8901951,0,0,0,0,0,0,8901951,324,27475.1574],["Ailla3.5hygien","Nước giặt Ailla 3.5kg hương hygien","Nước giặt Ailla 3.5kg hương hygien",50039,0,0,0,0,0,0,50039,0.1667,300173.9652],["Ailla3189","Nước giặt Ailla 3kg hương 189","Nước giặt Ailla 3kg hương 189",1005941,0,0,0,0,0,0,1005941,24,41914.2083],["Ailla3hyden","Nước giặt 3kg hương hyden","Nước giặt 3kg hương hyden",977376,0,0,0,0,0,0,977376,22,44426.1818],["AILLA5189","Nước giặt Ailla 5kg hương cá ngựa (189)","Nước giặt Ailla 5kg hương cá ngựa (189)",20780980,0,0,0,0,0,0,20780980,82,253426.5854],["AILLA5CFT","Nước giặt Ailla 5kg hương hoa nắng (CFT)","Nước giặt Ailla 5kg hương hoa nắng (CFT)",10256174,0,0,0,0,0,0,10256174,38.75,264675.4581],["Ailla5hygien","Nước giặt Ailla 5kg hương Hygien đen","Nước giặt Ailla 5kg hương Hygien đen",11588641,0,0,0,0,0,0,11588641,43,269503.2791],["AILLALS1L","Nước lau sàn Ailla 1 lít Ly","Nước lau sàn Ailla 1 lít Ly",312350,0,0,0,0,0,0,312350,2,156175],["AILLALS1SC","Nước lau sàn 1 lít sả chanh","Nước lau sàn 1 lít sả chanh",1277958,0,0,0,0,0,0,1277958,8.05,158752.5466],["AILLALS3.6L","Nước lau sàn Ailla 3.6kg Ly","Nước lau sàn Ailla 3.6kg Ly",491727,0,0,0,0,0,0,491727,5,98345.4],["AILLALS3.6Q","Nước lau sàn Ailla 3,6kg Quế","Nước lau sàn Ailla 3,6kg Quế",274164,0,0,0,0,0,0,274164,3,91388],["AILLALS3.6SC","Nước lau sàn Ailla 3,6kg Sả chanh","Nước lau sàn Ailla 3,6kg Sả chanh",1953199,0,0,0,0,0,0,1953199,19.3333,101027.7087],["AILLALSBV1LHOAHONG","Lau sàn bệnh viện 1 lít hoa hồng","Lau sàn bệnh viện 1 lít hoa hồng",1082745,0,0,0,0,0,0,1082745,115,9415.1739],["AILLALSBV1LHUONGSACHANH","Lau sàn bệnh viện 1 lít hương sả chanh","Lau sàn bệnh viện 1 lít hương sả chanh",4454657,0,0,0,0,0,0,4454657,401,11108.8703],["AILLALSBV2HH","LAU SẢN BỆNH VIỆN 2 LÍT HOA HỒNG","LAU SẢN BỆNH VIỆN 2 LÍT HOA HỒNG",358572,0,0,0,0,0,0,358572,25,14342.88],["AILLALSBV2SC","LAU SÀN BỆNH VIỆN 2 LÍT SẢ CHANH","LAU SÀN BỆNH VIỆN 2 LÍT SẢ CHANH",3261962,0,0,0,0,0,0,3261962,185,17632.227],["AILLALSBV5LHOAHONG","Lau sàn bệnh viện 5 lít hoa hồng","Lau sàn bệnh viện 5 lít hoa hồng",1768265,0,0,0,0,0,0,1768265,70,25260.9286],["AILLALSBV5LSACHANH","Lau sàn bệnh viện 5 lít hương sả chanh","Lau sàn bệnh viện 5 lít hương sả chanh",23301658,0,0,0,0,0,0,23301658,686,33967.4315],["AillaMOCTRANG","Tẩy mốc trắng quần áo","Tẩy mốc trắng quần áo",6504000,0,0,0,0,0,0,6504000,480,13550],["AILLANG10SUONGMAI","Nước giặt Ailla 10kg sương mai","Nước giặt Ailla 10kg sương mai",8129801,0,0,0,0,0,0,8129801,106,76696.2358],["AILLANG2SUONGMAI","Nước giặt Ailla 2kg sương mai","Nước giặt Ailla 2kg sương mai",124582,0,0,0,0,0,0,124582,6,20763.6667],["AillaRC10BH","Ailla rửa chén 10kg bạc hà","Ailla rửa chén 10kg bạc hà",220696,0,0,0,0,0,0,220696,2,110348],["AillaRC2D","Rửa chén Ailla 2kg hương dứa","Rửa chén Ailla 2kg hương dứa",9627320,0,0,0,0,0,0,9627320,341,28232.61],["AILLARC3.6B","Rửa chén Ailla hương Bạc Hà 3,6 kg","Rửa chén Ailla hương Bạc Hà 3,6 kg",1398630,0,0,0,0,0,0,1398630,5.5,254296.3636],["AILLARC3.6C","Nước rửa chén Ailla 3,6kg Chanh","Nước rửa chén Ailla 3,6kg Chanh",3803583,0,0,0,0,0,0,3803583,16,237723.9375],["AILLARC3.6Q","Nước rửa chén Ailla 3,6kg quế","Nước rửa chén Ailla 3,6kg quế",2763777,0,0,0,0,0,0,2763777,11.5,240328.4348],["AillaRC400D","Rửa chén Ailla 400gam hương dứa","Rửa chén Ailla 400gam hương dứa",263090,0,0,0,0,0,0,263090,45,5846.4444],["AILLARC5BH","Rửa chén Ailla hương bạc hà 5kg","Rửa chén Ailla hương bạc hà 5kg",1180932,0,0,0,0,0,0,1180932,5,236186.4],["AillaRC5C","Rửa chén Ailla 5kg hương Chanh","Rửa chén Ailla 5kg hương Chanh",3087596,0,0,0,0,0,0,3087596,56,55135.6429],["AillaRC5D","Rửa chén Ailla 5kg hương dứa","Rửa chén Ailla 5kg hương dứa",928553,0,0,0,0,0,0,928553,16,58034.5625],["AillaRC5Q","Rửa chend quế Ailla 5kg","Rửa chend quế Ailla 5kg",1118174,0,0,0,0,0,0,1118174,20,55908.7],["AILLARC800C","Nước rửa chén Ailla 800 Chanh","Nước rửa chén Ailla 800 Chanh",1805514,0,0,0,0,0,0,1805514,6.6071,273268.7563],["AILLASAPTHOMDAO","Sáp thơm đào Ailla","Sáp thơm đào Ailla",12390000,0,0,0,0,0,0,12390000,840,14750],["AILLASAPTHOMDUA","Sáp thơm dứa Ailla","Sáp thơm dứa Ailla",19706000,0,0,0,0,0,0,19706000,1336,14750],["AILLASAPTHOMNHAI","Sáp thơm nhài Ailla","Sáp thơm nhài Ailla",19706000,0,0,0,0,0,0,19706000,1336,14750],["AILLATDGS80BANME","Tinh dầu giặt sấy 80ml Ban mê","Tinh dầu giặt sấy 80ml Ban mê",2716265,0,0,0,0,0,0,2716265,250,10865.06],["AILLATDGS80CFT","Tinh dầu giặt sấy 80ml CFT","Tinh dầu giặt sấy 80ml CFT",28096985,0,0,0,0,0,0,28096985,2564,10958.2625],["AILLATDGS80FRANCRE","Tinh dầu giặt sấy 80ml VANILA","Tinh dầu giặt sấy 80ml VANILA",3668340,0,0,0,0,0,0,3668340,357,10275.4622],["AILLATDGS80HYDEN","Tinh dầu giặt sấy 80ml hyden","Tinh dầu giặt sấy 80ml hyden",112107799,0,0,0,0,0,0,112107799,7982,14045.0763],["AILLATDGS80LUXURY","Tinh dầu giặt sấy 80mlLuxury","Tinh dầu giặt sấy 80mlLuxury",80196327,0,0,0,0,0,0,80196327,6081,13188.0163],["AILLATHONGCONGRUOTGA","Thông cống ruột gà Ailla","Thông cống ruột gà Ailla",23055803,0,0,0,0,0,0,23055803,1948,11835.6278],["AILLATHONGCONGRUOTTHANG","Thông cống ruột thẳng Ailla","Thông cống ruột thẳng Ailla",38080000,0,0,0,0,0,0,38080000,3200,11900],["AillaToilet1lSX","Toilet Ailla 1 lít","Toilet Ailla 1 lít",4641214,0,0,0,0,0,0,4641214,560,8287.8821],["AillaToilet500SX","Tẩy toilet Ailla 500ml","Tẩy toilet Ailla 500ml",680530,0,0,0,0,0,0,680530,115,5917.6522],["AillaTVN","Tẩy vạn năng hộp Ailla","Tẩy vạn năng hộp Ailla",533952,0,0,0,0,0,0,533952,31,17224.2581],["AILLATVN250","Tẩy vạn năng ailla 250gam","Tẩy vạn năng ailla 250gam",2427189,0,0,0,0,0,0,2427189,245,9906.8939],["AILLAXITKINH5KG","Xịt kinh 5kg","Xịt kinh 5kg",20241,0,0,0,0,0,0,20241,1,20241],["Arila10kg","Nước giặt Arila 10kg","Nước giặt Arila 10kg",9761846,0,0,0,0,0,0,9761846,182,53636.5165],["ARILA2KG","Nước giặt Arila 2kg","Nước giặt Arila 2kg",2868648,0,0,0,0,0,0,2868648,200,14343.24],["Azzen10189SX","Nước giặt Azzen 10kg hương cá ngựa","Nước giặt Azzen 10kg hương cá ngựa",1787207,0,0,0,0,0,0,1787207,15,119147.1333],["AZZEN10VITAL","Nước giặt Azeen 10kg hương vital","Nước giặt Azeen 10kg hương vital",503722,0,0,0,0,0,0,503722,4,125930.5],["Azzen3189SX","Nước giặt Azzen 3kg hương 189","Nước giặt Azzen 3kg hương 189",230476,0,0,0,0,0,0,230476,6,38412.6667],["AZZEN5VITAL","Nước giặt Azzen 5kg hương Vital","Nước giặt Azzen 5kg hương Vital",64169,0,0,0,0,0,0,64169,1,64169],["AzzenRC2DSX","Rửa chén Dứa Azzen 2kg","Rửa chén Dứa Azzen 2kg",1302137,0,0,0,0,0,0,1302137,50,26042.74],["AzzenRC5D","Rửa chén Azzen 5kg hương Dứa","Rửa chén Azzen 5kg hương Dứa",56635,0,0,0,0,0,0,56635,1,56635],["CAMILALS10Q","Lau sàn Camila 10kg hương quế","Lau sàn Camila 10kg hương quế",4563566,0,0,0,0,0,0,4563566,135,33804.1926],["CamilaLS1L","Lau sàn Camila 1 lít hương Ly","Lau sàn Camila 1 lít hương Ly",576192,0,0,0,0,0,0,576192,85,6778.7294],["CamilaLS1SC","Lau sàn Camila 1 lít hương sả chanh","Lau sàn Camila 1 lít hương sả chanh",1381524,0,0,0,0,0,0,1381524,200,6907.62],["CAMILATDGSHYDEN","Tinh dầu giặt sấy camila hương hyden","Tinh dầu giặt sấy camila hương hyden",2453997,0,0,0,0,0,0,2453997,20,122699.85],["CAMILATDGSNANGMAI","Tinh dầu giặt sấy camila hương nắng mai","Tinh dầu giặt sấy camila hương nắng mai",215165,0,0,0,0,0,0,215165,20,10758.25],["CAMILATDGSTIM","Tinh dầu giặt sấy camila tím","Tinh dầu giặt sấy camila tím",259760,0,0,0,0,0,0,259760,20,12988],["CamilaTĐN","Tẩy đa năng Camila","Tẩy đa năng Camila",380103,0,0,0,0,0,0,380103,84,4525.0357],["CamilaToilet1l","Toilet Camila 1 lít","Toilet Camila 1 lít",480480,0,0,0,0,0,0,480480,69,6963.4783],["CON30ML","Cồn 30ml","Cồn 30ml",10610552,0,0,0,0,0,0,10610552,4214,2517.9288],["DUNGMOI250","Dung môi 250ml","Dung môi 250ml",3098873,0,0,0,0,0,0,3098873,367,8443.7956],["Metis10HDSX","Nước giặt Metis 10kg hương hyden","Nước giặt Metis 10kg hương hyden",636766,0,0,0,0,0,0,636766,5,127353.2],["METIS4.6CFTSX","Nước giặt Metis 4.6kg hương comfor","Nước giặt Metis 4.6kg hương comfor",2354106,0,0,0,0,0,0,2354106,40,58852.65],["METIS4.6HYDENSX","Nước giặt Metis 4.6kg hương Hyden","Nước giặt Metis 4.6kg hương Hyden",3653727,0,0,0,0,0,0,3653727,60,60895.45],["METIS5189SX","Nước giặt Metis 5kg hương 189","Nước giặt Metis 5kg hương 189",3593610,0,0,0,0,0,0,3593610,60,59893.5],["MTHYGIEN","Mẫu thử nước giặt hygien","Mẫu thử nước giặt hygien",12333,0,0,0,0,0,0,12333,4,3083.25],["Số dòng = 77","","",585315290,0,0,0,0,0,0,585315290,36318.9071,""]]),rows:[
- {id:"m1",ten:"Sáp thơm dứa (như ví dụ Google Sheet)",kenh:"tiktok",gia:55000,gvSp:null,gvQua:null,aff:5,booking:3,cpqc:15,parts:[{code:"AILLASAPTHOMDUA",qty:1,kind:"sp"}],mSp:false,mQua:false},
+ {id:"m1",ten:"Sáp thơm dứa (như ví dụ Google Sheet)",kenh:"tiktok",gia:55000,gvSp:null,gvQua:null,giam:0,giamK:"%",aff:5,booking:3,cpqc:15,parts:[{code:"AILLASAPTHOMDUA",qty:1,kind:"sp"}],mSp:false,mQua:false},
  {id:"m2",ten:"Tẩy vạn năng bộ 2 + chổi",kenh:"tiktok",gia:79000,gvSp:null,gvQua:null,aff:5,booking:2,cpqc:8,parts:[{code:"AILLATVN250",qty:2,kind:"sp"},{code:"QUA-CHOI",qty:1,kind:"gift"},{code:"HOP-GIAY",qty:1,kind:"pack"}],mSp:false,mQua:false},
  {id:"m3",ten:"Tinh dầu giặt sấy combo 2 chai + khăn",kenh:"facebook",gia:129000,gvSp:null,gvQua:null,aff:0,booking:5,cpqc:15,parts:[{code:"AILLATDGS80CFT",qty:2,kind:"sp"},{code:"QUA-KHAN",qty:1,kind:"gift"}],mSp:false,mQua:false},
  {id:"m4",ten:"Nước xả vải 1L (mã chưa có giá vốn)",kenh:"tiktok",gia:79000,gvSp:null,gvQua:null,aff:5,booking:0,cpqc:15,parts:[{code:"AILLA-NX1L",qty:1,kind:"sp"}],mSp:false,mQua:false}]}}
 
-document.getElementById("dz-reset").onclick=()=>{try{localStorage.removeItem("dutru_demo3")}catch(e){}location.reload()};
+document.getElementById("dz-reset").onclick=()=>{try{localStorage.removeItem("dutru_demo4")}catch(e){}location.reload()};
 pDutru($("#main"));
 
 </script></body></html>
