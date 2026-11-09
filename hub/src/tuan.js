@@ -506,18 +506,23 @@ function ksSearchHtml(q){
   return `<section class="card flush"><div class="card-h pad"><h2>Kết quả tìm kiếm</h2><span class="hint">${R.length?R.length+" video khớp với “"+esc(q.length>60?q.slice(0,60)+"…":q)+"”":"Không có video nào khớp. Link này chưa có trong hệ thống."}</span><span class="sp"></span><button type="button" class="btn sm" data-ksx="1">✕ Xóa tìm kiếm</button></div>
    ${R.length?`<div class="tbl"><table class="kstab"><thead><tr><th>Mã</th><th>Sản phẩm</th><th>Đang nằm ở</th><th>Trạng thái</th><th>Kênh</th><th>Tên / hook</th><th>Video</th></tr></thead><tbody>${R.slice(0,100).map(row).join("")}</tbody></table></div>`:""}</section>`
 }
+const xvKhoWait=()=>(D().kho||[]).filter(k=>{try{return ["cd","cceo"].includes(ktState(k))}catch(e){return false}});
+/* video tồn đang chờ duyệt (V1 / V2) ở tab ① để số đếm khớp: mỗi video một dòng, bấm Xem & duyệt */
+function xvKhoWaitBox(b){const L=xvKhoWait();if(!L.length)return;const sec=document.createElement("section");sec.className="card flush";
+  sec.innerHTML=`<div class="card-h pad"><h2>Video tồn chờ duyệt (${L.length})</h2><span class="hint">V1: Lead duyệt · V2: CEO duyệt · bấm một dòng để xem video rồi Duyệt hoặc Cần sửa</span></div>${L.map(k=>{const s=ktState(k);return `<div data-xkw="${esc(k.ma)}" style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-top:1px solid var(--line,#e6e8ef);cursor:pointer"><b class="mono" style="font-size:12.5px;white-space:nowrap">${esc(k.ma)}</b><span class="hint" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(skS(k.sku))} · ${esc(((k.tuyen||"")+" "+(k.ten||"")).trim())}${khoEditor(k)?" · "+esc(khoEditor(k)):""}</span>${pill(s==="cceo"?"Chờ duyệt V2":"Chờ duyệt V1","amb")}<button type="button" class="btn sm pri" data-xkw="${esc(k.ma)}">Xem &amp; duyệt</button></div>`}).join("")}`;
+  b.prepend(sec);sec.querySelectorAll("[data-xkw]").forEach(e=>e.onclick=ev=>{ev.stopPropagation();if(typeof cwKhoQuick==="function")cwKhoQuick(e.dataset.xkw);else ktModal(e.dataset.xkw)})}
 function xvKhoAll(b,o){
   if(!["wait","can","sx"].includes(XV.ks))XV.ks="wait";
-  const pend=o.d.cards.filter(c=>["edit","dvd","dceo"].includes(c.step)&&!c.wt).length,n=xvKhoFree().length+(o.d.kho||[]).filter(k=>k.choDuyet&&!khoOk(k)&&!k.maDang).length /* 04/11: tính cả video tồn đang chờ duyệt / cần sửa, khớp số ở dòng sản phẩm */;
+  const pend=o.d.cards.filter(c=>["dvd","dceo"].includes(c.step)&&!c.wt).length+xvKhoWait().length /* 09/11: chỉ đếm video THỰC SỰ chờ duyệt (thẻ V1/V2 + video tồn chờ duyệt), khớp danh sách bên trong */,n=(o.d.kho||[]).length /* số trên tab = tổng video trong bảng Kho video tồn */;
   const ndn=o.d.cards.filter(c=>c.step==="xong").length,nsx=o.d.cards.filter(c=>["dang","xong"].includes(c.step)&&((loaiOf(c)!=="kho"&&c.mix!=="ton")||c.repostOf)).length,TB=[["wait","① Video đợi duyệt"+(pend?` (${pend})`:"")],["sx","② Video sản xuất trong tháng ("+nsx+")"],["can","③ Kho video tồn ("+n+")"]];
   b.innerHTML=`${khoSummary(o)}<div class="ntrow ktool"><div class="seg ptk">${TB.map(([k,t])=>`<button data-xks="${k}" class="${XV.ks===k?"on":""}">${t}</button>`).join("")}</div><div class="ktool2"><input type="search" class="ksearch" id="xk-q" value="${esc(XV.q||"")}" placeholder="🔍 Tìm video: dán link Drive, mã, hook…" title="Dán link Drive hoặc gõ mã, hook, caption rồi bấm Enter"><button type="button" class="btn sm pri" data-xadd="1" title="Thêm một video chưa có trong hệ thống">+ Thêm video</button><button type="button" class="btn sm" data-xadd="1" title="Tải file Excel có nhiều link video một lúc (có file mẫu)">⬆ Tải hàng loạt</button><button type="button" class="btn sm" data-xexp="1" title="Xuất danh sách đang xem ra Excel">⬇ Xuất danh sách</button></div></div><div id="xk-b"></div>`;ntBind(b);
   b.querySelectorAll("[data-xadd]").forEach(x=>x.onclick=openThemVideo);
   b.querySelectorAll("[data-xexp]").forEach(x=>x.onclick=()=>{if(XV.exp)xlsExport(XV.exp.file,XV.exp.sheet,XV.exp.head,XV.exp.rows);else toast("Tab này chưa có danh sách để xuất")});
-  b.querySelectorAll("[data-xks]").forEach(x=>x.onclick=()=>{XV.ks=x.dataset.xks;renderMain()});
+  b.querySelectorAll("[data-xks]").forEach(x=>x.onclick=()=>{XV.ks=x.dataset.xks;XV.khoSku="";XV.ktK="";XV.khoSt="";renderMain()});
   const qi=b.querySelector("#xk-q");if(qi){const go=()=>{const v=qi.value.trim();if(v===(XV.q||""))return;XV.q=v;renderMain()};qi.onkeydown=e=>{if(e.key==="Enter")go()};qi.onchange=go;qi.onpaste=()=>setTimeout(go,60)}
   const c=b.querySelector("#xk-b");
   if(XV.q){c.innerHTML=ksSearchHtml(XV.q);c.querySelectorAll("[data-ksx]").forEach(x=>x.onclick=()=>{XV.q="";renderMain()});c.querySelectorAll("[data-ksr]").forEach(r=>r.onclick=e=>{if(e.target.closest("a"))return;const [k,id]=r.dataset.ksr.split("|");if(k==="kho")ktModal(id);else{const cc=D().cards.find(y=>y.id===id);if(cc&&["dang","xong"].includes(cc.step))scModal(id);else openCard(id)}});return}
-  if(XV.ks==="wait")xvVideoMade(c,o);else{XV.kind=XV.ks==="sx"?"sx":"ton";xvVideoCan(c,o)}
+  if(XV.ks==="wait"){xvVideoMade(c,o);xvKhoWaitBox(c)}else{XV.kind=XV.ks==="sx"?"sx":"ton";xvVideoCan(c,o)}
 }
 /* Kho video: tồn tháng trước + sản xuất trong tháng, lọc theo sản phẩm */
 function xvVideoCan(b,o){
