@@ -39,6 +39,28 @@ describe('Tin nhắn (/api/hub/chat)', () => {
     expect(sum2.body.data.rooms.find((x: { room: string }) => x.room === 'g:content').unread).toBe(0);
   });
 
+  it('gọi @all và @tên (có dấu, có khoảng trắng): cả nhóm nhận tin chưa đọc đúng nguyên văn, người ngoài phòng không thấy', async () => {
+    const all = await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: '@all họp 9h nhé' } });
+    const one = await ctx.request('/api/hub/chat/msgs', { as: USERS.thao, body: { room: 'g:content', body: '@Quỳnh Anh xem giúp, @CEO duyệt' } });
+    expect(all.status).toBe(200);
+    expect(one.status).toBe(200);
+    /* mọi thành viên khác trong phòng (Huyền, Lead Digital không thuộc phòng nên Lead chỉ thấy nếu là Lead Content; CEO thấy mọi phòng) có 2 tin chưa đọc */
+    for (const who of [USERS.huyen, USERS.ceo]) {
+      const sum = await ctx.request('/api/hub/chat/summary', { as: who });
+      const r = sum.body.data.rooms.find((x: { room: string }) => x.room === 'g:content');
+      expect(r.unread).toBe(2);
+      expect(r.last.body).toBe('@Quỳnh Anh xem giúp, @CEO duyệt');
+    }
+    const msgs = await ctx.request('/api/hub/chat/msgs?room=g:content', { as: USERS.huyen });
+    expect(msgs.body.data.map((x: { body: string }) => x.body)).toEqual(['@all họp 9h nhé', '@Quỳnh Anh xem giúp, @CEO duyệt']);
+    /* người gửi không bị tính chưa đọc tin của chính mình */
+    const mine = await ctx.request('/api/hub/chat/summary', { as: USERS.thao });
+    expect(mine.body.data.rooms.find((x: { room: string }) => x.room === 'g:content').unread).toBe(0);
+    /* phòng khác không đọc được tin gọi @all của phòng Content */
+    const blocked = await ctx.request('/api/hub/chat/msgs?room=g:content', { as: USERS.manager });
+    expect(blocked.status).toBe(403);
+  });
+
   it('nhắn riêng: chỉ hai người đọc, viết được; người thứ ba bị chặn và không thấy trong danh sách', async () => {
     const s = await ctx.request('/api/hub/chat/msgs', { as: USERS.ceo, body: { room: DM, body: 'Em gửi chị file nhé' } });
     expect(s.status).toBe(200);
