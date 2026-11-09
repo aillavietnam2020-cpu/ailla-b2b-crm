@@ -13,7 +13,7 @@ const HY_ST={queued:["Chờ Worker nhận","gry"],taken:["Worker đã nhận","b
 const HYW={tasks:[],at:0,busy:false,draft:{}};
 async function hyRefresh(force){
   if(typeof svApi!=="function"||HYW.busy||(!force&&Date.now()-HYW.at<8000))return;HYW.busy=true;
-  try{const L=await svApi("/api/hub/worker-tasks");const ch=JSON.stringify(L)!==JSON.stringify(HYW.tasks);HYW.tasks=L||[];HYW.at=Date.now();if(ch&&(PAGE==="win"||PAGE==="dg_win")&&!svTyping())renderMain();if(ch&&HYW.win)hyWinPaint(false)}catch(e){}finally{HYW.busy=false}
+  try{const L=await svApi("/api/hub/worker-tasks");const ch=JSON.stringify(L)!==JSON.stringify(HYW.tasks);HYW.tasks=L||[];HYW.at=Date.now();hyFixApprover();if(ch&&(PAGE==="win"||PAGE==="dg_win")&&!svTyping())renderMain();if(ch&&HYW.win)hyWinPaint(false)}catch(e){}finally{HYW.busy=false}
 }
 setInterval(()=>{if(ME&&(PAGE==="win"||PAGE==="dg_win"||HYW.win)&&!document.hidden)hyRefresh()},10000);
 /* cửa sổ nhân bản video win ngay trong Điều phối: phân tích, sửa kịch bản, duyệt, dựng đều làm trong cửa sổ này */
@@ -23,6 +23,9 @@ function hyWinPaint(first){const id=HYW.win;if(!id)return;
   if(first)openDrawerHTML('<h2>Nhân bản video win</h2><div id="hyw">'+hyHypitHtml(id)+'</div>');
   else{if(svTyping())return;$("#hyw").innerHTML=hyHypitHtml(id)}
   hyBind($("#hyw"))}
+/* Việc nhân bản cũ còn ghi người duyệt là lead không có quyền duyệt (tạo trước khi sửa): đổi sang người duyệt đúng, một lần */
+let HY_FIXED=false;
+function hyFixApprover(){if(HY_FIXED||!ME||!DB.data)return;const ap=hyApprover();if(!ap)return;const bad=(D().tasks||[]).filter(t=>t.hy&&t.st!=="done"&&t.duyet&&t.duyet!==ap.id&&!can(D().users.find(u=>u.id===t.duyet),"viec.duyet"));HY_FIXED=true;if(!bad.length)return;DB.mutate(ME.name,"đổi người duyệt việc nhân bản video win sang "+ap.name,d=>{(d.tasks||[]).forEach(t=>{if(bad.some(x=>x.id===t.id)){t.duyet=ap.id;t.phoi=[ap.id]}})})}
 const hyCan=()=>can(ME,"win.sua")||ME.role==="admin";
 /* Người duyệt video nhân bản: Lead có quyền duyệt (Uyên), không lấy lead không có quyền duyệt. CEO luôn duyệt được. */
 const hyApprover=()=>{const L=D().users.filter(u=>u.active&&u.role==="lead"),P=L.filter(u=>can(u,"viec.duyet"));return P.find(u=>/uyen/i.test(foldName(u.name)))||P[0]||L.find(u=>/oanh/i.test(foldName(u.name)))||L[0]};

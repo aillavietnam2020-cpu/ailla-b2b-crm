@@ -389,7 +389,7 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
       DB.mutate(ME.name,"CEO duyệt thẳng "+id,dt=>{const x=dt.cards.find(y=>y.id===id);if(x){x.duyet="Đã duyệt";x.ceo="PASS"}});c=D().cards.find(x=>x.id===id);if(c&&c.step==="dang")toast("Đã duyệt xong, video sang Chờ đăng");bvRe();return}
     if(c&&f==="duyet"&&v==="Đã duyệt"&&["dkb","dvd"].includes(c.step)&&nx){const was=c.step;if(go(nx[1])){c=D().cards.find(x=>x.id===id);if(was==="dvd"&&c&&c.step==="dceo"&&ME.role==="admin"&&c.ceo==="PASS"){const n2=nextAct(c);if(n2)go(n2[1])}}}
     else if(c&&f==="ceo"&&v==="PASS"&&c.step==="dceo"&&nx)go(nx[1]);
-    else if(c&&f==="duyet"&&v==="Cần sửa"&&["dkb","dvd","dceo"].includes(c.step)){try{sendBack(ME,id,"Cần sửa")}catch(e){}}
+    else if(c&&f==="duyet"&&v==="Cần sửa"&&["dkb","dvd","dceo"].includes(c.step)){let nt="";try{nt=(prompt("Cần sửa gì? (người làm sẽ thấy đúng câu này trong thẻ)")||"").trim()}catch(e){}if(!nt){toast("Chưa ghi lý do: người làm sẽ không biết sửa gì. Nhắn thêm ở ô Trao đổi trong thẻ nhé");nt="Cần sửa (chưa ghi lý do, xem ô Trao đổi)"}try{sendBack(ME,id,nt)}catch(e){}}
     bvRe()});
   m.querySelectorAll("[data-bvc]").forEach(i=>i.onchange=()=>{const [id,f]=i.dataset.bvc.split("|"),v=i.value;DB.mutate(ME.name,"sửa video "+id,dt=>{const c=dt.cards.find(x=>x.id===id);if(!c)return;
     if(f==="hook")c.hookText=v;else if(f==="linkFinal"){c.linkFinal=v.trim();bvGuiDuyet(dt,c)}else if(f==="linkVideo"){c.linkVideo=v.trim();if(c.linkFinal&&!bvMau(c))c.linkFinal=v.trim();bvGuiDuyet(dt,c)}else if(f==="han"||f==="tuan")c[f]=+v;else{c[f]=v;if(f==="nguoiKB"&&["cg","kb"].includes(c.step)){c.nguoi=v||c.nguoi;if(c.step==="cg"&&v&&["oneshot","kichban"].includes(mixOf(c)))c.step="kb"}}});bvRe()});
