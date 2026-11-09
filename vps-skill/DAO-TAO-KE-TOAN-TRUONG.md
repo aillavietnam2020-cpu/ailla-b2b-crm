@@ -125,6 +125,7 @@ Giá chỉ chị Hoa, chị Thảo, chị Huệ thấy. Bên vận hành (kho) k
 | Tồn hiện tại | Tổng các phát sinh đến nay. Tồn âm là cảnh báo (nhập chưa kịp ghi hoặc xuất vượt). | abos kho-stock --cls NVL --neg 1 |
 | Nhập – xuất – tồn | Tồn đầu, nhập, xuất, tồn cuối trong một kỳ. | abos kho-nxt --from --to |
 | Xuất B2C qua sàn | Từng ngày × TikTok/Shopee/Facebook: số đơn, số sản phẩm lẻ, phần chưa có mã vật tư; 7 ngày gần nhất. | abos kho-online |
+| Chi tiết xuất B2C qua sàn | Từng dòng ngày × kênh × mã vật tư (số lượng, tên, đơn vị) và dòng chưa có mã; lọc ngày/kênh/mã, phân trang. Chỉ tới mức ngày × mã, không theo từng đơn. | abos kho-online-ct |
 | Phiếu kho | Danh sách và chi tiết từng phiếu (không có đơn giá). | abos kho-docs, kho-doc |
 | Lô kiểm kê và tem | Đạt/lỗi/chờ, số tem đã tạo và đã in. | abos kho-lots |
 
