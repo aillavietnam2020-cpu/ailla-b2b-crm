@@ -268,7 +268,8 @@ function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)r
   DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));if(k==="done"&&old!=="done")x.stTruoc=old;x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});if(k==="review"&&old!=="review")x.vong=1;if(x.__chat){tkChatAdd(x,x.__chat[0],x.__chat[1],1);delete x.__chat}tkDoneDay(x,dt.settings.today);if(k==="review"&&old!=="review")x.nopNgay=dt.settings.today;
     if(old===k||typeof notifyU!=="function")return;
     cwTdNotify(dt,x,k==="review"?`${ME.name} nộp kết quả việc "${x.ten}", đang chờ duyệt`:`${ME.name} chuyển việc "${x.ten}" sang ${cvStN(k)}`);
-    if(k==="review")notifyU(dt,[...new Set([...tkAppr(x),...(x.tao&&x.tao!==x.nguoi?[x.tao]:[])])],`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
+    if(k==="review"){const ap=tkAppr(x);notifyU(dt,ap,`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
+      const gv=x.tao&&x.tao!==x.nguoi&&!ap.includes(x.tao)?[x.tao]:[];if(gv.length)notifyU(dt,gv,`${ME.name} đã nộp kết quả việc "${x.ten}", đang chờ ${tkMgrNames(x)||"người duyệt"} duyệt (chưa đến lượt bạn)`,ref)}
     else if(k==="done"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} đã duyệt xong việc "${x.ten}"`,ref);
     else if(old==="review"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} trả lại việc "${x.ten}"${note?": "+note:""}`,ref);
     else if(k==="done")notifyU(dt,[x.tao],`${ME.name} đã xong việc "${x.ten}"`,ref)})}
