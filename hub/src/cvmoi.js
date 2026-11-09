@@ -140,7 +140,7 @@ function cwGKey(x){if(x.src!=="task")return "";const lo=String(x.loai||"");if(lo
   return o.length>=2&&o.length<w.length?o.join(" "):""}
 let CW_C=null;
 function cwRows(){if(CW_C)return CW_C;const d=D(),td=d.settings.today,T={},out=[];(d.tasks||[]).forEach(t=>T[t.id]=t);
-  cvItems().filter(x=>x.src!=="card"&&!CV_TEST.includes(x.nguoi)).forEach(x=>{const t=x.src==="task"?T[x.id]:null,han=+x.han||0,late=x.st!=="done"&&!!han&&han<td;
+  cvItems().filter(x=>x.src!=="card"&&!CV_TEST.includes(x.nguoi)).forEach(x=>{const t=x.src==="task"?T[x.id]:null,han=+x.han||0,late=x.st!=="done"&&x.st!=="review"&&!!han&&han<td;
     out.push({k:x.src+":"+x.id,src:x.src,id:x.id,ten:String(x.ten||""),mo:x.src==="order"?x.mo:"",loai:x.loai,nguoi:x.nguoi||"",tao:x.tao||"",phoi:x.phoi||[],han,gio:x.gio||"",st:x.st,late,lateD:late?td-han:0,da:x.da||"",uu:x.uu||"",
       ck:x.ck||[],cd:t&&t.cd&&t.cd.length?t.cd:null,tl:!!(t&&t.tlNote),vong:t?+t.vong||0:0,tpl:t?t.tpl||"":"",tu:!!t&&(!!t.tuThem||(!!t.tao&&t.tao===t.nguoi)),xong:t?+t.xongNgay||0:0,
       tc:!!(t&&t.tuChoi&&t.tuChoi.st==="cho"),rv:!!t&&((typeof tkMyTurn==="function"&&tkMyTurn(t))||(!!t.tuChoi&&t.tuChoi.st==="cho"&&typeof tkTcCan==="function"&&tkTcCan(t))),v2:!!t&&typeof tkV2==="function"&&tkV2(t),g:cwGKey(x),
