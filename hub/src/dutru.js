@@ -5,7 +5,7 @@
    mã nào chưa có giá vốn thì ghi rõ "chưa có giá vốn", không ước số. Giả định chi phí và các dòng phương án lưu ở D().dutru (hub_state), không cần bảng mới.
    Chỉ CEO / kế toán xem (cùng quyền xem giá vốn): tài khoản vận hành không thấy lãi.
    ===================================================================== */
-const DZB={rows:null,A:null,pr:null,pp:{},showA:false,pk:null,ptab:"combo",pq:""};
+const DZB={file:()=>{const d=typeof D==="function"?D():null;return d&&d.dutru&&d.dutru.gvFile||null},rows:null,A:null,pr:null,pp:{},showA:false,pk:null,ptab:"combo",pq:""};
 const dzSee=()=>typeof spcSeeCost==="function"&&spcSeeCost();
 const dzId=()=>"dz"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 /* Nhập số kiểu Việt: "55.000" = 55000; "5,5" = 5,5. Phần trăm cho phép "5.5". */
@@ -25,13 +25,16 @@ function dzInit(){
 }
 const dzBlank=(o)=>Object.assign({id:dzId(),ten:"",kenh:"tiktok",gia:null,gvSp:null,gvQua:null,aff:0,cpqc:0,parts:null,mSp:false,mQua:false},o||{});
 function dzSave(){
-  const snap=JSON.parse(JSON.stringify({A:DZB.A,rows:DZB.rows}));
+  const snap=JSON.parse(JSON.stringify({A:DZB.A,rows:DZB.rows,gvFile:DZB.file()}));
   try{DB.mutate(ME&&ME.name||"",  "dự trù giá bán",d=>{d.dutru=snap})}catch(e){}
 }
 /* Bảng giá vốn hiện hành (mã chữ thường → {u,src}). */
 function dzCostMap(){
   if(typeof SPCB==="undefined"||!SPCB.rows)return null;
-  return spcGvMap((typeof D==="function"&&D()&&D().skus)||[],SPCB.cost||[],spcKy());
+  const skus=(typeof D==="function"&&D()&&D().skus)||[],ky=spcKy(),file=DZB.file();
+  const gSku=spcGvMap(skus,[],ky),gKho=spcGvMap([],SPCB.cost||[],ky);
+  /* Thứ tự ưu tiên: Giá vốn SKU kế toán nhập > Giá thành MISA đã nạp > giá nhập kho bình quân. */
+  return Object.assign({},gKho,file&&file.rows?dzMergeGiaThanh({},file,gSku):{},gSku);
 }
 /* Điền lại giá vốn tự động cho dòng đã gắn với danh mục (trừ ô đã gõ tay). Trả về danh sách mã thiếu. */
 function dzAuto(r,g){
@@ -200,6 +203,7 @@ function pDutru(m){
     <div class="tbl dz-wrap"><table class="dz-t"><thead><tr><th>#</th><th>Combo / phương án</th><th>Kênh</th><th class="n">Giá bán thực thu</th><th class="n">Giá vốn SP chính</th><th class="n">Giá vốn quà</th><th class="n">AFF %</th><th class="n">CPQC %</th>
     <th class="n">Tổng CP tỷ lệ %</th><th class="n">Tổng chi phí / đơn</th><th class="n">Lợi nhuận / đơn</th><th class="n">Biên LN</th><th class="n">CPQC hòa vốn</th><th class="n">CPQC trần</th><th class="n">ROAS hòa vốn</th><th class="n">ROAS trần</th><th></th></tr></thead><tbody>${body}</tbody></table></div></div>
    <div id="dz-promo-w"></div>
+   ${dzFileHTML()}
    ${DZB.showA?dzAssumeHTML():""}
    <p class="hint pad">CPQC hòa vốn = CPQC + biên lợi nhuận. CPQC trần = CPQC hòa vốn − biên mục tiêu (chạy quảng cáo quá mức này thì biên rớt dưới mục tiêu). ROAS = 1 ÷ CPQC. Màu đỏ: đang lỗ; màu cam: biên dưới mục tiêu.</p>`;
   dzBind(m);
@@ -229,7 +233,40 @@ function dzBind(m){
     const [k,f]=el.dataset.a.split("."),v=dzParse(el.value,false);
     if(f===undefined)DZB.A.bienMT=v==null?DZ_DEF.bienMT:v;else DZB.A[k][f]=v==null?0:v;
     dzSave();renderMain()});
+  const fb=m.querySelector("#dz-fbtn"),fi=m.querySelector("#dz-file");if(fb&&fi){fb.onclick=()=>fi.click();fi.onchange=()=>{if(fi.files[0])dzImport(fi.files[0])}}
   const rs=m.querySelector("#dz-areset");if(rs)rs.onclick=()=>{if(!confirm("Đặt lại các giả định về số kế toán T7/2026?"))return;DZB.A=dzAssume(null);dzSave();renderMain()};
+}
+/* Đối chiếu bảng giá thành MISA với mã trên web: mã nào không khớp thì liệt kê cho chị, không tự gán. */
+function dzMatch(){
+  const f=DZB.file();if(!f||!f.rows||typeof SPCB==="undefined"||!SPCB.rows)return null;
+  const web=new Set((SPCB.prods||[]).map(p=>dzLow(p.code)));
+  const used=new Set();spcGroup(SPCB.rows,SPCB.sales,spcToday()).filter(c=>c.active).forEach(c=>c.parts.forEach(p=>{if(p.kind!=="skip")used.add(dzLow(p.code))}));
+  const packOnly=new Set();spcGroup(SPCB.rows,SPCB.sales,spcToday()).forEach(c=>c.parts.forEach(p=>{if(p.kind==="pack")packOnly.add(dzLow(p.code))}));
+  spcGroup(SPCB.rows,SPCB.sales,spcToday()).forEach(c=>c.parts.forEach(p=>{if(p.kind!=="pack"&&p.kind!=="skip")packOnly.delete(dzLow(p.code))}));
+  packOnly.forEach(k=>used.delete(k));
+  const inFile=new Set(f.rows.map(x=>dzLow(x.code)));
+  const g=dzCostMap()||{};
+  return {khongKhop:f.rows.filter(x=>!web.has(dzLow(x.code))&&!used.has(dzLow(x.code))),
+    thieu:[...used].filter(k=>!g[k]).map(k=>{const p=(SPCB.prods||[]).find(x=>dzLow(x.code)===k);return {code:p?p.code:k,name:p?p.name:""}}),
+    khop:f.rows.length-f.rows.filter(x=>!web.has(dzLow(x.code))&&!used.has(dzLow(x.code))).length,total:f.rows.length};
+}
+function dzFileHTML(){
+  const f=DZB.file(),M=dzMatch();
+  const head=f?`<b>Giá vốn thành phẩm: bảng giá thành MISA tháng ${esc((f.ky||"").slice(5)+"/"+(f.ky||"").slice(0,4))}</b> <span class="hint">${nf(f.rows.length)} mã${M?` · ${nf(M.khop)} khớp mã trên web, ${nf(M.khongKhop.length)} không khớp`:""}</span>`
+   :`<b>Chưa nạp bảng giá thành thành phẩm</b> <span class="hint">Giá vốn đang lấy từ Giá vốn SKU và giá nhập kho bình quân.</span>`;
+  const list=(t,L,c)=>L.length?`<details style="margin-top:8px"${DZB.showM?" open":""}><summary>${t} (${nf(L.length)})</summary>${tbl(["Mã","Tên"].concat(c?["Giá thành đơn vị"]:[]),L.map(x=>`<tr><td class="mono">${esc(x.code)}</td><td>${esc(x.name||"")}</td>${c?`<td class="n">${nf(x.dv)}đ</td>`:""}</tr>`))}</details>`:"";
+  return `<div class="card"><div class="card-h">${head}<span style="margin-left:auto;display:flex;gap:8px"><input type="file" id="dz-file" accept=".xlsx,.xls" hidden><button class="btn sm" id="dz-fbtn">${f?"Nạp lại bảng giá thành (Excel)":"Nạp bảng giá thành (Excel)"}</button></span></div>
+   <p class="hint" style="margin:0">Ghép theo mã thành phẩm (không phân biệt hoa thường) với mã kho trên web. Giá vốn SKU kế toán nhập tay vẫn được ưu tiên hơn bảng này.</p>
+   ${M?list("Mã trong bảng giá thành KHÔNG khớp mã nào trên web (cần chị Huệ xem)",M.khongKhop,1)+list("Mã trong combo đang dùng nhưng CHƯA CÓ giá vốn",M.thieu,0):""}</div>`;
+}
+function dzImport(file){
+  if(typeof XLSX==="undefined"){toast("Chưa tải được bộ đọc Excel, thử lại sau");return}
+  const rd=new FileReader();rd.onload=()=>{try{
+    const wb=XLSX.read(rd.result,{type:"array"}),aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""}),r=dzParseGiaThanh(aoa);
+    if(r.err||!r.rows.length){toast(r.err||"Không đọc được dòng giá thành nào");return}
+    const d=D();d.dutru=d.dutru||{};d.dutru.gvFile={ky:r.ky,rows:r.rows,by:ME&&ME.name||"",at:new Date().toLocaleString("vi-VN")};
+    dzSave();toast("Đã nạp "+r.rows.length+" mã giá thành");renderMain()}catch(e){toast("Không đọc được file: "+e.message)}};
+  rd.readAsArrayBuffer(file);
 }
 PAGES.dutru=pDutru;
 MODULES.push({k:"q_dutru",adm:true,zone:"Quản trị",ic:"spark",n:"Dự trù giá bán",sub:"",groups:()=>[["",[MI("dutru","Dự trù giá bán",()=>dzSee())]]]});

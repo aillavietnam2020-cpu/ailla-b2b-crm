@@ -85,3 +85,25 @@ function dzCostParts(parts,g){
 const dzTone=x=>!x||!x.ok?"gry":x.tt==="lo"?"red":x.tt==="thap"?"amb":"grn";
 const dzFmtPct=v=>v==null||!isFinite(v)?"—":((Math.round(v*10)/10)||0).toLocaleString("vi-VN")+"%";
 const dzFmtRoas=v=>v==null||!isFinite(v)?"—":(Math.round(v*100)/100).toLocaleString("vi-VN");
+
+/* Đọc bảng "BẢNG TÍNH GIÁ THÀNH" xuất từ MISA (mảng 2 chiều của dòng Excel): cột "Mã thành phẩm" … cột cuối "Giá thành đơn vị".
+   Trả {ky:"2026-09"|"", rows:[{code,name,dv,sl}]}. Bỏ dòng tổng và dòng không có giá thành đơn vị. */
+function dzParseGiaThanh(aoa){
+  const rows=[];let ky="",hi=-1;
+  (aoa||[]).forEach((r,i)=>{
+    const t=String((r&&r[0])||"");const m=/tháng\s*(\d{1,2})[./-](\d{4})/i.exec(t);if(m&&!ky)ky=m[2]+"-"+m[1].padStart(2,"0");
+    if(hi<0&&dzLow(t)==="mã thành phẩm")hi=i});
+  if(hi<0)return {ky,rows,err:"Không thấy dòng tiêu đề “Mã thành phẩm”"};
+  const h=aoa[hi],ci=h.map(x=>dzLow(x)).lastIndexOf("giá thành đơn vị");
+  if(ci<0)return {ky,rows,err:"Không thấy cột “Giá thành đơn vị”"};
+  aoa.slice(hi+1).forEach(r=>{const code=String(r[0]||"").trim(),v=+r[ci];
+    if(!code||/^số dòng/i.test(code)||!isFinite(v)||v<=0||typeof r[ci]!=="number")return;
+    rows.push({code,name:String(r[1]||"").trim(),dv:v,sl:dzN(r[ci-1])})});
+  return {ky,rows};
+}
+/* Đưa bảng giá thành vào bảng giá vốn g (mã chữ thường → {u,src}); mã đã có giá từ nguồn khác (SKU kế toán) thì giữ nguồn đó. */
+function dzMergeGiaThanh(g,file,keepKeys){
+  const o=Object.assign({},g),lab="Giá thành MISA "+((file&&file.ky)||"").slice(5)+"/"+((file&&file.ky)||"").slice(0,4);
+  ((file&&file.rows)||[]).forEach(x=>{const k=dzLow(x.code);if(keepKeys&&keepKeys[k])return;o[k]={u:Math.round(x.dv),src:lab}});
+  return o;
+}

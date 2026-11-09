@@ -76,3 +76,29 @@ describe('dutrucalc', () => {
     expect(d.miss).toEqual(['B']);
   });
 });
+
+describe('dutrucalc giá thành MISA', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const P: any = new Function(`${readFileSync('hub/src/dutrucalc.js', 'utf8')} return {dzParseGiaThanh,dzMergeGiaThanh};`)();
+  const aoa = [
+    ['BẢNG TÍNH GIÁ THÀNH', '', ''],
+    ['Kỳ tính giá thành: Tính giá thành phẩm tháng 09.2026', '', ''],
+    ['Mã thành phẩm', 'Tên thành phẩm', 'Tổng', 'Số lượng thành phẩm', 'Giá thành đơn vị'],
+    ['AILLASAP', 'Sáp thơm', 1000, 10, 100],
+    ['XX', 'Không giá', 0, 0, ''],
+    ['Số dòng = 2', '', 0, 0, ''],
+  ];
+  it('đọc kỳ và dòng giá thành đơn vị', () => {
+    const r = P.dzParseGiaThanh(aoa);
+    expect(r.ky).toBe('2026-09');
+    expect(r.rows).toEqual([{ code: 'AILLASAP', name: 'Sáp thơm', dv: 100, sl: 10 }]);
+  });
+  it('giữ giá nguồn SKU kế toán, thêm mã mới từ bảng giá thành', () => {
+    const f = P.dzParseGiaThanh(aoa);
+    const m = P.dzMergeGiaThanh({}, f, { aillasap: { u: 5 } });
+    expect(m.aillasap).toBeUndefined();
+    const m2 = P.dzMergeGiaThanh({}, f, {});
+    expect(m2.aillasap.u).toBe(100);
+    expect(m2.aillasap.src).toContain('09/2026');
+  });
+});
