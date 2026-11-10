@@ -335,7 +335,7 @@ export const POS_STATUS: Record<number, string> = {
 const POS_FINAL = new Set([3, 5, 6, 7, 16]);
 export type PosStatusMap = Record<string, { s: number; at: string }>;
 export async function posStatuses(db: D1Database, secret: string | undefined, fetchFn: FetchFn, ids: string[]): Promise<PosStatusMap> {
-  const cache = (await getSetting<PosStatusMap>(db, 'pos_status')) ?? {};
+  const cache = (await getSetting<PosStatusMap>(db, 'pos_status2')) ?? {};
   const now = Date.now();
   const stale = [...new Set(ids)].filter((id) => {
     const x = cache[id];
@@ -349,7 +349,10 @@ export async function posStatuses(db: D1Database, secret: string | undefined, fe
           try {
             const r = await fetchFn(`${API}/shops/${encodeURIComponent(shop)}/orders/${encodeURIComponent(id)}?api_key=${encodeURIComponent(key)}`);
             if (!r.ok) return null;
-            const j = JSON.parse(await r.text()) as { data?: { status?: number } };
+            const j = JSON.parse(await r.text()) as { data?: Record<string, unknown> & { status?: number } };
+            // Chẩn đoán (10/11): xem Poscake ghi người tạo / thẻ / nguồn của đơn CSKH thế nào (chỉ tên trường, mã, tên nhân viên).
+            const d = j.data ?? {};
+            console.info('[cskh] don poscake', id, JSON.stringify({ tags: d.tags, creator: d.creator, assigning_seller: d.assigning_seller, assigning_care: d.assigning_care, assigning_seller_id: d.assigning_seller_id, assigning_care_id: d.assigning_care_id, order_sources: d.order_sources, order_sources_name: d.order_sources_name, account: d.account, keys: Object.keys(d).slice(0, 120) }).slice(0, 3000));
             const st = Number(j.data?.status);
             return Number.isFinite(st) ? ([id, st] as const) : null;
           } catch {
@@ -359,7 +362,7 @@ export async function posStatuses(db: D1Database, secret: string | undefined, fe
       );
       const at = new Date().toISOString();
       for (const g of got) if (g) cache[g[0]] = { s: g[1], at };
-      await putSetting(db, 'pos_status', cache);
+      await putSetting(db, 'pos_status2', cache);
     } catch {
       /* không hỏi được Poscake thì dùng số cũ */
     }
