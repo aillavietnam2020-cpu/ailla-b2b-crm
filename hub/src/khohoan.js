@@ -53,14 +53,9 @@ function retScanTab(){
     <td>${!full?`<span class="hint">${(s.items||[]).length} món · về đủ</span> <button class="btn sm rt-o" data-s="${s.id}">Báo lỗi</button>`:(s.items||[]).length?`<table class="tbl" style="margin:0"><thead><tr><th>Mã MISA</th><th>Tên sản phẩm</th><th class="n">Phải về</th><th class="n">Về thực tế</th><th class="n">Hỏng</th></tr></thead><tbody>${s.items.map((it,j)=>`<tr><td class="mono">${it.mapped?esc(it.item):"<span class='hint'>—</span>"}</td><td>${esc(it.name)}${it.mapped?"":" <span class='tag amb'>chưa có mã MISA</span>"}</td><td class="n">${knum(it.expected)}</td><td class="n">${lock?knum(it.received):`<input class="rt-r n" data-s="${s.id}" data-j="${j}" type="number" min="0" step="any" value="${it.received}" style="width:64px">`}</td><td class="n">${lock?knum(it.bad):`<input class="rt-b n" data-s="${s.id}" data-j="${j}" type="number" min="0" step="any" value="${it.bad}" style="width:64px">`}</td></tr>`).join("")}</tbody></table>`:""}${!s.order_id&&!lock&&s.source!=="BULK"?`<div style="display:flex;gap:6px;align-items:center"><span class="hint" style="white-space:nowrap">Chưa tra ra đơn ·</span><input class="rt-lk" data-s="${s.id}" placeholder="Mã đơn / mã vận đơn gốc (nếu có)" style="flex:1;min-width:0;height:30px"><button class="btn sm rt-lkb" data-s="${s.id}">Tra</button></div>`:""}</td>
     <td>${lock?`<span class="tag">Đã nhập kho</span>`:`<select class="rt-p" data-s="${s.id}" style="min-width:150px">${RET_PB.map(([k,t])=>`<option value="${k}"${s.problem===k?" selected":""}>${t}</option>`).join("")}</select>`}<div style="margin-top:4px">${retIssues(s)}</div></td>
     <td>${lock?"":`<button class="btn sm rt-x" data-s="${s.id}" title="Quét nhầm, bỏ gói này">×</button>`}</td></tr>`};
-  return `<section class="card"><div class="card-h"><h2>Quét mã vận đơn</h2><div class="filters"><label class="inl" style="display:inline-flex;align-items:center;gap:8px;margin:0">Ngày nhận <input type="date" id="rt-day" value="${day}"></label></div></div>
+  return `<section class="card"><div class="card-h"><h2>Quét mã vận đơn</h2><div class="filters"><label class="inl" style="display:inline-flex;align-items:center;gap:8px;margin:0">Ngày nhận <input type="date" id="rt-day" value="${day}"></label> <button type="button" class="btn pri" id="rt-add">+ Thêm phiếu nhập hàng hoàn</button> <button type="button" class="btn" id="rt-bb" title="In danh sách gói hoàn đã nhận trong ngày để shipper ký nhận">In biên bản cho shipper ký</button></div></div>
     <input id="rt-code" autocomplete="off" placeholder="Đặt con trỏ ở đây rồi quét (nhớ tắt Unikey: chữ E)" style="width:100%;font-size:20px;padding:12px">
-    <p class="hint">Quét liên tục, gói nào cũng quét vào ô này, web tự nhận TikTok / Shopee / Facebook. Gói bình thường không cần khai gì. Bóc hàng thấy thiếu, hỏng hoặc sai thì bấm <b>Báo lỗi</b> ở gói đó. Gói có vấn đề tự vào tab Khiếu nại (đơn Facebook ghi là tự chịu). Cuối ngày kế toán nhập <b>phiếu nhập hoàn</b> ở bảng bên dưới.</p>
-    <details class="rtman"${RET.manOpen?" open":""}><summary><b>+ Thêm nhập tay</b> <span class="hint">(gói không quét được)</span></summary>
-     <p class="hint">Gõ <b>mã vận đơn</b> hoặc <b>mã đơn</b> in trên gói, mỗi dòng một gói. Web tự tra đơn hoàn như khi quét; không tra ra thì gói nằm ở tab "Chưa tra ra đơn" theo sàn chọn bên dưới. Gói mất hẳn mã thì ghi sản phẩm ở phần <b>Nhập gộp</b> bên dưới.</p>
-     <textarea id="rtm-codes" rows="3" style="width:100%;font-size:15px" placeholder="Ví dụ:&#10;SPXVN0123456789&#10;5813…">${esc(RET.manTxt||"")}</textarea>
-     <div class="filters"><label class="inl">Sàn (nếu web không tự nhận) <select id="rtm-ch"><option value="">Để web tự nhận</option>${Object.entries(RET_CH).map(([v,t])=>`<option value="${v}"${RET.manCh===v?" selected":""}>${t}</option>`).join("")}</select></label>
-      <button class="btn pri" id="rtm-go">Thêm các gói</button></div></details></section>
+    <p class="hint">Quét liên tục, gói nào cũng quét vào ô này, web tự nhận TikTok / Shopee / Facebook. Gói bình thường không cần khai gì. Bóc hàng thấy thiếu, hỏng hoặc sai thì bấm <b>Báo lỗi</b> ở gói đó. Gói có vấn đề tự vào tab Khiếu nại (đơn Facebook ghi là tự chịu). Cuối ngày kế toán nhập <b>phiếu nhập hoàn</b> ở bảng bên dưới.</p></section>
    <div class="grid kpis">${kpi("Đã quét",knum(list.length))}${kpi("TikTok",knum(cnt("TIKTOK")))}${kpi("Shopee",knum(cnt("SHOPEE")))}${kpi("Facebook",knum(cnt("FACEBOOK")))}${kpi("Không rõ kênh",knum(unk))}</div>
    <section class="card flush"><div class="card-h pad"><h2>Gói đã quét ngày ${kDd(day)}</h2><div class="filters"></div></div>
     ${(RET.files||[]).length?`<div class="pad" style="padding-top:0"><span class="hint">Ảnh phiếu kiểm đã tải:</span> ${RET.files.map((f,i)=>`<a href="/api/hub/kho/ret/files/${f.id}" target="_blank" rel="noopener">Ảnh ${i+1}</a>`).join(" · ")}</div>`:""}
@@ -122,10 +117,8 @@ function pKhoHoan(m){
   if(!RET.recon&&RET.tab==="scan")retLoadRecon();
   if(!RET.unm&&!RET.unmBusy)retLoadUnm();
   const body=RET.tab==="scan"?retScanTab():RET.tab==="recon"?retReconTab():RET.tab==="unm"?retUnmTab():retClaimTab();
-  if(kCan("TL"))nav+=`<div class="filters" style="justify-content:flex-end;margin:-4px 0 8px"><button class="btn" id="rt-tl-new" title="Lập phiếu nhập hàng hoàn bằng tay: chọn sản phẩm, số lượng, bán tiếp hay bỏ">+ Thêm phiếu nhập hàng hoàn</button></div>`;
   khoFrame(m,"kho_hoan","Hàng hoàn các sàn","Quét mã vận đơn gói hoàn TikTok, Shopee, Facebook; web tự nhận kênh, tự lập phiếu nhập hàng hoàn, đối soát và cảnh báo thất lạc.",nav+body);
   retBind(m);
-  if($("#rt-tl-new"))$("#rt-tl-new").onclick=()=>khoForm("TL");
   const inp=$("#rt-code");if(inp){inp.value=RET.keep||"";RET.keep="";setTimeout(()=>inp.focus({preventScroll:true}),0)}
 }
 
@@ -175,13 +168,8 @@ function retBind(m){
     if(ok)toast("Đã tải "+ok+" ảnh phiếu kiểm. Giờ nhập số thực nhận / hỏng của từng gói ở bảng dưới.");RET.scans=null;renderMain()};
   m.querySelectorAll("[data-wch]").forEach(b=>b.onclick=()=>{RET.wch=b.dataset.wch;renderMain()});
   m.querySelectorAll("[data-rt]").forEach(b=>b.onclick=()=>{RET.tab=b.dataset.rt;if(RET.tab!=="scan")RET.recon=null;renderMain()});
-  const mg=$("#rtm-go");
-  if(mg)mg.onclick=async()=>{const ta=$("#rtm-codes"),ch=$("#rtm-ch").value;RET.manCh=ch;
-    const L=[...new Set(ta.value.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean))];if(!L.length){toast("Gõ ít nhất một mã");return}
-    mg.disabled=true;let ok=0,no=0;const err=[];
-    for(const code of L){try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code,day:RET.day||retToday(),channel:ch||undefined,manual:true})});ok++;if(!s.order_id)no++;RET.scans=RET.scans||{scans:[]};RET.scans.scans=[s].concat(RET.scans.scans||[])}catch(e){err.push(code+": "+e.message)}}
-    RET.manTxt=err.map(x=>x.split(":")[0]).join("\n");RET.manOpen=err.length>0;RET.unm=null;
-    toast(`Đã thêm ${ok} gói`+(no?`, ${no} gói chưa tra ra đơn (xem tab Chưa tra ra đơn)`:"")+(err.length?`. ${err.length} mã chưa thêm: ${err.join("; ")}`:""));renderMain()};
+  if($("#rt-add"))$("#rt-add").onclick=retAddOpen;
+  if($("#rt-bb"))$("#rt-bb").onclick=retBienBan;
   const inp=$("#rt-code");
   if(inp)inp.onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();const code=inp.value.trim();inp.value="";if(!code)return;
     try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code,day:RET.day||retToday()})});retBeep(!!s.channel);
@@ -231,3 +219,40 @@ function retBind(m){
   m.querySelectorAll(".rt-a").forEach(x=>x.onchange=()=>save(x.dataset.s,{claim_amount:+x.value||0}));
 }
 PAGES.kho_hoan=pKhoHoan;
+
+/* Thêm phiếu nhập hàng hoàn (chị Hoa 10/11): gói không quét được thì gõ mã vận đơn / mã đơn, mỗi dòng một gói;
+   web tra đơn như khi quét và đưa vào danh sách của ngày. Gói mất hẳn mã thì ghi theo sản phẩm. */
+function retAddOpen(){
+  const day=RET.day||retToday();
+  openDrawerHTML(`<h2>Thêm phiếu nhập hàng hoàn · ngày ${kDd(day)}</h2>
+   <p class="hint">Gói không quét được (tem mờ, rách, máy không đọc): gõ <b>mã vận đơn</b> hoặc <b>mã đơn</b> in trên gói, mỗi dòng một gói. Web tự tra đơn hoàn như khi quét.</p>
+   <textarea id="rtm-codes" rows="6" style="width:100%;font-size:15px" placeholder="Ví dụ:&#10;SPXVN0123456789&#10;5813…">${esc(RET.manTxt||"")}</textarea>
+   <div class="filters"><label class="inl">Sàn (nếu web không tự nhận) <select id="rtm-ch"><option value="">Để web tự nhận</option>${Object.entries(RET_CH).map(([v,t])=>`<option value="${v}"${RET.manCh===v?" selected":""}>${t}</option>`).join("")}</select></label></div>
+   <div class="acts"><button class="btn pri" id="rtm-go">Thêm vào danh sách ngày ${kDd(day)}</button></div>
+   <p class="hint" style="margin-top:14px">Gói mất hẳn mã: ghi sản phẩm, số lượng ở phần <b>Nhập gộp</b> bên dưới trang quét.</p>`);
+  const mg=$("#rtm-go");
+  mg.onclick=async()=>{const ch=$("#rtm-ch").value;RET.manCh=ch;
+    const L=[...new Set($("#rtm-codes").value.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean))];if(!L.length){toast("Gõ ít nhất một mã");return}
+    mg.disabled=true;let ok=0,no=0;const err=[];
+    for(const code of L){try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code,day,channel:ch||undefined,manual:true})});ok++;if(!s.order_id)no++;RET.scans=RET.scans||{scans:[]};RET.scans.scans=[s].concat(RET.scans.scans||[])}catch(e){err.push(code+": "+e.message)}}
+    RET.manTxt=err.map(x=>x.split(":")[0]).join("\n");RET.unm=null;
+    toast(`Đã thêm ${ok} gói`+(no?`, ${no} gói chưa tra ra đơn (xem tab Chưa tra ra đơn)`:"")+(err.length?`. ${err.length} mã chưa thêm: ${err.join("; ")}`:""));
+    if(!err.length)closeDrawer();else{mg.disabled=false;$("#rtm-codes").value=RET.manTxt}renderMain()};
+}
+/* Biên bản nhận hàng hoàn để shipper ký (chị Hoa 10/11): các gói đã quét / nhập trong ngày, đếm theo sàn, chỗ ký hai bên. */
+function retBienBan(){
+  const day=RET.day||retToday(),L=((RET.scans&&RET.scans.scans)||[]).filter(s=>s.source!=="BULK").slice().reverse();
+  if(!L.length){toast("Ngày "+kDd(day)+" chưa có gói nào");return}
+  const cnt=ch=>L.filter(s=>s.channel===ch).length,unk=L.filter(s=>!s.channel).length;
+  const rows=L.map((s,i)=>`<tr><td class="c">${i+1}</td><td class="m">${esc(s.code)}</td><td>${esc(RET_CH[s.channel]||"Chưa rõ")}</td><td class="m">${esc(s.order_id||"")}</td><td class="c">${(s.items||[]).reduce((n,it)=>n+(+it.expected||0),0)||""}</td><td></td></tr>`).join("");
+  const w=window.open("","_blank");if(!w){toast("Trình duyệt chặn cửa sổ in, cho phép bật cửa sổ rồi bấm lại");return}
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Biên bản nhận hàng hoàn ${kDd(day)}</title><style>body{font:12px Arial,sans-serif;margin:18px}h1{font-size:17px;text-align:center;margin:0 0 4px}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #444;padding:4px 6px}th{background:#f1f1f1}.c{text-align:center}.m{font-family:Consolas,monospace}.sum{margin-top:8px}.sig{display:flex;justify-content:space-around;margin-top:28px;text-align:center}.sig div{width:40%}.sig small{color:#555}@media print{button{display:none}}</style></head><body>
+  <h1>BIÊN BẢN GIAO NHẬN HÀNG HOÀN</h1><p style="text-align:center">Ngày ${kDd(day)}</p>
+  <p>Đơn vị vận chuyển / shipper: ......................................................... Số điện thoại: ................................</p>
+  <p class="sum"><b>Tổng số gói: ${L.length}</b> · TikTok: ${cnt("TIKTOK")} · Shopee: ${cnt("SHOPEE")} · Facebook: ${cnt("FACEBOOK")}${unk?" · Chưa rõ sàn: "+unk:""}</p>
+  <table><thead><tr><th class="c" style="width:36px">STT</th><th>Mã vận đơn</th><th style="width:80px">Sàn</th><th>Mã đơn</th><th class="c" style="width:60px">Số món</th><th style="width:22%">Ghi chú (móp, rách, ướt…)</th></tr></thead><tbody>${rows}</tbody></table>
+  <p style="margin-top:10px">Hai bên đã kiểm đếm đủ <b>${L.length}</b> gói theo danh sách trên. Tình trạng bên ngoài gói ghi ở cột Ghi chú.</p>
+  <div class="sig"><div><b>Shipper giao</b><br><small>(ký, ghi rõ họ tên)</small><br><br><br><br></div><div><b>Kho nhận</b><br><small>(ký, ghi rõ họ tên)</small><br><br><br><br></div></div>
+  <p class="c" style="text-align:center;margin-top:12px"><button onclick="window.print()">In biên bản</button></p></body></html>`);
+  w.document.close();setTimeout(()=>{try{w.print()}catch(e){}},300);
+}
