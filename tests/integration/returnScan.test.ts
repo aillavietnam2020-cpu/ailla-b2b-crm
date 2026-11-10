@@ -241,4 +241,12 @@ describe('Gói chưa tra ra đơn: kế toán điền mã đơn từ seller', ()
     const after = await ctx.request('/api/hub/kho/ret/unmatched', { as: USERS.ceo });
     expect(after.body.data.map((x: { id: number }) => x.id)).not.toContain(id);
   });
+
+  it('nhập tay mã không quét được: không tra ra đơn thì theo sàn chọn tay, ghi chú Nhập tay (10/11)', async () => {
+    const r = await ctx.request('/api/hub/kho/ret/scan', { as: USERS.ceo, body: { code: 'MAMO123456', day: '2026-11-10', channel: 'SHOPEE', manual: true } });
+    expect(r.status).toBe(200);
+    expect(r.body.data.channel).toBe('SHOPEE');
+    const row = await ctx.db.prepare("SELECT note FROM ret_scans WHERE code = 'MAMO123456'").first<{ note: string }>();
+    expect(row?.note).toBe('Nhập tay');
+  });
 });

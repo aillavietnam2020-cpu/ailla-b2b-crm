@@ -17,10 +17,9 @@ function retIssues(s){return (s.issues||[]).map(x=>`<span class="tag amb">${esc(
 function retBulkCard(list){
   const unk=list.filter(s=>!s.order_id&&s.source!=="BULK"&&s.state==="CHO");
   const done=list.filter(s=>s.source==="BULK");
-  if(!unk.length&&!done.length)return "";
   RET.bk=RET.bk||{ch:"TIKTOK",rows:[]};const B=RET.bk;
   const rows=B.rows.map((r,i)=>`<tr><td><input class="rb-i" data-i="${i}" value="${esc(r.code?r.code+" - "+r.name:"")}" data-code="${esc(r.code||"")}" placeholder="Gõ mã hoặc tên sản phẩm" style="min-width:260px"></td><td><input class="rb-q n" data-i="${i}" type="number" min="0" step="1" value="${r.qty}" style="width:80px"></td><td><input class="rb-b n" data-i="${i}" type="number" min="0" step="1" value="${r.bad}" style="width:80px"></td><td><button class="btn sm rb-x" data-i="${i}">×</button></td></tr>`).join("");
-  return `<section class="card"><div class="card-h"><h2>Nhập gộp hàng của các gói chưa tra ra đơn${unk.length?" ("+unk.length+" gói)":""}</h2></div>
+  return `<section class="card"><div class="card-h"><h2>Nhập gộp hàng của gói mất mã / chưa tra ra đơn${unk.length?" ("+unk.length+" gói chưa tra ra đơn)":""}</h2></div>
    <p class="hint">Không cần chia từng gói: ghi tổng sản phẩm và số lượng bóc ra từ các gói chưa tra ra đơn (theo phần 3 của phiếu kiểm). Bấm Nhập kho thì các gói này coi như đã nhận, hết cảnh báo.${done.length?" Đã lưu gộp: "+done.map(s=>RET_CH[s.channel]+" "+(s.items||[]).reduce((a,i)=>a+(+i.received||0),0)+" sản phẩm").join(", ")+".":""}</p>
    <div class="filters"><label class="inl">Kênh <select id="rb-ch">${Object.entries(RET_CH).map(([v,t])=>`<option value="${v}"${B.ch===v?" selected":""}>${t}</option>`).join("")}</select></label></div>
    <table class="tbl"><thead><tr><th>Sản phẩm</th><th class="n">Số lượng</th><th class="n">Trong đó hỏng</th><th></th></tr></thead><tbody>${rows}</tbody></table>
@@ -56,7 +55,12 @@ function retScanTab(){
     <td>${lock?"":`<button class="btn sm rt-x" data-s="${s.id}" title="Quét nhầm, bỏ gói này">×</button>`}</td></tr>`};
   return `<section class="card"><div class="card-h"><h2>Quét mã vận đơn</h2><div class="filters"><label class="inl" style="display:inline-flex;align-items:center;gap:8px;margin:0">Ngày nhận <input type="date" id="rt-day" value="${day}"></label></div></div>
     <input id="rt-code" autocomplete="off" placeholder="Đặt con trỏ ở đây rồi quét (nhớ tắt Unikey: chữ E)" style="width:100%;font-size:20px;padding:12px">
-    <p class="hint">Quét liên tục, gói nào cũng quét vào ô này, web tự nhận TikTok / Shopee / Facebook. Gói bình thường không cần khai gì. Bóc hàng thấy thiếu, hỏng hoặc sai thì bấm <b>Báo lỗi</b> ở gói đó. Gói có vấn đề tự vào tab Khiếu nại (đơn Facebook ghi là tự chịu). Cuối ngày kế toán nhập <b>phiếu nhập hoàn</b> ở bảng bên dưới.</p></section>
+    <p class="hint">Quét liên tục, gói nào cũng quét vào ô này, web tự nhận TikTok / Shopee / Facebook. Gói bình thường không cần khai gì. Bóc hàng thấy thiếu, hỏng hoặc sai thì bấm <b>Báo lỗi</b> ở gói đó. Gói có vấn đề tự vào tab Khiếu nại (đơn Facebook ghi là tự chịu). Cuối ngày kế toán nhập <b>phiếu nhập hoàn</b> ở bảng bên dưới.</p>
+    <details class="rtman"${RET.manOpen?" open":""}><summary><b>Nhập tay gói không quét được</b> <span class="hint">(tem mờ, rách, máy không đọc)</span></summary>
+     <p class="hint">Gõ <b>mã vận đơn</b> hoặc <b>mã đơn</b> in trên gói, mỗi dòng một gói. Web tự tra đơn hoàn như khi quét; không tra ra thì gói nằm ở tab "Chưa tra ra đơn" theo sàn chọn bên dưới. Gói mất hẳn mã thì ghi sản phẩm ở phần <b>Nhập gộp</b> bên dưới.</p>
+     <textarea id="rtm-codes" rows="3" style="width:100%;font-size:15px" placeholder="Ví dụ:&#10;SPXVN0123456789&#10;5813…">${esc(RET.manTxt||"")}</textarea>
+     <div class="filters"><label class="inl">Sàn (nếu web không tự nhận) <select id="rtm-ch"><option value="">Để web tự nhận</option>${Object.entries(RET_CH).map(([v,t])=>`<option value="${v}"${RET.manCh===v?" selected":""}>${t}</option>`).join("")}</select></label>
+      <button class="btn pri" id="rtm-go">Thêm các gói</button></div></details></section>
    <div class="grid kpis">${kpi("Đã quét",knum(list.length))}${kpi("TikTok",knum(cnt("TIKTOK")))}${kpi("Shopee",knum(cnt("SHOPEE")))}${kpi("Facebook",knum(cnt("FACEBOOK")))}${kpi("Không rõ kênh",knum(unk))}</div>
    <section class="card flush"><div class="card-h pad"><h2>Gói đã quét ngày ${kDd(day)}</h2><div class="filters"></div></div>
     ${(RET.files||[]).length?`<div class="pad" style="padding-top:0"><span class="hint">Ảnh phiếu kiểm đã tải:</span> ${RET.files.map((f,i)=>`<a href="/api/hub/kho/ret/files/${f.id}" target="_blank" rel="noopener">Ảnh ${i+1}</a>`).join(" · ")}</div>`:""}
@@ -111,15 +115,17 @@ function retClaimTab(){
 
 function pKhoHoan(m){
   const T=[["scan","Quét hàng hoàn"],["unm","Chưa tra ra đơn"],["recon","Đối soát"],["claim","Khiếu nại"],["docs","Phiếu đã nhập"]];
-  const nav=`<nav class="settabs">${T.map(([k,t])=>`<button class="${k===RET.tab?"on":""}" data-rt="${k}">${t}${k==="unm"&&RET.unm&&RET.unm.length?" ("+RET.unm.length+")":""}${k==="claim"&&RET.recon&&RET.recon.claims&&RET.recon.claims.filter(c=>c.claim).length?" ("+RET.recon.claims.filter(c=>c.claim).length+")":""}</button>`).join("")}</nav>`;
+  let nav=`<nav class="settabs">${T.map(([k,t])=>`<button class="${k===RET.tab?"on":""}" data-rt="${k}">${t}${k==="unm"&&RET.unm&&RET.unm.length?" ("+RET.unm.length+")":""}${k==="claim"&&RET.recon&&RET.recon.claims&&RET.recon.claims.filter(c=>c.claim).length?" ("+RET.recon.claims.filter(c=>c.claim).length+")":""}</button>`).join("")}</nav>`;
   if(RET.tab==="docs"){pKhoDocs(m,"TL");const s=m.querySelector("nav.kgsub")||m.querySelector("nav.kgtabs")||m.querySelector("nav.settabs");if(s)s.insertAdjacentHTML("afterend",nav);retBind(m);return}
   if(RET.tab==="scan"&&!RET.scans&&!RET.busy)retLoadScans();
   if(RET.tab!=="scan"&&!RET.recon)retLoadRecon();
   if(!RET.recon&&RET.tab==="scan")retLoadRecon();
   if(!RET.unm&&!RET.unmBusy)retLoadUnm();
   const body=RET.tab==="scan"?retScanTab():RET.tab==="recon"?retReconTab():RET.tab==="unm"?retUnmTab():retClaimTab();
+  if(kCan("TL"))nav+=`<div class="filters" style="justify-content:flex-end;margin:-4px 0 8px"><button class="btn" id="rt-tl-new" title="Lập phiếu nhập hàng hoàn bằng tay: chọn sản phẩm, số lượng, bán tiếp hay bỏ">+ Phiếu nhập hàng hoàn</button></div>`;
   khoFrame(m,"kho_hoan","Hàng hoàn các sàn","Quét mã vận đơn gói hoàn TikTok, Shopee, Facebook; web tự nhận kênh, tự lập phiếu nhập hàng hoàn, đối soát và cảnh báo thất lạc.",nav+body);
   retBind(m);
+  if($("#rt-tl-new"))$("#rt-tl-new").onclick=()=>khoForm("TL");
   const inp=$("#rt-code");if(inp){inp.value=RET.keep||"";RET.keep="";setTimeout(()=>inp.focus({preventScroll:true}),0)}
 }
 
@@ -169,6 +175,13 @@ function retBind(m){
     if(ok)toast("Đã tải "+ok+" ảnh phiếu kiểm. Giờ nhập số thực nhận / hỏng của từng gói ở bảng dưới.");RET.scans=null;renderMain()};
   m.querySelectorAll("[data-wch]").forEach(b=>b.onclick=()=>{RET.wch=b.dataset.wch;renderMain()});
   m.querySelectorAll("[data-rt]").forEach(b=>b.onclick=()=>{RET.tab=b.dataset.rt;if(RET.tab!=="scan")RET.recon=null;renderMain()});
+  const mg=$("#rtm-go");
+  if(mg)mg.onclick=async()=>{const ta=$("#rtm-codes"),ch=$("#rtm-ch").value;RET.manCh=ch;
+    const L=[...new Set(ta.value.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean))];if(!L.length){toast("Gõ ít nhất một mã");return}
+    mg.disabled=true;let ok=0,no=0;const err=[];
+    for(const code of L){try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code,day:RET.day||retToday(),channel:ch||undefined,manual:true})});ok++;if(!s.order_id)no++;RET.scans=RET.scans||{scans:[]};RET.scans.scans=[s].concat(RET.scans.scans||[])}catch(e){err.push(code+": "+e.message)}}
+    RET.manTxt=err.map(x=>x.split(":")[0]).join("\n");RET.manOpen=err.length>0;RET.unm=null;
+    toast(`Đã thêm ${ok} gói`+(no?`, ${no} gói chưa tra ra đơn (xem tab Chưa tra ra đơn)`:"")+(err.length?`. ${err.length} mã chưa thêm: ${err.join("; ")}`:""));renderMain()};
   const inp=$("#rt-code");
   if(inp)inp.onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();const code=inp.value.trim();inp.value="";if(!code)return;
     try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code,day:RET.day||retToday()})});retBeep(!!s.channel);

@@ -118,8 +118,11 @@ khoReturnRoutes.post('/sync', async (c) => {
 khoReturnRoutes.post('/scan', async (c) => {
   const auth = c.get('auth');
   if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
-  const b = (await c.req.json().catch(() => null)) as { code?: unknown; day?: unknown } | null;
+  const b = (await c.req.json().catch(() => null)) as { code?: unknown; day?: unknown; channel?: unknown; manual?: unknown } | null;
   const { code, vietnamese } = normalizeCode(String(b?.code ?? ''));
+  // Nhập tay (chị Hoa 10/11): mã vận đơn / mã đơn không quét được thì gõ tay, chọn sàn nếu web không tự tra ra.
+  const pickCh = ['TIKTOK', 'SHOPEE', 'FACEBOOK'].includes(String(b?.channel ?? '')) ? String(b?.channel) : null;
+  const manual = b?.manual === true;
   if (vietnamese) throw badRequest('UNIKEY', 'Mã có dấu tiếng Việt: tắt Unikey (chuyển sang E) rồi quét lại');
   if (code.length < 5) throw badRequest('BAD_CODE', 'Mã quá ngắn');
   const day = isDate(b?.day) ? b.day : vnToday();
@@ -140,9 +143,9 @@ khoReturnRoutes.post('/scan', async (c) => {
   const now = nowIso();
   const r = await db
     .prepare(
-      `INSERT INTO ret_scans (code, scan_day, scanned_at, scanned_by, channel, order_id, items) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO ret_scans (code, scan_day, scanned_at, scanned_by, channel, order_id, items, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     )
-    .bind(code, day, now, auth.user.id, hit?.channel ?? guessChannel(code), hit?.order_id ?? null, JSON.stringify(items))
+    .bind(code, day, now, auth.user.id, hit?.channel ?? pickCh ?? guessChannel(code), hit?.order_id ?? null, JSON.stringify(items), manual ? 'Nhập tay' : '')
     .first<ScanRow>();
   return ok(c, (await scanView(db, r ? [r] : []))[0]);
 });
