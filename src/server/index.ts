@@ -112,8 +112,8 @@ export default {
             console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6, 7].map(day), (u) => fetch(u))));
             // Tiền đơn Facebook đã gửi hàng (giá vốn, ship Facebook trên trang quản trị): hôm qua, hôm kia.
             console.info('[cron] fb money', JSON.stringify(await syncFbMoney(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
-            // CSKH khách lẻ: đơn Facebook giao thành công hôm nay, hôm qua, hôm kia → khách + chia khách mới.
-            console.info('[cron] cskh', JSON.stringify(await syncCskhDays(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
+            // CSKH khách lẻ: đơn Facebook giao thành công 7 ngày gần nhất (kéo trùng không sao, để lỡ một sáng lỗi mạng vẫn không sót).
+            console.info('[cron] cskh', JSON.stringify(await syncCskhDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6].map(day), (u) => fetch(u))));
           }
         } catch (error) {
           console.error('[cron] poscake loi', error);
