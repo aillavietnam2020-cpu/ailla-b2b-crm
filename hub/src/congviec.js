@@ -126,6 +126,8 @@ const tkCeoGiao=t=>!!t&&!!t.tao&&((D().users||[]).find(u=>u.id===t.tao)||{}).rol
 const tkV2=t=>!tkCeoGiao(t)&&tkV2On(t)&&!!tkLeadOf(t);
 const tkAdmins=()=>D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id);
 /* việc order hỗ trợ (orderlen.js): người order xác nhận kết quả */
+/* việc tự giao cho mình (Thêm việc, hoặc giao cho chính mình) và không đề xuất ai duyệt: không cần duyệt, tự bấm Xong */
+const tkSelf=t=>!!t&&!!t.nguoi&&t.tao===t.nguoi&&!(t.duyet&&t.duyet!==t.nguoi);
 const tkAppr=t=>{if(t.order&&t.tao)return [t.tao];if(t.tuThem&&t.duyet&&t.duyet!==t.nguoi)return [t.duyet];if(tkCeoGiao(t))return [t.tao];if(t.st==="review"&&t.vong===2)return tkAdmins();const L=tkLeadOf(t);return L?[L.id]:tkMgrIds(t)};
 const tkMgr=t=>!!ME&&ME.id!==t.nguoi&&(ME.role==="admin"||(t.st==="review"&&t.vong===2?false:(t.tao===ME.id||tkMgrIds(t).includes(ME.id)||tkAppr(t).includes(ME.id))));
 /* Quy tắc đóng việc: việc do người khác giao thì người làm chỉ bấm "Chờ duyệt", người giao (hoặc quản lý) duyệt mới Hoàn thành. Việc tự tạo cho mình thì tự đóng. */
@@ -241,7 +243,7 @@ function tkStepper(t){
 }
 function tkResultHtml(t){
   if(!t||(t.cd&&t.cd.length))return "";
-  return (t.tuThem?"":tkStepper(t))+tkResultBox(t);
+  return (t.tuThem||tkSelf(t)?"":tkStepper(t))+tkResultBox(t);
 }
 function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
@@ -250,7 +252,7 @@ function tkResultBox(t){
   {const tc=t.tuChoi;if(tc&&tc.st==="cho"){const can=tkTcCan(t);return `<div class="tkres rv"><b>${esc(userName(tc.by)||"")} xin từ chối việc này</b><p>“${esc(tc.lyDo)}”</p><small class="hint">Gửi lúc ${esc(tc.at||"")}</small>${can?`<div class="acts"><button type="button" class="btn sm pri" id="t-tcmv">Chuyển người khác làm</button><button type="button" class="btn sm" id="t-tcok">Hủy việc</button><button type="button" class="btn sm" id="t-tcno">Vẫn giao người này</button></div><div class="tkmg" id="t-tcmvw" hidden><label>Người làm mới<select id="t-tcng">${opt([["","— chọn người"]].concat((D().users||[]).filter(u=>u.active!==false&&u.name&&u.id!==t.nguoi&&u.role!=="admin").sort((a,b)=>a.name.localeCompare(b.name)).map(u=>[u.id,u.name])),"")}</select></label><label>Hạn mới${tkDate("t-tchan",Math.max(+t.han||0,D().settings.today+1))}</label><button type="button" class="btn sm pri" id="t-tcmvok">Chuyển</button></div>`:`<p class="hint">Đang chờ ${esc(userName(t.tao)||"quản lý")} duyệt.</p>`}</div>`}}
   const tcBtn=doer&&!t.tuThem&&t.tao&&t.tao!==ME.id&&["todo","nhan","doing"].includes(t.st)?`<button type="button" class="btn sm danger" id="t-tc" title="Không làm được việc này: ghi lý do gửi người giao duyệt">Từ chối việc</button>`:"";
   const tcNo=t.tuChoi&&t.tuChoi.st==="khong"&&t.st!=="done"?`<div class="note amb">Xin từ chối không được duyệt${t.tuChoi.note?": "+esc(t.tuChoi.note):""}. Việc vẫn cần làm.</div>`:"";
-  if(t.tuThem&&t.tao===t.nguoi&&!t.duyet&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
+  if(tkSelf(t)&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}${tkReopenOk(t)?`<div class="acts"><button type="button" class="btn sm" id="t-reopen">↺ Mở lại việc</button><span class="hint">bấm nhầm hoàn thành thì mở lại</span></div>`:""}</div>`;
   if(t.st==="review"&&mg&&!(t.nopAt||t.kq||t.kqNote||(t.kqFiles||[]).length))return `<div class="tkres rv"><b>Người làm chưa nộp kết quả</b> <span class="hint">việc đang ở Chờ duyệt nhưng chưa có gì để duyệt</span><div class="acts"><button type="button" class="btn sm pri" id="t-backtodo">Trả về Cần làm</button></div></div>`;
   if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Cần sửa</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt</button></div></div>`
@@ -276,14 +278,14 @@ function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)r
     if(old===k||typeof notifyU!=="function")return;
     cwTdNotify(dt,x,k==="review"?`${ME.name} nộp kết quả việc "${x.ten}", đang chờ duyệt`:`${ME.name} chuyển việc "${x.ten}" sang ${cvStN(k)}`);
     if(k==="review")tkKhoSync(dt,x,"nop");else if(k==="done"&&ME.id!==x.nguoi)tkKhoSync(dt,x,"ok");
-    if(k==="review"){const ap=tkAppr(x);notifyU(dt,ap,`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
+    if(k==="review"&&!tkSelf(x)){const ap=tkAppr(x);notifyU(dt,ap,`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
       const gv=x.tao&&x.tao!==x.nguoi&&!ap.includes(x.tao)?[x.tao]:[];if(gv.length)notifyU(dt,gv,`${ME.name} đã nộp kết quả việc "${x.ten}", đang chờ ${tkMgrNames(x)||"người duyệt"} duyệt (chưa đến lượt bạn)`,ref)}
     else if(k==="done"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} đã duyệt xong việc "${x.ten}"`,ref);
     else if(old==="review"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} trả lại việc "${x.ten}"${note?": "+note:""}`,ref);
     else if(k==="done")notifyU(dt,[x.tao],`${ME.name} đã xong việc "${x.ten}"`,ref)})}
 function tkDoneErr(t){if(!t||tkMgr(t))return "";if(t.tuThem&&t.duyet&&t.duyet!==t.nguoi)return `Việc này đã đề xuất ${userName(t.duyet)||"người duyệt"} duyệt. Bấm "Chờ duyệt" để gửi duyệt rồi mới hoàn thành.`;if(t.tao&&t.tao!==t.nguoi)return `Việc này do ${userName(t.tao)||"người giao"} giao. Bấm "Chờ duyệt" để người giao xem rồi mới hoàn thành.`;return ""}
 /* đến lượt tôi duyệt: đúng người của vòng hiện tại (vòng 1 lead, vòng 2 chị) */
-const tkMyTurn=t=>!!ME&&(t.cd&&t.cd.length?tkCdWait(t).length>0:t.st==="review"&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id));
+const tkMyTurn=t=>!!ME&&(t.cd&&t.cd.length?tkCdWait(t).length>0:t.st==="review"&&!tkSelf(t)&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id));
 const tkMgrNames=t=>tkAppr(t).map(userName).filter(Boolean).join(", ")||"quản lý";
 /* tinnhan.js: giao việc từ tin nhắn — giao xong gọi hàm này với mã việc mới để gửi thẻ việc vào cuộc trò chuyện */
 let TK_AFTER_NEW=null;
@@ -302,7 +304,7 @@ function openTask(id){
    <div class="field" id="t-stw">Trạng thái <small class="hint">bấm để đổi${t&&ed?", tự lưu ngay":""}</small><div class="tkst">${CV_ST.filter(s=>s[0]!=="cg").map(([k,n,c])=>`<button type="button" class="tkb tk-${c}${(t?t.st:"todo")===k?" on":""}" data-tkst="${k}" ${ed?"":"disabled"}>${(t?t.st:"todo")===k?"✓ ":""}${n}</button>`).join("")}</div><input type="hidden" id="t-st" value="${t?t.st:"todo"}">${t&&t.stAt?`<small class="hint">Đổi lần cuối: ${esc(t.stAt)} bởi ${esc(t.stBy||"")}</small>`:""}</div>
    ${t&&t.st!=="done"&&t.han&&(t.han<d.settings.today||(t.treReq||{}).st==="cho"||(ed&&!tkMgr(t)))?(()=>{const R=t.treReq||{},mg=tkMgr(t),cho=R.st==="cho",rv=t.st==="review",nt=rv?Math.max(0,(t.nopNgay||d.settings.today)-t.han):0,lt=!rv&&t.han<d.settings.today;
      /* việc tự thêm (không đề xuất người duyệt): tự gia hạn, ghi lý do, không gửi ai duyệt */
-     if(t.tuThem&&t.tao===t.nguoi&&!t.duyet&&ME.id===t.nguoi)return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Deadline "+dayLbl(t.han)}</b>${t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}<label class="field">Lý do gia hạn<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu"></textarea></label><div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",Math.max(t.han,d.settings.today)+1)}</label><button type="button" class="btn sm pri" id="t-selfgh">Gia hạn</button></div></div>`;
+     if(tkSelf(t)&&ME.id===t.nguoi)return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Deadline "+dayLbl(t.han)}</b>${t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}<label class="field">Lý do gia hạn<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu"></textarea></label><div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",Math.max(t.han,d.settings.today)+1)}</label><button type="button" class="btn sm pri" id="t-selfgh">Gia hạn</button></div></div>`;
      return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Hạn "+dayLbl(t.han)+(nt?` · nộp trễ ${nt} ngày`:"")}</b>${lt?` (hạn ${dayLbl(t.han)}${t.hanCu?`, hạn cũ ${dd(t.hanCu)}`:""})`:t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}
      ${cho?`<p>📨 <b>${esc(R.by)}</b> đã gửi lý do lúc ${esc(R.at)}: <i>${esc(R.lyDo)}</i><br><span class="hint">Chờ quản lý (${esc(tkMgrNames(t))}) gia hạn hoặc duyệt hoàn thành.</span></p>
        ${mg?`<div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:d.settings.today+2)}</label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button>${t.st==="review"?`<button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button>`:""}</div>`:""}`
