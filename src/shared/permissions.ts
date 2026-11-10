@@ -51,6 +51,8 @@ export const PERMISSIONS = [
   // Kế toán kho: thấy mọi đơn, kiểm tồn, báo đủ/thiếu hàng, ghi số thực xuất.
   'order.kho.process',
   'sx.kiemke',
+  // Nhân viên kho chỉ quét, nhập hàng hoàn các sàn (CEO 10/11): không kiểm kê, không lập phiếu kho khác.
+  'kho.hoan',
   // Quyền riêng của AI agent (xem shared/agent.ts): chỉ đọc qua /api/agent và ghi đề xuất.
   'agent.read',
   'agent.propose',
@@ -156,7 +158,9 @@ export function effectivePermissions(role: Role, extra: string[] = []): Permissi
   // Dấu "chỉ Marketing" chỉ thu quyền khi người đó KHÔNG được cấp quyền kho; ai có quyền kho (kế toán kho) thì giữ nguyên quyền kho
   // dù còn dấu này, để không bị mất quyền vì thao tác chọn lẫn.
   const isWarehouse = extra.some((p) => (WAREHOUSE_PERMISSIONS as string[]).includes(p));
-  if (role !== 'CEO' && extra.includes(HUB_ONLY) && !isWarehouse) return [...MARKETING_PERMISSIONS];
+  // Quyền riêng "Quét, nhập hàng hoàn" (nhân viên kho, CEO 10/11) vẫn giữ khi có dấu này.
+  if (role !== 'CEO' && extra.includes(HUB_ONLY) && !isWarehouse)
+    return [...MARKETING_PERMISSIONS, ...(extra.includes('kho.hoan') ? (['kho.hoan'] as Permission[]) : [])];
   const set = new Set<Permission>(ROLE_PERMISSIONS[role]);
   for (const item of extra) {
     if ((PERMISSIONS as readonly string[]).includes(item)) set.add(item as Permission);

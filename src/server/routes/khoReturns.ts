@@ -31,7 +31,7 @@ export const guessChannel = (code: string): string | null => {
   if (/^(862|854)\d{9}$/.test(code) || /^(TTVN|TO|VTPVN)/.test(code)) return 'TIKTOK';
   return null;
 };
-const canWork = (a: AuthContext) => a.user.role === 'CEO' || a.permissions.includes('sx.kiemke');
+const canWork = (a: AuthContext) => a.user.role === 'CEO' || a.permissions.includes('sx.kiemke') || a.permissions.includes('kho.hoan');
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const vnToday = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 const vnDay = (back: number) => new Date(Date.now() + 7 * 3_600_000 - back * 86_400_000).toISOString().slice(0, 10);
@@ -107,7 +107,7 @@ async function scanView(db: D1Database, rows: ScanRow[]) {
 
 /** Kéo lại danh sách đơn hoàn từ Poscake (mặc định 3 ngày gần nhất; tối đa 30). */
 khoReturnRoutes.post('/sync', async (c) => {
-  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const b = (await c.req.json().catch(() => ({}))) as { days?: unknown };
   const n = Math.min(Math.max(Math.floor(Number(b.days ?? 3)) || 3, 1), 30);
   const days = Array.from({ length: n }, (_, i) => vnDay(i));
@@ -117,7 +117,7 @@ khoReturnRoutes.post('/sync', async (c) => {
 /** Quét một mã: tra đơn hoàn theo mã vận đơn (hoặc mã đơn), ghi lượt quét chờ nhập kho. */
 khoReturnRoutes.post('/scan', async (c) => {
   const auth = c.get('auth');
-  if (!canWork(auth)) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const b = (await c.req.json().catch(() => null)) as { code?: unknown; day?: unknown } | null;
   const { code, vietnamese } = normalizeCode(String(b?.code ?? ''));
   if (vietnamese) throw badRequest('UNIKEY', 'Mã có dấu tiếng Việt: tắt Unikey (chuyển sang E) rồi quét lại');
@@ -160,7 +160,7 @@ khoReturnRoutes.get('/scans', async (c) => {
 /** Sửa kết quả kiểm một gói: số về thực tế / bán tiếp / hỏng từng món, vấn đề, ghi chú, link video, tình trạng khiếu nại. */
 khoReturnRoutes.put('/scans/:id', async (c) => {
   const auth = c.get('auth');
-  if (!canWork(auth)) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const id = Number(c.req.param('id'));
   const db = c.env.DB;
   const row = await db.prepare('SELECT * FROM ret_scans WHERE id = ?').bind(id).first<ScanRow>();
@@ -216,7 +216,7 @@ khoReturnRoutes.put('/scans/:id', async (c) => {
 
 /** Bỏ một lượt quét nhầm (chỉ khi chưa nhập kho). */
 khoReturnRoutes.delete('/scans/:id', async (c) => {
-  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const r = await c.env.DB.prepare("UPDATE ret_scans SET state = 'HUY' WHERE id = ? AND state = 'CHO'").bind(Number(c.req.param('id'))).run();
   if (!r.meta.changes) throw conflict('LOCKED', 'Gói đã nhập kho hoặc không còn');
   return ok(c, { ok: true });
@@ -321,7 +321,7 @@ async function receiveByActual(
 /** Nhập kho các gói đã quét của một ngày: mỗi kênh một phiếu nhập hàng hoàn (TL). Bán tiếp cộng tồn, hỏng chỉ ghi nhận. */
 khoReturnRoutes.post('/receive', async (c) => {
   const auth = c.get('auth');
-  if (!canWork(auth)) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const b = (await c.req.json().catch(() => null)) as { day?: unknown; actual?: unknown } | null;
   const day = isDate(b?.day) ? b.day : vnToday();
   const db = c.env.DB;
@@ -474,7 +474,7 @@ khoReturnRoutes.get('/recon', async (c) => {
 /** Nạp các mã đã quét trước đây (dán từ file Sheet "Đơn hoàn các sàn": ngày + mã vận đơn). Mã trùng thì bỏ qua. */
 khoReturnRoutes.post('/import', async (c) => {
   const auth = c.get('auth');
-  if (!canWork(auth)) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const b = (await c.req.json().catch(() => null)) as { rows?: unknown } | null;
   const rows = Array.isArray(b?.rows) ? (b.rows as Array<{ day?: unknown; code?: unknown }>) : [];
   if (!rows.length || rows.length > 3000) throw badRequest('BAD_ROWS', 'Không có dòng nào hoặc quá nhiều');
@@ -508,7 +508,7 @@ khoReturnRoutes.post('/import', async (c) => {
 
 /** Gắn lại đơn cho các mã đã quét nhưng lúc quét chưa có trong danh sách hoàn (Poscake cập nhật chậm). */
 khoReturnRoutes.post('/rematch', async (c) => {
-  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const db = c.env.DB;
   const rows = (
     await db
@@ -538,7 +538,7 @@ khoReturnRoutes.post('/rematch', async (c) => {
 const FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 khoReturnRoutes.post('/files', async (c) => {
   const auth = c.get('auth');
-  if (!canWork(auth)) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const form = await c.req.formData().catch(() => null);
   const file = form?.get('file');
   const day = String(form?.get('day') ?? '');
@@ -581,7 +581,7 @@ khoReturnRoutes.get('/files/:id', async (c) => {
  * kho gõ mã đơn hoặc mã vận đơn gốc để gắn gói vào đúng đơn và lấy ra các món phải về.
  */
 khoReturnRoutes.post('/scans/:id/link', async (c) => {
-  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const db = c.env.DB;
   const id = Number(c.req.param('id'));
   const b = (await c.req.json().catch(() => null)) as { code?: unknown } | null;
@@ -610,7 +610,7 @@ khoReturnRoutes.post('/scans/:id/link', async (c) => {
  */
 khoReturnRoutes.post('/bulk', async (c) => {
   const auth = c.get('auth');
-  if (!canWork(auth)) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const b = (await c.req.json().catch(() => null)) as { day?: unknown; channel?: unknown; items?: unknown } | null;
   const day = isDate(b?.day) ? b.day : vnToday();
   const channel = String(b?.channel ?? '');
@@ -657,7 +657,7 @@ khoReturnRoutes.get('/unmatched', async (c) => {
  * và lấy ra các món phải về; chưa có thì lưu lại mã đơn, lần kéo / gắn lại sau sẽ tự khớp.
  */
 khoReturnRoutes.post('/scans/:id/order-ref', async (c) => {
-  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán kho');
+  if (!canWork(c.get('auth'))) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
   const db = c.env.DB;
   const id = Number(c.req.param('id'));
   const b = (await c.req.json().catch(() => null)) as { order_ref?: unknown; channel?: unknown } | null;
