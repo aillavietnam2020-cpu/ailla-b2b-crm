@@ -257,4 +257,22 @@ describe('Gói chưa tra ra đơn: kế toán điền mã đơn từ seller', ()
     const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM ret_scans WHERE code = 'CHUACO99999'").first<{ n: number }>();
     expect(n?.n).toBe(0);
   });
+
+  it('mỗi lượt quét một phiếu theo ngày: chốt phiếu thì lần quét sau vào phiếu mới (10/11)', async () => {
+    const day = '2026-11-10';
+    const q = (code: string) => ctx.request('/api/hub/kho/ret/scan', { as: USERS.ceo, body: { code, day } });
+    await q('LUOT1AAAAA');
+    await q('LUOT1BBBBB');
+    const nb = await ctx.request('/api/hub/kho/ret/batches', { as: USERS.ceo, body: { day, kind: 'SCAN' } });
+    expect(nb.status).toBe(200);
+    await q('LUOT2CCCCC');
+    const g = await ctx.request(`/api/hub/kho/ret/scans?day=${day}`, { as: USERS.ceo, method: 'GET' });
+    const B = g.body.data.batches as Array<{ id: number; no: string; closed_at: string | null }>;
+    expect(B.length).toBe(2);
+    expect(B[0].no).toBe('PNH-101126-01');
+    expect(B[0].closed_at).not.toBeNull();
+    const S = g.body.data.scans as Array<{ code: string; batch_id: number }>;
+    expect(S.filter((x) => x.batch_id === B[0].id).length).toBe(2);
+    expect(S.find((x) => x.code === 'LUOT2CCCCC')?.batch_id).toBe(B[1].id);
+  });
 });
