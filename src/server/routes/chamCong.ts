@@ -107,7 +107,7 @@ async function loadBu(db: D1Database, s: CcSettings, pbOf: (id: string) => strin
       await db
         .prepare("SELECT user_id, tu, buoi, st, bu_ngay, bu_kieu, bu_tu, bu_den FROM ns_don WHERE loai = 'lambu' AND st IN ('lead', 'hcns', 'xong') AND tu >= ?")
         .bind(vnDate(new Date(Date.now() - 180 * 864e5)))
-        .all<{ user_id: string; tu: string; buoi: Buoi; st: string; bu_ngay: string; bu_kieu: BuKieu; bu_tu: string | null; bu_den: string | null }>()
+        .all<{ user_id: string; tu: string; buoi: Exclude<Buoi, 'gio'>; st: string; bu_ngay: string; bu_kieu: BuKieu; bu_tu: string | null; bu_den: string | null }>()
     ).results ?? [];
   const xong = rows.filter((r) => r.st === 'xong' && r.tu <= today);
   const ngays = [...new Set(xong.map((r) => r.tu))];
@@ -192,7 +192,8 @@ async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>
     for (const [n, ds] of donTheoNgay(list))
       for (const x of ds) {
         const e = at(u, n);
-        if (x.loai === 'vesom') e.coPhep = true;
+        // Nghỉ theo giờ (CEO 10/11): đi muộn / về sớm ngày đó không tính vi phạm; không coi là nghỉ cả ngày.
+        if (x.loai === 'vesom' || x.buoi === 'gio') e.coPhep = true;
         else if (x.loai === 'ot') e.ot = (e.ot ?? 0) + (x.gio ?? 0);
         else e.don = LOAI_DON[x.loai] + (x.buoi === 'sang' ? ' (sáng)' : x.buoi === 'chieu' ? ' (chiều)' : '');
       }

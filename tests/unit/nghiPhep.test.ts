@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeSettings, type Lich } from '../../src/server/services/chamCong';
-import { coTheDuyet, donTheoNgay, leadsCuaPhong, sauLeadDuyet, soNgayNghi, trangThaiDau } from '../../src/server/services/nghiPhep';
+import { coTheDuyet, donTheoNgay, gioNghi, leadsCuaPhong, sauLeadDuyet, soNgayNghi, trangThaiDau } from '../../src/server/services/nghiPhep';
+import { dayRule } from '../../src/server/services/chamCong';
 
 const s = normalizeSettings({});
 const vp = s.lich.find((l) => l.id === 'vp') as Lich;
@@ -119,5 +120,21 @@ describe('làm bù (CEO 06/11)', () => {
     const gio = { ngay: '2026-11-05', ...tongNgay([{ loai: 'vao', at: iso('2026-11-05', '08:40'), trong: 1 }, { loai: 'ra', at: iso('2026-11-05', '17:30'), trong: 1 }], vp, '2026-11-05', false, { bu: { kq: 'du', ngay: '2026-11-07', kieu: 'gio' } }) };
     expect(tongThang([muon], vp, '2026-11-10').viPham).toBe(1);
     expect(tongThang([gio], vp, '2026-11-10').viPham).toBe(0);
+  });
+});
+
+describe('nghỉ theo giờ (CEO 10/11)', () => {
+  const r = (d: string) => dayRule(vp, d);
+  it('tính giờ trong giờ làm, bỏ giờ nghỉ trưa, quy ra ngày theo giờ chuẩn', () => {
+    // văn phòng 08:00–17:30, trưa 12:00–13:30 → 8 giờ chuẩn
+    expect(gioNghi(vp, '2026-11-12', '14:00', '16:00', r('2026-11-12'))).toEqual({ gio: 2, soNgay: 0.25 });
+    expect(gioNghi(vp, '2026-11-12', '11:00', '14:00', r('2026-11-12'))).toEqual({ gio: 1.5, soNgay: 0.19 });
+    expect(gioNghi(vp, '2026-11-12', '07:00', '09:00', r('2026-11-12'))).toEqual({ gio: 1, soNgay: 0.13 });
+  });
+  it('báo lỗi khi giờ sai, ngoài giờ làm, ngày nghỉ, hoặc nghỉ hết ngày', () => {
+    expect(gioNghi(vp, '2026-11-12', '16:00', '14:00', r('2026-11-12'))).toHaveProperty('loi');
+    expect(gioNghi(vp, '2026-11-12', '18:00', '19:00', r('2026-11-12'))).toHaveProperty('loi');
+    expect(gioNghi(vp, '2026-11-15', '14:00', '16:00', r('2026-11-15'))).toHaveProperty('loi');
+    expect(gioNghi(vp, '2026-11-12', '08:00', '17:30', r('2026-11-12'))).toHaveProperty('loi');
   });
 });

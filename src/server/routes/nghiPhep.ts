@@ -10,6 +10,7 @@ import { loadMembers, type Members } from '../services/daoTao';
 import { dayRule, lichOf } from '../services/chamCong';
 import {
   coTheDuyet,
+  gioNghi,
   kiemBu,
   ngayCanBu,
   kyTamUng,
@@ -135,17 +136,27 @@ nghiPhepRoutes.post('/don', async (c) => {
   const den = loai === 'vesom' || loai === 'ot' ? tu : String(b.den ?? tu);
   if (!NGAY.test(tu) || !NGAY.test(den) || den < tu) throw badRequest('NGAY', 'Ngày chưa đúng: đến ngày phải từ ngày trở đi');
   if (Date.parse(den) - Date.parse(tu) > 61 * 864e5) throw badRequest('NGAY', 'Một đơn tối đa 2 tháng');
-  const buoi: Buoi = LOAI_NGHI.includes(loai) && (b.buoi === 'sang' || b.buoi === 'chieu') && tu === den ? b.buoi : 'ca';
+  const buoi: Buoi = LOAI_NGHI.includes(loai) && (b.buoi === 'sang' || b.buoi === 'chieu' || b.buoi === 'gio') && tu === den ? b.buoi : 'ca';
+  if (LOAI_NGHI.includes(loai) && b.buoi === 'gio' && tu !== den) throw badRequest('NGAY', 'Nghỉ theo giờ chỉ trong một ngày');
   const lyDo = String(b.lyDo ?? '').trim().slice(0, 400);
   if (!lyDo) throw badRequest('LY_DO', 'Ghi lý do');
-  const gio = loai === 'ot' ? Number(b.gio) : null;
+  let gio = loai === 'ot' ? Number(b.gio) : null;
   if (loai === 'ot' && !(gio! > 0 && gio! <= 16)) throw badRequest('GIO', 'Ghi số giờ tăng ca (0,5 đến 16 giờ)');
-  const ghiChu = String(b.ghiChu ?? '').trim().slice(0, 120) || null;
+  let ghiChu = String(b.ghiChu ?? '').trim().slice(0, 120) || null;
   const [s, m] = await Promise.all([loadSettings(db), loadMembers(db, auth.user.id)]);
   const me = m.users[auth.user.id];
   const pb = me?.pb ?? '';
   const lich = lichOf(s, auth.user.id, pb);
-  const soNgay = LOAI_NGHI.includes(loai) ? soNgayNghi(lich, tu, den, buoi, s.ngayLe.map((x) => x.ngay)) : 0;
+  let soNgay = LOAI_NGHI.includes(loai) ? soNgayNghi(lich, tu, den, buoi, s.ngayLe.map((x) => x.ngay)) : 0;
+  if (buoi === 'gio') {
+    const gTu = String(b.gioTu ?? '');
+    const gDen = String(b.gioDen ?? '');
+    const r = gioNghi(lich, tu, gTu, gDen, dayRule(lich, tu, null, s.ngayLe.some((x) => x.ngay === tu)));
+    if ('loi' in r) throw badRequest('GIO', r.loi);
+    gio = r.gio;
+    soNgay = r.soNgay;
+    ghiChu = `${gTu}–${gDen}`;
+  }
   if (LOAI_NGHI.includes(loai) && !soNgay) throw badRequest('NGAY', 'Khoảng ngày này không có ngày làm việc nào (Chủ nhật, ngày nghỉ, ngày lễ)');
   const leads = leadsCuaPhong(m.users, pb, auth.user.id);
   const st = trangThaiDau(leads.length > 0);
@@ -161,7 +172,7 @@ nghiPhepRoutes.post('/don', async (c) => {
     auditStatement(db, { actorId: auth.user.id, action: 'NS_DON_GUI', entityType: 'NS_DON', entityId: id, after: { loai, tu, den, soNgay, st } }),
   ]);
   const ten = me?.name || auth.user.id;
-  const mo = LOAI_NGHI.includes(loai) ? ` ${soNgay} ngày (${tu.slice(8)}/${tu.slice(5, 7)}${den !== tu ? '–' + den.slice(8) + '/' + den.slice(5, 7) : ''})` : '';
+  const mo = buoi === 'gio' ? ` ${String(gio).replace('.', ',')} giờ (${ghiChu} ngày ${tu.slice(8)}/${tu.slice(5, 7)})` : LOAI_NGHI.includes(loai) ? ` ${soNgay} ngày (${tu.slice(8)}/${tu.slice(5, 7)}${den !== tu ? '–' + den.slice(8) + '/' + den.slice(5, 7) : ''})` : '';
   await bellTo(db, st === 'lead' ? leads : hcnsIds(m), `${ten} gửi đơn ${LOAI_DON[loai].toLowerCase()}${mo}, chờ bạn duyệt`, st === 'lead' ? 'page:np_duyet' : 'page:np_ql');
   return ok(c, { id, st, soNgay });
 });

@@ -5,7 +5,7 @@
  * Phòng chưa có Lead, hoặc người gửi chính là Lead: đơn lên thẳng HCNS.
  * Tạm ứng: dưới mức tối đa (mặc định 3 triệu), Kế toán duyệt, cuối tháng trừ vào lương.
  */
-import { dayRule, daysFrom, type CcSettings, type Lich, type NgayCong } from './chamCong';
+import { dayRule, daysFrom, lichNgay, type CcSettings, type Lich, type NgayCong } from './chamCong';
 
 export type LoaiDon = 'phep' | 'om' | 'khongluong' | 'vesom' | 'ot' | 'lambu';
 export const LOAI_DON: Record<LoaiDon, string> = {
@@ -18,7 +18,35 @@ export const LOAI_DON: Record<LoaiDon, string> = {
 };
 export const LOAI_NGHI: LoaiDon[] = ['phep', 'om', 'khongluong'];
 export type TrangThai = 'lead' | 'hcns' | 'xong' | 'tuchoi' | 'huy';
-export type Buoi = 'ca' | 'sang' | 'chieu';
+/** 'gio' = nghỉ theo giờ trong một ngày (CEO 10/11): giờ từ–đến ghi ở ghi_chu, số giờ ở cột gio. */
+export type Buoi = 'ca' | 'sang' | 'chieu' | 'gio';
+
+/**
+ * Nghỉ theo giờ (CEO 10/11): số giờ nghỉ nằm trong giờ làm của ngày đó (bỏ phần ngoài giờ làm và giờ nghỉ trưa),
+ * quy ra ngày = giờ nghỉ ÷ số giờ làm chuẩn của ngày (để trừ quỹ phép năm). Trả câu báo lỗi dễ hiểu nếu không hợp lệ.
+ */
+export function gioNghi(
+  l: Lich,
+  ngay: string,
+  tu: string,
+  den: string,
+  rule: { lam: boolean; vao: number; ra: number },
+): { gio: number; soNgay: number } | { loi: string } {
+  const hm = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!hm.test(tu) || !hm.test(den) || den <= tu) return { loi: 'Ghi giờ nghỉ: từ giờ phải trước đến giờ' };
+  if (!rule.lam) return { loi: 'Ngày này không phải ngày đi làm theo lịch' };
+  const m = (x: string) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3, 5));
+  const giao = (a: number, b: number, c: number, d: number) => Math.max(0, Math.min(b, d) - Math.max(a, c));
+  const ln = lichNgay(l, ngay);
+  const trua = ln.kieu !== 'ca' && ln.truaTu && ln.truaDen ? [m(ln.truaTu), m(ln.truaDen)] : null;
+  const trongGio = (a: number, b: number) => giao(a, b, rule.vao, rule.ra) - (trua ? giao(Math.max(a, rule.vao), Math.min(b, rule.ra), trua[0], trua[1]) : 0);
+  const phut = trongGio(m(tu), m(den));
+  const chuan = trongGio(rule.vao, rule.ra);
+  if (phut <= 0) return { loi: 'Giờ nghỉ phải nằm trong giờ làm của ngày đó' };
+  if (chuan > 0 && phut >= chuan) return { loi: 'Nghỉ hết giờ làm của ngày thì chọn Cả ngày' };
+  const gio = Math.round((phut / 60) * 100) / 100;
+  return { gio, soNgay: chuan > 0 ? Math.round((phut / chuan) * 100) / 100 : 0 };
+}
 
 /**
  * Số ngày làm việc của một đơn nghỉ theo lịch làm của người gửi: bỏ Chủ nhật, thứ Bảy nghỉ, ngày lễ.
