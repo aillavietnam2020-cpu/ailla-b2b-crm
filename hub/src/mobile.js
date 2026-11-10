@@ -412,7 +412,7 @@
   const standalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
   /* chữ gợi ý ngắn như Messenger: chữ dài làm ô nhập cao 5 dòng trên điện thoại */
   const ph=()=>{if(!narrow.matches)return;const i=document.getElementById("tnin");if(i&&i.placeholder!=="Nhắn tin"){i.placeholder="Nhắn tin";i.style.height="auto";i.style.height=Math.min(i.scrollHeight,140)+"px"}const q=document.getElementById("tnq");if(q)q.placeholder="Tìm kiếm"};
-  {const _rm=renderMain;renderMain=function(){const r=_rm.apply(this,arguments);try{ph();if(window.CHAT_APP)chatDress()}catch(e){}return r}}
+  {const _rm=renderMain;renderMain=function(){const r=_rm.apply(this,arguments);try{ph();if(window.CHAT_APP)chatDress();else if(typeof PAGE!=="undefined"&&PAGE==="tinnhan"&&window.__chCard)window.__chCard()}catch(e){}return r}}
   if(!window.CHAT_APP){
     /* web thường trên điện thoại: chuyển Tin nhắn sang Ailla Chat */
     let first=true,prev="";
@@ -423,6 +423,7 @@
       const side=document.querySelector(".tn .tnside");if(hid||standalone()||!side||document.getElementById("chinst"))return;const q=side.querySelector(".tnq");if(!q)return;
       q.insertAdjacentHTML("afterend",`<div id="chinst"><img src="/chat-icon-192.png" alt=""><span><b>Cài Ailla Chat</b><small>Biểu tượng riêng ngoài màn hình, bấm là vào thẳng tin nhắn</small></span><a class="btn pri sm" href="/chat/?cai=1">Cài</a><button type="button" class="chx" data-x aria-label="Ẩn">✕</button></div>`);
       document.querySelector("#chinst [data-x]").onclick=()=>{try{localStorage.setItem("chat_inst_x",new Date().toDateString())}catch(e){}const c=document.getElementById("chinst");if(c)c.remove()}};
+    window.__chCard=card;setInterval(()=>{try{if(typeof PAGE!=="undefined"&&PAGE==="tinnhan"&&ME)card()}catch(e){}},1500);
     const _r=render;render=function(){
       if(narrow.matches&&ME&&PAGE==="tinnhan"&&!first&&prev!=="tinnhan"){prev=PAGE;go();return}
       first=false;prev=PAGE;const r=_r.apply(this,arguments);try{ph();if(PAGE==="tinnhan")card()}catch(e){}return r};
