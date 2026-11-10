@@ -56,7 +56,7 @@ function retScanTab(){
   return `<section class="card"><div class="card-h"><h2>Quét mã vận đơn</h2><div class="filters"><label class="inl" style="display:inline-flex;align-items:center;gap:8px;margin:0">Ngày nhận <input type="date" id="rt-day" value="${day}"></label></div></div>
     <input id="rt-code" autocomplete="off" placeholder="Đặt con trỏ ở đây rồi quét (nhớ tắt Unikey: chữ E)" style="width:100%;font-size:20px;padding:12px">
     <p class="hint">Quét liên tục, gói nào cũng quét vào ô này, web tự nhận TikTok / Shopee / Facebook. Gói bình thường không cần khai gì. Bóc hàng thấy thiếu, hỏng hoặc sai thì bấm <b>Báo lỗi</b> ở gói đó. Gói có vấn đề tự vào tab Khiếu nại (đơn Facebook ghi là tự chịu). Cuối ngày kế toán nhập <b>phiếu nhập hoàn</b> ở bảng bên dưới.</p>
-    <details class="rtman"${RET.manOpen?" open":""}><summary><b>Nhập tay gói không quét được</b> <span class="hint">(tem mờ, rách, máy không đọc)</span></summary>
+    <details class="rtman"${RET.manOpen?" open":""}><summary><b>+ Thêm nhập tay</b> <span class="hint">(gói không quét được)</span></summary>
      <p class="hint">Gõ <b>mã vận đơn</b> hoặc <b>mã đơn</b> in trên gói, mỗi dòng một gói. Web tự tra đơn hoàn như khi quét; không tra ra thì gói nằm ở tab "Chưa tra ra đơn" theo sàn chọn bên dưới. Gói mất hẳn mã thì ghi sản phẩm ở phần <b>Nhập gộp</b> bên dưới.</p>
      <textarea id="rtm-codes" rows="3" style="width:100%;font-size:15px" placeholder="Ví dụ:&#10;SPXVN0123456789&#10;5813…">${esc(RET.manTxt||"")}</textarea>
      <div class="filters"><label class="inl">Sàn (nếu web không tự nhận) <select id="rtm-ch"><option value="">Để web tự nhận</option>${Object.entries(RET_CH).map(([v,t])=>`<option value="${v}"${RET.manCh===v?" selected":""}>${t}</option>`).join("")}</select></label>
@@ -122,7 +122,7 @@ function pKhoHoan(m){
   if(!RET.recon&&RET.tab==="scan")retLoadRecon();
   if(!RET.unm&&!RET.unmBusy)retLoadUnm();
   const body=RET.tab==="scan"?retScanTab():RET.tab==="recon"?retReconTab():RET.tab==="unm"?retUnmTab():retClaimTab();
-  if(kCan("TL"))nav+=`<div class="filters" style="justify-content:flex-end;margin:-4px 0 8px"><button class="btn" id="rt-tl-new" title="Lập phiếu nhập hàng hoàn bằng tay: chọn sản phẩm, số lượng, bán tiếp hay bỏ">+ Phiếu nhập hàng hoàn</button></div>`;
+  if(kCan("TL"))nav+=`<div class="filters" style="justify-content:flex-end;margin:-4px 0 8px"><button class="btn" id="rt-tl-new" title="Lập phiếu nhập hàng hoàn bằng tay: chọn sản phẩm, số lượng, bán tiếp hay bỏ">+ Thêm phiếu nhập hàng hoàn</button></div>`;
   khoFrame(m,"kho_hoan","Hàng hoàn các sàn","Quét mã vận đơn gói hoàn TikTok, Shopee, Facebook; web tự nhận kênh, tự lập phiếu nhập hàng hoàn, đối soát và cảnh báo thất lạc.",nav+body);
   retBind(m);
   if($("#rt-tl-new"))$("#rt-tl-new").onclick=()=>khoForm("TL");
