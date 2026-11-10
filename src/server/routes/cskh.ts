@@ -38,6 +38,8 @@ import {
   getSetting,
   loadSettings,
   loadVariations,
+  posStatuses,
+  POS_STATUS,
   putSetting,
   sendOrderToPoscake,
   syncCskhDays,
@@ -440,8 +442,17 @@ cskhRoutes.get('/orders', async (c) => {
      WHERE w.day LIKE ? ${me.lead ? '' : 'AND w.by_id = ?'} ORDER BY w.created_at DESC LIMIT 500`,
   )
     .bind(m + '%', ...(me.lead ? [] : [me.id]))
-    .all();
-  return ok(c, r.results ?? []);
+    .all<Record<string, unknown>>();
+  const rows = r.results ?? [];
+  const ids = rows.map((x) => String(x.pos_id ?? '')).filter(Boolean);
+  const st = ids.length ? await posStatuses(c.env.DB, c.env.INGEST_KEY, httpFetch, ids) : {};
+  return ok(
+    c,
+    rows.map((x) => {
+      const p = st[String(x.pos_id ?? '')];
+      return { ...x, pos_status: p ? p.s : null, pos_status_name: p ? (POS_STATUS[p.s] ?? 'Mã ' + p.s) : '' };
+    }),
+  );
 });
 
 cskhRoutes.post('/order', async (c) => {

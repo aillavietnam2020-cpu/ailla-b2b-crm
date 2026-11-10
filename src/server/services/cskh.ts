@@ -326,6 +326,47 @@ export async function backfillStep(db: D1Database, secret: string | undefined, f
   return { done: res.filter((r) => r.ok).length, remaining: Math.max(0, diffDays(cursor, target)), note: res.map((r) => `${r.day}: ${r.note}`).join(' · ') };
 }
 
+/* ------------------------------------------------------------------ trạng thái đơn CSKH trên Poscake */
+/** Mã trạng thái đơn Poscake → chữ. 3 Đã nhận (giao thành công), 5 Đã hoàn, 6 Đã hủy, 7 Đã xóa là đã xong, không hỏi lại. */
+export const POS_STATUS: Record<number, string> = {
+  0: 'Mới', 17: 'Chờ xác nhận', 1: 'Đã xác nhận', 11: 'Chờ hàng', 20: 'Đã đặt hàng', 12: 'Chờ in', 13: 'Đã in', 8: 'Đang đóng hàng', 9: 'Chờ chuyển hàng',
+  2: 'Đã gửi hàng', 3: 'Giao thành công', 16: 'Đã thu tiền', 4: 'Đang hoàn', 15: 'Hoàn một phần', 5: 'Đã hoàn', 6: 'Đã hủy', 7: 'Đã xóa',
+};
+const POS_FINAL = new Set([3, 5, 6, 7, 16]);
+export type PosStatusMap = Record<string, { s: number; at: string }>;
+export async function posStatuses(db: D1Database, secret: string | undefined, fetchFn: FetchFn, ids: string[]): Promise<PosStatusMap> {
+  const cache = (await getSetting<PosStatusMap>(db, 'pos_status')) ?? {};
+  const now = Date.now();
+  const stale = [...new Set(ids)].filter((id) => {
+    const x = cache[id];
+    return !x || (!POS_FINAL.has(x.s) && now - Date.parse(x.at) > 10 * 60_000);
+  }).slice(0, 30);
+  if (stale.length) {
+    try {
+      const { shop, key } = await openFacebook(db, secret);
+      const got = await Promise.all(
+        stale.map(async (id) => {
+          try {
+            const r = await fetchFn(`${API}/shops/${encodeURIComponent(shop)}/orders/${encodeURIComponent(id)}?api_key=${encodeURIComponent(key)}`);
+            if (!r.ok) return null;
+            const j = JSON.parse(await r.text()) as { data?: { status?: number } };
+            const st = Number(j.data?.status);
+            return Number.isFinite(st) ? ([id, st] as const) : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const at = new Date().toISOString();
+      for (const g of got) if (g) cache[g[0]] = { s: g[1], at };
+      await putSetting(db, 'pos_status', cache);
+    } catch {
+      /* không hỏi được Poscake thì dùng số cũ */
+    }
+  }
+  return cache;
+}
+
 /* ------------------------------------------------------------------ sản phẩm để lên đơn */
 export interface CskhVariation {
   id: string;
