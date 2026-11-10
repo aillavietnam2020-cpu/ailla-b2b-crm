@@ -172,6 +172,19 @@ describe('Agent lập phiếu chi nhà cung cấp và Chi phí khác', () => {
     expect(old.status).toBe(409);
     expect(old.body.error.message).toContain('PC-2026-10-0001');
   });
+
+  it('Chi phí khác: chỗ agent chưa chắc được ghi lên phiếu chờ duyệt để người duyệt kiểm', async () => {
+    const { agent, dlg } = await setup();
+    await ctx.db.prepare("INSERT INTO hub_state (id, version, data, updated_at) VALUES ('main', 1, ?, ?)").bind(await pack(JSON.stringify({ pcCho: [], activity: [] })), T0).run();
+    await ctx.db.prepare("INSERT INTO hub_state (id, version, data, updated_at) VALUES ('secure', 1, ?, ?)").bind(await pack(JSON.stringify({ fin: { nkc: [] } })), T0).run();
+    const base = { pay_date: '2026-10-21', amount: 900_000, content: 'Sửa điều hòa', payee: 'Anh Hùng', method: 'TIEN_MAT' };
+    expect((await call(agent.token, 'POST', '/api/hub/so-chi/phieu-chi', { ...base, chua_chac: 'Chưa rõ có hóa đơn hay không' }, dlg)).status).toBe(200);
+    expect((await call(agent.token, 'POST', '/api/hub/so-chi/phieu-chi', { ...base, amount: 910_000 }, dlg)).status).toBe(200);
+    const st = await ctx.db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
+    const d = JSON.parse(await unpack(st!.data));
+    expect(d.pcCho[0].chuaChac).toBe('Chưa rõ có hóa đơn hay không');
+    expect(d.pcCho[1].chuaChac).toBeUndefined();
+  });
 });
 
 describe('Chị Hoa chọn thêm người ra lệnh cho agent (chị Huệ như chị Thảo)', () => {
