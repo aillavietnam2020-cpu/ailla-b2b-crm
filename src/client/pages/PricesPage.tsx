@@ -307,7 +307,7 @@ function TierView({ products, code, onEdit }: { products: ProductItem[]; code: s
                 return (
                   <tr key={r.key}>
                     <td>{r.name}</td>
-                    <td className="nowrap">{n ? `${n} ${r.le ? leUnit(r.le) : 'đơn vị'} / thùng` : r.box ? <span className="muted">chưa có số trong thùng</span> : <span className="muted">bán lẻ</span>}</td>
+                    <td className="nowrap">{n ? `${n} ${r.le ? leUnit(r.le) : 'đơn vị'} / thùng` : r.box ? <span className="muted">chưa có số trong thùng</span> : <span className="muted">bán theo {(r.le?.unit ?? 'cái').toLowerCase()}, không đóng thùng</span>}</td>
                     <td className="right nowrap">{cell(r.le)}</td>
                     <td className="right nowrap">{cell(r.box)}</td>
                     <td className="right nowrap">{n && pb ? formatVnd(Math.round(pb / n)) : <span className="muted">—</span>}</td>
