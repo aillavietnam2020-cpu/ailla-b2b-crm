@@ -150,6 +150,23 @@ khoReturnRoutes.post('/scan', async (c) => {
   return ok(c, (await scanView(db, r ? [r] : []))[0]);
 });
 
+/** Tra thử một mã (chưa lưu): phiếu nhập hàng hoàn gõ tay hiện ngay sàn, mã đơn, hàng trong gói (chị Hoa 10/11). */
+khoReturnRoutes.get('/lookup', async (c) => {
+  const { code } = normalizeCode(String(c.req.query('code') ?? ''));
+  if (code.length < 5) return ok(c, { code, found: false });
+  const db = c.env.DB;
+  const dup = await db
+    .prepare("SELECT scan_day FROM ret_scans WHERE code = ? AND state <> 'HUY' ORDER BY id DESC LIMIT 1")
+    .bind(code)
+    .first<{ scan_day: string }>();
+  const hit = await db
+    .prepare('SELECT channel, order_id FROM ret_orders WHERE tracking = ? OR UPPER(order_id) = ? LIMIT 1')
+    .bind(code, code)
+    .first<{ channel: string; order_id: string }>();
+  const items = hit ? await expectedItems(db, hit.channel, hit.order_id) : [];
+  return ok(c, { code, found: !!hit, channel: hit?.channel ?? guessChannel(code), order_id: hit?.order_id ?? null, items, dup_day: dup?.scan_day ?? null });
+});
+
 /** Danh sách lượt quét của một ngày (mặc định hôm nay). */
 khoReturnRoutes.get('/scans', async (c) => {
   const day = c.req.query('day');

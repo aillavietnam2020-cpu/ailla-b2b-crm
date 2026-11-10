@@ -220,24 +220,43 @@ function retBind(m){
 }
 PAGES.kho_hoan=pKhoHoan;
 
-/* Thêm phiếu nhập hàng hoàn (chị Hoa 10/11): gói không quét được thì gõ mã vận đơn / mã đơn, mỗi dòng một gói;
-   web tra đơn như khi quét và đưa vào danh sách của ngày. Gói mất hẳn mã thì ghi theo sản phẩm. */
+/* Thêm phiếu nhập hàng hoàn (chị Hoa 10/11): hiện một phiếu nhập, mỗi dòng điền một đơn (mã vận đơn hoặc mã đơn),
+   web tự nhận sàn, mã đơn, hàng trong gói ngay trên dòng; bấm Lưu phiếu thì các gói vào danh sách nhận của ngày như khi quét. */
 function retAddOpen(){
   const day=RET.day||retToday();
-  openDrawerHTML(`<h2>Thêm phiếu nhập hàng hoàn · ngày ${kDd(day)}</h2>
-   <p class="hint">Gói không quét được (tem mờ, rách, máy không đọc): gõ <b>mã vận đơn</b> hoặc <b>mã đơn</b> in trên gói, mỗi dòng một gói. Web tự tra đơn hoàn như khi quét.</p>
-   <textarea id="rtm-codes" rows="6" style="width:100%;font-size:15px" placeholder="Ví dụ:&#10;SPXVN0123456789&#10;5813…">${esc(RET.manTxt||"")}</textarea>
-   <div class="filters"><label class="inl">Sàn (nếu web không tự nhận) <select id="rtm-ch"><option value="">Để web tự nhận</option>${Object.entries(RET_CH).map(([v,t])=>`<option value="${v}"${RET.manCh===v?" selected":""}>${t}</option>`).join("")}</select></label></div>
-   <div class="acts"><button class="btn pri" id="rtm-go">Thêm vào danh sách ngày ${kDd(day)}</button></div>
-   <p class="hint" style="margin-top:14px">Gói mất hẳn mã: ghi sản phẩm, số lượng ở phần <b>Nhập gộp</b> bên dưới trang quét.</p>`);
-  const mg=$("#rtm-go");
-  mg.onclick=async()=>{const ch=$("#rtm-ch").value;RET.manCh=ch;
-    const L=[...new Set($("#rtm-codes").value.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean))];if(!L.length){toast("Gõ ít nhất một mã");return}
-    mg.disabled=true;let ok=0,no=0;const err=[];
-    for(const code of L){try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code,day,channel:ch||undefined,manual:true})});ok++;if(!s.order_id)no++;RET.scans=RET.scans||{scans:[]};RET.scans.scans=[s].concat(RET.scans.scans||[])}catch(e){err.push(code+": "+e.message)}}
-    RET.manTxt=err.map(x=>x.split(":")[0]).join("\n");RET.unm=null;
-    toast(`Đã thêm ${ok} gói`+(no?`, ${no} gói chưa tra ra đơn (xem tab Chưa tra ra đơn)`:"")+(err.length?`. ${err.length} mã chưa thêm: ${err.join("; ")}`:""));
-    if(!err.length)closeDrawer();else{mg.disabled=false;$("#rtm-codes").value=RET.manTxt}renderMain()};
+  openDrawerHTML(`<h2>Phiếu nhập hàng hoàn · ngày ${kDd(day)}</h2>
+   <p class="hint">Mỗi dòng điền một đơn: <b>mã vận đơn</b> hoặc <b>mã đơn</b> in trên gói. Web tự nhận sàn, mã đơn và hàng trong gói. Gõ xong bấm Enter để sang dòng mới.</p>
+   <div style="overflow:auto"><table class="tbl"><thead><tr><th style="width:36px">#</th><th>Mã vận đơn / mã đơn</th><th>Sàn</th><th>Web nhận diện</th><th></th></tr></thead><tbody id="rtp-b"></tbody></table></div>
+   <div class="filters"><button type="button" class="btn sm" id="rtp-add">+ Thêm dòng</button></div>
+   <div class="acts" style="position:sticky;bottom:0;background:#fff;padding:10px 0"><button class="btn pri" id="rtp-save">Lưu phiếu</button> <span id="rtp-msg" class="hint"></span></div>
+   <p class="hint">Gói mất hẳn mã: ghi sản phẩm, số lượng ở phần <b>Nhập gộp</b> dưới trang quét.</p>`);
+  const body=$("#rtp-b"),chOpt=v=>`<option value="">Tự nhận</option>${Object.entries(RET_CH).map(([k,t])=>`<option value="${k}"${v===k?" selected":""}>${t}</option>`).join("")}`;
+  const num=()=>body.querySelectorAll("tr").forEach((tr,i)=>tr.firstChild.textContent=i+1);
+  const look=async tr=>{const i=tr.querySelector(".rtp-c"),out=tr.querySelector(".rtp-o"),v=i.value.trim();tr.dataset.ok="";if(!v){out.innerHTML="";return}
+    out.innerHTML=`<span class="hint">Đang tra…</span>`;
+    try{const r=await kApi("/ret/lookup?code="+encodeURIComponent(v));if(i.value.trim()!==v)return;
+      if(r.dup_day){out.innerHTML=`<span class="tag amb">Đã nhận ngày ${kDd(r.dup_day)}</span>`;tr.dataset.ok="dup";return}
+      const sel=tr.querySelector(".rtp-ch");if(r.channel&&!sel.value)sel.value=r.channel;
+      out.innerHTML=r.found?`<span class="tag">${esc(RET_CH[r.channel]||r.channel)}</span> Đơn <b class="mono">${esc(r.order_id)}</b><br><small class="hint">${(r.items||[]).map(it=>esc(it.name)+" × "+knum(it.expected)).join(", ")||"chưa có hàng"}</small>`
+        :`<span class="tag amb">Chưa tra ra đơn</span> <small class="hint">${r.channel?"web đoán sàn "+esc(RET_CH[r.channel]||r.channel)+"; ":""}vẫn lưu được, gói vào tab Chưa tra ra đơn</small>`;
+      tr.dataset.ok="1"}catch(e){out.innerHTML=`<span class="tag amb">${esc(e.message)}</span>`}};
+  const add=(focus)=>{const tr=document.createElement("tr");tr.innerHTML=`<td></td><td><input class="rtp-c mono" autocomplete="off" placeholder="Gõ hoặc dán mã" style="min-width:200px"></td><td><select class="rtp-ch">${chOpt("")}</select></td><td class="rtp-o"></td><td><button type="button" class="lnk rtp-x" title="Bỏ dòng">✕</button></td>`;
+    body.appendChild(tr);num();const i=tr.querySelector(".rtp-c");let t=0;
+    i.oninput=()=>{clearTimeout(t);t=setTimeout(()=>look(tr),450)};
+    i.onkeydown=e=>{if(e.key!=="Enter")return;e.preventDefault();clearTimeout(t);look(tr);const nx=tr.nextElementSibling;if(nx)nx.querySelector(".rtp-c").focus();else add(true)};
+    i.onpaste=e=>{const tx=(e.clipboardData||window.clipboardData).getData("text");const L=tx.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean);if(L.length<2)return;e.preventDefault();
+      i.value=L[0];look(tr);L.slice(1).forEach(c=>{const n=add(false);n.querySelector(".rtp-c").value=c;look(n)});add(true)};
+    tr.querySelector(".rtp-x").onclick=()=>{tr.remove();if(!body.children.length)add(true);num()};
+    if(focus)setTimeout(()=>i.focus(),30);return tr};
+  for(let k=0;k<3;k++)add(k===0);
+  $("#rtp-add").onclick=()=>add(true);
+  $("#rtp-save").onclick=async()=>{const btn=$("#rtp-save");
+    const R=[...body.querySelectorAll("tr")].map(tr=>({tr,code:tr.querySelector(".rtp-c").value.trim(),ch:tr.querySelector(".rtp-ch").value})).filter(x=>x.code&&x.tr.dataset.ok!=="dup");
+    if(!R.length){toast("Chưa có đơn nào để lưu");return}
+    btn.disabled=true;$("#rtp-msg").textContent="Đang lưu…";let ok=0,no=0;const err=[];
+    for(const x of R){try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code:x.code,day,channel:x.ch||undefined,manual:true})});ok++;if(!s.order_id)no++;x.tr.remove();RET.scans=RET.scans||{scans:[]};RET.scans.scans=[s].concat(RET.scans.scans||[])}catch(e){err.push(x.code+": "+e.message);x.tr.querySelector(".rtp-o").innerHTML=`<span class="tag amb">${esc(e.message)}</span>`}}
+    RET.unm=null;toast(`Đã lưu ${ok} đơn vào danh sách nhận ngày ${kDd(day)}`+(no?`, ${no} đơn chưa tra ra đơn`:"")+(err.length?`. ${err.length} đơn chưa lưu`:""));
+    if(!err.length)closeDrawer();else{btn.disabled=false;$("#rtp-msg").textContent="Còn "+err.length+" dòng chưa lưu, xem lý do ở từng dòng.";num()}renderMain()};
 }
 /* Biên bản nhận hàng hoàn để shipper ký (chị Hoa 10/11): các gói đã quét / nhập trong ngày, đếm theo sàn, chỗ ký hai bên. */
 function retBienBan(){

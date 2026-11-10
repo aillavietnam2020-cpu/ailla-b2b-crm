@@ -249,4 +249,12 @@ describe('Gói chưa tra ra đơn: kế toán điền mã đơn từ seller', ()
     const row = await ctx.db.prepare("SELECT note FROM ret_scans WHERE code = 'MAMO123456'").first<{ note: string }>();
     expect(row?.note).toBe('Nhập tay');
   });
+
+  it('tra thử mã cho phiếu nhập hàng hoàn gõ tay: không lưu gì', async () => {
+    const r = await ctx.request('/api/hub/kho/ret/lookup?code=CHUACO99999', { as: USERS.ceo, method: 'GET' });
+    expect(r.status).toBe(200);
+    expect(r.body.data.found).toBe(false);
+    const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM ret_scans WHERE code = 'CHUACO99999'").first<{ n: number }>();
+    expect(n?.n).toBe(0);
+  });
 });
