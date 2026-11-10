@@ -51,6 +51,8 @@ export const PERMISSIONS = [
   // Kế toán kho: thấy mọi đơn, kiểm tồn, báo đủ/thiếu hàng, ghi số thực xuất.
   'order.kho.process',
   'sx.kiemke',
+  // Nhân viên kho chỉ quét, nhập hàng hoàn các sàn (CEO 10/11): không kiểm kê, không lập phiếu kho khác.
+  'kho.hoan',
   // Quyền riêng của AI agent (xem shared/agent.ts): chỉ đọc qua /api/agent và ghi đề xuất.
   'agent.read',
   'agent.propose',
