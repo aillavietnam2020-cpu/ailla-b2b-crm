@@ -231,7 +231,7 @@ export async function autoAssign(db: D1Database, today = vnDate()): Promise<numb
   const set = await loadSettings(db);
   if (set.chia !== 'auto') return 0;
   const rows = await db
-    .prepare('SELECT phone, owner_prev, last_order_day FROM cskh_customers WHERE owner_id IS NULL AND manual = 0 AND first_order_day >= ? ORDER BY first_order_day')
+    .prepare('SELECT phone, owner_prev, last_order_day FROM cskh_customers WHERE owner_id IS NULL AND manual = 0 AND length(stop_reason) = 0 AND first_order_day >= ? ORDER BY first_order_day')
     .bind(addDays(today, -14))
     .all<{ phone: string; owner_prev: string | null; last_order_day: string }>();
   const list = rows.results ?? [];

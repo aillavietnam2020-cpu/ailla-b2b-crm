@@ -7,6 +7,12 @@ import { Hono } from 'hono';
 import { nowIso, vnDate } from '@shared/datetime';
 import {
   CSKH_REASONS,
+  CSKH_TRAITS,
+  CSKH_STOP_REASONS,
+  TIER_BASE,
+  tierOf,
+  tierSql,
+  normTags,
   CSKH_RESULTS,
   addDays,
   attributeOrders,
@@ -17,7 +23,6 @@ import {
   mergeSettings,
   normBirthday,
   normPhone,
-  tier,
   type CskhSettings,
 } from '@shared/cskh';
 import type { AppEnv } from '../env';
@@ -53,6 +58,12 @@ const num = (v: unknown) => {
 
 type Cus = {
   phone: string;
+  tags: string;
+  tier_manual: string;
+  stop_reason: string;
+  stop_note: string;
+  stop_at: string | null;
+  stop_by: string;
   name: string;
   phone2: string;
   birthday: string;
@@ -76,7 +87,7 @@ type Cus = {
   manual: number;
 };
 const COLS =
-  'phone, name, phone2, birthday, addr_street, addr_ward, addr_district, addr_province, source, note, owner_id, owner_name, owner_prev, next_call, last_call, last_result, first_order_day, last_order_day, last_product, order_count, total_spent, manual';
+  'phone, tags, tier_manual, stop_reason, stop_note, stop_at, stop_by, name, phone2, birthday, addr_street, addr_ward, addr_district, addr_province, source, note, owner_id, owner_name, owner_prev, next_call, last_call, last_result, first_order_day, last_order_day, last_product, order_count, total_spent, manual';
 
 async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AppEnv['Variables']['auth'] }): Promise<CskhMe> {
   const me = await cskhMe(c.env.DB, c.get('auth'));
@@ -84,7 +95,7 @@ async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AppEnv['Var
   return me;
 }
 function view(c: Cus, set: CskhSettings, today: string) {
-  return { ...c, state: callState(c, today, set), tier: tier(c.order_count, set), bday: birthdaySoon(c.birthday, today) };
+  return { ...c, state: callState(c, today, set), tier: tierOf(c, set), bday: birthdaySoon(c.birthday, today) };
 }
 const canSee = (me: CskhMe, c: Pick<Cus, 'owner_id'>) => me.lead || c.owner_id === me.id;
 const mask = (p: string) => p.slice(0, 4) + ' *** ' + p.slice(-3);
@@ -95,7 +106,7 @@ cskhRoutes.get('/me', async (c) => {
   const set = await loadSettings(c.env.DB);
   const staff = await cskhStaff(c.env.DB);
   const bf = await getSetting<BackfillState>(c.env.DB, 'backfill');
-  return ok(c, { me, staff, settings: set, today: vnDate(), results: CSKH_RESULTS, reasons: CSKH_REASONS, backfill: bf });
+  return ok(c, { me, staff, settings: set, today: vnDate(), results: CSKH_RESULTS, reasons: CSKH_REASONS, traits: CSKH_TRAITS, stopReasons: CSKH_STOP_REASONS, backfill: bf });
 });
 
 cskhRoutes.put('/settings', async (c) => {
@@ -149,7 +160,7 @@ cskhRoutes.get('/today', async (c) => {
   const own = all ? '' : 'AND owner_id = ?';
   const binds = all ? [] : [me.id];
   const rows = await c.env.DB.prepare(
-    `SELECT ${COLS} FROM cskh_customers WHERE owner_id IS NOT NULL ${own}
+    `SELECT ${COLS} FROM cskh_customers WHERE owner_id IS NOT NULL AND stop_reason = '' ${own}
        AND (next_call <= ? OR (next_call IS NULL AND last_order_day >= ?) OR birthday <> '')`,
   )
     .bind(...binds, today, addDays(today, -400))
@@ -190,10 +201,13 @@ cskhRoutes.get('/list', async (c) => {
     }
   }
   const t = str(c.req.query('tier'), 20);
-  if (t === 'VIP') {
-    where.push('order_count >= ?');
-    binds.push(set.vipOrders);
-  } else if (t === '1') where.push('order_count = 1');
+  if (t) {
+    const ts = tierSql(set, t);
+    where.push(ts.sql);
+    binds.push(...ts.binds);
+  }
+  const stf0 = str(c.req.query('state'), 10);
+  if (stf0 === 'ngung') where.push("stop_reason <> ''");
   const sql = `SELECT ${COLS} FROM cskh_customers ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY COALESCE(last_order_day, '') DESC LIMIT 400`;
   const rows = await c.env.DB.prepare(sql).bind(...binds).all<Cus>();
   let out = (rows.results ?? []).map((r) => view(r, set, today));
@@ -231,7 +245,7 @@ cskhRoutes.get('/search', async (c) => {
     c,
     [...found.values()].slice(0, 8).map((x) =>
       canSee(me, x)
-        ? { phone: x.phone, name: x.name, tier: tier(x.order_count, set), addr: [x.addr_street, x.addr_ward, x.addr_district, x.addr_province].filter(Boolean).join(', '), lock: false }
+        ? { phone: x.phone, name: x.name, tier: tierOf(x, set), addr: [x.addr_street, x.addr_ward, x.addr_district, x.addr_province].filter(Boolean).join(', '), lock: false }
         : { phone: '', masked: mask(x.phone), owner: x.owner_name || (x.owner_id ? 'CSKH khác' : 'Chưa chia'), lock: true },
     ),
   );
@@ -304,10 +318,71 @@ cskhRoutes.put('/customer/:phone', async (c) => {
   )
     .bind(f.name, f.phone2, f.birthday, f.addr_street, f.addr_ward, f.addr_district, f.addr_province, f.note, nowIso(), phone)
     .run();
+  if (b.tags !== undefined) await c.env.DB.prepare('UPDATE cskh_customers SET tags = ? WHERE phone = ?').bind(normTags(b.tags), phone).run();
   if (me.lead && typeof b.owner_id === 'string' && b.owner_id && b.owner_id !== cus.owner_id) {
     const set = await loadSettings(c.env.DB);
     await assignTo(c.env.DB, [{ phone, prev: cus.owner_id }], set, vnDate(), { [phone]: b.owner_id });
   }
+  return ok(c, { phone });
+});
+
+/** Đặc điểm khách + ghi nhớ (sửa ngay trên hồ sơ, không cần mở Sửa hồ sơ). */
+cskhRoutes.put('/customer/:phone/traits', async (c) => {
+  const me = await who(c);
+  const phone = normPhone(c.req.param('phone'));
+  const cus = await c.env.DB.prepare('SELECT owner_id FROM cskh_customers WHERE phone = ?').bind(phone).first<{ owner_id: string | null }>();
+  if (!cus) throw notFound('Không thấy khách này');
+  if (!canSee(me, cus)) throw forbidden('Không phải khách của bạn');
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const tags = normTags(b.tags);
+  const note = str(b.note, 1000);
+  await c.env.DB.prepare('UPDATE cskh_customers SET tags = ?, note = ?, updated_at = ? WHERE phone = ?').bind(tags, note, nowIso(), phone).run();
+  return ok(c, { phone, tags, note });
+});
+
+/** Gán hạng tay ('' = để web tự xếp). */
+cskhRoutes.put('/customer/:phone/tier', async (c) => {
+  const me = await who(c);
+  const phone = normPhone(c.req.param('phone'));
+  const cus = await c.env.DB.prepare('SELECT owner_id FROM cskh_customers WHERE phone = ?').bind(phone).first<{ owner_id: string | null }>();
+  if (!cus) throw notFound('Không thấy khách này');
+  if (!canSee(me, cus)) throw forbidden('Không phải khách của bạn');
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const set = await loadSettings(c.env.DB);
+  const t = str(b.tier, 20);
+  if (t && t !== TIER_BASE && !set.tiers.some((x) => x.n === t)) throw badRequest('HANG', 'Hạng không có trong Cài đặt');
+  await c.env.DB.prepare('UPDATE cskh_customers SET tier_manual = ?, updated_at = ? WHERE phone = ?').bind(t, nowIso(), phone).run();
+  return ok(c, { phone, tier_manual: t });
+});
+
+/** Ngừng chăm sóc (CSKH / Lead, bắt buộc lý do): khách ra khỏi Việc hôm nay, không chia nữa. Lead / CEO cho chăm sóc lại. */
+cskhRoutes.post('/customer/:phone/stop', async (c) => {
+  const me = await who(c);
+  const phone = normPhone(c.req.param('phone'));
+  const cus = await c.env.DB.prepare('SELECT owner_id FROM cskh_customers WHERE phone = ?').bind(phone).first<{ owner_id: string | null }>();
+  if (!cus) throw notFound('Không thấy khách này');
+  if (!canSee(me, cus)) throw forbidden('Không phải khách của bạn');
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const reason = str(b.reason, 80);
+  if (!reason) throw badRequest('LY_DO', 'Chọn lý do ngừng chăm sóc');
+  const note = str(b.note, 500);
+  if (reason === 'Khác' && !note) throw badRequest('LY_DO', 'Ghi rõ lý do');
+  const now = nowIso();
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE cskh_customers SET stop_reason = ?, stop_note = ?, stop_at = ?, stop_by = ?, next_call = NULL, updated_at = ? WHERE phone = ?').bind(reason, note, now, me.name, now, phone),
+    c.env.DB.prepare("INSERT INTO cskh_logs (phone, by_id, by_name, day, at, result, reason, note) VALUES (?, ?, ?, ?, ?, 'Ngừng chăm sóc', ?, ?)").bind(phone, me.id, me.name, vnDate(), now, reason, note),
+  ]);
+  return ok(c, { phone });
+});
+cskhRoutes.post('/customer/:phone/resume', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO cho chăm sóc lại');
+  const phone = normPhone(c.req.param('phone'));
+  const now = nowIso();
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE cskh_customers SET stop_reason = '', stop_note = '', stop_at = NULL, stop_by = '', updated_at = ? WHERE phone = ?").bind(now, phone),
+    c.env.DB.prepare("INSERT INTO cskh_logs (phone, by_id, by_name, day, at, result, note) VALUES (?, ?, ?, ?, ?, 'Chăm sóc lại', '')").bind(phone, me.id, me.name, vnDate(), now),
+  ]);
   return ok(c, { phone });
 });
 
@@ -461,14 +536,14 @@ cskhRoutes.get('/chia', async (c) => {
   const today = vnDate();
   const kind = c.req.query('kind') === 'cu' ? 'cu' : 'moi';
   const rows = await c.env.DB.prepare(
-    `SELECT ${COLS} FROM cskh_customers WHERE owner_id IS NULL AND ${kind === 'moi' ? '(first_order_day >= ? OR manual = 1)' : '(first_order_day < ? OR first_order_day IS NULL) AND manual = 0'}
+    `SELECT ${COLS} FROM cskh_customers WHERE owner_id IS NULL AND stop_reason = '' AND ${kind === 'moi' ? '(first_order_day >= ? OR manual = 1)' : '(first_order_day < ? OR first_order_day IS NULL) AND manual = 0'}
      ORDER BY COALESCE(last_order_day, '') DESC LIMIT 500`,
   )
     .bind(addDays(today, -14))
     .all<Cus>();
   const cnt = await c.env.DB.prepare(
     `SELECT SUM(CASE WHEN first_order_day >= ? OR manual = 1 THEN 1 ELSE 0 END) AS moi, SUM(CASE WHEN (first_order_day < ? OR first_order_day IS NULL) AND manual = 0 THEN 1 ELSE 0 END) AS cu
-     FROM cskh_customers WHERE owner_id IS NULL`,
+     FROM cskh_customers WHERE owner_id IS NULL AND stop_reason = ''`,
   )
     .bind(addDays(today, -14), addDays(today, -14))
     .first<{ moi: number | null; cu: number | null }>();
@@ -487,7 +562,7 @@ cskhRoutes.post('/chia', async (c) => {
   if (b.auto) {
     const cut = addDays(today, -14);
     const r = await c.env.DB.prepare(
-      `SELECT phone, owner_prev, last_order_day FROM cskh_customers WHERE owner_id IS NULL AND ${b.kind === 'cu' ? '(first_order_day < ? OR first_order_day IS NULL) AND manual = 0' : '(first_order_day >= ? OR manual = 1)'} LIMIT 3000`,
+      `SELECT phone, owner_prev, last_order_day FROM cskh_customers WHERE owner_id IS NULL AND stop_reason = '' AND ${b.kind === 'cu' ? '(first_order_day < ? OR first_order_day IS NULL) AND manual = 0' : '(first_order_day >= ? OR manual = 1)'} LIMIT 3000`,
     )
       .bind(cut)
       .all<{ phone: string; owner_prev: string | null; last_order_day: string | null }>();
@@ -555,15 +630,17 @@ cskhRoutes.get('/overview', async (c) => {
   const mine = !me.lead || c.req.query('mine') === '1';
   const oc = mine ? 'AND owner_id = ?' : '';
   const ob = mine ? [me.id] : [];
+  const vipAuto = set.tiers.map((t) => [t.o > 0 ? 'order_count >= ' + t.o : '', t.s > 0 ? 'total_spent >= ' + t.s : ''].filter(Boolean).join(' OR ')).filter(Boolean);
+  const vipCond = { sql: `((tier_manual <> '' AND tier_manual <> ?) OR (tier_manual = '' AND (${vipAuto.length ? vipAuto.join(' OR ') : '0'})))`, binds: [TIER_BASE] as unknown[] };
   const base = await db
     .prepare(
       `SELECT COUNT(*) AS total, SUM(CASE WHEN first_order_day >= ? AND first_order_day <= ? THEN 1 ELSE 0 END) AS moi,
-         SUM(CASE WHEN order_count >= ? THEN 1 ELSE 0 END) AS vip, SUM(CASE WHEN order_count >= 1 THEN 1 ELSE 0 END) AS buyers,
+         SUM(CASE WHEN ${vipCond.sql} THEN 1 ELSE 0 END) AS vip, SUM(CASE WHEN stop_reason <> '' THEN 1 ELSE 0 END) AS ngung, SUM(CASE WHEN order_count >= 1 THEN 1 ELSE 0 END) AS buyers,
          SUM(CASE WHEN next_call < ? THEN 1 ELSE 0 END) AS qua, SUM(CASE WHEN owner_id IS NULL THEN 1 ELSE 0 END) AS chua
        FROM cskh_customers WHERE 1 = 1 ${oc}`,
     )
-    .bind(from, to0, set.vipOrders, today, ...ob)
-    .first<{ total: number; moi: number; vip: number; buyers: number; qua: number; chua: number }>();
+    .bind(from, to0, ...vipCond.binds, today, ...ob)
+    .first<{ total: number; moi: number; vip: number; ngung: number; buyers: number; qua: number; chua: number }>();
   // Hôm nay theo từng CSKH: cần gọi (quá hạn + hẹn hôm nay + khách mới + đến kỳ), đã gọi, chốt, quá hạn tồn.
   const cand = (
     await db

@@ -9,16 +9,29 @@
 
 export const CSKH_RESULTS = ['Đã chốt đơn', 'Không nghe máy', 'Hẹn gọi lại', 'Kết nối Zalo', 'Khách từ chối', 'Sai số / thuê bao'] as const;
 export type CskhResult = (typeof CSKH_RESULTS)[number];
+/** Đặc điểm khách hay gặp (bấm chọn nhanh ở hồ sơ); CSKH tự gõ thêm được. */
+export const CSKH_TRAITS = ['Có con nhỏ', 'Có người già', 'Dễ tính', 'Khó tính', 'Cả nể', 'Hay hỏi kỹ', 'Nhạy cảm về giá', 'Thích quà tặng', 'Mua làm quà', 'Chỉ nhắn Zalo', 'Ngại nghe điện thoại', 'Khách quen'];
+export function normTags(v: unknown): string {
+  const a = Array.isArray(v) ? v : String(v ?? '').split('|');
+  return [...new Set(a.map((x) => String(x ?? '').replace(/\|/g, ' ').trim().slice(0, 40)).filter(Boolean))].slice(0, 20).join('|');
+}
 export const CSKH_REASONS = ['Còn hàng, chưa dùng hết', 'Giá cao hơn chỗ khác', 'Không hài lòng sản phẩm', 'Không có nhu cầu', 'Khác'];
 /** Số ngày sau cuộc gọi chốt đơn mà đơn giao thành công vẫn tính cho CSKH đó. */
 export const UPSELL_DAYS = 7;
 
+export interface CskhTier {
+  n: string; // tên hạng: VVIP, VIP...
+  o: number; // từ số đơn (0 = không xét)
+  s: number; // hoặc tổng mua từ (đồng, 0 = không xét)
+}
+export const TIER_BASE = 'Thường';
 export interface CskhSettings {
   chia: 'auto' | 'tay';
   khachCu: 'cu' | 'moi'; // khách từng có người chăm: trả về người cũ / chia như khách mới
   staffOff: string[]; // CSKH đang tạm không nhận khách (nghỉ phép)
   fromDate: string; // lấy đơn giao thành công từ ngày
   vipOrders: number;
+  tiers: CskhTier[]; // hạng từ cao xuống thấp; khách không đạt hạng nào là "Thường"
   firstCallDays: number; // gọi khách mới sau khi giao (ngày)
   kpi: number; // chỉ tiêu bán thêm / tháng (cả nhóm)
   cycles: Record<string, number>; // tên sản phẩm → số ngày dùng hết
@@ -30,6 +43,10 @@ export const CSKH_DEFAULTS: CskhSettings = {
   staffOff: [],
   fromDate: '',
   vipOrders: 2,
+  tiers: [
+    { n: 'VVIP', o: 5, s: 3_000_000 },
+    { n: 'VIP', o: 2, s: 1_000_000 },
+  ],
   firstCallDays: 3,
   kpi: 0,
   cycles: {},
@@ -43,6 +60,11 @@ export function mergeSettings(raw: Partial<CskhSettings> | null | undefined): Cs
   s.staffOff = Array.isArray(s.staffOff) ? s.staffOff.map(String) : [];
   s.fromDate = isDay(s.fromDate) ? s.fromDate : '';
   s.vipOrders = clampInt(s.vipOrders, 1, 50, 2);
+  const tiers = (Array.isArray(s.tiers) ? s.tiers : CSKH_DEFAULTS.tiers)
+    .map((t) => ({ n: String(t?.n ?? '').trim().slice(0, 20), o: Math.max(0, Math.round(Number(t?.o) || 0)), s: Math.max(0, Number(t?.s) || 0) }))
+    .filter((t) => t.n && t.n !== TIER_BASE && (t.o > 0 || t.s > 0))
+    .slice(0, 6);
+  s.tiers = tiers;
   s.firstCallDays = clampInt(s.firstCallDays, 0, 60, 3);
   s.kpi = Math.max(0, Number(s.kpi) || 0);
   s.defaultCycle = clampInt(s.defaultCycle, 1, 365, 30);
@@ -164,8 +186,9 @@ export function parsePosOrder(raw: unknown, srcNames: Record<string, string> = {
 }
 
 /* ------------------------------------------------------------------ trạng thái gọi */
-export type CallState = 'qua' | 'nay' | 'moi' | 'ky' | 'cho' | 'chua';
+export type CallState = 'qua' | 'nay' | 'moi' | 'ky' | 'cho' | 'chua' | 'ngung';
 export interface CallInput {
+  stop_reason?: string;
   owner_id: string | null;
   next_call: string | null;
   last_call: string | null;
@@ -181,6 +204,7 @@ export function cycleOf(set: CskhSettings, product: string): number {
  * ky: chưa có hẹn mà đã tới kỳ dùng hết sản phẩm (trong 10 ngày gần đây); cho: còn lại; chua: chưa chia.
  */
 export function callState(c: CallInput, today: string, set: CskhSettings): CallState {
+  if (c.stop_reason) return 'ngung';
   if (!c.owner_id) return 'chua';
   if (!c.last_call && c.last_order_day && diffDays(today, c.last_order_day) <= 14 && (!c.next_call || c.next_call <= today)) return 'moi';
   if (c.next_call) {
@@ -196,9 +220,43 @@ export function callState(c: CallInput, today: string, set: CskhSettings): CallS
 }
 
 /** Hạng khách. */
-export function tier(orderCount: number, set: CskhSettings): 'VIP' | 'Mua 1 lần' | 'Chưa mua' {
-  return orderCount >= set.vipOrders ? 'VIP' : orderCount >= 1 ? 'Mua 1 lần' : 'Chưa mua';
+export function tierOf(c: { order_count: number; total_spent?: number; tier_manual?: string }, set: CskhSettings): string {
+  if (c.tier_manual) return c.tier_manual;
+  for (const t of set.tiers) if ((t.o > 0 && c.order_count >= t.o) || (t.s > 0 && (c.total_spent ?? 0) >= t.s)) return t.n;
+  return c.order_count >= 1 ? TIER_BASE : 'Chưa mua';
 }
+/** Điều kiện SQL "khách thuộc hạng name" (để lọc danh sách). */
+export function tierSql(set: CskhSettings, name: string): { sql: string; binds: unknown[] } {
+  const auto = (t: CskhTier) => {
+    const parts: string[] = [];
+    const b: unknown[] = [];
+    if (t.o > 0) {
+      parts.push('order_count >= ?');
+      b.push(t.o);
+    }
+    if (t.s > 0) {
+      parts.push('total_spent >= ?');
+      b.push(t.s);
+    }
+    return { sql: parts.length ? '(' + parts.join(' OR ') + ')' : '0', binds: b };
+  };
+  const idx = set.tiers.findIndex((t) => t.n === name);
+  const higher = idx >= 0 ? set.tiers.slice(0, idx) : set.tiers;
+  const not = higher.map(auto);
+  const notSql = not.map((x) => ' AND NOT ' + x.sql).join('');
+  const notB = not.flatMap((x) => x.binds);
+  if (idx >= 0) {
+    const me = auto(set.tiers[idx]!);
+    return { sql: `(tier_manual = ? OR (tier_manual = '' AND ${me.sql}${notSql}))`, binds: [name, ...me.binds, ...notB] };
+  }
+  // Thường: đã mua, không đạt hạng nào
+  return { sql: `(tier_manual = ? OR (tier_manual = '' AND order_count >= 1${notSql}))`, binds: [TIER_BASE, ...notB] };
+}
+/** Giữ cho chỗ cũ gọi tier(). */
+export function tier(orderCount: number, set: CskhSettings): string {
+  return tierOf({ order_count: orderCount }, set);
+}
+export const CSKH_STOP_REASONS = ['Khách yêu cầu không gọi nữa', 'Sai số / không liên lạc được', 'Khách bom hàng, hay hoàn', 'Khách khiếu nại, không hài lòng', 'Là đại lý / khách sỉ', 'Khác'];
 
 /** Sinh nhật (dd/mm) rơi vào [-3, +7] ngày quanh hôm nay. */
 export function birthdaySoon(bd: string, today: string): boolean {

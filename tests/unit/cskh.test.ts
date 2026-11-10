@@ -10,6 +10,8 @@ import {
   parsePosOrder,
   pickOwners,
   tier,
+  tierOf,
+  tierSql,
 } from '../../src/shared/cskh';
 
 const set = mergeSettings({ cycles: { 'Xịt ruồi': 25 } });
@@ -70,7 +72,11 @@ describe('CSKH khách lẻ', () => {
 
   it('hạng khách và sinh nhật', () => {
     expect(tier(2, CSKH_DEFAULTS)).toBe('VIP');
-    expect(tier(1, CSKH_DEFAULTS)).toBe('Mua 1 lần');
+    expect(tier(1, CSKH_DEFAULTS)).toBe('Thường');
+    expect(tierOf({ order_count: 1, total_spent: 3_500_000 }, CSKH_DEFAULTS)).toBe('VVIP');
+    expect(tierOf({ order_count: 1, total_spent: 0, tier_manual: 'VIP' }, CSKH_DEFAULTS)).toBe('VIP');
+    expect(tierSql(CSKH_DEFAULTS, 'VIP').binds).toEqual(['VIP', 2, 1_000_000, 5, 3_000_000]);
+    expect(callState({ owner_id: 'u', next_call: '2026-11-01', last_call: null, last_order_day: null, last_product: '', order_count: 1, stop_reason: 'Sai số' }, '2026-11-10', CSKH_DEFAULTS)).toBe('ngung');
     expect(birthdaySoon('12/11', '2026-11-10')).toBe(true);
     expect(birthdaySoon('20/11', '2026-11-10')).toBe(false);
     expect(birthdaySoon('02/01', '2026-12-30')).toBe(true);
