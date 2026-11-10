@@ -5,7 +5,7 @@
  * Phòng chưa có Lead, hoặc người gửi chính là Lead: đơn lên thẳng HCNS.
  * Tạm ứng: dưới mức tối đa (mặc định 3 triệu), Kế toán duyệt, cuối tháng trừ vào lương.
  */
-import { dayRule, daysFrom, lichNgay, type CcSettings, type Lich, type NgayCong } from './chamCong';
+import { dayRule, daysFrom, lichNgay, phutChuan, type CcSettings, type Lich, type NgayCong } from './chamCong';
 
 export type LoaiDon = 'phep' | 'om' | 'khongluong' | 'vesom' | 'ot' | 'lambu';
 export const LOAI_DON: Record<LoaiDon, string> = {
@@ -129,6 +129,35 @@ export function ngayCanBu(ngay: (NgayCong & { ngay: string })[], today: string):
       out.push({ ngay: x.ngay, kieu: 'gio', buoi: 'ca', phut: x.muon + x.som, mo: [x.muon ? 'đi muộn ' + x.muon + ' phút' : '', x.som ? 'về sớm ' + x.som + ' phút' : ''].filter(Boolean).join(', ') });
   }
   return out.reverse();
+}
+
+/**
+ * Làm trước, nghỉ sau (CEO 10/11, Lead Content hỏi): ngày nghỉ theo lịch (đã qua, trong hạn bù) mà có chấm vào và ra
+ * thì dùng để xin nghỉ bù một ngày đi làm sắp tới. Làm đủ giờ chuẩn của lịch đổi được cả ngày, đủ nửa giờ chuẩn đổi được nửa ngày
+ * (cùng mốc với cách chấm kết quả làm bù, có trừ phút được trễ).
+ * daDung: các ngày đã có đơn làm bù dùng rồi (đang chờ hoặc đã duyệt).
+ */
+export type DaLam = { ngay: string; phut: number; nua: boolean };
+export function ngayDaLamThem(ngay: (NgayCong & { ngay: string })[], l: Lich, today: string, daDung: Set<string>): DaLam[] {
+  const du = (x: NgayCong & { ngay: string }, phan: number) => {
+    const ln = lichNgay(l, x.ngay);
+    return x.phut >= phutChuan(ln) * phan - Math.max(5, ln.anHan || 0);
+  };
+  return ngay
+    .filter((x) => x.ngay < today && !x.lam && x.vao && x.ra && !x.lamBu && !daDung.has(x.ngay) && du(x, 0.5))
+    .map((x) => ({ ngay: x.ngay, phut: x.phut, nua: !du(x, 1) }))
+    .reverse();
+}
+
+/** Kiểm ngày xin nghỉ bù (làm trước, nghỉ sau); trả câu báo lỗi hoặc null. rule = giờ làm của ngày nghỉ theo lịch. */
+export function kiemNghiBu(d: DaLam, b: { ngay: string; buoi: Buoi }, rule: { lam: boolean }, today: string, hanBu: number): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.ngay)) return 'Chọn ngày nghỉ bù';
+  if (b.ngay < today) return 'Ngày nghỉ bù phải từ hôm nay trở đi';
+  if (!rule.lam) return 'Ngày này đã là ngày nghỉ theo lịch, không cần xin nghỉ bù';
+  if (d.nua && b.buoi === 'ca') return `Ngày ${d.ngay.slice(8)}/${d.ngay.slice(5, 7)} làm chưa đủ giờ cả ngày nên chỉ đổi được nửa ngày (chọn buổi sáng hoặc chiều)`;
+  const cach = Math.round((Date.parse(b.ngay) - Date.parse(d.ngay)) / 864e5);
+  if (cach > hanBu) return `Phải nghỉ bù trong vòng ${hanBu} ngày sau ngày đã làm ${d.ngay.slice(8)}/${d.ngay.slice(5, 7)}`;
+  return null;
 }
 
 /** Kiểm đơn làm bù; trả lời câu báo lỗi dễ hiểu, hoặc null nếu hợp lệ. rule = giờ làm của ngày làm bù theo lịch. */
