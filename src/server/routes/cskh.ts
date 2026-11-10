@@ -450,7 +450,7 @@ cskhRoutes.get('/orders', async (c) => {
     c,
     rows.map((x) => {
       const p = st[String(x.pos_id ?? '')];
-      return { ...x, pos_status: p ? p.s : null, pos_status_name: p ? (POS_STATUS[p.s] ?? 'Mã ' + p.s) : '' };
+      return { ...x, pos_status: p ? p.s : null, pos_status_name: p ? (POS_STATUS[p.s] ?? 'Mã ' + p.s) : '', ship_code: p?.code ?? '', carrier: p?.carrier ?? '' };
     }),
   );
 });

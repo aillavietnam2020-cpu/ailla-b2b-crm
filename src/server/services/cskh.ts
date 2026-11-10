@@ -333,9 +333,9 @@ export const POS_STATUS: Record<number, string> = {
   2: 'Đã gửi hàng', 3: 'Giao thành công', 16: 'Đã thu tiền', 4: 'Đang hoàn', 15: 'Hoàn một phần', 5: 'Đã hoàn', 6: 'Đã hủy', 7: 'Đã xóa',
 };
 const POS_FINAL = new Set([3, 5, 6, 7, 16]);
-export type PosStatusMap = Record<string, { s: number; at: string }>;
+export type PosStatusMap = Record<string, { s: number; at: string; code?: string; carrier?: string }>;
 export async function posStatuses(db: D1Database, secret: string | undefined, fetchFn: FetchFn, ids: string[]): Promise<PosStatusMap> {
-  const cache = (await getSetting<PosStatusMap>(db, 'pos_status2')) ?? {};
+  const cache = (await getSetting<PosStatusMap>(db, 'pos_status3')) ?? {};
   const now = Date.now();
   const stale = [...new Set(ids)].filter((id) => {
     const x = cache[id];
@@ -354,15 +354,19 @@ export async function posStatuses(db: D1Database, secret: string | undefined, fe
             const d = j.data ?? {};
             console.info('[cskh] don poscake', id, JSON.stringify({ tags: d.tags, creator: d.creator, assigning_seller: d.assigning_seller, assigning_care: d.assigning_care, assigning_seller_id: d.assigning_seller_id, assigning_care_id: d.assigning_care_id, order_sources: d.order_sources, order_sources_name: d.order_sources_name, account: d.account, keys: Object.keys(d).slice(0, 120) }).slice(0, 3000));
             const st = Number(j.data?.status);
-            return Number.isFinite(st) ? ([id, st] as const) : null;
+            const pt = (d.partner ?? {}) as Record<string, unknown>;
+            const code = String(pt.extend_code ?? pt.partner_order_id ?? pt.order_number_vtp ?? d.tracking_code ?? '').trim();
+            const carrier = String(pt.partner_name ?? (pt.partner_id !== undefined ? 'ĐVVC ' + pt.partner_id : '')).trim();
+            console.info('[cskh] partner', id, JSON.stringify(pt).slice(0, 1500));
+            return Number.isFinite(st) ? ([id, st, code, carrier] as const) : null;
           } catch {
             return null;
           }
         }),
       );
       const at = new Date().toISOString();
-      for (const g of got) if (g) cache[g[0]] = { s: g[1], at };
-      await putSetting(db, 'pos_status2', cache);
+      for (const g of got) if (g) cache[g[0]] = { s: g[1], at, code: g[2], carrier: g[3] };
+      await putSetting(db, 'pos_status3', cache);
     } catch {
       /* không hỏi được Poscake thì dùng số cũ */
     }
