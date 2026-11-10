@@ -158,7 +158,9 @@ export function effectivePermissions(role: Role, extra: string[] = []): Permissi
   // Dấu "chỉ Marketing" chỉ thu quyền khi người đó KHÔNG được cấp quyền kho; ai có quyền kho (kế toán kho) thì giữ nguyên quyền kho
   // dù còn dấu này, để không bị mất quyền vì thao tác chọn lẫn.
   const isWarehouse = extra.some((p) => (WAREHOUSE_PERMISSIONS as string[]).includes(p));
-  if (role !== 'CEO' && extra.includes(HUB_ONLY) && !isWarehouse) return [...MARKETING_PERMISSIONS];
+  // Quyền riêng "Quét, nhập hàng hoàn" (nhân viên kho, CEO 10/11) vẫn giữ khi có dấu này.
+  if (role !== 'CEO' && extra.includes(HUB_ONLY) && !isWarehouse)
+    return [...MARKETING_PERMISSIONS, ...(extra.includes('kho.hoan') ? (['kho.hoan'] as Permission[]) : [])];
   const set = new Set<Permission>(ROLE_PERMISSIONS[role]);
   for (const item of extra) {
     if ((PERMISSIONS as readonly string[]).includes(item)) set.add(item as Permission);
