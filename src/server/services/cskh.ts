@@ -352,6 +352,8 @@ export async function posStatuses(db: D1Database, secret: string | undefined, fe
             const j = JSON.parse(await r.text()) as { data?: Record<string, unknown> & { status?: number } };
             // Chẩn đoán (10/11): xem Poscake ghi người tạo / thẻ / nguồn của đơn CSKH thế nào (chỉ tên trường, mã, tên nhân viên).
             const d = j.data ?? {};
+            const dbg = JSON.stringify({ id, tags: d.tags, creator: d.creator, assigning_seller: d.assigning_seller, assigning_care: d.assigning_care, order_sources: d.order_sources, order_sources_name: d.order_sources_name, partner: d.partner, keys: Object.keys(d) }).slice(0, 6000);
+            await putSetting(db, 'pos_debug', dbg);
             console.info('[cskh] don poscake', id, JSON.stringify({ tags: d.tags, creator: d.creator, assigning_seller: d.assigning_seller, assigning_care: d.assigning_care, assigning_seller_id: d.assigning_seller_id, assigning_care_id: d.assigning_care_id, order_sources: d.order_sources, order_sources_name: d.order_sources_name, account: d.account, keys: Object.keys(d).slice(0, 120) }).slice(0, 3000));
             const st = Number(j.data?.status);
             const pt = (d.partner ?? {}) as Record<string, unknown>;
