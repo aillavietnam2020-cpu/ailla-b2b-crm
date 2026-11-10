@@ -186,9 +186,13 @@ function csLogForm(phone){
     <div class="cs-fl" style="margin-top:10px"><span>Kết quả cuộc gọi</span><div class="cs-chips">${RES.map(r=>`<button type="button" class="cs-chip${st.res===r?" on":""}" data-r="${esc(r)}">${esc(r)}</button>`).join("")}</div></div>
     <div id="csrsn" ${st.res==="Khách từ chối"?"":"hidden"} class="cs-fl" style="margin-top:8px"><span>Lý do từ chối</span><select id="csreason">${opt(REA,"")}</select></div>
     <div id="cschot" ${st.res==="Đã chốt đơn"?"":"hidden"} class="note" style="margin-top:8px">Khách đồng ý mua: lưu xong web mở luôn phiếu Tạo đơn, địa chỉ và số điện thoại điền sẵn.</div>
-    <label class="cs-fl" style="margin-top:8px"><span>Ghi chú</span><textarea id="csnote" rows="2" placeholder="Khách nói gì, cần nhớ gì cho lần sau"></textarea></label>
+    <label class="cs-fl" style="margin-top:8px"><span>Ghi chú cuộc gọi</span><textarea id="csnote" rows="2" placeholder="Khách nói gì, cần nhớ gì cho lần sau"></textarea></label>
     <label class="cs-fl" style="margin-top:8px"><span>Câu hỏi khó của khách (nếu có)</span><input id="csq"></label>
-    ${c.birthday?"":`<label class="cs-fl" style="margin-top:8px"><span>Sinh nhật (hỏi được thì ghi, ngày/tháng)</span><input id="csbd" placeholder="18/06"></label>`}
+    <div class="cs-sec" style="margin-top:12px">Thông tin khách (sửa ở đây là lưu vào hồ sơ)</div>
+    <div class="cs-f"><label class="cs-fl"><span>Họ tên</span><input id="ci-name" value="${esc(c.name)}"></label><label class="cs-fl"><span>Sinh nhật (ngày/tháng)</span><input id="ci-bd" value="${esc(c.birthday)}" placeholder="18/06"></label>
+     <label class="cs-fl"><span>Số phụ</span><input id="ci-ph2" inputmode="tel" value="${esc(c.phone2)}"></label><label class="cs-fl"><span>Số nhà, đường</span><input id="ci-st" value="${esc(c.addr_street)}"></label></div>
+    <div class="cs-f3" style="margin-top:8px"><label class="cs-fl"><span>Phường / xã</span><input id="ci-wd" value="${esc(c.addr_ward)}"></label><label class="cs-fl"><span>Quận / huyện</span><input id="ci-ds" value="${esc(c.addr_district)}"></label><label class="cs-fl"><span>Tỉnh / thành</span><input id="ci-pv" value="${esc(c.addr_province)}"></label></div>
+    <label class="cs-fl" style="margin-top:8px"><span>Ghi nhớ về khách (sở thích, hoàn cảnh, dùng sản phẩm gì…)</span><textarea id="ci-note" rows="2" placeholder="Ví dụ: nhà có trẻ nhỏ, dùng máy giặt cửa trước, thích giao giờ hành chính">${esc(c.note)}</textarea></label>
     <div class="cs-fl" style="margin-top:8px"><span>Gọi lại ngày (bắt buộc)</span><div class="cs-chips">${q.map(([t,n])=>`<button type="button" class="cs-chip" data-n="${n}">${t}</button>`).join("")}</div><input type="date" id="cshen" min="${csAdd(csToday(),1)}"></div>
     <div id="cserr" class="err"></div>
     <div class="acts" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="csx">Hủy</button><button class="btn pri" id="csok">Lưu</button></div>`);
@@ -198,7 +202,10 @@ function csLogForm(phone){
     $("#csx").onclick=closeCM;
     $("#csok").onclick=async()=>{const hen=$("#cshen").value;if(!st.res){$("#cserr").textContent="Chọn kết quả cuộc gọi";return}if(!hen||hen<=csToday()){$("#cserr").textContent="Chọn ngày gọi lại (sau hôm nay), không thì mai khách sẽ báo Quá hạn";return}
       $("#csok").disabled=true;
-      try{await csApi("/log/"+c.phone,{method:"POST",body:JSON.stringify({result:st.res,reason:st.res==="Khách từ chối"?$("#csreason").value:"",note:$("#csnote").value,question:$("#csq").value,birthday:$("#csbd")?$("#csbd").value:"",next_call:hen})});
+      try{const info={name:$("#ci-name").value,birthday:$("#ci-bd").value,phone2:$("#ci-ph2").value,addr_street:$("#ci-st").value,addr_ward:$("#ci-wd").value,addr_district:$("#ci-ds").value,addr_province:$("#ci-pv").value,note:$("#ci-note").value};
+        const changed=["name","birthday","phone2","addr_street","addr_ward","addr_district","addr_province","note"].some(k=>String(info[k]||"").trim()!==String(c[k]||"").trim());
+        if(changed){if(!info.name.trim()){$("#csok").disabled=false;$("#cserr").textContent="Cần họ tên khách";return}await csApi("/customer/"+c.phone,{method:"PUT",body:JSON.stringify(info)})}
+        await csApi("/log/"+c.phone,{method:"POST",body:JSON.stringify({result:st.res,reason:st.res==="Khách từ chối"?$("#csreason").value:"",note:$("#csnote").value,question:$("#csq").value,next_call:hen})});
         closeCM();toast("Đã lưu. Gọi lại "+csFd(hen));csAfterChange(c.phone);if(st.res==="Đã chốt đơn")csDonForm(c.phone)}catch(e){$("#csok").disabled=false;$("#cserr").textContent=e.message}}};
   csGetCus(phone).then(draw).catch(csErr)}
 function csGetCus(phone){if(CSK.prof&&CSK.prof.customer.phone===phone)return Promise.resolve(CSK.prof.customer);const T=CSK.today&&CSK.today.rows&&CSK.today.rows.find(r=>r.phone===phone);if(T)return Promise.resolve(T);return csApi("/customer/"+phone).then(r=>r.customer)}
