@@ -30,6 +30,11 @@ tr.cc-row{cursor:pointer}
 tr.cc-det>td{background:var(--gray-soft);padding:8px}
 .cc-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px 16px}
 .cc-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.cc-lich{border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:14px 16px;margin-bottom:12px}.cc-lich h3{margin:0 0 10px;font-size:15px}
+.cc-lg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 18px}.cc-lg>.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted);min-width:0}.cc-lg>.f.w2{grid-column:span 2}
+.cc-lg .pair{display:flex;align-items:center;gap:6px}.cc-lg .pair input{flex:1;min-width:0}.cc-lg input:not([type=checkbox]),.cc-lg select{width:100%;box-sizing:border-box}.cc-lg .pair input{width:auto}.cc-lg .ck{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--text,inherit)}
+.cc-lcu{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--gray-soft)}.cc-lcu .hint{margin:0 0 8px}
+@media(max-width:560px){.cc-lg>.f.w2{grid-column:auto}}
 .cc-chk{display:inline-flex;align-items:center;gap:4px;margin-right:10px;white-space:nowrap;font-size:13px}
 .cc-grid select{min-width:110px}
 .cc-savebar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:0 -4px 16px rgba(30,35,80,.08);margin-top:8px}
@@ -338,10 +343,28 @@ function pCcCaiDat(m){
   const lichSel=(id,val,blank)=>`<select id="${id}">${blank?`<option value="">${blank}</option>`:""}${s.lich.map(l=>`<option value="${esc(l.id)}"${l.id===val?" selected":""}>${esc(l.ten)}</option>`).join("")}</select>`;
   const rowD=(d,i)=>`<tr><td><input id="cc-dt-${i}" value="${esc(d.ten)}"></td><td><input id="cc-dl-${i}" value="${d.lat===""?"":d.lat+", "+d.lng}" placeholder="21.02851, 105.85416"></td><td><input id="cc-db-${i}" class="num s" type="number" min="30" max="2000" value="${d.bk}"> m</td><td><input id="cc-di-${i}" value="${esc((d.ip||[]).join(", "))}" placeholder="chưa có" style="min-width:150px"> <button class="btn sm" data-ipadd="${i}">Lấy mạng đang dùng</button></td><td>${d.lat!==""?`<a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${d.lat},${d.lng}">Xem bản đồ</a> `:""}<button class="btn sm danger" data-del="${i}">Xóa</button></td></tr>`;
   const t7=(i,v)=>`<select id="cc-l7-${i}">${Object.entries(CC_T7).map(([k,t])=>`<option value="${k}"${k===v?" selected":""}>${t[0].toUpperCase()+t.slice(1)}</option>`).join("")}</select>`;
-  const rowL=(l,i)=>`<tr><td><input id="cc-ln-${i}" value="${esc(l.ten)}"></td><td><select id="cc-lk-${i}">${Object.entries(CC_KIEU).map(([k,t])=>`<option value="${k}"${k===l.kieu?" selected":""}>${t}</option>`).join("")}</select></td><td><input type="time" id="cc-lv-${i}" value="${l.gioVao}"> – <input type="time" id="cc-lr-${i}" value="${l.gioRa}"></td><td><input type="time" id="cc-lt1-${i}" value="${l.truaTu}"> – <input type="time" id="cc-lt2-${i}" value="${l.truaDen}"></td><td><input type="number" class="num s" id="cc-la-${i}" min="0" max="120" value="${l.anHan}"> phút</td><td>${t7(i,l.thuBay)}</td><td><input type="time" id="cc-l8-${i}" value="${l.gioRaT7}"></td><td>${s.diem.length?s.diem.map(d=>`<label class="cc-chk"><input type="checkbox" data-ld="${i}" value="${esc(d.id)}"${(l.diem||[]).includes(d.id)?" checked":""}> ${esc(d.ten)}</label>`).join(""):'<span class="hint">chưa có điểm</span>'}</td><td><select id="cc-lo-${i}"><option value="0"${l.ngoaiOk?"":" selected"}>Không cho chấm</option><option value="1"${l.ngoaiOk?" selected":""}>Cho chấm, phải ghi lý do</option></select></td><td><label class="cc-chk"><input type="checkbox" id="cc-lc-${i}"${l.chuyenCan?" checked":""}> Có</label></td></tr>`+(l.kieu==="codinh"?ccCuRow(l,i):"");
-  /* Quy định đổi theo thời gian (CEO 04/11): giờ ở dòng trên áp dụng từ ngày này; trước ngày đó tính theo giờ cũ ở đây. */
+  const lf=(lb,html,w)=>`<div class="f${w?" w2":""}">${lb}${html}</div>`;
+  const rowL=(l,i)=>`<div class="cc-lich"><h3>${esc(l.ten)||"Lịch mới"}</h3><div class="cc-lg">
+      ${lf("Tên lịch",`<input id="cc-ln-${i}" value="${esc(l.ten)}">`)}
+      ${lf("Kiểu",`<select id="cc-lk-${i}">${Object.entries(CC_KIEU).map(([k,t])=>`<option value="${k}"${k===l.kieu?" selected":""}>${t}</option>`).join("")}</select>`)}
+      ${lf("Giờ vào – ra",`<div class="pair"><input type="time" id="cc-lv-${i}" value="${l.gioVao}"> – <input type="time" id="cc-lr-${i}" value="${l.gioRa}"></div>`)}
+      ${lf("Nghỉ trưa",`<div class="pair"><input type="time" id="cc-lt1-${i}" value="${l.truaTu}"> – <input type="time" id="cc-lt2-${i}" value="${l.truaDen}"></div>`)}
+      ${lf("Được trễ (phút)",`<input type="number" id="cc-la-${i}" min="0" max="120" value="${l.anHan}">`)}
+      ${lf("Thứ Bảy",t7(i,l.thuBay))}
+      ${lf("Giờ ra thứ Bảy (làm buổi sáng)",`<input type="time" id="cc-l8-${i}" value="${l.gioRaT7}">`)}
+      ${lf("Ngoài phạm vi",`<select id="cc-lo-${i}"><option value="0"${l.ngoaiOk?"":" selected"}>Không cho chấm</option><option value="1"${l.ngoaiOk?" selected":""}>Cho chấm, phải ghi lý do</option></select>`)}
+      ${lf("Chấm ở điểm",`<div class="ck">${s.diem.length?s.diem.map(d=>`<label class="cc-chk"><input type="checkbox" data-ld="${i}" value="${esc(d.id)}"${(l.diem||[]).includes(d.id)?" checked":""}> ${esc(d.ten)}</label>`).join(""):'<span class="hint">chưa có điểm</span>'}</div>`)}
+      ${lf("Tính chuyên cần",`<div class="ck"><label class="cc-chk"><input type="checkbox" id="cc-lc-${i}"${l.chuyenCan?" checked":""}> Có</label></div>`)}
+    </div>${l.kieu==="codinh"?ccCuRow(l,i):""}</div>`;
+  /* Quy định đổi theo thời gian (CEO 04/11): giờ ở trên áp dụng từ ngày này; trước ngày đó tính theo giờ cũ ở đây. */
   const ccCuRow=(l,i)=>{const c=l.cu||{gioVao:l.gioVao,gioRa:l.gioRa,anHan:l.anHan,thuBay:l.thuBay,gioRaT7:l.gioRaT7};
-    return `<tr class="cc-cu"><td colspan="10"><div class="cc-curow"><label>Áp dụng giờ trên từ ngày <input type="date" id="cc-ltn-${i}" value="${l.tuNgay||""}"></label><span class="hint">Trước ngày đó tính theo giờ cũ:</span><label>Vào <input type="time" id="cc-cv-${i}" value="${c.gioVao}"></label><label>Ra <input type="time" id="cc-cr-${i}" value="${c.gioRa}"></label><label>Được trễ <input type="number" class="num s" id="cc-ca-${i}" min="0" max="120" value="${c.anHan}"> phút</label><label>Thứ Bảy <select id="cc-c7-${i}">${Object.entries(CC_T7).map(([k,t])=>`<option value="${k}"${k===c.thuBay?" selected":""}>${t[0].toUpperCase()+t.slice(1)}</option>`).join("")}</select></label><label>Ra thứ Bảy <input type="time" id="cc-c8-${i}" value="${c.gioRaT7}"></label><span class="hint">Để trống ngày nếu không có quy định cũ.</span></div></td></tr>`};
+    return `<div class="cc-lcu"><p class="hint">Giờ ở trên áp dụng từ ngày bên dưới; trước ngày đó tính theo giờ cũ. Để trống ngày nếu không có quy định cũ.</p><div class="cc-lg">
+      ${lf("Áp dụng giờ trên từ ngày",`<input type="date" id="cc-ltn-${i}" value="${l.tuNgay||""}">`)}
+      ${lf("Giờ cũ: vào – ra",`<div class="pair"><input type="time" id="cc-cv-${i}" value="${c.gioVao}"> – <input type="time" id="cc-cr-${i}" value="${c.gioRa}"></div>`)}
+      ${lf("Giờ cũ: được trễ (phút)",`<input type="number" id="cc-ca-${i}" min="0" max="120" value="${c.anHan}">`)}
+      ${lf("Giờ cũ: thứ Bảy",`<select id="cc-c7-${i}">${Object.entries(CC_T7).map(([k,t])=>`<option value="${k}"${k===c.thuBay?" selected":""}>${t[0].toUpperCase()+t.slice(1)}</option>`).join("")}</select>`)}
+      ${lf("Giờ cũ: ra thứ Bảy",`<input type="time" id="cc-c8-${i}" value="${c.gioRaT7}">`)}
+    </div></div>`};
   const rowCa=(c,i)=>`<tr><td><input id="cc-cn-${i}" value="${esc(c.ten)}" placeholder="Ví dụ: Ca tối"></td><td><input type="time" id="cc-ct-${i}" value="${c.tu}"> – <input type="time" id="cc-cd-${i}" value="${c.den}"></td><td><button class="btn sm danger" data-cadel="${i}">Xóa</button></td></tr>`;
   const rowLe=(x,i)=>`<tr><td><input type="date" id="cc-len-${i}" value="${x.ngay}"></td><td><input id="cc-let-${i}" value="${esc(x.ten)}" placeholder="Ví dụ: Quốc khánh"></td><td><button class="btn sm danger" data-ledel="${i}">Xóa</button></td></tr>`;
   const qIn=(k,lb,max,step)=>`<label>${lb}<input type="number" id="cc-q-${k}" min="0" max="${max}" step="${step||1}" value="${Q[k]}"></label>`;
@@ -354,7 +377,7 @@ function pCcCaiDat(m){
     <div class="filters"><button class="btn" id="cc-here">Thêm điểm tại chỗ tôi đang đứng</button><button class="btn" id="cc-add">Thêm điểm (nhập tọa độ)</button></div>${CC.hereErr?`<p class="cc-err" style="max-width:none">${esc(CC.hereErr)}</p>`:""}
   </section>
   <section class="card"><div class="card-h"><h2>Lịch làm</h2></div>
-    ${tbl(["Tên lịch","Kiểu","Giờ vào – ra","Nghỉ trưa","Được trễ","Thứ Bảy","Ra thứ Bảy (buổi sáng)","Chấm ở điểm","Ngoài phạm vi","Tính chuyên cần"],s.lich.map(rowL))}
+    ${s.lich.map(rowL).join("")}
     <p class="hint">Giờ cố định: tính đi muộn, về sớm theo giờ vào – ra. Theo ca: giờ lấy theo ca được xếp ở trang Xếp ca. Giờ linh hoạt: chỉ ghi giờ vào ra. Nghỉ trưa không cần chấm và không tính vào giờ làm; để trống là không nghỉ trưa. Chấm ở điểm: không tích điểm nào thì chấm ở điểm nào cũng được.</p>
   </section>
   <section class="card"><div class="card-h"><h2>Danh sách ca</h2><span class="hint">cho người theo lịch "Theo ca"</span></div>
