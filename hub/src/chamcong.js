@@ -28,6 +28,7 @@ if(typeof document!=="undefined"&&!document.getElementById("cc-css")){const st=d
 tr.cc-today td{font-weight:600}
 tr.cc-row{cursor:pointer}
 tr.cc-det>td{background:var(--gray-soft);padding:8px}
+.cc-may{background:var(--brand-soft,#efedff);border-radius:12px;padding:10px 12px;font-size:13.5px;margin:6px 0 10px;text-align:left}
 .cc-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px 16px}
 .cc-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .cc-lich{border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:14px 16px;margin-bottom:12px}.cc-lich h3{margin:0 0 10px;font-size:15px}
@@ -128,6 +129,32 @@ function ccPos(){
       :"Chưa lấy được vị trí. Bật định vị (GPS) trên điện thoại, ra chỗ thoáng rồi bấm lại.")),{enableHighAccuracy:true,timeout:20000,maximumAge:0});
   });
 }
+/* Chấm công chính chủ (CEO 10/11): mỗi người một máy chấm công, mỗi lần chấm xác nhận vân tay / Face ID (WebAuthn).
+   Lần đầu trên một máy: đăng ký máy đó. Máy khác: không xác nhận được, báo HCNS. Mã máy (did) để phát hiện một máy chấm cho nhiều người. */
+const ccB64={e:b=>{const u=new Uint8Array(b);let s="";for(const x of u)s+=String.fromCharCode(x);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")},
+  d:s=>{const t=s.replace(/-/g,"+").replace(/_/g,"/");const b=atob(t+"=".repeat((4-t.length%4)%4));const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}};
+function ccDid(){try{let d=localStorage.getItem("cc_did");if(!d){d=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2));localStorage.setItem("cc_did",d)}return d}catch(e){return ""}}
+class CcLoi extends Error{constructor(m,code){super(m);this.code=code}}
+/* Lấy sẵn thử thách khi mở trang (và làm mới sau 4 phút) để bấm chấm là hỏi vân tay / Face ID ngay: iPhone chặn nếu phải chờ mạng trước. */
+let CC_TH=null,CC_THB=false;
+function ccPrep(force){if(CC_THB||(!force&&CC_TH&&Date.now()-CC_TH.at<240000))return;CC_THB=true;
+  svApi("/api/hub/chamcong/may/thu-thach",{method:"POST",body:"{}"}).then(t=>{const doi=!CC_TH||CC_TH.coMay!==t.coMay;CC_TH={...t,at:Date.now()};CC_THB=false;if(doi&&typeof PAGE!=="undefined"&&PAGE==="cc_toi")ccRedraw()}).catch(()=>{CC_THB=false})}
+async function ccXacMinh(){
+  if(!window.PublicKeyCredential||!navigator.credentials)throw new CcLoi("Trình duyệt này chưa hỗ trợ vân tay / Face ID. Mở web bằng Chrome (Android, máy tính) hoặc Safari (iPhone) rồi chấm lại.","KHONG_HO_TRO");
+  const t=CC_TH&&Date.now()-CC_TH.at<270000?CC_TH:await svApi("/api/hub/chamcong/may/thu-thach",{method:"POST",body:"{}"});CC_TH=null;
+  if(!t.coMay){
+    let cr;try{cr=await navigator.credentials.create({publicKey:{challenge:ccB64.d(t.chal),rp:{id:t.rpId,name:"Ailla chấm công"},user:{id:ccB64.d(t.uid),name:t.ten||"nhanvien",displayName:t.ten||"Nhân viên"},
+      pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},timeout:60000,attestation:"none"}})}
+    catch(e){throw new CcLoi(e&&e.name==="NotAllowedError"?"Chưa xác nhận vân tay / Face ID. Bấm chấm lại và làm theo hướng dẫn của điện thoại.":"Máy này chưa dùng được vân tay / Face ID cho web ("+(e&&e.name||"lỗi")+"). Mở bằng Chrome hoặc Safari bản mới.","DK_LOI")}
+    const r=cr.response;if(typeof r.getPublicKey!=="function"||!r.getPublicKey())throw new CcLoi("Trình duyệt này cũ, chưa đăng ký được máy chấm công. Cập nhật Chrome / Safari rồi chấm lại.","CU");
+    return {loai:"dk",credId:cr.id,pub:ccB64.e(r.getPublicKey()),alg:r.getPublicKeyAlgorithm(),cd:ccB64.e(r.clientDataJSON),ad:typeof r.getAuthenticatorData==="function"?ccB64.e(r.getAuthenticatorData()):""}}
+  let as;try{as=await navigator.credentials.get({publicKey:{challenge:ccB64.d(t.chal),rpId:t.rpId,allowCredentials:[{type:"public-key",id:ccB64.d(t.credId)}],userVerification:"required",timeout:60000}})}
+  catch(e){
+    if(e&&e.name==="NotAllowedError"){svApi("/api/hub/chamcong/may/la",{method:"POST",body:JSON.stringify({did:ccDid()})}).catch(()=>0);
+      throw new CcLoi(`Không xác nhận được. Nếu đây không phải máy chấm công của bạn${t.tenMay?" ("+t.tenMay+")":""} thì không chấm được trên máy này. Đổi máy, mất máy thì nhờ HCNS bấm Cho đổi máy. Nếu đúng máy của bạn thì bấm chấm lại và quét vân tay / Face ID.`,"MAY_LA")}
+    throw new CcLoi("Chưa xác nhận được vân tay / Face ID ("+(e&&e.name||"lỗi")+"). Bấm chấm lại.","XN_LOI")}
+  const r=as.response;return {loai:"xn",credId:as.id,ad:ccB64.e(r.authenticatorData),cd:ccB64.e(r.clientDataJSON),sig:ccB64.e(r.signature)};
+}
 async function ccCham(loai){
   if(CC.busy)return;
   const O=CC.out&&CC.out.loai===loai?CC.out:null;
@@ -140,16 +167,17 @@ async function ccCham(loai){
   const lyDoMuon=loai==="vao"?(($("#cc-lymuon")||{}).value||"").trim():"";
   CC.busy=true;CC.err="";ccRedraw();
   try{
+    const xm=await ccXacMinh();
     let c=null,posErr=null;try{c=await ccPos()}catch(e){posErr=e}
-    let r;try{r=await svApi("/api/hub/chamcong/cham",{method:"POST",body:JSON.stringify({loai,lat:c?c.latitude:null,lng:c?c.longitude:null,acc:c?c.accuracy:null,lyDo,lyDoMuon,anh:O?O.anh:undefined,quay:sh?{id:sh.id,gio:sh.gio||"",diaDiem:sh.diaDiem||"",ghiChu:sh.ghiChu||""}:undefined})})}catch(e){if(posErr&&e.code==="NO_LOCATION")throw posErr;throw e}
+    let r;try{r=await svApi("/api/hub/chamcong/cham",{method:"POST",body:JSON.stringify({xm,did:ccDid(),loai,lat:c?c.latitude:null,lng:c?c.longitude:null,acc:c?c.accuracy:null,lyDo,lyDoMuon,anh:O?O.anh:undefined,quay:sh?{id:sh.id,gio:sh.gio||"",diaDiem:sh.diaDiem||"",ghiChu:sh.ghiChu||""}:undefined})})}catch(e){if(posErr&&e.code==="NO_LOCATION")throw posErr;throw e}
     CC.reason=null;CC.out=null;toast((loai==="vao"?"Đã chấm vào lúc ":"Đã chấm ra lúc ")+ccHm(r.at)+(r.xn==="cho"?", chờ xác nhận":""));
     await ccLoadMe(true);
   }catch(e){
     if(e.code==="NEED_OUT"&&!ccPhone())CC.err="Bạn đang ở ngoài văn phòng. Tính năng chấm công ngoài văn phòng không khả dụng trên máy tính.";
     else if(e.code==="NEED_OUT"){const s=ccShoots()[0];CC.out={...(CC.out&&CC.out.loai===loai?CC.out:{ly:s?"quay":"khach",shoot:s?s.id:"",note:"",anh:""}),loai,msg:e.message}}
-    else if(e.code==="NEED_REASON")CC.reason={loai,msg:e.message};else CC.err=e.message||"Chưa chấm được";
+    else if(e.code==="NEED_REASON")CC.reason={loai,msg:e.message};else if(e.code!=="HUY")CC.err=e.message||"Chưa chấm được";
   }
-  CC.busy=false;ccRedraw();
+  CC.busy=false;ccPrep(true);ccRedraw();
 }
 
 let CC_TICK=0;
@@ -157,6 +185,7 @@ function ccClock(){clearInterval(CC_TICK);CC_TICK=setInterval(()=>{const el=docu
 
 /* ---------- Của tôi: nút chấm + ca + công trong tháng ---------- */
 function pCcToi(m){
+  try{ccPrep(false)}catch(e){}
   if(!CC.me){m.innerHTML=H("Chấm công")+(CC.err?`<section class="card"><p class="empty">${esc(CC.err)}</p></section>`:`<section class="card"><p class="empty">Đang tải…</p></section>`);ccLoadMe();return}
   const R=CC.me,L7=R.lich,T=R.tong,Q=R.quyTac,hn=R.homNay||[],vao=hn.find(x=>x.loai==="vao"),ra=hn.filter(x=>x.loai==="ra").pop(),today=R.today;
   const loai=vao?"ra":"vao",tdy=(R.ngay||[]).find(x=>x.ngay===today)||{},isCa=L7.kieu==="ca",ccCo=L7.chuyenCan&&L7.kieu!=="tudo";
@@ -177,6 +206,7 @@ function pCcToi(m){
     <div class="cc-date">${dstr} · Lịch ${esc(L7.ten)}</div>
     <div class="cc-clock" id="cc-clock">${[D7.getUTCHours(),D7.getUTCMinutes(),D7.getUTCSeconds()].map(n=>String(n).padStart(2,"0")).join(":")}</div>
     ${caLine}${st}${warn}${rs}${askMuon}${ccOutHtml(loai)}
+    ${CC_TH&&!CC_TH.coMay?`<p class="cc-may">Lần chấm này sẽ <b>đăng ký thiết bị này làm máy chấm công</b> của bạn. Từ nay chỉ máy này chấm được, mỗi lần xác nhận bằng vân tay / Face ID (hoặc mã mở khóa máy). Đổi máy thì nhờ HCNS bấm Cho đổi máy.</p>`:CC_TH&&CC_TH.coMay?`<p class="hint">Máy chấm công: ${esc(CC_TH.tenMay||"đã đăng ký")} · xác nhận vân tay / Face ID khi chấm</p>`:""}
     <button class="btn pri big cc-btn${loai==="ra"?" ra":""}" id="cc-go"${CC.busy?" disabled":""}>${CC.busy?"Đang lấy vị trí…":(loai==="vao"?"Chấm vào":(ra?"Chấm ra lại":"Chấm ra"))+(CC.out&&CC.out.loai===loai?" · gửi xác nhận":"")}</button>
     ${CC.err?`<p class="cc-err">${esc(CC.err)}</p>`:""}
     <p class="hint">${ccLichTxt(L7)}.</p>
@@ -336,6 +366,20 @@ function pCcXepCa(m){
 
 /* ---------- Cài đặt (Nhân sự): điểm chấm, lịch làm, ca, quy tắc tính công, gán lịch ---------- */
 const ccPbName2=(deps,k)=>{const d=deps.find(x=>x.k===k);return d?d.n:k};
+/* HCNS, CEO: máy chấm công đã đăng ký, cảnh báo máy lạ / một máy chấm hai người (14 ngày), nút Cho đổi máy (CEO 10/11). */
+let CC_MAY=null;
+function ccMayLoad(){CC_MAY={loading:true};svApi("/api/hub/chamcong/may/ds").then(r=>{CC_MAY=r;ccRedraw()}).catch(e=>{CC_MAY={err:e.message};ccRedraw()})}
+function ccMayHtml(){
+  if(!CC_MAY){setTimeout(ccMayLoad,0);return `<p class="empty">Đang tải…</p>`}
+  if(CC_MAY.loading)return `<p class="empty">Đang tải…</p>`;if(CC_MAY.err)return `<p class="empty">${esc(CC_MAY.err)}</p>`;
+  const cb=CC_MAY.canhBao||[],by={};cb.forEach(x=>{(by[x.user_id]=by[x.user_id]||[]).push(x)});
+  const ppl=new Map();(CC_MAY.may||[]).forEach(x=>ppl.set(x.user_id,{id:x.user_id,ten:x.ten_nv,may:x}));cb.forEach(x=>{if(!ppl.has(x.user_id))ppl.set(x.user_id,{id:x.user_id,ten:x.ten_nv,may:null})});
+  const L=[...ppl.values()].sort((a,b)=>(by[b.id]?1:0)-(by[a.id]?1:0)||String(a.ten).localeCompare(String(b.ten)));
+  const dm=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"";
+  const cbTxt=x=>x.kieu==="chung"?pill(`${dm(x.ngay)}: máy này cũng chấm cho ${x.ten_khac||"người khác"}`,"red"):pill(`${dm(x.ngay)}: thử chấm từ máy lạ${x.ten_may?" ("+x.ten_may+")":""}`,"amb");
+  return `<p class="hint">Lần chấm đầu tiên của mỗi người tự đăng ký máy đang dùng. Máy khác không chấm được. Đổi máy, mất máy: bấm Cho đổi máy, lần chấm tới trên máy mới sẽ đăng ký lại.</p>`+
+    (L.length?tbl(["Nhân viên","Máy đã đăng ký","Đăng ký / lần chấm gần nhất","Cảnh báo 14 ngày",""],L.map(p=>`<tr><td><b>${esc(p.ten)}</b></td><td>${p.may?esc(p.may.ten||"Đã đăng ký"):'<span class="hint">Chưa đăng ký</span>'}</td><td>${p.may?dm(vndateIso(p.may.created_at))+(p.may.last_at?" · "+dm(vndateIso(p.may.last_at)):""):"—"}</td><td>${(by[p.id]||[]).slice(0,3).map(cbTxt).join(" ")||'<span class="hint">—</span>'}</td><td>${p.may?`<button class="btn sm" data-doimay="${esc(p.id)}">Cho đổi máy</button>`:""}</td></tr>`)):`<p class="empty">Chưa ai đăng ký máy. Mỗi người chấm lần đầu là tự đăng ký.</p>`);
+}
 function pCcCaiDat(m){
   if(!CC.cfg){m.innerHTML=H("Cài đặt chấm công")+`<section class="card"><p class="empty">Đang tải…</p></section>`;
     svApi("/api/hub/chamcong/caidat").then(s=>{CC.cfg=JSON.parse(JSON.stringify(s));ccRedraw()}).catch(e=>{m.innerHTML=H("Cài đặt chấm công")+`<section class="card"><p class="empty">${esc(e.message)}</p></section>`});return}
@@ -369,6 +413,8 @@ function pCcCaiDat(m){
   const rowLe=(x,i)=>`<tr><td><input type="date" id="cc-len-${i}" value="${x.ngay}"></td><td><input id="cc-let-${i}" value="${esc(x.ten)}" placeholder="Ví dụ: Quốc khánh"></td><td><button class="btn sm danger" data-ledel="${i}">Xóa</button></td></tr>`;
   const qIn=(k,lb,max,step)=>`<label>${lb}<input type="number" id="cc-q-${k}" min="0" max="${max}" step="${step||1}" value="${Q[k]}"></label>`;
   const ov=Object.entries(s.nguoiLich);
+  setTimeout(()=>m.querySelectorAll("[data-doimay]").forEach(b=>b.onclick=async()=>{if(!confirm("Cho người này đổi máy chấm công? Máy cũ sẽ không chấm được nữa, lần chấm tới trên máy mới sẽ đăng ký lại."))return;
+    try{await svApi("/api/hub/chamcong/may/doi/"+encodeURIComponent(b.dataset.doimay),{method:"POST",body:"{}"});toast("Đã cho đổi máy");ccMayLoad()}catch(e){toast(e.message)}}),0);
   m.innerHTML=H("Cài đặt chấm công","Điểm chấm, lịch làm, ca, quy tắc tính công, ai theo lịch nào. Sửa xong bấm Lưu cài đặt ở cuối trang.")+`
   <section class="card"><div class="card-h"><h2>Điểm chấm công</h2><span class="hint">văn phòng, xưởng, kho</span></div>
     <p class="hint">Cách dễ nhất: đứng tại văn phòng hoặc xưởng, bấm "Thêm điểm tại chỗ tôi đang đứng". Hoặc mở Google Maps, bấm giữ vào vị trí, chép hai số tọa độ dán vào ô. Bán kính nên để 100–200 m vì định vị trong nhà hay lệch.</p>
@@ -380,6 +426,7 @@ function pCcCaiDat(m){
     ${s.lich.map(rowL).join("")}
     <p class="hint">Giờ cố định: tính đi muộn, về sớm theo giờ vào – ra. Theo ca: giờ lấy theo ca được xếp ở trang Xếp ca. Giờ linh hoạt: chỉ ghi giờ vào ra. Nghỉ trưa không cần chấm và không tính vào giờ làm; để trống là không nghỉ trưa. Chấm ở điểm: không tích điểm nào thì chấm ở điểm nào cũng được.</p>
   </section>
+  <section class="card" id="cc-mayds"><div class="card-h"><h2>Máy chấm công</h2><span class="hint">mỗi người một máy, xác nhận vân tay / Face ID</span></div>${ccMayHtml()}</section>
   <section class="card"><div class="card-h"><h2>Danh sách ca</h2><span class="hint">cho người theo lịch "Theo ca"</span></div>
     ${tbl(["Tên ca","Giờ bắt đầu – kết thúc",""],s.ca.map(rowCa))}
     <div class="filters"><button class="btn" id="cc-caadd">Thêm ca</button></div>
