@@ -2079,3 +2079,12 @@ table.data.wide input[type="checkbox"] { width: 14px; height: 14px; accent-color
   .card-head h3 { font-size: 15px; }
   table.data th, table.data td { font-size: 12px; padding: 7px 8px; }
 }
+
+/* Bảng giá các cấp (CEO 10/11): nút chọn cấp, bảng một cấp chia nhóm. */
+.tier-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 14px 12px; }
+.tier-tabs button { border: 1px solid var(--border, #e5e7eb); background: #fff; border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 13.5px; cursor: pointer; color: inherit; }
+.tier-tabs button.on { background: var(--primary, #6d28d9); border-color: var(--primary, #6d28d9); color: #fff; }
+table.data.tier-one { width: 100%; }
+table.data.tier-one th, table.data.tier-one td { vertical-align: top; }
+table.data.tier-one td:first-child { min-width: 220px; }
+table.data.tier-one tr.grp td { background: var(--bg-soft, #f6f5fb); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .02em; }
