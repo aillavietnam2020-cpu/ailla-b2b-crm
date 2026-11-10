@@ -418,9 +418,14 @@
     let first=true,prev="";
     const go=()=>{try{location.href="/chat/"}catch(e){}};
     document.addEventListener("click",e=>{const c=e.target&&e.target.closest&&e.target.closest("#chatbtn");if(c&&narrow.matches&&ME){e.preventDefault();e.stopImmediatePropagation();go()}},true);
+    /* Web vận hành (máy tính và điện thoại): trong Tin nhắn có thẻ "Cài Ailla Chat" dẫn sang /chat/ để cài (CEO 10/11: trước chỉ hiện trong /chat/ nên không ai thấy). */
+    const card=()=>{let hid=false;try{hid=localStorage.getItem("chat_inst")==="1"||localStorage.getItem("chat_inst_x")===new Date().toDateString()}catch(e){}
+      const side=document.querySelector(".tn .tnside");if(hid||standalone()||!side||document.getElementById("chinst"))return;const q=side.querySelector(".tnq");if(!q)return;
+      q.insertAdjacentHTML("afterend",`<div id="chinst"><img src="/chat-icon-192.png" alt=""><span><b>Cài Ailla Chat</b><small>Biểu tượng riêng ngoài màn hình, bấm là vào thẳng tin nhắn</small></span><a class="btn pri sm" href="/chat/?cai=1">Cài</a><button type="button" class="chx" data-x aria-label="Ẩn">✕</button></div>`);
+      document.querySelector("#chinst [data-x]").onclick=()=>{try{localStorage.setItem("chat_inst_x",new Date().toDateString())}catch(e){}const c=document.getElementById("chinst");if(c)c.remove()}};
     const _r=render;render=function(){
       if(narrow.matches&&ME&&PAGE==="tinnhan"&&!first&&prev!=="tinnhan"){prev=PAGE;go();return}
-      first=false;prev=PAGE;const r=_r.apply(this,arguments);try{ph()}catch(e){}return r};
+      first=false;prev=PAGE;const r=_r.apply(this,arguments);try{ph();if(PAGE==="tinnhan")card()}catch(e){}return r};
     return;
   }
   document.documentElement.classList.add("chatapp");document.body.classList.add("chatapp");
@@ -450,6 +455,7 @@
         ${xiaomi?`<p class="chgt">Máy Redmi / Xiaomi: nếu không thấy biểu tượng</p><ol>${step(1,"Mở <b>Cài đặt</b> › <b>Ứng dụng</b> › <b>Chrome</b> › <b>Quyền khác</b>")}${step(2,"Bật <b>Lối tắt trên màn hình chính</b> rồi cài lại")}${step(3,"Để nhận báo tin nhắn: Chrome › <b>Tiết kiệm pin</b> › chọn <b>Không giới hạn</b>")}</ol>`:""}`}
     </div>`;
     o.onclick=e=>{if(e.target===o||e.target.closest("[data-x]"))o.remove()};document.body.appendChild(o)}
+  if(/[?&]cai=1/.test(location.search)){try{history.replaceState(null,"","/chat/")}catch(e){}setTimeout(()=>{if(standalone())return;if(BIP){const b=document.querySelector("#chinst [data-i]");if(b){b.scrollIntoView({block:"center"});b.classList.add("pulse")}}else guide()},1800)}
   function chatDress(){
     const sh=document.querySelector(".tn .tnsh");if(!sh)return;
     if(!sh.querySelector(".chweb")){sh.insertAdjacentHTML("afterbegin",`<a class="chweb" href="/hub/" title="Về web vận hành" aria-label="Về web vận hành"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>`);const b=sh.querySelector("b");if(b)b.textContent="Đoạn chat"}
