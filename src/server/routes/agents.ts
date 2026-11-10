@@ -5,6 +5,8 @@ import { zodFieldErrors } from '@shared/schemas';
 import { AGENT_PHIEU_CHI, AGENT_SCOPES, AGENT_SCOPE_LABELS, AGENT_SCOPE_PREFIX, AGENT_WRITES, AGENT_WRITE_KEYS } from '@shared/agent';
 import { AGENT_IDS, AGENT_ROSTER } from '@shared/agentRoster';
 import type { Role } from '@shared/enums';
+import { effectivePermissions } from '@shared/permissions';
+import { hubPeople } from '../lib/hubBell';
 import type { AppEnv } from '../env';
 import { auditStatement } from '../lib/audit';
 import { generateAgentToken, hashAgentToken, tokenHint } from '../lib/agentToken';
@@ -274,11 +276,29 @@ async function delegatorCandidates(db: D1Database) {
   const rows = await db
     .prepare(
       `SELECT u.id, u.display_name, u.role,
+              (SELECT group_concat(p.permission, ',') FROM user_permissions p WHERE p.user_id = u.id) AS extra,
               (SELECT g.telegram_id FROM agent_delegators g WHERE g.user_id = u.id AND g.telegram_id IS NOT NULL LIMIT 1) AS telegram_id
        FROM users u WHERE u.kind = 'HUMAN' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL ORDER BY u.display_name`,
     )
-    .all<{ id: string; display_name: string; role: Role; telegram_id: string | null }>();
-  return (rows.results ?? []).map((u) => ({ id: u.id, display_name: u.display_name, role: u.role, kind: 'any', telegram_id: u.telegram_id }));
+    .all<{ id: string; display_name: string; role: Role; extra: string | null; telegram_id: string | null }>();
+  const hub = await hubPeople(db).catch(() => new Map<string, { role: string; pb: string }>());
+  return (rows.results ?? []).map((u) => {
+    const p = effectivePermissions(u.role, u.extra ? u.extra.split(',') : []);
+    const h = hub.get(u.id);
+    const pb = (h?.pb ?? '').toLowerCase();
+    const lead = h ? ['lead', 'truongphong'].includes(h.role) : false;
+    // Nhãn vai trò để trang Quyền agent gợi ý người ra lệnh theo vị trí (không ghi tên người).
+    const tags: string[] = [];
+    if (u.role === 'CEO') tags.push('CEO');
+    if (p.includes('order.approve.normal')) tags.push('Điều phối');
+    if (p.includes('order.accounting.confirm')) tags.push('Kế toán');
+    if (/kho/.test(pb)) tags.push('Kế toán kho');
+    if (lead && /content|media/.test(pb)) tags.push('Lead Content');
+    if (lead && /digital|ads|quảng cáo/.test(pb)) tags.push('Lead Digital');
+    if (lead && /sale|kinh doanh|bán hàng|phân phối/.test(pb)) tags.push('Lead Sale');
+    const label = tags[0] ?? (h?.pb ? h.pb : u.role === 'MANAGER' ? 'Quản lý' : 'Nhân viên');
+    return { id: u.id, display_name: u.display_name, role: u.role, kind: 'any', telegram_id: u.telegram_id, tags, label };
+  });
 }
 
 agentAdminRoutes.get('/delegator-candidates', async (c) => ok(c, await delegatorCandidates(c.env.DB)));
