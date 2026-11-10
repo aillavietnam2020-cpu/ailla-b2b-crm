@@ -485,6 +485,23 @@ cskhRoutes.post('/chia', async (c) => {
   return ok(c, { assigned: n });
 });
 
+/** Thu hồi khách đã chia mà CSKH chưa gọi lần nào (chia nhầm, người nghỉ): về lại "chưa chia". Không đụng khách đã có lần gọi / đơn web / khách thêm tay. */
+cskhRoutes.post('/chia/thu-hoi', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO thu hồi khách');
+  const b = (await c.req.json().catch(() => ({}))) as { owner_id?: string };
+  const owner = str(b.owner_id, 60);
+  const r = await c.env.DB.prepare(
+    `UPDATE cskh_customers SET owner_prev = NULL, owner_id = NULL, owner_name = '', assigned_at = NULL, next_call = NULL, updated_at = ?
+     WHERE owner_id IS NOT NULL ${owner ? 'AND owner_id = ?' : ''} AND manual = 0 AND last_call IS NULL
+       AND NOT EXISTS (SELECT 1 FROM cskh_logs l WHERE l.phone = cskh_customers.phone)
+       AND NOT EXISTS (SELECT 1 FROM cskh_web_orders w WHERE w.phone = cskh_customers.phone)`,
+  )
+    .bind(nowIso(), ...(owner ? [owner] : []))
+    .run();
+  return ok(c, { released: r.meta?.changes ?? 0 });
+});
+
 /* ------------------------------------------------------------------ tổng quan + báo cáo */
 type OrdRow = { id: string; phone: string; day: string; created_day: string; items: string; total: number };
 async function upsellIn(db: D1Database, from: string, to: string) {

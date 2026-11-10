@@ -25,7 +25,7 @@ export interface CskhSettings {
   defaultCycle: number;
 }
 export const CSKH_DEFAULTS: CskhSettings = {
-  chia: 'auto',
+  chia: 'tay', // mặc định Lead Sale chia tay, Lead bật Web tự chia ở Cài đặt khi đã đủ người (10/11)
   khachCu: 'cu',
   staffOff: [],
   fromDate: '',
@@ -38,7 +38,7 @@ export const CSKH_DEFAULTS: CskhSettings = {
 
 export function mergeSettings(raw: Partial<CskhSettings> | null | undefined): CskhSettings {
   const s = { ...CSKH_DEFAULTS, ...(raw ?? {}) };
-  s.chia = s.chia === 'tay' ? 'tay' : 'auto';
+  s.chia = s.chia === 'auto' ? 'auto' : 'tay';
   s.khachCu = s.khachCu === 'moi' ? 'moi' : 'cu';
   s.staffOff = Array.isArray(s.staffOff) ? s.staffOff.map(String) : [];
   s.fromDate = isDay(s.fromDate) ? s.fromDate : '';
