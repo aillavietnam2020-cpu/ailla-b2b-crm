@@ -25,7 +25,8 @@ function csGoiY(c){const p=c.last_product,d=c.last_order_day;if(!d)return "Khác
   if(used>=cy-5)return `${p} mua ${used} ngày trước, thường dùng ${cy} ngày: hỏi đã gần hết chưa, mời mua lại`;
   if(c.order_count<=1&&used<=14)return `Đơn đầu ${p} giao ${csFd(d)}: hỏi đã nhận hàng chưa, hướng dẫn dùng đúng`;
   return `Hỏi cảm nhận ${p}, giới thiệu sản phẩm cùng bộ`}
-function csRe(){if(typeof svTyping==="function"&&svTyping())return;if($("#crmm")&&!$("#crmm").hidden)return;if(CS_PAGES.includes(PAGE)||PAGE==="fb_cskh")renderMain()}
+/* Chỉ vẽ lại khi dữ liệu trang đang chờ vừa về. Không dùng svTyping() vì trang CSKH luôn có ô tìm khách (svTyping chặn 2 phút sau mỗi thao tác → trang treo "Đang tải…"). Chỉ hoãn khi đang gõ dở trong ô của trang hoặc đang mở hộp nhập. */
+function csRe(){const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA)$/.test(a.tagName)&&a.closest("#main")&&a.value&&!/^cs/.test(a.id)){setTimeout(csRe,1500);return}if($("#crmm")&&!$("#crmm").hidden){setTimeout(csRe,1500);return}if(!(CS_PAGES.includes(PAGE)||PAGE==="fb_cskh"))return;const fid=a&&a.closest&&a.closest("#main")&&/^cs/.test(a.id)?a.id:"";renderMain();if(fid){const e=document.getElementById(fid);if(e){e.focus();try{e.setSelectionRange(e.value.length,e.value.length)}catch(er){}}}}
 function csErr(e){toast(e&&e.message||"Lỗi");}
 
 /* ---------- tải ---------- */
