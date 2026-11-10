@@ -382,7 +382,7 @@ export async function sendOrderToPoscake(
   db: D1Database,
   secret: string | undefined,
   postFn: PostFn,
-  od: { recv_name: string; recv_phone: string; recv_addr: string; items: Array<{ vid: string; q: number; price: number; n: string }>; ship: number; discount: number; note: string; payment: string; ref: string },
+  od: { recv_name: string; recv_phone: string; recv_addr: string; items: Array<{ vid: string; q: number; price: number; n: string }>; ship: number; discount: number; note: string; note_print?: string; paid?: number; payment: string; ref: string },
 ): Promise<{ pos_id: string | null; error: string }> {
   if (od.items.some((i) => !i.vid)) return { pos_id: null, error: 'Có sản phẩm chưa khớp mã trên Poscake, cần lên đơn tay' };
   try {
@@ -394,7 +394,9 @@ export async function sendOrderToPoscake(
       items: od.items.map((i) => ({ variation_id: i.vid, quantity: i.q })),
       shipping_fee: od.ship,
       total_discount: od.discount,
-      note: [`CSKH ${od.ref}`, od.payment === 'CK' ? 'Khách đã chuyển khoản' : '', od.note].filter(Boolean).join(' · '),
+      note: [`CSKH ${od.ref}`, od.paid ? `Khách đã chuyển khoản ${od.paid}` : '', od.note].filter(Boolean).join(' · '),
+      note_print: od.note_print ?? '',
+      transfer_money: od.paid ?? 0,
       is_free_shipping: od.ship === 0,
     };
     const r = await postFn(`${API}/shops/${encodeURIComponent(shop)}/orders?api_key=${encodeURIComponent(key)}`, {

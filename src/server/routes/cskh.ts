@@ -466,9 +466,11 @@ cskhRoutes.post('/order', async (c) => {
   const today = vnDate();
   const seq = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM cskh_web_orders WHERE day = ?').bind(today).first<{ n: number }>();
   const id = `CS-${today.slice(2).replace(/-/g, '')}-${String((seq?.n ?? 0) + 1).padStart(3, '0')}`;
-  const payment = b.payment === 'CK' ? 'CK' : 'COD';
-  const note = str(b.note, 500);
-  const sent = await sendOrderToPoscake(c.env.DB, c.env.INGEST_KEY, httpPost, { recv_name: recvName, recv_phone: recvPhone, recv_addr: recvAddr, items, ship, discount, note, payment, ref: id });
+  const paid = Math.min(total, Math.max(0, num(b.paid)));
+  const payment = paid > 0 ? `CK:${paid}` : 'COD';
+  const notePrint = str(b.note_print, 300);
+  const note = [str(b.note, 500), notePrint ? `In: ${notePrint}` : ''].filter(Boolean).join(' · ');
+  const sent = await sendOrderToPoscake(c.env.DB, c.env.INGEST_KEY, httpPost, { recv_name: recvName, recv_phone: recvPhone, recv_addr: recvAddr, items, ship, discount, note: str(b.note, 500), note_print: notePrint, paid, payment, ref: id });
   const now = nowIso();
   const st = [
     c.env.DB.prepare(
@@ -510,6 +512,7 @@ cskhRoutes.post('/order/:id/resend', async (c) => {
     discount: Number(w.discount),
     note: String(w.note),
     payment: String(w.payment),
+    paid: Number(String(w.payment).startsWith('CK:') ? String(w.payment).slice(3) : 0) || 0,
     ref: String(w.id),
   });
   await c.env.DB.prepare('UPDATE cskh_web_orders SET pos_id = ?, pos_error = ? WHERE id = ?').bind(sent.pos_id, sent.error, w.id).run();
