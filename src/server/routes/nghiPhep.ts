@@ -12,6 +12,8 @@ import {
   coTheDuyet,
   gioNghi,
   kiemBu,
+  kiemNghiBu,
+  ngayDaLamThem,
   ngayCanBu,
   kyTamUng,
   LOAI_DON,
@@ -118,6 +120,7 @@ nghiPhepRoutes.get('/me', async (c) => {
     phep: qp[0],
     quyTac: { mocVong2: s.quyTac.mocVong2, tuMax: s.quyTac.tuMax, hanBu: s.quyTac.hanBu },
     canBu: ngayCanBu(nc.ngay, today),
+    daLam: ngayDaLamThem(nc.ngay, nc.lich, today, await ngayDaDung(db, auth.user.id)),
     lich: { ten: nc.lich.ten, gioVao: nc.lich.gioVao, gioRa: nc.lich.gioRa },
     loai: LOAI_DON,
     don: (don.results ?? []).map((d) => donView(m, d)),
@@ -131,7 +134,7 @@ nghiPhepRoutes.post('/don', async (c) => {
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const loai = String(b.loai ?? '') as LoaiDon;
   if (!LOAI_DON[loai]) throw badRequest('LOAI', 'Chọn loại đơn');
-  if (loai === 'lambu') return guiLamBu(c, b);
+  if (loai === 'lambu') return b.truoc ? guiNghiBu(c, b) : guiLamBu(c, b);
   const tu = String(b.tu ?? '');
   const den = loai === 'vesom' || loai === 'ot' ? tu : String(b.den ?? tu);
   if (!NGAY.test(tu) || !NGAY.test(den) || den < tu) throw badRequest('NGAY', 'Ngày chưa đúng: đến ngày phải từ ngày trở đi');
@@ -176,6 +179,52 @@ nghiPhepRoutes.post('/don', async (c) => {
   await bellTo(db, st === 'lead' ? leads : hcnsIds(m), `${ten} gửi đơn ${LOAI_DON[loai].toLowerCase()}${mo}, chờ bạn duyệt`, st === 'lead' ? 'page:np_duyet' : 'page:np_ql');
   return ok(c, { id, st, soNgay });
 });
+
+/** Ngày đã làm thêm đã được dùng cho đơn nghỉ bù (đang chờ hoặc đã duyệt). */
+async function ngayDaDung(db: D1Database, userId: string): Promise<Set<string>> {
+  const r = await db.prepare("SELECT tu FROM ns_don WHERE user_id = ? AND loai = 'lambu' AND st IN ('lead', 'hcns', 'xong')").bind(userId).all<{ tu: string }>();
+  return new Set((r.results ?? []).map((x) => x.tu));
+}
+
+/** Làm trước, nghỉ sau: tu = ngày đã làm thêm (đã qua), bu_ngay = ngày xin nghỉ bù (sắp tới). Lead duyệt. */
+async function guiNghiBu(c: Context<AppEnv>, b: Record<string, unknown>) {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const today = vnDate();
+  const daLam = String(b.daLam ?? '');
+  const nghi = String(b.nghiNgay ?? '');
+  const lyDo = String(b.lyDo ?? '').trim().slice(0, 400);
+  if (!lyDo) throw badRequest('LY_DO', 'Ghi lý do');
+  const m = await loadMembers(db, auth.user.id);
+  const me = m.users[auth.user.id];
+  const pb = me?.pb ?? '';
+  const s = await loadSettings(db);
+  const nc = await ngayCongCua(db, auth.user.id, pb, vnDate(new Date(Date.now() - s.quyTac.hanBu * 864e5)), today);
+  const d = ngayDaLamThem(nc.ngay, nc.lich, today, await ngayDaDung(db, auth.user.id)).find((x) => x.ngay === daLam);
+  if (!d) throw badRequest('BU', 'Ngày này không có chấm công làm thêm, hoặc đã dùng cho đơn khác');
+  const buoi: Buoi = b.buoi === 'sang' || b.buoi === 'chieu' ? b.buoi : 'ca';
+  const rule = NGAY.test(nghi) ? dayRule(nc.lich, nghi, null, s.ngayLe.some((x) => x.ngay === nghi)) : { lam: false, vao: 0, ra: 0, tinh: false };
+  const err = kiemNghiBu(d, { ngay: nghi, buoi }, rule, today, s.quyTac.hanBu);
+  if (err) throw badRequest('BU', err);
+  const leads = leadsCuaPhong(m.users, pb, auth.user.id);
+  const st = trangThaiDau(leads.length > 0);
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  const dm = (x: string) => `${x.slice(8)}/${x.slice(5, 7)}`;
+  const ghiChu = buoi === 'sang' ? 'buổi sáng' : buoi === 'chieu' ? 'buổi chiều' : 'cả ngày';
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO ns_don (id, user_id, pb, loai, tu, den, buoi, so_ngay, gio, ghi_chu, ly_do, st, created_at, updated_at, bu_ngay, bu_kieu, bu_tu, bu_den, bu_phut)
+         VALUES (?, ?, ?, 'lambu', ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'ngay', NULL, NULL, NULL)`,
+      )
+      .bind(id, auth.user.id, pb || null, daLam, daLam, buoi, buoi === 'ca' ? 1 : 0.5, `nghỉ bù ${ghiChu}`, lyDo, st, now, now, nghi),
+    auditStatement(db, { actorId: auth.user.id, action: 'NS_DON_GUI', entityType: 'NS_DON', entityId: id, after: { loai: 'lambu', truoc: true, daLam, nghi, st } }),
+  ]);
+  resetDonCache();
+  await bellTo(db, st === 'lead' ? leads : hcnsIds(m), `${me?.name || auth.user.id} đã làm thêm ngày ${dm(daLam)}, xin nghỉ bù ${ghiChu} ngày ${dm(nghi)}, chờ bạn duyệt`, st === 'lead' ? 'page:np_duyet' : 'page:np_ql');
+  return ok(c, { id, st, soNgay: 0 });
+}
 
 /** Đơn xin làm bù (CEO 06/11): bù ngày hoặc bù giờ, Lead duyệt (Lead gửi thì HCNS). */
 async function guiLamBu(c: Context<AppEnv>, b: Record<string, unknown>) {

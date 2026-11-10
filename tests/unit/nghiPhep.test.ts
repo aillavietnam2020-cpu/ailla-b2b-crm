@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeSettings, type Lich } from '../../src/server/services/chamCong';
-import { coTheDuyet, donTheoNgay, gioNghi, leadsCuaPhong, sauLeadDuyet, soNgayNghi, trangThaiDau } from '../../src/server/services/nghiPhep';
+import { coTheDuyet, donTheoNgay, gioNghi, kiemNghiBu, ngayDaLamThem, leadsCuaPhong, sauLeadDuyet, soNgayNghi, trangThaiDau } from '../../src/server/services/nghiPhep';
 import { dayRule } from '../../src/server/services/chamCong';
 
 const s = normalizeSettings({});
@@ -159,5 +159,23 @@ describe('công hưởng lương (CEO 10/11)', () => {
     expect(T.congHL).toBe(4.25); // 1 + 0,75 + 0,5 + 1 + 1 ngày phép
     expect(T.phepHL).toBe(1.25);
     expect(T.klNgay).toBe(1.75);
+  });
+});
+
+describe('làm trước, nghỉ sau (CEO 10/11)', () => {
+  const d = (ngay: string, lam: boolean, phut: number) => ({ ngay, lam, phut, vao: phut ? 'x' : null, ra: phut ? 'y' : null, lamBu: null }) as never;
+  it('chỉ lấy ngày nghỉ theo lịch đã qua có chấm đủ; nửa ngày khi làm chưa đủ giờ chuẩn', () => {
+    const L = [d('2026-11-01', false, 480), d('2026-11-08', false, 250), d('2026-11-09', true, 480), d('2026-11-02', false, 60), d('2026-11-15', false, 480)];
+    const r = ngayDaLamThem(L, vp, '2026-11-10', new Set());
+    expect(r.map((x) => [x.ngay, x.nua])).toEqual([['2026-11-08', true], ['2026-11-01', false]]);
+    expect(ngayDaLamThem(L, vp, '2026-11-10', new Set(['2026-11-01'])).map((x) => x.ngay)).toEqual(['2026-11-08']);
+  });
+  it('kiểm ngày nghỉ bù', () => {
+    const lam = { ngay: '2026-11-01', phut: 480, nua: false };
+    expect(kiemNghiBu(lam, { ngay: '2026-11-12', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toBeNull();
+    expect(kiemNghiBu(lam, { ngay: '2026-11-09', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toMatch(/hôm nay/);
+    expect(kiemNghiBu(lam, { ngay: '2026-11-15', buoi: 'ca' }, { lam: false }, '2026-11-10', 30)).toMatch(/ngày nghỉ/);
+    expect(kiemNghiBu({ ...lam, nua: true }, { ngay: '2026-11-12', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toMatch(/nửa ngày/);
+    expect(kiemNghiBu(lam, { ngay: '2026-12-12', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toMatch(/30 ngày/);
   });
 });
