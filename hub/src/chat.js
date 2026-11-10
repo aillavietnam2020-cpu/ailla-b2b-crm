@@ -68,6 +68,7 @@ function bellBadge(){const b=document.querySelector(".bell");if(!b)return;const 
 function ntGo(n){if(!n)return;if(n.id)DB.mutate(ME.name,"đọc thông báo",dt=>{const x=(dt.notifs||[]).find(y=>y.id===n.id);if(x)x.read=true});bellBadge();
   if(n.ref&&D().cards.some(c=>c.id===n.ref))openCard(n.ref);else if(n.ref&&n.ref.startsWith("room:"))openChat(n.ref.slice(5));
   else if(n.ref&&n.ref.startsWith("task:")&&typeof openTask==="function")openTask(n.ref.slice(5));
+  else if(n.ref&&/^KHO-/.test(n.ref)&&typeof ktModal==="function"&&(D().kho||[]).some(k=>k.ma===n.ref)){const ma=n.ref;MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt="";XV.ktK="";XV.q="";render();setTimeout(()=>{try{ktModal(ma)}catch(e){console.error(e)}},200)}
   else if(n.ref&&n.ref.startsWith("page:")){PAGE=n.ref.slice(5);if(APP_MODE==="admin"&&typeof modGroups==="function"&&!modGroups(curMod()).some(g=>g[1].some(i=>i[0]===PAGE)))MOD="";render()}}
 /* Thông báo bật lên ở góc dưới màn hình (tự ẩn sau 12 giây, bấm vào để mở) */
 function ntPop(n){let w=$("#ntpop");if(!w){w=document.createElement("div");w.id="ntpop";w.className="ntpop";document.body.appendChild(w)}
@@ -108,11 +109,11 @@ function openChat(room){
 }
 
 /* ---------- Trao đổi trong từng thẻ video ---------- */
-function threadHtml(c){const M=(c.chat||[]).slice(-50);return `<div class="fgrp cthr"><h3>Trao đổi</h3><div class="chl small">${M.map(m=>`<div class="chmsg${m.by===ME.id?" me":""}"><div class="chw"><b>${esc(userName(m.by)||m.who||"")}</b><small>${agoTxt(m.t)}</small></div><div class="chtx">${linkify(m.text)}</div></div>`).join("")||`<p class="hint">Chưa có trao đổi. Hỏi đáp, góp ý về video này ghi ở đây, người làm thẻ sẽ nhận thông báo.</p>`}</div>
-  <form class="chf" id="cth-f"><textarea id="cth-in" rows="2" placeholder="Nhắn về video này… @tên để gọi người"></textarea><button class="btn sm pri">Gửi</button></form></div>`}
-function bindThread(c){const f=$("#cth-f");if(!f)return;const send=()=>{const v=$("#cth-in").value.trim();if(!v)return;
-  DB.mutate(ME.name,"trao đổi thẻ "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(!x)return;x.chat=(x.chat||[]).concat({id:uid("cm"),by:ME.id,who:ME.name,t:nowISO(),text:v}).slice(-100);
-    const ppl=[x.nguoi,x.giao,x.nguoiKB,x.nguoiEdit,...(x.chat||[]).map(m=>m.by),...mentions(v)];notifyU(dt,ppl,`${ME.name} nhắn về ${cardLbl(x)}: ${v.slice(0,120)}`,x.id)});
+function threadHtml(c){const M=(c.chat||[]).slice(-50);return `<div class="fgrp cthr"><h3>Trao đổi</h3><div class="chl small">${M.map(m=>`<div class="chmsg${m.by===ME.id?" me":""}"><div class="chw"><b>${esc(userName(m.by)||m.who||"")}</b><small>${agoTxt(m.t)}</small></div><div class="chtx">${linkify(m.text)}</div>${tkFilesHtml(m.files,"",false)}</div>`).join("")||`<p class="hint">Chưa có trao đổi. Hỏi đáp, góp ý về video này ghi ở đây, người làm thẻ sẽ nhận thông báo.</p>`}</div>
+  <form class="chf" id="cth-f"><textarea id="cth-in" rows="2" placeholder="Nhắn về video này… @tên để gọi người"></textarea><label class="btn sm tkup" title="Gửi kèm ảnh / file">📎<input type="file" id="cth-f2" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label><button class="btn sm pri">Gửi</button></form><div id="cth-fl" class="hint"></div></div>`}
+function bindThread(c){const f=$("#cth-f");if(!f)return;let pend=[];const fi=$("#cth-f2");if(fi)fi.onchange=async e=>{const add=await tkUpload(e.target.files,"");e.target.value="";pend=pend.concat(add);$("#cth-fl").innerHTML=pend.length?"Đính kèm: "+pend.map(f=>esc(f.name)).join(", ")+" · bấm Gửi":""};const send=()=>{const v=$("#cth-in").value.trim();if(!v&&!pend.length)return;const fl=pend;
+  DB.mutate(ME.name,"trao đổi thẻ "+c.id,dt=>{const x=dt.cards.find(y=>y.id===c.id);if(!x)return;x.chat=(x.chat||[]).concat({id:uid("cm"),by:ME.id,who:ME.name,t:nowISO(),text:v,...(fl.length?{files:fl}:{})}).slice(-100);
+    const ppl=[x.nguoi,x.giao,x.nguoiKB,x.nguoiEdit,...(x.chat||[]).map(m=>m.by),...mentions(v)];notifyU(dt,ppl,`${ME.name} nhắn về ${cardLbl(x)}: ${(v||"đã gửi "+fl.length+" ảnh/file").slice(0,120)}`,x.id)});
   openCard(c.id)};f.onsubmit=e=>{e.preventDefault();send()};$("#cth-in").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}}}
 const _ocChat=openCard;
 openCard=function(id,o){_ocChat(id,o);const c=D().cards.find(x=>x.id===id),di=$("#drawerIn");if(!c||!di||$("#cth-f"))return;di.insertAdjacentHTML("beforeend",threadHtml(c));bindThread(c);const l=di.querySelector(".cthr .chl");if(l)l.scrollTop=l.scrollHeight};

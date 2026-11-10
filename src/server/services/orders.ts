@@ -1532,61 +1532,65 @@ export async function updateOrder(
     ...editFlowStatements(db, auth, orderId, khoNow, newKho, reason || 'Sửa đơn', now),
   );
 
-  statements.push(
-    db
-      .prepare(
-        `INSERT INTO order_revisions (id, order_id, revision_no, edited_by, reason, stage, before_json,
-           after_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        newId(),
-        orderId,
-        revisionNo,
-        auth.user.id,
-        reason || null,
-        `${approvalStatus}/${deliveryStatus}`,
-        JSON.stringify(before),
-        JSON.stringify(after),
-        now,
-      ),
-    auditStatement(db, {
-      actorId: auth.user.id,
-      action: 'ORDER_EDITED',
-      entityType: 'ORDER',
-      entityId: orderId,
-      before: {
-        total_amount: oldTotal,
-        approval_status: approvalStatus,
-        delivery_status: deliveryStatus,
-      },
-      after: {
-        total_amount: newTotal,
-        approval_status: newStatus,
-        lines: after.items.length,
-        revision_no: revisionNo,
-      },
-      reason: reason || null,
-      requestId: ctx.requestId,
-      ip: ctx.ip,
-    }),
-  );
+  // Tự lưu nháp: ghi đè nội dung đơn Nháp, không ghi bản sửa / nhật ký mỗi lần (tránh đầy lịch sử).
+  if (!(input.autosave && approvalStatus === 'DRAFT')) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO order_revisions (id, order_id, revision_no, edited_by, reason, stage, before_json,
+             after_json, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          newId(),
+          orderId,
+          revisionNo,
+          auth.user.id,
+          reason || null,
+          `${approvalStatus}/${deliveryStatus}`,
+          JSON.stringify(before),
+          JSON.stringify(after),
+          now,
+        ),
+      auditStatement(db, {
+        actorId: auth.user.id,
+        action: 'ORDER_EDITED',
+        entityType: 'ORDER',
+        entityId: orderId,
+        before: {
+          total_amount: oldTotal,
+          approval_status: approvalStatus,
+          delivery_status: deliveryStatus,
+        },
+        after: {
+          total_amount: newTotal,
+          approval_status: newStatus,
+          lines: after.items.length,
+          revision_no: revisionNo,
+        },
+        reason: reason || null,
+        requestId: ctx.requestId,
+        ip: ctx.ip,
+      }),
+    );
 
-  statements.push(
-    eventStatement(db, {
-      type: 'ORDER_EDITED',
-      entityType: 'ORDER',
-      entityId: orderId,
-      actorId: auth.user.id,
-      actorType: auth.actorType ?? 'USER',
-      payload: {
-        revision_no: revisionNo,
-        total_before: oldTotal,
-        total_after: newTotal,
-        status: newStatus,
-      },
-    }),
-  );
+    statements.push(
+      eventStatement(db, {
+        type: 'ORDER_EDITED',
+        entityType: 'ORDER',
+        entityId: orderId,
+        actorId: auth.user.id,
+        actorType: auth.actorType ?? 'USER',
+        payload: {
+          revision_no: revisionNo,
+          total_before: oldTotal,
+          total_after: newTotal,
+          status: newStatus,
+        },
+      }),
+    );
+  }
+
   if (prepared.tier_change) {
     statements.push(
       db

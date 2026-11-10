@@ -52,7 +52,7 @@ function cvItems(){
   const d=D(),today=d.settings.today,out=[];
   d.cards.forEach(c=>{const st=cardStatus(c),late=st!=="done"&&isLate(c);out.push({id:c.id,src:"card",kenh:c.kenh,sku:c.sku,mix:mixOf(c),cat:cvCat(c),fpId:c.fpId||"",tuyen:c.tuyen||"",ten:c.hookText||c.yTuong||c.tuyen,mo:`${chOf(c.kenh).short} · ${esc(sk(c.sku).n)} · ${c.tuyen||c.nguon}`,team:"content",da:cardProject(c),nguoi:c.nguoi||"",phoi:[],han:(c.han&&WORK_STEPS.includes(c.step))?c.han:c.day,batDau:c.batDau||0,uu:c.uuTien||"Trung bình",st,late,lateD:late?Math.max(1,today-((c.han&&WORK_STEPS.includes(c.step))?c.han:c.day)):0,loai:"Video "+(stepName(c.step)||"")})});
   d.orders.forEach(o=>{const st=o.trangThai==="Xong"?"done":o.trangThai==="Mới"&&!o.giao?"cg":o.trangThai==="Mới"?"todo":"doing",late=st!=="done"&&o.han<today;out.push({id:o.ma,src:"order",ten:"Order: "+o.muc,mo:`${o.kenh} · ${esc(sk(o.sku).n)} · ${o.sl} video`,team:"digital",da:"DA-06",nguoi:o.giao||"",phoi:[o.nguoiOrder],han:o.han,uu:"Cao",st,late,lateD:late?today-o.han:0,loai:"Order Digital → Content"})});
-  (d.tasks||[]).forEach(t=>{const late=t.st!=="done"&&!!t.han&&t.han<today,nb=t.loai==="Nhân bản video win"&&typeof cvWinInfo==="function"?cvWinInfo(t):null;out.push({id:t.id,src:"task",gio:t.gio||"",ten:nb?nb.ten:t.ten,mo:nb?nb.mo:(t.moTa||""),sub:nb?nb.mo:"",team:t.team,da:t.da,nguoi:t.nguoi,phoi:t.phoi||[],han:t.han,uu:t.uu,st:t.st,late,lateD:late?today-t.han:0,loai:t.loai||"Việc",ck:t.checklist||[],tao:t.tao||"",cd:t.cd||null,tl:!!t.tlNote})});
+  (d.tasks||[]).forEach(t=>{const late=t.st!=="done"&&t.st!=="review"&&!!t.han&&t.han<today,nb=t.loai==="Nhân bản video win"&&typeof cvWinInfo==="function"?cvWinInfo(t):null;out.push({id:t.id,src:"task",gio:t.gio||"",ten:nb?nb.ten:t.ten,mo:nb?nb.mo:(t.moTa||""),sub:nb?nb.mo:"",team:t.team,da:t.da,nguoi:t.nguoi,phoi:t.phoi||[],han:t.han,uu:t.uu,st:t.st,late,lateD:late?today-t.han:0,loai:t.loai||"Việc",ck:t.checklist||[],tao:t.tao||"",cd:t.cd||null,tl:!!t.tlNote})});
   return out;
 }
 const CVG={};
@@ -126,6 +126,8 @@ const tkCeoGiao=t=>!!t&&!!t.tao&&((D().users||[]).find(u=>u.id===t.tao)||{}).rol
 const tkV2=t=>!tkCeoGiao(t)&&tkV2On(t)&&!!tkLeadOf(t);
 const tkAdmins=()=>D().users.filter(u=>u.active&&u.role==="admin").map(u=>u.id);
 /* việc order hỗ trợ (orderlen.js): người order xác nhận kết quả */
+/* việc tự giao cho mình (Thêm việc, hoặc giao cho chính mình) và không đề xuất ai duyệt: không cần duyệt, tự bấm Xong */
+const tkSelf=t=>!!t&&!!t.nguoi&&t.tao===t.nguoi&&!(t.duyet&&t.duyet!==t.nguoi);
 const tkAppr=t=>{if(t.order&&t.tao)return [t.tao];if(t.tuThem&&t.duyet&&t.duyet!==t.nguoi)return [t.duyet];if(tkCeoGiao(t))return [t.tao];if(t.st==="review"&&t.vong===2)return tkAdmins();const L=tkLeadOf(t);return L?[L.id]:tkMgrIds(t)};
 const tkMgr=t=>!!ME&&ME.id!==t.nguoi&&(ME.role==="admin"||(t.st==="review"&&t.vong===2?false:(t.tao===ME.id||tkMgrIds(t).includes(ME.id)||tkAppr(t).includes(ME.id))));
 /* Quy tắc đóng việc: việc do người khác giao thì người làm chỉ bấm "Chờ duyệt", người giao (hoặc quản lý) duyệt mới Hoàn thành. Việc tự tạo cho mình thì tự đóng. */
@@ -204,14 +206,21 @@ const tkMention=txt=>{let h=esc(txt);tkNamesDesc().forEach(u=>{const k="@"+esc(u
 function tkChatHtml(t){const L=t.chat||[];
   return `<div class="tkchat"><div class="tkch"><b>Trao đổi</b><small class="hint">hỏi lại, góp ý, gọi người bằng @tên</small></div>${L.length?`<div class="tkcl">${L.map(c=>`<div class="tkc${c.byId===ME.id?" me":""}${c.kind==="tra"?" tra":c.kind?" ok":""}"><small><b>${esc(c.by)}</b> · ${esc(c.at)}${TK_KIND[c.kind]?" · "+TK_KIND[c.kind]:""}</small>${c.text?`<div>${tkMention(c.text)}</div>`:""}</div>`).join("")}</div>`:""}
    <div class="tkcin"><textarea id="t-cm" rows="1" placeholder="Viết trao đổi… gõ @ để gọi người"></textarea><button type="button" class="btn sm" id="t-cmok">Gửi</button></div><div id="t-cmat" class="tkatl" hidden></div></div>`}
+/* việc "Sửa video tồn" gắn video kho (khoMa): duyệt / trả lại ở việc phải đổi cả trạng thái video kho, không thì video và việc lệch nhau */
+function tkKhoSync(dt,x,kind,note){const k=x.khoMa&&(dt.kho||[]).find(y=>y.ma===x.khoMa);if(!k)return;const at=new Date().toLocaleString("vi-VN");
+  if(kind==="lead"){k.duyet="Chờ CEO duyệt";k.choDuyet=true;k.sua=null;k.leadOk={by:ME.name,at}}
+  else if(kind==="ok"&&typeof ktApplyDuyet==="function"){ktApplyDuyet(dt,k,"Duyệt ở việc")}
+  else if(kind==="tra"){k.sua={note,nguoi:x.nguoi,by:ME.id,byName:ME.name,at};k.suaLog=(k.suaLog||[]).concat([{note,nguoi:x.nguoi,by:ME.name,at}]);k.duyet="Chưa duyệt";k.choDuyet=true}
+  else if(kind==="nop"&&/(https?:\/\/|drive\.google)/i.test(String(x.kq||""))&&x.kq!==k.link){k.link=String(x.kq).trim();if(k.sua)tkKhoSync(dt,x,"nop2")}
+  else if((kind==="nop"||kind==="nop2")&&k.sua){const L=k.suaLog||[];if(L.length&&!L[L.length-1].xong)L[L.length-1].xong=at+" · "+ME.name;k.suaLog=L;k.sua=null;k.duyet="Chưa duyệt";k.choDuyet=true}}
 function tkApprove(id){const t0=D().tasks.find(x=>x.id===id);if(!t0)return false;if(t0.cd&&t0.cd.length){openTask(id);return false}const r2=t0.vong!==2&&tkV2(t0)&&ME.role!=="admin";
   DB.mutate(ME.name,`duyệt "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const ref="task:"+x.id,N=(ids,txt)=>{if(typeof notifyU==="function")notifyU(dt,ids,txt,ref)};
     tkChatAdd(x,r2?"ok1":"ok2","",x.vong||1);
-    if(r2){x.vong=2;tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);cwTdNotify(dt,x,`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
-    else{tkLog(x,"Duyệt hoàn thành");x.stTruoc=x.st;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`);cwTdNotify(dt,x,`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
+    if(r2){x.vong=2;x.st="review";tkKhoSync(dt,x,"lead");tkLog(x,"Duyệt vòng 1, chuyển CEO duyệt");N(tkAdmins(),`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);N([x.nguoi],`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`);cwTdNotify(dt,x,`${ME.name} đã duyệt vòng 1 việc "${x.ten}", chờ duyệt V2`)}
+    else{tkLog(x,"Duyệt hoàn thành");x.stTruoc=x.st;tkKhoSync(dt,x,"ok");x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;x.vong=0;tkDoneDay(x,dt.settings.today);N([x.nguoi,...(x.phoi||[]),x.tao,...(tkLeadOf(x)?[tkLeadOf(x).id]:[])],`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`);cwTdNotify(dt,x,`${ME.name} đã duyệt hoàn thành việc "${x.ten}"`)}});
   return r2}
 function tkReturn(id,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
-  DB.mutate(ME.name,`trả lại "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"tra",note,x.vong||1);tkLog(x,"Trả lại: "+note);x.st="doing";x.tlNote=note;x.vong=0;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);
+  DB.mutate(ME.name,`trả lại "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"tra",note,x.vong||1);tkLog(x,"Trả lại: "+note);tkKhoSync(dt,x,"tra",note);x.st="doing";x.tlNote=note;x.vong=0;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);
     if(typeof notifyU==="function")notifyU(dt,[x.nguoi,...(x.phoi||[])],`${ME.name} trả lại việc "${x.ten}": ${note}`,"task:"+x.id);cwTdNotify(dt,x,`${ME.name} trả lại việc "${x.ten}" để sửa`)})}
 function tkComment(id,text){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
   DB.mutate(ME.name,`trao đổi ở "${t0.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;tkChatAdd(x,"",text,x.vong||0);
@@ -234,7 +243,7 @@ function tkStepper(t){
 }
 function tkResultHtml(t){
   if(!t||(t.cd&&t.cd.length))return "";
-  return (t.tuThem?"":tkStepper(t))+tkResultBox(t);
+  return (t.tuThem||tkSelf(t)?"":tkStepper(t))+tkResultBox(t);
 }
 function tkResultBox(t){
   const doer=t.nguoi===ME.id||(t.phoi||[]).includes(ME.id),mg=tkMgr(t),sub=tkSubHtml(t);
@@ -243,7 +252,7 @@ function tkResultBox(t){
   {const tc=t.tuChoi;if(tc&&tc.st==="cho"){const can=tkTcCan(t);return `<div class="tkres rv"><b>${esc(userName(tc.by)||"")} xin từ chối việc này</b><p>“${esc(tc.lyDo)}”</p><small class="hint">Gửi lúc ${esc(tc.at||"")}</small>${can?`<div class="acts"><button type="button" class="btn sm pri" id="t-tcmv">Chuyển người khác làm</button><button type="button" class="btn sm" id="t-tcok">Hủy việc</button><button type="button" class="btn sm" id="t-tcno">Vẫn giao người này</button></div><div class="tkmg" id="t-tcmvw" hidden><label>Người làm mới<select id="t-tcng">${opt([["","— chọn người"]].concat((D().users||[]).filter(u=>u.active!==false&&u.name&&u.id!==t.nguoi&&u.role!=="admin").sort((a,b)=>a.name.localeCompare(b.name)).map(u=>[u.id,u.name])),"")}</select></label><label>Hạn mới${tkDate("t-tchan",Math.max(+t.han||0,D().settings.today+1))}</label><button type="button" class="btn sm pri" id="t-tcmvok">Chuyển</button></div>`:`<p class="hint">Đang chờ ${esc(userName(t.tao)||"quản lý")} duyệt.</p>`}</div>`}}
   const tcBtn=doer&&!t.tuThem&&t.tao&&t.tao!==ME.id&&["todo","nhan","doing"].includes(t.st)?`<button type="button" class="btn sm danger" id="t-tc" title="Không làm được việc này: ghi lý do gửi người giao duyệt">Từ chối việc</button>`:"";
   const tcNo=t.tuChoi&&t.tuChoi.st==="khong"&&t.st!=="done"?`<div class="note amb">Xin từ chối không được duyệt${t.tuChoi.note?": "+esc(t.tuChoi.note):""}. Việc vẫn cần làm.</div>`:"";
-  if(t.tuThem&&t.tao===t.nguoi&&!t.duyet&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
+  if(tkSelf(t)&&t.st!=="done")return doer?`<div class="tkres"><b>Việc tự thêm</b> <span class="hint">tự đánh dấu xong, không cần duyệt</span><div class="acts">${t.st==="todo"||t.st==="nhan"?`<button type="button" class="btn sm" data-tkq="doing">Bắt đầu làm</button>`:`<span class="hint">Đang làm</span>`}<button type="button" class="btn sm pri" id="t-selfok">✓ Xong</button></div></div>`:`<div class="tkres"><b>Việc ${esc(userName(t.nguoi)||"")} tự thêm</b> <span class="hint">${esc(cvStN(t.st))}</span></div>`;
   if(t.st==="done")return `<div class="tkres ok"><b>✓ Đã hoàn thành${t.xongNgay?" ngày "+dd(t.xongNgay):""}</b>${sub}${tkReopenOk(t)?`<div class="acts"><button type="button" class="btn sm" id="t-reopen">↺ Mở lại việc</button><span class="hint">bấm nhầm hoàn thành thì mở lại</span></div>`:""}</div>`;
   if(t.st==="review"&&mg&&!(t.nopAt||t.kq||t.kqNote||(t.kqFiles||[]).length))return `<div class="tkres rv"><b>Người làm chưa nộp kết quả</b> <span class="hint">việc đang ở Chờ duyệt nhưng chưa có gì để duyệt</span><div class="acts"><button type="button" class="btn sm pri" id="t-backtodo">Trả về Cần làm</button></div></div>`;
   if(t.st==="review")return mg?`<div class="tkres rv"><b>Kết quả chờ bạn duyệt${tkV2(t)?(t.vong===2?" · vòng 2":" · vòng 1"):""}</b> <small class="hint">${esc(userName(t.nguoi)||"")} nộp${t.vong===2&&tkLeadOf(t)?" · "+esc(tkLeadOf(t).name)+" đã duyệt vòng 1":""}</small>${sub||`<p class="hint">Người làm chưa ghi kết quả.</p>`}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Cần sửa</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt</button></div></div>`
@@ -254,7 +263,8 @@ function tkResultBox(t){
       <input id="t-kql" placeholder="Link kết quả (Drive, bài đăng, video…) nếu có" value="${esc(t.kq||"")}">
       <div id="t-kqfl"></div><label class="btn sm tkup">📎 Thêm ảnh / file<input type="file" id="t-kqf" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label>
       <div class="acts"><button type="button" class="btn pri" id="t-nop">${need?"Nộp kết quả để duyệt":"Nộp kết quả, xong việc"}</button></div>${need?`<small class="hint">Nộp xong, ${esc(tkMgrNames(t))} duyệt ngay trong việc này.</small>`:""}</div>`}
-  return mg?`<div class="tkres"><b>Chưa nộp kết quả</b>${sub}</div>`:"";
+  if(mg&&t.nopAt&&(t.kq||t.kqNote||(t.kqFiles||[]).length))return `<div class="tkres rv"><b>Kết quả chờ duyệt</b> <small class="hint">${esc(t.nopBy||userName(t.nguoi)||"")} nộp lúc ${esc(t.nopAt)} (trạng thái đang là ${esc(cvStN(t.st))})</small>${sub}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Cần sửa</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt</button></div></div>`;
+  return mg?`<div class="tkres"><b>Chưa bấm nộp kết quả</b> <small class="hint">${esc(userName(t.nguoi)||"Người làm")} chưa bấm Nộp. Nếu họ đã báo xong ở Trao đổi thì bấm Duyệt hoàn thành, hoặc ghi cần sửa gì.</small>${sub}<div class="tkmg"><input id="t-tl" placeholder="Nếu trả lại: cần sửa gì"><button type="button" class="btn sm" id="t-tlok">Cần sửa</button><button type="button" class="btn sm pri" id="t-duyet">✓ Duyệt hoàn thành</button></div></div>`:"";
 }
 /* đổi trạng thái một việc + báo chuông đúng người: gửi duyệt → người giao/quản lý · duyệt xong, trả lại → người làm */
 /* nhật ký từng việc: ai làm gì lúc nào (giữ 60 dòng gần nhất) */
@@ -264,16 +274,18 @@ function tkLog(x,txt){x.log=x.log||[];x.log.push({at:new Date().toLocaleString("
 /* ghi ngày xong để tính đúng hạn / trễ hạn */
 function tkDoneDay(x,today){if(x.st==="done"){if(!x.xongNgay)x.xongNgay=today}else delete x.xongNgay}
 function tkSetSt(id,k,extra,note){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
-  DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));if(k==="done"&&old!=="done")x.stTruoc=old;x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});if(k==="review"&&old!=="review")x.vong=1;if(x.__chat){tkChatAdd(x,x.__chat[0],x.__chat[1],1);delete x.__chat}tkDoneDay(x,dt.settings.today);
+  DB.mutate(ME.name,`"${t0.ten}" → ${cvStN(k)}`,dt=>{const x=dt.tasks.find(y=>y.id===id);if(!x)return;const old=x.st,ref="task:"+x.id,ng=[x.nguoi,...(x.phoi||[])];tkLog(x,"Trạng thái: "+cvStN(old)+" → "+cvStN(k)+(note?" · "+note:""));if(k==="done"&&old!=="done")x.stTruoc=old;x.st=k;x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;Object.assign(x,extra||{});if(k==="review"&&old!=="review")x.vong=1;if(x.__chat){tkChatAdd(x,x.__chat[0],x.__chat[1],1);delete x.__chat}tkDoneDay(x,dt.settings.today);if(k==="review"&&old!=="review")x.nopNgay=dt.settings.today;
     if(old===k||typeof notifyU!=="function")return;
     cwTdNotify(dt,x,k==="review"?`${ME.name} nộp kết quả việc "${x.ten}", đang chờ duyệt`:`${ME.name} chuyển việc "${x.ten}" sang ${cvStN(k)}`);
-    if(k==="review")notifyU(dt,tkAppr(x),`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
+    if(k==="review")tkKhoSync(dt,x,"nop");else if(k==="done"&&ME.id!==x.nguoi)tkKhoSync(dt,x,"ok");
+    if(k==="review"&&!tkSelf(x)){const ap=tkAppr(x);notifyU(dt,ap,`${ME.name} nộp kết quả việc "${x.ten}", chờ bạn duyệt${x.vong===2?" vòng 2":""}`,ref);
+      const gv=x.tao&&x.tao!==x.nguoi&&!ap.includes(x.tao)?[x.tao]:[];if(gv.length)notifyU(dt,gv,`${ME.name} đã nộp kết quả việc "${x.ten}", đang chờ ${tkMgrNames(x)||"người duyệt"} duyệt (chưa đến lượt bạn)`,ref)}
     else if(k==="done"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} đã duyệt xong việc "${x.ten}"`,ref);
     else if(old==="review"&&ME.id!==x.nguoi)notifyU(dt,ng,`${ME.name} trả lại việc "${x.ten}"${note?": "+note:""}`,ref);
     else if(k==="done")notifyU(dt,[x.tao],`${ME.name} đã xong việc "${x.ten}"`,ref)})}
 function tkDoneErr(t){if(!t||tkMgr(t))return "";if(t.tuThem&&t.duyet&&t.duyet!==t.nguoi)return `Việc này đã đề xuất ${userName(t.duyet)||"người duyệt"} duyệt. Bấm "Chờ duyệt" để gửi duyệt rồi mới hoàn thành.`;if(t.tao&&t.tao!==t.nguoi)return `Việc này do ${userName(t.tao)||"người giao"} giao. Bấm "Chờ duyệt" để người giao xem rồi mới hoàn thành.`;return ""}
 /* đến lượt tôi duyệt: đúng người của vòng hiện tại (vòng 1 lead, vòng 2 chị) */
-const tkMyTurn=t=>!!ME&&(t.cd&&t.cd.length?tkCdWait(t).length>0:t.st==="review"&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id));
+const tkMyTurn=t=>!!ME&&(t.cd&&t.cd.length?tkCdWait(t).length>0:t.st==="review"&&!tkSelf(t)&&ME.id!==t.nguoi&&tkAppr(t).includes(ME.id));
 const tkMgrNames=t=>tkAppr(t).map(userName).filter(Boolean).join(", ")||"quản lý";
 /* tinnhan.js: giao việc từ tin nhắn — giao xong gọi hàm này với mã việc mới để gửi thẻ việc vào cuộc trò chuyện */
 let TK_AFTER_NEW=null;
@@ -290,13 +302,13 @@ function openTask(id){
    ${!t&&giver?`<div class="row4 tklap"><label class="field">Lặp lại<select id="t-lap">${opt([["","Không lặp"],["ngay","Hằng ngày"],["tuan","Mỗi tuần"],["thang","Mỗi tháng"]],"")}</select></label><label class="field" id="t-lapdw" hidden>Vào<select id="t-lapd"></select></label><label class="ck sm"><input type="checkbox" id="t-tplsave"> Lưu làm mẫu việc</label></div>`:""}
    <div class="field" id="t-cdw">Công đoạn <small class="hint">(một việc có nhiều người, mỗi người một phần)</small><div id="t-cd"></div>${gv&&giver?`<div class="acts"><button type="button" class="btn sm" id="t-cdadd">＋ Công đoạn</button><button type="button" class="btn sm" id="t-cddu">＋ Bước duyệt</button><label class="ck sm"><input type="checkbox" id="t-seq" ${t&&t.tuanTu===false?"":"checked"}> Làm lần lượt</label></div>`:""}</div>
    <div class="field" id="t-stw">Trạng thái <small class="hint">bấm để đổi${t&&ed?", tự lưu ngay":""}</small><div class="tkst">${CV_ST.filter(s=>s[0]!=="cg").map(([k,n,c])=>`<button type="button" class="tkb tk-${c}${(t?t.st:"todo")===k?" on":""}" data-tkst="${k}" ${ed?"":"disabled"}>${(t?t.st:"todo")===k?"✓ ":""}${n}</button>`).join("")}</div><input type="hidden" id="t-st" value="${t?t.st:"todo"}">${t&&t.stAt?`<small class="hint">Đổi lần cuối: ${esc(t.stAt)} bởi ${esc(t.stBy||"")}</small>`:""}</div>
-   ${t&&t.st!=="done"&&t.han&&(t.han<d.settings.today||(t.treReq||{}).st==="cho"||(ed&&!tkMgr(t)))?(()=>{const R=t.treReq||{},mg=tkMgr(t),cho=R.st==="cho",lt=t.han<d.settings.today;
+   ${t&&t.st!=="done"&&t.han&&(t.han<d.settings.today||(t.treReq||{}).st==="cho"||(ed&&!tkMgr(t)))?(()=>{const R=t.treReq||{},mg=tkMgr(t),cho=R.st==="cho",rv=t.st==="review",nt=rv?Math.max(0,(t.nopNgay||d.settings.today)-t.han):0,lt=!rv&&t.han<d.settings.today;
      /* việc tự thêm (không đề xuất người duyệt): tự gia hạn, ghi lý do, không gửi ai duyệt */
-     if(t.tuThem&&t.tao===t.nguoi&&!t.duyet&&ME.id===t.nguoi)return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Deadline "+dayLbl(t.han)}</b>${t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}<label class="field">Lý do gia hạn<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu"></textarea></label><div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",Math.max(t.han,d.settings.today)+1)}</label><button type="button" class="btn sm pri" id="t-selfgh">Gia hạn</button></div></div>`;
-     return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Hạn "+dayLbl(t.han)}</b>${lt?` (hạn ${dayLbl(t.han)}${t.hanCu?`, hạn cũ ${dd(t.hanCu)}`:""})`:t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}
+     if(tkSelf(t)&&ME.id===t.nguoi)return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Deadline "+dayLbl(t.han)}</b>${t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}<label class="field">Lý do gia hạn<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu"></textarea></label><div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",Math.max(t.han,d.settings.today)+1)}</label><button type="button" class="btn sm pri" id="t-selfgh">Gia hạn</button></div></div>`;
+     return `<div class="tklate${lt?"":" ok"}"><b>${lt?`⚠ Trễ hạn ${d.settings.today-t.han} ngày`:"Hạn "+dayLbl(t.han)+(nt?` · nộp trễ ${nt} ngày`:"")}</b>${lt?` (hạn ${dayLbl(t.han)}${t.hanCu?`, hạn cũ ${dd(t.hanCu)}`:""})`:t.hanCu?` (hạn cũ ${dd(t.hanCu)})`:""}
      ${cho?`<p>📨 <b>${esc(R.by)}</b> đã gửi lý do lúc ${esc(R.at)}: <i>${esc(R.lyDo)}</i><br><span class="hint">Chờ quản lý (${esc(tkMgrNames(t))}) gia hạn hoặc duyệt hoàn thành.</span></p>
        ${mg?`<div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:d.settings.today+2)}</label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button>${t.st==="review"?`<button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button>`:""}</div>`:""}`
-     :`${ed&&!mg?`<label class="field">${lt?"Lý do trễ":"Xin gia hạn"}<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu, cần thêm bao lâu">${esc(R.lyDo||"")}</textarea></label><label class="field">Xin dời hạn đến${tkDate("t-hm",Math.max(t.han,d.settings.today)+1)}</label><button type="button" class="btn sm pri" id="t-trego">Gửi quản lý</button>`:mg?`<p class="hint">Người làm chưa gửi lý do trễ.</p><div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:d.settings.today+2)}</label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button>${t.st==="review"?`<button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button>`:""}</div>`:""}`}</div>`})():""}
+     :`${ed&&!mg&&!rv?`<label class="field">${lt?"Lý do trễ":"Xin gia hạn"}<textarea id="t-tre" rows="2" placeholder="Vì sao chưa kịp, xong đến đâu, cần thêm bao lâu">${esc(R.lyDo||"")}</textarea></label><label class="field">Xin dời hạn đến${tkDate("t-hm",Math.max(t.han,d.settings.today)+1)}</label><button type="button" class="btn sm pri" id="t-trego">Gửi quản lý</button>`:mg?`<p class="hint">${rv?"Đã nộp kết quả, chờ duyệt"+(nt?" (nộp trễ "+nt+" ngày, xem lý do ở ô Trao đổi).":"."):"Người làm chưa gửi lý do trễ."}</p><div class="tkmg"><label>Gia hạn đến${tkDate("t-gh",R.hanMoi&&R.hanMoi>=d.settings.today?R.hanMoi:d.settings.today+2)}</label><button type="button" class="btn sm" id="t-ghok">Gia hạn</button>${t.st==="review"?`<button type="button" class="btn sm pri" id="t-dok">✓ Duyệt hoàn thành</button>`:""}</div>`:""}`}</div>`})():""}
    ${t&&t.st!=="done"&&t.nguoi&&t.nguoi!==ME.id&&(tkMgr(t)||t.tao===ME.id)?(()=>{const N=tkNhacOf(t),last=N[N.length-1],lt=t.han&&t.han<d.settings.today;return `<div class="tknhac${lt?" lt":""}"><button type="button" class="btn sm${lt?" pri":""}" id="t-nhac">🔔 Nhắc ${esc(userName(t.nguoi)||"người làm")}${N.length?" lần "+(N.length+1):""}</button><span class="hint">${N.length?`Đã nhắc ${N.length} lần · lần cuối ${esc(last.at)} (${esc(last.by)})`:lt?"Việc đang trễ, chưa nhắc lần nào":"Chưa nhắc lần nào"}</span></div>`})():""}
    <div class="field" id="t-phw">Người cùng làm / hỗ trợ <small class="hint">(một việc có thể nhiều người)</small><div class="phc">${users.map(u=>`<label class="ck sm"><input type="checkbox" name="t-phoi" value="${u.id}" ${t&&(t.phoi||[]).includes(u.id)?"checked":""} ${gv?"":"disabled"}> ${esc(u.name)}</label>`).join("")}</div></div>
    <div class="field" id="t-tdw">Người theo dõi <small class="hint">· được báo khi việc đổi trạng thái, không tính là việc của mình</small><div class="phc">${tdUsers.map(u=>`<label class="ck sm"><input type="checkbox" name="t-td" value="${u.id}" ${t&&(t.theoDoi||[]).includes(u.id)?"checked":""} ${gv?"":"disabled"}> ${esc(u.name)}</label>`).join("")}</div></div>
@@ -386,7 +398,7 @@ function openTask(id){
   const now=()=>new Date().toLocaleString("vi-VN");
   if($("#t-trego"))$("#t-trego").onclick=()=>{const v=$("#t-tre").value.trim();if(!v){toast("Ghi lý do trễ");return}
     DB.mutate(ME.name,`lý do trễ "${t.ten}"`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;const hm=$("#t-hm")?tkDay($("#t-hm").value):0,lt=x.han<dt.settings.today;tkLog(x,(lt?"Báo trễ":"Xin gia hạn")+": "+v.slice(0,120)+(hm?" · xin đến "+dd(hm):""));x.treReq={lyDo:v,at:now(),by:ME.name,st:"cho",hanMoi:hm};x.tre={lyDo:v,at:now(),by:ME.name};if(typeof notifyU==="function")notifyU(dt,[x.tao,...tkMgrIds(x)],`${lt?"⚠ "+ME.name+" báo trễ":ME.name+" xin gia hạn"} việc "${x.ten}"${hm?" đến "+dd(hm):""}: ${v.slice(0,100)}`,"task:"+x.id)});toast("Đã gửi quản lý");openTask(t.id)};
-  if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển CEO duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
+  if($("#t-duyet"))$("#t-duyet").onclick=()=>{const n=($("#t-tl")||{}).value;if(n&&n.trim()&&!confirm("Bạn vừa ghi góp ý nhưng bấm Duyệt: việc sẽ được DUYỆT, không trả lại cho người làm.\n\nMuốn người làm sửa thì bấm Hủy rồi bấm nút Cần sửa.\n\nVẫn duyệt?"))return;if(n&&n.trim())tkComment(t.id,n.trim());const r2=tkApprove(t.id);toast(r2?"Đã duyệt vòng 1, chuyển CEO duyệt":"Đã duyệt hoàn thành");openTask(t.id);renderMain()};
   if($("#t-tlok"))$("#t-tlok").onclick=()=>{const n=$("#t-tl").value.trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}tkReturn(t.id,n);toast("Đã trả lại cho "+(userName(t.nguoi)||"người làm"));openTask(t.id);renderMain()};
   if($("#t-selfgh"))$("#t-selfgh").onclick=()=>{const v=($("#t-tre").value||"").trim(),h=tkDay($("#t-gh").value);if(!v){toast("Nhập lý do gia hạn");return}if(!h){toast("Chọn ngày gia hạn");return}
     DB.mutate(ME.name,`tự gia hạn "${t.ten}" đến ${dd(h)}`,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.hanCu=x.hanCu||x.han;tkLog(x,"Tự gia hạn đến "+dd(h)+": "+v.slice(0,160));x.han=h;x.treReq={st:"giahan",tu:true,lyDo:v,by:ME.name,at:now(),xl:ME.name,xlAt:now(),hanMoi:h}});toast("Đã gia hạn đến "+dd(h));openTask(t.id);renderMain()};
@@ -415,7 +427,7 @@ function openTask(id){
     toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+({ngay:"hằng ngày",tuan:"mỗi tuần",thang:"mỗi tháng"}[$("#t-lap").value]||""):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
   try{tkFormRow()}catch(e){console.error("bố cục form giao việc",e)}
-  if(t)try{tkLayout(t,gv)}catch(e){console.error("bố cục chi tiết việc",e)}
+  if(t)try{tkLayout(t,gv);tkTidy(t)}catch(e){console.error("bố cục chi tiết việc",e)}
 }
 /* Từ chối việc: người duyệt là người giao (CEO / Lead cũng duyệt được). Đồng ý thì việc chuyển sang lưu trữ (dt.tasksHuy), không tính vào số liệu. */
 /* mở lại việc đã hoàn thành (bấm nhầm): người giao, người duyệt, CEO; việc tự thêm thì chính người làm */
@@ -460,7 +472,12 @@ function tkFormRow(){const team=$("#t-team"),row=team&&team.closest(".row4"),ph=
 /* Bố cục khung Chi tiết việc (chị Hoa 03/11): nội dung việc lên đầu (tên, người giao / làm, hạn, mô tả, link, file);
    góc phải đầu khung có nút 💬 Trao đổi và ⏰ Xin gia hạn (bấm mới mở); các ô sửa thông tin gom vào "Sửa thông tin việc".
    Chỉ dời chỗ các phần đã vẽ (giữ nguyên ô nhập và nút đã gắn việc) nên mọi thao tác cũ vẫn chạy. */
-function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.querySelector("h2"),td=D().settings.today,late=t.st!=="done"&&t.han&&t.han<td;
+/* Việc đã nộp / đã xong: chỉ giữ kết quả, trao đổi và nút duyệt; ẩn ô sửa, công đoạn, bước nhỏ, nút nhắc (chị Hoa 09/11) */
+function tkTidy(t){if(!t||!["review","done"].includes(t.st))return;const di=$("#drawerIn");if(!di)return;
+  const hide=e=>{if(e)e.remove()};hide(di.querySelector(".tknhac"));hide(di.querySelector("details.tkedit"));
+  if(!(t.cd&&t.cd.length)){const w=di.querySelector(".tkcdrow");if(w)w.remove();else hide(di.querySelector("#t-cdw"))}
+  const ck=di.querySelector("#t-ck");if(ck&&!(t.checklist||[]).length)hide(ck.closest(".field"))}
+function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.querySelector("h2"),td=D().settings.today,late=t.st!=="done"&&t.st!=="review"&&t.han&&t.han<td;
   const link=u=>/^https?:\/\//.test(u)?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.length>70?u.slice(0,70)+"…":u)}</a>`:esc(u);
   const ppl=[t.nguoi].concat(t.phoi||[]).filter(Boolean).map(userName).filter(Boolean);
   const brief=document.createElement("div");brief.className="tkbrief";
@@ -468,12 +485,18 @@ function tkLayout(t,gv){const di=$("#drawerIn");if(!di)return;const h2=di.queryS
    <div class="tkbm"><span><small>Người giao</small>${esc(userName(t.tao)||"—")}</span><span><small>Người làm</small>${esc(ppl.join(", ")||"chưa giao")}</span><span class="${late?"t-red":""}"><small>Hạn</small>${t.han?dd(t.han)+(t.gio?" · "+t.gio:"")+(late?` · trễ ${td-t.han} ngày`:""):"—"}</span><span><small>Ưu tiên</small>${t.gap?'<b class="t-red">GẤP</b> · ':""}${esc(t.uu||"Trung bình")}</span>${(t.theoDoi||[]).length?`<span><small>Người theo dõi</small>${esc((t.theoDoi||[]).map(userName).filter(Boolean).join(", "))}</span>`:""}${t.da?`<span><small>Dự án</small>${esc(prjN(t.da))}</span>`:""}</div>
    ${t.moTa?`<div class="tkbd">${esc(t.moTa).replace(/https?:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`).replace(/\n/g,"<br>")}</div>`:`<div class="tkbd hint">Chưa có mô tả / yêu cầu.</div>`}
    ${t.dk||(t.files||[]).length?`<div class="tkbl">📎 ${t.dk?tkDkLinks(t.dk):""}${typeof tkFilesHtml==="function"?tkFilesHtml(t.files||[]):""}</div>`:""}
+   ${(()=>{const k=t.khoMa&&(D().kho||[]).find(y=>y.ma===t.khoMa);if(!k)return "";const lk=k.link?(/^https?:/.test(k.link)?k.link:"https://"+k.link):"",sua=k.sua&&k.sua.note;return `<div class="tkbl">🎬 Video cần sửa ${esc(k.ma)}: ${lk?`<a href="${esc(lk)}" target="_blank" rel="noopener">▶ Mở video hiện tại</a>`:"chưa có link"}${sua?`<br><b>Góp ý của ${esc(k.sua.byName||"người duyệt")}:</b> ${esc(sua)}`:""}<br><small class="hint">Sửa xong: dán link bản mới vào ô "Link kết quả" bên dưới rồi bấm Nộp, không cần tải file.</small></div>`})()}
    ${(t.checklist||[]).length?`<div class="tkbc hint">Việc nhỏ: ${(t.checklist||[]).filter(c=>c.x).length}/${(t.checklist||[]).length} đã xong</div>`:""}`;
   /* nút góc phải */
   const chat=di.querySelector(".tkchat"),lateBox=di.querySelector(".tklate"),nChat=(t.chat||[]).length;
   const tools=document.createElement("span");tools.className="tktools";
   if(chat)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm" id="tk-chatbtn" title="Trao đổi về việc này">💬 Trao đổi${nChat?` <b>${nChat}</b>`:""}</button>`);
   if(lateBox)tools.insertAdjacentHTML("beforeend",`<button type="button" class="btn sm${late?" danger":""}" id="tk-ghbtn" title="${late?"Báo lý do trễ / xin gia hạn":"Xin gia hạn"}">⏰ ${late?"Trễ hạn":"Xin gia hạn"}</button>`);
+  {const cdw=$("#t-cdw"),ckl=$("#t-ck"),ckw=ckl&&(ckl.closest(".field")||ckl.parentElement);
+    if((cdw||ckw)&&t.st!=="done"){const has=(t.cd&&t.cd.length)||(t.checklist||[]).length,n=(t.cd||[]).length+(t.checklist||[]).length;
+      [cdw,ckw].forEach(e=>{if(e)e.hidden=!has});
+      tools.insertAdjacentHTML("afterbegin",`<button type="button" class="btn sm" id="tk-splitbtn" title="Chia việc thành công đoạn (nhiều người) hoặc các bước nhỏ">＋ Công đoạn / bước nhỏ${n?` <b>${n}</b>`:""}</button>`);
+      setTimeout(()=>{const b=$("#tk-splitbtn");if(b)b.onclick=()=>{const hide=!!(cdw&&!cdw.hidden||ckw&&!ckw.hidden);[cdw,ckw].forEach(e=>{if(e)e.hidden=hide});if(!hide){const e=cdw||ckw;e.scrollIntoView({block:"nearest"})}}},0)}}
   if(h2){h2.classList.add("tkh2");h2.appendChild(tools);h2.after(brief)}
   di.querySelectorAll("p.hint").forEach(p=>{if(/^Người giao:/.test(p.textContent.trim()))p.remove()});
   {const ok=$("#t-selfok");if(ok)ok.onclick=()=>{DB.mutate(ME.name,"xong việc tự thêm: "+t.ten,dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(!x)return;x.stTruoc=x.st;x.st="done";x.stAt=new Date().toLocaleString("vi-VN");x.stBy=ME.name;tkDoneDay(x,dt.settings.today);tkLog(x,"Xong (việc tự thêm)");cwTdNotify(dt,x,`${ME.name} đã xong việc "${x.ten}"`)});toast("Đã xong");closeDrawer();renderMain()}}
@@ -727,7 +750,7 @@ function cvAutoDg(raw){
   return out.map(g=>{g.n=g.ids.length;g.done=g.ids.filter(id=>byId[id].step==="xong").length;const sh=chOf(g.kenh).short,u=(g.fp||/Fanpage/i.test(g.kenh))?"bài":"video";
     g.ten=(g.day?`Đăng ${sh}: `:`Lên lịch đăng ${sh}: `)+`đã đăng ${g.done}/${g.n} ${u}`;
     g.mo=(g.day?(g.late?`lẽ ra đăng ${dd(g.day)}, trễ ${g.lateD} ngày`:"đăng hôm nay"):"chưa chọn ngày đăng");
-    const a=cvAutoSt()[g.key];g.st=a&&a.st==="doing"?"doing":"todo";return g}).filter(g=>g.n-g.done>0)
+    const a=cvAutoSt()[g.key];g.st=a&&a.st==="doing"?"doing":"todo";return g}).filter(g=>g.n-g.done>0&&!(((cvAutoSt()[g.key]||{}).st==="done")&&(cvAutoSt()[g.key].d===td)))
 }
 /* việc của lead: tự sinh theo số đang chờ */
 function cvLeadLines(){
@@ -762,6 +785,7 @@ function cvWarn(){
   return out
 }
 function cvOpenMk(g){
+  {const fx=(g.ids||[]).filter(id=>{const c=D().cards.find(y=>y.id===id);return c&&["edit","worker"].includes(c.step)&&(c.gopy||[]).length});const rvN=(g.ids||[]).filter(id=>{const c=D().cards.find(y=>y.id===id);return c&&["dkb","dvd","dceo"].includes(c.step)}).length;if(fx.length&&!rvN&&typeof cwVidFix==="function"){cwVidFix(fx[0],fx);return}}
   const d=D(),cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean);
   const href=l=>/^https?:\/\//.test(l)?l:"https://"+l,fb=c=>`<input data-vfb="${c.id}" placeholder="Góp ý / cần sửa gì"><button type="button" class="btn sm" data-vtra="${c.id}">Cần sửa</button>`;
   const act=c=>{const st=c.step,lk=c.linkFinal||c.linkVideo||"";
@@ -770,8 +794,8 @@ function cvOpenMk(g){
     if(st==="dvd"&&canMove(ME,c,"dceo"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dceo">✓ Duyệt</button>${fb(c)}`;
     if(st==="dceo"&&canMove(ME,c,"dang"))return `<button type="button" class="btn sm pri" data-vok="${c.id}" data-to="dang">✓ Duyệt</button>${fb(c)}`;
     return ""};
-  const row=c=>{const lk=c.linkFinal||c.linkVideo||"",gy=(c.gopy||[]).slice(-3),a=act(c);
-    return `<div class="vrow"><div class="vrt"><b class="mono">${esc(c.id)}</b><span class="xmt">${esc(cvShort(c.hookText||c.yTuong||c.tuyen,60))}</span>${pill(stepName(c.step),["dang","xong"].includes(c.step)?"grn":["dvd","dceo","dkb"].includes(c.step)?"amb":"gry")}${lk?`<a href="${esc(href(lk))}" target="_blank" rel="noopener">▶ Xem video</a>`:""}<button type="button" class="lnk" data-opc="${esc(c.id)}">Mở thẻ</button></div>${gy.length?`<div class="vgy">${gy.map(x=>`↩ <b>${esc(x.who)}</b> (${esc(x.t)}): ${esc(x.note)}`).join("<br>")}</div>`:""}${a?`<div class="vact">${a}</div>`:""}</div>`};
+  const row=c=>{const lk=c.linkFinal||c.linkVideo||"",gy=(c.gopy||[]).slice(-3),old=[...(c.gopy||[])].reverse().map(x=>x.link).find(Boolean)||c.linkCu||"",a=act(c);
+    return `<div class="vrow"><div class="vrt"><b class="mono">${esc(c.id)}</b><span class="xmt">${esc(cvShort(c.hookText||c.yTuong||c.tuyen,60))}</span>${pill(stepName(c.step),["dang","xong"].includes(c.step)?"grn":["dvd","dceo","dkb"].includes(c.step)?"amb":"gry")}${lk?`<a href="${esc(href(lk))}" target="_blank" rel="noopener">▶ Xem video</a>`:old?`<a href="${esc(href(old))}" target="_blank" rel="noopener">▶ Xem bản cần sửa</a>`:`<span class="hint t-amb">chưa có link video, dán link bản edit vào ô dưới</span>`}<button type="button" class="lnk" data-opc="${esc(c.id)}">Mở thẻ</button></div>${gy.length?`<div class="vgy">${gy.map(x=>`↩ <b>${esc(x.who)}</b> (${esc(x.t)}): ${esc(x.note)}${x.link?` · <a href="${esc(href(x.link))}" target="_blank" rel="noopener">▶ video bị góp ý</a>`:""}`).join("<br>")}</div>`:""}${a?`<div class="vact">${a}</div>`:""}</div>`};
   openDrawerHTML(`<h2>${esc(g.ten)} · ${g.done}/${g.n}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa giao")} · Nộp link, lead duyệt, CEO duyệt vòng 2 ngay tại đây; link và góp ý tự ghi vào thẻ ở Content › Điều phối.</p>
    <div class="vlist">${cs.map(row).join("")}</div>`);
   const re=()=>{cvOpenMk(g);renderMain()};
@@ -781,25 +805,15 @@ function cvOpenMk(g){
   document.querySelectorAll("[data-vtra]").forEach(b=>b.onclick=()=>{const id=b.dataset.vtra,n=((document.querySelector(`[data-vfb="${id}"]`)||{}).value||"").trim();if(!n){toast("Ghi cần sửa gì để người làm biết");return}sendBack(ME,id,n);toast("Đã trả lại "+id);re()})
 }
 function cvOpenDg(g){
-  const d=D(),td=d.settings.today,cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean),days=[[0,"Chưa chọn ngày"]].concat(Array.from({length:Math.max(0,MONTH.ndays-td+1)},(_,i)=>[td+i,dayLbl(td+i)]));
-  const nd=cs.filter(c=>c.step==="xong").length,tk=chOf(g.kenh).needId;
-  openDrawerHTML(`<h2>${esc(g.ten)}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa có người phụ trách kênh")} · dán link bài${tk?" TikTok":""} rồi bấm Đã đăng; video chưa có link là chưa đăng</p>
-   ${cs.map(c=>{if(c.step==="xong")return `<section class="card pad"><b class="mono">${esc(c.id)}</b> ${esc(cvShort(c.hookText||c.yTuong||c.tuyen,90))} ${pill("✓ Đã đăng","grn")}<div class="hint">${c.linkDang?`<a href="${esc(/^https?:/i.test(c.linkDang)?c.linkDang:"https://"+c.linkDang)}" target="_blank" rel="noopener">${esc(cvShort(c.linkDang,70))}</a>`:""}</div></section>`;const lk=c.linkFinal||c.linkVideo||c.linkAnh||"",cap=c.caption||c.noiDung||"";return `<section class="card pad" data-dgc="${esc(c.id)}"><b class="mono">${esc(c.id)}</b> ${esc(cvShort(c.hookText||c.yTuong||c.tuyen,90))}
-    <div class="acts">${lk?`<a class="btn sm" href="${esc(/^https?:/i.test(lk)?lk:"https://"+lk)}" target="_blank" rel="noopener">Mở video / ảnh</a>`:`<span class="hint">chưa có link video</span>`}<button type="button" class="btn sm ghost" data-opc="${esc(c.id)}">Chi tiết thẻ</button></div>
-    ${cap?`<label class="field">Caption<textarea rows="3" readonly>${esc(cap)}</textarea></label><button type="button" class="btn sm ghost" data-cpc="${esc(c.id)}">Sao chép caption</button>`:""}
-    <label class="field">Ngày đăng<select data-dgday="${esc(c.id)}">${opt(days,+c.day||0)}</select></label>
-    <label class="field">Link bài đã đăng<input data-dgl="${esc(c.id)}" placeholder="${tk?"Dán link TikTok, ví dụ https://www.tiktok.com/@ailla/video/7…":"Dán link bài sau khi đăng"}" value="${esc(c.linkDang||"")}"></label>
-    <button type="button" class="btn sm pri" data-dgok="${esc(c.id)}">Đã đăng</button></section>`}).join("")}`);
-  document.querySelectorAll("[data-opc]").forEach(b=>b.onclick=()=>{closeDrawer();openCard(b.dataset.opc)});
-  document.querySelectorAll("[data-cpc]").forEach(b=>b.onclick=()=>{const c=d.cards.find(x=>x.id===b.dataset.cpc),t=(c&&(c.caption||c.noiDung))||"";try{navigator.clipboard.writeText(t);toast("Đã sao chép caption")}catch(e){toast("Không sao chép được, bôi đen rồi sao chép tay")}});
-  document.querySelectorAll("[data-dgday]").forEach(s=>s.onchange=()=>{const id=s.dataset.dgday,v=+s.value||0;DB.mutate(ME.name,"chọn ngày đăng "+id,dt=>{const x=dt.cards.find(y=>y.id===id);if(x)x.day=v});toast(v?"Đã đặt ngày đăng "+dd(v):"Đã bỏ ngày đăng");closeDrawer();renderMain()});
-  document.querySelectorAll("[data-dgok]").forEach(b=>b.onclick=()=>{const id=b.dataset.dgok,inp=document.querySelector(`[data-dgl="${id}"]`),link=inp?inp.value.trim():"",c0=d.cards.find(x=>x.id===id);if(!link){toast("Dán link bài đã đăng rồi bấm Đã đăng");return}
-    const m2=link.match(/[0-9]{19}/);if(c0&&chOf(c0.kenh).needId&&!m2){alert("Link này chưa có mã video TikTok (dãy 19 số sau /video/).\n\nNếu là link rút gọn (vt.tiktok.com/…): mở link đó trên trình duyệt, chờ hiện video rồi sao chép lại link trên thanh địa chỉ và dán vào đây.");return}
-    if(typeof dupAlert==="function"&&dupAlert(link,[id]))return;
-    const e=moveCard(ME,id,"xong",m2?{linkDang:link,tiktokId:m2[0]}:{linkDang:link});if(e){toast(e);return}
-    DB.mutate(ME.name,"đã đăng "+id,dt=>{const x=dt.cards.find(y=>y.id===id);if(!x)return;x.dgKey=g.key;x.ngayDang=td;if(!x.day)x.day=td;
-      const k=x.khoMa&&(dt.kho||[]).find(y=>y.ma===x.khoMa);if(k){k.linkBai=link;k.ngayThucTe=td;k.maDang=k.maDang||x.id;k.trangThai="Đã lên lịch"}});
-    toast("Đã lưu link, "+id+" chuyển sang Đã đăng");renderMain();const g2=cvAutoDg(true).find(z=>z.key===g.key);if(g2)cvOpenDg(g2);else{closeDrawer();toast("Xong việc đăng: đã đăng đủ "+cs.length+"/"+cs.length)}})
+  /* Chỉ nhắc lịch đăng (mọi người chốt 09/11): đăng thật làm ở Điều phối, xong thì bấm Hoàn thành ở đây; web không đăng hộ để tránh nhầm video */
+  const d=D(),td=d.settings.today,cs=g.ids.map(id=>d.cards.find(c=>c.id===id)).filter(Boolean),nd=cs.filter(c=>c.step==="xong").length;
+  openDrawerHTML(`<h2>${esc(g.ten)}</h2><p class="hint">${esc(g.mo)} · ${esc(userName(g.nguoi)||"chưa có người phụ trách kênh")}</p>
+   <section class="card pad"><b>Việc cần làm</b><p>Vào <b>Điều phối</b> để xếp ngày và đăng từng video của kênh ${esc(chOf(g.kenh).short)}. Đăng xong hết thì quay lại đây bấm <b>Hoàn thành</b>.</p>
+   <div class="acts"><button type="button" class="btn" id="dg-go">Mở Điều phối</button><button type="button" class="btn pri" id="dg-ok">✓ Hoàn thành</button></div>
+   <small class="hint">Đã đăng ${nd}/${cs.length} video (tính theo Điều phối).</small></section>
+   <details class="card pad"><summary>${cs.length} video của nhóm này</summary>${cs.map(c=>`<div class="hint"><span class="mono">${esc(c.id)}</span> ${esc(cvShort(c.hookText||c.yTuong||c.tuyen,80))} ${c.step==="xong"?"✓ đã đăng":""}</div>`).join("")}</details>`);
+  document.querySelector("#dg-go").onclick=()=>{closeDrawer();PAGE="dieuphoi";MOD="";render();scrollTo(0,0)};
+  document.querySelector("#dg-ok").onclick=()=>{DB.mutate(ME.name,"hoàn thành nhắc đăng bài",dt=>{dt.autoSt=dt.autoSt||{};dt.autoSt[g.key]={st:"done",d:td,by:ME.name,at:new Date().toLocaleString("vi-VN")}});toast("Đã hoàn thành nhắc đăng bài");closeDrawer();renderMain()}
 }
 function pCvNv2(m){
   const d=D(),td=d.settings.today,sm=cvSummaryOnly(),mk=sm?[]:cvAutoMk(),dg=sm?[]:cvAutoDg(),lead=(CVF.st||sm)?[]:cvLeadLines(),warn=sm?[]:cvWarn();
@@ -1120,6 +1134,7 @@ function cvMyItems(){
     }else{
       if(tkMyTurn(t))add({key:"r_"+t.id,group:G2,title:t.ten,detail:`${userName(t.nguoi)||"—"} đã nộp kết quả${t.vong===2?" · lead đã duyệt, chờ CEO":""}`,age_days:late(t.han),taskId:t.id,btn:"Xem & duyệt"});
       else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st==="review")add({key:"s_"+t.id,group:"Đã nộp, chờ duyệt",title:t.ten,detail:`Chờ ${tkMgrNames(t)} duyệt${t.nopAt?" · nộp lúc "+t.nopAt:""}`,taskId:t.id,btn:"Xem",chip:"Chờ duyệt",chipC:"amb"});
+      else if(t.st==="review"&&t.tao===ME_&&t.nguoi!==ME_)add({key:"r2_"+t.id,group:"Đã nộp, chờ duyệt",title:t.ten,detail:`${userName(t.nguoi)||"—"} đã nộp kết quả · chờ ${tkMgrNames(t)} duyệt`,age_days:0,taskId:t.id,btn:"Xem"});
       else if((t.nguoi===ME_||(t.phoi||[]).includes(ME_))&&t.st!=="review")add({key:"t_"+t.id,group:G1,title:t.ten,detail:`Hạn ${t.han?dd(t.han):"—"} · giao bởi ${who}${t.tlNote?" · bị trả lại: "+t.tlNote:""}`,age_days:late(t.han),han:t.han||0,taskId:t.id,btn:"Nộp kết quả",chip:tkStChip(t),chipC:t.tlNote?"red":tkStC(t.st)});
     }
     if((t.treReq||{}).st==="cho"&&tkMgr(t))add({key:"g_"+t.id,group:G2,title:t.ten,detail:`${(t.treReq||{}).by||"Người làm"} xin gia hạn${(t.treReq||{}).hanMoi?" đến "+dd(t.treReq.hanMoi):""}`,taskId:t.id});
@@ -1132,6 +1147,9 @@ function cvMyItems(){
     if(n("id"))add({key:"k_id",group:G4,title:`${n("id")} bài đã đăng nhưng thiếu link / ID`,detail:"Nhờ người đăng bổ sung",count:n("id"),go:"cv"});
   }
   const vid=d.cards.filter(c=>ok(c)&&["dkb","dvd","dceo"].includes(c.step)&&(ME.role==="admin"||can(ME,"viec.duyet"))&&(c.step!=="dceo"||ME.role==="admin")).length;
+  if(typeof ktState==="function"){const want=ME.role==="admin"?"cceo":(ME.role==="lead"||can(ME,"viec.duyet"))?"cd":"";
+    if(want){const nk=(d.kho||[]).filter(k=>{try{return ktState(k)===want}catch(e){return false}}).length;
+      if(nk)add({key:"kho_"+want,group:G2,title:want==="cceo"?"Video tồn chờ chị duyệt V2":"Video tồn chờ duyệt V1",detail:"Bấm để mở Kho video tồn, duyệt từng video hoặc tích chọn nhiều video rồi duyệt một lần",count:nk,go:"kehoach",mod:"mkt",xv:want,btn:"Mở kho"})}}
   if(vid)add({key:"v_vid",group:G2,title:"Video, kịch bản chờ duyệt",detail:"Duyệt xong thì video đi tiếp",count:vid,go:"cv"});
   return L;
 }

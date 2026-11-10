@@ -38,7 +38,18 @@ async function hubPeople(db: D1Database, fresh = false) {
   let depts: Dept[] = [];
   const vids = new Set<string>();
   if (row) {
-    const d = JSON.parse(await unpack(row.data)) as { users?: HubUser[]; departments?: Dept[]; cards?: { linkVideo?: string; linkFinal?: string }[] };
+    const d = JSON.parse(await unpack(row.data)) as { users?: HubUser[]; departments?: Dept[]; cards?: { linkVideo?: string; linkFinal?: string; linkCu?: string; gopy?: { link?: string }[] }[]; kho?: { link?: string }[]; tasks?: { kq?: string }[] };
+    const add = (l: unknown) => {
+      const m = String(l ?? '').match(/\/d\/([A-Za-z0-9_-]{10,})/) ?? String(l ?? '').match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+      if (m) vids.add(m[1]);
+    };
+    // Video tồn trong Kho, link nộp ở việc sửa video, và bản cũ bị góp ý cũng xem được ngay trên web
+    for (const k of Array.isArray(d.kho) ? d.kho : []) add(k?.link);
+    for (const t of Array.isArray(d.tasks) ? d.tasks : []) add(t?.kq);
+    for (const cd of Array.isArray(d.cards) ? d.cards : []) {
+      add(cd?.linkCu);
+      for (const g of Array.isArray(cd?.gopy) ? cd.gopy : []) add(g?.link);
+    }
     for (const cd of Array.isArray(d.cards) ? d.cards : [])
       for (const l of [cd?.linkVideo, cd?.linkFinal]) {
         const m = String(l ?? '').match(/\/d\/([A-Za-z0-9_-]{10,})/) ?? String(l ?? '').match(/[?&]id=([A-Za-z0-9_-]{10,})/);

@@ -179,14 +179,14 @@ function srcHtml(s,can2){
 }
 /* ---------- ③ Buổi quay & hook ---------- */
 function xvQuay2(b,o){
-  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>(s.day>=W.tu&&s.day<=W.den)||!["Đã quay","Đã hủy"].includes(s.trangThai)).sort((a,c)=>a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
+  const {d,W,days,team,give}=o,dv=can(ME,"viec.duyet")||ME.role==="admin",sh=(d.shoots||[]).filter(s=>(s.day>=W.tu&&s.day<=W.den)||!["Đã quay","Đã hủy"].includes(s.trangThai)).sort((a,c)=>((c.nguoi||[]).includes(ME.id)-(a.nguoi||[]).includes(ME.id))||a.day-c.day||(a.gio||"").localeCompare(c.gio||""));
   const qDef=team.find(u=>/quỳnh/i.test(u.name)),w=weekOf(W.tu)||1,wp=wpOf(d,w);
   const tOpts=()=>{const g=xvGroupBy(d.tuyen.slice(),t=>sk(t.sku).n+" · "+chOf(t.kenh).short);return g.map(([n,L])=>`<optgroup label="${esc(n)}">${L.map(t=>`<option value="${esc(t.ma)}">${esc(t.tuyen)}${t.vaiTro?" · "+esc(t.vaiTro):""}</option>`).join("")}</optgroup>`).join("")};
   const wait=d.cards.filter(c=>c.step==="quay"&&!c.buoiQuay);
   const sess=s=>{const I=d.cards.filter(c=>c.buoiQuay===s.id),chua=I.filter(c=>c.step==="dkb"),kb=I.filter(c=>c.step==="kb"),ok=I.filter(c=>c.step==="quay"),done=I.filter(c=>!["dkb","kb","quay","cg"].includes(c.step)),ps=I.filter(c=>c.phatSinh).length;
     const bySku=xvGroupBy(I,c=>c.sku+"|"+c.kenh);
-    return `<div class="sqitem xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${pill(SQ_LB[SQ_ST(s)][0],SQ_LB[SQ_ST(s)][1])}</div>
-     ${sqBox(s,give,dv)}<div class="xsum">${I.length} hook / kịch bản xếp vào buổi quay · <b class="${ok.length?"t-grn":""}">${ok.length} đã duyệt, sẵn sàng quay</b>${chua.length?` · <b class="t-amb">${chua.length} chờ duyệt</b>`:""}${kb.length?` · <b class="t-red">${kb.length} cần sửa</b>`:""} · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}${bySku.length?`<span class="sqsk">${bySku.map(([k,L])=>`${swatch(k.split("|")[0])} ${esc(sk(k.split("|")[0]).n)} (${esc(chOf(k.split("|")[1]).short)}): ${L.length}`).join(" · ")}</span>`:""}</div>
+    return `<div class="sqitem xses2"><div class="card-h"><h2>🎬 ${dayLbl(s.day)} · ${esc(s.buoi||"")}${s.gio?" "+esc(s.gio):""}</h2><span class="hint">${esc(s.diaDiem||"")} · quay: ${esc(s.nguoi.map(userName).join(", ")||"chưa có người")}</span><span class="sp"></span>${(s.nguoi||[]).includes(ME.id)&&!give?pill("Việc của bạn","blu"):""}${pill(SQ_LB[SQ_ST(s)][0],SQ_LB[SQ_ST(s)][1])}</div>
+     ${sqBox(s,give,dv,ok.length)}<div class="xsum">${I.length} hook / kịch bản xếp vào buổi quay · <b class="${ok.length?"t-grn":""}">${ok.length} đã duyệt, sẵn sàng quay</b>${chua.length?` · <b class="t-amb">${chua.length} chờ duyệt</b>`:""}${kb.length?` · <b class="t-red">${kb.length} cần sửa</b>`:""} · ${done.length} đã quay${ps?` (${ps} phát sinh)`:""}${bySku.length?`<span class="sqsk">${bySku.map(([k,L])=>`${swatch(k.split("|")[0])} ${esc(sk(k.split("|")[0]).n)} (${esc(chOf(k.split("|")[1]).short)}): ${L.length}`).join(" · ")}</span>`:""}</div>
      ${SQ_ST(s)!=="xong"&&SQ_ST(s)!=="huy"&&I.length&&(chua.length||kb.length)&&s.day-D().settings.today<=1?`<p class="sqwarn">⚠ Sắp tới buổi quay mà còn ${chua.length+kb.length} hook / kịch bản chưa được duyệt.</p>`:""}
 
      
@@ -506,18 +506,23 @@ function ksSearchHtml(q){
   return `<section class="card flush"><div class="card-h pad"><h2>Kết quả tìm kiếm</h2><span class="hint">${R.length?R.length+" video khớp với “"+esc(q.length>60?q.slice(0,60)+"…":q)+"”":"Không có video nào khớp. Link này chưa có trong hệ thống."}</span><span class="sp"></span><button type="button" class="btn sm" data-ksx="1">✕ Xóa tìm kiếm</button></div>
    ${R.length?`<div class="tbl"><table class="kstab"><thead><tr><th>Mã</th><th>Sản phẩm</th><th>Đang nằm ở</th><th>Trạng thái</th><th>Kênh</th><th>Tên / hook</th><th>Video</th></tr></thead><tbody>${R.slice(0,100).map(row).join("")}</tbody></table></div>`:""}</section>`
 }
+const xvKhoWait=()=>(D().kho||[]).filter(k=>{try{return ["cd","cceo"].includes(ktState(k))}catch(e){return false}});
+/* video tồn đang chờ duyệt (V1 / V2) ở tab ① để số đếm khớp: mỗi video một dòng, bấm Xem & duyệt */
+function xvKhoWaitBox(b){const L=xvKhoWait();if(!L.length)return;const sec=document.createElement("section");sec.className="card flush";
+  sec.innerHTML=`<div class="card-h pad"><h2>Video tồn chờ duyệt (${L.length})</h2><span class="hint">V1: Lead duyệt · V2: CEO duyệt · bấm một dòng để xem video rồi Duyệt hoặc Cần sửa</span></div>${L.map(k=>{const s=ktState(k);return `<div data-xkw="${esc(k.ma)}" style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-top:1px solid var(--line,#e6e8ef);cursor:pointer"><b class="mono" style="font-size:12.5px;white-space:nowrap">${esc(k.ma)}</b><span class="hint" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(skS(k.sku))} · ${esc(((k.tuyen||"")+" "+(k.ten||"")).trim())}${khoEditor(k)?" · "+esc(khoEditor(k)):""}</span>${pill(s==="cceo"?"Chờ duyệt V2":"Chờ duyệt V1","amb")}<button type="button" class="btn sm pri" data-xkw="${esc(k.ma)}">Xem &amp; duyệt</button></div>`}).join("")}`;
+  b.prepend(sec);sec.querySelectorAll("[data-xkw]").forEach(e=>e.onclick=ev=>{ev.stopPropagation();if(typeof cwKhoQuick==="function")cwKhoQuick(e.dataset.xkw);else ktModal(e.dataset.xkw)})}
 function xvKhoAll(b,o){
   if(!["wait","can","sx"].includes(XV.ks))XV.ks="wait";
-  const pend=o.d.cards.filter(c=>["edit","dvd","dceo"].includes(c.step)&&!c.wt).length,n=xvKhoFree().length+(o.d.kho||[]).filter(k=>k.choDuyet&&!khoOk(k)&&!k.maDang).length /* 04/11: tính cả video tồn đang chờ duyệt / cần sửa, khớp số ở dòng sản phẩm */;
+  const pend=o.d.cards.filter(c=>["dvd","dceo"].includes(c.step)&&!c.wt).length+xvKhoWait().length /* 09/11: chỉ đếm video THỰC SỰ chờ duyệt (thẻ V1/V2 + video tồn chờ duyệt), khớp danh sách bên trong */,n=(o.d.kho||[]).length /* số trên tab = tổng video trong bảng Kho video tồn */;
   const ndn=o.d.cards.filter(c=>c.step==="xong").length,nsx=o.d.cards.filter(c=>["dang","xong"].includes(c.step)&&((loaiOf(c)!=="kho"&&c.mix!=="ton")||c.repostOf)).length,TB=[["wait","① Video đợi duyệt"+(pend?` (${pend})`:"")],["sx","② Video sản xuất trong tháng ("+nsx+")"],["can","③ Kho video tồn ("+n+")"]];
   b.innerHTML=`${khoSummary(o)}<div class="ntrow ktool"><div class="seg ptk">${TB.map(([k,t])=>`<button data-xks="${k}" class="${XV.ks===k?"on":""}">${t}</button>`).join("")}</div><div class="ktool2"><input type="search" class="ksearch" id="xk-q" value="${esc(XV.q||"")}" placeholder="🔍 Tìm video: dán link Drive, mã, hook…" title="Dán link Drive hoặc gõ mã, hook, caption rồi bấm Enter"><button type="button" class="btn sm pri" data-xadd="1" title="Thêm một video chưa có trong hệ thống">+ Thêm video</button><button type="button" class="btn sm" data-xadd="1" title="Tải file Excel có nhiều link video một lúc (có file mẫu)">⬆ Tải hàng loạt</button><button type="button" class="btn sm" data-xexp="1" title="Xuất danh sách đang xem ra Excel">⬇ Xuất danh sách</button></div></div><div id="xk-b"></div>`;ntBind(b);
   b.querySelectorAll("[data-xadd]").forEach(x=>x.onclick=openThemVideo);
   b.querySelectorAll("[data-xexp]").forEach(x=>x.onclick=()=>{if(XV.exp)xlsExport(XV.exp.file,XV.exp.sheet,XV.exp.head,XV.exp.rows);else toast("Tab này chưa có danh sách để xuất")});
-  b.querySelectorAll("[data-xks]").forEach(x=>x.onclick=()=>{XV.ks=x.dataset.xks;renderMain()});
+  b.querySelectorAll("[data-xks]").forEach(x=>x.onclick=()=>{XV.ks=x.dataset.xks;XV.khoSku="";XV.ktK="";XV.khoSt="";renderMain()});
   const qi=b.querySelector("#xk-q");if(qi){const go=()=>{const v=qi.value.trim();if(v===(XV.q||""))return;XV.q=v;renderMain()};qi.onkeydown=e=>{if(e.key==="Enter")go()};qi.onchange=go;qi.onpaste=()=>setTimeout(go,60)}
   const c=b.querySelector("#xk-b");
   if(XV.q){c.innerHTML=ksSearchHtml(XV.q);c.querySelectorAll("[data-ksx]").forEach(x=>x.onclick=()=>{XV.q="";renderMain()});c.querySelectorAll("[data-ksr]").forEach(r=>r.onclick=e=>{if(e.target.closest("a"))return;const [k,id]=r.dataset.ksr.split("|");if(k==="kho")ktModal(id);else{const cc=D().cards.find(y=>y.id===id);if(cc&&["dang","xong"].includes(cc.step))scModal(id);else openCard(id)}});return}
-  if(XV.ks==="wait")xvVideoMade(c,o);else{XV.kind=XV.ks==="sx"?"sx":"ton";xvVideoCan(c,o)}
+  if(XV.ks==="wait"){xvVideoMade(c,o);xvKhoWaitBox(c)}else{XV.kind=XV.ks==="sx"?"sx":"ton";xvVideoCan(c,o)}
 }
 /* Kho video: tồn tháng trước + sản xuất trong tháng, lọc theo sản phẩm */
 function xvVideoCan(b,o){
@@ -898,7 +903,7 @@ function ktGan(ma,kenh){
   DB.mutate(ME.name,"gắn video đã đăng "+ma+" vào kênh "+kenh,dt=>{const kk=dt.kho.find(x=>x.ma===ma);if(!kk)return;const td=dt.settings.today,cc=newCard(dt,{sku:kk.sku,kenh,day:td});Object.assign(cc,{mix:"ton",loai:"kho",nguon:"Footage cũ",khoMa:ma,oneShot:false,hookText:kk.ten||kk.tuyen||"Video "+sk(kk.sku).n,linkVideo:kk.link||"",linkFinal:kk.link||"",caption:kk.caption||"",nguoi:ME.id,nguoiEdit:ME.id,nguoiKB:ME.id,giao:ME.id,duyet:"Đã duyệt",ceo:"PASS",step:"xong",ngayDang:td,nhapTay:true,tuan:weekOf(td)||1,batDau:td});dt.cards.push(cc);kk.maDang=cc.id;kk.trangThai="Đã lên lịch"});
   toast("Đã gắn "+ma+" vào "+chOf(kenh).short)
 }
-function ktNotiKenh(label,kenh,ref){if(XV.ktQuiet){(XV.ktQuietN=XV.ktQuietN||{})[kenh]=(XV.ktQuietN[kenh]||0)+1;return}const to=[chanOwner(kenh)].concat(chanHelp(kenh)).filter(Boolean);if(!to.length||typeof notifyU!=="function")return;
+function ktNotiKenh(label,kenh,ref){if(XV.ktQuiet){(XV.ktQuietN=XV.ktQuietN||{})[kenh]=(XV.ktQuietN[kenh]||0)+1;return}const to=[chanOwner(kenh)].filter(x=>x&&x!==ME.id);if(!to.length||typeof notifyU!=="function")return;
   DB.mutate(ME.name,"báo kênh "+kenh+" có video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp video ${label} vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,ref||""))}
 function ktPick(ma,kenh){
   const k0=(D().kho||[]).find(y=>y.ma===ma);if(!k0||!kenh)return false;if(!k0.maDang&&!khoOk(k0)){toast("Video "+ma+" chưa duyệt, Lead duyệt xong mới phân bổ kênh được");return false}
@@ -956,7 +961,7 @@ function ktBulkBind(w){{const tb=document.querySelector(".topbar");document.docu
   if(q("#ktb-x"))q("#ktb-x").onclick=()=>{S.clear();renderMain()};
   if(q("#ktb-go"))q("#ktb-go").onclick=()=>{const kenh=q("#ktb-k").value;if(!kenh){toast("Chọn kênh trước");q("#ktb-k").focus();return}
     const L=sel().filter(k=>ktState(k)==="free");let n=0;XV.ktQuiet=true;XV.ktQuietN={};try{L.forEach(k=>{if(ktPick(k.ma,kenh)){n++;S.delete(k.ma)}})}finally{XV.ktQuiet=false}
-    if(n){const to=[chanOwner(kenh)].concat(chanHelp(kenh)).filter(Boolean);if(to.length&&typeof notifyU==="function")DB.mutate(ME.name,"báo kênh "+kenh+" có "+n+" video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp ${n} video tồn vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,""))}
+    if(n){const to=[chanOwner(kenh)].filter(x=>x&&x!==ME.id);if(to.length&&typeof notifyU==="function")DB.mutate(ME.name,"báo kênh "+kenh+" có "+n+" video mới",dt=>notifyU(dt,to,`${ME.name} đã xếp ${n} video tồn vào kênh ${chOf(kenh).short}, chờ xếp ngày đăng`,""))}
     toast(n?"Đã phân bổ "+n+" video vào "+chOf(kenh).short+": Chờ đăng":"Không phân bổ được video nào");renderMain()};
   if(q("#ktb-ok"))q("#ktb-ok").onclick=()=>{const L=sel().filter(k=>(ktState(k)==="cd"&&xvGive())||(ktState(k)==="cceo"&&ME.role==="admin"));if(!L.length)return;
     if(!confirm((ME.role==="admin"?"CEO duyệt ":"Duyệt ")+L.length+" video đã chọn?"))return;
@@ -1111,11 +1116,12 @@ function hkMine(c){return xvGive()||c.nguoi===ME.id||c.giao===ME.id}
 /* Buổi quay: mục tiêu lead tự viết, link file hook & kịch bản trên Drive, trạng thái, trễ hạn */
 const SQ_ST=s=>{const x=s.trangThai;if(x==="Đã quay")return "xong";if(x==="Đã hủy")return "huy";if(s.day<D().settings.today)return "tre";return x==="Đang quay"?"dang":"chua"};
 const SQ_LB={chua:["Chưa làm","gry"],dang:["Đang làm","blu"],tre:["Trễ hạn","red"],xong:["Đã quay","grn"],huy:["Đã hủy","gry"]};
-function sqBox(s,give,dv){
+function sqBox(s,give,dv,nOk){
   const st=SQ_ST(s),may=give||(s.nguoi||[]).includes(ME.id),lnk=v=>/^https?:/.test(v)?v:"https://"+v,today=D().settings.today;
   const days=Array.from({length:MONTH.ndays-today+1},(_,i)=>today+i);
   const tre=st==="tre"?`<div class="sqtre"><b class="t-red">Buổi quay trễ so với lịch (${dd(s.day)})</b>${s.treLyDo?` · Lý do: ${esc(s.treLyDo)} <small>(${esc(s.treBy||"")})</small>`:may?`<div class="xrow"><input class="hkin" data-sqtre="${s.id}" placeholder="Điền lý do trễ…"><button class="btn sm pri" data-sqtres="${s.id}">Gửi lý do</button></div>`:" · chưa có lý do"}${dv?`<div class="xrow"><label>Dời sang ngày<select data-sqnew="${s.id}">${opt(days.map(x=>[x,dayLbl(x)]),today)}</select></label><button class="btn sm" data-sqmove="${s.id}">Dời lịch quay</button><button class="btn sm danger" data-sqcancel="${s.id}">Hủy buổi quay</button></div>`:""}</div>`:"";
-  const act="";
+  /* người quay (hoặc người giao) luôn có nút chốt, kể cả khi trễ hạn hoặc chưa có hook nào được duyệt */
+  const act=(may||dv||ME.role==="admin")&&!(give&&nOk)&&!(["Đã quay","Đã hủy"].includes(s.trangThai))?`<div class="xrow"><button class="btn pri" data-hkdone="${s.id}">✓ Đã quay xong buổi này</button></div>`:"";
   return `<div class="sqbox"><div class="sqtop"><label class="field full">Mục tiêu buổi quay (lead tự viết)<textarea rows="2" data-sqmt="${s.id}" ${dv||give?"":"disabled"} placeholder="Ví dụ: 5/10 quay 50 video tinh dầu · 6/10 quay thêm cảnh trám tinh dầu và 20 video bột tẩy">${esc(s.mucTieu||"")}</textarea>${dv||give?`<small><button type="button" class="lnk" data-qfill="${s.id}">↳ điền gợi ý "cần quay thêm" từ phân bổ tuần vào mục tiêu</button></small>`:""}</label>${sqEditHtml(s,dv||give)}</div>
    ${act}${tre}</div>`}
 function sqEditHtml(s,can){
@@ -1648,7 +1654,7 @@ async function wtSync(){if(WT_BUSY||Date.now()-WT_AT<20000||!DB.data)return;cons
   try{const L=await svApi("/api/hub/worker-tasks?kind=card"),by={};(L||[]).forEach(t=>by[t.id]=t);const ch=[];
     C.forEach(c=>{const t=by[c.wt];if(!t)return;const r=t.result||{},u={wStatus:t.status,wProg:t.progress||0,wDetail:t.detail||"",wJob:t.worker_job||c.wJob||"",wStage:r.stage||"",wScript:r.script||"",wHadScr:c.wHadScr||!!r.script};
       const fresh=!c.wFixAt||String(t.updated_at||"")>c.wFixAt;if(!fresh){u.wStatus="running";u.wDetail=c.wDetail;u.wStage=""}
-      if(fresh&&t.status==="running"&&["dvd","dceo"].includes(c.step)){u.step="worker";u.linkFinal=""} // dựng lại từ Telegram / trang Worker: về Đang làm
+      if(fresh&&t.status==="running"&&["dvd","dceo"].includes(c.step)){u.step="worker";u.linkCu=u.linkFinal||u.linkCu||"";u.linkFinal=""} // dựng lại từ Telegram / trang Worker: về Đang làm
       if(fresh&&t.status==="review"&&r.stage==="video"&&c.step==="worker"){u.linkFinal="/api/hub/worker-tasks/preview/"+u.wJob} // bản nháp: người phụ trách xem, bấm Duyệt thì mới sang Lead Content & Media
       if(t.status==="done"&&r.drive_url){u.linkFinal=r.drive_url;u.wDone=true}
       if(Object.keys(u).some(k=>String(c[k]??"")!==String(u[k]??"")))ch.push([c.id,u])});
@@ -1669,7 +1675,7 @@ async function wkRedo(id,btn){
   for(let i=0;i<16;i++){await new Promise(r=>setTimeout(r,5000));let t;try{t=((await svApi("/api/hub/worker-tasks?kind=card"))||[]).find(x=>x.id===tid)}catch(e){continue}
     if(!t)continue;
     if(t.status==="error"){toast("Worker không làm lại được: "+(t.detail||"không rõ lý do"));renderMain();return}
-    if(t.status==="done"){DB.mutate(ME.name,"Worker làm lại "+c.wJob,dt=>{const y=dt.cards.find(z=>z.id===id);if(!y)return;y.step="worker";y.wStatus="running";y.wStage="";y.linkFinal="";y.wDetail=t.detail||"Worker đang làm lại từ đầu";y.wFixAt=new Date().toISOString()});toast(t.detail||"Worker đang làm lại");WT_AT=0;renderMain();return}}
+    if(t.status==="done"){DB.mutate(ME.name,"Worker làm lại "+c.wJob,dt=>{const y=dt.cards.find(z=>z.id===id);if(!y)return;y.linkCu=y.linkFinal||y.linkCu||"";y.step="worker";y.wStatus="running";y.wStage="";y.linkFinal="";y.wDetail=t.detail||"Worker đang làm lại từ đầu";y.wFixAt=new Date().toISOString()});toast(t.detail||"Worker đang làm lại");WT_AT=0;renderMain();return}}
   toast("Máy văn phòng chưa nhận việc làm lại. Kiểm tra máy có bật không, việc vẫn nằm chờ và sẽ chạy khi máy bật.");renderMain()}
 
 
