@@ -16,6 +16,7 @@ import { syncFbMoney } from './services/fbCost';
 import { syncComboTasks } from './routes/sanpham';
 import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
+import { backfillStep, syncCskhDays } from './services/cskh';
 import { autoSyncEnabled, syncDrivePermissions } from './services/driveSync';
 import { isAdminHost } from './lib/host';
 import { syncAccessEmails } from './lib/access-sync';
@@ -80,6 +81,13 @@ export default {
         } catch (error) {
           console.error('[cron] thong bao day loi', error);
         }
+        // CSKH khách lẻ: kéo bù dần đơn Facebook giao thành công về ngày bắt đầu ở Cài đặt CSKH (mỗi 15 phút vài ngày, xong thì thôi).
+        try {
+          const bf = await backfillStep(env.DB, env.INGEST_KEY, (u) => fetch(u), 4);
+          if (bf.done) console.info('[cron] cskh keo bu', JSON.stringify(bf));
+        } catch (error) {
+          console.error('[cron] cskh keo bu loi', error);
+        }
         if (new Date(event.scheduledTime).getUTCMinutes() >= 15) return;
         const config = await loadConfig(env.DB);
         const result = await syncAlerts(env.DB, config);
@@ -104,6 +112,8 @@ export default {
             console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6, 7].map(day), (u) => fetch(u))));
             // Tiền đơn Facebook đã gửi hàng (giá vốn, ship Facebook trên trang quản trị): hôm qua, hôm kia.
             console.info('[cron] fb money', JSON.stringify(await syncFbMoney(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
+            // CSKH khách lẻ: đơn Facebook giao thành công hôm nay, hôm qua, hôm kia → khách + chia khách mới.
+            console.info('[cron] cskh', JSON.stringify(await syncCskhDays(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
           }
         } catch (error) {
           console.error('[cron] poscake loi', error);
