@@ -26,6 +26,8 @@ import { requirePermission } from '../middleware/rbac';
 import {
   assignTo,
   backfillStep,
+  startBackfill,
+  stopBackfill,
   cskhMe,
   cskhStaff,
   getSetting,
@@ -107,14 +109,35 @@ cskhRoutes.put('/settings', async (c) => {
   return ok(c, set);
 });
 
-/** Lead / CEO bấm "Kéo ngay": kéo 3 ngày gần nhất + bù thêm vài ngày cũ. */
+/** Lead / CEO bấm "Kéo đơn mới ngay": kéo 3 ngày gần nhất (như lượt 7h sáng). */
 cskhRoutes.post('/pull', async (c) => {
   const me = await who(c);
   if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO kéo dữ liệu');
   const today = vnDate();
   const recent = await syncCskhDays(c.env.DB, c.env.INGEST_KEY, [today, addDays(today, -1), addDays(today, -2)], httpFetch);
-  const bf = await backfillStep(c.env.DB, c.env.INGEST_KEY, httpFetch, 5);
-  return ok(c, { recent, backfill: bf });
+  return ok(c, { recent });
+});
+
+/** Kéo dữ liệu cũ theo khoảng ngày Lead / CEO chọn. Kéo ngay vài ngày đầu, phần còn lại máy chủ tự kéo mỗi 15 phút. */
+cskhRoutes.post('/pull-range', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO kéo dữ liệu');
+  const b = (await c.req.json().catch(() => ({}))) as { from?: string; to?: string };
+  const today = vnDate();
+  const from = str(b.from, 10);
+  const to = str(b.to, 10) || today;
+  if (!isDay(from) || !isDay(to) || from > to) throw badRequest('NGAY', 'Chọn từ ngày, đến ngày cho đúng');
+  if (to > today) throw badRequest('NGAY', 'Đến ngày không được sau hôm nay');
+  if (diffDays(to, from) > 1100) throw badRequest('NGAY', 'Mỗi lần kéo tối đa 3 năm');
+  await startBackfill(c.env.DB, from, to);
+  const first = await backfillStep(c.env.DB, c.env.INGEST_KEY, httpFetch, 3);
+  return ok(c, { first, state: await getSetting<BackfillState>(c.env.DB, 'backfill') });
+});
+cskhRoutes.post('/pull-stop', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO kéo dữ liệu');
+  await stopBackfill(c.env.DB);
+  return ok(c, { state: await getSetting<BackfillState>(c.env.DB, 'backfill') });
 });
 
 /* ------------------------------------------------------------------ việc hôm nay */

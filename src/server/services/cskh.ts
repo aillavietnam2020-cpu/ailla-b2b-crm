@@ -41,7 +41,6 @@ export async function putSetting(db: D1Database, k: string, v: unknown): Promise
 }
 export async function loadSettings(db: D1Database): Promise<CskhSettings> {
   const s = mergeSettings(await getSetting<Partial<CskhSettings>>(db, 'cfg'));
-  if (!s.fromDate) s.fromDate = addDays(vnDate(), -183); // mặc định 6 tháng gần nhất
   return s;
 }
 
@@ -286,17 +285,34 @@ export async function syncCskhDays(db: D1Database, secret: string | undefined, d
 
 export interface BackfillState {
   cursor: string; // ngày sớm nhất đã kéo xong
-  target: string;
+  target: string; // kéo lùi tới ngày này
+  from?: string; // khoảng Lead / CEO chọn (để hiện lại)
+  to?: string;
+  active?: boolean; // chỉ kéo khi Lead / CEO bấm "Bắt đầu kéo" ở Cài đặt (chị Hoa 10/11: không tự kéo dữ liệu cũ)
   at: string;
   last: string;
 }
-/** Kéo bù dần từ ngày đã kéo sớm nhất lùi về ngày bắt đầu ở Cài đặt (mỗi lần tối đa `maxDays` ngày). */
-export async function backfillStep(db: D1Database, secret: string | undefined, fetchFn: FetchFn, maxDays = 4): Promise<{ done: number; remaining: number; note: string }> {
-  const set = await loadSettings(db);
+/** Lead / CEO chọn khoảng ngày và bấm kéo: máy chủ kéo lùi dần từ ngày cuối về ngày đầu, mỗi 15 phút vài ngày. */
+export async function startBackfill(db: D1Database, from: string, to: string): Promise<BackfillState> {
   const minFb = await poscakeFrom(db, 'FACEBOOK');
-  const target = minFb && set.fromDate < minFb ? minFb : set.fromDate;
-  const st = (await getSetting<BackfillState>(db, 'backfill')) ?? { cursor: vnDate(), target, at: '', last: '' };
-  if (st.cursor <= target) return { done: 0, remaining: 0, note: 'đã kéo đủ' };
+  const target = minFb && from < minFb ? minFb : from;
+  const st: BackfillState = { cursor: addDays(to, 1), target, from, to, active: true, at: nowIso(), last: '' };
+  await putSetting(db, 'backfill', st);
+  return st;
+}
+export async function stopBackfill(db: D1Database): Promise<void> {
+  const st = await getSetting<BackfillState>(db, 'backfill');
+  if (st) await putSetting(db, 'backfill', { ...st, active: false });
+}
+/** Một bước kéo (cron mỗi 15 phút, hoặc ngay khi bấm). Không có việc kéo đang bật thì không làm gì. */
+export async function backfillStep(db: D1Database, secret: string | undefined, fetchFn: FetchFn, maxDays = 4): Promise<{ done: number; remaining: number; note: string }> {
+  const st = await getSetting<BackfillState>(db, 'backfill');
+  if (!st || !st.active) return { done: 0, remaining: 0, note: 'không có việc kéo' };
+  const target = st.target;
+  if (st.cursor <= target) {
+    await putSetting(db, 'backfill', { ...st, active: false });
+    return { done: 0, remaining: 0, note: 'đã kéo đủ' };
+  }
   const days: string[] = [];
   for (let d = addDays(st.cursor, -1); d >= target && days.length < maxDays; d = addDays(d, -1)) days.push(d);
   const res = await syncCskhDays(db, secret, days, fetchFn);
@@ -305,7 +321,8 @@ export async function backfillStep(db: D1Database, secret: string | undefined, f
     if (!r.ok) break;
     cursor = r.day;
   }
-  await putSetting(db, 'backfill', { cursor, target, at: nowIso(), last: res.map((r) => `${r.day}: ${r.note}`).join(' · ') });
+  const latest = await getSetting<BackfillState>(db, 'backfill'); // có thể đã bấm Dừng trong lúc kéo
+  await putSetting(db, 'backfill', { ...st, cursor, active: (latest?.active ?? true) && cursor > target, at: nowIso(), last: res.map((r) => `${r.day}: ${r.note}`).join(' · ') });
   return { done: res.filter((r) => r.ok).length, remaining: Math.max(0, diffDays(cursor, target)), note: res.map((r) => `${r.day}: ${r.note}`).join(' · ') };
 }
 
