@@ -94,15 +94,15 @@ export function leadsCuaPhong(users: Record<string, { pb: string; role: string }
 export const kyTamUng = (ngay: string) => ngay.slice(0, 7);
 
 /** Lịch làm của người gửi (lấy theo cài đặt chấm công); tách ra để route dùng chung. */
-export type NgayDon = { loai: LoaiDon; buoi: Buoi; gio: number | null };
+export type NgayDon = { loai: LoaiDon; buoi: Buoi; gio: number | null; so_ngay?: number };
 /** Đơn đã duyệt theo ngày: ngày → đơn (đơn nghỉ trải nhiều ngày thì mỗi ngày một dòng). */
-export function donTheoNgay(rows: { loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null }[]): Map<string, NgayDon[]> {
+export function donTheoNgay(rows: { loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null; so_ngay?: number }[]): Map<string, NgayDon[]> {
   const out = new Map<string, NgayDon[]>();
   for (const r of rows) {
     const n = Math.max(1, Math.round((Date.parse(r.den + 'T00:00:00Z') - Date.parse(r.tu + 'T00:00:00Z')) / 864e5) + 1);
     for (const d of daysFrom(r.tu, Math.min(n, 62))) {
       const a = out.get(d) ?? [];
-      a.push({ loai: r.loai, buoi: r.buoi, gio: r.gio });
+      a.push({ loai: r.loai, buoi: r.buoi, gio: r.gio, so_ngay: r.so_ngay });
       out.set(d, a);
     }
   }

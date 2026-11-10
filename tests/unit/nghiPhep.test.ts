@@ -138,3 +138,26 @@ describe('nghỉ theo giờ (CEO 10/11)', () => {
     expect(gioNghi(vp, '2026-11-12', '08:00', '17:30', r('2026-11-12'))).toHaveProperty('loi');
   });
 });
+
+describe('công hưởng lương (CEO 10/11)', () => {
+  const base = { vao: '2026-11-12T01:00:00.000Z', ra: '2026-11-12T10:30:00.000Z', muon: 0, som: 0, phut: 480, quenRa: false, ngoai: false, lam: true, ca: null, le: false, don: null, coPhep: false, ot: 0, kl: 0, pg: 0, lyDoMuon: null, canhBao: false, choXn: false, chamNgoai: false, bu: null, lamBu: null };
+  it('trừ phần nghỉ không lương nửa ngày / theo giờ, cộng ngày phép', async () => {
+    const { tongThang } = await import('../../src/server/services/chamCong');
+    const T = tongThang(
+      [
+        { ...base, ngay: '2026-11-10' },
+        { ...base, ngay: '2026-11-11', kl: 0.25 },
+        { ...base, ngay: '2026-11-12', kl: 0.5, don: 'Nghỉ không lương (sáng)' },
+        { ...base, ngay: '2026-11-13', pg: 0.25 },
+        { ...base, ngay: '2026-11-09', vao: null, ra: null, phut: 0, don: 'Nghỉ phép năm' },
+        { ...base, ngay: '2026-11-06', vao: null, ra: null, phut: 0, don: 'Nghỉ không lương' },
+      ],
+      vp,
+      '2026-11-20',
+    );
+    expect(T.cong).toBe(4);
+    expect(T.congHL).toBe(4.25); // 1 + 0,75 + 0,5 + 1 + 1 ngày phép
+    expect(T.phepHL).toBe(1.25);
+    expect(T.klNgay).toBe(1.75);
+  });
+});

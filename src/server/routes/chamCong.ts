@@ -85,7 +85,7 @@ async function loadXep(db: D1Database, s: CcSettings, tu: string, den: string, u
  * Đơn đã duyệt theo người và ngày: đơn cũ trong dữ liệu chung (hub_state.hr.don) và đơn mới (bảng ns_don, routes/nghiPhep.ts).
  * Giữ 60 giây trong máy chủ; duyệt đơn mới thì xóa ngay (resetDonCache).
  */
-export type DonNgay = { don?: string; coPhep?: boolean; ot?: number };
+export type DonNgay = { don?: string; coPhep?: boolean; ot?: number; kl?: number; pg?: number };
 let DON_CACHE: { at: number; map: Map<string, Map<string, DonNgay>> } | null = null;
 export function resetDonCache() {
   DON_CACHE = null;
@@ -185,7 +185,7 @@ async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>
     /* không đọc được đơn cũ thì bỏ qua */
   }
   const tu = vnDate(new Date(Date.now() - 400 * 864e5));
-  const rows = (await db.prepare("SELECT user_id, loai, tu, den, buoi, gio FROM ns_don WHERE st = 'xong' AND loai <> 'lambu' AND den >= ?").bind(tu).all<{ user_id: string; loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null }>()).results ?? [];
+  const rows = (await db.prepare("SELECT user_id, loai, tu, den, buoi, gio, so_ngay FROM ns_don WHERE st = 'xong' AND loai <> 'lambu' AND den >= ?").bind(tu).all<{ user_id: string; loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null; so_ngay: number }>()).results ?? [];
   const byUser = new Map<string, typeof rows>();
   for (const r of rows) byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), r]);
   for (const [u, list] of byUser)
@@ -193,6 +193,10 @@ async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>
       for (const x of ds) {
         const e = at(u, n);
         // Nghỉ theo giờ (CEO 10/11): đi muộn / về sớm ngày đó không tính vi phạm; không coi là nghỉ cả ngày.
+        // Phần ngày (nửa ngày 0,5; theo giờ = số ngày quy đổi của đơn): không lương thì trừ công, phép / ốm thì cộng ô phép hưởng lương.
+        const phan = x.buoi === 'gio' ? Number(x.so_ngay) || 0 : x.buoi === 'sang' || x.buoi === 'chieu' ? 0.5 : 0;
+        if (phan && x.loai === 'khongluong') e.kl = (e.kl ?? 0) + phan;
+        else if (phan && (x.loai === 'phep' || x.loai === 'om')) e.pg = (e.pg ?? 0) + phan;
         if (x.loai === 'vesom' || x.buoi === 'gio') e.coPhep = true;
         else if (x.loai === 'ot') e.ot = (e.ot ?? 0) + (x.gio ?? 0);
         else e.don = LOAI_DON[x.loai] + (x.buoi === 'sang' ? ' (sáng)' : x.buoi === 'chieu' ? ' (chiều)' : '');
@@ -200,7 +204,7 @@ async function loadDon(db: D1Database): Promise<Map<string, Map<string, DonNgay>
   DON_CACHE = { at: Date.now(), map };
   return map;
 }
-const donOpt = (e?: DonNgay) => ({ don: e?.don ?? null, coPhep: !!e?.coPhep, ot: e?.ot ?? 0 });
+const donOpt = (e?: DonNgay) => ({ don: e?.don ?? null, coPhep: !!e?.coPhep, ot: e?.ot ?? 0, kl: e?.kl ?? 0, pg: e?.pg ?? 0 });
 const leOf = (s: CcSettings, d: string) => s.ngayLe.some((x) => x.ngay === d);
 
 /** Máy chấm công: 'vp' máy văn phòng, 'xg' máy xưởng. */
