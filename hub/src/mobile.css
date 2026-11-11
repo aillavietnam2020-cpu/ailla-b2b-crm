@@ -458,3 +458,4 @@
   #tnrecbar .s svg{width:18px;height:18px;fill:currentColor}
   @keyframes tnrb{50%{opacity:.3}}
 }
+#chinst .pulse{animation:chpulse 1s ease-in-out 4}@keyframes chpulse{50%{transform:scale(1.12);box-shadow:0 0 0 6px rgba(99,91,255,.25)}}

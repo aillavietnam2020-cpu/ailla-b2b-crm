@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeSettings, type Lich } from '../../src/server/services/chamCong';
-import { coTheDuyet, donTheoNgay, leadsCuaPhong, sauLeadDuyet, soNgayNghi, trangThaiDau } from '../../src/server/services/nghiPhep';
+import { coTheDuyet, donTheoNgay, gioNghi, kiemNghiBu, ngayDaLamThem, leadsCuaPhong, sauLeadDuyet, soNgayNghi, trangThaiDau } from '../../src/server/services/nghiPhep';
+import { dayRule } from '../../src/server/services/chamCong';
 
 const s = normalizeSettings({});
 const vp = s.lich.find((l) => l.id === 'vp') as Lich;
@@ -119,5 +120,62 @@ describe('làm bù (CEO 06/11)', () => {
     const gio = { ngay: '2026-11-05', ...tongNgay([{ loai: 'vao', at: iso('2026-11-05', '08:40'), trong: 1 }, { loai: 'ra', at: iso('2026-11-05', '17:30'), trong: 1 }], vp, '2026-11-05', false, { bu: { kq: 'du', ngay: '2026-11-07', kieu: 'gio' } }) };
     expect(tongThang([muon], vp, '2026-11-10').viPham).toBe(1);
     expect(tongThang([gio], vp, '2026-11-10').viPham).toBe(0);
+  });
+});
+
+describe('nghỉ theo giờ (CEO 10/11)', () => {
+  const r = (d: string) => dayRule(vp, d);
+  it('tính giờ trong giờ làm, bỏ giờ nghỉ trưa, quy ra ngày theo giờ chuẩn', () => {
+    // văn phòng 08:00–17:30, trưa 12:00–13:30 → 8 giờ chuẩn
+    expect(gioNghi(vp, '2026-11-12', '14:00', '16:00', r('2026-11-12'))).toEqual({ gio: 2, soNgay: 0.25 });
+    expect(gioNghi(vp, '2026-11-12', '11:00', '14:00', r('2026-11-12'))).toEqual({ gio: 1.5, soNgay: 0.19 });
+    expect(gioNghi(vp, '2026-11-12', '07:00', '09:00', r('2026-11-12'))).toEqual({ gio: 1, soNgay: 0.13 });
+  });
+  it('báo lỗi khi giờ sai, ngoài giờ làm, ngày nghỉ, hoặc nghỉ hết ngày', () => {
+    expect(gioNghi(vp, '2026-11-12', '16:00', '14:00', r('2026-11-12'))).toHaveProperty('loi');
+    expect(gioNghi(vp, '2026-11-12', '18:00', '19:00', r('2026-11-12'))).toHaveProperty('loi');
+    expect(gioNghi(vp, '2026-11-15', '14:00', '16:00', r('2026-11-15'))).toHaveProperty('loi');
+    expect(gioNghi(vp, '2026-11-12', '08:00', '17:30', r('2026-11-12'))).toHaveProperty('loi');
+  });
+});
+
+describe('công hưởng lương (CEO 10/11)', () => {
+  const base = { vao: '2026-11-12T01:00:00.000Z', ra: '2026-11-12T10:30:00.000Z', muon: 0, som: 0, phut: 480, quenRa: false, ngoai: false, lam: true, ca: null, le: false, don: null, coPhep: false, ot: 0, kl: 0, pg: 0, lyDoMuon: null, canhBao: false, choXn: false, chamNgoai: false, bu: null, lamBu: null };
+  it('trừ phần nghỉ không lương nửa ngày / theo giờ, cộng ngày phép', async () => {
+    const { tongThang } = await import('../../src/server/services/chamCong');
+    const T = tongThang(
+      [
+        { ...base, ngay: '2026-11-10' },
+        { ...base, ngay: '2026-11-11', kl: 0.25 },
+        { ...base, ngay: '2026-11-12', kl: 0.5, don: 'Nghỉ không lương (sáng)' },
+        { ...base, ngay: '2026-11-13', pg: 0.25 },
+        { ...base, ngay: '2026-11-09', vao: null, ra: null, phut: 0, don: 'Nghỉ phép năm' },
+        { ...base, ngay: '2026-11-06', vao: null, ra: null, phut: 0, don: 'Nghỉ không lương' },
+      ],
+      vp,
+      '2026-11-20',
+    );
+    expect(T.cong).toBe(4);
+    expect(T.congHL).toBe(4.25); // 1 + 0,75 + 0,5 + 1 + 1 ngày phép
+    expect(T.phepHL).toBe(1.25);
+    expect(T.klNgay).toBe(1.75);
+  });
+});
+
+describe('làm trước, nghỉ sau (CEO 10/11)', () => {
+  const d = (ngay: string, lam: boolean, phut: number) => ({ ngay, lam, phut, vao: phut ? 'x' : null, ra: phut ? 'y' : null, lamBu: null }) as never;
+  it('chỉ lấy ngày nghỉ theo lịch đã qua có chấm đủ; nửa ngày khi làm chưa đủ giờ chuẩn', () => {
+    const L = [d('2026-11-01', false, 480), d('2026-11-08', false, 250), d('2026-11-09', true, 480), d('2026-11-02', false, 60), d('2026-11-15', false, 480)];
+    const r = ngayDaLamThem(L, vp, '2026-11-10', new Set());
+    expect(r.map((x) => [x.ngay, x.nua])).toEqual([['2026-11-08', true], ['2026-11-01', false]]);
+    expect(ngayDaLamThem(L, vp, '2026-11-10', new Set(['2026-11-01'])).map((x) => x.ngay)).toEqual(['2026-11-08']);
+  });
+  it('kiểm ngày nghỉ bù', () => {
+    const lam = { ngay: '2026-11-01', phut: 480, nua: false };
+    expect(kiemNghiBu(lam, { ngay: '2026-11-12', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toBeNull();
+    expect(kiemNghiBu(lam, { ngay: '2026-11-09', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toMatch(/hôm nay/);
+    expect(kiemNghiBu(lam, { ngay: '2026-11-15', buoi: 'ca' }, { lam: false }, '2026-11-10', 30)).toMatch(/ngày nghỉ/);
+    expect(kiemNghiBu({ ...lam, nua: true }, { ngay: '2026-11-12', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toMatch(/nửa ngày/);
+    expect(kiemNghiBu(lam, { ngay: '2026-12-12', buoi: 'ca' }, { lam: true }, '2026-11-10', 30)).toMatch(/30 ngày/);
   });
 });
