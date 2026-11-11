@@ -49,15 +49,17 @@ const ddCrm=()=>D().users.filter(u=>u.active!==false&&u.crm).map(u=>[u.crm,u.nam
 
 /* ---------- khung chung ---------- */
 function ddFrame(m,title,sub,body){
-  if(!DDS.d){m.innerHTML=H(title,sub)+(DDS.err?`<div class="note red">${esc(DDS.err)}</div>`:`<p class="hint">Đang tải…</p>`);ddLoad().then(ddRerender).catch(()=>ddRerender());return false}
-  m.innerHTML=H(title,sub)+`<div class="filters" style="gap:6px;margin-bottom:12px">${Object.entries(DD_NOI).map(([k,t])=>`<button class="btn sm${DDS.noi===k?" pri":""}" data-ddnoi="${k}">${t}</button>`).join("")}<span class="hint" style="margin:0 0 0 6px">Đang xem đồ ở ${DD_NOI[DDS.noi]}</span></div>`+body();
+  if(!DDS.d){m.innerHTML=(m.id==="dd-sub"?"":H(title,sub))+(DDS.err?`<div class="note red">${esc(DDS.err)}</div>`:`<p class="hint">Đang tải…</p>`);ddLoad().then(ddRerender).catch(()=>ddRerender());return false}
+  const emb=m.id==="dd-sub";
+  m.innerHTML=emb?body():H(title,sub)+`<div class="filters" style="gap:6px;margin-bottom:12px">${Object.entries(DD_NOI).map(([k,t])=>`<button class="btn sm${DDS.noi===k?" pri":""}" data-ddnoi="${k}">${t}</button>`).join("")}<span class="hint" style="margin:0 0 0 6px">Đang xem đồ ở ${DD_NOI[DDS.noi]}</span></div>`+body();
   m.querySelectorAll("[data-ddnoi]").forEach(b=>b.onclick=()=>{DDS.noi=b.dataset.ddnoi;try{localStorage.setItem("dd_noi",DDS.noi)}catch(e){}renderMain()});
   m.querySelectorAll("[data-ddtab]").forEach(b=>b.onclick=()=>{const[k,v]=b.dataset.ddtab.split(":");DDS.tab[k]=v;renderMain()});
   m.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{PAGE=b.dataset.go;render();scrollTo(0,0)});
   if(!document.getElementById("dd-css")){const s=document.createElement("style");s.id="dd-css";s.textContent=DD_CSS;document.head.appendChild(s)}
   return true;
 }
-const DD_CSS=`.ddrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line,#ece9f7)}.ddrow>div{flex:1;font-size:13.5px}
+const DD_CSS=`#dd-sub #dd-new,#dd-sub #dd-ym,#dd-sub #dd-dm,#dd-sub #dd-them,#dd-sub #dd-kk{display:none}.ddview{overflow-x:auto;white-space:nowrap}
+.ddrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line,#ece9f7)}.ddrow>div{flex:1;font-size:13.5px}
 @media(max-width:760px){table.ddt{min-width:0!important;width:100%}table.ddt thead{display:none}table.ddt tr{display:block;border-bottom:1px solid #ece9f7;padding:10px 12px}table.ddt td{display:inline-block;border:0!important;padding:2px 8px 2px 0!important;text-align:left!important;font-size:13px;vertical-align:top}table.ddt td:first-child{display:block;font-weight:700}table.ddt td.ddact{display:block;padding-top:6px!important}}`;
 const ddTabs=(k,L)=>L.map(([v,t,n])=>`<button class="btn sm${DDS.tab[k]===v?" pri":""}" data-ddtab="${k}:${v}">${t}${n?` <b>${n}</b>`:""}</button>`).join("");
 const ddOpen=html=>{$("#drawerIn").innerHTML=html;$("#drawer").hidden=false};
@@ -340,16 +342,35 @@ function pDdToi(m){
   ddWireActs(m,async a=>{const[k,id]=a.split(":");try{if(k==="ky"){await ddPost("/lay/"+id+"/ky");ddRe("Đã ký nhận")}else if(k==="tra")ddTra(DDS.d.lay.find(p=>p.id===id))}catch(er){ddErr(er)}});
 }
 
-/* ---------- Đăng ký trang + menu ---------- */
-Object.assign(PAGES,{vp_tq:pDdTq,vp_ton:pDdTon,vp_lay:pDdLay,vp_mau:pDdMau,vp_mua:pDdMua,vp_toi:pDdToi});
+/* ---------- Một trang gọn (chị Hoa 11/11: không bày 5 mục ra menu, chỉ một trang + vài nút tạo phiếu) ---------- */
+const DD_VIEW=[["tq","Cần làm"],["ton","Đồ đang có"],["lay","Phiếu lấy – trả"],["mau","Hàng mẫu"],["mua","Đề nghị mua"]];
+const DD_VIEW_FN={tq:pDdTq,ton:pDdTon,lay:pDdLay,mau:pDdMau,mua:pDdMua};
+try{DDS.view=localStorage.getItem("dd_view")||"tq"}catch(e){DDS.view="tq"}
+function pDdHub(m){
+  if(!DDS.d){m.innerHTML=H("Đồ dùng – thiết bị")+(DDS.err?`<div class="note red">${esc(DDS.err)}</div>`:`<p class="hint">Đang tải…</p>`);ddLoad().then(ddRerender).catch(()=>ddRerender());return}
+  const me=ddMe(),c=ddCho()||{},v=DD_VIEW_FN[DDS.view]?DDS.view:"tq",cnt={lay:c.lay,mau:c.mau,mua:c.mua};
+  m.innerHTML=H("Đồ dùng – thiết bị","Thiết bị quay, công cụ dụng cụ, hàng mẫu, đồ tiêu hao · HCNS quản lý")+`
+   <div class="filters" style="gap:6px;margin-bottom:10px">${Object.entries(DD_NOI).map(([k,t])=>`<button class="btn sm${DDS.noi===k?" pri":""}" data-ddnoi="${k}">${t}</button>`).join("")}
+    <span style="margin-left:auto"></span><button class="btn pri" data-ddmk="lay">＋ Phiếu lấy đồ</button><button class="btn" data-ddmk="mau">＋ Xin hàng mẫu</button><button class="btn" data-ddmk="mua">＋ Đề nghị mua</button>${me.hr?`<button class="btn" data-ddmk="them">＋ Thêm đồ</button><button class="btn" data-ddmk="kk">Kiểm kê</button>`:""}</div>
+   <div class="filters ddview" style="gap:6px;margin-bottom:12px;flex-wrap:nowrap">${DD_VIEW.map(([k,t])=>`<button class="btn sm${v===k?" pri":""}" data-ddv="${k}">${t}${cnt[k]?` <b>${cnt[k]}</b>`:""}</button>`).join("")}</div><div id="dd-sub"></div>`;
+  m.querySelectorAll("[data-ddnoi]").forEach(b=>b.onclick=()=>{DDS.noi=b.dataset.ddnoi;try{localStorage.setItem("dd_noi",DDS.noi)}catch(e){}renderMain()});
+  m.querySelectorAll("[data-ddv]").forEach(b=>b.onclick=()=>{DDS.view=b.dataset.ddv;try{localStorage.setItem("dd_view",DDS.view)}catch(e){}renderMain()});
+  const mk={lay:ddPhieu,mau:ddFormMau,mua:()=>ddFormMua(),them:()=>ddFormItem(),kk:ddKiemKe};
+  m.querySelectorAll("[data-ddmk]").forEach(b=>b.onclick=()=>mk[b.dataset.ddmk]());
+  DD_VIEW_FN[v](m.querySelector("#dd-sub"));
+}
+/* Chuông, nút cũ trỏ tới vp_lay / vp_mau / vp_mua / vp_ton: mở trang chung ở đúng phần. */
+const ddGo=v=>m=>{DDS.view=v;PAGE="vp_tq";pDdHub(m)};
+Object.assign(PAGES,{vp_tq:pDdHub,vp_ton:ddGo("ton"),vp_lay:ddGo("lay"),vp_mau:ddGo("mau"),vp_mua:ddGo("mua"),vp_toi:pDdToi});
 {
   const n=k=>()=>{const c=ddCho();return c&&c[k]||""};
+  const tong=()=>{const c=ddCho();return c&&(c.lay+c.mau+c.mua)||""};
   const hr=MODULES.find(x=>x.k==="hr");
-  if(hr){const g0=hr.groups;hr.groups=()=>{const G=g0();if(G.some(g=>g[0]==="Hành chính – đồ dùng"))return G;
-    return G.concat([["Hành chính – đồ dùng",[MI("vp_tq","Tổng quan đồ dùng",ddHrU),MI("vp_ton","Đồ dùng & thiết bị",ddHrU),MI("vp_lay","Lấy – trả đồ",ddHrU,n("lay")),MI("vp_mau","Yêu cầu hàng mẫu",ddHrU,n("mau")),MI("vp_mua","Đề nghị mua đồ dùng",ddHrU,n("mua"))]]])}}
+  if(hr){const g0=hr.groups;hr.groups=()=>{const G=g0();if(G.some(g=>g[1].some(i=>i[0]==="vp_tq")))return G;
+    return G.concat([["Hành chính",[MI("vp_tq","Đồ dùng – thiết bị",ddHrU,tong)]]])}}
   const mk=MODULES.find(x=>x.k==="mkt");
-  if(mk){const g0=mk.groups;mk.groups=function(){const r=g0.apply(this,arguments)||[];if(r.some(g=>g[0]==="Đồ đi quay"))return r;
-    return r.concat([["Đồ đi quay",[MI("vp_lay","Lấy – trả đồ",()=>true),MI("vp_mau","Yêu cầu hàng mẫu",()=>true,n("mau")),MI("vp_ton","Đồ dùng & thiết bị",()=>true)]]])}}
+  if(mk){const g0=mk.groups;mk.groups=function(){const r=g0.apply(this,arguments)||[];if(r.some(g=>g[1].some(i=>i[0]==="vp_tq")))return r;
+    return r.concat([["Đồ đi quay",[MI("vp_tq","Đồ dùng – thiết bị",()=>true,tong)]]])}}
   /* Kho thành phẩm: yêu cầu hàng mẫu chờ xuất (kế toán kho). */
   const sx=MODULES.find(x=>x.k==="sx");
   if(sx){const g0=sx.groups;sx.groups=function(){const r=g0.apply(this,arguments)||[];const g=r.find(x=>x[0]==="Kho thành phẩm");
