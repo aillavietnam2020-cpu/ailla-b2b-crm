@@ -467,8 +467,12 @@ PAGES.fb_cskh=pCsTq;
 if(typeof PERMS!=="undefined"&&!PERMS.some(g=>g[0]==="CSKH khách lẻ"))PERMS.push(["CSKH khách lẻ",[["cskh.lam","Chăm sóc khách lẻ được chia (CSKH)"],["cskh.quanly","Chia khách, xem mọi khách, báo cáo, cài đặt CSKH (Lead Sale)"]]]);
 const csSee=u=>!!u&&(u.role==="admin"||["CSKH","B2C","BDH"].includes(u.phongBan)||can(u,"cskh.lam")||can(u,"cskh.quanly"));
 const csLeadSee=u=>!!u&&(u.role==="admin"||can(u,"cskh.quanly")||(["CSKH","B2C"].includes(u.phongBan)&&["lead","truongphong"].includes(u.role)));
-{const i=MODULES.findIndex(x=>x.k==="b2c");
- MODULES.splice(i>=0?i+1:MODULES.length,0,{k:"cskh",zone:"Bán hàng",ic:"users",n:"CSKH khách lẻ",sub:"Khách Facebook · gọi chăm sóc",groups:()=>{
-   if(!csSee(ME))return [];if(!CSK.me&&!CSK.meBusy&&!CSK.err)csLoadMe().then(()=>{if(typeof render==="function"&&!(typeof svTyping==="function"&&svTyping()))render()}).catch(()=>{});
+/* Menu (chị Hoa 11/11: không để hai chỗ). CSKH nằm trong Kinh doanh: nhóm "Chăm sóc khách hàng" thay dòng fb_cskh cũ ở Kênh bán lẻ.
+   Web quản trị / không có mục Kinh doanh thì vẫn vào được qua trang fb_cskh (PAGES.fb_cskh = Tổng quan CSKH). */
+{const kd=MODULES.find(x=>x.k==="kd")||MODULES.find(x=>x.k==="b2c");
+ if(kd){const g0=kd.groups;kd.groups=()=>{let G=[];try{G=g0()}catch(e){}
+   G=G.map(([n,its])=>[n,its.filter(x=>x&&x[0]!=="fb_cskh")]).filter(x=>x[1].length);
+   if(!csSee(ME))return G;if(!CSK.me&&!CSK.meBusy&&!CSK.err)csLoadMe().then(()=>{if(typeof render==="function"&&!(typeof svTyping==="function"&&svTyping()))render()}).catch(()=>{});
    const n=()=>{const T=CSK.today&&CSK.today.rows;return T?T.filter(r=>["qua","nay","moi"].includes(r.state)).length||"":""};
-   return [["",[MI("cs_tq","Tổng quan"),MI("cs_today","Việc hôm nay",null,n),MI("cs_kh","Khách hàng"),MI("cs_don","Đơn hàng"),MI("cs_chia","Chia khách",csLeadSee),MI("cs_bc","Báo cáo",csLeadSee),MI("cs_cd","Cài đặt",csLeadSee)]]]}})}
+   const CS=["Chăm sóc khách hàng",[MI("cs_tq","Tổng quan CSKH"),MI("cs_today","Việc hôm nay",null,n),MI("cs_kh","Khách hàng"),MI("cs_don","Đơn hàng CSKH"),MI("cs_chia","Chia khách",csLeadSee),MI("cs_bc","Báo cáo CSKH",csLeadSee),MI("cs_cd","Cài đặt CSKH",csLeadSee)].filter(x=>!x[2]||x[2](ME))];
+   const at=G.findIndex(x=>x[0]==="Kênh bán lẻ");if(at>=0)G.splice(at+1,0,CS);else G.unshift(CS);return G}}}
