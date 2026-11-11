@@ -208,6 +208,13 @@ cskhRoutes.get('/list', async (c) => {
     where.push(ts.sql);
     binds.push(...ts.binds);
   }
+  const oc = str(c.req.query('orders'), 4);
+  if (oc === '0') where.push('order_count = 0');
+  else if (oc === '4') where.push('order_count > 3');
+  else if (['1', '2', '3'].includes(oc)) {
+    where.push('order_count = ?');
+    binds.push(Number(oc));
+  }
   const stf0 = str(c.req.query('state'), 10);
   if (stf0 === 'ngung') where.push("stop_reason <> ''");
   const sql = `SELECT ${COLS} FROM cskh_customers ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY COALESCE(last_order_day, '') DESC LIMIT 400`;
