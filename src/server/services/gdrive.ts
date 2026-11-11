@@ -91,7 +91,8 @@ const LIST = new Map<string, { v: DriveFile[]; at: number }>();
 
 export async function meta(key: SaKey, id: string): Promise<DriveMeta | null> {
   const hit = META.get(id);
-  if (hit && Date.now() - hit.at < 600_000) return hit.v;
+  // Không đọc được (chưa chia sẻ) chỉ nhớ 30 giây: chia sẻ xong là web thấy ngay.
+  if (hit && Date.now() - hit.at < (hit.v ? 600_000 : 30_000)) return hit.v;
   const f = await get<DriveFile>(key, `${API}/files/${encodeURIComponent(id)}?fields=id,name,parents,trashed&${COMMON}`);
   const v = f && !(f as { trashed?: boolean }).trashed ? { name: f.name, parents: f.parents ?? [] } : null;
   if (META.size > 5000) META.clear();

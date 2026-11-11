@@ -9,6 +9,7 @@ import { requirePermission } from '../middleware/rbac';
 import { donTheoNgay, LOAI_DON, type Buoi, type LoaiDon } from '../services/nghiPhep';
 import { loadMembers, type Members } from '../services/daoTao';
 import { bellTo } from '../lib/hubBell';
+import { b64u, kiemAuthData, kiemChuKy, kiemClientData, rpIdOf, taoThuThach } from '../lib/webauthn';
 import {
   CC_SETTINGS_KEY,
   ccViewer,
@@ -292,9 +293,140 @@ chamCongRoutes.get('/ip', (c) => {
   return ok(c, { ip, key: ipKey(ip) });
 });
 
+/* ---------------- Chấm công chính chủ (CEO 10/11): mỗi người một máy + vân tay / Face ID ---------------- */
+type MayDk = { user_id: string; cred_id: string; pub_key: string; alg: number; ten: string | null; created_at: string; last_at: string | null };
+/** Tên máy đọc từ trình duyệt (để HCNS nhận ra), ví dụ "iPhone", "Android · Redmi Note 12", "Máy tính Windows". */
+function tenMay(ua: string): string {
+  const a = /Android[^;)]*;\s*([^;)]+?)(?:\s+Build|\))/.exec(ua);
+  if (a) return 'Android · ' + a[1].trim().slice(0, 40);
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/Windows/.test(ua)) return 'Máy tính Windows';
+  if (/Macintosh/.test(ua)) return 'Máy Mac';
+  return 'Máy khác';
+}
+const hcnsOf = (m: Members) => Object.entries(m.users).filter(([, u]) => u.hr).map(([id]) => id);
+
+/** Máy chấm công của tôi + thử thách mới để ký (trình duyệt gọi ngay trước khi chấm). */
+chamCongRoutes.post('/may/thu-thach', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const rpId = rpIdOf(new URL(c.req.url).hostname);
+  const chal = taoThuThach();
+  const exp = new Date(Date.now() + 5 * 60_000).toISOString();
+  const [dk] = await Promise.all([
+    db.prepare('SELECT cred_id, ten, created_at FROM cc_may_dk WHERE user_id = ?').bind(auth.user.id).first<{ cred_id: string; ten: string | null; created_at: string }>(),
+    db.prepare('INSERT INTO cc_thu_thach (user_id, chal, exp) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET chal = excluded.chal, exp = excluded.exp').bind(auth.user.id, chal, exp).run(),
+  ]);
+  return ok(c, { chal, rpId, coMay: !!dk, credId: dk?.cred_id ?? null, tenMay: dk?.ten ?? null, uid: b64u.enc(new TextEncoder().encode(auth.user.id)), ten: auth.user.display_name });
+});
+
+/** Trình duyệt báo không xác nhận được trên máy này (máy lạ): ghi lại, báo HCNS một lần mỗi ngày mỗi người. */
+chamCongRoutes.post('/may/la', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const today = vnDate();
+  const dk = await db.prepare('SELECT 1 AS x FROM cc_may_dk WHERE user_id = ?').bind(auth.user.id).first();
+  if (!dk) return ok(c, { ghi: false });
+  const had = await db.prepare("SELECT 1 AS x FROM cc_may_canh_bao WHERE user_id = ? AND ngay = ? AND kieu = 'la'").bind(auth.user.id, today).first();
+  const ten = tenMay(c.req.header('user-agent') ?? '');
+  await db
+    .prepare("INSERT INTO cc_may_canh_bao (id, user_id, ngay, kieu, ten_may, did, created_at) VALUES (?, ?, ?, 'la', ?, ?, ?)")
+    .bind(crypto.randomUUID(), auth.user.id, today, ten, String(b.did ?? '').slice(0, 64) || null, nowIso())
+    .run();
+  if (!had) {
+    const m = await loadMembers(db, auth.user.id);
+    await bellTo(db, hcnsOf(m), `${m.users[auth.user.id]?.name ?? auth.user.display_name} thử chấm công trên máy lạ (${ten}), không phải máy đã đăng ký`, 'page:cc_caidat').catch(() => 0);
+  }
+  return ok(c, { ghi: true });
+});
+
+/** HCNS, CEO: danh sách máy chấm công đã đăng ký + cảnh báo 14 ngày gần đây. */
+chamCongRoutes.get('/may/ds', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const cx = await ctx(db, auth);
+  if (!cx.v.all) throw forbidden('Chỉ HCNS, CEO xem máy chấm công');
+  const tu = vnDate(new Date(Date.now() - 14 * 864e5));
+  const [dk, cb] = await Promise.all([
+    db.prepare('SELECT user_id, ten, created_at, last_at FROM cc_may_dk').all<{ user_id: string; ten: string | null; created_at: string; last_at: string | null }>(),
+    db
+      .prepare('SELECT user_id, ngay, kieu, ten_may, khac_id, created_at FROM cc_may_canh_bao WHERE ngay >= ? ORDER BY created_at DESC LIMIT 300')
+      .bind(tu)
+      .all<{ user_id: string; ngay: string; kieu: string; ten_may: string | null; khac_id: string | null; created_at: string }>(),
+  ]);
+  const nm = (id: string | null) => (id ? (cx.m.users[id]?.name ?? id) : '');
+  return ok(c, {
+    may: (dk.results ?? []).map((r) => ({ ...r, ten_nv: nm(r.user_id), pb: cx.m.users[r.user_id]?.pb ?? '' })),
+    canhBao: (cb.results ?? []).map((r) => ({ ...r, ten_nv: nm(r.user_id), ten_khac: nm(r.khac_id) })),
+  });
+});
+
+/** HCNS, CEO: cho đổi máy (xóa máy đã đăng ký; lần chấm tới trên máy mới sẽ đăng ký lại). */
+chamCongRoutes.post('/may/doi/:uid', async (c) => {
+  const auth = c.get('auth');
+  const db = c.env.DB;
+  const cx = await ctx(db, auth);
+  if (!cx.v.all) throw forbidden('Chỉ HCNS, CEO cho đổi máy chấm công');
+  const uid = c.req.param('uid');
+  await db.batch([
+    db.prepare('DELETE FROM cc_may_dk WHERE user_id = ?').bind(uid),
+    auditStatement(db, { actorId: auth.user.id, action: 'CC_DOI_MAY', entityType: 'CHAM_CONG', entityId: uid }),
+  ]);
+  return ok(c, { ok: true });
+});
+
+/**
+ * Kiểm lần chấm chính chủ: 'dk' = đăng ký máy (chưa có máy), 'xn' = ký bằng khóa trên máy đã đăng ký.
+ * Trả các câu lệnh cần chạy cùng lượt chấm (lưu máy / ghi lần dùng) hoặc báo lỗi dễ hiểu.
+ */
+async function kiemChinhChu(db: D1Database, userId: string, host: string, ua: string, xm: Record<string, unknown> | null, now: string): Promise<D1PreparedStatement[]> {
+  if (!xm) throw badRequest('CAN_XAC_NHAN', 'Chấm công cần xác nhận vân tay / Face ID. Tải lại trang (Ctrl+F5) rồi bấm chấm lại.');
+  const rpId = rpIdOf(host);
+  const th = await db.prepare('SELECT chal, exp FROM cc_thu_thach WHERE user_id = ?').bind(userId).first<{ chal: string; exp: string }>();
+  if (!th || th.exp < now) throw badRequest('HET_HAN', 'Mã xác nhận đã hết hạn, bấm chấm lại');
+  const dk = await db.prepare('SELECT * FROM cc_may_dk WHERE user_id = ?').bind(userId).first<MayDk>();
+  const cd = String(xm.cd ?? '');
+  const used = db.prepare('DELETE FROM cc_thu_thach WHERE user_id = ?').bind(userId);
+  if (xm.loai === 'dk') {
+    if (dk) throw badRequest('DA_CO_MAY', 'Bạn đã có máy chấm công. Đổi máy thì nhờ HCNS bấm Cho đổi máy.');
+    const e = kiemClientData(cd, 'webauthn.create', th.chal, rpId);
+    if (e) throw badRequest('XAC_NHAN', e);
+    if (xm.ad) {
+      const e2 = await kiemAuthData(b64u.dec(String(xm.ad)), rpId);
+      if (e2) throw badRequest('XAC_NHAN', e2);
+    }
+    const alg = Number(xm.alg);
+    const credId = String(xm.credId ?? '');
+    const pub = String(xm.pub ?? '');
+    if (!credId || !pub || (alg !== -7 && alg !== -257)) throw badRequest('XAC_NHAN', 'Máy này chưa hỗ trợ vân tay / Face ID cho web. Mở bằng Chrome hoặc Safari bản mới.');
+    return [
+      used,
+      db.prepare('INSERT INTO cc_may_dk (user_id, cred_id, pub_key, alg, ten, created_at, last_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(userId, credId, pub, alg, tenMay(ua), now, now),
+      auditStatement(db, { actorId: userId, action: 'CC_DK_MAY', entityType: 'CHAM_CONG', entityId: userId, after: { ten: tenMay(ua) } }),
+    ];
+  }
+  if (!dk) throw badRequest('CHUA_CO_MAY', 'Bạn chưa đăng ký máy chấm công. Tải lại trang rồi bấm chấm, web sẽ hỏi đăng ký máy này.');
+  if (String(xm.credId ?? '') !== dk.cred_id) throw badRequest('MAY_LA', 'Máy này không phải máy chấm công của bạn. Đổi máy thì nhờ HCNS bấm Cho đổi máy.');
+  const e = kiemClientData(cd, 'webauthn.get', th.chal, rpId);
+  if (e) throw badRequest('XAC_NHAN', e);
+  const ad = b64u.dec(String(xm.ad ?? ''));
+  const e2 = await kiemAuthData(ad, rpId);
+  if (e2) throw badRequest('XAC_NHAN', e2);
+  if (!(await kiemChuKy(dk.pub_key, dk.alg, ad, cd, String(xm.sig ?? ''))))
+    throw badRequest('MAY_LA', 'Xác nhận không khớp máy chấm công của bạn. Đổi máy thì nhờ HCNS bấm Cho đổi máy.');
+  return [used, db.prepare('UPDATE cc_may_dk SET last_at = ? WHERE user_id = ?').bind(now, userId)];
+}
+
+/** Máy tính (Windows, Linux, Chromebook): CEO 10/11 bỏ chấm công bằng máy tính, chỉ chấm bằng điện thoại. */
+export const laMayTinh = (ua: string) => /Windows NT|CrOS/.test(ua) || (/X11|Linux/.test(ua) && !/Android/.test(ua));
+
 chamCongRoutes.post('/cham', async (c) => {
   const auth = c.get('auth');
   const db = c.env.DB;
+  if (laMayTinh(c.req.header('user-agent') ?? ''))
+    throw badRequest('MAY_TINH', 'Không chấm công bằng máy tính nữa. Mở web trên điện thoại của bạn (Chrome hoặc Safari) để chấm công.');
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const loai = b.loai === 'ra' ? 'ra' : b.loai === 'vao' ? 'vao' : null;
   if (!loai) throw badRequest('LOAI', 'Chọn Chấm vào hoặc Chấm ra');
@@ -332,18 +464,30 @@ chamCongRoutes.post('/cham', async (c) => {
       .first<{ at: string }>();
     if (had) throw badRequest('DA_VAO', 'Hôm nay bạn đã chấm vào rồi. Lúc về thì bấm Chấm ra.');
   }
+  const ccc = await kiemChinhChu(db, auth.user.id, new URL(c.req.url).hostname, c.req.header('user-agent') ?? '', b.xm && typeof b.xm === 'object' ? (b.xm as Record<string, unknown>) : null, now);
+  const did = String(b.did ?? '').replace(/[^\w-]/g, '').slice(0, 64) || null;
+  // Một máy chấm cho người khác trong cùng ngày: báo HCNS (lượt vẫn ghi vì đã qua vân tay / Face ID của chính chủ).
+  const khac = did ? await db.prepare('SELECT user_id FROM cc_luot WHERE did = ? AND ngay = ? AND user_id <> ? LIMIT 1').bind(did, today, auth.user.id).first<{ user_id: string }>() : null;
   const id = crypto.randomUUID();
   const trong = near.trong === null ? null : near.trong ? 1 : 0;
   const anhId = ngoai ? crypto.randomUUID() : null;
   await db.batch([
+    ...ccc,
+    ...(khac
+      ? [db.prepare("INSERT INTO cc_may_canh_bao (id, user_id, ngay, kieu, ten_may, did, khac_id, created_at) VALUES (?, ?, ?, 'chung', ?, ?, ?, ?)").bind(crypto.randomUUID(), auth.user.id, today, tenMay(c.req.header('user-agent') ?? ''), did, khac.user_id, now)]
+      : []),
     ...(anhId ? [db.prepare('INSERT INTO cc_anh (id, user_id, data, created_at) VALUES (?, ?, ?, ?)').bind(anhId, auth.user.id, anh, now)] : []),
     db
       .prepare(
-        'INSERT INTO cc_luot (id, user_id, ngay, loai, at, lat, lng, acc, kc, diem, trong, ly_do, ly_do_muon, created_at, anh_id, xn, quay, gio_quay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO cc_luot (id, user_id, ngay, loai, at, lat, lng, acc, kc, diem, trong, ly_do, ly_do_muon, created_at, anh_id, xn, quay, gio_quay, did) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
-      .bind(id, auth.user.id, today, loai, now, lat, lng, acc, near.kc, near.diem?.ten ?? null, trong, lyDo || null, lyDoMuon || null, now, anhId, ngoai ? 'cho' : null, quay ? JSON.stringify(quay) : null, gioQuay),
+      .bind(id, auth.user.id, today, loai, now, lat, lng, acc, near.kc, near.diem?.ten ?? null, trong, lyDo || null, lyDoMuon || null, now, anhId, ngoai ? 'cho' : null, quay ? JSON.stringify(quay) : null, gioQuay, did),
     auditStatement(db, { actorId: auth.user.id, action: 'CC_CHAM', entityType: 'CHAM_CONG', entityId: id, after: { loai, ngay: today, kc: near.kc, trong } }),
   ]);
+  if (khac) {
+    const mm = await loadMembers(db, auth.user.id);
+    await bellTo(db, hcnsOf(mm), `Một máy vừa chấm công cho cả ${mm.users[khac.user_id]?.name ?? 'người khác'} và ${mm.users[auth.user.id]?.name ?? 'người khác'} hôm nay`, 'page:cc_caidat').catch(() => 0);
+  }
   if (ngoai) {
     const m = await loadMembers(db, auth.user.id);
     const ten = m.users[auth.user.id]?.name ?? 'Nhân viên';

@@ -59,6 +59,34 @@ interface ScanRow {
   order_ref: string;
   doc_id: number | null;
   source: string;
+  batch_id: number | null;
+}
+
+/* ---------- Phiếu nhận hàng hoàn (chị Hoa 10/11): mỗi lượt quét một phiếu theo ngày, in biên bản theo phiếu ---------- */
+interface BatchRow {
+  id: number;
+  no: string;
+  day: string;
+  kind: string;
+  created_at: string;
+  created_by: string | null;
+  closed_at: string | null;
+}
+async function newBatch(db: D1Database, day: string, kind: 'SCAN' | 'MANUAL', by: string): Promise<BatchRow> {
+  const n = (await db.prepare('SELECT COUNT(*) AS n FROM ret_batches WHERE day = ?').bind(day).first<{ n: number }>())?.n ?? 0;
+  const no = `PNH-${day.slice(8, 10)}${day.slice(5, 7)}${day.slice(2, 4)}-${String(n + 1).padStart(2, '0')}`;
+  return (await db
+    .prepare('INSERT INTO ret_batches (no, day, kind, created_at, created_by) VALUES (?, ?, ?, ?, ?) RETURNING *')
+    .bind(no, day, kind, nowIso(), by)
+    .first<BatchRow>())!;
+}
+/** Phiếu quét đang mở của ngày (chưa chốt); chưa có thì mở phiếu mới. */
+async function openScanBatch(db: D1Database, day: string, by: string): Promise<BatchRow> {
+  const cur = await db
+    .prepare("SELECT * FROM ret_batches WHERE day = ? AND kind = 'SCAN' AND closed_at IS NULL ORDER BY id DESC LIMIT 1")
+    .bind(day)
+    .first<BatchRow>();
+  return cur ?? newBatch(db, day, 'SCAN', by);
 }
 
 function parseItems(s: string): RetItem[] {
@@ -118,8 +146,12 @@ khoReturnRoutes.post('/sync', async (c) => {
 khoReturnRoutes.post('/scan', async (c) => {
   const auth = c.get('auth');
   if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
-  const b = (await c.req.json().catch(() => null)) as { code?: unknown; day?: unknown } | null;
+  const b = (await c.req.json().catch(() => null)) as { code?: unknown; day?: unknown; channel?: unknown; manual?: unknown } | null;
   const { code, vietnamese } = normalizeCode(String(b?.code ?? ''));
+  // Nhập tay (chị Hoa 10/11): mã vận đơn / mã đơn không quét được thì gõ tay, chọn sàn nếu web không tự tra ra.
+  const pickCh = ['TIKTOK', 'SHOPEE', 'FACEBOOK'].includes(String(b?.channel ?? '')) ? String(b?.channel) : null;
+  const manual = b?.manual === true;
+  const wantBatch = Number((b as { batch_id?: unknown } | null)?.batch_id) || 0;
   if (vietnamese) throw badRequest('UNIKEY', 'Mã có dấu tiếng Việt: tắt Unikey (chuyển sang E) rồi quét lại');
   if (code.length < 5) throw badRequest('BAD_CODE', 'Mã quá ngắn');
   const day = isDate(b?.day) ? b.day : vnToday();
@@ -138,13 +170,37 @@ khoReturnRoutes.post('/scan', async (c) => {
   const hit = hits[0];
   const items = hit ? await expectedItems(db, hit.channel, hit.order_id) : [];
   const now = nowIso();
+  // Gói vào phiếu: phiếu gõ tay truyền batch_id; quét máy vào phiếu quét đang mở của ngày.
+  let batch: BatchRow | null = null;
+  if (wantBatch) {
+    batch = await db.prepare('SELECT * FROM ret_batches WHERE id = ?').bind(wantBatch).first<BatchRow>();
+    if (!batch || batch.day !== day) throw badRequest('BAD_BATCH', 'Phiếu nhận không đúng ngày');
+    if (batch.closed_at) throw conflict('BATCH_CLOSED', `Phiếu ${batch.no} đã chốt`);
+  } else batch = await openScanBatch(db, day, auth.user.id);
   const r = await db
     .prepare(
-      `INSERT INTO ret_scans (code, scan_day, scanned_at, scanned_by, channel, order_id, items) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO ret_scans (code, scan_day, scanned_at, scanned_by, channel, order_id, items, note, batch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     )
-    .bind(code, day, now, auth.user.id, hit?.channel ?? guessChannel(code), hit?.order_id ?? null, JSON.stringify(items))
+    .bind(code, day, now, auth.user.id, hit?.channel ?? pickCh ?? guessChannel(code), hit?.order_id ?? null, JSON.stringify(items), manual ? 'Nhập tay' : '', batch.id)
     .first<ScanRow>();
   return ok(c, (await scanView(db, r ? [r] : []))[0]);
+});
+
+/** Tra thử một mã (chưa lưu): phiếu nhập hàng hoàn gõ tay hiện ngay sàn, mã đơn, hàng trong gói (chị Hoa 10/11). */
+khoReturnRoutes.get('/lookup', async (c) => {
+  const { code } = normalizeCode(String(c.req.query('code') ?? ''));
+  if (code.length < 5) return ok(c, { code, found: false });
+  const db = c.env.DB;
+  const dup = await db
+    .prepare("SELECT scan_day FROM ret_scans WHERE code = ? AND state <> 'HUY' ORDER BY id DESC LIMIT 1")
+    .bind(code)
+    .first<{ scan_day: string }>();
+  const hit = await db
+    .prepare('SELECT channel, order_id FROM ret_orders WHERE tracking = ? OR UPPER(order_id) = ? LIMIT 1')
+    .bind(code, code)
+    .first<{ channel: string; order_id: string }>();
+  const items = hit ? await expectedItems(db, hit.channel, hit.order_id) : [];
+  return ok(c, { code, found: !!hit, channel: hit?.channel ?? guessChannel(code), order_id: hit?.order_id ?? null, items, dup_day: dup?.scan_day ?? null });
 });
 
 /** Danh sách lượt quét của một ngày (mặc định hôm nay). */
@@ -154,7 +210,37 @@ khoReturnRoutes.get('/scans', async (c) => {
   const rows = (
     await c.env.DB.prepare("SELECT * FROM ret_scans WHERE scan_day = ? AND state <> 'HUY' ORDER BY id DESC").bind(d).all<ScanRow>()
   ).results ?? [];
-  return ok(c, { day: d, scans: await scanView(c.env.DB, rows) });
+  const batches = (
+    await c.env.DB.prepare(
+      `SELECT b.*, u.display_name AS created_by_name FROM ret_batches b LEFT JOIN users u ON u.id = b.created_by WHERE b.day = ? ORDER BY b.id`,
+    ).bind(d).all<BatchRow & { created_by_name: string | null }>()
+  ).results ?? [];
+  return ok(c, { day: d, scans: await scanView(c.env.DB, rows), batches });
+});
+
+/** Mở phiếu nhận mới: SCAN = chốt phiếu quét đang mở rồi mở phiếu mới (shipper khác tới); MANUAL = phiếu gõ tay. */
+khoReturnRoutes.post('/batches', async (c) => {
+  const auth = c.get('auth');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
+  const b = (await c.req.json().catch(() => null)) as { day?: unknown; kind?: unknown } | null;
+  const day = isDate(b?.day) ? b.day : vnToday();
+  const kind = b?.kind === 'MANUAL' ? 'MANUAL' : 'SCAN';
+  if (kind === 'SCAN')
+    await c.env.DB.prepare("UPDATE ret_batches SET closed_at = ?, closed_by = ? WHERE day = ? AND kind = 'SCAN' AND closed_at IS NULL")
+      .bind(nowIso(), auth.user.id, day)
+      .run();
+  return ok(c, await newBatch(c.env.DB, day, kind, auth.user.id));
+});
+
+/** Chốt phiếu nhận: không thêm gói vào nữa; lần quét sau mở phiếu mới. */
+khoReturnRoutes.post('/batches/:id/close', async (c) => {
+  const auth = c.get('auth');
+  if (!canWork(auth)) throw forbidden('Chỉ CEO, kế toán kho hoặc người có quyền nhập hàng hoàn');
+  const id = Number(c.req.param('id'));
+  await c.env.DB.prepare('UPDATE ret_batches SET closed_at = COALESCE(closed_at, ?), closed_by = COALESCE(closed_by, ?) WHERE id = ?')
+    .bind(nowIso(), auth.user.id, id)
+    .run();
+  return ok(c, { id });
 });
 
 /** Sửa kết quả kiểm một gói: số về thực tế / bán tiếp / hỏng từng món, vấn đề, ghi chú, link video, tình trạng khiếu nại. */
