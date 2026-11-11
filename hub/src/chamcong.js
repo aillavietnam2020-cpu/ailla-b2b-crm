@@ -140,7 +140,7 @@ let CC_TH=null,CC_THB=false;
 function ccPrep(force){if(CC_THB||(!force&&CC_TH&&Date.now()-CC_TH.at<240000))return;CC_THB=true;
   svApi("/api/hub/chamcong/may/thu-thach",{method:"POST",body:"{}"}).then(t=>{const doi=!CC_TH||CC_TH.coMay!==t.coMay;CC_TH={...t,at:Date.now()};CC_THB=false;if(doi&&typeof PAGE!=="undefined"&&PAGE==="cc_toi")ccRedraw()}).catch(()=>{CC_THB=false})}
 async function ccXacMinh(){
-  if(!window.PublicKeyCredential||!navigator.credentials)throw new CcLoi("Trình duyệt này chưa hỗ trợ vân tay / Face ID. Mở web bằng Chrome (Android, máy tính) hoặc Safari (iPhone) rồi chấm lại.","KHONG_HO_TRO");
+  if(!window.PublicKeyCredential||!navigator.credentials)throw new CcLoi("Trình duyệt này chưa hỗ trợ vân tay / Face ID. Mở web bằng Chrome (Android) hoặc Safari (iPhone) rồi chấm lại.","KHONG_HO_TRO");
   const t=CC_TH&&Date.now()-CC_TH.at<270000?CC_TH:await svApi("/api/hub/chamcong/may/thu-thach",{method:"POST",body:"{}"});CC_TH=null;
   if(!t.coMay){
     let cr;try{cr=await navigator.credentials.create({publicKey:{challenge:ccB64.d(t.chal),rp:{id:t.rpId,name:"Ailla chấm công"},user:{id:ccB64.d(t.uid),name:t.ten||"nhanvien",displayName:t.ten||"Nhân viên"},
@@ -156,7 +156,7 @@ async function ccXacMinh(){
   const r=as.response;return {loai:"xn",credId:as.id,ad:ccB64.e(r.authenticatorData),cd:ccB64.e(r.clientDataJSON),sig:ccB64.e(r.signature)};
 }
 async function ccCham(loai){
-  if(CC.busy)return;
+  if(CC.busy)return;if(!ccPhone()){toast("Chỉ chấm công bằng điện thoại");return}
   const O=CC.out&&CC.out.loai===loai?CC.out:null;
   if(O){const t=$("#cc-outnote");if(t)O.note=t.value;
     if(O.ly==="quay"&&!O.shoot&&!(O.note||"").trim()){toast("Ghi quay ở đâu, hoặc chọn buổi quay");return}
@@ -185,7 +185,7 @@ function ccClock(){clearInterval(CC_TICK);CC_TICK=setInterval(()=>{const el=docu
 
 /* ---------- Của tôi: nút chấm + ca + công trong tháng ---------- */
 function pCcToi(m){
-  try{ccPrep(false)}catch(e){}
+  try{if(ccPhone())ccPrep(false)}catch(e){}
   if(!CC.me){m.innerHTML=H("Chấm công")+(CC.err?`<section class="card"><p class="empty">${esc(CC.err)}</p></section>`:`<section class="card"><p class="empty">Đang tải…</p></section>`);ccLoadMe();return}
   const R=CC.me,L7=R.lich,T=R.tong,Q=R.quyTac,hn=R.homNay||[],vao=hn.find(x=>x.loai==="vao"),ra=hn.filter(x=>x.loai==="ra").pop(),today=R.today;
   const loai=vao?"ra":"vao",tdy=(R.ngay||[]).find(x=>x.ngay===today)||{},isCa=L7.kieu==="ca",ccCo=L7.chuyenCan&&L7.kieu!=="tudo";
@@ -207,7 +207,8 @@ function pCcToi(m){
     <div class="cc-clock" id="cc-clock">${[D7.getUTCHours(),D7.getUTCMinutes(),D7.getUTCSeconds()].map(n=>String(n).padStart(2,"0")).join(":")}</div>
     ${caLine}${st}${warn}${rs}${askMuon}${ccOutHtml(loai)}
     ${CC_TH&&!CC_TH.coMay?`<p class="cc-may">Lần chấm này sẽ <b>đăng ký thiết bị này làm máy chấm công</b> của bạn. Từ nay chỉ máy này chấm được, mỗi lần xác nhận bằng vân tay / Face ID (hoặc mã mở khóa máy). Đổi máy thì nhờ HCNS bấm Cho đổi máy.</p>`:CC_TH&&CC_TH.coMay?`<p class="hint">Máy chấm công: ${esc(CC_TH.tenMay||"đã đăng ký")} · xác nhận vân tay / Face ID khi chấm</p>`:""}
-    <button class="btn pri big cc-btn${loai==="ra"?" ra":""}" id="cc-go"${CC.busy?" disabled":""}>${CC.busy?"Đang lấy vị trí…":(loai==="vao"?"Chấm vào":(ra?"Chấm ra lại":"Chấm ra"))+(CC.out&&CC.out.loai===loai?" · gửi xác nhận":"")}</button>
+    ${!ccPhone()?`<p class="cc-may"><b>Chỉ chấm công bằng điện thoại.</b> Máy tính không chấm công được nữa: mở web trên điện thoại của bạn (Chrome hoặc Safari) để chấm.</p>`:""}
+    <button class="btn pri big cc-btn${loai==="ra"?" ra":""}" id="cc-go"${!ccPhone()?" hidden":""}${CC.busy?" disabled":""}>${CC.busy?"Đang lấy vị trí…":(loai==="vao"?"Chấm vào":(ra?"Chấm ra lại":"Chấm ra"))+(CC.out&&CC.out.loai===loai?" · gửi xác nhận":"")}</button>
     ${CC.err?`<p class="cc-err">${esc(CC.err)}</p>`:""}
     <p class="hint">${ccLichTxt(L7)}.</p>
     <p class="hint">Bấm nút, điện thoại sẽ hỏi cho phép xem vị trí: chọn Cho phép. Giờ chấm lấy theo đồng hồ máy chủ.${R.diem.length?" Chấm ở: "+R.diem.map(d=>esc(d.ten)).join(", ")+".":" CEO / HCNS chưa cài điểm chấm nên chưa kiểm được vị trí."}</p>
