@@ -3,6 +3,8 @@ import { nowIso } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
 import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { auditStatement } from '../lib/audit';
+import { accountantIds, taskStatements } from '../lib/notifyTasks';
+import { bellTo } from '../lib/hubBell';
 import { CHANNEL_LABELS, type Channel } from '../services/channelOut';
 import {
   OVERDUE_RETURNED_DAYS,
@@ -87,6 +89,55 @@ async function openScanBatch(db: D1Database, day: string, by: string): Promise<B
     .bind(day)
     .first<BatchRow>();
   return cur ?? newBatch(db, day, 'SCAN', by);
+}
+
+/* Chốt phiếu còn gói chưa tra ra đơn (chị Hoa 10/11): giao việc + chuông cho Kế toán (không giao quản lý / CEO) để tra trên seller,
+   điền mã đơn ở tab Chưa tra ra đơn. Tra xong hết thì việc tự xong. */
+const RET_TASK = (no: string) => `Tra đơn hàng hoàn phiếu ${no}:`;
+async function keToanIds(db: D1Database): Promise<string[]> {
+  const r = (
+    await db
+      .prepare(
+        `SELECT DISTINCT u.id FROM users u JOIN user_permissions p ON p.user_id = u.id AND p.permission = 'order.accounting.confirm'
+         WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL AND u.kind = 'HUMAN' AND u.role NOT IN ('CEO', 'MANAGER')`,
+      )
+      .all<{ id: string }>()
+  ).results ?? [];
+  return r.length ? r.map((x) => x.id) : accountantIds(db);
+}
+async function retBatchTask(db: D1Database, batchId: number, by: string): Promise<number> {
+  const b = await db.prepare('SELECT no FROM ret_batches WHERE id = ?').bind(batchId).first<{ no: string }>();
+  if (!b) return 0;
+  const n = (await db.prepare("SELECT COUNT(*) AS n FROM ret_scans WHERE batch_id = ? AND order_id IS NULL AND state <> 'HUY' AND source <> 'BULK'").bind(batchId).first<{ n: number }>())?.n ?? 0;
+  if (!n) return 0;
+  const had = await db.prepare("SELECT 1 FROM tasks WHERE status = 'OPEN' AND title LIKE ?").bind(`${RET_TASK(b.no)}%`).first();
+  if (had) return n;
+  const ids = await keToanIds(db);
+  const title = `${RET_TASK(b.no)} ${n} gói chưa tra ra đơn. Tra mã vận đơn trên seller, điền mã đơn ở Kho – Sản xuất › Hàng hoàn › Chưa tra ra đơn.`;
+  const st = taskStatements(db, ids, { title, createdBy: by, now: nowIso(), priority: 'HIGH' });
+  if (st.length) await db.batch(st);
+  await bellTo(db, ids, title, 'kho_hoan').catch(() => 0);
+  return n;
+}
+/** Phiếu nào đã tra ra hết đơn thì việc tra đơn của phiếu đó tự xong. */
+async function retBatchTaskDone(db: D1Database): Promise<void> {
+  const open = (
+    await db.prepare("SELECT DISTINCT title FROM tasks WHERE status = 'OPEN' AND title LIKE 'Tra đơn hàng hoàn phiếu %'").all<{ title: string }>()
+  ).results ?? [];
+  for (const t of open) {
+    const no = /phiếu (\S+):/.exec(t.title)?.[1];
+    if (!no) continue;
+    const left = (
+      await db
+        .prepare("SELECT COUNT(*) AS n FROM ret_scans s JOIN ret_batches b ON b.id = s.batch_id WHERE b.no = ? AND s.order_id IS NULL AND s.state <> 'HUY' AND s.source <> 'BULK'")
+        .bind(no)
+        .first<{ n: number }>()
+    )?.n ?? 0;
+    if (!left)
+      await db.prepare("UPDATE tasks SET status = 'DONE', completed_at = ?, updated_at = ? WHERE status = 'OPEN' AND title LIKE ?")
+        .bind(nowIso(), nowIso(), `${RET_TASK(no)}%`)
+        .run();
+  }
 }
 
 function parseItems(s: string): RetItem[] {
@@ -225,10 +276,13 @@ khoReturnRoutes.post('/batches', async (c) => {
   const b = (await c.req.json().catch(() => null)) as { day?: unknown; kind?: unknown } | null;
   const day = isDate(b?.day) ? b.day : vnToday();
   const kind = b?.kind === 'MANUAL' ? 'MANUAL' : 'SCAN';
-  if (kind === 'SCAN')
+  if (kind === 'SCAN') {
+    const olds = (await c.env.DB.prepare("SELECT id FROM ret_batches WHERE day = ? AND kind = 'SCAN' AND closed_at IS NULL").bind(day).all<{ id: number }>()).results ?? [];
     await c.env.DB.prepare("UPDATE ret_batches SET closed_at = ?, closed_by = ? WHERE day = ? AND kind = 'SCAN' AND closed_at IS NULL")
       .bind(nowIso(), auth.user.id, day)
       .run();
+    for (const o of olds) await retBatchTask(c.env.DB, o.id, auth.user.id);
+  }
   return ok(c, await newBatch(c.env.DB, day, kind, auth.user.id));
 });
 
@@ -240,7 +294,8 @@ khoReturnRoutes.post('/batches/:id/close', async (c) => {
   await c.env.DB.prepare('UPDATE ret_batches SET closed_at = COALESCE(closed_at, ?), closed_by = COALESCE(closed_by, ?) WHERE id = ?')
     .bind(nowIso(), auth.user.id, id)
     .run();
-  return ok(c, { id });
+  const unmatched = await retBatchTask(c.env.DB, id, auth.user.id);
+  return ok(c, { id, unmatched });
 });
 
 /** Sửa kết quả kiểm một gói: số về thực tế / bán tiếp / hỏng từng món, vấn đề, ghi chú, link video, tình trạng khiếu nại. */
@@ -617,6 +672,7 @@ khoReturnRoutes.post('/rematch', async (c) => {
     await db.prepare('UPDATE ret_scans SET channel = ?, order_id = ?, items = ? WHERE id = ?').bind(hit.channel, hit.order_id, JSON.stringify(items), r.id).run();
     n += 1;
   }
+  await retBatchTaskDone(c.env.DB).catch(() => undefined);
   return ok(c, { matched: n, left: rows.length - n });
 });
 
@@ -687,6 +743,7 @@ khoReturnRoutes.post('/scans/:id/link', async (c) => {
     .bind(hit.channel, hit.order_id, JSON.stringify(items), code, id)
     .run();
   const r = await db.prepare('SELECT * FROM ret_scans WHERE id = ?').bind(id).first<ScanRow>();
+  await retBatchTaskDone(db).catch(() => undefined);
   return ok(c, (await scanView(db, r ? [r] : []))[0]);
 });
 
@@ -769,5 +826,6 @@ khoReturnRoutes.post('/scans/:id/order-ref', async (c) => {
   }
   const r = await db.prepare('SELECT * FROM ret_scans WHERE id = ?').bind(id).first<ScanRow>();
   const view = (await scanView(db, r ? [r] : []))[0];
+  if (hit) await retBatchTaskDone(db).catch(() => undefined);
   return ok(c, { ...view, linked: !!hit });
 });

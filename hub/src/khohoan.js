@@ -171,10 +171,10 @@ function retBind(m){
   m.querySelectorAll("[data-rt]").forEach(b=>b.onclick=()=>{RET.tab=b.dataset.rt;if(RET.tab!=="scan")RET.recon=null;renderMain()});
   if($("#rt-add"))$("#rt-add").onclick=retAddOpen;
   m.querySelectorAll("[data-bb]").forEach(b=>b.onclick=()=>retBienBan(+b.dataset.bb));
-  m.querySelectorAll("[data-bc]").forEach(b=>b.onclick=async()=>{if(!confirm("Chốt phiếu này? Gói quét sau sẽ vào phiếu mới."))return;try{await kApi("/ret/batches/"+b.dataset.bc+"/close",{method:"POST",body:"{}"});RET.scans=null;renderMain()}catch(e){toast(e.message)}});
+  m.querySelectorAll("[data-bc]").forEach(b=>b.onclick=async()=>{if(!confirm("Chốt phiếu này? Gói quét sau sẽ vào phiếu mới."))return;try{const r=await kApi("/ret/batches/"+b.dataset.bc+"/close",{method:"POST",body:"{}"});if(r.unmatched)toast("Còn "+r.unmatched+" gói chưa tra ra đơn: đã giao việc cho Kế toán.");RET.scans=null;renderMain()}catch(e){toast(e.message)}});
   if($("#rt-nb"))$("#rt-nb").onclick=async()=>{const B=(RET.scans&&RET.scans.batches)||[],cur=B.slice().reverse().find(b=>b.kind==="SCAN"&&!b.closed_at);if(!cur)return;
     if(!confirm("Chốt phiếu "+cur.no+"? Gói tít sau sẽ vào phiếu mới."))return;
-    try{await kApi("/ret/batches/"+cur.id+"/close",{method:"POST",body:"{}"});toast("Đã chốt phiếu "+cur.no+". Bấm In biên bản ở dòng phiếu để shipper ký.");RET.scans=null;renderMain()}catch(e){toast(e.message)}};
+    try{const r=await kApi("/ret/batches/"+cur.id+"/close",{method:"POST",body:"{}"});toast("Đã chốt phiếu "+cur.no+"."+(r.unmatched?" Còn "+r.unmatched+" gói chưa tra ra đơn: đã giao việc cho Kế toán tra và cập nhật vào phiếu.":"")+" Bấm In biên bản ở dòng phiếu để shipper ký.");RET.scans=null;renderMain()}catch(e){toast(e.message)}};
   const inp=$("#rt-code");
   if(inp)inp.onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();const code=inp.value.trim();inp.value="";if(!code)return;
     try{const s=await kApi("/ret/scan",{method:"POST",body:JSON.stringify({code,day:RET.day||retToday()})});retBeep(!!s.channel);

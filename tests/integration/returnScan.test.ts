@@ -275,4 +275,16 @@ describe('Gói chưa tra ra đơn: kế toán điền mã đơn từ seller', ()
     expect(S.filter((x) => x.batch_id === B[0].id).length).toBe(2);
     expect(S.find((x) => x.code === 'LUOT2CCCCC')?.batch_id).toBe(B[1].id);
   });
+
+  it('chốt phiếu còn gói chưa tra ra đơn thì giao việc kế toán; không có gói thiếu thì không giao', async () => {
+    const day = '2026-11-11';
+    await ctx.db.prepare("INSERT INTO user_permissions (user_id, permission, created_at) VALUES ('user-huyen', 'order.accounting.confirm', '2026-11-01T00:00:00.000Z')").run();
+    await ctx.request('/api/hub/kho/ret/scan', { as: USERS.ceo, body: { code: 'KHONGRA0001', day } });
+    const g = await ctx.request(`/api/hub/kho/ret/scans?day=${day}`, { as: USERS.ceo, method: 'GET' });
+    const bid = g.body.data.batches[0].id as number;
+    const cl = await ctx.request(`/api/hub/kho/ret/batches/${bid}/close`, { as: USERS.ceo, body: {} });
+    expect(cl.body.data.unmatched).toBe(1);
+    const t = await ctx.db.prepare("SELECT assignee_id FROM tasks WHERE status = 'OPEN' AND title LIKE 'Tra đơn hàng hoàn phiếu PNH-111126-01:%'").all<{ assignee_id: string }>();
+    expect(t.results.length).toBeGreaterThan(0);
+  });
 });
