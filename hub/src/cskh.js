@@ -476,5 +476,5 @@ const csLeadSee=u=>!!u&&(u.role==="admin"||can(u,"cskh.quanly")||(["CSKH","B2C"]
    G=G.map(([n,its])=>[n,its.filter(x=>x&&x[0]!=="fb_cskh")]).filter(x=>x[1].length);
    if(!csSee(ME))return G;if(!CSK.me&&!CSK.meBusy&&!CSK.err)csLoadMe().then(()=>{if(typeof render==="function"&&!(typeof svTyping==="function"&&svTyping()))render()}).catch(()=>{});
    const n=()=>{const T=CSK.today&&CSK.today.rows;return T?T.filter(r=>["qua","nay","moi"].includes(r.state)).length||"":""};
-   const CS=["Chăm sóc khách hàng",[MI("cs_tq","Tổng quan CSKH"),MI("cs_today","Việc hôm nay",null,n),MI("cs_kh","Khách hàng"),MI("cs_don","Đơn hàng CSKH"),MI("cs_chia","Chia khách",csLeadSee),MI("cs_bc","Báo cáo CSKH",csLeadSee),MI("cs_cd","Cài đặt CSKH",csLeadSee)].filter(x=>!x[2]||x[2](ME))];
+   const CS=["Chăm sóc khách hàng",[MI("cs_tq","Tổng quan CSKH"),MI("cs_today","Việc hôm nay",null,n),MI("cs_kh","Khách hàng"),MI("cs_don","Đơn hàng CSKH"),MI("cs_chia","Chia khách",csLeadSee),MI("cs_cd","Cài đặt CSKH",csLeadSee)].filter(x=>!x[2]||x[2](ME))];
    const at=G.findIndex(x=>x[0]==="Kênh bán lẻ");if(at>=0)G.splice(at+1,0,CS);else G.unshift(CS);return G}}}

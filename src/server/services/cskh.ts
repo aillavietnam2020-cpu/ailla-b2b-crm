@@ -350,16 +350,11 @@ export async function posStatuses(db: D1Database, secret: string | undefined, fe
             const r = await fetchFn(`${API}/shops/${encodeURIComponent(shop)}/orders/${encodeURIComponent(id)}?api_key=${encodeURIComponent(key)}`);
             if (!r.ok) return null;
             const j = JSON.parse(await r.text()) as { data?: Record<string, unknown> & { status?: number } };
-            // Chẩn đoán (10/11): xem Poscake ghi người tạo / thẻ / nguồn của đơn CSKH thế nào (chỉ tên trường, mã, tên nhân viên).
             const d = j.data ?? {};
-            const dbg = JSON.stringify({ id, tags: d.tags, creator: d.creator, assigning_seller: d.assigning_seller, assigning_care: d.assigning_care, order_sources: d.order_sources, order_sources_name: d.order_sources_name, partner: d.partner, keys: Object.keys(d) }).slice(0, 6000);
-            await putSetting(db, 'pos_debug', dbg);
-            console.info('[cskh] don poscake', id, JSON.stringify({ tags: d.tags, creator: d.creator, assigning_seller: d.assigning_seller, assigning_care: d.assigning_care, assigning_seller_id: d.assigning_seller_id, assigning_care_id: d.assigning_care_id, order_sources: d.order_sources, order_sources_name: d.order_sources_name, account: d.account, keys: Object.keys(d).slice(0, 120) }).slice(0, 3000));
             const st = Number(j.data?.status);
             const pt = (d.partner ?? {}) as Record<string, unknown>;
             const code = String(pt.extend_code ?? pt.partner_order_id ?? pt.order_number_vtp ?? d.tracking_code ?? '').trim();
             const carrier = String(pt.partner_name ?? (pt.partner_id !== undefined ? 'ĐVVC ' + pt.partner_id : '')).trim();
-            console.info('[cskh] partner', id, JSON.stringify(pt).slice(0, 1500));
             return Number.isFinite(st) ? ([id, st, code, carrier] as const) : null;
           } catch {
             return null;
@@ -427,17 +422,56 @@ export async function loadVariations(db: D1Database, secret: string | undefined,
   }
 }
 
+/** Người xử lý / chăm sóc trên Poscake = nhân viên Poscake trùng tên người tạo đơn trên web; nguồn đơn = nguồn tên "CSKH". Lưu tạm 1 ngày. */
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
+async function posPeople(db: D1Database, shop: string, key: string, byName: string): Promise<{ userId: string | null; sourceId: number | string | null }> {
+  type Cache = { at: string; users: Array<{ id: string; name: string }>; cskh: number | string | null };
+  let c = await getSetting<Cache>(db, 'pos_people');
+  if (!c || Date.now() - Date.parse(c.at) > 86_400_000) {
+    const users: Array<{ id: string; name: string }> = [];
+    let cskh: number | string | null = null;
+    try {
+      const r = await fetch(`${API}/shops/${encodeURIComponent(shop)}/users?api_key=${encodeURIComponent(key)}`);
+      const j = JSON.parse(await r.text()) as { data?: Array<Record<string, unknown>> };
+      for (const u of j.data ?? []) {
+        const inner = (u.user ?? {}) as Record<string, unknown>;
+        const id = String(inner.id ?? u.user_id ?? u.id ?? '');
+        const name = String(u.name ?? inner.name ?? '').trim();
+        if (id && name) users.push({ id, name });
+      }
+    } catch {
+      /* không lấy được thì để Poscake tự gán */
+    }
+    try {
+      const r = await fetch(`${API}/shops/${encodeURIComponent(shop)}/order_source?api_key=${encodeURIComponent(key)}`);
+      const j = JSON.parse(await r.text()) as { data?: Array<{ id?: number | string; name?: string }> };
+      const f = (j.data ?? []).find((x) => fold(String(x.name ?? '')) === 'cskh');
+      if (f && f.id !== undefined) cskh = f.id;
+    } catch {
+      /* bỏ qua */
+    }
+    c = { at: new Date().toISOString(), users, cskh };
+    await putSetting(db, 'pos_people', c);
+  }
+  const n = fold(byName);
+  const u = n ? c.users.find((x) => fold(x.name) === n) ?? c.users.find((x) => fold(x.name).endsWith(' ' + n) || n.endsWith(' ' + fold(x.name))) : undefined;
+  return { userId: u?.id ?? null, sourceId: c.cskh };
+}
+
 /** Gửi đơn sang Poscake (trạng thái Mới). Trả mã đơn Poscake hoặc lỗi. */
 export async function sendOrderToPoscake(
   db: D1Database,
   secret: string | undefined,
   postFn: PostFn,
-  od: { recv_name: string; recv_phone: string; recv_addr: string; items: Array<{ vid: string; q: number; price: number; n: string }>; ship: number; discount: number; note: string; note_print?: string; paid?: number; payment: string; ref: string },
+  od: { recv_name: string; recv_phone: string; recv_addr: string; items: Array<{ vid: string; q: number; price: number; n: string }>; ship: number; discount: number; note: string; note_print?: string; paid?: number; payment: string; ref: string; by_name?: string },
 ): Promise<{ pos_id: string | null; error: string }> {
   if (od.items.some((i) => !i.vid)) return { pos_id: null, error: 'Có sản phẩm chưa khớp mã trên Poscake, cần lên đơn tay' };
   try {
     const { shop, key } = await openFacebook(db, secret);
+    const who = await posPeople(db, shop, key, od.by_name ?? '');
     const body = {
+      ...(who.userId ? { assigning_seller_id: who.userId, assigning_care_id: who.userId } : {}),
+      ...(who.sourceId !== null ? { order_sources: who.sourceId } : {}),
       bill_full_name: od.recv_name,
       bill_phone_number: od.recv_phone,
       shipping_address: { full_name: od.recv_name, phone_number: od.recv_phone, address: od.recv_addr, full_address: od.recv_addr },
