@@ -419,9 +419,14 @@ async function kiemChinhChu(db: D1Database, userId: string, host: string, ua: st
   return [used, db.prepare('UPDATE cc_may_dk SET last_at = ? WHERE user_id = ?').bind(now, userId)];
 }
 
+/** Máy tính (Windows, Linux, Chromebook): CEO 10/11 bỏ chấm công bằng máy tính, chỉ chấm bằng điện thoại. */
+export const laMayTinh = (ua: string) => /Windows NT|CrOS/.test(ua) || (/X11|Linux/.test(ua) && !/Android/.test(ua));
+
 chamCongRoutes.post('/cham', async (c) => {
   const auth = c.get('auth');
   const db = c.env.DB;
+  if (laMayTinh(c.req.header('user-agent') ?? ''))
+    throw badRequest('MAY_TINH', 'Không chấm công bằng máy tính nữa. Mở web trên điện thoại của bạn (Chrome hoặc Safari) để chấm công.');
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const loai = b.loai === 'ra' ? 'ra' : b.loai === 'vao' ? 'vao' : null;
   if (!loai) throw badRequest('LOAI', 'Chọn Chấm vào hoặc Chấm ra');
