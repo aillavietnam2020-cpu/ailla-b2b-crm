@@ -63,7 +63,7 @@ function csFrame(m,title,sub,body,bar){
   const tabs=[["cs_tq","Tổng quan"],["cs_today","Việc hôm nay",cnt],["cs_kh","Khách hàng"],["cs_don","Đơn hàng"]].concat(lead?[["cs_chia","Chia khách"],["cs_bc","Báo cáo"],["cs_cd","Cài đặt"]]:[]);
   const cur=PAGE==="fb_cskh"?"cs_tq":PAGE;
   if(CSK.open){m.innerHTML=H("Hồ sơ khách","")+csProfile();csBind(m);csProfBind(m);return}
-  m.innerHTML=H(title,sub)+`<div class="cs-tabs">${tabs.map(([k,t,n])=>`<button data-csgo="${k}" class="${cur===k&&!CSK.open?"on":""}">${t}${n?`<em>${n}</em>`:""}</button>`).join("")}</div>
+  m.innerHTML=H(title,sub)+`
    <div class="cs-bar">${bar&&bar.search||`<div class="cs-s"><input id="csgq" placeholder="Tìm khách: SĐT, tên, mã đơn" value="${esc(CSK.gq)}" autocomplete="off">${csDrop()}</div>`}${bar&&bar.extra||""}<span class="cs-sp"></span>
    <button class="btn" data-csnewkh="1">＋ Thêm khách</button><button class="btn pri" data-csnewdon="">＋ Tạo đơn</button></div>`+(CSK.open?csProfile():body());
   csBind(m);
@@ -72,6 +72,8 @@ function csDrop(){if(!CSK.gq||CSK.gq.length<2||!CSK.gres)return "";const R=CSK.g
   return `<div class="cs-drop">${R.length?R.map(r=>r.lock?`<button class="lk" disabled><b>${esc(r.masked)}</b><div class="hint">Khách đang do ${esc(r.owner)} chăm, không xem được</div></button>`:`<button data-csopen="${r.phone}"><b>${esc(r.name)}</b> ${pill(r.tier,r.tier==="VIP"?"vio":"gry")}<div class="hint">${esc(csPh(r.phone))} · ${esc(r.addr)}</div></button>`).join(""):`<button data-csnewkh="${esc(CSK.gq.replace(/\D/g,""))}"><b>Không thấy khách "${esc(CSK.gq)}"</b><div class="hint">Bấm để thêm khách mới</div></button>`}</div>`}
 let _csGqT=0;
 function csBind(m){
+  /* chị Hoa 11/11: bỏ hàng tab trong trang (menu trái đã có), ô chọn tháng đưa lên cùng hàng với ô tìm. */
+  {const mon=m.querySelector("#csmon,#csdm,#csrm"),sp=m.querySelector(".cs-bar .cs-sp");if(mon&&sp&&!sp.parentElement.contains(mon)){const w=mon.parentElement;sp.insertAdjacentElement("afterend",mon);if(w&&!w.children.length)w.remove()}}
   const gq=m.querySelector("#csgq");if(gq){gq.oninput=()=>{CSK.gq=gq.value;clearTimeout(_csGqT);if(CSK.gq.trim().length<2){CSK.gres=null;const d=m.querySelector(".cs-drop");if(d)d.remove();return}
     _csGqT=setTimeout(()=>csApi("/search?q="+encodeURIComponent(CSK.gq.trim())).then(r=>{CSK.gres=r;const box=m.querySelector(".cs-s");if(!box)return;const old=box.querySelector(".cs-drop");if(old)old.remove();box.insertAdjacentHTML("beforeend",csDrop());csBind2(box)}).catch(csErr),300)};
     gq.onkeydown=e=>{if(e.key==="Escape"){CSK.gq="";CSK.gres=null;renderMain()}}}
