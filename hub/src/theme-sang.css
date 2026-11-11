@@ -605,3 +605,20 @@ body.pop-open{overflow:hidden}
 
 /* Quy tắc kế toán (07/11) */
 .qtk-sw{display:inline-flex;align-items:center;gap:6px;cursor:pointer}.qtk-sw input{width:18px;height:18px}
+
+/* Hàng hoàn: phần quét + phiếu đang quét (11/11) */
+.rtscan .rtsh{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.rtscan .rtsh h2{margin:0;white-space:nowrap}
+.rtday{display:inline-flex;align-items:center;gap:8px;margin:0;white-space:nowrap;font-weight:600;color:#475069}
+.rtsp{flex:1}
+.rtph{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:#f3f5ff;border:1px solid #dfe3fb;border-radius:12px;padding:10px 14px;margin-bottom:10px}
+.rtph small{display:block;font-size:11px;color:#7a8199;text-transform:uppercase;letter-spacing:.03em}
+.rtph b{font-size:17px}
+.rtph.off{background:#f7f8fa;border-color:#e6e8ee}
+.rtph.off b{color:#9aa1b2}
+.rtpn{display:flex;align-items:baseline;gap:4px}.rtpn b{font-size:22px;color:#3f47d6}.rtpn small{display:inline;text-transform:none;font-size:13px}
+.rtpc{color:#475069;font-size:13px}.rtpc b{font-size:13px}
+.rtph .btn{min-width:110px}
+.rtsteps{margin:8px 0 0;padding-left:20px;color:#6b7280;font-size:13px;line-height:1.7}
+.rtbh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #eef0f4;background:#fafbfc}
+@media (max-width:640px){.rtph{gap:10px}.rtph .rtsp{display:none}.rtscan .rtsh .rtsp{display:none}}
