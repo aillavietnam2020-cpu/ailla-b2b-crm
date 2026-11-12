@@ -53,6 +53,7 @@ import { hrRoutes } from './routes/hr';
 import { daoTaoRoutes } from './routes/daoTao';
 import { chamCongRoutes } from './routes/chamCong';
 import { nghiPhepRoutes } from './routes/nghiPhep';
+import { doDungRoutes } from './routes/doDung';
 import { taskFileRoutes } from './routes/taskFiles';
 import { chatRoutes } from './routes/chat';
 import { ceoSpendRoutes } from './routes/ceoSpend';
@@ -179,6 +180,7 @@ export function createApp() {
   app.route('/api/hub/daotao', daoTaoRoutes);
   app.route('/api/hub/chamcong', chamCongRoutes);
   app.route('/api/hub/nghiphep', nghiPhepRoutes);
+  app.route('/api/hub/dodung', doDungRoutes);
   app.route('/api/hub/task-files', taskFileRoutes);
   app.route('/api/hub/chat', chatRoutes);
   app.route('/api/hub', hubRoutes);

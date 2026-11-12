@@ -8,6 +8,7 @@ import { serveHub } from './hub/serve';
 import HUB_HTML from './hub/hub.html';
 import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
+import { doDungReminders } from './routes/doDung';
 import { pushCron } from './services/pushDispatch';
 import { taskRecurring } from './services/taskRecurring';
 import { publishDue } from './services/fpPublish';
@@ -144,6 +145,12 @@ export default {
           console.info('[cron] nhac task', JSON.stringify(await taskReminders(env.DB)));
         } catch (error) {
           console.error('[cron] nhac task loi', error);
+        }
+        // Phiếu lấy đồ (thiết bị quay, hàng mẫu) quá hạn trả: nhắc người lấy + HCNS lúc 8 giờ sáng (routes/doDung.ts).
+        try {
+          console.info('[cron] nhac tra do', JSON.stringify(await doDungReminders(env.DB)));
+        } catch (error) {
+          console.error('[cron] nhac tra do loi', error);
         }
         // Ngày 25 hằng tháng: nhắc HCNS điền ngày lễ tháng sau (services/nhacNgayLe.ts).
         try {

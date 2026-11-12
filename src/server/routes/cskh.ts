@@ -208,6 +208,13 @@ cskhRoutes.get('/list', async (c) => {
     where.push(ts.sql);
     binds.push(...ts.binds);
   }
+  const oc = str(c.req.query('orders'), 4);
+  if (oc === '0') where.push('order_count = 0');
+  else if (oc === '4') where.push('order_count > 3');
+  else if (['1', '2', '3'].includes(oc)) {
+    where.push('order_count = ?');
+    binds.push(Number(oc));
+  }
   const stf0 = str(c.req.query('state'), 10);
   if (stf0 === 'ngung') where.push("stop_reason <> ''");
   const sql = `SELECT ${COLS} FROM cskh_customers ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY COALESCE(last_order_day, '') DESC LIMIT 400`;
@@ -481,7 +488,7 @@ cskhRoutes.post('/order', async (c) => {
   const payment = paid > 0 ? `CK:${paid}` : 'COD';
   const notePrint = str(b.note_print, 300);
   const note = [str(b.note, 500), notePrint ? `In: ${notePrint}` : ''].filter(Boolean).join(' · ');
-  const sent = await sendOrderToPoscake(c.env.DB, c.env.INGEST_KEY, httpPost, { recv_name: recvName, recv_phone: recvPhone, recv_addr: recvAddr, items, ship, discount, note: str(b.note, 500), note_print: notePrint, paid, payment, ref: id });
+  const sent = await sendOrderToPoscake(c.env.DB, c.env.INGEST_KEY, httpPost, { recv_name: recvName, recv_phone: recvPhone, recv_addr: recvAddr, items, ship, discount, note: str(b.note, 500), note_print: notePrint, paid, payment, ref: id, by_name: me.name });
   const now = nowIso();
   const st = [
     c.env.DB.prepare(
@@ -525,6 +532,7 @@ cskhRoutes.post('/order/:id/resend', async (c) => {
     payment: String(w.payment),
     paid: Number(String(w.payment).startsWith('CK:') ? String(w.payment).slice(3) : 0) || 0,
     ref: String(w.id),
+    by_name: String(w.by_name ?? ''),
   });
   await c.env.DB.prepare('UPDATE cskh_web_orders SET pos_id = ?, pos_error = ? WHERE id = ?').bind(sent.pos_id, sent.error, w.id).run();
   return ok(c, sent);
