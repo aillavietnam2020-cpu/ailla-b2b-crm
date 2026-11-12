@@ -172,9 +172,9 @@ const tkLapLbl=p=>p.lap==="ngay"?"hằng ngày":p.lap==="tuan"?"mỗi "+(+p.ngay
 const tkTodayIso=()=>{const x=new Date();return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
 function tkTplSave(v,lap,ngay){const today=tkTodayIso();DB.mutate(ME.name,"lưu mẫu việc "+v.ten,dt=>{dt.taskTpl=dt.taskTpl||[];dt.taskTpl.push({id:uid("tp"),ten:v.ten,moTa:v.moTa,team:v.team,da:v.da,nguoi:v.nguoi,phoi:v.phoi||[],theoDoi:v.theoDoi||[],gio:v.gio||"",uu:v.uu,v2:v.v2,v2ceo:v.v2ceo,checklist:(v.checklist||[]).map(c=>({t:c.t})),hanSau:Math.max(0,(+v.han||0)-dt.settings.today),lap:lap||"",ngay:+ngay||0,tao:ME.id,last:today,dung:false})})}
 /* việc lặp HẰNG NGÀY quá hạn mà chưa báo: tự đóng thành "Bỏ lỡ" (không dồn đống trễ); người làm được báo bù trong 1 ngày sau (chị Hoa 11/11) */
-function tkBoLo(){const d=D();if(!d||!d.settings)return;const td=d.settings.today,tp={};(d.taskTpl||[]).forEach(p=>tp[p.id]=p);
-  const L=(d.tasks||[]).filter(t=>t.tpl&&t.st!=="done"&&tp[t.tpl]&&tp[t.tpl].lap==="ngay"&&+t.han&&+t.han<td);if(!L.length)return;
-  DB.mutate("Hệ thống","đóng việc lặp hằng ngày bỏ lỡ",dt=>{const T=dt.settings.today;(dt.tasks||[]).forEach(t=>{const p=(dt.taskTpl||[]).find(z=>z.id===t.tpl);if(!p||p.lap!=="ngay"||t.st==="done"||!(+t.han&&+t.han<T))return;
+function tkBoLo(){const isD=(t,p)=>(p&&p.lap==="ngay")||!p&&/h[àaằ]ng ng[àa]y/i.test(String(t.ten||""));const d=D();if(!d||!d.settings)return;const td=d.settings.today,tp={};(d.taskTpl||[]).forEach(p=>tp[p.id]=p);
+  const L=(d.tasks||[]).filter(t=>t.st!=="done"&&isD(t,tp[t.tpl])&&+t.han&&+t.han<td);if(!L.length)return;
+  DB.mutate("Hệ thống","đóng việc lặp hằng ngày bỏ lỡ",dt=>{const T=dt.settings.today;(dt.tasks||[]).forEach(t=>{const p=(dt.taskTpl||[]).find(z=>z.id===t.tpl);if(t.st==="done"||!(+t.han&&+t.han<T)||!isD(t,p))return;
     t.stTruoc=t.st;t.st="done";t.boLo=T;t.boLoHan=+t.han;t.stAt=new Date().toLocaleString("vi-VN");t.stBy="Hệ thống";t.xongNgay=0;tkLog(t,"Bỏ lỡ: việc lặp hằng ngày không báo trong ngày, hệ thống tự đóng")})})}
 function tkRecur(){try{tkBoLo()}catch(e){console.error("việc bỏ lỡ",e)}const P=tkTpls().filter(p=>p.lap&&!p.dung),today=tkTodayIso();if(!P.length||!P.some(p=>(p.last||"")<today))return;
   const hit=(p,iso)=>{const x=new Date(iso+"T00:00:00");return p.lap==="ngay"?iso===today:p.lap==="tuan"?((x.getDay()+6)%7+1)===+p.ngay:x.getDate()===+p.ngay};
@@ -434,6 +434,7 @@ function openTask(id){
     toast(t?"Đã lưu":"Đã giao"+(!t&&$("#t-lap")&&$("#t-lap").value?", web sẽ tự giao lại "+({ngay:"hằng ngày",tuan:"mỗi tuần",thang:"mỗi tháng"}[$("#t-lap").value]||""):""));closeDrawer();renderMain()};
   if($("#t-del"))$("#t-del").onclick=()=>{if(!confirm("Xóa việc này?"))return;DB.mutate(ME.name,"xóa việc "+t.ten,dt=>dt.tasks=dt.tasks.filter(x=>x.id!==t.id));closeDrawer();renderMain()};
   try{tkFormRow()}catch(e){console.error("bố cục form giao việc",e)}
+  if(!t)try{tkSplitNew()}catch(e){console.error("nút công đoạn",e)}
   if(t)try{tkLayout(t,gv);tkTidy(t)}catch(e){console.error("bố cục chi tiết việc",e)}
 }
 /* Từ chối việc: người duyệt là người giao (CEO / Lead cũng duyệt được). Đồng ý thì việc chuyển sang lưu trữ (dt.tasksHuy), không tính vào số liệu. */
@@ -462,6 +463,11 @@ function tkTuChoi(id,act,txt,han){const t0=D().tasks.find(x=>x.id===id);if(!t0)r
     else{x.tuChoi=Object.assign({},x.tuChoi,{st:"khong",note:txt||"",duyet:ME.name,duyetAt:now});tkLog(x,ME.name+" không đồng ý từ chối"+(txt?": "+txt:""));N([x.nguoi],`${ME.name} không đồng ý từ chối, việc "${x.ten}" vẫn cần làm${txt?": "+txt:""}`)}})}
 /* Form giao việc gọn (chị Hoa 03/11): "Người cùng làm / hỗ trợ" thành ô bấm sổ ra, chọn nhiều người;
    ô đó và "Lặp lại" lên cùng hàng với Team, Dự án. Chỉ dời chỗ, giữ nguyên ô nhập đã gắn việc. */
+/* form Giao việc / Thêm việc mới: Công đoạn và Các bước nhỏ ẩn đi, một nút ở đầu khung (cùng hàng tiêu đề) bấm mới hiện (chị Hoa 12/11) */
+function tkSplitNew(){const di=$("#drawerIn");if(!di||$("#tk-splitbtn"))return;const h2=di.querySelector("h2"),cdw=$("#t-cdw"),ckl=$("#t-ck"),ckw=ckl&&(ckl.closest(".field")||ckl.parentElement);if(!h2||!(cdw||ckw))return;
+  [cdw,ckw].forEach(e=>{if(e)e.hidden=true});
+  const tools=document.createElement("span");tools.className="tktools";tools.innerHTML=`<button type="button" class="btn sm" id="tk-splitbtn" title="Chia việc thành công đoạn (nhiều người) hoặc các bước nhỏ">＋ Công đoạn / bước nhỏ</button>`;h2.appendChild(tools);h2.classList.add("tkh2");
+  $("#tk-splitbtn").onclick=()=>{const hide=!!((cdw&&!cdw.hidden)||(ckw&&!ckw.hidden));[cdw,ckw].forEach(e=>{if(e)e.hidden=hide});if(!hide){const e=cdw||ckw;e.scrollIntoView({block:"nearest"})}}}
 function tkFormRow(){const team=$("#t-team"),row=team&&team.closest(".row4"),ph=$("#t-phw");if(!row)return;row.classList.add("tkrow4");
   /* link + ảnh / file gộp một dòng "Tư liệu đính kèm", ngay dưới Mô tả (chị Hoa 04/11) */
   {const dk=$("#t-dk"),dkF=dk&&dk.closest("label.field"),bfl=$("#t-bfl"),bfF=bfl&&bfl.closest(".field"),up=bfF&&bfF.querySelector("label.tkup"),mo=$("#t-mo"),moF=mo&&mo.closest("label.field");
