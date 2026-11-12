@@ -231,6 +231,16 @@ def upload_docs(files, owner_id):
 UPLOAD_DIR = "/root/.openclaw/media/web-uploads"
 
 
+def updir(m):
+    """Thư mục lưu file người dùng gửi qua web cho agent (12/11/2026): đặt NGAY TRONG thư mục làm việc của agent đó
+    (<workspace>/.openclaw/tmp/web-uploads), vì agent chỉ được đọc file trong thư mục của mình. Không có thì dùng thư mục chung cũ."""
+    a = str(m.get("agent") or "")
+    ws = "/root/.openclaw/workspace" if a == "main" else f"/root/.openclaw/workspace-{a}"
+    if a and re.fullmatch(r"[A-Za-z0-9_-]+", a) and os.path.isdir(ws):
+        return f"{ws}/.openclaw/tmp/web-uploads"
+    return UPLOAD_DIR
+
+
 def web_get(path):
     req = urllib.request.Request(URL + "/api/agent-relay" + path, method="GET")
     req.add_header("X-Relay-Key", KEY)
@@ -245,12 +255,13 @@ def save_uploads(m):
     files = m.get("files") or []
     if not files:
         return out
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    up = updir(m)
+    os.makedirs(up, exist_ok=True)
     for i, f in enumerate(files[:6]):
         try:
             d = web_get(f"/file/{int(f['id'])}")
             ext = {"image/png": "png", "image/webp": "webp"}.get(d.get("mime"), "jpg")
-            p = f"{UPLOAD_DIR}/{int(m['id'])}-{i + 1}.{ext}"
+            p = f"{up}/{int(m['id'])}-{i + 1}.{ext}"
             with open(p, "wb") as fh:
                 fh.write(base64.b64decode(d["b64"]))
             out.append(p)
@@ -259,8 +270,8 @@ def save_uploads(m):
     # dọn ảnh cũ hơn 7 ngày
     try:
         cut = time.time() - 7 * 86400
-        for n in os.listdir(UPLOAD_DIR):
-            fp = os.path.join(UPLOAD_DIR, n)
+        for n in os.listdir(up):
+            fp = os.path.join(up, n)
             if os.path.getmtime(fp) < cut:
                 os.unlink(fp)
     except OSError:
@@ -317,12 +328,13 @@ def save_docs(m):
     docs = m.get("docs") or []
     if not docs:
         return out
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    up = updir(m)
+    os.makedirs(up, exist_ok=True)
     for d in docs[:3]:
         try:
             ext = d["name"].rsplit(".", 1)[-1].lower() if "." in d["name"] else ""
             safe = re.sub(r"[^A-Za-z0-9._-]", "_", d["name"])[:80]
-            p = f"{UPLOAD_DIR}/{int(m['id'])}-doc{int(d['id'])}-{safe}"
+            p = f"{up}/{int(m['id'])}-doc{int(d['id'])}-{safe}"
             with open(p, "wb") as fh:
                 for seq in range(int(d["nparts"])):
                     fh.write(base64.b64decode(web_get(f"/doc/{int(d['id'])}/{seq}")["b64"]))
