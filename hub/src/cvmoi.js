@@ -185,7 +185,7 @@ function cwMeta(r,sub){const a=[];
   if(r.src!=="task"&&r.mo)a.push(`<span>${esc(String(r.mo).replace(/<[^>]*>/g,""))}</span>`);
   if(r.gio)a.push(`<span>${cwI("clock")}${esc(r.gio)}</span>`);
   if(r.da&&prjN(r.da))a.push(`<span>${cwI("fold")}${esc(prjN(r.da))}</span>`);
-  if(r.cd)a.push(`<span>${cwI("sub")}${r.cd.filter(s=>s.st==="xong").length}/${r.cd.length} công đoạn</span>`);else if(r.ck&&r.ck.length)a.push(`<span>${cwI("sub")}${r.ck.filter(c=>c.x).length}/${r.ck.length}</span>`);
+  if(r.cd&&r.cd.length)a.push(`<button type="button" class="cwmulti" data-cwsx="${esc(r.k)}" title="Việc nhiều công đoạn: bấm để xem từng công đoạn">◫ ${r.cd.filter(s=>s.st==="xong").length}/${r.cd.length} công đoạn ▸</button>`);else if(r.ck&&r.ck.length)a.push(`<button type="button" class="cwmulti" data-cwsx="${esc(r.k)}" title="Việc có nhiều đầu việc: bấm để xem từng đầu việc">▤ ${r.ck.filter(c=>c.x).length}/${r.ck.length} đầu việc ▸</button>`);
   if(r.tpl)a.push(`<span>${cwI("rep")}Định kỳ</span>`);
   if(r.phoi&&r.phoi.length){const n=r.phoi.map(userName).filter(Boolean);if(n.length)a.push(`<span>${cwI("users")}${esc(n.slice(0,2).join(", "))}${n.length>2?" +"+(n.length-2):""}</span>`)}
   if(r.tl&&r.st!=="done"&&r.st!=="review")a.push('<span class="r">bị trả lại, cần sửa</span>');
@@ -219,7 +219,10 @@ function cwRow(r,o){o=o||{};const done=r.st==="done";
     :(r.src==="task"&&cwCanDo(r)?`<button type="button" class="cwck" data-cwck="${esc(r.k)}" title="${done?"Bỏ đánh dấu xong":"Bấm là xong"}" aria-label="${done?"Bỏ đánh dấu xong":"Đánh dấu xong"}"></button>`
     :`<span class="cwdot">${cwI(r.src==="mk"?"video":r.src==="dg"?"send":r.src==="order"?"inbox":r.src==="card"?"cc":"task")}</span>`);
   return `<div class="cwrow${done?" done":""}" data-cwo="${esc(r.k)}" data-cwrk="${esc(r.k)}">${o.ord?cwGrip(r.k):o.ordSp?"<span></span>":""}${lead}<div class="cwtt"><b>${cwUu(r)}${esc(r.ten)}</b><small>${cwMeta(r,o.sub)}</small></div>
-   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${r.late||!r.han?" r":""}">${cwDue(r)}</div><div class="cwst">${cwStPill(r)}</div>${o.act?cwAct(r):""}</div>`}
+   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${r.late||!r.han?" r":""}">${cwDue(r)}</div><div class="cwst">${cwStPill(r)}</div>${o.act?cwAct(r):""}</div>${cwSubItems(r)}`}
+/* đầu việc / công đoạn sổ xuống ngay dưới dòng việc (bấm nhãn ▤ / ◫) */
+function cwSubItems(r){const L=(r.cd&&r.cd.length)?r.cd.map(s=>[s.ten||"Công đoạn",s.st==="xong"]):(r.ck&&r.ck.length)?r.ck.map(c=>[c.t,!!c.x]):[];if(!L.length)return "";
+  return `<div class="cwsubi" data-cwsi="${esc(r.k)}" hidden>${L.map((x,i)=>`<div><span class="ck${x[1]?" on":""}">${x[1]?"✓":""}</span><span class="t${x[1]?" on":""}">${i+1}. ${esc(x[0])}</span></div>`).join("")}</div>`}
 function cwGrow(G,o){o=o||{};const n=G.a.length,ok=G.a.filter(r=>r.st==="done").length,lt=G.a.some(r=>r.late),hs=G.a.filter(r=>r.st!=="done"&&r.han).map(r=>r.han),h=hs.length?Math.min(...hs):0,op=CWS.open.has(G.k);
   return `<div class="cwrow cwgrp${op?" open":""}" data-cwg="${esc(G.k)}" data-cwrk="g:${esc(G.k)}">${o.ord?cwGrip("g:"+G.k):""}<span class="cwarr">${cwI("arr")}</span><div class="cwtt"><b>${esc(G.ten)} · ${n} việc</b><small><span>Bấm để xem từng việc</span></small></div>
    <div class="cwwho">${G.nguoi?avatar(G.nguoi)+esc(userName(G.nguoi)||"—"):"Chưa giao"}</div><div class="cwdue${lt?" r":""}">${h?cwDueN(h):"—"}</div><div class="cwst">${pill(ok+"/"+n+" xong",lt?"red":ok===n?"grn":"gry")}</div>${o.act?"<div></div>":""}</div>
@@ -303,6 +306,7 @@ function cwBind(m,list){const by={};(list||cwRows()).forEach(r=>by[r.k]=r);const
   m.querySelectorAll("[data-cwnhap]").forEach(b=>b.onclick=()=>bvNhapNhanh(""));
   const nb=m.querySelector("#cv-new");if(nb)nb.onclick=()=>openTask(null);
   m.querySelectorAll("[data-cwkx]").forEach(b=>b.onclick=()=>{CWS.kx=b.dataset.cwkx;CWS.sel.clear();try{localStorage.setItem("ailla_cw_kx",CWS.kx)}catch(e){}renderMain()});
+  m.querySelectorAll("[data-cwsx]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();const row=b.closest(".cwrow"),sub=row&&row.nextElementSibling;if(!sub||!sub.classList.contains("cwsubi"))return;sub.hidden=!sub.hidden;b.textContent=b.textContent.replace(/[▸▾]$/,sub.hidden?"▸":"▾")});
   m.querySelectorAll("[data-cwg]").forEach(r=>r.onclick=()=>{const k=r.dataset.cwg,s=m.querySelector(`[data-cwsub="${CSS.escape(k)}"]`);r.classList.toggle("open");if(s)s.classList.toggle("open");if(CWS.open.has(k))CWS.open.delete(k);else CWS.open.add(k)});
   m.querySelectorAll("[data-cwo]").forEach(e=>e.onclick=ev=>{if(ev.target.closest("button,input,select,a"))return;ev.stopPropagation();cwOpenRow(R(e.dataset.cwo))});
   m.querySelectorAll("[data-cwck]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();cwToggleDone(R(b.dataset.cwck))});
