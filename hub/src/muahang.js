@@ -68,7 +68,7 @@ function mhLateDays(p){
   return Math.round((new Date(t)-new Date(p.expected_date))/864e5)}
 /* Nguyên vật liệu dưới mức tối thiểu (hoặc âm kho) cần mua. Mức tối thiểu đặt ở Kho vật tư. */
 function mhNeedBuy(){
-  const A=(typeof KHO!=="undefined"&&KHO.alerts)||{low:[],negative:[]},ok=c=>["NVL","CCDC","HH"].includes(((KHO.items&&KHO.items.get(c))||{}).cls);
+  const A=(typeof KHO!=="undefined"&&KHO.alerts)||{low:[],negative:[]},ok=c=>["NVL","BTP","CCDC","HH"].includes(((KHO.items&&KHO.items.get(c))||{}).cls);
   return [...(A.negative||[]),...(A.low||[])].filter(r=>ok(r.code)).map(r=>({code:r.code,name:r.name,unit:r.unit,qty:+r.qty,min:+r.min_stock||0,need:Math.max(0,Math.round(((+r.min_stock||0)-(+r.qty))*1000)/1000)}))}
 /* Tiến trình của một phiếu mua hàng: đặt → hẹn giao → nhận hàng (xác nhận bên vận hành) → chứng từ → thanh toán.
    Hai bước tiền (chứng từ, thanh toán) chỉ hiện ở trang quản trị cho CEO, quản lý, kế toán. */
@@ -169,7 +169,7 @@ function mhForm(id,draft){
    <label class="field">Ghi chú phiếu<input id="mhf-n" value="${esc(draft&&draft.note!=null?draft.note:p?p.note:"")}"></label><div id="mhf-e2"></div><button class="btn pri">${p?"Lưu phiếu":"Lập phiếu"}</button></form>`);
   const tot=()=>{const v=L.reduce((t,l)=>t+(+l.qty||0)*(+l.price||0),0);$("#mhf-tot").textContent=v?"Giá trị đặt: "+nf(Math.round(v))+" đ":""};
   const draw=()=>{$("#mhf-b").innerHTML=L.map((l,i)=>`<tr><td><input class="mh-i" data-i="${i}" value="${esc(l.item)}" placeholder="Gõ mã hoặc tên" autocomplete="off"></td><td class="mh-nm">${esc(l.item?mhName(l.item):"")}</td><td><input class="mh-q n" data-i="${i}" type="number" min="0" step="any" value="${l.qty}"></td><td><input class="mh-p n" data-i="${i}" type="number" min="0" step="any" value="${l.price==null?"":l.price}" placeholder="Giá"></td><td><input class="mh-o" data-i="${i}" value="${esc(l.note)}"></td><td><button type="button" class="lnk" data-rm="${i}">✕</button></td></tr>`).join("");
-    document.querySelectorAll(".mh-i").forEach(x=>khoPick(x,TSM?["CCDC"]:["NVL","CCDC","HH"],it=>{const i=+x.dataset.i;L[i].item=it.code;x.value=it.code;x.closest("tr").querySelector(".mh-nm").textContent=it.name}));
+    document.querySelectorAll(".mh-i").forEach(x=>khoPick(x,TSM?["CCDC"]:["NVL","BTP","CCDC","HH"],it=>{const i=+x.dataset.i;L[i].item=it.code;x.value=it.code;x.closest("tr").querySelector(".mh-nm").textContent=it.name}));
     document.querySelectorAll(".mh-q").forEach(x=>x.oninput=()=>{L[+x.dataset.i].qty=x.value;tot()});document.querySelectorAll(".mh-p").forEach(x=>x.oninput=()=>{L[+x.dataset.i].price=x.value;tot()});
     document.querySelectorAll(".mh-o").forEach(x=>x.oninput=()=>L[+x.dataset.i].note=x.value);
     document.querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{L.splice(+x.dataset.rm,1);if(!L.length)L.push({item:"",qty:"",note:"",price:""});draw()});tot()};

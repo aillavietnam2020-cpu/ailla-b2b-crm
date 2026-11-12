@@ -1610,7 +1610,7 @@ khoRoutes.post('/docs', async (c) => {
     for (const l of lines) {
       const code = String(l.item ?? '');
       const it = need(code);
-      if (type === 'PN' && !['NVL', 'HH', 'CCDC'].includes(it.cls)) {
+      if (type === 'PN' && !['NVL', 'BTP', 'HH', 'CCDC'].includes(it.cls)) {
         warnings.push(`${code} (${it.name}) không phải nguyên vật liệu / hàng hóa mua về`);
       }
       const price = boSung && !canPrice(auth) ? Number.NaN : num(l.price);

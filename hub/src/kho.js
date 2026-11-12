@@ -150,7 +150,7 @@ const KF_U={"kg":[["kg",1],["gam",0.001]],"gam":[["gam",1],["kg",1000]],"g":[["g
 function kfNum(v){if(typeof v==="number")return v;let x=String(v==null?"":v).replace(/\s/g,"");if(x==="")return NaN;if(x.includes(",")&&x.includes("."))x=x.replace(/\./g,"").replace(",",".");else if((x.match(/\./g)||[]).length>1)x=x.replace(/\./g,"");else if((x.match(/,/g)||[]).length>1)x=x.replace(/,/g,"");else x=x.replace(",",".");const n=+x;return isFinite(n)?n:NaN}
 function kfUnitCell(unit){const o=KF_U[String(unit||"").toLowerCase().trim()];return o?`<select class="kf-un">${o.map(([n,f])=>`<option value="${f}">${n}</option>`).join("")}</select>`:esc(unit||"")}
 const kfQty=tr=>{const q=tr.querySelector(".kf-q"),u=tr.querySelector(".kf-un"),n=kfNum(q.value);if(q.value.trim()==="")return "";if(!isFinite(n))return "x";return String(Math.round(n*(u?+u.value:1)*1e6)/1e6)};
-const KHO_LINE_CLS={PN:["NVL","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null,TB:null};
+const KHO_LINE_CLS={PN:["NVL","BTP","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null,TB:null};
 function khoForm(type,pre,clsO){
   KHO.edit=KHO.editNext||null;KHO.editNext=null; // chỉ là "sửa" khi mở từ nút Sửa phiếu
   const T=KHO_TYPES[type],price=KHO.cat.can_price;
