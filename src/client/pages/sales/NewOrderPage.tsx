@@ -190,9 +190,14 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
   const customer = (customers.data ?? []).find((c) => c.id === customerId) ?? null;
   const customPricing = (customer?.price_mode ?? existing.data?.price_mode) === 'CUSTOM';
   const qs = debouncedQuery ? `&q=${encodeURIComponent(debouncedQuery)}` : '';
-  // Khách gia công chỉ chọn trong bảng giá riêng của họ; khách thường chọn trong bảng giá 8 cấp.
+  // Khách thường chọn trong bảng giá 8 cấp. Khách gia công: bảng giá riêng của họ, và gõ tìm thì thấy cả mọi mã khác
+  // (CEO 13/11: đơn gia công phải tạo được với mọi mã) — mã chưa có trong bảng riêng thì nhập giá tay, quản lý duyệt như giá thỏa thuận.
   const catalog = useApi<{ products: ProductItem[] }>(
-    customerId && !customPricing ? `/api/prices?limit=400&scope=TIER${qs}` : null,
+    customerId && !customPricing
+      ? `/api/prices?limit=400&scope=TIER${qs}`
+      : customerId && customPricing && debouncedQuery.trim()
+        ? `/api/prices?limit=200${qs}`
+        : null,
   );
   const ownCatalog = useApi<CustomerPriceItem[]>(
     customerId && customPricing ? `/api/customer-prices/${customerId}?${qs.slice(1)}` : null,
@@ -260,15 +265,22 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
   const packFor = (line: Line): number =>
     line.pack_size > 1 ? line.pack_size : siblingPack(line.sku);
 
+  const ownIds = new Set((ownCatalog.data ?? []).map((p) => p.product_id));
   const suggestions: Suggest[] = customPricing
-    ? (ownCatalog.data ?? []).map((p) => ({
-        id: p.product_id,
-        sku: p.sku,
-        name: p.name,
-        unit: p.unit,
-        pack_size: p.pack_size,
-        price: p.amount,
-      }))
+    ? [
+        ...(ownCatalog.data ?? []).map((p) => ({
+          id: p.product_id,
+          sku: p.sku,
+          name: p.name,
+          unit: p.unit,
+          pack_size: p.pack_size,
+          price: p.amount,
+        })),
+        // Mã chưa có trong bảng giá riêng của khách: vẫn chọn được, giá để trống cho người lập đơn nhập.
+        ...(catalog.data?.products ?? [])
+          .filter((p) => !ownIds.has(p.id))
+          .map((p) => ({ id: p.id, sku: p.sku, name: p.name + ' (chưa có giá riêng, nhập giá)', unit: p.unit, pack_size: p.pack_size, price: null })),
+      ]
     : (catalog.data?.products ?? []).map((p) => ({
         id: p.id,
         sku: p.sku,
