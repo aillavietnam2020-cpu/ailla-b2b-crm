@@ -112,6 +112,7 @@ describe('Nhập nhanh link video', () => {
     const d = await hub();
     const c = (id: string) => d.cards.find((x: any) => x.id === id);
     expect(c('TT-0771').nguoiEdit).toBe('u_lead');
+    expect(c('TT-0771').nguoiLam).toBe('u_lead');
     expect(JSON.stringify(c('TT-0771').history)).toContain('dòng giao cho Nhân sự Content');
     expect(c('TT-0770').nguoiEdit).toBe('u_q');
   });

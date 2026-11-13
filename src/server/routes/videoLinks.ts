@@ -168,6 +168,7 @@ videoLinkRoutes.post('/', async (c) => {
       x.linkVideo = p.url;
       const giao0 = x.nguoiEdit || x.nguoi;
       x.nguoiEdit = p.nguoi;
+      if (!/agency/i.test(p.nguon ?? '')) x.nguoiLam = p.nguoi;
       /* Video agency giao là đã duyệt (chị Hoa 07/11): vào thẳng Chờ đăng, không gửi Lead/CEO duyệt. */
       const agC = /agency/i.test(p.nguon ?? '') ? p.nguon || 'Agency' : '';
       if (agC) { x.agency = agC; x.linkFinal = p.url; x.duyet = 'Đã duyệt'; x.ceo = 'PASS'; x.step = 'dang'; nAg++; } else x.step = 'dvd';
