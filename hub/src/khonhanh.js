@@ -15,7 +15,7 @@ const KQ_LIST=()=>[
   ["Lập phiếu thu",()=>KQ_CHI()&&typeof cptQuick==="function",()=>cptQuick(),false],
   ["Lập phiếu chi",()=>KQ_CHI()&&typeof spForm==="function",()=>spForm(),false],
   ["Lập phiếu mua hàng",()=>KQ_MH()&&typeof mhForm==="function",async()=>{try{await mhLoad()}catch(e){}for(let i=0;i<40&&!(MH&&MH.sup);i++)await new Promise(r=>setTimeout(r,150));mhForm(null)},false],
-  ["Lập phiếu nhập kho",()=>kCan("PN")||KQ_MH(),()=>khoForm("PN",null,["NVL","CCDC","TP","HH"]),true],
+  ["Lập phiếu nhập kho",()=>kCan("PN")||KQ_MH(),()=>khoForm("PN",null,["NVL","BTP","CCDC","TP","HH"]),true],
   ["Lập phiếu xuất kho",()=>kCan("XB"),()=>khoForm("XB",null,null),true]]
   .filter(x=>{try{return x[1]()}catch(e){return false}});
 function khoQuickBtn(){return ""}
