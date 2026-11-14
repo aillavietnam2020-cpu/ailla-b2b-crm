@@ -1081,3 +1081,9 @@ body:has(#tnpop) #ntpop{right:392px}
 .cwrow.rvv .cwact .btn.sm{padding:5px 11px;font-size:12.5px;border-radius:8px}
 .cwrow.rvv .cwact .btn:not(.pri){background:#fff;color:#4b54d1;border-color:#d8dcf5}
 .cwrow.rvv .cwact [data-cwfix]{color:#6a7084;border-color:#e3e6ee}
+
+/* vạch tiến trình việc (như pin) */
+.cwst{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.cwpg{display:inline-flex;align-items:center;gap:6px}.cwpg .bar{display:inline-flex;gap:2px;padding:2px;border:1.5px solid #c7ccdc;border-radius:5px}
+.cwpg .bar i{width:9px;height:7px;border-radius:2px;background:#e6e8f0}.cwpg .bar i.on{background:#4b54d1}
+.cwpg.late .bar{border-color:#e7a8a8}.cwpg.late .bar i.on{background:#d23b3b}.cwpg small{font-size:11px;color:#6a7084}

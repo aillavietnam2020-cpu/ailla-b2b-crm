@@ -178,6 +178,9 @@ const cwCanEdit=r=>{const t=cwTask(r);return !!t&&(t.tao===ME.id||tkMgr(t))};
 /* ---------- một dòng việc ---------- */
 const cwDueN=h=>{const td=cwTd();return h===td?"Hôm nay":h===td+1?"Mai":h===td-1?"Hôm qua":dd(h)};
 const cwDue=r=>r.han?cwDueN(r.han)+(r.gio?" · "+esc(r.gio):""):"Chưa có hạn";
+/* vạch tiến trình như pin: Giao → Nhận → Đang làm → Nộp → Xong; việc trễ vạch đỏ (chị Hoa 14/11) */
+function cwProg(r){if(r.src!=="task"||r.rvOnly||r.st==="done"||r.st==="cg")return "";const L={todo:1,nhan:2,doing:3,pause:3,review:4}[r.st]||1,N=["Chưa nhận","Đã nhận","Đang làm","Đang làm","Chờ duyệt"][L-1]||"";
+  return `<span class="cwpg${r.late?" late":""}" title="Tiến trình: ${esc(N)}"><span class="bar">${[1,2,3,4,5].map(i=>`<i class="${i<=L?"on":""}"></i>`).join("")}</span><small>${esc(r.st==="pause"?"Tạm dừng":N)}</small></span>`}
 function cwStPill(r){if(r.st==="done")return pill("Xong","grn");if(r.tc)return pill("Xin từ chối","red");
   if(r.st==="review"){const l=r.src==="kho"?(r.cardStep==="cceo"?"Chờ duyệt V2":"Chờ duyệt V1"):r.src==="card"?(r.cardStep==="dceo"?"Chờ duyệt V2":r.cardStep==="dkb"?"Chờ duyệt kịch bản":"Chờ duyệt V1"):r.vong===2?"Chờ duyệt V2":r.v2?"Chờ duyệt V1":"Chờ duyệt";return pill(r.late?l+" · trễ":l,r.late?"red":"amb")}
   if(r.late)return pill("Trễ "+r.lateD+" ngày","red");if(r.tl)return pill("Cần sửa","red");
@@ -221,7 +224,7 @@ function cwRow(r,o){o=o||{};const done=r.st==="done";
     :(r.src==="task"&&cwCanDo(r)?`<button type="button" class="cwck" data-cwck="${esc(r.k)}" title="${done?"Bỏ đánh dấu xong":"Bấm là xong"}" aria-label="${done?"Bỏ đánh dấu xong":"Đánh dấu xong"}"></button>`
     :`<span class="cwdot">${cwI(r.src==="mk"?"video":r.src==="dg"?"send":r.src==="order"?"inbox":r.src==="card"?"cc":"task")}</span>`);
   return `<div class="cwrow${done?" done":""}${r.rvOnly?" rvv":""}" data-cwo="${esc(r.k)}" data-cwrk="${esc(r.k)}">${o.ord?cwGrip(r.k):o.ordSp?"<span></span>":""}${lead}<div class="cwtt"><b>${cwUu(r)}${esc(r.ten)}</b><small>${cwMeta(r,o.sub)}</small></div>
-   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):(r.rvOnly?"":"Chưa giao")}</div><div class="cwdue${r.late||!r.han?" r":""}">${r.rvOnly?"":cwDue(r)}</div><div class="cwst">${cwStPill(r)}</div>${o.act?cwAct(r):""}</div>${cwSubItems(r)}`}
+   <div class="cwwho">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||"—"):(r.rvOnly?"":"Chưa giao")}</div><div class="cwdue${r.late||!r.han?" r":""}">${r.rvOnly?"":cwDue(r)}</div><div class="cwst">${cwStPill(r)}${cwProg(r)}</div>${o.act?cwAct(r):""}</div>${cwSubItems(r)}`}
 /* đầu việc / công đoạn sổ xuống ngay dưới dòng việc (bấm nhãn ▤ / ◫) */
 function cwSubItems(r){const L=(r.cd&&r.cd.length)?r.cd.map(s=>[s.ten||"Công đoạn",s.st==="xong"]):(r.ck&&r.ck.length)?r.ck.map(c=>[c.t,!!c.x]):[];if(!L.length)return "";
   return `<div class="cwsubi" data-cwsi="${esc(r.k)}" hidden>${L.map((x,i)=>`<div><span class="ck${x[1]?" on":""}">${x[1]?"✓":""}</span><span class="t${x[1]?" on":""}">${i+1}. ${esc(x[0])}</span></div>`).join("")}</div>`}
