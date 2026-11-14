@@ -78,7 +78,10 @@ function fbvProds(days){const F=FBC.raw;if(!F||!F.p||!F.sk)return [];const m={};
   days.forEach(k=>(F.p[k]||[]).forEach(([i,q,dt,gv])=>{const t=m[i]||(m[i]={i,q:0,dt:0,gv:0});t.q+=q;t.dt+=dt*1000;t.gv+=gv*1000}));
   return Object.values(m).map(x=>{const s=F.sk[x.i]||["?","?",""];return {...x,c:s[0],n:s[1],g:s[2]||""}}).sort((a,b)=>b.dt-a.dt)}
 function fbvCamps(days){try{const D=typeof adfLive==="function"?adfLive():null;return D?adfAgg(D,days).C:[]}catch(e){return []}}
-function fbvLines(X){const days=X.cov.length?X.cov:X.days;return fbbcLines({prods:fbvProds(days),camps:fbvCamps(days),tax:X.tax,ship:X.shipAll})}
+/* Ngày có số theo sản phẩm (Sheet Pancake cũ, tới 21/10): doanh thu nhóm hàng và quảng cáo chỉ tính trên đúng các ngày này để cùng rổ
+   (14/11: doanh thu 01–21/10 mà quảng cáo cả tháng làm Tinh dầu giặt sấy −130%). Số web tự tính từ 22/10 chưa có theo sản phẩm. */
+const fbvPDays=X=>{const P=FBC.raw&&FBC.raw.p;return P?X.days.filter(k=>P[k]&&P[k].length):[]};
+function fbvLines(X){const days=fbvPDays(X);return fbbcLines({prods:fbvProds(days),camps:fbvCamps(days),tax:X.tax,ship:X.shipAll})}
 /* Cách ra doanh thu dự kiến, mỗi bước một dòng (chị Hoa 28/10: ghi dễ hiểu). */
 const fbvDkTxt=X=>`Đã giao ${tr(X.dt)}<br>+ Đang giao ${tr(X.dang.v)}<br>− Hoàn dự kiến ${tbP(X.RT.r,1)}: ${tr(X.dang.v*X.RT.r)}`;
 const fbvVn=k=>k?k.slice(8)+"/"+k.slice(5,7):"";
@@ -129,10 +132,10 @@ function fbvAdm(m){
      `<tr class="tb-sum"><td><span class="tb-car"></span>Lợi nhuận ròng kênh</td><td class="n">${ln==null?`<span class="hint">chưa có số</span>`:tbF(ln)}</td><td class="n">${ln==null?"":tbP(ln,dt)}</td><td class="hint">sau khi gánh hết chi phí riêng và chi chung</td></tr>`])}</section>`;
   /* Lãi sau quảng cáo theo nhóm hàng (riêng Facebook: chiến dịch đặt tên theo mã sản phẩm) */
   const dgP=s=>s?pill(s,/Lỗ|Dưới/.test(s)?"red":/mỏng/.test(s)?"amb":"grn"):"";
-  const lines=`<section class="card"><div class="card-h"><h2>Lãi sau quảng cáo theo nhóm hàng</h2><span class="hint">quảng cáo gán theo mã trong tên chiến dịch · ROAS (doanh số Pancake / chi chưa thuế) hòa vốn ${String(FBBC_ROAS_HV).replace(".",",")} · "còn lại" = lãi gộp − quảng cáo − ship ${tbP(X.shipAll,1)}${X.cov.length&&X.unc.length?" · số tới "+fbvVn(X.lastCov):""}${X.chua?" · tháng chưa chốt: đơn mới chưa giao hết nên \"còn lại\" đang thấp hơn thực tế, xem ROAS là chính":""}</span></div>
+  const lines=`<section class="card"><div class="card-h"><h2>Lãi sau quảng cáo theo nhóm hàng</h2><span class="hint">quảng cáo gán theo mã trong tên chiến dịch · ROAS (doanh số Pancake / chi chưa thuế) hòa vốn ${String(FBBC_ROAS_HV).replace(".",",")} · "còn lại" = lãi gộp − quảng cáo − ship ${tbP(X.shipAll,1)}${(()=>{const pd=fbvPDays(X);return !pd.length?" · kỳ này chưa có số theo sản phẩm":pd.length<X.days.length?` · doanh thu và quảng cáo cùng tính ${fbvVn(pd[0])}–${fbvVn(pd[pd.length-1])} (ngày có số theo sản phẩm; từ 22/10 chưa có)`:""})()}${X.chua?" · tháng chưa chốt: đơn mới chưa giao hết nên \"còn lại\" đang thấp hơn thực tế, xem ROAS là chính":""}</span></div>
    ${tbl(["Nhóm hàng","SL","Doanh thu","% kênh","Lãi gộp","Quảng cáo · ROAS","Còn lại","Đánh giá"],L.lines.map(x=>`<tr${/Lỗ|Dưới/.test(x.dg)?' style="background:rgba(240,160,32,.08)"':""}><td><b>${esc(x.n)}</b></td><td class="n">${nf(x.q)}</td><td class="n">${tr(x.dt)}</td><td class="n">${tbP(x.dt,L.dtAll)}</td><td class="n">${tr(x.lg)}</td><td class="n">${x.spend?tr(x.qcT)+" · "+tbX(x.roas):`<span class="hint">${x.k==="KH"?"không gán":"—"}</span>`}</td><td class="n${x.conPct!=null&&x.conPct<0?" t-red":""}">${x.k==="KH"?"—":x.conPct==null?"—":tbP(x.conPct,1)}</td><td>${dgP(x.dg)}</td></tr>`)
      .concat(L.unk.qcT?[`<tr><td class="hint">Quảng cáo chưa gán được nhóm hàng</td><td></td><td></td><td></td><td></td><td class="n">${tr(L.unk.qcT)}</td><td></td><td></td></tr>`]:[]))}</section>`;
-  const P=fbvProds(X.cov.length?X.cov:X.days),pT=P.reduce((a,x)=>a+x.dt,0);
+  const P=fbvProds(fbvPDays(X)),pT=P.reduce((a,x)=>a+x.dt,0);
   const top=P.length?`<section class="card"><div class="card-h"><h2>Top sản phẩm theo doanh thu</h2><span class="hint">đơn giao thành công, giá vốn thật · lãi gộp chưa trừ ship, quảng cáo</span></div>
    ${tbl(["#","Sản phẩm","SL","Doanh thu","% kênh","Lãi gộp","Biên","Nhóm"],P.slice(0,8).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.n)}</td><td class="n">${nf(x.q)}</td><td class="n">${tr(x.dt)}</td><td class="n">${tbP(x.dt,pT)}</td><td class="n">${x.gv?tr(x.dt-x.gv):`<span class="hint">chưa có giá vốn</span>`}</td><td class="n">${x.gv&&x.dt>0?tbP(x.dt-x.gv,x.dt):"—"}</td><td class="hint">${esc((FBBC_LINES.find(Lz=>Lz[0]===fbbcLineOf(x.n,x.g))||[0,"Nhóm khác"])[1])}</td></tr>`)
      .concat(P.filter(x=>x.dt>=3e6&&x.dt-x.gv<0).slice(0,2).map(x=>`<tr style="background:rgba(240,160,32,.08)"><td></td><td>${esc(x.n)}</td><td class="n">${nf(x.q)}</td><td class="n">${tr(x.dt)}</td><td class="n">${tbP(x.dt,pT)}</td><td class="n t-red">${tr(x.dt-x.gv)}</td><td class="n t-red">âm</td><td>${pill("Lỗ ở giá vốn","red")}</td></tr>`)))}
@@ -183,7 +186,7 @@ function fbvOps(m){
    ${card("🛒","rgba(23,128,74,.12)","Nguồn đơn & trang bán hàng",lw&&lw[1].dtChot<lw[0].dtChot*0.85?"Theo dõi":"Tốt",
      src.filter(x=>x.rev>0).slice(0,3).map(x=>row(esc(x.n),tr(x.rev)+" · "+tbP(x.rev,sT)+(x.o?" · hủy "+tbP(x.can,x.o):""))).join("")
      +(lw?row(`Doanh thu chốt tuần ${lw[0].a}–${lw[0].b} → ${lw[1].a}–${lw[1].b}`,tr(lw[0].dtChot)+" → "+tr(lw[1].dtChot))+row(`Đơn tạo tuần ${lw[1].a}–${lw[1].b}`,nf(lw[1].tao)+(lw[0].tao?" · "+(lw[1].tao>=lw[0].tao?"+":"−")+tbP(Math.abs(lw[1].tao-lw[0].tao),lw[0].tao):"")):""),"")}</div>`;
-  const PR=fbvProds(X.cov.length?X.cov:X.days),pT=PR.reduce((a,x)=>a+x.dt,0),lineOf=x=>L.lines.find(l=>l.k===fbbcLineOf(x.n,x.g));
+  const PR=fbvProds(fbvPDays(X)),pT=PR.reduce((a,x)=>a+x.dt,0),lineOf=x=>L.lines.find(l=>l.k===fbbcLineOf(x.n,x.g));
   const topP=PR.length?`<section class="card"><div class="card-h"><h2>Top sản phẩm bán chạy</h2><span class="hint">team thấy số bán và ROAS nhóm hàng, không thấy lãi · "Ưu tiên quảng cáo" do web tính từ lãi sau quảng cáo bên quản trị</span></div>
    ${tbl(["#","Sản phẩm","Số bán","Doanh thu","% kênh","ROAS nhóm","Ưu tiên quảng cáo"],PR.slice(0,8).map((x,i)=>{const l=lineOf(x);return `<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.n)}</td><td class="n">${nf(x.q)}</td><td class="n">${tr(x.dt)}</td><td class="n">${tbP(x.dt,pT)}</td><td class="n">${l&&l.roas!=null?tbX(l.roas):"—"}</td><td>${l&&l.pri?tbPill(l.pri):""}</td></tr>`}))}</section>`:"";
   const old=document.createElement("div");try{pFbdash(old,true)}catch(e){}
