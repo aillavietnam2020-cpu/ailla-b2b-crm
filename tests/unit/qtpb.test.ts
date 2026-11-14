@@ -137,3 +137,25 @@ describe('Quản trị phòng đợt 2: KPI, Work Flow, cài đặt HCNS', () =>
   });
 });
 
+
+describe('Quản trị phòng: CEO chọn Lead, bật tắt việc Lead được làm', () => {
+  it('CEO chọn Lead cho phòng thì theo CEO chọn, không theo vai trò', () => {
+    const q = { cfg: { depts: ['CM'], leads: { CM: 'u_nv' } } };
+    expect(leadOf(users(), 'c_nv', q)?.dept).toBe('CM');
+    expect(leadOf(users(), 'c_lead', q)).toBeNull();
+    expect(leadOf(users(), 'c_lead', { cfg: { depts: ['CM'], leads: { CM: '' } } })).toBeNull();
+    expect(leadOf(users(), 'c_lead', { cfg: { depts: ['CM'], leads: { ADS: 'u_ads' } } })?.dept).toBe('CM');
+  });
+  it('CEO tắt quyền phân quyền / khóa người / menu thì Lead gửi lên cũng không đổi', () => {
+    const q = { cfg: { depts: ['CM'], cap: { quyen: false, khoa: false, menu: false } } };
+    const lead = leadOf(users(), 'c_lead', q)!;
+    const inc = clone(users());
+    inc[2]!.perms = ['cv.xem', 'viec.giao'];
+    inc[2]!.active = false;
+    const nv = protectUsers(inc, users(), 'c_lead', false, { lead }).find((u) => u.id === 'u_nv')!;
+    expect(nv.perms).toEqual(['cv.xem', 'luong.quanly']);
+    expect(nv.active).toBe(true);
+    const out = protectQtpb({ ...q, dept: { CM: { hide: ['win'] } } }, { ...q, dept: { CM: { hide: [] } } }, false, lead) as any;
+    expect(out.dept.CM.hide).toEqual([]);
+  });
+});

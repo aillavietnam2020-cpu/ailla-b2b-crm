@@ -11,14 +11,15 @@
    Tên toàn cục trong file bắt đầu bằng "qb".
    ===================================================================== */
 const QB={list:null,me:null,busy:false,cur:"",data:null,dbusy:false,view:"grid",q:"",fv:""};
-const QB_TY=[["text","Chữ"],["num","Số"],["date","Ngày"],["sel","Chọn"],["user","Người"],["link","Link"],["check","Tích"]];
+const QB_TY=[["text","Chữ"],["num","Số"],["date","Ngày"],["sel","Danh sách chọn"],["user","Tên nhân sự"],["link","Link"],["check","Ô tích"]];
 const QB_MK=[["dem","Đếm dòng"],["tong","Tổng"],["tb","Trung bình"],["tile","Tỉ lệ %"]];
-const QB_SUA=[["lead","Chỉ Lead"],["phutrach","Lead + người phụ trách"],["phong","Cả phòng"]];
+const QB_SUA=[["lead","Chỉ Lead"],["phutrach","Lead + người có tên trong dòng"],["phong","Cả phòng"]];
 const qbTyN=t=>(QB_TY.find(x=>x[0]===t)||[,""])[1];
 const qbKey=()=>"c"+Math.random().toString(36).slice(2,9);
 const QB_SP=["Bột tẩy vạn năng","Tinh dầu giặt sấy","Tẩy lồng","Nước giặt"];
 /* Mẫu bảng gợi ý (bấm là có bảng với cột dựng sẵn, Lead sửa tiếp). */
 const QB_TPL=[
+ ["trong","Bảng trống",[["Cột 1","text"]],[],null],
  ["hook","Kho ý tưởng hook",[["Ý tưởng","text"],["Sản phẩm","sel",QB_SP],["Người phụ trách","user"],["Trạng thái","sel",["Ý tưởng","Đang viết","Đã quay","Bỏ"]],["Link Drive","link"],["Lượt xem","num"]],
   [["Đã quay","dem",null,3,"Đã quay"],["Tỉ lệ ý tưởng đã quay","tile",null,3,"Đã quay"],["Tổng lượt xem","tong",5]],3],
  ["koc","Booking KOC",[["Tên KOC","text"],["Kênh","sel",["TikTok","Facebook","Instagram","YouTube"]],["Link kênh","link"],["Sản phẩm","sel",QB_SP],["Người phụ trách","user"],["Ngày lên video","date"],["Trạng thái","sel",["Liên hệ","Đã gửi mẫu","Đã lên video","Hủy"]],["Lượt xem","num"]],
@@ -28,8 +29,7 @@ const QB_TPL=[
  ["live","Lịch livestream",[["Ngày","date"],["Giờ","text"],["Chủ đề","text"],["Người live","user"],["Sản phẩm chính","sel",QB_SP],["Đã chuẩn bị đồ","check"],["Trạng thái","sel",["Lên lịch","Đã live","Hoãn"]]],
   [["Đã live","dem",null,6,"Đã live"]],6],
  ["ads","Ý tưởng quảng cáo",[["Ý tưởng","text"],["Sản phẩm","sel",QB_SP],["Người phụ trách","user"],["Trạng thái","sel",["Ý tưởng","Đang làm","Đang chạy","Dừng"]],["Link","link"]],
-  [["Đang chạy","dem",null,3,"Đang chạy"]],3],
- ["trong","Bảng trống",[["Tên","text"],["Người phụ trách","user"],["Trạng thái","sel",["Mới","Đang làm","Xong"]],["Ghi chú","text"]],[],2]];
+  [["Đang chạy","dem",null,3,"Đang chạy"]],3]];
 function qbTplDef(t){const cols=t[2].map(([n,ty,o])=>{const c={k:qbKey(),t:n,ty};if(ty==="sel")c.opts=(o||[]).slice();return c});
   const metrics=t[3].map(([n,kind,col,fc,fv])=>{const m={t:n,kind};if(col!=null)m.col=cols[col].k;if(fc!=null){m.fc=cols[fc].k;m.fv=fv}return m});
   return {cols,metrics,xem:{mode:"phong",them:[]},sua:"phutrach",kan:t[4]!=null?cols[t[4]].k:""}}
@@ -87,11 +87,11 @@ function qbPageList(m){
   m.querySelectorAll("[data-qbo]").forEach(b=>b.onclick=()=>{QB.cur=b.dataset.qbo;QB.data=null;QB.q="";QB.fv="";QB.view="grid";renderMain();scrollTo(0,0)});
   const nb=$("#qb-new");if(nb)nb.onclick=qbNewDrawer;
 }
-function qbNewDrawer(){const me=QB.me||{};const depts=me.ceo?(me.depts||[]):[me.leadDept];
-  openDrawerHTML(`<h2>Tạo bảng</h2><p class="hint">Chọn một mẫu để có sẵn cột, sau đó thêm bớt cột tùy ý.</p>
+function qbNewDrawer(){const me=QB.me||{};
+  openDrawerHTML(`<h2>Tạo bảng</h2><p class="hint">Chọn "Bảng trống" để tự đặt cột từ đầu, hoặc chọn một mẫu có sẵn cột. Sau đó thêm, bớt, đổi tên cột tùy ý ở nút "Cột & chỉ số".</p>
    <div class="qb-grid" id="qb-tpls">${QB_TPL.map((t,i)=>`<button class="qb-tile${i===0?" on":""}" data-qbt="${i}"><b>${esc(t[1])}</b><span class="hint">${t[2].map(x=>esc(x[0])).join(" · ")}</span></button>`).join("")}</div>
    <label class="field"><span>Tên bảng</span><input id="qb-nn" maxlength="80" value="${esc(QB_TPL[0][1])}"></label>
-   ${depts.length>1?`<label class="field"><span>Của phòng</span><select id="qb-nd">${opt(depts.map(k=>[k,qpPb(k)]),me.leadDept||depts[0])}</select></label>`:""}
+   ${me.ceo?`<label class="field"><span>Bảng của phòng</span><select id="qb-nd">${opt((D().departments||[]).map(p=>[p.k,p.n]),qpD())}</select></label>`:""}
    <div class="acts"><button class="btn pri" id="qb-nok">Tạo bảng</button></div>`);
   let sel=0;document.querySelectorAll("[data-qbt]").forEach(b=>b.onclick=()=>{sel=+b.dataset.qbt;document.querySelectorAll("[data-qbt]").forEach(x=>x.classList.toggle("on",x===b));$("#qb-nn").value=QB_TPL[sel][1]});
   $("#qb-nok").onclick=e=>qpBusy(e.target,async()=>{const name=$("#qb-nn").value.trim();if(!name){toast("Đặt tên bảng");return}
@@ -103,7 +103,7 @@ function qbPageTable(m){
   const T=qbT(),def=T.def,rows=QB.data.rows||[];
   const kanCol=def.cols.find(c=>c.k===def.kan&&c.ty==="sel");if(QB.view==="kan"&&!kanCol)QB.view="grid";
   const q=QB.q.trim().toLowerCase();
-  const fcol=kanCol||def.cols.find(c=>c.ty==="sel");
+  const fcol=kanCol;
   const shown=rows.filter(r=>(!q||def.cols.some(c=>{const v=r.data[c.k];return v!=null&&String(c.ty==="user"?qbUName(v):v).toLowerCase().includes(q)}))&&(!QB.fv||!fcol||r.data[fcol.k]===QB.fv));
   m.innerHTML=`<div id="qb-root"><button class="btn sm" id="qb-back">← Tất cả bảng</button>`+H(esc(T.name),esc(qpPb(T.dept))+" · "+rows.length+" dòng · Ai xem: "+(def.xem.mode==="lead"?"chỉ Lead":"cả phòng"+(def.xem.them.length?" + "+def.xem.them.map(qpPb).join(", "):""))+" · Ai sửa: "+esc((QB_SUA.find(x=>x[0]===def.sua)||[,""])[1]))+
    (T.design?`<div class="acts" style="margin:0 0 12px"><button class="btn sm" id="qb-cols">Cột & chỉ số</button><button class="btn sm" id="qb-perm">Ai xem / ai sửa</button><button class="btn sm" id="qb-ren">Đổi tên</button><button class="btn sm" id="qb-del">Xóa bảng</button></div>`:"")+
@@ -130,7 +130,7 @@ function qbPageTable(m){
   m.querySelectorAll("[data-qbk]").forEach(c=>c.onclick=()=>qbRowDrawer(rows.find(r=>r.id===c.dataset.qbk)));
 }
 function qbGrid(def,rows,T){
-  const head=def.cols.map(c=>esc(c.t)+` <span class="hint">${qbTyN(c.ty)}</span>`);
+  const head=def.cols.map(c=>esc(c.t));
   return `<section class="card flush">`+tbl(head,rows.map(r=>`<tr data-qbr="${esc(r.id)}" class="qb-tr">${def.cols.map(c=>`<td>${c.ty==="sel"&&r.edit?`<select data-qbq="${esc(r.id)}" data-k="${c.k}" aria-label="${esc(c.t)}">${opt([["","—"]].concat((c.opts||[]).map(o=>[o,o])),r.data[c.k]||"")}</select>`:qbCell(c,r.data[c.k])}</td>`).join("")}</tr>`))+
    (rows.length?"":(T.add?`<p class="hint pad">Bấm "+ Thêm dòng" để nhập dòng đầu tiên.</p>`:""))+`</section>`;
 }
@@ -171,7 +171,7 @@ function qbColsDrawer(){const T=qbT();const W=JSON.parse(JSON.stringify(T.def));
        <button class="btn sm" data-qbx="${i}" aria-label="Bỏ cột ${esc(c.t)}" ${W.cols.length>1?"":"disabled"}>×</button>
        ${c.ty==="sel"?`<label class="field qb-opts"><span class="hint">Các lựa chọn, cách nhau dấu phẩy</span><input data-qbo2="${i}" value="${esc((c.opts||[]).join(", "))}"></label>`:""}</div>`).join("")}</div>
      <div class="acts"><button class="btn sm" id="qb-ca">+ Thêm cột</button></div>
-     <label class="field"><span>Chia thẻ kéo thả theo cột</span><select id="qb-kan">${opt([["","Không dùng thẻ kéo thả"]].concat(W.cols.filter(c=>c.ty==="sel").map(c=>[c.k,c.t])),W.kan||"")}</select></label>
+     <label class="field"><span>Xem dạng thẻ kéo thả theo cột (chỉ cột kiểu Danh sách chọn)</span><select id="qb-kan">${opt([["","Không dùng thẻ kéo thả"]].concat(W.cols.filter(c=>c.ty==="sel").map(c=>[c.k,c.t])),W.kan||"")}</select></label>
      <h3>Chỉ số tự tính</h3><div id="qb-ml">${W.metrics.map((mt,i)=>`<div class="qb-crow"><input data-qbmt="${i}" value="${esc(mt.t)}" maxlength="60" aria-label="Tên chỉ số">
        <select data-qbmk="${i}" aria-label="Cách tính">${opt(QB_MK,mt.kind)}</select>
        ${mt.kind==="tong"||mt.kind==="tb"?`<select data-qbmc="${i}" aria-label="Cột số">${opt(W.cols.filter(c=>c.ty==="num").map(c=>[c.k,c.t]).concat(W.cols.some(c=>c.ty==="num")?[]:[["","Chưa có cột kiểu Số"]]),mt.col||"")}</select>`:""}
@@ -207,7 +207,7 @@ function qbPermDrawer(){const T=qbT(),d=T.def;const others=(D().departments||[])
   openDrawerHTML(`<h2>Ai xem / ai sửa</h2><p class="hint">${esc(T.name)}. Lead và CEO luôn xem, sửa được.</p>
    <fieldset class="field"><legend>Ai xem</legend>${[["phong","Cả phòng "+qpPb(T.dept)],["lead","Chỉ Lead"]].map(([k,n])=>`<label class="qb-rad"><input type="radio" name="qbx" value="${k}" ${d.xem.mode===k?"checked":""}> ${esc(n)}</label>`).join("")}</fieldset>
    <fieldset class="field" id="qb-them"><legend>Mời thêm phòng khác xem (chỉ xem, không sửa)</legend>${others.map(p=>`<label class="qb-rad"><input type="checkbox" data-qbth="${esc(p.k)}" ${d.xem.them.includes(p.k)?"checked":""}> ${esc(p.n)}</label>`).join("")}</fieldset>
-   <fieldset class="field"><legend>Ai sửa</legend>${QB_SUA.map(([k,n])=>`<label class="qb-rad"><input type="radio" name="qbs" value="${k}" ${d.sua===k?"checked":""}> ${esc(n)}${k==="phutrach"?` <span class="hint">(người trong phòng sửa dòng mình thêm hoặc dòng có tên mình ở cột kiểu Người)</span>`:""}</label>`).join("")}</fieldset>
+   <fieldset class="field"><legend>Ai sửa</legend>${QB_SUA.map(([k,n])=>`<label class="qb-rad"><input type="radio" name="qbs" value="${k}" ${d.sua===k?"checked":""}> ${esc(n)}${k==="phutrach"?` <span class="hint">(nhân viên sửa được dòng mình thêm, hoặc dòng có tên mình ở cột kiểu Tên nhân sự)</span>`:""}</label>`).join("")}</fieldset>
    <div class="acts"><button class="btn pri" id="qb-ps">Lưu</button></div>`);
   const sync=()=>{const lead=document.querySelector('[name="qbx"]:checked').value==="lead";$("#qb-them").style.opacity=lead?".5":"";$("#qb-them").querySelectorAll("input").forEach(x=>x.disabled=lead)};
   document.querySelectorAll('[name="qbx"]').forEach(x=>x.onchange=sync);sync();

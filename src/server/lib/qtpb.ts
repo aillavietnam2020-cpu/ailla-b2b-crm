@@ -51,21 +51,41 @@ export type QtpbDept = {
   ct?: Record<string, Record<string, Record<string, number>>>;
   pend?: unknown[];
 };
-export type QtpbData = { cfg?: { depts?: string[]; videoCeo?: boolean }; hrcfg?: unknown; dept?: Record<string, QtpbDept> };
+/**
+ * cfg (chỉ CEO): depts = phòng đã mở; leads = CEO chọn Lead từng phòng (hub user id; '' = chưa có Lead; không có khóa
+ * thì Lead là người vai trò Trưởng nhóm / Trưởng phòng); cap = Lead được tự làm gì (mặc định bật hết);
+ * duyet = ai duyệt người mới ('HCNS' mặc định, hoặc 'CEO'); videoCeo = bước CEO duyệt video final.
+ */
+export const LEAD_CAPS = ['them', 'khoa', 'quyen', 'menu', 'wf', 'kpi', 'bang'] as const;
+export type LeadCap = (typeof LEAD_CAPS)[number];
+export type QtpbCfg = { depts?: string[]; videoCeo?: boolean; leads?: Record<string, string>; cap?: Partial<Record<LeadCap, boolean>>; duyet?: 'HCNS' | 'CEO' };
+export type QtpbData = { cfg?: QtpbCfg; hrcfg?: unknown; dept?: Record<string, QtpbDept>; bangXem?: string[] };
+
+export const capOn = (q: unknown, k: LeadCap): boolean => (q as QtpbData | undefined)?.cfg?.cap?.[k] !== false;
+export const approverOf = (q: unknown): 'HCNS' | 'CEO' => ((q as QtpbData | undefined)?.cfg?.duyet === 'CEO' ? 'CEO' : 'HCNS');
+
+/** Người này có phải Lead của phòng mình không: CEO đã chọn thì theo CEO chọn, chưa chọn thì theo vai trò. */
+export function isDeptLead(u: GuardUser | undefined, qtpb: unknown): boolean {
+  if (!u || u.active === false || !u.phongBan) return false;
+  const leads = (qtpb as QtpbData | undefined)?.cfg?.leads;
+  if (leads && typeof leads === 'object' && Object.prototype.hasOwnProperty.call(leads, u.phongBan)) return leads[u.phongBan] === u.id;
+  return LEAD_ROLES.includes(u.role ?? '');
+}
 
 export function enabledDepts(q: unknown): string[] {
   const cfg = (q as QtpbData | undefined)?.cfg;
   return Array.isArray(cfg?.depts) ? cfg!.depts!.filter((x) => typeof x === 'string') : DEFAULT_DEPTS;
 }
 
-export type LeadCtx = { hubId: string; crm: string; dept: string; perms: Set<string> };
+export type LeadCtx = { hubId: string; crm: string; dept: string; perms: Set<string>; off?: Set<LeadCap> };
 
 /** Người đang ghi có phải Lead của một phòng đã mở không (dựa trên bản đang lưu trên máy chủ, không tin trình duyệt). */
 export function leadOf(users: GuardUser[] | undefined, crmId: string, qtpb: unknown): LeadCtx | null {
   const me = (users ?? []).find((u) => u?.crm === crmId);
-  if (!me || me.active === false || !LEAD_ROLES.includes(me.role ?? '') || !me.phongBan) return null;
+  if (!me || !isDeptLead(me, qtpb) || !me.phongBan) return null;
   if (!enabledDepts(qtpb).includes(me.phongBan)) return null;
-  return { hubId: String(me.id ?? ''), crm: crmId, dept: me.phongBan, perms: new Set(me.perms ?? []) };
+  const off = new Set(LEAD_CAPS.filter((k) => !capOn(qtpb, k)));
+  return { hubId: String(me.id ?? ''), crm: crmId, dept: me.phongBan, perms: new Set(me.perms ?? []), off };
 }
 
 /** Lead được cấp / gỡ quyền này cho người trong phòng không. */
@@ -95,8 +115,8 @@ export function applyLeadEdits(out: GuardUser[], incoming: GuardUser[], existing
     const old = oldBy.get(o?.id);
     const inc = inBy.get(o?.id);
     if (!old || !inc || !leadManages(lead, old)) return o;
-    const r: GuardUser = { ...o, perms: mergePerms(lead, old.perms, inc.perms) };
-    if (old.active !== false && inc.active === false) {
+    const r: GuardUser = { ...o, perms: lead.off?.has('quyen') ? o.perms : mergePerms(lead, old.perms, inc.perms) };
+    if (!lead.off?.has('khoa') && old.active !== false && inc.active === false) {
       r.active = false;
       r.tt = '';
     }
@@ -137,7 +157,17 @@ export function protectQtpb(incoming: unknown, existing: unknown, isCeo: boolean
     }
     // Định mức, chỉ tiêu: Lead chỉ gửi đề nghị (pend), CEO duyệt mới ghi vào dm / ct.
     const pend = Array.isArray(mine.pend) ? mine.pend.slice(0, 50) : [];
-    out.dept![lead.dept] = { ...prev, hide, tpl, wf, nguong: numMap(mine.nguong, 100), pend, dm: prev.dm, ct: prev.ct };
+    const off = lead.off ?? new Set<LeadCap>();
+    out.dept![lead.dept] = {
+      ...prev,
+      hide: off.has('menu') ? prev.hide : hide,
+      tpl: off.has('quyen') ? prev.tpl : tpl,
+      wf: off.has('wf') ? prev.wf : wf,
+      nguong: off.has('kpi') ? prev.nguong : numMap(mine.nguong, 100),
+      pend: off.has('kpi') ? prev.pend : pend,
+      dm: prev.dm,
+      ct: prev.ct,
+    };
   }
   return out;
 }

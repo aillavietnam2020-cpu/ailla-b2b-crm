@@ -10,7 +10,7 @@ import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { newId } from '../lib/ids';
 import { pack, unpack } from '../lib/pack';
 import { hashPassword } from '../lib/password';
-import { applyUndo, enabledDepts, leadOf, type QtpbData } from '../lib/qtpb';
+import { applyUndo, approverOf, enabledDepts, leadOf, type QtpbData } from '../lib/qtpb';
 import { revokeAllSessions } from '../lib/session';
 import { syncBangXem, undoBang } from '../services/qtpbStore';
 import type { GuardUser } from '../lib/stateGuard';
@@ -60,7 +60,7 @@ export async function syncBangXemMain(db: D1Database, userId: string): Promise<v
   );
 }
 
-type Ctx = { ceo: boolean; hr: boolean; undo: boolean; lead: { dept: string } | null; name: string; depts: string[] };
+type Ctx = { ceo: boolean; hr: boolean; undo: boolean; lead: { dept: string; off: string[] } | null; name: string; depts: string[]; duyet: 'HCNS' | 'CEO' };
 
 async function ctxOf(db: D1Database, auth: AuthContext): Promise<Ctx> {
   const main = await loadMain(db);
@@ -73,9 +73,10 @@ async function ctxOf(db: D1Database, auth: AuthContext): Promise<Ctx> {
     ceo,
     hr,
     undo: ceo || !!me?.perms?.includes('qtpb.hoantac'),
-    lead: l ? { dept: l.dept } : null,
+    lead: l ? { dept: l.dept, off: [...(l.off ?? [])] } : null,
     name: String(me?.name ?? auth.user.display_name ?? ''),
     depts: enabledDepts(main?.data.qtpb),
+    duyet: approverOf(main?.data.qtpb),
   };
 }
 
@@ -179,6 +180,7 @@ qtpbRoutes.post('/requests', async (c) => {
   const auth = c.get('auth');
   const ctx = await ctxOf(c.env.DB, auth);
   if (!ctx.lead) throw forbidden('Chỉ Lead của phòng đã mở Quản trị phòng mới gửi được đề nghị.');
+  if (ctx.lead.off.includes('them')) throw forbidden('CEO đang tắt quyền Lead tự đề nghị thêm người.');
   const p = reqSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!p.success) throw badRequest('VALIDATION_FAILED', p.error.issues[0]?.message ?? 'Dữ liệu chưa hợp lệ');
   const v = p.data;
@@ -199,6 +201,7 @@ qtpbRoutes.post('/requests/:id/decide', async (c) => {
   const auth = c.get('auth');
   const ctx = await ctxOf(c.env.DB, auth);
   if (!ctx.ceo && !ctx.hr) throw forbidden('Chỉ HCNS hoặc CEO duyệt người mới.');
+  if (!ctx.ceo && ctx.duyet === 'CEO') throw forbidden('CEO đang đặt người mới do CEO duyệt.');
   const body = (await c.req.json().catch(() => ({}))) as { approve?: boolean; reason?: string };
   const r = await c.env.DB.prepare('SELECT * FROM qtpb_requests WHERE id = ?').bind(c.req.param('id')).first<{
     id: string; dept: string; name: string; email: string; title: string; status: string; by_name: string;

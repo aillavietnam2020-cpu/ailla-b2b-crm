@@ -11,7 +11,7 @@
    ===================================================================== */
 const QK={tab:"hs",ky:"ngay"};
 const QK_LOAI=[["edit","Edit video"],["kb","Viết kịch bản"],["hook","Viết hook"]];
-const qkDc=()=>qpDeptCfg(ME.phongBan);
+const qkDc=()=>qpDeptCfg(qpD());
 const qkVidCeo=()=>{const c=((D()&&D().qtpb)||{}).cfg||{};return c.videoCeo!==false};
 const qkHr=()=>((D()&&D().qtpb)||{}).hrcfg||{on:false,muc:[]};
 const qkNow=()=>new Date();
@@ -39,9 +39,9 @@ const qkMembers=()=>D().users.filter(u=>qpManaged(u)&&u.active!==false);
 
 /* ---------- KPI nhân sự (Lead) ---------- */
 function pQkKpi(m){
-  if(!qpIsLead(ME)){m.innerHTML=H("KPI nhân sự","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
+  if(!qpAct()){m.innerHTML=qpDeptPick()+H("KPI nhân sự","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
   const pend=(qkDc().pend||[]).length;
-  m.innerHTML=H("KPI nhân sự","Đo hiệu suất từng người và đặt chỉ tiêu của phòng "+esc(qpPb(ME.phongBan))+". Định mức, chỉ tiêu CEO duyệt mới có hiệu lực.")+
+  m.innerHTML=qpDeptPick()+H("KPI nhân sự","Đo hiệu suất từng người và đặt chỉ tiêu của phòng "+esc(qpPb(qpD()))+". Định mức, chỉ tiêu CEO duyệt mới có hiệu lực.")+
    `<div class="cwtabs" role="tablist">${[["hs","Hiệu suất",0],["ct","Chỉ tiêu & quy định",pend]].map(([k,n,c])=>`<button role="tab" aria-selected="${QK.tab===k}" class="${QK.tab===k?"on":""}" data-qktab="${k}">${n}${c?` <span class="n">${c} chờ CEO</span>`:""}</button>`).join("")}</div><div id="qk-sub"></div>`;
   m.querySelectorAll("[data-qktab]").forEach(b=>b.onclick=()=>{QK.tab=b.dataset.qktab;renderMain()});
   (QK.tab==="ct"?qkTabCt:qkTabHs)(m.querySelector("#qk-sub"));
@@ -63,8 +63,8 @@ function qkTabHs(s){
   s.querySelectorAll("[data-qkcap]").forEach(x=>x.onchange=()=>{const u=userBy(x.dataset.qkcap);DB.mutate(ME.name,`đặt cấp ${u.name}: ${x.value||"—"}`,d=>{const y=d.users.find(z=>z.id===u.id);if(y&&qpManaged(y))y.cap=x.value});toast("Đã lưu cấp "+u.name);renderMain()});
 }
 function qkSend(ten,kind,items){if(!items.length){toast("Chưa đổi gì");return}
-  DB.mutate(ME.name,"gửi CEO duyệt: "+ten,d=>{d.qtpb=d.qtpb||{};d.qtpb.dept=d.qtpb.dept||{};const c=d.qtpb.dept[ME.phongBan]=d.qtpb.dept[ME.phongBan]||{};c.pend=(c.pend||[]).concat([{id:uid("kp"),kind,ten,ym:qkYM(),by:ME.name,byId:ME.id,at:nowISO(),items}]);
-    const ad=d.users.filter(u=>u.role==="admin"&&u.active!==false).map(u=>u.id);if(typeof notifyU==="function")notifyU(d,ad,`${ME.name} gửi CEO duyệt ${ten} (${qpPb(ME.phongBan)})`,"qp_ct")});
+  DB.mutate(ME.name,"gửi CEO duyệt: "+ten,d=>{d.qtpb=d.qtpb||{};d.qtpb.dept=d.qtpb.dept||{};const c=d.qtpb.dept[qpD()]=d.qtpb.dept[qpD()]||{};c.pend=(c.pend||[]).concat([{id:uid("kp"),kind,ten,ym:qkYM(),by:ME.name,byId:ME.id,at:nowISO(),items}]);
+    const ad=d.users.filter(u=>u.role==="admin"&&u.active!==false).map(u=>u.id);if(typeof notifyU==="function")notifyU(d,ad,`${ME.name} gửi CEO duyệt ${ten} (${qpPb(qpD())})`,"qp_ct")});
   toast("Đã gửi CEO duyệt. Số cũ vẫn dùng tới khi CEO duyệt.");renderMain()}
 function qkTabCt(s){
   const dc=qkDc(),pend=dc.pend||[],M=qkMembers(),ym=qkYM(),cf=qkCong(false),ng=qkNg();
@@ -82,7 +82,7 @@ function qkTabCt(s){
   $("#qk-dm").onclick=()=>{const it=[];s.querySelectorAll("[data-qkdm]").forEach(x=>{const [cap,k]=x.dataset.qkdm.split("|"),b=qkDm(cap)[k],a=num(x.value);if((b==null?null:b)!==a)it.push({cap,k,before:b==null?null:b,after:a})});qkSend("Định mức theo cấp","dm",it)};
   $("#qk-ct").onclick=()=>{const it=[];s.querySelectorAll("[data-qkct]").forEach(x=>{const [id,k]=x.dataset.qkct.split("|"),b=qkCt(id)[k],a=num(x.value);if((b==null?null:b)!==a)it.push({uid:id,name:(userBy(id)||{}).name||"",k,before:b==null?null:b,after:a})});qkSend("Chỉ tiêu tháng "+ym.slice(5)+"/"+ym.slice(0,4),"ct",it)};
   $("#qk-ng").onclick=()=>{const a=Math.min(100,Math.max(1,Number($("#qk-n1").value)||80)),b=Math.min(100,Math.max(1,Number($("#qk-n2").value)||80));
-    DB.mutate(ME.name,"sửa ngưỡng cảnh báo hiệu suất",d=>{d.qtpb=d.qtpb||{};d.qtpb.dept=d.qtpb.dept||{};const c=d.qtpb.dept[ME.phongBan]=d.qtpb.dept[ME.phongBan]||{};c.nguong={ngay:a,gan:b}});toast("Đã lưu ngưỡng");renderMain()};
+    DB.mutate(ME.name,"sửa ngưỡng cảnh báo hiệu suất",d=>{d.qtpb=d.qtpb||{};d.qtpb.dept=d.qtpb.dept||{};const c=d.qtpb.dept[qpD()]=d.qtpb.dept[qpD()]||{};c.nguong={ngay:a,gan:b}});toast("Đã lưu ngưỡng");renderMain()};
 }
 
 /* ---------- CEO: Chỉ tiêu chờ duyệt ---------- */
@@ -96,7 +96,7 @@ function pQkCt(m){
     <div class="acts"><button class="btn pri" data-qkok="${p.id}">Duyệt</button><button class="btn" data-qkno="${p.id}">Trả lại</button></div></section>`).join(""):qpNo("Không có chỉ tiêu nào chờ duyệt."));
   const find=id=>P.find(x=>x.id===id);
   const done=(p,msg,apply)=>DB.mutate(ME.name,msg,d=>{const c=((d.qtpb||{}).dept||{})[p.pb];if(!c)return;c.pend=(c.pend||[]).filter(x=>x.id!==p.id);if(apply)apply(c);
-    const L=d.users.filter(u=>u.active!==false&&u.phongBan===p.pb&&QP_LEADR.includes(u.role)).map(u=>u.id);if(typeof notifyU==="function")notifyU(d,L,msg,"qp_kpi")});
+    const L=qpLeadIds(d,p.pb);if(typeof notifyU==="function")notifyU(d,L,msg,"qp_kpi")});
   m.querySelectorAll("[data-qkok]").forEach(b=>b.onclick=()=>{const p=find(b.dataset.qkok);done(p,"CEO đã duyệt "+p.ten,c=>{
     if(p.kind==="dm"){c.dm=c.dm||{};p.items.forEach(i=>{const r=c.dm[i.cap]=c.dm[i.cap]||{};if(i.after==null)delete r[i.k];else r[i.k]=i.after})}
     else{c.ct=c.ct||{};const mo=c.ct[p.ym]=c.ct[p.ym]||{};p.items.forEach(i=>{const r=mo[i.uid]=mo[i.uid]||{};if(i.after==null)delete r[i.k];else r[i.k]=i.after})}});toast("Đã duyệt, có hiệu lực ngay");renderMain()});
@@ -131,16 +131,16 @@ const QK_WF=[
 ];
 const qkHan=id=>(((qkDc().wf||{})[id])||{}).han||0;
 /* Việc đang chờ Lead duyệt mà web thấy được ngay ở trình duyệt: video, kịch bản của người trong phòng; task chờ Lead. */
-function qkWaiting(){const ids=new Set(D().users.filter(u=>u.phongBan===ME.phongBan).map(u=>u.id)),now=Date.now(),o=[];
+function qkWaiting(){const ids=new Set(D().users.filter(u=>u.phongBan===qpD()).map(u=>u.id)),now=Date.now(),o=[];
   const lastTo=(c,st)=>{const h=(c.history||[]).filter(x=>x.to===st).pop();return h?qkTime(h.t):0};
   (D().cards||[]).forEach(c=>{if(c.step==="dvd"&&ids.has(c.nguoiEdit||c.nguoi))o.push({wf:"video",ten:c.id+" · "+(c.tieuDe||c.ten||c.sku||""),ai:userName(c.nguoiEdit||c.nguoi),at:lastTo(c,"dvd")});
     if(c.step==="dkb"&&ids.has(c.nguoiKB||c.nguoi))o.push({wf:"kb",ten:c.id+" · "+(c.tieuDe||c.ten||c.sku||""),ai:userName(c.nguoiKB||c.nguoi),at:lastTo(c,"dkb")})});
   (D().tasks||[]).forEach(t=>{if(t.st==="review"&&t.vong!==2&&typeof tkAppr==="function"){let a=[];try{a=tkAppr(t)||[]}catch(e){}if(a.includes(ME.id))o.push({wf:"task",ten:t.ten,ai:userName(t.nguoi),at:qkTime(t.nopAt||t.stAt)})}});
   return o.map(x=>Object.assign(x,{gio:x.at?Math.floor((now-x.at)/3600000):null,han:qkHan(x.wf)})).sort((a,b)=>(b.gio||0)-(a.gio||0))}
 function pQkWf(m){
-  if(!qpIsLead(ME)){m.innerHTML=H("Work Flow","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
+  if(!qpAct()){m.innerHTML=qpDeptPick()+H("Work Flow","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
   const W=qkWaiting(),over=W.filter(x=>x.han&&x.gio!=null&&x.gio>x.han);
-  m.innerHTML=H("Work Flow","Các luồng duyệt đang chạy của phòng "+esc(qpPb(ME.phongBan))+". Lead đặt hạn duyệt cho bước của mình; bước của Quản lý mua hàng, Kế toán, Kế toán kho, HCNS, CEO giữ nguyên.")+
+  m.innerHTML=qpDeptPick()+H("Work Flow","Các luồng duyệt đang chạy của phòng "+esc(qpPb(qpD()))+". Lead đặt hạn duyệt cho bước của mình; bước của Quản lý mua hàng, Kế toán, Kế toán kho, HCNS, CEO giữ nguyên.")+
    `<section class="card"><h2 style="margin:0 0 6px">Đang chờ Lead duyệt <small class="hint">${W.length} việc${over.length?` · <b style="color:#d93a3a">${over.length} quá hạn</b>`:""}</small></h2>
     ${W.length?tbl(["Luồng","Việc","Người làm","Đã chờ",""],W.slice(0,40).map(x=>`<tr><td>${esc((QK_WF.find(f=>f.id===x.wf)||{}).ten||"")}</td><td>${esc(x.ten)}</td><td>${esc(x.ai||"")}</td><td>${x.gio==null?"—":x.gio+" giờ"}</td><td>${x.han&&x.gio!=null&&x.gio>x.han?pill("Quá hạn "+x.han+" giờ","red"):""}</td></tr>`)):`<p class="hint">Không có việc nào đang chờ.</p>`}
     <p class="hint">Nghỉ phép và đồ dùng xem ở mục duyệt riêng của từng luồng.</p></section>
@@ -149,7 +149,7 @@ function pQkWf(m){
      ${!f.lead?`<p class="hint">Luồng này không có bước của Lead.</p>`:""}</section>`).join("")}
    <div class="acts"><button class="btn pri" id="qk-wf">Lưu hạn duyệt</button></div>`;
   $("#qk-wf").onclick=()=>{const wf={};m.querySelectorAll("[data-qkh]").forEach(x=>{const v=Number(x.value);if(v>0)wf[x.dataset.qkh]={han:Math.min(720,Math.round(v))}});
-    DB.mutate(ME.name,"sửa hạn duyệt Work Flow phòng "+qpPb(ME.phongBan),d=>{d.qtpb=d.qtpb||{};d.qtpb.dept=d.qtpb.dept||{};const c=d.qtpb.dept[ME.phongBan]=d.qtpb.dept[ME.phongBan]||{};c.wf=wf});toast("Đã lưu hạn duyệt");renderMain()};
+    DB.mutate(ME.name,"sửa hạn duyệt Work Flow phòng "+qpPb(qpD()),d=>{d.qtpb=d.qtpb||{};d.qtpb.dept=d.qtpb.dept||{};const c=d.qtpb.dept[qpD()]=d.qtpb.dept[qpD()]||{};c.wf=wf});toast("Đã lưu hạn duyệt");renderMain()};
 }
 
 Object.assign(PAGES,{qp_kpi:pQkKpi,qp_wf:pQkWf,qp_ct:pQkCt,qp_hrkpi:pQkHr});

@@ -42,7 +42,8 @@ async function viewerOf(db: D1Database, auth: AuthContext): Promise<Me> {
   return {
     hubId: String(me?.id ?? ''),
     dept: String(me?.phongBan ?? ''),
-    leadDept: l?.dept ?? '',
+    // CEO tắt "Lead tạo bảng dữ liệu" thì Lead chỉ như người trong phòng
+    leadDept: l && !l.off?.has('bang') ? l.dept : '',
     ceo: auth.user.role === 'CEO',
     name: String(me?.name ?? auth.user.display_name ?? ''),
     depts: enabledDepts(main?.data.qtpb),
@@ -117,7 +118,7 @@ const tblSchema = z.object({ name: z.string().trim().min(1, 'Đặt tên bảng'
 qtpbBangRoutes.post('/', async (c) => {
   const me = await viewerOf(c.env.DB, c.get('auth'));
   const v = tblSchema.parse(await c.req.json());
-  const dept = me.ceo ? v.dept || me.leadDept || me.dept : me.leadDept;
+  const dept = me.ceo ? v.dept || '' : me.leadDept;
   if (!dept || !canDesign(dept, me)) throw forbidden('Chỉ Lead của phòng đã mở Quản trị phòng (hoặc CEO) tạo được bảng.');
   const cnt = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM qtpb_tables WHERE dept = ? AND deleted_at IS NULL').bind(dept).first<{ n: number }>();
   if ((cnt?.n ?? 0) >= LIMITS.tablesPerDept) throw badRequest('LIMIT', `Mỗi phòng tối đa ${LIMITS.tablesPerDept} bảng. Xóa bớt bảng không dùng nữa.`);
