@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
 import { applyUndo, diffForLog, isHardPerm, leadOf, protectQtpb } from '../../src/server/lib/qtpb';
 import { protectUsers, type GuardUser } from '../../src/server/lib/stateGuard';
@@ -108,3 +109,31 @@ describe('Quản trị phòng: menu, mẫu quyền, nhật ký, hoàn tác', () 
     expect(data.qtpb.dept.CM!.hide).toEqual([]);
   });
 });
+
+describe('Quản trị phòng đợt 2: KPI, Work Flow, cài đặt HCNS', () => {
+  const lead = leadOf(users(), 'c_lead', undefined)!;
+  it('Lead không tự ghi định mức / chỉ tiêu (chỉ gửi đề nghị), không đổi công tắc video của CEO', () => {
+    const old = { cfg: { depts: ['CM'], videoCeo: true }, dept: { CM: { dm: { 'Thực tập sinh': { edit: 2 } }, ct: {} } } };
+    const inc = { cfg: { depts: ['CM'], videoCeo: false }, dept: { CM: { dm: { 'Thực tập sinh': { edit: 9 } }, ct: { '2026-11': { u_nv: { edit: 99 } } }, pend: [{ ten: 'Định mức' }], wf: { video: { han: 12 }, x: { han: 9999 } }, nguong: { ngay: 80, bad: -1 } } } };
+    const out = protectQtpb(inc, old, false, lead) as any;
+    expect(out.cfg.videoCeo).toBe(true);
+    expect(out.dept.CM.dm['Thực tập sinh'].edit).toBe(2);
+    expect(out.dept.CM.ct).toEqual({});
+    expect(out.dept.CM.pend).toHaveLength(1);
+    expect(out.dept.CM.wf).toEqual({ video: { han: 12 }, x: {} });
+    expect(out.dept.CM.nguong).toEqual({ ngay: 80 });
+  });
+  it('HCNS đổi được cài đặt lương thưởng; người khác thì không', () => {
+    const old = { hrcfg: { on: false } };
+    expect((protectQtpb({ hrcfg: { on: true } }, old, false, null, true) as any).hrcfg).toEqual({ on: true });
+    expect((protectQtpb({ hrcfg: { on: true } }, old, false, null, false) as any).hrcfg).toEqual({ on: false });
+  });
+  it('nhật ký ghi Work Flow, ngưỡng, đề nghị chỉ tiêu; hoàn tác Work Flow', () => {
+    const rows = diffForLog(users(), users(), { dept: { CM: { wf: {}, pend: [] } } }, { dept: { CM: { wf: { video: { han: 8 } }, nguong: { ngay: 70 }, pend: [{ ten: 'Chỉ tiêu tháng 11' }] } } }, 'CM');
+    expect(rows.map((r) => r.action).sort()).toEqual(['kpi', 'rule', 'wf']);
+    const data: any = { users: [], qtpb: { dept: { CM: { wf: { video: { han: 8 } } } } } };
+    expect(applyUndo(data, rows.find((r) => r.action === 'wf')!)).toBe(true);
+    expect(data.qtpb.dept.CM.wf).toEqual({});
+  });
+});
+

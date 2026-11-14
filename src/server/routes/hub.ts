@@ -181,7 +181,7 @@ hubRoutes.put('/state', async (c) => {
         }
         if ('staff' in data) data.staff = protectStaff(data.staff, old.staff, hrOk);
         if ('qtpb' in data) {
-          const q = protectQtpb(data.qtpb, old.qtpb, false, lead);
+          const q = protectQtpb(data.qtpb, old.qtpb, false, lead, hrOk);
           if (q === undefined) delete data.qtpb;
           else data.qtpb = q;
         }

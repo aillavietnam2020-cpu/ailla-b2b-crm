@@ -30,7 +30,7 @@ const qpPend=()=>(QP.req||[]).filter(r=>r.status==="PENDING").length;
 const QP_CAP=["Thực tập sinh","Nhân viên","Chuyên viên"];
 const QP_KIND=["Thử việc","Chính thức","Thực tập"];
 /* Trang luôn có trong menu, Lead không tắt được. */
-const QP_ALWAYS=new Set(["cc_toi","np_toi","tu_toi","pl_toi","hr_me","hr_kpime","ketquatoi","thongbao","matkhau","anhdaidien","cv_v","vp_toi","qp_ns","qp_nk"]);
+const QP_ALWAYS=new Set(["cc_toi","np_toi","tu_toi","pl_toi","hr_me","hr_kpime","ketquatoi","thongbao","matkhau","anhdaidien","cv_v","vp_toi","qp_ns","qp_nk","qp_wf","qp_kpi"]);
 
 /* Quyền hoàn tác cho Quản lý: CEO bật ở Tài khoản & phân quyền. */
 {const g=PERMS.find(x=>x[0]==="Hệ thống");if(g&&!g[1].some(p=>p[0]==="qtpb.hoantac"))g[1].push(["qtpb.hoantac","Hoàn tác thay đổi của Lead ở Quản trị phòng (Quản lý)"]);}
@@ -152,12 +152,15 @@ function qpLogDesc(r){
     return `Mẫu quyền chức vụ <b>${esc(r.target)}</b>${on.length?`<div>Bật: ${on.map(x=>esc(qpPermLabel(x))).join(", ")}</div>`:""}${off.length?`<div>Tắt: ${off.map(x=>esc(qpPermLabel(x))).join(", ")}</div>`:""}`}
   if(r.action==="menu"&&(Array.isArray(a)||Array.isArray(b))){const A=a||[],B=b||[],nm=k=>{for(const mo of MODULES){try{for(const [,L] of mo.groups()||[])for(const i of L||[])if(i&&i[0]===k)return i[1]}catch(e){}}return k},off=A.filter(x=>!B.includes(x)),on=B.filter(x=>!A.includes(x));
     return `Menu nhân sự phòng${off.length?`<div>Ẩn: ${off.map(x=>esc(nm(x))).join(", ")}</div>`:""}${on.length?`<div>Hiện lại: ${on.map(x=>esc(nm(x))).join(", ")}</div>`:""}`}
+  if(r.action==="wf"&&a&&typeof a==="object"){const nm=k=>((typeof QK_WF!=="undefined"&&QK_WF.find(f=>f.id===k))||{ten:k}).ten;const ks=[...new Set(Object.keys(a).concat(Object.keys(b||{})))];
+    return `Hạn duyệt của Lead (Work Flow)${ks.map(k=>`<div>${esc(nm(k))}: ${((b||{})[k]||{}).han||"—"} → ${(a[k]||{}).han||"—"} giờ</div>`).join("")}`}
+  if(r.action==="rule"&&a)return `Ngưỡng cảnh báo hiệu suất: báo đỏ dưới ${(b||{}).ngay||80}% → ${a.ngay}% · gần đạt từ ${(b||{}).gan||80}% → ${a.gan}%`;
   return esc(r.summary||"");
 }
 function qpLogTable(rows,undo){
   const who=r=>esc(r.actor_name||"")+`<div class="hint">${({lead:"Lead",hr:"HCNS",ceo:"CEO"})[r.actor_role]||""}</div>`;
   return rows.length?tbl(["Lúc","Ai","Phòng","Thay đổi",""],rows.map(r=>`<tr class="${r.undone_at?"mut":""}"><td class="nowrap">${esc(qpDate(r.at))}</td><td>${who(r)}</td><td>${esc(qpPb(r.dept))}</td><td>${qpLogDesc(r)}</td>
-   <td class="nowrap">${r.undone_at?pill("Đã hoàn tác","gry")+`<div class="hint">${esc(r.undone_name||"")} · ${esc(qpDate(r.undone_at))}</div>`:undo&&["perms","lock","menu","tpl","add"].includes(r.action)?`<button class="btn sm" data-qpu="${r.id}">Hoàn tác</button>`:""}</td></tr>`)):`<p class="hint pad">Chưa có thay đổi nào.</p>`;
+   <td class="nowrap">${r.undone_at?pill("Đã hoàn tác","gry")+`<div class="hint">${esc(r.undone_name||"")} · ${esc(qpDate(r.undone_at))}</div>`:undo&&["perms","lock","menu","tpl","add","wf","rule"].includes(r.action)?`<button class="btn sm" data-qpu="${r.id}">Hoàn tác</button>`:""}</td></tr>`)):`<p class="hint pad">Chưa có thay đổi nào.</p>`;
 }
 function pQpNk(m){
   if(!qpIsLead(ME)){m.innerHTML=H("Nhật ký phòng","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
@@ -235,24 +238,28 @@ function pQpCfg(m){
   m.innerHTML=H("Ranh giới quyền Lead","CEO chọn phòng nào được tự quản. Lead là người có vai trò Trưởng nhóm / Trưởng phòng của phòng đó.")+
    `<section class="card"><h2 style="margin:0 0 6px">Mở Quản trị phòng cho</h2>${tbl(["Phòng","Lead","Mở"],D().departments.map(p=>`<tr><td>${esc(p.n)}</td><td>${leads(p.k).length?esc(leads(p.k).join(", ")):`<span class="hint">chưa có ai vai trò Trưởng nhóm / Trưởng phòng</span>`}</td><td>${p.k==="KT"||p.k==="HCNS"?`<span class="hint">Không áp dụng</span>`:`<input type="checkbox" data-qpd="${p.k}" ${on.has(p.k)?"checked":""}>`}</td></tr>`))}
     <div class="acts"><button class="btn pri" id="qp-cs">Lưu</button></div></section>
-   <section class="card"><h2 style="margin:0 0 6px">Lead được tự làm (trong phòng mình)</h2><ul><li>Gửi đề nghị thêm người mới (HCNS duyệt mới có tài khoản)</li><li>Khóa người nghỉ, chuyển việc đang dở</li><li>Phân quyền trong phạm vi quyền của chính Lead</li><li>Bật tắt trang trong menu của nhân sự phòng</li></ul></section>
+   <section class="card"><h2 style="margin:0 0 6px">Duyệt video final của CEO</h2><label class="row4" style="align-items:center;gap:10px"><input type="checkbox" id="qp-vc" ${((D().qtpb||{}).cfg||{}).videoCeo===false?"":"checked"}><span>Video final phải qua CEO duyệt V2 sau khi Lead duyệt</span></label>
+    <p class="hint">Tắt: Lead duyệt xong là video sang bước Đăng, video tồn sang Đã duyệt. Lead không tắt được, chỉ CEO.</p><div class="acts"><button class="btn" id="qp-vcs">Lưu</button></div></section>
+   <section class="card"><h2 style="margin:0 0 6px">Lead được tự làm (trong phòng mình)</h2><ul><li>Gửi đề nghị thêm người mới (HCNS duyệt mới có tài khoản)</li><li>Khóa người nghỉ, chuyển việc đang dở</li><li>Phân quyền trong phạm vi quyền của chính Lead</li><li>Bật tắt trang trong menu của nhân sự phòng</li><li>Đặt hạn duyệt cho bước của Lead trong Work Flow (luồng có tiền: chỉ phần của Lead)</li><li>Ngưỡng cảnh báo hiệu suất; định mức, chỉ tiêu thì gửi CEO duyệt</li></ul></section>
    <section class="card"><h2 style="margin:0 0 6px">Khóa cứng · chỉ CEO, Kế toán</h2><p class="hint">Lead không thấy, không cấp, không gỡ được.</p><ul><li>Tiền: chi, thu, công nợ</li><li>Giá vốn sản phẩm</li><li>Lợi nhuận, lãi lỗ</li><li>Lương, hồ sơ lương</li><li>Kho: nhập, xuất, kiểm kê</li><li>Cài đặt, sao lưu, xóa dữ liệu, khóa sổ</li><li>Phân quyền toàn công ty, đưa người sang phòng khác, mở lại tài khoản đã khóa</li></ul></section>
    <section class="card"><h2 style="margin:0 0 6px">Ai được hoàn tác</h2><p>CEO${undo.length?" và "+esc(undo.join(", ")):""}.</p><p class="hint">Cấp cho Quản lý: Tài khoản & phân quyền › Phân quyền › tích "Hoàn tác thay đổi của Lead ở Quản trị phòng (Quản lý)".</p></section>`;
-  $("#qp-cs").onclick=()=>{const ds=[...m.querySelectorAll("[data-qpd]:checked")].map(x=>x.dataset.qpd);DB.mutate(ME.name,"mở Quản trị phòng cho "+ds.map(qpPb).join(", "),d=>{d.qtpb=d.qtpb||{};d.qtpb.cfg={depts:ds}});toast("Đã lưu");renderMain()};
+  $("#qp-cs").onclick=()=>{const ds=[...m.querySelectorAll("[data-qpd]:checked")].map(x=>x.dataset.qpd);DB.mutate(ME.name,"mở Quản trị phòng cho "+ds.map(qpPb).join(", "),d=>{d.qtpb=d.qtpb||{};d.qtpb.cfg=Object.assign({},d.qtpb.cfg||{},{depts:ds})});toast("Đã lưu");renderMain()};
+  $("#qp-vcs").onclick=()=>{const on=$("#qp-vc").checked;DB.mutate(ME.name,(on?"bật":"tắt")+" bước CEO duyệt video final",d=>{d.qtpb=d.qtpb||{};d.qtpb.cfg=Object.assign({},d.qtpb.cfg||{},{videoCeo:on})});toast(on?"Video final lại qua CEO duyệt":"Đã tắt bước CEO duyệt video final");renderMain()};
 }
 
 Object.assign(PAGES,{qp_ns:pQpNs,qp_nk:pQpNk,qp_moi:pQpMoi,qp_log:pQpLog,qp_cfg:pQpCfg});
 
 /* ---------- Menu ---------- */
 {
-  const items=()=>[MI("qp_ns","Nhân sự & phân quyền",u=>qpIsLead(u),()=>qpNeed()||""),MI("qp_nk","Nhật ký phòng",u=>qpIsLead(u)),
+  const items=()=>[MI("qp_ns","Nhân sự & phân quyền",u=>qpIsLead(u),()=>qpNeed()||""),MI("qp_wf","Work Flow",u=>qpIsLead(u)),MI("qp_kpi","KPI nhân sự",u=>qpIsLead(u)),MI("qp_nk","Nhật ký phòng",u=>qpIsLead(u)),
+    MI("qp_ct","Chỉ tiêu chờ duyệt",u=>u.role==="admin",()=>(typeof qkAllPend==="function"&&qkAllPend().length)||""),MI("qp_hrkpi","Hiệu suất & lương thưởng",u=>u.role==="admin"||hrOk()),
     MI("qp_moi","Người mới chờ duyệt",u=>u.role==="admin"||hrOk(),()=>{qpLoadReq();return qpPend()||""}),
     MI("qp_log","Nhật ký quản trị phòng",u=>u.role==="admin"||can(u,"qtpb.hoantac")),MI("qp_cfg","Ranh giới quyền Lead",u=>u.role==="admin")];
   /* Web vận hành: mục Nhân sự (Lead, HCNS, CEO, Quản lý). Web quản trị: Cấu hình (chỉ phần CEO / Quản lý / HCNS). */
   const add=(mo,keys)=>{if(!mo)return;const g0=mo.groups;mo.groups=function(){const G=g0.apply(this,arguments)||[];if(G.some(g=>g[0]==="Quản trị phòng"))return G;
     const its=items().filter(i=>(!keys||keys.includes(i[0]))&&(()=>{try{return !ME||i[2](ME)}catch(e){return false}})());return its.length?[["Quản trị phòng",its],...G]:G}};
   add(MODULES.find(x=>x.k==="hr"));
-  add(MODULES.find(x=>x.k==="q_cfg"),["qp_moi","qp_log","qp_cfg"]);
+  add(MODULES.find(x=>x.k==="q_cfg"),["qp_ct","qp_moi","qp_log","qp_cfg","qp_hrkpi"]);
   /* Trang Lead đã tắt: ẩn khỏi menu của nhân sự phòng đó (Lead, CEO vẫn thấy đủ). */
   MODULES.forEach(mo=>{if(mo.k==="me")return;const g=mo.groups;mo.groups=function(){const G=g.apply(this,arguments)||[];
     if(QP.menuAll||!ME||ME.role==="admin"||!ME.phongBan||qpIsLead(ME)||!qpCfg().depts.includes(ME.phongBan))return G;

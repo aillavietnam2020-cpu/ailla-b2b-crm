@@ -37,8 +37,21 @@ export const HARD_PERMS = new Set([
 const HARD_RE = /(luong|chiphi|^gia\.|giavon|loinhuan|^pl\.|^kho\.hoan|^sx\.kiemke|debt|congno|caidat|khoaso)/i;
 export const isHardPerm = (p: string) => HARD_PERMS.has(p) || HARD_RE.test(p);
 
-export type QtpbDept = { hide?: string[]; tpl?: Record<string, string[]> };
-export type QtpbData = { cfg?: { depts?: string[] }; dept?: Record<string, QtpbDept> };
+/**
+ * Mỗi phòng: hide (menu), tpl (mẫu quyền), wf (hạn duyệt bước Lead theo luồng), nguong (ngưỡng cảnh báo hiệu suất),
+ * dm (định mức theo cấp, CEO duyệt), ct (chỉ tiêu tháng theo người, CEO duyệt), pend (đề nghị chờ CEO duyệt).
+ * Ngoài phòng: cfg (CEO: phòng nào mở, videoCeo), hrcfg (HCNS: hiệu suất tính vào lương thưởng).
+ */
+export type QtpbDept = {
+  hide?: string[];
+  tpl?: Record<string, string[]>;
+  wf?: Record<string, { han?: number }>;
+  nguong?: Record<string, number>;
+  dm?: Record<string, Record<string, number>>;
+  ct?: Record<string, Record<string, Record<string, number>>>;
+  pend?: unknown[];
+};
+export type QtpbData = { cfg?: { depts?: string[]; videoCeo?: boolean }; hrcfg?: unknown; dept?: Record<string, QtpbDept> };
 
 export function enabledDepts(q: unknown): string[] {
   const cfg = (q as QtpbData | undefined)?.cfg;
@@ -92,13 +105,21 @@ export function applyLeadEdits(out: GuardUser[], incoming: GuardUser[], existing
 }
 
 /** Mẫu quyền / menu của phòng: CEO sửa tự do; Lead chỉ sửa phòng mình (mẫu chỉ giữ quyền Lead được cấp); người khác giữ nguyên. */
-export function protectQtpb(incoming: unknown, existing: unknown, isCeo: boolean, lead: LeadCtx | null): unknown {
+const numMap = (v: unknown, max = 100000): Record<string, number> => {
+  const o: Record<string, number> = {};
+  if (v && typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>)) if (typeof x === 'number' && isFinite(x) && x >= 0 && x <= max) o[k] = x;
+  return o;
+};
+
+export function protectQtpb(incoming: unknown, existing: unknown, isCeo: boolean, lead: LeadCtx | null, hr = false): unknown {
   if (isCeo) return incoming;
   const old = (existing && typeof existing === 'object' ? existing : {}) as QtpbData;
-  if (!lead) return existing === undefined ? undefined : old;
   const inc = (incoming && typeof incoming === 'object' ? incoming : {}) as QtpbData;
+  // HCNS: cài đặt hiệu suất tính vào lương thưởng.
+  const withHr = (o: QtpbData): QtpbData => (hr && 'hrcfg' in inc ? { ...o, hrcfg: inc.hrcfg } : o);
+  if (!lead) return existing === undefined && !(hr && 'hrcfg' in inc) ? undefined : withHr({ ...old });
   const mine = inc.dept?.[lead.dept];
-  const out: QtpbData = { ...old, dept: { ...(old.dept ?? {}) } };
+  const out: QtpbData = withHr({ ...old, dept: { ...(old.dept ?? {}) } });
   if (mine && typeof mine === 'object') {
     const hide = Array.isArray(mine.hide) ? [...new Set(mine.hide.filter((x) => typeof x === 'string'))] : [];
     const tpl: Record<string, string[]> = {};
@@ -108,14 +129,22 @@ export function protectQtpb(incoming: unknown, existing: unknown, isCeo: boolean
       const keep = (oldTpl[t] ?? []).filter((p) => !grantable(lead, p));
       tpl[t] = [...new Set([...keep, ...ps.filter((p) => typeof p === 'string' && grantable(lead, p))])];
     }
-    out.dept![lead.dept] = { hide, tpl };
+    const prev = old.dept?.[lead.dept] ?? {};
+    const wf: Record<string, { han?: number }> = {};
+    for (const [k, v] of Object.entries(mine.wf ?? {})) {
+      const h = (v as { han?: unknown })?.han;
+      wf[k] = typeof h === 'number' && h > 0 && h <= 720 ? { han: Math.round(h) } : {};
+    }
+    // Định mức, chỉ tiêu: Lead chỉ gửi đề nghị (pend), CEO duyệt mới ghi vào dm / ct.
+    const pend = Array.isArray(mine.pend) ? mine.pend.slice(0, 50) : [];
+    out.dept![lead.dept] = { ...prev, hide, tpl, wf, nguong: numMap(mine.nguong, 100), pend, dm: prev.dm, ct: prev.ct };
   }
   return out;
 }
 
 export type QtpbLogRow = {
   dept: string;
-  action: 'perms' | 'lock' | 'menu' | 'tpl' | 'add';
+  action: 'perms' | 'lock' | 'menu' | 'tpl' | 'add' | 'wf' | 'rule' | 'kpi';
   target: string;
   target_name: string;
   before: unknown;
@@ -176,6 +205,19 @@ export function diffForLog(prevUsers: GuardUser[], nextUsers: GuardUser[], prevQ
       rows.push({ dept, action: 'tpl', target: t, target_name: t, before: (pq.tpl ?? {})[t] ?? null, after: (nq.tpl ?? {})[t] ?? null, summary: `Sửa mẫu quyền chức vụ ${t}` });
     }
   }
+  const js = (v: unknown) => JSON.stringify(v ?? {});
+  if (js(pq.wf) !== js(nq.wf)) {
+    rows.push({ dept, action: 'wf', target: dept, target_name: '', before: pq.wf ?? {}, after: nq.wf ?? {}, summary: 'Sửa hạn duyệt của Lead trong Work Flow' });
+  }
+  if (js(pq.nguong) !== js(nq.nguong)) {
+    rows.push({ dept, action: 'rule', target: dept, target_name: '', before: pq.nguong ?? {}, after: nq.nguong ?? {}, summary: 'Sửa ngưỡng cảnh báo hiệu suất' });
+  }
+  const pp = Array.isArray(pq.pend) ? pq.pend.length : 0;
+  const np = Array.isArray(nq.pend) ? nq.pend.length : 0;
+  if (np > pp) {
+    const last = (nq.pend as Array<{ ten?: string }>)[np - 1];
+    rows.push({ dept, action: 'kpi', target: dept, target_name: '', before: null, after: last ?? null, summary: `Gửi CEO duyệt: ${String(last?.ten ?? 'chỉ tiêu')}` });
+  }
   return rows;
 }
 
@@ -187,6 +229,13 @@ export function applyUndo(data: { users?: GuardUser[]; qtpb?: QtpbData }, row: {
     if (row.action === 'perms') u.perms = Array.isArray(row.before) ? (row.before as string[]) : [];
     else if (row.action === 'lock') u.active = true;
     else u.active = false;
+    return true;
+  }
+  if (row.action === 'wf' || row.action === 'rule') {
+    const q = (data.qtpb ??= {});
+    const d = ((q.dept ??= {})[row.dept] ??= {});
+    if (row.action === 'wf') d.wf = (row.before as QtpbDept['wf']) ?? {};
+    else d.nguong = (row.before as QtpbDept['nguong']) ?? {};
     return true;
   }
   if (row.action === 'menu' || row.action === 'tpl') {
