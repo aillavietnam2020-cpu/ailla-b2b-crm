@@ -110,8 +110,9 @@ export default {
             console.info('[cron] combo moi', JSON.stringify(await syncComboTasks(env.DB)));
             // Đơn hoàn (TikTok, Shopee, Facebook): hôm nay, hôm qua, hôm kia.
             console.info('[cron] don hoan', JSON.stringify(await syncReturns(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
-            // Số bán hàng Facebook theo người xử lý đơn (Pancake analytics): 8 ngày gần nhất, vì đơn hoàn và đơn giao về chậm.
-            console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6, 7].map(day), (u) => fetch(u))));
+            // Số bán hàng Facebook theo người xử lý đơn (Pancake analytics), theo ngày tạo đơn: 45 ngày gần nhất, vì đơn giao xong và đơn hoàn
+            // về chậm tới vài tuần (14/11: tháng 10 chỉ kéo lại 8 ngày nên web 996tr giao thành công, 66tr hoàn, Pancake đã 1.022tr và 176tr).
+            console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, Array.from({ length: 46 }, (_, i) => day(i)), (u) => fetch(u))));
             // Tiền đơn Facebook đã gửi hàng (giá vốn, ship Facebook trên trang quản trị): hôm qua, hôm kia.
             console.info('[cron] fb money', JSON.stringify(await syncFbMoney(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
             // CSKH khách lẻ: đơn Facebook giao thành công 7 ngày gần nhất (kéo trùng không sao, để lỡ một sáng lỗi mạng vẫn không sót).
