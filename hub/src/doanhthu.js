@@ -133,7 +133,9 @@ function dtAutoChot(){
   if(DTS.inAuto||!dtOk()||!DTS.rowsAt||DTS.err)return;const t=dtToday();
   if(typeof TSB!=="undefined"&&!Array.isArray(TSB.months))return;if(typeof FBS!=="undefined"&&!FBS.raw)return;
   DTS.inAuto=true;
-  try{for(let ym=DT_TU;dtTrangThai(ym,t)==="chot";ym=plYmAdd(ym,1)){if(DTS.auto[ym])continue;
+  /* Chốt ngày 10 = số hết ngày 9 (chị Hoa 14/11): máy chủ kéo lại số Facebook / Poscake lúc 7h sáng ngày 10, nên ngày 10 chỉ tự chốt từ 8h giờ Việt Nam. */
+  const hVn=(new Date().getUTCHours()+7)%24;
+  try{for(let ym=DT_TU;dtTrangThai(ym,t)==="chot";ym=plYmAdd(ym,1)){if(DTS.auto[ym])continue;if(typeof dtNgayChot==="function"&&dtNgayChot(ym)===t&&hVn<8)continue;
       const need=["tts","spe","fb","b2b","gc"].filter(ch=>!dtSnap(ym,ch));if(!need.length){DTS.auto[ym]=1;continue}
       const L=dtLiveMonth(ym);if(L._loading||need.some(ch=>dtChuaDu(ch,ym).some(x=>/đang tải/.test(x))))continue;
       const rows=need.map(ch=>{const r=L[ch];return r&&dtCanChot(ym,t,null,r.dt)&&!r.tam&&!r.thieu&&!dtChuaDu(ch,ym).length?{channel:ch,amount:Math.round(r.dt),orders:r.don==null?null:Math.round(+r.don||0),data:{dt:r.dt,don:r.don,gv:r.gv,phi:r.phi,ads:r.ads,khac:r.khac,lai:r.lai,src:r.src}}:null}).filter(Boolean);
