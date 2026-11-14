@@ -9,6 +9,8 @@ import { requirePermission } from '../middleware/rbac';
 import { canHr, dropHrGrant, hrGrantFromUsers, saveHrGrant, setAccountStatus } from '../lib/hrAccess';
 import { membersFromHub, saveMembers } from '../services/daoTao';
 import { accountChanges, neutralizeTags, protectStaff, protectUsers, type GuardUser } from '../lib/stateGuard';
+import { diffForLog, leadOf, protectQtpb, type LeadCtx } from '../lib/qtpb';
+import { approvedNewcomers, writeQtpbLog } from '../services/qtpbStore';
 import { revokeAllSessions } from '../lib/session';
 import { syncAccessEmails } from '../lib/access-sync';
 import { pushFromHub } from '../services/pushDispatch';
@@ -161,17 +163,28 @@ hubRoutes.put('/state', async (c) => {
   // không được thêm bớt tài khoản (người làm nhân sự đã được CEO duyệt thì sửa được trừ tài khoản quản trị).
   // Hồ sơ Nhân sự (data.staff) cũng vậy: chỉ CEO / người làm nhân sự đổi được (trạng thái "Đã nghỉ" kéo theo khóa tài khoản).
   let prevUsers: GuardUser[] = [];
-  if (Array.isArray(data.users) || 'staff' in data) {
+  let prevQtpb: unknown;
+  let lead: LeadCtx | null = null;
+  if (Array.isArray(data.users) || 'staff' in data || 'qtpb' in data) {
     const cur = await c.env.DB.prepare('SELECT data FROM hub_state WHERE id = ?').bind(STATE_ID).first<{ data: string }>();
     if (cur) {
-      const old = JSON.parse(await unpack(cur.data)) as { users?: unknown; staff?: unknown };
+      const old = JSON.parse(await unpack(cur.data)) as { users?: unknown; staff?: unknown; qtpb?: unknown };
       if (Array.isArray(old.users)) prevUsers = old.users as GuardUser[];
+      prevQtpb = old.qtpb;
       if (!isCeo) {
         const hrOk = await canHr(c.env.DB, auth);
+        // Quản trị phòng: Lead của phòng đã mở được đổi quyền (trong phạm vi), khóa người nghỉ, menu, mẫu quyền của phòng mình.
+        lead = leadOf(prevUsers, auth.user.id, old.qtpb);
+        const approvedCrm = hrOk ? await approvedNewcomers(c.env.DB) : undefined;
         if (Array.isArray(data.users) && Array.isArray(old.users)) {
-          data.users = protectUsers(data.users as GuardUser[], old.users as GuardUser[], auth.user.id, hrOk);
+          data.users = protectUsers(data.users as GuardUser[], old.users as GuardUser[], auth.user.id, hrOk, { lead, approvedCrm });
         }
         if ('staff' in data) data.staff = protectStaff(data.staff, old.staff, hrOk);
+        if ('qtpb' in data) {
+          const q = protectQtpb(data.qtpb, old.qtpb, false, lead);
+          if (q === undefined) delete data.qtpb;
+          else data.qtpb = q;
+        }
       }
     }
   }
@@ -262,6 +275,12 @@ hubRoutes.put('/state', async (c) => {
   if (isCeo && Array.isArray(data.users)) await saveHrGrant(c.env.DB, hrGrantFromUsers(data.users as never), auth.user.id);
   await saveDtMembers();
   await syncAccounts();
+  // Nhật ký quản trị phòng: ghi những gì Lead vừa đổi trong phòng mình (CEO / Quản lý xem và hoàn tác).
+  if (lead) {
+    const rows = diffForLog(prevUsers, Array.isArray(data.users) ? (data.users as GuardUser[]) : prevUsers, prevQtpb, 'qtpb' in data ? data.qtpb : prevQtpb, lead.dept);
+    const me = prevUsers.find((u) => u?.crm === auth.user.id);
+    await writeQtpbLog(c.env.DB, rows, { id: auth.user.id, name: String(me?.name ?? ''), role: 'lead' }).catch((e) => console.error('[qtpb] log', e));
+  }
   // Thông báo đẩy về điện thoại cho các dòng chuông mới (chạy nền, không làm chậm lần lưu).
   const job = pushFromHub(c.env, data as never).catch((e) => console.error('[push] luu', e));
   try {
