@@ -46,13 +46,14 @@ catalogRoutes.get('/supplies', async (c) => {
     throw badRequest('FORBIDDEN', 'Chỉ người lập đơn mới tìm vật tư bán kèm.');
   }
   const words = (c.req.query('q') ?? '').trim().split(/\s+/).filter((w) => w.length >= 1).slice(0, 5);
-  // all=1 (chị Hoa 14/11): mọi mã kho đang dùng — thành phẩm, hàng hóa, vật tư... — kế toán đã tạo trong kho là bán được.
+  // all=1 (chị Hoa 14/11): thành phẩm / bán thành phẩm kế toán đã tạo trong kho là bán được.
   //   Trả kèm mã bán đã nối (nếu có); chưa có mã bán thì chọn vào đơn là web tự tạo mã (POST /supplies/ensure-gift).
   // gift=1: (cũ) hàng hóa / quà chưa có mã bán Kênh phân phối. Mặc định: vật tư bán kèm cho khách gia công.
   const all = c.req.query('all') === '1';
   const gift = c.req.query('gift') === '1';
+  // Chỉ thành phẩm (gồm mẫu thử) và bán thành phẩm; tem, vỏ, nắp... không hiện (chị Hoa 14/11). hh=1: thêm hàng hóa / quà (đơn khách thường, 05/11).
   const where = all
-    ? ['i.active = 1']
+    ? ['i.active = 1', c.req.query('hh') === '1' ? "i.cls IN ('TP', 'BTP', 'HH')" : "i.cls IN ('TP', 'BTP')"]
     : gift
       ? ["i.active = 1", "i.cls = 'HH'", "NOT EXISTS (SELECT 1 FROM kho_map km WHERE km.misa_code = i.code)"]
       : ["i.active = 1", "i.cls NOT IN ('TP', 'COMBO', 'BTP')"];

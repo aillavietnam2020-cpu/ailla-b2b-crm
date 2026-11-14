@@ -276,11 +276,11 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
         pack_size: p.pack_size,
         price: priceForTier(p),
       }));
-  // Mọi mã trong kho (chị Hoa 14/11: kế toán đã tạo mã trong kho là bán được, bất kể mã nào — thành phẩm, hàng hóa, vật tư...).
+  // Thành phẩm, mẫu thử, bán thành phẩm trong kho (chị Hoa 14/11: kế toán đã tạo mã là bán được; tem, vỏ, nắp không hiện). Khách thường thêm hàng hóa / quà.
   // Mã đã có mã bán thì thêm thẳng; chưa có thì web tự tạo mã bán (Trưởng phòng tạo là dùng luôn, sale tạo thì chờ duyệt mã) rồi thêm.
   // Giá chưa có trong bảng giá thì người lập nhập giá tay.
   const khoItems = useApi<SupplyItem[]>(
-    customerId && debouncedQuery.trim() ? `/api/supplies?all=1&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
+    customerId && debouncedQuery.trim() ? `/api/supplies?all=1${customPricing ? '' : '&hh=1'}&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
   );
   const shownIds = new Set(suggestions.map((p) => p.id));
   const khoExtra = (khoItems.data ?? []).filter((it) => !it.product_id || !shownIds.has(it.product_id));
