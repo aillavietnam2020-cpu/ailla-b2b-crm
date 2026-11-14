@@ -23,18 +23,24 @@ function nlCt(d,kenh,sku){const o=((d.ctNguoi||{})[nlKey()]||{})[kenh];return o&
 function nlTarget(d,uid,kenh,sku){const o=nlCt(d,kenh,sku);if(o)return +o[uid]||0;return d.cards.filter(c=>c.kenh===kenh&&c.sku===sku&&nlMade(c)&&nlAsg(c)===uid).length}
 /* người được giao dòng (chỉ tiêu mặc định giữ cho người được giao, kể cả khi người khác làm hộ) */
 const nlAsg=c=>c.giao||c.nguoiKB||c.nguoiEdit||(c.nguoiLam&&!c.giao?c.nguoiLam:"")||(["dang","xong"].includes(c.step)?"":c.nguoi)||"";
-/* thống kê của một người: dòng theo kênh × sản phẩm + video kho chưa phân bổ */
+/* thống kê của một người, GỘP THEO SẢN PHẨM (14/11 chị Hoa: KPI theo sản phẩm, đã làm bao nhiêu, đang duyệt bao nhiêu):
+   gồm video ở mọi kênh + video vào Kho chưa phân bổ. Đã làm = đã nộp link (đang chờ duyệt + đã duyệt); Cần sửa chưa tính là đã làm. */
 function nlStats(d,uid){
-  const cards=d.cards.filter(c=>nlMade(c)&&mkOf(c)===uid),pairs={};
-  ptPairs().filter(x=>knShown(d,x)).forEach(x=>{const ct=nlTarget(d,uid,x.kenh,x.sku);if(ct)pairs[x.kenh+"|"+x.sku]={kenh:x.kenh,sku:x.sku,ct,L:[]}});
-  cards.forEach(c=>{const k=c.kenh+"|"+c.sku;(pairs[k]=pairs[k]||{kenh:c.kenh,sku:c.sku,ct:0,L:[]}).L.push(c)});
+  const cards=d.cards.filter(c=>nlMade(c)&&mkOf(c)===uid),P={};
+  const row=s=>P[s]=P[s]||{sku:s,ct:0,ctLead:false,L:[],K:[]};
+  ptPairs().filter(x=>knShown(d,x)).forEach(x=>{const ct=nlTarget(d,uid,x.kenh,x.sku);if(ct){const r=row(x.sku);r.ct+=ct;if(nlCt(d,x.kenh,x.sku))r.ctLead=true}});
+  cards.forEach(c=>row(c.sku).L.push(c));
   const used=new Set(d.cards.map(c=>c.khoMa).filter(Boolean)),mk=MONTH.key;
   const kho=(d.kho||[]).filter(k=>k.link&&!used.has(k.ma)&&!/agency/i.test(k.agency||"")&&(k.nguoiId===uid||(!k.nguoiId&&uidByName(k.nguoi)===uid))&&String(k.ngaySX||"").slice(0,7)===mk);
-  const R=Object.values(pairs).map(r=>Object.assign(r,{nop:r.L.filter(c=>NL_NOP.includes(c.step)).length,duyet:r.L.filter(c=>NL_OK.includes(c.step)).length,dang:r.L.filter(c=>c.step==="xong").length}))
-    .sort((a,b)=>b.ct-a.ct||String(a.kenh).localeCompare(String(b.kenh)));
-  const kOk=kho.filter(k=>/đã duyệt/i.test(k.duyet||"")).length;
-  const T={ct:sum(R,r=>r.ct),nop:sum(R,r=>r.nop)+kho.length,duyet:sum(R,r=>r.duyet)+kOk,dang:sum(R,r=>r.dang),win:cards.filter(c=>c.step==="xong"&&(+c.don||0)>=(+d.settings.winnerOrders||0)&&(+c.don||0)>0).length,gmv:sum(cards.filter(c=>c.step==="xong"),c=>+c.gmv||0)};
-  return {R,kho,kOk,T,cards}}
+  kho.forEach(k=>row(k.sku||"").K.push(k));
+  const kOk=k=>/đã duyệt/i.test(k.duyet||"");
+  const R=Object.values(P).map(r=>{const cho=r.L.filter(c=>["dvd","dceo"].includes(c.step)).length+r.K.filter(k=>!kOk(k)).length,duyet=r.L.filter(c=>NL_OK.includes(c.step)).length+r.K.filter(kOk).length;
+    const ws={};r.L.filter(c=>NL_NOP.includes(c.step)).forEach(c=>{const n=chOf(c.kenh).short;ws[n]=(ws[n]||0)+1});if(r.K.length)ws["Kho chưa phân bổ"]=r.K.length;
+    return Object.assign(r,{cho,duyet,nop:cho+duyet,dang:r.L.filter(c=>c.step==="xong").length,sua:r.L.filter(c=>nlSt(c)[0]==="Cần sửa").length,lam:r.L.filter(c=>nlSt(c)[0]==="Đang làm").length,where:Object.entries(ws).map(([k,n])=>k+" "+n).join(" · ")})})
+    .sort((a,b)=>b.ct-a.ct||b.nop-a.nop);
+  const T={ct:sum(R,r=>r.ct),nop:sum(R,r=>r.nop),cho:sum(R,r=>r.cho),duyet:sum(R,r=>r.duyet),dang:sum(R,r=>r.dang),sua:sum(R,r=>r.sua),thieu:sum(R,r=>r.ct?Math.max(0,r.ct-r.nop):0),lead:R.some(r=>r.ctLead),
+    win:cards.filter(c=>c.step==="xong"&&(+c.don||0)>=(+d.settings.winnerOrders||0)&&(+c.don||0)>0).length,gmv:sum(cards.filter(c=>c.step==="xong"),c=>+c.gmv||0)};
+  return {R,kho,T,cards}}
 const nlBar=(a,b)=>`<span class="nlbar"><i style="width:${b?Math.min(100,a/b*100).toFixed(0):0}%"></i></span>`;
 const NL_CSS=`<style>.nlbar{display:inline-block;width:90px;height:8px;border-radius:99px;background:#e6e9f2;overflow:hidden;vertical-align:middle}.nlbar i{display:block;height:100%;background:#2f9e5b}.nlk{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:8px 0}.nlk>div{border:1px solid var(--line,#e6e9f2);border-radius:12px;padding:8px 10px}.nlk>div.hl{border-color:#4b54d1;background:#eef0ff}.nlk span{display:block;font-size:12px;color:#6b7280}.nlk b{font-size:20px}.nltb{width:100%;border-collapse:collapse;font-size:13px}.nltb th{font-weight:500;color:#6b7280;text-align:right;padding:6px 8px;border-bottom:1px solid #eceef5;font-size:12px}.nltb td{padding:6px 8px;border-bottom:1px solid #eceef5;text-align:right}.nltb th:first-child,.nltb td:first-child{text-align:left}.nltb input{width:58px;text-align:right}@media(max-width:700px){.nlk{grid-template-columns:repeat(2,minmax(0,1fr))}}</style>`;
 let NLV={st:""};
@@ -43,14 +49,14 @@ function nlVideoToi(uid){const d=D(),S=nlStats(d,uid);if(!S.T.ct&&!S.cards.lengt
   const own=CHANNELS.filter(k=>chanOwner(k.k)===uid),posted=d.cards.filter(c=>own.some(k=>k.k===c.kenh)&&c.step==="xong").length;
   const L=S.cards.map(c=>({id:c.id,sp:sk(c.sku).n,kn:chOf(c.kenh).short,st:nlSt(c),note:c.giao&&c.giao!==uid&&(c.nguoiLam||"")===uid?"Làm hộ dòng giao cho "+userName(c.giao):"",card:1}))
     .concat(S.kho.map(k=>({id:k.ma,sp:k.skuText||sk(k.sku).n,kn:"Kho video · chưa phân bổ",st:/đã duyệt/i.test(k.duyet||"")?["Đã duyệt","grn"]:["Chờ duyệt","vio"],note:""})));
-  const F=L.filter(x=>!NLV.st||x.st[0]===NLV.st),con=Math.max(0,S.T.ct-S.T.duyet);
-  return NL_CSS+`<section class="card" id="nl-toi" style="margin-bottom:12px"><div class="card-h"><h2>🎬 Video của tôi · tháng ${MONTH.mon}</h2><span class="hint">đếm theo người làm video, kể cả video làm cho kênh người khác phụ trách</span></div>
-  <div class="nlk"><div class="hl"><span>Chỉ tiêu tháng</span><b>${S.T.ct}</b></div><div><span>Đã nộp</span><b>${S.T.nop}</b></div><div><span>Đã duyệt</span><b>${S.T.duyet}</b></div><div><span>Đã đăng</span><b>${S.T.dang}</b></div><div class="hl"><span>Còn cần làm</span><b style="color:${con?"#d92d20":"#2f9e5b"}">${con}</b></div></div>
-  ${own.length?`<p class="hint">Kênh bạn phụ trách đăng: ${own.map(k=>esc(k.short)).join(", ")} · đã đăng ${posted} video (việc đăng, tính riêng với việc làm video).</p>`:""}
-  <details ${NLV.open?"open":""} id="nl-det"><summary><b>Theo sản phẩm và danh sách video</b> <span class="hint">${L.length} video</span></summary>
-  <div class="bvscroll" style="overflow-x:auto;margin-top:8px"><table class="nltb"><tr><th>Sản phẩm · kênh</th><th>Chỉ tiêu</th><th>Đã nộp</th><th>Đã duyệt</th><th>Đã đăng</th><th>Còn cần</th><th>Tiến độ</th></tr>
-  ${S.R.map(r=>`<tr><td><b>${esc(sk(r.sku).n)}</b><br><small class="hint">${esc(chOf(r.kenh).short)}${chanOwner(r.kenh)&&chanOwner(r.kenh)!==uid?" · phụ trách: "+esc(userName(chanOwner(r.kenh))):""}</small></td><td>${r.ct}</td><td>${r.nop}</td><td>${r.duyet}</td><td>${r.dang}</td><td>${Math.max(0,r.ct-r.duyet)}</td><td>${nlBar(r.duyet,r.ct)}</td></tr>`).join("")}
-  ${S.kho.length?`<tr><td><b>Kho video · chưa phân bổ kênh</b></td><td>—</td><td>${S.kho.length}</td><td>${S.kOk}</td><td>—</td><td>—</td><td></td></tr>`:""}</table></div>
+  const F=L.filter(x=>!NLV.st||x.st[0]===NLV.st),T=S.T;
+  return NL_CSS+`<section class="card" id="nl-toi" style="margin-bottom:12px"><div class="card-h"><h2>🎬 Video của tôi · tháng ${MONTH.mon}</h2><span class="hint">đếm theo người làm video, mọi kênh và Kho video</span></div>
+  <div class="nlk"><div class="hl"><span>KPI tháng</span><b>${T.ct||"—"}</b></div><div><span>Đã làm</span><b>${T.nop}</b></div><div><span>Đang chờ duyệt</span><b>${T.cho}</b></div><div><span>Đã duyệt</span><b>${T.duyet}</b></div><div class="hl"><span>Còn thiếu so với KPI</span><b style="color:${T.thieu?"#d92d20":"#2f9e5b"}">${T.ct?T.thieu:"—"}</b></div></div>
+  <p class="hint">${T.ct?(T.lead?"KPI do Lead chia ở ② Điều phối.":"Lead chưa chia KPI theo người: đang tạm lấy số dòng video giao cho bạn."):"Lead chưa giao KPI theo người cho bạn."} Đã làm = video đã nộp (đang chờ duyệt + đã duyệt).${T.sua?` Có <b>${T.sua}</b> video Cần sửa chưa tính là đã làm.`:""}${own.length?` Kênh bạn phụ trách đăng: ${own.map(k=>esc(k.short)).join(", ")} · đã đăng ${posted} video (việc đăng, tính riêng).`:""}</p>
+  <div class="bvscroll" style="overflow-x:auto"><table class="nltb"><tr><th>Sản phẩm</th><th>KPI</th><th>Đã làm</th><th>Đang chờ duyệt</th><th>Đã duyệt</th><th>Đã đăng</th><th>Còn thiếu</th><th>Tiến độ</th></tr>
+  ${S.R.map(r=>`<tr><td><b>${swatch(r.sku)}${esc(sk(r.sku).n)}</b>${r.where?`<br><small class="hint">${esc(r.where)}</small>`:""}</td><td>${r.ct||"—"}</td><td>${r.nop}</td><td>${r.cho}</td><td>${r.duyet}</td><td>${r.dang}</td><td>${r.ct?Math.max(0,r.ct-r.nop):"—"}</td><td>${r.ct?nlBar(r.nop,r.ct):""}</td></tr>`).join("")}
+  <tr style="font-weight:700"><td>Tổng</td><td>${T.ct||"—"}</td><td>${T.nop}</td><td>${T.cho}</td><td>${T.duyet}</td><td>${T.dang}</td><td>${T.ct?T.thieu:"—"}</td><td>${T.ct?nlBar(T.nop,T.ct):""}</td></tr></table></div>
+  <details ${NLV.open?"open":""} id="nl-det" style="margin-top:8px"><summary><b>Danh sách video</b> <span class="hint">${L.length} video</span></summary>
   <div class="row7" style="margin:10px 0 6px;align-items:center"><select id="nl-st">${opt([["","Mọi trạng thái"],["Đang làm","Đang làm"],["Chờ duyệt","Chờ duyệt"],["Cần sửa","Cần sửa"],["Chờ đăng","Chờ đăng"],["Đã đăng","Đã đăng"],["Đã duyệt","Đã duyệt (kho)"]],NLV.st)}</select><span class="hint">${F.length} video</span></div>
   <div class="bvscroll" style="overflow-x:auto"><table class="nltb"><tr><th>Mã</th><th>Sản phẩm</th><th>Kênh</th><th>Trạng thái</th><th>Ghi chú</th></tr>
   ${F.slice(0,300).map(x=>`<tr><td>${x.card?`<a class="lnk" href="javascript:void 0" data-card="${esc(x.id)}">${esc(x.id)}</a>`:esc(x.id)}</td><td>${esc(x.sp||"")}</td><td>${esc(x.kn||"")}</td><td>${pill(x.st[0],x.st[1])}</td><td class="hint">${esc(x.note)}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">Không có video.</td></tr>`}</table></div></details></section>`}
@@ -75,9 +81,9 @@ function nlCtBind(m,kenh){const dt=m.querySelector("#nl-ct");if(!dt)return;dt.on
 function nlPeople(d,C,past,wOrd){
   const ids=new Set(C.filter(nlMade).map(mkOf).filter(Boolean));if(!past)xvTeam().forEach(u=>{if(ptPairs().some(x=>knShown(d,x)&&nlTarget(d,u.id,x.kenh,x.sku)))ids.add(u.id)});
   return [...ids].map(id=>{const S=past?null:nlStats(d,id),mine=C.filter(c=>nlMade(c)&&mkOf(c)===id),hc=mine.flatMap(c=>(c.hanCu||[]).filter(h=>h.han&&h.xong)),ps=mine.filter(c=>c.step==="xong"),g=sum(ps,c=>+c.gmv||0);
-    const grp={};mine.forEach(c=>{const k=c.kenh+"|"+c.sku;(grp[k]=grp[k]||{kenh:c.kenh,sku:c.sku,ct:0,L:[]}).L.push(c)});
-    const R=S?S.R:Object.values(grp).map(r=>Object.assign(r,{nop:r.L.filter(c=>NL_NOP.includes(c.step)).length,duyet:r.L.filter(c=>NL_OK.includes(c.step)).length,dang:r.L.filter(c=>c.step==="xong").length}));
+    const grp={};mine.forEach(c=>{(grp[c.sku]=grp[c.sku]||{sku:c.sku,ct:0,L:[]}).L.push(c)});
+    const R=S?S.R:Object.values(grp).map(r=>Object.assign(r,{where:"",cho:r.L.filter(c=>["dvd","dceo"].includes(c.step)).length,nop:r.L.filter(c=>NL_NOP.includes(c.step)).length,duyet:r.L.filter(c=>NL_OK.includes(c.step)).length,dang:r.L.filter(c=>c.step==="xong").length}));
     const own=CHANNELS.filter(k=>chanOwner(k.k)===id);
-    return {id,R,ct:S?S.T.ct:0,nop:S?S.T.nop:sum(R,r=>r.nop),duyet:S?S.T.duyet:sum(R,r=>r.duyet),dang:ps.length,ontime:hc.length?hc.filter(h=>+h.xong<=+h.han).length/hc.length:null,
+    return {id,R,ct:S?S.T.ct:0,thieu:S?S.T.thieu:0,cho:S?S.T.cho:sum(R,r=>r.cho),nop:S?S.T.nop:sum(R,r=>r.nop),duyet:S?S.T.duyet:sum(R,r=>r.duyet),dang:ps.length,ontime:hc.length?hc.filter(h=>+h.xong<=+h.han).length/hc.length:null,
       win:ps.filter(c=>(+c.don||0)>=wOrd&&(+c.don||0)>0).length,gmv:g,own:own.map(k=>k.short),posted:C.filter(c=>own.some(k=>k.k===c.kenh)&&c.step==="xong").length}})
    .filter(r=>r.ct||r.nop||r.R.length).sort((a,b)=>b.duyet-a.duyet||b.ct-a.ct)}

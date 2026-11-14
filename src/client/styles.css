@@ -2088,3 +2088,16 @@ table.data.tier-one { width: 100%; }
 table.data.tier-one th, table.data.tier-one td { vertical-align: top; }
 table.data.tier-one td:first-child { min-width: 220px; }
 table.data.tier-one tr.grp td { background: var(--bg-soft, #f6f5fb); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .02em; }
+
+/* Tạo đơn: bảng dòng hàng vừa màn laptop (~1366px), không cuộn ngang. Tên sản phẩm co giãn, hiện đủ chữ. */
+.order-lines-wrap { overflow-x: hidden; }
+.table-wrap table.data.order-lines { min-width: 0; width: 100%; table-layout: fixed; }
+table.data.order-lines th,
+table.data.order-lines td { padding: 10px 8px; }
+table.data.order-lines th { white-space: normal; }
+table.data.order-lines td:first-child { overflow-wrap: anywhere; }
+table.data.order-lines .center { text-align: center; }
+table.data.order-lines input[type='number'] { min-width: 0; box-sizing: border-box; }
+table.data.order-lines .order-unit select { width: 100%; max-width: 100%; }
+table.data.order-lines .order-unit .pack-size { display: flex; margin: 4px 0 0; gap: 4px; }
+table.data.order-lines td .btn.sm { padding-left: 8px; padding-right: 8px; }
