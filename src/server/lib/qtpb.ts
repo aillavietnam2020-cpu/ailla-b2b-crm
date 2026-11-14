@@ -144,7 +144,7 @@ export function protectQtpb(incoming: unknown, existing: unknown, isCeo: boolean
 
 export type QtpbLogRow = {
   dept: string;
-  action: 'perms' | 'lock' | 'menu' | 'tpl' | 'add' | 'wf' | 'rule' | 'kpi';
+  action: 'perms' | 'lock' | 'menu' | 'tpl' | 'add' | 'wf' | 'rule' | 'kpi' | 'bang';
   target: string;
   target_name: string;
   before: unknown;
