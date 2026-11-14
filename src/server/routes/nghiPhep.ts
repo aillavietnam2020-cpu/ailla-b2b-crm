@@ -1,3 +1,4 @@
+import { flowAdvance, flowGate, type GateRow } from '../services/flowGate';
 import { Hono, type Context } from 'hono';
 import { nowIso, vnDate } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
@@ -39,7 +40,7 @@ nghiPhepRoutes.use('*', requirePermission('hub.access'));
 type DonRow = {
   id: string; user_id: string; pb: string | null; loai: LoaiDon; tu: string; den: string; buoi: Buoi; so_ngay: number; gio: number | null;
   ghi_chu: string | null; ly_do: string; st: TrangThai; lead_id: string | null; lead_at: string | null; hcns_id: string | null; hcns_at: string | null;
-  tu_choi: string | null; created_at: string; updated_at: string;
+  tu_choi: string | null; created_at: string; updated_at: string; wfi?: string | null;
   bu_ngay?: string | null; bu_kieu?: string | null; bu_tu?: string | null; bu_den?: string | null; bu_phut?: number | null;
 };
 type TuRow = { id: string; user_id: string; so_tien: number; ly_do: string; ky: string; st: 'kt' | 'xong' | 'tuchoi' | 'huy'; kt_id: string | null; kt_at: string | null; tu_choi: string | null; created_at: string };
@@ -310,7 +311,14 @@ nghiPhepRoutes.post('/don/:id/duyet', async (c) => {
   const d = await db.prepare('SELECT * FROM ns_don WHERE id = ?').bind(c.req.param('id')).first<DonRow>();
   if (!d) throw notFound();
   const v = await viewer(db, auth);
-  if (!coTheDuyet(d, { id: v.id, hr: v.hcns, leadPb: v.leadPb })) throw forbidden('Bạn không duyệt được đơn này ở bước hiện tại');
+  // Work Flow của phòng: người được Lead đặt duyệt ở bước hiện tại (có thể là nhân viên) được bấm; bước trước chỉ chuyển tiếp.
+  const fr: GateRow = { table: 'ns_don', fid: 'nghi', id: d.id, pb: d.pb, owner: d.user_id, wfi: d.wfi ?? null, start: d.created_at };
+  const g = d.st === 'lead' ? await flowGate(db, fr, v.id) : null;
+  if (g?.act && b.ok && g.pre) {
+    const buoc = await flowAdvance(db, fr, g, v.id, `đơn ${LOAI_DON[d.loai].toLowerCase()} của ${nameOf(v.m, d.user_id)}`);
+    return ok(c, { id: d.id, st: d.st, buoc });
+  }
+  if (!g?.act && !coTheDuyet(d, { id: v.id, hr: v.hcns, leadPb: v.leadPb })) throw forbidden('Bạn không duyệt được đơn này ở bước hiện tại');
   const note = String(b.note ?? '').trim().slice(0, 300);
   if (!b.ok && !note) throw badRequest('LY_DO', 'Ghi lý do từ chối');
   const s = await loadSettings(db);

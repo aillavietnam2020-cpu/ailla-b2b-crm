@@ -50,7 +50,80 @@ export type QtpbDept = {
   dm?: Record<string, Record<string, number>>;
   ct?: Record<string, Record<string, Record<string, number>>>;
   pend?: unknown[];
+  /** Work Flow (đợt 2b, như demo): các bước Lead đặt cho từng luồng (trước các bước khóa của công ty). */
+  flow?: Record<string, FlowCfg>;
+  /** Work Flow Lead tạo mới từ mẫu. */
+  cflows?: CFlow[];
+  /** Quy định cho nhân viên (Chỉ tiêu & quy định). */
+  qd?: QdCfg;
 };
+/** Một bước duyệt: ai = 'lead' (Lead phòng) hoặc 'u:<hub user id>' (một người trong phòng); han = số giờ (0 = không đặt). */
+export type FlowStep = { ai: string; han: number };
+export type FlowCfg = { steps: FlowStep[]; qh: 'nhac' | 'lead' | 'ceo' };
+export type CFlow = FlowCfg & { id: string; ten: string };
+export type QdCfg = { tre?: number; traLai?: number; gio?: string; truoc?: number; duyet?: Record<string, boolean> };
+export const FLOW_IDS = ['video', 'kb', 'task', 'nghi', 'mua', 'mau'];
+const QH = ['nhac', 'lead', 'ceo'];
+
+export function sanitizeSteps(v: unknown): FlowStep[] {
+  const out: FlowStep[] = [];
+  for (const x of Array.isArray(v) ? v : []) {
+    if (out.length >= 6) break;
+    const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+    const ai = typeof o.ai === 'string' && (o.ai === 'lead' || /^u:[A-Za-z0-9_-]{1,40}$/.test(o.ai)) ? o.ai : '';
+    if (!ai) continue;
+    const h = Number(o.han);
+    out.push({ ai, han: Number.isFinite(h) && h > 0 ? Math.min(720, Math.round(h)) : 0 });
+  }
+  return out;
+}
+export function sanitizeFlow(v: unknown): FlowCfg | null {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const steps = sanitizeSteps(o.steps);
+  if (!steps.length) return null;
+  return { steps, qh: (QH.includes(String(o.qh)) ? o.qh : 'nhac') as FlowCfg['qh'] };
+}
+export function sanitizeFlows(v: unknown): Record<string, FlowCfg> {
+  const out: Record<string, FlowCfg> = {};
+  for (const [k, x] of Object.entries(v && typeof v === 'object' ? (v as Record<string, unknown>) : {})) {
+    if (!FLOW_IDS.includes(k)) continue;
+    const f = sanitizeFlow(x);
+    if (f) out[k] = f;
+  }
+  return out;
+}
+export function sanitizeCFlows(v: unknown): CFlow[] {
+  const out: CFlow[] = [];
+  for (const x of Array.isArray(v) ? v : []) {
+    if (out.length >= 20) break;
+    const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+    const id = typeof o.id === 'string' && /^n[a-z0-9]{3,14}$/.test(o.id) ? o.id : '';
+    const ten = typeof o.ten === 'string' ? o.ten.normalize('NFC').trim().slice(0, 60) : '';
+    const f = sanitizeFlow(o);
+    if (id && ten && f && !out.some((y) => y.id === id)) out.push({ id, ten, ...f });
+  }
+  return out;
+}
+export function sanitizeQd(v: unknown): QdCfg {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const n = (x: unknown, max: number) => {
+    const k = Number(x);
+    return Number.isFinite(k) && k >= 0 && k <= max ? Math.round(k) : undefined;
+  };
+  const out: QdCfg = {};
+  const tre = n(o.tre, 60);
+  const traLai = n(o.traLai, 100);
+  const truoc = n(o.truoc, 72);
+  if (tre !== undefined) out.tre = tre;
+  if (traLai !== undefined) out.traLai = traLai;
+  if (truoc !== undefined) out.truoc = truoc;
+  if (typeof o.gio === 'string' && /^\d{2}:\d{2}$/.test(o.gio)) out.gio = o.gio;
+  if (o.duyet && typeof o.duyet === 'object') {
+    out.duyet = {};
+    for (const k of ['kb', 'hook', 'le']) if (k in (o.duyet as object)) out.duyet[k] = !!(o.duyet as Record<string, unknown>)[k];
+  }
+  return out;
+}
 /**
  * cfg (chỉ CEO): depts = phòng đã mở; leads = CEO chọn Lead từng phòng (hub user id; '' = chưa có Lead; không có khóa
  * thì Lead là người vai trò Trưởng nhóm / Trưởng phòng); cap = Lead được tự làm gì (mặc định bật hết);
@@ -165,6 +238,9 @@ export function protectQtpb(incoming: unknown, existing: unknown, isCeo: boolean
       wf: off.has('wf') ? prev.wf : wf,
       nguong: off.has('kpi') ? prev.nguong : numMap(mine.nguong, 100),
       pend: off.has('kpi') ? prev.pend : pend,
+      flow: off.has('wf') ? prev.flow : 'flow' in mine ? sanitizeFlows(mine.flow) : prev.flow,
+      cflows: off.has('wf') ? prev.cflows : 'cflows' in mine ? sanitizeCFlows(mine.cflows) : prev.cflows,
+      qd: off.has('kpi') ? prev.qd : 'qd' in mine ? sanitizeQd(mine.qd) : prev.qd,
       dm: prev.dm,
       ct: prev.ct,
     };
@@ -174,7 +250,7 @@ export function protectQtpb(incoming: unknown, existing: unknown, isCeo: boolean
 
 export type QtpbLogRow = {
   dept: string;
-  action: 'perms' | 'lock' | 'menu' | 'tpl' | 'add' | 'wf' | 'rule' | 'kpi' | 'bang';
+  action: 'perms' | 'lock' | 'menu' | 'tpl' | 'add' | 'wf' | 'rule' | 'kpi' | 'bang' | 'flow' | 'qd';
   target: string;
   target_name: string;
   before: unknown;
@@ -239,6 +315,23 @@ export function diffForLog(prevUsers: GuardUser[], nextUsers: GuardUser[], prevQ
   if (js(pq.wf) !== js(nq.wf)) {
     rows.push({ dept, action: 'wf', target: dept, target_name: '', before: pq.wf ?? {}, after: nq.wf ?? {}, summary: 'Sửa hạn duyệt của Lead trong Work Flow' });
   }
+  if (js(pq.flow) !== js(nq.flow) || js(pq.cflows) !== js(nq.cflows)) {
+    const names = [...new Set([...Object.keys(pq.flow ?? {}), ...Object.keys(nq.flow ?? {})])].filter((k) => js((pq.flow ?? {})[k]) !== js((nq.flow ?? {})[k]));
+    const cn = (nq.cflows ?? []).filter((c) => js((pq.cflows ?? []).find((x) => x.id === c.id)) !== js(c)).map((c) => c.ten);
+    const rm = (pq.cflows ?? []).filter((c) => !(nq.cflows ?? []).some((x) => x.id === c.id)).map((c) => c.ten);
+    rows.push({
+      dept,
+      action: 'flow',
+      target: dept,
+      target_name: '',
+      before: { flow: pq.flow ?? {}, cflows: pq.cflows ?? [] },
+      after: { flow: nq.flow ?? {}, cflows: nq.cflows ?? [] },
+      summary: `Sửa Work Flow${names.length ? ' · ' + names.join(', ') : ''}${cn.length ? ' · ' + cn.join(', ') : ''}${rm.length ? ' · bỏ ' + rm.join(', ') : ''}`,
+    });
+  }
+  if (js(pq.qd) !== js(nq.qd)) {
+    rows.push({ dept, action: 'qd', target: dept, target_name: '', before: pq.qd ?? {}, after: nq.qd ?? {}, summary: 'Sửa quy định cho nhân viên' });
+  }
   if (js(pq.nguong) !== js(nq.nguong)) {
     rows.push({ dept, action: 'rule', target: dept, target_name: '', before: pq.nguong ?? {}, after: nq.nguong ?? {}, summary: 'Sửa ngưỡng cảnh báo hiệu suất' });
   }
@@ -259,6 +352,17 @@ export function applyUndo(data: { users?: GuardUser[]; qtpb?: QtpbData }, row: {
     if (row.action === 'perms') u.perms = Array.isArray(row.before) ? (row.before as string[]) : [];
     else if (row.action === 'lock') u.active = true;
     else u.active = false;
+    return true;
+  }
+  if (row.action === 'flow' || row.action === 'qd') {
+    const q = (data.qtpb ??= {});
+    const d = ((q.dept ??= {})[row.dept] ??= {});
+    if (row.action === 'qd') d.qd = (row.before as QdCfg) ?? {};
+    else {
+      const b = (row.before ?? {}) as { flow?: Record<string, FlowCfg>; cflows?: CFlow[] };
+      d.flow = b.flow ?? {};
+      d.cflows = b.cflows ?? [];
+    }
     return true;
   }
   if (row.action === 'wf' || row.action === 'rule') {

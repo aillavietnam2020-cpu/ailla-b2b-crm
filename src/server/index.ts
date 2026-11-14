@@ -1,3 +1,4 @@
+import { flowCron } from './services/flowGate';
 import { nhacNgayLe, nhacNgayVangChung } from './services/nhacNgayLe';
 import type { Env } from './env';
 import { createApp } from './app';
@@ -139,6 +140,12 @@ export default {
           console.info('[cron] viec lap lai', JSON.stringify(await taskRecurring(env.DB)));
         } catch (error) {
           console.error('[cron] viec lap lai loi', error);
+        }
+        // Work Flow của phòng (Quản trị phòng): báo người duyệt bước mới, nhắc / báo Lead / báo CEO khi quá hạn.
+        try {
+          console.info('[cron] work flow', JSON.stringify(await flowCron(env.DB)));
+        } catch (error) {
+          console.error('[cron] work flow loi', error);
         }
         // Nhắc việc Task giao việc: trễ, đến hạn, chờ duyệt + tóm tắt cho CEO, và tin nhắn của Trợ lý công việc (giờ đặt ở Cấu hình, mặc định 8 giờ).
         try {

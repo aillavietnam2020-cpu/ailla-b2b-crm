@@ -159,3 +159,16 @@ describe('Quản trị phòng: CEO chọn Lead, bật tắt việc Lead được
     expect(out.dept.CM.hide).toEqual([]);
   });
 });
+
+describe('Quản trị phòng: Work Flow như demo', () => {
+  it('Lead lưu bước duyệt (Lead hoặc nhân viên), bỏ bước sai; CEO tắt Work Flow thì giữ nguyên', () => {
+    const lead = leadOf(users(), 'c_lead', undefined)!;
+    const inc = { dept: { CM: { flow: { video: { steps: [{ ai: 'u:u_nv', han: 5 }, { ai: 'lead', han: 9999 }, { ai: 'hack' }], qh: 'ceo' }, x: { steps: [{ ai: 'lead' }] } }, cflows: [{ id: 'nabc1', ten: ' Xin KOC ', steps: [{ ai: 'lead', han: 2 }] }, { id: 'bad', ten: 'x', steps: [] }], qd: { duyet: { kb: false } } } } };
+    const out = protectQtpb(inc, {}, false, lead) as any;
+    expect(out.dept.CM.flow).toEqual({ video: { steps: [{ ai: 'u:u_nv', han: 5 }, { ai: 'lead', han: 720 }], qh: 'ceo' } });
+    expect(out.dept.CM.cflows).toEqual([{ id: 'nabc1', ten: 'Xin KOC', steps: [{ ai: 'lead', han: 2 }], qh: 'nhac' }]);
+    expect(out.dept.CM.qd).toEqual({ duyet: { kb: false } });
+    const off = leadOf(users(), 'c_lead', { cfg: { depts: ['CM'], cap: { wf: false } } })!;
+    expect((protectQtpb(inc, {}, false, off) as any).dept.CM.flow).toBeUndefined();
+  });
+});

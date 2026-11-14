@@ -38,6 +38,7 @@ import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
 import { qtpbRoutes } from './routes/qtpb';
 import { qtpbBangRoutes } from './routes/qtpbBang';
+import { qtpbFlowRoutes } from './routes/qtpbFlow';
 import { videoLinkRoutes } from './routes/videoLinks';
 import { driveRoutes } from './routes/drive';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
@@ -169,6 +170,7 @@ export function createApp() {
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/fp-publish', fpPublishRoutes);
   app.route('/api/hub/qtpb/bang', qtpbBangRoutes);
+  app.route('/api/hub/qtpb/flow', qtpbFlowRoutes);
   app.route('/api/hub/qtpb', qtpbRoutes);
   app.route('/api/hub/kho', khoRoutes);
   app.route('/api/hub/phache', phacheRoutes);

@@ -177,7 +177,7 @@ function qpLogDesc(r){
 function qpLogTable(rows,undo){
   const who=r=>esc(r.actor_name||"")+`<div class="hint">${({lead:"Lead",hr:"HCNS",ceo:"CEO"})[r.actor_role]||""}</div>`;
   return rows.length?tbl(["Lúc","Ai","Phòng","Thay đổi",""],rows.map(r=>`<tr class="${r.undone_at?"mut":""}"><td class="nowrap">${esc(qpDate(r.at))}</td><td>${who(r)}</td><td>${esc(qpPb(r.dept))}</td><td>${qpLogDesc(r)}</td>
-   <td class="nowrap">${r.undone_at?pill("Đã hoàn tác","gry")+`<div class="hint">${esc(r.undone_name||"")} · ${esc(qpDate(r.undone_at))}</div>`:undo&&["perms","lock","menu","tpl","add","wf","rule","bang"].includes(r.action)?`<button class="btn sm" data-qpu="${r.id}">Hoàn tác</button>`:""}</td></tr>`)):`<p class="hint pad">Chưa có thay đổi nào.</p>`;
+   <td class="nowrap">${r.undone_at?pill("Đã hoàn tác","gry")+`<div class="hint">${esc(r.undone_name||"")} · ${esc(qpDate(r.undone_at))}</div>`:undo&&["perms","lock","menu","tpl","add","wf","rule","bang","flow","qd"].includes(r.action)?`<button class="btn sm" data-qpu="${r.id}">Hoàn tác</button>`:""}</td></tr>`)):`<p class="hint pad">Chưa có thay đổi nào.</p>`;
 }
 function pQpNk(m){
   if(!qpAct()){m.innerHTML=H("Nhật ký phòng","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
