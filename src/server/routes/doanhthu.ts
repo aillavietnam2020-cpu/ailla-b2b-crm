@@ -4,6 +4,7 @@ import type { AppEnv, AuthContext } from '../env';
 import { auditStatement, nowIso } from '../lib/audit';
 import { badRequest, forbidden, ok } from '../lib/http';
 import { loadFbMoney, syncFbMoney } from '../services/fbCost';
+import { fbSaleTotals } from '../services/fbSales';
 
 /**
  * Doanh thu thực theo kênh × tháng (trang quản trị › Đối chiếu doanh thu, chị Hoa chốt 26/10/2026).
@@ -154,4 +155,15 @@ doanhthuRoutes.post('/fb-money', async (c) => {
   const days: string[] = [];
   for (let d = new Date(`${b.from}T00:00:00Z`); d.toISOString().slice(0, 10) <= b.to && days.length < 10; d.setUTCDate(d.getUTCDate() + 1)) days.push(d.toISOString().slice(0, 10));
   return ok(c, await syncFbMoney(c.env.DB, c.env.INGEST_KEY, days, (u) => fetch(u)));
+});
+
+/** Đối chiếu số Facebook với Pancake: tổng cả khoảng ngày theo ngày tạo đơn (mode=inserted) hoặc ngày đổi trạng thái (mode=updated). */
+doanhthuRoutes.get('/fb-sale-check', async (c) => {
+  if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem');
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+  const mode = c.req.query('mode') === 'updated' ? 'updated' : 'inserted';
+  const isD = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (!isD(from) || !isD(to) || from > to) throw badRequest('BAD_RANGE', 'Cần ngày bắt đầu và kết thúc (yyyy-mm-dd)');
+  return ok(c, await fbSaleTotals(c.env.DB, c.env.INGEST_KEY, from, to, mode, (u) => fetch(u)));
 });
