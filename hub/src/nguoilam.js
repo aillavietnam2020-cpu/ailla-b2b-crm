@@ -58,7 +58,9 @@ let NLV={st:"",sp:"",kn:"",uid:""};
 /* khối "Video của tôi" ở Công việc › Việc của tôi (Lead/CEO chọn xem của từng người) */
 function nlVideoToi(uid0){const d=D(),boss=xvGive(),team=xvTeam();if(boss&&NLV.uid&&!team.some(u=>u.id===NLV.uid))NLV.uid="";const uid=boss&&NLV.uid?NLV.uid:uid0;
   const {I}=nlItems(d,uid),hasKpi=ptPairs().some(x=>knShown(d,x)&&nlTarget(d,uid,x.kenh,x.sku));
-  if(!boss&&!I.length&&!hasKpi)return "";
+  /* chỉ người làm video (team Content/Media) hoặc người có video/KPI trong tháng mới thấy khối này; CEO và phòng khác không thấy (14/11) */
+  const inC=team.some(u=>u.id===ME.id),meHas=uid===ME.id?(I.length||hasKpi):(nlItems(d,ME.id).I.length||ptPairs().some(x=>knShown(d,x)&&nlTarget(d,ME.id,x.kenh,x.sku)));
+  if(!inC&&!meHas)return "";
   const fK=x=>!NLV.kn||x.kn===NLV.kn,fS=x=>!NLV.sp||x.sku===NLV.sp,fT=x=>!NLV.st||x.st===NLV.st;
   const skus=[...new Set(I.map(x=>x.sku).concat(ptPairs().filter(x=>knShown(d,x)&&nlTarget(d,uid,x.kenh,x.sku)).map(x=>x.sku)))];
   const kns=[...new Set(I.map(x=>x.kn).concat(ptPairs().filter(x=>knShown(d,x)&&nlTarget(d,uid,x.kenh,x.sku)).map(x=>chOf(x.kenh).short)))];
