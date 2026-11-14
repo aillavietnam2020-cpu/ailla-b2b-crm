@@ -103,11 +103,22 @@ function adfMergeDays(){
       const fs=(typeof FBS!=="undefined"&&FBS.raw&&FBS.raw.days||{})[k],hoan=fs?Math.min(del,sum(fs,r=>r.hoan)):Math.min(del,Math.round(rt/ADF_RET_AVG)),dtG=Math.max(0,dr-rt);if(!fs)ADF.mgEst=(ADF.mgEst||new Set()).add(k);
       DAYD.fb[k]=[o,Math.max(0,o-can),can,hoan,Math.max(0,del-hoan),dtG,rev,Math.round(dtG*ADF_GV),0,0];ADF.mgFb.add(k)}
     if(!sheetAds.has(k)&&(d.fb||[]).length){const by={};
-      (d.fb||[]).forEach(c=>{const p=adfParse(c.campaign,c.account),a=by[p.owner]||(by[p.owner]=[0,0,0,0]);a[0]+=c.spend||0;a[1]+=p.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0))});
+      (d.fb||[]).forEach(c=>{const p=adfParse(c.campaign,c.account),ck=adfCkChia(c.account,k,p.owner),sp=(c.spend||0)*adfCkTl(c.account),ms=p.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0));
+        (ck||[[p.owner,1]]).forEach(([w,f])=>{const a=by[w]||(by[w]=[0,0,0,0]);a[0]+=sp*f;a[1]+=ms*f})});
       pos.forEach(p=>{const n=names[p.campaign_id];if(!n)return;const w=adfParse(n.name,n.account).owner,a=by[w]||(by[w]=[0,0,0,0]);a[2]+=p.orders||0;a[3]+=p.revenue||0});
       Object.entries(by).forEach(([w,a])=>{(DAYD.ads[w]=DAYD.ads[w]||{})[k]=a;ADF.mgAds.push([w,k])})}
   });
 }
+/* Tài khoản chiết khấu "BI 3 PAGE" (Ailla mua chung, Duẩn + Việt Anh chạy, chị Hoa 14/11): Ailla trả 70% số tiêu (tiêu 38tr trả 26,6tr),
+   nên chi phí ghi = tiêu × 0,7. Tên chiến dịch là "MESS - …" (không ghi người); người chạy nằm ở tên quảng cáo (DUAN-…, VA-…) trong báo cáo
+   nhân sự gửi, chia theo đúng báo cáo từng kỳ. Kỳ chưa có báo cáo: ghi "Duẩn + Việt Anh (TK chiết khấu)", không đoán tỷ lệ.
+   Chiến dịch "BI - ANH" (từ 02/11) là của Việt Anh (chị Hoa 09/11). */
+const ADF_CK={"1056409566271847":{tl:0.7,chia:[["2026-09-01","2026-09-24",{"Duẩn":18610000,"Việt Anh":11910000}],["2026-09-25","2026-10-25",{"Duẩn":35970000,"Việt Anh":2730000}]]}};
+const ADF_CK_CHUNG="Duẩn + Việt Anh (TK chiết khấu)";
+const adfCkTl=acc=>(ADF_CK[acc]||{}).tl||1;
+/* Chia tiền một dòng chiến dịch tài khoản chiết khấu cho người chạy: [[người, tỷ lệ]]. */
+function adfCkChia(acc,day,owner){const C=ADF_CK[acc];if(!C)return null;if(owner&&owner!=="Chưa rõ người"&&!/^Chưa/.test(owner))return [[owner,1]];
+  const r=C.chia.find(x=>day>=x[0]&&day<=x[1]);if(!r)return [[ADF_CK_CHUNG,1]];const t=Object.values(r[2]).reduce((a,b)=>a+b,0);return Object.entries(r[2]).map(([w,v])=>[w,v/t])}
 const ADF_ACC={"2438831049860777":"Việt Anh","1721213761771236":"Việt Anh","1340771911416054":"Thảo","187878951968758":"Thảo","1354614543145294":"Thảo"};
 const ADF_PROD={LANDING:"Đơn trang bán hàng chưa gắn chiến dịch",INBOX:"Đơn chốt qua inbox (chưa chia sản phẩm)",TLAI:"Tẩy lồng Ailla (TLAi)",AIBIO:"Tẩy lồng Aibio",TLG:"Tẩy lồng giặt (TLG)",TINHDAU:"Tinh dầu giặt sấy",LS:"Nước lau sàn",MUOI:"Xịt muỗi",RUOI:"Xịt ruồi"};
 /* Đọc tên chiến dịch: VA-TLAi-CD-… | DUAN-TD-CD-… | TĐ - TLAi - 23.9 - … | MESS - … (không ghi người: lấy theo tài khoản). */
@@ -158,7 +169,7 @@ function adfAgg(D,days){
   const C={},US={};let unmatched=0,unOrders=0;
   const get=(id)=>C[id]||(C[id]=Object.assign({id,spend:0,msgs:0,orders:0,rev:0},(()=>{const nm=D.names[id]||{};const p=adfParse(nm.name,nm.account);const pgo=ADF_PAGE_OWNER[(D.campPage||{})[id]];return {name:nm.name||"",account:nm.account||"",owner:p.owner==="Chưa rõ người"&&pgo?pgo:p.owner,prod:p.prod,typ:p.typ}})()));
   days.forEach(k=>{const d=D.days[k];if(!d)return;
-    (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=c.spend||0;/* Data: quảng cáo tin nhắn = số tin nhắn; quảng cáo chuyển đổi = số khách để lại thông tin (đăng ký hoàn tất) */x.msgs+=x.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0))});
+    (d.fb||[]).forEach(c=>{const x=get(c.campaign_id);x.spend+=(c.spend||0)*adfCkTl(c.account);/* tài khoản chiết khấu: tiền Ailla trả *//* Data: quảng cáo tin nhắn = số tin nhắn; quảng cáo chuyển đổi = số khách để lại thông tin (đăng ký hoàn tất) */x.msgs+=x.typ==="Tin nhắn"?(c.messages||0):(c.leads!=null?c.leads:(c.messages||0))});
     (d.pos||[]).forEach(p=>{const od=(p.orders||0)-(p.canceled||0);/* don chot = tru don huy, giong Pancake */if(p.campaign_id&&D.names[p.campaign_id]){const x=get(p.campaign_id);x.orders+=od;x.rev+=p.revenue||0}else{unmatched+=p.revenue||0;unOrders+=od;const sn=p.source||"(chưa rõ nguồn)";const u=US[sn]||(US[sn]={name:sn,orders:0,rev:0});u.orders+=od;u.rev+=p.revenue||0}});
   });
   const SH=adfSheetMess();

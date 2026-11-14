@@ -26,7 +26,7 @@ const fbdTax=k=>fbdFinal(k)?1:1+FB_ADS_TAX;
 /* Số Digital hàng ngày có sẵn trên web: chi tiêu Facebook của các chiến dịch thuộc 3 người chạy ads (cùng số trang Hiệu quả Ads của vận hành đang hiện). Chiến dịch chưa rõ người không nằm trong số này. */
 const FBD_DIG_OWNERS=["Việt Anh","Thảo","Duẩn"];
 const fbdDigDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];if(!d||typeof adfParse!=="function")return 0;return sum(d.fb||[],c=>FBD_DIG_OWNERS.includes(adfParse(c.campaign,c.account).owner)?c.spend:0)};
-const fbdApiDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];return d?sum(d.fb||[],c=>c.spend):0};
+const fbdApiDay=k=>{const d=typeof ADF!=="undefined"&&ADF.raw&&ADF.raw.days&&ADF.raw.days[k];return d?sum(d.fb||[],c=>(c.spend||0)*(typeof adfCkTl==="function"?adfCkTl(c.account):1)):0};/* tài khoản chiết khấu: tiền Ailla trả (adsday.js) */
 function fbdQcRaw(k){
   const F=typeof FBC!=="undefined"&&FBC.raw?FBC.raw:null;
   /* Giống trang "Giao dịch thanh toán Facebook" của vận hành: tháng 10 lấy số Facebook (cả chiến dịch chưa rõ người), tháng 9 lấy báo cáo Digital, nhân 1,1 để ra tiền Facebook trừ. */
