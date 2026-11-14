@@ -218,12 +218,12 @@ describe('Mã bán Kênh phân phối cho hàng hóa / quà (05/11)', () => {
     expect((await ctx.db.prepare("SELECT status FROM tasks WHERE assignee_id = 'user-manager'").first<{ status: string }>())?.status).toBe('DONE');
   });
 
-  it('Trưởng phòng tạo hàng loạt: mã có hiệu lực ngay, mã kho QUA-… giữ nguyên; thành phẩm bị từ chối', async () => {
+  it('Trưởng phòng tạo hàng loạt: mã có hiệu lực ngay, mã kho QUA-… giữ nguyên; thành phẩm cũng tạo được (mã bán = mã kho, chị Hoa 14/11)', async () => {
     const r = await ctx.request('/api/hub/sanpham/kpp-code/bulk', { as: USERS.manager, body: { items: [{ code: 'NOIDIEN' }, { code: 'QUA-BONOI3' }, { code: 'TLG' }] } });
     expect(r.status).toBe(200);
     expect(r.body.data[0]).toEqual({ code: 'NOIDIEN', sku: 'QUA-NOIDIEN' });
     expect(r.body.data[1]).toEqual({ code: 'QUA-BONOI3', sku: 'QUA-BONOI3' });
-    expect(r.body.data[2].error).toBeTruthy();
+    expect(r.body.data[2]).toEqual({ code: 'TLG', sku: 'TLG' });
     expect(await ctx.db.prepare("SELECT code_status FROM products WHERE sku = 'QUA-NOIDIEN'").first()).toEqual({ code_status: '' });
     expect((await ctx.request('/api/hub/sanpham/kpp-code/bulk', { as: USERS.thao, body: { items: [{ code: 'NOIDIEN' }] } })).status).toBe(403);
   });
@@ -238,5 +238,25 @@ describe('Mã bán Kênh phân phối cho hàng hóa / quà (05/11)', () => {
     expect(created.status).toBeLessThan(300);
     const sub = await ctx.request(`/api/orders/${created.body.data.id}/submit`, { as: USERS.thao, body: {} });
     expect(sub.status).toBeLessThan(300);
+  });
+
+  it('thành phẩm kho chưa có mã bán (vd Arila 2kg): lên đơn là web tạo mã = mã kho, nối kho, nhập giá tay lưu và gửi duyệt được', async () => {
+    await seedBusinessData(ctx.db);
+    const g = await ctx.request('/api/supplies/ensure-gift', { as: USERS.thao, body: { code: 'TLG' } });
+    expect(g.status).toBe(200);
+    expect(g.body.data.sku).toBe('TLG');
+    expect(await ctx.db.prepare("SELECT crm_sku FROM kho_map WHERE misa_code = 'TLG'").first()).toEqual({ crm_sku: 'TLG' });
+    const created = await ctx.request('/api/orders', {
+      as: USERS.thao,
+      body: { customer_id: 'cus-thao-1', order_date: '2026-11-05', items: [{ product_id: g.body.data.id, qty: 2, applied_price: 150000 }] },
+    });
+    expect(created.status).toBeLessThan(300);
+    const sub = await ctx.request(`/api/orders/${created.body.data.id}/submit`, { as: USERS.thao, body: {} });
+    expect(sub.status).toBeLessThan(300);
+    // Chọn lại lần nữa: dùng lại mã đã tạo, không sinh mã mới.
+    const again = await ctx.request('/api/supplies/ensure-gift', { as: USERS.thao, body: { code: 'TLG' } });
+    expect(again.body.data.id).toBe(g.body.data.id);
+    const list = await ctx.request('/api/supplies?all=1&q=TLG', { as: USERS.thao });
+    expect(list.body.data[0]).toMatchObject({ code: 'TLG', sku: 'TLG', product_id: g.body.data.id });
   });
 });

@@ -18,29 +18,54 @@ export const CODE_TASK = 'Duyệt mã bán Kênh phân phối';
 export const canApproveCode = (a: AuthContext) => a.user.role === 'CEO' || a.permissions.includes('order.approve.normal');
 const SKU_RE = /^[\w.\-+]{2,40}$/;
 
-/** Hàng hóa / quà được tạo mã bán: lớp HH, đang dùng, chưa nối mã bán nào. */
+/**
+ * Mọi mã kho đang dùng đều tạo được mã bán (chị Hoa 14/11: kế toán đã tạo mã trong kho là Trưởng phòng / sale bán được,
+ * bất kể mã nào — thành phẩm, hàng hóa, vật tư...).
+ */
 async function itemForCode(db: D1Database, code: string) {
   const it = await db
     .prepare("SELECT code, name, unit, cls, active FROM kho_items WHERE code = ?")
     .bind(code)
     .first<{ code: string; name: string; unit: string; cls: string; active: number }>();
   if (!it || !it.active) throw notFound('Không thấy mã kho này (hoặc đã ngừng dùng)');
-  if (it.cls !== 'HH') throw badRequest('NOT_GIFT', 'Chỉ tự tạo mã bán cho hàng hóa / quà. Thành phẩm tạo ở Sản phẩm & combo › Thêm sản phẩm.');
   return it;
 }
 
+/**
+ * Nhóm của mã bán mới theo loại hàng trong kho:
+ * - Hàng hóa / quà (HH): nhóm QUA_TANG, mã QUA-… (quy ước 05/11), giá bán nhập tay, không bắt duyệt giá.
+ * - Vật tư, CCDC (NVL, CCDC): nhóm VAT_TU_BAN như vật tư bán kèm, giá nhập tay, không bắt duyệt giá.
+ * - Thành phẩm, bán thành phẩm, combo: không nhóm, mã bán = mã kho; chưa có bảng giá nên nhập giá tay, Quản lý duyệt giá.
+ */
+export function codeKind(cls: string): { group: 'QUA_TANG' | 'VAT_TU_BAN' | null; prefix: boolean } {
+  if (cls === 'HH') return { group: 'QUA_TANG', prefix: true };
+  if (cls === 'NVL' || cls === 'CCDC') return { group: 'VAT_TU_BAN', prefix: false };
+  return { group: null, prefix: false };
+}
+
 export async function existingSku(db: D1Database, code: string) {
-  return db
+  const mapped = await db
     .prepare(
       `SELECT p.id, p.sku, p.name, p.unit, p.code_status FROM kho_map km JOIN products p ON p.sku = km.crm_sku AND p.deleted_at IS NULL
        WHERE km.misa_code = ? LIMIT 1`,
     )
     .bind(code)
     .first<{ id: string; sku: string; name: string; unit: string | null; code_status: string }>();
+  if (mapped) return mapped;
+  // Mã bán trùng mã kho nhưng chưa nối (tạo tay ở Bảng giá): dùng luôn và nối kho để xuất kho trừ đúng mã.
+  const same = await db
+    .prepare('SELECT id, sku, name, unit, code_status FROM products WHERE lower(sku) = lower(?) AND deleted_at IS NULL LIMIT 1')
+    .bind(code)
+    .first<{ id: string; sku: string; name: string; unit: string | null; code_status: string }>();
+  if (same) {
+    await db.prepare("INSERT OR IGNORE INTO kho_map (crm_sku, misa_code, factor, note) VALUES (?, ?, 1, 'Nối mã bán trùng mã kho')").bind(same.sku, code).run();
+  }
+  return same;
 }
 
-export async function suggestSku(db: D1Database, code: string): Promise<string> {
-  const base = (/^QUA-/i.test(code) ? code : 'QUA-' + code).toUpperCase().replace(/[^\w.\-+]/g, '').slice(0, 36);
+export async function suggestSku(db: D1Database, code: string, prefix = true): Promise<string> {
+  const raw = prefix && !/^QUA-/i.test(code) ? 'QUA-' + code : code;
+  const base = raw.toUpperCase().replace(/[^\w.\-+]/g, '').slice(0, 36);
   for (let i = 1; i < 50; i++) {
     const sku = i === 1 ? base : `${base}-${i}`;
     const used = await db
@@ -62,6 +87,7 @@ export async function createKppCode(
   const have = await existingSku(db, code);
   if (have) return { ...have, created: false };
   const it = await itemForCode(db, code);
+  const kind = codeKind(it.cls);
   let sku = String(opts.sku ?? '').trim();
   if (sku) {
     if (!SKU_RE.test(sku)) throw badRequest('BAD_SKU', 'Mã bán chỉ gồm chữ không dấu, số, dấu chấm, gạch (2–40 ký tự)');
@@ -70,21 +96,21 @@ export async function createKppCode(
       .bind(sku, sku)
       .first();
     if (used) throw conflict('DUP_SKU', `Mã bán ${sku} đã có, chọn mã khác`);
-  } else sku = await suggestSku(db, code);
+  } else sku = await suggestSku(db, code, kind.prefix);
   const id = newId();
   const now = nowIso();
   const status = opts.approved ? '' : 'CHO_DUYET';
   await db.batch([
     db
-      .prepare("INSERT OR IGNORE INTO product_groups (id, code, name, created_at, updated_at) VALUES (?, 'QUA_TANG', 'Quà tặng và gia dụng', ?, ?)")
-      .bind(newId(), now, now),
+      .prepare("INSERT OR IGNORE INTO product_groups (id, code, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(newId(), kind.group ?? 'QUA_TANG', kind.group === 'VAT_TU_BAN' ? 'Vật tư bán kèm' : 'Quà tặng và gia dụng', now, now),
     db
       .prepare(
         `INSERT INTO products (id, sku, name, unit, group_id, active, created_at, updated_at, code_status, code_by)
-         VALUES (?, ?, ?, ?, (SELECT id FROM product_groups WHERE code = 'QUA_TANG'), 1, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, (SELECT id FROM product_groups WHERE code = ?), 1, ?, ?, ?, ?)`,
       )
-      .bind(id, sku, it.name, it.unit || null, now, now, status, auth.user.id),
-    db.prepare("INSERT INTO kho_map (crm_sku, misa_code, factor, note) VALUES (?, ?, 1, 'Mã bán hàng hóa / quà (web đề xuất)')").bind(sku, it.code),
+      .bind(id, sku, it.name, it.unit || null, kind.group ?? '', now, now, status, auth.user.id),
+    db.prepare("INSERT INTO kho_map (crm_sku, misa_code, factor, note) VALUES (?, ?, 1, ?)").bind(sku, it.code, 'Mã bán tạo khi lên đơn (web đề xuất)'),
     auditStatement(db, {
       actorId: auth.user.id,
       action: opts.approved ? 'KPP_CODE_ADD' : 'KPP_CODE_PROPOSE',

@@ -41,7 +41,10 @@ interface SupplyItem {
   name: string;
   unit: string;
   grp: string;
+  cls?: string;
   product_id: string | null;
+  /** Mã bán đã nối với mã kho này (nếu có). */
+  sku?: string | null;
 }
 
 /** 1 nếu khách lấy lẻ, bằng số chai trong thùng nếu khách lấy nguyên thùng. */
@@ -273,31 +276,30 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
         pack_size: p.pack_size,
         price: priceForTier(p),
       }));
-  // Khách gia công mua thêm vật tư (vỏ thùng, nắp, chai...): tìm trong kho vật tư, giá tự điền.
-  const supplies = useApi<SupplyItem[]>(
-    customPricing && customerId && debouncedQuery.trim() ? `/api/supplies?q=${encodeURIComponent(debouncedQuery.trim())}` : null,
+  // Mọi mã trong kho (chị Hoa 14/11: kế toán đã tạo mã trong kho là bán được, bất kể mã nào — thành phẩm, hàng hóa, vật tư...).
+  // Mã đã có mã bán thì thêm thẳng; chưa có thì web tự tạo mã bán (Trưởng phòng tạo là dùng luôn, sale tạo thì chờ duyệt mã) rồi thêm.
+  // Giá chưa có trong bảng giá thì người lập nhập giá tay.
+  const khoItems = useApi<SupplyItem[]>(
+    customerId && debouncedQuery.trim() ? `/api/supplies?all=1&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
   );
-  const addSupply = async (it: SupplyItem) => {
+  const shownIds = new Set(suggestions.map((p) => p.id));
+  const khoExtra = (khoItems.data ?? []).filter((it) => !it.product_id || !shownIds.has(it.product_id));
+  const addKhoItem = async (it: SupplyItem) => {
     try {
-      const r = await api.post<{ id: string; sku: string; name: string; unit: string | null }>('/api/supplies/ensure', { code: it.code });
-      const p = r.data;
-      addLine({ id: p.id, sku: p.sku, name: p.name, unit: p.unit, pack_size: null, price: null }, true);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được vật tư');
-    }
-  };
-  // Hàng hóa chưa có mã bán Kênh phân phối (mua về làm quà nhưng vẫn bán cho NPP, có giá và doanh thu): vẫn chọn vào đơn được, web tự tạo mã (QUA-…), Trưởng phòng duyệt mã sau.
-  const gifts = useApi<SupplyItem[]>(
-    !customPricing && customerId && debouncedQuery.trim() ? `/api/supplies?gift=1&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
-  );
-  const addGiftItem = async (it: SupplyItem) => {
-    try {
+      if (it.product_id && it.sku) {
+        addLine({ id: it.product_id, sku: it.sku, name: it.name, unit: it.unit, pack_size: null, price: null }, true);
+        return;
+      }
       const r = await api.post<{ id: string; sku: string; name: string; unit: string | null; code_status: string }>('/api/supplies/ensure-gift', { code: it.code });
       const p = r.data;
       addLine({ id: p.id, sku: p.sku, name: p.name, unit: p.unit, pack_size: null, price: null }, true);
-      if (p.code_status === 'CHO_DUYET') toast.success(`Đã tạo mã bán ${p.sku}, chờ Trưởng phòng duyệt mã. Nhập giá bán cho dòng này.`);
+      toast.success(
+        p.code_status === 'CHO_DUYET'
+          ? `Đã tạo mã bán ${p.sku}, chờ Trưởng phòng duyệt mã. Nhập giá bán cho dòng này.`
+          : `Đã tạo mã bán ${p.sku}. Nhập giá bán cho dòng này.`,
+      );
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được hàng hóa');
+      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được mã này');
     }
   };
   const suggestLoading = customPricing ? ownCatalog.loading : catalog.loading;
@@ -798,12 +800,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
             <StateBlock
               loading={suggestLoading}
               error={suggestError}
-              empty={suggestions.length === 0}
-              emptyText={
-                customPricing
-                  ? 'Mã này chưa có trong bảng giá riêng của khách.'
-                  : 'Không tìm thấy sản phẩm.'
-              }
+              empty={suggestions.length === 0 && khoExtra.length === 0}
+              emptyText={khoItems.loading ? 'Đang tìm trong kho…' : 'Không tìm thấy mã nào, kể cả trong kho.'}
             >
               {suggestions.slice(0, 8).map((product) => {
                 const price = product.price;
@@ -829,34 +827,18 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                 );
               })}
             </StateBlock>
-            {!customPricing && (gifts.data ?? []).length > 0 && (
+            {khoExtra.length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
                 <div className="muted" style={{ fontSize: 12.5, padding: '0 4px 4px' }}>
-                  Hàng hóa chưa có mã bán Kênh phân phối: chọn là web tự tạo mã, Trưởng phòng duyệt mã sau. Nhập giá bán như mọi mã khác.
+                  Hàng trong kho: mã chưa có mã bán thì chọn là web tự tạo mã bán. Nhập giá bán cho dòng đó.
                 </div>
-                {(gifts.data ?? []).map((it) => (
-                  <button type="button" key={it.code} className="suggest-row" onClick={() => void addGiftItem(it)} disabled={!customerId}>
+                {khoExtra.map((it) => (
+                  <button type="button" key={it.code} className="suggest-row" onClick={() => void addKhoItem(it)} disabled={!customerId}>
                     <span>
-                      <strong>{it.code}</strong> · {it.name}
+                      <strong>{it.sku ?? it.code}</strong> · {it.name}
                       <small className="muted"> {it.unit}{it.grp ? ` · ${it.grp}` : ''}</small>
                     </span>
-                    <span className="muted">Tạo mã · nhập giá</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {customPricing && (supplies.data ?? []).length > 0 && (
-              <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
-                <div className="muted" style={{ fontSize: 12.5, padding: '0 4px 4px' }}>
-                  Vật tư bán kèm (vỏ thùng, nắp, chai…): tự điền giá, không cần duyệt
-                </div>
-                {(supplies.data ?? []).map((it) => (
-                  <button type="button" key={it.code} className="suggest-row" onClick={() => void addSupply(it)} disabled={!customerId}>
-                    <span>
-                      <strong>{it.code}</strong> · {it.name}
-                      <small className="muted"> {it.unit}{it.grp ? ` · ${it.grp}` : ''}</small>
-                    </span>
-                    <span className="muted">Nhập giá</span>
+                    <span className="muted">{it.product_id ? 'Nhập giá' : 'Tạo mã · nhập giá'}</span>
                   </button>
                 ))}
               </div>
