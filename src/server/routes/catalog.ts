@@ -46,23 +46,31 @@ catalogRoutes.get('/supplies', async (c) => {
     throw badRequest('FORBIDDEN', 'Chỉ người lập đơn mới tìm vật tư bán kèm.');
   }
   const words = (c.req.query('q') ?? '').trim().split(/\s+/).filter((w) => w.length >= 1).slice(0, 5);
-  // gift=1: hàng hóa / quà chưa có mã bán Kênh phân phối (đơn thường): chọn vào đơn thì web tự tạo mã, Trưởng phòng duyệt sau (05/11).
+  // all=1 (chị Hoa 14/11): mọi mã kho đang dùng — thành phẩm, hàng hóa, vật tư... — kế toán đã tạo trong kho là bán được.
+  //   Trả kèm mã bán đã nối (nếu có); chưa có mã bán thì chọn vào đơn là web tự tạo mã (POST /supplies/ensure-gift).
+  // gift=1: (cũ) hàng hóa / quà chưa có mã bán Kênh phân phối. Mặc định: vật tư bán kèm cho khách gia công.
+  const all = c.req.query('all') === '1';
   const gift = c.req.query('gift') === '1';
-  const where = gift
-    ? ["i.active = 1", "i.cls = 'HH'", "NOT EXISTS (SELECT 1 FROM kho_map km WHERE km.misa_code = i.code)"]
-    : ["i.active = 1", "i.cls NOT IN ('TP', 'COMBO', 'BTP')"];
+  const where = all
+    ? ['i.active = 1']
+    : gift
+      ? ["i.active = 1", "i.cls = 'HH'", "NOT EXISTS (SELECT 1 FROM kho_map km WHERE km.misa_code = i.code)"]
+      : ["i.active = 1", "i.cls NOT IN ('TP', 'COMBO', 'BTP')"];
   const params: unknown[] = [];
   for (const w of words) {
     where.push("(i.code LIKE ? OR i.name LIKE ? OR i.grp LIKE ?)");
     params.push(`%${w}%`, `%${w}%`, `%${w}%`);
   }
   const rows = await c.env.DB.prepare(
-    `SELECT i.code, i.name, i.unit, i.grp, p.id AS product_id
-     FROM kho_items i LEFT JOIN products p ON p.sku = i.code AND p.deleted_at IS NULL
-     WHERE ${where.join(' AND ')} ORDER BY i.name LIMIT 12`,
+    `SELECT i.code, i.name, i.unit, i.grp, i.cls, COALESCE(pm.id, p.id) AS product_id, COALESCE(pm.sku, p.sku) AS sku
+     FROM kho_items i
+     LEFT JOIN products p ON p.sku = i.code AND p.deleted_at IS NULL
+     LEFT JOIN products pm ON pm.deleted_at IS NULL AND pm.sku = (SELECT km.crm_sku FROM kho_map km WHERE km.misa_code = i.code LIMIT 1)
+     WHERE ${where.join(' AND ')}
+     ORDER BY CASE i.cls WHEN 'TP' THEN 0 WHEN 'HH' THEN 1 WHEN 'NVL' THEN 2 ELSE 3 END, i.name LIMIT ${all ? 20 : 12}`,
   )
     .bind(...params)
-    .all<{ code: string; name: string; unit: string; grp: string; product_id: string | null }>();
+    .all<{ code: string; name: string; unit: string; grp: string; cls: string; product_id: string | null; sku: string | null }>();
   return ok(c, rows.results ?? []);
 });
 
