@@ -46,7 +46,7 @@ describe('Phê duyệt: lọc theo quyền', () => {
   it('CEO thấy mọi việc chờ, bỏ việc đã xử lý', () => {
     const r = T.pdBuild(S, { role: 'CEO', uid: 'u_ceo', perms: ['order.approve.normal', 'order.approve.exception', 'order.accounting.confirm'], admin: true, ns: true });
     expect(kinds(r)).toEqual(['chi', 'don', 'dx', 'ns', 'thu', 'thuong', 'xuat']);
-    expect(ids(r).filter((x) => x.startsWith('ap:'))).toEqual(['ap:a1', 'ap:a2']);
+    expect(ids(r).filter((x) => x.startsWith('ap:'))).toEqual(['ap:a2']); // cấp Quản lý là việc của Quản lý, CEO chỉ thấy cấp CEO
     expect(r.some((x: { id: string }) => x.id === 'gi:g2' || x.id === 'dn:d2')).toBe(false);
   });
 
@@ -86,7 +86,7 @@ describe('Phê duyệt: nội dung dòng', () => {
   const by = (id: string) => r.find((x: { id: string }) => x.id === id);
 
   it('đơn hàng có số tiền, người gửi, mở đúng đơn gốc; yêu cầu cấp CEO ghi rõ', () => {
-    expect(by('ap:a1')).toMatchObject({ tien: 5000000, by: 'Sale A', act: 'api', open: { page: 'cr_dn', path: '/admin/orders/o1' } });
+    expect(by('ap:a1')).toBeUndefined(); // cấp Quản lý: CEO không thấy (14/11)
     expect(by('ap:a2').loai).toContain('CEO duyệt');
   });
 
@@ -106,7 +106,7 @@ describe('Phê duyệt: nội dung dòng', () => {
 
   it('lọc theo loại và đếm', () => {
     expect(T.pdFilter(r, 'thuong').map((x: { id: string }) => x.id).sort()).toEqual(['ca:c1', 'ca:c2', 'gi:g1']);
-    expect(T.pdCounts(r)).toMatchObject({ don: 2, xuat: 1, dx: 1, thuong: 3, chi: 3, thu: 1, ns: 1 });
+    expect(T.pdCounts(r)).toMatchObject({ don: 1, xuat: 1, dx: 1, thuong: 3, chi: 3, thu: 1, ns: 1 });
     expect(T.pdAge(NOW - 30 * 60e3, NOW)).toBe('30 phút');
     expect(T.pdAge(NOW - 5 * 3600e3, NOW)).toBe('5 giờ');
     expect(T.pdAge(NOW - 3 * 864e5, NOW)).toBe('3 ngày');
