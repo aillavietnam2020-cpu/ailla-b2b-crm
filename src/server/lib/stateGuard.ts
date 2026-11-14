@@ -9,6 +9,8 @@
  *  - Mọi chữ có dạng mở thẻ HTML (<abc, </, <!, <?) bị đổi thành dấu ＜ toàn chiều rộng để không ai
  *    chèn được mã chạy trên màn hình người khác.
  */
+import { applyLeadEdits, NEWCOMER_ROLES, type LeadCtx } from './qtpb';
+
 export type GuardUser = {
   id?: string;
   crm?: string;
@@ -34,6 +36,7 @@ export function protectUsers(
   existing: GuardUser[],
   callerId: string,
   hrAllowed: boolean,
+  opts: { lead?: LeadCtx | null; approvedCrm?: Set<string> } = {},
 ): GuardUser[] {
   const inBy = new Map(incoming.map((u) => [u?.id, u]));
   const oldIds = new Set(existing.map((u) => u?.id));
@@ -64,14 +67,24 @@ export function protectUsers(
     return o;
   });
   // Người làm nhân sự thêm người mới thì chỉ ở mức thấp nhất: không quyền, không quản trị, chưa gắn tài khoản.
+  // Người mới đã được HCNS / CEO duyệt ở Quản trị phòng (qtpb_requests) thì gắn luôn tài khoản đăng nhập vừa tạo.
   if (hrAllowed) {
+    const usedCrm = new Set(existing.map((u) => u?.crm).filter(Boolean));
     for (const inc of incoming) {
       if (inc && !oldIds.has(inc.id)) {
-        out.push({ ...inc, role: 'nhanvien', perms: [], crm: '', active: inc.active !== false });
+        const okCrm = typeof inc.crm === 'string' && !!inc.crm && !!opts.approvedCrm?.has(inc.crm) && !usedCrm.has(inc.crm);
+        if (okCrm) usedCrm.add(inc.crm as string);
+        out.push({
+          ...inc,
+          role: okCrm && NEWCOMER_ROLES.includes(String(inc.role)) ? String(inc.role) : 'nhanvien',
+          perms: [],
+          crm: okCrm ? (inc.crm as string) : '',
+          active: inc.active !== false,
+        });
       }
     }
   }
-  return out;
+  return opts.lead ? applyLeadEdits(out, incoming, existing, opts.lead) : out;
 }
 
 /**

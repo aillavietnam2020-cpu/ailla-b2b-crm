@@ -49,6 +49,7 @@ File trong `migrations/` chạy theo số thứ tự tên file. Hai chat cùng t
 | Đấu nối (sổ chi ↔ tài sản ↔ mua hàng ↔ kho, hàng lệch đơn mua) | 0220–0229 |
 | Nhận đơn B2B qua Zalo (đọc ảnh đơn, link khách chốt, trợ lý nhóm Zalo) | 0290–0299 |
 | CSKH khách lẻ (B2C) | 0300–0309 |
+| Quản trị phòng ban (Lead tự quản nhân sự, phân quyền, menu, nhật ký) | 0330–0339 |
 | Chat khác (điện thoại, nhân sự...) | xin khối mới ở chị Hoa, ghi vào bảng này |
 
 - File đã chạy lên production thì KHÔNG đổi tên, KHÔNG sửa nội dung. Hiện cả hai file `0061_*` đều đã chạy.

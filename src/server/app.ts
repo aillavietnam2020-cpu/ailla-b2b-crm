@@ -36,6 +36,7 @@ import { financeRoutes } from './routes/finance';
 import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
+import { qtpbRoutes } from './routes/qtpb';
 import { videoLinkRoutes } from './routes/videoLinks';
 import { driveRoutes } from './routes/drive';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
@@ -166,6 +167,7 @@ export function createApp() {
   app.route('/api/dashboards', dashboardRoutes);
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/fp-publish', fpPublishRoutes);
+  app.route('/api/hub/qtpb', qtpbRoutes);
   app.route('/api/hub/kho', khoRoutes);
   app.route('/api/hub/phache', phacheRoutes);
   app.route('/api/hub/cskh', cskhRoutes);
