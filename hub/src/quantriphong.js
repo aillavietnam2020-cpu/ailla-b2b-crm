@@ -160,7 +160,7 @@ function qpLogDesc(r){
 function qpLogTable(rows,undo){
   const who=r=>esc(r.actor_name||"")+`<div class="hint">${({lead:"Lead",hr:"HCNS",ceo:"CEO"})[r.actor_role]||""}</div>`;
   return rows.length?tbl(["Lúc","Ai","Phòng","Thay đổi",""],rows.map(r=>`<tr class="${r.undone_at?"mut":""}"><td class="nowrap">${esc(qpDate(r.at))}</td><td>${who(r)}</td><td>${esc(qpPb(r.dept))}</td><td>${qpLogDesc(r)}</td>
-   <td class="nowrap">${r.undone_at?pill("Đã hoàn tác","gry")+`<div class="hint">${esc(r.undone_name||"")} · ${esc(qpDate(r.undone_at))}</div>`:undo&&["perms","lock","menu","tpl","add","wf","rule"].includes(r.action)?`<button class="btn sm" data-qpu="${r.id}">Hoàn tác</button>`:""}</td></tr>`)):`<p class="hint pad">Chưa có thay đổi nào.</p>`;
+   <td class="nowrap">${r.undone_at?pill("Đã hoàn tác","gry")+`<div class="hint">${esc(r.undone_name||"")} · ${esc(qpDate(r.undone_at))}</div>`:undo&&["perms","lock","menu","tpl","add","wf","rule","bang"].includes(r.action)?`<button class="btn sm" data-qpu="${r.id}">Hoàn tác</button>`:""}</td></tr>`)):`<p class="hint pad">Chưa có thay đổi nào.</p>`;
 }
 function pQpNk(m){
   if(!qpIsLead(ME)){m.innerHTML=H("Nhật ký phòng","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
@@ -251,7 +251,7 @@ Object.assign(PAGES,{qp_ns:pQpNs,qp_nk:pQpNk,qp_moi:pQpMoi,qp_log:pQpLog,qp_cfg:
 
 /* ---------- Menu ---------- */
 {
-  const items=()=>[MI("qp_ns","Nhân sự & phân quyền",u=>qpIsLead(u),()=>qpNeed()||""),MI("qp_wf","Work Flow",u=>qpIsLead(u)),MI("qp_kpi","KPI nhân sự",u=>qpIsLead(u)),MI("qp_nk","Nhật ký phòng",u=>qpIsLead(u)),
+  const items=()=>[MI("qp_ns","Nhân sự & phân quyền",u=>qpIsLead(u),()=>qpNeed()||""),MI("qp_wf","Work Flow",u=>qpIsLead(u)),MI("qp_kpi","KPI nhân sự",u=>qpIsLead(u)),MI("qp_bang","Bảng dữ liệu",u=>qpIsLead(u)),MI("qp_nk","Nhật ký phòng",u=>qpIsLead(u)),
     MI("qp_ct","Chỉ tiêu chờ duyệt",u=>u.role==="admin",()=>(typeof qkAllPend==="function"&&qkAllPend().length)||""),MI("qp_hrkpi","Hiệu suất & lương thưởng",u=>u.role==="admin"||hrOk()),
     MI("qp_moi","Người mới chờ duyệt",u=>u.role==="admin"||hrOk(),()=>{qpLoadReq();return qpPend()||""}),
     MI("qp_log","Nhật ký quản trị phòng",u=>u.role==="admin"||can(u,"qtpb.hoantac")),MI("qp_cfg","Ranh giới quyền Lead",u=>u.role==="admin")];
