@@ -121,7 +121,7 @@ function pQkHr(m){
 
 /* ---------- Work Flow (Lead) ---------- */
 const QK_WF=[
-  {id:"video",ten:"Duyệt video final",lead:true,co:"Điều phối, Bảng video",steps:()=>[["Lead phòng","lead"],[qkVidCeo()?"CEO duyệt V2 (đang bật)":"CEO duyệt V2 (CEO đang tắt)","CEO bật / tắt, Lead không bỏ được"]]},
+  {id:"video",ten:"Duyệt video final",lead:true,co:"Điều phối, Bảng video",steps:()=>[["Lead phòng","lead"],[qkVidCeo()?"CEO duyệt V2 (đang bật)":"CEO duyệt V2 (đang tắt)","CEO bật / tắt, Lead không bỏ được"]]},
   {id:"kb",ten:"Duyệt kịch bản",lead:true,co:"Điều phối",steps:()=>[["Lead phòng (người có quyền Duyệt kịch bản, video)","lead"]]},
   {id:"task",ten:"Duyệt việc giao (Task)",lead:true,co:"Công việc",steps:()=>[["Lead phòng","lead"],["CEO vòng 2 (khi việc bật duyệt 2 vòng)","Theo từng việc"]]},
   {id:"nghi",ten:"Xin nghỉ phép, tăng ca",lead:true,co:"Nghỉ phép & tăng ca",steps:()=>[["Lead phòng","lead"],["HCNS khi nghỉ từ số ngày HCNS đặt","HCNS đặt"]]},
@@ -141,13 +141,11 @@ function pQkWf(m){
   if(!qpAct()){m.innerHTML=qpDeptPick()+H("Work Flow","")+qpNo("Mục này dành cho Lead của phòng đã mở Quản trị phòng.");return}
   const W=qkWaiting(),over=W.filter(x=>x.han&&x.gio!=null&&x.gio>x.han);
   m.innerHTML=qpDeptPick()+H("Work Flow","Các luồng duyệt đang chạy của phòng "+esc(qpPb(qpD()))+". Lead đặt hạn duyệt cho bước của mình; bước của Quản lý mua hàng, Kế toán, Kế toán kho, HCNS, CEO giữ nguyên.")+
-   `<section class="card"><h2 style="margin:0 0 6px">Đang chờ Lead duyệt <small class="hint">${W.length} việc${over.length?` · <b style="color:#d93a3a">${over.length} quá hạn</b>`:""}</small></h2>
-    ${W.length?tbl(["Luồng","Việc","Người làm","Đã chờ",""],W.slice(0,40).map(x=>`<tr><td>${esc((QK_WF.find(f=>f.id===x.wf)||{}).ten||"")}</td><td>${esc(x.ten)}</td><td>${esc(x.ai||"")}</td><td>${x.gio==null?"—":x.gio+" giờ"}</td><td>${x.han&&x.gio!=null&&x.gio>x.han?pill("Quá hạn "+x.han+" giờ","red"):""}</td></tr>`)):`<p class="hint">Không có việc nào đang chờ.</p>`}
-    <p class="hint">Nghỉ phép và đồ dùng xem ở mục duyệt riêng của từng luồng.</p></section>
-   ${QK_WF.map(f=>`<section class="card"><div class="row4" style="align-items:center;gap:10px"><b style="font-size:15px">${f.ten}</b>${f.tien?pill("Có tiền","gry"):""}<span style="flex:1"></span><span class="hint">Chạy ở: ${esc(f.co)}</span></div>
-     <ol style="margin:8px 0 0;padding-left:20px">${f.steps().map(([n,k])=>`<li style="margin:4px 0">${esc(n)} ${k==="lead"?`<span class="hint">· hạn duyệt</span> <input type="number" min="1" max="720" style="width:70px" data-qkh="${f.id}" value="${qkHan(f.id)||""}" placeholder="—"> <span class="hint">giờ</span>`:pill(k,"gry")}</li>`).join("")}</ol>
+   `${QK_WF.map(f=>`<section class="card"><div class="row4" style="align-items:center;gap:10px"><b style="font-size:15px">${f.ten}</b>${f.tien?pill("Có tiền","gry"):""}<span style="flex:1"></span>${(()=>{const n=W.filter(x=>x.wf===f.id),o=n.filter(x=>x.han&&x.gio!=null&&x.gio>x.han).length;return n.length?`<span class="hint">Đang chờ Lead duyệt: <b>${n.length}</b>${o?` · <b style="color:#d93a3a">${o} quá hạn</b>`:""}</span>`:""})()}<span class="hint">Duyệt ở: ${esc(f.co)}</span></div>
+     <ol style="margin:8px 0 0;padding-left:20px">${f.steps().map(([n,k])=>`<li style="margin:4px 0">${esc(n)} ${k==="lead"?`<span class="hint">· hạn duyệt</span> <input type="number" min="1" max="720" style="width:70px" data-qkh="${f.id}" value="${qkHan(f.id)||""}" placeholder="—"> <span class="hint">giờ</span>`:(f.id==="video"&&k!=="lead"&&ME.role==="admin"?`<label class="row4" style="display:inline-flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="qk-vc" ${qkVidCeo()?"checked":""}> Bật</label>`:pill(k,"gry"))}</li>`).join("")}</ol>
      ${!f.lead?`<p class="hint">Luồng này không có bước của Lead.</p>`:""}</section>`).join("")}
    <div class="acts"><button class="btn pri" id="qk-wf">Lưu hạn duyệt</button></div>`;
+  const vc=$("#qk-vc");if(vc)vc.onchange=()=>{const on=vc.checked;DB.mutate(ME.name,(on?"bật":"tắt")+" bước CEO duyệt video final",d=>{d.qtpb=d.qtpb||{};d.qtpb.cfg=Object.assign({},d.qtpb.cfg||{},{videoCeo:on})});toast(on?"Video final lại qua CEO duyệt":"Đã tắt bước CEO duyệt video final: Lead duyệt xong là sang Đăng");renderMain()};
   $("#qk-wf").onclick=()=>{const wf={};m.querySelectorAll("[data-qkh]").forEach(x=>{const v=Number(x.value);if(v>0)wf[x.dataset.qkh]={han:Math.min(720,Math.round(v))}});
     DB.mutate(ME.name,"sửa hạn duyệt Work Flow phòng "+qpPb(qpD()),d=>{d.qtpb=d.qtpb||{};d.qtpb.dept=d.qtpb.dept||{};const c=d.qtpb.dept[qpD()]=d.qtpb.dept[qpD()]||{};c.wf=wf});toast("Đã lưu hạn duyệt");renderMain()};
 }

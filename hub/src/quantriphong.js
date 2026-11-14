@@ -31,7 +31,10 @@ const qpCap=k=>!!ME&&(ME.role==="admin"||qpCfg().cap[k]!==false);
 const qpDeptPick=()=>ME&&ME.role==="admin"?`<div class="filters"><label class="hint" for="qp-dp">Phòng</label><select id="qp-dp" data-qpdept>${opt((D().departments||[]).map(p=>[p.k,p.n+(qpCfg().depts.includes(p.k)?"":" (chưa mở cho Lead)")]),qpD())}</select><span class="hint">CEO xem và làm thay Lead của phòng đang chọn.</span></div>`:"";
 document.addEventListener("change",e=>{const t=e.target;if(t&&t.dataset&&t.dataset.qpdept!==undefined){QP.dept=t.value;QP.log=null;QP.logDept="";QP.pt="";renderMain()}});
 const qpDeptCfg=k=>{const q=(D()&&D().qtpb)||{};return (q.dept||{})[k]||{}};
-const qpGrant=p=>!!ME&&can(ME,p)&&!qpHard(p);
+/* Phạm vi quyền được cấp trong phòng: quyền Lead của phòng đang có, trừ khóa cứng.
+   CEO làm thay: theo quyền của Lead phòng đang chọn (phòng chưa có Lead thì mọi quyền trừ khóa cứng). */
+const qpScope=()=>{let ps;if(ME&&ME.role==="admin"){const L=(D().users||[]).find(u=>u.phongBan===qpD()&&qpDeptLead(u));ps=L?(L.perms||[]):PERMS.flatMap(([,x])=>x.map(y=>y[0]))}else ps=PERMS.flatMap(([,x])=>x.map(y=>y[0])).filter(k=>can(ME,k));return new Set(ps.filter(k=>!qpHard(k)))};
+const qpGrant=p=>!!ME&&qpScope().has(p);
 const qpManaged=u=>!!u&&!!ME&&u.phongBan===qpD()&&u.role!=="admin"&&u.id!==ME.id&&(ME.role==="admin"||(!QP_LEADR.includes(u.role)&&!qpDeptLead(u)));
 const qpPb=k=>(D().departments.find(p=>p.k===k)||{n:k||"—"}).n;
 const qpPermLabel=k=>{for(const [,ps] of PERMS)for(const [p,l] of ps)if(p===k)return l;return k};
@@ -126,8 +129,8 @@ function qpTabQuyen(s){
   s.innerHTML=`<div class="filters"><label class="hint" for="qp-pt">Áp cho</label><select id="qp-pt">${opt([...titles.map(t=>["t:"+t,"Mẫu chức vụ · "+t]),...M.map(x=>["u:"+x.id,"Riêng · "+x.name+(x.needPerm?" (chờ set quyền)":"")])],QP.pt)}</select>
    <span class="hint">${isU?"Quyền của riêng người này.":"Mẫu dùng khi set quyền cho người mới cùng chức vụ; bấm Áp mẫu để đổi cho cả "+same.length+" người."}</span></div>
    ${isU&&u&&u.needPerm?`<div class="note">Người mới: chọn quyền rồi bấm <b>Lưu quyền</b>, hoặc bấm <b>Áp mẫu chức vụ</b>.</div>`:""}
-   ${!QP.pt?qpNo("Phòng chưa có nhân sự để phân quyền."):PERMS.map(([g,ps])=>`<section class="card"><h2 style="margin:0 0 6px">${esc(g)}</h2>${ps.map(([k,l])=>{const hard=qpHard(k),no=!hard&&!can(ME,k),dis=hard||no;
-     return `<label class="row4" style="align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line,#e7e9f0);${dis?"opacity:.7":""}"><input type="checkbox" data-qpp="${esc(k)}" ${cur.has(k)?"checked":""} ${dis?"disabled":""}><span style="flex:1">${esc(l)}</span>${hard?pill("Chỉ CEO, Kế toán","gry"):no?pill("Lead không có quyền này","gry"):""}</label>`}).join("")}</section>`).join("")}
+   ${!QP.pt?qpNo("Phòng chưa có nhân sự để phân quyền."):`<p class="hint">Chỉ hiện quyền ${ME.role==="admin"?"Lead phòng "+esc(qpPb(qpD())):"bạn"} đang có (quyền của phòng mình). Quyền phòng khác và quyền khóa cứng không hiện; quyền người này đang có sẵn thì vẫn hiện để biết, nhưng không sửa được ở đây.</p>`+PERMS.map(([g,all])=>{const SC=qpScope(),ps=all.filter(([k])=>SC.has(k)||cur.has(k));return !ps.length?"":`<section class="card"><h2 style="margin:0 0 6px">${esc(g)}</h2>${ps.map(([k,l])=>{const hard=qpHard(k),no=!hard&&!SC.has(k),dis=hard||no;
+     return `<label class="row4" style="align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line,#e7e9f0);${dis?"opacity:.7":""}"><input type="checkbox" data-qpp="${esc(k)}" ${cur.has(k)?"checked":""} ${dis?"disabled":""}><span style="flex:1">${esc(l)}</span>${hard?pill("Chỉ CEO, Kế toán","gry"):no?pill("Ngoài phạm vi của Lead","gry"):""}</label>`}).join("")}</section>`}).join("")}
    ${QP.pt?`<div class="acts" style="position:sticky;bottom:10px"><button class="btn pri" id="qp-ps">${isU?"Lưu quyền":"Lưu mẫu"}</button>${isU&&u&&u.title?`<button class="btn" id="qp-pa1">Áp mẫu chức vụ ${esc(u.title)}</button>`:""}${!isU&&same.length?`<button class="btn" id="qp-pa">Áp mẫu cho ${same.length} người</button>`:""}</div>`:""}`;
   $("#qp-pt").onchange=e=>{QP.pt=e.target.value;renderMain()};
   if(!QP.pt)return;
