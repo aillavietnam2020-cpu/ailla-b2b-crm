@@ -233,10 +233,10 @@ function tkComment(id,text){const t0=D().tasks.find(x=>x.id===id);if(!t0)return;
     if(at.length)notifyU(dt,at,`${ME.name} nhắc bạn ở việc "${x.ten}": ${text.slice(0,90)}`,"task:"+x.id);notifyU(dt,who,`${ME.name} trao đổi ở việc "${x.ten}": ${text.slice(0,90)}`,"task:"+x.id)})}
 /* gợi ý tên khi gõ @ trong ô trao đổi */
 function tkBindChat(t){const ta=$("#t-cm"),box=$("#t-cmat");if(!ta)return;
-  ta.oninput=()=>{ta.style.height="auto";ta.style.height=Math.min(140,ta.scrollHeight)+"px";const v=ta.value.slice(0,ta.selectionStart),m=/@([^@\n]{0,20})$/.exec(v);if(!m||!m[1].trim()){box.hidden=true;return}
+  ta.oninput=()=>{ta.style.height="auto";ta.style.height=Math.min(140,ta.scrollHeight)+"px";const v=ta.value.slice(0,ta.selectionStart),m=/@([^@\n]{0,20})$/.exec(v);if(!m){box.hidden=true;return}
     const fd=typeof foldName==="function"?foldName:(z=>String(z).toLowerCase()),q=fd(m[1]),/* đủ mọi người (chị Hoa 03/11: trước chỉ 6 người đầu): người của việc → cùng phòng → còn lại */
       rel=new Set([t.tao,t.nguoi,...(t.phoi||[]),...(t.chat||[]).map(c=>c.byId)].filter(Boolean)),tm=teamOf(ME),rk=u=>rel.has(u.id)?0:teamOf(u)===tm?1:2,
-      L=D().users.filter(u=>u.active&&u.name&&u.id!==ME.id&&fd(u.name).includes(q)).sort((a,b)=>rk(a)-rk(b)||a.name.localeCompare(b.name)).slice(0,8);
+      L=D().users.filter(u=>u.active&&u.name&&u.id!==ME.id&&!CV_TEST.includes(u.id)&&fd(u.name).includes(q)).sort((a,b)=>rk(a)-rk(b)||a.name.localeCompare(b.name)).slice(0,8);
     if(!L.length){box.hidden=true;return}box.hidden=false;box.innerHTML=L.map(u=>`<button type="button" class="btn sm" data-atn="${esc(u.name)}">${esc(u.name)}<small> · ${esc(cvTeamName(teamOf(u))||"")}</small></button>`).join("");
     box.querySelectorAll("[data-atn]").forEach(b=>b.onclick=()=>{const pos=ta.selectionStart,pre=ta.value.slice(0,pos).replace(/@([^@\n]{0,20})$/,"@"+b.dataset.atn+" ");ta.value=pre+ta.value.slice(pos);box.hidden=true;ta.focus()})};
   $("#t-cmok").onclick=()=>{const v=ta.value.trim();if(!v){toast("Viết nội dung trao đổi");return}tkComment(t.id,v);toast("Đã gửi");openTask(t.id);renderMain()}}

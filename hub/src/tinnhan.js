@@ -30,7 +30,7 @@ const tnTime=t=>{const d=new Date(t),n=new Date();return d.toDateString()===n.to
 const tnDay=t=>{const d=new Date(t),n=new Date(),y=new Date(n-864e5);return d.toDateString()===n.toDateString()?"Hôm nay":d.toDateString()===y.toDateString()?"Hôm qua":d.toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit"})};
 const tnInit=n=>{const w=String(n||"?").trim().split(/\s+/);return (w.length>1?w[w.length-2][0]+w[w.length-1][0]:w[0].slice(0,2)).toUpperCase()};
 const tnAv=(id,name,grp)=>{const ag=tnAg(id);if(ag)return `<i class="tnav tnavag" style="background:${ag.color}1a;border:1.5px solid ${ag.color}">${ag.emoji||"🤖"}</i>`;const c=avC(id);return `<i class="tnav${grp?" g":""}" style="background:${c[0]};color:${c[1]}">${grp?"#":esc(tnInit(name))}</i>`};
-const tnPeople=()=>D().users.filter(u=>u.active&&u.name&&u.crm&&u.crm!==tnMe());
+const tnPeople=()=>D().users.filter(u=>u.active&&u.name&&u.crm&&u.crm!==tnMe()&&!(typeof CV_TEST!=="undefined"&&CV_TEST.includes(u.id)));
 const tnTotal=()=>TN.rooms.reduce((a,r)=>a+(r.room===TN.room&&PAGE==="tinnhan"?0:r.unread||0),0);
 /* gọi tên @: bỏ dấu + không phân biệt hoa thường; tên có khoảng trắng ("Lead Content") khớp theo cụm dài nhất; @ phải đứng đầu dòng hoặc sau khoảng trắng (không bắt email) */
 const tnNorm=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/gi,"d").toLowerCase().trim();
