@@ -10,14 +10,16 @@ function uidByName(n){if(!n)return "";const x=nlFold(n),L=(D().users||[]);const 
 /* người làm của một video */
 function mkOf(c){if(!c||c.agency)return "";if(c.nguoiLam)return c.nguoiLam;
   if(c.nguoiEdit)return c.nguoiEdit;const t=uidByName(c.nguoiEditTen);if(t)return t;
-  if(typeof mixOf==="function"&&mixOf(c)==="ton")return ""; // video tồn đăng lại: không tính là làm mới cho người đăng
+  if(typeof mixOf==="function"&&mixOf(c)==="ton"){const k=nlKhoNew(c);return k?(k.nguoiId||uidByName(k.nguoi)):""} // video tồn đăng lại: không tính là làm mới cho người đăng
   return c.nguoiKB||c.giao||nlUp(c)||(["dang","xong"].includes(c.step)?"":c.nguoi)||""}
 /* người đã dán link / nộp video (theo lịch sử thẻ), dùng khi dòng không ghi ai làm */
 function nlUp(c){const h=(c.history||[]).filter(x=>/Dán link|Nhập nhanh|gửi Lead duyệt/i.test(x.txt||"")||x.to==="dvd").pop();return h?uidByName(h.by||h.who):""}
 const NL_NOP=["dvd","dceo","dang","xong"],NL_OK=["dang","xong"];
 function nlSt(c){if(c.step==="xong")return ["Đã đăng","grn"];if(c.step==="dang")return ["Chờ đăng","blu"];if(["dvd","dceo"].includes(c.step))return ["Chờ duyệt","vio"];
   if(c.step==="edit"&&(c.duyet==="Cần sửa"||(c.gopy||[]).length&&(c.linkVideo||c.linkFinal)))return ["Cần sửa","red"];return ["Đang làm","amb"]}
-const nlMade=c=>BV_RT.includes(mixOf(c))||(mixOf(c)==="ton"&&!!c.nguoiLam);
+/* video kho làm MỚI trong tháng (nhập nhanh vào Kho rồi mới gắn kênh dạng video tồn) vẫn là video làm mới, không phải video cũ đăng lại (14/11) */
+function nlKhoNew(c){if(!c.khoMa)return null;const k=(D().kho||[]).find(x=>x.ma===c.khoMa);if(!k||String(k.ngaySX||"").slice(0,7)!==MONTH.key||k.agency||/agency/i.test(k.nguonFile||""))return null;return k}
+const nlMade=c=>BV_RT.includes(mixOf(c))||(mixOf(c)==="ton"&&(!!c.nguoiLam||!!nlKhoNew(c)));
 const nlKey=()=>MONTH.key;
 const nlPlan=(d,kenh,sku)=>sum(BV_RT,t=>bvPlanN(d,sku,kenh,t));
 function nlCt(d,kenh,sku){const o=((d.ctNguoi||{})[nlKey()]||{})[kenh];return o&&o[sku]?o[sku]:null}
