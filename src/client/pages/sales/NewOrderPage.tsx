@@ -1331,8 +1331,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
           {blockedLines.length > 0 && (
             <div className="alert-box" style={{ marginTop: 10 }}>
               Còn {blockedLines.length} dòng chưa có giá{' '}
-              {customPricing ? 'trong bảng giá riêng của khách' : 'ở cấp của khách'}. Bỏ dòng đó ra
-              hoặc bổ sung giá trước khi lưu.
+              {customPricing ? 'trong bảng giá riêng của khách' : 'ở cấp của khách'}. Nhập đơn giá tay
+              vào ô Đơn giá của dòng đó (Quản lý duyệt giá), hoặc bỏ dòng ra.
             </div>
           )}
         </Card>
