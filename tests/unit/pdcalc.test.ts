@@ -45,7 +45,7 @@ const ids = (rows: Array<{ id: string }>) => rows.map((r) => r.id).sort();
 describe('Phê duyệt: lọc theo quyền', () => {
   it('CEO thấy mọi việc chờ, bỏ việc đã xử lý', () => {
     const r = T.pdBuild(S, { role: 'CEO', uid: 'u_ceo', perms: ['order.approve.normal', 'order.approve.exception', 'order.accounting.confirm'], admin: true, ns: true });
-    expect(kinds(r)).toEqual(['chi', 'dx', 'don', 'thu', 'thuong', 'xuat'].sort()); // nhân sự (nghỉ, OT, tạm ứng) là việc của HCNS, CEO không thấy (15/11)
+    expect(kinds(r)).toEqual(['chi', 'don', 'dx', 'ns', 'thu', 'thuong', 'xuat']);
     expect(ids(r).filter((x) => x.startsWith('ap:'))).toEqual(['ap:a2']); // cấp Quản lý là việc của Quản lý, CEO chỉ thấy cấp CEO
     expect(r.some((x: { id: string }) => x.id === 'gi:g2' || x.id === 'dn:d2')).toBe(false);
   });
@@ -106,7 +106,7 @@ describe('Phê duyệt: nội dung dòng', () => {
 
   it('lọc theo loại và đếm', () => {
     expect(T.pdFilter(r, 'thuong').map((x: { id: string }) => x.id).sort()).toEqual(['ca:c1', 'ca:c2', 'gi:g1']);
-    expect(T.pdCounts(r)).toMatchObject({ don: 1, xuat: 1, dx: 1, thuong: 3, chi: 3, thu: 1 });
+    expect(T.pdCounts(r)).toMatchObject({ don: 1, xuat: 1, dx: 1, thuong: 3, chi: 3, thu: 1, ns: 1 });
     expect(T.pdAge(NOW - 30 * 60e3, NOW)).toBe('30 phút');
     expect(T.pdAge(NOW - 5 * 3600e3, NOW)).toBe('5 giờ');
     expect(T.pdAge(NOW - 3 * 864e5, NOW)).toBe('3 ngày');

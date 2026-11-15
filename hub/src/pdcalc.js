@@ -43,7 +43,7 @@ function pdRights(w){
     hoan:()=>P("order.accounting.confirm"),
     ceo:()=>ceo,
     mh:()=>ceo||!!w.admin||apN||P("order.accounting.confirm"),
-    ns:()=>!!w.ns&&w.role!=="CEO"};
+    ns:()=>!!w.ns};
 }
 const pdItems=v=>{try{const L=typeof v==="string"?JSON.parse(v):v;return Array.isArray(L)?L.map(x=>(x.name||x.item||"")+(x.qty?" × "+x.qty:"")).filter(Boolean).join(", "):""}catch(e){return ""}};
 const pdApLoai=a=>a.rule_code==="PRICE_VERSION"?"Đổi giá":a.entity_type==="CUSTOMER_TIER"||a.rule_code==="TIER_CHANGE"?"Đổi cấp khách":"Đơn hàng";
