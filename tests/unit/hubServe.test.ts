@@ -51,4 +51,17 @@ describe('Trang /hub/ giữ trong trình duyệt theo bản dựng', () => {
     const r = await serveHub(req('https://quantri.ailla.vn/hub/build'), env, HTML);
     expect(await r.json()).toEqual({ build: '123' });
   });
+
+  it('Ailla Agent (/agent/): cùng trang, gắn cờ AGENT_APP, tên riêng, mã bản dựng riêng', async () => {
+    const r = await serveHub(req('https://vanhanh.ailla.vn/agent/'), env, HTML, false, true);
+    expect(r.status).toBe(200);
+    expect(r.headers.get('ETag')).toBe('"123-og"');
+    const body = await r.text();
+    expect(body).toContain('window.AGENT_APP=1');
+    expect(body).toContain('<title>Ailla Agent</title>');
+    // địa chỉ khác bị chuyển về /agent/
+    const red = await serveHub(req('https://vanhanh.ailla.vn/agent'), env, HTML, false, true);
+    expect(red.status).toBe(302);
+    expect(red.headers.get('Location')).toBe('https://vanhanh.ailla.vn/agent/');
+  });
 });

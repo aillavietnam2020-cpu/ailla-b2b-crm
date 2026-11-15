@@ -100,7 +100,8 @@ agentOpsRoutes.get('/', async (c) => {
     .prepare(`SELECT id, agent, name, title, emoji, dept, parent, template, skills_json, duty, crons_json, combo, status, note, created_at, updated_at
               FROM agent_ops_req WHERE status <> 'cancelled' ORDER BY id DESC LIMIT 50`)
     .all<Record<string, unknown>>()
-    .catch(() => ({ results: [] as Record<string, unknown>[] }));
+    .catch(() => null);
+  const reqsOk = !!reqs;
   const docBy = new Map<string, Record<string, unknown>[]>();
   for (const d of docs.results ?? []) (docBy.get(d.agent) ?? docBy.set(d.agent, []).get(d.agent)!).push({ kind: d.kind, name: d.name, description: d.description, path: d.path, size: d.size, file_at: d.file_at, has_body: !!d.has_body });
   const stBy = new Map((st.results ?? []).map((r) => [String(r.agent), r]));
@@ -156,7 +157,8 @@ agentOpsRoutes.get('/', async (c) => {
     depts: depts.results ?? [],
     notes: notes.results ?? [],
     logs: logs.results ?? [],
-    reqs: (reqs.results ?? []).map((r) => ({ ...r, skills: safeJson<string[]>(r.skills_json as string, []), crons: safeJson<unknown[]>(r.crons_json as string, []) })),
+    reqs_ok: reqsOk,
+    reqs: (reqs?.results ?? []).map((r) => ({ ...r, skills: safeJson<string[]>(r.skills_json as string, []), crons: safeJson<unknown[]>(r.crons_json as string, []) })),
   });
 });
 

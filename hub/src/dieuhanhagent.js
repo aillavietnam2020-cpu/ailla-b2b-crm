@@ -288,7 +288,7 @@ function acGrid(){
      <div class="ac-q">Được đọc: ${esc(a.quyen||"")}</div></button>`}).join("")||'<div class="hint">Bạn chưa được cấp quyền nhắn agent nào. Nhờ CEO cấp quyền.</div>'}</div><div id="ac-access"></div>`;
   if(AC.isCeo&&typeof aopTabsBar==="function"){R.insertAdjacentHTML("afterbegin",aopTabsBar());aopBindTabs(R)} /* CEO: tab Nhắn agent nằm cùng thanh với Sơ đồ tổ chức */
   if(AC.isCeo)acAccess();
-  R.querySelectorAll("[data-ac]").forEach(b=>b.onclick=()=>acPick(b.dataset.ac));
+  R.querySelectorAll("[data-ac]").forEach(b=>b.onclick=()=>window.AGENT_APP||typeof aaOpen!=="function"?acPick(b.dataset.ac):aaOpen(b.dataset.ac)) /* 15/11: nhắn agent mở tab riêng Ailla Agent */;
   R.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{AC.filter=b.dataset.f;acGrid()});
 }
 /* ----- Màn nhắn tin ----- */

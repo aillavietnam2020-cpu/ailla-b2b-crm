@@ -33,10 +33,11 @@ export function hubBuildId(html: string): string {
 /** Trang đã thay tên/HOST_MODE, giữ lại theo từng địa chỉ để không phải ghép lại chuỗi 4 MB mỗi lần mở. */
 const pageCache = new Map<string, string>();
 
-export async function serveHub(request: Request, env: Env, html: string, chat = false): Promise<Response> {
+export async function serveHub(request: Request, env: Env, html: string, chat = false, agent = false): Promise<Response> {
   const url = new URL(request.url);
   /** Ailla Chat (chị Hoa duyệt demo 08/11): cùng trang, cùng đăng nhập, mở thẳng Tin nhắn toàn màn hình, tên + biểu tượng riêng để thêm ra màn hình chính. */
-  const home = chat ? '/chat/' : '/hub/';
+  /** Ailla Agent (chị Hoa duyệt demo 15/11): nhắn agent toàn màn hình kiểu Zalo, mở ở tab riêng. */
+  const home = agent ? '/agent/' : chat ? '/chat/' : '/hub/';
   // Trang đang mở hỏi "có bản web mới chưa" bằng số bản dựng (vài byte) thay vì tải lại cả trang.
   if (url.pathname === '/hub/build') {
     return new Response(JSON.stringify({ build: hubBuildId(html) }), {
@@ -73,7 +74,7 @@ export async function serveHub(request: Request, env: Env, html: string, chat = 
   const siteTitle = !env.ADMIN_HOST ? "Trang quản trị Ailla" : adminMode ? "Ailla Quản trị" : "Ailla Vận hành";
   // Trình duyệt giữ trang (khoảng 1,3 MB) và mỗi lần mở chỉ hỏi lại: cùng bản dựng thì trả 304, không tải lại.
   // Vẫn kiểm tra đăng nhập/quyền ở trên trước khi trả 304; trang không chứa số liệu, chỉ khác nhau theo địa chỉ.
-  const etag = '"' + hubBuildId(html) + '-' + (adminMode ? 'a' : 'o') + (chat ? 'c' : '') + '"';
+  const etag = '"' + hubBuildId(html) + '-' + (adminMode ? 'a' : 'o') + (chat ? 'c' : '') + (agent ? 'g' : '') + '"';
   const sent = (request.headers.get('If-None-Match') ?? '').split(',').map((t) => t.trim().replace(/^W\//, ''));
   const headers = {
     'Cache-Control': 'private, no-cache',
@@ -100,6 +101,13 @@ export async function serveHub(request: Request, env: Env, html: string, chat = 
         .replace('content="Ailla"', 'content="Ailla Chat"')
         .replace('href="/apple-touch-icon.png"', 'href="/chat-icon-180.png"')
         .replace(/<title>[^<]*<\/title>/, '<title>Ailla Chat</title>');
+    }
+    if (agent) {
+      const flag = '<script>window.AGENT_APP=1</script>';
+      page = (page.includes('<head>') ? page.replace('<head>', '<head>' + flag) : flag + page)
+        .replace('<meta name="theme-color" content="#0f1b3d">', '<meta name="theme-color" content="#ffffff">')
+        .replace('content="Ailla"', 'content="Ailla Agent"')
+        .replace(/<title>[^<]*<\/title>/, '<title>Ailla Agent</title>');
     }
     if (pageCache.size > 8) pageCache.clear();
     pageCache.set(key, page);
