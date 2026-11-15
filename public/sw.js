@@ -16,7 +16,10 @@ self.addEventListener('notificationclick',e=>{
   const url=(e.notification.data&&e.notification.data.url)||'/hub/';
   e.waitUntil((async()=>{
     const L=await self.clients.matchAll({type:'window',includeUncontrolled:true});
-    const w=L.find(c=>new URL(c.url).pathname.startsWith('/hub'));
+    /* tin agent (15/11): mở / chuyển tab Ailla Agent đúng agent; còn lại mở web vận hành như cũ */
+    const ag=url.startsWith('/agent/');
+    const w=L.find(c=>new URL(c.url).pathname.startsWith(ag?'/agent':'/hub'));
+    if(w&&ag){try{await w.focus()}catch(x){}w.postMessage({agUrl:url});return}
     if(w){try{await w.focus()}catch(x){}w.postMessage({ntUrl:url});return}
     await self.clients.openWindow(url);
   })());

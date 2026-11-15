@@ -112,6 +112,8 @@ if(typeof window!=="undefined"&&window.AGENT_APP){
   /* chọn agent theo địa chỉ #a=<mã> (bấm từ trang Điều hành agent) */
   const want=()=>{const m=/^#a=([a-z0-9-]+)/.exec(location.hash);return m?decodeURIComponent(m[1]):""};
   {const w=want();if(w){AC.cur=w;AC.restored=1;document.documentElement.classList.add("aa-open")}}
+  /* bấm thông báo "agent trả lời" khi Ailla Agent đang mở: chuyển sang đúng agent */
+  try{navigator.serviceWorker&&navigator.serviceWorker.addEventListener("message",e=>{const u=e.data&&e.data.agUrl;if(u){const h=new URL(u,location.href).hash;if(h&&h!==location.hash)location.hash=h}})}catch(e){}
   window.addEventListener("hashchange",()=>{const w=want();if(w&&acA(w)){document.documentElement.classList.add("aa-open");if(w!==AC.cur)acPick(w)}});
   /* không có màn thẻ: chưa chọn agent thì mở agent nhắn gần nhất (điện thoại vẫn thấy danh sách trước) */
   acGrid=function(){const L=(AC.agents||[]).slice().sort((x,y)=>String(y.last_at||"").localeCompare(String(x.last_at||"")));const a=acA(AC.cur)||L[0];if(!a){const R=acRoot();if(R)R.innerHTML='<div class="hint" style="padding:30px">Bạn chưa được cấp quyền nhắn agent nào. Nhờ CEO cấp quyền.</div>';return}acPick(a.id)};

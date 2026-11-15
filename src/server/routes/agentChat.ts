@@ -5,6 +5,7 @@ import type { AppEnv } from '../env';
 import { forbidden, badRequest, notFound, ok, unauthorized } from '../lib/http';
 import { issueDelegation, issueTelegramDelegation } from '../lib/delegation';
 import { hubCtx } from './chat';
+import { pushAgent } from '../services/pushDispatch';
 
 /**
  * Nhắn agent ngay trên web.
@@ -547,6 +548,16 @@ agentRelayRoutes.post('/push', async (c) => {
       .bind(link.v, 'agent:' + row.agent, failed ? '⚠ Agent chưa trả lời được: ' + text : text, 'ac:' + replyId, now)
       .run();
     await c.env.DB.prepare(`DELETE FROM app_kv WHERE k = ?`).bind('chatlink:' + id).run();
+  }
+  // Thông báo đẩy về điện thoại người đã nhắn (chạy nền, lỗi không ảnh hưởng việc lưu câu trả lời).
+  if (row.owner_id) {
+    const name = AGENT_ROSTER.find((a) => a.id === row.agent)?.name ?? row.agent;
+    const job = pushAgent(c.env, row.owner_id, row.agent, name, text, failed).catch((e) => console.error('[push] agent', e));
+    try {
+      c.executionCtx.waitUntil(job);
+    } catch {
+      await job;
+    }
   }
   return ok(c, { ok: true, files: files.length });
 });
