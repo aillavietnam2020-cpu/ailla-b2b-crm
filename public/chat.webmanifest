@@ -1,0 +1,31 @@
+{
+ "name": "Ailla Chat",
+ "short_name": "Ailla Chat",
+ "description": "Tin nhắn nội bộ AILLA Việt Nam",
+ "id": "/chat/",
+ "start_url": "/chat/",
+ "scope": "/chat/",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#ffffff",
+ "theme_color": "#ffffff",
+ "lang": "vi",
+ "icons": [
+  {
+   "src": "/chat-icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/chat-icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "/chat-icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { PriceTier, ProductItem } from '@shared/types';
 import { TIER_LABELS, TIER_ORDER, type TierCode } from '@shared/enums';
 
@@ -30,6 +30,8 @@ export function PricesPage() {
   const toast = useToast();
   const [q, setQ] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
+  // Xem từng cấp (mặc định cấp đầu) hoặc 'ALL' = so sánh mọi cấp.
+  const [view, setView] = useState<string>(TIER_ORDER[0]);
   const [editing, setEditing] = useState<{ product: ProductItem; tier: TierRow } | null>(null);
   const [adding, setAdding] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -59,7 +61,7 @@ export function PricesPage() {
     <>
       <div className="page-head">
         <div>
-          <h2>Bảng giá 8 cấp</h2>
+          <h2>Bảng giá các cấp</h2>
           <p>
             Giá hiệu lực ngày {prices.data?.date ?? '—'}. Ô "Chưa có" nghĩa là cấp đó chưa có giá và bị chặn bán.
             {canEditPrice && ' Bấm vào một ô giá để sửa.'}
@@ -102,7 +104,16 @@ export function PricesPage() {
           </label>
         </div>
 
-        <TierRulesCard canEdit={can('customer.tier.change') && onAdminSite} />
+        <div className="tier-tabs" role="tablist">
+          {PRICE_COLS.map((code) => (
+            <button key={code} role="tab" className={view === code ? 'on' : ''} onClick={() => setView(code)}>
+              {colLabel(code)}
+            </button>
+          ))}
+          <button role="tab" className={view === 'ALL' ? 'on' : ''} onClick={() => setView('ALL')}>
+            So sánh tất cả cấp
+          </button>
+        </div>
 
         <StateBlock
           loading={prices.loading}
@@ -110,6 +121,7 @@ export function PricesPage() {
           empty={products.length === 0}
           emptyText="Chưa có sản phẩm nào. Hãy import bảng giá từ file Excel hoặc bấm Thêm sản phẩm."
         >
+          {view === 'ALL' ? (
           <div className="table-wrap">
             <table className="data wide">
               <thead>
@@ -117,6 +129,7 @@ export function PricesPage() {
                   <th>Mã SKU</th>
                   <th>Tên sản phẩm</th>
                   <th>Nhóm</th>
+                  <th>Quy cách</th>
                   {PRICE_COLS.map((code) => (
                     <th key={code} className="right">
                       {colLabel(code)}
@@ -132,6 +145,7 @@ export function PricesPage() {
                     </td>
                     <td>{product.name}</td>
                     <td className="muted">{product.group_name ?? '—'}</td>
+                    <td className="muted nowrap">{quyCach(product)}</td>
                     {PRICE_COLS.map((code) => {
                       const amount = product.prices[code];
                       const eff = product.eff_prices?.[code];
@@ -171,8 +185,17 @@ export function PricesPage() {
               </tbody>
             </table>
           </div>
+          ) : (
+            <TierView
+              products={products}
+              code={view}
+              onEdit={canEditPrice && tierByCode.get(view) ? (product) => setEditing({ product, tier: tierByCode.get(view)! }) : null}
+            />
+          )}
         </StateBlock>
       </Card>
+
+      <TierRulesCard canEdit={can('customer.tier.change') && onAdminSite} />
 
       {editing && (
         <PriceEditModal
@@ -202,6 +225,100 @@ export function PricesPage() {
         />
       )}
     </>
+  );
+}
+
+/** Quy cách: mã bán theo thùng hiện "28 chai/thùng"; mã lẻ hiện đơn vị. */
+const leUnit = (p: ProductItem) => (p.per_box ? 'chai' : (p.unit ?? '').toLowerCase() || 'cái');
+function quyCach(p: ProductItem): string {
+  if (p.per_box) return `Thùng ${p.per_box}`;
+  return p.pack_size ? `${p.unit ?? ''} ${p.pack_size}`.trim() : p.unit ?? '—';
+}
+const baseSku = (sku: string) => sku.replace(/-c$/i, '').toLowerCase();
+const priceOf = (p: ProductItem | undefined, code: string) => (p ? (p.eff_prices?.[code] ?? p.prices[code] ?? null) : null);
+
+/**
+ * Bảng giá MỘT cấp (CEO 10/11): mỗi sản phẩm một dòng, gộp mã lẻ (…-C) và mã thùng; có quy cách đóng thùng,
+ * giá lẻ, giá thùng và quy ra mỗi chai / can khi mua thùng. Chia theo nhóm sản phẩm.
+ */
+function TierView({ products, code, onEdit }: { products: ProductItem[]; code: string; onEdit: ((p: ProductItem) => void) | null }) {
+  type Row = { key: string; name: string; group: string; le?: ProductItem; box?: ProductItem };
+  const rows = new Map<string, Row>();
+  for (const p of products) {
+    const k = baseSku(p.sku);
+    const r = rows.get(k) ?? { key: k, name: p.name, group: p.group_name ?? 'Khác' };
+    const isBox = !!p.per_box || (p.unit ?? '').toLowerCase().includes('thùng');
+    if (isBox && !r.box) r.box = p;
+    else if (!r.le) r.le = p;
+    else if (!r.box) r.box = p;
+    if (isBox) r.name = p.name;
+    rows.set(k, r);
+  }
+  const groups = new Map<string, Row[]>();
+  for (const r of rows.values()) groups.set(r.group, [...(groups.get(r.group) ?? []), r]);
+  const cell = (p: ProductItem | undefined) => {
+    if (!p) return <span className="muted">—</span>;
+    const v = priceOf(p, code);
+    const base = p.prices[code];
+    const txt = v === null || v === undefined ? <span className="badge orange">Chưa có</span> : <strong>{formatVnd(v)}</strong>;
+    return (
+      <>
+        {onEdit ? (
+          <button className="link-btn" onClick={() => onEdit(p)} title="Sửa giá">
+            {txt}
+          </button>
+        ) : (
+          txt
+        )}
+        {v !== base && base !== null && base !== undefined && (
+          <div>
+            <small className="muted" style={{ textDecoration: 'line-through' }}>
+              {formatVnd(base)}
+            </small>
+          </div>
+        )}
+        <div>
+          <small className="muted">{p.sku}</small>
+        </div>
+      </>
+    );
+  };
+  return (
+    <div className="table-wrap">
+      <table className="data tier-one">
+        <thead>
+          <tr>
+            <th>Sản phẩm</th>
+            <th>Quy cách đóng thùng</th>
+            <th className="right">Giá lẻ</th>
+            <th className="right">Giá thùng</th>
+            <th className="right">Quy ra mỗi chai / can (mua thùng)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...groups.entries()].map(([g, list]) => (
+            <Fragment key={g}>
+              <tr className="grp">
+                <td colSpan={5}>{g}</td>
+              </tr>
+              {list.map((r) => {
+                const n = r.box?.per_box ?? null;
+                const pb = priceOf(r.box, code);
+                return (
+                  <tr key={r.key}>
+                    <td>{r.name}</td>
+                    <td className="nowrap">{n ? `${n} ${r.le ? leUnit(r.le) : 'đơn vị'} / thùng` : r.box ? <span className="muted">chưa có số trong thùng</span> : <span className="muted">bán theo {(r.le?.unit ?? 'cái').toLowerCase()}, không đóng thùng</span>}</td>
+                    <td className="right nowrap">{cell(r.le)}</td>
+                    <td className="right nowrap">{cell(r.box)}</td>
+                    <td className="right nowrap">{n && pb ? formatVnd(Math.round(pb / n)) : <span className="muted">—</span>}</td>
+                  </tr>
+                );
+              })}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

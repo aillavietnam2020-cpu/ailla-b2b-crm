@@ -1,0 +1,14 @@
+[Unit]
+Description=Trợ lý đặt hàng nhóm Zalo (số Zalo riêng) - đẩy đơn lên web ABOS
+After=network-online.target
+
+[Service]
+EnvironmentFile=/root/.config/abos-relay.env
+ExecStart=/usr/bin/node /usr/local/lib/zalo-dat-hang/zalo-dat-hang.mjs
+Restart=always
+RestartSec=30
+# Mã 3: số này đang mở Zalo web ở nơi khác (bị đá ra). Không chạy lại liên tục để tránh bị Zalo nghi ngờ.
+RestartPreventExitStatus=3
+
+[Install]
+WantedBy=default.target

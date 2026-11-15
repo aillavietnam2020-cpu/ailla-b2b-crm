@@ -103,6 +103,20 @@ describe('Nhập nhanh link video', () => {
     expect(d.notifs[0].text).toContain('gửi duyệt 2 video');
   });
 
+  it('người phụ dựng chọn Người làm: video tính cho người làm thật, không phải người được giao dòng', async () => {
+    const r = await ctx.request('/api/hub/video-links', {
+      as: USERS.manager,
+      body: { kenh: 'TikTok chính', items: [{ url: L('1newNEWnew07'), sp: 'AR', to: 'TT-0771', nguoi: 'u_lead' }, { url: L('1newNEWnew08'), sp: 'AR', nguoi: 'khong-co' }] },
+    });
+    expect(r.body.data.saved).toBe(2);
+    const d = await hub();
+    const c = (id: string) => d.cards.find((x: any) => x.id === id);
+    expect(c('TT-0771').nguoiEdit).toBe('u_lead');
+    expect(c('TT-0771').nguoiLam).toBe('u_lead');
+    expect(JSON.stringify(c('TT-0771').history)).toContain('dòng giao cho Nhân sự Content');
+    expect(c('TT-0770').nguoiEdit).toBe('u_q');
+  });
+
   it('người ngoài team Content không nhập được', async () => {
     const d = await hub();
     d.users[0].role = 'sale';
@@ -137,7 +151,9 @@ describe('Nhập nhanh link video', () => {
     );
     expect(res.status).toBe(200);
     const d = await hub();
-    expect(d.cards.find((x: any) => x.id === 'TT-0771')).toMatchObject({ step: 'dvd', linkVideo: L('1newNEWnew09') });
+    // Không chọn kênh (chị Hoa 07/11): không tự xếp kênh, vào Kho video · Chưa phân bổ, chờ duyệt V1.
+    expect(d.cards.find((x: any) => x.id === 'TT-0771').linkVideo).toBeFalsy();
+    expect(d.kho.find((k: any) => k.link === L('1newNEWnew09'))).toMatchObject({ sku: 'AR', choDuyet: true, trangThai: 'Chưa dùng' });
     expect(d.notifs[0].text).toMatch(/(qua .*Lead Content)/);
   });
 });

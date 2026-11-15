@@ -15,7 +15,7 @@ const kpbName=pb=>((kpbDepts().find(p=>p.k===pb)||{}).n)||TEAMS[KPB_TEAM[pb]]||p
 const kpbTeam=pb=>KPB_TEAM[pb]||String(pb).toLowerCase().replace(/[^a-z0-9_-]/g,"");
 const kpbAll=()=>!!ME&&(ME.role==="admin"||ME.phongBan==="BDH");
 const kpbMembers=pb=>D().users.filter(u=>u.active&&u.name&&(u.phongBan===pb||(!u.phongBan&&teamOf(u)===kpbTeam(pb))));
-const kpbPrj=T=>(D().projects||[]).filter(p=>p.team===T||(p.teams||[]).includes(T));
+const kpbPrj=T=>(D().projects||[]).filter(p=>p.team===T||p.team==="chung"||(p.teams||[]).includes(T));
 function kpbItems(pb){const T=kpbTeam(pb),ids=new Set(kpbMembers(pb).map(u=>u.id));
   return cvItems().filter(x=>x.team===T||(x.src==="task"&&ids.has(x.nguoi))).filter(x=>!CV_TEST.includes(x.nguoi))}
 /* SOP hay biểu mẫu: theo tên tài liệu (Mẫu…, Biểu mẫu…, Template…) */

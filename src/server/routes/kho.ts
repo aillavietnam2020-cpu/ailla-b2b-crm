@@ -37,6 +37,7 @@ import {
 import { khoDoiChieu, khoMocMap, khoTonRows, type KhoTonRow } from '../services/khoTon';
 import { accountantIds, approverIds, taskStatements } from '../lib/notifyTasks';
 import { bellTo } from '../lib/hubBell';
+import { loadAccRules } from './accRules';
 import { unpack } from '../lib/pack';
 
 /**
@@ -1095,40 +1096,42 @@ khoRoutes.post('/items/:code/merge', async (c) => {
 
 /** Yêu cầu pha chế mới (chị Hoa 06/11, pha theo bồn, riêng với phiếu sản xuất): sinh việc + chuông cho kỹ thuật pha chế.
  * Việc tự xong khi kỹ thuật ghi phiếu pha chế gắn mã yêu cầu đó. */
+/** Tài khoản kỹ thuật pha chế (anh Hội): việc về pha chế, kỹ thuật, nguyên vật liệu đều nhắc người này (chị Hoa 07/11). */
+async function kyThuatIds(db: D1Database): Promise<string[]> {
+  try {
+    const row = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
+    const d = row ? (JSON.parse(await unpack(row.data)) as { users?: Array<{ crm?: string; perms?: string[]; active?: boolean }> }) : {};
+    return [...new Set((d.users ?? []).filter((u) => u.active !== false && u.crm && (u.perms ?? []).includes('sx.kythuat') && !(u.perms ?? []).includes('sx.dieuphoi') && !(u.perms ?? []).includes('sx.kiemke')).map((u) => u.crm as string))];
+  } catch {
+    return [];
+  }
+}
+
 khoRoutes.post('/pc-notify', async (c) => {
   const auth = c.get('auth');
   const b = (await c.req.json().catch(() => null)) as { items?: Array<Record<string, unknown>> } | null;
   const items = (Array.isArray(b?.items) ? b!.items : []).slice(0, 50);
   // Người nhận: tài khoản chỉ làm kỹ thuật (có sx.kythuat, không phải điều phối / kế toán kho, vì quyền mặc định của CEO, kế toán cũng có sx.kythuat).
   // Quyền "Kỹ thuật pha chế" (sx.kythuat) đặt ở hồ sơ người dùng web chung (hub_state main, users[].perms), nối tài khoản qua users[].crm.
-  let ids: string[] = [];
-  try {
-    const row = await c.env.DB.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
-    const d = row ? (JSON.parse(await unpack(row.data)) as { users?: Array<{ crm?: string; perms?: string[]; active?: boolean }> }) : {};
-    ids = [...new Set((d.users ?? []).filter((u) => u.active !== false && u.crm && (u.perms ?? []).includes('sx.kythuat') && !(u.perms ?? []).includes('sx.dieuphoi') && !(u.perms ?? []).includes('sx.kiemke')).map((u) => u.crm as string))];
-  } catch {
-    ids = [];
-  }
+  const ids = await kyThuatIds(c.env.DB);
   if (!ids.length) return ok(c, { sent: 0, no_kythuat: true });
   const now = nowIso();
   let sent = 0;
   for (const it of items) {
     const psx = String(it.psx ?? '').trim().slice(0, 40);
     if (!psx) continue;
-    const open = await c.env.DB.prepare("SELECT 1 FROM tasks WHERE status = 'OPEN' AND title LIKE ?").bind(`Pha chế theo yêu cầu ${psx}:%`).first();
-    if (open) continue;
-    const title = `Pha chế theo yêu cầu ${psx}: ${String(it.name ?? '').slice(0, 120)}${it.sl ? ` · ${it.sl}` : ''}${it.han ? ` · hạn ${it.han}` : ''}. Pha xong vào Kho – Sản xuất › Pha chế, bấm Nhập số thực tế.`;
-    // Hạn của việc = hạn cần của yêu cầu (17:00 giờ VN) để việc nhắc và báo trễ đúng ngày.
-    const due = /^\d{4}-\d{2}-\d{2}$/.test(String(it.han_iso ?? '')) ? `${String(it.han_iso)}T10:00:00.000Z` : now;
-    const st = taskStatements(c.env.DB, ids, { title, createdBy: auth.user.id, now, priority: 'HIGH', dueAt: due });
-    if (st.length) await c.env.DB.batch(st);
+    const title = `Pha chế theo yêu cầu ${psx}: ${String(it.name ?? '').slice(0, 120)}${it.sl ? ` · ${it.sl}` : ''}${it.han ? ` · hạn ${it.han}` : ''}. Mở Công việc, pha xong bấm Ghi số thực tế.`;
+    // 07/11 chị Hoa: việc pha chế giao vào Công việc (trình duyệt người tạo yêu cầu ghi vào bản chung), không tạo việc CRM nữa
+    // vì việc CRM hiện thành "việc chăm sóc khách". Ở đây chỉ báo chuông.
+    void now;
+    void auth;
     await bellTo(c.env.DB, ids, title, 'kho_pc').catch(() => 0);
     sent++;
   }
   return ok(c, { sent, no_kythuat: false });
 });
 
-/** Thiếu vật tư khi tạo yêu cầu pha chế / phiếu sản xuất (chị Hoa 06/11): sinh việc + chuông cho người phụ trách mua hàng
+/** Thiếu vật tư khi tạo yêu cầu pha chế / phiếu sản xuất (chị Hoa 06/11): sinh việc + chuông cho người phụ trách mua hàng và kỹ thuật pha chế
  * (Trưởng phòng, quản lý duyệt đơn) để đặt hàng hoặc tra xem tồn lệch ở đâu. */
 khoRoutes.post('/shortage-task', async (c) => {
   const auth = c.get('auth');
@@ -1141,7 +1144,9 @@ khoRoutes.post('/shortage-task', async (c) => {
   const ceo = new Set(
     ((await c.env.DB.prepare("SELECT id FROM users WHERE role = 'CEO'").all<{ id: string }>()).results ?? []).map((x) => x.id),
   );
-  const ids = all.filter((x) => !ceo.has(x)).length ? all.filter((x) => !ceo.has(x)) : all;
+  const mua = all.filter((x) => !ceo.has(x)).length ? all.filter((x) => !ceo.has(x)) : all;
+  // Thiếu nguyên vật liệu: nhắc cả kỹ thuật pha chế (chị Hoa 07/11: việc pha chế, kỹ thuật, nguyên vật liệu thì nhắc anh Hội).
+  const ids = [...new Set([...mua, ...(await kyThuatIds(c.env.DB))])];
   const txt = lines
     .map((l) => `${String(l.name ?? l.item).slice(0, 60)} thiếu ${Number(l.thieu ?? 0).toLocaleString('vi-VN')} ${String(l.unit ?? '')}`.trim())
     .join('; ');
@@ -1548,6 +1553,10 @@ khoRoutes.post('/docs', async (c) => {
   if (boSung && !isCeo(auth) && !auth.permissions.includes('sx.kiemke') && !canEditMap(auth)) throw forbidden('Chỉ kế toán kho, mua hàng, kế toán hoặc CEO lập phiếu kiểm tồn');
   if (!isDate(b.date)) throw badRequest('BAD_DATE', 'Ngày phiếu không đúng');
   const date = b.date;
+  // Quy tắc kế toán (quản trị › Cấu hình › Quy tắc kế toán, 07/11): khóa sổ, cho / không cho xuất âm kho.
+  const accRules = await loadAccRules(c.env.DB);
+  if (accRules.lock_date && date <= accRules.lock_date)
+    throw conflict('SO_DA_KHOA', `Sổ kho đã khóa đến hết ngày ${ddmm(accRules.lock_date)}. Phiếu phải có ngày sau ngày khóa sổ (CEO hoặc Kế toán mở khóa ở Quy tắc kế toán).`);
   const mocChung = type === 'TD' ? await khoMocChung(c.env.DB) : null;
   if (boSung) {
     if (!mocChung) throw badRequest('NO_MOC', 'Chưa có phiếu tồn chốt chung (mốc tồn). CEO nạp phiếu chốt trước, sau đó mới kiểm bổ sung.');
@@ -1601,7 +1610,7 @@ khoRoutes.post('/docs', async (c) => {
     for (const l of lines) {
       const code = String(l.item ?? '');
       const it = need(code);
-      if (type === 'PN' && !['NVL', 'HH', 'CCDC'].includes(it.cls)) {
+      if (type === 'PN' && !['NVL', 'BTP', 'HH', 'CCDC'].includes(it.cls)) {
         warnings.push(`${code} (${it.name}) không phải nguyên vật liệu / hàng hóa mua về`);
       }
       const price = boSung && !canPrice(auth) ? Number.NaN : num(l.price);
@@ -1647,6 +1656,9 @@ khoRoutes.post('/docs', async (c) => {
     const btp = String(b.btp ?? '');
     const it = need(btp);
     if (it.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp} không phải bán thành phẩm`);
+    // 07/11 chị Hoa: phiếu pha chế chỉ theo công thức của Kỹ thuật (Pha chế › Công thức), không theo định mức. Chưa có công thức thì phải nhập trước.
+    const ct = await c.env.DB.prepare("SELECT 1 FROM pc_recipe WHERE btp = ? AND status = 'OK'").bind(btp).first();
+    if (!ct) throw badRequest('NO_CT', `${it.name} chưa có công thức pha. Nhập công thức ở Pha chế › Công thức rồi mới ghi phiếu pha chế.`);
     const liters = positive(b.liters, 'Số lít thực tế');
     if (!lines.length) throw badRequest('NO_LINES', 'Cần ghi số thực tế của từng nguyên vật liệu đã dùng');
     extra.btp = btp;
@@ -1771,6 +1783,8 @@ khoRoutes.post('/docs', async (c) => {
       const after = round((have.get(code) ?? 0) + moves.filter((m) => m.item === code).reduce((s, m) => s + m.qty, 0));
       if (after < 0) warnings.push(`${code} (${items.get(code)?.name}) sẽ âm kho: còn ${have.get(code) ?? 0}, sau phiếu này ${after}.`);
     }
+    const amWarn = warnings.filter((w) => w.includes('sẽ âm kho'));
+    if (amWarn.length && !accRules.allow_negative) throw conflict('AM_KHO', `Quy tắc kế toán đang không cho xuất âm kho. ${amWarn.join(' ')}`);
   }
 
   // Sửa phiếu nhập (chị Hoa 02/11: kế toán kho lỡ lưu khi chưa nhập đủ, không có nút sửa): ghi phiếu mới, phiếu cũ tự hủy cùng lúc,
@@ -1809,7 +1823,7 @@ khoRoutes.post('/docs', async (c) => {
   let no = '';
   for (let attempt = 0; attempt < 4 && !docId; attempt++) {
     const row = await c.env.DB.prepare(
-      'SELECT COUNT(*) AS n FROM kho_docs WHERE type = ? AND no LIKE ?',
+      'SELECT MAX(CAST(substr(no, instr(no, char(45)) + 1) AS INTEGER)) AS n FROM kho_docs WHERE type = ? AND no LIKE ?',
     )
       .bind(type, `${type}${ym}-%`)
       .first<{ n: number }>();
@@ -1917,7 +1931,8 @@ khoRoutes.post('/docs', async (c) => {
   }
   if (type === 'KS' && Array.isArray(extra.no_bom) && extra.no_bom.length) {
     try {
-      const ids = await accountantIds(c.env.DB);
+      // Kế toán khai định mức (chị Hoa 06/11) + nhắc kỹ thuật pha chế vì định mức là việc kỹ thuật (07/11).
+      const ids = [...new Set([...(await accountantIds(c.env.DB)), ...(await kyThuatIds(c.env.DB))])];
       const now = nowIso();
       for (const x of extra.no_bom as Array<{ code: string }>) {
         const nm = items.get(x.code)?.name ?? x.code;
@@ -1946,6 +1961,11 @@ khoRoutes.post('/docs/:id/cancel', async (c) => {
   if (!doc) throw notFound('Không tìm thấy phiếu');
   if (doc.status !== 'OK') throw conflict('ALREADY', 'Phiếu này đã hủy rồi');
   if (doc.type === 'TD' && !isCeo(auth)) throw forbidden('Chỉ CEO hủy phiếu tồn đầu kỳ');
+  {
+    const lk = (await loadAccRules(c.env.DB)).lock_date;
+    const dd = lk ? (await c.env.DB.prepare('SELECT doc_date FROM kho_docs WHERE id = ?').bind(id).first<{ doc_date: string }>())?.doc_date : null;
+    if (lk && dd && dd <= lk) throw conflict('SO_DA_KHOA', `Sổ kho đã khóa đến hết ngày ${ddmm(lk)}, không hủy được phiếu ngày ${ddmm(dd)}.`);
+  }
   // Phiếu nhập đã gắn phiếu mua: hủy thì phiếu mua trả về chưa nhận (trừ khi đã vào hóa đơn nhà cung cấp).
   const linked = doc.type === 'PN'
     ? (await c.env.DB.prepare("SELECT id, po_id FROM po_receipts WHERE kho_doc_id = ? AND status = 'OK'").bind(id).all<{ id: string; po_id: string }>()).results

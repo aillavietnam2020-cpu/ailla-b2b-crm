@@ -54,12 +54,12 @@ export function App() {
   const goHub =
     hasHub &&
     (justLoggedIn ||
-      (next && /^\/hub\/[\w\-./?=&#]*$/.test(next)) ||
+      (next && /^\/(hub|chat)\/[\w\-./?=&#]*$/.test(next)) ||
       location.pathname === '/' ||
       (hubOnly && !location.pathname.endsWith('/account')));
   if (goHub) {
     // Giữ phần #lo=... của mã QR tem để mở đúng lô sau khi đăng nhập.
-    window.location.replace((next && next.startsWith('/hub/') ? next : '/hub/') + window.location.hash);
+    window.location.replace((next && (next.startsWith('/hub/') || next.startsWith('/chat/')) ? next : '/hub/') + window.location.hash);
     return <div className="loading" style={{ paddingTop: 80 }}>Đang mở Trang quản trị…</div>;
   }
 

@@ -91,7 +91,8 @@ const LIST = new Map<string, { v: DriveFile[]; at: number }>();
 
 export async function meta(key: SaKey, id: string): Promise<DriveMeta | null> {
   const hit = META.get(id);
-  if (hit && Date.now() - hit.at < 600_000) return hit.v;
+  // Không đọc được (chưa chia sẻ) chỉ nhớ 30 giây: chia sẻ xong là web thấy ngay.
+  if (hit && Date.now() - hit.at < (hit.v ? 600_000 : 30_000)) return hit.v;
   const f = await get<DriveFile>(key, `${API}/files/${encodeURIComponent(id)}?fields=id,name,parents,trashed&${COMMON}`);
   const v = f && !(f as { trashed?: boolean }).trashed ? { name: f.name, parents: f.parents ?? [] } : null;
   if (META.size > 5000) META.clear();
@@ -194,6 +195,28 @@ export async function thumbnail(key: SaKey, fileId: string, size = 400): Promise
   const url = f.thumbnailLink.replace(/=s\d+$/, `=s${size}`);
   const r = await fetch(url, { headers: { Authorization: `Bearer ${await accessToken(key)}` } });
   return r.ok ? r : null;
+}
+
+/**
+ * Phát video ngay trên web (nút "Xem" ở Duyệt video, chị Hoa 07/11/2026): chuyển tiếp dữ liệu từ Drive, giữ yêu cầu
+ * "Range" để trình duyệt tua được. Chỉ nhận file video; file khác trả null.
+ */
+export async function streamVideo(key: SaKey, fileId: string, range: string | null): Promise<Response | null> {
+  const f = await get<{ mimeType: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=mimeType&${COMMON}`);
+  if (!f || !f.mimeType.startsWith('video/')) return null;
+  const h: Record<string, string> = { Authorization: `Bearer ${await accessToken(key)}` };
+  if (range && /^bytes=\d*-\d*$/.test(range)) h.Range = range;
+  const r = await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, { headers: h });
+  if (!r.ok && r.status !== 206) {
+    console.error('[drive] video', r.status);
+    return null;
+  }
+  const out = new Headers({ 'Content-Type': f.mimeType, 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=600', 'Content-Disposition': 'inline' });
+  for (const k of ['Content-Length', 'Content-Range']) {
+    const v = r.headers.get(k);
+    if (v) out.set(k, v);
+  }
+  return new Response(r.body, { status: r.status, headers: out });
 }
 
 /** Tải file gốc (đúng độ phân giải, đúng dung lượng như trên Drive). File Google Docs / Sheets / Slides không có bản gốc để tải: trả null. */

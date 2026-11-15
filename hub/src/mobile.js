@@ -257,7 +257,7 @@
 (function(){
   if(typeof window==="undefined"||!window.matchMedia)return;
   let busy=false;
-  const editing=()=>{const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&(a.value||"").length>0)return true;
+  const editing=()=>{if(typeof svTyping==="function"&&svTyping())return true;const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&(a.value||"").length>0)return true;
     return [...document.querySelectorAll("textarea")].some(t=>(t.value||"").trim().length>2)};
   const check=async()=>{
     if(busy||document.hidden||typeof BUILD_ID==="undefined")return;busy=true;
@@ -286,6 +286,7 @@
     raf=0;
     const bar=document.getElementById("mobtab");
     if(!bar||!narrow.matches||document.hidden)return;
+    if(!bar.offsetHeight||getComputedStyle(bar).display==="none"){if(dy){dy=0;bar.style.transform=""}return} // thanh đang ẩn (mở menu, xem phiếu): không đo
     const v=window.visualViewport;
     if(v&&v.scale>1.05)return; // đang phóng to bằng 2 ngón: để yên
     const ih=window.innerHeight,ch=document.documentElement.clientHeight,vh=v?v.height+v.offsetTop:ih;
@@ -333,4 +334,193 @@
       `<section class="card"><div class="cnl">${L.map(i=>`<button type="button" class="cni" data-cn="${esc(i[0])}"><span><b>${esc(i[1])}</b>${sub[i[0]]?`<small>${sub[i[0]]}</small>`:""}</span><i>›</i></button>`).join("")}</div></section>`;
     m.querySelectorAll("[data-cn]").forEach(b=>b.onclick=()=>{MOD="me";PAGE=b.dataset.cn;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0)}); /* như menu ảnh đại diện: mục Của tôi */
   };
+})();
+
+/* ===== Điện thoại: xem / in / tải phiếu kho (phiếu pha chế, phiếu sản xuất, phiếu nhập xuất…) — chị Hoa 07/11.
+   Máy tính giữ như cũ (mở trang A4 rồi in). Điện thoại: mở màn xem phiếu ngay trong web, chữ to, mỗi dòng hàng thành 1 thẻ;
+   thanh trên có "Tải về máy" (lưu file phiếu để mở lại trên điện thoại) và "In / lưu PDF". ===== */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia||typeof khoShowPrint!=="function")return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  /* Bản rút gọn trên màn điện thoại (chị Hoa 07/11): mỗi dòng hàng 2 dòng — tên đậm + số chính (kèm đơn vị) bên phải; dòng nhỏ mã · định mức;
+     thực tế / chênh lệch chỉ hiện khi có số. Chỉ áp cho màn hình hẹp; in A4 / PDF vẫn đủ cột như cũ (không đổi chữ trong phiếu, chỉ thêm thuộc tính). */
+  const MCSS="<style id=\"mpvcss\">@media screen and (max-width:760px){html{background:#fff!important}body{max-width:none!important;margin:0!important;padding:10px 10px 24px!important;box-shadow:none!important;font-size:14px!important}"+
+    ".top{gap:8px!important;padding-bottom:6px!important;border-bottom-width:2px!important}.top img{height:28px!important}.co b{font-size:10px!important}.co span{display:none}.no b{font-size:12.5px!important}.no span{font-size:10px!important}"+
+    "h1{font-size:16px!important;margin:8px 0 2px!important}.st{margin:0 0 8px!important}.st i{font-size:10.5px!important}"+
+    ".meta{grid-template-columns:1fr!important;margin-bottom:10px!important}.meta div{padding:4px 10px!important;font-size:13px}.meta label{min-width:0!important;flex:1}.meta b{text-align:right}"+
+    "table,thead,tbody,tfoot{display:block!important;width:auto!important}thead{display:none!important}"+
+    "tbody tr,tfoot tr{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:1px 10px;border:0;border-bottom:1px solid #e4e8f5;padding:8px 2px;background:none!important}"+
+    "tbody tr td,tfoot tr td{display:none!important;border:0!important;padding:0!important;background:none!important;height:auto!important;min-height:0!important;min-width:0!important}"+
+    "td[data-k=nm]{display:block!important;grid-column:1;grid-row:1;font-weight:700;font-size:14px}"+
+    "td[data-k=q]{display:block!important;grid-column:2;grid-row:1;font-weight:700;text-align:right!important;white-space:nowrap}"+
+    "td[data-k=q]::after,td[data-k=tt]::after{content:\" \" attr(data-u);font-weight:400;color:#667085;font-size:12px}"+
+    "td[data-k=ma]{display:block!important;grid-column:1/-1;grid-row:2;font-size:11.5px;color:#667085}td[data-k=ma]::after{content:attr(data-dm)}"+
+    "td[data-k=tt].v,td[data-k=cl].v{display:block!important;grid-row:3;font-size:12.5px}td[data-k=tt].v{grid-column:1}td[data-k=cl].v{grid-column:2;text-align:right!important}"+
+    "td[data-k=tt].v::before{content:\"Thực tế \";color:#667085}td[data-k=cl].v::before{content:\"Lệch \";color:#667085}"+
+    "td[data-k=gc].v{display:block!important;grid-column:1/-1;font-size:12px;color:#667085}"+
+    "tr.pr{background:#fff0f6!important;border-radius:8px;padding:8px!important}tr.lech td[data-k=cl]{color:#b54708;font-weight:700}"+
+    "tfoot tr td.n{display:block!important;grid-column:2;font-weight:700}"+
+    "tr.em{display:none!important}"+".note,.can{font-size:13px}.sig{display:none!important}.foot{margin-top:10px!important}}</style>";
+  const label=doc=>{doc.querySelectorAll("table").forEach(t=>{const hr=t.tHead&&t.tHead.rows[0];if(!hr)return;const H=[...hr.cells].map(c=>c.textContent.trim());
+    const K={"Tên hàng":"nm","Nguyên vật liệu":"nm","Sản phẩm":"nm","Tên":"nm","Mã hàng":"ma","Mã":"ma","Định lượng":"q","Số lượng":"q","Cần dùng":"q","Thực tế":"tt","Chênh lệch":"cl","Ghi chú":"gc","ĐVT":"u","Định mức":"dm"};
+    const hasDl=H.includes("Định lượng");
+    [...t.querySelectorAll("tbody tr,tfoot tr")].forEach(r=>{let i=0;const C={};[...r.cells].forEach(c=>{const h=H[i]||"";c.setAttribute("data-l",h);let k=K[h]||"";if(k==="q"&&h==="Số lượng"&&hasDl)k="";if(k){c.setAttribute("data-k",k);C[k]=c}i+=c.colSpan||1});
+      const u=C.u?C.u.textContent.trim():"";const val=c=>{const v=(c&&c.textContent||"").trim();return v&&v!=="—"&&v!=="-"};
+      if(C.q)C.q.setAttribute("data-u",u);if(C.tt)C.tt.setAttribute("data-u",u);
+      if(C.ma&&C.dm&&val(C.dm))C.ma.setAttribute("data-dm"," · định mức "+C.dm.textContent.trim()+(hasDl?"/lít":""));
+      ["tt","cl","gc"].forEach(k=>{if(C[k]&&val(C[k])&&!C[k].classList.contains("fill"))C[k].classList.add("v")});
+      if(!C.nm||!(C.nm.textContent||"").trim())r.classList.add("em"); // dòng trống để ghi tay: ẩn trên màn điện thoại
+      if(!C.q&&C.nm){const q=[...r.cells].find(c=>c.classList.contains("n")&&val(c));if(q){q.setAttribute("data-k","q");q.setAttribute("data-u",u)}}
+    })})};
+  const nameOf=html=>{const m=/<title>([^<]*)<\/title>/i.exec(html);return ((m&&m[1])||"phieu").replace(/[\\/:*?"<>|]+/g,"-").trim()||"phieu"};
+  const close=()=>{const o=document.getElementById("mpv");if(o)o.remove();document.body.classList.remove("mpv-open")};
+  function view(html){
+    const h2=/<\/head>/i.test(html)?html.replace(/<\/head>/i,MCSS+"</head>"):MCSS+html;
+    close();
+    const o=document.createElement("div");o.id="mpv";
+    o.innerHTML=`<div class="mpvbar"><button type="button" data-a="x" aria-label="Đóng">✕</button><b>${esc(nameOf(html))}</b><button type="button" data-a="dl">Tải về máy</button><button type="button" data-a="pr">In / PDF</button></div><iframe title="Phiếu"></iframe>`;
+    document.body.appendChild(o);document.body.classList.add("mpv-open");
+    const f=o.querySelector("iframe");
+    f.onload=()=>{try{label(f.contentDocument)}catch(e){}};
+    f.srcdoc=h2;
+    o.querySelector("[data-a=x]").onclick=close;
+    o.querySelector("[data-a=pr]").onclick=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){toast("Chưa in được, thử bấm lại")}};
+    o.querySelector("[data-a=dl]").onclick=()=>{
+      let out=h2;try{label(f.contentDocument);out="<!doctype html>\n"+f.contentDocument.documentElement.outerHTML}catch(e){}
+      try{const b=new Blob([out],{type:"text/html;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=nameOf(html)+".html";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},4000);toast("Đã tải phiếu về máy. Mở trong mục Tệp / Tải về để xem.")}catch(e){toast("Chưa tải được, thử lại")}
+    };
+  }
+  const orig=khoShowPrint;
+  khoShowPrint=function(html){if(!narrow.matches)return orig(html);view(html)};
+})();
+/* Phiếu pha chế trên điện thoại: hiện tên bán thành phẩm dưới ô mã (ô chỉ hiện mã, khó nhận ra) */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const fix=()=>{if(!narrow.matches)return;const b=document.getElementById("kf-btp");if(!b)return;
+    let n=document.getElementById("kf-btpnm");const c=b.dataset.code||b.value;const it=(typeof KHO!=="undefined"&&KHO.items&&KHO.items.get(c))||null;
+    const t=it?it.name:"";if(!n){n=document.createElement("small");n.id="kf-btpnm";n.className="hint";n.style.cssText="display:block;margin-top:3px;font-weight:600;color:var(--ink)";b.insertAdjacentElement("afterend",n)}
+    if(n.textContent!==t)n.textContent=t};
+  let t=0;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(fix,150)}).observe(document.body,{childList:true,subtree:true});
+  document.addEventListener("input",e=>{if(e.target&&e.target.id==="kf-btp")setTimeout(fix,200)},true);
+})();
+/* Ailla Chat (chị Hoa duyệt demo 08/11): địa chỉ /chat/ mở thẳng Tin nhắn toàn màn hình như Messenger, có biểu tượng riêng ngoài màn hình chính (không lên store).
+   Trên web vanhanh ở điện thoại: bấm 💬 hay mở Tin nhắn thì sang /chat/ (Android đã cài thì mở trong ứng dụng). */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const standalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+  /* chữ gợi ý ngắn như Messenger: chữ dài làm ô nhập cao 5 dòng trên điện thoại */
+  const ph=()=>{if(!narrow.matches)return;const i=document.getElementById("tnin");if(i&&i.placeholder!=="Nhắn tin"){i.placeholder="Nhắn tin";i.style.height="auto";i.style.height=Math.min(i.scrollHeight,140)+"px"}const q=document.getElementById("tnq");if(q)q.placeholder="Tìm kiếm"};
+  {const _rm=renderMain;renderMain=function(){const r=_rm.apply(this,arguments);try{ph();if(window.CHAT_APP)chatDress();else if(typeof PAGE!=="undefined"&&PAGE==="tinnhan"&&window.__chCard)window.__chCard()}catch(e){}return r}}
+  if(!window.CHAT_APP){
+    /* web thường trên điện thoại: chuyển Tin nhắn sang Ailla Chat */
+    let first=true,prev="";
+    const go=()=>{try{location.href="/chat/"}catch(e){}};
+    document.addEventListener("click",e=>{const c=e.target&&e.target.closest&&e.target.closest("#chatbtn");if(c&&narrow.matches&&ME){e.preventDefault();e.stopImmediatePropagation();go()}},true);
+    /* Web vận hành (máy tính và điện thoại): trong Tin nhắn có thẻ "Cài Ailla Chat" dẫn sang /chat/ để cài (CEO 10/11: trước chỉ hiện trong /chat/ nên không ai thấy). */
+    const card=()=>{let hid=false;try{hid=localStorage.getItem("chat_inst")==="1"||localStorage.getItem("chat_inst_x")===new Date().toDateString()}catch(e){}
+      const side=document.querySelector(".tn .tnside");if(hid||standalone()||!side||document.getElementById("chinst"))return;const q=side.querySelector(".tnq");if(!q)return;
+      q.insertAdjacentHTML("afterend",`<div id="chinst"><img src="/chat-icon-192.png" alt=""><span><b>Cài Ailla Chat</b><small>Biểu tượng riêng ngoài màn hình, bấm là vào thẳng tin nhắn</small></span><a class="btn pri sm" href="/chat/?cai=1">Cài</a><button type="button" class="chx" data-x aria-label="Ẩn">✕</button></div>`);
+      document.querySelector("#chinst [data-x]").onclick=()=>{try{localStorage.setItem("chat_inst_x",new Date().toDateString())}catch(e){}const c=document.getElementById("chinst");if(c)c.remove()}};
+    window.__chCard=card;setInterval(()=>{try{if(typeof PAGE!=="undefined"&&PAGE==="tinnhan"&&ME)card()}catch(e){}},1500);
+    const _r=render;render=function(){
+      if(narrow.matches&&ME&&PAGE==="tinnhan"&&!first&&prev!=="tinnhan"){prev=PAGE;go();return}
+      first=false;prev=PAGE;const r=_r.apply(this,arguments);try{ph();if(PAGE==="tinnhan")card()}catch(e){}return r};
+    return;
+  }
+  document.documentElement.classList.add("chatapp");document.body.classList.add("chatapp");
+  /* không ghi "đang ở Tin nhắn" vào bộ nhớ của tab: bấm về web không bị mở lại Tin nhắn */
+  try{if(typeof VIEW_KEY!=="undefined")sessionStorage.removeItem(VIEW_KEY)}catch(e){}
+  if(typeof saveView==="function")saveView=function(){};
+  let started=false;
+  const _r=render;render=function(){
+    if(ME&&PAGE!=="tinnhan"){
+      /* đang ở Ailla Chat mà mở trang khác (thẻ việc, thông báo…): sang web vanhanh đúng trang đó */
+      if(started&&PAGE){const p=PAGE;PAGE="tinnhan";location.href="/hub/#go="+encodeURIComponent(p);return}
+      PAGE="tinnhan";MOD="";
+    }
+    started=!!ME;const r=_r.apply(this,arguments);try{ph();chatDress()}catch(e){}return r};
+  /* nút quay lại của điện thoại: đang trong cuộc chat thì về danh sách, không thoát ứng dụng */
+  const _open=tnOpen;tnOpen=function(room){const wasOpen=TN.mob&&document.querySelector(".tn.open");const r=_open.apply(this,arguments);if(!wasOpen)try{history.pushState({tnc:1},"")}catch(e){}return r};
+  window.addEventListener("popstate",()=>{const t=document.querySelector(".tn.open");if(t){TN.mob=false;t.classList.remove("open")}});
+  let BIP=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();BIP=e;try{chatDress()}catch(er){}});
+  window.addEventListener("appinstalled",()=>{BIP=null;try{localStorage.setItem("chat_inst","1")}catch(e){}const b=document.getElementById("chinst");if(b)b.remove()});
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent),xiaomi=/Redmi|Xiaomi|MIUI|HyperOS|\bM2\d{3}/i.test(navigator.userAgent);
+  function guide(){
+    const o=document.createElement("div");o.id="chguide";
+    const step=(n,t)=>`<li><i>${n}</i><span>${t}</span></li>`;
+    o.innerHTML=`<div class="chgbox"><div class="chgh"><img src="/chat-icon-192.png" alt=""><div><b>Cài Ailla Chat</b><small>Thêm biểu tượng ra màn hình chính, bấm là vào thẳng tin nhắn</small></div><button type="button" data-x aria-label="Đóng">✕</button></div>
+      ${ios?`<p class="chgt">iPhone (mở bằng Safari)</p><ol>${step(1,"Bấm nút <b>Chia sẻ</b> (ô vuông có mũi tên lên) ở thanh dưới Safari")}${step(2,"Kéo xuống, chọn <b>Thêm vào MH chính</b>")}${step(3,"Bấm <b>Thêm</b>. Biểu tượng Ailla Chat hiện ngoài màn hình")}${step(4,"Mở Ailla Chat từ biểu tượng đó, đăng nhập một lần là xong")}</ol><p class="hint">Nếu đang mở bằng Chrome hay Zalo trên iPhone: chép địa chỉ <b>${esc(location.host)}/chat/</b> sang Safari rồi làm như trên.</p>`
+      :`<p class="chgt">Android (Chrome)</p><ol>${step(1,"Bấm nút <b>⋮</b> góc trên bên phải Chrome")}${step(2,"Chọn <b>Thêm vào màn hình chính</b> (hoặc <b>Cài đặt ứng dụng</b>)")}${step(3,"Bấm <b>Cài đặt</b> / <b>Thêm</b>")}</ol>
+        ${xiaomi?`<p class="chgt">Máy Redmi / Xiaomi: nếu không thấy biểu tượng</p><ol>${step(1,"Mở <b>Cài đặt</b> › <b>Ứng dụng</b> › <b>Chrome</b> › <b>Quyền khác</b>")}${step(2,"Bật <b>Lối tắt trên màn hình chính</b> rồi cài lại")}${step(3,"Để nhận báo tin nhắn: Chrome › <b>Tiết kiệm pin</b> › chọn <b>Không giới hạn</b>")}</ol>`:""}`}
+    </div>`;
+    o.onclick=e=>{if(e.target===o||e.target.closest("[data-x]"))o.remove()};document.body.appendChild(o)}
+  if(/[?&]cai=1/.test(location.search)){try{history.replaceState(null,"","/chat/")}catch(e){}setTimeout(()=>{if(standalone())return;if(BIP){const b=document.querySelector("#chinst [data-i]");if(b){b.scrollIntoView({block:"center"});b.classList.add("pulse")}}else guide()},1800)}
+  function chatDress(){
+    const sh=document.querySelector(".tn .tnsh");if(!sh)return;
+    if(!sh.querySelector(".chweb")){sh.insertAdjacentHTML("afterbegin",`<a class="chweb" href="/hub/" title="Về web vận hành" aria-label="Về web vận hành"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>`);const b=sh.querySelector("b");if(b)b.textContent="Đoạn chat"}
+    let hid=false;try{hid=localStorage.getItem("chat_inst")==="1"||localStorage.getItem("chat_inst_x")===String(new Date().toDateString())}catch(e){}
+    const side=document.querySelector(".tn .tnside");
+    if(!standalone()&&!hid&&side&&!document.getElementById("chinst")){
+      side.querySelector(".tnq").insertAdjacentHTML("afterend",`<div id="chinst"><img src="/chat-icon-192.png" alt=""><span><b>Cài Ailla Chat</b><small>Biểu tượng riêng ngoài màn hình chính</small></span><button type="button" class="btn pri sm" data-i>Cài</button><button type="button" class="chx" data-x aria-label="Ẩn">✕</button></div>`);
+      const c=document.getElementById("chinst");
+      c.querySelector("[data-i]").onclick=async()=>{if(BIP){try{BIP.prompt();const r=await BIP.userChoice;if(r&&r.outcome==="accepted"){try{localStorage.setItem("chat_inst","1")}catch(e){}c.remove()}}catch(e){guide()}BIP=null}else guide()};
+      c.querySelector("[data-x]").onclick=()=>{try{localStorage.setItem("chat_inst_x",new Date().toDateString())}catch(e){}c.remove()};
+    }
+    const tb=document.getElementById("tnback");if(tb&&!tb.dataset.ch){tb.dataset.ch="1";tb.addEventListener("click",()=>{try{if(history.state&&history.state.tnc)history.back()}catch(e){}})}
+  }
+  /* số chưa đọc trên biểu tượng + tiêu đề tab */
+  let lastN=-1;setInterval(()=>{if(!ME||typeof tnTotal!=="function")return;const n=TN.rooms.reduce((a,r)=>a+(r.room===TN.room&&TN.mob&&!document.hidden?0:r.unread||0),0);if(n===lastN)return;lastN=n;
+    document.title=(n?"("+(n>99?"99+":n)+") ":"")+"Ailla Chat";
+    try{if(navigator.setAppBadge){n?navigator.setAppBadge(n):navigator.clearAppBadge()}}catch(e){}},3000);
+})();
+/* Ailla Chat đợt 2 (08/11): tin thoại kiểu Messenger + giữ lâu một tin để mở menu (giao việc, nhắc, trả lời…) — chỉ trên điện thoại */
+(function(){
+  if(typeof window==="undefined"||!window.matchMedia)return;
+  const narrow=window.matchMedia("(max-width:760px)");
+  const fmt=s=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+  /* --- tin thoại: nút phát + sóng âm + thời lượng thay cho trình phát mặc định --- */
+  const wave=seed=>{let h=0;for(const c of String(seed))h=(h*31+c.charCodeAt(0))>>>0;let o="";for(let i=0;i<26;i++){h=(h*1103515245+12345)>>>0;const v=0.25+((h>>>16)%100)/100*0.75;o+=`<i style="height:${Math.round(v*100)}%"></i>`}return o};
+  const _fh=tnFileHtml;tnFileHtml=function(m){const html=_fh.apply(this,arguments);if(!narrow.matches||html.indexOf('class="tnaud"')<0)return html;
+    const src=(html.match(/src="([^"]+)"/)||[])[1]||"",d=(String(m.body||"").match(/(\d+):(\d\d)/)||[]),len=d.length?(+d[1])*60+(+d[2]):0;
+    return `<div class="tnvo" data-src="${src}" data-len="${len}"><button type="button" class="tnvp" aria-label="Nghe"><svg viewBox="0 0 24 24"><path class="pl" d="M8 5l11 7-11 7z"/><path class="pa" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button><span class="tnvw">${wave(src)}</span><small>${len?fmt(len):"0:00"}</small></div>`};
+  let AU=null,cur=null;
+  const stopCur=()=>{if(cur){cur.classList.remove("on");cur.style.setProperty("--p","0");const s=cur.querySelector("small");if(s)s.textContent=fmt(+cur.dataset.len||0)}cur=null};
+  document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".tnvp");if(!b)return;e.preventDefault();e.stopPropagation();const v=b.closest(".tnvo");
+    if(cur===v&&AU){if(AU.paused){AU.play();v.classList.add("on")}else{AU.pause();v.classList.remove("on")}return}
+    if(AU){AU.pause();stopCur()}AU=new Audio(v.dataset.src);cur=v;v.classList.add("on");
+    AU.ontimeupdate=()=>{if(cur!==v)return;const L=isFinite(AU.duration)&&AU.duration>0?AU.duration:(+v.dataset.len||1);v.style.setProperty("--p",String(Math.min(1,AU.currentTime/L)));const s=v.querySelector("small");if(s)s.textContent=fmt(AU.currentTime)};
+    AU.onended=()=>{if(cur===v)stopCur()};AU.play().catch(()=>{toast("Chưa phát được tin thoại này");stopCur()})},true);
+  /* --- ghi âm: bấm micro → thanh ghi âm (✕ hủy · thời gian · ➤ gửi luôn), không phải qua khay chờ --- */
+  const _rt=tnRecToggle;
+  tnRecToggle=async function(room,btn){if(!narrow.matches)return _rt.apply(this,arguments);
+    if(TN_REC)return;
+    if(!navigator.mediaDevices||!window.MediaRecorder){toast("Máy này chưa ghi âm được trên trình duyệt");return}
+    let st;try{st=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){toast("Chưa cho phép dùng micro. Vào cài đặt trình duyệt › Quyền trang web › Micro › Cho phép");return}
+    const type=["audio/webm;codecs=opus","audio/ogg;codecs=opus","audio/mp4"].find(t=>MediaRecorder.isTypeSupported(t))||"";
+    const rec=new MediaRecorder(st,type?{mimeType:type,audioBitsPerSecond:24000}:{}),parts=[],t0=Date.now();let send=false;
+    const f=document.getElementById("tnf");const bar=document.createElement("div");bar.id="tnrecbar";
+    bar.innerHTML=`<button type="button" class="x" aria-label="Hủy ghi âm">✕</button><span class="rb"><i></i><b>0:00</b><small>Đang ghi âm…</small></span><button type="button" class="s" aria-label="Gửi tin thoại"><svg viewBox="0 0 24 24"><path d="M3 11.5 21 3l-8.5 18-2.2-7.3z"/></svg></button>`;
+    if(f)f.appendChild(bar);
+    rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+    const tick=setInterval(()=>{const s=(Date.now()-t0)/1000;const b=bar.querySelector("b");if(b)b.textContent=fmt(s);if(s>=300){send=true;rec.stop()}},300);
+    rec.onstop=async()=>{clearInterval(tick);st.getTracks().forEach(t=>t.stop());bar.remove();TN_REC=null;
+      const s=Math.max(1,Math.round((Date.now()-t0)/1000));if(!send||!parts.length)return;
+      const base=(rec.mimeType||type||"audio/webm").split(";")[0],ext=base.includes("ogg")?"ogg":base.includes("mp4")?"m4a":"webm";
+      const file=new File(parts,`Ghi âm ${fmt(s)}.${ext}`,{type:base});
+      try{await tnUpload(room,[file]);if(TN.room===room){tnDrawMsgs();tnDrawList()}}catch(e){toast("Chưa gửi được tin thoại, thử lại")}};
+    bar.querySelector(".x").onclick=()=>{send=false;rec.stop()};
+    bar.querySelector(".s").onclick=()=>{send=true;rec.stop()};
+    rec.start(1000);TN_REC=rec};
+  /* --- giữ lâu một tin (iPhone không có chuột phải): mở menu tin như máy tính --- */
+  let lp=null,lpAt=0;
+  document.addEventListener("touchstart",e=>{if(!narrow.matches||e.touches.length>1)return;const x=e.target.closest&&e.target.closest("#tnmsgs .tnm[data-mid]");if(!x||e.target.closest("a,button,audio,.tnvo"))return;
+    const t=e.touches[0],id=+x.dataset.mid;if(!id||typeof tnMenu!=="function"||(typeof TNM!=="undefined"&&TNM.sel))return;
+    lp={x:t.clientX,y:t.clientY,tm:setTimeout(()=>{const p=lp;lp=null;lpAt=Date.now();x.classList.add("tnhold");setTimeout(()=>x.classList.remove("tnhold"),300);try{navigator.vibrate&&navigator.vibrate(15)}catch(er){}tnMenu(id,p?p.x:t.clientX,p?p.y:t.clientY)},450)}},{passive:true});
+  const cancel=()=>{if(lp){clearTimeout(lp.tm);lp=null}};
+  document.addEventListener("touchmove",e=>{if(!lp)return;const t=e.touches[0];if(Math.abs(t.clientX-lp.x)>10||Math.abs(t.clientY-lp.y)>10)cancel()},{passive:true});
+  document.addEventListener("touchend",e=>{if(lp){cancel();return}if(Date.now()-lpAt<700&&e.target.closest&&e.target.closest("#tnmsgs"))e.preventDefault()},{passive:false});
+  /* Android tự bắn "chuột phải" khi giữ lâu: menu đã mở rồi thì bỏ qua để không mở hai lần */
+  document.addEventListener("contextmenu",e=>{if(narrow.matches&&Date.now()-lpAt<1500&&e.target.closest&&e.target.closest("#tnmsgs")){e.preventDefault();e.stopPropagation()}},true);
 })();

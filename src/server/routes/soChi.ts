@@ -34,6 +34,8 @@ const schema = z.object({
   group: z.string().trim().max(20).optional().default(''),
   channel: z.string().trim().max(40).optional().default('Chung'),
   note: z.string().trim().max(600).optional().default(''),
+  /** Chỗ agent chưa chắc (hỏi rồi mà vẫn chưa rõ): hiện nổi trên phiếu chờ duyệt để người duyệt kiểm. */
+  chua_chac: z.string().trim().max(600).optional().default(''),
 });
 
 type Row = Record<string, unknown> & { d?: string; t?: number; ct?: string; nn?: string; tkn?: string };
@@ -93,6 +95,7 @@ soChiRoutes.post('/phieu-chi', async (c) => {
       by,
       at: now,
       st: 'Chờ duyệt',
+      ...(b.chua_chac ? { chuaChac: b.chua_chac } : {}),
       ...(src ? { agent: src.agent, theoLenh: src.by, agentAt: src.at } : {}),
     });
     const d = main.d;

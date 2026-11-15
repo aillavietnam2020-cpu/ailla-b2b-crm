@@ -5,7 +5,7 @@
  * Phòng chưa có Lead, hoặc người gửi chính là Lead: đơn lên thẳng HCNS.
  * Tạm ứng: dưới mức tối đa (mặc định 3 triệu), Kế toán duyệt, cuối tháng trừ vào lương.
  */
-import { dayRule, daysFrom, type CcSettings, type Lich, type NgayCong } from './chamCong';
+import { dayRule, daysFrom, lichNgay, phutChuan, type CcSettings, type Lich, type NgayCong } from './chamCong';
 
 export type LoaiDon = 'phep' | 'om' | 'khongluong' | 'vesom' | 'ot' | 'lambu';
 export const LOAI_DON: Record<LoaiDon, string> = {
@@ -18,7 +18,35 @@ export const LOAI_DON: Record<LoaiDon, string> = {
 };
 export const LOAI_NGHI: LoaiDon[] = ['phep', 'om', 'khongluong'];
 export type TrangThai = 'lead' | 'hcns' | 'xong' | 'tuchoi' | 'huy';
-export type Buoi = 'ca' | 'sang' | 'chieu';
+/** 'gio' = nghỉ theo giờ trong một ngày (CEO 10/11): giờ từ–đến ghi ở ghi_chu, số giờ ở cột gio. */
+export type Buoi = 'ca' | 'sang' | 'chieu' | 'gio';
+
+/**
+ * Nghỉ theo giờ (CEO 10/11): số giờ nghỉ nằm trong giờ làm của ngày đó (bỏ phần ngoài giờ làm và giờ nghỉ trưa),
+ * quy ra ngày = giờ nghỉ ÷ số giờ làm chuẩn của ngày (để trừ quỹ phép năm). Trả câu báo lỗi dễ hiểu nếu không hợp lệ.
+ */
+export function gioNghi(
+  l: Lich,
+  ngay: string,
+  tu: string,
+  den: string,
+  rule: { lam: boolean; vao: number; ra: number },
+): { gio: number; soNgay: number } | { loi: string } {
+  const hm = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!hm.test(tu) || !hm.test(den) || den <= tu) return { loi: 'Ghi giờ nghỉ: từ giờ phải trước đến giờ' };
+  if (!rule.lam) return { loi: 'Ngày này không phải ngày đi làm theo lịch' };
+  const m = (x: string) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3, 5));
+  const giao = (a: number, b: number, c: number, d: number) => Math.max(0, Math.min(b, d) - Math.max(a, c));
+  const ln = lichNgay(l, ngay);
+  const trua = ln.kieu !== 'ca' && ln.truaTu && ln.truaDen ? [m(ln.truaTu), m(ln.truaDen)] : null;
+  const trongGio = (a: number, b: number) => giao(a, b, rule.vao, rule.ra) - (trua ? giao(Math.max(a, rule.vao), Math.min(b, rule.ra), trua[0], trua[1]) : 0);
+  const phut = trongGio(m(tu), m(den));
+  const chuan = trongGio(rule.vao, rule.ra);
+  if (phut <= 0) return { loi: 'Giờ nghỉ phải nằm trong giờ làm của ngày đó' };
+  if (chuan > 0 && phut >= chuan) return { loi: 'Nghỉ hết giờ làm của ngày thì chọn Cả ngày' };
+  const gio = Math.round((phut / 60) * 100) / 100;
+  return { gio, soNgay: chuan > 0 ? Math.round((phut / chuan) * 100) / 100 : 0 };
+}
 
 /**
  * Số ngày làm việc của một đơn nghỉ theo lịch làm của người gửi: bỏ Chủ nhật, thứ Bảy nghỉ, ngày lễ.
@@ -66,15 +94,15 @@ export function leadsCuaPhong(users: Record<string, { pb: string; role: string }
 export const kyTamUng = (ngay: string) => ngay.slice(0, 7);
 
 /** Lịch làm của người gửi (lấy theo cài đặt chấm công); tách ra để route dùng chung. */
-export type NgayDon = { loai: LoaiDon; buoi: Buoi; gio: number | null };
+export type NgayDon = { loai: LoaiDon; buoi: Buoi; gio: number | null; so_ngay?: number };
 /** Đơn đã duyệt theo ngày: ngày → đơn (đơn nghỉ trải nhiều ngày thì mỗi ngày một dòng). */
-export function donTheoNgay(rows: { loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null }[]): Map<string, NgayDon[]> {
+export function donTheoNgay(rows: { loai: LoaiDon; tu: string; den: string; buoi: Buoi; gio: number | null; so_ngay?: number }[]): Map<string, NgayDon[]> {
   const out = new Map<string, NgayDon[]>();
   for (const r of rows) {
     const n = Math.max(1, Math.round((Date.parse(r.den + 'T00:00:00Z') - Date.parse(r.tu + 'T00:00:00Z')) / 864e5) + 1);
     for (const d of daysFrom(r.tu, Math.min(n, 62))) {
       const a = out.get(d) ?? [];
-      a.push({ loai: r.loai, buoi: r.buoi, gio: r.gio });
+      a.push({ loai: r.loai, buoi: r.buoi, gio: r.gio, so_ngay: r.so_ngay });
       out.set(d, a);
     }
   }
@@ -101,6 +129,35 @@ export function ngayCanBu(ngay: (NgayCong & { ngay: string })[], today: string):
       out.push({ ngay: x.ngay, kieu: 'gio', buoi: 'ca', phut: x.muon + x.som, mo: [x.muon ? 'đi muộn ' + x.muon + ' phút' : '', x.som ? 'về sớm ' + x.som + ' phút' : ''].filter(Boolean).join(', ') });
   }
   return out.reverse();
+}
+
+/**
+ * Làm trước, nghỉ sau (CEO 10/11, Lead Content hỏi): ngày nghỉ theo lịch (đã qua, trong hạn bù) mà có chấm vào và ra
+ * thì dùng để xin nghỉ bù một ngày đi làm sắp tới. Làm đủ giờ chuẩn của lịch đổi được cả ngày, đủ nửa giờ chuẩn đổi được nửa ngày
+ * (cùng mốc với cách chấm kết quả làm bù, có trừ phút được trễ).
+ * daDung: các ngày đã có đơn làm bù dùng rồi (đang chờ hoặc đã duyệt).
+ */
+export type DaLam = { ngay: string; phut: number; nua: boolean };
+export function ngayDaLamThem(ngay: (NgayCong & { ngay: string })[], l: Lich, today: string, daDung: Set<string>): DaLam[] {
+  const du = (x: NgayCong & { ngay: string }, phan: number) => {
+    const ln = lichNgay(l, x.ngay);
+    return x.phut >= phutChuan(ln) * phan - Math.max(5, ln.anHan || 0);
+  };
+  return ngay
+    .filter((x) => x.ngay < today && !x.lam && x.vao && x.ra && !x.lamBu && !daDung.has(x.ngay) && du(x, 0.5))
+    .map((x) => ({ ngay: x.ngay, phut: x.phut, nua: !du(x, 1) }))
+    .reverse();
+}
+
+/** Kiểm ngày xin nghỉ bù (làm trước, nghỉ sau); trả câu báo lỗi hoặc null. rule = giờ làm của ngày nghỉ theo lịch. */
+export function kiemNghiBu(d: DaLam, b: { ngay: string; buoi: Buoi }, rule: { lam: boolean }, today: string, hanBu: number): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.ngay)) return 'Chọn ngày nghỉ bù';
+  if (b.ngay < today) return 'Ngày nghỉ bù phải từ hôm nay trở đi';
+  if (!rule.lam) return 'Ngày này đã là ngày nghỉ theo lịch, không cần xin nghỉ bù';
+  if (d.nua && b.buoi === 'ca') return `Ngày ${d.ngay.slice(8)}/${d.ngay.slice(5, 7)} làm chưa đủ giờ cả ngày nên chỉ đổi được nửa ngày (chọn buổi sáng hoặc chiều)`;
+  const cach = Math.round((Date.parse(b.ngay) - Date.parse(d.ngay)) / 864e5);
+  if (cach > hanBu) return `Phải nghỉ bù trong vòng ${hanBu} ngày sau ngày đã làm ${d.ngay.slice(8)}/${d.ngay.slice(5, 7)}`;
+  return null;
 }
 
 /** Kiểm đơn làm bù; trả lời câu báo lỗi dễ hiểu, hoặc null nếu hợp lệ. rule = giờ làm của ngày làm bù theo lịch. */

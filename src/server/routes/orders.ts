@@ -128,6 +128,11 @@ orderRoutes.post('/', requirePermission('order.create', 'order.create.team'), as
   const auth = c.get('auth');
   const body = await c.req.json().catch(() => ({}));
   const input = parseInput(orderCreateSchema, body);
+  // Agent lập đơn thay người: ghi rõ agent nào, theo yêu cầu của ai, ngay trên đơn (nhật ký AGENT_ACT ghi thêm phía middleware).
+  if (auth.delegation) {
+    const by = `[${auth.delegation.agentName} lập theo yêu cầu của ${auth.user.display_name}]`;
+    input.note = (input.note ? `${by} ${input.note}` : by).slice(0, 1000);
+  }
   const config = await loadConfig(c.env.DB);
   const key = c.req.header('Idempotency-Key') ?? null;
 

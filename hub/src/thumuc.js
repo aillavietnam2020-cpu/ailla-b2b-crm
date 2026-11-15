@@ -38,8 +38,8 @@ async function tmLoadRecent(pb){
   tmRedraw();
 }
 async function tmFind(){
-  const key=TM.q;if(TM.findKey===key&&TM.find)return;TM.findKey=key;TM.find={loading:true};
-  try{const r=await svApi("/api/drive/find?q="+encodeURIComponent(TM.q));if(TM.findKey===key)TM.find=r}
+  const key=TM.q+"|"+(TM.fpb||"");if(TM.findKey===key&&TM.find)return;TM.findKey=key;TM.find={loading:true};
+  try{const r=await svApi("/api/drive/find?q="+encodeURIComponent(TM.q)+(TM.fpb?"&pb="+encodeURIComponent(TM.fpb):""));if(TM.findKey===key)TM.find=r}
   catch(e){if(TM.findKey===key)TM.find={err:e.message||"Không tìm được"}}
   tmRedraw();
 }
@@ -102,6 +102,8 @@ function pThuMuc(m){
   .gd-ln{display:flex;gap:12px;align-items:center;min-width:0}.gd-nm{display:flex;flex-direction:column;min-width:0}.gd-nm b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gd-nm small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .gd-mu{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .gd-empty{color:var(--muted);padding:18px 4px}
+  .gd-lf{cursor:pointer}.gd-lf .gd-fsvg{width:20px;height:20px;flex:none;color:var(--muted)}
+  .gd-top select{max-width:240px}
   @media(max-width:860px){.gd{grid-template-columns:1fr}.gd-side{position:static;flex-direction:row;overflow-x:auto;gap:6px}.gd-side .gd-sh{display:none}.gd-side button{flex:none;background:var(--gray-soft)}
     .gd-lh,.gd-lr{grid-template-columns:minmax(0,1fr) 110px}.gd-lh span:nth-child(2),.gd-lh span:nth-child(4),.gd-lr>span:nth-child(2),.gd-lr>span:nth-child(4){display:none}.gd-grid,.gd-fold{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
   </style>`;
@@ -120,11 +122,13 @@ function pThuMuc(m){
   const side=TM.scope?`<nav class="gd-side" aria-label="Thư mục"><button class="gd-back" id="tm-back">‹ Về ${esc(typeof kpbName==="function"?kpbName(TM.scope):TM.scope)}</button><div class="gd-sh">Thư mục phòng</div>${T.filter(t=>t.pb===TM.scope).map(sb).join("")||`<small class="hint">Phòng chưa được gán thư mục</small>`}<div class="gd-sh">Tư liệu chung</div>${T.filter(t=>/^chung/.test(t.pb)).map(sb).join("")}<div class="gd-sh">Thư mục dự án</div>${PJ.map(p=>`<a class="gd-pj" href="${esc(p.drive)}" target="_blank" rel="noopener" title="Mở trên Google Drive">${tmFolderSvg}<span>${esc(p.ten)}</span></a>`).join("")||`<small class="hint">Chưa có dự án nào gắn thư mục</small>`}</nav>`
     :`<nav class="gd-side" aria-label="Thư mục"><div class="gd-sh">Thư mục của bạn</div>${T.map(sb).join("")}</nav>`;
   const kinds=`<select id="tm-kind" aria-label="Loại file"><option value="">Loại: tất cả</option>${Object.entries(TM_KIND).filter(([k])=>k!=="link"&&k!=="other").map(([k,x])=>`<option value="${k}"${TM.kind===k?" selected":""}>${x[0]}</option>`).join("")}</select>`;
-  const top=`<div class="gd-top"><label class="gd-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICONS.search}</svg><input type="search" id="tm-q" placeholder="Tìm trong các thư mục bạn được xem" value="${esc(TM.q)}" aria-label="Tìm file"></label>${kinds}
+  /* Lọc theo thư mục (chị Hoa 11/11): đang tìm thì chỉ tìm trong thư mục chọn; không tìm thì mở thẳng thư mục đó. */
+  const fsel=`<select id="tm-pbsel" aria-label="Thư mục"><option value="">Thư mục: ${TM.q?"tất cả":"chọn…"}</option>${T.map(t=>`<option value="${esc(t.pb)}"${(TM.q?TM.fpb:TM.pb)===t.pb?" selected":""}>${esc(t.name)}</option>`).join("")}</select>`;
+  const top=`<div class="gd-top"><label class="gd-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICONS.search}</svg><input type="search" id="tm-q" placeholder="Tìm trong các thư mục bạn được xem" value="${esc(TM.q)}" aria-label="Tìm file"></label>${fsel}${kinds}
     <span class="gd-vt" role="group" aria-label="Kiểu xem"><button data-tmmode="grid" class="${TM.mode==="grid"?"on":""}">▦ Lưới</button><button data-tmmode="list" class="${TM.mode==="list"?"on":""}">☰ Danh sách</button></span><button class="btn sm" id="tm-re">Tải lại</button></div>`;
   let body="";
   if(TM.q){
-    if(!TM.find||TM.findKey!==TM.q)tmFind();
+    if(!TM.find||TM.findKey!==TM.q+"|"+(TM.fpb||""))tmFind();
     const F=TM.find||{loading:true};
     body=`<div class="gd-cr"><b>Kết quả tìm “${esc(TM.q)}”</b></div>`+(F.loading?`<p class="gd-empty">Đang tìm…</p>`:F.err?`<div class="note red">${esc(F.err)}</div>`:tmFiles(F.files,true));
   }else{
@@ -136,8 +140,11 @@ function pThuMuc(m){
       const crumb=`<div class="gd-cr">${L.path.map((p,i)=>i===L.path.length-1?`<b>${esc(p.name)}</b>`:`<button data-tmf="${i?esc(p.id):""}">${esc(p.name)}</button><span class="s">›</span>`).join("")}</div>`;
       let recent="";
       if(!TM.folder){tmLoadRecent(TM.pb);const R=TM.recent[TM.pb]||{loading:true};
-        if(R.files&&R.files.length){const keep=TM.mode;TM.mode="grid";recent=`<div class="gd-sec">Tệp được sửa gần đây</div>`+tmFiles(R.files.slice(0,4),true);TM.mode=keep}}
-      body=crumb+recent+(L.folders.length?`<div class="gd-sec">Thư mục</div><div class="gd-fold">${L.folders.map(f=>`<button data-tmf="${esc(f.id)}" title="${esc(f.name)}">${tmFolderSvg}<b>${esc(f.name)}</b></button>`).join("")}</div>`:"")+
+        if(R.files&&R.files.length)recent=`<div class="gd-sec">Tệp được sửa gần đây</div>`+tmFiles(R.files.slice(0,TM.mode==="list"?6:4),true)}
+      const folds=TM.mode==="list"
+        ?`<div class="gd-list" role="table"><div class="gd-lh" role="row"><span>Tên thư mục</span><span></span><span>Ngày sửa đổi</span><span></span></div>${L.folders.map(f=>`<div class="gd-lr gd-lf" role="row" data-tmf="${esc(f.id)}" tabindex="0"><span class="gd-ln">${tmFolderSvg}<span class="gd-nm"><b>${esc(f.name)}</b></span></span><span></span><span class="gd-mu">${f.modified?tmTime(f.modified):""}</span><span></span></div>`).join("")}</div>`
+        :`<div class="gd-fold">${L.folders.map(f=>`<button data-tmf="${esc(f.id)}" title="${esc(f.name)}">${tmFolderSvg}<b>${esc(f.name)}</b></button>`).join("")}</div>`;
+      body=crumb+recent+(L.folders.length?`<div class="gd-sec">Thư mục</div>${folds}`:"")+
         `<div class="gd-sec">Tệp</div>`+tmFiles(L.files,false);
     }
   }
@@ -148,6 +155,8 @@ function pThuMuc(m){
   m.querySelectorAll("[data-tmmode]").forEach(b=>b.onclick=()=>{TM.mode=b.dataset.tmmode;try{localStorage.setItem("ailla_tm_mode",TM.mode)}catch(e){}renderMain()});
   const q=$("#tm-q");if(q){let t=0;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{TM.q=q.value.trim();renderMain();const n=$("#tm-q");if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},450)}}
   const k=$("#tm-kind");if(k)k.onchange=()=>{TM.kind=k.value;renderMain()};
+  const ps=$("#tm-pbsel");if(ps)ps.onchange=()=>{const v=ps.value;if(TM.q){TM.fpb=v;TM.find=null}else if(v){TM.pb=v;TM.folder=""}renderMain()};
+  m.querySelectorAll(".gd-lf").forEach(r=>r.onkeydown=e=>{if(e.key==="Enter")r.click()});
   const re=$("#tm-re");if(re)re.onclick=()=>{TM.list=null;TM.listKey="";TM.find=null;TM.findKey="";TM.recent={};tmTeams(true)};
 }
 function tmBindTabs(m){m.querySelectorAll("[data-tmv]").forEach(b=>b.onclick=()=>{TM.view=b.dataset.tmv;renderMain()})}

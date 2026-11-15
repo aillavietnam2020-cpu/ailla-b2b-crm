@@ -11,7 +11,7 @@ const KHO_GRP=[["Tồn kho",["kho_ton"]],["Nhập kho",["kho_nhap","kho_nhap_tp"
 const khoNav=key=>{if(typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin")return "";return `<nav class="kgtabs kgbar"></nav>`};
 const KHO_TYPES={
   PN:{page:"kho_nhap",name:"Phiếu nhập kho",who:["sx.kiemke"],hint:"Hàng mua về: nguyên vật liệu, vỏ, tem, hàng hóa. Kế toán kho ghi theo số thực nhận."},
-  PC:{page:"kho_pc",name:"Phiếu pha chế",who:["sx.kythuat","sx.kiemke"],hint:"Mỗi mẻ pha một phiếu, pha theo phiếu sản xuất của Thảo. Ghi số lít thực tế và số thực tế từng nguyên liệu (nguyên liệu không dùng ghi 0)."},
+  PC:{page:"kho_pc",name:"Phiếu pha chế",who:["sx.kythuat","sx.kiemke"],hint:"Mỗi mẻ pha một phiếu, pha theo yêu cầu pha chế của Quản lý mua hàng (tự pha không có yêu cầu thì bấm “+ Phiếu pha không theo yêu cầu”). Ghi số lít thực tế và số thực tế từng nguyên liệu (nguyên liệu không dùng ghi 0)."},
   KS:{page:"sx_lo",name:"Phiếu kiểm kê đóng gói",who:["sx.kiemke"],hint:"Chúc kiểm kê sau khi đóng gói xong. Hệ thống tự trừ bán thành phẩm, vỏ, tem theo định mức."},
   XB:{page:"kho_xuat",name:"Phiếu xuất kho",who:["sx.kiemke"],hint:"Xuất ngoài bán hàng: gia công, bán nguyên liệu, hàng mẫu, hủy hỏng. Đơn Kênh phân phối ở mục Xuất Kênh phân phối; bán lẻ TikTok, Shopee, Facebook ở mục Xuất Kênh bán lẻ."},
   TL:{page:"kho_hoan",name:"Phiếu nhập hàng hoàn",who:["sx.kiemke"],hint:"Hàng hoàn về kho: chọn Bán tiếp (cộng tồn) hoặc Bỏ (chỉ ghi nhận)."},
@@ -146,10 +146,11 @@ function khoEditPN(d,moves){
 /* Số lượng trong phiếu (chị Hoa 06/11): gõ được 0.5, 12.67, 0,03 (dấu phẩy hay chấm đều được); chọn đơn vị kg / gam, lít / ml
    ngay trên dòng, web tự đổi về đơn vị của mã khi ghi sổ. */
 const KF_U={"kg":[["kg",1],["gam",0.001]],"gam":[["gam",1],["kg",1000]],"g":[["g",1],["kg",1000]],"lít":[["lít",1],["ml",0.001]],"lit":[["lít",1],["ml",0.001]],"l":[["lít",1],["ml",0.001]],"ml":[["ml",1],["lít",1000]]};
-function kfNum(v){let x=String(v==null?"":v).replace(/\s/g,"");if(x==="")return NaN;if(x.includes(",")&&x.includes("."))x=x.replace(/\./g,"").replace(",",".");else x=x.replace(",",".");const n=+x;return isFinite(n)?n:NaN}
+/* Kiểu Việt Nam: dấu phẩy là thập phân; nhiều dấu chấm (1.234.567) là phân cách nghìn (08/11). Dùng chung cho mọi ô số lượng / định mức (nhapso.js). */
+function kfNum(v){if(typeof v==="number")return v;let x=String(v==null?"":v).replace(/\s/g,"");if(x==="")return NaN;if(x.includes(",")&&x.includes("."))x=x.replace(/\./g,"").replace(",",".");else if((x.match(/\./g)||[]).length>1)x=x.replace(/\./g,"");else if((x.match(/,/g)||[]).length>1)x=x.replace(/,/g,"");else x=x.replace(",",".");const n=+x;return isFinite(n)?n:NaN}
 function kfUnitCell(unit){const o=KF_U[String(unit||"").toLowerCase().trim()];return o?`<select class="kf-un">${o.map(([n,f])=>`<option value="${f}">${n}</option>`).join("")}</select>`:esc(unit||"")}
 const kfQty=tr=>{const q=tr.querySelector(".kf-q"),u=tr.querySelector(".kf-un"),n=kfNum(q.value);if(q.value.trim()==="")return "";if(!isFinite(n))return "x";return String(Math.round(n*(u?+u.value:1)*1e6)/1e6)};
-const KHO_LINE_CLS={PN:["NVL","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null,TB:null};
+const KHO_LINE_CLS={PN:["NVL","BTP","HH","CCDC"],KS:["TP"],XB:null,TL:null,PC:null,TD:null,TB:null};
 function khoForm(type,pre,clsO){
   KHO.edit=KHO.editNext||null;KHO.editNext=null; // chỉ là "sửa" khi mở từ nút Sửa phiếu
   const T=KHO_TYPES[type],price=KHO.cat.can_price;
@@ -162,11 +163,11 @@ function khoForm(type,pre,clsO){
    ${isKS?`<label class="field grow">Phiếu sản xuất của Thảo<select id="kf-psx">${khoPsxOpts(type)}</select></label><label class="field">Hoặc tự nhập số phiếu<input id="kf-r" placeholder="PSX…"></label>`:""}
    ${type==="TD"?`<label class="inl"><input type="checkbox" id="kf-moc"> Đây là phiếu tồn chốt chung (mốc tồn): hàng nhập, xuất, bán sàn từ hôm sau mới tính</label>`:""}
    ${type==="TB"&&typeof KTON!=="undefined"&&KTON.moc&&KTON.moc.moc?`<span class="hint">Mốc tồn chung ${kDd(KTON.moc.moc)} · đã có số kiểm ${KTON.moc.counted.length} mã; kiểm lại được nếu ngày đếm sau lần trước</span>`:""}</div>`;
-  const colHead=isPC?["Nguyên vật liệu","Định mức","Định lượng","Thực tế","ĐVT","Tồn kho",""]:isKS?["Thành phẩm đếm được","Số lượng","ĐVT","Theo phiếu SX","Tồn",""]:isTL?["Mã hàng","Số lượng","ĐVT","Xử lý",""]:isPN?["Mã hàng","Số lượng","ĐVT",...(price&&type==="PN"?["Đơn giá"]:[]),"Tồn",""]:["Mã hàng","Số lượng","ĐVT","Tồn",""];
+  const colHead=isPC?["Nguyên vật liệu","Công thức / 1 lít","Định lượng","Thực tế","ĐVT","Tồn kho",""]:isKS?["Thành phẩm đếm được","Số lượng","ĐVT","Theo phiếu SX","Tồn",""]:isTL?["Mã hàng","Số lượng","ĐVT","Xử lý",""]:isPN?["Mã hàng","Số lượng","ĐVT",...(price&&type==="PN"?["Đơn giá"]:[]),"Tồn",""]:["Mã hàng","Số lượng","ĐVT","Tồn",""];
   openDrawerHTML(`<h2>${T.name}</h2><p class="hint">${T.hint}</p><form class="frm" id="kf">${head}
-   <div class="tbl edit"><table><thead><tr>${colHead.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody id="kf-b"></tbody></table></div>
+   ${isPC?`<div id="kf-ctn"></div>`:""}<div class="tbl edit"><table><thead><tr>${colHead.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody id="kf-b"></tbody></table></div>
    <div class="row7"><button type="button" class="btn" id="kf-add">+ Thêm dòng</button>${isOut?`<button type="button" class="btn" id="kf-box">+ Thêm vỏ thùng</button>`:""}<label class="field grow">Ghi chú<input id="kf-n"></label></div>
-   ${isKS?`<div id="kf-prev"></div>`:""}<div id="kf-warn"></div>
+   ${isKS?`<div id="kf-prev"></div>`:""}${isPC?`<div id="kf-lyw" class="note amb" hidden><label class="field">Lý do lệch so với công thức <small class="hint">(ghi chung cho cả phiếu · lệch quá 5%: <span id="kf-lyn"></span>)</small><input id="kf-ly" placeholder="Ví dụ: SLES đặc, phải thêm nước"></label></div>`:""}<div id="kf-warn"></div>
    <div class="row7"><button class="btn pri" id="kf-ok">Ghi phiếu</button><button type="button" class="btn" id="kf-print">In bản điền tay</button><span class="hint" id="kf-msg"></span></div></form>`);
   const body=$("#kf-b"),cls=clsO||KHO_LINE_CLS[type];
   if(isPC&&$("#kf-ppl")){const ppl=$("#kf-ppl"),dl=typeof SX==="function"&&SX().people?SX().people.filter(p=>!p.an).map(p=>p.ten):[];
@@ -190,21 +191,28 @@ function khoForm(type,pre,clsO){
     tr.querySelector(".kf-q").oninput=refresh;if(tr.querySelector(".kf-rq"))tr.querySelector(".kf-rq").oninput=refresh;
     if(tr.querySelector(".kf-x"))tr.querySelector(".kf-x").onclick=()=>{tr.remove();refresh()};
     if(o.item)upd();return tr};
-  function lines(){return [...body.querySelectorAll("tr")].map(tr=>({item:tr.querySelector(".kf-i").dataset.code,qty:kfQty(tr),ref_qty:tr.querySelector(".kf-rq")&&tr.querySelector(".kf-rq").value.trim()!==""?String(kfNum(tr.querySelector(".kf-rq").value)):"",verdict:tr.querySelector(".kf-v")?tr.querySelector(".kf-v").value:"",price:tr.querySelector(".kf-pr")?tr.querySelector(".kf-pr").value:"",std_qty:tr.dataset.std!=null?+tr.dataset.std:undefined,tr})).filter(l=>l.item||l.qty!=="")}
+  function lines(){return [...body.querySelectorAll("tr")].map(tr=>({item:tr.querySelector(".kf-i").dataset.code,qty:kfQty(tr),ref_qty:tr.querySelector(".kf-rq")&&tr.querySelector(".kf-rq").value.trim()!==""?String(kfNum(tr.querySelector(".kf-rq").value)):"",verdict:tr.querySelector(".kf-v")?tr.querySelector(".kf-v").value:"",price:tr.querySelector(".kf-pr")?tr.querySelector(".kf-pr").value:"",std_qty:tr.dataset.std!=null?+tr.dataset.std:undefined,note:tr.classList.contains("lech")&&$("#kf-ly")?$("#kf-ly").value.trim():"",lech:tr.classList.contains("lech"),tr})).filter(l=>l.item||l.qty!=="")}
   function refresh(){const w=[];
     if(isKS){const need=new Map();lines().forEach(l=>{const q=+l.qty;if(!l.item||!(q>0))return;(khoNeedRows(l.item,q,refresh)||[]).forEach(b=>need.set(b.item,(need.get(b.item)||0)+b.need));if(!khoHasBom(l.item))w.push(`${l.item} chưa có định mức, chưa tự trừ vỏ / tem / BTP.`)});
       $("#kf-prev").innerHTML=need.size?`<div class="card flush"><div class="card-h pad"><h3>Hệ thống sẽ tự trừ</h3></div>${tbl(["Vật tư","Cần","Tồn","Sau phiếu"],[...need].map(([c,q])=>{const it=KHO.items.get(c)||{},after=khoStock(c)-q;if(after<0)w.push(`${c} sẽ âm kho (còn ${knum(khoStock(c))}, cần ${knum(q)}).`);return `<tr><td>${esc(c)} <small>${esc(it.name||"")}</small></td><td class="n">${knum(q)} ${esc(it.unit||"")}</td><td class="n">${knum(khoStock(c))}</td><td class="n ${after<0?"t-red":""}">${knum(after)}</td></tr>`}))}</div>`:""}
     else if(!isPC&&!isPN&&!isTL){lines().forEach(l=>{const q=+l.qty;if(l.item&&q>khoStock(l.item))w.push(`${l.item}: xuất ${knum(q)} nhưng tồn chỉ ${knum(khoStock(l.item))}.`)})}
-    else if(isPC){lines().forEach(l=>{const q=+l.qty,s=l.std_qty;if(l.item&&q>khoStock(l.item))w.push(`${l.item}: dùng ${knum(q)} nhưng tồn chỉ ${knum(khoStock(l.item))}.`);if(s>0&&q>=0&&Math.abs(q-s)*100/s>5)l.tr.classList.add("lech");else l.tr.classList.remove("lech")})}
-    $("#kf-warn").innerHTML=w.length?`<div class="note amb">${w.map(esc).join("<br>")}<br><small>Vẫn ghi được; kiểm tra lại số trước khi bấm Ghi phiếu.</small></div>`:""}
+    else if(isPC){lines().forEach(l=>{const q=+l.qty,s=l.std_qty;if(l.item&&q>khoStock(l.item))w.push(`${l.item}: dùng ${knum(q)} nhưng tồn chỉ ${knum(khoStock(l.item))}.`);const lc=s>0&&q>=0&&Math.abs(q-s)*100/s>5;l.tr.classList.toggle("lech",lc)});const anyL=!!body.querySelector("tr.lech"),lw=$("#kf-lyw");if(lw){lw.hidden=!anyL;const nm=$("#kf-lyn");if(nm)nm.textContent=lines().filter(x=>x.lech).map(x=>(KHO.items.get(x.item)||{}).name||x.item).join(", ")}}
+    {const noNeg=KHO.rules&&KHO.rules.allow_negative===false;$("#kf-warn").innerHTML=w.length?`<div class="note ${noNeg?"red":"amb"}">${w.map(esc).join("<br>")}<br><small>${noNeg?"Quy tắc kế toán đang không cho xuất âm kho: phiếu này sẽ không ghi được. Nhập kho hoặc kiểm tồn trước.":"Tồn không đủ, sẽ âm kho. Vẫn ghi được (quy tắc kế toán đang cho xuất âm); kiểm tra lại số trước khi bấm Ghi phiếu."}</small></div>`:""}}
   if(isPC){
     let fillTok=0;
     const fill=async()=>{const c=$("#kf-btp").dataset.code,lit=kfNum($("#kf-lit").value)*(kfNum($("#kf-bon")&&$("#kf-bon").value||"1")||1);if($("#kf-tong"))$("#kf-tong").value=lit>0?knum(Math.round(lit*1e6)/1e6):"";if(!c||!(lit>0))return;const my=++fillTok;let B;
-      if(KHO.bomHidden){try{const [[,,rows]]=await khoExpand([[c,lit]]);B=rows.map(x=>({item:x.item,need:x.need}))}catch(e){toast(e.message);return}if(my!==fillTok)return}
-      else B=KHO.bom.get(c)||[];
-      body.innerHTML="";
+      if(typeof pchLoadCt==="function"){try{await pchLoadCt()}catch(e){}if(my!==fillTok)return}
+      const RC=typeof pchCt==="function"?pchCt(c):null;
+      /* 07/11 chị Hoa: phiếu pha chế chỉ theo công thức của Kỹ thuật, không theo định mức. Chưa có công thức thì bắt nhập công thức trước. */
+      body.innerHTML="";const okBtn=$("#kf-ok");
+      if(!RC){if(okBtn)okBtn.disabled=true;
+        if($("#kf-ctn"))$("#kf-ctn").innerHTML=`<div class="note red"><b>${esc((KHO.items.get(c)||{}).name||c)} chưa có công thức pha.</b> Phải nhập công thức trước rồi mới ghi phiếu pha chế.${typeof pchCanCt==="function"&&pchCanCt()?` <button type="button" class="btn sm pri" id="kf-ctnew">Nhập công thức</button>`:" Báo Kỹ thuật pha chế nhập công thức ở Pha chế › Công thức."}</div>`;
+        if($("#kf-ctnew"))$("#kf-ctnew").onclick=()=>pchCtForm(c);return}
+      if(okBtn)okBtn.disabled=false;B=RC.lines.map(l=>({item:l.item,need:l.qty*lit}));
+      if($("#kf-ctn"))$("#kf-ctn").innerHTML=`<div class="note grn">Định lượng theo <b>công thức bản ${RC.version}</b> (dùng từ ${kDd(String(RC.effective_at||RC.created_at).slice(0,10))}).${RC.huong_dan?` <a href="#" class="lnk" id="kf-hd">Xem hướng dẫn pha</a>`:""}</div>`;
+      if($("#kf-hd"))$("#kf-hd").onclick=e=>{e.preventDefault();alert(RC.huong_dan)};
       const lb=kfNum($("#kf-lit").value)||lit;B.forEach(b=>{const std=kq(b.need!=null?b.need:b.qty*lit),per=b.need!=null?b.need/lit:b.qty,tr=addLine({item:b.item,qty:std,std,per:Math.round(per*1e6)/1e6,perBon:kq(per*lb),fixed:true});tr.dataset.std=std});
-      if(!B.length)$("#kf-warn").innerHTML=`<div class="note amb">${esc(c)} chưa có định mức. Thêm nguyên liệu bằng nút "+ Thêm dòng".</div>`;else refresh()};
+      refresh()};
     khoPick($("#kf-btp"),["BTP"],fill);$("#kf-lit").oninput=fill;if($("#kf-bon"))$("#kf-bon").oninput=fill;
     $("#kf-add").onclick=()=>{const tr=addLine({});tr.dataset.std=0}}
   else{$("#kf-add").onclick=()=>addLine({});if(isOut)$("#kf-box").onclick=()=>addLine({cls:["NVL","HH","CCDC"]});addLine({})}
@@ -226,13 +234,13 @@ function khoForm(type,pre,clsO){
     khoPrintDoc({doc:{no:"(chưa ghi sổ)",type:tp,doc_date:dt,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",ref_qty:isPC&&$("#kf-rq")&&$("#kf-rq").value!==""?kfNum($("#kf-rq").value):null,note:"",status:"OK"},moves:mv},Object.assign({},KHO_TYPES[tp]||T),false,isPC?{liters:kfNum($("#kf-lit").value),nguoi:[...document.querySelectorAll("#kf .sdm-pn")].map(x=>x.value.trim()).filter(Boolean)}:{},true)};
   $("#kf").onsubmit=async e=>{e.preventDefault();const ok=$("#kf-ok");ok.disabled=true;$("#kf-msg").textContent="Đang ghi…";
     try{const L=lines().filter(l=>l.item);const body={type:isOut?$("#kf-k").value:type==="TB"?"TD":type,date:$("#kf-d").value,partner:$("#kf-p")?$("#kf-p").value:"",ref_no:$("#kf-r")?$("#kf-r").value:"",note:$("#kf-n").value,
-      lines:L.map(l=>({item:l.item,qty:l.qty===""?undefined:+l.qty,ref_qty:l.ref_qty===""?undefined:+l.ref_qty,verdict:l.verdict||undefined,price:l.price===""?undefined:+l.price,std_qty:l.std_qty}))};
+      lines:L.map(l=>({item:l.item,qty:l.qty===""?undefined:+l.qty,ref_qty:l.ref_qty===""?undefined:+l.ref_qty,verdict:l.verdict||undefined,price:l.price===""?undefined:+l.price,std_qty:l.std_qty,note:l.note||undefined}))};
       if($("#kf-po")&&$("#kf-po").value)body.po_id=$("#kf-po").value;
       if(type==="TB")body.bo_sung=true;if(type==="TD"&&$("#kf-moc")&&$("#kf-moc").checked)body.moc=true;
       if(KHO.edit&&type==="PN")body.replace_doc_id=KHO.edit.id;
       if(isPC){body.nguoi=[...new Set([...document.querySelectorAll("#kf .sdm-pn")].map(x=>x.value.trim()).filter(Boolean))];body.btp=$("#kf-btp").dataset.code;body.liters=kfNum($("#kf-lit").value)*(kfNum($("#kf-bon")&&$("#kf-bon").value||"1")||1);body.bon=kfNum($("#kf-bon")&&$("#kf-bon").value||"1")||1;body.lit_bon=kfNum($("#kf-lit").value);body.ref_qty=$("#kf-rq").value.trim()===""?undefined:kfNum($("#kf-rq").value)}
-      if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");if(L.some(l=>l.qty==="x"))throw new Error("Có số lượng gõ chưa đúng (ví dụ đúng: 0,5 · 12,67 · 0.03)");
-      const r=await kApi("/docs",{method:"POST",body:JSON.stringify(body)});closeDrawer();KHO.at=0;KHO.list={};KHO.nxt=null;KHO.cl=null;KHO.mp=null;await khoLoad(true);renderMain();KHO.edit=null;if(typeof MH!=="undefined"&&typeof mhReload==="function")mhReload().catch(()=>{});toast("Đã ghi phiếu "+r.no);khoOpenDoc(r.id,r.warnings)}
+      if(L.some(l=>l.qty===""))throw new Error("Còn dòng chưa ghi số lượng");if(isPC){const nl=L.filter(l=>l.lech&&!l.note);if(nl.length){if($("#kf-ly"))$("#kf-ly").focus();throw new Error("Có nguyên liệu lệch quá 5% so với công thức ("+nl.map(l=>(KHO.items.get(l.item)||{}).name||l.item).join(", ")+"). Ghi lý do lệch ở cuối phiếu.")}}if(L.some(l=>l.qty==="x"))throw new Error("Có số lượng gõ chưa đúng (ví dụ đúng: 0,5 · 12,67 · 0.03)");
+      const r=await kApi("/docs",{method:"POST",body:JSON.stringify(body)});closeDrawer();KHO.at=0;KHO.list={};KHO.nxt=null;KHO.cl=null;KHO.mp=null;await khoLoad(true);renderMain();KHO.edit=null;if(typeof MH!=="undefined"&&typeof mhReload==="function")mhReload().catch(()=>{});toast("Đã ghi phiếu "+r.no);if(isPC&&typeof pchAfterPc==="function")pchAfterPc(body,r);khoOpenDoc(r.id,r.warnings)}
     catch(err){$("#kf-msg").textContent="";$("#kf-warn").innerHTML=`<div class="note red">${esc(err.message)}</div>`;ok.disabled=false}};
 }
 
@@ -271,9 +279,9 @@ const KHO_ROLE={IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:"Thu được",AUTO
 /* blank=true: bản ĐIỀN TAY — giữ mã, tên, ĐVT, định mức; để trống ô số thực tế (nền vàng) và thêm vài dòng trống để ghi thêm. */
 function khoPrintDoc(r,T,price,ex,blank){
   const d=r.doc,isPC=d.type==="PC",isPN=d.type==="PN"&&price&&!blank,cancelled=!blank&&d.status==="HUY";
-  const meta=[["Số phiếu",d.no],["Ngày",kDd(d.doc_date)],d.partner?[d.type==="PN"?"Nhà cung cấp":d.type==="XB"||d.type==="XK"?"Khách hàng / nơi nhận":"Đối tác",d.partner]:null,d.ref_no?[d.type==="PC"||d.type==="KS"?"Phiếu sản xuất / lô":"Tham chiếu",d.ref_no]:null,
-    d.ref_qty!=null?["Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&blank&&+ex.liters>0?["Số lít cần pha (1 bồn)",knum(ex.liters)+" lít"]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,isPC&&ex.bon>1?["Số bồn",knum(ex.bon)+" bồn × "+knum(ex.lit_bon||0)+" lít"]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
-  const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Định mức","Định lượng","Thực tế","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
+  const meta=[["Số phiếu",d.no],["Ngày",kDd(d.doc_date)],d.partner?[d.type==="PN"?"Nhà cung cấp":d.type==="XB"||d.type==="XK"?"Khách hàng / nơi nhận":"Đối tác",d.partner]:null,d.ref_no?[d.type==="PC"?(/^YCPC/.test(d.ref_no)?"Yêu cầu pha chế":"Phiếu sản xuất / lô"):d.type==="KS"?"Phiếu sản xuất / lô":"Tham chiếu",d.ref_no]:null,
+    d.ref_qty!=null?[isPC&&/^YCPC/.test(d.ref_no||"")?"Số lít theo yêu cầu":"Số lượng theo phiếu sản xuất",knum(d.ref_qty)]:null,isPC&&blank&&+ex.liters>0?["Số lít cần pha (1 bồn)",knum(ex.liters)+" lít"]:null,isPC&&(blank||ex.liters)?["Số lít thực tế thu được",blank?"…………… lít":knum(ex.liters)]:null,isPC&&ex.bon>1?["Số bồn",knum(ex.bon)+" bồn × "+knum(ex.lit_bon||0)+" lít"]:null,ex.nguoi&&ex.nguoi.length?["Người sản xuất",ex.nguoi.join(", ")]:null,ex.kind?["Loại xuất",ex.kind]:null,["Người lập",blank?"……………………":(d.created_by_name||"—")]].filter(Boolean);
+  const cols=["STT","Mã hàng","Tên hàng","ĐVT"].concat(isPC?["Công thức / 1 lít","Định lượng","Thực tế","Chênh lệch"]:["Số lượng"]).concat(isPN?["Đơn giá","Thành tiền"]:[]).concat(["Ghi chú"]);
   let tong=0;
   const body=r.moves.map((m,i)=>{const q=isPC?(m.role==="PRODUCT"?m.qty:-m.qty):Math.abs(m.qty);const qshow=d.type==="TL"&&m.role==="DROP"?knum(m.std_qty):knum(q);
     let cells=[i+1,m.item,m.name,m.unit];
@@ -325,7 +333,7 @@ function pKhoDocs(m,type,v){
   const can_=kCan(type);
   khoFrame(m,T.page,T.name,T.hint,`<section class="card flush"><div class="card-h pad"><h2>${KHO.docAll?"Tất cả phiếu":"Phiếu trong kỳ "+kPerLabel(P)}</h2><span class="hint">${rows?rows.length+" / "+nAll+" phiếu · ":""}<button class="lnk" id="kho-all">${KHO.docAll?"Chỉ xem theo kỳ":"Xem tất cả"}</button> · bấm vào số phiếu để xem, in hoặc hủy</span></div>
    ${rows&&!rows.length&&nAll?`<p class="hint pad">Không có phiếu nào trong kỳ này. Bấm "Xem tất cả" để xem các phiếu ngoài kỳ.</p>`:rows?khoRows(["Số phiếu","Ngày","Đối tác / tham chiếu","Số dòng","Người lập","Trạng thái"].concat(KHO_SPLIT[type]?["Phiếu nhập","Phiếu xuất vật tư"]:[]),rows.map(r=>`<tr class="clk" data-doc="${r.id}"><td><b>${esc(r.no)}</b></td><td>${kDd(r.doc_date)}</td><td>${esc([r.partner,r.ref_no].filter(Boolean).join(" · "))}</td><td class="n">${r.n_lines}</td><td>${esc(r.created_by_name||"—")}</td><td>${r.status==="OK"?pill("Hiệu lực","grn"):pill("Đã hủy","gry")}</td>${KHO_SPLIT[type]?`<td class="mono">${khoSubNos({type,no:r.no})[0]}</td><td class="mono">${khoSubNos({type,no:r.no})[1]}</td>`:""}</tr>`)):`<p class="hint pad">Đang tải…</p>`}</section>`,
-   can_?`<button class="btn pri" id="kho-new">+ Lập phiếu ${type==="PN"?"nhập":type==="XB"?"xuất":"mới"}</button>`:`<span class="hint">Bạn chỉ xem được loại phiếu này</span>`);
+   can_?`<button class="btn pri" id="kho-new">+ ${type==="PN"?"Lập phiếu nhập":type==="XB"?"Lập phiếu xuất":type==="TL"?"Thêm phiếu nhập hàng hoàn":"Lập phiếu mới"}</button>`:`<span class="hint">Bạn chỉ xem được loại phiếu này</span>`);
   if($("#kho-new"))$("#kho-new").onclick=()=>khoForm(type,null,v&&v.formCls);
   if($("#kho-all"))$("#kho-all").onclick=()=>{KHO.docAll=!KHO.docAll;renderMain()};
   m.querySelectorAll("[data-doc]").forEach(r=>r.onclick=()=>khoOpenDoc(+r.dataset.doc));

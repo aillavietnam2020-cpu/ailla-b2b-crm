@@ -5,6 +5,7 @@ import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { AGENT_ROSTER } from '@shared/agentRoster';
 import { unpack } from '../lib/pack';
 import { requirePermission } from '../middleware/rbac';
+import { pushChat } from '../services/pushDispatch';
 
 /**
  * Tin nhắn kiểu Lark (hub/src/tinnhan.js, chị Hoa 02–03/11/2026). Máy chủ chặn quyền, không chỉ ẩn trên màn hình:
@@ -85,7 +86,7 @@ export async function canRoom(room: string, A: Acc): Promise<boolean> {
     let p = (await hubCtx(A.db)).projects.find((x) => x.id === id);
     if (!p) p = (await hubCtx(A.db, true)).projects.find((x) => x.id === id); // dự án vừa tạo
     if (!p) return false;
-    return p.owner === A.hubId || (p.tv ?? []).includes(A.hubId) || (!!A.team && [p.team, ...(p.teams ?? [])].includes(A.team));
+    return p.team === 'chung' || p.owner === A.hubId || (p.tv ?? []).includes(A.hubId) || (!!A.team && [p.team, ...(p.teams ?? [])].includes(A.team));
   }
   const g = await A.db.prepare('SELECT members FROM chat_groups WHERE id = ?').bind(room.slice(2)).first<{ members: string }>();
   return !!g && parseMembers(g.members).includes(A.id);
@@ -170,6 +171,13 @@ chatRoutes.post('/msgs', async (c) => {
     .bind(me, room, id)
     .run();
   if (!kind && body.includes('@')) await callAgents(A, room, body, me).catch(() => undefined);
+  // Thông báo đẩy về điện thoại người nhận (chạy nền).
+  const job = pushChat(c.env, room, me, body, kind).catch((e) => console.error('[push] tin nhan', e));
+  try {
+    c.executionCtx.waitUntil(job);
+  } catch {
+    /* chạy thử không có executionCtx */
+  }
   return ok(c, { id, room, user_id: me, body, kind, ref, created_at: at });
 });
 

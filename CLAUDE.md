@@ -29,3 +29,10 @@ Chat được TỰ ghép vào `main` và TỰ đưa lên web, không cần hỏi
 - Kiểm tra: `npx tsc --noEmit`, `npx vitest run`. Sửa `hub/src/*` thì `node hub/build.mjs`.
 - Đưa lên web: `npm run deploy:prod`; cập nhật dữ liệu: `npm run db:migrate:prod`.
 - Hướng dẫn nghiệp vụ và bàn giao cũ: `docs/HUONG-DAN-CHO-TRO-LY-KHAC.md`, `docs/HIEN-TRANG-TRIEN-KHAI.md`.
+
+## Máy chủ VPS và dữ liệu thật (chị Hoa duyệt ghi 09/11)
+
+- Vào máy chủ VPS: gõ `ssh vps` (cấu hình sẵn trong `~/.ssh/config`: máy 103.57.223.91, cổng 24700, khóa `~/.ssh/inet_openclaw`). Lệnh `systemctl --user` trên VPS cần `export XDG_RUNTIME_DIR=/run/user/0` trước.
+- Không restart gateway OpenClaw vào 7h–8h30 thứ Hai và cả ngày 10 hằng tháng (giờ báo cáo; từng làm rớt Chrome).
+- Đọc dữ liệu thật: `env -u CLOUDFLARE_API_TOKEN npx wrangler d1 execute ailla_crm_prod --remote --env production --command "..."`. Không tắt sandbox, tắt là bị chặn. Chỉ đọc; ghi/sửa dữ liệu tiền, kho thật thì hỏi chị Hoa trước.
+- Không tự nhập mật khẩu hay kéo hộp kiểm tra (captcha) của TikTok/Shopee: dừng và nhắn chị.

@@ -1,3 +1,4 @@
+import { flowCron } from './services/flowGate';
 import { nhacNgayLe, nhacNgayVangChung } from './services/nhacNgayLe';
 import type { Env } from './env';
 import { createApp } from './app';
@@ -8,6 +9,8 @@ import { serveHub } from './hub/serve';
 import HUB_HTML from './hub/hub.html';
 import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
+import { doDungReminders } from './routes/doDung';
+import { pushCron } from './services/pushDispatch';
 import { taskRecurring } from './services/taskRecurring';
 import { publishDue } from './services/fpPublish';
 import { syncAllChannels } from './services/poscake';
@@ -15,6 +18,7 @@ import { syncFbMoney } from './services/fbCost';
 import { syncComboTasks } from './routes/sanpham';
 import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
+import { backfillStep, syncCskhDays } from './services/cskh';
 import { autoSyncEnabled, syncDrivePermissions } from './services/driveSync';
 import { isAdminHost } from './lib/host';
 import { syncAccessEmails } from './lib/access-sync';
@@ -26,13 +30,17 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname.startsWith('/api')) {
+    if (url.pathname.startsWith('/api') || url.pathname.startsWith('/d/')) {
       return app.fetch(request, env, ctx);
     }
 
     // Khu Marketing: trang tĩnh nhưng chỉ trả về sau khi kiểm tra đăng nhập.
     if (url.pathname === '/hub' || url.pathname.startsWith('/hub/')) {
       return serveHub(request, env, HUB_HTML);
+    }
+    // Ailla Chat: phần Tin nhắn dùng như ứng dụng riêng ngoài màn hình chính (không lên store).
+    if (url.pathname === '/chat' || url.pathname === '/chat/') {
+      return serveHub(request, env, HUB_HTML, true);
     }
 
     // Địa chỉ quản trị: đã đăng nhập thì mở gốc là vào luôn trang quản trị (không hiện giao diện CRM B2B).
@@ -69,6 +77,19 @@ export default {
         } catch (error) {
           console.error('[cron] cua vao loi', error);
         }
+        // Thông báo đẩy về điện thoại: chuông do máy chủ ghi, báo gộp việc chờ duyệt / sau giờ yên lặng.
+        try {
+          await pushCron(env);
+        } catch (error) {
+          console.error('[cron] thong bao day loi', error);
+        }
+        // CSKH khách lẻ: kéo bù dần đơn Facebook giao thành công về ngày bắt đầu ở Cài đặt CSKH (mỗi 15 phút vài ngày, xong thì thôi).
+        try {
+          const bf = await backfillStep(env.DB, env.INGEST_KEY, (u) => fetch(u), 4);
+          if (bf.done) console.info('[cron] cskh keo bu', JSON.stringify(bf));
+        } catch (error) {
+          console.error('[cron] cskh keo bu loi', error);
+        }
         if (new Date(event.scheduledTime).getUTCMinutes() >= 15) return;
         const config = await loadConfig(env.DB);
         const result = await syncAlerts(env.DB, config);
@@ -89,10 +110,13 @@ export default {
             console.info('[cron] combo moi', JSON.stringify(await syncComboTasks(env.DB)));
             // Đơn hoàn (TikTok, Shopee, Facebook): hôm nay, hôm qua, hôm kia.
             console.info('[cron] don hoan', JSON.stringify(await syncReturns(env.DB, env.INGEST_KEY, [day(0), day(1), day(2)], (u) => fetch(u))));
-            // Số bán hàng Facebook theo người xử lý đơn (Pancake analytics): 8 ngày gần nhất, vì đơn hoàn và đơn giao về chậm.
-            console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6, 7].map(day), (u) => fetch(u))));
+            // Số bán hàng Facebook theo người xử lý đơn (Pancake analytics), theo ngày tạo đơn: 45 ngày gần nhất, vì đơn giao xong và đơn hoàn
+            // về chậm tới vài tuần (14/11: tháng 10 chỉ kéo lại 8 ngày nên web 996tr giao thành công, 66tr hoàn, Pancake đã 1.022tr và 176tr).
+            console.info('[cron] fb sale', JSON.stringify(await syncFbSaleDays(env.DB, env.INGEST_KEY, Array.from({ length: 46 }, (_, i) => day(i)), (u) => fetch(u))));
             // Tiền đơn Facebook đã gửi hàng (giá vốn, ship Facebook trên trang quản trị): hôm qua, hôm kia.
             console.info('[cron] fb money', JSON.stringify(await syncFbMoney(env.DB, env.INGEST_KEY, [day(1), day(2)], (u) => fetch(u))));
+            // CSKH khách lẻ: đơn Facebook giao thành công 7 ngày gần nhất (kéo trùng không sao, để lỡ một sáng lỗi mạng vẫn không sót).
+            console.info('[cron] cskh', JSON.stringify(await syncCskhDays(env.DB, env.INGEST_KEY, [0, 1, 2, 3, 4, 5, 6].map(day), (u) => fetch(u))));
           }
         } catch (error) {
           console.error('[cron] poscake loi', error);
@@ -118,11 +142,23 @@ export default {
         } catch (error) {
           console.error('[cron] viec lap lai loi', error);
         }
+        // Work Flow của phòng (Quản trị phòng): báo người duyệt bước mới, nhắc / báo Lead / báo CEO khi quá hạn.
+        try {
+          console.info('[cron] work flow', JSON.stringify(await flowCron(env.DB)));
+        } catch (error) {
+          console.error('[cron] work flow loi', error);
+        }
         // Nhắc việc Task giao việc: trễ, đến hạn, chờ duyệt + tóm tắt cho CEO, và tin nhắn của Trợ lý công việc (giờ đặt ở Cấu hình, mặc định 8 giờ).
         try {
           console.info('[cron] nhac task', JSON.stringify(await taskReminders(env.DB)));
         } catch (error) {
           console.error('[cron] nhac task loi', error);
+        }
+        // Phiếu lấy đồ (thiết bị quay, hàng mẫu) quá hạn trả: nhắc người lấy + HCNS lúc 8 giờ sáng (routes/doDung.ts).
+        try {
+          console.info('[cron] nhac tra do', JSON.stringify(await doDungReminders(env.DB)));
+        } catch (error) {
+          console.error('[cron] nhac tra do loi', error);
         }
         // Ngày 25 hằng tháng: nhắc HCNS điền ngày lễ tháng sau (services/nhacNgayLe.ts).
         try {

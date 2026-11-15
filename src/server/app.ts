@@ -18,6 +18,7 @@ import { bonusRoutes } from './routes/bonus';
 import { priceAdjustmentRoutes } from './routes/priceAdjustments';
 import { workRoutes } from './routes/work';
 import { notifyRoutes } from './routes/notify';
+import { pushRoutes } from './routes/push';
 import { staffPurchaseRoutes } from './routes/staffPurchases';
 import { shippingVoucherRoutes } from './routes/shippingVouchers';
 import { soChiRoutes } from './routes/soChi';
@@ -35,12 +36,17 @@ import { financeRoutes } from './routes/finance';
 import { importRoutes } from './routes/imports';
 import { dashboardRoutes } from './routes/dashboards';
 import { hubRoutes } from './routes/hub';
+import { qtpbRoutes } from './routes/qtpb';
+import { qtpbBangRoutes } from './routes/qtpbBang';
+import { qtpbFlowRoutes } from './routes/qtpbFlow';
 import { videoLinkRoutes } from './routes/videoLinks';
 import { driveRoutes } from './routes/drive';
 import { fpAgentRoutes, hubWorkerRoutes, workerRoutes } from './routes/worker';
 import { fpPublishRoutes } from './routes/fpPublish';
 import { sttRoutes, sttWorkerRoutes } from './routes/stt';
 import { khoRoutes } from './routes/kho';
+import { phacheRoutes } from './routes/phache';
+import { cskhRoutes } from './routes/cskh';
 import { sanphamRoutes } from './routes/sanpham';
 import { tiktokRoutes } from './routes/tiktok';
 import { shopeeRoutes } from './routes/shopee';
@@ -50,9 +56,14 @@ import { hrRoutes } from './routes/hr';
 import { daoTaoRoutes } from './routes/daoTao';
 import { chamCongRoutes } from './routes/chamCong';
 import { nghiPhepRoutes } from './routes/nghiPhep';
+import { doDungRoutes } from './routes/doDung';
 import { taskFileRoutes } from './routes/taskFiles';
 import { chatRoutes } from './routes/chat';
 import { ceoSpendRoutes } from './routes/ceoSpend';
+import { accRulesRoutes } from './routes/accRules';
+import { orderIntakeRoutes } from './routes/orderIntake';
+import { publicOrderRoutes } from './routes/publicOrder';
+import { zaloRelayRoutes } from './routes/zaloRelay';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -104,6 +115,7 @@ export function createApp() {
   app.route('/api/stt-worker', sttWorkerRoutes);
   // Cầu nối trên VPS (nhắn agent trên web) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/agent-relay', agentRelayRoutes);
+  app.route('/api/zalo-relay', zaloRelayRoutes);
   app.route('/api/agent-relay-ops', agentRelayOpsRoutes);
   app.route('/api/agent-train-relay', agentTrainRelayRoutes);
   // Agent Fanpage (OpenClaw trên VPS) tự gọi bằng khoá riêng FP_KEY.
@@ -112,6 +124,9 @@ export function createApp() {
   app.route('/api/ingest', ingestRoutes);
 
   // Mọi endpoint /api còn lại đều phải qua xác thực + RBAC ở backend.
+  // Trang khách xem + chốt đơn qua link gửi Zalo (không đăng nhập, link khó đoán).
+  app.route('/d', publicOrderRoutes);
+
   app.use('/api/*', authMiddleware);
   // Trên địa chỉ quản trị chỉ CEO và kế toán; thao tác phân quyền chỉ làm ở địa chỉ quản trị.
   app.use('/api/*', adminHostGate);
@@ -130,8 +145,10 @@ export function createApp() {
   app.route('/api/price-adjustments', priceAdjustmentRoutes);
   app.route('/api/shipping-vouchers', shippingVoucherRoutes);
   app.route('/api/ceo-spend', ceoSpendRoutes);
+  app.route('/api/acc-rules', accRulesRoutes);
   app.route('/api/work', workRoutes);
   app.route('/api/notify', notifyRoutes);
+  app.route('/api/push', pushRoutes);
   app.route('/api/staff-purchases', staffPurchaseRoutes);
   app.route('/api/agent/tiktok', agentTiktokRoutes);
   app.route('/api/agent/shopee', agentShopeeRoutes);
@@ -144,6 +161,7 @@ export function createApp() {
   app.route('/api/agent-train', agentTrainRoutes);
   app.route('/api/proposals', proposalRoutes);
   app.route('/api/receiving-accounts', receivingAccountRoutes);
+  app.route('/api/order-intake', orderIntakeRoutes);
   app.route('/api/orders', orderRoutes);
   app.route('/api/approvals', approvalRoutes);
   app.route('/api', financeRoutes);
@@ -151,7 +169,12 @@ export function createApp() {
   app.route('/api/dashboards', dashboardRoutes);
   app.route('/api/hub/worker-tasks', hubWorkerRoutes);
   app.route('/api/hub/fp-publish', fpPublishRoutes);
+  app.route('/api/hub/qtpb/bang', qtpbBangRoutes);
+  app.route('/api/hub/qtpb/flow', qtpbFlowRoutes);
+  app.route('/api/hub/qtpb', qtpbRoutes);
   app.route('/api/hub/kho', khoRoutes);
+  app.route('/api/hub/phache', phacheRoutes);
+  app.route('/api/hub/cskh', cskhRoutes);
   app.route('/api/hub/sanpham', sanphamRoutes);
   app.route('/api/hub/so-chi', soChiRoutes);
   app.route('/api/hub/tiktok', tiktokRoutes);
@@ -163,6 +186,7 @@ export function createApp() {
   app.route('/api/hub/daotao', daoTaoRoutes);
   app.route('/api/hub/chamcong', chamCongRoutes);
   app.route('/api/hub/nghiphep', nghiPhepRoutes);
+  app.route('/api/hub/dodung', doDungRoutes);
   app.route('/api/hub/task-files', taskFileRoutes);
   app.route('/api/hub/chat', chatRoutes);
   app.route('/api/hub', hubRoutes);

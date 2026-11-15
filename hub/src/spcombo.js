@@ -11,7 +11,7 @@ const spcKy=()=>new Date(Date.now()+7*3600e3).toISOString().slice(0,7);
 const spcToday=()=>new Date(Date.now()+7*3600e3).toISOString().slice(0,10);
 /* Thấy giá vốn: CEO hoặc người có quyền xem số tiền (kế toán). */
 const spcSeeCost=()=>typeof SV!=="undefined"&&!!SV.me&&(SV.me.role==="CEO"||(SV.perms||[]).includes("debt.read.all")||(SV.perms||[]).includes("order.accounting.confirm"));
-const spcPage=()=>PAGE==="spcombo"||PAGE==="kho_combo"||PAGE==="kho_qd";
+const spcPage=()=>PAGE==="dutru"||PAGE==="spcombo"||PAGE==="kho_combo"||PAGE==="kho_qd";
 async function spcLoad(force){
   if(SPCB.busy)return;if(!force&&SPCB.at&&Date.now()-SPCB.at<60000)return;
   SPCB.busy=true;

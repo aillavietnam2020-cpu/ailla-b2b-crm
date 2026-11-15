@@ -271,7 +271,7 @@ export async function createReturn(
   const date = input.return_date ?? vnDate();
   const month = date.slice(0, 7).replace('-', '');
   const seq = await db
-    .prepare("SELECT COUNT(*) AS n FROM order_returns WHERE return_no LIKE ?")
+    .prepare("SELECT MAX(CAST(substr(return_no, instr(return_no, char(45)) + 1) AS INTEGER)) AS n FROM order_returns WHERE return_no LIKE ?")
     .bind(`TH${month}-%`)
     .first<{ n: number }>();
   const returnNo = `TH${month}-${String((seq?.n ?? 0) + 1).padStart(4, '0')}`;

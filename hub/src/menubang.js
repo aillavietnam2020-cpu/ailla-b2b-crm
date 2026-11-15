@@ -15,11 +15,12 @@
     const L=ADMH?SRC.filter(m=>m.adm).concat(SRC.filter(m=>!m.adm)):SRC.filter(m=>!m.adm).concat(SRC.filter(m=>m.adm));
     L.forEach(m=>{try{m.groups().forEach(([,its])=>its.forEach(i=>{if(!i)return;if(!o[i[0]])o[i[0]]=i;(src[m.k]=src[m.k]||[]).push(i[0])}))}catch(e){}});
     if(!o.nhaplieu&&typeof PAGES!=="undefined"&&PAGES.nhaplieu)o.nhaplieu=MI("nhaplieu","Nhập dữ liệu MKT",u=>u.role==="admin"||can(u,"baocao.tiktok")||can(u,"baocao.ads")||u.role==="lead");
+    if(!o.qt_kt&&typeof PAGES!=="undefined"&&PAGES.qt_kt)o.qt_kt=MI("qt_kt","Quy tắc kế toán",u=>u.role==="admin"||can(u,"chiphi.xem")||(typeof mhManage==="function"&&mhManage()));
     if(!o.quytac&&typeof PAGES!=="undefined"&&PAGES.quytac)o.quytac=MI("quytac","Quy tắc vận hành & luồng việc",()=>typeof mhManage==="function"&&mhManage());
     C={o,src};Promise.resolve().then(()=>{C=null});return C};
   /* sx_mh (Đơn mua hàng bản kho, không giá) chỉ cho người KHÔNG quản lý mua hàng; người quản lý (Thảo, kế toán, CEO) dùng mh_po. Tránh hiện hai dòng "Đơn mua hàng" (05/11). */
   const MHX=u=>!(typeof mhManage==="function"&&mhManage());
-  const it=(P,x)=>{const[id,nm]=Array.isArray(x)?x:[x];const i=P[id];if(!i)return null;const p=id==="sx_mh"?(u=>MHX(u)&&i[2](u)):id==="mh_po"?(u=>!MHX(u)&&i[2](u)):i[2];return [i[0],nm||i[1],p,i[3]]};
+  const it=(P,x)=>{const[id,nm]=Array.isArray(x)?x:[x];const i=P[id];if(!i)return null;if(typeof svKhoHoanOnly==="function"&&svKhoHoanOnly()&&/^(kho_|sx_|mh_)/.test(id)&&!KHO_HOAN_PAGES.includes(id))return null;const p=id==="sx_mh"?(u=>MHX(u)&&i[2](u)):id==="mh_po"?(u=>!MHX(u)&&i[2](u)):i[2];return [i[0],nm||i[1],p,i[3]]};
   /* spec: [[tên nhóm, [id | [id, tên mới]]]]; from: mục cũ để vét trang bảng chưa nhắc; drop: trang cố ý chuyển sang web kia. */
   const mod=(k,ic,n,zone,spec,from,drop,extra)=>Object.assign({k,ic,n,zone,sub:"",adm:ADMH||undefined,groups:()=>{const{o,src}=pool();
     const G=spec.map(([g,ids])=>[g,ids.map(x=>it(o,x)).filter(Boolean)]);
@@ -36,7 +37,7 @@
         ["Kênh bán hàng",[["bc_tiktok","TikTok Shop"],["bc_shopee","Shopee"],["bc_fb","Facebook"],["cskh_cu","CSKH cũ"],["bc_b2b","Kênh phân phối"],["bc_gc","Kênh OEM"],["bc_tong","So sánh kênh"],["dt_dc","Đối chiếu doanh thu"]]],
         ["Kế hoạch & KPI",[["muctieu","Kế hoạch doanh thu"]]],
         ["Cảnh báo",[["soat_sl","Máy soát số liệu"],["nguong","Ngưỡng cảnh báo & chỉ số"]]]],
-      tc:[["Lãi lỗ",[["pl","P&L công ty"]]],
+      tc:[["Lãi lỗ",[["pl","P&L công ty"],["dutru","Dự trù giá bán"]]],
         /* Chị Hoa 28/10: Mua hàng về lại kế toán, trong Thu chi. Trang mh_po gồm đơn mua, nhận hàng, chứng từ, trả tiền NCC (bấm vào từng đơn). */
         ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["mh_po","Mua hàng"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"]]],
         ["Dòng tiền",[["tien_lich","Dòng tiền"]]],
@@ -48,7 +49,8 @@
         ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã Kênh phân phối"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
       pd:[["",[["pheduyet","Phê duyệt"]]]],
-      cfg:[["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
+      cfg:[["Quy tắc",[["qt_kt","Quy tắc kế toán"]]], /* chị Hoa 07/11: luật kế toán đặt một chỗ (quytacketoan.js) */
+        ["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
         ["Danh mục",[["spcombo","Sản phẩm & combo"],["sanpham","Sản phẩm"],["kenhban","Kênh bán & phí"],["chiphidm","Danh mục chi phí"],["cr_rcv","Tài khoản nhận tiền"]]],
         ["Chính sách bán hàng",[["cr_gia","Bảng giá"],["cr_dc","Giá điều chỉnh / khuyến mại"],["cr_thuong","Thưởng & xếp hạng NPP"],["cr_giagc","Bảng giá Kênh OEM"]]],
         ["Dữ liệu & sao lưu",[["nhaplieu","Nhập dữ liệu MKT"],["cr_import","Nhập dữ liệu CRM"],["caidat","Sao lưu dữ liệu"],["cr_audit","Nhật ký"]]],

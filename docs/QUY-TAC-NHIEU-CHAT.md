@@ -37,6 +37,7 @@ File trong `migrations/` chạy theo số thứ tự tên file. Hai chat cùng t
 | Agent | 0080–0089 |
 | Ads / Facebook | 0090–0099 |
 | Marketing | 0100–0109 |
+| Đồ dùng văn phòng & nhà máy (HCNS) | 0320–0329 |
 | Đào tạo & onboarding | 0240–0249 |
 | Đơn hàng / Kế toán / Hàng trả (góp ý chị Thảo) | 0110–0119 |
 | Trang quản trị / Mua hàng / Phiếu chi | 0120–0129 |
@@ -44,7 +45,11 @@ File trong `migrations/` chạy theo số thứ tự tên file. Hai chat cùng t
 | Báo cáo sàn tải hằng tuần (Shopee 2 shop, nạp tự động) | 0180–0189 |
 | Task giao việc + Tin nhắn | 0250–0259 |
 | Nhân sự (chấm công, đơn nghỉ, phiếu lương) | 0260–0269 |
+| Pha chế (yêu cầu pha chế, công thức, báo tồn xưởng, hao hụt) | 0270–0279 |
 | Đấu nối (sổ chi ↔ tài sản ↔ mua hàng ↔ kho, hàng lệch đơn mua) | 0220–0229 |
+| Nhận đơn B2B qua Zalo (đọc ảnh đơn, link khách chốt, trợ lý nhóm Zalo) | 0290–0299 |
+| CSKH khách lẻ (B2C) | 0300–0309 |
+| Quản trị phòng ban (Lead tự quản nhân sự, phân quyền, menu, nhật ký) | 0330–0339 |
 | Chat khác (điện thoại, nhân sự...) | xin khối mới ở chị Hoa, ghi vào bảng này |
 
 - File đã chạy lên production thì KHÔNG đổi tên, KHÔNG sửa nội dung. Hiện cả hai file `0061_*` đều đã chạy.

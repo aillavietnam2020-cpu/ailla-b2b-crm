@@ -64,6 +64,8 @@ userRoutes.get('/', requirePermission('user.manage'), async (c) => {
             (SELECT COUNT(*) FROM user_permissions up
               WHERE up.user_id = users.id AND up.permission = 'order.kho.process') AS is_warehouse,
             (SELECT COUNT(*) FROM user_permissions up
+              WHERE up.user_id = users.id AND up.permission = 'kho.hoan') AS is_hoan,
+            (SELECT COUNT(*) FROM user_permissions up
               WHERE up.user_id = users.id AND up.permission = 'hub.access') AS is_marketing,
             (SELECT COUNT(*) FROM user_permissions up
               WHERE up.user_id = users.id AND up.permission = 'hub.only') AS is_hub_only
@@ -184,6 +186,27 @@ userRoutes.post('/:id/accountant', requirePermission('user.manage'), async (c) =
   );
   await c.env.DB.batch(statements);
   return c.json({ data: { ok: true, accountant: enabled }, request_id: c.get('requestId') });
+});
+
+/** Bật/tắt quyền riêng "Quét, nhập hàng hoàn" (CEO 10/11): nhân viên kho chỉ làm trang Hàng hoàn các sàn. Chỉ CEO cấp. */
+userRoutes.post('/:id/hoan', requirePermission('user.manage'), async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as { enabled?: boolean };
+  const enabled = body.enabled !== false;
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL').bind(id).first<{ id: string }>();
+  if (!target) throw notFound('Không tìm thấy tài khoản');
+  const now = nowIso();
+  await c.env.DB.batch([
+    enabled
+      ? c.env.DB.prepare(
+          `INSERT INTO user_permissions (user_id, permission, granted_by, created_at) VALUES (?, 'kho.hoan', ?, ?)
+           ON CONFLICT (user_id, permission) DO NOTHING`,
+        ).bind(id, auth.user.id, now)
+      : c.env.DB.prepare("DELETE FROM user_permissions WHERE user_id = ? AND permission = 'kho.hoan'").bind(id),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: enabled ? 'USER_HOAN_ON' : 'USER_HOAN_OFF', entityType: 'USER', entityId: id }),
+  ]);
+  return c.json({ data: { enabled }, request_id: c.get('requestId') });
 });
 
 /**

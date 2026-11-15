@@ -151,6 +151,8 @@ export interface ProductItem {
   name: string;
   unit: string | null;
   pack_size: string | null;
+  /** Số chai / can trong 1 thùng (mã bán theo thùng); null = không phải mã thùng hoặc chưa có. */
+  per_box?: number | null;
   group_id: string | null;
   group_name: string | null;
   active: number;

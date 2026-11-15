@@ -55,6 +55,15 @@ tnDrawMsgs=function(keepPos){_tnDrawMsgsM(keepPos);const el=$("#tnmsgs");if(!el)
   tnRepDraw(room)};
 function tnJump(id){const x=document.querySelector(`#tnmsgs [data-mid="${id}"]`);if(!x){toast("Tin này ở xa phía trên, bấm Xem tin cũ hơn để tìm");return}x.scrollIntoView({behavior:"smooth",block:"center"});x.classList.add("tnflash");setTimeout(()=>x.classList.remove("tnflash"),1600)}
 function tnCopy(t){const ok=()=>toast("Đã sao chép");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,()=>tnCopyOld(t));else tnCopyOld(t)}
+/* Sao chép tin: tin ảnh thì chép chính tấm ảnh (dán được vào chat, Word, Zalo…); tệp khác và tin chữ thì chép chữ */
+async function tnCopyMsg(m){const id=String(m.ref||"").replace(/^f:/,""),f=m.kind==="file"?(tnFMeta(m.room||TN.room,id)||{}):null;
+  const img=f&&(f.mime?/^image\//.test(f.mime):/\.(png|jpe?g|webp|gif)$/i.test(f.name||m.body||""));
+  if(!img)return tnCopy(tnTxt(m));
+  try{if(!navigator.clipboard||!window.ClipboardItem)throw 0;
+    const blob=await(await fetch(tnFUrl(id),{credentials:"same-origin"})).blob();let png=blob;
+    if(blob.type!=="image/png"){const bm=await createImageBitmap(blob),c=document.createElement("canvas");c.width=bm.width;c.height=bm.height;c.getContext("2d").drawImage(bm,0,0);png=await new Promise((r,j)=>c.toBlob(x=>x?r(x):j(0),"image/png"))}
+    await navigator.clipboard.write([new ClipboardItem({"image/png":png})]);toast("Đã sao chép ảnh")}
+  catch(e){toast("Máy chưa cho chép ảnh. Bấm giữ ảnh để lưu, hoặc mở ảnh ra rồi chép")}}
 function tnCopyOld(t){const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast("Đã sao chép")}catch(e){toast("Không sao chép được")}a.remove()}
 
 /* ---------- trả lời / trích dẫn: thanh nằm trên ô gõ, gửi tin là kèm ---------- */
@@ -98,7 +107,7 @@ function tnMenu(id,x,y){document.querySelectorAll(".tnmenu").forEach(z=>z.remove
   p.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{close();tnReact(m,b.dataset.e)});
   p.querySelectorAll("[data-k]").forEach(b=>b.onmousedown=e=>e.preventDefault());
   p.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{close();const k=b.dataset.k;
-    if(k==="reply")tnReplyTo(m,"");else if(k==="quote")tnReplyTo(m,selT);else if(k==="copysel")tnCopy(selT);else if(k==="copy")tnCopy(tnTxt(m));
+    if(k==="reply")tnReplyTo(m,"");else if(k==="quote")tnReplyTo(m,selT);else if(k==="copysel")tnCopy(selT);else if(k==="copy")tnCopyMsg(m);
     else if(k==="task")tnGiao(m.body);else if(k==="rem")tnRemind(m.body,tnMe());else if(k==="pin")tnPin(room,id,!pinned);else if(k==="fw")tnForward([m]);
     else if(k==="sel"){TNM.sel=new Set([id]);TNM.selRoom=room;tnDrawMsgs(true)}else if(k==="recall")tnRecall(room,m);
     else if(k==="del"&&confirm("Xóa tin này ở máy của bạn? Người khác vẫn thấy. Muốn xóa với mọi người thì dùng Thu hồi.")){tnHide([id]);tnDrawMsgs(true)}})}

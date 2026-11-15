@@ -416,10 +416,12 @@ export async function createOrder(
     .first<{ v: string }>();
   const flowOn = flowCfg?.v === '1' ? 1 : 0;
 
+  // Số đơn = số lớn nhất đã dùng trong tháng + 1 (không đếm số đơn: đơn bị xóa làm hụt số, đếm lại sẽ trùng số cũ).
+  const prefix = generateOrderNo(0, new Date(`${orderDate}T00:00:00.000Z`)).slice(0, -4);
   const seqRow = await db
-    .prepare(`SELECT COUNT(*) AS n FROM orders WHERE substr(order_date, 1, 7) = ?`)
-    .bind(orderDate.slice(0, 7))
-    .first<{ n: number }>();
+    .prepare(`SELECT MAX(CAST(substr(order_no, ?) AS INTEGER)) AS n FROM orders WHERE order_no LIKE ?`)
+    .bind(prefix.length + 1, `${prefix}%`)
+    .first<{ n: number | null }>();
   const orderNo = generateOrderNo((seqRow?.n ?? 0) + 1, new Date(`${orderDate}T00:00:00.000Z`));
 
   const statements: D1PreparedStatement[] = [
@@ -621,6 +623,17 @@ export async function submitOrder(
     if (item.is_gift) continue;
     // Giá do người lập đơn tự điền theo thỏa thuận (cấp Khác / Nhân viên, vật tư bán kèm): không có giá chuẩn để so, không cần duyệt giá.
     if (item.base_price === null && (item.group_code === 'VAT_TU_BAN' || item.group_code === 'QUA_TANG' || item.tier_code === 'KHAC' || item.tier_code === 'NHAN_VIEN')) continue;
+    // Mã chưa có giá chuẩn (khách gia công chưa có trong bảng giá riêng, hoặc cấp của khách chưa có giá) mà người lập
+    // đã nhập giá tay: giá thỏa thuận, Quản lý duyệt (CEO 13/11: đơn gia công phải tạo được với mọi mã).
+    if (item.base_price === null && item.applied_price > 0) {
+      requests.push({
+        rule: 'PRICE_OVERRIDE',
+        role: 'MANAGER',
+        reason: `${item.sku}: chưa có giá chuẩn, giá nhập tay ${item.applied_price}đ`,
+        payload: { sku: item.sku, base_price: null, proposed_price: item.applied_price },
+      });
+      continue;
+    }
     if (item.base_price === null) {
       throw unprocessable(
         'MISSING_PRICE',
@@ -1530,61 +1543,65 @@ export async function updateOrder(
     ...editFlowStatements(db, auth, orderId, khoNow, newKho, reason || 'Sửa đơn', now),
   );
 
-  statements.push(
-    db
-      .prepare(
-        `INSERT INTO order_revisions (id, order_id, revision_no, edited_by, reason, stage, before_json,
-           after_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        newId(),
-        orderId,
-        revisionNo,
-        auth.user.id,
-        reason || null,
-        `${approvalStatus}/${deliveryStatus}`,
-        JSON.stringify(before),
-        JSON.stringify(after),
-        now,
-      ),
-    auditStatement(db, {
-      actorId: auth.user.id,
-      action: 'ORDER_EDITED',
-      entityType: 'ORDER',
-      entityId: orderId,
-      before: {
-        total_amount: oldTotal,
-        approval_status: approvalStatus,
-        delivery_status: deliveryStatus,
-      },
-      after: {
-        total_amount: newTotal,
-        approval_status: newStatus,
-        lines: after.items.length,
-        revision_no: revisionNo,
-      },
-      reason: reason || null,
-      requestId: ctx.requestId,
-      ip: ctx.ip,
-    }),
-  );
+  // Tự lưu nháp: ghi đè nội dung đơn Nháp, không ghi bản sửa / nhật ký mỗi lần (tránh đầy lịch sử).
+  if (!(input.autosave && approvalStatus === 'DRAFT')) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO order_revisions (id, order_id, revision_no, edited_by, reason, stage, before_json,
+             after_json, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          newId(),
+          orderId,
+          revisionNo,
+          auth.user.id,
+          reason || null,
+          `${approvalStatus}/${deliveryStatus}`,
+          JSON.stringify(before),
+          JSON.stringify(after),
+          now,
+        ),
+      auditStatement(db, {
+        actorId: auth.user.id,
+        action: 'ORDER_EDITED',
+        entityType: 'ORDER',
+        entityId: orderId,
+        before: {
+          total_amount: oldTotal,
+          approval_status: approvalStatus,
+          delivery_status: deliveryStatus,
+        },
+        after: {
+          total_amount: newTotal,
+          approval_status: newStatus,
+          lines: after.items.length,
+          revision_no: revisionNo,
+        },
+        reason: reason || null,
+        requestId: ctx.requestId,
+        ip: ctx.ip,
+      }),
+    );
 
-  statements.push(
-    eventStatement(db, {
-      type: 'ORDER_EDITED',
-      entityType: 'ORDER',
-      entityId: orderId,
-      actorId: auth.user.id,
-      actorType: auth.actorType ?? 'USER',
-      payload: {
-        revision_no: revisionNo,
-        total_before: oldTotal,
-        total_after: newTotal,
-        status: newStatus,
-      },
-    }),
-  );
+    statements.push(
+      eventStatement(db, {
+        type: 'ORDER_EDITED',
+        entityType: 'ORDER',
+        entityId: orderId,
+        actorId: auth.user.id,
+        actorType: auth.actorType ?? 'USER',
+        payload: {
+          revision_no: revisionNo,
+          total_before: oldTotal,
+          total_after: newTotal,
+          status: newStatus,
+        },
+      }),
+    );
+  }
+
   if (prepared.tier_change) {
     statements.push(
       db

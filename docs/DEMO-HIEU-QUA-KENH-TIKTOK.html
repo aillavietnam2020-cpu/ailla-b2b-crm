@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo: Hiệu quả kênh TikTok (xem tổng quan + từng hạng mục)</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:"Be Vietnam Pro",system-ui,sans-serif;background:#f4f5fb;color:#1c2040}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.note{background:#fff7e0;border:1px solid #f0d58a;border-radius:12px;padding:10px 14px;font-size:13px;margin-bottom:14px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:#6b7194;font-size:13px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.tabs button{border:0;background:#fff;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;color:#4b54d1;box-shadow:0 1px 3px #0001}
+.tabs button.on{background:linear-gradient(90deg,#4b54d1,#7253e0);color:#fff}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kp div{background:#fff;border-radius:18px;padding:12px 14px;border-top:4px solid #7253e0}
+.kp small{display:block;color:#6b7194;font-size:12px}.kp b{font-size:22px;display:block;margin:2px 0}.kp i{font-style:normal;font-size:11px;color:#8a90b0}
+.card{background:#fff;border-radius:18px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.lane{display:grid;grid-template-columns:150px 1fr 110px 60px 70px;gap:10px;align-items:center;padding:9px 6px;border-radius:12px;cursor:pointer;font-size:14px}
+.lane:hover{background:#eef0ff}.bar{height:14px;border-radius:7px;background:#eceefa;overflow:hidden}.bar i{display:block;height:100%}
+.go{color:#4b54d1;font-size:12px;text-align:right}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 8px;border-bottom:1px solid #eceefa;text-align:right}th:first-child,td:first-child{text-align:left}
+.hint{font-size:12px;color:#8a90b0;margin-top:8px}
+.back{border:0;background:none;color:#4b54d1;cursor:pointer;font:inherit;padding:0;margin-bottom:8px}
+@media(max-width:640px){.lane{grid-template-columns:1fr 90px}.lane .bar,.lane .pc,.lane .go{display:none}}
+</style></head><body><div class="wrap">
+<div class="note"><b>Bản demo để duyệt, số trong này là SỐ MẪU.</b> Bấm thử các nút. Nếu ổn, bản thật sẽ lấy số thật từ báo cáo TikTok đã nạp (Key metrics, LIVE, Creator List) và thay khu "Hiệu quả kênh" hiện tại.</div>
+<h1>💹 Hiệu quả kênh TikTok</h1>
+<div class="sub">Tháng 11/2026 · số TikTok nạp đến ngày 08/11 · GMV là số đo hiệu suất, chưa trừ hủy, hoàn</div>
+<div class="tabs" id="tabs"></div>
+<div id="body"></div>
+</div>
+<script>
+const L={
+ tq:{n:"Tổng quan"},
+ vi:{n:"Video inhouse",c:"#5b4bdb",g:93.1,d:792,pc:41},
+ koc:{n:"KOC / Affiliate",c:"#e0607e",g:61.4,d:540,pc:27},
+ the:{n:"Thẻ sản phẩm",c:"#f0a020",g:38.2,d:310,pc:17},
+ live:{n:"Livestream",c:"#2a9d8f",g:33.5,d:240,pc:15}};
+const keys=["tq","vi","koc","the","live"];let cur="tq";
+const tabs=document.getElementById("tabs"),body=document.getElementById("body");
+function K(l,v,s){return `<div><small>${l}</small><b>${v}</b><i>${s||""}</i></div>`}
+function go(k){cur=k;draw()}
+function draw(){
+ tabs.innerHTML=keys.map(k=>`<button class="${k===cur?"on":""}" onclick="go('${k}')">${L[k].n}</button>`).join("");
+ if(cur==="tq"){
+  body.innerHTML=`<div class="kp">${K("💰 GMV cả kênh","226,2tr","4 hạng mục cộng lại")}${K("🛒 Đơn","1.882","")}${K("💵 GMV / đơn","120k","")}${K("📣 Chi quảng cáo","31,5tr","đã gồm thuế")}${K("📈 ROAS","7,2","GMV / quảng cáo")}${K("🏆 Video win","2","≥100 đơn")}</div>
+  <div class="card"><h2>Cơ cấu GMV theo hạng mục <span class="hint">· bấm một dòng để xem chi tiết</span></h2>
+  ${["vi","koc","the","live"].map(k=>{const x=L[k];return `<div class="lane" onclick="go('${k}')"><b>${x.n}</b><div class="bar"><i style="width:${x.pc*2.2}%;background:${x.c}"></i></div><span>${x.g.toLocaleString("vi")}tr</span><span class="pc">${x.pc}%</span><span class="go">Xem ›</span></div>`}).join("")}
+  <div class="hint">Video inhouse chỉ là một phần: hiện trang cũ chỉ hiện đúng hạng mục này.</div></div>
+  <div class="card"><h2>Theo tuần</h2><table><tr><th>Tuần</th><th>GMV</th><th>Quảng cáo</th><th>ROAS</th></tr><tr><td>01–07/11</td><td>131,0tr</td><td>18,2tr</td><td>7,2</td></tr><tr><td>08–14/11 (đang chạy)</td><td>95,2tr</td><td>13,3tr</td><td>7,2</td></tr></table></div>`;
+ }else if(cur==="vi"){
+  body.innerHTML=`<button class="back" onclick="go('tq')">‹ Về Tổng quan</button><div class="kp">${K("💰 GMV từ video","93,1tr","41% GMV kênh")}${K("🛒 Đơn","792","từ 658 video có lượt xem")}${K("💵 GMV / video","145k","")}${K("👁️ View","363.657","TB 566 / video")}${K("👆 Tỷ lệ bấm","—","click / view")}${K("✅ Tỷ lệ chốt","—","đơn / click")}${K("💤 Video &lt;1k view","630","")}${K("🏆 Video win","2","≥100 đơn")}</div>
+  <div class="card"><h2>Video bán tốt nhất</h2><table><tr><th>Video</th><th>View</th><th>Đơn</th><th>GMV</th></tr><tr><td>Video mẫu 1</td><td>48.200</td><td>131</td><td>15,6tr</td></tr><tr><td>Video mẫu 2</td><td>31.900</td><td>104</td><td>12,4tr</td></tr></table><div class="hint">Đây là phần đang có trên web hiện tại, giữ nguyên.</div></div>`;
+ }else if(cur==="koc"){
+  body.innerHTML=`<button class="back" onclick="go('tq')">‹ Về Tổng quan</button><div class="kp">${K("💰 GMV nhờ KOC","61,4tr","27% GMV kênh")}${K("🛒 Đơn","540","")}${K("🤝 KOC có doanh số","23","trên 41 người đã đăng")}${K("🎞️ Video KOC có số","118","")}${K("💸 Hoa hồng ước tính","6,1tr","số thật theo quyết toán")}${K("🏆 Win KOC","3","")}</div>
+  <div class="card"><h2>KOC bán tốt nhất</h2><table><tr><th>KOC</th><th>GMV video</th><th>GMV LIVE</th><th>Đơn</th><th>Hoa hồng</th></tr><tr><td>@koc_mau_1</td><td>9,8tr</td><td>2,1tr</td><td>96</td><td>1,0tr</td></tr><tr><td>@koc_mau_2</td><td>7,4tr</td><td>0</td><td>71</td><td>0,7tr</td></tr></table></div>`;
+ }else if(cur==="the"){
+  body.innerHTML=`<button class="back" onclick="go('tq')">‹ Về Tổng quan</button><div class="kp">${K("💰 GMV thẻ sản phẩm","38,2tr","17% GMV kênh")}${K("🛒 Đơn","310","")}${K("📈 So tuần trước","+8%","")}</div>
+  <div class="card"><h2>Sản phẩm bán qua thẻ / tìm kiếm</h2><table><tr><th>Sản phẩm</th><th>GMV</th><th>Đơn</th></tr><tr><td>Sản phẩm mẫu A</td><td>12,0tr</td><td>98</td></tr><tr><td>Sản phẩm mẫu B</td><td>8,3tr</td><td>71</td></tr></table><div class="hint">Báo cáo TikTok chỉ cho GMV thẻ theo ngày; bảng sản phẩm hiện nếu có file nạp theo sản phẩm, chưa có thì ghi "chờ tải báo cáo".</div></div>`;
+ }else{
+  body.innerHTML=`<button class="back" onclick="go('tq')">‹ Về Tổng quan</button><div class="kp">${K("💰 GMV LIVE","33,5tr","15% GMV kênh (shop + KOC)")}${K("🛒 Đơn","240","")}${K("📺 Số buổi LIVE","19","")}${K("⏱️ GMV / giờ LIVE","410k","")}</div>
+  <div class="card"><h2>Từng buổi LIVE</h2><table><tr><th>Ngày</th><th>Người live</th><th>Thời lượng</th><th>GMV</th><th>Đơn</th></tr><tr><td>07/11</td><td>Tài khoản shop</td><td>3h</td><td>4,2tr</td><td>31</td></tr><tr><td>06/11</td><td>Tài khoản shop</td><td>2h30</td><td>2,9tr</td><td>22</td></tr></table></div>`;
+ }}
+draw();
+</script></body></html>

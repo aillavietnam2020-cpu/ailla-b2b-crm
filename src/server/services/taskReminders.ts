@@ -53,7 +53,7 @@ export function buildDigest(d: { users?: HubUser[]; tasks?: Task[] }, uid: strin
   const dd = (n: number) => (n >= 1 && n <= 31 ? `${String(n).padStart(2, '0')}/${monthKey.slice(5)}` : `ngày ${n}`);
   const open = (d.tasks ?? []).filter((t) => t.st !== 'done');
   const mine = (t: Task) => t.nguoi === uid || (t.phoi ?? []).includes(uid);
-  const late = (t: Task) => !!t.han && t.han < today;
+  const late = (t: Task) => t.st !== 'review' && !!t.han && t.han < today;
   const cut = (L: string[], n = 6) => (L.length > n ? L.slice(0, n).concat(`… và ${L.length - n} việc nữa`) : L);
   const flag = (t: Task) => (t.gap ? '[GẤP] ' : '');
   const sec = (title: string, L: string[]) => (L.length ? [title, ...cut(L).map((x) => '• ' + x)].join('\n') : '');
@@ -181,7 +181,7 @@ export async function taskReminders(
         reviewN++;
         push(`v|tk|${t.id}`, [t.tao, ...(t.tao ? [] : admins)], `Việc "${t.ten}" của ${who} đang chờ bạn duyệt`, `task:${t.id}`);
       }
-      if (!t.han) continue;
+      if (!t.han || t.st === 'review') continue;
       if (t.han < today) {
         lateN++;
         lateBy.set(who, (lateBy.get(who) ?? 0) + 1);

@@ -98,13 +98,13 @@ const PERMS=[
  ["Báo cáo",[["baocao.tiktok","Nhập báo cáo TikTok"],["baocao.ads","Nhập báo cáo Ads Facebook"]]],
  ["Nhân sự & lương",[["nhansu.duyet","Duyệt nghỉ phép, OT, tạm ứng, KPI"],["luong.quanly","Xem và làm bảng lương, phiếu lương"]]],
  ["Thiết lập & Tài chính",[["thietlap.quanly","Sửa dữ liệu gốc: phòng ban, kênh bán, danh mục chi phí, SKU"],["gia.xem_von","Xem giá vốn SKU"],["chiphi.xem","Xem chi phí theo tháng"],["chiphi.nhap","Nhập chi phí"],["pl.xem","Xem báo cáo P&L"]]],
- ["Sản xuất",[["sx.dieuphoi","Tạo nhu cầu sản xuất, đề nghị mua hàng (điều phối)"],["sx.xuong","Bắt đầu việc, báo hoàn thành (tổ trưởng xưởng)"],["sx.kiemke","Kiểm kê, tạo lô, in tem, nhập kho (kế toán kho)"],["sx.kythuat","Báo nguyên vật liệu thực tế (kỹ thuật)"]]],
+ ["Sản xuất",[["sx.dieuphoi","Tạo nhu cầu sản xuất, đề nghị mua hàng (điều phối)"],["sx.xuong","Bắt đầu việc, báo hoàn thành (tổ trưởng xưởng)"],["sx.kiemke","Kiểm kê, tạo lô, in tem, nhập kho (kế toán kho)"],["sx.kythuat","Kỹ thuật pha chế: nhận việc pha, ghi phiếu pha, báo tồn"],["sx.congthuc","Duyệt công thức pha chế (Trưởng kỹ thuật)"]]],
  ["Hệ thống",[["sanpham.quanly","Quản lý danh mục sản phẩm"],["nhansu.quanly","Quản lý nhân sự, mật khẩu, phân quyền"],["quychuan.sua","Sửa quy chuẩn"],["caidat.quanly","Cài đặt, sao lưu, xóa dữ liệu"]]],
 ];
 const ALL_PERMS=PERMS.flatMap(g=>g[1].map(p=>p[0]));
 const ROLE_PRESET={
  admin:ALL_PERMS,
- lead:ALL_PERMS.filter(p=>!["nhansu.quanly","caidat.quanly","kehoach.duyet","sanpham.quanly","thietlap.quanly","gia.xem_von","chiphi.xem","chiphi.nhap","pl.xem","luong.quanly"].includes(p)),
+ lead:ALL_PERMS.filter(p=>!["nhansu.quanly","caidat.quanly","kehoach.duyet","sanpham.quanly","thietlap.quanly","gia.xem_von","chiphi.xem","chiphi.nhap","pl.xem","luong.quanly","sx.congthuc"].includes(p)),
  content:["cv.xem","kehoach.xem","research.xem","research.sua","lich.xem","lich.sua_cua_minh","win.xem","order.xem","kho.xem"],
  digital:["cv.xem","research.xem","lich.xem","win.xem","order.xem","order.tao","order.sua","baocao.ads"],
  // Phòng ban khác (Sale, Sản xuất, Kế toán, HCNS...): thấy phân hệ của phòng mình + giao việc.
@@ -194,7 +194,7 @@ function moveCard(u,id,to,inp={}){
   const c=D().cards.find(x=>x.id===id);if(!c)return "Không tìm thấy thẻ.";
   if(!canMove(u,c,to))return "Bạn không có quyền chuyển thẻ này.";
   const err=checkMove(c,to,inp);if(err)return err;
-  DB.mutate(u.name,`chuyển ${c.id} sang "${stepName(to)}"`,d=>{const x=d.cards.find(y=>y.id===id);Object.entries(inp).forEach(([k,v])=>{if(v!==undefined)x[k]=v});if(inp.maTuyen!==undefined){const t=d.tuyen.find(y=>y.ma===x.maTuyen);if(t)x.tuyen=t.tuyen}x.step=to;if(to==="kb"||to==="dkb")x.nguoiKB=x.nguoiKB||x.nguoi;if(to==="edit"&&x.nguoiEdit)x.nguoi=x.nguoiEdit;if(to==="edit")x.nguoiEdit=x.nguoi;if(to==="dang"){x.ceo="PASS";const o=((d.kenhPT||{})[x.kenh]||{}).chinh;if(o)x.nguoi=o}if(to==="xong"&&!x.ngayDang)x.ngayDang=d.settings.today;if(to==="xong"&&x.tiktokId&&!x.linkDang&&!chOf(x.kenh).acc.startsWith("("))x.linkDang="https://www.tiktok.com/@"+chOf(x.kenh).acc+"/video/"+x.tiktokId;x.history=(x.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,to})});
+  DB.mutate(u.name,`chuyển ${c.id} sang "${stepName(to)}"`,d=>{const x=d.cards.find(y=>y.id===id);Object.entries(inp).forEach(([k,v])=>{if(v!==undefined)x[k]=v});if(inp.maTuyen!==undefined){const t=d.tuyen.find(y=>y.ma===x.maTuyen);if(t)x.tuyen=t.tuyen}x.step=to;if(to==="kb"||to==="dkb")x.nguoiKB=x.nguoiKB||x.nguoi;if(to==="edit"&&x.nguoiEdit)x.nguoi=x.nguoiEdit;if(to==="edit")x.nguoiEdit=x.nguoi;if(to==="dang"){x.ceo="PASS";if(!x.nguoiLam&&typeof mkOf==="function"){const mk=x.nguoiEdit||x.nguoiKB||x.giao||x.nguoi;if(mk&&mixOf(x)!=="ton")x.nguoiLam=mk}const o=((d.kenhPT||{})[x.kenh]||{}).chinh;if(o)x.nguoi=o}if(to==="xong"&&!x.ngayDang)x.ngayDang=d.settings.today;if(to==="xong"&&x.tiktokId&&!x.linkDang&&!chOf(x.kenh).acc.startsWith("("))x.linkDang="https://www.tiktok.com/@"+chOf(x.kenh).acc+"/video/"+x.tiktokId;x.history=(x.history||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,to})});
   if(to==="worker")simulateWorker(id);
   return "";
 }
@@ -220,7 +220,7 @@ function removePlanChannel(u,k,kenh){const p=D().products.find(x=>x.k===k);if(!p
   if(D().tuyen.some(t=>t.sku===k&&t.kenh===kenh))return "Sản phẩm đã có tuyến ở kênh này, xóa tuyến trước.";
   DB.mutate(u.name,`bỏ ${esc(sk(k).n)} khỏi kênh ${kenh}`,d=>{const x=d.products.find(y=>y.k===k),e=pKenhs(x).find(y=>y.kenh===kenh);x.kenhs=pKenhs(x).filter(y=>y.kenh!==kenh);x.kenh=x.kenhs[0].kenh;x.huong=x.kenhs[0].huong;if(e&&d.goals[k])d.goals[k].gmv=Math.max(0,d.goals[k].gmv-(e.gmv||0))});return ""}
 function removePlanProduct(u,k){const d=D();if(d.cards.some(c=>c.sku===k&&c.nguon!=="Footage cũ")||d.tuyen.some(t=>t.sku===k))return "Sản phẩm đã có tuyến hoặc thẻ việc trong tháng, xóa tuyến/thẻ trước.";DB.mutate(u.name,`bỏ ${esc(sk(k).n)} khỏi kế hoạch tháng`,dd2=>{dd2.products=dd2.products.filter(p=>p.k!==k);delete dd2.goals[k]});return ""}
-function sendBack(u,id,note){DB.mutate(u.name,`trả lại ${id}: ${note||"cần sửa"}`,d=>{const x=d.cards.find(y=>y.id===id);if(["dvd","dceo"].includes(x.step)){x.step="edit";if(x.nguoiEdit)x.nguoi=x.nguoiEdit}else{x.step="kb";if(x.nguoiKB)x.nguoi=x.nguoiKB}x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa"})})}
+function sendBack(u,id,note){DB.mutate(u.name,`trả lại ${id}: ${note||"cần sửa"}`,d=>{const x=d.cards.find(y=>y.id===id);if(["dvd","dceo"].includes(x.step)){x.step="edit";if(x.nguoiEdit)x.nguoi=x.nguoiEdit}else{x.step="kb";if(x.nguoiKB)x.nguoi=x.nguoiKB}x.gopy=(x.gopy||[]).concat({t:new Date().toLocaleString("vi-VN"),who:u.name,note:note||"Cần sửa",link:String(x.linkFinal||x.linkVideo||"").trim()})})}
 function assignCard(u,id,to){DB.mutate(u.name,`giao ${id} cho ${esc(userName(to))}`,d=>{const x=d.cards.find(y=>y.id===id);x.nguoi=to;if(x.step==="cg"){const L=loaiOf(x);x.step=L==="moi"?"kb":L==="kho"?"dang":"edit"}if(x.step==="edit")x.nguoiEdit=to})}
 function simulateWorker(id){if(D().mode==="live")return; // web thật: người phụ trách dán link video Worker dựng rồi bấm gửi duyệt
   setTimeout(()=>{const c=D().cards.find(x=>x.id===id);if(!c||c.step!=="worker")return;DB.mutate("Worker",`dựng xong ${id}, chờ duyệt`,d=>{const x=d.cards.find(y=>y.id===id);x.step="dvd";x.linkFinal="drive.google.com/…/Ailla-VIDEO-FINAL/"+id+".mp4"});if(typeof render==="function")render();toast("Worker dựng xong "+id)},6000)}

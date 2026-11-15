@@ -38,7 +38,7 @@ export async function createShippingVoucher(
   const ceo = needsCeo(d.amount, await loadCeoSpend(db), realCeo(auth)) ? 'CHO' : '';
   for (let attempt = 0; attempt < 4; attempt++) {
     const row = await db
-      .prepare('SELECT COUNT(*) AS n FROM shipping_vouchers WHERE voucher_no LIKE ?')
+      .prepare('SELECT MAX(CAST(substr(voucher_no, instr(voucher_no, char(45)) + 1) AS INTEGER)) AS n FROM shipping_vouchers WHERE voucher_no LIKE ?')
       .bind(`PCVC${ym}-%`)
       .first<{ n: number }>();
     const no = `PCVC${ym}-${String((row?.n ?? 0) + 1 + attempt).padStart(3, '0')}`;

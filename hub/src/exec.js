@@ -6,7 +6,7 @@ const ico=k=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentCol
 
 function execAlerts(){
   const d=D(),A=[],late=d.cards.filter(isLate);try{aiTop(2).forEach(i=>A.push([i.lv==="hot"?"amb":"red","Trợ lý AI: "+i.title,"bấm để xem đề xuất","ai"]))}catch(err){}
-  if(late.length)A.push(["red",`${late.length} thẻ video trễ hạn`,"Marketing · Content","cv"]);
+  /* việc / thẻ video trễ hạn đã có trong Thông báo công việc, không báo ở đây (chị Hoa 12/11): cảnh báo điều hành chỉ cho lỗ, CPQC vượt ngưỡng, bất thường, rủi ro */
   const ms=(KDX.fbSale||[]).filter(s=>s.tao&&s.huy/s.tao>.2);ms.forEach(s=>A.push(["red",`${s.n}: tỷ lệ hủy ${(s.huy/s.tao*100).toFixed(1)}%`,"Facebook › Hoạt động Sale Kênh bán lẻ · vượt ngưỡng 20%","fb_sale"]));
   if(KDX.fbDash&&KDX.fbDash.dt&&!KDX.fbDash.tienVe)A.push(["amb",`${tr(KDX.fbDash.treo)} tiền Facebook chưa ghi nhận về`,"Kế toán · kiểm mã đối soát","doisoat"]);
   if(KDX.tts){const lo=KDX.tts.sp.filter(s=>s.lai<0);if(lo.length)A.push(["amb",`${lo.length} sản phẩm TikTok lỗ sau quảng cáo`,"TikTok · tháng 7","bc_tiktok"]);const nt=(KDX.tts.booking.find(r=>/nghiệm thu/.test(r[0]))||[])[1];if(nt===0)A.push(["amb","36 KOC đã book, chưa nghiệm thu video nào","KOC · tháng 8","bc_koc"])}

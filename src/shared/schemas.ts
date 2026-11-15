@@ -139,6 +139,8 @@ export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
  */
 export const orderUpdateSchema = orderCreateSchema.omit({ customer_id: true, order_date: true }).extend({
   reason: z.string().trim().max(300).optional().nullable(),
+  /** Tự lưu nháp khi đang nhập (chỉ áp cho đơn Nháp): ghi đè nội dung, không tạo bản sửa / nhật ký mỗi lần. */
+  autosave: z.boolean().optional(),
 });
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;
 

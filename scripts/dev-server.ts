@@ -61,8 +61,9 @@ const server = createServer(async (req, res) => {
   try {
     // Khu Marketing: đọc lại file mỗi lần để sửa hub/src rồi chạy `node hub/build.mjs` là thấy ngay.
     const pathname = new URL(url).pathname;
-    const response = pathname === '/hub' || pathname.startsWith('/hub/')
-      ? await serveHub(request, env, readFileSync(path.join(ROOT, 'src/server/hub/hub.html'), 'utf8'))
+    const isChat = pathname === '/chat' || pathname === '/chat/';
+    const response = pathname === '/hub' || pathname.startsWith('/hub/') || isChat
+      ? await serveHub(request, env, readFileSync(path.join(ROOT, 'src/server/hub/hub.html'), 'utf8'), isChat)
       : await app.fetch(request, env, {
       waitUntil: () => {},
       passThroughOnException: () => {},

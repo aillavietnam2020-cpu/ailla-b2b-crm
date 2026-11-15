@@ -107,12 +107,18 @@ async function collectItems(auth: AuthContext, db: D1Database, today: string, as
     add({ key: 'draft', group: 'Bán hàng', title: 'Đơn của tôi chưa gửi duyệt hoặc bị từ chối', detail: 'Gửi duyệt hoặc sửa lại', count: dr?.n ?? 0, oldest: dr?.oldest ?? null, page: 'don' });
   }
 
-  // ---- Việc CRM giao cho tôi (tái nhập, nhắc nợ, kho xuất lệch…)
+  // ---- Việc CRM giao cho tôi. Gắn khách hàng = chăm sóc khách (tái nhập, nhắc nợ…); không gắn khách = việc nội bộ (kho, mua hàng, duyệt…).
+  // 07/11 chị Hoa: kỹ thuật pha chế bị hiện việc kho thành "chăm sóc khách", nên tách hai nhóm.
   const tk = await db
-    .prepare(`SELECT COUNT(*) AS n, MIN(due_at) AS oldest FROM tasks WHERE assignee_id = ? AND status = 'OPEN' AND due_at <= ?`)
+    .prepare(`SELECT COUNT(*) AS n, MIN(due_at) AS oldest FROM tasks WHERE assignee_id = ? AND status = 'OPEN' AND due_at <= ? AND customer_id IS NOT NULL`)
     .bind(auth.user.id, today + 'T23:59:59Z')
     .first<{ n: number; oldest: string | null }>();
   add({ key: 'crm_task', group: 'Chăm sóc khách', title: 'Việc chăm sóc khách đến hạn', detail: 'Liên hệ, nhắc nợ, xử lý đơn lệch…', count: tk?.n ?? 0, oldest: tk?.oldest ?? null, page: 'hn' });
+  const tn = await db
+    .prepare(`SELECT COUNT(*) AS n, MIN(due_at) AS oldest FROM tasks WHERE assignee_id = ? AND status = 'OPEN' AND due_at <= ? AND customer_id IS NULL`)
+    .bind(auth.user.id, today + 'T23:59:59Z')
+    .first<{ n: number; oldest: string | null }>();
+  add({ key: 'noi_bo_task', group: 'Việc được giao', title: 'Việc được giao đến hạn', detail: 'Kho, mua hàng, duyệt, khai định mức…', count: tn?.n ?? 0, oldest: tn?.oldest ?? null, page: 'hn' });
 
   items.sort((a, b) => b.age_days - a.age_days || b.count - a.count);
   return items;
@@ -132,7 +138,7 @@ workRoutes.get('/overview', async (c) => {
   if (!(auth.user.role === 'CEO' || auth.permissions.includes('debt.read.all'))) throw forbidden('Chỉ CEO hoặc người xem công nợ toàn công ty mới xem được toàn cảnh.');
   const db = c.env.DB;
   const today = vnDate();
-  const items = (await collectItems(auth, db, today, true)).filter((x) => x.key !== 'draft' && x.key !== 'crm_task');
+  const items = (await collectItems(auth, db, today, true)).filter((x) => x.key !== 'draft' && x.key !== 'crm_task' && x.key !== 'noi_bo_task');
   const dr = await db
     .prepare(`SELECT COUNT(*) AS n, MIN(order_date) AS oldest FROM orders WHERE deleted_at IS NULL AND approval_status IN ('DRAFT', 'REJECTED')`)
     .first<{ n: number; oldest: string | null }>();

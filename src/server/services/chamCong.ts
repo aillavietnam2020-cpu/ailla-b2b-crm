@@ -312,6 +312,10 @@ export type NgayCong = {
   coPhep: boolean;
   /** Giờ tăng ca đã duyệt ngày đó. */
   ot: number;
+  /** Phần ngày nghỉ không lương ngày có đi làm (0,5 nửa ngày; nghỉ theo giờ = giờ nghỉ ÷ giờ chuẩn): trừ khỏi công hưởng lương. */
+  kl: number;
+  /** Phần ngày nghỉ phép / ốm theo giờ hoặc nửa ngày ngày có đi làm: vẫn hưởng lương, chỉ để cộng ô "phép hưởng lương". */
+  pg: number;
   /** Lý do đi muộn đã ghi; canhBao = muộn quá mốc hỏi lý do mà chưa ghi. */
   lyDoMuon: string | null;
   canhBao: boolean;
@@ -368,7 +372,7 @@ export function tongNgay(
   l0: Lich,
   ngay: string,
   homNay: boolean,
-  opt: { ca?: Ca | null; q?: QuyTac; le?: boolean; don?: string | null; coPhep?: boolean; ot?: number; bu?: BuKq | null; lamBu?: { cho: string; kieu: BuKieu } | null } = {},
+  opt: { ca?: Ca | null; q?: QuyTac; le?: boolean; don?: string | null; coPhep?: boolean; ot?: number; kl?: number; pg?: number; bu?: BuKq | null; lamBu?: { cho: string; kieu: BuKieu } | null } = {},
 ): NgayCong {
   const l = lichNgay(l0, ngay);
   const q = opt.q ?? CC_DEFAULT.quyTac;
@@ -413,6 +417,8 @@ export function tongNgay(
     // Bù giờ đủ: lần đi muộn / về sớm đó không tính vi phạm chuyên cần, như có đơn xin phép.
     coPhep: !!opt.coPhep || (opt.bu?.kq === 'du' && opt.bu.kieu === 'gio'),
     ot: opt.ot ?? 0,
+    kl: opt.kl ?? 0,
+    pg: opt.pg ?? 0,
     lyDoMuon: vaoL?.ly_do_muon || null,
     canhBao: muon > q.mocLyDo && !vaoL?.ly_do_muon,
     choXn,
@@ -445,6 +451,13 @@ export type TongThang = {
   /** Tổng giờ tăng ca đã duyệt. */
   ot: number;
   /**
+   * Công hưởng lương (CEO 10/11): ngày đi làm (trừ phần nghỉ không lương nửa ngày / theo giờ) + ngày bù đủ + ngày nghỉ phép, ốm.
+   * phepHL: ngày nghỉ phép, ốm quy đổi (cả phần nửa ngày / theo giờ); klNgay: ngày nghỉ không lương quy đổi.
+   */
+  congHL: number;
+  phepHL: number;
+  klNgay: number;
+  /**
    * Ngày nghỉ tính chuyên cần (thông báo 01102026: không quá 2 ngày/tháng, trừ ngày nghỉ trong chế độ và lễ tết):
    * ngày phải làm (đã qua) mà không chấm, trừ ngày có đơn nghỉ phép năm / nghỉ ốm đã duyệt. Nghỉ không lương vẫn tính.
    */
@@ -468,6 +481,14 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
   const vang = ngay.filter((x) => x.lam && !x.vao && !x.ra && x.ngay < homNay && !buNgay(x));
   const cheDo = (x: NgayCong) => !!x.don && x.don !== DON_KHONG_LUONG;
   const nghi = vang.filter((x) => !cheDo(x)).length;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const lam = co.filter((x) => !(x.lamBu?.kieu === 'ngay'));
+  // Ngày nghỉ không lương nửa ngày đã làm bù đủ thì không trừ.
+  const klLam = (x: NgayCong) => (buNgay(x) ? 0 : Math.min(1, x.kl || 0));
+  const nghiPhep = vang.filter(cheDo).length;
+  const congHL = r2(lam.reduce((t, x) => t + 1 - klLam(x), 0) + ngay.filter((x) => buNgay(x) && !x.vao && !x.ra).length + nghiPhep);
+  const phepHL = r2(nghiPhep + lam.reduce((t, x) => t + (x.pg || 0), 0));
+  const klNgay = r2(vang.filter((x) => x.don === DON_KHONG_LUONG).length + lam.reduce((t, x) => t + klLam(x), 0));
   return {
     cong,
     lamChuan: ngay.filter((x) => x.lam).length,
@@ -485,7 +506,10 @@ export function tongThang(ngay: (NgayCong & { ngay: string })[], l: Lich, homNay
     viPham,
     ot: ngay.reduce((t, x) => t + (x.ot || 0), 0),
     nghi,
-    nghiPhep: vang.filter(cheDo).length,
+    nghiPhep,
+    congHL,
+    phepHL,
+    klNgay,
     phut: co.reduce((t, x) => t + x.phut, 0),
     chuyenCan: l.kieu !== 'tudo' && l.chuyenCan ? viPham <= q.ccLan && nghi <= q.ccNghi : null,
   };

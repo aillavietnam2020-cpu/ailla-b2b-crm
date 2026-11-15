@@ -78,8 +78,13 @@ function kdChia(k){const ch=chOf(k),s=kdStat(CHANNELS.find(x=>x.k===k)||ch),C=s.
     toast(`Đã chia ${done} video`);closeDrawer();renderMain()}}
 /* gắn vào trang Dự án: dự án kênh đứng đầu */
 const _pCvDaKd=pCvDa;
-pCvDa=function(m){_pCvDaKd(m);const L=kdSee();if(!L.length)return;const g=m.querySelector(".pjgrid");const h=`<div class="pjgrid kdgrid">${L.map(kdCardHtml).join("")}</div>`;
-  if(g)g.insertAdjacentHTML("beforebegin",`<h3 class="kdh">📡 Dự án kênh</h3>${h}<h3 class="kdh">▣ Dự án khác</h3>`);else{const c=m.querySelector("section.card:last-of-type");(c||m).insertAdjacentHTML(c?"beforebegin":"beforeend",`<h3 class="kdh">📡 Dự án kênh</h3>${h}`)}kdBind(m)};
+/* kiểu xem Bảng / Danh sách (chị Hoa 08/11): dự án kênh gọn mỗi kênh một dòng, bấm để mở thẻ đầy đủ */
+const KD_OPEN=new Set();
+const kdRow=ch=>{const s=kdStat(ch),own=kdOwner(ch.k),op=KD_OPEN.has(ch.k),bad=s.miss.length||(!s.today.length&&!s.todayPosted.length&&s.per);
+  return `<div class="pjli${op?" op":""}"><div class="pjlh" data-kdop="${esc(ch.k)}"><i class="ptar">${op?"▾":"▸"}</i><span class="pjic kdlogo${/tiktok/i.test(ch.k)?" tt":" fb"}">${kdLogo(ch)}</span><div class="pjlt"><b>Vận hành kênh ${esc(kdNm(ch))}</b><small>Phụ trách ${esc(userName(own)||"chưa giao kênh")} · hôm nay ${s.todayPosted.length} đã đăng · ${s.todayReady.length} chờ đăng${s.per?` · cần ${s.per}/ngày`:""}</small></div>${bad?pill("Thiếu lịch đăng","red"):pill("Đủ lịch","grn")}</div>${op?`<div class="pjlb kdopen"><div class="pjgrid kdgrid">${kdCardHtml(ch)}</div></div>`:""}</div>`};
+pCvDa=function(m){_pCvDaKd(m);const L=kdSee();if(!L.length)return;const g=m.querySelector(".pjgrid");const alt=typeof pjVw==="function"&&pjVw()!=="the";const h=alt?`<section class="card flush pjls kdls">${L.map(kdRow).join("")}</section>`:`<div class="pjgrid kdgrid">${L.map(kdCardHtml).join("")}</div>`;
+  if(g)g.insertAdjacentHTML("beforebegin",`<h3 class="kdh">📡 Dự án kênh</h3>${h}<h3 class="kdh">▣ Dự án khác</h3>`);else{const c=m.querySelector("section.card:last-of-type");(c||m).insertAdjacentHTML(c?"beforebegin":"beforeend",`<h3 class="kdh">📡 Dự án kênh</h3>${h}`)}kdBind(m);
+  m.querySelectorAll("[data-kdop]").forEach(b=>b.onclick=()=>{const k=b.dataset.kdop;KD_OPEN.has(k)?KD_OPEN.delete(k):KD_OPEN.add(k);renderMain()})};
 PAGES.cv_da=m=>pCvDa(m);
 /* Công việc › Tổng quan: khung "Kênh tôi phụ trách" (chỉ người giữ kênh) */
 const _pCvVKd=pCvV;

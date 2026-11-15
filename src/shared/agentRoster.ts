@@ -15,6 +15,7 @@ export const AGENT_ROSTER: readonly AgentProfile[] = [
   { id: 'main', name: 'AILLA Center', title: 'Thảo · Trợ lý tổng quản', emoji: '🌿', color: '#0f766e', quyen: 'Thấy toàn bộ: đơn, công nợ, kho, Marketing, Công xưởng' },
   { id: 'lead-sale-ailla', name: 'Lead Sale', title: 'Trưởng nhóm Kinh doanh', emoji: '🛒', color: '#2563eb', quyen: 'Đơn hàng, khách và công nợ' },
   { id: 'sale-b2b-ailla', name: 'Sale B2B', title: 'Sale B2B · NPP, đơn hàng, công nợ', emoji: '🤝', color: '#0d9488', quyen: 'Đơn hàng, khách và công nợ (chỉ đọc)' },
+  { id: 'cskh-b2b-ailla', name: 'CSKH B2B', title: 'CSKH khách sỉ · Kênh phân phối, OEM', emoji: '💬', color: '#0e7490', quyen: 'Đơn, khách sỉ, công nợ, bảng giá, thưởng (Kênh phân phối, OEM); lập đơn khi được lệnh' },
   { id: 'ke-toan-truong-ailla', name: 'Kế toán trưởng', title: 'Kế toán · Công nợ, đối soát', emoji: '🧾', color: '#7c3aed', quyen: 'Đơn hàng, khách và công nợ' },
   { id: 'ke-toan-kho-ailla', name: 'Kế toán kho', title: 'Kế toán kho', emoji: '📦', color: '#b45309', quyen: 'Kho, đơn đang chờ kho' },
   { id: 'ky-thuat-san-xuat-ailla', name: 'Kỹ thuật sản xuất', title: 'Kỹ thuật · Pha chế, hóa chất', emoji: '🧪', color: '#047857', quyen: 'Kho, hóa chất, phiếu pha chế' },

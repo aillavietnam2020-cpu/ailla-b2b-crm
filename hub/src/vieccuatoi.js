@@ -11,14 +11,14 @@ async function wkLoad(force){
   try{
     const before=WK.items?wkCount():null;
     WK.items=await svApi("/api/work/mine");WK.err="";WK.at=Date.now();
-    if(before!==null&&wkCount()!==before&&!/^cv_v$/.test(PAGE)){const ae=document.activeElement,typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);if(!typing&&!document.querySelector(".modal,.mdl,[role=dialog],#drawer:not([hidden])"))try{render()}catch(x){}}}
+    if(before!==null&&wkCount()!==before&&!/^cv_v$/.test(PAGE)){const ae=document.activeElement,typing=(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))||(typeof svTyping==="function"&&svTyping());if(!typing&&!document.querySelector(".modal,.mdl,[role=dialog],#drawer:not([hidden])"))try{render()}catch(x){}}}
   catch(e){WK.err=e.message||"Không tải được"}
   WK.busy=false;
   if(PAGE==="cv_v"&&CVV.view==="list"&&CVV.scope==="mine")renderMain();
 }
 /* Chị (CEO): việc của kế toán, kho, chăm sóc khách (sale phụ trách, chị Hoa 04/11) đã có người phụ trách, xem ở "Toàn cảnh". Ở đây chỉ việc chính chị phải quyết hoặc làm. */
 const wkCeo=()=>!!ME&&ME.role==="admin";
-const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho","Chăm sóc khách"].includes(x.group))).filter(x=>!(WK.noTask&&typeof pdAny==="function"&&pdAny()&&["pay_confirm","return_confirm","ship_edit","approve"].includes(x.key)));/* trong Công việc: khoản đã có ở tab Chờ duyệt thì không nhắc lại */const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Cần phân công / theo dõi","Đã nộp, chờ duyệt","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
+const wkMine=()=>{const srv=(WK.items||[]).filter(x=>!(wkCeo()&&["Kế toán","Kho","Chăm sóc khách","Việc được giao"].includes(x.group))).filter(x=>!(WK.noTask&&typeof pdAny==="function"&&pdAny()&&["pay_confirm","return_confirm","ship_edit","approve"].includes(x.key)));/* trong Công việc: khoản đã có ở tab Chờ duyệt thì không nhắc lại */const my=typeof cvMyItems==="function"?cvMyItems():[];const order=["Đến lượt tôi làm","Cần tôi duyệt","Cần phân công / theo dõi","Đã nộp, chờ duyệt","Đang chờ người trước"];return my.sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group)||b.age_days-a.age_days).concat(srv)};
 /* dòng nhắc gộp (vd "90 thẻ video chưa giao người") là MỘT việc của người xem, không phải 90 việc (chị Hoa 04/11: "Của tôi 94" mà bấm vào không thấy) */
 const wkN=x=>x.group==="Cần phân công / theo dõi"?1:(x.count||1);
 const wkCount=()=>wkMine().reduce((n,x)=>n+wkN(x),0);
@@ -43,7 +43,7 @@ function wkBodyHtml(){
   const items=wkMine().filter(x=>!(WK.noTask&&x.taskId)),tone=a=>a>=3?"red":a>=1?"amb":"gry",secs={};
   items.forEach(x=>{(secs[wkSec(x)]=secs[wkSec(x)]||[]).push(x)});
   const keys=WK_FIRST.filter(k=>secs[k]).concat(Object.keys(secs).filter(k=>!WK_FIRST.includes(k)));
-  const row=x=>`<div class="sxal"><span style="flex:1;min-width:0"><b>${esc(x.title)}</b>${x.chip?` <span class="pill p-${x.chipC||"gry"}">${esc(x.chip)}</span>`:""}${x.count>1?` <span class="pill p-${tone(x.age_days)}">${x.count} việc</span>`:""}${x.han!==undefined&&x.age_days>0?` <span class="pill p-red">trễ ${x.age_days} ngày</span>`:""}${x.amount?` <span class="pill p-gry">${nf(x.amount)} đ</span>`:""}<br><small>${esc(x.detail)}${x.oldest?` · cũ nhất ${wkDd(x.oldest)}${x.age_days>0?`, tồn <b>${x.age_days} ngày</b>`:" (hôm nay)"}`:""}</small></span>${x.key==="pay_unallocated"?`<button class="btn sm pri" data-wkbulk="1" title="Chỉ xem trước, chưa ghi gì">Xem trước</button>`:""}${x.key==="pay_confirm"||x.key==="order_confirm"?`<button class="btn sm pri" data-wkq="${x.key}" title="Xem từng khoản, bấm xác nhận ngay tại đây">Xem và xác nhận</button>`:""}${x.act&&x.cdId?`<button class="btn sm pri" data-wkcd="${x.taskId}|${x.cdId}">Xong</button>`:""}${x.taskId?`<button class="btn sm${x.btn?" pri":""}" data-wktask="${x.taskId}">${x.btn||"Mở"}</button>`:`<button class="btn sm${x.age_days>=2?" pri":""}" data-wkgo="${x.go||wkPage(x.page)}"${x.st!==undefined?` data-wkst="${x.st}"`:""}${x.who?` data-wkwho="${x.who}"`:""}${x.mod?` data-wkmod="${x.mod}"`:""}>Mở</button>`}</div>`;
+  const row=x=>`<div class="sxal"><span style="flex:1;min-width:0"><b>${esc(x.title)}</b>${x.chip?` <span class="pill p-${x.chipC||"gry"}">${esc(x.chip)}</span>`:""}${x.count>1?` <span class="pill p-${tone(x.age_days)}">${x.count} việc</span>`:""}${x.han!==undefined&&x.age_days>0?` <span class="pill p-red">trễ ${x.age_days} ngày</span>`:""}${x.amount?` <span class="pill p-gry">${nf(x.amount)} đ</span>`:""}<br><small>${esc(x.detail)}${x.oldest?` · cũ nhất ${wkDd(x.oldest)}${x.age_days>0?`, tồn <b>${x.age_days} ngày</b>`:" (hôm nay)"}`:""}</small></span>${x.key==="pay_unallocated"?`<button class="btn sm pri" data-wkbulk="1" title="Chỉ xem trước, chưa ghi gì">Xem trước</button>`:""}${x.key==="pay_confirm"||x.key==="order_confirm"?`<button class="btn sm pri" data-wkq="${x.key}" title="Xem từng khoản, bấm xác nhận ngay tại đây">Xem và xác nhận</button>`:""}${x.act&&x.cdId?`<button class="btn sm pri" data-wkcd="${x.taskId}|${x.cdId}">Xong</button>`:""}${x.taskId?`<button class="btn sm${x.btn?" pri":""}" data-wktask="${x.taskId}">${x.btn||"Mở"}</button>`:`<button class="btn sm${x.age_days>=2?" pri":""}" data-wkgo="${x.go||wkPage(x.page)}"${x.st!==undefined?` data-wkst="${x.st}"`:""}${x.who?` data-wkwho="${x.who}"`:""}${x.mod?` data-wkmod="${x.mod}"`:""}${x.xv?` data-wkxv="${x.xv}"`:""}>Mở</button>`}</div>`;
   return keys.map(k=>{const L=secs[k],n=L.reduce((z,x)=>z+wkN(x),0),open=(k in WKO)?WKO[k]:!["Tuần này","Sau này","Đang chờ người trước"].includes(k);
     return `<details class="cvgrp wksec" data-sk="${esc(k)}"${open?" open":""}><summary><b>${esc(k)}</b><span class="cvgc">${n}</span></summary><div class="sxalerts">${L.map(row).join("")}</div></details>`}).join("");
 }
@@ -53,7 +53,7 @@ function wkBind(m){
   m.querySelectorAll("[data-wkq]").forEach(b=>b.onclick=()=>wkQueue(b.dataset.wkq));
   m.querySelectorAll("[data-wktask]").forEach(b=>b.onclick=()=>openTask(b.dataset.wktask));
   m.querySelectorAll("[data-wkcd]").forEach(b=>b.onclick=()=>{const p=b.dataset.wkcd.split("|");tkCdAct(p[0],p[1],"xong");toast("Đã xong công đoạn");renderMain()});
-  m.querySelectorAll("[data-wkgo]").forEach(b=>b.onclick=()=>{if(b.dataset.wkst!==undefined)CVF.st=b.dataset.wkst;if(b.dataset.wkwho)cvWhoSet(b.dataset.wkwho);if(b.dataset.wkmod)MOD=b.dataset.wkmod;PAGE=b.dataset.wkgo;renderMain();scrollTo(0,0)});
+  m.querySelectorAll("[data-wkgo]").forEach(b=>b.onclick=()=>{if(b.dataset.wkst!==undefined)CVF.st=b.dataset.wkst;if(b.dataset.wkwho)cvWhoSet(b.dataset.wkwho);if(b.dataset.wkmod)MOD=b.dataset.wkmod;if(b.dataset.wkxv&&typeof XV!=="undefined"){STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt=b.dataset.wkxv;XV.ktK="";XV.q=""}PAGE=b.dataset.wkgo;renderMain();scrollTo(0,0)});
 }
 function wkEmbed(m){
   if(!WK.at||typeof _rLast=="undefined"||_rLast!==PAGE)wkLoad(true);

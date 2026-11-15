@@ -46,13 +46,15 @@ function pExec(m){
   const O=execOrders(PERIOD.from,PERIOD.to),OP=execOrders(pr.from,pr.to),oTot=O.tts+O.spe+O.fb,oTotP=OP.tts+OP.spe+OP.fb;
   const AT=execAttention(),AL=execAlerts(),late=AT.filter(a=>a.late).length,wait=AT.filter(a=>a.st[0]==="Chờ duyệt").length;
   const tg=T.tong*k,margin=lDT?lTot/lDT:0,cr=N.tong?cTot/N.tong:0;
+  /* Việc và cảnh báo là của hôm nay, không theo kỳ đang xem (chị Hoa 11/11: xem tháng 10 vẫn hiện việc tháng 11) → ghi rõ "hiện tại". */
+  const xemCu=PERIOD.to<d.settings.today,hn=xemCu?" · hiện tại, không theo kỳ đang xem":"";
   const K=[
    {l:"Doanh số",ic:"money",v:N.tong?tr(N.tong):"",cmp:ok?xChg(N.tong,P.tong):"",tgt:tg?`${Math.round(N.tong/tg*100)}% mục tiêu`:"",st:!N.tong?"none":tg?(N.tong>=tg?"good":N.tong>=tg*.8?"warn":"bad"):ok&&N.tong<P.tong*.9?"warn":"good",go:"bc_tong"},
    {l:"Chi phí",ic:"wallet",v:cTot?tr(cTot):"",cmp:ok&&cOK?xChg(cTot,cTotP,true):"",tgt:N.tong?`${(cr*100).toFixed(0)}% doanh số`:"",st:!cTot?"none":cr>.55?"bad":cr>.45?"warn":"good",act:"cost"},
    {l:"Lợi nhuận",ic:"trend",v:lr.length?tr(lTot):"",cmp:ok&&lP.length===lr.length?xChg(lTot,lTotP):"",tgt:lDT?`biên ${(margin*100).toFixed(1)}% · MT 18,5%`:"",st:!lr.length?"none":margin>=.185?"good":margin>=.1?"warn":"bad",go:"pl"},
    {l:"Đơn hàng",ic:"cart",v:oTot?nf(oTot):"",cmp:ok&&oTotP?xChg(oTot,oTotP):"",tgt:"",st:!oTot?"none":ok&&oTotP&&oTot<oTotP*.9?"warn":"good",go:"bc_tong"},
-   {l:"Việc cần xử lý",ic:"task",v:String(AT.length),cmp:"",tgt:`${late} quá hạn · ${wait} chờ duyệt`,st:late?"bad":AT.length?"warn":"good",go:"cv_nv",zero:!AT.length},
-   {l:"Cảnh báo vận hành",ic:"alert",v:String(AL.length),cmp:"",tgt:AL.length?`${AL.filter(a=>a[0]==="red").length} nghiêm trọng`:"không có cảnh báo",st:AL.some(a=>a[0]==="red")?"bad":AL.length?"warn":"good",zero:!AL.length,anchor:"xal"}];
+   {l:"Việc cần xử lý",ic:"task",v:String(AT.length),cmp:"",tgt:`${late} quá hạn · ${wait} chờ duyệt${hn}`,st:late?"bad":AT.length?"warn":"good",go:"cv_nv",zero:!AT.length},
+   {l:"Cảnh báo vận hành",ic:"alert",v:String(AL.length),cmp:"",tgt:(AL.length?`${AL.filter(a=>a[0]==="red").length} nghiêm trọng`:"không có cảnh báo")+hn,st:AL.some(a=>a[0]==="red")?"bad":AL.length?"warn":"good",zero:!AL.length,anchor:"xal"}];
   const kcell=x=>{const none=!x.v;return `<button type="button" class="xk${none||x.zero?" mut":""}" ${x.go?`data-go="${x.go}"`:""} ${x.act?`data-kact="${x.act}"`:""} ${x.anchor?`data-anc="${x.anchor}"`:""}><span class="xkh"><span class="kic k-${x.ic}">${ico(x.ic)}</span><span class="xkl">${x.l}</span></span><span class="xkv numeric">${none?"Chưa đủ dữ liệu":x.v}</span><span class="xkm">${xsDot(x.st)}${x.cmp?` ${x.cmp}`:""}</span>${x.tgt?`<span class="xkm">${x.tgt}</span>`:""}</button>`};
   // kênh kinh doanh
   const CH=[["fb","Facebook",N.fbDT,P.fbDT,O.fb,N.C.gvFB+N.C.adsFB,N.L.fb,T.fb,getD("fb",6),"bc_fb"],["tts","TikTok Shop",N.tt,P.tt,O.tts,N.C.adsTT+N.C.gvTT+N.C.phiTT+N.C.khacTT,N.L.tts,T.tts,getD("tts",0),"bc_tiktok"],["spe","Shopee",N.spDT,P.spDT,O.spe,N.C.adsSPE+N.C.gvSPE+N.C.phiSPE,N.L.spe,T.spe,getD("spe",0),"bc_shopee"]];
@@ -82,7 +84,7 @@ function pExec(m){
    <section class="card flush xkenh"><div class="card-h pad"><h2>Hiệu quả kinh doanh theo kênh</h2><span class="hint">lãi đóng góp chưa trừ lương, kho, chi phí chung · <button class="lnk" id="tg-ed">Sửa mục tiêu</button></span></div>
     <div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Doanh thu</th><th class="n">Đơn</th><th class="n">Chi phí</th><th class="n">Lãi</th><th class="n">% MT</th><th class="n">Kỳ trước</th><th>Xu hướng</th></tr></thead><tbody>${CH.map(chRow).join("")}${b2bRow}
     <tr class="tot"><td>Tổng Kênh bán lẻ</td><td class="n">${tr(N.tong)}</td><td class="n">${oTot?nf(oTot):"—"}</td><td class="n">${tr(cTot)}</td><td class="n">${lr.length?tr(lTot):"—"}</td><td class="n">${tg?Math.round(N.tong/tg*100)+"%":"—"}</td><td class="n">${ok?xChg(N.tong,P.tong):"—"}</td><td></td></tr></tbody></table></div></section>
-   <section class="card flush xatt"><div class="card-h pad"><h2>${execFull()?"Việc cần xử lý":"Việc của tôi cần xử lý"} <span class="hint">${AT.length}</span></h2><button class="lnk" data-go="cv_nv">Tất cả việc →</button></div>
+   <section class="card flush xatt"><div class="card-h pad"><h2>${execFull()?"Việc cần xử lý":"Việc của tôi cần xử lý"} <span class="hint">${AT.length}${xemCu?" · hiện tại":""}</span></h2><button class="lnk" data-go="cv_nv">Tất cả việc →</button></div>
     ${AT.length?`<div class="xattl">${AT.slice(0,6).map((a,i)=>`<div class="xai"><i class="sdot s-${a.st[1]}"></i><div class="xat"><b>${esc(a.t)}</b><small>${esc(a.dep||"")}${a.who?" · "+esc(a.who):""} · <span class="${a.late?"t-red":""}">${esc(a.han)}</span></small></div>${pill(a.st[0],a.st[1])}<button class="btn sm${a.btn==="Duyệt"?" pri":""}" data-xai="${i}">${a.btn}</button></div>`).join("")}</div>`:`<p class="empty pad">${execFull()?"Không có việc nào cần xử lý.":"Bạn không có việc nào cần xử lý."}</p>`}</section>
   </div>
   <div class="xrow3">${blocks.join("")}</div>
@@ -91,7 +93,10 @@ function pExec(m){
   xchIcons(m);
   m.querySelectorAll("[data-href]").forEach(b=>b.onclick=()=>{location.href=b.dataset.href});
   m.querySelectorAll("[data-xai]").forEach(b=>b.onclick=()=>{const a=AT[+b.dataset.xai];if(a.href){location.href=a.href;return}if(a.open){if(a.open.src==="card")openCard(a.open.id);else if(a.open.src==="order"){PAGE="order";MOD="";render()}else openTask(a.open.id);return}if(a.go){PAGE=a.go;MOD="";render();scrollTo(0,0)}});
-  m.querySelectorAll("[data-anc]").forEach(b=>b.onclick=()=>{const t=document.querySelector(".xatt");if(t)t.scrollIntoView({behavior:"smooth",block:"center"})});
+  /* Bấm ô Cảnh báo vận hành: mở danh sách đủ các cảnh báo, bấm từng dòng sang đúng trang (trước chỉ cuộn tới Việc cần xử lý, không thấy gì) */
+  m.querySelectorAll("[data-anc]").forEach(b=>b.onclick=()=>{
+    openDrawerHTML(`<h2>Cảnh báo vận hành</h2><p class="hint">${AL.length} cảnh báo · hiện tại, không theo kỳ đang xem</p>${AL.length?`<div class="xattl">${AL.map((a,i)=>`<div class="xai"><i class="sdot ${a[0]==="red"?"s-red":"s-amb"}"></i><div class="xat"><b>${esc(a[1])}</b><small>${esc(a[2]||"")}</small></div>${a[3]?`<button class="btn sm" data-algo="${i}">Xem</button>`:""}</div>`).join("")}</div>`:`<p class="empty">Không có cảnh báo.</p>`}`);
+    document.querySelectorAll("[data-algo]").forEach(x=>x.onclick=()=>{const g=AL[+x.dataset.algo][3];closeDrawer();if(!g)return;if(String(g).startsWith("/"))location.href=g;else{PAGE=g;MOD="";render();scrollTo(0,0)}})});
   const cb=m.querySelector('[data-kact="cost"]');if(cb)cb.onclick=()=>openDrawerHTML(`<h2>Chi phí trong kỳ</h2><p class="hint">${esc(pLabel())} · tổng ${tr(cTot)}${N.tong?" · "+pc(cTot,N.tong)+" doanh số":""}</p>${cl.map(([g,L])=>`<h3>${g}</h3>${tbl(["Khoản","Số tiền","% doanh số"],L.map(x=>`<tr><td>${x[0]}</td><td class="n">${tr(x[1])}</td><td class="n">${pc(x[1],N.tong)}</td></tr>`))}`).join("")||`<p class="empty">Chưa có chi phí trong kỳ.</p>`}`);
   $("#tg-ed").onclick=()=>{const t=execTargets();openDrawerHTML(`<h2>Mục tiêu doanh số theo tháng</h2><form class="frm" id="tgf">${[["tong","Tổng doanh số"],["tts","TikTok Shop (GMV)"],["spe","Shopee"],["fb","Facebook (giao thành công)"],["ads","Ads Facebook (KPI doanh số đơn chốt)"]].map(([k2,l])=>`<label class="field">${l} (đ/tháng)<input type="number" min="0" id="tg-${k2}" value="${t[k2]||0}"></label>`).join("")}<p class="hint">Để 0 nếu chưa đặt.</p><button class="btn pri">Lưu</button></form>`);$("#tgf").onsubmit=e=>{e.preventDefault();DB.mutate(ME.name,"sửa mục tiêu doanh số",dt=>{execTargets();["tong","tts","spe","fb","ads"].forEach(k2=>dt.targets[k2]=+$("#tg-"+k2).value||0)});closeDrawer();renderMain()}};
 }

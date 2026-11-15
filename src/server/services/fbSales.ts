@@ -174,3 +174,25 @@ export async function probeSaleExtra(db: D1Database, secret: string | undefined,
     return { u: String((r as Record<string, unknown>)['User.id'] ?? ''), total: x.total_order_count, order_count: x.order_count, canceled: x.canceled_order_count, returned: x.returned_order_count, delivered: x.delivered_count, net: x.net_revenue, delivered_rev: x.delivered_revenue, returned_rev: x.returned_revenue };
   }), error: res.ok ? undefined : text.slice(0, 200) };
 }
+
+/**
+ * Đối chiếu (CEO, kế toán): tổng số bán hàng Facebook cả khoảng ngày theo hai mốc của Pancake —
+ * "inserted" = theo ngày tạo đơn (web đang dùng), "updated" = theo ngày đơn đổi trạng thái (giao xong / hoàn trong khoảng).
+ */
+export async function fbSaleTotals(db: D1Database, secret: string | undefined, from: string, to: string, mode: 'inserted' | 'updated', fetchFn: FetchFn) {
+  const { shop, key } = await openFacebook(db, secret);
+  const { since } = dayBoundsIso(from);
+  const { until } = dayBoundsIso(to);
+  const p = new URLSearchParams({ api_key: key, since, until, success_status: '1', success_record: mode === 'inserted' ? 'inserted_at' : 'updated_at', returned_record: 'success_record' });
+  for (const f of FIELDS) p.append('select_fields[]', f);
+  const res = await fetchFn(`${API}/shops/${encodeURIComponent(shop)}/analytics/sale?${p.toString()}`);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Pancake trả lỗi ${res.status}: ${text.slice(0, 120)}`);
+  const j = JSON.parse(text) as { data?: Array<Record<string, unknown>> };
+  const sum: Record<string, number> = {};
+  for (const r of j.data ?? []) {
+    const x = (r.result ?? r) as Record<string, unknown>;
+    for (const f of FIELDS) sum[f] = (sum[f] ?? 0) + (Number(x[f]) || 0);
+  }
+  return { from, to, mode, rows: (j.data ?? []).length, sum };
+}

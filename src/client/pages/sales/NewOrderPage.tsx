@@ -15,6 +15,16 @@ import { ApiError, api, newIdempotencyKey } from '../../lib/api';
 import { useApi, useDebounced } from '../../lib/hooks';
 import { Card, ErrorBox, StateBlock, useToast } from '../../components/ui';
 import { useAuth } from '../../components/AuthProvider';
+import { ZaloIntake, type IntakePick } from '../../components/ZaloIntake';
+import {
+  addProductLine,
+  lineNeedsPrice as lineNeedsPriceOf,
+  newLineUid,
+  patchLine,
+  removeLine,
+  setLineGift,
+  type Line,
+} from './orderLines';
 
 /** Một gợi ý sản phẩm khi gõ mã: giá đã quy theo cách tính giá của khách. */
 interface Suggest {
@@ -26,38 +36,15 @@ interface Suggest {
   price: number | null;
 }
 
-interface Line {
-  product_id: string;
-  sku: string;
-  name: string;
-  /** Đơn vị lẻ của sản phẩm, ví dụ "Chai", "Can". */
-  unit: string;
-  /** Số lượng lẻ trong một thùng; 1 nghĩa là không bán theo thùng. */
-  pack_size: number;
-  /** Khách lấy lẻ hay lấy nguyên thùng. */
-  pack_mode: 'LE' | 'THUNG';
-  /** Số lượng theo đơn vị đang chọn (lẻ hoặc thùng). */
-  qty: number;
-  /** Giá một đơn vị lẻ theo cấp của khách; null = cấp này chưa có giá. */
-  base_price: number | null;
-  /** Giá sửa tay cho một đơn vị lẻ; để trống là dùng giá chuẩn. */
-  applied_price: number | null;
-  is_gift: boolean;
-  /**
-   * Mã có ĐVT là Thùng (ví dụ AILLA2HD): bảng giá đã là giá MỘT THÙNG, số lượng đếm bằng thùng.
-   * Không có công tắc lẻ/thùng và không nhân giá với quy cách. Muốn bán lẻ từng can/chai thì chọn mã -C.
-   */
-  carton_sku: boolean;
-  /** Vật tư bán kèm (vỏ, nắp, chai...): không có bảng giá, người lập đơn tự điền giá. */
-  supply?: boolean;
-}
-
 interface SupplyItem {
   code: string;
   name: string;
   unit: string;
   grp: string;
+  cls?: string;
   product_id: string | null;
+  /** Mã bán đã nối với mã kho này (nếu có). */
+  sku?: string | null;
 }
 
 /** 1 nếu khách lấy lẻ, bằng số chai trong thùng nếu khách lấy nguyên thùng. */
@@ -130,6 +117,7 @@ function lineFromItem(item: OrderLineItem): Line {
   const f = asCarton ? pack : 1;
   const sameAsBase = item.base_price !== null && item.applied_price === item.base_price;
   return {
+    uid: newLineUid(),
     product_id: item.product_id,
     sku: item.sku,
     name: item.product_name,
@@ -177,6 +165,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
   const [promotion, setPromotion] = useState({ code: '', note: '' });
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  /** Ảnh / tin đơn từ Zalo đã đọc: lưu đơn xong thì gắn ảnh gốc vào đơn. */
+  const [intakeId, setIntakeId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey());
@@ -187,9 +177,14 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
   const customer = (customers.data ?? []).find((c) => c.id === customerId) ?? null;
   const customPricing = (customer?.price_mode ?? existing.data?.price_mode) === 'CUSTOM';
   const qs = debouncedQuery ? `&q=${encodeURIComponent(debouncedQuery)}` : '';
-  // Khách gia công chỉ chọn trong bảng giá riêng của họ; khách thường chọn trong bảng giá 8 cấp.
+  // Khách thường chọn trong bảng giá 8 cấp. Khách gia công: bảng giá riêng của họ, và gõ tìm thì thấy cả mọi mã khác
+  // (CEO 13/11: đơn gia công phải tạo được với mọi mã) — mã chưa có trong bảng riêng thì nhập giá tay, quản lý duyệt như giá thỏa thuận.
   const catalog = useApi<{ products: ProductItem[] }>(
-    customerId && !customPricing ? `/api/prices?limit=400&scope=TIER${qs}` : null,
+    customerId && !customPricing
+      ? `/api/prices?limit=400&scope=TIER${qs}`
+      : customerId && customPricing && debouncedQuery.trim()
+        ? `/api/prices?limit=200${qs}`
+        : null,
   );
   const ownCatalog = useApi<CustomerPriceItem[]>(
     customerId && customPricing ? `/api/customer-prices/${customerId}?${qs.slice(1)}` : null,
@@ -257,15 +252,22 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
   const packFor = (line: Line): number =>
     line.pack_size > 1 ? line.pack_size : siblingPack(line.sku);
 
+  const ownIds = new Set((ownCatalog.data ?? []).map((p) => p.product_id));
   const suggestions: Suggest[] = customPricing
-    ? (ownCatalog.data ?? []).map((p) => ({
-        id: p.product_id,
-        sku: p.sku,
-        name: p.name,
-        unit: p.unit,
-        pack_size: p.pack_size,
-        price: p.amount,
-      }))
+    ? [
+        ...(ownCatalog.data ?? []).map((p) => ({
+          id: p.product_id,
+          sku: p.sku,
+          name: p.name,
+          unit: p.unit,
+          pack_size: p.pack_size,
+          price: p.amount,
+        })),
+        // Mã chưa có trong bảng giá riêng của khách: vẫn chọn được, giá để trống cho người lập đơn nhập.
+        ...(catalog.data?.products ?? [])
+          .filter((p) => !ownIds.has(p.id))
+          .map((p) => ({ id: p.id, sku: p.sku, name: p.name + ' (chưa có giá riêng, nhập giá)', unit: p.unit, pack_size: p.pack_size, price: null })),
+      ]
     : (catalog.data?.products ?? []).map((p) => ({
         id: p.id,
         sku: p.sku,
@@ -274,31 +276,30 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
         pack_size: p.pack_size,
         price: priceForTier(p),
       }));
-  // Khách gia công mua thêm vật tư (vỏ thùng, nắp, chai...): tìm trong kho vật tư, giá tự điền.
-  const supplies = useApi<SupplyItem[]>(
-    customPricing && customerId && debouncedQuery.trim() ? `/api/supplies?q=${encodeURIComponent(debouncedQuery.trim())}` : null,
+  // Thành phẩm, mẫu thử, bán thành phẩm trong kho (chị Hoa 14/11: kế toán đã tạo mã là bán được; tem, vỏ, nắp không hiện). Khách thường thêm hàng hóa / quà.
+  // Mã đã có mã bán thì thêm thẳng; chưa có thì web tự tạo mã bán (Trưởng phòng tạo là dùng luôn, sale tạo thì chờ duyệt mã) rồi thêm.
+  // Giá chưa có trong bảng giá thì người lập nhập giá tay.
+  const khoItems = useApi<SupplyItem[]>(
+    customerId && debouncedQuery.trim() ? `/api/supplies?all=1${customPricing ? '' : '&hh=1'}&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
   );
-  const addSupply = async (it: SupplyItem) => {
+  const shownIds = new Set(suggestions.map((p) => p.id));
+  const khoExtra = (khoItems.data ?? []).filter((it) => !it.product_id || !shownIds.has(it.product_id));
+  const addKhoItem = async (it: SupplyItem) => {
     try {
-      const r = await api.post<{ id: string; sku: string; name: string; unit: string | null }>('/api/supplies/ensure', { code: it.code });
-      const p = r.data;
-      addLine({ id: p.id, sku: p.sku, name: p.name, unit: p.unit, pack_size: null, price: null }, true);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được vật tư');
-    }
-  };
-  // Hàng hóa chưa có mã bán Kênh phân phối (mua về làm quà nhưng vẫn bán cho NPP, có giá và doanh thu): vẫn chọn vào đơn được, web tự tạo mã (QUA-…), Trưởng phòng duyệt mã sau.
-  const gifts = useApi<SupplyItem[]>(
-    !customPricing && customerId && debouncedQuery.trim() ? `/api/supplies?gift=1&q=${encodeURIComponent(debouncedQuery.trim())}` : null,
-  );
-  const addGiftItem = async (it: SupplyItem) => {
-    try {
+      if (it.product_id && it.sku) {
+        addLine({ id: it.product_id, sku: it.sku, name: it.name, unit: it.unit, pack_size: null, price: null }, true);
+        return;
+      }
       const r = await api.post<{ id: string; sku: string; name: string; unit: string | null; code_status: string }>('/api/supplies/ensure-gift', { code: it.code });
       const p = r.data;
       addLine({ id: p.id, sku: p.sku, name: p.name, unit: p.unit, pack_size: null, price: null }, true);
-      if (p.code_status === 'CHO_DUYET') toast.success(`Đã tạo mã bán ${p.sku}, chờ Trưởng phòng duyệt mã. Nhập giá bán cho dòng này.`);
+      toast.success(
+        p.code_status === 'CHO_DUYET'
+          ? `Đã tạo mã bán ${p.sku}, chờ Trưởng phòng duyệt mã. Nhập giá bán cho dòng này.`
+          : `Đã tạo mã bán ${p.sku}. Nhập giá bán cho dòng này.`,
+      );
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được hàng hóa');
+      toast.error(err instanceof ApiError ? err.message : 'Chưa thêm được mã này');
     }
   };
   const suggestLoading = customPricing ? ownCatalog.loading : catalog.loading;
@@ -326,12 +327,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
   const totalAmount = subtotal - fees.discount_amount - fees.bonus_deduction + fees.shipping_fee;
   const remaining = totalAmount - fees.cod_amount;
   const freeTier = tierCode === 'KHAC';
-  const staffTier = tierCode === 'NHAN_VIEN';
-  const lineNeedsPrice = (l: Line) =>
-    !l.is_gift &&
-    (freeTier || l.supply || (staffTier && l.base_price === null)
-      ? (l.applied_price ?? 0) <= 0
-      : l.base_price === null && !(editing && (l.applied_price ?? 0) > 0));
+  // Mã chưa có giá chuẩn (khách gia công: chưa có trong bảng giá riêng) vẫn lên đơn được: người lập nhập giá tay.
+  const lineNeedsPrice = (l: Line) => lineNeedsPriceOf(l, { freeTier });
   const blockedLines = lines.filter(lineNeedsPrice);
   const needsReason =
     editing &&
@@ -339,39 +336,179 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
     existing.data.approval_status !== 'DRAFT' &&
     existing.data.approval_status !== 'REJECTED';
 
+  // ── Tự lưu nháp ──────────────────────────────────────────────────────────
+  // Khách + ít nhất một dòng hợp lệ thì đơn tự được ghi thành đơn Nháp (hiện trong danh sách đơn),
+  // sau đó mỗi lần sửa tự lưu lại sau ~2 giây. Tải lại trang / mất mạng vẫn còn đơn, mở lại làm tiếp.
+  const draftIdRef = useRef<string | null>(null);
+  const draftDateRef = useRef<string | null>(null);
+  const createKeyRef = useRef({ body: '', key: newIdempotencyKey() });
+  const lastSavedRef = useRef('');
+  const inflightRef = useRef(false);
+  const attachedRef = useRef(false);
+  const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null);
+  const [autoSaveFailed, setAutoSaveFailed] = useState(false);
+  const orderItemsBody = () =>
+    lines.map((line) => ({
+      product_id: line.product_id,
+      qty: unitQty(line),
+      applied_price:
+        line.is_gift || line.applied_price === null ? undefined : Math.round(line.applied_price / factorOf(line)),
+      is_gift: line.is_gift,
+    }));
+  const draftKey = JSON.stringify([customerId, orderDate, orderItemsBody(), fees, promotion, note]);
+  const canAutosave =
+    !saving &&
+    Boolean(customerId) &&
+    lines.length > 0 &&
+    blockedLines.length === 0 &&
+    !tierPick &&
+    lines.every((l) => unitQty(l) > 0) &&
+    (!editing || (loadedRef.current && existing.data?.approval_status === 'DRAFT'));
+  useEffect(() => {
+    if (!canAutosave) return;
+    if (editing && lastSavedRef.current === '') {
+      lastSavedRef.current = draftKey; // vừa nạp đơn nháp: chưa có gì mới để lưu
+      return;
+    }
+    if (draftKey === lastSavedRef.current) return;
+    const timer = window.setTimeout(async () => {
+      if (inflightRef.current) return;
+      inflightRef.current = true;
+      const id = editId ?? draftIdRef.current;
+      try {
+        if (!id) {
+          // Cùng nội dung thì dùng lại khóa (mất mạng gửi lại không sinh đơn trùng); nội dung khác thì khóa mới.
+          if (createKeyRef.current.body !== draftKey) createKeyRef.current = { body: draftKey, key: newIdempotencyKey() };
+          const r = await api.post<{ id: string }>(
+            '/api/orders',
+            {
+              customer_id: customerId,
+              order_date: orderDate,
+              items: orderItemsBody(),
+              ...fees,
+              promotion_code: promotion.code || null,
+              promotion_note: promotion.note || null,
+              note: note || null,
+            },
+            createKeyRef.current.key,
+          );
+          draftIdRef.current = r.data.id;
+          draftDateRef.current = orderDate;
+          // Tải lại trang thì vào thẳng đơn nháp này (không về form trống).
+          window.history.replaceState(window.history.state, '', `/${mode}/orders/${r.data.id}/edit`);
+          if (intakeId && !attachedRef.current) {
+            attachedRef.current = true;
+            await api.post(`/api/order-intake/${intakeId}/attach`, { order_id: r.data.id }).catch(() => undefined);
+          }
+        } else {
+          if (!editing && draftDateRef.current && orderDate !== draftDateRef.current) {
+            await api.post(`/api/orders/${id}/order-date`, { order_date: orderDate, reason: null });
+            draftDateRef.current = orderDate;
+          }
+          await api.put(`/api/orders/${id}`, {
+            items: orderItemsBody(),
+            ...fees,
+            promotion_code: promotion.code || null,
+            promotion_note: promotion.note || null,
+            note: note || null,
+            autosave: true,
+          });
+        }
+        lastSavedRef.current = draftKey;
+        setAutoSaveFailed(false);
+        setAutoSavedAt(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }));
+      } catch {
+        setAutoSaveFailed(true); // mất mạng / lỗi: lần sửa sau sẽ thử lại, nút Lưu đơn vẫn dùng bình thường
+      } finally {
+        inflightRef.current = false;
+      }
+    }, 2000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, canAutosave]);
+
   const addLine = (product: Suggest, supply = false) => {
-    const same = lines.filter((l) => l.product_id === product.id);
-    // Cùng sản phẩm được có hai dòng: một dòng bán, một dòng tặng.
-    const addAsGift = same.length === 1 && !same[0].is_gift;
-    if (same.length > 0 && !addAsGift) {
+    const r = addProductLine(lines, {
+      product_id: product.id,
+      sku: product.sku,
+      name: product.name.replace(' (chưa có giá riêng, nhập giá)', ''),
+      unit: isCartonUnit(product.unit) ? 'Thùng' : retailUnit(product.unit),
+      pack_size: parsePackSize(product.pack_size),
+      pack_mode: 'LE',
+      qty: 1,
+      base_price: product.price,
+      applied_price: null,
+      carton_sku: isCartonUnit(product.unit),
+      supply,
+    });
+    if (r.result === 'duplicate') {
       toast.error(`${product.sku} đã có trong đơn`);
       return;
     }
-    if (addAsGift) toast.success(`${product.sku} đã có dòng bán, thêm dòng TẶNG kèm`);
-    setLines([
-      ...lines,
-      {
-        product_id: product.id,
-        sku: product.sku,
-        name: product.name,
-        unit: isCartonUnit(product.unit) ? 'Thùng' : retailUnit(product.unit),
-        pack_size: parsePackSize(product.pack_size),
-        pack_mode: 'LE',
-        qty: 1,
-        base_price: product.price,
-        applied_price: null,
-        is_gift: addAsGift,
-        carton_sku: isCartonUnit(product.unit),
-        supply,
-      },
-    ]);
+    if (r.result === 'gift') toast.success(`${product.sku} đã có dòng bán, thêm dòng TẶNG kèm`);
+    setLines(r.lines);
     // Chọn xong thì ẩn danh sách gợi ý, ô tìm kiếm về trống để tìm mã tiếp theo.
     setProductQuery('');
   };
 
-  const updateLine = (index: number, patch: Partial<Line>) => {
-    setLines(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  /** Dòng máy đọc từ đơn Zalo: giá lấy theo cấp / bảng giá riêng của khách, giống lúc chọn tay. */
+  const addFromIntake = async (picks: IntakePick[], meta: { intakeId: string; note: string | null }) => {
+    let priceOf: (productId: string) => number | null = () => null;
+    try {
+      if (customPricing) {
+        const r = await api.get<CustomerPriceItem[]>(`/api/customer-prices/${customerId}`);
+        const m = new Map(r.data.map((p) => [p.product_id, p.amount]));
+        priceOf = (id) => m.get(id) ?? null;
+      } else {
+        const r = await api.get<{ products: ProductItem[] }>('/api/prices?limit=1000&scope=TIER');
+        const m = new Map(r.data.products.map((p) => [p.id, p]));
+        priceOf = (id) => {
+          const p = m.get(id);
+          return p ? priceForTier(p) : null;
+        };
+      }
+    } catch {
+      toast.error('Chưa tải được bảng giá. Dòng nào thiếu giá thì chọn lại mã.');
+    }
+    const have = new Set(lines.filter((l) => !l.is_gift).map((l) => l.product_id));
+    const add: Line[] = [];
+    let skipped = 0;
+    for (const pk of picks) {
+      if (have.has(pk.product.id)) {
+        skipped++;
+        continue;
+      }
+      have.add(pk.product.id);
+      const carton = isCartonUnit(pk.product.unit);
+      const pack = parsePackSize(pk.product.pack_size);
+      add.push({
+        uid: newLineUid(),
+        product_id: pk.product.id,
+        sku: pk.product.sku,
+        name: pk.product.name,
+        unit: carton ? 'Thùng' : retailUnit(pk.product.unit),
+        pack_size: pack,
+        pack_mode: pk.as_carton && pack > 1 ? 'THUNG' : 'LE',
+        qty: pk.qty,
+        base_price: priceOf(pk.product.id),
+        applied_price: null,
+        is_gift: false,
+        carton_sku: carton,
+      });
+    }
+    setLines((cur) => [...cur, ...add]);
+    setIntakeId(meta.intakeId);
+    if (meta.note && !note.trim()) setNote(meta.note);
+    toast.success(
+      `Đã đưa ${add.length} dòng vào đơn${skipped ? `, bỏ ${skipped} dòng trùng mã đã có` : ''}. Kiểm tra số lượng, thùng/lẻ và giá trước khi lưu.`,
+    );
   };
+
+  const updateLine = (uid: string, patch: Partial<Omit<Line, 'uid'>>) => {
+    setLines((cur) => patchLine(cur, uid, patch));
+  };
+  const toggleGift = (uid: string, gift: boolean) => setLines((cur) => setLineGift(cur, uid, gift));
+  const deleteLine = (uid: string) => setLines((cur) => removeLine(cur, uid));
 
   const save = async () => {
     setSaving(true);
@@ -415,6 +552,39 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
         navigate(`/${mode}/orders/${editId}`);
         return;
       }
+      // Chờ lần tự lưu đang chạy (nếu có) xong rồi mới lưu chính thức.
+      for (let i = 0; i < 50 && inflightRef.current; i++) await new Promise((r) => setTimeout(r, 100));
+      const draftId = draftIdRef.current;
+      if (draftId) {
+        if (draftDateRef.current && orderDate !== draftDateRef.current) {
+          await api.post(`/api/orders/${draftId}/order-date`, { order_date: orderDate, reason: null });
+        }
+        await api.put(`/api/orders/${draftId}`, {
+          items: orderItemsBody(),
+          ...fees,
+          promotion_code: promotion.code || null,
+          promotion_note: promotion.note || null,
+          customer_tier_id: tierPick || null,
+          note: note || null,
+        });
+        if (intakeId && !attachedRef.current) {
+          await api.post(`/api/order-intake/${intakeId}/attach`, { order_id: draftId }).catch(() => {
+            toast.error('Đơn đã lưu nhưng chưa gắn được ảnh gốc của khách.');
+          });
+        }
+        if (mayAutoSend && sendNow) {
+          try {
+            await api.post(`/api/orders/${draftId}/submit`, {});
+            toast.success('Đã tạo đơn và gửi đi.');
+          } catch (e) {
+            toast.error(`Đã lưu đơn nhưng chưa gửi được: ${e instanceof ApiError ? e.message : 'thử lại'}. Mở đơn để gửi.`);
+          }
+        } else {
+          toast.success('Đã tạo đơn. Kiểm tra lại rồi gửi duyệt.');
+        }
+        navigate(`/sales/orders/${draftId}`);
+        return;
+      }
       const result = await api.post<{ id: string; tier_request?: boolean }>(
         '/api/orders',
         {
@@ -439,6 +609,11 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
         },
         idempotencyKey,
       );
+      if (intakeId) {
+        await api.post(`/api/order-intake/${intakeId}/attach`, { order_id: result.data.id }).catch(() => {
+          toast.error('Đơn đã lưu nhưng chưa gắn được ảnh gốc của khách.');
+        });
+      }
       if (mayAutoSend && sendNow) {
         try {
           await api.post(`/api/orders/${result.data.id}/submit`, {});
@@ -593,6 +768,18 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
 
       <div style={{ height: 16 }} />
 
+      {!editing && (
+        <>
+          <ZaloIntake
+            customerId={customerId}
+            customers={(customers.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
+            onPickCustomer={setCustomerId}
+            onApply={(picks, meta) => void addFromIntake(picks, meta)}
+          />
+          <div style={{ height: 16 }} />
+        </>
+      )}
+
       {/* Khối 2: dòng hàng chiếm hết chiều ngang, không phải kéo qua lại */}
       <Card
         title={`Dòng đơn hàng (${lines.length})`}
@@ -613,12 +800,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
             <StateBlock
               loading={suggestLoading}
               error={suggestError}
-              empty={suggestions.length === 0}
-              emptyText={
-                customPricing
-                  ? 'Mã này chưa có trong bảng giá riêng của khách.'
-                  : 'Không tìm thấy sản phẩm.'
-              }
+              empty={suggestions.length === 0 && khoExtra.length === 0}
+              emptyText={khoItems.loading ? 'Đang tìm trong kho…' : 'Không tìm thấy mã nào, kể cả trong kho.'}
             >
               {suggestions.slice(0, 8).map((product) => {
                 const price = product.price;
@@ -644,34 +827,18 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                 );
               })}
             </StateBlock>
-            {!customPricing && (gifts.data ?? []).length > 0 && (
+            {khoExtra.length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
                 <div className="muted" style={{ fontSize: 12.5, padding: '0 4px 4px' }}>
-                  Hàng hóa chưa có mã bán Kênh phân phối: chọn là web tự tạo mã, Trưởng phòng duyệt mã sau. Nhập giá bán như mọi mã khác.
+                  Hàng trong kho: mã chưa có mã bán thì chọn là web tự tạo mã bán. Nhập giá bán cho dòng đó.
                 </div>
-                {(gifts.data ?? []).map((it) => (
-                  <button type="button" key={it.code} className="suggest-row" onClick={() => void addGiftItem(it)} disabled={!customerId}>
+                {khoExtra.map((it) => (
+                  <button type="button" key={it.code} className="suggest-row" onClick={() => void addKhoItem(it)} disabled={!customerId}>
                     <span>
-                      <strong>{it.code}</strong> · {it.name}
+                      <strong>{it.sku ?? it.code}</strong> · {it.name}
                       <small className="muted"> {it.unit}{it.grp ? ` · ${it.grp}` : ''}</small>
                     </span>
-                    <span className="muted">Tạo mã · nhập giá</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {customPricing && (supplies.data ?? []).length > 0 && (
-              <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
-                <div className="muted" style={{ fontSize: 12.5, padding: '0 4px 4px' }}>
-                  Vật tư bán kèm (vỏ thùng, nắp, chai…): tự điền giá, không cần duyệt
-                </div>
-                {(supplies.data ?? []).map((it) => (
-                  <button type="button" key={it.code} className="suggest-row" onClick={() => void addSupply(it)} disabled={!customerId}>
-                    <span>
-                      <strong>{it.code}</strong> · {it.name}
-                      <small className="muted"> {it.unit}{it.grp ? ` · ${it.grp}` : ''}</small>
-                    </span>
-                    <span className="muted">Nhập giá</span>
+                    <span className="muted">{it.product_id ? 'Nhập giá' : 'Tạo mã · nhập giá'}</span>
                   </button>
                 ))}
               </div>
@@ -689,15 +856,15 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
           <>
             <div className="mo-lines">
               {lines.map((line, index) => {
-                const open = openLine === line.product_id;
+                const open = openLine === line.uid;
                 const missing = lineNeedsPrice(line);
                 return (
-                  <div key={line.product_id + (line.is_gift ? "-tang" : "")} className={'mo-line' + (missing ? ' bad' : '')}>
+                  <div key={line.uid} className={'mo-line' + (missing ? ' bad' : '')}>
                     <div className="mo-line-main">
                       <button
                         type="button"
                         className="mo-line-info"
-                        onClick={() => setOpenLine(open ? null : line.product_id)}
+                        onClick={() => setOpenLine(open ? null : line.uid)}
                       >
                         <span className="mo-sku">
                           {line.sku} ·{' '}
@@ -715,7 +882,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                         <button
                           type="button"
                           aria-label="Giảm"
-                          onClick={() => updateLine(index, { qty: Math.max(1, line.qty - 1) })}
+                          onClick={() => updateLine(line.uid, { qty: Math.max(1, line.qty - 1) })}
                         >
                           −
                         </button>
@@ -724,12 +891,12 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                           inputMode="numeric"
                           min={1}
                           value={line.qty}
-                          onChange={(e) => updateLine(index, { qty: Number(e.target.value) || 1 })}
+                          onChange={(e) => updateLine(line.uid, { qty: Number(e.target.value) || 1 })}
                         />
                         <button
                           type="button"
                           aria-label="Tăng"
-                          onClick={() => updateLine(index, { qty: line.qty + 1 })}
+                          onClick={() => updateLine(line.uid, { qty: line.qty + 1 })}
                         >
                           +
                         </button>
@@ -739,8 +906,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                     {missing && (
                       <div className="error">
                         {customPricing
-                          ? 'Mã này chưa có trong bảng giá riêng của khách'
-                          : 'Cấp giá của khách chưa có giá cho mã này'}
+                          ? 'Mã chưa có trong bảng giá riêng của khách: nhập đơn giá tay'
+                          : 'Cấp giá của khách chưa có giá cho mã này: nhập đơn giá tay'}
                       </div>
                     )}
                     {fieldErrors[`items.${index}.applied_price`] && (
@@ -754,7 +921,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                             value={line.pack_mode}
                             disabled={line.carton_sku}
                             onChange={(e) =>
-                              updateLine(index, {
+                              updateLine(line.uid, {
                                 pack_mode: e.target.value as 'LE' | 'THUNG',
                                 pack_size:
                                   e.target.value === 'THUNG' && line.pack_size < 2
@@ -783,7 +950,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                               min={2}
                               value={line.pack_size}
                               onChange={(e) =>
-                                updateLine(index, {
+                                updateLine(line.uid, {
                                   pack_size: Math.max(2, Number(e.target.value) || 2),
                                 })
                               }
@@ -804,7 +971,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                               }
                               value={line.applied_price ?? ''}
                               onChange={(e) =>
-                                updateLine(index, {
+                                updateLine(line.uid, {
                                   applied_price:
                                     e.target.value === '' ? null : Number(e.target.value),
                                 })
@@ -816,7 +983,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                           <input
                             type="checkbox"
                             checked={line.is_gift}
-                            onChange={(e) => updateLine(index, { is_gift: e.target.checked })}
+                            onChange={(e) => toggleGift(line.uid, e.target.checked)}
                           />
                           Hàng tặng (0đ)
                         </label>
@@ -831,7 +998,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                           type="button"
                           className="btn sm danger"
                           onClick={() => {
-                            setLines(lines.filter((_, i) => i !== index));
+                            deleteLine(line.uid);
                             setOpenLine(null);
                           }}
                         >
@@ -843,25 +1010,38 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                 );
               })}
             </div>
-            <div className="table-wrap desk-only">
-              <table className="data">
+            {/* Bảng dòng hàng vừa màn laptop, không cuộn ngang: cột tên sản phẩm co giãn, các cột số cố định và gọn. */}
+            <div className="table-wrap desk-only order-lines-wrap">
+              <table className="data order-lines">
+                <colgroup>
+                  <col />
+                  <col style={{ width: 150 }} />
+                  <col style={{ width: 82 }} />
+                  <col style={{ width: 92 }} />
+                  <col style={{ width: 136 }} />
+                  <col style={{ width: 116 }} />
+                  <col style={{ width: 52 }} />
+                  <col style={{ width: 58 }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Sản phẩm</th>
                     <th>Đơn vị</th>
                     <th className="right">Số lượng</th>
-                    <th className="right">Quy ra đơn vị lẻ: can/chai (tính thưởng)</th>
-                    <th className="right">
-                      {customPricing ? 'Đơn giá theo bảng giá riêng' : 'Đơn giá theo cấp bậc'}
+                    <th className="right" title="Quy ra đơn vị lẻ can/chai, dùng để tính thưởng">
+                      Quy ra lẻ
+                    </th>
+                    <th className="right" title={customPricing ? 'Đơn giá theo bảng giá riêng của khách' : 'Đơn giá theo cấp bậc của khách'}>
+                      {customPricing ? 'Đơn giá (giá riêng)' : 'Đơn giá theo cấp'}
                     </th>
                     <th className="right">Thành tiền</th>
-                    <th className="right">Hàng tặng</th>
+                    <th className="center">Tặng</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {lines.map((line, index) => (
-                    <tr key={line.product_id + (line.is_gift ? "-tang" : "")}>
+                    <tr key={line.uid}>
                       <td>
                         <strong>{line.sku}</strong>
                         <div className="muted">{line.name}</div>
@@ -873,17 +1053,17 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                             {freeTier
                               ? 'Nhập giá bán (khách cấp "Khác" tự thỏa thuận giá)'
                               : customPricing
-                                ? 'Mã này chưa có trong bảng giá riêng của khách'
-                                : 'Cấp giá của khách chưa có giá cho mã này'}
+                                ? 'Mã chưa có trong bảng giá riêng của khách: nhập đơn giá tay'
+                                : 'Cấp giá của khách chưa có giá cho mã này: nhập đơn giá tay'}
                           </div>
                         )}
                       </td>
-                      <td className="nowrap">
+                      <td className="order-unit">
                         <select
                           value={line.pack_mode}
                           disabled={line.carton_sku}
                           onChange={(e) =>
-                            updateLine(index, {
+                            updateLine(line.uid, {
                               pack_mode: e.target.value as 'LE' | 'THUNG',
                               // Sản phẩm chưa khai quy cách thì tạm lấy 12, sửa ngay ở ô bên cạnh.
                               pack_size:
@@ -912,7 +1092,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                               value={line.pack_size}
                               title={`Một thùng có mấy ${line.unit.toLowerCase()}`}
                               onChange={(e) =>
-                                updateLine(index, {
+                                updateLine(line.uid, {
                                   pack_size: Math.max(2, Number(e.target.value) || 2),
                                 })
                               }
@@ -926,8 +1106,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                           type="number"
                           min={1}
                           value={line.qty}
-                          onChange={(e) => updateLine(index, { qty: Number(e.target.value) || 1 })}
-                          style={{ width: 84, textAlign: 'right' }}
+                          onChange={(e) => updateLine(line.uid, { qty: Number(e.target.value) || 1 })}
+                          style={{ width: '100%', textAlign: 'right' }}
                         />
                       </td>
                       <td className="right nowrap">
@@ -952,12 +1132,12 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                             }
                             value={line.applied_price ?? ''}
                             onChange={(e) =>
-                              updateLine(index, {
+                              updateLine(line.uid, {
                                 applied_price:
                                   e.target.value === '' ? null : Number(e.target.value),
                               })
                             }
-                            style={{ width: 130, textAlign: 'right' }}
+                            style={{ width: '100%', textAlign: 'right' }}
                           />
                         )}
                         {!line.is_gift && line.applied_price === 0 && (
@@ -967,7 +1147,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                               className="btn sm primary"
                               title="Giá 0đ sẽ bị tính là lệch 100% và phải CEO duyệt. Hàng tặng thì không cần."
                               onClick={() =>
-                                updateLine(index, { is_gift: true, applied_price: null })
+                                toggleGift(line.uid, true)
                               }
                             >
                               Đây là hàng tặng
@@ -978,18 +1158,21 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
                       <td className="right nowrap">
                         <strong>{formatVnd(lineTotal(line))}</strong>
                       </td>
-                      <td className="right">
+                      <td className="center">
                         <input
                           type="checkbox"
                           checked={line.is_gift}
+                          aria-label={`Hàng tặng ${line.sku}`}
                           title="Hàng tặng khuyến mại, không tính tiền"
-                          onChange={(e) => updateLine(index, { is_gift: e.target.checked })}
+                          onChange={(e) => toggleGift(line.uid, e.target.checked)}
                         />
                       </td>
-                      <td>
+                      <td className="center">
                         <button
+                          type="button"
                           className="btn sm danger"
-                          onClick={() => setLines(lines.filter((_, i) => i !== index))}
+                          aria-label={`Xoá dòng ${line.sku}`}
+                          onClick={() => deleteLine(line.uid)}
                         >
                           Xoá
                         </button>
@@ -1089,6 +1272,11 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
           </div>
 
           <div className="modal-foot" style={{ paddingRight: 0 }}>
+            {(autoSavedAt || autoSaveFailed) && (
+              <span className="muted" style={{ marginRight: 12, fontSize: 12 }}>
+                {autoSaveFailed ? 'Chưa tự lưu được nháp, sẽ thử lại khi sửa tiếp' : `Đã tự lưu nháp lúc ${autoSavedAt}`}
+              </span>
+            )}
             {!editing && mayAutoSend && (
               <label style={{ marginRight: 12 }}>
                 <input
@@ -1125,8 +1313,8 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
           {blockedLines.length > 0 && (
             <div className="alert-box" style={{ marginTop: 10 }}>
               Còn {blockedLines.length} dòng chưa có giá{' '}
-              {customPricing ? 'trong bảng giá riêng của khách' : 'ở cấp của khách'}. Bỏ dòng đó ra
-              hoặc bổ sung giá trước khi lưu.
+              {customPricing ? 'trong bảng giá riêng của khách' : 'ở cấp của khách'}. Nhập đơn giá tay
+              vào ô Đơn giá của dòng đó (Quản lý duyệt giá), hoặc bỏ dòng ra.
             </div>
           )}
         </Card>

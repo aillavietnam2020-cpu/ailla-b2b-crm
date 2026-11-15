@@ -196,7 +196,14 @@ interface ProductRow {
   group_name: string | null;
   active: number;
   price_scope: string | null;
+  per_box: number | null;
 }
+
+const perBox = (p: ProductRow): number | null => {
+  if (p.per_box && p.per_box > 1) return p.per_box;
+  const n = Number(String(p.pack_size ?? '').match(/^\s*(\d+)\s*$/)?.[1]);
+  return (p.unit ?? '').toLowerCase().includes('thùng') && n > 1 ? n : null;
+};
 
 /** Bảng giá 8 cấp theo ngày hiệu lực; giá NULL trả về null để giao diện hiện "Chưa có". */
 export async function listPriceTable(
@@ -251,7 +258,8 @@ export async function listPriceTable(
   const productRows = await db
     .prepare(
       `SELECT p.id, p.sku, p.name, p.unit, p.pack_size, p.group_id, g.name AS group_name, p.active,
-              p.price_scope
+              p.price_scope,
+              (SELECT m.factor FROM kho_map m WHERE lower(m.crm_sku) = lower(p.sku)) AS per_box
        FROM products p LEFT JOIN product_groups g ON g.id = p.group_id
        WHERE ${where.join(' AND ')}
        ORDER BY ${rank}p.sku
@@ -319,6 +327,8 @@ export async function listPriceTable(
       name: p.name,
       unit: p.unit,
       pack_size: p.pack_size,
+      // Số chai / can trong 1 thùng: lấy từ đồng bộ mã kho (factor), chưa có thì lấy số ở ô quy cách.
+      per_box: perBox(p),
       group_id: p.group_id,
       group_name: p.group_name,
       active: p.active,

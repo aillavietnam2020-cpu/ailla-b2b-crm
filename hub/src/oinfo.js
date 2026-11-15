@@ -21,13 +21,14 @@ function oiShow(b){oiHide();const p=document.createElement("div");p.className="o
   p.style.left=x+"px";p.style.top=y+"px";OI_POP=p}
 function oiHide(){if(OI_POP){OI_POP.remove();OI_POP=null}}
 if(typeof document!=="undefined"){
-  document.addEventListener("mouseover",e=>{const b=e.target.closest&&e.target.closest(".oi");if(b)oiShow(b)});
-  document.addEventListener("mouseout",e=>{const b=e.target.closest&&e.target.closest(".oi");if(b)oiHide()});
+  /* rê chuột hiện tạm; bấm thì ghim (chị Hoa 11/11: trước bấm vào lại tắt cái đang hiện nên tưởng không ra gì) */
+  document.addEventListener("mouseover",e=>{const b=e.target.closest&&e.target.closest(".oi");if(b&&!(OI_POP&&OI_POP.dataset.pin))oiShow(b)});
+  document.addEventListener("mouseout",e=>{const b=e.target.closest&&e.target.closest(".oi");if(b&&!(OI_POP&&OI_POP.dataset.pin))oiHide()});
   document.addEventListener("focusin",e=>{if(e.target.classList&&e.target.classList.contains("oi"))oiShow(e.target)});
   document.addEventListener("focusout",e=>{if(e.target.classList&&e.target.classList.contains("oi"))oiHide()});
   /* bấm chữ i không mở trang của ô (ô là nút bấm), chỉ hiện giải thích; chạm lần nữa thì ẩn */
-  document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".oi");if(!b){oiHide();return}e.stopPropagation();e.preventDefault();if(OI_POP&&OI_POP.textContent===b.dataset.tip)oiHide();else oiShow(b)},true);
-  addEventListener("scroll",oiHide,true);
+  document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".oi");if(!b){oiHide();return}e.stopPropagation();e.preventDefault();if(OI_POP&&OI_POP.textContent===b.dataset.tip&&OI_POP.dataset.pin)oiHide();else{oiShow(b);if(OI_POP)OI_POP.dataset.pin="1"}},true);
+  addEventListener("scroll",()=>{if(!(OI_POP&&OI_POP.dataset.pin))oiHide()},true);
   let oiT=0;const go=()=>{clearTimeout(oiT);oiT=setTimeout(()=>{try{oiApply(document)}catch(e){}},30)};
   new MutationObserver(go).observe(document.documentElement,{childList:true,subtree:true});
   const s=document.createElement("style");s.textContent=`.oi{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid #b7bfce;color:#6b7590;font:italic 600 10px/1 Georgia,serif;cursor:help;margin-top:3px;flex:none;vertical-align:middle;background:#fff}

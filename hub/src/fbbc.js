@@ -5,7 +5,9 @@
    - fbbcWeeks / fbbcLast2: số theo khối 7 ngày để so tuần (so theo doanh thu chốt: đơn tuần gần nhất chưa kịp giao nên doanh thu giao thành công luôn thấp). fbbcAlerts: cảnh báo & đề xuất tuần / tháng.
    DAYD.fb[ngày] = [đơn tạo, chốt, hủy, hoàn, giao thành công, doanh thu giao thành công, doanh thu chốt, giá vốn ước, …].
    ===================================================================== */
-const FBBC_LINES=[["TL","Tẩy lồng giặt",["TLAI","AIBIO","TLG"],/t[ẩa]y\s*l[ồo]ng/i],["TD","Tinh dầu giặt sấy",["TINHDAU"],/tinh\s*d[ầa]u/i],
+/* Tẩy lồng giặt tách hai mã Ailla và AiBio (chị Hoa 14/11). Chiến dịch TLAi, TLG (không có AiBio) → Ailla; có AIBIO → AiBio.
+   AiBio đứng trước để tên sản phẩm có "AiBio" không rơi vào Ailla. */
+const FBBC_LINES=[["TB","Tẩy lồng giặt AiBio",["AIBIO"],/t[ẩa]y\s*l[ồo]ng.*ai\s*bio|ai\s*bio.*t[ẩa]y\s*l[ồo]ng/i],["TL","Tẩy lồng giặt Ailla",["TLAI","TLG"],/t[ẩa]y\s*l[ồo]ng/i],["TD","Tinh dầu giặt sấy",["TINHDAU"],/tinh\s*d[ầa]u/i],
   ["LS","Lau sàn",["LS"],/lau\s*s[àa]n/i],["CT","Kiểm soát côn trùng",["MUOI","RUOI"],/mu[ỗo]i|ru[ồo]i|gi[áa]n|c[ôo]n\s*tr[ùu]ng/i]];
 const FBBC_ROAS_HV=1.8,FBBC_HOAN=0.09,FBBC_HUY=0.2;
 const fbbcF=v=>(Math.round(v*1000)/10).toString().replace(".",",")+"%";
