@@ -34,11 +34,16 @@ describe('fbbc: lãi sau quảng cáo theo nhóm hàng', () => {
       { prod: 'TINHDAU', spend: 152e6, rev: 250e6 }, { prod: '', spend: 50e6, rev: 73e6 }, { prod: 'LANDING', spend: 0, rev: 113e6 },
     ];
     const R = T.fbbcLines({ prods, camps, tax: 1.1, ship: 0.117 });
+    // Tẩy lồng giặt tách Ailla (TLAi, TLG) và AiBio (AIBIO), chị Hoa 14/11
     const tl = R.lines.find((x: { k: string }) => x.k === 'TL');
-    expect(tl.dt).toBe(604e6);
-    expect(tl.spend).toBe(218e6);
-    expect(tl.roas).toBeCloseTo(549 / 218, 6);
-    expect(tl.dg).toBe('Gánh được ads');
+    expect(tl.dt).toBe(66e6);
+    expect(tl.spend).toBe(190e6);
+    expect(tl.roas).toBeCloseTo(473 / 190, 6);
+    const tb = R.lines.find((x: { k: string }) => x.k === 'TB');
+    expect(tb.dt).toBe(538e6);
+    expect(tb.spend).toBe(28e6);
+    expect(tb.roas).toBeCloseTo(76 / 28, 6);
+    expect(tb.dg).toBe('Gánh được ads');
     const td = R.lines.find((x: { k: string }) => x.k === 'TD');
     expect(td.dg).toBe('Dưới hòa vốn');
     expect(R.lines[R.lines.length - 1].k).toBe('KH');

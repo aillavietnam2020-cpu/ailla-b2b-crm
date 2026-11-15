@@ -5,6 +5,7 @@
  * - Hàng mẫu: Lead phòng duyệt → kho thành phẩm lập phiếu xuất kho thật (XK, ref_no = mã yêu cầu, ở routes/kho.ts) → HCNS nhận về.
  * - Đề nghị mua: Lead phòng → Quản lý mua hàng duyệt → mua về: nhập tồn; trình duyệt ghi phiếu chi nháp vào Sổ chi phí (pc_id).
  */
+import { flowAdvance, flowGate, type GateRow } from '../services/flowGate';
 import { Hono } from 'hono';
 import { nowIso, vnDate } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
@@ -392,7 +393,7 @@ doDungRoutes.post('/lay/:id/huy', async (c) => {
 });
 
 /* ================= Yêu cầu hàng mẫu từ xưởng ================= */
-type MauRow = { id: string; noi: Noi; user_id: string; user_name: string; pb: string; kho_code: string; sl: number; st: string };
+type MauRow = { id: string; noi: Noi; user_id: string; user_name: string; pb: string; kho_code: string; sl: number; st: string; wfi?: string | null; created_at?: string };
 const mauGet = async (db: D1Database, id: string) => {
   const x = await db.prepare('SELECT * FROM dd_mau WHERE id = ?').bind(id).first<MauRow>();
   if (!x) throw notFound('Không có yêu cầu này');
@@ -440,8 +441,11 @@ doDungRoutes.post('/mau/:id/duyet', async (c) => {
   const v = await viewer(db, c.get('auth'));
   const x = await mauGet(db, c.req.param('id'));
   if (x.st !== 'lead') throw conflict('SAI_BUOC', 'Yêu cầu không ở bước chờ Lead duyệt');
-  if (!v.ceo && !(v.lead && v.pb === x.pb && v.id !== x.user_id)) throw forbidden('Chỉ Lead phòng của người xin hoặc CEO duyệt');
   const b = ((await c.req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+  const fr: GateRow = { table: 'dd_mau', fid: 'mau', id: x.id, pb: x.pb, owner: x.user_id, wfi: x.wfi ?? null, start: x.created_at ?? '' };
+  const g = await flowGate(db, fr, v.id);
+  if (g.act && b.ok !== false && g.pre) return ok(c, { id: x.id, st: x.st, buoc: await flowAdvance(db, fr, g, v.id, `xin hàng mẫu ${x.id} của ${x.user_name}`) });
+  if (!g.act && !v.ceo && !(v.lead && v.pb === x.pb && v.id !== x.user_id)) throw forbidden('Chỉ Lead phòng của người xin hoặc CEO duyệt');
   const now = nowIso();
   if (b.ok === false) {
     const ly = str(b.ly_do);
@@ -498,7 +502,7 @@ doDungRoutes.post('/mau/:id/huy', async (c) => {
 });
 
 /* ================= Đề nghị mua đồ dùng ================= */
-type MuaRow = { id: string; noi: Noi; user_id: string; user_name: string; pb: string; item_id: string | null; ten: string; loai: string; sl: number; dvt: string; gia: number; st: string };
+type MuaRow = { id: string; noi: Noi; user_id: string; user_name: string; pb: string; item_id: string | null; ten: string; loai: string; sl: number; dvt: string; gia: number; st: string; wfi?: string | null; updated_at?: string };
 const muaGet = async (db: D1Database, id: string) => {
   const x = await db.prepare('SELECT * FROM dd_mua WHERE id = ?').bind(id).first<MuaRow>();
   if (!x) throw notFound('Không có đề nghị này');
@@ -552,7 +556,10 @@ doDungRoutes.post('/mua/:id/duyet', async (c) => {
   const now = nowIso();
   let next: string;
   if (x.st === 'lead') {
-    if (!v.ceo && !(v.lead && v.pb === x.pb && v.id !== x.user_id)) throw forbidden('Chỉ Lead phòng của người đề nghị hoặc CEO duyệt');
+    const fr: GateRow = { table: 'dd_mua', fid: 'mua', id: x.id, pb: x.pb, owner: x.user_id, wfi: x.wfi ?? null, start: x.updated_at ?? '' };
+    const g = await flowGate(db, fr, v.id);
+    if (g.act && b.ok !== false && g.pre) return ok(c, { id: x.id, st: x.st, buoc: await flowAdvance(db, fr, g, v.id, `đề nghị mua ${x.ten} (${x.id})`) });
+    if (!g.act && !v.ceo && !(v.lead && v.pb === x.pb && v.id !== x.user_id)) throw forbidden('Chỉ Lead phòng của người đề nghị hoặc CEO duyệt');
     next = v.ceo ? 'mua' : muaSauLead(v.ql);
   } else if (x.st === 'ql') {
     if (!v.ql) throw forbidden('Chỉ Quản lý mua hàng hoặc CEO duyệt');
@@ -637,7 +644,7 @@ doDungRoutes.post('/mua/:id/gui-lai', async (c) => {
   const gia = Number.isFinite(num(b.gia)) && num(b.gia) >= 0 ? Math.round(num(b.gia)) : x.gia;
   const leads = leadsOf(v.m.users, x.pb, v.id);
   const st0 = muaDau({ laCeo: v.ceo, laLead: v.lead, coLead: leads.length > 0, laQl: v.ql });
-  await db.prepare('UPDATE dd_mua SET st = ?, sl = ?, gia = ?, ly_do = COALESCE(NULLIF(?, \'\'), ly_do), ly_do_tl = NULL, updated_at = ? WHERE id = ?').bind(st0, sl, gia, str(b.ly_do), nowIso(), x.id).run();
+  await db.prepare('UPDATE dd_mua SET st = ?, sl = ?, gia = ?, ly_do = COALESCE(NULLIF(?, \'\'), ly_do), ly_do_tl = NULL, wfi = NULL, updated_at = ? WHERE id = ?').bind(st0, sl, gia, str(b.ly_do), nowIso(), x.id).run();
   if (st0 === 'lead') await bell(db, leads, v.id, `${v.name} gửi lại đề nghị mua ${x.ten} (${x.id})`, 'vp_mua');
   else if (st0 === 'ql') await bell(db, await qlIds(db), v.id, `Đề nghị mua ${x.ten} (${x.id}) gửi lại, cần Quản lý mua hàng duyệt`, 'vp_mua');
   return ok(c, { id: x.id, st: st0 });

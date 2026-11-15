@@ -10,8 +10,9 @@ import { badRequest, conflict, forbidden, notFound, ok } from '../lib/http';
 import { newId } from '../lib/ids';
 import { pack, unpack } from '../lib/pack';
 import { hashPassword } from '../lib/password';
-import { applyUndo, enabledDepts, leadOf, type QtpbData } from '../lib/qtpb';
+import { applyUndo, approverOf, enabledDepts, leadOf, type QtpbData } from '../lib/qtpb';
 import { revokeAllSessions } from '../lib/session';
+import { syncBangXem, undoBang } from '../services/qtpbStore';
 import type { GuardUser } from '../lib/stateGuard';
 import { requirePermission } from '../middleware/rbac';
 
@@ -27,14 +28,14 @@ qtpbRoutes.use('*', requirePermission('hub.access'));
 
 type MainData = { users?: GuardUser[]; qtpb?: QtpbData; [k: string]: unknown };
 
-async function loadMain(db: D1Database): Promise<{ version: number; data: MainData } | null> {
+export async function loadMain(db: D1Database): Promise<{ version: number; data: MainData } | null> {
   const row = await db.prepare("SELECT version, data FROM hub_state WHERE id = 'main'").first<{ version: number; data: string }>();
   if (!row) return null;
   return { version: row.version, data: JSON.parse(await unpack(row.data)) as MainData };
 }
 
 /** Sửa bản chung trên máy chủ (hoàn tác). Có người vừa ghi thì đọc lại và thử lại. */
-async function mutateMain(db: D1Database, userId: string, f: (d: MainData) => boolean): Promise<boolean> {
+export async function mutateMain(db: D1Database, userId: string, f: (d: MainData) => boolean): Promise<boolean> {
   for (let i = 0; i < 4; i += 1) {
     const cur = await loadMain(db);
     if (!cur) return false;
@@ -48,7 +49,18 @@ async function mutateMain(db: D1Database, userId: string, f: (d: MainData) => bo
   throw conflict('VERSION_CONFLICT', 'Đang có người sửa cùng lúc, thử lại sau ít giây');
 }
 
-type Ctx = { ceo: boolean; hr: boolean; undo: boolean; lead: { dept: string } | null; name: string; depts: string[] };
+/** Cập nhật qtpb.bangXem trong bản chung sau khi bảng dữ liệu đổi ai xem / bị xóa / hoàn tác. */
+export async function syncBangXemMain(db: D1Database, userId: string): Promise<void> {
+  const cur = await loadMain(db);
+  await syncBangXem(db, (cur?.data.qtpb as { bangXem?: string[] } | undefined)?.bangXem, (f) =>
+    mutateMain(db, userId, (d) => {
+      d.qtpb = (d.qtpb ?? {}) as QtpbData;
+      return f(d.qtpb as { bangXem?: string[] });
+    }),
+  );
+}
+
+type Ctx = { ceo: boolean; hr: boolean; undo: boolean; lead: { dept: string; off: string[] } | null; name: string; depts: string[]; duyet: 'HCNS' | 'CEO' };
 
 async function ctxOf(db: D1Database, auth: AuthContext): Promise<Ctx> {
   const main = await loadMain(db);
@@ -61,9 +73,10 @@ async function ctxOf(db: D1Database, auth: AuthContext): Promise<Ctx> {
     ceo,
     hr,
     undo: ceo || !!me?.perms?.includes('qtpb.hoantac'),
-    lead: l ? { dept: l.dept } : null,
+    lead: l ? { dept: l.dept, off: [...(l.off ?? [])] } : null,
     name: String(me?.name ?? auth.user.display_name ?? ''),
     depts: enabledDepts(main?.data.qtpb),
+    duyet: approverOf(main?.data.qtpb),
   };
 }
 
@@ -167,6 +180,7 @@ qtpbRoutes.post('/requests', async (c) => {
   const auth = c.get('auth');
   const ctx = await ctxOf(c.env.DB, auth);
   if (!ctx.lead) throw forbidden('Chỉ Lead của phòng đã mở Quản trị phòng mới gửi được đề nghị.');
+  if (ctx.lead.off.includes('them')) throw forbidden('CEO đang tắt quyền Lead tự đề nghị thêm người.');
   const p = reqSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!p.success) throw badRequest('VALIDATION_FAILED', p.error.issues[0]?.message ?? 'Dữ liệu chưa hợp lệ');
   const v = p.data;
@@ -187,6 +201,7 @@ qtpbRoutes.post('/requests/:id/decide', async (c) => {
   const auth = c.get('auth');
   const ctx = await ctxOf(c.env.DB, auth);
   if (!ctx.ceo && !ctx.hr) throw forbidden('Chỉ HCNS hoặc CEO duyệt người mới.');
+  if (!ctx.ceo && ctx.duyet === 'CEO') throw forbidden('CEO đang đặt người mới do CEO duyệt.');
   const body = (await c.req.json().catch(() => ({}))) as { approve?: boolean; reason?: string };
   const r = await c.env.DB.prepare('SELECT * FROM qtpb_requests WHERE id = ?').bind(c.req.param('id')).first<{
     id: string; dept: string; name: string; email: string; title: string; status: string; by_name: string;
@@ -259,6 +274,14 @@ qtpbRoutes.post('/log/:id/undo', async (c) => {
   if (!row) throw notFound('Không tìm thấy dòng nhật ký');
   if (row.undone_at) throw badRequest('DONE', 'Dòng này đã hoàn tác rồi');
   const before = JSON.parse(row.before_json ?? 'null') as unknown;
+  if (row.action === 'bang') {
+    if (!(await undoBang(c.env.DB, row.target, before, JSON.parse((row as { after_json?: string }).after_json ?? 'null')))) throw badRequest('GONE', 'Không còn bảng này để hoàn tác.');
+    await syncBangXemMain(c.env.DB, auth.user.id);
+    await c.env.DB.prepare('UPDATE qtpb_log SET undone_at = ?, undone_by = ?, undone_name = ? WHERE id = ?')
+      .bind(nowIso(), auth.user.id, ctx.name, row.id)
+      .run();
+    return ok(c, { ok: true });
+  }
   let crm = '';
   const done = await mutateMain(c.env.DB, auth.user.id, (d) => {
     if (row.action === 'add') {

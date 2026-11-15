@@ -623,6 +623,17 @@ export async function submitOrder(
     if (item.is_gift) continue;
     // Giá do người lập đơn tự điền theo thỏa thuận (cấp Khác / Nhân viên, vật tư bán kèm): không có giá chuẩn để so, không cần duyệt giá.
     if (item.base_price === null && (item.group_code === 'VAT_TU_BAN' || item.group_code === 'QUA_TANG' || item.tier_code === 'KHAC' || item.tier_code === 'NHAN_VIEN')) continue;
+    // Mã chưa có giá chuẩn (khách gia công chưa có trong bảng giá riêng, hoặc cấp của khách chưa có giá) mà người lập
+    // đã nhập giá tay: giá thỏa thuận, Quản lý duyệt (CEO 13/11: đơn gia công phải tạo được với mọi mã).
+    if (item.base_price === null && item.applied_price > 0) {
+      requests.push({
+        rule: 'PRICE_OVERRIDE',
+        role: 'MANAGER',
+        reason: `${item.sku}: chưa có giá chuẩn, giá nhập tay ${item.applied_price}đ`,
+        payload: { sku: item.sku, base_price: null, proposed_price: item.applied_price },
+      });
+      continue;
+    }
     if (item.base_price === null) {
       throw unprocessable(
         'MISSING_PRICE',

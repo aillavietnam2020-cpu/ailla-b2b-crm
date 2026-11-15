@@ -214,7 +214,7 @@ function bvNhapDraw(){
   q("#bvn-save").onclick=async()=>{const b=q("#bvn-save");b.disabled=true;b.textContent="Đang lưu…";
     try{if(typeof svFlush==="function")await svFlush();
       const r=await bvNhapApi(false,P.filter(p=>!["dup","bad"].includes(p.st)).map(p=>({url:p.url,sp:p.sku||"",to:p.to||"",kenh:p.kenhSel||"",nguon:p.nguon||"",nguoi:p.nguoi||BVN.ng||ME.id})));
-      closeDrawer();toast("Đã gửi Lead duyệt "+r.saved+" video");if(typeof svPoll==="function"){svLastPoll=0;svActive=Date.now();await svPoll()}renderMain()}
+      closeDrawer();toast("Đã gửi Lead duyệt "+r.saved+" video · xem lại ở Công việc › Việc của tôi › Video của tôi");if(typeof svPoll==="function"){svLastPoll=0;svActive=Date.now();await svPoll()}renderMain()}
     catch(e){b.disabled=false;b.textContent="Lưu, gửi Lead duyệt";toast(e.message||String(e))}};
 }
 /* Giao việc: mở khung tạo việc ở Công việc, điền sẵn số video còn cần làm của kênh đang xem */
@@ -337,7 +337,7 @@ function pBangVideo(m){if(BV.fbTam){BV.k=BV.kTruoc||"";BV.fbTam=false}
   const d=D(),lead=xvGive(),give=true,team=xvTeam(),td=d.settings.today,chs=CHANNELS.filter(ch=>ptPairs().some(x=>x.kenh===ch.k&&+x.sl>0)||d.cards.some(c=>c.kenh===ch.k));
   /* mở Điều phối: kênh mình giữ có video thì vào kênh đó, không thì kênh đầu tiên có video (không đứng ở kênh trống) */
   if(!BV.k||!chs.some(c=>c.k===BV.k)){const has=k=>d.cards.some(c=>c.kenh===k),mine=chs.find(c=>chanOwner(c.k)===ME.id&&has(c.k));BV.k=(mine||chs.find(c=>has(c.k))||chs[0]||{}).k||""}
-  if(BV.ng==null)BV.ng="";
+  if(BV.ng==null)BV.ng=xvGive()?"":ME.id; // nhân sự mở Điều phối: mặc định thấy video của mình (14/11)
   if(bvAutoTrim()){renderMain();return}
   if(bvAutoSync(chs)){renderMain();return}
   /* Fanpage cũng chia việc bằng bảng như các kênh TikTok (chị Hoa 02/11); lịch đăng bài nằm ở trang Lịch đăng Fanpage */
