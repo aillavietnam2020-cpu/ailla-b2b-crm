@@ -23,7 +23,6 @@ const NG_DICT=[
  ["Chuỗi cung ứng","Tồn kho tối thiểu","Mức nguyên vật liệu, vỏ, tem thấp nhất cho phép trước khi phải mua thêm.","Tồn kho & giá trị","Kho đặt cho từng mã","Dưới mức tối thiểu thì báo cần mua"],
  ["Chuỗi cung ứng","Chênh lệch định mức","Nguyên liệu thực xuất so với định mức của lô sản xuất.","Lãi lỗ & Giá thành › Chênh lệch định mức","Kỹ thuật báo thực xuất","Lệch quá mức cho phép thì báo"],
  ["Chuỗi cung ứng","Giá nguyên vật liệu","Giá mua nguyên liệu theo tháng, lấy từ chứng từ nhà cung cấp.","Mua hàng › Giá nguyên vật liệu theo tháng","Quản lý ghi chứng từ","Tăng từ …% so với tháng trước thì báo"],
- ["Marketing","Video win","Video TikTok (shop hoặc KOC) có GMV trong báo cáo TikTok từ mốc này trở lên. Dùng chung cho Video win, Digital, Tổng quan Content, Năng suất nhân sự, KOC và thưởng video win bên Nhân sự.","Báo cáo video TikTok, báo cáo KOC đã nạp (cột GMV của từng video)","Lead Content nạp báo cáo TikTok; mốc CEO đặt ở bên dưới","GMV video từ 8 triệu (CEO chốt 15/11)"],
  ["Con người & tiến độ","Việc chờ tôi","Những việc đang chờ CEO, Quản lý, Kế toán xử lý: chuyển khoản trước, trả nợ, ghi chứng từ, nhập giá, mua nguyên liệu.","Tổng quan","Tự gom","—"],
 ];
 const ngCfg=()=>typeof dhCfg==="function"?dhCfg((D().fin||{}).dh):null;
@@ -42,7 +41,6 @@ function pNguong(m){
    <div class="row4">${f("sl-sau","Trả nhà cung cấp sau khi nhận hàng: trong (ngày)",SL.sau,"Tính từ ngày hàng nhập kho")}${f("sl-leo","Quá hạn bao nhiêu ngày thì ghi “Cần CEO quyết”",SL.leo,"Hộp Việc chờ tôi đẩy việc đó lên đầu")}</div>
    <button class="btn pri">Lưu hạn xử lý</button></form><p class="hint">Chưa tự gửi tin nhắn cho ai: quá hạn chỉ hiện đỏ trong hộp Việc chờ tôi ở Tổng quan.</p></div>`
    :`<div class="note">${ed?"Chưa tải được thiết lập ngưỡng.":"Chỉ CEO, Quản lý, Kế toán đổi được ngưỡng."}</div>`)+
-  `<div class="card pad"><div class="tlh"><b>Video win</b></div><form class="frm" id="ng-win"><div class="row4">${f("ng-wg","Video win khi GMV video từ (triệu đồng)",winGmv()/1e6,"Tính trên GMV của từng video trong báo cáo TikTok (video shop và KOC). Mặc định 8 triệu","0.5")}</div>${ed?'<button class="btn pri">Lưu mốc video win</button>':""}</form><p class="hint">Mọi trang tính video win dùng chung mốc này: Video win, Digital, Tổng quan Content, Năng suất nhân sự, KOC, thưởng video win.</p></div>`+
   `<div class="card pad"><div class="tlh"><b>Từ điển chỉ số</b><input id="ng-q" class="mhq" placeholder="Tìm chỉ số…" value="${esc(NG.q||"")}"></div>
    ${nhoms.length?nhoms.map(n=>`<h3 class="ngh">${esc(n)}</h3><div class="nsw"><table class="tbl ngt"><thead><tr><th>Chỉ số</th><th>Nghĩa là gì, tính thế nào</th><th>Xem ở đâu</th><th>Ai cập nhật</th><th>Khi nào báo</th></tr></thead><tbody>${L.filter(r=>r[0]===n).map(r=>`<tr><td><b>${esc(r[1])}</b></td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${esc(r[5])}</td></tr>`).join("")}</tbody></table></div>`).join(""):`<p class="empty">Không có chỉ số nào khớp.</p>`}</div>`;
   const qi=m.querySelector("#ng-q");qi.oninput=()=>{NG.q=qi.value;const p=qi.selectionStart;renderMain();const n=document.querySelector("#ng-q");if(n){n.focus();n.setSelectionRange(p,p)}};
@@ -50,9 +48,6 @@ function pNguong(m){
   if(fs)fs.onsubmit=e=>{e.preventDefault();const g=id=>Math.max(0,Math.round(+m.querySelector(id).value||0));
     DB.mutate(ME.name,"sửa hạn xử lý việc chờ",dt=>{dt.fin=dt.fin||{};dt.fin.sla={ct:g("#sl-ct"),gia:g("#sl-gia"),tr:g("#sl-tr"),sau:g("#sl-sau"),leo:g("#sl-leo")}});
     toast("Đã lưu hạn xử lý");renderMain()};
-  const fw=m.querySelector("#ng-win");
-  if(fw&&ed)fw.onsubmit=e=>{e.preventDefault();const v=+m.querySelector("#ng-wg").value;if(!(v>0)){toast("Nhập mốc GMV lớn hơn 0");return}
-    DB.mutate(ME.name,"sửa mốc video win: GMV từ "+v+" triệu",dt=>{dt.settings=dt.settings||{};dt.settings.winnerGmv=Math.round(v*1e6)});toast("Đã lưu mốc video win");renderMain()};
   const fm=m.querySelector("#ng-f");
   if(fm)fm.onsubmit=e=>{e.preventDefault();const g=id=>+m.querySelector(id).value;
     DB.mutate(ME.name,"sửa ngưỡng cảnh báo",dt=>{dt.fin=dt.fin||{};const cc=dhCfg(dt.fin.dh);

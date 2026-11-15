@@ -4,7 +4,7 @@
    - Content sx: video content đã qua bước duyệt cuối (Chờ đăng trở đi) tự sang, ads thấy hết
    - KOC: video KOC có trong báo cáo tự sang
    - Digital sx: team ads tự thêm, không cần ai giao việc
-   Tín hiệu theo báo cáo TikTok: từ 20 đơn là xanh; Win = GMV video từ mốc ở trang Ngưỡng (CEO chốt 15/11: 8 triệu/video).
+   Tín hiệu theo số đơn trong báo cáo TikTok: từ 20 đơn là xanh, từ 100 đơn là Win.
    ===================================================================== */
 const DG={q:"",sku:"",nguon:"",tt:"",tin:"",ns:""};
 const DG_TT=["Đang test","Scale","Đã dừng","Chưa dùng"];
@@ -13,7 +13,7 @@ const DG_ST=[["","—"],["Đang test","Đang test"],["Scale","Scale"],["Đã d�
 const dgLegacy={"Test":"Đang test","Đang chạy":"Scale","Đã dừng":"Đã dừng"};
 function dgSt(m,tt0){if(m.st)return m.st;const o={};(m.dung||[]).forEach(u=>{o[u]=dgLegacy[m.tt||tt0||"Test"]||"Đang test"});return o}
 function dgAll(st){const v=Object.values(st||{}).filter(Boolean);return v.includes("Scale")?"Scale":v.includes("Đang test")?"Đang test":v.includes("Đã dừng")?"Đã dừng":"Chưa dùng"}
-const dgTin=r=>isWin(r)?"win":(+r.don||0)>=20?"xanh":"";
+const dgTin=n=>(+n||0)>=100?"win":(+n||0)>=20?"xanh":"";
 const dgAds=()=>(D().users||[]).filter(u=>u.active!==false&&u.role==="digital"&&u.id!=="u_digital");
 /* gom mọi video thành một danh sách thống nhất */
 function dgRows(){
@@ -32,9 +32,9 @@ function dgSet(key,patch){DB.mutate(ME.name,"cập nhật thư viện video ads 
 function pDgLib(m){
   const d=D(),all=dgRows(),ads=dgAds(),lead=ME.role==="admin"||ME.role==="lead"||ME.role==="digital"||can(ME,"order.sua");
   const fq=bkFold(DG.q),skus=[...new Set(all.map(r=>r.sku))].filter(Boolean);
-  const L=all.filter(r=>(!DG.sku||r.sku===DG.sku)&&(!DG.nguon||r.nguon===DG.nguon)&&(!DG.tt||r.tt===DG.tt)&&(!DG.tin||dgTin(r)===DG.tin)&&(!DG.ns||r.st[DG.ns]||r.fb.some(f=>f.nguoi===DG.ns)||r.sx===((ads.find(u=>u.id===DG.ns)||{}).name))&&(!fq||[r.ma,r.hook,r.sx,r.ghi,r.link,r.post,sk(r.sku).n].some(x=>x&&bkFold(x).includes(fq)))).sort((a,b)=>(b.don-a.don)||String(b.ma).localeCompare(String(a.ma)));
-  const cnt=t=>all.filter(r=>r.tt===t).length,nW=all.filter(r=>dgTin(r)==="win").length,nX=all.filter(r=>dgTin(r)==="xanh").length;
-  const tinP=r=>{const t=dgTin(r);return t==="win"?pill("Win","pnk"):t==="xanh"?pill("Tín hiệu xanh","grn"):"—"};
+  const L=all.filter(r=>(!DG.sku||r.sku===DG.sku)&&(!DG.nguon||r.nguon===DG.nguon)&&(!DG.tt||r.tt===DG.tt)&&(!DG.tin||dgTin(r.don)===DG.tin)&&(!DG.ns||r.st[DG.ns]||r.fb.some(f=>f.nguoi===DG.ns)||r.sx===((ads.find(u=>u.id===DG.ns)||{}).name))&&(!fq||[r.ma,r.hook,r.sx,r.ghi,r.link,r.post,sk(r.sku).n].some(x=>x&&bkFold(x).includes(fq)))).sort((a,b)=>(b.don-a.don)||String(b.ma).localeCompare(String(a.ma)));
+  const cnt=t=>all.filter(r=>r.tt===t).length,nW=all.filter(r=>dgTin(r.don)==="win").length,nX=all.filter(r=>dgTin(r.don)==="xanh").length;
+  const tinP=r=>{const t=dgTin(r.don);return t==="win"?pill("Win","pnk"):t==="xanh"?pill("Tín hiệu xanh","grn"):"—"};
   const row=r=>`<tr data-dgr="${esc(r.key)}"><td class="mono">${esc(r.ma)}${r.order?`<small class="fpmt">${esc(r.order)}</small>`:""}</td><td>${swatch(r.sku)}${esc(sk(r.sku).n)}</td><td>${esc(r.nguon)}</td>
     <td>${r.link?`<a href="${esc(r.link)}" target="_blank" rel="noopener" title="Video gốc">▶</a>`:"—"}${r.post?` <a href="${esc(r.post)}" target="_blank" rel="noopener" title="Bài đăng">↗</a>`:""}</td>
     <td>${esc(r.sx||"—")}</td>
@@ -43,7 +43,7 @@ function pDgLib(m){
     ${ads.map(u=>`<td><select class="dgst dgst-${({"Đang test":"t","Scale":"s","Đã dừng":"d"})[r.st[u.id]]||"n"}" data-dgs="${esc(r.key)}|${esc(u.id)}" ${lead?"":"disabled"}>${opt(DG_ST,r.st[u.id]||"")}</select></td>`).join("")}
     <td><input class="bvhook" data-dgg="${esc(r.key)}" value="${esc(r.ghi)}" placeholder="Ghi chú…" ${lead?"":"disabled"}></td></tr>`;
   m.innerHTML=H("Thư viện video quảng cáo","Video content được duyệt tự sang đây · video KOC có báo cáo tự sang · team Ads tự thêm video làm riêng")+
-   `<div class="grid kpis">${kpi("Tổng video",all.length)}${kpi("Đang test",cnt("Đang test"))}${kpi("Scale",cnt("Scale"),"","var(--green)")}${kpi("Đã dừng",cnt("Đã dừng"))}${kpi("Tín hiệu xanh · TikTok (≥20 đơn)",nX,"","var(--green)")}${kpi("Win · TikTok (GMV ≥"+winTxt()+")",nW,"","var(--pink,#d6336c)")}</div>
+   `<div class="grid kpis">${kpi("Tổng video",all.length)}${kpi("Đang test",cnt("Đang test"))}${kpi("Scale",cnt("Scale"),"","var(--green)")}${kpi("Đã dừng",cnt("Đã dừng"))}${kpi("Tín hiệu xanh · TikTok (≥20 đơn)",nX,"","var(--green)")}${kpi("Win · TikTok (≥100 đơn)",nW,"","var(--pink,#d6336c)")}</div>
    <section class="card flush"><div class="pad sxfil dgbar"><input type="search" class="ksearch" id="dg-q" value="${esc(DG.q)}" placeholder="🔍 Tìm: mã, hook, người làm, link…"><select data-dgf="sku">${opt([["","Mọi sản phẩm"]].concat(skus.map(s=>[s,sk(s).n])),DG.sku)}</select><select data-dgf="nguon">${opt([["","Mọi nguồn"],["Content sx","Content sx"],["Digital sx","Digital sx"],["KOC","KOC"],["Agency","Agency"]],DG.nguon)}</select><select data-dgf="tt">${opt([["","Mọi trạng thái"]].concat(DG_TT.map(x=>[x,x])),DG.tt)}</select><select data-dgf="ns">${opt([["","Mọi nhân sự Ads"]].concat(ads.map(u=>[u.id,u.name])),DG.ns)}</select><select data-dgf="tin">${opt([["","Mọi tín hiệu"],["win","Win"],["xanh","Tín hiệu xanh"]],DG.tin)}</select><span class="hint">${L.length} video</span><span class="sp"></span><button type="button" class="btn sm pri" id="dg-add">+ Thêm video</button><button type="button" class="btn sm" id="dg-x">⬇ Xuất Excel</button></div>
    <div class="tbl bvscroll"><table class="kstab dgtab pn12"><thead><tr><th>Mã</th><th>Sản phẩm</th><th>Nguồn</th><th>Video</th><th>Người làm</th><th>Tín hiệu TikTok</th><th>Bài đăng Facebook</th>${ads.map(u=>`<th class="dgph" title="Trạng thái creative của ${esc(u.name)}">${esc(u.name.split(" ").pop())}</th>`).join("")}<th>Ghi chú</th></tr></thead><tbody>${L.slice(0,300).map(row).join("")||'<tr><td colspan="11" class="empty">Chưa có video nào khớp.</td></tr>'}</tbody></table></div>${L.length>300?`<p class="hint pad">Hiện 300/${L.length} video đầu, lọc để xem tiếp.</p>`:""}</section>`;
   const qi=m.querySelector("#dg-q");if(qi){const go=()=>{if(qi.value.trim()===DG.q)return;DG.q=qi.value.trim();renderMain()};qi.onkeydown=e=>{if(e.key==="Enter")go()};qi.onchange=go}
@@ -53,7 +53,7 @@ function pDgLib(m){
   m.querySelectorAll("[data-dgw]").forEach(i=>i.onchange=()=>{dgSet(i.dataset.dgw,{winAds:i.checked});renderMain()});
   m.querySelectorAll("[data-dgg]").forEach(i=>i.onchange=()=>dgSet(i.dataset.dgg,{ghi:i.value.trim()}));
   m.querySelectorAll("[data-dgd]").forEach(i=>i.onchange=()=>{const [key,uid]=i.dataset.dgd.split("|"),cur=((D().adsMeta||{})[key]||{}).dung||[],nx=i.checked?cur.concat([uid]).filter((x,k,a)=>a.indexOf(x)===k):cur.filter(x=>x!==uid);dgSet(key,{dung:nx})});
-  const ex=m.querySelector("#dg-x");if(ex)ex.onclick=()=>xlsExport("thu-vien-video-ads","Thư viện video ads",["Mã","Sản phẩm","Nguồn","Hook / tên","Link video","Link bài đăng","Người làm","Ngày đăng"].concat(ads.map(u=>u.name)).concat(["Bài đăng Facebook","Trạng thái chung","Tín hiệu TikTok","Ghi chú"]),L.map(r=>[r.ma,sk(r.sku).n,r.nguon,r.hook,r.link,r.post,r.sx,r.cho?"Chờ đăng":xlD(r.ngay)].concat(ads.map(u=>r.st[u.id]||"")).concat([r.fb.map(f=>(f.trang||f.nguoi)+": "+f.link).join(" | "),r.tt,dgTin(r)==="win"?"Win":dgTin(r)==="xanh"?"Xanh":"",r.ghi])));
+  const ex=m.querySelector("#dg-x");if(ex)ex.onclick=()=>xlsExport("thu-vien-video-ads","Thư viện video ads",["Mã","Sản phẩm","Nguồn","Hook / tên","Link video","Link bài đăng","Người làm","Ngày đăng"].concat(ads.map(u=>u.name)).concat(["Bài đăng Facebook","Trạng thái chung","Tín hiệu TikTok","Ghi chú"]),L.map(r=>[r.ma,sk(r.sku).n,r.nguon,r.hook,r.link,r.post,r.sx,r.cho?"Chờ đăng":xlD(r.ngay)].concat(ads.map(u=>r.st[u.id]||"")).concat([r.fb.map(f=>(f.trang||f.nguoi)+": "+f.link).join(" | "),r.tt,dgTin(r.don)==="win"?"Win":dgTin(r.don)==="xanh"?"Xanh":"",r.ghi])));
   const ad=m.querySelector("#dg-add");if(ad)ad.onclick=dgAdd;
   bindCommon(m)
 }
@@ -121,7 +121,7 @@ function pDgTq(m){
   const prodTbl=spSec.find(s=>!s.querySelector(".card-h")),tran=secBy(spSec,/trần/i);
   if(prodTbl){prodTbl.insertAdjacentHTML("afterbegin",`<div class="card-h"><h2>Top sản phẩm</h2><span class="hint">xếp theo doanh số mang về</span></div>`)}
   if(rank){const h=rank.querySelector(".card-h h2");if(h)h.textContent="Top nhân sự"}
-  const creative=`<div class="grid kpis">${kpi("Video trong thư viện",all.length)}${kpi("Scale",all.filter(r=>r.tt==="Scale").length,"","var(--green)")}${kpi("Win TikTok",all.filter(r=>dgTin(r)==="win").length)}${kpi("Order đang chờ Content",O.filter(o=>o.trangThai!=="Xong").length,"",O.some(o=>o.trangThai!=="Xong"&&o.han<td)?"var(--red)":"")}</div>
+  const creative=`<div class="grid kpis">${kpi("Video trong thư viện",all.length)}${kpi("Scale",all.filter(r=>r.tt==="Scale").length,"","var(--green)")}${kpi("Win TikTok",all.filter(r=>dgTin(r.don)==="win").length)}${kpi("Order đang chờ Content",O.filter(o=>o.trangThai!=="Xong").length,"",O.some(o=>o.trangThai!=="Xong"&&o.han<td)?"var(--red)":"")}</div>
    <section class="card flush"><div class="card-h pad"><h2>Creative của từng người</h2><span class="hint">chọn trạng thái của người đó ở Thư viện video quảng cáo là tính cho người đó</span></div><div class="tbl"><table class="kstab"><thead><tr><th>Người</th><th class="n">Creative đang dùng</th><th class="n">Scale</th><th class="n">Đang test</th><th class="n">Đã dừng</th></tr></thead><tbody>${ads.map(u=>{const p=per(u);return `<tr><td><b>${esc(u.name)}</b></td><td class="n">${p.length}</td><td class="n">${p.filter(r=>r.st[u.id]==="Scale").length}</td><td class="n">${p.filter(r=>r.st[u.id]==="Đang test").length}</td><td class="n">${p.filter(r=>r.st[u.id]==="Đã dừng").length}</td></tr>`}).join("")||'<tr><td colspan="5" class="empty">Chưa có nhân sự Ads.</td></tr>'}</tbody></table></div></section>
    <div class="acts" style="padding:0 4px"><button class="btn pri" data-go="dg_lib">Mở Thư viện video quảng cáo</button><button class="btn" data-go="order">Order cho Content</button></div>`;
   m.innerHTML=H("Tổng quan Digital","Quảng cáo Facebook và creative: số tổng, top nhân sự, top sản phẩm, trần chi phí")+`<div id="dgq"></div>`;
@@ -150,10 +150,10 @@ function winVarCell(ref,old){
 }
 function winVarOpen(ref){
   const src=(typeof winSources==="function"?winSources():[]).find(x=>x.ref===ref)||{},V=winVars(ref),T=V.filter(c=>c.step==="xong"),thr=(D().settings||{}).potential||20;
-  const sumD=T.reduce((a,c)=>a+(+c.don||0),0),sumG=T.reduce((a,c)=>a+(+c.gmv||0),0),sumV=T.reduce((a,c)=>a+(+c.view||0),0),ok20=T.filter(c=>(+c.don||0)>=20).length,ok100=T.filter(isWin).length;
+  const sumD=T.reduce((a,c)=>a+(+c.don||0),0),sumG=T.reduce((a,c)=>a+(+c.gmv||0),0),sumV=T.reduce((a,c)=>a+(+c.view||0),0),ok20=T.filter(c=>(+c.don||0)>=20).length,ok100=T.filter(c=>(+c.don||0)>=100).length;
   const kl=T.length<3?"Chưa đủ dữ liệu: cần ít nhất 3 biến thể đã đăng và đã có số từ báo cáo TikTok.":ok20*2>=T.length?"Nhân bản hiệu quả: từ một nửa số biến thể đã đăng đạt từ 20 đơn. Nên nhân bản thêm.":"Nhân bản chưa hiệu quả: dưới một nửa số biến thể đạt 20 đơn. Cân nhắc đổi cách nhân bản.";
   openDrawerHTML(`<h2 class="dtitle">Nhân bản video win</h2><p class="hint"><b>${esc(src.ten||ref)}</b><br>${src.don?"Video gốc: "+nf(src.don)+" đơn · "+(src.gmv?money(src.gmv)+" GMV · ":"")+nf(src.view||0)+" view":"Chưa có số của video gốc"}</p>
-   <div class="grid kpis" style="margin:10px 0">${kpi("Biến thể",V.length)}${kpi("Đã đăng",T.length,"","var(--green)")}${kpi("Tổng đơn",nf(sumD),money(sumG))}${kpi("TB đơn / biến thể",T.length?Math.round(sumD/T.length):"—")}${kpi("Từ 20 đơn",T.length?ok20+"/"+T.length:"—","","var(--green)")}${kpi("Win (GMV ≥"+winTxt()+")",T.length?ok100+"/"+T.length:"—")}</div>
+   <div class="grid kpis" style="margin:10px 0">${kpi("Biến thể",V.length)}${kpi("Đã đăng",T.length,"","var(--green)")}${kpi("Tổng đơn",nf(sumD),money(sumG))}${kpi("TB đơn / biến thể",T.length?Math.round(sumD/T.length):"—")}${kpi("Từ 20 đơn",T.length?ok20+"/"+T.length:"—","","var(--green)")}${kpi("Từ 100 đơn (Win)",T.length?ok100+"/"+T.length:"—")}</div>
    <div class="rule"><b>Kết luận</b>${esc(kl)}</div>
    <div class="tbl"><table class="kstab"><thead><tr><th>Mã</th><th>Trạng thái</th><th>Kênh</th><th>Ngày đăng</th><th class="n">View</th><th class="n">Đơn</th><th class="n">GMV</th><th>Đánh giá</th></tr></thead><tbody>${V.map(c=>{const rt=typeof vidRate==="function"?vidRate(c):[];return `<tr class="clk" data-card="${esc(c.id)}"><td class="mono">${esc(c.id)}</td><td>${esc(stepName(c.step))}</td><td>${esc(chOf(c.kenh).short)}</td><td>${c.step==="xong"&&+c.ngayDang?xlD(c.ngayDang):"—"}</td><td class="n">${c.view?nf(c.view):"—"}</td><td class="n">${c.don?nf(c.don):"—"}</td><td class="n">${c.gmv?money(c.gmv):"—"}</td><td>${rt&&rt[0]?pill(rt[1],rt[0]):"—"}</td></tr>`}).join("")||'<tr><td colspan="8" class="empty">Chưa có biến thể nào. Content chọn video này ở dòng Nhân bản win trong tab ② Điều phối.</td></tr>'}</tbody></table></div><div class="acts"><button class="btn ghost" id="wv-x">Đóng</button></div>`);
   const x=document.querySelector("#drawerIn #wv-x");if(x)x.onclick=closeDrawer;bindCommon(document.querySelector("#drawerIn"))

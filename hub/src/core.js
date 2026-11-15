@@ -190,11 +190,6 @@ function checkMove(c,to,inp){
   if(to==="xong"&&!chOf(c.kenh).needId&&!String(v("linkDang")).trim())return "Dán Link bài đã đăng.";
   return "";
 }
-/* Video win (CEO chốt 15/11/2026): GMV của video trong báo cáo TikTok (số GMV web nhập từ báo cáo video / KOC) từ 8 triệu/video.
-   Mốc sửa ở quản trị › Ngưỡng cảnh báo (D().settings.winnerGmv). Mọi trang dùng isWin, không ghi cứng số đơn nữa. */
-const winGmv=()=>{const v=+((D()||{}).settings||{}).winnerGmv;return v>0?v:8e6};
-const isWin=x=>!!x&&(+x.gmv||0)>=winGmv();
-const winTxt=()=>{const v=winGmv();return v%1e6===0?(v/1e6)+" triệu":money(v)};
 function moveCard(u,id,to,inp={}){
   const c=D().cards.find(x=>x.id===id);if(!c)return "Không tìm thấy thẻ.";
   if(!canMove(u,c,to))return "Bạn không có quyền chuyển thẻ này.";
@@ -350,7 +345,7 @@ function seedData(){
   _rs=20261015;_seq=100;
   const mkUser=(id,username,name,role,title)=>({id,username,name,role,title,active:true,pw:"",perms:ROLE_PRESET[role].slice()});
   const d={version:APP_VERSION,month:MONTH.key,
-    settings:{today:15,cutoff:11,workDays:26,winnerGmv:8e6,winnerOrders:100,winnerBonus:200000,potential:30,adsBudget:[6e6,10e6,14e6,12e6,8e6]},
+    settings:{today:15,cutoff:11,workDays:26,winnerOrders:100,winnerBonus:200000,potential:30,adsBudget:[6e6,10e6,14e6,12e6,8e6]},
     users:[mkUser("u_chi","chihoa","Chị Hoa","admin","CEO"),mkUser("u_oanh","oanh","Oanh","lead","Oanh"),mkUser("u_quynh","quynh","Quỳnh","content","Content"),mkUser("u_may","may","May","content","Content + Research"),mkUser("u_trinh","trinh","Trinh","content","Content"),mkUser("u_hoa","hoa","Hòa","content","Content"),mkUser("u_digital","digital","Digital (tài khoản chung)","digital","Team Digital"),mkUser("u_va","vietanh","Việt Anh","digital","Ads Facebook"),mkUser("u_thao","thao","Ngọc Thảo","digital","Ads Facebook"),mkUser("u_duan","duan","Duẩn","digital","Ads Facebook"),mkUser("u_dat","dat","Đình Đạt","digital","Ads Facebook"),mkUser("u_huyen","huyen","Bích Huyền","digital","Ads TikTok")],
     products:JSON.parse(JSON.stringify(PRODUCTS0)),catalog:catalog0(),
     plan:{notes1:{nhanDinh:"Tốt: tinh dầu giữ doanh thu nhờ video đăng 30/05.\nChưa tốt: video tháng 9 gần như không ra đơn; bột tẩy chỉ 8 video; thiếu ngày, thiếu ID nên không đo được.",vanDe:"1. Giảm phụ thuộc 1 video cũ: nhân bản + tìm video win mới (tinh dầu đang tốt, làm 50).\n2. Đẩy Bột tẩy vạn năng lên 50 video mới.\n3. Via: 2 video/ngày (30 edit footage có sẵn + 30 đăng lại video kho); Via phụ reup 1 video/ngày.\n4. Fanpage chính 28 bài, agent tạo ảnh và đăng tự động.\n5. Sale đôi 10/10 và 20/10 trên TikTok + Fanpage.\n6. Bắt buộc nhập đủ ngày, link, ID.",nguonLuc:"Worker dựng tự động (giảm công dựng).\n2 tài khoản Via mới.\n193 video cũ đã duyệt trong kho."},steps:{1:{s:"done",by:"Oanh",at:"25/09"},2:{s:"done",by:"Chị Hoa",at:"26/09"},3:{s:"done",by:"Oanh",at:"26/09"},4:{s:"review",by:"May",at:"28/09",note:"Còn thiếu research Nước giặt AiBio, Arila"},5:{s:"done",by:"Chị Hoa",at:"29/09"},6:{s:"done",by:"Oanh",at:"30/09"}},published:null},
