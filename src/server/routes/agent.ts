@@ -807,7 +807,7 @@ agentRoutes.get('/mkt/orders', requirePermission('agent.read'), async (c) => {
 agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
   needScope(c, 'cskh_b2b', 'mkt_digital', 'mkt_content');
   const d = await hubData(c);
-  const fb = (d.fbCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>> } | null;
+  const fb = (d.fbCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>>; gia?: Array<Record<string, unknown>> } | null;
   if (!fb || !Array.isArray(fb.combos)) {
     return ok(c, [], { ghi_chu: 'Chưa có bảng combo lưu trên web (Digital chưa sửa lần nào). Không tự đoán combo.' });
   }
@@ -833,6 +833,8 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
     .filter((x) => ((x.tt as string) || 'ok') === 'ok' && !x.dx)
     .map((x) => ({
       nhom: x.nhom || '',
+      // Bộ phận tạo combo (16/11): CSKH = combo không chạy ads; không ghi = Ads.
+      bo_phan: x.bp === 'CSKH' ? 'CSKH (không chạy ads)' : 'Ads',
       mua: items(x.gom),
       tang: items(x.tang),
       mo_ta_cu: (x.gom as unknown[])?.length ? undefined : x.combo || undefined,
@@ -847,10 +849,15 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
       ghi_chu: cut(x.ghi),
     }))
     .filter((x) => all || x.trang_thai !== 'Đã hết');
+  // Giá bán lẻ riêng từng sản phẩm theo chương trình của bộ phận, đang trong hạn.
+  const giaCt = (fb.gia ?? [])
+    .filter((g) => Number(g.gia) > 0 && (!g.tu || String(g.tu) <= today) && (!g.den || String(g.den) >= today))
+    .map((g) => ({ bo_phan: g.bp === 'CSKH' ? 'CSKH' : 'Ads', ma: g.ma || '', ten: names.get(String(g.ma)) || g.ma || '', gia: Number(g.gia), tu: g.tu || '', den: g.den || '' }));
   return ok(c, combos, {
     san_pham: products,
+    gia_chuong_trinh: giaCt,
     ngay: today,
-    ghi_chu: 'Combo do team Digital set trên web, chỉ xem. Giá/quà có thể đổi theo ngày: luôn đọc lại trước khi báo khách, không hứa ngoài bảng này.',
+    ghi_chu: 'Combo do Ads (team Digital) và CSKH set trên web, chỉ xem; combo CSKH không chạy ads. Giá/quà có thể đổi theo ngày: luôn đọc lại trước khi báo khách, không hứa ngoài bảng này.',
   });
 });
 
