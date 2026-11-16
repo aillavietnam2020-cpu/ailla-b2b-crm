@@ -133,6 +133,7 @@ function spcBind(m,C){
   keep("#spc-q",v=>SPCB.q=v);keep("#spc-pq",v=>SPCB.pq=v);
   const ch=(id,f)=>{const e=$(id);if(e)e.onchange=()=>{f(e.value);renderMain()}};
   ch("#spc-f",v=>SPCB.f=v);ch("#spc-shop",v=>SPCB.shop=v);ch("#spc-pf",v=>SPCB.pf=v);
+  m.querySelectorAll("[data-spbpk]").forEach(b=>b.onclick=()=>spbPkLoad());
   m.querySelectorAll("[data-spbf]").forEach(b=>b.onclick=()=>{SPCB.bpf=b.dataset.spbf;renderMain()});keep("#spb-q",v=>SPCB.bq=v);
   m.querySelectorAll("[data-spch]").forEach(b=>b.onclick=()=>{SPCB.ch=b.dataset.spch;SPCB.shop="";renderMain()});
   m.querySelectorAll("[data-sped]").forEach(b=>b.onclick=()=>{const c=C.combos.find(x=>x.key===b.dataset.sped);if(c)spcbEdit(c)});
@@ -366,6 +367,22 @@ PAGES.kd_combo=function(m){if(typeof spcEditor!=="function"){m.innerHTML=H("Comb
 /* Vận hành › Digital › Sản phẩm và combo (Ads): thêm bảng giá chương trình của Ads */
 {const _dg=PAGES.dg_sp;if(_dg)PAGES.dg_sp=function(m){_dg(m);m.insertAdjacentHTML("beforeend",spbGiaSection("ADS"));spbGiaBind(m)}}
 MODULES.push({k:"spb_cskh",zone:"Vận hành",ic:"bag",n:"Combo & giá CSKH",sub:"",groups:()=>[["",[MI("kd_combo","Combo & giá CSKH",u=>u.role==="admin"||u.phongBan==="B2C")]]]});
+/* Đồng bộ Pancake (chỉ đọc, chị Hoa duyệt 16/11): so mã sản phẩm web (Facebook › Sản phẩm) với danh sách sản phẩm và giá trên Pancake Facebook.
+   Ghi ngược lên Pancake chưa làm: chờ chị duyệt riêng. */
+async function spbPkLoad(){SPCB.pkBusy=1;renderMain();try{SPCB.pk=await spcApi("/pancake-products?channel=FACEBOOK");SPCB.pkErr=""}catch(e){SPCB.pkErr=e.message}SPCB.pkBusy=0;renderMain()}
+function spbPkView(){
+  const P=SPCB.pk;
+  const head=`<div class="card-h"><h2>Đồng bộ Pancake Facebook <small class="hint">chỉ đọc</small></h2><button class="btn${P?"":" pri"}" data-spbpk="1" ${SPCB.pkBusy?"disabled":""}>${SPCB.pkBusy?"Đang đọc…":P?"Đọc lại":"Đọc từ Pancake"}</button></div>`;
+  if(!P)return `<section class="card">${head}<p class="hint">Bấm "Đọc từ Pancake" để so mã và giá sản phẩm trên Pancake với danh mục trên web. Web không sửa gì trên Pancake.${SPCB.pkErr?` <span class="t-red">${esc(SPCB.pkErr)}</span>`:""}</p></section>`;
+  const web=(typeof spcCat==="function"?spcCat():[]).flatMap(p=>(p.bt||[]).filter(v=>v.ma).map(v=>({ma:v.ma,ten:p.ten+((v.dt||v.pl)?" ("+[v.dt,v.pl].filter(Boolean).join(" · ")+")":""),on:v.on!==false&&p.loai!=="off"})));
+  const pk=new Map(P.rows.filter(r=>r.code).map(r=>[spcLow(r.code),r])),wm=new Set(web.map(w=>spcLow(w.ma)));
+  const both=web.filter(w=>pk.has(spcLow(w.ma))),noPk=web.filter(w=>w.on&&!pk.has(spcLow(w.ma))),noWeb=P.rows.filter(r=>r.code&&!r.hidden&&!wm.has(spcLow(r.code)));
+  const G=spbGia().filter(g=>g.gia);
+  return `<section class="card">${head}<p class="hint">Pancake có ${nf(P.count)} sản phẩm (biến thể). Khớp mã với web: ${nf(both.length)} · web có mà Pancake chưa có: ${nf(noPk.length)} · Pancake có mà web chưa khai: ${nf(noWeb.length)}. Ghi ngược lên Pancake chưa bật, chờ chị duyệt riêng.</p>
+   ${tbl(["Mã","Sản phẩm trên web","Trên Pancake","Giá bán lẻ Pancake","Giá chương trình bộ phận"],both.concat(noPk).map(w=>{const r=pk.get(spcLow(w.ma)),gs=G.filter(g=>spcLow(g.ma)===spcLow(w.ma));
+     return `<tr><td class="mono">${esc(w.ma)}</td><td>${esc(w.ten)}${w.on?"":` <small class="hint">(không chạy)</small>`}</td><td>${r?esc(r.name)+(r.variant?" · "+esc(r.variant):""):pill("chưa có trên Pancake","amb")}</td><td class="n">${r&&r.price!=null?nf(r.price):"—"}</td><td>${gs.map(g=>pill(SPB_BP[g.bp][0].split(" ")[0]+" "+nf(g.gia),SPB_BP[g.bp][1])).join(" ")||"—"}</td></tr>`}))}
+   ${noWeb.length?`<details style="margin-top:8px"><summary style="cursor:pointer">Pancake có mà web chưa khai (${nf(noWeb.length)})</summary>${tbl(["Mã Pancake","Tên","Giá bán lẻ"],noWeb.map(r=>`<tr><td class="mono">${esc(r.code)}</td><td>${esc(r.name)}${r.variant?" · "+esc(r.variant):""}</td><td class="n">${r.price!=null?nf(r.price):"—"}</td></tr>`))}</details>`:""}</section>`;
+}
 /* Quản trị: kho tổng combo các bộ phận (chỉ xem) */
 function spbAdminView(){
   const all=typeof spcCombosAll==="function"?spcCombosAll():[],F=SPCB.bpf||"",fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.bq||"").trim();
@@ -379,7 +396,7 @@ function spbAdminView(){
    <p class="hint pad" style="padding-top:0">Quản trị chỉ xem tổng. Ads, CSKH thêm và sửa ở trang vận hành; kế toán duyệt phiếu combo như trước.</p>
    ${tbl(["Bộ phận","Combo","Tặng kèm","Giá bán","Ngày áp dụng","Người tạo","Trạng thái"],L.slice(0,300).map(c=>{const bp=c.bp||"ADS";return `<tr><td>${pill(SPB_BP[bp][0],SPB_BP[bp][1])}</td><td><b>${esc(c.nhom||"")}</b><br><small class="hint">${esc(c.combo||"")}</small></td><td><small>${esc(c.qua||"")}</small></td>
      <td class="n">${nf(c.gia||0)}${c.ship?`<br><small class="hint">ship ${nf(c.ship)}</small>`:""}</td><td class="hint">${c.tu?"từ "+esc(c.tu.slice(8,10)+"/"+c.tu.slice(5,7)):""}${c.den?" đến "+esc(c.den.slice(8,10)+"/"+c.den.slice(5,7)):""}</td><td class="hint">${esc((c.tao&&c.tao.by)||c.nguoi||"")}</td><td>${st(c)}</td></tr>`}))}</section>
-   ${G.length?`<section class="card"><div class="card-h"><h2>Giá sản phẩm theo chương trình</h2></div>${tbl(["Bộ phận","Mã","Giá chương trình","Từ","Đến","Người đặt"],G.map(g=>`<tr><td>${pill(SPB_BP[g.bp][0],SPB_BP[g.bp][1])}</td><td class="mono">${esc(g.ma)}</td><td class="n">${nf(g.gia)}</td><td>${esc(g.tu||"")}</td><td>${esc(g.den||"")}</td><td class="hint">${esc(g.by||"")}</td></tr>`))}</section>`:""}`;
+   ${G.length?`<section class="card"><div class="card-h"><h2>Giá sản phẩm theo chương trình</h2></div>${tbl(["Bộ phận","Mã","Giá chương trình","Từ","Đến","Người đặt"],G.map(g=>`<tr><td>${pill(SPB_BP[g.bp][0],SPB_BP[g.bp][1])}</td><td class="mono">${esc(g.ma)}</td><td class="n">${nf(g.gia)}</td><td>${esc(g.tu||"")}</td><td>${esc(g.den||"")}</td><td class="hint">${esc(g.by||"")}</td></tr>`))}</section>`:""}${SPCB.can||SPCB.canCode?spbPkView():""}`;
 }
 PAGES.spcombo=pSpcombo;
 PAGES.kho_combo=pKhoCombo;
