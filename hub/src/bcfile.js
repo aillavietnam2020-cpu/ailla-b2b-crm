@@ -74,6 +74,7 @@ function speCalcBook(x){
     ["2. Dòng sản phẩm đã hủy, hoặc Tài chính ghi hoàn tiền toàn bộ: web bỏ dòng đó. Đơn có hàng trả mà Shopee vẫn thu tiền: tiền hàng theo Tài chính (giá sản phẩm + hoàn lại), phí theo Tài chính, giá vốn trừ số lượng trả. Đơn có hàng trả chưa có trong Tài chính: bỏ dòng đó."],
     ["3. Phí của từng đơn lấy từ file Tài chính, chia cho các dòng sản phẩm theo tỷ lệ doanh thu dòng."],
     ["4. Đơn chưa có trong Tài chính (chưa quyết toán): phí ước theo tỷ lệ phí trung bình của các đơn đã có."],
+    ["4b. Tab Adjustment của file Tài chính: chỉ lấy điều chỉnh của đơn đặt trong tháng. Trả hàng/Hoàn tiền trừ vào tiền hàng (cột TC: Số tiền hoàn lại đã gồm), khoản khác vào phí Khoản khác. Điều chỉnh của đơn tháng khác bỏ qua."],
     ["5. Phí vận chuyển ròng và Thuế sàn khấu trừ được cộng vào phí (xem từng cột riêng)."],
     ["6. Giá vốn = số lượng × giá thành web của mã; mã chưa có giá thành để 0 (không ước)."],
     ["7. Cột TC: … là số nguyên trong file Tài chính của đơn đó để kế toán so trực tiếp."]];

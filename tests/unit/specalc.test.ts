@@ -113,6 +113,21 @@ describe('specalc: số tháng một shop', () => {
     expect(M.den).toBe(null);
     expect(M.fees.find((f: [string, number]) => f[0] === 'Hoa hồng affiliate')[1]).toBe(-8000 + Math.round(60000 * (-8000 / 120000)));
   });
+  it('tab Adjustment: chỉ lấy điều chỉnh của đơn trong tháng; hoàn tiền trừ tiền hàng, khoản khác vào phí (16/11/2026)', () => {
+    const base = build();
+    const fs0 = finSheets();
+    const fin = { ...fs0, Adjustment: [...fs0.Adjustment, [], ['Mã giao dịch', 'Ngày hoàn thành điều chỉnh đơn hàng', 'Loại điều chỉnh | Mô tả', 'Lý do điều chỉnh', 'Số tiền điều chỉnh', 'Mã đơn hàng liên quan'],
+      [1, '2026-10-05', 'Trả hàng/ Hoàn tiền', null, -40000, 'A1'], [2, '2026-10-05', 'Chương trình Marketing', null, -1000, 'A1'], [3, '2026-10-05', 'Trả hàng/ Hoàn tiền', null, -999, 'B9']] };
+    const O = T.speReadOrders(T.speOrderSheet(ordersSheets()), '2026-09');
+    const F = T.speReadFin(fin, '2026-09');
+    expect(F.adj).toHaveLength(3);
+    const M = T.speBuildMonth({ ky: '2026-09', shop: F.shop, orders: O, fin: F, ads: null, costOf: null });
+    // A1: giá sản phẩm 160.000, hoàn 40.000 → tiền hàng còn 3/4; B9 là đơn tháng khác nên bỏ qua.
+    // A4 chưa quyết toán: mã ưu đãi bình quân tính lại trên tiền hàng A1 mới (90.000 thay vì 120.000).
+    expect(Math.abs(M.dt - (base.dt - 30000 + 60000 * (-10000 / 90000 + 10000 / 120000)))).toBeLessThanOrEqual(2);
+    expect(M.fees.find((f: [string, number]) => f[0] === 'Khoản khác')[1]).toBe(-1000 + Math.round(60000 * (-1000 / 90000))); // A4 chưa quyết toán chịu phí bình quân
+    expect(M.don).toBe(base.don);
+  });
   it('giá vốn theo mã đã quy đổi; mã thiếu giá KHÔNG ước: giá vốn 0, đánh dấu chưa tính', () => {
     const M = build({ costOf: (s: { pn: string }) => (s.pn === 'Tẩy lồng' ? { u: 30000 } : { u: null, why: 'Chưa quy đổi mã' }) });
     const tl = M.rows.find((r: { pn: string }) => r.pn === 'Tẩy lồng'), xm = M.rows.find((r: { pn: string }) => r.pn === 'Xịt muỗi');

@@ -72,7 +72,15 @@ function speReadFin(sheets,ky){
     const x=ord[id]||(ord[id]={d:ttIsoDay(ttCell(a[I["Ngày đặt hàng"]])),gross:0,hoan:0,vou:0,f:new Array(SPE_NG).fill(0),aff:false});
     x.gross+=ttNum(a[I["Giá sản phẩm"]]);x.hoan+=ttNum(a[I["Số tiền hoàn lại"]]);x.vou+=vc.reduce((s,c)=>s+ttNum(a[c]),0);
     gc.forEach((cs,k)=>{x.f[k]+=cs.reduce((s,c)=>s+ttNum(a[c]),0)});if(ac!=null&&ttNum(a[ac])!==0)x.aff=true}
-  return {...meta,partial:!!ky&&g.to<ttKyNext(ky)+"-09",ord};
+  return {...meta,partial:!!ky&&g.to<ttKyNext(ky)+"-09",ord,adj:speReadAdj(sheets)};
+}
+/* Tab Adjustment (điều chỉnh sau quyết toán, chị Hoa 16/11/2026: chỉ lấy đơn trong tháng và chi phí tương ứng):
+   [{o: mã đơn liên quan, loai, v: số tiền}]. "Trả hàng/ Hoàn tiền" là tiền hàng trả lại khách; khoản khác (marketing, bồi thường) vào phí. */
+function speReadAdj(sheets){
+  const aoa=sheets&&sheets["Adjustment"],H=aoa&&ttHead(aoa,["Loại điều chỉnh | Mô tả","Số tiền điều chỉnh","Mã đơn hàng liên quan"],60);if(!H)return [];
+  const I=H.ix,out=[];
+  for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r]||[],o=ttCell(a[I["Mã đơn hàng liên quan"]]),v=ttNum(a[I["Số tiền điều chỉnh"]]);if(o&&v)out.push({o,loai:ttCell(a[I["Loại điều chỉnh | Mô tả"]]),v})}
+  return out;
 }
 
 /* Nhiều file Tài chính › Doanh thu của CÙNG một shop cho một tháng (chị Hoa duyệt 30/10/2026): Shopee chỉ cho xuất tối đa 31 ngày,
@@ -86,11 +94,11 @@ function speReadFins(list,ky){
   for(let i=1;i<P.length;i++){const a=P[i-1].meta.range,b=P[i].meta.range;
     if(b.from<=a.to)return {err:`Hai file Tài chính chồng ngày (${vn(a.from)}–${vn(a.to)} và ${vn(b.from)}–${vn(b.to)}), sẽ cộng trùng. Hãy xuất lại cho nối liền.`,shop};
     if(b.from!==speDayAfter(a.to))return {err:`Hai file Tài chính hở ngày: thiếu từ ${vn(speDayAfter(a.to))} tới ${vn(speDayBefore(b.from))}.`,shop}}
-  const first=speReadFin(P[0].sh,ky);if(first.err)return first;const ord=first.ord;
-  for(let i=1;i<P.length;i++){const x=speReadFin(P[i].sh,null);if(x.err)return x;
+  const first=speReadFin(P[0].sh,ky);if(first.err)return first;const ord=first.ord,adj=[...(first.adj||[])];
+  for(let i=1;i<P.length;i++){const x=speReadFin(P[i].sh,null);if(x.err)return x;adj.push(...(x.adj||[]));
     Object.entries(x.ord).forEach(([id,o])=>{const t=ord[id];if(!t){ord[id]=o;return}t.gross+=o.gross;t.hoan+=o.hoan;t.vou+=o.vou;for(let k=0;k<t.f.length;k++)t.f[k]+=o.f[k];t.aff=t.aff||o.aff;t.d=t.d||o.d})}
   const to=P[P.length-1].meta.range.to;
-  return {shop,range:{from:P[0].meta.range.from,to},partial:!!ky&&to<ttKyNext(ky)+"-09",ord,n:P.length};
+  return {shop,range:{from:P[0].meta.range.from,to},partial:!!ky&&to<ttKyNext(ky)+"-09",ord,adj,n:P.length};
 }
 
 /* ---------- Quảng cáo Shopee (Lịch sử giao dịch Dịch vụ Hiển thị, CSV) ---------- */
@@ -129,6 +137,10 @@ function speLearnPos(lines,pos){
    Trả: số tháng có dòng sản phẩm, số theo ngày [doanh thu, phí sàn (âm), giá vốn, lãi gộp, đơn, quảng cáo]. */
 function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   const L=orders.lines,F=fin.ord,den=fin.partial?L.reduce((m,l)=>l.d>m?l.d:m,""):null;
+  /* Điều chỉnh của đơn đặt trong tháng (đơn có trong file đơn tháng này): hoàn tiền trừ vào tiền hàng, khoản khác vào phí "Khoản khác". Đơn tháng khác bỏ qua. */
+  const inM=new Set(L.map(l=>l.o)),kk=SPE_NG-1;let adjT=0;
+  (fin.adj||[]).forEach(a=>{const x=F[a.o];if(!x||!inM.has(a.o)||(x.adjDone&&x.adjDone.includes(a)))return;(x.adjDone=x.adjDone||[]).push(a);adjT+=a.v;
+    if(/hoàn tiền|trả hàng/i.test(a.loai))x.hoan+=a.v;else x.f[kk]+=a.v});
   /* Shopee là nguồn sự thật về hoàn tiền: tổng hàng hoá về 0 = hoàn toàn bộ. */
   const hoan=new Set(Object.keys(F).filter(id=>F[id].gross>0&&Math.abs(F[id].gross+F[id].hoan)<1));
   /* Hoàn tiền toàn bộ mà Shopee vẫn thu phí: giữ dòng với tiền hàng 0 để tính đúng phí, không đếm là đơn (full). */
@@ -136,7 +148,7 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   /* Đơn có hàng trả (chị Hoa duyệt 16/11/2026, theo đối soát của chị Huệ): không bỏ cả đơn nữa mà tính đúng phần Shopee thực thu theo file Tài chính.
      Đã có trong Tài chính: tiền hàng nhân tỷ lệ (Giá sản phẩm + Số tiền hoàn lại) / Giá sản phẩm, có hoàn tiền thì trừ số lượng trả khỏi giá vốn.
      Chưa có trong Tài chính (chưa quyết toán): bỏ dòng có hàng trả như trước, không ước. */
-  const traO={};L.forEach(l=>{if(l.rq>0&&!l.huy){if(!F[l.o]){l.huy=true;return}traO[l.o]=1}});
+  const traO={};L.forEach(l=>{if(l.huy)return;if(l.rq>0&&!F[l.o]){l.huy=true;return}if(F[l.o]&&(l.rq>0||F[l.o].hoan<0))traO[l.o]=1});
   L.forEach(l=>{if(!traO[l.o]||l.huy)return;const x=F[l.o],k=x.gross>0?(x.gross+x.hoan)/x.gross:1;
     if(k<1){l.dt=l.dt*k;if(l.rq>0)l.q=Math.max(0,l.q-l.rq)}l.tra=1});
   const ordDt={},ordQ={},ordN={};L.forEach(l=>{if(l.huy)return;ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q;ordN[l.o]=(ordN[l.o]||0)+1});
