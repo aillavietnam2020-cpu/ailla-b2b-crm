@@ -126,10 +126,11 @@ describe('TikTok: chia phí và lãi lỗ', () => {
     expect(s111.f[0]).toBe(-15000 - 6000); // hoa hồng: 75% × -20.000 + đơn 1000002
     expect(s111.f[6]).toBe(-750 - 2000); // phí khác: đơn 1: 75% × (-30.000 - (-29.000)); đơn 2: -10.000 - (-8.000)
     const tot = Object.values(M.sku).reduce((a: number, s: any) => a + s.f.reduce((x: number, y: number) => x + y, 0), 0);
-    const rate = -40000 / 340000; // phí bình quân trên doanh thu đã quyết toán (đơn hủy không tính)
-    expect(Math.abs(tot - (-40000 + 80000 * rate))).toBeLessThan(5);
-    expect(M.dtUoc).toBe(80000);
-    expect(M.don).toBe(3);
+    // File income đủ tháng (tới 09/10): đơn 1000004 chưa có trong Tài chính → không tính, theo dõi kỳ sau (cách chị Huệ 16/11/2026).
+    expect(Math.abs(tot - -40000)).toBeLessThan(5);
+    expect(M.dtUoc).toBe(0);
+    expect(M.choQT).toBe(80000);
+    expect(M.don).toBe(2);
     expect(M.hh).toBe(60000);
   });
   it('lãi lỗ: thiếu giá vốn thì KHÔNG ước (chưa tính giá vốn), ghi doanh thu chưa tính và đưa vào việc kế toán', () => {
@@ -137,7 +138,7 @@ describe('TikTok: chia phí và lãi lỗ', () => {
     const P = T.ttPL(M, (id: string) => (id === '111' ? { u: 50000, src: 'x' } : id === '222' ? { u: null, why: 'Chưa quy đổi mã' } : { u: 20000 }), [
       { n: 'Agency', v: 10000 },
     ]);
-    expect(P.dt).toBe(420000);
+    expect(P.dt).toBe(340000);
     const r222 = P.rows.find((r: any) => r.id === '222');
     expect(r222.uoc).toBe(true);
     expect(r222.gv).toBe(0);
@@ -216,20 +217,38 @@ describe.skipIf(!existsSync(DIR + 'OrderSKUList_T9_2026.csv'))('TikTok: số th�
       if (r && r[0] && typeof r[16] === 'number') map[String(r[0])] = r[16] as number;
     });
     const P = T.ttPL(M, (id: string) => (id in map ? { u: map[id] } : null), []);
-    expect(P.dt).toBe(1392110100);
-    expect(P.gv).toBe(240643848);
-    expect(-P.phi).toBe(415466276);
-    expect(P.lg).toBe(735999976);
+    // 16/11/2026 theo cách chị Huệ: doanh thu = cột "Tổng doanh thu" file Tài chính (đã trừ hoàn), phí = "Tổng phí" của mọi đơn tạo trong tháng.
+    // File income T9 chỉ tới 08/10 (giữa tháng) nên đơn chưa quyết toán vẫn ước; phần đã quyết toán = đúng tổng file Tài chính 1.392.340.301.
+    expect(P.dt).toBe(1395632399);
+    expect(P.dt - M.dtUoc).toBe(1392340301);
+    expect(-P.phi).toBe(426276335);
     expect(P.ads).toBe(364658750);
-    expect(P.lai).toBe(371517226);
-    expect(P.don).toBe(12350);
-    expect((P.hhRate * 100).toFixed(2)).toBe('11.29');
+    expect(P.don).toBe(12171);
     expect(P.adsVi).toBe(315886241);
-    expect(P.fees.map((f: unknown[]) => f[1])).toEqual([-181702105, -70628452, -106008494, -34655085, -1594296, -20877844, 0]);
+    expect(P.fees.map((f: unknown[]) => f[1])).toEqual([-182197985, -70816938, -106728768, -34831235, -10767258, -20934151, 0]);
     const km = T.ttReadKeyMetrics(first(sh('Shop Analytics_Key metrics_20261024 (1).xlsx')));
     const s = (k: string) => Object.values(km.days).reduce((a: number, d: any) => a + d[k], 0);
     expect(s('gmv')).toBe(1538012277);
     expect([s('vInh'), s('vKoc'), s('the'), s('lShop'), s('lKoc')]).toEqual([895475505, 358365742, 260159896, 23444263, 566871]);
+  });
+});
+
+describe('TikTok: tính theo cách chị Huệ (file income có cột Tổng doanh thu, 16/11/2026)', () => {
+  it('doanh thu và phí theo file Tài chính; đơn hủy có phí vẫn tính phí, không đếm đơn; có hàng trả thì trừ số lượng', () => {
+    const H = [...INC_HEAD, 'Tổng doanh thu'];
+    const inc = { 'Chi tiết đơn hàng': [H,
+      ['1000001', 'Đơn hàng', '2026/09/02', '2026/09/10', '-30000', '-20000', '-5000', '-4000', '0', '0', '200000'], // hoàn 1 phần: 240.000 → 200.000
+      ['1000002', 'Đơn hàng', '2026/09/30', '2026/10/05', '-10000', '-6000', '-2000', '0', '0', '0', '100000'],
+      ['1000003', 'Đơn hàng', '2026/09/15', '2026/09/20', '-1000', '-1000', '0', '0', '0', '0', '0']], // file đơn ghi hủy, sàn vẫn thu phí
+      'Báo cáo': [[null, 'Khoảng thời gian', null, null, null, '2026/09/01-2026/10/09']] };
+    const ords = [...ORDERS.slice(0, 2), order('1000001', 'Đã hoàn tất', '111', 2, 200000, 20000, '02/09/2026', 1), ...ORDERS.slice(3)];
+    const M = T.ttBuildMonth({ ky: '2026-09', orders: T.ttReadOrders(ords, '2026-09'), income: T.ttReadIncome(inc, '2026-09'), camp: T.ttReadCampaign(CAMP) });
+    const P = T.ttPL(M, () => null, []);
+    expect(P.dt).toBe(300000);
+    expect(P.phi).toBe(-41000);
+    expect(P.don).toBe(2);
+    expect(M.sku['111'].q).toBe(2); // 1000001: 2 cái trả 1 → 1, cộng đơn 1000002 → 2
+    expect(M.choQT).toBe(80000);
   });
 });
 
@@ -241,7 +260,7 @@ describe('TikTok: giá trị hoàn sau khi giao (để tính doanh thu dự ki�
     expect(M.hh).toBe(60000 + 90000);
     const S = T.ttSummary(T.ttPL(M, () => ({ u: 1000 }), []));
     expect(S.hoanGiao).toBe(90000);
-    expect(S.dtUoc).toBe(80000);
+    expect(S.dtUoc).toBe(0); // đủ tháng: đơn chưa quyết toán không tính
   });
 });
 
