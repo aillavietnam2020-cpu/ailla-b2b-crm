@@ -34,14 +34,14 @@ function spbgCreate(){
   const B=SPCF.b2b||{},T=B.tiers||[],chg=SPCF.chg||{},NP=SPCF.newP||[];
   const lines=Object.keys(chg).map(k=>{const [pid,tid]=k.split("|"),p=(B.products||[]).find(x=>x.id===pid)||{},t=T.find(x=>x.id===tid)||{};return {pid,sku:p.sku,ten:p.name,tid,tier:t.name,cu:p.prices?p.prices[t.code]:null,moi:chg[k]}});
   if(!lines.length&&!NP.length){toast("Chưa sửa ô giá nào");return}
-  const R=spcfModal("Tạo phiếu điều chỉnh giá",
+  const R=spcfModal("Lưu giá: phiếu điều chỉnh giá",
     spcfSec("Phiếu",spcfBox(spcfRow("Lý do điều chỉnh *",`<input id="pg-ly" placeholder="ví dụ: giá vỏ can tăng">`)+spcfRow("Áp dụng từ ngày *",`<input type="date" id="pg-tu" value="${spcfToday()}">`)))+
     spcfSec("Các thay đổi",`<div class="spf-box" style="padding:0">${tbl(["Sản phẩm","Cấp","Giá cũ","Giá mới","Chênh"],lines.map(l=>`<tr><td><span class="spf-tag">${esc(l.sku)}</span>${esc(l.ten)}</td><td>${esc(l.tier)}</td><td class="n">${l.cu!=null?nf(l.cu):"chưa có"}</td><td class="n"><b>${l.moi!=null?nf(l.moi):"bỏ giá"}</b></td><td class="n">${l.cu!=null&&l.moi!=null?`<span class="${l.moi>l.cu?"t-red":"t-grn"}">${l.moi>l.cu?"+":""}${nf(l.moi-l.cu)}</span>`:""}</td></tr>`).concat(NP.map(p=>`<tr><td><span class="spf-tag">${esc(p.sku)}</span>${esc(p.name)} ${pill("mã mới","amb")}</td><td colspan="4" class="hint">${Object.values(p.prices).map(x=>esc(x.tier)+" "+nf(x.amount)).join(" · ")||"chưa đặt giá"}</td></tr>`)))}</div>`,(lines.length?lines.length+" ô giá":"")+(NP.length?(lines.length?", ":"")+NP.length+" mã mới":"")),
-    `<button class="btn pri" id="pg-ok">${spbgIsCeo()?"Tạo phiếu":"Gửi chị duyệt"}</button>`);
+    `<button class="btn pri" id="pg-ok">${spbgIsCeo()?"Lưu phiếu":"Lưu và gửi chị duyệt"}</button>`);
   R.querySelector("#pg-ok").onclick=()=>{const ly=R.querySelector("#pg-ly").value.trim(),tu=R.querySelector("#pg-tu").value;if(!ly){toast("Ghi lý do điều chỉnh");return}if(!tu){toast("Chọn ngày áp dụng");return}
     const ph={id:"pg"+Date.now(),ma:spbgMa(),ly,tu,lines,moi:NP,by:ME.name||"",byId:ME.id||"",at:new Date().toISOString(),tt:"cho"};
     DB.mutate(ME.name,"tạo phiếu giá "+ph.ma,d=>{d.giaPhieu=Array.isArray(d.giaPhieu)?d.giaPhieu:[];d.giaPhieu.push(ph);try{if(typeof notifyU==="function")notifyU(d,spbgCeoIds(),`${ME.name||""} gửi phiếu điều chỉnh giá ${ph.ma}: ${ly}`,"page:sp_cfg")}catch(e){}});
-    SPCF.chg={};SPCF.newP=[];SPCF.b2bEd=false;closeCM();toast(spbgIsCeo()?"Đã tạo phiếu "+ph.ma+", bấm Duyệt để áp giá":"Đã gửi chị duyệt phiếu "+ph.ma);renderMain()}}
+    SPCF.chg={};SPCF.newP=[];SPCF.b2bEd=false;closeCM();toast(spbgIsCeo()?"Đã lưu phiếu "+ph.ma+", bấm Duyệt phiếu ở cuối bảng để áp giá":"Đã lưu và gửi chị duyệt phiếu "+ph.ma);renderMain()}}
 
 /* ---------- Danh sách phiếu (dưới bảng giá) ---------- */
 function spbgListView(){const L=spbgList().slice().reverse().slice(0,12);if(!L.length)return "";const ceo=spbgIsCeo();

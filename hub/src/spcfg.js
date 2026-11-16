@@ -60,7 +60,7 @@ const SPCF_CSS=`<style>
 .spf-nb tbody tr:not(.grp):hover td{background:#fafbff}.spf-nb tbody tr:not(.grp):hover td.hl{background:#fde3ee}
 .spf-nb td.chg,.spf-nb tbody tr:hover td.chg{background:#fff6c7}
 .spf-adj{position:absolute;top:5px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--pink)}
-.spf-nb .spf-xin{width:100%;min-width:80px;border:0;background:transparent;text-align:right;font:inherit;padding:2px 0;outline:none}.spf-nb .spf-xin:focus{box-shadow:inset 0 0 0 2px var(--blue);background:#fff}
+.spf-nb .spf-xin{width:100%;min-width:80px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;text-align:right;font:inherit;padding:4px 6px;outline:none}.spf-nb .spf-xin:focus{box-shadow:inset 0 0 0 2px var(--blue);background:#fff}
 .spf-chips{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0}.spf-chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 6px 3px 10px;font-size:13px;background:#fff}
 .spf-chip button{border:0;background:none;color:var(--red);cursor:pointer;font-size:13px}
 @media(max-width:760px){.spf-sec{grid-template-columns:1fr;gap:8px}.spf-row{flex-wrap:wrap}.spf-row>.v{flex-basis:100%;justify-content:flex-start}.spf-its .hd,.spf-it{grid-template-columns:40px minmax(0,1fr) 70px 30px}.spf-its .hd span:nth-child(4),.spf-it .gc{display:none}}
@@ -292,17 +292,17 @@ function spcfB2bView(m,t,sub){
   const nMiss=R.filter(r=>T0.some(x=>x.code!=="NHAN_VIEN"&&r.le.prices[x.code]==null)).length,nChg=Object.keys(chg).length;
   /* Sửa giá / thêm mã thành phiếu chờ chị duyệt (spbg.js); báo giá gửi khách theo cấp */
   const nNew=(SPCF.newP||[]).length;
-  const tools=ed?`<button class="btn" data-spbgnew="1">+ Mã mới</button><button class="btn" data-spcfxx="1">Hủy sửa</button><button class="btn pri" data-spcfxs="1">Tạo phiếu ${nChg+nNew?"("+(nChg?nChg+" ô":"")+(nChg&&nNew?", ":"")+(nNew?nNew+" mã mới":"")+")":""}</button>`
+  const tools=ed?`<button class="btn" data-spbgnew="1">+ Mã mới</button><button class="btn" data-spcfxx="1">Hủy</button><button class="btn pri" data-spcfxs="1">Lưu ${nChg+nNew?"("+(nChg?nChg+" ô":"")+(nChg&&nNew?", ":"")+(nNew?nNew+" mã mới":"")+")":""}</button>`
     :`<button class="btn" data-spbgbq="1">🖼 Báo giá gửi khách</button>${perm?`<button class="btn pri" data-spcfxe="1">✎ Sửa giá, thêm mã</button>`:""}`;
   spcfFrame(m,t,sub,{q:"Tìm tên, mã KPP, mã MISA…",count:nf(R.length)+" sản phẩm",tools,
     inner:`<div class="spf-tiers"><div class="settabs" style="margin:0">${[["","Tất cả cấp"]].concat(T.map(x=>[x.code,x.name])).map(([k,n])=>`<button class="${SPCF.tier===k?"on":""}" data-spcftier="${esc(k)}">${esc(n)}</button>`).join("")}</div>
       <label class="inl" style="margin-left:auto;white-space:nowrap"><input type="checkbox" id="spcf-miss" ${SPCF.miss?"checked":""} style="width:auto"> Chỉ mã thiếu giá${nMiss?" ("+nMiss+")":""}</label></div>
-      ${ed?`<div class="note" style="margin:0 14px 10px">Gõ giá vào ô (giá mỗi chai / can), ô đã đổi tô vàng. Xóa trắng ô = bỏ giá cấp đó. Thêm sản phẩm bấm <b>+ Mã mới</b>. Xong bấm <b>Tạo phiếu</b>: giá chỉ đổi khi chị duyệt phiếu.</div>${typeof spbgNewView==="function"?spbgNewView():""}`:""}
+      ${ed?`<div class="note" style="margin:0 14px 10px">Gõ giá vào ô (giá mỗi chai / can), ô đã đổi tô vàng. Xóa trắng ô = bỏ giá cấp đó. Thêm sản phẩm bấm <b>+ Mã mới</b>. Sửa xong bấm <b>Lưu</b>: web lập phiếu điều chỉnh giá, giá chỉ đổi khi chị duyệt phiếu. Bấm <b>Hủy</b> là bỏ hết chỗ vừa sửa.</div>${typeof spbgNewView==="function"?spbgNewView():""}`:""}
       <div class="spf-nb"><table><thead>${head}</thead><tbody>${body||`<tr><td colspan="${nc}" class="spf-empty">Không có sản phẩm</td></tr>`}</tbody></table></div>
       <p class="hint pad" style="margin:0">Giá niêm yết = giá bán lẻ. Giá theo mỗi chai / can; quy cách = số chai / can một thùng. Giá hiệu lực ngày ${esc(spcfVN(SPCF.b2b.date||spcfToday()))}; ô có chấm hồng là giá đang có chương trình điều chỉnh (rê chuột để xem giá gốc). Bấm 🕘 xem lịch sử giá.</p>`,after:typeof spbgListView==="function"?spbgListView():""});
   m.querySelectorAll(".spf-xin").forEach(inp=>{inp.onkeydown=e=>{if(e.key==="Enter"){const all=[...m.querySelectorAll(".spf-xin")],n=all[all.indexOf(inp)+show.length];if(n)n.focus()}};
     inp.onfocus=()=>inp.select();inp.onchange=()=>{const k=inp.dataset.k,[pid,tid]=k.split("|"),p=SPCF.b2b.products.find(x=>x.id===pid),x=T0.find(y=>y.id===tid),old=p.prices[x.code],v=inp.value.trim()===""?null:spcfNum(inp.value);
-      if(v===old)delete chg[k];else chg[k]=v;inp.value=v==null?"":nf(v);inp.parentNode.classList.toggle("chg",k in chg);const b=m.querySelector("[data-spcfxs]"),n=Object.keys(chg).length;if(b){const nn=(SPCF.newP||[]).length;b.textContent="Tạo phiếu"+(n+nn?" ("+(n?n+" ô":"")+(n&&nn?", ":"")+(nn?nn+" mã mới":"")+")":"")}}});
+      if(v===old)delete chg[k];else chg[k]=v;inp.value=v==null?"":nf(v);inp.parentNode.classList.toggle("chg",k in chg);const b=m.querySelector("[data-spcfxs]"),n=Object.keys(chg).length;if(b){const nn=(SPCF.newP||[]).length;b.textContent="Lưu"+(n+nn?" ("+(n?n+" ô":"")+(n&&nn?", ":"")+(nn?nn+" mã mới":"")+")":"")}}});
 }
 async function spcfB2bHist(pid){const p=(SPCF.b2b.products||[]).find(x=>x.id===pid);if(!p)return;
   let R=[];try{R=await svApi("/api/products/"+encodeURIComponent(pid)+"/price-history")}catch(e){toast(e.message);return}
