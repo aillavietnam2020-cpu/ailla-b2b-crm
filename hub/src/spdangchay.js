@@ -87,7 +87,7 @@ const spcVN=d=>d?d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4):"";
 const spcWhen=c=>c.tu?`từ ${spcVN(c.tu)}${c.den?" đến "+spcVN(c.den):""}`:`<span style="color:var(--red)">chưa có ngày bắt đầu</span>${c.den?" · đến "+spcVN(c.den):""}`;
 const spcDayBefore=d=>{const x=new Date(d+"T00:00:00Z");x.setUTCDate(x.getUTCDate()-1);return x.toISOString().slice(0,10)};
 /* Giá bán từng biến thể (chị Hoa 16/11): giá riêng của bộ phận (v.gia, vd giá CSKH) nếu có, không thì giá bán lẻ trên Pancake. */
-const spcGiaTxt=v=>{if(+v.gia>0)return `${nf(v.gia)}${SPC.bpView==="CSKH"?` <small class="hint">giá CSKH</small>`:""}`;const g=typeof spbPkPrice==="function"?spbPkPrice(v):null;return g!=null?`${nf(g)} <small class="hint">Pancake</small>`:"—"};
+const spcGiaTxt=v=>{if(+v.gia>0)return `${nf(v.gia)}${SPC.bpView==="CSKH"?` <small style="color:#667085;font-weight:400">giá CSKH</small>`:""}`;const g=typeof spbPkPrice==="function"?spbPkPrice(v):null;return g!=null?`${nf(g)} <small style="color:#667085;font-weight:400">Pancake</small>`:"—"};
 const spcVar=v=>[v.dt,v.pl].filter(Boolean).join(" · ")||v.ma||"mặc định";
 
 /* ---- Thành phần combo: "2 × Tẩy lồng Ailla + 1 × Tẩy mốc", quà tặng cũng khai như vậy (kế toán dùng làm bảng quy đổi) ---- */
