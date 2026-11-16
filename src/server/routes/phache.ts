@@ -306,8 +306,13 @@ phacheRoutes.post('/ton', async (c) => {
 });
 
 /* ---------------- Phiếu pha chế NHÁP (16/11, chị Hoa đồng ý cho agent Kế toán trưởng nhập) ----------------
- * Agent ghi thay người được chỉ định (quyền agent.w.phache) chỉ lập NHÁP; Kỹ thuật pha chế kiểm, sửa nếu cần rồi bấm Ghi phiếu trên web
- * thì mới thành phiếu kho (trừ nguyên liệu, cộng bán thành phẩm). Cùng luật như web: phải có công thức đã duyệt, lệch quá 5% phải có lý do. */
+ * Agent Kế toán trưởng ghi thay người ra lệnh (quyền agent.w.phache) chỉ lập NHÁP; người ra lệnh phải là Kế toán hoặc CEO (chị Hoa chốt 16/11).
+ * Kế toán kiểm, sửa nếu cần rồi bấm Ghi phiếu trên web thì mới thành phiếu kho. Kỹ thuật pha chế vẫn tự ghi phiếu của mình như cũ.
+ * Cùng luật như web: phải có công thức đã duyệt, lệch quá 5% phải có lý do. */
+/** Kế toán = tài khoản được cấp riêng quyền xác nhận kế toán (cùng danh sách việc kế toán, accountantIds); quản lý có sẵn quyền theo vai trò thì không tính. */
+async function isKeToan(db: D1Database, a: AuthContext): Promise<boolean> {
+  return a.user.role === 'CEO' || (await accountantIds(db)).includes(a.user.id);
+}
 type NhapRow = { id: number; ref_no: string; btp: string; ngay: string; lit_bon: number; bon: number; liters: number; nguoi: string; lines: string; ct_version: number | null; ly_do_lech: string; ghi_chu: string; status: string; created_by_name: string; agent_name: string | null; created_at: string; doc_id: number | null; doc_no: string | null; xu_ly_by_name: string | null; xu_ly_at: string | null; ly_do_huy: string | null };
 const nhapOut = (r: NhapRow) => ({ ...r, nguoi: JSON.parse(r.nguoi || '[]'), lines: JSON.parse(r.lines || '[]') });
 
@@ -315,13 +320,15 @@ phacheRoutes.get('/nhap', async (c) => {
   const rows = await c.env.DB.prepare("SELECT * FROM pc_nhap WHERE status = 'CHO' OR created_at >= ? ORDER BY id DESC LIMIT 200")
     .bind(new Date(Date.now() - 30 * 86400000).toISOString())
     .all<NhapRow>();
-  return ok(c, (rows.results ?? []).map(nhapOut));
+  const auth = c.get('auth');
+  return ok(c, { rows: (rows.results ?? []).map(nhapOut), can_duyet: auth.actorType !== 'AGENT' && (await isKeToan(c.env.DB, auth)) });
 });
 
 /** Body: { btp, lit_bon, bon?, ngay?, ref_no?, nguoi?: string[], lines: [{item, qty}], ly_do_lech?, ghi_chu? }.
  * qty là số THỰC TẾ đã dùng (đơn vị của mã). Thiếu nguyên liệu trong công thức thì coi như 0 và báo lại. */
 phacheRoutes.post('/nhap', async (c) => {
   const auth = c.get('auth');
+  if (auth.delegation && !(await isKeToan(c.env.DB, auth))) throw forbidden('Agent chỉ lập phiếu pha chế nháp khi Kế toán hoặc CEO ra lệnh');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!b) throw badRequest('BAD_JSON', 'Dữ liệu gửi lên không đúng định dạng');
   const btp = str(b.btp, 60);
@@ -371,15 +378,17 @@ phacheRoutes.post('/nhap', async (c) => {
     .bind(refNo, btp, ngay, litBon, bon, liters, JSON.stringify(nguoi), JSON.stringify(lines), ct.version, lyDo, str(b.ghi_chu), auth.user.id, auth.user.display_name, auth.delegation?.agentName ?? null, nowIso())
     .run();
   const id = Number(res.meta.last_row_id);
-  const txt = `Phiếu pha chế nháp #${id}: ${it.name} · ${liters} lít${auth.delegation ? ` (agent ${auth.delegation.agentName} lập thay ${auth.user.display_name})` : ''}. Kiểm rồi bấm Ghi phiếu ở Pha chế › Yêu cầu & phiếu.${thieu.length ? ' Tồn không đủ: ' + thieu.join('; ') : ''}`;
-  await bellTo(c.env.DB, await kyThuatIds(c.env.DB), txt.slice(0, 480), 'kho_pc').catch(() => 0);
+  const txt = `Phiếu pha chế nháp #${id}: ${it.name} · ${liters} lít${auth.delegation ? ` (agent ${auth.delegation.agentName} lập thay ${auth.user.display_name})` : ''}. Kế toán kiểm rồi bấm Ghi phiếu ở Pha chế › Yêu cầu & phiếu.${thieu.length ? ' Tồn không đủ: ' + thieu.join('; ') : ''}`;
+  // Kế toán duyệt nháp; thiếu vật tư thì nhắc cả kỹ thuật pha chế (quy tắc kyThuatIds 07/11).
+  const nhan = [...new Set([...(await accountantIds(c.env.DB)), ...(thieu.length ? await kyThuatIds(c.env.DB) : [])])];
+  await bellTo(c.env.DB, nhan, txt.slice(0, 480), 'kho_pc').catch(() => 0);
   return ok(c, { id, btp, liters, ct_version: ct.version, lech, warnings });
 });
 
 /** Kỹ thuật pha chế đã ghi phiếu kho từ nháp này (gọi sau khi POST /api/hub/kho/docs thành công). */
 phacheRoutes.post('/nhap/:id/xong', async (c) => {
   const auth = c.get('auth');
-  if (auth.actorType === 'AGENT') throw forbidden('Kỹ thuật pha chế xử lý phiếu nháp trên web');
+  if (auth.actorType === 'AGENT' || !(await isKeToan(c.env.DB, auth))) throw forbidden('Kế toán (hoặc CEO) xử lý phiếu pha chế nháp trên web');
   const id = Number(c.req.param('id'));
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   const doc = await c.env.DB.prepare("SELECT id, no FROM kho_docs WHERE id = ? AND type = 'PC' AND status = 'OK'").bind(num(b?.doc_id)).first<{ id: number; no: string }>();
@@ -393,7 +402,7 @@ phacheRoutes.post('/nhap/:id/xong', async (c) => {
 
 phacheRoutes.post('/nhap/:id/huy', async (c) => {
   const auth = c.get('auth');
-  if (auth.actorType === 'AGENT') throw forbidden('Agent không hủy được phiếu nháp; Kỹ thuật pha chế hủy trên web');
+  if (auth.actorType === 'AGENT' || !(await isKeToan(c.env.DB, auth))) throw forbidden('Kế toán (hoặc CEO) hủy phiếu pha chế nháp trên web');
   const id = Number(c.req.param('id'));
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   const ly = str(b?.ly_do);

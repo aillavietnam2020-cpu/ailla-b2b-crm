@@ -409,13 +409,14 @@ function pchGanBind(w){const moi=w.dataset.pchgan,q=c=>w.querySelector(c),err=m=
   q(".pg-ok").onclick=async()=>{const code=q(".pg-old").dataset.code;if(!code){err("Chọn mã bán thành phẩm trong danh sách.");return}try{await done(code)}catch(e){err(e.message)}};
 }
 
-/* ---------- Phiếu pha chế NHÁP (16/11): agent Kế toán trưởng lập thay người được chỉ định; Kỹ thuật pha chế kiểm rồi bấm Ghi phiếu ---------- */
-function pchLoadNhap(){if(PCH.nhapBusy)return;PCH.nhapBusy=true;pApi("/nhap").then(r=>{PCH.nhap=r||[]}).catch(()=>{PCH.nhap=[]}).finally(()=>{PCH.nhapBusy=false;pchRerender()})}
+/* ---------- Phiếu pha chế NHÁP (16/11): agent Kế toán trưởng lập khi Kế toán / CEO ra lệnh; Kế toán kiểm rồi bấm Ghi phiếu ---------- */
+const pchKeToanMe=()=>!!PCH.nhapDuyet;
+function pchLoadNhap(){if(PCH.nhapBusy)return;PCH.nhapBusy=true;pApi("/nhap").then(r=>{PCH.nhap=(r&&r.rows)||[];PCH.nhapDuyet=!!(r&&r.can_duyet)}).catch(()=>{PCH.nhap=[]}).finally(()=>{PCH.nhapBusy=false;pchRerender()})}
 function pchNhapCard(m){
   if(!PCH.nhap){pchLoadNhap();return}
-  const L=PCH.nhap.filter(x=>x.status==="CHO");if(!L.length)return;const can=pchMeKT()||pchAdm();
+  const L=PCH.nhap.filter(x=>x.status==="CHO");if(!L.length)return;const can=pchKeToanMe();
   const card=document.createElement("section");card.className="card flush";card.style.marginBottom="12px";
-  card.innerHTML=`<div class="card-h pad"><h2>Phiếu pha chế nháp chờ kiểm · ${L.length}</h2><span class="hint">Agent lập thay người ra lệnh. Kỹ thuật pha chế kiểm số, bấm Ghi phiếu thì mới trừ nguyên liệu, cộng bán thành phẩm.</span></div>`+
+  card.innerHTML=`<div class="card-h pad"><h2>Phiếu pha chế nháp chờ kiểm · ${L.length}</h2><span class="hint">Agent Kế toán trưởng lập thay người ra lệnh. Kế toán kiểm số, bấm Ghi phiếu thì mới trừ nguyên liệu, cộng bán thành phẩm.</span></div>`+
     tbl(["Nháp","Ngày pha","Bán thành phẩm","Số lít","Lệch","Người lập","",""],L.map(x=>{const lech=x.lines.filter(l=>l.std_qty>0&&Math.abs(l.qty-l.std_qty)*100/l.std_qty>PCH_TOL);
       return `<tr><td class="mono">#${x.id}${x.ref_no?`<small class="hint" style="display:block">${esc(x.ref_no)}</small>`:""}</td><td>${kDd(x.ngay)}</td><td><b>${esc(pchName(x.btp))}</b>${x.ghi_chu?`<small class="hint" style="display:block">${esc(x.ghi_chu)}</small>`:""}</td><td class="n">${knum(x.liters)}</td><td>${lech.length?pill(lech.length+" nguyên liệu","amb")+(x.ly_do_lech?`<small class="hint" style="display:block">${esc(x.ly_do_lech)}</small>`:""):"—"}</td><td>${esc(x.created_by_name)}${x.agent_name?`<small class="hint" style="display:block">qua ${esc(x.agent_name)}</small>`:""}</td><td>${can?`<button class="btn sm pri" data-pcnhap="${x.id}">Kiểm & ghi phiếu</button>`:""}</td><td>${can?`<button class="lnk" data-pcnhuy="${x.id}" style="color:#b42318">Hủy</button>`:""}</td></tr>`}));
   const first=m.querySelector("section.card");if(first)first.before(card);else m.appendChild(card);

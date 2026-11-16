@@ -1653,8 +1653,8 @@ khoRoutes.post('/docs', async (c) => {
       extra.bo_sung = true;
     }
   } else if (type === 'PC') {
-    // 16/11: agent không ghi thẳng phiếu pha chế vào kho; chỉ lập nháp (POST /api/hub/phache/nhap), Kỹ thuật pha chế kiểm rồi ghi.
-    if (auth.actorType === 'AGENT') throw forbidden('Agent chỉ lập phiếu pha chế nháp (Pha chế › phiếu nháp), Kỹ thuật pha chế kiểm rồi mới ghi vào kho');
+    // 16/11: agent không ghi thẳng phiếu pha chế vào kho; chỉ lập nháp (POST /api/hub/phache/nhap), Kế toán kiểm rồi ghi.
+    if (auth.actorType === 'AGENT') throw forbidden('Agent chỉ lập phiếu pha chế nháp (Pha chế › phiếu nháp), Kế toán kiểm rồi mới ghi vào kho');
     const btp = String(b.btp ?? '');
     const it = need(btp);
     if (it.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp} không phải bán thành phẩm`);

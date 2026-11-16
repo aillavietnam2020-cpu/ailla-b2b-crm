@@ -17,8 +17,8 @@ export const AGENT_WRITES = [
   { key: 'agent.w.payment', label: 'Ghi tiền khách trả', sensitive: true },
   { key: 'agent.w.kho', label: 'Mua hàng, phiếu kho, vật tư', sensitive: true },
   { key: 'agent.phieuchi', label: 'Lập phiếu chi', sensitive: true },
-  // 16/11/2026 chị Hoa đồng ý: agent lập phiếu pha chế NHÁP, Kỹ thuật pha chế kiểm rồi mới ghi vào kho.
-  { key: 'agent.w.phache', label: 'Lập phiếu pha chế (nháp, kỹ thuật pha chế duyệt)', sensitive: true },
+  // 16/11/2026 chị Hoa đồng ý: agent lập phiếu pha chế NHÁP khi Kế toán hoặc CEO ra lệnh, Kế toán kiểm rồi mới ghi vào kho.
+  { key: 'agent.w.phache', label: 'Lập phiếu pha chế (nháp, Kế toán duyệt)', sensitive: true },
   { key: 'agent.propose', label: 'Ghi đề xuất (người có quyền bấm duyệt)', sensitive: false },
 ] as const;
 export const AGENT_WRITE_KEYS: string[] = AGENT_WRITES.map((w) => w.key);
