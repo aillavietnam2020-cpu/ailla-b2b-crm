@@ -75,6 +75,9 @@ function spePair(){
     U.orders.forEach(o=>{o.ids=o.ids||ids(o);const n=keys.filter(k=>o.ids.has(k)).length;if(n>bn){bn=n;best=o}});
     return {shop:F.meta.shop,F,Fs,O:best,A:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).A||null,adsName:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).name||"",adsFile:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).file||null}});
 }
+/* Tải lại tháng mà không kèm file quảng cáo: giữ quảng cáo đã lưu của tháng đó, không để về 0 (16/11/2026: lần tải lại Shopee Mall T10 thiếu file quảng cáo làm mất 22,3tr). */
+function speOldAds(ky,shop){const s=(SPE.sums||[]).find(z=>z.ky===ky&&z.shop===shop);if(!s||!s.hasAds)return null;
+  const days={};Object.entries(s.days||{}).forEach(([d,x])=>{if(+x[5])days[d]=+x[5]});return {shop,days,giu:1}}
 async function speCompute(){
   SPE.prev=null;const U=SPE.up;if(!U.fin.length){renderMain();return}
   SPE.busy="Đang tính số Shopee…";renderMain();await new Promise(r=>setTimeout(r,30));
@@ -84,7 +87,7 @@ async function speCompute(){
       if(!p.O)throw new Error(`Shop ${speShopL(p.shop)}: chưa có file đơn hàng của shop này.`);
       const ky=speGuessKy(p.O.aoa),O=speReadOrders(p.O.aoa,ky);if(O.err)throw new Error(O.err);
       const F=speReadFins(p.Fs.map(f=>f.sh),ky);if(F.err)throw new Error(`Shop ${speShopL(p.shop)}: ${F.err}`);
-      const M=speBuildMonth({ky,shop:p.shop,orders:O,fin:F,ads:p.A,costOf:await speCostOf(ky),pos:await spePosOf(ky)});if(M.err)throw new Error(M.err);
+      const M=speBuildMonth({ky,shop:p.shop,orders:O,fin:F,ads:p.A||speOldAds(ky,p.shop),costOf:await speCostOf(ky),pos:await spePosOf(ky)});if(M.err)throw new Error(M.err);
       x.ky=ky;x.M=M}catch(e){x.err=e.message}
     res.push(x)}
   SPE.prev=res;SPE.busy="";renderMain();
