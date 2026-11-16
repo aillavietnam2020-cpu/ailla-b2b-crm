@@ -69,9 +69,10 @@ export async function crawlTeam(key: NonNullable<ReturnType<typeof saKey>>, team
   return { pb: team.pb, root: team.folderId, at: nowIso(), subs: countSubs(subs, files), files, cut };
 }
 
-export async function loadIdx(db: D1Database, pb: string): Promise<TeamIdx | null> {
+/** fresh = đọc thẳng D1, bỏ bản nhớ tạm 60 giây (bản nhớ tạm nằm riêng từng máy chủ, có thể cũ sau khi máy khác vừa sửa). */
+export async function loadIdx(db: D1Database, pb: string, fresh = false): Promise<TeamIdx | null> {
   const hit = MEM.get(pb);
-  if (hit && Date.now() - hit.at < 60_000) return hit.v;
+  if (!fresh && hit && Date.now() - hit.at < 60_000) return hit.v;
   const row = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(KEY(pb)).first<{ data: string }>();
   let v: TeamIdx | null = null;
   if (row) {
