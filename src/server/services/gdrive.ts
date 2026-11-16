@@ -12,13 +12,14 @@ const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 const API = 'https://www.googleapis.com/drive/v3';
 const COMMON = 'supportsAllDrives=true&includeItemsFromAllDrives=true';
 export const FILE_FIELDS =
-  'id,name,mimeType,modifiedTime,size,webViewLink,parents,hasThumbnail,lastModifyingUser(displayName),shortcutDetails(targetId,targetMimeType)';
+  'id,name,mimeType,modifiedTime,createdTime,size,webViewLink,parents,hasThumbnail,lastModifyingUser(displayName),shortcutDetails(targetId,targetMimeType)';
 
 export type DriveFile = {
   id: string;
   name: string;
   mimeType: string;
   modifiedTime?: string;
+  createdTime?: string;
   size?: string;
   webViewLink?: string;
   parents?: string[];

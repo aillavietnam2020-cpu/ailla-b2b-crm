@@ -25,9 +25,10 @@ function fbvRate(){
    Giá vốn, ship trên trang = doanh thu × (giá vốn / tiền hàng) của các đơn đã gửi trong kỳ (cùng rổ đơn, số thật). */
 const FBM={raw:null,at:0,busy:0,lines:null,lk:"",cost:null,days:null,miss:[],ver:0};
 const FBM_FROM="2026-10-22";
+const FBM_P_FROM="2026-10-21";/* số theo sản phẩm Sheet Pancake có tới 20/10; từ 21/10 lấy từ dòng đơn web (chị Hoa 16/11/2026) */
 async function fbmLoad(){if(FBM.busy||(FBM.raw&&Date.now()-FBM.at<600000)||typeof svApi!=="function")return;FBM.busy=1;
-  try{const t=iso(new Date()),k=FBM_FROM+"|"+t;
-    const [raw,sh]=await Promise.all([svApi("/api/hub/dieuhanh/doanhthu/fb-money").catch(()=>null),FBM.lk===k&&FBM.lines?FBM.lines:kApi(`/online/sheet?channel=FACEBOOK&from=${FBM_FROM}&to=${t}`).then(r=>r.lines||[]).catch(()=>null)]);
+  try{const t=iso(new Date()),k=FBM_P_FROM+"|"+t;
+    const [raw,sh]=await Promise.all([svApi("/api/hub/dieuhanh/doanhthu/fb-money").catch(()=>null),FBM.lk===k&&FBM.lines?FBM.lines:kApi(`/online/sheet?channel=FACEBOOK&from=${FBM_P_FROM}&to=${t}`).then(r=>r.lines||[]).catch(()=>null)]);
     if(!FBM.cost){const [map,cat,costs,on]=await Promise.all([kApi("/online/map?channel=FACEBOOK").catch(()=>[]),kApi("/catalog").catch(()=>null),kApi("/costs").catch(()=>[]),kApi("/online").catch(()=>null)]);
       const items=new Map(((cat&&cat.items)||[]).map(i=>[String(i.code).toLowerCase(),i])),isPack=code=>{const it=items.get(String(code).toLowerCase());return !!it&&/đóng gói|hộp|thùng|bao bì/i.test((it.grp||"")+" "+(it.name||""))&&it.cls==="NVL"};
       FBM.cost={map:Array.isArray(map)?map:[],kho:Object.fromEntries((costs||[]).map(c=>[c.item,c.avg])),alias:(on&&on.aliases)||[],isPack}}
@@ -40,11 +41,26 @@ function fbmCalc(){const R=FBM.raw,L=FBM.lines,C=FBM.cost;if(!R||!R.o||!L||!C)re
   Object.entries(R.o).forEach(([id,[d,dt,ship]])=>{if(d<FBM_FROM)return;const ls=by[id]||[],o=days[d]||(days[d]={n:0,dt:0,gv:0,ship:0,nAll:0,nMiss:0,dtMiss:0});o.nAll++;
     let gv=0,ok=ls.length>0;ls.forEach(l=>{const c=cf(l.sku,null,l.variant);if(c.u==null){ok=false;const k=l.sku+(l.variant?" · "+l.variant:"");const m=miss[k]||(miss[k]={n:k,q:0,why:c.why});m.q+=+l.qty||0}else gv+=c.u*(+l.qty||0)});
     if(!ok){o.nMiss++;o.dtMiss+=dt;return}o.n++;o.dt+=dt;o.gv+=gv;o.ship+=ship});
-  FBM.days=days;FBM.miss=Object.values(miss).sort((a,b)=>b.q-a.q);FBM.ver++;fbmMerge()}
+  FBM.days=days;FBM.miss=Object.values(miss).sort((a,b)=>b.q-a.q);FBM.pd=fbmProdDays(R,by,cf);FBM.ver++;fbmMerge()}
+/* Số theo sản phẩm từ dòng đơn web (đơn đã gửi, từ 21/10). Dòng đơn không có tiền riêng: đơn một sản phẩm lấy đúng tiền đơn;
+   đơn nhiều sản phẩm chia tiền đơn theo giá bán thực trung bình của sản phẩm trong Sheet Pancake (quà tặng giá 0 thì không nhận tiền),
+   sản phẩm chưa có giá trong Sheet thì chia theo giá vốn, chưa có cả hai thì theo số lượng (chị Hoa duyệt 16/11/2026).
+   Giá vốn = số lượng × giá thành trên web; mã chưa có giá thành thì để 0. Đơn chưa có dòng sản phẩm thì không vào bảng sản phẩm. */
+function fbmProdDays(R,by,cf){const F=typeof FBC!=="undefined"&&FBC.raw,nm=x=>String(x||"").toLowerCase().replace(/\s+/g," ").trim(),pr={};
+  if(F&&F.p&&F.sk){const a={};Object.entries(F.p).forEach(([d,r])=>{if(F._pweb&&F._pweb[d])return;r.forEach(([i,q,dt])=>{const t=a[i]||(a[i]={q:0,dt:0});t.q+=q;t.dt+=dt})});Object.entries(a).forEach(([i,t])=>{const s=F.sk[i];if(s&&t.q>0)pr[nm(s[1])]=t.dt*1000/t.q})}
+  const out={};Object.entries(R.o).forEach(([id,[d,dt]])=>{if(d<FBM_P_FROM)return;const ls=by[id]||[];if(!ls.length)return;
+    const it=ls.map(l=>{const q=+l.qty||0,c=cf(l.sku,null,l.variant);return {n:String(l.sku||l.name||"").trim(),q,p:pr[nm(l.sku)],u:c.u}});
+    const w=it.every(x=>x.p!=null)?it.map(x=>x.p*x.q):it.every(x=>x.u!=null)?it.map(x=>x.u*x.q):it.map(x=>x.q),W=w.reduce((a,b)=>a+b,0);
+    const D=out[d]||(out[d]={});it.forEach((x,j)=>{const t=D[x.n]||(D[x.n]={q:0,dt:0,gv:0});t.q+=x.q;t.dt+=it.length===1?dt:W>0?dt*w[j]/W:dt/it.length;t.gv+=(x.u||0)*x.q})});
+  return out}
 /* Ghép số web vào FBC.raw.days (thay ngày cùng tên của bản nạp tay cũ): g = [số đơn, tiền hàng, giá vốn, ship], h (ship hoàn) chưa có = 0. */
 function fbmMerge(){if(typeof FBC==="undefined"||!FBM.days)return;if(!FBC.raw)FBC.raw={days:{}};if(!FBC.raw.days)FBC.raw.days={};if(FBC.raw._web===FBM.ver)return;
-  Object.entries(FBM.days).forEach(([d,o])=>{if(o.n)FBC.raw.days[d]={g:[o.n,o.dt,o.gv,o.ship],h:[0,0],web:1};else delete FBC.raw.days[d]});FBC.raw._web=FBM.ver}
-{const _l=fbcLoad;fbcLoad=async function(){const r=await _l.apply(this,arguments);try{FBC.raw&&delete FBC.raw._web;fbmMerge()}catch(e){}return r}}
+  Object.entries(FBM.days).forEach(([d,o])=>{if(o.n)FBC.raw.days[d]={g:[o.n,o.dt,o.gv,o.ship],h:[0,0],web:1};else delete FBC.raw.days[d]});
+  /* Số theo sản phẩm: chỉ điền ngày Sheet chưa có; tên chưa có trong Sheet thì thêm vào danh mục (nhóm do bảng nhóm đoán theo tên) */
+  if(FBM.pd){const F=FBC.raw;if(!F.p)F.p={};if(!F.sk)F.sk=[];const nm=x=>String(x||"").toLowerCase().replace(/\s+/g," ").trim(),ix=new Map(F.sk.map((s,i)=>[nm(s[1]),i])),old=F._pweb||{};
+    Object.entries(FBM.pd).forEach(([d,D])=>{if(F.p[d]&&!old[d])return;old[d]=1;F.p[d]=Object.entries(D).map(([n,t])=>{let i=ix.get(nm(n));if(i==null){i=F.sk.length;F.sk.push(["",n,""]);ix.set(nm(n),i)}return [i,t.q,t.dt/1000,t.gv/1000]})});F._pweb=old}
+  FBC.raw._web=FBM.ver}
+{const _l=fbcLoad;fbcLoad=async function(){const r=await _l.apply(this,arguments);try{FBC.raw&&delete FBC.raw._web;fbmCalc();fbmMerge()}catch(e){}return r}}
 /* Giá vốn, ship cùng rổ: tỷ lệ trên tiền hàng các ngày có số trong khoảng (đơn đã gửi). Không có ngày nào có số thì null (không ước). */
 function fbvTyLe(from,to){fbmLoad();fbmMerge();const R=FBC.raw&&FBC.raw.days;if(!R)return null;const ks=Object.keys(R).filter(k=>k>=from&&k<=to).sort();if(!ks.length)return null;const C=fbdCost(ks);
   return C.dt>0?{gv:C.gv/C.dt,ship:C.ship/C.dt,ret:C.shipRet/C.dt,n:ks.length,den:ks[ks.length-1],C}:null}
