@@ -807,7 +807,9 @@ agentRoutes.get('/mkt/orders', requirePermission('agent.read'), async (c) => {
 agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
   needScope(c, 'cskh_b2b', 'mkt_digital', 'mkt_content');
   const d = await hubData(c);
-  const fb = (d.fbCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>>; gia?: Array<Record<string, unknown>> } | null;
+  const fb = (d.fbCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>> } | null;
+  // Khuyến mại các bộ phận (d.kmCat, 16/11): chỉ chương trình kế toán đã duyệt.
+  const km = (Array.isArray(d.kmCat) ? d.kmCat : []) as Array<Record<string, unknown>>;
   // CSKH có kho sản phẩm + combo riêng (d.cskhCat, 16/11), không chạy ads.
   const ck = (d.cskhCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>> } | null;
   if (!fb || !Array.isArray(fb.combos)) {
@@ -852,13 +854,13 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
       ghi_chu: cut(x.ghi),
     }))
     .filter((x) => all || x.trang_thai !== 'Đã hết');
-  // Giá bán lẻ riêng từng sản phẩm theo chương trình của bộ phận, đang trong hạn.
-  const giaCt = (fb.gia ?? [])
-    .filter((g) => Number(g.gia) > 0 && (!g.tu || String(g.tu) <= today) && (!g.den || String(g.den) >= today))
-    .map((g) => ({ bo_phan: g.bp === 'CSKH' ? 'CSKH' : 'Ads', ma: g.ma || '', ten: names.get(String(g.ma)) || g.ma || '', gia: Number(g.gia), tu: g.tu || '', den: g.den || '' }));
+  const BP: Record<string, string> = { ads: 'Ads Facebook', tt: 'TikTok', cskh: 'CSKH', b2b: 'Kênh phân phối' };
+  const khuyenMai = km
+    .filter((k) => k.tt === 'ok' && (!k.tu || String(k.tu) <= today) && (!k.den || String(k.den) >= today))
+    .map((k) => ({ bo_phan: BP[String(k.bp)] || k.bp, ten: k.ten || '', ap_dung: k.ap || '', gia: Number(k.gia) || 0, tu: k.tu || '', den: k.den || '', ghi_chu: cut(k.ghi) }));
   return ok(c, combos, {
     san_pham: products,
-    gia_chuong_trinh: giaCt,
+    khuyen_mai: khuyenMai,
     ngay: today,
     ghi_chu: 'Combo do Ads (team Digital) và CSKH set trên web, chỉ xem; combo CSKH không chạy ads. Giá/quà có thể đổi theo ngày: luôn đọc lại trước khi báo khách, không hứa ngoài bảng này.',
   });

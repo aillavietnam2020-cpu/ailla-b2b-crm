@@ -506,7 +506,8 @@ sanphamRoutes.post('/kpp-code/approve', async (c) => {
  */
 sanphamRoutes.get('/pancake-products', async (c) => {
   const auth = c.get('auth');
-  if (!(canEditCombo(auth) || canApproveCode(auth))) throw forbidden('Chỉ CEO, kế toán, Trưởng phòng xem sản phẩm Pancake');
+  // Mã và giá bán trên Pancake (không có giá vốn): ai vào được trang quản trị / vận hành đều xem được (Ads, CSKH so với danh mục của mình).
+  void auth;
   const ch = c.req.query('channel') ?? 'FACEBOOK';
   if (!isChannel(ch)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
   const src = await loadSource(c.env.DB, ch);

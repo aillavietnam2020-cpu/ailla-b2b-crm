@@ -46,7 +46,7 @@ async function pdLoad(force){
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */
 function pdRows(){
   const d=(typeof D==="function"&&D())||{},h=d.hr||{};
-  return pdBuild({...(PD.sv||{}),th:pdTh(),pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],...(typeof spcPdSrc==="function"?spcPdSrc(d):{}),
+  return pdBuild({...(PD.sv||{}),th:pdTh(),pcCho:d.pcCho||[],costsCho:d.costsCho||[],thuCho:d.thuCho||[],hrDon:h.don||[],hrTu:h.tu||[],...(typeof spcfPdSrc==="function"?spcfPdSrc(d):{}),...(typeof spcPdSrc==="function"?spcPdSrc(d):{}),
     staffName:ma=>{try{return staffBy(ma).ten}catch(e){return ma}}},pdWho());
 }
 /* CEO chỉ thấy việc của mình trong danh sách duyệt (chị Hoa 03/11); đề xuất agent đã gửi Kho / Sale / Kế toán là việc của phòng đó,
@@ -76,6 +76,8 @@ async function pdAct(r,ok){
   const post=(p,b)=>svApi(p,{method:"POST",body:JSON.stringify(b||{})});
   const ask=(need)=>{const t=prompt(need?"Lý do từ chối (bắt buộc):":"Lý do từ chối (có thể bỏ trống):");if(t===null)return null;if(need&&t.trim().length<3){toast("Ghi lý do ít nhất vài chữ");return null}return t.trim()};
   if(r.act==="fn"){
+    if(r.src==="kmCat"&&typeof spcfKmDuyet==="function"){if(ok){if(confirm("Duyệt khuyến mại \""+r.nd+"\"?"))spcfKmDuyet(r.ref,true)}else{const t=ask(true);if(t)spcfKmDuyet(r.ref,false,t)}return}
+    if(r.src==="ttCombo"&&typeof spcfTtOpen==="function"){if(ok)spcfTtOpen(r.ref);else toast("Combo sai thì nhắn team TikTok sửa, rồi khai lại");return}
     if(r.src==="kppCode"&&typeof spcKppFromPd==="function"){if(ok)spcKppFromPd(()=>pdLoad(true));else toast("Mã đề xuất sai thì sửa mã trong hộp duyệt rồi bấm Duyệt");return}
     if(r.src==="pcCho"){if(ok){if(confirm("Duyệt phiếu chi \""+r.nd+"\" vào sổ?"))scDuyet(r.ref)}else{const t=ask(false);if(t!==null)scTuChoi(r.ref,t)}return}
     if(r.src==="costsCho"&&ok){if(confirm("Duyệt khoản \""+r.nd+"\" theo đề xuất của web ("+r.sub+")?"))cpApprove([r.ref]);return}
