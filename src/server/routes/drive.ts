@@ -13,10 +13,10 @@ import {
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
-import { children, download, meta, recentFiles, saKey, streamVideo, thumbnail, type DriveFile } from '../services/gdrive';
+import { children, download, fileInfo, meta, moveItem, recentFiles, saKey, streamVideo, thumbnail, type DriveFile } from '../services/gdrive';
 import { setSyncPaused, syncDrivePermissions, syncPaused } from '../services/driveSync';
-import { searchIdx, todoFor, weekStats, type IdxFile, type TodoItem } from '../lib/driveIndex';
-import { isStale, loadIdx, refreshIdx } from '../services/driveIndex';
+import { moveInIdx, searchIdx, todoFor, weekStats, type IdxFile, type TodoItem } from '../lib/driveIndex';
+import { isStale, loadIdx, refreshIdx, saveIdx } from '../services/driveIndex';
 
 /**
  * Thư mục làm việc: xem thư mục Google Drive của phòng ban ngay trên web (chỉ xem; mở file thì sang Drive).
@@ -328,6 +328,47 @@ driveRoutes.get('/files', async (c) => {
   const sub = c.req.query('sub') ?? '';
   const files = idx.files.filter((f) => !sub || f.s === sub).sort((a, b) => (b.m ?? '').localeCompare(a.m ?? ''));
   return ok(c, { pb, at: idx.at, cut: idx.cut, subs: idx.subs, total: idx.files.length, edit: ceo || me?.phongBan === pb, files: files.slice(0, 500).map((f) => fileOut(f, pb)), more: Math.max(0, files.length - 500) });
+});
+
+/**
+ * Chuyển một file hoặc một thư mục con cấp 1 sang thư mục gốc / thư mục con cấp 1 của thư mục khác — chuyển thật trên Drive.
+ * CEO chuyển được mọi thư mục; nhân viên chỉ chuyển trong thư mục phòng mình (giống quyền "Được sửa").
+ * Body: { pb, id, to_pb, to_sub } — to_sub '' là thư mục gốc.
+ */
+driveRoutes.post('/move', async (c) => {
+  const { me, ceo } = await who(c);
+  const b = (await c.req.json().catch(() => null)) as { pb?: string; id?: string; to_pb?: string; to_sub?: string } | null;
+  const pb = b?.pb ?? '', id = b?.id ?? '', toPb = b?.to_pb ?? '', toSub = b?.to_sub ?? '';
+  if (!pb || !id || !toPb) throw badRequest('INVALID', 'Dữ liệu gửi lên không đúng.');
+  const cfg = await loadConfig(c.env.DB);
+  const mine = teamsFor(cfg, me, ceo);
+  const from = mine.find((t) => t.pb === pb), to = mine.find((t) => t.pb === toPb);
+  const canEdit = (p: string) => ceo || me?.phongBan === p;
+  if (!from || !to || from.direct || to.direct || !canEdit(pb) || !canEdit(toPb)) throw forbidden('Bạn chỉ được chuyển file trong thư mục phòng mình.');
+  const src = await loadIdx(c.env.DB, pb);
+  const dst = toPb === pb ? src : await loadIdx(c.env.DB, toPb);
+  if (!src || !dst) throw badRequest('NOT_READY', 'Web đang đếm file thư mục này, thử lại sau 1 phút.');
+  const target = toSub ? dst.subs.find((x) => x.n === toSub)?.id : to.folderId;
+  if (!target) throw badRequest('INVALID', 'Không thấy thư mục đích, bấm Tải lại rồi thử lại.');
+  if (target === id) throw badRequest('INVALID', 'Không chuyển thư mục vào chính nó được.');
+  const key = needKey(c.env);
+  const info = await fileInfo(key, id);
+  if (!info) throw notFound('Không thấy file trên Drive (có thể đã bị xóa hoặc chuyển đi). Bấm Tải lại.');
+  if (info.parents?.includes(target)) throw badRequest('SAME', 'File đã nằm ở thư mục này rồi.');
+  const r = await moveItem(key, id, info.parents ?? [], target);
+  if (!r.ok)
+    throw badRequest(
+      'DRIVE_MOVE',
+      r.status === 403
+        ? 'Drive không cho chuyển: tài khoản của web chưa có quyền sửa file này (thường là file do người khác tạo). Mở trên Drive để chuyển tay.'
+        : 'Drive chưa chuyển được, thử lại sau.',
+    );
+  const m = moveInIdx(src, dst, id, toSub);
+  if (m) {
+    await saveIdx(c.env.DB, m.src);
+    if (m.dst !== m.src) await saveIdx(c.env.DB, m.dst);
+  }
+  return ok(c, { moved: true });
 });
 
 /** Tạm dừng / bật lại tự cấp quyền mỗi giờ (CEO). */

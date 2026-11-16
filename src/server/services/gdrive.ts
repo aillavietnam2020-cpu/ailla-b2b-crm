@@ -189,6 +189,16 @@ export async function removePermission(key: SaKey, fileId: string, permId: strin
   return (await shareCall(key, 'DELETE', `${API}/files/${encodeURIComponent(fileId)}/permissions/${encodeURIComponent(permId)}?supportsAllDrives=true`)).ok;
 }
 
+/**
+ * Chuyển file / thư mục sang thư mục khác trên Drive (đổi thư mục cha). Vẫn là file cũ, link cũ vẫn mở được.
+ * Trả mã lỗi Drive khi không chuyển được (vd 403: tài khoản của web không có quyền sửa file đó).
+ */
+export async function moveItem(key: SaKey, id: string, from: string[], to: string) {
+  const q = `addParents=${encodeURIComponent(to)}${from.length ? `&removeParents=${encodeURIComponent(from.join(','))}` : ''}&supportsAllDrives=true&fields=id,parents`;
+  const r = await shareCall(key, 'PATCH', `${API}/files/${encodeURIComponent(id)}?${q}`, {});
+  return { ok: r.ok, status: r.status, reason: ((r.json as { error?: { errors?: { reason?: string }[] } } | null)?.error?.errors?.[0]?.reason) ?? '' };
+}
+
 /** Ảnh thu nhỏ của file (Drive tự tạo cho ảnh, video, PDF, Docs…). Trả ảnh để máy chủ chuyển tiếp; không có thì null. */
 export async function thumbnail(key: SaKey, fileId: string, size = 400): Promise<Response | null> {
   const f = await get<{ thumbnailLink?: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=thumbnailLink&${COMMON}`);
