@@ -12,7 +12,8 @@
  * Phòng ban, vai trò của từng người lấy ở bản dữ liệu chung, nhưng chỉ CEO đổi được hai ô đó (lib/stateGuard.ts),
  * nên dùng làm căn cứ phân quyền được.
  */
-export type DriveTeam = { pb: string; folderId: string; viewers: string[]; name?: string };
+/** direct: thư mục rất lớn (vd video booking của Worker), web không đếm file, bấm là mở thẳng trên Drive (chị Hoa 16/11). */
+export type DriveTeam = { pb: string; folderId: string; viewers: string[]; name?: string; direct?: boolean };
 export type DriveConfig = { teams: DriveTeam[] };
 export type DriveUser = { phongBan?: string; role?: string; active?: boolean };
 
@@ -43,7 +44,9 @@ export function normalizeConfig(raw: unknown): DriveConfig {
       ? [...new Set(t.viewers.map(String).filter((v) => /^(all|(pb|lead):[A-Za-z0-9_*-]{1,20})$/.test(v)))]
       : [];
     const name = String(t.name ?? '').trim().slice(0, 60);
-    teams.push(name ? { pb, folderId, viewers, name } : { pb, folderId, viewers });
+    const team: DriveTeam = name ? { pb, folderId, viewers, name } : { pb, folderId, viewers };
+    if ((t as DriveTeam).direct === true) team.direct = true;
+    teams.push(team);
   }
   return { teams };
 }
