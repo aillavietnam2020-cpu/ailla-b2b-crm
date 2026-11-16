@@ -44,11 +44,12 @@ function speCalcBook(x){
     "TC: Giá sản phẩm","TC: Số tiền hoàn lại","TC: Mã ưu đãi người bán chịu",...G.map(g=>"TC: "+g),"TC: Cộng phí"];
   const rows=[],T=new Array(head.length).fill(0);
   Object.entries(O).sort((a,b)=>(a[1].d||"").localeCompare(b[1].d||"")||a[0].localeCompare(b[0])).forEach(([id,o])=>{
-    const f=F[id],ls=o.lines,ok=ls.filter(l=>!l.huy),bo=ls.filter(l=>l.huy);
+    const f=F[id],ls=o.lines,ok=ls.filter(l=>!l.huy&&l.wf),bo=ls.filter(l=>l.huy),cho=ls.filter(l=>!l.huy&&!l.wf);
     let tinh,why;
     if(!ls.length){tinh="Không";why=`Không có trong file đơn tháng ${M.ky.slice(5)}/${M.ky.slice(0,4)}${o.d&&o.d.slice(0,7)!==M.ky?" (đặt ngày "+vn(o.d)+")":""}`}
     else{const r=bo.map(l=>l.st==="Đã hủy"?"đơn hủy":l.rq>0?"có hàng trả":M.hoanSet&&M.hoanSet.has(id)?"Tài chính hoàn tiền toàn bộ":"loại").filter((v,i,a)=>a.indexOf(v)===i);
-      if(!ok.length){tinh="Không";why="Bỏ cả đơn: "+r.join(", ")}
+      if(!ok.length&&cho.length){tinh="Không";why="Chưa về tiền (chưa có trong Tài chính): theo dõi sang kỳ sau"}
+      else if(!ok.length){tinh="Không";why="Bỏ cả đơn: "+r.join(", ")}
       else if(ok.every(l=>l.full)){tinh="Chỉ phí";why="Hoàn tiền toàn bộ: không tính tiền hàng, chỉ tính phí Shopee vẫn thu"}
       else if(bo.length){tinh="Một phần";why="Bỏ dòng: "+r.join(", ")}
       else{tinh="Có";why=f?(ls.some(l=>l.tra)?"Có hàng trả: tính phần Shopee thực thu theo Tài chính":""):"Chưa có trong Tài chính: phí ước theo tỷ lệ trung bình"}}
@@ -75,9 +76,8 @@ function speCalcBook(x){
     ["1. Đơn lấy từ file đơn hàng (đặt trong tháng). Đơn có trong file Tài chính mà không có trong file đơn tháng này thì web KHÔNG tính (cột Web tính = Không)."],
     ["2. Dòng sản phẩm đã hủy, hoặc Tài chính ghi hoàn tiền toàn bộ: web bỏ dòng đó. Đơn có hàng trả mà Shopee vẫn thu tiền: tiền hàng theo Tài chính (giá sản phẩm + hoàn lại), phí theo Tài chính, giá vốn trừ số lượng trả. Đơn có hàng trả chưa có trong Tài chính: bỏ dòng đó."],
     ["3. Phí của từng đơn lấy từ file Tài chính, chia cho các dòng sản phẩm theo tỷ lệ doanh thu dòng."],
-    ["4. Đơn chưa có trong Tài chính (chưa quyết toán): phí ước theo tỷ lệ phí trung bình của các đơn đã có."],
-    ["4b. Tab Adjustment của file Tài chính: chỉ lấy điều chỉnh của đơn đặt trong tháng. Trả hàng/Hoàn tiền trừ vào tiền hàng (cột TC: Số tiền hoàn lại đã gồm), khoản khác vào phí Khoản khác. Điều chỉnh của đơn tháng khác bỏ qua."],
-    ["5. Phí vận chuyển ròng và Thuế sàn khấu trừ được cộng vào phí (xem từng cột riêng)."],
+    ["4. Đơn chưa có trong Tài chính (chưa về tiền): báo cáo đủ tháng thì không tính doanh thu, theo dõi sang kỳ sau (cách chị Huệ). Báo cáo giữa tháng thì ước phí theo tỷ lệ trung bình."],
+    ["5. Phí vận chuyển ròng (gồm Phí dịch vụ PiShip) và Thuế sàn khấu trừ là cột riêng. Phí sàn = Hoa hồng cố định + Phí dịch vụ + Phí xử lý giao dịch + Affiliate + Thuế."],
     ["6. Giá vốn = số lượng × giá thành web của mã; mã chưa có giá thành để 0 (không ước)."],
     ["7. Cột TC: … là số nguyên trong file Tài chính của đơn đó để kế toán so trực tiếp."]];
   const wb=XLSX.utils.book_new();
