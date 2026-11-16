@@ -83,7 +83,7 @@ function ttReadOrders(aoa,ky){
     const d=ttIsoDay(ttCell(a[I["Created Time"]]));if(!d)continue;
     if(ky&&d.slice(0,7)!==ky){outside++;if(d.slice(0,7)<ky)before++;else after++;continue}
     const q=ttNum(a[I["Quantity"]]),rq=ttNum(a[I["Sku Quantity of return"]]),st=ttCell(a[I["Order Status"]]);
-    lines.push({o,d,rq,huy:st==="Đã hủy",hoan:rq>0&&st!=="Đã hủy",sku:ttCell(a[I["SKU ID"]]),ss:ttCell(a[I["Seller SKU"]]),pn:ttCell(a[I["Product Name"]]),vr:ttCell(a[I["Variation"]]),q,dt:ttNum(a[I["SKU Subtotal Before Discount"]])-ttNum(a[I["SKU Seller Discount"]])})}
+    lines.push({o,d,rq,st,huy:st==="Đã hủy",hoan:rq>0&&st!=="Đã hủy",sku:ttCell(a[I["SKU ID"]]),ss:ttCell(a[I["Seller SKU"]]),pn:ttCell(a[I["Product Name"]]),vr:ttCell(a[I["Variation"]]),q,dt:ttNum(a[I["SKU Subtotal Before Discount"]])-ttNum(a[I["SKU Seller Discount"]])})}
   if(!lines.length)return {err:ky?`File đơn không có đơn nào tạo trong tháng ${ky.slice(5)}/${ky.slice(0,4)}.`:"File đơn không có dòng nào đọc được."};
   return {lines,outside,before,after};
 }
@@ -223,7 +223,7 @@ function ttBuildMonth({ky,orders,income,camp}){
     if(l.huy){s.hq+=l.q;s.hdt+=l.dt;hh+=l.dt;return}
     if(!l.qt&&!income.partial){choQT+=l.dt;return}
     if(l.qt&&l.dt0>l.dt+0.5){s.hdt+=l.dt0-l.dt;hh+=l.dt0-l.dt;if(l.rq>0)s.hq+=l.rq}
-    s.q+=l.q;s.dt+=l.dt;for(let g=0;g<TT_NG;g++)s.f[g]+=f[g];mon+=l.q;
+    s.q+=l.q;s.dt+=l.dt;for(let g=0;g<TT_NG;g++)s.f[g]+=f[g];mon+=l.q;l.wf=f;
     if(!l.qt){s.dtU+=l.dt;dtUoc+=l.dt;nUoc++}
     const dd=days[l.d]||(days[l.d]={dt:0,phi:0,mon:0,don:0,hh:0});dd.dt+=l.dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.mon+=l.q;
     if(l.full)return;okOrd.add(l.o);
@@ -233,9 +233,12 @@ function ttBuildMonth({ky,orders,income,camp}){
   Object.values(sku).forEach(s=>{s.dt=Math.round(s.dt);s.hdt=Math.round(s.hdt);s.dtU=Math.round(s.dtU)});
   Object.values(days).forEach(d=>{d.dt=Math.round(d.dt);d.phi=Math.round(d.phi);d.hh=Math.round(d.hh)});
   let chi=0,nAds=0;const adsDays={};Object.entries(camp.days).forEach(([d,v])=>{if(d.slice(0,7)!==ky||(den&&d>den))return;chi+=v.chi;nAds++;adsDays[d]=v});
-  return {ky,den,sku,days,don:okOrd.size,mon,hh:Math.round(hh),hoanGiao:Math.round(hoanGiao),dtUoc:Math.round(dtUoc),nUoc,choQT:Math.round(choQT),
+  const out={ky,den,sku,days,don:okOrd.size,mon,hh:Math.round(hh),hoanGiao:Math.round(hoanGiao),dtUoc:Math.round(dtUoc),nUoc,choQT:Math.round(choQT),
     ads:{chi,vat:Math.round(chi*(1+TT_ADS_VAT)-1e-6),vi:-income.adsVi,nDays:nAds,days:adsDays},adj:income.adj,cut:income.cut,
     inc:{from:income.range.from,to:income.range.to,nOrd:income.nOrd},n:{lines:L.length,outside:orders.outside,before:orders.before,after:orders.after,unmatched:L.filter(l=>!l.qt).length}};
+  /* Dòng từng đơn cho file tính toán (bcfile.js ttCalcBook); không lưu lên web (không đếm khi JSON). */
+  Object.defineProperty(out,"_L",{value:L,enumerable:false});Object.defineProperty(out,"_F",{value:F,enumerable:false});
+  return out;
 }
 
 /* ---------- Lãi lỗ: thêm giá vốn + chi phí riêng của kênh vào số tháng ----------
