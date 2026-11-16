@@ -49,7 +49,7 @@ function pSpcombo(m){
     ${go("combo",kpi("Combo đang dùng",nf(act.length),SPC_CH.map(([k,n])=>n+" "+act.filter(c=>c.ch===k).length).join(" · ")))}
     ${C.g?go("combo",kpi("Combo chưa tính được giá vốn",nf(noGv),`món bên trong chưa có giá vốn · ${nf(flag)} combo cần kế toán xác nhận`,noGv?"#b54708":"")):""}
     ${go("un",kpi("Mã chưa quy đổi",nf(U.codes),`${nf(U.orders)} đơn kho đã xuất, chưa tính giá vốn`,U.codes?"#b42318":""))}</div>`;
-  const tabs=`<nav class="settabs">${[["combo","Combo theo kênh"],["sp","Sản phẩm gốc"],["un","Mã chưa quy đổi"+(U.codes?" ("+U.codes+")":"")],["bp","Combo các bộ phận"]].map(([k,t])=>`<button class="${SPCB.tab===k?"on":""}" data-spct="${k}">${t}</button>`).join("")}</nav>`;
+  const tabs=`<nav class="settabs">${[["combo","Combo theo kênh"],["sp","Sản phẩm gốc"],["un","Mã chưa quy đổi"+(U.codes?" ("+U.codes+")":"")],["bp","Tổng combo các kênh"]].map(([k,t])=>`<button class="${SPCB.tab===k?"on":""}" data-spct="${k}">${t}</button>`).join("")}</nav>`;
   const body=SPCB.tab==="bp"?spbAdminView():SPCB.tab==="sp"?spcProdView(C):SPCB.tab==="un"?spcUnView(C):spcComboView(C);
   /* Có mã bán sale tạo đang chờ: Trưởng phòng mở trang là hiện hộp duyệt (một lần mỗi lần tải). */
   if(SPCB.canCode&&(SPCB.kpPend||[]).length&&!SPCB.kpShown){SPCB.kpShown=1;setTimeout(()=>spcKppPending(),300)}
@@ -385,17 +385,24 @@ function spbPkView(){
 }
 /* Quản trị: kho tổng combo các bộ phận (chỉ xem) */
 function spbAdminView(){
-  const all=typeof spcCombosAll==="function"?spcCombosAll():[],F=SPCB.bpf||"",fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.bq||"").trim();
-  let L=all.filter(c=>!F||(c.bp||"ADS")===F);
-  if(q)L=L.filter(c=>fold([c.nhom,c.combo,c.qua,c.nguoi,c.tao&&c.tao.by].join(" ")).includes(q));
+  /* Một bảng tổng combo mọi kênh như demo chị duyệt 16/11: Ads Facebook, CSKH (không chạy ads), sàn TikTok, sàn Shopee. */
+  const fb=typeof spcCombosAll==="function"?spcCombosAll():[],F=SPCB.bpf||"",fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.bq||"").trim();
   const st=c=>typeof spcTag==="function"?spcTag(c):"",run=c=>(typeof spcTT!=="function"||spcTT(c)==="ok")&&!(typeof spcSt==="function"&&spcSt(c)[0]==="Đã hết");
-  const n=bp=>all.filter(c=>(c.bp||"ADS")===bp&&run(c)).length,G=spbGia().filter(g=>g.gia),san=SPCB.rows?new Set(SPCB.rows.filter(r=>r.channel!=="FACEBOOK").map(r=>r.channel+"|"+r.sku+"|"+r.variant)).size:0;
-  return `<div class="grid kpis">${kpi("Combo Ads đang chạy",nf(n("ADS")),"Ads thêm ở vận hành › Digital › Sản phẩm và combo")}${kpi("Combo CSKH đang chạy",nf(n("CSKH")),"không chạy ads · CSKH (phòng B2C) thêm ở vận hành")}${kpi("Combo sàn TikTok · Shopee",nf(san),"xem ở tab Combo theo kênh")}${kpi("Giá chương trình",nf(G.length),"sản phẩm có giá riêng của bộ phận")}</div>
-   <section class="card flush"><div class="card-h pad"><div class="filters"><div class="seg">${[["","Tất cả"],["ADS","Ads"],["CSKH","CSKH"]].map(([k,t])=>`<button class="${F===k?"on":""}" data-spbf="${k}">${t}</button>`).join("")}</div>
+  const dm=d=>d?esc(d.slice(8,10)+"/"+d.slice(5,7)):"";
+  const R=fb.map(c=>{const k=c.bp||"ADS";return {k,tag:pill(SPB_BP[k][0],SPB_BP[k][1]),ten:c.nhom||"",gom:c.combo||"",qua:c.qua||"",gia:nf(c.gia||0)+(c.ship?`<br><small class="hint">ship ${nf(c.ship)}</small>`:""),
+    ngay:(c.tu?"từ "+dm(c.tu):"")+(c.den?" đến "+dm(c.den):""),by:(c.tao&&c.tao.by)||c.nguoi||"",st:st(c),on:run(c)}});
+  const san=SPCB.rows?spcGroup(SPCB.rows.filter(r=>r.channel!=="FACEBOOK"),SPCB.sales,spcToday()).filter(c=>c.active):[];
+  san.forEach(c=>{const nm=p=>p.qty+" × "+((SPCB.items.get(spcLow(p.code))||{}).name||p.label);
+    R.push({k:c.ch,tag:pill("Sàn "+SPC_CHN(c.ch),"gry"),ten:c.sku+(c.variant?" · "+c.variant:""),gom:c.parts.filter(p=>p.kind==="sp").map(nm).join(" + "),qua:c.parts.filter(p=>p.kind==="gift").map(nm).join(" + "),
+      gia:`<small class="hint">giá trên sàn</small>`,ngay:"",by:c.orders?nf(c.orders)+" đơn":"",st:pill("Đang dùng","grn"),on:true})});
+  const n=k=>R.filter(r=>r.k===k&&r.on).length,G=spbGia().filter(g=>g.gia);
+  let L=R.filter(r=>!F||r.k===F);if(q)L=L.filter(r=>fold([r.ten,r.gom,r.qua,r.by].join(" ")).includes(q));
+  return `<div class="grid kpis">${kpi("Combo Ads Facebook đang chạy",nf(n("ADS")),"Ads thêm ở vận hành › Digital › Sản phẩm và combo")}${kpi("Combo CSKH đang chạy",nf(n("CSKH")),"không chạy ads · CSKH (phòng B2C) thêm ở vận hành")}${kpi("Combo sàn TikTok · Shopee",nf(n("TIKTOK"))+" · "+nf(n("SHOPEE")),"từ bảng quy đổi của kế toán")}${kpi("Giá chương trình",nf(G.length),"sản phẩm có giá riêng của bộ phận")}</div>
+   <section class="card flush"><div class="card-h pad"><div class="filters"><div class="seg">${[["","Tất cả"],["ADS","Ads Facebook"],["CSKH","CSKH"],["TIKTOK","Sàn TikTok"],["SHOPEE","Sàn Shopee"]].map(([k,t])=>`<button class="${F===k?"on":""}" data-spbf="${k}">${t}</button>`).join("")}</div>
     <input id="spb-q" placeholder="Tìm combo, sản phẩm, người tạo…" value="${esc(SPCB.bq||"")}" style="max-width:260px"><span class="hint">${nf(L.length)} combo</span></div></div>
-   <p class="hint pad" style="padding-top:0">Quản trị chỉ xem tổng. Ads, CSKH thêm và sửa ở trang vận hành; kế toán duyệt phiếu combo như trước.</p>
-   ${tbl(["Bộ phận","Combo","Tặng kèm","Giá bán","Ngày áp dụng","Người tạo","Trạng thái"],L.slice(0,300).map(c=>{const bp=c.bp||"ADS";return `<tr><td>${pill(SPB_BP[bp][0],SPB_BP[bp][1])}</td><td><b>${esc(c.nhom||"")}</b><br><small class="hint">${esc(c.combo||"")}</small></td><td><small>${esc(c.qua||"")}</small></td>
-     <td class="n">${nf(c.gia||0)}${c.ship?`<br><small class="hint">ship ${nf(c.ship)}</small>`:""}</td><td class="hint">${c.tu?"từ "+esc(c.tu.slice(8,10)+"/"+c.tu.slice(5,7)):""}${c.den?" đến "+esc(c.den.slice(8,10)+"/"+c.den.slice(5,7)):""}</td><td class="hint">${esc((c.tao&&c.tao.by)||c.nguoi||"")}</td><td>${st(c)}</td></tr>`}))}</section>
+   <p class="hint pad" style="padding-top:0">Quản trị chỉ xem tổng mọi combo của mọi kênh. Ads, CSKH thêm và sửa ở trang vận hành, kế toán duyệt phiếu như trước; combo sàn sửa ở tab Combo theo kênh. Giá combo sàn nằm trên sàn.</p>
+   ${tbl(["Bộ phận / kênh","Combo","Gồm","Tặng kèm","Giá bán","Ngày áp dụng","Người tạo / đơn","Trạng thái"],L.slice(0,400).map(r=>`<tr><td>${r.tag}</td><td><b>${esc(r.ten)}</b></td><td><small>${esc(r.gom)}</small></td><td><small>${esc(r.qua)}</small></td><td class="n">${r.gia}</td><td class="hint">${r.ngay}</td><td class="hint">${esc(r.by)}</td><td>${r.st}</td></tr>`))}
+   ${L.length>400?`<p class="hint pad">Đang hiện 400 / ${nf(L.length)} combo. Gõ vào ô tìm hoặc chọn kênh để thu hẹp.</p>`:""}</section>
    ${G.length?`<section class="card"><div class="card-h"><h2>Giá sản phẩm theo chương trình</h2></div>${tbl(["Bộ phận","Mã","Giá chương trình","Từ","Đến","Người đặt"],G.map(g=>`<tr><td>${pill(SPB_BP[g.bp][0],SPB_BP[g.bp][1])}</td><td class="mono">${esc(g.ma)}</td><td class="n">${nf(g.gia)}</td><td>${esc(g.tu||"")}</td><td>${esc(g.den||"")}</td><td class="hint">${esc(g.by||"")}</td></tr>`))}</section>`:""}${SPCB.can||SPCB.canCode?spbPkView():""}`;
 }
 PAGES.spcombo=pSpcombo;
