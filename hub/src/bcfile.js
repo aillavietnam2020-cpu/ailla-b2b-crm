@@ -29,9 +29,9 @@ function bcCell(kenh){
   if(!L.length)return `<span class="hint">${kenh==="spe"?"chưa lưu file":"chưa làm"}</span>`;
   const by={};L.forEach(f=>{(by[f.nhom]=by[f.nhom]||[]).push(f)});
   /* Mỗi shop một khối: tên shop, hai nút rõ ràng (thư mục Drive, file tính toán mới nhất), số file gốc (chị Hoa 16/11 "trình bày tử tế"). */
-  return Object.entries(by).map(([n,fs])=>{const g=fs.filter(f=>f.loai==="goc").length,t=fs.filter(f=>f.loai==="tinh"),last=fs[fs.length-1],tt=t[t.length-1];
+  return Object.entries(by).map(([n,fs])=>{const gs=fs.filter(f=>f.loai==="goc"),g=gs.length,t=fs.filter(f=>f.loai==="tinh"),gl=gs[gs.length-1],tt=t[t.length-1];
     return `<div style="margin-bottom:8px;white-space:nowrap"><b>${esc(n)}</b> <small class="hint">· ${g} file gốc</small><div style="margin-top:3px;display:flex;gap:6px">
-      <a class="btn sm" href="${esc(last.folderUrl||last.url)}" target="_blank" rel="noopener">📁 Thư mục</a>${tt?`<a class="btn sm" href="${esc(tt.url)}" target="_blank" rel="noopener">📊 File tính toán</a>`:""}</div></div>`}).join("");
+      ${gl?`<a class="btn sm" href="${esc(gl.folderUrl)}" target="_blank" rel="noopener" title="Thư mục 1. File gốc trên Drive: file tải từ sàn">📁 File gốc</a>`:""}${tt?`<a class="btn sm" href="${esc(tt.url)}" target="_blank" rel="noopener" title="File tính toán mới nhất (thư mục 2. File tính toán)">📊 File tính toán</a>`:""}</div></div>`}).join("");
 }
 
 /* ---------- File tính toán Shopee: mỗi đơn một dòng, cộng lại ra đúng số web ---------- */
