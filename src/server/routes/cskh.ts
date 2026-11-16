@@ -39,6 +39,7 @@ import {
   loadSettings,
   loadVariations,
   loadPosCombos,
+  posUsers,
   posStatuses,
   POS_STATUS,
   putSetting,
@@ -439,6 +440,23 @@ cskhRoutes.get('/products', async (c) => {
   return ok(c, await loadVariations(c.env.DB, c.env.INGEST_KEY, httpFetch, c.req.query('force') === '1'));
 });
 
+/** Ghép người tạo đơn trên web với nhân viên Poscake (Lead / CEO, Cài đặt CSKH; chị Hoa 16/11). */
+cskhRoutes.get('/pos-map', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO sửa cài đặt CSKH');
+  const p = await posUsers(c.env.DB, c.env.INGEST_KEY);
+  return ok(c, { users: p.users.filter((u) => u.name !== 'API_CONNECTION'), map: (await getSetting<Record<string, string>>(c.env.DB, 'pos_map')) ?? {} });
+});
+cskhRoutes.put('/pos-map', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO sửa cài đặt CSKH');
+  const b = (await c.req.json().catch(() => ({}))) as { map?: Record<string, unknown> };
+  const map: Record<string, string> = {};
+  for (const [k, v] of Object.entries(b.map ?? {})) if (k && typeof v === 'string' && v) map[str(k, 80)] = str(v, 80);
+  await putSetting(c.env.DB, 'pos_map', map);
+  return ok(c, { map });
+});
+
 /** Combo Poscake để chọn khi tạo đơn (chị Hoa 16/11). */
 cskhRoutes.get('/combos', async (c) => {
   await who(c);
@@ -495,7 +513,7 @@ cskhRoutes.post('/order', async (c) => {
   const payment = paid > 0 ? `CK:${paid}` : 'COD';
   const notePrint = str(b.note_print, 300);
   const note = [str(b.note, 500), notePrint ? `In: ${notePrint}` : ''].filter(Boolean).join(' · ');
-  const sent = await sendOrderToPoscake(c.env.DB, c.env.INGEST_KEY, httpPost, { recv_name: recvName, recv_phone: recvPhone, recv_addr: recvAddr, items, ship, discount, note: str(b.note, 500), note_print: notePrint, paid, payment, ref: id, by_name: me.name });
+  const sent = await sendOrderToPoscake(c.env.DB, c.env.INGEST_KEY, httpPost, { recv_name: recvName, recv_phone: recvPhone, recv_addr: recvAddr, items, ship, discount, note: str(b.note, 500), note_print: notePrint, paid, payment, ref: id, by_id: me.id, by_name: me.name });
   const now = nowIso();
   const st = [
     c.env.DB.prepare(
@@ -539,6 +557,7 @@ cskhRoutes.post('/order/:id/resend', async (c) => {
     payment: String(w.payment),
     paid: Number(String(w.payment).startsWith('CK:') ? String(w.payment).slice(3) : 0) || 0,
     ref: String(w.id),
+    by_id: String(w.by_id ?? ''),
     by_name: String(w.by_name ?? ''),
   });
   await c.env.DB.prepare('UPDATE cskh_web_orders SET pos_id = ?, pos_error = ? WHERE id = ?').bind(sent.pos_id, sent.error, w.id).run();

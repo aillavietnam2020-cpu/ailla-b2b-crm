@@ -491,11 +491,17 @@ export async function loadVariations(db: D1Database, secret: string | undefined,
   }
 }
 
-/** Người xử lý / chăm sóc trên Poscake = nhân viên Poscake trùng tên người tạo đơn trên web; nguồn đơn = nguồn tên "CSKH". Lưu tạm 1 ngày. */
+/** Người xử lý / chăm sóc trên Poscake = nhân viên Poscake Lead / CEO ghép ở Cài đặt CSKH (pos_map), chưa ghép thì trùng tên người tạo đơn;
+ * nguồn đơn = nguồn tên "CSKH". Danh sách nhân viên Poscake lưu tạm 1 ngày.
+ * Chị Hoa 16/11: tên web "Quỳnh Hoa" không trùng ai trên Poscake (tài khoản chị là "Việt Nam") nên Poscake tự chia đơn cho người khác. */
 const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
-async function posPeople(db: D1Database, shop: string, key: string, byName: string): Promise<{ userId: string | null; sourceId: number | string | null }> {
-  type Cache = { at: string; users: Array<{ id: string; name: string }>; cskh: number | string | null };
-  let c = await getSetting<Cache>(db, 'pos_people');
+type PosPeopleCache = { at: string; users: Array<{ id: string; name: string }>; cskh: number | string | null };
+export async function posUsers(db: D1Database, secret: string | undefined): Promise<PosPeopleCache> {
+  const { shop, key } = await openFacebook(db, secret);
+  return posCache(db, shop, key);
+}
+async function posCache(db: D1Database, shop: string, key: string): Promise<PosPeopleCache> {
+  let c = await getSetting<PosPeopleCache>(db, 'pos_people');
   if (!c || Date.now() - Date.parse(c.at) > 86_400_000) {
     const users: Array<{ id: string; name: string }> = [];
     let cskh: number | string | null = null;
@@ -519,9 +525,15 @@ async function posPeople(db: D1Database, shop: string, key: string, byName: stri
     } catch {
       /* bỏ qua */
     }
-    c = { at: new Date().toISOString(), users, cskh };
+    c = { at: new Date().toISOString(), users: users.filter((u) => u.name !== 'API_CONNECTION'), cskh };
     await putSetting(db, 'pos_people', c);
   }
+  return c;
+}
+async function posPeople(db: D1Database, shop: string, key: string, byId: string, byName: string): Promise<{ userId: string | null; sourceId: number | string | null }> {
+  const c = await posCache(db, shop, key);
+  const map = (await getSetting<Record<string, string>>(db, 'pos_map')) ?? {};
+  if (byId && map[byId] && c.users.some((x) => x.id === map[byId])) return { userId: map[byId]!, sourceId: c.cskh };
   const n = fold(byName);
   const u = n ? c.users.find((x) => fold(x.name) === n) ?? c.users.find((x) => fold(x.name).endsWith(' ' + n) || n.endsWith(' ' + fold(x.name))) : undefined;
   return { userId: u?.id ?? null, sourceId: c.cskh };
@@ -532,12 +544,12 @@ export async function sendOrderToPoscake(
   db: D1Database,
   secret: string | undefined,
   postFn: PostFn,
-  od: { recv_name: string; recv_phone: string; recv_addr: string; items: Array<{ vid: string; q: number; price: number; n: string }>; ship: number; discount: number; note: string; note_print?: string; paid?: number; payment: string; ref: string; by_name?: string },
+  od: { recv_name: string; recv_phone: string; recv_addr: string; items: Array<{ vid: string; q: number; price: number; n: string }>; ship: number; discount: number; note: string; note_print?: string; paid?: number; payment: string; ref: string; by_id?: string; by_name?: string },
 ): Promise<{ pos_id: string | null; error: string }> {
   if (od.items.some((i) => !i.vid)) return { pos_id: null, error: 'Có sản phẩm chưa khớp mã trên Poscake, cần lên đơn tay' };
   try {
     const { shop, key } = await openFacebook(db, secret);
-    const who = await posPeople(db, shop, key, od.by_name ?? '');
+    const who = await posPeople(db, shop, key, od.by_id ?? '', od.by_name ?? '');
     const body = {
       ...(who.userId ? { assigning_seller_id: who.userId, assigning_care_id: who.userId } : {}),
       ...(who.sourceId !== null ? { order_sources: who.sourceId } : {}),

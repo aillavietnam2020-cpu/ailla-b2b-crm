@@ -529,6 +529,18 @@ function pCsBc(m){
 }
 
 /* ---------- Cài đặt ---------- */
+/* Nhân viên Poscake của từng người tạo đơn (chị Hoa 16/11: đơn chị tạo bị Poscake gán cho người khác vì tên không trùng). */
+function csPosMapBlock(m){const box=document.createElement("section");box.className="card";box.id="csposmap";
+  const ppl=[{id:CSK.me.me.id,name:CSK.me.me.name}].concat((CSK.me.staff||[]).filter(s=>s.id!==CSK.me.me.id));
+  const P=CSK.posmap;
+  box.innerHTML=`<h2>Người tạo đơn trên Poscake</h2><p class="hint">Đơn tạo từ web gửi sang Poscake ghi "Phân công cho" và "Nhân viên chăm sóc" là người chọn ở đây. Để trống thì web tìm nhân viên Poscake trùng tên; không trùng ai thì Poscake tự chia.</p>`+
+    (!P||P.busy?`<p class="hint">Đang tải danh sách nhân viên Poscake…</p>`:P.error?`<p class="err">${esc(P.error)}</p>`:
+    `<table><tbody>${ppl.map(u=>`<tr><td>${esc(u.name)}</td><td><select data-posmap="${esc(u.id)}" style="width:auto"><option value="">Trùng tên (tự khớp)</option>${P.users.map(x=>`<option value="${esc(x.id)}" ${P.map[u.id]===x.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table>
+     <div class="acts" style="justify-content:flex-end;margin-top:8px"><button class="btn pri" id="csposmapsv">Lưu</button></div>`);
+  const old=m.querySelector("#csposmap");if(old)old.replaceWith(box);else{const cards=m.querySelectorAll("section.card");const last=cards[cards.length-1];if(last)last.insertAdjacentElement("afterend",box);else m.appendChild(box)}
+  if(!P){CSK.posmap={users:[],map:{},busy:1};csApi("/pos-map").then(r=>{CSK.posmap=r;if(PAGE==="cs_cd")csPosMapBlock(m)}).catch(e=>{CSK.posmap={users:[],map:{},error:e.message};if(PAGE==="cs_cd")csPosMapBlock(m)});return}
+  const sv=box.querySelector("#csposmapsv");if(sv)sv.onclick=()=>{const map={};box.querySelectorAll("[data-posmap]").forEach(x=>{if(x.value)map[x.dataset.posmap]=x.value});sv.disabled=true;
+    csApi("/pos-map",{method:"PUT",body:JSON.stringify({map})}).then(r=>{CSK.posmap.map=r.map;sv.disabled=false;toast("Đã lưu")}).catch(e=>{sv.disabled=false;csErr(e)})}}
 function pCsCd(m){
   csFrame(m,"Cài đặt CSKH","Chia khách, kéo khách từ Poscake, hạng khách, chu kỳ sản phẩm",()=>{if(!csLead())return `<section class="card"><p>Chỉ Lead Sale, CEO sửa cài đặt.</p></section>`;
     const S=CSK.me.settings,staff=CSK.me.staff||[],bf=CSK.me.backfill;const cyc=Object.entries(S.cycles).sort((a,b)=>a[0].localeCompare(b[0],"vi"));
@@ -551,6 +563,7 @@ function pCsCd(m){
      <div class="acts"><select id="cs-addp"><option value="">＋ Thêm sản phẩm…</option></select></div></section>
     <div class="acts" style="justify-content:flex-end"><button class="btn pri" id="cssv">Lưu cài đặt</button></div>`});
   if(!csLead()||!CSK.me)return;
+  csPosMapBlock(m);
   m.querySelectorAll("input[name=cschia]").forEach(r=>r.onchange=()=>{m.querySelectorAll("input[name=cschia]").forEach(x=>x.closest("label").classList.toggle("on",x.checked))});
   m.querySelectorAll("[data-cson]").forEach(c=>c.onchange=()=>c.closest("label").classList.toggle("on",c.checked));
   const ap=m.querySelector("#cs-addp");if(ap){csLoadProds().then(r=>{const have=new Set(Object.keys(CSK.me.settings.cycles));const names=[...new Set((r.list||[]).map(p=>p.name.split(" - ")[0]))].filter(n=>!have.has(n));ap.innerHTML=`<option value="">＋ Thêm sản phẩm…</option>`+opt(names,"")}).catch(()=>{});
