@@ -250,9 +250,11 @@ function fbdCost(days){
 }
 
 /* Theo nhóm sản phẩm của đúng kỳ đang chọn (chị Hoa 16/11/2026: trước đây cố định tháng 9). Số theo sản phẩm lấy từ Sheet Pancake (fb_cost_days, có tới 20/10), đơn giao thành công. */
+/* Sản phẩm chưa có nhóm trong Sheet: đoán nhóm theo tên, cùng luật gán chiến dịch quảng cáo (FBBC_LINES ở fbbc.js) */
+const fbdNhomDoan=n=>{if(typeof FBBC_LINES==="undefined")return "";const L=FBBC_LINES.find(L=>L[3].test(n||""));return L?(L[0]==="TB"||L[0]==="TL"?"Tẩy lồng giặt":L[1]):""};
 function fbdNhomCard(days,full){
   const F=FBC.raw,m={};let n=0,last="";
-  if(F&&F.p&&F.sk)days.forEach(k=>{const r=F.p[k];if(!r)return;n++;last=k;r.forEach(([i,q,dt,gv])=>{const g=(F.sk[i]||[])[2]||"(chưa nhóm)",t=m[g]||(m[g]={n:g,sl:0,dt:0,gv:0});t.sl+=q;t.dt+=dt*1000;t.gv+=gv*1000})});
+  if(F&&F.p&&F.sk)days.forEach(k=>{const r=F.p[k];if(!r)return;n++;last=k;r.forEach(([i,q,dt,gv])=>{const sk=F.sk[i]||[],g=sk[2]||fbdNhomDoan(sk[1])||"(chưa nhóm)",t=m[g]||(m[g]={n:g,sl:0,dt:0,gv:0});t.sl+=q;t.dt+=dt*1000;t.gv+=gv*1000})});
   if(!n){const e=F&&F.p?Object.keys(F.p).sort().pop():"";return `<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm</h3><p class="empty">Kỳ này chưa có số theo nhóm sản phẩm${e?` (số theo sản phẩm hiện có đến ${e.slice(8)}/${e.slice(5,7)})`:""}.</p></section>`}
   const L=Object.values(m).sort((a,b)=>b.dt-a.dt);
   return `<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm · ${n} ngày có số, đến ${last.slice(8)}/${last.slice(5,7)}</h3>${tbl(full?["Nhóm hàng","Số lượng","Doanh thu","Giá vốn","Biên gộp"]:["Nhóm hàng","Số lượng","Doanh thu"],L.map(x=>`<tr><td><b>${esc(x.n)}</b></td><td class="n">${nf(x.sl)}</td><td class="n">${tr(x.dt)}</td>${full?`<td class="n">${tr(x.gv)}</td><td class="n">${x.dt?pill(Math.round((x.dt-x.gv)/x.dt*100)+"%",(x.dt-x.gv)/x.dt>.6?"grn":"amb"):"—"}</td>`:""}</tr>`))}<p class="fbd-note">Đơn đã giao thành công trong kỳ đang chọn.</p></section>`;
