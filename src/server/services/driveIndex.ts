@@ -69,9 +69,10 @@ export async function crawlTeam(key: NonNullable<ReturnType<typeof saKey>>, team
   return { pb: team.pb, root: team.folderId, at: nowIso(), subs: countSubs(subs, files), files, cut };
 }
 
-export async function loadIdx(db: D1Database, pb: string): Promise<TeamIdx | null> {
+/** fresh = đọc thẳng D1, bỏ bản nhớ tạm 60 giây (bản nhớ tạm nằm riêng từng máy chủ, có thể cũ sau khi máy khác vừa sửa). */
+export async function loadIdx(db: D1Database, pb: string, fresh = false): Promise<TeamIdx | null> {
   const hit = MEM.get(pb);
-  if (hit && Date.now() - hit.at < 60_000) return hit.v;
+  if (!fresh && hit && Date.now() - hit.at < 60_000) return hit.v;
   const row = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(KEY(pb)).first<{ data: string }>();
   let v: TeamIdx | null = null;
   if (row) {
@@ -83,6 +84,18 @@ export async function loadIdx(db: D1Database, pb: string): Promise<TeamIdx | nul
   }
   MEM.set(pb, { at: Date.now(), v });
   return v;
+}
+
+/** Lưu mục lục đã sửa (sau khi chuyển file). */
+export async function saveIdx(db: D1Database, idx: TeamIdx) {
+  await db
+    .prepare(
+      `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 1, ?, NULL)
+       ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+    )
+    .bind(KEY(idx.pb), await pack(JSON.stringify(idx)), nowIso())
+    .run();
+  MEM.set(idx.pb, { at: Date.now(), v: idx });
 }
 
 /** Quét lại một thư mục và lưu. Đang quét thì thôi (trả null). */

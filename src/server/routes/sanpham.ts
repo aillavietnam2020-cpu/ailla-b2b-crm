@@ -6,6 +6,7 @@ import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
 import { accountantIds, taskStatements } from '../lib/notifyTasks';
 import { requirePermission } from '../middleware/rbac';
+import { unpack } from '../lib/pack';
 import { CHANNELS, loadLookups, resolveLabel, type Channel } from '../services/channelOut';
 import { API as PANCAKE_API, loadMapVersions, loadSource, openKey, pickMap, recomputeDay } from '../services/poscake';
 import { approveKppCode, canApproveCode, createKppCode, suggestSku } from '../services/kppCode';
@@ -537,6 +538,17 @@ interface PkVariant {
   variant: string;
   price: number | null;
   hidden: boolean;
+  /** ảnh mẫu mã (hoặc ảnh sản phẩm) trên Pancake, để hiện ảnh nhỏ trên web */
+  img: string;
+}
+/** Ảnh Pancake: chuỗi URL hoặc {url}. */
+function pkImg(...xs: unknown[]): string {
+  for (const x of xs) {
+    const a = Array.isArray(x) ? x[0] : x;
+    const u = typeof a === 'string' ? a : a && typeof a === 'object' ? (a as Record<string, unknown>).url : '';
+    if (typeof u === 'string' && /^https?:\/\//.test(u)) return u;
+  }
+  return '';
 }
 /** Một biến thể Pancake → mã hiển thị, tên sản phẩm, phân loại, giá bán lẻ (tên trường theo API Pancake POS). */
 function pkVariant(v: Record<string, unknown>): PkVariant {
@@ -551,6 +563,7 @@ function pkVariant(v: Record<string, unknown>): PkVariant {
     variant: fields.map((f) => String(f.value ?? '')).filter(Boolean).join(' · '),
     price: Number.isFinite(price) ? price : null,
     hidden: v.is_hidden === true || prod.is_hide === true,
+    img: pkImg(v.images, prod.image),
   };
 }
 
@@ -577,14 +590,14 @@ sanphamRoutes.get('/pancake-combos', async (c) => {
   }
   const rows = [];
   for (const x of list.slice(0, 200)) {
-    let items: Array<{ pid: string; code: string; name: string; qty: number }> = [];
+    let items: Array<{ pid: string; code: string; name: string; qty: number; img: string }> = [];
     try {
       const r = await fetch(`${base}/combo_products/${encodeURIComponent(String(x.id))}/variations?${q}&combo_product_id=${encodeURIComponent(String(x.id))}`);
       if (r.ok) {
         const j = JSON.parse(await r.text()) as { data?: Array<Record<string, unknown>> };
         items = (j.data ?? []).map((v) => {
           const p = (v.product ?? v.variation ?? {}) as Record<string, unknown>;
-          return { pid: String(p.id ?? v.product_id ?? ''), code: String(p.display_id ?? p.custom_id ?? ''), name: String(p.name ?? ''), qty: Number(v.count) || 1 };
+          return { pid: String(p.id ?? v.product_id ?? ''), code: String(p.display_id ?? p.custom_id ?? ''), name: String(p.name ?? ''), qty: Number(v.count) || 1, img: pkImg(v.images, p.image) };
         });
       }
     } catch {
@@ -604,4 +617,40 @@ sanphamRoutes.get('/pancake-combos', async (c) => {
     });
   }
   return ok(c, { channel: ch, count: rows.length, rows });
+});
+
+/**
+ * Sản phẩm đang bán trên TikTok / Shopee (chị Hoa 16/11: trang Sản phẩm kênh sàn phải hiện danh sách).
+ * Lấy từ báo cáo tháng mới nhất đã nạp (tts_month / spe_month): mã người bán, tên, phân loại, số món, giá bán trung bình
+ * = doanh thu / số món. Không trả giá vốn, phí, lãi.
+ */
+sanphamRoutes.get('/san-products', async (c) => {
+  const ch = c.req.query('channel') === 'SHOPEE' ? 'SHOPEE' : 'TIKTOK';
+  type Row = { ss?: string; pn?: string; vr?: string; q?: number; dt?: number };
+  let ky = '';
+  const src: Row[] = [];
+  if (ch === 'TIKTOK') {
+    const r = await c.env.DB.prepare('SELECT ky, data FROM tts_month ORDER BY ky DESC LIMIT 1').first<{ ky: string; data: string }>();
+    if (r) {
+      ky = r.ky;
+      const d = JSON.parse(await unpack(r.data)) as { pl?: { rows?: Row[] }; todo?: { noMap?: Row[] } };
+      src.push(...(d.pl?.rows ?? []), ...(d.todo?.noMap ?? []));
+    }
+  } else {
+    const top = await c.env.DB.prepare('SELECT MAX(ky) AS ky FROM spe_month').first<{ ky: string | null }>();
+    ky = top?.ky ?? '';
+    const rs = await c.env.DB.prepare('SELECT data FROM spe_month WHERE ky = ?').bind(ky).all<{ data: string }>();
+    for (const r of rs.results ?? []) src.push(...((JSON.parse(await unpack(r.data)) as { rows?: Row[] }).rows ?? []));
+  }
+  const m = new Map<string, { sku: string; name: string; variant: string; qty: number; dt: number }>();
+  for (const x of src) {
+    const sku = String(x.ss ?? ''), name = String(x.pn ?? ''), variant = String(x.vr ?? '');
+    const k = sku + '|' + name + '|' + variant;
+    const o = m.get(k) ?? { sku, name, variant, qty: 0, dt: 0 };
+    o.qty += Number(x.q) || 0;
+    o.dt += Number(x.dt) || 0;
+    m.set(k, o);
+  }
+  const rows = [...m.values()].map((o) => ({ sku: o.sku, name: o.name, variant: o.variant, qty: o.qty, price: o.qty ? Math.round(o.dt / o.qty) : null })).sort((a, b) => b.qty - a.qty);
+  return ok(c, { channel: ch, ky, count: rows.length, rows });
 });

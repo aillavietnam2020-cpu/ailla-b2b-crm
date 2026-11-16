@@ -230,10 +230,10 @@ const AG_READ=[
   ["TikTok",[["doc_tiktok","Xem số TikTok","Chỉ xem"],["baocao_san","Nạp báo cáo sàn TikTok",""]]]];
 const AG_WRITE=[
   ["Việc thường ngày",[["agent.w.order","Lập đơn nháp","Tính giá, tạo đơn ở trạng thái nháp"],["agent.w.submit","Gửi đơn đi duyệt",""],["agent.propose","Gợi ý việc","Ví dụ nhắc việc, đề xuất sản xuất. Người duyệt bấm đồng ý mới thành việc"]]],
-  ["⚠ Cẩn thận (đụng tiền, sửa/hủy đơn, kho)",[["agent.w.order_edit","Sửa đơn, chuyển bước, hủy đơn",""],["agent.w.payment","Ghi tiền khách trả",""],["agent.w.kho","Mua hàng, phiếu kho, vật tư",""],["agent.phieuchi","Lập phiếu chi",""]],1]];
-const AG_CAREFUL=["agent.w.order_edit","agent.w.payment","agent.w.kho","agent.phieuchi"];
+  ["⚠ Cẩn thận (đụng tiền, sửa/hủy đơn, kho)",[["agent.w.order_edit","Sửa đơn, chuyển bước, hủy đơn",""],["agent.w.payment","Ghi tiền khách trả",""],["agent.w.kho","Mua hàng, phiếu kho, vật tư",""],["agent.phieuchi","Lập phiếu chi",""],["agent.w.phache","Lập phiếu pha chế","Chỉ lập nháp khi Kế toán / CEO ra lệnh; Kế toán kiểm rồi mới ghi vào kho"]],1]];
+const AG_CAREFUL=["agent.w.order_edit","agent.w.payment","agent.w.kho","agent.phieuchi","agent.w.phache"];
 const AG_SHORT={cskh_b2b:"đơn, khách, giá, thưởng (B2B)",orders:"đơn hàng",debts:"công nợ",orders_kho:"đơn chờ kho",kho:"kho",mkt_content:"việc Content",mkt_digital:"việc Digital",xuong:"dựng video",baocao_san:"nạp TikTok",doc_tiktok:"số TikTok",
-  "agent.w.order":"lập đơn nháp","agent.w.submit":"gửi duyệt","agent.propose":"gợi ý việc","agent.w.order_edit":"sửa/hủy đơn","agent.w.payment":"ghi tiền","agent.w.kho":"phiếu kho","agent.phieuchi":"phiếu chi"};
+  "agent.w.order":"lập đơn nháp","agent.w.submit":"gửi duyệt","agent.propose":"gợi ý việc","agent.w.order_edit":"sửa/hủy đơn","agent.w.payment":"ghi tiền","agent.w.kho":"phiếu kho","agent.phieuchi":"phiếu chi","agent.w.phache":"phiếu pha chế nháp"};
 /* Vị trí: dùng để làm gì (d), quyền bật sẵn (r, w), quyền LIÊN QUAN được hiện (rel, còn lại vào "Quyền khác"), ai thường ra lệnh (by: nhãn vai trò máy chủ gắn cho từng người). */
 const AG_TPL={
   "CSKH B2B":{d:"Nhận đơn và trả lời khách sỉ (Kênh phân phối, OEM). Lập đơn nháp khi được lệnh.",r:["cskh_b2b"],w:["agent.w.order","agent.w.submit","agent.propose"],rel:["cskh_b2b","agent.w.order","agent.w.submit","agent.propose"],by:["Điều phối","CEO"]},

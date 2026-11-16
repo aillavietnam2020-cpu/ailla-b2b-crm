@@ -100,6 +100,39 @@ describe('Sản phẩm và bảng giá', () => {
     expect(product.prices.BAN_LE).toBe(99000);
   });
 
+  it('sửa giá được cả ở web vận hành (chị Hoa duyệt 16/11), vẫn chỉ người có quyền giá', async () => {
+    const post = (email: string, amount: number) =>
+      ctx.app.fetch(
+        new Request('http://qt.test/api/prices', {
+          method: 'POST',
+          headers: { 'X-Dev-Email': email, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_id: 'prod-missing', tier_id: 'tier-banle', amount, valid_from: '2026-08-16' }),
+        }),
+        { ...ctx.env, ADMIN_HOST: 'quantri.test', OPS_HOST: 'qt.test' },
+      );
+    const ceo = await post(USERS.ceo, 98000);
+    expect(ceo.status).toBe(200);
+    expect(((await ceo.json()) as { data: { status: string } }).data.status).toBe('ACTIVE');
+    const mgr = await post(USERS.manager, 97000);
+    expect(mgr.status).toBe(200);
+    expect(((await mgr.json()) as { data: { status: string } }).data.status).toBe('DRAFT');
+    expect((await post(USERS.thao, 96000)).status).toBe(403);
+  });
+
+  it('thêm mã mới được ở web vận hành (phiếu giá CEO duyệt), nhân viên không có quyền thì bị chặn', async () => {
+    const add = (email: string, sku: string) =>
+      ctx.app.fetch(
+        new Request('http://qt.test/api/products', {
+          method: 'POST',
+          headers: { 'X-Dev-Email': email, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sku, name: 'Serum hôi nách 5ml', unit: 'Chai', pack_size: '240' }),
+        }),
+        { ...ctx.env, ADMIN_HOST: 'quantri.test', OPS_HOST: 'qt.test' },
+      );
+    expect((await add(USERS.ceo, 'SECRET5ML')).status).toBe(200);
+    expect((await add(USERS.thao, 'SECRET15ML')).status).toBe(403);
+  });
+
   it('quản lý đặt giá thì thành đề nghị chờ CEO duyệt, giá cũ chưa đổi', async () => {
     const res = await ctx.request('/api/prices', {
       as: USERS.manager,

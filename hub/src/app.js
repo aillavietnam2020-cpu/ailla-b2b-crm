@@ -67,6 +67,7 @@ function render(){
   if(ADM&&$("#uchip")){const me=MODULES.find(mo=>mo.k==="me"),its=me?(HOST_MODE==="admin"?me.groups().flatMap(g=>g[1]).filter(i=>["anhdaidien","thongbao","matkhau"].includes(i[0])):modGroups(me).flatMap(g=>g[1])):[];$("#uchip").onclick=e=>{e.stopPropagation();let d=$("#umenu");if(d){d.remove();return}d=document.createElement("div");d.id="umenu";d.className="umenu";d.innerHTML=its.map(([id,t])=>`<button data-um="${id}">${t}</button>`).join("")+`<button data-um="__out">Đăng xuất</button>`;$("#uchip").after(d);d.querySelectorAll("[data-um]").forEach(b=>b.onclick=()=>{d.remove();if(b.dataset.um==="__out"){$("#logout").click();return}MOD="me";PAGE=b.dataset.um;render();scrollTo(0,0)});setTimeout(()=>addEventListener("click",()=>{const x=$("#umenu");if(x)x.remove()},{once:true}),0)}}
   $$(".aibtn").forEach(b=>b.onclick=()=>{MOD="aiq";PAGE="ai";render();scrollTo(0,0)});
   const m=$("#main");PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);
+  {const pp=document.querySelector(".topbar .pp");if(pp)pp.style.display=window.NO_PP&&NO_PP.has(PAGE)?"none":""}
   _rLast=PAGE;_rmLast=PAGE;navRecord();
   if(_keep){_rmRestore(m,_keep,_y0);requestAnimationFrame(()=>{_rmRestore($("#main")||m,_keep,_y0)})}
 }
@@ -132,7 +133,9 @@ function renderMain(){if(!ME)return;const m=$("#main");if(!m){render();return}
   if(same)m.style.minHeight=h+"px";
   /* Trang không tồn tại (tên sai, trang đã bỏ) thì về trang đầu của mục đang chọn và quên trang đã nhớ, đừng để trắng trang mãi. */
   if(!PAGES[PAGE]){try{localStorage.removeItem(SKEY+"_p")}catch(e){}let its=[];try{const mo0=curMod();its=mo0?modGroups(mo0).flatMap(g=>g[1]):[]}catch(e){}const ok=its.find(i=>PAGES[i[0]]);PAGE=ok?ok[0]:(PAGES.exec?"exec":Object.keys(PAGES)[0])}
-  m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);_rmLast=PAGE;navRecord();
+  m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);
+  /* Trang không dùng kỳ thời gian (NO_PP, khai ở trang đó) thì ẩn ô chọn ngày trên thanh trên cùng */
+  {const pp=document.querySelector(".topbar .pp");if(pp)pp.style.display=window.NO_PP&&NO_PP.has(PAGE)?"none":""}bindCommon(m);_rmLast=PAGE;navRecord();
   if(same){_rmRestore(m,sv,y);m.style.minHeight="";_rmRestore(m,sv,y);requestAnimationFrame(()=>{_rmRestore(m,sv,y);setTimeout(()=>_rmRestore(m,sv,y),120)})}else{m.style.minHeight="";if(top){window.scrollTo(0,0);const sb=_rmSave(m);}}}
 function bindCommon(m){
   m.querySelectorAll("[data-card]").forEach(e=>e.addEventListener("click",ev=>{if(ev.target.closest("select,input,button:not([data-card]),a"))return;openCard(e.dataset.card)}));

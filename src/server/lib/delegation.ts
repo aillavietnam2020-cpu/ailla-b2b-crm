@@ -25,6 +25,9 @@ const ALLOW: Array<{ methods: string[]; re: RegExp }> = [
   { methods: ['POST'], re: /^\/api\/hub\/so-chi\/phieu-chi$/ },
   // Nhập nhanh link video vào ② Điều phối (điền link + gửi Lead duyệt), chị Hoa đồng ý 06/11/2026: nhân sự Content nhắn link cho agent Lead Content.
   { methods: ['POST'], re: /^\/api\/hub\/video-links\/?$/ },
+  // Phiếu pha chế NHÁP (chị Hoa đồng ý 16/11/2026 cho agent Kế toán trưởng): chỉ lập nháp khi Kế toán / CEO ra lệnh, Kế toán kiểm rồi mới ghi vào kho.
+  { methods: ['GET', 'POST'], re: /^\/api\/hub\/phache\/nhap$/ },
+  { methods: ['GET'], re: /^\/api\/hub\/phache\/(yc|ct)$/ },
 ];
 
 export function delegatedPathAllowed(method: string, path: string): boolean {

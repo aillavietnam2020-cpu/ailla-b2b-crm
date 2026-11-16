@@ -70,3 +70,47 @@ describe('thư mục mở thẳng trên Drive', () => {
     expect('direct' in cfg.teams[1]).toBe(false);
   });
 });
+
+describe('chuyển file / thư mục con', () => {
+  const mk = (pb: string, subs: string[], files: IdxFile[]): TeamIdx => ({
+    pb, root: pb, at: '', cut: false, files, subs: countSubs(subs.map((n) => ({ id: `${pb}-${n}`, n })), files),
+  });
+  it('chuyển file sang thư mục con của phòng khác, số file hai bên đổi theo', async () => {
+    const { moveInIdx } = await import('../../src/server/lib/driveIndex');
+    const a = mk('CM', ['MEDIA', 'SKILL'], [f('skill.md', 'MEDIA'), f('v.mp4', 'MEDIA')]);
+    const b = mk('ADS', ['BÁO CÁO'], []);
+    const r = moveInIdx(a, b, 'skill.md', 'BÁO CÁO')!;
+    expect(r.src.files.map((x) => x.n)).toEqual(['v.mp4']);
+    expect(r.src.subs.find((x) => x.n === 'MEDIA')!.c).toBe(1);
+    expect(r.dst.files[0]).toMatchObject({ n: 'skill.md', s: 'BÁO CÁO', w: 'BÁO CÁO' });
+    expect(r.dst.subs[0].c).toBe(1);
+    expect(a.files.length).toBe(2); // không sửa mục lục cũ
+  });
+  it('chuyển trong cùng phòng: từ MEDIA sang SKILL', async () => {
+    const { moveInIdx } = await import('../../src/server/lib/driveIndex');
+    const a = mk('CM', ['MEDIA', 'SKILL'], [f('skill.md', 'MEDIA')]);
+    const r = moveInIdx(a, a, 'skill.md', 'SKILL')!;
+    expect(r.src).toBe(r.dst);
+    expect(r.src.subs.map((x) => [x.n, x.c])).toEqual([['MEDIA', 0], ['SKILL', 1]]);
+  });
+  it('chuyển cả thư mục con: vào gốc phòng khác thành thư mục con cấp 1, vào thư mục con thì nằm sâu hơn', async () => {
+    const { moveInIdx } = await import('../../src/server/lib/driveIndex');
+    const a = mk('CM', ['SKILL'], [f('a.md', 'SKILL', { w: 'SKILL › 2026' })]);
+    const b = mk('ADS', ['TÀI LIỆU'], []);
+    const r1 = moveInIdx(a, b, 'CM-SKILL', '')!;
+    expect(r1.src.subs).toEqual([]);
+    expect(r1.dst.subs.map((x) => [x.n, x.c])).toEqual([['TÀI LIỆU', 0], ['SKILL', 1]]);
+    const r2 = moveInIdx(a, b, 'CM-SKILL', 'TÀI LIỆU')!;
+    expect(r2.dst.files[0]).toMatchObject({ s: 'TÀI LIỆU', w: 'TÀI LIỆU › SKILL › 2026' });
+    expect(moveInIdx(a, b, 'không có', '')).toBeNull();
+  });
+});
+
+describe('tạo thư mục: sửa mục lục', () => {
+  it('thêm thư mục con mới vào cuối, số file 0', async () => {
+    const { addSubToIdx } = await import('../../src/server/lib/driveIndex');
+    const files = [f('a', 'MEDIA'), f('b', 'MEDIA'), f('c', 'BÁO CÁO')];
+    const idx: TeamIdx = { pb: 'CM', root: 'r', at: '', cut: false, files, subs: countSubs([{ id: 's1', n: 'MEDIA' }, { id: 's2', n: 'BÁO CÁO' }], files) };
+    expect(addSubToIdx(idx, { id: 's3', n: 'SKILL' }).subs.map((s) => [s.n, s.c])).toEqual([['MEDIA', 2], ['BÁO CÁO', 1], ['SKILL', 0]]);
+  });
+});

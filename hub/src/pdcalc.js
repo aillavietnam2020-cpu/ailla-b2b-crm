@@ -21,7 +21,7 @@
    NGƯỠNG CHI PHẢI CEO DUYỆT (chị Hoa chốt 27/10/2026, mặc định 5.000.000đ, đổi ở Ngưỡng cảnh báo; cùng quy tắc src/shared/ceoSpend.ts):
     khoản chi từ ngưỡng mà người duyệt/lập không phải CEO thì chờ CEO. Dòng "chờ CEO" chỉ CEO thấy; người duyệt trước không thấy lại.
    ===================================================================== */
-const PD_KINDS=[["km","Khuyến mại"],["ttcb","Combo TikTok mới"],["ma","Mã bán chờ duyệt"],["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"],["cbdx","Combo Digital"],["mh","Hàng về lệch đơn mua"]];
+const PD_KINDS=[["pg","Phiếu giá"],["km","Khuyến mại"],["ttcb","Combo TikTok mới"],["ma","Mã bán chờ duyệt"],["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"],["cbdx","Combo Digital"],["mh","Hàng về lệch đơn mua"]];
 /* Khoản chi này có phải chờ CEO duyệt không (giống needsCeo ở máy chủ). Ngưỡng 0 = tắt. */
 const pdNeedCeo=(amount,th,isCeo)=>!isCeo&&th>0&&amount>=th;
 const PD_KIND_N=k=>(PD_KINDS.find(x=>x[0]===k)||[k,k])[1];
@@ -103,6 +103,8 @@ function pdBuild(S,w){
     add({k:"mh",id:"ml:"+x.id,ref:x.id,src:"mhLech",loai:"Hàng về "+ty+" so với đơn",ok:"Xử lý",nd:[x.po_no,x.supplier_name].filter(Boolean).join(" · "),
       sub:(x.name||x.item||"")+": đặt "+q(+x.ordered||0)+", nhận "+q(+x.received||0)+" ("+ty+" "+q(Math.abs(d))+")"+(x.kho_doc_no?" · phiếu nhập "+x.kho_doc_no:""),
       tien:x.unit_price!=null?Math.round(Math.abs(d)*+x.unit_price):null,by:"Kho",at:pdTs(x.created_at),act:"fn",open:{page:"mh_po",po:x.po_id}})});
+  /* Phiếu điều chỉnh bảng giá Kênh phân phối chờ CEO duyệt (spbg.js, 16/11). */
+  if(ceo)(S.pgCho||[]).forEach(p=>add({k:"pg",id:"pg:"+p.id,ref:p.id,src:"giaPhieu",loai:"Phiếu điều chỉnh giá",ok:"Duyệt phiếu",nd:p.ma+" · "+(p.ly||""),sub:[(p.lines||[]).length+" ô giá",(p.moi||[]).length?(p.moi||[]).length+" mã mới":"","áp dụng từ "+p.tu].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"sp_gia"}}));
   /* Khuyến mại các bộ phận chờ kế toán duyệt; combo TikTok mới chờ kế toán khai quy đổi (spcfg.js, 16/11). */
   if(R.ketoan()){
     (S.kmCho||[]).forEach(k=>add({k:"km",id:"km:"+k.id,ref:k.id,src:"kmCat",loai:"Khuyến mại · chờ kế toán duyệt",nd:k.ten||"",sub:[k.ap,k.tu?"từ "+k.tu:"",k.den?"đến "+k.den:""].filter(Boolean).join(" · "),tien:+k.gia||null,by:k.by||"",at:pdTs(k.at),act:"fn",open:{page:"sp_km"}}));

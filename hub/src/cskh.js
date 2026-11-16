@@ -20,7 +20,7 @@ const csPh=p=>{p=String(p||"");return p.length===10?p.slice(0,4)+" "+p.slice(4,7
 const csTierTop=t=>{const T=(CSK.me&&CSK.me.settings&&CSK.me.settings.tiers)||[];return T.some(x=>x.n===t)};
 const csTier=c=>c.tier?pill(c.tier,csTierTop(c.tier)?(((CSK.me.settings.tiers[0]||{}).n===c.tier)?"pnk":"vio"):"gry"):"";
 const csStP=s=>{const x=CS_ST[s]||["",""];return x[0]?pill(x[0],x[1]):""};
-const csContact=c=>`<div class="cs-ct"><b>📞 ${esc(csPh(c.phone))}${c.phone2?" · "+esc(c.phone2):""}</b><span>📍 ${esc(csAddr(c))||"<i>chưa có địa chỉ</i>"}</span></div>`;
+const csContact=c=>`<div class="cs-ct"><b><button type="button" class="lnk" data-cscall="${esc(c.phone)}" title="Chép số, mở Poscake để gọi">📞 ${esc(csPh(c.phone))}</button>${c.phone2?" · "+esc(c.phone2):""}</b><span>📍 ${esc(csAddr(c))||"<i>chưa có địa chỉ</i>"}</span></div>`;
 const csCyc=p=>{const s=CSK.me&&CSK.me.settings;return s?(s.cycles[p]||s.defaultCycle):30};
 function csGoiY(c){const p=c.last_product,d=c.last_order_day;if(!d)return "Khách chưa có đơn: hỏi nhu cầu, giới thiệu sản phẩm";const used=csDiff(csToday(),d),cy=csCyc(p);
   if(used>=cy-5)return `${p} mua ${used} ngày trước, thường dùng ${cy} ngày: hỏi đã gần hết chưa, mời mua lại`;
@@ -79,6 +79,11 @@ function csBind(m){
     gq.onkeydown=e=>{if(e.key==="Escape"){CSK.gq="";CSK.gres=null;renderMain()}}}
   csBind2(m);
 }
+/* Gọi qua Poscake (cách tạm, chị Hoa 16/11, chờ ITY cấp kết nối tổng đài): Poscake không nhận số qua đường dẫn nên chép số rồi mở trang Đơn hàng. Bắt ở cả cửa sổ xem nhanh. */
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-cscall]");if(!b)return;e.stopPropagation();e.preventDefault();const t=b.dataset.cscall,shop=CSK.me&&CSK.me.posShop;
+    const w=shop?window.open("https://pos.pancake.vn/shop/"+encodeURIComponent(shop)+"/order","_blank"):null;if(w)try{w.opener=null}catch(er){}
+    const msg=(w||!shop?"":"Trình duyệt chặn mở tab mới. ")+"Đã chép số "+t+". Bên Poscake: bấm ô Tìm đơn hàng, Ctrl+V, Enter rồi bấm vào số khách để gọi.";
+    try{navigator.clipboard.writeText(t).then(()=>toast(msg),()=>toast("Số khách: "+t))}catch(er){toast("Số khách: "+t)}},true);
 function csBind2(root){
   root.querySelectorAll("[data-csgo]").forEach(b=>b.onclick=()=>{CSK.open=null;PAGE=b.dataset.csgo;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}window.RM_TOP=true;render()});
   root.querySelectorAll("[data-csquick]").forEach(b=>b.onclick=e=>{if(e.target.closest("button"))return;e.stopPropagation();csQuick(b.dataset.csquick)});
@@ -93,49 +98,119 @@ function csOpen(phone){CSK.open=phone;CSK.openPage=PAGE;CSK.prof=null;CSK.gq="";
   csApi("/customer/"+phone).then(r=>{CSK.prof=r;renderMain()}).catch(e=>{CSK.open=null;csErr(e);renderMain()});renderMain()}
 
 /* ---------- Tổng quan ---------- */
-function pCsTq(m){
-  const lead=csLead(),month=CSK.month||csToday().slice(0,7);
-  if(CSK.me&&(!CSK.ov||CSK.ov.month!==month)&&!CSK.ov_busy){CSK.ov_busy=1;csApi("/overview?month="+month).then(r=>{CSK.ov=r;CSK.ov_busy=0;csRe()}).catch(e=>{CSK.ov_busy=0;CSK.ov={month,error:e.message};csRe()})}
-  if(CSK.me&&!CSK.today)csLoad("today","/today");
-  csFrame(m,"CSKH khách lẻ",lead?"Tổng quan cả nhóm CSKH":"Tổng quan của tôi",()=>{
-    const O=CSK.ov;if(!O||O.month!==month)return `<section class="card"><p class="hint">Đang tải…</p></section>`;if(O.error)return `<section class="card"><p>${esc(O.error)}</p></section>`;
-    const TH="tháng "+(+month.slice(5));const B=O.base||{},k=O.kpi||0,dt=O.upsell.total,pct=k?Math.round(dt/k*100):0,mx=Math.max(1,...O.days.map(d=>d.v)),F=O.funnel;
-    const months=[0,1,2,3,4,5].map(i=>{const d=new Date(Date.parse(csToday().slice(0,7)+"-15T00:00:00Z"));d.setUTCMonth(d.getUTCMonth()-i);return d.toISOString().slice(0,7)});
-    return `<div class="acts" style="justify-content:flex-end;margin-bottom:8px"><select id="csmon" style="width:auto">${opt(months.map(x=>[x,"Tháng "+x.slice(5)+"/"+x.slice(0,4)]),month)}</select></div>
-    <div class="cs-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-     <div class="cs-tile"><b>${nf(B.total)}</b><span>${lead?"Tổng khách lẻ":"Khách phụ trách"}</span><div class="hint">+${nf(B.moi)} khách mới trong tháng${lead&&B.chua?` · ${nf(B.chua)} chưa chia`:""}</div></div>
-     <div class="cs-tile"><b style="color:#4b54d1">${nf(B.vip)}</b><span>Khách VIP</span><div class="hint">Tỷ lệ mua lại ${B.buyers?Math.round(B.vip/B.buyers*100):0}%</div></div>
-     <div class="cs-tile"><b style="color:#137a4b">${nf(dt)}</b><span>Doanh thu CSKH ${TH} · ${nf(O.upsell.orders)} đơn</span>${k?`<div class="cs-prog" style="margin-top:6px"><i style="width:${Math.min(100,pct)}%"></i></div><div class="hint">${pct}% chỉ tiêu ${nf(k)}</div>`:`<div class="hint">${lead?"Chưa đặt chỉ tiêu (Cài đặt)":""}</div>`}</div>
-     <div class="cs-tile"><b style="color:#c0352b">${nf(B.qua)}</b><span>Quá hạn gọi</span></div></div>
-    <section class="card"><div class="card-h"><h2>Top nhân sự ${TH}</h2><span class="hint">xếp theo doanh thu CSKH</span></div>
-     ${tbl(["Nhân sự","Doanh thu","Đơn","Cần gọi hôm nay","Đã gọi","Tiến độ","Quá hạn"],O.per.map((r,i)=>`<tr><td><b>${i+1}. ${esc(r.name||"(chưa rõ tên)")}</b></td><td class="n"><b>${nf(r.dt)}</b></td><td class="n">${nf(r.don)}</td><td class="n">${nf(r.can)}</td><td class="n">${nf(r.goi)}</td><td><div class="cs-prog"><i style="width:${r.can?Math.min(100,Math.round(r.goi/r.can*100)):0}%"></i></div></td><td class="n"${r.qua>4?' style="color:#c0352b;font-weight:700"':""}>${nf(r.qua)}</td></tr>`))}</section>
-    <div class="cs-g2"><section class="card"><h2>Doanh thu CSKH 10 ngày</h2><div class="cs-bars">${O.days.map(d=>`<div><span>${d.v?Math.round(d.v/1e5)/10+"tr":""}</span><i style="height:${Math.round(d.v/mx*110)}px"></i><span>${d.day.slice(8)}/${d.day.slice(5,7)}</span></div>`).join("")}</div></section>
-     <section class="card"><h2>Phễu chăm sóc ${TH}</h2><div class="cs-fun">${[["Cuộc gọi",F.goi],["Khách bắt máy",F.bat],["Chốt đơn",F.chot],["Giao thành công",F.giao]].map(([t,n])=>`<div><em>${t}</em><i style="width:${F.goi?Math.max(12,Math.round(n/F.goi*100)):12}%"><b>${nf(n)}</b></i></div>`).join("")}</div><p class="hint">Chốt / bắt máy: ${F.bat?Math.round(F.chot/F.bat*100):0}%</p></section></div>
-    <div class="cs-g2"><section class="card"><h2>Top sản phẩm ${TH}</h2>${O.products.length?tbl(["Sản phẩm","Số lượng","Doanh thu"],O.products.map(p=>`<tr><td>${esc(p.n)}</td><td class="n">${nf(p.q)}</td><td class="n">${nf(p.v)}</td></tr>`)):`<p class="hint">Chưa có đơn CSKH trong tháng.</p>`}</section>
-     <section class="card"><h2>Sinh nhật khách ${TH}</h2>${O.birthdays.length?tbl(["Khách","Sinh nhật"].concat(lead?["CSKH"]:[]),O.birthdays.map(b=>`<tr class="clk" data-csopen="${b.phone}"><td><b>${esc(b.name)}</b><br><span class="hint">${esc(csPh(b.phone))}</span></td><td>${esc(b.birthday)}</td>${lead?`<td>${esc(b.owner_name||"—")}</td>`:""}</tr>`)):`<p class="hint">Chưa có khách nào ghi sinh nhật tháng này. Hỏi sinh nhật khi gọi và ghi vào hồ sơ.</p>`}</section></div>
-    <section class="card"><h2>Khách mới theo nguồn ${TH}</h2>${O.sources.length?tbl(["Nguồn","Khách mới"],O.sources.map(s=>`<tr><td>${esc(s.source||"Không rõ")}</td><td class="n">${nf(s.n)}</td></tr>`)):`<p class="hint">Chưa có.</p>`}</section>`});
-  const ms=m.querySelector("#csmon");if(ms)ms.onchange=()=>{CSK.month=ms.value;renderMain()};
-  if(csLead()&&CSK.me)csPlBlock(m,month);
-}
+/* ---------- Báo cáo kinh doanh CSKH (chị Hoa 16/11, demo https://claude.ai/artifact/7Jq6SjNsBMLPjBgXSou8Zf) ----------
+   Theo kỳ chọn ở trên cùng (PERIOD), so với kỳ liền trước cùng số ngày. Doanh thu thực = đơn giao thành công, không GMV, không ước.
+   Giá vốn, ship tính như báo cáo Facebook (giá thành web × số lượng xuất, phí hãng của đơn đã gửi); giá vốn = doanh thu thực × (giá vốn / tiền hàng đơn gửi trong kỳ).
+   Lương CSKH = lương nhân sự phòng CSKH trong Bảng lương, chia đều theo ngày; chỉ ai xem được lương (CEO, kế toán) mới thấy. Quảng cáo = 0.
+   CEO / Lead CSKH: tab theo nhóm chỉ số. Sale CSKH: số của mình + bảng xếp hạng nhân viên (chị Hoa 16/11). */
+const CSKD={tab:"kq",c:{}};
+function csKdRe(pg){if(PAGE!==pg)return;if(pg==="cskh_cu")renderMain();else csRe()}
+function csKdGet(f,t,pg){const k=f+"|"+t,c=CSKD.c[k];if(c&&(c.busy||Date.now()-c.at<600000))return c.data||null;
+  CSKD.c[k]={busy:1,at:Date.now(),data:c&&c.data};
+  csApi("/kd?from="+f+"&to="+t).then(r=>{CSKD.c[k]={at:Date.now(),data:r};csKdRe(pg)}).catch(e=>{CSKD.c[k]={at:Date.now(),data:{error:e.message}};csKdRe(pg)});
+  return CSKD.c[k].data||null}
+/* Giá vốn / tiền hàng và ship theo ngày gửi của đơn CSKH đã gửi (cần số Facebook: FBM). */
+function csKdCost(K){if(!K.me.lead||!FBM.raw||!FBM.lines||!FBM.cost)return null;
+  const R=FBM.raw,C=FBM.cost,by={},cfs={},ids=new Set(K.sent.map(o=>o.id));
+  FBM.lines.forEach(l=>{if(ids.has(l.order_id))(by[l.order_id]=by[l.order_id]||[]).push(l)});
+  const cfOf=ym=>cfs[ym]||(cfs[ym]=typeof ttMakeCostOf==="function"?ttMakeCostOf({ky:ym,mapRows:C.map,skus:D().skus||[],khoCost:C.kho,isPack:C.isPack,alias:C.alias}):null);
+  let tien=0,gv=0,thieu=0;const ship={};
+  K.sent.forEach(o=>{const x=R.o&&R.o[o.id];if(x){tien+=x[1];ship[o.day]=(ship[o.day]||0)+x[2]}const cf=cfOf(o.day.slice(0,7));if(cf)(by[o.id]||[]).forEach(l=>{const k=cf(l.sku,null,l.variant);if(k.u==null)thieu++;else gv+=k.u*(+l.qty||0)})});
+  return {rate:tien?gv/tien:0,ship,thieu}}
+/* Lương phòng CSKH chia theo ngày; null nếu người xem không được xem lương. */
+function csKdLuong(days){if(typeof cpLgRows!=="function"||!(typeof cpLgCan==="function"&&cpLgCan()))return null;
+  const day={},miss=[],byM={};let tam=false;days.forEach(k=>(byM[k.slice(0,7)]=byM[k.slice(0,7)]||[]).push(k));
+  Object.entries(byM).forEach(([ym,ks])=>{const S=cpLgRows(ym);if(!S.ok){miss.push(ym);return}if(!S.chot)tam=true;
+    const tong=S.rows.filter(r=>r.pb==="CSKH").reduce((a,r)=>a+r.tong,0),dim=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();ks.forEach(k=>day[k]=tong/dim)});
+  return {day,miss,tam}}
+function csKdDays(K,days,cost,lg,meId){const o={};days.forEach(k=>o[k]={dt:0,giao:0,gui:0,sGiao:0,hoan:0,dang:0,ship:0,gv:0,luong:0,goi:0,chot:0,sl:0});
+  K.delivered.forEach(d=>{const r=o[d.day];if(!r||(meId&&d.by!==meId))return;r.dt+=d.total;r.giao++;d.items.forEach(i=>r.sl+=+i.q||0)});
+  if(!meId)K.sent.forEach(s=>{const r=o[s.day];if(!r)return;r.gui++;if(s.st==="giao")r.sGiao++;else if(s.st==="hoan")r.hoan++;else r.dang++});
+  K.calls.forEach(c=>{const r=o[c.day];if(!r||(meId&&c.by_id!==meId))return;r.goi+=c.goi;r.chot+=c.chot});
+  days.forEach(k=>{const r=o[k];if(cost){r.ship=cost.ship[k]||0;r.gv=r.dt*cost.rate}if(lg)r.luong=lg.day[k]||0});return o}
+/* Bảng theo nhân viên CSKH trong kỳ. */
+function csKdPer(K){const m=new Map(),nm=id=>(K.staff.find(s=>s.id===id)||{}).name||"";
+  const g=id=>{let r=m.get(id);if(!r){r={id,name:id?nm(id)||"(chưa rõ tên)":"Chưa rõ người chốt",dt:0,don:0,goi:0,chot:0,khach:0,qua:0};m.set(id,r)}return r};
+  K.staff.forEach(s=>g(s.id));K.delivered.forEach(d=>{const r=g(d.by);r.dt+=d.total;r.don++});
+  K.calls.forEach(c=>{const r=g(c.by_id);r.goi+=c.goi;r.chot+=c.chot});K.own.forEach(o=>{const r=g(o.owner_id);r.khach=o.n;r.qua=o.qua});
+  return [...m.values()].filter(r=>r.id||r.dt).sort((a,b)=>b.dt-a.dt||b.don-a.don||a.name.localeCompare(b.name))}
+function csKdProds(K){const m=new Map();K.delivered.forEach(d=>{const seen=new Set();d.items.forEach(i=>{const a=m.get(i.n)||{n:i.n,q:0,v:0,don:0};a.q+=+i.q||0;a.v+=+i.p||0;if(!seen.has(i.n)){a.don++;seen.add(i.n)}m.set(i.n,a)})});return [...m.values()].sort((a,b)=>b.v-a.v)}
+const csKdCard=(t,sub,body)=>`<section class="pc-card"><div class="pc-h"><b>${t}</b>${sub?`<span>${sub}</span>`:""}</div>${body}</section>`;
+const csKdTbl=(h,rows)=>`<div class="pc-tw"><table class="pc-t"><thead><tr>${h.map((x,i)=>`<th${i?' class="n"':""}>${x}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+const csKdTr=(cells,b)=>`<tr>${cells.map((c,i)=>`<td${i?' class="n"':""}>${b?"<b>"+c+"</b>":c}</td>`).join("")}</tr>`;
+const csKdPct=(a,b)=>b?(a/b*100).toLocaleString("vi-VN",{maximumFractionDigits:1})+"%":"—";
+function csKdRank(rows,n,f){const mx=Math.max(1,...rows.map(f.v));
+  return rows.length?rows.slice(0,n).map((r,i)=>`<div class="cskd-rk"><span class="no${i<3?" g"+(i+1):""}">${i+1}</span><span class="nm">${esc(f.n(r))}<small>${f.s(r)}</small></span><span class="v">${nf(f.v(r))}<small>${f.vs(r)}</small></span><div class="b"><i style="width:${(f.v(r)/mx*100).toFixed(1)}%"></i></div></div>`).join(""):`<p class="empty" style="padding:10px 14px">Kỳ này chưa có số.</p>`}
+const csKdTopSp=(P,n)=>csKdCard("Top sản phẩm bán chạy","theo doanh thu thực",csKdRank(P,n,{n:r=>r.n,s:r=>nf(r.q)+" sản phẩm",v:r=>r.v,vs:r=>nf(r.don)+" đơn"}));
+const csKdTopNv=per=>csKdCard("Xếp hạng nhân viên CSKH","theo doanh thu thực",csKdRank(per,20,{n:r=>r.name,s:r=>"tỷ lệ chốt "+csKdPct(r.chot,r.goi),v:r=>r.dt,vs:r=>nf(r.don)+" đơn"}));
+function csKdCss(){if($("#cskdcss"))return;const s=document.createElement("style");s.id="cskdcss";s.textContent=`
+.cskd-rk{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 14px;border-bottom:1px solid #eef0f5;font-variant-numeric:tabular-nums}.cskd-rk:last-child{border-bottom:0}
+.cskd-rk .no{width:22px;height:22px;border-radius:50%;background:#f1f3f8;color:#475066;font-size:12px;font-weight:700;display:grid;place-items:center}.cskd-rk .no.g1{background:#fef0c7;color:#93370d}.cskd-rk .no.g2{background:#eaecf0;color:#344054}.cskd-rk .no.g3{background:#fbe4d6;color:#8a3a12}
+.cskd-rk .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cskd-rk small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}.cskd-rk .v{text-align:right;font-weight:700}
+.cskd-rk .b{grid-column:2/-1;height:6px;background:#eef0f5;border-radius:99px;overflow:hidden}.cskd-rk .b i{display:block;height:100%;border-radius:99px;background:#2457c5}
+.cskd-sbar{display:flex;height:22px;border-radius:6px;overflow:hidden;margin:10px 14px 4px;font-size:11.5px;color:#fff;font-weight:600}.cskd-sbar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+.cskd-g{display:grid;gap:10px;margin-top:10px}.cskd-s .pc-m{flex:1 1 0;min-width:92px}.cskd-s .pc-m .l{max-width:100%;overflow:hidden;text-overflow:ellipsis}.cskd-note{color:var(--muted);font-size:12px;margin:0;padding:8px 14px 10px}`;document.head.appendChild(s)}
+/* Trả HTML của báo cáo (đã gồm tab, dải chỉ số, thẻ chi tiết). pg: trang đang mở, để tải xong vẽ lại đúng trang. */
+function csKdHtml(pg){csKdCss();
+  const today=csToday(),from=PERIOD.from,to=PERIOD.to>today?today:PERIOD.to;
+  if(to<from)return csKdCard("Kỳ chưa bắt đầu","",`<p class="cskd-note">Chọn kỳ đến hôm nay ở thanh trên cùng.</p>`);
+  const days=fbdRange(from,to),len=days.length,pf=iso(addD(pdate(from),-len)),pt=iso(addD(pdate(from),-1)),pdays=fbdRange(pf,pt);
+  const K=csKdGet(from,to,pg),KP=csKdGet(pf,pt,pg);
+  if(!K||!KP)return `<section class="pc-card"><p class="cskd-note">Đang tải…</p></section>`;
+  if(K.error||KP.error)return `<section class="pc-card"><p class="cskd-note">${esc(K.error||KP.error)}</p></section>`;
+  const lead=K.me.lead;
+  if(lead&&typeof fbmLoad==="function"&&!FBM.raw&&!FBM.busy&&!CSK.fbmAsk){CSK.fbmAsk=1;fbmLoad().then(()=>{CSK.fbmAsk=0;if(FBM.raw)csKdRe(pg)})}
+  const cost=csKdCost(K),pcost=csKdCost(KP),lg=lead?csKdLuong(days):null,plg=lead?csKdLuong(pdays):null,meId=lead?"":K.me.id;
+  const A=csKdDays(K,days,cost,lg,meId),B=csKdDays(KP,pdays,pcost,plg,meId),R=k=>A[k]||B[k]||{},f=fn=>k=>fn(R(k)||{});
+  const S=ks=>{const o={};ks.forEach(k=>{const r=(A[k]||B[k]);for(const x in r)o[x]=(o[x]||0)+r[x]});return o},T=S(days),TP=S(pdays);
+  const per=csKdPer(K),last=days[days.length-1],only=v=>k=>k===last?v:0;
+  /* ---------- sale CSKH: số của mình ---------- */
+  if(!lead){const me=per.find(r=>r.id===K.me.id)||{khach:0,qua:0};
+    const defs=[{l:"Doanh thu của tôi",t:"m",n:f(r=>r.dt)},{l:"Đơn giao thành công",t:"n",n:f(r=>r.giao)},{l:"Cuộc gọi",t:"n",n:f(r=>r.goi)},{l:"Tỷ lệ chốt sau gọi",t:"p",n:f(r=>r.chot),d:f(r=>r.goi)},{l:"Khách đang chăm",t:"n",n:only(me.khach)},{l:"Quá hạn gọi",t:"n",rev:true,n:only(me.qua),warn:v=>v>0}];
+    const T2=CSK.today&&CSK.today.rows?CSK.today.rows.filter(r=>["qua","nay","moi"].includes(r.state)):null;
+    return `<div class="cskd-s">${fbdMetPanel("cskd_me",defs,days,pdays,"",null,true)}</div>`+`<div class="cskd-g">${csKdTopNv(per)}
+      ${csKdCard("Việc gọi hôm nay",T2?nf(T2.length)+" khách cần gọi":"",T2?(T2.length?T2.slice(0,8).map(csTask).join("")+(T2.length>8?`<p class="cskd-note"><button class="lnk" data-csgo="cs_today">Xem đủ ${nf(T2.length)} khách →</button></p>`:""):`<p class="cskd-note">Hôm nay không còn khách nào cần gọi.</p>`):`<p class="cskd-note">Đang tải…</p>`)}</div>`}
+  /* ---------- CEO / Lead CSKH: tab nhóm chỉ số ---------- */
+  const hasC=!!cost,hasL=!!lg,cp=r=>r.gv+r.ship+(hasL?r.luong:0),lai=r=>r.dt-cp(r);
+  const tabs=[["kq","Kết quả kinh doanh"],["don","Đơn hàng"],["kh","Khách & chăm sóc"],["sp","Sản phẩm"],["ns","Nhân sự"]];
+  const tab=tabs.some(x=>x[0]===CSKD.tab)?CSKD.tab:"kq";
+  const nav=`<nav class="fbd-tabs">${tabs.map(([k,t])=>`<button type="button" data-cskdtab="${k}" class="${tab===k?"on":""}">${t}</button>`).join("")}</nav>`;
+  let defs,det="";
+  if(tab==="kq"){
+    defs=[{l:"Doanh thu thực",t:"m",n:f(r=>r.dt)}].concat(hasC?[{l:"Giá vốn",t:"m",rev:true,n:f(r=>r.gv)},{l:"Chi phí vận chuyển",t:"m",rev:true,n:f(r=>r.ship)}]:[]).concat(hasL?[{l:"Lương CSKH",t:"m",rev:true,n:f(r=>r.luong)}]:[])
+      .concat(hasC?[{l:"Tổng chi phí",t:"m",rev:true,n:f(cp)},{l:"Lãi đóng góp",t:"m",n:f(lai)},{l:"Biên lãi đóng góp",t:"p",n:f(lai),d:f(r=>r.dt)}]:[]);
+    const tot=cp(T),items=[["Giá vốn hàng bán",T.gv,"#6941c6"],["Chi phí vận chuyển",T.ship,"#175cd3"]].concat(hasL?[["Lương CSKH",T.luong,"#0e9384"]]:[]).concat([["Quảng cáo",0,"#e7357b"]]);
+    const dl=(a,b,rev)=>b?fbdDelta(a,b,rev):"";
+    const costCard=hasC?csKdCard("Cơ cấu chi phí","trên doanh thu thực "+nf(T.dt),`${tot?`<div class="cskd-sbar">${items.filter(x=>x[1]>0).map(([n,v,c])=>`<div style="width:${(v/tot*100).toFixed(2)}%;background:${c}">${v/tot>=.12?n+" "+csKdPct(v,T.dt):""}</div>`).join("")}</div>`:""}`+
+      csKdTbl(["Khoản chi phí","Số tiền","% chi phí","% doanh thu"],items.map(([n,v,c])=>csKdTr([`<span class="pc-dot" style="background:${c}"></span>${n}`,nf(v),csKdPct(v,tot),csKdPct(v,T.dt)])).concat(hasL?[]:[csKdTr(['<span class="pc-dot" style="background:#d0d5dd"></span>Lương CSKH','<span class="hint">chỉ CEO, kế toán xem</span>',"",""])]).concat([csKdTr(["Tổng chi phí",nf(tot),tot?"100%":"—",csKdPct(tot,T.dt)],1)]))+
+      `<p class="cskd-note">${cost.thieu?nf(cost.thieu)+" dòng sản phẩm chưa có giá thành, chưa vào giá vốn. ":""}${hasL?(lg.miss.length?"Chưa có bảng lương tháng "+lg.miss.map(x=>+x.slice(5)).join(", ")+". ":"")+(lg.tam?"Lương tháng chưa chốt là số tạm tính. ":"")+"Lương CSKH = lương nhân sự phòng CSKH trong Bảng lương, chia theo số ngày của kỳ.":""}</p>`):csKdCard("Cơ cấu chi phí","",`<p class="cskd-note">Đang tính giá vốn, phí vận chuyển từ số Facebook…</p>`);
+    const plCard=csKdCard("Doanh thu, giá vốn, lãi lỗ","so với "+fbdVN2(pf)+" – "+fbdVN2(pt),csKdTbl(["","Kỳ này","Kỳ trước","Chênh"],[csKdTr(["Doanh thu thực",nf(T.dt),nf(TP.dt),dl(T.dt,TP.dt)])].concat(hasC?[csKdTr(["− Giá vốn",nf(T.gv),nf(TP.gv),dl(T.gv,TP.gv,1)]),csKdTr(["− Vận chuyển",nf(T.ship),nf(TP.ship),dl(T.ship,TP.ship,1)])]:[])
+      .concat(hasL?[csKdTr(["− Lương CSKH",nf(T.luong),nf(TP.luong),dl(T.luong,TP.luong,1)])]:[]).concat([csKdTr(["− Quảng cáo","0","0",""])]).concat(hasC?[csKdTr(["= Lãi đóng góp"+(hasL?"":" (chưa trừ lương)"),nf(lai(T)),nf(lai(TP)),dl(lai(T),lai(TP))],1)]:[]))+
+      `<p class="cskd-note">Doanh thu thực là đơn giao thành công, không GMV, không ước. Đơn CSKH là đơn Facebook nguồn "CSKH" trên Poscake hoặc tạo từ web CSKH, không tính vào báo cáo Facebook Ads.</p>`);
+    det=`<div class="pc-2">${costCard}${plCard}</div><div class="pc-2">${csKdTopSp(csKdProds(K),5)}${csKdTopNv(per)}</div>`}
+  else if(tab==="don"){
+    defs=[{l:"Đơn gửi đi",t:"n",n:f(r=>r.gui)},{l:"Đơn giao thành công",t:"n",n:f(r=>r.giao)},{l:"Đơn đang giao",t:"n",n:f(r=>r.dang)},{l:"Đơn hoàn",t:"n",rev:true,n:f(r=>r.hoan)},{l:"Tỷ lệ giao thành công",t:"p",n:f(r=>r.sGiao),d:f(r=>r.gui)},{l:"Tỷ lệ hoàn",t:"p",rev:true,n:f(r=>r.hoan),d:f(r=>r.gui)},{l:"Giá trị TB / đơn",t:"d",n:f(r=>r.dt),d:f(r=>r.giao)}];
+    det=csKdCard("Đơn gửi đi trong kỳ theo tình trạng","tính trên đơn gửi hàng trong kỳ",csKdTbl(["Tình trạng","Số đơn","Tỷ lệ"],[["Giao thành công",T.sGiao],["Đang giao",T.dang],["Hoàn",T.hoan]].map(([n,v])=>csKdTr([n,nf(v),csKdPct(v,T.gui)])).concat([csKdTr(["Tổng đơn gửi",nf(T.gui),T.gui?"100%":"—"],1)]))+`<p class="cskd-note">Tỷ lệ hoàn tính riêng với hủy. Đơn đang giao chưa tính vào doanh thu thực.</p>`)}
+  else if(tab==="kh"){
+    defs=[{l:"Cuộc gọi",t:"n",n:f(r=>r.goi)},{l:"Cuộc chốt đơn",t:"n",n:f(r=>r.chot)},{l:"Tỷ lệ chốt sau gọi",t:"p",n:f(r=>r.chot),d:f(r=>r.goi)},{l:"Khách được gọi",t:"n",n:only(K.cared)},{l:"Khách quá hạn gọi",t:"n",rev:true,n:only(K.own.reduce((a,o)=>a+o.qua,0)),warn:v=>v>0},{l:"Khách ngừng chăm",t:"n",rev:true,n:only(K.stopped)}];
+    const nG=K.results.reduce((a,r)=>a+r.n,0);
+    det=`<div class="pc-2">${csKdCard("Kết quả cuộc gọi","",K.results.length?csKdTbl(["Kết quả","Cuộc","Tỷ lệ"],K.results.map(r=>csKdTr([esc(r.result||"Khác"),nf(r.n),csKdPct(r.n,nG)]))):`<p class="cskd-note">Kỳ này chưa có cuộc gọi nào được ghi.</p>`)}
+      ${csKdCard("Khách theo hạng","khách có đơn giao thành công trong kỳ",csKdTbl(["Hạng","Khách","Doanh thu thực","TB / khách"],K.tiers.map(t=>csKdTr([esc(t.n),nf(t.khach),nf(t.dt),t.khach?nf(Math.round(t.dt/t.khach)):"—"]))))}</div>`}
+  else if(tab==="sp"){
+    defs=[{l:"Doanh thu thực",t:"m",n:f(r=>r.dt)},{l:"Đơn giao thành công",t:"n",n:f(r=>r.giao)},{l:"Sản phẩm bán ra",t:"n",n:f(r=>r.sl)}];
+    const P=csKdProds(K);
+    det=csKdCard("Sản phẩm bán trong kỳ","theo doanh thu thực",P.length?csKdTbl(["Sản phẩm","Số lượng","Đơn","Doanh thu thực","% doanh thu"],P.map(p=>csKdTr([esc(p.n),nf(p.q),nf(p.don),nf(p.v),csKdPct(p.v,T.dt)]))):`<p class="cskd-note">Kỳ này chưa có đơn CSKH giao thành công.</p>`)}
+  else{
+    defs=[{l:"Doanh thu thực",t:"m",n:f(r=>r.dt)},{l:"Cuộc gọi",t:"n",n:f(r=>r.goi)},{l:"Tỷ lệ chốt sau gọi",t:"p",n:f(r=>r.chot),d:f(r=>r.goi)}];
+    det=`<div class="pc-2">${csKdTopNv(per)}${csKdCard("Chi tiết nhân viên CSKH","",csKdTbl(["Nhân viên","Doanh thu thực","Đơn","Khách đang chăm","Cuộc gọi","Tỷ lệ chốt","Quá hạn gọi"],per.map(r=>csKdTr([esc(r.name),nf(r.dt),nf(r.don),nf(r.khach),nf(r.goi),csKdPct(r.chot,r.goi),r.qua>4?`<b style="color:#b42318">${nf(r.qua)}</b>`:nf(r.qua)]))))}</div>`}
+  return nav+`<div class="cskd-s">${fbdMetPanel("cskd_"+tab,defs,days,pdays)}</div>`+`<div class="cskd-g">${det}</div>`}
+function csKdBind(m){m.querySelectorAll("[data-cskdtab]").forEach(b=>b.onclick=()=>{CSKD.tab=b.dataset.cskdtab;renderMain()});if(typeof fbdBindMet==="function")fbdBindMet(m);csBind2(m)}
 
-/* Lãi lỗ CSKH (chị Hoa 16/11: báo cáo riêng, không chung Facebook Ads). Doanh thu = đơn giao thành công; giá vốn, ship tính như báo cáo Facebook
-   (giá thành web × số lượng xuất, phí hãng vận chuyển của đơn đã gửi); giá vốn theo tỷ lệ giá vốn / tiền hàng của đơn đã gửi trong kỳ. Quảng cáo = 0. */
-function csPlBlock(m,month,pg){
-  if(!CSK.pl||CSK.pl.month!==month){if(!CSK.pl_busy){CSK.pl_busy=1;csApi("/pl?month="+month).then(r=>{CSK.pl=r;CSK.pl_busy=0;if(pg&&PAGE===pg)renderMain();else csRe()}).catch(e=>{CSK.pl={month,error:e.message};CSK.pl_busy=0})}}
-  if(typeof fbmLoad==="function"&&!FBM.raw&&!FBM.busy&&!CSK.fbmAsk){CSK.fbmAsk=1;fbmLoad().then(()=>{CSK.fbmAsk=0;if(FBM.raw){if(pg&&PAGE===pg)renderMain();else csRe()}})}
-  const P=CSK.pl;let h;
-  if(!P||P.month!==month)h=`<p class="hint">Đang tải…</p>`;else if(P.error)h=`<p>${esc(P.error)}</p>`;
-  else{const R=FBM.raw,L=FBM.lines,C=FBM.cost;let tien=0,gv=0,ship=0,thieu=0;
-    const by={};(L||[]).forEach(l=>{(by[l.order_id]=by[l.order_id]||[]).push(l)});
-    const cf=C&&typeof ttMakeCostOf==="function"?ttMakeCostOf({ky:month,mapRows:C.map,skus:D().skus||[],khoCost:C.kho,isPack:C.isPack,alias:C.alias}):null;
-    P.shipped.forEach(o=>{const x=R&&R.o&&R.o[o.id];if(x){tien+=x[1];ship+=x[2]}if(cf)(by[o.id]||[]).forEach(l=>{const k=cf(l.sku,null,l.variant);if(k.u==null)thieu++;else gv+=k.u*(+l.qty||0)})});
-    const dt=P.delivered.reduce((a,o)=>a+(+o.total||0),0),gvR=tien?gv/tien*dt:0,lai=dt-gvR-ship,hoanT=P.returned.reduce((a,o)=>a+((R&&R.o&&R.o[o.id])?R.o[o.id][1]:0),0);
-    const row=(k,v,b)=>`<tr><td>${b?"<b>"+k+"</b>":k}</td><td class="n">${b?"<b>"+nf(v)+"</b>":nf(v)}</td></tr>`;
-    h=`<div class="cs-g2"><div><table>${row("Doanh thu giao thành công ("+P.delivered.length+" đơn)",dt)}${row("Giá vốn",-gvR)}${row("Ship trả hãng vận chuyển ("+P.shipped.length+" đơn đã gửi)",-ship)}${row("Quảng cáo",0)}${row("Lãi đóng góp",lai,1)}</table></div>
-     <div><table>${row("Đơn đã gửi hàng",P.shipped.length)}${row("Tiền hàng đơn đã gửi",tien)}${row("Đơn hoàn ("+P.returned.length+" đơn)",hoanT)}</table>${thieu?`<p class="hint">${thieu} dòng sản phẩm chưa có giá thành, chưa vào giá vốn.</p>`:""}</div></div>
-     <p class="hint">Đơn CSKH = đơn Facebook nguồn "CSKH" trên Poscake hoặc đơn tạo từ web CSKH. Các đơn này không tính vào báo cáo Facebook Ads. Ship hoàn chiều về chưa có trong số Poscake nên chưa trừ.</p>`}
-  const box=document.createElement("section");box.className="card";box.innerHTML=`<h2>Lãi lỗ CSKH tháng ${+month.slice(5)}</h2>`+h;
-  const first=m.querySelector(".cs-tiles");if(first)first.insertAdjacentElement("afterend",box);else m.appendChild(box)}
+function pCsTq(m){
+  if(CSK.me&&!csLead()&&!CSK.today)csLoad("today","/today");
+  csFrame(m,"Tổng quan CSKH",(csLead()?"Kết quả kinh doanh CSKH":"Của tôi")+" · "+pLabel(),()=>csKdHtml(PAGE));
+  if(CSK.me)csKdBind(m);
+}
 
 /* ---------- Việc hôm nay ---------- */
 function pCsToday(m){
@@ -171,7 +246,7 @@ function pCsKh(m){
     const L=CSK.list,lead=csLead(),staff=(CSK.me.staff||[]);
     if(!L||L.key!==key)return `<section class="card"><p class="hint">Đang tải…</p></section>`;if(L.error)return `<section class="card"><p>${esc(L.error)}</p></section>`;
     return `<p class="hint">${nf(L.total)} khách${L.total>L.rows.length?` · hiện ${L.rows.length} khách mua gần nhất, gõ ô lọc để tìm thêm`:""}</p>
-     <section class="card flush cs-cmp">${L.rows.length?tbl(["Khách","SĐT","Địa chỉ","Hạng","Số đơn","Tổng mua","Gọi lần sau"].concat(lead?["CSKH"]:[]).concat([""]),L.rows.map(c=>`<tr class="clk" data-csquick="${c.phone}"><td class="cnm" title="${esc(c.name)}"><b>${esc(c.name||"(chưa có tên)")}</b></td><td class="cph">${esc(csPh(c.phone))}</td><td class="cad" title="${esc(csAddr(c))}">${esc(csAddr(c))||"—"}</td><td>${csTier(c)}</td><td class="n">${nf(c.order_count)}</td><td class="n">${nf(c.total_spent)}</td><td>${c.next_call?pill(csFd(c.next_call),CS_ST[c.state]?CS_ST[c.state][1]:"gry"):csStP(c.state)}</td>${lead?`<td class="cow">${esc(c.owner_name||"—")}</td>`:""}<td class="cac" style="text-align:right"><button class="cs-ib" data-csnewdon="${c.phone}" title="Tạo đơn">＋</button><button class="cs-ib pri" data-cslog="${c.phone}" title="Ghi cuộc gọi">📝</button></td></tr>`),"cs-cmpt"):`<p class="hint pad">Chưa có khách. ${lead?"Máy chủ đang kéo khách từ Poscake, xem tiến độ ở Cài đặt.":"Lead Sale chưa chia khách cho bạn."}</p>`}</section>`},{search:`<div class="cs-s"><input id="cslq" placeholder="Tìm: tên, SĐT, tỉnh" value="${esc(F.q)}" autocomplete="off"></div>`,
+     <section class="card flush cs-cmp">${L.rows.length?tbl(["Khách","SĐT","Địa chỉ","Hạng","Số đơn","Tổng mua","Gọi lần sau"].concat(lead?["CSKH"]:[]).concat([""]),L.rows.map(c=>`<tr class="clk" data-csquick="${c.phone}"><td class="cnm" title="${esc(c.name)}"><b>${esc(c.name||"(chưa có tên)")}</b></td><td class="cph">${esc(csPh(c.phone))} <button type="button" class="lnk" data-cscall="${esc(c.phone)}" title="Chép số, mở Poscake để gọi">📞</button></td><td class="cad" title="${esc(csAddr(c))}">${esc(csAddr(c))||"—"}</td><td>${csTier(c)}</td><td class="n">${nf(c.order_count)}</td><td class="n">${nf(c.total_spent)}</td><td>${c.next_call?pill(csFd(c.next_call),CS_ST[c.state]?CS_ST[c.state][1]:"gry"):csStP(c.state)}</td>${lead?`<td class="cow">${esc(c.owner_name||"—")}</td>`:""}<td class="cac" style="text-align:right"><button class="cs-ib" data-csnewdon="${c.phone}" title="Tạo đơn">＋</button><button class="cs-ib pri" data-cslog="${c.phone}" title="Ghi cuộc gọi">📝</button></td></tr>`),"cs-cmpt"):`<p class="hint pad">Chưa có khách. ${lead?"Máy chủ đang kéo khách từ Poscake, xem tiến độ ở Cài đặt.":"Lead Sale chưa chia khách cho bạn."}</p>`}</section>`},{search:`<div class="cs-s"><input id="cslq" placeholder="Tìm: tên, SĐT, tỉnh" value="${esc(F.q)}" autocomplete="off"></div>`,
     extra:`<select id="cslc">${opt([["","Số lần mua"],["1","Mua 1 lần"],["2","Mua 2 lần"],["3","Mua 3 lần"],["4","Trên 3 lần"],["0","Chưa mua"]],F.orders||"")}</select><select id="cslt">${opt([["","Hạng"]].concat(((CSK.me&&CSK.me.settings.tiers)||[]).map(t=>[t.n,t.n])).concat([["Thường","Thường"]]),F.tier)}</select><select id="csls">${opt([["","Trạng thái"],["qua","Quá hạn"],["nay","Hôm nay gọi"],["moi","Khách mới"],["ky","Đến kỳ mua lại"],["cho","Chưa tới hạn"],["ngung","Ngừng chăm sóc"]],F.state)}</select>${csLead()?`<select id="cslo">${opt([["","CSKH"],["_none","Chưa chia"]].concat((CSK.me&&CSK.me.staff||[]).map(x=>[x.id,x.name])),F.owner)}</select>`:""}`});
   let t=0;const q=m.querySelector("#cslq");if(q){q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{F.q=q.value.trim();renderMain();const x=document.querySelector("#cslq");if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length)}},400)}}
   [["#cslc","orders"],["#cslt","tier"],["#csls","state"],["#cslo","owner"]].forEach(([s,k])=>{const e=m.querySelector(s);if(e)e.onchange=()=>{F[k]=e.value;renderMain()}});
@@ -293,7 +368,7 @@ function csLogForm(phone){
         closeCM();toast("Đã lưu. Gọi lại "+csFd(hen));csAfterChange(c.phone);if(st.res==="Đã chốt đơn")csDonForm(c.phone)}catch(e){$("#csok").disabled=false;$("#cserr").textContent=e.message}}};
   csGetCus(phone).then(draw).catch(csErr)}
 function csGetCus(phone){if(CSK.prof&&CSK.prof.customer.phone===phone)return Promise.resolve(CSK.prof.customer);const T=CSK.today&&CSK.today.rows&&CSK.today.rows.find(r=>r.phone===phone);if(T)return Promise.resolve(T);return csApi("/customer/"+phone).then(r=>r.customer)}
-function csAfterChange(phone){CSK.today=null;CSK.list=null;CSK.ov=null;if(CSK.open===phone)csApi("/customer/"+phone).then(r=>{CSK.prof=r;csRe()}).catch(()=>{});csRe()}
+function csAfterChange(phone){CSK.today=null;CSK.list=null;CSKD.c={};if(CSK.open===phone)csApi("/customer/"+phone).then(r=>{CSK.prof=r;csRe()}).catch(()=>{});csRe()}
 
 /* ---------- Thêm / sửa hồ sơ ---------- */
 function csKhForm(phone,prefill){
@@ -322,10 +397,14 @@ function csKhForm(phone,prefill){
 /* ---------- Tạo đơn (chị Hoa 10/11: làm giống màn Tạo đơn của Poscake) ----------
    Trái: Sản phẩm (ô tìm, bảng dòng) · Giá trị đơn hàng · Thanh toán · Ghi chú (Nội bộ / Để in).
    Phải: Thông tin (tạo lúc, người tạo) · Khách hàng · Nhận hàng. Dưới cùng: Tiền cần thu, COD, nút Tạo đơn. */
+function csLoadCombos(){if(CSK.combos)return Promise.resolve(CSK.combos);return csApi("/combos").then(r=>{CSK.combos=r;return r}).catch(e=>{CSK.combos={list:[],error:e.message};return CSK.combos})}
+/* Sản phẩm của một combo Poscake (khớp mẫu mã theo tên) + phần giảm = tổng giá lẻ − giá trị combo. */
+function csComboItems(cb,L){const items=cb.items.map(i=>{const v=L.find(p=>p.name===i.name)||L.find(p=>p.name.startsWith(i.name+" - "));return {n:v?v.name:i.name,vid:v?v.id:null,q:i.qty,price:v?v.price:0}});
+  const sum=items.reduce((a,i)=>a+i.q*i.price,0),disc=cb.value!=null?Math.max(0,sum-cb.value):cb.pct?Math.round(sum*cb.pct/100):Math.min(sum,cb.off||0);return {items,disc}}
 function csLoadProds(){if(CSK.prods)return Promise.resolve(CSK.prods);return csApi("/products").then(r=>{CSK.prods=r;return r})}
 const csFold=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/gi,"d").toLowerCase();
 function csDonForm(phone){
-  const st={c:null,items:[],ship:0,disc:0,ck:0,noteIn:"",notePr:"",ntab:"in",r:{},save:true,pq:""};
+  const st={c:null,items:[],ship:0,disc:0,ck:0,noteIn:"",notePr:"",ntab:"in",r:{},save:true,pq:"",mode:"sp",cbs:[]};
   /* Danh mục CSKH trước (combo, sản phẩm giá CSKH, spcfg.js), rồi mọi sản phẩm Pancake */
   const prods=()=>{const L=(CSK.prods&&CSK.prods.list)||[];return typeof spcfDonList==="function"?spcfDonList(L):L};
   const num=v=>+String(v||"").replace(/\D/g,"")||0;
@@ -338,9 +417,10 @@ function csDonForm(phone){
     if(st.newc){const a=g("cd-nn"),b=g("cd-np");if(a!==undefined)st.newc.name=a;if(b!==undefined)st.newc.phone=b}};
   const money=()=>{const t=total(),cod=Math.max(0,t-st.ck);[["#cd-sub",sub()],["#cd-tot",t],["#cd-need",cod],["#cd-cod",cod]].forEach(([s,v])=>{const e=$("#crmm").querySelector(s);if(e)e.textContent=nf(v)+" đ"})};
   const draw=()=>{const c=st.c||(st.newc?{name:st.newc.name,phone:st.newc.phone,addr_street:"",addr_ward:"",addr_district:"",addr_province:""}:null),P=prods(),now=new Date(Date.now()+7*36e5).toISOString();
-    const pm=st.pq.trim().length>=1?P.filter(p=>csFold(p.name).includes(csFold(st.pq))).slice(0,12):[];
+    const CB=(CSK.combos&&CSK.combos.list)||[],src=st.mode==="cb"?CB:P;/* tab Combo: combo Poscake (chị Hoa 16/11) */
+    const pm=st.pq.trim().length>=1?src.filter(p=>csFold(p.name).includes(csFold(st.pq))).slice(0,st.mode==="cb"?40:12):st.pOpen?src:[];/* bấm vào ô trống là xổ cả danh sách như Poscake (chị Hoa 16/11) */
     const box=(t,h,x)=>`<section class="cs-pbx"><div class="cs-pbh"><b>${t}</b>${x||""}</div>${h}</section>`;
-    const left=box("Sản phẩm",`${typeof spcfDonKm==="function"?spcfDonKm(st):""}<div class="cs-psr"><input id="cd-pq" placeholder="Tìm sản phẩm, combo CSKH theo tên…" value="${esc(st.pq)}" autocomplete="off">${pm.length?`<div class="cs-drop">${pm.map(p=>`<button data-addp="${esc(p.name)}">${p.combo?`<span class="pill p-vio">combo</span> `:p.cskh?`<span class="pill p-grn">CSKH</span> `:""}<b>${esc(p.name)}</b> <span class="hint">${p.price?nf(p.price)+" đ":""}${p.id?"":" · chưa có mã Poscake"}</span></button>`).join("")}</div>`:""}</div>
+    const left=box("Sản phẩm",`${typeof spcfDonKm==="function"?spcfDonKm(st):""}<div class="cs-psr"><div style="display:flex;gap:6px"><div class="cs-tabs" style="margin:0;flex:none"><button type="button" data-pmode="sp" class="${st.mode==="sp"?"on":""}">Sản phẩm</button><button type="button" data-pmode="cb" class="${st.mode==="cb"?"on":""}">Combo</button></div><input id="cd-pq" style="flex:1;min-width:0" placeholder="${st.mode==="cb"?"Tìm combo":"Tìm sản phẩm, combo CSKH theo tên…"}" value="${esc(st.pq)}" autocomplete="off"></div>${pm.length?`<div class="cs-drop" style="max-height:340px;overflow-y:auto">${st.mode==="cb"?pm.map(p=>`<button data-addc="${esc(p.id)}"><b>${esc(p.name)}</b><div class="hint">Giá trị: <b style="color:#175cd3">${p.value!=null?nf(p.value)+" đ":p.pct?"giảm "+p.pct+"%":"giảm "+nf(p.off)+" đ"}</b> · Miễn phí vận chuyển: ${p.freeShip?"Có":"không"} · ${esc(p.items.map(i=>i.qty+" "+i.name).join(", "))}</div></button>`).join(""):pm.map(p=>`<button data-addp="${esc(p.name)}" style="display:flex;gap:8px;align-items:baseline"><span style="flex:1;min-width:0">${p.combo?`<span class="pill p-vio">combo</span> `:p.cskh?`<span class="pill p-grn">CSKH</span> `:""}<b>${esc(p.name)}</b>${p.id?"":` <span class="hint">· chưa có mã Poscake</span>`}</span><b style="color:#175cd3;white-space:nowrap">${p.price?nf(p.price)+" đ":""}</b></button>`).join("")}</div>`:st.mode==="cb"&&CSK.combos&&CSK.combos.error&&!CB.length?`<div class="note red" style="margin-top:6px">Chưa lấy được combo Poscake (${esc(CSK.combos.error)}).</div>`:""}</div>${st.cbs.length?`<div class="cs-chips" style="margin-top:8px">${st.cbs.map(c=>`<span class="pill p-blu">${esc(c.n)}: ${c.q}</span>`).join("")}</div>`:""}
       ${st.items.length?`<table class="cs-pit"><thead><tr><th>Sản phẩm</th><th class="n">SL</th><th class="n">Đơn giá</th><th class="n">Thành tiền</th><th></th></tr></thead><tbody>${st.items.map((it,i)=>`<tr><td>${esc(it.n)}${it.vid?"":` <span class="pill p-amb">chưa có mã Poscake</span>`}</td><td class="n"><input data-isq="${i}" type="number" min="1" value="${it.q}" style="width:64px;text-align:right"></td><td class="n"><input data-ispr="${i}" inputmode="numeric" value="${nf(it.price)}" style="width:100px;text-align:right"></td><td class="n" data-ist="${i}">${nf(it.q*it.price)}</td><td><button class="lnk" data-isd="${i}" aria-label="Bỏ">✕</button></td></tr>`).join("")}</tbody></table>`:`<div class="cs-pem">Chưa có sản phẩm. Gõ tên vào ô tìm ở trên để thêm.</div>`}
       ${CSK.prods&&CSK.prods.error&&!P.some(p=>p.id)?`<div class="note red" style="margin-top:8px">Chưa lấy được danh mục Poscake (${esc(CSK.prods.error)}). Đơn vẫn lưu trên web nhưng phải lên tay ở Poscake.</div>`:""}`)+
       `<div class="cs-pg2">`+box("Giá trị đơn hàng",`<dl class="cs-kv cs-kvr"><dt>Tiền hàng</dt><dd id="cd-sub">${nf(sub())} đ</dd><dt>Giảm giá</dt><dd><input id="cd-disc" inputmode="numeric" value="${nf(st.disc)}"></dd><dt>Phí vận chuyển</dt><dd><input id="cd-ship" inputmode="numeric" value="${nf(st.ship)}"></dd><dt><b>Tổng số tiền</b></dt><dd><b id="cd-tot">${nf(total())} đ</b></dd></dl>`)+
@@ -359,8 +439,14 @@ function csDonForm(phone){
     const R=$("#crmm");R.querySelector(".cm-in").classList.add("cs-pomodal");
     $("#cdx").onclick=closeCM;
     // tìm sản phẩm
-    const pq=$("#cd-pq");pq.oninput=()=>{keep();st.pq=pq.value;draw();const x=$("#cd-pq");x.focus();x.setSelectionRange(x.value.length,x.value.length)};
-    R.querySelectorAll("[data-addp]").forEach(b=>b.onclick=()=>{keep();const p=prods().find(x=>x.name===b.dataset.addp);
+    const pq=$("#cd-pq");pq.onfocus=()=>{if(st.pOpen||st.pq)return;keep();st.pOpen=1;draw();$("#cd-pq").focus()};pq.onkeydown=e=>{if(e.key==="Escape"&&st.pOpen){e.stopPropagation();st.pOpen=0;const d=R.querySelector(".cs-psr .cs-drop");if(d)d.remove()}};
+    R.onmousedown=e=>{if(st.pOpen&&!e.target.closest(".cs-psr")){st.pOpen=0;const d=R.querySelector(".cs-psr .cs-drop");if(d)d.remove()}};
+    pq.oninput=()=>{keep();st.pq=pq.value;draw();const x=$("#cd-pq");x.focus();x.setSelectionRange(x.value.length,x.value.length)};
+    R.querySelectorAll("[data-pmode]").forEach(b=>b.onclick=()=>{keep();st.mode=b.dataset.pmode;st.pq="";st.pOpen=1;draw();$("#cd-pq").focus();if(st.mode==="cb"&&!CSK.combos)csLoadCombos().then(()=>{if($("#cd-pq"))draw()})});
+    R.querySelectorAll("[data-addc]").forEach(b=>b.onclick=()=>{keep();st.pOpen=0;const cb=((CSK.combos&&CSK.combos.list)||[]).find(x=>x.id===b.dataset.addc);if(!cb)return;
+      const r=csComboItems(cb,(CSK.prods&&CSK.prods.list)||[]);r.items.forEach(it=>{const ex=st.items.find(i=>i.n===it.n&&i.price===it.price);if(ex)ex.q+=it.q;else st.items.push(it)});st.disc+=r.disc;
+      const c0=st.cbs.find(x=>x.n===cb.name);if(c0)c0.q++;else st.cbs.push({n:cb.name,q:1});st.pq="";if(r.items.some(i=>!i.vid))toast("Có sản phẩm trong combo chưa khớp danh mục Poscake, kiểm tra lại giá");else if(r.disc)toast("Đã thêm combo, phần giảm "+nf(r.disc)+" đ cộng vào Giảm giá");draw()});
+    R.querySelectorAll("[data-addp]").forEach(b=>b.onclick=()=>{keep();st.pOpen=0;const p=prods().find(x=>x.name===b.dataset.addp);
       if(p&&p.combo&&typeof spcfDonCombo==="function"){const r=spcfDonCombo(p.combo,(CSK.prods&&CSK.prods.list)||[]);r.items.forEach(it=>{const ex=st.items.find(i=>i.n===it.n&&i.price===it.price);if(ex)ex.q+=it.q;else st.items.push(it)});st.disc+=r.disc;st.pq="";if(r.disc)toast("Đã thêm combo, phần chênh "+nf(r.disc)+" đ cộng vào Giảm giá");draw();return}const ex=st.items.find(i=>i.n===p.name);if(ex)ex.q++;else st.items.push({n:p.name,vid:p.id,q:1,price:p.price});st.pq="";draw()});
     R.querySelectorAll("[data-isq]").forEach(e=>e.oninput=()=>{const it=st.items[+e.dataset.isq];it.q=Math.max(1,+e.value||1);R.querySelector(`[data-ist="${e.dataset.isq}"]`).textContent=nf(it.q*it.price);money()});
     R.querySelectorAll("[data-ispr]").forEach(e=>e.oninput=()=>{const it=st.items[+e.dataset.ispr];it.price=num(e.value);R.querySelector(`[data-ist="${e.dataset.ispr}"]`).textContent=nf(it.q*it.price);money()});
@@ -387,7 +473,7 @@ function csDonForm(phone){
         else crmModal("Đã lưu đơn "+esc(r.id),`<div class="note red">Poscake chưa nhận đơn: ${esc(r.error)}</div><p>Đơn đã lưu trên web. Lên đơn tay ở Poscake rồi ghi mã đơn Poscake ở mục <b>Đơn hàng</b> để tính doanh thu đúng người.</p><div class="acts" style="justify-content:flex-end"><button class="btn pri" onclick="closeCM()">Đã hiểu</button></div>`)}
       catch(e){$("#cdok").disabled=false;$("#cdok").textContent="Tạo đơn";err.textContent=e.message}}};
   const pick=ph=>csGetCus(ph).then(c=>{st.c=c;st.r={};if(!st.items.length){const lp=prods().find(p=>p.name===c.last_product);if(lp)st.items=[{n:lp.name,vid:lp.id,q:1,price:lp.price}]}draw()}).catch(csErr);
-  csLoadProds().catch(e=>{CSK.prods={list:[],error:e.message}}).then(()=>{if(phone)pick(phone);else draw()});
+  csLoadProds().catch(e=>{CSK.prods={list:[],error:e.message}}).then(()=>{if(phone)pick(phone);else draw()});csLoadCombos();
 }
 /* ---------- Đơn hàng CSKH tạo ---------- */
 /* Tiến trình đơn theo trạng thái trên Poscake: Mới → Xác nhận → Đóng hàng → Đã gửi → Giao thành công; hoàn / hủy hiện đỏ. */
@@ -425,10 +511,10 @@ function pCsChia(m){
     <section class="card flush">${C.rows.length?tbl(["Khách","Mua gần nhất","Cũ / mới","Giao cho"],C.rows.map(c=>`<tr><td><b>${esc(c.name||"(chưa có tên)")}</b>${csContact(c)}</td><td>${esc(c.last_product||"")}<br><span class="hint">${csFd(c.last_order_day)} · ${nf(c.order_count)} đơn · ${esc(c.source)}</span></td><td>${c.owner_prev?pill("Khách cũ","vio"):pill(kind==="moi"?"Khách mới":"Chưa ai chăm","blu")}</td><td style="min-width:140px"><select data-csas="${c.phone}">${opt([["","Chọn CSKH"]].concat(staff.map(s=>[s.id,s.name])),c.owner_prev&&staff.some(s=>s.id===c.owner_prev)?c.owner_prev:"")}</select></td></tr>`)):`<p class="hint pad">Không còn khách nào chưa chia.</p>`}</section>
     ${C.rows.length?`<div class="acts" style="justify-content:flex-end"><button class="btn pri" id="cssave">Lưu phân chia</button></div>`:""}`});
   m.querySelectorAll("[data-csck]").forEach(b=>b.onclick=()=>{CSK.chiaKind=b.dataset.csck;renderMain()});
-  const rb=m.querySelector("#csrelb");if(rb)rb.onclick=()=>{const o=m.querySelector("#csrel").value,nm=o?(m.querySelector("#csrel").selectedOptions[0].textContent):"mọi CSKH";crmModal("Thu hồi khách chưa gọi",`<p>Đưa toàn bộ khách đã chia cho <b>${esc(nm)}</b> mà chưa có lần gọi nào về lại <b>Chưa chia</b>. Khách đã gọi, đã tạo đơn, khách thêm tay giữ nguyên.</p><div class="acts" style="justify-content:flex-end"><button class="btn" onclick="closeCM()">Hủy</button><button class="btn pri" id="csrelok">Thu hồi</button></div>`);$("#csrelok").onclick=()=>{$("#csrelok").disabled=true;csApi("/chia/thu-hoi",{method:"POST",body:JSON.stringify({owner_id:o})}).then(r=>{closeCM();toast(`Đã thu hồi ${nf(r.released)} khách`);CSK.chia=null;CSK.ov=null;CSK.today=null;CSK.list=null;renderMain()}).catch(e=>{closeCM();csErr(e)})}};
-  const a=m.querySelector("#csauto");if(a)a.onclick=()=>{a.disabled=true;csApi("/chia",{method:"POST",body:JSON.stringify({auto:true,kind})}).then(r=>{toast(`Đã chia ${nf(r.assigned)} khách`);CSK.chia=null;CSK.ov=null;CSK.today=null;renderMain()}).catch(e=>{a.disabled=false;csErr(e)})};
+  const rb=m.querySelector("#csrelb");if(rb)rb.onclick=()=>{const o=m.querySelector("#csrel").value,nm=o?(m.querySelector("#csrel").selectedOptions[0].textContent):"mọi CSKH";crmModal("Thu hồi khách chưa gọi",`<p>Đưa toàn bộ khách đã chia cho <b>${esc(nm)}</b> mà chưa có lần gọi nào về lại <b>Chưa chia</b>. Khách đã gọi, đã tạo đơn, khách thêm tay giữ nguyên.</p><div class="acts" style="justify-content:flex-end"><button class="btn" onclick="closeCM()">Hủy</button><button class="btn pri" id="csrelok">Thu hồi</button></div>`);$("#csrelok").onclick=()=>{$("#csrelok").disabled=true;csApi("/chia/thu-hoi",{method:"POST",body:JSON.stringify({owner_id:o})}).then(r=>{closeCM();toast(`Đã thu hồi ${nf(r.released)} khách`);CSK.chia=null;CSKD.c={};CSK.today=null;CSK.list=null;renderMain()}).catch(e=>{closeCM();csErr(e)})}};
+  const a=m.querySelector("#csauto");if(a)a.onclick=()=>{a.disabled=true;csApi("/chia",{method:"POST",body:JSON.stringify({auto:true,kind})}).then(r=>{toast(`Đã chia ${nf(r.assigned)} khách`);CSK.chia=null;CSKD.c={};CSK.today=null;renderMain()}).catch(e=>{a.disabled=false;csErr(e)})};
   const s=m.querySelector("#cssave");if(s)s.onclick=()=>{const as={};m.querySelectorAll("[data-csas]").forEach(x=>{if(x.value)as[x.dataset.csas]=x.value});if(!Object.keys(as).length){toast("Chọn CSKH cho khách");return}
-    s.disabled=true;csApi("/chia",{method:"POST",body:JSON.stringify({assign:as})}).then(r=>{toast(`Đã giao ${nf(r.assigned)} khách`);CSK.chia=null;CSK.ov=null;CSK.today=null;renderMain()}).catch(e=>{s.disabled=false;csErr(e)})};
+    s.disabled=true;csApi("/chia",{method:"POST",body:JSON.stringify({assign:as})}).then(r=>{toast(`Đã giao ${nf(r.assigned)} khách`);CSK.chia=null;CSKD.c={};CSK.today=null;renderMain()}).catch(e=>{s.disabled=false;csErr(e)})};
 }
 
 /* ---------- Báo cáo ---------- */
@@ -448,6 +534,18 @@ function pCsBc(m){
 }
 
 /* ---------- Cài đặt ---------- */
+/* Nhân viên Poscake của từng người tạo đơn (chị Hoa 16/11: đơn chị tạo bị Poscake gán cho người khác vì tên không trùng). */
+function csPosMapBlock(m){const box=document.createElement("section");box.className="card";box.id="csposmap";
+  const ppl=[{id:CSK.me.me.id,name:CSK.me.me.name}].concat((CSK.me.staff||[]).filter(s=>s.id!==CSK.me.me.id));
+  const P=CSK.posmap;
+  box.innerHTML=`<h2>Người tạo đơn trên Poscake</h2><p class="hint">Đơn tạo từ web gửi sang Poscake ghi "Phân công cho" và "Nhân viên chăm sóc" là người chọn ở đây. Để trống thì web tìm nhân viên Poscake trùng tên; không trùng ai thì Poscake tự chia.</p>`+
+    (!P||P.busy?`<p class="hint">Đang tải danh sách nhân viên Poscake…</p>`:P.error?`<p class="err">${esc(P.error)}</p>`:
+    `<table><tbody>${ppl.map(u=>`<tr><td>${esc(u.name)}</td><td><select data-posmap="${esc(u.id)}" style="width:auto"><option value="">Trùng tên (tự khớp)</option>${P.users.map(x=>`<option value="${esc(x.id)}" ${P.map[u.id]===x.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table>
+     <div class="acts" style="justify-content:flex-end;margin-top:8px"><button class="btn pri" id="csposmapsv">Lưu</button></div>`);
+  const old=m.querySelector("#csposmap");if(old)old.replaceWith(box);else{const cards=m.querySelectorAll("section.card");const last=cards[cards.length-1];if(last)last.insertAdjacentElement("afterend",box);else m.appendChild(box)}
+  if(!P){CSK.posmap={users:[],map:{},busy:1};csApi("/pos-map").then(r=>{CSK.posmap=r;if(PAGE==="cs_cd")csPosMapBlock(m)}).catch(e=>{CSK.posmap={users:[],map:{},error:e.message};if(PAGE==="cs_cd")csPosMapBlock(m)});return}
+  const sv=box.querySelector("#csposmapsv");if(sv)sv.onclick=()=>{const map={};box.querySelectorAll("[data-posmap]").forEach(x=>{if(x.value)map[x.dataset.posmap]=x.value});sv.disabled=true;
+    csApi("/pos-map",{method:"PUT",body:JSON.stringify({map})}).then(r=>{CSK.posmap.map=r.map;sv.disabled=false;toast("Đã lưu")}).catch(e=>{sv.disabled=false;csErr(e)})}}
 function pCsCd(m){
   csFrame(m,"Cài đặt CSKH","Chia khách, kéo khách từ Poscake, hạng khách, chu kỳ sản phẩm",()=>{if(!csLead())return `<section class="card"><p>Chỉ Lead Sale, CEO sửa cài đặt.</p></section>`;
     const S=CSK.me.settings,staff=CSK.me.staff||[],bf=CSK.me.backfill;const cyc=Object.entries(S.cycles).sort((a,b)=>a[0].localeCompare(b[0],"vi"));
@@ -470,11 +568,12 @@ function pCsCd(m){
      <div class="acts"><select id="cs-addp"><option value="">＋ Thêm sản phẩm…</option></select></div></section>
     <div class="acts" style="justify-content:flex-end"><button class="btn pri" id="cssv">Lưu cài đặt</button></div>`});
   if(!csLead()||!CSK.me)return;
+  csPosMapBlock(m);
   m.querySelectorAll("input[name=cschia]").forEach(r=>r.onchange=()=>{m.querySelectorAll("input[name=cschia]").forEach(x=>x.closest("label").classList.toggle("on",x.checked))});
   m.querySelectorAll("[data-cson]").forEach(c=>c.onchange=()=>c.closest("label").classList.toggle("on",c.checked));
   const ap=m.querySelector("#cs-addp");if(ap){csLoadProds().then(r=>{const have=new Set(Object.keys(CSK.me.settings.cycles));const names=[...new Set((r.list||[]).map(p=>p.name.split(" - ")[0]))].filter(n=>!have.has(n));ap.innerHTML=`<option value="">＋ Thêm sản phẩm…</option>`+opt(names,"")}).catch(()=>{});
     ap.onchange=()=>{if(!ap.value)return;const box=m.querySelector("#cscyc"),i=box.children.length;box.insertAdjacentHTML("beforeend",`<div class="cs-it"><input data-cycn="${i}" value="${esc(ap.value)}" style="flex:1;width:auto;text-align:left"><input data-cycd="${i}" type="number" min="1" value="30"><span class="hint">ngày</span></div>`);ap.value=""}}
-  const csAfterPull=()=>{CSK.me=null;CSK.today=null;CSK.ov=null;CSK.chia=null;CSK.list=null;csLoadMe().then(csRe)};
+  const csAfterPull=()=>{CSK.me=null;CSK.today=null;CSKD.c={};CSK.chia=null;CSK.list=null;csLoadMe().then(csRe)};
   m.querySelector("#cspull").onclick=e=>{const b=e.target;b.disabled=true;b.textContent="Đang kéo…";csApi("/pull",{method:"POST"}).then(r=>{toast("Đã kéo: "+r.recent.map(x=>x.note).join(" · "));csAfterPull()}).catch(er=>{b.disabled=false;b.textContent="Kéo đơn mới ngay";csErr(er)})};
   const go=m.querySelector("#csbfgo");if(go)go.onclick=()=>{const f=m.querySelector("#cs-bf-from").value,t=m.querySelector("#cs-bf-to").value;if(!f){toast("Chọn từ ngày");return}
     go.disabled=true;go.textContent="Đang bắt đầu…";csApi("/pull-range",{method:"POST",body:JSON.stringify({from:f,to:t})}).then(r=>{toast("Đã bắt đầu kéo. "+(r.first&&r.first.note||""));csAfterPull()}).catch(er=>{go.disabled=false;go.textContent="Bắt đầu kéo";csErr(er)})};
@@ -483,7 +582,7 @@ function pCsCd(m){
   m.querySelector("#cssv").onclick=e=>{const cyc={};m.querySelectorAll("[data-cycn]").forEach(x=>{const d=m.querySelector(`[data-cycd="${x.dataset.cycn}"]`);if(x.value.trim()&&d&&+d.value>0)cyc[x.value.trim()]=+d.value});
     const on=new Set([...m.querySelectorAll("[data-cson]")].filter(x=>x.checked).map(x=>x.dataset.cson));
     const b={chia:(m.querySelector("input[name=cschia]:checked")||{}).value||"tay",khachCu:m.querySelector("#cs-kc").value,staffOff:(CSK.me.staff||[]).map(s=>s.id).filter(id=>!on.has(id)),tiers:[...m.querySelectorAll("[data-tn]")].map(x=>{const i=x.dataset.tn;return {n:x.value.trim(),o:+(m.querySelector(`[data-to="${i}"]`).value||0),s:+(m.querySelector(`[data-ts="${i}"]`).value.replace(/\D/g,"")||0)}}).filter(t=>t.n),firstCallDays:+m.querySelector("#cs-first").value,kpi:+m.querySelector("#cs-kpi").value.replace(/\D/g,"")||0,defaultCycle:+m.querySelector("#cs-defc").value,cycles:cyc};
-    e.target.disabled=true;csApi("/settings",{method:"PUT",body:JSON.stringify(b)}).then(s=>{CSK.me.settings=s;toast("Đã lưu cài đặt");CSK.ov=null;CSK.today=null;renderMain()}).catch(er=>{e.target.disabled=false;csErr(er)})};
+    e.target.disabled=true;csApi("/settings",{method:"PUT",body:JSON.stringify(b)}).then(s=>{CSK.me.settings=s;toast("Đã lưu cài đặt");CSKD.c={};CSK.today=null;renderMain()}).catch(er=>{e.target.disabled=false;csErr(er)})};
 }
 
 /* Đơn CSKH theo ngày tạo, để số Facebook Ads (dtcalc.js dtFbNgay) trừ ra. Tải một lần khi mở web, 30 phút làm mới. */
@@ -496,17 +595,11 @@ function csFbMinus(day){if(!CSFB.days&&!CSFB.busy&&Date.now()-CSFB.at>60000&&typ
 /* ---------- Gắn vào web: trang, menu, quyền ---------- */
 Object.assign(PAGES,{cs_tq:pCsTq,cs_today:pCsToday,cs_kh:pCsKh,cs_don:pCsDon,cs_chia:pCsChia,cs_bc:pCsBc,cs_cd:pCsCd});
 /* Quản trị › Điều hành CEO › Kênh bán hàng › CSKH cũ (chị Hoa 16/11): báo cáo riêng của mảng CSKH, không chung Facebook Ads. */
-PAGES.cskh_cu=function(m){csCss();const month=CSK.qmonth||csToday().slice(0,7);
-  const months=[0,1,2,3,4,5].map(i=>{const d=new Date(Date.parse(csToday().slice(0,7)+"-15T00:00:00Z"));d.setUTCMonth(d.getUTCMonth()-i);return d.toISOString().slice(0,7)});
-  if(!CSK.me){m.innerHTML=H("CSKH cũ","Báo cáo chăm sóc khách lẻ")+(CSK.err?`<section class="card"><p>${esc(CSK.err)}</p></section>`:`<section class="card"><p class="hint">Đang tải…</p></section>`);
+/* Quản trị › Điều hành CEO › Kênh bán hàng › CSKH: báo cáo kinh doanh CSKH theo kỳ (chị Hoa 16/11), không chung Facebook Ads. */
+PAGES.cskh_cu=function(m){csCss();
+  if(!CSK.me){m.innerHTML=H("CSKH","Báo cáo kinh doanh CSKH")+(CSK.err?`<section class="card"><p>${esc(CSK.err)}</p></section>`:`<section class="card"><p class="hint">Đang tải…</p></section>`);
     if(!CSK.err)csLoadMe().then(()=>{if(PAGE==="cskh_cu")renderMain()}).catch(()=>{if(PAGE==="cskh_cu")renderMain()});return}
-  if((!CSK.ov||CSK.ov.month!==month)&&!CSK.ov_busy){CSK.ov_busy=1;csApi("/overview?month="+month).then(r=>{CSK.ov=r;CSK.ov_busy=0;if(PAGE==="cskh_cu")renderMain()}).catch(e=>{CSK.ov_busy=0;CSK.ov={month,error:e.message}})}
-  const O=CSK.ov&&CSK.ov.month===month&&!CSK.ov.error?CSK.ov:null,B=(O&&O.base)||{},v=x=>O?nf(x):"…";
-  m.innerHTML=H("CSKH cũ","Báo cáo chăm sóc khách lẻ · đơn Facebook nguồn CSKH, tách riêng khỏi Facebook Ads")+`<div class="acts" style="justify-content:flex-end;margin-bottom:8px"><select id="csqm" style="width:auto">${opt(months.map(x=>[x,"Tháng "+x.slice(5)+"/"+x.slice(0,4)]),month)}</select></div>
-   <div class="cs-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))"><div class="cs-tile"><b>${v(B.total)}</b><span>Khách lẻ</span></div><div class="cs-tile"><b>${v(B.vip)}</b><span>Khách VIP</span></div><div class="cs-tile"><b>${O?nf(O.upsell.orders):"…"}</b><span>Đơn CSKH giao thành công</span></div><div class="cs-tile"><b>${v(B.qua)}</b><span>Quá hạn gọi</span></div></div>
-   ${O&&O.per.length?`<section class="card"><h2>Top nhân sự tháng ${+month.slice(5)}</h2>${tbl(["Nhân sự","Doanh thu","Đơn","Quá hạn"],O.per.map((r,i)=>`<tr><td><b>${i+1}. ${esc(r.name||"(chưa rõ tên)")}</b></td><td class="n">${nf(r.dt)}</td><td class="n">${nf(r.don)}</td><td class="n">${nf(r.qua)}</td></tr>`))}</section>`:""}`;
-  const q=m.querySelector("#csqm");q.onchange=()=>{CSK.qmonth=q.value;renderMain()};
-  if(CSK.me.me.lead)csPlBlock(m,month,"cskh_cu")};
+  m.innerHTML=H("CSKH","Kết quả kinh doanh CSKH · "+pLabel()+" · đơn Facebook nguồn CSKH, tách riêng khỏi Facebook Ads")+csKdHtml("cskh_cu");csKdBind(m)};
 /* Trang "Chăm sóc khách hàng" cũ ở Kênh bán lẻ (chỉ ghi "Sắp triển khai") nay mở Tổng quan CSKH. */
 PAGES.fb_cskh=pCsTq;
 /* Quyền ở Tài khoản & phân quyền. */
