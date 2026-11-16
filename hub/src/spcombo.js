@@ -350,6 +350,8 @@ async function spbPkLoad(){SPCB.pkBusy=1;renderMain();try{SPCB.pk=await spcApi("
    Chỉ sửa danh mục trên web (d.fbCat / d.cskhCat); giá trên Pancake giữ nguyên (ghi lên Pancake chờ chị duyệt riêng). */
 /* Mã Pancake trùng nhau (vd nhiều sản phẩm mã "1") thì không so theo mã, chỉ theo mã nội bộ Pancake (pkId). */
 const spbPkUniq=code=>!!code&&(SPCB.pk&&SPCB.pk.rows||[]).filter(r=>spcLow(r.code)===spcLow(code)).length===1;
+/* Giá bán lẻ trên Pancake của một biến thể (theo pkId, hoặc mã nếu mã không trùng); chưa đọc Pancake thì null. */
+const spbPkPrice=v=>{const R=SPCB.pk&&SPCB.pk.rows;if(!R)return null;const r=R.find(x=>(v.pkId&&x.id===v.pkId)||(!v.pkId&&spbPkUniq(v.ma)&&spcLow(x.code)===spcLow(v.ma)));return r&&r.price!=null?r.price:null};
 const spbPkVar=(id,code)=>{const cu=spbPkUniq(code);for(const p of (typeof spcCat==="function"?spcCat():[]))for(const v of (p.bt||[]))if((id&&v.pkId===id)||(cu&&!v.pkId&&spcLow(v.ma)===spcLow(code)))return {p,v};return null};
 function spbPkEditView(bpv){
   const P=SPCB.pk,cs=bpv==="CSKH",ed=typeof spcCanEdit==="function"&&spcCanEdit(),fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.pkq||"").trim();
