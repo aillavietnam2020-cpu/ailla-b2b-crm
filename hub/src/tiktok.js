@@ -70,7 +70,7 @@ async function tsbAdmFiles(fs){
   for(const f of fs){try{
     const sh=await tsbRead(f),kind=ttKind(sh);
     if(!["orders","income","camp"].includes(kind)){TSB.err=`File "${f.name}" không phải file kế toán cần (${kind?TT_KIND_NAME[kind]+" là file của team TikTok, tải ở trang vận hành":"không nhận ra loại file"}).`;continue}
-    if(kind==="orders"){const a=sh[Object.keys(sh)[0]];TSB.up.orders={name:f.name,file:f,aoa:a,ky:ttGuessKy(a)}}
+    if(kind==="orders"){const a=ttOrderSheet(sh);TSB.up.orders={name:f.name,file:f,aoa:a,ky:ttGuessKy(a)}}
     else TSB.up[kind]={name:f.name,file:f,sh}
   }catch(e){TSB.err=e.message}}
   if(TSB.up.orders&&!TSB.up.ky)TSB.up.ky=TSB.up.orders.ky;
