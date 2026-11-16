@@ -82,6 +82,8 @@ function pchYcTaskEdit(id,v){const L=pchOpenTasks(t=>t.pcYc===id);if(!L.length)r
   DB.mutate(ME.name,"sửa việc pha chế "+id,dt=>dt.tasks.filter(t=>t.pcYc===id&&t.st!=="done").forEach(t=>{t.ten=`Pha ${pchName(v.btp)} · ${knum(v.lit)} lít`;t.han=pchHan(v.han);if(typeof tkLog==="function")tkLog(t,ME.name+" sửa yêu cầu "+id)}))}
 /* kho.js gọi sau khi ghi phiếu pha chế. */
 function pchAfterPc(body,r){
+  /* Ghi từ phiếu nháp (agent lập): đánh dấu nháp đã ghi. */
+  const N=PCH.nhapOpen;if(N&&body&&body.btp===N.btp&&Date.now()-N.at<7200000){PCH.nhapOpen=null;pApi("/nhap/"+N.id+"/xong",{method:"POST",body:JSON.stringify({doc_id:r.id})}).then(()=>{PCH.nhap=null;pchRerender()}).catch(e=>toast(e.message))}
   const ref=String(body&&body.ref_no||"").trim();
   if(ref)pchTaskDone(t=>t.pcYc===ref,"Đã ghi phiếu pha chế "+r.no);
   pchLoadYc(true).then(pchRerender).catch(()=>{});
@@ -137,7 +139,7 @@ function pchCss(){if(document.getElementById("pch-css"))return;const s=document.
 {const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){
   pchCss();if(!PCH.ct)pchLoadCt().then(pchRerender).catch(()=>{});
   if(!PCH_TABS.some(t=>t[0]===PCH.tab))PCH.tab="yc";
-  if(PCH.tab==="yc"){const r=_pc.apply(this,arguments);pchMountTabs(m);pchBindBox(m);pchKiemCheck();return r}
+  if(PCH.tab==="yc"){const r=_pc.apply(this,arguments);pchMountTabs(m);pchNhapCard(m);pchBindBox(m);pchKiemCheck();return r}
   const body=PCH.tab==="ct"?pchViewCt():PCH.tab==="ton"?pchViewTon():pchViewHh();
   khoFrame(m,"kho_pc","Pha chế",PCH.tab==="ct"?"Công thức pha của Kỹ thuật (cho 1 lít bán thành phẩm) và hướng dẫn pha. Phiếu pha chế lấy định lượng theo công thức đang dùng.":PCH.tab==="ton"?"Kỹ thuật đếm nguyên liệu ở xưởng: hết thật thì báo Quản lý mua hàng đặt, lệch sổ thì báo kiểm tra. Không tự sửa tồn trên web.":"Hao hụt pha chế: số thực tế so với công thức, theo mẻ, theo người pha, theo nguyên liệu.",body);
   pchMountTabs(m);pchBind(m);pchKiemCheck();
@@ -405,4 +407,35 @@ function pchGanBind(w){const moi=w.dataset.pchgan,q=c=>w.querySelector(c),err=m=
   q(".pg-new").onclick=async()=>{const code=q(".pg-c").value.trim(),name=q(".pg-n").value.trim(),unit=q(".pg-u").value.trim()||"lít";if(!code||!name){err("Cần mã và tên.");return}
     q(".pg-new").disabled=true;try{await kApi("/items",{method:"POST",body:JSON.stringify({code,name,unit,cls:"BTP"})});if(typeof khoLoad==="function"){KHO.at=0;await khoLoad(true).catch(()=>{})}await done(code)}catch(e){q(".pg-new").disabled=false;err(e.message)}};
   q(".pg-ok").onclick=async()=>{const code=q(".pg-old").dataset.code;if(!code){err("Chọn mã bán thành phẩm trong danh sách.");return}try{await done(code)}catch(e){err(e.message)}};
+}
+
+/* ---------- Phiếu pha chế NHÁP (16/11): agent Kế toán trưởng lập thay người được chỉ định; Kỹ thuật pha chế kiểm rồi bấm Ghi phiếu ---------- */
+function pchLoadNhap(){if(PCH.nhapBusy)return;PCH.nhapBusy=true;pApi("/nhap").then(r=>{PCH.nhap=r||[]}).catch(()=>{PCH.nhap=[]}).finally(()=>{PCH.nhapBusy=false;pchRerender()})}
+function pchNhapCard(m){
+  if(!PCH.nhap){pchLoadNhap();return}
+  const L=PCH.nhap.filter(x=>x.status==="CHO");if(!L.length)return;const can=pchMeKT()||pchAdm();
+  const card=document.createElement("section");card.className="card flush";card.style.marginBottom="12px";
+  card.innerHTML=`<div class="card-h pad"><h2>Phiếu pha chế nháp chờ kiểm · ${L.length}</h2><span class="hint">Agent lập thay người ra lệnh. Kỹ thuật pha chế kiểm số, bấm Ghi phiếu thì mới trừ nguyên liệu, cộng bán thành phẩm.</span></div>`+
+    tbl(["Nháp","Ngày pha","Bán thành phẩm","Số lít","Lệch","Người lập","",""],L.map(x=>{const lech=x.lines.filter(l=>l.std_qty>0&&Math.abs(l.qty-l.std_qty)*100/l.std_qty>PCH_TOL);
+      return `<tr><td class="mono">#${x.id}${x.ref_no?`<small class="hint" style="display:block">${esc(x.ref_no)}</small>`:""}</td><td>${kDd(x.ngay)}</td><td><b>${esc(pchName(x.btp))}</b>${x.ghi_chu?`<small class="hint" style="display:block">${esc(x.ghi_chu)}</small>`:""}</td><td class="n">${knum(x.liters)}</td><td>${lech.length?pill(lech.length+" nguyên liệu","amb")+(x.ly_do_lech?`<small class="hint" style="display:block">${esc(x.ly_do_lech)}</small>`:""):"—"}</td><td>${esc(x.created_by_name)}${x.agent_name?`<small class="hint" style="display:block">qua ${esc(x.agent_name)}</small>`:""}</td><td>${can?`<button class="btn sm pri" data-pcnhap="${x.id}">Kiểm & ghi phiếu</button>`:""}</td><td>${can?`<button class="lnk" data-pcnhuy="${x.id}" style="color:#b42318">Hủy</button>`:""}</td></tr>`}));
+  const first=m.querySelector("section.card");if(first)first.before(card);else m.appendChild(card);
+  card.querySelectorAll("[data-pcnhap]").forEach(b=>b.onclick=()=>pchNhapOpen(+b.dataset.pcnhap));
+  card.querySelectorAll("[data-pcnhuy]").forEach(b=>b.onclick=async()=>{const ly=(prompt("Lý do hủy phiếu nháp #"+b.dataset.pcnhuy+":")||"").trim();if(!ly)return;
+    try{await pApi("/nhap/"+b.dataset.pcnhuy+"/huy",{method:"POST",body:JSON.stringify({ly_do:ly})});PCH.nhap=null;toast("Đã hủy phiếu nháp");renderMain()}catch(e){toast(e.message)}});
+}
+/* Mở form phiếu pha chế điền sẵn số của phiếu nháp; kỹ thuật sửa nếu cần rồi bấm Ghi phiếu như thường. */
+async function pchNhapOpen(id){
+  const x=(PCH.nhap||[]).find(y=>y.id===id);if(!x)return;
+  if(!KHO.cat){try{await khoLoad()}catch(e){}}try{await pchLoadCt()}catch(e){}
+  khoForm("PC");const b=$("#kf-btp");if(!b)return;
+  $("#kf-d").value=x.ngay;b.value=x.btp;b.dataset.code=x.btp;if($("#kf-r"))$("#kf-r").value=x.ref_no||"";
+  const p=document.querySelector("#kf .sdm-pn");if(p&&x.nguoi.length)p.value=x.nguoi.join(", ");
+  $("#kf-lit").value=String(x.liters);$("#kf-lit").dispatchEvent(new Event("input"));
+  PCH.nhapOpen={id,btp:x.btp,at:Date.now()};
+  const h=document.querySelector("#drawerIn h2");if(h)h.insertAdjacentHTML("afterend",`<div class="note amb">Đang kiểm <b>phiếu nháp #${id}</b> (${esc(x.created_by_name)}${x.agent_name?" qua "+esc(x.agent_name):""}). Số thực tế đã điền sẵn theo nháp, sửa nếu sai rồi bấm Ghi phiếu.</div>`);
+  /* Form tự điền số theo công thức (có thể vẽ lại vài lần lúc mở): điền số nháp vào dòng nào còn đúng số công thức (chưa ai sửa). */
+  const want=new Map(x.lines.map(l=>[l.item,l.qty]));
+  const fill=()=>{if(!$("#kf"))return;document.querySelectorAll("#kf-b tr").forEach(tr=>{const c=tr.querySelector(".kf-i").dataset.code,q=tr.querySelector(".kf-q");if(!want.has(c)||tr.dataset.nhap)return;if(String(kfNum(q.value))!==String(kfNum(tr.dataset.std)))return;tr.dataset.nhap="1";q.value=String(want.get(c));q.dispatchEvent(new Event("input"))});
+    if(x.ly_do_lech&&$("#kf-ly")&&!$("#kf-ly").value)$("#kf-ly").value=x.ly_do_lech};
+  [250,800,1600,3000].forEach(t=>setTimeout(fill,t));
 }

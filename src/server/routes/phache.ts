@@ -15,6 +15,8 @@ import { requirePermission } from '../middleware/rbac';
 import { unpack } from '../lib/pack';
 import { khoTonRows } from '../services/khoTon';
 import { accountantIds, approverIds } from '../lib/notifyTasks';
+import { bellTo } from '../lib/hubBell';
+import { kyThuatIds } from './kho';
 
 export const phacheRoutes = new Hono<AppEnv>();
 phacheRoutes.use('*', requirePermission('hub.access'));
@@ -301,6 +303,106 @@ phacheRoutes.post('/ton', async (c) => {
     .bind(JSON.stringify(lines), str(b?.note), auth.user.id, auth.user.display_name, nowIso())
     .run();
   return ok(c, { id: res.meta.last_row_id, lines });
+});
+
+/* ---------------- Phiếu pha chế NHÁP (16/11, chị Hoa đồng ý cho agent Kế toán trưởng nhập) ----------------
+ * Agent ghi thay người được chỉ định (quyền agent.w.phache) chỉ lập NHÁP; Kỹ thuật pha chế kiểm, sửa nếu cần rồi bấm Ghi phiếu trên web
+ * thì mới thành phiếu kho (trừ nguyên liệu, cộng bán thành phẩm). Cùng luật như web: phải có công thức đã duyệt, lệch quá 5% phải có lý do. */
+type NhapRow = { id: number; ref_no: string; btp: string; ngay: string; lit_bon: number; bon: number; liters: number; nguoi: string; lines: string; ct_version: number | null; ly_do_lech: string; ghi_chu: string; status: string; created_by_name: string; agent_name: string | null; created_at: string; doc_id: number | null; doc_no: string | null; xu_ly_by_name: string | null; xu_ly_at: string | null; ly_do_huy: string | null };
+const nhapOut = (r: NhapRow) => ({ ...r, nguoi: JSON.parse(r.nguoi || '[]'), lines: JSON.parse(r.lines || '[]') });
+
+phacheRoutes.get('/nhap', async (c) => {
+  const rows = await c.env.DB.prepare("SELECT * FROM pc_nhap WHERE status = 'CHO' OR created_at >= ? ORDER BY id DESC LIMIT 200")
+    .bind(new Date(Date.now() - 30 * 86400000).toISOString())
+    .all<NhapRow>();
+  return ok(c, (rows.results ?? []).map(nhapOut));
+});
+
+/** Body: { btp, lit_bon, bon?, ngay?, ref_no?, nguoi?: string[], lines: [{item, qty}], ly_do_lech?, ghi_chu? }.
+ * qty là số THỰC TẾ đã dùng (đơn vị của mã). Thiếu nguyên liệu trong công thức thì coi như 0 và báo lại. */
+phacheRoutes.post('/nhap', async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!b) throw badRequest('BAD_JSON', 'Dữ liệu gửi lên không đúng định dạng');
+  const btp = str(b.btp, 60);
+  const it = await c.env.DB.prepare('SELECT cls, name FROM kho_items WHERE code = ?').bind(btp).first<{ cls: string; name: string }>();
+  if (it?.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp || '(trống)'} không phải bán thành phẩm`);
+  const ct = await c.env.DB.prepare("SELECT version, lines FROM pc_recipe WHERE btp = ? AND status = 'OK'").bind(btp).first<{ version: number; lines: string }>();
+  if (!ct) throw badRequest('NO_CT', `${it.name} chưa có công thức pha đã duyệt. Kỹ thuật pha chế nhập công thức trước (Pha chế › Công thức).`);
+  const litBon = num(b.lit_bon);
+  if (!(litBon > 0)) throw badRequest('BAD_LIT', 'Số lít (1 bồn) phải lớn hơn 0');
+  const bon = num(b.bon) > 0 ? num(b.bon) : 1;
+  const liters = r6(litBon * bon);
+  const ngay = isDate(b.ngay) ? b.ngay : vnDate();
+  const refNo = str(b.ref_no, 40);
+  if (refNo) {
+    const y = await c.env.DB.prepare('SELECT status FROM pc_req WHERE id = ?').bind(refNo).first<{ status: string }>();
+    if (!y) throw badRequest('NO_YC', `Không có yêu cầu pha chế ${refNo}`);
+    if (y.status === 'HUY') throw badRequest('YC_HUY', `Yêu cầu ${refNo} đã hủy`);
+  }
+  const given = new Map<string, number>();
+  for (const l of Array.isArray(b.lines) ? (b.lines as Array<Record<string, unknown>>) : []) {
+    const code = str(l.item, 60);
+    if (!code) continue;
+    const q = num(l.qty);
+    if (!(q >= 0)) throw badRequest('BAD_QTY', `Số thực tế của ${code} phải là số từ 0 trở lên`);
+    given.set(code, r6(q));
+  }
+  const recipe = JSON.parse(ct.lines || '[]') as Array<{ item: string; qty: number }>;
+  const inCt = new Set(recipe.map((r) => r.item));
+  const extra = [...given.keys()].filter((k) => !inCt.has(k));
+  if (extra.length) throw badRequest('NOT_IN_CT', `Không có trong công thức ${it.name}: ${extra.join(', ')}. Muốn thêm nguyên liệu thì điều chỉnh công thức trước.`);
+  const warnings: string[] = [];
+  const missing = recipe.filter((r) => !given.has(r.item)).map((r) => r.item);
+  if (missing.length) warnings.push(`Không có số thực tế của: ${missing.join(', ')} (ghi 0). Kỹ thuật pha chế kiểm lại.`);
+  const lines = recipe.map((r) => ({ item: r.item, qty: given.get(r.item) ?? 0, std_qty: r6(r.qty * liters) }));
+  const lech = lines.filter((l) => l.std_qty > 0 && (Math.abs(l.qty - l.std_qty) * 100) / l.std_qty > PC_TOL_PCT).map((l) => l.item);
+  const lyDo = str(b.ly_do_lech);
+  if (lech.length && !lyDo) throw badRequest('NO_REASON', `Lệch quá ${PC_TOL_PCT}% so với công thức (${lech.join(', ')}): cần ghi lý do lệch (ly_do_lech)`);
+  // Thiếu vật tư so với tồn: vẫn lập nháp, báo kỹ thuật pha chế (quy tắc kyThuatIds 07/11).
+  const ton = new Map((await khoTonRows(c.env.DB)).map((r) => [r.code, r]));
+  const thieu = lines.filter((l) => l.qty > 0 && l.qty > (ton.get(l.item)?.ton ?? 0)).map((l) => `${ton.get(l.item)?.name ?? l.item} cần ${l.qty}, tồn ${r6(ton.get(l.item)?.ton ?? 0)}`);
+  if (thieu.length) warnings.push(`Tồn không đủ: ${thieu.join('; ')}`);
+  const nguoi = Array.isArray(b.nguoi) ? (b.nguoi as unknown[]).map((x) => str(x, 60)).filter(Boolean).slice(0, 20) : [];
+  const res = await c.env.DB.prepare(
+    `INSERT INTO pc_nhap (ref_no, btp, ngay, lit_bon, bon, liters, nguoi, lines, ct_version, ly_do_lech, ghi_chu, status, created_by, created_by_name, agent_name, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CHO', ?, ?, ?, ?)`,
+  )
+    .bind(refNo, btp, ngay, litBon, bon, liters, JSON.stringify(nguoi), JSON.stringify(lines), ct.version, lyDo, str(b.ghi_chu), auth.user.id, auth.user.display_name, auth.delegation?.agentName ?? null, nowIso())
+    .run();
+  const id = Number(res.meta.last_row_id);
+  const txt = `Phiếu pha chế nháp #${id}: ${it.name} · ${liters} lít${auth.delegation ? ` (agent ${auth.delegation.agentName} lập thay ${auth.user.display_name})` : ''}. Kiểm rồi bấm Ghi phiếu ở Pha chế › Yêu cầu & phiếu.${thieu.length ? ' Tồn không đủ: ' + thieu.join('; ') : ''}`;
+  await bellTo(c.env.DB, await kyThuatIds(c.env.DB), txt.slice(0, 480), 'kho_pc').catch(() => 0);
+  return ok(c, { id, btp, liters, ct_version: ct.version, lech, warnings });
+});
+
+/** Kỹ thuật pha chế đã ghi phiếu kho từ nháp này (gọi sau khi POST /api/hub/kho/docs thành công). */
+phacheRoutes.post('/nhap/:id/xong', async (c) => {
+  const auth = c.get('auth');
+  if (auth.actorType === 'AGENT') throw forbidden('Kỹ thuật pha chế xử lý phiếu nháp trên web');
+  const id = Number(c.req.param('id'));
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const doc = await c.env.DB.prepare("SELECT id, no FROM kho_docs WHERE id = ? AND type = 'PC' AND status = 'OK'").bind(num(b?.doc_id)).first<{ id: number; no: string }>();
+  if (!doc) throw badRequest('NO_DOC', 'Không thấy phiếu pha chế đã ghi');
+  const r = await c.env.DB.prepare("UPDATE pc_nhap SET status = 'DA_GHI', doc_id = ?, doc_no = ?, xu_ly_by_name = ?, xu_ly_at = ? WHERE id = ? AND status = 'CHO'")
+    .bind(doc.id, doc.no, auth.user.display_name, nowIso(), id)
+    .run();
+  if (!r.meta.changes) throw notFound('Phiếu nháp không còn chờ xử lý');
+  return ok(c, { id, doc_no: doc.no });
+});
+
+phacheRoutes.post('/nhap/:id/huy', async (c) => {
+  const auth = c.get('auth');
+  if (auth.actorType === 'AGENT') throw forbidden('Agent không hủy được phiếu nháp; Kỹ thuật pha chế hủy trên web');
+  const id = Number(c.req.param('id'));
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const ly = str(b?.ly_do);
+  if (!ly) throw badRequest('NO_REASON', 'Cần ghi lý do hủy');
+  const r = await c.env.DB.prepare("UPDATE pc_nhap SET status = 'HUY', ly_do_huy = ?, xu_ly_by_name = ?, xu_ly_at = ? WHERE id = ? AND status = 'CHO'")
+    .bind(ly, auth.user.display_name, nowIso(), id)
+    .run();
+  if (!r.meta.changes) throw notFound('Phiếu nháp không còn chờ xử lý');
+  return ok(c, { id });
 });
 
 /* ---------------- Hao hụt ---------------- */
