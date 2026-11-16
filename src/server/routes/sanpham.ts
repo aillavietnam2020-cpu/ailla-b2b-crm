@@ -7,7 +7,7 @@ import { newId } from '../lib/ids';
 import { accountantIds, taskStatements } from '../lib/notifyTasks';
 import { requirePermission } from '../middleware/rbac';
 import { CHANNELS, loadLookups, resolveLabel, type Channel } from '../services/channelOut';
-import { loadMapVersions, pickMap, recomputeDay } from '../services/poscake';
+import { API as PANCAKE_API, loadMapVersions, loadSource, openKey, pickMap, recomputeDay } from '../services/poscake';
 import { approveKppCode, canApproveCode, createKppCode, suggestSku } from '../services/kppCode';
 
 /**
@@ -499,3 +499,54 @@ sanphamRoutes.post('/kpp-code/approve', async (c) => {
   if (!id) throw badRequest('MISSING', 'Thiếu mã bán');
   return ok(c, await approveKppCode(c.env.DB, auth, id, b?.sku ? String(b.sku) : undefined, { requestId: c.get('requestId'), ip: ip(c) }));
 });
+
+/**
+ * Đọc danh sách sản phẩm (biến thể) và giá đang có trên Pancake của một kênh, CHỈ ĐỌC (chị Hoa duyệt 16/11).
+ * Ghi ngược lên Pancake chưa làm: chờ chị duyệt riêng.
+ */
+sanphamRoutes.get('/pancake-products', async (c) => {
+  const auth = c.get('auth');
+  // Mã và giá bán trên Pancake (không có giá vốn): ai vào được trang quản trị / vận hành đều xem được (Ads, CSKH so với danh mục của mình).
+  void auth;
+  const ch = c.req.query('channel') ?? 'FACEBOOK';
+  if (!isChannel(ch)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
+  const src = await loadSource(c.env.DB, ch);
+  if (!src) throw badRequest('NO_SOURCE', 'Chưa nối Pancake cho kênh này');
+  const key = await openKey(src.api_key, c.env.INGEST_KEY);
+  const out: PkVariant[] = [];
+  let raw: unknown = null;
+  for (let page = 1; page <= 20; page++) {
+    const res = await fetch(
+      `${PANCAKE_API}/shops/${encodeURIComponent(src.shop_id)}/products/variations?api_key=${encodeURIComponent(key)}&page_size=100&page_number=${page}`,
+    );
+    if (!res.ok) throw badRequest('PANCAKE', `Pancake trả lỗi ${res.status}`);
+    const j = JSON.parse(await res.text()) as { data?: Array<Record<string, unknown>>; total_pages?: number };
+    if (page === 1) raw = (j.data ?? [])[0] ?? null;
+    for (const v of j.data ?? []) out.push(pkVariant(v));
+    if (!j.data?.length || page >= (j.total_pages ?? 1)) break;
+  }
+  return ok(c, { channel: ch, shop: src.shop_id, count: out.length, rows: out, sample: c.req.query('raw') === '1' ? raw : undefined });
+});
+
+interface PkVariant {
+  id: string;
+  code: string;
+  name: string;
+  variant: string;
+  price: number | null;
+  hidden: boolean;
+}
+/** Một biến thể Pancake → mã hiển thị, tên sản phẩm, phân loại, giá bán lẻ (tên trường theo API Pancake POS). */
+function pkVariant(v: Record<string, unknown>): PkVariant {
+  const prod = (v.product ?? {}) as Record<string, unknown>;
+  const fields = Array.isArray(v.fields) ? (v.fields as Array<Record<string, unknown>>) : [];
+  const price = Number(v.retail_price ?? v.price);
+  return {
+    id: String(v.id ?? ''),
+    code: String(v.display_id ?? v.custom_id ?? prod.display_id ?? v.id ?? ''),
+    name: String(prod.name ?? v.name ?? ''),
+    variant: fields.map((f) => String(f.value ?? '')).filter(Boolean).join(' · '),
+    price: Number.isFinite(price) ? price : null,
+    hidden: v.is_hidden === true || prod.is_hide === true,
+  };
+}

@@ -215,3 +215,12 @@ describe('Mã bán Kênh phân phối chờ duyệt (05/11)', () => {
     expect(T.pdBuild({ kppCode }, { role: 'EMPLOYEE', uid: 'u', perms: ['order.accounting.confirm'] })).toHaveLength(0);
   });
 });
+
+describe('Khuyến mại và combo TikTok mới chờ kế toán (16/11)', () => {
+  const S = { kmCho: [{ id: 'k1', ten: 'Sale 11/11', ap: 'Tẩy lồng', gia: 99000, tu: '2026-11-11', by: 'Ads A', at: '2026-11-10T01:00:00Z' }], ttCho: [{ id: 't1', sku: '2TL', gom: '2 Tẩy lồng', by: 'Content B', at: '2026-11-10T02:00:00Z' }] };
+  it('kế toán thấy cả hai, bấm mở hộp xử lý; Trưởng phòng không có quyền kế toán thì không thấy', () => {
+    const r = T.pdBuild(S, { role: 'EMPLOYEE', uid: 'u', perms: ['order.accounting.confirm'] });
+    expect(r.map((x: { k: string; src: string; act: string }) => [x.k, x.src, x.act])).toEqual([['km', 'kmCat', 'fn'], ['ttcb', 'ttCombo', 'fn']]);
+    expect(T.pdBuild(S, { role: 'MANAGER', uid: 'u', perms: ['order.approve.normal'] })).toHaveLength(0);
+  });
+});

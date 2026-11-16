@@ -538,7 +538,10 @@ function cwPb(m){cwCss();if(!cwMgr()){PAGE="cv_pb";PAGES.cv_pb(m);return}PAGE="c
 function cwPbSpace(m,old){cwCss();
   m.innerHTML=cwHead("Thư mục công việc","",{btns:false})+'<div id="cw-body"></div>';cwTop(m);
   if(typeof KPB!=="undefined"&&(!KPB.doc||KPB.doc==="tpl"))KPB.doc="sop";
-  const body=m.querySelector("#cw-body");old(body);
+  const body=m.querySelector("#cw-body");
+  /* Từ 16/11 (chị Hoa duyệt): mở thẳng trang Thư mục làm việc mới (thumuc.js), Mẫu tài liệu & SOP thành một tab trong đó */
+  if(typeof pThuMuc==="function"&&typeof TM!=="undefined"){TM.sopOld=old;pThuMuc(body);return}
+  old(body);
   /* chỉ giữ Thư mục công việc (Drive) và Mẫu tài liệu & SOP; việc, người, dự án, trao đổi đã có ở mục khác */
   body.querySelectorAll(".kgk,[data-kgdt=\"tpl\"]").forEach(x=>x.remove());
   body.querySelectorAll("section.kgs").forEach(sc=>{const h=sc.querySelector("h3"),t=h?h.textContent:"";if(/Thư mục Drive/.test(t))h.textContent="📁 Thư mục công việc";else if(/Mẫu & SOP/.test(t))h.textContent="🧩 Mẫu tài liệu & SOP";else sc.remove()})}

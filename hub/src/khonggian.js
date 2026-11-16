@@ -85,9 +85,9 @@ function pKhongGian(m){
   $("#kg-chat").onclick=()=>openChat(room);
   m.querySelectorAll("[data-kgch]").forEach(b=>b.onclick=()=>{KPB.chat=b.dataset.kgch;renderMain()});
   m.querySelectorAll("[data-kgdm]").forEach(b=>b.onclick=()=>openChat(tnDm(b.dataset.kgdm)));
-  m.querySelectorAll("[data-kgdir]").forEach(b=>b.onclick=()=>{const [p2,f]=b.dataset.kgdir.split("|");if(typeof TM!=="undefined"){TM.scope=pb;TM.pb=p2;TM.folder=f||"";TM.list=null;TM.listKey="";TM.q=""}ntPage("thumuc")});
+  m.querySelectorAll("[data-kgdir]").forEach(b=>b.onclick=()=>{const [p2,f]=b.dataset.kgdir.split("|");if(typeof TM!=="undefined"){TM.scope=pb;TM.pb=p2;TM.folder=f||"";TM.sub="";TM.inq="";TM.tab="thumuc";TM.file=null;TM.q=""}ntPage("thumuc")});
   m.querySelectorAll("[data-kgdmore]").forEach(b=>b.onclick=()=>{KPB.dmore=KPB.dmore===b.dataset.kgdmore?"":b.dataset.kgdmore;renderMain()});
-  $("#kg-drive").onclick=()=>{if(typeof TM!=="undefined"){TM.scope=pb;TM.pb=pb;TM.folder="";TM.list=null;TM.listKey="";TM.q=""}ntPage("thumuc")};
+  $("#kg-drive").onclick=()=>{if(typeof TM!=="undefined"){TM.scope=pb;TM.pb="";TM.folder="";TM.sub="";TM.inq="";TM.tab="thumuc";TM.file=null;TM.q=""}ntPage("thumuc")};
   m.querySelectorAll("[data-kgtpl]").forEach(b=>b.onclick=()=>{openTask(null);const s=$("#t-tpl");if(s){s.value=b.dataset.kgtpl;s.onchange&&s.onchange()}});
   m.querySelectorAll("[data-kgdt]").forEach(b=>b.onclick=()=>{KPB.doc=b.dataset.kgdt;renderMain()});
   m.querySelectorAll("[data-kgdoc]").forEach(b=>b.onclick=()=>dtOpen(b.dataset.kgdoc));

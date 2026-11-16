@@ -21,7 +21,7 @@
    NGƯỠNG CHI PHẢI CEO DUYỆT (chị Hoa chốt 27/10/2026, mặc định 5.000.000đ, đổi ở Ngưỡng cảnh báo; cùng quy tắc src/shared/ceoSpend.ts):
     khoản chi từ ngưỡng mà người duyệt/lập không phải CEO thì chờ CEO. Dòng "chờ CEO" chỉ CEO thấy; người duyệt trước không thấy lại.
    ===================================================================== */
-const PD_KINDS=[["ma","Mã bán chờ duyệt"],["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"],["cbdx","Combo Digital"],["mh","Hàng về lệch đơn mua"]];
+const PD_KINDS=[["km","Khuyến mại"],["ttcb","Combo TikTok mới"],["ma","Mã bán chờ duyệt"],["chi","Phiếu chi"],["thuong","Thưởng NPP"],["tien","Tiền về"],["thu","Phiếu thu"],["hoan","Hàng trả lại"],["don","Đơn & giá Kênh phân phối"],["xuat","Sửa phiếu xuất kho"],["dx","Đề xuất của agent"],["ns","Nhân sự"],["combo","Combo mới chờ nhập"],["cbdx","Combo Digital"],["mh","Hàng về lệch đơn mua"]];
 /* Khoản chi này có phải chờ CEO duyệt không (giống needsCeo ở máy chủ). Ngưỡng 0 = tắt. */
 const pdNeedCeo=(amount,th,isCeo)=>!isCeo&&th>0&&amount>=th;
 const PD_KIND_N=k=>(PD_KINDS.find(x=>x[0]===k)||[k,k])[1];
@@ -96,13 +96,18 @@ function pdBuild(S,w){
       sub:Object.entries(by).map(([c,n])=>(c==="FACEBOOK"?"Facebook":c==="SHOPEE"?"Shopee":"TikTok")+" "+n).join(", ")+" · kho vẫn xuất bình thường",at:pdTs(first),act:"",open:{page:"spcombo"}})}
   if(R.ketoan()){
     (S.cbPhieu||[]).forEach(p=>{const it=p.items||[],moi=it.filter(x=>x.loai==="moi").length,dung=it.length-moi;
-      add({k:"cbdx",id:"cbp:"+p.id,ref:p.id,src:"cbPhieu",loai:"Duyệt combo Digital",nd:p.ten||"",sub:[moi?moi+" combo mới":"",dung?dung+" combo dừng chạy":"",p.ghi||""].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"dg_sp"}})});
+      add({k:"cbdx",id:"cbp:"+p.id,ref:p.id,src:"cbPhieu",loai:p.bp==="CSKH"?"Duyệt combo CSKH":"Duyệt combo Digital",nd:p.ten||"",sub:[moi?moi+" combo mới":"",dung?dung+" combo dừng chạy":"",p.ghi||""].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"dg_sp"}})});
     const mi=S.cbMisa||[];
     if(mi.length)add({k:"cbdx",id:"cbmisa",ref:"cbmisa",src:"cbMisa",loai:"Combo chờ mã MISA",nd:mi.length+" combo đã duyệt chưa có mã MISA",sub:"kế toán trưởng nhập ở Sản phẩm và combo",at:pdTs(mi.map(x=>x.at).filter(Boolean).sort()[0]||0),act:"",open:{page:"dg_sp"}})}
   if(R.mh())(S.mhLech||[]).filter(x=>!x.status||x.status==="CHO").forEach(x=>{const d=+x.diff||0,ty=d>0?"dư":"thiếu",q=n=>String(Math.round(n*1000)/1000).replace(".",",");
     add({k:"mh",id:"ml:"+x.id,ref:x.id,src:"mhLech",loai:"Hàng về "+ty+" so với đơn",ok:"Xử lý",nd:[x.po_no,x.supplier_name].filter(Boolean).join(" · "),
       sub:(x.name||x.item||"")+": đặt "+q(+x.ordered||0)+", nhận "+q(+x.received||0)+" ("+ty+" "+q(Math.abs(d))+")"+(x.kho_doc_no?" · phiếu nhập "+x.kho_doc_no:""),
       tien:x.unit_price!=null?Math.round(Math.abs(d)*+x.unit_price):null,by:"Kho",at:pdTs(x.created_at),act:"fn",open:{page:"mh_po",po:x.po_id}})});
+  /* Khuyến mại các bộ phận chờ kế toán duyệt; combo TikTok mới chờ kế toán khai quy đổi (spcfg.js, 16/11). */
+  if(R.ketoan()){
+    (S.kmCho||[]).forEach(k=>add({k:"km",id:"km:"+k.id,ref:k.id,src:"kmCat",loai:"Khuyến mại · chờ kế toán duyệt",nd:k.ten||"",sub:[k.ap,k.tu?"từ "+k.tu:"",k.den?"đến "+k.den:""].filter(Boolean).join(" · "),tien:+k.gia||null,by:k.by||"",at:pdTs(k.at),act:"fn",open:{page:"sp_cfg"}}));
+    (S.ttCho||[]).forEach(x=>add({k:"ttcb",id:"tt:"+x.id,ref:x.id,src:"ttCombo",loai:"Combo TikTok mới · chờ kế toán khai",ok:"Khai quy đổi",nd:x.sku+(x.variant?" · "+x.variant:""),sub:[x.gom,x.qua?"tặng "+x.qua:""].filter(Boolean).join(" · "),by:x.by||"",at:pdTs(x.at),act:"fn",open:{page:"spcombo"}}));
+  }
   /* Mã bán Kênh phân phối sale tạo khi lên đơn, chờ Trưởng phòng duyệt (giữ hoặc sửa mã). */
   const P=n=>((w&&w.perms)||[]).includes(n);
   if(ceo||P("order.approve.normal"))(S.kppCode||[]).forEach(x=>add({k:"ma",id:"kp:"+x.id,ref:x.id,src:"kppCode",loai:"Mã bán Kênh phân phối · chờ duyệt",nd:x.sku+" · "+(x.name||""),

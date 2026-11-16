@@ -15,6 +15,8 @@ import {
 } from '../lib/driveAccess';
 import { children, download, meta, recentFiles, saKey, streamVideo, thumbnail, type DriveFile } from '../services/gdrive';
 import { setSyncPaused, syncDrivePermissions, syncPaused } from '../services/driveSync';
+import { searchIdx, todoFor, weekStats, type IdxFile, type TodoItem } from '../lib/driveIndex';
+import { isStale, loadIdx, refreshIdx } from '../services/driveIndex';
 
 /**
  * Thư mục làm việc: xem thư mục Google Drive của phòng ban ngay trên web (chỉ xem; mở file thì sang Drive).
@@ -154,7 +156,18 @@ driveRoutes.get('/find', async (c) => {
   const q = (c.req.query('q') ?? '').trim().slice(0, 80);
   const pb = c.req.query('pb') ?? '';
   const cfg = await loadConfig(c.env.DB);
-  if (!teamsFor(cfg, me, ceo).length) return ok(c, { files: [] });
+  const vis = teamsFor(cfg, me, ceo).filter((t) => (!pb || t.pb === pb) && (!q || !t.direct));
+  if (!vis.length) return ok(c, { files: [] });
+  // Tìm không dấu trong mục lục (16/11). Thư mục chưa có mục lục: quét ngầm, báo số thư mục còn đang đếm.
+  if (q) {
+    const idxs = await Promise.all(vis.map((t) => loadIdx(c.env.DB, t.pb)));
+    const have = idxs.filter((x, i): x is NonNullable<typeof x> => !!x && x.root === vis[i].folderId);
+    const miss = vis.filter((t, i) => !idxs[i] || idxs[i]!.root !== t.folderId);
+    for (const t of [...miss].sort(() => Math.random() - 0.5).slice(0, 2)) later(c, refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, t.pb));
+    const all = have.flatMap((x) => x.files.map((f) => ({ f, pb: x.pb })));
+    const hit = new Set(searchIdx(all.map((a) => a.f), q, 60));
+    return ok(c, { files: all.filter((a) => hit.has(a.f)).sort((a, b) => (b.f.m ?? '').localeCompare(a.f.m ?? '')).map((a) => fileOut(a.f, a.pb)), counting: miss.length });
+  }
   const roots = rootsFor(cfg, me, ceo);
   const limit = q ? 40 : 15;
   const out: ReturnType<typeof shape>[] = [];
@@ -185,12 +198,12 @@ driveRoutes.get('/config', async (c) => {
 driveRoutes.put('/config', async (c) => {
   const { auth, ceo } = await who(c);
   if (!ceo) throw forbidden('Chỉ CEO gán thư mục Drive cho phòng ban.');
-  const body = (await c.req.json().catch(() => null)) as { teams?: { pb?: string; folder?: string; viewers?: string[]; name?: string }[] } | null;
+  const body = (await c.req.json().catch(() => null)) as { teams?: { pb?: string; folder?: string; viewers?: string[]; name?: string; direct?: boolean }[] } | null;
   if (!body || !Array.isArray(body.teams)) throw badRequest('INVALID', 'Dữ liệu gửi lên không đúng.');
   for (const t of body.teams) {
     if (t?.folder && !folderIdFrom(t.folder)) throw badRequest('INVALID_FOLDER', `Link thư mục của phòng ${t.pb ?? ''} không đúng dạng link Google Drive.`);
   }
-  const cfg = normalizeConfig({ teams: body.teams.map((t) => ({ pb: t?.pb, folderId: t?.folder, viewers: t?.viewers, name: t?.name })) });
+  const cfg = normalizeConfig({ teams: body.teams.map((t) => ({ pb: t?.pb, folderId: t?.folder, viewers: t?.viewers, name: t?.name, direct: t?.direct === true })) });
   await c.env.DB.prepare(
     `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)
      ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
@@ -255,6 +268,66 @@ driveRoutes.get('/download/:id', async (c) => {
   };
   if (f.size) headers['Content-Length'] = f.size;
   return new Response(f.body, { headers });
+});
+
+/* ---------- Mục lục (chị Hoa duyệt demo 16/11): số file, nằm ở đâu, tìm không dấu, việc cần xử lý, báo cáo ---------- */
+function later(c: { executionCtx: { waitUntil(p: Promise<unknown>): void } }, job: Promise<unknown>) {
+  const safe = job.catch((e) => console.error('[drive idx]', e));
+  try {
+    c.executionCtx.waitUntil(safe);
+  } catch {
+    /* chạy thử không có executionCtx */
+  }
+}
+const isShared = (pb: string) => /^chung/.test(pb);
+const fileOut = (f: IdxFile, pb: string) => ({
+  id: f.i, name: f.n, kind: f.k, sub: f.s, where: f.w, modified: f.m, created: f.c, by: f.b, size: f.z, link: f.l, pb,
+  thumb: f.t ? `/api/drive/thumb/${encodeURIComponent(f.i)}` : null,
+  dl: f.d ? `/api/drive/download/${encodeURIComponent(f.i)}` : null,
+});
+
+/** Tổng quan các thư mục người này được xem: số file từng thư mục con, việc cần xử lý, số 7 ngày; CEO có thêm bảng báo cáo. */
+driveRoutes.get('/overview', async (c) => {
+  const { me, ceo, depts } = await who(c);
+  const cfg = await loadConfig(c.env.DB);
+  const teams = teamsFor(cfg, me, ceo);
+  const name = (t: (typeof teams)[number]) => t.name || depts.find((d) => d.k === t.pb)?.n || t.pb;
+  const now = Date.now();
+  const rows = await Promise.all(teams.map(async (t) => ({ t, idx: t.direct ? null : await loadIdx(c.env.DB, t.pb) })));
+  // Thư mục chưa có mục lục: quét ngầm tối đa 2 thư mục mỗi lượt mở; còn lại quét dần thư mục cũ nhất.
+  // Chọn ngẫu nhiên để một thư mục quét lỗi không chặn mãi các thư mục sau.
+  const missing = rows.filter((r) => !r.t.direct && isStale(r.idx, r.t.folderId, Infinity)).sort(() => Math.random() - 0.5).slice(0, 2);
+  const stale = rows.filter((r) => !r.t.direct && isStale(r.idx, r.t.folderId)).sort((a, b) => (a.idx?.at ?? '').localeCompare(b.idx?.at ?? ''));
+  for (const r of missing.length ? missing : stale.slice(0, 1)) later(c, refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, r.t.pb));
+  const todo: TodoItem[] = [];
+  const out = rows.map(({ t, idx }) => {
+    const ok = idx && idx.root === t.folderId;
+    const td = ok ? todoFor(idx, name(t), isShared(t.pb), now) : [];
+    todo.push(...td);
+    const wk = ok ? weekStats(idx.files, now) : { added: 0, edited: 0 };
+    return {
+      pb: t.pb, name: name(t), shared: isShared(t.pb), edit: ceo || me?.phongBan === t.pb, direct: !!t.direct, folder_id: t.folderId,
+      total: ok ? idx.files.length : null, subs: ok ? idx.subs : [], at: ok ? idx.at : null, cut: ok ? idx.cut : false,
+      added: wk.added, edited: wk.edited, todo: td.length,
+    };
+  });
+  return ok(c, { teams: out, todo: todo.slice(0, 500), can_manage: ceo });
+});
+
+/** File của một thư mục (từ mục lục), lọc theo thư mục con cấp 1; mục lục cũ hơn 15 phút thì quét lại ngầm. */
+driveRoutes.get('/files', async (c) => {
+  const { me, ceo } = await who(c);
+  const pb = c.req.query('pb') ?? '';
+  const cfg = await loadConfig(c.env.DB);
+  const team = teamsFor(cfg, me, ceo).find((t) => t.pb === pb);
+  if (!team) throw forbidden('Bạn chưa được xem thư mục này.');
+  let idx = await loadIdx(c.env.DB, pb);
+  if (isStale(idx, team.folderId, Infinity) || c.req.query('fresh') === '1') idx = (await refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, pb)) ?? idx;
+  else if (isStale(idx, team.folderId)) later(c, refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, pb));
+  if (!idx) throw notFound('Web đang đếm file thư mục này lần đầu, bấm Tải lại sau 1 phút. Vẫn không được thì kiểm tra thư mục đã chia sẻ cho tài khoản của web chưa.');
+  const sub = c.req.query('sub') ?? '';
+  const files = idx.files.filter((f) => !sub || f.s === sub).sort((a, b) => (b.m ?? '').localeCompare(a.m ?? ''));
+  return ok(c, { pb, at: idx.at, cut: idx.cut, subs: idx.subs, total: idx.files.length, edit: ceo || me?.phongBan === pb, files: files.slice(0, 500).map((f) => fileOut(f, pb)), more: Math.max(0, files.length - 500) });
 });
 
 /** Tạm dừng / bật lại tự cấp quyền mỗi giờ (CEO). */

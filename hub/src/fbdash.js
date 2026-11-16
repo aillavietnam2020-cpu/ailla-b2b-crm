@@ -200,8 +200,8 @@ function pFbdash(m,forceOps){
   if(est)al.push(["blu","Có ngày dùng số tự động từ Pancake: đơn giao xong là ước tính. Vài ngày cuối kỳ tỷ lệ hủy thấp giả vì sale chưa gọi hết đơn mới"]);
   const alF=full?al.filter(x=>/Chi phí quảng cáo|Phí vận chuyển|chưa có số chi phí|ROAS|thấp hơn kỳ trước/.test(x[1])):al;
   const alerts=alF.length?`<div class="fbd-al">${alF.map(([c,t])=>`<span class="fbd-ch ${c}">${c==="red"?"⚠":c==="amb"?"●":"ⓘ"} ${t}</span>`).join("")}</div>`:"",banner=alF.length?`<div class="pc-banner"><b>⚠ Có ${alF.length} việc cần làm</b>${alF.map(([c,t])=>`<span title="${esc(t.replace(/<[^>]*>/g,""))}">${t.replace(/<[^>]*>/g,"").split(/\. |: /)[0]}</span>`).join("")}</div>`:"";
-  const Dd=KDX.fbDash||{},N=KDX.fbNhom||[];
-  const nhom=N.length?`<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm · tháng 9</h3>${tbl(full?["Nhóm hàng","Số đơn","Số lượng","Doanh thu","Giá vốn","Biên gộp"]:["Nhóm hàng","Số đơn","Số lượng","Doanh thu"],N.map(x=>`<tr><td><b>${esc(x.n)}</b></td><td class="n">${nf(x.don)}</td><td class="n">${nf(x.sl)}</td><td class="n">${tr(x.dt)}</td>${full?`<td class="n">${tr(x.gv)}</td><td class="n">${x.dt?pill(Math.round((x.dt-x.gv)/x.dt*100)+"%",(x.dt-x.gv)/x.dt>.6?"grn":"amb"):"—"}</td>`:""}</tr>`))}</section>`:"";
+  const Dd=KDX.fbDash||{};
+  const nhom=fbdNhomCard(days,full);
   const pl=full&&Dd.dt?`<section class="fbd-card fbd-wide"><h3>Lãi đóng góp kênh · kỳ ${esc(Dd.ky||"")} (Sheet Pancake)</h3>${tbl(["Khoản","Số tiền","% doanh thu"],[["Doanh thu ghi nhận",Dd.dt],["− Giá vốn hàng bán",Dd.gv],["− Phí vận chuyển",Dd.vc],["− Ship đơn hoàn (2 chiều)",Dd.hoan],["= Lãi gộp",Dd.laigop]].map(([l,v])=>`<tr class="${l.startsWith("=")?"tot":""}"><td>${l}</td><td class="n">${nf(v)}</td><td class="n">${Dd.dt?Math.abs(v/Dd.dt*100).toFixed(1)+"%":"—"}</td></tr>`))}</section>`:"";
   const heroUse=(full&&heroA)?heroA:hero;
   m.innerHTML=head+`<div class="fbd-meta"><span>Số đến ${days.length?days[days.length-1].slice(8)+"/"+days[days.length-1].slice(5,7):"—"}${A.n<len?" · thiếu số "+(len-A.n)+" ngày":""}${upd?" · cập nhật lúc "+upd:""}</span></div>${full?heroUse+alerts:banner+fbdMetPanel("ops",[{l:"Doanh thu chốt",t:"m",n:fbdDay},{l:"Đơn chốt",t:"n",n:k=>((DAYD.fb||{})[k]||[])[1]},{l:"Đơn tạo",t:"n",n:k=>((DAYD.fb||{})[k]||[])[0]},{l:"Đơn hủy",t:"n",rev:true,n:k=>((DAYD.fb||{})[k]||[])[2]},{l:"Tỷ lệ hủy",t:"p",rev:true,warn:v=>v>.2,n:k=>((DAYD.fb||{})[k]||[])[2],d:k=>((DAYD.fb||{})[k]||[])[0]},{l:"Giá trị TB / đơn",t:"d",n:fbdDay,d:k=>((DAYD.fb||{})[k]||[])[1]},{l:"Chi phí QC sau thuế",t:"m",rev:true,n:fbdQc},{l:"ROAS sau thuế",t:"x",warn:v=>v&&v<1.8,n:fbdDay,d:fbdQc},{l:"CPO",t:"d",rev:true,n:fbdQc,d:k=>((DAYD.fb||{})[k]||[])[1]},{l:"Đơn hoàn",t:"n",rev:true,n:k=>((DAYD.fb||{})[k]||[])[3]}],days,fbdRange(pf,pt),"Tổng quan Facebook",fbdToday(days))+'<div class="pc-2">'+fbdSrcTable(days,fbdRange(pf,pt))+fbdWfTable(C,A)+"</div>"+(typeof FBD!=="undefined"&&FBD.tab==="bh"?"":fbdPeopleTable(days,fbdRange(pf,pt)))}<div class="fbd-grid">${full?costCard+wf+chartA:""}${full?fbdProdCard(days):""}${nhom}${pl}</div>
@@ -247,6 +247,17 @@ function fbdCost(days){
   const R=FBC.raw&&FBC.raw.days,o={n:0,dt:0,gv:0,ship:0,shipRet:0,qc:0,qcT:0,last:"",gop:0,fN:0,fRev:0,fGv:0};if(!R)return o;
   days.forEach(k=>{const d=R[k];if(!d)return;o.n++;o.dt+=d.g[1];o.gv+=d.g[2];o.ship+=d.g[3];o.shipRet+=2*d.h[1];const qr=fbdQcRaw(k);o.qc+=qr;o.qcT+=qr*fbdTax(k);if(d.f){o.fN+=d.f[0];o.fRev+=d.f[1];o.fGv+=d.f[2]};o.last=k});
   o.gop=o.dt-o.gv-o.ship-o.shipRet;return o;
+}
+
+/* Theo nhóm sản phẩm của đúng kỳ đang chọn (chị Hoa 16/11/2026: trước đây cố định tháng 9). Số theo sản phẩm lấy từ Sheet Pancake (fb_cost_days, có tới 20/10), đơn giao thành công. */
+/* Sản phẩm chưa có nhóm trong Sheet: đoán nhóm theo tên, cùng luật gán chiến dịch quảng cáo (FBBC_LINES ở fbbc.js) */
+const fbdNhomDoan=n=>{if(typeof FBBC_LINES==="undefined")return "";const L=FBBC_LINES.find(L=>L[3].test(n||""));return L?(L[0]==="TB"||L[0]==="TL"?"Tẩy lồng giặt":L[1]):""};
+function fbdNhomCard(days,full){
+  const F=FBC.raw,m={};let n=0,last="";
+  if(F&&F.p&&F.sk)days.forEach(k=>{const r=F.p[k];if(!r)return;n++;last=k;r.forEach(([i,q,dt,gv])=>{const sk=F.sk[i]||[],g=sk[2]||fbdNhomDoan(sk[1])||"(chưa nhóm)",t=m[g]||(m[g]={n:g,sl:0,dt:0,gv:0});t.sl+=q;t.dt+=dt*1000;t.gv+=gv*1000})});
+  if(!n){const e=F&&F.p?Object.keys(F.p).sort().pop():"";return `<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm</h3><p class="empty">Kỳ này chưa có số theo nhóm sản phẩm${e?` (số theo sản phẩm hiện có đến ${e.slice(8)}/${e.slice(5,7)})`:""}.</p></section>`}
+  const L=Object.values(m).sort((a,b)=>b.dt-a.dt);
+  return `<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm · ${n} ngày có số, đến ${last.slice(8)}/${last.slice(5,7)}</h3>${tbl(full?["Nhóm hàng","Số lượng","Doanh thu","Giá vốn","Biên gộp"]:["Nhóm hàng","Số lượng","Doanh thu"],L.map(x=>`<tr><td><b>${esc(x.n)}</b></td><td class="n">${nf(x.sl)}</td><td class="n">${tr(x.dt)}</td>${full?`<td class="n">${tr(x.gv)}</td><td class="n">${x.dt?pill(Math.round((x.dt-x.gv)/x.dt*100)+"%",(x.dt-x.gv)/x.dt>.6?"grn":"amb"):"—"}</td>`:""}</tr>`))}<p class="fbd-note">Đến 20/10: đơn giao thành công (Sheet Pancake). Từ 21/10: đơn đã gửi hàng trên web; đơn nhiều sản phẩm chia tiền theo giá bán thực của từng sản phẩm.</p></section>`;
 }
 
 /* Hiệu quả theo sản phẩm (chỉ trang quản trị): doanh thu, giá vốn, lãi gộp từng sản phẩm, đơn đã giao thành công theo Sheet Pancake. */

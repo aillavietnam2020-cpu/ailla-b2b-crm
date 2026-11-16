@@ -73,6 +73,8 @@
   }else{
     const S={
       exec:[["",[["exec","Tổng quan vận hành"]]]],
+      /* Chị Hoa 16/11: Cấu hình › Sản phẩm và combo gộp một chỗ cho Ads, TikTok, CSKH, Kênh phân phối, Khuyến mại (spcfg.js) */
+      vcfg:[["",["sp_cfg"]]],
       kd:[["Kênh bán lẻ",[["bc_tiktok","TikTok Shop"],"bc_shopee","bc_fb","fb_sale","fb_cskh"]],
         ["Kênh phân phối",[["cr_rp","Dashboard kênh phân phối"],"cr_kh","cr_dn","cr_cn","cr_ret",["cr_gia","Bảng giá"],
           "cr_s_hn","cr_s_kh","cr_s_dn",["cr_s_gia","Bảng giá"],"cr_s_cn","cr_s_ret","cr_s_kq"]],
@@ -106,6 +108,7 @@
       hr,
       dt, // Đào tạo & onboarding (daotao.js, chị Hoa duyệt 02/11)
       mod("agt","spark","AI Agent","",S.agt,["agt"],DROP),
+      mod("vcfg","gear","Cấu hình","",S.vcfg,[],DROP),
       aiq,me].filter(Boolean);
     /* Hai nhóm "Kho vật tư", "Sản xuất" đang gộp nhiều trang thành một dòng; bảng muốn thấy từng trang theo đường đi của hàng. */
     for(let i=PAGE_SETS.length-1;i>=0;i--)if(!PAGE_SETS[i].adm&&(PAGE_SETS[i].n==="Kho vật tư"||PAGE_SETS[i].n==="Sản xuất"))PAGE_SETS.splice(i,1);

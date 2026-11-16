@@ -808,13 +808,17 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
   needScope(c, 'cskh_b2b', 'mkt_digital', 'mkt_content');
   const d = await hubData(c);
   const fb = (d.fbCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>> } | null;
+  // Khuyến mại các bộ phận (d.kmCat, 16/11): chỉ chương trình kế toán đã duyệt.
+  const km = (Array.isArray(d.kmCat) ? d.kmCat : []) as Array<Record<string, unknown>>;
+  // CSKH có kho sản phẩm + combo riêng (d.cskhCat, 16/11), không chạy ads.
+  const ck = (d.cskhCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>> } | null;
   if (!fb || !Array.isArray(fb.combos)) {
     return ok(c, [], { ghi_chu: 'Chưa có bảng combo lưu trên web (Digital chưa sửa lần nào). Không tự đoán combo.' });
   }
   const all = c.req.query('all') === '1';
   const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
   const names = new Map<string, string>();
-  const products = (fb.sp ?? []).map((p) => {
+  const products = (fb.sp ?? []).concat(ck?.sp ?? []).map((p) => {
     const bt = ((p.bt as Array<Record<string, unknown>>) ?? []).map((v) => {
       const label = [p.ten, v.dt, v.pl].filter((x) => x).join(' ');
       if (v.ma) names.set(String(v.ma), label);
@@ -830,9 +834,12 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
     return 'Đang áp dụng';
   };
   const combos = fb.combos
+    .concat((ck?.combos ?? []).map((x) => ({ ...x, bp: 'CSKH' })))
     .filter((x) => ((x.tt as string) || 'ok') === 'ok' && !x.dx)
     .map((x) => ({
       nhom: x.nhom || '',
+      // Bộ phận tạo combo (16/11): CSKH = combo không chạy ads; không ghi = Ads.
+      bo_phan: x.bp === 'CSKH' ? 'CSKH (không chạy ads)' : 'Ads',
       mua: items(x.gom),
       tang: items(x.tang),
       mo_ta_cu: (x.gom as unknown[])?.length ? undefined : x.combo || undefined,
@@ -847,10 +854,15 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
       ghi_chu: cut(x.ghi),
     }))
     .filter((x) => all || x.trang_thai !== 'Đã hết');
+  const BP: Record<string, string> = { ads: 'Ads Facebook', tt: 'TikTok', cskh: 'CSKH', b2b: 'Kênh phân phối' };
+  const khuyenMai = km
+    .filter((k) => k.tt === 'ok' && (!k.tu || String(k.tu) <= today) && (!k.den || String(k.den) >= today))
+    .map((k) => ({ bo_phan: BP[String(k.bp)] || k.bp, ten: k.ten || '', ap_dung: k.ap || '', gia: Number(k.gia) || 0, tu: k.tu || '', den: k.den || '', ghi_chu: cut(k.ghi) }));
   return ok(c, combos, {
     san_pham: products,
+    khuyen_mai: khuyenMai,
     ngay: today,
-    ghi_chu: 'Combo do team Digital set trên web, chỉ xem. Giá/quà có thể đổi theo ngày: luôn đọc lại trước khi báo khách, không hứa ngoài bảng này.',
+    ghi_chu: 'Combo do Ads (team Digital) và CSKH set trên web, chỉ xem; combo CSKH không chạy ads. Giá/quà có thể đổi theo ngày: luôn đọc lại trước khi báo khách, không hứa ngoài bảng này.',
   });
 });
 

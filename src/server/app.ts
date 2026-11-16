@@ -50,6 +50,7 @@ import { cskhRoutes } from './routes/cskh';
 import { sanphamRoutes } from './routes/sanpham';
 import { tiktokRoutes } from './routes/tiktok';
 import { shopeeRoutes } from './routes/shopee';
+import { baocaoFileRoutes } from './routes/baocaoFile';
 import { dieuhanhRoutes } from './routes/dieuhanh';
 import { soatRoutes } from './routes/soatSoLieu';
 import { hrRoutes } from './routes/hr';
@@ -180,6 +181,7 @@ export function createApp() {
   app.route('/api/hub/tiktok', tiktokRoutes);
   app.route('/api/hub/video-links', videoLinkRoutes);
   app.route('/api/hub/shopee', shopeeRoutes);
+  app.route('/api/hub/bc-file', baocaoFileRoutes);
   app.route('/api/hub/dieuhanh', dieuhanhRoutes);
   app.route('/api/hub/soat', soatRoutes);
   app.route('/api/hub/hr', hrRoutes);

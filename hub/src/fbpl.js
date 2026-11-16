@@ -46,8 +46,7 @@ function pFbPL(m){
   if(FBD.tab==="sale"){m.innerHTML=head+tabs+meta+fbdSaleView();bind();return}
   if(FBD.tab==="nc"){fbdRenderNc(m,head,tabs);bind();return}
   const C=fbdCost(days),pdays=days.map(fbdShiftMonth),Cp=fbdCost(pdays);
-  if(FBD.tab==="sp"){const N=KDX.fbNhom||[];
-    const nhom=N.length?`<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm · tháng 9 (Sheet Pancake)</h3>${tbl(["Nhóm hàng","Số đơn","Số lượng","Doanh thu","Giá vốn","Biên gộp"],N.map(x=>`<tr><td><b>${esc(x.n)}</b></td><td class="n">${nf(x.don)}</td><td class="n">${nf(x.sl)}</td><td class="n">${tr(x.dt)}</td><td class="n">${tr(x.gv)}</td><td class="n">${x.dt?pill(Math.round((x.dt-x.gv)/x.dt*100)+"%",(x.dt-x.gv)/x.dt>.6?"grn":"amb"):"—"}</td></tr>`))}</section>`:"";
+  if(FBD.tab==="sp"){const nhom=fbdNhomCard(days,true);
     m.innerHTML=head+tabs+meta+`<div class="fbd-grid">${fbdProdCard(days)||'<section class="fbd-card fbd-wide"><p class="empty">Kỳ này chưa có số theo sản phẩm.</p></section>'}${nhom}</div>`;bind();return}
   if(!C.n){m.innerHTML=head+tabs+meta+`<section class="fbd-card"><p class="empty">Kỳ này chưa có giá vốn và chi phí vận chuyển thật nên chưa dựng được P&L. Số thật có từ 01/08 đến 21/10; chọn kỳ trong khoảng đó.</p></section>`;bind();return}
   const OP=fbdOpex(days),OPp=fbdOpex(pdays),tot=fbdCostTot(C,A.hasQc)+OP.amt,prof=C.dt-tot,margin=C.dt?prof/C.dt*100:0,totP=fbdCostTot(Cp,true)+OPp.amt,profP=Cp.dt-totP;

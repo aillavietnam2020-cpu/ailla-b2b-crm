@@ -1,7 +1,7 @@
 /* =====================================================================
    BÁO CÁO SHOPEE (2 shop): đọc file xuất từ Shopee và tính số tháng của từng shop (chỉ hàm thuần, không đụng giao diện).
    Quy tắc theo skill ailla-baocao-quantri-shopee (cùng cách với TikTok, chị Hoa chốt 25–27/10/2026):
-   - Một đơn thuộc tháng nó được ĐẶT. Doanh thu = Giá gốc − Người bán trợ giá − Mã ưu đãi người bán chịu
+   - Một đơn thuộc tháng nó được ĐẶT. Doanh thu = Giá gốc × Số lượng − Tổng số tiền người bán trợ giá − Mã ưu đãi người bán chịu
      (mã ưu đãi là giảm trừ doanh thu, không phải phí sàn).
    - Đơn hủy, đơn hoàn (file đơn báo hủy/hoàn, hoặc file Tài chính có Giá sản phẩm + Số tiền hoàn lại = 0): doanh thu 0.
    - Phí sàn 7 nhóm lấy từ file Tài chính (Doanh thu), chia về dòng sản phẩm theo tỷ trọng doanh thu trong đơn;
@@ -12,10 +12,10 @@
    ===================================================================== */
 const SPE_FEE_GROUPS=[
  ["Hoa hồng cố định",["Phí cố định"],"Hoa hồng Shopee thu trên từng đơn"],
- ["Phí dịch vụ sàn",["Phí Dịch Vụ","Phí dịch vụ PiShip","Phí dịch vụ hiển thị NTTD (từ doanh thu đơn hàng)"],"Freeship Xtra, Voucher Xtra và các chương trình sàn"],
+ ["Phí dịch vụ sàn",["Phí Dịch Vụ","Phí dịch vụ hiển thị NTTD (từ doanh thu đơn hàng)"],"Freeship Xtra, Voucher Xtra và các chương trình sàn"],
  ["Phí xử lý giao dịch",["Phí xử lý giao dịch"],"Phí xử lý thanh toán"],
  ["Hoa hồng affiliate",["Phí hoa hồng Tiếp thị liên kết"],"Hoa hồng Tiếp thị liên kết trả cho KOC/đối tác"],
- ["Phí vận chuyển ròng",["Phí vận chuyển Người mua trả","Phí vận chuyển thực tế","Phí vận chuyển được trợ giá từ Shopee","Phí vận chuyển trả hàng (đơn Trả hàng/hoàn tiền)","Phí vận chuyển được hoàn bởi PiShip","Phí vận chuyển trả hàng (đơn giao không thành công)"],"Phí ship thực tế trừ phần Shopee trợ giá và khách trả"],
+ ["Phí vận chuyển ròng",["Phí dịch vụ PiShip","Phí vận chuyển Người mua trả","Phí vận chuyển thực tế","Phí vận chuyển được trợ giá từ Shopee","Phí vận chuyển trả hàng (đơn Trả hàng/hoàn tiền)","Phí vận chuyển được hoàn bởi PiShip","Phí vận chuyển trả hàng (đơn giao không thành công)"],"Phí ship thực tế trừ phần Shopee trợ giá và khách trả"],
  ["Thuế sàn khấu trừ",["Thuế GTGT","Thuế TNCN"],"Thuế GTGT và TNCN Shopee khấu trừ hộ"],
  ["Khoản khác",["Đền bù đơn mất hàng","Phí lắp đặt người mua trả","Phí lắp đặt thực tế","Trade-in Bonus by Seller","Sản phẩm được trợ giá từ Shopee"],"Đền bù, phí lắp đặt và các khoản lẻ"]];
 const SPE_NG=SPE_FEE_GROUPS.length;
@@ -40,8 +40,9 @@ function speReadOrders(aoa,ky){
   for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const o=ttCell(g(a,"Mã đơn hàng"));if(!o)continue;
     const d=ttIsoDay(ttCell(g(a,"Ngày đặt hàng")));if(!d)continue;if(ky&&d.slice(0,7)!==ky){outside++;continue}
     const q=ttNum(g(a,"Số lượng")),rq=ttNum(g(a,"Số lượng sản phẩm được hoàn trả"));
-    lines.push({o,d,huy:ttCell(g(a,"Trạng Thái Đơn Hàng"))==="Đã hủy"||rq>0,pn:ttCell(g(a,"Tên sản phẩm")),vr:ttCell(g(a,"Tên phân loại hàng")),
-      sv:ttCell(g(a,"SKU phân loại hàng")),sp:ttCell(g(a,"SKU sản phẩm")),q,dt:ttNum(g(a,"Giá gốc"))-ttNum(g(a,"Người bán trợ giá"))})}
+    const st=ttCell(g(a,"Trạng Thái Đơn Hàng"));lines.push({o,d,st,rq,huy:st==="Đã hủy",pn:ttCell(g(a,"Tên sản phẩm")),vr:ttCell(g(a,"Tên phân loại hàng")),
+      sv:ttCell(g(a,"SKU phân loại hàng")),sp:ttCell(g(a,"SKU sản phẩm")),q,/* tiền hàng của dòng = Giá gốc × Số lượng − Tổng số tiền được người bán trợ giá (16/11/2026: trước đây quên nhân số lượng, khớp cột "Giá sản phẩm" file Tài chính) */
+      dt:ttNum(g(a,"Giá gốc"))*q-("Tổng số tiền được người bán trợ giá" in I?ttNum(g(a,"Tổng số tiền được người bán trợ giá")):ttNum(g(a,"Người bán trợ giá"))*q)})}
   if(!lines.length)return {err:ky?`File đơn không có đơn nào đặt trong tháng ${ky.slice(5)}/${ky.slice(0,4)}.`:"File đơn không có dòng nào đọc được."};
   return {lines,outside};
 }
@@ -131,23 +132,33 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   const L=orders.lines,F=fin.ord,den=fin.partial?L.reduce((m,l)=>l.d>m?l.d:m,""):null;
   /* Shopee là nguồn sự thật về hoàn tiền: tổng hàng hoá về 0 = hoàn toàn bộ. */
   const hoan=new Set(Object.keys(F).filter(id=>F[id].gross>0&&Math.abs(F[id].gross+F[id].hoan)<1));
-  let lech=0;L.forEach(l=>{if(hoan.has(l.o)&&!l.huy){l.huy=true;lech++}});
-  const ordDt={},ordQ={};L.forEach(l=>{ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q});
-  L.forEach(l=>{l.w=ordDt[l.o]?l.dt/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:0);l.qt=!!F[l.o]});
-  const base=L.filter(l=>l.qt&&!l.huy),baseDt=base.reduce((s,l)=>s+l.dt,0);
+  /* Hoàn tiền toàn bộ mà Shopee vẫn thu phí: giữ dòng với tiền hàng 0 để tính đúng phí, không đếm là đơn (full). */
+  let lech=0;L.forEach(l=>{if(hoan.has(l.o)&&!l.huy){if(F[l.o].f.some(v=>Math.abs(v)>=1)){l.full=1;l.dt0=l.dt;l.dt=0;l.q=0}else l.huy=true;lech++}});
+  /* Đơn có hàng trả (chị Hoa duyệt 16/11/2026, theo đối soát của chị Huệ): không bỏ cả đơn nữa mà tính đúng phần Shopee thực thu theo file Tài chính.
+     Đã có trong Tài chính: tiền hàng nhân tỷ lệ (Giá sản phẩm + Số tiền hoàn lại) / Giá sản phẩm, có hoàn tiền thì trừ số lượng trả khỏi giá vốn.
+     Chưa có trong Tài chính (chưa quyết toán): bỏ dòng có hàng trả như trước, không ước. */
+  const traO={};L.forEach(l=>{if(l.huy)return;if(l.rq>0&&!F[l.o]){l.huy=true;return}if(F[l.o]&&(l.rq>0||F[l.o].hoan<0))traO[l.o]=1});
+  L.forEach(l=>{if(!traO[l.o]||l.huy)return;const x=F[l.o],k=x.gross>0?(x.gross+x.hoan)/x.gross:1;
+    if(k<1){l.dt=l.dt*k;if(l.rq>0)l.q=Math.max(0,l.q-l.rq)}l.tra=1});
+  const ordDt={},ordQ={},ordN={};L.forEach(l=>{if(l.huy)return;ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q;ordN[l.o]=(ordN[l.o]||0)+1});
+  L.forEach(l=>{l.w=ordDt[l.o]?l.dt/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:(ordN[l.o]?1/ordN[l.o]:0));l.qt=!!F[l.o]});
+  const base=L.filter(l=>l.qt&&!l.huy&&!l.full),baseDt=base.reduce((s,l)=>s+l.dt,0);
   if(!baseDt)return {err:`Shop ${shop||"?"}: không ghép được đơn nào giữa file đơn và file Tài chính. Hãy kiểm tra hai file cùng shop, cùng tháng.`};
   const rate=new Array(SPE_NG).fill(0);let rateV=0;
   base.forEach(l=>{const x=F[l.o];for(let g=0;g<SPE_NG;g++)rate[g]+=x.f[g]*l.w;rateV+=x.vou*l.w});
   for(let g=0;g<SPE_NG;g++)rate[g]/=baseDt;rateV/=baseDt;
-  const sku={},days={},dayOrd={},okOrd=new Set();let hh=0,dtUoc=0,mon=0,koc=0;
+  const sku={},days={},dayOrd={},okOrd=new Set();let choQT=0,hh=0,dtUoc=0,mon=0,koc=0;
   L.forEach(l=>{
     if(l.huy){hh+=l.dt;return}
+    /* Chị Huệ dạy 15/11: báo cáo đủ tháng thì đơn chưa có trong file Tài chính (chưa về tiền) không cộng doanh thu tháng này, chỉ theo dõi sang kỳ sau. */
+    if(!l.qt&&!fin.partial){choQT+=l.dt;return}
     const x=F[l.o],f=(l.qt?x.f.map(v=>v*l.w):rate.map(r=>r*l.dt)).map(ttRound),vou=ttRound(l.qt?x.vou*l.w:rateV*l.dt),dt=l.dt+vou;
+    l.wf=f;l.wdt=dt;/* giữ số từng dòng cho file tính toán (bcfile.js) */
     const k=speKey(l.pn,l.vr),s=sku[k]||(sku[k]={pn:l.pn,vr:l.vr,sv:l.sv,sp:l.sp,q:0,dt:0,vou:0,f:new Array(SPE_NG).fill(0),dtU:0});
     s.q+=l.q;s.dt+=dt;s.vou+=vou;for(let g=0;g<SPE_NG;g++)s.f[g]+=f[g];mon+=l.q;if(!l.qt){s.dtU+=dt;dtUoc+=dt}
-    if(x&&x.aff)koc+=dt;okOrd.add(l.o);
+    if(x&&x.aff)koc+=dt;if(l.full)hh+=l.dt0;else okOrd.add(l.o);
     const dd=days[l.d]||(days[l.d]={dt:0,phi:0,gv:0,don:0,sk:{}});dd.dt+=dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.sk[k]=(dd.sk[k]||0)+l.q;
-    if(!dayOrd[l.d+"|"+l.o]){dayOrd[l.d+"|"+l.o]=1;dd.don++}});
+    if(!l.full&&!dayOrd[l.d+"|"+l.o]){dayOrd[l.d+"|"+l.o]=1;dd.don++}});
   /* Giá vốn: mã chưa có giá vốn KHÔNG ước (chị Hoa duyệt 28/10/2026): để 0, đánh dấu uoc = "chưa tính giá vốn"; dtUocGv = doanh thu chưa tính giá vốn. */
   const learn=pos?speLearnPos(L,pos):{};
   const rows=Object.entries(sku).map(([k,s])=>{if(learn[k])s.ps=learn[k];const c=(costOf&&costOf(s))||{u:null,why:"Chưa quy đổi mã"};return {k,...s,phi:s.f.reduce((a,b)=>a+b,0),c,u:c.u}});
@@ -158,10 +169,10 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   const adsDays={};let adsT=0;Object.entries((ads&&ads.days)||{}).forEach(([d,v])=>{if(d.slice(0,7)!==ky||(den&&d>den))return;adsDays[d]=Math.round(v);adsT+=v});
   rows.sort((a,b)=>b.dt-a.dt);
   const S=k=>rows.reduce((a,r)=>a+r[k],0),dt=S("dt"),gv=S("gv"),phi=S("phi");
-  return {ky,shop,den,dt,gv,phi,lg:dt+phi-gv,ads:Math.round(adsT),hasAds:!!ads,don:okOrd.size,mon,hh:Math.round(hh),koc:Math.round(koc),
+  return {ky,shop,den,dt,gv,phi,lg:dt+phi-gv,ads:Math.round(adsT),hasAds:!!ads,don:okOrd.size,mon,hh:Math.round(hh),choQT:Math.round(choQT),koc:Math.round(koc),
     vou:Math.round(S("vou")),dtUoc:Math.round(dtUoc),dtUocGv:rows.filter(r=>r.uoc).reduce((a,r)=>a+r.dt,0),gvRate,lech,
     fees:SPE_FEE_GROUPS.map((g,i)=>[g[0],rows.reduce((a,r)=>a+r.f[i],0)]),rows,days,adsDays,
-    inc:{...fin.range},n:{lines:L.length,outside:orders.outside,unmatched:L.filter(l=>!l.qt&&!l.huy).length}};
+    L,F,hoanSet:hoan,inc:{...fin.range},n:{lines:L.length,outside:orders.outside,unmatched:L.filter(l=>!l.qt&&!l.huy).length}};
 }
 /* Tóm tắt để lưu: số theo ngày [doanh thu, phí sàn (âm), giá vốn, lãi gộp, đơn, quảng cáo]. */
 function speSummary(M){

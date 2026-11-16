@@ -20,6 +20,7 @@ import { syncReturns } from './services/returnScan';
 import { syncFbSaleDays } from './services/fbSales';
 import { backfillStep, syncCskhDays } from './services/cskh';
 import { autoSyncEnabled, syncDrivePermissions } from './services/driveSync';
+import { cronRefreshOne } from './services/driveIndex';
 import { isAdminHost } from './lib/host';
 import { syncAccessEmails } from './lib/access-sync';
 import { readSessionCookie, resolveSession } from './lib/session';
@@ -93,6 +94,13 @@ export default {
           if (bf.done) console.info('[cron] cskh keo bu', JSON.stringify(bf));
         } catch (error) {
           console.error('[cron] cskh keo bu loi', error);
+        }
+        // Thư mục làm việc: mỗi 15 phút quét lại một thư mục Drive có mục lục cũ nhất (quá 6 giờ) để số file không quá cũ.
+        try {
+          const r = await cronRefreshOne(env.DB, env.GDRIVE_SA_JSON);
+          if (r) console.info('[cron] muc luc drive', JSON.stringify(r));
+        } catch (error) {
+          console.error('[cron] muc luc drive loi', error);
         }
         if (new Date(event.scheduledTime).getUTCMinutes() >= 15) return;
         const config = await loadConfig(env.DB);
