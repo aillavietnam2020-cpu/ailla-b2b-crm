@@ -316,9 +316,11 @@ function ttDaydRow(x){const k=x.km||{},a=x.ads||{};return [k.gmv||0,k.don||0,k.m
 /* Tháng có nhiều đơn nhất trong file đơn (để tự chọn kỳ báo cáo). */
 function ttGuessKy(aoa){const H=ttHead(aoa,["Created Time"]);if(!H)return "";const c={};for(let r=H.at+1;r<aoa.length;r++){const d=ttIsoDay(ttCell((aoa[r]||[])[H.ix["Created Time"]]));if(d){const k=d.slice(0,7);c[k]=(c[k]||0)+1}}const b=Object.entries(c).sort((a,x)=>x[1]-a[1])[0];return b?b[0]:""}
 /* Nhận diện loại file TikTok theo cột bên trong (không dựa vào tên file). */
+/* Trang danh sách đơn: tab "OrderSKUList" nếu có (file kế toán hay thêm trang tổng hợp lên đầu, chị Huệ 16/11/2026), không thì trang đầu. */
+const ttOrderSheet=sheets=>sheets["OrderSKUList"]||Object.values(sheets).find(a=>ttHead(a||[],["Order ID","SKU ID"]))||sheets[Object.keys(sheets)[0]];
 function ttKind(sheets){const first=sheets[Object.keys(sheets)[0]]||[];
   if(sheets["Chi tiết đơn hàng"])return "income";
-  if(ttHead(first,["Order ID","SKU ID"]))return "orders";
+  if(ttHead(first,["Order ID","SKU ID"])||sheets["OrderSKUList"])return "orders";
   if(ttHead(first,["Theo ngày","Chi phí"]))return "camp";
   if(ttHead(first,["ID video","VV"]))return "videos";
   if(ttHead(first,["Thời gian","GMV đến từ video (₫)"]))return "vdays";
