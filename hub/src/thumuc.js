@@ -46,7 +46,7 @@ async function tmOv(force){
   try{TM.ov=await svApi("/api/drive/overview");TM.ovErr=""}catch(e){TM.ovErr=e.message||"Không tải được"}
   TM.ovBusy=false;tmRedraw();
   /* Thư mục chưa đếm xong (máy chủ đang quét ngầm): hỏi lại sau ít giây. */
-  if(TM.ov&&TM.ov.teams.some(t=>t.total==null)&&!TM.ovRetry){TM.ovRetry=setTimeout(()=>{TM.ovRetry=0;if(tmOn())tmOv(true)},8000)}
+  if(TM.ov&&TM.ov.teams.some(t=>t.total==null&&!t.direct)&&!TM.ovRetry){TM.ovRetry=setTimeout(()=>{TM.ovRetry=0;if(tmOn())tmOv(true)},8000)}
 }
 async function tmLoadFiles(pb,fresh){
   const k=pb;if(!fresh&&TM.fl[k]&&!TM.fl[k].err)return;TM.fl[k]={loading:true};
@@ -147,7 +147,11 @@ const tmCss=`<style>
   @media(max-width:860px){.tm-two,.tm-dg{grid-template-columns:1fr}.tm-kv{grid-template-columns:1fr 1fr}}
 </style>`;
 
+const tmDrv=t=>"https://drive.google.com/drive/folders/"+encodeURIComponent(t.folder_id||"");
+/* Thư mục rất lớn (vd video booking của Worker): web không đếm, bấm là mở thẳng trên Drive (chị Hoa 16/11). */
+const tmDirectCard=t=>`<a class="tm-fc" href="${tmDrv(t)}" target="_blank" rel="noopener" style="text-decoration:none"><div class="hd"><span class="tm-fic">${tmFolderSvg}</span><span class="tm-num"><b>↗</b><small>mở trên Drive</small></span></div><div class="t">${esc(t.name)}</div><div class="tm-more">Thư mục rất nhiều file, bấm để mở thẳng trên Google Drive</div><span class="tm-tag ${t.edit?"w":""}">${t.edit?"Được sửa":"Chỉ xem"}</span></a>`;
 function tmCard(t){
+  if(t.direct)return tmDirectCard(t);
   const S=[...t.subs].map((s,i)=>({...s,col:TM_SUBC[i%TM_SUBC.length]}));const top=[...S].sort((a,b)=>b.c-a.c);
   return `<button class="tm-fc" data-tmpb="${esc(t.pb)}">
    <div class="hd"><span class="tm-fic">${tmFolderSvg}</span><span class="tm-num"><b>${t.total==null?"…":t.total.toLocaleString("vi-VN")}</b><small>${t.total==null?"đang đếm":"file"}</small></span></div>
@@ -169,7 +173,7 @@ function tmCardsView(){
 }
 function tmDeptStrip(){
   const T=tmVisible(),a=T.filter(t=>!t.shared),b=T.filter(t=>t.shared);
-  const one=t=>`<button class="tm-dp${t.pb===TM.pb?" on":""}" data-tmpb="${esc(t.pb)}">${esc(t.name)}<small>${t.total==null?"…":t.total}</small></button>`;
+  const one=t=>t.direct?`<a class="tm-dp" href="${tmDrv(t)}" target="_blank" rel="noopener" style="text-decoration:none">${esc(t.name)}<small>↗</small></a>`:`<button class="tm-dp${t.pb===TM.pb?" on":""}" data-tmpb="${esc(t.pb)}">${esc(t.name)}<small>${t.total==null?"…":t.total}</small></button>`;
   return `<div class="tm-dept">${a.map(one).join("")}${a.length&&b.length?`<span class="tm-dsep"></span>`:""}${b.map(one).join("")}</div>`;
 }
 function tmRows(L,q){
@@ -219,7 +223,7 @@ function tmDashView(){
    <button class="tm-kpi" data-tmt="find"><span><small>Thêm mới 7 ngày</small><b>+${add}</b><em>${big&&big.added?"nhiều nhất: "+esc(big.name):"chưa có file mới"}</em></span><i style="background:var(--green-soft);color:var(--green)">↑</i></button>
    <button class="tm-kpi" data-tmt="todo"><span><small>Việc cần xử lý</small><b>${td.length}</b><em class="${td.some(x=>x.lv==="r")?"r":""}">${td.filter(x=>x.lv==="r").length} cần làm ngay</em></span><i style="background:var(--red-soft);color:var(--red)">!</i></button></div>
   <div class="tm-two"><div class="tm-box"><div class="tm-bh"><span><h3>Các thư mục</h3><small>Bấm để xem bên trong</small></span><button class="tm-lk" data-tmt="thumuc">Xem tất cả</button></div>
-   <div class="tm-mini">${T.map(t=>`<button class="tm-mf" data-tmpb="${esc(t.pb)}"><span class="t"><span>${esc(t.name)}</span><span class="hint">${t.total??"…"}</span></span><span class="dots">${t.subs.map((s,i)=>`<i style="background:${TM_SUBC[i%TM_SUBC.length]}" title="${esc(s.n)} · ${s.c} file"></i>`).join("")}</span></button>`).join("")}</div></div>
+   <div class="tm-mini">${T.map(t=>t.direct?`<a class="tm-mf" href="${tmDrv(t)}" target="_blank" rel="noopener" style="text-decoration:none"><span class="t"><span>${esc(t.name)}</span><span class="hint">↗</span></span><span class="hint" style="font-size:11.5px">Mở trên Drive</span></a>`:`<button class="tm-mf" data-tmpb="${esc(t.pb)}"><span class="t"><span>${esc(t.name)}</span><span class="hint">${t.total??"…"}</span></span><span class="dots">${t.subs.map((s,i)=>`<i style="background:${TM_SUBC[i%TM_SUBC.length]}" title="${esc(s.n)} · ${s.c} file"></i>`).join("")}</span></button>`).join("")}</div></div>
   <div class="tm-box"><div class="tm-bh"><span><h3>Việc cần xử lý</h3><small>${td.length} việc</small></span><button class="tm-lk" data-tmt="todo">Xem tất cả</button></div>${td.slice(0,8).map(tmTi).join("")||`<div class="tm-empty">Thư mục đang gọn, không có việc nào.</div>`}</div></div>`;
 }
 function tmTodoView(){
@@ -232,7 +236,7 @@ function tmRepView(){
   const T=tmVisible(),s=k=>T.reduce((a,t)=>a+(t[k]||0),0);
   return `<div class="tm-hd"><div><h2>Báo cáo thư mục</h2><p>Số file đang lưu, thêm và sửa trong 7 ngày qua, việc cần xử lý của từng thư mục.</p></div></div>
   <div class="tm-box"><div class="tm-tw"><table class="tm-t tm-rt" style="min-width:560px"><thead><tr><th style="width:36%">Thư mục</th><th style="text-align:right">Đang lưu</th><th style="text-align:right">Thêm 7 ngày</th><th style="text-align:right">Sửa 7 ngày</th><th style="text-align:right">Cần xử lý</th></tr></thead><tbody>
-  ${T.map(t=>`<tr data-tmpb="${esc(t.pb)}"><td>${esc(t.name)}${t.shared?` <span class="hint">· tư liệu chung</span>`:""}</td><td style="text-align:right">${t.total??"…"}</td><td style="text-align:right">${t.added||'<span class="hint">0</span>'}</td><td style="text-align:right">${t.edited||'<span class="hint">0</span>'}</td><td style="text-align:right">${t.todo?`<b class="t-red">${t.todo}</b>`:'<span class="hint">0</span>'}</td></tr>`).join("")}
+  ${T.filter(t=>!t.direct).map(t=>`<tr data-tmpb="${esc(t.pb)}"><td>${esc(t.name)}${t.shared?` <span class="hint">· tư liệu chung</span>`:""}</td><td style="text-align:right">${t.total??"…"}</td><td style="text-align:right">${t.added||'<span class="hint">0</span>'}</td><td style="text-align:right">${t.edited||'<span class="hint">0</span>'}</td><td style="text-align:right">${t.todo?`<b class="t-red">${t.todo}</b>`:'<span class="hint">0</span>'}</td></tr>`).join("")}
   <tr style="cursor:default;font-weight:700"><td>Tổng</td><td style="text-align:right">${s("total").toLocaleString("vi-VN")}</td><td style="text-align:right">${s("added")}</td><td style="text-align:right">${s("edited")}</td><td style="text-align:right">${s("todo")}</td></tr></tbody></table></div></div>`;
 }
 function tmFindView(){
@@ -264,6 +268,7 @@ function pThuMuc(m){
   else if(tab==="todo")body=tmTodoView();
   else if(tab==="rep"&&ceo)body=tmRepView();
   else if(TM.file)body=tmFileView();
+  else if(TM.pb&&tmTeam(TM.pb)&&tmTeam(TM.pb).direct)body=`<div class="note">Thư mục <b>${esc(tmTeam(TM.pb).name)}</b> rất nhiều file nên mở thẳng trên Drive. <a href="${tmDrv(tmTeam(TM.pb))}" target="_blank" rel="noopener">Mở trên Google Drive ↗</a></div>`+tmCardsView();
   else if(TM.pb&&tmVisible().some(t=>t.pb===TM.pb))body=tmFolderView();
   else body=tmCardsView();
   m.innerHTML=tmCss+head+tabs+`<div class="tm-wrap">${body}</div>`;
@@ -304,7 +309,7 @@ function tmCfgHtml(){
   const isDept=pb=>D_.some(d=>d.k===pb);
   const sh=C.teams.filter(t=>!isDept(t.pb));let n=1;const used=new Set(C.teams.map(t=>t.pb));const nextPb=()=>{while(used.has("chung"+n))n++;used.add("chung"+n);return "chung"+n};
   const shRows=sh.concat([{pb:nextPb(),folderId:"",viewers:["all"],name:"",blank:true}]).map(t=>{const st=t.blank?"":!C.connected?pill("Chờ nối Drive","amb"):t.ok?pill("Đã thấy: "+(t.folder_name||"thư mục"),"grn"):pill("Chưa chia sẻ cho web","amb");
-    return `<tr><td style="min-width:180px"><input data-tmnm="${esc(t.pb)}" placeholder="${t.blank?"Thêm thư mục chung: tên":"Tên thư mục"}" value="${esc(t.name||"")}"></td><td style="min-width:240px"><input data-tmfo="${esc(t.pb)}" placeholder="Dán link thư mục Google Drive" value="${t.folderId?esc("https://drive.google.com/drive/folders/"+t.folderId):""}"></td><td style="min-width:220px">${extra(t.pb,t,true)}</td><td>${st}</td></tr>`});
+    return `<tr><td style="min-width:180px"><input data-tmnm="${esc(t.pb)}" placeholder="${t.blank?"Thêm thư mục chung: tên":"Tên thư mục"}" value="${esc(t.name||"")}"></td><td style="min-width:240px"><input data-tmfo="${esc(t.pb)}" placeholder="Dán link thư mục Google Drive" value="${t.folderId?esc("https://drive.google.com/drive/folders/"+t.folderId):""}"></td><td style="min-width:220px">${extra(t.pb,t,true)}${t.blank?"":`<label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" style="width:auto" data-tmdirect="${esc(t.pb)}"${t.direct?" checked":""}> Mở thẳng trên Drive (thư mục rất lớn, web không đếm file)</label>`}</td><td>${st}</td></tr>`});
   const sy=TM.sync,syHtml=!sy?"":sy.loading?`<p class="hint">Đang kiểm tra quyền trên Drive…</p>`:sy.err?`<div class="note red">${esc(sy.err)}</div>`:
     `<div class="card pad" style="margin-top:10px">${sy.dry?"<b>Xem trước:</b> ":"<b>Đã đồng bộ.</b> "}${sy.folders.map(f=>{const nm=(D_.find(d=>d.k===f.pb)||C.teams.find(t=>t.pb===f.pb)||{}).n||(C.teams.find(t=>t.pb===f.pb)||{}).name||f.pb;
       return `<div style="margin-top:6px"><b>${esc(nm)}</b>: ${f.error?`<span class="t-red">${esc(f.error)}</span>`:[f.added.length?"thêm "+esc(f.added.join(", ")):"",f.changed.length?"đổi "+esc(f.changed.join(", ")):"",f.removed.length?"gỡ "+esc(f.removed.join(", ")):""].filter(Boolean).join(" · ")||"không cần đổi"}</div>`}).join("")}
@@ -325,7 +330,8 @@ function tmCfgBind(m){
   const cp=$("#tm-cp");if(cp)cp.onclick=()=>{try{navigator.clipboard.writeText(TM.cfg.sa_email).then(()=>toast("Đã chép email"),()=>toast(TM.cfg.sa_email))}catch(e){toast(TM.cfg.sa_email)}};
   const sv=$("#tm-save");if(sv)sv.onclick=async()=>{
     const teams=[...m.querySelectorAll("[data-tmfo]")].map(i=>{const pb=i.dataset.tmfo,nm=m.querySelector(`[data-tmnm="${CSS.escape(pb)}"]`);
-      return {pb,folder:i.value.trim(),name:nm?nm.value.trim():"",viewers:[...m.querySelectorAll(`[data-tmvw="${CSS.escape(pb)}"]:checked`)].map(c=>c.value)}}).filter(t=>t.folder);
+      const dr=m.querySelector(`[data-tmdirect="${CSS.escape(pb)}"]`);
+      return {pb,folder:i.value.trim(),name:nm?nm.value.trim():"",direct:!!(dr&&dr.checked),viewers:[...m.querySelectorAll(`[data-tmvw="${CSS.escape(pb)}"]:checked`)].map(c=>c.value)}}).filter(t=>t.folder);
     const noName=teams.find(t=>m.querySelector(`[data-tmnm="${CSS.escape(t.pb)}"]`)&&!t.name);if(noName){toast("Đặt tên cho thư mục dùng chung trước khi lưu");return}
     TM.saving=true;renderMain();
     try{await svApi("/api/drive/config",{method:"PUT",body:JSON.stringify({teams})});toast("Đã lưu thư mục các phòng");TM.teams=null;TM.ov=null;TM.fl={};await tmCfgLoad();tmTeams(true)}

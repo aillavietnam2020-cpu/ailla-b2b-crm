@@ -89,7 +89,7 @@ export async function loadIdx(db: D1Database, pb: string): Promise<TeamIdx | nul
 export async function refreshIdx(db: D1Database, saJson: string | undefined, cfg: DriveConfig, pb: string): Promise<TeamIdx | null> {
   const key = saKey(saJson);
   const team = cfg.teams.find((t) => t.pb === pb);
-  if (!key || !team || RUNNING.has(pb)) return null;
+  if (!key || !team || team.direct || RUNNING.has(pb)) return null;
   RUNNING.add(pb);
   try {
     const skip = new Set(cfg.teams.filter((t) => t.pb !== pb).map((t) => t.folderId));
@@ -118,7 +118,7 @@ export async function cronRefreshOne(db: D1Database, saJson: string | undefined)
   const cfg: DriveConfig = row ? normalizeConfig(JSON.parse(row.data)) : { teams: [] };
   if (!cfg.teams.length) return null;
   let pick: { pb: string; at: number } | null = null;
-  for (const t of cfg.teams) {
+  for (const t of cfg.teams.filter((x) => !x.direct)) {
     const idx = await loadIdx(db, t.pb);
     // Đổi thư mục gốc ở trang Gán thư mục thì quét lại ngay lượt sau.
     const at = idx && idx.root === t.folderId ? Date.parse(idx.at) : 0;

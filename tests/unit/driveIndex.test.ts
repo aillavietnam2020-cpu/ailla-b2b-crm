@@ -58,3 +58,15 @@ describe('mục lục Thư mục làm việc', () => {
     expect(searchIdx(files, '   ')).toEqual([]);
   });
 });
+
+describe('thư mục mở thẳng trên Drive', () => {
+  it('giữ cờ direct khi lưu cấu hình, bỏ giá trị lạ', async () => {
+    const { normalizeConfig } = await import('../../src/server/lib/driveAccess');
+    const cfg = normalizeConfig({ teams: [
+      { pb: 'chung4', folderId: '1WB9GbF2xPg9dtgVVWdL7RqWlwwZJJO4v', viewers: ['pb:CM'], name: 'Booking video', direct: true },
+      { pb: 'chung5', folderId: '1NNcrdHYg3X-FokcwTR0aXN_zDMcoHmEZ', viewers: ['all'], name: 'Ảnh sàn', direct: 'có' },
+    ] });
+    expect(cfg.teams[0].direct).toBe(true);
+    expect('direct' in cfg.teams[1]).toBe(false);
+  });
+});
