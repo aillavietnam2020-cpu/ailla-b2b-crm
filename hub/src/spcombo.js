@@ -348,7 +348,9 @@ const spbGia=()=>[];
 async function spbPkLoad(){SPCB.pkBusy=1;renderMain();try{SPCB.pk=await spcApi("/pancake-products?channel=FACEBOOK");SPCB.pkErr=""}catch(e){SPCB.pkErr=e.message}SPCB.pkBusy=0;renderMain()}
 /* Danh sách sản phẩm của bộ phận chọn từ Pancake (chị Hoa 16/11): thêm / bỏ ngay trên bảng Pancake; CSKH đặt giá bán CSKH (dùng khi CSKH tạo đơn).
    Chỉ sửa danh mục trên web (d.fbCat / d.cskhCat); giá trên Pancake giữ nguyên (ghi lên Pancake chờ chị duyệt riêng). */
-const spbPkVar=(id,code)=>{for(const p of (typeof spcCat==="function"?spcCat():[]))for(const v of (p.bt||[]))if((id&&v.pkId===id)||(code&&spcLow(v.ma)===spcLow(code)))return {p,v};return null};
+/* Mã Pancake trùng nhau (vd nhiều sản phẩm mã "1") thì không so theo mã, chỉ theo mã nội bộ Pancake (pkId). */
+const spbPkUniq=code=>!!code&&(SPCB.pk&&SPCB.pk.rows||[]).filter(r=>spcLow(r.code)===spcLow(code)).length===1;
+const spbPkVar=(id,code)=>{const cu=spbPkUniq(code);for(const p of (typeof spcCat==="function"?spcCat():[]))for(const v of (p.bt||[]))if((id&&v.pkId===id)||(cu&&!v.pkId&&spcLow(v.ma)===spcLow(code)))return {p,v};return null};
 function spbPkEditView(bpv){
   const P=SPCB.pk,cs=bpv==="CSKH",ed=typeof spcCanEdit==="function"&&spcCanEdit(),fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.pkq||"").trim();
   const rows=P.rows.filter(r=>!r.hidden).map(r=>({r,lk:spbPkVar(r.id,r.code)})).filter(x=>!q||fold(x.r.code+" "+x.r.name).includes(q)).sort((a,b)=>(b.lk?1:0)-(a.lk?1:0)||a.r.name.localeCompare(b.r.name,"vi"));
@@ -364,7 +366,7 @@ function spbPkBind(m){
   const q=$("#spb-pkq");if(q)q.oninput=()=>{SPCB.pkq=q.value;const p=q.selectionStart;renderMain();const x=$("#spb-pkq");if(x){x.focus();x.setSelectionRange(p,p)}};
   const row=id=>(SPCB.pk&&SPCB.pk.rows||[]).find(r=>r.id===id);
   m.querySelectorAll("[data-pkadd]").forEach(b=>b.onclick=()=>{const r=row(b.dataset.pkadd);if(!r||spbPkVar(r.id,r.code))return;const t=Date.now();
-    spcEdit("thêm sản phẩm từ Pancake: "+r.name,c=>{c.sp.push({id:"p"+t,ten:r.name,loai:"run",bt:[{id:"v"+t,ma:r.code||r.id,dt:"",pl:r.variant||"",on:true,pkId:r.id}]})})});
+    spcEdit("thêm sản phẩm từ Pancake: "+r.name,c=>{c.sp.push({id:"p"+t,ten:r.name,loai:"run",bt:[{id:"v"+t,ma:spbPkUniq(r.code)?r.code:r.id,dt:"",pl:r.variant||"",on:true,pkId:r.id}]})})});
   m.querySelectorAll("[data-pkdel]").forEach(b=>b.onclick=()=>{const lk=spbPkVar(b.dataset.pkdel,b.dataset.pkcode);if(!lk)return;const ma=lk.v.ma;
     const used=(typeof spcCombosAll==="function"?spcCombosAll():[]).some(c=>(c.gom||[]).concat(c.tang||[]).some(x=>x.ma===ma));
     if(used){toast("Sản phẩm này đang nằm trong combo. Sửa hoặc dừng combo trước rồi mới bỏ.");return}
