@@ -502,7 +502,7 @@ function cwMy(m){cwCss();PAGE="cv_v";
     const v=CW_MY.find(x=>x[0]===CWS.my);title="Việc của tôi";desc=CWS.my==="today"?cwToday()+" · "+CW_MYD.today:CW_MYD[CWS.my];
     body=CWS.kx==="list"?cwMyList(R,CWS.my):cwView(cwDaF(cwQ(v[3](R))))}
   const daChip=cwDaSel();
-  m.innerHTML=cwTry(()=>cwHero(R),()=>cwHead(title,desc))+(typeof nlVideoToi==="function"?nlVideoToi(ME.id):"")+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+cwTry(()=>cwLay(body,R),()=>body)+cwTry(cwWs,()=>"")+cwTry(cwDocs,()=>"");
+  m.innerHTML=cwTry(()=>cwHero(R),()=>cwHead(title,desc))+(typeof nlVideoToi==="function"?nlVideoToi(ME.id):"")+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+cwTry(()=>cwLay(body,R),()=>body)+(CWS.my==="today"?cwTry(cwWs,()=>"")+cwTry(cwDocs,()=>""):"");
   cwTop(m);cwBind(m,R);if(typeof nlVideoToiBind==="function")nlVideoToiBind(m);
   m.querySelectorAll("[data-cwkv]").forEach(b=>b.onclick=e=>{e.stopPropagation();if(b.tagName==="DIV"&&e.target.closest("button"))return;cwKhoQuick(b.dataset.cwkv)});
   m.querySelectorAll("[data-cwkho]").forEach(b=>b.onclick=()=>{MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt=b.dataset.cwkho;XV.ktK="";XV.q="";render();scrollTo(0,0)});
