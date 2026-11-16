@@ -15,14 +15,15 @@ it('mkt/combos: có bộ phận và giá chương trình', async () => {
     sp: [{ id: 'p1', ten: 'Tẩy lồng', loai: 'run', bt: [{ id: 'v1', ma: 'TLG', dt: '300g', pl: '', on: true }] }],
     combos: [
       { id: 'a', nhom: 'Tẩy lồng', gom: [{ ma: 'TLG', sl: 2 }], tang: [], gia: 150000, tu: '2026-11-01', tt: 'ok' },
-      { id: 'b', nhom: 'Tẩy lồng', gom: [{ ma: 'TLG', sl: 1 }], tang: [], gia: 89000, tu: '2026-11-01', tt: 'ok', bp: 'CSKH' },
     ],
     gia: [
       { bp: 'CSKH', ma: 'TLG', gia: 80000, tu: '2026-11-01' },
       { bp: 'ADS', ma: 'TLG', gia: 90000, den: '2026-01-01' },
     ],
   };
-  await ctx.db.prepare("INSERT INTO hub_state (id, version, data, updated_at) VALUES ('main', 1, ?, ?)").bind(await pack(JSON.stringify({ fbCat })), today).run();
+  // Combo CSKH nằm ở kho riêng cskhCat (16/11)
+  const cskhCat = { sp: [], combos: [{ id: 'b', nhom: 'Tẩy lồng', gom: [{ ma: 'TLG', sl: 1 }], tang: [], gia: 89000, tu: '2026-11-01', tt: 'ok' }] };
+  await ctx.db.prepare("INSERT INTO hub_state (id, version, data, updated_at) VALUES ('main', 1, ?, ?)").bind(await pack(JSON.stringify({ fbCat, cskhCat })), today).run();
   const made = await ctx.request('/api/admin/agents', { as: USERS.ceo, body: { name: 'CSKH', scopes: ['mkt_digital'], can_propose: false } });
   const res = await ctx.app.fetch(
     new Request('http://localhost/api/agent/mkt/combos', { headers: { Authorization: `Bearer ${made.body.data.token}` } }),

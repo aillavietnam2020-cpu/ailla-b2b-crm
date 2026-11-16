@@ -96,7 +96,7 @@ function pdBuild(S,w){
       sub:Object.entries(by).map(([c,n])=>(c==="FACEBOOK"?"Facebook":c==="SHOPEE"?"Shopee":"TikTok")+" "+n).join(", ")+" · kho vẫn xuất bình thường",at:pdTs(first),act:"",open:{page:"spcombo"}})}
   if(R.ketoan()){
     (S.cbPhieu||[]).forEach(p=>{const it=p.items||[],moi=it.filter(x=>x.loai==="moi").length,dung=it.length-moi;
-      add({k:"cbdx",id:"cbp:"+p.id,ref:p.id,src:"cbPhieu",loai:"Duyệt combo Digital",nd:p.ten||"",sub:[moi?moi+" combo mới":"",dung?dung+" combo dừng chạy":"",p.ghi||""].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"dg_sp"}})});
+      add({k:"cbdx",id:"cbp:"+p.id,ref:p.id,src:"cbPhieu",loai:p.bp==="CSKH"?"Duyệt combo CSKH":"Duyệt combo Digital",nd:p.ten||"",sub:[moi?moi+" combo mới":"",dung?dung+" combo dừng chạy":"",p.ghi||""].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"dg_sp"}})});
     const mi=S.cbMisa||[];
     if(mi.length)add({k:"cbdx",id:"cbmisa",ref:"cbmisa",src:"cbMisa",loai:"Combo chờ mã MISA",nd:mi.length+" combo đã duyệt chưa có mã MISA",sub:"kế toán trưởng nhập ở Sản phẩm và combo",at:pdTs(mi.map(x=>x.at).filter(Boolean).sort()[0]||0),act:"",open:{page:"dg_sp"}})}
   if(R.mh())(S.mhLech||[]).filter(x=>!x.status||x.status==="CHO").forEach(x=>{const d=+x.diff||0,ty=d>0?"dư":"thiếu",q=n=>String(Math.round(n*1000)/1000).replace(".",",");

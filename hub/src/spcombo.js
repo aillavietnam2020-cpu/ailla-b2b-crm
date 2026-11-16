@@ -335,13 +335,13 @@ function spcKppPending(onDone){
 /* Duyệt một mã từ trang Phê duyệt (cùng hộp duyệt). */
 async function spcKppFromPd(onDone){try{const r=await spcApi("/kpp-code/pending");SPCB.kpPend=r.rows||[];spcKppPending(onDone)}catch(e){toast(e.message)}}
 /* ---------- Combo & giá theo bộ phận (chị Hoa duyệt demo 16/11, C:\Users\ADMIN\Downloads\demo-combo-bo-phan.html) ----------
-   Combo Ads và CSKH dùng chung danh mục Facebook › Sản phẩm (spdangchay.js, d.fbCat.combos; combo CSKH có bp:"CSKH", không chạy ads),
-   vẫn gửi phiếu cho kế toán duyệt như Ads. CSKH = phòng B2C (chị Hoa chốt 16/11).
+   Ads dùng danh mục Facebook › Sản phẩm (d.fbCat); CSKH có kho sản phẩm và combo RIÊNG (d.cskhCat, cùng giao diện spdangchay.js, SPC.bpView "CSKH"),
+   không chạy ads, vẫn gửi phiếu cho kế toán duyệt như Ads. CSKH = phòng CSKH / B2C (chị Hoa chốt 16/11).
    Giá chương trình: giá bán lẻ riêng từng sản phẩm của bộ phận, có ngày (d.fbCat.gia [{bp, ma, gia, tu, den, by, at}]).
    Quản trị › Sản phẩm & combo › tab "Combo các bộ phận": xem tổng, không sửa. */
 const SPB_BP={ADS:["Ads (chạy quảng cáo)","blu"],CSKH:["CSKH (không chạy ads)","vio"]};
 const spbGia=()=>{try{const f=D().fbCat;return f&&Array.isArray(f.gia)?f.gia:[]}catch(e){return []}};
-const spbCanGia=bp=>{try{return ME.role==="admin"||(bp==="CSKH"?ME.phongBan==="B2C":(ME.role==="digital"||(typeof userTeam==="function"&&userTeam(ME)==="ads")))}catch(e){return false}};
+const spbCanGia=bp=>{try{return ME.role==="admin"||(bp==="CSKH"?["CSKH","B2C"].includes(ME.phongBan):(ME.role==="digital"||(typeof userTeam==="function"&&userTeam(ME)==="ads")))}catch(e){return false}};
 const spbVars=()=>(typeof spcCat==="function"?spcCat():[]).filter(p=>p.loai==="run").flatMap(p=>(p.bt||[]).filter(v=>v.ma&&v.on!==false).map(v=>({ma:v.ma,ten:p.ten+((v.dt||v.pl)?" ("+[v.dt,v.pl].filter(Boolean).join(" · ")+")":"")})));
 function spbGiaSection(bp){
   const ed=spbCanGia(bp),L=spbGia().filter(g=>g.bp===bp),by=new Map(L.map(g=>[g.ma,g]));
@@ -363,14 +363,15 @@ function spbGiaBind(m){
 /* Vận hành › Kinh doanh › Combo & giá CSKH (phòng B2C) */
 PAGES.kd_combo=function(m){if(typeof spcEditor!=="function"){m.innerHTML=H("Combo & giá CSKH","")+`<p class="hint pad">Chưa tải được danh mục sản phẩm.</p>`;return}
   SPC.bpView="CSKH";
-  m.innerHTML=H("Combo & giá CSKH","Combo không chạy ads của CSKH · thêm combo, gửi kế toán duyệt như Ads · giá sản phẩm theo chương trình")+spcEditor(null,[],{van:true})+spbGiaSection("CSKH");spbGiaBind(m)};
+  m.innerHTML=H("Combo & giá CSKH","Sản phẩm và combo riêng của CSKH (không chạy ads, tách với Ads) · gửi kế toán duyệt · giá sản phẩm theo chương trình")+spcEditor(null,[],{van:true})+spbGiaSection("CSKH");spbGiaBind(m)};
 /* Vận hành › Digital › Sản phẩm và combo (Ads): thêm bảng giá chương trình của Ads */
 {const _dg=PAGES.dg_sp;if(_dg)PAGES.dg_sp=function(m){_dg(m);m.insertAdjacentHTML("beforeend",spbGiaSection("ADS"));spbGiaBind(m)}}
-MODULES.push({k:"spb_cskh",zone:"Vận hành",ic:"bag",n:"Combo & giá CSKH",sub:"",groups:()=>[["",[MI("kd_combo","Combo & giá CSKH",u=>u.role==="admin"||u.phongBan==="B2C")]]]});
+/* Menu: Kinh doanh › Chăm sóc khách hàng › Combo & giá CSKH (cskh.js dựng nhóm này). */
 /* Đồng bộ Pancake (chỉ đọc, chị Hoa duyệt 16/11): so mã sản phẩm web (Facebook › Sản phẩm) với danh sách sản phẩm và giá trên Pancake Facebook.
    Ghi ngược lên Pancake chưa làm: chờ chị duyệt riêng. */
 async function spbPkLoad(){SPCB.pkBusy=1;renderMain();try{SPCB.pk=await spcApi("/pancake-products?channel=FACEBOOK");SPCB.pkErr=""}catch(e){SPCB.pkErr=e.message}SPCB.pkBusy=0;renderMain()}
 function spbPkView(){
+  if(typeof SPC!=="undefined")SPC.bpView=null;
   const P=SPCB.pk;
   const head=`<div class="card-h"><h2>Đồng bộ Pancake Facebook <small class="hint">chỉ đọc</small></h2><button class="btn${P?"":" pri"}" data-spbpk="1" ${SPCB.pkBusy?"disabled":""}>${SPCB.pkBusy?"Đang đọc…":P?"Đọc lại":"Đọc từ Pancake"}</button></div>`;
   if(!P)return `<section class="card">${head}<p class="hint">Bấm "Đọc từ Pancake" để so mã và giá sản phẩm trên Pancake với danh mục trên web. Web không sửa gì trên Pancake.${SPCB.pkErr?` <span class="t-red">${esc(SPCB.pkErr)}</span>`:""}</p></section>`;
@@ -385,8 +386,11 @@ function spbPkView(){
 }
 /* Quản trị: kho tổng combo các bộ phận (chỉ xem) */
 function spbAdminView(){
+  if(typeof SPC!=="undefined")SPC.bpView=null;
   /* Một bảng tổng combo mọi kênh như demo chị duyệt 16/11: Ads Facebook, CSKH (không chạy ads), sàn TikTok, sàn Shopee. */
-  const fb=typeof spcCombosAll==="function"?spcCombosAll():[],F=SPCB.bpf||"",fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.bq||"").trim();
+  /* Combo Ads ở d.fbCat, combo CSKH ở kho riêng d.cskhCat */
+  const ck=(D()&&D().cskhCat&&Array.isArray(D().cskhCat.combos))?D().cskhCat.combos.map(c=>Object.assign({},c,{bp:"CSKH"})):[];
+  const fb=(typeof spcCombosAll==="function"?spcCombosAll().filter(c=>c.bp!=="CSKH"):[]).concat(ck),F=SPCB.bpf||"",fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.bq||"").trim();
   const st=c=>typeof spcTag==="function"?spcTag(c):"",run=c=>(typeof spcTT!=="function"||spcTT(c)==="ok")&&!(typeof spcSt==="function"&&spcSt(c)[0]==="Đã hết");
   const dm=d=>d?esc(d.slice(8,10)+"/"+d.slice(5,7)):"";
   const R=fb.map(c=>{const k=c.bp||"ADS";return {k,tag:pill(SPB_BP[k][0],SPB_BP[k][1]),ten:c.nhom||"",gom:c.combo||"",qua:c.qua||"",gia:nf(c.gia||0)+(c.ship?`<br><small class="hint">ship ${nf(c.ship)}</small>`:""),

@@ -808,13 +808,15 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
   needScope(c, 'cskh_b2b', 'mkt_digital', 'mkt_content');
   const d = await hubData(c);
   const fb = (d.fbCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>>; gia?: Array<Record<string, unknown>> } | null;
+  // CSKH có kho sản phẩm + combo riêng (d.cskhCat, 16/11), không chạy ads.
+  const ck = (d.cskhCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>> } | null;
   if (!fb || !Array.isArray(fb.combos)) {
     return ok(c, [], { ghi_chu: 'Chưa có bảng combo lưu trên web (Digital chưa sửa lần nào). Không tự đoán combo.' });
   }
   const all = c.req.query('all') === '1';
   const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
   const names = new Map<string, string>();
-  const products = (fb.sp ?? []).map((p) => {
+  const products = (fb.sp ?? []).concat(ck?.sp ?? []).map((p) => {
     const bt = ((p.bt as Array<Record<string, unknown>>) ?? []).map((v) => {
       const label = [p.ten, v.dt, v.pl].filter((x) => x).join(' ');
       if (v.ma) names.set(String(v.ma), label);
@@ -830,6 +832,7 @@ agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
     return 'Đang áp dụng';
   };
   const combos = fb.combos
+    .concat((ck?.combos ?? []).map((x) => ({ ...x, bp: 'CSKH' })))
     .filter((x) => ((x.tt as string) || 'ok') === 'ok' && !x.dx)
     .map((x) => ({
       nhom: x.nhom || '',

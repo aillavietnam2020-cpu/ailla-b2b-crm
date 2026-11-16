@@ -62,22 +62,24 @@ const SPC_DEF_CAT=[
 const SPC_MISA={TLG125:"AILLATLGTUI",TLG:"AILLATLGSX",TM:"AILLAMOCGIOANGCHAITRON",M300:"AILLAXM300ML",XM530ML:"AillaXM",R300:"AILLAXR300ML",XR:"AillaXR",TDSH:"AILLATDGS80HYDEN",TDST:"AILLATDGS80LUXURY",TDSX:"AILLATDGS80CFT",TDSXL:"AILLATDGS80FRANCRE",TDSD:"AILLATDGS80BANME",TD:"AILLATDGS80HYDEN",TDGSH500:"AILLATDGSLUXURY500ML",TDGST500:"AILLATDGSLUXURY500ML",BTVN250:"AILLATVN250",BTVN:"AillaTVN",LSCD5KG:"AILLALSBV5LSACHANH",LSCD2KG:"AILLALSBV2SC",LS5CDSC:"AILLALSBV5LSACHANH",LS5CDHH:"AILLALSBV5LHOAHONG",LSCDSC2KG:"AILLALSBV2SC",LSCDHH2KG:"AILLALSBV2HH",LS1LCDHH:"AILLALSBV1LHOAHONG",LS1SC:"AILLALS1SC",ND:"NOIDIEN",BD100:"AILLABODY100",C:"CHOIGIOANG",TOILET500:"AillaToilet500SX",MT:"AillaMOCTRANG",MM:"AillaMOCMAU",DM:"DUNGMOI250",CCK:"CHOICOKHE"};
 const spcCanMisa=()=>{try{return ME.role==="admin"||/huệ/i.test(ME.name||"")}catch(e){return false}};
 const spcMisa=v=>(v&&(v.misa||SPC_MISA[v.ma]))||"";
-const spcStore=()=>{try{return D().fbCat||null}catch(e){return null}};
-const spcCat=()=>{const s=spcStore();return s&&Array.isArray(s.sp)?s.sp:SPC_DEF_CAT};
-const spcCombosAll=()=>{const s=spcStore();return s&&Array.isArray(s.combos)?s.combos:SPC_DEF_COMBOS};
+/* Ads dùng d.fbCat; CSKH có kho sản phẩm và combo riêng d.cskhCat (chị Hoa chốt 16/11: sản phẩm, combo của CSKH khác Ads). */
+const spcKey=()=>SPC.bpView==="CSKH"?"cskhCat":"fbCat";
+const spcStore=()=>{try{return D()[spcKey()]||null}catch(e){return null}};
+const spcCat=()=>{const s=spcStore();return s&&Array.isArray(s.sp)?s.sp:(spcKey()==="cskhCat"?[]:SPC_DEF_CAT)};
+const spcCombosAll=()=>{const s=spcStore();return s&&Array.isArray(s.combos)?s.combos:(spcKey()==="cskhCat"?[]:SPC_DEF_COMBOS)};
 /* Combo theo bộ phận (chị Hoa giao 16/11): c.bp = "CSKH" (không chạy ads) | không có = Ads. Trang vận hành chỉ hiện combo bộ phận mình (SPC.bpView); quản trị xem hết. */
 const spcCombos=()=>{const a=spcCombosAll();return SPC.bpView?a.filter(c=>(c.bp||"ADS")===SPC.bpView):a};
 function spcCls(code){const cat=spcCat();for(const p of cat){const v=(p.bt||[]).find(x=>x.ma===code);if(v)return v.on===false?SPC_OFF:p.loai}const s=spcStore();return (s&&s.cls&&s.cls[code])||SPC_OFF}
 function spcLookup(code){const cat=spcCat();for(const p of cat){const v=(p.bt||[]).find(x=>x.ma===code);if(v)return {p,v}}return null}
 /* CEO, cả team Digital (CEO duyệt 03/11), kế toán và Quản lý được thêm/sửa; người khác chỉ xem */
-const spcCanEdit=()=>{try{return (SPC.bpView==="CSKH"&&ME.phongBan==="B2C")||ME.role==="admin"||ME.role==="digital"||(typeof userTeam==="function"&&userTeam(ME)==="ads")||/huệ|thảo/i.test(ME.name||"")}catch(e){return false}};
+const spcCanEdit=()=>{try{return (SPC.bpView==="CSKH"&&["CSKH","B2C"].includes(ME.phongBan))||ME.role==="admin"||ME.role==="digital"||(typeof userTeam==="function"&&userTeam(ME)==="ads")||/huệ|thảo/i.test(ME.name||"")}catch(e){return false}};
 const spcClone=o=>JSON.parse(JSON.stringify(o));
 /* Mã kho + tên Pancake đã điền thì tự thêm vào bảng quy đổi Facebook của kế toán, chỉ thêm khi chưa có dòng, không ghi đè */
 async function spcSyncKho(prod){try{const vs=(prod.bt||[]).filter(v=>String(v.misa||"").trim()&&String(v.pk||"").trim());if(!vs.length)return;
   const g=await svApi("/api/hub/kho/online/map?channel=FACEBOOK"),have=new Set((g.data||g||[]).map(r=>String(r.sku||"").trim().toLowerCase()));let n=0;
   for(const v of vs){const k=v.pk.trim();if(have.has(k.toLowerCase()))continue;await svApi("/api/hub/kho/online/map/add",{method:"POST",body:JSON.stringify({channel:"FACEBOOK",sku:k,variant:"",item_label:v.misa.trim()+" - "+prod.ten+((v.dt||v.pl)?" "+spcVar(v):""),qty:1,from_day:""})});n++}
   if(n)toast("Đã thêm "+n+" mã vào bảng quy đổi của kế toán")}catch(e){toast("Chưa thêm được vào bảng quy đổi của kế toán ("+(e.message||"")+"); nhờ kế toán xác nhận")}}
-function spcEdit(msg,fn){DB.mutate(ME.name,msg,d=>{if(!d.fbCat)d.fbCat={};const c=d.fbCat;if(!Array.isArray(c.sp))c.sp=spcClone(SPC_DEF_CAT);if(!Array.isArray(c.combos))c.combos=spcClone(SPC_DEF_COMBOS);fn(c,d)});toast("Đã lưu");renderMain()}
+function spcEdit(msg,fn){const k=spcKey(),cs=k==="cskhCat";DB.mutate(ME.name,msg,d=>{if(!d[k])d[k]={};const c=d[k];if(!Array.isArray(c.sp))c.sp=cs?[]:spcClone(SPC_DEF_CAT);if(!Array.isArray(c.combos))c.combos=cs?[]:spcClone(SPC_DEF_COMBOS);fn(c,d)});toast("Đã lưu");renderMain()}
 const spcSt=c=>{const t=iso(new Date());if(c.tu&&c.tu>t)return ["Sắp chạy","amb"];if(c.den&&c.den<t)return ["Đã hết","gry"];return ["Đang áp dụng","grn"]};
 const spcShort=u=>String(u||"").replace(/^https?:\/\/(www\.)?/,"");
 const spcVN=d=>d?d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4):"";
@@ -132,15 +134,17 @@ const spcDrafts=()=>{const L=[];spcCombos().forEach(c=>{const t=spcTT(c);if(t===
 /* Kéo tới khung gửi duyệt, đặt con trỏ vào ô tên chiến dịch */
 function spcGoSend(){const b=document.getElementById("spc-send");if(!b)return;b.scrollIntoView({behavior:"smooth",block:"start"});const i=document.getElementById("spc-pten");if(i)setTimeout(()=>i.focus({preventScroll:true}),300)}
 /* Kế toán duyệt / trả lại một phiếu (trang này và trang Phê duyệt dùng chung). Duyệt hay trả lại đều báo chuông cho người gửi và người làm từng mục. */
-function spcDuyetPhieu(id,ok,ly){if(!spcCanDuyet())return;const p0=spcPhieu().find(x=>x.id===id);if(!p0||p0.tt!=="cho")return;const by=ME.name||"",at=spcNow();
+function spcDuyetPhieu(id,ok,ly){const v0=SPC.bpView;try{const k=(D().cskhCat&&(D().cskhCat.phieu||[]).some(x=>x.id===id))?"CSKH":null;SPC.bpView=k;spcDuyetPhieu0(id,ok,ly)}finally{SPC.bpView=v0}}
+function spcDuyetPhieu0(id,ok,ly){if(!spcCanDuyet())return;const p0=spcPhieu().find(x=>x.id===id);if(!p0||p0.tt!=="cho")return;const by=ME.name||"",at=spcNow();
   spcEdit((ok?"duyệt":"trả lại")+" phiếu combo: "+p0.ten,(c,d)=>{const p=(c.phieu||[]).find(x=>x.id===id);if(!p||p.tt!=="cho")return;p.tt=ok?"ok":"tralai";p.duyetBy=by;p.duyetAt=at;if(ly)p.ly=ly;const to=[p.byId];
     (p.items||[]).forEach(it=>{const x=c.combos.find(y=>y.id===it.id);if(!x)return;
       if(it.loai==="moi"&&x.tt==="cho"){to.push(x.tao&&x.tao.byId);if(ok){x.tt="ok";x.duyet={by,at,phieu:id};x.misaCho=true;delete x.traLai}else{x.tt="tralai";x.traLai={by,at,ly}}}
       else if(it.loai==="dung"&&x.dx&&x.dx.tt==="cho"){to.push(x.dx.byId);if(ok){const den=spcDayBefore(x.dx.ngay);if(!x.den||x.den>den)x.den=den;x.dung={ngay:x.dx.ngay,ly:x.dx.ly,by:x.dx.by,at:x.dx.at,duyetBy:by,duyetAt:at};delete x.dx}else{x.dx.tt="tralai";x.dx.traLai=ly}}});
     try{if(typeof notifyU==="function")notifyU(d,to,ok?`Kế toán đã duyệt phiếu combo “${p.ten}”: combo mới đã vào danh sách chạy`:`Phiếu combo “${p.ten}” bị trả về sửa: ${ly||""}`,"page:dg_sp")}catch(e){}})}
 /* Cho trang Phê duyệt (pdcalc.js): phiếu combo đang chờ kế toán + combo đã duyệt chờ mã MISA */
-function spcPdSrc(d){const f=d&&d.fbCat;if(!f)return {};const cs=Array.isArray(f.combos)?f.combos:[];
-  return {cbPhieu:(f.phieu||[]).filter(p=>p.tt==="cho"),cbMisa:cs.filter(c=>c.misaCho).map(c=>({id:c.id,at:c.duyet&&c.duyet.at}))}}
+function spcPdSrc(d){const f=(d&&d.fbCat)||{},k=(d&&d.cskhCat)||{};const cs=Array.isArray(f.combos)?f.combos:[];
+  /* Phiếu combo của Ads (fbCat) và của CSKH (cskhCat, bp "CSKH") cùng chờ kế toán duyệt */
+  return {cbPhieu:(f.phieu||[]).concat((k.phieu||[]).map(p=>Object.assign({bp:"CSKH"},p))).filter(p=>p.tt==="cho"),cbMisa:cs.filter(c=>c.misaCho).map(c=>({id:c.id,at:c.duyet&&c.duyet.at}))}}
 /* Menu ⋯ riêng của combo (Sửa, Đổi giá, Dừng chạy, Xóa); class "rmb" để menu ⋯ chung (rowmenu.js) bỏ qua ô này, không thành hai nút */
 function spcMenu(c){const t=spcTT(c),live=t==="ok"&&spcSt(c)[0]!=="Đã hết",id=esc(c.id),bt=(a,l,cl)=>`<button type="button" data-spc-act="${a}" data-spid="${id}"${cl?` class="${cl}"`:""}>${l}</button>`;
   return `<details class="spc-mn"><summary class="btn rmb" data-spc-act="noop" title="Sửa, đổi giá, dừng chạy, xóa">⋯</summary><div class="spc-mnl" data-spc-act="noop">${bt("cedit","Sửa")}${live?bt("gopen","Đổi giá từ ngày…"):""}${live&&!c.dx?bt("sopen","Dừng chạy"):""}${c.dx&&c.dx.tt!=="cho"?bt("sbo","Bỏ đề xuất dừng"):""}${bt("cdelx","Xóa","dn")}</div></details>`}
@@ -231,11 +235,11 @@ function spcEditor(F,days,opt){
     return `<table class="spc-ct">${cHead}<tbody>${now.map(cRow).join("")||`<tr><td colspan="${ed?9:8}" class="hint">Chưa có combo nào đang áp dụng cho sản phẩm này.</td></tr>`}</tbody></table>${old.length?`<details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px">Giá cũ đã hết (${old.length})</summary><table class="spc-ct" style="margin-top:6px">${cHead}<tbody>${old.map(cRow).join("")}</tbody></table></details>`:""}${ed&&pid?`<div style="margin-top:8px"><button class="btn pri" data-spc-act="cadd" data-spid="${esc(pid)}">+ Thêm combo cho sản phẩm này</button></div>`:""}`};
   const wait=cat.filter(p=>p.loai!==SPC_OFF).flatMap(p=>(p.bt||[]).filter(v=>v.on!==false&&!spcMisa(v)).map(v=>p.ten+((v.dt||v.pl)?" ("+spcVar(v)+")":"")));
   const pr=cat.map(p=>{const cs=spcProdCombos(p,all);cs.forEach(c=>used.add(c.id));const open=!!SPC.openP[p.id],on=(p.bt||[]).filter(v=>v.on!==false),off=(p.bt||[]).length-on.length;
-    return `<tr class="clk" data-spc-act="ptg" data-spid="${esc(p.id)}"><td><b>${open?"▾ ":"▸ "}${esc(p.ten)}</b>${p.tu||p.den?`<small class="hint" style="display:block">${p.tu?"chạy từ "+spcVN(p.tu):""}${p.den?" · ngừng từ "+spcVN(p.den):""}</small>`:""}</td><td>${pill(SPC_LBL[p.loai],p.loai===SPC_RUN?"grn":p.loai===SPC_GIFT?"amb":"gry")}</td><td>${on.map(v=>`<span class="spc-chip">${esc(spcVar(v))}</span>`).join("")||'<span class="hint">chưa có biến thể đang chạy</span>'}${off?`<span class="hint"> · ${off} không chạy</span>`:""}</td><td class="n">${cs.length?cs.length+" combo":"—"}</td>${ed?`<td class="n">${SPC.bpView==="CSKH"?"":`<button class="btn" data-spc-act="pedit" data-spid="${esc(p.id)}">Sửa</button>`}</td>`:""}</tr>`+(open?`<tr class="spc-sub"><td colspan="${ed?5:4}"><div style="overflow-x:auto">${cTbl(cs,p.id)}</div></td></tr>`:"")}).join("");
+    return `<tr class="clk" data-spc-act="ptg" data-spid="${esc(p.id)}"><td><b>${open?"▾ ":"▸ "}${esc(p.ten)}</b>${p.tu||p.den?`<small class="hint" style="display:block">${p.tu?"chạy từ "+spcVN(p.tu):""}${p.den?" · ngừng từ "+spcVN(p.den):""}</small>`:""}</td><td>${pill(SPC_LBL[p.loai],p.loai===SPC_RUN?"grn":p.loai===SPC_GIFT?"amb":"gry")}</td><td>${on.map(v=>`<span class="spc-chip">${esc(spcVar(v))}</span>`).join("")||'<span class="hint">chưa có biến thể đang chạy</span>'}${off?`<span class="hint"> · ${off} không chạy</span>`:""}</td><td class="n">${cs.length?cs.length+" combo":"—"}</td>${ed?`<td class="n"><button class="btn" data-spc-act="pedit" data-spid="${esc(p.id)}">Sửa</button></td>`:""}</tr>`+(open?`<tr class="spc-sub"><td colspan="${ed?5:4}"><div style="overflow-x:auto">${cTbl(cs,p.id)}</div></td></tr>`:"")}).join("");
   const orph=all.filter(c=>!used.has(c.id)),noDay=all.filter(c=>!c.tu&&spcSt(c)[0]!=="Đã hết").length;
   spcMdDraw();if(SPC.goSend){SPC.goSend=0;setTimeout(spcGoSend,80)}return `<style>${SPC_CSS}</style>${spcFlow(ed)}
-  <section class="fbd-card fbd-wide"><h3>${SPC.bpView==="CSKH"?"Sản phẩm và combo CSKH (không chạy ads)":"Sản phẩm đang chạy quảng cáo"} <span class="hint" style="font-weight:400">${runN} đang chạy · ${giftN} quà tặng · ${all.length} combo</span></h3>
-  ${wait.length?`<p class="fbd-note" style="background:var(--amber-soft,#fff6e0);padding:8px 12px;border-radius:8px"><b>Chờ kế toán thêm mã kho (${wait.length}):</b> ${wait.slice(0,12).map(x=>esc(x)).join(", ")}${wait.length>12?"…":""}. Kế toán vào “Sửa” sản phẩm để điền mã MISA.</p>`:""}${ed?`<div class="spc-bt" style="margin:0 0 10px">${SPC.bpView==="CSKH"?"":`<button class="btn pri" data-spc-act="padd">+ Thêm sản phẩm</button>`}<button class="btn pri" data-spc-act="cadd">+ Thêm combo</button>${spcDrafts().length?`<button class="btn pri" data-spc-act="pgo" style="background:var(--green,#1a8f4c);border-color:var(--green,#1a8f4c)">Gửi duyệt (${spcDrafts().length})</button>`:""}${noDay?`<span class="hint" style="align-self:center;color:var(--red)">${noDay} combo đang chạy chưa có ngày bắt đầu: bấm Sửa để điền</span>`:""}</div>`:""}<div class="tbl"><table><thead><tr><th>Sản phẩm</th><th>Loại</th><th>Biến thể đang chạy</th><th class="n">Combo</th>${ed?"<th></th>":""}</tr></thead><tbody>${pr}</tbody></table></div></section>
+  <section class="fbd-card fbd-wide"><h3>${SPC.bpView==="CSKH"?"Sản phẩm và combo của CSKH (không chạy ads, riêng với Ads)":"Sản phẩm đang chạy quảng cáo"} <span class="hint" style="font-weight:400">${runN} đang chạy · ${giftN} quà tặng · ${all.length} combo</span></h3>
+  ${wait.length?`<p class="fbd-note" style="background:var(--amber-soft,#fff6e0);padding:8px 12px;border-radius:8px"><b>Chờ kế toán thêm mã kho (${wait.length}):</b> ${wait.slice(0,12).map(x=>esc(x)).join(", ")}${wait.length>12?"…":""}. Kế toán vào “Sửa” sản phẩm để điền mã MISA.</p>`:""}${ed?`<div class="spc-bt" style="margin:0 0 10px"><button class="btn pri" data-spc-act="padd">+ Thêm sản phẩm</button><button class="btn pri" data-spc-act="cadd">+ Thêm combo</button>${spcDrafts().length?`<button class="btn pri" data-spc-act="pgo" style="background:var(--green,#1a8f4c);border-color:var(--green,#1a8f4c)">Gửi duyệt (${spcDrafts().length})</button>`:""}${noDay?`<span class="hint" style="align-self:center;color:var(--red)">${noDay} combo đang chạy chưa có ngày bắt đầu: bấm Sửa để điền</span>`:""}</div>`:""}<div class="tbl"><table><thead><tr><th>Sản phẩm</th><th>Loại</th><th>Biến thể đang chạy</th><th class="n">Combo</th>${ed?"<th></th>":""}</tr></thead><tbody>${pr}</tbody></table></div></section>
   ${orph.length?`<section class="fbd-card fbd-wide"><h3>Combo chưa gắn vào sản phẩm nào <span class="hint" style="font-weight:400">${orph.length} combo</span></h3><div style="overflow-x:auto">${cTbl(orph,"")}</div></section>`:""}`;
 }
 
@@ -288,8 +292,6 @@ if(!window.__spcBound){window.__spcBound=1;
     if(act==="cview"){SPC.modal={t:"d",id};spcMdDraw();return}
     if(act==="qd"){SPC.modal=null;spcMdDraw();if(spcQdOn()){PAGE="kho_qd";try{if(APP_MODE==="admin"&&!modGroups(curMod()).some(g=>g[1].some(i=>i[0]===PAGE)))MOD=""}catch(e){}render();scrollTo(0,0)}return}
     if(!spcCanEdit()&&!(spcCanDuyet()&&["pok","pno","mok"].includes(act)))return;
-    /* CSKH chỉ thêm combo, không sửa danh mục sản phẩm (Ads, kế toán quản lý) */
-    if(SPC.bpView==="CSKH"&&(act==="padd"||act==="pedit"))return;
     const today=iso(new Date()),yest=iso(new Date(Date.now()-864e5));
     if(act==="padd"){SPC.modal={t:"p",id:"",d:{ten:"",loai:SPC_RUN,bt:[{id:"v"+Date.now(),ma:"",dt:"",pl:"",on:true}]}};spcMdDraw()}
     else if(act==="pedit"){const p=spcCat().find(x=>x.id===id);if(p){SPC.modal={t:"p",id,d:spcClone(p)};spcMdDraw()}}
