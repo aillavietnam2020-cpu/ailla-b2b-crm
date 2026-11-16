@@ -2349,6 +2349,61 @@ const isSrcChannel = (v: unknown): v is Channel => typeof v === 'string' && (SOU
 const httpFetch = (url: string) => fetch(url);
 
 /** Bán lẻ B2C theo khoảng ngày: tổng hợp từng ngày/kênh và chi tiết từng dòng phiếu (để lọc theo thời gian và tải báo cáo). */
+/**
+ * Phiếu xuất Shopee tách theo từng shop (chị Hoa 16/11/2026): shop "Ailla VN" là Shopee Mall (XL-SPM-<ngày>), shop còn lại là Shopee thường (XL-SPT-<ngày>).
+ * Tính lại từ dòng đơn Poscake cùng luật tách combo như recomputeDay, nên cộng hai phiếu = phiếu gộp XL-SP cũ. Ngày không có dòng đơn (nạp tay cũ) thì giữ phiếu gộp.
+ */
+const spShop = (shop: string) =>
+  shop.normalize('NFC').trim().toLowerCase() === 'ailla vn' ? { cd: 'SPM', label: 'Shopee Mall' } : { cd: 'SPT', label: 'Shopee thường' };
+async function shopeeByShop(db: D1Database, from: string, to: string) {
+  const map = await loadMapVersions(db, 'SHOPEE');
+  const lk = await loadLookups(db);
+  const codes = new Map(
+    ((await db.prepare('SELECT code FROM kho_items').all<{ code: string }>()).results ?? []).map((r) => [r.code.toLowerCase(), r.code]),
+  );
+  const rows = await db
+    .prepare('SELECT day, shop, order_id, sku, variant, qty FROM channel_order_lines WHERE channel = ? AND day >= ? AND day <= ?')
+    .bind('SHOPEE', from, to)
+    .all<{ day: string; shop: string; order_id: string; sku: string; variant: string; qty: number }>();
+  type V = { day: string; cd: string; label: string; orders: Set<string>; out: Map<string, number>; un: number };
+  const vs = new Map<string, V>();
+  for (const r of rows.results ?? []) {
+    const sh = spShop(r.shop ?? '');
+    const k = r.day + '|' + sh.cd;
+    const v = vs.get(k) ?? { day: r.day, cd: sh.cd, label: sh.label, orders: new Set<string>(), out: new Map<string, number>(), un: 0 };
+    vs.set(k, v);
+    v.orders.add(r.order_id);
+    const parts = pickMap(map, r.sku, r.variant, r.day)?.rows;
+    const direct = codes.get(r.sku.toLowerCase());
+    const items = parts
+      ? parts.map((x) => ({ label: x.item_label, qty: x.qty }))
+      : direct
+        ? [{ label: direct, qty: 1 }]
+        : [{ label: unmappedLabel(r.sku, r.variant), qty: 1 }];
+    for (const it of items) {
+      const q = r.qty * it.qty;
+      const label = it.label.trim();
+      if (!(q > 0) || !label || /^bỏ qua$/i.test(label)) continue;
+      const item = resolveLabel(label, lk);
+      if (item) v.out.set(item, (v.out.get(item) ?? 0) + q);
+      else v.un += q;
+    }
+  }
+  return [...vs.values()].sort((a, b) => b.day.localeCompare(a.day) || a.cd.localeCompare(b.cd));
+}
+async function itemNames(db: D1Database, codes: string[]) {
+  const m = new Map<string, { name: string; unit: string }>();
+  for (let i = 0; i < codes.length; i += 90) {
+    const part = codes.slice(i, i + 90);
+    const r = await db
+      .prepare(`SELECT code, name, unit FROM kho_items WHERE code IN (${part.map(() => '?').join(',')})`)
+      .bind(...part)
+      .all<{ code: string; name: string; unit: string | null }>();
+    for (const x of r.results ?? []) m.set(x.code, { name: x.name, unit: x.unit ?? '' });
+  }
+  return m;
+}
+
 khoRoutes.get('/online/range', async (c) => {
   const from = c.req.query('from');
   const to = c.req.query('to');
@@ -2371,7 +2426,21 @@ khoRoutes.get('/online/range', async (c) => {
   )
     .bind(from, to)
     .all<Record<string, unknown>>();
-  return ok(c, { from, to, runs: runs.results ?? [], lines: lines.results ?? [] });
+  // Shopee: ngày nào có dòng đơn thì thay phiếu gộp bằng hai phiếu theo shop.
+  const sp = await shopeeByShop(c.env.DB, from, to);
+  const spDays = new Set(sp.map((v) => v.day));
+  const nm = await itemNames(c.env.DB, [...new Set(sp.flatMap((v) => [...v.out.keys()]))]);
+  const runsAll = (runs.results ?? []).filter((r) => !(r.channel === 'SHOPEE' && spDays.has(String(r.day))));
+  const linesAll = (lines.results ?? []).filter((l) => !(l.channel === 'SHOPEE' && spDays.has(String(l.day))));
+  for (const v of sp) {
+    runsAll.push({ channel: 'SHOPEE', cd: v.cd, label: v.label, day: v.day, orders: v.orders.size, qty: [...v.out.values()].reduce((a, b) => a + b, 0), unmapped_qty: v.un });
+    for (const [code, qty] of [...v.out].sort((a, b) => a[0].localeCompare(b[0])))
+      linesAll.push({ channel: 'SHOPEE', cd: v.cd, label: v.label, day: v.day, code, name: nm.get(code)?.name ?? code, unit: nm.get(code)?.unit ?? '', qty });
+  }
+  const ord = (r: Record<string, unknown>) => String(r.day);
+  runsAll.sort((a, b) => ord(b).localeCompare(ord(a)) || String(a.channel).localeCompare(String(b.channel)) || String(a.cd ?? '').localeCompare(String(b.cd ?? '')));
+  linesAll.sort((a, b) => ord(b).localeCompare(ord(a)) || String(a.channel).localeCompare(String(b.channel)) || String(a.cd ?? '').localeCompare(String(b.cd ?? '')) || String(a.code).localeCompare(String(b.code)));
+  return ok(c, { from, to, runs: runsAll, lines: linesAll });
 });
 
 /** Phiếu xuất bán lẻ trong một ngày: mỗi kênh một phiếu XL-<kênh>-<ngày>, các dòng là sản phẩm lẻ đã trừ kho (từ bảng channel_out). */
@@ -2388,14 +2457,29 @@ khoRoutes.get('/online/day', async (c) => {
   const runs = await c.env.DB.prepare('SELECT channel, orders FROM channel_runs WHERE day = ?').bind(day).all<{ channel: string; orders: number | null }>();
   const orders: Record<string, number | null> = {};
   for (const r of runs.results ?? []) orders[r.channel] = r.orders;
-  const out = ['TIKTOK', 'SHOPEE', 'FACEBOOK'].map((ch) => {
+  const sp = await shopeeByShop(c.env.DB, day, day);
+  const nm = await itemNames(c.env.DB, [...new Set(sp.flatMap((v) => [...v.out.keys()]))]);
+  const out = ['TIKTOK', 'SHOPEE', 'FACEBOOK'].flatMap((ch) => {
+    if (ch === 'SHOPEE' && sp.length)
+      return sp.map((v) => ({
+        channel: ch,
+        cd: v.cd,
+        label: v.label,
+        no: `XL-${v.cd}-${day.replace(/-/g, '')}`,
+        orders: v.orders.size,
+        lines: [...v.out]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([code, qty]) => ({ channel: ch, code, name: nm.get(code)?.name ?? code, unit: nm.get(code)?.unit ?? '', qty })),
+      }));
     const code = ch === 'TIKTOK' ? 'TT' : ch === 'SHOPEE' ? 'SP' : 'FB';
-    return {
-      channel: ch,
-      no: `XL-${code}-${day.replace(/-/g, '')}`,
-      orders: orders[ch] ?? null,
-      lines: (rows.results ?? []).filter((r) => r.channel === ch),
-    };
+    return [
+      {
+        channel: ch,
+        no: `XL-${code}-${day.replace(/-/g, '')}`,
+        orders: orders[ch] ?? null,
+        lines: (rows.results ?? []).filter((r) => r.channel === ch),
+      },
+    ];
   });
   return ok(c, { day, vouchers: out });
 });

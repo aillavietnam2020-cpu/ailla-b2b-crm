@@ -83,6 +83,8 @@ interface PosOrder {
   system_id?: string | number;
   account?: string | number;
   page?: { name?: string };
+  /** Tên nguồn đơn trên Poscake; "CSKH" = đơn chăm sóc khách lẻ (tách khỏi Ads). */
+  order_sources_name?: string;
   page_id?: string | number;
   status?: number;
   time_send_partner?: string;
@@ -180,7 +182,9 @@ export async function fetchShippedLines(
         const acc = String(o.account ?? '');
         const shop =
           channel === 'FACEBOOK'
-            ? o.page?.name?.trim()
+            ? String(o.order_sources_name ?? '').trim().toUpperCase() === 'CSKH'
+              ? 'CSKH'
+              : o.page?.name?.trim()
               ? `Page: ${o.page.name.trim()}`
               : acc && srcNames[acc]
                 ? `Landing: ${srcNames[acc]}`

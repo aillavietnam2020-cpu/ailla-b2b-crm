@@ -271,6 +271,11 @@ export async function syncCskhDays(db: D1Database, secret: string | undefined, d
   const { shop, key } = await openFacebook(db, secret);
   const src = await sourceNames(fetchFn, shop, key);
   const out: Array<{ day: string; ok: boolean; note: string }> = [];
+  try {
+    await markCskhLines(db);
+  } catch {
+    /* bảng kho chưa có thì thôi */
+  }
   for (const day of days) {
     try {
       const orders = await fetchDeliveredDay(fetchFn, shop, key, day, src);
@@ -281,6 +286,14 @@ export async function syncCskhDays(db: D1Database, secret: string | undefined, d
     }
   }
   return out;
+}
+
+/** Dòng xuất kho Facebook của đơn tạo từ web CSKH: ghi nguồn CSKH (mã đơn Poscake đã lưu khi gửi). */
+export async function markCskhLines(db: D1Database): Promise<number> {
+  const r = await db
+    .prepare("UPDATE channel_order_lines SET shop = 'CSKH' WHERE channel = 'FACEBOOK' AND shop <> 'CSKH' AND order_id IN (SELECT pos_id FROM cskh_web_orders WHERE pos_id IS NOT NULL)")
+    .run();
+  return r.meta?.changes ?? 0;
 }
 
 export interface BackfillState {

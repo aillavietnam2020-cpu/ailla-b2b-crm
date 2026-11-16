@@ -18,7 +18,9 @@ function dtNhan(ym,today){return dtTrangThai(ym,today)==="chot"?"đã chốt "+d
 const dtDuKien=(that,dang,hoan)=>(+that||0)+Math.max(0,+dang||0)*(1-(hoan==null?DT_HOAN_FB:hoan));
 /* Một ngày Facebook từ Pancake (blob fb_sale_days: mỗi dòng một sale). dtGiao = giao thành công (đã trừ hoàn),
    dt = doanh thu đơn chốt (chưa hủy), phần còn lại dt − giao − hoàn là đơn đang giao. */
-function dtFbNgay(L){const o={tao:0,huy:0,giao:0,hoan:0,dt:0,dtGiao:0,hoanDt:0};(L||[]).forEach(r=>{for(const k in o)o[k]+=+r[k]||0});o.dang=Math.max(0,o.dt-o.dtGiao-o.hoanDt);return o}
+function dtFbNgay(L,day){const o={tao:0,huy:0,giao:0,hoan:0,dt:0,dtGiao:0,hoanDt:0};(L||[]).forEach(r=>{for(const k in o)o[k]+=+r[k]||0});
+  /* Facebook Ads không gồm đơn CSKH (chị Hoa 16/11): trừ số đơn CSKH cùng ngày tạo (cskh.js csFbMinus). */
+  const c=day&&typeof csFbMinus==="function"?csFbMinus(day):null;if(c){o.tao=Math.max(0,o.tao-c.tao);o.dt=Math.max(0,o.dt-c.dt);o.giao=Math.max(0,o.giao-c.giao);o.dtGiao=Math.max(0,o.dtGiao-c.dtGiao);o.hoan=Math.max(0,o.hoan-c.hoan)}o.dang=Math.max(0,o.dt-o.dtGiao-o.hoanDt);return o}
 /* Tháng ym có cần lưu số chốt không: đã tới ngày chốt, chưa có số chốt, từ tháng áp luật, và có số (không chốt số trống / 0). */
 /* Sàn chỉ tự chốt khi MỌI shop đã có báo cáo đủ tháng (bản chốt sổ, không "đến ngày X" — bản giữa tháng phí còn ước).
    items: [{ten, s}] mỗi shop một dòng, s = bản đã tải của tháng (null nếu chưa tải). Trả các lý do chưa chốt; rỗng = đủ. (điều phối 30/10) */

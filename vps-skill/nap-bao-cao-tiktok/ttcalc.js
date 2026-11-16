@@ -1,7 +1,7 @@
 /* =====================================================================
    BÁO CÁO TIKTOK SHOP: đọc file xuất từ TikTok và tính lãi lỗ tháng (chỉ hàm thuần, không đụng giao diện).
    Quy tắc theo skill ailla-baocao-quantri-tiktok (chị Hoa duyệt 24/10/2026):
-   - Một đơn thuộc tháng nó được TẠO. Doanh thu = Tổng phụ trước giảm giá − Giảm giá của người bán.
+   - Một đơn thuộc tháng nó được TẠO. Doanh thu = cột "Tổng doanh thu" của file Tài chính (16/11/2026 theo cách chị Huệ; file đơn chỉ để SKU, trạng thái, số lượng).
    - Đơn hủy/hoàn: doanh thu 0, giá vốn 0, chỉ dùng tính tỷ lệ hủy/hoàn.
    - Phí sàn lấy số quyết toán (file income 01/tháng → hết ngày 09 tháng sau; chị Hoa chốt sổ sáng ngày 10), chia về dòng SKU theo tỷ trọng
      doanh thu trong đơn; đơn chưa quyết toán thì ước tính theo tỷ lệ phí bình quân. "Phí khác" hứng phần dư
@@ -83,7 +83,7 @@ function ttReadOrders(aoa,ky){
     const d=ttIsoDay(ttCell(a[I["Created Time"]]));if(!d)continue;
     if(ky&&d.slice(0,7)!==ky){outside++;if(d.slice(0,7)<ky)before++;else after++;continue}
     const q=ttNum(a[I["Quantity"]]),rq=ttNum(a[I["Sku Quantity of return"]]),st=ttCell(a[I["Order Status"]]);
-    lines.push({o,d,huy:st==="Đã hủy"||rq>0,hoan:rq>0&&st!=="Đã hủy",sku:ttCell(a[I["SKU ID"]]),ss:ttCell(a[I["Seller SKU"]]),pn:ttCell(a[I["Product Name"]]),vr:ttCell(a[I["Variation"]]),q,dt:ttNum(a[I["SKU Subtotal Before Discount"]])-ttNum(a[I["SKU Seller Discount"]])})}
+    lines.push({o,d,rq,st,huy:st==="Đã hủy",hoan:rq>0&&st!=="Đã hủy",sku:ttCell(a[I["SKU ID"]]),ss:ttCell(a[I["Seller SKU"]]),pn:ttCell(a[I["Product Name"]]),vr:ttCell(a[I["Variation"]]),q,dt:ttNum(a[I["SKU Subtotal Before Discount"]])-ttNum(a[I["SKU Seller Discount"]])})}
   if(!lines.length)return {err:ky?`File đơn không có đơn nào tạo trong tháng ${ky.slice(5)}/${ky.slice(0,4)}.`:"File đơn không có dòng nào đọc được."};
   return {lines,outside,before,after};
 }
@@ -114,11 +114,12 @@ function ttReadIncome(sheets,ky){
   for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const typ=ttCell(a[I["Loại giao dịch"]]);if(!typ)continue;
     if(typ==="Đơn hàng"){const tao=ttIsoDay(ttCell(a[I["Thời gian tạo đơn hàng"]]));if(tao.slice(0,7)!==ky)continue;
       const id=ttCell(a[I["ID đơn hàng/điều chỉnh"]]),f=fees[id]||(fees[id]=new Array(TT_NG+1).fill(0));if(!f.n){f.n=1;nOrd++}
-      let s=0;gcols.forEach((cs,g)=>{const v=cs.reduce((x,c)=>x+ttNum(a[c]),0);f[g]+=v;s+=v});const tot=ttNum(a[I["Tổng phí"]]);f[TT_NG-1]+=tot-s;f[TT_NG]+=tot;continue}
+      let s=0;gcols.forEach((cs,g)=>{const v=cs.reduce((x,c)=>x+ttNum(a[c]),0);f[g]+=v;s+=v});const tot=ttNum(a[I["Tổng phí"]]);f[TT_NG-1]+=tot-s;f[TT_NG]+=tot;
+      f.dt=(f.dt||0)+("Tổng doanh thu" in I?ttNum(a[I["Tổng doanh thu"]]):0);continue}
     const qt=ttIsoDay(ttCell(a[I["Thời gian quyết toán đơn hàng"]])),v=ttNum(a[amt]);
     if(qt.slice(0,7)!==ky){cut+=v;continue}
     if(typ==="GMV thanh toán cho Quảng cáo TikTok")adsVi+=v;else adj+=v}
-  return {partial,range,fees,nOrd,adsVi,adj,cut};
+  return {partial,range,fees,nOrd,adsVi,adj,cut,hasDt:"Tổng doanh thu" in I};
 }
 
 /* ---------- Quảng cáo GMV Max theo kỳ chi tiêu (Campaign overview) ---------- */
@@ -202,29 +203,42 @@ function ttReadVideoList(aoa,keep=50){
 function ttBuildMonth({ky,orders,income,camp}){
   /* Báo cáo giữa tháng: số tính đến ngày đơn mới nhất trong file đơn (den); quảng cáo cũng cắt đến ngày đó. */
   const den=income.partial?orders.lines.reduce((m,l)=>l.d>m?l.d:m,""):null;
-  const L=orders.lines,F=income.fees,ordDt={},ordQ={};
-  L.forEach(l=>{ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q});
-  L.forEach(l=>{const w=ordDt[l.o]?l.dt/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:0);l.w=w;l.qt=!!F[l.o]});
-  const base=L.filter(l=>l.qt&&!l.huy),baseDt=base.reduce((s,l)=>s+l.dt,0);
+  /* Cách chị Huệ dạy agent kế toán trưởng (16/11/2026, chị Hoa duyệt): file đơn chỉ dùng SKU, trạng thái, số lượng; tiền và phí lấy từ file
+     Tài chính theo mã đơn. Đơn đã có trong Tài chính: doanh thu = cột "Tổng doanh thu" (đã trừ hoàn), phí = "Tổng phí", dù file đơn ghi hủy/hoàn;
+     chia về dòng SKU theo tỷ trọng tiền dòng; có hàng trả thì trừ số lượng trả khỏi giá vốn. Tổng doanh thu về 0 (hoàn hết): chỉ giữ phí, không đếm đơn.
+     Đơn chưa có trong Tài chính: hủy thì bỏ; báo cáo đủ tháng thì không tính (theo dõi kỳ sau); báo cáo giữa tháng thì ước phí bình quân. */
+  const L=orders.lines,F=income.fees,ordDt={},ordQ={},ordN={};
+  /* File income cũ không có cột "Tổng doanh thu": giữ cách cũ (doanh thu từ file đơn, dòng hủy/có hàng trả bỏ ra). */
+  L.forEach(l=>{l.qt=!!F[l.o];if(income.hasDt){if(l.qt)l.huy=false}else if(l.rq>0)l.huy=true;l.dt0=l.dt});
+  L.forEach(l=>{if(l.huy)return;ordDt[l.o]=(ordDt[l.o]||0)+Math.max(l.dt,0);ordQ[l.o]=(ordQ[l.o]||0)+l.q;ordN[l.o]=(ordN[l.o]||0)+1});
+  L.forEach(l=>{l.w=ordDt[l.o]?Math.max(l.dt,0)/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:(ordN[l.o]?1/ordN[l.o]:0));
+    if(l.qt&&income.hasDt){const fd=F[l.o].dt||0;l.dt=fd*l.w;if(fd<=0.5){l.full=1;l.dt=0;l.q=0}else if(l.rq>0&&fd<ordDt[l.o]-0.5)l.q=Math.max(0,l.q-l.rq)}});
+  const base=L.filter(l=>l.qt&&!l.full),baseDt=base.reduce((s,l)=>s+l.dt,0);
   if(!baseDt)return {err:"Không ghép được đơn nào giữa file đơn và file income. Hãy kiểm tra hai file có cùng tháng không."};
   const rate=new Array(TT_NG).fill(0);base.forEach(l=>{const f=F[l.o];for(let g=0;g<TT_NG;g++)rate[g]+=f[g]*l.w});for(let g=0;g<TT_NG;g++)rate[g]/=baseDt;
-  const sku={},days={},okOrd=new Set(),dayOrd={};let hh=0,dtUoc=0,nUoc=0,mon=0;
+  const sku={},days={},okOrd=new Set(),dayOrd={};let hh=0,dtUoc=0,nUoc=0,mon=0,choQT=0;
   /* Làm tròn phí từng dòng (giống file Excel cũ) rồi mới cộng, để tổng khớp từng đồng. */
   L.forEach(l=>{const f=(l.qt?F[l.o].slice(0,TT_NG).map(v=>v*l.w):rate.map(r=>r*l.dt)).map(ttRound);
     const s=sku[l.sku]||(sku[l.sku]={ss:l.ss,pn:l.pn,vr:l.vr,q:0,dt:0,f:new Array(TT_NG).fill(0),dtU:0,hq:0,hdt:0});
     if(l.huy){s.hq+=l.q;s.hdt+=l.dt;hh+=l.dt;return}
-    s.q+=l.q;s.dt+=l.dt;for(let g=0;g<TT_NG;g++)s.f[g]+=f[g];mon+=l.q;
+    if(!l.qt&&!income.partial){choQT+=l.dt;return}
+    if(l.qt&&l.dt0>l.dt+0.5){s.hdt+=l.dt0-l.dt;hh+=l.dt0-l.dt;if(l.rq>0)s.hq+=l.rq}
+    s.q+=l.q;s.dt+=l.dt;for(let g=0;g<TT_NG;g++)s.f[g]+=f[g];mon+=l.q;l.wf=f;
     if(!l.qt){s.dtU+=l.dt;dtUoc+=l.dt;nUoc++}
-    okOrd.add(l.o);const dd=days[l.d]||(days[l.d]={dt:0,phi:0,mon:0,don:0,hh:0});dd.dt+=l.dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.mon+=l.q;
+    const dd=days[l.d]||(days[l.d]={dt:0,phi:0,mon:0,don:0,hh:0});dd.dt+=l.dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.mon+=l.q;
+    if(l.full)return;okOrd.add(l.o);
     const k=l.d+"|"+l.o;if(!dayOrd[k]){dayOrd[k]=1;dd.don++}});
-  let hoanGiao=0;L.forEach(l=>{if(l.huy&&l.hoan)hoanGiao+=l.dt});
-  L.forEach(l=>{if(l.huy){const dd=days[l.d]||(days[l.d]={dt:0,phi:0,mon:0,don:0,hh:0});dd.hh+=l.dt}});
+  let hoanGiao=0;L.forEach(l=>{if(income.hasDt){if(l.qt&&l.hoan&&l.dt0>l.dt)hoanGiao+=l.dt0-l.dt}else if(l.huy&&l.hoan)hoanGiao+=l.dt});
+  L.forEach(l=>{const h=l.huy?l.dt:(l.qt&&l.dt0>l.dt?l.dt0-l.dt:0);if(h){const dd=days[l.d]||(days[l.d]={dt:0,phi:0,mon:0,don:0,hh:0});dd.hh+=h}});
   Object.values(sku).forEach(s=>{s.dt=Math.round(s.dt);s.hdt=Math.round(s.hdt);s.dtU=Math.round(s.dtU)});
   Object.values(days).forEach(d=>{d.dt=Math.round(d.dt);d.phi=Math.round(d.phi);d.hh=Math.round(d.hh)});
   let chi=0,nAds=0;const adsDays={};Object.entries(camp.days).forEach(([d,v])=>{if(d.slice(0,7)!==ky||(den&&d>den))return;chi+=v.chi;nAds++;adsDays[d]=v});
-  return {ky,den,sku,days,don:okOrd.size,mon,hh:Math.round(hh),hoanGiao:Math.round(hoanGiao),dtUoc:Math.round(dtUoc),nUoc,
+  const out={ky,den,sku,days,don:okOrd.size,mon,hh:Math.round(hh),hoanGiao:Math.round(hoanGiao),dtUoc:Math.round(dtUoc),nUoc,choQT:Math.round(choQT),
     ads:{chi,vat:Math.round(chi*(1+TT_ADS_VAT)-1e-6),vi:-income.adsVi,nDays:nAds,days:adsDays},adj:income.adj,cut:income.cut,
     inc:{from:income.range.from,to:income.range.to,nOrd:income.nOrd},n:{lines:L.length,outside:orders.outside,before:orders.before,after:orders.after,unmatched:L.filter(l=>!l.qt).length}};
+  /* Dòng từng đơn cho file tính toán (bcfile.js ttCalcBook); không lưu lên web (không đếm khi JSON). */
+  Object.defineProperty(out,"_L",{value:L,enumerable:false});Object.defineProperty(out,"_F",{value:F,enumerable:false});
+  return out;
 }
 
 /* ---------- Lãi lỗ: thêm giá vốn + chi phí riêng của kênh vào số tháng ----------
@@ -302,9 +316,11 @@ function ttDaydRow(x){const k=x.km||{},a=x.ads||{};return [k.gmv||0,k.don||0,k.m
 /* Tháng có nhiều đơn nhất trong file đơn (để tự chọn kỳ báo cáo). */
 function ttGuessKy(aoa){const H=ttHead(aoa,["Created Time"]);if(!H)return "";const c={};for(let r=H.at+1;r<aoa.length;r++){const d=ttIsoDay(ttCell((aoa[r]||[])[H.ix["Created Time"]]));if(d){const k=d.slice(0,7);c[k]=(c[k]||0)+1}}const b=Object.entries(c).sort((a,x)=>x[1]-a[1])[0];return b?b[0]:""}
 /* Nhận diện loại file TikTok theo cột bên trong (không dựa vào tên file). */
+/* Trang danh sách đơn: tab "OrderSKUList" nếu có (file kế toán hay thêm trang tổng hợp lên đầu, chị Huệ 16/11/2026), không thì trang đầu. */
+const ttOrderSheet=sheets=>sheets["OrderSKUList"]||Object.values(sheets).find(a=>ttHead(a||[],["Order ID","SKU ID"]))||sheets[Object.keys(sheets)[0]];
 function ttKind(sheets){const first=sheets[Object.keys(sheets)[0]]||[];
   if(sheets["Chi tiết đơn hàng"])return "income";
-  if(ttHead(first,["Order ID","SKU ID"]))return "orders";
+  if(ttHead(first,["Order ID","SKU ID"])||sheets["OrderSKUList"])return "orders";
   if(ttHead(first,["Theo ngày","Chi phí"]))return "camp";
   if(ttHead(first,["ID video","VV"]))return "videos";
   if(ttHead(first,["Thời gian","GMV đến từ video (₫)"]))return "vdays";

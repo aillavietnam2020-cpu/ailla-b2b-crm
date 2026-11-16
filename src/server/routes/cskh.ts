@@ -744,6 +744,39 @@ cskhRoutes.get('/overview', async (c) => {
   });
 });
 
+/** Lãi lỗ CSKH (báo cáo riêng, không chung báo cáo Facebook Ads): đơn Facebook nguồn CSKH trong kỳ.
+ * Trả mã đơn đã gửi (để trình duyệt tính giá vốn, ship như báo cáo Facebook), đơn giao thành công (doanh thu thực), đơn hoàn. */
+cskhRoutes.get('/pl', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO xem lãi lỗ CSKH');
+  const db = c.env.DB;
+  const today = vnDate();
+  const month = /^\d{4}-\d{2}$/.test(str(c.req.query('month'), 7)) ? str(c.req.query('month'), 7) : today.slice(0, 7);
+  const [from, to] = monthRange(month);
+  const CS = "SELECT DISTINCT order_id FROM channel_order_lines WHERE channel = 'FACEBOOK' AND shop = 'CSKH' UNION SELECT pos_id FROM cskh_web_orders WHERE pos_id IS NOT NULL";
+  const shipped = (await db.prepare(`SELECT order_id AS id, MIN(day) AS day FROM channel_order_lines WHERE channel = 'FACEBOOK' AND day >= ? AND day <= ? AND order_id IN (${CS}) GROUP BY order_id`).bind(from, to).all<{ id: string; day: string }>()).results ?? [];
+  const delivered = (await db.prepare(`SELECT id, day, total FROM cskh_orders WHERE day >= ? AND day <= ? AND id IN (${CS})`).bind(from, to).all<{ id: string; day: string; total: number }>()).results ?? [];
+  const returned = (await db.prepare(`SELECT order_id AS id, COALESCE(returned_at, returning_at) AS at FROM ret_orders WHERE channel = 'FACEBOOK' AND COALESCE(returned_at, returning_at) >= ? AND COALESCE(returned_at, returning_at) < ? AND order_id IN (${CS})`).bind(from, addDays(to, 1)).all<{ id: string; at: string }>()).results ?? [];
+  return ok(c, { month, shipped, delivered, returned });
+});
+
+/** Đơn CSKH theo ngày tạo đơn (cùng cách chia ngày của số Pancake Facebook) để báo cáo Facebook Ads trừ ra (chị Hoa 16/11).
+ * giao/dtGiao: đơn giao thành công; hoan: đơn hoàn; tao/dt: đơn tạo từ web CSKH đã gửi sang Poscake. Ai vào được web là đọc được (chỉ số tổng, không có khách). */
+cskhRoutes.get('/fb-days', async (c) => {
+  const db = c.env.DB;
+  const from = isDay(c.req.query('from')) ? String(c.req.query('from')) : addDays(vnDate(), -150);
+  const CS = "SELECT DISTINCT order_id FROM channel_order_lines WHERE channel = 'FACEBOOK' AND shop = 'CSKH' UNION SELECT pos_id FROM cskh_web_orders WHERE pos_id IS NOT NULL";
+  const days: Record<string, { tao: number; dt: number; giao: number; dtGiao: number; hoan: number }> = {};
+  const d = (k: string) => (days[k] ??= { tao: 0, dt: 0, giao: 0, dtGiao: 0, hoan: 0 });
+  const del = (await db.prepare(`SELECT COALESCE(NULLIF(created_day, ''), day) AS k, COUNT(*) AS n, SUM(total) AS t FROM cskh_orders WHERE id IN (${CS}) AND COALESCE(NULLIF(created_day, ''), day) >= ? GROUP BY k`).bind(from).all<{ k: string; n: number; t: number }>()).results ?? [];
+  for (const r of del) Object.assign(d(r.k), { giao: r.n, dtGiao: r.t ?? 0 });
+  const web = (await db.prepare('SELECT day AS k, COUNT(*) AS n, SUM(total) AS t FROM cskh_web_orders WHERE pos_id IS NOT NULL AND day >= ? GROUP BY day').bind(from).all<{ k: string; n: number; t: number }>()).results ?? [];
+  for (const r of web) Object.assign(d(r.k), { tao: r.n, dt: r.t ?? 0 });
+  const ret = (await db.prepare(`SELECT o.created_day AS k, COUNT(*) AS n FROM ret_orders r JOIN cskh_orders o ON o.id = r.order_id WHERE r.channel = 'FACEBOOK' AND r.returned_at IS NOT NULL AND r.order_id IN (${CS}) AND o.created_day >= ? GROUP BY o.created_day`).bind(from).all<{ k: string; n: number }>()).results ?? [];
+  for (const r of ret) d(r.k).hoan = r.n;
+  return ok(c, { from, days });
+});
+
 cskhRoutes.get('/report', async (c) => {
   const me = await who(c);
   if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO xem báo cáo');

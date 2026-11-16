@@ -14,6 +14,8 @@ import { getCustomerDebt, listDebts, totalDebts } from '../services/debts';
 import { listPayments } from '../services/payments';
 import { createProposal } from '../services/proposals';
 import { khoAlerts } from './kho';
+import { listUnmapped } from './sanpham';
+import { loadLookups, resolveLabel } from '../services/channelOut';
 import { unpack } from '../lib/pack';
 import { loadTiers as loadBonusTiers } from '../services/bonus';
 
@@ -320,6 +322,65 @@ agentRoutes.get('/shortages', requirePermission('agent.read'), async (c) => {
 agentRoutes.get('/kho/alerts', requirePermission('agent.read'), async (c) => {
   needScope(c, 'kho');
   return ok(c, await khoAlerts(c.env.DB));
+});
+
+/**
+ * Mã quy đổi combo các sàn (trang Cấu hình › Sản phẩm & combo), CHỈ XEM, phạm vi kho (16/11/2026, Kế toán trưởng cần đối chiếu MISA/sàn).
+ * Lọc: kenh (TIKTOK | SHOPEE | FACEBOOK), q (mã sàn, phân loại hoặc mã/tên món), limit (mặc định 300, tối đa 1000).
+ * Mỗi dòng: mã sàn + phân loại → món (mã kho) × số lượng, áp dụng từ ngày; kèm số đơn và shop đang bán.
+ */
+agentRoutes.get('/combos', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const db = c.env.DB;
+  const kenh = (c.req.query('kenh') ?? '').toUpperCase();
+  const q = (c.req.query('q') ?? '').trim().toLowerCase().slice(0, 60);
+  const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 300) || 300, 1), 1000);
+  const [rows, sales] = await Promise.all([
+    db
+      .prepare(
+        `SELECT channel, sku, variant, from_day, item_label, qty, kind, note, off_from FROM channel_map
+         WHERE (? = '' OR channel = ?) ORDER BY channel, sku, variant, from_day, kind, item_label`,
+      )
+      .bind(kenh, kenh)
+      .all<Record<string, unknown> & { channel: string; sku: string; variant: string; item_label: string }>(),
+    db
+      .prepare(
+        `SELECT channel, sku, variant, COALESCE(shop, '') AS shop, COUNT(DISTINCT order_id) AS orders, MAX(day) AS last_day
+         FROM channel_order_lines WHERE (? = '' OR channel = ?) GROUP BY channel, sku, variant, shop`,
+      )
+      .bind(kenh, kenh)
+      .all<{ channel: string; sku: string; variant: string; shop: string; orders: number; last_day: string }>(),
+  ]);
+  const lk = await loadLookups(db);
+  const sold = new Map<string, Array<{ shop: string; orders: number; last_day: string }>>();
+  for (const x of sales.results ?? []) {
+    const k = x.channel + '|' + x.sku + '|' + (x.variant ?? '');
+    sold.set(k, [...(sold.get(k) ?? []), { shop: x.shop, orders: x.orders, last_day: x.last_day }]);
+  }
+  const all = (rows.results ?? []).map((r) => ({
+    ...r,
+    ma_kho: resolveLabel(String(r.item_label), lk) ?? String(r.item_label).split(' - ')[0]!.trim(),
+    dang_ban: sold.get(r.channel + '|' + r.sku + '|' + (r.variant ?? '')) ?? [],
+  }));
+  const hit = q ? all.filter((r) => [r.sku, r.variant, r.item_label, r.ma_kho].some((v) => String(v ?? '').toLowerCase().includes(q))) : all;
+  return ok(c, hit.slice(0, limit), { tong: hit.length, ghi_chu: 'Chỉ xem. Sửa mã quy đổi làm trên web (Cấu hình › Sản phẩm & combo).' });
+});
+
+/** Mã sàn đã bán nhưng chưa có trong bảng quy đổi (đang bị tính vào "[Chưa quy đổi]"), CHỈ XEM, phạm vi kho. */
+agentRoutes.get('/combo-unmapped', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  return ok(c, await listUnmapped(c.env.DB));
+});
+
+/** Sản phẩm gốc: mã kho thành phẩm / hàng hóa (MISA) và mã bán Kênh phân phối đang nối, CHỈ XEM, phạm vi kho. */
+agentRoutes.get('/products-goc', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'kho');
+  const db = c.env.DB;
+  const [items, maps] = await Promise.all([
+    db.prepare("SELECT code, name, unit, cls, grp, active FROM kho_items WHERE cls IN ('TP', 'HH') ORDER BY code").all(),
+    db.prepare('SELECT crm_sku, misa_code, factor FROM kho_map ORDER BY misa_code').all(),
+  ]);
+  return ok(c, { san_pham: items.results ?? [], noi_ma_kenh_phan_phoi: maps.results ?? [] });
 });
 
 /** Tồn hiện tại theo mã kho. Lọc: cls (NVL = Kho vật tư, TP, BTP, HH, COMBO, CCDC), q (tên hoặc mã), neg=1 (chỉ tồn âm), nonzero=1 (chỉ tồn khác 0), limit (mặc định 200). */

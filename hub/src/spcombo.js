@@ -53,9 +53,31 @@ function pSpcombo(m){
   const body=SPCB.tab==="bp"?spbAdminView():SPCB.tab==="sp"?spcProdView(C):SPCB.tab==="un"?spcUnView(C):spcComboView(C);
   /* Có mã bán sale tạo đang chờ: Trưởng phòng mở trang là hiện hộp duyệt (một lần mỗi lần tải). */
   if(SPCB.canCode&&(SPCB.kpPend||[]).length&&!SPCB.kpShown){SPCB.kpShown=1;setTimeout(()=>spcKppPending(),300)}
-  m.innerHTML=H(T,S)+kp+tabs+body+(SPCB.can?"":`<p class="hint pad">Bạn chỉ xem. CEO và kế toán mới sửa được.</p>`);
+  const xl=`<div class="acts" style="justify-content:flex-end;margin:0 0 8px"><button class="btn" id="spc-xl" title="Tải toàn bộ bảng quy đổi mã MISA: combo mọi kênh, sản phẩm gốc, mã chưa quy đổi">⬇ Tải Excel quy đổi mã MISA</button></div>`;
+  m.innerHTML=H(T,S)+kp+xl+tabs+body+(SPCB.can?"":`<p class="hint pad">Bạn chỉ xem. CEO và kế toán mới sửa được.</p>`);
   m.querySelectorAll("[data-spct]").forEach(b=>b.onclick=()=>{SPCB.tab=b.dataset.spct;renderMain()});
+  const xb=m.querySelector("#spc-xl");if(xb)xb.onclick=()=>spcExcel(C);
   spcBind(m,C);
+}
+/* Tải Excel bảng quy đổi mã MISA (Kế toán trưởng cần lấy về dùng, chị Hoa 16/11/2026): 3 sheet, lấy đủ mọi kênh, không theo bộ lọc đang chọn.
+   Combo: mỗi món một dòng, theo phiên bản đang áp dụng hôm nay. Cột giá vốn chỉ có khi người tải được xem giá vốn (như trên trang). */
+function spcExcel(C){
+  if(typeof XLSX==="undefined"){toast("Chưa tải được công cụ Excel, thử lại sau");return}
+  const nm=code=>{const it=SPCB.items.get(spcLow(code));return it?it.name:""},KN=k=>(SPC_KOPT.find(x=>x[0]===k)||["",k])[1];
+  const h1=["Kênh","Mã trên sàn","Phân loại","Shop / nguồn đang bán","Số đơn","Áp dụng từ","Trạng thái","Mã kho / MISA","Tên sản phẩm","Loại","SL / 1 combo"].concat(C.g?["Giá vốn món","Giá vốn 1 combo"]:[]);
+  const r1=[];C.combos.slice().sort((a,b)=>a.ch.localeCompare(b.ch)||a.sku.localeCompare(b.sku)||String(a.variant).localeCompare(String(b.variant))).forEach(c=>{
+    const x=C.g?spcCost(c.parts,C.g):null;
+    c.parts.forEach(p=>{const gv=C.g&&C.g[spcLow(p.code)];
+      r1.push([SPC_CHN(c.ch),c.sku,c.variant||"",c.shops.join(", "),c.orders||0,c.cur.from||"",c.active?"Đang dùng":"Ngừng từ "+c.off,p.kind==="skip"?"":p.code,p.kind==="skip"?"(không trừ kho)":nm(p.code)||p.label,KN(p.kind),p.qty]
+        .concat(C.g?[p.kind==="skip"||!gv?"":Math.round(gv.u*p.qty),x.u==null?"chưa tính được":Math.round(x.u)]:[]))})});
+  const h2=["Mã kho / MISA","Tên","ĐVT","Loại","Mã bán Kênh phân phối","Số combo đang dùng","Trạng thái"].concat(C.g?["Giá vốn","Nguồn giá vốn"]:[]);
+  const r2=SPCB.prods.slice().sort((a,b)=>a.code.localeCompare(b.code)).map(p=>{const crm=SPCB.khomap.filter(k=>spcLow(k.misa_code)===spcLow(p.code)).map(k=>k.crm_sku).join(", "),gv=C.g&&C.g[spcLow(p.code)];
+    return [p.code,p.name,p.unit||"",p.cls==="TP"?"Thành phẩm":"Hàng hóa / quà",crm,C.used[spcLow(p.code)]||0,p.active?"Đang dùng":"Ngừng dùng"].concat(C.g?[gv?Math.round(gv.u):"",gv?gv.src:""]:[])});
+  const h3=["Kênh","Mã trên đơn","Phân loại","Tên trên sàn","Shop","Số đơn","Từ ngày","Đến ngày"];
+  const r3=(SPCB.un||[]).map(u=>[SPC_CHN(u.channel),u.sku,u.variant||"",u.name||"",(u.shops||[]).join(", "),u.orders||0,u.first_day||"",u.last_day||""]);
+  const wb=XLSX.utils.book_new(),add=(h,r,n,w)=>{const ws=XLSX.utils.aoa_to_sheet([h].concat(r));ws["!cols"]=h.map((x,i)=>({wch:(w&&w[i])||Math.max(12,x.length+2)}));XLSX.utils.book_append_sheet(wb,ws,n)};
+  add(h1,r1,"Combo quy doi",[10,22,22,30,8,12,16,16,40,14,10,12,14]);add(h2,r2,"San pham goc MISA",[16,44,8,16,24,10,12,12,22]);add(h3,r3,"Ma chua quy doi",[10,22,22,50,24,8,12,12]);
+  XLSX.writeFile(wb,"quy-doi-ma-misa-"+spcToday()+".xlsx");
 }
 /* Bảng combo kiểu bảng quy đổi cũ bên vận hành (chị Hoa góp ý 28/10: dễ nhìn hơn): mỗi món một dòng, sửa mã / loại / số lượng ngay trong ô,
    dòng đầu mỗi combo có mã sàn, trạng thái và nút Xác nhận / Lưu. Sửa xong chưa lưu thì giữ nháp ở SPCB.dr[key]. */
@@ -350,6 +372,8 @@ async function spbPkLoad(){SPCB.pkBusy=1;renderMain();try{SPCB.pk=await spcApi("
    Chỉ sửa danh mục trên web (d.fbCat / d.cskhCat); giá trên Pancake giữ nguyên (ghi lên Pancake chờ chị duyệt riêng). */
 /* Mã Pancake trùng nhau (vd nhiều sản phẩm mã "1") thì không so theo mã, chỉ theo mã nội bộ Pancake (pkId). */
 const spbPkUniq=code=>!!code&&(SPCB.pk&&SPCB.pk.rows||[]).filter(r=>spcLow(r.code)===spcLow(code)).length===1;
+/* Giá bán lẻ trên Pancake của một biến thể (theo pkId, hoặc mã nếu mã không trùng); chưa đọc Pancake thì null. */
+const spbPkPrice=v=>{const R=SPCB.pk&&SPCB.pk.rows;if(!R)return null;const r=R.find(x=>(v.pkId&&x.id===v.pkId)||(!v.pkId&&spbPkUniq(v.ma)&&spcLow(x.code)===spcLow(v.ma)));return r&&r.price!=null?r.price:null};
 const spbPkVar=(id,code)=>{const cu=spbPkUniq(code);for(const p of (typeof spcCat==="function"?spcCat():[]))for(const v of (p.bt||[]))if((id&&v.pkId===id)||(cu&&!v.pkId&&spcLow(v.ma)===spcLow(code)))return {p,v};return null};
 function spbPkEditView(bpv){
   const P=SPCB.pk,cs=bpv==="CSKH",ed=typeof spcCanEdit==="function"&&spcCanEdit(),fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.pkq||"").trim();
