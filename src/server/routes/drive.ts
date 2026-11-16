@@ -311,7 +311,7 @@ driveRoutes.get('/overview', async (c) => {
       added: wk.added, edited: wk.edited, todo: td.length,
     };
   });
-  return ok(c, { teams: out, todo: todo.slice(0, 300), can_manage: ceo });
+  return ok(c, { teams: out, todo: todo.slice(0, 500), can_manage: ceo });
 });
 
 /** File của một thư mục (từ mục lục), lọc theo thư mục con cấp 1; mục lục cũ hơn 15 phút thì quét lại ngầm. */
