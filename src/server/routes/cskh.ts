@@ -744,6 +744,22 @@ cskhRoutes.get('/overview', async (c) => {
   });
 });
 
+/** Lãi lỗ CSKH (báo cáo riêng, không chung báo cáo Facebook Ads): đơn Facebook nguồn CSKH trong kỳ.
+ * Trả mã đơn đã gửi (để trình duyệt tính giá vốn, ship như báo cáo Facebook), đơn giao thành công (doanh thu thực), đơn hoàn. */
+cskhRoutes.get('/pl', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO xem lãi lỗ CSKH');
+  const db = c.env.DB;
+  const today = vnDate();
+  const month = /^\d{4}-\d{2}$/.test(str(c.req.query('month'), 7)) ? str(c.req.query('month'), 7) : today.slice(0, 7);
+  const [from, to] = monthRange(month);
+  const CS = "SELECT DISTINCT order_id FROM channel_order_lines WHERE channel = 'FACEBOOK' AND shop = 'CSKH' UNION SELECT pos_id FROM cskh_web_orders WHERE pos_id IS NOT NULL";
+  const shipped = (await db.prepare(`SELECT order_id AS id, MIN(day) AS day FROM channel_order_lines WHERE channel = 'FACEBOOK' AND day >= ? AND day <= ? AND order_id IN (${CS}) GROUP BY order_id`).bind(from, to).all<{ id: string; day: string }>()).results ?? [];
+  const delivered = (await db.prepare(`SELECT id, day, total FROM cskh_orders WHERE day >= ? AND day <= ? AND id IN (${CS})`).bind(from, to).all<{ id: string; day: string; total: number }>()).results ?? [];
+  const returned = (await db.prepare(`SELECT order_id AS id, COALESCE(returned_at, returning_at) AS at FROM ret_orders WHERE channel = 'FACEBOOK' AND COALESCE(returned_at, returning_at) >= ? AND COALESCE(returned_at, returning_at) < ? AND order_id IN (${CS})`).bind(from, addDays(to, 1)).all<{ id: string; at: string }>()).results ?? [];
+  return ok(c, { month, shipped, delivered, returned });
+});
+
 cskhRoutes.get('/report', async (c) => {
   const me = await who(c);
   if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO xem báo cáo');

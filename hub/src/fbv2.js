@@ -38,7 +38,7 @@ function fbmCalc(){const R=FBM.raw,L=FBM.lines,C=FBM.cost;if(!R||!R.o||!L||!C)re
   const ky=iso(new Date()).slice(0,7),cf=ttMakeCostOf({ky,mapRows:C.map,skus:D().skus||[],khoCost:C.kho,isPack:C.isPack,alias:C.alias}),by={};
   L.forEach(l=>{(by[l.order_id]=by[l.order_id]||[]).push(l)});
   const days={},miss={};
-  Object.entries(R.o).forEach(([id,[d,dt,ship]])=>{if(d<FBM_FROM)return;const ls=by[id]||[],o=days[d]||(days[d]={n:0,dt:0,gv:0,ship:0,nAll:0,nMiss:0,dtMiss:0});o.nAll++;
+  Object.entries(R.o).forEach(([id,[d,dt,ship]])=>{if(d<FBM_FROM)return;if((by[id]||[]).some(l=>l.shop==="CSKH"))return;/* đơn CSKH tính ở Lãi lỗ CSKH, không vào Facebook Ads (chị Hoa 16/11) */const ls=by[id]||[],o=days[d]||(days[d]={n:0,dt:0,gv:0,ship:0,nAll:0,nMiss:0,dtMiss:0});o.nAll++;
     let gv=0,ok=ls.length>0;ls.forEach(l=>{const c=cf(l.sku,null,l.variant);if(c.u==null){ok=false;const k=l.sku+(l.variant?" · "+l.variant:"");const m=miss[k]||(miss[k]={n:k,q:0,why:c.why});m.q+=+l.qty||0}else gv+=c.u*(+l.qty||0)});
     if(!ok){o.nMiss++;o.dtMiss+=dt;return}o.n++;o.dt+=dt;o.gv+=gv;o.ship+=ship});
   FBM.days=days;FBM.miss=Object.values(miss).sort((a,b)=>b.q-a.q);FBM.pd=fbmProdDays(R,by,cf);FBM.ver++;fbmMerge()}

@@ -115,7 +115,27 @@ function pCsTq(m){
      <section class="card"><h2>Sinh nhật khách ${TH}</h2>${O.birthdays.length?tbl(["Khách","Sinh nhật"].concat(lead?["CSKH"]:[]),O.birthdays.map(b=>`<tr class="clk" data-csopen="${b.phone}"><td><b>${esc(b.name)}</b><br><span class="hint">${esc(csPh(b.phone))}</span></td><td>${esc(b.birthday)}</td>${lead?`<td>${esc(b.owner_name||"—")}</td>`:""}</tr>`)):`<p class="hint">Chưa có khách nào ghi sinh nhật tháng này. Hỏi sinh nhật khi gọi và ghi vào hồ sơ.</p>`}</section></div>
     <section class="card"><h2>Khách mới theo nguồn ${TH}</h2>${O.sources.length?tbl(["Nguồn","Khách mới"],O.sources.map(s=>`<tr><td>${esc(s.source||"Không rõ")}</td><td class="n">${nf(s.n)}</td></tr>`)):`<p class="hint">Chưa có.</p>`}</section>`});
   const ms=m.querySelector("#csmon");if(ms)ms.onchange=()=>{CSK.month=ms.value;renderMain()};
+  if(csLead()&&CSK.me)csPlBlock(m,month);
 }
+
+/* Lãi lỗ CSKH (chị Hoa 16/11: báo cáo riêng, không chung Facebook Ads). Doanh thu = đơn giao thành công; giá vốn, ship tính như báo cáo Facebook
+   (giá thành web × số lượng xuất, phí hãng vận chuyển của đơn đã gửi); giá vốn theo tỷ lệ giá vốn / tiền hàng của đơn đã gửi trong kỳ. Quảng cáo = 0. */
+function csPlBlock(m,month){
+  if(!CSK.pl||CSK.pl.month!==month){if(!CSK.pl_busy){CSK.pl_busy=1;csApi("/pl?month="+month).then(r=>{CSK.pl=r;CSK.pl_busy=0;csRe()}).catch(e=>{CSK.pl={month,error:e.message};CSK.pl_busy=0})}}
+  if(typeof fbmLoad==="function"&&!FBM.raw&&!FBM.busy&&!CSK.fbmAsk){CSK.fbmAsk=1;fbmLoad().then(()=>{CSK.fbmAsk=0;if(FBM.raw)csRe()})}
+  const P=CSK.pl;let h;
+  if(!P||P.month!==month)h=`<p class="hint">Đang tải…</p>`;else if(P.error)h=`<p>${esc(P.error)}</p>`;
+  else{const R=FBM.raw,L=FBM.lines,C=FBM.cost;let tien=0,gv=0,ship=0,thieu=0;
+    const by={};(L||[]).forEach(l=>{(by[l.order_id]=by[l.order_id]||[]).push(l)});
+    const cf=C&&typeof ttMakeCostOf==="function"?ttMakeCostOf({ky:month,mapRows:C.map,skus:D().skus||[],khoCost:C.kho,isPack:C.isPack,alias:C.alias}):null;
+    P.shipped.forEach(o=>{const x=R&&R.o&&R.o[o.id];if(x){tien+=x[1];ship+=x[2]}if(cf)(by[o.id]||[]).forEach(l=>{const k=cf(l.sku,null,l.variant);if(k.u==null)thieu++;else gv+=k.u*(+l.qty||0)})});
+    const dt=P.delivered.reduce((a,o)=>a+(+o.total||0),0),gvR=tien?gv/tien*dt:0,lai=dt-gvR-ship,hoanT=P.returned.reduce((a,o)=>a+((R&&R.o&&R.o[o.id])?R.o[o.id][1]:0),0);
+    const row=(k,v,b)=>`<tr><td>${b?"<b>"+k+"</b>":k}</td><td class="n">${b?"<b>"+nf(v)+"</b>":nf(v)}</td></tr>`;
+    h=`<div class="cs-g2"><div><table>${row("Doanh thu giao thành công ("+P.delivered.length+" đơn)",dt)}${row("Giá vốn",-gvR)}${row("Ship trả hãng vận chuyển ("+P.shipped.length+" đơn đã gửi)",-ship)}${row("Quảng cáo",0)}${row("Lãi đóng góp",lai,1)}</table></div>
+     <div><table>${row("Đơn đã gửi hàng",P.shipped.length)}${row("Tiền hàng đơn đã gửi",tien)}${row("Đơn hoàn ("+P.returned.length+" đơn)",hoanT)}</table>${thieu?`<p class="hint">${thieu} dòng sản phẩm chưa có giá thành, chưa vào giá vốn.</p>`:""}</div></div>
+     <p class="hint">Đơn CSKH = đơn Facebook nguồn "CSKH" trên Poscake hoặc đơn tạo từ web CSKH. Các đơn này không tính vào báo cáo Facebook Ads. Ship hoàn chiều về chưa có trong số Poscake nên chưa trừ.</p>`}
+  const box=document.createElement("section");box.className="card";box.innerHTML=`<h2>Lãi lỗ CSKH tháng ${+month.slice(5)}</h2>`+h;
+  const first=m.querySelector(".cs-tiles");if(first)first.insertAdjacentElement("afterend",box);else m.appendChild(box)}
 
 /* ---------- Việc hôm nay ---------- */
 function pCsToday(m){
