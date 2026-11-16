@@ -110,7 +110,8 @@ const tmCss=`<style>
   .tm-t tr.fold td{background:var(--gray-soft)}.tm-t tr.fold:hover td{background:var(--violet-soft)}
   .tm-ffi{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--violet-soft);color:var(--violet);position:relative}.tm-ffi .gd-fsvg{width:14px;height:14px}
   .tm-ffi i{position:absolute;left:-1px;top:4px;bottom:4px;width:3px;border-radius:2px}
-  .tm-mvb{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;color:inherit;font-weight:600;font-family:inherit}.tm-mvb:hover{border-color:var(--violet);color:var(--violet)}
+  .tm-t td:last-child{overflow:visible;text-overflow:clip;padding:0 10px 0 0}
+  .tm-mvb{white-space:nowrap;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;color:inherit;font-weight:600;font-family:inherit}.tm-mvb:hover{border-color:var(--violet);color:var(--violet)}
   .tm-kf{display:flex;gap:4px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
   .tm-kf button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer;color:inherit;font-family:inherit}
   .tm-kf button small{color:var(--muted);margin-left:4px;font-variant-numeric:tabular-nums}.tm-kf button.on{background:var(--violet);border-color:var(--violet);color:#fff}.tm-kf button.on small{color:#fff}
@@ -198,7 +199,7 @@ function tmRows(L,q,subs,pb){
   subs=subs||[];
   if(!L.length&&!subs.length)return `<div class="tm-empty">Không có file nào${q?" khớp":""}.</div>`;
   const mv=x=>`<button class="tm-mvb" ${x}>Chuyển</button>`;
-  return `<div class="tm-tw"><table class="tm-t"><colgroup><col style="width:38%"><col style="width:24%"><col style="width:12%"><col style="width:15%"><col style="width:44px"><col style="width:78px"></colgroup>
+  return `<div class="tm-tw"><table class="tm-t"><colgroup><col style="width:38%"><col style="width:24%"><col style="width:12%"><col style="width:15%"><col style="width:44px"><col style="width:96px"></colgroup>
   <thead><tr><th>Tên</th><th>Nằm ở đâu</th><th>Sửa lúc</th><th>Người sửa</th><th></th><th></th></tr></thead><tbody>
   ${subs.map(s=>`<tr class="fold" data-tmsub="${esc(s.n)}" title="${esc(s.n)}"><td><div class="tm-fn"><span class="tm-ffi"><i style="background:${tmSubCol(pb,s.n)}"></i>${tmFolderSvg}</span><div class="tx"><b>${esc(s.n)}</b><small>Thư mục · ${s.c} file</small></div></div></td><td class="hint">—</td><td>${tmTime(s.last)}</td><td class="hint">—</td><td class="hint">›</td><td>${tmCanMove(pb)&&s.id?mv(`data-tmmv="${esc(s.id)}" data-tmmvpb="${esc(pb)}" data-tmmvn="${esc(s.n)}" data-tmmvf="1"`):""}</td></tr>`).join("")}
   ${L.map(f=>`<tr data-tmfile="${esc(f.id)}" title="${esc(f.name)}"><td><div class="tm-fn">${tmIc(f.kind)}<div class="tx"><b>${tmHl(f.name,q)}</b><small>${esc((TM_KIND[f.kind]||TM_KIND.other)[0])}${f.size?" · "+tmSize(f.size):""}</small></div></div></td><td>${tmLoc(f)}</td><td>${tmTime(f.modified)}</td><td>${esc(f.by||"—")}</td><td>${tmDl(f)}</td><td>${tmCanMove(f.pb)?mv(`data-tmmv="${esc(f.id)}" data-tmmvpb="${esc(f.pb)}" data-tmmvn="${esc(f.name)}" data-tmmvs="${esc(f.sub||"")}"`):""}</td></tr>`).join("")}</tbody></table></div>`;
