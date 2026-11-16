@@ -503,8 +503,9 @@ function cwMy(m){cwCss();PAGE="cv_v";
     const v=CW_MY.find(x=>x[0]===CWS.my);title="Việc của tôi";desc=CWS.my==="today"?cwToday()+" · "+CW_MYD.today:CW_MYD[CWS.my];
     body=CWS.kx==="list"?cwMyList(R,CWS.my):cwView(cwDaF(cwQ(v[3](R))))}
   const daChip=cwDaSel();
-  m.innerHTML=cwTry(()=>cwHero(R),()=>cwHead(title,desc))+(typeof nlVideoToi==="function"?nlVideoToi(ME.id):"")+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+cwTry(()=>cwLay(body,R),()=>body)+(CWS.my==="today"?cwTry(cwWs,()=>"")+cwTry(cwDocs,()=>""):"");
+  m.innerHTML=cwTry(()=>cwHero(R),()=>cwHead(title,desc))+(typeof nlVideoToi==="function"?nlVideoToi(ME.id):"")+tabs+`<div class="cwtb">${cwKxSel()}${daChip}<span class="sp"></span></div>`+cwTry(()=>cwLay(body,R),()=>body)+(CWS.my==="today"?`<section class="cwcard" style="margin-top:14px"><h3>${cwI("fold")}Dự án</h3><div id="cw-dabox" style="padding:8px 14px 14px"></div></section>`+cwTry(cwDocs,()=>""):"");
   cwTop(m);cwBind(m,R);if(typeof nlVideoToiBind==="function")nlVideoToiBind(m);
+  {const db=m.querySelector("#cw-dabox");if(db){try{pCvDa(db)}catch(e){console.error("Dự án trong Việc của tôi",e);db.innerHTML='<p class="cwempty">Chưa hiện được dự án.</p>'}}}
   m.querySelectorAll("[data-cwkv]").forEach(b=>b.onclick=e=>{e.stopPropagation();if(b.tagName==="DIV"&&e.target.closest("button"))return;cwKhoQuick(b.dataset.cwkv)});
   m.querySelectorAll("[data-cwkho]").forEach(b=>b.onclick=()=>{MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt=b.dataset.cwkho;XV.ktK="";XV.q="";render();scrollTo(0,0)});
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
@@ -650,7 +651,7 @@ if(typeof pdLoad==="function"){const _pdL=pdLoad;pdLoad=async function(f){const 
 /* ---------- 4. DỰ ÁN (tab Dự án · Mục tiêu) ---------- */
 function cwDaFrame(m,tab,inner){cwCss();
   m.innerHTML=cwHead(tab==="mt"?"Mục tiêu":"Dự án",tab==="mt"?"Mục tiêu tháng của từng người, từng phòng":"Mỗi dự án gồm nhiều việc, tiến độ tự tính từ số việc xong",{btns:false})+
-    cwTabs([{l:"Dự án",ic:"fold",on:tab!=="mt",attr:'data-cwda="cv_da"'},{l:"Mục tiêu",ic:"target",on:tab==="mt",attr:'data-cwda="cv_mt"'}])+'<div id="cw-body"></div>';cwTop(m);
+    cwTabs([{l:"Mục tiêu",ic:"target",on:tab==="mt",attr:'data-cwda="cv_mt"'}])+'<div id="cw-body"></div>';cwTop(m);
   m.querySelectorAll("[data-cwda]").forEach(b=>b.onclick=()=>{if(b.dataset.cwda!==PAGE)cwGo(b.dataset.cwda)});
   try{inner(m.querySelector("#cw-body"))}catch(e){console.error("Dự án / mục tiêu lỗi",e);m.querySelector("#cw-body").innerHTML=`<div class="note red"><b>Trang chưa hiện được.</b> ${esc(String(e&&e.message||e))}</div>`}
   /* ô tìm, bộ lọc, nút Thêm dự án đưa lên cùng hàng tab, bên phải */
@@ -758,7 +759,7 @@ PAGES.cv_ov=cwSafe(cwOv,"Tổng quan việc");
 PAGES.cv_pbv=cwSafe(cwPb,"Phòng ban");
 PAGES.cv_nk=cwSafe(cwNk,"Nhật ký việc");
 {const old=PAGES.cv_pb;if(old)PAGES.cv_pb=cwSafe(m=>cwPbSpace(m,old),"Thư mục công việc")}
-PAGES.cv_da=cwSafe(m=>cwDaFrame(m,"da",b=>pCvDa(b)),"Dự án");
+PAGES.cv_da=cwSafe(m=>{PAGE="cv_v";MOD="cv";CWS.my="today";cwMy(m)},"Việc của tôi");
 PAGES.cv_mt=cwSafe(m=>cwDaFrame(m,"mt",b=>pCvMt(b)),"Mục tiêu");
 /* trang cũ của "Tổng quan" Công việc (cv_tq) mở Tổng quan mới */
 PAGES.cv_tq=m=>{PAGE="cv_ov";PAGES.cv_ov(m)};

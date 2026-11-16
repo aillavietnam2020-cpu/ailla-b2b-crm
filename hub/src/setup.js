@@ -71,7 +71,7 @@ const PAGE_SETS=[
   {n:"Bảng tiến độ",ids:["cv_kb","congviec"],labels:["Tất cả việc","Theo bước video"]},
   {n:"Lịch",ids:["cv_lich","giaoviec"],labels:["Lịch việc","Lịch quay"]},
   {n:"Phòng ban",ids:["cv_pbv"],labels:[],noBar:true},
-  {n:"Dự án",ids:["cv_da","cv_mt"],labels:[],noBar:true},
+  {n:"Dự án",ids:["cv_mt"],labels:[],noBar:true},
   /* Marketing: mục cha bấm vào sổ ra các trang con ngay ở thanh bên (kiểu Pancake), trong trang không có hàng tab */
   /* Marketing: 5 team ngang hàng; team nhiều trang thì bấm vào sổ ra các trang con ngay thanh bên (mỗi lần chỉ mở một team) */
   {n:"Content",ids:["mkt_tq","kehoach","research","dieuphoi","lich_fb","lich","kho_luutru","win","order_c"],labels:["Tổng quan","Kế hoạch tháng","Research","Điều phối sản xuất","Lịch đăng Fanpage","Calendar","Kho lưu trữ video","Video win","Order từ Ads"],acc:true,noBar:true,hide:["lich","research"]},
@@ -127,7 +127,7 @@ const MODULES=[
  {k:"exec",zone:"",ic:"home",n:"Tổng quan",sub:"",groups:()=>[["",[MI("exec","Tổng quan điều hành",tq)]]]},
  /* Công việc (chị Hoa duyệt demo 04/11): Tổng quan · Việc của tôi · Phòng ban · Dự án · Nhật ký ở thanh bên, mỗi trang có hàng tab riêng (cvmoi.js).
     Phòng ban gồm việc của phòng (cv_pbv) + Tài liệu & trao đổi (cv_pb); Dự án gồm Dự án (cv_da) + Mục tiêu (cv_mt). Nhân sự không quản lý: không có Phòng ban. */
- {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",groups:()=>[["",[MI("cv_ov","Tổng quan"),MI("cv_v","Việc của tôi",null,()=>{try{return typeof cwTodayN==="function"?cwTodayN()||"":wkCount()||""}catch(e){return ""}}),MI("cv_pbv","Phòng ban",()=>typeof cwMgr==="function"&&cwMgr()),MI("cv_da","Dự án"),MI("cv_pb","Thư mục công việc",()=>true),MI("cv_mt","Mục tiêu"),MI("cv_nk","Nhật ký")].filter(Boolean)]]},
+ {k:"cv",zone:"",ic:"task",n:"Task giao việc",sub:"",groups:()=>[["",[MI("cv_ov","Tổng quan"),MI("cv_v","Việc của tôi",null,()=>{try{return typeof cwTodayN==="function"?cwTodayN()||"":wkCount()||""}catch(e){return ""}}),MI("cv_pbv","Phòng ban",()=>typeof cwMgr==="function"&&cwMgr()),MI("cv_pb","Thư mục công việc",()=>true),MI("cv_mt","Mục tiêu"),MI("cv_nk","Nhật ký")].filter(Boolean)]]},
  {k:"aiq",zone:"",ic:"spark",n:"Trợ lý AI",sub:"",hide:true,groups:()=>[["",[MI("ai","Trợ lý AI",u=>can(u,"kehoach.xem"),()=>{try{return aiTop(9).length||""}catch(e){return ""}})]]]},
  {k:"me",zone:"",ic:"ppl",n:"Của tôi",sub:"",hide:true,groups:()=>[["",[MI("hr_me","Nghỉ phép, OT, tạm ứng"),MI("hr_kpime","KPI của tôi"),MI("ketquatoi","Kết quả video của tôi",u=>u.role==="content"),MI("anhdaidien","Ảnh đại diện"),MI("thongbao","Cài đặt thông báo"),MI("matkhau","Đổi mật khẩu")]]]},
  {k:"b2c",zone:"Bán hàng",ic:"bag",n:"Kênh bán lẻ",sub:"TikTok · Shopee · Facebook",groups:()=>[
