@@ -42,6 +42,8 @@ const COSTCAT0=[
 ].map(r=>({k:r[0],n:r[1],nhom:r[2],loai:r[3],phanBo:r[4],pb:r[5],note:r[6]}));
 const COST_GROUPS=["Marketing","Bán hàng","Logistics","Nhân sự","Vận hành","Tài chính","Khác"];
 function ensureShape(d){
+  /* Tên hiển thị của CEO là "Quỳnh Hoa" (chị 16/11), không phải "Chị Hoa": đổi ở một chỗ, mọi nơi lấy tên theo mã nhân sự đều theo. */
+  (d.users||[]).forEach(u=>{if(u.id==="u_chi"&&u.name==="Chị Hoa")u.name="Quỳnh Hoa"});
   if(!d.departments||!d.departments.some(p=>p.k==="CM"))d.departments=JSON.parse(JSON.stringify(DEPTS0));
   if(!d.saleChannels)d.saleChannels=JSON.parse(JSON.stringify(SALECH0));
   d.saleChannels.forEach(c=>{const z=SALECH0.find(x=>x.k===c.k);if(z&&!c.phiSan&&!c.phiTT&&!c.phiDV&&!c.affiliate)Object.assign(c,{phiSan:z.phiSan,phiTT:z.phiTT,phiDV:z.phiDV,affiliate:z.affiliate,note:z.note})});
