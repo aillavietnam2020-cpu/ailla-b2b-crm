@@ -462,7 +462,8 @@ function cwMy(m){cwCss();PAGE="cv_v";
   m.querySelectorAll("[data-cwkho]").forEach(b=>b.onclick=()=>{MOD="mkt";PAGE="kehoach";STEP=7;XV.tab="kho";XV.ks="can";XV.khoSt=b.dataset.cwkho;XV.ktK="";XV.q="";render();scrollTo(0,0)});
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
   if(CWS.my==="rv")cwRvBind(m);
-  if(typeof PD!=="undefined"&&!PD.at&&typeof pdLoad==="function"&&typeof pdAny==="function"&&pdAny()&&!CWS.pdL){CWS.pdL=1;pdLoad().catch(()=>{})}
+  /* danh sách phê duyệt tải lại khi cũ quá 20 giây (duyệt xong ở trang khác thì dòng cũ biến mất) */
+  if(typeof PD!=="undefined"&&typeof pdLoad==="function"&&typeof pdAny==="function"&&pdAny()&&(!PD.at||Date.now()-PD.at>20000)&&Date.now()-(CWS.pdT||0)>15000){CWS.pdT=Date.now();pdLoad(true).then(()=>{if(PAGE==="cv_v"&&MOD==="cv")renderMain()}).catch(()=>{})}
   m.querySelectorAll("[data-cwrl]").forEach(b=>b.onclick=()=>{CWS.rl=b.dataset.cwrl;renderMain()});
   /* việc khác từ máy chủ (đơn hàng, kho, kế toán…) như "Việc khác đang chờ bạn" cũ */
   const ow=m.querySelector("#cw-wk");if(ow&&typeof wkEmbed==="function"){WK.noTask=true;try{wkEmbed(ow)}catch(e){console.error("việc khác",e)}finally{WK.noTask=false}

@@ -127,7 +127,7 @@ function pPlToi(m){
 /* ---------- Lead, HCNS: duyệt đơn ---------- */
 async function npDuyet(id,okk,reload){
   let note="";if(!okk){const el=document.getElementById("np-n-"+id);note=el?el.value.trim():"";if(!note){if(el){el.hidden=false;el.focus()}toast("Ghi lý do từ chối rồi bấm Từ chối lần nữa");return}}
-  try{const r=await svApi("/api/hub/nghiphep/don/"+id+"/duyet",{method:"POST",body:JSON.stringify({ok:okk,note})});toast(!okk?"Đã từ chối, người gửi nhận thông báo":r.st==="hcns"?"Đã duyệt. Đơn chuyển HCNS duyệt vòng 2.":"Đã duyệt, người gửi nhận thông báo");npCho();if(typeof CC!=="undefined"){CC.day=null;CC.mon=null}reload()}catch(e){toast(e.message)}
+  try{const r=await svApi("/api/hub/nghiphep/don/"+id+"/duyet",{method:"POST",body:JSON.stringify({ok:okk,note})});toast(!okk?"Đã từ chối, người gửi nhận thông báo":r.st==="hcns"?"Đã duyệt. Đơn chuyển HCNS duyệt vòng 2.":"Đã duyệt, người gửi nhận thông báo");npCho();if(typeof PD!=="undefined")PD.at=0;if(typeof CC!=="undefined"){CC.day=null;CC.mon=null}reload()}catch(e){toast(e.message)}
 }
 const npActs=x=>x.duyet?`<div class="btns" style="display:flex;gap:6px;flex-wrap:wrap"><input id="np-n-${x.id}" placeholder="Lý do từ chối" hidden style="flex:1;min-width:140px"><button class="btn sm" data-no="${x.id}">Từ chối</button><button class="btn sm pri" data-ok="${x.id}">${x.st==="hcns"&&x.lead_id?"Duyệt vòng 2":"Duyệt"}</button></div>`:"";
 const npBind=(m,reload)=>{m.querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>npDuyet(b.dataset.ok,true,reload));m.querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>npDuyet(b.dataset.no,false,reload))};
