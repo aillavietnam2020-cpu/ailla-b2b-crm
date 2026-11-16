@@ -49,8 +49,8 @@ function pSpcombo(m){
     ${go("combo",kpi("Combo đang dùng",nf(act.length),SPC_CH.map(([k,n])=>n+" "+act.filter(c=>c.ch===k).length).join(" · ")))}
     ${C.g?go("combo",kpi("Combo chưa tính được giá vốn",nf(noGv),`món bên trong chưa có giá vốn · ${nf(flag)} combo cần kế toán xác nhận`,noGv?"#b54708":"")):""}
     ${go("un",kpi("Mã chưa quy đổi",nf(U.codes),`${nf(U.orders)} đơn kho đã xuất, chưa tính giá vốn`,U.codes?"#b42318":""))}</div>`;
-  const tabs=`<nav class="settabs">${[["combo","Combo theo kênh"],["sp","Sản phẩm gốc"],["un","Mã chưa quy đổi"+(U.codes?" ("+U.codes+")":"")]].map(([k,t])=>`<button class="${SPCB.tab===k?"on":""}" data-spct="${k}">${t}</button>`).join("")}</nav>`;
-  const body=SPCB.tab==="sp"?spcProdView(C):SPCB.tab==="un"?spcUnView(C):spcComboView(C);
+  const tabs=`<nav class="settabs">${[["combo","Combo theo kênh"],["sp","Sản phẩm gốc"],["un","Mã chưa quy đổi"+(U.codes?" ("+U.codes+")":"")],["bp","Combo các bộ phận"]].map(([k,t])=>`<button class="${SPCB.tab===k?"on":""}" data-spct="${k}">${t}</button>`).join("")}</nav>`;
+  const body=SPCB.tab==="bp"?spbAdminView():SPCB.tab==="sp"?spcProdView(C):SPCB.tab==="un"?spcUnView(C):spcComboView(C);
   /* Có mã bán sale tạo đang chờ: Trưởng phòng mở trang là hiện hộp duyệt (một lần mỗi lần tải). */
   if(SPCB.canCode&&(SPCB.kpPend||[]).length&&!SPCB.kpShown){SPCB.kpShown=1;setTimeout(()=>spcKppPending(),300)}
   m.innerHTML=H(T,S)+kp+tabs+body+(SPCB.can?"":`<p class="hint pad">Bạn chỉ xem. CEO và kế toán mới sửa được.</p>`);
@@ -133,6 +133,7 @@ function spcBind(m,C){
   keep("#spc-q",v=>SPCB.q=v);keep("#spc-pq",v=>SPCB.pq=v);
   const ch=(id,f)=>{const e=$(id);if(e)e.onchange=()=>{f(e.value);renderMain()}};
   ch("#spc-f",v=>SPCB.f=v);ch("#spc-shop",v=>SPCB.shop=v);ch("#spc-pf",v=>SPCB.pf=v);
+  m.querySelectorAll("[data-spbf]").forEach(b=>b.onclick=()=>{SPCB.bpf=b.dataset.spbf;renderMain()});keep("#spb-q",v=>SPCB.bq=v);
   m.querySelectorAll("[data-spch]").forEach(b=>b.onclick=()=>{SPCB.ch=b.dataset.spch;SPCB.shop="";renderMain()});
   m.querySelectorAll("[data-sped]").forEach(b=>b.onclick=()=>{const c=C.combos.find(x=>x.key===b.dataset.sped);if(c)spcbEdit(c)});
   m.querySelectorAll("[data-spun]").forEach(b=>b.onclick=()=>spcbEdit(null,SPCB.un[+b.dataset.spun]));
@@ -332,6 +333,54 @@ function spcKppPending(onDone){
 }
 /* Duyệt một mã từ trang Phê duyệt (cùng hộp duyệt). */
 async function spcKppFromPd(onDone){try{const r=await spcApi("/kpp-code/pending");SPCB.kpPend=r.rows||[];spcKppPending(onDone)}catch(e){toast(e.message)}}
+/* ---------- Combo & giá theo bộ phận (chị Hoa duyệt demo 16/11, C:\Users\ADMIN\Downloads\demo-combo-bo-phan.html) ----------
+   Combo Ads và CSKH dùng chung danh mục Facebook › Sản phẩm (spdangchay.js, d.fbCat.combos; combo CSKH có bp:"CSKH", không chạy ads),
+   vẫn gửi phiếu cho kế toán duyệt như Ads. CSKH = phòng B2C (chị Hoa chốt 16/11).
+   Giá chương trình: giá bán lẻ riêng từng sản phẩm của bộ phận, có ngày (d.fbCat.gia [{bp, ma, gia, tu, den, by, at}]).
+   Quản trị › Sản phẩm & combo › tab "Combo các bộ phận": xem tổng, không sửa. */
+const SPB_BP={ADS:["Ads (chạy quảng cáo)","blu"],CSKH:["CSKH (không chạy ads)","vio"]};
+const spbGia=()=>{try{const f=D().fbCat;return f&&Array.isArray(f.gia)?f.gia:[]}catch(e){return []}};
+const spbCanGia=bp=>{try{return ME.role==="admin"||(bp==="CSKH"?ME.phongBan==="B2C":(ME.role==="digital"||(typeof userTeam==="function"&&userTeam(ME)==="ads")))}catch(e){return false}};
+const spbVars=()=>(typeof spcCat==="function"?spcCat():[]).filter(p=>p.loai==="run").flatMap(p=>(p.bt||[]).filter(v=>v.ma&&v.on!==false).map(v=>({ma:v.ma,ten:p.ten+((v.dt||v.pl)?" ("+[v.dt,v.pl].filter(Boolean).join(" · ")+")":"")})));
+function spbGiaSection(bp){
+  const ed=spbCanGia(bp),L=spbGia().filter(g=>g.bp===bp),by=new Map(L.map(g=>[g.ma,g]));
+  return `<section class="card"><div class="card-h"><h2>Giá sản phẩm theo chương trình · ${esc(SPB_BP[bp][0])}</h2></div>
+   <p class="hint">Giá bán lẻ riêng của bộ phận cho từng sản phẩm (ví dụ chương trình khách cũ). Để trống = dùng giá chung. Đổi xong là lưu, trang quản trị thấy ngay.</p>
+   ${tbl(["Sản phẩm","Mã","Giá chương trình","Từ ngày","Đến ngày","Sửa lần cuối"],spbVars().map(v=>{const g=by.get(v.ma)||{};
+     return `<tr><td>${esc(v.ten)}</td><td class="mono">${esc(v.ma)}</td><td class="n">${ed?`<input class="spb-g n" data-bp="${bp}" data-ma="${esc(v.ma)}" inputmode="numeric" value="${g.gia||""}" placeholder="giá chung" style="width:110px">`:g.gia?nf(g.gia):"—"}</td>
+       <td>${ed?`<input type="date" class="spb-t" data-bp="${bp}" data-ma="${esc(v.ma)}" value="${esc(g.tu||"")}">`:esc(g.tu||"")}</td><td>${ed?`<input type="date" class="spb-d" data-bp="${bp}" data-ma="${esc(v.ma)}" value="${esc(g.den||"")}">`:esc(g.den||"")}</td>
+       <td class="hint">${g.by?esc(g.by)+" · "+esc(typeof spcAt==="function"?spcAt(g.at):g.at):""}</td></tr>`}))}</section>`;
+}
+function spbGiaBind(m){
+  const save=(x,f)=>{const bp=x.dataset.bp,ma=x.dataset.ma;if(!spbCanGia(bp))return;
+    DB.mutate(ME.name,"giá chương trình "+bp+" "+ma,d=>{d.fbCat=d.fbCat||{};const L=d.fbCat.gia=Array.isArray(d.fbCat.gia)?d.fbCat.gia:[];let g=L.find(y=>y.bp===bp&&y.ma===ma);
+      if(!g){g={bp,ma};L.push(g)}f(g);g.by=ME.name||"";g.at=new Date().toISOString();if(!g.gia){const i=L.indexOf(g);L.splice(i,1)}});toast("Đã lưu giá chương trình "+ma);renderMain()};
+  m.querySelectorAll(".spb-g").forEach(x=>x.onchange=()=>save(x,g=>{g.gia=+String(x.value).replace(/[^0-9]/g,"")||0}));
+  m.querySelectorAll(".spb-t").forEach(x=>x.onchange=()=>save(x,g=>{g.tu=x.value}));
+  m.querySelectorAll(".spb-d").forEach(x=>x.onchange=()=>save(x,g=>{g.den=x.value}));
+}
+/* Vận hành › Kinh doanh › Combo & giá CSKH (phòng B2C) */
+PAGES.kd_combo=function(m){if(typeof spcEditor!=="function"){m.innerHTML=H("Combo & giá CSKH","")+`<p class="hint pad">Chưa tải được danh mục sản phẩm.</p>`;return}
+  SPC.bpView="CSKH";
+  m.innerHTML=H("Combo & giá CSKH","Combo không chạy ads của CSKH · thêm combo, gửi kế toán duyệt như Ads · giá sản phẩm theo chương trình")+spcEditor(null,[],{van:true})+spbGiaSection("CSKH");spbGiaBind(m)};
+/* Vận hành › Digital › Sản phẩm và combo (Ads): thêm bảng giá chương trình của Ads */
+{const _dg=PAGES.dg_sp;if(_dg)PAGES.dg_sp=function(m){_dg(m);m.insertAdjacentHTML("beforeend",spbGiaSection("ADS"));spbGiaBind(m)}}
+MODULES.push({k:"spb_cskh",zone:"Vận hành",ic:"bag",n:"Combo & giá CSKH",sub:"",groups:()=>[["",[MI("kd_combo","Combo & giá CSKH",u=>u.role==="admin"||u.phongBan==="B2C")]]]});
+/* Quản trị: kho tổng combo các bộ phận (chỉ xem) */
+function spbAdminView(){
+  const all=typeof spcCombosAll==="function"?spcCombosAll():[],F=SPCB.bpf||"",fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.bq||"").trim();
+  let L=all.filter(c=>!F||(c.bp||"ADS")===F);
+  if(q)L=L.filter(c=>fold([c.nhom,c.combo,c.qua,c.nguoi,c.tao&&c.tao.by].join(" ")).includes(q));
+  const st=c=>typeof spcTag==="function"?spcTag(c):"",run=c=>(typeof spcTT!=="function"||spcTT(c)==="ok")&&!(typeof spcSt==="function"&&spcSt(c)[0]==="Đã hết");
+  const n=bp=>all.filter(c=>(c.bp||"ADS")===bp&&run(c)).length,G=spbGia().filter(g=>g.gia),san=SPCB.rows?new Set(SPCB.rows.filter(r=>r.channel!=="FACEBOOK").map(r=>r.channel+"|"+r.sku+"|"+r.variant)).size:0;
+  return `<div class="grid kpis">${kpi("Combo Ads đang chạy",nf(n("ADS")),"Ads thêm ở vận hành › Digital › Sản phẩm và combo")}${kpi("Combo CSKH đang chạy",nf(n("CSKH")),"không chạy ads · CSKH (phòng B2C) thêm ở vận hành")}${kpi("Combo sàn TikTok · Shopee",nf(san),"xem ở tab Combo theo kênh")}${kpi("Giá chương trình",nf(G.length),"sản phẩm có giá riêng của bộ phận")}</div>
+   <section class="card flush"><div class="card-h pad"><div class="filters"><div class="seg">${[["","Tất cả"],["ADS","Ads"],["CSKH","CSKH"]].map(([k,t])=>`<button class="${F===k?"on":""}" data-spbf="${k}">${t}</button>`).join("")}</div>
+    <input id="spb-q" placeholder="Tìm combo, sản phẩm, người tạo…" value="${esc(SPCB.bq||"")}" style="max-width:260px"><span class="hint">${nf(L.length)} combo</span></div></div>
+   <p class="hint pad" style="padding-top:0">Quản trị chỉ xem tổng. Ads, CSKH thêm và sửa ở trang vận hành; kế toán duyệt phiếu combo như trước.</p>
+   ${tbl(["Bộ phận","Combo","Tặng kèm","Giá bán","Ngày áp dụng","Người tạo","Trạng thái"],L.slice(0,300).map(c=>{const bp=c.bp||"ADS";return `<tr><td>${pill(SPB_BP[bp][0],SPB_BP[bp][1])}</td><td><b>${esc(c.nhom||"")}</b><br><small class="hint">${esc(c.combo||"")}</small></td><td><small>${esc(c.qua||"")}</small></td>
+     <td class="n">${nf(c.gia||0)}${c.ship?`<br><small class="hint">ship ${nf(c.ship)}</small>`:""}</td><td class="hint">${c.tu?"từ "+esc(c.tu.slice(8,10)+"/"+c.tu.slice(5,7)):""}${c.den?" đến "+esc(c.den.slice(8,10)+"/"+c.den.slice(5,7)):""}</td><td class="hint">${esc((c.tao&&c.tao.by)||c.nguoi||"")}</td><td>${st(c)}</td></tr>`}))}</section>
+   ${G.length?`<section class="card"><div class="card-h"><h2>Giá sản phẩm theo chương trình</h2></div>${tbl(["Bộ phận","Mã","Giá chương trình","Từ","Đến","Người đặt"],G.map(g=>`<tr><td>${pill(SPB_BP[g.bp][0],SPB_BP[g.bp][1])}</td><td class="mono">${esc(g.ma)}</td><td class="n">${nf(g.gia)}</td><td>${esc(g.tu||"")}</td><td>${esc(g.den||"")}</td><td class="hint">${esc(g.by||"")}</td></tr>`))}</section>`:""}`;
+}
 PAGES.spcombo=pSpcombo;
 PAGES.kho_combo=pKhoCombo;
 /* Quy đổi mã các sàn (trang cũ ở quản trị): mở thẳng Sản phẩm & combo; các nút "Mở Quy đổi mã các sàn" ở TikTok/Shopee về đây. */

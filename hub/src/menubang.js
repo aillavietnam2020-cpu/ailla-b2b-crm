@@ -73,7 +73,7 @@
   }else{
     const S={
       exec:[["",[["exec","Tổng quan vận hành"]]]],
-      kd:[["Kênh bán lẻ",[["bc_tiktok","TikTok Shop"],"bc_shopee","bc_fb","fb_sale","fb_cskh"]],
+      kd:[["Kênh bán lẻ",[["bc_tiktok","TikTok Shop"],"bc_shopee","bc_fb","fb_sale","fb_cskh","kd_combo"]],
         ["Kênh phân phối",[["cr_rp","Dashboard kênh phân phối"],"cr_kh","cr_dn","cr_cn","cr_ret",["cr_gia","Bảng giá"],
           "cr_s_hn","cr_s_kh","cr_s_dn",["cr_s_gia","Bảng giá"],"cr_s_cn","cr_s_ret","cr_s_kq"]],
         ["Kênh OEM",[["gc_tq","Tổng quan Kênh OEM"],["gc_kh","Khách hàng OEM"],["gc_don","Đơn OEM"],["gc_sx","Sản xuất OEM"],["gc_cn","Công nợ OEM"]]]],
