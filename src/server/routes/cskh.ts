@@ -641,123 +641,77 @@ function monthRange(m: string): [string, string] {
   return [from, addDays(d.toISOString().slice(0, 10), -1)];
 }
 
-cskhRoutes.get('/overview', async (c) => {
+/** Báo cáo kinh doanh CSKH theo kỳ (chị Hoa 16/11): đơn Facebook nguồn "CSKH" trên Poscake hoặc tạo từ web CSKH, không chung Facebook Ads.
+ * Doanh thu thực = đơn giao thành công (ngày giao). Trả số thô theo ngày, trình duyệt tính giá vốn, ship (như báo cáo Facebook), lương CSKH.
+ * Ai vào CSKH đều xem được (sale CSKH thấy bảng xếp hạng nhân viên, chị Hoa 16/11); danh sách đơn gửi để tính giá vốn chỉ trả cho Lead / CEO. */
+cskhRoutes.get('/kd', async (c) => {
   const me = await who(c);
   const db = c.env.DB;
   const set = await loadSettings(db);
   const today = vnDate();
-  const month = /^\d{4}-\d{2}$/.test(str(c.req.query('month'), 7)) ? str(c.req.query('month'), 7) : today.slice(0, 7);
-  const [from, to0] = monthRange(month);
+  const from = isDay(c.req.query('from')) ? String(c.req.query('from')) : today.slice(0, 8) + '01';
+  const to0 = isDay(c.req.query('to')) ? String(c.req.query('to')) : today;
   const to = to0 > today ? today : to0;
-  const mine = !me.lead || c.req.query('mine') === '1';
-  const oc = mine ? 'AND owner_id = ?' : '';
-  const ob = mine ? [me.id] : [];
-  const vipAuto = set.tiers.map((t) => [t.o > 0 ? 'order_count >= ' + t.o : '', t.s > 0 ? 'total_spent >= ' + t.s : ''].filter(Boolean).join(' OR ')).filter(Boolean);
-  const vipCond = { sql: `((tier_manual <> '' AND tier_manual <> ?) OR (tier_manual = '' AND (${vipAuto.length ? vipAuto.join(' OR ') : '0'})))`, binds: [TIER_BASE] as unknown[] };
-  const base = await db
-    .prepare(
-      `SELECT COUNT(*) AS total, SUM(CASE WHEN first_order_day >= ? AND first_order_day <= ? THEN 1 ELSE 0 END) AS moi,
-         SUM(CASE WHEN ${vipCond.sql} THEN 1 ELSE 0 END) AS vip, SUM(CASE WHEN stop_reason <> '' THEN 1 ELSE 0 END) AS ngung, SUM(CASE WHEN order_count >= 1 THEN 1 ELSE 0 END) AS buyers,
-         SUM(CASE WHEN next_call < ? THEN 1 ELSE 0 END) AS qua, SUM(CASE WHEN owner_id IS NULL THEN 1 ELSE 0 END) AS chua
-       FROM cskh_customers WHERE 1 = 1 ${oc}`,
-    )
-    .bind(from, to0, ...vipCond.binds, today, ...ob)
-    .first<{ total: number; moi: number; vip: number; ngung: number; buyers: number; qua: number; chua: number }>();
-  // Hôm nay theo từng CSKH: cần gọi (quá hạn + hẹn hôm nay + khách mới + đến kỳ), đã gọi, chốt, quá hạn tồn.
-  const cand = (
-    await db
-      .prepare(`SELECT ${COLS} FROM cskh_customers WHERE owner_id IS NOT NULL ${oc} AND (next_call <= ? OR (next_call IS NULL AND last_order_day >= ?))`)
-      .bind(...ob, today, addDays(today, -400))
-      .all<Cus>()
-  ).results ?? [];
-  const staff = await cskhStaff(db);
-  const per = new Map<string, { id: string; name: string; can: number; goi: number; chot: number; qua: number; dt: number; don: number }>();
-  const row = (id: string, name = '') => {
-    let r = per.get(id);
-    if (!r) {
-      r = { id, name: name || staff.find((s) => s.id === id)?.name || '', can: 0, goi: 0, chot: 0, qua: 0, dt: 0, don: 0 };
-      per.set(id, r);
-    }
-    return r;
-  };
-  if (!mine) for (const s of staff) row(s.id, s.name);
-  else row(me.id, me.name);
-  for (const cu of cand) {
-    const s = callState(cu, today, set);
-    if (!cu.owner_id) continue;
-    const r = row(cu.owner_id, cu.owner_name);
-    if (['qua', 'nay', 'moi', 'ky'].includes(s)) r.can += 1;
-    if (s === 'qua') r.qua += 1;
-  }
-  const lt = (await db.prepare(`SELECT by_id, by_name, COUNT(DISTINCT phone) AS n, SUM(CASE WHEN result = 'Đã chốt đơn' THEN 1 ELSE 0 END) AS chot FROM cskh_logs WHERE day = ? ${mine ? 'AND by_id = ?' : ''} GROUP BY by_id`).bind(today, ...ob).all<{ by_id: string; by_name: string; n: number; chot: number }>()).results ?? [];
-  for (const l of lt) {
-    const r = row(l.by_id, l.by_name);
-    r.goi = l.n;
-    r.chot = l.chot;
-  }
-  // Doanh thu bán thêm trong tháng + 10 ngày gần nhất.
-  const ups = await upsellIn(db, addDays(to, -9) < from ? addDays(to, -9) : from, to);
-  const inMonth = ups.filter((o) => o.day >= from && o.day <= to && (!mine || o.by === me.id));
-  for (const o of inMonth) {
-    const r = row(o.by);
-    r.dt += o.total;
-    r.don += 1;
-  }
-  const days: Array<{ day: string; v: number }> = [];
-  for (let i = 9; i >= 0; i--) {
-    const d = addDays(to, -i);
-    days.push({ day: d, v: ups.filter((o) => o.day === d && (!mine || o.by === me.id)).reduce((a, o) => a + o.total, 0) });
-  }
-  const prod = new Map<string, { q: number; v: number }>();
-  for (const o of inMonth)
-    for (const it of JSON.parse(o.items) as Array<{ n: string; q: number; p: number }>) {
-      const a = prod.get(it.n) ?? { q: 0, v: 0 };
-      a.q += it.q;
-      a.v += it.p;
-      prod.set(it.n, a);
-    }
-  const fun = await db
-    .prepare(
-      `SELECT COUNT(*) AS goi, SUM(CASE WHEN result NOT IN ('Không nghe máy', 'Sai số / thuê bao') THEN 1 ELSE 0 END) AS bat, SUM(CASE WHEN result = 'Đã chốt đơn' THEN 1 ELSE 0 END) AS chot
-       FROM cskh_logs WHERE day >= ? AND day <= ? ${mine ? 'AND by_id = ?' : ''}`,
-    )
-    .bind(from, to, ...ob)
-    .first<{ goi: number; bat: number; chot: number }>();
-  const bdays = (
-    await db.prepare(`SELECT phone, name, birthday, owner_name FROM cskh_customers WHERE birthday LIKE ? ${oc} ORDER BY birthday LIMIT 60`).bind('%/' + month.slice(5), ...ob).all()
-  ).results ?? [];
-  const src = (
-    await db.prepare(`SELECT source, COUNT(*) AS n FROM cskh_customers WHERE first_order_day >= ? AND first_order_day <= ? ${oc} GROUP BY source ORDER BY n DESC LIMIT 8`).bind(from, to0, ...ob).all()
-  ).results ?? [];
-  const kpi = mine && me.lead === false ? (staff.length ? set.kpi / Math.max(1, staff.filter((s) => !set.staffOff.includes(s.id)).length) : 0) : set.kpi;
-  return ok(c, {
-    month,
-    base,
-    kpi,
-    upsell: { total: inMonth.reduce((a, o) => a + o.total, 0), orders: inMonth.length },
-    per: [...per.values()].sort((a, b) => b.dt - a.dt || a.name.localeCompare(b.name)),
-    days,
-    funnel: { goi: fun?.goi ?? 0, bat: fun?.bat ?? 0, chot: fun?.chot ?? 0, giao: inMonth.length },
-    products: [...prod.entries()].map(([n, a]) => ({ n, ...a })).sort((a, b) => b.v - a.v).slice(0, 8),
-    birthdays: bdays,
-    sources: src,
-  });
-});
-
-/** Lãi lỗ CSKH (báo cáo riêng, không chung báo cáo Facebook Ads): đơn Facebook nguồn CSKH trong kỳ.
- * Trả mã đơn đã gửi (để trình duyệt tính giá vốn, ship như báo cáo Facebook), đơn giao thành công (doanh thu thực), đơn hoàn. */
-cskhRoutes.get('/pl', async (c) => {
-  const me = await who(c);
-  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO xem lãi lỗ CSKH');
-  const db = c.env.DB;
-  const today = vnDate();
-  const month = /^\d{4}-\d{2}$/.test(str(c.req.query('month'), 7)) ? str(c.req.query('month'), 7) : today.slice(0, 7);
-  const [from, to] = monthRange(month);
+  if (to < from) throw badRequest('NGAY', 'Kỳ không hợp lệ');
   const CS = "SELECT DISTINCT order_id FROM channel_order_lines WHERE channel = 'FACEBOOK' AND shop = 'CSKH' UNION SELECT pos_id FROM cskh_web_orders WHERE pos_id IS NOT NULL";
-  const shipped = (await db.prepare(`SELECT order_id AS id, MIN(day) AS day FROM channel_order_lines WHERE channel = 'FACEBOOK' AND day >= ? AND day <= ? AND order_id IN (${CS}) GROUP BY order_id`).bind(from, to).all<{ id: string; day: string }>()).results ?? [];
-  const delivered = (await db.prepare(`SELECT id, day, total FROM cskh_orders WHERE day >= ? AND day <= ? AND id IN (${CS})`).bind(from, to).all<{ id: string; day: string; total: number }>()).results ?? [];
-  const returned = (await db.prepare(`SELECT order_id AS id, COALESCE(returned_at, returning_at) AS at FROM ret_orders WHERE channel = 'FACEBOOK' AND COALESCE(returned_at, returning_at) >= ? AND COALESCE(returned_at, returning_at) < ? AND order_id IN (${CS})`).bind(from, addDays(to, 1)).all<{ id: string; at: string }>()).results ?? [];
-  return ok(c, { month, shipped, delivered, returned });
+  // Đơn giao thành công trong kỳ, gán cho người CSKH (đơn tạo từ web: người tạo; đơn lên tay: người gọi "Đã chốt đơn" trước đó).
+  const del = (await db.prepare(`SELECT id, phone, day, created_day, items, total FROM cskh_orders WHERE day >= ? AND day <= ? AND id IN (${CS})`).bind(from, to).all<OrdRow>()).results ?? [];
+  const logs = (await db.prepare("SELECT phone, by_id, day FROM cskh_logs WHERE result = 'Đã chốt đơn' AND day >= ? AND day <= ?").bind(addDays(from, -40), to).all<{ phone: string; by_id: string; day: string }>()).results ?? [];
+  const web = (await db.prepare('SELECT pos_id, by_id FROM cskh_web_orders WHERE pos_id IS NOT NULL AND day >= ?').bind(addDays(from, -60)).all<{ pos_id: string; by_id: string }>()).results ?? [];
+  const webBy: Record<string, string> = {};
+  for (const w of web) webBy[w.pos_id] = w.by_id;
+  const byOf = attributeOrders(del, logs, webBy);
+  const mineOnly = (by: string) => me.lead || by === me.id;
+  const delivered = del.map((o) => ({ id: mineOnly(byOf.get(o.id) ?? '') ? o.id : '', day: o.day, phone: mineOnly(byOf.get(o.id) ?? '') ? o.phone : '', total: o.total ?? 0, by: byOf.get(o.id) ?? '', items: JSON.parse(o.items || '[]') as Array<{ n: string; q: number; p: number }> }));
+  // Đơn đã gửi trong kỳ (ngày gửi hàng) và tình trạng hiện tại: giao / hoàn / đang giao.
+  const sent = (
+    await db
+      .prepare(
+        `SELECT l.order_id AS id, MIN(l.day) AS day,
+           CASE WHEN EXISTS (SELECT 1 FROM ret_orders r WHERE r.channel = 'FACEBOOK' AND r.order_id = l.order_id) THEN 'hoan'
+                WHEN EXISTS (SELECT 1 FROM cskh_orders o WHERE o.id = l.order_id) THEN 'giao' ELSE 'dang' END AS st
+         FROM channel_order_lines l WHERE l.channel = 'FACEBOOK' AND l.day >= ? AND l.day <= ? AND l.order_id IN (${CS}) GROUP BY l.order_id`,
+      )
+      .bind(from, to)
+      .all<{ id: string; day: string; st: string }>()
+  ).results ?? [];
+  // Cuộc gọi theo ngày và theo người.
+  const calls = (
+    await db
+      .prepare(`SELECT day, by_id, COUNT(*) AS goi, COUNT(DISTINCT phone) AS khach, SUM(CASE WHEN result = 'Đã chốt đơn' THEN 1 ELSE 0 END) AS chot FROM cskh_logs WHERE day >= ? AND day <= ? GROUP BY day, by_id`)
+      .bind(from, to)
+      .all<{ day: string; by_id: string; goi: number; khach: number; chot: number }>()
+  ).results ?? [];
+  const results = (await db.prepare('SELECT result, COUNT(*) AS n FROM cskh_logs WHERE day >= ? AND day <= ? GROUP BY result ORDER BY n DESC').bind(from, to).all<{ result: string; n: number }>()).results ?? [];
+  const cared = await db.prepare('SELECT COUNT(DISTINCT phone) AS n FROM cskh_logs WHERE day >= ? AND day <= ?').bind(from, to).first<{ n: number }>();
+  const stop = await db.prepare('SELECT COUNT(*) AS n FROM cskh_customers WHERE stop_at >= ? AND stop_at < ?').bind(from, addDays(to, 1)).first<{ n: number }>();
+  // Khách đang chăm và quá hạn gọi (hiện tại) theo người.
+  const own = (await db.prepare("SELECT owner_id, COUNT(*) AS n, SUM(CASE WHEN next_call < ? THEN 1 ELSE 0 END) AS qua FROM cskh_customers WHERE owner_id IS NOT NULL AND stop_reason = '' GROUP BY owner_id").bind(today).all<{ owner_id: string; n: number; qua: number }>()).results ?? [];
+  // Doanh thu thực theo hạng khách.
+  const tiers: Array<{ n: string; khach: number; dt: number }> = [];
+  for (const name of [...set.tiers.map((t) => t.n), TIER_BASE]) {
+    const t = tierSql(set, name);
+    const r = await db
+      .prepare(`SELECT COUNT(DISTINCT o.phone) AS khach, SUM(o.total) AS dt FROM cskh_orders o JOIN cskh_customers k ON k.phone = o.phone WHERE o.day >= ? AND o.day <= ? AND o.id IN (${CS}) AND ${t.sql}`)
+      .bind(from, to, ...t.binds)
+      .first<{ khach: number; dt: number }>();
+    tiers.push({ n: name, khach: r?.khach ?? 0, dt: r?.dt ?? 0 });
+  }
+  const staff = await cskhStaff(db);
+  return ok(c, {
+    from,
+    to,
+    me: { id: me.id, lead: me.lead },
+    staff: staff.map((s) => ({ id: s.id, name: s.name })),
+    delivered,
+    sent: sent.map((s) => (me.lead ? s : { id: '', day: s.day, st: s.st })),
+    calls,
+    results,
+    cared: cared?.n ?? 0,
+    stopped: stop?.n ?? 0,
+    own,
+    tiers,
+  });
 });
 
 /** Đơn CSKH theo ngày tạo đơn (cùng cách chia ngày của số Pancake Facebook) để báo cáo Facebook Ads trừ ra (chị Hoa 16/11).
