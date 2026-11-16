@@ -104,7 +104,7 @@ function pdBuild(S,w){
       sub:(x.name||x.item||"")+": đặt "+q(+x.ordered||0)+", nhận "+q(+x.received||0)+" ("+ty+" "+q(Math.abs(d))+")"+(x.kho_doc_no?" · phiếu nhập "+x.kho_doc_no:""),
       tien:x.unit_price!=null?Math.round(Math.abs(d)*+x.unit_price):null,by:"Kho",at:pdTs(x.created_at),act:"fn",open:{page:"mh_po",po:x.po_id}})});
   /* Phiếu điều chỉnh bảng giá Kênh phân phối chờ CEO duyệt (spbg.js, 16/11). */
-  if(ceo)(S.pgCho||[]).forEach(p=>add({k:"pg",id:"pg:"+p.id,ref:p.id,src:"giaPhieu",loai:"Phiếu điều chỉnh giá",ok:"Duyệt phiếu",nd:p.ma+" · "+(p.ly||""),sub:[(p.lines||[]).length+" ô giá",(p.moi||[]).length?(p.moi||[]).length+" mã mới":"","áp dụng từ "+p.tu].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"sp_cfg"}}));
+  if(ceo)(S.pgCho||[]).forEach(p=>add({k:"pg",id:"pg:"+p.id,ref:p.id,src:"giaPhieu",loai:"Phiếu điều chỉnh giá",ok:"Duyệt phiếu",nd:p.ma+" · "+(p.ly||""),sub:[(p.lines||[]).length+" ô giá",(p.moi||[]).length?(p.moi||[]).length+" mã mới":"","áp dụng từ "+p.tu].filter(Boolean).join(" · "),by:p.by||"",at:pdTs(p.at),act:"fn",open:{page:"sp_gia"}}));
   /* Khuyến mại các bộ phận chờ kế toán duyệt; combo TikTok mới chờ kế toán khai quy đổi (spcfg.js, 16/11). */
   if(R.ketoan()){
     (S.kmCho||[]).forEach(k=>add({k:"km",id:"km:"+k.id,ref:k.id,src:"kmCat",loai:"Khuyến mại · chờ kế toán duyệt",nd:k.ten||"",sub:[k.ap,k.tu?"từ "+k.tu:"",k.den?"đến "+k.den:""].filter(Boolean).join(" · "),tien:+k.gia||null,by:k.by||"",at:pdTs(k.at),act:"fn",open:{page:"sp_km"}}));

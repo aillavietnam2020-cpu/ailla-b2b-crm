@@ -40,7 +40,7 @@ function spbgCreate(){
     `<button class="btn pri" id="pg-ok">${spbgIsCeo()?"Lưu phiếu":"Lưu và gửi chị duyệt"}</button>`);
   R.querySelector("#pg-ok").onclick=()=>{const ly=R.querySelector("#pg-ly").value.trim(),tu=R.querySelector("#pg-tu").value;if(!ly){toast("Ghi lý do điều chỉnh");return}if(!tu){toast("Chọn ngày áp dụng");return}
     const ph={id:"pg"+Date.now(),ma:spbgMa(),ly,tu,lines,moi:NP,by:ME.name||"",byId:ME.id||"",at:new Date().toISOString(),tt:"cho"};
-    DB.mutate(ME.name,"tạo phiếu giá "+ph.ma,d=>{d.giaPhieu=Array.isArray(d.giaPhieu)?d.giaPhieu:[];d.giaPhieu.push(ph);try{if(typeof notifyU==="function")notifyU(d,spbgCeoIds(),`${ME.name||""} gửi phiếu điều chỉnh giá ${ph.ma}: ${ly}`,"page:sp_cfg")}catch(e){}});
+    DB.mutate(ME.name,"tạo phiếu giá "+ph.ma,d=>{d.giaPhieu=Array.isArray(d.giaPhieu)?d.giaPhieu:[];d.giaPhieu.push(ph);try{if(typeof notifyU==="function")notifyU(d,spbgCeoIds(),`${ME.name||""} gửi phiếu điều chỉnh giá ${ph.ma}: ${ly}`,"page:sp_gia")}catch(e){}});
     SPCF.chg={};SPCF.newP=[];SPCF.b2bEd=false;closeCM();toast(spbgIsCeo()?"Đã lưu phiếu "+ph.ma+", bấm Duyệt phiếu ở cuối bảng để áp giá":"Đã lưu và gửi chị duyệt phiếu "+ph.ma);renderMain()}}
 
 /* ---------- Danh sách phiếu (dưới bảng giá) ---------- */
@@ -61,10 +61,10 @@ async function spbgDuyet(id){if(!spbgIsCeo())return;const p0=spbgList().find(x=>
       for(const [tid,x] of Object.entries(n.prices||{})){if(x.done)continue;await put(n.id,tid,x.amount);x.done=true}n.done=true}catch(e){loi.push(n.sku+": "+e.message)}}
   for(const l of (p.lines||[])){if(l.done)continue;try{await put(l.pid,l.tid,l.moi);l.done=true}catch(e){loi.push(l.sku+" "+l.tier+": "+e.message)}}
   DB.mutate(ME.name,"duyệt phiếu giá "+p.ma,d=>{const x=(d.giaPhieu||[]).find(y=>y.id===id);if(!x)return;x.lines=p.lines;x.moi=p.moi;x.loi=loi;
-    if(!loi.length){x.tt="ok";x.duyet={by:ME.name||"",at:new Date().toISOString()};try{if(typeof notifyU==="function")notifyU(d,[x.byId],`Chị đã duyệt phiếu giá ${x.ma}, giá mới áp dụng từ ${spcfVN(x.tu)}`,"page:sp_cfg")}catch(e){}}});
+    if(!loi.length){x.tt="ok";x.duyet={by:ME.name||"",at:new Date().toISOString()};try{if(typeof notifyU==="function")notifyU(d,[x.byId],`Chị đã duyệt phiếu giá ${x.ma}, giá mới áp dụng từ ${spcfVN(x.tu)}`,"page:sp_gia")}catch(e){}}});
   toast(loi.length?`Còn ${loi.length} ô chưa áp được: ${loi[0]}`:`Đã duyệt phiếu ${p.ma}, giá mới đã vào bảng giá`);SPCF.b2b=null;if(typeof spcfB2bLoad==="function")spcfB2bLoad(true);renderMain()}
 function spbgTraLai(id,ly){if(!spbgIsCeo())return;DB.mutate(ME.name,"trả lại phiếu giá",d=>{const x=(d.giaPhieu||[]).find(y=>y.id===id);if(!x||x.tt!=="cho")return;x.tt="tralai";x.lyTra=ly||"";x.duyet={by:ME.name||"",at:new Date().toISOString()};
-  try{if(typeof notifyU==="function")notifyU(d,[x.byId],`Phiếu giá ${x.ma} bị trả lại: ${ly||""}`,"page:sp_cfg")}catch(e){}});renderMain()}
+  try{if(typeof notifyU==="function")notifyU(d,[x.byId],`Phiếu giá ${x.ma} bị trả lại: ${ly||""}`,"page:sp_gia")}catch(e){}});renderMain()}
 function spbgBind(m){const on=(s,f)=>m.querySelectorAll(s).forEach(b=>b.onclick=()=>f(b));
   on("[data-pgview]",b=>spbgView(b.dataset.pgview));on("[data-pgok]",b=>spbgDuyet(b.dataset.pgok));
   on("[data-pgno]",b=>{const ly=prompt("Lý do trả lại phiếu:");if(ly)spbgTraLai(b.dataset.pgno,ly)});
