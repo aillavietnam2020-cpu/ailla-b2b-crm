@@ -26,6 +26,7 @@ import {
   type CskhSettings,
 } from '@shared/cskh';
 import type { AppEnv } from '../env';
+import { loadSource } from '../services/poscake';
 import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { requirePermission } from '../middleware/rbac';
 import {
@@ -110,7 +111,8 @@ cskhRoutes.get('/me', async (c) => {
   const set = await loadSettings(c.env.DB);
   const staff = await cskhStaff(c.env.DB);
   const bf = await getSetting<BackfillState>(c.env.DB, 'backfill');
-  return ok(c, { me, staff, settings: set, today: vnDate(), results: CSKH_RESULTS, reasons: CSKH_REASONS, traits: CSKH_TRAITS, stopReasons: CSKH_STOP_REASONS, backfill: bf });
+  const pos = await loadSource(c.env.DB, 'FACEBOOK');
+  return ok(c, { me, staff, posShop: pos?.shop_id ?? '', settings: set, today: vnDate(), results: CSKH_RESULTS, reasons: CSKH_REASONS, traits: CSKH_TRAITS, stopReasons: CSKH_STOP_REASONS, backfill: bf });
 });
 
 cskhRoutes.put('/settings', async (c) => {
