@@ -219,6 +219,31 @@ export async function pushChat(env: Env, room: string, from: string, body: strin
   }
 }
 
+/**
+ * Agent trả lời trên web (Ailla Agent / Điều hành agent): báo về máy của người đã nhắn (15/11, chị Hoa: agent trả lời mà không có thông báo).
+ * Theo loại "Tin nhắn" của người đó (tắt Tin nhắn là tắt luôn), giờ yên lặng vẫn áp; mỗi agent tối đa một thông báo mỗi phút.
+ * Bấm vào mở thẳng Ailla Agent đúng agent đó.
+ */
+export async function pushAgent(env: Env, uid: string, agentId: string, agentName: string, body: string, failed = false): Promise<void> {
+  if (!vapid(env) || !uid) return;
+  const subs = await subscribers(env.DB);
+  if (!subs.has(uid)) return;
+  const minute = Math.floor(Date.now() / 60_000);
+  const key = `ag:${agentId}:${uid}:${minute}`;
+  if (!(await claim(env.DB, [key])).has(key)) return;
+  const text = body.replace(/\*\*/g, '').replace(/\s+/g, ' ').trim() || 'Đã trả lời (có tệp đính kèm)';
+  await deliver(env, uid, [
+    {
+      key: 'ag-' + agentId,
+      type: 'tin',
+      urgent: false,
+      title: (failed ? '⚠ ' : '🤖 ') + agentName,
+      body: cut(failed ? 'Chưa trả lời được: ' + text : text, 180),
+      url: '/agent/#a=' + encodeURIComponent(agentId),
+    },
+  ]);
+}
+
 /** Chạy mỗi 15 phút: chuông do máy chủ ghi, báo gộp việc chờ duyệt, báo gộp sau giờ yên lặng, dọn khóa cũ. */
 export async function pushCron(env: Env): Promise<void> {
   if (!vapid(env)) return;

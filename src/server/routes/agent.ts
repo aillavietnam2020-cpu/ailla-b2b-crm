@@ -799,6 +799,61 @@ agentRoutes.get('/mkt/orders', requirePermission('agent.read'), async (c) => {
   return ok(c, orders);
 });
 
+/**
+ * Combo sản phẩm Facebook do team Digital set (trang Marketing › Sản phẩm và combo), CHỈ XEM.
+ * Cho CSKH biết combo, quà, giá, ship, landing đang áp dụng để tư vấn khách (chị Hoa 15/11).
+ * Mặc định chỉ combo đã duyệt và chưa hết hạn; ?all=1 lấy cả combo sắp chạy / đã hết.
+ */
+agentRoutes.get('/mkt/combos', requirePermission('agent.read'), async (c) => {
+  needScope(c, 'cskh_b2b', 'mkt_digital', 'mkt_content');
+  const d = await hubData(c);
+  const fb = (d.fbCat ?? null) as { sp?: Array<Record<string, unknown>>; combos?: Array<Record<string, unknown>> } | null;
+  if (!fb || !Array.isArray(fb.combos)) {
+    return ok(c, [], { ghi_chu: 'Chưa có bảng combo lưu trên web (Digital chưa sửa lần nào). Không tự đoán combo.' });
+  }
+  const all = c.req.query('all') === '1';
+  const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+  const names = new Map<string, string>();
+  const products = (fb.sp ?? []).map((p) => {
+    const bt = ((p.bt as Array<Record<string, unknown>>) ?? []).map((v) => {
+      const label = [p.ten, v.dt, v.pl].filter((x) => x).join(' ');
+      if (v.ma) names.set(String(v.ma), label);
+      return { ma: v.ma, dung_tich: v.dt || '', phan_loai: v.pl || '', dang_chay: v.on !== false };
+    });
+    return { ten: p.ten, loai: p.loai === 'run' ? 'Đang chạy' : p.loai === 'gift' ? 'Quà tặng' : 'Không chạy', bien_the: bt };
+  });
+  const items = (l: unknown) =>
+    ((l as Array<Record<string, unknown>>) ?? []).map((x) => ({ ma: x.ma || '', ten: names.get(String(x.ma)) || x.ten || x.ma || '', sl: Number(x.sl) || 1 }));
+  const status = (x: Record<string, unknown>) => {
+    if (x.tu && String(x.tu) > today) return 'Sắp chạy';
+    if (x.den && String(x.den) < today) return 'Đã hết';
+    return 'Đang áp dụng';
+  };
+  const combos = fb.combos
+    .filter((x) => ((x.tt as string) || 'ok') === 'ok' && !x.dx)
+    .map((x) => ({
+      nhom: x.nhom || '',
+      mua: items(x.gom),
+      tang: items(x.tang),
+      mo_ta_cu: (x.gom as unknown[])?.length ? undefined : x.combo || undefined,
+      qua_cu: (x.tang as unknown[])?.length ? undefined : x.qua || undefined,
+      gia: Number(x.gia) || 0,
+      ship: Number(x.ship) ? Number(x.ship) : 'miễn ship',
+      page: x.page || '',
+      landing: Array.isArray(x.landings) && (x.landings as unknown[]).length ? x.landings : x.landing ? [x.landing] : [],
+      tu: x.tu || '',
+      den: x.den || '',
+      trang_thai: status(x),
+      ghi_chu: cut(x.ghi),
+    }))
+    .filter((x) => all || x.trang_thai !== 'Đã hết');
+  return ok(c, combos, {
+    san_pham: products,
+    ngay: today,
+    ghi_chu: 'Combo do team Digital set trên web, chỉ xem. Giá/quà có thể đổi theo ngày: luôn đọc lại trước khi báo khách, không hứa ngoài bảng này.',
+  });
+});
+
 agentRoutes.get('/mkt/ads', requirePermission('agent.read'), async (c) => {
   needScope(c, 'mkt_digital');
   const row = await c.env.DB.prepare(`SELECT data FROM hub_blobs WHERE key = 'ads_live' AND admin_only = 0`).first<{ data: string }>();

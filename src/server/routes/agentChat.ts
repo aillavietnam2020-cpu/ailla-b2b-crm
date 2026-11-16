@@ -5,6 +5,7 @@ import type { AppEnv } from '../env';
 import { forbidden, badRequest, notFound, ok, unauthorized } from '../lib/http';
 import { issueDelegation, issueTelegramDelegation } from '../lib/delegation';
 import { hubCtx } from './chat';
+import { pushAgent } from '../services/pushDispatch';
 
 /**
  * Nhắn agent ngay trên web.
@@ -95,6 +96,14 @@ agentChatRoutes.get('/agents', async (c) => {
     .bind(dayStart, c.get('auth').user.id)
     .all<{ agent: string; pending: number; today: number; last_at: string | null; last_id: number }>();
   const by = new Map((stats.results ?? []).map((r) => [r.agent, r]));
+  // Tin cuối mỗi agent (cho danh sách kiểu Zalo ở Ailla Agent).
+  const lastRows = await c.env.DB.prepare(
+    `SELECT c.agent, c.role, substr(c.body, 1, 160) AS body FROM agent_chat c
+     JOIN (SELECT agent, MAX(id) AS mid FROM agent_chat WHERE owner_id = ? GROUP BY agent) t ON c.id = t.mid`,
+  )
+    .bind(c.get('auth').user.id)
+    .all<{ agent: string; role: string; body: string }>();
+  const lastBy = new Map((lastRows.results ?? []).map((r) => [r.agent, r]));
   const allowed = await allowedAgents(c.env.DB, c.get('auth').user);
   return ok(c, {
     relay_online: online,
@@ -106,6 +115,8 @@ agentChatRoutes.get('/agents', async (c) => {
       today: by.get(a.id)?.today ?? 0,
       last_at: by.get(a.id)?.last_at ?? null,
       last_id: by.get(a.id)?.last_id ?? 0,
+      last_role: lastBy.get(a.id)?.role ?? null,
+      last_body: lastBy.get(a.id)?.body ?? null,
     })),
   });
 });
@@ -537,6 +548,16 @@ agentRelayRoutes.post('/push', async (c) => {
       .bind(link.v, 'agent:' + row.agent, failed ? '⚠ Agent chưa trả lời được: ' + text : text, 'ac:' + replyId, now)
       .run();
     await c.env.DB.prepare(`DELETE FROM app_kv WHERE k = ?`).bind('chatlink:' + id).run();
+  }
+  // Thông báo đẩy về điện thoại người đã nhắn (chạy nền, lỗi không ảnh hưởng việc lưu câu trả lời).
+  if (row.owner_id) {
+    const name = AGENT_ROSTER.find((a) => a.id === row.agent)?.name ?? row.agent;
+    const job = pushAgent(c.env, row.owner_id, row.agent, name, text, failed).catch((e) => console.error('[push] agent', e));
+    try {
+      c.executionCtx.waitUntil(job);
+    } catch {
+      await job;
+    }
   }
   return ok(c, { ok: true, files: files.length });
 });

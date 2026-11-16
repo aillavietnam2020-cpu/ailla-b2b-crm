@@ -42,6 +42,10 @@ export default {
     if (url.pathname === '/chat' || url.pathname === '/chat/') {
       return serveHub(request, env, HUB_HTML, true);
     }
+    // Ailla Agent: nhắn agent toàn màn hình, mở ở tab riêng từ trang Điều hành agent.
+    if (url.pathname === '/agent' || url.pathname === '/agent/') {
+      return serveHub(request, env, HUB_HTML, false, true);
+    }
 
     // Địa chỉ quản trị: đã đăng nhập thì mở gốc là vào luôn trang quản trị (không hiện giao diện CRM B2B).
     if (url.pathname === '/' && !url.searchParams.has('next') && isAdminHost(env, request)) {
