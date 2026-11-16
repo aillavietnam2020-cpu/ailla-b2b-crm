@@ -83,6 +83,7 @@ const tmCss=`<style>
   .tm-cr{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted);cursor:pointer}
   .tm-cr.cur{background:var(--blue-soft);border-color:transparent;color:var(--blue);cursor:default}
   .tm-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .tm-hd a.btn{text-decoration:none}
   .tm-hd h2{font-size:19px;margin:0}.tm-hd p{margin:2px 0 0;color:var(--muted);font-size:12.5px}.tm-hd .act{display:flex;gap:8px;flex-wrap:wrap}
   .tm-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
   .tm-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;cursor:pointer;font-size:13px;color:inherit}
@@ -240,7 +241,7 @@ function tmFindView(){
   return `<div class="tm-hd"><div><h2>Tìm file</h2><p>Gõ tên file, sản phẩm, người sửa, thư mục… không cần dấu. Kết quả hiện luôn chỗ để.</p></div></div>
   <label class="tm-big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICONS.search}</svg><input id="tm-q" value="${esc(TM.q)}" placeholder="vd: bot tay van nang, bao cao ads, kich ban" aria-label="Tìm file"></label>
   <div class="tm-box" style="margin-top:12px">${!TM.q?`<div class="tm-empty">Gõ vào ô trên để tìm trong ${tot.toLocaleString("vi-VN")} file bạn được xem</div>`:F.loading?`<div class="tm-empty">Đang tìm…</div>`:F.err?`<div class="note red" style="margin:12px">${esc(F.err)}</div>`:
-   `<div class="tm-bh"><h3>${F.files.length} kết quả</h3><small>mới sửa trước${F.files.length>=60?" · hiện 60 file đầu":""}</small></div>${F.files.map(f=>`<div class="tm-res" data-tmfile="${esc(f.id)}"><div class="tm-fn">${tmIc(f.kind)}<div class="tx"><b>${tmHl(f.name,TM.q)}</b><small>${esc((TM_KIND[f.kind]||TM_KIND.other)[0])} · ${esc(f.by||"—")} · ${tmTime(f.modified)}</small></div></div>${f.sub!=null?tmLoc(f):`<span class="tm-loc">${esc(tmName(f.pb))}${f.where?" › "+esc(f.where):""}</span>`}</div>`).join("")||`<div class="tm-empty">Không thấy file nào. Thử gõ ít chữ hơn.</div>`}`}</div>`;
+   `<div class="tm-bh"><h3>${F.files.length} kết quả</h3><small>mới sửa trước${F.files.length>=60?" · hiện 60 file đầu":""}${F.counting?" · "+F.counting+" thư mục web đang đếm, tìm lại sau ít phút để đủ":""}</small></div>${F.files.map(f=>`<div class="tm-res" data-tmfile="${esc(f.id)}"><div class="tm-fn">${tmIc(f.kind)}<div class="tx"><b>${tmHl(f.name,TM.q)}</b><small>${esc((TM_KIND[f.kind]||TM_KIND.other)[0])} · ${esc(f.by||"—")} · ${tmTime(f.modified)}</small></div></div>${f.sub!=null?tmLoc(f):`<span class="tm-loc">${esc(tmName(f.pb))}${f.where?" › "+esc(f.where):""}</span>`}</div>`).join("")||`<div class="tm-empty">Không thấy file nào. Thử gõ ít chữ hơn.</div>`}`}</div>`;
 }
 
 function pThuMuc(m){

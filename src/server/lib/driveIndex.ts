@@ -50,12 +50,15 @@ const DAY = 86_400_000;
  *  - "Chưa xếp thư mục": file nằm ngay thư mục gốc, chưa vào thư mục con nào (lối tắt thì bỏ qua).
  *  - "Tên chưa rõ": Untitled, "final final", "(1)".
  *  - "Lâu không cập nhật": thư mục con của phòng (không tính thư mục dùng chung) 30 ngày không có file mới.
+ * Thư mục dùng chung chỉ nhắc "Bản sao lạc chỗ".
  */
 export function todoFor(idx: TeamIdx, name: string, shared: boolean, now: number): TodoItem[] {
   const out: TodoItem[] = [];
   const at = (f: IdxFile) => `${name}${f.w ? ' › ' + f.w : ''}`;
   for (const f of idx.files) {
     if (COPY_RE.test(f.n)) out.push({ lv: 'r', k: 'Bản sao lạc chỗ', pb: idx.pb, i: f.i, tx: f.n, sub: at(f) });
+    // Thư mục dùng chung (kho ảnh, video đối tác, thư mục chung công ty) chỉ nhắc bản sao, tránh báo hàng trăm tên file máy quay.
+    else if (shared) continue;
     else if (!f.s && f.k !== 'link') out.push({ lv: 'a', k: 'Chưa xếp thư mục', pb: idx.pb, i: f.i, tx: f.n, sub: `${name} · nằm ngay thư mục gốc` });
     else if (BAD_NAME_RE.test(f.n.trim())) out.push({ lv: 'a', k: 'Tên chưa rõ', pb: idx.pb, i: f.i, tx: f.n, sub: at(f) });
   }

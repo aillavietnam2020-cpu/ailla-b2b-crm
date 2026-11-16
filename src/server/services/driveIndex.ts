@@ -26,41 +26,45 @@ export async function crawlTeam(key: NonNullable<ReturnType<typeof saKey>>, team
   const files: IdxFile[] = [];
   let folders = 0;
   let cut = false;
+  const until = Date.now() + 25_000;
+  // Đọc 8 thư mục một lượt cho nhanh; quá 250 thư mục hoặc quá 25 giây thì dừng, lưu phần đã đếm (cut).
   while (queue.length) {
-    const cur = queue.shift()!;
-    if (++folders > MAX_FOLDERS) {
+    if (folders >= MAX_FOLDERS || Date.now() > until) {
       cut = true;
       break;
     }
-    for (const f of await children(key, cur.id)) {
-      if (f.mimeType === 'application/vnd.google-apps.folder') {
-        if (skip.has(f.id)) continue;
-        if (!cur.path.length) subs.push({ id: f.id, n: f.name });
-        queue.push({ id: f.id, sub: cur.sub || f.name, path: [...cur.path, f.name] });
-        continue;
+    const wave = queue.splice(0, Math.min(8, MAX_FOLDERS - folders));
+    folders += wave.length;
+    const lists = await Promise.all(wave.map((w) => children(key, w.id)));
+    wave.forEach((cur, wi) => {
+      for (const f of lists[wi]) {
+        if (f.mimeType === 'application/vnd.google-apps.folder') {
+          if (skip.has(f.id)) continue;
+          if (!cur.path.length) subs.push({ id: f.id, n: f.name });
+          queue.push({ id: f.id, sub: cur.sub || f.name, path: [...cur.path, f.name] });
+          continue;
+        }
+        if (files.length >= MAX_FILES) {
+          cut = true;
+          continue;
+        }
+        const shortcut = f.mimeType === 'application/vnd.google-apps.shortcut';
+        files.push({
+          i: f.id,
+          n: f.name,
+          k: shortcut ? 'link' : fileKind(f.mimeType, f.name),
+          s: cur.sub,
+          w: cur.path.join(' › '),
+          m: f.modifiedTime ?? null,
+          c: f.createdTime ?? null,
+          b: f.lastModifyingUser?.displayName ?? '',
+          z: f.size ? Number(f.size) : null,
+          l: f.webViewLink ?? `https://drive.google.com/open?id=${f.shortcutDetails?.targetId ?? f.id}`,
+          d: !f.mimeType.startsWith('application/vnd.google-apps'),
+          t: !!f.hasThumbnail,
+        });
       }
-      if (files.length >= MAX_FILES) {
-        cut = true;
-        continue;
-      }
-      const target = f.shortcutDetails?.targetMimeType;
-      const shortcut = f.mimeType === 'application/vnd.google-apps.shortcut';
-      files.push({
-        i: f.id,
-        n: f.name,
-        k: fileKind(shortcut && target ? target : f.mimeType, f.name),
-        s: cur.sub,
-        w: cur.path.join(' › '),
-        m: f.modifiedTime ?? null,
-        c: f.createdTime ?? null,
-        b: f.lastModifyingUser?.displayName ?? '',
-        z: f.size ? Number(f.size) : null,
-        l: f.webViewLink ?? `https://drive.google.com/open?id=${f.shortcutDetails?.targetId ?? f.id}`,
-        d: !f.mimeType.startsWith('application/vnd.google-apps'),
-        t: !!f.hasThumbnail,
-      });
-      if (shortcut) files[files.length - 1].k = 'link';
-    }
+    });
   }
   return { pb: team.pb, root: team.folderId, at: nowIso(), subs: countSubs(subs, files), files, cut };
 }

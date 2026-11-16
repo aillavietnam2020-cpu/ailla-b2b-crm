@@ -38,8 +38,8 @@ describe('mục lục Thư mục làm việc', () => {
       ['Tên chưa rõ', 'bot tay final final (1).mp4'],
       ['Lâu không cập nhật', 'BÁO CÁO 30 ngày không có file mới'],
     ]);
-    // Thư mục dùng chung không nhắc "lâu không cập nhật"
-    expect(todoFor(idx, 'Kho ảnh', true, NOW).some((x) => x.k === 'Lâu không cập nhật')).toBe(false);
+    // Thư mục dùng chung chỉ nhắc bản sao
+    expect(todoFor(idx, 'Kho ảnh', true, NOW).map((x) => x.k)).toEqual(['Bản sao lạc chỗ']);
   });
 
   it('số file thêm mới / được sửa trong 7 ngày', () => {
