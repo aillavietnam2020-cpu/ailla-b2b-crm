@@ -120,9 +120,9 @@ function pCsTq(m){
 
 /* Lãi lỗ CSKH (chị Hoa 16/11: báo cáo riêng, không chung Facebook Ads). Doanh thu = đơn giao thành công; giá vốn, ship tính như báo cáo Facebook
    (giá thành web × số lượng xuất, phí hãng vận chuyển của đơn đã gửi); giá vốn theo tỷ lệ giá vốn / tiền hàng của đơn đã gửi trong kỳ. Quảng cáo = 0. */
-function csPlBlock(m,month){
-  if(!CSK.pl||CSK.pl.month!==month){if(!CSK.pl_busy){CSK.pl_busy=1;csApi("/pl?month="+month).then(r=>{CSK.pl=r;CSK.pl_busy=0;csRe()}).catch(e=>{CSK.pl={month,error:e.message};CSK.pl_busy=0})}}
-  if(typeof fbmLoad==="function"&&!FBM.raw&&!FBM.busy&&!CSK.fbmAsk){CSK.fbmAsk=1;fbmLoad().then(()=>{CSK.fbmAsk=0;if(FBM.raw)csRe()})}
+function csPlBlock(m,month,pg){
+  if(!CSK.pl||CSK.pl.month!==month){if(!CSK.pl_busy){CSK.pl_busy=1;csApi("/pl?month="+month).then(r=>{CSK.pl=r;CSK.pl_busy=0;if(pg&&PAGE===pg)renderMain();else csRe()}).catch(e=>{CSK.pl={month,error:e.message};CSK.pl_busy=0})}}
+  if(typeof fbmLoad==="function"&&!FBM.raw&&!FBM.busy&&!CSK.fbmAsk){CSK.fbmAsk=1;fbmLoad().then(()=>{CSK.fbmAsk=0;if(FBM.raw){if(pg&&PAGE===pg)renderMain();else csRe()}})}
   const P=CSK.pl;let h;
   if(!P||P.month!==month)h=`<p class="hint">Đang tải…</p>`;else if(P.error)h=`<p>${esc(P.error)}</p>`;
   else{const R=FBM.raw,L=FBM.lines,C=FBM.cost;let tien=0,gv=0,ship=0,thieu=0;
@@ -485,6 +485,18 @@ function pCsCd(m){
 
 /* ---------- Gắn vào web: trang, menu, quyền ---------- */
 Object.assign(PAGES,{cs_tq:pCsTq,cs_today:pCsToday,cs_kh:pCsKh,cs_don:pCsDon,cs_chia:pCsChia,cs_bc:pCsBc,cs_cd:pCsCd});
+/* Quản trị › Điều hành CEO › Kênh bán hàng › CSKH cũ (chị Hoa 16/11): báo cáo riêng của mảng CSKH, không chung Facebook Ads. */
+PAGES.cskh_cu=function(m){csCss();const month=CSK.qmonth||csToday().slice(0,7);
+  const months=[0,1,2,3,4,5].map(i=>{const d=new Date(Date.parse(csToday().slice(0,7)+"-15T00:00:00Z"));d.setUTCMonth(d.getUTCMonth()-i);return d.toISOString().slice(0,7)});
+  if(!CSK.me){m.innerHTML=H("CSKH cũ","Báo cáo chăm sóc khách lẻ")+(CSK.err?`<section class="card"><p>${esc(CSK.err)}</p></section>`:`<section class="card"><p class="hint">Đang tải…</p></section>`);
+    if(!CSK.err)csLoadMe().then(()=>{if(PAGE==="cskh_cu")renderMain()}).catch(()=>{if(PAGE==="cskh_cu")renderMain()});return}
+  if((!CSK.ov||CSK.ov.month!==month)&&!CSK.ov_busy){CSK.ov_busy=1;csApi("/overview?month="+month).then(r=>{CSK.ov=r;CSK.ov_busy=0;if(PAGE==="cskh_cu")renderMain()}).catch(e=>{CSK.ov_busy=0;CSK.ov={month,error:e.message}})}
+  const O=CSK.ov&&CSK.ov.month===month&&!CSK.ov.error?CSK.ov:null,B=(O&&O.base)||{},v=x=>O?nf(x):"…";
+  m.innerHTML=H("CSKH cũ","Báo cáo chăm sóc khách lẻ · đơn Facebook nguồn CSKH, tách riêng khỏi Facebook Ads")+`<div class="acts" style="justify-content:flex-end;margin-bottom:8px"><select id="csqm" style="width:auto">${opt(months.map(x=>[x,"Tháng "+x.slice(5)+"/"+x.slice(0,4)]),month)}</select></div>
+   <div class="cs-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))"><div class="cs-tile"><b>${v(B.total)}</b><span>Khách lẻ</span></div><div class="cs-tile"><b>${v(B.vip)}</b><span>Khách VIP</span></div><div class="cs-tile"><b>${O?nf(O.upsell.orders):"…"}</b><span>Đơn CSKH giao thành công</span></div><div class="cs-tile"><b>${v(B.qua)}</b><span>Quá hạn gọi</span></div></div>
+   ${O&&O.per.length?`<section class="card"><h2>Top nhân sự tháng ${+month.slice(5)}</h2>${tbl(["Nhân sự","Doanh thu","Đơn","Quá hạn"],O.per.map((r,i)=>`<tr><td><b>${i+1}. ${esc(r.name||"(chưa rõ tên)")}</b></td><td class="n">${nf(r.dt)}</td><td class="n">${nf(r.don)}</td><td class="n">${nf(r.qua)}</td></tr>`))}</section>`:""}`;
+  const q=m.querySelector("#csqm");q.onchange=()=>{CSK.qmonth=q.value;renderMain()};
+  if(CSK.me.me.lead)csPlBlock(m,month,"cskh_cu")};
 /* Trang "Chăm sóc khách hàng" cũ ở Kênh bán lẻ (chỉ ghi "Sắp triển khai") nay mở Tổng quan CSKH. */
 PAGES.fb_cskh=pCsTq;
 /* Quyền ở Tài khoản & phân quyền. */
