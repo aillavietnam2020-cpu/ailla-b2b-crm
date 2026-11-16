@@ -196,18 +196,22 @@ function spcfGocCard(code){
     spcfSec("Giá",spcfBox((see?spcfRow("Giá vốn",ed?`<input id="goc-gv" data-c="${esc(code)}" data-n="${esc(it.name)}" inputmode="numeric" value="${gv?nf(Math.round(gv.u)):""}" placeholder="chưa có" style="width:150px;text-align:right"><small class="hint">${gv?esc(gv.src):""}</small>`:`<b>${gv?nf(Math.round(gv.u)):"chưa có"}</b>`):"")+
       spcfRow("Giá lẻ niêm yết",le&&le.kpp?`<b>${nf(le.v)}</b><small class="hint">theo Bảng giá (mã ${esc(le.kpp)}), sửa qua phiếu</small>`:ed?`<input id="goc-le" inputmode="numeric" value="${le?nf(le.v):""}" placeholder="chưa có" style="width:150px;text-align:right">`:`<b>${le?nf(le.v):"chưa có"}</b>`)),see?"Giá vốn chỉ CEO, kế toán thấy.":"")+
     spcfSec("Giá bán từng kênh",`<div class="spf-box" style="padding:0">${tbl(["Kênh","Mã bán và giá"],[chRow("fbCat","ADS","Facebook")+chRow("cskhCat","CSKH","CSKH")+sanRow("TIKTOK","TikTok")+sanRow("SHOPEE","Shopee")+kppRow])}</div>`,"Đặt giá ngay tại đây. Facebook, CSKH để trống = theo giá Pancake. Giá TikTok, Shopee là giá đang để trên sàn (tải file ở Combo › TikTok / Shopee › Mã bán trên kênh)."),
-    "");
+    `<button class="btn pri" id="goc-save">Lưu</button>`);
   const reopen=()=>setTimeout(()=>spcfGocCard(code),50);
-  const gvI=R.querySelector("#goc-gv");if(gvI&&typeof spcGvInput==="function")spcGvInput(gvI,reopen);
-  const leI=R.querySelector("#goc-le");if(leI)leI.onchange=()=>{const v=spcfNum(leI.value);spcfSkuSet(code,it.name,"giá lẻ niêm yết "+code,s=>{s.giaBan=v});toast("Đã lưu giá lẻ "+code);reopen()};
-  R.querySelectorAll(".goc-cg").forEach(x=>{x.onkeydown=e=>{if(e.key==="Enter")x.blur()};x.onchange=()=>{const v=spcfNum(x.value),k=x.dataset.k;
-    spcfChMut(k,"giá "+(k==="cskhCat"?"CSKH":"Facebook")+" "+code,c=>{const p=c.sp.find(y=>y.id===x.dataset.pid);const b=p&&(p.bt||[]).find(y=>(y.id||y.ma)===x.dataset.vid);if(!b)return;if(v>0)b.gia=v;else delete b.gia});toast(v>0?"Đã lưu giá "+nf(v):"Đã bỏ giá riêng, theo giá Pancake");reopen()}});
+  /* Sửa giá chỉ lưu khi bấm Lưu (chị Hoa 16/11); Hủy là bỏ thay đổi */
+  const ins=[...R.querySelectorAll("#goc-gv,#goc-le,.goc-cg,.goc-sg")];ins.forEach(x=>{x.dataset.o=String(spcfNum(x.value));x.onkeydown=e=>{if(e.key==="Enter")R.querySelector("#goc-save").click()}});
+  R.querySelector("#goc-save").onclick=()=>{const chg=ins.filter(x=>String(spcfNum(x.value))!==x.dataset.o);if(!chg.length){closeCM();return}let n=0;
+    chg.forEach(x=>{const v=spcfNum(x.value);
+      if(x.id==="goc-gv"){if(v>0&&typeof spcSetGv==="function"&&spcSetGv(code,it.name,v))n++}
+      else if(x.id==="goc-le"){spcfSkuSet(code,it.name,"giá lẻ niêm yết "+code,s=>{s.giaBan=v});n++}
+      else if(x.classList.contains("goc-cg")){const k=x.dataset.k;spcfChMut(k,"giá "+(k==="cskhCat"?"CSKH":"Facebook")+" "+code,c=>{const p=c.sp.find(y=>y.id===x.dataset.pid);const b=p&&(p.bt||[]).find(y=>(y.id||y.ma)===x.dataset.vid);if(!b)return;if(v>0)b.gia=v;else delete b.gia});n++}
+      else if(x.classList.contains("goc-sg")){spcfSanSet(x.dataset.ch,x.dataset.sku,x.dataset.var,v);n++}});
+    renderMain();toast(n?"Đã lưu "+n+" giá":"Giá vốn phải lớn hơn 0");reopen()};
   R.querySelectorAll("[data-gocadd]").forEach(b=>b.onclick=()=>{const k=b.dataset.gocadd,ma=(R.querySelector(`.goc-nma[data-k="${k}"]`).value||"").trim(),gia=spcfNum(R.querySelector(`.goc-ngia[data-k="${k}"]`).value);if(!ma){toast("Nhập mã Pancake");return}
     if(spcfChanCat(k).some(p=>(p.bt||[]).some(v=>spcLow(v.ma)===spcLow(ma)))){toast("Mã "+ma+" đã có trong danh sách kênh này, sửa mã kho ở mục Combo › Mã bán trên kênh");return}
     spcfChMut(k,"bán "+code+" trên "+(k==="cskhCat"?"CSKH":"Facebook"),c=>{c.sp.push(spcfNewChanSp(it,ma,gia))});toast("Đã thêm "+ma);reopen()});
   const fi=R.querySelector("#goc-img");if(fi)fi.onchange=async()=>{const f=fi.files&&fi.files[0];if(!f)return;try{const u=await spcfThumb(f);spcfSkuSet(code,it.name,"ảnh "+code,s=>{s.img=u});toast("Đã lưu ảnh");reopen()}catch(e){toast("Không đọc được ảnh")}};
   const ix=R.querySelector("#goc-imgx");if(ix)ix.onclick=()=>{spcfSkuSet(code,it.name,"bỏ ảnh "+code,s=>{delete s.img});reopen()};
-  R.querySelectorAll(".goc-sg").forEach(x=>{x.onkeydown=e=>{if(e.key==="Enter")x.blur()};x.onchange=()=>{spcfSanSet(x.dataset.ch,x.dataset.sku,x.dataset.var,spcfNum(x.value));reopen()}});
   const gl=R.querySelector("[data-gocgia]");if(gl)gl.onclick=e=>{e.preventDefault();closeCM();ntPage("sp_gia")};
 }
 /* Ảnh tải lên thu nhỏ còn cạnh dài 240px (JPEG) để lưu chung, không nặng web */
