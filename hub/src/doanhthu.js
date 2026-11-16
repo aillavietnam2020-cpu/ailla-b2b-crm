@@ -195,18 +195,21 @@ function pDtDoiChieu(m){
     const lab=st==="chot"?(snap?pill("đã chốt","grn")+`<br><small class="hint">số lưu ngày ${dtVN(String(snap.closedAt).slice(0,10))}</small>`:pill("chưa lưu số chốt","gry")):pill("chưa chốt – dự kiến","amb");
     const drift=snap&&l.dt!=null&&Math.abs(l.dt-snap.dt)>=1000?`<br><small class="hint">tính lại hôm nay: ${nf(l.dt)} (${l.dt-snap.dt>0?"+":""}${nf(l.dt-snap.dt)})</small>`:"";
     const dk=st!=="chot"&&r.dk!=null&&r.dk!==r.dt?`<br><small class="hint">dự kiến ${nf(r.dk)}</small>`:"";
-    return `<tr class="clk${DTD.open===ch?" sel":""}" data-dtopen="${ch}"><td><b>${n}</b><br><small class="hint">${esc(r.src||"")}</small></td><td>${lab}${ceo&&snap&&ch!=="cskh"?`<br><button class="btn sm" data-dtre="${ch}" title="Chỉ khi số chốt sai">Chốt lại</button>`:""}</td>
+    /* Chị Hoa 16/11 "trình bày lại": giải thích dài vào ⓘ, nhãn chốt dưới tên kênh, số cần so đứng cạnh nhau. */
+    const kt=ch==="cskh"?"":`<input type="text" inputmode="numeric" data-dtkt="${ch}" value="${K?nf(K.v):""}" placeholder="nhập số" style="width:120px;text-align:right"><br><input type="text" data-dtktn="${ch}" value="${esc(K?K.note:"")}" placeholder="ghi chú" style="width:120px;margin-top:3px">`;
+    return `<tr class="clk${DTD.open===ch?" sel":""}" data-dtopen="${ch}"><td style="min-width:150px;white-space:normal"><b>${n}</b> <span class="oi" tabindex="0" role="button" data-stop="1" data-tip="${esc(r.src||"")}">i</span><div style="margin-top:4px">${lab}</div>${ceo&&snap&&ch!=="cskh"?`<button class="btn sm" style="margin-top:4px" data-dtre="${ch}" title="Chỉ khi số chốt sai">Chốt lại</button>`:""}</td>
       <td class="n"><b>${r.dt==null?`<span class="hint">chưa có số</span>`:nf(r.dt)}</b>${dk}${drift}</td>
       <td class="n">${dtMoney(F.v)}<br><small class="hint">${esc(F.n)}</small></td>
-      <td data-stop="1">${typeof bcCell==="function"&&["spe","tts","fb"].includes(ch)?bcCell(ch):`<span class="hint">—</span>`}</td>
-      <td class="n" data-stop="1">${ch==="cskh"?"":`<input type="text" inputmode="numeric" data-dtkt="${ch}" value="${K?nf(K.v):""}" placeholder="nhập số" style="width:130px;text-align:right"><br><input type="text" data-dtktn="${ch}" value="${esc(K?K.note:"")}" placeholder="ghi chú" style="width:130px;margin-top:3px">`}</td>
-      <td class="n">${dtDiff(r.dt,F.v)}</td><td class="n">${dtDiff(r.dt,K?K.v:null)}</td></tr>`}).join("");
+      <td class="n">${dtDiff(r.dt,F.v)}</td>
+      <td class="n" data-stop="1">${kt}</td>
+      <td class="n">${dtDiff(r.dt,K?K.v:null)}</td>
+      <td data-stop="1">${typeof bcCell==="function"&&["spe","tts","fb"].includes(ch)?bcCell(ch):`<span class="hint">—</span>`}</td></tr>`}).join("");
   const open=DTD.open?DT_KENH.find(x=>x[0]===DTD.open):null;
   m.innerHTML=H("Đối chiếu doanh thu",`Doanh thu thực từng kênh × tháng · số web (mọi trang dùng chung) so với file nguồn và số kế toán · chốt số ngày 10 tháng sau`)+`
   <div class="tabs" style="margin-bottom:10px">${tabs.join("")}</div>
   <div class="note ${st==="chot"?"":"amb"}">Tháng ${dtYmVN(ym)}: ${st==="chot"?`<b>đã tới ngày chốt ${dtVN(dtNgayChot(ym))}</b>. Số web đã lưu không đổi nữa; cột "tính lại hôm nay" chỉ để thấy dữ liệu nguồn có thay đổi sau ngày chốt.`:`<b>chưa chốt – dự kiến</b>. Số sẽ tự lưu (đóng băng) từ ngày ${dtVN(dtNgayChot(ym))}.`}${DTS.err?` <span class="t-red">Lỗi tải số chốt: ${esc(DTS.err)}</span>`:""}</div>
-  <section class="card flush"><div class="tbl"><table><thead><tr><th>Kênh · cách tính</th><th>Nhãn</th><th class="n">Số web (doanh thu thực)</th><th class="n">Số file nguồn đã tải</th><th>File đã lưu (Drive)</th><th class="n">Số kế toán (nhập tay)</th><th class="n">Web − file</th><th class="n">Web − kế toán</th></tr></thead><tbody>${body}
-   <tr class="tot"><td><b>Cộng các kênh</b></td><td></td><td class="n"><b>${nf(tot.w)}</b></td><td class="n">${tot.hasF?nf(tot.f):"—"}</td><td></td><td class="n">${tot.hasK?nf(tot.k):"—"}</td><td></td><td class="n">${tot.hasK?dtDiff(tot.w,tot.k):"—"}</td></tr></tbody></table></div>
+  <section class="card flush"><div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Số web (doanh thu thực)</th><th class="n">Số file nguồn</th><th class="n">Web − file</th><th class="n">Số kế toán (nhập tay)</th><th class="n">Web − kế toán</th><th>File đã lưu (Drive)</th></tr></thead><tbody>${body}
+   <tr class="tot"><td><b>Cộng các kênh</b></td><td class="n"><b>${nf(tot.w)}</b></td><td class="n">${tot.hasF?nf(tot.f):"—"}</td><td></td><td class="n">${tot.hasK?nf(tot.k):"—"}</td><td class="n">${tot.hasK?dtDiff(tot.w,tot.k):"—"}</td><td></td></tr></tbody></table></div>
    <div class="acts pad"><button class="btn pri" id="dt-kt-save">Lưu số kế toán</button><span class="hint">Số kế toán: Kế toán nhập số đã chốt sổ của từng kênh (đ). Để trống ô nào thì xóa số ô đó. Bấm từng dòng để xem từng ngày / từng đơn tạo nên số web. Chênh lệch tô đỏ khi lệch trên 1% (tối thiểu 1 triệu).</span></div></section>
   ${open?`<section class="card flush"><div class="card-h pad"><h2>${open[1]} · tháng ${dtYmVN(ym)}: số web từng ngày / từng đơn</h2><button class="btn sm" id="dt-close">Đóng</button></div>${dtChiTiet(open[0],ym)}</section>`:""}
   <section class="card"><div class="card-h"><h2>Cách tính doanh thu thực (một cách cho mọi trang)</h2></div><ul class="lessons">
