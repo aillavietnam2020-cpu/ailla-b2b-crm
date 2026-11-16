@@ -537,6 +537,17 @@ interface PkVariant {
   variant: string;
   price: number | null;
   hidden: boolean;
+  /** ảnh mẫu mã (hoặc ảnh sản phẩm) trên Pancake, để hiện ảnh nhỏ trên web */
+  img: string;
+}
+/** Ảnh Pancake: chuỗi URL hoặc {url}. */
+function pkImg(...xs: unknown[]): string {
+  for (const x of xs) {
+    const a = Array.isArray(x) ? x[0] : x;
+    const u = typeof a === 'string' ? a : a && typeof a === 'object' ? (a as Record<string, unknown>).url : '';
+    if (typeof u === 'string' && /^https?:\/\//.test(u)) return u;
+  }
+  return '';
 }
 /** Một biến thể Pancake → mã hiển thị, tên sản phẩm, phân loại, giá bán lẻ (tên trường theo API Pancake POS). */
 function pkVariant(v: Record<string, unknown>): PkVariant {
@@ -551,6 +562,7 @@ function pkVariant(v: Record<string, unknown>): PkVariant {
     variant: fields.map((f) => String(f.value ?? '')).filter(Boolean).join(' · '),
     price: Number.isFinite(price) ? price : null,
     hidden: v.is_hidden === true || prod.is_hide === true,
+    img: pkImg(v.images, prod.image),
   };
 }
 
@@ -577,14 +589,14 @@ sanphamRoutes.get('/pancake-combos', async (c) => {
   }
   const rows = [];
   for (const x of list.slice(0, 200)) {
-    let items: Array<{ pid: string; code: string; name: string; qty: number }> = [];
+    let items: Array<{ pid: string; code: string; name: string; qty: number; img: string }> = [];
     try {
       const r = await fetch(`${base}/combo_products/${encodeURIComponent(String(x.id))}/variations?${q}&combo_product_id=${encodeURIComponent(String(x.id))}`);
       if (r.ok) {
         const j = JSON.parse(await r.text()) as { data?: Array<Record<string, unknown>> };
         items = (j.data ?? []).map((v) => {
           const p = (v.product ?? v.variation ?? {}) as Record<string, unknown>;
-          return { pid: String(p.id ?? v.product_id ?? ''), code: String(p.display_id ?? p.custom_id ?? ''), name: String(p.name ?? ''), qty: Number(v.count) || 1 };
+          return { pid: String(p.id ?? v.product_id ?? ''), code: String(p.display_id ?? p.custom_id ?? ''), name: String(p.name ?? ''), qty: Number(v.count) || 1, img: pkImg(v.images, p.image) };
         });
       }
     } catch {
