@@ -118,3 +118,23 @@ export function moveInIdx(src: TeamIdx, dst: TeamIdx, id: string, toSub: string)
   if (!same) d.subs = countSubs(d.subs, d.files);
   return { src: s, dst: d };
 }
+
+/** Bỏ một file, hoặc một thư mục con cấp 1 cùng các file bên trong, khỏi mục lục (sau khi đưa vào thùng rác Drive). */
+export function removeFromIdx(idx: TeamIdx, id: string): TeamIdx | null {
+  const sub = idx.subs.find((x) => x.id === id);
+  const files = sub ? idx.files.filter((f) => f.s !== sub.n) : idx.files.filter((f) => f.i !== id);
+  if (!sub && files.length === idx.files.length) return null;
+  const subs = sub ? idx.subs.filter((x) => x.id !== id) : idx.subs;
+  return { ...idx, files, subs: countSubs(subs, files) };
+}
+
+/** Thêm file mới (bản sao) vào mục lục, cùng chỗ với file gốc `like`. */
+export function addFileToIdx(idx: TeamIdx, f: IdxFile): TeamIdx {
+  const files = [...idx.files, f];
+  return { ...idx, files, subs: countSubs(idx.subs, files) };
+}
+
+/** Thêm thư mục con cấp 1 mới (vừa tạo trên Drive) vào mục lục. */
+export function addSubToIdx(idx: TeamIdx, sub: { id: string; n: string }): TeamIdx {
+  return { ...idx, subs: countSubs([...idx.subs, sub], idx.files) };
+}

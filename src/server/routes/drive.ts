@@ -13,9 +13,9 @@ import {
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
-import { children, download, fileInfo, meta, moveItem, recentFiles, saKey, streamVideo, thumbnail, type DriveFile } from '../services/gdrive';
+import { children, copyFile, createFolder, download, fileInfo, meta, moveItem, recentFiles, saKey, streamVideo, thumbnail, trashItem, type DriveFile } from '../services/gdrive';
 import { setSyncPaused, syncDrivePermissions, syncPaused } from '../services/driveSync';
-import { moveInIdx, searchIdx, todoFor, weekStats, type IdxFile, type TodoItem } from '../lib/driveIndex';
+import { addFileToIdx, addSubToIdx, moveInIdx, removeFromIdx, searchIdx, todoFor, weekStats, type IdxFile, type TodoItem } from '../lib/driveIndex';
 import { isStale, loadIdx, refreshIdx, saveIdx } from '../services/driveIndex';
 
 /**
@@ -369,6 +369,65 @@ driveRoutes.post('/move', async (c) => {
     if (m.dst !== m.src) await saveIdx(c.env.DB, m.dst);
   }
   return ok(c, { moved: true });
+});
+
+/** Thư mục được sửa (CEO mọi thư mục, nhân viên thư mục phòng mình) + mục lục của nó. */
+async function editable(c: Parameters<typeof who>[0], pb: string) {
+  const { me, ceo } = await who(c);
+  const cfg = await loadConfig(c.env.DB);
+  const team = teamsFor(cfg, me, ceo).find((t) => t.pb === pb);
+  if (!team || team.direct || !(ceo || me?.phongBan === pb)) throw forbidden('Bạn chỉ được sửa thư mục phòng mình.');
+  const idx = await loadIdx(c.env.DB, pb);
+  if (!idx || idx.root !== team.folderId) throw badRequest('NOT_READY', 'Web đang đếm file thư mục này, thử lại sau 1 phút.');
+  return { team, idx };
+}
+const driveErr = (status: number, what: string) =>
+  badRequest('DRIVE', status === 403 || status === 404 ? `Drive không cho ${what}: tài khoản của web chưa có quyền với file này (thường là file do người khác tạo). Mở trên Drive để làm tay.` : `Drive chưa ${what} được, thử lại sau.`);
+
+/** Đưa file hoặc thư mục con cấp 1 vào thùng rác Drive (trang đã hỏi xác nhận). Body: { pb, id } */
+driveRoutes.post('/trash', async (c) => {
+  const b = (await c.req.json().catch(() => null)) as { pb?: string; id?: string } | null;
+  if (!b?.pb || !b.id) throw badRequest('INVALID', 'Dữ liệu gửi lên không đúng.');
+  const { idx } = await editable(c, b.pb);
+  const next = removeFromIdx(idx, b.id);
+  if (!next) throw notFound('Không thấy file trong thư mục này, bấm Tải lại.');
+  const r = await trashItem(needKey(c.env), b.id);
+  if (!r.ok) throw driveErr(r.status, 'xóa');
+  await saveIdx(c.env.DB, next);
+  return ok(c, { trashed: true });
+});
+
+/** Tạo bản sao file, cùng thư mục với file gốc. Body: { pb, id } */
+driveRoutes.post('/copy', async (c) => {
+  const b = (await c.req.json().catch(() => null)) as { pb?: string; id?: string } | null;
+  if (!b?.pb || !b.id) throw badRequest('INVALID', 'Dữ liệu gửi lên không đúng.');
+  const { idx } = await editable(c, b.pb);
+  const src = idx.files.find((f) => f.i === b.id);
+  if (!src) throw badRequest('INVALID', 'Chỉ tạo bản sao được cho file, không sao chép cả thư mục.');
+  if (src.k === 'link') throw badRequest('INVALID', 'Lối tắt không cần tạo bản sao.');
+  const r = await copyFile(needKey(c.env), b.id, `Bản sao của ${src.n}`);
+  if (!r.ok || !r.file) throw driveErr(r.status, 'tạo bản sao');
+  const f = r.file;
+  const rec: IdxFile = {
+    ...src, i: f.id, n: f.name, m: f.modifiedTime ?? nowIso(), c: f.createdTime ?? nowIso(), b: f.lastModifyingUser?.displayName ?? '',
+    l: f.webViewLink ?? `https://drive.google.com/open?id=${f.id}`, t: !!f.hasThumbnail,
+  };
+  await saveIdx(c.env.DB, addFileToIdx(idx, rec));
+  return ok(c, fileOut(rec, b.pb));
+});
+
+/** Tạo thư mục con cấp 1 mới trong thư mục của phòng. Body: { pb, name } */
+driveRoutes.post('/folder', async (c) => {
+  const b = (await c.req.json().catch(() => null)) as { pb?: string; name?: string } | null;
+  const name = (b?.name ?? '').trim().replace(/\s+/g, ' ');
+  if (!b?.pb || !name) throw badRequest('INVALID', 'Gõ tên thư mục.');
+  if (name.length > 120) throw badRequest('INVALID', 'Tên thư mục dài quá.');
+  const { team, idx } = await editable(c, b.pb);
+  if (idx.subs.some((s) => s.n.toLowerCase() === name.toLowerCase())) throw badRequest('INVALID', 'Đã có thư mục tên này rồi.');
+  const r = await createFolder(needKey(c.env), name, team.folderId);
+  if (!r.ok || !r.file) throw driveErr(r.status, 'tạo thư mục');
+  await saveIdx(c.env.DB, addSubToIdx(idx, { id: r.file.id, n: r.file.name }));
+  return ok(c, { id: r.file.id, name: r.file.name });
 });
 
 /** Tạm dừng / bật lại tự cấp quyền mỗi giờ (CEO). */

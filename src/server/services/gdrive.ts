@@ -199,6 +199,24 @@ export async function moveItem(key: SaKey, id: string, from: string[], to: strin
   return { ok: r.ok, status: r.status, reason: ((r.json as { error?: { errors?: { reason?: string }[] } } | null)?.error?.errors?.[0]?.reason) ?? '' };
 }
 
+/** Đưa file / thư mục vào thùng rác Drive (khôi phục được trong 30 ngày), không xóa hẳn. */
+export async function trashItem(key: SaKey, id: string) {
+  const r = await shareCall(key, 'PATCH', `${API}/files/${encodeURIComponent(id)}?supportsAllDrives=true&fields=id,trashed`, { trashed: true });
+  return { ok: r.ok, status: r.status };
+}
+
+/** Tạo bản sao của file, đặt cùng thư mục với file gốc. Thư mục thì Drive không cho sao chép. */
+export async function copyFile(key: SaKey, id: string, name: string) {
+  const r = await shareCall(key, 'POST', `${API}/files/${encodeURIComponent(id)}/copy?supportsAllDrives=true&fields=${encodeURIComponent(FILE_FIELDS)}`, { name });
+  return { ok: r.ok, status: r.status, file: r.ok ? (r.json as DriveFile) : null };
+}
+
+/** Tạo thư mục mới trong thư mục `parent`. */
+export async function createFolder(key: SaKey, name: string, parent: string) {
+  const r = await shareCall(key, 'POST', `${API}/files?supportsAllDrives=true&fields=id,name`, { name, mimeType: 'application/vnd.google-apps.folder', parents: [parent] });
+  return { ok: r.ok, status: r.status, file: r.ok ? (r.json as { id: string; name: string }) : null };
+}
+
 /** Ảnh thu nhỏ của file (Drive tự tạo cho ảnh, video, PDF, Docs…). Trả ảnh để máy chủ chuyển tiếp; không có thì null. */
 export async function thumbnail(key: SaKey, fileId: string, size = 400): Promise<Response | null> {
   const f = await get<{ thumbnailLink?: string }>(key, `${API}/files/${encodeURIComponent(fileId)}?fields=thumbnailLink&${COMMON}`);
