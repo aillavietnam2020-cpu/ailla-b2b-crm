@@ -6,6 +6,7 @@ import { auditStatement } from '../lib/audit';
 import { newId } from '../lib/ids';
 import { accountantIds, taskStatements } from '../lib/notifyTasks';
 import { requirePermission } from '../middleware/rbac';
+import { unpack } from '../lib/pack';
 import { CHANNELS, loadLookups, resolveLabel, type Channel } from '../services/channelOut';
 import { API as PANCAKE_API, loadMapVersions, loadSource, openKey, pickMap, recomputeDay } from '../services/poscake';
 import { approveKppCode, canApproveCode, createKppCode, suggestSku } from '../services/kppCode';
@@ -616,4 +617,40 @@ sanphamRoutes.get('/pancake-combos', async (c) => {
     });
   }
   return ok(c, { channel: ch, count: rows.length, rows });
+});
+
+/**
+ * Sản phẩm đang bán trên TikTok / Shopee (chị Hoa 16/11: trang Sản phẩm kênh sàn phải hiện danh sách).
+ * Lấy từ báo cáo tháng mới nhất đã nạp (tts_month / spe_month): mã người bán, tên, phân loại, số món, giá bán trung bình
+ * = doanh thu / số món. Không trả giá vốn, phí, lãi.
+ */
+sanphamRoutes.get('/san-products', async (c) => {
+  const ch = c.req.query('channel') === 'SHOPEE' ? 'SHOPEE' : 'TIKTOK';
+  type Row = { ss?: string; pn?: string; vr?: string; q?: number; dt?: number };
+  let ky = '';
+  const src: Row[] = [];
+  if (ch === 'TIKTOK') {
+    const r = await c.env.DB.prepare('SELECT ky, data FROM tts_month ORDER BY ky DESC LIMIT 1').first<{ ky: string; data: string }>();
+    if (r) {
+      ky = r.ky;
+      const d = JSON.parse(await unpack(r.data)) as { pl?: { rows?: Row[] }; todo?: { noMap?: Row[] } };
+      src.push(...(d.pl?.rows ?? []), ...(d.todo?.noMap ?? []));
+    }
+  } else {
+    const top = await c.env.DB.prepare('SELECT MAX(ky) AS ky FROM spe_month').first<{ ky: string | null }>();
+    ky = top?.ky ?? '';
+    const rs = await c.env.DB.prepare('SELECT data FROM spe_month WHERE ky = ?').bind(ky).all<{ data: string }>();
+    for (const r of rs.results ?? []) src.push(...((JSON.parse(await unpack(r.data)) as { rows?: Row[] }).rows ?? []));
+  }
+  const m = new Map<string, { sku: string; name: string; variant: string; qty: number; dt: number }>();
+  for (const x of src) {
+    const sku = String(x.ss ?? ''), name = String(x.pn ?? ''), variant = String(x.vr ?? '');
+    const k = sku + '|' + name + '|' + variant;
+    const o = m.get(k) ?? { sku, name, variant, qty: 0, dt: 0 };
+    o.qty += Number(x.q) || 0;
+    o.dt += Number(x.dt) || 0;
+    m.set(k, o);
+  }
+  const rows = [...m.values()].map((o) => ({ sku: o.sku, name: o.name, variant: o.variant, qty: o.qty, price: o.qty ? Math.round(o.dt / o.qty) : null })).sort((a, b) => b.qty - a.qty);
+  return ok(c, { channel: ch, ky, count: rows.length, rows });
 });

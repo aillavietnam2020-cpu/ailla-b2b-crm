@@ -10,7 +10,7 @@
    (sản phẩm, giá, ảnh, combo); ghi ngược lên Pancake chờ chị duyệt riêng. CEO, Ban điều hành (BDH), kế toán (KT) thấy hết.
    Bố cục kiểu Poscake (chị Hoa 16/11 chiều): một thanh công cụ gọn, cột ảnh, hộp thoại giữa màn hình chia mục trái / ô phải.
    ===================================================================== */
-const SPCF={ch:"",q:"",open:{},kmT:"all",b2b:null,b2bBusy:false,pkOpen:false,pkcb:null,pkcbBusy:false,pkcbErr:""};
+const SPCF={ch:"",q:"",open:{},kmT:"all",b2b:null,b2bBusy:false,pkOpen:false,pkcb:null,pkcbBusy:false,pkcbErr:"",san:{},tier:""};
 const SPCF_CSS=`<style>
 .spf-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
 .spf-bar .spf-q{flex:1 1 200px;max-width:300px;height:34px;padding:0 10px}
@@ -105,7 +105,7 @@ function pSpcfSp(m){
   const ch=spcfCh();if(!ch){spcfNoAccess(m,"Sản phẩm");return}
   const sub="Sản phẩm từng kênh · giá bán của kênh · không hiện giá vốn";
   if(ch==="b2b"){spcfB2bView(m,"Sản phẩm",sub);return}
-  if(ch==="tt"||ch==="sp"){spcfFrame(m,"Sản phẩm",sub,{inner:`<div class="note" style="margin:14px">Sản phẩm và giá ${SPCF_BP[ch]} nằm trên sàn. Combo trên sàn gồm những sản phẩm nào xem và khai ở mục <b>Combo</b>.</div>`});return}
+  if(ch==="tt"||ch==="sp"){spcfSanSp(m,ch==="tt"?"TIKTOK":"SHOPEE",sub);return}
   spcfPkNeed();
   const ed=spcfCatEd(),cat=spcCat(),q=spcfFold(SPCF.q).trim();
   const L=cat.filter(p=>!q||spcfFold(p.ten+" "+(p.bt||[]).map(v=>v.ma).join(" ")).includes(q));
@@ -121,6 +121,15 @@ function pSpcfSp(m){
     tools:`<button class="btn" data-spcfpk="1" ${SPCB.pkBusy?"disabled":""} title="Đọc lại giá, ảnh trên Pancake${ed?" và mở danh sách để thêm sản phẩm":""}">${SPCB.pkBusy?"Đang đọc Pancake…":"⟳ Đồng bộ Pancake"}</button>${ed?`<button class="btn pri" data-spcfpe="">+ Tạo sản phẩm</button>`:""}`,
     inner:tbl(["","Bán","Ảnh","Mã SP","Tên sản phẩm","Loại","Số mẫu mã","Giá bán kênh","Giá Pancake",""],[rows])+`<p class="hint pad" style="margin:0">Giá bán kênh: giá riêng của kênh nếu đã đặt, chưa đặt thì theo giá Pancake. Tắt nút "Bán" để ngừng bán ở kênh này mà không xóa.</p>`,
     after:SPCF.pkOpen&&ed?(SPCB.pk?spbPkEditView(SPC.bpView):SPCB.pkErr?`<div class="note red">Chưa đọc được Pancake: ${esc(SPCB.pkErr)}</div>`:`<p class="hint pad">Đang đọc Pancake…</p>`):""});
+}
+/* TikTok / Shopee: sản phẩm đang bán trên sàn, lấy từ báo cáo tháng mới nhất đã nạp (mã người bán, phân loại, số món, giá bán trung bình). */
+async function spcfSanLoad(CH){const S=SPCF.san;if(S[CH]&&(S[CH].busy||S[CH].rows||S[CH].err))return;S[CH]={busy:true};try{S[CH]=await spcApi("/san-products?channel="+CH)}catch(e){S[CH]={err:e.message}}if(/^sp_/.test(PAGE))renderMain()}
+function spcfSanSp(m,CH,sub){const S=SPCF.san[CH];if(!S||S.busy){spcfSanLoad(CH);spcfFrame(m,"Sản phẩm",sub,{inner:`<p class="hint pad">Đang tải…</p>`});return}
+  if(S.err){spcfFrame(m,"Sản phẩm",sub,{inner:`<div class="note red" style="margin:14px">${esc(S.err)}</div>`});return}
+  const q=spcfFold(SPCF.q).trim(),L=(S.rows||[]).filter(r=>!q||spcfFold(r.sku+" "+r.name+" "+r.variant).includes(q)),th=S.ky?"tháng "+S.ky.slice(5)+"/"+S.ky.slice(0,4):"";
+  spcfFrame(m,"Sản phẩm",sub,{q:"Tìm mã, tên, phân loại…",count:nf(L.length)+" mẫu đang bán"+(th?" · số "+th:""),
+    inner:L.length?tbl(["Mã người bán","Sản phẩm trên sàn","Phân loại","Đã bán "+th,"Giá bán trung bình"],L.slice(0,400).map(r=>`<tr><td>${r.sku?`<span class="spf-tag">${esc(r.sku)}</span>`:"<span class=\"hint\">—</span>"}</td><td><small>${esc(r.name)}</small></td><td><b>${esc(r.variant||"")}</b></td><td class="n">${nf(r.qty)}</td><td class="n"><b>${r.price!=null?nf(r.price)+" đ":"—"}</b></td></tr>`))+`<p class="hint pad" style="margin:0">Lấy từ báo cáo ${CH==="TIKTOK"?"TikTok":"Shopee"} ${th} đã nạp. Giá bán trung bình = doanh thu / số món (đã gồm giảm giá trên sàn). Sửa giá, tên thì làm trên sàn.</p>`
+      :`<div class="note" style="margin:14px">Chưa có báo cáo ${CH==="TIKTOK"?"TikTok":"Shopee"} nào được nạp lên web.</div>`});
 }
 /* Tạo / sửa sản phẩm (giống Poscake: thông tin, các mẫu mã kèm giá bán kênh) */
 function spcfProdForm(id){
@@ -240,10 +249,12 @@ async function spcfB2bLoad(){if(SPCF.b2bBusy)return;SPCF.b2bBusy=true;try{SPCF.b
 function spcfB2bView(m,t,sub){
   if(!SPCF.b2b){spcfB2bLoad();spcfFrame(m,t,sub,{inner:`<p class="hint pad">Đang tải…</p>`});return}
   if(SPCF.b2b.err){spcfFrame(m,t,sub,{inner:`<div class="note red" style="margin:14px">${esc(SPCF.b2b.err)}</div>`});return}
-  const T=SPCF.b2b.tiers||[],q=spcfFold(SPCF.q).trim();
-  const L=(SPCF.b2b.products||[]).filter(p=>!q||spcfFold(p.sku+" "+p.name).includes(q));
-  spcfFrame(m,t,sub,{q:"Tìm mã, tên…",count:nf(L.length)+" sản phẩm · bảng giá 8 cấp, chỉ xem",
-    inner:tbl(["Mã","Sản phẩm","ĐVT"].concat(T.map(x=>x.name)),L.slice(0,300).map(p=>`<tr><td><span class="spf-tag">${esc(p.sku)}</span></td><td>${esc(p.name)}</td><td>${esc(p.unit||"")}</td>${T.map(x=>`<td class="n">${p.prices&&p.prices[x.code]!=null?nf(p.prices[x.code]):"—"}</td>`).join("")}</tr>`))+
+  const T=SPCF.b2b.tiers||[],q=spcfFold(SPCF.q).trim();if(!T.some(x=>x.code===SPCF.tier))SPCF.tier=(T.find(x=>/^NPP$/i.test(x.code)||/^NPP$/i.test(x.name))||T[0]||{}).code||"";
+  const tr=T.find(x=>x.code===SPCF.tier)||{},has=p=>p.prices&&p.prices[SPCF.tier]!=null;
+  const L=(SPCF.b2b.products||[]).filter(p=>!q||spcfFold(p.sku+" "+p.name).includes(q)).sort((a,b)=>(has(b)?1:0)-(has(a)?1:0));
+  spcfFrame(m,t,sub,{q:"Tìm mã, tên…",count:nf(L.filter(has).length)+" / "+nf(L.length)+" sản phẩm có giá cấp này · chỉ xem",
+    inner:`<div class="settabs" style="margin:10px 14px 4px">${T.map(x=>`<button class="${SPCF.tier===x.code?"on":""}" data-spcftier="${esc(x.code)}">${esc(x.name)} · ${(SPCF.b2b.products||[]).filter(p=>p.prices&&p.prices[x.code]!=null).length}</button>`).join("")}</div>`+
+      tbl(["Mã","Sản phẩm","ĐVT","Giá "+esc(tr.name||"")],L.slice(0,300).map(p=>`<tr${has(p)?"":' style="opacity:.55"'}><td><span class="spf-tag">${esc(p.sku)}</span></td><td>${esc(p.name)}</td><td>${esc(p.unit||"")}</td><td class="n"><b>${has(p)?nf(p.prices[SPCF.tier])+" đ":"chưa có giá"}</b></td></tr>`))+
       `<p class="hint pad" style="margin:0">${L.length>300?`Hiện 300 / ${nf(L.length)}. Gõ để thu hẹp. `:""}Sửa giá ở Bảng giá (quản lý).</p>`});
 }
 
@@ -334,6 +345,7 @@ function spcfBind(m){
   on("[data-spcfpkcb]",()=>spcfPkCbLoad());
   on("[data-spcfpkimp]",b=>{const x=SPCF.pkcb.rows[+b.dataset.spcfpkimp],V=spcfVars();spcfComboForm(null,{ten:x.name,gia:x.value,fs:x.free_ship,gom:x.items.map(it=>({ma:spcfPkMa(it,V)||it.code,sl:it.qty}))})});
   on("[data-spcftt]",()=>spcfTtForm());
+  on("[data-spcftier]",b=>{SPCF.tier=b.dataset.spcftier;renderMain()});
   on("[data-spcfkt]",b=>{SPCF.kmT=b.dataset.spcfkt;renderMain()});
   on("[data-spcfkmnew]",()=>spcfKmPick());
   on("[data-spcfkmok]",b=>{if(confirm("Duyệt khuyến mãi này?"))spcfKmDuyet(b.dataset.spcfkmok,true)});
