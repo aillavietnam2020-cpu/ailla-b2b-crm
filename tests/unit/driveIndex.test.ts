@@ -106,17 +106,11 @@ describe('chuyển file / thư mục con', () => {
   });
 });
 
-describe('xóa, tạo bản sao, tạo thư mục: sửa mục lục', () => {
-  it('xóa file, xóa thư mục con kèm file bên trong, thêm bản sao, thêm thư mục mới', async () => {
-    const { removeFromIdx, addFileToIdx, addSubToIdx } = await import('../../src/server/lib/driveIndex');
+describe('tạo thư mục: sửa mục lục', () => {
+  it('thêm thư mục con mới vào cuối, số file 0', async () => {
+    const { addSubToIdx } = await import('../../src/server/lib/driveIndex');
     const files = [f('a', 'MEDIA'), f('b', 'MEDIA'), f('c', 'BÁO CÁO')];
     const idx: TeamIdx = { pb: 'CM', root: 'r', at: '', cut: false, files, subs: countSubs([{ id: 's1', n: 'MEDIA' }, { id: 's2', n: 'BÁO CÁO' }], files) };
-    expect(removeFromIdx(idx, 'a')!.subs.map((s) => s.c)).toEqual([1, 1]);
-    const noMedia = removeFromIdx(idx, 's1')!;
-    expect(noMedia.files.map((x) => x.n)).toEqual(['c']);
-    expect(noMedia.subs.map((s) => s.n)).toEqual(['BÁO CÁO']);
-    expect(removeFromIdx(idx, 'không có')).toBeNull();
-    expect(addFileToIdx(idx, f('Bản sao của c', 'BÁO CÁO')).subs[1].c).toBe(2);
     expect(addSubToIdx(idx, { id: 's3', n: 'SKILL' }).subs.map((s) => [s.n, s.c])).toEqual([['MEDIA', 2], ['BÁO CÁO', 1], ['SKILL', 0]]);
   });
 });
