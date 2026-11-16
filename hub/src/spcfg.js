@@ -139,14 +139,16 @@ function spcfComboForm(id,pre){
   draw();
 }
 /* Combo đang có trên Pancake (chỉ đọc) + đưa một combo về web */
-async function spcfPkCbLoad(){SPCF.pkcbBusy=true;renderMain();try{SPCF.pkcb=await spcApi("/pancake-combos?channel=FACEBOOK");SPCF.pkcbErr=""}catch(e){SPCF.pkcbErr=e.message}SPCF.pkcbBusy=false;renderMain()}
+function spcfPkMa(it,V){const ids=new Set(((SPCB.pk&&SPCB.pk.rows)||[]).filter(r=>it.pid&&r.pid===it.pid).map(r=>r.id));
+  const v=V.find(y=>y.pkId&&ids.has(y.pkId))||V.find(y=>spcLow(y.ma)===spcLow(it.code))||V.find(y=>it.name&&spcLow(y.ten).startsWith(spcLow(it.name)));return v?v.ma:""}
+async function spcfPkCbLoad(){SPCF.pkcbBusy=true;renderMain();if(!SPCB.pk&&typeof spbPkLoad==="function")try{await spbPkLoad()}catch(e){}try{SPCF.pkcb=await spcApi("/pancake-combos?channel=FACEBOOK");SPCF.pkcbErr=""}catch(e){SPCF.pkcbErr=e.message}SPCF.pkcbBusy=false;renderMain()}
 function spcfPkCbView(ed){
   if(SPCF.pkcbErr)return `<div class="note red">Chưa đọc được combo Pancake: ${esc(SPCF.pkcbErr)}</div>`;
   const P=SPCF.pkcb;if(!P)return "";const V=spcfVars(),has=new Set(spcCombos().map(c=>spcLow(c.nhom)));
   return `<section class="card flush"><div class="card-h pad"><h2>Combo trên Pancake <small class="hint">${nf(P.count)} combo · chỉ đọc</small></h2></div>
-   ${tbl(["Bật","Tên combo trên Pancake","Gồm","Freeship","Giá trị","Trên web",""],P.rows.map((x,i)=>{const miss=x.items.filter(it=>!V.some(v=>spcLow(v.ma)===spcLow(it.code)));
+   ${tbl(["Bật","Tên combo trên Pancake","Gồm","Freeship","Giá trị","Trên web",""],P.rows.map((x,i)=>{const miss=x.items.filter(it=>!spcfPkMa(it,V));
      return `<tr${x.on?"":' class="mut"'}><td>${x.on?"✓":""}</td><td><b>${esc(x.name)}</b></td><td><small>${esc(x.items.map(it=>it.qty+" × "+(it.name||it.code)).join(" + "))}</small></td><td>${x.free_ship?"✓":""}</td><td class="n">${x.value!=null?nf(x.value):"giảm "+esc(String(x.discount))}</td>
-       <td>${has.has(spcLow(x.name))?pill("đã có","grn"):miss.length?`<small class="hint">thiếu SP: ${esc(miss.map(it=>it.code||it.name).join(", "))}</small>`:"—"}</td><td>${ed&&!has.has(spcLow(x.name))&&!miss.length&&x.value?`<button class="btn sm" data-spcfpkimp="${i}">Đưa về web</button>`:""}</td></tr>`}))}</section>`;
+       <td>${has.has(spcLow(x.name))?pill("đã có","grn"):miss.length?`<small class="hint">thiếu SP: ${esc(miss.map(it=>it.name||it.code).join(", "))}</small>`:"—"}</td><td>${ed&&!has.has(spcLow(x.name))&&!miss.length&&x.value?`<button class="btn sm" data-spcfpkimp="${i}">Đưa về web</button>`:""}</td></tr>`}))}</section>`;
 }
 /* TikTok / Shopee: combo trên sàn (bảng quy đổi) + khai combo mới để kế toán quy đổi */
 function spcfSanView(CH){
@@ -258,7 +260,7 @@ function spcfBind(m){
   on("[data-spcfpk]",()=>{SPCF.pkOpen=!SPCF.pkOpen;if(SPCF.pkOpen&&!SPCB.pk)spbPkLoad();renderMain()});
   on("[data-spcfce]",b=>spcfComboForm(b.dataset.spcfce||null));
   on("[data-spcfpkcb]",()=>spcfPkCbLoad());
-  on("[data-spcfpkimp]",b=>{const x=SPCF.pkcb.rows[+b.dataset.spcfpkimp],V=spcfVars();spcfComboForm(null,{ten:x.name,gia:x.value,fs:x.free_ship,gom:x.items.map(it=>{const v=V.find(y=>spcLow(y.ma)===spcLow(it.code));return {ma:v?v.ma:it.code,sl:it.qty}})})});
+  on("[data-spcfpkimp]",b=>{const x=SPCF.pkcb.rows[+b.dataset.spcfpkimp],V=spcfVars();spcfComboForm(null,{ten:x.name,gia:x.value,fs:x.free_ship,gom:x.items.map(it=>({ma:spcfPkMa(it,V)||it.code,sl:it.qty}))})});
   on("[data-spcftt]",()=>spcfTtForm());
   on("[data-spcfkt]",b=>{SPCF.kmT=b.dataset.spcfkt;renderMain()});
   on("[data-spcfkmnew]",()=>spcfKmPick());

@@ -530,6 +530,8 @@ sanphamRoutes.get('/pancake-products', async (c) => {
 
 interface PkVariant {
   id: string;
+  /** id sản phẩm cha trên Pancake: combo Pancake ghi món theo sản phẩm cha, không theo mẫu mã */
+  pid: string;
   code: string;
   name: string;
   variant: string;
@@ -543,6 +545,7 @@ function pkVariant(v: Record<string, unknown>): PkVariant {
   const price = Number(v.retail_price ?? v.price);
   return {
     id: String(v.id ?? ''),
+    pid: String(prod.id ?? v.product_id ?? ''),
     code: String(v.display_id ?? v.custom_id ?? prod.display_id ?? v.id ?? ''),
     name: String(prod.name ?? v.name ?? ''),
     variant: fields.map((f) => String(f.value ?? '')).filter(Boolean).join(' · '),
@@ -574,14 +577,14 @@ sanphamRoutes.get('/pancake-combos', async (c) => {
   }
   const rows = [];
   for (const x of list.slice(0, 200)) {
-    let items: Array<{ code: string; name: string; qty: number }> = [];
+    let items: Array<{ pid: string; code: string; name: string; qty: number }> = [];
     try {
       const r = await fetch(`${base}/combo_products/${encodeURIComponent(String(x.id))}/variations?${q}&combo_product_id=${encodeURIComponent(String(x.id))}`);
       if (r.ok) {
         const j = JSON.parse(await r.text()) as { data?: Array<Record<string, unknown>> };
         items = (j.data ?? []).map((v) => {
           const p = (v.product ?? v.variation ?? {}) as Record<string, unknown>;
-          return { code: String(p.display_id ?? p.custom_id ?? ''), name: String(p.name ?? ''), qty: Number(v.count) || 1 };
+          return { pid: String(p.id ?? v.product_id ?? ''), code: String(p.display_id ?? p.custom_id ?? ''), name: String(p.name ?? ''), qty: Number(v.count) || 1 };
         });
       }
     } catch {
