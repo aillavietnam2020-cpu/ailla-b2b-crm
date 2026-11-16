@@ -105,7 +105,7 @@ function pdBuild(S,w){
       tien:x.unit_price!=null?Math.round(Math.abs(d)*+x.unit_price):null,by:"Kho",at:pdTs(x.created_at),act:"fn",open:{page:"mh_po",po:x.po_id}})});
   /* Khuyến mại các bộ phận chờ kế toán duyệt; combo TikTok mới chờ kế toán khai quy đổi (spcfg.js, 16/11). */
   if(R.ketoan()){
-    (S.kmCho||[]).forEach(k=>add({k:"km",id:"km:"+k.id,ref:k.id,src:"kmCat",loai:"Khuyến mại · chờ kế toán duyệt",nd:k.ten||"",sub:[k.ap,k.tu?"từ "+k.tu:"",k.den?"đến "+k.den:""].filter(Boolean).join(" · "),tien:+k.gia||null,by:k.by||"",at:pdTs(k.at),act:"fn",open:{page:"sp_cfg"}}));
+    (S.kmCho||[]).forEach(k=>add({k:"km",id:"km:"+k.id,ref:k.id,src:"kmCat",loai:"Khuyến mại · chờ kế toán duyệt",nd:k.ten||"",sub:[k.ap,k.tu?"từ "+k.tu:"",k.den?"đến "+k.den:""].filter(Boolean).join(" · "),tien:+k.gia||null,by:k.by||"",at:pdTs(k.at),act:"fn",open:{page:"sp_km"}}));
     (S.ttCho||[]).forEach(x=>add({k:"ttcb",id:"tt:"+x.id,ref:x.id,src:"ttCombo",loai:"Combo TikTok mới · chờ kế toán khai",ok:"Khai quy đổi",nd:x.sku+(x.variant?" · "+x.variant:""),sub:[x.gom,x.qua?"tặng "+x.qua:""].filter(Boolean).join(" · "),by:x.by||"",at:pdTs(x.at),act:"fn",open:{page:"spcombo"}}));
   }
   /* Mã bán Kênh phân phối sale tạo khi lên đơn, chờ Trưởng phòng duyệt (giữ hoặc sửa mã). */
