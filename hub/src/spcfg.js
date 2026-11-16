@@ -139,8 +139,8 @@ function spcfComboForm(id,pre){
   draw();
 }
 /* Combo đang có trên Pancake (chỉ đọc) + đưa một combo về web */
-function spcfPkMa(it,V){const ids=new Set(((SPCB.pk&&SPCB.pk.rows)||[]).filter(r=>it.pid&&r.pid===it.pid).map(r=>r.id));
-  const v=V.find(y=>y.pkId&&ids.has(y.pkId))||V.find(y=>spcLow(y.ma)===spcLow(it.code))||V.find(y=>it.name&&spcLow(y.ten).startsWith(spcLow(it.name)));return v?v.ma:""}
+function spcfPkMa(it,V){const R=((SPCB.pk&&SPCB.pk.rows)||[]).filter(r=>it.pid&&r.pid===it.pid),ids=new Set(R.map(r=>r.id)),cs=new Set(R.map(r=>spcLow(r.code)).filter(c=>c&&!/^\d{1,3}$/.test(c)));
+  const v=V.find(y=>y.pkId&&ids.has(y.pkId))||V.find(y=>cs.has(spcLow(y.ma)))||V.find(y=>spcLow(y.ma)===spcLow(it.code))||V.find(y=>it.name&&spcLow(y.ten).startsWith(spcLow(it.name)));return v?v.ma:""}
 async function spcfPkCbLoad(){SPCF.pkcbBusy=true;renderMain();if(!SPCB.pk&&typeof spbPkLoad==="function")try{await spbPkLoad()}catch(e){}try{SPCF.pkcb=await spcApi("/pancake-combos?channel=FACEBOOK");SPCF.pkcbErr=""}catch(e){SPCF.pkcbErr=e.message}SPCF.pkcbBusy=false;renderMain()}
 function spcfPkCbView(ed){
   if(SPCF.pkcbErr)return `<div class="note red">Chưa đọc được combo Pancake: ${esc(SPCF.pkcbErr)}</div>`;
