@@ -512,7 +512,7 @@ function cwMy(m){cwCss();PAGE="cv_v";
   m.querySelectorAll("[data-cwtmall]").forEach(b=>b.onclick=()=>{TM.tab="thumuc";TM.pb="";TM.sub="";TM.file=null;cwGo("cv_pb")});
   m.querySelectorAll("[data-cwwsall]").forEach(b=>b.onclick=()=>{CWS.wsAll=!CWS.wsAll;renderMain()});
   m.querySelectorAll("[data-cwact]").forEach(b=>b.onclick=()=>{CWS.actN=+b.dataset.cwact;renderMain()});
-  m.querySelectorAll("[data-cwws]").forEach(b=>b.onclick=()=>{CWS.ws=CWS.ws===b.dataset.cwws?"":b.dataset.cwws;renderMain()});
+  m.querySelectorAll("[data-cwws]").forEach(b=>b.onclick=()=>{const p=(D().projects||[]).find(x=>x.id===b.dataset.cwws);if(typeof CVP!=="undefined"){CVP.q=p?p.ten:"";CVP.st="";CVP.ow="";CVP.uu=""}cwGo("cv_da")});
   m.querySelectorAll("[data-cwwsda]").forEach(b=>b.onclick=()=>{CWS.da=b.dataset.cwwsda;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-cwpj]").forEach(b=>b.onclick=e=>{e.stopPropagation();if(typeof openProject==="function")openProject(b.dataset.cwpj||null)});
   if(CWS.my==="rv")cwRvBind(m);
