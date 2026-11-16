@@ -290,22 +290,20 @@ function spcfB2bView(m,t,sub){
   const body=G.map(g=>`<tr class="grp"><td colspan="${nc}">${esc(g.g)} <span>· ${g.L.length}</span></td></tr>`+g.L.map(r=>`<tr><td class="c">${++i}</td><td>${esc(r.le.name)}</td><td class="c">${esc(String(r.q||""))}</td>${LE?cell(r,LE,"ny"):"<td></td>"}${cols.map(x=>cell(r,x,one?"hl":"")).join("")}
     <td class="cd">${esc(r.le.sku)}${r.th?`<br><small>thùng ${esc(r.th.sku)}</small>`:""}</td><td class="cd">${r.misa?esc(r.misa):`<small class="hint">chưa nối</small>`}</td><td class="c"><button class="lnk" data-spcfph="${esc(r.le.id)}" title="Lịch sử giá">🕘</button></td></tr>`).join("")).join("");
   const nMiss=R.filter(r=>T0.some(x=>x.code!=="NHAN_VIEN"&&r.le.prices[x.code]==null)).length,nChg=Object.keys(chg).length;
-  const tools=perm?(ed?`<button class="btn" data-spcfxx="1">Hủy sửa</button><button class="btn pri" data-spcfxs="1" ${nChg?"":"disabled"}>${perm==="ok"?"Lưu":"Gửi chị duyệt"} ${nChg?nChg+" ô":""}</button>`:`<button class="btn pri" data-spcfxe="1">✎ Sửa giá</button>`):"";
+  /* Sửa giá / thêm mã thành phiếu chờ chị duyệt (spbg.js); báo giá gửi khách theo cấp */
+  const nNew=(SPCF.newP||[]).length;
+  const tools=ed?`<button class="btn" data-spbgnew="1">+ Mã mới</button><button class="btn" data-spcfxx="1">Hủy sửa</button><button class="btn pri" data-spcfxs="1">Tạo phiếu ${nChg+nNew?"("+(nChg?nChg+" ô":"")+(nChg&&nNew?", ":"")+(nNew?nNew+" mã mới":"")+")":""}</button>`
+    :`<button class="btn" data-spbgbq="1">🖼 Báo giá gửi khách</button>${perm?`<button class="btn pri" data-spcfxe="1">✎ Sửa giá, thêm mã</button>`:""}`;
   spcfFrame(m,t,sub,{q:"Tìm tên, mã KPP, mã MISA…",count:nf(R.length)+" sản phẩm",tools,
     inner:`<div class="spf-tiers"><div class="settabs" style="margin:0">${[["","Tất cả cấp"]].concat(T.map(x=>[x.code,x.name])).map(([k,n])=>`<button class="${SPCF.tier===k?"on":""}" data-spcftier="${esc(k)}">${esc(n)}</button>`).join("")}</div>
       <label class="inl" style="margin-left:auto;white-space:nowrap"><input type="checkbox" id="spcf-miss" ${SPCF.miss?"checked":""} style="width:auto"> Chỉ mã thiếu giá${nMiss?" ("+nMiss+")":""}</label></div>
-      ${ed?`<div class="note" style="margin:0 14px 10px">Gõ giá vào ô (giá mỗi chai / can), ô đã đổi tô vàng. Xóa trắng ô = bỏ giá cấp đó. ${perm==="ok"?"Bấm Lưu là giá có hiệu lực từ hôm nay.":"Bấm Gửi chị duyệt: giá mới chờ CEO duyệt rồi mới áp dụng."} Giá thùng sửa riêng ở mã thùng.</div>`:""}
+      ${ed?`<div class="note" style="margin:0 14px 10px">Gõ giá vào ô (giá mỗi chai / can), ô đã đổi tô vàng. Xóa trắng ô = bỏ giá cấp đó. Thêm sản phẩm bấm <b>+ Mã mới</b>. Xong bấm <b>Tạo phiếu</b>: giá chỉ đổi khi chị duyệt phiếu.</div>${typeof spbgNewView==="function"?spbgNewView():""}`:""}
       <div class="spf-nb"><table><thead>${head}</thead><tbody>${body||`<tr><td colspan="${nc}" class="spf-empty">Không có sản phẩm</td></tr>`}</tbody></table></div>
-      <p class="hint pad" style="margin:0">Giá niêm yết = giá bán lẻ. Giá theo mỗi chai / can; quy cách = số chai / can một thùng. Giá hiệu lực ngày ${esc(spcfVN(SPCF.b2b.date||spcfToday()))}; ô có chấm hồng là giá đang có chương trình điều chỉnh (rê chuột để xem giá gốc). Bấm 🕘 xem lịch sử giá.</p>`});
+      <p class="hint pad" style="margin:0">Giá niêm yết = giá bán lẻ. Giá theo mỗi chai / can; quy cách = số chai / can một thùng. Giá hiệu lực ngày ${esc(spcfVN(SPCF.b2b.date||spcfToday()))}; ô có chấm hồng là giá đang có chương trình điều chỉnh (rê chuột để xem giá gốc). Bấm 🕘 xem lịch sử giá.</p>`,after:typeof spbgListView==="function"?spbgListView():""});
   m.querySelectorAll(".spf-xin").forEach(inp=>{inp.onkeydown=e=>{if(e.key==="Enter"){const all=[...m.querySelectorAll(".spf-xin")],n=all[all.indexOf(inp)+show.length];if(n)n.focus()}};
     inp.onfocus=()=>inp.select();inp.onchange=()=>{const k=inp.dataset.k,[pid,tid]=k.split("|"),p=SPCF.b2b.products.find(x=>x.id===pid),x=T0.find(y=>y.id===tid),old=p.prices[x.code],v=inp.value.trim()===""?null:spcfNum(inp.value);
-      if(v===old)delete chg[k];else chg[k]=v;inp.value=v==null?"":nf(v);inp.parentNode.classList.toggle("chg",k in chg);const b=m.querySelector("[data-spcfxs]"),n=Object.keys(chg).length;if(b){b.disabled=!n;b.textContent=(perm==="ok"?"Lưu":"Gửi chị duyệt")+(n?" "+n+" ô":"")}}});
+      if(v===old)delete chg[k];else chg[k]=v;inp.value=v==null?"":nf(v);inp.parentNode.classList.toggle("chg",k in chg);const b=m.querySelector("[data-spcfxs]"),n=Object.keys(chg).length;if(b){const nn=(SPCF.newP||[]).length;b.textContent="Tạo phiếu"+(n+nn?" ("+(n?n+" ô":"")+(n&&nn?", ":"")+(nn?nn+" mã mới":"")+")":"")}}});
 }
-async function spcfB2bSave(){const chg=SPCF.chg||{},K=Object.keys(chg);if(!K.length)return;const perm=spcfB2bPerm();
-  const ly=prompt((perm==="ok"?"Lưu ":"Gửi chị duyệt ")+K.length+" ô giá. Lý do điều chỉnh (để ghi lịch sử):","");if(ly===null)return;
-  let okN=0;const err=[];for(const k of K){const [product_id,tier_id]=k.split("|");try{await svApi("/api/prices",{method:"POST",body:JSON.stringify({product_id,tier_id,amount:chg[k],reason:ly||null})});okN++;delete chg[k]}catch(e){err.push(e.message)}}
-  toast(err.length?`Đã lưu ${okN} ô, ${err.length} ô lỗi: ${err[0]}`:perm==="ok"?`Đã lưu ${okN} ô giá`:`Đã gửi chị duyệt ${okN} ô giá`);
-  if(!Object.keys(chg).length)SPCF.b2bEd=false;SPCF.b2b=null;spcfB2bLoad(true)}
 async function spcfB2bHist(pid){const p=(SPCF.b2b.products||[]).find(x=>x.id===pid);if(!p)return;
   let R=[];try{R=await svApi("/api/products/"+encodeURIComponent(pid)+"/price-history")}catch(e){toast(e.message);return}
   const ST={ACTIVE:["đang dùng","grn"],DRAFT:["chờ duyệt","amb"],ARCHIVED:["đã thay","gry"],REJECTED:["bị từ chối","red"]};
@@ -401,8 +399,9 @@ function spcfBind(m){
   on("[data-spcftier]",b=>{SPCF.tier=b.dataset.spcftier;renderMain()});
   const ms=$("#spcf-miss");if(ms)ms.onchange=()=>{SPCF.miss=ms.checked;renderMain()};
   on("[data-spcfxe]",()=>{SPCF.b2bEd=true;SPCF.chg={};renderMain()});
-  on("[data-spcfxx]",()=>{if(Object.keys(SPCF.chg||{}).length&&!confirm("Bỏ các ô đã sửa?"))return;SPCF.b2bEd=false;SPCF.chg={};renderMain()});
-  on("[data-spcfxs]",()=>spcfB2bSave());
+  on("[data-spcfxx]",()=>{if((Object.keys(SPCF.chg||{}).length||(SPCF.newP||[]).length)&&!confirm("Bỏ các ô đã sửa và mã mới?"))return;SPCF.b2bEd=false;SPCF.chg={};SPCF.newP=[];renderMain()});
+  on("[data-spcfxs]",()=>spbgCreate());
+  if(typeof spbgBind==="function")spbgBind(m);
   on("[data-spcfph]",b=>spcfB2bHist(b.dataset.spcfph));
   on("[data-spcfkt]",b=>{SPCF.kmT=b.dataset.spcfkt;renderMain()});
   on("[data-spcfkmnew]",()=>spcfKmPick());
@@ -411,7 +410,7 @@ function spcfBind(m){
   on("[data-spcfkmdel]",b=>{if(!confirm("Xóa khuyến mãi này?"))return;DB.mutate(ME.name,"xóa khuyến mãi",d=>{d.kmCat=(d.kmCat||[]).filter(x=>!(x.id===b.dataset.spcfkmdel&&x.byId===ME.id&&x.tt!=="ok"))});renderMain()});
 }
 /* Phê duyệt (pdcalc.js): khuyến mãi chờ duyệt + combo sàn chờ kế toán khai */
-function spcfPdSrc(d){return {kmCho:((d&&d.kmCat)||[]).filter(k=>k.tt==="cho"),ttCho:((d&&d.ttCombo)||[]).filter(x=>x.tt==="cho")}}
+function spcfPdSrc(d){return {kmCho:((d&&d.kmCat)||[]).filter(k=>k.tt==="cho"),ttCho:((d&&d.ttCombo)||[]).filter(x=>x.tt==="cho"),pgCho:((d&&d.giaPhieu)||[]).filter(x=>x.tt==="cho")}}
 
 /* ---------- CSKH tạo đơn (cskh.js csDonForm) dùng danh mục CSKH ----------
    Ô tìm sản phẩm: combo CSKH đang chạy → sản phẩm CSKH (giá CSKH) → mọi sản phẩm Pancake còn lại.

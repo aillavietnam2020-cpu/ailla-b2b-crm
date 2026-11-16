@@ -270,8 +270,11 @@ catalogRoutes.post('/products/bulk-group', adminOnlyEndpoint, requirePermission(
   return ok(c, { count: ids.length });
 });
 
-/** Thêm sản phẩm mới (SKU). Giá nhập riêng ở màn hình Bảng giá. */
-catalogRoutes.post('/products', adminOnlyEndpoint, requirePermission('product.manage'), async (c) => {
+/**
+ * Thêm sản phẩm mới (SKU). Giá nhập riêng ở màn hình Bảng giá.
+ * Làm được cả ở web vận hành (chị Hoa duyệt 16/11: thêm mã ngay trên bảng giá, mã mới vào phiếu giá, tạo khi CEO duyệt phiếu).
+ */
+catalogRoutes.post('/products', requirePermission('product.manage'), async (c) => {
   const auth = c.get('auth');
   const parsed = productCreateSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
