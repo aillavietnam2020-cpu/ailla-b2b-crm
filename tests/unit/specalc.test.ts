@@ -97,36 +97,28 @@ describe('specalc: đọc file Shopee', () => {
 });
 
 describe('specalc: số tháng một shop', () => {
-  it('mã ưu đãi trừ vào doanh thu, đơn hoàn theo Tài chính bị loại, đơn chưa quyết toán dùng phí bình quân', () => {
+  it('mã ưu đãi trừ vào doanh thu, đơn hoàn theo Tài chính bị loại; đủ tháng thì đơn chưa về tiền không tính (cách chị Huệ 15/11)', () => {
     const M = build();
     // A1: tiền hàng dòng = giá gốc × SL − trợ giá: 100.000 − 20.000 = 80.000; (50.000 − 10.000) × 2 = 80.000 → 160.000 (= Giá sản phẩm Tài chính), mã ưu đãi −10.000 → 150.000
-    // A3 hoàn toàn bộ theo Tài chính (160 − 160 = 0) → loại. A4 chưa quyết toán: phí và mã ưu đãi theo tỷ lệ của A1.
-    const rateFee = -32000 / 160000, rateV = -10000 / 160000;
+    // A3 hoàn toàn bộ theo Tài chính (160 − 160 = 0) → không đếm đơn, vẫn giữ ship Shopee thu −20.000. A4 chưa có trong Tài chính, báo cáo đủ tháng → không tính, theo dõi kỳ sau.
     expect(M.lech).toBe(1);
-    expect(M.don).toBe(2);
-    expect(M.dt).toBe(150000 + Math.round(60000 + 60000 * rateV));
-    // A3 hoàn tiền toàn bộ nhưng Shopee vẫn thu ship −20.000: giữ phần phí đó, không đếm đơn (16/11/2026).
-    expect(M.phi).toBe(-32000 - 20000 + Math.round(60000 * rateFee));
+    expect(M.don).toBe(1);
+    expect(M.dt).toBe(150000);
+    expect(M.phi).toBe(-32000 - 20000);
+    expect(M.choQT).toBe(60000);
     expect(M.hh).toBe(100000 + 100000);
     expect(M.koc).toBe(150000);
     expect(M.ads).toBe(50000);
     expect(M.den).toBe(null);
-    expect(M.fees.find((f: [string, number]) => f[0] === 'Hoa hồng affiliate')[1]).toBe(-8000 + Math.round(60000 * (-8000 / 160000)));
+    expect(M.fees.find((f: [string, number]) => f[0] === 'Hoa hồng affiliate')[1]).toBe(-8000);
   });
-  it('tab Adjustment: chỉ lấy điều chỉnh của đơn trong tháng; hoàn tiền trừ tiền hàng, khoản khác vào phí (16/11/2026)', () => {
-    const base = build();
-    const fs0 = finSheets();
-    const fin = { ...fs0, Adjustment: [...fs0.Adjustment, [], ['Mã giao dịch', 'Ngày hoàn thành điều chỉnh đơn hàng', 'Loại điều chỉnh | Mô tả', 'Lý do điều chỉnh', 'Số tiền điều chỉnh', 'Mã đơn hàng liên quan'],
-      [1, '2026-10-05', 'Trả hàng/ Hoàn tiền', null, -40000, 'A1'], [2, '2026-10-05', 'Chương trình Marketing', null, -1000, 'A1'], [3, '2026-10-05', 'Trả hàng/ Hoàn tiền', null, -999, 'B9']] };
-    const O = T.speReadOrders(T.speOrderSheet(ordersSheets()), '2026-09');
-    const F = T.speReadFin(fin, '2026-09');
-    expect(F.adj).toHaveLength(3);
-    const M = T.speBuildMonth({ ky: '2026-09', shop: F.shop, orders: O, fin: F, ads: null, costOf: null });
-    // A1: giá sản phẩm 160.000, hoàn 40.000 → tiền hàng còn 3/4 (120.000); B9 là đơn tháng khác nên bỏ qua.
-    // A4 chưa quyết toán: mã ưu đãi bình quân tính lại trên tiền hàng A1 mới (120.000 thay vì 160.000).
-    expect(Math.abs(M.dt - (base.dt - 40000 + 60000 * (-10000 / 120000 + 10000 / 160000)))).toBeLessThanOrEqual(2);
-    expect(M.fees.find((f: [string, number]) => f[0] === 'Khoản khác')[1]).toBe(-1000 + Math.round(60000 * (-1000 / 120000))); // A4 chưa quyết toán chịu phí bình quân
-    expect(M.don).toBe(base.don);
+  it('báo cáo giữa tháng: đơn chưa quyết toán dùng phí và mã ưu đãi bình quân', () => {
+    const M = build({ to: '2026-10-08' });
+    const rateFee = -32000 / 160000, rateV = -10000 / 160000;
+    expect(M.don).toBe(2);
+    expect(M.dt).toBe(150000 + Math.round(60000 + 60000 * rateV));
+    expect(M.phi).toBe(-32000 - 20000 + Math.round(60000 * rateFee));
+    expect(M.choQT).toBe(0);
   });
   it('giá vốn theo mã đã quy đổi; mã thiếu giá KHÔNG ước: giá vốn 0, đánh dấu chưa tính', () => {
     const M = build({ costOf: (s: { pn: string }) => (s.pn === 'Tẩy lồng' ? { u: 30000 } : { u: null, why: 'Chưa quy đổi mã' }) });
