@@ -450,8 +450,10 @@ catalogRoutes.delete('/products/:id', adminOnlyEndpoint, requirePermission('prod
  * - CEO: giá có hiệu lực ngay (ACTIVE).
  * - Quản lý: tạo bản nháp (DRAFT) + yêu cầu duyệt gửi lên CEO (mục 4: Quản lý đề nghị, CEO duyệt).
  * Giá cũ được đóng lại bằng valid_to = ngày trước ngày hiệu lực mới; đơn cũ giữ nguyên giá đã chốt.
+ * Làm được cả ở web vận hành (chị Hoa duyệt 16/11: CEO và Trưởng phòng Kênh phân phối sửa giá ngay trên bảng giá ở
+ * Vận hành › Cấu hình › Sản phẩm); quyền vẫn chỉ theo price.propose / price.approve như trên.
  */
-catalogRoutes.post('/prices', adminOnlyEndpoint, requirePermission('price.propose', 'price.approve'), async (c) => {
+catalogRoutes.post('/prices', requirePermission('price.propose', 'price.approve'), async (c) => {
   const auth = c.get('auth');
   const parsed = priceUpsertSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {

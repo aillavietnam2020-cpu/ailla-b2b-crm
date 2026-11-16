@@ -265,8 +265,8 @@ async function spcfTtOpen(id){const x=spcfList("ttCombo").find(y=>y.id===id);if(
    Chọn "Tất cả cấp" hoặc một cấp. Sửa giá (trang quản trị, người có quyền giá): gõ vào ô, ô đổi vàng, Lưu kèm lý do
    qua /api/prices (CEO có hiệu lực ngay, Trưởng phòng thành đề nghị chờ CEO). Lịch sử: /api/products/:id/price-history. */
 const spcfB2bRole=()=>{const P=(typeof SV!=="undefined"&&SV.perms)||[];return P.includes("price.approve")?"ok":P.includes("price.propose")?"de":""};
-/* Ghi giá chỉ làm ở trang quản trị (máy chủ chặn ghi giá từ địa chỉ khác); ở web vận hành chỉ xem */
-const spcfB2bPerm=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"?spcfB2bRole():"";
+/* Sửa giá ở cả web vận hành và trang quản trị (chị Hoa duyệt 16/11), theo quyền giá của người dùng */
+const spcfB2bPerm=()=>spcfB2bRole();
 async function spcfB2bLoad(force){if(SPCF.b2bBusy)return;SPCF.b2bBusy=true;try{SPCF.b2b=await svApi("/api/prices?limit=1000&scope=TIER"+(force?"&_="+Date.now():""))}catch(e){SPCF.b2b={err:e.message}}SPCF.b2bBusy=false;if(/^sp_/.test(PAGE))renderMain()}
 /* Gộp mã lẻ + mã thùng: khóa = mã bỏ đuôi -C */
 function spcfB2bRows(P){const by=new Map();P.forEach(p=>{const k=String(p.sku).replace(/-c$/i,"").toUpperCase();if(!by.has(k))by.set(k,[]);by.get(k).push(p)});
@@ -290,7 +290,7 @@ function spcfB2bView(m,t,sub){
   const body=G.map(g=>`<tr class="grp"><td colspan="${nc}">${esc(g.g)} <span>· ${g.L.length}</span></td></tr>`+g.L.map(r=>`<tr><td class="c">${++i}</td><td>${esc(r.le.name)}</td><td class="c">${esc(String(r.q||""))}</td>${LE?cell(r,LE,"ny"):"<td></td>"}${cols.map(x=>cell(r,x,one?"hl":"")).join("")}
     <td class="cd">${esc(r.le.sku)}${r.th?`<br><small>thùng ${esc(r.th.sku)}</small>`:""}</td><td class="cd">${r.misa?esc(r.misa):`<small class="hint">chưa nối</small>`}</td><td class="c"><button class="lnk" data-spcfph="${esc(r.le.id)}" title="Lịch sử giá">🕘</button></td></tr>`).join("")).join("");
   const nMiss=R.filter(r=>T0.some(x=>x.code!=="NHAN_VIEN"&&r.le.prices[x.code]==null)).length,nChg=Object.keys(chg).length;
-  const tools=!perm&&spcfB2bRole()?`<span class="hint">Sửa giá: mở mục này ở trang quản trị</span>`:perm?(ed?`<button class="btn" data-spcfxx="1">Hủy sửa</button><button class="btn pri" data-spcfxs="1" ${nChg?"":"disabled"}>${perm==="ok"?"Lưu":"Gửi chị duyệt"} ${nChg?nChg+" ô":""}</button>`:`<button class="btn pri" data-spcfxe="1">✎ Sửa giá</button>`):"";
+  const tools=perm?(ed?`<button class="btn" data-spcfxx="1">Hủy sửa</button><button class="btn pri" data-spcfxs="1" ${nChg?"":"disabled"}>${perm==="ok"?"Lưu":"Gửi chị duyệt"} ${nChg?nChg+" ô":""}</button>`:`<button class="btn pri" data-spcfxe="1">✎ Sửa giá</button>`):"";
   spcfFrame(m,t,sub,{q:"Tìm tên, mã KPP, mã MISA…",count:nf(R.length)+" sản phẩm",tools,
     inner:`<div class="spf-tiers"><div class="settabs" style="margin:0">${[["","Tất cả cấp"]].concat(T.map(x=>[x.code,x.name])).map(([k,n])=>`<button class="${SPCF.tier===k?"on":""}" data-spcftier="${esc(k)}">${esc(n)}</button>`).join("")}</div>
       <label class="inl" style="margin-left:auto;white-space:nowrap"><input type="checkbox" id="spcf-miss" ${SPCF.miss?"checked":""} style="width:auto"> Chỉ mã thiếu giá${nMiss?" ("+nMiss+")":""}</label></div>
