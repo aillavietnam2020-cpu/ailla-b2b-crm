@@ -175,7 +175,7 @@ function spcfChanSp(m){
      <td>${ed?spcfActs([["Sửa",`data-spcfpe="${esc(p.id)}"`],[on?"Ngừng bán":"Bán lại",`data-spcfonb="${esc(p.id)}" data-v="${on?0:1}"`],["Xóa",`data-spcfpdel="${esc(p.id)}"`]]):""}</td></tr>`+
      (open?bt.map(v=>`<tr style="background:var(--gray-soft)"><td></td><td>${v.on!==false?"✓":""}</td><td>${spcfVImg(v)}</td><td><span class="spf-tag">${esc(v.ma)}</span></td><td><small>${esc([v.dt,v.pl].filter(Boolean).join(" · ")||"mặc định")}</small></td><td></td><td></td><td class="n">${spcGiaTxt(v)}</td><td class="n">${pkp(v)}</td><td></td></tr>`).join(""):"")}).join("");
   spcfFrame(m,"Combo",sub,{q:"Tìm mã, tên sản phẩm…",count:nf(L.length)+" mã bán",
-    tools:`<button class="btn" data-spcfpk="1" ${SPCB.pkBusy?"disabled":""} title="Đọc lại giá, ảnh trên Pancake${ed?" và mở danh sách để thêm sản phẩm":""}">${SPCB.pkBusy?"Đang đọc Pancake…":"⟳ Đồng bộ Pancake"}</button>${ed?`<button class="btn pri" data-spcfpe="">+ Tạo sản phẩm</button>`:""}`,
+    tools:`<button class="btn" data-spcfpk="1" ${SPCB.pkBusy?"disabled":""} title="Đọc lại giá, ảnh trên Pancake${ed?" và mở danh sách để thêm sản phẩm":""}">${SPCB.pkBusy?"Đang đọc Pancake…":"⟳ Đồng bộ Pancake"}</button>${ed?`<button class="btn pri" data-spcfpe="">+ Thêm mã bán</button>`:""}`,
     inner:tbl(["","Trạng thái","Ảnh","Mã bán","Tên sản phẩm","Loại","Số mẫu mã","Giá bán kênh","Giá Pancake",""],[rows])+`<p class="hint pad" style="margin:0">Giá bán kênh: giá riêng của kênh nếu đã đặt, chưa đặt thì theo giá Pancake. Bấm ⋯ để sửa, ngừng bán hoặc xóa.</p>`,
     after:SPCF.pkOpen&&ed?(SPCB.pk?spbPkEditView(SPC.bpView):SPCB.pkErr?`<div class="note red">Chưa đọc được Pancake: ${esc(SPCB.pkErr)}</div>`:`<p class="hint pad">Đang đọc Pancake…</p>`):""});
 }
