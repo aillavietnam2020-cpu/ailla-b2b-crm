@@ -40,6 +40,7 @@ function pSpcfg(m){
   m.innerHTML=H("Sản phẩm và combo",sub)+nav+body;
   m.querySelectorAll("[data-spcf]").forEach(b=>b.onclick=()=>{SPCF.tab=b.dataset.spcf;SPCF.km=null;SPCF.tt=null;renderMain()});
   m.querySelectorAll("[data-spbpk]").forEach(b=>b.onclick=()=>spbPkLoad());
+  if(typeof spbPkBind==="function")spbPkBind(m);
   spcfBind(m);
 }
 const spcfKmCho=()=>{const n=spcfList("kmCat").filter(k=>k.tt==="cho").length;return n?` <b class="pdn">${n}</b>`:""};
@@ -117,6 +118,29 @@ function spcfBind(m){
 /* Phê duyệt (pdcalc.js): khuyến mại chờ duyệt + combo TikTok chờ kế toán khai */
 function spcfPdSrc(d){return {kmCho:((d&&d.kmCat)||[]).filter(k=>k.tt==="cho"),ttCho:((d&&d.ttCombo)||[]).filter(x=>x.tt==="cho")}}
 
+/* ---------- CSKH tạo đơn (cskh.js csDonForm) dùng danh mục CSKH (chị Hoa 16/11) ----------
+   Ô tìm sản phẩm: combo CSKH đang chạy → sản phẩm CSKH (giá CSKH) → mọi sản phẩm Pancake còn lại.
+   Chọn combo: thêm từng món theo giá CSKH (quà giá 0), phần chênh với giá combo cộng vào ô Giảm giá. */
+const spcfToday=()=>new Date(Date.now()+7*3600e3).toISOString().slice(0,10);
+const spcfCk=()=>{try{return D().cskhCat||{}}catch(e){return {}}};
+function spcfDonList(list){
+  const ck=spcfCk(),byId=new Map((list||[]).map(x=>[x.id,x])),t=spcfToday(),mine=[];
+  (ck.sp||[]).forEach(p=>(p.bt||[]).forEach(v=>{if(v.on===false)return;const pv=v.pkId&&byId.get(v.pkId);mine.push({id:pv?pv.id:(v.pkId||""),name:pv?pv.name:p.ten,price:v.gia||(pv?pv.price:0),cskh:true})}));
+  const ids=new Set(mine.map(x=>x.id));
+  const combos=(ck.combos||[]).filter(c=>(c.tt||"ok")==="ok"&&!(c.den&&c.den<t)&&!(c.tu&&c.tu>t)).map(c=>({combo:c,name:"Combo CSKH: "+(c.nhom||"")+(c.combo?" · "+c.combo:""),price:+c.gia||0,id:"combo"}));
+  return combos.concat(mine,(list||[]).filter(x=>!ids.has(x.id)));
+}
+function spcfDonCombo(c,list){
+  const ck=spcfCk(),byId=new Map((list||[]).map(x=>[x.id,x])),items=[];let sum=0;
+  const vOf=ma=>{for(const p of (ck.sp||[]))for(const v of (p.bt||[]))if(v.ma===ma)return {p,v};return null};
+  const add=(x,gift)=>{const lk=x.ma?vOf(x.ma):null,pv=lk&&lk.v.pkId?byId.get(lk.v.pkId):null,price=gift?0:(lk&&lk.v.gia)||(pv?pv.price:0),q=+x.sl||1;
+    items.push({n:pv?pv.name:(lk?lk.p.ten:(x.ten||x.ma||"")),vid:pv?pv.id:"",q,price});sum+=q*price};
+  (c.gom||[]).forEach(x=>add(x,false));(c.tang||[]).forEach(x=>add(x,true));
+  return {items,disc:Math.max(0,sum-(+c.gia||0))};
+}
+/* Khuyến mại CSKH đang chạy (kế toán đã duyệt) hiện nhắc trong ô tạo đơn */
+function spcfDonKm(){const t=spcfToday(),L=((typeof D==="function"&&D()&&D().kmCat)||[]).filter(k=>k.bp==="cskh"&&k.tt==="ok"&&!(k.tu&&k.tu>t)&&!(k.den&&k.den<t));
+  return L.length?`<div class="note" style="margin-top:8px"><b>Khuyến mại CSKH đang chạy:</b> ${L.map(k=>esc(k.ten)+" · "+esc(k.ap)+(k.gia?" · "+nf(k.gia)+" đ":"")+(k.den?" (đến "+esc(k.den.slice(8,10)+"/"+k.den.slice(5,7))+")":"")).join("; ")}</div>`:""}
 PAGES.sp_cfg=pSpcfg;
 /* Trang cũ dồn về đây */
 PAGES.dg_sp=m=>{SPCF.tab="ads";pSpcfg(m)};

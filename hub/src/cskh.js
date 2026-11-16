@@ -306,7 +306,8 @@ function csLoadProds(){if(CSK.prods)return Promise.resolve(CSK.prods);return csA
 const csFold=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/gi,"d").toLowerCase();
 function csDonForm(phone){
   const st={c:null,items:[],ship:0,disc:0,ck:0,noteIn:"",notePr:"",ntab:"in",r:{},save:true,pq:""};
-  const prods=()=>(CSK.prods&&CSK.prods.list)||[];
+  /* Danh mục CSKH trước (combo, sản phẩm giá CSKH, spcfg.js), rồi mọi sản phẩm Pancake */
+  const prods=()=>{const L=(CSK.prods&&CSK.prods.list)||[];return typeof spcfDonList==="function"?spcfDonList(L):L};
   const num=v=>+String(v||"").replace(/\D/g,"")||0;
   const sub=()=>st.items.reduce((a,i)=>a+i.q*i.price,0);
   const total=()=>Math.max(0,sub()+st.ship-st.disc);
@@ -317,9 +318,9 @@ function csDonForm(phone){
     if(st.newc){const a=g("cd-nn"),b=g("cd-np");if(a!==undefined)st.newc.name=a;if(b!==undefined)st.newc.phone=b}};
   const money=()=>{const t=total(),cod=Math.max(0,t-st.ck);[["#cd-sub",sub()],["#cd-tot",t],["#cd-need",cod],["#cd-cod",cod]].forEach(([s,v])=>{const e=$("#crmm").querySelector(s);if(e)e.textContent=nf(v)+" đ"})};
   const draw=()=>{const c=st.c||(st.newc?{name:st.newc.name,phone:st.newc.phone,addr_street:"",addr_ward:"",addr_district:"",addr_province:""}:null),P=prods(),now=new Date(Date.now()+7*36e5).toISOString();
-    const pm=st.pq.trim().length>=1?P.filter(p=>csFold(p.name).includes(csFold(st.pq))).slice(0,8):[];
+    const pm=st.pq.trim().length>=1?P.filter(p=>csFold(p.name).includes(csFold(st.pq))).slice(0,12):[];
     const box=(t,h,x)=>`<section class="cs-pbx"><div class="cs-pbh"><b>${t}</b>${x||""}</div>${h}</section>`;
-    const left=box("Sản phẩm",`<div class="cs-psr"><input id="cd-pq" placeholder="Tìm sản phẩm theo tên…" value="${esc(st.pq)}" autocomplete="off">${pm.length?`<div class="cs-drop">${pm.map(p=>`<button data-addp="${esc(p.name)}"><b>${esc(p.name)}</b> <span class="hint">${p.price?nf(p.price)+" đ":""}${p.id?"":" · chưa có mã Poscake"}</span></button>`).join("")}</div>`:""}</div>
+    const left=box("Sản phẩm",`${typeof spcfDonKm==="function"?spcfDonKm():""}<div class="cs-psr"><input id="cd-pq" placeholder="Tìm sản phẩm, combo CSKH theo tên…" value="${esc(st.pq)}" autocomplete="off">${pm.length?`<div class="cs-drop">${pm.map(p=>`<button data-addp="${esc(p.name)}">${p.combo?`<span class="pill p-vio">combo</span> `:p.cskh?`<span class="pill p-grn">CSKH</span> `:""}<b>${esc(p.name)}</b> <span class="hint">${p.price?nf(p.price)+" đ":""}${p.id?"":" · chưa có mã Poscake"}</span></button>`).join("")}</div>`:""}</div>
       ${st.items.length?`<table class="cs-pit"><thead><tr><th>Sản phẩm</th><th class="n">SL</th><th class="n">Đơn giá</th><th class="n">Thành tiền</th><th></th></tr></thead><tbody>${st.items.map((it,i)=>`<tr><td>${esc(it.n)}${it.vid?"":` <span class="pill p-amb">chưa có mã Poscake</span>`}</td><td class="n"><input data-isq="${i}" type="number" min="1" value="${it.q}" style="width:64px;text-align:right"></td><td class="n"><input data-ispr="${i}" inputmode="numeric" value="${nf(it.price)}" style="width:100px;text-align:right"></td><td class="n" data-ist="${i}">${nf(it.q*it.price)}</td><td><button class="lnk" data-isd="${i}" aria-label="Bỏ">✕</button></td></tr>`).join("")}</tbody></table>`:`<div class="cs-pem">Chưa có sản phẩm. Gõ tên vào ô tìm ở trên để thêm.</div>`}
       ${CSK.prods&&CSK.prods.error&&!P.some(p=>p.id)?`<div class="note red" style="margin-top:8px">Chưa lấy được danh mục Poscake (${esc(CSK.prods.error)}). Đơn vẫn lưu trên web nhưng phải lên tay ở Poscake.</div>`:""}`)+
       `<div class="cs-pg2">`+box("Giá trị đơn hàng",`<dl class="cs-kv cs-kvr"><dt>Tiền hàng</dt><dd id="cd-sub">${nf(sub())} đ</dd><dt>Giảm giá</dt><dd><input id="cd-disc" inputmode="numeric" value="${nf(st.disc)}"></dd><dt>Phí vận chuyển</dt><dd><input id="cd-ship" inputmode="numeric" value="${nf(st.ship)}"></dd><dt><b>Tổng số tiền</b></dt><dd><b id="cd-tot">${nf(total())} đ</b></dd></dl>`)+
@@ -339,7 +340,8 @@ function csDonForm(phone){
     $("#cdx").onclick=closeCM;
     // tìm sản phẩm
     const pq=$("#cd-pq");pq.oninput=()=>{keep();st.pq=pq.value;draw();const x=$("#cd-pq");x.focus();x.setSelectionRange(x.value.length,x.value.length)};
-    R.querySelectorAll("[data-addp]").forEach(b=>b.onclick=()=>{keep();const p=prods().find(x=>x.name===b.dataset.addp);const ex=st.items.find(i=>i.n===p.name);if(ex)ex.q++;else st.items.push({n:p.name,vid:p.id,q:1,price:p.price});st.pq="";draw()});
+    R.querySelectorAll("[data-addp]").forEach(b=>b.onclick=()=>{keep();const p=prods().find(x=>x.name===b.dataset.addp);
+      if(p&&p.combo&&typeof spcfDonCombo==="function"){const r=spcfDonCombo(p.combo,(CSK.prods&&CSK.prods.list)||[]);r.items.forEach(it=>{const ex=st.items.find(i=>i.n===it.n&&i.price===it.price);if(ex)ex.q+=it.q;else st.items.push(it)});st.disc+=r.disc;st.pq="";if(r.disc)toast("Đã thêm combo, phần chênh "+nf(r.disc)+" đ cộng vào Giảm giá");draw();return}const ex=st.items.find(i=>i.n===p.name);if(ex)ex.q++;else st.items.push({n:p.name,vid:p.id,q:1,price:p.price});st.pq="";draw()});
     R.querySelectorAll("[data-isq]").forEach(e=>e.oninput=()=>{const it=st.items[+e.dataset.isq];it.q=Math.max(1,+e.value||1);R.querySelector(`[data-ist="${e.dataset.isq}"]`).textContent=nf(it.q*it.price);money()});
     R.querySelectorAll("[data-ispr]").forEach(e=>e.oninput=()=>{const it=st.items[+e.dataset.ispr];it.price=num(e.value);R.querySelector(`[data-ist="${e.dataset.ispr}"]`).textContent=nf(it.q*it.price);money()});
     R.querySelectorAll("[data-isd]").forEach(e=>e.onclick=()=>{keep();st.items.splice(+e.dataset.isd,1);draw()});

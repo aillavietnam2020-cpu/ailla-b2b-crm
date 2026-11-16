@@ -346,10 +346,42 @@ const SPB_BP={ADS:["Ads (chạy quảng cáo)","blu"],CSKH:["CSKH (không chạy
    Ghi ngược lên Pancake chưa làm: chờ chị duyệt riêng. */
 const spbGia=()=>[];
 async function spbPkLoad(){SPCB.pkBusy=1;renderMain();try{SPCB.pk=await spcApi("/pancake-products?channel=FACEBOOK");SPCB.pkErr=""}catch(e){SPCB.pkErr=e.message}SPCB.pkBusy=0;renderMain()}
+/* Danh sách sản phẩm của bộ phận chọn từ Pancake (chị Hoa 16/11): thêm / bỏ ngay trên bảng Pancake; CSKH đặt giá bán CSKH (dùng khi CSKH tạo đơn).
+   Chỉ sửa danh mục trên web (d.fbCat / d.cskhCat); giá trên Pancake giữ nguyên (ghi lên Pancake chờ chị duyệt riêng). */
+/* Mã Pancake trùng nhau (vd nhiều sản phẩm mã "1") thì không so theo mã, chỉ theo mã nội bộ Pancake (pkId). */
+const spbPkUniq=code=>!!code&&(SPCB.pk&&SPCB.pk.rows||[]).filter(r=>spcLow(r.code)===spcLow(code)).length===1;
+const spbPkVar=(id,code)=>{const cu=spbPkUniq(code);for(const p of (typeof spcCat==="function"?spcCat():[]))for(const v of (p.bt||[]))if((id&&v.pkId===id)||(cu&&!v.pkId&&spcLow(v.ma)===spcLow(code)))return {p,v};return null};
+function spbPkEditView(bpv){
+  const P=SPCB.pk,cs=bpv==="CSKH",ed=typeof spcCanEdit==="function"&&spcCanEdit(),fold=typeof kfold==="function"?kfold:spcLow,q=fold(SPCB.pkq||"").trim();
+  const rows=P.rows.filter(r=>!r.hidden).map(r=>({r,lk:spbPkVar(r.id,r.code)})).filter(x=>!q||fold(x.r.code+" "+x.r.name).includes(q)).sort((a,b)=>(b.lk?1:0)-(a.lk?1:0)||a.r.name.localeCompare(b.r.name,"vi"));
+  const nIn=P.rows.filter(r=>spbPkVar(r.id,r.code)).length,lbl=cs?"CSKH":"Ads";
+  return `<section class="card flush"><div class="card-h pad"><h2>Sản phẩm ${lbl} lấy từ Pancake <small class="hint">${nf(nIn)} / ${nf(P.count)} đang trong danh sách</small></h2><button class="btn" data-spbpk="1" ${SPCB.pkBusy?"disabled":""}>${SPCB.pkBusy?"Đang đọc…":"Đọc lại Pancake"}</button></div>
+   <div class="filters pad" style="padding-top:0"><input id="spb-pkq" placeholder="Tìm mã, tên…" value="${esc(SPCB.pkq||"")}" style="max-width:260px">${ed?`<span class="hint">Bấm <b>Thêm</b> để đưa sản phẩm vào danh sách ${lbl}${cs?", sửa ô Giá CSKH là giá hiện khi CSKH tạo đơn":""}. Giá trên Pancake không đổi.</span>`:""}</div>
+   ${tbl(["Mã Pancake","Sản phẩm trên Pancake","Giá Pancake"].concat(cs?["Giá CSKH"]:[],["Danh sách "+lbl]),rows.slice(0,300).map(({r,lk})=>`<tr${lk?"":' style="opacity:.75"'}><td class="mono">${esc(r.code)}</td><td>${esc(r.name)}${r.variant?" · "+esc(r.variant):""}</td><td class="n">${r.price!=null?nf(r.price):"—"}</td>
+     ${cs?`<td class="n">${lk?(ed?`<input class="spb-pkg n" data-pkid="${esc(r.id)}" data-pkcode="${esc(r.code)}" inputmode="numeric" value="${lk.v.gia?Math.round(lk.v.gia):""}" placeholder="${r.price!=null?nf(r.price):"giá"}" style="width:110px">`:(lk.v.gia?nf(lk.v.gia):"—")):""}</td>`:""}
+     <td>${lk?`${pill("đang có","grn")}${ed?` <button class="btn sm" data-pkdel="${esc(r.id)}" data-pkcode="${esc(r.code)}">Bỏ</button>`:""}`:(ed?`<button class="btn sm pri" data-pkadd="${esc(r.id)}">+ Thêm</button>`:"—")}</td></tr>`))}
+   ${rows.length>300?`<p class="hint pad">Hiện 300 / ${nf(rows.length)}. Gõ để thu hẹp.</p>`:""}</section>`;
+}
+function spbPkBind(m){
+  const q=$("#spb-pkq");if(q)q.oninput=()=>{SPCB.pkq=q.value;const p=q.selectionStart;renderMain();const x=$("#spb-pkq");if(x){x.focus();x.setSelectionRange(p,p)}};
+  const row=id=>(SPCB.pk&&SPCB.pk.rows||[]).find(r=>r.id===id);
+  m.querySelectorAll("[data-pkadd]").forEach(b=>b.onclick=()=>{const r=row(b.dataset.pkadd);if(!r||spbPkVar(r.id,r.code))return;const t=Date.now();
+    spcEdit("thêm sản phẩm từ Pancake: "+r.name,c=>{c.sp.push({id:"p"+t,ten:r.name,loai:"run",bt:[{id:"v"+t,ma:spbPkUniq(r.code)?r.code:r.id,dt:"",pl:r.variant||"",on:true,pkId:r.id}]})})});
+  m.querySelectorAll("[data-pkdel]").forEach(b=>b.onclick=()=>{const lk=spbPkVar(b.dataset.pkdel,b.dataset.pkcode);if(!lk)return;const ma=lk.v.ma;
+    const used=(typeof spcCombosAll==="function"?spcCombosAll():[]).some(c=>(c.gom||[]).concat(c.tang||[]).some(x=>x.ma===ma));
+    if(used){toast("Sản phẩm này đang nằm trong combo. Sửa hoặc dừng combo trước rồi mới bỏ.");return}
+    if(!confirm("Bỏ "+lk.p.ten+" khỏi danh sách?"))return;
+    spcEdit("bỏ sản phẩm "+lk.p.ten,c=>{const p=c.sp.find(x=>x.id===lk.p.id);if(!p)return;p.bt=(p.bt||[]).filter(v=>v.id!==lk.v.id);if(!p.bt.length)c.sp=c.sp.filter(x=>x.id!==p.id)})});
+  m.querySelectorAll(".spb-pkg").forEach(x=>{x.onkeydown=e=>{if(e.key==="Enter")x.blur()};x.onchange=()=>{const lk=spbPkVar(x.dataset.pkid,x.dataset.pkcode);if(!lk)return;const v=+String(x.value).replace(/[^0-9]/g,"")||0;
+    spcEdit("giá CSKH "+lk.p.ten,c=>{const p=c.sp.find(y=>y.id===lk.p.id),vv=p&&(p.bt||[]).find(y=>y.id===lk.v.id);if(vv){if(v)vv.gia=v;else delete vv.gia}})}});
+}
 /* bpv: "ADS" (danh mục Ads) | "CSKH" (danh mục CSKH) | null (quản trị: danh mục Ads) */
 function spbPkView(bpv){
   if(typeof SPC!=="undefined")SPC.bpView=bpv||null;
   const P=SPCB.pk;
+  /* Trang vận hành: bảng thêm / bỏ / đặt giá ngay trên danh sách Pancake */
+  if(bpv&&P)return spbPkEditView(bpv);
+  if(bpv&&!P&&!SPCB.pkBusy&&!SPCB.pkErr)setTimeout(()=>{if(!SPCB.pk&&!SPCB.pkBusy)spbPkLoad()},0);
   const head=`<div class="card-h"><h2>Đồng bộ Pancake Facebook <small class="hint">chỉ đọc</small></h2><button class="btn${P?"":" pri"}" data-spbpk="1" ${SPCB.pkBusy?"disabled":""}>${SPCB.pkBusy?"Đang đọc…":P?"Đọc lại":"Đọc từ Pancake"}</button></div>`;
   if(!P)return `<section class="card">${head}<p class="hint">Bấm "Đọc từ Pancake" để so mã và giá sản phẩm trên Pancake với danh mục trên web. Web không sửa gì trên Pancake.${SPCB.pkErr?` <span class="t-red">${esc(SPCB.pkErr)}</span>`:""}</p></section>`;
   const web=(typeof spcCat==="function"?spcCat():[]).flatMap(p=>(p.bt||[]).filter(v=>v.ma).map(v=>({ma:v.ma,ten:p.ten+((v.dt||v.pl)?" ("+[v.dt,v.pl].filter(Boolean).join(" · ")+")":""),on:v.on!==false&&p.loai!=="off"})));
