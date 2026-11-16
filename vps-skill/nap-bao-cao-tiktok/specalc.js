@@ -40,7 +40,7 @@ function speReadOrders(aoa,ky){
   for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const o=ttCell(g(a,"Mã đơn hàng"));if(!o)continue;
     const d=ttIsoDay(ttCell(g(a,"Ngày đặt hàng")));if(!d)continue;if(ky&&d.slice(0,7)!==ky){outside++;continue}
     const q=ttNum(g(a,"Số lượng")),rq=ttNum(g(a,"Số lượng sản phẩm được hoàn trả"));
-    lines.push({o,d,huy:ttCell(g(a,"Trạng Thái Đơn Hàng"))==="Đã hủy"||rq>0,pn:ttCell(g(a,"Tên sản phẩm")),vr:ttCell(g(a,"Tên phân loại hàng")),
+    const st=ttCell(g(a,"Trạng Thái Đơn Hàng"));lines.push({o,d,st,rq,huy:st==="Đã hủy"||rq>0,pn:ttCell(g(a,"Tên sản phẩm")),vr:ttCell(g(a,"Tên phân loại hàng")),
       sv:ttCell(g(a,"SKU phân loại hàng")),sp:ttCell(g(a,"SKU sản phẩm")),q,dt:ttNum(g(a,"Giá gốc"))-ttNum(g(a,"Người bán trợ giá"))})}
   if(!lines.length)return {err:ky?`File đơn không có đơn nào đặt trong tháng ${ky.slice(5)}/${ky.slice(0,4)}.`:"File đơn không có dòng nào đọc được."};
   return {lines,outside};
@@ -143,6 +143,7 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   L.forEach(l=>{
     if(l.huy){hh+=l.dt;return}
     const x=F[l.o],f=(l.qt?x.f.map(v=>v*l.w):rate.map(r=>r*l.dt)).map(ttRound),vou=ttRound(l.qt?x.vou*l.w:rateV*l.dt),dt=l.dt+vou;
+    l.wf=f;l.wdt=dt;/* giữ số từng dòng cho file tính toán (bcfile.js) */
     const k=speKey(l.pn,l.vr),s=sku[k]||(sku[k]={pn:l.pn,vr:l.vr,sv:l.sv,sp:l.sp,q:0,dt:0,vou:0,f:new Array(SPE_NG).fill(0),dtU:0});
     s.q+=l.q;s.dt+=dt;s.vou+=vou;for(let g=0;g<SPE_NG;g++)s.f[g]+=f[g];mon+=l.q;if(!l.qt){s.dtU+=dt;dtUoc+=dt}
     if(x&&x.aff)koc+=dt;okOrd.add(l.o);
@@ -161,7 +162,7 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   return {ky,shop,den,dt,gv,phi,lg:dt+phi-gv,ads:Math.round(adsT),hasAds:!!ads,don:okOrd.size,mon,hh:Math.round(hh),koc:Math.round(koc),
     vou:Math.round(S("vou")),dtUoc:Math.round(dtUoc),dtUocGv:rows.filter(r=>r.uoc).reduce((a,r)=>a+r.dt,0),gvRate,lech,
     fees:SPE_FEE_GROUPS.map((g,i)=>[g[0],rows.reduce((a,r)=>a+r.f[i],0)]),rows,days,adsDays,
-    inc:{...fin.range},n:{lines:L.length,outside:orders.outside,unmatched:L.filter(l=>!l.qt&&!l.huy).length}};
+    L,F,hoanSet:hoan,inc:{...fin.range},n:{lines:L.length,outside:orders.outside,unmatched:L.filter(l=>!l.qt&&!l.huy).length}};
 }
 /* Tóm tắt để lưu: số theo ngày [doanh thu, phí sàn (âm), giá vốn, lãi gộp, đơn, quảng cáo]. */
 function speSummary(M){

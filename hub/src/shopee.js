@@ -60,9 +60,9 @@ async function speFiles(fs){
   SPE.busy="Đang đọc "+fs.length+" file…";SPE.err="";renderMain();
   for(const f of fs){try{
     const sh=await tsbRead(f),kind=speKind(sh);
-    if(kind==="orders")SPE.up.orders=SPE.up.orders.filter(x=>x.name!==f.name).concat([{name:f.name,aoa:speOrderSheet(sh)}]);
-    else if(kind==="fin")SPE.up.fin=SPE.up.fin.filter(x=>x.name!==f.name).concat([{name:f.name,sh,meta:speFinMeta(sh)}]);
-    else if(kind==="ads"){const A=speReadAds(sh.csv);if(A.err)throw new Error(A.err);SPE.up.ads=SPE.up.ads.filter(x=>x.name!==f.name).concat([{name:f.name,A}])}
+    if(kind==="orders")SPE.up.orders=SPE.up.orders.filter(x=>x.name!==f.name).concat([{name:f.name,file:f,aoa:speOrderSheet(sh)}]);
+    else if(kind==="fin")SPE.up.fin=SPE.up.fin.filter(x=>x.name!==f.name).concat([{name:f.name,file:f,sh,meta:speFinMeta(sh)}]);
+    else if(kind==="ads"){const A=speReadAds(sh.csv);if(A.err)throw new Error(A.err);SPE.up.ads=SPE.up.ads.filter(x=>x.name!==f.name).concat([{name:f.name,file:f,A}])}
     else SPE.err=`File "${f.name}" không phải file Shopee cần (đơn hàng, Tài chính › Doanh thu, hoặc lịch sử giao dịch quảng cáo).`;
   }catch(e){SPE.err=e.message}}
   SPE.busy="";await speCompute();
@@ -73,13 +73,13 @@ function spePair(){
   const by={};U.fin.forEach(F=>{(by[F.meta.shop]=by[F.meta.shop]||[]).push(F)});
   return Object.values(by).map(Fs=>{const F=Fs[0],keys=Fs.flatMap(f=>Object.keys(speReadFin(f.sh,null).ord||{}));let best=null,bn=0;
     U.orders.forEach(o=>{o.ids=o.ids||ids(o);const n=keys.filter(k=>o.ids.has(k)).length;if(n>bn){bn=n;best=o}});
-    return {shop:F.meta.shop,F,Fs,O:best,A:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).A||null,adsName:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).name||""}});
+    return {shop:F.meta.shop,F,Fs,O:best,A:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).A||null,adsName:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).name||"",adsFile:(U.ads.find(a=>a.A.shop===F.meta.shop)||{}).file||null}});
 }
 async function speCompute(){
   SPE.prev=null;const U=SPE.up;if(!U.fin.length){renderMain();return}
   SPE.busy="Đang tính số Shopee…";renderMain();await new Promise(r=>setTimeout(r,30));
   const res=[];
-  for(const p of spePair()){const x={shop:p.shop,files:{fin:p.Fs.map(f=>f.name).join(" + "),orders:p.O?p.O.name:"",ads:p.adsName}};
+  for(const p of spePair()){const x={shop:p.shop,files:{fin:p.Fs.map(f=>f.name).join(" + "),orders:p.O?p.O.name:"",ads:p.adsName},raw:[p.O&&p.O.file,...p.Fs.map(f=>f.file),p.adsFile]};
     try{if(!p.shop)throw new Error(`File ${p.F.name}: không đọc được tên shop (dòng Người Bán).`);
       if(!p.O)throw new Error(`Shop ${speShopL(p.shop)}: chưa có file đơn hàng của shop này.`);
       const ky=speGuessKy(p.O.aoa),O=speReadOrders(p.O.aoa,ky);if(O.err)throw new Error(O.err);
@@ -94,6 +94,9 @@ async function speSave(){
   if(!confirm(`Lưu báo cáo Shopee: ${ok.map(x=>`${speShopL(x.shop)} T${x.ky.slice(5)}/${x.ky.slice(0,4)}${x.M.den?" (đến "+x.M.den.split("-").reverse().join("/")+")":""}`).join(", ")}?\n\nTháng đã có bản lưu thì bản mới thay bản cũ.`))return;
   SPE.busy="Đang lưu…";renderMain();const done=[];
   for(const x of ok){try{await speApi(`/month/${x.ky}/${encodeURIComponent(x.shop)}`,{method:"PUT",body:JSON.stringify({data:{rows:speRowsPack(x.M),fees:x.M.fees,n:x.M.n,files:x.files,at:new Date().toISOString(),by:ME.name},summary:speSummary(x.M),files:x.files})});done.push(x)}catch(e){toast(`${speShopL(x.shop)}: ${e.message}`)}}
+  /* Cất file gốc + file tính toán lên Drive (bcfile.js) cho kế toán đối soát; lỗi chỉ báo, số đã lưu vẫn giữ. */
+  for(const x of done){SPE.busy=`Đang lưu file ${speShopL(x.shop)} lên Drive…`;renderMain();let book=null;try{book=speCalcBook(x)}catch(e){toast(`${speShopL(x.shop)}: không tạo được file tính toán (${e.message})`)}
+    const n=await bcSaveSet({ky:x.ky,kenh:"spe",nhom:speShopL(x.shop),raw:x.raw||[],book});if(n)toast(`${speShopL(x.shop)}: đã lưu ${n} file lên Drive`)}
   if(done.length)toast("Đã lưu "+done.map(x=>speShopL(x.shop)).join(", "));
   SPE.prev=null;SPE.up={orders:[],fin:[],ads:[]};SPE.busy="";await speLoad(true);renderMain();
 }
