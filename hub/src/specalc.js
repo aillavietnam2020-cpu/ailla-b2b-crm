@@ -1,7 +1,7 @@
 /* =====================================================================
    BÁO CÁO SHOPEE (2 shop): đọc file xuất từ Shopee và tính số tháng của từng shop (chỉ hàm thuần, không đụng giao diện).
    Quy tắc theo skill ailla-baocao-quantri-shopee (cùng cách với TikTok, chị Hoa chốt 25–27/10/2026):
-   - Một đơn thuộc tháng nó được ĐẶT. Doanh thu = Giá gốc − Người bán trợ giá − Mã ưu đãi người bán chịu
+   - Một đơn thuộc tháng nó được ĐẶT. Doanh thu = Giá gốc × Số lượng − Tổng số tiền người bán trợ giá − Mã ưu đãi người bán chịu
      (mã ưu đãi là giảm trừ doanh thu, không phải phí sàn).
    - Đơn hủy, đơn hoàn (file đơn báo hủy/hoàn, hoặc file Tài chính có Giá sản phẩm + Số tiền hoàn lại = 0): doanh thu 0.
    - Phí sàn 7 nhóm lấy từ file Tài chính (Doanh thu), chia về dòng sản phẩm theo tỷ trọng doanh thu trong đơn;
@@ -41,7 +41,8 @@ function speReadOrders(aoa,ky){
     const d=ttIsoDay(ttCell(g(a,"Ngày đặt hàng")));if(!d)continue;if(ky&&d.slice(0,7)!==ky){outside++;continue}
     const q=ttNum(g(a,"Số lượng")),rq=ttNum(g(a,"Số lượng sản phẩm được hoàn trả"));
     const st=ttCell(g(a,"Trạng Thái Đơn Hàng"));lines.push({o,d,st,rq,huy:st==="Đã hủy",pn:ttCell(g(a,"Tên sản phẩm")),vr:ttCell(g(a,"Tên phân loại hàng")),
-      sv:ttCell(g(a,"SKU phân loại hàng")),sp:ttCell(g(a,"SKU sản phẩm")),q,dt:ttNum(g(a,"Giá gốc"))-ttNum(g(a,"Người bán trợ giá"))})}
+      sv:ttCell(g(a,"SKU phân loại hàng")),sp:ttCell(g(a,"SKU sản phẩm")),q,/* tiền hàng của dòng = Giá gốc × Số lượng − Tổng số tiền được người bán trợ giá (16/11/2026: trước đây quên nhân số lượng, khớp cột "Giá sản phẩm" file Tài chính) */
+      dt:ttNum(g(a,"Giá gốc"))*q-("Tổng số tiền được người bán trợ giá" in I?ttNum(g(a,"Tổng số tiền được người bán trợ giá")):ttNum(g(a,"Người bán trợ giá"))*q)})}
   if(!lines.length)return {err:ky?`File đơn không có đơn nào đặt trong tháng ${ky.slice(5)}/${ky.slice(0,4)}.`:"File đơn không có dòng nào đọc được."};
   return {lines,outside};
 }

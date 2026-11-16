@@ -99,19 +99,19 @@ describe('specalc: đọc file Shopee', () => {
 describe('specalc: số tháng một shop', () => {
   it('mã ưu đãi trừ vào doanh thu, đơn hoàn theo Tài chính bị loại, đơn chưa quyết toán dùng phí bình quân', () => {
     const M = build();
-    // A1: 80.000 + 40.000×2… giá gốc 50.000 − 10.000 trợ giá cho cả dòng = 40.000 → 120.000, mã ưu đãi −10.000 → 110.000
+    // A1: tiền hàng dòng = giá gốc × SL − trợ giá: 100.000 − 20.000 = 80.000; (50.000 − 10.000) × 2 = 80.000 → 160.000 (= Giá sản phẩm Tài chính), mã ưu đãi −10.000 → 150.000
     // A3 hoàn toàn bộ theo Tài chính (160 − 160 = 0) → loại. A4 chưa quyết toán: phí và mã ưu đãi theo tỷ lệ của A1.
-    const rateFee = -32000 / 120000, rateV = -10000 / 120000;
+    const rateFee = -32000 / 160000, rateV = -10000 / 160000;
     expect(M.lech).toBe(1);
     expect(M.don).toBe(2);
-    expect(M.dt).toBe(110000 + Math.round(60000 + 60000 * rateV));
+    expect(M.dt).toBe(150000 + Math.round(60000 + 60000 * rateV));
     // A3 hoàn tiền toàn bộ nhưng Shopee vẫn thu ship −20.000: giữ phần phí đó, không đếm đơn (16/11/2026).
     expect(M.phi).toBe(-32000 - 20000 + Math.round(60000 * rateFee));
     expect(M.hh).toBe(100000 + 100000);
-    expect(M.koc).toBe(110000);
+    expect(M.koc).toBe(150000);
     expect(M.ads).toBe(50000);
     expect(M.den).toBe(null);
-    expect(M.fees.find((f: [string, number]) => f[0] === 'Hoa hồng affiliate')[1]).toBe(-8000 + Math.round(60000 * (-8000 / 120000)));
+    expect(M.fees.find((f: [string, number]) => f[0] === 'Hoa hồng affiliate')[1]).toBe(-8000 + Math.round(60000 * (-8000 / 160000)));
   });
   it('tab Adjustment: chỉ lấy điều chỉnh của đơn trong tháng; hoàn tiền trừ tiền hàng, khoản khác vào phí (16/11/2026)', () => {
     const base = build();
@@ -122,10 +122,10 @@ describe('specalc: số tháng một shop', () => {
     const F = T.speReadFin(fin, '2026-09');
     expect(F.adj).toHaveLength(3);
     const M = T.speBuildMonth({ ky: '2026-09', shop: F.shop, orders: O, fin: F, ads: null, costOf: null });
-    // A1: giá sản phẩm 160.000, hoàn 40.000 → tiền hàng còn 3/4; B9 là đơn tháng khác nên bỏ qua.
-    // A4 chưa quyết toán: mã ưu đãi bình quân tính lại trên tiền hàng A1 mới (90.000 thay vì 120.000).
-    expect(Math.abs(M.dt - (base.dt - 30000 + 60000 * (-10000 / 90000 + 10000 / 120000)))).toBeLessThanOrEqual(2);
-    expect(M.fees.find((f: [string, number]) => f[0] === 'Khoản khác')[1]).toBe(-1000 + Math.round(60000 * (-1000 / 90000))); // A4 chưa quyết toán chịu phí bình quân
+    // A1: giá sản phẩm 160.000, hoàn 40.000 → tiền hàng còn 3/4 (120.000); B9 là đơn tháng khác nên bỏ qua.
+    // A4 chưa quyết toán: mã ưu đãi bình quân tính lại trên tiền hàng A1 mới (120.000 thay vì 160.000).
+    expect(Math.abs(M.dt - (base.dt - 40000 + 60000 * (-10000 / 120000 + 10000 / 160000)))).toBeLessThanOrEqual(2);
+    expect(M.fees.find((f: [string, number]) => f[0] === 'Khoản khác')[1]).toBe(-1000 + Math.round(60000 * (-1000 / 120000))); // A4 chưa quyết toán chịu phí bình quân
     expect(M.don).toBe(base.don);
   });
   it('giá vốn theo mã đã quy đổi; mã thiếu giá KHÔNG ước: giá vốn 0, đánh dấu chưa tính', () => {
@@ -184,16 +184,18 @@ describe('specalc: kỳ đã có báo cáo của mọi shop', () => {
 const DIR = 'F:/QUẢN LÝ NỘI BỘ/BÁO CÁO SHOPEE/';
 const REAL = [`${DIR}Đơn shopee mall tháng 07.2026.xlsx`, `${DIR}Tài chính shopeemall từ 01.7-8.8.2026.xlsx`, `${DIR}aillavn_adwords_bill_2026-08-26.csv`];
 describe.skipIf(!REAL.every((p) => existsSync(p)))('specalc: số thật T07/2026 Shopee Mall', () => {
-  // 16/11/2026 đổi cách tính đơn có hàng trả (tính phần Shopee thực thu theo Tài chính): doanh thu +483đ, phí thêm 241.898đ của đơn có hàng trả, thêm 1 đơn.
-  it('doanh thu 118.855.279 (lệch làm tròn ≤ 5đ), phí sàn 40.169.487, ads 23.339.193, 969 đơn', () => {
+  // 16/11/2026 (đối soát chị Huệ): tiền hàng dòng nhân số lượng (trước quên nhân) và đơn có hàng trả tính phần Shopee thực thu.
+  // Doanh thu 133.360.488 = cột Giá sản phẩm + Hoàn lại + Mã ưu đãi của 972 đơn T07 trong file Tài chính (132.772.530) + 587.953 đơn chưa quyết toán (ước).
+  it('doanh thu 133.360.488 (lệch làm tròn ≤ 5đ), phí sàn 40.148.316, ads 23.339.193, 969 đơn', () => {
     const XLSX = createRequire(import.meta.url)('xlsx');
     const rd = (p: string) => T.ttSheets(XLSX, XLSX.read(readFileSync(p), { type: 'buffer' }));
     const O = T.speReadOrders(T.speOrderSheet(rd(REAL[0])), '2026-07');
     const F = T.speReadFin(rd(REAL[1]), '2026-07');
     const A = T.speReadAds(T.ttCsv(readFileSync(REAL[2], 'utf8')));
     const M = T.speBuildMonth({ ky: '2026-07', shop: F.shop, orders: O, fin: F, ads: A });
-    expect(Math.abs(M.dt - 118855279)).toBeLessThanOrEqual(5);
-    expect(M.phi).toBe(-40169487);
+    expect(Math.abs(M.dt - 133360488)).toBeLessThanOrEqual(5);
+    expect(Math.abs(M.dt - M.dtUoc - 132772530)).toBeLessThanOrEqual(5);
+    expect(M.phi).toBe(-40148316);
     expect(M.ads).toBe(23339193);
     expect(M.don).toBe(969);
     expect(M.mon).toBe(1160);
