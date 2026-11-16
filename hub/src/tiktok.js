@@ -70,8 +70,8 @@ async function tsbAdmFiles(fs){
   for(const f of fs){try{
     const sh=await tsbRead(f),kind=ttKind(sh);
     if(!["orders","income","camp"].includes(kind)){TSB.err=`File "${f.name}" không phải file kế toán cần (${kind?TT_KIND_NAME[kind]+" là file của team TikTok, tải ở trang vận hành":"không nhận ra loại file"}).`;continue}
-    if(kind==="orders"){const a=sh[Object.keys(sh)[0]];TSB.up.orders={name:f.name,aoa:a,ky:ttGuessKy(a)}}
-    else TSB.up[kind]={name:f.name,sh}
+    if(kind==="orders"){const a=sh[Object.keys(sh)[0]];TSB.up.orders={name:f.name,file:f,aoa:a,ky:ttGuessKy(a)}}
+    else TSB.up[kind]={name:f.name,file:f,sh}
   }catch(e){TSB.err=e.message}}
   if(TSB.up.orders&&!TSB.up.ky)TSB.up.ky=TSB.up.orders.ky;
   TSB.busy="";await tsbAdmCompute();
@@ -86,7 +86,7 @@ async function tsbAdmCompute(){
     const sh=U.camp.sh,camp=ttReadCampaign(sh[Object.keys(sh)[0]]);if(camp.err)throw new Error(camp.err);
     const M=ttBuildMonth({ky,orders:o,income:inc,camp});if(M.err)throw new Error(M.err);
     const P=ttPL(M,await tsbCostOf(ky),tsbExtra(ky));
-    TSB.prev={ky,M,P,files:{orders:U.orders.name,income:U.income.name,camp:U.camp.name},campDays:camp.days};
+    TSB.prev={ky,M,P,files:{orders:U.orders.name,income:U.income.name,camp:U.camp.name},campDays:camp.days,raw:[U.orders.file,U.income.file,U.camp.file]};
     SUB.bc_tiktok="pl";
   }catch(e){TSB.err=e.message}
   TSB.busy="";renderMain();
@@ -102,6 +102,9 @@ async function tsbSavePrev(){
     const data={ky:V.ky,M:V.M,pl:ttPackPL(V.P),todo:ttTodo(V.P),files:V.files,at:new Date().toISOString(),by:ME.name};
     await tsbApi("/month/"+V.ky,{method:"PUT",body:JSON.stringify({data,summary:ttSummary(V.P),files:V.files})});
     if(V.campDays){const ad={};Object.entries(V.campDays).forEach(([d,x])=>{if(d.slice(0,7)===V.ky)ad[d]=x});if(Object.keys(ad).length)await tsbApi("/days",{method:"PUT",body:JSON.stringify({src:"ads",days:ad,file:V.files.camp})})}
+    /* Cất file gốc + file tính toán lên Drive (bcfile.js), cùng cấu trúc Shopee: tháng › TikTok Shop › 1. File gốc | 2. File tính toán. */
+    if(typeof bcSaveSet==="function"){TSB.busy="Đang lưu file lên Drive…";renderMain();let book=null;try{book=ttCalcBook(V)}catch(e){toast("Không tạo được file tính toán TikTok ("+e.message+")")}
+      const n=await bcSaveSet({ky:V.ky,kenh:"tts",nhom:"TikTok Shop",raw:V.raw||[],book});if(n)toast("TikTok: đã lưu "+n+" file lên Drive")}
     toast("Đã lưu báo cáo "+tsbKyL(V.ky));TSB.ky=V.ky;delete TSB.data[V.ky];TSB.prev=null;TSB.up={};
     await Promise.all([tsbLoadMonths(true),tsbLoadMonth(V.ky),tsbLoadAll(true)]);
   }catch(e){toast(e.message)}

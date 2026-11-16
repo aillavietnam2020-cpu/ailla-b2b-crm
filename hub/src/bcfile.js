@@ -88,3 +88,42 @@ function speCalcBook(x){
   XLSX.utils.book_append_sheet(wb,sh(cach,[120]),"Cach tinh");
   return {name:`Shopee ${speShopL(M.shop)} ${M.ky} tinh toan (${bcStamp()}).xlsx`,data:XLSX.write(wb,{type:"base64",bookType:"xlsx"})};
 }
+
+/* ---------- File tính toán TikTok (cùng cấu trúc Shopee): mỗi đơn một dòng, cộng lại ra đúng số web ---------- */
+function ttCalcBook(V){
+  const M=V.M,P=V.P,L=M._L||[],F=M._F||{},G=TT_FEE_GROUPS.map(g=>g[0]),NG=G.length,vn=d=>d?d.split("-").reverse().join("/"):"";
+  const O={};L.forEach(l=>{(O[l.o]=O[l.o]||{d:l.d,lines:[]}).lines.push(l)});
+  const head=["Mã đơn","Ngày tạo","Sản phẩm (tên – phân loại × SL)","Trạng thái file đơn","Có trong Tài chính","Web tính","Lý do","Doanh thu web",...G.map(g=>g+" (web)"),"Cộng phí web","TC: Tổng doanh thu","TC: Tổng phí"];
+  const rows=[],T=new Array(head.length).fill(0);
+  Object.entries(O).sort((a,b)=>a[1].d.localeCompare(b[1].d)||a[0].localeCompare(b[0])).forEach(([id,o])=>{
+    const f=F[id],ls=o.lines,ok=ls.filter(l=>l.wf);let tinh,why="";
+    if(!ok.length){tinh="Không";why=f?"":ls.every(l=>l.huy)?"Đơn hủy, chưa có trong Tài chính":"Chưa về tiền (chưa có trong Tài chính): theo dõi sang kỳ sau"}
+    else if(ok.every(l=>l.full)){tinh="Chỉ phí";why="Tổng doanh thu Tài chính = 0 (hủy/hoàn hết): chỉ tính phí sàn vẫn thu"}
+    else{tinh="Có";why=!f?"Chưa có trong Tài chính: phí ước theo tỷ lệ trung bình (báo cáo giữa tháng)":ls.some(l=>l.rq>0)?"Có hàng trả: tiền theo Tài chính, trừ số lượng trả khỏi giá vốn":""}
+    const wf=new Array(NG).fill(0);let wdt=0;ok.forEach(l=>{wdt+=l.dt;l.wf.forEach((v,i)=>wf[i]+=v)});
+    const row=[id,vn(o.d),ls.map(l=>`${l.pn}${l.vr?" – "+l.vr:""} × ${l.q}${l.rq?" (trả "+l.rq+")":""}`).join("; "),[...new Set(ls.map(l=>l.st))].join(", "),f?"Có":"Không",tinh,why,Math.round(wdt),...wf,wf.reduce((a,b)=>a+b,0),f?Math.round(f.dt||0):0,f?Math.round(f[NG]):0];
+    row.forEach((v,i)=>{if(i>=7&&typeof v==="number")T[i]+=v});rows.push(row)});
+  let tcDt=0,tcPhi=0,tcN=0;Object.values(F).forEach(f=>{tcDt+=f.dt||0;tcPhi+=f[NG];tcN++});
+  const sum=k=>T[head.indexOf(k)];
+  const tong=[["TikTok Shop · tháng "+M.ky.slice(5)+"/"+M.ky.slice(0,4)+" · file tính toán web ABOS, tạo "+bcStamp()],
+    ["Tài chính từ "+vn(M.inc&&M.inc.from)+" đến "+vn(M.inc&&M.inc.to)+" · file: "+[V.files.orders,V.files.income,V.files.camp].filter(Boolean).join(" | ")],[],
+    ["Khoản","Số trên web","Cộng lại từ trang Từng đơn","Lệch (làm tròn)","Cả file Tài chính (đơn tạo trong tháng)","Kế toán (nhập để so)","Web − Kế toán"],
+    ["Số đơn",P.don,rows.filter(r=>r[5]==="Có").length,P.don-rows.filter(r=>r[5]==="Có").length,tcN,"",""],
+    ["Doanh thu (Tổng doanh thu Tài chính)",P.dt,sum("Doanh thu web"),P.dt-sum("Doanh thu web"),Math.round(tcDt),"",""],
+    ...P.fees.map((x,i)=>[x[0],Math.round(x[1]),sum(G[i]+" (web)"),Math.round(x[1])-sum(G[i]+" (web)"),"","",""]),
+    ["Cộng phí sàn",Math.round(P.phi),sum("Cộng phí web"),Math.round(P.phi)-sum("Cộng phí web"),Math.round(tcPhi),"",""],
+    ["Giá vốn",P.gv,"","","","",""],["Quảng cáo (chi tiêu + VAT 10%)",P.ads,"","","","",""]];
+  for(let r=4;r<tong.length;r++){const R=r+1;if(tong[r][0]==="Giá vốn"||tong[r][0].startsWith("Quảng cáo"))continue;tong[r][6]={f:`IF(F${R}="","",B${R}-F${R})`}}
+  const cach=[["Cách web tính số TikTok (cách chị Huệ, chị Hoa duyệt 16/11/2026)"],[],
+    ["1. Chỉ lấy đơn TẠO trong tháng. File đơn chỉ dùng mã SKU, trạng thái, số lượng; tiền và phí lấy từ file Tài chính (tab Chi tiết đơn hàng) theo mã đơn."],
+    ["2. Doanh thu = cột \"Tổng doanh thu\" (đã trừ hoàn tiền). Phí = cột \"Tổng phí\" (đã gồm thuế giữ hộ), chia nhóm theo từng cột phí; phần dư vào \"Phí khác\"."],
+    ["3. Đơn file đơn ghi hủy/hoàn nhưng có trong Tài chính: vẫn tính đúng số Tài chính. Tổng doanh thu = 0 thì chỉ tính phí, không đếm đơn."],
+    ["4. Đơn chưa có trong Tài chính: báo cáo đủ tháng thì không tính (theo dõi kỳ sau); báo cáo giữa tháng thì ước phí theo tỷ lệ bình quân."],
+    ["5. Có hàng trả và Tài chính đã trừ tiền: giá vốn tính trên số lượng bán − số lượng trả. Quảng cáo = chi tiêu Campaign + VAT 10%."]];
+  const wb=XLSX.utils.book_new(),sh=(aoa,w)=>{const s=XLSX.utils.aoa_to_sheet(aoa);if(w)s["!cols"]=w.map(x=>({wch:x}));return s};
+  XLSX.utils.book_append_sheet(wb,sh(tong,[40,16,22,14,26,18,16]),"Tong");
+  XLSX.utils.book_append_sheet(wb,sh([head,...rows,["Cộng","","","","","","",...T.slice(7)]],[22,11,50,16,9,9,40]),"Tung don");
+  XLSX.utils.book_append_sheet(wb,sh([head,...rows.filter(r=>r[5]!=="Có"||r[6])],[22,11,50,16,9,9,40]),"Don bi loai - uoc");
+  XLSX.utils.book_append_sheet(wb,sh(cach,[120]),"Cach tinh");
+  return {name:`TikTok Shop ${M.ky} tinh toan (${bcStamp()}).xlsx`,data:XLSX.write(wb,{type:"base64",bookType:"xlsx"})};
+}
