@@ -314,6 +314,8 @@ function spcfDonKm(st){const t=spcfToday(),L=spcfList("kmCat").filter(k=>k.bp===
    ${hit.length?`<div style="margin-top:6px">${hit.map(h=>done[h.k.id]?`<span class="pill p-grn">đã áp ${esc(h.k.ten)} −${nf(h.giam)} đ</span>`:`<button class="btn sm pri" data-kmap="${esc(h.k.id)}" data-kmg="${h.giam}">Áp ${esc(h.k.ten)} −${nf(h.giam)} đ</button>`).join(" ")}</div>`:""}
    ${L.some(k=>k.t==="vc")?`<div class="filters" style="margin-top:6px"><input id="cd-vc" placeholder="Mã voucher khách đưa" value="${esc((st&&st.voucher)||"")}" style="max-width:200px"></div>`:""}</div>`}
 
+/* Sản phẩm, combo, khuyến mãi không theo kỳ: ẩn ô chọn tháng (chị Hoa 16/11) */
+window.NO_PP=window.NO_PP||new Set();["sp_cfg","sp_cb","sp_km","dg_sp","kd_combo"].forEach(k=>NO_PP.add(k));
 PAGES.sp_cfg=pSpcfSp;PAGES.sp_cb=pSpcfCb;PAGES.sp_km=pSpcfKm;
 /* Trang cũ dồn về đây */
 PAGES.dg_sp=m=>{SPCF.ch="ads";pSpcfSp(m)};

@@ -89,3 +89,32 @@ export function searchIdx(files: IdxFile[], q: string, limit = 60): IdxFile[] {
   }
   return out.sort((a, b) => (b.m ?? '').localeCompare(a.m ?? '')).slice(0, limit);
 }
+
+/**
+ * Sửa mục lục sau khi chuyển một file hoặc một thư mục con cấp 1 trên Drive (không phải quét lại cả thư mục).
+ * `toSub` = '' là chuyển vào thư mục gốc của phòng đích, khác '' là vào thư mục con cấp 1 tên đó.
+ * src và dst có thể là cùng một mục lục (chuyển trong cùng phòng). Không thấy file / thư mục thì trả null.
+ */
+export function moveInIdx(src: TeamIdx, dst: TeamIdx, id: string, toSub: string): { src: TeamIdx; dst: TeamIdx } | null {
+  const same = src === dst || src.pb === dst.pb;
+  const s: TeamIdx = { ...src, files: [...src.files], subs: [...src.subs] };
+  const d: TeamIdx = same ? s : { ...dst, files: [...dst.files], subs: [...dst.subs] };
+  const fi = s.files.findIndex((f) => f.i === id);
+  const si = s.subs.findIndex((x) => x.id === id);
+  if (fi >= 0) {
+    const [f] = s.files.splice(fi, 1);
+    d.files.push({ ...f, s: toSub, w: toSub });
+  } else if (si >= 0) {
+    const [sub] = s.subs.splice(si, 1);
+    const moved = s.files.filter((f) => f.s === sub.n);
+    s.files = s.files.filter((f) => f.s !== sub.n);
+    if (toSub) d.files.push(...moved.map((f) => ({ ...f, s: toSub, w: `${toSub} › ${f.w}` })));
+    else {
+      d.files.push(...moved);
+      d.subs.push({ id: sub.id, n: sub.n, c: 0, last: null });
+    }
+  } else return null;
+  s.subs = countSubs(s.subs, s.files);
+  if (!same) d.subs = countSubs(d.subs, d.files);
+  return { src: s, dst: d };
+}

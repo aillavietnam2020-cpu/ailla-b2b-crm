@@ -85,6 +85,18 @@ export async function loadIdx(db: D1Database, pb: string): Promise<TeamIdx | nul
   return v;
 }
 
+/** Lưu mục lục đã sửa (sau khi chuyển file). */
+export async function saveIdx(db: D1Database, idx: TeamIdx) {
+  await db
+    .prepare(
+      `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 1, ?, NULL)
+       ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+    )
+    .bind(KEY(idx.pb), await pack(JSON.stringify(idx)), nowIso())
+    .run();
+  MEM.set(idx.pb, { at: Date.now(), v: idx });
+}
+
 /** Quét lại một thư mục và lưu. Đang quét thì thôi (trả null). */
 export async function refreshIdx(db: D1Database, saJson: string | undefined, cfg: DriveConfig, pb: string): Promise<TeamIdx | null> {
   const key = saKey(saJson);
