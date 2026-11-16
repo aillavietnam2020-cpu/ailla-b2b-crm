@@ -38,6 +38,7 @@ import {
   getSetting,
   loadSettings,
   loadVariations,
+  loadPosCombos,
   posStatuses,
   POS_STATUS,
   putSetting,
@@ -436,6 +437,12 @@ cskhRoutes.post('/log/:phone', async (c) => {
 cskhRoutes.get('/products', async (c) => {
   await who(c);
   return ok(c, await loadVariations(c.env.DB, c.env.INGEST_KEY, httpFetch, c.req.query('force') === '1'));
+});
+
+/** Combo Poscake để chọn khi tạo đơn (chị Hoa 16/11). */
+cskhRoutes.get('/combos', async (c) => {
+  await who(c);
+  return ok(c, await loadPosCombos(c.env.DB, c.env.INGEST_KEY, httpFetch, c.req.query('force') === '1'));
 });
 
 cskhRoutes.get('/orders', async (c) => {

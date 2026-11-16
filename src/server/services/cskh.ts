@@ -385,6 +385,62 @@ export async function posStatuses(db: D1Database, secret: string | undefined, fe
 }
 
 /* ------------------------------------------------------------------ sản phẩm để lên đơn */
+/** Combo đang bật trên Poscake (chị Hoa 16/11: tạo đơn chọn combo như Poscake, ra sản phẩm trong combo và giá). Lưu 1 ngày.
+ * value: giá trị combo (combo theo giá trị); off / pct: giảm tiền / giảm % (combo theo mức giảm). Sản phẩm trong combo ghi theo tên để khớp danh mục mẫu mã. */
+export interface CskhCombo {
+  id: string;
+  name: string;
+  value: number | null;
+  off: number;
+  pct: number;
+  freeShip: boolean;
+  items: Array<{ name: string; qty: number }>;
+}
+export async function loadPosCombos(db: D1Database, secret: string | undefined, fetchFn: FetchFn, force = false): Promise<{ list: CskhCombo[]; at: string; error?: string }> {
+  const cached = await getSetting<{ list: CskhCombo[]; at: string }>(db, 'pos_combos');
+  if (cached && !force && Date.now() - Date.parse(cached.at) < 86_400_000) return cached;
+  try {
+    const { shop, key } = await openFacebook(db, secret);
+    const base = `${API}/shops/${encodeURIComponent(shop)}`;
+    const q = `api_key=${encodeURIComponent(key)}`;
+    const raw: Array<Record<string, unknown>> = [];
+    for (let page = 1; page <= 10; page++) {
+      const r = await fetchFn(`${base}/combo_products?${q}&page_size=100&page=${page}`);
+      if (!r.ok) throw new Error(`Poscake trả lỗi ${r.status}`);
+      const j = JSON.parse(await r.text()) as { data?: Array<Record<string, unknown>>; total_pages?: number };
+      raw.push(...(j.data ?? []));
+      if (!j.data?.length || page >= (j.total_pages ?? 1)) break;
+    }
+    const now = Date.now();
+    const list: CskhCombo[] = [];
+    for (const x of raw) {
+      if (x.is_activated === false || (x.end_time && Date.parse(String(x.end_time)) < now)) continue;
+      const id = String(x.id ?? '');
+      let items: CskhCombo['items'] = [];
+      const r = await fetchFn(`${base}/combo_products/${encodeURIComponent(id)}/variations?${q}&combo_product_id=${encodeURIComponent(id)}`);
+      if (r.ok) {
+        const j = JSON.parse(await r.text()) as { data?: Array<Record<string, unknown>> };
+        items = (j.data ?? []).map((v) => ({ name: String(((v.product ?? v.variation ?? {}) as Record<string, unknown>).name ?? '').trim(), qty: Number(v.count) || 1 })).filter((i) => i.name);
+      }
+      if (!items.length) continue;
+      list.push({
+        id,
+        name: String(x.name ?? '').trim(),
+        value: x.is_value_combo ? Number(x.value_combo) || 0 : null,
+        off: x.is_value_combo || x.is_use_percent ? 0 : Number(x.discount_amount) || 0,
+        pct: !x.is_value_combo && x.is_use_percent ? Number(x.discount_by_percent) || 0 : 0,
+        freeShip: x.is_free_shipping === true,
+        items,
+      });
+    }
+    const out = { list: list.sort((a, b) => a.name.localeCompare(b.name, 'vi')), at: nowIso() };
+    await putSetting(db, 'pos_combos', out);
+    return out;
+  } catch (e) {
+    return { list: cached?.list ?? [], at: cached?.at ?? '', error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export interface CskhVariation {
   id: string;
   name: string;
