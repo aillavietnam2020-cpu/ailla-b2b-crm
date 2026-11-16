@@ -8,7 +8,7 @@
    - Tài liệu chuẩn (quy trình, biểu mẫu) để ở Thư viện tài liệu của khu Đào tạo; trang này chỉ cho file làm hằng ngày.
    - Nhãn trên màn hình theo vai trò, không ghi tên người (chị Hoa 02/11).
    ===================================================================== */
-const TM={teams:null,err:"",pb:"",folder:"",busy:false,q:"",find:null,findKey:"",tab:"thumuc",sub:"",inq:"",kf:"",mv:null,mto:null,mq:"",mvBusy:false,file:null,fl:{},ov:null,ovErr:"",tt:"",cfg:null,cfgErr:"",saving:false,sync:null};
+const TM={teams:null,err:"",pb:"",folder:"",busy:false,q:"",find:null,findKey:"",tab:"thumuc",sub:"",inq:"",kf:"",menu:"",mv:null,mto:null,mq:"",mvBusy:false,file:null,fl:{},ov:null,ovErr:"",tt:"",cfg:null,cfgErr:"",saving:false,sync:null};
 ICONS.folder='<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>';
 const TM_KIND={sheet:["Bảng tính","XLS","grn"],doc:["Tài liệu","DOC","blu"],slide:["Trình chiếu","PPT","amb"],pdf:["PDF","PDF","gry"],vid:["Video","MP4","pnk"],img:["Ảnh","IMG","amb"],link:["Lối tắt","↗","gry"],other:["Khác","FILE","gry"]};
 const tmOn=()=>typeof PAGE!=="undefined"&&(PAGE==="thumuc"||PAGE==="thumuc_gan"||PAGE==="cv_pb");
@@ -110,7 +110,13 @@ const tmCss=`<style>
   .tm-t tr.fold td{background:var(--gray-soft)}.tm-t tr.fold:hover td{background:var(--violet-soft)}
   .tm-ffi{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--violet-soft);color:var(--violet);position:relative}.tm-ffi .gd-fsvg{width:14px;height:14px}
   .tm-ffi i{position:absolute;left:-1px;top:4px;bottom:4px;width:3px;border-radius:2px}
-  .tm-mvb{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;color:inherit;font-weight:600;font-family:inherit}.tm-mvb:hover{border-color:var(--violet);color:var(--violet)}
+  .tm-t td:nth-last-child(-n+2){overflow:visible;text-overflow:clip}.tm-t td:last-child{position:relative;padding:0 8px 0 0}
+  .tm-xem{color:var(--blue);font-weight:600;font-size:12.5px;text-decoration:none;margin-right:4px;white-space:nowrap}.tm-xem:hover{text-decoration:underline}
+  .tm-dots{width:30px;height:28px;border-radius:8px;border:1px solid transparent;background:none;cursor:pointer;font-size:17px;line-height:1;color:var(--muted);font-family:inherit}.tm-dots:hover,.tm-dots.on{background:var(--gray-soft);border-color:var(--line);color:var(--ink)}
+  .tm-mbk{position:fixed;inset:0;z-index:250}
+  .tm-menu{position:absolute;right:8px;top:38px;z-index:260;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:5px;min-width:170px}
+  .tm-menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 11px;border-radius:8px;font-size:13.5px;cursor:pointer;color:inherit;font-family:inherit}.tm-menu .tm-mi{display:block;padding:8px 11px;border-radius:8px;font-size:13.5px;color:inherit;text-decoration:none}.tm-menu button:hover,.tm-menu .tm-mi:hover{background:var(--gray-soft)}
+  .tm-mvb{white-space:nowrap;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;color:inherit;font-weight:600;font-family:inherit}.tm-mvb:hover{border-color:var(--violet);color:var(--violet)}
   .tm-kf{display:flex;gap:4px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
   .tm-kf button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer;color:inherit;font-family:inherit}
   .tm-kf button small{color:var(--muted);margin-left:4px;font-variant-numeric:tabular-nums}.tm-kf button.on{background:var(--violet);border-color:var(--violet);color:#fff}.tm-kf button.on small{color:#fff}
@@ -197,11 +203,24 @@ const tmCanMove=pb=>{const t=tmTeam(pb);return !!(t&&t.edit&&!t.direct)};
 function tmRows(L,q,subs,pb){
   subs=subs||[];
   if(!L.length&&!subs.length)return `<div class="tm-empty">Không có file nào${q?" khớp":""}.</div>`;
-  const mv=x=>`<button class="tm-mvb" ${x}>Chuyển</button>`;
-  return `<div class="tm-tw"><table class="tm-t"><colgroup><col style="width:38%"><col style="width:24%"><col style="width:12%"><col style="width:15%"><col style="width:44px"><col style="width:78px"></colgroup>
+  return `<div class="tm-tw"><table class="tm-t"><colgroup><col style="width:38%"><col style="width:24%"><col style="width:12%"><col style="width:15%"><col style="width:92px"><col style="width:46px"></colgroup>
   <thead><tr><th>Tên</th><th>Nằm ở đâu</th><th>Sửa lúc</th><th>Người sửa</th><th></th><th></th></tr></thead><tbody>
-  ${subs.map(s=>`<tr class="fold" data-tmsub="${esc(s.n)}" title="${esc(s.n)}"><td><div class="tm-fn"><span class="tm-ffi"><i style="background:${tmSubCol(pb,s.n)}"></i>${tmFolderSvg}</span><div class="tx"><b>${esc(s.n)}</b><small>Thư mục · ${s.c} file</small></div></div></td><td class="hint">—</td><td>${tmTime(s.last)}</td><td class="hint">—</td><td class="hint">›</td><td>${tmCanMove(pb)&&s.id?mv(`data-tmmv="${esc(s.id)}" data-tmmvpb="${esc(pb)}" data-tmmvn="${esc(s.n)}" data-tmmvf="1"`):""}</td></tr>`).join("")}
-  ${L.map(f=>`<tr data-tmfile="${esc(f.id)}" title="${esc(f.name)}"><td><div class="tm-fn">${tmIc(f.kind)}<div class="tx"><b>${tmHl(f.name,q)}</b><small>${esc((TM_KIND[f.kind]||TM_KIND.other)[0])}${f.size?" · "+tmSize(f.size):""}</small></div></div></td><td>${tmLoc(f)}</td><td>${tmTime(f.modified)}</td><td>${esc(f.by||"—")}</td><td>${tmDl(f)}</td><td>${tmCanMove(f.pb)?mv(`data-tmmv="${esc(f.id)}" data-tmmvpb="${esc(f.pb)}" data-tmmvn="${esc(f.name)}" data-tmmvs="${esc(f.sub||"")}"`):""}</td></tr>`).join("")}</tbody></table></div>`;
+  ${subs.map(s=>`<tr class="fold" data-tmsub="${esc(s.n)}" title="${esc(s.n)}"><td><div class="tm-fn"><span class="tm-ffi"><i style="background:${tmSubCol(pb,s.n)}"></i>${tmFolderSvg}</span><div class="tx"><b>${esc(s.n)}</b><small>Thư mục · ${s.c} file</small></div></div></td><td class="hint">—</td><td>${tmTime(s.last)}</td><td class="hint">—</td><td class="hint">›</td><td>${tmCanMove(pb)&&s.id?tmDots({id:s.id,pb,name:s.n,sub:"",folder:1,c:s.c}):""}</td></tr>`).join("")}
+  ${L.map(f=>`<tr data-tmfile="${esc(f.id)}" title="${esc(f.name)}"><td><div class="tm-fn">${tmIc(f.kind)}<div class="tx"><b>${tmHl(f.name,q)}</b><small>${esc((TM_KIND[f.kind]||TM_KIND.other)[0])}${f.size?" · "+tmSize(f.size):""}</small></div></div></td><td>${tmLoc(f)}</td><td>${tmTime(f.modified)}</td><td>${esc(f.by||"—")}</td><td><a class="tm-xem" href="${esc(f.link)}" target="_blank" rel="noopener" title="Mở trên Google Drive">Xem ↗</a>${tmDl(f)}</td><td>${tmCanMove(f.pb)?tmDots({id:f.id,pb:f.pb,name:f.name,sub:f.sub||"",copy:!f.dl&&f.kind!=="link"?TM_COPY[f.kind]:""}):""}</td></tr>`).join("")}</tbody></table></div>`;
+}
+/* Nút ⋯ cuối dòng: Chuyển · Tạo bản sao. Không có Xóa: Google không cho tài khoản của web xóa file người khác tạo (chị Hoa chọn bỏ, 16/11).
+   Tạo bản sao chỉ cho Google Tài liệu / Trang tính / Trình chiếu: mở trang "Tạo bản sao" của Google, làm bằng tài khoản người bấm. */
+const TM_COPY={doc:"document",sheet:"spreadsheets",slide:"presentation"};
+function tmDots(o){
+  const a=`data-tmmv="${esc(o.id)}" data-tmmvpb="${esc(o.pb)}" data-tmmvn="${esc(o.name)}" data-tmmvs="${esc(o.sub)}"${o.folder?' data-tmmvf="1"':""}`;
+  const open=TM.menu===o.id;
+  return `<button class="tm-dots${open?" on":""}" data-tmdots="${esc(o.id)}" aria-label="Thao tác với ${esc(o.name)}" aria-expanded="${open}">⋯</button>${open?`<div class="tm-mbk" data-tmmbk="1"></div><div class="tm-menu" role="menu">
+   <button role="menuitem" ${a}>Chuyển sang thư mục khác</button>${o.copy?`<a role="menuitem" class="tm-mi" href="https://docs.google.com/${o.copy}/d/${encodeURIComponent(o.id)}/copy" target="_blank" rel="noopener" data-tmmbk="1">Tạo bản sao ↗</a>`:""}</div>`:""}`;
+}
+async function tmAct(path,body,okMsg,pb){
+  TM.menu="";
+  try{const r=await svApi("/api/drive/"+path,{method:"POST",body:JSON.stringify(body)});toast(okMsg);delete TM.fl[pb];tmOv(true);return r}
+  catch(e){toast(e.message||"Không làm được");renderMain()}
 }
 /* Lọc theo loại: Thư mục · Ảnh · Video · Tài liệu · Trang tính · PDF… (đứng ở gốc thì lọc cả file trong các thư mục con) */
 const TM_KF=[["img","Ảnh"],["vid","Video"],["doc","Tài liệu"],["sheet","Trang tính"],["slide","Trình chiếu"],["pdf","PDF"],["link","Lối tắt"],["other","Khác"]];
@@ -220,7 +239,7 @@ function tmFolderView(){
   return tmDeptStrip()+`<div class="tm-crumbs"><span class="tm-cr" data-tmhome="1">‹ Tất cả thư mục</span><span class="tm-cr${cur?"":" cur"}" data-tmsub="">${esc(t.name)}</span>${cur?`<span class="tm-cr cur">${esc(cur)}</span>`:""}</div>
   <div class="tm-hd"><div><h2>${esc(cur||t.name)}</h2><p>${n==null?"Đang đếm file":n.toLocaleString("vi-VN")+" file"}${cur?" · trong "+esc(t.name):" · "+subs.length+" thư mục con"}${R.at?" · cập nhật "+tmTime(R.at):""}${R.edit===false?" · chỉ xem":""}</p></div>
    <div class="act">${root?`<a class="btn sm" href="https://drive.google.com/drive/folders/${esc(root.folder_id)}" target="_blank" rel="noopener">Mở trên Drive ↗</a>`:""}<button class="btn sm" id="tm-re">Tải lại</button></div></div>
-  <div class="tm-box"><div class="tm-tbar"><label class="tm-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICONS.search}</svg><input id="tm-inq" placeholder="Tìm tên file, người sửa trong thư mục này (không cần dấu)" value="${esc(TM.inq||"")}" aria-label="Tìm trong thư mục"></label></div>
+  <div class="tm-box"><div class="tm-tbar"><label class="tm-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICONS.search}</svg><input id="tm-inq" placeholder="Tìm tên file, người sửa trong thư mục này (không cần dấu)" value="${esc(TM.inq||"")}" aria-label="Tìm trong thư mục"></label>${!cur&&tmCanMove(TM.pb)?`<span style="flex:1"></span><button class="btn sm" id="tm-newf">＋ Thư mục mới</button>`:""}</div>
   ${R.loading?`<div class="tm-empty">Đang mở thư mục… (lần đầu web đếm file có thể mất vài chục giây)</div>`:R.err?`<div class="note red" style="margin:12px">${esc(R.err)}</div>`:(()=>{
     /* Ở gốc, không tìm, không lọc: thư mục con + file nằm ngay gốc. Lọc theo loại: file loại đó trong cả phạm vi đang xem. */
     const sb=!cur&&!TM.inq?subs:[];
@@ -343,14 +362,17 @@ function tmBind(m){
   m.querySelectorAll("[data-tmt]").forEach(b=>b.onclick=()=>{TM.tab=b.dataset.tmt;TM.file=null;if(TM.tab==="thumuc"){TM.pb="";TM.sub=""}go()});
   m.querySelectorAll("[data-tmpb]").forEach(b=>b.onclick=()=>{TM.tab="thumuc";TM.pb=b.dataset.tmpb;TM.sub=b.dataset.tmsubgo||"";TM.inq="";TM.kf="";TM.file=null;go()});
   m.querySelectorAll("[data-tmhome]").forEach(b=>b.onclick=()=>{TM.pb="";TM.sub="";TM.file=null;TM.inq="";TM.kf="";go()});
-  m.querySelectorAll("[data-tmsub]").forEach(b=>b.onclick=e=>{if(e.target.closest("[data-tmmv]"))return;TM.sub=b.dataset.tmsub;TM.kf="";TM.file=null;renderMain()});
+  m.querySelectorAll("[data-tmsub]").forEach(b=>b.onclick=e=>{if(e.target.closest("[data-tmmv],[data-tmdots],.tm-menu,.tm-mbk"))return;TM.sub=b.dataset.tmsub;TM.kf="";TM.file=null;renderMain()});
   m.querySelectorAll("[data-tmkf]").forEach(b=>b.onclick=()=>{TM.kf=b.dataset.tmkf;renderMain()});
-  m.querySelectorAll("[data-tmmv]").forEach(b=>b.onclick=e=>{e.stopPropagation();const d=b.dataset;TM.mv={id:d.tmmv,pb:d.tmmvpb,name:d.tmmvn,sub:d.tmmvs||"",folder:!!d.tmmvf};TM.mto=null;TM.mq="";renderMain();const i=document.querySelector("#tm-mq");if(i)i.focus()});
+  m.querySelectorAll("[data-tmmv]").forEach(b=>b.onclick=e=>{e.stopPropagation();const d=b.dataset;TM.mv={id:d.tmmv,pb:d.tmmvpb,name:d.tmmvn,sub:d.tmmvs||"",folder:!!d.tmmvf};TM.menu="";TM.mto=null;TM.mq="";renderMain();const i=document.querySelector("#tm-mq");if(i)i.focus()});
   m.querySelectorAll("[data-tmto]").forEach(b=>b.onclick=()=>{TM.mto={pb:b.dataset.tmto,sub:b.dataset.tmtos};renderMain()});
   const mk=m.querySelector("#tm-mask");if(mk)mk.onclick=e=>{if(e.target===mk&&!TM.mvBusy){TM.mv=null;renderMain()}};
   const mx=m.querySelector("#tm-mvx");if(mx)mx.onclick=()=>{if(!TM.mvBusy){TM.mv=null;renderMain()}};
   const mo=m.querySelector("#tm-mvok");if(mo)mo.onclick=tmDoMove;
-  m.querySelectorAll("[data-tmfile]").forEach(b=>b.onclick=e=>{if(e.target.closest(".gd-dl,[data-tmmv]"))return;const f=tmFindFile(b.dataset.tmfile);if(f){TM.tab="thumuc";TM.file=f;go()}});
+  m.querySelectorAll("[data-tmdots]").forEach(b=>b.onclick=e=>{e.stopPropagation();TM.menu=TM.menu===b.dataset.tmdots?"":b.dataset.tmdots;renderMain()});
+  m.querySelectorAll("[data-tmmbk]").forEach(b=>b.onclick=e=>{e.stopPropagation();TM.menu="";renderMain()});
+  const nf=m.querySelector("#tm-newf");if(nf)nf.onclick=()=>{const n=(prompt("Tên thư mục mới trong "+tmName(TM.pb)+":")||"").trim();if(n)tmAct("folder",{pb:TM.pb,name:n},"Đã tạo thư mục "+n+" trên Drive",TM.pb)};
+  m.querySelectorAll("[data-tmfile]").forEach(b=>b.onclick=e=>{if(e.target.closest(".gd-dl,.tm-xem,[data-tmmv],[data-tmdots],.tm-menu,.tm-mbk"))return;const f=tmFindFile(b.dataset.tmfile);if(f){TM.tab="thumuc";TM.file=f;go()}});
   m.querySelectorAll("[data-tmtodo]").forEach(b=>b.onclick=()=>{TM.tab="thumuc";TM.pb=b.dataset.tmtodo;TM.sub=b.dataset.tmsubgo||"";TM.inq=b.dataset.tmq||"";TM.file=null;go()});
   m.querySelectorAll("[data-tmtt]").forEach(b=>b.onclick=()=>{TM.tt=b.dataset.tmtt;renderMain()});
   const bk=m.querySelector("#tm-back");if(bk)bk.onclick=()=>{TM.scope="";MOD="cv";PAGE="cv_pb";render()};

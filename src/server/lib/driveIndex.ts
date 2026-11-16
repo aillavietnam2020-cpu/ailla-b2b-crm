@@ -118,3 +118,8 @@ export function moveInIdx(src: TeamIdx, dst: TeamIdx, id: string, toSub: string)
   if (!same) d.subs = countSubs(d.subs, d.files);
   return { src: s, dst: d };
 }
+
+/** Thêm thư mục con cấp 1 mới (vừa tạo trên Drive) vào mục lục. */
+export function addSubToIdx(idx: TeamIdx, sub: { id: string; n: string }): TeamIdx {
+  return { ...idx, subs: countSubs([...idx.subs, sub], idx.files) };
+}

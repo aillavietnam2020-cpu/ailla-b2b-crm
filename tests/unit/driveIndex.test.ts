@@ -105,3 +105,12 @@ describe('chuyển file / thư mục con', () => {
     expect(moveInIdx(a, b, 'không có', '')).toBeNull();
   });
 });
+
+describe('tạo thư mục: sửa mục lục', () => {
+  it('thêm thư mục con mới vào cuối, số file 0', async () => {
+    const { addSubToIdx } = await import('../../src/server/lib/driveIndex');
+    const files = [f('a', 'MEDIA'), f('b', 'MEDIA'), f('c', 'BÁO CÁO')];
+    const idx: TeamIdx = { pb: 'CM', root: 'r', at: '', cut: false, files, subs: countSubs([{ id: 's1', n: 'MEDIA' }, { id: 's2', n: 'BÁO CÁO' }], files) };
+    expect(addSubToIdx(idx, { id: 's3', n: 'SKILL' }).subs.map((s) => [s.n, s.c])).toEqual([['MEDIA', 2], ['BÁO CÁO', 1], ['SKILL', 0]]);
+  });
+});
