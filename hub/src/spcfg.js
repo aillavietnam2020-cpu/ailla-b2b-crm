@@ -264,7 +264,7 @@ function spcfSanSet(CH,sku,variant,gia){DB.mutate(ME.name,"giá "+(CH==="TIKTOK"
 /* Đọc file giá sàn: tìm dòng tiêu đề có cột giá, rồi các cột mã sản phẩm, mã người bán, tên, phân loại */
 function spcfSanParse(rows){const H=(rows||[]).slice(0,12);let best=-1,bi=-1,C=null;
   H.forEach((r,i)=>{const h=(r||[]).map(x=>spcfFold(String(x||"")).trim()),f=re=>h.findIndex(x=>re.test(x));
-    const c={gia:h.findIndex(x=>/^(gia|price|retail price)/.test(x)&&!/(von|nhap|goc|si)\b/.test(x)),pid:f(/(^id san pham|^ma san pham|product[_ ]?id|^id$)/),sku:f(/(sku nguoi ban|seller[_ ]?sku|sku phan loai|^sku$|^ma sku|sku)/),variant:f(/(ten phan loai|phan loai hang|variation|variant|bien the)/),name:f(/(ten san pham|product[_ ]?name)/)};
+    const c={gia:h.findIndex(x=>/^(gia|price|retail price)/.test(x)&&!/(von|nhap|goc|si)\b/.test(x)),pid:f(/(^id san pham|^ma san pham|product[_ ]?id|^id$)/),sku:(i=>i>=0?i:f(/^(ma )?sku$|sku(?!.*\bid\b)/))(f(/(seller[_ ]?sku|sku nguoi ban|sku phan loai)/)),variant:f(/(ten phan loai|phan loai hang|variation|variant|bien the)/),name:f(/(ten san pham|product[_ ]?name)/)};
     if(c.variant===c.sku)c.variant=-1;const n=Object.values(c).filter(x=>x>=0).length;if(c.gia>=0&&n>best){best=n;bi=i;C=c}});
   if(!C||(C.pid<0&&C.sku<0))return {err:"Không thấy cột giá và cột mã sản phẩm / mã SKU trong file"};
   const num=v=>{const t=String(v==null?"":v).trim().replace(/[.,]00$/,"");return +t.replace(/[^0-9]/g,"")||0},g=(r,i)=>i>=0?String(r[i]==null?"":r[i]).trim():"";
