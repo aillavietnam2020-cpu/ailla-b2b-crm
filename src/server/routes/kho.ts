@@ -1097,7 +1097,7 @@ khoRoutes.post('/items/:code/merge', async (c) => {
 /** Yêu cầu pha chế mới (chị Hoa 06/11, pha theo bồn, riêng với phiếu sản xuất): sinh việc + chuông cho kỹ thuật pha chế.
  * Việc tự xong khi kỹ thuật ghi phiếu pha chế gắn mã yêu cầu đó. */
 /** Tài khoản kỹ thuật pha chế (anh Hội): việc về pha chế, kỹ thuật, nguyên vật liệu đều nhắc người này (chị Hoa 07/11). */
-async function kyThuatIds(db: D1Database): Promise<string[]> {
+export async function kyThuatIds(db: D1Database): Promise<string[]> {
   try {
     const row = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
     const d = row ? (JSON.parse(await unpack(row.data)) as { users?: Array<{ crm?: string; perms?: string[]; active?: boolean }> }) : {};
@@ -1653,6 +1653,8 @@ khoRoutes.post('/docs', async (c) => {
       extra.bo_sung = true;
     }
   } else if (type === 'PC') {
+    // 16/11: agent không ghi thẳng phiếu pha chế vào kho; chỉ lập nháp (POST /api/hub/phache/nhap), Kế toán kiểm rồi ghi.
+    if (auth.actorType === 'AGENT') throw forbidden('Agent chỉ lập phiếu pha chế nháp (Pha chế › phiếu nháp), Kế toán kiểm rồi mới ghi vào kho');
     const btp = String(b.btp ?? '');
     const it = need(btp);
     if (it.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp} không phải bán thành phẩm`);
