@@ -249,11 +249,11 @@ function fbdCost(days){
   o.gop=o.dt-o.gv-o.ship-o.shipRet;return o;
 }
 
-/* Theo nhóm sản phẩm của đúng kỳ đang chọn (chị Hoa 16/11/2026: trước đây cố định tháng 9). Số theo sản phẩm lấy từ Sheet Pancake (fb_cost_days, có tới 21/10), đơn giao thành công. */
+/* Theo nhóm sản phẩm của đúng kỳ đang chọn (chị Hoa 16/11/2026: trước đây cố định tháng 9). Số theo sản phẩm lấy từ Sheet Pancake (fb_cost_days, có tới 20/10), đơn giao thành công. */
 function fbdNhomCard(days,full){
   const F=FBC.raw,m={};let n=0,last="";
   if(F&&F.p&&F.sk)days.forEach(k=>{const r=F.p[k];if(!r)return;n++;last=k;r.forEach(([i,q,dt,gv])=>{const g=(F.sk[i]||[])[2]||"(chưa nhóm)",t=m[g]||(m[g]={n:g,sl:0,dt:0,gv:0});t.sl+=q;t.dt+=dt*1000;t.gv+=gv*1000})});
-  if(!n)return `<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm</h3><p class="empty">Kỳ này chưa có số theo nhóm sản phẩm (số theo sản phẩm hiện có đến 21/10).</p></section>`;
+  if(!n){const e=F&&F.p?Object.keys(F.p).sort().pop():"";return `<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm</h3><p class="empty">Kỳ này chưa có số theo nhóm sản phẩm${e?` (số theo sản phẩm hiện có đến ${e.slice(8)}/${e.slice(5,7)})`:""}.</p></section>`}
   const L=Object.values(m).sort((a,b)=>b.dt-a.dt);
   return `<section class="fbd-card fbd-wide"><h3>Theo nhóm sản phẩm · ${n} ngày có số, đến ${last.slice(8)}/${last.slice(5,7)}</h3>${tbl(full?["Nhóm hàng","Số lượng","Doanh thu","Giá vốn","Biên gộp"]:["Nhóm hàng","Số lượng","Doanh thu"],L.map(x=>`<tr><td><b>${esc(x.n)}</b></td><td class="n">${nf(x.sl)}</td><td class="n">${tr(x.dt)}</td>${full?`<td class="n">${tr(x.gv)}</td><td class="n">${x.dt?pill(Math.round((x.dt-x.gv)/x.dt*100)+"%",(x.dt-x.gv)/x.dt>.6?"grn":"amb"):"—"}</td>`:""}</tr>`))}<p class="fbd-note">Đơn đã giao thành công trong kỳ đang chọn.</p></section>`;
 }
