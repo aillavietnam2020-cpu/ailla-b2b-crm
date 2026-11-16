@@ -324,7 +324,7 @@ driveRoutes.get('/files', async (c) => {
   let idx = await loadIdx(c.env.DB, pb);
   if (isStale(idx, team.folderId, Infinity) || c.req.query('fresh') === '1') idx = (await refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, pb)) ?? idx;
   else if (isStale(idx, team.folderId)) later(c, refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, pb));
-  if (!idx) throw notFound('Web chưa đọc được thư mục này. Kiểm tra thư mục đã chia sẻ cho tài khoản của web chưa.');
+  if (!idx) throw notFound('Web đang đếm file thư mục này lần đầu, bấm Tải lại sau 1 phút. Vẫn không được thì kiểm tra thư mục đã chia sẻ cho tài khoản của web chưa.');
   const sub = c.req.query('sub') ?? '';
   const files = idx.files.filter((f) => !sub || f.s === sub).sort((a, b) => (b.m ?? '').localeCompare(a.m ?? ''));
   return ok(c, { pb, at: idx.at, cut: idx.cut, subs: idx.subs, total: idx.files.length, edit: ceo || me?.phongBan === pb, files: files.slice(0, 500).map((f) => fileOut(f, pb)), more: Math.max(0, files.length - 500) });
