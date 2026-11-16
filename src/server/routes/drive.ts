@@ -158,14 +158,15 @@ driveRoutes.get('/find', async (c) => {
   const cfg = await loadConfig(c.env.DB);
   const vis = teamsFor(cfg, me, ceo).filter((t) => !pb || t.pb === pb);
   if (!vis.length) return ok(c, { files: [] });
-  // Tìm không dấu trong mục lục (16/11); thư mục nào chưa có mục lục thì mới tìm thẳng trên Drive như cũ.
+  // Tìm không dấu trong mục lục (16/11). Thư mục chưa có mục lục: quét ngầm, báo số thư mục còn đang đếm.
   if (q) {
     const idxs = await Promise.all(vis.map((t) => loadIdx(c.env.DB, t.pb)));
-    if (idxs.every((x, i) => x && x.root === vis[i].folderId)) {
-      const all = idxs.flatMap((x) => x!.files.map((f) => ({ f, pb: x!.pb })));
-      const hit = new Set(searchIdx(all.map((a) => a.f), q, 60));
-      return ok(c, { files: all.filter((a) => hit.has(a.f)).sort((a, b) => (b.f.m ?? '').localeCompare(a.f.m ?? '')).map((a) => fileOut(a.f, a.pb)) });
-    }
+    const have = idxs.filter((x, i): x is NonNullable<typeof x> => !!x && x.root === vis[i].folderId);
+    const miss = vis.filter((t, i) => !idxs[i] || idxs[i]!.root !== t.folderId);
+    for (const t of [...miss].sort(() => Math.random() - 0.5).slice(0, 2)) later(c, refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, t.pb));
+    const all = have.flatMap((x) => x.files.map((f) => ({ f, pb: x.pb })));
+    const hit = new Set(searchIdx(all.map((a) => a.f), q, 60));
+    return ok(c, { files: all.filter((a) => hit.has(a.f)).sort((a, b) => (b.f.m ?? '').localeCompare(a.f.m ?? '')).map((a) => fileOut(a.f, a.pb)), counting: miss.length });
   }
   const roots = rootsFor(cfg, me, ceo);
   const limit = q ? 40 : 15;
@@ -294,7 +295,8 @@ driveRoutes.get('/overview', async (c) => {
   const now = Date.now();
   const rows = await Promise.all(teams.map(async (t) => ({ t, idx: await loadIdx(c.env.DB, t.pb) })));
   // Thư mục chưa có mục lục: quét ngầm tối đa 2 thư mục mỗi lượt mở; còn lại quét dần thư mục cũ nhất.
-  const missing = rows.filter((r) => isStale(r.idx, r.t.folderId, Infinity)).slice(0, 2);
+  // Chọn ngẫu nhiên để một thư mục quét lỗi không chặn mãi các thư mục sau.
+  const missing = rows.filter((r) => isStale(r.idx, r.t.folderId, Infinity)).sort(() => Math.random() - 0.5).slice(0, 2);
   const stale = rows.filter((r) => isStale(r.idx, r.t.folderId)).sort((a, b) => (a.idx?.at ?? '').localeCompare(b.idx?.at ?? ''));
   for (const r of missing.length ? missing : stale.slice(0, 1)) later(c, refreshIdx(c.env.DB, c.env.GDRIVE_SA_JSON, cfg, r.t.pb));
   const todo: TodoItem[] = [];
