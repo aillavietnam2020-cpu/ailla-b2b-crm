@@ -11,7 +11,7 @@
 const TM={teams:null,err:"",pb:"",folder:"",busy:false,q:"",find:null,findKey:"",tab:"thumuc",sub:"",inq:"",file:null,fl:{},ov:null,ovErr:"",tt:"",cfg:null,cfgErr:"",saving:false,sync:null};
 ICONS.folder='<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>';
 const TM_KIND={sheet:["Bảng tính","XLS","grn"],doc:["Tài liệu","DOC","blu"],slide:["Trình chiếu","PPT","amb"],pdf:["PDF","PDF","gry"],vid:["Video","MP4","pnk"],img:["Ảnh","IMG","amb"],link:["Lối tắt","↗","gry"],other:["Khác","FILE","gry"]};
-const tmOn=()=>typeof PAGE!=="undefined"&&(PAGE==="thumuc"||PAGE==="thumuc_gan");
+const tmOn=()=>typeof PAGE!=="undefined"&&(PAGE==="thumuc"||PAGE==="thumuc_gan"||PAGE==="cv_pb");
 const tmRedraw=()=>{if(tmOn())renderMain()};
 const tmTime=s=>{if(!s)return "—";const d=new Date(Date.parse(s)+7*3600e3),p=n=>String(n).padStart(2,"0"),now=new Date(Date.now()+7*3600e3);
   return p(d.getUTCDate())+"/"+p(d.getUTCMonth()+1)+(d.getUTCFullYear()!==now.getUTCFullYear()?"/"+d.getUTCFullYear():"")+" "+p(d.getUTCHours())+":"+p(d.getUTCMinutes())};
@@ -249,7 +249,8 @@ function tmFindView(){
 }
 
 function pThuMuc(m){
-  const head=H("Thư mục làm việc","File làm hằng ngày của các phòng, lấy thẳng từ Google Drive");
+  /* Mở từ Công việc › Thư mục công việc (cvmoi.js) thì trang đó đã có tiêu đề, không vẽ thêm. */
+  const emb=PAGE==="cv_pb",head=emb?"":H("Thư mục làm việc","File làm hằng ngày của các phòng, lấy thẳng từ Google Drive");
   if(!TM.teams){m.innerHTML=head+(TM.err?`<div class="note red">${esc(TM.err)}</div>`:`<p class="hint">Đang tải…</p>`);if(!TM.busy)tmTeams();return}
   const ceo=!!TM.teams.can_manage,adm=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
   if(PAGE==="thumuc_gan"||TM.tab==="gan"){
@@ -261,9 +262,10 @@ function pThuMuc(m){
   if(TM.folder){const R=TM.fl[TM.pb];const s=R&&R.subs?R.subs.find(x=>x.id===TM.folder):null;if(s||R&&R.subs){TM.sub=s?s.n:"";TM.folder=""}}
   const tab=TM.tab||"thumuc",bt=(k,l,x="")=>`<button class="btn sm${tab===k?" pri":""}" data-tmt="${k}">${l}${x}</button>`;
   const td=TM.ov.todo.filter(x=>tmVisible().some(t=>t.pb===x.pb)).length;
-  const tabs=`<div class="filters tm-tabs">${bt("thumuc","Thư mục")}${bt("dash","Bảng điều khiển")}${bt("find","Tìm file")}${bt("todo","Việc cần xử lý",td?` <span class="pill p-red" style="margin-left:4px">${td}</span>`:"")}${ceo?bt("rep","Báo cáo"):""}<span class="sp"></span>${ceo&&!adm?`<button class="btn sm" data-tmt="gan">Gán thư mục cho phòng ban</button>`:""}</div>`;
+  const tabs=`<div class="filters tm-tabs">${bt("thumuc","Thư mục")}${bt("dash","Bảng điều khiển")}${bt("find","Tìm file")}${bt("todo","Việc cần xử lý",td?` <span class="pill p-red" style="margin-left:4px">${td}</span>`:"")}${ceo?bt("rep","Báo cáo"):""}${emb&&TM.sopOld?bt("sop","Mẫu tài liệu & SOP"):""}<span class="sp"></span>${ceo&&!adm?`<button class="btn sm" data-tmt="gan">Gán thư mục cho phòng ban</button>`:""}</div>`;
   let body;
-  if(tab==="dash")body=tmDashView();
+  if(tab==="sop"&&emb&&TM.sopOld)body=`<div id="tm-sop"></div>`;
+  else if(tab==="dash")body=tmDashView();
   else if(tab==="find")body=tmFindView();
   else if(tab==="todo")body=tmTodoView();
   else if(tab==="rep"&&ceo)body=tmRepView();
@@ -273,6 +275,10 @@ function pThuMuc(m){
   else body=tmCardsView();
   m.innerHTML=tmCss+head+tabs+`<div class="tm-wrap">${body}</div>`;
   tmBind(m);
+  /* Tab Mẫu tài liệu & SOP: vẽ trang phòng cũ (khonggian.js) rồi chỉ giữ ô Mẫu & SOP và dải chọn phòng */
+  const sp=m.querySelector("#tm-sop");if(sp){if(typeof KPB!=="undefined"&&(!KPB.doc||KPB.doc==="tpl"))KPB.doc="sop";TM.sopOld(sp);
+    sp.querySelectorAll(".kgk,[data-kgdt=\"tpl\"]").forEach(x=>x.remove());
+    sp.querySelectorAll("section.kgs").forEach(sc=>{const h=sc.querySelector("h3");if(h&&/Mẫu & SOP/.test(h.textContent))h.textContent="🧩 Mẫu tài liệu & SOP";else sc.remove()})}
 }
 function tmBind(m){
   const go=()=>{renderMain();scrollTo(0,0)};
