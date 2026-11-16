@@ -6,7 +6,7 @@
    2. Báo giá gửi khách: chọn cấp, bỏ tích mã không bán (web nhớ theo cấp, d.bgCfg), sửa tên công ty, tiêu đề,
       ghi chú từng cấp (vd cấp được miễn phí vận chuyển), tải ảnh PNG hoặc PDF (html2canvas + jsPDF từ cdnjs).
    ===================================================================== */
-const SPBG={tier:"",open:null};
+const SPBG={open:null};
 const spbgD=()=>{try{return D()}catch(e){return {}}};
 const spbgList=()=>Array.isArray(spbgD().giaPhieu)?spbgD().giaPhieu:[];
 const spbgIsCeo=()=>typeof spcfB2bRole==="function"&&spcfB2bRole()==="ok";
@@ -73,54 +73,91 @@ function spbgBind(m){const on=(s,f)=>m.querySelectorAll(s).forEach(b=>b.onclick=
   on("[data-spbgnew]",()=>spbgNewProd());on("[data-spbgbq]",()=>spbgBaoGia())}
 
 /* ============================== BÁO GIÁ GỬI KHÁCH ============================== */
+/* Báo giá mẫu (chị Hoa 16/11): mở "Báo giá gửi khách" là ra danh sách mẫu đã lưu. "Lấy báo giá" = ra luôn tờ báo giá
+   theo mẫu (giá lấy mới nhất từ bảng giá), tải ảnh / PDF. "+ Tạo báo giá mới" (góc phải) mới hiện chỗ chọn cấp, mã, ghi chú;
+   chọn xong đặt tên và Lưu mẫu, lần sau cứ thế dùng. Mẫu: d.bgMau [{id, ten, tier, an:[mã ẩn], ghi, tieuDe}];
+   tên công ty, dòng dưới dùng chung: d.bgCfg {cty, sub}. */
 const SPBG_GHI="Giá trên đã bao gồm thuế GTGT\nGiá chưa bao gồm chi phí vận chuyển\nKhông công nợ, chuyển khoản trước giao hàng sau\nThời gian xuất hàng 3-7 ngày làm việc\nBáo giá có hiệu lực từ ngày {ngay} tới khi có thông báo mới";
-const spbgCfg=()=>{const c=spbgD().bgCfg||{};return {cty:c.cty||"CÔNG TY AILLA VIỆT NAM",sub:c.sub||"",tiers:c.tiers||{}}};
-function spbgBaoGia(){
-  const B=SPCF.b2b;if(!B||!B.products){toast("Đang tải bảng giá, thử lại sau giây lát");return}
-  const T=(B.tiers||[]).filter(t=>t.code!=="BAN_LE"),LE=(B.tiers||[]).find(t=>t.code==="BAN_LE");
-  if(!T.some(t=>t.code===SPBG.tier))SPBG.tier=(T.find(t=>t.code==="DAI_SU")||T[0]||{}).code||"";
-  const cf=spbgCfg(),st={cty:cf.cty,sub:cf.sub,tiers:JSON.parse(JSON.stringify(cf.tiers))};
-  const rows=spcfB2bRows(B.products).sort((a,b)=>String(a.g).localeCompare(String(b.g),"vi"));
-  const tc=()=>{const t=T.find(x=>x.code===SPBG.tier)||{};const o=st.tiers[t.code]||(st.tiers[t.code]={an:[],ghi:"",ten:""});return {t,o}};
-  const priced=r=>{const {t}=tc();return r.le.prices[t.code]!=null};
-  const draw=()=>{const {t,o}=tc(),an=new Set(o.an||[]),title=o.ten||("BẢNG GIÁ "+String(t.name||"").toUpperCase()+" AILLA"),ghi=(o.ghi||SPBG_GHI).replace(/\{ngay\}/g,spcfVN(spcfToday()));
-    const show=rows.filter(r=>priced(r)&&!an.has(r.le.id));let i=0;
-    const sheet=`<div id="bg-sheet" style="width:860px;background:#fff;color:#2b2b2b;font-family:'Be Vietnam Pro',system-ui,sans-serif;padding:26px 30px 22px;border-radius:0">
-      <div style="text-align:center"><img src="data:image/png;base64,${LOGO}" alt="Ailla" style="height:92px;object-fit:contain"></div>
-      <div style="text-align:center;font-size:34px;font-weight:800;color:#e7357b;letter-spacing:.5px;margin:8px 0 2px;line-height:1.15">${esc(title)}</div>
-      <div style="text-align:center;font-size:16px;font-weight:700;color:#9d1b55;letter-spacing:.3px">${esc(st.cty)}</div>
-      ${st.sub?`<div style="text-align:center;font-size:13px;color:#6b5560;margin-top:2px">${esc(st.sub)}</div>`:""}
-      <table style="width:100%;border-collapse:separate;border-spacing:0;margin-top:16px;font-size:14px;border:1.5px solid #e7357b;border-radius:12px;overflow:hidden">
-       <tr>${["STT","SẢN PHẨM","QUY CÁCH","GIÁ NIÊM YẾT",String(t.name||"").toUpperCase()].map((h,k)=>`<th style="background:#e7357b;color:#fff;font-weight:800;padding:10px 8px;font-size:14px;text-align:${k===1?"left":"center"}">${esc(h)}</th>`).join("")}</tr>
-       ${show.map((r,k)=>{i++;const bd=k===show.length-1?"0":"1px solid #f6c3d8";return `<tr><td style="text-align:center;padding:7px 6px;border-bottom:${bd};border-right:1px solid #f6c3d8;width:48px">${i}</td><td style="padding:7px 10px;border-bottom:${bd};border-right:1px solid #f6c3d8">${esc(r.le.name)}</td><td style="text-align:center;padding:7px 6px;border-bottom:${bd};border-right:1px solid #f6c3d8;width:90px">${esc(String(r.q||""))}</td><td style="text-align:right;padding:7px 12px;border-bottom:${bd};border-right:1px solid #f6c3d8;width:130px">${LE&&r.le.prices[LE.code]!=null?nf(r.le.prices[LE.code]):""}</td><td style="text-align:right;padding:7px 12px;border-bottom:${bd};width:140px;font-weight:700;color:#9d1b55;background:#fff0f6">${nf(r.le.eff_prices&&r.le.eff_prices[t.code]!=null?r.le.eff_prices[t.code]:r.le.prices[t.code])}</td></tr>`}).join("")}
-      </table>
-      <div style="margin-top:12px;font-size:13px;color:#7a3352;line-height:1.7">${ghi.split("\n").filter(s=>s.trim()).map(s=>"- "+esc(s.trim())).join("<br>")}</div></div>`;
-    const R=spcfModal("Báo giá gửi khách",`<div style="display:grid;grid-template-columns:minmax(260px,330px) minmax(0,1fr);gap:16px;padding:16px 0">
-      <div>
-       <div class="spf-box" style="padding:10px 12px;margin-bottom:10px"><b style="font-size:13px">Cấp</b><div class="settabs" style="margin:6px 0 0">${T.filter(x=>x.code!=="NHAN_VIEN").map(x=>`<button class="${x.code===t.code?"on":""}" data-bgt="${esc(x.code)}">${esc(x.name)}</button>`).join("")}</div></div>
-       <div class="spf-box" style="padding:4px 12px;margin-bottom:10px">${spcfRow("Tên công ty",`<input id="bg-cty" value="${esc(st.cty)}">`)}${spcfRow("Dòng dưới (hotline, địa chỉ)",`<input id="bg-sub" value="${esc(st.sub)}" placeholder="không bắt buộc">`)}${spcfRow("Tiêu đề",`<input id="bg-ten" value="${esc(o.ten||"")}" placeholder="${esc("BẢNG GIÁ "+String(t.name||"").toUpperCase()+" AILLA")}">`)}</div>
-       <div class="spf-box" style="padding:8px 12px;margin-bottom:10px"><b style="font-size:13px">Ghi chú cấp ${esc(t.name)}</b><p class="hint" style="margin:2px 0 6px;font-size:12px">Mỗi dòng một ý. Cấp được miễn phí vận chuyển thì ghi vào đây.</p><textarea id="bg-ghi" rows="7" style="width:100%;font-size:13px">${esc(o.ghi||SPBG_GHI)}</textarea></div>
-       <div class="spf-box" style="padding:8px 12px"><b style="font-size:13px">Mã hiện trên báo giá</b> <span class="hint" style="font-size:12px">${show.length} mã · bỏ tích để ẩn</span>
-        <div style="max-height:340px;overflow:auto;margin-top:6px">${rows.filter(priced).map(r=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;border-bottom:1px solid #f0f1f5"><input type="checkbox" class="bg-on" data-id="${esc(r.le.id)}" ${an.has(r.le.id)?"":"checked"} style="width:auto;margin-top:3px"><span>${esc(r.le.name)}</span></label>`).join("")}</div>
-        ${rows.some(r=>!priced(r))?`<p class="hint" style="font-size:12px;margin:6px 0 0">${rows.filter(r=>!priced(r)).length} mã chưa có giá cấp này nên không hiện.</p>`:""}</div>
-      </div>
-      <div style="overflow:auto;background:var(--canvas);border-radius:12px;padding:14px">${sheet}</div></div>`,
-      `<button class="btn" id="bg-save" style="margin-right:auto;order:-1">Lưu cài đặt</button><button class="btn" id="bg-png">Tải ảnh (PNG)</button><button class="btn pri" id="bg-pdf">Tải PDF</button>`);
-    const rd=()=>{st.cty=R.querySelector("#bg-cty").value.trim()||"CÔNG TY AILLA VIỆT NAM";st.sub=R.querySelector("#bg-sub").value.trim();o.ten=R.querySelector("#bg-ten").value.trim();o.ghi=R.querySelector("#bg-ghi").value};
-    R.querySelectorAll("[data-bgt]").forEach(b=>b.onclick=()=>{rd();SPBG.tier=b.dataset.bgt;draw()});
-    ["#bg-cty","#bg-sub","#bg-ten","#bg-ghi"].forEach(s=>R.querySelector(s).onchange=()=>{rd();draw()});
-    R.querySelectorAll(".bg-on").forEach(c=>c.onchange=()=>{rd();const s=new Set(o.an||[]);c.checked?s.delete(c.dataset.id):s.add(c.dataset.id);o.an=[...s];draw()});
-    const save=()=>{rd();DB.mutate(ME.name,"cài đặt báo giá",d=>{d.bgCfg={cty:st.cty,sub:st.sub,tiers:st.tiers}})};
-    R.querySelector("#bg-save").onclick=()=>{save();toast("Đã lưu cài đặt báo giá")};
-    const file="Bang-gia-"+String(t.name||"").replace(/\s+/g,"-")+"-"+spcfToday();
-    R.querySelector("#bg-png").onclick=async()=>{save();try{const cv=await spbgShot();const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download=file+".png";a.click()}catch(e){toast(e.message)}};
-    R.querySelector("#bg-pdf").onclick=async()=>{save();try{const cv=await spbgShot();await spbgLib("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");const {jsPDF}=window.jspdf;
-      const pdf=new jsPDF({unit:"mm",format:"a4"}),W=210,H=297,m=8,w=W-2*m,ph=(H-2*m)*cv.width/w;let y=0,first=true;
-      while(y<cv.height){const h=Math.min(ph,cv.height-y),c=document.createElement("canvas");c.width=cv.width;c.height=h;c.getContext("2d").drawImage(cv,0,y,cv.width,h,0,0,cv.width,h);
-        if(!first)pdf.addPage();pdf.addImage(c.toDataURL("image/jpeg",.92),"JPEG",m,m,w,h*w/cv.width);first=false;y+=h}
-      pdf.save(file+".pdf")}catch(e){toast(e.message)}}};
-  draw();
+const spbgCfg=()=>{const c=spbgD().bgCfg||{};return {cty:c.cty||"CÔNG TY AILLA VIỆT NAM",sub:c.sub||""}};
+const spbgMau=()=>Array.isArray(spbgD().bgMau)?spbgD().bgMau:[];
+const spbgTiers=()=>((SPCF.b2b&&SPCF.b2b.tiers)||[]).filter(t=>t.code!=="BAN_LE"&&t.code!=="NHAN_VIEN");
+const spbgRows=()=>spcfB2bRows((SPCF.b2b&&SPCF.b2b.products)||[]).sort((a,b)=>String(a.g).localeCompare(String(b.g),"vi"));
+function spbgReady(){if(!SPCF.b2b||!SPCF.b2b.products){toast("Đang tải bảng giá, thử lại sau giây lát");return false}return true}
+/* Tờ báo giá (dùng cho xem trước, ảnh và PDF) */
+function spbgSheet(m,cf){
+  const B=SPCF.b2b,LE=(B.tiers||[]).find(t=>t.code==="BAN_LE"),t=(B.tiers||[]).find(x=>x.code===m.tier)||{},an=new Set(m.an||[]);
+  const show=spbgRows().filter(r=>r.le.prices[t.code]!=null&&!an.has(r.le.id)),title=m.tieuDe||("BẢNG GIÁ "+String(t.name||"").toUpperCase()+" AILLA"),ghi=(m.ghi||SPBG_GHI).replace(/\{ngay\}/g,spcfVN(spcfToday()));
+  const bd="1px solid #f6c3d8";
+  return `<div id="bg-sheet" style="width:860px;background:#fff;color:#2b2b2b;font-family:'Be Vietnam Pro',system-ui,sans-serif;padding:26px 30px 22px;margin:0 auto">
+    <div style="text-align:center"><img src="data:image/png;base64,${LOGO}" alt="Ailla" style="height:92px;object-fit:contain"></div>
+    <div style="text-align:center;font-size:34px;font-weight:800;color:#e7357b;letter-spacing:.5px;margin:8px 0 2px;line-height:1.15">${esc(title)}</div>
+    <div style="text-align:center;font-size:16px;font-weight:700;color:#9d1b55;letter-spacing:.3px">${esc(cf.cty)}</div>
+    ${cf.sub?`<div style="text-align:center;font-size:13px;color:#6b5560;margin-top:2px">${esc(cf.sub)}</div>`:""}
+    <table style="width:100%;border-collapse:separate;border-spacing:0;margin-top:16px;font-size:14px;border:1.5px solid #e7357b;border-radius:12px;overflow:hidden">
+     <tr>${["STT","SẢN PHẨM","QUY CÁCH","GIÁ NIÊM YẾT",String(t.name||"").toUpperCase()].map((h,k)=>`<th style="background:#e7357b;color:#fff;font-weight:800;padding:10px 8px;font-size:14px;text-align:${k===1?"left":"center"}">${esc(h)}</th>`).join("")}</tr>
+     ${show.map((r,k)=>{const b=k===show.length-1?"0":bd,v=r.le.eff_prices&&r.le.eff_prices[t.code]!=null?r.le.eff_prices[t.code]:r.le.prices[t.code];return `<tr><td style="text-align:center;padding:7px 6px;border-bottom:${b};border-right:${bd};width:48px">${k+1}</td><td style="padding:7px 10px;border-bottom:${b};border-right:${bd}">${esc(r.le.name)}</td><td style="text-align:center;padding:7px 6px;border-bottom:${b};border-right:${bd};width:90px">${esc(String(r.q||""))}</td><td style="text-align:right;padding:7px 12px;border-bottom:${b};border-right:${bd};width:130px">${LE&&r.le.prices[LE.code]!=null?nf(r.le.prices[LE.code]):""}</td><td style="text-align:right;padding:7px 12px;border-bottom:${b};width:140px;font-weight:700;color:#9d1b55;background:#fff0f6">${nf(v)}</td></tr>`}).join("")}
+    </table>
+    <div style="margin-top:12px;font-size:13px;color:#7a3352;line-height:1.7">${ghi.split("\n").filter(s=>s.trim()).map(s=>"- "+esc(s.trim())).join("<br>")}</div></div>`;
 }
+/* Nút tải ảnh / PDF cho tờ đang hiện */
+function spbgDl(R,m){const t=spbgTiers().find(x=>x.code===m.tier)||{},file=(m.ten||("Bang-gia-"+(t.name||""))).replace(/[\\/:*?"<>|]+/g,"").replace(/\s+/g,"-")+"-"+spcfToday();
+  const png=R.querySelector("#bg-png"),pdf=R.querySelector("#bg-pdf");
+  if(png)png.onclick=async()=>{try{const cv=await spbgShot();const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download=file+".png";a.click()}catch(e){toast(e.message)}};
+  if(pdf)pdf.onclick=async()=>{try{const cv=await spbgShot();await spbgLib("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:"mm",format:"a4"}),W=210,H=297,mg=8,w=W-2*mg,ph=(H-2*mg)*cv.width/w;let y=0,first=true;
+    while(y<cv.height){const h=Math.min(ph,cv.height-y),c=document.createElement("canvas");c.width=cv.width;c.height=h;c.getContext("2d").drawImage(cv,0,y,cv.width,h,0,0,cv.width,h);
+      if(!first)doc.addPage();doc.addImage(c.toDataURL("image/jpeg",.92),"JPEG",mg,mg,w,h*w/cv.width);first=false;y+=h}
+    doc.save(file+".pdf")}catch(e){toast(e.message)}}}
+const spbgWide=R=>{const i=R.querySelector(".cm-in");if(i)i.style.width="min(1440px,97vw)";return R};
+/* 1. Danh sách báo giá mẫu */
+function spbgBaoGia(){if(!spbgReady())return;const L=spbgMau().slice().reverse(),T=spbgTiers();
+  const R=spbgWide(spcfModal("Báo giá gửi khách",`<div style="padding:16px 0">${L.length?`<div class="spf-box" style="padding:0">${tbl(["Tên báo giá","Cấp","Số mã","Lưu lúc",""],L.map(m=>{const t=T.find(x=>x.code===m.tier)||{},n=spbgRows().filter(r=>r.le.prices[m.tier]!=null&&!(m.an||[]).includes(r.le.id)).length;
+      return `<tr><td><b>${esc(m.ten)}</b></td><td>${esc(t.name||m.tier)}</td><td class="n">${n}</td><td class="hint">${esc(m.by||"")} · ${esc(String(m.at||"").slice(0,10).split("-").reverse().join("/"))}</td><td style="white-space:nowrap;text-align:right"><button class="btn sm pri" data-bgget="${esc(m.id)}">Lấy báo giá</button> <button class="btn sm" data-bged="${esc(m.id)}">Sửa</button> <button class="btn sm" data-bgrm="${esc(m.id)}">Xóa</button></td></tr>`}))}</div>`
+      :`<div class="note">Chưa có báo giá mẫu nào. Bấm <b>+ Tạo báo giá mới</b> ở góc phải: chọn cấp, bỏ tích mã không bán, sửa ghi chú, đặt tên rồi Lưu mẫu. Lần sau chỉ cần bấm Lấy báo giá.</div>`}</div>`,""));
+  const h=R.querySelector(".cm-h"),x=h&&h.querySelector(".x");if(x)x.insertAdjacentHTML("beforebegin",`<button class="btn pri" id="bg-new" style="margin-left:auto;margin-right:10px">+ Tạo báo giá mới</button>`);
+  R.querySelector("#bg-new").onclick=()=>spbgEdit(null);
+  R.querySelectorAll("[data-bgget]").forEach(b=>b.onclick=()=>spbgGet(b.dataset.bgget));
+  R.querySelectorAll("[data-bged]").forEach(b=>b.onclick=()=>spbgEdit(b.dataset.bged));
+  R.querySelectorAll("[data-bgrm]").forEach(b=>b.onclick=()=>{const m=spbgMau().find(y=>y.id===b.dataset.bgrm);if(!m||!confirm("Xóa báo giá mẫu \""+m.ten+"\"?"))return;DB.mutate(ME.name,"xóa báo giá mẫu",d=>{d.bgMau=(d.bgMau||[]).filter(y=>y.id!==m.id)});setTimeout(spbgBaoGia,50)})}
+/* 2. Lấy báo giá đã lưu: ra luôn tờ báo giá, tải ảnh / PDF */
+function spbgGet(id){if(!spbgReady())return;const m=spbgMau().find(x=>x.id===id);if(!m)return;
+  const R=spbgWide(spcfModal(esc(m.ten),`<div style="padding:16px 0;background:var(--canvas)">${spbgSheet(m,spbgCfg())}</div>`,
+    `<button class="btn" id="bg-back" style="margin-right:auto;order:-1">← Danh sách</button><button class="btn" id="bg-ed">Sửa mẫu</button><button class="btn" id="bg-png">Tải ảnh (PNG)</button><button class="btn pri" id="bg-pdf">Tải PDF</button>`));
+  R.querySelector("#bg-back").onclick=()=>spbgBaoGia();R.querySelector("#bg-ed").onclick=()=>spbgEdit(id);spbgDl(R,m)}
+/* 3. Tạo / sửa báo giá mẫu: chọn cấp, bỏ tích mã, ghi chú, tên; xem trước bên phải (tích không làm nhảy danh sách) */
+function spbgEdit(id){if(!spbgReady())return;const T=spbgTiers(),old=id?spbgMau().find(x=>x.id===id):null,cf=spbgCfg();
+  const m=old?JSON.parse(JSON.stringify(old)):{id:"",ten:"",tier:(T.find(t=>t.code==="DAI_SU")||T[0]||{}).code||"",an:[],ghi:"",tieuDe:""};
+  const draw=()=>{const t=T.find(x=>x.code===m.tier)||{},rows=spbgRows().filter(r=>r.le.prices[t.code]!=null),an=new Set(m.an);
+    const R=spbgWide(spcfModal(old?"Sửa báo giá mẫu":"Tạo báo giá mới",`<div style="display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;padding:16px 0;align-items:start">
+      <div>
+       <div class="spf-box" style="padding:4px 12px;margin-bottom:10px">${spcfRow("Tên báo giá *",`<input id="bg-name" value="${esc(m.ten)}" placeholder="ví dụ: Đại sứ - bỏ hàng gội, xả">`)}</div>
+       <div class="spf-box" style="padding:10px 12px;margin-bottom:10px"><b style="font-size:13px">Cấp</b><div class="settabs" style="margin:6px 0 0">${T.map(x=>`<button class="${x.code===t.code?"on":""}" data-bgt="${esc(x.code)}">${esc(x.name)}</button>`).join("")}</div></div>
+       <div class="spf-box" style="padding:4px 12px;margin-bottom:10px">${spcfRow("Tiêu đề",`<input id="bg-ten" value="${esc(m.tieuDe)}" placeholder="${esc("BẢNG GIÁ "+String(t.name||"").toUpperCase()+" AILLA")}">`)}${spcfRow("Tên công ty",`<input id="bg-cty" value="${esc(cf.cty)}">`)}${spcfRow("Dòng dưới",`<input id="bg-sub" value="${esc(cf.sub)}" placeholder="hotline, địa chỉ (không bắt buộc)">`)}</div>
+       <div class="spf-box" style="padding:8px 12px;margin-bottom:10px"><b style="font-size:13px">Ghi chú cuối báo giá</b><p class="hint" style="margin:2px 0 6px;font-size:12px">Mỗi dòng một ý. Cấp được miễn phí vận chuyển thì ghi vào đây.</p><textarea id="bg-ghi" rows="7" style="width:100%;font-size:13px">${esc(m.ghi||SPBG_GHI)}</textarea></div>
+       <div class="spf-box" style="padding:8px 12px"><b style="font-size:13px">Mã hiện trên báo giá</b> <span class="hint" style="font-size:12px" id="bg-cnt"></span>
+        <div style="display:flex;gap:6px;margin:6px 0"><button class="btn sm" id="bg-all">Chọn hết</button><button class="btn sm" id="bg-none">Bỏ hết</button></div>
+        <div id="bg-list" style="max-height:420px;overflow:auto">${rows.map(r=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;border-bottom:1px solid #f0f1f5;cursor:pointer"><input type="checkbox" class="bg-on" data-id="${esc(r.le.id)}" ${an.has(r.le.id)?"":"checked"} style="width:auto;margin-top:3px"><span>${esc(r.le.name)}</span></label>`).join("")}</div>
+        ${spbgRows().length>rows.length?`<p class="hint" style="font-size:12px;margin:6px 0 0">${spbgRows().length-rows.length} mã chưa có giá cấp này nên không hiện.</p>`:""}</div>
+      </div>
+      <div id="bg-prev" style="background:var(--canvas);border-radius:12px;padding:14px;overflow:auto"></div></div>`,
+      `<button class="btn" id="bg-back" style="margin-right:auto;order:-1">← Danh sách</button><button class="btn" id="bg-png">Tải ảnh (PNG)</button><button class="btn" id="bg-pdf">Tải PDF</button><button class="btn pri" id="bg-save">Lưu mẫu</button>`));
+    const cfNow=()=>({cty:R.querySelector("#bg-cty").value.trim()||"CÔNG TY AILLA VIỆT NAM",sub:R.querySelector("#bg-sub").value.trim()});
+    const rd=()=>{m.ten=R.querySelector("#bg-name").value.trim();m.tieuDe=R.querySelector("#bg-ten").value.trim();m.ghi=R.querySelector("#bg-ghi").value};
+    /* chỉ vẽ lại tờ xem trước, không vẽ lại danh sách mã (giữ nguyên chỗ đang cuộn) */
+    const prev=()=>{rd();R.querySelector("#bg-prev").innerHTML=spbgSheet(m,cfNow());const sh=new Set(m.an);R.querySelector("#bg-cnt").textContent=rows.filter(r=>!sh.has(r.le.id)).length+" / "+rows.length+" mã · bỏ tích để ẩn"};
+    prev();
+    R.querySelectorAll("[data-bgt]").forEach(b=>b.onclick=()=>{rd();m.tier=b.dataset.bgt;draw()});
+    ["#bg-ten","#bg-cty","#bg-sub","#bg-ghi"].forEach(s=>R.querySelector(s).oninput=prev);
+    R.querySelectorAll(".bg-on").forEach(c=>c.onchange=()=>{const s=new Set(m.an);c.checked?s.delete(c.dataset.id):s.add(c.dataset.id);m.an=[...s];prev()});
+    const setAll=on=>{R.querySelectorAll(".bg-on").forEach(c=>{c.checked=on});m.an=on?[]:rows.map(r=>r.le.id);prev()};
+    R.querySelector("#bg-all").onclick=()=>setAll(true);R.querySelector("#bg-none").onclick=()=>setAll(false);
+    R.querySelector("#bg-back").onclick=()=>spbgBaoGia();
+    R.querySelector("#bg-save").onclick=()=>{rd();if(!m.ten){toast("Đặt tên cho báo giá mẫu");R.querySelector("#bg-name").focus();return}const c=cfNow(),isNew=!m.id;if(isNew)m.id="bq"+Date.now();
+      const rec={id:m.id,ten:m.ten,tier:m.tier,an:m.an,ghi:m.ghi,tieuDe:m.tieuDe,by:ME.name||"",byId:ME.id||"",at:new Date().toISOString()};
+      DB.mutate(ME.name,"lưu báo giá mẫu "+m.ten,d=>{d.bgCfg={cty:c.cty,sub:c.sub};d.bgMau=Array.isArray(d.bgMau)?d.bgMau:[];const i=d.bgMau.findIndex(y=>y.id===rec.id);if(i>=0)d.bgMau[i]=rec;else d.bgMau.push(rec)});
+      toast("Đã lưu báo giá mẫu \""+m.ten+"\"");setTimeout(spbgBaoGia,50)};
+    spbgDl(R,m)};
+  draw()}
 const spbgLib=src=>new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)&&(window.html2canvas||window.jspdf)&&(src.includes("html2canvas")?window.html2canvas:window.jspdf))return res();const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("Không tải được công cụ tạo ảnh / PDF, kiểm tra mạng rồi thử lại"));document.head.appendChild(s)});
 async function spbgShot(){await spbgLib("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");const el=document.getElementById("bg-sheet");if(!el)throw new Error("Chưa có báo giá");
   return window.html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true})}
