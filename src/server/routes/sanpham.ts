@@ -550,3 +550,55 @@ function pkVariant(v: Record<string, unknown>): PkVariant {
     hidden: v.is_hidden === true || prod.is_hide === true,
   };
 }
+
+/**
+ * Đọc combo đang có trên Pancake (chỉ đọc, chị Hoa 16/11): danh sách combo + từng combo gồm sản phẩm nào, số lượng.
+ * Trường theo API Pancake POS: combo_products (value_combo, is_value_combo, discount_*, is_free_shipping, start/end_time, is_activated)
+ * và combo_products/{id}/variations (count, product{display_id, name}).
+ */
+sanphamRoutes.get('/pancake-combos', async (c) => {
+  const ch = c.req.query('channel') ?? 'FACEBOOK';
+  if (!isChannel(ch)) throw badRequest('BAD_CHANNEL', 'Chọn kênh');
+  const src = await loadSource(c.env.DB, ch);
+  if (!src) throw badRequest('NO_SOURCE', 'Chưa nối Pancake cho kênh này');
+  const key = await openKey(src.api_key, c.env.INGEST_KEY);
+  const base = `${PANCAKE_API}/shops/${encodeURIComponent(src.shop_id)}`;
+  const q = `api_key=${encodeURIComponent(key)}`;
+  const list: Array<Record<string, unknown>> = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(`${base}/combo_products?${q}&page_size=100&page=${page}`);
+    if (!res.ok) throw badRequest('PANCAKE', `Pancake trả lỗi ${res.status}`);
+    const j = JSON.parse(await res.text()) as { data?: Array<Record<string, unknown>>; total_pages?: number };
+    list.push(...(j.data ?? []));
+    if (!j.data?.length || page >= (j.total_pages ?? 1)) break;
+  }
+  const rows = [];
+  for (const x of list.slice(0, 200)) {
+    let items: Array<{ code: string; name: string; qty: number }> = [];
+    try {
+      const r = await fetch(`${base}/combo_products/${encodeURIComponent(String(x.id))}/variations?${q}&combo_product_id=${encodeURIComponent(String(x.id))}`);
+      if (r.ok) {
+        const j = JSON.parse(await r.text()) as { data?: Array<Record<string, unknown>> };
+        items = (j.data ?? []).map((v) => {
+          const p = (v.product ?? v.variation ?? {}) as Record<string, unknown>;
+          return { code: String(p.display_id ?? p.custom_id ?? ''), name: String(p.name ?? ''), qty: Number(v.count) || 1 };
+        });
+      }
+    } catch {
+      /* thiếu chi tiết một combo thì vẫn trả danh sách */
+    }
+    rows.push({
+      id: String(x.id ?? ''),
+      name: String(x.name ?? ''),
+      on: x.is_activated !== false,
+      kind: x.is_variation ? 'Mẫu mã' : x.is_categories ? 'Danh mục' : 'Sản phẩm',
+      free_ship: x.is_free_shipping === true,
+      value: x.is_value_combo ? Number(x.value_combo) || 0 : null,
+      discount: x.is_value_combo ? null : x.is_use_percent ? `${Number(x.discount_by_percent) || 0}%` : Number(x.discount_amount) || 0,
+      start: x.start_time ?? null,
+      end: x.end_time ?? null,
+      items,
+    });
+  }
+  return ok(c, { channel: ch, count: rows.length, rows });
+});
