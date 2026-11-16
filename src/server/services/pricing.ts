@@ -197,6 +197,7 @@ interface ProductRow {
   active: number;
   price_scope: string | null;
   per_box: number | null;
+  misa_code: string | null;
 }
 
 const perBox = (p: ProductRow): number | null => {
@@ -259,7 +260,8 @@ export async function listPriceTable(
     .prepare(
       `SELECT p.id, p.sku, p.name, p.unit, p.pack_size, p.group_id, g.name AS group_name, p.active,
               p.price_scope,
-              (SELECT m.factor FROM kho_map m WHERE lower(m.crm_sku) = lower(p.sku)) AS per_box
+              (SELECT m.factor FROM kho_map m WHERE lower(m.crm_sku) = lower(p.sku)) AS per_box,
+              (SELECT m.misa_code FROM kho_map m WHERE lower(m.crm_sku) = lower(p.sku)) AS misa_code
        FROM products p LEFT JOIN product_groups g ON g.id = p.group_id
        WHERE ${where.join(' AND ')}
        ORDER BY ${rank}p.sku
@@ -329,6 +331,7 @@ export async function listPriceTable(
       pack_size: p.pack_size,
       // Số chai / can trong 1 thùng: lấy từ đồng bộ mã kho (factor), chưa có thì lấy số ở ô quy cách.
       per_box: perBox(p),
+      misa_code: p.misa_code ?? null,
       group_id: p.group_id,
       group_name: p.group_name,
       active: p.active,

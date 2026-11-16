@@ -47,18 +47,20 @@ const SPCF_CSS=`<style>
 .spf-kmc .btn{margin-top:auto;align-self:flex-start}
 .spf-ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff;font-size:15px;flex:none}
 .spf-tiers{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px}
-.spf-xl{max-height:72vh;overflow:auto;border-top:1px solid var(--line)}
-.spf-xl table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
-.spf-xl th,.spf-xl td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 8px;white-space:nowrap;background:#fff}
-.spf-xl th{position:sticky;top:0;z-index:2;background:var(--gray-soft);font-size:12.5px;font-weight:700;color:var(--muted);text-align:left}
-.spf-xl th.n,.spf-xl td.n{text-align:right;font-variant-numeric:tabular-nums;min-width:96px}
-.spf-xl .st0{position:sticky;left:0;z-index:1;min-width:118px;max-width:118px;overflow:hidden}.spf-xl .st1{position:sticky;left:118px;z-index:1;min-width:230px;white-space:normal;box-shadow:2px 0 0 var(--line)}
-.spf-xl th.st0,.spf-xl th.st1{z-index:3}.spf-xl tr.grp td.st0{max-width:none;overflow:visible}
-.spf-xl tr.grp td{background:var(--canvas);font-weight:700;text-transform:uppercase;font-size:12.5px;color:var(--ink)}
-.spf-xl tbody tr:not(.grp):hover td{background:#fafbff}
-.spf-xl td.miss{background:var(--red-soft);color:#c7a4a1}.spf-xl td.chg,.spf-xl tbody tr:hover td.chg{background:#fff6c7}
-.spf-xl td s{display:block;font-size:11.5px;color:var(--muted)}
-.spf-xl .spf-xin{width:100%;min-width:84px;border:0;background:transparent;text-align:right;font:inherit;padding:2px 0;outline:none}.spf-xl .spf-xin:focus{box-shadow:inset 0 0 0 2px var(--blue);background:#fff}
+.spf-nb{overflow:auto;max-height:74vh;margin:0 14px 4px;border:1px solid #f4b6cf;border-radius:12px}
+.spf-nb table{border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+.spf-nb th{position:sticky;top:0;z-index:2;background:var(--pink);color:#fff;font-weight:700;font-size:13px;padding:10px 8px;text-align:center;border-right:1px solid rgba(255,255,255,.35);text-transform:none;letter-spacing:0;white-space:nowrap}
+.spf-nb th.l{text-align:left}.spf-nb th:last-child,.spf-nb td:last-child{border-right:0}
+.spf-nb td{padding:7px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;vertical-align:middle}
+.spf-nb td.c{text-align:center}.spf-nb td.n{text-align:right;white-space:nowrap;position:relative}
+.spf-nb td.ny{color:var(--muted)}.spf-nb td.hl{background:var(--pink-soft);font-weight:700;color:#9d1b55}
+.spf-nb td.miss{text-align:center;color:#b9bec8;font-size:12px}
+.spf-nb td.cd{font-family:var(--fm);font-size:12px;color:var(--muted);white-space:nowrap}.spf-nb td.cd small{font-size:11px}
+.spf-nb tr.grp td{background:#fdf2f7;color:#9d1b55;font-weight:700;font-size:12.5px;padding:6px 10px}.spf-nb tr.grp td span{font-weight:500;color:var(--muted)}
+.spf-nb tbody tr:not(.grp):hover td{background:#fafbff}.spf-nb tbody tr:not(.grp):hover td.hl{background:#fde3ee}
+.spf-nb td.chg,.spf-nb tbody tr:hover td.chg{background:#fff6c7}
+.spf-adj{position:absolute;top:5px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--pink)}
+.spf-nb .spf-xin{width:100%;min-width:80px;border:0;background:transparent;text-align:right;font:inherit;padding:2px 0;outline:none}.spf-nb .spf-xin:focus{box-shadow:inset 0 0 0 2px var(--blue);background:#fff}
 .spf-chips{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0}.spf-chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 6px 3px 10px;font-size:13px;background:#fff}
 .spf-chip button{border:0;background:none;color:var(--red);cursor:pointer;font-size:13px}
 @media(max-width:760px){.spf-sec{grid-template-columns:1fr;gap:8px}.spf-row{flex-wrap:wrap}.spf-row>.v{flex-basis:100%;justify-content:flex-start}.spf-its .hd,.spf-it{grid-template-columns:40px minmax(0,1fr) 70px 30px}.spf-its .hd span:nth-child(4),.spf-it .gc{display:none}}
@@ -257,42 +259,47 @@ function spcfTtDone(id){DB.mutate(ME.name,"đã khai combo sàn",d=>{const x=(d.
 async function spcfTtOpen(id){const x=spcfList("ttCombo").find(y=>y.id===id);if(!x)return;SPCB.at=0;await spcLoad(true);
   spcbEdit(null,{channel:x.ch||"TIKTOK",sku:x.sku,variant:x.variant||"",shops:[],orders:0,ttId:x.id,name:"Team khai: "+[x.gom,x.qua?"tặng "+x.qua:"",x.ghi].filter(Boolean).join(" · "),ttNote:[x.gom,x.qua?"tặng "+x.qua:"",x.ghi].filter(Boolean).join(" · ")})}
 
-/* ---------- Kênh phân phối: bảng giá 8 cấp kiểu Excel (chị Hoa 16/11) ----------
-   Lưới ô như Excel, nhóm hàng có dòng tiêu đề, cột Mã / Sản phẩm dính bên trái. Chọn "Tất cả cấp" hoặc một cấp (thêm cột giá thùng).
-   Sửa giá: ai có quyền giá (CEO: có hiệu lực ngay; Trưởng phòng: thành đề nghị chờ CEO duyệt) bấm "Sửa giá", gõ vào ô, ô đổi tô vàng,
-   bấm Lưu. Lưu qua /api/prices (giữ nguyên quy tắc cũ: giá cũ đóng lại, đơn cũ giữ giá đã chốt). Lịch sử: /api/products/:id/price-history. */
-/* Ghi giá chỉ làm ở trang quản trị (máy chủ chặn ghi giá từ địa chỉ khác); ở web vận hành chỉ xem */
+/* ---------- Kênh phân phối: bảng giá ngang kiểu tờ niêm yết Ailla (chị Hoa duyệt 16/11) ----------
+   STT · Sản phẩm · Quy cách (số chai / can một thùng) · Giá niêm yết (= Bán lẻ) · giá từng cấp · Mã KPP · Mã MISA (mã để cuối).
+   Mã lẻ (đuôi -C) và mã thùng của cùng sản phẩm gộp một dòng: giá theo mã lẻ, quy cách theo mã thùng.
+   Chọn "Tất cả cấp" hoặc một cấp. Sửa giá (trang quản trị, người có quyền giá): gõ vào ô, ô đổi vàng, Lưu kèm lý do
+   qua /api/prices (CEO có hiệu lực ngay, Trưởng phòng thành đề nghị chờ CEO). Lịch sử: /api/products/:id/price-history. */
 const spcfB2bRole=()=>{const P=(typeof SV!=="undefined"&&SV.perms)||[];return P.includes("price.approve")?"ok":P.includes("price.propose")?"de":""};
+/* Ghi giá chỉ làm ở trang quản trị (máy chủ chặn ghi giá từ địa chỉ khác); ở web vận hành chỉ xem */
 const spcfB2bPerm=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"?spcfB2bRole():"";
 async function spcfB2bLoad(force){if(SPCF.b2bBusy)return;SPCF.b2bBusy=true;try{SPCF.b2b=await svApi("/api/prices?limit=1000&scope=TIER"+(force?"&_="+Date.now():""))}catch(e){SPCF.b2b={err:e.message}}SPCF.b2bBusy=false;if(/^sp_/.test(PAGE))renderMain()}
+/* Gộp mã lẻ + mã thùng: khóa = mã bỏ đuôi -C */
+function spcfB2bRows(P){const by=new Map();P.forEach(p=>{const k=String(p.sku).replace(/-c$/i,"").toUpperCase();if(!by.has(k))by.set(k,[]);by.get(k).push(p)});
+  return [...by.values()].map(L=>{const th=L.find(p=>/thùng/i.test(p.unit||"")),le=L.find(p=>p!==th)||th;const q=(th&&(th.per_box||+String(th.pack_size||"").replace(/\D/g,"")))||le.per_box||"";
+    return {le,th:th!==le?th:null,q,g:le.group_name||(th&&th.group_name)||"Chưa xếp nhóm",misa:le.misa_code||(th&&th.misa_code)||""}})}
 function spcfB2bView(m,t,sub){
   if(!SPCF.b2b){spcfB2bLoad();spcfFrame(m,t,sub,{inner:`<p class="hint pad">Đang tải…</p>`});return}
   if(SPCF.b2b.err){spcfFrame(m,t,sub,{inner:`<div class="note red" style="margin:14px">${esc(SPCF.b2b.err)}</div>`});return}
-  const T=SPCF.b2b.tiers||[],q=spcfFold(SPCF.q).trim(),perm=spcfB2bPerm(),ed=!!(SPCF.b2bEd&&perm),chg=SPCF.chg||(SPCF.chg={});
+  const T0=SPCF.b2b.tiers||[],LE=T0.find(x=>x.code==="BAN_LE"),T=T0.filter(x=>x.code!=="BAN_LE");
+  const q=spcfFold(SPCF.q).trim(),perm=spcfB2bPerm(),ed=!!(SPCF.b2bEd&&perm),chg=SPCF.chg||(SPCF.chg={});
   if(SPCF.tier&&!T.some(x=>x.code===SPCF.tier))SPCF.tier="";
-  const one=T.find(x=>x.code===SPCF.tier),cols=one?[one]:T;
-  const L=(SPCF.b2b.products||[]).filter(p=>(!q||spcfFold(p.sku+" "+p.name+" "+(p.group_name||"")).includes(q))&&(!SPCF.miss||cols.some(x=>p.prices[x.code]==null)));
-  const G=[];L.forEach(p=>{const g=p.group_name||"Chưa xếp nhóm";let x=G.find(y=>y.g===g);if(!x)G.push(x={g,L:[]});x.L.push(p)});
-  const cell=(p,x)=>{const k=p.id+"|"+x.id,base=p.prices[x.code],eff=p.eff_prices?p.eff_prices[x.code]:base,adj=(p.adjusted||[]).find(a=>a.tier===x.code),c=chg[k];
-    if(ed)return `<td class="n${c!==undefined?" chg":""}${base==null&&c===undefined?" miss":""}"><input class="spf-xin" data-k="${k}" inputmode="numeric" value="${c!==undefined?(c==null?"":nf(c)):base!=null?nf(base):""}" placeholder="—"></td>`;
-    if(base==null)return `<td class="n miss" title="Chưa có giá: cấp này bị chặn bán">—</td>`;
-    return `<td class="n"${adj?` title="${esc(adj.label)}"`:""}>${adj&&eff!==base?`<b>${nf(eff)}</b><s>${nf(base)}</s>`:nf(base)}</td>`};
-  const box=p=>{if(!one)return "";const v=p.eff_prices?p.eff_prices[one.code]:p.prices[one.code];return `<td class="n">${p.per_box&&v!=null?nf(v*p.per_box):""}</td>`};
-  const nc=4+cols.length+(one?1:0)+1;
-  const head=`<tr><th class="st0">Mã</th><th class="st1">Sản phẩm</th><th>ĐVT</th><th>Quy cách</th>${cols.map(x=>`<th class="n">${esc(x.name)}</th>`).join("")}${one?`<th class="n">Giá thùng</th>`:""}<th></th></tr>`;
-  const body=G.map(g=>`<tr class="grp"><td class="st0" colspan="2">${esc(g.g)} <span class="hint">· ${g.L.length}</span></td><td colspan="${nc-2}"></td></tr>`+g.L.map(p=>`<tr><td class="st0"><span class="spf-tag">${esc(p.sku)}</span></td><td class="st1">${esc(p.name)}</td><td>${esc(p.unit||"")}</td><td class="hint">${esc(p.pack_size||"")}</td>${cols.map(x=>cell(p,x)).join("")}${box(p)}<td><button class="lnk" data-spcfph="${esc(p.id)}" title="Lịch sử giá">🕘</button></td></tr>`).join("")).join("");
-  const nMiss=(SPCF.b2b.products||[]).filter(p=>(p.missing_tiers||[]).length).length,nChg=Object.keys(chg).length;
+  const one=T.find(x=>x.code===SPCF.tier),cols=one?[one]:T,show=(LE?[LE]:[]).concat(cols);
+  const R=spcfB2bRows(SPCF.b2b.products||[]).filter(r=>(!q||spcfFold([r.le.sku,r.th&&r.th.sku,r.le.name,r.g,r.misa].join(" ")).includes(q))&&(!SPCF.miss||show.some(x=>r.le.prices[x.code]==null)));
+  const G=[];R.forEach(r=>{let x=G.find(y=>y.g===r.g);if(!x)G.push(x={g:r.g,L:[]});x.L.push(r)});
+  const cell=(r,x,cls)=>{const p=r.le,k=p.id+"|"+x.id,base=p.prices[x.code],eff=p.eff_prices?p.eff_prices[x.code]:base,adj=(p.adjusted||[]).find(a=>a.tier===x.code),c=chg[k];
+    if(ed)return `<td class="n${c!==undefined?" chg":""}"><input class="spf-xin" data-k="${k}" inputmode="numeric" value="${c!==undefined?(c==null?"":nf(c)):base!=null?nf(base):""}" placeholder="chưa có"></td>`;
+    if(base==null)return `<td class="miss">chưa có</td>`;
+    return `<td class="n ${cls}"${adj?` title="Giá gốc ${nf(base)} · ${esc(adj.label)}"`:""}>${nf(eff!=null?eff:base)}${adj&&eff!==base?`<i class="spf-adj" aria-hidden="true"></i>`:""}</td>`};
+  const nc=4+cols.length+3;let i=0;
+  const head=`<tr><th style="width:46px">STT</th><th class="l">Sản phẩm</th><th style="width:76px">Quy cách</th><th style="width:104px">Giá niêm yết</th>${cols.map(x=>`<th style="width:${one?128:96}px">${esc(one?"Giá "+x.name:x.name)}</th>`).join("")}<th style="width:120px">Mã KPP</th><th style="width:120px">Mã MISA</th><th style="width:34px"></th></tr>`;
+  const body=G.map(g=>`<tr class="grp"><td colspan="${nc}">${esc(g.g)} <span>· ${g.L.length}</span></td></tr>`+g.L.map(r=>`<tr><td class="c">${++i}</td><td>${esc(r.le.name)}</td><td class="c">${esc(String(r.q||""))}</td>${LE?cell(r,LE,"ny"):"<td></td>"}${cols.map(x=>cell(r,x,one?"hl":"")).join("")}
+    <td class="cd">${esc(r.le.sku)}${r.th?`<br><small>thùng ${esc(r.th.sku)}</small>`:""}</td><td class="cd">${r.misa?esc(r.misa):`<small class="hint">chưa nối</small>`}</td><td class="c"><button class="lnk" data-spcfph="${esc(r.le.id)}" title="Lịch sử giá">🕘</button></td></tr>`).join("")).join("");
+  const nMiss=R.filter(r=>T0.some(x=>x.code!=="NHAN_VIEN"&&r.le.prices[x.code]==null)).length,nChg=Object.keys(chg).length;
   const tools=!perm&&spcfB2bRole()?`<span class="hint">Sửa giá: mở mục này ở trang quản trị</span>`:perm?(ed?`<button class="btn" data-spcfxx="1">Hủy sửa</button><button class="btn pri" data-spcfxs="1" ${nChg?"":"disabled"}>${perm==="ok"?"Lưu":"Gửi chị duyệt"} ${nChg?nChg+" ô":""}</button>`:`<button class="btn pri" data-spcfxe="1">✎ Sửa giá</button>`):"";
-  spcfFrame(m,t,sub,{q:"Tìm mã, tên, nhóm…",count:nf(L.length)+" sản phẩm",tools,
+  spcfFrame(m,t,sub,{q:"Tìm tên, mã KPP, mã MISA…",count:nf(R.length)+" sản phẩm",tools,
     inner:`<div class="spf-tiers"><div class="settabs" style="margin:0">${[["","Tất cả cấp"]].concat(T.map(x=>[x.code,x.name])).map(([k,n])=>`<button class="${SPCF.tier===k?"on":""}" data-spcftier="${esc(k)}">${esc(n)}</button>`).join("")}</div>
-      <label class="inl" style="margin-left:auto;white-space:nowrap"><input type="checkbox" id="spcf-miss" ${SPCF.miss?"checked":""} style="width:auto"> Chỉ mã thiếu giá</label></div>
-      ${nMiss?`<div class="note" style="margin:0 14px 10px;background:var(--orange-soft);color:var(--orange)">${nMiss} mã đang thiếu giá ở ít nhất một cấp (ô đỏ nhạt): cấp đó bị chặn bán, không tự áp giá.</div>`:""}
-      ${ed?`<div class="note" style="margin:0 14px 10px">Gõ giá vào ô, ô đã đổi tô vàng. Xóa trắng ô = bỏ giá cấp đó. ${perm==="ok"?"Bấm Lưu là giá có hiệu lực từ hôm nay.":"Bấm Gửi chị duyệt: giá mới chờ CEO duyệt rồi mới áp dụng."}</div>`:""}
-      <div class="spf-xl"><table><thead>${head}</thead><tbody>${body||`<tr><td colspan="${nc}" class="spf-empty">Không có sản phẩm</td></tr>`}</tbody></table></div>
-      <p class="hint pad" style="margin:0">Giá hiệu lực ngày ${esc(spcfVN(SPCF.b2b.date||spcfToday()))}. Số in đậm kèm số gạch ngang là giá đang có chương trình điều chỉnh. Bấm 🕘 để xem lịch sử giá từng mã.</p>`});
-  m.querySelectorAll(".spf-xin").forEach(i=>{i.onkeydown=e=>{if(e.key==="Enter"){const all=[...m.querySelectorAll(".spf-xin")],n=all[all.indexOf(i)+cols.length];if(n)n.focus()}};
-    i.onfocus=()=>i.select();i.onchange=()=>{const k=i.dataset.k,[pid,tid]=k.split("|"),p=SPCF.b2b.products.find(x=>x.id===pid),x=T.find(y=>y.id===tid),old=p.prices[x.code],v=i.value.trim()===""?null:spcfNum(i.value);
-      if(v===old)delete chg[k];else chg[k]=v;i.value=v==null?"":nf(v);i.parentNode.classList.toggle("chg",k in chg);const b=m.querySelector("[data-spcfxs]"),n=Object.keys(chg).length;if(b){b.disabled=!n;b.textContent=(perm==="ok"?"Lưu":"Gửi chị duyệt")+(n?" "+n+" ô":"")}}});
+      <label class="inl" style="margin-left:auto;white-space:nowrap"><input type="checkbox" id="spcf-miss" ${SPCF.miss?"checked":""} style="width:auto"> Chỉ mã thiếu giá${nMiss?" ("+nMiss+")":""}</label></div>
+      ${ed?`<div class="note" style="margin:0 14px 10px">Gõ giá vào ô (giá mỗi chai / can), ô đã đổi tô vàng. Xóa trắng ô = bỏ giá cấp đó. ${perm==="ok"?"Bấm Lưu là giá có hiệu lực từ hôm nay.":"Bấm Gửi chị duyệt: giá mới chờ CEO duyệt rồi mới áp dụng."} Giá thùng sửa riêng ở mã thùng.</div>`:""}
+      <div class="spf-nb"><table><thead>${head}</thead><tbody>${body||`<tr><td colspan="${nc}" class="spf-empty">Không có sản phẩm</td></tr>`}</tbody></table></div>
+      <p class="hint pad" style="margin:0">Giá niêm yết = giá bán lẻ. Giá theo mỗi chai / can; quy cách = số chai / can một thùng. Giá hiệu lực ngày ${esc(spcfVN(SPCF.b2b.date||spcfToday()))}; ô có chấm hồng là giá đang có chương trình điều chỉnh (rê chuột để xem giá gốc). Bấm 🕘 xem lịch sử giá.</p>`});
+  m.querySelectorAll(".spf-xin").forEach(inp=>{inp.onkeydown=e=>{if(e.key==="Enter"){const all=[...m.querySelectorAll(".spf-xin")],n=all[all.indexOf(inp)+show.length];if(n)n.focus()}};
+    inp.onfocus=()=>inp.select();inp.onchange=()=>{const k=inp.dataset.k,[pid,tid]=k.split("|"),p=SPCF.b2b.products.find(x=>x.id===pid),x=T0.find(y=>y.id===tid),old=p.prices[x.code],v=inp.value.trim()===""?null:spcfNum(inp.value);
+      if(v===old)delete chg[k];else chg[k]=v;inp.value=v==null?"":nf(v);inp.parentNode.classList.toggle("chg",k in chg);const b=m.querySelector("[data-spcfxs]"),n=Object.keys(chg).length;if(b){b.disabled=!n;b.textContent=(perm==="ok"?"Lưu":"Gửi chị duyệt")+(n?" "+n+" ô":"")}}});
 }
 async function spcfB2bSave(){const chg=SPCF.chg||{},K=Object.keys(chg);if(!K.length)return;const perm=spcfB2bPerm();
   const ly=prompt((perm==="ok"?"Lưu ":"Gửi chị duyệt ")+K.length+" ô giá. Lý do điều chỉnh (để ghi lịch sử):","");if(ly===null)return;
@@ -302,7 +309,7 @@ async function spcfB2bSave(){const chg=SPCF.chg||{},K=Object.keys(chg);if(!K.len
 async function spcfB2bHist(pid){const p=(SPCF.b2b.products||[]).find(x=>x.id===pid);if(!p)return;
   let R=[];try{R=await svApi("/api/products/"+encodeURIComponent(pid)+"/price-history")}catch(e){toast(e.message);return}
   const ST={ACTIVE:["đang dùng","grn"],DRAFT:["chờ duyệt","amb"],ARCHIVED:["đã thay","gry"],REJECTED:["bị từ chối","red"]};
-  spcfModal(`Lịch sử giá · ${esc(p.sku)} ${esc(p.name)}`,spcfSec("Các lần đặt giá",`<div class="spf-box" style="padding:0">${tbl(["Cấp","Giá","Từ ngày","Đến ngày","Trạng thái","Người đặt","Lúc"],(R||[]).map(r=>{const s=ST[r.status]||[r.status,"gry"];return `<tr><td>${esc(r.tier_name)}</td><td class="n"><b>${r.amount!=null?nf(r.amount):"bỏ giá"}</b></td><td>${esc(spcfVN(r.valid_from))}</td><td class="hint">${esc(spcfVN(r.valid_to||""))}</td><td>${pill(s[0],s[1])}</td><td>${esc(r.created_by_name||"")}</td><td class="hint">${esc(String(r.created_at||"").slice(0,16).replace("T"," "))}</td></tr>`}))}</div>`,"Theo từng cấp, mới nhất ở trên. Đơn cũ giữ giá lúc chốt."),"")}
+  spcfModal(`Lịch sử giá · ${esc(p.name)}`,spcfSec("Các lần đặt giá",`<div class="spf-box" style="padding:0">${tbl(["Cấp","Giá","Từ ngày","Đến ngày","Trạng thái","Người đặt","Lúc"],(R||[]).map(r=>{const s=ST[r.status]||[r.status,"gry"];return `<tr><td>${esc(r.tier_name)}</td><td class="n"><b>${r.amount!=null?nf(r.amount):"bỏ giá"}</b></td><td>${esc(spcfVN(r.valid_from))}</td><td class="hint">${esc(spcfVN(r.valid_to||""))}</td><td>${pill(s[0],s[1])}</td><td>${esc(r.created_by_name||"")}</td><td class="hint">${esc(String(r.created_at||"").slice(0,16).replace("T"," "))}</td></tr>`}))}</div>`,"Theo từng cấp, mới nhất ở trên. Đơn cũ giữ giá lúc chốt."),"")}
 
 /* ============================== KHUYẾN MÃI ============================== */
 /* 6 loại như Poscake. cfg theo loại:

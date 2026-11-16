@@ -153,6 +153,8 @@ export interface ProductItem {
   pack_size: string | null;
   /** Số chai / can trong 1 thùng (mã bán theo thùng); null = không phải mã thùng hoặc chưa có. */
   per_box?: number | null;
+  /** Mã kho MISA nối với mã này (kho_map), để bảng giá hiện kèm mã MISA. */
+  misa_code?: string | null;
   group_id: string | null;
   group_name: string | null;
   active: number;
