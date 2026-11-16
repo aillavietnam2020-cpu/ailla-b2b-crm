@@ -38,7 +38,7 @@ function dtSyncFb(){
   if(DTS.fbFor!==DAYD){DTS.fbFor=DAYD;DTS.fbGoc={};DTS.fbAt=""}
   if(DTS.fbAt!==FBS.raw.at){DTS.fbAt=FBS.raw.at;DTS.fbMine={};DTS.fbDay={}}
   for(const k in F){const cur=DAYD.fb[k];if(cur&&cur===DTS.fbMine[k])continue;
-    const a=DTS.fbDay[k]||(DTS.fbDay[k]=dtFbNgay(F[k])),est=typeof ADF!=="undefined"&&ADF.mgFb&&ADF.mgFb.has(k);
+    const a=DTS.fbDay[k]||(DTS.fbDay[k]=dtFbNgay(F[k],k)),est=typeof ADF!=="undefined"&&ADF.mgFb&&ADF.mgFb.has(k);
     if(cur&&!est&&!DTS.mine.has(cur)&&!DTS.fbGoc[k])DTS.fbGoc[k]=cur.slice();
     const g=DTS.fbGoc[k],ratio=g&&g[5]>0&&g[7]>0?g[7]/g[5]:(typeof ADF_GV!=="undefined"?ADF_GV:0.156);
     const row=[a.tao,Math.max(0,a.tao-a.huy),a.huy,a.hoan,a.giao,a.dtGiao,a.dt,Math.round(a.dtGiao*ratio),cur?+cur[8]||0:0,cur?+cur[9]||0:0];

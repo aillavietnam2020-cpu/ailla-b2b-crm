@@ -483,6 +483,13 @@ function pCsCd(m){
     e.target.disabled=true;csApi("/settings",{method:"PUT",body:JSON.stringify(b)}).then(s=>{CSK.me.settings=s;toast("Đã lưu cài đặt");CSK.ov=null;CSK.today=null;renderMain()}).catch(er=>{e.target.disabled=false;csErr(er)})};
 }
 
+/* Đơn CSKH theo ngày tạo, để số Facebook Ads (dtcalc.js dtFbNgay) trừ ra. Tải một lần khi mở web, 30 phút làm mới. */
+const CSFB={days:null,at:0,busy:0};
+function csFbMinus(day){if(!CSFB.days&&!CSFB.busy&&Date.now()-CSFB.at>60000&&typeof svApi==="function"){CSFB.busy=1;CSFB.at=Date.now();
+    csApi("/fb-days").then(r=>{CSFB.days=(r&&r.days)||{};CSFB.busy=0;if(Object.keys(CSFB.days).length&&typeof DTS!=="undefined"){DTS.fbAt="";try{dtSyncFb()}catch(e){}if(typeof dtRe==="function")dtRe()}}).catch(()=>{CSFB.busy=0})}
+  if(CSFB.days&&Date.now()-CSFB.at>1800000){CSFB.days=null}
+  return CSFB.days?CSFB.days[day]||null:null}
+
 /* ---------- Gắn vào web: trang, menu, quyền ---------- */
 Object.assign(PAGES,{cs_tq:pCsTq,cs_today:pCsToday,cs_kh:pCsKh,cs_don:pCsDon,cs_chia:pCsChia,cs_bc:pCsBc,cs_cd:pCsCd});
 /* Quản trị › Điều hành CEO › Kênh bán hàng › CSKH cũ (chị Hoa 16/11): báo cáo riêng của mảng CSKH, không chung Facebook Ads. */
