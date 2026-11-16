@@ -62,7 +62,7 @@ baocaoFileRoutes.post('/', adminOnlyEndpoint, async (c) => {
   const r = await fetch(c.env.BC_DRIVE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: c.env.BC_DRIVE_KEY, path: [ky, nhom, LOAI[loai]], name, mime: clean(b.mime, 120) || 'application/octet-stream', data }),
+    body: JSON.stringify({ key: c.env.BC_DRIVE_KEY, path: [ky, nhom, LOAI[loai]], name, mime: /^[\w.+-]+\/[\w.+-]+$/.test(String(b.mime ?? '')) ? String(b.mime) : 'application/octet-stream', data }),
   });
   const res = (await r.json().catch(() => null)) as { id?: string; url?: string; folderUrl?: string; size?: number; error?: string } | null;
   if (!res || res.error || !res.id) throw badRequest('DRIVE_FAIL', `Không lưu được file lên Drive: ${res?.error ?? 'HTTP ' + r.status}`);
