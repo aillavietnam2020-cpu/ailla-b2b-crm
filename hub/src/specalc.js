@@ -40,7 +40,7 @@ function speReadOrders(aoa,ky){
   for(let r=H.at+1;r<aoa.length;r++){const a=aoa[r];if(!a)continue;const o=ttCell(g(a,"Mã đơn hàng"));if(!o)continue;
     const d=ttIsoDay(ttCell(g(a,"Ngày đặt hàng")));if(!d)continue;if(ky&&d.slice(0,7)!==ky){outside++;continue}
     const q=ttNum(g(a,"Số lượng")),rq=ttNum(g(a,"Số lượng sản phẩm được hoàn trả"));
-    const st=ttCell(g(a,"Trạng Thái Đơn Hàng"));lines.push({o,d,st,rq,huy:st==="Đã hủy"||rq>0,pn:ttCell(g(a,"Tên sản phẩm")),vr:ttCell(g(a,"Tên phân loại hàng")),
+    const st=ttCell(g(a,"Trạng Thái Đơn Hàng"));lines.push({o,d,st,rq,huy:st==="Đã hủy",pn:ttCell(g(a,"Tên sản phẩm")),vr:ttCell(g(a,"Tên phân loại hàng")),
       sv:ttCell(g(a,"SKU phân loại hàng")),sp:ttCell(g(a,"SKU sản phẩm")),q,dt:ttNum(g(a,"Giá gốc"))-ttNum(g(a,"Người bán trợ giá"))})}
   if(!lines.length)return {err:ky?`File đơn không có đơn nào đặt trong tháng ${ky.slice(5)}/${ky.slice(0,4)}.`:"File đơn không có dòng nào đọc được."};
   return {lines,outside};
@@ -131,10 +131,17 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
   const L=orders.lines,F=fin.ord,den=fin.partial?L.reduce((m,l)=>l.d>m?l.d:m,""):null;
   /* Shopee là nguồn sự thật về hoàn tiền: tổng hàng hoá về 0 = hoàn toàn bộ. */
   const hoan=new Set(Object.keys(F).filter(id=>F[id].gross>0&&Math.abs(F[id].gross+F[id].hoan)<1));
-  let lech=0;L.forEach(l=>{if(hoan.has(l.o)&&!l.huy){l.huy=true;lech++}});
-  const ordDt={},ordQ={};L.forEach(l=>{ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q});
-  L.forEach(l=>{l.w=ordDt[l.o]?l.dt/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:0);l.qt=!!F[l.o]});
-  const base=L.filter(l=>l.qt&&!l.huy),baseDt=base.reduce((s,l)=>s+l.dt,0);
+  /* Hoàn tiền toàn bộ mà Shopee vẫn thu phí: giữ dòng với tiền hàng 0 để tính đúng phí, không đếm là đơn (full). */
+  let lech=0;L.forEach(l=>{if(hoan.has(l.o)&&!l.huy){if(F[l.o].f.some(v=>Math.abs(v)>=1)){l.full=1;l.dt0=l.dt;l.dt=0;l.q=0}else l.huy=true;lech++}});
+  /* Đơn có hàng trả (chị Hoa duyệt 16/11/2026, theo đối soát của chị Huệ): không bỏ cả đơn nữa mà tính đúng phần Shopee thực thu theo file Tài chính.
+     Đã có trong Tài chính: tiền hàng nhân tỷ lệ (Giá sản phẩm + Số tiền hoàn lại) / Giá sản phẩm, có hoàn tiền thì trừ số lượng trả khỏi giá vốn.
+     Chưa có trong Tài chính (chưa quyết toán): bỏ dòng có hàng trả như trước, không ước. */
+  const traO={};L.forEach(l=>{if(l.rq>0&&!l.huy){if(!F[l.o]){l.huy=true;return}traO[l.o]=1}});
+  L.forEach(l=>{if(!traO[l.o]||l.huy)return;const x=F[l.o],k=x.gross>0?(x.gross+x.hoan)/x.gross:1;
+    if(k<1){l.dt=l.dt*k;if(l.rq>0)l.q=Math.max(0,l.q-l.rq)}l.tra=1});
+  const ordDt={},ordQ={},ordN={};L.forEach(l=>{if(l.huy)return;ordDt[l.o]=(ordDt[l.o]||0)+l.dt;ordQ[l.o]=(ordQ[l.o]||0)+l.q;ordN[l.o]=(ordN[l.o]||0)+1});
+  L.forEach(l=>{l.w=ordDt[l.o]?l.dt/ordDt[l.o]:(ordQ[l.o]?l.q/ordQ[l.o]:(ordN[l.o]?1/ordN[l.o]:0));l.qt=!!F[l.o]});
+  const base=L.filter(l=>l.qt&&!l.huy&&!l.full),baseDt=base.reduce((s,l)=>s+l.dt,0);
   if(!baseDt)return {err:`Shop ${shop||"?"}: không ghép được đơn nào giữa file đơn và file Tài chính. Hãy kiểm tra hai file cùng shop, cùng tháng.`};
   const rate=new Array(SPE_NG).fill(0);let rateV=0;
   base.forEach(l=>{const x=F[l.o];for(let g=0;g<SPE_NG;g++)rate[g]+=x.f[g]*l.w;rateV+=x.vou*l.w});
@@ -146,9 +153,9 @@ function speBuildMonth({ky,shop,orders,fin,ads,costOf,pos}){
     l.wf=f;l.wdt=dt;/* giữ số từng dòng cho file tính toán (bcfile.js) */
     const k=speKey(l.pn,l.vr),s=sku[k]||(sku[k]={pn:l.pn,vr:l.vr,sv:l.sv,sp:l.sp,q:0,dt:0,vou:0,f:new Array(SPE_NG).fill(0),dtU:0});
     s.q+=l.q;s.dt+=dt;s.vou+=vou;for(let g=0;g<SPE_NG;g++)s.f[g]+=f[g];mon+=l.q;if(!l.qt){s.dtU+=dt;dtUoc+=dt}
-    if(x&&x.aff)koc+=dt;okOrd.add(l.o);
+    if(x&&x.aff)koc+=dt;if(l.full)hh+=l.dt0;else okOrd.add(l.o);
     const dd=days[l.d]||(days[l.d]={dt:0,phi:0,gv:0,don:0,sk:{}});dd.dt+=dt;dd.phi+=f.reduce((a,b)=>a+b,0);dd.sk[k]=(dd.sk[k]||0)+l.q;
-    if(!dayOrd[l.d+"|"+l.o]){dayOrd[l.d+"|"+l.o]=1;dd.don++}});
+    if(!l.full&&!dayOrd[l.d+"|"+l.o]){dayOrd[l.d+"|"+l.o]=1;dd.don++}});
   /* Giá vốn: mã chưa có giá vốn KHÔNG ước (chị Hoa duyệt 28/10/2026): để 0, đánh dấu uoc = "chưa tính giá vốn"; dtUocGv = doanh thu chưa tính giá vốn. */
   const learn=pos?speLearnPos(L,pos):{};
   const rows=Object.entries(sku).map(([k,s])=>{if(learn[k])s.ps=learn[k];const c=(costOf&&costOf(s))||{u:null,why:"Chưa quy đổi mã"};return {k,...s,phi:s.f.reduce((a,b)=>a+b,0),c,u:c.u}});

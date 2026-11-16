@@ -47,8 +47,9 @@ function speCalcBook(x){
     if(!ls.length){tinh="Không";why=`Không có trong file đơn tháng ${M.ky.slice(5)}/${M.ky.slice(0,4)}${o.d&&o.d.slice(0,7)!==M.ky?" (đặt ngày "+vn(o.d)+")":""}`}
     else{const r=bo.map(l=>l.st==="Đã hủy"?"đơn hủy":l.rq>0?"có hàng trả":M.hoanSet&&M.hoanSet.has(id)?"Tài chính hoàn tiền toàn bộ":"loại").filter((v,i,a)=>a.indexOf(v)===i);
       if(!ok.length){tinh="Không";why="Bỏ cả đơn: "+r.join(", ")}
+      else if(ok.every(l=>l.full)){tinh="Chỉ phí";why="Hoàn tiền toàn bộ: không tính tiền hàng, chỉ tính phí Shopee vẫn thu"}
       else if(bo.length){tinh="Một phần";why="Bỏ dòng: "+r.join(", ")}
-      else{tinh="Có";why=f?"":"Chưa có trong Tài chính: phí ước theo tỷ lệ trung bình"}}
+      else{tinh="Có";why=f?(ls.some(l=>l.tra)?"Có hàng trả: tính phần Shopee thực thu theo Tài chính":""):"Chưa có trong Tài chính: phí ước theo tỷ lệ trung bình"}}
     const wf=new Array(NG).fill(0);let wdt=0,gv=0;ok.forEach(l=>{wdt+=l.wdt||0;(l.wf||[]).forEach((v,i)=>wf[i]+=v);const r=byK[speKey(l.pn,l.vr)];if(r&&!r.uoc)gv+=r.u*l.q});
     const tf=f?f.f:new Array(NG).fill(0);
     const row=[id,vn(o.d),ls.map(l=>`${l.pn}${l.vr?" – "+l.vr:""} × ${l.q}`).join("; "),ls.length?"Có":"Không",f?"Có":"Không",tinh,why,Math.round(wdt),...wf,wf.reduce((a,b)=>a+b,0),Math.round(gv),
@@ -56,7 +57,7 @@ function speCalcBook(x){
     row.forEach((v,i)=>{if(i>=7&&typeof v==="number")T[i]+=v});rows.push(row)});
   const sum=k=>T[head.indexOf(k)];
   const tcPhi=G.map(g=>sum("TC: "+g)),webPhi=G.map(g=>sum(g+" (web)"));
-  const nDon=rows.filter(r=>r[5]!=="Không").length,nTc=rows.filter(r=>r[4]==="Có").length;
+  const nDon=rows.filter(r=>r[5]!=="Không"&&r[5]!=="Chỉ phí").length,nTc=rows.filter(r=>r[4]==="Có").length;
   const tong=[["Shopee "+speShopL(M.shop)+" · tháng "+M.ky.slice(5)+"/"+M.ky.slice(0,4)+" · file tính toán web ABOS, tạo "+bcStamp()],
     ["Tài chính từ "+vn(M.inc&&M.inc.from)+" đến "+vn(M.inc&&M.inc.to)+" · file: "+[x.files.orders,x.files.fin,x.files.ads].filter(Boolean).join(" | ")],[],
     ["Khoản","Số trên web","Cộng lại từ trang Từng đơn","Lệch (làm tròn)","Cả file Tài chính (mọi đơn trong file)","Kế toán (nhập để so)","Web − Kế toán"],
@@ -70,7 +71,7 @@ function speCalcBook(x){
   const loai=rows.filter(r=>r[5]!=="Có"||r[6]);
   const cach=[["Cách web tính số Shopee (đọc để đối soát)"],[],
     ["1. Đơn lấy từ file đơn hàng (đặt trong tháng). Đơn có trong file Tài chính mà không có trong file đơn tháng này thì web KHÔNG tính (cột Web tính = Không)."],
-    ["2. Dòng sản phẩm đã hủy, hoặc có số lượng hoàn trả > 0, hoặc Tài chính ghi hoàn tiền toàn bộ: web bỏ dòng đó, kéo theo phí của dòng đó."],
+    ["2. Dòng sản phẩm đã hủy, hoặc Tài chính ghi hoàn tiền toàn bộ: web bỏ dòng đó. Đơn có hàng trả mà Shopee vẫn thu tiền: tiền hàng theo Tài chính (giá sản phẩm + hoàn lại), phí theo Tài chính, giá vốn trừ số lượng trả. Đơn có hàng trả chưa có trong Tài chính: bỏ dòng đó."],
     ["3. Phí của từng đơn lấy từ file Tài chính, chia cho các dòng sản phẩm theo tỷ lệ doanh thu dòng."],
     ["4. Đơn chưa có trong Tài chính (chưa quyết toán): phí ước theo tỷ lệ phí trung bình của các đơn đã có."],
     ["5. Phí vận chuyển ròng và Thuế sàn khấu trừ được cộng vào phí (xem từng cột riêng)."],

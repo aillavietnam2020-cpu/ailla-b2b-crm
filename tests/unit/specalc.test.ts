@@ -105,7 +105,8 @@ describe('specalc: số tháng một shop', () => {
     expect(M.lech).toBe(1);
     expect(M.don).toBe(2);
     expect(M.dt).toBe(110000 + Math.round(60000 + 60000 * rateV));
-    expect(M.phi).toBe(-32000 + Math.round(60000 * rateFee));
+    // A3 hoàn tiền toàn bộ nhưng Shopee vẫn thu ship −20.000: giữ phần phí đó, không đếm đơn (16/11/2026).
+    expect(M.phi).toBe(-32000 - 20000 + Math.round(60000 * rateFee));
     expect(M.hh).toBe(100000 + 100000);
     expect(M.koc).toBe(110000);
     expect(M.ads).toBe(50000);
@@ -168,17 +169,18 @@ describe('specalc: kỳ đã có báo cáo của mọi shop', () => {
 const DIR = 'F:/QUẢN LÝ NỘI BỘ/BÁO CÁO SHOPEE/';
 const REAL = [`${DIR}Đơn shopee mall tháng 07.2026.xlsx`, `${DIR}Tài chính shopeemall từ 01.7-8.8.2026.xlsx`, `${DIR}aillavn_adwords_bill_2026-08-26.csv`];
 describe.skipIf(!REAL.every((p) => existsSync(p)))('specalc: số thật T07/2026 Shopee Mall', () => {
-  it('doanh thu 118.854.796 (lệch làm tròn ≤ 5đ), phí sàn 39.927.589, ads 23.339.193, 968 đơn', () => {
+  // 16/11/2026 đổi cách tính đơn có hàng trả (tính phần Shopee thực thu theo Tài chính): doanh thu +483đ, phí thêm 241.898đ của đơn có hàng trả, thêm 1 đơn.
+  it('doanh thu 118.855.279 (lệch làm tròn ≤ 5đ), phí sàn 40.169.487, ads 23.339.193, 969 đơn', () => {
     const XLSX = createRequire(import.meta.url)('xlsx');
     const rd = (p: string) => T.ttSheets(XLSX, XLSX.read(readFileSync(p), { type: 'buffer' }));
     const O = T.speReadOrders(T.speOrderSheet(rd(REAL[0])), '2026-07');
     const F = T.speReadFin(rd(REAL[1]), '2026-07');
     const A = T.speReadAds(T.ttCsv(readFileSync(REAL[2], 'utf8')));
     const M = T.speBuildMonth({ ky: '2026-07', shop: F.shop, orders: O, fin: F, ads: A });
-    expect(Math.abs(M.dt - 118854796)).toBeLessThanOrEqual(5);
-    expect(M.phi).toBe(-39927589);
+    expect(Math.abs(M.dt - 118855279)).toBeLessThanOrEqual(5);
+    expect(M.phi).toBe(-40169487);
     expect(M.ads).toBe(23339193);
-    expect(M.don).toBe(968);
+    expect(M.don).toBe(969);
     expect(M.mon).toBe(1160);
   }, 120000);
 });

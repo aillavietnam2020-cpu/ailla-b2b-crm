@@ -82,6 +82,7 @@ describe('bcfile: file tính toán Shopee', () => {
     expect(String(by('A2')[6])).toMatch(/đơn hủy/);
     expect(by('A4')[4]).toBe('Không');
     expect(String(by('A4')[6])).toMatch(/Chưa có trong Tài chính/);
+    expect(by('A3')[5]).toBe('Chỉ phí');
     expect(JSON.stringify(don)).not.toMatch(/N\*+A|\*+90/);
   });
 });
