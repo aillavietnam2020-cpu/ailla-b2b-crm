@@ -418,12 +418,14 @@ function spcfPkCbView(ed){
 function spcfSanView(m,CH,sub){
   spcLoad();
   const P=spcfList("ttCombo").filter(x=>x.tt!=="xong"&&(x.ch||"TIKTOK")===CH).slice().reverse(),ed=spcfChs(ME).some(c=>c[0]===SPCF.ch);
-  const nm=p=>p.qty+" × "+((SPCB.items&&SPCB.items.get(spcLow(p.code))||{}).name||p.label);
+  /* Tên, biến thể, SKU tách cột; Gồm / Quà mỗi sản phẩm một dòng kèm số lượng (chị Hoa 17/11) */
+  const nm=p=>(SPCB.items&&SPCB.items.get(spcLow(p.code))||{}).name||p.label;
+  const lines=ps=>ps.map(p=>`<div style="display:flex;gap:10px;justify-content:space-between;padding:1px 0"><span>${esc(nm(p))}</span><b style="white-space:nowrap">× ${nf(p.qty)}</b></div>`).join("")||'<span class="hint">—</span>';
   const q=spcfFold(SPCF.q).trim();
-  const L=SPCB.rows?spcGroup(SPCB.rows.filter(r=>r.channel===CH),SPCB.sales,spcToday()).filter(c=>c.active&&(!q||spcfFold(c.sku+" "+c.variant+" "+c.parts.map(p=>p.label).join(" ")).includes(q))).sort((a,b)=>b.orders-a.orders):null;
+  const L=SPCB.rows?spcGroup(SPCB.rows.filter(r=>r.channel===CH),SPCB.sales,spcToday()).filter(c=>c.active&&(!q||spcfFold(c.sku+" "+c.variant+" "+(c.name||"")+" "+c.parts.map(p=>p.label).join(" ")).includes(q))).sort((a,b)=>b.orders-a.orders):null;
   spcfFrame(m,"Combo",sub,{q:"Tìm mã sàn, sản phẩm…",count:L?nf(L.length)+" combo đang dùng":"Đang tải…",tools:ed?`<button class="btn pri" data-spcftt="1">+ Khai combo mới</button>`:"",
     inner:(P.length?`<div class="note" style="margin:12px 14px"><b>${P.length} combo mới đã khai, chờ kế toán quy đổi:</b> ${P.map(x=>`<span class="spf-tag">${esc(x.sku)}</span>${esc(x.gom)}`).join(" · ")}</div>`:"")+
-    (L?tbl(["Mã trên sàn","Gồm","Quà","Đơn"],L.slice(0,300).map(c=>`<tr><td><span class="spf-tag">${esc(c.sku)}</span>${c.variant?`<br><small class="hint">${esc(c.variant)}</small>`:""}</td><td><small>${esc(c.parts.filter(p=>p.kind==="sp").map(nm).join(" + "))}</small></td><td><small>${esc(c.parts.filter(p=>p.kind==="gift").map(nm).join(" + "))}</small></td><td class="n">${c.orders||""}</td></tr>`)):"")+
+    (L?tbl(["Tên sản phẩm","Biến thể","SKU","Gồm","Quà","Đơn"],L.slice(0,300).map(c=>`<tr><td style="max-width:260px"><small>${esc(c.name||"—")}</small></td><td><small>${esc(c.variant||"Mọi biến thể")}</small></td><td style="white-space:nowrap"><span class="spf-tag">${esc(c.sku)}</span></td><td style="min-width:200px"><small>${lines(c.parts.filter(p=>p.kind==="sp"))}</small></td><td style="min-width:160px"><small>${lines(c.parts.filter(p=>p.kind==="gift"))}</small></td><td class="n">${c.orders||""}</td></tr>`)):"")+
     `<p class="hint pad" style="margin:0">Lên combo mới trên ${CH==="TIKTOK"?"TikTok":"Shopee"} thì bấm <b>Khai combo mới</b>: mã trên sàn, gồm sản phẩm nào, quà gì. Kế toán khai vào bảng quy đổi (để trừ kho, tính giá vốn) rồi combo hiện trong danh sách này. Giá bán nằm trên sàn.</p>`});
 }
 function spcfTtForm(){const CH=SPCF.ch==="sp"?"SHOPEE":"TIKTOK";
