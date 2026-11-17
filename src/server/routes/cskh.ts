@@ -434,6 +434,31 @@ cskhRoutes.post('/customer/:phone/resume', async (c) => {
   return ok(c, { phone });
 });
 
+/* ------------------------------------------------------------------ tổng đài ITY: gọi ngay trên web (chị Hoa duyệt demo 17/11) */
+const ITY_WSS = 'wss://vpbx.ity.vn:7443';
+type Ity = { domain?: string; ext?: string; pass?: string };
+/** Máy nhánh dùng chung (CSKH làm theo ca). Trình duyệt người gọi cần mật khẩu máy nhánh để nối tổng đài, nên chỉ trả cho người dùng mục CSKH. */
+cskhRoutes.get('/ity', async (c) => {
+  await who(c);
+  const s = (await getSetting<Ity>(c.env.DB, 'ity')) ?? {};
+  const ready = !!(s.domain && s.ext && s.pass);
+  return ok(c, { wss: ITY_WSS, domain: s.domain ?? '', ext: s.ext ?? '', hasPass: !!s.pass, pass: ready ? s.pass : '' });
+});
+cskhRoutes.put('/ity', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO cài tổng đài');
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const old = (await getSetting<Ity>(c.env.DB, 'ity')) ?? {};
+  const domain = str(b.domain, 100).toLowerCase();
+  const ext = str(b.ext, 20);
+  if (domain && !/^[a-z0-9.-]+$/.test(domain)) throw badRequest('ITY', 'Tên miền tổng đài không đúng (ví dụ c90678.ity.vn)');
+  if (ext && !/^\d+$/.test(ext)) throw badRequest('ITY', 'Máy nhánh chỉ gồm chữ số');
+  const pass = str(b.pass, 100);
+  const next: Ity = { domain, ext, pass: b.clearPass ? '' : pass || old.pass || '' };
+  await putSetting(c.env.DB, 'ity', next);
+  return ok(c, { domain: next.domain, ext: next.ext, hasPass: !!next.pass });
+});
+
 /* ------------------------------------------------------------------ ghi kết quả cuộc gọi */
 cskhRoutes.post('/log/:phone', async (c) => {
   const me = await who(c);
