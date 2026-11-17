@@ -206,7 +206,8 @@ export function cycleOf(set: CskhSettings, product: string): number {
 export function callState(c: CallInput, today: string, set: CskhSettings): CallState {
   if (c.stop_reason) return 'ngung';
   if (!c.owner_id) return 'chua';
-  if (!c.last_call && c.last_order_day && diffDays(today, c.last_order_day) <= 14 && (!c.next_call || c.next_call <= today)) return 'moi';
+  // Đã chia mà chưa gọi lần nào (khách mới hay data cũ Lead chia) là việc cần gọi; hẹn gọi lần đầu ở ngày sau thì chờ tới ngày.
+  if (!c.last_call && (!c.next_call || c.next_call <= today)) return 'moi';
   if (c.next_call) {
     if (c.next_call < today) return 'qua';
     if (c.next_call === today) return 'nay';

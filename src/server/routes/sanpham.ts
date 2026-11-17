@@ -134,7 +134,7 @@ sanphamRoutes.get('/combos', async (c) => {
       .all(),
     db
       .prepare(
-        `SELECT channel, sku, variant, COALESCE(shop, '') AS shop, COUNT(DISTINCT order_id) AS orders, MAX(day) AS last_day
+        `SELECT channel, sku, variant, COALESCE(shop, '') AS shop, COUNT(DISTINCT order_id) AS orders, MAX(day) AS last_day, MAX(name) AS name
          FROM channel_order_lines GROUP BY channel, sku, variant, shop`,
       )
       .all(),
