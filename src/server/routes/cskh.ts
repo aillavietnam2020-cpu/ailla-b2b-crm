@@ -167,7 +167,7 @@ cskhRoutes.get('/today', async (c) => {
   const binds = all ? [] : [me.id];
   const rows = await c.env.DB.prepare(
     `SELECT ${COLS} FROM cskh_customers WHERE owner_id IS NOT NULL AND stop_reason = '' ${own}
-       AND (next_call <= ? OR (next_call IS NULL AND last_order_day >= ?) OR birthday <> '')`,
+       AND (next_call <= ? OR (next_call IS NULL AND (last_call IS NULL OR last_order_day >= ?)) OR birthday <> '')`,
   )
     .bind(...binds, today, addDays(today, -400))
     .all<Cus>();
@@ -184,7 +184,7 @@ cskhRoutes.get('/today', async (c) => {
     .bind(today, ...binds)
     .all<Cus>();
   const called = (dr.results ?? []).map((r) => view(r, set, today));
-  return ok(c, { rows: out.slice(0, 600), more: Math.max(0, out.length - 600), calledToday: done?.n ?? 0, chotToday: done?.chot ?? 0, called });
+  return ok(c, { rows: out.slice(0, 8000), more: Math.max(0, out.length - 8000), calledToday: done?.n ?? 0, chotToday: done?.chot ?? 0, called });
 });
 
 /* ------------------------------------------------------------------ danh sách + tìm */

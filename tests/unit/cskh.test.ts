@@ -62,6 +62,8 @@ describe('CSKH khách lẻ', () => {
     expect(callState({ ...base, owner_id: null }, '2026-11-10', set)).toBe('chua');
     expect(callState(base, '2026-11-10', set)).toBe('moi');
     expect(callState({ ...base, next_call: '2026-11-11' }, '2026-11-10', set)).toBe('cho');
+    // Data cũ Lead chia, chưa gọi lần nào: cũng là khách cần gọi.
+    expect(callState({ ...base, last_order_day: '2026-08-01' }, '2026-11-10', set)).toBe('moi');
     expect(callState({ ...base, last_call: '2026-11-09', next_call: '2026-11-09' }, '2026-11-10', set)).toBe('qua');
     expect(callState({ ...base, last_call: '2026-11-09', next_call: '2026-11-10' }, '2026-11-10', set)).toBe('nay');
     // Mua xịt ruồi 23 ngày trước (chu kỳ 25 ngày, gọi trước 3 ngày) → đến kỳ mua lại.
