@@ -176,10 +176,15 @@ cskhRoutes.get('/today', async (c) => {
     .filter((r) => ['qua', 'nay', 'moi', 'ky'].includes(r.state) || r.bday);
   const order = { qua: 0, nay: 1, moi: 2, ky: 3, cho: 4, chua: 5 } as Record<string, number>;
   out.sort((a, b) => order[a.state] - order[b.state] || String(a.next_call ?? a.last_order_day).localeCompare(String(b.next_call ?? b.last_order_day)));
-  const done = await c.env.DB.prepare(`SELECT COUNT(DISTINCT phone) AS n FROM cskh_logs WHERE day = ? ${all ? '' : 'AND by_id = ?'}`)
+  const done = await c.env.DB.prepare(`SELECT COUNT(DISTINCT phone) AS n, COUNT(DISTINCT CASE WHEN result = 'Đã chốt đơn' THEN phone END) AS chot FROM cskh_logs WHERE day = ? ${all ? '' : 'AND by_id = ?'}`)
     .bind(today, ...binds)
-    .first<{ n: number }>();
-  return ok(c, { rows: out.slice(0, 600), more: Math.max(0, out.length - 600), calledToday: done?.n ?? 0 });
+    .first<{ n: number; chot: number }>();
+  // Khách đã gọi hôm nay: vẫn hiện ở mục "Đã gọi hôm nay" thay vì biến mất (chị Hoa 17/11: gọi xong nhảy lung tung, không biết ai gọi rồi).
+  const dr = await c.env.DB.prepare(`SELECT ${COLS} FROM cskh_customers WHERE owner_id IS NOT NULL AND last_call = ? ${own} ORDER BY updated_at DESC LIMIT 300`)
+    .bind(today, ...binds)
+    .all<Cus>();
+  const called = (dr.results ?? []).map((r) => view(r, set, today));
+  return ok(c, { rows: out.slice(0, 600), more: Math.max(0, out.length - 600), calledToday: done?.n ?? 0, chotToday: done?.chot ?? 0, called });
 });
 
 /* ------------------------------------------------------------------ danh sách + tìm */
@@ -214,22 +219,52 @@ cskhRoutes.get('/list', async (c) => {
   }
   const oc = str(c.req.query('orders'), 4);
   if (oc === '0') where.push('order_count = 0');
-  else if (oc === '4') where.push('order_count > 3');
-  else if (['1', '2', '3'].includes(oc)) {
+  else if (oc === '6') where.push('order_count > 5');
+  else if (['1', '2', '3', '4', '5'].includes(oc)) {
     where.push('order_count = ?');
     binds.push(Number(oc));
   }
-  const stf0 = str(c.req.query('state'), 10);
-  if (stf0 === 'ngung') where.push("stop_reason <> ''");
-  const sql = `SELECT ${COLS} FROM cskh_customers ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY COALESCE(last_order_day, '') DESC LIMIT 400`;
-  const rows = await c.env.DB.prepare(sql).bind(...binds).all<Cus>();
-  let out = (rows.results ?? []).map((r) => view(r, set, today));
+  // Bao lâu chưa mua (tính từ ngày giao đơn gần nhất; chị Hoa 17/11): dưới 5, 5–7, 8–15, 16–30, trên 30 ngày.
+  const dg: Record<string, [number, number]> = { lt5: [0, 4], '5-7': [5, 7], '8-15': [8, 15], '16-30': [16, 30], gt30: [31, 100000] };
+  const d = dg[str(c.req.query('days'), 6)];
+  if (d) {
+    where.push('last_order_day IS NOT NULL AND last_order_day <= ? AND last_order_day >= ?');
+    binds.push(addDays(today, -d[0]), addDays(today, -d[1]));
+  }
+  const goi = str(c.req.query('goi'), 4);
+  if (goi === 'da') {
+    where.push('last_call = ?');
+    binds.push(today);
+  } else if (goi === 'chua') {
+    where.push('(last_call IS NULL OR last_call < ?)');
+    binds.push(today);
+  }
   const stf = str(c.req.query('state'), 10);
-  if (stf) out = out.filter((r) => r.state === stf);
-  const cnt = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM cskh_customers ${where.length ? 'WHERE ' + where.join(' AND ') : ''}`)
-    .bind(...binds)
-    .first<{ n: number }>();
-  return ok(c, { rows: out, total: cnt?.n ?? out.length });
+  if (stf === 'ngung') where.push("stop_reason <> ''");
+  const size = [20, 50, 100].includes(Number(c.req.query('size'))) ? Number(c.req.query('size')) : 50;
+  const page = Math.max(1, Math.floor(Number(c.req.query('page')) || 1));
+  const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const order = "ORDER BY COALESCE(last_order_day, '') DESC, phone";
+  let out: ReturnType<typeof view>[];
+  let total: number;
+  if (stf && stf !== 'ngung') {
+    // Trạng thái gọi tính theo chu kỳ từng sản phẩm nên lọc sau khi đọc, rồi mới chia trang.
+    const all = ((await c.env.DB.prepare(`SELECT ${COLS} FROM cskh_customers ${w} ${order}`).bind(...binds).all<Cus>()).results ?? [])
+      .map((r) => view(r, set, today))
+      .filter((r) => r.state === stf);
+    total = all.length;
+    out = all.slice((page - 1) * size, page * size);
+  } else {
+    const rows = await c.env.DB.prepare(`SELECT ${COLS} FROM cskh_customers ${w} ${order} LIMIT ? OFFSET ?`).bind(...binds, size, (page - 1) * size).all<Cus>();
+    out = (rows.results ?? []).map((r) => view(r, set, today));
+    total = (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM cskh_customers ${w}`).bind(...binds).first<{ n: number }>())?.n ?? out.length;
+  }
+  // Số cuộc gọi hôm nay của người đang xem (Lead: của CSKH đang lọc, không lọc thì cả nhóm) để nhân viên biết mình gọi được bao nhiêu.
+  const by = me.lead ? (owner && owner !== '_none' ? owner : '') : me.id;
+  const st = await c.env.DB.prepare(`SELECT COUNT(DISTINCT phone) AS n, COUNT(DISTINCT CASE WHEN result = 'Đã chốt đơn' THEN phone END) AS chot FROM cskh_logs WHERE day = ? ${by ? 'AND by_id = ?' : ''}`)
+    .bind(today, ...(by ? [by] : []))
+    .first<{ n: number; chot: number }>();
+  return ok(c, { rows: out, total, page, size, today: { goi: st?.n ?? 0, chot: st?.chot ?? 0 } });
 });
 
 /** Ô tìm trên cùng: số điện thoại, tên, mã đơn. Khách của người khác chỉ báo ai đang chăm, không lộ chi tiết. */
