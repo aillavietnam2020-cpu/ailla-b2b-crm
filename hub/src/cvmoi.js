@@ -593,9 +593,9 @@ function cwPb(m){cwCss();if(!cwMgr()){PAGE="cv_pb";PAGES.cv_pb(m);return}PAGE="c
   const v=CW_PB.find(x=>x[0]===CWS.pb),L=cwQ(date?S.filter(r=>cwOpen(r)||(r.xong&&r.xong>=mon)):v[3](S));
   const scopeN=w.who?userName(w.who):w.team?cwPhong(w.team):"Cả công ty";
   const daChip=cwDaSel();
-  m.innerHTML=cwHead("Phòng ban",`Việc của từng phòng ban và từng nhân sự · đang xem: ${esc(scopeN)}`)+cwTry(()=>cwPbDash(S),()=>"")+cwPbTabs(S,date?"open":CWS.pb)+
-    `<div class="cwtb">${cwKxSel()}${cwWhoSel("cw-pbt","cw-pbw",w.team,w.who)}${daChip}<span class="sp"></span></div>`+(CWS.kx==="list"?cwBulk(cwSort(L)):cwView(L));
-  cwTop(m);cwBind(m,R);
+  {const pj=CWS.da&&(D().projects||[]).find(p=>p.id===CWS.da);m.innerHTML=cwHead(pj?`<button type="button" class="btn sm" data-cwpjback="1" style="margin-right:10px">← Dự án</button>${esc(pj.ten)}`:"Phòng ban",pj?`Việc của dự án này · đang xem: ${esc(scopeN)}`:`Việc của từng phòng ban và từng nhân sự · đang xem: ${esc(scopeN)}`)+cwTry(()=>cwPbDash(S),()=>"")+cwPbTabs(S,date?"open":CWS.pb)+
+    `<div class="cwtb">${cwKxSel()}${cwWhoSel("cw-pbt","cw-pbw",w.team,w.who)}${daChip}<span class="sp"></span></div>`+(CWS.kx==="list"?cwBulk(cwSort(L)):cwView(L))}
+  cwTop(m);cwBind(m,R);{const bk=m.querySelector("[data-cwpjback]");if(bk)bk.onclick=()=>{CWS.da="";cwGo("cv_da")}}
   m.querySelectorAll("[data-cwpb]").forEach(b=>b.onclick=()=>{const k=b.dataset.cwpb;CWS.sel.clear();if(k==="space"){cwGo("cv_pb");return}CWS.pb=k;if(PAGE!=="cv_pbv")cwGo("cv_pbv");else{renderMain();scrollTo(0,0)}});
   const a=m.querySelector("#cw-pbt");if(a)a.onchange=()=>{CWS.pbT=a.value;CWS.pbW="";CWS.sel.clear();renderMain()};
   const b2=m.querySelector("#cw-pbw");if(b2)b2.onchange=()=>{CWS.pbW=b2.value;CWS.sel.clear();renderMain()};
