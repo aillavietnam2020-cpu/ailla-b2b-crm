@@ -217,7 +217,7 @@ function pCsTq(m){
 /* ---------- Việc hôm nay ---------- */
 function pCsToday(m){
   const lead=csLead(),F=CSK.tdf||(CSK.tdf={q:"",owner:"",days:"",orders:"",tier:""});
-  if(CSK.me&&!CSK.today)csLoad("today","/today"+(lead?"?all=1":""));
+  if(CSK.me)csTodayFresh(lead);
   csFrame(m,"Việc hôm nay",csFd(csToday()),()=>{
     const T=CSK.today;if(!T)return `<section class="card"><p class="hint">Đang tải…</p></section>`;if(T.error)return `<section class="card"><p>${esc(T.error)}</p></section>`;
     const td=csToday(),q=csFold(F.q||""),qd=(F.q||"").replace(/\D/g,"");
@@ -244,6 +244,9 @@ window.addEventListener("resize",()=>{if(PAGE==="cs_today"||PAGE==="cs_kh"){cons
 /* Bộ lọc dùng chung Việc hôm nay / Khách hàng: CSKH (Lead, CEO), bao lâu chưa mua, số lần mua, hạng. */
 function csFilters(F,lead,kh){return (lead?`<select id="csfo" class="cs-own">${opt([["","CSKH: Tất cả"]].concat(kh?[["_none","Chưa chia"]]:[]).concat((CSK.me&&CSK.me.staff||[]).map(x=>[x.id,x.name])),F.owner)}</select>`:"")+
   `<select id="csfd">${opt([["","Bao lâu chưa mua"],["lt5","Dưới 5 ngày"],["5-7","5 – 7 ngày"],["8-15","8 – 15 ngày"],["16-30","16 – 30 ngày"],["gt30","Trên 30 ngày"]],F.days||"")}</select><select id="csfc">${opt([["","Số lần mua"],["1","Mua 1 lần"],["2","Mua 2 lần"],["3","Mua 3 lần"],["4","Mua 4 lần"],["5","Mua 5 lần"],["6","Trên 5 lần"],["0","Chưa mua"]],F.orders||"")}</select><select id="csft">${opt([["","Hạng"]].concat(((CSK.me&&CSK.me.settings.tiers)||[]).map(t=>[t.n,t.n])).concat([["Thường","Thường"]]),F.tier||"")}</select>`}
+/* Việc hôm nay tự tải lại: dữ liệu cũ hơn 1 phút thì lấy lại ngầm, vẫn hiện bảng cũ trong lúc chờ (chị Hoa 17/11: trang báo đã gọi 9 trong khi Huyền đã gọi 22, vì trang mở từ trưa không tải lại). */
+function csTodayFresh(lead){if(CSK.todayBusy)return;if(CSK.today&&Date.now()-(CSK.todayAt||0)<60000)return;CSK.todayBusy=1;CSK.todayAt=Date.now();csApi("/today"+(lead?"?all=1":"")).then(r=>{CSK.today=r;CSK.todayAt=Date.now()}).catch(e=>{if(!CSK.today)CSK.today={error:e.message}}).finally(()=>{CSK.todayBusy=0;csRe()})}
+setInterval(()=>{if(PAGE==="cs_today"&&CSK.me&&document.visibilityState==="visible")csTodayFresh(csLead())},30000);
 function csDaysOk(c,k,td){if(!k)return true;if(!c.last_order_day)return false;const d=csDiff(td,c.last_order_day);return k==="lt5"?d<5:k==="5-7"?d>=5&&d<=7:k==="8-15"?d>=8&&d<=15:k==="16-30"?d>=16&&d<=30:d>30}
 function csOrdOk(c,k){if(!k)return true;const n=+c.order_count||0;return k==="6"?n>5:n===+k}
 /* Bảng việc hôm nay: cùng cột với trang Khách hàng; khách đã gọi hôm nay tô xanh, nằm cuối. */
