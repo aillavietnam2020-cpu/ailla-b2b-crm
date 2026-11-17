@@ -18,6 +18,7 @@ const SPCF_CSS=`<style>
 .spf-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
 .spf-seg button{border:0;border-right:1px solid var(--line);background:#fff;padding:0 12px;height:32px;font:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
 .spf-seg button:last-child{border-right:0}.spf-seg button.on{background:var(--navy);color:#fff}
+.spf-gt td{padding-top:5px!important;padding-bottom:5px!important}.spf-gt td.cd{width:1%;white-space:nowrap}.spf-gt .spf-tag{font-size:11px;padding:1px 6px}.spf-gt .spf-img{width:30px;height:30px}.spf-gt a.nm{color:inherit;font-weight:600;text-decoration:none}.spf-gt a.nm:hover{color:var(--pri);text-decoration:underline}
 .spf-img{width:38px;height:38px;border-radius:8px;object-fit:cover;border:1px solid var(--line);background:var(--gray-soft);display:block}
 .spf-sw{appearance:none;-webkit-appearance:none;width:34px!important;height:20px;border-radius:20px;background:#d0d5dd;position:relative;cursor:pointer;margin:0;flex:none;transition:.15s}
 .spf-sw:before{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
@@ -88,10 +89,11 @@ const spcfNoAccess=(m,t)=>{m.innerHTML=H(t,"")+`<div class="note">Trang này dà
 /* Khung trang: tiêu đề + một thẻ có thanh công cụ một hàng (chọn kênh · ô tìm · số dòng · nút), rồi nội dung.
    o: {q: placeholder ô tìm (bỏ trống thì không có ô tìm), count, tools, inner (trong thẻ), after (dưới thẻ)} */
 function spcfFrame(m,t,sub,o){
-  const chs=o.noCh?[]:spcfChs(ME).filter(c=>PAGE!=="sp_cb"||c[0]!=="b2b"),cb=PAGE==="sp_cb";
+  const gp=PAGE==="sp_cfg"||PAGE==="dg_sp",chs=o.noCh||gp?[]:spcfChs(ME).filter(c=>PAGE!=="sp_cb"||c[0]!=="b2b");
+  const spt=gp?[["","Sản phẩm gốc"]].concat(spcfChs(ME).filter(c=>c[0]!=="b2b").map(c=>[c[0],c[1]])):[];
   m.innerHTML=SPCF_CSS+H(t,sub)+`<section class="card flush"><div class="spf-bar">${chs.length>1?`<div class="spf-seg">${chs.map(([k,n])=>`<button class="${SPCF.ch===k?"on":""}" data-spcfch="${k}">${n}</button>`).join("")}</div>`:""}
-    ${o.q?`<input id="spcf-q" class="spf-q" placeholder="${esc(o.q)}" value="${esc(SPCF.q)}">`:""}${o.count?`<span class="hint">${o.count}</span>`:""}<span class="sp"></span>${o.tools||""}</div>${cb&&SPCF.ch?`<div class="settabs" style="margin:10px 14px 4px">${[["cb","Combo"],["sp","Mã bán trên kênh"]].map(([k,n])=>`<button class="${(SPCF.sub||"cb")===k?"on":""}" data-spcfsub="${k}">${n}</button>`).join("")}</div>`:""}${o.inner||""}</section>${o.after||""}`;
-  m.querySelectorAll("[data-spcfsub]").forEach(b=>b.onclick=()=>{SPCF.sub=b.dataset.spcfsub;SPCF.q="";renderMain()});
+    ${o.q?`<input id="spcf-q" class="spf-q" placeholder="${esc(o.q)}" value="${esc(SPCF.q)}">`:""}${o.count?`<span class="hint">${o.count}</span>`:""}<span class="sp"></span>${o.tools||""}</div>${spt.length>1?`<div class="settabs" style="margin:10px 14px 4px">${spt.map(([k,n])=>`<button class="${(SPCF.spv||"")===k?"on":""}" data-spcfspv="${k}">${n}</button>`).join("")}</div>`:""}${o.inner||""}</section>${o.after||""}`;
+  m.querySelectorAll("[data-spcfspv]").forEach(b=>b.onclick=()=>{SPCF.spv=b.dataset.spcfspv;SPCF.q="";SPCF.pkOpen=false;renderMain()});
   spcfDotsBind(m);
   m.querySelectorAll("[data-spcfch]").forEach(b=>b.onclick=()=>{SPCF.ch=b.dataset.spcfch;SPCF.open={};SPCF.pkOpen=false;SPCF.q="";renderMain()});
   if(typeof spbPkBind==="function")spbPkBind(m);spcfBind(m)}
@@ -100,7 +102,7 @@ const spcfCatEd=()=>typeof spcCanEdit==="function"&&spcCanEdit();
 const spcfPkRow=(pkId,ma)=>{const R=(SPCB.pk&&SPCB.pk.rows)||[];return (pkId&&R.find(r=>r.id===pkId))||(ma&&!/^\d{1,3}$/.test(ma)&&R.find(r=>spcLow(r.code)===spcLow(ma)))||null};
 const spcfImg=src=>src?`<img class="spf-img" src="${esc(src)}" loading="lazy" alt="">`:`<span class="spf-img"></span>`;
 const spcfVImg=v=>spcfImg((spcfPkRow(v.pkId,v.ma)||{}).img||"");
-const spcfVars=()=>(typeof spcCat==="function"?spcCat():[]).flatMap(p=>(p.bt||[]).filter(v=>v.ma).map(v=>({ma:v.ma,pkId:v.pkId||"",ten:p.ten+((v.dt||v.pl)?" ("+[v.dt,v.pl].filter(Boolean).join(" · ")+")":""),gia:+v.gia||(typeof spbPkPrice==="function"?spbPkPrice(v):0)||0,loai:p.loai,on:v.on!==false,img:(spcfPkRow(v.pkId,v.ma)||{}).img||""})));
+const spcfVars=()=>(typeof spcCat==="function"?spcCat():[]).flatMap(p=>(p.bt||[]).filter(v=>v.ma).map(v=>({ma:v.ma,pkId:v.pkId||"",ten:p.ten+((v.dt||v.pl)?" ("+[v.dt,v.pl].filter(Boolean).join(" · ")+")":""),gia:+v.gia||(typeof spbPkPrice==="function"?spbPkPrice(v):0)||0,loai:p.loai,on:v.on!==false,misa:spcMisa(v),img:(spcfPkRow(v.pkId,v.ma)||{}).img||""})));
 const spcfPkNeed=()=>{if(!SPCB.pk&&!SPCB.pkBusy&&!SPCB.pkErr&&typeof spbPkLoad==="function")setTimeout(()=>{if(!SPCB.pk&&!SPCB.pkBusy)spbPkLoad()},0)};
 /* Hộp thoại giữa màn hình kiểu Poscake: mục bên trái, ô nhập bên phải, nút dưới cùng. */
 const spcfSec=(t,inner,hint)=>`<div class="spf-sec"><div><h4>${t}</h4>${hint?`<p class="hint">${hint}</p>`:""}</div><div>${inner}</div></div>`;
@@ -111,45 +113,150 @@ function spcfModal(title,body,foot){const y=($("#crmm .cm-in")||{}).scrollTop||0
   inn.insertAdjacentHTML("beforeend",`<div class="spf-foot"><button class="btn" data-spfx="1">Hủy</button>${foot}</div>`);inn.querySelector("[data-spfx]").onclick=closeCM;
   if(open)inn.querySelector(".cm-b").scrollTop=y;return R}
 /* Ô tìm và chọn sản phẩm (danh sách kết quả hiện ngay dưới ô, kèm ảnh, mã, giá) */
-function spcfPicker(R,k,V,onPick){const inp=R.querySelector(`.spf-ps[data-k="${k}"]`),out=R.querySelector(`.spf-pr[data-k="${k}"]`);if(!inp||!out)return;
-  const show=()=>{const q=spcfFold(inp.value).trim();out.innerHTML=(q?V.filter(v=>spcfFold(v.ma+" "+v.ten).includes(q)):V).slice(0,30).map(v=>`<button data-ma="${esc(v.ma)}">${spcfImg(v.img)}<span style="flex:1"><span class="spf-tag">${esc(v.ma)}</span>${esc(v.ten)}</span><span class="hint">${v.gia?nf(v.gia)+" đ":""}</span></button>`).join("")||`<div class="spf-empty">Không thấy sản phẩm</div>`;
-    out.querySelectorAll("[data-ma]").forEach(b=>b.onmousedown=e=>{e.preventDefault();onPick(b.dataset.ma)})};
+function spcfPicker(R,k,V,onPick,onNew){const inp=R.querySelector(`.spf-ps[data-k="${k}"]`),out=R.querySelector(`.spf-pr[data-k="${k}"]`);if(!inp||!out)return;
+  const show=()=>{const q=spcfFold(inp.value).trim();out.innerHTML=((q?V.filter(v=>spcfFold(v.ma+" "+(v.tag||"")+" "+v.ten).includes(q)):V).slice(0,30).map(v=>`<button data-ma="${esc(v.ma)}">${spcfImg(v.img)}<span style="flex:1"><span class="spf-tag">${esc(v.tag||v.ma)}</span>${esc(v.ten)}${v.note?`<br><small class="hint">${esc(v.note)}</small>`:""}</span><span class="hint">${v.gia?nf(v.gia)+" đ":""}</span></button>`).join("")||`<div class="spf-empty">Không thấy sản phẩm</div>`)+(onNew?`<button data-spfnew="1"><span style="flex:1;color:var(--pri);font-weight:600">+ Thêm sản phẩm mới${inp.value.trim()?" “"+esc(inp.value.trim())+"”":""}</span></button>`:"");
+    out.querySelectorAll("[data-ma]").forEach(b=>b.onmousedown=e=>{e.preventDefault();onPick(b.dataset.ma)});
+    const nb=out.querySelector("[data-spfnew]");if(nb)nb.onmousedown=e=>{e.preventDefault();onNew(inp.value.trim())}};
   inp.oninput=show;inp.onfocus=show;inp.onblur=()=>setTimeout(()=>{out.innerHTML=""},150)}
 const spcfPickBox=(k,ph)=>`<div class="spf-pick"><input class="spf-ps" data-k="${k}" placeholder="${esc(ph||"Tìm sản phẩm theo mã, tên…")}" autocomplete="off"><div class="spf-pr" data-k="${k}"></div></div>`;
 
 /* ============================== SẢN PHẨM GỐC (chị Hoa 16/11) ==============================
-   Trang Sản phẩm chỉ còn sản phẩm gốc: mã MISA, tên, ĐVT, loại (kho_items Thành phẩm / Hàng hóa) và các mã bán KPP đang nối.
-   Mã bán của từng kênh (Facebook, CSKH, TikTok, Shopee) nằm ở trang Combo. Thêm / sửa / ngừng dùng: CEO, kế toán (máy chủ kiểm quyền). */
-async function spcfGocLoad(force){if(SPCF.gocBusy)return;if(SPCF.goc&&!force)return;SPCF.gocBusy=true;try{SPCF.goc=await spcApi("/products")}catch(e){SPCF.goc={err:e.message}}SPCF.gocBusy=false;if(/^sp_/.test(PAGE))renderMain()}
+   Mỗi sản phẩm một hồ sơ: ảnh, mã MISA, tên, giá vốn, giá lẻ niêm yết và giá bán từng kênh (bấm vào sản phẩm). Combo các kênh chọn món từ danh sách này.
+   - Giá vốn: lấy đúng chỗ đang dùng (Giá vốn SKU kế toán nhập > giá nhập kho bình quân), chỉ CEO, kế toán thấy.
+   - Giá lẻ niêm yết: cấp Bán lẻ của Bảng giá (mã KPP nối mã MISA, sửa qua phiếu); mã chưa có trên Bảng giá thì lấy giá bán ở Giá vốn SKU (D().skus[].giaBan).
+   - Ảnh: ảnh tải lên (D().skus[].img, thu nhỏ) > ảnh Pancake của mã bán Facebook / CSKH nối mã này > ảnh Pancake cùng mã. */
+async function spcfGocLoad(force){
+  if(typeof spcLoad==="function"&&!SPCB.at&&!SPCB.busy)spcLoad().then(()=>{if(/^sp_/.test(PAGE))renderMain()});
+  if(spcfB2bOk(ME)&&!SPCF.b2b&&!SPCF.b2bBusy)spcfB2bLoad();spcfPkNeed();
+  if(SPCF.gocBusy)return;if(SPCF.goc&&!force)return;SPCF.gocBusy=true;try{SPCF.goc=await spcApi("/products")}catch(e){SPCF.goc={err:e.message}}SPCF.gocBusy=false;if(/^sp_/.test(PAGE))renderMain()}
+const spcfSkus=()=>{try{return D().skus||[]}catch(e){return []}};
+const spcfSku=code=>spcfSkus().find(s=>spcLow(s.ma)===spcLow(code));
+const spcfSeeGv=()=>typeof spcSeeCost==="function"&&spcSeeCost();
+const spcfGv=code=>spcfSeeGv()?spcGvMap(spcfSkus(),SPCB.cost||[],spcKy())[spcLow(code)]||null:null;
+const spcfChanCat=k=>{try{const s=D()[k];return s&&Array.isArray(s.sp)?s.sp:(k==="fbCat"?SPC_DEF_CAT:[])}catch(e){return []}};
+const spcfOnCh=(k,code)=>spcfChanCat(k).flatMap(p=>(p.bt||[]).filter(v=>spcLow(spcMisa(v))===spcLow(code)).map(v=>({p,v})));
+const spcfKpp=code=>((SPCF.b2b&&SPCF.b2b.products)||[]).filter(p=>spcLow(p.misa_code)===spcLow(code));
+function spcfLe(code){const K=spcfKpp(code),le=K.find(p=>!/thùng/i.test(p.unit||""))||K[0];if(le&&le.prices&&le.prices.BAN_LE!=null)return {v:+le.prices.BAN_LE,kpp:le.sku};const s=spcfSku(code);return s&&+s.giaBan>0?{v:+s.giaBan}:null}
+function spcfGocImg(code){const s=spcfSku(code);if(s&&s.img)return s.img;for(const k of ["fbCat","cskhCat"])for(const x of spcfOnCh(k,code)){const r=spcfPkRow(x.v.pkId,x.v.ma);if(r&&r.img)return r.img}const r=spcfPkRow(null,code);return (r&&r.img)||""}
+/* Mã sàn (TikTok / Shopee) đang quy đổi ra mã MISA này, theo bảng quy đổi kế toán */
+const spcfSanOf=(CH,code)=>{const m=new Map();((typeof SPCB!=="undefined"&&SPCB.rows)||[]).forEach(r=>{if(r.channel===CH&&spcLow(r.code||spcCode(r.item_label))===spcLow(code)&&!r.off_from)m.set(r.sku+"|"+r.variant,{sku:r.sku,variant:r.variant||""})});return [...m.values()]};
+const spcfChEd=bp=>{if(typeof SPC==="undefined")return false;const o=SPC.bpView;SPC.bpView=bp;const r=spcCanEdit();SPC.bpView=o;return r};
+function spcfChMut(k,msg,fn){DB.mutate(ME.name,msg,d=>{const cs=k==="cskhCat";if(!d[k])d[k]={};const c=d[k];if(!Array.isArray(c.sp))c.sp=cs?[]:spcClone(SPC_DEF_CAT);if(!Array.isArray(c.combos))c.combos=cs?[]:spcClone(SPC_DEF_COMBOS);fn(c)});renderMain()}
+function spcfSkuSet(code,name,msg,fn){DB.mutate(ME.name,msg,d=>{d.skus=d.skus||[];let s=d.skus.find(x=>spcLow(x.ma)===spcLow(code));if(!s){s={ma:code,ten:name,k:typeof guessSku==="function"?guessSku(name)||"KHAC":"KHAC",qc:"",giaVon:{},giaBan:0,active:true};d.skus.push(s)}fn(s)});renderMain()}
+/* Thêm một mã bán vào danh sách kênh Facebook / CSKH từ sản phẩm gốc (mã Pancake mặc định = mã MISA) */
+const spcfNewChanSp=(it,ma,gia)=>({id:"p"+Date.now()+Math.floor(Math.random()*1e3),ten:it.name,loai:"run",bt:[{id:"v"+Date.now(),ma,dt:"",pl:"",on:true,misa:it.code,...(gia>0?{gia}:{})}]});
+/* Danh mục sản phẩm (chị Hoa 16/11: Giặt giũ, Tẩy rửa…): d.spDm = {list:[{id, ten}], gan:{mã kho chữ thường: id}}; CEO, kế toán thêm / sửa / xếp */
+const spcfDm=()=>{try{const x=D().spDm||{};return {list:x.list||[],gan:x.gan||{}}}catch(e){return {list:[],gan:{}}}};
+const spcfDmOf=code=>{const X=spcfDm(),id=X.gan[spcLow(code)];return X.list.find(x=>x.id===id)||null};
+const spcfDmOpt=v=>`<option value="">— Chưa xếp danh mục —</option>`+spcfDm().list.map(x=>`<option value="${esc(x.id)}"${x.id===v?" selected":""}>${esc(x.ten)}</option>`).join("");
+function spcfDmSet(codes,id){DB.mutate(ME.name,"xếp danh mục "+codes.length+" sản phẩm",d=>{const X=d.spDm=d.spDm||{list:[],gan:{}};X.gan=X.gan||{};codes.forEach(c=>{if(id)X.gan[spcLow(c)]=id;else delete X.gan[spcLow(c)]})});renderMain()}
+function spcfDmQl(){const L=spcfDm().list.map(x=>({...x})),X=spcfDm(),cnt=id=>Object.values(X.gan).filter(v=>v===id).length;
+  const draw=()=>{const R=spcfModal("Danh mục sản phẩm",spcfSec("Danh mục",`<div class="spf-box" style="padding:10px 14px">${L.map((x,i)=>`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><input class="dm-t" data-i="${i}" value="${esc(x.ten)}" style="flex:1"><small class="hint" style="width:90px">${cnt(x.id)} sản phẩm</small><button class="btn sm" data-dmx="${i}" title="Xóa danh mục">🗑</button></div>`).join("")||'<p class="hint">Chưa có danh mục nào.</p>'}
+      <div style="display:flex;gap:8px;margin-top:10px"><input id="dm-new" placeholder="Tên danh mục mới, ví dụ: Giặt giũ" style="flex:1"><button class="btn" id="dm-add">+ Thêm</button></div></div>`,"Xóa danh mục thì các sản phẩm trong đó về Chưa xếp."),`<button class="btn pri" id="dm-ok">Lưu</button>`);
+    const rd=()=>R.querySelectorAll(".dm-t").forEach(i=>{L[+i.dataset.i].ten=i.value.trim()});
+    R.querySelector("#dm-add").onclick=()=>{rd();const t=R.querySelector("#dm-new").value.trim();if(!t){toast("Nhập tên danh mục");return}L.push({id:"dm"+Date.now(),ten:t});draw()};
+    R.querySelector("#dm-new").onkeydown=e=>{if(e.key==="Enter")R.querySelector("#dm-add").click()};
+    R.querySelectorAll("[data-dmx]").forEach(b=>b.onclick=()=>{rd();const x=L[+b.dataset.dmx];if(cnt(x.id)&&!confirm("Danh mục "+x.ten+" đang có "+cnt(x.id)+" sản phẩm. Xóa thì các sản phẩm này về Chưa xếp. Xóa?"))return;L.splice(+b.dataset.dmx,1);draw()});
+    R.querySelector("#dm-ok").onclick=()=>{rd();const nw=R.querySelector("#dm-new").value.trim();if(nw)L.push({id:"dm"+Date.now(),ten:nw});const V=L.filter(x=>x.ten);
+      DB.mutate(ME.name,"sửa danh mục sản phẩm",d=>{const X2=d.spDm=d.spDm||{list:[],gan:{}};X2.gan=X2.gan||{};X2.list=V;const ids=new Set(V.map(x=>x.id));Object.keys(X2.gan).forEach(k=>{if(!ids.has(X2.gan[k]))delete X2.gan[k]})});
+      if(SPCF.dm&&SPCF.dm!=="_"&&!V.some(x=>x.id===SPCF.dm))SPCF.dm="";closeCM();toast("Đã lưu danh mục");renderMain()}};
+  draw()}
 function pSpcfGoc(m){
   if(!spcfChs(ME).length){spcfNoAccess(m,"Sản phẩm");return}
-  const sub="Sản phẩm gốc: mã MISA và tên · mã bán từng kênh xem ở mục Combo";
+  if(SPCF.spv&&!spcfChs(ME).some(c=>c[0]===SPCF.spv&&c[0]!=="b2b"))SPCF.spv="";
+  if(SPCF.spv){SPCF.ch=SPCF.spv;spcfCh();spcfChanSp(m);return}
+  const sub="Mỗi sản phẩm một hồ sơ: bấm vào tên để xem giá vốn, giá lẻ và giá bán từng kênh";
   if(!SPCF.goc){spcfGocLoad();spcfFrame(m,"Sản phẩm",sub,{noCh:1,inner:`<p class="hint pad">Đang tải…</p>`});return}
   if(SPCF.goc.err){spcfFrame(m,"Sản phẩm",sub,{noCh:1,inner:`<div class="note red" style="margin:14px">${esc(SPCF.goc.err)}</div>`});return}
-  const G=SPCF.goc,ed=!!G.can_edit,q=spcfFold(SPCF.q).trim(),maps=new Map();(G.kho_map||[]).forEach(x=>{const k=String(x.misa_code||"").toLowerCase();if(!maps.has(k))maps.set(k,[]);maps.get(k).push(x.crm_sku)});
-  const L=(G.items||[]).filter(it=>(SPCF.gocOff||it.active!==0)&&(!q||spcfFold(it.code+" "+it.name+" "+(maps.get(String(it.code).toLowerCase())||[]).join(" ")).includes(q)));
+  spcfGocLoad();
+  const G=SPCF.goc,ed=!!G.can_edit,see=spcfSeeGv(),q=spcfFold(SPCF.q).trim(),maps=new Map();(G.kho_map||[]).forEach(x=>{const k=spcLow(x.misa_code);if(!maps.has(k))maps.set(k,[]);maps.get(k).push(x.crm_sku)});
+  const chOn=new Map(),mark=(code,k)=>{const c=spcLow(code);if(!chOn.has(c))chOn.set(c,new Set());chOn.get(c).add(k)};
+  [["fbCat","FB"],["cskhCat","CSKH"]].forEach(([k,n])=>spcfChanCat(k).forEach(p=>{if(p.loai==="off")return;(p.bt||[]).forEach(v=>{if(v.on!==false&&spcMisa(v))mark(spcMisa(v),n)})}));
+  ((typeof SPCB!=="undefined"&&SPCB.rows)||[]).forEach(r=>{if(!r.off_from&&(r.channel==="TIKTOK"||r.channel==="SHOPEE"))mark(r.code||spcCode(r.item_label),r.channel==="TIKTOK"?"TikTok":"Shopee")});
+  maps.forEach((v,k)=>mark(k,"KPP"));
+  const DM=spcfDm(),dmOf=c=>{const id=DM.gan[spcLow(c)];return DM.list.find(x=>x.id===id)||null},sel=SPCF.gsel||(SPCF.gsel=new Set());
+  const L0=(G.items||[]).filter(it=>(SPCF.gocOff||it.active!==0)&&(!q||spcfFold(it.code+" "+it.name+" "+(maps.get(spcLow(it.code))||[]).join(" ")+" "+((dmOf(it.code)||{}).ten||"")).includes(q)));
+  const L=L0.filter(it=>{const d=dmOf(it.code);return !SPCF.dm||(SPCF.dm==="_"?!d:d&&d.id===SPCF.dm)});
+  const chip=(k,t,n)=>`<button class="${(SPCF.dm||"")===k?"on":""}" data-gocdm="${k}">${esc(t)} <small>${n}</small></button>`;
+  const dmBar=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line)"><div class="spf-seg" style="flex-wrap:wrap">${chip("","Tất cả",L0.length)+DM.list.map(x=>chip(x.id,x.ten,L0.filter(it=>(dmOf(it.code)||{}).id===x.id).length)).join("")+chip("_","Chưa xếp",L0.filter(it=>!dmOf(it.code)).length)}</div>${ed?`<button class="btn sm" id="goc-dmql">⚙ Danh mục</button>`:""}
+    ${ed&&sel.size?`<span class="sp" style="flex:1"></span><b>Đã chọn ${sel.size}</b><select id="goc-dmto" style="width:auto">${spcfDmOpt("")}</select><button class="btn sm pri" id="goc-dmgo">Đưa vào danh mục</button><button class="btn sm" id="goc-dmclr">Bỏ chọn</button>`:""}</div>`;
   const nOff=(G.items||[]).filter(it=>it.active===0).length;
-  const rows=L.map(it=>{const mk=maps.get(String(it.code).toLowerCase())||[],off=it.active===0;
-    return `<tr${off?' style="opacity:.55"':""}><td><span class="spf-tag">${esc(it.code)}</span></td><td><b>${esc(it.name)}</b></td><td>${esc(it.unit||"")}</td><td>${pill(it.cls==="HH"?"Hàng hóa":"Thành phẩm",it.cls==="HH"?"amb":"blu")}</td>
-      <td class="hint" style="font-family:var(--fm);font-size:12px">${mk.length?esc(mk.slice(0,4).join(", "))+(mk.length>4?" +"+(mk.length-4):""):"—"}</td><td>${off?pill("Ngừng dùng","gry"):pill("Đang dùng","grn")}</td>
-      <td>${ed?spcfActs([["Sửa",`data-gocsua="${esc(it.code)}"`],[off?"Dùng lại":"Ngừng dùng",`data-gocoff="${esc(it.code)}" data-v="${off?1:0}"`]]):""}</td></tr>`}).join("");
-  spcfFrame(m,"Sản phẩm",sub,{noCh:1,q:"Tìm mã MISA, tên, mã bán…",count:nf(L.length)+" sản phẩm gốc",
+  const rows=L.map(it=>{const off=it.active===0,gv=see?spcfGv(it.code):null,le=spcfLe(it.code),on=[...(chOn.get(spcLow(it.code))||[])];
+    return `<tr${off?' style="opacity:.55"':""}>${ed?`<td class="cd"><input type="checkbox" class="goc-ck" data-c="${esc(it.code)}" ${sel.has(it.code)?"checked":""} style="width:auto"></td>`:""}<td class="cd">${spcfImg(spcfGocImg(it.code))}</td><td class="cd"><span class="spf-tag">${esc(it.code)}</span></td><td><a href="#" class="nm" data-goccard="${esc(it.code)}">${esc(it.name)}</a></td><td class="cd hint">${esc((dmOf(it.code)||{}).ten||"—")}</td><td class="cd">${esc(it.unit||"")}</td>
+      ${see?`<td class="n">${gv?nf(Math.round(gv.u)):'<span class="hint">chưa có</span>'}</td>`:""}<td class="n">${le?`<b>${nf(le.v)}</b>`:'<span class="hint">chưa có</span>'}</td>
+      <td>${on.length?on.map(x=>`<span class="spf-tag" style="color:var(--ink);background:var(--gray-soft);border-color:var(--line)">${x}</span>`).join(" "):'<span class="hint">chưa bán</span>'}</td><td class="cd">${off?pill("Ngừng dùng","gry"):pill("Đang dùng","grn")}</td>
+      <td class="cd">${spcfActs([["Giá các kênh",`data-goccard="${esc(it.code)}"`]].concat(ed?[["Sửa tên, ĐVT",`data-gocsua="${esc(it.code)}"`],[off?"Dùng lại":"Ngừng dùng",`data-gocoff="${esc(it.code)}" data-v="${off?1:0}"`]]:[]))}</td></tr>`}).join("");
+  spcfFrame(m,"Sản phẩm",sub,{noCh:1,q:"Tìm mã MISA, tên, mã bán…",count:nf(L.length)+" sản phẩm",
     tools:`${nOff?`<label class="inl" style="white-space:nowrap"><input type="checkbox" id="goc-off" ${SPCF.gocOff?"checked":""} style="width:auto"> Hiện cả ${nOff} mã ngừng dùng</label>`:""}${ed?`<button class="btn pri" data-gocsua="">+ Thêm sản phẩm</button>`:""}`,
-    inner:tbl(["Mã MISA","Tên sản phẩm","ĐVT","Loại","Mã bán Kênh phân phối","Trạng thái",""],[rows])});
+    inner:dmBar+tbl((ed?[`<input type="checkbox" id="goc-ckall" ${L.length&&L.every(it=>sel.has(it.code))?"checked":""} style="width:auto" title="Chọn hết">`]:[]).concat(["Ảnh","Mã MISA","Tên sản phẩm","Danh mục","ĐVT"]).concat(see?["Giá vốn"]:[],["Giá lẻ","Đang bán ở","Trạng thái",""]),[rows]).replace("<table","<table class=\"spf-gt\"")+`<p class="hint pad" style="margin:0">Bấm vào tên sản phẩm để xem và đặt giá bán từng kênh (Facebook, CSKH, TikTok, Shopee, Kênh phân phối). Combo các kênh chọn món từ danh sách này.</p>`});
   const off=$("#goc-off");if(off)off.onchange=()=>{SPCF.gocOff=off.checked;renderMain()};
+  m.querySelectorAll("[data-gocdm]").forEach(b=>b.onclick=()=>{SPCF.dm=b.dataset.gocdm;renderMain()});
+  const ql=$("#goc-dmql");if(ql)ql.onclick=spcfDmQl;
+  m.querySelectorAll(".goc-ck").forEach(c=>c.onchange=()=>{c.checked?sel.add(c.dataset.c):sel.delete(c.dataset.c);const y=scrollY;renderMain();scrollTo(0,y)});
+  const ca=$("#goc-ckall");if(ca)ca.onchange=()=>{L.forEach(it=>ca.checked?sel.add(it.code):sel.delete(it.code));renderMain()};
+  const go=$("#goc-dmgo");if(go)go.onclick=()=>{const id=$("#goc-dmto").value,n=sel.size;spcfDmSet([...sel],id);sel.clear();toast(id?"Đã đưa "+n+" sản phẩm vào "+((DM.list.find(x=>x.id===id)||{}).ten||""):"Đã bỏ danh mục "+n+" sản phẩm")};
+  const clr=$("#goc-dmclr");if(clr)clr.onclick=()=>{sel.clear();renderMain()};
   m.querySelectorAll("[data-gocsua]").forEach(b=>b.onclick=()=>spcfGocForm(b.dataset.gocsua||null));
+  m.querySelectorAll("[data-goccard]").forEach(b=>b.onclick=e=>{e.preventDefault();spcfGocCard(b.dataset.goccard)});
   m.querySelectorAll("[data-gocoff]").forEach(b=>b.onclick=async()=>{const on=b.dataset.v==="1",code=b.dataset.gocoff;if(!on&&!confirm("Ngừng dùng "+code+"? Mã vẫn giữ trong lịch sử, chỉ ẩn khỏi danh sách."))return;
     try{await spcApi("/products/"+encodeURIComponent(code),{method:"PATCH",body:JSON.stringify({active:on})});toast(on?"Đã dùng lại "+code:"Đã ngừng dùng "+code);spcfGocLoad(true)}catch(e){toast(e.message)}});
 }
-function spcfGocForm(code){const it=code?((SPCF.goc&&SPCF.goc.items)||[]).find(x=>x.code===code):null;
-  const R=spcfModal(it?"Sửa sản phẩm gốc":"Thêm sản phẩm gốc",spcfSec("Thông tin",spcfBox(
-    spcfRow("Mã MISA (mã kho) *",it?`<b class="mono">${esc(it.code)}</b>`:`<input id="goc-code" placeholder="đúng mã trên MISA">`)+spcfRow("Tên sản phẩm *",`<input id="goc-name" value="${esc(it?it.name:"")}">`)+spcfRow("Đơn vị tính",`<input id="goc-unit" value="${esc(it?it.unit||"":"Chai")}">`)+
-    (it?"":spcfRow("Loại",`<select id="goc-cls">${opt([["TP","Thành phẩm"],["HH","Hàng hóa"]],"TP")}</select>`)+spcfRow("Tạo luôn mã bán Kênh phân phối cùng mã",`<input type="checkbox" class="spf-sw" id="goc-kpp">`))),it?"":"Mã bán của Facebook, CSKH, sàn thêm ở mục Combo."),
+/* Hồ sơ một sản phẩm: ảnh, giá vốn, giá lẻ niêm yết, giá bán từng kênh. Đặt giá Facebook / CSKH ngay tại đây; sàn và Kênh phân phối chỉ xem (sửa trên sàn / qua phiếu Bảng giá). */
+function spcfGocCard(code){
+  const it=((SPCF.goc&&SPCF.goc.items)||[]).find(x=>x.code===code);if(!it)return;
+  const ed=!!(SPCF.goc&&SPCF.goc.can_edit),see=spcfSeeGv(),gv=see?spcfGv(code):null,le=spcfLe(code),img=spcfGocImg(code),sku=spcfSku(code);
+  const chRow=(k,bp,n)=>{const L=spcfOnCh(k,code),can=spcfChEd(bp);
+    const body=L.length?L.map(({p,v})=>{const pk=typeof spbPkPrice==="function"?spbPkPrice(v):null,off=v.on===false||p.loai==="off";
+      return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:3px 0"><span class="spf-tag">${esc(v.ma)}</span>${(v.dt||v.pl)?`<small class="hint">${esc([v.dt,v.pl].filter(Boolean).join(" · "))}</small>`:""}${off?pill("Ngừng bán","gry"):""}<span class="sp" style="flex:1"></span>
+        ${can?`<input class="goc-cg" data-k="${k}" data-pid="${esc(p.id)}" data-vid="${esc(v.id||v.ma)}" inputmode="numeric" value="${+v.gia>0?nf(v.gia):""}" placeholder="${pk!=null?nf(pk)+" (Pancake)":"giá"}" style="width:130px;text-align:right">`:`<b>${+v.gia>0?nf(v.gia):pk!=null?nf(pk):"—"}</b>`}</div>`}).join("")
+      :can?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="hint" style="flex:1">Chưa bán trên ${n}</span><input class="goc-nma mono" data-k="${k}" value="${esc(code)}" placeholder="mã Pancake" style="width:150px"><input class="goc-ngia" data-k="${k}" inputmode="numeric" value="${le?nf(le.v):""}" placeholder="giá bán" style="width:110px;text-align:right"><button class="btn sm" data-gocadd="${k}">+ Bán trên ${n}</button></div>`
+      :`<span class="hint">Chưa bán trên ${n}</span>`;
+    return `<tr><td style="width:120px"><b>${n}</b></td><td>${body}</td></tr>`};
+  const sanRow=(CH,n)=>{const L=spcfSanOf(CH,code),can=spcfSanEd(CH);
+    const body=L.length?L.map(x=>{const r=spcfSanFind(CH,x.sku,x.variant);return `<div style="display:flex;gap:8px;align-items:center;margin:3px 0"><span class="spf-tag">${esc(x.sku)}</span><small class="hint">${esc(x.variant)}</small><span style="flex:1"></span>
+      ${can?`<input class="goc-sg" data-ch="${CH}" data-sku="${esc(x.sku)}" data-var="${esc(x.variant)}" inputmode="numeric" value="${r&&r.gia?nf(r.gia):""}" placeholder="giá" style="width:120px;text-align:right">`:r&&r.gia?`<b>${nf(r.gia)}</b>`:'<span class="hint">chưa có giá</span>'}</div>`}).join("")
+      :`<span class="hint">Chưa có mã ${n} nào quy đổi ra mã này${typeof SPCB!=="undefined"&&!SPCB.at?" (đang tải)":""}</span>`;
+    return `<tr><td><b>${n}</b></td><td>${body}</td></tr>`};
+  const K=spcfKpp(code),kppRow=`<tr><td><b>Kênh phân phối</b></td><td>${K.length?K.map(p=>`<div style="display:flex;gap:8px;align-items:center;margin:3px 0"><span class="spf-tag">${esc(p.sku)}</span><small class="hint">${esc(p.unit||"")}</small><span style="flex:1"></span><small class="hint">${Object.keys(p.prices||{}).length} cấp giá</small></div>`).join("")+`<small class="hint">Giá từng cấp xem và sửa ở mục <a href="#" data-gocgia="1">Bảng giá</a> (sửa giá cần phiếu chị duyệt).</small>`
+    :spcfB2bOk(ME)?`<span class="hint">${SPCF.b2b?"Chưa có mã KPP":"Đang tải…"}</span>`:`<span class="hint">—</span>`}</td></tr>`;
+  const R=spcfModal("Sản phẩm · "+esc(it.name),
+    `<div data-gocc="1"></div>`+spcfSec("Thông tin",spcfBox(`<div style="display:flex;gap:14px;align-items:center;padding:12px 16px">${img?`<img src="${esc(img)}" alt="" style="width:84px;height:84px;border-radius:10px;object-fit:cover;border:1px solid var(--line)">`:`<span class="spf-img" style="width:84px;height:84px"></span>`}
+      <div style="flex:1"><span class="spf-tag">${esc(it.code)}</span><div style="font-weight:700;margin:4px 0">${esc(it.name)}</div><small class="hint">${esc(it.unit||"")} · ${it.cls==="HH"?"Hàng hóa":"Thành phẩm"}</small>${ed?`<div style="margin-top:6px"><select id="goc-dm" data-o="${esc((spcfDmOf(code)||{}).id||"")}" style="width:auto">${spcfDmOpt((spcfDmOf(code)||{}).id||"")}</select></div>`:spcfDmOf(code)?`<div class="hint">Danh mục: ${esc(spcfDmOf(code).ten)}</div>`:""}</div>
+      ${ed?`<div style="display:flex;flex-direction:column;gap:6px"><label class="btn sm" style="cursor:pointer">Tải ảnh lên<input type="file" accept="image/*" id="goc-img" hidden></label>${sku&&sku.img?`<button class="btn sm" id="goc-imgx">Bỏ ảnh tải lên</button>`:""}</div>`:""}</div>`))+
+    spcfSec("Giá",spcfBox((see?spcfRow("Giá vốn",ed?`<input id="goc-gv" data-c="${esc(code)}" data-n="${esc(it.name)}" inputmode="numeric" value="${gv?nf(Math.round(gv.u)):""}" placeholder="chưa có" style="width:150px;text-align:right"><small class="hint">${gv?esc(gv.src):""}</small>`:`<b>${gv?nf(Math.round(gv.u)):"chưa có"}</b>`):"")+
+      spcfRow("Giá lẻ niêm yết",le&&le.kpp?`<b>${nf(le.v)}</b><small class="hint">theo Bảng giá (mã ${esc(le.kpp)}), sửa qua phiếu</small>`:ed?`<input id="goc-le" inputmode="numeric" value="${le?nf(le.v):""}" placeholder="chưa có" style="width:150px;text-align:right">`:`<b>${le?nf(le.v):"chưa có"}</b>`)),see?"Giá vốn chỉ CEO, kế toán thấy.":"")+
+    spcfSec("Giá bán từng kênh",`<div class="spf-box" style="padding:0">${tbl(["Kênh","Mã bán và giá"],[chRow("fbCat","ADS","Facebook")+chRow("cskhCat","CSKH","CSKH")+sanRow("TIKTOK","TikTok")+sanRow("SHOPEE","Shopee")+kppRow])}</div>`,"Đặt giá ngay tại đây. Facebook, CSKH để trống = theo giá Pancake. Giá TikTok, Shopee là giá đang để trên sàn (tải file ở Sản phẩm › thẻ TikTok / Shopee)."),
+    `<button class="btn pri" id="goc-save">Lưu</button>`);
+  const reopen=()=>setTimeout(()=>spcfGocCard(code),50);
+  /* Sửa giá chỉ lưu khi bấm Lưu (chị Hoa 16/11); Hủy là bỏ thay đổi */
+  const ins=[...R.querySelectorAll("#goc-gv,#goc-le,.goc-cg,.goc-sg")];ins.forEach(x=>{x.dataset.o=String(spcfNum(x.value));x.onkeydown=e=>{if(e.key==="Enter")R.querySelector("#goc-save").click()}});
+  R.querySelector("#goc-save").onclick=()=>{const chg=ins.filter(x=>String(spcfNum(x.value))!==x.dataset.o),dmS=R.querySelector("#goc-dm"),dmC=!!dmS&&dmS.value!==dmS.dataset.o;if(!chg.length&&!dmC){closeCM();return}let n=0;if(dmC){spcfDmSet([code],dmS.value);n++}
+    chg.forEach(x=>{const v=spcfNum(x.value);
+      if(x.id==="goc-gv"){if(v>0&&typeof spcSetGv==="function"&&spcSetGv(code,it.name,v))n++}
+      else if(x.id==="goc-le"){spcfSkuSet(code,it.name,"giá lẻ niêm yết "+code,s=>{s.giaBan=v});n++}
+      else if(x.classList.contains("goc-cg")){const k=x.dataset.k;spcfChMut(k,"giá "+(k==="cskhCat"?"CSKH":"Facebook")+" "+code,c=>{const p=c.sp.find(y=>y.id===x.dataset.pid);const b=p&&(p.bt||[]).find(y=>(y.id||y.ma)===x.dataset.vid);if(!b)return;if(v>0)b.gia=v;else delete b.gia});n++}
+      else if(x.classList.contains("goc-sg")){spcfSanSet(x.dataset.ch,x.dataset.sku,x.dataset.var,v);n++}});
+    renderMain();toast(n?"Đã lưu "+n+" thay đổi":"Giá vốn phải lớn hơn 0");reopen()};
+  R.querySelectorAll("[data-gocadd]").forEach(b=>b.onclick=()=>{const k=b.dataset.gocadd,ma=(R.querySelector(`.goc-nma[data-k="${k}"]`).value||"").trim(),gia=spcfNum(R.querySelector(`.goc-ngia[data-k="${k}"]`).value);if(!ma){toast("Nhập mã Pancake");return}
+    if(spcfChanCat(k).some(p=>(p.bt||[]).some(v=>spcLow(v.ma)===spcLow(ma)))){toast("Mã "+ma+" đã có trong danh sách kênh này, sửa ở Sản phẩm › thẻ kênh");return}
+    spcfChMut(k,"bán "+code+" trên "+(k==="cskhCat"?"CSKH":"Facebook"),c=>{c.sp.push(spcfNewChanSp(it,ma,gia))});toast("Đã thêm "+ma);reopen()});
+  const fi=R.querySelector("#goc-img");if(fi)fi.onchange=async()=>{const f=fi.files&&fi.files[0];if(!f)return;try{const u=await spcfThumb(f);spcfSkuSet(code,it.name,"ảnh "+code,s=>{s.img=u});toast("Đã lưu ảnh");reopen()}catch(e){toast("Không đọc được ảnh")}};
+  const ix=R.querySelector("#goc-imgx");if(ix)ix.onclick=()=>{spcfSkuSet(code,it.name,"bỏ ảnh "+code,s=>{delete s.img});reopen()};
+  const gl=R.querySelector("[data-gocgia]");if(gl)gl.onclick=e=>{e.preventDefault();closeCM();ntPage("sp_gia")};
+}
+/* Ảnh tải lên thu nhỏ còn cạnh dài 240px (JPEG) để lưu chung, không nặng web */
+function spcfThumb(f){return new Promise((ok,no)=>{const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const s=Math.min(1,240/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+  const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",.78))};im.onerror=no;im.src=u})}
+function spcfGocForm(code,o){o=o||{};const it=code?((SPCF.goc&&SPCF.goc.items)||[]).find(x=>x.code===code):null;
+  const R=spcfModal(it?"Sửa sản phẩm":"Thêm sản phẩm",spcfSec("Thông tin",spcfBox(
+    spcfRow("Mã MISA (mã kho) *",it?`<b class="mono">${esc(it.code)}</b>`:`<input id="goc-code" placeholder="đúng mã trên MISA">`)+spcfRow("Tên sản phẩm *",`<input id="goc-name" value="${esc(it?it.name:o.ten||"")}">`)+spcfRow("Đơn vị tính",`<input id="goc-unit" value="${esc(it?it.unit||"":"Chai")}">`)+
+    (it?"":spcfRow("Loại",`<select id="goc-cls">${opt([["TP","Thành phẩm"],["HH","Hàng hóa"]],"TP")}</select>`)+spcfRow("Giá lẻ niêm yết",`<input id="goc-le0" inputmode="numeric" placeholder="đ" style="text-align:right">`)+spcfRow("Danh mục",`<select id="goc-dm0">${spcfDmOpt(SPCF.dm&&SPCF.dm!=="_"?SPCF.dm:"")}</select>`)+spcfRow("Tạo luôn mã bán Kênh phân phối cùng mã",`<input type="checkbox" class="spf-sw" id="goc-kpp">`))),it?"":"Lưu xong sản phẩm có trong danh sách để các kênh chọn bán, làm combo."),
     `<button class="btn pri" id="goc-ok">Lưu</button>`);
   R.querySelector("#goc-ok").onclick=async()=>{const g=s=>{const e=R.querySelector(s);return e?(e.type==="checkbox"?e.checked:e.value.trim()):""};const name=g("#goc-name");if(!name){toast("Nhập tên sản phẩm");return}
-    try{if(it)await spcApi("/products/"+encodeURIComponent(it.code),{method:"PATCH",body:JSON.stringify({name,unit:g("#goc-unit")})});
-      else{const c=g("#goc-code");if(!c){toast("Nhập mã MISA");return}await spcApi("/products",{method:"POST",body:JSON.stringify({code:c,name,unit:g("#goc-unit"),cls:g("#goc-cls"),kpp:g("#goc-kpp")===true})})}
-      closeCM();toast("Đã lưu");spcfGocLoad(true)}catch(e){toast(e.message)}}}
+    try{let c=it&&it.code;if(it)await spcApi("/products/"+encodeURIComponent(it.code),{method:"PATCH",body:JSON.stringify({name,unit:g("#goc-unit")})});
+      else{c=g("#goc-code");if(!c){toast("Nhập mã MISA");return}await spcApi("/products",{method:"POST",body:JSON.stringify({code:c,name,unit:g("#goc-unit"),cls:g("#goc-cls"),kpp:g("#goc-kpp")===true})});
+        const le0=spcfNum(g("#goc-le0"));if(le0)spcfSkuSet(c,name,"giá lẻ niêm yết "+c,s=>{s.giaBan=le0});const dm0=g("#goc-dm0");if(dm0)spcfDmSet([c],dm0)}
+      closeCM();toast("Đã lưu");await spcfGocLoad(true);if(o.after)o.after(c)}catch(e){toast(e.message)}}}
 /* Nút "⋯" của cột thao tác: các nút thật ẩn đi, bấm "⋯" ra menu, bấm mục nào là bấm nút đó */
 const spcfActs=L=>L.length?`<span class="spf-acts" style="white-space:nowrap">${L.map(([t,a])=>`<button class="btn sm" ${a} style="display:none">${t}</button>`).join("")}<button type="button" class="btn sm rmb spf-dots" title="Thao tác" aria-label="Thao tác">⋯</button></span>`:"";
 function spcfDotsBind(m){m.querySelectorAll(".spf-dots").forEach(b=>b.onclick=e=>{e.stopPropagation();const had=document.querySelector(".rmpop"),mine=had&&had._src===b;if(had)had.remove();if(mine)return;
@@ -158,7 +265,7 @@ function spcfDotsBind(m){m.querySelectorAll(".spf-dots").forEach(b=>b.onclick=e=
   sec.forEach(x=>{const it=document.createElement("button");it.type="button";const t=x.textContent.trim();it.textContent=t;if(/^(xóa|xoá)/i.test(t))it.className="dg";it.onclick=ev=>{ev.stopPropagation();pop.remove();x.click()};pop.appendChild(it)});
   document.body.appendChild(pop);setTimeout(()=>document.addEventListener("click",()=>pop.remove(),{once:true}),0)})}
 
-/* ============================== MÃ BÁN TỪNG KÊNH (trang Combo, thẻ "Mã bán trên kênh") ============================== */
+/* ============================== MÃ BÁN TỪNG KÊNH (trang Sản phẩm, thẻ từng kênh) ============================== */
 function spcfChanSp(m){
   const ch=spcfCh();if(!ch){spcfNoAccess(m,"Combo");return}
   const sub="Mã bán từng kênh · giá bán của kênh · không hiện giá vốn";
@@ -174,30 +281,55 @@ function spcfChanSp(m){
      <td class="n">${bt.length===1?spcGiaTxt(v0):`<small class="hint">${bt.length} mẫu</small>`}</td><td class="n">${bt.length===1?pkp(v0):"—"}</td>
      <td>${ed?spcfActs([["Sửa",`data-spcfpe="${esc(p.id)}"`],[on?"Ngừng bán":"Bán lại",`data-spcfonb="${esc(p.id)}" data-v="${on?0:1}"`],["Xóa",`data-spcfpdel="${esc(p.id)}"`]]):""}</td></tr>`+
      (open?bt.map(v=>`<tr style="background:var(--gray-soft)"><td></td><td>${v.on!==false?"✓":""}</td><td>${spcfVImg(v)}</td><td><span class="spf-tag">${esc(v.ma)}</span></td><td><small>${esc([v.dt,v.pl].filter(Boolean).join(" · ")||"mặc định")}</small></td><td></td><td></td><td class="n">${spcGiaTxt(v)}</td><td class="n">${pkp(v)}</td><td></td></tr>`).join(""):"")}).join("");
-  spcfFrame(m,"Combo",sub,{q:"Tìm mã, tên sản phẩm…",count:nf(L.length)+" mã bán",
+  spcfFrame(m,"Sản phẩm",sub,{q:"Tìm mã, tên sản phẩm…",count:nf(L.length)+" mã bán",
     tools:`<button class="btn" data-spcfpk="1" ${SPCB.pkBusy?"disabled":""} title="Đọc lại giá, ảnh trên Pancake${ed?" và mở danh sách để thêm sản phẩm":""}">${SPCB.pkBusy?"Đang đọc Pancake…":"⟳ Đồng bộ Pancake"}</button>${ed?`<button class="btn pri" data-spcfpe="">+ Thêm mã bán</button>`:""}`,
     inner:tbl(["","Trạng thái","Ảnh","Mã bán","Tên sản phẩm","Loại","Số mẫu mã","Giá bán kênh","Giá Pancake",""],[rows])+`<p class="hint pad" style="margin:0">Giá bán kênh: giá riêng của kênh nếu đã đặt, chưa đặt thì theo giá Pancake. Bấm ⋯ để sửa, ngừng bán hoặc xóa.</p>`,
     after:SPCF.pkOpen&&ed?(SPCB.pk?spbPkEditView(SPC.bpView):SPCB.pkErr?`<div class="note red">Chưa đọc được Pancake: ${esc(SPCB.pkErr)}</div>`:`<p class="hint pad">Đang đọc Pancake…</p>`):""});
 }
-/* TikTok / Shopee: sản phẩm đang bán trên sàn, lấy từ báo cáo tháng mới nhất đã nạp (mã người bán, phân loại, số món, giá bán trung bình). */
-async function spcfSanLoad(CH){const S=SPCF.san;if(S[CH]&&(S[CH].busy||S[CH].rows||S[CH].err))return;S[CH]={busy:true};try{S[CH]=await spcApi("/san-products?channel="+CH)}catch(e){S[CH]={err:e.message}}if(/^sp_/.test(PAGE))renderMain()}
-function spcfSanSp(m,CH,sub){const S=SPCF.san[CH];if(!S||S.busy){spcfSanLoad(CH);spcfFrame(m,"Combo",sub,{inner:`<p class="hint pad">Đang tải…</p>`});return}
-  if(S.err){spcfFrame(m,"Combo",sub,{inner:`<div class="note red" style="margin:14px">${esc(S.err)}</div>`});return}
-  const q=spcfFold(SPCF.q).trim(),L=(S.rows||[]).filter(r=>!q||spcfFold(r.sku+" "+r.name+" "+r.variant).includes(q)),th=S.ky?"tháng "+S.ky.slice(5)+"/"+S.ky.slice(0,4):"";
-  spcfFrame(m,"Combo",sub,{q:"Tìm mã, tên, phân loại…",count:nf(L.length)+" mẫu đang bán"+(th?" · số "+th:""),
-    inner:L.length?tbl(["Mã người bán","Sản phẩm trên sàn","Phân loại","Đã bán "+th,"Giá bán trung bình"],L.slice(0,400).map(r=>`<tr><td>${r.sku?`<span class="spf-tag">${esc(r.sku)}</span>`:"<span class=\"hint\">—</span>"}</td><td><small>${esc(r.name)}</small></td><td><b>${esc(r.variant||"")}</b></td><td class="n">${nf(r.qty)}</td><td class="n"><b>${r.price!=null?nf(r.price)+" đ":"—"}</b></td></tr>`))+`<p class="hint pad" style="margin:0">Lấy từ báo cáo ${CH==="TIKTOK"?"TikTok":"Shopee"} ${th} đã nạp. Giá bán trung bình = doanh thu / số món (đã gồm giảm giá trên sàn). Sửa giá, tên thì làm trên sàn.</p>`
-      :`<div class="note" style="margin:14px">Chưa có báo cáo ${CH==="TIKTOK"?"TikTok":"Shopee"} nào được nạp lên web.</div>`});
+/* TikTok / Shopee: bảng giá đang để trên sàn (chị Hoa 16/11). Tải file xuất từ sàn (danh sách sản phẩm / cập nhật hàng loạt, có cột giá)
+   hoặc sửa giá từng dòng trên web. Lưu chung d.sanGia[CH] = {at, by, file, rows:[{pid, sku, variant, name, gia}]}.
+   Nối với sản phẩm gốc qua bảng quy đổi kế toán (channel_map: mã sàn = mã sản phẩm hoặc mã người bán, + phân loại). */
+const spcfSanEd=CH=>spcfAll(ME)||(CH==="TIKTOK"&&ME.phongBan==="CM");
+const spcfSanG=CH=>{try{return (D().sanGia||{})[CH]||{rows:[]}}catch(e){return {rows:[]}}};
+const spcfLo=v=>String(v==null?"":v).trim().toLowerCase();
+function spcfSanFind(CH,sku,variant){const R=spcfSanG(CH).rows||[],k=spcfLo(sku),v=spcfLo(variant),hit=r=>spcfLo(r.pid)===k||spcfLo(r.sku)===k;return R.find(r=>hit(r)&&spcfLo(r.variant)===v)||(v?null:R.find(hit))||R.find(r=>hit(r)&&!r.variant)||null}
+function spcfSanSet(CH,sku,variant,gia){DB.mutate(ME.name,"giá "+(CH==="TIKTOK"?"TikTok":"Shopee")+" "+sku,d=>{d.sanGia=d.sanGia||{};const G=d.sanGia[CH]=d.sanGia[CH]||{rows:[]},k=spcfLo(sku),v=spcfLo(variant);
+  let r=G.rows.find(x=>(spcfLo(x.pid)===k||spcfLo(x.sku)===k)&&spcfLo(x.variant)===v);if(!r){r={pid:"",sku,variant:variant||"",name:""};G.rows.push(r)}r.gia=gia||0;r.sua={by:ME.name||"",at:new Date().toISOString()}});toast(gia?"Đã lưu giá "+nf(gia):"Đã xóa giá");renderMain()}
+/* Đọc file giá sàn: tìm dòng tiêu đề có cột giá, rồi các cột mã sản phẩm, mã người bán, tên, phân loại */
+function spcfSanParse(rows){const H=(rows||[]).slice(0,12);let best=-1,bi=-1,C=null;
+  H.forEach((r,i)=>{const h=(r||[]).map(x=>spcfFold(String(x||"")).trim()),f=re=>h.findIndex(x=>re.test(x));
+    const c={gia:h.findIndex(x=>/^(gia|price|retail price)/.test(x)&&!/(von|nhap|goc|si)\b/.test(x)),pid:f(/(^id san pham|^ma san pham|product[_ ]?id|^id$)/),sku:(i=>i>=0?i:f(/^(ma )?sku$|sku(?!.*\bid\b)/))(f(/(seller[_ ]?sku|sku nguoi ban|sku phan loai)/)),variant:f(/(ten phan loai|phan loai hang|variation|variant|bien the)/),name:f(/(ten san pham|product[_ ]?name)/)};
+    if(c.variant===c.sku)c.variant=-1;const n=Object.values(c).filter(x=>x>=0).length;if(c.gia>=0&&n>best){best=n;bi=i;C=c}});
+  if(!C||(C.pid<0&&C.sku<0))return {err:"Không thấy cột giá và cột mã sản phẩm / mã SKU trong file"};
+  const num=v=>{const t=String(v==null?"":v).trim().replace(/[.,]00$/,"");return +t.replace(/[^0-9]/g,"")||0},g=(r,i)=>i>=0?String(r[i]==null?"":r[i]).trim():"";
+  const out=[];rows.slice(bi+1).forEach(r=>{if(!r)return;const gia=num(r[C.gia]),pid=g(r,C.pid),sku=g(r,C.sku);if(!gia||(!pid&&!sku)||!/\d/.test(pid+sku+gia))return;out.push({pid,sku,variant:g(r,C.variant),name:g(r,C.name),gia})});
+  return out.length?{rows:out}:{err:"File không có dòng nào có giá"}}
+function spcfSanSp(m,CH,sub){const G=spcfSanG(CH),can=spcfSanEd(CH),nm=CH==="TIKTOK"?"TikTok":"Shopee",q=spcfFold(SPCF.q).trim();
+  const misa=r=>{const M=((typeof SPCB!=="undefined"&&SPCB.rows)||[]).filter(x=>x.channel===CH&&(spcfLo(x.sku)===spcfLo(r.pid)||spcfLo(x.sku)===spcfLo(r.sku))&&(!x.variant||spcfLo(x.variant)===spcfLo(r.variant))&&!x.off_from);return [...new Set(M.map(x=>x.code||spcCode(x.item_label)))]};
+  const R=(G.rows||[]).map((r,i)=>({...r,i})).filter(r=>!q||spcfFold([r.pid,r.sku,r.name,r.variant].join(" ")).includes(q));
+  spcfFrame(m,"Sản phẩm",sub,{q:"Tìm mã, tên, phân loại…",count:nf(R.length)+" mẫu"+(G.at?" · tải lúc "+spcfVN(G.at.slice(0,10))+(G.by?" ("+esc(G.by)+")":""):""),
+    tools:can?`<label class="btn pri" style="cursor:pointer">⇪ Tải file giá ${nm}<input type="file" id="san-f" accept=".xlsx,.xls,.csv" hidden></label>`:"",
+    inner:R.length?tbl(["Mã sản phẩm","Mã người bán","Sản phẩm trên sàn","Phân loại","Mã MISA","Giá trên sàn"],R.slice(0,600).map(r=>{const k=misa(r);return `<tr><td class="mono hint" style="white-space:nowrap">${esc(r.pid||"")}</td><td style="white-space:nowrap">${r.sku?`<span class="spf-tag">${esc(r.sku)}</span>`:""}</td><td><small>${esc(r.name||"")}</small></td><td>${esc(r.variant||"")}</td><td style="white-space:nowrap">${k.length?k.map(x=>`<span class="spf-tag">${esc(x)}</span>`).join(" "):'<span class="hint">chưa quy đổi</span>'}</td>
+      <td class="n">${can?`<input class="san-g" data-i="${r.i}" inputmode="numeric" value="${r.gia?nf(r.gia):""}" style="width:110px;text-align:right">`:`<b>${r.gia?nf(r.gia):"—"}</b>`}</td></tr>`})).replace("<table","<table class=\"spf-gt\"")+`<p class="hint pad" style="margin:0">Giá đang để trên ${nm}. Đổi giá trên sàn xong thì sửa ô giá ở đây hoặc tải lại file cho khớp. Mã MISA theo bảng quy đổi của kế toán.</p>`
+      :`<div class="note" style="margin:14px">Chưa có bảng giá ${nm}. ${can?`Vào ${nm} xuất file danh sách sản phẩm (có cột mã sản phẩm hoặc SKU người bán, phân loại, giá) rồi bấm <b>⇪ Tải file giá ${nm}</b>.`:"Nhờ kế toán tải file giá lên."}</div>`});
+  const f=m.querySelector("#san-f");if(f)f.onchange=async()=>{const x=f.files&&f.files[0];if(!x)return;let rows;try{rows=await readXlsx(x)}catch(e){return}const P=spcfSanParse(rows);if(P.err){toast(P.err);return}
+    if(!confirm("Đọc được "+P.rows.length+" mẫu có giá trong file "+x.name+". Thay bảng giá "+nm+" đang có bằng file này?"))return;
+    DB.mutate(ME.name,"tải file giá "+nm+" ("+P.rows.length+" mẫu)",d=>{d.sanGia=d.sanGia||{};d.sanGia[CH]={at:new Date().toISOString(),by:ME.name||"",file:x.name,rows:P.rows}});toast("Đã tải "+P.rows.length+" mẫu giá "+nm);renderMain()};
+  m.querySelectorAll(".san-g").forEach(x=>{x.onkeydown=e=>{if(e.key==="Enter")x.blur()};x.onchange=()=>{const v=spcfNum(x.value),i=+x.dataset.i;DB.mutate(ME.name,"sửa giá "+nm,d=>{const r=d.sanGia&&d.sanGia[CH]&&d.sanGia[CH].rows[i];if(r){r.gia=v;r.sua={by:ME.name||"",at:new Date().toISOString()}}});toast("Đã lưu giá "+nf(v));renderMain()}});
+  if(typeof SPCB!=="undefined"&&!SPCB.at&&!SPCB.busy&&typeof spcLoad==="function")spcLoad().then(()=>{if(/^sp_/.test(PAGE))renderMain()});
 }
 /* Tạo / sửa sản phẩm (giống Poscake: thông tin, các mẫu mã kèm giá bán kênh) */
 function spcfProdForm(id){
   const p=id?spcCat().find(x=>x.id===id):null,bt=p?(p.bt||[]).map(v=>({...v})):[{id:"v"+Date.now(),ma:"",dt:"",pl:"",on:true}],misa=typeof spcCanMisa==="function"&&spcCanMisa();
-  const st={ten:p?p.ten:"",loai:p?p.loai||"run":"run"};
+  const st={ten:p?p.ten:"",loai:p?p.loai||"run":"run"};if(!p)spcfGocLoad();
   const draw=()=>{const R=spcfModal(`${p?"Sửa":"Tạo"} sản phẩm · ${esc(SPCF_BP[SPCF.ch])}`,
+    (p?"":spcfSec("Lấy từ sản phẩm",`<div class="spf-box">${spcfPickBox("goc","Tìm sản phẩm có sẵn theo mã MISA, tên…")}</div>`,"Chọn sản phẩm có sẵn thì tự điền tên, mã kho, giá lẻ."))+
     spcfSec("Thông tin cơ bản",spcfBox(spcfRow("Tên sản phẩm *",`<input id="spf-ten" value="${esc(st.ten)}">`)+spcfRow("Loại hình sản phẩm",`<select id="spf-loai">${opt([["run","Sản phẩm"],["gift","Quà tặng"],["off","Không bán"]],st.loai)}</select>`)))+
     spcfSec("Mẫu mã",`<div class="spf-box" style="padding:0">${tbl(["Bán","Ảnh","Mã mẫu (mã Pancake)","Dung tích","Phân loại / hương","Giá bán kênh (đ)"].concat(misa?["Mã kho (MISA)"]:[],[""]),bt.map((v,i)=>`<tr data-spfv="${i}"><td><input type="checkbox" class="spf-sw spf-on" ${v.on!==false?"checked":""}></td><td>${spcfVImg(v)}</td><td><input class="spf-ma mono" value="${esc(v.ma)}" style="width:120px"></td><td><input class="spf-dt" value="${esc(v.dt||"")}" style="width:90px"></td><td><input class="spf-pl" value="${esc(v.pl||"")}" style="width:120px"></td>
       <td><input class="spf-gia n" inputmode="numeric" value="${v.gia?Math.round(v.gia):""}" placeholder="${spbPkPrice(v)!=null?nf(spbPkPrice(v)):"giá"}" style="width:110px"></td>${misa?`<td><input class="spf-misa mono" value="${esc(v.misa||"")}" style="width:130px"></td>`:""}<td>${bt.length>1?`<button class="btn sm" data-spfdel="${i}">✕</button>`:""}</td></tr>`))}<div style="padding:10px 14px"><button class="btn sm" id="spf-add">+ Thêm mẫu mã</button></div></div>`,"Mỗi mẫu mã một mã Pancake. Giá bán kênh để trống thì theo giá Pancake."),
     `${p?`<button class="btn" id="spf-rm" style="margin-right:auto;order:-1">Xóa sản phẩm</button>`:""}<button class="btn pri" id="spf-save">Lưu</button>`);
     const read=()=>{st.ten=R.querySelector("#spf-ten").value.trim();st.loai=R.querySelector("#spf-loai").value;R.querySelectorAll("[data-spfv]").forEach(r=>{const v=bt[+r.dataset.spfv],g=s=>r.querySelector(s);v.on=g(".spf-on").checked;v.ma=g(".spf-ma").value.trim();v.dt=g(".spf-dt").value.trim();v.pl=g(".spf-pl").value.trim();const n=spcfNum(g(".spf-gia").value);if(n)v.gia=n;else delete v.gia;if(g(".spf-misa"))v.misa=g(".spf-misa").value.trim()})};
+    if(!p)spcfPicker(R,"goc",((SPCF.goc&&SPCF.goc.items)||[]).filter(x=>x.active!==0).map(x=>{const le=spcfLe(x.code);return {ma:x.code,ten:x.name,gia:le?le.v:0,img:spcfGocImg(x.code)}}),code=>{read();const x=SPCF.goc.items.find(y=>y.code===code),le=spcfLe(code),v=bt[0];st.ten=x.name;v.misa=code;if(!v.ma)v.ma=code;if(!v.gia&&le)v.gia=le.v;draw()});
     R.querySelector("#spf-add").onclick=()=>{read();bt.push({id:"v"+Date.now(),ma:"",dt:"",pl:"",on:true});draw()};
     R.querySelectorAll("[data-spfdel]").forEach(b=>b.onclick=()=>{read();bt.splice(+b.dataset.spfdel,1);draw()});
     R.querySelector("#spf-save").onclick=()=>{read();const ten=st.ten,loai=st.loai,V=bt.filter(v=>v.ma);if(!ten){toast("Nhập tên sản phẩm");return}if(!V.length){toast("Cần ít nhất một mã mẫu");return}
@@ -210,7 +342,6 @@ function spcfProdForm(id){
 /* ============================== COMBO ============================== */
 function pSpcfCb(m){
   const ch=spcfCh();if(!ch){spcfNoAccess(m,"Combo");return}
-  if(SPCF.sub==="sp"){spcfChanSp(m);return}
   const sub="Combo từng kênh · lưu xong chờ kế toán duyệt (nối mã kho) rồi mới chạy";
   if(ch==="b2b"){spcfFrame(m,"Combo",sub,{inner:`<div class="note" style="margin:14px">Kênh phân phối bán theo bảng giá 8 cấp, không dùng combo. Khuyến mãi cho NPP đặt ở mục <b>Khuyến mãi</b>.</div>`});return}
   if(ch==="tt"||ch==="sp"){spcfSanView(m,ch==="tt"?"TIKTOK":"SHOPEE",sub);return}
@@ -228,17 +359,19 @@ function pSpcfCb(m){
   if(typeof spcMdDraw==="function")spcMdDraw();
 }
 /* Tạo / sửa combo kiểu Poscake: thông tin cơ bản, giảm giá / giá trị combo + freeship, phạm vi (sản phẩm + số lượng, có ảnh), quà kèm */
-function spcfComboForm(id,pre){
-  spcfPkNeed();
-  const c=id?spcCombos().find(x=>x.id===id):null,V=spcfVars(),vOf=ma=>V.find(v=>v.ma===ma);
-  const st={ten:c?c.nhom||"":(pre&&pre.ten)||"",tu:c?c.tu||spcfToday():spcfToday(),den:c?c.den||"":"",land:c?(spcLands(c)[0]||""):"",kieu:"gt",gia:c?+c.gia||0:(pre&&pre.gia)||0,giam:0,giamPct:false,fs:c?(+c.ship||0)===0:(pre?!!pre.fs:true),ship:c?+c.ship||0:0,
+function spcfComboForm(id,pre,st0){
+  spcfPkNeed();spcfGocLoad();
+  /* Danh sách chọn món = mã bán của kênh + sản phẩm gốc chưa bán trên kênh (lưu combo thì tự thêm vào mã bán của kênh, mã Pancake = mã MISA, giá = giá lẻ niêm yết) */
+  const c=id?spcCombos().find(x=>x.id===id):null,Vch=spcfVars(),vOf=ma=>V.find(v=>v.ma===ma);let V=Vch;
+  const vGoc=()=>((SPCF.goc&&SPCF.goc.items)||[]).filter(it=>it.active!==0&&!Vch.some(v=>spcLow(v.misa)===spcLow(it.code)||spcLow(v.ma)===spcLow(it.code))).map(it=>{const le=spcfLe(it.code);return {ma:"goc:"+it.code,tag:it.code,goc:it,ten:it.name,gia:le?le.v:0,on:true,img:spcfGocImg(it.code),note:"chưa bán trên kênh này, lưu combo sẽ tự thêm"}});
+  const st=st0||{ten:c?c.nhom||"":(pre&&pre.ten)||"",tu:c?c.tu||spcfToday():spcfToday(),den:c?c.den||"":"",land:c?(spcLands(c)[0]||""):"",kieu:"gt",gia:c?+c.gia||0:(pre&&pre.gia)||0,giam:0,giamPct:false,fs:c?(+c.ship||0)===0:(pre?!!pre.fs:true),ship:c?+c.ship||0:0,
     gom:c?(c.gom||[]).map(x=>({...x})):(pre&&pre.gom)||[],tang:c?(c.tang||[]).map(x=>({...x})):[],ghi:c?c.ghi||"":""};
   const goc=()=>st.gom.reduce((a,x)=>{const v=vOf(x.ma);return a+(v?v.gia:0)*(+x.sl||1)},0);
   const val=()=>st.kieu==="gt"?st.gia:Math.max(0,st.giamPct?Math.round(goc()*(1-st.giam/100)):goc()-st.giam);
   const its=k=>`<div class="spf-box">${spcfPickBox(k,k==="tang"?"Tìm quà tặng kèm…":"Tìm sản phẩm…")}<div class="spf-its"><div class="hd"><span>Ảnh</span><span>Sản phẩm</span><span>Số lượng</span><span style="text-align:right">Giá kênh</span><span></span></div>
-    ${st[k].map((x,i)=>{const v=vOf(x.ma);return `<div class="spf-it">${spcfImg(v&&v.img)}<div>${v?`<span class="spf-tag">${esc(x.ma)}</span>${esc(v.ten)}`:`<span class="t-red">${esc(x.ma||x.ten||"")} (chưa có trong danh sách)</span>`}</div><input class="spcb-q" data-k="${k}" data-i="${i}" type="number" min="1" value="${+x.sl||1}"><span class="n gc">${k==="tang"?"quà":v?nf(v.gia):"—"}</span><button class="del" data-spcbdel="${k}:${i}" title="Bỏ">🗑</button></div>`}).join("")||`<div class="spf-empty">Trống</div>`}</div>
+    ${st[k].map((x,i)=>{const v=vOf(x.ma);return `<div class="spf-it">${spcfImg(v&&v.img)}<div>${v?`<span class="spf-tag">${esc(v.tag||x.ma)}</span>${esc(v.ten)}${v.goc?' <small class="hint">(mới trên kênh)</small>':""}`:`<span class="t-red">${esc(x.ma||x.ten||"")} (chưa có trong danh sách)</span>`}</div><input class="spcb-q" data-k="${k}" data-i="${i}" type="number" min="1" value="${+x.sl||1}"><span class="n gc">${k==="tang"?"quà":v?nf(v.gia):"—"}</span><button class="del" data-spcbdel="${k}:${i}" title="Bỏ">🗑</button></div>`}).join("")||`<div class="spf-empty">Trống</div>`}</div>
     ${k==="gom"?`<div class="spf-sum"><span>Tổng tiền gốc: <b>${nf(goc())} đ</b></span><span>Giá combo: <b style="color:var(--pink)">${nf(val())} đ</b></span></div>`:""}</div>`;
-  const draw=()=>{const R=spcfModal(`${c?"Sửa":"Tạo"} combo · ${esc(SPCF_BP[SPCF.ch])}`,
+  const draw=()=>{V=Vch.concat(vGoc());const R=spcfModal(`${c?"Sửa":"Tạo"} combo · ${esc(SPCF_BP[SPCF.ch])}`,
     spcfSec("Thông tin cơ bản",spcfBox(spcfRow("Tên combo sản phẩm *",`<input id="spcb-ten" value="${esc(st.ten)}" placeholder="Ví dụ: [250g] 2 bột tẩy vạn năng 185K">`)+spcfRow("Thời gian áp dụng *",`<input type="date" id="spcb-tu" value="${esc(st.tu)}"><span class="hint">→</span><input type="date" id="spcb-den" value="${esc(st.den)}">`)+(SPCF.ch==="ads"?spcfRow("Landing / page",`<input id="spcb-land" value="${esc(st.land)}">`):"")))+
     spcfSec("Khuyến mãi",spcfBox(spcfRow("Loại giảm giá",`<label><input type="radio" name="spcb-k" value="gt" ${st.kieu==="gt"?"checked":""}> Giá trị combo</label><label><input type="radio" name="spcb-k" value="gg" ${st.kieu==="gg"?"checked":""}> Giảm giá</label>`)+
       (st.kieu==="gt"?spcfRow("Giá trị combo (đ) *",`<input id="spcb-gia" inputmode="numeric" value="${st.gia?nf(st.gia):""}" style="text-align:right">`):spcfRow("Giảm giá combo",`<select id="spcb-pct" style="flex:0 0 110px">${opt([["d","Tiền mặt"],["p","Phần trăm"]],st.giamPct?"p":"d")}</select><input id="spcb-giam" inputmode="numeric" value="${st.giam||""}" style="text-align:right">`))+
@@ -251,14 +384,19 @@ function spcfComboForm(id,pre){
       st.kieu=(R.querySelector("input[name=spcb-k]:checked")||{}).value||"gt";if(g("#spcb-gia"))st.gia=spcfNum(g("#spcb-gia").value);if(g("#spcb-giam")){st.giam=spcfNum(g("#spcb-giam").value);st.giamPct=g("#spcb-pct").value==="p"}
       st.fs=g("#spcb-fs").checked;if(g("#spcb-ship"))st.ship=spcfNum(g("#spcb-ship").value);st.ghi=g("#spcb-ghi").value.trim();R.querySelectorAll(".spcb-q").forEach(i=>{st[i.dataset.k][+i.dataset.i].sl=Math.max(1,+i.value||1)})};
     R.querySelectorAll("input[name=spcb-k],#spcb-fs,.spcb-q,#spcb-gia,#spcb-giam,#spcb-pct").forEach(i=>i.onchange=()=>{read();draw()});
-    ["gom","tang"].forEach(k=>spcfPicker(R,k,V.filter(v=>v.on),ma=>{read();const L=st[k],f=L.find(x=>x.ma===ma);if(f)f.sl=(+f.sl||1)+1;else L.push({ma,sl:1});draw()}));
+    const addMa=(k,ma)=>{const L=st[k],f=L.find(x=>x.ma===ma);if(f)f.sl=(+f.sl||1)+1;else L.push({ma,sl:1})};
+    ["gom","tang"].forEach(k=>spcfPicker(R,k,V.filter(v=>v.on),ma=>{read();addMa(k,ma);draw()},(SPCF.goc&&SPCF.goc.can_edit)?q=>{read();const ch=SPCF.ch;spcfGocForm(null,{ten:q,after:code=>{SPCF.ch=ch;spcfCh();addMa(k,"goc:"+code);spcfComboForm(id,pre,st)}})}:null));
     R.querySelectorAll("[data-spcbdel]").forEach(b=>b.onclick=()=>{read();const [k,i]=b.dataset.spcbdel.split(":");st[k].splice(+i,1);draw()});
     g("#spcb-save").onclick=()=>{read();if(!st.ten){toast("Nhập tên combo");return}if(!st.gom.length){toast("Chọn ít nhất một sản phẩm trong combo");return}if(!st.tu){toast("Chọn ngày áp dụng");return}if(st.den&&st.den<st.tu){toast("Đến ngày phải sau ngày bắt đầu");return}
       const gia=val();if(!(gia>0)){toast("Nhập giá trị combo hoặc mức giảm");return}
       const who={by:ME.name||"",byId:ME.id||"",at:new Date().toISOString()},cid=c?c.id:"n"+Date.now(),pid="ph"+Date.now();
-      const d0={nhom:st.ten,gom:st.gom.filter(x=>x.ma),tang:st.tang.filter(x=>x.ma),gia,ship:st.fs?0:st.ship,tu:st.tu,den:st.den,ghi:st.ghi,landings:st.land?[st.land]:[],landing:st.land||"",page:c?c.page||"":"",nguoi:c?c.nguoi||ME.name||"":ME.name||""};
-      d0.combo=spcCompText(d0.gom,1);d0.qua=spcCompText(d0.tang,1);
-      spcEdit((c?"sửa":"tạo")+" combo "+st.ten,cc=>{if(!Array.isArray(cc.phieu))cc.phieu=[];let x;
+      /* Món lấy từ sản phẩm gốc: dùng mã bán đã có của kênh (cùng mã kho), chưa có thì thêm mã bán mới */
+      const neu=[],nm={},fix=x=>{if(!String(x.ma).startsWith("goc:"))return x;const v=vOf(x.ma),code=x.ma.slice(4),cat=spcCat();
+        const had=cat.flatMap(p=>(p.bt||[]).map(b=>({p,b}))).find(o=>spcLow(spcMisa(o.b))===spcLow(code)||spcLow(o.b.ma)===spcLow(code));if(had)return {...x,ma:had.b.ma};
+        if(!neu.some(n=>n.bt[0].ma===code)&&v&&v.goc)neu.push(spcfNewChanSp(v.goc,code,v.gia));nm[code]=v?v.ten:code;return {...x,ma:code}};
+      const d0={nhom:st.ten,gom:st.gom.filter(x=>x.ma).map(fix),tang:st.tang.filter(x=>x.ma).map(fix),gia,ship:st.fs?0:st.ship,tu:st.tu,den:st.den,ghi:st.ghi,landings:st.land?[st.land]:[],landing:st.land||"",page:c?c.page||"":"",nguoi:c?c.nguoi||ME.name||"":ME.name||""};
+      const txt=l=>l.map(x=>(x.sl||1)+" × "+(nm[x.ma]||spcCompName(x,1))).join(" + ");d0.combo=txt(d0.gom);d0.qua=txt(d0.tang);
+      spcEdit((c?"sửa":"tạo")+" combo "+st.ten,cc=>{neu.forEach(n=>{if(!cc.sp.some(p=>(p.bt||[]).some(b=>b.ma===n.bt[0].ma)))cc.sp.push(n)});if(!Array.isArray(cc.phieu))cc.phieu=[];let x;
         if(c){x=cc.combos.find(y=>y.id===c.id);if(!x)return;Object.assign(x,d0,{tt:"cho",sua:who,phieu:pid});delete x.traLai}else{x=Object.assign({id:cid},d0,{tt:"cho",tao:who,phieu:pid},SPC.bpView==="CSKH"?{bp:"CSKH"}:{});cc.combos.unshift(x)}
         cc.phieu.unshift(Object.assign({id:pid,ten:(c?"Sửa combo ":"Combo mới ")+st.ten,ghi:"",by:who.by,byId:who.byId,at:who.at,tt:"cho",items:[{loai:"moi",id:x.id,ten:spcDesc(x),gia,ngay:st.tu}]},SPC.bpView==="CSKH"?{bp:"CSKH"}:{}))});
       closeCM();toast("Đã lưu, chờ kế toán duyệt combo "+st.ten)}};
@@ -280,12 +418,14 @@ function spcfPkCbView(ed){
 function spcfSanView(m,CH,sub){
   spcLoad();
   const P=spcfList("ttCombo").filter(x=>x.tt!=="xong"&&(x.ch||"TIKTOK")===CH).slice().reverse(),ed=spcfChs(ME).some(c=>c[0]===SPCF.ch);
-  const nm=p=>p.qty+" × "+((SPCB.items&&SPCB.items.get(spcLow(p.code))||{}).name||p.label);
+  /* Tên, biến thể, SKU tách cột; Gồm / Quà mỗi sản phẩm một dòng kèm số lượng (chị Hoa 17/11) */
+  const nm=p=>(SPCB.items&&SPCB.items.get(spcLow(p.code))||{}).name||p.label;
+  const lines=ps=>ps.map(p=>`<div style="display:flex;gap:10px;justify-content:space-between;padding:1px 0"><span>${esc(nm(p))}</span><b style="white-space:nowrap">× ${nf(p.qty)}</b></div>`).join("")||'<span class="hint">—</span>';
   const q=spcfFold(SPCF.q).trim();
-  const L=SPCB.rows?spcGroup(SPCB.rows.filter(r=>r.channel===CH),SPCB.sales,spcToday()).filter(c=>c.active&&(!q||spcfFold(c.sku+" "+c.variant+" "+c.parts.map(p=>p.label).join(" ")).includes(q))).sort((a,b)=>b.orders-a.orders):null;
+  const L=SPCB.rows?spcGroup(SPCB.rows.filter(r=>r.channel===CH),SPCB.sales,spcToday()).filter(c=>c.active&&(!q||spcfFold(c.sku+" "+c.variant+" "+(c.name||"")+" "+c.parts.map(p=>p.label).join(" ")).includes(q))).sort((a,b)=>b.orders-a.orders):null;
   spcfFrame(m,"Combo",sub,{q:"Tìm mã sàn, sản phẩm…",count:L?nf(L.length)+" combo đang dùng":"Đang tải…",tools:ed?`<button class="btn pri" data-spcftt="1">+ Khai combo mới</button>`:"",
     inner:(P.length?`<div class="note" style="margin:12px 14px"><b>${P.length} combo mới đã khai, chờ kế toán quy đổi:</b> ${P.map(x=>`<span class="spf-tag">${esc(x.sku)}</span>${esc(x.gom)}`).join(" · ")}</div>`:"")+
-    (L?tbl(["Mã trên sàn","Gồm","Quà","Đơn"],L.slice(0,300).map(c=>`<tr><td><span class="spf-tag">${esc(c.sku)}</span>${c.variant?`<br><small class="hint">${esc(c.variant)}</small>`:""}</td><td><small>${esc(c.parts.filter(p=>p.kind==="sp").map(nm).join(" + "))}</small></td><td><small>${esc(c.parts.filter(p=>p.kind==="gift").map(nm).join(" + "))}</small></td><td class="n">${c.orders||""}</td></tr>`)):"")+
+    (L?tbl(["Tên sản phẩm","Biến thể","SKU","Gồm","Quà","Đơn"],L.slice(0,300).map(c=>`<tr><td style="max-width:260px"><small>${esc(c.name||"—")}</small></td><td><small>${esc(c.variant||"Mọi biến thể")}</small></td><td style="white-space:nowrap"><span class="spf-tag">${esc(c.sku)}</span></td><td style="min-width:200px"><small>${lines(c.parts.filter(p=>p.kind==="sp"))}</small></td><td style="min-width:160px"><small>${lines(c.parts.filter(p=>p.kind==="gift"))}</small></td><td class="n">${c.orders||""}</td></tr>`)):"")+
     `<p class="hint pad" style="margin:0">Lên combo mới trên ${CH==="TIKTOK"?"TikTok":"Shopee"} thì bấm <b>Khai combo mới</b>: mã trên sàn, gồm sản phẩm nào, quà gì. Kế toán khai vào bảng quy đổi (để trừ kho, tính giá vốn) rồi combo hiện trong danh sách này. Giá bán nằm trên sàn.</p>`});
 }
 function spcfTtForm(){const CH=SPCF.ch==="sp"?"SHOPEE":"TIKTOK";
@@ -509,6 +649,6 @@ const spcfB2bOk=u=>spcfAll(u)||(!!u&&u.phongBan==="KV");
 PAGES.sp_cfg=pSpcfGoc;PAGES.sp_cb=pSpcfCb;PAGES.sp_km=pSpcfKm;
 PAGES.sp_gia=m=>{if(!spcfB2bOk(ME)){spcfNoAccess(m,"Bảng giá");return}spcfB2bView(m,"Bảng giá","Bảng giá Kênh phân phối 8 cấp · sửa giá qua phiếu chị duyệt · báo giá gửi khách")};
 /* Trang cũ dồn về đây */
-PAGES.dg_sp=m=>{SPCF.ch="ads";SPCF.sub="sp";pSpcfCb(m)};
+PAGES.dg_sp=m=>{SPCF.spv="ads";pSpcfGoc(m)};
 PAGES.kd_combo=m=>{SPCF.ch="cskh";pSpcfCb(m)};
 MODULES.push({k:"spcf",zone:"Vận hành",ic:"gear",n:"Sản phẩm",sub:"",groups:()=>[["",[MI("sp_cfg","Sản phẩm",u=>spcfChs(u).length>0),MI("sp_cb","Combo",u=>spcfChs(u).some(c=>c[0]!=="b2b")),MI("sp_gia","Bảng giá",u=>spcfB2bOk(u)),MI("sp_km","Khuyến mãi",u=>spcfChs(u).length>0,()=>spcfCanDuyet()?spcfList("kmCat").filter(k=>k.tt==="cho").length||"":"")]]]});

@@ -82,11 +82,13 @@ const spbgCfg=()=>{const c=spbgD().bgCfg||{};return {cty:c.cty||"CÔNG TY AILLA 
 const spbgMau=()=>Array.isArray(spbgD().bgMau)?spbgD().bgMau:[];
 const spbgTiers=()=>((SPCF.b2b&&SPCF.b2b.tiers)||[]).filter(t=>t.code!=="BAN_LE"&&t.code!=="NHAN_VIEN");
 const spbgRows=()=>spcfB2bRows((SPCF.b2b&&SPCF.b2b.products)||[]).sort((a,b)=>String(a.g).localeCompare(String(b.g),"vi"));
+/* Thứ tự mã trên báo giá (chị Hoa 17/11: kéo thả / mũi tên để chọn cái nào hiện trước) */
+const spbgOrd=(rows,thu)=>{if(!Array.isArray(thu)||!thu.length)return rows;const ix=new Map(thu.map((id,i)=>[id,i]));return rows.map((r,i)=>[r,ix.has(r.le.id)?ix.get(r.le.id):1e6+i]).sort((a,b)=>a[1]-b[1]).map(x=>x[0])};
 function spbgReady(){if(!SPCF.b2b||!SPCF.b2b.products){toast("Đang tải bảng giá, thử lại sau giây lát");return false}return true}
 /* Tờ báo giá (dùng cho xem trước, ảnh và PDF) */
 function spbgSheet(m,cf){
   const B=SPCF.b2b,LE=(B.tiers||[]).find(t=>t.code==="BAN_LE"),t=(B.tiers||[]).find(x=>x.code===m.tier)||{},an=new Set(m.an||[]);
-  const show=spbgRows().filter(r=>r.le.prices[t.code]!=null&&!an.has(r.le.id)),title=m.tieuDe||("BẢNG GIÁ "+String(t.name||"").toUpperCase()+" AILLA"),ghi=(m.ghi||SPBG_GHI).replace(/\{ngay\}/g,spcfVN(spcfToday()));
+  const show=spbgOrd(spbgRows(),m.thu).filter(r=>r.le.prices[t.code]!=null&&!an.has(r.le.id)),title=m.tieuDe||("BẢNG GIÁ "+String(t.name||"").toUpperCase()+" AILLA"),ghi=(m.ghi||SPBG_GHI).replace(/\{ngay\}/g,spcfVN(spcfToday()));
   const bd="1px solid #f6c3d8";
   return `<div id="bg-sheet" style="width:860px;background:#fff;color:#2b2b2b;font-family:'Be Vietnam Pro',system-ui,sans-serif;padding:26px 30px 22px;margin:0 auto">
     <div style="text-align:center"><img src="data:image/png;base64,${LOGO}" alt="Ailla" style="height:92px;object-fit:contain"></div>
@@ -102,7 +104,8 @@ function spbgSheet(m,cf){
 /* Nút tải ảnh / PDF cho tờ đang hiện */
 function spbgDl(R,m){const t=spbgTiers().find(x=>x.code===m.tier)||{},file=(m.ten||("Bang-gia-"+(t.name||""))).replace(/[\\/:*?"<>|]+/g,"").replace(/\s+/g,"-")+"-"+spcfToday();
   const png=R.querySelector("#bg-png"),pdf=R.querySelector("#bg-pdf");
-  if(png)png.onclick=async()=>{try{const cv=await spbgShot();const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download=file+".png";a.click()}catch(e){toast(e.message)}};
+  if(png)png.onclick=async()=>{try{toast("Đang tạo ảnh…");const cv=await spbgShot();const bl=await new Promise((ok,no)=>cv.toBlob(b=>b?ok(b):no(new Error("Không tạo được ảnh")),"image/png"));
+    const u=URL.createObjectURL(bl),a=document.createElement("a");a.href=u;a.download=file+".png";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}catch(e){toast(e.message)}};
   if(pdf)pdf.onclick=async()=>{try{const cv=await spbgShot();await spbgLib("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");const {jsPDF}=window.jspdf;
     const doc=new jsPDF({unit:"mm",format:"a4"}),W=210,H=297,mg=8,w=W-2*mg,ph=(H-2*mg)*cv.width/w;let y=0,first=true;
     while(y<cv.height){const h=Math.min(ph,cv.height-y),c=document.createElement("canvas");c.width=cv.width;c.height=h;c.getContext("2d").drawImage(cv,0,y,cv.width,h,0,0,cv.width,h);
@@ -126,17 +129,17 @@ function spbgGet(id){if(!spbgReady())return;const m=spbgMau().find(x=>x.id===id)
   R.querySelector("#bg-back").onclick=()=>spbgBaoGia();R.querySelector("#bg-ed").onclick=()=>spbgEdit(id);spbgDl(R,m)}
 /* 3. Tạo / sửa báo giá mẫu: chọn cấp, bỏ tích mã, ghi chú, tên; xem trước bên phải (tích không làm nhảy danh sách) */
 function spbgEdit(id){if(!spbgReady())return;const T=spbgTiers(),old=id?spbgMau().find(x=>x.id===id):null,cf=spbgCfg();
-  const m=old?JSON.parse(JSON.stringify(old)):{id:"",ten:"",tier:(T.find(t=>t.code==="DAI_SU")||T[0]||{}).code||"",an:[],ghi:"",tieuDe:""};
-  const draw=()=>{const t=T.find(x=>x.code===m.tier)||{},rows=spbgRows().filter(r=>r.le.prices[t.code]!=null),an=new Set(m.an);
+  const m=old?JSON.parse(JSON.stringify(old)):{id:"",ten:"",tier:(T.find(t=>t.code==="DAI_SU")||T[0]||{}).code||"",an:[],thu:[],ghi:"",tieuDe:""};
+  const draw=()=>{const t=T.find(x=>x.code===m.tier)||{},rows=spbgOrd(spbgRows(),m.thu).filter(r=>r.le.prices[t.code]!=null),an=new Set(m.an);
     const R=spbgWide(spcfModal(old?"Sửa báo giá mẫu":"Tạo báo giá mới",`<div style="display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;padding:16px 0;align-items:start">
       <div>
        <div class="spf-box" style="padding:4px 12px;margin-bottom:10px">${spcfRow("Tên báo giá *",`<input id="bg-name" value="${esc(m.ten)}" placeholder="ví dụ: Đại sứ - bỏ hàng gội, xả">`)}</div>
        <div class="spf-box" style="padding:10px 12px;margin-bottom:10px"><b style="font-size:13px">Cấp</b><div class="settabs" style="margin:6px 0 0">${T.map(x=>`<button class="${x.code===t.code?"on":""}" data-bgt="${esc(x.code)}">${esc(x.name)}</button>`).join("")}</div></div>
        <div class="spf-box" style="padding:4px 12px;margin-bottom:10px">${spcfRow("Tiêu đề",`<input id="bg-ten" value="${esc(m.tieuDe)}" placeholder="${esc("BẢNG GIÁ "+String(t.name||"").toUpperCase()+" AILLA")}">`)}${spcfRow("Tên công ty",`<input id="bg-cty" value="${esc(cf.cty)}">`)}${spcfRow("Dòng dưới",`<input id="bg-sub" value="${esc(cf.sub)}" placeholder="hotline, địa chỉ (không bắt buộc)">`)}</div>
        <div class="spf-box" style="padding:8px 12px;margin-bottom:10px"><b style="font-size:13px">Ghi chú cuối báo giá</b><p class="hint" style="margin:2px 0 6px;font-size:12px">Mỗi dòng một ý. Cấp được miễn phí vận chuyển thì ghi vào đây.</p><textarea id="bg-ghi" rows="7" style="width:100%;font-size:13px">${esc(m.ghi||SPBG_GHI)}</textarea></div>
-       <div class="spf-box" style="padding:8px 12px"><b style="font-size:13px">Mã hiện trên báo giá</b> <span class="hint" style="font-size:12px" id="bg-cnt"></span>
+       <div class="spf-box" style="padding:8px 12px"><b style="font-size:13px">Mã hiện trên báo giá</b> <span class="hint" style="font-size:12px" id="bg-cnt"></span><p class="hint" style="font-size:12px;margin:2px 0 0">Kéo ⠿ hoặc bấm ▲▼ để đổi thứ tự.</p>
         <div style="display:flex;gap:6px;margin:6px 0"><button class="btn sm" id="bg-all">Chọn hết</button><button class="btn sm" id="bg-none">Bỏ hết</button></div>
-        <div id="bg-list" style="max-height:420px;overflow:auto">${rows.map(r=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;border-bottom:1px solid #f0f1f5;cursor:pointer"><input type="checkbox" class="bg-on" data-id="${esc(r.le.id)}" ${an.has(r.le.id)?"":"checked"} style="width:auto;margin-top:3px"><span>${esc(r.le.name)}</span></label>`).join("")}</div>
+        <div id="bg-list" style="max-height:420px;overflow:auto"></div>
         ${spbgRows().length>rows.length?`<p class="hint" style="font-size:12px;margin:6px 0 0">${spbgRows().length-rows.length} mã chưa có giá cấp này nên không hiện.</p>`:""}</div>
       </div>
       <div id="bg-prev" style="background:var(--canvas);border-radius:12px;padding:14px;overflow:auto"></div></div>`,
@@ -145,15 +148,21 @@ function spbgEdit(id){if(!spbgReady())return;const T=spbgTiers(),old=id?spbgMau(
     const rd=()=>{m.ten=R.querySelector("#bg-name").value.trim();m.tieuDe=R.querySelector("#bg-ten").value.trim();m.ghi=R.querySelector("#bg-ghi").value};
     /* chỉ vẽ lại tờ xem trước, không vẽ lại danh sách mã (giữ nguyên chỗ đang cuộn) */
     const prev=()=>{rd();R.querySelector("#bg-prev").innerHTML=spbgSheet(m,cfNow());const sh=new Set(m.an);R.querySelector("#bg-cnt").textContent=rows.filter(r=>!sh.has(r.le.id)).length+" / "+rows.length+" mã · bỏ tích để ẩn"};
-    prev();
+    const list=R.querySelector("#bg-list");
+    const drawList=()=>{const sh=new Set(m.an);list.innerHTML=rows.map((r,i)=>`<div class="bg-row" draggable="true" data-i="${i}" style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:13px;border-bottom:1px solid #f0f1f5"><span title="Kéo để đổi thứ tự" style="cursor:grab;color:#9aa0ae;padding:0 2px">⠿</span><input type="checkbox" class="bg-on" data-id="${esc(r.le.id)}" ${sh.has(r.le.id)?"":"checked"} style="width:auto;margin:0"><span style="flex:1">${esc(r.le.name)}</span><button class="btn sm" data-up="${i}" ${i?"":"disabled"} style="padding:0 6px" title="Lên">▲</button><button class="btn sm" data-dn="${i}" ${i<rows.length-1?"":"disabled"} style="padding:0 6px" title="Xuống">▼</button></div>`).join("");
+      list.querySelectorAll(".bg-on").forEach(c=>c.onchange=()=>{const s=new Set(m.an);c.checked?s.delete(c.dataset.id):s.add(c.dataset.id);m.an=[...s];prev()});
+      list.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>mv(+b.dataset.up,+b.dataset.up-1));
+      list.querySelectorAll("[data-dn]").forEach(b=>b.onclick=()=>mv(+b.dataset.dn,+b.dataset.dn+1));
+      let from=-1;list.querySelectorAll(".bg-row").forEach(el=>{el.ondragstart=e=>{from=+el.dataset.i;e.dataTransfer.effectAllowed="move"};el.ondragover=e=>{e.preventDefault();el.style.borderTop="2px solid var(--pri)"};el.ondragleave=()=>{el.style.borderTop=""};el.ondrop=e=>{e.preventDefault();el.style.borderTop="";if(from>=0)mv(from,+el.dataset.i);from=-1}})};
+    const mv=(a,b)=>{if(a===b||b<0||b>=rows.length)return;const y=list.scrollTop;const [x]=rows.splice(a,1);rows.splice(b,0,x);m.thu=rows.map(r=>r.le.id);drawList();list.scrollTop=y;prev()};
+    drawList();prev();
     R.querySelectorAll("[data-bgt]").forEach(b=>b.onclick=()=>{rd();m.tier=b.dataset.bgt;draw()});
     ["#bg-ten","#bg-cty","#bg-sub","#bg-ghi"].forEach(s=>R.querySelector(s).oninput=prev);
-    R.querySelectorAll(".bg-on").forEach(c=>c.onchange=()=>{const s=new Set(m.an);c.checked?s.delete(c.dataset.id):s.add(c.dataset.id);m.an=[...s];prev()});
     const setAll=on=>{R.querySelectorAll(".bg-on").forEach(c=>{c.checked=on});m.an=on?[]:rows.map(r=>r.le.id);prev()};
     R.querySelector("#bg-all").onclick=()=>setAll(true);R.querySelector("#bg-none").onclick=()=>setAll(false);
     R.querySelector("#bg-back").onclick=()=>spbgBaoGia();
     R.querySelector("#bg-save").onclick=()=>{rd();if(!m.ten){toast("Đặt tên cho báo giá mẫu");R.querySelector("#bg-name").focus();return}const c=cfNow(),isNew=!m.id;if(isNew)m.id="bq"+Date.now();
-      const rec={id:m.id,ten:m.ten,tier:m.tier,an:m.an,ghi:m.ghi,tieuDe:m.tieuDe,by:ME.name||"",byId:ME.id||"",at:new Date().toISOString()};
+      const rec={id:m.id,ten:m.ten,tier:m.tier,an:m.an,thu:m.thu||[],ghi:m.ghi,tieuDe:m.tieuDe,by:ME.name||"",byId:ME.id||"",at:new Date().toISOString()};
       DB.mutate(ME.name,"lưu báo giá mẫu "+m.ten,d=>{d.bgCfg={cty:c.cty,sub:c.sub};d.bgMau=Array.isArray(d.bgMau)?d.bgMau:[];const i=d.bgMau.findIndex(y=>y.id===rec.id);if(i>=0)d.bgMau[i]=rec;else d.bgMau.push(rec)});
       toast("Đã lưu báo giá mẫu \""+m.ten+"\"");setTimeout(spbgBaoGia,50)};
     spbgDl(R,m)};

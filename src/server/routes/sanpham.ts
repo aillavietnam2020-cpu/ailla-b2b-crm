@@ -134,7 +134,7 @@ sanphamRoutes.get('/combos', async (c) => {
       .all(),
     db
       .prepare(
-        `SELECT channel, sku, variant, COALESCE(shop, '') AS shop, COUNT(DISTINCT order_id) AS orders, MAX(day) AS last_day
+        `SELECT channel, sku, variant, COALESCE(shop, '') AS shop, COUNT(DISTINCT order_id) AS orders, MAX(day) AS last_day, MAX(name) AS name
          FROM channel_order_lines GROUP BY channel, sku, variant, shop`,
       )
       .all(),
@@ -621,26 +621,39 @@ sanphamRoutes.get('/pancake-combos', async (c) => {
 
 /**
  * Sản phẩm đang bán trên TikTok / Shopee (chị Hoa 16/11: trang Sản phẩm kênh sàn phải hiện danh sách).
- * Lấy từ báo cáo tháng mới nhất đã nạp (tts_month / spe_month): mã người bán, tên, phân loại, số món, giá bán trung bình
- * = doanh thu / số món. Không trả giá vốn, phí, lãi.
+ * Lấy từ 3 báo cáo tháng mới nhất đã nạp (tts_month / spe_month): mã người bán, tên, phân loại, số món, giá bán trung bình
+ * = doanh thu / số món. Không trả giá vốn, phí, lãi. Báo cáo Shopee không có mã: điền mã sản phẩm Shopee từ đơn đã nạp
+ * (channel_order_lines, khớp tên + phân loại) để nối được với bảng quy đổi (chị Hoa 16/11: hồ sơ sản phẩm phải hiện giá sàn).
  */
 sanphamRoutes.get('/san-products', async (c) => {
   const ch = c.req.query('channel') === 'SHOPEE' ? 'SHOPEE' : 'TIKTOK';
   type Row = { ss?: string; pn?: string; vr?: string; q?: number; dt?: number };
   let ky = '';
+  let tu = '';
   const src: Row[] = [];
   if (ch === 'TIKTOK') {
-    const r = await c.env.DB.prepare('SELECT ky, data FROM tts_month ORDER BY ky DESC LIMIT 1').first<{ ky: string; data: string }>();
-    if (r) {
-      ky = r.ky;
+    const rs = await c.env.DB.prepare('SELECT ky, data FROM tts_month ORDER BY ky DESC LIMIT 3').all<{ ky: string; data: string }>();
+    for (const r of rs.results ?? []) {
+      ky = ky || r.ky;
+      tu = r.ky;
       const d = JSON.parse(await unpack(r.data)) as { pl?: { rows?: Row[] }; todo?: { noMap?: Row[] } };
       src.push(...(d.pl?.rows ?? []), ...(d.todo?.noMap ?? []));
     }
   } else {
-    const top = await c.env.DB.prepare('SELECT MAX(ky) AS ky FROM spe_month').first<{ ky: string | null }>();
-    ky = top?.ky ?? '';
-    const rs = await c.env.DB.prepare('SELECT data FROM spe_month WHERE ky = ?').bind(ky).all<{ data: string }>();
-    for (const r of rs.results ?? []) src.push(...((JSON.parse(await unpack(r.data)) as { rows?: Row[] }).rows ?? []));
+    const ks = ((await c.env.DB.prepare('SELECT DISTINCT ky FROM spe_month ORDER BY ky DESC LIMIT 3').all<{ ky: string }>()).results ?? []).map((r) => r.ky);
+    ky = ks[0] ?? '';
+    tu = ks[ks.length - 1] ?? '';
+    for (const k of ks) {
+      const rs = await c.env.DB.prepare('SELECT data FROM spe_month WHERE ky = ?').bind(k).all<{ data: string }>();
+      for (const r of rs.results ?? []) src.push(...((JSON.parse(await unpack(r.data)) as { rows?: Row[] }).rows ?? []));
+    }
+    const lo = (v: unknown) => String(v ?? '').trim().toLowerCase();
+    const ids = new Map<string, string>();
+    const ol = await c.env.DB.prepare(
+      "SELECT sku, variant, name FROM channel_order_lines WHERE channel = 'SHOPEE' AND name IS NOT NULL GROUP BY sku, variant, name",
+    ).all<{ sku: string; variant: string; name: string }>();
+    for (const r of ol.results ?? []) ids.set(lo(r.name) + '|' + lo(r.variant), r.sku);
+    for (const x of src) if (!x.ss) x.ss = ids.get(lo(x.pn) + '|' + lo(x.vr)) ?? '';
   }
   const m = new Map<string, { sku: string; name: string; variant: string; qty: number; dt: number }>();
   for (const x of src) {
@@ -652,5 +665,5 @@ sanphamRoutes.get('/san-products', async (c) => {
     m.set(k, o);
   }
   const rows = [...m.values()].map((o) => ({ sku: o.sku, name: o.name, variant: o.variant, qty: o.qty, price: o.qty ? Math.round(o.dt / o.qty) : null })).sort((a, b) => b.qty - a.qty);
-  return ok(c, { channel: ch, ky, count: rows.length, rows });
+  return ok(c, { channel: ch, ky, tu, count: rows.length, rows });
 });
