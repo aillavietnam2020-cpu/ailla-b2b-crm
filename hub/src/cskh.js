@@ -344,7 +344,7 @@ function csProfile(){
      <div id="csrsn2" hidden class="cs-fl" style="margin-top:8px"><span>Lý do từ chối</span><select id="csreason2">${opt(REA,"")}</select></div>
      <textarea id="csnote2" rows="2" placeholder="Ghi chú cuộc gọi: khách nói gì, hẹn gì…" style="margin-top:8px;width:100%"></textarea>
      <input id="csq2" placeholder="Câu hỏi khó của khách (nếu có)" style="margin-top:8px;width:100%">
-     <div class="acts" style="margin:8px 0 0;align-items:center"><span class="hint">Gọi lại:</span>${[["3 ngày",3],["7 ngày",7],["30 ngày",30],[cy+" ngày (chu kỳ)",cy]].map(([t,n])=>`<button type="button" class="cs-chip" data-n="${n}">${t}</button>`).join("")}<input type="date" id="cshen2" min="${csAdd(csToday(),1)}" style="width:auto"></div>
+     <div class="acts" style="margin:8px 0 0;align-items:center"><span class="hint">Gọi lại:</span>${[["3 ngày",3],["7 ngày",7],["30 ngày",30],[cy+" ngày (chu kỳ)",cy]].map(([t,n])=>`<button type="button" class="cs-chip" data-n="${n}">${t}</button>`).join("")}<button type="button" class="cs-chip" data-nostop="1">✕ Không chăm lại</button><input type="date" id="cshen2" min="${csAdd(csToday(),1)}" style="width:auto"></div>${csStopBox()}
      <div class="acts" style="justify-content:flex-end;margin:10px 0 0"><span class="err" id="cserr2" style="flex:1"></span><button class="btn pri" id="cslogsave">Lưu cuộc gọi</button></div></section>
     <section class="card"><h3>Các lần gọi (${P.logs.length})</h3>${csLogsHtml(P.logs,"Chưa có cuộc gọi nào. Ghi cuộc gọi đầu tiên ở ô bên trên.")}</section>
     <section class="card"><h3>Đơn hàng (${ords.length})</h3>${csOrdHtml(ords)}</section>
@@ -363,11 +363,12 @@ function csProfBind(m){const P=CSK.prof;if(!P||!m.querySelector("#cslogsave"))re
   m.querySelector("#csmemo").oninput=msg;
   m.querySelector("#cstrsave").onclick=e=>{e.target.disabled=true;csApi("/customer/"+c.phone+"/traits",{method:"PUT",body:JSON.stringify({tags,note:m.querySelector("#csmemo").value})}).then(r=>{c.tags=r.tags;c.note=r.note;toast("Đã lưu đặc điểm khách");renderMain()}).catch(er=>{e.target.disabled=false;csErr(er)})};
   m.querySelectorAll("#csres [data-r]").forEach(b=>b.onclick=()=>{res=b.dataset.r;m.querySelectorAll("#csres [data-r]").forEach(x=>x.classList.toggle("on",x===b));m.querySelector("#csrsn2").hidden=res!=="Khách từ chối";m.querySelector("#cslogsave").textContent=res==="Đã chốt đơn"?"Lưu và tạo đơn":"Lưu cuộc gọi"});
-  m.querySelectorAll(".cs-pr [data-n]").forEach(b=>b.onclick=()=>{m.querySelector("#cshen2").value=csAdd(csToday(),+b.dataset.n);m.querySelectorAll(".cs-pr [data-n]").forEach(x=>x.classList.toggle("on",x===b))});
+  const st2={stop:""};csStopBind(m.querySelector(".cs-pr"),"#cshen2",st2);
+  m.querySelectorAll(".cs-pr [data-n]").forEach(b=>b.onclick=()=>{st2.stop="";csStopShow(m.querySelector(".cs-pr"),"#cshen2",false);m.querySelector("#cshen2").value=csAdd(csToday(),+b.dataset.n);m.querySelectorAll(".cs-pr [data-n]").forEach(x=>x.classList.toggle("on",x===b))});
   m.querySelector("#cslogsave").onclick=async e=>{const hen=m.querySelector("#cshen2").value,err=m.querySelector("#cserr2");
-    if(!res){err.textContent="Chọn kết quả cuộc gọi";return}if(!hen||hen<=csToday()){err.textContent="Chọn ngày gọi lại (sau hôm nay)";return}
-    e.target.disabled=true;try{await csApi("/log/"+c.phone,{method:"POST",body:JSON.stringify({result:res,reason:res==="Khách từ chối"?m.querySelector("#csreason2").value:"",note:m.querySelector("#csnote2").value,question:m.querySelector("#csq2").value,next_call:hen})});
-      toast("Đã lưu cuộc gọi. Gọi lại "+csFd(hen));csAfterChange(c.phone);if(res==="Đã chốt đơn")csDonForm(c.phone)}catch(er){e.target.disabled=false;err.textContent=er.message}}}
+    if(!res){err.textContent="Chọn kết quả cuộc gọi";return}if(st2.stop===null){err.textContent="Chọn lý do không chăm lại";return}if(!st2.stop&&(!hen||hen<=csToday())){err.textContent="Chọn ngày gọi lại (sau hôm nay)";return}
+    e.target.disabled=true;try{await csApi("/log/"+c.phone,{method:"POST",body:JSON.stringify({result:res,reason:res==="Khách từ chối"?m.querySelector("#csreason2").value:"",note:m.querySelector("#csnote2").value,question:m.querySelector("#csq2").value,next_call:st2.stop?"":hen,stop:st2.stop||""})});
+      toast(st2.stop?"Đã lưu. Khách chuyển sang Ngừng chăm sóc":"Đã lưu cuộc gọi. Gọi lại "+csFd(hen));csAfterChange(c.phone);if(res==="Đã chốt đơn")csDonForm(c.phone)}catch(er){e.target.disabled=false;err.textContent=er.message}}}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-csback],[data-csptab]");if(!b||!$("#main")||!$("#main").contains(b))return;
   if(b.dataset.csback){CSK.open=null;CSK.prof=null;renderMain()}else{CSK.ptab=b.dataset.csptab;renderMain()}});
 
@@ -388,22 +389,30 @@ function csLogForm(phone){
     <div class="cs-f3" style="margin-top:8px"><label class="cs-fl"><span>Phường / xã</span><input id="ci-wd" value="${esc(c.addr_ward)}"></label><label class="cs-fl"><span>Quận / huyện</span><input id="ci-ds" value="${esc(c.addr_district)}"></label><label class="cs-fl"><span>Tỉnh / thành</span><input id="ci-pv" value="${esc(c.addr_province)}"></label></div>
     <div class="cs-fl" style="margin-top:8px"><span>Đặc điểm khách</span><div class="cs-chips" id="ci-tags">${[...new Set([...((CSK.me&&CSK.me.traits)||CS_TRAITS0),...csTagsOf(c)])].map(t=>`<button type="button" class="cs-chip${csTagsOf(c).includes(t)?" on":""}" data-tg="${esc(t)}">${esc(t)}</button>`).join("")}</div></div>
     <label class="cs-fl" style="margin-top:8px"><span>Ghi nhớ về khách (sở thích, hoàn cảnh, dùng sản phẩm gì…)</span><textarea id="ci-note" rows="2" placeholder="Ví dụ: nhà có trẻ nhỏ, dùng máy giặt cửa trước, thích giao giờ hành chính">${esc(c.note)}</textarea></label>
-    <div class="cs-fl" style="margin-top:8px"><span>Gọi lại ngày (bắt buộc)</span><div class="cs-chips">${q.map(([t,n])=>`<button type="button" class="cs-chip" data-n="${n}">${t}</button>`).join("")}</div><input type="date" id="cshen" min="${csAdd(csToday(),1)}"></div>
+    <div class="cs-fl" style="margin-top:8px"><span>Gọi lại ngày (bắt buộc, trừ khi không chăm lại)</span><div class="cs-chips">${q.map(([t,n])=>`<button type="button" class="cs-chip" data-n="${n}">${t}</button>`).join("")}<button type="button" class="cs-chip" data-nostop="1">✕ Không chăm lại</button></div><input type="date" id="cshen" min="${csAdd(csToday(),1)}">${csStopBox()}</div>
     <div id="cserr" class="err"></div>
     <div class="acts" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="csx">Hủy</button><button class="btn pri" id="csok">Lưu</button></div>`);
     const root=$("#crmm");
     root.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{st.res=b.dataset.r;root.querySelectorAll("[data-r]").forEach(x=>x.classList.toggle("on",x===b));$("#csrsn").hidden=st.res!=="Khách từ chối";$("#cschot").hidden=st.res!=="Đã chốt đơn";$("#csok").textContent=st.res==="Đã chốt đơn"?"Lưu và tạo đơn":"Lưu"});
     root.querySelectorAll("[data-tg]").forEach(b=>b.onclick=()=>b.classList.toggle("on"));
-    root.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{$("#cshen").value=csAdd(csToday(),+b.dataset.n);root.querySelectorAll("[data-n]").forEach(x=>x.classList.toggle("on",x===b))});
+    root.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{st.stop="";csStopShow(root,"#cshen",false);$("#cshen").value=csAdd(csToday(),+b.dataset.n);root.querySelectorAll("[data-n]").forEach(x=>x.classList.toggle("on",x===b))});
+    csStopBind(root,"#cshen",st);
     $("#csx").onclick=closeCM;
-    $("#csok").onclick=async()=>{const hen=$("#cshen").value;if(!st.res){$("#cserr").textContent="Chọn kết quả cuộc gọi";return}if(!hen||hen<=csToday()){$("#cserr").textContent="Chọn ngày gọi lại (sau hôm nay), không thì mai khách sẽ báo Quá hạn";return}
+    $("#csok").onclick=async()=>{const hen=st.stop===undefined||st.stop===""?$("#cshen").value:"";if(!st.res){$("#cserr").textContent="Chọn kết quả cuộc gọi";return}if(st.stop===null){$("#cserr").textContent="Chọn lý do không chăm lại";return}if(!st.stop&&(!hen||hen<=csToday())){$("#cserr").textContent="Chọn ngày gọi lại (sau hôm nay), không thì mai khách sẽ báo Quá hạn";return}
       $("#csok").disabled=true;
       try{const info={tags:[...root.querySelectorAll("[data-tg].on")].map(b=>b.dataset.tg),name:$("#ci-name").value,birthday:$("#ci-bd").value,phone2:$("#ci-ph2").value,addr_street:$("#ci-st").value,addr_ward:$("#ci-wd").value,addr_district:$("#ci-ds").value,addr_province:$("#ci-pv").value,note:$("#ci-note").value};
         const changed=info.tags.join("|")!==csTagsOf(c).join("|")||["name","birthday","phone2","addr_street","addr_ward","addr_district","addr_province","note"].some(k=>String(info[k]||"").trim()!==String(c[k]||"").trim());
         if(changed){if(!info.name.trim()){$("#csok").disabled=false;$("#cserr").textContent="Cần họ tên khách";return}await csApi("/customer/"+c.phone,{method:"PUT",body:JSON.stringify(info)})}
-        await csApi("/log/"+c.phone,{method:"POST",body:JSON.stringify({result:st.res,reason:st.res==="Khách từ chối"?$("#csreason").value:"",note:$("#csnote").value,question:$("#csq").value,next_call:hen})});
-        closeCM();toast("Đã lưu. Gọi lại "+csFd(hen));csAfterChange(c.phone);if(st.res==="Đã chốt đơn")csDonForm(c.phone)}catch(e){$("#csok").disabled=false;$("#cserr").textContent=e.message}}};
+        await csApi("/log/"+c.phone,{method:"POST",body:JSON.stringify({result:st.res,reason:st.res==="Khách từ chối"?$("#csreason").value:"",note:$("#csnote").value,question:$("#csq").value,next_call:hen,stop:st.stop||""})});
+        closeCM();toast(st.stop?"Đã lưu. Khách chuyển sang Ngừng chăm sóc":"Đã lưu. Gọi lại "+csFd(hen));csAfterChange(c.phone);if(st.res==="Đã chốt đơn")csDonForm(c.phone)}catch(e){$("#csok").disabled=false;$("#cserr").textContent=e.message}}};
   csGetCus(phone).then(draw).catch(csErr)}
+function csStopBox(){const R=(CSK.me&&CSK.me.stopReasons)||["Khách yêu cầu không gọi nữa","Sai số / không liên lạc được","Khách bom hàng, hay hoàn","Khách khiếu nại, không hài lòng","Là đại lý / khách sỉ","Khác"];
+  return `<div class="cs-stopbox" hidden style="margin-top:6px"><span class="hint">Lý do không chăm lại (khách ra khỏi Việc hôm nay, Lead / CEO cho chăm sóc lại được; chọn Khác thì ghi rõ ở Ghi chú):</span><div class="cs-chips" style="margin-top:4px">${R.map(x=>`<button type="button" class="cs-chip" data-sr="${esc(x)}">${esc(x)}</button>`).join("")}</div></div>`}
+function csStopShow(root,dateSel,on){const box=root.querySelector(".cs-stopbox"),d=root.querySelector(dateSel),b=root.querySelector("[data-nostop]");if(box)box.hidden=!on;if(d){d.style.display=on?"none":"";if(on)d.value=""}if(b)b.classList.toggle("on",on);if(!on)root.querySelectorAll(".cs-stopbox [data-sr]").forEach(x=>x.classList.remove("on"))}
+function csStopBind(root,dateSel,st){const b=root.querySelector("[data-nostop]");if(!b)return;
+  b.onclick=()=>{const on=!b.classList.contains("on");st.stop=on?null:"";csStopShow(root,dateSel,on);if(on)root.querySelectorAll("[data-n]").forEach(x=>x.classList.remove("on"))};
+  root.querySelectorAll(".cs-stopbox [data-sr]").forEach(x=>x.onclick=()=>{st.stop=x.dataset.sr;root.querySelectorAll(".cs-stopbox [data-sr]").forEach(y=>y.classList.toggle("on",y===x))});
+  const d=root.querySelector(dateSel);if(d)d.addEventListener("input",()=>{if(d.value){st.stop="";csStopShow(root,dateSel,false)}})}
 function csGetCus(phone){if(CSK.prof&&CSK.prof.customer.phone===phone)return Promise.resolve(CSK.prof.customer);const T=CSK.today&&CSK.today.rows&&CSK.today.rows.find(r=>r.phone===phone);if(T)return Promise.resolve(T);return csApi("/customer/"+phone).then(r=>r.customer)}
 function csAfterChange(phone){CSK.today=null;CSK.list=null;CSKD.c={};if(CSK.open===phone)csApi("/customer/"+phone).then(r=>{CSK.prof=r;csRe()}).catch(()=>{});csRe()}
 

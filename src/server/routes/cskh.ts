@@ -444,10 +444,16 @@ cskhRoutes.post('/log/:phone', async (c) => {
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const result = str(b.result, 40);
   if (!(CSKH_RESULTS as readonly string[]).includes(result)) throw badRequest('KET_QUA', 'Chọn kết quả cuộc gọi');
-  const next = str(b.next_call, 10);
+  // Khách không cần chăm lại: chọn lý do thay cho ngày gọi lại, khách sang Ngừng chăm sóc (chị Hoa 17/11).
+  const stop = str(b.stop, 80);
   const today = vnDate();
-  if (!isDay(next) || next <= today) throw badRequest('HEN', 'Chọn ngày gọi lại (sau hôm nay)');
-  if (diffDays(next, today) > 366) throw badRequest('HEN', 'Ngày gọi lại quá xa');
+  const next = stop ? null : str(b.next_call, 10);
+  if (stop) {
+    if (stop === 'Khác' && !str(b.note, 1000)) throw badRequest('LY_DO', 'Ghi rõ lý do không chăm lại vào ghi chú');
+  } else {
+    if (!next || !isDay(next) || next <= today) throw badRequest('HEN', 'Chọn ngày gọi lại (sau hôm nay)');
+    if (diffDays(next, today) > 366) throw badRequest('HEN', 'Ngày gọi lại quá xa');
+  }
   const now = nowIso();
   const bd = normBirthday(b.birthday);
   await c.env.DB.batch([
@@ -467,6 +473,9 @@ cskhRoutes.post('/log/:phone', async (c) => {
       `UPDATE cskh_customers SET next_call = ?, last_call = ?, last_result = ?, birthday = CASE WHEN birthday = '' AND ? <> '' THEN ? ELSE birthday END,
          owner_id = COALESCE(owner_id, ?), owner_name = CASE WHEN owner_id IS NULL THEN ? ELSE owner_name END, updated_at = ? WHERE phone = ?`,
     ).bind(next, today, result, bd, bd, me.id, me.name, now, phone),
+    ...(stop
+      ? [c.env.DB.prepare('UPDATE cskh_customers SET stop_reason = ?, stop_note = ?, stop_at = ?, stop_by = ? WHERE phone = ?').bind(stop, str(b.note, 500), now, me.name, phone)]
+      : []),
   ]);
   return ok(c, { phone, next_call: next });
 });
