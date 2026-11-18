@@ -80,7 +80,7 @@ function fdsBind(m){const q=s=>m.querySelector(s);bcLinkBind(m);if(!q("#fds-go")
 {const _p=PAGES.bc_fb;PAGES.bc_fb=m=>{const can=typeof APP_MODE!=="undefined"&&APP_MODE==="admin"&&fdsCan()&&typeof fbdFull==="function"&&fbdFull();
   const tbc=can&&FBD.tab==="tbc";if(tbc)FBD.tab="pl";try{_p(m)}finally{if(tbc)FBD.tab="tbc"}
   if(!can)return;try{const nav=m.querySelector("nav.fbd-tabs");if(!nav)return;
-    nav.insertAdjacentHTML("beforeend",`<button type="button" data-fbdtab="tbc" class="${FBD.tab==="tbc"?"on":""}">Tải báo cáo</button>`);
+    nav.insertAdjacentHTML("beforeend",`<button type="button" data-fbdtab="tbc" class="${FBD.tab==="tbc"?"on":""}">Nạp báo cáo</button>`);
     if(tbc){nav.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.fbdtab==="tbc"));let x=nav.nextSibling;while(x){const n=x.nextSibling;x.remove();x=n}
       nav.insertAdjacentHTML("afterend",fdsThang()+fdsCard());fdsBind(m)}
     nav.querySelectorAll("[data-fbdtab]").forEach(b=>b.onclick=()=>{FBD.tab=b.dataset.fbdtab;renderMain()})}catch(e){console.warn("tải báo cáo FB",e)}}}

@@ -140,7 +140,10 @@ function tbAdmDon(ky){const t=iso(new Date()),from=PERIOD.from.slice(0,7)===ky?P
    <section class="card"><p class="hint">Phí sàn, giá vốn, lãi đóng góp và lợi nhuận: ${cho}. Web không ước số; có báo cáo quyết toán (kể cả bản đến ngày X) là tự hiện.</p></section>`}
 function tbAdmPage(m){
   const v=SUB.bc_tiktok;
-  if(v&&v!=="tong"&&v!=="pl"){if(TB.pk)TSB.pk=PERIOD.from+"|"+PERIOD.to;tsbAdmPage(m);const tb=m.querySelector(".tabs");if(tb)tb.outerHTML=`<div class="tb-acts"><button class="btn sm" data-tbv="tong">← Tổng quan</button><b>${{sp:"Sản phẩm & SKU",cb:"Cảnh báo SKU",dl:"Kiểm dữ liệu",thang:"Các tháng",up:"Tải file tháng"}[v]||""}</b></div>`;tbBind(m);return}
+  if(v&&v!=="tong"&&v!=="pl"){if(TB.pk)TSB.pk=PERIOD.from+"|"+PERIOD.to;tsbAdmPage(m);const tb=m.querySelector(".tabs");if(tb)tb.outerHTML=`<div class="tb-acts"><button class="btn sm" data-tbv="tong">← Tổng quan</button><b>${{sp:"Sản phẩm & SKU",cb:"Cảnh báo SKU",dl:"Kiểm dữ liệu",thang:"Các tháng",up:"Nạp báo cáo TikTok (kế toán tải lên)"}[v]||""}</b></div>`;
+    /* chị Hoa 18/11: tháng theo bộ lọc ngày, bỏ hàng nút tháng; khoá sổ bỏ (chốt ở Đối chiếu doanh thu); tính lại giá vốn chỉ để ở trang nạp báo cáo */
+    const fl=m.querySelector(".filters");if(fl){const ch=fl.querySelector(".chips");if(ch&&!TSB.prev)ch.remove();fl.querySelectorAll("#tsb-lock,#tsb-unlock").forEach(x=>x.remove());if(v!=="up")fl.querySelectorAll("#tsb-recalc").forEach(x=>x.remove());if(!fl.textContent.trim())fl.remove()}
+    tbBind(m);return}
   if(!(typeof SV!=="undefined"&&SV.acct)||!TSB.months){tsbAdmPage(m);return}
   {const pk=PERIOD.from+"|"+PERIOD.to;TSB.pk=pk;TSB.noRep="";if(TB.pk!==pk){TB.pk=pk;const pym=plYmNow(),has=TSB.months.some(x=>x.ky===pym);TSB.ky=has?pym:(TSB.months.length?TSB.months[TSB.months.length-1].ky:"");TB.noRep=has?"":pym}}
   if(TSB.prev){SUB.bc_tiktok="pl";tsbAdmPage(m);const tb=m.querySelector(".tabs");if(tb)tb.remove();tbBind(m);return}
@@ -149,19 +152,18 @@ function tbAdmPage(m){
   const nViec=todo?todo.noMap.length+todo.miss.length+todo.pack.length:0,lock=S&&S.locked_at;
   const head=H("Kênh TikTok Shop",`Báo cáo quản trị${TB.noRep?" · "+tsbKyL(TB.noRep)+" · theo đơn, chưa có báo cáo quyết toán":ky?" · "+tsbKyL(ky):""}${S&&S.data.M&&S.data.M.den?" · số đến "+tsbVn(S.data.M.den):""} · chốt sổ ngày 10 tháng sau`)
    +`<div class="tb-acts">${""/* chị Hoa 18/11: bỏ nút tháng, tháng theo bộ lọc ngày trên cùng */}<span style="flex:1"></span>
-     <button class="btn sm" data-tbv="thang">Các tháng</button><button class="btn sm" data-tbv="dl">Kiểm dữ liệu${nViec?`<span class="tb-cnt">${nViec}</span>`:""}</button>
-     ${S&&!TB.noRep?(lock?(isCeo()?`<button class="btn sm" id="tsb-unlock">Mở khoá ${tsbKyL(ky)}</button>`:`<span class="hint">Đã khoá sổ</span>`):`<button class="btn sm" id="tsb-recalc">Tính lại giá vốn</button><button class="btn sm" id="tsb-lock">Khoá sổ ${tsbKyL(ky)}</button>`):""}
-     <button class="btn sm pri" data-tbv="up">⬆ Tải file</button></div>`
+     ${P?`<button class="btn sm" id="tb-dl">Kiểm dữ liệu${nViec?`<span class="tb-cnt">${nViec}</span>`:""}</button>`:""}
+     <button class="btn sm pri" data-tbv="up" title="Kế toán tải lên file báo cáo TikTok khi agent chưa tải">⬆ Nạp báo cáo</button></div>`
    +(TB.noRep?"":tbDenNote(ky,S&&S.data.M&&S.data.M.den));
   let body;
   if(TB.noRep)body=tbAdmDon(TB.noRep);
-  else if(!ky)body=`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Tải file</b> để kế toán tải 3 file TikTok.</p></section>`;
+  else if(!ky)body=`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Nạp báo cáo</b> để kế toán tải lên 3 file TikTok.</p></section>`;
   else if(!P)body=`<section class="card"><p class="hint">Đang tải ${tsbKyL(ky)}…</p></section>`;
   else body=tbAdmTong(ky,P);
   m.innerHTML=head+body+srcNote("Báo cáo quyết toán TikTok do kế toán tải (OrderSKUList, income, Campaign overview); nguồn doanh thu từ Key metrics team TikTok tải; chi riêng khác và chi chung từ Sổ chi phí. Quy tắc: skill ailla-baocao-quantri-tiktok.");
   tbBind(m);
   const on=(id,f)=>{const b=m.querySelector("#"+id);if(b)b.onclick=f};
-  on("tsb-recalc",tsbRecalc);on("tsb-lock",()=>tsbLock(true));on("tsb-unlock",()=>tsbLock(false));
+  on("tb-dl",()=>{openDrawerHTML(`<h2>Kiểm dữ liệu TikTok · ${tsbKyL(ky)}</h2>`+tsbChecks(P,todo));const w=$("#drawerIn");w.querySelectorAll("[data-go]").forEach(x=>x.onclick=()=>{closeDrawer();PAGE=x.dataset.go;render();scrollTo(0,0)})});
 }
 function tbBind(m){
   m.querySelectorAll("[data-tbv]").forEach(b=>b.onclick=()=>{SUB.bc_tiktok=b.dataset.tbv;if(b.dataset.tbv==="tong")TSB.prev=null;renderMain()});
