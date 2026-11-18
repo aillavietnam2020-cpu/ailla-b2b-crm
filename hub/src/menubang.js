@@ -36,7 +36,7 @@
       tq:[["",[["exec","Tổng quan công ty"]]],
         ["Kênh bán hàng",[["bc_tiktok","TikTok Shop"],["bc_shopee","Shopee"],["bc_fb","Facebook"],["cskh_cu","CSKH cũ"],["bc_b2b","Kênh phân phối"],["bc_gc","Kênh OEM"],["bc_tong","So sánh kênh"],["dt_dc","Đối chiếu doanh thu"]]],
         ["Kế hoạch & KPI",[["muctieu","Kế hoạch doanh thu"]]],
-        ["Cảnh báo",[["soat_sl","Máy soát số liệu"],["nguong","Ngưỡng cảnh báo & chỉ số"]]]],
+        ["Cảnh báo",[["soat_sl","Máy soát số liệu"]]]], /* chị Hoa 18/11: Ngưỡng cảnh báo là cấu hình, chuyển sang Cấu hình › Quy tắc */
       tc:[["Lãi lỗ",[["pl","P&L công ty"],["dutru","Dự trù giá bán"]]],
         /* Chị Hoa 28/10: Mua hàng về lại kế toán, trong Thu chi. Trang mh_po gồm đơn mua, nhận hàng, chứng từ, trả tiền NCC (bấm vào từng đơn). */
         /* Chị Hoa 18/11: nhóm "Báo cáo dòng tiền" gồm hai dòng: Dòng tiền và Thu chi (Thu chi có tab bên trong). */
@@ -49,7 +49,7 @@
         ["Tồn kho",[["kho_gtri","Tồn kho & giá trị"],["kho_dc","Đối chiếu tồn kho"],["kho_map","Đồng bộ mã Kênh phân phối"]]]],
       ns:[["",[["ngan_sach","Ngân sách"]]]],
       pd:[["",[["pheduyet","Phê duyệt"]]]],
-      cfg:[["Quy tắc",[["qt_kt","Quy tắc kế toán"]]], /* chị Hoa 07/11: luật kế toán đặt một chỗ (quytacketoan.js) */
+      cfg:[["Quy tắc",[["qt_kt","Quy tắc kế toán"],["nguong","Ngưỡng cảnh báo & chỉ số"]]], /* chị Hoa 07/11: luật kế toán đặt một chỗ (quytacketoan.js) */
         ["Tài khoản",[["nhansu","Tài khoản & phân quyền"],["phongban","Phòng ban"]]],
         ["Danh mục",[["spcombo","Sản phẩm & combo"],["sanpham","Sản phẩm"],["kenhban","Kênh bán & phí"],["chiphidm","Danh mục chi phí"],["cr_rcv","Tài khoản nhận tiền"]]],
         ["Chính sách bán hàng",[["cr_gia","Bảng giá"],["cr_dc","Giá điều chỉnh / khuyến mại"],["cr_thuong","Thưởng & xếp hạng NPP"],["cr_giagc","Bảng giá Kênh OEM"]]],
