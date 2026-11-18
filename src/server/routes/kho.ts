@@ -2219,6 +2219,65 @@ khoRoutes.post('/docs/:id/to-kk', async (c) => {
   return ok(c, { id, no: d.no, lines: agg.size });
 });
 
+/** Số tổng hợp cho trang Kiểm kê tồn: từng phiếu kiểm (số mã, lệch, giá trị, đã điều chỉnh chưa) và từng phiếu điều chỉnh. */
+khoRoutes.get('/kk-overview', async (c) => {
+  const db = c.env.DB;
+  const cp = canPrice(c.get('auth'));
+  const kk = (
+    await db
+      .prepare(
+        `SELECT d.id, d.no, d.doc_date, d.status, d.extra, COALESCE(u.display_name, '') AS created_by_name
+         FROM kho_docs d LEFT JOIN users u ON u.id = d.created_by WHERE d.type = 'KK' ORDER BY d.doc_date DESC, d.id DESC LIMIT 100`,
+      )
+      .all<{ id: number; no: string; doc_date: string; status: string; extra: string; created_by_name: string }>()
+  ).results ?? [];
+  const dcRows = (
+    await db
+      .prepare(
+        `SELECT d.id, d.no, d.doc_date, d.ref_no, d.status, d.extra, COALESCE(u.display_name, '') AS created_by_name,
+           SUM(CASE WHEN m.role = 'DC' AND m.qty > 0 THEN 1 ELSE 0 END) AS thua,
+           SUM(CASE WHEN m.role = 'DC' AND m.qty < 0 THEN 1 ELSE 0 END) AS thieu,
+           SUM(CASE WHEN m.role = 'TREO' THEN 1 ELSE 0 END) AS treo,
+           ROUND(SUM(m.qty * COALESCE(m.price, 0))) AS gia_tri
+         FROM kho_docs d LEFT JOIN kho_moves m ON m.doc_id = d.id LEFT JOIN users u ON u.id = d.created_by
+         WHERE d.type = 'DC' GROUP BY d.id ORDER BY d.doc_date DESC, d.id DESC LIMIT 100`,
+      )
+      .all<{ id: number; no: string; doc_date: string; ref_no: string; status: string; extra: string; created_by_name: string; thua: number; thieu: number; treo: number; gia_tri: number }>()
+  ).results ?? [];
+  const dcByKk = new Map<number, (typeof dcRows)[number]>();
+  for (const d of dcRows) {
+    const k = (JSON.parse(d.extra || '{}') as { kk_id?: number }).kk_id;
+    if (k && d.status === 'OK') dcByKk.set(k, d);
+  }
+  const out = [];
+  for (const d of kk) {
+    const ex = JSON.parse(d.extra || '{}') as { lines?: KkLine[]; tu_td?: string };
+    const n = (ex.lines ?? []).length;
+    const dc = dcByKk.get(d.id) ?? null;
+    let lech = 0;
+    let thua = 0;
+    let giaTri = 0;
+    if (dc) {
+      lech = dc.thua + dc.thieu + dc.treo;
+      giaTri = dc.gia_tri ?? 0;
+    } else if (d.status === 'OK') {
+      const r = await kkLoad(db, d.id);
+      for (const x of r.rows) {
+        const cl = Math.round((x.dem - x.so) * 1e6) / 1e6;
+        if (cl === 0) continue;
+        lech++;
+        if (cl > 0) thua++;
+        giaTri += cl * (x.gia ?? 0);
+      }
+    }
+    out.push({ id: d.id, no: d.no, doc_date: d.doc_date, status: d.status, created_by_name: d.created_by_name, tu_td: ex.tu_td ?? null, n, lech, thua, gia_tri: cp ? Math.round(giaTri) : null, dc: dc ? { id: dc.id, no: dc.no } : null });
+  }
+  return ok(c, {
+    kk: out,
+    dc: dcRows.map((d) => ({ id: d.id, no: d.no, doc_date: d.doc_date, kk: d.ref_no, status: d.status, created_by_name: d.created_by_name, thua: d.thua, thieu: d.thieu, treo: d.treo, gia_tri: cp ? d.gia_tri : null })),
+  });
+});
+
 khoRoutes.post('/docs/:id/cancel', async (c) => {
   const auth = c.get('auth');
   const id = Number(c.req.param('id'));

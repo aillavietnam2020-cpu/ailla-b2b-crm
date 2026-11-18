@@ -58,6 +58,10 @@ describe('tồn đầu kỳ, kiểm tồn và điều chỉnh', () => {
     expect([T.get('A'), T.get('B'), T.get('C')]).toEqual([65, 52, 10]);
     expect((await ctx.request(`/api/hub/kho/kk/${kk.body.data.id}/dieu-chinh`, { as: KT, body: {} })).body.error.code).toBe('DA_DC');
 
+    const ov = await ctx.request('/api/hub/kho/kk-overview', { as: KT });
+    expect(ov.body.data.kk[0]).toMatchObject({ no: kk.body.data.no, n: 3, lech: 2, dc: { no: dc.body.data.no } });
+    expect(ov.body.data.dc[0]).toMatchObject({ thua: 1, thieu: 0, treo: 1 });
+
     const treo = await ctx.request('/api/hub/kho/treo', { as: KT });
     expect(treo.body.data).toHaveLength(1);
     expect(treo.body.data[0]).toMatchObject({ item: 'A', qty: -5, st: 'TREO', ly_do: 'Chưa tìm ra' });
