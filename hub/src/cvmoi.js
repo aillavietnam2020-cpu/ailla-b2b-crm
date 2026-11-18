@@ -186,6 +186,12 @@ function cwRows(){if(CW_C)return CW_C;const d=D(),td=d.settings.today,T={},out=[
   /* video tồn chờ MÌNH duyệt: mỗi video một dòng như các việc khác (chị Hoa 09/11: hiển thị đồng bộ) */
   try{if(typeof cwKhoList==="function"){const w=cwKhoWho();cwKhoList().forEach(ma=>{const k=(d.kho||[]).find(y=>y.ma===ma);if(!k)return;const u=(d.users||[]).find(x=>x.id===k.nguoi||x.name===k.nguoi);
     out.push({k:"kho:"+ma,src:"kho",id:ma,rvOnly:true,rv:true,cardStep:w,ten:String(((k.tuyen||"")+" "+(k.ten||"")).trim()||ma).slice(0,90),mo:"Video tồn · "+ma+" · "+(typeof skS==="function"?skS(k.sku):""),nguoi:u?u.id:"",tao:"",phoi:[],han:td,gio:"",st:"review",late:false,lateD:0,da:"",uu:"",ck:[],g:"Duyệt video tồn",theoDoi:[],gap:false})})}}catch(e){console.error("video tồn chờ duyệt",e)}
+  /* đầu việc có hạn riêng hiện thành dòng riêng ở Hôm nay / Quá hạn / Sắp tới (chị Hoa 18/11); việc lớn không hiện chung nữa */
+  try{const P={};out.forEach(r=>{if(r.src==="task")P[r.id]=r});
+    (d.tasks||[]).forEach(t=>{const p=P[t.id];if(!p||t.st==="done"||t.st==="review"||!Array.isArray(t.checklist))return;
+      t.checklist.forEach((c,i)=>{if(!c||c.x||!(+c.han))return;const ng=c.nguoi||t.nguoi,han=+c.han,late=han<td;if(!ng||CV_TEST.includes(ng))return;
+        out.push(Object.assign({},p,{k:"task:"+t.id+"#"+i,ckI:i,ckT:c.t,ten:p.ten+" › "+c.t,nguoi:ng,han,late,lateD:late?td-han:0,st:"todo",rv:false,tpl:"",ck:[],cd:null,hasMyKid:false}));
+        if(ng===ME.id)p.hasMyKid=true})})}catch(e){console.error("đầu việc có hạn",e)}
   CW_C=out;Promise.resolve().then(()=>{CW_C=null});return out}
 const cwOpen=r=>r.st!=="done";
 const cwMine=r=>r.nguoi===ME.id&&!r.rvOnly;
@@ -272,7 +278,7 @@ function cwList(L,o){o=o||{};if(!L.length)return `<p class="cwempty">${o.empty||
   const S=o.sort?o.sort(L):cwSort(L),act=!o.sel&&S.some(r=>r.rv),lim=o.lim||300,ord=!!o.ord&&!o.sel;let items=o.flat?S:cwGroupRows(S);if(ord)items=cwOrdApply(items);
   return `<div class="cwlist${act?" hasact":""}${ord?" ord":""}"${ord?' data-cword="1"':""}>${items.slice(0,lim).map(x=>x.grp?cwGrow(x,{act,ord}):cwRow(x,{act,sel:o.sel,ord})).join("")}</div>${items.length>lim?`<p class="cwempty">Còn ${items.length-lim} dòng nữa chưa hiện. Gõ vào ô tìm hoặc chọn phòng, người để lọc bớt.</p>`:""}`}
 const cwSec=(t,L,o)=>`<section class="cwcard"><h3>${t}<span class="c">${(o&&o.c)||L.length+" việc"}</span></h3>${cwList(L,o)}</section>`;
-const cwDragOk=r=>r.src==="task"&&(cwCanDo(r)||cwCanEdit(r));
+const cwDragOk=r=>r.src==="task"&&r.ckI===undefined&&(cwCanDo(r)||cwCanEdit(r));
 const cwDragA=r=>cwDragOk(r)?` draggable="true" data-cwdrag="${esc(r.k)}"`:"";
 const cwKt=r=>`<div class="cwkt${r.late?" late":""}" data-cwo="${esc(r.k)}"${cwDragA(r)}><b>${cwUu(r)}${esc(r.ten)}</b><div class="m">${r.nguoi?avatar(r.nguoi)+esc(userName(r.nguoi)||""):"Chưa giao"}<span class="sp"></span>${r.ck&&r.ck.length?cwI("sub")+r.ck.filter(c=>c.x).length+"/"+r.ck.length+" ":""}${r.han?cwDueN(r.han):""}</div></div>`;
 
@@ -409,10 +415,10 @@ const CW_MY=[
   ["done","chk","Hoàn thành",R=>R.filter(r=>!cwOpen(r)&&(cwMine(r)||cwGiao(r)))]];
 const CW_MYD={today:"việc cần làm ngay",soon:"Việc của bạn chia theo ngày mai, tuần này, sau đó",giao:"Việc bạn giao cho người khác, việc trễ lên đầu",rv:"Bấm Duyệt hoặc Cần sửa ngay tại dòng",
   td:"Việc người khác làm mà bạn được thêm vào ô Người theo dõi, để biết tiến độ",nodue:"Việc để dành, khi nào làm thì đặt hạn",lap:"Việc tự giao theo mẫu lặp lại hằng ngày, mỗi tuần, mỗi tháng",done:"Việc đã hoàn thành trong tháng này"};
-function cwTodayL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&(cwMine(r)||r.rv||(cwGiao(r)&&r.late))&&(r.late||r.han===td||r.st==="doing"||r.rv))}
+function cwTodayL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&(cwMine(r)||r.rv||(cwGiao(r)&&r.late))&&(r.late||r.han===td||r.st==="doing"||r.rv)&&!r.hasMyKid)}
 /* việc của mình chưa đặt hạn: hiện ngay ở Cần làm, nhãn đỏ, để không bị bỏ sót */
 function cwNoDueL(R){return R.filter(r=>cwOpen(r)&&!r.han&&!r.rv&&cwMine(r))}
-function cwSoonL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&cwMine(r)&&r.han>td&&r.st!=="doing"&&!r.rv&&!r.late)}
+function cwSoonL(R){const td=cwTd();return R.filter(r=>cwOpen(r)&&cwMine(r)&&r.han>td&&r.st!=="doing"&&!r.rv&&!r.late&&!r.hasMyKid)}
 const cwTodayN=()=>{try{const R=cwRows();return cwTodayL(R).length+cwNoDueL(R).length}catch(e){return 0}};
 const cwToday=()=>{const td=cwTd();return CW_THU[cwWd(td)]+" "+dd(td)};
 function cwPins(){const T=D().tasks||[],pin=(((D().taskPins||{})[ME.id])||[]).map(id=>T.find(t=>t.id===id)).filter(Boolean);if(!pin.length)return "";
@@ -846,3 +852,4 @@ function cwMeetOpen(id){const x=(D().meetings||[]).find(z=>z.id===id);if(!x)retu
 function cwMeetBind(m){m.querySelectorAll("[data-cwatt]").forEach(x=>x.onclick=()=>cwAttachDa(x.dataset.cwatt));m.querySelectorAll("[data-cwmeet]").forEach(b=>b.onclick=cwMeetForm);m.querySelectorAll("[data-cwmt]").forEach(b=>b.onclick=()=>cwMeetOpen(b.dataset.cwmt))}
 {const _b=cwBind;cwBind=function(m){const r=_b.apply(this,arguments);try{cwMeetCss();cwMeetBind(m)}catch(e){console.error("cuộc hẹn",e)}return r}}
 {const _r=cwRailAct;cwRailAct=function(){let h="";try{h=cwMeetBox()}catch(e){console.error("cuộc hẹn",e)}return h+_r.apply(this,arguments)}}
+{const _td=cwToggleDone;cwToggleDone=function(r){if(r&&r.ckI!==undefined){const id=r.id,i=r.ckI,tx=r.ckT;DB.mutate(ME.name,"đầu việc xong",dt=>{const t=(dt.tasks||[]).find(x=>x.id===id),c=t&&(t.checklist||[])[i];if(c&&c.t===tx)c.x=!c.x});toast("Đã tích xong đầu việc");renderMain();return}return _td.apply(this,arguments)}}
