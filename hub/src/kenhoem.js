@@ -114,7 +114,7 @@ function koAdm(m,K,X,r){
   const tTP=[...tPM.values()].sort((p,q)=>tby==="sl"?q.qty-p.qty||q.rev-p.rev:q.rev-p.rev||q.qty-p.qty);
   const ttg=(k,t)=>`<button class="btn sm${tby===k?" pri":""}" data-kotop="${k}">${t}</button>`;
   const top=`<section class="card"><div class="card-h"><h2>Top sản phẩm bán chạy</h2><span class="hint">${esc(pLabel())} · ${tPM.size} sản phẩm</span><span style="margin-left:auto;display:flex;gap:6px">${ttg("dt","Theo doanh thu")}${ttg("sl","Theo số lượng")}</span></div><div class="ko-w">${tTP.length?tbl(["#","Sản phẩm","Số lượng","Doanh thu","Giá vốn","Lãi gộp","Khách mua"],tTP.slice(0,12).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.name)} <small class="hint mono">${esc(x.sku)}</small></td><td class="n">${tby==="sl"?`<b>${nf(x.qty)}</b>`:nf(x.qty)}</td><td class="n">${tby==="dt"?`<b>${tr(x.rev)}</b>`:tr(x.rev)}</td><td class="n">${x.noCost?`<span class="pill p-gry">chưa có giá vốn</span>`:tr(x.cost)}</td><td class="n">${x.noCost?"—":tr(x.rev-x.cost)}</td><td>${esc([...x.kh].map(K.name).join(", "))}</td></tr>`)):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div></section>`;
-  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}</div>${side}</div>${coCp}${doiTac}${top}`+
+  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}${coCp}</div>${side}</div>${doiTac}${top}`+
     srcNote("Đơn OEM đã duyệt trên CRM (khách chỉ dùng bảng giá riêng, không có cấp giá) · giá vốn SKU / định mức, không ước phần chưa có · chi phí từ Sổ chi phí.");
   m.querySelectorAll("[data-kotop]").forEach(b=>b.onclick=()=>{KO.topBy=b.dataset.kotop;renderMain()});
 }
