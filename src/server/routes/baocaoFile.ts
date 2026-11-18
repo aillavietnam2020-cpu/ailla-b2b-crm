@@ -45,6 +45,48 @@ baocaoFileRoutes.get('/', async (c) => {
   return ok(c, { ready: !!(c.env.BC_DRIVE_URL && c.env.BC_DRIVE_KEY), files: ky && KY.test(ky) ? list.filter((f) => f.ky === ky) : list });
 });
 
+/**
+ * Đối soát tiền về Facebook theo tháng (cách chị Huệ, 18/11/2026): kế toán nạp file đơn FB + file tiền về SPX/Best ở trang Facebook,
+ * trang tính (fbdscalc.js) rồi lưu bản tóm tắt theo tháng (không mã đơn, không thông tin khách) ở hub_blobs 'fb_doisoat'.
+ * Doanh thu Facebook tháng đó trên web lấy theo số này.
+ */
+const FB_KEY = 'fb_doisoat';
+async function loadFb(db: D1Database): Promise<Record<string, unknown>> {
+  const row = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(FB_KEY).first<{ data: string }>();
+  if (!row) return {};
+  try {
+    const v = JSON.parse(await unpack(row.data)) as Record<string, unknown>;
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+baocaoFileRoutes.get('/fb', async (c) => {
+  if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem đối soát Facebook');
+  return ok(c, await loadFb(c.env.DB));
+});
+baocaoFileRoutes.put('/fb', adminOnlyEndpoint, async (c) => {
+  const auth = c.get('auth');
+  if (!canMoney(auth)) throw forbidden('Chỉ CEO hoặc kế toán lưu đối soát Facebook');
+  const b = (await c.req.json().catch(() => null)) as { ky?: unknown; s?: Record<string, unknown> } | null;
+  const ky = String(b?.ky ?? '');
+  const s = b?.s;
+  const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  if (!KY.test(ky) || !s || typeof s !== 'object' || !num(s.dt) || !num(s.don) || !num(s.ship)) throw badRequest('BAD_BODY', 'Thiếu tháng hoặc số đối soát');
+  const json = JSON.stringify(s);
+  if (json.length > 200_000) throw badRequest('TOO_LARGE', 'Bản tóm tắt quá lớn');
+  const all = await loadFb(c.env.DB);
+  const at = nowIso();
+  all[ky] = { ...s, ky, at, by: auth.user.display_name };
+  await c.env.DB.prepare(
+    `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+  )
+    .bind(FB_KEY, await pack(JSON.stringify(all)), at, auth.user.id)
+    .run();
+  return ok(c, all[ky]);
+});
+
 baocaoFileRoutes.post('/', adminOnlyEndpoint, async (c) => {
   const auth = c.get('auth');
   if (!canMoney(auth)) throw forbidden('Chỉ CEO hoặc kế toán lưu file báo cáo');
