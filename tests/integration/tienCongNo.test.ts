@@ -113,6 +113,8 @@ describe('Tiền & công nợ: một chỗ tính', () => {
     expect(docs.filter((x) => x.loai === 'THU').map((x) => (x as unknown as { kenh: string }).kenh)).toEqual(['B2B', 'GIA_CONG']);
     expect(docs.filter((x) => x.loai === 'CHI_NCC').map((x) => [x.amount, x.acct, x.ceo])).toEqual([[-4_000_000, 'acc-mb', ''], [-1_000_000, 'TIEN_MAT', 'CHO']]);
     expect(docs.filter((x) => x.loai === 'CHI_VC').map((x) => x.amount)).toEqual([-250_000]);
+    // mã phiếu ổn định để kế toán gán tài khoản / mã B03
+    expect((d.tien.docs as Array<{ id: string }>).every((x) => /^(pay|po|vc|bo):/.test(x.id))).toBe(true);
   });
 
   it('chứng từ từng khách / nhà cung cấp', async () => {
