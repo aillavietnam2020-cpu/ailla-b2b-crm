@@ -71,7 +71,7 @@
     /* Bảng tách Giá thành thành từng trang riêng, nên bỏ nhóm gộp "Giá thành & định mức". */
     for(let i=PAGE_SETS.length-1;i>=0;i--)if(PAGE_SETS[i].adm)PAGE_SETS.splice(i,1);
     /* Chị Hoa 18/11: nhóm Thu chi gọn một dòng trên menu, các trang thành tab bên trong. */
-    PAGE_SETS.push({adm:true,n:"Thu chi",ids:["cp_thu","so_cp","mh_po","cr_bill","cr_s_bill","doisoat"],labels:["Sổ thu","Sổ chi phí","Mua hàng","Kho bill giao dịch","Kho bill giao dịch","Đối soát tiền về"]});
+    PAGE_SETS.push({adm:true,n:"Thu chi",ids:["cp_thu","so_cp","tu_ql","mh_po","cr_bill","cr_s_bill","doisoat"],labels:["Sổ thu","Sổ chi phí","Tạm ứng lương","Mua hàng","Kho bill giao dịch","Kho bill giao dịch","Đối soát tiền về"]});
   }else{
     const S={
       exec:[["",[["exec","Tổng quan vận hành"]]]],
