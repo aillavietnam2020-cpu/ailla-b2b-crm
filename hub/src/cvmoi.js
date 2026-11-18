@@ -215,10 +215,10 @@ function cwStPill(r){if(r.st==="done")return pill("Xong","grn");if(r.tc)return p
   if(r.late)return pill("Trễ "+r.lateD+" ngày","red");if(r.tl)return pill("Cần sửa","red");
   return r.st==="doing"?pill("Đang làm","blu"):r.st==="pause"?pill("Tạm dừng","gry"):r.st==="nhan"?pill("Đã nhận việc","blu"):r.st==="cg"?pill("Chưa giao","gry"):pill("Cần làm","gry")}
 function cwMeta(r,sub){const a=[];
-  if(r.kidOf)a.push(`<span>Trong việc: ${esc(r.kidOf)}</span>`);else if(r.src==="task"&&!sub){if(r.tu)a.push("<span>Tự thêm</span>");else if(r.tao&&r.tao!==r.nguoi)a.push(`<span>Giao bởi ${esc(userName(r.tao)||"—")}</span>`)}
+  if(r.kidOf)a.push(`<span>${cwI("fold")}${esc(cvShort(r.kidOf,40))}</span>`);else if(r.src==="task"&&!sub){if(r.tu)a.push("<span>Tự thêm</span>");else if(r.tao&&r.tao!==r.nguoi)a.push(`<span>Giao bởi ${esc(userName(r.tao)||"—")}</span>`)}
   if(r.src!=="task"&&r.mo)a.push(`<span>${esc(String(r.mo).replace(/<[^>]*>/g,""))}</span>`);
   if(r.gio)a.push(`<span>${cwI("clock")}${esc(r.gio)}</span>`);
-  if(r.da&&prjN(r.da))a.push(`<span>${cwI("fold")}${esc(prjN(r.da))}</span>`);
+  if(r.da&&prjN(r.da)&&!r.kidOf)a.push(`<span>${cwI("fold")}${esc(prjN(r.da))}</span>`);
   if(r.cd&&r.cd.length)a.push(`<button type="button" class="cwmulti" data-cwsx="${esc(r.k)}" title="Việc nhiều công đoạn: bấm để xem từng công đoạn">◫ ${r.cd.filter(s=>s.st==="xong").length}/${r.cd.length} công đoạn ▸</button>`);else if(r.ck&&r.ck.length)a.push(`<button type="button" class="cwmulti" data-cwsx="${esc(r.k)}" title="Việc có nhiều đầu việc: bấm để xem từng đầu việc">▤ ${r.ck.filter(c=>c.x).length}/${r.ck.length} đầu việc ▸</button>`);
   if(r.tpl)a.push(`<span>${cwI("rep")}Định kỳ</span>`);
   if(r.phoi&&r.phoi.length){const n=r.phoi.map(userName).filter(Boolean);if(n.length)a.push(`<span>${cwI("users")}${esc(n.slice(0,2).join(", "))}${n.length>2?" +"+(n.length-2):""}</span>`)}
