@@ -1305,8 +1305,11 @@ khoRoutes.get('/nxt/detail', async (c) => {
     .first<{ n: number }>();
   const rows = await c.env.DB.prepare(
     `SELECT l.doc_date, l.doc_id, l.doc_type, l.doc_no, ROUND(SUM(l.qty), 6) AS qty,
-            MAX(o.id) AS order_id, MAX(r.id) AS return_id
+            MAX(o.id) AS order_id, MAX(r.id) AS return_id,
+            MAX(d.partner) AS partner, MAX(d.ref_no) AS ref_no, MAX(d.note) AS note,
+            (SELECT SUM(m.qty * m.price) / NULLIF(SUM(CASE WHEN m.price IS NOT NULL THEN m.qty END), 0) FROM kho_moves m WHERE m.doc_id = l.doc_id AND m.item = l.item AND l.doc_id > 0) AS price
      FROM kho_ledger l
+     LEFT JOIN kho_docs d ON d.id = l.doc_id AND l.doc_id > 0
      LEFT JOIN orders o ON l.doc_id = 0 AND l.doc_type = 'B2B' AND l.doc_no = 'XB-' || o.order_no
      LEFT JOIN order_returns r ON l.doc_id = 0 AND l.doc_type = 'TRA_HANG' AND l.doc_no = r.return_no
      WHERE l.item = ? AND l.doc_date >= ? AND l.doc_date <= ?
@@ -1315,7 +1318,9 @@ khoRoutes.get('/nxt/detail', async (c) => {
   )
     .bind(item, from, to)
     .all<Record<string, unknown>>();
-  return ok(c, { opening: opening?.n ?? 0, rows: rows.results ?? [] });
+  // Đơn giá theo phiếu (sổ chi tiết vật tư, chị Huệ 18/11): chỉ người được xem giá.
+  const cp = canPrice(c.get('auth'));
+  return ok(c, { opening: opening?.n ?? 0, rows: (rows.results ?? []).map((r) => (cp ? r : { ...r, price: null })) });
 });
 
 /** Chênh lệch định mức và thực tế của các mẻ pha chế trong kỳ, theo từng NVL. */
