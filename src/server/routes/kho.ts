@@ -1463,6 +1463,14 @@ khoRoutes.get('/alerts', async (c) => {
 
 /* ---------- Phiếu ---------- */
 
+/** Số lệnh MISA đã nạp (phiếu còn hiệu lực), để trang nạp lệnh đánh dấu lệnh nào đã có. */
+khoRoutes.get('/misa-lx', async (c) => {
+  const r = await c.env.DB.prepare(
+    "SELECT json_extract(extra, '$.misa.lx') AS lx, no, type, doc_date FROM kho_docs WHERE status = 'OK' AND json_extract(extra, '$.misa.lx') IS NOT NULL",
+  ).all<{ lx: string; no: string; type: string; doc_date: string }>();
+  return ok(c, r.results ?? []);
+});
+
 khoRoutes.get('/docs', async (c) => {
   const type = c.req.query('type');
   const from = c.req.query('from');
@@ -1557,7 +1565,18 @@ khoRoutes.post('/docs', async (c) => {
   const accRules = await loadAccRules(c.env.DB);
   if (accRules.lock_date && date <= accRules.lock_date)
     throw conflict('SO_DA_KHOA', `Sổ kho đã khóa đến hết ngày ${ddmm(accRules.lock_date)}. Phiếu phải có ngày sau ngày khóa sổ (CEO hoặc Kế toán mở khóa ở Quy tắc kế toán).`);
-  const mocChung = type === 'TD' ? await khoMocChung(c.env.DB) : null;
+  // Nạp lệnh sản xuất MISA (18/11): chỉ CEO / Kế toán; mỗi số lệnh LX chỉ nạp một lần (phiếu còn hiệu lực).
+  const misa = b.misa && typeof b.misa === 'object' ? (b.misa as Record<string, unknown>) : null;
+  const mstr = (v: unknown) => String(v ?? '').trim().slice(0, 20);
+  const misaLx = misa ? mstr(misa.lx).toUpperCase() : '';
+  if (misa) {
+    if (type !== 'PC') throw badRequest('BAD_TYPE', 'Hiện chỉ nạp lệnh pha chế từ MISA');
+    if (!isCeo(auth) && !auth.permissions.includes('order.accounting.confirm')) throw forbidden('Chỉ CEO hoặc Kế toán nạp lệnh sản xuất MISA');
+    if (!/^LX\d+$/.test(misaLx)) throw badRequest('BAD_LX', 'Số lệnh MISA phải dạng LX1234');
+    const had = await c.env.DB.prepare("SELECT no FROM kho_docs WHERE status = 'OK' AND json_extract(extra, '$.misa.lx') = ?").bind(misaLx).first<{ no: string }>();
+    if (had) throw conflict('DA_NAP', `Lệnh ${misaLx} đã nạp ở phiếu ${had.no}`);
+  }
+  const mocChung = type === 'TD' || misa ? await khoMocChung(c.env.DB) : null;
   if (boSung) {
     if (!mocChung) throw badRequest('NO_MOC', 'Chưa có phiếu tồn chốt chung (mốc tồn). CEO nạp phiếu chốt trước, sau đó mới kiểm bổ sung.');
     if (!(date > mocChung)) throw badRequest('BAD_DATE', `Ngày kiểm bổ sung phải sau ngày mốc chung ${ddmm(mocChung)}`);
@@ -1658,9 +1677,14 @@ khoRoutes.post('/docs', async (c) => {
     const btp = String(b.btp ?? '');
     const it = need(btp);
     if (it.cls !== 'BTP') throw badRequest('NOT_BTP', `${btp} không phải bán thành phẩm`);
+    if (misaLx) {
+      // 18/11 chị Hoa: nạp lệnh sản xuất đã ghi trên MISA. Số nguyên liệu = số MISA thực xuất, không theo công thức web.
+      extra.misa = { lx: misaLx, pxk: mstr(misa?.pxk), pnk: mstr(misa?.pnk) };
+    } else {
     // 07/11 chị Hoa: phiếu pha chế chỉ theo công thức của Kỹ thuật (Pha chế › Công thức), không theo định mức. Chưa có công thức thì phải nhập trước.
     const ct = await c.env.DB.prepare("SELECT 1 FROM pc_recipe WHERE btp = ? AND status = 'OK'").bind(btp).first();
     if (!ct) throw badRequest('NO_CT', `${it.name} chưa có công thức pha. Nhập công thức ở Pha chế › Công thức rồi mới ghi phiếu pha chế.`);
+    }
     const liters = positive(b.liters, 'Số lít thực tế');
     if (!lines.length) throw badRequest('NO_LINES', 'Cần ghi số thực tế của từng nguyên vật liệu đã dùng');
     extra.btp = btp;
@@ -1771,7 +1795,9 @@ khoRoutes.post('/docs', async (c) => {
 
   // Cảnh báo tồn âm sau khi ghi (vẫn cho ghi: kho thực tế có thể về hàng sau, nhưng báo để kiểm tra).
   const outItems = [...new Set(moves.filter((m) => m.qty < 0).map((m) => m.item))];
-  if (outItems.length) {
+  // Lệnh MISA trước mốc tồn: sổ kho không tính phiếu trước mốc nên không làm âm tồn, bỏ qua kiểm âm.
+  const truocMoc = !!misaLx && !!mocChung && date <= mocChung;
+  if (outItems.length && !truocMoc) {
     const marks = outItems.map(() => '?').join(',');
     const cur = (
       await c.env.DB.prepare(
