@@ -107,10 +107,16 @@ function koAdm(m,K,X,r){
     tg("ch","#5d6d8e","Chi phí chung phân bổ",hasChia?chia:null,hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia),
     `<tr class="tb-sum"><td><span class="tb-car"></span>Lãi ròng kênh</td><td class="n">${ln==null?koTag():kpF(ln)}</td><td class="n">${ln==null?"":kpP(ln,dt)}</td><td></td></tr>`])}</div></section>`;
   /* top đơn / sản phẩm */
-  let flag=false;const top=`<section class="card"><div class="card-h"><h2>Top đơn / sản phẩm OEM</h2><span class="hint">${esc(pLabel())} · lãi hiện khi có giá vốn</span></div><div class="ko-w">${L.length?tbl(["#","Đơn · sản phẩm","Khách","SL","Doanh thu","Giá vốn","Lãi gộp","Trạng thái"],L.slice(0,12).map((l,i)=>{const u=b2bUnitCost(l.sku,String(l.order_date).slice(0,7)),c=u==null?null:u*(+l.qty||0),st=c==null&&!flag?(flag=true,pill("Nhập giá vốn","blu")):"";
-      return `<tr><td>${i===0||l.order_no!==L[i-1].order_no?`<span class="tb-rk">${i+1}</span>`:""}</td><td>${esc(l.order_no)} · ${esc(l.name)}</td><td>${esc(K.name(l.customer_id))}</td><td class="n">${nf(l.qty)}</td><td class="n">${tr(l.revenue)}</td><td class="n">${c==null?`<span class="pill p-gry">chưa có giá vốn</span>`:tr(c)}</td><td class="n">${c==null?"—":tr(l.revenue-c)}</td><td>${st}</td></tr>`})):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div></section>`;
-  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}</div>${side}</div>${doiTac}${coCp}${top}`+
+  /* Top sản phẩm bán chạy (chị Hoa 18/11/2026): gộp theo mã, xếp theo doanh thu hoặc số lượng (nút chọn). Giá vốn theo tháng bán, mã chưa có giá vốn để trống. */
+  const tby=KO.topBy==="sl"?"sl":"dt",tPM=new Map();
+  L.forEach(l=>{const x=tPM.get(l.sku)||{sku:l.sku,name:l.name,qty:0,rev:0,cost:0,noCost:false,kh:new Set()};const u=b2bUnitCost(l.sku,String(l.order_date).slice(0,7));
+    x.qty+=+l.qty||0;x.rev+=+l.revenue||0;if(u==null)x.noCost=true;else x.cost+=u*(+l.qty||0);x.kh.add(l.customer_id);tPM.set(l.sku,x)});
+  const tTP=[...tPM.values()].sort((p,q)=>tby==="sl"?q.qty-p.qty||q.rev-p.rev:q.rev-p.rev||q.qty-p.qty);
+  const ttg=(k,t)=>`<button class="btn sm${tby===k?" pri":""}" data-kotop="${k}">${t}</button>`;
+  const top=`<section class="card"><div class="card-h"><h2>Top sản phẩm bán chạy</h2><span class="hint">${esc(pLabel())} · ${tPM.size} sản phẩm</span><span style="margin-left:auto;display:flex;gap:6px">${ttg("dt","Theo doanh thu")}${ttg("sl","Theo số lượng")}</span></div><div class="ko-w">${tTP.length?tbl(["#","Sản phẩm","Số lượng","Doanh thu","Giá vốn","Lãi gộp","Khách mua"],tTP.slice(0,12).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.name)} <small class="hint mono">${esc(x.sku)}</small></td><td class="n">${tby==="sl"?`<b>${nf(x.qty)}</b>`:nf(x.qty)}</td><td class="n">${tby==="dt"?`<b>${tr(x.rev)}</b>`:tr(x.rev)}</td><td class="n">${x.noCost?`<span class="pill p-gry">chưa có giá vốn</span>`:tr(x.cost)}</td><td class="n">${x.noCost?"—":tr(x.rev-x.cost)}</td><td>${esc([...x.kh].map(K.name).join(", "))}</td></tr>`)):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div></section>`;
+  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}</div>${side}</div>${coCp}${doiTac}${top}`+
     srcNote("Đơn OEM đã duyệt trên CRM (khách chỉ dùng bảng giá riêng, không có cấp giá) · giá vốn SKU / định mức, không ước phần chưa có · chi phí từ Sổ chi phí.");
+  m.querySelectorAll("[data-kotop]").forEach(b=>b.onclick=()=>{KO.topBy=b.dataset.kotop;renderMain()});
 }
 
 /* ---------- Vận hành ---------- */
