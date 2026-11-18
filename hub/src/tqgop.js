@@ -75,7 +75,7 @@ function tqTot(rows){const has=rows.filter(r=>r.dt!=null);return {dt:has.reduce(
 function tqTabKenh(){
   const rows=tqKenhRows(),T=tqTot(rows),ng=dhGet().nguong;
   const warn=r=>{const w=[];if(r.dt&&r.ads/(r.qb||r.dt)>ng.qcMax)w.push(pill(`quảng cáo ${dhPct(r.ads/(r.qb||r.dt))} doanh thu${r.qb?" dự kiến":""}`,"red"));if(r.dt&&r.lai!=null&&r.lai/r.dt<ng.bienKenh)w.push(pill("biên dưới "+dhPct(ng.bienKenh),"amb"));if(r.tam)w.push(pill("tạm tính","blu"));if(r.dt==null)w.push(pill("chờ tải báo cáo","gry"));return w.join(" ")};
-  const row=r=>`<tr class="clk" data-go="${r.go}"><td><b>${r.n}</b><br><small class="hint">${esc(r.src||"")}</small>${r.dang?`<br><small class="hint">đang giao, chưa tính: ${nf(r.dang)} đơn · ${tr(r.dangDt)}</small>`:""}</td><td class="n">${r.dt==null?"—":r.dt===0?"0 đ":tr(r.dt)}</td><td class="n">${r.don?nf(r.don):r.dt===0?"0":"—"}</td><td class="n">${r.gv?tr(r.gv):"—"}</td><td class="n">${r.phi?tr(r.phi):"—"}</td><td class="n">${r.ads?tr(r.ads):"—"}</td><td class="n"><b class="${r.lai<0?"t-red":""}">${r.lai==null?"—":tr(r.lai)}</b></td><td class="n">${r.dt&&r.lai!=null?dhPct(r.lai/r.dt):"—"}</td><td>${warn(r)}</td></tr>`;
+  const row=r=>`<tr class="clk" data-go="${r.go}"><td><b>${r.n}</b><br><small class="hint" title="${esc(r.src||"")}">${esc(tqSrcNgan(r.src))}</small>${r.dang?`<br><small class="hint">đang giao, chưa tính: ${nf(r.dang)} đơn · ${tr(r.dangDt)}</small>`:""}</td><td class="n">${r.dt==null?"—":r.dt===0?"0 đ":tr(r.dt)}</td><td class="n">${r.don?nf(r.don):r.dt===0?"0":"—"}</td><td class="n">${r.gv?tr(r.gv):"—"}</td><td class="n">${r.phi?tr(r.phi):"—"}</td><td class="n">${r.ads?tr(r.ads):"—"}</td><td class="n"><b class="${r.lai<0?"t-red":""}">${r.lai==null?"—":tr(r.lai)}</b></td><td class="n">${r.dt&&r.lai!=null?dhPct(r.lai/r.dt):"—"}</td><td>${warn(r)}</td></tr>`;
   const sub=(m)=>{const R=rows.filter(r=>r.mang===m),t=tqTot(R);return `<tr class="tot"><td>${m}</td><td class="n">${tr(t.dt)}</td><td class="n">${t.don?nf(t.don):"—"}</td><td></td><td></td><td></td><td class="n">${tr(t.lai)}</td><td class="n">${t.dt?dhPct(t.lai/t.dt):"—"}</td><td></td></tr>`};
   return `<section class="card flush"><div class="card-h pad"><h2>Lãi theo kênh</h2><span class="hint">${esc(pLabel())} · doanh thu thực · lãi đóng góp (chưa trừ lương, chi phí chung)</span></div>
    <div class="tbl"><table><thead><tr><th>Kênh · nguồn số</th><th class="n">Doanh thu thực</th><th class="n">Đơn</th><th class="n">Giá vốn</th><th class="n">Phí sàn / ship, thuế</th><th class="n">Quảng cáo</th><th class="n">Lãi đóng góp</th><th class="n">Biên</th><th>Cảnh báo</th></tr></thead><tbody>
@@ -128,6 +128,8 @@ function plRowsFor(from,to){
   try{return tqKenhRows()}finally{PERIOD=sv;B2BR.key=bk.key;B2BR.data=bk.data}}
 const plKey=r=>({tts:"tts",spe:"spe",fb:"fb",B2B:"b2b",GIA_CONG:"gc"})[r.k];
 /* Một kênh → các dòng P&L. Phí sàn và vận chuyển = phần còn lại để các dòng cộng khớp lãi đóng góp. */
+/* Chị Hoa 18/11: ghi chú nguồn số chỉ hiện ngắn (2 ý đầu, bỏ ngoặc), đủ câu khi rê chuột. */
+const tqSrcNgan=s=>{const t=String(s||"").split(" · ").slice(0,2).map(x=>x.replace(/\s*\([^)]*\)/g,"").trim()).filter(Boolean).join(" · ");return t.length>42?t.slice(0,40)+"…":t};
 function plCol(r){if(!r||r.dt==null)return null;if(r.dt===0)return {dt:0,gv:0,lg:0,phi:0,ads:0,cpk:r.cpk||0,luong:r.luong||0,chia:r.chia||0,lai:r.lai==null?0:r.lai,ngv:0,tam:false,src:r.src,don:0};const dt=r.dt,gv=r.gv,ngv=r.ngv||0,ads=r.ads||0,lai=r.lai,cpk=r.cpk||0,luong=r.luong||0,chia=r.chia||0;
   const lg=gv==null?null:dt-gv-ngv,phi=lai==null||gv==null?(r.phi||0):dt-gv-ngv-ads-cpk-luong-lai;return {dt,gv,ngv,lg,phi,ads,cpk,luong,lai,chia,lsp:lai==null?null:lai-chia,tam:!!r.tam,src:r.src,don:r.don,qb:r.qb||dt,adsCa:r.adsCa!=null?r.adsCa:ads}}
 function plSum(cols,names){const ok=cols.filter(Boolean);if(!ok.length)return null;const s=k=>ok.reduce((a,c)=>a+(c[k]||0),0);
@@ -158,7 +160,7 @@ function tqSoSanhKenh(m){
   const list=[...rk,...rows.filter(r=>!rk.includes(r))];
   const p=v=>v==null||!isFinite(v)?"—":dhPct(v);
   const row=r=>{const v=r.dt!=null&&r.dt>0,c=v?plCol(r):null,hh=v?tqHuyHoan(r.k,PERIOD.from,PERIOD.to):null,qc=v?(r.ads||0)/r.dt:null;
-    return `<tr class="clk${v?"":" mut"}" data-go="${r.go}"><td class="n"><b>${r.rank||""}</b></td><td><b>${esc(r.n)}</b><br><small class="hint">${esc(r.src||"")}</small></td>
+    return `<tr class="clk${v?"":" mut"}" data-go="${r.go}"><td class="n"><b>${r.rank||""}</b></td><td><b>${esc(r.n)}</b><br><small class="hint" title="${esc(r.src||"")}">${esc(tqSrcNgan(r.src))}</small></td>
     <td class="n">${r.dt==null?`<span class="pill p-gry">chờ tải báo cáo</span>`:r.dt===0?"0 đ":tr(r.dt)}</td><td class="n">${v?p(r.dt/T.dt):"—"}</td>
     <td class="n">${c&&c.lg!=null?p(c.lg/r.dt):"—"}</td><td class="n">${c?p(c.phi/r.dt):"—"}</td>
     <td class="n">${v?(qc>ng.qcMax?`<b class="t-red">${p(qc)}</b>`:p(qc)):"—"}</td>
