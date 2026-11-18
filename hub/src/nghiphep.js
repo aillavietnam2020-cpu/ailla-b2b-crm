@@ -163,10 +163,23 @@ function pTuQl(m){
   <section class="card flush">${tbl(["Nhân viên","Ngày gửi","Số tiền","Lý do","Trừ lương tháng","Trạng thái",""],R.list.map(x=>`<tr><td><b>${esc(x.ten)}</b><div class="hint">${esc(x.pbTen)}</div></td><td>${npDm(vndateIso(x.created_at))}</td><td class="n">${npTien(x.so_tien)}</td><td>${esc(x.ly_do)}</td><td>${x.ky.slice(5)}/${x.ky.slice(0,4)}</td><td>${npTuSt(x)}${x.ktTen?`<div class="hint">${esc(x.ktTen)}</div>`:""}${x.tu_choi?`<div class="hint">${esc(x.tu_choi)}</div>`:""}</td><td>${R.vai.duyet&&x.st==="kt"?`<div style="display:flex;gap:6px;flex-wrap:wrap"><input id="tu-n-${x.id}" placeholder="Lý do từ chối" hidden><button class="btn sm" data-tno="${x.id}">Từ chối</button><button class="btn sm pri" data-tok="${x.id}">Duyệt</button></div>`:""}</td></tr>`))}</section>
   <p class="hint">Duyệt xong khoản tạm ứng tự vào bảng lương tháng (dòng "Tạm ứng" trên phiếu lương). Mức tối đa sửa ở Nhân sự › Cài đặt chấm công.</p>`;
   const act=async(id,okk)=>{let note="";if(!okk){const el=$("#tu-n-"+id);note=el.value.trim();if(!note){el.hidden=false;el.focus();toast("Ghi lý do từ chối rồi bấm Từ chối lần nữa");return}}
-    try{await svApi("/api/hub/nghiphep/tamung/"+id+"/duyet",{method:"POST",body:JSON.stringify({ok:okk,note})});toast(okk?"Đã duyệt, người đề nghị nhận thông báo":"Đã từ chối");NP.tuInj=0;npCho();npLoad("tu","/api/hub/nghiphep/tamung",true)}catch(e){toast(e.message)}};
+    try{await svApi("/api/hub/nghiphep/tamung/"+id+"/duyet",{method:"POST",body:JSON.stringify({ok:okk,note})});toast(okk?"Đã duyệt, web lập phiếu chi lương chờ kế toán xác nhận ở Sổ chi phí":"Đã từ chối");NP.tuInj=0;npCho();await npTuSync()}catch(e){toast(e.message)}};
   m.querySelectorAll("[data-tok]").forEach(b=>b.onclick=()=>act(b.dataset.tok,true));m.querySelectorAll("[data-tno]").forEach(b=>b.onclick=()=>act(b.dataset.tno,false));
 }
 
+/* Tạm ứng là một khoản chi lương (chị Hoa 18/11): đề nghị được duyệt thì web lập phiếu chi lương ở Sổ chi phí (chờ kế toán xác nhận chi),
+   nhóm G07, đánh dấu src "tamung" để không cộng thêm chi phí (lương đã lấy cả tháng từ bảng lương). Mỗi đề nghị một phiếu (mã "tu-" + mã đề nghị).
+   Chỉ lập cho đề nghị duyệt từ 18/11/2026: các khoản cũ kế toán đã tự ghi. Người có quyền Sổ chi phí (Kế toán, CEO) mở web là tự bù phiếu còn thiếu. */
+const NP_TU_TU="2026-11-18";
+function npTuPhieu(list){
+  if(!(typeof npKetoan==="function"&&npKetoan())||typeof DB==="undefined")return 0;const d=D(),co=new Set([...(d.pcCho||[]),...(d.pcTra||[]),...(((d.fin||{}).nkc)||[])].map(x=>x.id));
+  const moi=(list||[]).filter(x=>x.st==="xong"&&x.kt_at&&vndateIso(x.kt_at)>=NP_TU_TU&&!co.has("tu-"+x.id));if(!moi.length)return 0;
+  DB.mutate(ME.name,"lập phiếu chi tạm ứng lương",dt=>{const has=new Set([...(dt.pcCho||[]),...(dt.pcTra||[]),...(((dt.fin||{}).nkc)||[])].map(x=>x.id));dt.pcCho=dt.pcCho||[];
+    moi.forEach(x=>{const id="tu-"+x.id;if(has.has(id))return;const ngay=vndateIso(x.kt_at),th=x.ky.slice(5)+"/"+x.ky.slice(0,4);let ct="";try{ct=typeof scSoPhieu==="function"?scSoPhieu(ngay):""}catch(e){}
+      dt.pcCho.push({id,src:"tamung",tu:x.id,tkc:"",tkn:"",d:ngay,ct:ct||"PC-"+ngay.slice(0,7)+"-TU",lct:"Phiếu chi",dg:"Tạm ứng lương tháng "+th+" · "+(x.ten||""),tk:"1121",t:+x.so_tien||0,g:"G07",k:"Chung",
+        gc:"Tạm ứng · trừ vào lương tháng "+th+", không tính thêm chi phí · đề nghị "+String(x.id).slice(0,8)+(x.ly_do?" · "+x.ly_do:""),dn:x.ten||"",bp:x.pbTen||"",nn:x.ten||"",ht:"Chuyển khoản",by:ME.name,at:Date.now(),st:"Chờ duyệt"});has.add(id)})});
+  return moi.length}
+async function npTuSync(){if(!(typeof npKetoan==="function"&&npKetoan()))return;try{const r=await svApi("/api/hub/nghiphep/tamung");NP.tu=r;if(npTuPhieu(r.list)&&typeof PAGE!=="undefined"&&PAGE==="so_cp")renderMain()}catch(e){}}
 /* Bảng lương: tạm ứng duyệt trên máy chủ đưa vào danh sách tạm ứng (HRD().tu) trước khi tính, để dòng "Tạm ứng" đúng. */
 async function npTuInject(){
   if(typeof HRD!=="function"||!HRD()||!Array.isArray(HRD().tu)||Date.now()-NP.tuInj<60000)return false;NP.tuInj=Date.now();
@@ -183,7 +196,7 @@ async function npTuInject(){
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-npme]");if(b){e.preventDefault();PAGE="np_toi";render()}});
 PAGES.np_toi=pNpToi;PAGES.tu_toi=pTuToi;PAGES.pl_toi=pPlToi;PAGES.np_duyet=pNpDuyet;PAGES.np_ql=pNpQl;PAGES.tu_ql=pTuQl;
 if(typeof document!=="undefined"&&!document.getElementById("np-css")){const st=document.createElement("style");st.id="np-css";st.textContent=`.np-bu{display:grid;gap:10px}.np-bu .cc-chips{display:flex;gap:6px;margin-top:4px}.np-bu .cc-chip{flex:1;white-space:nowrap;text-align:center;padding:8px 6px}.np-gio{display:grid;grid-template-columns:1fr 1fr;gap:10px}.np-bu .cc-chip:disabled{opacity:.4}.np-item{display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}.np-item:last-child{border-bottom:0}`;document.head.appendChild(st)}
-if(typeof window!=="undefined"&&typeof SERVER!=="undefined"&&SERVER){setTimeout(npCho,1500);setInterval(npCho,120000)}
+if(typeof window!=="undefined"&&typeof SERVER!=="undefined"&&SERVER){setTimeout(npCho,1500);setInterval(npCho,120000);setTimeout(npTuSync,4000);setInterval(npTuSync,300000)}
 
 /* Menu (chạy sau chamcong.js):
    - Của tôi: Chấm công, Nghỉ phép & tăng ca, Tạm ứng lương, Phiếu lương (thay mục cũ "Nghỉ phép, OT, tạm ứng").
@@ -191,5 +204,5 @@ if(typeof window!=="undefined"&&typeof SERVER!=="undefined"&&SERVER){setTimeout(
 {
   const ADMH=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
   const me=MODULES.find(x=>x.k==="me");if(me){const g0=me.groups;me.groups=()=>{const G=g0();if(G[0]){G[0][1]=G[0][1].filter(i=>i[0]!=="hr_me"&&i[0]!=="hr_plme");const at=G[0][1].findIndex(i=>i[0]==="cc_toi")+1;if(!G[0][1].some(i=>i[0]==="np_toi"))G[0][1].splice(at,0,MI("np_toi","Nghỉ phép & tăng ca"),MI("tu_toi","Tạm ứng lương"),MI("pl_toi","Phiếu lương"))}return G}}
-  if(ADMH){const t=MODULES.find(x=>x.k==="q_tc");if(t){const g0=t.groups;t.groups=()=>{const G=g0();const it=MI("tu_ql","Tạm ứng lương",()=>npKetoan(),()=>NP.cho.tu||"");if(G[0]&&!G[0][1].some(i=>i[0]==="tu_ql"))G[0][1].push(it);return G}}}
+  /* chị Hoa 18/11: tạm ứng là khoản chi lương, xem ở Sổ chi phí (nhóm Lương); không còn mục "Tạm ứng lương" riêng bên quản trị. Duyệt vẫn qua Phê duyệt. */
 }

@@ -94,6 +94,9 @@ interface PosOrder {
   total_price?: number;
   total_price_after_sub_discount?: number;
   partner_fee?: number;
+  /** Mã vận đơn của hãng (SPX, Best…) và giờ tạo đơn: dùng đối soát tiền về Facebook (fbCost.ts, chị Huệ 18/11/2026). */
+  partner?: { extend_code?: string } | null;
+  inserted_at?: string;
 }
 export type { PosOrder };
 

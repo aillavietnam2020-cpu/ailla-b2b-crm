@@ -127,3 +127,28 @@ function ttCalcBook(V){
   XLSX.utils.book_append_sheet(wb,sh(cach,[120]),"Cach tinh");
   return {name:`TikTok Shop ${M.ky} tinh toan (${bcStamp()}).xlsx`,data:XLSX.write(wb,{type:"base64",bookType:"xlsx"})};
 }
+
+/* ---------- Mục "Tải báo cáo" dùng chung các kênh (chị Hoa 18/11/2026): bảng đủ các tháng, nút file Excel / thư mục gốc, link Drive ---------- */
+const BCA={files:null,links:null,busy:0,at:0};
+function bcAllLoad(force){if(BCA.busy||typeof svApi!=="function"||(!force&&BCA.files&&Date.now()-BCA.at<300000))return;BCA.busy=1;
+  Promise.all([svApi("/api/hub/bc-file").catch(()=>({files:[]})),svApi("/api/hub/bc-file/link").catch(()=>({}))]).then(([f,l])=>{BCA.files=f.files||[];BCA.links=l||{};BCA.at=Date.now();if(typeof renderMain==="function")renderMain()}).finally(()=>{BCA.busy=0})}
+function bcFileBtns(kenh,ky,nhom){const L=(BCA.files||[]).filter(f=>f.kenh===kenh&&f.ky===ky&&(!nhom||f.nhom===nhom)),t=L.filter(f=>f.loai==="tinh").pop(),g=L.filter(f=>f.loai==="goc").pop();
+  if(!t&&!g)return `<span class="hint">—</span>`;
+  return `<span style="white-space:nowrap">${t?`<a class="btn sm" href="${esc(t.url)}" target="_blank" rel="noopener" title="File Excel tính từng đơn ra số web">📊 Tính toán</a> `:""}${g?`<a class="btn sm" href="${esc(g.folderUrl)}" target="_blank" rel="noopener" title="Thư mục file gốc trên Drive">📁 Gốc</a>`:""}</span>`}
+function bcLinkBtns(kenh,ky){const u=BCA.links&&BCA.links[kenh+"|"+ky];
+  return u?`<span style="white-space:nowrap"><a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener">Mở ↗</a> <button class="btn sm" data-bclink="${kenh}|${ky}">Sửa</button></span>`:`<button class="btn sm" data-bclink="${kenh}|${ky}">🔗 Điền</button>`}
+function bcLinkBind(m){m.querySelectorAll("[data-bclink]").forEach(b=>b.onclick=async()=>{const [kenh,ky]=b.dataset.bclink.split("|"),cur=(BCA.links||{})[kenh+"|"+ky]||"";
+  const v=prompt(`Dán link thư mục Google Drive của tháng ${ky.slice(5)}/${ky.slice(0,4)} (để trống là xóa link):`,cur);if(v===null)return;
+  try{BCA.links=await svApi("/api/hub/bc-file/link",{method:"PUT",body:JSON.stringify({kenh,ky,link:v.trim()})});toast(v.trim()?"Đã lưu link Drive":"Đã xóa link");renderMain()}catch(e){toast(e.message)}})}
+/* Các tháng cần hiện: tháng có số, có file, có link, và 3 tháng gần nhất. */
+function bcMonths(kenh,extra){const t=iso(new Date()).slice(0,7),set=new Set(extra||[]);
+  for(let i=0;i<3;i++){const d=new Date(+t.slice(0,4),+t.slice(5,7)-1-i,1);set.add(iso(d).slice(0,7))}
+  (BCA.files||[]).filter(f=>f.kenh===kenh).forEach(f=>set.add(f.ky));Object.keys(BCA.links||{}).filter(k=>k.startsWith(kenh+"|")).forEach(k=>set.add(k.split("|")[1]));
+  return [...set].filter(k=>/^\d{4}-\d{2}$/.test(k)).sort().reverse()}
+/* Bảng "File & link Drive các tháng" cho TikTok, Shopee (cùng kiểu mục Tải báo cáo Facebook). rows: [{ky, nhom, so, cells[]}]. */
+const bcVnAt=a=>{if(!a)return "";const v=new Date(Date.parse(a)+7*3600e3).toISOString();return v.slice(8,10)+"/"+v.slice(5,7)+" "+v.slice(11,16)};
+function bcThangCard(kenh,title,heads,rows){bcAllLoad();
+  const body=rows.map(r=>`<tr><td><b>T${r.ky.slice(5)}/${r.ky.slice(0,4)}</b>${r.nhom?`<br><small class="hint">${esc(r.nhom)}</small>`:""}</td><td>${r.so}</td>${r.cells.map(c=>`<td class="n">${c}</td>`).join("")}<td>${bcFileBtns(kenh,r.ky,r.nhom)}</td><td>${bcLinkBtns(kenh,r.ky)}</td></tr>`).join("");
+  return `<section class="card"><div class="card-h"><h2>${title}</h2><span class="hint">lưu đủ mọi tháng · file gốc và file tính toán nằm trên Drive</span></div>
+   <div class="tbl"><table><thead><tr><th>Tháng</th><th>Số liệu</th>${heads.map(h=>`<th class="n">${h}</th>`).join("")}<th>File</th><th>Link Drive</th></tr></thead><tbody>${body||`<tr><td colspan="${heads.length+4}" class="hint">Chưa có tháng nào.</td></tr>`}</tbody></table></div>
+   <p class="hint" style="margin:8px 0 0">"Điền" để dán link thư mục Drive kế toán đang giữ file của tháng đó.</p></section>`}

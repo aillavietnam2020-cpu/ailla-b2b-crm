@@ -7,7 +7,7 @@ import { chiaTuoiNo } from '../../src/server/services/debts';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const C: any = new Function(
   `${readFileSync('hub/src/tiencalc.js', 'utf8')}
-  return {TCN_DN,TCN_LC,tcnSoDu,tcnSoDuTinh,tcnChiNgay,tcnRunway,tcnAcctOf,tcnCuoi,tcnKhop,tcnTong,tcnLcKey,tcnLctt,tcnSoDuCong,tcnTuan,tcnChiaTuan,tcnTuanCua,tcnDuBao,tcnCkDocs};`,
+  return {TCN_DN,TCN_LC,tcnSoDu,tcnSoDuTinh,tcnChiNgay,tcnRunway,tcnAcctOf,tcnCuoi,tcnKhop,tcnTong,tcnLcKey,tcnLctt,tcnSoDuCong,tcnTuan,tcnChiaTuan,tcnTuanCua,tcnDuBao,tcnCkDocs,TCN_B03,TCN_B03_MA,TCN_TCP,tcnB03Of,tcnGan,tcnB03,tcnSoNgay,tcnSoDuNgay,tcnChotLyDo,TCN_MOC};`,
 )();
 
 describe('Tiền: số dư, chi bình quân, đủ dùng', () => {
@@ -84,8 +84,8 @@ describe('Dòng tiền: lưu chuyển tiền tệ trực tiếp, dự báo 4 tu�
     const A = C.tcnLctt(docs, '2026-10-01', '2026-10-31');
     expect(A.v).toMatchObject({ kpp: 100, oem: 45, sanrut: 30, ncc: -60, qc: -20, luong: -15, vc: -3, hoan: -2, mua_ts: -25, thanh_ly: 7 });
     expect(A.v.tts).toBe(0);
-    expect(A.v.vay).toBeNull();
-    expect(A.v.thue).toBeNull();
+    expect(A.v.vay).toBe(0);
+    expect(A.v.thue).toBe(0);
     expect(A.thu).toBe(175);
     expect(A.kd).toBe(175 - 100);
     expect(A.dt).toBe(-18);
@@ -134,5 +134,58 @@ describe('Chuyển tiền nội bộ', () => {
     expect(A.v.spe).toBe(20);
     expect(A.net).toBe(100);
     expect(A.vao).toBe(100);
+  });
+});
+
+describe('Dòng tiền quản trị: mẫu B03-DNN, sổ ngày, chốt sổ', () => {
+  it('mẫu B03 đủ mã như MISA', () => {
+    const ma = C.TCN_B03.map((r: string[]) => r[0]).filter((c: string) => /^\d\d$/.test(c));
+    expect(ma).toEqual(['01', '02', '03', '04', '05', '06', '07', '20', '21', '22', '23', '24', '25', '30', '31', '32', '33', '34', '35', '40', '50', '60', '61', '70']);
+  });
+  it('mã B03 mặc định theo loại phiếu; chuyển nội bộ không vào báo cáo', () => {
+    expect(C.tcnB03Of({ loai: 'THU' })).toBe('01');
+    expect(C.tcnB03Of({ loai: 'SAN_RUT' })).toBe('01');
+    expect(C.tcnB03Of({ loai: 'CHI_NCC' })).toBe('02');
+    expect(C.tcnB03Of({ loai: 'CHI_LUONG' })).toBe('03');
+    expect(C.tcnB03Of({ loai: 'CHI_SO', g: 'G07' })).toBe('03');
+    expect(C.tcnB03Of({ loai: 'CHI_SO', g: 'G28' })).toBe('21');
+    expect(C.tcnB03Of({ loai: 'CHI_SO', g: 'G23' })).toBeNull();
+    expect(C.tcnB03Of({ loai: 'TCP', tcp: 'vay' })).toBe('33');
+    expect(C.tcnB03Of({ loai: 'TCP', tcp: 'san_tt' })).toBe('01');
+    expect(C.tcnB03Of({ loai: 'THU_SO', nguon: 'tts' })).toBe('01');
+    expect(C.tcnLcKey({ loai: 'THU_SO', nguon: 'fbcod', amount: 5 })).toBe('fbcod');
+    expect(C.tcnLcKey({ loai: 'TCP', tcp: 'san_spe', amount: 5 })).toBe('spe');
+    expect(C.tcnB03Of({ loai: 'TCP', tcp: 'thue_tndn' })).toBe('05');
+    expect(C.tcnB03Of({ loai: 'CK_RA' })).toBe('noibo');
+    expect(C.tcnB03Of({ loai: 'THU_SO', nguon: 'hoan' })).toBe('06');
+  });
+  it('kế toán gán đè tài khoản / mã, không sửa phiếu gốc', () => {
+    const d = [{ id: 'po:1', loai: 'CHI_NCC', acct: '', amount: -5 }];
+    const g = C.tcnGan(d, { 'po:1': { acct: 'mb', code: '07' } });
+    expect(g[0]).toMatchObject({ acct: 'mb', code: '07' });
+    expect(d[0].acct).toBe('');
+  });
+  it('B03: 20 + 30 + 40 = 50; 70 = 50 + 60', () => {
+    const docs = C.tcnGan([
+      { id: 'a', date: '2026-11-02', loai: 'THU', amount: 200 },
+      { id: 'b', date: '2026-11-05', loai: 'CHI_NCC', amount: -60 },
+      { id: 'c', date: '2026-11-06', loai: 'CHI_SO', g: 'G28', amount: -30 },
+      { id: 'd', date: '2026-11-07', loai: 'TCP', tcp: 'vay', amount: 100 },
+      { id: 'e', date: '2026-11-08', loai: 'CK_RA', amount: -50 },
+      { id: 'f', date: '2026-12-01', loai: 'THU', amount: 999 },
+    ], {});
+    const r = C.tcnB03(docs, '2026-11-01', '2026-11-30', 1000);
+    expect(r.v).toMatchObject({ '01': 200, '02': -60, '21': -30, '33': 100, '20': 140, '30': -30, '40': 100, '50': 210, '60': 1000, '70': 1210 });
+    expect(C.tcnB03(docs, '2026-11-01', '2026-11-30', null).v['70']).toBeNull();
+  });
+  it('sổ ngày: đầu ngày + thu − chi = cuối ngày, nối tiếp từng ngày', () => {
+    const R = C.tcnSoNgay([{ date: '2026-11-02', amount: 50 }, { date: '2026-11-02', amount: -20 }, { date: '2026-11-04', amount: -10 }, { date: '2026-10-30', amount: 7 }], 100, '2026-11-01', '2026-11-30');
+    expect(R).toEqual([{ d: '2026-11-02', dau: 100, thu: 50, chi: 20, cuoi: 130, n: 2 }, { d: '2026-11-04', dau: 130, thu: 0, chi: 10, cuoi: 120, n: 1 }]);
+    expect(C.tcnSoDuNgay(100, [{ date: '2026-09-30', amount: 5 }, { date: '2026-10-01', amount: 7 }, { date: '2026-11-01', amount: 9 }], '2026-10-31')).toBe(107);
+  });
+  it('chốt sổ: phải có sao kê khớp và không còn phiếu cần gán', () => {
+    expect(C.tcnChotLyDo([{ n: 'MB', cuoi: 100, sk: 100 }], 0)).toEqual([]);
+    expect(C.tcnChotLyDo([{ n: 'MB', cuoi: 100, sk: null }], 0)[0]).toMatch(/chưa nhập/);
+    expect(C.tcnChotLyDo([{ n: 'MB', cuoi: 100, sk: 90 }], 2).length).toBe(2);
   });
 });
