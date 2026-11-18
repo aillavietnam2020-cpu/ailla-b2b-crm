@@ -13,7 +13,10 @@ async function gcLoad(force){
     const all=await svApi("/api/customers?page_size=200&page=1");
     GC.cust=(all||[]).filter(gcIs);
     const ids=new Set(GC.cust.map(c=>c.id)),o=await svApi("/api/orders?limit=500");
-    GC.orders=(o||[]).filter(x=>ids.has(x.customer_id));GC.err="";GC.at=Date.now()}
+    GC.orders=(o||[]).filter(x=>ids.has(x.customer_id));
+    // Công nợ đủ cột như NPP và phiếu phải thu: không có quyền xem thì bỏ qua, trang vẫn chạy.
+    const [d,p]=await Promise.all([svApi("/api/debts").catch(()=>null),svApi("/api/customers/receivables/list").catch(()=>null)]);
+    GC.debts=d||null;GC.ppt=(p||[]).filter(x=>ids.has(x.customer_id));GC.err="";GC.at=Date.now()}
   catch(e){GC.err=e.message||"Không tải được dữ liệu gia công"}
   GC.busy=false;
   if(/^gc_/.test(PAGE))renderMain();
@@ -63,11 +66,15 @@ function pGcDon(m){
   gcLoad();const T="Đơn gia công",S="Đơn của khách gia công";
   if(!GC.cust){gcLoading(m,T,S);return}
   const O=(GC.orders||[]).filter(o=>!GC.st||gcOrderState(o)[0]===GC.st).sort((a,b)=>String(b.order_date).localeCompare(String(a.order_date)));
-  const states=[...new Set((GC.orders||[]).map(o=>gcOrderState(o)[0]))];
-  m.innerHTML=H(T,S+" · "+(GC.orders||[]).length+" đơn")+`<div class="filters"><select id="gcd-s">${opt([["","Mọi trạng thái"]].concat(states.map(x=>[x,x])),GC.st)}</select><span class="sp"></span><button class="btn pri" data-gcgo="cr_dn">+ Tạo đơn gia công</button></div>
-  ${(GC.orders||[]).length?`<section class="card flush">${tbl(["Mã đơn","Khách hàng","Ngày","Tổng phải thu","Còn phải thu","Trạng thái"],O.map(o=>{const st=gcOrderState(o);return `<tr class="clk" data-gco="${o.id}"><td class="mono"><b>${esc(o.order_no)}</b></td><td>${esc(o.customer_name)}</td><td>${esc(kDd(String(o.order_date).slice(0,10)))}</td><td class="n">${nf(+o.total_amount||0)}</td><td class="n">${(+o.remaining_amount)>0?`<b>${nf(+o.remaining_amount)}</b>`:"—"}</td><td>${pill(st[0],st[1])}</td></tr>`}))}</section>`:`<section class="card"><p class="pad">Chưa có đơn gia công nào. Đơn xuất hiện khi khách gia công có đơn trong CRM. Bấm "Tạo đơn gia công" rồi chọn khách gia công.</p></section>`}`;
+  /* Phiếu phải thu của khách gia công hiện cùng danh sách, ghi rõ loại (chị Hoa 18/11/2026). */
+  const PP=(GC.ppt||[]).filter(()=>!GC.st||GC.st==="Phiếu phải thu");
+  const states=[...new Set((GC.orders||[]).map(o=>gcOrderState(o)[0]))].concat((GC.ppt||[]).length?["Phiếu phải thu"]:[]);
+  m.innerHTML=H(T,S+" · "+(GC.orders||[]).length+" đơn")+`<div class="filters"><select id="gcd-s">${opt([["","Mọi trạng thái"]].concat(states.map(x=>[x,x])),GC.st)}</select><span class="sp"></span>${gcCanDk()?`<button class="btn" id="gcd-ppt">+ Phiếu phải thu</button>`:""}<button class="btn pri" data-gcgo="cr_dn">+ Tạo đơn gia công</button></div>
+  ${(GC.orders||[]).length?`<section class="card flush">${tbl(["Mã đơn","Khách hàng","Ngày","Tổng phải thu","Còn phải thu","Trạng thái"],O.map(o=>{const st=gcOrderState(o);return [String(o.order_date).slice(0,10),`<tr class="clk" data-gco="${o.id}"><td class="mono"><b>${esc(o.order_no)}</b></td><td>${esc(o.customer_name)}</td><td>${esc(kDd(String(o.order_date).slice(0,10)))}</td><td class="n">${nf(+o.total_amount||0)}</td><td class="n">${(+o.remaining_amount)>0?`<b>${nf(+o.remaining_amount)}</b>`:"—"}</td><td>${pill(st[0],st[1])}</td></tr>`]}).concat(PP.map(p=>[String(p.charge_date).slice(0,10),`<tr class="clk" data-gcp="${p.id}"><td class="mono"><b>${esc(p.voucher_no||"")}</b></td><td>${esc(p.customer_name)}</td><td>${esc(kDd(String(p.charge_date).slice(0,10)))}</td><td class="n">${nf(+p.amount||0)}</td><td class="hint">${esc(p.description)}</td><td>${pill("Phiếu phải thu","vio")}</td></tr>`])).sort((a,b)=>b[0].localeCompare(a[0])).map(x=>x[1]))}</section>`:`<section class="card"><p class="pad">Chưa có đơn gia công nào. Đơn xuất hiện khi khách gia công có đơn trong CRM. Bấm "Tạo đơn gia công" rồi chọn khách gia công.</p></section>`}`;
   gcBind(m);$("#gcd-s").onchange=e=>{GC.st=e.target.value;renderMain()};
   m.querySelectorAll("[data-gco]").forEach(r=>r.onclick=()=>gcOpen("cr_dn","/admin/orders/"+r.dataset.gco));
+  m.querySelectorAll("[data-gcp]").forEach(r=>r.onclick=()=>gcPptView((GC.ppt||[]).find(p=>p.id===r.dataset.gcp)));
+  const np=$("#gcd-ppt");if(np)np.onclick=()=>gcPptNew();
 }
 /* ---- Sản xuất gia công (bên vận hành) ---- */
 function pGcSx(m){
@@ -82,38 +89,48 @@ function pGcSx(m){
 function pGcCn(m){
   gcLoad();const T="Công nợ gia công",S="Công nợ của khách gia công";
   if(!GC.cust){gcLoading(m,T,S);return}
-  const C=GC.cust.slice().sort((a,b)=>(+b.official_debt||0)-(+a.official_debt||0)),tot=k=>sum(C,c=>+c[k]||0);
-  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Phải thu Kênh OEM",tr(sum(C,c=>Math.max(0,+c.official_debt||0))),"công nợ chính thức của khách còn nợ"+(C.some(c=>(+c.official_debt||0)<0)?" · khách trả thừa "+tr(sum(C,c=>Math.max(0,-(+c.official_debt||0))))+" để riêng":"")+" · cùng số Phải thu, Đối chiếu công nợ")}${kpi("Công nợ dự kiến",tr(tot("projected_debt")),"gồm đơn chờ thu")}${kpi("Khách còn nợ",nf(C.filter(c=>(+c.official_debt)>0).length),"trên "+C.length+" khách gia công")}</div>
-  <section class="card flush">${C.length?tbl(["Khách hàng","Nợ đầu kỳ","Thu nhập khác","Công nợ chính thức","Công nợ dự kiến","Hạn mức nợ","Vượt hạn mức"],C.map(c=>{const over=(+c.debt_limit>0)&&(+c.projected_debt>+c.debt_limit);return `<tr class="clk" data-gck="${c.id}"><td><b>${esc(c.name)}</b></td><td class="n">${nf(+c.opening_debt||0)}${gcCanDk()?` <button class="btn sm" data-gcdk="${c.id}" title="Nhập số dư nợ đầu kỳ theo sổ MISA">Sửa</button>`:""}</td><td class="n">${nf(+c.other_charges||0)} <button class="btn sm" data-gctk="${c.id}" title="Khoản khách phải trả ngoài tiền hàng, ví dụ tiền VAT khi lấy hóa đơn">${gcCanDk()?"Thêm / xem":"Xem"}</button></td><td class="n">${nf(+c.official_debt||0)}</td><td class="n">${nf(+c.projected_debt||0)}</td><td class="n">${+c.debt_limit>0?nf(+c.debt_limit):"—"}</td><td>${over?pill("Vượt hạn mức","red"):"—"}</td></tr>`})):`<p class="pad">Chưa có khách gia công.</p>`}</section>
+  /* Trình bày như Công nợ khách hàng NPP (chị Hoa 18/11/2026). Đã ghi nợ = đơn đã xuất kho đã chốt + phiếu phải thu. */
+  const D=new Map((GC.debts||[]).map(d=>[d.customer_id,d])),g=(c,k)=>+((D.get(c.id)||{})[k]??c[k]??0)||0;
+  const C=GC.cust.slice().sort((a,b)=>g(b,"official_debt")-g(a,"official_debt")),tot=k=>sum(C,c=>g(c,k));
+  const can=gcCanDk();
+  m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Phải thu Kênh OEM",tr(sum(C,c=>Math.max(0,g(c,"official_debt")))),"công nợ chính thức của khách còn nợ"+(C.some(c=>g(c,"official_debt")<0)?" · khách trả thừa "+tr(sum(C,c=>Math.max(0,-g(c,"official_debt"))))+" để riêng":"")+" · cùng số Phải thu, Đối chiếu công nợ")}${kpi("Công nợ dự kiến",tr(tot("projected_debt")),"gồm đơn chờ thu")}${kpi("Khách còn nợ",nf(C.filter(c=>g(c,"official_debt")>0).length),"trên "+C.length+" khách gia công")}</div>
+  ${can?`<div class="filters"><span class="sp"></span><button class="btn" id="gc-dk">Nhập nợ đầu kỳ</button><button class="btn pri" id="gc-ppt">+ Phiếu phải thu</button></div>`:""}
+  <section class="card flush">${C.length?tbl(["Khách hàng","Dư nợ đầu kỳ","Đã ghi nợ","Đã thanh toán","Chính thức","Chờ ghi nợ","Chờ tiền về","Dự kiến","Hạn mức"],C.map(c=>{const over=(+c.debt_limit>0)&&(g(c,"projected_debt")>+c.debt_limit);return `<tr class="clk" data-gck="${c.id}"><td><b>${esc(c.name)}</b></td><td class="n">${nf(g(c,"opening_debt"))}</td><td class="n">${nf(g(c,"posted_charges"))}</td><td class="n">${nf(g(c,"confirmed_payments"))}</td><td class="n"><b>${nf(g(c,"official_debt"))}</b></td><td class="n">${nf(g(c,"pending_charges"))}</td><td class="n">${nf(g(c,"pending_cash"))}</td><td class="n">${nf(g(c,"projected_debt"))}${over?" "+pill("Vượt hạn mức","red"):""}</td><td class="n">${+c.debt_limit>0?nf(+c.debt_limit):"—"}</td></tr>`})):`<p class="pad">Chưa có khách gia công.</p>`}</section>
+  <p class="hint">Đã ghi nợ gồm đơn đã xuất kho đã chốt tiền và phiếu phải thu (tiền VAT khách lấy hóa đơn...). Phiếu phải thu xem ở <button class="lnk" data-gcgo="gc_don">Đơn gia công</button>.</p>
   <div class="acts"><button class="btn" data-gcgo="cr_cn">Công nợ toàn bộ khách hàng</button></div>`;
   gcBind(m);m.querySelectorAll("[data-gck]").forEach(r=>r.onclick=()=>gcOpen("cr_kh","/admin/customers/"+r.dataset.gck));
-  m.querySelectorAll("[data-gcdk]").forEach(b=>b.onclick=e=>{e.stopPropagation();gcDk(C.find(c=>c.id===b.dataset.gcdk))});
-  m.querySelectorAll("[data-gctk]").forEach(b=>b.onclick=e=>{e.stopPropagation();gcTk(C.find(c=>c.id===b.dataset.gctk))});
+  const a=$("#gc-dk");if(a)a.onclick=()=>gcDk();const b=$("#gc-ppt");if(b)b.onclick=()=>gcPptNew();
 }
-/* Nợ đầu kỳ của khách gia công (chị Hoa 18/11/2026): kế toán / CEO nhập số dư nợ đầu kỳ theo sổ MISA, có ghi chú nguồn số. */
 const gcCanDk=()=>typeof SV!=="undefined"&&SV.perms&&SV.perms.includes("order.accounting.confirm");
-function gcDk(c){if(!c)return;
-  openDrawerHTML(`<h2>Nợ đầu kỳ: ${esc(c.name)}</h2><p class="hint">Số dư khách còn nợ trước đơn đầu tiên trên web (lấy theo sổ công nợ MISA). Công nợ chính thức = nợ đầu kỳ + các đơn đã chốt − tiền đã thu.</p>
-   <div class="filters"><label class="inl">Nợ đầu kỳ (đ) <input id="gcdk-a" type="number" step="1" value="${+c.opening_debt||0}" style="width:180px"></label></div>
-   <div class="filters"><label class="inl" style="width:100%">Số này lấy từ đâu, tính đến ngày nào <input id="gcdk-n" placeholder="Ví dụ: Số dư đầu kỳ MISA tháng 10/2026 (đến hết 30/09)" style="width:100%"></label></div>
+const gcCustOpt=sel=>`<option value="">Chọn khách gia công</option>`+GC.cust.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}"${c.id===sel?" selected":""}>${esc(c.name)}</option>`).join("");
+const gcReload=async()=>{closeDrawer();GC.at=0;await gcLoad(true);renderMain()};
+/* Nợ đầu kỳ (chị Hoa 18/11/2026): kế toán / CEO nhập số dư nợ đầu kỳ theo sổ MISA, có ghi chú nguồn số. */
+function gcDk(){
+  const D=new Map((GC.debts||[]).map(d=>[d.customer_id,d]));
+  openDrawerHTML(`<h2>Nhập nợ đầu kỳ</h2><p class="hint">Số dư khách còn nợ trước đơn đầu tiên trên web (lấy theo sổ công nợ MISA). Khách trả thừa thì ghi số âm.</p>
+   <div class="filters"><label class="inl">Khách <select id="gcdk-c">${gcCustOpt("")}</select></label><label class="inl">Nợ đầu kỳ (đ) <input id="gcdk-a" type="number" step="1" style="width:170px"></label></div>
+   <div class="filters"><label class="inl" style="width:100%">Số này lấy từ đâu, tính đến ngày nào <input id="gcdk-n" placeholder="Ví dụ: Số dư đầu kỳ MISA tháng 10/2026" style="width:100%"></label></div>
    <div class="acts"><button class="btn pri" id="gcdk-ok">Lưu</button></div>`);
-  $("#gcdk-ok").onclick=async()=>{const a=Math.round(+$("#gcdk-a").value||0),n=$("#gcdk-n").value.trim();if(n.length<5){toast("Ghi rõ số này lấy từ đâu");return}
-    try{await svApi("/api/customers/"+c.id+"/opening-debt",{method:"PUT",body:JSON.stringify({amount:a,note:n})});toast("Đã lưu nợ đầu kỳ "+nf(a)+"đ");closeDrawer();await gcLoad(true);renderMain()}catch(e){toast(e.message)}}}
-/* Thu nhập khác của khách (chị Hoa 18/11/2026): khoản khách phải trả ngoài tiền hàng (VAT khi lấy hóa đơn...), ghi rõ khoản gì.
-   Cộng vào công nợ, không tính doanh thu bán hàng. Kế toán / CEO thêm, xóa (xóa phải ghi lý do). */
-async function gcTk(c){if(!c)return;let L=[];try{L=await svApi("/api/customers/"+c.id+"/other-charges")||[]}catch(e){toast(e.message);return}
-  const can=gcCanDk(),today=new Date(Date.now()+7*36e5).toISOString().slice(0,10);
-  openDrawerHTML(`<h2>Thu nhập khác: ${esc(c.name)}</h2><p class="hint">Khoản khách phải trả ngoài tiền hàng, ví dụ tiền thuế VAT khi khách lấy hóa đơn. Cộng vào công nợ của khách, không tính vào doanh thu bán hàng.</p>
-   ${L.length?tbl(["Ngày","Khoản gì","Số chứng từ","Số tiền",""],L.map(x=>`<tr><td>${esc(x.charge_date)}</td><td>${esc(x.description)}</td><td>${esc(x.doc_no||"")}</td><td class="n">${nf(+x.amount||0)}</td><td>${can?`<button class="btn sm" data-tkdel="${x.id}">Xóa</button>`:""}</td></tr>`)):`<p class="pad hint">Chưa có khoản nào.</p>`}
-   ${can?`<h3 style="margin:14px 0 6px">Thêm khoản</h3>
-   <div class="filters"><label class="inl">Ngày chứng từ <input id="gctk-d" type="date" max="${today}" value="${today}"></label><label class="inl">Số tiền (đ) <input id="gctk-a" type="number" step="1" style="width:160px"></label><label class="inl">Số chứng từ <input id="gctk-no" placeholder="VD: NVK1728" style="width:140px"></label></div>
-   <div class="filters"><label class="inl" style="width:100%">Khoản gì <input id="gctk-t" placeholder="VD: Tiền thuế VAT hóa đơn số 94 ngày 18/10/2026" style="width:100%"></label></div>
-   <div class="acts"><button class="btn pri" id="gctk-ok">Thêm vào công nợ</button></div>`:""}`);
-  const reload=async()=>{closeDrawer();await gcLoad(true);renderMain()};
-  const ok=$("#gctk-ok");if(ok)ok.onclick=async()=>{const a=Math.round(+$("#gctk-a").value||0),t=$("#gctk-t").value.trim();if(!a){toast("Nhập số tiền");return}if(t.length<5){toast("Ghi rõ đây là khoản gì");return}
-    try{await svApi("/api/customers/"+c.id+"/other-charges",{method:"POST",body:JSON.stringify({charge_date:$("#gctk-d").value,amount:a,description:t,doc_no:$("#gctk-no").value.trim()})});toast("Đã thêm "+nf(a)+"đ vào công nợ "+c.name);await reload()}catch(e){toast(e.message)}};
-  document.querySelectorAll("[data-tkdel]").forEach(b=>b.onclick=async()=>{const r=prompt("Lý do xóa khoản này?");if(!r||r.trim().length<5){toast("Cần ghi lý do (từ 5 ký tự)");return}
-    try{await svApi("/api/customers/"+c.id+"/other-charges/"+b.dataset.tkdel+"/delete",{method:"POST",body:JSON.stringify({reason:r.trim()})});toast("Đã xóa");await reload()}catch(e){toast(e.message)}})}
+  $("#gcdk-c").onchange=e=>{const d=D.get(e.target.value);$("#gcdk-a").value=d?d.opening_debt:0};
+  $("#gcdk-ok").onclick=async()=>{const id=$("#gcdk-c").value,a=Math.round(+$("#gcdk-a").value||0),n=$("#gcdk-n").value.trim();if(!id){toast("Chọn khách");return}if(n.length<5){toast("Ghi rõ số này lấy từ đâu");return}
+    try{await svApi("/api/customers/"+id+"/opening-debt",{method:"PUT",body:JSON.stringify({amount:a,note:n})});toast("Đã lưu nợ đầu kỳ "+nf(a)+"đ");await gcReload()}catch(e){toast(e.message)}}}
+/* Phiếu phải thu (chị Hoa 18/11/2026): kế toán tạo phiếu phải thu riêng của khách cho khoản ngoài tiền hàng (VAT khách lấy hóa đơn...),
+   ghi rõ khoản gì; web đánh số PPT<yymm>-<stt>, cộng vào công nợ, không tính doanh thu bán hàng. */
+function gcPptNew(){const today=new Date(Date.now()+7*36e5).toISOString().slice(0,10);
+  openDrawerHTML(`<h2>Phiếu phải thu</h2><p class="hint">Khoản khách phải trả ngoài tiền hàng, ví dụ tiền thuế VAT khi khách lấy hóa đơn. Cộng vào công nợ của khách, không tính vào doanh thu bán hàng. Số phiếu web tự đánh.</p>
+   <div class="filters"><label class="inl">Khách <select id="ppt-c">${gcCustOpt("")}</select></label><label class="inl">Ngày <input id="ppt-d" type="date" max="${today}" value="${today}"></label></div>
+   <div class="filters"><label class="inl">Số tiền (đ) <input id="ppt-a" type="number" step="1" style="width:170px"></label><label class="inl">Số chứng từ MISA <input id="ppt-no" placeholder="VD: NVK1728" style="width:150px"></label></div>
+   <div class="filters"><label class="inl" style="width:100%">Khoản gì <input id="ppt-t" placeholder="VD: Tiền thuế VAT hóa đơn số 94 ngày 18/10/2026" style="width:100%"></label></div>
+   <div class="acts"><button class="btn pri" id="ppt-ok">Tạo phiếu và ghi vào công nợ</button></div>`);
+  $("#ppt-ok").onclick=async()=>{const id=$("#ppt-c").value,a=Math.round(+$("#ppt-a").value||0),t=$("#ppt-t").value.trim();if(!id){toast("Chọn khách");return}if(!a){toast("Nhập số tiền");return}if(t.length<5){toast("Ghi rõ đây là khoản gì");return}
+    try{const r=await svApi("/api/customers/"+id+"/other-charges",{method:"POST",body:JSON.stringify({charge_date:$("#ppt-d").value,amount:a,description:t,doc_no:$("#ppt-no").value.trim()})});toast("Đã tạo phiếu "+(r&&r.voucher_no||"")+", ghi "+nf(a)+"đ vào công nợ");await gcReload()}catch(e){toast(e.message)}}}
+function gcPptView(p){if(!p)return;const can=gcCanDk();
+  openDrawerHTML(`<h2>Phiếu phải thu ${esc(p.voucher_no||"")}</h2>
+   <table class="tbl"><tbody><tr><td>Khách hàng</td><td><b>${esc(p.customer_name)}</b></td></tr><tr><td>Ngày</td><td>${esc(kDd(p.charge_date))}</td></tr><tr><td>Khoản gì</td><td>${esc(p.description)}</td></tr><tr><td>Số chứng từ MISA</td><td>${esc(p.doc_no||"—")}</td></tr><tr><td>Số tiền</td><td><b>${nf(+p.amount||0)}</b> đ</td></tr></tbody></table>
+   <p class="hint">Đã cộng vào công nợ của khách. Không tính vào doanh thu bán hàng.</p>
+   ${can?`<div class="acts"><button class="btn" id="ppt-del">Xóa phiếu</button></div>`:""}`);
+  const d=$("#ppt-del");if(d)d.onclick=async()=>{const r=prompt("Lý do xóa phiếu "+(p.voucher_no||"")+"?");if(!r||r.trim().length<5){toast("Cần ghi lý do (từ 5 ký tự)");return}
+    try{await svApi("/api/customers/"+p.customer_id+"/other-charges/"+p.id+"/delete",{method:"POST",body:JSON.stringify({reason:r.trim()})});toast("Đã xóa phiếu");await gcReload()}catch(e){toast(e.message)}}}
 Object.assign(PAGES,{gc_tq:pGcTq,gc_kh:pGcKh,gc_don:pGcDon,gc_sx:pGcSx,gc_cn:pGcCn});
 
 /* ---- Menu bên vận hành: mục Gia công (bán hàng) ---- */

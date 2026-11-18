@@ -12,7 +12,7 @@ const KO={key:"",d:null,busy:false,err:"",al:"tuan",open:{}};
 async function koLoad(){const key=PERIOD.from+"|"+PERIOD.to;if(KO.busy||(KO.key===key&&(KO.d||KO.err)))return;
   KO.busy=true;KO.key=key;KO.err="";
   const pf=plYmAdd(PERIOD.from.slice(0,7),-1)+"-01",since=kpAdd(PERIOD.from,-92)<pf?kpAdd(PERIOD.from,-92):pf;
-  try{KO.d=await svApi(`/api/dashboards/kenh-pp?channel=GIA_CONG&from=${PERIOD.from}&to=${PERIOD.to}&since=${since}`)}catch(e){KO.d=null;KO.err=e.message||"Không tải được đơn Kênh OEM"}
+  try{KO.d=await svApi(`/api/dashboards/kenh-pp?channel=GIA_CONG&from=${PERIOD.from}&to=${PERIOD.to}&since=${since}`);KO.debts=await svApi("/api/debts").catch(()=>null)}catch(e){KO.d=null;KO.err=e.message||"Không tải được đơn Kênh OEM"}
   KO.busy=false;if(["bc_gc","gc_tq"].includes(PAGE))renderMain()}
 
 const KO_XUAT=o=>o.delivery_status==="DA_XUAT_KHO"||o.delivery_status==="DA_GIAO"||o.kho_status==="DA_XUAT"||o.kho_status==="DA_CHOT_TIEN";
@@ -22,7 +22,11 @@ function koCalc(d){
   const name=id=>(K.C.get(id)||{}).name||"";
   /* công nợ: đơn đã xuất kho chưa thu đủ */
   const no=ok.filter(KO_XUAT).map(o=>({...o,left:(+o.total_amount||0)-(+o.received||0),age:kpDays(String(o.delivered_at||o.order_date).slice(0,10),ref)})).filter(o=>o.left>0).sort((a,b)=>b.age-a.age);
-  const b30=no.filter(o=>o.age<=30).reduce((a,o)=>a+o.left,0),b60=no.filter(o=>o.age>30&&o.age<=60).reduce((a,o)=>a+o.left,0),bx=no.filter(o=>o.age>60).reduce((a,o)=>a+o.left,0),debt=b30+b60+bx;
+  const b30=no.filter(o=>o.age<=30).reduce((a,o)=>a+o.left,0),b60=no.filter(o=>o.age>30&&o.age<=60).reduce((a,o)=>a+o.left,0),bx=no.filter(o=>o.age>60).reduce((a,o)=>a+o.left,0);
+  /* Nợ cũ = công nợ chính thức của khách OEM (cùng số trang Công nợ gia công: nợ đầu kỳ + đơn + phiếu phải thu − tiền đã thu) trừ phần nằm ở đơn chưa thu đủ.
+     Là nợ đầu kỳ và phiếu phải thu (VAT khách lấy hóa đơn...) còn chưa thu (chị Hoa 18/11/2026). */
+  const offi=KO.debts?KO.debts.filter(x=>K.C.has(x.customer_id)).reduce((a,x)=>a+Math.max(0,+x.official_debt||0),0):null;
+  const old=offi==null?0:Math.max(0,offi-(b30+b60+bx)),debt=b30+b60+bx+old;
   const first=[...K.C.values()].map(c=>c.first_order).filter(Boolean).sort()[0]||"",d90=kpAdd(ref,-90);
   const rev90=ok.filter(o=>KO_XUAT(o)&&o.order_date>=d90&&o.order_date<=ref).reduce((a,o)=>a+(+o.total_amount||0),0);
   const dso=first&&first<=d90&&rev90?Math.round(debt/rev90*90):null;
@@ -30,7 +34,7 @@ function koCalc(d){
   const open=ok.filter(o=>!KO_XUAT(o)),d7=kpAdd(ref,7);
   const sx=open.filter(KO_CHO_HANG),chuaSx=open.filter(o=>!KO_CHO_HANG(o)),sap=open.filter(o=>o.need_date&&o.need_date>=ref&&o.need_date<=d7),tre=open.filter(o=>o.need_date&&o.need_date<ref);
   const noNeed=K.cur.filter(o=>!o.need_date).length;
-  return {...K,name,no,b30,b60,bx,debt,dso,rev90,first,open,sx,chuaSx,sap,tre,noNeed,cho:O.filter(o=>o.approval_status==="PENDING_APPROVAL")};
+  return {...K,name,no,b30,b60,bx,old,debt,dso,rev90,first,open,sx,chuaSx,sap,tre,noNeed,cho:O.filter(o=>o.approval_status==="PENDING_APPROVAL")};
 }
 const koTag=t=>`<span class="pill p-gry">${esc(t||"chưa có số")}</span>`;
 const koNoSt=o=>o.kho_status==="DA_CHOT_TIEN"?pill("Đã chốt tiền, chờ thu","amb"):o.delivery_status==="DA_GIAO"?pill("Đã giao, chờ thu","amb"):pill("Đã xuất kho, chờ chốt tiền","amb");
@@ -45,10 +49,10 @@ function koAdm(m,K,X,r){
   const whyChia=!one?"chọn một tháng để xem chi chung phân bổ":PB&&PB.loi&&PB.loi.length?"chưa chia được: "+PB.loi[0]:"Sổ chi phí tháng này chưa chia";
   const kp=`<div class="grid kpis">${kpi("Doanh thu thực",tr(dt),`${nf(X.orders)} đơn · ${K.buyers.length} khách · tháng ${pm} ${K.pdt?tr(K.pdt):koTag()}`)}${kpi("Giá vốn",X.cover?tr(gv):"—",(X.cover?kpP(gv,cv)+` doanh thu hàng có giá vốn (${tr(cv)})`:"")+(ngv?`${X.cover?"<br>":""}<span class="t-red">${tr(ngv)} hàng chưa có giá vốn</span> (${miss.length} mã)`:""))}${kpi("Chi phí kênh",cp?tr(cp):"—",cp?kpP(cp,dt)+" doanh thu · "+cpL.map(x=>x.n+" "+tr(x.t)).join(", "):"Sổ chi phí chưa có khoản nào cho Kênh OEM")}${kpi("Lãi đóng góp kênh",lai==null?"—":tr(lai),lai==null?"chờ giá vốn":kpP(lai,dt)+" · trước chi chung","var(--green)")}${kpi("Chi chung phân bổ",hasChia?tr(chia):"—",hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia)}${kpi("Lãi ròng kênh",ln==null?"—":tr(ln),ln==null?(lai==null?"chờ giá vốn, chi chung":"chờ chi chung"):kpP(ln,dt)+" · sau chi chung","var(--green)")}</div>`;
   /* công nợ */
-  const T=K.debt||1,seg=[["≤30 ngày",K.b30,"#17804a"],["31–60 ngày",K.b60,"#f0a020"],["Trên 60 ngày",K.bx,"#c0392b"]].filter(s=>s[1]>0);
+  const T=K.debt||1,seg=[["≤30 ngày",K.b30,"#17804a"],["31–60 ngày",K.b60,"#f0a020"],["Trên 60 ngày",K.bx,"#c0392b"],["Nợ đầu kỳ, phiếu phải thu",K.old,"#7a5af8"]].filter(s=>s[1]>0);
   const nKh=new Set(K.no.map(o=>o.customer_id)).size;
-  const no=`<section class="card"><div class="card-h"><h2>Công nợ Kênh OEM</h2><span class="hint">tính đến ${kpVn(K.ref)} · đơn đã xuất kho chưa thu đủ tiền</span></div>
-    <div class="grid kpis" style="margin-bottom:10px">${kpi("Phải thu",tr(K.debt),K.no.length?`${nKh} khách · ${K.no.length} đơn chưa thu`:"không có đơn nợ")}${kpi("≤30 ngày",tr(K.b30),K.no.filter(o=>o.age<=30).length===1?"đơn "+kpVn(K.no.find(o=>o.age<=30).order_date):"")}${kpi("31–60 ngày",tr(K.b60),"")}${kpi("Trên 60 ngày",tr(K.bx),"",K.bx?"var(--red)":"")}${kpi("DSO",K.dso==null?"—":K.dso+" ngày",K.dso==null?"chưa đủ 90 ngày số":"doanh thu 90 ngày "+tr(K.rev90))}</div>
+  const no=`<section class="card"><div class="card-h"><h2>Công nợ Kênh OEM</h2><span class="hint">đơn đã xuất kho chưa thu đủ tiền (tính đến ${kpVn(K.ref)}) + nợ đầu kỳ, phiếu phải thu còn chưa thu · cùng số Công nợ gia công</span></div>
+    <div class="grid kpis" style="margin-bottom:10px">${kpi("Phải thu",tr(K.debt),(K.no.length?`${nKh} khách · ${K.no.length} đơn chưa thu`:"không có đơn nợ")+(K.old?` · ${tr(K.old)} nợ đầu kỳ, phiếu phải thu`:""))}${kpi("≤30 ngày",tr(K.b30),K.no.filter(o=>o.age<=30).length===1?"đơn "+kpVn(K.no.find(o=>o.age<=30).order_date):"")}${kpi("31–60 ngày",tr(K.b60),"")}${kpi("Trên 60 ngày",tr(K.bx),"",K.bx?"var(--red)":"")}${kpi("Nợ đầu kỳ, phiếu phải thu",tr(K.old),"chưa thu, xem ở Công nợ gia công")}${kpi("DSO",K.dso==null?"—":K.dso+" ngày",K.dso==null?"chưa đủ 90 ngày số":"doanh thu 90 ngày "+tr(K.rev90))}</div>
     ${K.debt?`<div class="tb-bar">${seg.map(s=>`<div style="width:${(s[1]/T*100).toFixed(2)}%;background:${s[2]}">${s[1]/T>=.1?esc(s[0])+" "+tr(s[1])+" · "+kpPct(s[1]/T):""}</div>`).join("")}</div>`:""}
     <div class="ko-w">${K.no.length?tbl(["Khách","Đơn","Ngày","Còn phải thu","Số ngày","Trạng thái"],K.no.slice(0,12).map(o=>`<tr><td>${esc(K.name(o.customer_id))}</td><td class="mono">${esc(o.order_no)}</td><td class="n">${kpVn(o.order_date)}</td><td class="n"><b>${tr(o.left)}</b></td><td class="n">${o.age}</td><td>${koNoSt(o)}</td></tr>`)):`<p class="hint">Không có đơn OEM nào chờ thu tiền.</p>`}</div>
     <p class="hint">Gồm cả đơn kế toán chưa xác nhận, nên có thể lớn hơn số công nợ chính thức ở Chi phí & Tiền › Phải thu.</p></section>`;
