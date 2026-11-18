@@ -39,11 +39,11 @@ function fdsBook(R,ky,names){const vn=k=>({ve:"Đã về tiền",lech:"Đã về
 function fdsCan(){return typeof SV!=="undefined"&&!!SV.me&&(SV.me.role==="CEO"||(SV.perms||[]).includes("debt.read.all"))}
 /* Mục cuối "Tải báo cáo" của trang Facebook (chị Hoa duyệt demo 18/11/2026): bảng đủ các tháng + kế toán tự tải 3 bước. */
 function fdsThang(){fdsLoad();bcAllLoad();const M=FDS.m||{},ks=bcMonths("fb",Object.keys(M)),vn=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"";
-  const rows=ks.map(ky=>{const s=M[ky],end=plYmEnd?plYmEnd(ky):ky+"-31",at=s?String(s.at||"").slice(0,10):"";
+  const rows=ks.map(ky=>{const s=M[ky],end=plYmEnd(ky),vt=s&&s.at?new Date(Date.parse(s.at)+7*3600e3).toISOString():"",at=vt.slice(0,10);/* giờ Việt Nam */
     const so=!s?pill("chưa nạp","gry"):at>end?pill("đủ tháng","grn"):pill("đến "+vn(at),"blu");
     return `<tr><td><b>T${ky.slice(5)}/${ky.slice(0,4)}</b></td><td>${so}</td>
       <td class="n">${s?nf(s.don):"—"}</td><td class="n">${s?nf(s.dt):"—"}</td><td class="n">${s&&s.g&&s.g.chua?nf(s.g.chua[0])+" đơn":"—"}</td><td class="n">${s?nf(s.ship):"—"}</td>
-      <td style="white-space:nowrap">${s?esc((s.by||"")+" · "+vn(at)+" "+String(s.at||"").slice(11,16)):`<span class="hint">—</span>`}</td>
+      <td style="white-space:nowrap">${s?esc((s.by||"")+" · "+vn(at)+" "+vt.slice(11,16)):`<span class="hint">—</span>`}</td>
       <td>${bcFileBtns("fb",ky)}</td><td>${bcLinkBtns("fb",ky)}</td></tr>`}).join("");
   return `<section class="card"><div class="card-h"><h2>Báo cáo tiền về các tháng</h2><span class="hint">lưu đủ mọi tháng · số này vào Lãi lỗ, Tổng quan, Đối chiếu doanh thu</span></div>
    <div class="tbl"><table><thead><tr><th>Tháng</th><th>Số liệu</th><th class="n">Đơn đã về tiền</th><th class="n">Tiền hãng đã trả</th><th class="n">Chưa về tiền</th><th class="n">Phí hãng</th><th>Ai nạp</th><th>File</th><th>Link Drive</th></tr></thead><tbody>${rows}</tbody></table></div>
