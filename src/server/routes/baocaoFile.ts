@@ -5,6 +5,7 @@ import { badRequest, forbidden, ok } from '../lib/http';
 import { pack, unpack } from '../lib/pack';
 import { adminOnlyEndpoint } from '../middleware/adminHost';
 import { requirePermission } from '../middleware/rbac';
+import { loadFbMoney } from '../services/fbCost';
 
 /**
  * Lưu file báo cáo tháng lên Drive (chị Hoa duyệt 16/11/2026): mỗi lần kế toán tải báo cáo kênh lên trang quản trị,
@@ -65,6 +66,31 @@ baocaoFileRoutes.get('/fb', async (c) => {
   if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem đối soát Facebook');
   return ok(c, await loadFb(c.env.DB));
 });
+/**
+ * Đơn Facebook TẠO trong tháng ky, lấy từ số web kéo hằng ngày (fb_money): mã đơn, mã vận đơn, tiền hàng (COD), phí hãng,
+ * kèm cờ hoàn nếu đơn có trong danh sách hàng hoàn (ret_orders). Thay cho việc nạp lại file đơn FB khi đối soát tiền về.
+ */
+baocaoFileRoutes.get('/fb-orders', async (c) => {
+  if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán xem đối soát Facebook');
+  const ky = c.req.query('ky') ?? '';
+  if (!KY.test(ky)) throw badRequest('BAD_KY', 'Chọn tháng');
+  const fm = await loadFbMoney(c.env.DB);
+  const list = Object.entries(fm.o)
+    .filter(([, v]) => (v[4] ?? '').slice(0, 7) === ky)
+    .map(([id, v]) => ({ id, track: v[3] ?? '', cod: v[1], ship: v[2], day: v[4] ?? '' }));
+  const hoan = new Set<string>();
+  const ids = list.map((x) => x.id);
+  for (let i = 0; i < ids.length; i += 90) {
+    const part = ids.slice(i, i + 90);
+    const r = await c.env.DB.prepare(`SELECT order_id FROM ret_orders WHERE channel = 'FACEBOOK' AND order_id IN (${part.map(() => '?').join(',')})`)
+      .bind(...part)
+      .all<{ order_id: string }>();
+    for (const x of r.results ?? []) hoan.add(x.order_id);
+  }
+  const noCreated = Object.values(fm.o).filter((v) => v[0].slice(0, 7) >= ky && !v[4]).length;
+  return ok(c, { ky, at: fm.at, noCreated, orders: list.map((x) => ({ ...x, hoan: hoan.has(x.id) })) });
+});
+
 baocaoFileRoutes.put('/fb', adminOnlyEndpoint, async (c) => {
   const auth = c.get('auth');
   if (!canMoney(auth)) throw forbidden('Chỉ CEO hoặc kế toán lưu đối soát Facebook');

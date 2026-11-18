@@ -39,8 +39,10 @@ function fdsReadFb(rows){const h=(rows[0]||[]).map(fdsLow),c=k=>h.indexOf(k);
     if(id){last=O[id]={id,track:fdsS(r[cT]),cod:fdsN(r[cC]),st:fdsS(r[cS]),vc:cV<0?"":fdsS(r[cV]),sp:[]}}
     if(!last)continue;const p=cP<0?"":fdsS(r[cP]),q=cQ<0?0:fdsN(r[cQ]);if(p||q)last.sp.push([p,q,cG<0?0:fdsN(r[cG])])}
   return O}
-/* Gộp: fb = bảng file đơn FB; spx = [{name, rows}]; best = [{name, sheets:[rows…]}]. */
-function fdsBuild(fb,spx,best){const O=fdsReadFb(fb);if(!O)throw new Error("File đơn Facebook thiếu cột Mã đơn hàng đầy đủ / Mã vận đơn / COD");
+/* Đơn FB lấy từ số web kéo hằng ngày (/api/hub/bc-file/fb-orders): không cần nạp lại file đơn FB (chị Hoa 18/11/2026). */
+function fdsFromWeb(orders){const O={};(orders||[]).forEach(x=>{O[x.id]={id:x.id,track:fdsS(x.track),cod:+x.cod||0,st:x.hoan?"Đã hoàn":"",vc:"",sp:[]}});return O}
+/* Gộp: fb = bảng file đơn FB, hoặc {web:[đơn web]}; spx = [{name, rows}]; best = [{name, sheets:[rows…]}]. */
+function fdsBuild(fb,spx,best){const O=fb&&fb.web?fdsFromWeb(fb.web):fdsReadFb(fb);if(!O)throw new Error("File đơn Facebook thiếu cột Mã đơn hàng đầy đủ / Mã vận đơn / COD");
   const S={},T={},src=[];
   (spx||[]).forEach(f=>src.push({name:f.name,loai:"SPX",n:fdsReadSpx(f.rows,f.name,S)}));
   (best||[]).forEach(f=>src.push({name:f.name,loai:"Best",n:fdsReadBest(f.sheets,f.name,T)}));

@@ -1,4 +1,4 @@
-import { fetchShippedLines, loadSource, openKey, type FetchFn } from './poscake';
+import { fetchShippedLines, loadSource, openKey, parseUtc, type FetchFn } from './poscake';
 import { pack, unpack } from '../lib/pack';
 
 /**
@@ -6,7 +6,8 @@ import { pack, unpack } from '../lib/pack';
  * (chị Hoa duyệt 06/11/2026, thay bản nạp tay fb_cost_days từ Sheet Pancake cũ chỉ có tới 21/10).
  * Mỗi đơn: tiền hàng sau giảm giá, phí trả hãng vận chuyển (partner_fee; shipping_fee trên đơn là ship thu của khách, thường 0).
  * Giá vốn do trang tính: số lượng từng dòng đơn (channel_order_lines FACEBOOK) × giá thành trên web; mã chưa có giá thành thì để trống.
- * Lưu ở hub_blobs 'fb_money': { at, d: { ngày: [số đơn, tiền hàng, ship] }, o: { mã đơn: [ngày, tiền hàng, ship] } }.
+ * Lưu ở hub_blobs 'fb_money': { at, d: { ngày: [số đơn, tiền hàng, ship] }, o: { mã đơn: [ngày gửi, tiền hàng, ship, mã vận đơn, ngày tạo] } }.
+ * Mã vận đơn + ngày tạo (thêm 18/11/2026) để đối soát tiền về SPX/Best theo tháng tạo đơn mà không cần nạp lại file đơn FB.
  */
 export const FB_MONEY_KEY = 'fb_money';
 const KEEP_DAYS = 160;
@@ -14,7 +15,7 @@ const KEEP_DAYS = 160;
 export interface FbMoney {
   at: string;
   d: Record<string, [number, number, number]>;
-  o: Record<string, [string, number, number]>;
+  o: Record<string, [string, number, number, string?, string?]>;
 }
 
 export async function loadFbMoney(db: D1Database): Promise<FbMoney> {
@@ -39,9 +40,11 @@ export async function syncFbMoney(db: D1Database, secret: string | undefined, da
   const out: Array<{ day: string; orders: number; error?: string }> = [];
   for (const day of days) {
     try {
-      const o: Record<string, [string, number, number]> = {};
+      const o: Record<string, [string, number, number, string?, string?]> = {};
       await fetchShippedLines(fetchFn, 'FACEBOOK', src.shop_id, key, day, {}, (id, x) => {
-        o[id] = [day, money(x.total_price_after_sub_discount ?? x.total_price), money(x.partner_fee)];
+        const ins = parseUtc(x.inserted_at);
+        const created = ins === null ? '' : new Date(ins + 7 * 3_600_000).toISOString().slice(0, 10);
+        o[id] = [day, money(x.total_price_after_sub_discount ?? x.total_price), money(x.partner_fee), String(x.partner?.extend_code ?? '').trim(), created];
       });
       for (const [id, v] of Object.entries(cur.o)) if (v[0] === day) delete cur.o[id];
       Object.assign(cur.o, o);

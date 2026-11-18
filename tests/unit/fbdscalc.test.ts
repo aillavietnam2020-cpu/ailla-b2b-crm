@@ -41,6 +41,19 @@ describe('đối soát tiền về Facebook', () => {
     expect(s).toMatchObject({ ky: '2026-10', don: 2, dt: 299000, ship: 55000 });
     expect(JSON.stringify(s)).not.toContain('S1'); // bản lưu không có mã đơn
   });
+  it('dùng đơn web kéo hằng ngày thay file đơn FB: cùng kết quả', () => {
+    const web = [
+      { id: '1', track: 'SPXVN1', cod: 99000, hoan: false },
+      { id: '2', track: '848001', cod: 209000, hoan: false },
+      { id: '3', track: 'SPXVN3', cod: 149000, hoan: false },
+      { id: '4', track: 'SPXVN4', cod: 99000, hoan: true },
+      { id: '5', track: 'SPXVN5', cod: 0, hoan: false },
+    ];
+    const R = F.fdsBuild({ web }, [{ name: 'SPX TK1.xlsx', rows: SPX }], [{ name: 'Best ông A.xlsx', sheets: BEST }]);
+    expect(R.sum).toMatchObject({ don: 2, dt: 299000, ship: 55000, tong: 5 });
+    expect(R.sum.g.hoan[0]).toBe(1);
+    expect(R.sum.g.chua[0]).toBe(1);
+  });
   it('báo lỗi khi file đơn FB thiếu cột', () => {
     expect(() => F.fdsBuild([['A', 'B']], [], [])).toThrow(/thiếu cột/);
   });

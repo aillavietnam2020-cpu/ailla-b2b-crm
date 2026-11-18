@@ -40,21 +40,23 @@ function fdsCan(){return typeof SV!=="undefined"&&!!SV.me&&(SV.me.role==="CEO"||
 function fdsCard(){fdsLoad();const ky=FDS.ky||PERIOD.from.slice(0,7),s=FDS.m&&FDS.m[ky],R=FDS.run,vn=v=>nf(Math.round(v))+"đ";
   const cur=s?`<p style="margin:0 0 8px">Tháng ${ky.slice(5)}/${ky.slice(0,4)} đã đối soát: <b>${vn(s.dt)}</b> · ${nf(s.don)} đơn đã về tiền · phí hãng ${vn(s.ship)} <span class="hint">(nạp ${esc(String(s.at||"").slice(0,16).replace("T"," "))}${s.by?" · "+esc(s.by):""})</span></p>`:`<p class="hint" style="margin:0 0 8px">Tháng ${ky.slice(5)}/${ky.slice(0,4)} chưa đối soát tiền về: doanh thu đang tạm lấy theo đơn giao thành công trên Pancake.</p>`;
   const prev=R?`<div class="note" style="margin-top:10px"><b>Kết quả (chưa lưu):</b> ${nf(R.sum.tong)} đơn trong file FB → <b>${nf(R.sum.don)} đơn đã về tiền, ${vn(R.sum.dt)}</b> · chưa về tiền ${nf(R.sum.g.chua[0])} đơn (${vn(R.sum.g.chua[1])}) · lệch COD ${nf(R.sum.g.lech[0])} đơn · hoàn ${nf(R.sum.g.hoan[0]+R.sum.g.cod0[0])} đơn · phí hãng ${vn(R.sum.ship)}
-     <div class="hint" style="margin-top:4px">${R.src.map(x=>`${esc(x.name)}: ${nf(x.n)} vận đơn`).join(" · ")}</div>
+     <div class="hint" style="margin-top:4px">${R.web?`Đơn lấy từ dữ liệu web kéo hằng ngày (đơn tạo trong tháng): ${nf(R.web.n)} đơn${R.web.noTrack?` · <b>${nf(R.web.noTrack)} đơn chưa có mã vận đơn</b>, nên nạp file đơn FB`:""}. `:"Đơn lấy từ file đơn FB. "}${R.src.map(x=>`${esc(x.name)}: ${nf(x.n)} vận đơn`).join(" · ")}</div>
      <div class="acts" style="margin-top:8px"><button class="btn pri" id="fds-save">Lưu số tháng ${ky.slice(5)}/${ky.slice(0,4)} + cất file lên Drive</button></div></div>`:"";
   return `<section class="card"><div class="card-h"><h2>Đối soát tiền về (SPX, Best)</h2></div>${cur}
     <div class="filters" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
       <label>Tháng<br><input type="month" id="fds-ky" value="${ky}"></label>
-      <label>File đơn FB của tháng<br><input type="file" id="fds-fb" accept=".xlsx,.xls"></label>
+      <label>File đơn FB (không bắt buộc: bỏ trống thì web dùng đơn đã kéo từ Pancake)<br><input type="file" id="fds-fb" accept=".xlsx,.xls"></label>
       <label>File tiền về SPX (chọn nhiều)<br><input type="file" id="fds-spx" accept=".xlsx,.xls" multiple></label>
       <label>File Best (chọn nhiều, nguồn theo tên file)<br><input type="file" id="fds-best" accept=".xlsx,.xls" multiple></label>
       <button class="btn" id="fds-go">Đối soát</button></div>${FDS.err?`<p class="note amb">${esc(FDS.err)}</p>`:""}${prev}</section>`}
 function fdsBind(m){const q=s=>m.querySelector(s);if(!q("#fds-go"))return;
   q("#fds-ky").onchange=e=>{FDS.ky=e.target.value;FDS.run=null;renderMain()};
   q("#fds-go").onclick=async()=>{const fb=q("#fds-fb").files[0],spx=[...q("#fds-spx").files],best=[...q("#fds-best").files];FDS.err="";
-    if(!fb||!(spx.length+best.length)){toast("Chọn file đơn FB và ít nhất một file tiền về");return}
-    try{const R=fdsBuild((await fdsAoa(fb))[0],await Promise.all(spx.map(async f=>({name:f.name,rows:(await fdsAoa(f))[0]}))),await Promise.all(best.map(async f=>({name:f.name,sheets:await fdsAoa(f)}))));
-      R.files=[fb,...spx,...best];R.ky=q("#fds-ky").value;FDS.ky=R.ky;FDS.run=R}catch(e){FDS.err=e.message;FDS.run=null}renderMain()};
+    if(!(spx.length+best.length)){toast("Chọn ít nhất một file tiền về SPX hoặc Best");return}
+    try{const ky=q("#fds-ky").value;let src,web=null;
+      if(fb)src=(await fdsAoa(fb))[0];else{web=await svApi("/api/hub/bc-file/fb-orders?ky="+ky);if(!web.orders.length)throw new Error("Web chưa có đơn Facebook tạo trong tháng này (hoặc chưa kéo mã vận đơn): nạp file đơn FB.");src={web:web.orders}}
+      const R=fdsBuild(src,await Promise.all(spx.map(async f=>({name:f.name,rows:(await fdsAoa(f))[0]}))),await Promise.all(best.map(async f=>({name:f.name,sheets:await fdsAoa(f)}))));
+      R.files=[fb,...spx,...best].filter(Boolean);R.ky=ky;FDS.ky=ky;R.web=web?{n:web.orders.length,noTrack:web.orders.filter(o=>!o.track).length,noCreated:web.noCreated}:null;FDS.run=R}catch(e){FDS.err=e.message;FDS.run=null}renderMain()};
   if(q("#fds-save"))q("#fds-save").onclick=async e=>{const R=FDS.run,ky=R.ky;e.target.disabled=true;
     try{await svApi("/api/hub/bc-file/fb",{method:"PUT",body:JSON.stringify({ky,s:fdsSummary(R,ky,R.files.map(f=>f.name))})});
       toast("Đã lưu số đối soát Facebook tháng "+ky.slice(5)+"/"+ky.slice(0,4));
