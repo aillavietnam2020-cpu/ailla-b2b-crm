@@ -374,7 +374,7 @@ interface LedgerEntry {
 
 const LEDGER_KIND: Record<LedgerEntry['kind'], string> = {
   DAU_KY: 'Dư nợ đầu kỳ',
-  KHAC: 'Thu nhập khác',
+  KHAC: 'Phiếu phải thu',
   GHI_NO: 'Ghi nợ (đơn hàng)',
   THANH_TOAN: 'Thanh toán',
   DIEU_CHINH: 'Điều chỉnh',

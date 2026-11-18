@@ -54,6 +54,15 @@ describe('Thu nhập khác của khách (VAT khách lấy hóa đơn...)', () =>
       body: { charge_date: '2026-10-25', amount: 13600000, description: 'Tiền thuế VAT hóa đơn số 94 ngày 18/10/2026', doc_no: 'NVK1728' },
     });
     expect(add.status).toBe(200);
+    expect(add.body.data.voucher_no).toBe('PPT2610-001');
+    const add2 = await ctx.request('/api/customers/cus-thao-1/other-charges', {
+      as: USERS.ceo,
+      body: { charge_date: '2026-10-28', amount: 500000, description: 'Phí in tem riêng theo yêu cầu' },
+    });
+    expect(add2.body.data.voucher_no).toBe('PPT2610-002');
+    const all = (await ctx.request('/api/customers/receivables/list', { as: USERS.ceo })).body.data;
+    expect(all.map((x: { voucher_no: string }) => x.voucher_no)).toEqual(['PPT2610-002', 'PPT2610-001']);
+    await ctx.request(`/api/customers/cus-thao-1/other-charges/${add2.body.data.id}/delete`, { as: USERS.ceo, body: { reason: 'Thử xóa phiếu' } });
     const after = (await ctx.request('/api/customers/cus-thao-1', { as: USERS.ceo })).body.data;
     expect(after.debt.official_debt - before.debt.official_debt).toBe(13600000);
     expect(after.debt.other_charges).toBe(13600000);

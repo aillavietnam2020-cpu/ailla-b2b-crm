@@ -102,9 +102,23 @@ customerRoutes.put('/:id/opening-debt', requirePermission('order.accounting.conf
  * Thu nhập khác của khách (chị Hoa 18/11/2026): khoản khách phải trả ngoài tiền hàng, phải ghi rõ là khoản gì
  * (ví dụ tiền thuế VAT khi khách lấy hóa đơn, MISA Nợ 131 / Có 711). Cộng vào công nợ khách, không tính doanh thu bán hàng.
  */
+/** Danh sách phiếu phải thu (thu nhập khác) của các khách người xem được thấy, mới nhất trước. */
+customerRoutes.get('/receivables/list', requirePermission('customer.read.own'), async (c) => {
+  const scope = customerScopeClause(c.get('auth'));
+  const rows = await c.env.DB.prepare(
+    `SELECT x.id, x.voucher_no, x.customer_id, c.name AS customer_name, x.charge_date, x.amount, x.description, x.doc_no
+     FROM customer_other_charges x JOIN customers c ON c.id = x.customer_id
+     WHERE x.deleted_at IS NULL AND c.deleted_at IS NULL AND ${scope.sql}
+     ORDER BY x.charge_date DESC, x.voucher_no DESC LIMIT 500`,
+  )
+    .bind(...scope.params)
+    .all();
+  return ok(c, rows.results ?? []);
+});
+
 customerRoutes.get('/:id/other-charges', async (c) => {
   const rows = await c.env.DB.prepare(
-    `SELECT x.id, x.charge_date, x.amount, x.description, x.doc_no, x.created_at, u.display_name AS created_by_name
+    `SELECT x.id, x.voucher_no, x.charge_date, x.amount, x.description, x.doc_no, x.created_at, u.display_name AS created_by_name
      FROM customer_other_charges x LEFT JOIN users u ON u.id = x.created_by
      WHERE x.customer_id = ? AND x.deleted_at IS NULL ORDER BY x.charge_date, x.created_at`,
   )
@@ -128,21 +142,29 @@ customerRoutes.post('/:id/other-charges', requirePermission('order.accounting.co
   if (!cust) throw notFound('Không tìm thấy khách hàng');
   const cid = crypto.randomUUID();
   const now = nowIso();
+  // Số phiếu PPT<yymm>-<stt> theo tháng của ngày chứng từ.
+  const prefix = 'PPT' + day.slice(2, 4) + day.slice(5, 7) + '-';
+  const last = await c.env.DB.prepare(
+    "SELECT MAX(CAST(substr(voucher_no, 9) AS INTEGER)) AS n FROM customer_other_charges WHERE voucher_no LIKE ? || '%'",
+  )
+    .bind(prefix)
+    .first<{ n: number | null }>();
+  const voucherNo = prefix + String((last?.n ?? 0) + 1).padStart(3, '0');
   await c.env.DB.batch([
     c.env.DB.prepare(
-      'INSERT INTO customer_other_charges (id, customer_id, charge_date, amount, description, doc_no, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(cid, id, day, amount, description, docNo, auth.user.id, now),
+      'INSERT INTO customer_other_charges (id, customer_id, charge_date, amount, description, doc_no, voucher_no, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(cid, id, day, amount, description, docNo, voucherNo, auth.user.id, now),
     auditStatement(c.env.DB, {
       actorId: auth.user.id,
       action: 'CUSTOMER_OTHER_CHARGE_ADD',
       entityType: 'CUSTOMER',
       entityId: id,
-      after: { id: cid, charge_date: day, amount, description, doc_no: docNo },
+      after: { id: cid, voucher_no: voucherNo, charge_date: day, amount, description, doc_no: docNo },
       requestId: c.get('requestId'),
       ip: clientIp(c.req.raw.headers),
     }),
   ]);
-  return ok(c, { id: cid });
+  return ok(c, { id: cid, voucher_no: voucherNo });
 });
 
 customerRoutes.post('/:id/other-charges/:cid/delete', requirePermission('order.accounting.confirm'), async (c) => {

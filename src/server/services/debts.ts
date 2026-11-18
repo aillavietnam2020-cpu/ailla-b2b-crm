@@ -230,10 +230,11 @@ export async function customerLedger(db: D1Database, customerId: string): Promis
       amount: adj ? p.amount : -p.amount, confirmed: p.accounting_status === 'DA_XAC_NHAN' });
   }
   const other = await db.prepare(
-    `SELECT charge_date, amount, description, doc_no FROM customer_other_charges WHERE customer_id = ? AND deleted_at IS NULL`,
+    `SELECT charge_date, amount, description, doc_no, voucher_no FROM customer_other_charges WHERE customer_id = ? AND deleted_at IS NULL`,
   ).bind(customerId).all<Record<string, any>>();
   for (const x of other.results ?? []) {
-    rows.push({ date: x.charge_date, kind: 'KHAC', ref: x.doc_no || 'Thu nhập khác', note: x.description, amount: x.amount, confirmed: true });
+    rows.push({ date: x.charge_date, kind: 'KHAC', ref: x.voucher_no || x.doc_no || 'Phiếu phải thu',
+      note: x.description + (x.doc_no ? ` (chứng từ ${x.doc_no})` : ''), amount: x.amount, confirmed: true });
   }
   const rets = await db.prepare(
     `SELECT return_no, return_date, credit_amount, claimed_amount, status, reason FROM order_returns
