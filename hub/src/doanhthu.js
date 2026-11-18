@@ -192,12 +192,12 @@ function pDtDoiChieu(m){
   /* Chị Hoa 18/11 duyệt demo: bảng gọn (Kênh · Doanh thu web · Số đơn · Số kế toán MISA · Lệch), bấm dòng mở cửa sổ chi tiết
      (số web + Chốt lại, so file nguồn, nhập số kế toán, file Drive, từng ngày/từng đơn). */
   const tot={w:0,k:0,hasK:false};
-  const body=DT_KENH.map(([ch,n])=>{const r=S[ch]||{dt:null},l=L[ch]||{},K=dtKt(ym,ch),snap=dtSnap(ym,ch);
+  const body=DT_KENH.map(([ch,n])=>{const K=dtKt(ym,ch),snap=dtSnap(ym,ch),r0=S[ch]||{dt:null},r=r0.dt==null&&snap?{...r0,dt:snap.dt,don:snap.don}:r0,l=L[ch]||{};/* kênh CRM tải chậm: tạm hiện số đã chốt */
     if(r.dt!=null)tot.w+=+r.dt||0;if(K){tot.k+=K.v;tot.hasK=true}
     const drift=snap&&l.dt!=null&&Math.abs(l.dt-snap.dt)>=1000;
     const lab=ch==="cskh"&&r.dt==null?pill("chưa chạy","gry"):st==="chot"?(snap?(drift?pill("số mới khác số chốt","amb"):pill("đã chốt","grn")):pill("chưa lưu số chốt","gry")):pill("dự kiến","amb");
     const don=r.don!=null?r.don:snap&&snap.don!=null?snap.don:null;
-    return `<tr class="clk" data-dtopen="${ch}"><td><b>${n}</b> ${lab}</td>
+    return `<tr class="clk" data-dtopen="${ch}"><td style="white-space:nowrap"><b>${n}</b></td><td style="white-space:nowrap">${lab}</td>
       <td class="n"><b>${r.dt==null?`<span class="hint">chưa có số</span>`:nf(r.dt)}</b></td>
       <td class="n">${don==null?`<span class="hint">—</span>`:nf(don)}</td>
       <td class="n">${ch==="cskh"?`<span class="hint">—</span>`:K?nf(K.v):`<span class="hint">chưa nhập</span>`}</td>
@@ -206,8 +206,8 @@ function pDtDoiChieu(m){
   m.innerHTML=H("Đối chiếu doanh thu",`Doanh thu thực từng kênh theo tháng · so số web với số kế toán đã chốt sổ MISA · chốt số ngày 10 tháng sau`)+`
   <div class="tabs" style="margin-bottom:10px">${tabs.join("")}</div>
   <div class="note ${st==="chot"?"":"amb"}">Tháng ${dtYmVN(ym)}: ${st==="chot"?`<b>đã chốt ngày ${dtVN(dtNgayChot(ym))}</b>.`:`<b>chưa chốt, đang là số dự kiến</b>. Số tự lưu (đóng băng) từ ngày ${dtVN(dtNgayChot(ym))}.`} Bấm vào một kênh để xem chi tiết, nhập số kế toán, mở file trên Drive.${DTS.err?` <span class="t-red">Lỗi tải số chốt: ${esc(DTS.err)}</span>`:""}</div>
-  <section class="card flush"><div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Doanh thu web</th><th class="n">Số đơn</th><th class="n">Số kế toán (MISA)</th><th class="n">Lệch</th><th></th></tr></thead><tbody>${body}
-   <tr class="tot"><td><b>Cộng các kênh</b></td><td class="n"><b>${nf(tot.w)}</b></td><td></td><td class="n">${tot.hasK?nf(tot.k):"—"}</td><td class="n">${tot.hasK?dtDiffK(tot.w,tot.k):""}</td><td></td></tr></tbody></table></div>
+  <section class="card flush"><div class="tbl"><table><thead><tr><th>Kênh</th><th>Trạng thái</th><th class="n">Doanh thu web</th><th class="n">Số đơn</th><th class="n">Số kế toán (MISA)</th><th class="n">Lệch</th><th></th></tr></thead><tbody>${body}
+   <tr class="tot"><td><b>Cộng các kênh</b></td><td></td><td class="n"><b>${nf(tot.w)}</b></td><td></td><td class="n">${tot.hasK?nf(tot.k):"—"}</td><td class="n">${tot.hasK?dtDiffK(tot.w,tot.k):""}</td><td></td></tr></tbody></table></div>
    <p class="hint pad">Số kế toán (MISA): kế toán nhập số doanh thu đã chốt sổ trên MISA của từng kênh (trong cửa sổ chi tiết), web tự so với số web. Lệch tô đỏ khi chênh trên 1% (tối thiểu 1 triệu).</p></section>
   <section class="card"><div class="card-h"><h2>Cách tính doanh thu thực (một cách cho mọi trang)</h2></div><ul class="lessons">
    <li><b>TikTok Shop:</b> cột "Tổng doanh thu" file Tài chính TikTok của đơn tạo trong tháng (cách chị Huệ). GMV chỉ là chỉ số hiệu suất.</li>
