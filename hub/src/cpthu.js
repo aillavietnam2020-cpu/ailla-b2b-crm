@@ -2,19 +2,20 @@
    PHIẾU THU (sổ thu chi): chị Thảo ghi nhanh chọn "Phiếu thu" hoặc "Phiếu chi", chị Huệ xác nhận, vào Sổ thu.
    - Phiếu thu chờ xác nhận: D().thuCho. Xác nhận xong: D().thuTay (nguồn của Sổ thu).
    - Tiền NPP / đại lý: chị Thảo đã xác nhận ở đơn B2C trên trang vận hành (ghi nợ, thu nợ), KHÔNG ghi lại ở đây để khỏi trùng.
-   - Tiền sàn trả về tài khoản: kế toán đối soát ở "Đối soát tiền về".
+   - Tiền sàn (TikTok Shop, Shopee) và COD Facebook về tài khoản: phiếu thu nguồn "Báo có …" (phiếu báo có ngân hàng, CEO chốt 18/11);
+     Dòng tiền tính vào mã 01. Số còn trên ví sàn chưa rút không ghi phiếu, chỉ nhập số dư ví cuối tháng ở Dòng tiền.
    - Phiếu thu ở đây dành cho khoản thu ngoài hai luồng trên (khách lẻ chuyển khoản, khách gia công, hoàn tiền nhà cung cấp, thu khác).
    ===================================================================== */
-const CPT_NGUON=[["gc","Khách gia công"],["le","Khách lẻ chuyển khoản"],["hoan","Nhà cung cấp hoàn tiền"],["sanrut","Tiền sàn rút về (chưa đối soát)"],["khac","Thu khác"],["npp","NPP / đại lý (đã xác nhận ở B2C, ghi lại chỉ khi Quản lý chưa làm)"]];
+const CPT_NGUON=[["tts","Báo có: tiền TikTok Shop rút về"],["spe","Báo có: tiền Shopee rút về"],["fbcod","Báo có: tiền COD Facebook về"],["gc","Khách gia công"],["le","Khách lẻ chuyển khoản"],["hoan","Nhà cung cấp hoàn tiền"],["sanrut","Tiền sàn rút về (chưa đối soát)"],["khac","Thu khác"],["npp","NPP / đại lý (đã xác nhận ở B2C, ghi lại chỉ khi Quản lý chưa làm)"]];
 const cptNg=k=>(CPT_NGUON.find(x=>x[0]===k)||["","Thu khác"])[1];
 function cptQuick(){
   const today=mhToday();
   openDrawerHTML(`<h2>Ghi phiếu thu</h2><div class="mhpm"><label class="chk"><input type="radio" name="cq-t" value="chi"> Phiếu chi</label><label class="chk"><input type="radio" name="cq-t" value="thu" checked> Phiếu thu</label></div>
-  <div class="note amb">Tiền <b>NPP, đại lý</b> Quản lý đã xác nhận ở đơn B2C trên trang vận hành, không ghi lại ở đây. Tiền sàn về tài khoản: kế toán ghi ở Đối soát tiền về.</div>
+  <div class="note amb">Tiền <b>NPP, đại lý</b> Quản lý đã xác nhận ở đơn B2C trên trang vận hành, không ghi lại ở đây. Tiền sàn, COD về tài khoản: chọn nguồn <b>Báo có</b> bên dưới.</div>
   <form class="frm" id="cqt">
    <label class="field">Thu của ai, thu việc gì<input id="cqt-n" required placeholder="Ví dụ: Khách gia công ABC chuyển cọc đợt 1"></label>
    <div class="row4"><label class="field">Số tiền (đ)<input id="cqt-t" type="number" min="1" required></label><label class="field">Ngày thu<input id="cqt-d" type="date" value="${today}" required></label></div>
-   <label class="field">Nguồn thu<select id="cqt-g">${opt(CPT_NGUON,"khac")}</select></label>
+   <div class="field">Nguồn thu<div class="cqt-ng" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px">${CPT_NGUON.map(([k,n])=>`<label class="chk"><input type="radio" name="cqt-g" value="${k}"${k==="khac"?" checked":""}> ${esc(n)}</label>`).join("")}</div></div>
    <label class="field">Tiền về tài khoản<select id="cqt-a"><option value="">Đang tải tài khoản…</option></select></label>
    <label class="field">Ảnh bill, ảnh sao kê (nếu có)<input type="file" id="cqt-f" multiple accept="image/*,application/pdf"></label>
    <div id="cqt-e"></div><button class="btn pri">Gửi Kế toán xác nhận</button></form>`);
@@ -22,7 +23,7 @@ function cptQuick(){
   mhAccts().then(A=>{const s=$("#cqt-a");if(!s)return;s.innerHTML=A.map(a=>`<option>${esc(mhAcctLabel(a))}</option>`).join("")+`<option>Tiền mặt tại công ty</option>`}).catch(()=>{const s=$("#cqt-a");if(s)s.innerHTML=`<option>Tiền mặt tại công ty</option>`});
   $("#cqt").onsubmit=async e=>{e.preventDefault();const tien=+$("#cqt-t").value;if(!(tien>0)){$("#cqt-e").innerHTML=`<div class="note red">Nhập số tiền.</div>`;return}
     const btn=e.submitter||document.querySelector("#cqt button.pri");if(btn)btn.disabled=true;
-    const id=uid("th"),ngay=$("#cqt-d").value,note=$("#cqt-n").value.trim(),nguon=$("#cqt-g").value,acct=$("#cqt-a").value;
+    const id=uid("th"),ngay=$("#cqt-d").value,note=$("#cqt-n").value.trim(),nguon=(document.querySelector('input[name="cqt-g"]:checked')||{}).value||"khac",acct=$("#cqt-a").value;
     DB.mutate(ME.name,"ghi phiếu thu chờ xác nhận",dt=>{if(!dt.thuCho)dt.thuCho=[];dt.thuCho.push({id,ngay,thang:ngay.slice(0,7),tien,note,nguon,acct,by:ME.name,at:Date.now()})});
     let up=0;for(const f of [...$("#cqt-f").files]){try{const x=await mhPrepFile(f);await kApi("/mh/costs/"+id+"/files",{method:"POST",body:JSON.stringify(x)});up++}catch(er){toast(er.message)}}
     closeDrawer();toast("Đã gửi Kế toán xác nhận phiếu thu"+(up?", đính kèm "+up+" ảnh":""));if(["cp_duyet","cp_thu"].includes(PAGE))renderMain()}}

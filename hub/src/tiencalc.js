@@ -70,9 +70,9 @@ function tcnTong(rows,k){let duong=0,am=0;(rows||[]).forEach(r=>{const v=+r[k]||
 const TCN_LC=[
   ["kpp","KD","thu","Kênh phân phối: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn NPP)",1],
   ["oem","KD","thu","Kênh OEM: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn khách gia công)",1],
-  ["tts","KD","thu","TikTok Shop: tiền rút về tài khoản","Dòng tiền › phiếu báo có tiền TikTok Shop rút về",1],
-  ["spe","KD","thu","Shopee: tiền rút về tài khoản","Dòng tiền › phiếu báo có tiền Shopee rút về",1],
-  ["fbcod","KD","thu","Facebook: tiền COD về tài khoản","Dòng tiền › phiếu \"Tiền COD Facebook về\"",1],
+  ["tts","KD","thu","TikTok Shop: tiền rút về tài khoản","Phiếu thu nguồn \"Báo có: tiền TikTok Shop rút về\" (Sổ thu)",1],
+  ["spe","KD","thu","Shopee: tiền rút về tài khoản","Phiếu thu nguồn \"Báo có: tiền Shopee rút về\" (Sổ thu)",1],
+  ["fbcod","KD","thu","Facebook: tiền COD về tài khoản","Phiếu thu nguồn \"Báo có: tiền COD Facebook về\" (Sổ thu)",1],
   ["sanrut","KD","thu","Tiền sàn rút về (chưa tách theo sàn)","Sổ thu, nguồn \"Tiền sàn rút về\"",1],
   ["thukhac","KD","thu","Thu khác","Sổ thu (khách lẻ, nhà cung cấp hoàn tiền, thu khác)",1],
   ["ncc","KD","chi","Trả nhà cung cấp (nguyên liệu, bao bì)","Mua hàng › phiếu chi nhà cung cấp (cả cọc)",1],
@@ -97,7 +97,7 @@ function tcnLcKey(d){
     case "SAN_RUT":return d.san==="VI_SPE"?"spe":"tts";
     case "HOAN":return "hoan";case "CHI_NCC":return "ncc";case "CHI_VC":return "vc";case "CHI_THUONG":return "thuong";case "CHI_LUONG":return "luong";case "TS_TL":return "thanh_ly";
     case "TCP":return {san_tt:"tts",san_spe:"spe",cod:"fbcod",thu_khac:"thukhac",lai_gui:"thukhac",vay:"vay",gop_von:"von",tra_vay:"tra_vay",rut_von:"von",co_tuc:"von",thue_tndn:"thue",thue_khac:"thue",lai_vay:"khac",phi_nh:"khac",chi_khac:"khac"}[d.tcp]||(d.amount>=0?"thukhac":"khac");
-    case "THU_SO":return d.nguon==="sanrut"?"sanrut":d.nguon==="gc"?"oem":d.nguon==="npp"?"kpp":"thukhac";
+    case "THU_SO":return d.nguon==="tts"?"tts":d.nguon==="spe"?"spe":d.nguon==="fbcod"?"fbcod":d.nguon==="sanrut"?"sanrut":d.nguon==="gc"?"oem":d.nguon==="npp"?"kpp":"thukhac";
     case "CHI_SO":{const g=String(d.g||"");return /^G0[123]$/.test(g)?"qc":/^G0[59]$/.test(g)?"vc":/^G0[78]$/.test(g)?"luong":g==="G28"?"mua_ts":"khac"}}
   return d.amount>=0?"thukhac":"khac"}
 /* Cộng chứng từ trong [from,to] theo dòng. Dòng web chưa có chỗ ghi để null (hiện "chưa có"). */

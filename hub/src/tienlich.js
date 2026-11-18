@@ -107,7 +107,7 @@ function tlTabSo(X,C,ym){
   const chua=C.docs.filter(d=>d.date>=C.f&&d.date<=C.e&&!C.ks.has(d.acct)&&d.code!=="noibo");
   const L=docs.filter(d=>d.date===day);
   return `<section class="card pad"><div class="tlh"><b>Sổ tiền theo ngày · ${tlVn(ym)}</b><span class="tlacts"><select id="tl-acct"><option value="">Tất cả (111 + 112)</option>${C.acc.map(a=>`<option value="${esc(a.k)}"${TL.acct===a.k?" selected":""}>${a.tk} · ${esc(a.n)}</option>`).join("")}</select>
-   ${tlEd()?`<button class="btn sm" id="tl-tcp">+ Phiếu báo có / thu chi khác</button> <button class="btn sm" id="tl-ck">Chuyển nội bộ</button>`:""}</span></div>
+   ${tlEd()?`<button class="btn sm" id="tl-thu" title="Ghi nhanh › Phiếu thu, vào Sổ thu sau khi Kế toán xác nhận">+ Phiếu thu (báo có)</button> <button class="btn sm" id="tl-tcp">+ Phiếu vay, vốn, thuế, phí</button> <button class="btn sm" id="tl-ck">Chuyển nội bộ</button>`:""}</span></div>
    <p class="hint">Như sổ quỹ tiền mặt / sổ tiền gửi: đầu ngày + thu − chi = cuối ngày. ${ks.length>1?"Xem tất cả thì chuyển nội bộ giữa các tài khoản không tính. ":""}Bấm một ngày để xem phiếu.${dau0==null?" <b>Chưa có số dư đầu kỳ 30/09</b> nên cột đầu ngày tính từ 0.":""}</p>
    ${R.length?`<div class="nsw"><table class="tbl gd"><thead><tr><th>Ngày</th><th class="n">Đầu ngày</th><th class="n">Thu</th><th class="n">Chi</th><th class="n">Cuối ngày</th><th class="n">Số phiếu</th></tr></thead><tbody>${R.map(r=>`<tr class="clk${r.d===day?" tlon":""}" data-tlday="${r.d}"><td>${tcnDd(r.d)}</td><td class="n">${tlN(r.dau)}</td><td class="n">${r.thu?tlN(r.thu):"–"}</td><td class="n">${r.chi?tlN(r.chi):"–"}</td><td class="n"><b>${tlN(r.cuoi)}</b></td><td class="n">${r.n}</td></tr>`).join("")}
     <tr class="tltot"><td>Cộng tháng</td><td class="n">${tlN(dau0||0)}</td><td class="n">${tlN(R.reduce((t,r)=>t+r.thu,0))}</td><td class="n">${tlN(R.reduce((t,r)=>t+r.chi,0))}</td><td class="n">${tlN(R[R.length-1].cuoi)}</td><td class="n">${R.reduce((t,r)=>t+r.n,0)}</td></tr></tbody></table></div>`:`<p class="empty">Tháng này chưa có phiếu nào ở tài khoản đang chọn.</p>`}
@@ -116,7 +116,7 @@ function tlTabSo(X,C,ym){
    ${tlTcpList()}${tlCkList(tlEd())}`}
 
 /* ---------- 3. Lưu chuyển tiền tệ B03 ---------- */
-const TL_B03_SRC={"01":"tiền khách Kênh phân phối / OEM đã xác nhận, phiếu báo có tiền sàn (TikTok, Shopee) và COD Facebook về, Sổ thu","02":"phiếu chi nhà cung cấp, vận chuyển, dòng tiền thật Sổ chi phí (hàng hóa, dịch vụ)","03":"chi lương bằng QR, Sổ chi phí G07, G08","04":"phiếu trả lãi vay","05":"phiếu nộp thuế TNDN","06":"Sổ thu (nhà cung cấp hoàn tiền, thu khác), phiếu thu khác","07":"thưởng NPP, hoàn bù khách, phí ngân hàng, thuế khác, chi khác","21":"Sổ chi phí G28 (mua TSCĐ / CCDC)","22":"Tài sản & CCDC › ghi giảm có thu tiền","23":"chưa có loại phiếu","24":"chưa có loại phiếu","25":"phiếu lãi tiền gửi","31":"phiếu chủ sở hữu góp vốn","32":"phiếu trả lại vốn góp","33":"phiếu tiền vay","34":"phiếu trả nợ gốc vay","35":"phiếu chia lợi nhuận"};
+const TL_B03_SRC={"01":"tiền khách Kênh phân phối / OEM đã xác nhận, phiếu thu (Sổ thu) báo có tiền sàn TikTok, Shopee, COD Facebook","02":"phiếu chi nhà cung cấp, vận chuyển, dòng tiền thật Sổ chi phí (hàng hóa, dịch vụ)","03":"chi lương bằng QR, Sổ chi phí G07, G08","04":"phiếu trả lãi vay","05":"phiếu nộp thuế TNDN","06":"Sổ thu (nhà cung cấp hoàn tiền, thu khác), phiếu thu khác","07":"thưởng NPP, hoàn bù khách, phí ngân hàng, thuế khác, chi khác","21":"Sổ chi phí G28 (mua TSCĐ / CCDC)","22":"Tài sản & CCDC › ghi giảm có thu tiền","23":"chưa có loại phiếu","24":"chưa có loại phiếu","25":"phiếu lãi tiền gửi","31":"phiếu chủ sở hữu góp vốn","32":"phiếu trả lại vốn góp","33":"phiếu tiền vay","34":"phiếu trả nợ gốc vay","35":"phiếu chia lợi nhuận"};
 function tlB03Thang(C,ym){const cl=(tlFin().cashClose||{})[ym];if(cl&&cl.b03)return {v:cl.b03,chot:cl,co:new Set(Object.keys(cl.b03))};
   const f=ym+"-01",e=tlEnd(ym),dau=C.tong(tcnPrevDay(f));const r=tcnB03(C.docs.filter(d=>C.ks.has(d.acct)),f,e,dau);return {v:r.v,co:r.co,chot:null}}
 function tlTabB03(X,C,ym){
@@ -198,10 +198,10 @@ function tlPlanSet(id,f,why){DB.mutate(ME.name,why,dt=>{const p=((dt.fin||{}).ch
 
 /* ---------- Phiếu thu / chi khác (khoản web chưa có chỗ ghi) ---------- */
 function tlTcpForm(C){const ao=a=>`<option value="${esc(a.k)}">${a.tk} · ${esc(a.n)}</option>`;
-  openDrawerHTML(`<h2>Phiếu thu / chi khác</h2><p class="hint">Phiếu báo có khi tiền sàn (TikTok Shop, Shopee) hoặc COD Facebook về tài khoản; số còn trên ví sàn chưa rút không ghi phiếu, chỉ nhập số dư ví. Và khoản chưa có chỗ ghi ở trang khác: vay, trả nợ vay, lãi vay, góp / trả vốn, chia lợi nhuận, nộp thuế, phí ngân hàng. Khoản đã có trang riêng (khách trả tiền, trả nhà cung cấp, vận chuyển, chi phí, lương) thì ghi ở trang đó để khỏi tính hai lần.</p>
-  <form class="frm" id="tlt"><label class="field">Loại<select id="tlt-l">${TCN_TCP.map(t=>`<option value="${t[0]}">${t[3]>0?"Thu":"Chi"} · ${esc(t[1])} (mã ${t[2]})</option>`).join("")}</select></label>
+  openDrawerHTML(`<h2>Phiếu thu / chi khác</h2><p class="hint">Cho khoản chưa có chỗ ghi ở trang khác: vay, trả nợ vay, lãi vay, góp / trả vốn, chia lợi nhuận, nộp thuế, phí ngân hàng. Khoản đã có chỗ ghi riêng (tiền sàn / COD về và thu khác: Phiếu thu; khách trả tiền, trả nhà cung cấp, vận chuyển, chi phí, lương) thì ghi ở đó để khỏi tính hai lần.</p>
+  <form class="frm" id="tlt"><label class="field">Loại<select id="tlt-l">${TCN_TCP.filter(t=>!["san_tt","san_spe","cod"].includes(t[0])).map(t=>`<option value="${t[0]}">${t[3]>0?"Thu":"Chi"} · ${esc(t[1])} (mã ${t[2]})</option>`).join("")}</select></label>
    <label class="field">Ngày<input id="tlt-d" type="date" value="${mhToday()}" required></label><label class="field">Tài khoản<select id="tlt-a">${C.acc.map(ao).join("")}</select></label>
-   <label class="field">Số tiền (đ)<input id="tlt-t" type="number" min="1" step="1" required></label><label class="field">Nội dung<input id="tlt-n" placeholder="Ví dụ: TikTok Shop rút về ngày 17/11, mã giao dịch …"></label><div id="tlt-e"></div><button class="btn pri">Lưu phiếu</button></form>`);
+   <label class="field">Số tiền (đ)<input id="tlt-t" type="number" min="1" step="1" required></label><label class="field">Nội dung<input id="tlt-n" placeholder="Ví dụ: Trả gốc vay Vietcombank kỳ 11"></label><div id="tlt-e"></div><button class="btn pri">Lưu phiếu</button></form>`);
   $("#tlt").onsubmit=e=>{e.preventDefault();const x={id:uid("tp"),loai:$("#tlt-l").value,ngay:$("#tlt-d").value,acct:$("#tlt-a").value,tien:Math.round(+$("#tlt-t").value),note:$("#tlt-n").value.trim(),by:ME.name,at:Date.now()};
     if(tlKhoa(x.ngay)){$("#tlt-e").innerHTML=`<div class="note red">Tháng ${x.ngay.slice(5,7)} đã chốt sổ. CEO mở khóa rồi mới ghi được.</div>`;return}
     if(!(x.tien>0)){$("#tlt-e").innerHTML=`<div class="note red">Nhập số tiền</div>`;return}
@@ -301,7 +301,7 @@ function pTienLich(m){
   m.querySelectorAll("[data-tlday]").forEach(r=>r.onclick=()=>{TL.day=r.dataset.tlday;renderMain()});
   const on=(id,f)=>{const el=m.querySelector(id);if(el)el.onclick=f};
   const sa=m.querySelector("#tl-acct");if(sa)sa.onchange=()=>{TL.acct=sa.value;TL.day="";renderMain()};
-  on("#tl-tcp",()=>tlTcpForm(C));on("#tl-ck",()=>tlCkForm());on("#tl-plan",()=>tlPlanForm());on("#tl-xls",()=>tlXls(C,ym));
+  on("#tl-tcp",()=>tlTcpForm(C));on("#tl-thu",()=>{if(typeof cptQuick==="function")cptQuick()});on("#tl-ck",()=>tlCkForm());on("#tl-plan",()=>tlPlanForm());on("#tl-xls",()=>tlXls(C,ym));
   on("#tl-moc",()=>tlForm(C.acc.map(a=>({k:a.k,n:a.tk+" · "+a.n})),C.moc,TCN_MOC,"Số dư đầu kỳ 30/09/2026","Số dư cuối ngày 30/09/2026 trên MISA (TK 111, từng TK 112). Nhập lại thì lấy lần nhập sau."));
   on("#tl-sk",()=>{const e=tlEnd(ym),ac=tlAccts();const L={};ac.forEach(a=>{const b=C.B.find(x=>x.acct===a.k&&x.ngay===e);if(b)L[a.k]=+b.tien});tlForm(ac,L,e,"Sao kê cuối "+tlVn(ym).toLowerCase(),"Số trên sao kê ngân hàng / kiểm quỹ tiền mặt cuối ngày "+tcnDd(e)+". Ví sàn nhập để theo dõi tiền chờ rút.")});
   on("#tl-chot",()=>tlChot(X,C,ym));
