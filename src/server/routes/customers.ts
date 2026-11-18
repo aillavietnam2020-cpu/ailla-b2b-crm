@@ -98,6 +98,85 @@ customerRoutes.put('/:id/opening-debt', requirePermission('order.accounting.conf
   return ok(c, { id, opening_debt: amount });
 });
 
+/**
+ * Thu nhập khác của khách (chị Hoa 18/11/2026): khoản khách phải trả ngoài tiền hàng, phải ghi rõ là khoản gì
+ * (ví dụ tiền thuế VAT khi khách lấy hóa đơn, MISA Nợ 131 / Có 711). Cộng vào công nợ khách, không tính doanh thu bán hàng.
+ */
+customerRoutes.get('/:id/other-charges', async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT x.id, x.charge_date, x.amount, x.description, x.doc_no, x.created_at, u.display_name AS created_by_name
+     FROM customer_other_charges x LEFT JOIN users u ON u.id = x.created_by
+     WHERE x.customer_id = ? AND x.deleted_at IS NULL ORDER BY x.charge_date, x.created_at`,
+  )
+    .bind(c.req.param('id'))
+    .all();
+  return ok(c, rows.results ?? []);
+});
+
+customerRoutes.post('/:id/other-charges', requirePermission('order.accounting.confirm'), async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const amount = Number(b?.amount);
+  const day = String(b?.charge_date ?? '').trim();
+  const description = String(b?.description ?? '').trim().slice(0, 300);
+  const docNo = String(b?.doc_no ?? '').trim().slice(0, 60) || null;
+  if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > 1e12) throw badRequest('BAD_AMOUNT', 'Số tiền phải là số nguyên đồng, khác 0');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > vnDate()) throw badRequest('BAD_DATE', 'Ngày chứng từ không hợp lệ (không sau hôm nay)');
+  if (description.length < 5) throw badRequest('MISSING_DESC', 'Ghi rõ đây là khoản gì (ví dụ: Tiền thuế VAT hóa đơn số 94 ngày 18/10)');
+  const id = c.req.param('id');
+  const cust = await c.env.DB.prepare('SELECT id FROM customers WHERE id = ? AND deleted_at IS NULL').bind(id).first();
+  if (!cust) throw notFound('Không tìm thấy khách hàng');
+  const cid = crypto.randomUUID();
+  const now = nowIso();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      'INSERT INTO customer_other_charges (id, customer_id, charge_date, amount, description, doc_no, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(cid, id, day, amount, description, docNo, auth.user.id, now),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'CUSTOMER_OTHER_CHARGE_ADD',
+      entityType: 'CUSTOMER',
+      entityId: id,
+      after: { id: cid, charge_date: day, amount, description, doc_no: docNo },
+      requestId: c.get('requestId'),
+      ip: clientIp(c.req.raw.headers),
+    }),
+  ]);
+  return ok(c, { id: cid });
+});
+
+customerRoutes.post('/:id/other-charges/:cid/delete', requirePermission('order.accounting.confirm'), async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => null)) as { reason?: unknown } | null;
+  const reason = String(b?.reason ?? '').trim().slice(0, 300);
+  if (reason.length < 5) throw badRequest('MISSING_REASON', 'Ghi lý do xóa khoản này');
+  const row = await c.env.DB.prepare(
+    'SELECT id, charge_date, amount, description, doc_no FROM customer_other_charges WHERE id = ? AND customer_id = ? AND deleted_at IS NULL',
+  )
+    .bind(c.req.param('cid'), c.req.param('id'))
+    .first();
+  if (!row) throw notFound('Không thấy khoản này');
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE customer_other_charges SET deleted_at = ?, deleted_by = ?, delete_reason = ? WHERE id = ?').bind(
+      nowIso(),
+      auth.user.id,
+      reason,
+      c.req.param('cid'),
+    ),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'CUSTOMER_OTHER_CHARGE_DELETE',
+      entityType: 'CUSTOMER',
+      entityId: c.req.param('id'),
+      before: row,
+      reason,
+      requestId: c.get('requestId'),
+      ip: clientIp(c.req.raw.headers),
+    }),
+  ]);
+  return ok(c, { deleted: true });
+});
+
 customerRoutes.post('/', requirePermission('customer.create'), async (c) => {
   const auth = c.get('auth');
   const body = await c.req.json().catch(() => ({}));

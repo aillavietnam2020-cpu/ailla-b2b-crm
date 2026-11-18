@@ -344,6 +344,8 @@ export interface DebtSummary {
   owner_name?: string | null;
   opening_debt: number;
   posted_charges: number;
+  /** Thu nhập khác (VAT khách lấy hóa đơn...), đã cộng trong posted_charges, không phải doanh thu. */
+  other_charges?: number;
   confirmed_payments: number;
   official_debt: number;
   pending_charges: number;

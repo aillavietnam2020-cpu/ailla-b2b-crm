@@ -102,11 +102,13 @@ export interface ChungTu { date: string; loai: string; ref: string; note: string
 async function khachChungTu(db: D1Database, customerId?: string) {
   const w = customerId ? ' AND x.customer_id = ?' : '';
   const b = customerId ? [customerId] : [];
-  const [ord, pay, ret] = await Promise.all([
+  const [ord, pay, oth, ret] = await Promise.all([
     db.prepare(`SELECT x.customer_id, x.order_date AS date, COALESCE(x.legacy_order_code, x.order_no) AS ref, x.total_amount AS amount, x.accounting_status AS st, x.note
       FROM orders x WHERE x.deleted_at IS NULL AND x.approval_status = 'APPROVED' AND x.delivery_status IN ('DA_XUAT_KHO','DA_GIAO')${w}`).bind(...b).all<Record<string, any>>(),
     db.prepare(`SELECT x.customer_id, x.paid_at AS date, COALESCE(x.external_receipt_no, x.method, '') AS ref, x.amount, x.accounting_status AS st, x.is_adjustment AS adj, x.note, x.method, ${PAY_DON} AS lq
       FROM payments x WHERE 1=1${w}`).bind(...b).all<Record<string, any>>(),
+    db.prepare(`SELECT x.customer_id, x.charge_date AS date, COALESCE(x.doc_no, 'Thu nhập khác') AS ref, x.amount, x.description AS note
+      FROM customer_other_charges x WHERE x.deleted_at IS NULL${w}`).bind(...b).all<Record<string, any>>(),
     db.prepare(`SELECT x.customer_id, x.return_date AS date, x.return_no AS ref, x.credit_amount AS amount, x.status AS st, x.reason AS note,
       (SELECT COALESCE(o.legacy_order_code, o.order_no) FROM orders o WHERE o.id = x.order_id) AS lq
       FROM order_returns x WHERE x.status IN ('DA_NHAN_KHO','DA_GIAM_NO')${w}`).bind(...b).all<Record<string, any>>(),
@@ -122,6 +124,8 @@ async function khachChungTu(db: D1Database, customerId?: string) {
     const adj = p.adj === 1;
     add(p.customer_id, { k: 'TRA', date: String(p.date).slice(0, 10), loai: adj ? 'Bút toán đảo / hoàn tiền' : p.method === 'Bù trừ cước vận chuyển' ? 'Bù trừ cước khách trả hộ' : 'Tiền khách trả', ref: p.ref, note: p.note ?? null, amount: adj ? -p.amount : p.amount, tinh: p.st === 'DA_XAC_NHAN', lq: p.lq ?? '' });
   }
+  // Thu nhập khác (VAT khách lấy hóa đơn...): phát sinh nợ, đã vào công nợ chính thức ngay khi kế toán ghi.
+  for (const x of oth.results ?? []) add(x.customer_id, { k: 'PS', date: String(x.date).slice(0, 10), loai: 'Thu nhập khác', ref: x.ref, note: x.note ?? null, amount: x.amount || 0, tinh: true });
   for (const r of ret.results ?? []) add(r.customer_id, { k: 'TL', date: String(r.date).slice(0, 10), loai: 'Hàng trả lại', ref: r.ref, note: r.note ?? null, amount: r.amount || 0, tinh: r.st === 'DA_GIAM_NO', lq: r.lq ?? '' });
   return by;
 }

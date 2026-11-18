@@ -40,3 +40,39 @@ describe('PUT /api/customers/:id/opening-debt', () => {
     expect(sale.status).toBe(403);
   });
 });
+
+describe('Thu nhập khác của khách (VAT khách lấy hóa đơn...)', () => {
+  it('cộng vào công nợ, có trong sổ chi tiết, không tính doanh thu; xóa phải có lý do và trừ lại', async () => {
+    const before = (await ctx.request('/api/customers/cus-thao-1', { as: USERS.ceo })).body.data;
+    const noDesc = await ctx.request('/api/customers/cus-thao-1/other-charges', {
+      as: USERS.ceo,
+      body: { charge_date: '2026-10-25', amount: 13600000, description: '' },
+    });
+    expect(noDesc.status).toBe(400);
+    const add = await ctx.request('/api/customers/cus-thao-1/other-charges', {
+      as: USERS.ceo,
+      body: { charge_date: '2026-10-25', amount: 13600000, description: 'Tiền thuế VAT hóa đơn số 94 ngày 18/10/2026', doc_no: 'NVK1728' },
+    });
+    expect(add.status).toBe(200);
+    const after = (await ctx.request('/api/customers/cus-thao-1', { as: USERS.ceo })).body.data;
+    expect(after.debt.official_debt - before.debt.official_debt).toBe(13600000);
+    expect(after.debt.other_charges).toBe(13600000);
+    const list = (await ctx.request('/api/customers?page_size=200', { as: USERS.ceo })).body.data.find((c: { id: string }) => c.id === 'cus-thao-1');
+    const listBefore = before.debt.posted_charges;
+    expect(list.revenue_total).toBe(listBefore);
+    expect(list.other_charges).toBe(13600000);
+    const sale = await ctx.request('/api/customers/cus-thao-1/other-charges', {
+      as: USERS.thao,
+      body: { charge_date: '2026-10-25', amount: 1000, description: 'thử quyền sale' },
+    });
+    expect(sale.status).toBe(403);
+    const rows = (await ctx.request('/api/customers/cus-thao-1/other-charges', { as: USERS.ceo })).body.data;
+    expect(rows).toHaveLength(1);
+    const del0 = await ctx.request(`/api/customers/cus-thao-1/other-charges/${rows[0].id}/delete`, { as: USERS.ceo, body: {} });
+    expect(del0.status).toBe(400);
+    const del = await ctx.request(`/api/customers/cus-thao-1/other-charges/${rows[0].id}/delete`, { as: USERS.ceo, body: { reason: 'Ghi nhầm khách' } });
+    expect(del.status).toBe(200);
+    const end = (await ctx.request('/api/customers/cus-thao-1', { as: USERS.ceo })).body.data;
+    expect(end.debt.official_debt).toBe(before.debt.official_debt);
+  });
+});

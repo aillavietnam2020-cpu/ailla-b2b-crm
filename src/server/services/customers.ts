@@ -182,7 +182,8 @@ export async function listCustomers(
     opening_debt: debtRows[index].opening_debt,
     official_debt: debtRows[index].official_debt,
     projected_debt: debtRows[index].projected_debt,
-    revenue_total: debtRows[index].posted_charges,
+    revenue_total: debtRows[index].posted_charges - (debtRows[index].other_charges ?? 0),
+    other_charges: debtRows[index].other_charges ?? 0,
   }));
 
   if (sortByComputed) {
