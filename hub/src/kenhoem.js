@@ -57,8 +57,20 @@ function koAdm(m,K,X,r){
   const T=K.debt||1,seg=[["≤30 ngày",K.b30,"#17804a"],["31–60 ngày",K.b60,"#f0a020"],["Trên 60 ngày",K.bx,"#c0392b"],["Nợ đầu kỳ còn lại",K.old,"#7a5af8"]].filter(s=>s[1]>0);
   const nKh=new Set(K.no.map(o=>o.customer_id)).size;
   const no=`<section class="card"><div class="card-h"><h2>Công nợ Kênh OEM</h2><span class="hint">${K.aged?"tính đến hôm nay · tiền khách trả trừ nợ cũ nhất trước (như sổ kế toán) · cùng số Công nợ gia công":"tính đến "+kpVn(K.ref)+" · đơn đã xuất kho chưa thu đủ tiền"}</span></div>
-    <div class="grid kpis" style="margin-bottom:10px">${kpi("Phải thu",tr(K.debt),K.no.length?`${nKh} khách · ${K.no.length} chứng từ còn nợ`:"không còn chứng từ nào nợ")}${kpi("≤30 ngày",tr(K.b30),K.no.filter(o=>o.age<=30).length===1?"đơn "+kpVn(K.no.find(o=>o.age<=30).order_date):"")}${kpi("31–60 ngày",tr(K.b60),"")}${kpi("Trên 60 ngày",tr(K.bx),"",K.bx?"var(--red)":"")}${K.old?kpi("Nợ đầu kỳ còn lại",tr(K.old),"tiền khách trả chưa trừ hết nợ đầu kỳ"):""}${kpi("DSO",K.dso==null?"—":K.dso+" ngày",K.dso==null?"chưa đủ 90 ngày số":"doanh thu 90 ngày "+tr(K.rev90))}</div>
-    ${K.debt?`<div class="tb-bar">${seg.map(s=>`<div style="width:${(s[1]/T*100).toFixed(2)}%;background:${s[2]}">${s[1]/T>=.1?esc(s[0])+" "+tr(s[1])+" · "+kpPct(s[1]/T):""}</div>`).join("")}</div>`:""}
+    <div class="ko-cn">${[
+      ["Phải thu",tr(K.debt),K.no.length?`${nKh} khách · ${K.no.length} chứng từ`:"không còn nợ",1],
+      ["≤30 ngày",tr(K.b30),"","","#17804a"],
+      ["31–60 ngày",K.b60?tr(K.b60):"—","","","#f0a020"],
+      ["Trên 60 ngày",K.bx?tr(K.bx):"—","","","#c0392b"],
+      ...(K.old?[["Nợ đầu kỳ còn lại",tr(K.old),"","","#7a5af8"]]:[]),
+      ["DSO",K.dso==null?"—":K.dso+" ngày",K.dso==null?"chưa đủ 90 ngày số":"thu tiền bình quân"]
+    ].map(x=>`<div class="ko-cn-i${x[3]?" big":""}"><span class="l">${x[4]?`<i style="background:${x[4]}"></i>`:""}${esc(x[0])}</span><b>${x[1]}</b>${x[2]?`<small>${esc(x[2])}</small>`:""}</div>`).join("")}</div>
+    <style>.ko-cn{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
+      .ko-cn-i{flex:1 1 120px;padding:8px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:1px;min-width:0}
+      .ko-cn-i:last-child{border-right:0}.ko-cn-i .l{font-size:12px;color:var(--muted,#667085);display:flex;align-items:center;gap:5px;white-space:nowrap}
+      .ko-cn-i .l i{width:8px;height:8px;border-radius:2px;display:inline-block}.ko-cn-i b{font-size:16px}.ko-cn-i.big b{font-size:19px}
+      .ko-cn-i small{font-size:11.5px;color:var(--muted,#667085)}</style>
+    ${K.debt?`<div class="tb-bar" style="height:18px;font-size:11.5px;margin-bottom:8px">${seg.map(s=>`<div style="width:${(s[1]/T*100).toFixed(2)}%;background:${s[2]}">${s[1]/T>=.1?esc(s[0])+" "+tr(s[1])+" · "+kpPct(s[1]/T):""}</div>`).join("")}</div>`:""}
     <div class="ko-w">${K.no.length?tbl(["Khách","Chứng từ","Ngày","Còn phải thu","Số ngày","Trạng thái"],K.no.slice(0,12).map(o=>`<tr><td>${esc(K.name(o.customer_id))}</td><td class="mono">${esc(o.order_no)}</td><td class="n">${kpVn(o.order_date)}</td><td class="n"><b>${tr(o.left)}</b></td><td class="n">${o.age}</td><td>${koNoSt(o)}</td></tr>`)):`<p class="hint">Không có đơn OEM nào chờ thu tiền.</p>`}</div>
     <p class="hint">${K.aged?"Chứng từ còn nợ gồm đơn đã xuất kho đã chốt tiền và phiếu phải thu. Đơn kế toán chưa xác nhận chưa vào công nợ.":"Gồm cả đơn kế toán chưa xác nhận, nên có thể lớn hơn số công nợ chính thức ở Chi phí & Tiền › Phải thu."}</p></section>`;
   /* cảnh báo & đề xuất */
