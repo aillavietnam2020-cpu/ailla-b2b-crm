@@ -151,6 +151,8 @@ describe('Dòng tiền quản trị: mẫu B03-DNN, sổ ngày, chốt sổ', ()
     expect(C.tcnB03Of({ loai: 'CHI_SO', g: 'G28' })).toBe('21');
     expect(C.tcnB03Of({ loai: 'CHI_SO', g: 'G23' })).toBeNull();
     expect(C.tcnB03Of({ loai: 'TCP', tcp: 'vay' })).toBe('33');
+    expect(C.tcnB03Of({ loai: 'TCP', tcp: 'san_tt' })).toBe('01');
+    expect(C.tcnLcKey({ loai: 'TCP', tcp: 'san_spe', amount: 5 })).toBe('spe');
     expect(C.tcnB03Of({ loai: 'TCP', tcp: 'thue_tndn' })).toBe('05');
     expect(C.tcnB03Of({ loai: 'CK_RA' })).toBe('noibo');
     expect(C.tcnB03Of({ loai: 'THU_SO', nguon: 'hoan' })).toBe('06');

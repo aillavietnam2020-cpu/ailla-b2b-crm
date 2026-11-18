@@ -70,8 +70,8 @@ function tcnTong(rows,k){let duong=0,am=0;(rows||[]).forEach(r=>{const v=+r[k]||
 const TCN_LC=[
   ["kpp","KD","thu","Kênh phân phối: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn NPP)",1],
   ["oem","KD","thu","Kênh OEM: khách trả tiền","Tiền khách kế toán đã xác nhận, cùng nguồn Kho bill giao dịch (+ Sổ thu nguồn khách gia công)",1],
-  ["tts","KD","thu","TikTok Shop: tiền rút về tài khoản","Phiếu chuyển tiền nội bộ: ví TikTok Shop → tài khoản",1],
-  ["spe","KD","thu","Shopee: tiền rút về tài khoản","Phiếu chuyển tiền nội bộ: ví Shopee → tài khoản",1],
+  ["tts","KD","thu","TikTok Shop: tiền rút về tài khoản","Dòng tiền › phiếu báo có tiền TikTok Shop rút về",1],
+  ["spe","KD","thu","Shopee: tiền rút về tài khoản","Dòng tiền › phiếu báo có tiền Shopee rút về",1],
   ["fbcod","KD","thu","Facebook: tiền COD về tài khoản","Dòng tiền › phiếu \"Tiền COD Facebook về\"",1],
   ["sanrut","KD","thu","Tiền sàn rút về (chưa tách theo sàn)","Sổ thu, nguồn \"Tiền sàn rút về\"",1],
   ["thukhac","KD","thu","Thu khác","Sổ thu (khách lẻ, nhà cung cấp hoàn tiền, thu khác)",1],
@@ -96,7 +96,7 @@ function tcnLcKey(d){
     case "CK_VAO":case "CK_RA":return "noibo";
     case "SAN_RUT":return d.san==="VI_SPE"?"spe":"tts";
     case "HOAN":return "hoan";case "CHI_NCC":return "ncc";case "CHI_VC":return "vc";case "CHI_THUONG":return "thuong";case "CHI_LUONG":return "luong";case "TS_TL":return "thanh_ly";
-    case "TCP":return {cod:"fbcod",thu_khac:"thukhac",lai_gui:"thukhac",vay:"vay",gop_von:"von",tra_vay:"tra_vay",rut_von:"von",co_tuc:"von",thue_tndn:"thue",thue_khac:"thue",lai_vay:"khac",phi_nh:"khac",chi_khac:"khac"}[d.tcp]||(d.amount>=0?"thukhac":"khac");
+    case "TCP":return {san_tt:"tts",san_spe:"spe",cod:"fbcod",thu_khac:"thukhac",lai_gui:"thukhac",vay:"vay",gop_von:"von",tra_vay:"tra_vay",rut_von:"von",co_tuc:"von",thue_tndn:"thue",thue_khac:"thue",lai_vay:"khac",phi_nh:"khac",chi_khac:"khac"}[d.tcp]||(d.amount>=0?"thukhac":"khac");
     case "THU_SO":return d.nguon==="sanrut"?"sanrut":d.nguon==="gc"?"oem":d.nguon==="npp"?"kpp":"thukhac";
     case "CHI_SO":{const g=String(d.g||"");return /^G0[123]$/.test(g)?"qc":/^G0[59]$/.test(g)?"vc":/^G0[78]$/.test(g)?"luong":g==="G28"?"mua_ts":"khac"}}
   return d.amount>=0?"thukhac":"khac"}
@@ -157,7 +157,8 @@ const TCN_B03=[
   ["61","Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ"],["70","Tiền và tương đương tiền cuối kỳ (70 = 50 + 60 + 61)"]];
 const TCN_B03_MA=TCN_B03.filter(r=>/^\d\d$/.test(r[0])&&!["20","30","40","50","60","61","70"].includes(r[0])).map(r=>r[0]);
 /* Phiếu thu / chi khác ghi thẳng ở Dòng tiền (khoản web chưa có chỗ ghi): [loại, tên, mã B03, +1 thu / −1 chi]. */
-const TCN_TCP=[["cod","Tiền COD Facebook về","01",1],["thu_khac","Thu khác","06",1],["lai_gui","Lãi tiền gửi ngân hàng","25",1],
+/* Tiền sàn rút về tài khoản = phiếu báo có ngân hàng (mã 01). Số dư còn trên ví sàn chưa phải tiền, không vào B03. */
+const TCN_TCP=[["san_tt","Báo có: tiền TikTok Shop rút về","01",1],["san_spe","Báo có: tiền Shopee rút về","01",1],["cod","Báo có: tiền COD Facebook về","01",1],["thu_khac","Thu khác","06",1],["lai_gui","Lãi tiền gửi ngân hàng","25",1],
   ["vay","Tiền vay (ngân hàng, cá nhân)","33",1],["gop_von","Chủ sở hữu góp vốn","31",1],
   ["tra_vay","Trả nợ gốc vay","34",-1],["lai_vay","Trả lãi vay","04",-1],["rut_von","Trả lại vốn góp","32",-1],["co_tuc","Chia lợi nhuận, cổ tức","35",-1],
   ["thue_tndn","Nộp thuế TNDN","05",-1],["thue_khac","Nộp thuế khác (GTGT, môn bài…)","07",-1],["phi_nh","Phí ngân hàng","07",-1],["chi_khac","Chi khác","07",-1]];
