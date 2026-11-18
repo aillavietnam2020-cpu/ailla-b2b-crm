@@ -43,7 +43,7 @@ function fdsThang(){fdsLoad();bcAllLoad();const M=FDS.m||{},ks=bcMonths("fb",Obj
     const so=!s?pill("chưa nạp","gry"):at>end?pill("đủ tháng","grn"):pill("đến "+vn(at),"blu");
     return `<tr><td><b>T${ky.slice(5)}/${ky.slice(0,4)}</b></td><td>${so}</td>
       <td class="n">${s?nf(s.don):"—"}</td><td class="n">${s?nf(s.dt):"—"}</td><td class="n">${s&&s.g&&s.g.chua?nf(s.g.chua[0])+" đơn":"—"}</td><td class="n">${s?nf(s.ship):"—"}</td>
-      <td style="white-space:nowrap">${s?esc((s.by||"")+" · "+vn(at)+" "+vt.slice(11,16)):`<span class="hint">—</span>`}</td>
+      <td>${s?esc(s.by||"")+`<br><small class="hint">${vn(at)} ${vt.slice(11,16)}</small>`:`<span class="hint">—</span>`}</td>
       <td>${bcFileBtns("fb",ky)}</td><td>${bcLinkBtns("fb",ky)}</td></tr>`}).join("");
   return `<section class="card"><div class="card-h"><h2>Báo cáo tiền về các tháng</h2><span class="hint">lưu đủ mọi tháng · số này vào Lãi lỗ, Tổng quan, Đối chiếu doanh thu</span></div>
    <div class="tbl"><table><thead><tr><th>Tháng</th><th>Số liệu</th><th class="n">Đơn đã về tiền</th><th class="n">Tiền hãng đã trả</th><th class="n">Chưa về tiền</th><th class="n">Phí hãng</th><th>Ai nạp</th><th>File</th><th>Link Drive</th></tr></thead><tbody>${rows}</tbody></table></div>

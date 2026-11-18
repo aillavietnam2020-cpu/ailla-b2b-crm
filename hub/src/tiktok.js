@@ -178,7 +178,7 @@ function tsbAdmPage(m){
   const chips=(TSB.months||[]).map(x=>`<button class="chip${!V&&x.ky===TSB.ky?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.summary&&x.summary.den?" · đến "+tsbVn(x.summary.den).slice(0,5):""}${x.locked_at?" ✓":""}</button>`).join("");
   const tabs=[["pl","Lãi lỗ"],["sp","Sản phẩm & SKU"],["cb","Cảnh báo"],["dl","Chất lượng dữ liệu"],["thang","Các tháng"],["up","Tải file tháng"]];
   let body="";
-  if(tab==="up")body=tsbUpAdmCard();
+  if(tab==="up")body=tsbUpAdmCard()+bcThangCard("tts","Báo cáo TikTok các tháng",["Doanh thu","Phí sàn","Đơn","Cập nhật"],(TSB.months||[]).slice().reverse().map(x=>({ky:x.ky,so:x.summary&&x.summary.den?pill("đến "+tsbVn(x.summary.den).slice(0,5),"blu"):pill(x.locked_at?"đã khoá sổ":"đủ tháng","grn"),cells:[tsbN(x.summary&&x.summary.dt),tsbN(Math.abs((x.summary&&x.summary.phi)||0)),x.summary&&x.summary.don?nf(x.summary.don):"—",`<small class="hint">${bcVnAt(x.updated_at)}</small>`]})));/* chị Hoa 18/11: file + link Drive từng tháng */
   else if(tab==="thang")body=tsbMonthsView();
   else if(!P)body=ky&&!V&&TSB.data[ky]===null?`<section class="card"><p class="hint">Đang tải ${tsbKyL(ky)}…</p></section>`:`<section class="card"><p class="empty">${TSB.months.length&&TSB.noRep?`Tháng ${tsbKyL(TSB.noRep)} chưa tải báo cáo TikTok. Bấm <b>Tải file tháng</b> để tải báo cáo tuần này (income đến ngày gần nhất), hoặc bấm tháng khác ở trên để xem.`:`Chưa có tháng nào. Bấm <b>Tải file tháng</b> để kế toán tải 3 file TikTok.`}</p></section>`;
   else if(tab==="pl")body=`<section class="card"><div class="card-h"><h2>Lãi lỗ kênh ${tsbKyL(ky)}</h2></div>${tsbPLTbl(P)}</section><section class="card"><div class="card-h"><h2>Phí sàn 7 nhóm</h2></div>${tsbFeeTbl(P)}</section>
@@ -193,6 +193,7 @@ function tsbAdmPage(m){
    +`<div class="filters"><div class="chips"><b>Tháng</b>${chips||`<span class="hint">chưa có tháng nào</span>`}${V?`<button class="chip on">${tsbKyL(V.ky)} · xem trước</button>`:""}</div>${stat}</div>`
    +prevBar+kp+`<div class="tabs">${tabs.map(([k,t])=>`<button data-sub="${k}" class="${k===tab?"on":""}">${t}</button>`).join("")}</div>`+body
    +srcNote("File TikTok Shop do kế toán tải (OrderSKUList, income, Campaign overview). Giá vốn lấy từ Quy đổi mã các sàn và Giá vốn SKU. Quy tắc: báo cáo quản trị TikTok (skill ailla-baocao-quantri-tiktok).");
+  if(typeof bcLinkBind==="function")bcLinkBind(m);
   m.querySelectorAll("[data-tsbky]").forEach(b=>b.onclick=()=>{TSB.prev=null;TSB.ky=b.dataset.tsbky;TSB.noRep="";if(SUB.bc_tiktok==="thang"||SUB.bc_tiktok==="up")SUB.bc_tiktok="pl";renderMain()});
   tsbBindFiles("tsbadm",tsbAdmFiles);
   const ki=$("#tsb-ky");if(ki)ki.onchange=()=>{TSB.up.ky=ki.value;tsbAdmCompute()};

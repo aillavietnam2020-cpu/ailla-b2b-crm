@@ -125,7 +125,7 @@ function spbAdmPage(m){
    +`<div class="tb-acts">${spbChips()}<span style="width:12px"></span>${kys.map(k=>`<button class="chip${k===ky&&!NR?" on":""}" data-spbky="${k}">${tsbKyL(k)}</button>`).join("")}${NR?`<button class="chip on">${tsbKyL(NR)} · theo đơn</button>`:""}<span style="flex:1"></span>
      <button class="btn sm" data-spbv="up">Các tháng</button><button class="btn sm pri" data-spbv="up">⬆ Tải file</button></div>`;
   let body;
-  if(v==="up"){m.innerHTML=H("Kênh Shopee","Tải báo cáo · các tháng đã lưu")+`<div class="tb-acts"><button class="btn sm" data-spbv="tong">← Tổng quan</button></div>`+speUpCard()+speSumCard();spbBind(m);
+  if(v==="up"){m.innerHTML=H("Kênh Shopee","Tải báo cáo · các tháng đã lưu")+`<div class="tb-acts"><button class="btn sm" data-spbv="tong">← Tổng quan</button></div>`+speUpCard()+speSumCard()+bcThangCard("spe","File & link Drive các tháng",["Doanh thu","Phí sàn","Đơn","Cập nhật"],(SPE.sums||[]).slice().sort((a,b)=>a.ky<b.ky?1:a.ky>b.ky?-1:a.shop<b.shop?-1:1).map(x=>({ky:x.ky,nhom:speShopL(x.shop),so:x.den?pill("đến "+speVn(x.den).slice(0,5),"blu"):pill("đủ tháng","grn"),cells:[speN(x.dt),speN(Math.abs(x.phi||0)),x.don?nf(x.don):"—",`<small class="hint">${bcVnAt(x.at)}</small>`]})));spbBind(m);bcLinkBind(m);
     tsbBindFiles("speup",speFiles);const sv=m.querySelector("#spe-save");if(sv)sv.onclick=speSave;const cl=m.querySelector("#spe-clr");if(cl)cl.onclick=()=>{SPE.prev=null;SPE.up={orders:[],fin:[],ads:[]};SPE.err="";renderMain()};return}
   if(NR)body=spbAdmDon(NR);
   else if(!ky)body=`<section class="card"><p class="empty">Chưa có tháng nào. Bấm <b>Tải file</b> để kế toán tải file của từng shop.</p></section>`;
