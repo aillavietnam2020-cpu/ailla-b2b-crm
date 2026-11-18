@@ -170,3 +170,6 @@ khoOpenDoc=async function(id,w){
     try{await kApi("/docs/"+id+"/to-kk",{method:"POST",body:"{}"});toast("Đã đổi");KHO.at=0;KHO.list={};await khoLoad(true);kkReload();kkOpen(id)}catch(e){toast(e.message)}};
 };
 PAGES.kho_kk=pKkPage;
+/* Quản trị › Tồn kho & giá trị (18/11 chị Huệ): bấm một mã mở cửa sổ tồn đầu kỳ + các phiếu nhập, xuất trong kỳ. */
+{const _g=PAGES.kho_gtri;if(_g)PAGES.kho_gtri=function(m){const r=_g.apply(this,arguments);
+  m.querySelectorAll("tbody tr").forEach(tr=>{const c=tr.querySelector("td.mono");if(!c)return;tr.classList.add("clk");tr.title="Bấm để xem tồn đầu kỳ và các phiếu nhập, xuất trong kỳ";tr.onclick=()=>khoNxtDetail(c.textContent.trim())});return r}}
