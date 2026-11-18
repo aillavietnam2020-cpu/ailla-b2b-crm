@@ -23,7 +23,7 @@ function plcTot(A,kk){if(!A)return null;
 /* Chi chung theo nhóm: cùng nguồn và cùng điều kiện lọc với spChungTheoThang (Sổ chi phí) + lương chung (dtPB). Lệch (nếu có) ghi "Khác" để tổng luôn khớp dòng Chi phí chung. */
 function plcChungNhom(ym,A){const o={},d=D(),add=(k,v)=>{if(v)o[k]=(o[k]||0)+v};
   try{const lo=g=>typeof scG==="function"?scG(g).lo:"",ok=x=>String(x.d||"").slice(0,7)===ym&&x.k==="Chung"&&!(typeof SC_PL_TRU!=="undefined"&&SC_PL_TRU.includes(x.g))&&/^[BC] - /.test(String(lo(x.g)||""))&&x.st!=="Chờ duyệt";
-    ((d.fin||{}).nkc||[]).filter(x=>!(typeof scChiDoiChieu==="function"&&scChiDoiChieu(x))).filter(ok).forEach(x=>add(x.g,+x.t||0));
+    ((d.fin||{}).nkc||[]).filter(x=>x.src!=="tamung"&&!(typeof scChiDoiChieu==="function"&&scChiDoiChieu(x))).filter(ok).forEach(x=>add(x.g,+x.t||0));
     const r=typeof scTsThang==="function"?scTsThang(ym):null;if(r&&r.chay)(r.dong||[]).map(z=>({d:z.d,g:z.g,k:z.k,t:z.t,st:"Ổn"})).filter(ok).forEach(x=>add(x.g,+x.t||0));
     const cat=k=>(d.costCats||[]).find(c=>c.k===k)||{nhom:"Khác"};(d.costs||[]).filter(c=>(c.ngay?c.ngay.slice(0,7):c.thang)===ym&&!c.kenh&&cat(c.cat).nhom!=="Marketing").forEach(c=>add("tay",+c.tien||0))}catch(e){}
   if(A.pb&&+A.pb.luongChung)add("luong",+A.pb.luongChung);

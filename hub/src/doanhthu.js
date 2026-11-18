@@ -88,7 +88,7 @@ const DT_NKC_ROW={tts:"tts",fb:"fb",spe:"spe",B2B:"b2b",GIA_CONG:"gc"};
 /* Tháng đã chạy khấu hao / phân bổ trên trang Tài sản: bỏ dòng khấu hao MISA của tháng đó (scChiDoiChieu, chỉ đối chiếu) và cộng dòng
    tsChiPhiThang(ym).dong (không ghi vào fin.nkc) — báo của chat Sổ chi phí 28/10. Ngày của dòng tài sản là cuối tháng, kéo về `to` nếu kỳ dừng giữa tháng. */
 function dtSoCp(from,to){const f=typeof D==="function"&&D()&&D().fin;if(!f||!f.nkc)return null;
-  let nkc=typeof scChiDoiChieu==="function"?f.nkc.filter(x=>!scChiDoiChieu(x)):f.nkc;
+  let nkc=(typeof scChiDoiChieu==="function"?f.nkc.filter(x=>!scChiDoiChieu(x)):f.nkc).filter(x=>x.src!=="tamung"); /* tạm ứng lương: không phải chi phí thêm */
   if(typeof tsChiPhiThang==="function"){const ts=[];for(let ym=from.slice(0,7);ym<=to.slice(0,7);ym=plYmAdd(ym,1)){try{const r=tsChiPhiThang(ym);if(r&&r.chay)r.dong.forEach(x=>ts.push({...x,d:x.d>to?to:x.d}))}catch(e){}}if(ts.length)nkc=nkc.concat(ts)}
   nkc=nkc.concat(dtVcRows(f.nkc,from,to));
   return dtNkcKenh(nkc,from,to,g=>typeof scG==="function"?scG(g).lo:"")}
