@@ -105,6 +105,9 @@ function pchTaskBox(t){
   if(t.pcMa){const left=(PCH.ct||[]).some(r=>r.btp===t.pcMa);return left?pchGanHtml(t.pcMa):`<div class="note grn">Đã gán mã cho bán thành phẩm này.</div>`}
   if(t.pcKiem||t.pcDat||t.pcLech||t.pcOrder)return `<div class="note amb">${t.pcKiem?"Đếm các nguyên liệu này ở xưởng rồi báo tồn: web tự báo Quản lý mua hàng đặt nếu hết thật.":t.pcOrder?"Kỹ thuật order đặt hàng các nguyên liệu trong mô tả việc. Lập đơn mua.":t.pcDat?"Kỹ thuật đã đếm: các mã dưới đây còn dưới mức đặt mua. Lập đơn mua.":"Số đếm ở xưởng khác số trên web. Tìm phiếu nhập / xuất bị sót hoặc ghi sai, rồi báo kế toán kho lập phiếu kiểm kê."}
     <div class="acts" style="margin-top:8px">${t.pcKiem?`<button type="button" class="btn pri" data-pchgo="ton">Đếm và báo tồn</button>`:`<button type="button" class="btn pri" data-pchgo="kho_ton">Xem tồn kho nguyên vật liệu</button>`}</div></div>`;
+  if(t.pcHh){const nm=String(t.pcHh).split("|")[0];return `<div class="note red"><b>${esc(nm)}</b>: ${esc(String(t.ten||"").replace(/^Xem hao hụt pha chế: /,""))}.<br>Mẻ bị tính là lệch khi một dòng nguyên liệu pha khác công thức quá ${PCH_TOL}%.
+    <div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchhh="me">Xem các mẻ lệch</button> <button type="button" class="btn" data-pchhh="ng">Xem theo người pha</button> <button type="button" class="btn" data-pchhh="nl">Xem theo nguyên liệu</button></div>
+    <p class="hint" style="margin:8px 0 0">Xem xong thì nhắc người pha hoặc ghi lý do vào phần trao đổi bên dưới, rồi bấm Xong.</p></div>`}
   return "";
 }
 function pchBindBox(root){
@@ -116,10 +119,11 @@ function pchBindBox(root){
   root.querySelectorAll("[data-pchhd]").forEach(b=>b.onclick=()=>pchHdShow(b.dataset.pchhd));
   root.querySelectorAll("[data-pchok]").forEach(b=>b.onclick=()=>pchCtApprove(+b.dataset.pchok));
   root.querySelectorAll("[data-pchtra]").forEach(b=>b.onclick=()=>pchCtReturn(+b.dataset.pchtra));
+  root.querySelectorAll("[data-pchhh]").forEach(b=>b.onclick=()=>{closeDrawer();PCH.hhView=b.dataset.pchhh;pchGo("kho_pc","hh")});
   root.querySelectorAll("[data-pchgo]").forEach(b=>b.onclick=()=>{closeDrawer();b.dataset.pchgo==="kho_ton"?pchGo("kho_ton"):pchGo("kho_pc",b.dataset.pchgo)});
 }
 if(typeof openTask==="function"){const _ot=openTask;openTask=function(id){const r=_ot.apply(this,arguments);try{
-  const t=id&&D().tasks.find(x=>x.id===id);if(!t||!(t.pcYc||t.pcCt||t.pcKiem||t.pcDat||t.pcLech||t.pcOrder||t.pcMa))return r;
+  const t=id&&D().tasks.find(x=>x.id===id);if(!t||!(t.pcYc||t.pcCt||t.pcKiem||t.pcDat||t.pcLech||t.pcOrder||t.pcMa||t.pcHh))return r;
   const draw=()=>{const h=document.querySelector("#drawerIn h2");if(!h)return;let box=document.getElementById("pch-box");if(!box){box=document.createElement("div");box.id="pch-box";h.after(box)}box.innerHTML=pchTaskBox(t);pchBindBox(box)};
   draw();if(t.pcYc&&!PCH.yc)pchLoadYc().then(draw).catch(()=>{});if((t.pcYc||t.pcCt||t.pcMa)&&!PCH.ct)pchLoadCt().then(draw).catch(()=>{});
   if(typeof KHO!=="undefined"&&!KHO.cat&&typeof khoLoad==="function")khoLoad();
