@@ -190,7 +190,7 @@ function cwRows(){if(CW_C)return CW_C;const d=D(),td=d.settings.today,T={},out=[
   try{const P={};out.forEach(r=>{if(r.src==="task")P[r.id]=r});
     (d.tasks||[]).forEach(t=>{const p=P[t.id];if(!p||t.st==="done"||t.st==="review"||!Array.isArray(t.checklist))return;
       t.checklist.forEach((c,i)=>{if(!c||c.x||!(+c.han))return;const ng=c.nguoi||t.nguoi,han=+c.han,late=han<td;if(!ng||CV_TEST.includes(ng))return;
-        out.push(Object.assign({},p,{k:"task:"+t.id+"#"+i,ckI:i,ckT:c.t,ten:p.ten+" › "+c.t,nguoi:ng,han,late,lateD:late?td-han:0,st:"todo",rv:false,tpl:"",ck:[],cd:null,hasMyKid:false}));
+        out.push(Object.assign({},p,{k:"task:"+t.id+"#"+i,ckI:i,ckT:c.t,ten:c.t,kidOf:p.ten,nguoi:ng,han,late,lateD:late?td-han:0,st:"todo",rv:false,tpl:"",ck:[],cd:null,hasMyKid:false}));
         if(ng===ME.id)p.hasMyKid=true})})}catch(e){console.error("đầu việc có hạn",e)}
   CW_C=out;Promise.resolve().then(()=>{CW_C=null});return out}
 const cwOpen=r=>r.st!=="done";
@@ -215,7 +215,7 @@ function cwStPill(r){if(r.st==="done")return pill("Xong","grn");if(r.tc)return p
   if(r.late)return pill("Trễ "+r.lateD+" ngày","red");if(r.tl)return pill("Cần sửa","red");
   return r.st==="doing"?pill("Đang làm","blu"):r.st==="pause"?pill("Tạm dừng","gry"):r.st==="nhan"?pill("Đã nhận việc","blu"):r.st==="cg"?pill("Chưa giao","gry"):pill("Cần làm","gry")}
 function cwMeta(r,sub){const a=[];
-  if(r.src==="task"&&!sub){if(r.tu)a.push("<span>Tự thêm</span>");else if(r.tao&&r.tao!==r.nguoi)a.push(`<span>Giao bởi ${esc(userName(r.tao)||"—")}</span>`)}
+  if(r.kidOf)a.push(`<span>Trong việc: ${esc(r.kidOf)}</span>`);else if(r.src==="task"&&!sub){if(r.tu)a.push("<span>Tự thêm</span>");else if(r.tao&&r.tao!==r.nguoi)a.push(`<span>Giao bởi ${esc(userName(r.tao)||"—")}</span>`)}
   if(r.src!=="task"&&r.mo)a.push(`<span>${esc(String(r.mo).replace(/<[^>]*>/g,""))}</span>`);
   if(r.gio)a.push(`<span>${cwI("clock")}${esc(r.gio)}</span>`);
   if(r.da&&prjN(r.da))a.push(`<span>${cwI("fold")}${esc(prjN(r.da))}</span>`);
