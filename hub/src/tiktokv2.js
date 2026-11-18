@@ -148,7 +148,7 @@ function tbAdmPage(m){
   const S=ky?TSB.data[ky]:null,P=S?tbNoUoc(S.pl):null,todo=S?(S.data.todo||ttTodo(S.pl)):null;
   const nViec=todo?todo.noMap.length+todo.miss.length+todo.pack.length:0,lock=S&&S.locked_at;
   const head=H("Kênh TikTok Shop",`Báo cáo quản trị${TB.noRep?" · "+tsbKyL(TB.noRep)+" · theo đơn, chưa có báo cáo quyết toán":ky?" · "+tsbKyL(ky):""}${S&&S.data.M&&S.data.M.den?" · số đến "+tsbVn(S.data.M.den):""} · chốt sổ ngày 10 tháng sau`)
-   +`<div class="tb-acts">${(TSB.months||[]).map(x=>`<button class="chip${x.ky===ky&&!TB.noRep?" on":""}" data-tsbky="${x.ky}">${tsbKyL(x.ky)}${x.locked_at?" ✓":""}</button>`).join("")}${TB.noRep?`<button class="chip on">${tsbKyL(TB.noRep)} · theo đơn</button>`:""}<span style="flex:1"></span>
+   +`<div class="tb-acts">${""/* chị Hoa 18/11: bỏ nút tháng, tháng theo bộ lọc ngày trên cùng */}<span style="flex:1"></span>
      <button class="btn sm" data-tbv="thang">Các tháng</button><button class="btn sm" data-tbv="dl">Kiểm dữ liệu${nViec?`<span class="tb-cnt">${nViec}</span>`:""}</button>
      ${S&&!TB.noRep?(lock?(isCeo()?`<button class="btn sm" id="tsb-unlock">Mở khoá ${tsbKyL(ky)}</button>`:`<span class="hint">Đã khoá sổ</span>`):`<button class="btn sm" id="tsb-recalc">Tính lại giá vốn</button><button class="btn sm" id="tsb-lock">Khoá sổ ${tsbKyL(ky)}</button>`):""}
      <button class="btn sm pri" data-tbv="up">⬆ Tải file</button></div>`

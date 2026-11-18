@@ -122,7 +122,7 @@ function spbAdmPage(m){
   const ky=SPB.ky,S0=SPE.sums.filter(s=>s.ky===ky),den=S0.reduce((a,s)=>s.den&&(!a||s.den<a)?s.den:a,null);
   const NR=SPB.noRep&&v!=="up"?SPB.noRep:"";
   const head=H("Kênh Shopee",`Báo cáo quản trị${NR?" · "+tsbKyL(NR)+" · theo đơn, chưa có báo cáo":(ky?" · "+tsbKyL(ky):"")+(den?" · số đến "+speVn(den)+" · tạm tính":"")} · chốt sổ sáng ngày 10 tháng sau`)
-   +`<div class="tb-acts">${spbChips()}<span style="width:12px"></span>${kys.map(k=>`<button class="chip${k===ky&&!NR?" on":""}" data-spbky="${k}">${tsbKyL(k)}</button>`).join("")}${NR?`<button class="chip on">${tsbKyL(NR)} · theo đơn</button>`:""}<span style="flex:1"></span>
+   +`<div class="tb-acts">${spbChips()}${""/* chị Hoa 18/11: bỏ nút tháng, tháng theo bộ lọc ngày trên cùng */}<span style="flex:1"></span>
      <button class="btn sm" data-spbv="up">Các tháng</button><button class="btn sm pri" data-spbv="up">⬆ Tải file</button></div>`;
   let body;
   if(v==="up"){m.innerHTML=H("Kênh Shopee","Tải báo cáo · các tháng đã lưu")+`<div class="tb-acts"><button class="btn sm" data-spbv="tong">← Tổng quan</button></div>`+speUpCard()+speSumCard()+bcThangCard("spe","File & link Drive các tháng",["Doanh thu","Phí sàn","Đơn","Cập nhật"],(SPE.sums||[]).slice().sort((a,b)=>a.ky<b.ky?1:a.ky>b.ky?-1:a.shop<b.shop?-1:1).map(x=>({ky:x.ky,nhom:speShopL(x.shop),so:x.den?pill("đến "+speVn(x.den).slice(0,5),"blu"):pill("đủ tháng","grn"),cells:[speN(x.dt),speN(Math.abs(x.phi||0)),x.don?nf(x.don):"—",`<small class="hint">${bcVnAt(x.at)}</small>`]})));spbBind(m);bcLinkBind(m);
