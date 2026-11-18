@@ -170,3 +170,33 @@ khoOpenDoc=async function(id,w){
     try{await kApi("/docs/"+id+"/to-kk",{method:"POST",body:"{}"});toast("Đã đổi");KHO.at=0;KHO.list={};await khoLoad(true);kkReload();kkOpen(id)}catch(e){toast(e.message)}};
 };
 PAGES.kho_kk=pKkPage;
+/* Quản trị › Tồn kho & giá trị (18/11 chị Huệ): bấm một mã mở cửa sổ tồn đầu kỳ + các phiếu nhập, xuất trong kỳ. */
+{const _g=PAGES.kho_gtri;if(_g)PAGES.kho_gtri=function(m){const r=_g.apply(this,arguments);
+  m.querySelectorAll("tbody tr").forEach(tr=>{const c=tr.querySelector("td.mono");if(!c)return;tr.classList.add("clk");tr.title="Bấm để xem tồn đầu kỳ và các phiếu nhập, xuất trong kỳ";tr.onclick=()=>khoNxtDetail(c.textContent.trim())});return r}}
+/* Sổ chi tiết theo mã (chị Huệ 18/11, giống "Sổ chi tiết vật tư hàng hóa" MISA): từng chứng từ của MỘT mã trong kỳ:
+   ngày, số chứng từ, diễn giải, đơn giá, nhập, xuất, tồn. Bấm dòng chỉ hiện dòng của mã đó trong phiếu; nút "Xem cả phiếu" mở toàn phiếu. */
+const KK_TY={B2B:"Xuất bán đơn Kênh phân phối",TRA_HANG:"Nhập hàng trả lại",ONLINE:"Xuất bán lẻ sàn",PN:"Phiếu nhập",XB:"Phiếu xuất",XK:"Phiếu xuất khác",PC:"Pha chế",KS:"Đóng gói",TD:"Tồn đầu kỳ",TL:"Nhập hàng hoàn",DC:"Điều chỉnh kiểm kê",KK:"Kiểm tồn"};
+khoNxtDetail=async function(code){
+  kkCss();const P=kPer();let r;try{r=await kApi(`/nxt/detail?item=${encodeURIComponent(code)}&from=${P.from}&to=${P.to}`)}catch(e){toast(e.message);return}
+  const it=KHO.items.get(code)||{name:code,unit:""};let bal=+r.opening||0,tin=0,tout=0,vin=0,vout=0;
+  const rows=r.rows.map((x,i)=>{const q=+x.qty;bal+=q;const p=x.price!=null?+x.price:null,v=p!=null?Math.round(Math.abs(q)*p):null;
+    if(q>0){tin+=q;vin+=v||0}else{tout+=-q;vout+=v||0}
+    const dg=[KK_TY[x.doc_type]||x.doc_type,x.partner,x.ref_no&&x.ref_no!==x.partner?"tham chiếu "+x.ref_no:"",x.note].filter(Boolean).join(" · ");
+    return `<tr class="clk" data-ln="${i}"><td>${kDd(x.doc_date)}</td><td class="mono"><a href="#" class="lnk">${esc(x.doc_no||"—")}</a></td><td>${esc(dg)}</td><td class="n">${p!=null?nf(Math.round(p)):""}</td><td class="n">${q>0?knum(q):""}</td><td class="n">${q>0&&v!=null?nf(v):""}</td><td class="n">${q<0?knum(-q):""}</td><td class="n">${q<0&&v!=null?nf(v):""}</td><td class="n"><b>${knum(bal)}</b></td></tr>`}).join("");
+  openDrawerHTML(`<h2>Sổ chi tiết · ${esc(code)} · ${esc(it.name)}</h2><p class="hint">Kỳ ${kPerLabel(P)} · ĐVT ${esc(it.unit||"—")}. Bấm một dòng để xem đúng dòng của mã này trong phiếu.</p>
+   <div class="kk-kp"><div><b>${knum(r.opening)}</b><span>tồn đầu kỳ</span></div><div><b style="color:#16804a">${knum(tin)}</b><span>nhập trong kỳ${vin?" · "+nf(vin)+" đ":""}</span></div><div><b style="color:#c62f3a">${knum(tout)}</b><span>xuất trong kỳ${vout?" · "+nf(vout)+" đ":""}</span></div><div><b>${knum(bal)}</b><span>tồn cuối kỳ</span></div></div>
+   ${r.rows.length?`<div class="tbl"><table><thead><tr><th>Ngày</th><th>Chứng từ</th><th>Diễn giải</th><th class="n">Đơn giá</th><th class="n">Nhập SL</th><th class="n">Nhập GT</th><th class="n">Xuất SL</th><th class="n">Xuất GT</th><th class="n">Tồn</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="kk-empty">Không có chứng từ nào trong kỳ.</p>`}`);
+  document.querySelectorAll("#drawer [data-ln]").forEach(tr=>tr.onclick=e=>{e.preventDefault();const x=r.rows[+tr.dataset.ln];
+    if(x.doc_id>0)kkLine(x.doc_id,code);else if(x.order_id)window.open("/print/orders/"+x.order_id+"?type=ship","_blank")});
+};
+async function kkLine(id,code){
+  let r;try{r=await kApi("/docs/"+id)}catch(e){toast(e.message);return}
+  const d=r.doc,T=KHO_TYPES[d.type]||{name:KK_TY[d.type]||d.type},L=r.moves.filter(m=>m.item===code),it=KHO.items.get(code)||{name:code,unit:""};
+  const ROLE={IN:"Nhập",USE:"Dùng",OUT:"Xuất",PRODUCT:"Thành phẩm / thu được",AUTO:"Trừ theo định mức",RETURN:"Nhập lại",DROP:"Bỏ",DC:"Điều chỉnh",TREO:"Điều chỉnh (treo)"};
+  openDrawerHTML(`<h2>${esc(d.no)} · chỉ mã ${esc(code)}</h2>
+   <p>${esc(T.name)} · ngày ${kDd(d.doc_date)} · lập bởi ${esc(d.created_by_name||"—")}${d.partner?` · ${esc(d.partner)}`:""}${d.ref_no?` · tham chiếu ${esc(d.ref_no)}`:""}${d.status!=="OK"?" · "+pill(d.status==="CHO"?"Chờ duyệt":"Đã hủy","gry"):""}</p>${d.note?`<p class="hint">${esc(d.note)}</p>`:""}
+   <p class="hint">${esc(it.name)} · ĐVT ${esc(it.unit||"—")} · phiếu này có ${nf(r.moves.length)} dòng, đang hiện ${nf(L.length)} dòng của mã này.</p>
+   ${L.length?tbl(["Vai trò","Số lượng","Đơn giá","Giá trị","Định mức / số sổ","Ghi chú"],L.map(m=>`<tr><td>${esc(ROLE[m.role]||m.role)}</td><td class="n"><b>${knum(m.qty)}</b></td><td class="n">${m.price!=null?nf(Math.round(m.price)):"—"}</td><td class="n">${m.price!=null?nf(Math.round(m.qty*m.price)):"—"}</td><td class="n">${m.std_qty!=null?knum(m.std_qty):"—"}</td><td>${esc(m.note||"")}</td></tr>`)):`<p class="kk-empty">Phiếu này không có dòng của mã ${esc(code)}.</p>`}
+   <div class="row7"><button class="btn" id="kl-back">← Quay lại sổ chi tiết ${esc(code)}</button><button class="btn" id="kl-all">Xem cả phiếu / in</button></div>`);
+  $("#kl-back").onclick=()=>khoNxtDetail(code);$("#kl-all").onclick=()=>kkOrig(id);
+}
