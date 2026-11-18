@@ -655,7 +655,7 @@ function pCvDa(m){
   m.querySelectorAll("[data-pjtk]").forEach(b=>b.onclick=()=>openTask(b.dataset.pjtk));
   if($("#pj-quick"))$("#pj-quick").onsubmit=e=>{e.preventDefault();const ten=$("#pjq-t").value.trim();if(!ten)return;prjSave(null,{ten,owner:$("#pjq-o").value,han:+$("#pjq-h").value,team:teamOf(ME)&&TEAMS[teamOf(ME)]?teamOf(ME):"content"});toast("Đã thêm dự án");renderMain()};
   const goView=(id,view)=>{CVF.da=id;CVV.view=view;CVV.scope="team";cvWhoSet("all");CVF.st="";MOD="cv";PAGE="cv_v";render()};
-  m.querySelectorAll("[data-pjv]").forEach(b=>b.onclick=()=>goView(b.dataset.pjv,"list"));
+  m.querySelectorAll("[data-pjv]").forEach(b=>b.onclick=()=>{const w=window.open(location.pathname+"#da="+encodeURIComponent(b.dataset.pjv),"_blank","noopener");if(!w)goView(b.dataset.pjv,"list")});
   /* giao việc ngay trong dự án (chị Hoa 08/11): mở khung giao việc, ô Dự án điền sẵn dự án này */
   m.querySelectorAll("[data-pjatt]").forEach(b=>b.onclick=()=>{if(typeof cwAttachDa==="function")cwAttachDa(b.dataset.pjatt)});
   m.querySelectorAll("[data-pjadd]").forEach(b=>b.onclick=()=>{const id=b.dataset.pjadd;openTask(null);const da=document.querySelector("#tkf2 #t-da");if(da){da.disabled=false;da.value=id;da.dispatchEvent(new Event("change"))}});
