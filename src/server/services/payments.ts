@@ -156,7 +156,13 @@ async function settleLeftover(
 ) {
   const leftover = amount - allocated;
   if (leftover <= 0) return { to_old: 0, to_credit: 0 };
-  const cust = await db.prepare('SELECT opening_debt FROM customers WHERE id = ?').bind(customerId).first<{ opening_debt: number }>();
+  // Nợ cũ gồm nợ đầu kỳ + thu nhập khác (VAT khách lấy hóa đơn...).
+  const cust = await db
+    .prepare(
+      'SELECT opening_debt + (SELECT COALESCE(SUM(amount), 0) FROM customer_other_charges WHERE customer_id = customers.id AND deleted_at IS NULL) AS opening_debt FROM customers WHERE id = ?',
+    )
+    .bind(customerId)
+    .first<{ opening_debt: number }>();
   const prior = await db
     .prepare(
       `SELECT COALESCE(SUM(p.amount - COALESCE(a.allocated, 0)), 0) AS free
@@ -405,7 +411,8 @@ export interface AutoAllocatePreview {
 export async function previewAutoAllocate(db: D1Database): Promise<AutoAllocatePreview> {
   const rows = await db
     .prepare(
-      `SELECT p.id, p.customer_id, c.name AS customer_name, c.opening_debt AS opening_debt,
+      `SELECT p.id, p.customer_id, c.name AS customer_name,
+              c.opening_debt + (SELECT COALESCE(SUM(oc.amount), 0) FROM customer_other_charges oc WHERE oc.customer_id = c.id AND oc.deleted_at IS NULL) AS opening_debt,
               p.note, p.explanation, p.amount - COALESCE(a.allocated, 0) AS free, (${NOT_LEFTOVER_SETTLED_SQL}) AS unsettled
        FROM payments p JOIN customers c ON c.id = p.customer_id
        LEFT JOIN (${ALLOCATED_BY_PAYMENT}) a ON a.payment_id = p.id

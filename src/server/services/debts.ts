@@ -10,6 +10,8 @@ interface DebtRow {
   credit_limit: number | null;
   tier_debt_limit: number | null;
   posted_charges: number;
+  /** Thu nhập khác (đã nằm trong posted_charges). */
+  other_charges: number;
   pending_charges: number;
   confirmed_payments: number;
   pending_cash: number;
@@ -28,7 +30,9 @@ interface DebtRow {
 const BASE_SQL = `
 SELECT c.id, c.name, c.owner_id, u.display_name AS owner_name,
        c.opening_debt, c.credit_limit, t.debt_limit AS tier_debt_limit,
-       COALESCE(o.posted_charges, 0) - COALESCE(rt.credited, 0) AS posted_charges,
+       -- Thu nhập khác (VAT khách lấy hóa đơn...) cộng vào nợ đã ghi, không phải doanh thu bán hàng.
+       COALESCE(o.posted_charges, 0) - COALESCE(rt.credited, 0) + (SELECT COALESCE(SUM(oc.amount), 0) FROM customer_other_charges oc WHERE oc.customer_id = c.id AND oc.deleted_at IS NULL) AS posted_charges,
+       (SELECT COALESCE(SUM(oc.amount), 0) FROM customer_other_charges oc WHERE oc.customer_id = c.id AND oc.deleted_at IS NULL) AS other_charges,
        COALESCE(o.pending_charges, 0) - COALESCE(rt.awaiting, 0) AS pending_charges,
        COALESCE(p.confirmed_payments, 0) AS confirmed_payments,
        COALESCE(p.pending_cash, 0)       AS pending_cash,
@@ -85,6 +89,7 @@ function toSummary(row: DebtRow): DebtSummary {
     ...debt,
     opening_debt: debt.openingDebt,
     posted_charges: debt.postedCharges,
+    other_charges: row.other_charges ?? 0,
     confirmed_payments: debt.confirmedPayments,
     official_debt: debt.officialDebt,
     pending_charges: debt.pendingCharges,
@@ -178,7 +183,7 @@ export function totalDebts(list: DebtSummary[]): DebtTotals {
 /** Một dòng trong lịch sử giao dịch công nợ của khách (13/10 chị: hồ sơ khách cần lịch sử giao dịch). */
 export interface LedgerEntry {
   date: string;
-  kind: 'DAU_KY' | 'GHI_NO' | 'THANH_TOAN' | 'DIEU_CHINH' | 'TRA_HANG';
+  kind: 'DAU_KY' | 'GHI_NO' | 'THANH_TOAN' | 'DIEU_CHINH' | 'TRA_HANG' | 'KHAC';
   ref: string;
   note: string | null;
   /** + làm tăng nợ, - làm giảm nợ */
@@ -187,6 +192,15 @@ export interface LedgerEntry {
   confirmed: boolean;
   /** dư nợ chính thức sau dòng này (chỉ cộng các dòng đã xác nhận) */
   balance: number;
+}
+
+/** Tổng thu nhập khác (còn hiệu lực) của một khách. */
+export async function otherChargesOf(db: D1Database, customerId: string): Promise<number> {
+  const r = await db
+    .prepare('SELECT COALESCE(SUM(amount), 0) AS s FROM customer_other_charges WHERE customer_id = ? AND deleted_at IS NULL')
+    .bind(customerId)
+    .first<{ s: number }>();
+  return r?.s ?? 0;
 }
 
 export async function customerLedger(db: D1Database, customerId: string): Promise<LedgerEntry[]> {
@@ -214,6 +228,12 @@ export async function customerLedger(db: D1Database, customerId: string): Promis
     rows.push({ date: p.paid_at, kind: adj ? 'DIEU_CHINH' : 'THANH_TOAN',
       ref: p.external_receipt_no || (adj ? 'Bút toán đảo' : p.method || 'Thu tiền'), note: p.note ?? null,
       amount: adj ? p.amount : -p.amount, confirmed: p.accounting_status === 'DA_XAC_NHAN' });
+  }
+  const other = await db.prepare(
+    `SELECT charge_date, amount, description, doc_no FROM customer_other_charges WHERE customer_id = ? AND deleted_at IS NULL`,
+  ).bind(customerId).all<Record<string, any>>();
+  for (const x of other.results ?? []) {
+    rows.push({ date: x.charge_date, kind: 'KHAC', ref: x.doc_no || 'Thu nhập khác', note: x.description, amount: x.amount, confirmed: true });
   }
   const rets = await db.prepare(
     `SELECT return_no, return_date, credit_amount, claimed_amount, status, reason FROM order_returns
@@ -326,7 +346,8 @@ export async function customerStatement(db: D1Database, customerId: string, asOf
     byPay.set(r.payment_id, arr);
   }
   // Phần chưa trừ đơn nào: trừ công nợ cũ trước, hết nợ cũ thì thành số dư có (làm tuần tự theo ngày).
-  let oldLeft = cust.opening_debt ?? 0;
+  // Nợ cũ = nợ đầu kỳ + thu nhập khác (VAT...): tiền thừa sau khi trừ đơn thì trừ vào đây trước khi thành số dư có.
+  let oldLeft = (cust.opening_debt ?? 0) + (await otherChargesOf(db, customerId));
   const everPays = await db
     .prepare('SELECT id, amount, purpose, paid_at FROM payments WHERE customer_id = ? AND is_adjustment = 0 ORDER BY paid_at ASC, created_at ASC')
     .bind(customerId)
