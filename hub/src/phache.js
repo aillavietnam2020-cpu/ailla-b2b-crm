@@ -107,7 +107,8 @@ function pchTaskBox(t){
     <div class="acts" style="margin-top:8px">${t.pcKiem?`<button type="button" class="btn pri" data-pchgo="ton">Đếm và báo tồn</button>`:`<button type="button" class="btn pri" data-pchgo="kho_ton">Xem tồn kho nguyên vật liệu</button>`}</div></div>`;
   if(t.pcHh){const nm=String(t.pcHh).split("|")[0];return `<div class="note red"><b>${esc(nm)}</b>: ${esc(String(t.ten||"").replace(/^Xem hao hụt pha chế: /,""))}.<br>Mẻ bị tính là lệch khi một dòng nguyên liệu pha khác công thức quá ${PCH_TOL}%.
     <div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchhh="me">Xem các mẻ lệch</button> <button type="button" class="btn" data-pchhh="ng">Xem theo người pha</button> <button type="button" class="btn" data-pchhh="nl">Xem theo nguyên liệu</button></div>
-    <p class="hint" style="margin:8px 0 0">Xem xong thì nhắc người pha hoặc ghi lý do vào phần trao đổi bên dưới, rồi bấm Xong.</p></div>`}
+    <div class="acts" style="margin-top:8px"><button type="button" class="btn" data-pchhq="${esc(t.id)}">Nhắn hỏi ${esc(nm)} lý do lệch</button> <button type="button" class="btn" data-pchhok="${esc(t.id)}">Đã xem, bình thường, xong việc</button></div>
+    <p class="hint" style="margin:8px 0 0">Nhắn hỏi: ${esc(nm)} nhận thông báo và trả lời ở phần trao đổi của việc này. Nếu lệch vì pha nhiều mẻ hoặc công thức cũ thì bấm Đã xem để đóng việc.</p></div>`}
   return "";
 }
 function pchBindBox(root){
@@ -119,6 +120,9 @@ function pchBindBox(root){
   root.querySelectorAll("[data-pchhd]").forEach(b=>b.onclick=()=>pchHdShow(b.dataset.pchhd));
   root.querySelectorAll("[data-pchok]").forEach(b=>b.onclick=()=>pchCtApprove(+b.dataset.pchok));
   root.querySelectorAll("[data-pchtra]").forEach(b=>b.onclick=()=>pchCtReturn(+b.dataset.pchtra));
+  root.querySelectorAll("[data-pchhq]").forEach(b=>b.onclick=()=>{const t=D().tasks.find(x=>x.id===b.dataset.pchhq);if(!t)return;const nm=String(t.pcHh||"").split("|")[0],u=(D().users||[]).find(x=>x.name===nm);if(!u){toast("Không tìm thấy người pha trong danh sách nhân sự");return}
+    DB.mutate(ME.name,"hỏi lý do hao hụt pha chế",dt=>{const x=dt.tasks.find(y=>y.id===t.id);if(x&&x.nguoi!==u.id&&!(x.phoi||[]).includes(u.id))x.phoi=(x.phoi||[]).concat(u.id);notifyU(dt,[u.id],`${ME.name} hỏi bạn: các mẻ pha lệch tháng này (${t.ten.replace(/^Xem hao hụt pha chế: /,"")}). Bạn ghi lý do giúp nhé.`,"task:"+t.id)});toast("Đã nhắn "+nm)});
+  root.querySelectorAll("[data-pchhok]").forEach(b=>b.onclick=()=>{if(!confirm("Đóng việc này: đã xem, lệch là bình thường?"))return;tkSetSt(b.dataset.pchhok,"done");toast("Đã xong việc");closeDrawer();renderMain()});
   root.querySelectorAll("[data-pchhh]").forEach(b=>b.onclick=()=>{closeDrawer();PCH.hhView=b.dataset.pchhh;pchGo("kho_pc","hh")});
   root.querySelectorAll("[data-pchgo]").forEach(b=>b.onclick=()=>{closeDrawer();b.dataset.pchgo==="kho_ton"?pchGo("kho_ton"):pchGo("kho_pc",b.dataset.pchgo)});
 }
