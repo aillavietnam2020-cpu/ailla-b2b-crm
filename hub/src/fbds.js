@@ -45,7 +45,7 @@ function fdsThang(){fdsLoad();bcAllLoad();const M=FDS.m||{},ks=bcMonths("fb",Obj
       <td class="n">${s?nf(s.don):"—"}</td><td class="n">${s?nf(s.dt):"—"}</td><td class="n">${s&&s.g&&s.g.chua?nf(s.g.chua[0])+" đơn":"—"}</td><td class="n">${s?nf(s.ship):"—"}</td>
       <td>${s?esc(s.by||"")+`<br><small class="hint">${vn(at)} ${vt.slice(11,16)}</small>`:`<span class="hint">—</span>`}</td>
       <td>${bcFileBtns("fb",ky)}</td><td>${bcLinkBtns("fb",ky)}</td></tr>`}).join("");
-  return `<section class="card"><div class="card-h"><h2>Báo cáo tiền về các tháng</h2><span class="hint">lưu đủ mọi tháng · số này vào Lãi lỗ, Tổng quan, Đối chiếu doanh thu</span></div>
+  return `<section class="card" id="fds-thang"><div class="card-h"><h2>Báo cáo tiền về các tháng</h2><span class="hint">lưu đủ mọi tháng · số này vào Lãi lỗ, Tổng quan, Đối chiếu doanh thu</span></div>
    <div class="tbl"><table><thead><tr><th>Tháng</th><th>Số liệu</th><th class="n">Đơn đã về tiền</th><th class="n">Tiền hãng đã trả</th><th class="n">Chưa về tiền</th><th class="n">Phí hãng</th><th>Ai nạp</th><th>File</th><th>Link Drive</th></tr></thead><tbody>${rows}</tbody></table></div>
    <p class="hint" style="margin:8px 0 0">Mỗi tháng một dòng; nạp lại thì số mới thay số cũ, file cũ vẫn giữ trên Drive. "Điền" để dán link thư mục Drive kế toán đang giữ file của tháng đó.</p></section>`}
 function fdsCard(){const ky=FDS.ky||plYmNow(),R=FDS.run,vn=v=>nf(Math.round(v))+"đ";
@@ -76,11 +76,27 @@ function fdsBind(m){const q=s=>m.querySelector(s);bcLinkBind(m);if(!q("#fds-go")
       toast("Đã lưu số đối soát Facebook tháng "+ky.slice(5)+"/"+ky.slice(0,4));
       const n=await bcSaveSet({ky,kenh:"fb",nhom:"Facebook",raw:R.files,book:fdsBook(R,ky,R.files.map(f=>f.name))});if(n)toast("Đã cất "+n+" file lên Drive");
       FDS.run=null;fdsLoad(true);bcAllLoad(true)}catch(x){toast(x.message);e.target.disabled=false}}}
-/* Trang Facebook (quản trị, CEO + kế toán): thêm nút mục cuối "Tải báo cáo"; bấm thì vẽ khung trang Tổng quan rồi thay phần thân bằng mục này. */
+/* ---------- "Nạp báo cáo" mở cửa sổ ngay trên trang, không chuyển trang (chị Hoa 18/11/2026) — dùng chung TikTok, Shopee, Facebook ---------- */
+const UPD={k:""};
+function upDlg(key,title,draw){const dr=$("#drawer"),di=$("#drawerIn");if(!dr||!di)return;
+  if(dr.hidden||!di.querySelector(`.updlg[data-k="${key}"]`)){openDrawerHTML(`<h2>${esc(title)}</h2><div class="updlg" data-k="${key}"></div>`);di.style.width="min(1150px,100%)";
+    $("#dx").onclick=()=>{UPD.k="";di.style.width="";closeDrawer()}}
+  draw(di.querySelector(".updlg"))}
+/* TikTok, Shopee: nút "⬆ Nạp báo cáo" (trước là trang con "up") mở cửa sổ; trang chính vẫn ở Tổng quan. */
+function upWrap(page,key,title){const _p=PAGES[page];if(typeof _p!=="function")return;
+  PAGES[page]=m=>{if(SUB[page]==="up"){SUB[page]="tong";UPD.k=key}
+    _p(m);if(UPD.k===key&&PAGE===page)upDlg(key,title,box=>{const s=SUB[page];SUB[page]="up";try{_p(box)}finally{SUB[page]=s}
+      box.querySelectorAll('[data-tbv="tong"],[data-spbv="tong"]').forEach(b=>{const a=b.closest(".tb-acts");if(a)a.remove();else b.remove()});const ph=box.querySelector(".ph");if(ph)ph.remove()})}}
+upWrap("bc_tiktok","tts","Nạp báo cáo TikTok (kế toán tải file lên khi agent chưa tải)");
+upWrap("bc_shopee","spe","Nạp báo cáo Shopee (kế toán tải file lên khi agent chưa tải)");
+/* Trang Facebook (quản trị, CEO + kế toán): mục cuối "Báo cáo các tháng"; nút "⬆ Nạp báo cáo" mở cửa sổ 3 bước. */
 {const _p=PAGES.bc_fb;PAGES.bc_fb=m=>{const can=typeof APP_MODE!=="undefined"&&APP_MODE==="admin"&&fdsCan()&&typeof fbdFull==="function"&&fbdFull();
   const tbc=can&&FBD.tab==="tbc";if(tbc)FBD.tab="pl";try{_p(m)}finally{if(tbc)FBD.tab="tbc"}
   if(!can)return;try{const nav=m.querySelector("nav.fbd-tabs");if(!nav)return;
-    nav.insertAdjacentHTML("beforeend",`<button type="button" data-fbdtab="tbc" class="${FBD.tab==="tbc"?"on":""}">Nạp báo cáo</button>`);
+    nav.insertAdjacentHTML("beforeend",`<button type="button" data-fbdtab="tbc" class="${FBD.tab==="tbc"?"on":""}">Báo cáo các tháng</button>`);
     if(tbc){nav.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.fbdtab==="tbc"));let x=nav.nextSibling;while(x){const n=x.nextSibling;x.remove();x=n}
-      nav.insertAdjacentHTML("afterend",fdsThang()+fdsCard());fdsBind(m)}
-    nav.querySelectorAll("[data-fbdtab]").forEach(b=>b.onclick=()=>{FBD.tab=b.dataset.fbdtab;renderMain()})}catch(e){console.warn("tải báo cáo FB",e)}}}
+      nav.insertAdjacentHTML("afterend",fdsThang());bcLinkBind(m);
+      const hh=m.querySelector("#fds-thang .card-h");if(hh)hh.insertAdjacentHTML("beforeend",`<button class="btn sm pri" id="fds-open" title="Kế toán tải file tiền về SPX, Best lên web khi agent chưa tải">⬆ Nạp báo cáo</button>`);
+      const ob=m.querySelector("#fds-open");if(ob)ob.onclick=()=>{UPD.k="fb";renderMain()}}
+    nav.querySelectorAll("[data-fbdtab]").forEach(b=>b.onclick=()=>{FBD.tab=b.dataset.fbdtab;renderMain()});
+    if(UPD.k==="fb")upDlg("fb","Nạp báo cáo Facebook (file tiền về SPX, Best)",box=>{box.innerHTML=fdsCard();fdsBind(box)})}catch(e){console.warn("báo cáo FB",e)}}}

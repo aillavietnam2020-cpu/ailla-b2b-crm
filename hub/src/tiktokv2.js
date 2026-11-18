@@ -163,7 +163,7 @@ function tbAdmPage(m){
   m.innerHTML=head+body+srcNote("Báo cáo quyết toán TikTok do kế toán tải (OrderSKUList, income, Campaign overview); nguồn doanh thu từ Key metrics team TikTok tải; chi riêng khác và chi chung từ Sổ chi phí. Quy tắc: skill ailla-baocao-quantri-tiktok.");
   tbBind(m);
   const on=(id,f)=>{const b=m.querySelector("#"+id);if(b)b.onclick=f};
-  on("tb-dl",()=>{openDrawerHTML(`<h2>Kiểm dữ liệu TikTok · ${tsbKyL(ky)}</h2>`+tsbChecks(P,todo));const w=$("#drawerIn");w.querySelectorAll("[data-go]").forEach(x=>x.onclick=()=>{closeDrawer();PAGE=x.dataset.go;render();scrollTo(0,0)})});
+  on("tb-dl",()=>{openDrawerHTML(`<h2>Kiểm dữ liệu TikTok · ${tsbKyL(ky)}</h2>`+tsbChecks(P,todo));const w=$("#drawerIn");w.querySelectorAll("[data-go]").forEach(x=>x.onclick=()=>window.open(location.pathname+"#go="+x.dataset.go,"_blank"))/* mở tab mới, giữ tab đang xem (chị Hoa 18/11) */});
 }
 function tbBind(m){
   m.querySelectorAll("[data-tbv]").forEach(b=>b.onclick=()=>{SUB.bc_tiktok=b.dataset.tbv;if(b.dataset.tbv==="tong")TSB.prev=null;renderMain()});
