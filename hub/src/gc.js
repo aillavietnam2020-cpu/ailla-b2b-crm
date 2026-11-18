@@ -84,10 +84,20 @@ function pGcCn(m){
   if(!GC.cust){gcLoading(m,T,S);return}
   const C=GC.cust.slice().sort((a,b)=>(+b.official_debt||0)-(+a.official_debt||0)),tot=k=>sum(C,c=>+c[k]||0);
   m.innerHTML=H(T,S)+`<div class="grid kpis">${kpi("Phải thu Kênh OEM",tr(sum(C,c=>Math.max(0,+c.official_debt||0))),"công nợ chính thức của khách còn nợ"+(C.some(c=>(+c.official_debt||0)<0)?" · khách trả thừa "+tr(sum(C,c=>Math.max(0,-(+c.official_debt||0))))+" để riêng":"")+" · cùng số Phải thu, Đối chiếu công nợ")}${kpi("Công nợ dự kiến",tr(tot("projected_debt")),"gồm đơn chờ thu")}${kpi("Khách còn nợ",nf(C.filter(c=>(+c.official_debt)>0).length),"trên "+C.length+" khách gia công")}</div>
-  <section class="card flush">${C.length?tbl(["Khách hàng","Công nợ chính thức","Công nợ dự kiến","Hạn mức nợ","Vượt hạn mức"],C.map(c=>{const over=(+c.debt_limit>0)&&(+c.projected_debt>+c.debt_limit);return `<tr class="clk" data-gck="${c.id}"><td><b>${esc(c.name)}</b></td><td class="n">${nf(+c.official_debt||0)}</td><td class="n">${nf(+c.projected_debt||0)}</td><td class="n">${+c.debt_limit>0?nf(+c.debt_limit):"—"}</td><td>${over?pill("Vượt hạn mức","red"):"—"}</td></tr>`})):`<p class="pad">Chưa có khách gia công.</p>`}</section>
+  <section class="card flush">${C.length?tbl(["Khách hàng","Nợ đầu kỳ","Công nợ chính thức","Công nợ dự kiến","Hạn mức nợ","Vượt hạn mức"],C.map(c=>{const over=(+c.debt_limit>0)&&(+c.projected_debt>+c.debt_limit);return `<tr class="clk" data-gck="${c.id}"><td><b>${esc(c.name)}</b></td><td class="n">${nf(+c.opening_debt||0)}${gcCanDk()?` <button class="btn sm" data-gcdk="${c.id}" title="Nhập số dư nợ đầu kỳ theo sổ MISA">Sửa</button>`:""}</td><td class="n">${nf(+c.official_debt||0)}</td><td class="n">${nf(+c.projected_debt||0)}</td><td class="n">${+c.debt_limit>0?nf(+c.debt_limit):"—"}</td><td>${over?pill("Vượt hạn mức","red"):"—"}</td></tr>`})):`<p class="pad">Chưa có khách gia công.</p>`}</section>
   <div class="acts"><button class="btn" data-gcgo="cr_cn">Công nợ toàn bộ khách hàng</button></div>`;
   gcBind(m);m.querySelectorAll("[data-gck]").forEach(r=>r.onclick=()=>gcOpen("cr_kh","/admin/customers/"+r.dataset.gck));
+  m.querySelectorAll("[data-gcdk]").forEach(b=>b.onclick=e=>{e.stopPropagation();gcDk(C.find(c=>c.id===b.dataset.gcdk))});
 }
+/* Nợ đầu kỳ của khách gia công (chị Hoa 18/11/2026): kế toán / CEO nhập số dư nợ đầu kỳ theo sổ MISA, có ghi chú nguồn số. */
+const gcCanDk=()=>typeof SV!=="undefined"&&SV.perms&&SV.perms.includes("order.accounting.confirm");
+function gcDk(c){if(!c)return;
+  openDrawerHTML(`<h2>Nợ đầu kỳ: ${esc(c.name)}</h2><p class="hint">Số dư khách còn nợ trước đơn đầu tiên trên web (lấy theo sổ công nợ MISA). Công nợ chính thức = nợ đầu kỳ + các đơn đã chốt − tiền đã thu.</p>
+   <div class="filters"><label class="inl">Nợ đầu kỳ (đ) <input id="gcdk-a" type="number" step="1" value="${+c.opening_debt||0}" style="width:180px"></label></div>
+   <div class="filters"><label class="inl" style="width:100%">Số này lấy từ đâu, tính đến ngày nào <input id="gcdk-n" placeholder="Ví dụ: Số dư đầu kỳ MISA tháng 10/2026 (đến hết 30/09)" style="width:100%"></label></div>
+   <div class="acts"><button class="btn pri" id="gcdk-ok">Lưu</button></div>`);
+  $("#gcdk-ok").onclick=async()=>{const a=Math.round(+$("#gcdk-a").value||0),n=$("#gcdk-n").value.trim();if(n.length<5){toast("Ghi rõ số này lấy từ đâu");return}
+    try{await svApi("/api/customers/"+c.id+"/opening-debt",{method:"PUT",body:JSON.stringify({amount:a,note:n})});toast("Đã lưu nợ đầu kỳ "+nf(a)+"đ");closeDrawer();await gcLoad(true);renderMain()}catch(e){toast(e.message)}}}
 Object.assign(PAGES,{gc_tq:pGcTq,gc_kh:pGcKh,gc_don:pGcDon,gc_sx:pGcSx,gc_cn:pGcCn});
 
 /* ---- Menu bên vận hành: mục Gia công (bán hàng) ---- */

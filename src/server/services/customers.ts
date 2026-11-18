@@ -179,6 +179,7 @@ export async function listCustomers(
     // Quá ngưỡng tái mua riêng của khách thì bật cảnh báo để sale gọi lại.
     reorder_due:
       row.last_order_date != null && (row.days_since_order ?? 0) > (row.reorder_cycle_days ?? 30),
+    opening_debt: debtRows[index].opening_debt,
     official_debt: debtRows[index].official_debt,
     projected_debt: debtRows[index].projected_debt,
     revenue_total: debtRows[index].posted_charges,
