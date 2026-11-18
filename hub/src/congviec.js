@@ -438,6 +438,8 @@ function openTask(id){
     const nid=uid("cv"),oldNg=t?t.nguoi:"",oldPhoi=t?(t.phoi||[]):[],oldTd=t?(t.theoDoi||[]):[],oldHan=t?t.han:0;
     DB.mutate(ME.name,(t?"cập nhật việc: ":"giao việc: ")+v.ten+(v.nguoi?" → "+userName(v.nguoi):""),dt=>{let x;if(t){x=dt.tasks.find(y=>y.id===t.id);Object.assign(x,gv?v:{st:v.st,checklist:v.checklist,kq:v.kq,...(v.tre?{tre:v.tre}:{})})}else{x={id:nid,...v,files:bf,loai:"Việc",tao:ME.id};dt.tasks.push(x)}
       if(x.cd&&x.cd.length){tkSync(x);v.nguoi=x.nguoi;v.han=x.han;v.phoi=x.phoi}
+      /* đầu việc giao cho ai thì người đó vào danh sách Cùng làm của việc: việc hiện ở Việc của tôi và họ tích xong được (chị Hoa 18/11) */
+      if(gv)(x.checklist||[]).forEach(c=>{if(c.nguoi&&c.nguoi!==x.nguoi&&!(x.phoi||[]).includes(c.nguoi))x.phoi=(x.phoi||[]).concat(c.nguoi)});
       tkDoneDay(x,dt.settings.today);
       /* đổi người làm khi việc đang có đơn xin từ chối: coi như đã chuyển người, khung xin từ chối không hiện nữa */
       if(t&&oldNg!==x.nguoi)x.nhac=[];
