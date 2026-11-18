@@ -28,7 +28,7 @@ function kkCss(){if(document.getElementById("kk-css"))return;const s=document.cr
 .kk-tabs button.on{color:#e7357b;border-bottom-color:#e7357b;font-weight:600}
 .kk-c{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:#eef0f5;color:#6b7285;font-size:12px;margin-left:4px;text-align:center}.kk-c.w{background:#fff4e0;color:#b7791f}
 .kk-bar{display:flex;align-items:center;gap:8px;padding:12px 14px;flex-wrap:wrap}.kk-bar .sp{flex:1}
-.kk-bar input.kk-q{border:1px solid #d9deea;border-radius:9px;padding:7px 11px;font:inherit;min-width:220px}
+.kk-bar input.kk-q{border:1px solid #d9deea;border-radius:9px;padding:7px 11px;font:inherit;width:260px;max-width:100%;flex:0 1 260px}
 .kk-seg{display:inline-flex;border:1px solid #d9deea;border-radius:9px;overflow:hidden}.kk-seg button{border:0;background:#fff;padding:6px 11px;font:inherit;cursor:pointer}.kk-seg button.on{background:#2b3a8c;color:#fff}
 .kk-empty{padding:26px;text-align:center;color:#6b7285}
 .kk-kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}.kk-kp div{background:#fafbfe;border:1px solid #e6e9f2;border-radius:10px;padding:10px}.kk-kp b{display:block;font-size:18px}.kk-kp span{color:#6b7285;font-size:12px}
