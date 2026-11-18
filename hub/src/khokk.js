@@ -88,7 +88,7 @@ function pKkPage(m){
   const on=(id,f)=>{const b=m.querySelector("#"+id);if(b)b.onclick=f};
   on("kk-new",()=>khoForm("TB"));on("kk-up",kkUpload);on("kk-td",()=>khoTdImport());
   on("kk-tpl",async()=>{try{await kkTemplate()}catch(e){toast(e.message)}});
-  on("kk-tdtpl",async()=>{try{await khoTdTemplate()}catch(e){toast(e.message)}});
+  on("kk-tdtpl",async()=>{try{await kkTemplate()}catch(e){toast(e.message)}});
 }
 
 /* Mở phiếu kiểm tồn: bảng chênh lệch + lập phiếu điều chỉnh. */
@@ -200,3 +200,5 @@ async function kkLine(id,code){
    <div class="row7"><button class="btn" id="kl-back">← Quay lại sổ chi tiết ${esc(code)}</button><button class="btn" id="kl-all">Xem cả phiếu / in</button></div>`);
   $("#kl-back").onclick=()=>khoNxtDetail(code);$("#kl-all").onclick=()=>kkOrig(id);
 }
+/* Tồn đầu kỳ cần cả đơn giá (giá trị tồn): nút "Tải file mẫu" trong cửa sổ nạp tồn dùng file mẫu có cột Số lượng + Đơn giá (cùng mẫu kiểm tồn). */
+{const _ti=khoTdImport;khoTdImport=async function(){await _ti.apply(this,arguments);const b=document.getElementById("td-tpl");if(b)b.onclick=async()=>{b.disabled=true;try{await kkTemplate()}catch(e){toast(e.message)}b.disabled=false}}}
