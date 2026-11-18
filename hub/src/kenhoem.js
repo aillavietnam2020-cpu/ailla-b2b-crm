@@ -110,10 +110,8 @@ function koAdm(m,K,X,r){
   const tg=(k,c,n,t,h,A)=>`<tr class="${A&&A.length?"tb-tg":""}" ${A&&A.length?`data-kotg="${k}"`:""}><td><span class="tb-car" data-kocar="${k}">${A&&A.length?(KO.open[k]?"▾":"▸"):""}</span><span class="tb-dot" style="background:${c}"></span>${A&&A.length?`<b>${esc(n)}</b>`:esc(n)}</td><td class="n">${t==null?koTag():kpF(t)}</td><td class="n">${t==null?"":kpP(t,dt)}</td><td class="hint">${esc(h)}</td></tr>`+(A?sub(k,A):"");
   const coCp=`<section class="card"><div class="card-h"><h2>Cơ cấu chi phí</h2><span class="hint">trên doanh thu thực ${tr(dt)} · khoản nào có số mới hiện dòng</span></div><div class="ko-w">${tbl(["Khoản","Số tiền (đ)","% doanh thu","Ghi chú"],[
     tg("gv","#8a8799","Giá vốn (NVL + bao bì + sản xuất)",X.cover?gv:null,"bấm xem mã",gvSub),
-    tg("cp","#b06ab3","Chi phí kênh",cp||null,cp?"bấm xem từng khoản":"vận chuyển, hàng mẫu, chiết khấu, lương phụ trách OEM: hiện khi có",cpL),
-    `<tr class="tb-sum"><td><span class="tb-car"></span>Lãi đóng góp kênh</td><td class="n">${lai==null?koTag():kpF(lai)}</td><td class="n">${lai==null?"":kpP(lai,dt)}</td><td class="hint">${lai==null?"chờ giá vốn":ngv?"chỉ phần hàng có giá vốn":""}</td></tr>`,
-    tg("ch","#5d6d8e","Chi phí chung phân bổ",hasChia?chia:null,hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia),
-    `<tr class="tb-sum"><td><span class="tb-car"></span>Lãi ròng kênh</td><td class="n">${ln==null?koTag():kpF(ln)}</td><td class="n">${ln==null?"":kpP(ln,dt)}</td><td></td></tr>`])}</div></section>`;
+    tg("cp","#b06ab3","Chi phí kênh",cp||null,cp?"bấm xem từng khoản":"chưa có khoản nào",cpL),
+    tg("ch","#5d6d8e","Chi phí chung phân bổ",hasChia?chia:null,hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia)])}</div></section>`;
   /* top đơn / sản phẩm */
   /* Top sản phẩm bán chạy (chị Hoa 18/11/2026): gộp theo mã, xếp theo doanh thu hoặc số lượng (nút chọn). Giá vốn theo tháng bán, mã chưa có giá vốn để trống. */
   const tby=KO.topBy==="sl"?"sl":"dt",tPM=new Map();
