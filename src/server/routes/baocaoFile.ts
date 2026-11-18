@@ -52,6 +52,7 @@ baocaoFileRoutes.get('/', async (c) => {
  * Doanh thu Facebook tháng đó trên web lấy theo số này.
  */
 const FB_KEY = 'fb_doisoat';
+const LINK_KEY = 'bc_links';
 async function loadFb(db: D1Database): Promise<Record<string, unknown>> {
   const row = await db.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(FB_KEY).first<{ data: string }>();
   if (!row) return {};
@@ -89,6 +90,44 @@ baocaoFileRoutes.get('/fb-orders', async (c) => {
   }
   const noCreated = Object.values(fm.o).filter((v) => v[0].slice(0, 7) >= ky && !v[4]).length;
   return ok(c, { ky, at: fm.at, noCreated, orders: list.map((x) => ({ ...x, hoan: hoan.has(x.id) })) });
+});
+
+/** Link thư mục Drive kế toán dán cho từng tháng (mục Tải báo cáo, chị Hoa 18/11/2026). Tháng chưa đối soát vẫn dán được. */
+baocaoFileRoutes.put('/link', adminOnlyEndpoint, async (c) => {
+  const auth = c.get('auth');
+  if (!canMoney(auth)) throw forbidden('Chỉ CEO hoặc kế toán');
+  const b = (await c.req.json().catch(() => null)) as { kenh?: unknown; ky?: unknown; link?: unknown } | null;
+  const kenh = String(b?.kenh ?? '');
+  const ky = String(b?.ky ?? '');
+  const link = String(b?.link ?? '').trim();
+  if (!KENH.test(kenh) || !KY.test(ky)) throw badRequest('BAD_BODY', 'Thiếu kênh hoặc tháng');
+  if (link && !/^https:\/\/(drive|docs)\.google\.com\//.test(link)) throw badRequest('BAD_LINK', 'Dán link Google Drive (bắt đầu bằng https://drive.google.com/)');
+  const row = await c.env.DB.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(LINK_KEY).first<{ data: string }>();
+  let all: Record<string, string> = {};
+  try {
+    all = row ? (JSON.parse(await unpack(row.data)) as Record<string, string>) : {};
+  } catch {
+    all = {};
+  }
+  const k = `${kenh}|${ky}`;
+  if (link) all[k] = link.slice(0, 500);
+  else delete all[k];
+  await c.env.DB.prepare(
+    `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+  )
+    .bind(LINK_KEY, await pack(JSON.stringify(all)), nowIso(), auth.user.id)
+    .run();
+  return ok(c, all);
+});
+baocaoFileRoutes.get('/link', async (c) => {
+  if (!canMoney(c.get('auth'))) throw forbidden('Chỉ CEO hoặc kế toán');
+  const row = await c.env.DB.prepare('SELECT data FROM hub_blobs WHERE key = ?').bind(LINK_KEY).first<{ data: string }>();
+  try {
+    return ok(c, row ? JSON.parse(await unpack(row.data)) : {});
+  } catch {
+    return ok(c, {});
+  }
 });
 
 baocaoFileRoutes.put('/fb', adminOnlyEndpoint, async (c) => {
