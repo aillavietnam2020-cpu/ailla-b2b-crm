@@ -153,7 +153,7 @@ const DTD={ym:"",open:"",orders:{},busy:{}};
 function dtFile(ch,ym){
   const days=(o,i)=>{let v=0,n=0;for(const k in o||{})if(k.slice(0,7)===ym){v+=+o[k][i]||0;n++}return n?v:null};
   if(ch==="tts"){const s=(typeof TSB!=="undefined"&&TSB.sum||{})[ym];return s&&s.dt?{v:s.dt,n:"Báo cáo quyết toán TikTok "+(s.den?"đến ngày "+dtVN(s.den):"cả tháng")}:{v:null,n:"chưa tải báo cáo quyết toán TikTok"}}
-  if(ch==="fb"){const R=typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.days;if(!R)return {v:null,n:"Sheet Pancake đang tải…"};let v=0,n=0,last="";for(const k in R)if(k.slice(0,7)===ym){v+=+R[k].g[1]||0;n++;if(k>last)last=k}
+  if(ch==="fb"){const s=typeof FDS!=="undefined"&&FDS.m&&FDS.m[ym];if(s&&s.dt>0)return {v:s.dt,n:`Đối soát tiền về SPX/Best (${nf(s.don)} đơn đã về tiền)`};const R=typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.days;if(!R)return {v:null,n:"Sheet Pancake đang tải…"};let v=0,n=0,last="";for(const k in R)if(k.slice(0,7)===ym){v+=+R[k].g[1]||0;n++;if(k>last)last=k}
     return n?{v,n:`Sheet Pancake (đơn giao thành công) cập nhật ${FBC.raw.at?dtVN(FBC.raw.at.slice(0,10)):""}, có đến ngày ${dtVN(last)}`}:{v:null,n:"Sheet Pancake chưa có tháng này"}}
   if(ch==="spe"){const v=days(DAYD.spe,0);return v==null?{v:null,n:"chưa tải báo cáo Shopee"}:{v,n:"File Shopee đã tải lên"}}
   if(ch==="cskh")return {v:null,n:"mảng chưa chạy"};
@@ -189,47 +189,67 @@ function pDtDoiChieu(m){
   const ym=DTD.ym||plYmNow(),st=dtTrangThai(ym,t);if(typeof bcLoad==="function")bcLoad(ym);
   const S=dtShownMonth(ym),L=dtLiveMonth(ym),ceo=typeof isCeo==="function"&&isCeo();
   const tabs=[],tk=[];for(let i=-3;i<=0;i++){const k=plYmAdd(cur,i);if(k>="2026-08")tk.push(k)}if(!tk.includes(ym))tk.unshift(ym);tk.forEach(k=>{tabs.push(`<button data-dtym="${k}" class="${k===ym?"on":""}">Tháng ${dtYmVN(k)}</button>`)})
-  const tot={w:0,f:0,k:0,hasF:false,hasK:false};
-  const body=DT_KENH.map(([ch,n])=>{const r=S[ch]||{dt:null,src:"mảng chưa chạy, chưa có số"},l=L[ch]||{},F=dtFile(ch,ym),K=dtKt(ym,ch),snap=dtSnap(ym,ch);
-    if(r.dt!=null)tot.w+=+r.dt||0;if(F.v!=null){tot.f+=F.v;tot.hasF=true}if(K){tot.k+=K.v;tot.hasK=true}
-    const lab=st==="chot"?(snap?pill("đã chốt","grn")+`<br><small class="hint">số lưu ngày ${dtVN(String(snap.closedAt).slice(0,10))}</small>`:pill("chưa lưu số chốt","gry")):pill("chưa chốt – dự kiến","amb");
-    const drift=snap&&l.dt!=null&&Math.abs(l.dt-snap.dt)>=1000?`<br><small class="hint">tính lại hôm nay: ${nf(l.dt)} (${l.dt-snap.dt>0?"+":""}${nf(l.dt-snap.dt)})</small>`:"";
-    const dk=st!=="chot"&&r.dk!=null&&r.dk!==r.dt?`<br><small class="hint">dự kiến ${nf(r.dk)}</small>`:"";
-    /* Chị Hoa 16/11 "trình bày lại": giải thích dài vào ⓘ, nhãn chốt dưới tên kênh, số cần so đứng cạnh nhau. */
-    const kt=ch==="cskh"?`<span class="hint">—</span>`:`<div style="display:inline-flex;flex-direction:column;gap:4px;width:140px"><input type="text" inputmode="numeric" data-dtkt="${ch}" value="${K?nf(K.v):""}" placeholder="nhập số" style="width:100%;box-sizing:border-box;text-align:right"><input type="text" data-dtktn="${ch}" value="${esc(K?K.note:"")}" placeholder="ghi chú" style="width:100%;box-sizing:border-box;text-align:right"></div>`;
-    return `<tr class="clk${DTD.open===ch?" sel":""}" data-dtopen="${ch}"><td style="min-width:150px;white-space:normal"><b>${n}</b> <span class="oi" tabindex="0" role="button" data-stop="1" data-tip="${esc(r.src||"")}">i</span><div style="margin-top:4px">${lab}</div>${ceo&&snap&&ch!=="cskh"?`<button class="btn sm" style="margin-top:4px" data-dtre="${ch}" title="Chỉ khi số chốt sai">Chốt lại</button>`:""}</td>
-      <td class="n"><b>${r.dt==null?`<span class="hint">chưa có số</span>`:nf(r.dt)}</b>${dk}${drift}</td>
-      <td class="n">${dtMoney(F.v)}<small class="hint" style="display:block;max-width:190px;margin-left:auto;white-space:normal">${esc(F.n)}</small></td>
-      <td class="n">${dtDiff(r.dt,F.v)}</td>
-      <td data-stop="1">${typeof bcCell==="function"&&["spe","tts","fb"].includes(ch)?bcCell(ch):`<span class="hint">—</span>`}</td>
-      <td class="n" data-stop="1">${kt}</td>
-      <td class="n">${dtDiff(r.dt,K?K.v:null)}</td></tr>`}).join("");
-  const open=DTD.open?DT_KENH.find(x=>x[0]===DTD.open):null;
-  m.innerHTML=H("Đối chiếu doanh thu",`Doanh thu thực từng kênh × tháng · số web (mọi trang dùng chung) so với file nguồn và số kế toán · chốt số ngày 10 tháng sau`)+`
+  /* Chị Hoa 18/11 duyệt demo: bảng gọn (Kênh · Doanh thu web · Số đơn · Số kế toán MISA · Lệch), bấm dòng mở cửa sổ chi tiết
+     (số web + Chốt lại, so file nguồn, nhập số kế toán, file Drive, từng ngày/từng đơn). */
+  const tot={w:0,k:0,hasK:false};
+  const body=DT_KENH.map(([ch,n])=>{const r=S[ch]||{dt:null},l=L[ch]||{},K=dtKt(ym,ch),snap=dtSnap(ym,ch);
+    if(r.dt!=null)tot.w+=+r.dt||0;if(K){tot.k+=K.v;tot.hasK=true}
+    const drift=snap&&l.dt!=null&&Math.abs(l.dt-snap.dt)>=1000;
+    const lab=ch==="cskh"&&r.dt==null?pill("chưa chạy","gry"):st==="chot"?(snap?(drift?pill("số mới khác số chốt","amb"):pill("đã chốt","grn")):pill("chưa lưu số chốt","gry")):pill("dự kiến","amb");
+    const don=r.don!=null?r.don:snap&&snap.don!=null?snap.don:null;
+    return `<tr class="clk" data-dtopen="${ch}"><td><b>${n}</b> ${lab}</td>
+      <td class="n"><b>${r.dt==null?`<span class="hint">chưa có số</span>`:nf(r.dt)}</b></td>
+      <td class="n">${don==null?`<span class="hint">—</span>`:nf(don)}</td>
+      <td class="n">${ch==="cskh"?`<span class="hint">—</span>`:K?nf(K.v):`<span class="hint">chưa nhập</span>`}</td>
+      <td class="n">${dtDiffK(r.dt,K?K.v:null)}</td>
+      <td><a class="link" style="white-space:nowrap">Chi tiết ›</a></td></tr>`}).join("");
+  m.innerHTML=H("Đối chiếu doanh thu",`Doanh thu thực từng kênh theo tháng · so số web với số kế toán đã chốt sổ MISA · chốt số ngày 10 tháng sau`)+`
   <div class="tabs" style="margin-bottom:10px">${tabs.join("")}</div>
-  <div class="note ${st==="chot"?"":"amb"}">Tháng ${dtYmVN(ym)}: ${st==="chot"?`<b>đã tới ngày chốt ${dtVN(dtNgayChot(ym))}</b>. Số web đã lưu không đổi nữa; cột "tính lại hôm nay" chỉ để thấy dữ liệu nguồn có thay đổi sau ngày chốt.`:`<b>chưa chốt – dự kiến</b>. Số sẽ tự lưu (đóng băng) từ ngày ${dtVN(dtNgayChot(ym))}.`}${DTS.err?` <span class="t-red">Lỗi tải số chốt: ${esc(DTS.err)}</span>`:""}</div>
-  <section class="card flush"><div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Số web (doanh thu thực)</th><th class="n">Số file nguồn</th><th class="n">Web − file</th><th>File đã lưu (Drive)</th><th class="n">Số kế toán (nhập tay)</th><th class="n">Web − kế toán</th></tr></thead><tbody>${body}
-   <tr class="tot"><td><b>Cộng các kênh</b></td><td class="n"><b>${nf(tot.w)}</b></td><td class="n">${tot.hasF?nf(tot.f):"—"}</td><td></td><td></td><td class="n">${tot.hasK?nf(tot.k):"—"}</td><td class="n">${tot.hasK?dtDiff(tot.w,tot.k):"—"}</td></tr></tbody></table></div>
-   <div class="acts pad"><button class="btn pri" id="dt-kt-save">Lưu số kế toán</button><span class="hint">Số kế toán: Kế toán nhập số đã chốt sổ của từng kênh (đ). Để trống ô nào thì xóa số ô đó. Bấm từng dòng để xem từng ngày / từng đơn tạo nên số web. Chênh lệch tô đỏ khi lệch trên 1% (tối thiểu 1 triệu).</span></div></section>
-  ${open?`<section class="card flush"><div class="card-h pad"><h2>${open[1]} · tháng ${dtYmVN(ym)}: số web từng ngày / từng đơn</h2><button class="btn sm" id="dt-close">Đóng</button></div>${dtChiTiet(open[0],ym)}</section>`:""}
+  <div class="note ${st==="chot"?"":"amb"}">Tháng ${dtYmVN(ym)}: ${st==="chot"?`<b>đã chốt ngày ${dtVN(dtNgayChot(ym))}</b>.`:`<b>chưa chốt, đang là số dự kiến</b>. Số tự lưu (đóng băng) từ ngày ${dtVN(dtNgayChot(ym))}.`} Bấm vào một kênh để xem chi tiết, nhập số kế toán, mở file trên Drive.${DTS.err?` <span class="t-red">Lỗi tải số chốt: ${esc(DTS.err)}</span>`:""}</div>
+  <section class="card flush"><div class="tbl"><table><thead><tr><th>Kênh</th><th class="n">Doanh thu web</th><th class="n">Số đơn</th><th class="n">Số kế toán (MISA)</th><th class="n">Lệch</th><th></th></tr></thead><tbody>${body}
+   <tr class="tot"><td><b>Cộng các kênh</b></td><td class="n"><b>${nf(tot.w)}</b></td><td></td><td class="n">${tot.hasK?nf(tot.k):"—"}</td><td class="n">${tot.hasK?dtDiffK(tot.w,tot.k):""}</td><td></td></tr></tbody></table></div>
+   <p class="hint pad">Số kế toán (MISA): kế toán nhập số doanh thu đã chốt sổ trên MISA của từng kênh (trong cửa sổ chi tiết), web tự so với số web. Lệch tô đỏ khi chênh trên 1% (tối thiểu 1 triệu).</p></section>
   <section class="card"><div class="card-h"><h2>Cách tính doanh thu thực (một cách cho mọi trang)</h2></div><ul class="lessons">
-   <li><b>TikTok Shop:</b> doanh thu thuần theo báo cáo quyết toán đã tải lên; agent tải báo cáo mỗi ngày; ngày chưa có báo cáo thì để trống, ghi "chờ tải báo cáo" (không ước từ số đơn). Tháng chỉ chốt khi báo cáo phủ đủ cả tháng. GMV chỉ là chỉ số hiệu suất.</li>
-   <li><b>Shopee:</b> doanh thu theo file báo cáo Shopee tải lên; chưa tải thì để trống.</li>
-   <li><b>Facebook:</b> đơn giao thành công theo ngày tạo đơn (Pancake, cập nhật mỗi sáng). Doanh thu chốt đơn chỉ là chỉ số hiệu suất. Dự kiến = giao thành công + đơn đang giao × (1 − ${Math.round(DT_HOAN_FB*100)}% hoàn dự kiến).</li>
+   <li><b>TikTok Shop:</b> cột "Tổng doanh thu" file Tài chính TikTok của đơn tạo trong tháng (cách chị Huệ). GMV chỉ là chỉ số hiệu suất.</li>
+   <li><b>Shopee:</b> theo file Tài chính Shopee từng shop (cách chị Huệ); chưa tải thì để trống.</li>
+   <li><b>Facebook:</b> tháng đã đối soát tiền về (trang Facebook › Đối soát tiền về SPX, Best): tiền hãng vận chuyển đã trả của đơn tạo trong tháng. Chưa đối soát: tạm theo đơn giao thành công trên Pancake.</li>
    <li><b>Kênh phân phối, Kênh OEM:</b> đơn đã duyệt trên CRM theo ngày đơn (sau chiết khấu, trừ thưởng).</li>
-   <li><b>Chốt số:</b> đơn tháng nào tính tháng đó. Từ ngày 10 tháng sau, số web được lưu lại và mọi trang hiện đúng số đã lưu. Kênh chưa có số, số 0 hoặc báo cáo chưa phủ đủ tháng thì chưa lưu, chờ đủ số.</li></ul></section>`;
+   <li><b>Chốt số:</b> đơn tháng nào tính tháng đó. Từ ngày 10 tháng sau số web được lưu lại, mọi trang hiện đúng số đã lưu; số sai thì CEO bấm "Chốt lại" trong cửa sổ chi tiết.</li></ul></section>`;
   m.querySelectorAll("[data-dtym]").forEach(b=>b.onclick=()=>{DTD.ym=b.dataset.dtym;DTD.open="";renderMain()});
-  m.querySelectorAll("[data-dtopen]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-stop],button,input"))return;DTD.open=DTD.open===tr.dataset.dtopen?"":tr.dataset.dtopen;renderMain()});
-  const cl=m.querySelector("#dt-close");if(cl)cl.onclick=()=>{DTD.open="";renderMain()};
-  m.querySelectorAll("[data-dtkt]").forEach(i=>i.onblur=()=>{const v=String(i.value).replace(/[^\d-]/g,"");i.value=v?nf(+v):""});
-  m.querySelector("#dt-kt-save").onclick=async()=>{const jobs=[];DT_KENH.forEach(([ch])=>{const i=m.querySelector(`[data-dtkt="${ch}"]`),nt=m.querySelector(`[data-dtktn="${ch}"]`);if(!i)return;
-      const raw=String(i.value).replace(/[^\d-]/g,""),v=raw===""?null:+raw,K=dtKt(ym,ch),note=nt?nt.value.trim():"";if((K?K.v:null)===v&&(K?K.note:"")===note)return;
-      jobs.push(svApi("/api/hub/dieuhanh/doanhthu/ketoan",{method:"PUT",body:JSON.stringify({ym,channel:ch,amount:v,note})}))});
-    if(!jobs.length){toast("Không có số nào thay đổi");return}
-    try{await Promise.all(jobs);toast("Đã lưu số kế toán");dtLoadRows(true)}catch(e){toast(e.message)}};
-  m.querySelectorAll("[data-dtre]").forEach(b=>b.onclick=async()=>{const ch=b.dataset.dtre,l=L[ch];if(!l||l.dt==null){toast("Chưa có số để chốt lại");return}
-    const why=prompt(`Chốt lại ${DT_KENH.find(x=>x[0]===ch)[1]} tháng ${dtYmVN(ym)} bằng số tính hôm nay ${nf(l.dt)}? Ghi lý do:`);if(!why||why.trim().length<3)return;
-    try{await svApi("/api/hub/dieuhanh/doanhthu/chot",{method:"POST",body:JSON.stringify({ym,force:true,reason:why.trim(),rows:[{channel:ch,amount:Math.round(l.dt),orders:l.don==null?null:Math.round(+l.don||0),data:{dt:l.dt,don:l.don,gv:l.gv,phi:l.phi,ads:l.ads,khac:l.khac,lai:l.lai,src:l.src}}]})});toast("Đã chốt lại");dtLoadRows(true)}catch(e){toast(e.message)}});
+  m.querySelectorAll("[data-dtopen]").forEach(tr=>tr.onclick=()=>{DTD.open=tr.dataset.dtopen;dtDlg(ym)});
+  /* Đang mở cửa sổ (vd. danh sách đơn vừa tải xong) thì vẽ lại nội dung cửa sổ. */
+  if(DTD.open&&$("#drawer")&&!$("#drawer").hidden&&DTD.dlgYm===ym)dtDlg(ym);
+}
+const dtDiffK=(a,b)=>a==null||b==null?`<span class="hint">—</span>`:Math.abs(a-b)<1?pill("khớp","grn"):dtDiff(a,b);
+/* Cửa sổ chi tiết một kênh × tháng. */
+function dtDlg(ym){const ch=DTD.open,K0=DT_KENH.find(x=>x[0]===ch);if(!K0)return;DTD.dlgYm=ym;
+  const n=K0[1],S=dtShownMonth(ym),L=dtLiveMonth(ym),r=S[ch]||{dt:null},l=L[ch]||{},F=dtFile(ch,ym),K=dtKt(ym,ch),snap=dtSnap(ym,ch),st=dtTrangThai(ym,dtToday()),ceo=typeof isCeo==="function"&&isCeo();
+  const drift=snap&&l.dt!=null&&Math.abs(l.dt-snap.dt)>=1000,row=(a,b)=>`<div>${a}</div><div class="n">${b}</div>`;
+  const don=r.don!=null?r.don:snap&&snap.don!=null?snap.don:null;
+  const h=`<h2>${esc(n)} · tháng ${dtYmVN(ym)}</h2>
+   <section class="card"><div class="card-h"><h2>Số web</h2></div><div style="display:grid;grid-template-columns:1fr auto;gap:6px 16px">
+     ${row(st==="chot"&&snap?`Doanh thu đã chốt (lưu ${dtVN(String(snap.closedAt).slice(0,10))})`:st==="chot"?"Doanh thu (chưa lưu số chốt)":"Doanh thu dự kiến",`<b>${r.dt==null?"chưa có số":nf(r.dt)}</b>`)}
+     ${row("Số đơn",don==null?"—":nf(don))}
+     ${st!=="chot"&&r.dk!=null&&r.dk!==r.dt?row("Dự kiến khi đơn đang giao có kết quả",nf(r.dk)):""}
+     ${drift?row("Tính lại hôm nay",`<b>${nf(l.dt)}</b> <span class="hint">(${l.dt-snap.dt>0?"+":""}${nf(l.dt-snap.dt)})</span>`):""}</div>
+     <p class="hint" style="margin:8px 0 0">${esc(r.src||"")}</p>
+     ${ceo&&snap&&ch!=="cskh"?`<div class="acts" style="margin-top:10px"><button class="btn ${drift?"pri":""}" id="dtd-re">Chốt lại bằng số hôm nay</button><span class="hint">chỉ CEO, phải ghi lý do</span></div>`:""}</section>
+   <section class="card"><div class="card-h"><h2>So với file nguồn</h2></div>${F.v==null?`<p class="hint">${esc(F.n)}</p>`:`<div style="display:grid;grid-template-columns:1fr auto;gap:6px 16px">${row(esc(F.n),nf(F.v))}${row("Web − file",dtDiffK(r.dt,F.v))}</div>`}</section>
+   ${ch==="cskh"?"":`<section class="card"><div class="card-h"><h2>Số kế toán (MISA)</h2></div>
+     <div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Số đã chốt sổ trên MISA (đ)<br><input type="text" inputmode="numeric" id="dtd-kt" value="${K?nf(K.v):""}" placeholder="nhập số" style="text-align:right;width:180px"></label>
+     <label>Ghi chú<br><input type="text" id="dtd-ktn" value="${esc(K?K.note:"")}" placeholder="ví dụ: theo sổ 5111 tháng ${ym.slice(5)}" style="width:220px"></label><button class="btn pri" id="dtd-save">Lưu</button></div>
+     <div style="display:grid;grid-template-columns:1fr auto;gap:6px 16px;margin-top:8px">${row("Web − kế toán",dtDiffK(r.dt,K?K.v:null))}</div><p class="hint" style="margin:6px 0 0">Để trống rồi bấm Lưu là xóa số kế toán của kênh này.</p></section>`}
+   ${["spe","tts","fb"].includes(ch)&&typeof bcCell==="function"?`<section class="card"><div class="card-h"><h2>File đã lưu trên Drive</h2></div>${bcCell(ch)}</section>`:""}
+   <section class="card flush"><div class="card-h pad"><h2>Từng ngày / từng đơn</h2></div><div style="max-height:420px;overflow:auto">${dtChiTiet(ch,ym)}</div></section>`;
+  openDrawerHTML(h);
+  const dx=$("#dx");if(dx)dx.onclick=()=>{DTD.open="";closeDrawer()};
+  const q=s=>$("#drawerIn").querySelector(s),ki=q("#dtd-kt");
+  if(ki)ki.onblur=()=>{const v=String(ki.value).replace(/[^\d-]/g,"");ki.value=v?nf(+v):""};
+  if(q("#dtd-save"))q("#dtd-save").onclick=async()=>{const raw=String(ki.value).replace(/[^\d-]/g,""),v=raw===""?null:+raw,note=q("#dtd-ktn").value.trim();
+    try{await svApi("/api/hub/dieuhanh/doanhthu/ketoan",{method:"PUT",body:JSON.stringify({ym,channel:ch,amount:v,note})});toast("Đã lưu số kế toán");dtLoadRows(true)}catch(e){toast(e.message)}};
+  if(q("#dtd-re"))q("#dtd-re").onclick=async()=>{if(!l||l.dt==null){toast("Chưa có số để chốt lại");return}
+    const why=prompt(`Chốt lại ${n} tháng ${dtYmVN(ym)} bằng số tính hôm nay ${nf(l.dt)}? Ghi lý do:`);if(!why||why.trim().length<3)return;
+    try{await svApi("/api/hub/dieuhanh/doanhthu/chot",{method:"POST",body:JSON.stringify({ym,force:true,reason:why.trim(),rows:[{channel:ch,amount:Math.round(l.dt),orders:l.don==null?null:Math.round(+l.don||0),data:{dt:l.dt,don:l.don,gv:l.gv,phi:l.phi,ads:l.ads,khac:l.khac,lai:l.lai,src:l.src}}]})});toast("Đã chốt lại");dtLoadRows(true)}catch(e){toast(e.message)}};
 }
 PAGES.dt_dc=pDtDoiChieu;
 /* Đưa trang vào kho trang để menubang.js xếp vào Điều hành CEO › Kênh bán hàng. */
