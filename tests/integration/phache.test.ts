@@ -137,3 +137,29 @@ describe('bán thành phẩm mới chưa có mã', () => {
     expect(rows.find((x) => x.btp === 'BTP2')!.status).toBe('OK');
   });
 });
+
+describe('tiếp nhận yêu cầu pha chế, xin dời hạn, trao đổi', () => {
+  it('kỹ thuật xin dời → người tạo đồng ý / đổi / giữ; mọi bước có nhật ký', async () => {
+    const mk = await req('/yc', USERS.ceo, { ngay: '2026-11-18', han: '2026-11-19', items: [{ btp: 'BTP1', lit_bon: 500 }] });
+    const id = mk.body.data[0].id as string;
+    expect((await req(`/yc/${id}/nhan`, USERS.manager, {})).status).toBe(403); // không phải kỹ thuật
+    expect((await req(`/yc/${id}/xin`, KT, { han: '2026-11-21' })).body.error.code).toBe('NO_REASON');
+    expect((await req(`/yc/${id}/xin`, KT, { han: '2026-11-21', ly_do: 'hết SLES' })).status).toBe(200);
+    expect((await req(`/yc/${id}/nhan`, KT, {})).body.error.code).toBe('DANG_XIN');
+    expect((await req(`/yc/${id}/tra-loi`, KT, { kieu: 'DONGY' })).status).toBe(403); // kỹ thuật không tự duyệt
+    let r = await req(`/yc/${id}/tra-loi`, USERS.ceo, { kieu: 'DONGY' });
+    expect(r.body.data).toMatchObject({ han: '2026-11-21', tiep_nhan: 'NHAN' });
+    // Xin tiếp, người tạo đổi sang ngày khác → chờ tiếp nhận lại; giữ hạn phải có lý do.
+    await req(`/yc/${id}/xin`, KT, { han: '2026-11-25', ly_do: 'máy khuấy hỏng' });
+    r = await req(`/yc/${id}/tra-loi`, USERS.ceo, { kieu: 'DOI', han: '2026-11-22', ly_do: 'NPP cần gấp' });
+    expect(r.body.data).toMatchObject({ han: '2026-11-22', tiep_nhan: 'CHO' });
+    expect((await req(`/yc/${id}/tra-loi`, USERS.ceo, { kieu: 'GIU' })).body.error.code).toBe('NO_REASON');
+    expect((await req(`/yc/${id}/nhan`, KT, {})).status).toBe(200);
+    expect((await req(`/yc/${id}/tin`, KT, { text: 'chiều nay xong' })).status).toBe(200);
+    const log = (await req(`/yc/${id}/log`, KT)).body.data;
+    expect(log.rows.map((x: { kind: string }) => x.kind)).toEqual(['TAO', 'XIN', 'DONGY', 'XIN', 'DOI', 'NHAN', 'MSG']);
+    expect(log.la_ky_thuat).toBe(true);
+    const row = (await req('/yc', USERS.ceo)).body.data.find((x: { id: string }) => x.id === id);
+    expect(row).toMatchObject({ han: '2026-11-22', tiep_nhan: 'NHAN' });
+  });
+});
