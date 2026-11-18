@@ -191,5 +191,5 @@ if(typeof window!=="undefined"&&typeof SERVER!=="undefined"&&SERVER){setTimeout(
 {
   const ADMH=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
   const me=MODULES.find(x=>x.k==="me");if(me){const g0=me.groups;me.groups=()=>{const G=g0();if(G[0]){G[0][1]=G[0][1].filter(i=>i[0]!=="hr_me"&&i[0]!=="hr_plme");const at=G[0][1].findIndex(i=>i[0]==="cc_toi")+1;if(!G[0][1].some(i=>i[0]==="np_toi"))G[0][1].splice(at,0,MI("np_toi","Nghỉ phép & tăng ca"),MI("tu_toi","Tạm ứng lương"),MI("pl_toi","Phiếu lương"))}return G}}
-  if(ADMH){const t=MODULES.find(x=>x.k==="q_tc");if(t){const g0=t.groups;t.groups=()=>{const G=g0();const it=MI("tu_ql","Tạm ứng lương",()=>npKetoan(),()=>NP.cho.tu||"");/* chị Hoa 18/11: tạm ứng là phiếu chi, đặt trong Thu chi (thành tab), không để ở Lãi lỗ */const g=G.find(x=>x[0]==="Thu chi")||G[0];if(g&&!g[1].some(i=>i[0]==="tu_ql"))g[1].push(it);return G}}}
+  if(ADMH){const t=MODULES.find(x=>x.k==="q_tc");if(t){const g0=t.groups;t.groups=()=>{const G=g0();const it=MI("tu_ql","Tạm ứng lương",()=>npKetoan(),()=>NP.cho.tu||"");/* chị Hoa 18/11: tạm ứng là phiếu chi, đặt trong Thu chi (thành tab), không để ở Lãi lỗ */const g=G.find(x=>x[0]==="Báo cáo lưu chuyển tiền tệ"||x[0]==="Thu chi")||G[0];if(g&&!g[1].some(i=>i[0]==="tu_ql"))g[1].push(it);return G}}}
 }

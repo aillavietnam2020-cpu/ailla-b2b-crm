@@ -39,8 +39,8 @@
         ["Cảnh báo",[["soat_sl","Máy soát số liệu"],["nguong","Ngưỡng cảnh báo & chỉ số"]]]],
       tc:[["Lãi lỗ",[["pl","P&L công ty"],["dutru","Dự trù giá bán"]]],
         /* Chị Hoa 28/10: Mua hàng về lại kế toán, trong Thu chi. Trang mh_po gồm đơn mua, nhận hàng, chứng từ, trả tiền NCC (bấm vào từng đơn). */
-        ["Thu chi",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["mh_po","Mua hàng"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"]]],
-        ["Dòng tiền",[["tien_lich","Dòng tiền"]]],
+        /* Chị Hoa 18/11: nhóm đổi tên "Báo cáo lưu chuyển tiền tệ", Dòng tiền thành tab trong Thu chi (bỏ nhóm Dòng tiền riêng). */
+        ["Báo cáo lưu chuyển tiền tệ",[["cp_thu","Sổ thu"],["so_cp","Sổ chi phí"],["tien_lich","Dòng tiền"],["mh_po","Mua hàng"],["cr_bill","Kho bill giao dịch"],["cr_s_bill","Kho bill giao dịch"],["doisoat","Đối soát tiền về"]]],
         ["Công nợ",[["phai_thu","Công nợ khách hàng"],["mh_no","Công nợ nhà cung cấp"],["tcn_dc","Đối chiếu công nợ & tiền"]]],
         ["Giá thành",[["sku","Giá vốn SKU"],["kho_boc","Định mức & giá thành"],["kho_cl","Chênh lệch định mức"],["mh_gianvl","Giá nguyên vật liệu"]]],
         /* Quy đổi mã các sàn đã chuyển sang Cấu hình › Sản phẩm & combo (28/10). Đồng bộ mã Kênh phân phối: bảng xếp vào Kho › Danh mục bên vận hành, nhưng web vận hành đang che hai trang này (opsview.js) nên tạm giữ ở đây. */
@@ -71,7 +71,7 @@
     /* Bảng tách Giá thành thành từng trang riêng, nên bỏ nhóm gộp "Giá thành & định mức". */
     for(let i=PAGE_SETS.length-1;i>=0;i--)if(PAGE_SETS[i].adm)PAGE_SETS.splice(i,1);
     /* Chị Hoa 18/11: nhóm Thu chi gọn một dòng trên menu, các trang thành tab bên trong. */
-    PAGE_SETS.push({adm:true,n:"Thu chi",ids:["cp_thu","so_cp","tu_ql","mh_po","cr_bill","cr_s_bill","doisoat"],labels:["Sổ thu","Sổ chi phí","Tạm ứng lương","Mua hàng","Kho bill giao dịch","Kho bill giao dịch","Đối soát tiền về"]});
+    PAGE_SETS.push({adm:true,n:"Thu chi",ids:["cp_thu","so_cp","tien_lich","tu_ql","mh_po","cr_bill","cr_s_bill","doisoat"],labels:["Sổ thu","Sổ chi phí","Dòng tiền","Tạm ứng lương","Mua hàng","Kho bill giao dịch","Kho bill giao dịch","Đối soát tiền về"]});
   }else{
     const S={
       exec:[["",[["exec","Tổng quan vận hành"]]]],
