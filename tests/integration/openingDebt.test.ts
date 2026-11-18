@@ -66,6 +66,11 @@ describe('Thu nhập khác của khách (VAT khách lấy hóa đơn...)', () =>
     const after = (await ctx.request('/api/customers/cus-thao-1', { as: USERS.ceo })).body.data;
     expect(after.debt.official_debt - before.debt.official_debt).toBe(13600000);
     expect(after.debt.other_charges).toBe(13600000);
+    // Tuổi nợ: phần nợ chia vào các chứng từ mới nhất (gồm phiếu phải thu), cộng phần nợ đầu kỳ còn lại = công nợ chính thức.
+    const aging = (await ctx.request('/api/debts/aging', { as: USERS.ceo })).body.data;
+    const ar = aging.rows.find((r: { customer_id: string }) => r.customer_id === 'cus-thao-1');
+    expect(ar.open_docs.reduce((t: number, d: { left: number }) => t + d.left, 0) + ar.old).toBe(ar.official_debt);
+    expect(ar.open_docs.some((d: { kind: string; ref: string }) => d.kind === 'PPT' && d.ref === 'PPT2610-001')).toBe(true);
     const list = (await ctx.request('/api/customers?page_size=200', { as: USERS.ceo })).body.data.find((c: { id: string }) => c.id === 'cus-thao-1');
     const listBefore = before.debt.posted_charges;
     expect(list.revenue_total).toBe(listBefore);

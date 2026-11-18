@@ -406,6 +406,17 @@ export interface AgingRow {
   oldest_days: number;
   /** Kênh của khách: B2B = Kênh phân phối, GIA_CONG = Kênh OEM (cùng luật dashboards.ts / doanhthu.ts). */
   kenh: Kenh;
+  /** Chứng từ còn nợ theo cách vào trước trả trước (đơn, phiếu phải thu), mới → cũ, kèm số còn nợ và số ngày. */
+  open_docs: AgingDoc[];
+}
+export interface AgingDoc {
+  kind: 'DON' | 'PPT';
+  id: string;
+  ref: string;
+  date: string;
+  amount: number;
+  left: number;
+  days: number;
 }
 
 export type Kenh = 'B2B' | 'GIA_CONG';
@@ -427,7 +438,12 @@ export interface DebtAging {
  * Chia một khoản nợ còn lại vào các chứng từ theo tuổi (vào trước trả trước: phần còn nợ nằm ở chứng từ MỚI nhất).
  * docs xếp mới → cũ. Phần nợ không còn chứng từ nào đối ứng là nợ đầu kỳ (old). Dùng chung cho khách và nhà cung cấp.
  */
-export function chiaTuoiNo(debt: number, docs: Array<{ date: string; amount: number }>, asOf: string) {
+export function chiaTuoiNo<T extends { date: string; amount: number }>(
+  debt: number,
+  docs: T[],
+  asOf: string,
+  open?: Array<T & { left: number; days: number }>,
+) {
   const r = { b30: 0, b60: 0, b90: 0, b90p: 0, old: 0, oldest_days: 0 };
   const t0 = new Date(`${asOf}T00:00:00Z`).getTime();
   let left = debt;
@@ -438,6 +454,7 @@ export function chiaTuoiNo(debt: number, docs: Array<{ date: string; amount: num
     left -= take;
     const days = Math.max(0, Math.round((t0 - new Date(`${String(o.date).slice(0, 10)}T00:00:00Z`).getTime()) / 864e5));
     if (days > r.oldest_days) r.oldest_days = days;
+    if (open) open.push({ ...o, left: take, days });
     if (days <= 30) r.b30 += take;
     else if (days <= 60) r.b60 += take;
     else if (days <= 90) r.b90 += take;
@@ -461,14 +478,15 @@ export async function debtAging(db: D1Database, scopeSql: string, scopeParams: u
   );
   const orders = await db
     .prepare(
-      `SELECT o.customer_id, o.order_date, o.total_amount, ${KENH_SQL} AS kenh FROM orders o JOIN customers c ON c.id = o.customer_id
+      `SELECT o.id, COALESCE(o.legacy_order_code, o.order_no) AS ref, o.customer_id, o.order_date, o.total_amount, ${KENH_SQL} AS kenh FROM orders o JOIN customers c ON c.id = o.customer_id
        WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED' AND o.accounting_status = 'DA_XAC_NHAN'
          AND o.delivery_status IN ('DA_XUAT_KHO','DA_GIAO') AND c.deleted_at IS NULL AND ${scopeSql}
        ORDER BY o.order_date DESC`,
     )
     .bind(...scopeParams)
-    .all<{ customer_id: string; order_date: string; total_amount: number; kenh: Kenh }>();
-  const by = new Map<string, Array<{ date: string; amount: number }>>();
+    .all<{ id: string; ref: string; customer_id: string; order_date: string; total_amount: number; kenh: Kenh }>();
+  type Doc = { kind: 'DON' | 'PPT'; id: string; ref: string; date: string; amount: number };
+  const by = new Map<string, Doc[]>();
   const t0 = new Date(`${asOf}T00:00:00Z`).getTime();
   const since = new Date(t0 - 90 * 864e5).toISOString().slice(0, 10);
   const rev: Record<Kenh, number> = { B2B: 0, GIA_CONG: 0 };
@@ -476,17 +494,32 @@ export async function debtAging(db: D1Database, scopeSql: string, scopeParams: u
     if (o.order_date >= since && o.order_date <= asOf) rev[o.kenh] += o.total_amount || 0;
     if (!ids.has(o.customer_id)) continue;
     const a = by.get(o.customer_id) ?? [];
-    a.push({ date: o.order_date, amount: o.total_amount });
+    a.push({ kind: 'DON', id: o.id, ref: o.ref, date: o.order_date, amount: o.total_amount });
     by.set(o.customer_id, a);
   }
-  const rows: AgingRow[] = list.map((d) => ({
-    customer_id: d.customer_id,
-    customer_name: d.customer_name,
-    owner_name: d.owner_name ?? null,
-    official_debt: d.official_debt,
-    ...chiaTuoiNo(d.official_debt, by.get(d.customer_id) ?? [], asOf),
-    kenh: kenhOf.get(d.customer_id) ?? 'B2B',
-  }));
+  // Phiếu phải thu (thu nhập khác: VAT khách lấy hóa đơn...) cũng là chứng từ phát sinh nợ có ngày, tính tuổi như đơn.
+  const ppt = await db
+    .prepare('SELECT id, customer_id, COALESCE(voucher_no, doc_no, \'Phiếu phải thu\') AS ref, charge_date, amount FROM customer_other_charges WHERE deleted_at IS NULL')
+    .all<{ id: string; customer_id: string; ref: string; charge_date: string; amount: number }>();
+  for (const x of ppt.results ?? []) {
+    if (!ids.has(x.customer_id)) continue;
+    const a = by.get(x.customer_id) ?? [];
+    a.push({ kind: 'PPT', id: x.id, ref: x.ref, date: x.charge_date, amount: x.amount });
+    by.set(x.customer_id, a);
+  }
+  for (const a of by.values()) a.sort((x, y) => String(y.date).localeCompare(String(x.date)));
+  const rows: AgingRow[] = list.map((d) => {
+    const open: Array<Doc & { left: number; days: number }> = [];
+    return {
+      customer_id: d.customer_id,
+      customer_name: d.customer_name,
+      owner_name: d.owner_name ?? null,
+      official_debt: d.official_debt,
+      ...chiaTuoiNo(d.official_debt, by.get(d.customer_id) ?? [], asOf, open),
+      kenh: kenhOf.get(d.customer_id) ?? 'B2B',
+      open_docs: open,
+    };
+  });
   rows.sort((a, b) => b.b90p + b.old - (a.b90p + a.old) || b.official_debt - a.official_debt);
   const sumT = (rs: AgingRow[]): AgingTotals =>
     rs.reduce((t, r) => ({ debt: t.debt + r.official_debt, b30: t.b30 + r.b30, b60: t.b60 + r.b60, b90: t.b90 + r.b90, b90p: t.b90p + r.b90p, old: t.old + r.old }), { debt: 0, b30: 0, b60: 0, b90: 0, b90p: 0, old: 0 });
