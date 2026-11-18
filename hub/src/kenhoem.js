@@ -71,8 +71,7 @@ function koAdm(m,K,X,r){
       .ko-cn-i .l i{width:8px;height:8px;border-radius:2px;display:inline-block}.ko-cn-i b{font-size:16px}.ko-cn-i.big b{font-size:19px}
       .ko-cn-i small{font-size:11.5px;color:var(--muted,#667085)}</style>
     ${K.debt?`<div class="tb-bar" style="height:18px;font-size:11.5px;margin-bottom:8px">${seg.map(s=>`<div style="width:${(s[1]/T*100).toFixed(2)}%;background:${s[2]}">${s[1]/T>=.1?esc(s[0])+" "+tr(s[1])+" · "+kpPct(s[1]/T):""}</div>`).join("")}</div>`:""}
-    <div class="ko-w">${K.no.length?tbl(["Khách","Chứng từ","Ngày","Còn phải thu","Số ngày","Trạng thái"],K.no.slice(0,12).map(o=>`<tr><td>${esc(K.name(o.customer_id))}</td><td class="mono">${esc(o.order_no)}</td><td class="n">${kpVn(o.order_date)}</td><td class="n"><b>${tr(o.left)}</b></td><td class="n">${o.age}</td><td>${koNoSt(o)}</td></tr>`)):`<p class="hint">Không có đơn OEM nào chờ thu tiền.</p>`}</div>
-    <p class="hint">${K.aged?"Chứng từ còn nợ gồm đơn đã xuất kho đã chốt tiền và phiếu phải thu. Đơn kế toán chưa xác nhận chưa vào công nợ.":"Gồm cả đơn kế toán chưa xác nhận, nên có thể lớn hơn số công nợ chính thức ở Chi phí & Tiền › Phải thu."}</p></section>`;
+    </section>`;
   /* cảnh báo & đề xuất */
   const AW={c:[],d:[]},AM={c:[],d:[]};
   K.no.filter(o=>o.age>=7).slice(0,3).forEach(o=>{AW.c.push(["a",o.kind==="PPT"?`Phiếu phải thu ${o.order_no} của ${K.name(o.customer_id)} ${o.age} ngày, chưa thu tiền`:`Đơn ${K.name(o.customer_id)} ${o.order_no} đã xuất kho ${o.age} ngày, chưa thu tiền`,tr(o.left)+".","Phụ trách OEM + Kế toán"]);AW.d.push(["b",`Chốt tiền đơn ${K.name(o.customer_id)}`,"Gửi đối chiếu, hẹn ngày thanh toán.",""])});
