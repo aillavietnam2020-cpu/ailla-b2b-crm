@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { canEditCombo } from './sanpham';
 import { nowIso, vnDate } from '@shared/datetime';
 import type { AppEnv, AuthContext } from '../env';
@@ -50,7 +50,8 @@ khoRoutes.use('*', requirePermission('hub.access'));
 khoRoutes.route('/ret', khoReturnRoutes);
 khoRoutes.route('/mh', purchasingRoutes);
 
-const DOC_TYPES = ['PN', 'PC', 'KS', 'XB', 'XK', 'TL', 'TD'] as const;
+// KK = phiếu kiểm tồn (chỉ ghi số đếm, không đổi sổ), DC = phiếu điều chỉnh kiểm kê (chị Hoa 18/11).
+const DOC_TYPES = ['PN', 'PC', 'KS', 'XB', 'XK', 'TL', 'TD', 'KK', 'DC'] as const;
 type DocType = (typeof DOC_TYPES)[number];
 const TYPE_NAME: Record<DocType, string> = {
   PN: 'Phiếu nhập kho',
@@ -60,6 +61,8 @@ const TYPE_NAME: Record<DocType, string> = {
   XK: 'Phiếu xuất khác (mẫu, hủy, gia công)',
   TL: 'Phiếu nhập hàng hoàn',
   TD: 'Tồn đầu kỳ',
+  KK: 'Phiếu kiểm tồn',
+  DC: 'Phiếu điều chỉnh kiểm kê',
 };
 const VAT_TOLERANCE_PCT = 5;
 
@@ -1547,6 +1550,27 @@ interface Move {
   note: string;
 }
 
+/** Đặt mốc tồn chung (ton_moc) = ngày phiếu tồn chốt; bán sàn bắt đầu trừ từ hôm sau nếu chưa đặt. */
+async function khoSetMoc(c: Context<AppEnv>, date: string, no: string) {
+  const auth = c.get('auth');
+  const next = new Date(`${date}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const onl = await c.env.DB.prepare("SELECT v FROM kho_cfg WHERE k = 'online_from'").first<{ v: string }>();
+  await c.env.DB.batch([
+    c.env.DB.prepare("INSERT INTO kho_cfg (k, v) VALUES ('ton_moc', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(date),
+    ...(onl ? [] : [c.env.DB.prepare("INSERT INTO kho_cfg (k, v) VALUES ('online_from', ?)").bind(next.toISOString().slice(0, 10))]),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'KHO_CFG',
+      entityType: 'KHO_CFG',
+      entityId: 'ton_moc',
+      after: { ton_moc: date, online_from: onl?.v ?? next.toISOString().slice(0, 10), doc: no },
+      requestId: c.get('requestId'),
+      ip: ip(c),
+    }),
+  ]);
+}
+
 khoRoutes.post('/docs', async (c) => {
   const auth = c.get('auth');
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -1556,7 +1580,12 @@ khoRoutes.post('/docs', async (c) => {
   // Kiểm tồn bổ sung (chị Hoa chốt 04/11): mã chưa có trong phiếu tồn chốt chung thì kế toán kho kiểm sau, ngày phiếu = ngày kiểm thật.
   // Sổ kho lấy ngày đó làm mốc riêng của mã (view kho_ledger, migration 0070).
   const boSung = type === 'TD' && b.bo_sung === true;
-  if (type === 'TD' && !boSung && !isCeo(auth)) throw forbidden('Chỉ CEO nhập tồn đầu kỳ');
+  // 18/11 chị Hoa: Kế toán lập phiếu tồn đầu kỳ, CEO duyệt mới vào sổ (phiếu ở trạng thái CHO).
+  const keToan = auth.permissions.includes('order.accounting.confirm');
+  if (type === 'TD' && !boSung && !isCeo(auth) && !keToan) throw forbidden('Chỉ CEO hoặc Kế toán lập phiếu tồn đầu kỳ');
+  const choDuyet = type === 'TD' && !boSung && !isCeo(auth);
+  if (type === 'DC') throw badRequest('BAD_TYPE', 'Phiếu điều chỉnh lập từ bảng chênh lệch của phiếu kiểm tồn');
+  if (type === 'KK' && !isCeo(auth) && !auth.permissions.includes('sx.kiemke') && !canEditMap(auth)) throw forbidden('Chỉ kế toán kho, mua hàng, kế toán hoặc CEO lập phiếu kiểm tồn');
   // Phiếu kiểm tồn (chị Hoa 06/11): kế toán kho, mua hàng (Thảo), kế toán (Huệ), CEO. Có số phiếu, ngày đếm, người lập.
   if (boSung && !isCeo(auth) && !auth.permissions.includes('sx.kiemke') && !canEditMap(auth)) throw forbidden('Chỉ kế toán kho, mua hàng, kế toán hoặc CEO lập phiếu kiểm tồn');
   if (!isDate(b.date)) throw badRequest('BAD_DATE', 'Ngày phiếu không đúng');
@@ -1671,6 +1700,23 @@ khoRoutes.post('/docs', async (c) => {
       }
       extra.bo_sung = true;
     }
+  } else if (type === 'KK') {
+    // Phiếu kiểm tồn: chỉ lưu số đếm + đơn giá, sổ không đổi. Chênh lệch với sổ xử lý bằng phiếu điều chỉnh (POST /kk/:id/dieu-chinh).
+    if (!lines.length) throw badRequest('NO_LINES', 'Phiếu chưa có dòng hàng nào');
+    if (date > vnDate()) throw badRequest('BAD_DATE', 'Ngày kiểm không được sau hôm nay');
+    const seen = new Set<string>();
+    const kl: Array<{ item: string; dem: number; gia: number | null; note: string }> = [];
+    for (const l of lines) {
+      const code = String(l.item ?? '');
+      need(code);
+      if (seen.has(code)) throw badRequest('DUP_ITEM', `Mã "${code}" xuất hiện hai lần, gộp lại thành một dòng`);
+      seen.add(code);
+      const q = num(l.qty);
+      if (!(q >= 0)) throw badRequest('BAD_QTY', `Số đếm ${code} phải là số từ 0 trở lên`);
+      const pr = num(l.price);
+      kl.push({ item: code, dem: q, gia: Number.isFinite(pr) && pr >= 0 ? pr : null, note: String(l.note ?? '').slice(0, 200) });
+    }
+    extra.lines = kl;
   } else if (type === 'PC') {
     // 16/11: agent không ghi thẳng phiếu pha chế vào kho; chỉ lập nháp (POST /api/hub/phache/nhap), Kế toán kiểm rồi ghi.
     if (auth.actorType === 'AGENT') throw forbidden('Agent chỉ lập phiếu pha chế nháp (Pha chế › phiếu nháp), Kế toán kiểm rồi mới ghi vào kho');
@@ -1876,9 +1922,9 @@ khoRoutes.post('/docs', async (c) => {
     try {
       await c.env.DB.prepare(
         `INSERT INTO kho_docs (no, type, doc_date, partner, ref_no, ref_qty, note, extra, status, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OK', ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-        .bind(no, type, date, String(b.partner ?? '').trim(), String(b.ref_no ?? '').trim(), refQty, String(b.note ?? '').trim(), JSON.stringify(extra), auth.user.id, now)
+        .bind(no, type, date, String(b.partner ?? '').trim(), String(b.ref_no ?? '').trim(), refQty, String(b.note ?? '').trim(), JSON.stringify(choDuyet && b.moc === true ? { ...extra, moc: true } : extra), choDuyet ? 'CHO' : 'OK', auth.user.id, now)
         .run();
       docId = (await c.env.DB.prepare('SELECT id FROM kho_docs WHERE no = ?').bind(no).first<{ id: number }>())?.id ?? 0;
     } catch (e) {
@@ -1911,24 +1957,7 @@ khoRoutes.post('/docs', async (c) => {
     }),
   ]);
   // CEO đánh dấu phiếu này là phiếu tồn chốt chung: đặt mốc tồn (ton_moc) = ngày phiếu; bán sàn bắt đầu trừ từ hôm sau nếu chưa đặt.
-  if (type === 'TD' && !boSung && b.moc === true && isCeo(auth)) {
-    const next = new Date(`${date}T00:00:00Z`);
-    next.setUTCDate(next.getUTCDate() + 1);
-    const onl = await c.env.DB.prepare("SELECT v FROM kho_cfg WHERE k = 'online_from'").first<{ v: string }>();
-    await c.env.DB.batch([
-      c.env.DB.prepare("INSERT INTO kho_cfg (k, v) VALUES ('ton_moc', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(date),
-      ...(onl ? [] : [c.env.DB.prepare("INSERT INTO kho_cfg (k, v) VALUES ('online_from', ?)").bind(next.toISOString().slice(0, 10))]),
-      auditStatement(c.env.DB, {
-        actorId: auth.user.id,
-        action: 'KHO_CFG',
-        entityType: 'KHO_CFG',
-        entityId: 'ton_moc',
-        after: { ton_moc: date, online_from: onl?.v ?? next.toISOString().slice(0, 10), doc: no },
-        requestId: c.get('requestId'),
-        ip: ip(c),
-      }),
-    ]);
-  }
+  if (type === 'TD' && !boSung && b.moc === true && isCeo(auth)) await khoSetMoc(c, date, no);
   // Nhập nguyên vật liệu không có phiếu đặt nhưng có ghi nhà cung cấp (ví dụ vỏ can): tự tạo phiếu mua để Thảo nhập giá, kế toán theo dõi công nợ.
   if (!poRow && type === 'PN' && String(b.partner ?? '').trim().length >= 2 && moves.length) {
     const agg = new Map<string, { item: string; qty: number; price: number | null }>();
@@ -1996,6 +2025,200 @@ khoRoutes.post('/docs', async (c) => {
   return ok(c, { id: docId, no, warnings });
 });
 
+/* ---------- Kiểm kê và điều chỉnh (chị Hoa duyệt bản xem thử 18/11/2026) ----------
+ * Phiếu kiểm tồn (KK) chỉ ghi số đếm + đơn giá. Bảng chênh lệch = số đếm − số sổ đến hết ngày kiểm.
+ * Kế toán lập Phiếu điều chỉnh (DC): thừa cộng, thiếu trừ, theo đơn giá phiếu kiểm. Dòng chưa rõ nguyên nhân là "treo"
+ * (kho vẫn theo số đếm, tiền chưa hạch toán chi phí; gỡ treo hoặc hạch toán sau). */
+type KkLine = { item: string; dem: number; gia: number | null; note: string };
+const keToanOrCeo = (a: AuthContext) => isCeo(a) || a.permissions.includes('order.accounting.confirm');
+async function kkLoad(db: D1Database, id: number) {
+  const d = await db
+    .prepare('SELECT id, no, type, doc_date, status, extra FROM kho_docs WHERE id = ?')
+    .bind(id)
+    .first<{ id: number; no: string; type: string; doc_date: string; status: string; extra: string }>();
+  if (!d || d.type !== 'KK') throw notFound('Không có phiếu kiểm tồn này');
+  const lines = (JSON.parse(d.extra || '{}') as { lines?: KkLine[] }).lines ?? [];
+  const book = new Map<string, number>();
+  const codes = lines.map((l) => l.item);
+  for (let i = 0; i < codes.length; i += 90) {
+    const part = codes.slice(i, i + 90);
+    const r = await db
+      .prepare(`SELECT item, ROUND(SUM(qty), 6) AS q FROM kho_ledger WHERE doc_date <= ? AND doc_id <> ? AND item IN (${part.map(() => '?').join(',')}) GROUP BY item`)
+      .bind(d.doc_date, id, ...part)
+      .all<{ item: string; q: number }>();
+    for (const x of r.results ?? []) book.set(x.item, x.q);
+  }
+  const dc = await db
+    .prepare("SELECT id, no FROM kho_docs WHERE type = 'DC' AND status = 'OK' AND json_extract(extra, '$.kk_id') = ?")
+    .bind(id)
+    .first<{ id: number; no: string }>();
+  return { doc: d, dc, rows: lines.map((l) => ({ ...l, so: book.get(l.item) ?? 0 })) };
+}
+
+khoRoutes.get('/kk/:id', async (c) => {
+  const r = await kkLoad(c.env.DB, Number(c.req.param('id')));
+  // Đã có phiếu điều chỉnh thì sổ đã gồm điều chỉnh: trừ ra để xem lại số sổ trước điều chỉnh.
+  let before: Map<string, number> | null = null;
+  if (r.dc) {
+    const m = await c.env.DB.prepare('SELECT item, qty FROM kho_moves WHERE doc_id = ?').bind(r.dc.id).all<{ item: string; qty: number }>();
+    before = new Map((m.results ?? []).map((x) => [x.item, x.qty]));
+  }
+  const cp = canPrice(c.get('auth'));
+  return ok(c, {
+    doc: { id: r.doc.id, no: r.doc.no, doc_date: r.doc.doc_date, status: r.doc.status },
+    dc: r.dc,
+    rows: r.rows.map((x) => {
+      const so = before ? Math.round((x.so - (before.get(x.item) ?? 0)) * 1e6) / 1e6 : x.so;
+      return { item: x.item, dem: x.dem, so, cl: Math.round((x.dem - so) * 1e6) / 1e6, gia: cp ? x.gia : null, note: x.note };
+    }),
+  });
+});
+
+/** Body: { treo?: {mã: lý do}, ly_do?: {mã: ghi chú} }. Lập một phiếu điều chỉnh cho mọi mã lệch của phiếu kiểm. */
+khoRoutes.post('/kk/:id/dieu-chinh', async (c) => {
+  const auth = c.get('auth');
+  if (!keToanOrCeo(auth)) throw forbidden('Chỉ Kế toán hoặc CEO lập phiếu điều chỉnh kiểm kê');
+  const id = Number(c.req.param('id'));
+  const b = ((await c.req.json().catch(() => null)) ?? {}) as { treo?: Record<string, unknown>; ly_do?: Record<string, unknown> };
+  const r = await kkLoad(c.env.DB, id);
+  if (r.doc.status !== 'OK') throw conflict('HUY', 'Phiếu kiểm tồn đã hủy');
+  if (r.dc) throw conflict('DA_DC', `Phiếu kiểm này đã có phiếu điều chỉnh ${r.dc.no}. Muốn làm lại thì hủy phiếu đó trước.`);
+  const lk = (await loadAccRules(c.env.DB)).lock_date;
+  if (lk && r.doc.doc_date <= lk) throw conflict('SO_DA_KHOA', `Sổ kho đã khóa đến hết ngày ${ddmm(lk)}.`);
+  const treo: Record<string, { ly_do: string; st: 'TREO' }> = {};
+  const moves = r.rows
+    .map((x) => ({ ...x, cl: Math.round((x.dem - x.so) * 1e6) / 1e6 }))
+    .filter((x) => x.cl !== 0)
+    .map((x) => {
+      const t = !!b.treo && Object.prototype.hasOwnProperty.call(b.treo, x.item);
+      const note = String((t ? b.treo?.[x.item] : b.ly_do?.[x.item]) ?? '')
+        .trim()
+        .slice(0, 200);
+      if (t) treo[x.item] = { ly_do: note || 'Chưa rõ nguyên nhân', st: 'TREO' };
+      return { item: x.item, qty: x.cl, std_qty: x.so, price: x.gia, role: t ? 'TREO' : 'DC', note };
+    });
+  if (!moves.length) throw badRequest('KHOP', 'Số đếm khớp sổ, không cần điều chỉnh');
+  const ym = r.doc.doc_date.slice(2, 4) + r.doc.doc_date.slice(5, 7);
+  let no = '';
+  let docId = 0;
+  for (let attempt = 0; attempt < 4 && !docId; attempt++) {
+    const row = await c.env.DB.prepare('SELECT MAX(CAST(substr(no, instr(no, char(45)) + 1) AS INTEGER)) AS n FROM kho_docs WHERE type = ? AND no LIKE ?')
+      .bind('DC', `DC${ym}-%`)
+      .first<{ n: number }>();
+    no = `DC${ym}-${String((row?.n ?? 0) + 1 + attempt).padStart(3, '0')}`;
+    try {
+      const res = await c.env.DB.prepare(
+        `INSERT INTO kho_docs (no, type, doc_date, partner, ref_no, ref_qty, note, extra, status, created_by, created_at)
+         VALUES (?, 'DC', ?, '', ?, NULL, ?, ?, 'OK', ?, ?)`,
+      )
+        .bind(no, r.doc.doc_date, r.doc.no, `Điều chỉnh theo phiếu kiểm tồn ${r.doc.no}`, JSON.stringify({ kk_id: id, treo }), auth.user.id, nowIso())
+        .run();
+      docId = Number(res.meta.last_row_id);
+    } catch (e) {
+      if (!String(e).includes('UNIQUE')) throw e;
+    }
+  }
+  if (!docId) throw conflict('NO_CLASH', 'Không cấp được số phiếu, thử lại');
+  await c.env.DB.batch([
+    ...Array.from({ length: Math.ceil(moves.length / 12) }, (_, i) => moves.slice(i * 12, i * 12 + 12)).map((part) =>
+      c.env.DB.prepare(`INSERT INTO kho_moves (doc_id, item, qty, std_qty, price, role, note) VALUES ${part.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')}`).bind(
+        ...part.flatMap((m) => [docId, m.item, m.qty, m.std_qty, m.price, m.role, m.note]),
+      ),
+    ),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'KHO_DOC_CREATED',
+      entityType: 'KHO_DOC',
+      entityId: no,
+      after: { type: 'DC', kk: r.doc.no, lines: moves.length, treo: Object.keys(treo).length },
+      requestId: c.get('requestId'),
+      ip: ip(c),
+    }),
+  ]);
+  return ok(c, { id: docId, no, lines: moves.length, treo: Object.keys(treo).length });
+});
+
+/** Các dòng điều chỉnh đang treo / đã gỡ / đã hạch toán. */
+khoRoutes.get('/treo', async (c) => {
+  const r = await c.env.DB.prepare(
+    `SELECT d.id, d.no, d.doc_date, d.ref_no, d.extra, m.item, m.qty, m.price, m.note
+     FROM kho_moves m JOIN kho_docs d ON d.id = m.doc_id
+     WHERE d.type = 'DC' AND d.status = 'OK' AND m.role = 'TREO' ORDER BY d.doc_date DESC, d.id DESC LIMIT 500`,
+  ).all<{ id: number; no: string; doc_date: string; ref_no: string; extra: string; item: string; qty: number; price: number | null; note: string }>();
+  const cp = canPrice(c.get('auth'));
+  return ok(
+    c,
+    (r.results ?? []).map((x) => {
+      const t = ((JSON.parse(x.extra || '{}') as { treo?: Record<string, { st?: string; ly_do?: string; by?: string; at?: string; ghi_chu?: string }> }).treo ?? {})[x.item] ?? {};
+      return { doc_id: x.id, no: x.no, doc_date: x.doc_date, kk: x.ref_no, item: x.item, qty: x.qty, gia: cp ? x.price : null, ly_do: t.ly_do ?? x.note, st: t.st ?? 'TREO', by: t.by ?? null, at: t.at ?? null, ghi_chu: t.ghi_chu ?? '' };
+    }),
+  );
+});
+
+/** Body: { item, action: 'go' (đã tìm ra nguyên nhân) | 'ht' (hạch toán chi phí), ghi_chu }. */
+khoRoutes.post('/dc/:id/treo', async (c) => {
+  const auth = c.get('auth');
+  if (!keToanOrCeo(auth)) throw forbidden('Chỉ Kế toán hoặc CEO xử lý dòng treo');
+  const id = Number(c.req.param('id'));
+  const b = ((await c.req.json().catch(() => null)) ?? {}) as { item?: unknown; action?: unknown; ghi_chu?: unknown };
+  const item = String(b.item ?? '');
+  const st = b.action === 'go' ? 'DA_GO' : b.action === 'ht' ? 'DA_HT' : '';
+  if (!st) throw badRequest('BAD_ACTION', 'Chọn Gỡ treo hoặc Hạch toán');
+  const d = await c.env.DB.prepare("SELECT no, extra FROM kho_docs WHERE id = ? AND type = 'DC' AND status = 'OK'").bind(id).first<{ no: string; extra: string }>();
+  if (!d) throw notFound('Không có phiếu điều chỉnh này');
+  const ex = JSON.parse(d.extra || '{}') as { treo?: Record<string, Record<string, unknown>> };
+  const t = ex.treo?.[item];
+  if (!t) throw notFound('Dòng này không treo');
+  if (t.st !== 'TREO') throw conflict('DA_XU_LY', 'Dòng này đã xử lý');
+  Object.assign(t, { st, by: auth.user.display_name, at: nowIso(), ghi_chu: String(b.ghi_chu ?? '').trim().slice(0, 300) });
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE kho_docs SET extra = ? WHERE id = ?').bind(JSON.stringify(ex), id),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'KHO_TREO', entityType: 'KHO_DOC', entityId: d.no, after: { item, st }, requestId: c.get('requestId'), ip: ip(c) }),
+  ]);
+  return ok(c, { id, item, st });
+});
+
+/** CEO duyệt phiếu tồn đầu kỳ do Kế toán lập: vào sổ, và nếu là phiếu tồn chốt chung thì đặt mốc. */
+khoRoutes.post('/docs/:id/duyet', async (c) => {
+  const auth = c.get('auth');
+  if (!isCeo(auth)) throw forbidden('Chỉ CEO duyệt phiếu tồn đầu kỳ');
+  const id = Number(c.req.param('id'));
+  const d = await c.env.DB.prepare("SELECT no, doc_date, extra FROM kho_docs WHERE id = ? AND type = 'TD' AND status = 'CHO'")
+    .bind(id)
+    .first<{ no: string; doc_date: string; extra: string }>();
+  if (!d) throw notFound('Không có phiếu tồn đầu kỳ chờ duyệt này');
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE kho_docs SET status = 'OK' WHERE id = ? AND status = 'CHO'").bind(id),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'KHO_DOC_APPROVED', entityType: 'KHO_DOC', entityId: d.no, requestId: c.get('requestId'), ip: ip(c) }),
+  ]);
+  if ((JSON.parse(d.extra || '{}') as { moc?: boolean }).moc) await khoSetMoc(c, d.doc_date, d.no);
+  return ok(c, { id, no: d.no });
+});
+
+/** CEO đổi phiếu tồn chốt / kiểm bổ sung cũ (sau mốc chung) thành phiếu kiểm tồn: không ghi đè sổ nữa, ra chênh lệch để điều chỉnh. */
+khoRoutes.post('/docs/:id/to-kk', async (c) => {
+  const auth = c.get('auth');
+  if (!isCeo(auth)) throw forbidden('Chỉ CEO đổi phiếu tồn thành phiếu kiểm tồn');
+  const id = Number(c.req.param('id'));
+  const d = await c.env.DB.prepare("SELECT no, doc_date FROM kho_docs WHERE id = ? AND type = 'TD' AND status = 'OK'").bind(id).first<{ no: string; doc_date: string }>();
+  if (!d) throw notFound('Không có phiếu tồn này');
+  const moc = await khoMocChung(c.env.DB);
+  if (!moc || !(d.doc_date > moc)) throw badRequest('LA_MOC', 'Đây là phiếu tồn của mốc chung (hoặc trước mốc). Chỉ đổi được phiếu tồn sau mốc chung.');
+  const mv = (await c.env.DB.prepare('SELECT item, qty, price, note FROM kho_moves WHERE doc_id = ? ORDER BY id').bind(id).all<{ item: string; qty: number; price: number | null; note: string }>()).results ?? [];
+  const agg = new Map<string, KkLine>();
+  for (const m of mv) {
+    const x = agg.get(m.item);
+    if (x) x.dem += m.qty;
+    else agg.set(m.item, { item: m.item, dem: m.qty, gia: m.price, note: m.note ?? '' });
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE kho_docs SET type = 'KK', extra = json_set(COALESCE(extra, '{}'), '$.lines', json(?), '$.tu_td', ?) WHERE id = ?").bind(JSON.stringify([...agg.values()]), d.no, id),
+    c.env.DB.prepare('DELETE FROM kho_moves WHERE doc_id = ?').bind(id),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'KHO_TD_TO_KK', entityType: 'KHO_DOC', entityId: d.no, before: { lines: mv.length }, requestId: c.get('requestId'), ip: ip(c) }),
+  ]);
+  return ok(c, { id, no: d.no, lines: agg.size });
+});
+
 khoRoutes.post('/docs/:id/cancel', async (c) => {
   const auth = c.get('auth');
   const id = Number(c.req.param('id'));
@@ -2004,7 +2227,7 @@ khoRoutes.post('/docs/:id/cancel', async (c) => {
   if (reason.length < 3) throw badRequest('NO_REASON', 'Cần ghi lý do hủy phiếu');
   const doc = await c.env.DB.prepare('SELECT no, type, status FROM kho_docs WHERE id = ?').bind(id).first<{ no: string; type: string; status: string }>();
   if (!doc) throw notFound('Không tìm thấy phiếu');
-  if (doc.status !== 'OK') throw conflict('ALREADY', 'Phiếu này đã hủy rồi');
+  if (doc.status === 'HUY') throw conflict('ALREADY', 'Phiếu này đã hủy rồi');
   if (doc.type === 'TD' && !isCeo(auth)) throw forbidden('Chỉ CEO hủy phiếu tồn đầu kỳ');
   {
     const lk = (await loadAccRules(c.env.DB)).lock_date;
@@ -2021,7 +2244,7 @@ khoRoutes.post('/docs/:id/cancel', async (c) => {
   }
   await c.env.DB.batch([
     c.env.DB.prepare(
-      "UPDATE kho_docs SET status = 'HUY', cancelled_by = ?, cancelled_at = ?, cancel_reason = ? WHERE id = ? AND status = 'OK'",
+      "UPDATE kho_docs SET status = 'HUY', cancelled_by = ?, cancelled_at = ?, cancel_reason = ? WHERE id = ? AND status IN ('OK', 'CHO')",
     ).bind(auth.user.id, nowIso(), reason, id),
     ...linked.map((r) => c.env.DB.prepare("UPDATE po_receipts SET status = 'HUY' WHERE id = ?").bind(r.id)),
     auditStatement(c.env.DB, {
