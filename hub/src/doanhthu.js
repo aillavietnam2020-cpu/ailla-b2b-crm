@@ -153,7 +153,7 @@ const DTD={ym:"",open:"",orders:{},busy:{}};
 function dtFile(ch,ym){
   const days=(o,i)=>{let v=0,n=0;for(const k in o||{})if(k.slice(0,7)===ym){v+=+o[k][i]||0;n++}return n?v:null};
   if(ch==="tts"){const s=(typeof TSB!=="undefined"&&TSB.sum||{})[ym];return s&&s.dt?{v:s.dt,n:"Báo cáo quyết toán TikTok "+(s.den?"đến ngày "+dtVN(s.den):"cả tháng")}:{v:null,n:"chưa tải báo cáo quyết toán TikTok"}}
-  if(ch==="fb"){const R=typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.days;if(!R)return {v:null,n:"Sheet Pancake đang tải…"};let v=0,n=0,last="";for(const k in R)if(k.slice(0,7)===ym){v+=+R[k].g[1]||0;n++;if(k>last)last=k}
+  if(ch==="fb"){const s=typeof FDS!=="undefined"&&FDS.m&&FDS.m[ym];if(s&&s.dt>0)return {v:s.dt,n:`Đối soát tiền về SPX/Best (${nf(s.don)} đơn đã về tiền)`};const R=typeof FBC!=="undefined"&&FBC.raw&&FBC.raw.days;if(!R)return {v:null,n:"Sheet Pancake đang tải…"};let v=0,n=0,last="";for(const k in R)if(k.slice(0,7)===ym){v+=+R[k].g[1]||0;n++;if(k>last)last=k}
     return n?{v,n:`Sheet Pancake (đơn giao thành công) cập nhật ${FBC.raw.at?dtVN(FBC.raw.at.slice(0,10)):""}, có đến ngày ${dtVN(last)}`}:{v:null,n:"Sheet Pancake chưa có tháng này"}}
   if(ch==="spe"){const v=days(DAYD.spe,0);return v==null?{v:null,n:"chưa tải báo cáo Shopee"}:{v,n:"File Shopee đã tải lên"}}
   if(ch==="cskh")return {v:null,n:"mảng chưa chạy"};
