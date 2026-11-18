@@ -73,27 +73,35 @@ function koAdm(m,K,X,r){
     ${K.debt?`<div class="tb-bar" style="height:18px;font-size:11.5px;margin-bottom:8px">${seg.map(s=>`<div style="width:${(s[1]/T*100).toFixed(2)}%;background:${s[2]}">${s[1]/T>=.1?esc(s[0])+" "+tr(s[1])+" · "+kpPct(s[1]/T):""}</div>`).join("")}</div>`:""}
     </section>`;
   /* cảnh báo & đề xuất */
+  /* Cần làm (chị Hoa 18/11/2026): gọn, ít màu, câu ngắn. Mỗi dòng một việc; nợ gộp theo khách. [mức, chữ]: r đỏ, a vàng, b xám. */
   const AW={c:[],d:[]},AM={c:[],d:[]};
-  K.no.filter(o=>o.age>=7).slice(0,3).forEach(o=>{AW.c.push(["a",o.kind==="PPT"?`Phiếu phải thu ${o.order_no} của ${K.name(o.customer_id)} ${o.age} ngày, chưa thu tiền`:`Đơn ${K.name(o.customer_id)} ${o.order_no} đã xuất kho ${o.age} ngày, chưa thu tiền`,tr(o.left)+".","Phụ trách OEM + Kế toán"]);AW.d.push(["b",`Chốt tiền đơn ${K.name(o.customer_id)}`,"Gửi đối chiếu, hẹn ngày thanh toán.",""])});
-  K.tre.forEach(o=>AW.c.push(["r",`Đơn ${o.order_no} trễ hạn giao`,`Khách cần hàng ${kpVn(o.need_date)}, chưa xuất kho.`,"Sản xuất"]));
-  K.sap.forEach(o=>AW.c.push(["a",`Đơn ${o.order_no} sắp đến hạn giao`,`Khách cần hàng ${kpVn(o.need_date)}.`,"Sản xuất"]));
-  if(dt&&ngv)AM.c.push([ngv/dt>=.3?"r":"a",`${kpPct(ngv/dt)} doanh thu chưa có giá vốn`,miss.slice(0,3).map(x=>`${x.sku} (${x.name})`).join(", ")+".","Kế toán nhập định mức + giá vốn"]);
-  if(K.buyers.length&&K.buyers.length<=2)AM.c.push(["a",`Chỉ ${K.buyers.length} khách, ${K.cur.length} đơn trong kỳ`,K.buyers.length===1?`Kênh phụ thuộc hoàn toàn vào ${K.name(K.buyers[0])}.`:"Kênh phụ thuộc vào ít khách.","Phụ trách OEM"]);
-  if(!K.pdt)AM.c.push(["a",`Tháng ${pm} chưa có số OEM`,"Chưa có đơn OEM đã duyệt trên CRM.","Kế toán"]);
-  K.no.filter(o=>o.age>60).forEach(o=>AM.c.push(["r",`Đơn ${o.order_no} nợ ${o.age} ngày`,`${K.name(o.customer_id)} còn ${tr(o.left)}.`,"Kế toán + Phụ trách OEM"]));
-  if(miss.length)AM.d.push(["b",`Lập định mức cho ${miss[0].name||miss[0].sku}`,"NVL + bao bì theo đơn, để tính được lãi đơn OEM.",""]);
-  if(K.buyers.length<=2)AM.d.push(["b","Tìm thêm khách OEM","Mỗi khách một bảng giá riêng, theo dõi ở Khách hàng OEM.",""]);
+  const noKh=new Map();K.no.forEach(o=>{const x=noKh.get(o.customer_id)||{id:o.customer_id,v:0,age:0};x.v+=o.left;x.age=Math.max(x.age,o.age);noKh.set(o.customer_id,x)});
+  const NK=[...noKh.values()].sort((x,y)=>y.age-x.age);
+  NK.filter(x=>x.age>=7).forEach(x=>AW.c.push([x.age>60?"r":"a",`${K.name(x.id)}: nợ ${tr(x.v)}, lâu nhất ${x.age} ngày`]));
+  if(NK.some(x=>x.age>=7))AW.d.push(["b",`Gửi đối chiếu, hẹn ngày trả: ${NK.filter(x=>x.age>=7).map(x=>K.name(x.id)).join(", ")}`]);
+  K.tre.forEach(o=>AW.c.push(["r",`Đơn ${o.order_no} trễ giao (khách cần ${kpVn(o.need_date)})`]));
+  K.sap.forEach(o=>AW.c.push(["a",`Đơn ${o.order_no} sắp đến hạn giao ${kpVn(o.need_date)}`]));
+  NK.filter(x=>x.age>60).forEach(x=>AM.c.push(["r",`${K.name(x.id)}: nợ ${tr(x.v)} quá 60 ngày`]));
+  if(dt&&ngv)AM.c.push([ngv/dt>=.3?"r":"a",`${kpPct(ngv/dt)} doanh thu chưa có giá vốn (${miss.length} mã)`]);
+  if(K.buyers.length&&K.buyers.length<=2)AM.c.push(["a",`Chỉ ${K.buyers.length} khách mua trong kỳ`]);
+  if(!K.pdt)AM.c.push(["a",`Tháng ${pm} chưa có đơn OEM`]);
+  if(miss.length)AM.d.push(["b",`Kế toán nhập giá vốn cho ${miss.length} mã, đầu tiên ${miss[0].name||miss[0].sku}`]);
+  if(K.buyers.length<=2)AM.d.push(["b","Tìm thêm khách OEM"]);
   const AL=KO.al==="tuan"?AW:AM,chot=r.chot==="chot"&&r.frozen,nx=plYmAdd(ym,1),W=K.W;
-  const side=`<aside><section class="card"><div class="card-h"><h2>⚠️ Cảnh báo & đề xuất</h2></div>
-    <div class="chips" style="margin:0 0 8px"><button class="chip${KO.al==="tuan"?" on":""}" data-koal="tuan">Tuần ${kpVn(W[1].a)}–${kpVn(W[1].b)}</button><button class="chip${KO.al==="thang"?" on":""}" data-koal="thang">${one?"Tháng "+ym.slice(5):"Cả kỳ"}</button></div>
-    ${AL.c.length?`<h4 class="kp-h4">Cảnh báo</h4>${AL.c.map(kpAl).join("")}`:`<p class="hint">Không có cảnh báo.</p>`}${AL.d.length?`<h4 class="kp-h4">Đề xuất</h4>${AL.d.map(kpAl).join("")}`:""}</section>
-    <div class="note dt-ban" style="margin-top:12px"><b>Doanh thu thực ${esc(pLabel())}: ${tr(dt)}</b> ${pill(chot?"đã chốt":one?"chưa chốt · chốt 10/"+nx.slice(5):"chưa chốt",chot?"grn":"amb")}<br><small class="hint">đơn OEM đã duyệt trên CRM · cùng số với Tổng quan công ty, Lãi lỗ, Đối chiếu doanh thu</small></div></aside>`;
+  const li=x=>`<li><i class="d-${x[0]}"></i>${esc(x[1])}</li>`;
+  const side=`<aside><section class="card ko-al"><div class="card-h"><h2>Cần làm</h2><span class="ko-al-t"><button class="${KO.al==="tuan"?"on":""}" data-koal="tuan">Tuần ${kpVn(W[1].a)}–${kpVn(W[1].b)}</button><button class="${KO.al==="thang"?"on":""}" data-koal="thang">${one?"Tháng "+ym.slice(5):"Cả kỳ"}</button></span></div>
+    ${AL.c.length||AL.d.length?`<ul>${AL.c.map(li).join("")}${AL.d.map(li).join("")}</ul>`:`<p class="hint">Không có việc gì cần làm.</p>`}
+    <p class="ko-al-dt">Doanh thu ${one?"tháng "+ym.slice(5):"kỳ"}: <b>${tr(dt)}</b> · ${chot?"đã chốt":one?"chốt ngày 10/"+nx.slice(5):"chưa chốt"}</p></section>
+    <style>.ko-al ul{list-style:none;margin:0;padding:0}.ko-al li{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.4}
+      .ko-al li:last-child{border-bottom:0}.ko-al li i{flex:0 0 7px;height:7px;border-radius:50%;background:#98a1b2;transform:translateY(-1px)}.ko-al li i.d-r{background:#c0392b}.ko-al li i.d-a{background:#f0a020}
+      .ko-al-t{margin-left:auto;display:flex;gap:4px}.ko-al-t button{border:0;background:none;font:inherit;font-size:12px;color:var(--muted,#667085);padding:2px 6px;border-radius:6px;cursor:pointer}.ko-al-t button.on{background:var(--line);color:inherit;font-weight:600}
+      .ko-al-dt{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line);font-size:13px;color:var(--muted,#667085)}.ko-al-dt b{color:var(--ink,#111)}</style></aside>`;
   /* top đối tác */
   const L=KO.d.lines||[],by=new Map();K.cur.forEach(o=>{const x=by.get(o.customer_id)||{id:o.customer_id,don:0,v:0,last:""};x.don++;x.v+=kpRev(o);if(o.order_date>x.last)x.last=o.order_date;by.set(o.customer_id,x)});
   const pv=id=>K.prev.filter(o=>o.customer_id===id).reduce((a,o)=>a+kpRev(o),0),left=id=>K.no.filter(o=>o.customer_id===id).reduce((a,o)=>a+o.left,0);
   const mainSp=id=>{const l=L.filter(x=>x.customer_id===id).sort((a,b)=>b.revenue-a.revenue)[0];return l?l.name:""};
   const P=[...by.values()].sort((a,b)=>b.v-a.v);
-  const doiTac=`<section class="card"><div class="card-h"><h2>Top đối tác OEM</h2><span class="hint">xếp theo doanh thu ${esc(pLabel())}</span></div><div class="ko-w">${P.length?tbl(["#","Đối tác","Đơn","Doanh thu","% kênh","Còn phải thu","Đơn gần nhất",`Tháng ${pm}`],P.map((x,i)=>{const c=K.C.get(x.id)||{},p=pv(x.id),lf=left(x.id),fs=c.first_order&&c.first_order>=PERIOD.from;return `<tr><td><span class="tb-rk">${i+1}</span></td><td><b>${esc(c.name||"")}</b><br><small class="hint">${esc(mainSp(x.id))}${fs?" · đơn đầu tiên":""}</small></td><td class="n">${x.don}</td><td class="n">${tr(x.v)}</td><td class="n">${kpP(x.v,K.dt)}</td><td class="n ${lf?"t-red":""}">${tr(lf)}</td><td class="n">${kpVn(x.last)}</td><td class="n">${p?tr(p):koTag()}</td></tr>`})):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div>
+  const doiTac=`<section class="card"><div class="card-h"><h2>Top 5 đối tác OEM</h2><span class="hint">xếp theo doanh thu ${esc(pLabel())}</span></div><div class="ko-w">${P.length?tbl(["#","Đối tác","Đơn","Doanh thu","% kênh","Còn phải thu","Đơn gần nhất",`Tháng ${pm}`],P.map((x,i)=>{const c=K.C.get(x.id)||{},p=pv(x.id),lf=left(x.id),fs=c.first_order&&c.first_order>=PERIOD.from;return `<tr><td><span class="tb-rk">${i+1}</span></td><td><b>${esc(c.name||"")}</b><br><small class="hint">${esc(mainSp(x.id))}${fs?" · đơn đầu tiên":""}</small></td><td class="n">${x.don}</td><td class="n">${tr(x.v)}</td><td class="n">${kpP(x.v,K.dt)}</td><td class="n ${lf?"t-red":""}">${tr(lf)}</td><td class="n">${kpVn(x.last)}</td><td class="n">${p?tr(p):koTag()}</td></tr>`})):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div>
     <p class="hint">${K.C.size} đối tác có bảng giá riêng. Đối tác mới tự hiện ở đây khi được lập bảng giá riêng và có đơn.</p></section>`;
   /* cơ cấu chi phí */
   const skuC=new Map();L.forEach(l=>{const x=skuC.get(l.sku)||{sku:l.sku,n:l.name,q:0,v:0,c:null};x.q+=+l.qty||0;x.v+=+l.revenue||0;const u=b2bUnitCost(l.sku,String(l.order_date).slice(0,7));if(u!=null)x.c=(x.c||0)+u*(+l.qty||0);skuC.set(l.sku,x)});
@@ -102,10 +110,8 @@ function koAdm(m,K,X,r){
   const tg=(k,c,n,t,h,A)=>`<tr class="${A&&A.length?"tb-tg":""}" ${A&&A.length?`data-kotg="${k}"`:""}><td><span class="tb-car" data-kocar="${k}">${A&&A.length?(KO.open[k]?"▾":"▸"):""}</span><span class="tb-dot" style="background:${c}"></span>${A&&A.length?`<b>${esc(n)}</b>`:esc(n)}</td><td class="n">${t==null?koTag():kpF(t)}</td><td class="n">${t==null?"":kpP(t,dt)}</td><td class="hint">${esc(h)}</td></tr>`+(A?sub(k,A):"");
   const coCp=`<section class="card"><div class="card-h"><h2>Cơ cấu chi phí</h2><span class="hint">trên doanh thu thực ${tr(dt)} · khoản nào có số mới hiện dòng</span></div><div class="ko-w">${tbl(["Khoản","Số tiền (đ)","% doanh thu","Ghi chú"],[
     tg("gv","#8a8799","Giá vốn (NVL + bao bì + sản xuất)",X.cover?gv:null,"bấm xem mã",gvSub),
-    tg("cp","#b06ab3","Chi phí kênh",cp||null,cp?"bấm xem từng khoản":"vận chuyển, hàng mẫu, chiết khấu, lương phụ trách OEM: hiện khi có",cpL),
-    `<tr class="tb-sum"><td><span class="tb-car"></span>Lãi đóng góp kênh</td><td class="n">${lai==null?koTag():kpF(lai)}</td><td class="n">${lai==null?"":kpP(lai,dt)}</td><td class="hint">${lai==null?"chờ giá vốn":ngv?"chỉ phần hàng có giá vốn":""}</td></tr>`,
-    tg("ch","#5d6d8e","Chi phí chung phân bổ",hasChia?chia:null,hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia),
-    `<tr class="tb-sum"><td><span class="tb-car"></span>Lãi ròng kênh</td><td class="n">${ln==null?koTag():kpF(ln)}</td><td class="n">${ln==null?"":kpP(ln,dt)}</td><td></td></tr>`])}</div></section>`;
+    tg("cp","#b06ab3","Chi phí kênh",cp||null,cp?"bấm xem từng khoản":"chưa có khoản nào",cpL),
+    tg("ch","#5d6d8e","Chi phí chung phân bổ",hasChia?chia:null,hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia)])}</div></section>`;
   /* top đơn / sản phẩm */
   /* Top sản phẩm bán chạy (chị Hoa 18/11/2026): gộp theo mã, xếp theo doanh thu hoặc số lượng (nút chọn). Giá vốn theo tháng bán, mã chưa có giá vốn để trống. */
   const tby=KO.topBy==="sl"?"sl":"dt",tPM=new Map();
@@ -113,8 +119,8 @@ function koAdm(m,K,X,r){
     x.qty+=+l.qty||0;x.rev+=+l.revenue||0;if(u==null)x.noCost=true;else x.cost+=u*(+l.qty||0);x.kh.add(l.customer_id);tPM.set(l.sku,x)});
   const tTP=[...tPM.values()].sort((p,q)=>tby==="sl"?q.qty-p.qty||q.rev-p.rev:q.rev-p.rev||q.qty-p.qty);
   const ttg=(k,t)=>`<button class="btn sm${tby===k?" pri":""}" data-kotop="${k}">${t}</button>`;
-  const top=`<section class="card"><div class="card-h"><h2>Top sản phẩm bán chạy</h2><span class="hint">${esc(pLabel())} · ${tPM.size} sản phẩm</span><span style="margin-left:auto;display:flex;gap:6px">${ttg("dt","Theo doanh thu")}${ttg("sl","Theo số lượng")}</span></div><div class="ko-w">${tTP.length?tbl(["#","Sản phẩm","Số lượng","Doanh thu","Giá vốn","Lãi gộp","Khách mua"],tTP.slice(0,12).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.name)} <small class="hint mono">${esc(x.sku)}</small></td><td class="n">${tby==="sl"?`<b>${nf(x.qty)}</b>`:nf(x.qty)}</td><td class="n">${tby==="dt"?`<b>${tr(x.rev)}</b>`:tr(x.rev)}</td><td class="n">${x.noCost?`<span class="pill p-gry">chưa có giá vốn</span>`:tr(x.cost)}</td><td class="n">${x.noCost?"—":tr(x.rev-x.cost)}</td><td>${esc([...x.kh].map(K.name).join(", "))}</td></tr>`)):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div></section>`;
-  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}</div>${side}</div>${coCp}${doiTac}${top}`+
+  const top=`<section class="card"><div class="card-h"><h2>Top 5 sản phẩm bán chạy</h2><span class="hint">${esc(pLabel())} · ${tPM.size} sản phẩm</span><span style="margin-left:auto;display:flex;gap:6px">${ttg("dt","Theo doanh thu")}${ttg("sl","Theo số lượng")}</span></div><div class="ko-w">${tTP.length?tbl(["#","Sản phẩm","Số lượng","Doanh thu","Giá vốn","Lãi gộp","Khách mua"],tTP.slice(0,5).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.name)} <small class="hint mono">${esc(x.sku)}</small></td><td class="n">${tby==="sl"?`<b>${nf(x.qty)}</b>`:nf(x.qty)}</td><td class="n">${tby==="dt"?`<b>${tr(x.rev)}</b>`:tr(x.rev)}</td><td class="n">${x.noCost?`<span class="pill p-gry">chưa có giá vốn</span>`:tr(x.cost)}</td><td class="n">${x.noCost?"—":tr(x.rev-x.cost)}</td><td>${esc([...x.kh].map(K.name).join(", "))}</td></tr>`)):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div></section>`;
+  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}${coCp}</div>${side}</div>${doiTac}${top}`+
     srcNote("Đơn OEM đã duyệt trên CRM (khách chỉ dùng bảng giá riêng, không có cấp giá) · giá vốn SKU / định mức, không ước phần chưa có · chi phí từ Sổ chi phí.");
   m.querySelectorAll("[data-kotop]").forEach(b=>b.onclick=()=>{KO.topBy=b.dataset.kotop;renderMain()});
 }
@@ -135,7 +141,7 @@ function koOps(m,K){
     ${K.no.length?kpAl(["b","Đề xuất",`Gửi đối chiếu, hẹn ngày thanh toán${K.no.length===1?" đơn "+kpVn(K.no[0].order_date):""}.`]):""}</div>`;
   const spm=new Map();LN.forEach(l=>{const k=l.sku+"|"+l.customer_id,x=spm.get(k)||{n:l.name,kh:K.name(l.customer_id),q:0,v:0};x.q+=+l.qty||0;x.v+=+l.revenue||0;spm.set(k,x)});
   const SP=spm.size?[...spm.values()].sort((a,b)=>b.v-a.v):L.map(x=>({n:x.name,kh:"",q:+x.qty||0,v:+x.revenue||0}));
-  const sp=`<section class="card" style="margin-top:12px"><div class="card-h"><h2>Sản phẩm OEM bán ra</h2><span class="hint">theo đơn đã duyệt</span></div><div class="ko-w">${SP.length?tbl(["#","Sản phẩm","Khách","Số lượng","Doanh thu"],SP.slice(0,12).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.n)}</td><td>${esc(x.kh)}</td><td class="n">${nf(x.q)}</td><td class="n">${tr(x.v)}</td></tr>`)):`<p class="hint">Kỳ này chưa có đơn OEM.</p>`}</div></section>`;
+  const sp=`<section class="card" style="margin-top:12px"><div class="card-h"><h2>Sản phẩm OEM bán ra</h2><span class="hint">theo đơn đã duyệt</span></div><div class="ko-w">${SP.length?tbl(["#","Sản phẩm","Khách","Số lượng","Doanh thu"],SP.slice(0,5).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.n)}</td><td>${esc(x.kh)}</td><td class="n">${nf(x.q)}</td><td class="n">${tr(x.v)}</td></tr>`)):`<p class="hint">Kỳ này chưa có đơn OEM.</p>`}</div></section>`;
   m.innerHTML=H("Kênh OEM · Việc của phụ trách OEM và sản xuất",pLabel())+kp+(todo.length?`<section class="card" style="padding:10px 14px"><div class="tb-todo"><b>Việc cần làm (${todo.length}):</b>${todo.map(t=>pill(t[1],t[0])).join("")}</div></section>`:"")+`<div class="tb-teams">${c1}${c2}${c3}${c4}</div>${sp}`;
 }
 function koBind(m){

@@ -137,6 +137,7 @@ phacheRoutes.post('/yc', async (c) => {
     ).bind(id, codes[i], r6(lb * bon), lb, bon, ngay, han, str(b?.ghi_chu), auth.user.id, auth.user.display_name, now, now);
   });
   await c.env.DB.batch(st);
+  for (const o of out) await reqLog(c.env.DB, o.id, 'TAO', 'MH', auth, `Tạo yêu cầu ${o.id} · ${o.lit} lít · hạn ${ddmm(han)}`, null, han);
   return ok(c, out);
 });
 
@@ -167,9 +168,135 @@ phacheRoutes.patch('/yc/:id', async (c) => {
   const lb = num(b?.lit_bon);
   if (!(lb > 0)) throw badRequest('BAD_LIT', 'Số lít phải lớn hơn 0');
   const bon = num(b?.bon) > 0 ? num(b?.bon) : r.bon || 1;
-  await c.env.DB.prepare('UPDATE pc_req SET btp = ?, lit_bon = ?, bon = ?, lit = ?, han = ?, ghi_chu = ?, updated_at = ? WHERE id = ?')
-    .bind(btp, lb, bon, r6(lb * bon), isDate(b?.han) ? b!.han : null, str(b?.ghi_chu), now, id)
+  const hanMoi = isDate(b?.han) ? b!.han : null;
+  const doiHan = (hanMoi ?? '') !== (r.han ?? '');
+  await c.env.DB.prepare(`UPDATE pc_req SET btp = ?, lit_bon = ?, bon = ?, lit = ?, han = ?, ghi_chu = ?, updated_at = ?${doiHan ? ", tiep_nhan = 'CHO', xin_han = NULL, xin_ly = NULL" : ''} WHERE id = ?`)
+    .bind(btp, lb, bon, r6(lb * bon), hanMoi, str(b?.ghi_chu), now, id)
     .run();
+  if (doiHan) {
+    await reqLog(c.env.DB, id, 'SUA', 'MH', auth, `Sửa yêu cầu, đổi hạn ${r.han ?? '—'} → ${hanMoi ?? '—'}. Kỹ thuật tiếp nhận lại.`, r.han, hanMoi);
+    await bellTo(c.env.DB, await kyThuatIds(c.env.DB), `Yêu cầu pha chế ${id} đổi hạn sang ${hanMoi ?? '—'}. Mở Pha chế để tiếp nhận lại.`, 'kho_pc').catch(() => 0);
+  }
+  return ok(c, { id });
+});
+
+/* ---------------- Tiếp nhận / xin dời hạn / trao đổi (chị Hoa duyệt demo 18/11) ----------------
+ * Kỹ thuật pha chế: Tiếp nhận, hoặc Xin dời hạn (ngày + lý do). Người tạo yêu cầu (Quản lý mua hàng) / CEO: Đồng ý ngày xin,
+ * Đổi sang ngày khác, hoặc Giữ hạn cũ (lý do). Hai bên nhắn trao đổi. Mọi bước ghi vào pc_req_log. */
+async function reqLog(db: D1Database, reqId: string, kind: string, ben: 'KT' | 'MH', auth: AuthContext, text: string, hanCu: string | null = null, hanMoi: string | null = null) {
+  await db.prepare('INSERT INTO pc_req_log (req_id, kind, ben, by_id, by_name, text, han_cu, han_moi, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(reqId, kind, ben, auth.user.id, auth.user.display_name, text.slice(0, 2000), hanCu, hanMoi, nowIso())
+    .run();
+}
+async function isKyThuat(db: D1Database, auth: AuthContext): Promise<boolean> {
+  if (auth.actorType === 'AGENT') return false;
+  if (auth.user.role === 'CEO') return true;
+  const me = (await hubUsers(db)).find((u) => u.crm && u.crm === auth.user.id);
+  return !!me && ((me.perms ?? []).includes('sx.kythuat') || (me.perms ?? []).includes('sx.congthuc'));
+}
+async function isNguoiTao(db: D1Database, auth: AuthContext, r: { created_by?: string | null }): Promise<boolean> {
+  if (auth.actorType === 'AGENT') return false;
+  if (auth.user.role === 'CEO' || (r.created_by && r.created_by === auth.user.id)) return true;
+  return (await approverIds(db)).includes(auth.user.id);
+}
+/** Yêu cầu còn mở (chưa hủy, chưa có phiếu pha chế). */
+async function reqOpen(db: D1Database, id: string) {
+  const r = await db.prepare('SELECT * FROM pc_req WHERE id = ?').bind(id).first<ReqRow & { created_by: string | null; tiep_nhan: string; xin_han: string | null; xin_ly: string | null }>();
+  if (!r) throw notFound('Không có yêu cầu này');
+  if (r.status === 'HUY') throw badRequest('DA_HUY', 'Yêu cầu đã hủy');
+  const done = await db.prepare("SELECT no FROM kho_docs WHERE type = 'PC' AND status = 'OK' AND ref_no = ?").bind(id).first<{ no: string }>();
+  if (done) throw badRequest('DA_PHA', `Yêu cầu ${id} đã pha (phiếu ${done.no})`);
+  return r;
+}
+const ddmm = (s: string | null) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : '—');
+
+phacheRoutes.get('/yc/:id/log', async (c) => {
+  const id = c.req.param('id');
+  const rows = await c.env.DB.prepare('SELECT * FROM pc_req_log WHERE req_id = ? ORDER BY id').bind(id).all<Record<string, unknown>>();
+  const r = await c.env.DB.prepare('SELECT created_by FROM pc_req WHERE id = ?').bind(id).first<{ created_by: string | null }>();
+  const auth = c.get('auth');
+  return ok(c, { rows: rows.results ?? [], la_ky_thuat: await isKyThuat(c.env.DB, auth), la_nguoi_tao: r ? await isNguoiTao(c.env.DB, auth, r) : false });
+});
+
+phacheRoutes.post('/yc/:id/nhan', async (c) => {
+  const auth = c.get('auth');
+  if (!(await isKyThuat(c.env.DB, auth))) throw forbidden('Chỉ Kỹ thuật pha chế tiếp nhận yêu cầu');
+  const id = c.req.param('id');
+  const r = await reqOpen(c.env.DB, id);
+  if (r.tiep_nhan === 'XIN') throw badRequest('DANG_XIN', 'Đang chờ người tạo trả lời việc xin dời hạn');
+  const now = nowIso();
+  await c.env.DB.prepare("UPDATE pc_req SET tiep_nhan = 'NHAN', nhan_by_name = ?, nhan_at = ?, updated_at = ? WHERE id = ?").bind(auth.user.display_name, now, now, id).run();
+  await reqLog(c.env.DB, id, 'NHAN', 'KT', auth, `Tiếp nhận, làm theo hạn ${ddmm(r.han)}`);
+  if (r.created_by) await bellTo(c.env.DB, [r.created_by], `Kỹ thuật pha chế đã tiếp nhận yêu cầu ${id} (hạn ${ddmm(r.han)})`, 'kho_pc').catch(() => 0);
+  return ok(c, { id, tiep_nhan: 'NHAN' });
+});
+
+phacheRoutes.post('/yc/:id/xin', async (c) => {
+  const auth = c.get('auth');
+  if (!(await isKyThuat(c.env.DB, auth))) throw forbidden('Chỉ Kỹ thuật pha chế xin dời hạn');
+  const id = c.req.param('id');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const han = isDate(b?.han) ? (b!.han as string) : null;
+  const ly = str(b?.ly_do);
+  if (!han) throw badRequest('BAD_DATE', 'Chọn ngày làm được');
+  if (!ly) throw badRequest('NO_REASON', 'Cần ghi lý do xin dời hạn');
+  const r = await reqOpen(c.env.DB, id);
+  await c.env.DB.prepare("UPDATE pc_req SET tiep_nhan = 'XIN', xin_han = ?, xin_ly = ?, updated_at = ? WHERE id = ?").bind(han, ly, nowIso(), id).run();
+  await reqLog(c.env.DB, id, 'XIN', 'KT', auth, `Xin dời hạn ${ddmm(r.han)} → ${ddmm(han)}: ${ly}`, r.han, han);
+  const to = r.created_by ? [r.created_by] : (await approverIds(c.env.DB));
+  await bellTo(c.env.DB, to, `Kỹ thuật pha chế xin dời hạn yêu cầu ${id}: ${ddmm(r.han)} → ${ddmm(han)}. Lý do: ${ly}`.slice(0, 480), 'kho_pc').catch(() => 0);
+  return ok(c, { id, tiep_nhan: 'XIN' });
+});
+
+/** Người tạo trả lời: kieu DONGY (lấy ngày kỹ thuật xin) · DOI (han mới) · GIU (giữ hạn, bắt buộc lý do). */
+phacheRoutes.post('/yc/:id/tra-loi', async (c) => {
+  const auth = c.get('auth');
+  const id = c.req.param('id');
+  const r = await reqOpen(c.env.DB, id);
+  if (!(await isNguoiTao(c.env.DB, auth, r))) throw forbidden('Chỉ người tạo yêu cầu (Quản lý mua hàng) hoặc CEO trả lời');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const kieu = str(b?.kieu, 10);
+  const ly = str(b?.ly_do);
+  const now = nowIso();
+  let hanMoi = r.han;
+  let tn = 'CHO';
+  let text = '';
+  if (kieu === 'DONGY') {
+    if (r.tiep_nhan !== 'XIN' || !r.xin_han) throw badRequest('KHONG_XIN', 'Kỹ thuật không có đề nghị dời hạn nào');
+    hanMoi = r.xin_han;
+    tn = 'NHAN';
+    text = `Đồng ý dời hạn ${ddmm(r.han)} → ${ddmm(hanMoi)}${ly ? ': ' + ly : ''}`;
+  } else if (kieu === 'DOI') {
+    if (!isDate(b?.han)) throw badRequest('BAD_DATE', 'Chọn hạn mới');
+    hanMoi = b!.han as string;
+    text = `Đặt hạn mới ${ddmm(r.han)} → ${ddmm(hanMoi)}${ly ? ': ' + ly : ''}. Chờ Kỹ thuật tiếp nhận lại.`;
+  } else if (kieu === 'GIU') {
+    if (!ly) throw badRequest('NO_REASON', 'Cần ghi lý do giữ hạn cũ');
+    text = `Giữ hạn ${ddmm(r.han)}: ${ly}. Chờ Kỹ thuật tiếp nhận lại.`;
+  } else throw badRequest('BAD_KIEU', 'Chọn Đồng ý, Đổi ngày khác hoặc Giữ hạn cũ');
+  await c.env.DB.prepare(`UPDATE pc_req SET han = ?, tiep_nhan = ?, xin_han = NULL, xin_ly = NULL, updated_at = ?${tn === 'NHAN' ? ', nhan_at = ?' : ''} WHERE id = ?`)
+    .bind(...(tn === 'NHAN' ? [hanMoi, tn, now, now, id] : [hanMoi, tn, now, id]))
+    .run();
+  await reqLog(c.env.DB, id, kieu, 'MH', auth, text, r.han, hanMoi);
+  await bellTo(c.env.DB, await kyThuatIds(c.env.DB), `Yêu cầu pha chế ${id}: ${text}`.slice(0, 480), 'kho_pc').catch(() => 0);
+  return ok(c, { id, han: hanMoi, tiep_nhan: tn });
+});
+
+/** Tin nhắn trao đổi trong yêu cầu; báo chuông bên kia. */
+phacheRoutes.post('/yc/:id/tin', async (c) => {
+  const auth = c.get('auth');
+  if (auth.actorType === 'AGENT') throw forbidden('Agent không nhắn trong yêu cầu pha chế');
+  const id = c.req.param('id');
+  const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const text = str(b?.text, 1000);
+  if (!text) throw badRequest('EMPTY', 'Chưa có nội dung');
+  const r = await c.env.DB.prepare('SELECT id, created_by FROM pc_req WHERE id = ?').bind(id).first<{ id: string; created_by: string | null }>();
+  if (!r) throw notFound('Không có yêu cầu này');
+  const kt = await isKyThuat(c.env.DB, auth);
+  const ben: 'KT' | 'MH' = kt && auth.user.id !== r.created_by && auth.user.role !== 'CEO' ? 'KT' : 'MH';
+  await reqLog(c.env.DB, id, 'MSG', ben, auth, text);
+  const to = ben === 'KT' ? (r.created_by ? [r.created_by] : await approverIds(c.env.DB)) : await kyThuatIds(c.env.DB);
+  await bellTo(c.env.DB, to.filter((x) => x !== auth.user.id), `${auth.user.display_name} nhắn về yêu cầu pha chế ${id}: ${text}`.slice(0, 480), 'kho_pc').catch(() => 0);
   return ok(c, { id });
 });
 

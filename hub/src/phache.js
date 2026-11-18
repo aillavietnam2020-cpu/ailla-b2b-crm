@@ -38,7 +38,7 @@ function pchLoadCt(force){
 function pchYcRows(){
   if(!PCH.yc){pchLoadYc().then(pchRerender).catch(()=>{});return []}
   return PCH.yc.map(r=>{const doc=r.doc_id?{id:r.doc_id,no:r.doc_no,doc_date:r.doc_date,extra:r.doc_extra,created_by_name:r.doc_by}:null;
-    return {id:r.id,btp:r.btp,lit:r.lit,litBon:r.lit_bon||r.lit,bon:r.bon||1,han:r.han||"",ghiChu:r.ghi_chu||"",taoLuc:r.ngay,tao:r.created_by_name,st:r.status==="HUY"?"HUY":"CHO_LAM",lyDoHuy:r.ly_do_huy,huyBy:r.huy_by_name,doc,tt:r.status==="HUY"?"HUY":doc?"XONG":"CHO"}});
+    return {id:r.id,btp:r.btp,lit:r.lit,litBon:r.lit_bon||r.lit,bon:r.bon||1,han:r.han||"",ghiChu:r.ghi_chu||"",taoLuc:r.ngay,tao:r.created_by_name,st:r.status==="HUY"?"HUY":"CHO_LAM",lyDoHuy:r.ly_do_huy,huyBy:r.huy_by_name,doc,tt:r.status==="HUY"?"HUY":doc?"XONG":"CHO",tiepNhan:r.tiep_nhan||"CHO",xinHan:r.xin_han||"",xinLy:r.xin_ly||"",createdBy:r.created_by||""}});
 }
 async function pchYcCreate(b){const r=await pApi("/yc",{method:"POST",body:JSON.stringify(b)});await pchLoadYc(true).catch(()=>{});return r}
 /* Bán thành phẩm chưa có công thức (07/11: phiếu pha chế bắt buộc theo công thức). */
@@ -98,8 +98,9 @@ function pchTaskBox(t){
     if(x.tt==="XONG")return `<div class="note grn">Đã pha: phiếu <a href="#" class="lnk" data-pchdoc="${x.doc.id}">${esc(x.doc.no)}</a> ngày ${kDd(x.doc.doc_date)}.</div>`;
     const R=pchCt(x.btp),pend=(PCH.ct||[]).some(r=>r.btp===x.btp&&r.status==="CHO");
     if(!R)return `<div class="note red"><b>Pha ${esc(pchName(x.btp))} · ${knum(x.lit)} lít</b><br>Yêu cầu ${esc(x.id)}${x.han?" · hạn "+kDd(x.han):""}<br><b>Chưa có công thức pha.</b> ${pend?"Công thức đang chờ Trưởng kỹ thuật duyệt, duyệt xong mới ghi phiếu được.":"Phải nhập công thức trước rồi mới ghi phiếu pha chế."}${!pend&&pchCanCt()?`<div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchctb="${esc(x.btp)}">Nhập công thức</button></div>`:""}</div>`;
-    return `<div class="note amb"><b>Pha ${esc(pchName(x.btp))} · ${knum(x.lit)} lít</b><br>Yêu cầu ${esc(x.id)}${x.han?" · hạn "+kDd(x.han):""}${x.ghiChu?" · "+esc(x.ghiChu):""}<br>Theo công thức bản ${R.version}.
-      <div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchghi="${esc(x.id)}">Ghi số thực tế</button> <button type="button" class="btn" data-pchin="${esc(x.id)}">In phiếu</button>${R&&R.huong_dan?` <button type="button" class="btn" data-pchhd="${esc(x.btp)}">Hướng dẫn pha</button>`:""}</div></div>`}
+    return `<div class="note amb"><b>Pha ${esc(pchName(x.btp))} · ${knum(x.lit)} lít</b><br>Yêu cầu ${esc(x.id)}${x.han?" · hạn "+kDd(x.han):""}${x.ghiChu?" · "+esc(x.ghiChu):""}<br>Theo công thức bản ${R.version}. ${pchTnPill(x)}
+      ${x.tiepNhan==="CHO"?`<div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pctn="${esc(x.id)}">Tiếp nhận</button> <button type="button" class="btn" data-pctx="${esc(x.id)}">Xin dời hạn</button></div>`:x.tiepNhan==="XIN"?`<div class="hint" style="margin-top:6px">Đã xin dời đến ${kDd(x.xinHan)}: ${esc(x.xinLy)}. Chờ người tạo trả lời.</div>`:""}
+      <div class="acts" style="margin-top:8px"><button type="button" class="btn" data-pctd="${esc(x.id)}">Trao đổi & lịch sử hạn</button> <button type="button" class="btn pri" data-pchghi="${esc(x.id)}">Ghi số thực tế</button> <button type="button" class="btn" data-pchin="${esc(x.id)}">In phiếu</button>${R&&R.huong_dan?` <button type="button" class="btn" data-pchhd="${esc(x.btp)}">Hướng dẫn pha</button>`:""}</div></div>`}
   if(t.pcCt){const r=(PCH.ct||[]).find(y=>y.id===t.pcCt);if(!r)return `<div class="note">Phiếu điều chỉnh công thức. <span class="hint">Đang tải…</span></div>`;
     return `<div class="note ${r.status==="CHO"?"amb":""}">${pchCtCompare(r)}${r.status==="CHO"&&PCH.ctOk?`<div class="acts" style="margin-top:8px"><button type="button" class="btn pri" data-pchok="${r.id}">Duyệt, dùng từ hôm nay</button> <button type="button" class="btn" data-pchtra="${r.id}">Trả lại</button></div>`:r.status==="CHO"?`<p class="hint">Chờ Trưởng kỹ thuật duyệt.</p>`:`<p class="hint">${r.status==="TRA"?"Đã trả lại: "+esc(r.tra_ly_do||""):"Đã duyệt, đang dùng."}</p>`}</div>`}
   if(t.pcMa){const left=(PCH.ct||[]).some(r=>r.btp===t.pcMa);return left?pchGanHtml(t.pcMa):`<div class="note grn">Đã gán mã cho bán thành phẩm này.</div>`}
@@ -116,6 +117,7 @@ function pchBindBox(root){
   root.querySelectorAll("[data-pchin]").forEach(b=>b.onclick=()=>kqPcOpen(b.dataset.pchin,true));
   root.querySelectorAll("[data-pchdoc]").forEach(a=>a.onclick=e=>{e.preventDefault();khoOpenDoc(+a.dataset.pchdoc)});
   root.querySelectorAll("[data-pchgan]").forEach(w=>pchGanBind(w));
+  pchTnBind(root);
   root.querySelectorAll("[data-pchctb]").forEach(b=>b.onclick=()=>pchCtForm(b.dataset.pchctb));
   root.querySelectorAll("[data-pchhd]").forEach(b=>b.onclick=()=>pchHdShow(b.dataset.pchhd));
   root.querySelectorAll("[data-pchok]").forEach(b=>b.onclick=()=>pchCtApprove(+b.dataset.pchok));
@@ -142,12 +144,12 @@ function pchCss(){if(document.getElementById("pch-css"))return;const s=document.
   .pchhd{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;background:#f7f8fc;border-radius:8px;padding:8px 10px;margin-top:6px}.pchhd.open{display:block;-webkit-line-clamp:unset}
   .pchhd::after{content:""}.pchmore{font-size:12px;color:#e7357b;cursor:pointer}.pchcard{border:1px solid #e4e8f2;border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff}
   .pchcard h3{margin:0 0 4px;font-size:15px}.pchview{display:inline-flex;border:1px solid #d9deea;border-radius:8px;overflow:hidden}.pchview button{border:0;background:#fff;padding:6px 12px;font:inherit;cursor:pointer}.pchview button.on{background:#2b3a8c;color:#fff}.pchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
-  tr.pchlech td{background:#fff4e0}input.pchdem{width:100px;text-align:right}input.pchmin{width:90px;text-align:right}
+  tr.pchlech td{background:#fff4e0}.pctn-chat{max-height:320px;overflow:auto;border:1px solid #e4e8f2;border-radius:10px;padding:8px;background:#fafbfe}.pctn-msg{margin:6px 0;max-width:85%;padding:7px 10px;border-radius:12px;font-size:13px;background:#f1f3f9}.pctn-msg.mh{margin-left:auto;background:#fff0f6}.pctn-msg small{display:block;color:#7a8199;font-size:11px}.pctn-sys{color:#7a8199;font-size:12px;text-align:center;margin:4px 0}input.pchdem{width:100px;text-align:right}input.pchmin{width:90px;text-align:right}
   @media(max-width:700px){.pchgrid{grid-template-columns:1fr}input.pchdem{width:72px}input.pchmin{width:64px}}`;document.head.appendChild(s)}
 {const _pc=PAGES.kho_pc;if(_pc)PAGES.kho_pc=function(m){
   pchCss();if(!PCH.ct)pchLoadCt().then(pchRerender).catch(()=>{});
   if(!PCH_TABS.some(t=>t[0]===PCH.tab))PCH.tab="yc";
-  if(PCH.tab==="yc"){const r=_pc.apply(this,arguments);pchMountTabs(m);pchNhapCard(m);pchBindBox(m);pchKiemCheck();return r}
+  if(PCH.tab==="yc"){const r=_pc.apply(this,arguments);pchMountTabs(m);pchNhapCard(m);pchTnRows(m);pchBindBox(m);pchKiemCheck();pchTnQuaHan();return r}
   const body=PCH.tab==="ct"?pchViewCt():PCH.tab==="ton"?pchViewTon():pchViewHh();
   khoFrame(m,"kho_pc","Pha chế",PCH.tab==="ct"?"Công thức pha của Kỹ thuật (cho 1 lít bán thành phẩm) và hướng dẫn pha. Phiếu pha chế lấy định lượng theo công thức đang dùng.":PCH.tab==="ton"?"Kỹ thuật đếm nguyên liệu ở xưởng: hết thật thì báo Quản lý mua hàng đặt, lệch sổ thì báo kiểm tra. Không tự sửa tồn trên web.":"Hao hụt pha chế: số thực tế so với công thức, theo mẻ, theo người pha, theo nguyên liệu.",body);
   pchMountTabs(m);pchBind(m);pchKiemCheck();
@@ -457,3 +459,58 @@ async function pchNhapOpen(id){
     if(x.ly_do_lech&&$("#kf-ly")&&!$("#kf-ly").value)$("#kf-ly").value=x.ly_do_lech};
   [250,800,1600,3000].forEach(t=>setTimeout(fill,t));
 }
+
+/* ---------- Tiếp nhận yêu cầu pha chế / xin dời hạn / trao đổi (chị Hoa duyệt demo 18/11) ----------
+   Kỹ thuật pha chế: Tiếp nhận hoặc Xin dời hạn (ngày + lý do). Người tạo (Quản lý mua hàng) / CEO: Đồng ý, Đổi ngày khác, Giữ hạn cũ.
+   Hai bên nhắn trao đổi trong yêu cầu; mọi bước lưu ở máy chủ (pc_req_log). */
+const pchTnPill=x=>x.tt!=="CHO"?"":x.tiepNhan==="NHAN"?pill("Đã tiếp nhận","grn"):x.tiepNhan==="XIN"?pill("Xin dời đến "+kDd(x.xinHan).slice(0,5),"red"):pill("Chờ tiếp nhận","amb");
+const pchTnKT=()=>pchMeKT()||pchAdm();
+const pchTnMH=()=>typeof kqYcCan==="function"&&kqYcCan();
+function pchTnRows(m){
+  const X=new Map(pchYcRows().map(x=>[x.id,x]));
+  m.querySelectorAll("tr[data-ycd]").forEach(tr=>{const x=X.get(tr.dataset.ycd);if(!x||x.tt!=="CHO")return;const td=tr.children;if(td.length<11)return;
+    td[8].insertAdjacentHTML("beforeend",`<div style="margin-top:3px">${pchTnPill(x)}</div>`);
+    const a=x.tiepNhan==="CHO"&&pchTnKT()?`<button class="btn sm pri" data-pctn="${esc(x.id)}">Tiếp nhận</button> <button class="btn sm" data-pctx="${esc(x.id)}">Xin dời hạn</button> `:x.tiepNhan==="XIN"&&pchTnMH()?`<button class="btn sm pri" data-pctd="${esc(x.id)}">Trả lời xin dời hạn</button> `:"";
+    if(a)td[10].insertAdjacentHTML("afterbegin",a)});
+}
+function pchTnBind(root){
+  root.querySelectorAll("[data-pctn]").forEach(b=>b.onclick=e=>{e.stopPropagation();pchTnNhan(b.dataset.pctn)});
+  root.querySelectorAll("[data-pctx]").forEach(b=>b.onclick=e=>{e.stopPropagation();pchTnXinForm(b.dataset.pctx)});
+  root.querySelectorAll("[data-pctd]").forEach(b=>b.onclick=e=>{e.stopPropagation();kqYcDetail(b.dataset.pctd)});
+}
+async function pchTnAfter(id,msg){toast(msg);await pchLoadYc(true).catch(()=>{});const x=pchYcRows().find(y=>y.id===id);if(x)pchYcTaskEdit(id,{btp:x.btp,lit:x.lit,han:x.han});
+  if(document.querySelector("#drawer:not([hidden]) #pctn-box"))kqYcDetail(id);else pchRerender()}
+async function pchTnNhan(id){try{await pApi("/yc/"+encodeURIComponent(id)+"/nhan",{method:"POST",body:"{}"});
+  pchOpenTasks(t=>t.pcYc===id&&t.st==="todo").forEach(t=>{if(typeof tkSetSt==="function")tkSetSt(t.id,"doing",{},"Đã tiếp nhận yêu cầu pha chế")});
+  pchTnAfter(id,"Đã tiếp nhận, báo người tạo yêu cầu")}catch(e){toast(e.message)}}
+function pchTnXinForm(id){const x=pchYcRows().find(y=>y.id===id);if(!x)return;
+  openDrawerHTML(`<h2>Xin dời hạn ${esc(id)}</h2><p class="hint">${esc(pchName(x.btp))} · ${knum(x.lit)} lít · hạn hiện tại ${kDd(x.han)}</p><form class="frm" id="pctx-f">
+    <label class="field">Làm được vào ngày<input type="date" id="pctx-d" required></label>
+    <label class="field">Lý do <b class="t-red">*</b><textarea id="pctx-l" rows="2" placeholder="Ví dụ: hết SLES, chờ hàng về 20/11"></textarea></label><div id="pctx-e"></div>
+    <button class="btn pri">Gửi người tạo yêu cầu</button></form>`);
+  $("#pctx-f").onsubmit=async e=>{e.preventDefault();const d=$("#pctx-d").value,l=$("#pctx-l").value.trim();if(!d||!l){$("#pctx-e").innerHTML='<div class="note red">Chọn ngày và ghi lý do.</div>';return}
+    try{await pApi("/yc/"+encodeURIComponent(id)+"/xin",{method:"POST",body:JSON.stringify({han:d,ly_do:l})});closeDrawer();pchTnAfter(id,"Đã gửi xin dời hạn")}catch(er){$("#pctx-e").innerHTML=`<div class="note red">${esc(er.message)}</div>`}}}
+/* Chi tiết yêu cầu (bấm một dòng): thông tin như cũ + tiếp nhận / trả lời + lịch sử hạn + trao đổi. */
+if(typeof kqYcDetail==="function"){const _yd=kqYcDetail;kqYcDetail=async function(id){_yd(id);const dr=document.getElementById("drawerIn");if(!dr)return;
+  const box=document.createElement("div");box.id="pctn-box";box.innerHTML='<p class="hint">Đang tải trao đổi…</p>';dr.appendChild(box);
+  let L;try{L=await pApi("/yc/"+encodeURIComponent(id)+"/log")}catch(e){box.innerHTML=`<div class="note red">${esc(e.message)}</div>`;return}
+  const x=pchYcRows().find(y=>y.id===id);if(!x||!document.getElementById("pctn-box"))return;const open=x.tt==="CHO";
+  let h=open?`<div style="margin:8px 0">${pchTnPill(x)}</div>`:"";
+  if(open&&L.la_ky_thuat&&x.tiepNhan==="CHO")h+=`<div class="acts"><button class="btn pri" data-pctn="${esc(id)}">Tiếp nhận</button> <button class="btn" data-pctx="${esc(id)}">Xin dời hạn</button></div>`;
+  if(open&&x.tiepNhan==="XIN")h+=`<div class="note red"><b>Kỹ thuật xin dời hạn</b> ${kDd(x.han)} → <b>${kDd(x.xinHan)}</b><br>Lý do: ${esc(x.xinLy)}</div>`+(L.la_nguoi_tao?`<div class="acts"><button class="btn pri" data-pctr="DONGY">Đồng ý ${kDd(x.xinHan).slice(0,5)}</button> <button class="btn" data-pctr="DOI">Đổi sang ngày khác</button> <button class="btn" data-pctr="GIU">Giữ hạn cũ</button></div><div id="pctr-f"></div>`:"");
+  const doiHan=L.rows.filter(r=>r.han_moi&&r.han_cu&&r.han_moi!==r.han_cu&&["DONGY","DOI","SUA"].includes(r.kind));
+  if(doiHan.length)h+=`<div class="hint" style="margin-top:8px">Lịch sử hạn: ${doiHan.map(r=>`${kDd(r.han_cu).slice(0,5)} → <b>${kDd(r.han_moi).slice(0,5)}</b> (${esc(r.by_name)})`).join(" · ")}</div>`;
+  h+=`<h3 style="margin:12px 0 6px">Trao đổi</h3><div class="pctn-chat">${L.rows.map(r=>r.kind==="MSG"?`<div class="pctn-msg ${r.ben==="KT"?"kt":"mh"}"><small>${esc(r.by_name)} · ${esc(String(r.created_at).slice(11,16))} ${esc(kDd(String(r.created_at).slice(0,10)).slice(0,5))}</small>${esc(r.text)}</div>`:`<div class="pctn-sys">${esc(r.by_name)}: ${esc(r.text)}</div>`).join("")||'<p class="hint">Chưa có trao đổi.</p>'}</div>
+    <form id="pctn-send" style="display:flex;gap:6px;margin-top:8px"><input id="pctn-t" placeholder="Nhắn về yêu cầu này…" style="flex:1"><button class="btn sm pri">Gửi</button></form>`;
+  box.innerHTML=h;pchTnBind(box);
+  box.querySelectorAll("[data-pctr]").forEach(b=>b.onclick=()=>{const k=b.dataset.pctr,f=$("#pctr-f");
+    if(k==="DONGY"){pchTnTra(id,{kieu:"DONGY"});return}
+    f.innerHTML=`<form class="frm" id="pctr-x">${k==="DOI"?'<label class="field">Hạn mới<input type="date" id="pctr-d" required></label>':""}<label class="field">Lý do${k==="GIU"?' <b class="t-red">*</b>':""}<input id="pctr-l"></label><button class="btn pri">${k==="DOI"?"Đặt hạn mới":"Giữ hạn "+kDd(x.han).slice(0,5)}</button></form>`;
+    $("#pctr-x").onsubmit=e=>{e.preventDefault();const l=$("#pctr-l").value.trim();if(k==="GIU"&&!l){toast("Ghi lý do giữ hạn cũ");return}pchTnTra(id,{kieu:k,han:k==="DOI"?$("#pctr-d").value:undefined,ly_do:l})}});
+  $("#pctn-send").onsubmit=async e=>{e.preventDefault();const t=$("#pctn-t").value.trim();if(!t)return;try{await pApi("/yc/"+encodeURIComponent(id)+"/tin",{method:"POST",body:JSON.stringify({text:t})});kqYcDetail(id)}catch(er){toast(er.message)}};
+}}
+async function pchTnTra(id,b){try{await pApi("/yc/"+encodeURIComponent(id)+"/tra-loi",{method:"POST",body:JSON.stringify(b)});pchTnAfter(id,b.kieu==="DONGY"?"Đã đồng ý hạn mới, báo Kỹ thuật":"Đã trả lời, báo Kỹ thuật")}catch(e){toast(e.message)}}
+/* Quá hạn mà chưa tiếp nhận: nhắc Kỹ thuật và người tạo, mỗi yêu cầu một lần mỗi ngày. */
+function pchTnQuaHan(){try{const t=kToday();if(PCH.qhDay===t||!(pchTnKT()||pchTnMH()))return;const L=pchYcRows().filter(x=>x.tt==="CHO"&&x.tiepNhan!=="NHAN"&&x.han&&x.han<t);if(!PCH.yc)return;PCH.qhDay=t;if(!L.length)return;
+  const K=pchKyThuat().map(u=>u.id),need=L.filter(x=>!(D().notifs||[]).some(n=>n.ref==="pcqh:"+x.id+":"+t));if(!need.length)return;
+  DB.mutate(ME.name,"nhắc yêu cầu pha chế quá hạn chưa tiếp nhận",dt=>need.forEach(x=>{const cre=pchUsers().find(u=>u.crm&&u.crm===x.createdBy);if(typeof notifyU==="function")notifyU(dt,[...K,cre&&cre.id].filter(Boolean),`Yêu cầu pha chế ${x.id} (${pchName(x.btp)}) quá hạn ${kDd(x.han).slice(0,5)} mà chưa tiếp nhận`,"pcqh:"+x.id+":"+t)}))}catch(e){}}
