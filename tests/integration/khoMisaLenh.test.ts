@@ -26,6 +26,8 @@ beforeEach(async () => {
     ['BTPLAUSANQUE', 'Lau sàn quế', 'BTP'],
     ['HCTEA', 'Triethanol Amine', 'NVL'],
     ['HUONGQUE', 'Hương Quế', 'NVL'],
+    ['CAMILALS10Q', 'Lau sàn Camila 10kg quế', 'TP'],
+    ['VC10', 'Vỏ can 10kg', 'NVL'],
   ];
   for (const [code, name, cls] of items) {
     await ctx.db.prepare("INSERT INTO kho_items (code, name, unit, cls, grp, min_stock, active, created_at) VALUES (?, ?, 'kg', ?, '', 0, 1, ?)").bind(code, name, cls, NOW).run();
@@ -65,5 +67,23 @@ describe('nạp lệnh pha chế MISA', () => {
     expect(thuong.body.error.code).toBe('NO_CT');
     const sai = await doc(USERS.ceo, lenh('1441'));
     expect(sai.body.error.code).toBe('BAD_LX');
+  });
+
+  it('lệnh đóng gói: cộng thành phẩm, trừ bán thành phẩm và vỏ đúng số MISA, không theo định mức web', async () => {
+    const r = await doc(USERS.ceo, {
+      type: 'KS',
+      date: '2026-10-01',
+      ref_no: 'LX1457',
+      misa: { lx: 'LX1457' },
+      lines: [{ item: 'CAMILALS10Q', qty: 39, nvl: [{ item: 'BTPLAUSANQUE', qty: 382.2 }, { item: 'VC10', qty: 39 }] }],
+    });
+    expect(r.status).toBe(200);
+    const mv = (await ctx.db.prepare('SELECT item, qty, role FROM kho_moves WHERE doc_id = ? ORDER BY id').bind(r.body.data.id).all<{ item: string; qty: number; role: string }>()).results;
+    expect(mv).toEqual([
+      { item: 'CAMILALS10Q', qty: 39, role: 'PRODUCT' },
+      { item: 'BTPLAUSANQUE', qty: -382.2, role: 'USE' },
+      { item: 'VC10', qty: -39, role: 'USE' },
+    ]);
+    expect((await doc(USERS.ceo, { type: 'KS', date: '2026-10-01', misa: { lx: 'LX1457' }, lines: [{ item: 'CAMILALS10Q', qty: 1 }] })).body.error.code).toBe('DA_NAP');
   });
 });

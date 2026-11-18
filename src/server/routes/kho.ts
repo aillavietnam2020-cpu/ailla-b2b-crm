@@ -1570,7 +1570,7 @@ khoRoutes.post('/docs', async (c) => {
   const mstr = (v: unknown) => String(v ?? '').trim().slice(0, 20);
   const misaLx = misa ? mstr(misa.lx).toUpperCase() : '';
   if (misa) {
-    if (type !== 'PC') throw badRequest('BAD_TYPE', 'Hiện chỉ nạp lệnh pha chế từ MISA');
+    if (type !== 'PC' && type !== 'KS') throw badRequest('BAD_TYPE', 'Chỉ nạp lệnh pha chế hoặc lệnh đóng gói từ MISA');
     if (!isCeo(auth) && !auth.permissions.includes('order.accounting.confirm')) throw forbidden('Chỉ CEO hoặc Kế toán nạp lệnh sản xuất MISA');
     if (!/^LX\d+$/.test(misaLx)) throw badRequest('BAD_LX', 'Số lệnh MISA phải dạng LX1234');
     const had = await c.env.DB.prepare("SELECT no FROM kho_docs WHERE status = 'OK' AND json_extract(extra, '$.misa.lx') = ?").bind(misaLx).first<{ no: string }>();
@@ -1718,6 +1718,23 @@ khoRoutes.post('/docs', async (c) => {
     const given = new Set(lines.map((l) => String(l.item)));
     const miss = bom.filter((r) => !given.has(r.item)).map((r) => r.item);
     if (miss.length) warnings.push(`Thiếu số thực tế của: ${miss.join(', ')}. Ghi 0 nếu mẻ này không dùng.`);
+  } else if (type === 'KS' && misaLx) {
+    // 18/11 chị Hoa: lệnh đóng gói MISA. Mỗi thành phẩm cộng đúng số MISA, vỏ / tem / bán thành phẩm trừ đúng số MISA (không theo định mức web).
+    if (!lines.length) throw badRequest('NO_LINES', 'Lệnh chưa có thành phẩm nào');
+    extra.misa = { lx: misaLx, pxk: mstr(misa?.pxk), pnk: mstr(misa?.pnk) };
+    for (const l of lines) {
+      const code = String(l.item ?? '');
+      need(code);
+      const qty = positive(l.qty, `Số lượng ${code}`);
+      moves.push({ item: code, qty, std_qty: qty, price: null, role: 'PRODUCT', note: '' });
+      for (const n of Array.isArray(l.nvl) ? (l.nvl as Array<Record<string, unknown>>) : []) {
+        const it2 = String(n.item ?? '');
+        need(it2);
+        const q = num(n.qty);
+        if (!(q >= 0)) throw badRequest('BAD_QTY', `Số ${it2} của ${code} phải là số từ 0 trở lên`);
+        moves.push({ item: it2, qty: -q, std_qty: q, price: null, role: 'USE', note: code });
+      }
+    }
   } else if (type === 'KS') {
     if (!lines.length) throw badRequest('NO_LINES', 'Phiếu chưa có thành phẩm nào');
     let sumRef = 0;
