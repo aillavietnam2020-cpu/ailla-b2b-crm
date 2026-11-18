@@ -57,10 +57,21 @@ function koAdm(m,K,X,r){
   const T=K.debt||1,seg=[["≤30 ngày",K.b30,"#17804a"],["31–60 ngày",K.b60,"#f0a020"],["Trên 60 ngày",K.bx,"#c0392b"],["Nợ đầu kỳ còn lại",K.old,"#7a5af8"]].filter(s=>s[1]>0);
   const nKh=new Set(K.no.map(o=>o.customer_id)).size;
   const no=`<section class="card"><div class="card-h"><h2>Công nợ Kênh OEM</h2><span class="hint">${K.aged?"tính đến hôm nay · tiền khách trả trừ nợ cũ nhất trước (như sổ kế toán) · cùng số Công nợ gia công":"tính đến "+kpVn(K.ref)+" · đơn đã xuất kho chưa thu đủ tiền"}</span></div>
-    <div class="grid kpis" style="margin-bottom:10px">${kpi("Phải thu",tr(K.debt),K.no.length?`${nKh} khách · ${K.no.length} chứng từ còn nợ`:"không còn chứng từ nào nợ")}${kpi("≤30 ngày",tr(K.b30),K.no.filter(o=>o.age<=30).length===1?"đơn "+kpVn(K.no.find(o=>o.age<=30).order_date):"")}${kpi("31–60 ngày",tr(K.b60),"")}${kpi("Trên 60 ngày",tr(K.bx),"",K.bx?"var(--red)":"")}${K.old?kpi("Nợ đầu kỳ còn lại",tr(K.old),"tiền khách trả chưa trừ hết nợ đầu kỳ"):""}${kpi("DSO",K.dso==null?"—":K.dso+" ngày",K.dso==null?"chưa đủ 90 ngày số":"doanh thu 90 ngày "+tr(K.rev90))}</div>
-    ${K.debt?`<div class="tb-bar">${seg.map(s=>`<div style="width:${(s[1]/T*100).toFixed(2)}%;background:${s[2]}">${s[1]/T>=.1?esc(s[0])+" "+tr(s[1])+" · "+kpPct(s[1]/T):""}</div>`).join("")}</div>`:""}
-    <div class="ko-w">${K.no.length?tbl(["Khách","Chứng từ","Ngày","Còn phải thu","Số ngày","Trạng thái"],K.no.slice(0,12).map(o=>`<tr><td>${esc(K.name(o.customer_id))}</td><td class="mono">${esc(o.order_no)}</td><td class="n">${kpVn(o.order_date)}</td><td class="n"><b>${tr(o.left)}</b></td><td class="n">${o.age}</td><td>${koNoSt(o)}</td></tr>`)):`<p class="hint">Không có đơn OEM nào chờ thu tiền.</p>`}</div>
-    <p class="hint">${K.aged?"Chứng từ còn nợ gồm đơn đã xuất kho đã chốt tiền và phiếu phải thu. Đơn kế toán chưa xác nhận chưa vào công nợ.":"Gồm cả đơn kế toán chưa xác nhận, nên có thể lớn hơn số công nợ chính thức ở Chi phí & Tiền › Phải thu."}</p></section>`;
+    <div class="ko-cn">${[
+      ["Phải thu",tr(K.debt),K.no.length?`${nKh} khách · ${K.no.length} chứng từ`:"không còn nợ",1],
+      ["≤30 ngày",tr(K.b30),"","","#17804a"],
+      ["31–60 ngày",K.b60?tr(K.b60):"—","","","#f0a020"],
+      ["Trên 60 ngày",K.bx?tr(K.bx):"—","","","#c0392b"],
+      ...(K.old?[["Nợ đầu kỳ còn lại",tr(K.old),"","","#7a5af8"]]:[]),
+      ["DSO",K.dso==null?"—":K.dso+" ngày",K.dso==null?"chưa đủ 90 ngày số":"thu tiền bình quân"]
+    ].map(x=>`<div class="ko-cn-i${x[3]?" big":""}"><span class="l">${x[4]?`<i style="background:${x[4]}"></i>`:""}${esc(x[0])}</span><b>${x[1]}</b>${x[2]?`<small>${esc(x[2])}</small>`:""}</div>`).join("")}</div>
+    <style>.ko-cn{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
+      .ko-cn-i{flex:1 1 120px;padding:8px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:1px;min-width:0}
+      .ko-cn-i:last-child{border-right:0}.ko-cn-i .l{font-size:12px;color:var(--muted,#667085);display:flex;align-items:center;gap:5px;white-space:nowrap}
+      .ko-cn-i .l i{width:8px;height:8px;border-radius:2px;display:inline-block}.ko-cn-i b{font-size:16px}.ko-cn-i.big b{font-size:19px}
+      .ko-cn-i small{font-size:11.5px;color:var(--muted,#667085)}</style>
+    ${K.debt?`<div class="tb-bar" style="height:18px;font-size:11.5px;margin-bottom:8px">${seg.map(s=>`<div style="width:${(s[1]/T*100).toFixed(2)}%;background:${s[2]}">${s[1]/T>=.1?esc(s[0])+" "+tr(s[1])+" · "+kpPct(s[1]/T):""}</div>`).join("")}</div>`:""}
+    </section>`;
   /* cảnh báo & đề xuất */
   const AW={c:[],d:[]},AM={c:[],d:[]};
   K.no.filter(o=>o.age>=7).slice(0,3).forEach(o=>{AW.c.push(["a",o.kind==="PPT"?`Phiếu phải thu ${o.order_no} của ${K.name(o.customer_id)} ${o.age} ngày, chưa thu tiền`:`Đơn ${K.name(o.customer_id)} ${o.order_no} đã xuất kho ${o.age} ngày, chưa thu tiền`,tr(o.left)+".","Phụ trách OEM + Kế toán"]);AW.d.push(["b",`Chốt tiền đơn ${K.name(o.customer_id)}`,"Gửi đối chiếu, hẹn ngày thanh toán.",""])});
@@ -96,10 +107,16 @@ function koAdm(m,K,X,r){
     tg("ch","#5d6d8e","Chi phí chung phân bổ",hasChia?chia:null,hasChia?"theo Quy tắc phân bổ ở Sổ chi phí":whyChia),
     `<tr class="tb-sum"><td><span class="tb-car"></span>Lãi ròng kênh</td><td class="n">${ln==null?koTag():kpF(ln)}</td><td class="n">${ln==null?"":kpP(ln,dt)}</td><td></td></tr>`])}</div></section>`;
   /* top đơn / sản phẩm */
-  let flag=false;const top=`<section class="card"><div class="card-h"><h2>Top đơn / sản phẩm OEM</h2><span class="hint">${esc(pLabel())} · lãi hiện khi có giá vốn</span></div><div class="ko-w">${L.length?tbl(["#","Đơn · sản phẩm","Khách","SL","Doanh thu","Giá vốn","Lãi gộp","Trạng thái"],L.slice(0,12).map((l,i)=>{const u=b2bUnitCost(l.sku,String(l.order_date).slice(0,7)),c=u==null?null:u*(+l.qty||0),st=c==null&&!flag?(flag=true,pill("Nhập giá vốn","blu")):"";
-      return `<tr><td>${i===0||l.order_no!==L[i-1].order_no?`<span class="tb-rk">${i+1}</span>`:""}</td><td>${esc(l.order_no)} · ${esc(l.name)}</td><td>${esc(K.name(l.customer_id))}</td><td class="n">${nf(l.qty)}</td><td class="n">${tr(l.revenue)}</td><td class="n">${c==null?`<span class="pill p-gry">chưa có giá vốn</span>`:tr(c)}</td><td class="n">${c==null?"—":tr(l.revenue-c)}</td><td>${st}</td></tr>`})):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div></section>`;
-  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}</div>${side}</div>${doiTac}${coCp}${top}`+
+  /* Top sản phẩm bán chạy (chị Hoa 18/11/2026): gộp theo mã, xếp theo doanh thu hoặc số lượng (nút chọn). Giá vốn theo tháng bán, mã chưa có giá vốn để trống. */
+  const tby=KO.topBy==="sl"?"sl":"dt",tPM=new Map();
+  L.forEach(l=>{const x=tPM.get(l.sku)||{sku:l.sku,name:l.name,qty:0,rev:0,cost:0,noCost:false,kh:new Set()};const u=b2bUnitCost(l.sku,String(l.order_date).slice(0,7));
+    x.qty+=+l.qty||0;x.rev+=+l.revenue||0;if(u==null)x.noCost=true;else x.cost+=u*(+l.qty||0);x.kh.add(l.customer_id);tPM.set(l.sku,x)});
+  const tTP=[...tPM.values()].sort((p,q)=>tby==="sl"?q.qty-p.qty||q.rev-p.rev:q.rev-p.rev||q.qty-p.qty);
+  const ttg=(k,t)=>`<button class="btn sm${tby===k?" pri":""}" data-kotop="${k}">${t}</button>`;
+  const top=`<section class="card"><div class="card-h"><h2>Top sản phẩm bán chạy</h2><span class="hint">${esc(pLabel())} · ${tPM.size} sản phẩm</span><span style="margin-left:auto;display:flex;gap:6px">${ttg("dt","Theo doanh thu")}${ttg("sl","Theo số lượng")}</span></div><div class="ko-w">${tTP.length?tbl(["#","Sản phẩm","Số lượng","Doanh thu","Giá vốn","Lãi gộp","Khách mua"],tTP.slice(0,12).map((x,i)=>`<tr><td><span class="tb-rk">${i+1}</span></td><td>${esc(x.name)} <small class="hint mono">${esc(x.sku)}</small></td><td class="n">${tby==="sl"?`<b>${nf(x.qty)}</b>`:nf(x.qty)}</td><td class="n">${tby==="dt"?`<b>${tr(x.rev)}</b>`:tr(x.rev)}</td><td class="n">${x.noCost?`<span class="pill p-gry">chưa có giá vốn</span>`:tr(x.cost)}</td><td class="n">${x.noCost?"—":tr(x.rev-x.cost)}</td><td>${esc([...x.kh].map(K.name).join(", "))}</td></tr>`)):`<p class="hint">Kỳ này chưa có đơn OEM đã duyệt.</p>`}</div></section>`;
+  m.innerHTML=H("Kênh OEM","Khách dùng bảng giá riêng · đơn OEM đã duyệt trên CRM · "+pLabel())+kp+`<div class="ko-lay"><div>${no}</div>${side}</div>${coCp}${doiTac}${top}`+
     srcNote("Đơn OEM đã duyệt trên CRM (khách chỉ dùng bảng giá riêng, không có cấp giá) · giá vốn SKU / định mức, không ước phần chưa có · chi phí từ Sổ chi phí.");
+  m.querySelectorAll("[data-kotop]").forEach(b=>b.onclick=()=>{KO.topBy=b.dataset.kotop;renderMain()});
 }
 
 /* ---------- Vận hành ---------- */
