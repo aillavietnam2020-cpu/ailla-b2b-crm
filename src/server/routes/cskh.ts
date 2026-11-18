@@ -434,6 +434,31 @@ cskhRoutes.post('/customer/:phone/resume', async (c) => {
   return ok(c, { phone });
 });
 
+/* ------------------------------------------------------------------ tổng đài ITY: gọi ngay trên web (chị Hoa duyệt demo 17/11) */
+const ITY_WSS = 'wss://vpbx.ity.vn:7443';
+type Ity = { domain?: string; ext?: string; pass?: string };
+/** Máy nhánh dùng chung (CSKH làm theo ca). Trình duyệt người gọi cần mật khẩu máy nhánh để nối tổng đài, nên chỉ trả cho người dùng mục CSKH. */
+cskhRoutes.get('/ity', async (c) => {
+  await who(c);
+  const s = (await getSetting<Ity>(c.env.DB, 'ity')) ?? {};
+  const ready = !!(s.domain && s.ext && s.pass);
+  return ok(c, { wss: ITY_WSS, domain: s.domain ?? '', ext: s.ext ?? '', hasPass: !!s.pass, pass: ready ? s.pass : '' });
+});
+cskhRoutes.put('/ity', async (c) => {
+  const me = await who(c);
+  if (!me.lead) throw forbidden('Chỉ Lead Sale, CEO cài tổng đài');
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const old = (await getSetting<Ity>(c.env.DB, 'ity')) ?? {};
+  const domain = str(b.domain, 100).toLowerCase();
+  const ext = str(b.ext, 20);
+  if (domain && !/^[a-z0-9.-]+$/.test(domain)) throw badRequest('ITY', 'Tên miền tổng đài không đúng (ví dụ c90678.ity.vn)');
+  if (ext && !/^\d+$/.test(ext)) throw badRequest('ITY', 'Máy nhánh chỉ gồm chữ số');
+  const pass = str(b.pass, 100);
+  const next: Ity = { domain, ext, pass: b.clearPass ? '' : pass || old.pass || '' };
+  await putSetting(c.env.DB, 'ity', next);
+  return ok(c, { domain: next.domain, ext: next.ext, hasPass: !!next.pass });
+});
+
 /* ------------------------------------------------------------------ ghi kết quả cuộc gọi */
 cskhRoutes.post('/log/:phone', async (c) => {
   const me = await who(c);
@@ -444,10 +469,16 @@ cskhRoutes.post('/log/:phone', async (c) => {
   const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const result = str(b.result, 40);
   if (!(CSKH_RESULTS as readonly string[]).includes(result)) throw badRequest('KET_QUA', 'Chọn kết quả cuộc gọi');
-  const next = str(b.next_call, 10);
+  // Khách không cần chăm lại: chọn lý do thay cho ngày gọi lại, khách sang Ngừng chăm sóc (chị Hoa 17/11).
+  const stop = str(b.stop, 80);
   const today = vnDate();
-  if (!isDay(next) || next <= today) throw badRequest('HEN', 'Chọn ngày gọi lại (sau hôm nay)');
-  if (diffDays(next, today) > 366) throw badRequest('HEN', 'Ngày gọi lại quá xa');
+  const next = stop ? null : str(b.next_call, 10);
+  if (stop) {
+    if (stop === 'Khác' && !str(b.note, 1000)) throw badRequest('LY_DO', 'Ghi rõ lý do không chăm lại vào ghi chú');
+  } else {
+    if (!next || !isDay(next) || next <= today) throw badRequest('HEN', 'Chọn ngày gọi lại (sau hôm nay)');
+    if (diffDays(next, today) > 366) throw badRequest('HEN', 'Ngày gọi lại quá xa');
+  }
   const now = nowIso();
   const bd = normBirthday(b.birthday);
   await c.env.DB.batch([
@@ -467,6 +498,9 @@ cskhRoutes.post('/log/:phone', async (c) => {
       `UPDATE cskh_customers SET next_call = ?, last_call = ?, last_result = ?, birthday = CASE WHEN birthday = '' AND ? <> '' THEN ? ELSE birthday END,
          owner_id = COALESCE(owner_id, ?), owner_name = CASE WHEN owner_id IS NULL THEN ? ELSE owner_name END, updated_at = ? WHERE phone = ?`,
     ).bind(next, today, result, bd, bd, me.id, me.name, now, phone),
+    ...(stop
+      ? [c.env.DB.prepare('UPDATE cskh_customers SET stop_reason = ?, stop_note = ?, stop_at = ?, stop_by = ? WHERE phone = ?').bind(stop, str(b.note, 500), now, me.name, phone)]
+      : []),
   ]);
   return ok(c, { phone, next_call: next });
 });

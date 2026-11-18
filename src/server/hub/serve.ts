@@ -11,7 +11,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self'",
+  "connect-src 'self' wss://vpbx.ity.vn:7443",
   "object-src 'none'",
   "frame-src 'self' https://drive.google.com https://www.youtube.com",
   "frame-ancestors 'none'",
