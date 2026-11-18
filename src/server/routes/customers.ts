@@ -65,6 +65,39 @@ customerRoutes.patch('/:id', requirePermission('customer.update'), async (c) => 
   return ok(c, await getCustomer(c.env.DB, auth, c.req.param('id')));
 });
 
+/**
+ * Công nợ đầu kỳ của khách (chị Hoa 18/11/2026): khách gia công / khách mới chưa có dư nợ cũ từ lần nhập file đầu,
+ * kế toán hoặc CEO nhập số dư đầu kỳ theo sổ MISA. Nợ chính thức = nợ đầu kỳ + đơn đã chốt − tiền đã thu. Có nhật ký trước/sau.
+ */
+customerRoutes.put('/:id/opening-debt', requirePermission('order.accounting.confirm'), async (c) => {
+  const auth = c.get('auth');
+  const b = (await c.req.json().catch(() => null)) as { amount?: unknown; note?: unknown } | null;
+  const amount = Number(b?.amount);
+  if (!Number.isInteger(amount) || Math.abs(amount) > 1e12) throw badRequest('BAD_AMOUNT', 'Số nợ đầu kỳ phải là số nguyên đồng');
+  const note = String(b?.note ?? '').trim().slice(0, 300);
+  if (note.length < 5) throw badRequest('MISSING_NOTE', 'Ghi rõ số này lấy từ đâu, tính đến ngày nào (tối thiểu 5 ký tự)');
+  const id = c.req.param('id');
+  const before = await c.env.DB.prepare('SELECT id, name, opening_debt FROM customers WHERE id = ? AND deleted_at IS NULL')
+    .bind(id)
+    .first<{ id: string; name: string; opening_debt: number }>();
+  if (!before) throw notFound('Không tìm thấy khách hàng');
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE customers SET opening_debt = ?, updated_at = ? WHERE id = ?').bind(amount, nowIso(), id),
+    auditStatement(c.env.DB, {
+      actorId: auth.user.id,
+      action: 'CUSTOMER_OPENING_DEBT_SET',
+      entityType: 'CUSTOMER',
+      entityId: id,
+      before: { opening_debt: before.opening_debt },
+      after: { opening_debt: amount },
+      reason: note,
+      requestId: c.get('requestId'),
+      ip: clientIp(c.req.raw.headers),
+    }),
+  ]);
+  return ok(c, { id, opening_debt: amount });
+});
+
 customerRoutes.post('/', requirePermission('customer.create'), async (c) => {
   const auth = c.get('auth');
   const body = await c.req.json().catch(() => ({}));

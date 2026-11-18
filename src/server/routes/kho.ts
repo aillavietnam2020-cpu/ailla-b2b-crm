@@ -2483,6 +2483,20 @@ khoRoutes.put('/map', async (c) => {
 });
 
 /** Ngày bắt đầu trừ kho theo đơn Kênh phân phối (đơn xuất trước ngày này coi như đã nằm trong tồn đầu). */
+/** CEO dời mốc đầu của sổ (chị Hoa 18/11: dời về 30/09 trước, Kế toán nạp tồn 30/09 sau). Chỉ đổi kho_cfg ton_moc, có nhật ký. */
+khoRoutes.put('/cfg/ton-moc', async (c) => {
+  const auth = c.get('auth');
+  if (!isCeo(auth)) throw forbidden('Chỉ CEO dời mốc tồn');
+  const b = (await c.req.json().catch(() => null)) as { date?: unknown } | null;
+  if (!isDate(b?.date)) throw badRequest('BAD_DATE', 'Ngày không đúng');
+  const truoc = await khoMocChung(c.env.DB);
+  await c.env.DB.batch([
+    c.env.DB.prepare("INSERT INTO kho_cfg (k, v) VALUES ('ton_moc', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(b.date),
+    auditStatement(c.env.DB, { actorId: auth.user.id, action: 'KHO_CFG', entityType: 'KHO_CFG', entityId: 'ton_moc', before: { ton_moc: truoc }, after: { ton_moc: b.date }, requestId: c.get('requestId'), ip: ip(c) }),
+  ]);
+  return ok(c, { ton_moc: b.date, truoc });
+});
+
 khoRoutes.put('/cfg/b2b-from', async (c) => {
   const auth = c.get('auth');
   if (!isCeo(auth)) throw forbidden('Chỉ CEO đặt ngày bắt đầu');
