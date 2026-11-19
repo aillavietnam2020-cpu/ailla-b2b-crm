@@ -58,9 +58,12 @@ describe('chấm công: lịch làm', () => {
     expect(lichOf(s, 'a', 'SX').id).toBe('xuong');
     expect(lichOf({ ...s, nguoiLich: { a: 'live' } }, 'a', 'CM').id).toBe('live');
   });
+  it('tháng 11/2026 văn phòng nghỉ đúng 7/11 và 21/11 (CEO 19/11), làm 14/11 và 28/11', () => {
+    expect(['2026-11-07', '2026-11-14', '2026-11-21', '2026-11-28'].map((d) => dayRule(vp, d).lam)).toEqual([false, true, false, true]);
+  });
   it('văn phòng nghỉ thứ Bảy thứ 2 và thứ 4; xưởng làm mọi thứ Bảy; Chủ nhật nghỉ', () => {
-    expect(['2026-11-07', '2026-11-14', '2026-11-21', '2026-11-28'].map((d) => dayRule(vp, d).lam)).toEqual([true, false, true, false]);
-    expect(dayRule({ ...vp, thuBay: 'nghi13' }, '2026-11-07').lam).toBe(false);
+    expect(['2026-11-07', '2026-11-14', '2026-11-21', '2026-11-28'].map((d) => dayRule({ ...vp, nghiT7: [] }, d).lam)).toEqual([true, false, true, false]);
+    expect(dayRule({ ...vp, nghiT7: [], thuBay: 'nghi13' }, '2026-11-07').lam).toBe(false);
     expect(dayRule(xuong, '2026-11-14')).toEqual({ lam: true, vao: 480, ra: 1020, tinh: true });
     expect(dayRule(xuong, '2026-11-08').lam).toBe(false);
   });

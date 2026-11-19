@@ -55,6 +55,8 @@ export type Lich = {
   chuyenCan: boolean;
   diem: string[];
   ngoaiOk: boolean;
+  /** Thứ Bảy nghỉ cụ thể (YYYY-MM-DD). Tháng nào có ghi ngày ở đây thì thứ Bảy tháng đó chỉ nghỉ đúng các ngày này, không theo thuBay (CEO 19/11: nghỉ 1 tuần làm 1 tuần, tối đa 2 thứ Bảy mỗi tháng). */
+  nghiT7: string[];
   /**
    * Quy định đổi theo thời gian (CEO 04/11: văn phòng trước vào 8:30 và làm mọi thứ Bảy; từ khi vào 8:00 mới nghỉ 2 thứ Bảy).
    * tuNgay: ngày bắt đầu áp dụng giờ hiện tại; ngày trước đó dùng giờ trong cu. '' = không có lịch cũ.
@@ -85,12 +87,12 @@ export type CcSettings = {
   macDinh: string;
 };
 
-const BASE = { anHan: 5, gioRaT7: '12:00', diem: [] as string[] };
+const BASE = { anHan: 5, gioRaT7: '12:00', diem: [] as string[], nghiT7: [] as string[] };
 /** Mặc định theo thông báo 01102026/TB-AILLA và lời CEO 04/11; CEO / HCNS sửa ở trang cài đặt. */
 export const CC_DEFAULT: CcSettings = {
   diem: [],
   lich: [
-    { ...BASE, id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', truaTu: '12:00', truaDen: '13:30', thuBay: 'nghi24', chuyenCan: true, ngoaiOk: false,
+    { ...BASE, id: 'vp', ten: 'Văn phòng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:30', truaTu: '12:00', truaDen: '13:30', thuBay: 'nghi24', nghiT7: ['2026-11-07', '2026-11-21'], chuyenCan: true, ngoaiOk: false,
       tuNgay: '2026-10-01', cu: { gioVao: '08:30', gioRa: '17:30', truaTu: '12:00', truaDen: '13:30', anHan: 5, thuBay: 'nua', gioRaT7: '12:00' } },
     { ...BASE, id: 'xuong', ten: 'Xưởng', kieu: 'codinh', gioVao: '08:00', gioRa: '17:00', truaTu: '12:00', truaDen: '13:00', thuBay: 'ca', chuyenCan: false, ngoaiOk: false, tuNgay: '', cu: null },
     { ...BASE, id: 'live', ten: 'Live (theo ca)', kieu: 'ca', gioVao: '08:00', gioRa: '17:30', truaTu: '', truaDen: '', thuBay: 'ca', chuyenCan: false, ngoaiOk: false, tuNgay: '', cu: null },
@@ -130,6 +132,7 @@ function normLich(x: unknown, i: number): Lich {
     chuyenCan: typeof o.chuyenCan === 'boolean' ? o.chuyenCan : d.chuyenCan,
     diem: Array.isArray(o.diem) ? o.diem.map(String).slice(0, 10) : [],
     ngoaiOk: typeof o.ngoaiOk === 'boolean' ? o.ngoaiOk : o.kieu === 'tudo',
+    nghiT7: 'nghiT7' in o ? (Array.isArray(o.nghiT7) ? [...new Set(o.nghiT7.map(String).filter((x) => NGAY_RE.test(x)))].sort().slice(0, 60) : []) : [...d.nghiT7],
     ...normCu(o, d),
   };
 }
@@ -282,6 +285,8 @@ export function dayRule(l0: Lich, ngay: string, ca?: Ca | null, le = false): { l
   const tinh = l.kieu === 'codinh';
   if (w === 0 || le) return { lam: false, vao, ra, tinh: false };
   if (w !== 6) return { lam: true, vao, ra, tinh };
+  const rieng = (l.nghiT7 ?? []).filter((x) => x.slice(0, 7) === ngay.slice(0, 7));
+  if (rieng.length) return rieng.includes(ngay) ? { lam: false, vao, ra, tinh: false } : { lam: true, vao, ra, tinh };
   const thu = Math.ceil(Number(ngay.slice(8, 10)) / 7); // thứ Bảy thứ mấy trong tháng
   if (l.thuBay === 'nghi' || (l.thuBay === 'nghi13' && (thu === 1 || thu === 3)) || (l.thuBay === 'nghi24' && (thu === 2 || thu === 4)))
     return { lam: false, vao, ra, tinh: false };

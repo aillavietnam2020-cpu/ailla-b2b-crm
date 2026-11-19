@@ -10,8 +10,13 @@ const live = s.lich.find((l) => l.id === 'live') as Lich;
 describe('nghỉ phép: số ngày', () => {
   it('bỏ Chủ nhật, thứ Bảy nghỉ (tuần 2 và 4), ngày lễ', () => {
     // 12/11 (T5) → 16/11 (T2): T5, T6, T7 14/11 (thứ Bảy thứ 2: nghỉ), CN, T2 = 3 ngày làm
-    expect(soNgayNghi(vp, '2026-11-12', '2026-11-16', 'ca')).toBe(3);
-    expect(soNgayNghi(vp, '2026-11-12', '2026-11-16', 'ca', ['2026-11-13'])).toBe(2);
+    const vp24 = { ...vp, nghiT7: [] };
+    expect(soNgayNghi(vp24, '2026-11-12', '2026-11-16', 'ca')).toBe(3);
+    expect(soNgayNghi(vp24, '2026-11-12', '2026-11-16', 'ca', ['2026-11-13'])).toBe(2);
+    // tháng 11/2026 nghỉ 7/11 và 21/11: 14/11 là ngày làm, 28/11 là ngày làm
+    expect(soNgayNghi(vp, '2026-11-12', '2026-11-16', 'ca')).toBe(4);
+    expect(soNgayNghi(vp, '2026-11-28', '2026-11-28', 'ca')).toBe(1);
+    expect(soNgayNghi(vp, '2026-11-21', '2026-11-21', 'ca')).toBe(0);
   });
   it('nửa ngày; lịch theo ca tính ngày lịch', () => {
     expect(soNgayNghi(vp, '2026-11-12', '2026-11-12', 'sang')).toBe(0.5);

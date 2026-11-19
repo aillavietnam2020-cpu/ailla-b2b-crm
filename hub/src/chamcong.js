@@ -396,6 +396,7 @@ function pCcCaiDat(m){
       ${lf("Nghỉ trưa",`<div class="pair"><input type="time" id="cc-lt1-${i}" value="${l.truaTu}"> – <input type="time" id="cc-lt2-${i}" value="${l.truaDen}"></div>`)}
       ${lf("Được trễ (phút)",`<input type="number" id="cc-la-${i}" min="0" max="120" value="${l.anHan}">`)}
       ${lf("Thứ Bảy",t7(i,l.thuBay))}
+      ${lf("Thứ Bảy nghỉ cụ thể",`<input type="text" id="cc-ln7-${i}" value="${(l.nghiT7||[]).join(", ")}" placeholder="2026-11-07, 2026-11-21"><small class="hint">Tháng nào ghi ngày ở đây thì thứ Bảy tháng đó chỉ nghỉ đúng các ngày này</small>`)}
       ${lf("Giờ ra thứ Bảy (làm buổi sáng)",`<input type="time" id="cc-l8-${i}" value="${l.gioRaT7}">`)}
       ${lf("Ngoài phạm vi",`<select id="cc-lo-${i}"><option value="0"${l.ngoaiOk?"":" selected"}>Không cho chấm</option><option value="1"${l.ngoaiOk?" selected":""}>Cho chấm, phải ghi lý do</option></select>`)}
       ${lf("Chấm ở điểm",`<div class="ck">${s.diem.length?s.diem.map(d=>`<label class="cc-chk"><input type="checkbox" data-ld="${i}" value="${esc(d.id)}"${(l.diem||[]).includes(d.id)?" checked":""}> ${esc(d.ten)}</label>`).join(""):'<span class="hint">chưa có điểm</span>'}</div>`)}
@@ -452,7 +453,7 @@ function pCcCaiDat(m){
   const v=id=>($("#"+id)||{}).value;
   const pull=()=>{
     s.diem=s.diem.map((d,i)=>{const ll=(v("cc-dl-"+i)||"").split(/[,\s]+/).filter(Boolean).map(Number);return {...d,ip:(v("cc-di-"+i)||"").split(/[,\s]+/).filter(Boolean),ten:v("cc-dt-"+i)||d.ten,lat:ll.length===2?ll[0]:"",lng:ll.length===2?ll[1]:"",bk:Number(v("cc-db-"+i))||d.bk}});
-    s.lich=s.lich.map((l,i)=>({...l,ten:v("cc-ln-"+i)||l.ten,kieu:v("cc-lk-"+i)||l.kieu,gioVao:v("cc-lv-"+i)||l.gioVao,gioRa:v("cc-lr-"+i)||l.gioRa,truaTu:v("cc-lt1-"+i)??l.truaTu,truaDen:v("cc-lt2-"+i)??l.truaDen,anHan:Number(v("cc-la-"+i))||0,thuBay:v("cc-l7-"+i)||l.thuBay,gioRaT7:v("cc-l8-"+i)||l.gioRaT7,ngoaiOk:v("cc-lo-"+i)==="1",chuyenCan:!!($("#cc-lc-"+i)||{}).checked,diem:[...m.querySelectorAll(`[data-ld="${i}"]:checked`)].map(x=>x.value)}));
+    s.lich=s.lich.map((l,i)=>({...l,ten:v("cc-ln-"+i)||l.ten,kieu:v("cc-lk-"+i)||l.kieu,gioVao:v("cc-lv-"+i)||l.gioVao,gioRa:v("cc-lr-"+i)||l.gioRa,truaTu:v("cc-lt1-"+i)??l.truaTu,truaDen:v("cc-lt2-"+i)??l.truaDen,anHan:Number(v("cc-la-"+i))||0,thuBay:v("cc-l7-"+i)||l.thuBay,nghiT7:String(v("cc-ln7-"+i)||"").split(/[,\s]+/).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)),gioRaT7:v("cc-l8-"+i)||l.gioRaT7,ngoaiOk:v("cc-lo-"+i)==="1",chuyenCan:!!($("#cc-lc-"+i)||{}).checked,diem:[...m.querySelectorAll(`[data-ld="${i}"]:checked`)].map(x=>x.value)}));
     s.lich=s.lich.map((l,i)=>{const tn=$("#cc-ltn-"+i);if(!tn)return l;const t=tn.value||"";const b=l.cu||l;
       return {...l,tuNgay:t,cu:t?{gioVao:v("cc-cv-"+i)||b.gioVao,gioRa:v("cc-cr-"+i)||b.gioRa,truaTu:b.truaTu??l.truaTu,truaDen:b.truaDen??l.truaDen,anHan:Number(v("cc-ca-"+i))||0,thuBay:v("cc-c7-"+i)||b.thuBay,gioRaT7:v("cc-c8-"+i)||b.gioRaT7}:null}});
     s.ca=s.ca.map((c,i)=>({...c,ten:v("cc-cn-"+i)||c.ten,tu:v("cc-ct-"+i)??c.tu,den:v("cc-cd-"+i)??c.den}));
