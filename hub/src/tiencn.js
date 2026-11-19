@@ -143,12 +143,12 @@ const tcnPg1=()=>{Object.values(TCN.pg).forEach(p=>p.trang=1)};
 function tcnCtOpen(tab,id,P,name){
   const isK=tab==="kh",r=TCN.dc&&!TCN.dc.err?(isK?TCN.dc.khach:TCN.dc.ncc).find(x=>x.id===id):null,nm=r?r.name:name||"";
   openDrawerHTML(`<h2>${esc(nm)}</h2><p class="hint">Đang tải chứng từ…</p>`);
-  tcnApi(`/chung-tu?kind=${isK?"kh":"ncc"}&id=${encodeURIComponent(id)}`).then(d=>{
+  Promise.all([tcnApi(`/chung-tu?kind=${isK?"kh":"ncc"}&id=${encodeURIComponent(id)}`),isK&&typeof mhAccts==="function"?mhAccts():null]).then(([d])=>{
     const open=+d.opening_debt||0;let bal=open;
     const rows=d.rows.map(x=>{const v=isK&&x.loai!=="Đơn đã giao / xuất kho"?-x.amount:x.amount;if(x.tinh)bal+=v;return {...x,v,bal}});
     openDrawerHTML(`<h2>${esc(nm)}</h2>${r?`<p class="hint">Nợ đầu kỳ ${nf(tcnR(r.dau))} + phát sinh ${nf(tcnR(r.phat_sinh))} − đã trả ${nf(tcnR(r.da_tra))}${isK?" − hàng trả lại "+nf(tcnR(r.tra_lai)):""} = <b>${nf(tcnR(r.cuoi))}</b> (kỳ ${tcnDd(P.from)} – ${tcnDd(P.to)})</p>`:""}
-    ${tcnGd(["Ngày","Loại","Số chứng từ","Liên quan","Ghi chú","Tăng / giảm nợ","Dư nợ sau dòng"],[`<tr><td>${isK?"—":tcnDd(d.opening_date)}</td><td>${isK?"Dư nợ cũ đầu kỳ (nạp lúc bắt đầu dùng web)":"Công nợ đầu kỳ (ngày chốt)"}</td><td></td><td></td><td></td><td class="n">${nf(tcnR(open))}</td><td class="n">${nf(tcnR(open))}</td></tr>`].concat(rows.map(x=>`<tr style="${x.tinh?"":"opacity:.55;"}${P&&x.date>=P.from&&x.date<=P.to?"background:#f5f7fb":""}"><td>${tcnDd(x.date)}</td><td>${esc(x.loai)}${x.tinh?"":` <small>(${isK?"chưa xác nhận, chưa tính":"trước ngày chốt, không tính"})</small>`}${x.ceo==="CHO"?" "+pill("chờ CEO duyệt","amb"):""}</td><td class="mono">${esc(x.ref||"")}</td><td>${tcnDon(x.lq)}</td><td class="gdd" title="${esc(x.note||"")}">${esc(x.note||"")}</td><td class="n">${nf(tcnR(x.v))}</td><td class="n">${x.tinh?nf(tcnR(x.bal)):"—"}</td></tr>`)))}
-    <p class="hint">Dòng mờ: chưa vào công nợ chính thức. Dòng nền nhạt: trong kỳ đang xem. Bấm mã ở cột Liên quan để mở đơn.</p>`);tcnBindDr()
+    ${tcnGd(["Ngày","Loại","Số chứng từ","Liên quan","Ghi chú"].concat(isK?["Tiền vào tài khoản"]:[],["Tăng / giảm nợ","Dư nợ sau dòng"]),[`<tr><td>${isK?"—":tcnDd(d.opening_date)}</td><td>${isK?"Dư nợ cũ đầu kỳ (nạp lúc bắt đầu dùng web)":"Công nợ đầu kỳ (ngày chốt)"}</td><td></td><td></td><td></td><td class="n">${nf(tcnR(open))}</td><td class="n">${nf(tcnR(open))}</td></tr>`].concat(rows.map(x=>`<tr style="${x.tinh?"":"opacity:.55;"}${P&&x.date>=P.from&&x.date<=P.to?"background:#f5f7fb":""}"><td>${tcnDd(x.date)}</td><td>${esc(x.loai)}${x.tinh?"":` <small>(${isK?"chưa xác nhận, chưa tính":"trước ngày chốt, không tính"})</small>`}${x.ceo==="CHO"?" "+pill("chờ CEO duyệt","amb"):""}</td><td class="mono">${esc(x.ref||"")}</td><td>${tcnDon(x.lq)}</td><td class="gdd" title="${esc(x.note||"")}">${esc(x.note||"")}</td>${isK?`<td>${x.pid?tcnAcctCell(x):""}</td>`:""}<td class="n">${nf(tcnR(x.v))}</td><td class="n">${x.tinh?nf(tcnR(x.bal)):"—"}</td></tr>`)))}
+    <p class="hint">Dòng mờ: chưa vào công nợ chính thức. Dòng nền nhạt: trong kỳ đang xem. Bấm mã ở cột Liên quan để mở đơn.${isK&&tcnAcctCan()?" Tiền vào nhầm tài khoản: bấm Đổi ở cột Tiền vào tài khoản (công nợ không đổi).":""}</p>`);tcnBindDr();if(isK)tcnAcctBind(()=>tcnCtOpen(tab,id,P,name))
   }).catch(e=>openDrawerHTML(`<h2>${esc(nm)}</h2><div class="note red">${esc(e.message)}</div>`))}
 function tcnAcctOpen(a,P){
   let run=a.moc?+a.moc.tien||0:0;const L=a.docs.filter(d=>d.date>(a.moc?a.moc.ngay:"")&&d.date<=P.to).map(d=>{run+=d.amount;return {...d,run}});
@@ -158,6 +158,14 @@ function tcnAcctOpen(a,P){
 const tcnGd=(h,r)=>{if(typeof gdCss==="function")gdCss();return tbl(h,r).replace("<table>",'<table class="gd">')};
 const tcnLk=(t,a,ti)=>typeof gdLink==="function"?gdLink(t,a,ti):`<a class="lnk" ${a}>${esc(t)}</a>`;
 const tcnDon=s=>s?(typeof gdDonLinks==="function"?gdDonLinks(s):esc(s)):"";
+/* Tiền khách trả vào tài khoản nào: kế toán đổi được khi gán nhầm (POST /api/payments/:id/fix-account). */
+const tcnAcctCan=()=>!!ME&&(ME.role==="admin"||(typeof mhPerm==="function"&&mhPerm("order.accounting.confirm")));
+function tcnAcctCell(x){const t=x.acct?tcnAcctTen(x.acct):"Chưa ghi tài khoản";return `<span class="hint">${esc(t)}</span>${tcnAcctCan()?` <button class="btn sm" data-tcnacct="${esc(x.pid)}" data-cur="${esc(x.acct||"")}">Đổi</button>`:""}`}
+function tcnAcctBind(reload){const d=document.getElementById("drawerIn");if(!d)return;
+  d.querySelectorAll("[data-tcnacct]").forEach(b=>b.onclick=()=>{const td=b.parentElement,A=(typeof MH!=="undefined"&&MH.accts)||[];
+    td.innerHTML=`<select class="inp sm">${A.map(a=>`<option value="${esc(a.id)}"${a.id===b.dataset.cur?" selected":""}>${esc([a.bank,a.account_no].filter(Boolean).join(" · "))}</option>`).join("")}</select> <button class="btn sm pri">Lưu</button>`;
+    td.querySelector("button").onclick=async()=>{const v=td.querySelector("select").value;if(v===b.dataset.cur){reload();return}
+      try{await svApi(`/api/payments/${b.dataset.tcnacct}/fix-account`,{method:"POST",body:JSON.stringify({receiving_account_id:v,reason:"Kế toán đổi tài khoản nhận (đối chiếu sổ ngân hàng)"})});toast("Đã đổi tài khoản nhận");reload()}catch(e){toast(e.message||"Chưa đổi được")}}})}
 function tcnBindDr(){const d=document.getElementById("drawerIn");if(d&&typeof gdBind==="function")gdBind(d)}
 PAGES.tcn_dc=pTcnDc;
 MODULES.push({k:"q_tcn",adm:true,zone:"Quản trị",ic:"fin",n:"Đối chiếu công nợ & tiền",sub:"",groups:()=>[["",[MI("tcn_dc","Đối chiếu công nợ & tiền",()=>tcnOk())]]]});

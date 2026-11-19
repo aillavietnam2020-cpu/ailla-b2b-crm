@@ -18,6 +18,7 @@ import {
   previewAutoAllocate,
   markLeftoverReviewed,
   fixPaymentDate,
+  fixPaymentAccount,
   voidPayment,
   refundOrderPayment,
   listPayments,
@@ -87,6 +88,16 @@ financeRoutes.post('/payments/:id/confirm', requirePermission('order.accounting.
 financeRoutes.post('/payments/:id/fix-date', requirePermission('order.accounting.confirm'), async (c) => {
   const b = (await c.req.json().catch(() => null)) as { paid_at?: unknown; reason?: unknown } | null;
   const r = await fixPaymentDate(c.env.DB, c.get('auth'), c.req.param('id'), String(b?.paid_at ?? ''), String(b?.reason ?? ''), {
+    requestId: c.get('requestId'),
+    ip: clientIp(c.req.raw.headers),
+  });
+  return ok(c, r);
+});
+
+/** Đổi tài khoản nhận của khoản tiền khách trả gán nhầm (kế toán). */
+financeRoutes.post('/payments/:id/fix-account', requirePermission('order.accounting.confirm'), async (c) => {
+  const b = (await c.req.json().catch(() => null)) as { receiving_account_id?: unknown; reason?: unknown } | null;
+  const r = await fixPaymentAccount(c.env.DB, c.get('auth'), c.req.param('id'), String(b?.receiving_account_id ?? ''), String(b?.reason ?? ''), {
     requestId: c.get('requestId'),
     ip: clientIp(c.req.raw.headers),
   });

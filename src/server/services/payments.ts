@@ -1079,6 +1079,37 @@ export async function fixPaymentDate(
   return { paid_at: newDate };
 }
 
+/** Đổi tài khoản nhận của khoản tiền khách trả bị gán nhầm (kế toán). Không đổi số tiền, công nợ giữ nguyên. */
+export async function fixPaymentAccount(
+  db: D1Database,
+  auth: AuthContext,
+  paymentId: string,
+  accountId: string,
+  reason: string,
+  ctx: { requestId: string; ip: string | null },
+): Promise<{ receiving_account_id: string }> {
+  if (reason.trim().length < 3) throw badRequest('NEED_REASON', 'Ghi lý do đổi tài khoản.');
+  const acc = await db.prepare('SELECT id FROM receiving_accounts WHERE id = ? AND active = 1').bind(accountId).first<{ id: string }>();
+  if (!acc) throw badRequest('BAD_ACCOUNT', 'Tài khoản nhận không có trong danh sách.');
+  const p = await db.prepare('SELECT id, receiving_account_id, method FROM payments WHERE id = ?').bind(paymentId).first<{ id: string; receiving_account_id: string | null; method: string }>();
+  if (!p) throw notFound('Không tìm thấy khoản tiền');
+  await db.batch([
+    db.prepare("UPDATE payments SET receiving_account_id = ?, method = 'Chuyển khoản', updated_at = ? WHERE id = ?").bind(accountId, nowIso(), paymentId),
+    auditStatement(db, {
+      actorId: auth.user.id,
+      action: 'PAYMENT_ACCOUNT_FIXED',
+      entityType: 'PAYMENT',
+      entityId: paymentId,
+      before: { receiving_account_id: p.receiving_account_id, method: p.method },
+      after: { receiving_account_id: accountId, method: 'Chuyển khoản' },
+      reason: reason.trim(),
+      requestId: ctx.requestId,
+      ip: ctx.ip,
+    }),
+  ]);
+  return { receiving_account_id: accountId };
+}
+
 /** Xóa an toàn một khoản tiền ghi nhầm: chỉ khi chưa xác nhận và chưa trừ vào đơn nào. Giữ nguyên bản ghi cũ trong nhật ký cùng lý do. */
 export async function voidPayment(
   db: D1Database,
