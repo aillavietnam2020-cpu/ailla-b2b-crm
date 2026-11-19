@@ -793,7 +793,7 @@ function cvAutoDg(raw){
   return out.map(g=>{g.n=g.ids.length;g.done=g.ids.filter(id=>byId[id].step==="xong").length;const sh=chOf(g.kenh).short,u=(g.fp||/Fanpage/i.test(g.kenh))?"bài":"video";
     g.ten=(g.day?`Đăng ${sh}: `:`Lên lịch đăng ${sh}: `)+`đã đăng ${g.done}/${g.n} ${u}`;
     g.mo=(g.day?(g.late?`lẽ ra đăng ${dd(g.day)}, trễ ${g.lateD} ngày`:"đăng hôm nay"):"chưa chọn ngày đăng");
-    const a=cvAutoSt()[g.key];g.st=a&&a.st==="doing"?"doing":"todo";return g}).filter(g=>g.n-g.done>0&&!(((cvAutoSt()[g.key]||{}).st==="done")&&(cvAutoSt()[g.key].d===td)))
+    const a=cvAutoSt()[g.key];g.st=a&&a.st==="doing"?"doing":"todo";return g}).filter(g=>g.n-g.done>0&&!(g.day&&((cvAutoSt()[g.key]||{}).st==="done")&&(cvAutoSt()[g.key].d===td)))
 }
 /* việc của lead: tự sinh theo số đang chờ */
 function cvLeadLines(){
