@@ -93,7 +93,10 @@ const NAV_SUB=[
   ["mh",()=>typeof MH!=="undefined"&&MH?MH.open||null:null,v=>{if(typeof MH!=="undefined"&&MH)MH.open=v||null}],
   ["sct",()=>typeof SC!=="undefined"&&PAGE==="so_cp"?SC.tab:null,v=>{if(typeof SC!=="undefined"&&v)SC.tab=v}],
   ["tst",()=>typeof TSV!=="undefined"&&TSV.tab&&TSV.tab[PAGE]?TSV.tab[PAGE]:null,v=>{if(typeof TSV!=="undefined"&&TSV.tab&&v)TSV.tab[PAGE]=v}],
-  ["tkh",()=>typeof TSV!=="undefined"&&PAGE==="ts_kh"?TSV.kh:null,v=>{if(typeof TSV!=="undefined"&&v)TSV.kh=v}]];
+  ["tkh",()=>typeof TSV!=="undefined"&&PAGE==="ts_kh"?TSV.kh:null,v=>{if(typeof TSV!=="undefined"&&v)TSV.kh=v}],
+  /* Chị Hoa 19/11: Thư mục làm việc — xem 1 file rồi bấm Quay lại phải về đúng thư mục đang xem. */
+  ["tm",()=>typeof TM!=="undefined"&&typeof tmOn==="function"&&tmOn()?{t:TM.tab,pb:TM.pb,s:TM.sub,f:TM.file?TM.file.id:""}:null,
+    v=>{if(typeof TM==="undefined"||!v)return;TM.tab=v.t||"thumuc";TM.pb=v.pb||"";TM.sub=v.s||"";TM.folder="";TM.file=v.f&&typeof tmFindFile==="function"?tmFindFile(v.f):null}]];
 const _navSub=()=>{const o={};NAV_SUB.forEach(([k,g])=>{try{o[k]=g()}catch(e){o[k]=null}});return o};
 const _navKey=sub=>PAGE+"|"+JSON.stringify(sub);
 function navDrawerWatch(){const dr=document.getElementById("drawer");if(!dr||dr._navW)return;dr._navW=1;_navDrOpen=!dr.hidden;
