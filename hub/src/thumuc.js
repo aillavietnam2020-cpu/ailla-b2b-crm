@@ -328,6 +328,7 @@ function tmFindView(){
 function pThuMuc(m){
   /* Mở từ Công việc › Thư mục công việc (cvmoi.js) thì trang đó đã có tiêu đề, không vẽ thêm. */
   const emb=PAGE==="cv_pb",head=emb?"":H("Thư mục làm việc","File làm hằng ngày của các phòng, lấy thẳng từ Google Drive");
+  if(!tmAllowed()){m.innerHTML=head+`<div class="note">Thư mục làm việc đang tạm ẩn trong lúc công ty sắp xếp lại Google Drive. Cần file gấp thì hỏi quản lý phòng.</div>`;return}
   if(!TM.teams){m.innerHTML=head+(TM.err?`<div class="note red">${esc(TM.err)}</div>`:`<p class="hint">Đang tải…</p>`);if(!TM.busy)tmTeams();return}
   const ceo=!!TM.teams.can_manage,adm=typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin";
   if(PAGE==="thumuc_gan"||TM.tab==="gan"){
@@ -431,6 +432,10 @@ function tmCfgBind(m){
     TM.saving=false;tmRedraw();
   };
 }
+/* TẠM ẨN (chị Hoa 19/11/2026) tới khi Drive mới sắp xếp xong: chỉ CEO, Kế toán trưởng, quản lý HCNS (trưởng nhóm/trưởng phòng ở HCNS hoặc Ban điều hành).
+   Máy chủ chặn giống vậy (driveAccess.ts tmAllowed). Mở lại: cho hàm trả true. */
+function tmAllowed(){const u=typeof ME!=="undefined"?ME:null;if(!u)return false;if(u.role==="admin")return true;
+  if(/kế toán trưởng/i.test(u.title||""))return true;return ["lead","truongphong"].includes(u.role)&&["HCNS","BDH"].includes(u.phongBan)}
 PAGES.thumuc=pThuMuc;
 PAGES.thumuc_gan=pThuMuc;
 

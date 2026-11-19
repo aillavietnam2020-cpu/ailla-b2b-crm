@@ -15,9 +15,21 @@
 /** direct: thư mục rất lớn (vd video booking của Worker), web không đếm file, bấm là mở thẳng trên Drive (chị Hoa 16/11). */
 export type DriveTeam = { pb: string; folderId: string; viewers: string[]; name?: string; direct?: boolean };
 export type DriveConfig = { teams: DriveTeam[] };
-export type DriveUser = { phongBan?: string; role?: string; active?: boolean };
+export type DriveUser = { phongBan?: string; role?: string; active?: boolean; title?: string };
 
 const LEAD_ROLES = ['lead', 'truongphong'];
+
+/**
+ * TẠM ẨN Thư mục làm việc (chị Hoa chốt 19/11/2026) tới khi Drive mới sắp xếp xong:
+ * chỉ CEO, Kế toán trưởng và quản lý HCNS (trưởng nhóm / trưởng phòng ở HCNS hoặc Ban điều hành) còn thấy.
+ * Mở lại cho mọi người: cho hàm này trả true.
+ */
+export function tmAllowed(user: DriveUser | null, isCeo: boolean): boolean {
+  if (isCeo) return true;
+  if (!user || user.active === false) return false;
+  if (/kế toán trưởng/i.test(user.title ?? '')) return true;
+  return LEAD_ROLES.includes(user.role ?? '') && ['HCNS', 'BDH'].includes(user.phongBan ?? '');
+}
 const ID_RE = /^[A-Za-z0-9_-]{10,80}$/;
 
 /** Lấy mã thư mục từ đường link Drive dán vào (hoặc chính mã). Không nhận ra thì trả null. */

@@ -207,7 +207,7 @@ function pDtLib(m){
   m.innerHTML=DT_CSS+H("Thư viện tài liệu","Chỉ tài liệu chuẩn đã duyệt: nội quy, quy trình, hướng dẫn. File làm việc hằng ngày của team xem ở Thư mục làm việc.")+
   `<div class="filters"><input id="dt-q" placeholder="Tìm tài liệu…" value="${esc(DT.q)}" style="max-width:300px">
    ${[["","Tất cả"],["chung","Chung"],["web","Sổ tay web"],["team","Team"],["req","Bắt buộc"]].map(([k,n])=>`<button class="btn sm${f===k?" pri":""}" data-dtf="${k}">${n}</button>`).join(" ")}
-   <span class="sp"></span>${PAGES.thumuc?`<button class="btn sm" id="dt-tm">📁 Thư mục làm việc của team →</button>`:""}${DT.me&&DT.me.editor?` <button class="btn sm pri" data-dtnew="1">＋ Tạo tài liệu</button>`:""}</div>
+   <span class="sp"></span>${PAGES.thumuc&&(typeof tmAllowed!=="function"||tmAllowed())?`<button class="btn sm" id="dt-tm">📁 Thư mục làm việc của team →</button>`:""}${DT.me&&DT.me.editor?` <button class="btn sm pri" data-dtnew="1">＋ Tạo tài liệu</button>`:""}</div>
   <div class="dt-cols">${box("🏢 Chung — mọi nhân viên",L.filter(d=>d.nhom==="chung"),"Chưa có tài liệu chung.")}
    ${box("🧭 Sổ tay web vận hành",L.filter(d=>d.nhom==="web"),"Chưa có trang sổ tay nào.")}
    <section class="card"><div class="card-h"><h2>👥 Tài liệu theo team</h2><span class="hint">${team.length}</span></div>

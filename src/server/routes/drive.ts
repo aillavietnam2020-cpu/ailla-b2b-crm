@@ -9,7 +9,8 @@ import {
   locate,
   normalizeConfig,
   rootsFor,
-  teamsFor,
+  teamsFor as teamsForAll,
+  tmAllowed,
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
@@ -80,6 +81,9 @@ async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AuthContext
   const me = hub.users.find((u) => u.crm && u.crm === auth.user.id) ?? null;
   return { auth, me, ceo: isCeo(auth, me), depts: hub.depts };
 }
+
+/* Thư mục người này thấy trong danh sách; đang tạm ẩn (tmAllowed) thì không thấy thư mục nào. */
+const teamsFor = (cfg: DriveConfig, me: HubUser | null, ceo: boolean) => (tmAllowed(me, ceo) ? teamsForAll(cfg, me, ceo) : []);
 
 function needKey(env: AppEnv['Bindings']) {
   const k = saKey(env.GDRIVE_SA_JSON);

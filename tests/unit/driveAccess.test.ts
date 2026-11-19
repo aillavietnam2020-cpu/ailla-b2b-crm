@@ -167,3 +167,18 @@ describe('đồng bộ quyền Drive theo danh sách nhân viên', () => {
     expect(p.remove.map((x) => x.email).sort()).toEqual(['cu@gmail.com', 'nghi@gmail.com']);
   });
 });
+
+describe('tạm ẩn Thư mục làm việc (19/11)', () => {
+  it('chỉ CEO, Kế toán trưởng, quản lý HCNS / Ban điều hành còn thấy', async () => {
+    const { tmAllowed } = await import('../../src/server/lib/driveAccess');
+    expect(tmAllowed(null, true)).toBe(true);
+    expect(tmAllowed({ role: 'truongphong', title: 'Kế toán trưởng', phongBan: 'KT' }, false)).toBe(true);
+    expect(tmAllowed({ role: 'truongphong', title: 'Trưởng phòng', phongBan: 'BDH' }, false)).toBe(true);
+    expect(tmAllowed({ role: 'lead', phongBan: 'HCNS' }, false)).toBe(true);
+    expect(tmAllowed({ role: 'lead', title: 'Trưởng nhóm', phongBan: 'CM' }, false)).toBe(false);
+    expect(tmAllowed({ role: 'nhanvien', title: 'Kế toán kho', phongBan: 'KT' }, false)).toBe(false);
+    expect(tmAllowed({ role: 'nhanvien', phongBan: 'HCNS' }, false)).toBe(false);
+    expect(tmAllowed({ role: 'truongphong', title: 'Kế toán trưởng', active: false }, false)).toBe(false);
+    expect(tmAllowed(null, false)).toBe(false);
+  });
+});
