@@ -609,6 +609,20 @@ describe('Gợi ý đơn cho khoản tiền chưa gắn + xác nhận một lầ
     const noWhy = await ctx.request(`/api/payments/${id}/void`, { as: USERS.manager, body: { reason: '' } });
     expect(noWhy.status).toBe(400);
   });
+  it('đổi tài khoản nhận của khoản tiền gán nhầm: cần lý do, công nợ giữ nguyên, sổ chứng từ khách hiện tài khoản mới', async () => {
+    await approvedOrder();
+    const mb = await addAccount();
+    const vib = await ctx.request('/api/receiving-accounts', { as: USERS.ceo, body: { bank: 'VIB', account_no: '921398099', account_name: 'AILLA' } });
+    const r = await pay(USERS.thao, { customer_id: 'cus-thao-1', amount: 500_000, method: 'Chuyển khoản', receiving_account_id: mb });
+    const id = r.body.data.id as string;
+    expect((await ctx.request(`/api/payments/${id}/fix-account`, { as: USERS.manager, body: { receiving_account_id: vib.body.data.id } })).status).toBe(400);
+    const fx = await ctx.request(`/api/payments/${id}/fix-account`, { as: USERS.manager, body: { receiving_account_id: vib.body.data.id, reason: 'Đối chiếu sổ MISA' } });
+    expect(fx.status).toBe(200);
+    const row = await ctx.db.prepare('SELECT receiving_account_id, amount FROM payments WHERE id = ?').bind(id).first<{ receiving_account_id: string; amount: number }>();
+    expect(row).toEqual({ receiving_account_id: vib.body.data.id, amount: 500_000 });
+    const ct = await ctx.request('/api/hub/dieuhanh/tien/chung-tu?kind=kh&id=cus-thao-1', { as: USERS.ceo });
+    expect(ct.body.data.rows.find((x: { pid?: string }) => x.pid === id)?.acct).toBe(vib.body.data.id);
+  });
   it('bill đã gắn đơn nhưng khoản tiền ghi lúc đơn chưa duyệt (chưa trừ đơn, đã thành số dư có): đơn duyệt xong thì tự trừ đúng đơn và trả lại số dư có', async () => {
     const orderId = await approvedOrder();
     const r = await pay(USERS.thao, { customer_id: 'cus-thao-1', amount: 1_000_000, method: 'Chuyển khoản' });

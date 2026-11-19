@@ -527,7 +527,9 @@ function mhStage(p,M){
   if(M.paid<M.invTotal-1)return ["no",M.paid>0?"Đã nhập kho · trả một phần":"Đã nhập kho · chưa thanh toán","red"];
   return ["xong","Đã nhập kho · đã thanh toán","grn"]}
 /* Khoảng thời gian lọc theo ngày đặt: [từ, đến (không gồm)] */
-function mhPeriod(){const t=mhToday(),y=+t.slice(0,4),mo=+t.slice(5,7),f=(Y,M)=>{while(M<1){M+=12;Y--}return Y+"-"+String(M).padStart(2,"0")+"-01"};
+/* Chị Hoa 19/11: ở trang quản trị, lọc theo ô chọn kỳ trên cùng (01/10 – 31/10…), không dùng ô riêng. */
+const mhTopPer=()=>typeof HOST_MODE!=="undefined"&&HOST_MODE==="admin"&&typeof PERIOD!=="undefined"&&PERIOD&&PERIOD.from;
+function mhPeriod(){if(mhTopPer())return [PERIOD.from,iso(addD(pdate(PERIOD.to),1))];const t=mhToday(),y=+t.slice(0,4),mo=+t.slice(5,7),f=(Y,M)=>{while(M<1){M+=12;Y--}return Y+"-"+String(M).padStart(2,"0")+"-01"};
   return {m0:[f(y,mo),null],m1:[f(y,mo-1),f(y,mo)],m3:[f(y,mo-2),null],y:[y+"-01-01",null]}[MH.per]||[null,null]}
 /* Phiếu chi vận chuyển gắn đơn mua (mã PM… trong order_refs): cước chỉ tính MỘT nơi (đấu nối 29/10, docs/DAU-NOI-SO-CHI-TAI-SAN-KHO.md mục 10).
    Trả null nếu không gắn đơn mua; "ts" = đơn toàn tài sản / công cụ: cộng vào nguyên giá (tsPhiDon), Sổ chi phí để G28 Không tính;
@@ -577,7 +579,7 @@ function pMhDon(m){
   const act=x=>{const p=x.p,o=p.status==="DAT"||p.status==="DANG_GIAO";return o?"":x.st[0]==="ct"?`<button class="btn sm pri" data-mhw="${p.id}">Ghi chứng từ</button>`:x.st[0]==="no"?`<button class="btn sm pri" data-mhp="${p.id}">Ghi chi</button>`:""};
   m.innerHTML=H(T,S)+(need.length?`<div class="note mhneed">⚠ <b>${need.length} nguyên vật liệu</b> dưới mức tồn tối thiểu: ${need.slice(0,4).map(r=>esc(r.name)).join(", ")}${need.length>4?"…":""} <button class="btn sm" id="mh-buyall">Lập phiếu mua cho các mã này</button></div>`:"")+
   `<div class="grid kpis">${kpi("Số phiếu mua",nf(live.length),cnt("hang")?cnt("hang")+" phiếu đang chờ hàng":"")}${kpi("Tiền hàng",nf(Math.round(tot("val"))),"theo chứng từ, chưa có thì theo giá đặt")}${kpi("Đã trả",nf(paid),"")}${kpi("Còn phải trả",nf(Math.round(owe)),cnt("ct")?cnt("ct")+" phiếu chưa có chứng từ":"")}</div>
-  <div class="filters"><select id="mh-per">${opt([["all","Tất cả thời gian"],["m0","Tháng này"],["m1","Tháng trước"],["m3","3 tháng gần đây"],["y","Năm nay"]],MH.per||"all")}</select><select id="mh-sid">${opt([["","Tất cả nhà cung cấp"]].concat((MH.sup||[]).map(x=>[x.id,x.name])),MH.sid||"")}</select><input id="mh-q" class="mhq" placeholder="Tìm số phiếu, hàng…" value="${esc(MH.q||"")}"><span class="sp"></span><button class="btn pri" id="mh-new">+ Lập phiếu mua hàng</button></div>
+  <div class="filters">${mhTopPer()?"":`<select id="mh-per">${opt([["all","Tất cả thời gian"],["m0","Tháng này"],["m1","Tháng trước"],["m3","3 tháng gần đây"],["y","Năm nay"]],MH.per||"all")}</select>`}<select id="mh-sid">${opt([["","Tất cả nhà cung cấp"]].concat((MH.sup||[]).map(x=>[x.id,x.name])),MH.sid||"")}</select><input id="mh-q" class="mhq" placeholder="Tìm số phiếu, hàng…" value="${esc(MH.q||"")}"><span class="sp"></span><button class="btn pri" id="mh-new">+ Lập phiếu mua hàng</button></div>
   <div class="ttchips mhchips">${chips.map(([k,t,n])=>`<button class="ttchip${F===k?" on":""}" data-mhst="${k}">${t} <b>${n}</b></button>`).join("")}</div>
    <section class="card flush">${gdTbl(["Ngày đặt","Mã phiếu","Nhà cung cấp","Hàng","Tổng tiền","Đã trả","Còn phải trả","Trạng thái","Liên quan"],gdCat(shown,MH.pgDon||(MH.pgDon={co:gdCoNho("mhdon",100),trang:1})).map(x=>{const p=x.p,M=x.M,late=mhLateDays(p),tot=M.invTotal||x.val||0,due=Math.max(0,tot-M.paid);
     const todo=p.status==="HUY"?"":mhLechCho(p).length?`<span class="mhtodo red">Hàng lệch đơn, chốt tiền</span>`:x.st[0]==="tr"?`<span class="mhtodo red">Chuyển khoản trước</span>`:p.status!=="DU"?(late?`<span class="mhtodo red">Trễ ${late} ngày</span>`:`<span class="mhtodo">Chờ nhận hàng</span>`):x.st[0]==="gia"?`<span class="mhtodo red">Nhập giá</span>`:x.st[0]==="ct"?`<span class="mhtodo">Ghi chứng từ</span>`:x.st[0]==="no"?`<span class="mhtodo">Thanh toán</span>`:"";
@@ -585,7 +587,7 @@ function pMhDon(m){
     return `<tr class="clk mhrow" data-mhd="${p.id}" title="${esc(ghi)}"><td>${esc(kDd(p.order_date))}</td><td><a class="mhno">${esc(p.no)}</a></td><td class="gdd" style="max-width:170px" title="${esc(p.supplier_name)}">${esc(p.supplier_name)}</td><td class="gdd" style="max-width:200px" title="${esc(ten)}">${esc(ten)}</td><td class="n">${tot?nf(Math.round(tot)):"—"}</td><td class="n">${M.paid?nf(M.paid):"0"}</td><td class="n">${due>1?`<b>${nf(Math.round(due))}</b>`:"0"}</td><td>${/class="mhtodo red"/.test(todo)?todo:pill(x.st[1],x.st[2])}</td><td class="gdd" style="max-width:240px">${mhLienQuan(p,M)}</td></tr>`}))}${(()=>{const t=k=>shown.reduce((s,x)=>s+(k==="tot"?(x.M.invTotal||x.val||0):k==="paid"?x.M.paid:Math.max(0,(x.M.invTotal||x.val||0)-x.M.paid)),0);
     return gdChan(`<span>Cộng <b>${shown.length}</b> đơn: tổng <b>${nf(Math.round(t("tot")))}</b> đ</span><span class="hint">đã trả <b>${nf(Math.round(t("paid")))}</b> · còn phải trả <b>${nf(Math.round(t("due")))}</b></span>`,shown.length,MH.pgDon,"mhdon")})()}</section>`;
   gdCss();mhLqBind(m);
-  $("#mh-per").onchange=e=>{MH.per=e.target.value;renderMain()};$("#mh-sid").onchange=e=>{MH.sid=e.target.value;renderMain()};
+  if($("#mh-per"))$("#mh-per").onchange=e=>{MH.per=e.target.value;renderMain()};$("#mh-sid").onchange=e=>{MH.sid=e.target.value;renderMain()};
   $("#mh-q").onchange=e=>{MH.q=e.target.value;renderMain()};
   m.querySelectorAll("[data-mhst]").forEach(b=>b.onclick=()=>{MH.st=b.dataset.mhst;renderMain()});
   $("#mh-new").onclick=()=>mhForm(null);

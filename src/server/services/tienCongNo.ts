@@ -96,7 +96,7 @@ export interface DcRow {
   cho_ghi_no?: number;
   cho_tien_ve?: number;
 }
-export interface ChungTu { date: string; loai: string; ref: string; note: string | null; amount: number; tinh: boolean; ceo?: string; /** mã đơn liên quan (đơn bán / đơn mua), cách nhau dấu phẩy */ lq?: string }
+export interface ChungTu { date: string; loai: string; ref: string; note: string | null; amount: number; tinh: boolean; ceo?: string; /** mã đơn liên quan (đơn bán / đơn mua), cách nhau dấu phẩy */ lq?: string; /** tiền khách trả: mã khoản + tài khoản nhận */ pid?: string; acct?: string | null }
 
 /** Chứng từ công nợ một khách (đơn đã giao/xuất, tiền thu, điều chỉnh, hàng trả lại). tinh = đã vào công nợ chính thức. */
 async function khachChungTu(db: D1Database, customerId?: string) {
@@ -105,7 +105,7 @@ async function khachChungTu(db: D1Database, customerId?: string) {
   const [ord, pay, oth, ret] = await Promise.all([
     db.prepare(`SELECT x.customer_id, x.order_date AS date, COALESCE(x.legacy_order_code, x.order_no) AS ref, x.total_amount AS amount, x.accounting_status AS st, x.note
       FROM orders x WHERE x.deleted_at IS NULL AND x.approval_status = 'APPROVED' AND x.delivery_status IN ('DA_XUAT_KHO','DA_GIAO')${w}`).bind(...b).all<Record<string, any>>(),
-    db.prepare(`SELECT x.customer_id, x.paid_at AS date, COALESCE(x.external_receipt_no, x.method, '') AS ref, x.amount, x.accounting_status AS st, x.is_adjustment AS adj, x.note, x.method, ${PAY_DON} AS lq
+    db.prepare(`SELECT x.id AS pid, x.receiving_account_id AS acct, x.customer_id, x.paid_at AS date, COALESCE(x.external_receipt_no, x.method, '') AS ref, x.amount, x.accounting_status AS st, x.is_adjustment AS adj, x.note, x.method, ${PAY_DON} AS lq
       FROM payments x WHERE 1=1${w}`).bind(...b).all<Record<string, any>>(),
     db.prepare(`SELECT x.customer_id, x.charge_date AS date, COALESCE(x.voucher_no, x.doc_no, 'Phiếu phải thu') AS ref, x.amount, x.description AS note
       FROM customer_other_charges x WHERE x.deleted_at IS NULL${w}`).bind(...b).all<Record<string, any>>(),
@@ -122,7 +122,7 @@ async function khachChungTu(db: D1Database, customerId?: string) {
   for (const o of ord.results ?? []) add(o.customer_id, { k: 'PS', date: String(o.date).slice(0, 10), loai: 'Đơn đã giao / xuất kho', ref: o.ref, note: o.note ?? null, amount: o.amount || 0, tinh: o.st === 'DA_XAC_NHAN', lq: o.ref });
   for (const p of pay.results ?? []) {
     const adj = p.adj === 1;
-    add(p.customer_id, { k: 'TRA', date: String(p.date).slice(0, 10), loai: adj ? 'Bút toán đảo / hoàn tiền' : p.method === 'Bù trừ cước vận chuyển' ? 'Bù trừ cước khách trả hộ' : 'Tiền khách trả', ref: p.ref, note: p.note ?? null, amount: adj ? -p.amount : p.amount, tinh: p.st === 'DA_XAC_NHAN', lq: p.lq ?? '' });
+    add(p.customer_id, { k: 'TRA', date: String(p.date).slice(0, 10), loai: adj ? 'Bút toán đảo / hoàn tiền' : p.method === 'Bù trừ cước vận chuyển' ? 'Bù trừ cước khách trả hộ' : 'Tiền khách trả', ref: p.ref, note: p.note ?? null, amount: adj ? -p.amount : p.amount, tinh: p.st === 'DA_XAC_NHAN', lq: p.lq ?? '', pid: p.pid, acct: p.acct ?? null });
   }
   // Phiếu phải thu (thu nhập khác: VAT khách lấy hóa đơn...): phát sinh nợ, đã vào công nợ chính thức ngay khi kế toán ghi.
   for (const x of oth.results ?? []) add(x.customer_id, { k: 'PS', date: String(x.date).slice(0, 10), loai: 'Phiếu phải thu', ref: x.ref, note: x.note ?? null, amount: x.amount || 0, tinh: true });

@@ -98,7 +98,8 @@ function pGcCn(m){
   <section class="card flush">${C.length?tbl(["Khách hàng","Dư nợ đầu kỳ","Đã ghi nợ","Đã thanh toán","Chính thức","Chờ ghi nợ","Chờ tiền về","Dự kiến","Hạn mức"],C.map(c=>{const over=(+c.debt_limit>0)&&(g(c,"projected_debt")>+c.debt_limit);return `<tr class="clk" data-gck="${c.id}"><td><b>${esc(c.name)}</b></td><td class="n">${nf(g(c,"opening_debt"))}</td><td class="n">${nf(g(c,"posted_charges"))}</td><td class="n">${nf(g(c,"confirmed_payments"))}</td><td class="n"><b>${nf(g(c,"official_debt"))}</b></td><td class="n">${nf(g(c,"pending_charges"))}</td><td class="n">${nf(g(c,"pending_cash"))}</td><td class="n">${nf(g(c,"projected_debt"))}${over?" "+pill("Vượt hạn mức","red"):""}</td><td class="n">${+c.debt_limit>0?nf(+c.debt_limit):"—"}</td></tr>`})):`<p class="pad">Chưa có khách gia công.</p>`}</section>
   <p class="hint">Đã ghi nợ gồm đơn đã xuất kho đã chốt tiền và phiếu phải thu (tiền VAT khách lấy hóa đơn...). Phiếu phải thu xem ở <button class="lnk" data-gcgo="gc_don">Đơn gia công</button>.</p>
   <div class="acts"><button class="btn" data-gcgo="cr_cn">Công nợ toàn bộ khách hàng</button></div>`;
-  gcBind(m);m.querySelectorAll("[data-gck]").forEach(r=>r.onclick=()=>gcOpen("cr_kh","/admin/customers/"+r.dataset.gck));
+  /* Bấm khách: mở chứng từ công nợ ngay tại đây (trang Danh sách khách hàng không có ở Vận hành nên trước nhảy sang trang khác). */
+  gcBind(m);m.querySelectorAll("[data-gck]").forEach(r=>r.onclick=()=>{const c=C.find(x=>x.id===r.dataset.gck);tcnCtOpen("kh",r.dataset.gck,{from:"",to:""},c?c.name:"")});
   const a=$("#gc-dk");if(a)a.onclick=()=>gcDk();const b=$("#gc-ppt");if(b)b.onclick=()=>gcPptNew();
 }
 const gcCanDk=()=>typeof SV!=="undefined"&&SV.perms&&SV.perms.includes("order.accounting.confirm");
