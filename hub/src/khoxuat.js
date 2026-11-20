@@ -6,6 +6,8 @@
    ===================================================================== */
 const XP={rows:null,done:null,doneKey:"",busy:false,err:"",at:0,edits:null};
 const xpApprover=()=>ME&&(ME.role==="admin"||can(ME,"order.approve.normal"));
+/* Chị Hoa 20/11: Quản lý mua hàng xem + in phiếu xuất; nút ghi/sửa thực xuất chỉ hiện cho kế toán kho. */
+const xpKho=()=>ME&&(ME.role==="admin"||can(ME,"order.kho.process")||can(ME,"sx.kiemke"));
 async function xpLoad(){
   if(XP.busy)return;XP.busy=true;
   try{
@@ -28,7 +30,7 @@ function xpPending(){
     return `<tr><td><b>${esc(o.order_no)}</b></td><td>${esc(o.customer_name)}</td>
       <td>${due?`<span class="pill p-${late?"red":soon?"amb":"gry"}">${late?"Quá hẹn ":soon?"Hôm nay ":""}${xpDate(due)}</span>`:`<span class="hint">Không hẹn</span>`}</td>
       <td class="n">${o.lines.length} mã</td><td>${esc(o.owner_name||"")}</td>
-      <td class="nowrap"><button class="btn sm" data-xp-print="${o.id}">In phiếu xuất kho</button> <button class="btn sm pri" data-xp-open="${o.id}">Ghi thực xuất</button></td></tr>`}).join("");
+      <td class="nowrap"><button class="btn sm" data-xp-print="${o.id}">In phiếu xuất kho</button>${xpKho()?` <button class="btn sm pri" data-xp-open="${o.id}">Ghi thực xuất</button>`:""}</td></tr>`}).join("");
   return `<section class="card flush" id="xp-sec">${head}${tbl(["Mã đơn","Khách","Ngày hẹn xuất","Số mã","Sale",""],[rows])}</section>`}
 /* Yêu cầu sửa phiếu xuất đang chờ duyệt: kho gửi kèm lý do, quản lý điều phối / CEO duyệt hoặc từ chối. */
 function xpEdits(){
@@ -43,7 +45,7 @@ function xpShipped(){
   const D=XP.done;if(!D)return "";
   const P=kPer();
   const rows=D.map(o=>`<tr><td><b>${esc(o.order_no)}</b></td><td>${esc(o.customer_name)}</td><td><b>${xpDate(o.shipped_day)}</b></td><td>${o.shipped_by_name?esc(o.shipped_by_name):`<span class="pill p-amb">Chưa ghi</span>`}</td><td class="n">${o.lines.length} mã</td>
-    <td class="nowrap"><button class="btn sm pri" data-xp-edit="${o.id}">Sửa phiếu xuất</button> <button class="btn sm" data-xp-print="${o.id}">In lại phiếu</button> <button class="btn sm" data-xp-view="${o.id}">Xem</button></td></tr>`).join("");
+    <td class="nowrap">${xpKho()?`<button class="btn sm pri" data-xp-edit="${o.id}">Sửa phiếu xuất</button> `:""}<button class="btn sm" data-xp-print="${o.id}">In lại phiếu</button> <button class="btn sm" data-xp-view="${o.id}">Xem</button></td></tr>`).join("");
   return `<section class="card flush" id="xp-done"><div class="card-h pad"><h2>Đơn NPP đã xuất kho trong kỳ ${kPerLabel(P)}</h2><span class="hint">${D.length} đơn</span></div>
    ${D.length?tbl(["Mã đơn","Khách","Ngày xuất kho","Người xuất kho","Số mã",""],[rows]):`<p class="hint pad">Chưa có đơn nào xuất trong kỳ này.</p>`}</section>`}
 function xpBind(sec){

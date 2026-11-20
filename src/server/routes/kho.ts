@@ -3616,8 +3616,9 @@ khoRoutes.get('/online/probe-customer', async (c) => {
 /** Đơn NPP đã duyệt, đang chờ kế toán kho xuất hàng: hiện ở Sản xuất & kho để in phiếu xuất kho và ghi số thực xuất. */
 khoRoutes.get('/b2b-pending', async (c) => {
   const auth = c.get('auth');
-  if (!isCeo(auth) && !auth.permissions.includes('order.kho.process') && !auth.permissions.includes('sx.kiemke')) {
-    throw forbidden('Chỉ kế toán kho xem được đơn chờ xuất');
+  // Chị Hoa 20/11: Quản lý mua hàng (duyệt đơn) xem + in phiếu xuất được; ghi thực xuất vẫn chỉ kế toán kho (flowShip).
+  if (!isCeo(auth) && !(['order.kho.process', 'sx.kiemke', 'order.approve.normal', 'order.accounting.confirm'] as const).some((p) => auth.permissions.includes(p))) {
+    throw forbidden('Chỉ kế toán kho, quản lý mua hàng xem được đơn chờ xuất');
   }
   const orders = await c.env.DB
     .prepare(
@@ -3635,8 +3636,9 @@ khoRoutes.get('/b2b-pending', async (c) => {
 /** Đơn NPP đã xuất kho trong một khoảng ngày (theo giờ Việt Nam): để xem lại và in lại phiếu xuất kho. */
 khoRoutes.get('/b2b-shipped', async (c) => {
   const auth = c.get('auth');
-  if (!isCeo(auth) && !auth.permissions.includes('order.kho.process') && !auth.permissions.includes('sx.kiemke')) {
-    throw forbidden('Chỉ kế toán kho xem được đơn đã xuất');
+  // Chị Hoa 20/11: Quản lý mua hàng (duyệt đơn) xem + in phiếu xuất được; ghi thực xuất vẫn chỉ kế toán kho (flowShip).
+  if (!isCeo(auth) && !(['order.kho.process', 'sx.kiemke', 'order.approve.normal', 'order.accounting.confirm'] as const).some((p) => auth.permissions.includes(p))) {
+    throw forbidden('Chỉ kế toán kho, quản lý mua hàng xem được đơn đã xuất');
   }
   const from = c.req.query('from') ?? '';
   const to = c.req.query('to') ?? '';
