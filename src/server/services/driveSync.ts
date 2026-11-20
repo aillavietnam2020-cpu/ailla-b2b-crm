@@ -47,17 +47,16 @@ export async function loadStaff(db: D1Database): Promise<{ staff: StaffRow[]; na
   const acc = await db.prepare("SELECT id, email FROM users WHERE deleted_at IS NULL AND kind = 'HUMAN' AND status = 'ACTIVE'").all<{ id: string; email: string | null }>();
   const accMail = new Map((acc.results ?? []).map((r) => [r.id, String(r.email ?? '')]));
   const users = d.users ?? [];
-  const byNs = new Map(users.filter((u) => u.maNS && u.crm).map((u) => [u.maNS as string, u]));
   const names = new Map<string, string>();
   const staff: StaffRow[] = (d.staff ?? []).map((s) => {
     names.set(s.ma, s.ten ?? s.ma);
-    const u = byNs.get(s.ma);
-    const email = ns[s.ma]?.hs?.email || (u?.crm ? accMail.get(u.crm) : '') || '';
+    const email = ns[s.ma]?.hs?.email ?? '';
     return { ma: s.ma, pb: s.pb ?? '', tt: locked.has(s.ma) ? 'Đã nghỉ' : (s.tt ?? ''), email, lead: leads.has(s.ma) };
   });
-  // Tài khoản web đang mở, có phòng ban nhưng chưa gắn mã nhân viên (vd. trưởng nhóm mới): vẫn cấp theo phòng của tài khoản.
+  // Mỗi tài khoản web đang mở: cấp theo phòng của CHÍNH tài khoản (khớp với cái web cho xem). Không lấy email qua mã nhân viên
+  // gắn với tài khoản, vì 20/11 nhiều tài khoản gắn nhầm hồ sơ người khác (vd. tài khoản Content gắn hồ sơ Kế toán).
   for (const u of users) {
-    if (u.maNS || !u.crm || u.active === false || !u.phongBan || u.role === 'admin') continue;
+    if (!u.crm || u.active === false || !u.phongBan || u.role === 'admin') continue;
     const email = accMail.get(u.crm);
     if (!email) continue;
     const ma = `tk:${u.crm}`;
