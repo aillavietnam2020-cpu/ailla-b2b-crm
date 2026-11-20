@@ -23,10 +23,13 @@ const LEAD_ROLES = ['lead', 'truongphong'];
  * TẠM ẨN Thư mục làm việc (chị Hoa chốt 19/11/2026) tới khi Drive mới sắp xếp xong:
  * chỉ CEO, Kế toán trưởng và quản lý HCNS (trưởng nhóm / trưởng phòng ở HCNS hoặc Ban điều hành) còn thấy.
  * Mở lại cho mọi người: cho hàm này trả true.
+ * 20/11/2026 chị Hoa cho MỞ LẠI cho mọi nhân sự (TM_OPEN_ALL); ai thấy thư mục nào vẫn theo canSeeTeam (phòng mình + chung).
  */
+export const TM_OPEN_ALL = true;
 export function tmAllowed(user: DriveUser | null, isCeo: boolean): boolean {
   if (isCeo) return true;
   if (!user || user.active === false) return false;
+  if (TM_OPEN_ALL) return true;
   if (/kế toán trưởng/i.test(user.title ?? '')) return true;
   return LEAD_ROLES.includes(user.role ?? '') && ['HCNS', 'BDH'].includes(user.phongBan ?? '');
 }

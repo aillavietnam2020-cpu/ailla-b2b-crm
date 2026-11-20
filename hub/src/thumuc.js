@@ -434,7 +434,9 @@ function tmCfgBind(m){
 }
 /* TẠM ẨN (chị Hoa 19/11/2026) tới khi Drive mới sắp xếp xong: chỉ CEO, Kế toán trưởng, quản lý HCNS (trưởng nhóm/trưởng phòng ở HCNS hoặc Ban điều hành).
    Máy chủ chặn giống vậy (driveAccess.ts tmAllowed). Mở lại: cho hàm trả true. */
-function tmAllowed(){const u=typeof ME!=="undefined"?ME:null;if(!u)return false;if(u.role==="admin")return true;
+/* 20/11/2026 chị Hoa cho mở lại cho mọi nhân sự (TM_OPEN_ALL, máy chủ cũng vậy). */
+const TM_OPEN_ALL=true;
+function tmAllowed(){const u=typeof ME!=="undefined"?ME:null;if(!u)return false;if(u.role==="admin"||TM_OPEN_ALL)return true;
   if(/kế toán trưởng/i.test(u.title||""))return true;const ld=["lead","truongphong"].includes(u.role);
   /* 20/11: trưởng nhóm Content & Media thấy lại thư mục phòng mình (máy chủ chỉ trả thư mục CM, xem TM_LEAD_OPEN) */
   return ld&&["HCNS","BDH","CM"].includes(u.phongBan)}

@@ -168,28 +168,13 @@ describe('đồng bộ quyền Drive theo danh sách nhân viên', () => {
   });
 });
 
-describe('tạm ẩn Thư mục làm việc (19/11)', () => {
-  it('chỉ CEO, Kế toán trưởng, quản lý HCNS / Ban điều hành còn thấy', async () => {
-    const { tmAllowed } = await import('../../src/server/lib/driveAccess');
-    expect(tmAllowed(null, true)).toBe(true);
-    expect(tmAllowed({ role: 'truongphong', title: 'Kế toán trưởng', phongBan: 'KT' }, false)).toBe(true);
-    expect(tmAllowed({ role: 'truongphong', title: 'Trưởng phòng', phongBan: 'BDH' }, false)).toBe(true);
-    expect(tmAllowed({ role: 'lead', phongBan: 'HCNS' }, false)).toBe(true);
-    expect(tmAllowed({ role: 'lead', title: 'Trưởng nhóm', phongBan: 'CM' }, false)).toBe(false);
-    expect(tmAllowed({ role: 'nhanvien', title: 'Kế toán kho', phongBan: 'KT' }, false)).toBe(false);
-    expect(tmAllowed({ role: 'nhanvien', phongBan: 'HCNS' }, false)).toBe(false);
-    expect(tmAllowed({ role: 'truongphong', title: 'Kế toán trưởng', active: false }, false)).toBe(false);
+describe('20/11: mở lại Thư mục làm việc cho mọi nhân sự', () => {
+  it('nhân sự đang làm thấy (theo phòng), đã nghỉ / không có hồ sơ thì không', async () => {
+    const { tmAllowed, tmScope } = await import('../../src/server/lib/driveAccess');
+    expect(tmAllowed({ role: 'nhanvien', phongBan: 'SX' }, false)).toBe(true);
+    expect(tmScope({ role: 'content', phongBan: 'CM' }, false)).toBe('all');
+    expect(tmAllowed({ role: 'nhanvien', phongBan: 'SX', active: false }, false)).toBe(false);
     expect(tmAllowed(null, false)).toBe(false);
-  });
-});
-
-describe('20/11: Lead Content thấy lại riêng thư mục Content & Media', () => {
-  it('tmScope', async () => {
-    const { tmScope } = await import('../../src/server/lib/driveAccess');
-    expect(tmScope(null, true)).toBe('all');
-    expect(tmScope({ role: 'lead', title: 'Trưởng nhóm', phongBan: 'CM' }, false)).toEqual(['CM', 'lead:CM']);
-    expect(tmScope({ role: 'content', phongBan: 'CM' }, false)).toEqual([]);
-    expect(tmScope({ role: 'lead', phongBan: 'B2C' }, false)).toEqual([]);
-    expect(tmScope({ role: 'lead', phongBan: 'CM', active: false }, false)).toEqual([]);
+    expect(tmAllowed(null, true)).toBe(true);
   });
 });
