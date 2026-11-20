@@ -30,6 +30,17 @@ export function tmAllowed(user: DriveUser | null, isCeo: boolean): boolean {
   if (/kế toán trưởng/i.test(user.title ?? '')) return true;
   return LEAD_ROLES.includes(user.role ?? '') && ['HCNS', 'BDH'].includes(user.phongBan ?? '');
 }
+
+/** Phòng đã mở lại cho trưởng nhóm / trưởng phòng của chính phòng đó (chị Hoa 20/11/2026: Content & Media trước). */
+export const TM_LEAD_OPEN = ['CM'];
+
+/** Trong lúc tạm ẩn: 'all' = thấy như trước; danh sách = chỉ thấy thư mục các phòng này (không gồm tư liệu chung). */
+export function tmScope(user: DriveUser | null, isCeo: boolean): 'all' | string[] {
+  if (tmAllowed(user, isCeo)) return 'all';
+  if (!user || user.active === false) return [];
+  const pb = user.phongBan ?? '';
+  return LEAD_ROLES.includes(user.role ?? '') && TM_LEAD_OPEN.includes(pb) ? [pb] : [];
+}
 const ID_RE = /^[A-Za-z0-9_-]{10,80}$/;
 
 /** Lấy mã thư mục từ đường link Drive dán vào (hoặc chính mã). Không nhận ra thì trả null. */

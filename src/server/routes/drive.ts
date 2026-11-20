@@ -10,7 +10,7 @@ import {
   normalizeConfig,
   rootsFor,
   teamsFor as teamsForAll,
-  tmAllowed,
+  tmScope,
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
@@ -83,7 +83,11 @@ async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AuthContext
 }
 
 /* Thư mục người này thấy trong danh sách; đang tạm ẩn (tmAllowed) thì không thấy thư mục nào. */
-const teamsFor = (cfg: DriveConfig, me: HubUser | null, ceo: boolean) => (tmAllowed(me, ceo) ? teamsForAll(cfg, me, ceo) : []);
+const teamsFor = (cfg: DriveConfig, me: HubUser | null, ceo: boolean) => {
+  const sc = tmScope(me, ceo);
+  const all = teamsForAll(cfg, me, ceo);
+  return sc === 'all' ? all : all.filter((t) => sc.includes(t.pb));
+};
 
 function needKey(env: AppEnv['Bindings']) {
   const k = saKey(env.GDRIVE_SA_JSON);
