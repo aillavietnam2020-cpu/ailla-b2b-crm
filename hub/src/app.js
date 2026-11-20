@@ -41,7 +41,13 @@ let _rLast="";
 /* Trang đã ẩn khỏi menu nhưng vẫn mở được khi bấm từ chỗ khác (Phê duyệt, Việc của tôi, Nhật ký chi…).
    Chị Hoa 29/10: ẩn menu xong mà nút dẫn tới trang đó bị đẩy về trang đầu (P&L) là sai luồng. Ẩn trang nào khỏi menu thì thêm vào đây. */
 const NAV_AN_MO=new Set(["cr_vc","cr_s_vc","cr_bill","cr_s_bill","cr_im","cr_import","thongbao","matkhau","anhdaidien"]);
+/* Chị Hoa 20/11: trang nhúng CRM (tạo đơn, khách hàng…) là khung iframe; vẽ lại trang là khung tải lại, mất đơn đang nhập.
+   Các vòng làm mới nền gọi render()/renderMain() khi vẫn đang ở đúng trang đó thì giữ nguyên khung, không vẽ lại. */
+const embKey=()=>PAGE+"|"+MOD+"|"+(typeof CRM_SRC!=="undefined"&&CRM_SRC[PAGE]||"");
+const embKeep=()=>{const f=document.querySelector("#main iframe#crmfr");return !!(f&&f.dataset.k===embKey())};
+const embMark=()=>{const f=document.querySelector("#main iframe#crmfr");if(f)f.dataset.k=embKey()};
 function render(){
+  if(ME&&embKeep())return;
   if(typeof closePop==="function"&&PAGE!=="mh_po")closePop(true);
   if(!ME){renderLogin();return}
   const _m0=$("#main"),_keep=_rLast===PAGE&&_m0&&_m0.childElementCount>0?_rmSave(_m0):null,_y0=window.scrollY;
@@ -52,7 +58,7 @@ function render(){
    <nav>${ADM?navAdmin():menuItems().map(([g,its])=>`<div class="mg">${g}</div>${its.map(([id,t,,cnt])=>{const n=cnt?cnt():"";return `<button class="mi${id===PAGE?" on":""}" data-p="${id}"><span>${t}</span>${n!==""&&n!==0?`<b>${n}</b>`:""}</button>`}).join("")}`).join("")}</nav>
    <div class="me"><b>${esc(ME.name)}</b><span>${esc(ME.title)} · ${ROLES[ME.role]}</span><button class="lnk" id="logout">Đăng xuất</button></div></aside>
    <div class="mainwrap"><header class="topbar"><button class="hamb" id="hamb" aria-label="Mở menu">☰</button><div class="tbslot" id="tbslot"></div>${ADM&&HOST_MODE!=="admin"/* quản trị: bỏ ô Tìm chức năng (chị Hoa 18/11) */?`<div class="srch">${ico("search")}<input id="qs" placeholder="${HOST_MODE==='admin'?'Tìm chức năng…':'Tìm trang, thẻ video, khách hàng…'}" autocomplete="off"><div class="qsr" id="qsr" hidden></div></div>`:`<div class="crumb">${esc((items.find(i=>i[0]===PAGE)||[])[1]||"")}</div>`}<span class="sp"></span>${ADM?`<span class="crumb sm"><span class="cm">${esc(cm.n)}</span>${cm.k!=="exec"?" › "+esc((items.find(i=>i[0]===PAGE)||[])[1]||""):""}</span>`:""}${ADM?periodPicker():`<span class="sync"><i></i>Tháng ${MONTH.mon}/${MONTH.year}</span>`}${ME?`<button class="chatbtn" id="chatbtn" title="Trao đổi nội bộ">💬</button><button class="bell" title="Thông báo">${ico("bell")}${alN?`<b>${alN}</b>`:""}</button>`:""}${typeof SERVER!=="undefined"?`<i id="svsync" class="svsync ok" title="Đã lưu lên máy chủ"></i>`:""}${ADM&&MODULES.some(mo=>mo.k==="aiq"&&modGroups(mo).length)?`<button class="aibtn" data-go="ai" title="Trợ lý AI">${ico("spark")}<span>Trợ lý AI</span></button>`:""}<span class="uchip" id="uchip" title="Của tôi"><i${typeof avsUrl==="function"&&avsUrl(ME.id)?` style="background:url('${avsUrl(ME.id)}') center/cover no-repeat;color:transparent"`:""}>${esc((ME.name||"?").trim().split(" ").pop()[0]||"")}</i><span><b>${esc(ME.name)}</b><small>${esc(ME.title)}</small></span></span></header><main id="main"></main></div>`;
-  $$(".mi").forEach(b=>b.onclick=()=>{PAGE=b.dataset.p;if(typeof CRM_SRC!=="undefined")for(const k in CRM_SRC)delete CRM_SRC[k];if(typeof B2B!=="undefined"){B2B.kh=null;B2B.don=null;B2B.newOrder=null}try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0);document.body.classList.remove("menu-open")});
+  $$(".mi").forEach(b=>b.onclick=()=>{PAGE=b.dataset.p;{const f=document.querySelector("#main iframe#crmfr");if(f)f.dataset.k=""}/* bấm menu: mở lại trang nhúng từ đầu */if(typeof CRM_SRC!=="undefined")for(const k in CRM_SRC)delete CRM_SRC[k];if(typeof B2B!=="undefined"){B2B.kh=null;B2B.don=null;B2B.newOrder=null}try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}render();scrollTo(0,0);document.body.classList.remove("menu-open")});
   $$(".top").forEach(b=>b.onclick=()=>{if(b.dataset.mod===MOD&&b.classList.contains("open")){b.classList.remove("open");const s=b.nextElementSibling;if(s&&s.classList.contains("subnav"))s.remove();return}MOD=b.dataset.mod;PAGE="";_navAuto=true;try{localStorage.setItem(SKEY+"_m",MOD)}catch(e){}render();scrollTo(0,0);if(modGroups(curMod()).flatMap(g=>g[1]).length===1)document.body.classList.remove("menu-open")});
   bindPeriodPicker();
   $$(".bell").forEach(b=>b.onclick=()=>{MOD="exec";PAGE="exec";render()});
@@ -68,7 +74,7 @@ function render(){
   $$(".aibtn").forEach(b=>b.onclick=()=>{MOD="aiq";PAGE="ai";render();scrollTo(0,0)});
   const m=$("#main");PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);bindCommon(m);
   {const pp=document.querySelector(".topbar .pp");if(pp)pp.style.display=window.NO_PP&&NO_PP.has(PAGE)?"none":""}
-  _rLast=PAGE;_rmLast=PAGE;navRecord();
+  _rLast=PAGE;_rmLast=PAGE;navRecord();embMark();
   if(_keep){_rmRestore(m,_keep,_y0);requestAnimationFrame(()=>{_rmRestore($("#main")||m,_keep,_y0)})}
 }
 /* Cửa sổ chi tiết nổi giữa màn hình (chị Hoa 29/10, kiểu Poscake): xem chi tiết một chứng từ (đơn mua…) đè lên danh sách,
@@ -130,7 +136,7 @@ function _rmRestore(m,sv,y){
   window.scrollTo(0,y);
   sv.anc.forEach(([e,t,l,sel,i])=>{let x=e;if(!x.isConnected){x=null;try{x=document.querySelectorAll(sel)[i]}catch(er){}}if(x){x.scrollTop=t;x.scrollLeft=l}});
   sv.inn.forEach(([sel,i,t,l])=>{let el=null;try{el=m.querySelectorAll(sel)[i]}catch(e){}if(el){el.scrollTop=t;el.scrollLeft=l}})}
-function renderMain(){if(!ME)return;const m=$("#main");if(!m){render();return}
+function renderMain(){if(!ME)return;if(embKeep())return;const m=$("#main");if(!m){render();return}
   const top=window.RM_TOP;window.RM_TOP=false;
   const same=_rmLast===PAGE&&m.childElementCount>0&&!top,y=window.scrollY,h=m.offsetHeight,sv=same?_rmSave(m):null;
   if(same)m.style.minHeight=h+"px";
@@ -138,7 +144,7 @@ function renderMain(){if(!ME)return;const m=$("#main");if(!m){render();return}
   if(!PAGES[PAGE]){try{localStorage.removeItem(SKEY+"_p")}catch(e){}let its=[];try{const mo0=curMod();its=mo0?modGroups(mo0).flatMap(g=>g[1]):[]}catch(e){}const ok=its.find(i=>PAGES[i[0]]);PAGE=ok?ok[0]:(PAGES.exec?"exec":Object.keys(PAGES)[0])}
   m.innerHTML="";PAGES[PAGE](m);if(typeof modTabs==="function")modTabs(m);
   /* Trang không dùng kỳ thời gian (NO_PP, khai ở trang đó) thì ẩn ô chọn ngày trên thanh trên cùng */
-  {const pp=document.querySelector(".topbar .pp");if(pp)pp.style.display=window.NO_PP&&NO_PP.has(PAGE)?"none":""}bindCommon(m);_rmLast=PAGE;navRecord();
+  {const pp=document.querySelector(".topbar .pp");if(pp)pp.style.display=window.NO_PP&&NO_PP.has(PAGE)?"none":""}bindCommon(m);_rmLast=PAGE;navRecord();embMark();
   if(same){_rmRestore(m,sv,y);m.style.minHeight="";_rmRestore(m,sv,y);requestAnimationFrame(()=>{_rmRestore(m,sv,y);setTimeout(()=>_rmRestore(m,sv,y),120)})}else{m.style.minHeight="";if(top){window.scrollTo(0,0);const sb=_rmSave(m);}}}
 function bindCommon(m){
   m.querySelectorAll("[data-card]").forEach(e=>e.addEventListener("click",ev=>{if(ev.target.closest("select,input,button:not([data-card]),a"))return;openCard(e.dataset.card)}));
