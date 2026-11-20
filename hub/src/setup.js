@@ -56,7 +56,7 @@ function ensureShape(d){
   d.departments.forEach(p=>{p.phanHe=[...new Set((p.phanHe||[]).flatMap(x=>({dig:["mkt"],pl:["fin"],kt:["fin"],bc:["exec","b2c"],sale:p.k==="B2B"?["b2b"]:["b2c"],setup:["setup"]})[x]||[x]))]});
   crmSeed(d);
   gvSeed(d);cvSeed(d);hrShape(d);aiShape(d);dcShape(d);botShape(d);if(d.mode==="live")d.settings.today=realDay();if(!d.kenhPT)d.kenhPT={};if(!d.strategyExtra)d.strategyExtra=[];
-  const pbOf={u_chi:"BDH",u_digital:"ADS"},nsOf={u_quynh:"NV012"};
+  const pbOf={u_chi:"BDH",u_digital:"ADS"},nsOf={};
   d.users.forEach(u=>{if(u.role==="digital"&&!u.phongBan)u.phongBan="ADS";if(u.phongBan===undefined||u.phongBan==="MKT"||u.phongBan==="DIG"||u.phongBan==="BGD")u.phongBan=pbOf[u.id]||(u.role==="content"||u.role==="lead"?"CM":u.role==="digital"?"ADS":"");if(u.maNS===undefined)u.maNS=nsOf[u.id]||"";if(u.role==="admin")u.perms=ALL_PERMS.slice()});
   if(typeof syncPillars==="function")syncPillars(d);return d;
 }
