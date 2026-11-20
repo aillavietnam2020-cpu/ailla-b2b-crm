@@ -197,7 +197,7 @@ export function planSync(current: DrivePerm[], want: Map<string, DriveRole>, man
     if (!p) add.push({ email, role });
     else if (p.role === 'reader' || p.role === 'commenter') {
       if (role === 'writer') update.push({ id: p.id, email, role });
-    } else if (p.role === 'writer' && role === 'reader' && managed.has(email)) update.push({ id: p.id, email, role });
+    } // 20/11/2026: không hạ quyền sửa → xem nữa; ai được CEO nâng tay trên Drive (vd. Kế toán sửa Kế toán kho) thì giữ.
   }
   for (const p of current) {
     const email = (p.email || '').toLowerCase();

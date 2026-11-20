@@ -115,7 +115,7 @@ export async function syncDrivePermissions(db: D1Database, saJson: string | unde
       continue;
     }
     // Thư mục chỉ CEO xem (không ai cần cấp, web chưa từng cấp ai): bỏ qua, khỏi cần quyền chỉnh sửa.
-    if (!(want.get(t.folderId)?.size) && !(grants[t.folderId]?.length)) continue;
+    if (!(want.get(t.folderId)?.size) && !(grants[t.folderId]?.length) && !left.size) continue;
     const row: SyncResult['folders'][number] = { folder_id: t.folderId, pb: t.pb, added: [], changed: [], removed: [] };
     result.folders.push(row);
     const cur = await listPermissions(key, t.folderId);
