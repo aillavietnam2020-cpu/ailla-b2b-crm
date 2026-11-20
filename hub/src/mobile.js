@@ -252,19 +252,18 @@
   },true);
 })();
 
-/* ===== Điện thoại: mở lại trang từ nền (Safari giữ trang cũ) thì tự hỏi máy chủ có bản mới không, có thì tự tải lại.
-   Không tải lại khi chị đang gõ dở (ô nhập có chữ) — lúc đó vẫn hiện nút "Tải lại ngay" như cũ. ===== */
+/* ===== Chị Hoa 20/11: web KHÔNG tự tải lại nữa (Thảo đang lập đơn bị tải lại cả chục lần).
+   Quay lại tab/mở lại từ nền: chỉ hỏi máy chủ có bản mới không, có thì hiện thanh "Có bản web mới — Tải lại ngay".
+   Người dùng tự bấm mới tải bản mới. ===== */
 (function(){
-  if(typeof window==="undefined"||!window.matchMedia)return;
+  if(typeof window==="undefined")return;
   let busy=false;
-  const editing=()=>{if(typeof svTyping==="function"&&svTyping())return true;const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&(a.value||"").length>0)return true;
-    return [...document.querySelectorAll("textarea")].some(t=>(t.value||"").trim().length>2)};
   const check=async()=>{
-    if(busy||document.hidden||typeof BUILD_ID==="undefined")return;busy=true;
+    if(busy||document.hidden||typeof BUILD_ID==="undefined"||document.getElementById("newver"))return;busy=true;
     try{const j=await fetch("/hub/build",{cache:"no-store",credentials:"same-origin"}).then(r=>r.json());
-      if(j&&j.build&&j.build!==BUILD_ID&&!editing()){
-        const k="mob_reload_"+j.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1")}catch(e){}
-        location.reload()}}catch(e){}finally{busy=false}};
+      if(j&&j.build&&j.build!==BUILD_ID&&!document.getElementById("newver")){
+        const d=document.createElement("div");d.id="newver";d.className="newver";d.innerHTML="Có bản web mới <button type=\"button\">Tải lại ngay</button>";
+        d.querySelector("button").onclick=()=>location.reload();document.body.appendChild(d)}}catch(e){}finally{busy=false}};
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)setTimeout(check,400)});
   window.addEventListener("pageshow",e=>{if(e.persisted)setTimeout(check,400)});
 })();
