@@ -109,7 +109,11 @@ export async function syncDrivePermissions(db: D1Database, saJson: string | unde
   };
   for (const t of cfg.teams) {
     // Gốc ổ dùng chung (mã bắt đầu "0A"): cấp ở đây là thêm thành viên cả ổ — CEO tự thêm trên Drive, web không đụng.
-    if (/^0A/.test(t.folderId)) continue;
+    if (/^0A/.test(t.folderId)) {
+      // Chạy thử: kê email cần thêm làm thành viên ổ để CEO tự thêm trên Drive.
+      if (dry) result.folders.push({ folder_id: t.folderId, pb: t.pb, added: [...(want.get(t.folderId)?.keys() ?? [])], changed: [], removed: [], error: 'Gốc ổ dùng chung: CEO tự thêm thành viên trên Drive.' });
+      continue;
+    }
     // Thư mục chỉ CEO xem (không ai cần cấp, web chưa từng cấp ai): bỏ qua, khỏi cần quyền chỉnh sửa.
     if (!(want.get(t.folderId)?.size) && !(grants[t.folderId]?.length)) continue;
     const row: SyncResult['folders'][number] = { folder_id: t.folderId, pb: t.pb, added: [], changed: [], removed: [] };
