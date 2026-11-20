@@ -316,10 +316,12 @@ orderRoutes.put('/:id', requirePermission('order.create', 'order.create.team'), 
   const auth = c.get('auth');
   const input = parseInput(orderUpdateSchema, await c.req.json().catch(() => ({})));
   const config = await loadConfig(c.env.DB);
-  const result = await updateOrder(c.env.DB, config, auth, c.req.param('id'), input, {
-    requestId: c.get('requestId'),
-    ip: clientIp(c.req.raw.headers),
-  });
+  const ctx = { requestId: c.get('requestId'), ip: clientIp(c.req.raw.headers) };
+  const result = await updateOrder(c.env.DB, config, auth, c.req.param('id'), input, ctx);
+  // Chị Hoa 20/11: người có quyền duyệt sửa đơn thì không phải chờ duyệt lại (kể cả vượt hạn mức công nợ).
+  if (result.needs_approval && (await autoApproveOwn(c.env.DB, config, auth, c.req.param('id'), ctx))) {
+    return ok(c, { ...result, needs_approval: false, auto_approved: true });
+  }
   return ok(c, result);
 });
 
@@ -348,38 +350,9 @@ orderRoutes.post('/:id/submit', requirePermission('order.submit'), async (c) => 
     ctx,
   );
   // Chị Hoa chốt 27/10: đơn Sale tạo thì Quản lý duyệt; đơn do chính người có quyền duyệt (Quản lý, CEO) tạo
-  // thì mặc định coi như đã duyệt. Chỉ các yêu cầu mức Quản lý được tự duyệt; yêu cầu vượt ngưỡng CEO vẫn chờ.
-  if (
-    config.allowSelfApproval &&
-    auth.permissions.includes('order.approve.normal') &&
-    result.approvals.length > 0 &&
-    result.approvals.every((a) => canDecideApproval(auth.user.role, a.required_role as 'MANAGER' | 'CEO'))
-  ) {
-    const pend = await c.env.DB
-      .prepare(`SELECT id FROM approvals WHERE entity_type = 'ORDER' AND entity_id = ? AND status = 'PENDING'`)
-      .bind(c.req.param('id'))
-      .all<{ id: string }>();
-    const before = await c.env.DB
-      .prepare('SELECT flow_on, kho_status FROM orders WHERE id = ?')
-      .bind(c.req.param('id'))
-      .first<{ flow_on: number; kho_status: string }>();
-    let last: { approval_status: string; order_status?: string } | null = null;
-    for (const a of pend.results ?? []) {
-      last = await decideApproval(c.env.DB, auth, a.id, 'APPROVED', 'Người lập đơn có quyền duyệt: tự duyệt mặc định', {
-        ...ctx,
-        allowSelfApproval: true,
-      });
-    }
-    if (last?.order_status === 'APPROVED') {
-      // Đơn qua luồng kho: duyệt sẵn nhưng kho vẫn phải kiểm hàng trước, kho báo đủ mới sang chờ xuất.
-      if (Number(before?.flow_on) === 1 && before?.kho_status && before.kho_status !== 'CHO_XUAT') {
-        await c.env.DB
-          .prepare(`UPDATE orders SET kho_status = 'CHO_KIEM_KHO' WHERE id = ? AND kho_status = 'CHO_XUAT'`)
-          .bind(c.req.param('id'))
-          .run();
-      }
-      result = { status: 'APPROVED', approvals: [], auto_approved: true };
-    }
+  // thì mặc định coi như đã duyệt (20/11: kể cả vượt hạn mức công nợ). Yêu cầu mức CEO khác (giá…) vẫn chờ.
+  if (result.approvals.length > 0 && (await autoApproveOwn(c.env.DB, config, auth, c.req.param('id'), ctx))) {
+    result = { status: 'APPROVED', approvals: [], auto_approved: true };
   }
   await completeIdempotent(c.env.DB, key, result);
   return ok(c, result);
@@ -539,3 +512,37 @@ approvalRoutes.post('/:id/decide', requirePermission('order.approve.normal', 'or
   );
   return ok(c, result);
 });
+
+/** Người lập/sửa đơn có quyền duyệt đơn: tự duyệt các yêu cầu đang chờ nếu mình duyệt được hết. Trả true nếu đơn đã duyệt. */
+async function autoApproveOwn(
+  db: D1Database,
+  config: { allowSelfApproval: boolean },
+  auth: AppEnv['Variables']['auth'],
+  orderId: string,
+  ctx: { requestId: string; ip: string | null },
+): Promise<boolean> {
+  if (!config.allowSelfApproval || !auth.permissions.includes('order.approve.normal')) return false;
+  const pend = await db
+    .prepare(`SELECT id, required_role FROM approvals WHERE entity_type = 'ORDER' AND entity_id = ? AND status = 'PENDING'`)
+    .bind(orderId)
+    .all<{ id: string; required_role: string }>();
+  const L = pend.results ?? [];
+  if (!L.length || !L.every((a) => canDecideApproval(auth.user.role, a.required_role as 'MANAGER' | 'CEO'))) return false;
+  const before = await db
+    .prepare('SELECT flow_on, kho_status FROM orders WHERE id = ?')
+    .bind(orderId)
+    .first<{ flow_on: number; kho_status: string }>();
+  let last: { approval_status: string; order_status?: string } | null = null;
+  for (const a of L) {
+    last = await decideApproval(db, auth, a.id, 'APPROVED', 'Người lập đơn có quyền duyệt: tự duyệt mặc định', {
+      ...ctx,
+      allowSelfApproval: true,
+    });
+  }
+  if (last?.order_status !== 'APPROVED') return false;
+  // Đơn qua luồng kho: duyệt sẵn nhưng kho vẫn phải kiểm hàng trước, kho báo đủ mới sang chờ xuất.
+  if (Number(before?.flow_on) === 1 && before?.kho_status && before.kho_status !== 'CHO_XUAT') {
+    await db.prepare(`UPDATE orders SET kho_status = 'CHO_KIEM_KHO' WHERE id = ? AND kho_status = 'CHO_XUAT'`).bind(orderId).run();
+  }
+  return true;
+}

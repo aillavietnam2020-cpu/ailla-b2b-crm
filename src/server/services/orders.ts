@@ -673,7 +673,8 @@ export async function submitOrder(
   if (limitCheck.officialExceeded || limitCheck.projectedExceeded) {
     requests.push({
       rule: limitCheck.officialExceeded ? 'DEBT_LIMIT_EXCEEDED' : 'PROJECTED_DEBT_EXCEEDED',
-      role: limitCheck.requiredRole ?? 'CEO',
+      // Chị Hoa 20/11: người lập/sửa đơn có quyền duyệt đơn tự duyệt luôn cả đơn vượt hạn mức công nợ.
+      role: auth.permissions.includes('order.approve.normal') ? 'MANAGER' : (limitCheck.requiredRole ?? 'CEO'),
       reason: limitCheck.message ?? 'Vượt hạn mức công nợ',
       payload: {
         limit: limitCheck.limit,
@@ -1378,7 +1379,7 @@ export async function updateOrder(
       if (limitCheck.officialExceeded || limitCheck.projectedExceeded) {
         requests.push({
           rule: limitCheck.officialExceeded ? 'DEBT_LIMIT_EXCEEDED' : 'PROJECTED_DEBT_EXCEEDED',
-          role: limitCheck.requiredRole ?? 'CEO',
+          role: auth.permissions.includes('order.approve.normal') ? 'MANAGER' : (limitCheck.requiredRole ?? 'CEO'),
           reason: limitCheck.message ?? 'Vượt hạn mức công nợ',
           payload: {
             limit: limitCheck.limit,
