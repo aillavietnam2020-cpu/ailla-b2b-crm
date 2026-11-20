@@ -75,11 +75,19 @@ async function loadConfig(db: D1Database): Promise<DriveConfig> {
   }
 }
 
-async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AuthContext }) {
+async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AuthContext; req?: { query: (k: string) => string | undefined; method?: string } }) {
   const auth = c.get('auth');
   const hub = await hubPeople(c.env.DB);
   const me = hub.users.find((u) => u.crm && u.crm === auth.user.id) ?? null;
-  return { auth, me, ceo: isCeo(auth, me), depts: hub.depts };
+  const ceo = isCeo(auth, me);
+  // CEO kiểm thử "xem như" một nhân sự (?as=<mã người dùng khu chung>): chỉ dùng cho danh sách thư mục, không sửa được gì.
+  const as = ceo && c.req?.method === 'GET' ? c.req.query('as') : undefined;
+  if (as) {
+    const u = hub.users.find((x) => x.id === as);
+    if (!u) throw notFound('Không thấy người này.');
+    return { auth, me: u, ceo: isCeo({ user: { ...auth.user, role: 'EMPLOYEE' } } as AuthContext, u), depts: hub.depts, viewAs: true };
+  }
+  return { auth, me, ceo, depts: hub.depts, viewAs: false };
 }
 
 /* Thư mục người này thấy trong danh sách; đang tạm ẩn (tmAllowed) thì không thấy thư mục nào. */

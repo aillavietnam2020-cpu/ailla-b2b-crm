@@ -20,7 +20,7 @@ import { addPermission, listPermissions, removePermission, saKey, setPermissionR
  */
 const GRANTS_KEY = 'drive_grants';
 
-type HubUser = { role?: string; maNS?: string; active?: boolean };
+type HubUser = { role?: string; maNS?: string; active?: boolean; crm?: string; phongBan?: string; name?: string };
 export type SyncResult = {
   ok: boolean;
   message?: string;
@@ -41,11 +41,27 @@ export async function loadStaff(db: D1Database): Promise<{ staff: StaffRow[]; na
   const leads = new Set((d.users ?? []).filter((u) => u.active !== false && u.maNS && ['lead', 'truongphong'].includes(u.role ?? '')).map((u) => u.maNS as string));
   // Tài khoản web đã khóa ("Đã nghỉ việc" ở Tài khoản & phân quyền) mà có gắn mã nhân viên: coi như đã nghỉ.
   const locked = new Set((d.users ?? []).filter((u) => u.active === false && u.maNS).map((u) => u.maNS as string));
+  // Email tài khoản web (trang quản trị › Người dùng): dùng khi hồ sơ nhân sự chưa có email (chị Hoa 20/11/2026).
+  const acc = await db.prepare("SELECT id, email FROM users WHERE deleted_at IS NULL AND kind = 'HUMAN' AND status = 'ACTIVE'").all<{ id: string; email: string | null }>();
+  const accMail = new Map((acc.results ?? []).map((r) => [r.id, String(r.email ?? '')]));
+  const users = d.users ?? [];
+  const byNs = new Map(users.filter((u) => u.maNS && u.crm).map((u) => [u.maNS as string, u]));
   const names = new Map<string, string>();
-  const staff = (d.staff ?? []).map((s) => {
+  const staff: StaffRow[] = (d.staff ?? []).map((s) => {
     names.set(s.ma, s.ten ?? s.ma);
-    return { ma: s.ma, pb: s.pb ?? '', tt: locked.has(s.ma) ? 'Đã nghỉ' : (s.tt ?? ''), email: ns[s.ma]?.hs?.email ?? '', lead: leads.has(s.ma) };
+    const u = byNs.get(s.ma);
+    const email = ns[s.ma]?.hs?.email || (u?.crm ? accMail.get(u.crm) : '') || '';
+    return { ma: s.ma, pb: s.pb ?? '', tt: locked.has(s.ma) ? 'Đã nghỉ' : (s.tt ?? ''), email, lead: leads.has(s.ma) };
   });
+  // Tài khoản web đang mở, có phòng ban nhưng chưa gắn mã nhân viên (vd. trưởng nhóm mới): vẫn cấp theo phòng của tài khoản.
+  for (const u of users) {
+    if (u.maNS || !u.crm || u.active === false || !u.phongBan || u.role === 'admin') continue;
+    const email = accMail.get(u.crm);
+    if (!email) continue;
+    const ma = `tk:${u.crm}`;
+    names.set(ma, u.name ?? ma);
+    staff.push({ ma, pb: u.phongBan, tt: '', email, lead: ['lead', 'truongphong'].includes(u.role ?? '') });
+  }
   return { staff, names };
 }
 
