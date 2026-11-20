@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo giao việc video</title>
+<style>
+:root{--bg:#f5f6fb;--card:#fff;--line:#e6e9f2;--ink:#1f2340;--mut:#6b7280;--pri:#4b54d1;--grn:#2f9e5b;--red:#d92d20;--amb:#b45309;--pnk:#c2185b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 2px}.sub{color:var(--mut);margin:0 0 14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 14px;cursor:pointer;font-weight:600}.tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 8px}.hint{color:var(--mut);font-size:12.5px}
+.why{background:#fff8e6;border:1px solid #f5d98a;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13.5px}
+.why b{color:#7a4b00}
+.kp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.kp>div{border:1px solid var(--line);border-radius:12px;padding:8px 12px}.kp span{display:block;color:var(--mut);font-size:12px}.kp b{font-size:22px}.kp .hl{background:#eef0ff;border-color:var(--pri)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th{color:var(--mut);font-weight:500;font-size:12px;text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}td{padding:7px 8px;border-bottom:1px solid #eef0f6;vertical-align:middle}td.n,th.n{text-align:right}
+.pill{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600}.g{background:#e7f6ee;color:var(--grn)}.b{background:#e8ecff;color:var(--pri)}.a{background:#fff3df;color:var(--amb)}.r{background:#fde8e6;color:var(--red)}.v{background:#f3e8ff;color:#7e22ce}.x{background:#eef0f4;color:#555}
+.bar{display:inline-block;width:110px;height:8px;border-radius:99px;background:#e6e9f2;overflow:hidden;vertical-align:middle;position:relative}.bar i{display:block;height:100%;background:var(--grn)}.bar i.over{background:#16a34a}
+.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;cursor:pointer;font-weight:600;font-size:13px}.btn.pri{background:var(--pri);color:#fff;border-color:var(--pri)}
+select,input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fff}
+input.num{width:64px;text-align:right}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mix{display:flex;gap:8px;flex-wrap:wrap}.mix label{border:1px solid var(--line);border-radius:10px;padding:5px 10px;background:#fafbff}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cmp>div{border-radius:12px;padding:10px 12px;font-size:13px}.old{background:#fdf0ef;border:1px solid #f4c7c2}.new{background:#eaf7f0;border:1px solid #bfe6cf}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2340;color:#fff;padding:9px 16px;border-radius:10px;display:none}
+.plus{color:var(--grn);font-weight:700}
+@media(max-width:720px){.kp{grid-template-columns:repeat(2,minmax(0,1fr))}.cmp{grid-template-columns:1fr}.wrap{padding:12px}table{font-size:12.5px}}
+</style></head><body><div class="wrap">
+<h1>Demo: giao việc video không sinh dòng trống</h1>
+<p class="sub">Ví dụ Tinh dầu giặt sấy · Ailla Việt Nam Store · tháng 11.</p><div class="why" style="background:#eef0ff;border-color:#c7cbf5"><b style="color:#2f3470">Đây là bản thử.</b> Bấm gì cũng không ghi vào web thật, tải lại trang là về như ban đầu. Thử xong góp ý cho Lead Content.</div>
+
+<div class="why"><b>Đang vướng ở web thật (số liệu 20/11):</b> web tạo sẵn dòng trống bằng đúng KPI rồi tự xóa dòng vượt KPI. Ailla Việt Nam Store có KPI 150, đang có 151 dòng, trong đó <b>45 dòng One shot trống</b>. Via 1 có KPI 60 và đúng 60 dòng (13 dòng trống). Ở Via 2, <b>17 dòng Nhân bản win không dòng nào dùng nút chọn video mẫu hay Hypit</b>: nhân sự đều tự dán link như video thường. Từ đầu tháng, web đã 10 lần tự tạo hoặc tự bỏ dòng.</div>
+
+<div class="tabs" id="tabs"></div>
+<div id="v"></div>
+<div class="toast" id="t"></div>
+</div>
+<script>
+const P=[{id:"may",n:"May"},{id:"linh",n:"Tống Linh"},{id:"quynh",n:"Quỳnh"}];
+const S={tab:0,kpi:65,ton:30,giao:[{id:1,who:"may",sl:15,dang:"One shot",han:"25/11"},{id:2,who:"linh",sl:12,dang:"One shot",han:"25/11"},{id:3,who:"quynh",sl:8,dang:"Nhân bản win",han:"27/11"}],
+ vids:[]};
+const DANG=["One shot","Review / voice off","Không quay · Worker","Reup","Nhân bản win","Outsource"];
+const ST=[["Chờ duyệt","a"],["Đã duyệt","g"],["Đã đăng","b"],["Cần sửa","r"]];
+// video thật đã nộp: May 18 (vượt), Linh 9, Quỳnh 5
+(function(){let k=1201;const add=(who,n,dang,stw)=>{for(let i=0;i<n;i++){S.vids.push({id:"TT-"+(k++),who,dang:dang(i),st:stw(i),mau:dang(i)==="Nhân bản win"&&i%2===0?"tiktok.com/@ailla/video/76…(mẫu)":""})}};
+ add("may",18,i=>i<16?"One shot":"Nhân bản win",i=>i<9?2:i<15?1:0);
+ add("linh",9,()=>"One shot",i=>i<4?2:i<7?1:i<8?3:0);
+ add("quynh",5,i=>i<4?"Nhân bản win":"One shot",i=>i<2?2:i<4?1:0)})();
+const $=s=>document.querySelector(s),nm=id=>P.find(p=>p.id===id).n;
+const toast=m=>{const t=$("#t");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",2200)};
+const done=v=>v.st===1||v.st===2;
+const bar=(a,b)=>`<span class="bar"><i class="${a>b?"over":""}" style="width:${b?Math.min(100,a/b*100):0}%"></i></span>`;
+const TABS=["① Kế hoạch kênh","② Giao việc (phiếu)","③ Bảng video","④ Năng suất nhân sự","⑤ So với cách cũ"];
+function draw(){
+ $("#tabs").innerHTML=TABS.map((t,i)=>`<button class="${S.tab===i?"on":""}" data-tab="${i}">${t}</button>`).join("");
+ const moi=Math.max(0,S.kpi-S.ton),giaoT=S.giao.reduce((a,g)=>a+g.sl,0),nop=S.vids.length,duyet=S.vids.filter(done).length,dang=S.vids.filter(v=>v.st===2).length;
+ let h="";
+ if(S.tab===0){h=`<div class="card"><h2>Kế hoạch kênh = chỉ tiêu, không phải số dòng</h2>
+  <div class="row" style="margin-bottom:10px"><label>KPI đăng tháng <input class="num" id="kpi" type="number" value="${S.kpi}"></label><label>Video tồn dùng được <input class="num" id="ton" type="number" value="${S.ton}"></label><span class="hint">Sửa số nào cũng được, web không tự tạo hay xóa dòng nào.</span></div>
+  <div class="kp"><div><span>KPI đăng</span><b>${S.kpi}</b></div><div><span>Lấy từ kho tồn</span><b>${S.ton}</b></div><div class="hl"><span>Cần làm mới tối thiểu</span><b>${moi}</b></div><div><span>Đã giao cho nhân sự</span><b>${giaoT}</b> <small class="${giaoT>=moi?"plus":""}">${giaoT>moi?"+"+(giaoT-moi)+" dự phòng":giaoT<moi?"còn "+(moi-giaoT)+" chưa giao":"đủ"}</small></div></div>
+  <p class="hint" style="margin-top:10px">Tỷ lệ dạng (One shot, Nhân bản…) chỉ là gợi ý để Lead nhìn. Đổi kế hoạch từ Nhân bản sang One shot thì sửa phiếu giao ở bước ②, không có dòng nào phải xóa.</p>
+  <div class="mix">${DANG.map(d=>`<label>${d} <b>${S.vids.filter(v=>v.dang===d).length}</b> <span class="hint">đã có</span></label>`).join("")}</div></div>`}
+ if(S.tab===1){h=`<div class="card"><h2>Phiếu giao: mỗi người một dòng, không tạo dòng trống</h2>
+  <p class="hint">Lead giao số lượng, dạng và hạn. Video chỉ hiện ở bảng ③ khi nhân sự nộp link. Làm vượt phiếu vẫn nộp bình thường.</p>
+  <table><tr><th>Nhân sự</th><th>Dạng</th><th class="n">Giao</th><th class="n">Đã nộp</th><th class="n">Đã duyệt</th><th>Tiến độ</th><th>Hạn</th><th></th></tr>
+  ${S.giao.map(g=>{const vs=S.vids.filter(v=>v.who===g.who),n=vs.length,du=vs.filter(done).length;return `<tr><td><b>${nm(g.who)}</b></td><td><select data-gd="${g.id}">${DANG.map(d=>`<option ${d===g.dang?"selected":""}>${d}</option>`).join("")}</select></td><td class="n"><input class="num" type="number" data-gs="${g.id}" value="${g.sl}"></td><td class="n">${n}</td><td class="n">${du}</td><td>${bar(du,g.sl)} ${du>g.sl?`<span class="plus">+${du-g.sl}</span>`:""}</td><td>${g.han}</td><td><button class="btn" data-gx="${g.id}">Bỏ</button></td></tr>`}).join("")}
+  </table><div class="row" style="margin-top:10px"><select id="nw">${P.map(p=>`<option value="${p.id}">${p.n}</option>`).join("")}</select><input class="num" id="ns" type="number" value="5"><select id="nd">${DANG.map(d=>`<option>${d}</option>`).join("")}</select><button class="btn pri" id="add">＋ Giao thêm</button></div>
+  <p class="hint">Giao trùng người, trùng dạng thì cộng vào phiếu cũ. Phiếu cũng hiện ở Công việc của nhân sự và có nhắc hạn như việc thường.</p></div>`}
+ if(S.tab===2){h=`<div class="card"><h2>Bảng video: chỉ video thật đã nộp (${nop})</h2>
+  <p class="hint">Nhân bản win là video thường: nhân sự tự dán link video làm xong. Ô "Video mẫu" là tùy chọn và tách riêng, không dùng chung ô link nộp. Dạng đổi được ngay trên dòng.</p>
+  <div class="row" style="margin:8px 0"><button class="btn pri" id="nop">⬆ Nhập nhanh link video</button><span class="hint">Thử: bấm để Quỳnh nộp thêm 1 video</span></div>
+  <div style="overflow-x:auto"><table><tr><th>Mã</th><th>Người làm</th><th>Dạng</th><th>Video mẫu (tùy chọn)</th><th>Link video nộp</th><th>Trạng thái</th></tr>
+  ${S.vids.slice().reverse().slice(0,14).map(v=>`<tr><td>${v.id}</td><td>${nm(v.who)}</td><td><select data-vd="${v.id}">${DANG.map(d=>`<option ${d===v.dang?"selected":""}>${d}</option>`).join("")}</select></td><td class="hint">${v.mau||"—"}</td><td><a href="#" onclick="return false">drive.google.com/…</a></td><td><span class="pill ${ST[v.st][1]}">${ST[v.st][0]}</span></td></tr>`).join("")}
+  </table></div><p class="hint">Đang hiện 14 video mới nhất trên ${nop}.</p></div>`}
+ if(S.tab===3){const R=P.map(p=>{const vs=S.vids.filter(v=>v.who===p.id),g=S.giao.filter(x=>x.who===p.id).reduce((a,x)=>a+x.sl,0),du=vs.filter(done).length;return {p,g,nop:vs.length,cho:vs.filter(v=>v.st===0).length,sua:vs.filter(v=>v.st===3).length,du,dang:vs.filter(v=>v.st===2).length}});
+  h=`<div class="card"><h2>Năng suất nhân sự: đếm hết, không chặn trần</h2>
+  <div class="kp" style="margin-bottom:10px"><div><span>Kênh: KPI đăng</span><b>${S.kpi}</b></div><div><span>Kênh: đã đăng</span><b>${dang}</b></div><div class="hl"><span>Nhân sự: đã duyệt</span><b>${duyet}</b></div><div><span>Duyệt dư (sang kho tồn tháng sau)</span><b class="plus">${Math.max(0,duyet+S.ton-S.kpi)}</b></div></div>
+  <table><tr><th>Nhân sự</th><th class="n">Được giao</th><th class="n">Đã nộp</th><th class="n">Chờ duyệt</th><th class="n">Cần sửa</th><th class="n">Đã duyệt</th><th>So với giao</th></tr>
+  ${R.map(r=>`<tr><td><b>${r.p.n}</b></td><td class="n">${r.g}</td><td class="n">${r.nop}</td><td class="n">${r.cho}</td><td class="n">${r.sua}</td><td class="n"><b>${r.du}</b></td><td>${bar(r.du,r.g)} ${r.du>r.g?`<span class="plus">vượt +${r.du-r.g}</span>`:r.du<r.g?`<span class="hint">còn ${r.g-r.du}</span>`:"đủ"}</td></tr>`).join("")}</table>
+  <p class="hint">Hai thước đo tách riêng. <b>Nhân sự</b> được tính theo video mình làm và được duyệt, làm vượt thì hiện "vượt +", không bị cắt. <b>Kênh</b> được tính theo số video đăng so với KPI đăng. Video duyệt mà tháng này không đăng hết tự nằm ở Kho video tồn để tháng sau dùng.</p></div>`}
+ if(S.tab===4){h=`<div class="card"><h2>So với cách đang chạy</h2><div class="cmp">
+  <div class="old"><b>Đang chạy</b><br>• KPI 65 → web tạo 65 dòng trống chia theo dạng<br>• Dòng vượt KPI bị tự xóa, số chia bị tự hạ<br>• Đổi Nhân bản sang One shot: phải xóa dòng, tạo dòng<br>• Nhân bản win: phải chọn mẫu, có nút Hypit; ô link mẫu dùng chung với link nộp<br>• Làm dự phòng tháng sau: không có chỗ ghi</div>
+  <div class="new"><b>Đề xuất</b><br>• KPI chỉ là chỉ tiêu; Lead giao số lượng theo người (phiếu)<br>• Không tạo dòng trống, không tự xóa; video hiện khi nộp link<br>• Dạng là nhãn trên từng video, đổi lúc nào cũng được<br>• Nhân bản win như video thường; video mẫu là ô tùy chọn riêng; bỏ nút Hypit khỏi bảng<br>• Duyệt dư tự thành video tồn tháng sau</div></div>
+  <p class="hint" style="margin-top:10px">Khi chuyển: dòng trống chưa ai làm được gộp thành phiếu giao cho đúng người đang giữ (dòng chưa ai giữ thì bỏ). Video đã có link, đã duyệt, đã đăng giữ nguyên.</p></div>`}
+ $("#v").innerHTML=h;bind()}
+function bind(){
+ document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;draw()});
+ const k=$("#kpi");if(k){k.onchange=()=>{S.kpi=+k.value||0;draw()};$("#ton").onchange=e=>{S.ton=+e.target.value||0;draw()}}
+ document.querySelectorAll("[data-gs]").forEach(i=>i.onchange=()=>{S.giao.find(g=>g.id==i.dataset.gs).sl=+i.value||0;draw();toast("Đã sửa số giao, không dòng nào bị tạo hay xóa")});
+ document.querySelectorAll("[data-gd]").forEach(i=>i.onchange=()=>{S.giao.find(g=>g.id==i.dataset.gd).dang=i.value;draw();toast("Đã đổi dạng của phiếu: "+i.value)});
+ document.querySelectorAll("[data-gx]").forEach(b=>b.onclick=()=>{S.giao=S.giao.filter(g=>g.id!=b.dataset.gx);draw()});
+ const a=$("#add");if(a)a.onclick=()=>{const who=$("#nw").value,sl=+$("#ns").value||0,dang=$("#nd").value,o=S.giao.find(g=>g.who===who&&g.dang===dang);if(o)o.sl+=sl;else S.giao.push({id:Date.now(),who,sl,dang,han:"30/11"});draw();toast("Đã giao "+sl+" video "+dang+" cho "+nm(who))};
+ const n=$("#nop");if(n)n.onclick=()=>{S.vids.push({id:"TT-"+(1201+S.vids.length),who:"quynh",dang:"Nhân bản win",st:0,mau:""});draw();toast("Quỳnh nộp 1 video Nhân bản win: vào Chờ duyệt, không cần chọn mẫu")};
+ document.querySelectorAll("[data-vd]").forEach(i=>i.onchange=()=>{S.vids.find(v=>v.id===i.dataset.vd).dang=i.value;toast("Đã đổi dạng video sang "+i.value)});
+}
+draw();
+</script></body></html>
