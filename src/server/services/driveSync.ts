@@ -33,6 +33,8 @@ async function readJson<T>(db: D1Database, sql: string, ...bind: string[]): Prom
   return row ? (JSON.parse(row.data) as T) : null;
 }
 
+const NO_GRANT = new Set(['aillavietnamnoibo@gmail.com', 'aillavietnam2026@gmail.com']);
+
 export async function loadStaff(db: D1Database): Promise<{ staff: StaffRow[]; names: Map<string, string> }> {
   const main = await db.prepare("SELECT data FROM hub_state WHERE id = 'main'").first<{ data: string }>();
   const hr = await db.prepare("SELECT data FROM hub_state WHERE id = 'hr'").first<{ data: string }>();
@@ -96,7 +98,8 @@ export async function syncDrivePermissions(db: D1Database, saJson: string | unde
   const cfg: DriveConfig = normalizeConfig((await readJson<unknown>(db, 'SELECT data FROM hub_blobs WHERE key = ?', 'drive_teams')) ?? {});
   const { staff, names } = await loadStaff(db);
   const grants = (await readJson<Record<string, string[]>>(db, 'SELECT data FROM hub_blobs WHERE key = ?', GRANTS_KEY)) ?? {};
-  const want = desiredGrants(cfg, staff);
+  // Email chung của công ty không cấp theo phòng (chị Hoa 20/11/2026).
+  const want = desiredGrants(cfg, staff.filter((s) => !NO_GRANT.has(normEmail(s.email))));
   const left = new Set(staff.filter((s) => !isActiveStaff(s)).map((s) => normEmail(s.email)).filter(Boolean));
   const self = key.client_email.toLowerCase();
   const pbs = new Set(cfg.teams.map((t) => t.pb));
