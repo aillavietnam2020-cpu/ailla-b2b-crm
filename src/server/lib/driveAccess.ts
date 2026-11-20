@@ -34,12 +34,15 @@ export function tmAllowed(user: DriveUser | null, isCeo: boolean): boolean {
 /** Phòng đã mở lại cho trưởng nhóm / trưởng phòng của chính phòng đó (chị Hoa 20/11/2026: Content & Media trước). */
 export const TM_LEAD_OPEN = ['CM'];
 
-/** Trong lúc tạm ẩn: 'all' = thấy như trước; danh sách = chỉ thấy thư mục các phòng này (không gồm tư liệu chung). */
+/**
+ * Trong lúc tạm ẩn: 'all' = thấy như trước; danh sách = chỉ thấy thư mục phòng mình + thư mục dùng chung
+ * mà cấu hình ghi người xem "lead:<phòng>" (20/11: chị Hoa mở thêm tư liệu chung cho Lead Content).
+ */
 export function tmScope(user: DriveUser | null, isCeo: boolean): 'all' | string[] {
   if (tmAllowed(user, isCeo)) return 'all';
   if (!user || user.active === false) return [];
   const pb = user.phongBan ?? '';
-  return LEAD_ROLES.includes(user.role ?? '') && TM_LEAD_OPEN.includes(pb) ? [pb] : [];
+  return LEAD_ROLES.includes(user.role ?? '') && TM_LEAD_OPEN.includes(pb) ? [pb, `lead:${pb}`] : [];
 }
 const ID_RE = /^[A-Za-z0-9_-]{10,80}$/;
 

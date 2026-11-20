@@ -86,7 +86,7 @@ async function who(c: { env: AppEnv['Bindings']; get: (k: 'auth') => AuthContext
 const teamsFor = (cfg: DriveConfig, me: HubUser | null, ceo: boolean) => {
   const sc = tmScope(me, ceo);
   const all = teamsForAll(cfg, me, ceo);
-  return sc === 'all' ? all : all.filter((t) => sc.includes(t.pb));
+  return sc === 'all' ? all : all.filter((t) => sc.includes(t.pb) || t.viewers.some((v) => sc.includes(v)));
 };
 
 function needKey(env: AppEnv['Bindings']) {

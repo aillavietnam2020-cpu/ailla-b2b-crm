@@ -187,7 +187,7 @@ describe('20/11: Lead Content thấy lại riêng thư mục Content & Media', (
   it('tmScope', async () => {
     const { tmScope } = await import('../../src/server/lib/driveAccess');
     expect(tmScope(null, true)).toBe('all');
-    expect(tmScope({ role: 'lead', title: 'Trưởng nhóm', phongBan: 'CM' }, false)).toEqual(['CM']);
+    expect(tmScope({ role: 'lead', title: 'Trưởng nhóm', phongBan: 'CM' }, false)).toEqual(['CM', 'lead:CM']);
     expect(tmScope({ role: 'content', phongBan: 'CM' }, false)).toEqual([]);
     expect(tmScope({ role: 'lead', phongBan: 'B2C' }, false)).toEqual([]);
     expect(tmScope({ role: 'lead', phongBan: 'CM', active: false }, false)).toEqual([]);
