@@ -50,7 +50,7 @@ function hnToday(s,today){
   return {late,now,done}}
 
 /* ---------- Tab Kế hoạch ---------- */
-const hnDot=(c,t)=>`<span class="hn-dot"><i class="d-${c}"></i>${esc(t)}</span>`;
+const hnDot=(c,t)=>`<span class="hn-dot"><i class="d-${c}"></i><span>${esc(t)}</span></span>`;
 function hnVt(t){
   if(!t)return `<span class="hn-sub">—</span>`;
   if(t.noBom)return hnDot("gry","Chưa có định mức");
@@ -72,16 +72,16 @@ function hnPlan(s,today,T){
   const grp=(t,n,cls="")=>`<tr class="hn-grp ${cls}"><td colspan="${cols}">${t}${n!=null?" · "+n:""}</td></tr>`;
   /* Dòng lệnh đã có (PSX) — Quá hạn / Hôm nay */
   const reqTr=(r,st)=>{const t=hmOf(r.id),lt=r.han&&r.han<today;rank++;
-    return `<tr class="${lt?"hn-late":""}"><td class="hn-drag"></td><td><span class="hn-rank">${rank}</span></td><td class="hn-prod"><b>${esc(sxP(r.sp).ten)}</b><span><span class="mono">${esc(r.id)}</span>${r.ghiChu?" · "+esc(r.ghiChu):""}</span></td>
+    return `<tr class="${lt?"hn-late":""}"><td class="hn-drag"></td><td><span class="hn-rank">${rank}</span></td><td class="hn-prod" title="${esc(sxP(r.sp).ten+(r.ghiChu?" · "+r.ghiChu:""))}"><b>${esc(sxP(r.sp).ten)}</b><span><span class="mono">${esc(r.id)}</span>${r.ghiChu?" · "+esc(r.ghiChu):""}</span></td>
       <td class="n"><b>${r.sl?nf(r.sl):"—"}</b> ${esc(hnUnit(r.sp))}</td><td>${r.nguon?`<span class="hn-tag ${/Gia công|OEM/.test(r.nguon)?"t-oem":/tồn/i.test(r.nguon)?"t-ton":"t-don"}">${esc(r.nguon)}</span>`:""}</td>
       <td>${r.han?(lt?`<b class="hn-red">${esc(sxDd(r.han).slice(0,5))}</b><span class="hn-fix">Trễ ${hnDays(r.han,today)} ngày</span>`:esc(sxDd(r.han).slice(0,5))):"—"}</td><td>${st==="xong"?`<span class="hn-sub">—</span>`:hnVt(t)}</td><td>${hnSt(st)}</td></tr>`};
   /* Dòng việc đề xuất trong lịch (ngày di) */
   const tkTr=(t,di)=>{rank++;const off=HN.off[t.key];
     return `<tr class="${t.late?"hn-late":""}${off?" hn-offr":""}" draggable="true" data-hnit="${esc(t.item)}"><td class="hn-drag" title="Kéo để đổi thứ tự">⋮⋮${di===0?`<input type="checkbox" class="hn-cb" data-hnoff="${esc(t.key)}"${off?"":" checked"} title="Bỏ chọn nếu không làm ngày này">`:""}</td>
       <td><span class="hn-rank">${rank}</span></td>
-      <td class="hn-prod"><b>${esc(t.name)}</b><span>${t.part?esc(t.part)+" · ":""}${esc(t.reason)}</span></td>
+      <td class="hn-prod" title="${esc(t.name+" · "+(t.part?t.part+" · ":"")+t.reason)}"><b>${esc(t.name)}</b><span>${t.part?esc(t.part)+" · ":""}${esc(t.reason)}</span></td>
       <td class="n" title="${t.hoursEst?"Chưa có định mức năng suất, tạm ước "+L.cfg.gioMacDinh+" giờ công":hnR1(t.hours)+" giờ công"}"><b>${nf(t.qty)}</b> ${esc(t.unit)}<span class="hn-sub">${t.hoursEst?"≈ ":""}${hnR1(t.hours)} giờ công</span></td>
-      <td>${hnTag(t)}</td><td>${t.kind==="TON"||!t.due?"—":t.late?`<b class="hn-red">${esc(sxDd(t.due).slice(0,5))}</b><span class="hn-fix">Đề xuất dời giao ${esc(sxDd(L.days[di].date).slice(0,5))}</span>`:esc(sxDd(t.due).slice(0,5))}</td>
+      <td>${hnTag(t)}</td><td>${t.kind==="TON"||!t.due?"—":t.late?`<b class="hn-red">${esc(sxDd(t.due).slice(0,5))}</b><span class="hn-fix" title="Không kịp hạn, đề xuất dời ngày giao">Dời giao ${esc(sxDd(L.days[di].date).slice(0,5))}</span>`:esc(sxDd(t.due).slice(0,5))}</td>
       <td>${hnVt(t)}</td><td>${hnSt(t.kind==="LENH"?"chot":"de")}</td></tr>`};
   const f=HN.f,show=k=>f==null||f===k;
   let body="";
@@ -96,7 +96,7 @@ function hnPlan(s,today,T){
   const TH=L?L.thieu||[]:[];
   const uu=s.cfg&&s.cfg.lich&&s.cfg.lich.uu&&s.cfg.lich.uu.ngay===today;
   const d0=L&&L.days[0];
-  return `<div class="tbl hn-list"><table><thead><tr><th></th><th>#</th><th>Sản phẩm</th><th class="n">Số lượng</th><th>Làm cho</th><th>Hạn giao</th><th>Vật tư</th><th>Trạng thái</th></tr></thead><tbody id="hn-body">${body}</tbody></table></div>
+  return `<div class="tbl hn-list"><table><colgroup><col class="c-dr"><col class="c-rk"><col><col class="c-sl"><col class="c-for"><col class="c-han"><col class="c-vt"><col class="c-st"></colgroup><thead><tr><th></th><th>#</th><th>Sản phẩm</th><th class="n">Số lượng</th><th>Làm cho</th><th>Hạn giao</th><th>Vật tư</th><th>Trạng thái</th></tr></thead><tbody id="hn-body">${body}</tbody></table></div>
     ${sau?`<p class="hint" style="text-align:center">+ ${sau} việc làm tiếp sau ${L.days.length} ngày</p>`:""}
     ${ra.length?`<div class="hn-doi"><b>${pill(ra.length+" đơn / lệnh","red")} quá 30 ngày làm việc vẫn chưa xếp kịp — cần bàn lại với khách:</b> ${ra.map(x=>esc(x.name)+(x.refs.length?" ("+esc(x.refs.join(", "))+")":"")).join(" · ")}</div>`:""}
     ${TH.length?`<details class="hn-det"><summary>${pill(TH.length+" vật tư","amb")} cần chuẩn bị cho lịch (tồn trên web không đủ) — bấm để xem</summary>
@@ -123,7 +123,7 @@ function hnOrders(today){
     const di=L.days.findIndex(d=>d.tasks.some(t=>t.refs.includes(o.order_no)));
     if(di>=0)return `<span class="hn-st s-lam">Chờ sản xuất · ${esc(hnT(L.days[di].date))}</span>`;
     return `<span class="hn-st s-de">Chờ xuất kho</span>`};
-  const card=o=>{const Ls=o.lines||[];return `<div class="hn-ord"><div class="hn-l1"><b>${esc(o.customer_name)}</b>${st(o)}</div><div class="hn-sub"><span class="mono">${esc(o.order_no)}</span> · ${o.kenh==="GIA_CONG"?"Kênh OEM":"Kênh phân phối"} · giao ${esc(sxDd(oDay(o)).slice(0,5))}</div><div class="hn-items">${Ls.slice(0,2).map(l=>esc(l.name)+" ×"+nf(l.qty)).join(" · ")}${Ls.length>2?` · +${Ls.length-2} mã`:""}</div></div>`};
+  const card=o=>{const Ls=o.lines||[];return `<div class="hn-ord" title="${esc(o.customer_name+" · "+Ls.map(l=>l.name+" ×"+l.qty).join(" · "))}"><div class="hn-l1"><b>${esc(o.customer_name)}</b>${st(o)}</div><div class="hn-sub"><span class="mono">${esc(o.order_no)}</span> · ${o.kenh==="GIA_CONG"?"Kênh OEM":"Kênh phân phối"} · giao ${esc(sxDd(oDay(o)).slice(0,5))}</div><div class="hn-items">${Ls.slice(0,2).map(l=>esc(l.name)+" ×"+nf(l.qty)).join(" · ")}${Ls.length>2?` · +${Ls.length-2} mã`:""}</div></div>`};
   const sec=(t,rows,cls="")=>rows.length?`<div class="hn-sec ${cls}">${t} · ${rows.length}</div>`+rows.map(card).join(""):"";
   const h=sec("Trễ hạn",all.filter(o=>oDay(o)<today),"red")+sec("Giao hôm nay",all.filter(o=>oDay(o)===today))+sec("Giao 2 ngày tới",all.filter(o=>oDay(o)>today));
   return h||`<p class="hint">Không có đơn cần xuất trong 2 ngày tới.</p>`}

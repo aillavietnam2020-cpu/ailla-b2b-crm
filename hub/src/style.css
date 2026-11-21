@@ -1163,3 +1163,14 @@ tr.hn-dragging td{opacity:.5;background:#eef4ff}
 .hn-step{display:flex;gap:10px;margin:10px 0}.hn-step i{flex:none;width:24px;height:24px;border-radius:50%;background:#1f4fbf;color:#fff;font-style:normal;font-weight:700;display:grid;place-items:center;font-size:12px}
 @media (max-width:1100px){.hn-main,.hn-two{grid-template-columns:1fr}.hn-week{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:600px){.hn-week{grid-template-columns:repeat(2,minmax(0,1fr))}.hn-phone{padding:8px;border:0;background:none}}
+/* Điều phối SX: bảng lệnh gọn một dòng, cột cố định (21/11) */
+.hn-list table{table-layout:fixed;min-width:860px}.hn-list td,.hn-list th{padding:8px 10px}
+.hn-list col.c-dr{width:58px}.hn-list col.c-rk{width:48px}.hn-list col.c-sl{width:118px}.hn-list col.c-for{width:150px}.hn-list col.c-han{width:140px}.hn-list col.c-vt{width:180px}.hn-list col.c-st{width:96px}
+.hn-list td{overflow:hidden;text-overflow:ellipsis}.hn-list td:nth-child(-n+2){text-overflow:clip}
+.hn-list .hn-prod b,.hn-list .hn-prod>span,.hn-list .hn-fix{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hn-list .hn-prod>span{display:block}
+.hn-list .hn-tag{max-width:100%}
+.hn-list td:nth-child(7){white-space:nowrap}.hn-list td:nth-child(7)>span{display:inline-flex;max-width:calc(100% - 46px);vertical-align:middle}
+.hn-dot>span{overflow:hidden;text-overflow:ellipsis;min-width:0}.hn-dot{max-width:100%}
+.hn-list tr.hn-grp td{white-space:nowrap}
+.hn-ord .hn-l1 b,.hn-ord .hn-sub,.hn-ord .hn-items{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.hn-ord .hn-l1 .hn-st{flex:none}.hn-ord .hn-sub,.hn-ord .hn-items{display:block}
