@@ -29,17 +29,28 @@ const HN_THU=["Chủ nhật","Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Th
 const hnThu=d=>HN_THU[new Date(d+"T00:00:00").getDay()]+" "+d.slice(8,10)+"/"+d.slice(5,7);
 function hnLichHtml(){
   const L=HN.lich;if(HN.lichErr)return `<div class="note red">${esc(HN.lichErr)}</div>`;if(!L)return `<p class="hint">Đang tính lịch…</p>`;
-  const tk=(t,di,ti,first)=>{const k=HN_KIND[t.kind],id=di+"_"+ti,off=HN.off[t.key];
-    return `<li class="hn-tk${off?" off":""}">${first?`<input type="checkbox" data-hnoff="${esc(t.key)}"${off?"":" checked"} title="Bỏ chọn nếu không làm ngày này">`:""}<div class="hn-tkm"><b>${esc(t.name)}</b><span class="hn-q">${nf(t.qty)} ${esc(t.unit)}</span>
-      <div class="hn-sub">${pill(k[0],k[1])} ${esc(t.reason)}${t.part?" · "+esc(t.part):""}${t.late?" "+pill("Trễ so với hạn","red"):""}${t.noBom?" "+pill("Chưa có định mức vật tư","amb"):""}</div></div>
-      <span class="hn-hr">${hnR1(t.hours)} giờ${t.hoursEst?`<small title="Chưa có định mức năng suất, tạm ước ${L.cfg.gioMacDinh} giờ công">ước</small>`:""}</span></li>`};
-  const day=(d,di)=>{const pct=d.cap?Math.min(100,Math.round(d.used/d.cap*100)):0;
-    return `<div class="hn-dcol"><div class="hn-dh"><b>${hnThu(d.date)}</b><span>${hnR1(d.used)} / ${hnR1(d.cap)} giờ công</span></div>
-      <div class="hn-bar"><i style="width:${pct}%" class="${pct>95?"full":""}"></i></div>
-      ${d.tasks.length?`<ul class="hn-tl">${d.tasks.map((t,ti)=>tk(t,di,ti,di===0)).join("")}</ul>`:`<p class="hint">Còn trống, có thể nhận đơn gấp.</p>`}
-      ${di===0&&d.tasks.length?`<button class="btn pri hn-chot" id="hn-chot">Chốt lịch ${hnThu(d.date)}</button>`:""}</div>`};
-  const side=(t,rows,cls)=>rows.length?`<div class="hn-side ${cls}"><b>${t} · ${rows.length}</b><ul>${rows.map(r=>`<li><b>${esc(r.name)}</b> ${nf(r.qty)} ${esc(r.unit)} <span class="hn-sub">${esc(r.reason)}${r.lack&&r.lack.length?` · thiếu: ${r.lack.map(x=>esc(x.name)+" (cần "+nf(x.need)+", còn "+nf(x.have)+")").join("; ")}`:""}</span></li>`).join("")}</ul></div>`:"";
-  return `<div class="hn-days">${L.days.map(day).join("")}</div>${side("Chờ vật tư — chưa xếp lịch",L.waitMat,"amb")}${side("Vượt sức xưởng 3 ngày — cần tăng ca hoặc dời việc khác",L.overflow,"red")}`}
+  /* Mỗi ngày một băng ngang (chị Hoa 21/11): đầu băng là ngày + sức xưởng, dưới là bảng việc. */
+  const tk=(t,first)=>{const k=HN_KIND[t.kind],off=HN.off[t.key];
+    return `<tr class="${off?"hn-offr":""}"><td class="hn-ck">${first?`<input type="checkbox" data-hnoff="${esc(t.key)}"${off?"":" checked"} title="Bỏ chọn nếu không làm ngày này">`:""}</td>
+      <td><b>${esc(t.name)}</b>${t.part?`<div class="hn-sub">${esc(t.part)}</div>`:""}</td><td class="n"><b>${nf(t.qty)}</b> ${esc(t.unit)}</td>
+      <td class="n" style="white-space:nowrap">${hnR1(t.hours)}${t.hoursEst?` <small class="hn-est" title="Chưa có định mức năng suất, tạm ước ${L.cfg.gioMacDinh} giờ công">ước</small>`:""}</td>
+      <td>${pill(k[0],k[1])}</td><td>${esc(t.reason)}</td><td>${t.late?pill("Trễ so với hạn","red")+" ":""}${t.noBom?pill("Chưa có định mức vật tư","gry"):""}${t.lack&&t.lack.length?`<span title="${esc(t.lack.map(x=>x.name).join(", "))}">${pill("Thiếu "+t.lack.length+" vật tư","amb")}</span>`:""}</td></tr>`};
+  /* Chị Hoa 21/11: 3 ngày dàn một hàng ngang; bấm ngày nào thì sổ bảng việc ngày đó. */
+  const sel=Math.min(HN.lichDay||0,L.days.length-1);
+  const chip=(d,di)=>{const pct=d.cap?Math.min(100,Math.round(d.used/d.cap*100)):0,warn=d.tasks.some(t=>t.late);
+    return `<button class="hn-chip${di===sel?" on":""}" data-hnday="${di}"><span class="hn-chiph"><b>${hnThu(d.date)}</b>${di===0?pill("Chốt chiều nay","amb"):pill("Dự kiến","gry")}</span>
+      <span class="hn-bar"><i style="width:${pct}%" class="${pct>95?"full":""}"></i></span>
+      <span class="hn-sub">${d.tasks.length} việc · ${hnR1(d.used)} / ${hnR1(d.cap)} giờ công${warn?` · <b class="hn-red">có việc trễ hạn</b>`:""}</span></button>`};
+  const d=L.days[sel];
+  const TH=L.thieu||[],ov=L.overflow||[];
+  const thieuHtml=TH.length?`<details class="hn-det"><summary>${pill(TH.length+" vật tư","amb")} cần chuẩn bị cho lịch 3 ngày (tồn trên web không đủ) — bấm để xem</summary>
+    <div class="tbl"><table><thead><tr><th>Vật tư</th><th class="n">Cần</th><th class="n">Tồn trên web</th><th class="n">Thiếu</th><th>Dùng cho</th></tr></thead><tbody>${TH.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${nf(x.need)} ${esc(x.unit)}</td><td class="n">${nf(x.have)}</td><td class="n"><b>${nf(x.short)}</b></td><td class="hn-sub">${esc(x.for.slice(0,3).join(", "))}${x.for.length>3?` +${x.for.length-3}`:""}</td></tr>`).join("")}</tbody></table></div></details>`:"";
+  const ovHtml=ov.length?`<details class="hn-det"><summary>${pill(ov.length+" việc","red")} vượt sức xưởng 3 ngày — cần tăng ca hoặc dời việc khác</summary>
+    <div class="tbl"><table><thead><tr><th>Sản phẩm</th><th class="n">Còn lại</th><th class="n">Giờ công</th><th>Lý do</th></tr></thead><tbody>${ov.map(t=>`<tr><td>${esc(t.name)}</td><td class="n">${nf(t.qty)} ${esc(t.unit)}</td><td class="n">${hnR1(t.hours)}</td><td class="hn-sub">${esc(t.reason)}</td></tr>`).join("")}</tbody></table></div></details>`:"";
+  const d0=L.days[0];
+  return `<div class="hn-chips">${L.days.map(chip).join("")}</div><div class="tbl hn-lich"><table><thead><tr><th></th><th>Sản phẩm</th><th class="n">Số lượng</th><th class="n">Giờ công</th><th>Loại việc</th><th>Lý do</th><th>Lưu ý</th></tr></thead><tbody>${d.tasks.length?d.tasks.map(t=>tk(t,sel===0)).join(""):`<tr><td></td><td colspan="6" class="hint">Còn trống, có thể nhận đơn gấp.</td></tr>`}</tbody></table></div>
+    ${sel===0&&d0&&d0.tasks.length?`<div class="hn-act"><span class="hint">Bỏ tích việc không làm, rồi bấm chốt để tạo lệnh sản xuất cho ${hnThu(d0.date)}.</span><span class="sp"></span><button class="btn pri" id="hn-chot">Chốt lịch ${hnThu(d0.date)}</button></div>`:""}
+    ${ovHtml}${thieuHtml}`}
 function hnChot(){
   const L=HN.lich;if(!L)return;const d=L.days[0],pick=d.tasks.filter(t=>!HN.off[t.key]&&t.kind!=="LENH");
   const lenh=d.tasks.filter(t=>!HN.off[t.key]&&t.kind==="LENH");
@@ -101,7 +112,7 @@ function pSxHn(m){
   </div>
   <section class="card"><div class="card-h hn-h"><h2>③ Lịch sản xuất đề xuất 3 ngày</h2><span class="hn-cfg">Sức xưởng <input id="hn-cong" value="${esc(HN.lich?HN.lich.cfg.cong:"")}" inputmode="numeric"> giờ công/ngày · Dự phòng đơn gấp <input id="hn-dp" value="${esc(HN.lich?HN.lich.cfg.duPhong:"")}" inputmode="numeric">% <button class="lnk" id="hn-tinh">Tính lại</button></span></div>
    ${hnLichHtml()}
-   <p class="hint">Thứ tự xếp: đơn sát hạn giao → lệnh sản xuất đang mở → hàng còn dưới ${HN.lich?HN.lich.cfg.minDays:7} ngày bán (làm đủ ${HN.lich?HN.lich.cfg.targetDays:21} ngày). Chỉ xếp việc đủ vật tư theo định mức; việc lớn được chia sang ngày sau. Giờ công lấy theo định mức năng suất (mục ⑤), sản phẩm chưa có định mức tạm ước ${HN.lich?HN.lich.cfg.gioMacDinh:4} giờ.</p></section>
+   <p class="hint">Thứ tự xếp: đơn sát hạn giao → lệnh sản xuất đang mở → hàng còn dưới ${HN.lich?HN.lich.cfg.minDays:7} ngày bán (làm đủ ${HN.lich?HN.lich.cfg.targetDays:21} ngày). Việc thiếu vật tư theo định mức vẫn được xếp, có nhãn "Thiếu vật tư" và danh sách cần chuẩn bị bên trên; việc lớn được chia sang ngày sau. Giờ công lấy theo định mức năng suất (mục ⑤), sản phẩm chưa có định mức tạm ước ${HN.lich?HN.lich.cfg.gioMacDinh:4} giờ.</p></section>
   <section class="card"><div class="card-h hn-h"><h2>④ Báo cáo sản lượng</h2><label class="hn-day">Ngày báo cáo <input type="date" id="hn-day" value="${esc(day)}" max="${esc(today)}"></label></div>
    <div class="tbl hn-log"><table><thead><tr><th>#</th><th>Công việc / sản phẩm</th><th>Số lao động</th><th>Bắt đầu</th><th>Kết thúc</th><th>Sản lượng</th><th class="n">Giờ công</th><th class="n">Năng suất / giờ công</th><th>Ghi chú</th><th></th></tr></thead>
    <tbody>${logRows.join("")}</tbody>
@@ -119,8 +130,9 @@ function pSxHn(m){
   m.querySelectorAll("[data-hndel]").forEach(b=>b.onclick=()=>{HN.draft.splice(+b.dataset.hndel,1);if(!HN.draft.length)HN.draft.push({sp:"",nguoi:"",tu:"",den:"",sl:"",ghi:""});HN.dirty=true;renderMain()});
   $("#hn-add").onclick=()=>{const last=HN.draft[HN.draft.length-1]||{};HN.draft.push({sp:"",nguoi:last.nguoi||"",tu:last.den||"",den:"",sl:"",ghi:""});HN.dirty=true;renderMain()};
   $("#hn-day").onchange=e=>{if(HN.dirty&&!confirm("Có thay đổi chưa lưu ở ngày đang mở. Bỏ thay đổi và chuyển ngày?")){e.target.value=day;return}HN.day=e.target.value||today;HN.draft=null;HN.dirty=false;renderMain()};
-  m.querySelectorAll("[data-hnoff]").forEach(c=>c.onchange=()=>{if(c.checked)delete HN.off[c.dataset.hnoff];else HN.off[c.dataset.hnoff]=1;c.closest("li").classList.toggle("off",!c.checked)});
+  m.querySelectorAll("[data-hnoff]").forEach(c=>c.onchange=()=>{if(c.checked)delete HN.off[c.dataset.hnoff];else HN.off[c.dataset.hnoff]=1;c.closest("tr").classList.toggle("hn-offr",!c.checked)});
   {const b=$("#hn-chot");if(b)b.onclick=hnChot}
+  m.querySelectorAll("[data-hnday]").forEach(b=>b.onclick=()=>{HN.lichDay=+b.dataset.hnday;renderMain()});
   $("#hn-tinh").onclick=()=>{const cong=+$("#hn-cong").value,dp=+$("#hn-dp").value;
     if(!(cong>0)||!(dp>=0&&dp<100))return toast("Sức xưởng phải lớn hơn 0, dự phòng từ 0 đến 99%");
     sxMut("đặt sức xưởng "+cong+" giờ công/ngày, dự phòng "+dp+"%",s2=>{s2.cfg.lich={...(s2.cfg.lich||{}),cong,duPhong:dp}});

@@ -31,8 +31,9 @@ export interface LichResult {
   today: string;
   cfg: LichCfg;
   days: LichDay[];
-  waitMat: LichTask[];
   overflow: LichTask[];
+  /** Vật tư thiếu cho các việc đã xếp trong 3 ngày (gom theo vật tư). */
+  thieu: Array<{ item: string; name: string; unit: string; need: number; have: number; short: number; for: string[] }>;
 }
 export interface LichCfg { cong: number; duPhong: number; minDays: number; targetDays: number; gioMacDinh: number }
 export const LICH_CFG_DEFAULT: LichCfg = { cong: 64, duPhong: 30, minDays: 7, targetDays: 21, gioMacDinh: 4 };
@@ -154,15 +155,14 @@ export function planLichSx(inp: LichInput): LichResult {
       }
     }
   };
+  // Chị Hoa 21/11: thiếu vật tư không chặn việc khỏi lịch (tồn vật tư trên web chưa đủ tin cậy) — chỉ đánh dấu và gom danh sách cần chuẩn bị.
   const ready: LichTask[] = [];
-  const waitMat: LichTask[] = [];
   for (const t of tasks) {
-    if (t.noBom) { ready.push(t); continue; }
-    const st = new Map(stock);
-    const lack: LichTask['lack'] = [];
-    need(t.item, t.qty, st, lack, 0);
-    if (lack.length) { t.lack = lack; waitMat.push(t); continue; }
-    for (const [k, v] of st) stock.set(k, v);
+    if (!t.noBom) {
+      const lack: LichTask['lack'] = [];
+      need(t.item, t.qty, stock, lack, 0);
+      t.lack = lack.filter((x) => x.need >= 0.01);
+    }
     ready.push(t);
   }
 
@@ -195,7 +195,21 @@ export function planLichSx(inp: LichInput): LichResult {
     if (parts.length > 1) parts.forEach((p, i) => { p.part = `phần ${i + 1}/${parts.length + (left > 0 ? 1 : 0)}`; });
     if (left > 0) overflow.push({ ...t, qty: left, hours: r2(hoursLeft), hoursEst: est });
   }
-  return { today, cfg, days: out, waitMat, overflow };
+  const T = new Map<string, LichResult['thieu'][number]>();
+  const seen = new Set<string>();
+  for (const d of out) for (const t of d.tasks) {
+    if (seen.has(t.key)) continue;
+    seen.add(t.key);
+    for (const x of t.lack) {
+      const a = T.get(x.item) || { item: x.item, name: x.name, unit: un(x.item), need: 0, have: x.have, short: 0, for: [] };
+      a.need = r2(a.need + x.need);
+      a.short = r2(Math.max(0, a.need - a.have));
+      if (!a.for.includes(t.name)) a.for.push(t.name);
+      T.set(x.item, a);
+    }
+  }
+  const thieu = [...T.values()].filter((x) => x.short > 0).sort((a, b) => b.for.length - a.for.length || a.name.localeCompare(b.name));
+  return { today, cfg, days: out, overflow, thieu };
 }
 
 /** Gom dữ liệu thật rồi gọi planLichSx. */

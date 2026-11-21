@@ -42,14 +42,15 @@ describe('lịch sản xuất đề xuất', () => {
     expect(tui.reduce((a, t) => a + t.qty, 0) + r.overflow[0].qty).toBe(19000);
   });
 
-  it('thiếu bán thành phẩm thì xét tiếp vật tư pha chế; thiếu vật tư thì đưa vào Chờ vật tư', () => {
+  it('thiếu bán thành phẩm thì xét tiếp vật tư pha chế; thiếu vật tư vẫn xếp lịch, đánh dấu và gom danh sách cần chuẩn bị', () => {
     const inp = base();
     inp.items.find((i) => i.code === 'BTP189')!.ton = 100; // cần 588 lít → thiếu 488 lít → cần 4,88 kg hương (có 100)
-    expect(planLichSx(inp).waitMat).toHaveLength(0);
+    expect(planLichSx(inp).thieu).toHaveLength(0);
     inp.items.find((i) => i.code === 'HUONG')!.ton = 1;
     const r = planLichSx(inp);
-    expect(r.waitMat[0]).toMatchObject({ item: 'NG10', kind: 'DON' });
-    expect(r.waitMat[0].lack[0]).toMatchObject({ item: 'HUONG' });
+    expect(r.days[0].tasks[0]).toMatchObject({ item: 'NG10', kind: 'DON' });
+    expect(r.days[0].tasks[0].lack[0]).toMatchObject({ item: 'HUONG' });
+    expect(r.thieu[0]).toMatchObject({ item: 'HUONG', have: 1, for: ['Nước giặt 10kg'] });
   });
 
   it('lệnh sản xuất đang mở được tính là hàng sắp có, không đẻ thêm việc theo đơn', () => {
