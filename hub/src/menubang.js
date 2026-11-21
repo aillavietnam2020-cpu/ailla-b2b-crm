@@ -86,7 +86,7 @@
       sx:[["",["sx_tq"]],
         ["Mua hàng",[["mh_po","Đơn mua hàng"],["sx_mh","Đơn mua hàng"],"mh_hd"]],
         ["Kho nguyên vật liệu",[["kho_ton","Tồn kho nguyên vật liệu"],["kho_nhap","Nhập nguyên vật liệu"],["kho_xuat","Phiếu xuất kho"]]],
-        ["Sản xuất",["sx_nc","sx_td",["kho_pc","Pha chế"],["sx_lo","Đóng gói & kiểm kê"],["sx_bc","Báo cáo sản xuất"]]],
+        ["Sản xuất",[["sx_hn","Hôm nay xưởng"],"sx_nc","sx_td",["kho_pc","Pha chế"],["sx_lo","Đóng gói & kiểm kê"],["sx_bc","Báo cáo sản xuất"]]],
         ["Kho thành phẩm",[["kho_ton_tp","Tồn kho thành phẩm"],["kho_nhap_tp","Nhập hàng mua ngoài"],"kho_xuat_b2b","kho_online","kho_hoan",["kho_xuat_tp","Phiếu xuất kho"]]],
         ["Kiểm kê & đối chiếu",[["kho_kk","Kiểm kê tồn"],"kho_nxt","kho_cl"]],
         ["Danh mục",["kho_dm","kho_vo","kho_map","kho_combo","kho_boc"]]],

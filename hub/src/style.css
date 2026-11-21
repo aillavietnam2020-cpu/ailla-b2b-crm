@@ -1087,3 +1087,8 @@ body:has(#tnpop) #ntpop{right:392px}
 .cwpg{display:inline-flex;align-items:center;gap:6px}.cwpg .bar{display:inline-flex;gap:2px;padding:2px;border:1.5px solid #c7ccdc;border-radius:5px}
 .cwpg .bar i{width:9px;height:7px;border-radius:2px;background:#e6e8f0}.cwpg .bar i.on{background:#4b54d1}
 .cwpg.late .bar{border-color:#e7a8a8}.cwpg.late .bar i.on{background:#d23b3b}.cwpg small{font-size:11px;color:#6a7084}
+
+/* Hôm nay xưởng (sxhomnay.js) */
+.hn-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}.hn-kpi{padding:10px 14px;margin:0}.hn-kpi small{display:block;color:var(--mut,#667085)}.hn-kpi b{font-size:20px}
+.hn-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+tr.hn-oth td{background:#f9fafb;color:#475467}

@@ -3623,7 +3623,8 @@ khoRoutes.get('/b2b-pending', async (c) => {
   const orders = await c.env.DB
     .prepare(
       `SELECT o.id, o.order_no, o.order_date, o.need_date, o.ship_date, o.kho_note, o.approved_at, o.flow_on, c.name AS customer_name,
-              u.display_name AS owner_name
+              u.display_name AS owner_name,
+              CASE WHEN c.price_mode = 'CUSTOM' AND c.tier_id IS NULL THEN 'GIA_CONG' ELSE 'B2B' END AS kenh
        FROM orders o JOIN customers c ON c.id = o.customer_id LEFT JOIN users u ON u.id = o.owner_id
        WHERE o.deleted_at IS NULL AND o.approval_status = 'APPROVED'
          AND ((o.flow_on = 1 AND o.kho_status = 'CHO_XUAT') OR (o.flow_on = 0 AND o.delivery_status = 'CHUA_XUAT'))
