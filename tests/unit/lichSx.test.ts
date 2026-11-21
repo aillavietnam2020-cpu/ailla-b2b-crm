@@ -67,4 +67,19 @@ describe('lịch sản xuất đề xuất', () => {
     expect(t.hoursEst).toBe(true);
     expect(t.hours).toBe(4);
   });
+
+  it('mỗi ngày tối đa số mã đặt trước; đơn không kịp hạn thì đề xuất dời ngày giao, không dồn tăng ca', () => {
+    const inp = base();
+    inp.ban = {};
+    inp.cfg = { maxMa: 2 };
+    inp.items.push({ code: 'A', name: 'Hàng A', unit: 'chai', cls: 'TP', ton: 0 }, { code: 'B', name: 'Hàng B', unit: 'chai', cls: 'TP', ton: 0 });
+    inp.bom.push({ product: 'A', item: 'BOT', qty: 0.01 }, { product: 'B', item: 'BOT', qty: 0.01 });
+    inp.orders.push({ order_no: 'DH2', customer: 'NPP X', kenh: 'B2B', ship: '2026-11-23', item: 'A', qty: 10 },
+      { order_no: 'DH3', customer: 'NPP Y', kenh: 'B2B', ship: '2026-11-23', item: 'B', qty: 10 });
+    const r = planLichSx(inp);
+    expect(new Set(r.days[0].tasks.map((t) => t.item)).size).toBe(2);
+    const moved = r.days[1].tasks[0];
+    expect(moved.late).toBe(true);
+    expect(r.doi).toContainEqual(expect.objectContaining({ item: moved.item, due: '2026-11-23', newDate: '2026-11-24' }));
+  });
 });

@@ -25,18 +25,23 @@ export interface LichTask {
   noBom: boolean;
   late: boolean;
   part?: string;
+  /** Phần cần tạo lệnh mới khi chốt (không tính phần của lệnh đang mở). */
+  newQty?: number;
 }
 export interface LichDay { date: string; cap: number; used: number; tasks: LichTask[] }
 export interface LichResult {
   today: string;
   cfg: LichCfg;
   days: LichDay[];
+  /** Phần không kịp trong 3 ngày (giữ để tương thích; xem doi). */
   overflow: LichTask[];
+  /** Đề xuất dời lịch: đơn/lệnh làm không kịp hạn → ngày giao đề xuất; hàng bổ sung tồn → làm tiếp từ ngày nào. Không đề xuất tăng ca. */
+  doi: Array<{ item: string; name: string; unit: string; kind: LichKind; refs: string[]; reason: string; due: string; qtyLeft: number; newDate: string }>;
   /** Vật tư thiếu cho các việc đã xếp trong 3 ngày (gom theo vật tư). */
   thieu: Array<{ item: string; name: string; unit: string; need: number; have: number; short: number; for: string[] }>;
 }
-export interface LichCfg { cong: number; duPhong: number; minDays: number; targetDays: number; gioMacDinh: number }
-export const LICH_CFG_DEFAULT: LichCfg = { cong: 64, duPhong: 30, minDays: 7, targetDays: 21, gioMacDinh: 4 };
+export interface LichCfg { cong: number; duPhong: number; minDays: number; targetDays: number; gioMacDinh: number; maxMa: number }
+export const LICH_CFG_DEFAULT: LichCfg = { cong: 64, duPhong: 30, minDays: 7, targetDays: 21, gioMacDinh: 4, maxMa: 5 };
 
 export interface LichInput {
   today: string;
@@ -166,10 +171,15 @@ export function planLichSx(inp: LichInput): LichResult {
     ready.push(t);
   }
 
-  // Xếp vào 3 ngày theo sức xưởng; việc lớn được chia sang ngày sau.
+  // Xếp theo sức xưởng, mỗi ngày tối đa cfg.maxMa mã (đỡ đổi bồn, đổi vỏ). Tính trên 30 ngày làm việc để biết việc
+  // nào không kịp hạn thì đề xuất dời ngày giao (chị Hoa 21/11: không dồn tăng ca); chỉ trả về 3 ngày đầu.
   const cap = r2(cfg.cong * (1 - cfg.duPhong / 100));
-  const out: LichDay[] = days.map((date) => ({ date, cap, used: 0, tasks: [] }));
+  const horizon = workDays(today, 30);
+  const all: LichDay[] = horizon.map((date) => ({ date, cap, used: 0, tasks: [] }));
   const overflow: LichTask[] = [];
+  const doi: LichResult['doi'] = [];
+  const last = days[days.length - 1];
+  const fits = (d: LichDay, code: string) => d.tasks.some((x) => x.item === code) || new Set(d.tasks.map((x) => x.item)).size < cfg.maxMa;
   for (const t of ready) {
     const rate = inp.rate[t.item];
     const perUnit = rate > 0 ? 1 / rate : 0;
@@ -177,23 +187,52 @@ export function planLichSx(inp: LichInput): LichResult {
     let hoursLeft = perUnit ? t.qty * perUnit : cfg.gioMacDinh;
     const est = !perUnit;
     const parts: LichTask[] = [];
-    for (const d of out) {
+    const pd: string[] = [];
+    for (const d of all) {
       if (left <= 0) break;
       const room = r2(d.cap - d.used);
-      if (room <= 0.05) continue;
+      if (room <= 0.05 || !fits(d, t.item)) continue;
+      const late = !!t.due && t.kind !== 'TON' && d.date > t.due;
       if (hoursLeft <= room) {
-        const p = { ...t, qty: left, hours: r2(hoursLeft), hoursEst: est, late: !!t.due && t.kind !== 'TON' && d.date > t.due };
-        d.tasks.push(p); d.used = r2(d.used + hoursLeft); parts.push(p); left = 0; hoursLeft = 0;
+        const p = { ...t, qty: left, hours: r2(hoursLeft), hoursEst: est, late };
+        d.tasks.push(p); d.used = r2(d.used + hoursLeft); parts.push(p); pd.push(d.date); left = 0; hoursLeft = 0;
       } else {
         const q = perUnit ? Math.floor(room / perUnit) : Math.floor((left * room) / hoursLeft);
         if (q <= 0) continue;
         const h = perUnit ? q * perUnit : (hoursLeft * q) / left;
-        const p = { ...t, qty: q, hours: r2(h), hoursEst: est, late: !!t.due && t.kind !== 'TON' && d.date > t.due };
-        d.tasks.push(p); d.used = r2(d.used + h); parts.push(p); left -= q; hoursLeft = r2(hoursLeft - h);
+        const p = { ...t, qty: q, hours: r2(h), hoursEst: est, late };
+        d.tasks.push(p); d.used = r2(d.used + h); parts.push(p); pd.push(d.date); left -= q; hoursLeft = r2(hoursLeft - h);
       }
     }
-    if (parts.length > 1) parts.forEach((p, i) => { p.part = `phần ${i + 1}/${parts.length + (left > 0 ? 1 : 0)}`; });
-    if (left > 0) overflow.push({ ...t, qty: left, hours: r2(hoursLeft), hoursEst: est });
+    if (parts.length > 1) parts.forEach((p, i) => { p.part = `phần ${i + 1}/${parts.length}`; });
+    const end = pd[pd.length - 1] || '';
+    const leftAfter3 = parts.filter((_, i) => pd[i] > last).reduce((a, p) => a + p.qty, 0) + left;
+    if (leftAfter3 > 0) overflow.push({ ...t, qty: leftAfter3 });
+    if (t.kind !== 'TON' && t.due && (end > t.due || left > 0)) {
+      doi.push({ item: t.item, name: t.name, unit: t.unit, kind: t.kind, refs: t.refs, reason: t.reason, due: t.due, qtyLeft: leftAfter3, newDate: left > 0 ? '' : end });
+    } else if (t.kind === 'TON' && leftAfter3 > 0) {
+      const from = pd.find((x) => x > last) || '';
+      doi.push({ item: t.item, name: t.name, unit: t.unit, kind: t.kind, refs: t.refs, reason: t.reason, due: t.due, qtyLeft: leftAfter3, newDate: from });
+    }
+  }
+  const out = all.slice(0, days.length);
+  // Cùng một sản phẩm trong một ngày gộp thành một dòng (làm một lần): cộng số lượng, giờ công; lý do nối lại.
+  for (const d of out) {
+    const m = new Map<string, LichTask>();
+    for (const t of d.tasks) {
+      const a = m.get(t.item);
+      if (!a) { m.set(t.item, { ...t, refs: [...t.refs], lack: [...t.lack], newQty: t.kind === 'LENH' ? 0 : t.qty }); continue; }
+      a.newQty = (a.newQty || 0) + (t.kind === 'LENH' ? 0 : t.qty);
+      a.qty += t.qty;
+      a.hours = r2(a.hours + t.hours);
+      a.hoursEst = a.hoursEst || t.hoursEst;
+      a.late = a.late || t.late;
+      a.reason += ` + ${t.kind === 'TON' ? 'bổ sung tồn ' + t.qty.toLocaleString('vi-VN') : t.reason}`;
+      a.refs.push(...t.refs.filter((x) => !a.refs.includes(x)));
+      for (const x of t.lack) if (!a.lack.some((y) => y.item === x.item)) a.lack.push(x);
+      if (t.part && !a.part) a.part = t.part;
+    }
+    d.tasks = [...m.values()];
   }
   const T = new Map<string, LichResult['thieu'][number]>();
   const seen = new Set<string>();
@@ -209,7 +248,7 @@ export function planLichSx(inp: LichInput): LichResult {
     }
   }
   const thieu = [...T.values()].filter((x) => x.short > 0).sort((a, b) => b.for.length - a.for.length || a.name.localeCompare(b.name));
-  return { today, cfg, days: out, overflow, thieu };
+  return { today, cfg, days: out, overflow, doi, thieu };
 }
 
 /** Gom dữ liệu thật rồi gọi planLichSx. */
