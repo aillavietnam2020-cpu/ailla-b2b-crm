@@ -137,7 +137,7 @@ function csKdDays(K,days,cost,lg,meId){const o={};days.forEach(k=>o[k]={dt:0,gia
 function csKdPer(K){const m=new Map(),nm=id=>(K.staff.find(s=>s.id===id)||{}).name||"";
   const g=id=>{let r=m.get(id);if(!r){r={id,name:id?nm(id)||"(chưa rõ tên)":"Chưa rõ người chốt",dt:0,don:0,goi:0,chot:0,khach:0,qua:0};m.set(id,r)}return r};
   K.staff.forEach(s=>g(s.id));K.delivered.forEach(d=>{const r=g(d.by);r.dt+=d.total;r.don++});
-  K.calls.forEach(c=>{const r=g(c.by_id);r.goi+=c.goi;r.chot+=c.chot});K.own.forEach(o=>{const r=g(o.owner_id);r.khach=o.n;r.qua=o.qua});
+  K.calls.forEach(c=>{const r=g(c.by_id);r.goi+=c.goi;r.chot+=c.chot});K.own.forEach(o=>{const r=g(o.owner_id);if(r.name==="(chưa rõ tên)"&&o.name)r.name=o.name;r.khach=o.n;r.qua=o.qua});
   return [...m.values()].filter(r=>r.id||r.dt).sort((a,b)=>b.dt-a.dt||b.don-a.don||a.name.localeCompare(b.name))}
 function csKdProds(K){const m=new Map();K.delivered.forEach(d=>{const seen=new Set();d.items.forEach(i=>{const a=m.get(i.n)||{n:i.n,q:0,v:0,don:0};a.q+=+i.q||0;a.v+=+i.p||0;if(!seen.has(i.n)){a.don++;seen.add(i.n)}m.set(i.n,a)})});return [...m.values()].sort((a,b)=>b.v-a.v)}
 const csKdCard=(t,sub,body)=>`<section class="pc-card"><div class="pc-h"><b>${t}</b>${sub?`<span>${sub}</span>`:""}</div>${body}</section>`;
