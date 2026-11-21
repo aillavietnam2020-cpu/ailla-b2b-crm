@@ -758,6 +758,17 @@ cskhRoutes.get('/kd', async (c) => {
   const webBy: Record<string, string> = {};
   for (const w of web) webBy[w.pos_id] = w.by_id;
   const byOf = attributeOrders(del, logs, webBy);
+  // Không thấy cuộc gọi chốt / đơn tạo trên web: tính cho CSKH đang phụ trách khách (chị Hoa 21/11).
+  const noBy = [...new Set(del.filter((o) => !byOf.get(o.id)).map((o) => o.phone))];
+  if (noBy.length) {
+    const ow: Record<string, string> = {};
+    for (let i = 0; i < noBy.length; i += 90) {
+      const part = noBy.slice(i, i + 90);
+      const r = (await db.prepare(`SELECT phone, owner_id FROM cskh_customers WHERE owner_id IS NOT NULL AND phone IN (${part.map(() => '?').join(',')})`).bind(...part).all<{ phone: string; owner_id: string }>()).results ?? [];
+      for (const x of r) ow[x.phone] = x.owner_id;
+    }
+    for (const o of del) if (!byOf.get(o.id) && ow[o.phone]) byOf.set(o.id, ow[o.phone]);
+  }
   const mineOnly = (by: string) => me.lead || by === me.id;
   const delivered = del.map((o) => ({ id: mineOnly(byOf.get(o.id) ?? '') ? o.id : '', day: o.day, phone: mineOnly(byOf.get(o.id) ?? '') ? o.phone : '', total: o.total ?? 0, by: byOf.get(o.id) ?? '', items: JSON.parse(o.items || '[]') as Array<{ n: string; q: number; p: number }> }));
   // Đơn đã gửi trong kỳ (ngày gửi hàng) và tình trạng hiện tại: giao / hoàn / đang giao.
@@ -783,7 +794,7 @@ cskhRoutes.get('/kd', async (c) => {
   const cared = await db.prepare('SELECT COUNT(DISTINCT phone) AS n FROM cskh_logs WHERE day >= ? AND day <= ?').bind(from, to).first<{ n: number }>();
   const stop = await db.prepare('SELECT COUNT(*) AS n FROM cskh_customers WHERE stop_at >= ? AND stop_at < ?').bind(from, addDays(to, 1)).first<{ n: number }>();
   // Khách đang chăm và quá hạn gọi (hiện tại) theo người.
-  const own = (await db.prepare("SELECT owner_id, COUNT(*) AS n, SUM(CASE WHEN next_call < ? THEN 1 ELSE 0 END) AS qua FROM cskh_customers WHERE owner_id IS NOT NULL AND stop_reason = '' GROUP BY owner_id").bind(today).all<{ owner_id: string; n: number; qua: number }>()).results ?? [];
+  const own = (await db.prepare("SELECT owner_id, MAX(owner_name) AS name, COUNT(*) AS n, SUM(CASE WHEN next_call < ? THEN 1 ELSE 0 END) AS qua FROM cskh_customers WHERE owner_id IS NOT NULL AND stop_reason = '' GROUP BY owner_id").bind(today).all<{ owner_id: string; n: number; qua: number }>()).results ?? [];
   // Doanh thu thực theo hạng khách.
   const tiers: Array<{ n: string; khach: number; dt: number }> = [];
   for (const name of [...set.tiers.map((t) => t.n), TIER_BASE]) {
