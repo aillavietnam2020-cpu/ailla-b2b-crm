@@ -1088,7 +1088,7 @@ body:has(#tnpop) #ntpop{right:392px}
 .cwpg .bar i{width:9px;height:7px;border-radius:2px;background:#e6e8f0}.cwpg .bar i.on{background:#4b54d1}
 .cwpg.late .bar{border-color:#e7a8a8}.cwpg.late .bar i.on{background:#d23b3b}.cwpg small{font-size:11px;color:#6a7084}
 
-/* Điều độ sản xuất (sxhomnay.js) */
+/* Điều phối sản xuất (sxhomnay.js) */
 .hn-k{cursor:default}.hn-row{margin-bottom:14px}.hn-row>.card{margin:0}
 .hn-h{justify-content:space-between}.hn-h h2{margin:0}
 .hn-sub{font-size:12px;color:var(--mut,#667085);margin-top:2px}

@@ -1,5 +1,5 @@
 /* =====================================================================
-   ĐIỀU ĐỘ SẢN XUẤT (chị Hoa duyệt demo 21/11/2026, đổi tên từ "Hôm nay xưởng") — trang cho CEO và người quản lý điều phối sản xuất.
+   ĐIỀU PHỐI SẢN XUẤT (chị Hoa duyệt demo 21/11/2026, đổi tên từ "Hôm nay xưởng") — trang cho CEO và người quản lý điều phối sản xuất.
    ① Lệnh sản xuất đến hạn: phiếu sản xuất (PSX) chưa xong, hạn đến hết ngày mai, quá hạn lên đầu.
    ② Đơn hàng cần xuất trong ngày: đơn Kênh phân phối / Kênh OEM đã duyệt, chờ xuất, ngày giao ≤ hôm nay.
    ③ Báo cáo sản lượng cuối ngày: mỗi dòng = số người × từ giờ – đến giờ → số cái; "Việc khác" tách giờ không ra hàng.
@@ -30,7 +30,7 @@ function hnDraft(day){
   return HN.draft}
 
 function pSxHn(m){
-  const T="Điều độ sản xuất",S0="Lệnh sản xuất đến hạn, đơn hàng cần xuất, báo cáo sản lượng và định mức năng suất";
+  const T="Điều phối sản xuất",S0="Lệnh sản xuất đến hạn, đơn hàng cần xuất, báo cáo sản lượng và định mức năng suất";
   if(!hnOk()){m.innerHTML=H(T,"")+`<div class="note">Trang này chỉ dành cho CEO và quản lý điều phối sản xuất.</div>`;return}
   const s=SX(),today=sxToday(),day=HN.day||today,tmr=hnAdd(today,1);hnLoadOrders();
   /* ① Lệnh sản xuất chưa xong, hạn ≤ ngày mai (hoặc đang làm mà chưa đặt hạn) — chia nhóm Quá hạn / Hôm nay / Ngày mai */
@@ -99,5 +99,5 @@ PAGES.sx_hn=sxInit(pSxHn);
 {
   const sx=MODULES.find(x=>x.k==="sx");
   if(sx){const g0=sx.groups;sx.groups=function(){const r=g0.apply(this,arguments)||[];if(r.some(g=>g[1].some(i=>i[0]==="sx_hn")))return r;
-    const it=MI("sx_hn","Điều độ sản xuất",()=>hnOk());const g=r.find(x=>x[0]==="Sản xuất");if(g)g[1]=[it].concat(g[1]);else r.push(["Sản xuất",[it]]);return r}}
+    const it=MI("sx_hn","Điều phối sản xuất",()=>hnOk());const g=r.find(x=>x[0]==="Sản xuất");if(g)g[1]=[it].concat(g[1]);else r.push(["Sản xuất",[it]]);return r}}
 }
