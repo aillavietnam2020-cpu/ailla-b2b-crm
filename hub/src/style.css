@@ -1088,7 +1088,20 @@ body:has(#tnpop) #ntpop{right:392px}
 .cwpg .bar i{width:9px;height:7px;border-radius:2px;background:#e6e8f0}.cwpg .bar i.on{background:#4b54d1}
 .cwpg.late .bar{border-color:#e7a8a8}.cwpg.late .bar i.on{background:#d23b3b}.cwpg small{font-size:11px;color:#6a7084}
 
-/* Hôm nay xưởng (sxhomnay.js) */
-.hn-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}.hn-kpi{padding:10px 14px;margin:0}.hn-kpi small{display:block;color:var(--mut,#667085)}.hn-kpi b{font-size:20px}
-.hn-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-tr.hn-oth td{background:#f9fafb;color:#475467}
+/* Điều độ sản xuất (sxhomnay.js) */
+.hn-k{cursor:default}.hn-row{margin-bottom:14px}.hn-row>.card{margin:0}
+.hn-h{justify-content:space-between}.hn-h h2{margin:0}
+.hn-sub{font-size:12px;color:var(--mut,#667085);margin-top:2px}
+tr.hn-grp td{background:#f2f4f7;font-size:12px;font-weight:700;color:#475467;text-transform:uppercase;letter-spacing:.02em;padding:5px 10px}
+tr.hn-grp.red td{background:#fef3f2;color:#b42318}
+.hn-log table{min-width:980px}.hn-log td{vertical-align:middle}
+.hn-in{width:100%;box-sizing:border-box;border:1px solid var(--line,#d0d5dd);border-radius:8px;padding:6px 8px;font:inherit;background:#fff}
+.hn-in:focus{outline:2px solid #c7d7fe;border-color:#1f4fbf}
+select.hn-in{min-width:240px}.hn-num{width:80px;text-align:right}.hn-t{width:110px}
+.hn-i{color:#98a2b3;width:22px}.hn-calc{color:#344054;font-weight:600;white-space:nowrap}.hn-dash{color:#98a2b3;padding-left:8px}
+.hn-del{color:#98a2b3}.hn-del:hover{color:#b42318}
+tr.hn-oth td{background:#f9fafb}
+.hn-log tfoot td{background:#f9fafb;border-top:2px solid var(--line,#e4e7ec)}
+.hn-act{display:flex;align-items:center;gap:10px;margin:12px 0 6px}.hn-act .sp{flex:1}
+.hn-eq{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}@media (max-width:1100px){.hn-eq{grid-template-columns:1fr}}
+.hn-day{white-space:nowrap;display:flex;align-items:center;gap:8px;font-size:13px;color:#475467}.hn-day input{border:1px solid var(--line,#d0d5dd);border-radius:8px;padding:5px 8px;font:inherit}
