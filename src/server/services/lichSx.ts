@@ -1,5 +1,5 @@
 /**
- * LỊCH SẢN XUẤT ĐỀ XUẤT 3 NGÀY (chị Hoa yêu cầu 21/11/2026, theo SOP "Đề xuất SOP Điều phối sản xuất").
+ * LỊCH SẢN XUẤT ĐỀ XUẤT (hôm nay + 5 ngày) (chị Hoa yêu cầu 21/11/2026, theo SOP "Đề xuất SOP Điều phối sản xuất").
  * Web xếp việc theo thứ tự: ① hạn giao đơn · ② lệnh sản xuất đang mở · ③ hàng sắp hết (dưới 7 ngày bán, làm đủ 21 ngày) ·
  * kiểm đủ vật tư theo định mức (thiếu bán thành phẩm thì xét tiếp vật tư pha chế) · không quá sức xưởng (chừa % dự phòng).
  * Chỉ tính và trả về đề xuất; không ghi gì. Quản đốc chốt thì trang web mới tạo lệnh sản xuất.
@@ -27,12 +27,16 @@ export interface LichTask {
   part?: string;
   /** Phần cần tạo lệnh mới khi chốt (không tính phần của lệnh đang mở). */
   newQty?: number;
+  /** Lệnh đã đến hạn (hạn ≤ hôm nay) hoặc đang làm: thuộc việc hôm nay, không xếp sang ngày sau. */
+  now?: boolean;
 }
 export interface LichDay { date: string; cap: number; used: number; tasks: LichTask[] }
 export interface LichResult {
   today: string;
   cfg: LichCfg;
   days: LichDay[];
+  /** Việc hôm nay: lệnh đến hạn / đang làm (có kiểm vật tư, giờ công). */
+  homNay: LichTask[];
   /** Phần không kịp trong 3 ngày (giữ để tương thích; xem doi). */
   overflow: LichTask[];
   /** Đề xuất dời lịch: đơn/lệnh làm không kịp hạn → ngày giao đề xuất; hàng bổ sung tồn → làm tiếp từ ngày nào. Không đề xuất tăng ca. */
@@ -41,6 +45,10 @@ export interface LichResult {
   thieu: Array<{ item: string; name: string; unit: string; need: number; have: number; short: number; for: string[] }>;
 }
 export interface LichCfg { cong: number; duPhong: number; minDays: number; targetDays: number; gioMacDinh: number; maxMa: number }
+/** Số ngày làm việc trả về (chị Hoa duyệt demo v5 21/11: thanh tải xưởng hôm nay + 5 ngày). */
+export const LICH_SO_NGAY = 5;
+/** Thứ tự ưu tiên quản đốc kéo thả trên trang: chỉ có hiệu lực trong ngày đã kéo. */
+export interface LichUu { ngay: string; items: string[] }
 export const LICH_CFG_DEFAULT: LichCfg = { cong: 64, duPhong: 30, minDays: 7, targetDays: 21, gioMacDinh: 4, maxMa: 5 };
 
 export interface LichInput {
@@ -52,6 +60,7 @@ export interface LichInput {
   bom: Array<{ product: string; item: string; qty: number }>;
   rate: Record<string, number>;
   cfg?: Partial<LichCfg>;
+  uu?: LichUu;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -75,7 +84,7 @@ const dd = (d: string) => (d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '');
 export function planLichSx(inp: LichInput): LichResult {
   const cfg: LichCfg = { ...LICH_CFG_DEFAULT, ...(inp.cfg || {}) };
   const today = inp.today;
-  const days = workDays(today);
+  const days = workDays(today, LICH_SO_NGAY);
   const item = new Map(inp.items.map((i) => [i.code, i]));
   const bom = new Map<string, Array<{ item: string; qty: number }>>();
   for (const b of inp.bom) {
@@ -107,7 +116,9 @@ export function planLichSx(inp: LichInput): LichResult {
     let supply = 0;
     for (const r of reqs) {
       supply += r.sl;
-      tasks.push(mk(code, 'LENH', r.sl, r.han || '', `Lệnh ${r.id}${r.han ? ' · hạn ' + dd(r.han) : ''}`, [r.id]));
+      const t = mk(code, 'LENH', r.sl, r.han || '', `Lệnh ${r.id}${r.han ? ' · hạn ' + dd(r.han) : ''}`, [r.id]);
+      if ((r.han && r.han <= today) || r.st === 'DANG_LAM') t.now = true;
+      tasks.push(t);
     }
     // ① Đơn chờ xuất: phần thiếu so với tồn + lệnh đang mở
     const ords = inp.orders.filter((o) => o.item === code).sort((a, b) => (a.ship < b.ship ? -1 : a.ship > b.ship ? 1 : 0));
@@ -144,6 +155,11 @@ export function planLichSx(inp: LichInput): LichResult {
   const btp = (c: string) => (bom.get(c) || []).map((x) => x.item).find((x) => item.get(x)?.cls === 'BTP') || '';
   // Đúng SOP: đơn có hạn giao trước, rồi lệnh đang mở, rồi hàng sắp hết; cùng nhóm thì hạn sớm trước, cùng hạn thì gom cùng bán thành phẩm (cùng bồn).
   tasks.sort((a, b) => kindOrd[a.kind] - kindOrd[b.kind] || (a.due < b.due ? -1 : a.due > b.due ? 1 : btp(a.item).localeCompare(btp(b.item))));
+  // Quản đốc kéo thả đổi thứ tự (chỉ trong ngày): mã có trong danh sách lên trước theo thứ tự đã kéo; việc hôm nay luôn đứng đầu.
+  const uu = inp.uu && inp.uu.ngay === today ? inp.uu.items : [];
+  const ui = (c: string) => { const i = uu.indexOf(c); return i < 0 ? 1e9 : i; };
+  const order = new Map(tasks.map((t, i) => [t, i]));
+  tasks.sort((a, b) => Number(!!b.now) - Number(!!a.now) || ui(a.item) - ui(b.item) || order.get(a)! - order.get(b)!);
 
   // Kiểm vật tư theo thứ tự ưu tiên: việc trước giữ vật tư trước.
   const stock = new Map(inp.items.map((i) => [i.code, Math.max(0, i.ton)]));
@@ -162,13 +178,17 @@ export function planLichSx(inp: LichInput): LichResult {
   };
   // Chị Hoa 21/11: thiếu vật tư không chặn việc khỏi lịch (tồn vật tư trên web chưa đủ tin cậy) — chỉ đánh dấu và gom danh sách cần chuẩn bị.
   const ready: LichTask[] = [];
+  const homNay: LichTask[] = [];
   for (const t of tasks) {
     if (!t.noBom) {
       const lack: LichTask['lack'] = [];
       need(t.item, t.qty, stock, lack, 0);
       t.lack = lack.filter((x) => x.need >= 0.01);
     }
-    ready.push(t);
+    if (t.now) {
+      const rt = inp.rate[t.item];
+      homNay.push({ ...t, hours: r2(rt > 0 ? t.qty / rt : cfg.gioMacDinh), hoursEst: !(rt > 0), late: !!t.due && t.due < today });
+    } else ready.push(t);
   }
 
   // Xếp theo sức xưởng, mỗi ngày tối đa cfg.maxMa mã (đỡ đổi bồn, đổi vỏ). Tính trên 30 ngày làm việc để biết việc
@@ -236,7 +256,7 @@ export function planLichSx(inp: LichInput): LichResult {
   }
   const T = new Map<string, LichResult['thieu'][number]>();
   const seen = new Set<string>();
-  for (const d of out) for (const t of d.tasks) {
+  for (const t of [...homNay, ...out.flatMap((d) => d.tasks)]) {
     if (seen.has(t.key)) continue;
     seen.add(t.key);
     for (const x of t.lack) {
@@ -248,7 +268,7 @@ export function planLichSx(inp: LichInput): LichResult {
     }
   }
   const thieu = [...T.values()].filter((x) => x.short > 0).sort((a, b) => b.for.length - a.for.length || a.name.localeCompare(b.name));
-  return { today, cfg, days: out, overflow, doi, thieu };
+  return { today, cfg, days: out, homNay, overflow, doi, thieu };
 }
 
 /** Gom dữ liệu thật rồi gọi planLichSx. */
@@ -277,8 +297,8 @@ export async function loadLichSx(db: D1Database): Promise<LichResult> {
     db.prepare("SELECT data FROM hub_state WHERE id = 'sx'").first<{ data: string }>(),
   ]);
   type Lot = { req?: string; st?: string; dat?: number; baoSL?: number };
-  type Nk = { sp?: string; nguoi?: number; tu?: string; den?: string; sl?: number };
-  let sx: { requests?: Array<{ id: string; sp: string; sl: number | null; han?: string; st: string }>; batches?: Lot[]; nk?: Nk[]; cfg?: { lich?: Partial<LichCfg> } } = {};
+  type Nk = { id?: string; sp?: string; psx?: string; nguoi?: number; tu?: string; den?: string; sl?: number };
+  let sx: { requests?: Array<{ id: string; sp: string; sl: number | null; han?: string; st: string }>; batches?: Lot[]; nk?: Nk[]; cfg?: { lich?: Partial<LichCfg> & { uu?: LichUu } } } = {};
   try { if (sxRow) sx = JSON.parse(await unpack(sxRow.data)); } catch { sx = {}; }
   const lots = sx.batches || [];
   const reqs = (sx.requests || [])
@@ -289,14 +309,20 @@ export async function loadLichSx(db: D1Database): Promise<LichResult> {
     });
   // Định mức năng suất: tổng sản lượng ÷ tổng giờ công từ báo cáo sản lượng (trang Điều phối sản xuất).
   const hh = (t?: string) => { const m = String(t || '').trim().match(/^(\d{1,2})(?:[:hH.](\d{0,2}))?$/); return m ? +m[1] + +(m[2] || 0) / 60 : NaN; };
-  const agg: Record<string, { c: number; q: number }> = {};
-  for (const r of sx.nk || []) {
-    if (!r.sp || r.sp === '__khac') continue;
+  // Màn hình xưởng ghi nhiều đoạn cho một lệnh (tạm dừng rồi làm tiếp), số lượng ghi ở đoạn cuối → gom theo lệnh trước.
+  const job: Record<string, { sp: string; c: number; q: number }> = {};
+  (sx.nk || []).forEach((r, i) => {
+    if (!r.sp || r.sp === '__khac') return;
     const h = hh(r.den) - hh(r.tu);
     const c = (Number(r.nguoi) || 0) * (h > 0 ? h : 0);
-    if (!(c > 0 && Number(r.sl) > 0)) continue;
-    const a = (agg[r.sp] ||= { c: 0, q: 0 });
-    a.c += c; a.q += Number(r.sl);
+    const j = (job[r.psx ? 'P:' + r.psx : 'R:' + (r.id || i)] ||= { sp: r.sp, c: 0, q: 0 });
+    j.c += c; j.q += Number(r.sl) || 0;
+  });
+  const agg: Record<string, { c: number; q: number }> = {};
+  for (const j of Object.values(job)) {
+    if (!(j.c > 0 && j.q > 0)) continue;
+    const a = (agg[j.sp] ||= { c: 0, q: 0 });
+    a.c += j.c; a.q += j.q;
   }
   const rate: Record<string, number> = {};
   for (const [k, a] of Object.entries(agg)) rate[k] = a.q / a.c;
@@ -311,5 +337,6 @@ export async function loadLichSx(db: D1Database): Promise<LichResult> {
     bom: bomR.results.map((b) => ({ ...b, qty: Number(b.qty) || 0 })),
     rate,
     cfg: sx.cfg?.lich,
+    uu: sx.cfg?.lich?.uu,
   });
 }

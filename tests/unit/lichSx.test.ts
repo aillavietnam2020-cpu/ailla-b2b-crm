@@ -30,16 +30,18 @@ describe('lịch sản xuất đề xuất', () => {
   });
 
   it('đơn thiếu hàng xếp trước, bổ sung tồn sau; chia việc lớn sang ngày sau theo sức xưởng', () => {
-    const r = planLichSx(base());
+    const inp = base();
+    inp.ban = { TUI: 1500 };
+    const r = planLichSx(inp);
     const d1 = r.days[0];
     expect(d1.tasks[0]).toMatchObject({ item: 'NG10', kind: 'DON', qty: 60, refs: ['DH1'], late: false });
     expect(d1.tasks[0].hours).toBe(3);
-    // Túi: còn 2 ngày bán → làm đủ 21 ngày = 19.000 túi = 190 giờ công; sức xưởng 64 × 70% = 44,8 giờ/ngày.
+    // Túi: còn 1,3 ngày bán → làm đủ 21 ngày = 29.500 túi = 295 giờ công; sức xưởng 64 × 70% = 44,8 giờ/ngày × 5 ngày không đủ.
     const tui = r.days.flatMap((d) => d.tasks).filter((t) => t.item === 'TUI');
-    expect(tui.length).toBe(3);
+    expect(tui.length).toBe(5); // 5 ngày làm việc (demo v5)
     expect(r.days.every((d) => d.used <= d.cap + 0.01)).toBe(true);
     expect(r.overflow[0]).toMatchObject({ item: 'TUI' });
-    expect(tui.reduce((a, t) => a + t.qty, 0) + r.overflow[0].qty).toBe(19000);
+    expect(tui.reduce((a, t) => a + t.qty, 0) + r.overflow[0].qty).toBe(29500);
   });
 
   it('thiếu bán thành phẩm thì xét tiếp vật tư pha chế; thiếu vật tư vẫn xếp lịch, đánh dấu và gom danh sách cần chuẩn bị', () => {
@@ -81,5 +83,26 @@ describe('lịch sản xuất đề xuất', () => {
     const moved = r.days[1].tasks[0];
     expect(moved.late).toBe(true);
     expect(r.doi).toContainEqual(expect.objectContaining({ item: moved.item, due: '2026-11-23', newDate: '2026-11-24' }));
+  });
+});
+
+describe('lịch sản xuất — việc hôm nay và thứ tự kéo thả (demo v5, 21/11)', () => {
+  it('lệnh đến hạn hôm nay / đang làm vào việc hôm nay, không xếp sang ngày sau, vẫn tính là hàng sắp có', () => {
+    const inp = base();
+    inp.reqs = [{ id: 'PSX1', sp: 'NG10', sl: 60, han: '2026-11-21', st: 'CAN_LAM' }, { id: 'PSX2', sp: 'TUI', sl: 500, han: '', st: 'DANG_LAM' }];
+    const r = planLichSx(inp);
+    expect(r.homNay.map((t) => t.refs[0]).sort()).toEqual(['PSX1', 'PSX2']);
+    expect(r.homNay.find((t) => t.item === 'NG10')!.hours).toBe(3);
+    const later = r.days.flatMap((d) => d.tasks);
+    expect(later.some((t) => t.refs.includes('PSX1') || t.refs.includes('PSX2'))).toBe(false);
+    expect(later.some((t) => t.item === 'NG10')).toBe(false);
+  });
+
+  it('thứ tự quản đốc kéo thả chỉ có hiệu lực trong ngày', () => {
+    const inp = base();
+    inp.uu = { ngay: '2026-11-21', items: ['TUI', 'NG10'] };
+    expect(planLichSx(inp).days[0].tasks[0].item).toBe('TUI');
+    inp.uu = { ngay: '2026-11-20', items: ['TUI', 'NG10'] };
+    expect(planLichSx(inp).days[0].tasks[0].item).toBe('NG10');
   });
 });
