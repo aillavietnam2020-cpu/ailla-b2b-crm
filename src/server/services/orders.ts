@@ -992,6 +992,11 @@ export async function updateDeliveryStatus(
   const now = nowIso();
   const at = ship?.day ? shipDayToIso(ship.day) : now;
   if (ship?.day && ship.day > vnDate()) throw badRequest('BAD_SHIP_DAY', 'Ngày xuất kho không được sau hôm nay.');
+  // Đơn luồng kho chưa qua bước xuất mà người có quyền bấm "Đã giao": coi như xuất đủ theo đơn (kho trừ theo dòng đơn),
+  // đơn ra khỏi luồng kho để không còn kẹt "Chờ kho kiểm tồn", và tự vào công nợ như đơn thường.
+  const PRE_SHIP = ['CHO_DIEU_PHOI', 'CHO_KIEM_KHO', 'DU_HANG', 'THIEU_HANG', 'CHO_HANG', 'CHO_XUAT'];
+  const leaveFlow = status === 'DA_GIAO' && Number(order.flow_on) === 1 && PRE_SHIP.includes(order.kho_status);
+  if (leaveFlow) order.flow_on = 0;
   // Kho đã xác nhận xuất / giao thì đơn tự vào công nợ chính thức, kế toán không phải bấm xác nhận thêm một lần nữa.
   // (Đơn theo luồng kho thì tự xác nhận ở bước sale chốt tiền.) Vẫn "Bỏ xác nhận kế toán" được nếu cần.
   const autoAccount =
@@ -1000,6 +1005,17 @@ export async function updateDeliveryStatus(
     order.flow_on !== 1 &&
     order.accounting_status !== 'DA_XAC_NHAN';
   await db.batch([
+    ...(leaveFlow
+      ? [
+          db.prepare("UPDATE orders SET flow_on = 0, kho_status = 'KHONG' WHERE id = ?").bind(orderId),
+          db
+            .prepare(
+              `INSERT INTO order_flow_log (order_id, at, actor_id, action, from_status, to_status, note)
+               VALUES (?, ?, ?, 'DA_GIAO_THANG', ?, 'KHONG', 'Đánh dấu đã giao: xuất đủ theo đơn, bỏ qua bước kho')`,
+            )
+            .bind(orderId, now, auth.user.id, order.kho_status),
+        ]
+      : []),
     ...(autoAccount
       ? [
           db

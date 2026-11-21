@@ -602,6 +602,27 @@ describe('Luồng đơn B2B qua kho', () => {
     expect((await status(id)).kho_status).toBe('CHO_XUAT');
   });
 
+  it('đơn đã duyệt đang chờ kho kiểm tồn: quản lý bấm Đã giao thì xuất đủ theo đơn, ra khỏi luồng kho, vào công nợ', async () => {
+    await ctx.db
+      .prepare(
+        `INSERT INTO customers (id, legacy_code, name, phone_text, phone_normalized, province, tier_id, owner_id,
+           stage, opening_debt, data_quality, created_at, updated_at)
+         VALUES ('cus-mgr2', 'cus-mgr2', 'Khách của quản lý 2', '0900000019', 'cus-mgr2', 'HN', 'tier-dlc1', 'user-manager',
+           'NEGOTIATING', 0, 'OK', ?, ?)`,
+      )
+      .bind(NOW, NOW)
+      .run();
+    const id = await newOrder(5, USERS.manager, 'cus-mgr2');
+    await ctx.request(`/api/orders/${id}/submit`, { as: USERS.manager, body: {} });
+    expect((await status(id)).kho_status).toBe('CHO_KIEM_KHO');
+    const r = await ctx.request(`/api/orders/${id}/delivery`, { as: USERS.manager, body: { delivery_status: 'DA_GIAO' } });
+    expect(r.status).toBe(200);
+    const o = await status(id);
+    expect(o.delivery_status).toBe('DA_GIAO');
+    expect(o.kho_status).toBe('KHONG');
+    expect(o.accounting_status).toBe('DA_XAC_NHAN');
+  });
+
   it('sửa đơn đã duyệt đang chờ xuất thì quay lại duyệt, kho thả hàng đã giữ', async () => {
     const id = await newOrder(10);
     await ctx.request(`/api/orders/${id}/submit`, { as: USERS.thao, body: {} });
