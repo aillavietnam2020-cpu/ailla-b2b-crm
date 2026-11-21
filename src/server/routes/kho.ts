@@ -39,6 +39,7 @@ import { accountantIds, approverIds, taskStatements } from '../lib/notifyTasks';
 import { bellTo } from '../lib/hubBell';
 import { loadAccRules } from './accRules';
 import { unpack } from '../lib/pack';
+import { loadLichSx } from '../services/lichSx';
 
 /**
  * Kho sản xuất: nhập NVL → pha chế BTP → kiểm kê đóng gói → xuất kho → hàng hoàn.
@@ -3611,6 +3612,12 @@ khoRoutes.get('/online/probe-customer', async (c) => {
   const day = c.req.query('day');
   if (!isSrcChannel(channel) || !isDate(day)) throw badRequest('BAD_PARAMS', 'Cần kênh và ngày');
   return ok(c, await probeCustomerFields(c.env.DB, c.env.INGEST_KEY, channel, day, httpFetch));
+});
+
+/** Lịch sản xuất đề xuất 3 ngày (trang Điều phối sản xuất). Dùng định mức vật tư nên chỉ CEO, quản lý, kế toán xem. */
+khoRoutes.get('/lich-sx', async (c) => {
+  if (!canEditMap(c.get('auth'))) throw forbidden('Chỉ CEO và quản lý điều phối sản xuất xem được lịch sản xuất đề xuất');
+  return ok(c, await loadLichSx(c.env.DB));
 });
 
 /** Đơn NPP đã duyệt, đang chờ kế toán kho xuất hàng: hiện ở Sản xuất & kho để in phiếu xuất kho và ghi số thực xuất. */
