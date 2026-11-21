@@ -124,9 +124,9 @@ function hnOrders(today){
     if(di>=0)return `<span class="hn-st s-lam">Chờ sản xuất · ${esc(hnT(L.days[di].date))}</span>`;
     return `<span class="hn-st s-de">Chờ xuất kho</span>`};
   const card=o=>{const Ls=o.lines||[];return `<div class="hn-ord" title="${esc(o.customer_name+" · "+Ls.map(l=>l.name+" ×"+l.qty).join(" · "))}"><div class="hn-l1"><b>${esc(o.customer_name)}</b>${st(o)}</div><div class="hn-sub"><span class="mono">${esc(o.order_no)}</span> · ${o.kenh==="GIA_CONG"?"Kênh OEM":"Kênh phân phối"} · giao ${esc(sxDd(oDay(o)).slice(0,5))}</div><div class="hn-items">${Ls.slice(0,2).map(l=>esc(l.name)+" ×"+nf(l.qty)).join(" · ")}${Ls.length>2?` · +${Ls.length-2} mã`:""}</div></div>`};
-  const sec=(t,rows,cls="")=>rows.length?`<div class="hn-sec ${cls}">${t} · ${rows.length}</div>`+rows.map(card).join(""):"";
+  const sec=(t,rows,cls="")=>`<div class="hn-ocol"><div class="hn-sec ${cls}">${t} · ${rows.length}</div>${rows.map(card).join("")||`<p class="hint">Không có đơn.</p>`}</div>`;
   const h=sec("Trễ hạn",all.filter(o=>oDay(o)<today),"red")+sec("Giao hôm nay",all.filter(o=>oDay(o)===today))+sec("Giao 2 ngày tới",all.filter(o=>oDay(o)>today));
-  return h||`<p class="hint">Không có đơn cần xuất trong 2 ngày tới.</p>`}
+  return all.length?`<div class="hn-ogrid">${h}</div>`:`<p class="hint">Không có đơn cần xuất trong 2 ngày tới.</p>`}
 
 /* ---------- Tab Màn hình xưởng ---------- */
 const HN_PZ=["Chờ vật tư","Sửa máy","Vệ sinh","Chuyển việc khác"];
@@ -232,8 +232,8 @@ function pSxHn(m){
     <section class="card"><div class="card-h hn-h"><h2>Tải xưởng theo ngày</h2><span class="hint">${c?`${hnR1(c.cong*(1-c.duPhong/100))} giờ công/ngày (đã chừa ${c.duPhong}% cho đơn gấp) · tối đa ${c.maxMa} mã/ngày · `:""}bấm một ngày để lọc danh sách${HN.f!=null?` · <button class="lnk" data-hnf="all">Xem tất cả</button>`:""}</span></div>
      ${HN.cfg?`<div class="hn-cfg hn-cfgbox">Sức xưởng <input id="hn-cong" value="${esc(c?c.cong:"")}" inputmode="numeric"> giờ công/ngày · Dự phòng đơn gấp <input id="hn-dp" value="${esc(c?c.duPhong:"")}" inputmode="numeric">% · Tối đa <input id="hn-ma" value="${esc(c?c.maxMa:"")}" inputmode="numeric"> mã/ngày <button class="btn sm pri" id="hn-tinh">Lưu và tính lại</button></div>`:""}
      ${hnStrip(T,today)}</section>
-    <div class="hn-main"><section class="card"><div class="card-h hn-h"><h2>Lệnh sản xuất — xếp theo ưu tiên</h2><span class="hint">Kéo ⋮⋮ để đổi thứ tự · web tự xếp lại ngày làm và kiểm lại vật tư</span></div>${hnPlan(s,today,T)}</section>
-     <section class="card"><div class="card-h hn-h"><h2>Đơn cần xuất</h2><button class="lnk" data-go="kho_xuat_b2b">Xuất kho đơn ›</button></div>${hnOrders(today)}</section></div>`}
+    <section class="card"><div class="card-h hn-h"><h2>Đơn cần xuất</h2><button class="lnk" data-go="kho_xuat_b2b">Xuất kho đơn ›</button></div>${hnOrders(today)}</section>
+    <section class="card"><div class="card-h hn-h"><h2>Lệnh sản xuất — xếp theo ưu tiên</h2><span class="hint">Kéo ⋮⋮ để đổi thứ tự · web tự xếp lại ngày làm và kiểm lại vật tư</span></div>${hnPlan(s,today,T)}</section>`}
   else if(HN.tab==="xuong")body=hnXuong(s,T,today);
   else if(HN.tab==="bc")body=hnBaoCao(s,today,day);
   else body=hnDinhMuc(s);
