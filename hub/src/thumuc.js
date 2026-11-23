@@ -197,7 +197,8 @@ function tmTreeView(){
   const T=tmVisible(),N=new Map(),roots=[];
   const node=(id,n,o)=>{let x=N.get(id);if(!x){x={id,n,o,kids:[],team:null};N.set(id,x)}else if(n&&!x.n)x.n=n;return x};
   const link=(par,ch)=>{if(par&&!par.kids.includes(ch))par.kids.push(ch);if(!par&&!roots.includes(ch))roots.push(ch)};
-  T.forEach(t=>{const A=t.anc||[];let par=null;
+  /* Thư mục chưa nằm trong ổ dùng chung (Drive cũ, tài khoản web không đọc được thư mục cha): gom vào một nhánh */
+  T.forEach(t=>{const A=(t.anc&&t.anc.length)||t.drive?(t.anc||[]):[{id:"~old",n:"",o:"old"}];let par=null;
     A.forEach(a=>{const x=node(a.id,a.n,a.o);link(par,x);par=x});
     const me=node(t.folder_id,t.drive||t.name,t.drive?"drive":"");me.team=t;if(t.drive)me.n=t.drive;link(par,me)});
   /* Gốc ổ trùng với một thư mục chung (ổ 01, 06): node gốc chính là thư mục đó */
