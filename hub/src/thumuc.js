@@ -204,15 +204,15 @@ function tmTreeView(){
   /* Gốc ổ trùng với một thư mục chung (ổ 01, 06): node gốc chính là thư mục đó */
   const cnt=x=>x.team?(x.team.total||0):x.kids.reduce((a,k)=>a+cnt(k),0);
   const nm=x=>x.o==="old"?"Drive cũ (chưa chuyển sang ổ mới)":x.n;
-  const key=x=>(x.o==="old"?"~":"")+nm(x);
+  const key=x=>nm(x),srt=(a,b)=>((a.o==="old")-(b.o==="old"))||key(a).localeCompare(key(b),"vi");
   const li=(x,d)=>{const t=x.team,subs=t&&!t.direct?(t.subs||[]):[],kidIds=new Set(x.kids.map(k=>k.id));
     const extra=subs.filter(s=>!kidIds.has(s.id));const has=x.kids.length||extra.length,op=TM.open.has(x.id)||(!TM.open.size&&d===0);
     const row=`<button class="tm-tr${d===0?" drv":""}${t?" team":""}" data-tmtg="${esc(x.id)}"><span class="tw">${has?(op?"▾":"▸"):""}</span><span class="tm-fic" style="width:22px;height:22px">${tmFolderSvg}</span><span class="nm">${esc(t&&!t.drive?t.name:nm(x))}</span><span class="ct">${cnt(x).toLocaleString("vi-VN")}</span>${t?(t.direct?`<a class="op" href="${tmDrv(t)}" target="_blank" rel="noopener">Mở Drive ↗</a>`:`<span class="op" data-tmpb="${esc(t.pb)}">Xem file ›</span>`):""}</button>`;
-    const sub=op&&has?`<ul>${x.kids.sort((a,b)=>key(a).localeCompare(key(b),"vi")).map(k=>{const s=t&&subs.find(z=>z.id===k.id);return s&&!k.team?li2(k,t,s,d+1):li(k,d+1)}).join("")}${extra.map(s=>`<li><button class="tm-tr" data-tmpb="${esc(t.pb)}" data-tmsubgo="${esc(s.n)}"><span class="tw"></span><span class="tm-sq" style="width:10px;height:10px;background:var(--muted)"></span><span class="nm">${esc(s.n)}</span><span class="ct">${s.c}</span></button></li>`).join("")}</ul>`:"";
+    const sub=op&&has?`<ul>${x.kids.sort(srt).map(k=>{const s=t&&subs.find(z=>z.id===k.id);return s&&!k.team?li2(k,t,s,d+1):li(k,d+1)}).join("")}${extra.map(s=>`<li><button class="tm-tr" data-tmpb="${esc(t.pb)}" data-tmsubgo="${esc(s.n)}"><span class="tw"></span><span class="tm-sq" style="width:10px;height:10px;background:var(--muted)"></span><span class="nm">${esc(s.n)}</span><span class="ct">${s.c}</span></button></li>`).join("")}</ul>`:"";
     return `<li>${row}${sub}</li>`};
   /* Thư mục con cấp 1 của một thư mục, bên trong lại có thư mục khác được gán (vd. Ảnh thương hiệu › Kho hình ảnh) */
   const li2=(k,t,s,d)=>{const op=TM.open.has(k.id);return `<li><button class="tm-tr" data-tmtg="${esc(k.id)}"><span class="tw">${op?"▾":"▸"}</span><span class="tm-sq" style="width:10px;height:10px;background:var(--muted)"></span><span class="nm">${esc(s.n)}</span><span class="ct">${s.c}</span><span class="op" data-tmpb="${esc(t.pb)}" data-tmsubgo="${esc(s.n)}">Xem file ›</span></button>${op?`<ul>${k.kids.map(z=>li(z,d+1)).join("")}</ul>`:""}</li>`};
-  return roots.length?`<div class="tm-tree"><ul>${roots.sort((a,b)=>key(a).localeCompare(key(b),"vi")).map(x=>li(x,0)).join("")}</ul></div>`:`<p class="hint">Chưa có thư mục nào.</p>`;
+  return roots.length?`<div class="tm-tree"><ul>${roots.sort(srt).map(x=>li(x,0)).join("")}</ul></div>`:`<p class="hint">Chưa có thư mục nào.</p>`;
 }
 function tmCardsView(){
   const T0=tmVisible(),tot=T0.reduce((a,t)=>a+(t.total||0),0);
