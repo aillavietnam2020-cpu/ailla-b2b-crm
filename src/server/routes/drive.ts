@@ -14,7 +14,7 @@ import {
   type DriveConfig,
   type DriveUser,
 } from '../lib/driveAccess';
-import { children, createFolder, download, fileInfo, meta, moveItem, recentFiles, saKey, streamVideo, thumbnail, type DriveFile } from '../services/gdrive';
+import { ancestors, children, createFolder, driveName, download, fileInfo, meta, moveItem, recentFiles, saKey, streamVideo, thumbnail, type DriveFile } from '../services/gdrive';
 import { setSyncPaused, syncDrivePermissions, syncPaused } from '../services/driveSync';
 import { addSubToIdx, moveInIdx, searchIdx, todoFor, weekStats, type IdxFile, type TodoItem } from '../lib/driveIndex';
 import { isStale, loadIdx, refreshIdx, saveIdx } from '../services/driveIndex';
@@ -287,6 +287,33 @@ driveRoutes.get('/download/:id', async (c) => {
 });
 
 /* ---------- Mục lục (chị Hoa duyệt demo 16/11): số file, nằm ở đâu, tìm không dấu, việc cần xử lý, báo cáo ---------- */
+type AncRow = { p: { id: string; n: string; o?: string }[]; d: string; at: string };
+async function loadAnc(db: D1Database, saJson: string | undefined, ids: string[]): Promise<Record<string, AncRow>> {
+  const row = await db.prepare("SELECT data FROM hub_blobs WHERE key = 'drive_anc'").first<{ data: string }>();
+  const all: Record<string, AncRow> = row ? JSON.parse(row.data) : {};
+  const key = saKey(saJson);
+  const miss = ids.filter((id) => !all[id] || Date.now() - Date.parse(all[id].at) > 86_400_000);
+  if (!key || !miss.length) return all;
+  for (const id of miss) {
+    try {
+      const p = await ancestors(key, id);
+      // Chính thư mục là gốc ổ dùng chung (vd. ổ 01, ổ 06): d = tên ổ để gom đúng nhánh.
+      const d = id.startsWith('0A') ? ((await driveName(key, id)) ?? '') : '';
+      all[id] = { p, d, at: nowIso() };
+    } catch {
+      /* lần sau thử lại */
+    }
+  }
+  await db
+    .prepare(
+      `INSERT INTO hub_blobs (key, data, admin_only, updated_at, updated_by) VALUES ('drive_anc', ?, 1, ?, NULL)
+       ON CONFLICT (key) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+    )
+    .bind(JSON.stringify(all), nowIso())
+    .run();
+  return all;
+}
+
 function later(c: { executionCtx: { waitUntil(p: Promise<unknown>): void } }, job: Promise<unknown>) {
   const safe = job.catch((e) => console.error('[drive idx]', e));
   try {
@@ -327,7 +354,10 @@ driveRoutes.get('/overview', async (c) => {
       added: wk.added, edited: wk.edited, todo: td.length,
     };
   });
-  return ok(c, { teams: out, todo: todo.slice(0, 500), can_manage: ceo });
+  // Đường đi tới từng thư mục (ổ › … › thư mục) cho chế độ xem cây; cất ở hub_blobs 'drive_anc', thiếu mới hỏi Drive.
+  const anc = await loadAnc(c.env.DB, c.env.GDRIVE_SA_JSON, teams.map((t) => t.folderId));
+  const outA = out.map((t) => ({ ...t, anc: anc[t.folder_id]?.p ?? [], drive: anc[t.folder_id]?.d ?? '' }));
+  return ok(c, { teams: outA, todo: todo.slice(0, 500), can_manage: ceo });
 });
 
 /** File của một thư mục (từ mục lục), lọc theo thư mục con cấp 1; mục lục cũ hơn 15 phút thì quét lại ngầm. */

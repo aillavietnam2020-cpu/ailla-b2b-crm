@@ -8,7 +8,7 @@
    - Tài liệu chuẩn (quy trình, biểu mẫu) để ở Thư viện tài liệu của khu Đào tạo; trang này chỉ cho file làm hằng ngày.
    - Nhãn trên màn hình theo vai trò, không ghi tên người (chị Hoa 02/11).
    ===================================================================== */
-const TM={teams:null,err:"",pb:"",folder:"",busy:false,q:"",find:null,findKey:"",tab:"thumuc",sub:"",inq:"",kf:"",menu:"",mv:null,mto:null,mq:"",mvBusy:false,file:null,fl:{},ov:null,ovErr:"",tt:"",cfg:null,cfgErr:"",saving:false,sync:null};
+const TM={teams:null,err:"",pb:"",folder:"",busy:false,q:"",find:null,findKey:"",tab:"thumuc",sub:"",inq:"",kf:"",menu:"",mv:null,mto:null,mq:"",mvBusy:false,file:null,fl:{},ov:null,ovErr:"",view:(()=>{try{return localStorage.getItem("tmView")||"bang"}catch(e){return "bang"}})(),open:new Set(),tt:"",cfg:null,cfgErr:"",saving:false,sync:null};
 ICONS.folder='<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>';
 const TM_KIND={sheet:["Bảng tính","XLS","grn"],doc:["Tài liệu","DOC","blu"],slide:["Trình chiếu","PPT","amb"],pdf:["PDF","PDF","gry"],vid:["Video","MP4","pnk"],img:["Ảnh","IMG","amb"],link:["Lối tắt","↗","gry"],other:["Khác","FILE","gry"]};
 const tmOn=()=>typeof PAGE!=="undefined"&&(PAGE==="thumuc"||PAGE==="thumuc_gan"||PAGE==="cv_pb");
@@ -62,6 +62,11 @@ async function tmFind(){
 const tmCss=`<style>
   .tm-wrap{min-width:0}
   .tm-tabs .sp{flex:1}
+  .tm-vt{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.tm-vt button{border:0;background:none;padding:6px 13px;cursor:pointer;color:inherit;font:inherit;font-size:13px}.tm-vt button.on{background:var(--accent,#4b54d1);color:#fff}
+  .tm-tree{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 10px;max-width:760px}.tm-tree ul{list-style:none;margin:0;padding-left:20px}.tm-tree>ul{padding-left:0}
+  .tm-tr{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:8px;cursor:pointer;border:0;background:none;width:100%;text-align:left;color:inherit;font:inherit}.tm-tr:hover{background:var(--gray-soft)}
+  .tm-tr .tw{width:14px;color:var(--muted);font-size:11px;flex:none}.tm-tr .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tm-tr .ct{color:var(--muted);font-size:12px}
+  .tm-tr.drv .nm{font-weight:700}.tm-tr.team .nm{font-weight:600}.tm-tr .op{font-size:12px;color:var(--blue);margin-left:6px;white-space:nowrap}
   .tm-sec{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px}
   .tm-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
   .tm-fc{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:9px;min-width:0;text-align:left;color:inherit;font:inherit}
@@ -184,13 +189,41 @@ function tmCard(t){
    <span class="tm-tag ${t.edit?"w":""}">${t.edit?"Được sửa":"Chỉ xem"}</span></button>`;
 }
 function tmVisible(){const T=(TM.ov&&TM.ov.teams)||[];return TM.scope?T.filter(t=>t.pb===TM.scope||t.shared):T}
+/* Chế độ Bảng (chị Hoa 23/11): thư mục chung công ty lên đầu, chỉ 4 mục; báo cáo để riêng; thư mục chung cũ chỉ còn ở chế độ Cây. */
+const TM_TOP=["chung6","chung7","chung8","chung9"],TM_REP=["chung10","chung11"];
+const tmViewBar=()=>`<div class="tm-vt" role="group" aria-label="Kiểu xem"><button class="${TM.view!=="cay"?"on":""}" data-tmview="bang">▦ Bảng</button><button class="${TM.view==="cay"?"on":""}" data-tmview="cay">🌳 Cây thư mục</button></div>`;
+/* Chế độ Cây: ổ › … › thư mục phòng › thư mục con, dựng từ đường đi (anc) máy chủ gửi; chỉ có nhánh người này được xem. */
+function tmTreeView(){
+  const T=tmVisible(),N=new Map(),roots=[];
+  const node=(id,n,o)=>{let x=N.get(id);if(!x){x={id,n,o,kids:[],team:null};N.set(id,x)}else if(n&&!x.n)x.n=n;return x};
+  const link=(par,ch)=>{if(par&&!par.kids.includes(ch))par.kids.push(ch);if(!par&&!roots.includes(ch))roots.push(ch)};
+  T.forEach(t=>{const A=t.anc||[];let par=null;
+    A.forEach(a=>{const x=node(a.id,a.n,a.o);link(par,x);par=x});
+    const me=node(t.folder_id,t.drive||t.name,t.drive?"drive":"");me.team=t;if(t.drive)me.n=t.drive;link(par,me)});
+  /* Gốc ổ trùng với một thư mục chung (ổ 01, 06): node gốc chính là thư mục đó */
+  const cnt=x=>x.team?(x.team.total||0):x.kids.reduce((a,k)=>a+cnt(k),0);
+  const nm=x=>x.o==="old"?"Drive cũ (chưa chuyển sang ổ mới)":x.n;
+  const key=x=>(x.o==="old"?"~":"")+nm(x);
+  const li=(x,d)=>{const t=x.team,subs=t&&!t.direct?(t.subs||[]):[],kidIds=new Set(x.kids.map(k=>k.id));
+    const extra=subs.filter(s=>!kidIds.has(s.id));const has=x.kids.length||extra.length,op=TM.open.has(x.id)||(!TM.open.size&&d===0);
+    const row=`<button class="tm-tr${d===0?" drv":""}${t?" team":""}" data-tmtg="${esc(x.id)}"><span class="tw">${has?(op?"▾":"▸"):""}</span><span class="tm-fic" style="width:22px;height:22px">${tmFolderSvg}</span><span class="nm">${esc(t&&!t.drive?t.name:nm(x))}</span><span class="ct">${cnt(x).toLocaleString("vi-VN")}</span>${t?(t.direct?`<a class="op" href="${tmDrv(t)}" target="_blank" rel="noopener">Mở Drive ↗</a>`:`<span class="op" data-tmpb="${esc(t.pb)}">Xem file ›</span>`):""}</button>`;
+    const sub=op&&has?`<ul>${x.kids.sort((a,b)=>key(a).localeCompare(key(b),"vi")).map(k=>{const s=t&&subs.find(z=>z.id===k.id);return s&&!k.team?li2(k,t,s,d+1):li(k,d+1)}).join("")}${extra.map(s=>`<li><button class="tm-tr" data-tmpb="${esc(t.pb)}" data-tmsubgo="${esc(s.n)}"><span class="tw"></span><span class="tm-sq" style="width:10px;height:10px;background:var(--muted)"></span><span class="nm">${esc(s.n)}</span><span class="ct">${s.c}</span></button></li>`).join("")}</ul>`:"";
+    return `<li>${row}${sub}</li>`};
+  /* Thư mục con cấp 1 của một thư mục, bên trong lại có thư mục khác được gán (vd. Ảnh thương hiệu › Kho hình ảnh) */
+  const li2=(k,t,s,d)=>{const op=TM.open.has(k.id);return `<li><button class="tm-tr" data-tmtg="${esc(k.id)}"><span class="tw">${op?"▾":"▸"}</span><span class="tm-sq" style="width:10px;height:10px;background:var(--muted)"></span><span class="nm">${esc(s.n)}</span><span class="ct">${s.c}</span><span class="op" data-tmpb="${esc(t.pb)}" data-tmsubgo="${esc(s.n)}">Xem file ›</span></button>${op?`<ul>${k.kids.map(z=>li(z,d+1)).join("")}</ul>`:""}</li>`};
+  return roots.length?`<div class="tm-tree"><ul>${roots.sort((a,b)=>key(a).localeCompare(key(b),"vi")).map(x=>li(x,0)).join("")}</ul></div>`:`<p class="hint">Chưa có thư mục nào.</p>`;
+}
 function tmCardsView(){
-  const T=tmVisible(),own=T.filter(t=>!t.shared),sh=T.filter(t=>t.shared),tot=T.reduce((a,t)=>a+(t.total||0),0);
+  const T0=tmVisible(),tot=T0.reduce((a,t)=>a+(t.total||0),0);
+  const T=T0.filter(t=>!t.shared||TM_TOP.includes(t.pb)||TM_REP.includes(t.pb)||TM.scope);
+  const own=T.filter(t=>!t.shared),sh=TM_TOP.map(pb=>T.find(t=>t.pb===pb)).filter(Boolean),rp=TM_REP.map(pb=>T.find(t=>t.pb===pb)).filter(Boolean);
   const PJ=TM.scope&&typeof kpbPrj==="function"?kpbPrj(kpbTeam(TM.scope)).filter(p=>p.drive):[];
-  return `<div class="tm-hd"><div><h2>${TM.scope?"Thư mục của "+esc(typeof kpbName==="function"?kpbName(TM.scope):TM.scope):"Thư mục làm việc"}</h2><p>Xem file theo phòng và thư mục con, không cần biết file nằm ở đâu trên Drive · ${T.length} thư mục · ${tot.toLocaleString("vi-VN")} file</p></div>
-   <div class="act">${TM.scope?`<button class="btn sm" id="tm-back">‹ Về phòng</button>`:""}</div></div>
+  return `<div class="tm-hd"><div><h2>${TM.scope?"Thư mục của "+esc(typeof kpbName==="function"?kpbName(TM.scope):TM.scope):"Thư mục làm việc"}</h2><p>Xem file theo phòng và thư mục con, không cần biết file nằm ở đâu trên Drive · ${T0.length} thư mục · ${tot.toLocaleString("vi-VN")} file</p></div>
+   <div class="act">${tmViewBar()}${TM.scope?`<button class="btn sm" id="tm-back">‹ Về phòng</button>`:""}</div></div>
+   ${TM.view==="cay"?tmTreeView():`${!TM.scope&&sh.length?`<div class="tm-sec">Thư mục chung công ty</div><div class="tm-cards">${sh.map(tmCard).join("")}</div>`:""}
    ${own.length?`<div class="tm-sec">Thư mục phòng</div><div class="tm-cards">${own.map(tmCard).join("")}</div>`:`<div class="note">Phòng ${TM.scope?"này":"của bạn"} chưa được gán thư mục Drive.${TM.ov&&TM.ov.can_manage?" Gán ở tab Gán thư mục cho phòng ban.":" Nhờ CEO gán thư mục cho phòng."}</div>`}
-   ${sh.length?`<div class="tm-sec">Tư liệu chung</div><div class="tm-cards">${sh.map(tmCard).join("")}</div>`:""}
+   ${rp.length?`<div class="tm-sec">Báo cáo</div><div class="tm-cards">${rp.map(tmCard).join("")}</div>`:""}
+   ${TM.scope&&sh.length?`<div class="tm-sec">Tư liệu chung</div><div class="tm-cards">${sh.map(tmCard).join("")}</div>`:""}`}
    ${TM.scope?`<div class="tm-sec">Thư mục dự án</div>${PJ.length?`<div class="tm-cards">${PJ.map(p=>`<a class="gd-pj" href="${esc(p.drive)}" target="_blank" rel="noopener" title="Mở trên Google Drive">${tmFolderSvg}<span>${esc(p.ten)}</span></a>`).join("")}</div>`:`<p class="hint">Chưa có dự án nào gắn thư mục</p>`}`:""}`;
 }
 function tmDeptStrip(){
@@ -361,7 +394,10 @@ function pThuMuc(m){
 function tmBind(m){
   const go=()=>{renderMain();scrollTo(0,0)};
   m.querySelectorAll("[data-tmt]").forEach(b=>b.onclick=()=>{TM.tab=b.dataset.tmt;TM.file=null;if(TM.tab==="thumuc"){TM.pb="";TM.sub=""}go()});
-  m.querySelectorAll("[data-tmpb]").forEach(b=>b.onclick=()=>{TM.tab="thumuc";TM.pb=b.dataset.tmpb;TM.sub=b.dataset.tmsubgo||"";TM.inq="";TM.kf="";TM.file=null;go()});
+  m.querySelectorAll("[data-tmview]").forEach(b=>b.onclick=()=>{TM.view=b.dataset.tmview;try{localStorage.setItem("tmView",TM.view)}catch(e){}renderMain()});
+  m.querySelectorAll("[data-tmtg]").forEach(b=>b.onclick=e=>{if(e.target.closest("[data-tmpb],a"))return;const k=b.dataset.tmtg;
+    if(!TM.open.size)m.querySelectorAll(".tm-tree>ul>li>[data-tmtg]").forEach(r=>TM.open.add(r.dataset.tmtg));TM.open.has(k)?TM.open.delete(k):TM.open.add(k);renderMain()});
+  m.querySelectorAll("[data-tmpb]").forEach(b=>b.onclick=e=>{e.stopPropagation();TM.tab="thumuc";TM.pb=b.dataset.tmpb;TM.sub=b.dataset.tmsubgo||"";TM.inq="";TM.kf="";TM.file=null;go()});
   m.querySelectorAll("[data-tmhome]").forEach(b=>b.onclick=()=>{TM.pb="";TM.sub="";TM.file=null;TM.inq="";TM.kf="";go()});
   m.querySelectorAll("[data-tmsub]").forEach(b=>b.onclick=e=>{if(e.target.closest("[data-tmmv],[data-tmdots],.tm-menu,.tm-mbk"))return;TM.sub=b.dataset.tmsub;TM.kf="";TM.file=null;renderMain()});
   m.querySelectorAll("[data-tmkf]").forEach(b=>b.onclick=()=>{TM.kf=b.dataset.tmkf;renderMain()});

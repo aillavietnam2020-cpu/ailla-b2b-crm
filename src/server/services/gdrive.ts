@@ -101,6 +101,30 @@ export async function meta(key: SaKey, id: string): Promise<DriveMeta | null> {
   return v;
 }
 
+/** Tên ổ dùng chung (mã gốc ổ bắt đầu "0A"). */
+export async function driveName(key: SaKey, id: string): Promise<string | null> {
+  const d = await get<{ name?: string }>(key, `${API}/drives/${encodeURIComponent(id)}?fields=name`);
+  return d?.name ?? null;
+}
+
+/**
+ * Đường từ gốc tới thư mục cha của `id` (không gồm chính nó), mỗi bậc { id, n }; bậc đầu là ổ dùng chung
+ * (tên thật của ổ) hoặc gốc Drive của tài khoản (o: 'old'). Dùng cho chế độ xem cây ở trang Thư mục làm việc.
+ */
+export async function ancestors(key: SaKey, id: string): Promise<{ id: string; n: string; o?: string }[]> {
+  const out: { id: string; n: string; o?: string }[] = [];
+  let cur = (await meta(key, id))?.parents?.[0];
+  for (let i = 0; cur && i < 12; i++) {
+    const m = await meta(key, cur);
+    if (!m) break;
+    const root = !m.parents.length;
+    const sd = root && cur.startsWith('0A') ? await driveName(key, cur) : null;
+    out.unshift(root ? { id: cur, n: sd ?? m.name, o: sd ? 'drive' : 'old' } : { id: cur, n: m.name });
+    cur = m.parents[0];
+  }
+  return out;
+}
+
 async function listQuery(key: SaKey, q: string, orderBy: string, max: number): Promise<DriveFile[]> {
   const out: DriveFile[] = [];
   let page = '';
