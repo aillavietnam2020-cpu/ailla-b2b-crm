@@ -79,7 +79,7 @@ describe('Nhập nhanh link video', () => {
     expect(p.map((x: any) => [x.to, x.st])).toEqual([
       ['TT-0771', 'ok'],
       ['TT-0770', 'ok'],
-      ['', 'full'],
+      ['', 'new'],
       ['', 'dup'],
       ['', 'nosku'],
     ]);
@@ -115,6 +115,19 @@ describe('Nhập nhanh link video', () => {
     expect(c('TT-0771').nguoiLam).toBe('u_lead');
     expect(JSON.stringify(c('TT-0771').history)).toContain('dòng giao cho Nhân sự Content');
     expect(c('TT-0770').nguoiEdit).toBe('u_q');
+  });
+
+  it('kênh đã hết dòng trống: tạo dòng mới ngoài kế hoạch, tính cho người làm', async () => {
+    const r = await ctx.request('/api/hub/video-links', {
+      as: USERS.manager,
+      body: { items: [{ url: L('1newNEWnew21'), sp: 'AR', kenh: 'TikTok Via 1' }, { url: L('1newNEWnew22'), sp: 'AR', kenh: 'TikTok Via 1' }] },
+    });
+    expect(r.body.data.saved).toBe(2);
+    const d = await hub();
+    const c90 = d.cards.find((x: any) => x.id === 'TT-0790');
+    expect(c90).toMatchObject({ step: 'dvd', linkVideo: L('1newNEWnew21') });
+    const nw = d.cards.find((x: any) => x.linkVideo === L('1newNEWnew22'));
+    expect(nw).toMatchObject({ id: 'TT-0791', kenh: 'TikTok Via 1', sku: 'AR', step: 'dvd', mix: 'oneshot', phatSinh: true, nguoiLam: 'u_q' });
   });
 
   it('người ngoài team Content không nhập được', async () => {

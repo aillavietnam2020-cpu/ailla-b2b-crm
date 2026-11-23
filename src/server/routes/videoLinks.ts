@@ -121,7 +121,8 @@ videoLinkRoutes.post('/', async (c) => {
       const free0 = (x: Card) =>
         x.sku === sku && OPEN.includes(x.step ?? '') && !x.linkVideo && !x.linkFinal && !x.fpId && x.mix !== 'ton';
       const free = (x: Card) => free0(x) && (!kn || x.kenh === kn);
-      const kenhs = sku ? [...new Set(cards.filter(free0).map((x) => String(x.kenh ?? '')).filter(Boolean))] : [];
+      /* kênh chọn được: mọi kênh đã có video của sản phẩm này (23/11: May làm thêm Tinh dầu cho kênh đã hết dòng trống) */
+      const kenhs = sku ? [...new Set(cards.filter((x) => x.sku === sku).map((x) => String(x.kenh ?? '')).filter(Boolean))] : [];
       // dòng giao cho chính người nộp trước, rồi theo mã
       const opts = sku
         ? cards
@@ -137,10 +138,11 @@ videoLinkRoutes.post('/', async (c) => {
         if (opts.some((x) => x.id === it.to) && !used.has(it.to)) to = it.to;
       } else to = opts.find((x) => !used.has(x.id))?.id ?? '';
       if (to) used.add(to);
-      const st = !id ? 'bad' : dup ? 'dup' : !sku ? 'nosku' : !to ? 'full' : 'ok';
+      /* kênh đã hết dòng trống: tạo dòng mới khi lưu (làm vượt kế hoạch vẫn nộp được) */
+      const st = !id ? 'bad' : dup ? 'dup' : !sku ? 'nosku' : !to ? 'new' : 'ok';
       return { url: it.url, name, sku, sp: sku ? prods.find((p) => p.k === sku)?.n ?? sku : '', to, kenh: to ? cards.find((x) => x.id === to)?.kenh ?? '' : '', kenhSel: it.kenh, nguon: it.nguon, nguoi: maker(it.nguoi), kenhs, st, opts: opts.map((x) => x.id) };
     });
-    const go = plan.filter((p) => p.st === 'ok' || p.st === 'kho');
+    const go = plan.filter((p) => p.st === 'ok' || p.st === 'kho' || p.st === 'new');
     if (b.dry || !go.length) return ok(c, { plan, saved: 0, drive: !!key });
 
     const at = nowIso();
@@ -163,7 +165,14 @@ videoLinkRoutes.post('/', async (c) => {
         count[p.sp] = (count[p.sp] ?? 0) + 1;
         continue;
       }
-      const x = cards.find((y) => y.id === p.to);
+      let x = cards.find((y) => y.id === p.to);
+      if (!x && p.st === 'new' && p.kenhSel) {
+        const seq = Math.max(Number((d as { cardSeq?: number }).cardSeq) || 0, ...cards.map((y) => Number(String(y.id ?? '').replace(/\D/g, '')) || 0)) + 1;
+        const thang = cards.find((y) => y.thang)?.thang ?? vn.slice(0, 7);
+        x = { id: 'TT-' + String(seq).padStart(4, '0'), thang, day: 0, sku: p.sku, kenh: p.kenhSel, mix: 'oneshot', loai: 'moi', nguon: 'Quay mới', oneShot: true, dangVideo: 'One shot', hookText: '', yTuong: '', noiDung: '', caption: '', linkVideo: '', linkFinal: '', linkDang: '', tiktokId: '', ceo: 'CẦN KIỂM TRA', nguoi: p.nguoi, giao: p.nguoi, step: 'cg', nhapTay: true, phatSinh: true, view: 0, don: 0, gmv: 0, click: 0, history: [], createdAt: Date.now() } as Card;
+        cards.push(x);
+        d.cards = cards;
+      }
       if (!x) continue;
       x.linkVideo = p.url;
       const giao0 = x.nguoiEdit || x.nguoi;
