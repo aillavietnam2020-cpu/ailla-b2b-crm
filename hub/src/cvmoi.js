@@ -411,7 +411,7 @@ const CW_MY=[
   ["giao","send","Tôi giao - theo dõi",R=>R.filter(r=>cwOpen(r)&&(cwGiao(r)||cwFollow(r)))],
   ["rv","cc","Chờ duyệt",R=>R.filter(r=>r.rv)],
   ["nodue","inbox","Chưa có hạn",R=>R.filter(r=>cwOpen(r)&&!r.han&&(cwMine(r)||cwGiao(r)))],
-  ["lap","rep","Việc định kỳ",R=>R.filter(r=>r.tpl&&(cwMine(r)||cwGiao(r)))],
+  ["lap","rep","Việc định kỳ",R=>R.filter(r=>r.tpl&&r.st!=="done"&&(cwMine(r)||cwGiao(r)))],
   ["done","chk","Hoàn thành",R=>R.filter(r=>!cwOpen(r)&&(cwMine(r)||cwGiao(r)))]];
 const CW_MYD={today:"việc cần làm ngay",soon:"Việc của bạn chia theo ngày mai, tuần này, sau đó",giao:"Việc bạn giao cho người khác, việc trễ lên đầu",rv:"Bấm Duyệt hoặc Cần sửa ngay tại dòng",
   td:"Việc người khác làm mà bạn được thêm vào ô Người theo dõi, để biết tiến độ",nodue:"Việc để dành, khi nào làm thì đặt hạn",lap:"Việc tự giao theo mẫu lặp lại hằng ngày, mỗi tuần, mỗi tháng",done:"Việc đã hoàn thành trong tháng này"};

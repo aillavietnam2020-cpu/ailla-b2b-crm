@@ -25,13 +25,14 @@ const pdAny=()=>{if(!ME)return false;const w=pdWho(),P=n=>w.perms.includes(n);re
 const pdYm=back=>{const d=new Date(Date.now()+7*3600e3);d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-back);return d.toISOString().slice(0,7)};
 async function pdLoad(force){
   if(PD.busy||!ME||typeof svApi!=="function")return;if(!force&&PD.at&&Date.now()-PD.at<60000)return;
-  PD.busy=true;const w=pdWho(),P=n=>w.perms.includes(n),ceo=w.role==="CEO",get=p=>svApi(p).catch(()=>[]);
+  PD.busy=true;const w=pdWho(),P=n=>w.perms.includes(n),ceo=w.role==="CEO",get=p=>svApi(p).catch(()=>[]);let mhP=null;
   try{
     const ap=P("order.approve.normal")||P("order.approve.exception"),th=ceo||P("order.approve.normal");
     const months=[0,1,2].map(pdYm);
     const kt=P("order.accounting.confirm");
     const mhOk=ceo||w.admin||P("order.approve.normal")||kt;
-    const [mhLech,cs,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,...bon]=await Promise.all([mhOk?get("/api/hub/kho/mh/lech"):[],svApi("/api/ceo-spend").catch(()=>null),ceo?get("/api/ceo-spend/pending"):[],
+    mhP=mhOk?get("/api/hub/kho/mh/lech"):null;
+    const [cs,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,...bon]=await Promise.all([svApi("/api/ceo-spend").catch(()=>null),ceo?get("/api/ceo-spend/pending"):[],
       ceo||kt?get("/api/work/queue/pay_confirm"):[],kt?get("/api/returns?status=DA_NHAN_KHO"):[],
       ap?get("/api/approvals?status=PENDING"):[],th?get("/api/orders/ship-edits"):[],get("/api/proposals?status=PENDING"),
       ...months.flatMap(m=>th?[get("/api/bonus/gifts?month="+m),get("/api/bonus/cash?month="+m)]:[])]);
@@ -40,9 +41,11 @@ async function pdLoad(force){
     const kppCode=ceo||P("order.approve.normal")?((await svApi("/api/hub/sanpham/kpp-code/pending").catch(()=>({rows:[]}))).rows||[]):[];
     const ccXn=w.ns||ceo?((await get("/api/hub/chamcong/xac-nhan")).list||[]):[];
     const nsDon=w.ns?((await get("/api/hub/nghiphep/duyet")).list||[]):[],nsTu=w.ns||ceo?((await get("/api/hub/nghiphep/tamung")).list||[]):[];
-    PD.sv={kppCode,mhLech:Array.isArray(mhLech)?mhLech:[],combo,ccXn,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
+    PD.sv={kppCode,mhLech:(PD.sv&&PD.sv.mhLech)||[],combo,ccXn,nsDon,nsTu,ceoSpend,payConfirm,returns,approvals,shipEdits,proposals,gifts:bon.filter((x,i)=>i%2===0).flat(),cash:bon.filter((x,i)=>i%2===1).flat()};PD.err=""}
   catch(e){PD.err=e.message||"Không tải được"}
-  PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();pdBadge()}
+  PD.at=Date.now();PD.busy=false;if(PAGE==="pheduyet")renderMain();pdBadge();
+  /* hàng lệch về sau: cập nhật vào danh sách rồi vẽ lại (25/11: trước đây chờ cái này ~8 giây, trang Chờ duyệt trống) */
+  if(mhP)mhP.then(x=>{if(PD.sv){PD.sv.mhLech=Array.isArray(x)?x:[];if(PAGE==="pheduyet"||(PAGE==="cv_v"&&typeof CWS!=="undefined"&&CWS.my==="rv"))renderMain();pdBadge()}})}
 /* Dữ liệu máy chủ (tải ở trên) + phiếu đang chờ trong dữ liệu chung của web (đọc ngay, luôn mới). */
 function pdRows(){
   const d=(typeof D==="function"&&D())||{},h=d.hr||{};
