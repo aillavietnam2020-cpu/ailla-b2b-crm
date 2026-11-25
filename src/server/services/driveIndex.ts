@@ -40,6 +40,8 @@ export async function crawlTeam(key: NonNullable<ReturnType<typeof saKey>>, team
       for (const f of lists[wi]) {
         if (f.mimeType === 'application/vnd.google-apps.folder') {
           if (skip.has(f.id)) continue;
+          // 25/11 chị Hoa bỏ cách ghim bằng thư mục Drive; thư mục "📌 Ghim" cũ (trống) không hiện trên web.
+          if (!cur.path.length && f.name === '📌 Ghim') continue;
           if (!cur.path.length) subs.push({ id: f.id, n: f.name });
           queue.push({ id: f.id, sub: cur.sub || f.name, path: [...cur.path, f.name] });
           continue;
