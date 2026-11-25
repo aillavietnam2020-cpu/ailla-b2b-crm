@@ -130,7 +130,7 @@ const CW_CSS3=`#cw-dabox{font-size:13.5px;line-height:1.6}#cw-dabox b,#cw-dabox 
 .cwtt b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.cwtt small span{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:inline-block}.cwrow .cwpg{height:auto;overflow:visible;background:none;margin:5px 0 0;border-radius:0}.cwrow .cwpg small{white-space:nowrap;display:block;margin-top:3px}
 [class^="cw"],[class*=" cw"]{font-family:Inter,var(--f)}
 .cwrow{padding:11px 14px;column-gap:12px}.cwtt b{font-size:14px;font-weight:600;line-height:1.5;letter-spacing:.005em}.cwtt small{font-size:12px;line-height:1.6;margin-top:1px;gap:6px 12px}.cwwho,.cwdue{font-size:13px}.cwst .pill{font-size:12px;padding:2px 9px}.cwwho i.av{width:22px;height:22px;font-size:10px}.cwck{width:18px;height:18px}.cwcard>h3,.cwcard h3{padding-top:12px;padding-bottom:12px}
-.cwtl .cwtx b{font-size:13.5px;font-weight:600;line-height:1.45}.cwtl .cwtx small{font-size:12px;line-height:1.45}.cwev2{padding:10px 14px;line-height:1.5}.cwev2 b{font-weight:600;font-size:13.5px;line-height:1.5}.cwev2 small,.cwev2 time{line-height:1.5}
+.cwtl .cwtx b{font-size:13.5px;font-weight:600;line-height:1.45}.cwtl .cwtx small{font-size:12px;line-height:1.45}.cwev2{padding:10px 14px;line-height:1.5}.cwdocs2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px}.cwdocs2>.cwcard{margin:0}@media(max-width:900px){.cwdocs2{grid-template-columns:1fr}}.cwdoc{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding-right:12px}.cwdoc .cwdpin{border:1px solid var(--line,#e7e9f0);background:#fff;border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;color:var(--muted,#6b7385);opacity:0;transition:opacity .15s}.cwdoc:hover .cwdpin,.cwdoc .cwdpin.on,.cwdoc .cwdpin:focus-visible{opacity:1}.cwdoc .cwdpin.on{color:#4b54d1}@media(hover:none){.cwdoc .cwdpin{opacity:1}}.cwev2 b{font-weight:600;font-size:13.5px;line-height:1.5}.cwev2 small,.cwev2 time{line-height:1.5}
 .cwkp span{line-height:1.5}.cwdkk span,.cwdkk b{line-height:1.5}.cwdkk b{font-weight:600}.cwhd h1,.cwht h1{line-height:1.4;font-weight:700}.cwtabs button{line-height:1.5}
 `;
 function cwCss(){if(document.getElementById("cw-css"))return;const s=document.createElement("style");s.id="cw-css";s.textContent=CW_CSS+CW_CSS2+CW_CSS3;document.head.appendChild(s)}
@@ -493,8 +493,17 @@ function cwDocs(){if(typeof TM==="undefined"||typeof tmOv!=="function"||typeof t
   if(!TM.ov){if(!TM.ovBusy&&!CWS.tmTry){CWS.tmTry=1;tmOv().then(()=>{if(PAGE==="cv_v"&&MOD==="cv")renderMain()}).catch(()=>{})}return ""}
   const T=tmVisible().filter(t=>!t.direct);if(!T.length)return "";
   if(!CWS.docs&&!CWS.docsBusy){CWS.docsBusy=1;Promise.all(T.map(t=>svApi("/api/drive/files?pb="+encodeURIComponent(t.pb)).then(r=>(r.files||[]).map(f=>({...f,pbn:t.name}))).catch(()=>[]))).then(a=>{CWS.docs=a.flat().filter(f=>f.kind!=="vid"&&f.kind!=="link"&&!/\.(md|json|log|txt)$/i.test(f.name||"")&&!/nhật ký/iu.test(f.name||"")).sort((x,y)=>String(y.modified||"").localeCompare(String(x.modified||""))).slice(0,6);CWS.docsBusy=0;if(PAGE==="cv_v"&&MOD==="cv")renderMain()})}
-  const L=CWS.docs;if(!L)return "";if(!L.length)return "";
-  return `<section class="cwcard cwws" style="margin-top:14px"><h3>${cwI("fold")}Tài liệu gần đây<span class="c">file mới sửa trên Google Drive, không gồm video và nhật ký hệ thống</span><button type="button" class="btn sm" data-cwtmall="1" style="margin-left:auto">Xem tất cả</button></h3>${L.map(f=>`<a class="cwev2" href="${esc(f.link)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;grid-template-columns:70px 4px minmax(0,1fr)"><time>${typeof tmTime==="function"?tmTime(f.modified):""}</time><i></i><span><b>${esc(f.name)}</b><small>${esc(f.pbn)}${f.by?" · "+esc(f.by)+" sửa":""}</small></span></a>`).join("")}</section>`}
+  const L=CWS.docs||[];
+  /* 25/11 chị Hoa: chia 2 khổ, Tài liệu gần đây | Tài liệu ghim. Ghim lưu trong dữ liệu chung, mỗi người một danh sách riêng. */
+  const pins=cwDocPins(),pinIds=new Set(pins.map(x=>x.id)),when=f=>typeof tmTime==="function"?tmTime(f.modified):"";
+  const row=(f,pinned)=>`<div class="cwdoc"><a class="cwev2" href="${esc(f.link)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;grid-template-columns:70px 4px minmax(0,1fr)"><time>${pinned?"📌":when(f)}</time><i></i><span><b>${esc(f.name)}</b><small>${esc(f.pbn||"")}${f.by?" · "+esc(f.by)+" sửa":""}</small></span></a><button type="button" class="cwdpin${pinned||pinIds.has(f.id)?" on":""}" data-cwdpin="${esc(f.id)}" title="${pinned||pinIds.has(f.id)?"Bỏ ghim":"Ghim tài liệu"}">${pinned||pinIds.has(f.id)?"Bỏ ghim":"📌 Ghim"}</button></div>`;
+  if(!L.length&&!pins.length)return "";
+  return `<div class="cwdocs2"><section class="cwcard cwws"><h3>${cwI("fold")}Tài liệu gần đây<span class="c">file mới sửa trên Drive, không gồm video và nhật ký hệ thống</span><button type="button" class="btn sm" data-cwtmall="1" style="margin-left:auto">Xem tất cả</button></h3>${L.length?L.map(f=>row(f,false)).join(""):'<p class="cwempty">Chưa có tài liệu mới.</p>'}</section>
+  <section class="cwcard cwws"><h3>📌 Tài liệu ghim<span class="c">bấm Ghim ở tài liệu bên cạnh để giữ lại đây</span></h3>${pins.length?pins.map(f=>row(f,true)).join(""):'<p class="cwempty">Chưa ghim tài liệu nào.</p>'}</section></div>`}
+const cwDocPins=()=>(((D().docPins||{})[ME.id])||[]);
+function cwDocPin(id){const f=(CWS.docs||[]).find(x=>x.id===id)||cwDocPins().find(x=>x.id===id);if(!f)return;const on=cwDocPins().some(x=>x.id===id);
+  DB.mutate(ME.name,(on?"bỏ ghim ":"ghim ")+"tài liệu "+f.name,dt=>{dt.docPins=dt.docPins||{};const A=dt.docPins[ME.id]=(dt.docPins[ME.id]||[]).filter(x=>x.id!==id);if(!on)A.unshift({id:f.id,name:f.name,link:f.link,pbn:f.pbn||"",at:Date.now()});dt.docPins[ME.id]=A.slice(0,20)});
+  toast(on?"Đã bỏ ghim":"Đã ghim");renderMain()}
 function cwWs(){const d=D(),T=d.tasks||[],boss=cwBoss(),mine=t=>t.nguoi===ME.id||t.tao===ME.id||(t.phoi||[]).includes(ME.id);
   const P=(d.projects||[]).map(p=>{const X=T.filter(t=>t.da===p.id);return boss||p.owner===ME.id||X.some(mine)?{p,X}:null}).filter(Boolean);
   if(!P.length)return "";
@@ -524,6 +533,7 @@ function cwMy(m){cwCss();PAGE="cv_v";
   m.querySelectorAll("[data-cwmy]").forEach(b=>b.onclick=()=>{CWS.my=b.dataset.cwmy;renderMain();scrollTo(0,0)});
   m.querySelectorAll("[data-cwtm]").forEach(b=>b.onclick=()=>{TM.tab="thumuc";TM.pb=b.dataset.cwtm;TM.sub="";TM.inq="";TM.file=null;cwGo("cv_pb")});
   m.querySelectorAll("[data-cwtmall]").forEach(b=>b.onclick=()=>{TM.tab="thumuc";TM.pb="";TM.sub="";TM.file=null;cwGo("cv_pb")});
+  m.querySelectorAll("[data-cwdpin]").forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cwDocPin(b.dataset.cwdpin)});
   m.querySelectorAll("[data-cwwsall]").forEach(b=>b.onclick=()=>{CWS.wsAll=!CWS.wsAll;renderMain()});
   m.querySelectorAll("[data-cwact]").forEach(b=>b.onclick=()=>{CWS.actN=+b.dataset.cwact;renderMain()});
   m.querySelectorAll("[data-cwws]").forEach(b=>b.onclick=()=>{const p=(D().projects||[]).find(x=>x.id===b.dataset.cwws);if(typeof CVP!=="undefined"){CVP.q=p?p.ten:"";CVP.st="";CVP.ow="";CVP.uu=""}cwGo("cv_da")});
