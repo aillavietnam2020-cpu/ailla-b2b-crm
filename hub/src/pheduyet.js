@@ -90,7 +90,7 @@ async function pdAct(r,ok){
   let note=null;
   if(ok&&r.src==="payment"){if(!confirm("Xác nhận đã nhận "+nf(r.tien)+" đ của "+r.nd+"?"))return}
   else if(ok){if(!confirm("Duyệt: "+r.loai+" · "+r.nd+"?"+(r.src==="gift"?" Web tạo phiếu xuất kho quà như ở trang Thưởng NPP.":"")))return}
-  else{note=ask(r.src==="shipEdit"||r.src==="gift"||r.src==="cash"||r.src==="ceo_ship");if(note===null)return}
+  else{note=ask(r.src==="nsDon"||r.src==="shipEdit"||r.src==="gift"||r.src==="cash"||r.src==="ceo_ship");if(note===null)return}
   PD.doing[r.id]=1;renderMain();
   try{
     if(r.src==="approval")await post("/api/approvals/"+r.ref+"/decide",{decision:ok?"APPROVED":"REJECTED",note:note||null});
@@ -100,6 +100,7 @@ async function pdAct(r,ok){
       if(ok&&x&&x.ceo_status==="CHO"){toast("Đã duyệt. Khoản từ ngưỡng chi nên chuyển CEO duyệt");delete PD.doing[r.id];await pdLoad(true);return}}
     else if(r.src==="payment")await post("/api/payments/"+r.ref+"/confirm",{confirmed:true});
     else if(r.src==="ceo_ship")await post(ok?"/api/ceo-spend/ship/"+r.ref+"/approve":"/api/shipping-vouchers/"+r.ref+"/cancel",ok?{}:{reason:note});
+    else if(r.src==="nsDon")await post("/api/hub/nghiphep/don/"+r.ref+"/duyet",{ok,note:note||""});
     else if(r.src==="ceo_ncc")await post(ok?"/api/ceo-spend/ncc/"+r.ref+"/approve":"/api/hub/kho/mh/payments/"+r.ref+"/cancel",{});
     toast(ok?(r.ok?"Đã xác nhận":"Đã duyệt"):"Đã từ chối");if(r.src==="shipEdit"&&typeof KHO!=="undefined")KHO.at=0}
   catch(e){toast(e.message||"Chưa xử lý được")}
