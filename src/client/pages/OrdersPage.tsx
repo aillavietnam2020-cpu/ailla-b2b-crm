@@ -695,9 +695,10 @@ export function OrderDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
     mayEdit &&
     o.approval_status !== 'CANCELLED' &&
     o.delivery_status !== 'HOAN' &&
-    o.accounting_status !== 'DA_XAC_NHAN';
+    // Khớp máy chủ: chỉ khoá khi kế toán xác nhận BẰNG TAY; web tự xác nhận lúc giao thì vẫn sửa được (26/11, đơn 0038 thu thêm cước).
+    (o.accounting_status !== 'DA_XAC_NHAN' || Number(o.accounting_auto ?? 0) === 1);
   const lockedByAccounting =
-    mayEdit && o.accounting_status === 'DA_XAC_NHAN' && o.approval_status !== 'CANCELLED';
+    mayEdit && o.accounting_status === 'DA_XAC_NHAN' && Number(o.accounting_auto ?? 0) !== 1 && o.approval_status !== 'CANCELLED';
 
   const cancel = async () => {
     const reason = prompt('Lý do huỷ đơn (bắt buộc, tối thiểu 5 ký tự):');
@@ -1278,7 +1279,7 @@ function QuickActions({
     ((can('order.create') && order.owner_id === me?.user.id) || can('order.create.team')) &&
     order.approval_status !== 'CANCELLED' &&
     order.delivery_status !== 'HOAN' &&
-    order.accounting_status !== 'DA_XAC_NHAN'
+    (order.accounting_status !== 'DA_XAC_NHAN' || Number(order.accounting_auto ?? 0) === 1)
   ) {
     buttons.push(
       <Link key="sua" className="btn sm" to={`/${mode}/orders/${order.id}/edit`}>

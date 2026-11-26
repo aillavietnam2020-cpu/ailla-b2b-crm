@@ -257,6 +257,8 @@ export interface OrderListItem {
   delivery_status: DeliveryStatus;
   payment_status: PaymentStatus;
   accounting_status: AccountingStatus;
+  /** 1 = web tự xác nhận khi kho xuất / giao (không phải kế toán bấm tay): vẫn sửa đơn được. */
+  accounting_auto?: number;
   /** 1 = đơn đi theo luồng kho (tạo sau khi có luồng); đơn cũ là 0. */
   flow_on?: number;
   /** Bước hiện tại trong luồng kho (KHONG nếu đơn cũ / chưa gửi). */

@@ -809,7 +809,7 @@ export async function listOrders(
     .prepare(
       `SELECT o.id, o.order_no, o.customer_id, c.name AS customer_name, o.owner_id,
               u.display_name AS owner_name, o.order_date, o.total_amount, o.cod_amount,
-              o.approval_status, o.delivery_status, o.payment_status, o.accounting_status,
+              o.approval_status, o.delivery_status, o.payment_status, o.accounting_status, o.accounting_auto,
               o.flow_on, o.kho_status, o.ship_date, o.need_date, o.hold_until, o.updated_at,
               c.phone_text AS customer_phone,
               (SELECT COUNT(DISTINCT pp.id) FROM payment_allocations pa JOIN payments pp ON pp.id = pa.payment_id
