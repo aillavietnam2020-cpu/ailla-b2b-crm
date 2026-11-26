@@ -229,13 +229,13 @@ export function PrintOrderPage() {
           <table className="print-table">
             <thead>
               <tr>
-                <th style={{ width: 36 }}>STT</th>
-                <th style={{ width: 120 }}>Mã sản phẩm</th>
+                <th style={{ width: 32 }}>STT</th>
+                <th style={{ width: 105 }}>Mã sản phẩm</th>
                 <th>Tên sản phẩm</th>
-                <th style={{ width: 70 }}>ĐVT</th>
-                <th style={{ width: 70 }}>SL đặt</th>
-                <th style={{ width: 90 }}>Thực xuất</th>
-                <th style={{ width: 130 }}>Ghi chú</th>
+                <th style={{ width: 66 }}>ĐVT</th>
+                <th style={{ width: 52 }}>SL đặt</th>
+                <th style={{ width: 66 }}>Thực xuất</th>
+                <th style={{ width: 90 }}>Ghi chú</th>
               </tr>
             </thead>
             <tbody>

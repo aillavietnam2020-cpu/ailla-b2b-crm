@@ -1187,14 +1187,15 @@ table.data td { font-size: 14px; color: var(--ink); }
 .print-logo { width: 84px; height: auto; }
 .print-co { font-size: 13px; }
 .print-form { font-size: 11.5px; text-align: right; color: #444; }
-.print-title { text-align: center; font-size: 22px; margin: 16px 0 2px; letter-spacing: .02em; }
+.print-title { text-align: center; font-size: 22px; margin: 10px 0 2px; letter-spacing: .02em; }
 .print-sub { text-align: center; margin: 0 0 10px; }
 .print-info { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
 .print-info td { padding: 3px 4px; vertical-align: top; }
 .print-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-.print-table th, .print-table td { border: 1px solid #555; padding: 5px 6px; }
+/* 26/11 chị Hoa: phiếu 28 dòng phải gọn trong 1 trang A4 — dòng sát, chữ 12px, ĐVT/số không xuống dòng */
+.print-table th, .print-table td { border: 1px solid #555; padding: 2px 5px; font-size: 12px; line-height: 1.3; }
 .print-table th { background: #fbe4ef; font-size: 12px; text-align: center; }
-.print-table td.c { text-align: center; }
+.print-table td.c { text-align: center; white-space: nowrap; }
 .print-table td.r { text-align: right; white-space: nowrap; }
 .print-table tr.tot td { font-weight: 700; background: #f6f6f6; }
 .print-table td.hl { font-weight: 800; background: #fff4cc; }
@@ -1202,13 +1203,13 @@ table.data td { font-size: 14px; color: var(--ink); }
 .print-bank { border: 1px dashed #999; padding: 8px 10px; }
 .print-date { text-align: right; font-style: italic; margin: 14px 0 6px; }
 .print-sign { width: 100%; border-collapse: collapse; text-align: center; }
-.print-sign td { width: 25%; height: 96px; vertical-align: top; padding-top: 4px; }
+.print-sign td { width: 25%; height: 80px; vertical-align: top; padding-top: 4px; }
 .print-sign td div { font-size: 11px; color: #555; }
 @media print {
   .no-print { display: none !important; }
   .print-root { background: #fff; padding: 0; }
   .print-page { box-shadow: none; padding: 0; width: 100%; }
-  @page { size: A4; margin: 12mm; }
+  @page { size: A4; margin: 10mm; }
   .print-table tr { page-break-inside: avoid; }
 }
 
