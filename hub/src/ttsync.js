@@ -39,10 +39,11 @@ function ttsMerge(kind,from,to){
 const ttsLbl=R=>R.map(r=>ttsVn(r.from)+"–"+ttsVn(r.to)).join(", ");
 const ttsAt=R=>{const t=R.map(r=>r.at||"").sort().pop();return t?new Date(t).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"}):""};
 /* thẻ đã đăng theo ID video (thẻ tháng này + video win cũ) */
-function ttsCardMap(){const m=new Map(),d=D();(d.cards||[]).forEach(c=>{const id=c.tiktokId||((String(c.linkDang||"").match(/[0-9]{19}/)||[])[0]);if(id&&!m.has(id))m.set(id,c)});return m}
+function ttsCardMap(extra){const m=new Map(),d=D();(extra||[]).concat(d.cards||[]).forEach(c=>{const id=c.tiktokId||((String(c.linkDang||"").match(/[0-9]{19}/)||[])[0]);if(id&&!m.has(id))m.set(id,c)});return m}
 /* Video › Chi tiết gộp các khoảng: số tổng + từng video (cộng số nếu có ở nhiều khoảng) */
-function ttsVideos(from,to,kind){
-  const MG=ttsMerge(kind||"videos",from,to);if(!MG)return null;const R=MG.R,x=MG.data,cm=ttsCardMap();
+/* cards: thẻ của tháng đang xem (tháng cũ không nằm trong D().cards), 26/11 */
+function ttsVideos(from,to,kind,cards){
+  const MG=ttsMerge(kind||"videos",from,to);if(!MG)return null;const R=MG.R,x=MG.data,cm=ttsCardMap(cards);
   const T={n:+x.n||0,nDang:+x.nDang||0,nCoDon:+x.nCoDon||0,gmv:+x.gmv||0,vv:+x.vv||0,don:+x.don||0};
   const rows=x.top.map(v=>({vv:0,don:0,gmv:0,...v})).map(v=>{const c=cm.get(v.id)||null,sku=c?c.sku:(typeof bkSku==="function"?bkSku(v.sp||v.t||""):""),ch=c?c.kenh:ttsChOfAcc(v.u);return {...v,card:c,sku,kenh:ch}}).sort((a,b)=>b.gmv-a.gmv);
   return {T,rows,R,lbl:ttsLbl(R),at:ttsAt(R)}}

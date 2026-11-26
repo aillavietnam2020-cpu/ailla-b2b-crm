@@ -173,7 +173,7 @@ function dqHieuQuaVideo(C,past,M,set,onlyHead){
   const yr=M.mon>MONTH.mon?MONTH.year-1:MONTH.year,ym=yr+"-"+String(M.mon).padStart(2,"0");
   /* số TikTok agent nạp hằng ngày (ttsync.js) cho tháng đang xem; chưa có thì dùng báo cáo nhập tay */
   if(typeof ttsEnsure==="function")ttsEnsure();
-  const V=typeof ttsVideos==="function"?ttsVideos(...ttsPer(ym,yr,M.mon)):null,NN=c=>V?ttsCardNums(c,V):{view:+c.view||0,don:+c.don||0,gmv:+c.gmv||0,click:+c.click||0,src:c.hist||+c.view>0?"tay":""};
+  const V=typeof ttsVideos==="function"?ttsVideos(...ttsPer(ym,yr,M.mon),"videos",C):null,NN=c=>V?ttsCardNums(c,V):{view:+c.view||0,don:+c.don||0,gmv:+c.gmv||0,click:+c.click||0,src:c.hist||+c.view>0?"tay":""};
   const gTarget=k=>sum(d.products||[],p=>sum(pKenhs(p).filter(e=>!k||e.kenh===k),e=>+e.gmv||0));
   const st=cs=>{const ps=cs.filter(c=>c.step==="xong").map(c=>Object.assign({},c,NN(c))),rp=ps.filter(c=>c.src),view=sum(rp,c=>c.view),click=sum(rp,c=>+c.click||0),don=sum(ps,c=>c.don),gmv=sum(ps,c=>c.gmv);
     return {dang:ps.length,rp:rp.length,view,click,don,gmv,gpv:ps.length?gmv/ps.length:0,vtb:rp.length?view/rp.length:0,dead:rp.filter(c=>c.view<1000).length,ctr:view&&click?click/view*100:0,chot:click?don/click*100:0,
