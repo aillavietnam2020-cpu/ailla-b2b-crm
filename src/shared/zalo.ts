@@ -76,9 +76,9 @@ export function aiMask(t: string): string {
 /** Từ nhạy cảm: AI không soạn, sale tự trả lời và báo Lead. Trả về từ gặp đầu tiên (bỏ dấu khi so). */
 const SENSITIVE = ['khiếu nại', 'hoàn tiền', 'trả hàng', 'đổi trả', 'công an', 'khởi kiện', 'lừa đảo', 'hàng giả', 'dị ứng', 'ngộ độc', 'bỏng', 'cấp cứu', 'báo chí', 'tố cáo', 'bồi thường'];
 const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
-export function aiSensitive(t: string): string | null {
+export function aiSensitive(t: string, list: string[] = SENSITIVE): string | null {
   const f = ' ' + fold(String(t ?? '')).replace(/[^a-z0-9]+/g, ' ') + ' ';
-  return SENSITIVE.find((w) => f.includes(' ' + fold(w) + ' ')) ?? null;
+  return list.find((w) => w && f.includes(' ' + fold(w).replace(/[^a-z0-9]+/g, ' ').trim() + ' ')) ?? null;
 }
 
 /** Số ngày không liên lạc thì coi là "khách lâu không chăm", theo giai đoạn khách kênh phân phối. */
@@ -147,3 +147,94 @@ export function responseStats(rows: RespSample[]): Record<string, RespStat> {
   }
   return out;
 }
+
+/* ------------------------------------------------------------------ cài đặt "AI soạn sẵn" (27/11, theo mẫu ZL-CRM) */
+export interface ZaloAiCfg {
+  enabled: boolean;
+  /** Nick áp dụng; trống = mọi nick. */
+  nick_ids: string[];
+  /** Khung giờ AI soạn (giờ Việt Nam), 0–24. */
+  hour_start: number;
+  hour_end: number;
+  max_per_day: number;
+  /** Sale vừa trả lời trong N phút thì AI tạm lùi (0 = tắt). */
+  skip_staff_min: number;
+  /** Khách nhắn liên tiếp: nghỉ N giây giữa hai nháp cùng hội thoại (0 = tắt). */
+  min_gap_sec: number;
+  /** Nháp cũ hơn N phút thì soạn lại. */
+  ttl_min: number;
+  /** Khách nhắn trúng các từ này thì AI không soạn, để người thật xử lý. */
+  blocked: string[];
+  /** Lời dặn riêng cho AI (thêm vào mọi lần soạn). */
+  extra: string;
+  /** Khách kênh phân phối: nhờ agent CSKH B2B soạn (kèm đơn nháp). */
+  agent_b2b: boolean;
+}
+export const ZALO_AI_DEFAULT: ZaloAiCfg = {
+  enabled: true,
+  nick_ids: [],
+  hour_start: 0,
+  hour_end: 24,
+  max_per_day: 300,
+  skip_staff_min: 0,
+  min_gap_sec: 0,
+  ttl_min: 240,
+  blocked: SENSITIVE,
+  extra: '',
+  agent_b2b: true,
+};
+const num = (v: unknown, lo: number, hi: number, d: number) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d;
+};
+export function mergeAiCfg(raw: unknown): ZaloAiCfg {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<keyof ZaloAiCfg, unknown>>;
+  const d = ZALO_AI_DEFAULT;
+  const list = (v: unknown, max: number, len: number) => (Array.isArray(v) ? [...new Set(v.map((x) => String(x ?? '').trim().slice(0, len)).filter(Boolean))].slice(0, max) : null);
+  return {
+    enabled: r.enabled === undefined ? d.enabled : !!r.enabled,
+    nick_ids: list(r.nick_ids, 100, 64) ?? d.nick_ids,
+    hour_start: num(r.hour_start, 0, 23, d.hour_start),
+    hour_end: num(r.hour_end, 1, 24, d.hour_end),
+    max_per_day: num(r.max_per_day, 1, 5000, d.max_per_day),
+    skip_staff_min: num(r.skip_staff_min, 0, 600, d.skip_staff_min),
+    min_gap_sec: num(r.min_gap_sec, 0, 3600, d.min_gap_sec),
+    ttl_min: num(r.ttl_min, 5, 10080, d.ttl_min),
+    blocked: list(r.blocked, 100, 60) ?? d.blocked,
+    extra: String(r.extra ?? d.extra).slice(0, 2000),
+    agent_b2b: r.agent_b2b === undefined ? d.agent_b2b : !!r.agent_b2b,
+  };
+}
+/** Giờ hiện tại theo giờ Việt Nam (0–23). */
+export const vnHour = (ms = Date.now()) => new Date(ms + 7 * 3600_000).getUTCHours();
+/** Cổng chặn trước khi soạn: trả về lời báo nếu không được soạn. */
+export function aiGate(cfg: ZaloAiCfg, x: { nickId: string; now: number; todayDrafts: number; lastStaffAt: string | null }): string | null {
+  if (!cfg.enabled) return 'off';
+  if (cfg.nick_ids.length && !cfg.nick_ids.includes(x.nickId)) return 'off';
+  const h = vnHour(x.now);
+  const inHours = cfg.hour_start < cfg.hour_end ? h >= cfg.hour_start && h < cfg.hour_end : h >= cfg.hour_start || h < cfg.hour_end;
+  if (!inHours) return `Ngoài giờ AI soạn (${cfg.hour_start}h–${cfg.hour_end}h).`;
+  if (x.todayDrafts >= cfg.max_per_day) return `Hôm nay đã soạn đủ ${cfg.max_per_day} nháp (giới hạn trong Cài AI soạn sẵn).`;
+  if (cfg.skip_staff_min && x.lastStaffAt && x.now - Date.parse(x.lastStaffAt) < cfg.skip_staff_min * 60_000) return `Sale vừa trả lời trong ${cfg.skip_staff_min} phút, AI tạm lùi.`;
+  return null;
+}
+export interface PlaybookEntry {
+  id: string;
+  title: string;
+  category: string;
+  keywords: string[];
+  content: string;
+  priority: number;
+  enabled: number;
+}
+/** Chọn mục kịch bản đưa cho AI: mục khớp từ khóa trong tin khách gần đây trước, rồi mục không có từ khóa; theo ưu tiên; tối đa 6. */
+export function pickPlaybook(entries: PlaybookEntry[], recent: string, max = 6): PlaybookEntry[] {
+  const f = ' ' + fold(recent).replace(/[^a-z0-9]+/g, ' ') + ' ';
+  const hit = (e: PlaybookEntry) => e.keywords.some((k) => k && f.includes(' ' + fold(k).replace(/[^a-z0-9]+/g, ' ').trim() + ' '));
+  const on = entries.filter((e) => e.enabled);
+  const a = on.filter(hit).sort((x, y) => y.priority - x.priority);
+  const b = on.filter((e) => !e.keywords.length).sort((x, y) => y.priority - x.priority);
+  return [...a, ...b.filter((e) => !a.includes(e))].slice(0, max);
+}
+export const playbookText = (list: PlaybookEntry[]) =>
+  list.length ? 'KỊCH BẢN BÁN HÀNG ĐÃ DUYỆT (chỉ nêu giá, chính sách, cam kết theo đây và bảng giá):\n' + list.map((e) => `## ${e.title}${e.category ? ' (' + e.category + ')' : ''}\n${e.content.slice(0, 1500)}`).join('\n\n') : '';

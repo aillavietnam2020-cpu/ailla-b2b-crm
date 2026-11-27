@@ -8,13 +8,14 @@
  */
 import { Hono } from 'hono';
 import { nowIso, vnDate } from '@shared/datetime';
-import { aiMask, aiSensitive, responseStats, STUCK_DAYS, type RespSample } from '@shared/zalo';
+import { ZALO_AI_DEFAULT, aiGate, aiMask, aiSensitive, mergeAiCfg, pickPlaybook, playbookText, responseStats, STUCK_DAYS, type RespSample } from '@shared/zalo';
 import type { AppEnv, Env } from '../env';
 import { badRequest, forbidden, ok } from '../lib/http';
 import { bellTo } from '../lib/hubBell';
 import { callAi } from '../lib/orderReader';
 import { convFor, nickScope, viewer } from './zaloNick';
-import { AGENT_WAIT_MS, orderPreview, queueAgent } from '../services/zaloAgent';
+import { AGENT_WAIT_MS, loadAiCfg, loadPlaybook, orderPreview, queueAgent, todayDrafts } from '../services/zaloAgent';
+import { newId } from '../lib/ids';
 
 export const zaloInsightRoutes = new Hono<AppEnv>();
 
@@ -97,58 +98,146 @@ const clean = (t: string) => t.replace(/^["“”'\s]+|["“”'\s]+$/g, '').tri
 zaloInsightRoutes.get('/convs/:id/ai', async (c) => {
   const v = await viewer(c);
   const z = await convFor(c, v, c.req.param('id'));
-  if (z.is_group) return ok(c, { text: '', note: 'Nhóm chưa có AI soạn ở đợt này.' });
+  if (z.is_group) return ok(c, { text: '', note: '' });
+  const db = c.env.DB;
+  const cfg = await loadAiCfg(db);
   const { msgs, profile, prices } = await convContext(c.env, z.id);
   const lastIn = [...msgs].reverse().find((m) => !m.from_me && !m.recalled_at);
   const last = msgs[msgs.length - 1];
   if (!lastIn || !last || last.from_me) return ok(c, { text: '', note: '' });
   const redo = c.req.query('redo') === '1';
+  // Cổng chặn theo Cài AI soạn sẵn: bật/tắt, nick, khung giờ, lượt mỗi ngày, sale vừa trả lời.
+  const lastStaff = [...msgs].reverse().find((m) => m.from_me);
+  const gate = aiGate(cfg, { nickId: z.nick_id, now: Date.now(), todayDrafts: await todayDrafts(db), lastStaffAt: lastStaff?.at ?? null });
+  if (gate === 'off') return ok(c, { text: '', note: '', off: true });
+  if (gate) return ok(c, { text: '', note: gate });
+  const recentIn = msgs.filter((m) => !m.from_me).slice(-3).map((m) => m.text).join(' ');
+  const hit = aiSensitive(recentIn, cfg.blocked);
+  if (hit) return ok(c, { text: '', note: `Khách nhắc "${hit}": để người thật xử lý, AI không soạn. Báo Lead nếu cần.` });
+  const used = pickPlaybook(await loadPlaybook(db), recentIn);
+  const playbook_used = used.map((e) => e.title);
+  const fresh = (at: string) => Date.now() - Date.parse(at) < cfg.ttl_min * 60_000;
+  const prev = await db.prepare('SELECT msg_id, text, source, created_at FROM zalo_ai WHERE conv_id = ?').bind(z.id).first<{ msg_id: string; text: string; source: string; created_at: string }>();
+  // Khách nhắn liên tiếp: chưa đủ thời gian nghỉ thì giữ nháp trước, bấm Viết lại để soạn theo tin mới.
+  if (!redo && cfg.min_gap_sec && prev && prev.text && prev.msg_id !== lastIn.msg_id && Date.now() - Date.parse(prev.created_at) < cfg.min_gap_sec * 1000) {
+    return ok(c, { text: prev.text, note: 'Khách vừa nhắn liên tiếp; bấm Viết lại để soạn theo tin mới nhất.', source: prev.source });
+  }
   let fallbackNote = '';
   // Khách kênh phân phối: agent CSKH B2B soạn (kèm đơn nháp nếu khách đặt). Chờ tối đa AGENT_WAIT_MS rồi mới dùng AI thường.
-  if (z.customer_id && c.req.query('plain') !== '1') {
-    const got = await c.env.DB.prepare("SELECT text, note, order_json, created_at FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'agent'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string; order_json: string; created_at: string }>();
-    const cmd = await c.env.DB.prepare("SELECT status, created_at FROM zalo_cmds WHERE conv_id = ? AND kind = 'AGENT' ORDER BY created_at DESC LIMIT 1").bind(z.id).first<{ status: string; created_at: string }>();
-    if (got && !redo) {
+  if (z.customer_id && cfg.agent_b2b && c.req.query('plain') !== '1') {
+    const got = await db.prepare("SELECT text, note, order_json, created_at FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'agent'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string; order_json: string; created_at: string }>();
+    const cmd = await db.prepare("SELECT status, created_at FROM zalo_cmds WHERE conv_id = ? AND kind = 'AGENT' ORDER BY created_at DESC LIMIT 1").bind(z.id).first<{ status: string; created_at: string }>();
+    if (got && !redo && fresh(got.created_at)) {
       let order = null;
       try {
-        order = got.order_json ? await orderPreview(c.env.DB, z.customer_id, JSON.parse(got.order_json)) : null;
+        order = got.order_json ? await orderPreview(db, z.customer_id, JSON.parse(got.order_json)) : null;
       } catch {
         order = null;
       }
-      return ok(c, { text: got.text, note: got.note, source: 'agent', order });
+      return ok(c, { text: got.text, note: got.note, source: 'agent', order, playbook_used });
     }
-    const lastInAt = Date.parse(lastIn.at);
-    const fresh = cmd && Date.parse(cmd.created_at) >= lastInAt - 5000;
-    if (redo || !cmd || !fresh) {
-      if (redo && got) await c.env.DB.prepare("UPDATE zalo_ai SET msg_id = '' WHERE conv_id = ?").bind(z.id).run();
-      await queueAgent(c.env.DB, z.id);
+    const isFresh = cmd && Date.parse(cmd.created_at) >= Date.parse(lastIn.at) - 5000 && !(got && !fresh(got.created_at));
+    if (redo || !cmd || !isFresh) {
+      if (got) await db.prepare("UPDATE zalo_ai SET msg_id = '' WHERE conv_id = ?").bind(z.id).run();
+      await queueAgent(db, z.id);
       return ok(c, { pending: true, source: 'agent' });
     }
     if (['PENDING', 'TAKEN'].includes(cmd.status) && Date.now() - Date.parse(cmd.created_at) < AGENT_WAIT_MS) return ok(c, { pending: true, source: 'agent' });
     fallbackNote = 'Agent CSKH B2B chưa trả lời kịp, đây là nháp AI thường.';
   }
-  if (!redo) {
-    const cached = await c.env.DB.prepare("SELECT text, note FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'ai'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string }>();
-    if (cached) return ok(c, { ...cached, note: cached.note || fallbackNote });
+  if (!redo && prev && prev.source === 'ai' && prev.msg_id === lastIn.msg_id && fresh(prev.created_at)) {
+    return ok(c, { text: prev.text, note: fallbackNote, playbook_used });
   }
-  const recentIn = msgs.filter((m) => !m.from_me).slice(-3).map((m) => m.text).join(' ');
-  const hit = aiSensitive(recentIn);
-  let out = { text: '', note: '' };
-  if (hit) out = { text: '', note: `Khách nhắc "${hit}": việc nhạy cảm, AI không soạn. Sale tự trả lời và báo Lead.` };
-  else {
-    try {
-      const prompt = `${RULES}\n\n${priceBlock(prices)}\n\nTHÔNG TIN KHÁCH: ${aiMask(profile) || 'chưa rõ'}\n\nĐOẠN CHAT GẦN NHẤT:\n${chatLines(msgs)}\n\nSoạn tin trả lời tiếp theo của AILLA${redo ? ' (cách viết khác lần trước)' : ''}:`;
-      out = { text: clean(await callAi(c.env, [{ type: 'text', text: prompt }])), note: '' };
-    } catch (e) {
-      const m = String((e as Error).message);
-      return ok(c, { text: '', note: m === 'AI_NOT_CONFIGURED' ? 'Chưa cài AI cho web.' : 'AI đang bận, thử lại sau.' });
-    }
+  let text = '';
+  try {
+    const pb = playbookText(used);
+    const prompt = `${RULES}${cfg.extra ? '\n- Lời dặn riêng của AILLA: ' + cfg.extra : ''}\n\n${priceBlock(prices)}${pb ? '\n\n' + pb : ''}\n\nTHÔNG TIN KHÁCH: ${aiMask(profile) || 'chưa rõ'}\n\nĐOẠN CHAT GẦN NHẤT:\n${chatLines(msgs)}\n\nSoạn tin trả lời tiếp theo của AILLA${redo ? ' (cách viết khác lần trước)' : ''}:`;
+    text = clean(await callAi(c.env, [{ type: 'text', text: prompt }]));
+  } catch (e) {
+    const m = String((e as Error).message);
+    return ok(c, { text: '', note: m === 'AI_NOT_CONFIGURED' ? 'Chưa cài AI cho web.' : 'AI đang bận, thử lại sau.' });
   }
   // Nháp AI thường chỉ lưu khi chưa có nháp agent cho đúng tin này (không đè nháp agent).
-  await c.env.DB.prepare("INSERT INTO zalo_ai (conv_id, msg_id, text, note, source, created_at) VALUES (?, ?, ?, ?, 'ai', ?) ON CONFLICT(conv_id) DO UPDATE SET msg_id = excluded.msg_id, text = excluded.text, note = excluded.note, source = 'ai', order_json = '', created_at = excluded.created_at WHERE zalo_ai.source <> 'agent' OR zalo_ai.msg_id <> excluded.msg_id")
-    .bind(z.id, lastIn.msg_id, out.text, out.note, nowIso())
+  await db
+    .prepare("INSERT INTO zalo_ai (conv_id, msg_id, text, note, source, created_at) VALUES (?, ?, ?, '', 'ai', ?) ON CONFLICT(conv_id) DO UPDATE SET msg_id = excluded.msg_id, text = excluded.text, note = '', source = 'ai', order_json = '', created_at = excluded.created_at WHERE zalo_ai.source <> 'agent' OR zalo_ai.msg_id <> excluded.msg_id")
+    .bind(z.id, lastIn.msg_id, text, nowIso())
     .run();
-  return ok(c, { ...out, note: out.note || (out.text ? fallbackNote : '') });
+  await db.prepare("INSERT INTO zalo_ai_log (conv_id, source, action, by_id, at) VALUES (?, 'ai', 'draft', ?, ?)").bind(z.id, v.id, nowIso()).run();
+  return ok(c, { text, note: text ? fallbackNote : '', playbook_used });
+});
+
+/** Sale bấm "Dùng câu này" / "Bỏ" trên nháp: ghi lại để xem tỉ lệ dùng. */
+zaloInsightRoutes.post('/convs/:id/ai-mark', async (c) => {
+  const v = await viewer(c);
+  const z = await convFor(c, v, c.req.param('id'));
+  const b = (await c.req.json().catch(() => ({}))) as { action?: string; source?: string };
+  const action = b.action === 'used' ? 'used' : 'dismissed';
+  await c.env.DB.prepare('INSERT INTO zalo_ai_log (conv_id, source, action, by_id, at) VALUES (?, ?, ?, ?, ?)').bind(z.id, b.source === 'agent' ? 'agent' : 'ai', action, v.id, nowIso()).run();
+  return ok(c, { ok: true });
+});
+
+/* ---------------- Cài AI soạn sẵn + Kho kịch bản (Lead / CEO sửa; mọi người xem) */
+zaloInsightRoutes.get('/ai-cfg', async (c) => {
+  const v = await viewer(c);
+  const db = c.env.DB;
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const st = (await db.prepare('SELECT action, COUNT(*) AS n FROM zalo_ai_log WHERE at >= ? GROUP BY action').bind(since).all<{ action: string; n: number }>()).results ?? [];
+  const n = (a: string) => st.find((x) => x.action === a)?.n ?? 0;
+  const nicks = (await db.prepare('SELECT id, name FROM zalo_nicks WHERE disabled = 0 ORDER BY name').all()).results ?? [];
+  return ok(c, {
+    lead: v.lead,
+    cfg: await loadAiCfg(db),
+    defaults: ZALO_AI_DEFAULT,
+    playbook: await loadPlaybook(db, true),
+    stats: { total: n('draft'), used: n('used'), dismissed: n('dismissed'), today: await todayDrafts(db) },
+    nicks,
+  });
+});
+zaloInsightRoutes.put('/ai-cfg', async (c) => {
+  const v = await viewer(c);
+  if (!v.lead) throw forbidden('Chỉ Lead / CEO sửa cài đặt AI');
+  const cfg = mergeAiCfg(await c.req.json().catch(() => ({})));
+  await c.env.DB.prepare("INSERT INTO app_kv (k, v, updated_at) VALUES ('zalo_ai_cfg', ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at").bind(JSON.stringify(cfg), nowIso()).run();
+  return ok(c, cfg);
+});
+function playbookInput(b: Record<string, unknown>) {
+  const title = String(b.title ?? '').trim().slice(0, 200);
+  const content = String(b.content ?? '').trim().slice(0, 8000);
+  if (!title || !content) throw badRequest('NO_CONTENT', 'Cần tiêu đề và nội dung');
+  const kws = Array.isArray(b.keywords) ? b.keywords : String(b.keywords ?? '').split(/[,\n]/);
+  return {
+    title,
+    content,
+    category: String(b.category ?? '').trim().slice(0, 60),
+    keywords: JSON.stringify([...new Set(kws.map((x) => String(x ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 30)),
+    priority: Math.min(100, Math.max(0, Math.round(Number(b.priority ?? 50)) || 0)),
+    enabled: b.enabled === false ? 0 : 1,
+  };
+}
+zaloInsightRoutes.post('/playbook', async (c) => {
+  const v = await viewer(c);
+  if (!v.lead) throw forbidden('Chỉ Lead / CEO sửa kịch bản');
+  const x = playbookInput((await c.req.json().catch(() => ({}))) as Record<string, unknown>);
+  const id = newId();
+  await c.env.DB.prepare('INSERT INTO zalo_playbook (id, title, category, keywords, content, priority, enabled, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, x.title, x.category, x.keywords, x.content, x.priority, x.enabled, v.id, nowIso())
+    .run();
+  return ok(c, { id });
+});
+zaloInsightRoutes.put('/playbook/:id', async (c) => {
+  const v = await viewer(c);
+  if (!v.lead) throw forbidden('Chỉ Lead / CEO sửa kịch bản');
+  const x = playbookInput((await c.req.json().catch(() => ({}))) as Record<string, unknown>);
+  await c.env.DB.prepare('UPDATE zalo_playbook SET title = ?, category = ?, keywords = ?, content = ?, priority = ?, enabled = ?, updated_by = ?, updated_at = ? WHERE id = ?')
+    .bind(x.title, x.category, x.keywords, x.content, x.priority, x.enabled, v.id, nowIso(), c.req.param('id'))
+    .run();
+  return ok(c, { ok: true });
+});
+zaloInsightRoutes.delete('/playbook/:id', async (c) => {
+  const v = await viewer(c);
+  if (!v.lead) throw forbidden('Chỉ Lead / CEO sửa kịch bản');
+  await c.env.DB.prepare('DELETE FROM zalo_playbook WHERE id = ?').bind(c.req.param('id')).run();
+  return ok(c, { ok: true });
 });
 
 /** AI trau chuốt câu sale đang gõ (giữ ý, sửa lỗi, lễ phép hơn). */

@@ -25,7 +25,7 @@ import type { AppEnv } from '../env';
 import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { newId } from '../lib/ids';
 import { cskhMe } from '../services/cskh';
-import { agentPrompt, parseAgent, queueAgent } from '../services/zaloAgent';
+import { agentAllowed, agentPrompt, parseAgent, queueAgent } from '../services/zaloAgent';
 import { relayAuth } from './agentChat';
 
 type C = Context<AppEnv>;
@@ -917,7 +917,7 @@ zaloNickRelayRoutes.post('/events', async (c) => {
       if (!e.from_me && !e.is_group) {
         await db.prepare('UPDATE zalo_convs SET typing_at = NULL WHERE id = ?').bind(convId).run();
         // Khách kênh phân phối nhắn tới: nhờ agent CSKH B2B soạn nháp (chỉ khách đã gắn, chỉ tin mới).
-        if (!e.old) await queueAgent(db, convId);
+        if (!e.old && (await agentAllowed(db, nick.id, String(e.text ?? '')))) await queueAgent(db, convId);
       }
     } else if (e.type === 'undo') {
       // Thu hồi: giữ nguyên nội dung, chỉ đánh dấu (Lead / CEO vẫn đọc được).
@@ -1013,6 +1013,7 @@ zaloNickRelayRoutes.post('/cmd/:id/done', async (c) => {
         .run();
     }
     await db.prepare("UPDATE zalo_cmds SET status = 'DONE', done_at = ? WHERE id = ?").bind(now, cmd.id).run();
+    if (cmd.conv_id && (r.reply || r.order)) await db.prepare("INSERT INTO zalo_ai_log (conv_id, source, action, at) VALUES (?, 'agent', 'draft', ?)").bind(cmd.conv_id, now).run();
     // Trong lúc agent soạn, khách nhắn thêm: nhờ soạn lại theo tin mới.
     if (cmd.conv_id) {
       const newer = await db.prepare('SELECT msg_id FROM zalo_msgs WHERE conv_id = ? AND from_me = 0 ORDER BY at DESC LIMIT 1').bind(cmd.conv_id).first<{ msg_id: string }>();

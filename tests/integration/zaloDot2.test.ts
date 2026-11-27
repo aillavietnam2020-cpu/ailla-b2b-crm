@@ -263,3 +263,52 @@ describe('agent CSKH B2B soạn nháp cho khách kênh phân phối', () => {
     expect(all.filter((x) => x.kind === 'AGENT')).toHaveLength(1); // chỉ lệnh của khách KPP lúc đầu
   });
 });
+
+describe('Cài AI soạn sẵn + kho kịch bản (theo mẫu ZL-CRM)', () => {
+  const ai = () => ctx.request(`/api/zalo/convs/${conv}/ai?plain=1`, { as: USERS.thao });
+  it('chỉ Lead / CEO sửa; tắt thì không soạn; ngoài giờ, từ khóa riêng thì báo lý do', async () => {
+    ctx.env.AI_BASE_URL = 'https://ai.test';
+    ctx.env.AI_API_KEY = 'k';
+    const fake = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'Dạ ạ.' } }] })));
+    vi.stubGlobal('fetch', fake);
+    expect((await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.thao, body: { enabled: false } })).status).toBe(403);
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { enabled: false } });
+    expect((await ai()).body.data.off).toBe(true);
+    const h = new Date(Date.now() + 7 * 3600_000).getUTCHours();
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { enabled: true, hour_start: (h + 2) % 24, hour_end: (h + 3) % 24 || 24 } });
+    expect((await ai()).body.data.note).toContain('Ngoài giờ');
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { enabled: true, blocked: ['giá sao'] } });
+    expect((await ai()).body.data.note).toContain('giá sao');
+    expect(fake).not.toHaveBeenCalled();
+  });
+
+  it('kịch bản khớp từ khóa và lời dặn riêng đi vào lời nhắc AI; thống kê dùng / bỏ', async () => {
+    ctx.env.AI_BASE_URL = 'https://ai.test';
+    ctx.env.AI_API_KEY = 'k';
+    const fake = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'Dạ nước giặt 3.6kg 95k ạ.' } }] })));
+    vi.stubGlobal('fetch', fake);
+    expect((await ctx.request('/api/zalo/playbook', { as: USERS.thao, body: { title: 'x', content: 'y' } })).status).toBe(403);
+    await ctx.request('/api/zalo/playbook', { as: USERS.manager, body: { title: 'Bảng giá nước giặt', keywords: ['giá', 'nước giặt'], content: 'Nước giặt 3.6kg: 95.000đ/thùng cho NPP.', priority: 80 } });
+    await ctx.request('/api/zalo/playbook', { as: USERS.manager, body: { title: 'Chính sách đổi trả', keywords: ['đổi hàng'], content: 'Đổi trong 7 ngày.' } });
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { extra: 'Luôn mời khách lấy thêm nước xả.' } });
+    const r = await ai();
+    expect(r.body.data.playbook_used).toEqual(['Bảng giá nước giặt']);
+    const prompt = JSON.parse((fake.mock.calls[0] as unknown as [string, { body: string }])[1].body).messages[0].content[0].text as string;
+    expect(prompt).toContain('Nước giặt 3.6kg: 95.000đ/thùng');
+    expect(prompt).not.toContain('Đổi trong 7 ngày');
+    expect(prompt).toContain('Luôn mời khách lấy thêm nước xả');
+    await ctx.request(`/api/zalo/convs/${conv}/ai-mark`, { as: USERS.thao, body: { action: 'used' } });
+    const cfg = await ctx.request('/api/zalo/ai-cfg', { as: USERS.thao });
+    expect(cfg.body.data.stats).toMatchObject({ total: 1, used: 1 });
+    expect(cfg.body.data.playbook).toHaveLength(2);
+  });
+
+  it('tắt nhờ agent thì khách KPP dùng AI thường, không xếp lệnh agent', async () => {
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { agent_b2b: false } });
+    await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'k1', text: 'cho anh 5 thùng' })] });
+    const all = (await relay('/poll')).body.data.cmds as Array<{ kind: string }>;
+    expect(all.filter((x) => x.kind === 'AGENT')).toHaveLength(1); // chỉ lệnh lúc đầu (trước khi tắt)
+    const r = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
+    expect(r.body.data.pending).toBeUndefined();
+  });
+});
