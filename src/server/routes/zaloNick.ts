@@ -31,12 +31,12 @@ type C = Context<AppEnv>;
 const str = (v: unknown, max = 500) => String(v ?? '').trim().slice(0, max);
 
 /* ------------------------------------------------------------------ ai đang xem */
-interface Viewer {
+export interface Viewer {
   id: string;
   name: string;
   lead: boolean;
 }
-async function viewer(c: C): Promise<Viewer> {
+export async function viewer(c: C): Promise<Viewer> {
   const auth = c.get('auth');
   if (auth.actorType === 'AGENT') throw forbidden('Agent không dùng hộp tin Zalo');
   let lead = auth.user.role === 'CEO' || auth.user.role === 'MANAGER';
@@ -50,7 +50,7 @@ async function viewer(c: C): Promise<Viewer> {
   return { id: auth.user.id, name: auth.user.display_name, lead };
 }
 /** Điều kiện SQL "nick này người xem thấy được" (bí danh bảng nick là n). */
-const nickScope = (v: Viewer): { sql: string; params: unknown[] } => (v.lead ? { sql: '1=1', params: [] } : { sql: 'n.owner_id = ?', params: [v.id] });
+export const nickScope = (v: Viewer): { sql: string; params: unknown[] } => (v.lead ? { sql: '1=1', params: [] } : { sql: 'n.owner_id = ?', params: [v.id] });
 
 interface NickRow {
   id: string;
@@ -59,7 +59,7 @@ interface NickRow {
   status: string;
   disabled: number;
 }
-async function nickFor(c: C, v: Viewer, id: string): Promise<NickRow> {
+export async function nickFor(c: C, v: Viewer, id: string): Promise<NickRow> {
   const n = await c.env.DB.prepare('SELECT id, name, owner_id, status, disabled FROM zalo_nicks WHERE id = ?').bind(id).first<NickRow>();
   if (!n) throw notFound('Không có nick này');
   if (!v.lead && n.owner_id !== v.id) throw forbidden('Nick này không phải của bạn');
@@ -77,7 +77,7 @@ interface ConvRow {
   owner_id: string | null;
   nick_name: string;
 }
-async function convFor(c: C, v: Viewer, id: string): Promise<ConvRow> {
+export async function convFor(c: C, v: Viewer, id: string): Promise<ConvRow> {
   const r = await c.env.DB.prepare(
     `SELECT z.id, z.nick_id, z.thread_id, z.is_group, z.name, z.customer_id, z.cskh_phone, z.peer_phone, n.owner_id, n.name AS nick_name
      FROM zalo_convs z JOIN zalo_nicks n ON n.id = z.nick_id WHERE z.id = ?`,
@@ -93,7 +93,7 @@ async function convFor(c: C, v: Viewer, id: string): Promise<ConvRow> {
 async function checkRate(db: D1Database, nickId: string) {
   const since = new Date(Date.now() - ZALO_SEND_WINDOW_MS).toISOString();
   const rows =
-    (await db.prepare("SELECT created_at FROM zalo_cmds WHERE nick_id = ? AND kind = 'SEND' AND status <> 'FAILED' AND created_at >= ?").bind(nickId, since).all<{ created_at: string }>())
+    (await db.prepare("SELECT created_at FROM zalo_cmds WHERE nick_id = ? AND kind IN ('SEND','FRIEND_REQ') AND status <> 'FAILED' AND created_at >= ?").bind(nickId, since).all<{ created_at: string }>())
       .results ?? [];
   const r = sendAllowed(rows.map((x) => Date.parse(x.created_at)), Date.now());
   if (!r.ok) throw badRequest('ZALO_SLOW', `Gửi nhanh quá dễ bị Zalo khóa nick. Chờ ${r.waitSec} giây rồi gửi tiếp.`);
@@ -222,10 +222,10 @@ zaloRoutes.get('/convs', async (c) => {
     (
       await c.env.DB.prepare(
         `SELECT z.id, z.nick_id, n.name AS nick_name, z.is_group, z.name, z.avatar, z.peer_phone, z.customer_id, cu.name AS customer_name,
-                z.cskh_phone, cs.name AS cskh_name, z.last_at, z.last_text, z.last_from_me, z.unread, z.waiting_since
+                z.cskh_phone, cs.name AS cskh_name, z.last_at, z.last_text, z.last_from_me, z.unread, z.waiting_since, z.pinned_at, z.typing_at, z.is_friend
          FROM zalo_convs z JOIN zalo_nicks n ON n.id = z.nick_id
          LEFT JOIN customers cu ON cu.id = z.customer_id LEFT JOIN cskh_customers cs ON cs.phone = z.cskh_phone
-         WHERE ${where.join(' AND ')} ORDER BY (z.waiting_since IS NULL), z.last_at DESC LIMIT 300`,
+         WHERE ${where.join(' AND ')} ORDER BY (z.pinned_at IS NULL), (z.waiting_since IS NULL), z.last_at DESC LIMIT 300`,
       )
         .bind(...params)
         .all()
@@ -233,7 +233,7 @@ zaloRoutes.get('/convs', async (c) => {
   return ok(c, rows);
 });
 
-const MSG_COLS = `m.id, m.conv_id, m.from_me, m.sender_name, m.kind, m.text, m.url, m.at, m.recalled_at, m.seen_at, u.display_name AS sent_by_name`;
+const MSG_COLS = `m.id, m.conv_id, m.from_me, m.sender_name, m.kind, m.text, m.url, m.at, m.recalled_at, m.seen_at, m.quote_text, m.quote_name, m.hidden_at, u.display_name AS sent_by_name`;
 
 /** Một hội thoại: tin (mới nhất 100, kéo lên xem cũ hơn bằng ?before=), tin đang chờ gửi, thông tin khách cho khung bên phải. */
 zaloRoutes.get('/convs/:id', async (c) => {
@@ -243,7 +243,7 @@ zaloRoutes.get('/convs/:id', async (c) => {
   const msgs = (
     (
       await c.env.DB.prepare(
-        `SELECT ${MSG_COLS} FROM zalo_msgs m LEFT JOIN users u ON u.id = m.sent_by WHERE m.conv_id = ? ${before ? 'AND m.at < ?' : ''} ORDER BY m.at DESC LIMIT 100`,
+        `SELECT ${MSG_COLS} FROM zalo_msgs m LEFT JOIN users u ON u.id = m.sent_by WHERE m.conv_id = ? ${v.lead ? '' : 'AND m.hidden_at IS NULL'} ${before ? 'AND m.at < ?' : ''} ORDER BY m.at DESC LIMIT 100`,
       )
         .bind(...(before ? [z.id, before] : [z.id]))
         .all<ZaloMsgRow>()
@@ -251,9 +251,18 @@ zaloRoutes.get('/convs/:id', async (c) => {
   )
     .reverse()
     .map((m) => msgForViewer(m, v.lead));
+  // Cảm xúc của các tin đang hiện.
+  const reacts: Record<string, Array<{ icon: string; who_name: string; from_me: number }>> = {};
+  for (let i = 0; i < msgs.length; i += 90) {
+    const part = msgs.slice(i, i + 90).map((m) => m.id);
+    const rr =
+      (await c.env.DB.prepare(`SELECT msg_row_id, icon, who_name, from_me FROM zalo_reactions WHERE msg_row_id IN (${part.map(() => '?').join(',')})`).bind(...part).all<{ msg_row_id: string; icon: string; who_name: string; from_me: number }>())
+        .results ?? [];
+    for (const r of rr) (reacts[r.msg_row_id] ??= []).push({ icon: r.icon, who_name: r.who_name, from_me: r.from_me });
+  }
   const since = new Date(Date.now() - 30 * 60_000).toISOString();
   const pending =
-    (await c.env.DB.prepare("SELECT id, text, status, error, created_at FROM zalo_cmds WHERE conv_id = ? AND kind = 'SEND' AND status <> 'DONE' AND created_at >= ? ORDER BY created_at").bind(z.id, since).all())
+    (await c.env.DB.prepare("SELECT id, text, status, error, created_at, payload FROM zalo_cmds WHERE conv_id = ? AND kind = 'SEND' AND status <> 'DONE' AND created_at >= ? ORDER BY created_at").bind(z.id, since).all())
       .results ?? [];
   let customer = null;
   if (z.customer_id) {
@@ -270,7 +279,7 @@ zaloRoutes.get('/convs/:id', async (c) => {
     cskh = await c.env.DB.prepare('SELECT phone, name, owner_name, order_count, total_spent, last_order_day, last_product FROM cskh_customers WHERE phone = ?').bind(z.cskh_phone).first();
   }
   const conv = await c.env.DB.prepare('SELECT z.*, n.name AS nick_name FROM zalo_convs z JOIN zalo_nicks n ON n.id = z.nick_id WHERE z.id = ?').bind(z.id).first();
-  return ok(c, { conv, msgs, pending, customer, cskh, lead: v.lead, can_send: v.lead || z.owner_id === v.id });
+  return ok(c, { conv, msgs: msgs.map((m) => ({ ...m, reacts: reacts[m.id] ?? [] })), pending, customer, cskh, lead: v.lead, can_send: v.lead || z.owner_id === v.id });
 });
 
 zaloRoutes.post('/convs/:id/read', async (c) => {
@@ -286,21 +295,212 @@ async function queueSend(
   nick: NickRow,
   text: string,
   target: { conv_id?: string; thread_id?: string; is_group?: number; to_phone?: string; customer_id?: string | null; cskh_phone?: string | null },
+  payload: SendPayload = {},
 ) {
   if (nick.disabled || nick.status !== 'ON') throw badRequest('NICK_OFF', `Nick "${nick.name}" chưa nối Zalo. Vào Nick Zalo để quét QR.`);
   const t = String(text ?? '').trim();
-  if (!t) throw badRequest('NO_TEXT', 'Chưa có nội dung');
+  if (!t && !payload.file && !payload.sticker && !payload.url) throw badRequest('NO_TEXT', 'Chưa có nội dung');
   if (t.length > ZALO_TEXT_MAX) throw badRequest('TOO_LONG', `Tin dài quá (tối đa ${ZALO_TEXT_MAX} ký tự)`);
   await checkRate(c.env.DB, nick.id);
   const id = newId();
   await c.env.DB.prepare(
-    `INSERT INTO zalo_cmds (id, nick_id, kind, conv_id, thread_id, is_group, to_phone, customer_id, cskh_phone, text, status, created_by, created_at)
-     VALUES (?, ?, 'SEND', ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+    `INSERT INTO zalo_cmds (id, nick_id, kind, conv_id, thread_id, is_group, to_phone, customer_id, cskh_phone, text, payload, status, created_by, created_at)
+     VALUES (?, ?, 'SEND', ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
   )
-    .bind(id, nick.id, target.conv_id ?? null, target.thread_id ?? null, target.is_group ?? 0, target.to_phone ?? null, target.customer_id ?? null, target.cskh_phone ?? null, t, v.id, nowIso())
+    .bind(id, nick.id, target.conv_id ?? null, target.thread_id ?? null, target.is_group ?? 0, target.to_phone ?? null, target.customer_id ?? null, target.cskh_phone ?? null, t, Object.keys(payload).length ? JSON.stringify(payload) : '', v.id, nowIso())
     .run();
   return id;
 }
+
+/** Dữ liệu thêm khi gửi: trích dẫn tin cũ, tệp đã tải lên, nhãn dán, ảnh / tệp theo đường dẫn (chuyển tiếp). */
+interface SendPayload {
+  quote?: { msg_id: string; cli_msg_id: string; raw: string; text: string; name: string };
+  file?: { id: string; name: string; mime: string };
+  sticker?: { id: number; cateId: number; type: number; url: string };
+  url?: { href: string; kind: string; name: string };
+}
+/** Lệnh không phải gửi tin (thu hồi, thả cảm xúc, kết bạn, kéo danh bạ). */
+async function queueCmd(c: C, v: Viewer, nickId: string, kind: string, extra: { conv_id?: string | null; thread_id?: string | null; is_group?: number; text?: string; payload?: unknown }) {
+  const id = newId();
+  await c.env.DB.prepare(
+    `INSERT INTO zalo_cmds (id, nick_id, kind, conv_id, thread_id, is_group, text, payload, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+  )
+    .bind(id, nickId, kind, extra.conv_id ?? null, extra.thread_id ?? null, extra.is_group ?? 0, extra.text ?? null, extra.payload ? JSON.stringify(extra.payload) : '', v.id, nowIso())
+    .run();
+  return id;
+}
+interface MsgFull {
+  id: string;
+  conv_id: string;
+  nick_id: string;
+  msg_id: string;
+  cli_msg_id: string;
+  from_me: number;
+  kind: string;
+  text: string;
+  url: string;
+  raw: string;
+  sender_name: string;
+  recalled_at: string | null;
+}
+async function msgFor(c: C, v: Viewer, id: string): Promise<{ m: MsgFull; z: ConvRow }> {
+  const m = await c.env.DB.prepare('SELECT id, conv_id, nick_id, msg_id, cli_msg_id, from_me, kind, text, url, raw, sender_name, recalled_at FROM zalo_msgs WHERE id = ?').bind(id).first<MsgFull>();
+  if (!m) throw notFound('Không có tin này');
+  const z = await convFor(c, v, m.conv_id);
+  return { m, z };
+}
+const canSendIn = (v: Viewer, z: ConvRow) => v.lead || z.owner_id === v.id;
+
+/** Tải ảnh / tệp lên để gửi Zalo (base64, tối đa 1,9 MB; ảnh đã được trình duyệt thu nhỏ). Máy Zalo gửi xong thì xóa nội dung. */
+const FILE_MAX = 1_900_000;
+zaloRoutes.post('/files', async (c) => {
+  const v = await viewer(c);
+  const b = (await c.req.json().catch(() => ({}))) as { nick_id?: string; name?: string; mime?: string; b64?: string };
+  const nick = await nickFor(c, v, str(b.nick_id, 64));
+  const b64 = String(b.b64 ?? '');
+  if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) throw badRequest('BAD_FILE', 'Tệp không đọc được');
+  if (b64.length * 0.75 > FILE_MAX + 4) throw badRequest('TOO_BIG', 'Tệp lớn quá 1,9 MB. Ảnh thì web tự thu nhỏ; tệp lớn hơn gửi bằng Zalo trên điện thoại.');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const id = newId();
+  const name = str(b.name, 120).replace(/[\\/:*?"<>|]/g, '_') || 'tep';
+  await c.env.DB.prepare('INSERT INTO zalo_files (id, nick_id, name, mime, size, data, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, nick.id, name, str(b.mime, 100) || 'application/octet-stream', bytes.length, bytes, v.id, nowIso())
+    .run();
+  return ok(c, { id });
+});
+
+/** Thu hồi tin bên mình đã gửi (trên Zalo, khách không còn thấy). */
+zaloRoutes.post('/msgs/:id/undo', async (c) => {
+  const v = await viewer(c);
+  const { m, z } = await msgFor(c, v, c.req.param('id'));
+  if (!canSendIn(v, z)) throw forbidden('Chỉ người phụ trách nick hoặc Lead được thu hồi');
+  if (!m.from_me) throw badRequest('NOT_MINE', 'Chỉ thu hồi được tin bên mình gửi');
+  if (m.recalled_at) throw badRequest('DONE', 'Tin này đã thu hồi');
+  if (m.msg_id.startsWith('web:')) throw badRequest('NO_ID', 'Tin này thiếu mã Zalo, thu hồi trên điện thoại');
+  const id = await queueCmd(c, v, m.nick_id, 'UNDO', { conv_id: z.id, thread_id: z.thread_id, is_group: z.is_group, payload: { msg_id: m.msg_id, cli_msg_id: m.cli_msg_id } });
+  return ok(c, { id });
+});
+
+/** Xóa phía mình: ẩn tin trên web (khách vẫn thấy trên Zalo). Lead / CEO vẫn xem được, có dấu "đã ẩn". */
+zaloRoutes.post('/msgs/:id/hide', async (c) => {
+  const v = await viewer(c);
+  const { m, z } = await msgFor(c, v, c.req.param('id'));
+  if (!canSendIn(v, z)) throw forbidden();
+  await c.env.DB.prepare('UPDATE zalo_msgs SET hidden_at = ?, hidden_by = ? WHERE id = ?').bind(nowIso(), v.name, m.id).run();
+  return ok(c, { ok: true });
+});
+
+/** Mã cảm xúc Zalo: tim, thích, haha, wow, khóc, giận. */
+export const ZALO_ICONS = ['/-heart', '/-strong', ':>', ':o', ':-((', ':-h'];
+zaloRoutes.post('/msgs/:id/react', async (c) => {
+  const v = await viewer(c);
+  const { m, z } = await msgFor(c, v, c.req.param('id'));
+  if (!canSendIn(v, z)) throw forbidden();
+  const b = (await c.req.json().catch(() => ({}))) as { icon?: string };
+  const icon = String(b.icon ?? '');
+  if (!ZALO_ICONS.includes(icon)) throw badRequest('BAD_ICON', 'Không có cảm xúc này');
+  if (m.msg_id.startsWith('web:')) throw badRequest('NO_ID', 'Tin này thiếu mã Zalo');
+  const id = await queueCmd(c, v, m.nick_id, 'REACT', { conv_id: z.id, thread_id: z.thread_id, is_group: z.is_group, payload: { msg_id: m.msg_id, cli_msg_id: m.cli_msg_id, icon, row: m.id } });
+  return ok(c, { id });
+});
+
+/** Chuyển tiếp một tin (chữ, hoặc ảnh / tệp có đường dẫn) sang tối đa 5 hội thoại. Vẫn qua trần 5 tin / 30 giây. */
+zaloRoutes.post('/msgs/:id/forward', async (c) => {
+  const v = await viewer(c);
+  const { m } = await msgFor(c, v, c.req.param('id'));
+  if (m.recalled_at && !v.lead) throw badRequest('RECALLED', 'Tin đã thu hồi');
+  const b = (await c.req.json().catch(() => ({}))) as { conv_ids?: string[] };
+  const ids = [...new Set((b.conv_ids ?? []).map((x) => str(x, 64)).filter(Boolean))].slice(0, 5);
+  if (!ids.length) throw badRequest('NO_TARGET', 'Chọn hội thoại nhận');
+  const out: string[] = [];
+  for (const cid of ids) {
+    const z = await convFor(c, v, cid);
+    if (!canSendIn(v, z)) throw forbidden('Không gửi được vào hội thoại thuộc nick của người khác');
+    const nick = await nickFor(c, v, z.nick_id);
+    const media = m.url && ['image', 'file', 'video', 'voice'].includes(m.kind);
+    const payload: SendPayload = media ? { url: { href: m.url, kind: m.kind, name: m.text || 'tep' } } : {};
+    const text = media ? (m.kind === 'image' ? m.text : '') : m.kind === 'link' ? m.url || m.text : m.text;
+    out.push(await queueSend(c, v, nick, text, { conv_id: z.id, thread_id: z.thread_id, is_group: z.is_group }, payload));
+  }
+  return ok(c, { ids: out });
+});
+
+/** Ghim hội thoại lên đầu danh sách (trên web). */
+zaloRoutes.post('/convs/:id/pin', async (c) => {
+  const v = await viewer(c);
+  const z = await convFor(c, v, c.req.param('id'));
+  const b = (await c.req.json().catch(() => ({}))) as { on?: boolean };
+  await c.env.DB.prepare('UPDATE zalo_convs SET pinned_at = ? WHERE id = ?').bind(b.on ? nowIso() : null, z.id).run();
+  return ok(c, { ok: true });
+});
+
+/** Gửi lời mời kết bạn (người bấm). Trần 30 lời mời / 24 giờ / nick. */
+export const ZALO_FRIEND_DAY_MAX = 30;
+zaloRoutes.post('/convs/:id/friend', async (c) => {
+  const v = await viewer(c);
+  const z = await convFor(c, v, c.req.param('id'));
+  if (!canSendIn(v, z)) throw forbidden();
+  if (z.is_group) throw badRequest('GROUP', 'Nhóm không kết bạn được');
+  const nick = await nickFor(c, v, z.nick_id);
+  if (nick.disabled || nick.status !== 'ON') throw badRequest('NICK_OFF', `Nick "${nick.name}" chưa nối Zalo`);
+  const day = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM zalo_cmds WHERE nick_id = ? AND kind = 'FRIEND_REQ' AND status <> 'FAILED' AND created_at >= ?").bind(nick.id, day).first<{ n: number }>();
+  if ((n?.n ?? 0) >= ZALO_FRIEND_DAY_MAX) throw badRequest('FRIEND_MAX', `Nick đã gửi ${ZALO_FRIEND_DAY_MAX} lời mời trong 24 giờ. Gửi thêm dễ bị Zalo khóa, để mai gửi tiếp.`);
+  await checkRate(c.env.DB, nick.id);
+  const b = (await c.req.json().catch(() => ({}))) as { text?: string };
+  const id = await queueCmd(c, v, nick.id, 'FRIEND_REQ', { conv_id: z.id, thread_id: z.thread_id, text: str(b.text, 150) || 'Chào anh/chị, em bên AILLA ạ.' });
+  return ok(c, { id });
+});
+
+/** Lời mời kết bạn gửi tới các nick người xem thấy. */
+zaloRoutes.get('/friend-reqs', async (c) => {
+  const v = await viewer(c);
+  const sc = nickScope(v);
+  const r =
+    (await c.env.DB.prepare(`SELECT f.nick_id, n.name AS nick_name, f.uid, f.name, f.avatar, f.msg, f.at FROM zalo_friend_reqs f JOIN zalo_nicks n ON n.id = f.nick_id WHERE f.status = 'PENDING' AND ${sc.sql} ORDER BY f.at DESC LIMIT 100`).bind(...sc.params).all())
+      .results ?? [];
+  return ok(c, r);
+});
+zaloRoutes.post('/friend-reqs/:nick/:uid', async (c) => {
+  const v = await viewer(c);
+  const nick = await nickFor(c, v, c.req.param('nick'));
+  const uid = str(c.req.param('uid'), 64);
+  const b = (await c.req.json().catch(() => ({}))) as { accept?: boolean };
+  const id = await queueCmd(c, v, nick.id, b.accept ? 'FRIEND_ACCEPT' : 'FRIEND_REJECT', { thread_id: uid });
+  return ok(c, { id });
+});
+
+/** Kéo danh bạ, nhóm và tin cũ của nick về web. */
+zaloRoutes.post('/nicks/:id/sync', async (c) => {
+  const v = await viewer(c);
+  const nick = await nickFor(c, v, c.req.param('id'));
+  if (nick.status !== 'ON') throw badRequest('NICK_OFF', 'Nick chưa nối Zalo');
+  const id = await queueCmd(c, v, nick.id, 'SYNC', {});
+  return ok(c, { id });
+});
+
+/** Nhãn dán đã gặp gần đây (khách gửi hoặc mình gửi) để chọn gửi lại. */
+zaloRoutes.get('/stickers', async (c) => {
+  const v = await viewer(c);
+  const sc = nickScope(v);
+  const rows =
+    (await c.env.DB.prepare(`SELECT m.raw, m.url FROM zalo_msgs m JOIN zalo_nicks n ON n.id = m.nick_id WHERE m.kind = 'sticker' AND m.raw <> '' AND ${sc.sql} ORDER BY m.at DESC LIMIT 300`).bind(...sc.params).all<{ raw: string; url: string }>())
+      .results ?? [];
+  const seen = new Map<string, { id: number; cateId: number; type: number; url: string }>();
+  for (const r of rows) {
+    try {
+      const ct = ((JSON.parse(r.raw) as { content?: { id?: number; catId?: number; cateId?: number; type?: number } }).content ?? {}) as { id?: number; catId?: number; cateId?: number; type?: number };
+      if (ct.id === undefined || seen.has(String(ct.id))) continue;
+      seen.set(String(ct.id), { id: Number(ct.id), cateId: Number(ct.catId ?? ct.cateId ?? 0), type: Number(ct.type ?? 0), url: r.url });
+    } catch {
+      /* bỏ */
+    }
+    if (seen.size >= 40) break;
+  }
+  return ok(c, [...seen.values()]);
+});
 
 /** Gửi tin trong hội thoại (người bấm Gửi). Chương trình VPS lấy về gửi trong vài giây. */
 zaloRoutes.post('/convs/:id/send', async (c) => {
@@ -308,8 +508,20 @@ zaloRoutes.post('/convs/:id/send', async (c) => {
   const z = await convFor(c, v, c.req.param('id'));
   if (!v.lead && z.owner_id !== v.id) throw forbidden('Chỉ người phụ trách nick hoặc Lead được gửi');
   const nick = await nickFor(c, v, z.nick_id);
-  const b = (await c.req.json().catch(() => ({}))) as { text?: string };
-  const id = await queueSend(c, v, nick, String(b.text ?? ''), { conv_id: z.id, thread_id: z.thread_id, is_group: z.is_group });
+  const b = (await c.req.json().catch(() => ({}))) as { text?: string; quote_id?: string; file_id?: string; sticker?: { id?: number; cateId?: number; type?: number; url?: string } };
+  const payload: SendPayload = {};
+  if (b.quote_id) {
+    const { m } = await msgFor(c, v, str(b.quote_id, 64));
+    if (m.conv_id !== z.id) throw badRequest('BAD_QUOTE', 'Tin trích dẫn không thuộc hội thoại này');
+    payload.quote = { msg_id: m.msg_id, cli_msg_id: m.cli_msg_id, raw: m.raw, text: m.text.slice(0, 300), name: m.from_me ? '' : m.sender_name };
+  }
+  if (b.file_id) {
+    const f = await c.env.DB.prepare('SELECT id, name, mime FROM zalo_files WHERE id = ? AND created_by = ? AND sent_at IS NULL').bind(str(b.file_id, 64), v.id).first<{ id: string; name: string; mime: string }>();
+    if (!f) throw badRequest('NO_FILE', 'Không thấy tệp vừa tải lên, chọn lại tệp');
+    payload.file = { id: f.id, name: f.name, mime: f.mime };
+  }
+  if (b.sticker && Number.isFinite(Number(b.sticker.id))) payload.sticker = { id: Number(b.sticker.id), cateId: Number(b.sticker.cateId) || 0, type: Number(b.sticker.type) || 0, url: str(b.sticker.url, 500) };
+  const id = await queueSend(c, v, nick, String(b.text ?? ''), { conv_id: z.id, thread_id: z.thread_id, is_group: z.is_group }, payload);
   return ok(c, { id });
 });
 
@@ -499,7 +711,7 @@ zaloNickRelayRoutes.get('/poll', async (c) => {
   const old = new Date(Date.now() - 10 * 60_000).toISOString();
   await db.prepare("UPDATE zalo_cmds SET status = 'FAILED', error = 'Máy Zalo chưa chạy, tin chưa gửi', done_at = ? WHERE status = 'PENDING' AND created_at < ?").bind(now, old).run();
   const cmds =
-    (await db.prepare("SELECT id, nick_id, kind, thread_id, is_group, to_phone, text FROM zalo_cmds WHERE status = 'PENDING' ORDER BY created_at LIMIT 20").all<{ id: string }>()).results ?? [];
+    (await db.prepare("SELECT id, nick_id, kind, thread_id, is_group, to_phone, text, payload FROM zalo_cmds WHERE status = 'PENDING' ORDER BY created_at LIMIT 20").all<{ id: string }>()).results ?? [];
   if (cmds.length) {
     await db.batch(cmds.map((x) => db.prepare("UPDATE zalo_cmds SET status = 'TAKEN', taken_at = ? WHERE id = ? AND status = 'PENDING'").bind(now, x.id)));
   }
@@ -545,6 +757,19 @@ interface RelayEvent {
   text?: string;
   url?: string;
   at?: number | string;
+  /** Tin cũ kéo về: không tính chưa đọc / đang chờ. */
+  old?: boolean;
+  quote_text?: string;
+  quote_name?: string;
+  raw?: string;
+  /** react: mã tin được thả, người thả, biểu tượng */
+  icon?: string;
+  uid?: string;
+  name?: string;
+  avatar_url?: string;
+  phone?: string;
+  /** friends / groups: danh sách */
+  list?: Array<{ uid?: string; id?: string; name?: string; avatar?: string; phone?: string }>;
 }
 const KINDS = ['text', 'image', 'file', 'sticker', 'voice', 'video', 'link', 'other'];
 const atIso = (v: unknown) => {
@@ -600,19 +825,44 @@ async function upsertConv(db: D1Database, nickId: string, ownerId: string | null
 }
 
 /** Ghi một tin vào hội thoại; tin mới thì cập nhật tin cuối, số chưa đọc, "đang chờ trả lời". Trả về false nếu tin đã có. */
-async function addMsg(db: D1Database, convId: string, nickId: string, m: { msg_id: string; cli_msg_id: string; from_me: boolean; sender_uid: string; sender_name: string; kind: string; text: string; url: string; at: string; sent_by: string | null }): Promise<boolean> {
+interface NewMsg {
+  msg_id: string;
+  cli_msg_id: string;
+  from_me: boolean;
+  sender_uid: string;
+  sender_name: string;
+  kind: string;
+  text: string;
+  url: string;
+  at: string;
+  sent_by: string | null;
+  quote_text?: string;
+  quote_name?: string;
+  raw?: string;
+  old?: boolean;
+}
+async function addMsg(db: D1Database, convId: string, nickId: string, m: NewMsg): Promise<boolean> {
   const r = await db
     .prepare(
-      `INSERT INTO zalo_msgs (id, conv_id, nick_id, msg_id, cli_msg_id, from_me, sender_uid, sender_name, kind, text, url, at, sent_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(nick_id, msg_id) DO NOTHING`,
+      `INSERT INTO zalo_msgs (id, conv_id, nick_id, msg_id, cli_msg_id, from_me, sender_uid, sender_name, kind, text, url, at, sent_by, quote_text, quote_name, raw, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(nick_id, msg_id) DO NOTHING`,
     )
-    .bind(newId(), convId, nickId, m.msg_id, m.cli_msg_id, m.from_me ? 1 : 0, m.sender_uid, m.sender_name, m.kind, m.text, m.url, m.at, m.sent_by, nowIso())
+    .bind(newId(), convId, nickId, m.msg_id, m.cli_msg_id, m.from_me ? 1 : 0, m.sender_uid, m.sender_name, m.kind, m.text, m.url, m.at, m.sent_by, m.quote_text ?? '', m.quote_name ?? '', m.raw ?? '', nowIso())
     .run();
   if (!r.meta.changes) {
     if (m.sent_by) await db.prepare('UPDATE zalo_msgs SET sent_by = ? WHERE nick_id = ? AND msg_id = ? AND sent_by IS NULL').bind(m.sent_by, nickId, m.msg_id).run();
+    // Zalo dội lại tin mình vừa gửi từ web: bổ sung mã phụ + dữ liệu gốc để sau này thu hồi / trích dẫn được.
+    if (m.cli_msg_id || m.raw) await db.prepare("UPDATE zalo_msgs SET cli_msg_id = CASE WHEN cli_msg_id = '' THEN ? ELSE cli_msg_id END, raw = CASE WHEN raw = '' THEN ? ELSE raw END, url = CASE WHEN url = '' THEN ? ELSE url END WHERE nick_id = ? AND msg_id = ?").bind(m.cli_msg_id, m.raw ?? '', m.url, nickId, m.msg_id).run();
     return false;
   }
   const prev = msgPreview(m.kind, m.text);
+  if (m.old) {
+    // Tin cũ: chỉ đổi "tin cuối" nếu mới hơn, không tính chưa đọc / đang chờ.
+    await db.prepare('UPDATE zalo_convs SET last_text = CASE WHEN last_at IS NULL OR last_at < ? THEN ? ELSE last_text END, last_from_me = CASE WHEN last_at IS NULL OR last_at < ? THEN ? ELSE last_from_me END, last_at = MAX(COALESCE(last_at, ?), ?) WHERE id = ?')
+      .bind(m.at, prev, m.at, m.from_me ? 1 : 0, m.at, m.at, convId)
+      .run();
+    return true;
+  }
   if (m.from_me) {
     // Mình đã trả lời (trên web hoặc trên điện thoại): hết "đang chờ".
     await db.prepare('UPDATE zalo_convs SET last_at = MAX(COALESCE(last_at, ?), ?), last_text = ?, last_from_me = 1, waiting_since = NULL, unread = 0, updated_at = ? WHERE id = ?').bind(m.at, m.at, prev, nowIso(), convId).run();
@@ -641,7 +891,27 @@ zaloNickRelayRoutes.post('/events', async (c) => {
       const convId = await upsertConv(db, nick.id, nick.owner_id, e);
       const kind = KINDS.includes(String(e.kind)) ? String(e.kind) : 'other';
       const url = /^https:\/\//.test(String(e.url ?? '')) ? str(e.url, 1000) : '';
-      if (await addMsg(db, convId, nick.id, { msg_id: msgId, cli_msg_id: str(e.cli_msg_id, 80), from_me: !!e.from_me, sender_uid: str(e.sender_uid, 64), sender_name: str(e.sender_name, 120), kind, text: str(e.text, 6000), url, at: atIso(e.at), sent_by: null })) added++;
+      const raw = typeof e.raw === 'string' && e.raw.length <= 4000 ? e.raw : '';
+      if (
+        await addMsg(db, convId, nick.id, {
+          msg_id: msgId,
+          cli_msg_id: str(e.cli_msg_id, 80),
+          from_me: !!e.from_me,
+          sender_uid: str(e.sender_uid, 64),
+          sender_name: str(e.sender_name, 120),
+          kind,
+          text: str(e.text, 6000),
+          url,
+          at: atIso(e.at),
+          sent_by: null,
+          quote_text: str(e.quote_text, 300),
+          quote_name: str(e.quote_name, 120),
+          raw,
+          old: !!e.old,
+        })
+      )
+        added++;
+      if (!e.from_me && !e.is_group) await db.prepare('UPDATE zalo_convs SET typing_at = NULL WHERE id = ?').bind(convId).run();
     } else if (e.type === 'undo') {
       // Thu hồi: giữ nguyên nội dung, chỉ đánh dấu (Lead / CEO vẫn đọc được).
       const ids = [str(e.msg_id, 80), str(e.cli_msg_id, 80)].filter(Boolean);
@@ -654,6 +924,49 @@ zaloNickRelayRoutes.post('/events', async (c) => {
       const ids = (e.msg_ids ?? []).map((x) => str(x, 80)).filter(Boolean).slice(0, 50);
       if (!ids.length) continue;
       await db.prepare(`UPDATE zalo_msgs SET seen_at = COALESCE(seen_at, ?) WHERE nick_id = ? AND from_me = 1 AND msg_id IN (${ids.map(() => '?').join(',')})`).bind(nowIso(), nick.id, ...ids).run();
+    } else if (e.type === 'react') {
+      // Cảm xúc: icon rỗng = gỡ.
+      const row = await db.prepare('SELECT id FROM zalo_msgs WHERE nick_id = ? AND (msg_id = ? OR cli_msg_id = ?)').bind(nick.id, str(e.msg_id, 80), str(e.msg_id, 80)).first<{ id: string }>();
+      const uid = str(e.uid, 64);
+      if (!row || !uid) continue;
+      if (!e.icon) await db.prepare('DELETE FROM zalo_reactions WHERE msg_row_id = ? AND who_uid = ?').bind(row.id, uid).run();
+      else
+        await db
+          .prepare('INSERT INTO zalo_reactions (msg_row_id, who_uid, who_name, icon, from_me, at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(msg_row_id, who_uid) DO UPDATE SET icon = excluded.icon, who_name = excluded.who_name, at = excluded.at')
+          .bind(row.id, uid, str(e.name, 120), str(e.icon, 20), e.from_me ? 1 : 0, atIso(e.at))
+          .run();
+    } else if (e.type === 'typing') {
+      await db.prepare('UPDATE zalo_convs SET typing_at = ? WHERE nick_id = ? AND thread_id = ?').bind(nowIso(), nick.id, threadId).run();
+    } else if (e.type === 'friends') {
+      // Danh bạ: thread_id = "friends". Ghi bạn bè, điền số Zalo cho hội thoại, đánh dấu đã là bạn.
+      const now = nowIso();
+      const st: D1PreparedStatement[] = [];
+      for (const f of (e.list ?? []).slice(0, 300)) {
+        const uid = str(f.uid, 64);
+        if (!uid) continue;
+        const ph = zaloPhone(f.phone);
+        st.push(
+          db
+            .prepare('INSERT INTO zalo_friends (nick_id, uid, name, avatar, phone, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(nick_id, uid) DO UPDATE SET name = excluded.name, avatar = excluded.avatar, phone = excluded.phone, updated_at = excluded.updated_at')
+            .bind(nick.id, uid, str(f.name, 120), str(f.avatar, 500), ph, now),
+          db.prepare("UPDATE zalo_convs SET is_friend = 1, peer_phone = CASE WHEN peer_phone = '' THEN ? ELSE peer_phone END WHERE nick_id = ? AND thread_id = ?").bind(ph, nick.id, uid),
+        );
+      }
+      for (let i = 0; i < st.length; i += 80) await db.batch(st.slice(i, i + 80));
+    } else if (e.type === 'groups') {
+      // Nhóm Zalo của nick: tạo hội thoại nhóm (chưa có tin) để thấy trong Hộp tin.
+      for (const g of (e.list ?? []).slice(0, 300)) {
+        const gid = str(g.id, 64);
+        if (gid) await upsertConv(db, nick.id, nick.owner_id, { thread_id: gid, thread_name: str(g.name, 200), avatar: str(g.avatar, 500), is_group: true });
+      }
+    } else if (e.type === 'fr_req') {
+      await db
+        .prepare("INSERT INTO zalo_friend_reqs (nick_id, uid, name, avatar, msg, at, status) VALUES (?, ?, ?, ?, ?, ?, 'PENDING') ON CONFLICT(nick_id, uid) DO UPDATE SET name = excluded.name, avatar = excluded.avatar, msg = excluded.msg, at = excluded.at, status = 'PENDING'")
+        .bind(nick.id, threadId, str(e.name, 120), str(e.avatar_url, 500), str(e.text, 300), atIso(e.at))
+        .run();
+    } else if (e.type === 'fr_ok') {
+      await db.prepare("UPDATE zalo_friend_reqs SET status = 'ACCEPTED' WHERE nick_id = ? AND uid = ?").bind(nick.id, threadId).run();
+      await db.prepare('UPDATE zalo_convs SET is_friend = 1 WHERE nick_id = ? AND thread_id = ?').bind(nick.id, threadId).run();
     }
   }
   await db.prepare('UPDATE zalo_nicks SET seen_at = ? WHERE id = ?').bind(nowIso(), nick.id).run();
@@ -663,17 +976,35 @@ zaloNickRelayRoutes.post('/events', async (c) => {
 /** Máy VPS báo lệnh đã làm xong. Gửi tin xong thì ghi tin vào hội thoại ngay (không chờ Zalo dội lại). */
 zaloNickRelayRoutes.post('/cmd/:id/done', async (c) => {
   const db = c.env.DB;
-  const b = (await c.req.json().catch(() => ({}))) as { ok?: boolean; error?: string; msg_id?: string; thread_id?: string; thread_name?: string; peer_phone?: string };
+  const b = (await c.req.json().catch(() => ({}))) as { ok?: boolean; error?: string; msg_id?: string; cli_msg_id?: string; thread_id?: string; thread_name?: string; peer_phone?: string };
   const cmd = await db
-    .prepare('SELECT id, nick_id, kind, conv_id, to_phone, customer_id, cskh_phone, text, created_by, status FROM zalo_cmds WHERE id = ?')
+    .prepare('SELECT id, nick_id, kind, conv_id, thread_id, to_phone, customer_id, cskh_phone, text, payload, created_by, status FROM zalo_cmds WHERE id = ?')
     .bind(c.req.param('id'))
-    .first<{ id: string; nick_id: string; kind: string; conv_id: string | null; to_phone: string | null; customer_id: string | null; cskh_phone: string | null; text: string; created_by: string | null; status: string }>();
+    .first<{ id: string; nick_id: string; kind: string; conv_id: string | null; thread_id: string | null; to_phone: string | null; customer_id: string | null; cskh_phone: string | null; text: string | null; payload: string; created_by: string | null; status: string }>();
   if (!cmd) throw notFound();
   if (cmd.status === 'DONE') return ok(c, { ok: true });
   const now = nowIso();
+  let pl: { file?: { id: string; name: string }; sticker?: { url: string }; url?: { href: string; kind: string; name: string }; quote?: { text: string; name: string }; msg_id?: string; cli_msg_id?: string; icon?: string; row?: string } = {};
+  try {
+    pl = cmd.payload ? JSON.parse(cmd.payload) : {};
+  } catch {
+    /* bỏ */
+  }
+  if (pl.file) await db.prepare('UPDATE zalo_files SET data = NULL, sent_at = ? WHERE id = ?').bind(now, pl.file.id).run();
   if (!b.ok) {
     await db.prepare("UPDATE zalo_cmds SET status = 'FAILED', error = ?, done_at = ? WHERE id = ?").bind(str(b.error, 300) || 'Lỗi', now, cmd.id).run();
     return ok(c, { ok: true });
+  }
+  if (cmd.kind === 'UNDO' && pl.msg_id) await db.prepare('UPDATE zalo_msgs SET recalled_at = COALESCE(recalled_at, ?) WHERE nick_id = ? AND msg_id = ?').bind(now, cmd.nick_id, pl.msg_id).run();
+  if (cmd.kind === 'REACT' && pl.row && pl.icon) {
+    await db
+      .prepare("INSERT INTO zalo_reactions (msg_row_id, who_uid, who_name, icon, from_me, at) VALUES (?, 'me', 'Mình', ?, 1, ?) ON CONFLICT(msg_row_id, who_uid) DO UPDATE SET icon = excluded.icon, at = excluded.at")
+      .bind(pl.row, pl.icon, now)
+      .run();
+  }
+  if (cmd.kind === 'FRIEND_ACCEPT' || cmd.kind === 'FRIEND_REJECT') {
+    await db.prepare('UPDATE zalo_friend_reqs SET status = ? WHERE nick_id = ? AND uid = ?').bind(cmd.kind === 'FRIEND_ACCEPT' ? 'ACCEPTED' : 'REJECTED', cmd.nick_id, cmd.thread_id ?? '').run();
+    if (cmd.kind === 'FRIEND_ACCEPT') await db.prepare('UPDATE zalo_convs SET is_friend = 1 WHERE nick_id = ? AND thread_id = ?').bind(cmd.nick_id, cmd.thread_id ?? '').run();
   }
   let convId = cmd.conv_id;
   if (cmd.kind === 'SEND') {
@@ -685,9 +1016,32 @@ zaloNickRelayRoutes.post('/cmd/:id/done', async (c) => {
       }
     }
     if (convId) {
-      await addMsg(db, convId, cmd.nick_id, { msg_id: str(b.msg_id, 80) || 'web:' + cmd.id, cli_msg_id: '', from_me: true, sender_uid: '', sender_name: '', kind: 'text', text: cmd.text, url: '', at: now, sent_by: cmd.created_by });
+      const kind = pl.sticker ? 'sticker' : pl.file ? (/^image\//.test((pl.file as { mime?: string }).mime ?? '') ? 'image' : 'file') : pl.url ? pl.url.kind : 'text';
+      const text = pl.file && !cmd.text ? pl.file.name : cmd.text ?? '';
+      await addMsg(db, convId, cmd.nick_id, {
+        msg_id: str(b.msg_id, 80) || 'web:' + cmd.id,
+        cli_msg_id: str(b.cli_msg_id, 80),
+        from_me: true,
+        sender_uid: '',
+        sender_name: '',
+        kind,
+        text,
+        url: pl.sticker?.url ?? pl.url?.href ?? '',
+        at: now,
+        sent_by: cmd.created_by,
+        quote_text: pl.quote?.text ?? '',
+        quote_name: pl.quote?.name ?? '',
+      });
     }
   }
   await db.prepare("UPDATE zalo_cmds SET status = 'DONE', msg_id = ?, conv_id = COALESCE(conv_id, ?), done_at = ? WHERE id = ?").bind(str(b.msg_id, 80) || null, convId, now, cmd.id).run();
   return ok(c, { ok: true, conv_id: convId });
+});
+
+/** Máy Zalo lấy nội dung tệp sale đã tải lên để gửi. */
+zaloNickRelayRoutes.get('/file/:id', async (c) => {
+  const f = await c.env.DB.prepare('SELECT name, mime, data FROM zalo_files WHERE id = ?').bind(c.req.param('id')).first<{ name: string; mime: string; data: ArrayBuffer | Uint8Array | number[] | null }>();
+  if (!f || !f.data) throw notFound('Tệp đã gửi hoặc không còn');
+  const bytes = f.data instanceof Uint8Array ? f.data : Array.isArray(f.data) ? new Uint8Array(f.data) : new Uint8Array(f.data);
+  return new Response(bytes as unknown as BodyInit, { headers: { 'Content-Type': f.mime, 'X-File-Name': encodeURIComponent(f.name) } });
 });

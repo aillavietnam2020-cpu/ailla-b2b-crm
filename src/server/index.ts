@@ -6,6 +6,7 @@ import { loadConfig } from './lib/settings';
 import { syncAlerts } from './services/alerts';
 import { emitTimeEvents } from './services/timeEvents';
 import { serveHub } from './hub/serve';
+import { zaloWaitBell } from './routes/zaloInsight';
 import HUB_HTML from './hub/hub.html';
 import { shootReminders } from './services/shootReminders';
 import { taskReminders } from './services/taskReminders';
@@ -81,6 +82,13 @@ export default {
           console.info('[cron] cua vao', JSON.stringify(await syncAccessEmails(env)));
         } catch (error) {
           console.error('[cron] cua vao loi', error);
+        }
+        // Zalo: khách chờ trả lời quá 30 phút thì chuông báo người phụ trách nick (trước khi đẩy thông báo về điện thoại).
+        try {
+          const n = await zaloWaitBell(env.DB);
+          if (n) console.info('[cron] zalo cho tra loi', n);
+        } catch (error) {
+          console.error('[cron] zalo chuong loi', error);
         }
         // Thông báo đẩy về điện thoại: chuông do máy chủ ghi, báo gộp việc chờ duyệt / sau giờ yên lặng.
         try {

@@ -66,6 +66,7 @@ import { orderIntakeRoutes } from './routes/orderIntake';
 import { publicOrderRoutes } from './routes/publicOrder';
 import { zaloRelayRoutes } from './routes/zaloRelay';
 import { zaloNickRelayRoutes, zaloRoutes } from './routes/zaloNick';
+import { zaloInsightRoutes } from './routes/zaloInsight';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -195,6 +196,7 @@ export function createApp() {
   app.route('/api/hub/task-files', taskFileRoutes);
   app.route('/api/hub/chat', chatRoutes);
   app.route('/api/zalo', zaloRoutes);
+  app.route('/api/zalo', zaloInsightRoutes);
   app.route('/api/hub', hubRoutes);
   app.route('/api/drive', driveRoutes);
 

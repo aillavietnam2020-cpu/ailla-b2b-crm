@@ -63,3 +63,87 @@ export interface ZaloDay {
   last_out: string;
   last_at: string;
 }
+
+/* ------------------------------------------------------------------ đợt 2: AI, đo sale */
+
+/** Che số điện thoại, số tài khoản, dãy số dài trước khi gửi nội dung cho AI. Giữ số tiền có dấu chấm (95.000) và số nhỏ. */
+export function aiMask(t: string): string {
+  return String(t ?? '')
+    .replace(/(?<![\d.])(\+?84|0)[\s.-]?\d{2,3}[\s.-]?\d{3}[\s.-]?\d{3,4}(?![\d.])/g, '[SĐT]')
+    .replace(/(?<![\d.])\d{8,}(?![\d.])/g, '[số]');
+}
+
+/** Từ nhạy cảm: AI không soạn, sale tự trả lời và báo Lead. Trả về từ gặp đầu tiên (bỏ dấu khi so). */
+const SENSITIVE = ['khiếu nại', 'hoàn tiền', 'trả hàng', 'đổi trả', 'công an', 'khởi kiện', 'lừa đảo', 'hàng giả', 'dị ứng', 'ngộ độc', 'bỏng', 'cấp cứu', 'báo chí', 'tố cáo', 'bồi thường'];
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+export function aiSensitive(t: string): string | null {
+  const f = ' ' + fold(String(t ?? '')).replace(/[^a-z0-9]+/g, ' ') + ' ';
+  return SENSITIVE.find((w) => f.includes(' ' + fold(w) + ' ')) ?? null;
+}
+
+/** Số ngày không liên lạc thì coi là "khách lâu không chăm", theo giai đoạn khách kênh phân phối. */
+export const STUCK_DAYS: Record<string, number> = { NEW: 7, CONSULTING: 14, QUOTED: 14, NEGOTIATING: 21, FIRST_ORDER: 30 };
+
+export interface RespSample {
+  conv_id: string;
+  from_me: number;
+  at: string;
+  owner_id: string | null;
+}
+export interface RespStat {
+  convs: number;
+  inMsgs: number;
+  outMsgs: number;
+  replies: number;
+  avgMin: number | null;
+  medianMin: number | null;
+  /** % lần trả lời trong 15 phút */
+  within15: number | null;
+  /** số lần để khách chờ quá 60 phút */
+  over60: number;
+}
+/**
+ * Thời gian trả lời: tính từ tin khách đầu tiên chưa được trả lời tới tin bên mình gửi kế tiếp, theo người phụ trách nick.
+ * `rows` phải xếp theo hội thoại rồi theo giờ.
+ */
+export function responseStats(rows: RespSample[]): Record<string, RespStat> {
+  const acc: Record<string, { convs: Set<string>; inMsgs: number; outMsgs: number; mins: number[] }> = {};
+  let conv = '';
+  let open: number | null = null;
+  for (const r of rows) {
+    if (r.conv_id !== conv) {
+      conv = r.conv_id;
+      open = null;
+    }
+    const k = r.owner_id ?? '';
+    const a = (acc[k] ??= { convs: new Set(), inMsgs: 0, outMsgs: 0, mins: [] });
+    a.convs.add(r.conv_id);
+    const t = Date.parse(r.at);
+    if (r.from_me) {
+      a.outMsgs++;
+      if (open !== null) {
+        a.mins.push(Math.max(0, (t - open) / 60000));
+        open = null;
+      }
+    } else {
+      a.inMsgs++;
+      if (open === null) open = t;
+    }
+  }
+  const out: Record<string, RespStat> = {};
+  for (const [k, a] of Object.entries(acc)) {
+    const m = [...a.mins].sort((x, y) => x - y);
+    const n = m.length;
+    out[k] = {
+      convs: a.convs.size,
+      inMsgs: a.inMsgs,
+      outMsgs: a.outMsgs,
+      replies: n,
+      avgMin: n ? Math.round((m.reduce((s, x) => s + x, 0) / n) * 10) / 10 : null,
+      medianMin: n ? Math.round((n % 2 ? m[(n - 1) / 2]! : (m[n / 2 - 1]! + m[n / 2]!) / 2) * 10) / 10 : null,
+      within15: n ? Math.round((m.filter((x) => x <= 15).length / n) * 100) : null,
+      over60: m.filter((x) => x > 60).length,
+    };
+  }
+  return out;
+}

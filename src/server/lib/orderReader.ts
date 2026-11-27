@@ -123,7 +123,7 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 /** Gọi 9router (OpenAI-compatible), trả về chữ máy viết. */
-async function callAi(env: Env, content: unknown[]): Promise<string> {
+export async function callAi(env: Env, content: unknown[]): Promise<string> {
   const { AI_BASE_URL, AI_API_KEY, AI_MODEL } = env;
   if (!AI_BASE_URL || !AI_API_KEY) throw new Error('AI_NOT_CONFIGURED');
   const res = await fetch(`${AI_BASE_URL.replace(/\/$/, '')}/v1/chat/completions`, {
