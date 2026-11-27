@@ -2127,3 +2127,7 @@ table.data.order-lines td .btn.sm { padding-left: 8px; padding-right: 8px; }
 .zl-tpl button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; }
 .zl-tpl button:hover, .zl-tpl button.on { background: #eceaff; }
 @media (max-width: 760px) { .zl-m { max-width: 90%; } .zl-comp { flex-wrap: wrap; } .zl-comp select { max-width: none; flex: 1 1 100%; } }
+.zl-q { border-left: 3px solid #7253e0; background: rgba(114,83,224,.07); border-radius: 6px; padding: 3px 8px; margin-bottom: 4px; font-size: 12.5px; color: #6b7385; }
+.zl-q b { display: block; color: #4b54d1; font-size: 11.5px; }
+.zl-st { width: 110px; height: 110px; object-fit: contain; display: block; }
+.zl-m audio { max-width: 240px; height: 36px; }

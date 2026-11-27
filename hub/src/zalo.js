@@ -6,6 +6,9 @@
    - Gõ "/" trong ô nhắn để chọn tin mẫu. Tin chỉ gửi khi người bấm Gửi (đợt này không có gửi tự động).
    - Sale chỉ thấy nick của mình; Lead / CEO thấy hết và thấy nội dung tin khách đã thu hồi (máy chủ lọc, src/server/routes/zaloNick.ts).
    - Kết nối Zalo thật do chương trình trên VPS giữ (vps-zalo/zalo-nick.mjs), phiên đăng nhập lưu mã hóa trên VPS.
+   - Đợt 2 (chị Hoa chọn 27/11): menu từng tin (trả lời trích dẫn, chuyển tiếp, thả cảm xúc, thu hồi, ẩn phía mình), gửi ảnh / tệp,
+     nhãn dán, ghim, kết bạn (người bấm), đang gõ; AI soạn nháp (người bấm gửi), AI sửa câu, AI tóm tắt; "Khách hôm nay";
+     Nick Zalo: kéo danh bạ + tin cũ, lời mời kết bạn; trang "Đo sale qua Zalo" (Lead / CEO). Máy chủ: routes/zaloInsight.ts.
    ===================================================================== */
 const ZL={me:null,busy:false,f:"all",nick:"",q:"",convs:null,cAt:0,cur:"",det:null,tpl:null,cs:null,csAt:0,csWait:null,nicks:null,tm:0};
 const zlApi=(p,o)=>svApi("/api/zalo"+p,o);
@@ -95,8 +98,8 @@ function zlTopBtn(){const cb=document.querySelector(".topbar #chatbtn");if(!cb)r
   if(!b){b=document.createElement("button");b.type="button";b.className="zlbtn";b.title="Hộp tin Zalo";b.onclick=()=>zlGo("zl_inbox");cb.before(b)}
   const n=ZL.me.unread||0;b.innerHTML=`<span class="zlz">Z</span><span class="zlt">Zalo</span>${n?`<b>${n>99?"99+":n}</b>`:""}`}
 function zlGo(page,conv){if(conv){ZL.cur=conv;ZL.det=null}PAGE=page;try{localStorage.setItem(SKEY+"_p",PAGE)}catch(e){}window.RM_TOP=true;render()}
-if(typeof NAV_AN_MO!=="undefined"){NAV_AN_MO.add("zl_inbox");NAV_AN_MO.add("zl_nick")}
-window.NO_PP=window.NO_PP||new Set();["zl_inbox","zl_nick"].forEach(k=>NO_PP.add(k));
+if(typeof NAV_AN_MO!=="undefined"){NAV_AN_MO.add("zl_inbox");NAV_AN_MO.add("zl_nick");NAV_AN_MO.add("zl_dosale")}
+window.NO_PP=window.NO_PP||new Set();["zl_inbox","zl_nick","zl_dosale"].forEach(k=>NO_PP.add(k));
 {const _r=render;render=function(){const r=_r.apply(this,arguments);try{if(ME&&!ZL.me&&!ZL.busy)zlLoadMe();zlTopBtn()}catch(e){}return r}}
 setInterval(()=>{if(ME&&!document.hidden)zlLoadMe()},30000);
 /* Trang CRM (khung nhúng) nhờ mở Hộp tin ở đúng hội thoại. */
@@ -105,31 +108,38 @@ window.addEventListener("message",e=>{if(e.origin!==location.origin||!e.data||ty
 /* Menu: Kinh doanh › Zalo, đặt sau Kênh phân phối. */
 {const kd=MODULES.find(x=>x.k==="kd")||MODULES.find(x=>x.k==="b2c");
  if(kd){const g0=kd.groups;kd.groups=()=>{let G=[];try{G=g0()}catch(e){}if(!zlSee())return G;
-   const Z=["Zalo",[MI("zl_inbox","Hộp tin Zalo",null,()=>(ZL.me&&ZL.me.unread)||""),MI("zl_nick","Nick Zalo")]];
+   const Z=["Zalo",[MI("zl_inbox","Hộp tin Zalo",null,()=>(ZL.me&&ZL.me.unread)||""),MI("zl_nick","Nick Zalo"),MI("zl_dosale","Đo sale qua Zalo",()=>zlLead())].filter(x=>!x[2]||x[2](ME))];
    const at=G.findIndex(x=>x[0]==="Kênh phân phối");if(at>=0)G.splice(at+1,0,Z);else G.push(Z);return G}}}
 
 /* ---------- tin mẫu "/" ---------- */
 async function zlTpl(){if(ZL.tpl)return ZL.tpl;try{ZL.tpl=await zlApi("/templates")}catch(e){ZL.tpl=[]}return ZL.tpl}
 
 /* ---------- bong bóng tin ---------- */
-function zlBub(m,lead,showNick){const t=`<div class="t">${zlHM(m.at)}${showNick&&m.nick_name?" · "+esc(m.nick_name):""}${m.from_me&&m.sent_by_name?" · "+esc(m.sent_by_name):""}${m.from_me&&m.seen_at?" · đã xem":""}</div>`;
+const ZL_ICON={"/-heart":"❤️","/-strong":"👍",":>":"😆",":o":"😮",":-((":"😭",":-h":"😡"};
+function zlBub(m,lead,showNick,menu){const t=`<div class="t">${zlHM(m.at)}${showNick&&m.nick_name?" · "+esc(m.nick_name):""}${m.from_me&&m.sent_by_name?" · "+esc(m.sent_by_name):""}${m.from_me&&m.seen_at?" · đã xem":""}${m.hidden_at?" · "+pill("đã ẩn phía mình","gry"):""}</div>`;
   const who=!m.from_me&&m.sender_name&&m.group?`<div class="who">${esc(m.sender_name)}</div>`:"";
+  const qt=m.quote_text?`<div class="zl-q"><b>${esc(m.quote_name||(m.from_me?"Khách":"AILLA"))}</b>${esc(m.quote_text)}</div>`:"";
+  const R=m.reacts||[],rx=R.length?`<div class="zl-rx" title="${esc(R.map(r=>(r.from_me?"Mình":r.who_name)+" "+(ZL_ICON[r.icon]||r.icon)).join(", "))}">${[...new Set(R.map(r=>ZL_ICON[r.icon]||r.icon))].join("")}${R.length>1?" "+R.length:""}</div>`:"";
+  const mm=menu&&m.id?`<button type="button" class="zl-mm" data-zlmm="${esc(m.id)}" title="Trả lời, chuyển tiếp, thả cảm xúc, thu hồi…" aria-label="Thao tác với tin">⋯</button>`:"";
   if(m.recalled){if(!lead)return `<div class="zl-m${m.from_me?" me":""}"><i style="color:var(--muted,#6b7090)">Tin đã thu hồi</i>${t}</div>`;
     return `<div class="zl-m rc${m.from_me?" me":""}">${who}<div class="body">${zlBody(m)}</div><div class="t">${zlHM(m.at)} · ${pill(m.from_me?"đã thu hồi":"khách đã thu hồi","red")}</div></div>`}
-  return `<div class="zl-m${m.from_me?" me":""}">${who}${zlBody(m)}${t}</div>`}
+  return `<div class="zl-m${m.from_me?" me":""}${m.hidden_at?" hid":""}" data-zlm="${esc(m.id||"")}">${mm}${who}${qt}${zlBody(m)}${t}${rx}</div>`}
 function zlBody(m){const tx=esc(m.text||"");
+  if(m.kind==="sticker"&&m.url)return `<img class="zl-st" src="${esc(m.url)}" alt="Nhãn dán" loading="lazy" referrerpolicy="no-referrer">`;
+  if(m.kind==="voice"&&m.url)return `<audio controls preload="none" src="${esc(m.url)}"></audio>`;
   if(m.kind==="image"&&m.url)return `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer"><img src="${esc(m.url)}" alt="Ảnh" loading="lazy" referrerpolicy="no-referrer"></a>${tx?`<div>${tx}</div>`:""}`;
   if((m.kind==="file"||m.kind==="link"||m.kind==="video"||m.kind==="voice")&&m.url)return `${{file:"📎",link:"🔗",video:"🎬",voice:"🎤"}[m.kind]} <a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">${tx||{file:"Tệp",link:"Liên kết",video:"Video",voice:"Tin thoại"}[m.kind]}</a>`;
   if(m.kind!=="text")return `<i>${esc({image:"[Ảnh]",file:"[Tệp]",sticker:"[Nhãn dán]",voice:"[Tin thoại]",video:"[Video]",link:"[Liên kết]",other:"[Tin]"}[m.kind]||"[Tin]")}</i>${tx?" "+tx:""}`;
   return tx}
-function zlMsgsHtml(L,lead,showNick,pend){let last="",h="";(L||[]).forEach(m=>{const d=new Date(m.at).toLocaleDateString("vi-VN",{weekday:"short",day:"2-digit",month:"2-digit"});if(d!==last){h+=`<div class="zl-day">${d}</div>`;last=d}h+=zlBub(m,lead,showNick)});
-  (pend||[]).forEach(p=>{h+=`<div class="zl-m me ${p.status==="FAILED"?"fail":"pend"}">${esc(p.text)}<div class="t">${p.status==="FAILED"?"Chưa gửi được: "+esc(p.error||""):"Đang gửi…"}</div></div>`});
+function zlMsgsHtml(L,lead,showNick,pend,menu){let last="",h="";(L||[]).forEach(m=>{const d=new Date(m.at).toLocaleDateString("vi-VN",{weekday:"short",day:"2-digit",month:"2-digit"});if(d!==last){h+=`<div class="zl-day">${d}</div>`;last=d}h+=zlBub(m,lead,showNick,menu)});
+  (pend||[]).forEach(p=>{let pl={};try{pl=p.payload?JSON.parse(p.payload):{}}catch(e){}const what=p.text||(pl.file?"📎 "+pl.file.name:pl.sticker?"[Nhãn dán]":pl.url?"↪ "+(pl.url.name||"Tệp"):"");
+    h+=`<div class="zl-m me ${p.status==="FAILED"?"fail":"pend"}">${pl.quote?`<div class="zl-q">${esc(pl.quote.text||"")}</div>`:""}${esc(what)}<div class="t">${p.status==="FAILED"?"Chưa gửi được: "+esc(p.error||""):"Đang gửi…"}</div></div>`});
   return h||`<div class="zl-empty">Chưa có tin nhắn.</div>`}
 
 /* ---------- ô nhắn: Enter gửi, Shift+Enter xuống dòng, "/" mở tin mẫu ---------- */
 /* Mã ô kết thúc "-q": phần tự lưu nháp phiếu (nhapdo.js) và cờ "đang gõ" coi như ô tìm, không bắt ô nhắn Zalo. */
 let ZL_CN=0;
-function zlComposer(extra){return `<div class="zl-comp"><div class="zl-tpl" hidden></div>${extra||""}<textarea id="zlc${++ZL_CN}-q" rows="1" placeholder="Nhắn Zalo… gõ / để chọn tin mẫu" autocomplete="off"></textarea><button type="button" class="btn pri" data-zlsend="1">Gửi</button></div>`}
+function zlComposer(extra,tools){return `<div class="zl-comp"><div class="zl-tpl" hidden></div>${extra||""}${tools?`<button type="button" class="zl-ib2" data-zlatt title="Gửi ảnh, tệp (tối đa 1,9 MB)" aria-label="Gửi ảnh, tệp">📎</button><input type="file" data-zlfile hidden><button type="button" class="zl-ib2" data-zlstk title="Nhãn dán" aria-label="Nhãn dán">🙂</button>`:""}<textarea id="zlc${++ZL_CN}-q" rows="1" placeholder="Nhắn Zalo… gõ / để chọn tin mẫu" autocomplete="off"></textarea><button type="button" class="btn pri" data-zlsend="1">Gửi</button>${tools?`<button type="button" class="zl-ib2" data-zlpol title="AI sửa câu đang gõ cho gọn, lễ phép" aria-label="AI sửa câu">✦</button>`:""}</div>`}
 function zlBindComposer(root,onSend){const box=root.querySelector(".zl-comp");if(!box)return;const ta=box.querySelector("textarea"),tp=box.querySelector(".zl-tpl"),btn=box.querySelector("[data-zlsend]");let sel=0,list=[];
   const fit=()=>{ta.style.height="auto";ta.style.height=Math.min(140,ta.scrollHeight)+"px"};
   const show=async()=>{const v=ta.value;if(!v.startsWith("/")||v.includes("\n")){tp.hidden=true;return}const T=await zlTpl(),k=v.slice(1).split(" ")[0].toLowerCase();
@@ -156,6 +166,7 @@ function pZlInbox(m){zlCss();
      <input id="zl-q" placeholder="Tìm tên, số điện thoại" value="${esc(ZL.q)}" autocomplete="off">
      ${[["all","Tất cả"],["wait","Chờ trả lời"],["unread","Chưa đọc"],["grp","Nhóm"]].map(([k,t])=>`<button type="button" class="zl-tab${ZL.f===k?" on":""}" data-zlf="${k}">${t}</button>`).join("")}
      ${nicks.length>1?`<select id="zlnk">${opt([["","Mọi nick"]].concat(nicks.map(n=>[n.id,n.name])),ZL.nick)}</select>`:""}
+     <button type="button" class="zl-tab" id="zlbrief" title="Khách chờ lâu, hẹn hôm nay, khách lâu không chăm, khách im 30 ngày">☀ Khách hôm nay</button>
    </div><div class="zl-list" id="zllist"><p class="hint zl-pad">Đang tải…</p></div></div>
    <div class="zl-ch" id="zlch"></div>
    <div class="zl-rp" id="zlrp"></div>
@@ -163,6 +174,7 @@ function pZlInbox(m){zlCss();
   ${!nicks.length?`<p class="hint">Chưa có nick Zalo nào. ${zlLead()?"Vào Nick Zalo để thêm nick và quét QR.":"Nhờ Lead thêm nick công việc của bạn ở Nick Zalo."}</p>`:""}`;
   m.querySelectorAll("[data-zlf]").forEach(b=>b.onclick=()=>{ZL.f=b.dataset.zlf;ZL.convs=null;m.querySelectorAll("[data-zlf]").forEach(x=>x.classList.toggle("on",x===b));zlLoadConvs(true)});
   const nk=m.querySelector("#zlnk");if(nk)nk.onchange=()=>{ZL.nick=nk.value;zlLoadConvs(true)};
+  m.querySelector("#zlbrief").onclick=zlBrief;
   let t=0;const q=m.querySelector("#zl-q");q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{ZL.q=q.value.trim();zlLoadConvs(true)},300)};
   zlDrawList();zlLoadConvs(true);zlDrawChat();if(ZL.cur)zlLoadConv(true);zlTick()}
 function zlTick(){clearTimeout(ZL.tm);ZL.tm=setTimeout(async()=>{if(PAGE!=="zl_inbox"||!document.getElementById("zlib"))return;
@@ -173,28 +185,29 @@ function zlInit(n){const w=String(n||"?").replace(/\(.*?\)/g,"").replace(/[^\p{L
 function zlDrawList(){const el=$("#zllist");if(!el)return;const L=ZL.convs;if(!L){el.innerHTML=`<p class="hint zl-pad">Đang tải…</p>`;return}
   el.innerHTML=L.length?L.map(c=>{const nm=c.customer_name||c.cskh_name||c.name||c.peer_phone||"(chưa rõ tên)";
     return `<button type="button" class="zl-cv${c.id===ZL.cur?" on":""}" data-zlcv="${c.id}"><span class="zl-av">${c.avatar?`<img src="${esc(c.avatar)}" alt="" referrerpolicy="no-referrer" loading="lazy">`:c.is_group?"#":zlInit(nm)}</span>
-     <span style="min-width:0"><span class="zl-cn" style="display:block">${esc(nm)}</span><span class="zl-cp" style="display:block">${c.last_from_me?"Bạn: ":""}${esc(c.last_text||"")}</span>
+     <span style="min-width:0"><span class="zl-cn" style="display:block">${c.pinned_at?"📌 ":""}${esc(nm)}</span><span class="zl-cp" style="display:block">${zlTyping(c.typing_at)?`<i style="color:#18864f">đang gõ…</i>`:(c.last_from_me?"Bạn: ":"")+esc(c.last_text||"")}</span>
      <span class="zl-sub">${pill(c.nick_name,"vio")}${c.is_group?pill("Nhóm","gry"):""}${c.customer_id?pill("Kênh phân phối","blu"):c.cskh_phone?pill("Khách lẻ","blu"):c.is_group?"":pill("Chưa gắn khách","amb")}${c.waiting_since&&!c.is_group?pill("Chờ "+zlAgo(c.waiting_since),"red"):""}</span></span>
      <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><small class="hint">${zlHM(c.last_at)}</small>${c.unread?`<span class="zl-un">${c.unread}</span>`:""}</span></button>`}).join(""):`<p class="hint zl-pad">${ZL.f==="wait"?"Không có khách nào đang chờ trả lời.":"Chưa có hội thoại."}</p>`;
   el.querySelectorAll("[data-zlcv]").forEach(b=>b.onclick=()=>{ZL.cur=b.dataset.zlcv;ZL.det=null;const ib=$("#zlib");if(ib)ib.classList.add("has");el.querySelectorAll(".zl-cv").forEach(x=>x.classList.toggle("on",x===b));zlDrawChat();zlLoadConv(true)})}
 async function zlLoadConv(force){const id=ZL.cur;if(!id)return;
-  try{const r=await zlApi("/convs/"+id);if(ZL.cur!==id)return;const sig=JSON.stringify([r.msgs.length,r.msgs.slice(-1),r.pending,r.conv.customer_id,r.conv.cskh_phone,r.msgs.filter(x=>x.recalled||x.seen_at).length]);
+  try{const r=await zlApi("/convs/"+id);if(ZL.cur!==id)return;const sig=JSON.stringify([r.msgs.length,r.msgs.slice(-1),r.pending,r.conv.customer_id,r.conv.cskh_phone,r.conv.pinned_at,r.conv.is_friend,zlTyping(r.conv.typing_at),r.msgs.filter(x=>x.recalled||x.seen_at||x.hidden_at).length,r.msgs.reduce((a,x)=>a+(x.reacts||[]).length,0)]);
     const first=!ZL.det;if(!force&&sig===ZL.dSig)return;ZL.dSig=sig;ZL.det=r;
-    if(first||force)zlDrawChat();else zlDrawMsgs();zlDrawPanel();
+    if(first||force)zlDrawChat();else{zlDrawMsgs();zlDrawHead()}zlDrawPanel();zlAiLoad(false);
     if(r.conv.unread){await zlPost("/convs/"+id+"/read");const c=(ZL.convs||[]).find(x=>x.id===id);if(c){c.unread=0;zlDrawList()}zlLoadMe()}}
   catch(e){if(force){const ch=$("#zlch");if(ch)ch.innerHTML=`<div class="zl-empty">${esc(e.message)}</div>`}}}
 function zlDrawChat(){const ch=$("#zlch");if(!ch)return;const D0=ZL.det;
   if(!ZL.cur){ch.innerHTML=`<div class="zl-empty">Chọn một hội thoại bên trái.</div>`;const rp=$("#zlrp");if(rp)rp.innerHTML="";return}
   if(!D0){ch.innerHTML=`<div class="zl-empty">Đang tải…</div>`;return}
   const c=D0.conv,nm=(D0.customer&&D0.customer.name)||(D0.cskh&&D0.cskh.name)||c.name||c.peer_phone||"";
-  ch.innerHTML=`<div class="zl-hd"><button type="button" class="btn sm zl-back" id="zlback">← Danh sách</button>${zlDot}<span>${esc(nm)}</span>${pill(c.nick_name,"vio")}${c.peer_phone?`<span class="hint">${esc(c.peer_phone)}</span>`:""}<span class="sp"></span><button type="button" class="btn sm" id="zlinfo">Thông tin khách</button></div>
-   <div class="zl-msgs" id="zlmsgs"></div>${D0.can_send?zlComposer():`<p class="hint zl-pad">Nick này của người khác: chỉ xem.</p>`}`;
-  zlDrawMsgs();zlBindComposer(ch,async v=>{await zlPost("/convs/"+c.id+"/send",{text:v});await zlLoadConv(false);zlTick()});
-  $("#zlback").onclick=()=>{ZL.cur="";ZL.det=null;const ib=$("#zlib");if(ib)ib.classList.remove("has","rp");zlDrawChat();zlDrawList()};
-  $("#zlinfo").onclick=()=>{const ib=$("#zlib");if(ib){ib.classList.toggle("rp");const rp=$("#zlrp");if(rp&&ib.classList.contains("rp"))rp.scrollIntoView({behavior:"smooth",block:"start"})}};
+  ch.innerHTML=`<div class="zl-hd" id="zlhd"></div>
+   <div class="zl-msgs" id="zlmsgs"></div><div id="zlai"></div><div id="zlqbar"></div>${D0.can_send?zlComposer("",true):`<p class="hint zl-pad">Nick này của người khác: chỉ xem.</p>`}`;
+  zlDrawHead();zlDrawMsgs();ZL.quote=null;zlQBar();
+  zlBindComposer(ch,async v=>{const q=ZL.quote;await zlPost("/convs/"+c.id+"/send",{text:v,quote_id:q?q.id:undefined});ZL.quote=null;zlQBar();await zlLoadConv(false);zlTick()});
+  zlBindTools(ch,c.id);zlAiLoad(false);
   const ta=ch.querySelector("textarea");if(ta&&window.innerWidth>760)ta.focus()}
 function zlDrawMsgs(){const el=$("#zlmsgs");if(!el||!ZL.det)return;const near=el.scrollHeight-el.scrollTop-el.clientHeight<80||!el.childElementCount;
-  const g=ZL.det.conv.is_group;el.innerHTML=zlMsgsHtml(ZL.det.msgs.map(x=>({...x,group:g})),ZL.det.lead,false,ZL.det.pending);if(near)el.scrollTop=el.scrollHeight}
+  const g=ZL.det.conv.is_group;el.innerHTML=zlMsgsHtml(ZL.det.msgs.map(x=>({...x,group:g})),ZL.det.lead,false,ZL.det.pending,ZL.det.can_send);if(near)el.scrollTop=el.scrollHeight;
+  el.querySelectorAll("[data-zlmm]").forEach(b=>b.onclick=e=>{e.stopPropagation();const r=b.getBoundingClientRect();zlMsgMenu(b.dataset.zlmm,r.left,r.bottom)})}
 function zlDrawPanel(){const rp=$("#zlrp");if(!rp||!ZL.det)return;const D0=ZL.det,c=D0.conv,k=D0.customer,s=D0.cskh,can=D0.can_send;
   const kv=a=>`<div class="zl-kv">${a.map(([x,y])=>`<span>${x}</span><span>${y}</span>`).join("")}</div>`;
   let h="";
@@ -265,7 +278,6 @@ async function zlTplEditor(el,lead){if(!el)return;ZL.tpl=null;const T=await zlTp
     el.querySelector("#zltadd").onclick=()=>{rows.push({code:"",text:""});draw()};
     el.querySelector("#zltsave").onclick=async e=>{e.target.disabled=true;try{const r=await zlPost("/templates",{items:rows},"PUT");ZL.tpl=null;toast("Đã lưu "+r.n+" tin mẫu")}catch(er){toast(er.message)}e.target.disabled=false}};
   draw()}
-Object.assign(PAGES,{zl_inbox:pZlInbox,zl_nick:pZlNick});
 
 /* ---------- khung Zalo của một khách (CSKH: hộp thông tin khách, hồ sơ khách) ---------- */
 async function zlThreadBox(el,q,opts){if(!el||!ZL.me||!zlSee())return;zlCss();opts=opts||{};
@@ -312,3 +324,156 @@ if(typeof csQuick==="function"){const _q=csQuick;csQuick=function(phone){const r
   const acts=b.closest(".acts");if(!acts||document.getElementById("zlqk"))return;const d=document.createElement("div");d.id="zlqk";d.style.marginTop="12px";acts.before(d);zlThreadBox(d,{cskh_phone:phone,phone},{title:"Zalo gần nhất",days:false})};w()}return r}}
 /* Hồ sơ khách CSKH: khung Tin Zalo trên "Các lần gọi"; tóm tắt nhắn Zalo theo ngày nằm trong khung. */
 if(typeof csProfBind==="function"){const _p=csProfBind;csProfBind=function(m){const r=_p.apply(this,arguments);try{const P=CSK.prof;if(P&&zlSee()&&!m.querySelector("#zlprof")){const pr=m.querySelector(".cs-pr");if(pr){const s=document.createElement("section");s.className="card";s.id="zlprof";const c=P.customer;pr.insertBefore(s,pr.children[1]||null);zlThreadBox(s,{cskh_phone:c.phone,phone:c.phone})}}}catch(e){}return r}}
+
+/* =====================================================================
+   ĐỢT 2 (27/11): thao tác từng tin, ảnh / tệp / nhãn dán, ghim, kết bạn, AI, Khách hôm nay, Đo sale
+   ===================================================================== */
+const zlTyping=t=>!!t&&Date.now()-Date.parse(t)<12000;
+function zlCss2(){if(document.getElementById("zlcss2"))return;const s=document.createElement("style");s.id="zlcss2";s.textContent=`
+.zl-m{position:relative}.zl-m.hid{opacity:.55}
+.zl-mm{position:absolute;top:2px;right:-26px;border:0;background:none;cursor:pointer;color:var(--muted,#6b7090);font-size:16px;padding:0 4px;opacity:0}
+.zl-m.me .zl-mm{right:auto;left:-26px}.zl-m:hover .zl-mm,.zl-mm:focus-visible{opacity:1}
+@media(hover:none){.zl-mm{opacity:.7}}
+.zl-q{border-left:3px solid #7253e0;background:rgba(114,83,224,.07);border-radius:6px;padding:3px 8px;margin-bottom:4px;font-size:12.5px;color:var(--muted,#6b7090);white-space:pre-wrap}
+.zl-q b{display:block;color:#4b54d1;font-size:11.5px}
+.zl-rx{position:absolute;bottom:-10px;right:8px;background:#fff;border:1px solid var(--line,#e6e8f0);border-radius:99px;font-size:12px;padding:0 6px;line-height:18px}
+.zl-m:has(.zl-rx){margin-bottom:8px}
+.zl-st{width:110px;height:110px;object-fit:contain;display:block}
+.zl-m audio{max-width:240px;height:36px}
+.zl-ib2{border:1px solid var(--line,#e6e8f0);background:#fff;border-radius:9px;width:36px;height:36px;cursor:pointer;font-size:16px;flex:none}
+.zl-ai{margin:6px 12px;border:1px solid #4b54d1;border-radius:12px;padding:8px 10px;background:#fff;display:flex;flex-direction:column;gap:6px}
+.zl-ai.note{border-color:#e0a800;background:#fff8e6;color:#8a5a00;font-size:13px}
+.zl-ai .tx{white-space:pre-wrap;font-size:13.5px}
+.zl-qbar{display:flex;gap:8px;align-items:center;margin:6px 12px 0;border-left:3px solid #7253e0;background:rgba(114,83,224,.07);border-radius:6px;padding:4px 8px;font-size:12.5px}
+.zl-qbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zl-pop{position:fixed;z-index:60;background:#fff;border:1px solid var(--line,#e6e8f0);border-radius:12px;box-shadow:0 12px 32px rgba(16,24,40,.18);padding:6px;min-width:190px}
+.zl-pop .emo{display:flex;gap:2px;padding:2px 2px 6px;border-bottom:1px solid var(--line,#eef0f5);margin-bottom:4px}
+.zl-pop .emo button{border:0;background:none;font-size:20px;cursor:pointer;border-radius:8px;padding:2px 4px}.zl-pop .emo button:hover{background:#f1f2f7}
+.zl-pop .it{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 9px;border-radius:8px;cursor:pointer;font:inherit;font-size:13.5px}.zl-pop .it:hover{background:#f1f2f7}.zl-pop .it.red{color:#c0352b}
+.zl-stk{display:grid;grid-template-columns:repeat(5,64px);gap:4px;max-height:280px;overflow:auto}.zl-stk button{border:0;background:none;cursor:pointer;border-radius:8px}.zl-stk button:hover{background:#f1f2f7}.zl-stk img{width:60px;height:60px;object-fit:contain}
+.zl-br h4{margin:12px 0 4px;font-size:13.5px}.zl-br .row{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;cursor:pointer;border:0;background:none;width:100%;text-align:left;font:inherit}.zl-br .row:hover{background:#f6f6fd}.zl-br .row>span:not(.pill){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zl-br .row>.pill{flex:none}
+.zl-fw{max-height:50vh;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-top:8px}.zl-fw label{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:8px;cursor:pointer}.zl-fw label:hover{background:#f6f6fd}
+`;document.head.appendChild(s)}
+{const _c=zlCss;zlCss=function(){_c();zlCss2()}}
+
+/* Đầu khung chat: tên, nick, đang gõ, ghim, kết bạn, AI tóm tắt, thông tin khách. */
+function zlDrawHead(){const hd=$("#zlhd");if(!hd||!ZL.det)return;const D0=ZL.det,c=D0.conv,nm=(D0.customer&&D0.customer.name)||(D0.cskh&&D0.cskh.name)||c.name||c.peer_phone||"",can=D0.can_send;
+  hd.innerHTML=`<button type="button" class="btn sm zl-back" id="zlback">← Danh sách</button>${zlDot}<span>${esc(nm)}</span>${pill(c.nick_name,"vio")}${c.peer_phone?`<span class="hint">${esc(c.peer_phone)}</span>`:""}${zlTyping(c.typing_at)?`<i class="hint" style="color:#18864f">đang gõ…</i>`:""}<span class="sp"></span>
+   <button type="button" class="btn sm" id="zlpin" title="${c.pinned_at?"Bỏ ghim":"Ghim lên đầu danh sách"}">${c.pinned_at?"📌 Bỏ ghim":"📌 Ghim"}</button>
+   ${can&&!c.is_group&&c.is_friend!==1?`<button type="button" class="btn sm" id="zlfr" title="Gửi lời mời kết bạn từ nick này">＋ Kết bạn</button>`:""}
+   <button type="button" class="btn sm" id="zlsum" title="AI tóm tắt cuộc chat, khách vui hay lăn tăn, nên làm gì tiếp">✦ Tóm tắt</button>
+   <button type="button" class="btn sm" id="zlinfo">Thông tin khách</button>`;
+  $("#zlback").onclick=()=>{ZL.cur="";ZL.det=null;const ib=$("#zlib");if(ib)ib.classList.remove("has","rp");zlDrawChat();zlDrawList()};
+  $("#zlinfo").onclick=()=>{const ib=$("#zlib");if(ib){ib.classList.toggle("rp");const rp=$("#zlrp");if(rp&&ib.classList.contains("rp"))rp.scrollIntoView({behavior:"smooth",block:"start"})}};
+  $("#zlpin").onclick=async()=>{try{await zlPost("/convs/"+c.id+"/pin",{on:!c.pinned_at});await zlLoadConv(true);zlLoadConvs(true)}catch(e){toast(e.message)}};
+  const fr=$("#zlfr");if(fr)fr.onclick=()=>{crmModal("Gửi lời mời kết bạn",`<p class="hint" style="margin-top:0">Mỗi nick tối đa 30 lời mời trong 24 giờ để tránh bị Zalo khóa.</p><textarea id="zlfrt" rows="2" style="width:100%">Chào anh/chị, em bên AILLA ạ. Anh/chị kết bạn để em tiện gửi bảng giá, chương trình mới nhé.</textarea><div class="acts" style="justify-content:flex-end"><button type="button" class="btn" onclick="closeCM()">Hủy</button><button type="button" class="btn pri" id="zlfrs">Gửi lời mời</button></div>`);
+    $("#zlfrs").onclick=async e=>{e.target.disabled=true;try{await zlPost("/convs/"+c.id+"/friend",{text:$("#zlfrt").value});closeCM();toast("Đã gửi lời mời kết bạn")}catch(er){e.target.disabled=false;toast(er.message)}}};
+  $("#zlsum").onclick=async e=>{e.target.disabled=true;try{const r=await zlPost("/convs/"+c.id+"/ai-summary");crmModal("AI tóm tắt · "+esc(nm),`<div style="white-space:pre-wrap;line-height:1.6">${esc(r.text)}</div><p class="hint">AI đọc 30 tin gần nhất (đã che số điện thoại). Dùng để tham khảo.</p>`)}catch(er){toast(er.message)}e.target.disabled=false}}
+
+/* Ô trích dẫn đang trả lời. */
+function zlQBar(){const el=$("#zlqbar");if(!el)return;const q=ZL.quote;el.innerHTML=q?`<div class="zl-qbar">↩ <span>Trả lời: ${esc(q.text||(q.kind!=="text"?"["+q.kind+"]":""))}</span><button type="button" class="btn sm" id="zlqx" aria-label="Bỏ trả lời">✕</button></div>`:"";
+  const x=$("#zlqx");if(x)x.onclick=()=>{ZL.quote=null;zlQBar()}}
+
+/* Nút ảnh / tệp, nhãn dán, AI sửa câu cạnh ô nhắn. */
+function zlBindTools(root,convId){const ta=root.querySelector(".zl-comp textarea"),fi=root.querySelector("[data-zlfile]");if(!ta)return;
+  const att=root.querySelector("[data-zlatt]");if(att)att.onclick=()=>fi.click();
+  if(fi)fi.onchange=async()=>{const f=fi.files&&fi.files[0];fi.value="";if(!f||!ZL.det)return;
+    try{toast("Đang tải "+f.name+"…");const up=await zlFileUp(f,ZL.det.conv.nick_id);const cap=ta.value.trim();
+      await zlPost("/convs/"+convId+"/send",{text:/^image\//.test(f.type)?cap:"",file_id:up.id,quote_id:ZL.quote?ZL.quote.id:undefined});if(/^image\//.test(f.type))ta.value="";ZL.quote=null;zlQBar();await zlLoadConv(false);zlTick()}catch(e){toast(e.message)}};
+  const stk=root.querySelector("[data-zlstk]");if(stk)stk.onclick=async()=>{const r=stk.getBoundingClientRect();let L=[];try{L=await zlApi("/stickers")}catch(e){}
+    zlPop(r.left,r.top-300,L.length?`<div class="zl-stk">${L.map((x,i)=>`<button type="button" data-si="${i}" title="Gửi nhãn dán">${x.url?`<img src="${esc(x.url)}" alt="Nhãn dán" referrerpolicy="no-referrer" loading="lazy">`:"#"+x.id}</button>`).join("")}</div>`:`<p class="hint" style="max-width:240px;margin:6px">Chưa có nhãn dán. Khi khách hoặc sale gửi nhãn dán trên Zalo, web nhớ lại để chọn gửi ở đây.</p>`,
+      p=>p.querySelectorAll("[data-si]").forEach(b=>b.onclick=async()=>{zlPopClose();try{await zlPost("/convs/"+convId+"/send",{sticker:L[+b.dataset.si]});await zlLoadConv(false);zlTick()}catch(e){toast(e.message)}}))};
+  const pol=root.querySelector("[data-zlpol]");if(pol)pol.onclick=async()=>{const t=ta.value.trim();if(!t){toast("Gõ câu trước, rồi bấm ✦ để AI sửa");return}pol.disabled=true;
+    try{const r=await zlPost("/convs/"+convId+"/ai-polish",{text:t});if(r.text){ZL.polUndo=t;ta.value=r.text;ta.dispatchEvent(new Event("input"));toast("AI đã sửa câu. Đọc lại rồi bấm Gửi (Ctrl+Z để lấy lại câu cũ).")}}catch(e){toast(e.message)}pol.disabled=false};
+  ta.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="z"&&ZL.polUndo){e.preventDefault();ta.value=ZL.polUndo;ZL.polUndo="";ta.dispatchEvent(new Event("input"))}})}
+/* Tải tệp lên: ảnh thu nhỏ tối đa 1600px, JPEG; tệp khác tối đa 1,9 MB. */
+async function zlFileUp(f,nickId){let b64="",mime=f.type||"application/octet-stream",name=f.name||"tep";
+  if(/^image\/(jpeg|png|webp)$/.test(mime)){const url=URL.createObjectURL(f);try{const im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url});
+      const k=Math.min(1,1600/Math.max(im.width,im.height)),cv=document.createElement("canvas");cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);
+      b64=cv.toDataURL("image/jpeg",.85).split(",")[1];mime="image/jpeg";name=name.replace(/\.\w+$/,"")+".jpg"}finally{URL.revokeObjectURL(url)}}
+  else{if(f.size>1900000)throw new Error("Tệp lớn quá 1,9 MB. Tệp lớn gửi bằng Zalo trên điện thoại.");b64=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(",")[1]||"");r.onerror=no;r.readAsDataURL(f)})}
+  return zlPost("/files",{nick_id:nickId,name,mime,b64})}
+
+/* Hộp nổi nhỏ (menu tin, nhãn dán). */
+function zlPopClose(){const p=$("#zlpop");if(p)p.remove()}
+function zlPop(x,y,html,bind){zlPopClose();const p=document.createElement("div");p.id="zlpop";p.className="zl-pop";p.innerHTML=html;document.body.appendChild(p);
+  const w=p.offsetWidth,h=p.offsetHeight;p.style.left=Math.max(8,Math.min(x,innerWidth-w-8))+"px";p.style.top=Math.max(8,Math.min(y,innerHeight-h-8))+"px";if(bind)bind(p);
+  setTimeout(()=>document.addEventListener("click",function f(e){if(!p.contains(e.target)){zlPopClose();document.removeEventListener("click",f,true)}},true),0)}
+/* Menu một tin: thả cảm xúc, trả lời, chép, chuyển tiếp, thu hồi (tin mình), ẩn phía mình. */
+function zlMsgMenu(id,x,y){const m=ZL.det&&ZL.det.msgs.find(z=>z.id===id);if(!m)return;const mine=!!m.from_me;
+  zlPop(x,y,`<div class="emo">${Object.entries(ZL_ICON).map(([k,v])=>`<button type="button" data-ic="${esc(k)}" title="Thả ${v}">${v}</button>`).join("")}</div>
+   <button type="button" class="it" data-a="rep">↩ Trả lời (trích dẫn)</button><button type="button" class="it" data-a="copy">⧉ Chép chữ</button><button type="button" class="it" data-a="fw">↪ Chuyển tiếp…</button>
+   ${mine&&!m.recalled?`<button type="button" class="it red" data-a="undo">⟲ Thu hồi (khách không thấy nữa)</button>`:""}<button type="button" class="it" data-a="hide">🙈 Ẩn phía mình</button>`,
+   p=>{p.querySelectorAll("[data-ic]").forEach(b=>b.onclick=async()=>{zlPopClose();try{await zlPost("/msgs/"+id+"/react",{icon:b.dataset.ic});toast("Đã thả "+ZL_ICON[b.dataset.ic]);setTimeout(()=>zlLoadConv(false),3000)}catch(e){toast(e.message)}});
+    p.querySelectorAll("[data-a]").forEach(b=>b.onclick=async()=>{zlPopClose();const a=b.dataset.a;
+      if(a==="rep"){ZL.quote=m;zlQBar();const ta=$("#zlch textarea");if(ta)ta.focus()}
+      else if(a==="copy"){try{await navigator.clipboard.writeText(m.text||m.url||"");toast("Đã chép")}catch(e){toast(m.text||"")}}
+      else if(a==="fw")zlForward(m);
+      else if(a==="undo"){if(!confirm("Thu hồi tin này trên Zalo? Khách sẽ không thấy nữa."))return;try{await zlPost("/msgs/"+id+"/undo");toast("Đang thu hồi…");setTimeout(()=>zlLoadConv(true),3500)}catch(e){toast(e.message)}}
+      else if(a==="hide"){if(!confirm("Ẩn tin này trên web? Khách vẫn thấy trên Zalo; Lead / CEO vẫn xem được."))return;try{await zlPost("/msgs/"+id+"/hide");await zlLoadConv(true)}catch(e){toast(e.message)}}})})}
+/* Chuyển tiếp: chọn tối đa 5 hội thoại. */
+function zlForward(m){const L=(ZL.convs||[]).filter(c=>c.id!==ZL.cur);
+  crmModal("Chuyển tiếp tin",`<div class="hint" style="margin-top:0">${esc((m.text||"["+m.kind+"]").slice(0,120))}</div><input id="zlfwq" placeholder="Tìm hội thoại" style="width:100%;margin-top:8px" autocomplete="off"><div class="zl-fw" id="zlfwl">${L.map(c=>`<label data-n="${esc((c.customer_name||c.cskh_name||c.name||"").toLowerCase())}"><input type="checkbox" value="${c.id}"> ${esc(c.customer_name||c.cskh_name||c.name||c.peer_phone||"")} <span class="hint">· ${esc(c.nick_name)}</span></label>`).join("")||`<p class="hint">Chưa có hội thoại khác.</p>`}</div>
+   <div class="acts" style="justify-content:flex-end;margin-top:10px"><span class="hint" style="flex:1">Tối đa 5 nơi một lần.</span><button type="button" class="btn" onclick="closeCM()">Hủy</button><button type="button" class="btn pri" id="zlfws">Chuyển tiếp</button></div>`);
+  $("#zlfwq").oninput=e=>{const q=e.target.value.trim().toLowerCase();document.querySelectorAll("#zlfwl label").forEach(l=>l.hidden=!!q&&!l.dataset.n.includes(q))};
+  $("#zlfws").onclick=async e=>{const ids=[...document.querySelectorAll("#zlfwl input:checked")].map(x=>x.value);if(!ids.length){toast("Chọn hội thoại nhận");return}if(ids.length>5){toast("Tối đa 5 nơi");return}
+    e.target.disabled=true;try{await zlPost("/msgs/"+m.id+"/forward",{conv_ids:ids});closeCM();toast("Đã chuyển tiếp tới "+ids.length+" hội thoại")}catch(er){e.target.disabled=false;toast(er.message)}}}
+
+/* AI soạn nháp: khách đang chờ trả lời thì hiện câu nháp trên ô nhắn; người đọc lại rồi bấm Gửi. */
+ZL.aiOff={};
+async function zlAiLoad(redo){const box=$("#zlai"),D0=ZL.det;if(!box||!D0)return;const c=D0.conv,L=D0.msgs,last=L[L.length-1];
+  const key=c.id+":"+(last?last.id:"");
+  if(!D0.can_send||c.is_group||!c.waiting_since||!last||last.from_me||ZL.aiOff[key]){box.innerHTML="";return}
+  if(!redo&&ZL.ai&&ZL.ai.key===key){zlAiDraw();return}
+  if(ZL.aiBusy===key)return;ZL.aiBusy=key;ZL.ai={key,busy:true};zlAiDraw();
+  try{const r=await zlApi("/convs/"+c.id+"/ai"+(redo?"?redo=1":""));if(ZL.ai&&ZL.ai.key===key)ZL.ai={key,text:r.text,note:r.note}}catch(e){ZL.ai={key,text:"",note:e.message}}
+  ZL.aiBusy="";zlAiDraw()}
+function zlAiDraw(){const box=$("#zlai"),A=ZL.ai;if(!box||!A)return;
+  if(A.busy){box.innerHTML=`<div class="zl-ai"><b style="color:#4b54d1">✦ AI đang soạn nháp…</b></div>`;return}
+  if(!A.text&&!A.note){box.innerHTML="";return}
+  if(!A.text){box.innerHTML=`<div class="zl-ai note">✦ ${esc(A.note)}</div>`;return}
+  box.innerHTML=`<div class="zl-ai"><div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap"><b style="color:#4b54d1">✦ AI soạn sẵn</b><span class="hint">giá lấy từ bảng giá đúng cấp khách · người đọc lại rồi bấm Gửi</span></div><div class="tx">${esc(A.text)}</div>
+   <div class="acts" style="margin:0;gap:6px"><button type="button" class="btn sm pri" id="zlaiu">Dùng câu này</button><button type="button" class="btn sm" id="zlair">Viết lại</button><button type="button" class="btn sm" id="zlaix">Bỏ</button></div></div>`;
+  $("#zlaiu").onclick=()=>{const ta=$("#zlch textarea");if(ta){ta.value=A.text;ta.dispatchEvent(new Event("input"));ta.focus()}toast("Đã chèn vào ô nhắn. Đọc lại rồi bấm Gửi.")};
+  $("#zlair").onclick=()=>zlAiLoad(true);$("#zlaix").onclick=()=>{ZL.aiOff[A.key]=true;box.innerHTML=""}}
+
+/* Khách hôm nay: chờ lâu nhất, hẹn hôm nay / quá hạn, lâu không chăm, im 30 ngày. */
+async function zlBrief(){crmModal("☀ Khách hôm nay",`<div class="zl-br" id="zlbr"><p class="hint">Đang tải…</p></div>`,true);let B;try{B=await zlApi("/brief")}catch(e){$("#zlbr").innerHTML=`<p>${esc(e.message)}</p>`;return}
+  const nm=x=>x.customer_name||x.cskh_name||x.name||"(chưa rõ tên)",fd=d=>d?String(d).slice(8,10)+"/"+String(d).slice(5,7):"";
+  const sec=(t,L,row,empty)=>`<h4>${t} <span class="hint">(${L.length})</span></h4>${L.length?L.map(row).join(""):`<p class="hint" style="margin:0 8px">${empty}</p>`}`;
+  $("#zlbr").innerHTML=sec("Khách đang chờ trả lời lâu nhất",B.waiting,x=>`<button type="button" class="row" data-cv="${x.id}">${pill("Chờ "+zlAgo(x.waiting_since),"red")}<span><b>${esc(nm(x))}</b> · ${esc(x.last_text||"")}</span>${pill(x.nick_name,"vio")}</button>`,"Không có khách nào chờ.")
+   +sec("Hẹn chăm sóc hôm nay / quá hạn (kênh phân phối)",B.due,x=>`<button type="button" class="row" data-kh="${x.id}">${pill(fd(x.day),"amb")}<span><b>${esc(x.name)}</b>${x.owner_name?" · "+esc(x.owner_name):""}</span></button>`,"Không có hẹn.")
+   +sec("Hẹn gọi lại hôm nay / quá hạn (khách lẻ)",B.due_cskh,x=>`<button type="button" class="row" data-cs="${esc(x.phone)}">${pill(fd(x.day),"amb")}<span><b>${esc(x.name||x.phone)}</b>${x.owner_name?" · "+esc(x.owner_name):""}</span></button>`,"Không có hẹn.")
+   +sec("Khách lâu không chăm (theo giai đoạn)",B.stuck,x=>`<button type="button" class="row" data-kh="${x.id}">${pill(x.days+" ngày","red")}<span><b>${esc(x.name)}</b> · ${esc(ZL_STAGE[x.stage]||x.stage)}${x.owner_name?" · "+esc(x.owner_name):""}</span></button>`,"Không có khách nào bị bỏ quên.")
+   +sec("Khách im trên Zalo hơn 30 ngày",B.silent,x=>`<button type="button" class="row" data-cv="${x.id}">${pill(fd(x.last_at),"gry")}<span><b>${esc(nm(x))}</b></span>${pill(x.nick_name,"vio")}</button>`,"Không có.")
+   +`<p class="hint">Mới tiếp cận quá 7 ngày, đang tư vấn / đã báo giá quá 14 ngày, đang đàm phán quá 21 ngày, đã chốt đơn đầu quá 30 ngày không liên lạc thì tính là lâu không chăm.</p>`;
+  document.querySelectorAll("#zlbr [data-cv]").forEach(b=>b.onclick=()=>{closeCM();zlGo("zl_inbox",b.dataset.cv)});
+  document.querySelectorAll("#zlbr [data-kh]").forEach(b=>b.onclick=()=>{closeCM();zlOpenKpp(b.dataset.kh)});
+  document.querySelectorAll("#zlbr [data-cs]").forEach(b=>b.onclick=()=>{closeCM();zlGo("cs_today");if(typeof csOpen==="function")csOpen(b.dataset.cs)})}
+
+/* Nick Zalo: nút Kéo danh bạ + tin cũ, và lời mời kết bạn chờ trả lời. */
+{const _n=pZlNick;pZlNick=function(m){_n(m);const N=ZL.nicks;if(!N||N.error||!N.nicks)return;const me=ZL.me&&ZL.me.id;
+  m.querySelectorAll("tbody tr").forEach((tr,i)=>{const x=N.nicks[i];if(!x||x.status!=="ON"||!(N.lead||x.owner_id===me))return;const td=tr.lastElementChild;if(!td)return;
+    const b=document.createElement("button");b.type="button";b.className="btn sm";b.textContent="Kéo danh bạ, tin cũ";b.title="Kéo bạn bè, nhóm Zalo và tin nhắn cũ của nick về web";b.style.marginRight="4px";
+    b.onclick=async()=>{b.disabled=true;try{await zlPost("/nicks/"+x.id+"/sync");toast("Đang kéo danh bạ và tin cũ của "+x.name+". Vài phút sau xem ở Hộp tin.")}catch(e){toast(e.message)}b.disabled=false};td.prepend(b)});
+  const tp=m.querySelector("#zltpl");if(!tp)return;const sec=document.createElement("section");sec.className="card";sec.style.marginTop="12px";sec.innerHTML=`<h3 style="margin-top:0">Lời mời kết bạn tới các nick</h3><div id="zlfrq"><p class="hint">Đang tải…</p></div>`;
+  tp.closest("section").before(sec);zlFrDraw()}}
+async function zlFrDraw(){const el=$("#zlfrq");if(!el)return;let L=[];try{L=await zlApi("/friend-reqs")}catch(e){el.innerHTML=`<p class="hint">${esc(e.message)}</p>`;return}
+  el.innerHTML=L.length?tbl(["Người mời","Lời nhắn","Nick","Lúc",""],L.map(x=>`<tr><td><b>${esc(x.name||x.uid)}</b></td><td class="hint">${esc(x.msg||"")}</td><td>${pill(x.nick_name,"vio")}</td><td>${esc(zlHM(x.at))}</td><td style="text-align:right;white-space:nowrap"><button type="button" class="btn sm pri" data-fy="${esc(x.nick_id)}|${esc(x.uid)}">Đồng ý</button> <button type="button" class="btn sm" data-fn="${esc(x.nick_id)}|${esc(x.uid)}">Từ chối</button></td></tr>`)):`<p class="hint">Chưa có lời mời nào đang chờ.</p>`;
+  el.querySelectorAll("[data-fy],[data-fn]").forEach(b=>b.onclick=async()=>{const [n,u]=(b.dataset.fy||b.dataset.fn).split("|");b.disabled=true;try{await zlPost("/friend-reqs/"+encodeURIComponent(n)+"/"+encodeURIComponent(u),{accept:!!b.dataset.fy});toast(b.dataset.fy?"Đang đồng ý kết bạn…":"Đã từ chối");setTimeout(zlFrDraw,4000)}catch(e){b.disabled=false;toast(e.message)}})}
+
+/* Đo sale qua Zalo (Lead / CEO). */
+const ZLDS={from:"",to:"",data:null,busy:false};
+function pZlDoSale(m){zlCss();if(!zlLead()){m.innerHTML=H("Đo sale qua Zalo","")+`<section class="card"><p>Chỉ Lead / CEO xem trang này.</p></section>`;return}
+  const d0=new Date(Date.now()+7*36e5).toISOString().slice(0,10),d7=new Date(Date.now()+7*36e5-6*864e5).toISOString().slice(0,10);if(!ZLDS.from){ZLDS.from=d7;ZLDS.to=d0}
+  const D0=ZLDS.data;const f=v=>v===null||v===undefined?"—":nf(v);
+  m.innerHTML=H("Đo sale qua Zalo","Sale trả lời khách nhanh hay chậm, khách nào đang bị để chờ")+`
+   <div class="acts" style="align-items:center;margin:0 0 10px"><label>Từ <input type="date" id="zlds-f" value="${ZLDS.from}"></label><label>đến <input type="date" id="zlds-t" value="${ZLDS.to}"></label><button type="button" class="btn pri" id="zlds-go">Xem</button><span class="hint">Tối đa 31 ngày.</span></div>
+   <section class="card flush">${!D0?`<p class="hint pad">${ZLDS.busy?"Đang tính…":"Bấm Xem."}</p>`:D0.error?`<p class="pad">${esc(D0.error)}</p>`:tbl(["Sale","Hội thoại","Tin nhận","Tin gửi","Lần trả lời","Trả lời TB","Trả lời giữa","Trong 15 phút","Chờ quá 60 phút","Đang chờ","Đang chờ quá 30 phút"],
+     D0.people.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="n">${f(p.convs)}</td><td class="n">${f(p.inMsgs)}</td><td class="n">${f(p.outMsgs)}</td><td class="n">${f(p.replies)}</td><td class="n">${p.avgMin===null?"—":p.avgMin+" phút"}</td><td class="n"><b>${p.medianMin===null?"—":p.medianMin+" phút"}</b></td><td class="n">${p.within15===null?"—":p.within15+"%"}</td><td class="n" style="${p.over60?"color:#c0352b;font-weight:700":""}">${f(p.over60)}</td><td class="n">${f(p.wait_now)}</td><td class="n" style="${p.wait_late?"color:#c0352b;font-weight:700":""}">${f(p.wait_late)}</td></tr>`))}
+   <p class="hint pad">Cách tính: mỗi lần khách nhắn mà chưa ai trả lời, tính từ tin khách đầu tiên tới tin bên mình gửi kế tiếp (gửi trên web hay trên điện thoại đều tính). Chỉ tính chat 1-1, không tính nhóm. "Trả lời giữa" là mức ở giữa: một nửa số lần trả lời nhanh hơn mức này. Xếp từ người trả lời nhanh nhất.</p></section>
+   <div class="acts" style="margin-top:10px"><button type="button" class="btn" id="zlds-br">☀ Khách hôm nay</button></div>`;
+  const go=async()=>{ZLDS.from=$("#zlds-f").value;ZLDS.to=$("#zlds-t").value;ZLDS.busy=true;ZLDS.data=null;renderMain();try{ZLDS.data=await zlApi(`/report?from=${ZLDS.from}&to=${ZLDS.to}`)}catch(e){ZLDS.data={error:e.message}}ZLDS.busy=false;if(PAGE==="zl_dosale")renderMain()};
+  $("#zlds-go").onclick=go;$("#zlds-br").onclick=zlBrief;if(!D0&&!ZLDS.busy)go()}
+
+Object.assign(PAGES,{zl_inbox:pZlInbox,zl_nick:pZlNick,zl_dosale:pZlDoSale});

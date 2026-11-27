@@ -18,6 +18,8 @@ export interface ZaloMsg {
   seen_at: string | null;
   sent_by_name?: string | null;
   nick_name?: string;
+  quote_text?: string;
+  quote_name?: string;
 }
 export interface ZaloConv {
   id: string;
@@ -111,6 +113,8 @@ export function ZaloCell({ s }: { s?: ZaloStatusRow }) {
 }
 
 function Body({ m }: { m: ZaloMsg }) {
+  if (m.kind === 'sticker' && m.url) return <img className="zl-st" src={m.url} alt="Nhãn dán" loading="lazy" referrerPolicy="no-referrer" />;
+  if (m.kind === 'voice' && m.url) return <audio controls preload="none" src={m.url} />;
   if (m.kind === 'image' && m.url)
     return (
       <>
@@ -146,6 +150,12 @@ function Bubble({ m, lead, many }: { m: ZaloMsg; lead: boolean; many: boolean })
     );
   return (
     <div className={`zl-m${m.from_me ? ' me' : ''}${m.recalled ? ' rc' : ''}`}>
+      {m.quote_text && (
+        <div className="zl-q">
+          <b>{m.quote_name || (m.from_me ? 'Khách' : 'AILLA')}</b>
+          {m.quote_text}
+        </div>
+      )}
       <div className="body">
         <Body m={m} />
       </div>
