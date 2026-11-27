@@ -74,11 +74,50 @@ export function aiMask(t: string): string {
 }
 
 /** Từ nhạy cảm: AI không soạn, sale tự trả lời và báo Lead. Trả về từ gặp đầu tiên (bỏ dấu khi so). */
-const SENSITIVE = ['khiếu nại', 'hoàn tiền', 'trả hàng', 'đổi trả', 'công an', 'khởi kiện', 'lừa đảo', 'hàng giả', 'dị ứng', 'ngộ độc', 'bỏng', 'cấp cứu', 'báo chí', 'tố cáo', 'bồi thường'];
+/** Mặc định chị Hoa duyệt 27/11 (bản demo "Cài AI soạn sẵn"). */
+const SENSITIVE = ['hoàn tiền', 'trả hàng', 'khiếu nại', 'lừa đảo', 'kiện', 'luật sư', 'công an', 'báo chí', 'tố cáo', 'bồi thường', 'huỷ hợp đồng', 'hàng lỗi'];
+export const ORDER_WORDS = ['lấy', 'đặt', 'chốt', 'gửi cho anh', 'gửi cho chị', 'lên đơn', 'ship cho'];
 const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+const words = (s: string) => ' ' + s.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() + ' ';
+/** Cụm vô hại chứa từ khóa ngắn: bỏ trước khi so ("ý kiến" ≠ "kiện", "kiện hàng" là gói hàng). */
+const SAFE = ['kiện hàng', 'ý kiến'];
+/**
+ * Tin có trúng từ nào trong danh sách không. So theo nguyên chữ (ranh giới chữ), không cắt giữa chữ.
+ * Từ một tiếng có dấu (kiện, lấy, đặt…) so giữ dấu để không bắt nhầm (kiện ≠ kiến); khách gõ không dấu thì so bỏ dấu.
+ * Cụm nhiều tiếng thì so bỏ dấu (hủy / huỷ hợp đồng đều trúng).
+ */
+export function kwHit(text: string, list: string[]): string | null {
+  let t = words(String(text ?? ''));
+  for (const x of SAFE) t = t.split(' ' + x + ' ').join(' ');
+  const tf = fold(t);
+  const plain = tf === t; // khách gõ không dấu
+  for (const w of list) {
+    const k = words(w).trim();
+    if (!k) continue;
+    const exact = !plain && !k.includes(' ') && fold(k) !== k;
+    if (exact ? t.includes(' ' + k + ' ') : tf.includes(' ' + fold(k) + ' ')) return w;
+  }
+  return null;
+}
 export function aiSensitive(t: string, list: string[] = SENSITIVE): string | null {
-  const f = ' ' + fold(String(t ?? '')).replace(/[^a-z0-9]+/g, ' ') + ' ';
-  return list.find((w) => w && f.includes(' ' + fold(w).replace(/[^a-z0-9]+/g, ' ').trim() + ' ')) ?? null;
+  return kwHit(t, list);
+}
+/** Có số lượng: con số + thùng / chai / can / hộp / bao / gói / két / túi (có dấu hoặc không). */
+export function hasQty(t: string): boolean {
+  return /(^|[^\p{L}\p{N}])\d+\s*(thùng|thung|chai|can|hộp|hop|bao|gói|goi|két|ket|túi|tui)(?![\p{L}])/iu.test(String(t ?? ''));
+}
+export type OrderMode = 'off' | 'clear' | 'ask';
+/**
+ * Khi nào gợi ý lên đơn (chị Hoa duyệt 27/11): "rõ" = có từ đặt hàng VÀ có số lượng.
+ * Chế độ "ask": khách nhắc số lượng thì hỏi sale có tạo đơn nháp không. Chỉ gợi ý; sale bấm mới mở trang Tạo đơn.
+ */
+export function orderSignal(text: string, mode: OrderMode, orderWords: string[]): { kind: 'order' | 'ask' | null; word: string | null; reason: string } | null {
+  if (mode === 'off') return null;
+  const word = kwHit(text, orderWords);
+  const qty = hasQty(text);
+  if (word && qty) return { kind: 'order', word, reason: `Khách đặt hàng (có "${word}" và số lượng).` };
+  if (mode === 'ask' && qty) return { kind: 'ask', word, reason: 'Khách nhắc số lượng, có vẻ muốn mua.' };
+  return { kind: null, word, reason: !word ? 'Không gợi ý đơn: tin không có từ đặt hàng.' : 'Không gợi ý đơn: tin không có số lượng.' };
 }
 
 /** Số ngày không liên lạc thì coi là "khách lâu không chăm", theo giai đoạn khách kênh phân phối. */
@@ -167,21 +206,28 @@ export interface ZaloAiCfg {
   blocked: string[];
   /** Lời dặn riêng cho AI (thêm vào mọi lần soạn). */
   extra: string;
-  /** Khách kênh phân phối: nhờ agent CSKH B2B soạn (kèm đơn nháp). */
+  /** Khách kênh phân phối: nhờ agent CSKH B2B soạn câu trả lời. */
   agent_b2b: boolean;
+  /** Khi nào gợi ý lên đơn: tắt / chỉ khi khách nói rõ muốn đặt / hỏi sale khi khách có vẻ muốn mua. */
+  order_mode: OrderMode;
+  /** Từ báo hiệu khách đặt hàng (phải kèm số lượng). */
+  order_words: string[];
 }
+/** Mặc định theo bản demo chị Hoa duyệt 27/11. */
 export const ZALO_AI_DEFAULT: ZaloAiCfg = {
   enabled: true,
   nick_ids: [],
-  hour_start: 0,
-  hour_end: 24,
-  max_per_day: 300,
-  skip_staff_min: 0,
-  min_gap_sec: 0,
-  ttl_min: 240,
+  hour_start: 7,
+  hour_end: 21,
+  max_per_day: 200,
+  skip_staff_min: 3,
+  min_gap_sec: 90,
+  ttl_min: 120,
   blocked: SENSITIVE,
-  extra: '',
+  extra: 'Xưng "em", gọi khách là anh/chị. Trả lời ngắn như nhắn Zalo, tối đa 4 câu.\nGiá chỉ lấy theo Bảng giá đúng cấp của khách, không tự giảm giá.\nKhách hỏi chiết khấu riêng thì hẹn sale báo lại sau khi hỏi Lead.\nKhông nhắc đối thủ.',
   agent_b2b: true,
+  order_mode: 'clear',
+  order_words: ORDER_WORDS,
 };
 const num = (v: unknown, lo: number, hi: number, d: number) => {
   const n = Math.round(Number(v));
@@ -203,6 +249,8 @@ export function mergeAiCfg(raw: unknown): ZaloAiCfg {
     blocked: list(r.blocked, 100, 60) ?? d.blocked,
     extra: String(r.extra ?? d.extra).slice(0, 2000),
     agent_b2b: r.agent_b2b === undefined ? d.agent_b2b : !!r.agent_b2b,
+    order_mode: r.order_mode === 'off' || r.order_mode === 'ask' || r.order_mode === 'clear' ? r.order_mode : d.order_mode,
+    order_words: list(r.order_words, 50, 40) ?? d.order_words,
   };
 }
 /** Giờ hiện tại theo giờ Việt Nam (0–23). */
@@ -229,8 +277,7 @@ export interface PlaybookEntry {
 }
 /** Chọn mục kịch bản đưa cho AI: mục khớp từ khóa trong tin khách gần đây trước, rồi mục không có từ khóa; theo ưu tiên; tối đa 6. */
 export function pickPlaybook(entries: PlaybookEntry[], recent: string, max = 6): PlaybookEntry[] {
-  const f = ' ' + fold(recent).replace(/[^a-z0-9]+/g, ' ') + ' ';
-  const hit = (e: PlaybookEntry) => e.keywords.some((k) => k && f.includes(' ' + fold(k).replace(/[^a-z0-9]+/g, ' ').trim() + ' '));
+  const hit = (e: PlaybookEntry) => !!kwHit(recent, e.keywords);
   const on = entries.filter((e) => e.enabled);
   const a = on.filter(hit).sort((x, y) => y.priority - x.priority);
   const b = on.filter((e) => !e.keywords.length).sort((x, y) => y.priority - x.priority);

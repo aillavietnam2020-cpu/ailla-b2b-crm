@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { useAuth } from './AuthProvider';
@@ -113,7 +113,10 @@ export function ZaloIntake({
   customers,
   onPickCustomer,
   onApply,
+  initialText,
 }: {
+  /** Mở từ Hộp tin Zalo ("Tạo đơn nháp từ tin này"): điền sẵn tin khách và cho máy đọc ngay. */
+  initialText?: string;
   customerId: string;
   customers: Array<{ id: string; name: string }>;
   onPickCustomer: (id: string) => void;
@@ -203,14 +206,14 @@ export function ZaloIntake({
     }
   };
 
-  const read = async () => {
+  const read = async (t: string = text) => {
     setBusy(true);
     setErr(null);
     setRes(null);
     setDone(false);
     try {
       const r = await api.post<ReadResponse>('/api/order-intake/read', {
-        text: text.trim() || undefined,
+        text: t.trim() || undefined,
         image_b64: image?.b64 || undefined,
         mime: image?.b64 ? image.mime : undefined,
         customer_id: customerId || undefined,
@@ -223,6 +226,17 @@ export function ZaloIntake({
       setBusy(false);
     }
   };
+
+  // Tin khách gửi sang từ Hộp tin Zalo: mở khung, điền tin, máy đọc ra dòng hàng (sale kiểm rồi mới thêm vào đơn).
+  const autoRef = useRef(false);
+  useEffect(() => {
+    if (!initialText || autoRef.current || !customerId) return;
+    autoRef.current = true;
+    setOpen(true);
+    setText(initialText);
+    void read(initialText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialText, customerId]);
 
   const patch = (i: number, p: Partial<Work>) => setWork((w) => w.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const pending = work.filter((w) => !w.drop && (!w.pick || !(Number(w.qtyEdit) > 0))).length;

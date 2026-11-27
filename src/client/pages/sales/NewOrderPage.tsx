@@ -775,6 +775,7 @@ export function NewOrderPage({ mode = 'sales' }: { mode?: 'sales' | 'admin' }) {
             customers={(customers.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
             onPickCustomer={setCustomerId}
             onApply={(picks, meta) => void addFromIntake(picks, meta)}
+            initialText={params.get('zalo_text') ?? undefined}
           />
           <div style={{ height: 16 }} />
         </>

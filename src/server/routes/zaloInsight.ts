@@ -8,13 +8,13 @@
  */
 import { Hono } from 'hono';
 import { nowIso, vnDate } from '@shared/datetime';
-import { ZALO_AI_DEFAULT, aiGate, aiMask, aiSensitive, mergeAiCfg, pickPlaybook, playbookText, responseStats, STUCK_DAYS, type RespSample } from '@shared/zalo';
+import { ZALO_AI_DEFAULT, aiGate, aiMask, aiSensitive, mergeAiCfg, orderSignal, pickPlaybook, playbookText, responseStats, STUCK_DAYS, type PlaybookEntry, type RespSample, type ZaloAiCfg } from '@shared/zalo';
 import type { AppEnv, Env } from '../env';
 import { badRequest, forbidden, ok } from '../lib/http';
 import { bellTo } from '../lib/hubBell';
 import { callAi } from '../lib/orderReader';
 import { convFor, nickScope, viewer } from './zaloNick';
-import { AGENT_WAIT_MS, loadAiCfg, loadPlaybook, queueAgent, todayDrafts } from '../services/zaloAgent';
+import { AGENT_WAIT_MS, loadAiCfg, loadPlaybook, queueAgent, tierPrices, todayDrafts } from '../services/zaloAgent';
 import { newId } from '../lib/ids';
 
 export const zaloInsightRoutes = new Hono<AppEnv>();
@@ -94,6 +94,58 @@ function priceBlock(prices: Array<{ name: string; unit: string | null; amount: n
 }
 const clean = (t: string) => t.replace(/^["“”'\s]+|["“”'\s]+$/g, '').trim().slice(0, 1500);
 
+/**
+ * Lời nhắc soạn nháp theo ZL-CRM `prompts/auto-reply.ts` (chị Hoa duyệt bản demo 27/11), viết cho hóa phẩm / đại lý.
+ * Lời dặn riêng (Cài AI soạn sẵn) ưu tiên cao hơn quy tắc giọng văn.
+ */
+function autoReplyPrompt(extra: string): string {
+  const base = [
+    'Bạn là nhân viên bán hàng người Việt của AILLA (hóa phẩm gia dụng: nước giặt, nước xả, lau sàn, tẩy rửa...) đang trả lời khách trên Zalo.',
+    'Bạn nhận NGỮ CẢNH gồm: lịch sử chat, hồ sơ khách, kịch bản bán hàng đã duyệt và bảng giá đúng cấp của khách.',
+    'Nhiệm vụ: viết MỘT tin nhắn trả lời cho tin cuối cùng của khách. Tin này là NHÁP: nhân viên đọc lại rồi mới bấm gửi.',
+    '',
+    'Quy tắc bắt buộc:',
+    '- Viết như người thật nhắn Zalo: ngắn, tự nhiên, xuống dòng hợp lý. Tối đa 4 câu trừ khi khách hỏi nhiều ý.',
+    '- Giá, chính sách, chiết khấu, khuyến mãi, cam kết, thời gian giao: CHỈ được lấy từ kịch bản và bảng giá trong ngữ cảnh.',
+    '  Không có trong đó thì KHÔNG được nêu con số nào, thay bằng câu hẹn kiểm tra lại và báo khách.',
+    '- Không bịa tên người, lịch hẹn, thông tin khách chưa từng nói. Không chê đối thủ.',
+    '- Xưng hô bám theo cách khách đang xưng hô trong lịch sử chat. Chưa rõ thì dùng "anh/chị" và "em".',
+    '- Khách bức xúc hoặc đòi hoàn tiền: viết câu tiếp nhận, xin lỗi ngắn, hẹn chuyển người phụ trách. Không tự hứa xử lý.',
+    '- Không chào lại từ đầu nếu hai bên đang giữa cuộc trò chuyện.',
+    '- Không tự tạo đơn, không liệt kê đơn hàng. Khách đặt hàng thì xác nhận đã nhận và hẹn báo tổng tiền.',
+    '- Không tự nhắc là AI khi khách không hỏi. Khách hỏi thẳng có phải bot/AI không thì phải nói thật.',
+    '',
+    'Trả về DUY NHẤT một khối JSON, không kèm giải thích bên ngoài:',
+    '{"reply": "nội dung tin nhắn gửi khách", "rationale": "một câu ngắn nói vì sao trả lời như vậy"}',
+    'Trường "reply" là thứ khách sẽ đọc: viết hoàn chỉnh, không để chỗ trống kiểu [tên khách].',
+  ];
+  if (extra.trim()) base.push('', 'Lời dặn riêng của chủ doanh nghiệp, ưu tiên cao hơn mọi quy tắc giọng văn ở trên:', extra.trim());
+  return base.join('\n');
+}
+/** Bóc câu trả lời từ JSON AI trả về; không phải JSON thì lấy cả câu. */
+function replyOf(raw: string): string {
+  const t = String(raw ?? '').trim();
+  const a = t.indexOf('{');
+  const b = t.lastIndexOf('}');
+  if (a >= 0 && b > a) {
+    try {
+      const j = JSON.parse(t.slice(a, b + 1)) as { reply?: unknown };
+      if (typeof j.reply === 'string' && j.reply.trim()) return clean(j.reply);
+    } catch {
+      /* không phải JSON */
+    }
+  }
+  return clean(t);
+}
+/** Dựng lời nhắc: kịch bản khớp + bảng giá (chỉ khi có kịch bản dùng); kho trống / không khớp thì cấm nêu con số. */
+function draftPrompt(cfg: ZaloAiCfg, used: PlaybookEntry[], prices: Array<{ name: string; unit: string | null; amount: number }>, profile: string, chat: string, redo: boolean) {
+  const pb = playbookText(used);
+  const ctx = pb
+    ? `${pb}\n\n${priceBlock(prices)}`
+    : 'KỊCH BẢN: không có mục nào khớp tin khách. KHÔNG nêu con số nào (giá, chiết khấu, thời gian giao); hẹn khách để sale kiểm rồi báo lại.';
+  return `${autoReplyPrompt(cfg.extra)}\n\n${ctx}\n\nHỒ SƠ KHÁCH: ${aiMask(profile) || 'chưa rõ'}\n\nLỊCH SỬ CHAT GẦN NHẤT:\n${chat}\n\nViết tin trả lời tiếp theo của AILLA${redo ? ' (cách viết khác lần trước)' : ''}.`;
+}
+
 /** Nháp AI cho hội thoại đang chờ trả lời. Nháp giữ theo tin khách mới nhất; ?redo=1 thì soạn lại. */
 zaloInsightRoutes.get('/convs/:id/ai', async (c) => {
   const v = await viewer(c);
@@ -106,48 +158,46 @@ zaloInsightRoutes.get('/convs/:id/ai', async (c) => {
   const last = msgs[msgs.length - 1];
   if (!lastIn || !last || last.from_me) return ok(c, { text: '', note: '' });
   const redo = c.req.query('redo') === '1';
+  const now = Date.now();
   // Cổng chặn theo Cài AI soạn sẵn: bật/tắt, nick, khung giờ, lượt mỗi ngày, sale vừa trả lời.
   const lastStaff = [...msgs].reverse().find((m) => m.from_me);
-  const gate = aiGate(cfg, { nickId: z.nick_id, now: Date.now(), todayDrafts: await todayDrafts(db), lastStaffAt: lastStaff?.at ?? null });
+  const gate = aiGate(cfg, { nickId: z.nick_id, now, todayDrafts: await todayDrafts(db), lastStaffAt: lastStaff?.at ?? null });
   if (gate === 'off') return ok(c, { text: '', note: '', off: true });
   if (gate) return ok(c, { text: '', note: gate });
+  // Nháp hết hạn: tin khách đã cũ quá thì ẩn, vì chuyện đã cũ.
+  if (now - Date.parse(lastIn.at) > cfg.ttl_min * 60_000) return ok(c, { text: '', note: '', expired: true });
   const recentIn = msgs.filter((m) => !m.from_me).slice(-3).map((m) => m.text).join(' ');
-  const hit = aiSensitive(recentIn, cfg.blocked);
-  if (hit) return ok(c, { text: '', note: `Khách nhắc "${hit}": để người thật xử lý, AI không soạn. Báo Lead nếu cần.` });
+  const hit = aiSensitive(lastIn.text, cfg.blocked);
+  if (hit) return ok(c, { text: '', note: `Khách nhắc "${hit}": để người thật xử lý, AI không soạn.`, flag: hit });
+  // Khách nhắn liền mấy tin: đợi khách nhắn xong rồi mới soạn.
+  const waitMs = cfg.min_gap_sec * 1000 - (now - Date.parse(lastIn.at));
+  if (!redo && waitMs > 0) return ok(c, { text: '', note: 'Đợi khách nhắn xong rồi AI mới soạn…', wait: Math.ceil(waitMs / 1000) });
+  // Gợi ý lên đơn (chỉ khách kênh phân phối, theo tin khách mới nhất). Chỉ gợi ý, sale bấm mới mở trang Tạo đơn.
+  const order_hint = z.customer_id ? orderSignal(lastIn.text, cfg.order_mode, cfg.order_words) : null;
   const used = pickPlaybook(await loadPlaybook(db), recentIn);
   const playbook_used = used.map((e) => e.title);
-  const fresh = (at: string) => Date.now() - Date.parse(at) < cfg.ttl_min * 60_000;
-  const prev = await db.prepare('SELECT msg_id, text, source, created_at FROM zalo_ai WHERE conv_id = ?').bind(z.id).first<{ msg_id: string; text: string; source: string; created_at: string }>();
-  // Khách nhắn liên tiếp: chưa đủ thời gian nghỉ thì giữ nháp trước, bấm Viết lại để soạn theo tin mới.
-  if (!redo && cfg.min_gap_sec && prev && prev.text && prev.msg_id !== lastIn.msg_id && Date.now() - Date.parse(prev.created_at) < cfg.min_gap_sec * 1000) {
-    return ok(c, { text: prev.text, note: 'Khách vừa nhắn liên tiếp; bấm Viết lại để soạn theo tin mới nhất.', source: prev.source });
-  }
+  const extraOut = { playbook_used, order_hint, order_text: order_hint?.kind ? lastIn.text : undefined };
+  const fresh = (at: string) => now - Date.parse(at) < cfg.ttl_min * 60_000;
   let fallbackNote = '';
-  // Khách kênh phân phối: agent CSKH B2B soạn (kèm đơn nháp nếu khách đặt). Chờ tối đa AGENT_WAIT_MS rồi mới dùng AI thường.
+  // Khách kênh phân phối: agent CSKH B2B soạn câu trả lời. Chờ tối đa AGENT_WAIT_MS rồi mới dùng AI thường.
   if (z.customer_id && cfg.agent_b2b && c.req.query('plain') !== '1') {
-    const got = await db.prepare("SELECT text, note, order_json, created_at FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'agent'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string; order_json: string; created_at: string }>();
+    const got = await db.prepare("SELECT text, note, created_at FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'agent'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string; created_at: string }>();
     const cmd = await db.prepare("SELECT status, created_at FROM zalo_cmds WHERE conv_id = ? AND kind = 'AGENT' ORDER BY created_at DESC LIMIT 1").bind(z.id).first<{ status: string; created_at: string }>();
-    if (got && !redo && fresh(got.created_at)) {
-      // Đơn nháp do agent gợi ý đã tắt (chị Hoa 27/11: không phải khách nói gì cũng là lên đơn); chỉ trả câu trả lời.
-      return ok(c, { text: got.text, note: got.note, source: 'agent', playbook_used });
-    }
+    if (got && !redo && fresh(got.created_at)) return ok(c, { text: got.text, note: got.note, source: 'agent', ...extraOut });
     const isFresh = cmd && Date.parse(cmd.created_at) >= Date.parse(lastIn.at) - 5000 && !(got && !fresh(got.created_at));
     if (redo || !cmd || !isFresh) {
       if (got) await db.prepare("UPDATE zalo_ai SET msg_id = '' WHERE conv_id = ?").bind(z.id).run();
       await queueAgent(db, z.id);
       return ok(c, { pending: true, source: 'agent' });
     }
-    if (['PENDING', 'TAKEN'].includes(cmd.status) && Date.now() - Date.parse(cmd.created_at) < AGENT_WAIT_MS) return ok(c, { pending: true, source: 'agent' });
+    if (['PENDING', 'TAKEN'].includes(cmd.status) && now - Date.parse(cmd.created_at) < AGENT_WAIT_MS) return ok(c, { pending: true, source: 'agent' });
     fallbackNote = 'Agent CSKH B2B chưa trả lời kịp, đây là nháp AI thường.';
   }
-  if (!redo && prev && prev.source === 'ai' && prev.msg_id === lastIn.msg_id && fresh(prev.created_at)) {
-    return ok(c, { text: prev.text, note: fallbackNote, playbook_used });
-  }
+  const prev = await db.prepare('SELECT msg_id, text, source, created_at FROM zalo_ai WHERE conv_id = ?').bind(z.id).first<{ msg_id: string; text: string; source: string; created_at: string }>();
+  if (!redo && prev && prev.source === 'ai' && prev.msg_id === lastIn.msg_id && fresh(prev.created_at)) return ok(c, { text: prev.text, note: fallbackNote, ...extraOut });
   let text = '';
   try {
-    const pb = playbookText(used);
-    const prompt = `${RULES}${cfg.extra ? '\n- Lời dặn riêng của AILLA: ' + cfg.extra : ''}\n\n${priceBlock(prices)}${pb ? '\n\n' + pb : ''}\n\nTHÔNG TIN KHÁCH: ${aiMask(profile) || 'chưa rõ'}\n\nĐOẠN CHAT GẦN NHẤT:\n${chatLines(msgs)}\n\nSoạn tin trả lời tiếp theo của AILLA${redo ? ' (cách viết khác lần trước)' : ''}:`;
-    text = clean(await callAi(c.env, [{ type: 'text', text: prompt }]));
+    text = replyOf(await callAi(c.env, [{ type: 'text', text: draftPrompt(cfg, used, prices, profile, chatLines(msgs), redo) }]));
   } catch (e) {
     const m = String((e as Error).message);
     return ok(c, { text: '', note: m === 'AI_NOT_CONFIGURED' ? 'Chưa cài AI cho web.' : 'AI đang bận, thử lại sau.' });
@@ -158,7 +208,32 @@ zaloInsightRoutes.get('/convs/:id/ai', async (c) => {
     .bind(z.id, lastIn.msg_id, text, nowIso())
     .run();
   await db.prepare("INSERT INTO zalo_ai_log (conv_id, source, action, by_id, at) VALUES (?, 'ai', 'draft', ?, ?)").bind(z.id, v.id, nowIso()).run();
-  return ok(c, { text, note: text ? fallbackNote : '', playbook_used });
+  return ok(c, { text, note: text ? fallbackNote : '', ...extraOut });
+});
+
+/** Thử AI (trang Cài AI soạn sẵn): gõ một tin như khách đại lý cấp NPP nhắn, xem AI soạn gì, dựa vào kịch bản nào, có gợi ý đơn không. Không lưu, không tính lượt. */
+zaloInsightRoutes.post('/ai-try', async (c) => {
+  await viewer(c);
+  const db = c.env.DB;
+  const b = (await c.req.json().catch(() => ({}))) as { text?: string; cfg?: unknown };
+  const t = String(b.text ?? '').trim().slice(0, 1000);
+  if (!t) throw badRequest('NO_TEXT', 'Gõ một tin như khách nhắn');
+  // Thử theo cài đặt đang sửa trên trang (chưa lưu) nếu có, không thì theo cài đặt đã lưu.
+  const cfg = b.cfg ? mergeAiCfg(b.cfg) : await loadAiCfg(db);
+  if (!cfg.enabled) return ok(c, { off: true, note: 'AI đang tắt. Sale tự trả lời.' });
+  const hit = aiSensitive(t, cfg.blocked);
+  if (hit) return ok(c, { blocked: hit, note: `AI không soạn. Tin có từ "${hit}": báo sale tự xử lý, Hộp tin gắn cờ đỏ.` });
+  const used = pickPlaybook(await loadPlaybook(db), t);
+  const order_hint = orderSignal(t, cfg.order_mode, cfg.order_words);
+  const tier = await db.prepare("SELECT id FROM price_tiers WHERE name LIKE '%NPP%' ORDER BY name LIMIT 1").first<{ id: string }>();
+  const prices = used.length ? await tierPrices(db, tier?.id ?? null) : [];
+  try {
+    const text = replyOf(await callAi(c.env, [{ type: 'text', text: draftPrompt(cfg, used, prices, 'Đại lý cấp NPP (khách thử).', `Khách: ${aiMask(t)}`, false) }]));
+    return ok(c, { text, playbook_used: used.map((e) => e.title), order_hint });
+  } catch (e) {
+    const m = String((e as Error).message);
+    return ok(c, { text: '', playbook_used: used.map((e) => e.title), order_hint, note: m === 'AI_NOT_CONFIGURED' ? 'Chưa cài AI cho web.' : 'AI đang bận, thử lại sau.' });
+  }
 });
 
 /** Sale bấm "Dùng câu này" / "Bỏ" trên nháp: ghi lại để xem tỉ lệ dùng. */
@@ -191,7 +266,8 @@ zaloInsightRoutes.get('/ai-cfg', async (c) => {
 zaloInsightRoutes.put('/ai-cfg', async (c) => {
   const v = await viewer(c);
   if (!v.lead) throw forbidden('Chỉ Lead / CEO sửa cài đặt AI');
-  const cfg = mergeAiCfg(await c.req.json().catch(() => ({})));
+  // Gửi phần nào sửa phần đó, phần còn lại giữ như đã lưu.
+  const cfg = mergeAiCfg({ ...(await loadAiCfg(c.env.DB)), ...((await c.req.json().catch(() => ({}))) as object) });
   await c.env.DB.prepare("INSERT INTO app_kv (k, v, updated_at) VALUES ('zalo_ai_cfg', ?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at").bind(JSON.stringify(cfg), nowIso()).run();
   return ok(c, cfg);
 });

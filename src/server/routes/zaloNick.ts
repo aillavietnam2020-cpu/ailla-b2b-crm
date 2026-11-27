@@ -12,6 +12,7 @@
 import { Hono, type Context } from 'hono';
 import { nowIso, vnDate } from '@shared/datetime';
 import {
+  aiSensitive,
   ZALO_SEND_WINDOW_MS,
   ZALO_TEXT_MAX,
   msgForViewer,
@@ -25,7 +26,7 @@ import type { AppEnv } from '../env';
 import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { newId } from '../lib/ids';
 import { cskhMe } from '../services/cskh';
-import { agentAllowed, agentPrompt, parseAgent, queueAgent } from '../services/zaloAgent';
+import { agentAllowed, agentPrompt, loadAiCfg, parseAgent, queueAgent } from '../services/zaloAgent';
 import { relayAuth } from './agentChat';
 
 type C = Context<AppEnv>;
@@ -231,9 +232,11 @@ zaloRoutes.get('/convs', async (c) => {
          WHERE ${where.join(' AND ')} ORDER BY (z.pinned_at IS NULL), (z.waiting_since IS NULL), z.last_at DESC LIMIT 300`,
       )
         .bind(...params)
-        .all()
+        .all<{ is_group: number; last_from_me: number; last_text: string }>()
     ).results ?? [];
-  return ok(c, rows);
+  // Cờ đỏ: tin cuối của khách trúng "Từ khóa để người thật xử lý" (Cài AI soạn sẵn).
+  const blocked = (await loadAiCfg(c.env.DB)).blocked;
+  return ok(c, rows.map((r) => ({ ...r, flag: !r.is_group && !r.last_from_me ? aiSensitive(r.last_text, blocked) : null })));
 });
 
 const MSG_COLS = `m.id, m.conv_id, m.from_me, m.sender_name, m.kind, m.text, m.url, m.at, m.recalled_at, m.seen_at, m.quote_text, m.quote_name, m.hidden_at, u.display_name AS sent_by_name`;

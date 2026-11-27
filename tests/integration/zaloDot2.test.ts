@@ -18,6 +18,8 @@ beforeEach(async () => {
   await relay('/state', { nick_id: nick, status: 'ON' });
   await relay('/events', { nick_id: nick, events: [msg()] });
   conv = (await ctx.request('/api/zalo/convs', { as: USERS.thao })).body.data[0].id;
+  // Bài thử dùng giờ cố định: mở cả ngày, không hết hạn, không chờ, để kết quả không phụ thuộc giờ chạy.
+  await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { hour_start: 0, hour_end: 24, ttl_min: 10080, min_gap_sec: 0, skip_staff_min: 0 } });
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -176,6 +178,8 @@ describe('AI và đo sale', () => {
     ctx.env.AI_API_KEY = 'k';
     const fake = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: '"Dạ 20 thùng em để 110.000đ/thùng ạ."' } }] })));
     vi.stubGlobal('fetch', fake);
+    // Có mục kịch bản khớp thì mới đưa bảng giá (kho trống / không khớp thì AI không nêu con số).
+    await ctx.request('/api/zalo/playbook', { as: USERS.manager, body: { title: 'Bảng giá theo cấp', keywords: ['số'], content: 'Giá lấy theo bảng giá đúng cấp của khách.' } });
     await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'm7', text: 'số anh 0987 654 321 nhé', at: Date.parse('2026-11-27T01:20:00Z') })] });
     const r = await ctx.request(`/api/zalo/convs/${conv}/ai?plain=1`, { as: USERS.thao });
     expect(r.body.data.text).toBe('Dạ 20 thùng em để 110.000đ/thùng ạ.');
@@ -275,7 +279,7 @@ describe('Cài AI soạn sẵn + kho kịch bản (theo mẫu ZL-CRM)', () => {
     const h = new Date(Date.now() + 7 * 3600_000).getUTCHours();
     await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { enabled: true, hour_start: (h + 2) % 24, hour_end: (h + 3) % 24 || 24 } });
     expect((await ai()).body.data.note).toContain('Ngoài giờ');
-    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { enabled: true, blocked: ['giá sao'] } });
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { enabled: true, hour_start: 0, hour_end: 24, blocked: ['giá sao'] } });
     expect((await ai()).body.data.note).toContain('giá sao');
     expect(fake).not.toHaveBeenCalled();
   });
@@ -308,5 +312,44 @@ describe('Cài AI soạn sẵn + kho kịch bản (theo mẫu ZL-CRM)', () => {
     expect(all.filter((x) => x.kind === 'AGENT')).toHaveLength(1); // chỉ lệnh lúc đầu (trước khi tắt)
     const r = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
     expect(r.body.data.pending).toBeUndefined();
+  });
+});
+
+describe('bản Cài AI soạn sẵn chị Hoa duyệt 27/11', () => {
+  it('gợi ý lên đơn chỉ khi khách nói rõ; đợi khách nhắn xong; tin cũ thì ẩn; cờ đỏ ở Hộp tin; Thử AI', async () => {
+    ctx.env.AI_BASE_URL = 'https://ai.test';
+    ctx.env.AI_API_KEY = 'k';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"Dạ em nhận rồi ạ.","rationale":"x"}' } }] }))));
+    const ai = () => ctx.request(`/api/zalo/convs/${conv}/ai?plain=1`, { as: USERS.thao });
+    // hỏi giá: không gợi ý đơn
+    let r = await ai();
+    expect(r.body.data.text).toBe('Dạ em nhận rồi ạ.');
+    expect(r.body.data.order_hint.kind).toBeNull();
+    // nói rõ muốn đặt: có gợi ý (chỉ nút, không tạo đơn)
+    await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'o1', text: 'Chốt cho anh 10 thùng lau sàn', at: Date.parse('2026-11-27T01:40:00Z') })] });
+    r = await ai();
+    expect(r.body.data.order_hint).toMatchObject({ kind: 'order', word: 'chốt' });
+    expect(r.body.data.order_text).toBe('Chốt cho anh 10 thùng lau sàn');
+    expect((await ctx.db.prepare("SELECT COUNT(*) AS n FROM orders WHERE customer_id = 'cus-thao-1'").first<{ n: number }>())?.n).toBe(0);
+    // chế độ Tắt: không nhắc đơn
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { order_mode: 'off' } });
+    expect((await ai()).body.data.order_hint).toBeNull();
+    // tin khách cũ quá hạn (tin trên đã cũ vài giờ): ẩn
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { ttl_min: 5 } });
+    expect((await ai()).body.data.expired).toBe(true);
+    // khách vừa nhắn: đợi khách nhắn xong
+    await ctx.request('/api/zalo/ai-cfg', { method: 'PUT', as: USERS.manager, body: { min_gap_sec: 90, ttl_min: 120 } });
+    await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'o2', text: 'à thêm 2 thùng nữa', at: Date.now() - 10_000 })] });
+    expect((await ai()).body.data.wait).toBeGreaterThan(0);
+    // cờ đỏ
+    await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'o4', text: 'hàng lỗi, chị muốn trả hàng', at: Date.now() })] });
+    const list = (await ctx.request('/api/zalo/convs', { as: USERS.thao })).body.data;
+    expect(list.find((x: { id: string }) => x.id === conv).flag).toBe('trả hàng');
+    // Thử AI
+    const t1 = await ctx.request('/api/zalo/ai-try', { as: USERS.thao, body: { text: 'Lấy cho anh 30 thùng nước giặt, ship luôn nhé', cfg: { order_mode: 'clear' } } });
+    expect(t1.body.data.order_hint.kind).toBe('order');
+    expect(t1.body.data.text).toBe('Dạ em nhận rồi ạ.');
+    const t2 = await ctx.request('/api/zalo/ai-try', { as: USERS.thao, body: { text: 'chị sẽ kiện' } });
+    expect(t2.body.data.blocked).toBe('kiện');
   });
 });
