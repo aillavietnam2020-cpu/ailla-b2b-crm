@@ -219,7 +219,7 @@ describe('AI và đo sale', () => {
 
 describe('agent CSKH B2B soạn nháp cho khách kênh phân phối', () => {
   const agentCmd = async () => ((await relay('/poll')).body.data.cmds as Array<{ id: string; kind: string }>).find((x) => x.kind === 'AGENT');
-  it('tin khách KPP → lệnh nhờ agent; lời nhờ có bảng giá đúng cấp, che SĐT, cấm gửi / tạo đơn; trả nháp + đơn nháp', async () => {
+  it('tin khách KPP → lệnh nhờ agent; lời nhờ có bảng giá đúng cấp, che SĐT, cấm gửi / tạo đơn; chỉ trả câu trả lời nháp, không gợi ý đơn', async () => {
     await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'm20', text: 'lấy anh 10 thùng nước giặt 5L, số anh 0987 654 321', at: Date.parse('2026-11-27T01:30:00Z') })] });
     const pend = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
     expect(pend.body.data.pending).toBe(true);
@@ -236,13 +236,11 @@ describe('agent CSKH B2B soạn nháp cho khách kênh phân phối', () => {
     const r = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
     expect(r.body.data.source).toBe('agent');
     expect(r.body.data.text).toBe('Dạ em lên đơn 10 thùng ạ.');
-    expect(r.body.data.order.lines[0]).toMatchObject({ sku: 'TEST-FULL', qty: 10, ok: true });
-    expect(r.body.data.order.lines[0].price).toBeGreaterThan(0);
-    expect(r.body.data.order.lines[1].ok).toBe(false);
-    expect(r.body.data.order.note).toBe('giao chiều');
-    // sale bấm Lập đơn nháp: đơn DRAFT, không tự gửi duyệt
-    const o = await ctx.request('/api/orders', { as: USERS.thao, body: { customer_id: 'cus-thao-1', items: [{ product_id: r.body.data.order.lines[0].product_id, qty: 10 }] } });
-    expect(o.status).toBe(201);
+    // Chị Hoa 27/11: tắt đơn nháp do agent gợi ý; agent có lỡ đưa đơn thì web cũng bỏ, chỉ giữ câu trả lời.
+    expect(r.body.data.order).toBeUndefined();
+    expect(pr).toContain('KHÔNG đề xuất đơn hàng');
+    const row = await ctx.db.prepare('SELECT order_json FROM zalo_ai WHERE conv_id = ?').bind(conv).first<{ order_json: string }>();
+    expect(row?.order_json).toBe('');
   });
 
   it('agent không trả lời kịp hoặc lỗi thì dùng AI soạn nháp thường', async () => {

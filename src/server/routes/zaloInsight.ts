@@ -14,7 +14,7 @@ import { badRequest, forbidden, ok } from '../lib/http';
 import { bellTo } from '../lib/hubBell';
 import { callAi } from '../lib/orderReader';
 import { convFor, nickScope, viewer } from './zaloNick';
-import { AGENT_WAIT_MS, loadAiCfg, loadPlaybook, orderPreview, queueAgent, todayDrafts } from '../services/zaloAgent';
+import { AGENT_WAIT_MS, loadAiCfg, loadPlaybook, queueAgent, todayDrafts } from '../services/zaloAgent';
 import { newId } from '../lib/ids';
 
 export const zaloInsightRoutes = new Hono<AppEnv>();
@@ -128,13 +128,8 @@ zaloInsightRoutes.get('/convs/:id/ai', async (c) => {
     const got = await db.prepare("SELECT text, note, order_json, created_at FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'agent'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string; order_json: string; created_at: string }>();
     const cmd = await db.prepare("SELECT status, created_at FROM zalo_cmds WHERE conv_id = ? AND kind = 'AGENT' ORDER BY created_at DESC LIMIT 1").bind(z.id).first<{ status: string; created_at: string }>();
     if (got && !redo && fresh(got.created_at)) {
-      let order = null;
-      try {
-        order = got.order_json ? await orderPreview(db, z.customer_id, JSON.parse(got.order_json)) : null;
-      } catch {
-        order = null;
-      }
-      return ok(c, { text: got.text, note: got.note, source: 'agent', order, playbook_used });
+      // Đơn nháp do agent gợi ý đã tắt (chị Hoa 27/11: không phải khách nói gì cũng là lên đơn); chỉ trả câu trả lời.
+      return ok(c, { text: got.text, note: got.note, source: 'agent', playbook_used });
     }
     const isFresh = cmd && Date.parse(cmd.created_at) >= Date.parse(lastIn.at) - 5000 && !(got && !fresh(got.created_at));
     if (redo || !cmd || !isFresh) {

@@ -1006,14 +1006,15 @@ zaloNickRelayRoutes.post('/cmd/:id/done', async (c) => {
     // Agent CSKH B2B trả nháp: lưu cạnh nháp AI, theo tin khách mới nhất lúc dựng lời nhờ.
     const lastId = String((pl as { last_msg_id?: string }).last_msg_id ?? '');
     const r = parseAgent(String(b.text ?? ''));
-    if (cmd.conv_id && lastId && (r.reply || r.order)) {
+    if (cmd.conv_id && lastId && r.reply) {
       await db
         .prepare("INSERT INTO zalo_ai (conv_id, msg_id, text, note, source, order_json, created_at) VALUES (?, ?, ?, '', 'agent', ?, ?) ON CONFLICT(conv_id) DO UPDATE SET msg_id = excluded.msg_id, text = excluded.text, note = '', source = 'agent', order_json = excluded.order_json, created_at = excluded.created_at")
-        .bind(cmd.conv_id, lastId, r.reply, r.order ? JSON.stringify(r.order) : '', now)
+        // Chị Hoa 27/11: tắt đơn nháp do agent gợi ý (không phải khách nói gì cũng là lên đơn); chỉ giữ câu trả lời.
+        .bind(cmd.conv_id, lastId, r.reply, '', now)
         .run();
     }
     await db.prepare("UPDATE zalo_cmds SET status = 'DONE', done_at = ? WHERE id = ?").bind(now, cmd.id).run();
-    if (cmd.conv_id && (r.reply || r.order)) await db.prepare("INSERT INTO zalo_ai_log (conv_id, source, action, at) VALUES (?, 'agent', 'draft', ?)").bind(cmd.conv_id, now).run();
+    if (cmd.conv_id && r.reply) await db.prepare("INSERT INTO zalo_ai_log (conv_id, source, action, at) VALUES (?, 'agent', 'draft', ?)").bind(cmd.conv_id, now).run();
     // Trong lúc agent soạn, khách nhắn thêm: nhờ soạn lại theo tin mới.
     if (cmd.conv_id) {
       const newer = await db.prepare('SELECT msg_id FROM zalo_msgs WHERE conv_id = ? AND from_me = 0 ORDER BY at DESC LIMIT 1').bind(cmd.conv_id).first<{ msg_id: string }>();

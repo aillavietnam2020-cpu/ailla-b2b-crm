@@ -154,10 +154,9 @@ ${priceText}
 ${chat}
 
 YÊU CẦU: Trả về ĐÚNG MỘT khối JSON, không viết gì thêm:
-{"reply":"<câu trả lời nháp, tối đa 4 câu, xưng em gọi anh/chị>","order":null}
-hoặc nếu khách đã nói rõ muốn đặt hàng cụ thể:
-{"reply":"...","order":{"lines":[{"sku":"<mã trong bảng giá>","qty":<số nguyên>}],"note":"<ghi chú giao hàng nếu khách nói>"}}
-${pb ? pb + '\n\n' : ''}${cfg.extra ? 'LỜI DẶN RIÊNG CỦA AILLA: ' + cfg.extra + '\n' : ''}Quy tắc: giá và chính sách chỉ lấy từ bảng giá, kịch bản trên và kiến thức đã duyệt; không chắc thì hẹn kiểm lại. Mã hàng phải có trong bảng giá; khách nói chưa rõ (thiếu loại, dung tích, số lượng) thì order = null và hỏi lại khách trong reply. Công nợ vượt hạn mức thì nhắc khéo thanh toán, không hứa giao. Không hứa thời gian giao, không hứa quà ngoài chính sách.`;
+{"reply":"<câu trả lời nháp, tối đa 4 câu, xưng em gọi anh/chị>"}
+KHÔNG đề xuất đơn hàng, KHÔNG liệt kê dòng đơn: chỉ soạn câu trả lời (chị Hoa dặn 27/11: không phải khách nói gì cũng là lên đơn).
+${pb ? pb + '\n\n' : ''}${cfg.extra ? 'LỜI DẶN RIÊNG CỦA AILLA: ' + cfg.extra + '\n' : ''}Quy tắc: giá và chính sách chỉ lấy từ bảng giá, kịch bản trên và kiến thức đã duyệt; không chắc thì hẹn kiểm lại. Khách nói chưa rõ (thiếu loại, dung tích, số lượng) thì hỏi lại khách. Công nợ vượt hạn mức thì nhắc khéo thanh toán, không hứa giao. Không hứa thời gian giao, không hứa quà ngoài chính sách.`;
   return { prompt, session: `agent:${ZALO_AGENT_ID}:zalo-${convId.slice(0, 12)}`, last_msg_id: lastIn.msg_id };
 }
 
