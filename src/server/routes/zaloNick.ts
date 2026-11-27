@@ -25,6 +25,7 @@ import type { AppEnv } from '../env';
 import { badRequest, forbidden, notFound, ok } from '../lib/http';
 import { newId } from '../lib/ids';
 import { cskhMe } from '../services/cskh';
+import { agentPrompt, parseAgent, queueAgent } from '../services/zaloAgent';
 import { relayAuth } from './agentChat';
 
 type C = Context<AppEnv>;
@@ -913,7 +914,11 @@ zaloNickRelayRoutes.post('/events', async (c) => {
         })
       )
         added++;
-      if (!e.from_me && !e.is_group) await db.prepare('UPDATE zalo_convs SET typing_at = NULL WHERE id = ?').bind(convId).run();
+      if (!e.from_me && !e.is_group) {
+        await db.prepare('UPDATE zalo_convs SET typing_at = NULL WHERE id = ?').bind(convId).run();
+        // Khách kênh phân phối nhắn tới: nhờ agent CSKH B2B soạn nháp (chỉ khách đã gắn, chỉ tin mới).
+        if (!e.old) await queueAgent(db, convId);
+      }
     } else if (e.type === 'undo') {
       // Thu hồi: giữ nguyên nội dung, chỉ đánh dấu (Lead / CEO vẫn đọc được).
       const ids = [str(e.msg_id, 80), str(e.cli_msg_id, 80)].filter(Boolean);
@@ -978,7 +983,7 @@ zaloNickRelayRoutes.post('/events', async (c) => {
 /** Máy VPS báo lệnh đã làm xong. Gửi tin xong thì ghi tin vào hội thoại ngay (không chờ Zalo dội lại). */
 zaloNickRelayRoutes.post('/cmd/:id/done', async (c) => {
   const db = c.env.DB;
-  const b = (await c.req.json().catch(() => ({}))) as { ok?: boolean; error?: string; msg_id?: string; cli_msg_id?: string; thread_id?: string; thread_name?: string; peer_phone?: string };
+  const b = (await c.req.json().catch(() => ({}))) as { ok?: boolean; error?: string; msg_id?: string; cli_msg_id?: string; thread_id?: string; thread_name?: string; peer_phone?: string; text?: string };
   const cmd = await db
     .prepare('SELECT id, nick_id, kind, conv_id, thread_id, to_phone, customer_id, cskh_phone, text, payload, created_by, status FROM zalo_cmds WHERE id = ?')
     .bind(c.req.param('id'))
@@ -995,6 +1000,24 @@ zaloNickRelayRoutes.post('/cmd/:id/done', async (c) => {
   if (pl.file) await db.prepare('UPDATE zalo_files SET data = NULL, sent_at = ? WHERE id = ?').bind(now, pl.file.id).run();
   if (!b.ok) {
     await db.prepare("UPDATE zalo_cmds SET status = 'FAILED', error = ?, done_at = ? WHERE id = ?").bind(str(b.error, 300) || 'Lỗi', now, cmd.id).run();
+    return ok(c, { ok: true });
+  }
+  if (cmd.kind === 'AGENT') {
+    // Agent CSKH B2B trả nháp: lưu cạnh nháp AI, theo tin khách mới nhất lúc dựng lời nhờ.
+    const lastId = String((pl as { last_msg_id?: string }).last_msg_id ?? '');
+    const r = parseAgent(String(b.text ?? ''));
+    if (cmd.conv_id && lastId && (r.reply || r.order)) {
+      await db
+        .prepare("INSERT INTO zalo_ai (conv_id, msg_id, text, note, source, order_json, created_at) VALUES (?, ?, ?, '', 'agent', ?, ?) ON CONFLICT(conv_id) DO UPDATE SET msg_id = excluded.msg_id, text = excluded.text, note = '', source = 'agent', order_json = excluded.order_json, created_at = excluded.created_at")
+        .bind(cmd.conv_id, lastId, r.reply, r.order ? JSON.stringify(r.order) : '', now)
+        .run();
+    }
+    await db.prepare("UPDATE zalo_cmds SET status = 'DONE', done_at = ? WHERE id = ?").bind(now, cmd.id).run();
+    // Trong lúc agent soạn, khách nhắn thêm: nhờ soạn lại theo tin mới.
+    if (cmd.conv_id) {
+      const newer = await db.prepare('SELECT msg_id FROM zalo_msgs WHERE conv_id = ? AND from_me = 0 ORDER BY at DESC LIMIT 1').bind(cmd.conv_id).first<{ msg_id: string }>();
+      if (newer && lastId && newer.msg_id !== lastId) await queueAgent(db, cmd.conv_id);
+    }
     return ok(c, { ok: true });
   }
   if (cmd.kind === 'UNDO' && pl.msg_id) await db.prepare('UPDATE zalo_msgs SET recalled_at = COALESCE(recalled_at, ?) WHERE nick_id = ? AND msg_id = ?').bind(now, cmd.nick_id, pl.msg_id).run();
@@ -1038,6 +1061,17 @@ zaloNickRelayRoutes.post('/cmd/:id/done', async (c) => {
   }
   await db.prepare("UPDATE zalo_cmds SET status = 'DONE', msg_id = ?, conv_id = COALESCE(conv_id, ?), done_at = ? WHERE id = ?").bind(str(b.msg_id, 80) || null, convId, now, cmd.id).run();
   return ok(c, { ok: true, conv_id: convId });
+});
+
+/** Máy Zalo lấy lời nhờ agent CSKH B2B cho lệnh AGENT (dựng lúc lấy để có tin mới nhất). */
+zaloNickRelayRoutes.get('/agent-ctx/:id', async (c) => {
+  const db = c.env.DB;
+  const cmd = await db.prepare("SELECT id, conv_id FROM zalo_cmds WHERE id = ? AND kind = 'AGENT'").bind(c.req.param('id')).first<{ id: string; conv_id: string | null }>();
+  if (!cmd?.conv_id) throw notFound();
+  const p = await agentPrompt(db, cmd.conv_id);
+  if (!p) throw badRequest('NO_CONTEXT', 'Hội thoại chưa gắn khách kênh phân phối hoặc chưa có tin khách');
+  await db.prepare('UPDATE zalo_cmds SET payload = ? WHERE id = ?').bind(JSON.stringify({ last_msg_id: p.last_msg_id }), cmd.id).run();
+  return ok(c, { agent: 'cskh-b2b-ailla', session: p.session, prompt: p.prompt });
 });
 
 /** Máy Zalo lấy nội dung tệp sale đã tải lên để gửi. */

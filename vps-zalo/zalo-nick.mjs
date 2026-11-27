@@ -10,6 +10,8 @@
 //   KHÔNG có gửi tự động, gửi hàng loạt, tự kết bạn ở đợt này.
 //   Đợt 2 (27/11): gửi ảnh/tệp, trích dẫn, nhãn dán, thu hồi tin mình, thả cảm xúc, gửi / nhận lời mời kết bạn (người bấm),
 //   kéo danh bạ + nhóm + tin cũ (lệnh SYNC, tự chạy một lần sau khi quét QR), báo "đang gõ".
+//   Lệnh AGENT (27/11, chị Hoa đồng ý): khách kênh phân phối nhắn tới thì nhờ agent OpenClaw CSKH B2B soạn câu trả lời NHÁP
+//   (và đơn nháp nếu khách đặt). Agent không gửi Zalo, không tạo đơn; chương trình chỉ chuyển lời nhờ và trả nháp về web.
 //
 // Học cách làm từ ZL-CRM (github.com/nguyentatkiem/ZL-CRM, Apache 2.0: backend/src/modules/zalo/zalo-listener-factory.ts,
 // zalo-pool.ts) — viết lại, không chép nguyên đoạn.
@@ -19,6 +21,7 @@
 //   node zalo-nick.mjs       -> chạy (dịch vụ zalo-nick.service)
 // Biến môi trường: ABOS_URL, ABOS_RELAY_KEY (file chung /root/.config/abos-relay.env), ZALO_NICK_KEY (file riêng, quyền 600).
 
+import { execFile } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -575,6 +578,54 @@ async function sendCmd(c) {
   }
 }
 
+/** Gom chữ trả lời từ kết quả JSON của `openclaw agent` (giống abos-relay). */
+function agentTexts(o, out) {
+  if (Array.isArray(o)) for (const x of o) agentTexts(x, out);
+  else if (o && typeof o === 'object') {
+    for (const k of ['payloads', 'replies', 'messages', 'content', 'reply', 'text', 'message', 'output']) if (k in o) agentTexts(o[k], out);
+  } else if (typeof o === 'string' && o.trim()) out.push(o.trim());
+  return out;
+}
+/** Hỏi agent CSKH B2B; tối đa 2 lượt cùng lúc để không đè máy. */
+let agentBusy = 0;
+const agentWait = [];
+async function askAgent(c) {
+  if (agentBusy >= 2) await new Promise((r) => agentWait.push(r));
+  agentBusy++;
+  try {
+    const ctx = await web('GET', `/agent-ctx/${c.id}`);
+    const file = path.join(os.tmpdir(), `znk-agent-${c.id}.txt`);
+    fs.writeFileSync(file, ctx.prompt, { mode: 0o600 });
+    try {
+      const out = await new Promise((ok, no) =>
+        execFile('openclaw', ['agent', '--agent', ctx.agent, '--session-key', ctx.session, '--message-file', file, '--json', '--timeout', '110'],
+          { timeout: 140_000, maxBuffer: 20_000_000, env: { ...process.env, XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || '/run/user/0' } },
+          (err, stdout, stderr) => (err ? no(new Error(String(stderr || err.message).slice(-300))) : ok(stdout))),
+      );
+      let text = '';
+      try {
+        const d = JSON.parse(out);
+        text = [...new Set(agentTexts(d?.result?.payloads || [], []))].join('\n');
+        if (!text) text = String(d?.result?.meta?.finalAssistantVisibleText || '');
+      } catch {
+        text = String(out).trim();
+      }
+      if (!text.trim()) throw new Error('Agent không trả lời chữ');
+      await web('POST', `/cmd/${c.id}/done`, { ok: true, text: text.slice(0, 8000) });
+      log('Agent CSKH B2B đã soạn nháp', c.conv_id || c.id);
+    } finally {
+      fs.rmSync(file, { force: true });
+    }
+  } catch (e) {
+    log('Agent lỗi', c.id, e?.message || e);
+    await web('POST', `/cmd/${c.id}/done`, { ok: false, error: String(e?.message || e).slice(0, 250) }).catch(() => {});
+  } finally {
+    agentBusy--;
+    const next = agentWait.shift();
+    if (next) next();
+  }
+}
+
 async function doCmd(c) {
   try {
     if (c.kind === 'LOGIN_QR') {
@@ -637,6 +688,7 @@ async function tick() {
       const n = nick(c.nick_id);
       // Mỗi nick làm lệnh lần lượt; các nick khác nhau chạy song song.
       if (c.kind === 'LOGIN_QR') doCmd(c);
+      else if (c.kind === 'AGENT') askAgent(c);
       else n.chain = n.chain.then(() => doCmd(c));
     }
     // 5 phút báo web một lần nick nào đang chạy (để web biết máy còn sống).

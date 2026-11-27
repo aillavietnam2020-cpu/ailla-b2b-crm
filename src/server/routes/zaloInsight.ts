@@ -14,6 +14,7 @@ import { badRequest, forbidden, ok } from '../lib/http';
 import { bellTo } from '../lib/hubBell';
 import { callAi } from '../lib/orderReader';
 import { convFor, nickScope, viewer } from './zaloNick';
+import { AGENT_WAIT_MS, orderPreview, queueAgent } from '../services/zaloAgent';
 
 export const zaloInsightRoutes = new Hono<AppEnv>();
 
@@ -102,9 +103,33 @@ zaloInsightRoutes.get('/convs/:id/ai', async (c) => {
   const last = msgs[msgs.length - 1];
   if (!lastIn || !last || last.from_me) return ok(c, { text: '', note: '' });
   const redo = c.req.query('redo') === '1';
+  let fallbackNote = '';
+  // Khách kênh phân phối: agent CSKH B2B soạn (kèm đơn nháp nếu khách đặt). Chờ tối đa AGENT_WAIT_MS rồi mới dùng AI thường.
+  if (z.customer_id && c.req.query('plain') !== '1') {
+    const got = await c.env.DB.prepare("SELECT text, note, order_json, created_at FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'agent'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string; order_json: string; created_at: string }>();
+    const cmd = await c.env.DB.prepare("SELECT status, created_at FROM zalo_cmds WHERE conv_id = ? AND kind = 'AGENT' ORDER BY created_at DESC LIMIT 1").bind(z.id).first<{ status: string; created_at: string }>();
+    if (got && !redo) {
+      let order = null;
+      try {
+        order = got.order_json ? await orderPreview(c.env.DB, z.customer_id, JSON.parse(got.order_json)) : null;
+      } catch {
+        order = null;
+      }
+      return ok(c, { text: got.text, note: got.note, source: 'agent', order });
+    }
+    const lastInAt = Date.parse(lastIn.at);
+    const fresh = cmd && Date.parse(cmd.created_at) >= lastInAt - 5000;
+    if (redo || !cmd || !fresh) {
+      if (redo && got) await c.env.DB.prepare("UPDATE zalo_ai SET msg_id = '' WHERE conv_id = ?").bind(z.id).run();
+      await queueAgent(c.env.DB, z.id);
+      return ok(c, { pending: true, source: 'agent' });
+    }
+    if (['PENDING', 'TAKEN'].includes(cmd.status) && Date.now() - Date.parse(cmd.created_at) < AGENT_WAIT_MS) return ok(c, { pending: true, source: 'agent' });
+    fallbackNote = 'Agent CSKH B2B chưa trả lời kịp, đây là nháp AI thường.';
+  }
   if (!redo) {
-    const cached = await c.env.DB.prepare('SELECT text, note FROM zalo_ai WHERE conv_id = ? AND msg_id = ?').bind(z.id, lastIn.msg_id).first<{ text: string; note: string }>();
-    if (cached) return ok(c, cached);
+    const cached = await c.env.DB.prepare("SELECT text, note FROM zalo_ai WHERE conv_id = ? AND msg_id = ? AND source = 'ai'").bind(z.id, lastIn.msg_id).first<{ text: string; note: string }>();
+    if (cached) return ok(c, { ...cached, note: cached.note || fallbackNote });
   }
   const recentIn = msgs.filter((m) => !m.from_me).slice(-3).map((m) => m.text).join(' ');
   const hit = aiSensitive(recentIn);
@@ -119,10 +144,11 @@ zaloInsightRoutes.get('/convs/:id/ai', async (c) => {
       return ok(c, { text: '', note: m === 'AI_NOT_CONFIGURED' ? 'Chưa cài AI cho web.' : 'AI đang bận, thử lại sau.' });
     }
   }
-  await c.env.DB.prepare('INSERT INTO zalo_ai (conv_id, msg_id, text, note, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(conv_id) DO UPDATE SET msg_id = excluded.msg_id, text = excluded.text, note = excluded.note, created_at = excluded.created_at')
+  // Nháp AI thường chỉ lưu khi chưa có nháp agent cho đúng tin này (không đè nháp agent).
+  await c.env.DB.prepare("INSERT INTO zalo_ai (conv_id, msg_id, text, note, source, created_at) VALUES (?, ?, ?, ?, 'ai', ?) ON CONFLICT(conv_id) DO UPDATE SET msg_id = excluded.msg_id, text = excluded.text, note = excluded.note, source = 'ai', order_json = '', created_at = excluded.created_at WHERE zalo_ai.source <> 'agent' OR zalo_ai.msg_id <> excluded.msg_id")
     .bind(z.id, lastIn.msg_id, out.text, out.note, nowIso())
     .run();
-  return ok(c, out);
+  return ok(c, { ...out, note: out.note || (out.text ? fallbackNote : '') });
 });
 
 /** AI trau chuốt câu sale đang gõ (giữ ý, sửa lỗi, lễ phép hơn). */

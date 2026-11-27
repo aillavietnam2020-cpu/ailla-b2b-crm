@@ -53,7 +53,7 @@ const msg = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const firstRow = async (id = 'm1') => (await ctx.db.prepare('SELECT id FROM zalo_msgs WHERE msg_id = ?').bind(id).first<{ id: string }>())!.id;
-const takeCmds = async () => (await relay('/poll')).body.data.cmds as Array<{ id: string; kind: string; payload: string; thread_id: string }>;
+const takeCmds = async () => ((await relay('/poll')).body.data.cmds as Array<{ id: string; kind: string; payload: string; thread_id: string }>).filter((x) => x.kind !== 'AGENT');
 
 describe('tính toán đợt 2', () => {
   it('che số điện thoại / số tài khoản trước khi gửi AI', () => {
@@ -177,15 +177,15 @@ describe('AI và đo sale', () => {
     const fake = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: '"Dạ 20 thùng em để 110.000đ/thùng ạ."' } }] })));
     vi.stubGlobal('fetch', fake);
     await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'm7', text: 'số anh 0987 654 321 nhé', at: Date.parse('2026-11-27T01:20:00Z') })] });
-    const r = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
+    const r = await ctx.request(`/api/zalo/convs/${conv}/ai?plain=1`, { as: USERS.thao });
     expect(r.body.data.text).toBe('Dạ 20 thùng em để 110.000đ/thùng ạ.');
     const prompt = JSON.parse((fake.mock.calls[0] as unknown as [string, { body: string }])[1].body).messages[0].content[0].text as string;
     expect(prompt).toContain('Nước giặt test 5L');
     expect(prompt).toContain('[SĐT]');
     expect(prompt).not.toContain('0987 654 321');
-    await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
+    await ctx.request(`/api/zalo/convs/${conv}/ai?plain=1`, { as: USERS.thao });
     expect(fake).toHaveBeenCalledTimes(1); // dùng lại nháp
-    await ctx.request(`/api/zalo/convs/${conv}/ai?redo=1`, { as: USERS.thao });
+    await ctx.request(`/api/zalo/convs/${conv}/ai?redo=1&plain=1`, { as: USERS.thao });
     expect(fake).toHaveBeenCalledTimes(2);
   });
 
@@ -195,7 +195,7 @@ describe('AI và đo sale', () => {
     const fake = vi.fn();
     vi.stubGlobal('fetch', fake);
     await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'm8', text: 'hàng lỗi, chị muốn hoàn tiền' })] });
-    const r = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
+    const r = await ctx.request(`/api/zalo/convs/${conv}/ai?plain=1`, { as: USERS.thao });
     expect(r.body.data.text).toBe('');
     expect(r.body.data.note).toContain('hoàn tiền');
     expect(fake).not.toHaveBeenCalled();
@@ -214,5 +214,52 @@ describe('AI và đo sale', () => {
     await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'm10', text: 'em ơi', at: Date.now() - 40 * 60_000 })] });
     expect(await zaloWaitBell(ctx.env.DB)).toBe(1);
     expect(await zaloWaitBell(ctx.env.DB)).toBe(0);
+  });
+});
+
+describe('agent CSKH B2B soạn nháp cho khách kênh phân phối', () => {
+  const agentCmd = async () => ((await relay('/poll')).body.data.cmds as Array<{ id: string; kind: string }>).find((x) => x.kind === 'AGENT');
+  it('tin khách KPP → lệnh nhờ agent; lời nhờ có bảng giá đúng cấp, che SĐT, cấm gửi / tạo đơn; trả nháp + đơn nháp', async () => {
+    await relay('/events', { nick_id: nick, events: [msg({ msg_id: 'm20', text: 'lấy anh 10 thùng nước giặt 5L, số anh 0987 654 321', at: Date.parse('2026-11-27T01:30:00Z') })] });
+    const pend = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
+    expect(pend.body.data.pending).toBe(true);
+    const cmd = (await agentCmd())!;
+    expect(cmd).toBeTruthy();
+    const cx = await relay(`/agent-ctx/${cmd.id}`);
+    expect(cx.body.data.agent).toBe('cskh-b2b-ailla');
+    const pr = cx.body.data.prompt as string;
+    expect(pr).toContain('TEST-FULL');
+    expect(pr).toContain('KHÔNG gửi gì cho khách');
+    expect(pr).toContain('[SĐT]');
+    expect(pr).not.toContain('0987 654 321');
+    await relay(`/cmd/${cmd.id}/done`, { ok: true, text: 'Dạ đây ạ: {"reply":"Dạ em lên đơn 10 thùng ạ.","order":{"lines":[{"sku":"TEST-FULL","qty":10},{"sku":"KHONG-CO","qty":1}],"note":"giao chiều"}}' });
+    const r = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
+    expect(r.body.data.source).toBe('agent');
+    expect(r.body.data.text).toBe('Dạ em lên đơn 10 thùng ạ.');
+    expect(r.body.data.order.lines[0]).toMatchObject({ sku: 'TEST-FULL', qty: 10, ok: true });
+    expect(r.body.data.order.lines[0].price).toBeGreaterThan(0);
+    expect(r.body.data.order.lines[1].ok).toBe(false);
+    expect(r.body.data.order.note).toBe('giao chiều');
+    // sale bấm Lập đơn nháp: đơn DRAFT, không tự gửi duyệt
+    const o = await ctx.request('/api/orders', { as: USERS.thao, body: { customer_id: 'cus-thao-1', items: [{ product_id: r.body.data.order.lines[0].product_id, qty: 10 }] } });
+    expect(o.status).toBe(201);
+  });
+
+  it('agent không trả lời kịp hoặc lỗi thì dùng AI soạn nháp thường', async () => {
+    ctx.env.AI_BASE_URL = 'https://ai.test';
+    ctx.env.AI_API_KEY = 'k';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'Dạ em kiểm lại giá rồi báo anh ạ.' } }] }))));
+    const cmd = (await agentCmd())!;
+    await relay(`/cmd/${cmd.id}/done`, { ok: false, error: 'agent bận' });
+    const r = await ctx.request(`/api/zalo/convs/${conv}/ai`, { as: USERS.thao });
+    expect(r.body.data.source).toBeUndefined();
+    expect(r.body.data.text).toBe('Dạ em kiểm lại giá rồi báo anh ạ.');
+    expect(r.body.data.note).toContain('Agent CSKH B2B chưa trả lời kịp');
+  });
+
+  it('khách lẻ / chưa gắn khách thì không nhờ agent', async () => {
+    await relay('/events', { nick_id: nick, events: [msg({ thread_id: 'u-la', peer_phone: '', msg_id: 'x1' })] });
+    const all = (await relay('/poll')).body.data.cmds as Array<{ kind: string }>;
+    expect(all.filter((x) => x.kind === 'AGENT')).toHaveLength(1); // chỉ lệnh của khách KPP lúc đầu
   });
 });

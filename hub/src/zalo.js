@@ -226,6 +226,8 @@ function zlDrawPanel(){const rp=$("#zlrp");if(!rp||!ZL.det)return;const D0=ZL.de
     try{const r=await zlApi("/find-customer?q="+encodeURIComponent(fi.value.trim()));
       fr.innerHTML=r.customers.map(x=>`<button type="button" class="btn sm" data-zllk="c:${esc(x.id)}">${esc(x.name)} <span class="hint">· ${esc(x.phone_text||"")} · Kênh phân phối</span></button>`).join("")+r.cskh.map(x=>`<button type="button" class="btn sm" data-zllk="s:${esc(x.phone)}">${esc(x.name||x.phone)} <span class="hint">· ${esc(x.phone)} · Khách lẻ</span></button>`).join("")||`<span class="hint">Không thấy khách.</span>`;
       fr.querySelectorAll("[data-zllk]").forEach(b=>b.onclick=async()=>{const [t2,v]=[b.dataset.zllk.slice(0,1),b.dataset.zllk.slice(2)];try{await zlPost("/convs/"+c.id+"/link",t2==="c"?{customer_id:v}:{cskh_phone:v});toast("Đã gắn khách");await zlLoadConv(true);zlLoadConvs(true)}catch(e){toast(e.message)}})}catch(e){fr.innerHTML=`<span class="hint">${esc(e.message)}</span>`}},300)}}}
+/* Mở đơn hàng (trang CRM nhúng). */
+function zlOpenOrder(id){if(!id)return;const emp=typeof crmRole==="function"&&crmRole()==="EMPLOYEE",k=emp?"cr_s_dn":"cr_dn";if(typeof CRM_SRC!=="undefined")CRM_SRC[k]=(emp?"/sales":"/admin")+"/orders/"+encodeURIComponent(id);zlGo(k)}
 /* Mở hồ sơ khách kênh phân phối (trang CRM nhúng). */
 function zlOpenKpp(id){const emp=typeof crmRole==="function"&&crmRole()==="EMPLOYEE",k=emp?"cr_s_kh":"cr_kh";if(typeof CRM_SRC!=="undefined")CRM_SRC[k]=(emp?"/sales":"/admin")+"/customers/"+encodeURIComponent(id);zlGo(k)}
 
@@ -426,14 +428,24 @@ async function zlAiLoad(redo){const box=$("#zlai"),D0=ZL.det;if(!box||!D0)return
   if(!D0.can_send||c.is_group||!c.waiting_since||!last||last.from_me||ZL.aiOff[key]){box.innerHTML="";return}
   if(!redo&&ZL.ai&&ZL.ai.key===key){zlAiDraw();return}
   if(ZL.aiBusy===key)return;ZL.aiBusy=key;ZL.ai={key,busy:true};zlAiDraw();
-  try{const r=await zlApi("/convs/"+c.id+"/ai"+(redo?"?redo=1":""));if(ZL.ai&&ZL.ai.key===key)ZL.ai={key,text:r.text,note:r.note}}catch(e){ZL.ai={key,text:"",note:e.message}}
+  /* Khách kênh phân phối: agent CSKH B2B soạn (có thể kèm đơn nháp); máy chủ báo "đang soạn" thì hỏi lại mỗi 4 giây. */
+  let r=null;
+  try{for(let i=0;i<30;i++){r=await zlApi("/convs/"+c.id+"/ai"+(redo&&i===0?"?redo=1":""));if(!r.pending||ZL.cur!==c.id)break;if(ZL.ai&&ZL.ai.key===key){ZL.ai={key,busy:true,agent:true};zlAiDraw()}await new Promise(ok=>setTimeout(ok,4000))}
+    if(ZL.ai&&ZL.ai.key===key)ZL.ai=r&&!r.pending?{key,text:r.text,note:r.note,source:r.source,order:r.order}:{key,text:"",note:"Agent chưa soạn xong, bấm Viết lại sau."}}catch(e){ZL.ai={key,text:"",note:e.message}}
   ZL.aiBusy="";zlAiDraw()}
 function zlAiDraw(){const box=$("#zlai"),A=ZL.ai;if(!box||!A)return;
-  if(A.busy){box.innerHTML=`<div class="zl-ai"><b style="color:#4b54d1">✦ AI đang soạn nháp…</b></div>`;return}
+  if(A.busy){box.innerHTML=`<div class="zl-ai"><b style="color:#4b54d1">✦ ${A.agent?"Agent CSKH B2B đang soạn nháp… (khoảng 10–30 giây)":"AI đang soạn nháp…"}</b></div>`;return}
   if(!A.text&&!A.note){box.innerHTML="";return}
   if(!A.text){box.innerHTML=`<div class="zl-ai note">✦ ${esc(A.note)}</div>`;return}
-  box.innerHTML=`<div class="zl-ai"><div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap"><b style="color:#4b54d1">✦ AI soạn sẵn</b><span class="hint">giá lấy từ bảng giá đúng cấp khách · người đọc lại rồi bấm Gửi</span></div><div class="tx">${esc(A.text)}</div>
+  const O=A.order,okL=O?O.lines.filter(l=>l.ok&&l.product_id):[];
+  const ord=O&&O.lines.length?`<div style="border-top:1px dashed var(--line,#e6e8f0);padding-top:6px"><b>Đơn nháp agent gợi ý</b>${tbl(["Mã","Sản phẩm","SL","Đơn giá","Thành tiền"],O.lines.map(l=>`<tr${l.ok?"":' style="color:#c0352b"'}><td class="mono">${esc(l.sku)}</td><td>${esc(l.name)}${l.ok?"":" · không có trong bảng giá, bỏ khi lập đơn"}</td><td class="n">${nf(l.qty)}</td><td class="n">${l.price===null?"—":nf(l.price)}</td><td class="n">${l.amount===null?"—":nf(l.amount)}</td></tr>`))}
+     <div class="acts" style="margin:4px 0 0;align-items:center"><span class="hint" style="flex:1">${O.total!==null?"Tạm tính <b>"+nf(O.total)+"đ</b> (chưa chiết khấu, phí ship). ":""}${O.note?"Ghi chú: "+esc(O.note):""}</span>${okL.length?`<button type="button" class="btn sm" id="zlaio">Lập đơn nháp</button>`:""}</div></div>`:"";
+  box.innerHTML=`<div class="zl-ai"><div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap"><b style="color:#4b54d1">✦ ${A.source==="agent"?"Agent CSKH B2B soạn sẵn":"AI soạn sẵn"}</b><span class="hint">${A.note?esc(A.note)+" · ":""}giá lấy từ bảng giá đúng cấp khách · người đọc lại rồi bấm Gửi</span></div><div class="tx">${esc(A.text)}</div>${ord}
    <div class="acts" style="margin:0;gap:6px"><button type="button" class="btn sm pri" id="zlaiu">Dùng câu này</button><button type="button" class="btn sm" id="zlair">Viết lại</button><button type="button" class="btn sm" id="zlaix">Bỏ</button></div></div>`;
+  const bo=$("#zlaio");if(bo)bo.onclick=async()=>{const cid=ZL.det&&ZL.det.conv.customer_id;if(!cid)return;
+    if(!confirm("Lập đơn NHÁP "+okL.length+" dòng cho khách này? Đơn chưa gửi duyệt; mở ra kiểm lại số lượng, giá, chiết khấu rồi mới gửi."))return;bo.disabled=true;
+    try{const o=await svApi("/api/orders",{method:"POST",headers:{"Idempotency-Key":"zl-"+A.key},body:JSON.stringify({customer_id:cid,items:okL.map(l=>({product_id:l.product_id,qty:l.qty})),note:("[Đơn nháp từ Zalo, agent CSKH B2B gợi ý] "+(O.note||"")).trim()})});
+      toast("Đã lập đơn nháp. Mở đơn để kiểm rồi gửi duyệt.");zlOpenOrder(o.id||(o.order&&o.order.id))}catch(e){bo.disabled=false;toast(e.message)}};
   $("#zlaiu").onclick=()=>{const ta=$("#zlch textarea");if(ta){ta.value=A.text;ta.dispatchEvent(new Event("input"));ta.focus()}toast("Đã chèn vào ô nhắn. Đọc lại rồi bấm Gửi.")};
   $("#zlair").onclick=()=>zlAiLoad(true);$("#zlaix").onclick=()=>{ZL.aiOff[A.key]=true;box.innerHTML=""}}
 
