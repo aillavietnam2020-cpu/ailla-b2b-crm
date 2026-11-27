@@ -46,6 +46,8 @@ export interface CustomerFilters {
   ownerId?: string;
   due?: 'today' | 'overdue' | 'upcoming';
   dataQuality?: 'OK' | 'NEEDS_REVIEW';
+  /** Zalo (27/11): wait = khách đang chờ trả lời trên Zalo, none = chưa có hội thoại Zalo. */
+  zalo?: 'wait' | 'none';
   sort?: string;
   /** Tháng tính doanh số (YYYY-MM); bỏ trống là tháng hiện tại. */
   month?: string;
@@ -132,6 +134,8 @@ export async function listCustomers(
     where.push('c.data_quality = ?');
     params.push(filters.dataQuality);
   }
+  if (filters.zalo === 'wait') where.push('c.id IN (SELECT customer_id FROM zalo_convs WHERE customer_id IS NOT NULL AND is_group = 0 AND waiting_since IS NOT NULL)');
+  if (filters.zalo === 'none') where.push('c.id NOT IN (SELECT customer_id FROM zalo_convs WHERE customer_id IS NOT NULL)');
   if (filters.due === 'today') {
     where.push('c.next_follow_up_at = ?');
     params.push(today);

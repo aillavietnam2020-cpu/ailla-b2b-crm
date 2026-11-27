@@ -65,6 +65,7 @@ import { accRulesRoutes } from './routes/accRules';
 import { orderIntakeRoutes } from './routes/orderIntake';
 import { publicOrderRoutes } from './routes/publicOrder';
 import { zaloRelayRoutes } from './routes/zaloRelay';
+import { zaloNickRelayRoutes, zaloRoutes } from './routes/zaloNick';
 
 /**
  * Ứng dụng Hono. Tách khỏi index.ts để test có thể gọi trực tiếp app.fetch()
@@ -117,6 +118,8 @@ export function createApp() {
   // Cầu nối trên VPS (nhắn agent trên web) tự gọi bằng khoá riêng, không có phiên đăng nhập.
   app.route('/api/agent-relay', agentRelayRoutes);
   app.route('/api/zalo-relay', zaloRelayRoutes);
+  // Zalo trong CRM (27/11): chương trình nhiều nick trên VPS.
+  app.route('/api/zalo-nick-relay', zaloNickRelayRoutes);
   app.route('/api/agent-relay-ops', agentRelayOpsRoutes);
   app.route('/api/agent-train-relay', agentTrainRelayRoutes);
   // Agent Fanpage (OpenClaw trên VPS) tự gọi bằng khoá riêng FP_KEY.
@@ -191,6 +194,7 @@ export function createApp() {
   app.route('/api/hub/dodung', doDungRoutes);
   app.route('/api/hub/task-files', taskFileRoutes);
   app.route('/api/hub/chat', chatRoutes);
+  app.route('/api/zalo', zaloRoutes);
   app.route('/api/hub', hubRoutes);
   app.route('/api/drive', driveRoutes);
 

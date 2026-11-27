@@ -40,6 +40,7 @@ customerRoutes.get('/', requirePermission('customer.read.own'), async (c) => {
     ownerId: query.owner_id,
     due: query.due,
     dataQuality: query.data_quality,
+    zalo: query.zalo,
     sort: query.sort,
     month: c.req.query('month') ?? undefined,
     page: query.page,

@@ -375,6 +375,7 @@ export const listQuerySchema = z.object({
   owner_id: z.string().trim().optional(),
   due: z.enum(['today', 'overdue', 'upcoming']).optional(),
   data_quality: z.enum(['OK', 'NEEDS_REVIEW']).optional(),
+  zalo: z.enum(['wait', 'none']).optional(),
   debt: z.enum(['exceeded', 'has_debt']).optional(),
   sort: z
     .enum([
