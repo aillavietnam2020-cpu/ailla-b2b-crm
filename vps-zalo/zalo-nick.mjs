@@ -8,6 +8,8 @@
 //   - Tự nối lại khi rớt (giãn dần 30 giây -> 15 phút); rớt liên tục hoặc phiên hết hạn thì báo web "Cần quét lại QR".
 //   - Chỉ gửi tin khi người trên web bấm Gửi (lệnh SEND). Trần chống khóa nick: tối đa 5 tin / 30 giây / nick.
 //   KHÔNG có gửi tự động, gửi hàng loạt, tự kết bạn ở đợt này.
+//   Đợt 2 (27/11): gửi ảnh/tệp, trích dẫn, nhãn dán, thu hồi tin mình, thả cảm xúc, gửi / nhận lời mời kết bạn (người bấm),
+//   kéo danh bạ + nhóm + tin cũ (lệnh SYNC, tự chạy một lần sau khi quét QR), báo "đang gõ".
 //
 // Học cách làm từ ZL-CRM (github.com/nguyentatkiem/ZL-CRM, Apache 2.0: backend/src/modules/zalo/zalo-listener-factory.ts,
 // zalo-pool.ts) — viết lại, không chép nguyên đoạn.
@@ -20,6 +22,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 if (process.argv[2] === 'key') {
@@ -49,7 +52,7 @@ if (KEY.length !== 32) {
   process.exit(1);
 }
 fs.mkdirSync(SESS, { recursive: true, mode: 0o700 });
-const { Zalo, ThreadType, LoginQRCallbackEventType: QE } = await import(pathToFileURL(ZCA).href);
+const { Zalo, ThreadType, LoginQRCallbackEventType: QE, FriendEventType: FE } = await import(pathToFileURL(ZCA).href);
 
 /* ------------------------------------------------------------------ phiên đăng nhập mã hóa */
 const sessFile = (id) => path.join(SESS, String(id).replace(/[^A-Za-z0-9_-]/g, '') + '.enc');
@@ -152,6 +155,57 @@ async function groupName(n, gid) {
   return v;
 }
 
+/** Ảnh nhãn dán để hiện trên web. */
+async function stickerUrl(n, c) {
+  const sid = Number(c?.id);
+  if (!sid) return '';
+  if (!n.stickers) n.stickers = new Map();
+  if (n.stickers.has(sid)) return n.stickers.get(sid);
+  let u = '';
+  try {
+    const r = await n.api.getStickersDetail(sid);
+    const d = Array.isArray(r) ? r[0] : null;
+    u = String(d?.stickerWebpUrl || d?.stickerUrl || '');
+  } catch {}
+  if (!/^https:\/\//.test(u)) u = '';
+  n.stickers.set(sid, u);
+  return u;
+}
+
+/** Kéo danh bạ, nhóm và tin cũ về web. */
+async function syncNick(id) {
+  const n = nick(id);
+  if (!n.api) throw new Error('Nick chưa nối Zalo');
+  let friends = [];
+  try {
+    friends = (await n.api.getAllFriends(2000, 1)) || [];
+  } catch (e) {
+    log('Không kéo được danh bạ', id, e?.message || e);
+  }
+  for (let i = 0; i < friends.length; i += 200) {
+    push(id, { type: 'friends', thread_id: 'list', list: friends.slice(i, i + 200).map((f) => ({ uid: String(f.userId || ''), name: f.zaloName || f.displayName || '', avatar: f.avatar || '', phone: f.phoneNumber || '' })) });
+  }
+  try {
+    const g = await n.api.getAllGroups();
+    const ids = Object.keys(g?.gridVerMap || {});
+    for (let i = 0; i < ids.length; i += 50) {
+      const info = await n.api.getGroupInfo(ids.slice(i, i + 50));
+      const map = info?.gridInfoMap || {};
+      push(id, { type: 'groups', thread_id: 'list', list: ids.slice(i, i + 50).map((gid) => ({ id: gid, name: map[gid]?.name || '', avatar: map[gid]?.avt || '' })) });
+      await sleep(800);
+    }
+  } catch (e) {
+    log('Không kéo được nhóm', id, e?.message || e);
+  }
+  try {
+    n.api.listener.requestOldMessages(ThreadType.User);
+    n.api.listener.requestOldMessages(ThreadType.Group);
+  } catch (e) {
+    log('Không kéo được tin cũ', id, e?.message || e);
+  }
+  return friends.length;
+}
+
 function push(id, ev) {
   const n = nick(id);
   n.buf.push(ev);
@@ -187,13 +241,15 @@ function attach(id, api) {
   const L = api.listener;
   // Sự kiện xếp hàng theo đúng thứ tự đến (tin đọc tên người gửi mất chút thời gian; báo thu hồi không được đi trước tin).
   const q = (fn) => (n.evq = n.evq.then(fn).catch((e) => log('Lỗi sự kiện', id, e?.message || e)));
-  L.on('message', (msg) => q(async () => {
+  const onMsg = (msg, old) => q(async () => {
     try {
       const d = msg.data || {};
       const isGroup = msg.type === ThreadType.Group;
       const threadId = String(msg.threadId || '');
       if (!threadId) return;
       const ct = contentOf(d.msgType, d.content);
+      if (ct.kind === 'sticker') ct.url = await stickerUrl(n, d.content);
+      const qt = d.quote && typeof d.quote === 'object' ? d.quote : null;
       let thread_name = '';
       let avatar = '';
       let peer_phone = '';
@@ -223,9 +279,44 @@ function attach(id, api) {
         text: ct.text,
         url: ct.url,
         at: Number(d.ts) || Date.now(),
+        quote_text: qt ? String(qt.msg || (qt.attach ? '[Ảnh / tệp]' : '')).slice(0, 300) : '',
+        quote_name: qt ? String(qt.fromD || '') : '',
+        // Dữ liệu gốc để sau này trả lời trích dẫn chính tin này.
+        raw: JSON.stringify({ msgType: d.msgType, content: d.content, propertyExt: d.propertyExt, ttl: d.ttl, ts: d.ts, uidFrom: d.uidFrom }).slice(0, 4000),
+        old: !!old,
       });
     } catch (e) {
       log('Lỗi đọc tin', id, e?.message || e);
+    }
+  });
+  L.on('message', (msg) => onMsg(msg, false));
+  L.on('old_messages', (list) => {
+    for (const m of list || []) onMsg(m, true);
+  });
+  // Cảm xúc: khách thả (hoặc mình thả trên điện thoại). rIcon rỗng = gỡ.
+  L.on('reaction', (r) => q(() => {
+    const d = r?.data || {};
+    const target = String(d.content?.rMsg?.[0]?.gMsgID || '');
+    if (!target) return;
+    push(id, { type: 'react', thread_id: String(r.threadId || ''), msg_id: target, uid: r.isSelf ? 'me' : String(d.uidFrom || ''), name: r.isSelf ? 'Mình' : String(d.dName || ''), icon: String(d.content?.rIcon || ''), from_me: !!r.isSelf, at: Number(d.ts) || Date.now() });
+  }));
+  // Đang gõ: chỉ 1-1, mỗi hội thoại báo tối đa 1 lần / 6 giây.
+  const typed = new Map();
+  L.on('typing', (t) => {
+    if (t?.type !== ThreadType.User) return;
+    const th = String(t.threadId || '');
+    if (!th || Date.now() - (typed.get(th) || 0) < 6000) return;
+    typed.set(th, Date.now());
+    push(id, { type: 'typing', thread_id: th });
+  });
+  // Lời mời kết bạn tới nick; đã thành bạn.
+  L.on('friend_event', (ev) => q(async () => {
+    if (ev?.type === FE.REQUEST && !ev.isSelf) {
+      const uid = String(ev.data?.fromUid || ev.threadId || '');
+      const u = await userInfo(n, uid);
+      push(id, { type: 'fr_req', thread_id: uid, name: u.name, avatar_url: u.avatar, text: String(ev.data?.message || '').slice(0, 300) });
+    } else if (ev?.type === FE.ADD) {
+      push(id, { type: 'fr_ok', thread_id: String(ev.threadId || ev.data?.fromUid || '') });
     }
   }));
   // Thu hồi: chỉ báo mã tin, web giữ nguyên nội dung cũ.
@@ -333,6 +424,7 @@ async function loginQR(id) {
     n.name = me.name;
     await state(id, 'ON', { zalo_uid: n.uid, zalo_name: n.name });
     log('Đã thêm nick bằng QR', id, n.name);
+    setTimeout(() => syncNick(id).catch((e) => log('Kéo danh bạ lỗi', id, e?.message || e)), 5000);
     return true;
   } catch (e) {
     log('Đăng nhập QR không xong', id, e?.message || e);
@@ -368,9 +460,46 @@ async function sendCmd(c) {
     threadName = u.display_name || u.zalo_name || '';
   }
   if (!threadId) throw new Error('Thiếu người nhận');
+  let pl = {};
+  try {
+    pl = c.payload ? JSON.parse(c.payload) : {};
+  } catch {}
+  const type = isGroup ? ThreadType.Group : ThreadType.User;
   n.sends.push(Date.now());
-  const r = await n.api.sendMessage(String(c.text), threadId, isGroup ? ThreadType.Group : ThreadType.User);
-  return { msg_id: String(r?.message?.msgId || ''), thread_id: threadId, thread_name: threadName, peer_phone: c.to_phone || '' };
+  if (pl.sticker) {
+    const r = await n.api.sendSticker({ id: Number(pl.sticker.id), cateId: Number(pl.sticker.cateId), type: Number(pl.sticker.type) }, threadId, type);
+    return { msg_id: String(r?.msgId || ''), thread_id: threadId, thread_name: threadName, peer_phone: c.to_phone || '' };
+  }
+  const msg = { msg: String(c.text || '') };
+  if (pl.quote && pl.quote.raw) {
+    try {
+      const raw = JSON.parse(pl.quote.raw);
+      msg.quote = { content: raw.content, msgType: raw.msgType, propertyExt: raw.propertyExt, uidFrom: raw.uidFrom, msgId: pl.quote.msg_id, cliMsgId: pl.quote.cli_msg_id, ts: raw.ts, ttl: raw.ttl || 0 };
+    } catch {}
+  }
+  let tmp = '';
+  try {
+    if (pl.file || pl.url) {
+      // Tệp: lấy từ web (sale tải lên) hoặc từ đường dẫn (chuyển tiếp), lưu tạm rồi gửi.
+      const name = String((pl.file || pl.url).name || 'tep').replace(/[^\p{L}\d._ -]/gu, '_').slice(0, 80) || 'tep';
+      const r = pl.file
+        ? await fetch(URL_BASE + '/api/zalo-nick-relay/file/' + encodeURIComponent(pl.file.id), { headers: { 'X-Relay-Key': RELAY }, signal: AbortSignal.timeout(60_000) })
+        : await fetch(pl.url.href, { signal: AbortSignal.timeout(60_000) });
+      if (!r.ok) throw new Error('Không lấy được tệp (' + r.status + ')');
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 25_000_000) throw new Error('Tệp lớn quá');
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'znk-'));
+      const ext = path.extname(name) || (pl.url && pl.url.kind === 'image' ? '.jpg' : '');
+      tmp = path.join(dir, path.basename(name, path.extname(name)) + ext);
+      fs.writeFileSync(tmp, buf);
+      msg.attachments = [tmp];
+    }
+    const r = await n.api.sendMessage(msg.attachments || msg.quote ? msg : msg.msg, threadId, type);
+    const first = r?.message || (Array.isArray(r?.attachment) ? r.attachment[0] : null);
+    return { msg_id: String(first?.msgId || ''), thread_id: threadId, thread_name: threadName, peer_phone: c.to_phone || '' };
+  } finally {
+    if (tmp) fs.rmSync(path.dirname(tmp), { recursive: true, force: true });
+  }
 }
 
 async function doCmd(c) {
@@ -388,6 +517,24 @@ async function doCmd(c) {
       const r = await sendCmd(c);
       await web('POST', `/cmd/${c.id}/done`, { ok: true, ...r });
       log('Đã gửi tin', c.nick_id);
+    } else {
+      const n = nick(c.nick_id);
+      if (!n.api) throw new Error('Nick chưa nối Zalo');
+      let pl = {};
+      try {
+        pl = c.payload ? JSON.parse(c.payload) : {};
+      } catch {}
+      const type = c.is_group ? ThreadType.Group : ThreadType.User;
+      if (c.kind === 'UNDO') await n.api.undo({ msgId: pl.msg_id, cliMsgId: pl.cli_msg_id }, c.thread_id, type);
+      else if (c.kind === 'REACT') await n.api.addReaction(pl.icon, { data: { msgId: pl.msg_id, cliMsgId: pl.cli_msg_id }, threadId: c.thread_id, type });
+      else if (c.kind === 'FRIEND_REQ') {
+        n.sends.push(Date.now());
+        await n.api.sendFriendRequest(String(c.text || 'Chào anh/chị'), c.thread_id);
+      } else if (c.kind === 'FRIEND_ACCEPT') await n.api.acceptFriendRequest(c.thread_id);
+      else if (c.kind === 'FRIEND_REJECT') await n.api.rejectFriendRequest(c.thread_id);
+      else if (c.kind === 'SYNC') log('Kéo danh bạ', c.nick_id, await syncNick(c.nick_id), 'bạn');
+      else throw new Error('Lệnh lạ ' + c.kind);
+      await web('POST', `/cmd/${c.id}/done`, { ok: true });
     }
   } catch (e) {
     log('Lệnh lỗi', c.kind, c.nick_id, e?.message || e);
