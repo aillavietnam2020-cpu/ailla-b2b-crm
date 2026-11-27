@@ -115,7 +115,7 @@ export function orderSignal(text: string, mode: OrderMode, orderWords: string[])
   if (mode === 'off') return null;
   const word = kwHit(text, orderWords);
   const qty = hasQty(text);
-  if (word && qty) return { kind: 'order', word, reason: `Khách đặt hàng (có "${word}" và số lượng).` };
+  if (word && qty) return { kind: 'order', word, reason: `Có "${word}" và số lượng.` };
   if (mode === 'ask' && qty) return { kind: 'ask', word, reason: 'Khách nhắc số lượng, có vẻ muốn mua.' };
   return { kind: null, word, reason: !word ? 'Không gợi ý đơn: tin không có từ đặt hàng.' : 'Không gợi ý đơn: tin không có số lượng.' };
 }
