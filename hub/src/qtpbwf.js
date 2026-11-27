@@ -152,9 +152,4 @@ Object.assign(PAGES,{qp_wf:pQwWf,qw_cho:pQwCho});
 {const _ap=tkApprove;tkApprove=function(id){try{const t=D().tasks.find(x=>x.id===id),I=qwTask(t);
   if(I&&qwCustom(I.steps)&&ME.role!=="admin"&&!(qpDeptLead(ME)&&ME.phongBan===I.dept)&&I.w.i<I.steps.length-1&&qwAppr(I.steps[I.w.i],I.dept).includes(ME.id)){qwAdvanceLocal({kind:"task",id,ten:"Việc: "+t.ten,I});toast("Đã duyệt bước "+(I.w.i+1)+", chuyển bước sau");return false}}catch(e){}
   return _ap.apply(this,arguments)}}
-/* Menu: Task giao việc › Duyệt theo Work Flow (mọi người của phòng đã mở Quản trị phòng, CEO). */
-{const okM=u=>!!u&&(u.role==="admin"||(!!u.phongBan&&qpCfg().depts.includes(u.phongBan)));
-  const cv=MODULES.find(x=>x.k==="cv");if(cv){const g0=cv.groups;cv.groups=function(){const G=g0.apply(this,arguments)||[];if(!G.length||G.some(g=>(g[1]||[]).some(i=>i&&i[0]==="qw_cho")))return G;
-    let ok=false;try{ok=!ME||okM(ME)}catch(e){}if(!ok)return G;const G2=G.slice();G2[0]=[G2[0][0],(G2[0][1]||[]).concat([MI("qw_cho","Duyệt theo Work Flow",okM,()=>{try{return qwMineLocal().length+((QW.cho&&QW.cho.d1||[]).length)+((QW.cho&&QW.cho.items||[]).length)||""}catch(e){return ""}})])];return G2}}
-  QP_ALWAYS.add("qw_cho");
-}
+/* 27/11 CEO bỏ mục "Duyệt theo Work Flow" khỏi menu Task giao việc. Trang vẫn mở được từ thông báo; Lead / CEO duyệt thay ở chỗ cũ. */

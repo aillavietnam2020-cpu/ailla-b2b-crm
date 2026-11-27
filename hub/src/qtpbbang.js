@@ -234,10 +234,5 @@ function qbPermDrawer(){const T=qbT(),d=T.def;const others=(D().departments||[])
 @media (max-width:640px){.qb-kcol{flex-basis:78vw}}`;document.head.appendChild(st)}
 
 Object.assign(PAGES,{qp_bang:pQpBang});
-/* Menu: Task giao việc › Bảng dữ liệu cho mọi người của phòng đã mở Quản trị phòng, phòng được mời xem, CEO;
-   Lead thấy thêm ở Nhân sự › Quản trị phòng. */
-{const qbMenuOk=u=>!!u&&(u.role==="admin"||(!!u.phongBan&&(qpCfg().depts.includes(u.phongBan)||(((D()&&D().qtpb)||{}).bangXem||[]).includes(u.phongBan))));
-  const cv=MODULES.find(x=>x.k==="cv");if(cv){const g0=cv.groups;cv.groups=function(){const G=g0.apply(this,arguments)||[];if(!G.length||G.some(g=>(g[1]||[]).some(i=>i&&i[0]==="qp_bang")))return G;
-    let ok=false;try{ok=!ME||qbMenuOk(ME)}catch(e){}if(!ok)return G;const G2=G.slice();G2[0]=[G2[0][0],(G2[0][1]||[]).concat([MI("qp_bang","Bảng dữ liệu",qbMenuOk)])];return G2}}
-  QP_ALWAYS.add("qp_bang");
-}
+/* 27/11 CEO bỏ mục "Bảng dữ liệu" khỏi menu Task giao việc (đang xem demo bảng tự tạo kiểu mới). Dữ liệu giữ nguyên;
+   Lead vẫn thấy ở Nhân sự › Quản trị phòng. */
