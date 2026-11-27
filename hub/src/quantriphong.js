@@ -294,9 +294,10 @@ Object.assign(PAGES,{qp_ns:pQpNs,qp_nk:pQpNk,qp_moi:pQpMoi,qp_log:pQpLog,qp_cfg:
 
 /* ---------- Menu ---------- */
 {
+  /* 27/11 CEO gỡ "Work Flow" và "Bảng dữ liệu" khỏi menu (dữ liệu giữ nguyên, các luồng duyệt chạy như cũ). */
   const lead=(u,k)=>u.role==="admin"||(qpIsLead(u)&&(!k||qpCfg().cap[k]!==false));
   const items=()=>[MI("qp_moi","Nhân sự các phòng",u=>u.role==="admin"||hrOk(),()=>{qpLoadReq();return qpPend()||""}),
-    MI("qp_ns","Nhân sự & phân quyền",u=>lead(u),()=>qpNeed()||""),MI("qp_wf","Work Flow",u=>lead(u,"wf")),MI("qp_kpi","KPI nhân sự",u=>lead(u,"kpi")),MI("qp_bang","Bảng dữ liệu",u=>lead(u)),
+    MI("qp_ns","Nhân sự & phân quyền",u=>lead(u),()=>qpNeed()||""),MI("qp_kpi","KPI nhân sự",u=>lead(u,"kpi")),
     MI("qp_nk","Nhật ký phòng",u=>u.role!=="admin"&&qpIsLead(u)),
     MI("qp_ct","Chỉ tiêu chờ duyệt",u=>u.role==="admin",()=>(typeof qkAllPend==="function"&&qkAllPend().length)||""),MI("qp_hrkpi","Hiệu suất & lương thưởng",u=>u.role==="admin"||hrOk()),
     MI("qp_log","Nhật ký quản trị phòng",u=>u.role==="admin"||can(u,"qtpb.hoantac")),MI("qp_cfg","Ranh giới quyền Lead",u=>u.role==="admin")];
@@ -304,7 +305,7 @@ Object.assign(PAGES,{qp_ns:pQpNs,qp_nk:pQpNk,qp_moi:pQpMoi,qp_log:pQpLog,qp_cfg:
   const add=(mo,keys)=>{if(!mo)return;const g0=mo.groups;mo.groups=function(){const G=g0.apply(this,arguments)||[];if(G.some(g=>g[0]==="Quản trị phòng"))return G;
     const its=items().filter(i=>(!keys||keys.includes(i[0]))&&(()=>{try{return !ME||i[2](ME)}catch(e){return false}})());return its.length?[["Quản trị phòng",its],...G]:G}};
   add(MODULES.find(x=>x.k==="hr"));
-  add(MODULES.find(x=>x.k==="q_cfg"),["qp_moi","qp_ns","qp_wf","qp_kpi","qp_bang","qp_ct","qp_hrkpi","qp_log","qp_cfg"]);
+  add(MODULES.find(x=>x.k==="q_cfg"),["qp_moi","qp_ns","qp_kpi","qp_ct","qp_hrkpi","qp_log","qp_cfg"]);
   /* Trang Lead đã tắt: ẩn khỏi menu của nhân sự phòng đó (Lead, CEO vẫn thấy đủ). */
   MODULES.forEach(mo=>{if(mo.k==="me")return;const g=mo.groups;mo.groups=function(){const G=g.apply(this,arguments)||[];
     if(QP.menuAll||!ME||ME.role==="admin"||!ME.phongBan||qpIsLead(ME)||!qpCfg().depts.includes(ME.phongBan))return G;
