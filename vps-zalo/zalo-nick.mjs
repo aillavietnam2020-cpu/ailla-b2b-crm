@@ -176,35 +176,99 @@ async function stickerUrl(n, c) {
 async function syncNick(id) {
   const n = nick(id);
   if (!n.api) throw new Error('Nick chưa nối Zalo');
+  // Chờ kết nối nghe tin mở xong: xin tin cũ trước lúc đó thì Zalo bỏ qua (lỗi 27/11: nick nối xong không có tin cũ).
+  for (let i = 0; i < 30 && !n.connected; i++) await sleep(1000);
   let friends = [];
   try {
-    friends = (await n.api.getAllFriends(2000, 1)) || [];
+    for (let page = 1; page <= 5; page++) {
+      const part = (await n.api.getAllFriends(2000, page)) || [];
+      friends = friends.concat(part);
+      if (part.length < 2000) break;
+      await sleep(1000);
+    }
   } catch (e) {
     log('Không kéo được danh bạ', id, e?.message || e);
   }
   for (let i = 0; i < friends.length; i += 200) {
     push(id, { type: 'friends', thread_id: 'list', list: friends.slice(i, i + 200).map((f) => ({ uid: String(f.userId || ''), name: f.zaloName || f.displayName || '', avatar: f.avatar || '', phone: f.phoneNumber || '' })) });
   }
+  let gids = [];
   try {
     const g = await n.api.getAllGroups();
-    const ids = Object.keys(g?.gridVerMap || {});
-    for (let i = 0; i < ids.length; i += 50) {
-      const info = await n.api.getGroupInfo(ids.slice(i, i + 50));
+    gids = Object.keys(g?.gridVerMap || {});
+    for (let i = 0; i < gids.length; i += 50) {
+      const info = await n.api.getGroupInfo(gids.slice(i, i + 50));
       const map = info?.gridInfoMap || {};
-      push(id, { type: 'groups', thread_id: 'list', list: ids.slice(i, i + 50).map((gid) => ({ id: gid, name: map[gid]?.name || '', avatar: map[gid]?.avt || '' })) });
+      push(id, { type: 'groups', thread_id: 'list', list: gids.slice(i, i + 50).map((gid) => ({ id: gid, name: map[gid]?.name || '', avatar: map[gid]?.avt || '' })) });
       await sleep(800);
     }
   } catch (e) {
     log('Không kéo được nhóm', id, e?.message || e);
   }
-  try {
-    n.api.listener.requestOldMessages(ThreadType.User);
-    n.api.listener.requestOldMessages(ThreadType.Group);
-  } catch (e) {
-    log('Không kéo được tin cũ', id, e?.message || e);
+  // Tin cũ chat 1-1: xin từng trang (mỗi trang lấy mốc là tin cũ nhất trang trước), tối đa 40 trang.
+  const dm = await pumpOld(n, ThreadType.User, 40);
+  // Tin cũ nhóm: 50 nhóm đầu, mỗi nhóm 30 tin gần nhất, giãn 1,2 giây cho Zalo khỏi nghi.
+  let gm = 0;
+  for (const gid of gids.slice(0, 50)) {
+    try {
+      const h = await n.api.getGroupChatHistory(gid, 30);
+      for (const m of h?.groupMsgs || []) {
+        onOld(id, { type: ThreadType.Group, threadId: gid, isSelf: !!m.isSelf || String(m?.data?.uidFrom) === '0' || String(m?.data?.uidFrom) === n.uid, data: m.data || {} });
+        gm++;
+      }
+    } catch (e) {
+      log('Không lấy được tin cũ nhóm', gid, e?.message || e);
+    }
+    await sleep(1200);
   }
+  log('Kéo xong', id, 'bạn', friends.length, 'nhóm', gids.length, 'tin 1-1', dm, 'tin nhóm', gm);
   return friends.length;
 }
+
+/** Xin tin cũ theo trang qua kết nối nghe tin; Zalo trả về bằng sự kiện old_messages (đã ghi ở attach). */
+function pumpOld(n, type, maxPages) {
+  return new Promise((resolve) => {
+    let got = 0;
+    let pages = 0;
+    let timer = null;
+    const asked = new Set();
+    const L = n.api?.listener;
+    if (!L) return resolve(0);
+    const done = () => {
+      clearTimeout(timer);
+      L.off('old_messages', onPage);
+      resolve(got);
+    };
+    const ask = (cursor) => {
+      const c = String(cursor || '');
+      if (c && asked.has(c)) return false;
+      if (c) asked.add(c);
+      try {
+        L.requestOldMessages(type, c || null);
+      } catch {
+        return false;
+      }
+      pages++;
+      clearTimeout(timer);
+      timer = setTimeout(done, 15_000);
+      return true;
+    };
+    const onPage = (list, t) => {
+      if (t !== type) return;
+      if (!Array.isArray(list) || !list.length) return done();
+      got += list.length;
+      if (pages >= maxPages) return done();
+      const oldest = list.reduce((a, m) => (!a || Number(m?.data?.ts || 0) < Number(a?.data?.ts || 0) ? m : a), null);
+      const cands = [oldest, list[list.length - 1], list[0]].map((m) => m?.data?.msgId || m?.data?.cliMsgId || '');
+      if (!cands.some((c) => ask(c))) done();
+    };
+    L.on('old_messages', onPage);
+    if (!ask(null)) done();
+  });
+}
+
+
+const onOld = (id, m) => nick(id).onMsg?.(m, true);
 
 function push(id, ev) {
   const n = nick(id);
@@ -245,7 +309,8 @@ function attach(id, api) {
     try {
       const d = msg.data || {};
       const isGroup = msg.type === ThreadType.Group;
-      const threadId = String(msg.threadId || '');
+      // Tin cũ 1-1 có khi thiếu mã hội thoại: lấy người nhận (tin mình) hoặc người gửi (tin khách).
+      const threadId = String(msg.threadId || (msg.isSelf ? d.idTo : d.uidFrom) || '');
       if (!threadId) return;
       const ct = contentOf(d.msgType, d.content);
       if (ct.kind === 'sticker') ct.url = await stickerUrl(n, d.content);
@@ -288,6 +353,14 @@ function attach(id, api) {
     } catch (e) {
       log('Lỗi đọc tin', id, e?.message || e);
     }
+  });
+  n.onMsg = onMsg;
+  n.connected = false;
+  L.on('connected', () => {
+    n.connected = true;
+  });
+  L.on('disconnected', () => {
+    n.connected = false;
   });
   L.on('message', (msg) => onMsg(msg, false));
   L.on('old_messages', (list) => {

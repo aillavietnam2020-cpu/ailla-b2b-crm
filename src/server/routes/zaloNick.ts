@@ -214,6 +214,8 @@ zaloRoutes.get('/convs', async (c) => {
     params.push(nick);
   }
   const q = str(c.req.query('q'), 80);
+  // Nhóm / bạn kéo về từ danh bạ mà chưa có tin nào thì không liệt kê (nick có hàng trăm nhóm), gõ tên vẫn tìm ra.
+  if (!q) where.push('z.last_at IS NOT NULL');
   if (q) {
     where.push('(z.name LIKE ? OR z.peer_phone LIKE ? OR cu.name LIKE ? OR cs.name LIKE ?)');
     params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);

@@ -164,7 +164,9 @@ describe('chat đầy đủ', () => {
     expect(k.is_friend).toBe(1);
     expect(k.unread).toBe(1); // tin cũ không cộng chưa đọc
     expect(k.typing_at).toBeTruthy();
-    expect(list.some((x: { is_group: number; name: string }) => x.is_group && x.name.includes('miền Bắc'))).toBe(true);
+    expect(list.some((x: { is_group: number }) => x.is_group)).toBe(false); // nhóm chưa có tin: không liệt kê
+    const found = (await ctx.request('/api/zalo/convs?q=' + encodeURIComponent('miền Bắc'), { as: USERS.thao })).body.data;
+    expect(found.some((x: { is_group: number }) => x.is_group)).toBe(true);
   });
 });
 
