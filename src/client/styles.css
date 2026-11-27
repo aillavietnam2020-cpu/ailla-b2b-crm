@@ -2102,3 +2102,28 @@ table.data.order-lines input[type='number'] { min-width: 0; box-sizing: border-b
 table.data.order-lines .order-unit select { width: 100%; max-width: 100%; }
 table.data.order-lines .order-unit .pack-size { display: flex; margin: 4px 0 0; gap: 4px; }
 table.data.order-lines td .btn.sm { padding-left: 8px; padding-right: 8px; }
+
+/* ===== Zalo trong CRM, đợt 1 (27/11): cột Zalo, khung Tin Zalo ở hồ sơ khách ===== */
+.zl-dot { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; background: #0068ff; color: #fff; font-size: 10px; font-weight: 700; flex: none; }
+.zl-cell { display: inline-flex; gap: 5px; align-items: center; font-size: 12.5px; }
+.zl-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 2px 8px; border-radius: 99px; font-weight: 600; white-space: nowrap; background: #eef0f5; color: #3a4256; }
+.zl-pill.red { background: #fde8ea; color: #c0352b; }
+.zl-pill.vio { background: #eceaff; color: #5b45c9; }
+.zl-box { border: 1px solid #e3e6ec; border-radius: 12px; overflow: hidden; background: #fff; }
+.zl-box .zl-hd { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid #e3e6ec; }
+.zl-msgs { background: #eef1f8; padding: 12px; display: flex; flex-direction: column; gap: 7px; max-height: 340px; min-height: 120px; overflow: auto; }
+.zl-m { max-width: 80%; padding: 7px 10px; border-radius: 13px; background: #fff; font-size: 13.5px; white-space: pre-wrap; word-break: break-word; }
+.zl-m.me { align-self: flex-end; background: #e3eaff; }
+.zl-m .t { font-size: 10.5px; color: #6b7385; margin-top: 2px; white-space: normal; }
+.zl-m img { max-width: 220px; max-height: 260px; border-radius: 8px; display: block; }
+.zl-m.rc { border: 1px dashed #c0352b; }
+.zl-m.rc .body { text-decoration: line-through; color: #6b7385; }
+.zl-m.pend { opacity: .65; }
+.zl-empty { margin: auto; color: #6b7385; padding: 16px; text-align: center; font-size: 13px; }
+.zl-comp { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid #e3e6ec; position: relative; align-items: flex-end; }
+.zl-comp textarea { flex: 1; min-width: 0; border: 1px solid #d5d9e3; border-radius: 9px; padding: 7px 9px; font: inherit; font-size: 13.5px; resize: vertical; min-height: 36px; max-height: 140px; }
+.zl-comp select { max-width: 130px; }
+.zl-tpl { position: absolute; bottom: 52px; left: 12px; right: 12px; background: #fff; border: 1px solid #e3e6ec; border-radius: 10px; padding: 5px; box-shadow: 0 12px 32px rgba(16,24,40,.14); z-index: 5; max-height: 240px; overflow: auto; }
+.zl-tpl button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; }
+.zl-tpl button:hover, .zl-tpl button.on { background: #eceaff; }
+@media (max-width: 760px) { .zl-m { max-width: 90%; } .zl-comp { flex-wrap: wrap; } .zl-comp select { max-width: none; flex: 1 1 100%; } }

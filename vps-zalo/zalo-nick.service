@@ -1,0 +1,14 @@
+[Unit]
+Description=Zalo trong CRM ABOS - giữ kết nối các nick Zalo công việc (đợt 1, không gửi tự động)
+After=network-online.target
+
+[Service]
+EnvironmentFile=/root/.config/abos-relay.env
+EnvironmentFile=/root/.config/zalo-nick.env
+ExecStart=/usr/bin/node /usr/local/lib/zalo-nick/zalo-nick.mjs
+Restart=always
+RestartSec=30
+MemoryMax=600M
+
+[Install]
+WantedBy=default.target

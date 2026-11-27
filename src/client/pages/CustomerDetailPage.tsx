@@ -1,5 +1,5 @@
 import { hubPeriodLabel, hubPeriodParam } from '../lib/hubPeriod';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { CustomerDetail } from '@shared/types';
 import { formatVnDate, formatVnDateTime } from '@shared/datetime';
@@ -13,6 +13,7 @@ import { CustomerEditModal } from '../components/CustomerEditModal';
 import { PaymentForm } from '../components/PaymentForm';
 import { Card, OrderStatusBadges, StageBadge, StateBlock } from '../components/ui';
 import { useAuth } from '../components/AuthProvider';
+import { ZaloCustomerBox, zaloAgo, type ZaloBoxHandle, type ZaloThread } from '../components/ZaloBox';
 
 export function CustomerDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
   const { id = '' } = useParams();
@@ -21,6 +22,10 @@ export function CustomerDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
   const [showEdit, setShowEdit] = useState(false);
   const [showPay, setShowPay] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Zalo (27/11): khung Tin Zalo, ô Zalo ở hàng số liệu, tin Zalo theo ngày trong Lịch sử chăm sóc.
+  const [zalo, setZalo] = useState<ZaloThread | null>(null);
+  const zaloBox = useRef<ZaloBoxHandle>(null);
+  const zaloCard = useRef<HTMLDivElement>(null);
   const periodParam = hubPeriodParam();
   const navigate = useNavigate();
   const customer = useApi<CustomerDetail>(
@@ -88,6 +93,16 @@ export function CustomerDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
               Thu tiền
             </button>
           )}
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              zaloCard.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              setTimeout(() => zaloBox.current?.focus(), 300);
+            }}
+          >
+            Nhắn Zalo
+          </button>
           {can('order.create') && (
             <Link className="btn dark" to={`/sales/orders/new?customer_id=${c.id}`}>
               Tạo đơn cho khách này
@@ -147,33 +162,73 @@ export function CustomerDetailPage({ mode }: { mode: 'sales' | 'admin' }) {
           </div>
           <div className="hint">Lần mua gần nhất: {formatVnDate(c.last_order_date)}</div>
         </div>
+        {zalo && zalo.convs.length > 0 && (
+          <div className="kpi">
+            <div className="label">Zalo</div>
+            {(() => {
+              const w = zalo.convs.filter((x) => x.waiting_since).sort((a, b) => (a.waiting_since! < b.waiting_since! ? -1 : 1))[0];
+              const un = zalo.convs.reduce((t, x) => t + x.unread, 0);
+              return (
+                <>
+                  <div className="value" style={{ fontSize: 20, color: w ? 'var(--red)' : undefined }}>
+                    {w ? `Chờ ${zaloAgo(w.waiting_since)}` : 'Đã trả lời'}
+                  </div>
+                  <div className="hint">
+                    {un ? `${un} tin chưa đọc · ` : ''}nick {zalo.convs.map((x) => x.nick_name).join(', ')}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       <div className="grid-2">
         <div className="stack">
+          <div ref={zaloCard}>
+            <Card title="Tin Zalo">
+              <ZaloCustomerBox ref={zaloBox} customerId={c.id} phone={c.phone_text} onData={setZalo} />
+            </Card>
+          </div>
           <Card title="Lịch sử chăm sóc">
             <StateBlock
               loading={false}
               error={null}
-              empty={c.activities.length === 0}
+              empty={c.activities.length === 0 && !zalo?.days.length}
               emptyText="Chưa có hoạt động chăm sóc nào."
             >
               <div className="timeline">
-                {c.activities.map((activity) => (
-                  <div className="event" key={activity.id}>
-                    <p>
-                      <strong>{activity.result}</strong> · {activity.channel} — {activity.user_name}
-                    </p>
-                    <small>{formatVnDateTime(activity.created_at)}</small>
-                    <div>{activity.content}</div>
-                    {activity.next_action && (
-                      <small>
-                        Bước tiếp theo: {activity.next_action} ({formatVnDate(activity.next_date)})
-                      </small>
-                    )}
-                    {activity.reason_code && <small>Lý do: {activity.reason_code}</small>}
-                  </div>
-                ))}
+                {/* Tin Zalo tự ghi theo ngày, xếp chung theo thời gian (không cộng vào số lần chăm sóc của sale). */}
+                {[
+                  ...(zalo?.days ?? []).map((d) => ({ at: d.last_at, d, a: null })),
+                  ...c.activities.map((a) => ({ at: a.created_at, d: null, a })),
+                ]
+                  .sort((x, y) => (x.at < y.at ? 1 : -1))
+                  .map(({ d, a: activity }) =>
+                    d ? (
+                      <div className="event" key={'z' + d.day + d.nick}>
+                        <p>
+                          <strong>Zalo</strong> · {d.in} tin khách, {d.out} tin gửi — {d.nick}
+                        </p>
+                        <small>{formatVnDateTime(d.last_at)} · tự ghi từ tin Zalo</small>
+                        {d.last_in && <div>Khách: {d.last_in}</div>}
+                      </div>
+                    ) : activity ? (
+                      <div className="event" key={activity.id}>
+                        <p>
+                          <strong>{activity.result}</strong> · {activity.channel} — {activity.user_name}
+                        </p>
+                        <small>{formatVnDateTime(activity.created_at)}</small>
+                        <div>{activity.content}</div>
+                        {activity.next_action && (
+                          <small>
+                            Bước tiếp theo: {activity.next_action} ({formatVnDate(activity.next_date)})
+                          </small>
+                        )}
+                        {activity.reason_code && <small>Lý do: {activity.reason_code}</small>}
+                      </div>
+                    ) : null,
+                  )}
               </div>
             </StateBlock>
           </Card>

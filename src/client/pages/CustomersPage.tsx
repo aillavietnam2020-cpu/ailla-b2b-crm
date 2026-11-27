@@ -10,6 +10,7 @@ import { useApi, useDebounced } from '../lib/hooks';
 import { Card, Field, Modal, StageBadge, StateBlock, useToast } from '../components/ui';
 import { useAuth } from '../components/AuthProvider';
 import { hubPeriodParam } from '../lib/hubPeriod';
+import { ZaloCell, useZaloStatus } from '../components/ZaloBox';
 
 export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
   const { me, can } = useAuth();
@@ -19,6 +20,8 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
   const [stage, setStage] = useState('');
   const [owner, setOwner] = useState('');
   const [quality, setQuality] = useState('');
+  const [zaloF, setZaloF] = useState('');
+  const zalo = useZaloStatus();
   const [sort, setSort] = useState('follow_up');
   const [showCreate, setShowCreate] = useState(params.get('new') === '1');
   const [reassignTarget, setReassignTarget] = useState<CustomerListItem | null>(null);
@@ -31,6 +34,7 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
   if (stage) query.set('stage', stage);
   if (owner) query.set('owner_id', owner);
   if (quality) query.set('data_quality', quality);
+  if (zaloF) query.set('zalo', zaloF);
   if (sort) query.set('sort', sort);
   // Doanh số theo tháng đang chọn ở thanh thời gian trên cùng của Trang quản trị.
   query.set('month', hubPeriodParam());
@@ -142,6 +146,11 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
             <option value="NEEDS_REVIEW">Cần kiểm tra dữ liệu</option>
             <option value="OK">Dữ liệu đủ</option>
           </select>
+          <select className="select" value={zaloF} onChange={(e) => setZaloF(e.target.value)} title="Lọc theo tin Zalo">
+            <option value="">Zalo: tất cả</option>
+            <option value="wait">Zalo: khách đang chờ trả lời</option>
+            <option value="none">Zalo: chưa có hội thoại</option>
+          </select>
           <label className="muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             Sắp xếp
             <select
@@ -173,6 +182,7 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
               setStage('');
               setOwner('');
               setQuality('');
+              setZaloF('');
             }}
           >
             Xóa bộ lọc
@@ -235,6 +245,7 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                   <th>Cấp giá</th>
                   <th>Giai đoạn</th>
                   {mode === 'admin' && <th>Sale</th>}
+                  <th title="Tin Zalo: khách đang chờ trả lời bao lâu, hoặc lần nhắn gần nhất">Zalo</th>
                   <th
                     className="right"
                     title="Doanh số tháng này theo giá nhập (giá cấp của khách)"
@@ -300,6 +311,9 @@ export function CustomersPage({ mode }: { mode: 'sales' | 'admin' }) {
                         <StageBadge stage={customer.stage} />
                       </td>
                       {mode === 'admin' && <td>{customer.owner_short ?? '_'}</td>}
+                      <td className="nowrap">
+                        <ZaloCell s={zalo[customer.id]} />
+                      </td>
                       <td className="right nowrap">
                         {customer.revenue_month ? (
                           <strong>{formatVndNumber(customer.revenue_month)}</strong>
